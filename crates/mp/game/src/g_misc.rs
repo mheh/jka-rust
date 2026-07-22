@@ -9,6 +9,7 @@ use core::ffi::CStr;
 use crate::prelude::*;
 use crate::g_utils::G_BSPIndex;
 use native_string::atof::atof_bytes;
+use native_string::atoi::atoi_bytes;
 
 use crate::ent_fn_enums::{EntDie, EntThink, EntTouch, EntUse};
 use crate::g_client::SetClientViewAngle;
@@ -28,7 +29,7 @@ use crate::level::reference_tag::MAX_REFNAME;
 use crate::level::tag_owner::{MAX_TAGS, MAX_TAG_OWNERS, TAG_GENERIC_NAME, TAG_GENERIC_NAME_C};
 use crate::q_math::vec3_origin;
 use crate::q_math::{DirToByte, PerpendicularVector, VectorNormalize};
-use crate::q_shared::{Info_SetValueForKey, Q_strlwr};
+use crate::q_shared::{GetIDForString, Info_SetValueForKey, Q_strlwr};
 use native_string::q_string::Q_stricmp;
 use native_string::strncpyz_string;
 use crate::trap;
@@ -466,8 +467,7 @@ pub fn SP_misc_bsp(ctx: &mut GameContext, ent: EntityId) {
             e.s.angles[2] = 0.0;
         }
 
-        let mut out: *mut c_char = core::ptr::null_mut();
-        G_SpawnString(ctx, c"bspmodel".as_ptr(), c"".as_ptr(), &mut out);
+        let (_, out) = G_SpawnString(ctx, "bspmodel", "");
 
         ctx.world.entity_mut(ent).s.eFlags = EF_PERMANENT;
 
@@ -484,7 +484,7 @@ pub fn SP_misc_bsp(ctx: &mut GameContext, ent: EntityId) {
         // rules S19; we keep the one Raven-defined behavior rather than
         // invent a fix.
         let mut temp: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
-        write_cstr_field(&mut temp, &format!("#{}", cstr_to_str(out)));
+        write_cstr_field(&mut temp, &format!("#{}", out));
         let ep: *mut gentity_t = ctx.world.entity_mut(ent);
         trap::SetBrushModel(ctx.engine, ep.cast(), &cstr_to_str(temp.as_ptr())); // SV_SetBrushModel -- sets mins and maxs
         G_BSPIndex(ctx, &cstr_to_str(temp.as_ptr()));
@@ -497,15 +497,9 @@ pub fn SP_misc_bsp(ctx: &mut GameContext, ent: EntityId) {
         ctx.world.level.mTargetAdjust = temp.as_mut_ptr();
         ctx.world.level.mBSPInstanceDepth += 1;
 
-        let mut teamfilter_out: *mut c_char = core::ptr::null_mut();
-        G_SpawnString(
-            ctx,
-            c"teamfilter".as_ptr(),
-            c"".as_ptr(),
-            &mut teamfilter_out,
-        );
+        let (_, teamfilter_out) = G_SpawnString(ctx, "teamfilter", "");
         ctx.world.level.mTeamFilter =
-            strncpyz_string(cstr_to_str(teamfilter_out).as_bytes(), MAX_QPATH as usize);
+            strncpyz_string(teamfilter_out.as_bytes(), MAX_QPATH as usize);
 
         {
             let e = ctx.world.entity_mut(ent);
@@ -561,15 +555,15 @@ pub fn SP_terrain(ctx: &mut GameContext, ent: EntityId) {
         // Get info required for the common init
         let mut temp: String = String::new();
 
-        let mut value: *mut c_char = core::ptr::null_mut();
-        G_SpawnString(ctx, c"heightmap".as_ptr(), c"".as_ptr(), &mut value);
-        Info_SetValueForKey(&mut temp, "heightMap", &cstr_to_str(value));
+        let mut value: String;
+        value = G_SpawnString(ctx, "heightmap", "").1;
+        Info_SetValueForKey(&mut temp, "heightMap", &value);
 
-        G_SpawnString(ctx, c"numpatches".as_ptr(), c"400".as_ptr(), &mut value);
-        Info_SetValueForKey(&mut temp, "numPatches", &format!("{}", atoi(value)));
+        value = G_SpawnString(ctx, "numpatches", "400").1;
+        Info_SetValueForKey(&mut temp, "numPatches", &format!("{}", atoi_bytes(value.as_bytes())));
 
-        G_SpawnString(ctx, c"terxels".as_ptr(), c"4".as_ptr(), &mut value);
-        Info_SetValueForKey(&mut temp, "terxels", &format!("{}", atoi(value)));
+        value = G_SpawnString(ctx, "terxels", "4").1;
+        Info_SetValueForKey(&mut temp, "terxels", &format!("{}", atoi_bytes(value.as_bytes())));
 
         Info_SetValueForKey(&mut temp, "seed", &seed);
         Info_SetValueForKey(
@@ -609,19 +603,14 @@ pub fn SP_terrain(ctx: &mut GameContext, ent: EntityId) {
             &format!("{}", ctx.world.entity(ent).s.modelindex),
         );
 
-        G_SpawnString(
-            ctx,
-            c"terraindef".as_ptr(),
-            c"grassyhills".as_ptr(),
-            &mut value,
-        );
-        Info_SetValueForKey(&mut temp, "terrainDef", &cstr_to_str(value));
+        value = G_SpawnString(ctx, "terraindef", "grassyhills").1;
+        Info_SetValueForKey(&mut temp, "terrainDef", &value);
 
-        G_SpawnString(ctx, c"instancedef".as_ptr(), c"".as_ptr(), &mut value);
-        Info_SetValueForKey(&mut temp, "instanceDef", &cstr_to_str(value));
+        value = G_SpawnString(ctx, "instancedef", "").1;
+        Info_SetValueForKey(&mut temp, "instanceDef", &value);
 
-        G_SpawnString(ctx, c"miscentdef".as_ptr(), c"".as_ptr(), &mut value);
-        Info_SetValueForKey(&mut temp, "miscentDef", &cstr_to_str(value));
+        value = G_SpawnString(ctx, "miscentdef", "").1;
+        Info_SetValueForKey(&mut temp, "miscentDef", &value);
 
         Info_SetValueForKey(&mut temp, "missionType", &mission_type);
 
@@ -641,15 +630,15 @@ pub fn SP_terrain(ctx: &mut GameContext, ent: EntityId) {
         }
 
         // Set additional data required on the client only
-        G_SpawnString(ctx, c"densitymap".as_ptr(), c"".as_ptr(), &mut value);
-        Info_SetValueForKey(&mut temp, "densityMap", &cstr_to_str(value));
+        value = G_SpawnString(ctx, "densitymap", "").1;
+        Info_SetValueForKey(&mut temp, "densityMap", &value);
 
         Info_SetValueForKey(&mut temp, "shader", &format!("{}", shader_num));
-        G_SpawnString(ctx, c"texturescale".as_ptr(), c"0.005".as_ptr(), &mut value);
+        value = G_SpawnString(ctx, "texturescale", "0.005").1;
         Info_SetValueForKey(
             &mut temp,
             "texturescale",
-            &format!("{:.6}", atof_bytes(CStr::from_ptr(value).to_bytes())),
+            &format!("{:.6}", atof_bytes(value.as_bytes())),
         );
 
         // Initialise the common aspects of the terrain
@@ -747,9 +736,8 @@ pub fn SP_misc_skyportal_orient(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_misc.c:694-715`
 pub fn SP_misc_skyportal(ctx: &mut GameContext, ent: EntityId) {
-    let mut fov: *mut c_char = core::ptr::null_mut();
-    G_SpawnString(ctx, c"fov".as_ptr(), c"80".as_ptr(), &mut fov);
-    let fov_x = atof_bytes(unsafe { CStr::from_ptr(fov) }.to_bytes()) as f32;
+    let (_, fov) = G_SpawnString(ctx, "fov", "80");
+    let fov_x = atof_bytes(fov.as_bytes()) as f32;
 
     let mut fogv: vec3_t = [0.0, 0.0, 0.0];
     let mut isfog: c_int = 0;
@@ -2520,9 +2508,7 @@ pub fn fx_runner_link(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2456-2501`
 pub fn SP_fx_runner(ctx: &mut GameContext, ent: EntityId) {
-    let mut fx_file: *mut c_char = core::ptr::null_mut();
-
-    G_SpawnString(ctx, c"fxFile".as_ptr(), c"".as_ptr(), &mut fx_file);
+    let (_, fx_file) = G_SpawnString(ctx, "fxFile", "");
     // Get our defaults
     let mut delay: c_int = 0;
     G_SpawnInt(ctx, c"delay".as_ptr(), c"200".as_ptr(), &mut delay);
@@ -2555,7 +2541,7 @@ pub fn SP_fx_runner(ctx: &mut GameContext, ent: EntityId) {
         }
     }
 
-    if fx_file.is_null() || unsafe { *fx_file } == 0 {
+    if fx_file.is_empty() {
         let targetname = ctx.world.entity(ent).targetname;
         let origin = ctx.world.entity(ent).s.origin;
         crate::g_main::Com_Printf(&format!(
@@ -2569,7 +2555,7 @@ pub fn SP_fx_runner(ctx: &mut GameContext, ent: EntityId) {
 
     // Try and associate an effect file, unfortunately we won't know if this worked or not
     //	until the CGAME trys to register it...
-    let mi = G_EffectIndex(&(unsafe { cstr_to_str(fx_file) }));
+    let mi = G_EffectIndex(&fx_file);
     let level_time = ctx.world.level.time;
     {
         let e = ctx.world.entity_mut(ent);
@@ -3440,10 +3426,11 @@ pub fn ref_link(ctx: &mut GameContext, ent: EntityId) {
 
     // Add the tag
     let targetname = ctx.world.entity(ent).targetname;
-    let ownername = ctx.world.entity(ent).ownername;
+    let ownername = ctx.world.entity(ent).ownername.clone();
+    let ownername_c = cstr(&ownername);
     let origin = ctx.world.entity(ent).s.origin;
     let angles = ctx.world.entity(ent).s.angles;
-    TAG_Add(ctx, targetname, ownername, origin, angles, 16, 0);
+    TAG_Add(ctx, targetname, ownername_c.as_ptr(), origin, angles, 16, 0);
 
     // Delete immediately, cannot be refered to as an entity again
     // NOTE: this means if you wanted to link them in a chain for, say, a path, you can't
@@ -3604,8 +3591,7 @@ pub fn SP_misc_weapon_shooter(ctx: &mut GameContext, self_: EntityId) {
     let cl = G_ClientForShooter(ctx);
     ctx.world.entity_mut(self_).client = cl;
 
-    let mut s: *mut c_char = core::ptr::null_mut();
-    G_SpawnString(ctx, c"weapon".as_ptr(), c"".as_ptr(), &mut s);
+    let (_, s) = G_SpawnString(ctx, "weapon", "");
 
     // FLAG (task #7): self_->client is a shooter-pool gclient_t; ps dereffed raw
     // exactly as Raven does (copied pointer value).
@@ -3616,9 +3602,10 @@ pub fn SP_misc_weapon_shooter(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
         (*client).ps.weapon = mp_bg::weapons::weapon_t::WP_BLASTER;
     }
-    if !s.is_null() && unsafe { *s } != 0 {
+    if !s.is_empty() {
         // use a different weapon
-        let w = crate::q_shared::GetIDForString(WPTable.as_ptr() as *mut _, s);
+        let s_c = cstr(&s);
+        let w = GetIDForString(WPTable.as_ptr() as *mut _, s_c.as_ptr() as *mut c_char);
         ctx.world.entity_mut(self_).s.weapon = w;
         unsafe {
             (*client).ps.weapon = w;

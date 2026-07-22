@@ -199,7 +199,15 @@ fn run_scenario(name: &str) -> String {
     pm.animations = bg.bgHumanoidAnimations.as_mut_ptr();
     pm.gametype = 0;
 
-    let mut arena: Vec<bgEntity_t> = (0..8).map(|_| unsafe { core::mem::zeroed() }).collect();
+    // `bgEntity_t` aliases `gentity_t`, no longer zero-valid (owned `String`
+    // tail): zero the bytes, then seat valid empty `String`s before `assume_init`.
+    let mut arena: Vec<bgEntity_t> = (0..8)
+        .map(|_| unsafe {
+            let mut e = core::mem::MaybeUninit::<bgEntity_t>::zeroed();
+            bgEntity_t::seat_owned_strings(e.as_mut_ptr());
+            e.assume_init()
+        })
+        .collect();
     pm.entSize = core::mem::size_of::<bgEntity_t>() as c_int;
 
     let mut o = String::new();

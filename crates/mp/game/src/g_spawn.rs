@@ -34,6 +34,7 @@ use crate::prelude::*;
 use crate::trap;
 use crate::world::GameContext;
 use native_string::atof::atof_bytes;
+use native_string::atoi::atoi_bytes;
 
 use crate::g_items::G_SpawnItem;
 use crate::g_main::{G_Error, G_Printf};
@@ -54,6 +55,7 @@ use mp_abi::game::syscalls::G_G2_SETBOLTINFO::GG2SetboltinfoArgs as GG2SetBoltIn
 use mp_abi::game::syscalls::G_G2_SETSKIN::GG2SetskinArgs as GG2SetSkinArgs;
 use mp_abi::game::syscalls::G_SET_SERVER_CULL::GSetServerCullArgs;
 
+use mp_bg::public::bg_field::SpawnStringSetter;
 use mp_bg::public::fieldtype::fieldtype_t;
 use crate::q_shared;
 
@@ -98,31 +100,16 @@ const LS_NUM_STYLES: c_int = 32;
 /// Source: `oracle/codemp/game/q_shared.h:2035`
 pub const MAX_AMBIENT_SETS: c_int = 256;
 
-pub fn G_SpawnString(
-    ctx: &mut GameContext,
-    key: *const c_char,
-    defaultString: *const c_char,
-    out: *mut *mut c_char,
-) -> qboolean {
-    unsafe {
-        let level = &ctx.world.level;
-
-        if level.spawning == qfalse {
-            *out = defaultString as *mut c_char;
-            // G_Error(ctx,  "G_SpawnString(ctx) called while not spawning" ) — commented
-            // out in Raven itself; preserved as a no-op per the source.
+pub fn G_SpawnString(ctx: &mut GameContext, key: &str, default: &str) -> (qboolean, String) {
+    // Raven's `if ( !level.spawning ) { *out = default; }` is a no-op guard: the
+    // `G_Error` return is commented out in Raven, so the search runs regardless
+    // and the fall-through supplies `default` anyway.
+    for (k, v) in &ctx.world.level.spawnVars {
+        if Q_stricmp(k, key) == 0 {
+            return (qtrue, v.clone());
         }
-
-        for i in 0..level.numSpawnVars {
-            if q_shared::Q_stricmp(key, level.spawnVars[i as usize][0]) == 0 {
-                *out = level.spawnVars[i as usize][1];
-                return qtrue;
-            }
-        }
-
-        *out = defaultString as *mut c_char;
-        qfalse
     }
+    (qfalse, default.to_owned())
 }
 
 /// Raven `G_SpawnFloat`.
@@ -135,9 +122,8 @@ pub fn G_SpawnFloat(
     out: *mut f32,
 ) -> qboolean {
     unsafe {
-        let mut s: *mut c_char = std::ptr::null_mut();
-        let present = G_SpawnString(ctx, key, defaultString, &mut s);
-        *out = atof_bytes(CStr::from_ptr(s).to_bytes()) as f32;
+        let (present, s) = G_SpawnString(ctx, &cstr_to_str(key), &cstr_to_str(defaultString));
+        *out = atof_bytes(s.as_bytes()) as f32;
         present
     }
 }
@@ -152,9 +138,8 @@ pub fn G_SpawnInt(
     out: *mut c_int,
 ) -> qboolean {
     unsafe {
-        let mut s: *mut c_char = std::ptr::null_mut();
-        let present = G_SpawnString(ctx, key, defaultString, &mut s);
-        *out = atoi(s);
+        let (present, s) = G_SpawnString(ctx, &cstr_to_str(key), &cstr_to_str(defaultString));
+        *out = atoi_bytes(s.as_bytes());
         present
     }
 }
@@ -169,13 +154,12 @@ pub fn G_SpawnVector(
     out: *mut f32,
 ) -> qboolean {
     unsafe {
-        let mut s: *mut c_char = std::ptr::null_mut();
-        let present = G_SpawnString(ctx, key, defaultString, &mut s);
+        let (present, s) = G_SpawnString(ctx, &cstr_to_str(key), &cstr_to_str(defaultString));
         // Unmatched components are left as whatever `*out` already held
-        // (porting-rules §19) — read the current 3 floats, let `sscanf_3f`
+        // (porting-rules §19) — read the current 3 floats, let `sscanf_str_3f`
         // overwrite only the ones libc `sscanf` would have matched.
         let mut vec: [f32; 3] = [*out.add(0), *out.add(1), *out.add(2)];
-        sscanf_3f(s, &mut vec);
+        sscanf_str_3f(&s, &mut vec);
         *out.add(0) = vec[0];
         *out.add(1) = vec[1];
         *out.add(2) = vec[2];
@@ -195,23 +179,16 @@ pub fn G_SpawnVector(
 /// `sscanf(s, "%f %f %f", &out[0], &out[1], &out[2])` via the shared
 /// libc-`%f`-faithful scanner. Unmatched components are left at whatever
 /// value `out` already held (porting-rules §19) — callers pre-seed `out`
-/// before calling.
-unsafe fn sscanf_3f(s: *const c_char, out: &mut [f32; 3]) {
-    if s.is_null() {
-        return;
-    }
-    let text = CStr::from_ptr(s).to_string_lossy();
-    sscanf_f32s(&text, out);
+/// before calling. An empty `s` matches nothing, mirroring the old NULL-pointer
+/// early return.
+fn sscanf_str_3f(s: &str, out: &mut [f32; 3]) {
+    sscanf_f32s(s, out);
 }
 
 /// `sscanf(s, "%f", out)` via the shared libc-`%f`-faithful scanner. Leaves
 /// `*out` untouched on a failed match (porting-rules §19).
-unsafe fn sscanf_1f(s: *const c_char, out: &mut f32) {
-    if s.is_null() {
-        return;
-    }
-    let text = CStr::from_ptr(s).to_string_lossy();
-    sscanf_f32s(&text, std::slice::from_mut(out));
+fn sscanf_str_1f(s: &str, out: &mut f32) {
+    sscanf_f32s(s, std::slice::from_mut(out));
 }
 
 /// Raven `SP_item_botroam` — empty body (Raven's is a stub too).
@@ -224,8 +201,10 @@ pub fn SP_item_botroam(ent: &mut gentity_t) {}
 /// Source: `oracle/codemp/game/g_spawn.c:372-431`
 pub fn SP_gametype_item(ctx: &mut GameContext, id: EntityId) {
     unsafe {
-        let mut value: *mut c_char = std::ptr::null_mut();
-        G_SpawnString(ctx, c"teamfilter".as_ptr(), c"".as_ptr(), &mut value);
+        // Raven reads "teamfilter" into a local that is never used again (the
+        // team override below consults `level.mTeamFilter`); the call is pure, so
+        // its result is discarded.
+        let _ = G_SpawnString(ctx, "teamfilter", "");
 
         let origin = ctx.entity(id).s.origin;
         G_SetOrigin(ctx.entity_mut(id), origin);
@@ -300,10 +279,10 @@ pub fn G_CallSpawn(ctx: &mut GameContext, id: EntityId) -> qboolean {
         // check normal spawn functions
         let classname = std::ffi::CStr::from_ptr(ctx.entity(id).classname).to_string_lossy();
         if let Some(sp) = crate::ent_fn_enums::spawn_for_classname(&classname) {
-            let healingsound = ctx.entity(id).healingsound;
-            if !healingsound.is_null() && *healingsound != 0 {
+            let healingsound = ctx.entity(id).healingsound.clone();
+            if !healingsound.is_empty() {
                 //yeah...this can be used for anything, so.. precache it if it's there
-                G_SoundIndex(&cstr_to_str(healingsound));
+                G_SoundIndex(&healingsound);
             }
             let ent_ptr = ctx.entity_mut(id) as *mut gentity_t;
             crate::ent_fn_enums::dispatch_spawn(ctx, sp, ent_ptr);
@@ -387,36 +366,18 @@ pub static FIELDS: &[BG_field_t] = &[
         core::mem::offset_of!(gentity_t, alliedTeam),
         fieldtype_t::F_INT,
     ),
-    field(
-        c"roffname",
-        core::mem::offset_of!(gentity_t, roffname),
-        fieldtype_t::F_LSTRING,
-    ),
-    field(
-        c"rofftarget",
-        core::mem::offset_of!(gentity_t, rofftarget),
-        fieldtype_t::F_LSTRING,
-    ),
-    field(
-        c"healingclass",
-        core::mem::offset_of!(gentity_t, healingclass),
-        fieldtype_t::F_LSTRING,
-    ),
-    field(
-        c"healingsound",
-        core::mem::offset_of!(gentity_t, healingsound),
-        fieldtype_t::F_LSTRING,
-    ),
+    // `roffname`/`rofftarget` fields deleted (zero readers); their spawn keys
+    // parse silently as F_IGNORE so maps still load.
+    field(c"roffname", 0, fieldtype_t::F_IGNORE),
+    field(c"rofftarget", 0, fieldtype_t::F_IGNORE),
+    field_owned(c"healingclass", set_healingclass),
+    field_owned(c"healingsound", set_healingsound),
     field(
         c"healingrate",
         core::mem::offset_of!(gentity_t, healingrate),
         fieldtype_t::F_INT,
     ),
-    field(
-        c"ownername",
-        core::mem::offset_of!(gentity_t, ownername),
-        fieldtype_t::F_LSTRING,
-    ),
+    field_owned(c"ownername", set_ownername),
     field(
         c"origin",
         core::mem::offset_of!(gentity_t, s) + core::mem::offset_of!(entityState_t, origin),
@@ -462,26 +423,14 @@ pub static FIELDS: &[BG_field_t] = &[
         core::mem::offset_of!(gentity_t, target4),
         fieldtype_t::F_LSTRING,
     ),
-    field(
-        c"target5",
-        core::mem::offset_of!(gentity_t, target5),
-        fieldtype_t::F_LSTRING,
-    ),
-    field(
-        c"target6",
-        core::mem::offset_of!(gentity_t, target6),
-        fieldtype_t::F_LSTRING,
-    ),
+    field_owned(c"target5", set_target5),
+    field_owned(c"target6", set_target6),
     field(
         c"NPC_targetname",
         core::mem::offset_of!(gentity_t, NPC_targetname),
         fieldtype_t::F_LSTRING,
     ),
-    field(
-        c"NPC_target",
-        core::mem::offset_of!(gentity_t, NPC_target),
-        fieldtype_t::F_LSTRING,
-    ),
+    field_owned(c"NPC_target", set_NPC_target),
     field(
         c"NPC_target2",
         core::mem::offset_of!(gentity_t, target2),
@@ -553,16 +502,8 @@ pub static FIELDS: &[BG_field_t] = &[
         core::mem::offset_of!(gentity_t, s) + core::mem::offset_of!(entityState_t, angles),
         fieldtype_t::F_ANGLEHACK,
     ),
-    field(
-        c"targetShaderName",
-        core::mem::offset_of!(gentity_t, targetShaderName),
-        fieldtype_t::F_LSTRING,
-    ),
-    field(
-        c"targetShaderNewName",
-        core::mem::offset_of!(gentity_t, targetShaderNewName),
-        fieldtype_t::F_LSTRING,
-    ),
+    field_owned(c"targetShaderName", set_targetShaderName),
+    field_owned(c"targetShaderNewName", set_targetShaderNewName),
     field(
         c"linear",
         core::mem::offset_of!(gentity_t, alt_fire),
@@ -583,16 +524,8 @@ pub static FIELDS: &[BG_field_t] = &[
         core::mem::offset_of!(gentity_t, paintarget),
         fieldtype_t::F_LSTRING,
     ), // for doors
-    field(
-        c"goaltarget",
-        core::mem::offset_of!(gentity_t, goaltarget),
-        fieldtype_t::F_LSTRING,
-    ), // for siege
-    field(
-        c"idealclass",
-        core::mem::offset_of!(gentity_t, idealclass),
-        fieldtype_t::F_LSTRING,
-    ), // for siege spawnpoints
+    field_owned(c"goaltarget", set_goaltarget), // for siege
+    field_owned(c"idealclass", set_idealclass), // for siege spawnpoints
     // rww - icarus stuff:
     field(
         c"spawnscript",
@@ -730,6 +663,7 @@ pub static FIELDS: &[BG_field_t] = &[
         ofs: 0,
         r#type: fieldtype_t::F_IGNORE,
         flags: 0,
+        set: None,
     },
 ];
 
@@ -744,7 +678,60 @@ const fn field(name: &'static CStr, ofs: usize, r#type: fieldtype_t) -> BG_field
         ofs: ofs as c_int,
         r#type,
         flags: 0,
+        set: None,
     }
+}
+
+/// Owned-tail-field entry: [`fieldtype_t::F_STRING_OWNED`] with no offset — the
+/// typed `set`ter stores the decoded value into the entity's owned
+/// `String`/`Option<String>` field. Replaces the `F_LSTRING` (pool-pointer)
+/// entry for every migrated tail field.
+const fn field_owned(name: &'static CStr, set: SpawnStringSetter) -> BG_field_t {
+    BG_field_t {
+        name: name.as_ptr() as *mut c_char,
+        ofs: 0,
+        r#type: fieldtype_t::F_STRING_OWNED,
+        flags: 0,
+        set: Some(set),
+    }
+}
+
+// Typed setters for the owned tail fields migrated in this batch (all plain
+// `String`: `""` ≡ absent per the migration's ruling C). Each casts the
+// type-erased entity base and stores the decoded value; the setter matches the
+// [`SpawnStringSetter`] shape bg's `BG_ParseField` invokes.
+//
+// # Safety (all): `ent` is the base of one live `gentity_t`, as `BG_ParseField`
+// passes it.
+fn set_healingclass(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).healingclass = val.to_owned() };
+}
+fn set_healingsound(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).healingsound = val.to_owned() };
+}
+fn set_ownername(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).ownername = val.to_owned() };
+}
+fn set_NPC_target(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).NPC_target = val.to_owned() };
+}
+fn set_target5(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).target5 = val.to_owned() };
+}
+fn set_target6(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).target6 = val.to_owned() };
+}
+fn set_targetShaderName(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).targetShaderName = val.to_owned() };
+}
+fn set_targetShaderNewName(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).targetShaderNewName = val.to_owned() };
+}
+fn set_goaltarget(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).goaltarget = val.to_owned() };
+}
+fn set_idealclass(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).idealclass = val.to_owned() };
 }
 
 /// Raven `G_SpawnGEntityFromSpawnVars` — spawns an entity and fills in all of
@@ -778,15 +765,15 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) {
             world: ctx.world_raw(),
             engine: ctx.engine,
         };
-        let num_spawn_vars = ctx.world.level.numSpawnVars;
+        let num_spawn_vars = ctx.world.level.spawnVars.len();
         for i in 0..num_spawn_vars {
-            let key = ctx.world.level.spawnVars[i as usize][0];
-            let value = ctx.world.level.spawnVars[i as usize][1];
+            let key = cstr(&ctx.world.level.spawnVars[i].0);
+            let value = cstr(&ctx.world.level.spawnVars[i].1);
             BG_ParseField(
                 &mut callbacks,
                 FIELDS.as_ptr() as *mut BG_field_t,
-                key,
-                value,
+                key.as_ptr(),
+                value.as_ptr(),
                 ent as *mut byte,
             );
         }
@@ -821,13 +808,12 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) {
             return;
         }
 
-        let mut value: *mut c_char = std::ptr::null_mut();
-        if G_SpawnString(ctx, c"gametype".as_ptr(), std::ptr::null(), &mut value) != qfalse {
+        let (present, value) = G_SpawnString(ctx, "gametype", "");
+        if present != qfalse {
             let gt = ctx.world.cvars.g_gametype.integer;
             if gt >= GT_FFA && gt < GT_MAX_GAME_TYPE {
                 let gametype_name = GAMETYPE_NAMES[gt as usize];
-                let value_str = CStr::from_ptr(value).to_string_lossy();
-                if !value_str.contains(gametype_name.to_str().unwrap()) {
+                if !value.contains(gametype_name.to_str().unwrap()) {
                     G_FreeEntity(ctx, Some(ent_eid));
                     return;
                 }
@@ -863,54 +849,22 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) {
     }
 }
 
-/// Raven `G_AddSpawnVarToken`.
-///
-/// Source: `oracle/codemp/game/g_spawn.c:851-866`
-pub fn G_AddSpawnVarToken(ctx: &mut GameContext, string: *const c_char) -> *mut c_char {
-    unsafe {
-        let mut l: isize = 0;
-        while *string.offset(l) != 0 {
-            l += 1;
-        }
-
-        let level = &mut ctx.world.level;
-        if level.numSpawnVarChars + (l as c_int) + 1 > mp_bg::MAX_SPAWN_VARS_CHARS as c_int {
-            // G_Error(ctx,  "G_AddSpawnVarToken: MAX_SPAWN_CHARS" ) — fatal, panic
-            // per frozen Group A (Com_Error/G_Error -> panic).
-            panic!("G_AddSpawnVarToken: MAX_SPAWN_CHARS");
-        }
-
-        let dest = level
-            .spawnVarChars
-            .as_mut_ptr()
-            .offset(level.numSpawnVarChars as isize);
-        std::ptr::copy_nonoverlapping(string, dest, (l + 1) as usize);
-
-        level.numSpawnVarChars += l as c_int + 1;
-
-        dest
-    }
-}
+// Raven `G_AddSpawnVarToken` (g_spawn.c:851-866) deleted: it bump-copied a token
+// into the fixed `spawnVarChars` pool and returned a pointer. `spawnVars` is now
+// an owned `Vec<(String, String)>`, so tokens are pushed as owned strings and the
+// pool (and its `MAX_SPAWN_CHARS` overflow error) no longer exist.
 
 /// Raven `AddSpawnField`.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:868-884`
-pub fn AddSpawnField(ctx: &mut GameContext, field: *mut c_char, value: *mut c_char) {
-    let num_spawn_vars = ctx.world.level.numSpawnVars;
-    for i in 0..num_spawn_vars {
-        if q_shared::Q_stricmp(ctx.world.level.spawnVars[i as usize][0], field) == 0 {
-            let token = G_AddSpawnVarToken(ctx, value);
-            ctx.world.level.spawnVars[i as usize][1] = token;
+pub fn AddSpawnField(ctx: &mut GameContext, field: &str, value: &str) {
+    for kv in &mut ctx.world.level.spawnVars {
+        if Q_stricmp(&kv.0, field) == 0 {
+            kv.1 = value.to_owned();
             return;
         }
     }
-
-    let n = ctx.world.level.numSpawnVars;
-    let key_tok = G_AddSpawnVarToken(ctx, field);
-    let val_tok = G_AddSpawnVarToken(ctx, value);
-    ctx.world.level.spawnVars[n as usize][0] = key_tok;
-    ctx.world.level.spawnVars[n as usize][1] = val_tok;
-    ctx.world.level.numSpawnVars += 1;
+    ctx.world.level.spawnVars.push((field.to_owned(), value.to_owned()));
 }
 
 pub const NOVALUE: &CStr = c"novalue";
@@ -921,16 +875,15 @@ pub const NOVALUE: &CStr = c"novalue";
 /// Source: `oracle/codemp/game/g_spawn.c:888-1006`
 fn HandleEntityAdjustment(ctx: &mut GameContext) {
     unsafe {
-        let mut value: *mut c_char = std::ptr::null_mut();
         let mut new_origin: vec3_t = [0.0; 3];
 
-        G_SpawnString(ctx, c"origin".as_ptr(), NOVALUE.as_ptr(), &mut value);
+        let (_, value) = G_SpawnString(ctx, "origin", "novalue");
         // `origin` is pre-seeded 0.0 (matching the else-branch below); any
-        // component `sscanf_3f` fails to match is left at that seed rather
+        // component `sscanf_str_3f` fails to match is left at that seed rather
         // than picking up C's stack garbage (porting-rules §19).
         let mut origin: vec3_t = [0.0, 0.0, 0.0];
-        if value.is_null() || Q_stricmp(&cstr_to_str(value), "novalue") != 0 {
-            sscanf_3f(value, &mut origin);
+        if Q_stricmp(&value, "novalue") != 0 {
+            sscanf_str_3f(&value, &mut origin);
         }
 
         // `DEG2RAD(a)` is `(a * M_PI) / 180.0F`; M_PI resolves to glibc's double
@@ -959,63 +912,43 @@ fn HandleEntityAdjustment(ctx: &mut GameContext) {
             "{:.0} {:.0} {:.0}",
             new_origin[0], new_origin[1], new_origin[2]
         );
-        let temp_c = CString::new(temp).unwrap();
-        AddSpawnField(
-            ctx,
-            c"origin".as_ptr() as *mut c_char,
-            temp_c.as_ptr() as *mut c_char,
-        );
+        AddSpawnField(ctx, "origin", &temp);
 
-        G_SpawnString(ctx, c"angles".as_ptr(), NOVALUE.as_ptr(), &mut value);
-        if value.is_null() || Q_stricmp(&cstr_to_str(value), "novalue") != 0 {
+        let (_, value) = G_SpawnString(ctx, "angles", "novalue");
+        if Q_stricmp(&value, "novalue") != 0 {
             let mut angles: vec3_t = [0.0, 0.0, 0.0];
-            sscanf_3f(value, &mut angles);
+            sscanf_str_3f(&value, &mut angles);
 
             // `fmod` is a double-precision truncated remainder whose sign follows
             // the dividend; `rem_euclid` (least non-negative) differs by 360 for a
             // negative sum.
             angles[1] = ((angles[1] + ctx.world.level.mRotationAdjust) as f64 % 360.0) as f32;
             let temp = format!("{:.0} {:.0} {:.0}", angles[0], angles[1], angles[2]);
-            let temp_c = CString::new(temp).unwrap();
-            AddSpawnField(
-                ctx,
-                c"angles".as_ptr() as *mut c_char,
-                temp_c.as_ptr() as *mut c_char,
-            );
+            AddSpawnField(ctx, "angles", &temp);
         } else {
-            G_SpawnString(ctx, c"angle".as_ptr(), NOVALUE.as_ptr(), &mut value);
+            let (_, value) = G_SpawnString(ctx, "angle", "novalue");
             let mut angle1: f32 = 0.0;
-            if value.is_null() || Q_stricmp(&cstr_to_str(value), "novalue") != 0 {
-                sscanf_1f(value, &mut angle1);
+            if Q_stricmp(&value, "novalue") != 0 {
+                sscanf_str_1f(&value, &mut angle1);
             }
             angle1 = ((angle1 + ctx.world.level.mRotationAdjust) as f64 % 360.0) as f32;
             let temp = format!("{:.0}", angle1);
-            let temp_c = CString::new(temp).unwrap();
-            AddSpawnField(
-                ctx,
-                c"angle".as_ptr() as *mut c_char,
-                temp_c.as_ptr() as *mut c_char,
-            );
+            AddSpawnField(ctx, "angle", &temp);
         }
 
         // RJR experimental code for handling "direction" field of breakable
         // brushes, though direction is rarely ever used.
-        G_SpawnString(ctx, c"direction".as_ptr(), NOVALUE.as_ptr(), &mut value);
+        let (_, value) = G_SpawnString(ctx, "direction", "novalue");
         let mut direction: vec3_t = [0.0, 0.0, 0.0];
-        if value.is_null() || Q_stricmp(&cstr_to_str(value), "novalue") != 0 {
-            sscanf_3f(value, &mut direction);
+        if Q_stricmp(&value, "novalue") != 0 {
+            sscanf_str_3f(&value, &mut direction);
         }
         direction[1] = ((direction[1] + ctx.world.level.mRotationAdjust) as f64 % 360.0) as f32;
         let temp = format!(
             "{:.0} {:.0} {:.0}",
             direction[0], direction[1], direction[2]
         );
-        let temp_c = CString::new(temp).unwrap();
-        AddSpawnField(
-            ctx,
-            c"direction".as_ptr() as *mut c_char,
-            temp_c.as_ptr() as *mut c_char,
-        );
+        AddSpawnField(ctx, "direction", &temp);
 
         let target_adjust = ctx.world.level.mTargetAdjust;
         let target_adjust_str = if target_adjust.is_null() {
@@ -1024,27 +957,21 @@ fn HandleEntityAdjustment(ctx: &mut GameContext) {
             CStr::from_ptr(target_adjust).to_string_lossy().into_owned()
         };
 
-        AddSpawnField(ctx, c"BSPInstanceID".as_ptr() as *mut c_char, target_adjust);
+        AddSpawnField(ctx, "BSPInstanceID", &target_adjust_str);
 
-        for (key, out_key) in [
-            (c"targetname", c"targetname"),
-            (c"target", c"target"),
-            (c"killtarget", c"killtarget"),
-            (c"brushparent", c"brushparent"),
-            (c"brushchild", c"brushchild"),
-            (c"enemy", c"enemy"),
-            (c"ICARUSname", c"ICARUSname"),
+        for key in [
+            "targetname",
+            "target",
+            "killtarget",
+            "brushparent",
+            "brushchild",
+            "enemy",
+            "ICARUSname",
         ] {
-            G_SpawnString(ctx, key.as_ptr(), NOVALUE.as_ptr(), &mut value);
-            if value.is_null() || Q_stricmp(&cstr_to_str(value), "novalue") != 0 {
-                let value_str = CStr::from_ptr(value).to_string_lossy();
-                let temp = format!("{}{}", target_adjust_str, value_str);
-                let temp_c = CString::new(temp).unwrap();
-                AddSpawnField(
-                    ctx,
-                    out_key.as_ptr() as *mut c_char,
-                    temp_c.as_ptr() as *mut c_char,
-                );
+            let (_, value) = G_SpawnString(ctx, key, "novalue");
+            if Q_stricmp(&value, "novalue") != 0 {
+                let temp = format!("{}{}", target_adjust_str, value);
+                AddSpawnField(ctx, key, &temp);
             }
         }
     }
@@ -1058,8 +985,7 @@ fn HandleEntityAdjustment(ctx: &mut GameContext) {
 pub fn G_ParseSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) -> qboolean {
     // `MAX_TOKEN_CHARS` (value 1024) canonical in `mp_qshared::shared::limits`,
     // reaches this file via the crate prelude glob.
-    ctx.world.level.numSpawnVars = 0;
-    ctx.world.level.numSpawnVarChars = 0;
+    ctx.world.level.spawnVars.clear();
 
     // parse the opening brace
     let Some(com_token) = trap::GetEntityToken(ctx.engine, MAX_TOKEN_CHARS) else {
@@ -1089,15 +1015,10 @@ pub fn G_ParseSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) -> qboolean {
         if com_token.as_bytes().first() == Some(&b'}') {
             panic!("G_ParseSpawnVars: closing brace without data");
         }
-        if ctx.world.level.numSpawnVars == mp_bg::MAX_SPAWN_VARS as c_int {
+        if ctx.world.level.spawnVars.len() == mp_bg::MAX_SPAWN_VARS {
             panic!("G_ParseSpawnVars: MAX_SPAWN_VARS");
         }
-        let n = ctx.world.level.numSpawnVars;
-        let key_tok = G_AddSpawnVarToken(ctx, cstr(&keyname).as_ptr());
-        let val_tok = G_AddSpawnVarToken(ctx, cstr(&com_token).as_ptr());
-        ctx.world.level.spawnVars[n as usize][0] = key_tok;
-        ctx.world.level.spawnVars[n as usize][1] = val_tok;
-        ctx.world.level.numSpawnVars += 1;
+        ctx.world.level.spawnVars.push((keyname, com_token));
     }
 
     // Oracle calls HandleEntityAdjustment exactly once, after the loop, gated on
@@ -1117,7 +1038,7 @@ pub fn G_ParseSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) -> qboolean {
 /// Source: `oracle/codemp/game/g_spawn.c:1259-1386`
 pub fn SP_worldspawn(ctx: &mut GameContext) {
     unsafe {
-        let mut text: *mut c_char = std::ptr::null_mut();
+        let mut text: String = String::new();
         let mut temp = [0i8; 32];
         let mut lengthRed: c_int;
         let mut lengthBlue: c_int;
@@ -1134,8 +1055,8 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
             GSetServerCullArgs::new(ctx.world.globals.g_cullDistance),
         );
 
-        G_SpawnString(ctx, c"classname".as_ptr(), c"".as_ptr(), &mut text);
-        if text.is_null() || Q_stricmp(&cstr_to_str(text), "worldspawn") != 0 {
+        text = G_SpawnString(ctx, "classname", "").1;
+        if Q_stricmp(&text, "worldspawn") != 0 {
             G_Error(ctx, "SP_worldspawn: The first entity isn't 'worldspawn'");
         }
 
@@ -1145,20 +1066,17 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
             world: ctx.world_raw(),
             engine: ctx.engine,
         };
-        for i in 0..ctx.world.level.numSpawnVars {
-            if {
-                let sv = ctx.world.level.spawnVars[i as usize][0];
-                !sv.is_null() && Q_stricmp("spawnscript", &cstr_to_str(sv)) == 0
-            } {
-                let field_key = ctx.world.level.spawnVars[i as usize][0];
-                let field_value = ctx.world.level.spawnVars[i as usize][1];
+        for i in 0..ctx.world.level.spawnVars.len() {
+            if Q_stricmp("spawnscript", &ctx.world.level.spawnVars[i].0) == 0 {
+                let field_key = cstr(&ctx.world.level.spawnVars[i].0);
+                let field_value = cstr(&ctx.world.level.spawnVars[i].1);
                 let ent_base = ctx.world.g_entities.as_mut_ptr() as *mut byte;
                 // Only let them set spawnscript, we don't want them setting an angle or something on the world.
                 BG_ParseField(
                     &mut callbacks,
                     FIELDS.as_ptr() as *mut BG_field_t,
-                    field_key,
-                    field_value,
+                    field_key.as_ptr(),
+                    field_value.as_ptr(),
                     ent_base,
                 );
             }
@@ -1250,11 +1168,11 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
             &format!("{}", ctx.world.level.startTime),
         );
 
-        G_SpawnString(ctx, c"music".as_ptr(), c"".as_ptr(), &mut text);
-        trap::SetConfigstring(ctx.engine, CS_MUSIC, &cstr_to_str(text));
+        text = G_SpawnString(ctx, "music", "").1;
+        trap::SetConfigstring(ctx.engine, CS_MUSIC, &text);
 
-        G_SpawnString(ctx, c"message".as_ptr(), c"".as_ptr(), &mut text);
-        trap::SetConfigstring(ctx.engine, CS_MESSAGE, &cstr_to_str(text)); // map specific message
+        text = G_SpawnString(ctx, "message", "").1;
+        trap::SetConfigstring(ctx.engine, CS_MESSAGE, &text); // map specific message
 
         trap::SetConfigstring(
             ctx.engine,
@@ -1262,17 +1180,17 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
             &cstr_from_chars(&ctx.world.cvars.g_motd.string).to_string_lossy(),
         ); // message of the day
 
-        G_SpawnString(ctx, c"gravity".as_ptr(), c"800".as_ptr(), &mut text);
-        trap::Cvar_Set(ctx.engine, "g_gravity", &cstr_to_str(text));
+        text = G_SpawnString(ctx, "gravity", "800").1;
+        trap::Cvar_Set(ctx.engine, "g_gravity", &text);
 
-        G_SpawnString(ctx, c"enableBreath".as_ptr(), c"0".as_ptr(), &mut text);
-        trap::Cvar_Set(ctx.engine, "g_enableBreath", &cstr_to_str(text));
+        text = G_SpawnString(ctx, "enableBreath", "0").1;
+        trap::Cvar_Set(ctx.engine, "g_enableBreath", &text);
 
-        G_SpawnString(ctx, c"soundSet".as_ptr(), c"default".as_ptr(), &mut text);
+        text = G_SpawnString(ctx, "soundSet", "default").1;
         trap::SetConfigstring(
             ctx.engine,
             mp_bg::public::configstring::CS_GLOBAL_AMBIENT_SET,
-            &cstr_to_str(text),
+            &text,
         );
 
         ctx.world.g_entities[ENTITYNUM_WORLD as usize].s.number = ENTITYNUM_WORLD;
@@ -1304,48 +1222,30 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
 
         for i in 1..LS_NUM_STYLES {
             let red_key = format!("ls_{}r", i);
-            let red_key_c = CString::new(red_key).unwrap();
-            G_SpawnString(
-                ctx,
-                red_key_c.as_ptr(),
-                defaultStyles[i as usize][0],
-                &mut text,
-            );
-            lengthRed = (strlen(text)) as i32;
+            text = G_SpawnString(ctx, &red_key, &cstr_to_str(defaultStyles[i as usize][0])).1;
+            lengthRed = text.len() as i32;
             trap::SetConfigstring(
                 ctx.engine,
                 CS_LIGHT_STYLES + ((i + LS_STYLES_START) as c_int * 3) as c_int,
-                &cstr_to_str(text),
+                &text,
             );
 
             let green_key = format!("ls_{}g", i);
-            let green_key_c = CString::new(green_key).unwrap();
-            G_SpawnString(
-                ctx,
-                green_key_c.as_ptr(),
-                defaultStyles[i as usize][1],
-                &mut text,
-            );
-            lengthGreen = (strlen(text)) as i32;
+            text = G_SpawnString(ctx, &green_key, &cstr_to_str(defaultStyles[i as usize][1])).1;
+            lengthGreen = text.len() as i32;
             trap::SetConfigstring(
                 ctx.engine,
                 CS_LIGHT_STYLES + ((i + LS_STYLES_START) as c_int * 3 + 1) as c_int,
-                &cstr_to_str(text),
+                &text,
             );
 
             let blue_key = format!("ls_{}b", i);
-            let blue_key_c = CString::new(blue_key).unwrap();
-            G_SpawnString(
-                ctx,
-                blue_key_c.as_ptr(),
-                defaultStyles[i as usize][2],
-                &mut text,
-            );
-            lengthBlue = (strlen(text)) as i32;
+            text = G_SpawnString(ctx, &blue_key, &cstr_to_str(defaultStyles[i as usize][2])).1;
+            lengthBlue = text.len() as i32;
             trap::SetConfigstring(
                 ctx.engine,
                 CS_LIGHT_STYLES + ((i + LS_STYLES_START) as c_int * 3 + 2) as c_int,
-                &cstr_to_str(text),
+                &text,
             );
 
             if lengthRed != lengthGreen || lengthGreen != lengthBlue {
@@ -1397,7 +1297,7 @@ pub fn G_SpawnEntitiesFromString(ctx: &mut GameContext, inSubBSP: qboolean) {
     unsafe {
         // allow calls to G_Spawn*()
         ctx.world.level.spawning = qtrue;
-        ctx.world.level.numSpawnVars = 0;
+        ctx.world.level.spawnVars.clear();
 
         // the worldspawn is not an actual entity, but it still
         // has a "spawn" function to perform any global setup

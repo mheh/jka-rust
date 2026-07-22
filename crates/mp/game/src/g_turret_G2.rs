@@ -1294,18 +1294,12 @@ pub fn SP_misc_turretG2(ctx: &mut GameContext, base: EntityId) {
         ctx.world.entity_mut(base).modelScale = [scale, scale, scale];
     }
 
-    let mut s: *mut c_char = core::ptr::null_mut();
-    G_SpawnString(
-        ctx,
-        c"icon".as_ptr(),
-        c"".as_ptr(),
-        &mut s as *mut *mut c_char,
-    );
-    if !s.is_null() && unsafe { VALIDSTRING(s as *const c_char) } {
+    let (_, s) = G_SpawnString(ctx, "icon", "");
+    if !s.is_empty() {
         // We have an icon, so index it now.  We are reusing the
         // genericenemyindex variable rather than adding a new one to the
         // entity state.
-        let icon = G_IconIndex(ctx, &(unsafe { cstr_to_str(s) }));
+        let icon = G_IconIndex(ctx, &s);
         ctx.world.entity_mut(base).s.genericenemyindex = icon;
     }
 

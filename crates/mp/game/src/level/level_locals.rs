@@ -7,7 +7,7 @@
 use core::ffi::{c_char, c_int};
 
 use crate::entity::gentity_t;
-use mp_bg::{MAX_SPAWN_VARS, MAX_SPAWN_VARS_CHARS, TEAM_NUM_TEAMS};
+use mp_bg::TEAM_NUM_TEAMS;
 use mp_qshared::shared::{fileHandle_t, qboolean, vec3_t, MAX_CLIENTS};
 
 use crate::ai::{AIGroupInfo_t, MAX_FRAME_GROUPS};
@@ -91,10 +91,10 @@ pub struct level_locals_t {
 
     // spawn variables
     pub spawning: qboolean, // the G_Spawn*() functions are valid
-    pub numSpawnVars: c_int,
-    pub spawnVars: [[*mut c_char; 2]; MAX_SPAWN_VARS], // key / value pairs
-    pub numSpawnVarChars: c_int,
-    pub spawnVarChars: [c_char; MAX_SPAWN_VARS_CHARS],
+    /// Raven's `numSpawnVars`/`spawnVars[][2]`/`numSpawnVarChars`/`spawnVarChars[]`
+    /// (the key/value pointer table plus its backing char pool) collapse to one
+    /// owned `Vec` of `(key, value)` pairs; the count is `spawnVars.len()`.
+    pub spawnVars: Vec<(String, String)>,
 
     // intermission state
     pub intermissionQueued: c_int, // wait INTERMISSION_DELAY_TIME before going there
@@ -139,18 +139,19 @@ impl Default for level_locals_t {
     /// Raven zero-fills `level` wholesale (`memset(&level, 0, sizeof(level))` in
     /// `G_InitGame`, `g_main.c`). Every field is all-zero-valid EXCEPT the owned
     /// `String`s (`voteString`, `voteDisplayString`, `teamVoteString[2]`,
-    /// `mTeamFilter`), whose zeroed bytes would be invalid; we zero the whole
-    /// image and install a valid empty `String` into each of those slots before
-    /// the value is read, matching Raven's zero state (every scalar 0, every
-    /// pointer null, every vote/filter string "") exactly.
+    /// `mTeamFilter`) and the owned `spawnVars` `Vec`, whose zeroed bytes would be
+    /// invalid; we zero the whole image and install a valid empty value into each
+    /// of those slots before the value is read, matching Raven's zero state (every
+    /// scalar 0, every pointer null, every vote/filter string "", the spawn-var
+    /// table empty) exactly.
     fn default() -> Self {
         let mut u = core::mem::MaybeUninit::<level_locals_t>::uninit();
         let p = u.as_mut_ptr();
         // SAFETY: `p` is freshly-allocated, correctly-aligned storage for one
         // `level_locals_t`. `write_bytes` zeroes every field (all-zero-valid save
-        // the owned `String`s); each `ptr::write` overwrites one non-zero-valid
-        // `String` slot with a valid empty `String` (its zeroed bytes never
-        // dropped), so `assume_init` observes a fully-valid value.
+        // the owned `String`s/`Vec`); each `ptr::write` overwrites one non-zero-valid
+        // slot with a valid empty value (its zeroed bytes never dropped), so
+        // `assume_init` observes a fully-valid value.
         unsafe {
             core::ptr::write_bytes(p, 0, 1);
             core::ptr::write(core::ptr::addr_of_mut!((*p).voteString), String::new());
@@ -160,6 +161,7 @@ impl Default for level_locals_t {
                 [String::new(), String::new()],
             );
             core::ptr::write(core::ptr::addr_of_mut!((*p).mTeamFilter), String::new());
+            core::ptr::write(core::ptr::addr_of_mut!((*p).spawnVars), Vec::new());
             u.assume_init()
         }
     }

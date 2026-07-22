@@ -3259,18 +3259,11 @@ pub fn funcBBrushTouch(ent: EntityId, other: Option<EntityId>, trace: *mut trace
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2731-2829`
 pub fn SP_func_breakable(ctx: &mut GameContext, self_: EntityId) {
-    let mut s: *mut c_char = core::ptr::null_mut();
-    G_SpawnString(
-        ctx,
-        c"playfx".as_ptr(),
-        c"".as_ptr(),
-        &mut s as *mut *mut c_char,
-    );
+    let (_, s) = G_SpawnString(ctx, "playfx", "");
 
-    // Raw C-string deref of the engine-owned playfx name (seam).
-    if !s.is_null() && unsafe { *s } != 0 {
+    if !s.is_empty() {
         // should we play a special death effect?
-        ctx.entity_mut(self_).genericValue15 = G_EffectIndex(&(unsafe { cstr_to_str(s as *const c_char) }));
+        ctx.entity_mut(self_).genericValue15 = G_EffectIndex(&s);
     } else {
         ctx.entity_mut(self_).genericValue15 = 0;
     }

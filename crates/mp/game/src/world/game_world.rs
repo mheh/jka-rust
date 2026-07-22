@@ -120,6 +120,32 @@ fn zeroed_clients() -> Box<[gclient_t; MAX_CLIENTS]> {
     }
 }
 
+/// Zeroed `g_entities` array, built directly on the heap (never on the stack —
+/// the by-value array is ~1.83 MB). `gentity_t` stopped being `ZeroValid` when
+/// its owned-`String` tail fields landed, so this mirrors
+/// `native_platform::zeroed_box` and then seats a valid empty `String` into each
+/// entity's owned-`String` slots ([`gentity_t::seat_owned_strings`]) before the
+/// array is ever read, matching Raven's `memset(g_entities, 0, ...)` (every
+/// scalar 0, every pointer null, every owned string ""). The zeroed bytes leave
+/// each entity's `FnId<EntXxx>` handler fields as `None` by construction.
+fn zeroed_entities() -> Box<[gentity_t; MAX_GENTITIES]> {
+    let layout = Layout::new::<[gentity_t; MAX_GENTITIES]>();
+    // SAFETY: `alloc_zeroed` yields storage that is all-zero-valid for every
+    // `gentity_t` field save the owned `String`s; `seat_owned_strings` overwrites
+    // each such slot with a valid empty `String` (its zeroed bytes never dropped)
+    // before ownership passes to the `Box`, so the whole array is initialized.
+    unsafe {
+        let base = alloc_zeroed(layout) as *mut gentity_t;
+        if base.is_null() {
+            handle_alloc_error(layout);
+        }
+        for i in 0..MAX_GENTITIES {
+            gentity_t::seat_owned_strings(base.add(i));
+        }
+        Box::from_raw(base as *mut [gentity_t; MAX_GENTITIES])
+    }
+}
+
 impl GameWorld {
     /// Borrow entity `id` out of the owned `g_entities` arena (§B5). Safe: the
     /// world owns the arena, so this is a plain checked index, not pointer math.
@@ -161,7 +187,7 @@ impl GameWorld {
         // level.gentities/clients + entities[i].client back-pointers alias them
         // AFTER they exist, in G_InitGame's dispatched arm (g_main.c:978-988) —
         // not here.
-        let g_entities = native_platform::zeroed_box::<[gentity_t; MAX_GENTITIES]>();
+        let g_entities = zeroed_entities();
         // The zeroed bytes leave each entity's FnId<EntXxx> handler fields as
         // None by construction (zero == None, std-guaranteed via
         // Option<NonZeroU8>) — no post-zero fixup needed.
@@ -224,7 +250,7 @@ impl GameWorld {
         unsafe {
             use core::ptr::addr_of_mut;
             addr_of_mut!((*p).level).write(level_locals_t::default());
-            addr_of_mut!((*p).g_entities).write(native_platform::zeroed_box());
+            addr_of_mut!((*p).g_entities).write(zeroed_entities());
             // The zeroed bytes leave each entity's FnId<EntXxx> handler fields as
             // None by construction (zero == None, std-guaranteed via
             // Option<NonZeroU8>) — no post-zero fixup needed.

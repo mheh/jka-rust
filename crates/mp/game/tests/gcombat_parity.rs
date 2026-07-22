@@ -82,7 +82,14 @@ fn sec_hitloc(o: &mut String, ctx: &mut GameContext) {
         let mut client: gclient_t = gclient_t::default();
         {
             let ent = ctx.entity_mut(id);
-            *ent = unsafe { core::mem::zeroed() };
+            // `gentity_t` is no longer zero-valid (owned `String` tail); reset it
+            // through the same take/zero/seat dance `G_FreeEntity` uses.
+            unsafe {
+                let p = ent as *mut gentity_t;
+                (*p).take_owned_strings();
+                core::ptr::write_bytes(p, 0, 1);
+                gentity_t::seat_owned_strings(p);
+            }
             ent.client = &mut client as *mut gclient_t;
             ent.r.currentAngles[YAW] = pf(tok[1]);
             ent.r.absmin = [pf(tok[2]), pf(tok[3]), pf(tok[4])];
@@ -126,7 +133,14 @@ fn sec_armor(o: &mut String, ctx: &mut GameContext) {
         client.ps.electrifyTime = pi(tok[3]);
         {
             let ent = ctx.entity_mut(id);
-            *ent = unsafe { core::mem::zeroed() };
+            // `gentity_t` is no longer zero-valid (owned `String` tail); reset it
+            // through the same take/zero/seat dance `G_FreeEntity` uses.
+            unsafe {
+                let p = ent as *mut gentity_t;
+                (*p).take_owned_strings();
+                core::ptr::write_bytes(p, 0, 1);
+                gentity_t::seat_owned_strings(p);
+            }
             ent.client = &mut client as *mut gclient_t;
             ent.m_pVehicle = if pi(tok[4]) != 0 {
                 &mut dummy_veh as *mut u8 as *mut Vehicle_t

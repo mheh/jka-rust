@@ -1350,7 +1350,7 @@ pub fn siegeTriggerUse(
 /// Source: `oracle/codemp/game/g_saga.c:1137-1179`
 pub fn SP_info_siege_objective(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
-        let mut s: *mut c_char = core::ptr::null_mut();
+        let mut s: String = String::new();
 
         if ctx.world.bg_state.siege_valid == 0 || ctx.world.cvars.g_gametype.integer != GT_SIEGE {
             crate::g_utils::G_FreeEntity(ctx, Some(ent));
@@ -1395,18 +1395,13 @@ pub fn SP_info_siege_objective(ctx: &mut GameContext, ent: EntityId) {
         // All clients want to know where it is at all times for radar
         ctx.world.entity_mut(ent).r.svFlags |= SVF_BROADCAST;
 
-        G_SpawnString(
-            ctx,
-            b"icon\0".as_ptr() as *const c_char,
-            b"\0".as_ptr() as *const c_char,
-            &mut s,
-        );
+        s = G_SpawnString(ctx, "icon", "").1;
 
-        if !s.is_null() && *s != 0 {
+        if !s.is_empty() {
             // We have an icon, so index it now. We are reusing the
             // genericenemyindex variable rather than adding a new one to the
             // entity state.
-            let idx = G_IconIndex(ctx, &cstr_to_str(s));
+            let idx = G_IconIndex(ctx, &s);
             ctx.world.entity_mut(ent).s.genericenemyindex = idx;
         }
 
@@ -1441,7 +1436,7 @@ pub fn SiegeIconUse(ent: &mut gentity_t, other: Option<EntityId>, activator: Opt
 /// Source: `oracle/codemp/game/g_saga.c:1203-1234`
 pub fn SP_info_siege_radaricon(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
-        let mut s: *mut c_char = core::ptr::null_mut();
+        let mut s: String = String::new();
         let mut i: c_int = 0;
 
         if ctx.world.bg_state.siege_valid == 0 || ctx.world.cvars.g_gametype.integer != GT_SIEGE {
@@ -1462,13 +1457,8 @@ pub fn SP_info_siege_radaricon(ctx: &mut GameContext, ent: EntityId) {
             ctx.world.entity_mut(ent).r.svFlags |= SVF_BROADCAST;
         }
 
-        G_SpawnString(
-            ctx,
-            b"icon\0".as_ptr() as *const c_char,
-            b"\0".as_ptr() as *const c_char,
-            &mut s,
-        );
-        if s.is_null() || *s == 0 {
+        s = G_SpawnString(ctx, "icon", "").1;
+        if s.is_empty() {
             // that's the whole point of the entity
             crate::g_main::Com_Error(
                 (ERR_DROP) as i32,
@@ -1479,7 +1469,7 @@ pub fn SP_info_siege_radaricon(ctx: &mut GameContext, ent: EntityId) {
 
         ctx.world.entity_mut(ent).use_ = Some(EntUse::SiegeIconUse).into();
 
-        let idx = G_IconIndex(ctx, &cstr_to_str(s));
+        let idx = G_IconIndex(ctx, &s);
         ctx.world.entity_mut(ent).s.genericenemyindex = idx;
 
         trap::LinkEntity(
@@ -1654,11 +1644,12 @@ pub fn SiegeItemRemoveOwner(ctx: &mut GameContext, ent: EntityId, carrier: Optio
 /// Source: `oracle/codemp/game/g_saga.c:1351-1370`
 pub fn SiegeItemRespawnEffect(ctx: &mut GameContext, ent: EntityId, newOrg: vec3_t) {
     unsafe {
-        // `target5` is a `*mut c_char` field pointer (not a gentity/gclient
-        // reference); passing it into the target-firing call matches Raven.
-        let target5 = ctx.world.entity(ent).target5;
-        if !target5.is_null() && *target5 != 0 {
-            G_UseTargets2(ctx, Some(ent), Some(ent), target5 as *const c_char);
+        // `target5` is now an owned `String` (`""` ≡ absent); materialize a
+        // `CString` for the raw-`c_char` target-firing seam.
+        let target5 = ctx.world.entity(ent).target5.clone();
+        if !target5.is_empty() {
+            let target5_c = cstr(&target5);
+            G_UseTargets2(ctx, Some(ent), Some(ent), target5_c.as_ptr());
         }
 
         if ctx.world.entity(ent).genericValue10 == 0 {
@@ -1782,9 +1773,10 @@ pub fn SiegeItemThink(ctx: &mut GameContext, ent: EntityId) {
                 SiegeItemRespawnOnOriginalSpot(ctx, ent, None);
             } else if ctx.world.entity(carrier).health < 1 {
                 // The carrier died so pop out where he is (unless in nodrop).
-                let target6 = ctx.world.entity(ent).target6;
-                if !target6.is_null() && *target6 != 0 {
-                    G_UseTargets2(ctx, Some(ent), Some(ent), target6 as *const c_char);
+                let target6 = ctx.world.entity(ent).target6.clone();
+                if !target6.is_empty() {
+                    let target6_c = cstr(&target6);
+                    G_UseTargets2(ctx, Some(ent), Some(ent), target6_c.as_ptr());
                 }
 
                 let carrier_origin = (*ccl).ps.origin;
@@ -2062,7 +2054,7 @@ pub fn SP_misc_siege_item(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         let mut canpickup: c_int = 0;
         let mut noradar: c_int = 0;
-        let mut s: *mut c_char = core::ptr::null_mut();
+        let mut s: String = String::new();
 
         if ctx.world.bg_state.siege_valid == 0 || ctx.world.cvars.g_gametype.integer != GT_SIEGE {
             crate::g_utils::G_FreeEntity(ctx, Some(ent));
@@ -2162,54 +2154,34 @@ pub fn SP_misc_siege_item(ctx: &mut GameContext, ent: EntityId) {
         );
         ctx.world.entity_mut(ent).random = random;
 
-        G_SpawnString(
-            ctx,
-            b"pickupsound\0".as_ptr() as *const c_char,
-            b"\0".as_ptr() as *const c_char,
-            &mut s,
-        );
+        s = G_SpawnString(ctx, "pickupsound", "").1;
 
-        if !s.is_null() && *s != 0 {
+        if !s.is_empty() {
             // We have a pickup sound, so index it now.
-            ctx.world.entity_mut(ent).noise_index = G_SoundIndex(&cstr_to_str(s));
+            ctx.world.entity_mut(ent).noise_index = G_SoundIndex(&s);
         }
 
-        G_SpawnString(
-            ctx,
-            b"deathfx\0".as_ptr() as *const c_char,
-            b"\0".as_ptr() as *const c_char,
-            &mut s,
-        );
+        s = G_SpawnString(ctx, "deathfx", "").1;
 
-        if !s.is_null() && *s != 0 {
+        if !s.is_empty() {
             // We have a death effect, so index it now.
-            ctx.world.entity_mut(ent).genericValue3 = G_EffectIndex(&cstr_to_str(s));
+            ctx.world.entity_mut(ent).genericValue3 = G_EffectIndex(&s);
         }
 
-        G_SpawnString(
-            ctx,
-            b"respawnfx\0".as_ptr() as *const c_char,
-            b"\0".as_ptr() as *const c_char,
-            &mut s,
-        );
+        s = G_SpawnString(ctx, "respawnfx", "").1;
 
-        if !s.is_null() && *s != 0 {
+        if !s.is_empty() {
             // We have a respawn effect, so index it now.
-            ctx.world.entity_mut(ent).genericValue10 = G_EffectIndex(&cstr_to_str(s));
+            ctx.world.entity_mut(ent).genericValue10 = G_EffectIndex(&s);
         }
 
-        G_SpawnString(
-            ctx,
-            b"icon\0".as_ptr() as *const c_char,
-            b"\0".as_ptr() as *const c_char,
-            &mut s,
-        );
+        s = G_SpawnString(ctx, "icon", "").1;
 
-        if !s.is_null() && *s != 0 {
+        if !s.is_empty() {
             // We have an icon, so index it now. We are reusing the
             // genericenemyindex variable rather than adding a new one to the
             // entity state.
-            let idx = G_IconIndex(ctx, &cstr_to_str(s));
+            let idx = G_IconIndex(ctx, &s);
             ctx.world.entity_mut(ent).s.genericenemyindex = idx;
         }
 

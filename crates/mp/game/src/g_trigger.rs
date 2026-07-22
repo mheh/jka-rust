@@ -260,11 +260,8 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
         }
     }
 
-    let idealclass = ctx.world.entity(ent_id).idealclass;
-    if ctx.world.cvars.g_gametype.integer == GT_SIEGE
-        && !idealclass.is_null()
-        && unsafe { *idealclass } != 0
-    {
+    let idealclass = ctx.world.entity(ent_id).idealclass.clone();
+    if ctx.world.cvars.g_gametype.integer == GT_SIEGE && !idealclass.is_empty() {
         // only certain classes can activate it
         // FLAG: pool `gclient_t` deref (see above).
         let ac = match activator_id {
@@ -278,7 +275,12 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
 
         let siege_class = unsafe { (*ac).siegeClass } as usize;
         let siege_class_name = cstr(&ctx.world.bg_state.bgSiegeClasses[siege_class].name);
-        if G_NameInTriggerClassList(siege_class_name.as_ptr() as *mut c_char, idealclass) == 0 {
+        let idealclass_c = cstr(&idealclass);
+        if G_NameInTriggerClassList(
+            siege_class_name.as_ptr() as *mut c_char,
+            idealclass_c.as_ptr() as *mut c_char,
+        ) == 0
+        {
             // wasn't in the list
             return;
         }
@@ -302,10 +304,10 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
             let obj_item = EntityId(unsafe { (*ac).holdingObjectiveItem } as u32);
 
             if ctx.world.entity(obj_item).inuse != 0 {
-                let goaltarget = ctx.world.entity(obj_item).goaltarget;
-                if !goaltarget.is_null()
-                    && unsafe { *goaltarget } != 0
-                    && q_shared::Q_stricmp(targetname, goaltarget) == 0
+                let goaltarget = ctx.world.entity(obj_item).goaltarget.clone();
+                let goaltarget_c = cstr(&goaltarget);
+                if !goaltarget.is_empty()
+                    && q_shared::Q_stricmp(targetname, goaltarget_c.as_ptr()) == 0
                 {
                     let sess_team = unsafe { (*ac).sess.sessionTeam };
                     if ctx.world.entity(obj_item).genericValue7 != sess_team {
@@ -602,11 +604,8 @@ pub fn Touch_Multi(
         if ctx.world.entity(self_id).genericValue7 != 0 {
             // we have to be holding the use key in this trigger for x
             // milliseconds before firing
-            let idealclass = ctx.world.entity(self_id).idealclass;
-            if ctx.world.cvars.g_gametype.integer == GT_SIEGE
-                && !idealclass.is_null()
-                && unsafe { *idealclass } != 0
-            {
+            let idealclass = ctx.world.entity(self_id).idealclass.clone();
+            if ctx.world.cvars.g_gametype.integer == GT_SIEGE && !idealclass.is_empty() {
                 // only certain classes can activate it
                 if other_client.is_null() || unsafe { (*other_client).siegeClass } < 0 {
                     // no class
@@ -615,7 +614,11 @@ pub fn Touch_Multi(
 
                 let siege_class = unsafe { (*other_client).siegeClass } as usize;
                 let siege_class_name = cstr(&ctx.world.bg_state.bgSiegeClasses[siege_class].name);
-                if G_NameInTriggerClassList(siege_class_name.as_ptr() as *mut c_char, idealclass) == 0
+                let idealclass_c = cstr(&idealclass);
+                if G_NameInTriggerClassList(
+                    siege_class_name.as_ptr() as *mut c_char,
+                    idealclass_c.as_ptr() as *mut c_char,
+                ) == 0
                 {
                     // wasn't in the list
                     return;
@@ -747,16 +750,10 @@ pub fn trigger_cleared_fire(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_trigger.c:607-656`
 pub fn SP_trigger_multiple(ctx: &mut GameContext, ent_id: EntityId) {
-    let mut s: *mut c_char = core::ptr::null_mut();
-    if G_SpawnString(
-        ctx,
-        c"noise".as_ptr(),
-        c"".as_ptr(),
-        &mut s as *mut *mut c_char,
-    ) != 0
-    {
-        if !s.is_null() && unsafe { *s } != 0 {
-            ctx.world.entity_mut(ent_id).noise_index = G_SoundIndex(&(unsafe { cstr_to_str(s as *const c_char) }));
+    let (present, s) = G_SpawnString(ctx, "noise", "");
+    if present != 0 {
+        if !s.is_empty() {
+            ctx.world.entity_mut(ent_id).noise_index = G_SoundIndex(&s);
         } else {
             ctx.world.entity_mut(ent_id).noise_index = 0;
         }
@@ -812,16 +809,10 @@ pub fn SP_trigger_multiple(ctx: &mut GameContext, ent_id: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_trigger.c:694-731`
 pub fn SP_trigger_once(ctx: &mut GameContext, ent_id: EntityId) {
-    let mut s: *mut c_char = core::ptr::null_mut();
-    if G_SpawnString(
-        ctx,
-        c"noise".as_ptr(),
-        c"".as_ptr(),
-        &mut s as *mut *mut c_char,
-    ) != 0
-    {
-        if !s.is_null() && unsafe { *s } != 0 {
-            ctx.world.entity_mut(ent_id).noise_index = G_SoundIndex(&(unsafe { cstr_to_str(s as *const c_char) }));
+    let (present, s) = G_SpawnString(ctx, "noise", "");
+    if present != 0 {
+        if !s.is_empty() {
+            ctx.world.entity_mut(ent_id).noise_index = G_SoundIndex(&s);
         } else {
             ctx.world.entity_mut(ent_id).noise_index = 0;
         }
@@ -994,20 +985,14 @@ pub fn SP_trigger_lightningstrike(ctx: &mut GameContext, ent_id: EntityId) {
     ctx.world.entity_mut(ent_id).think = Some(EntThink::Think_Strike).into();
     ctx.world.entity_mut(ent_id).nextthink = ctx.world.level.time + 500;
 
-    let mut s: *mut c_char = core::ptr::null_mut();
-    G_SpawnString(
-        ctx,
-        c"lightningfx".as_ptr(),
-        c"".as_ptr(),
-        &mut s as *mut *mut c_char,
-    );
-    if s.is_null() || unsafe { *s } == 0 {
+    let (_, s) = G_SpawnString(ctx, "lightningfx", "");
+    if s.is_empty() {
         // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
         panic!("trigger_lightningstrike with no lightningfx");
     }
 
     // get a configstring index for it
-    ctx.world.entity_mut(ent_id).genericValue2 = G_EffectIndex(&(unsafe { cstr_to_str(s as *const c_char) }));
+    ctx.world.entity_mut(ent_id).genericValue2 = G_EffectIndex(&s);
 
     if ctx.world.entity(ent_id).spawnflags & 1 != 0 {
         // START_OFF

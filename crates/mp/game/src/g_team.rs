@@ -1270,14 +1270,12 @@ pub fn SelectRandomTeamSpawnPoint(
 
         while i < count {
             if let Some(sid) = spots[i as usize] {
-                // FLAG (task #7): `.idealclass` is a `*mut c_char` (spawn string);
-                // read the pointer via the safe entity borrow, deref raw. (recipe 2c)
-                let idealclass = ctx.world.entity(sid).idealclass;
-                if !idealclass.is_null() && unsafe { *idealclass } != 0 {
+                // `.idealclass` is now an owned `String` (`""` ≡ absent).
+                let idealclass = ctx.world.entity(sid).idealclass.clone();
+                if !idealclass.is_empty() {
                     let bg_classes = &ctx.world.bg_state.bgSiegeClasses;
                     let class_name = &bg_classes[siegeClass as usize].name;
-                    let spot_class = unsafe { cstr_to_str(idealclass) };
-                    if class_name.eq_ignore_ascii_case(&spot_class) {
+                    if class_name.eq_ignore_ascii_case(&idealclass) {
                         class_spots[class_count as usize] = spots[i as usize];
                         class_count += 1;
                     }

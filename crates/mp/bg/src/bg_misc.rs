@@ -275,6 +275,14 @@ pub fn BG_ParseField(
                         let s = callbacks.new_string(&cstr_to_str(value));
                         *(b.offset((*f).ofs as isize) as *mut *mut c_char) = s;
                     }
+                    fieldtype_t::F_STRING_OWNED => {
+                        // jka-rust tail field: no offset, no pool alloc — the
+                        // typed setter stores the decoded value into the entity's
+                        // owned `String`/`Option<String>` field.
+                        if let Some(set) = (*f).set {
+                            set(b, &cstr_to_str(value));
+                        }
+                    }
                     fieldtype_t::F_VECTOR => {
                         // sscanf(value, "%f %f %f", &vec[0], &vec[1], &vec[2]) —
                         // oracle bg_misc.c:379 has no count check; unmatched

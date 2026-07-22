@@ -440,7 +440,7 @@ pub fn Use_Target_Speaker(
 ///
 /// Source: `oracle/codemp/game/g_target.c:286-340`
 pub fn SP_target_speaker(ctx: &mut GameContext, ent: EntityId) {
-    let mut s: *mut c_char = core::ptr::null_mut();
+    let mut s: String = String::new();
 
     let wait_ptr: *mut f32 = &mut ctx.entity_mut(ent).wait;
     G_SpawnFloat(
@@ -457,15 +457,11 @@ pub fn SP_target_speaker(ctx: &mut GameContext, ent: EntityId) {
         random_ptr,
     );
 
-    if G_SpawnString(
-        ctx,
-        b"soundSet\0".as_ptr() as *const c_char,
-        b"\0".as_ptr() as *const c_char,
-        &mut s,
-    ) != 0
-    {
+    let present;
+    (present, s) = G_SpawnString(ctx, "soundSet", "");
+    if present != 0 {
         // this is a sound set
-        let soundset = G_SoundSetIndex(ctx, &(unsafe { cstr_to_str(s as *const c_char) }));
+        let soundset = G_SoundSetIndex(ctx, &s);
         let e = ctx.entity_mut(ent);
         e.s.soundSetIndex = soundset;
         e.s.eFlags = mp_bg::public::entity_flags::EF_PERMANENT;
@@ -477,25 +473,21 @@ pub fn SP_target_speaker(ctx: &mut GameContext, ent: EntityId) {
         return;
     }
 
-    if G_SpawnString(
-        ctx,
-        b"noise\0".as_ptr() as *const c_char,
-        b"NOSOUND\0".as_ptr() as *const c_char,
-        &mut s,
-    ) == 0
-    {
+    let present;
+    (present, s) = G_SpawnString(ctx, "noise", "NOSOUND");
+    if present == 0 {
         // G_Error is PARKED, so we can't call it properly
         // G_Error(ctx, "target_speaker without a noise key at %s", vtos(ctx, ent.s.origin));
     }
 
     // force all client relative sounds to be "activator" speakers
-    if unsafe { *s == b'*' as c_char } {
+    if s.as_bytes().first() == Some(&b'*') {
         ctx.entity_mut(ent).spawnflags |= 8;
     }
 
-    // `s` is a `*mut c_char` into the entity arena; read it through the seam and
-    // `Q_strncpyz`-bound it (`MAX_QPATH-1` bytes) for the sound-index lookup.
-    let buffer = strncpyz_string(unsafe { CStr::from_ptr(s) }.to_bytes(), MAX_QPATH as usize);
+    // `s` is the owned soundSet/noise value; `Q_strncpyz`-bound it
+    // (`MAX_QPATH-1` bytes) for the sound-index lookup.
+    let buffer = strncpyz_string(s.as_bytes(), MAX_QPATH as usize);
 
     let noise_index = G_SoundIndex(&buffer);
     let e = ctx.entity_mut(ent);
@@ -1365,15 +1357,9 @@ pub fn target_level_change_use(
 ///
 /// Source: `oracle/codemp/game/g_target.c:955-970`
 pub fn SP_target_level_change(ctx: &mut GameContext, self_: EntityId) {
-    let mut s: *mut c_char = core::ptr::null_mut();
-
-    G_SpawnString(
-        ctx,
-        b"mapname\0".as_ptr() as *const c_char,
-        b"\0".as_ptr() as *const c_char,
-        &mut s,
-    );
-    let msg = G_NewString(ctx, s);
+    let (_, s) = G_SpawnString(ctx, "mapname", "");
+    let s_c = cstr(&s);
+    let msg = G_NewString(ctx, s_c.as_ptr());
     ctx.entity_mut(self_).message = msg;
 
     let message = ctx.entity(self_).message;
@@ -1411,21 +1397,15 @@ pub fn target_play_music_use(
 ///
 /// Source: `oracle/codemp/game/g_target.c:989-1002`
 pub fn SP_target_play_music(ctx: &mut GameContext, self_: EntityId) {
-    let mut s: *mut c_char = core::ptr::null_mut();
-
     let origin = ctx.entity(self_).s.origin;
     G_SetOrigin(ctx.entity_mut(self_), origin);
-    if G_SpawnString(
-        ctx,
-        b"music\0".as_ptr() as *const c_char,
-        b"\0".as_ptr() as *const c_char,
-        &mut s,
-    ) == 0
-    {
+    let (present, s) = G_SpawnString(ctx, "music", "");
+    if present == 0 {
         // Error case; informational message dropped.
     }
 
-    let msg = G_NewString(ctx, s);
+    let s_c = cstr(&s);
+    let msg = G_NewString(ctx, s_c.as_ptr());
     ctx.entity_mut(self_).message = msg;
 
     ctx.entity_mut(self_).use_ = Some(EntUse::target_play_music_use).into();

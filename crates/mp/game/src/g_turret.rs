@@ -880,10 +880,9 @@ pub fn SP_misc_turret(ctx: &mut GameContext, base: EntityId) {
     let mi = G_ModelIndex("models/map_objects/hoth/turret_base.md3");
     ctx.world.entity_mut(base).s.modelindex = mi;
 
-    let mut s: *mut c_char = std::ptr::null_mut();
-    G_SpawnString(ctx, c"icon".as_ptr(), c"".as_ptr(), &mut s);
-    if !s.is_null() && unsafe { *s != 0 } {
-        let icon = G_IconIndex(ctx, &(unsafe { cstr_to_str(s as *const c_char) }));
+    let (_, s) = G_SpawnString(ctx, "icon", "");
+    if !s.is_empty() {
+        let icon = G_IconIndex(ctx, &s);
         ctx.world.entity_mut(base).s.genericenemyindex = icon;
     }
 

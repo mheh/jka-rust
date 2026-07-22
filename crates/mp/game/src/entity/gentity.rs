@@ -116,26 +116,26 @@ pub struct gentity_t {
     /// Damage will be ignored if it comes from this team.
     /// Raven field source: `oracle/codemp/game/g_local.h:186`
     pub teamnodmg: c_int,
-    /// Set in QuakeEd.
-    /// Raven field source: `oracle/codemp/game/g_local.h:188`
-    pub roffname: *mut c_char,
-    /// Set in QuakeEd.
-    /// Raven field source: `oracle/codemp/game/g_local.h:189`
-    pub rofftarget: *mut c_char,
-    /// Set in QuakeEd.
+    // Raven `roffname`/`rofftarget` (`g_local.h:188-189`) deleted: `rofftarget`
+    // had zero readers repo-wide and `roffname` only ever fed the resolved
+    // `roffid` int, so both spawn keys became `F_IGNORE` (parse silently) and the
+    // ICARUS `roffname` store dropped. Private tail — no ABI impact.
+    /// Owned copy of the QuakeEd healing-class name; `""` ≡ absent (Raven `char *`,
+    /// distinguished only by `!= 0`, never by NULL-vs-empty).
     /// Raven field source: `oracle/codemp/game/g_local.h:191`
-    pub healingclass: *mut c_char,
-    /// Set in QuakeEd.
+    pub healingclass: String,
+    /// Owned copy of the QuakeEd healing sound name; `""` ≡ absent.
     /// Raven field source: `oracle/codemp/game/g_local.h:192`
-    pub healingsound: *mut c_char,
+    pub healingsound: String,
     /// Set in QuakeEd.
     /// Raven field source: `oracle/codemp/game/g_local.h:193`
     pub healingrate: c_int,
     /// Debounce for generic object healing.
     /// Raven field source: `oracle/codemp/game/g_local.h:194`
     pub healingDebounce: c_int,
+    /// Owned copy of the QuakeEd owner-tag name; `""` ≡ absent.
     /// Raven field source: `oracle/codemp/game/g_local.h:196`
-    pub ownername: *mut c_char,
+    pub ownername: String,
     /// Raven field source: `oracle/codemp/game/g_local.h:198`
     pub objective: c_int,
     /// Raven field source: `oracle/codemp/game/g_local.h:199`
@@ -190,9 +190,10 @@ pub struct gentity_t {
     /// Only used by NPC_spawners.
     /// Raven field source: `oracle/codemp/game/g_local.h:231`
     pub NPC_targetname: *mut c_char,
+    /// Owned copy of the NPC_spawner's target name; `""` ≡ absent.
     /// Only used by NPC_spawners.
     /// Raven field source: `oracle/codemp/game/g_local.h:232`
-    pub NPC_target: *mut c_char,
+    pub NPC_target: String,
     /// Raven field source: `oracle/codemp/game/g_local.h:235`
     pub moverState: moverState_t,
     /// Raven field source: `oracle/codemp/game/g_local.h:236`
@@ -234,18 +235,22 @@ pub struct gentity_t {
     pub target3: *mut c_char,
     /// Raven field source: `oracle/codemp/game/g_local.h:257`
     pub target4: *mut c_char,
+    /// Owned copy of the siege-item target name; `""` ≡ absent.
     /// Mainly added for siege items.
     /// Raven field source: `oracle/codemp/game/g_local.h:258`
-    pub target5: *mut c_char,
+    pub target5: String,
+    /// Owned copy of the siege-item target name; `""` ≡ absent.
     /// Mainly added for siege items.
     /// Raven field source: `oracle/codemp/game/g_local.h:259`
-    pub target6: *mut c_char,
+    pub target6: String,
     /// Raven field source: `oracle/codemp/game/g_local.h:261`
     pub team: *mut c_char,
+    /// Owned copy of the shader-remap source name; `""` ≡ absent.
     /// Raven field source: `oracle/codemp/game/g_local.h:262`
-    pub targetShaderName: *mut c_char,
+    pub targetShaderName: String,
+    /// Owned copy of the shader-remap destination name; `""` ≡ absent.
     /// Raven field source: `oracle/codemp/game/g_local.h:263`
-    pub targetShaderNewName: *mut c_char,
+    pub targetShaderNewName: String,
     /// Raven field source: `oracle/codemp/game/g_local.h:264`
     pub target_ent: Option<EntityId>,
     /// Raven field source: `oracle/codemp/game/g_local.h:266`
@@ -254,10 +259,12 @@ pub struct gentity_t {
     pub opentarget: *mut c_char,
     /// Raven field source: `oracle/codemp/game/g_local.h:268`
     pub paintarget: *mut c_char,
+    /// Owned copy of the siege goal-target name; `""` ≡ absent.
     /// Raven field source: `oracle/codemp/game/g_local.h:270`
-    pub goaltarget: *mut c_char,
+    pub goaltarget: String,
+    /// Owned copy of the siege ideal-class name; `""` ≡ absent.
     /// Raven field source: `oracle/codemp/game/g_local.h:271`
-    pub idealclass: *mut c_char,
+    pub idealclass: String,
     /// Raven field source: `oracle/codemp/game/g_local.h:273`
     pub radius: f32,
     /// Used as a base for crosshair health display.
@@ -409,15 +416,16 @@ pub struct gentity_t {
 // earlier `*mut c_void` form.
 // Source: `oracle/codemp/game/g_local.h:133-359`
 //
-// The 10 stored `gentity_t*` fields (`parent`..`teammaster`, all after
-// `moverState`) became `Option<EntityId>`. Those pointers were never
-// ABI-visible — the engine only pins the SHARED PREFIX (`s`, then
-// `r`/`entityShared_t`, up through
-// `next_roff_time`, per the "DO NOT MODIFY ANYTHING ABOVE THIS" comment) and
-// learns the full stride at runtime via `trap_LocateGameData`. So the private
-// tail (`size_of` and every offset at/after the first flipped field `parent`)
-// is free and its literal asserts are dropped; only the fixed-prefix asserts
-// below (all BEFORE `parent`) are kept.
+// The engine only pins the SHARED PREFIX (`s`, then `r`/`entityShared_t`, up
+// through `next_roff_time`, per the "DO NOT MODIFY ANYTHING ABOVE THIS" comment)
+// and learns the full stride at runtime via `trap_LocateGameData`, so the
+// private tail is free. Several tail fields have since diverged from Raven
+// layout: the 10 stored `gentity_t*` (`parent`..`teammaster`) became
+// `Option<EntityId>`, and the owned-`String` migration flipped tail string
+// fields to `String` (and deleted `roffname`/`rofftarget`) — all past
+// `next_roff_time`. Only the fixed-prefix asserts below (every one BEFORE the
+// first diverged field) are kept; `client` still sits immediately after the
+// prefix, so its offset is unchanged.
 const _: () = assert!(core::mem::offset_of!(gentity_t, s) == 0); // arch-independent anchor
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(gentity_t, r) == 576);
@@ -425,25 +433,60 @@ const _: () = assert!(core::mem::offset_of!(gentity_t, r) == 576);
 const _: () = assert!(core::mem::offset_of!(gentity_t, taskID) == 688);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(gentity_t, client) == 976);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(gentity_t, moverState) == 1176);
 
-// The STATE-D9 zeroed-construction contract (round-5 STATE-Q10 resolution):
-// all-zero bytes are a valid gentity_t — the same property the layout asserts above
-// pin and Raven's memset/static zero-init relies on.
-// Source: oracle/codemp/game/g_shared.h (all-zero-valid #[repr(C)]; Raven memsets g_entities, g_main.c:978)
-//
-// The seven fn-ID dispatch fields (`think`, `reached`, `blocked`, `touch`,
-// `use_`, `pain`, `die`) are `FnId<EntXxx>` — a `#[repr(transparent)]` wrapper
-// over `Option<NonZeroU8>` (`ent_fn_ids.rs`). std guarantees `Option<NonZero*>`
-// (and transparent structs around it) encode `None` as the all-zero bit
-// pattern, so zeroed bytes decode as `None` ("no handler") *by construction*,
-// matching Raven's C NULL-fn-pointer semantics. There is therefore no post-zero
-// fixup: the earlier niche hazard (a bare `Option<EntXxx>` enum, whose `None`
-// niche sat AFTER the last variant, so zeroed `touch` read as
-// `Some(EntTouch::HolocronTouch)`) is now structurally impossible. The
-// `fn_id_niche_tests` module below is the regression lock.
-unsafe impl native_platform::ZeroValid for gentity_t {}
+impl gentity_t {
+    /// Drops every owned-`String` tail field (`mem::take` → empty `String`),
+    /// leaving the byte image safe to wholesale-zero. Paired with
+    /// [`Self::seat_owned_strings`] to bracket the `memset`-equivalent
+    /// `write_bytes` in `G_FreeEntity` — later batches EXTEND this set as more
+    /// tail fields migrate to owned strings. No Raven counterpart (Raven's fields
+    /// were pool pointers, cleared by the `memset` itself).
+    pub fn take_owned_strings(&mut self) {
+        let _ = core::mem::take(&mut self.healingclass);
+        let _ = core::mem::take(&mut self.healingsound);
+        let _ = core::mem::take(&mut self.ownername);
+        let _ = core::mem::take(&mut self.NPC_target);
+        let _ = core::mem::take(&mut self.target5);
+        let _ = core::mem::take(&mut self.target6);
+        let _ = core::mem::take(&mut self.targetShaderName);
+        let _ = core::mem::take(&mut self.targetShaderNewName);
+        let _ = core::mem::take(&mut self.goaltarget);
+        let _ = core::mem::take(&mut self.idealclass);
+    }
+
+    /// Seats a fresh empty `String` into every owned-`String` tail field of a
+    /// freshly-zeroed entity image, overwriting the invalid all-zero `String`
+    /// bytes WITHOUT dropping them (`ptr::write`). Mirrors `zeroed_clients`'s
+    /// per-slot `String` install; the arena constructor and the `G_FreeEntity`
+    /// zero dance both call it. `p` must point at a live (possibly zeroed)
+    /// allocation for one `gentity_t`.
+    ///
+    /// # Safety
+    /// `p` is a valid, aligned, writable pointer to one `gentity_t` whose owned
+    /// `String` slots may hold invalid (zeroed) bytes that must not be dropped.
+    pub unsafe fn seat_owned_strings(p: *mut Self) {
+        core::ptr::write(core::ptr::addr_of_mut!((*p).healingclass), String::new());
+        core::ptr::write(core::ptr::addr_of_mut!((*p).healingsound), String::new());
+        core::ptr::write(core::ptr::addr_of_mut!((*p).ownername), String::new());
+        core::ptr::write(core::ptr::addr_of_mut!((*p).NPC_target), String::new());
+        core::ptr::write(core::ptr::addr_of_mut!((*p).target5), String::new());
+        core::ptr::write(core::ptr::addr_of_mut!((*p).target6), String::new());
+        core::ptr::write(core::ptr::addr_of_mut!((*p).targetShaderName), String::new());
+        core::ptr::write(core::ptr::addr_of_mut!((*p).targetShaderNewName), String::new());
+        core::ptr::write(core::ptr::addr_of_mut!((*p).goaltarget), String::new());
+        core::ptr::write(core::ptr::addr_of_mut!((*p).idealclass), String::new());
+    }
+}
+
+// `gentity_t` is no longer `ZeroValid`: the owned-`String` tail fields make an
+// all-zero image an invalid value (a zeroed `String` has a null data pointer).
+// Wholesale-zero construction now goes through `zeroed_entities()` (arena) and
+// the `take`/`seat_owned_strings` dance (`G_FreeEntity`), which install valid
+// empty `String`s into those slots. The seven fn-ID dispatch fields (`think`..
+// `die`) are still `FnId<EntXxx>` — a `#[repr(transparent)]` wrapper over
+// `Option<NonZeroU8>` whose zeroed bytes decode as `None` ("no handler") by
+// construction, matching Raven's NULL fn pointers; `fn_id_niche_tests` is the
+// regression lock.
 
 #[cfg(test)]
 mod fn_id_niche_tests {
@@ -465,21 +508,30 @@ mod fn_id_niche_tests {
         assert_eq!(size_of::<FnId<EntDie>>(), 1);
     }
 
-    /// The whole-bug-class regression lock: a fully byte-zeroed `gentity_t`
-    /// reads all seven handler fields as `None`. Before the `FnId` refactor
+    /// The whole-bug-class regression lock: in a fully byte-zeroed `gentity_t`
+    /// image, all seven handler fields read as `None`. Before the `FnId` refactor
     /// this decoded as `Some(variant 0)` (e.g. `touch == HolocronTouch`).
+    ///
+    /// `gentity_t` is no longer `ZeroValid` (its owned `String` tail makes an
+    /// all-zero image an invalid value), so the handler bytes are read off a
+    /// zeroed `MaybeUninit` through raw pointers — never materializing a
+    /// `gentity_t` value, which would be UB on the zeroed `String` slots.
     #[test]
     fn zeroed_gentity_reads_all_handlers_none() {
-        // SAFETY: `gentity_t: ZeroValid` — all-zero bytes are a valid value;
-        // it holds no `Drop` types, so `forget` is a formality.
-        let z: gentity_t = unsafe { MaybeUninit::zeroed().assume_init() };
-        assert!(z.think.is_none());
-        assert!(z.reached.is_none());
-        assert!(z.blocked.is_none());
-        assert!(z.touch.is_none());
-        assert!(z.use_.is_none());
-        assert!(z.pain.is_none());
-        assert!(z.die.is_none());
-        core::mem::forget(z);
+        use core::ptr::addr_of;
+        let z = MaybeUninit::<gentity_t>::zeroed();
+        let p = z.as_ptr();
+        // SAFETY: `p` points at zeroed, correctly-aligned storage; each
+        // `FnId<EntXxx>` field is one byte whose all-zero pattern is the valid
+        // `None` encoding, so reading it out is sound (no `String` slot touched).
+        unsafe {
+            assert!(addr_of!((*p).think).read().is_none());
+            assert!(addr_of!((*p).reached).read().is_none());
+            assert!(addr_of!((*p).blocked).read().is_none());
+            assert!(addr_of!((*p).touch).read().is_none());
+            assert!(addr_of!((*p).use_).read().is_none());
+            assert!(addr_of!((*p).pain).read().is_none());
+            assert!(addr_of!((*p).die).read().is_none());
+        }
     }
 }

@@ -689,14 +689,17 @@ pub fn G_UseTargets2(
 
     let (tsn, tsnn) = {
         let e = ctx.world.entity(ent_id);
-        (e.targetShaderName, e.targetShaderNewName)
+        (e.targetShaderName.clone(), e.targetShaderNewName.clone())
     };
-    if !tsn.is_null() && !tsnn.is_null() {
+    // Owned `String` fields now: `""` ≡ absent (was the paired non-NULL check).
+    if !tsn.is_empty() && !tsnn.is_empty() {
         // C's `level.time * 0.001`: 0.001 is a double literal, so level.time
         // promotes to f64 and narrows once at the store.
         // Source: `oracle/codemp/game/g_utils.c:574`
         let f = (ctx.world.level.time as f64 * 0.001) as f32;
-        AddRemap(ctx, tsn, tsnn, f);
+        let tsn_c = cstr(&tsn);
+        let tsnn_c = cstr(&tsnn);
+        AddRemap(ctx, tsn_c.as_ptr(), tsnn_c.as_ptr(), f);
         let config = BuildShaderStateConfig(ctx);
         trap::SetConfigstring(ctx.engine, CS_SHADERSTATE, &config);
     }
@@ -1138,11 +1141,18 @@ pub fn G_FreeEntity(ctx: &mut GameContext, ed: Option<EntityId>) {
 
     let ed_ptr = ctx.world.entity_mut(ed_id) as *mut gentity_t;
     unsafe {
+        // Owned-`String` tail fields are not zero-valid: drop them first
+        // (`take_owned_strings`), then the byte-wise zero (Raven
+        // `memset(ed, 0, sizeof(*ed))`), then re-seat valid empty `String`s into
+        // those now-zeroed slots (`seat_owned_strings`) — never dropping the
+        // invalid zeroed image. Mirrors the ClientSpawn dance.
+        (*ed_ptr).take_owned_strings();
         core::ptr::write_bytes(ed_ptr, 0, 1);
+        gentity_t::seat_owned_strings(ed_ptr);
     }
-    // The byte-wise zero above (Raven `memset(ed, 0, sizeof(*ed))`) leaves
-    // the FnId<EntXxx> handler fields as None by construction (zero == None,
-    // std-guaranteed via Option<NonZeroU8>), matching Raven's NULL fn ptrs.
+    // The byte-wise zero above leaves the FnId<EntXxx> handler fields as None by
+    // construction (zero == None, std-guaranteed via Option<NonZeroU8>), matching
+    // Raven's NULL fn ptrs.
     let level_time = ctx.world.level.time;
     let ed = ctx.world.entity_mut(ed_id);
     ed.classname = b"freed\0".as_ptr() as *mut c_char;
@@ -1753,13 +1763,12 @@ pub fn TryHeal(ctx: &mut GameContext, ent: Option<EntityId>, target: Option<Enti
     let siegeClass = unsafe { (*client).siegeClass };
     let bail = {
         let t = ctx.world.entity(target_id);
-        let hc = t.healingclass;
+        // Owned `String` now: `""` ≡ absent (was the `!= 0` non-empty check).
         g_gametype != GT_SIEGE
             || siegeClass == -1
             || t.inuse == qfalse
             || t.maxHealth == 0
-            || hc.is_null()
-            || unsafe { *hc } == 0
+            || t.healingclass.is_empty()
             || t.health <= 0
             || t.health >= t.maxHealth
     };
@@ -1768,11 +1777,9 @@ pub fn TryHeal(ctx: &mut GameContext, ent: Option<EntityId>, target: Option<Enti
         return qfalse;
     }
 
-    let healingclass = ctx.world.entity(target_id).healingclass;
     let scl_matches = {
         let scl = &ctx.world.bg_state.bgSiegeClasses[siegeClass as usize];
-        let hc = unsafe { cstr_to_str(healingclass) };
-        scl.name.eq_ignore_ascii_case(&hc)
+        scl.name.eq_ignore_ascii_case(&ctx.world.entity(target_id).healingclass)
     };
     if !scl_matches {
         return qfalse;
@@ -1793,10 +1800,10 @@ pub fn TryHeal(ctx: &mut GameContext, ent: Option<EntityId>, target: Option<Enti
         let healingrate = ctx.world.entity(target_id).healingrate;
         ctx.world.entity_mut(target_id).healingDebounce = level_time + healingrate;
 
-        let healingsound = ctx.world.entity(target_id).healingsound;
-        if !healingsound.is_null() && unsafe { *healingsound } != 0 {
+        let healingsound = ctx.world.entity(target_id).healingsound.clone();
+        if !healingsound.is_empty() {
             // play it
-            let sound = G_SoundIndex(&(unsafe { cstr_to_str(healingsound) }));
+            let sound = G_SoundIndex(&healingsound);
             if ctx.world.entity(target_id).s.solid == SOLID_BMODEL {
                 // ok, well, just play it on the client then.
                 G_Sound(ctx, Some(ent_id), CHAN_AUTO as c_int, sound);

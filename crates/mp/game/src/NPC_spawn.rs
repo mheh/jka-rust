@@ -1291,8 +1291,8 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
             (*newent).fly_sound_debounce_time = (*ent).fly_sound_debounce_time;
             (*newent).damage = (*ent).damage;
             (*newent).speed = (*ent).speed;
-            (*newent).healingclass = (*ent).healingclass;
-            (*newent).healingsound = (*ent).healingsound;
+            (*newent).healingclass = (*ent).healingclass.clone();
+            (*newent).healingsound = (*ent).healingsound.clone();
             (*newent).healingrate = (*ent).healingrate;
             (*newent).model2 = (*ent).model2;
         } else {
@@ -1346,7 +1346,20 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         }
         (*newent).script_targetname = (*ent).NPC_targetname;
         (*newent).targetname = (*ent).NPC_targetname;
-        (*newent).target = (*ent).NPC_target;
+        // `NPC_target` is now an owned `String` (`""` ≡ absent); `target` stays a
+        // G_Alloc-pool `*mut c_char` this batch. Materialize a pool copy via
+        // G_NewString (which also restores the `\n` translation the old
+        // `F_LSTRING` NPC_target carried), so `target` ends up identical to Raven's
+        // aliased value; empty → NULL, matching the old NULL-pointer alias.
+        (*newent).target = {
+            let npc_target = (*ent).NPC_target.clone();
+            if npc_target.is_empty() {
+                core::ptr::null_mut()
+            } else {
+                let npc_target_c = cstr(&npc_target);
+                G_NewString(ctx, npc_target_c.as_ptr())
+            }
+        };
         (*newent).target2 = (*ent).target2;
         (*newent).target3 = (*ent).target3;
         (*newent).target4 = (*ent).target4;

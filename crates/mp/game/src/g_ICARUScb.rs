@@ -286,8 +286,9 @@ pub fn Q3_Play(
         let roffid = trap::ROFF_Cache(ctx.engine, &unsafe { cstr_to_str(name) });
         ctx.world.entity_mut(id).roffid = roffid;
         if roffid != 0 {
-            let roffname = G_NewString(ctx, name);
-            ctx.world.entity_mut(id).roffname = roffname;
+            // Raven stored `roffname = G_NewString(name)` here; the field was
+            // deleted (zero readers — only the resolved `roffid` is consumed), so
+            // the store drops.
 
             // Save this off for later
             trap::ICARUS_TaskIDSet(
@@ -774,12 +775,13 @@ pub fn Q3_GetTag(
         return 0;
     }
 
-    let ownername = ctx.world.entity(id).ownername;
+    let ownername = ctx.world.entity(id).ownername.clone();
+    let ownername_c = cstr(&ownername);
     // `TYPE_ORIGIN`/`TYPE_ANGLES` are module-level consts (see above).
     if lookup == TYPE_ORIGIN {
-        return TAG_GetOrigin(ctx, ownername, name, info);
+        return TAG_GetOrigin(ctx, ownername_c.as_ptr(), name, info);
     } else if lookup == TYPE_ANGLES {
-        return TAG_GetAngles(ctx, ownername, name, info);
+        return TAG_GetAngles(ctx, ownername_c.as_ptr(), name, info);
     }
 
     0

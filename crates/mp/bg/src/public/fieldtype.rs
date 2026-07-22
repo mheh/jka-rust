@@ -36,4 +36,9 @@ pub enum fieldtype_t {
     F_PARM15 = 23,
     F_PARM16 = 24,
     F_IGNORE = 25,
+    /// jka-rust tail-field migration: the field's value is owned by the entity
+    /// (`String`/`Option<String>`), set through a typed setter carried on
+    /// [`super::bg_field::BG_field_t::set`] rather than an offset write. No Raven
+    /// counterpart — Raven kept these as `F_LSTRING` pool pointers.
+    F_STRING_OWNED = 26,
 }
