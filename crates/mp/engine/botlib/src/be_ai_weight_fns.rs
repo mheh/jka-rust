@@ -419,7 +419,7 @@ pub fn FuzzyWeightUndecided(
 ///
 /// Source: `oracle/codemp/botlib/be_ai_weight.cpp:125-129`
 pub fn FreeWeightConfig(bot: &mut BotLib, config: *mut weightconfig_t) {
-    if LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr() as *mut c_char) == 0.0 {
+    if LibVarGetValue(bot, "bot_reloadcharacters") == 0.0 {
         return;
     }
     FreeWeightConfig2(bot, config);
@@ -718,7 +718,7 @@ pub fn ReadWeightConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weightc
         let mut fs: *mut fuzzyseperator_t;
         let mut config: *mut weightconfig_t;
 
-        if LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr() as *mut c_char) == 0.0 {
+        if LibVarGetValue(bot, "bot_reloadcharacters") == 0.0 {
             avail = -1;
             n = 0;
             while n < MAX_WEIGHT_FILES as c_int {
@@ -877,7 +877,7 @@ pub fn ReadWeightConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weightc
         );
         // #ifdef DEBUG (dropped — not defined by the oracle build, §C10)
         //
-        if LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr() as *mut c_char) == 0.0 {
+        if LibVarGetValue(bot, "bot_reloadcharacters") == 0.0 {
             bot.weightFileList[avail as usize] = config;
         }
         //

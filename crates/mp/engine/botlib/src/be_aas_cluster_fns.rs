@@ -971,9 +971,9 @@ pub fn AAS_InitClustering(bot: &mut BotLib) {
             // Raven's `#ifndef BSPC` early-out reads the "forceclustering"/
             // "forcereachability" libvars; BSPC is not built here, so it always applies.
             let force_clustering =
-                LibVarGetValue(bot, c"forceclustering".as_ptr() as *mut c_char) as c_int;
+                LibVarGetValue(bot, "forceclustering") as c_int;
             let force_reachability =
-                LibVarGetValue(bot, c"forcereachability".as_ptr() as *mut c_char) as c_int;
+                LibVarGetValue(bot, "forcereachability") as c_int;
             if force_clustering == 0 && force_reachability == 0 {
                 return;
             }

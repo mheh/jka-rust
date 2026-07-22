@@ -428,10 +428,8 @@ pub fn AAS_LoadAASFile(bot: &mut BotLib, filename: *mut c_char) -> c_int {
             );
         }
         //
-        bot.aasworld.bspchecksum = libc::atoi(LibVarGetString(
-            bot,
-            c"sv_mapChecksum".as_ptr() as *mut c_char,
-        ));
+        let sv_mapchecksum = std::ffi::CString::new(LibVarGetString(bot, "sv_mapChecksum")).unwrap();
+        bot.aasworld.bspchecksum = libc::atoi(sv_mapchecksum.as_ptr());
         if LittleLong(header.bspchecksum) != bot.aasworld.bspchecksum {
             let msg = std::ffi::CString::new(format!(
                 "aas file {} is out of date\n",

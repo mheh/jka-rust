@@ -257,14 +257,10 @@ pub fn AAS_ContinueInit(bot: &mut BotLib, time: f32) {
         // if reachability has been calculated and an AAS file should be written
         // or there is a forced data optimization
         if bot.aasworld.savefile != 0
-            || (LibVarGetValue(bot, c"forcewrite".as_ptr() as *mut c_char) as c_int) != 0
+            || (LibVarGetValue(bot, "forcewrite") as c_int) != 0
         {
             // optimize the AAS data
-            if (LibVarValue(
-                bot,
-                c"aasoptimize".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-            ) as c_int)
+            if (LibVarValue(bot, "aasoptimize", "0") as c_int)
                 != 0
             {
                 AAS_Optimize(bot);
@@ -296,56 +292,38 @@ pub fn AAS_ContinueInit(bot: &mut BotLib, time: f32) {
 ///
 /// Source: `oracle/codemp/botlib/be_aas_main.cpp:221-260`
 pub fn AAS_StartFrame(bot: &mut BotLib, time: f32) -> c_int {
-    unsafe {
-        bot.aasworld.time = time;
-        // unlink all entities that were not updated last frame
-        AAS_UnlinkInvalidEntities(bot);
-        // invalidate the entities
-        AAS_InvalidateEntities(bot);
-        // initialize AAS
-        AAS_ContinueInit(bot, time);
-        //
-        bot.aasworld.frameroutingupdates = 0;
-        //
-        if bot.bot_developer != 0 {
-            if LibVarGetValue(bot, c"showcacheupdates".as_ptr() as *mut c_char) != 0.0 {
-                AAS_RoutingInfo(bot);
-                LibVarSet(
-                    bot,
-                    c"showcacheupdates".as_ptr() as *mut c_char,
-                    c"0".as_ptr() as *mut c_char,
-                );
-            }
-            if LibVarGetValue(bot, c"showmemoryusage".as_ptr() as *mut c_char) != 0.0 {
-                PrintUsedMemorySize();
-                LibVarSet(
-                    bot,
-                    c"showmemoryusage".as_ptr() as *mut c_char,
-                    c"0".as_ptr() as *mut c_char,
-                );
-            }
-            if LibVarGetValue(bot, c"memorydump".as_ptr() as *mut c_char) != 0.0 {
-                PrintMemoryLabels();
-                LibVarSet(
-                    bot,
-                    c"memorydump".as_ptr() as *mut c_char,
-                    c"0".as_ptr() as *mut c_char,
-                );
-            }
+    bot.aasworld.time = time;
+    // unlink all entities that were not updated last frame
+    AAS_UnlinkInvalidEntities(bot);
+    // invalidate the entities
+    AAS_InvalidateEntities(bot);
+    // initialize AAS
+    AAS_ContinueInit(bot, time);
+    //
+    bot.aasworld.frameroutingupdates = 0;
+    //
+    if bot.bot_developer != 0 {
+        if LibVarGetValue(bot, "showcacheupdates") != 0.0 {
+            AAS_RoutingInfo(bot);
+            LibVarSet(bot, "showcacheupdates", "0");
         }
-        //
-        if (*bot.saveroutingcache).value != 0.0 {
-            AAS_WriteRouteCache(bot);
-            LibVarSet(
-                bot,
-                c"saveroutingcache".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-            );
+        if LibVarGetValue(bot, "showmemoryusage") != 0.0 {
+            PrintUsedMemorySize();
+            LibVarSet(bot, "showmemoryusage", "0");
         }
-        //
-        bot.aasworld.numframes += 1;
-        BLERR_NOERROR
+        if LibVarGetValue(bot, "memorydump") != 0.0 {
+            PrintMemoryLabels();
+            LibVarSet(bot, "memorydump", "0");
+        }
     }
+    //
+    if bot.libvar(bot.saveroutingcache).value != 0.0 {
+        AAS_WriteRouteCache(bot);
+        LibVarSet(bot, "saveroutingcache", "0");
+    }
+    //
+    bot.aasworld.numframes += 1;
+    BLERR_NOERROR
 }
 
 /// Raven `AAS_Time`.
@@ -446,22 +424,10 @@ pub fn AAS_ProjectPointOntoVector(point: vec3_t, vStart: vec3_t, vEnd: vec3_t, v
 ///
 /// Source: `oracle/codemp/botlib/be_aas_main.cpp:366-382`
 pub fn AAS_Setup(bot: &mut BotLib) -> c_int {
-    bot.aasworld.maxclients = LibVarValue(
-        bot,
-        c"maxclients".as_ptr() as *mut c_char,
-        c"128".as_ptr() as *mut c_char,
-    ) as c_int;
-    bot.aasworld.maxentities = LibVarValue(
-        bot,
-        c"maxentities".as_ptr() as *mut c_char,
-        c"1024".as_ptr() as *mut c_char,
-    ) as c_int;
+    bot.aasworld.maxclients = LibVarValue(bot, "maxclients", "128") as c_int;
+    bot.aasworld.maxentities = LibVarValue(bot, "maxentities", "1024") as c_int;
     // as soon as it's set to 1 the routing cache will be saved
-    bot.saveroutingcache = LibVar(
-        bot,
-        c"saveroutingcache".as_ptr() as *mut c_char,
-        c"0".as_ptr() as *mut c_char,
-    );
+    bot.saveroutingcache = LibVar(bot, "saveroutingcache", "0");
     // allocate memory for the entities
     if !bot.aasworld.entities.is_null() {
         FreeMemory(bot, bot.aasworld.entities as *mut ());

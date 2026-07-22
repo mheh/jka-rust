@@ -87,7 +87,7 @@ use crate::be_ai_move::bot_movestate_s::bot_movestate_t;
 use crate::be_ai_weap::bot_weaponstate_s::bot_weaponstate_t;
 use crate::be_ai_weap::weaponconfig_s::weaponconfig_t;
 use crate::be_interface::botlib_globals_s::botlib_globals_t;
-use crate::l_libvar::libvar_s::libvar_t;
+use crate::l_libvar::libvar_s::{LibVar, LibVarHandle};
 use crate::l_log::consts::MAX_LOGFILENAMESIZE;
 use crate::l_precomp::define_s::define_t;
 use crate::l_precomp::precomp_consts::MAX_SOURCEFILES;
@@ -140,10 +140,10 @@ pub struct BotLib {
     pub clusterareas: *mut c_int,
     /// Raven `libvar_t *cmd_grappleoff`.
     /// Source: `oracle/codemp/botlib/be_ai_move.cpp:97`
-    pub cmd_grappleoff: *mut libvar_t,
+    pub cmd_grappleoff: LibVarHandle,
     /// Raven `libvar_t *cmd_grappleon`.
     /// Source: `oracle/codemp/botlib/be_ai_move.cpp:98`
-    pub cmd_grappleon: *mut libvar_t,
+    pub cmd_grappleon: LibVarHandle,
     /// Raven `bot_consolemessage_t *consolemessageheap`.
     /// Source: `oracle/codemp/botlib/be_ai_chat.cpp:185`
     pub consolemessageheap: *mut bot_consolemessage_t,
@@ -156,10 +156,10 @@ pub struct BotLib {
     pub default_punctuations: [punctuation_t; DEFAULT_PUNCTUATIONS_LEN],
     /// Raven `libvar_t *droppedweight`.
     /// Source: `oracle/codemp/botlib/be_ai_goal.cpp:178`
-    pub droppedweight: *mut libvar_t,
+    pub droppedweight: LibVarHandle,
     /// Raven `libvar_t *entitytypemissile`.
     /// Source: `oracle/codemp/botlib/be_ai_move.cpp:95`
-    pub entitytypemissile: *mut libvar_t,
+    pub entitytypemissile: LibVarHandle,
     /// Raven `bot_consolemessage_t *freeconsolemessages`.
     /// Source: `oracle/codemp/botlib/be_ai_chat.cpp:186`
     pub freeconsolemessages: *mut bot_consolemessage_t,
@@ -202,7 +202,7 @@ pub struct BotLib {
     pub numlevelitems: c_int,
     /// Raven `libvar_t *offhandgrapple`.
     /// Source: `oracle/codemp/botlib/be_ai_move.cpp:96`
-    pub offhandgrapple: *mut libvar_t,
+    pub offhandgrapple: LibVarHandle,
     /// Raven `bot_randomlist_t *randomstrings`.
     /// Source: `oracle/codemp/botlib/be_ai_chat.cpp:192`
     pub randomstrings: *mut bot_randomlist_t,
@@ -211,28 +211,28 @@ pub struct BotLib {
     pub replychats: *mut bot_replychat_t,
     /// Raven `libvar_t *saveroutingcache`.
     /// Source: `oracle/codemp/botlib/be_aas_main.cpp:32`
-    pub saveroutingcache: *mut libvar_t,
+    pub saveroutingcache: LibVarHandle,
     /// Raven `libvar_t *sv_gravity`.
     /// Source: `oracle/codemp/botlib/be_ai_move.cpp:91`
-    pub sv_gravity: *mut libvar_t,
+    pub sv_gravity: LibVarHandle,
     /// Raven `libvar_t *sv_maxbarrier`.
     /// Source: `oracle/codemp/botlib/be_ai_move.cpp:90`
-    pub sv_maxbarrier: *mut libvar_t,
+    pub sv_maxbarrier: LibVarHandle,
     /// Raven `libvar_t *sv_maxstep`.
     /// Source: `oracle/codemp/botlib/be_ai_move.cpp:89`
-    pub sv_maxstep: *mut libvar_t,
+    pub sv_maxstep: LibVarHandle,
     /// Raven `bot_synonymlist_t *synonyms`.
     /// Source: `oracle/codemp/botlib/be_ai_chat.cpp:190`
     pub synonyms: *mut bot_synonymlist_t,
     /// Raven `libvar_t *weapindex_bfg10k`.
     /// Source: `oracle/codemp/botlib/be_ai_move.cpp:93`
-    pub weapindex_bfg10k: *mut libvar_t,
+    pub weapindex_bfg10k: LibVarHandle,
     /// Raven `libvar_t *weapindex_grapple`.
     /// Source: `oracle/codemp/botlib/be_ai_move.cpp:94`
-    pub weapindex_grapple: *mut libvar_t,
+    pub weapindex_grapple: LibVarHandle,
     /// Raven `libvar_t *weapindex_rocketlauncher`.
     /// Source: `oracle/codemp/botlib/be_ai_move.cpp:92`
-    pub weapindex_rocketlauncher: *mut libvar_t,
+    pub weapindex_rocketlauncher: LibVarHandle,
 
     // ---- Round-3 field merge: file-scope globals and function-static hoists
     // referenced by transcribed bodies but absent from the initial aggregate.
@@ -268,9 +268,12 @@ pub struct BotLib {
     /// Raven function-static `int lastpercentage` (hoisted from `AAS_ContinueInitReachability`).
     /// Source: `oracle/codemp/botlib/be_aas_reach.cpp:4351`
     pub lastpercentage: c_int,
-    /// Raven `libvar_t *libvarlist`.
+    /// Raven `libvar_t *libvarlist` — the library-variable list. Redesigned
+    /// (porting-rules §F17) from a malloc'd linked list into this owned arena;
+    /// `LibVarHandle` indexes it. Slots are only appended or cleared wholesale,
+    /// never individually removed.
     /// Source: `oracle/codemp/botlib/l_libvar.cpp:20`
-    pub libvarlist: *mut libvar_t,
+    pub libvars: Vec<LibVar>,
     /// Raven `logfile_t logfile`.
     /// Source: `oracle/codemp/botlib/l_log.cpp:33`
     pub logfile: logfile_t,
@@ -389,20 +392,42 @@ pub struct BotLib {
 }
 
 impl Default for BotLib {
-    /// Hand-written (NOT `#[derive]`): every field is a faithful C type — raw
-    /// pointers, `#[repr(C)]` structs of pointers/ints/floats, and arrays of
+    /// Hand-written (NOT `#[derive]`): nearly every field is a faithful C type —
+    /// raw pointers, `#[repr(C)]` structs of pointers/ints/floats, and arrays of
     /// those — none of which derive `Default`, but all of which are zero-valid
     /// (null pointers, `0`, `None` fn-ptrs), matching Raven's zero-initialized
-    /// file-scope globals. Fields whose Raven definitions carry a real
-    /// initializer (`default_punctuations`, `iteminfo_struct`, `crctable`) are
-    /// populated at setup time, not here.
+    /// file-scope globals. The lone exception is `libvars: Vec<LibVar>`, whose
+    /// all-zero bit pattern is an invalid `Vec` (its `NonNull` buffer pointer
+    /// cannot be null); it is written explicitly before `assume_init`. Fields
+    /// whose Raven definitions carry a real initializer (`default_punctuations`,
+    /// `iteminfo_struct`, `crctable`) are populated at setup time, not here. The
+    /// cached `LibVarHandle` fields (`sv_maxstep`, `cmd_grappleon`, …) default to
+    /// `LibVarHandle(0)`, matching Raven's null pointers: they are assigned real
+    /// handles at setup (`BotSetupMoveAI`/`AAS_Setup`/…) before any read.
     fn default() -> Self {
-        // SAFETY: all fields are zero-valid (raw pointers → null, `Option<fn>`
-        // → `None`, ints/floats/arrays → 0); no field type reserves a niche.
-        let mut bot: Self = unsafe { core::mem::zeroed() };
-        // Raven `int nofaceflood = qtrue` — the one non-zero static initializer.
-        bot.nofaceflood = 1;
-        bot
+        // SAFETY: every field except `libvars` is zero-valid (raw pointers →
+        // null, `Option<fn>` → `None`, ints/floats/arrays → 0, `LibVarHandle` →
+        // index 0). `MaybeUninit::zeroed` never materializes a zeroed `Vec` as a
+        // valid value: the `libvars` slot is overwritten with a real empty `Vec`
+        // (via `ptr::write`, so the invalid zeroed bytes are not dropped) before
+        // `assume_init`.
+        let mut uninit = core::mem::MaybeUninit::<Self>::zeroed();
+        let ptr = uninit.as_mut_ptr();
+        unsafe {
+            core::ptr::write(core::ptr::addr_of_mut!((*ptr).libvars), Vec::new());
+            // Raven `int nofaceflood = qtrue` — the one non-zero static initializer.
+            core::ptr::addr_of_mut!((*ptr).nofaceflood).write(1);
+            uninit.assume_init()
+        }
+    }
+}
+
+impl BotLib {
+    /// Resolve a cached `LibVarHandle` to its `LibVar` slot — the arena
+    /// equivalent of dereferencing Raven's cached `libvar_t *` (§B5).
+    #[inline]
+    pub fn libvar(&self, handle: LibVarHandle) -> &LibVar {
+        &self.libvars[handle.0]
     }
 }
 

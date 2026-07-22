@@ -16,7 +16,7 @@
 //!
 //! Source: `oracle/codemp/botlib/be_aas_move.cpp`
 
-use core::ffi::{c_char, c_int};
+use core::ffi::c_int;
 
 use mp_engine_qcommon::common::Common;
 use mp_qshared::common::mp::botlib::aas_clientmove_s::{aas_clientmove_s, aas_clientmove_t};
@@ -453,59 +453,44 @@ pub fn AAS_InitSettings(bot: &mut BotLib) {
         bot.aassettings.phys_gravitydirection[0] = 0.0;
         bot.aassettings.phys_gravitydirection[1] = 0.0;
         bot.aassettings.phys_gravitydirection[2] = -1.0;
-        bot.aassettings.phys_friction = LibVarValue_str(bot, "phys_friction", "6");
-        bot.aassettings.phys_stopspeed = LibVarValue_str(bot, "phys_stopspeed", "100");
-        bot.aassettings.phys_gravity = LibVarValue_str(bot, "phys_gravity", "800");
-        bot.aassettings.phys_waterfriction = LibVarValue_str(bot, "phys_waterfriction", "1");
-        bot.aassettings.phys_watergravity = LibVarValue_str(bot, "phys_watergravity", "400");
-        bot.aassettings.phys_maxvelocity = LibVarValue_str(bot, "phys_maxvelocity", "320");
-        bot.aassettings.phys_maxwalkvelocity = LibVarValue_str(bot, "phys_maxwalkvelocity", "320");
+        bot.aassettings.phys_friction = LibVarValue(bot, "phys_friction", "6");
+        bot.aassettings.phys_stopspeed = LibVarValue(bot, "phys_stopspeed", "100");
+        bot.aassettings.phys_gravity = LibVarValue(bot, "phys_gravity", "800");
+        bot.aassettings.phys_waterfriction = LibVarValue(bot, "phys_waterfriction", "1");
+        bot.aassettings.phys_watergravity = LibVarValue(bot, "phys_watergravity", "400");
+        bot.aassettings.phys_maxvelocity = LibVarValue(bot, "phys_maxvelocity", "320");
+        bot.aassettings.phys_maxwalkvelocity = LibVarValue(bot, "phys_maxwalkvelocity", "320");
         bot.aassettings.phys_maxcrouchvelocity =
-            LibVarValue_str(bot, "phys_maxcrouchvelocity", "100");
-        bot.aassettings.phys_maxswimvelocity = LibVarValue_str(bot, "phys_maxswimvelocity", "150");
-        bot.aassettings.phys_walkaccelerate = LibVarValue_str(bot, "phys_walkaccelerate", "10");
-        bot.aassettings.phys_airaccelerate = LibVarValue_str(bot, "phys_airaccelerate", "1");
-        bot.aassettings.phys_swimaccelerate = LibVarValue_str(bot, "phys_swimaccelerate", "4");
-        bot.aassettings.phys_maxstep = LibVarValue_str(bot, "phys_maxstep", "19");
-        bot.aassettings.phys_maxsteepness = LibVarValue_str(bot, "phys_maxsteepness", "0.7");
-        bot.aassettings.phys_maxwaterjump = LibVarValue_str(bot, "phys_maxwaterjump", "18");
-        bot.aassettings.phys_maxbarrier = LibVarValue_str(bot, "phys_maxbarrier", "33");
-        bot.aassettings.phys_jumpvel = LibVarValue_str(bot, "phys_jumpvel", "270");
-        bot.aassettings.phys_falldelta5 = LibVarValue_str(bot, "phys_falldelta5", "40");
-        bot.aassettings.phys_falldelta10 = LibVarValue_str(bot, "phys_falldelta10", "60");
-        bot.aassettings.rs_waterjump = LibVarValue_str(bot, "rs_waterjump", "400");
-        bot.aassettings.rs_teleport = LibVarValue_str(bot, "rs_teleport", "50");
-        bot.aassettings.rs_barrierjump = LibVarValue_str(bot, "rs_barrierjump", "100");
-        bot.aassettings.rs_startcrouch = LibVarValue_str(bot, "rs_startcrouch", "300");
-        bot.aassettings.rs_startgrapple = LibVarValue_str(bot, "rs_startgrapple", "500");
-        bot.aassettings.rs_startwalkoffledge = LibVarValue_str(bot, "rs_startwalkoffledge", "70");
-        bot.aassettings.rs_startjump = LibVarValue_str(bot, "rs_startjump", "300");
-        bot.aassettings.rs_rocketjump = LibVarValue_str(bot, "rs_rocketjump", "500");
-        bot.aassettings.rs_bfgjump = LibVarValue_str(bot, "rs_bfgjump", "500");
-        bot.aassettings.rs_jumppad = LibVarValue_str(bot, "rs_jumppad", "250");
+            LibVarValue(bot, "phys_maxcrouchvelocity", "100");
+        bot.aassettings.phys_maxswimvelocity = LibVarValue(bot, "phys_maxswimvelocity", "150");
+        bot.aassettings.phys_walkaccelerate = LibVarValue(bot, "phys_walkaccelerate", "10");
+        bot.aassettings.phys_airaccelerate = LibVarValue(bot, "phys_airaccelerate", "1");
+        bot.aassettings.phys_swimaccelerate = LibVarValue(bot, "phys_swimaccelerate", "4");
+        bot.aassettings.phys_maxstep = LibVarValue(bot, "phys_maxstep", "19");
+        bot.aassettings.phys_maxsteepness = LibVarValue(bot, "phys_maxsteepness", "0.7");
+        bot.aassettings.phys_maxwaterjump = LibVarValue(bot, "phys_maxwaterjump", "18");
+        bot.aassettings.phys_maxbarrier = LibVarValue(bot, "phys_maxbarrier", "33");
+        bot.aassettings.phys_jumpvel = LibVarValue(bot, "phys_jumpvel", "270");
+        bot.aassettings.phys_falldelta5 = LibVarValue(bot, "phys_falldelta5", "40");
+        bot.aassettings.phys_falldelta10 = LibVarValue(bot, "phys_falldelta10", "60");
+        bot.aassettings.rs_waterjump = LibVarValue(bot, "rs_waterjump", "400");
+        bot.aassettings.rs_teleport = LibVarValue(bot, "rs_teleport", "50");
+        bot.aassettings.rs_barrierjump = LibVarValue(bot, "rs_barrierjump", "100");
+        bot.aassettings.rs_startcrouch = LibVarValue(bot, "rs_startcrouch", "300");
+        bot.aassettings.rs_startgrapple = LibVarValue(bot, "rs_startgrapple", "500");
+        bot.aassettings.rs_startwalkoffledge = LibVarValue(bot, "rs_startwalkoffledge", "70");
+        bot.aassettings.rs_startjump = LibVarValue(bot, "rs_startjump", "300");
+        bot.aassettings.rs_rocketjump = LibVarValue(bot, "rs_rocketjump", "500");
+        bot.aassettings.rs_bfgjump = LibVarValue(bot, "rs_bfgjump", "500");
+        bot.aassettings.rs_jumppad = LibVarValue(bot, "rs_jumppad", "250");
         bot.aassettings.rs_aircontrolledjumppad =
-            LibVarValue_str(bot, "rs_aircontrolledjumppad", "300");
-        bot.aassettings.rs_funcbob = LibVarValue_str(bot, "rs_funcbob", "300");
-        bot.aassettings.rs_startelevator = LibVarValue_str(bot, "rs_startelevator", "50");
-        bot.aassettings.rs_falldamage5 = LibVarValue_str(bot, "rs_falldamage5", "300");
-        bot.aassettings.rs_falldamage10 = LibVarValue_str(bot, "rs_falldamage10", "500");
-        bot.aassettings.rs_maxfallheight = LibVarValue_str(bot, "rs_maxfallheight", "0");
-        bot.aassettings.rs_maxjumpfallheight = LibVarValue_str(bot, "rs_maxjumpfallheight", "450");
-    }
-}
-
-// `LibVarValue` takes `char *` in Raven for both the name and default-value
-// string literals; this shim builds the null-terminated buffers so
-// `AAS_InitSettings`'s 36 call sites stay a 1:1 transcription.
-fn LibVarValue_str(bot: &mut BotLib, name: &str, default: &str) -> f32 {
-    let name_c = std::ffi::CString::new(name).unwrap();
-    let default_c = std::ffi::CString::new(default).unwrap();
-    unsafe {
-        LibVarValue(
-            bot,
-            name_c.as_ptr() as *mut c_char,
-            default_c.as_ptr() as *mut c_char,
-        )
+            LibVarValue(bot, "rs_aircontrolledjumppad", "300");
+        bot.aassettings.rs_funcbob = LibVarValue(bot, "rs_funcbob", "300");
+        bot.aassettings.rs_startelevator = LibVarValue(bot, "rs_startelevator", "50");
+        bot.aassettings.rs_falldamage5 = LibVarValue(bot, "rs_falldamage5", "300");
+        bot.aassettings.rs_falldamage10 = LibVarValue(bot, "rs_falldamage10", "500");
+        bot.aassettings.rs_maxfallheight = LibVarValue(bot, "rs_maxfallheight", "0");
+        bot.aassettings.rs_maxjumpfallheight = LibVarValue(bot, "rs_maxjumpfallheight", "450");
     }
 }
 

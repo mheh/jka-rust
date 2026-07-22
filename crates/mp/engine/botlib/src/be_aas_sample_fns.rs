@@ -10,7 +10,7 @@
 //! constants-only) — so this file lands at the `_fns` escape per
 //! `_PREAMBLE.md`'s destination rule.
 //!
-use core::ffi::{c_char, c_int, c_ulong};
+use core::ffi::{c_int, c_ulong};
 
 use mp_qshared::common::mp::botlib::aas_trace_s::aas_trace_t;
 use mp_qshared::common::mp::botlib::bsp_trace_s::bsp_trace_t;
@@ -1312,11 +1312,7 @@ pub fn AAS_InitAASLinkHeap(bot: &mut BotLib) {
             }
             #[cfg(not(feature = "bspc"))]
             {
-                max_aaslinks = LibVarValue(
-                    bot,
-                    c"max_aaslinks".as_ptr() as *mut c_char,
-                    c"6144".as_ptr() as *mut c_char,
-                ) as c_int;
+                max_aaslinks = LibVarValue(bot, "max_aaslinks", "6144") as c_int;
             }
             if max_aaslinks < 0 {
                 max_aaslinks = 0;

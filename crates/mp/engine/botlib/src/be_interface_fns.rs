@@ -18,7 +18,7 @@
 //!
 //! Destination `_fns` escape: the `be_interface/` directory holds the types.
 
-use core::ffi::{c_char, c_int, c_void};
+use core::ffi::{c_char, c_int, c_void, CStr};
 
 use crate::be_interface::botlib_globals_s::botlib_globals_t;
 use crate::BotLib;
@@ -192,12 +192,19 @@ pub fn Export_BotLibVarGet(
     value: *mut c_char,
     size: c_int,
 ) -> c_int {
+    // Thin ABI adapter (frozen signature): decode the incoming C string once,
+    // drive the idiomatic internal, then copy the result back with Raven's
+    // `strncpy(value, varvalue, size-1); value[size-1] = 0;` truncation.
+    let name = unsafe { CStr::from_ptr(var_name) }.to_string_lossy();
+    let varvalue = LibVarGetString(bot, &name);
+    let src = varvalue.as_bytes();
+    let cap = (size - 1).max(0) as usize;
+    let n = src.len().min(cap);
     unsafe {
-        let varvalue = LibVarGetString(bot, var_name);
-        libc::strncpy(value, varvalue, (size - 1) as usize);
-        *value.offset((size - 1) as isize) = 0;
-        BLERR_NOERROR
+        core::ptr::copy_nonoverlapping(src.as_ptr() as *const c_char, value, n);
+        *value.add(n) = 0;
     }
+    BLERR_NOERROR
 }
 
 /// Raven `Init_EA_Export` — populates the elementary-action export table.
@@ -241,7 +248,11 @@ pub fn Init_EA_Export(ea: *mut ea_export_t) {
 ///
 /// Source: `oracle/codemp/botlib/be_interface.cpp:202-206`
 pub fn Export_BotLibVarSet(bot: &mut BotLib, var_name: *mut c_char, value: *mut c_char) -> c_int {
-    LibVarSet(bot, var_name, value);
+    // Thin ABI adapter (frozen signature): decode both C strings at the seam,
+    // then drive the idiomatic internal.
+    let name = unsafe { CStr::from_ptr(var_name) }.to_string_lossy();
+    let val = unsafe { CStr::from_ptr(value) }.to_string_lossy();
+    LibVarSet(bot, &name, &val);
     BLERR_NOERROR
 }
 
@@ -267,7 +278,7 @@ pub fn Export_BotLibUpdateEntity(
 /// Source: `oracle/codemp/botlib/be_interface.cpp:119-152`
 pub fn Export_BotLibSetup(bot: &mut BotLib) -> c_int {
     unsafe {
-        bot.bot_developer = LibVarGetValue(bot, c"bot_developer".as_ptr() as *mut c_char) as c_int;
+        bot.bot_developer = LibVarGetValue(bot, "bot_developer") as c_int;
         libc::memset(
             &mut bot.botlibglobals as *mut botlib_globals_t as *mut c_void,
             0,
@@ -279,16 +290,8 @@ pub fn Export_BotLibSetup(bot: &mut BotLib) -> c_int {
         //
         // botimport.Print(PRT_MESSAGE, "------- BotLib Initialization -------\n");
         //
-        bot.botlibglobals.maxclients = LibVarValue(
-            bot,
-            c"maxclients".as_ptr() as *mut c_char,
-            c"128".as_ptr() as *mut c_char,
-        ) as c_int;
-        bot.botlibglobals.maxentities = LibVarValue(
-            bot,
-            c"maxentities".as_ptr() as *mut c_char,
-            c"1024".as_ptr() as *mut c_char,
-        ) as c_int;
+        bot.botlibglobals.maxclients = LibVarValue(bot, "maxclients", "128") as c_int;
+        bot.botlibglobals.maxentities = LibVarValue(bot, "maxentities", "1024") as c_int;
 
         let mut errnum = AAS_Setup(bot); //be_aas_main.c
         if errnum != BLERR_NOERROR {

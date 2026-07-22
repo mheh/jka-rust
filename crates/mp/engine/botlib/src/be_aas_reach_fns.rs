@@ -3905,12 +3905,12 @@ pub fn AAS_InitReachability(bot: &mut BotLib) {
     }
 
     if bot.aasworld.reachabilitysize != 0 {
-        if (LibVarGetValue(bot, c"forcereachability".as_ptr() as *mut c_char) as c_int) == 0 {
+        if (LibVarGetValue(bot, "forcereachability") as c_int) == 0 {
             bot.aasworld.numreachabilityareas = bot.aasworld.numareas + 2;
             return;
         }
     }
-    bot.calcgrapplereach = LibVarGetValue(bot, c"grapplereach".as_ptr() as *mut c_char) as c_int;
+    bot.calcgrapplereach = LibVarGetValue(bot, "grapplereach") as c_int;
     bot.aasworld.savefile = qtrue;
     //start with area 1 because area zero is a dummy
     bot.aasworld.numreachabilityareas = 1;
@@ -3948,11 +3948,7 @@ pub fn AAS_BestReachableFromJumpPadArea(
         let mut r#move: aas_clientmove_t = core::mem::zeroed();
         let mut classname: [c_char; MAX_EPAIRKEY as usize] = [0; MAX_EPAIRKEY as usize];
 
-        bot_visualizejumppads = LibVarValue(
-            bot,
-            c"bot_visualizejumppads".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-        ) as c_int;
+        bot_visualizejumppads = LibVarValue(bot, "bot_visualizejumppads", "0") as c_int;
         let bboxmins: vec3_t = [
             origin[0] + mins[0],
             origin[1] + mins[1],
@@ -5013,11 +5009,7 @@ pub fn AAS_Reachability_JumpPad(bot: &mut BotLib) {
         let mut r#move: aas_clientmove_t = core::mem::zeroed();
         let mut classname: [c_char; MAX_EPAIRKEY as usize] = [0; MAX_EPAIRKEY as usize];
 
-        bot_visualizejumppads = LibVarValue(
-            bot,
-            c"bot_visualizejumppads".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-        ) as c_int;
+        bot_visualizejumppads = LibVarValue(bot, "bot_visualizejumppads", "0") as c_int;
         let mut ent = AAS_NextBSPEntity(bot, 0);
         while ent != 0 {
             if AAS_ValueForBSPEpairKey(

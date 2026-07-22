@@ -340,11 +340,7 @@ pub fn LoadWeaponConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weaponc
     };
 
     unsafe {
-        let mut max_weaponinfo = LibVarValue(
-            bot,
-            c"max_weaponinfo".as_ptr() as *mut c_char,
-            c"32".as_ptr() as *mut c_char,
-        ) as c_int;
+        let mut max_weaponinfo = LibVarValue(bot, "max_weaponinfo", "32") as c_int;
         if max_weaponinfo < 0 {
             bot.botimport.Print.unwrap()(
                 PRT_ERROR,
@@ -352,17 +348,9 @@ pub fn LoadWeaponConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weaponc
                 max_weaponinfo,
             );
             max_weaponinfo = 32;
-            LibVarSet(
-                bot,
-                c"max_weaponinfo".as_ptr() as *mut c_char,
-                c"32".as_ptr() as *mut c_char,
-            );
+            LibVarSet(bot, "max_weaponinfo", "32");
         }
-        let mut max_projectileinfo = LibVarValue(
-            bot,
-            c"max_projectileinfo".as_ptr() as *mut c_char,
-            c"32".as_ptr() as *mut c_char,
-        ) as c_int;
+        let mut max_projectileinfo = LibVarValue(bot, "max_projectileinfo", "32") as c_int;
         if max_projectileinfo < 0 {
             bot.botimport.Print.unwrap()(
                 PRT_ERROR,
@@ -370,11 +358,7 @@ pub fn LoadWeaponConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weaponc
                 max_projectileinfo,
             );
             max_projectileinfo = 32;
-            LibVarSet(
-                bot,
-                c"max_projectileinfo".as_ptr() as *mut c_char,
-                c"32".as_ptr() as *mut c_char,
-            );
+            LibVarSet(bot, "max_projectileinfo", "32");
         }
         // §19: `path` is a fixed local buffer Raven writes via strncpy before
         // any read; zero-init to avoid reading uninitialized bytes.
@@ -758,12 +742,8 @@ pub fn BotFreeWeaponState(bot: &mut BotLib, handle: c_int) {
 ///
 /// Source: `oracle/codemp/botlib/be_ai_weap.cpp:487-504`
 pub fn BotSetupWeaponAI(bot: &mut BotLib) -> c_int {
-    let file = LibVarString(
-        bot,
-        c"weaponconfig".as_ptr() as *mut c_char,
-        c"weapons.c".as_ptr() as *mut c_char,
-    );
-    bot.weaponconfig = LoadWeaponConfig(bot, file);
+    let file = std::ffi::CString::new(LibVarString(bot, "weaponconfig", "weapons.c")).unwrap();
+    bot.weaponconfig = LoadWeaponConfig(bot, file.as_ptr() as *mut c_char);
     if bot.weaponconfig.is_null() {
         unsafe {
             bot.botimport.Print.unwrap()(

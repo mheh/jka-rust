@@ -25,6 +25,8 @@ use mp_qshared::shared::file_mode::{FS_READ, FS_WRITE};
 use mp_qshared::shared::q_math::{_VectorSubtract, VectorLength};
 use mp_qshared::shared::{fileHandle_t, qfalse, qtrue, vec3_t};
 
+use crate::l_libvar_fns::LibVarValue;
+
 use crate::aasfile::aas_area_s::aas_area_t;
 use crate::aasfile::aas_areasettings_s::aas_areasettings_t;
 use crate::aasfile::aas_cluster_s::aas_cluster_t;
@@ -1563,11 +1565,7 @@ pub fn AAS_InitRouting(bot: &mut BotLib) {
     AAS_InitReachabilityAreas(bot);
     bot.routingcachesize = 0;
     bot.max_routingcachesize = 1024
-        * crate::l_libvar_fns::LibVarValue(
-            bot,
-            c"max_routingcache".as_ptr() as *mut c_char,
-            c"4096".as_ptr() as *mut c_char,
-        ) as c_int;
+        * LibVarValue(bot, "max_routingcache", "4096") as c_int;
     AAS_ReadRouteCache(bot);
 }
 

@@ -971,11 +971,7 @@ pub fn InitLevelItemHeap(bot: &mut BotLib) {
             FreeMemory(bot, bot.levelitemheap as *mut ());
         }
 
-        let max_levelitems = LibVarValue(
-            bot,
-            c"max_levelitems".as_ptr() as *mut c_char,
-            c"256".as_ptr() as *mut c_char,
-        ) as c_int;
+        let max_levelitems = LibVarValue(bot, "max_levelitems", "256") as c_int;
         bot.levelitemheap = GetClearedMemory(
             bot,
             (max_levelitems as usize * core::mem::size_of::<levelitem_t>()) as c_ulong,
@@ -1551,7 +1547,7 @@ pub fn BotChooseLTGItem(
                         FuzzyWeightUndecided(common, inventory, (*gs).itemweightconfig, weightnum);
                     //HACK: to make dropped items more attractive
                     if (*li).timeout != 0.0 {
-                        weight += (*bot.droppedweight).value;
+                        weight += bot.libvar(bot.droppedweight).value;
                     }
                     //use weight scale for item_botroam
                     if flags & IFL_ROAM != 0 {
@@ -1699,7 +1695,7 @@ pub fn BotChooseNBGItem(
                         FuzzyWeightUndecided(common, inventory, (*gs).itemweightconfig, weightnum);
                     //HACK: to make dropped items more attractive
                     if (*li).timeout != 0.0 {
-                        weight += (*bot.droppedweight).value;
+                        weight += bot.libvar(bot.droppedweight).value;
                     }
                     //use weight scale for item_botroam
                     if flags & IFL_ROAM != 0 {
@@ -1791,11 +1787,7 @@ pub fn BotChooseNBGItem(
 /// Source: `oracle/codemp/botlib/be_ai_goal.cpp:251-324`
 pub fn LoadItemConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut itemconfig_t {
     unsafe {
-        let mut max_iteminfo = LibVarValue(
-            bot,
-            c"max_iteminfo".as_ptr() as *mut c_char,
-            c"256".as_ptr() as *mut c_char,
-        ) as c_int;
+        let mut max_iteminfo = LibVarValue(bot, "max_iteminfo", "256") as c_int;
         if max_iteminfo < 0 {
             bot.botimport.Print.unwrap()(
                 PRT_ERROR,
@@ -1803,11 +1795,7 @@ pub fn LoadItemConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut itemconfi
                 max_iteminfo,
             );
             max_iteminfo = 256;
-            LibVarSet(
-                bot,
-                c"max_iteminfo".as_ptr() as *mut c_char,
-                c"256".as_ptr() as *mut c_char,
-            );
+            LibVarSet(bot, "max_iteminfo", "256");
         }
 
         // §19: `path` is a fixed local buffer Raven writes via strncpy before
@@ -1936,19 +1924,11 @@ pub fn BotLoadItemWeights(bot: &mut BotLib, goalstate: c_int, filename: *mut c_c
 pub fn BotSetupGoalAI(bot: &mut BotLib) -> c_int {
     //check if teamplay is on
     unsafe {
-        bot.g_gametype = LibVarValue(
-            bot,
-            c"g_gametype".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-        ) as c_int;
+        bot.g_gametype = LibVarValue(bot, "g_gametype", "0") as c_int;
         //item configuration file
-        let filename = LibVarString(
-            bot,
-            c"itemconfig".as_ptr() as *mut c_char,
-            c"items.c".as_ptr() as *mut c_char,
-        );
+        let filename = std::ffi::CString::new(LibVarString(bot, "itemconfig", "items.c")).unwrap();
         //load the item configuration
-        bot.itemconfig = LoadItemConfig(bot, filename);
+        bot.itemconfig = LoadItemConfig(bot, filename.as_ptr() as *mut c_char);
         if bot.itemconfig.is_null() {
             bot.botimport.Print.unwrap()(
                 PRT_FATAL,
@@ -1957,11 +1937,7 @@ pub fn BotSetupGoalAI(bot: &mut BotLib) -> c_int {
             return BLERR_CANNOTLOADITEMCONFIG;
         }
 
-        bot.droppedweight = LibVar(
-            bot,
-            c"droppedweight".as_ptr() as *mut c_char,
-            c"1000".as_ptr() as *mut c_char,
-        );
+        bot.droppedweight = LibVar(bot, "droppedweight", "1000");
     }
     //everything went ok
     BLERR_NOERROR

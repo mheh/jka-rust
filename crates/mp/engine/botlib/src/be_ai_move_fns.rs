@@ -208,7 +208,7 @@ pub fn BotAirControl(
         _VectorScale(velocity, 0.1, &mut vel);
         i = 0;
         while i < 50 {
-            vel[2] -= (*bot.sv_gravity).value * 0.01;
+            vel[2] -= bot.libvar(bot.sv_gravity).value * 0.01;
             //if going down and next position would be below the goal
             if vel[2] < 0.0 && org[2] + vel[2] < goal[2] {
                 _VectorScale(vel, (goal[2] - org[2]) / vel[2], &mut vel);
@@ -951,10 +951,10 @@ pub fn BotTravel_RocketJump(
         EA_SelectWeapon(
             bot,
             (*ms).client,
-            (*bot.weapindex_rocketlauncher).value as c_int,
+            bot.libvar(bot.weapindex_rocketlauncher).value as c_int,
         );
         //weapon is used for movement
-        result.weapon = (*bot.weapindex_rocketlauncher).value as c_int;
+        result.weapon = bot.libvar(bot.weapindex_rocketlauncher).value as c_int;
         result.flags |= MOVERESULT_MOVEMENTWEAPON;
         //
         _VectorCopy(hordir, &mut result.movedir);
@@ -1014,9 +1014,9 @@ pub fn BotTravel_BFGJump(
         //view is important for the movment
         result.flags |= MOVERESULT_MOVEMENTVIEWSET;
         //select the rocket launcher
-        EA_SelectWeapon(bot, (*ms).client, (*bot.weapindex_bfg10k).value as c_int);
+        EA_SelectWeapon(bot, (*ms).client, bot.libvar(bot.weapindex_bfg10k).value as c_int);
         //weapon is used for movement
-        result.weapon = (*bot.weapindex_bfg10k).value as c_int;
+        result.weapon = bot.libvar(bot.weapindex_bfg10k).value as c_int;
         result.flags |= MOVERESULT_MOVEMENTWEAPON;
         //
         _VectorCopy(hordir, &mut result.movedir);
@@ -1462,7 +1462,7 @@ pub fn BotCheckBlocked(
         AAS_PresenceTypeBoundingBox(bot, (*ms).presencetype, &mut mins, &mut maxs);
         //
         if _DotProduct(dir, up).abs() < 0.7 {
-            mins[2] += (*bot.sv_maxstep).value; //if the bot can step on
+            mins[2] += bot.libvar(bot.sv_maxstep).value; //if the bot can step on
             maxs[2] -= 10.0; //a little lower to avoid low ceiling
         }
         _VectorMA((*ms).origin, 3.0, dir, &mut end);
@@ -1623,9 +1623,9 @@ pub fn GrappleState(
         //or visible grapple entity
         i = AAS_NextEntity(bot, 0);
         while i != 0 {
-            if AAS_EntityType(bot, i) == (*bot.entitytypemissile).value as c_int {
+            if AAS_EntityType(bot, i) == bot.libvar(bot.entitytypemissile).value as c_int {
                 AAS_EntityInfo(bot, i, &mut entinfo);
-                if entinfo.weapon == (*bot.weapindex_grapple).value as c_int {
+                if entinfo.weapon == bot.libvar(bot.weapindex_grapple).value as c_int {
                     return 1;
                 }
             }
@@ -1646,8 +1646,9 @@ pub fn BotResetGrapple(bot: &mut BotLib, ms: *mut bot_movestate_t) {
         //if not using the grapple hook reachability anymore
         if (reach.traveltype & TRAVELTYPE_MASK) != TRAVEL_GRAPPLEHOOK {
             if (*ms).moveflags & MFL_ACTIVEGRAPPLE != 0 || (*ms).grapplevisible_time != 0.0 {
-                if (*bot.offhandgrapple).value != 0.0 {
-                    EA_Command(bot, (*ms).client, (*bot.cmd_grappleoff).string);
+                if bot.libvar(bot.offhandgrapple).value != 0.0 {
+                    let command = std::ffi::CString::new(bot.libvar(bot.cmd_grappleoff).string.as_str()).unwrap();
+                    EA_Command(bot, (*ms).client, command.as_ptr() as *mut c_char);
                 }
                 (*ms).moveflags &= !MFL_ACTIVEGRAPPLE;
                 (*ms).grapplevisible_time = 0.0;
@@ -1968,15 +1969,16 @@ pub fn BotTravel_Grapple(
         BotClearMoveResult(&mut result);
         //
         if (*ms).moveflags & MFL_GRAPPLERESET != 0 {
-            if (*bot.offhandgrapple).value != 0.0 {
-                EA_Command(bot, (*ms).client, (*bot.cmd_grappleoff).string);
+            if bot.libvar(bot.offhandgrapple).value != 0.0 {
+                let command = std::ffi::CString::new(bot.libvar(bot.cmd_grappleoff).string.as_str()).unwrap();
+                EA_Command(bot, (*ms).client, command.as_ptr() as *mut c_char);
             }
             (*ms).moveflags &= !MFL_ACTIVEGRAPPLE;
             return result;
         }
         //
-        if (*bot.offhandgrapple).value as c_int == 0 {
-            result.weapon = (*bot.weapindex_grapple).value as c_int;
+        if bot.libvar(bot.offhandgrapple).value as c_int == 0 {
+            result.weapon = bot.libvar(bot.weapindex_grapple).value as c_int;
             result.flags |= MOVERESULT_MOVEMENTWEAPON;
         }
         //
@@ -1991,8 +1993,9 @@ pub fn BotTravel_Grapple(
             //the bot doesn't get any closer
             if state != 0 && dist < 48.0 {
                 if (*ms).lastgrappledist - dist < 1.0 {
-                    if (*bot.offhandgrapple).value != 0.0 {
-                        EA_Command(bot, (*ms).client, (*bot.cmd_grappleoff).string);
+                    if bot.libvar(bot.offhandgrapple).value != 0.0 {
+                        let command = std::ffi::CString::new(bot.libvar(bot.cmd_grappleoff).string.as_str()).unwrap();
+                        EA_Command(bot, (*ms).client, command.as_ptr() as *mut c_char);
                     }
                     (*ms).moveflags &= !MFL_ACTIVEGRAPPLE;
                     (*ms).moveflags |= MFL_GRAPPLERESET;
@@ -2004,8 +2007,9 @@ pub fn BotTravel_Grapple(
             //isn't moving anymore
             else if state == 0 || (state == 2 && dist > (*ms).lastgrappledist - 2.0) {
                 if (*ms).grapplevisible_time < AAS_Time(bot) - 0.4 {
-                    if (*bot.offhandgrapple).value != 0.0 {
-                        EA_Command(bot, (*ms).client, (*bot.cmd_grappleoff).string);
+                    if bot.libvar(bot.offhandgrapple).value != 0.0 {
+                        let command = std::ffi::CString::new(bot.libvar(bot.cmd_grappleoff).string.as_str()).unwrap();
+                        EA_Command(bot, (*ms).client, command.as_ptr() as *mut c_char);
                     }
                     (*ms).moveflags &= !MFL_ACTIVEGRAPPLE;
                     (*ms).moveflags |= MFL_GRAPPLERESET;
@@ -2016,7 +2020,7 @@ pub fn BotTravel_Grapple(
                 (*ms).grapplevisible_time = AAS_Time(bot);
             }
             //
-            if (*bot.offhandgrapple).value as c_int == 0 {
+            if bot.libvar(bot.offhandgrapple).value as c_int == 0 {
                 EA_Attack(bot, (*ms).client);
             }
             //remember the current grapple distance
@@ -2057,8 +2061,9 @@ pub fn BotTravel_Grapple(
                     return result;
                 }
                 //activate the grapple
-                if (*bot.offhandgrapple).value != 0.0 {
-                    EA_Command(bot, (*ms).client, (*bot.cmd_grappleon).string);
+                if bot.libvar(bot.offhandgrapple).value != 0.0 {
+                    let command = std::ffi::CString::new(bot.libvar(bot.cmd_grappleon).string.as_str()).unwrap();
+                    EA_Command(bot, (*ms).client, command.as_ptr() as *mut c_char);
                 } else {
                     EA_Attack(bot, (*ms).client);
                 }
@@ -2210,56 +2215,16 @@ pub fn BotMoveInGoalArea(
 /// Source: `oracle/codemp/botlib/be_ai_move.cpp:3558-3572`
 pub fn BotSetupMoveAI(bot: &mut BotLib) -> c_int {
     BotSetBrushModelTypes(bot);
-    bot.sv_maxstep = LibVar(
-        bot,
-        c"sv_step".as_ptr() as *mut c_char,
-        c"18".as_ptr() as *mut c_char,
-    );
-    bot.sv_maxbarrier = LibVar(
-        bot,
-        c"sv_maxbarrier".as_ptr() as *mut c_char,
-        c"32".as_ptr() as *mut c_char,
-    );
-    bot.sv_gravity = LibVar(
-        bot,
-        c"sv_gravity".as_ptr() as *mut c_char,
-        c"800".as_ptr() as *mut c_char,
-    );
-    bot.weapindex_rocketlauncher = LibVar(
-        bot,
-        c"weapindex_rocketlauncher".as_ptr() as *mut c_char,
-        c"5".as_ptr() as *mut c_char,
-    );
-    bot.weapindex_bfg10k = LibVar(
-        bot,
-        c"weapindex_bfg10k".as_ptr() as *mut c_char,
-        c"9".as_ptr() as *mut c_char,
-    );
-    bot.weapindex_grapple = LibVar(
-        bot,
-        c"weapindex_grapple".as_ptr() as *mut c_char,
-        c"10".as_ptr() as *mut c_char,
-    );
-    bot.entitytypemissile = LibVar(
-        bot,
-        c"entitytypemissile".as_ptr() as *mut c_char,
-        c"3".as_ptr() as *mut c_char,
-    );
-    bot.offhandgrapple = LibVar(
-        bot,
-        c"offhandgrapple".as_ptr() as *mut c_char,
-        c"0".as_ptr() as *mut c_char,
-    );
-    bot.cmd_grappleon = LibVar(
-        bot,
-        c"cmd_grappleon".as_ptr() as *mut c_char,
-        c"grappleon".as_ptr() as *mut c_char,
-    );
-    bot.cmd_grappleoff = LibVar(
-        bot,
-        c"cmd_grappleoff".as_ptr() as *mut c_char,
-        c"grappleoff".as_ptr() as *mut c_char,
-    );
+    bot.sv_maxstep = LibVar(bot, "sv_step", "18");
+    bot.sv_maxbarrier = LibVar(bot, "sv_maxbarrier", "32");
+    bot.sv_gravity = LibVar(bot, "sv_gravity", "800");
+    bot.weapindex_rocketlauncher = LibVar(bot, "weapindex_rocketlauncher", "5");
+    bot.weapindex_bfg10k = LibVar(bot, "weapindex_bfg10k", "9");
+    bot.weapindex_grapple = LibVar(bot, "weapindex_grapple", "10");
+    bot.entitytypemissile = LibVar(bot, "entitytypemissile", "3");
+    bot.offhandgrapple = LibVar(bot, "offhandgrapple", "0");
+    bot.cmd_grappleon = LibVar(bot, "cmd_grappleon", "grappleon");
+    bot.cmd_grappleoff = LibVar(bot, "cmd_grappleoff", "grappleoff");
     BLERR_NOERROR
 }
 
@@ -2366,12 +2331,12 @@ pub fn BotGapDistance(bot: &mut BotLib, origin: vec3_t, hordir: vec3_t, entnum: 
             _VectorMA(origin, dist, hordir, &mut start);
             start[2] = startz + 24.0;
             _VectorCopy(start, &mut end);
-            end[2] -= 48.0 + (*bot.sv_maxbarrier).value;
+            end[2] -= 48.0 + bot.libvar(bot.sv_maxbarrier).value;
             trace = AAS_TraceClientBBox(bot, start, end, PRESENCE_CROUCH, entnum);
             //if solid is found the bot can't walk any further and fall into a gap
             if trace.startsolid == 0 {
                 //if it is a gap
-                if trace.endpos[2] < startz - (*bot.sv_maxstep).value - 8.0 {
+                if trace.endpos[2] < startz - bot.libvar(bot.sv_maxstep).value - 8.0 {
                     _VectorCopy(trace.endpos, &mut end);
                     end[2] -= 20.0;
                     if AAS_PointContents(bot, end) & CONTENTS_WATER != 0 {
@@ -2403,7 +2368,7 @@ pub fn BotCheckBarrierJump(
         let mut trace: aas_trace_t;
 
         _VectorCopy((*ms).origin, &mut end);
-        end[2] += (*bot.sv_maxbarrier).value;
+        end[2] += bot.libvar(bot.sv_maxbarrier).value;
         //trace right up
         trace = AAS_TraceClientBBox(bot, (*ms).origin, end, PRESENCE_NORMAL, (*ms).entitynum);
         //this shouldn't happen... but we check anyway
@@ -2411,7 +2376,7 @@ pub fn BotCheckBarrierJump(
             return qfalse;
         }
         //if very low ceiling it isn't possible to jump up to a barrier
-        if trace.endpos[2] - (*ms).origin[2] < (*bot.sv_maxstep).value {
+        if trace.endpos[2] - (*ms).origin[2] < bot.libvar(bot.sv_maxstep).value {
             return qfalse;
         }
         //
@@ -2448,7 +2413,7 @@ pub fn BotCheckBarrierJump(
             return qfalse;
         }
         //if less than the maximum step height
-        if trace.endpos[2] - (*ms).origin[2] < (*bot.sv_maxstep).value {
+        if trace.endpos[2] - (*ms).origin[2] < bot.libvar(bot.sv_maxstep).value {
             return qfalse;
         }
         //
@@ -2545,7 +2510,7 @@ pub fn BotTravel_Elevator(
         if BotOnMover(bot, (*ms).origin, (*ms).entitynum, reach) != 0 {
             //if vertically not too far from the end point
             if (((*ms).origin[2] - (*reach).end[2]) as c_int).abs()
-                < (*bot.sv_maxbarrier).value as c_int
+                < bot.libvar(bot.sv_maxbarrier).value as c_int
             {
                 //move to the end point
                 _VectorSubtract((*reach).end, (*ms).origin, &mut hordir);

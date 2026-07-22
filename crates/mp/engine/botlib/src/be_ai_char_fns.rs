@@ -408,7 +408,7 @@ pub fn Characteristic_String(
 ///
 /// Source: `oracle/codemp/botlib/be_ai_char.cpp:152-156`
 pub fn BotFreeCharacter(bot: &mut BotLib, handle: c_int) {
-    if LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr() as *mut c_char) == 0.0 {
+    if LibVarGetValue(bot, "bot_reloadcharacters") == 0.0 {
         return;
     } //end if
     BotFreeCharacter2(bot, handle);
@@ -827,7 +827,7 @@ pub fn BotLoadCharacterSkill(bot: &mut BotLib, charfile: *mut c_char, skill: f32
         skill,
         qfalse as c_int,
     );
-    let reload = LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr() as *mut c_char) as c_int;
+    let reload = LibVarGetValue(bot, "bot_reloadcharacters") as c_int;
     let ch = BotLoadCachedCharacter(bot, charfile, skill, reload);
 
     if defaultch != 0 && ch != 0 {
