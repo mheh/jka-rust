@@ -19,7 +19,6 @@
 #![allow(non_snake_case)]
 
 use std::env;
-use std::ffi::CStr;
 use std::fs;
 
 use mp_engine_core::engine::Engine;
@@ -330,7 +329,6 @@ fn parse_server_message(view: &mut EngineHostView, cl: &mut Cl, rec: &Record, mi
             SVC_SERVERCOMMAND => {
                 let seq = MSG_ReadLong(view.common, &mut m);
                 let s = MSG_ReadString(view.common, &mut m);
-                let s = unsafe { CStr::from_ptr(s) }.to_string_lossy();
                 if seq > cl.server_command_sequence {
                     cl.server_command_sequence = seq;
                 }
@@ -385,10 +383,9 @@ fn parse_gamestate(view: &mut EngineHostView, cl: &mut Cl, m: &mut msg_t, mi: us
                     panic!("msg {mi}: configstring index {idx} out of range");
                 }
                 let s = MSG_ReadBigString(view.common, m);
-                let len = unsafe { CStr::from_ptr(s) }.to_bytes().len();
+                let len = s.len();
                 n_cs += 1;
                 if idx <= 1 {
-                    let s = unsafe { CStr::from_ptr(s) }.to_string_lossy();
                     let shown: String = s.chars().take(60).collect();
                     println!("     cs {idx} ({len} bytes): {shown}");
                 }

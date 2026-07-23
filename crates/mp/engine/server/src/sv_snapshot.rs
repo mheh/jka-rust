@@ -1,6 +1,6 @@
 //! `sv_snapshot.cpp` — server snapshot building/sending.
 
-use core::ffi::c_int;
+use core::ffi::{c_int, CStr};
 
 use mp_bg::public::entity_flags::EF_PERMANENT;
 use mp_engine_qcommon::cm_load::{CM_LeafArea, CM_LeafCluster};
@@ -15,7 +15,7 @@ use mp_engine_qcommon::common_fns::{Com_DPrintf, Com_Memset};
 use mp_engine_qcommon::cvar_fns::Cvar_Set;
 use mp_engine_qcommon::msg::{
     MSG_WriteBits, MSG_WriteByte, MSG_WriteData, MSG_WriteDeltaEntity, MSG_WriteDeltaPlayerstate,
-    MSG_WriteLong,
+    MSG_WriteLong, MSG_WriteString,
 };
 use mp_engine_qcommon::qcommon::net_limits::{
     MAX_MSGLEN, MAX_RELIABLE_COMMANDS, PACKET_BACKUP, PACKET_MASK,
@@ -179,11 +179,14 @@ pub fn SV_UpdateServerCommandsToClient(
                 svc_ops_e::svc_serverCommand as c_int,
             );
             mp_engine_qcommon::msg::MSG_WriteLong(common, msg, i);
-            mp_engine_qcommon::msg::MSG_WriteString(
+            MSG_WriteString(
                 common,
                 msg,
-                (*client).reliableCommands[(i & (MAX_RELIABLE_COMMANDS as c_int - 1)) as usize]
-                    .as_ptr(),
+                &CStr::from_ptr(
+                    (*client).reliableCommands[(i & (MAX_RELIABLE_COMMANDS as c_int - 1)) as usize]
+                        .as_ptr(),
+                )
+                .to_string_lossy(),
             );
             i += 1;
         }

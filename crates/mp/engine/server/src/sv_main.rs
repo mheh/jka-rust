@@ -751,10 +751,7 @@ pub fn SV_ConnectionlessPacket(
             Huff_Decompress(msg, 12);
         }
 
-        // wire seam: the message-scratch line converts once at the head.
-        let s = CStr::from_ptr(MSG_ReadStringLine(view.common, msg))
-            .to_string_lossy()
-            .into_owned();
+        let s = MSG_ReadStringLine(view.common, msg);
         Cmd_TokenizeString(view.common, &s);
 
         let c = Cmd_Argv(view.common, 0).to_owned();

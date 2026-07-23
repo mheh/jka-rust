@@ -35,6 +35,7 @@ use native_string::{Info_SetValueForKey, Info_ValueForKey};
 use native_string::q_string::{Q_strcmpBytes, Q_stricmp};
 use native_string::q_strncpyz::Q_strncpyz;
 
+use mp_engine_qcommon::msg::{MSG_ReadString, MSG_WriteBigString, MSG_WriteString};
 use mp_engine_qcommon::cmd_common::Cmd_Argv;
 use mp_engine_qcommon::net_chan::NET_AdrToString;
 use mp_qshared::shared::limits::{MAX_INFO_STRING, MAX_NAME_LENGTH};
@@ -1138,7 +1139,11 @@ pub fn SV_SendClientGameState(view: &mut EngineHostView, sv: &mut Server, client
                     mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::svc_configstring as c_int,
                 );
                 mp_engine_qcommon::msg::MSG_WriteShort(view.common, &mut msg, start as c_int);
-                mp_engine_qcommon::msg::MSG_WriteBigString(view.common, &mut msg, cs);
+                MSG_WriteBigString(
+                    view.common,
+                    &mut msg,
+                    &CStr::from_ptr(cs).to_string_lossy(),
+                );
             }
         }
 
@@ -1452,10 +1457,7 @@ pub fn SV_ClientCommand(
 ) -> qboolean {
     unsafe {
         let seq = mp_engine_qcommon::msg::MSG_ReadLong(view.common, msg);
-        // wire seam: the message-scratch command converts once at the read.
-        let s = CStr::from_ptr(mp_engine_qcommon::msg::MSG_ReadString(view.common, msg))
-            .to_string_lossy()
-            .into_owned();
+        let s = MSG_ReadString(view.common, msg);
         let mut client_ok = qtrue;
 
         // see if we have already executed it
@@ -1971,7 +1973,11 @@ pub fn SV_WriteDownloadToClient(
                 );
                 mp_engine_qcommon::msg::MSG_WriteShort(view.common, msg, 0); // client is expecting block zero
                 mp_engine_qcommon::msg::MSG_WriteLong(view.common, msg, -1); // illegal file size
-                mp_engine_qcommon::msg::MSG_WriteString(view.common, msg, errorMessage.as_ptr());
+                MSG_WriteString(
+                    view.common,
+                    msg,
+                    &CStr::from_ptr(errorMessage.as_ptr()).to_string_lossy(),
+                );
 
                 (*cl).downloadName.clear();
                 return;

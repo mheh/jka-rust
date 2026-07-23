@@ -24,10 +24,8 @@ use crate::common::engine_host_view::EngineHostView;
 use crate::common::Common;
 
 // Sweep: extern forward-declares eliminated. Real qshared/in-crate callees
-// imported; `strlen` from libc (rule 3).
+// imported.
 use crate::common::com_error;
-use libc::strlen;
-use mp_qshared::shared::q_string::Q_strncpyz;
 
 // `MSG_CheckNETFPSFOverrides` callees (netf/psf mod-override reload).
 use crate::common::com_printf;
@@ -35,7 +33,7 @@ use crate::files_common::{FS_FCloseFile, FS_FOpenFileRead, FS_Read};
 use crate::qcommon::bit_storage_t::bitStorage_t;
 use crate::z_memman_pc::Z_Malloc;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
-use mp_qshared::shared::limits::GENTITYNUM_BITS;
+use mp_qshared::shared::limits::{BIG_INFO_STRING, GENTITYNUM_BITS, MAX_STRING_CHARS};
 use native_types::fileHandle_t;
 
 // The `sv`/`SV_GentityNum` cross-crate reach (server depends on qcommon) is
@@ -2156,25 +2154,25 @@ pub fn MSG_WriteLong(common: &mut Common, sb: *mut msg_t, c: c_int) {
 }
 
 /// Raven `MSG_WriteString`. The eurofix 0xff-strip loop is left commented in
-/// the oracle and not ported.
+/// the oracle and not ported. Raven's `!s` NULL arm — write a bare NUL — is the
+/// empty `&str` here: `""` emits zero body bytes plus the trailing NUL, the same
+/// single byte Raven's `MSG_WriteData(sb, "", 1)` writes, so callers that
+/// previously passed a possibly-null pointer map their null case to `""`.
 ///
 /// Source: `oracle/codemp/qcommon/msg.cpp:328-354`
-pub fn MSG_WriteString(common: &mut Common, sb: *mut msg_t, s: *const c_char) {
-    unsafe {
-        if s.is_null() {
-            MSG_WriteData(common, sb, b"\0".as_ptr() as *const (), 1);
-        } else {
-            let l = strlen(s);
-            if l >= mp_qshared::shared::limits::MAX_STRING_CHARS {
-                com_printf(common, "MSG_WriteString: MAX_STRING_CHARS");
-                MSG_WriteData(common, sb, b"\0".as_ptr() as *const (), 1);
-                return;
-            }
-            let mut string = [0u8; mp_qshared::shared::limits::MAX_STRING_CHARS];
-            Q_strncpyz(string.as_mut_ptr() as *mut c_char, s, string.len() as c_int);
-            MSG_WriteData(common, sb, string.as_ptr() as *const (), l as c_int + 1);
-        }
+pub fn MSG_WriteString(common: &mut Common, sb: *mut msg_t, s: &str) {
+    let l = s.len();
+    if l >= MAX_STRING_CHARS {
+        com_printf(common, "MSG_WriteString: MAX_STRING_CHARS");
+        MSG_WriteData(common, sb, b"\0".as_ptr() as *const (), 1);
+        return;
     }
+    // Raven copies into a scratch buffer then `MSG_WriteData(string, l+1)` — the
+    // `l` body bytes followed by the terminating NUL. `MSG_WriteData` is a plain
+    // per-byte `MSG_WriteByte` loop, so writing the body then one NUL byte emits
+    // the identical wire sequence with no scratch copy.
+    MSG_WriteData(common, sb, s.as_ptr() as *const (), l as c_int);
+    MSG_WriteByte(common, sb, 0);
 }
 
 /// Raven `MSG_ReadLong`.
@@ -2207,29 +2205,24 @@ pub fn MSG_WriteFloat(common: &mut Common, sb: *mut msg_t, f: f32) {
     MSG_WriteBits(common, sb, l, 32);
 }
 
-/// Raven `MSG_WriteBigString`.
+/// Raven `MSG_WriteBigString`. Same NUL-arm and body+NUL wire shape as
+/// `MSG_WriteString`; the empty `&str` is Raven's `!s` case. The
+/// `Com_Printf` guard keeps Raven's literal `"MSG_WriteString:"` prefix.
 ///
 /// Source: `oracle/codemp/qcommon/msg.cpp:356-383`
-pub fn MSG_WriteBigString(common: &mut Common, sb: *mut msg_t, s: *const c_char) {
-    unsafe {
-        if s.is_null() {
-            MSG_WriteData(common, sb, b"\0".as_ptr() as *const (), 1);
-        } else {
-            let l = strlen(s);
-            if l >= mp_qshared::shared::limits::BIG_INFO_STRING {
-                crate::common::com_printf(common, "MSG_WriteString: BIG_INFO_STRING");
-                MSG_WriteData(common, sb, b"\0".as_ptr() as *const (), 1);
-                return;
-            }
-            let mut string = [0u8; mp_qshared::shared::limits::BIG_INFO_STRING];
-            Q_strncpyz(string.as_mut_ptr() as *mut c_char, s, string.len() as c_int);
-
-            // eurofix: remove this so we can chat in european languages...	-ste
-            // (0xff-strip loop left commented in the oracle; not ported)
-
-            MSG_WriteData(common, sb, string.as_ptr() as *const (), l as c_int + 1);
-        }
+pub fn MSG_WriteBigString(common: &mut Common, sb: *mut msg_t, s: &str) {
+    let l = s.len();
+    if l >= BIG_INFO_STRING {
+        com_printf(common, "MSG_WriteString: BIG_INFO_STRING");
+        MSG_WriteData(common, sb, b"\0".as_ptr() as *const (), 1);
+        return;
     }
+
+    // eurofix: remove this so we can chat in european languages...	-ste
+    // (0xff-strip loop left commented in the oracle; not ported)
+
+    MSG_WriteData(common, sb, s.as_ptr() as *const (), l as c_int);
+    MSG_WriteByte(common, sb, 0);
 }
 
 /// Raven `MSG_WriteAngle`.
@@ -2444,15 +2437,22 @@ pub fn MSG_ReportChangeVectors_f(common: &mut Common) {
     }
 }
 
-/// Raven `MSG_ReadString`.
+/// Raven `MSG_ReadString`. Returns the decoded bytes as an owned `String`; the
+/// static/`Common`-field scratch buffer is gone. '%' is translated to '.' (defang
+/// format specifiers) and the loop stops on NUL or an out-of-bounds read (-1).
+///
+/// §19: Raven's `while (l <= sizeof-1)` lets `l` reach `MAX_STRING_CHARS` (one
+/// past the last stored index), then the "bonus protection" clamp NUL-caps at
+/// `sizeof-1`, so the last over-limit byte is dropped from the returned C string.
+/// `truncate(cap-1)` reproduces that: it is a no-op on the common (NUL/-1) exit
+/// and drops the one extra byte on the overflow exit. High bytes surviving into
+/// a non-UTF-8 result are lossily replaced, matching the prior consumer-side
+/// `to_string_lossy`.
 ///
 /// Source: `oracle/codemp/qcommon/msg.cpp:459-495`
-pub fn MSG_ReadString(common: &mut Common, msg: *mut msg_t) -> *mut c_char {
-    // §19: Raven's `static char string[MAX_STRING_CHARS]` scratch buffer —
-    // ruling-3 rotating-scratch case, owned as a field on `Common` in place
-    // of a hidden `static`.
+pub fn MSG_ReadString(common: &mut Common, msg: *mut msg_t) -> String {
     let cap = mp_qshared::shared::limits::MAX_STRING_CHARS;
-    let mut l: usize = 0;
+    let mut string: Vec<u8> = Vec::new();
     loop {
         let c = MSG_ReadByte(common, msg);
         if c == -1 || c == 0 {
@@ -2463,27 +2463,24 @@ pub fn MSG_ReadString(common: &mut Common, msg: *mut msg_t) -> *mut c_char {
         if c == '%' as c_int {
             c = '.' as c_int;
         }
-        common.msg_read_string_buf[l] = c as u8;
-        l += 1;
-        if l > cap - 1 {
+        string.push(c as u8);
+        if string.len() > cap - 1 {
             break;
         }
     }
     // some bonus protection, shouldn't occur cause server doesn't write such things
-    if l <= cap - 1 {
-        common.msg_read_string_buf[l] = 0;
-    } else {
-        common.msg_read_string_buf[cap - 1] = 0;
-    }
-    common.msg_read_string_buf.as_mut_ptr() as *mut c_char
+    string.truncate(cap - 1);
+    String::from_utf8_lossy(&string).into_owned()
 }
 
-/// Raven `MSG_ReadBigString`.
+/// Raven `MSG_ReadBigString`. As `MSG_ReadString` but bounded by
+/// `BIG_INFO_STRING`; Raven's `while (l < sizeof-1)` never over-runs, so no
+/// bonus-protection truncate is needed.
 ///
 /// Source: `oracle/codemp/qcommon/msg.cpp:497-519`
-pub fn MSG_ReadBigString(common: &mut Common, msg: *mut msg_t) -> *mut c_char {
+pub fn MSG_ReadBigString(common: &mut Common, msg: *mut msg_t) -> String {
     let cap = mp_qshared::shared::limits::BIG_INFO_STRING;
-    let mut l: usize = 0;
+    let mut string: Vec<u8> = Vec::new();
     loop {
         let c = MSG_ReadByte(common, msg);
         if c == -1 || c == 0 {
@@ -2494,22 +2491,21 @@ pub fn MSG_ReadBigString(common: &mut Common, msg: *mut msg_t) -> *mut c_char {
         if c == '%' as c_int {
             c = '.' as c_int;
         }
-        common.msg_read_big_string_buf[l] = c as u8;
-        l += 1;
-        if l >= cap - 1 {
+        string.push(c as u8);
+        if string.len() >= cap - 1 {
             break;
         }
     }
-    common.msg_read_big_string_buf[l] = 0;
-    common.msg_read_big_string_buf.as_mut_ptr() as *mut c_char
+    String::from_utf8_lossy(&string).into_owned()
 }
 
-/// Raven `MSG_ReadStringLine`.
+/// Raven `MSG_ReadStringLine`. As `MSG_ReadBigString` (bounded by
+/// `MAX_STRING_CHARS`) but the loop also stops on a newline.
 ///
 /// Source: `oracle/codemp/qcommon/msg.cpp:521-542`
-pub fn MSG_ReadStringLine(common: &mut Common, msg: *mut msg_t) -> *mut c_char {
+pub fn MSG_ReadStringLine(common: &mut Common, msg: *mut msg_t) -> String {
     let cap = mp_qshared::shared::limits::MAX_STRING_CHARS;
-    let mut l: usize = 0;
+    let mut string: Vec<u8> = Vec::new();
     loop {
         let c = MSG_ReadByte(common, msg);
         if c == -1 || c == 0 || c == '\n' as c_int {
@@ -2520,14 +2516,12 @@ pub fn MSG_ReadStringLine(common: &mut Common, msg: *mut msg_t) -> *mut c_char {
         if c == '%' as c_int {
             c = '.' as c_int;
         }
-        common.msg_read_string_line_buf[l] = c as u8;
-        l += 1;
-        if l >= cap - 1 {
+        string.push(c as u8);
+        if string.len() >= cap - 1 {
             break;
         }
     }
-    common.msg_read_string_line_buf[l] = 0;
-    common.msg_read_string_line_buf.as_mut_ptr() as *mut c_char
+    String::from_utf8_lossy(&string).into_owned()
 }
 
 /// Raven `MSG_ReadAngle16`. `SHORT2ANGLE(x)` = `(x)*(360.0/65536)`.

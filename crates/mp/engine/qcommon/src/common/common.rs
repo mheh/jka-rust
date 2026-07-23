@@ -164,18 +164,8 @@ pub struct Common {
     //TODO: Port cl_shownet
     // Source: oracle/codemp/qcommon/msg.cpp:12
     pub cl_shownet: i32,
-    /// Raven `MSG_ReadString`'s `static char string[MAX_STRING_CHARS]`.
-    ///
-    /// Source: `oracle/codemp/qcommon/msg.cpp:460`
-    pub msg_read_string_buf: [u8; mp_qshared::shared::limits::MAX_STRING_CHARS],
-    /// Raven `MSG_ReadBigString`'s `static char string[BIG_INFO_STRING]`.
-    ///
-    /// Source: `oracle/codemp/qcommon/msg.cpp:498`
-    pub msg_read_big_string_buf: [u8; mp_qshared::shared::limits::BIG_INFO_STRING],
-    /// Raven `MSG_ReadStringLine`'s `static char string[MAX_STRING_CHARS]`.
-    ///
-    /// Source: `oracle/codemp/qcommon/msg.cpp:522`
-    pub msg_read_string_line_buf: [u8; mp_qshared::shared::limits::MAX_STRING_CHARS],
+    // MSG_ReadString/ReadBigString/ReadStringLine's `static char string[]`
+    // scratch buffers are gone — the read fns now return owned `String`s.
     /// Raven `entityStateFields[]`.
     ///
     /// Source: `oracle/codemp/qcommon/msg.cpp:859-1051`
