@@ -3,4 +3,3 @@
 pub mod bot_character_s;
 pub mod bot_characteristic_s;
 pub mod consts;
-pub mod cvalue;

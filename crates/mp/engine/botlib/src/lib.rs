@@ -74,6 +74,7 @@ use crate::be_aas_def::aas_s::aas_t;
 use crate::be_aas_def::aas_settings_s::aas_settings_t;
 use crate::be_aas_reach::aas_lreachability_s::aas_lreachability_t;
 use crate::be_aas_routealt::midrangearea_t;
+use crate::be_ai_char::bot_character_s::BotCharacter;
 use crate::be_ai_chat::bot_chatstate_s::bot_chatstate_t;
 use crate::be_ai_chat::bot_ichatdata_s::bot_ichatdata_t;
 use crate::be_ai_chat::bot_matchtemplate_s::bot_matchtemplate_t;
@@ -429,9 +430,13 @@ pub struct BotLib {
     /// Raven `botlib_export_t be_botlib_export` — the botlib export fn-ptr table.
     /// Source: `oracle/codemp/botlib/be_interface.cpp:41`
     pub be_botlib_export: crate::be_interface::botlib_export_s::botlib_export_t,
-    /// Raven `bot_character_t *botcharacters[MAX_CLIENTS + 1]`.
+    /// Raven `bot_character_t *botcharacters[MAX_CLIENTS + 1]` — redesigned
+    /// (porting-rules §F17) from a malloc'd handle table into an owned slab
+    /// keyed by the 1-based character handle (index 0 unused = Raven's null
+    /// handle); a `None` slot is free. Pre-sized to `MAX_CLIENTS + 1` (seated in
+    /// `Default`) so a handle indexes directly.
     /// Source: `oracle/codemp/botlib/be_ai_char.cpp:60`
-    pub botcharacters: [*mut crate::be_ai_char::bot_character_s::bot_character_t; MAX_CLIENTS + 1],
+    pub botcharacters: Vec<Option<BotCharacter>>,
     /// Raven `int botlibsetup` — true when the bot library has been set up.
     /// Source: `oracle/codemp/botlib/be_interface.h:21`
     pub botlibsetup: c_int,
@@ -487,16 +492,17 @@ impl Default for BotLib {
     /// (null pointers, `0`, `None` fn-ptrs), matching Raven's zero-initialized
     /// file-scope globals. The exceptions are the owned-collection and reference
     /// fields whose all-zero bit pattern is *invalid* — `libvars`,
-    /// `globaldefines`, `sourceFiles` (a `Vec`'s `NonNull` buffer pointer cannot
-    /// be null) and `default_punctuations` (a `&'static` reference cannot be
-    /// null); each is written explicitly before `assume_init`. Fields whose
+    /// `globaldefines`, `sourceFiles`, `botcharacters` (a `Vec`'s `NonNull`
+    /// buffer pointer cannot be null) and `default_punctuations` (a `&'static`
+    /// reference cannot be null); each is written explicitly before
+    /// `assume_init`. Fields whose
     /// Raven definitions carry a real initializer (`iteminfo_struct`,
     /// `crctable`) are populated at setup time, not here. The cached
     /// `LibVarHandle` fields (`sv_maxstep`, `cmd_grappleon`, …) default to
     /// `LibVarHandle(0)`, matching Raven's null pointers: they are assigned real
     /// handles at setup (`BotSetupMoveAI`/`AAS_Setup`/…) before any read.
     fn default() -> Self {
-        // SAFETY: every field except the four seated below is zero-valid (raw
+        // SAFETY: every field except the five seated below is zero-valid (raw
         // pointers → null, `Option<fn>` → `None`, ints/floats/arrays → 0,
         // `LibVarHandle` → index 0). `MaybeUninit::zeroed` never materializes a
         // zeroed `Vec`/reference as a valid value: each such slot is overwritten
@@ -510,6 +516,10 @@ impl Default for BotLib {
             core::ptr::write(
                 core::ptr::addr_of_mut!((*ptr).sourceFiles),
                 (0..MAX_SOURCEFILES).map(|_| None).collect(),
+            );
+            core::ptr::write(
+                core::ptr::addr_of_mut!((*ptr).botcharacters),
+                (0..=MAX_CLIENTS).map(|_| None).collect(),
             );
             core::ptr::write(
                 core::ptr::addr_of_mut!((*ptr).default_punctuations),
