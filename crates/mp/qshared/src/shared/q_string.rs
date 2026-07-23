@@ -60,6 +60,19 @@ pub fn Q_strncpyz(dest: *mut c_char, src: *const c_char, destsize: c_int) {
     }
 }
 
+/// Borrowed `&str` view of a NUL-terminated `[c_char; N]` field — the read
+/// accessor for ABI-frozen inline char arrays (the DEC-33 structs' `_str()`
+/// methods route here). A missing NUL or non-UTF-8 bytes decode as `""`.
+// Sound: `c_char` and `u8` are both 1-byte with every bit pattern valid — a
+// pure type pun over the same bytes and length.
+pub fn chars_str(a: &[c_char]) -> &str {
+    let bytes = unsafe { core::slice::from_raw_parts(a.as_ptr() as *const u8, a.len()) };
+    core::ffi::CStr::from_bytes_until_nul(bytes)
+        .ok()
+        .and_then(|c| c.to_str().ok())
+        .unwrap_or("")
+}
+
 /// Raven `Q_strncmp`.
 ///
 /// Source: `oracle/codemp/game/q_shared.c:881-898`

@@ -73,6 +73,7 @@ use crate::l_precomp_fns::{
 };
 use crate::l_script_fns::StripDoubleQuotes;
 use crate::l_struct_fns::ReadStructure;
+use mp_qshared::shared::q_string::chars_str;
 use mp_qshared::shared::q_string::Q_strncpyz;
 use mp_qshared::shared::q_math::{_VectorAdd, _VectorScale, _VectorSubtract, VectorLength};
 
@@ -653,15 +654,13 @@ pub fn ItemWeightIndex(
         ) as *mut c_int;
 
         for i in 0..numiteminfo {
-            let classname = (*(*ic).iteminfo.add(i as usize)).classname.as_ptr() as *mut c_char;
-            let classname_str = std::ffi::CStr::from_ptr(classname).to_string_lossy();
-            let w = FindFuzzyWeight(bot.weightconfig(iwc), &classname_str);
+            let classname = (*(*ic).iteminfo.add(i as usize)).classname_str();
+            let w = FindFuzzyWeight(bot.weightconfig(iwc), classname);
             *index.add(i as usize) = w;
             if w < 0 {
                 let __m = std::ffi::CString::new(format!(
                     "item info {} \"{}\" has no fuzzy weight\r\n",
-                    i,
-                    std::ffi::CStr::from_ptr(classname).to_string_lossy(),
+                    i, classname,
                 ))
                 .unwrap_or_default();
                 Log_Write(bot, __m.as_ptr() as *mut c_char);
@@ -1293,7 +1292,7 @@ pub fn BotInitLevelItems(bot: &mut BotLib) {
             if (*ii).modelindex == 0 {
                 let __m = std::ffi::CString::new(format!(
                     "item {} has modelindex 0",
-                    std::ffi::CStr::from_ptr((*ii).classname.as_ptr()).to_string_lossy(),
+                    (*ii).classname_str(),
                 ))
                 .unwrap_or_default();
                 Log_Write(bot, __m.as_ptr() as *mut c_char);
@@ -1321,16 +1320,7 @@ pub fn BotInitLevelItems(bot: &mut BotLib) {
 
                 let mut i = 0;
                 while i < numiteminfo {
-                    if libc::strcmp(
-                        classname.as_ptr(),
-                        (*ic)
-                            .iteminfo
-                            .add(i as usize)
-                            .as_ref()
-                            .unwrap()
-                            .classname
-                            .as_ptr(),
-                    ) == 0
+                    if chars_str(&classname) == (*(*ic).iteminfo.add(i as usize)).classname_str()
                     {
                         break;
                     }
@@ -1392,8 +1382,7 @@ pub fn BotInitLevelItems(bot: &mut BotLib) {
                             );
                             let __m = std::ffi::CString::new(format!(
                                 "item {} reachable from jumppad area {}\r\n",
-                                std::ffi::CStr::from_ptr((*ii).classname.as_ptr())
-                                    .to_string_lossy(),
+                                (*ii).classname_str(),
                                 goalareanum,
                             ))
                             .unwrap_or_default();

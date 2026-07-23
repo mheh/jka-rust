@@ -557,9 +557,8 @@ pub fn WeaponWeightIndex(
         ) as *mut c_int;
 
         for i in 0..(*wc).numweapons {
-            let name = CStr::from_ptr((*(*wc).weaponinfo.add(i as usize)).name.as_ptr())
-                .to_string_lossy();
-            *index.add(i as usize) = FindFuzzyWeight(bot.weightconfig(wwc), &name);
+            let name = (*(*wc).weaponinfo.add(i as usize)).name_str();
+            *index.add(i as usize) = FindFuzzyWeight(bot.weightconfig(wwc), name);
         }
         index
     }

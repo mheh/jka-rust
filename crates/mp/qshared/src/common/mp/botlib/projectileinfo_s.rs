@@ -2,6 +2,8 @@
 
 use core::ffi::c_char;
 
+use crate::shared::q_string::chars_str;
+
 /// `MAX_STRINGFIELD`.
 ///
 /// Source: `oracle/codemp/botlib/l_struct.h:16`
@@ -26,6 +28,20 @@ pub struct projectileinfo_t {
     pub bounce: f32,
     pub bouncefric: f32,
     pub bouncestop: f32,
+}
+
+impl projectileinfo_t {
+    /// `name` as `&str` — decodes the live NUL-terminated array each call
+    /// (gentity-`_str()` convention; array shape ABI-frozen per DEC-33). A
+    /// missing NUL or non-UTF-8 bytes decode as `""`.
+    pub fn name_str(&self) -> &str {
+        chars_str(&self.name)
+    }
+
+    /// `model` as `&str` (see [`Self::name_str`]).
+    pub fn model_str(&self) -> &str {
+        chars_str(&self.model)
+    }
 }
 
 pub type projectileinfo_s = projectileinfo_t;

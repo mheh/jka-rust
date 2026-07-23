@@ -2,6 +2,7 @@
 
 use core::ffi::c_char;
 
+use crate::shared::q_string::chars_str;
 use crate::shared::vec3_t;
 
 use super::projectileinfo_s::projectileinfo_t;
@@ -43,6 +44,26 @@ pub struct weaponinfo_t {
     pub spindown: f32,
     /// pointer to the used projectile
     pub proj: projectileinfo_t,
+}
+
+impl weaponinfo_t {
+    /// `name` as `&str` — decodes the live NUL-terminated array each call
+    /// (gentity-`_str()` convention). The array shape is ABI-frozen (DEC-33:
+    /// this struct is memcpy'd across the game seam); a missing NUL or
+    /// non-UTF-8 bytes decode as `""`.
+    pub fn name_str(&self) -> &str {
+        chars_str(&self.name)
+    }
+
+    /// `model` as `&str` (see [`Self::name_str`]).
+    pub fn model_str(&self) -> &str {
+        chars_str(&self.model)
+    }
+
+    /// `projectile` as `&str` (see [`Self::name_str`]).
+    pub fn projectile_str(&self) -> &str {
+        chars_str(&self.projectile)
+    }
 }
 
 pub type weaponinfo_s = weaponinfo_t;

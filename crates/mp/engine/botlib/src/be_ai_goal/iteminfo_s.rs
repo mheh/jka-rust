@@ -2,6 +2,7 @@
 
 use core::ffi::c_char;
 
+use mp_qshared::shared::q_string::chars_str;
 use mp_qshared::shared::vec3_t;
 
 /// `MAX_STRINGFIELD`.
@@ -34,6 +35,25 @@ pub struct iteminfo_t {
     pub maxs: vec3_t,
     /// number of the item info
     pub number: i32,
+}
+
+impl iteminfo_t {
+    /// `classname` as `&str` — decodes the live NUL-terminated array each call
+    /// (gentity-`_str()` convention). The array shape is ABI-frozen (DEC-33);
+    /// a missing NUL or non-UTF-8 bytes decode as `""`.
+    pub fn classname_str(&self) -> &str {
+        chars_str(&self.classname)
+    }
+
+    /// `name` as `&str` (see [`Self::classname_str`]).
+    pub fn name_str(&self) -> &str {
+        chars_str(&self.name)
+    }
+
+    /// `model` as `&str` (see [`Self::classname_str`]).
+    pub fn model_str(&self) -> &str {
+        chars_str(&self.model)
+    }
 }
 
 pub type iteminfo_s = iteminfo_t;
