@@ -1253,8 +1253,12 @@ pub fn Jedi_BattleTaunt(ctx: &mut GameContext) -> qboolean {
     if crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"chatter".as_ptr()) != qfalse
         && ctx.world.bg_state.rng.Q_irand(0, 3) == 0
         && unsafe { (*npc_info).blockedSpeechDebounceTime } < ctx.world.level.time
-        && ctx.world.globals.jediSpeechDebounceTime[unsafe { (*client).playerTeam } as usize]
-            < ctx.world.level.time
+        && ctx
+            .world
+            .globals
+            .jediSpeechDebounceTime
+            .get(unsafe { (*client).playerTeam } as usize)
+            .is_none_or(|&t| t < ctx.world.level.time)
     {
         let mut event: c_int = -1;
         let enemy_id = ctx.world.entity(npc_id).enemy;
@@ -1290,7 +1294,9 @@ pub fn Jedi_BattleTaunt(ctx: &mut GameContext) -> qboolean {
             }
             let team = unsafe { (*client).playerTeam } as usize;
             let deb2 = ctx.world.level.time + 6000;
-            ctx.world.globals.jediSpeechDebounceTime[team] = deb2;
+            if let Some(t) = ctx.world.globals.jediSpeechDebounceTime.get_mut(team) {
+                *t = deb2;
+            }
             let chatter_time = ctx.world.bg_state.rng.Q_irand(5000, 10000);
             crate::g_timer::TIMER_Set(ctx, Some(npc_id), c"chatter".as_ptr(), chatter_time);
             return qtrue;
@@ -2041,8 +2047,7 @@ pub fn Jedi_CombatDistance(ctx: &mut GameContext, enemy_dist: c_int) {
             if enemy_dist > 384 {
                 if ctx.world.bg_state.rng.Q_irand(0, 10) == 0
                     && (*npc_info).blockedSpeechDebounceTime < ctx.world.level.time
-                    && ctx.world.globals.jediSpeechDebounceTime[(*client).playerTeam as usize]
-                        < ctx.world.level.time
+                    && ctx.world.globals.jediSpeechDebounceTime.get((*client).playerTeam as usize).is_none_or(|&t| t < ctx.world.level.time)
                 {
                     if crate::NPC_utils::NPC_ClearLOS4(ctx, ctx.entity_id_of(enemy)) != qfalse {
                         let voice_event = ctx.world.bg_state.rng.Q_irand(
@@ -2057,8 +2062,9 @@ pub fn Jedi_CombatDistance(ctx: &mut GameContext, enemy_dist: c_int) {
                         );
                     }
                     (*npc_info).blockedSpeechDebounceTime = ctx.world.level.time + 3000;
-                    ctx.world.globals.jediSpeechDebounceTime[(*client).playerTeam as usize] =
-                        ctx.world.level.time + 3000;
+                    if let Some(t) = ctx.world.globals.jediSpeechDebounceTime.get_mut((*client).playerTeam as usize) {
+                    *t = ctx.world.level.time + 3000;
+                }
                 }
             }
             //Unless we're totally hiding, go after him
@@ -2116,8 +2122,7 @@ pub fn Jedi_CombatDistance(ctx: &mut GameContext, enemy_dist: c_int) {
                 //They're throwing their saber, grip them!
                 if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"chatter".as_ptr())
                     != qfalse
-                    && ctx.world.globals.jediSpeechDebounceTime[(*client).playerTeam as usize]
-                        < ctx.world.level.time
+                    && ctx.world.globals.jediSpeechDebounceTime.get((*client).playerTeam as usize).is_none_or(|&t| t < ctx.world.level.time)
                     && (*npc_info).blockedSpeechDebounceTime < ctx.world.level.time
                 {
                     let voice_event = ctx.world.bg_state.rng.Q_irand(
@@ -2131,8 +2136,9 @@ pub fn Jedi_CombatDistance(ctx: &mut GameContext, enemy_dist: c_int) {
                         3000,
                     );
                     (*npc_info).blockedSpeechDebounceTime = ctx.world.level.time + 3000;
-                    ctx.world.globals.jediSpeechDebounceTime[(*client).playerTeam as usize] =
-                        ctx.world.level.time + 3000;
+                    if let Some(t) = ctx.world.globals.jediSpeechDebounceTime.get_mut((*client).playerTeam as usize) {
+                    *t = ctx.world.level.time + 3000;
+                }
                     crate::g_timer::TIMER_Set(
                         ctx,
                         ctx.entity_id_of(npc),
@@ -2261,9 +2267,7 @@ pub fn Jedi_CombatDistance(ctx: &mut GameContext, enemy_dist: c_int) {
                                 ctx.entity_id_of(npc),
                                 c"chatter".as_ptr(),
                             ) != qfalse
-                                && ctx.world.globals.jediSpeechDebounceTime
-                                    [(*client).playerTeam as usize]
-                                    < ctx.world.level.time
+                                && ctx.world.globals.jediSpeechDebounceTime.get((*client).playerTeam as usize).is_none_or(|&t| t < ctx.world.level.time)
                                 && (*npc_info).blockedSpeechDebounceTime < ctx.world.level.time
                             {
                                 let voice_event = ctx.world.bg_state.rng.Q_irand(
@@ -2277,8 +2281,9 @@ pub fn Jedi_CombatDistance(ctx: &mut GameContext, enemy_dist: c_int) {
                                     3000,
                                 );
                                 (*npc_info).blockedSpeechDebounceTime = ctx.world.level.time + 3000;
-                                ctx.world.globals.jediSpeechDebounceTime
-                                    [(*client).playerTeam as usize] = ctx.world.level.time + 3000;
+                                if let Some(t) = ctx.world.globals.jediSpeechDebounceTime.get_mut((*client).playerTeam as usize) {
+                    *t = ctx.world.level.time + 3000;
+                }
                                 crate::g_timer::TIMER_Set(
                                     ctx,
                                     ctx.entity_id_of(npc),
@@ -5013,8 +5018,7 @@ pub fn Jedi_CombatTimersUpdate(ctx: &mut GameContext, enemy_dist: c_int) {
                     Jedi_Aggression(&*npc, -1);
                     if ctx.world.bg_state.rng.Q_irand(0, 3) == 0
                         && (*npc_info).blockedSpeechDebounceTime < ctx.world.level.time
-                        && ctx.world.globals.jediSpeechDebounceTime[(*client).playerTeam as usize]
-                            < ctx.world.level.time
+                        && ctx.world.globals.jediSpeechDebounceTime.get((*client).playerTeam as usize).is_none_or(|&t| t < ctx.world.level.time)
                         && (*npc).painDebounceTime < ctx.world.level.time - 1000
                     {
                         let voice_event = ctx.world.bg_state.rng.Q_irand(
@@ -5028,8 +5032,9 @@ pub fn Jedi_CombatTimersUpdate(ctx: &mut GameContext, enemy_dist: c_int) {
                             3000,
                         );
                         (*npc_info).blockedSpeechDebounceTime = ctx.world.level.time + 3000;
-                        ctx.world.globals.jediSpeechDebounceTime[(*client).playerTeam as usize] =
-                            ctx.world.level.time + 3000;
+                        if let Some(t) = ctx.world.globals.jediSpeechDebounceTime.get_mut((*client).playerTeam as usize) {
+                    *t = ctx.world.level.time + 3000;
+                }
                     }
                 }
                 if ctx.world.bg_state.rng.Q_irand(0, 2) == 0 {
@@ -6208,8 +6213,7 @@ pub fn Jedi_Combat(ctx: &mut GameContext) {
                     if enemy_dist < 384.0
                         && ctx.world.bg_state.rng.Q_irand(0, 10) == 0
                         && (*npc_info).blockedSpeechDebounceTime < ctx.world.level.time
-                        && ctx.world.globals.jediSpeechDebounceTime[(*client).playerTeam as usize]
-                            < ctx.world.level.time
+                        && ctx.world.globals.jediSpeechDebounceTime.get((*client).playerTeam as usize).is_none_or(|&t| t < ctx.world.level.time)
                         && crate::NPC_utils::NPC_ClearLOS4(ctx, ctx.entity_id_of(enemy)) == qfalse
                     {
                         let voice_event = ctx.world.bg_state.rng.Q_irand(
@@ -6223,8 +6227,9 @@ pub fn Jedi_Combat(ctx: &mut GameContext) {
                             3000,
                         );
                         (*npc_info).blockedSpeechDebounceTime = ctx.world.level.time + 3000;
-                        ctx.world.globals.jediSpeechDebounceTime[(*client).playerTeam as usize] =
-                            ctx.world.level.time + 3000;
+                        if let Some(t) = ctx.world.globals.jediSpeechDebounceTime.get_mut((*client).playerTeam as usize) {
+                    *t = ctx.world.level.time + 3000;
+                }
                     }
 
                     return;
@@ -7259,8 +7264,9 @@ pub fn Jedi_Attack(ctx: &mut GameContext) {
                             voice_event,
                             3000,
                         );
-                        ctx.world.globals.jediSpeechDebounceTime[(*client).playerTeam as usize] =
-                            ctx.world.level.time + 3000;
+                        if let Some(t) = ctx.world.globals.jediSpeechDebounceTime.get_mut((*client).playerTeam as usize) {
+                    *t = ctx.world.level.time + 3000;
+                }
                         (*npc_info).desiredPitch = 0.0;
                         (*npc_info).goalEntity = None;
                     }
@@ -7298,8 +7304,9 @@ pub fn Jedi_Attack(ctx: &mut GameContext) {
                                 voice_event,
                                 3000,
                             );
-                            ctx.world.globals.jediSpeechDebounceTime
-                                [(*client).playerTeam as usize] = ctx.world.level.time + 3000;
+                            if let Some(t) = ctx.world.globals.jediSpeechDebounceTime.get_mut((*client).playerTeam as usize) {
+                    *t = ctx.world.level.time + 3000;
+                }
                             (*npc_info).desiredPitch = 0.0;
                             (*npc_info).goalEntity = None;
                         }

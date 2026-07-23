@@ -217,8 +217,7 @@ pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, fail
             } else if TIMER_Done(ctx, Some(self_), c"chatter".as_ptr()) == 0 {
                 // personal timer
                 return;
-            } else if ctx.world.globals.groupSpeechDebounceTime[(*client).playerTeam as usize]
-                > ctx.world.level.time
+            } else if ctx.world.globals.groupSpeechDebounceTime.get((*client).playerTeam as usize).is_some_and(|&t| t > ctx.world.level.time)
             {
                 // for those not in group AI
                 // FIXME: let certain speech types interrupt others? Let closer NPCs
@@ -237,8 +236,9 @@ pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, fail
             let delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
             TIMER_Set(ctx, Some(self_), c"chatter".as_ptr(), delay);
         }
-        ctx.world.globals.groupSpeechDebounceTime[(*client).playerTeam as usize] =
-            ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(2000, 4000);
+        if let Some(t) = ctx.world.globals.groupSpeechDebounceTime.get_mut((*client).playerTeam as usize) {
+                    *t = ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(2000, 4000);
+                }
 
         if (*npc).blockedSpeechDebounceTime > ctx.world.level.time {
             return;

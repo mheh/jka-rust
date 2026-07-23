@@ -539,6 +539,9 @@ pub struct GameGlobals {
     pub shoot3: qboolean,
     // --- `NPC_AI_Jedi.c` file-scope globals ---
     /// `jediSpeechDebounceTime`. Source: `oracle/codemp/game/NPC_AI_Jedi.c:94`
+    // §19: every .npc-parsed NPC has playerTeam == -1 (Raven's "NPC%s" sprintf
+    // bug), so Raven indexes [-1] here — OOB read/write. Consumers use
+    // .get()/.get_mut(): out-of-range reads pass the debounce, writes are skipped.
     pub jediSpeechDebounceTime: [c_int; TEAM_NUM_TEAMS as usize],
     // --- `NPC_AI_Sniper.c` file-scope globals ---
     /// `enemyCS2`. Source: `oracle/codemp/game/NPC_AI_Sniper.c:30`
