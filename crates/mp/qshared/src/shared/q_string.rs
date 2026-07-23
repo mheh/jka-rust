@@ -6,13 +6,8 @@ use core::ffi::{c_char, c_int, CStr};
 use native_string::Q_stricmpBytes;
 
 use crate::shared::limits::MAX_TOKEN_CHARS;
-use crate::shared::q_format::{c_vsprintf, FmtArg};
 use crate::shared::string_id_table::stringID_table_t;
 use crate::shared::MAX_QPATH;
-
-// va() rotating-buffer statics (2-slot rotating return buffer).
-static mut VA_STRING: [[c_char; 32000]; 2] = [[0; 32000]; 2];
-static mut VA_INDEX: usize = 0;
 
 /// Raven `Q_strncpyz`.
 ///
@@ -471,26 +466,6 @@ pub fn Com_sprintf(dest: *mut c_char, size: c_int, s: &str) {
         let mut cbig: Vec<c_char> = bytes.iter().map(|&b| b as c_char).collect();
         cbig.push(0);
         Q_strncpyz(dest, cbig.as_ptr() as *const c_char, size);
-    }
-}
-
-/// Raven `va` — does a varargs printf into a temp buffer, so I don't need to
-/// have varargs versions of all text functions.
-///
-/// Diverges: a `>= 32000`-byte result truncates instead of overrunning (Raven UB).
-/// Source: `oracle/codemp/game/q_shared.c:1017-1031`
-pub fn va(format: *const c_char, args: &[FmtArg]) -> *mut c_char {
-    unsafe {
-        let buf = VA_STRING[VA_INDEX & 1].as_mut_ptr();
-        VA_INDEX += 1;
-
-        let fmt_bytes = std::ffi::CStr::from_ptr(format).to_bytes();
-        let formatted = c_vsprintf(fmt_bytes, args);
-        let copy_len = formatted.len().min(32000 - 1);
-        std::ptr::copy_nonoverlapping(formatted.as_ptr() as *const c_char, buf, copy_len);
-        *buf.offset(copy_len as isize) = 0;
-
-        buf
     }
 }
 

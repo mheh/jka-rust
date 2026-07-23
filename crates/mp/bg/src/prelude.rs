@@ -163,8 +163,8 @@ pub use mp_qshared::shared::q_math::{
     VectorSet, PITCH, ROLL, YAW,
 };
 pub use mp_qshared::shared::q_string::{
-    va, COM_Compress, COM_StripExtension, GetIDForString, Q_strcat, Q_strcmp, Q_stricmp,
-    Q_stricmpn, Q_strncmp, Q_strncpyz,
+    COM_Compress, COM_StripExtension, GetIDForString, Q_strcat, Q_strcmp, Q_stricmp, Q_stricmpn,
+    Q_strncmp, Q_strncpyz,
 };
 pub use mp_qshared::shared::qint64;
 pub use mp_qshared::shared::saber_blocked_type::{saberBlockedType_t, saberBlockedType_t::*};

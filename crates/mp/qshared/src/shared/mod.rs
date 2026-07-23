@@ -11,9 +11,9 @@ pub mod cbuf_exec;
 #[path = "e_status.rs"]
 pub mod cinematic_status;
 pub mod collision;
-// S5-5: canonical home for the `QSharedScratch`-threaded `COM_Parse*` family
-// (bg/game import the module path explicitly — no crate-root re-export, so it
-// does not collide with the `static mut` `COM_*` twins in `q_string.rs`).
+// Canonical home for the `QSharedScratch`-threaded `COM_Parse*` family (line-
+// counting byte cursors); `q_string.rs` carries the session-free `&str`
+// tokenizer twin. bg/game import the module path explicitly.
 pub mod com_parse;
 pub mod connstate;
 pub mod ct_table;
@@ -41,7 +41,6 @@ pub mod mark_fragment;
 pub mod pc_token;
 pub mod print_parm;
 pub mod q_color;
-pub mod q_format;
 pub mod q_math;
 pub mod q_string;
 pub mod saber_block_type;

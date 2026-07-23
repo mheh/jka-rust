@@ -47,46 +47,6 @@ unsafe fn c_strlen(s: *const c_char) -> usize {
     n as usize
 }
 
-unsafe fn c_strchr(s: *const c_char, c: c_char) -> *mut c_char {
-    let mut p = s;
-    loop {
-        if *p == c {
-            return p as *mut c_char;
-        }
-        if *p == 0 {
-            return std::ptr::null_mut();
-        }
-        p = p.offset(1);
-    }
-}
-
-unsafe fn c_strcmp(a: *const c_char, b: *const c_char) -> c_int {
-    let mut i: isize = 0;
-    loop {
-        let ca = *a.offset(i);
-        let cb = *b.offset(i);
-        if ca != cb {
-            return (ca as c_int) - (cb as c_int);
-        }
-        if ca == 0 {
-            return 0;
-        }
-        i += 1;
-    }
-}
-
-unsafe fn c_strcpy(dst: *mut c_char, src: *const c_char) {
-    let mut i: isize = 0;
-    loop {
-        let c = *src.offset(i);
-        *dst.offset(i) = c;
-        if c == 0 {
-            break;
-        }
-        i += 1;
-    }
-}
-
 /// Prints a fixed (no-interpolation) message via `Com_Printf`.
 unsafe fn com_printf_lit(msg: &str) {
     crate::g_main::Com_Printf(msg);
