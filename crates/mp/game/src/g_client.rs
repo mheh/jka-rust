@@ -49,6 +49,7 @@ use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t::{
 use native_string::atoi;
 use native_string::strncpyz_string;
 use native_string::Q_stricmp;
+use native_string::Q_strncpyzBytes;
 
 use crate::client::client_persistant::MAX_NETNAME;
 
@@ -4017,7 +4018,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
 
         // set model
         let modelname_kv = Info_ValueForKey(&userinfo, "model");
-        crate::q_shared::Q_strncpyz(model.as_mut_ptr(), cstr(&modelname_kv).as_ptr(), 260);
+        Q_strncpyzBytes(&mut model, modelname_kv.as_bytes(), 260);
 
         if ctx.world.cvars.d_perPlayerGhoul2.integer != 0 {
             // `modelname` is a `String`; `model` stays a C buffer (feeds pointer
@@ -4054,7 +4055,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         (*client).ps.customRGBA[3] = 255;
 
         let forcepowers_kv = Info_ValueForKey(&userinfo, "forcepowers");
-        crate::q_shared::Q_strncpyz(forcePowers.as_mut_ptr(), cstr(&forcepowers_kv).as_ptr(), 260);
+        Q_strncpyzBytes(&mut forcePowers, forcepowers_kv.as_bytes(), 260);
 
         // bots set their team a few frames later
         if ctx.world.cvars.g_gametype.integer >= GT_TEAM

@@ -6,10 +6,11 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_main::G_Printf;
-use crate::q_shared::COM_BeginParseSession;
+use crate::q_shared::{COM_BeginParseSession, COM_ParseExt};
 use crate::prelude::*;
 use crate::trap;
 use crate::world::GameWorld;
+use native_string::atoi_bytes;
 use native_string::Q_stricmp;
 
 // IP filter type: holds mask and compare value for IP filtering.
@@ -401,31 +402,29 @@ pub fn G_LoadIPBans(ctx: &mut GameContext) {
     // we substitute "banip.txt". Source: `oracle/codemp/game/g_svcmds.c:339,352`.
     COM_BeginParseSession(&mut ctx.world.bg_state.qs, "banip.txt");
 
-    let mut p: *const c_char = ban_ip_buffer.as_ptr() as *const c_char;
-    let token = crate::q_shared::COM_ParseExt(&mut ctx.world.bg_state.qs, &mut p, qtrue);
+    let mut p: Option<&[u8]> = Some(&ban_ip_buffer[..]);
+    let (token, rest) = COM_ParseExt(&mut ctx.world.bg_state.qs, p, true);
+    p = rest;
 
-    if !token.is_null() {
-        ctx.world.globals.numIPFilters = atoi(token);
+    // Raven's `if (token)` tests the (always non-NULL) `com_token` pointer — it is
+    // always true, and the loop's `else break` is correspondingly dead. Preserved
+    // by always entering.
+    ctx.world.globals.numIPFilters = atoi_bytes(token.as_bytes());
 
-        for i in 0..(ctx.world.globals.numIPFilters as usize) {
-            let token = crate::q_shared::COM_ParseExt(&mut ctx.world.bg_state.qs, &mut p, qtrue);
-            if !token.is_null() {
-                let token_str = unsafe { std::ffi::CStr::from_ptr(token).to_string_lossy() };
-                if token_str.to_lowercase() == "unused" {
-                    (&mut ctx.world.globals.ipFilters)[i].compare = 0xffffffffu32;
-                } else {
-                    // STAGE-2b: irreducible — `&mut world.globals.ipFilters[i]` is an
-                    // out-param that aliases the `ctx` passed to the same StringToFilter
-                    // call; a raw world pointer hoisted before the call keeps it disjoint
-                    // from ctx's borrow.
-                    let world_ptr = ctx.world_raw();
-                    StringToFilter(ctx, token as *mut c_char, unsafe {
-                        &mut (&mut (*world_ptr).globals.ipFilters)[i] as *mut ipFilter_t
-                    });
-                }
-            } else {
-                break;
-            }
+    for i in 0..(ctx.world.globals.numIPFilters as usize) {
+        let (token, rest) = COM_ParseExt(&mut ctx.world.bg_state.qs, p, true);
+        p = rest;
+        if token.to_lowercase() == "unused" {
+            (&mut ctx.world.globals.ipFilters)[i].compare = 0xffffffffu32;
+        } else {
+            // STAGE-2b: irreducible — `&mut world.globals.ipFilters[i]` is an
+            // out-param that aliases the `ctx` passed to the same StringToFilter
+            // call; a raw world pointer hoisted before the call keeps it disjoint
+            // from ctx's borrow.
+            let world_ptr = ctx.world_raw();
+            StringToFilter(ctx, cstr(&token).as_ptr() as *mut c_char, unsafe {
+                &mut (&mut (*world_ptr).globals.ipFilters)[i] as *mut ipFilter_t
+            });
         }
     }
 }

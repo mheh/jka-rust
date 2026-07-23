@@ -18,6 +18,7 @@ use core::ffi::CStr;
 use crate::c_format::{c_vsprintf, FmtArg};
 use crate::prelude::*;
 use native_string::atof_bytes;
+use native_string::atoi_bytes;
 use native_string::InfoSetResult;
 
 // S5-5: the `QSharedScratch` type and the `QSharedScratch`-threaded
@@ -27,7 +28,7 @@ use native_string::InfoSetResult;
 // `COM_MatchToken`, `Parse{1,2,3}DMatrix`) keep compiling unchanged.
 pub use mp_qshared::shared::com_parse::{
     COM_BeginParseSession, COM_GetCurrentParseLine, COM_Parse, COM_ParseExt, QSharedScratch,
-    SkipBracedSection, SkipRestOfLine, SkipWhitespace,
+    SkipBracedSection, SkipRestOfLine,
 };
 
 
@@ -93,7 +94,7 @@ unsafe fn com_printf_lit(msg: &str) {
 
 // `GetIDForString` is canonical in `mp_qshared` (the shared-tier
 // `q_string.rs`); re-exported here so this file's importers keep resolving
-// `crate::q_shared::GetIDForString`.
+// `GetIDForString`.
 pub use mp_qshared::shared::q_string::GetIDForString;
 
 /// Raven `GetStringForID`.
@@ -403,56 +404,47 @@ pub fn COM_Compress(data_p: *mut c_char) -> c_int {
 
 /// Raven `COM_ParseString`.
 ///
+/// Raven's guard is `if ( s[0] == 0 )` where `s` is `const char **`, so `s[0]`
+/// is the (always non-NULL) `com_token` pointer, not the first token byte — the
+/// EOF branch is dead and `COM_ParseString` never returns `qtrue`. Preserved.
 /// Source: `oracle/codemp/game/q_shared.c:588-598`
 pub fn COM_ParseString(
     qs: &mut QSharedScratch,
-    data: *mut *const c_char,
-    s: *mut *const c_char,
+    data: &mut Option<&[u8]>,
+    s: &mut String,
 ) -> qboolean {
-    unsafe {
-        let token = crate::q_shared::COM_ParseExt(qs, data, qfalse);
-        *s = token as *const c_char;
-        // Raven's guard is literally `if ( s[0] == 0 )` — `s` is `const
-        // char **`, so `s[0]` is the token pointer itself, not `*token`.
-        // That's always non-zero here (COM_ParseExt never returns NULL),
-        // so the oracle's check is dead in practice; preserved faithfully
-        // as a null-pointer check rather than silently "fixed" to `*token`.
-        if (*s).is_null() {
-            com_printf_lit("unexpected EOF\n");
-            return qtrue;
-        }
-        qfalse
-    }
+    let (token, rest) = COM_ParseExt(qs, *data, false);
+    *data = rest;
+    *s = token;
+    qfalse
 }
 
 /// Raven `COM_ParseInt`.
 ///
 /// Source: `oracle/codemp/game/q_shared.c:605-618`
-pub fn COM_ParseInt(qs: &mut QSharedScratch, data: *mut *const c_char, i: *mut c_int) -> qboolean {
-    unsafe {
-        let token = crate::q_shared::COM_ParseExt(qs, data, qfalse);
-        if *token == 0 {
-            com_printf_lit("unexpected EOF\n");
-            return qtrue;
-        }
-        *i = atoi(token as *const c_char);
-        qfalse
+pub fn COM_ParseInt(qs: &mut QSharedScratch, data: &mut Option<&[u8]>, i: &mut c_int) -> qboolean {
+    let (token, rest) = COM_ParseExt(qs, *data, false);
+    *data = rest;
+    if token.is_empty() {
+        unsafe { com_printf_lit("unexpected EOF\n") };
+        return qtrue;
     }
+    *i = atoi_bytes(token.as_bytes());
+    qfalse
 }
 
 /// Raven `COM_ParseFloat`.
 ///
 /// Source: `oracle/codemp/game/q_shared.c:625-638`
-pub fn COM_ParseFloat(qs: &mut QSharedScratch, data: *mut *const c_char, f: *mut f32) -> qboolean {
-    unsafe {
-        let token = crate::q_shared::COM_ParseExt(qs, data, qfalse);
-        if *token == 0 {
-            com_printf_lit("unexpected EOF\n");
-            return qtrue;
-        }
-        *f = atof_bytes(CStr::from_ptr(token).to_bytes()) as f32;
-        qfalse
+pub fn COM_ParseFloat(qs: &mut QSharedScratch, data: &mut Option<&[u8]>, f: &mut f32) -> qboolean {
+    let (token, rest) = COM_ParseExt(qs, *data, false);
+    *data = rest;
+    if token.is_empty() {
+        unsafe { com_printf_lit("unexpected EOF\n") };
+        return qtrue;
     }
+    *f = atof_bytes(token.as_bytes()) as f32;
+    qfalse
 }
 
 /// Raven `COM_ParseVec4`.
@@ -460,47 +452,43 @@ pub fn COM_ParseFloat(qs: &mut QSharedScratch, data: *mut *const c_char, f: *mut
 /// Source: `oracle/codemp/game/q_shared.c:645-659`
 pub fn COM_ParseVec4(
     qs: &mut QSharedScratch,
-    buffer: *mut *const c_char,
-    c: *mut vec4_t,
+    buffer: &mut Option<&[u8]>,
+    c: &mut vec4_t,
 ) -> qboolean {
-    unsafe {
-        for i in 0..4usize {
-            let mut f = 0.0f32;
-            if crate::q_shared::COM_ParseFloat(qs, buffer, &mut f) == qtrue {
-                return qtrue;
-            }
-            (*c)[i] = f;
+    for i in 0..4usize {
+        let mut f = 0.0f32;
+        if COM_ParseFloat(qs, buffer, &mut f) == qtrue {
+            return qtrue;
         }
-        qfalse
+        c[i] = f;
     }
+    qfalse
 }
 
 /// Raven `COM_MatchToken`.
 ///
 /// Source: `oracle/codemp/game/q_shared.c:666-673`
-pub fn COM_MatchToken(qs: &mut QSharedScratch, buf_p: *mut *const c_char, r#match: *mut c_char) {
-    unsafe {
-        let token = crate::q_shared::COM_Parse(qs, buf_p);
-        if c_strcmp(token as *const c_char, r#match as *const c_char) != 0 {
-            let t = std::ffi::CStr::from_ptr(token).to_string_lossy();
-            let m = std::ffi::CStr::from_ptr(r#match).to_string_lossy();
-            // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
-            panic!("MatchToken: {t} != {m}");
-        }
+pub fn COM_MatchToken(qs: &mut QSharedScratch, buf_p: &mut Option<&[u8]>, r#match: &str) {
+    let (token, rest) = COM_Parse(qs, *buf_p);
+    *buf_p = rest;
+    if token != r#match {
+        // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+        panic!("MatchToken: {token} != {}", r#match);
     }
 }
 
 /// Raven `Parse1DMatrix`.
 ///
 /// Source: `oracle/codemp/game/q_shared.c:724-736`
-pub fn Parse1DMatrix(qs: &mut QSharedScratch, buf_p: *mut *const c_char, x: c_int, m: *mut f32) {
+pub fn Parse1DMatrix(qs: &mut QSharedScratch, buf_p: &mut Option<&[u8]>, x: c_int, m: *mut f32) {
     unsafe {
-        crate::q_shared::COM_MatchToken(qs, buf_p, c"(".as_ptr() as *mut c_char);
+        COM_MatchToken(qs, buf_p, "(");
         for i in 0..x {
-            let token = crate::q_shared::COM_Parse(qs, buf_p);
-            *m.offset(i as isize) = atof_bytes(CStr::from_ptr(token).to_bytes()) as f32;
+            let (token, rest) = COM_Parse(qs, *buf_p);
+            *buf_p = rest;
+            *m.offset(i as isize) = atof_bytes(token.as_bytes()) as f32;
         }
-        crate::q_shared::COM_MatchToken(qs, buf_p, c")".as_ptr() as *mut c_char);
+        COM_MatchToken(qs, buf_p, ")");
     }
 }
 
@@ -509,17 +497,17 @@ pub fn Parse1DMatrix(qs: &mut QSharedScratch, buf_p: *mut *const c_char, x: c_in
 /// Source: `oracle/codemp/game/q_shared.c:738-748`
 pub fn Parse2DMatrix(
     qs: &mut QSharedScratch,
-    buf_p: *mut *const c_char,
+    buf_p: &mut Option<&[u8]>,
     y: c_int,
     x: c_int,
     m: *mut f32,
 ) {
     unsafe {
-        crate::q_shared::COM_MatchToken(qs, buf_p, c"(".as_ptr() as *mut c_char);
+        COM_MatchToken(qs, buf_p, "(");
         for i in 0..y {
-            crate::q_shared::Parse1DMatrix(qs, buf_p, x, m.offset((i * x) as isize));
+            Parse1DMatrix(qs, buf_p, x, m.offset((i * x) as isize));
         }
-        crate::q_shared::COM_MatchToken(qs, buf_p, c")".as_ptr() as *mut c_char);
+        COM_MatchToken(qs, buf_p, ")");
     }
 }
 
@@ -528,18 +516,18 @@ pub fn Parse2DMatrix(
 /// Source: `oracle/codemp/game/q_shared.c:750-760`
 pub fn Parse3DMatrix(
     qs: &mut QSharedScratch,
-    buf_p: *mut *const c_char,
+    buf_p: &mut Option<&[u8]>,
     z: c_int,
     y: c_int,
     x: c_int,
     m: *mut f32,
 ) {
     unsafe {
-        crate::q_shared::COM_MatchToken(qs, buf_p, c"(".as_ptr() as *mut c_char);
+        COM_MatchToken(qs, buf_p, "(");
         for i in 0..z {
-            crate::q_shared::Parse2DMatrix(qs, buf_p, y, x, m.offset((i * x * y) as isize));
+            Parse2DMatrix(qs, buf_p, y, x, m.offset((i * x * y) as isize));
         }
-        crate::q_shared::COM_MatchToken(qs, buf_p, c")".as_ptr() as *mut c_char);
+        COM_MatchToken(qs, buf_p, ")");
     }
 }
 
@@ -813,7 +801,7 @@ pub fn Q_strlen(string: *const c_char) -> usize {
 /// Source: `oracle/codemp/game/q_shared.c:900-902`
 pub fn Q_stricmp(s1: *const c_char, s2: *const c_char) -> c_int {
     if !s1.is_null() && !s2.is_null() {
-        crate::q_shared::Q_stricmpn(s1, s2, 99999)
+        Q_stricmpn(s1, s2, 99999)
     } else {
         -1
     }
@@ -856,7 +844,7 @@ pub fn Q_strcat(dest: *mut c_char, size: c_int, src: *const c_char) {
         if l1 >= size {
             panic!("Q_strcat: already overflowed"); // Com_Error(ERR_FATAL, ...) -> panic (frozen Group A).
         }
-        crate::q_shared::Q_strncpyz(dest.offset(l1 as isize), src, size - l1);
+        Q_strncpyz(dest.offset(l1 as isize), src, size - l1);
     }
 }
 
@@ -952,7 +940,7 @@ pub fn Com_sprintf(dest: *mut c_char, size: c_int, fmt: *const c_char, args: &[F
         // NUL (the formatter never emits one), so append the terminator here.
         let mut cbig = bigbuffer;
         cbig.push(0);
-        crate::q_shared::Q_strncpyz(dest, cbig.as_ptr() as *const c_char, size);
+        Q_strncpyz(dest, cbig.as_ptr() as *const c_char, size);
     }
 }
 

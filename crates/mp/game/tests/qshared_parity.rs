@@ -21,7 +21,7 @@
 use core::ffi::{c_char, c_int};
 use std::fmt::Write as _;
 
-use mp_game::prelude::{cstr, qfalse, qtrue};
+use mp_game::prelude::cstr;
 use mp_game::q_shared::{
     va, COM_BeginParseSession, COM_Compress, COM_DefaultExtension, COM_GetCurrentParseLine,
     COM_ParseExt, COM_StripExtension, Com_Clamp, Com_Clampi, Com_sprintf, Info_SetValueForKey,
@@ -111,40 +111,50 @@ fn dump_clamp(o: &mut String) {
     }
 }
 
+// Feed the tokenizer a NUL-terminated byte buffer — the byte cursor treats an
+// embedded NUL as the C-string end (§19), reproducing the pointer version that
+// walked a `char*` past its terminator.
+fn nul_terminated(bytes: &[u8]) -> Vec<u8> {
+    let mut v = bytes.to_vec();
+    v.push(0);
+    v
+}
+
 fn dump_tokens(o: &mut String) {
     o.push_str("== tokens ==\n");
-    let cb = cbuf_b(&read_fixture("tokens.txt"));
+    let cb = nul_terminated(&read_fixture("tokens.txt"));
     let mut qs = QSharedScratch::zeroed();
 
     // pass 1: allowLineBreaks = qtrue
     let name = "tokens";
     COM_BeginParseSession(&mut qs, name);
-    let mut p: *const c_char = cb.as_ptr();
+    let mut p: Option<&[u8]> = Some(&cb);
     for _ in 0..200 {
-        let tok = COM_ParseExt(&mut qs, &mut p, qtrue);
-        let eof = p.is_null();
+        let (tok, rest) = COM_ParseExt(&mut qs, p, true);
+        p = rest;
+        let eof = p.is_none();
         let _ = write!(o, "qt ");
-        qstr_p(o, tok);
+        qstr(o, tok.as_bytes());
         let _ = writeln!(
             o,
             " line {} nul {}",
             COM_GetCurrentParseLine(&qs),
             eof as i32
         );
-        let first = unsafe { *tok };
-        if first == 0 && eof {
+        if tok.is_empty() && eof {
             break;
         }
     }
 
     // pass 2: allowLineBreaks = qfalse (empty token returned at line breaks)
     COM_BeginParseSession(&mut qs, name);
-    p = cb.as_ptr();
+    p = Some(&cb);
     for _ in 0..200 {
-        let tok = COM_ParseExt(&mut qs, &mut p, qfalse);
-        let eof = p.is_null();
+        let (tok, rest) = COM_ParseExt(&mut qs, p, false);
+        p = rest;
+        let eof = p.is_none();
         let _ = write!(o, "qf ");
-        qstr_p(o, tok);
+        qstr(o, tok.as_bytes());
         let _ = writeln!(
             o,
             " line {} nul {}",
@@ -181,23 +191,21 @@ fn dump_braced(o: &mut String) {
     let name = "braced";
     let mut qs = QSharedScratch::zeroed();
     for (i, input) in cases.iter().enumerate() {
-        let cb = cbuf(input);
+        let cb = nul_terminated(input.as_bytes());
         COM_BeginParseSession(&mut qs, name);
-        let mut p: *const c_char = cb.as_ptr();
-        SkipBracedSection(&mut qs, &mut p);
-        let off: i64 = if p.is_null() {
-            -1
-        } else {
-            unsafe { p.offset_from(cb.as_ptr()) as i64 }
+        let p: Option<&[u8]> = Some(&cb);
+        let p = SkipBracedSection(&mut qs, p);
+        let off: i64 = match p {
+            None => -1,
+            Some(rest) => (cb.len() - rest.len()) as i64,
         };
-        let rest: Vec<u8> = if p.is_null() {
-            Vec::new()
-        } else {
-            read_cstr(COM_ParseExt(&mut qs, &mut p, qtrue))
+        let rest_tok: String = match p {
+            None => String::new(),
+            Some(_) => COM_ParseExt(&mut qs, p, true).0,
         };
         let line = COM_GetCurrentParseLine(&qs);
         let _ = write!(o, "br {i} off {off} line {line} rest ");
-        qstr(o, &rest);
+        qstr(o, rest_tok.as_bytes());
         let _ = writeln!(o);
     }
 }
@@ -213,14 +221,18 @@ fn dump_skipline(o: &mut String) {
     let name = "skipline";
     let mut qs = QSharedScratch::zeroed();
     for (i, input) in cases.iter().enumerate() {
-        let cb = cbuf(input);
+        let cb = nul_terminated(input.as_bytes());
         COM_BeginParseSession(&mut qs, name);
-        let mut p: *const c_char = cb.as_ptr();
-        SkipRestOfLine(&mut qs, &mut p);
+        let p: Option<&[u8]> = Some(&cb);
+        let p = SkipRestOfLine(&mut qs, p);
         // Raven's SkipRestOfLine consumes the terminating NUL when there is no
-        // newline, leaving the cursor one past the NUL; dereferencing it is UB.
-        // Only the (defined) offset + line counter are dumped (§19).
-        let off = unsafe { p.offset_from(cb.as_ptr()) };
+        // newline, leaving the cursor one past the NUL; the byte cursor
+        // reproduces that (the NUL-terminated buffer's `\0` is consumed), so the
+        // offset matches the pointer version. Only offset + line are dumped (§19).
+        let off: i64 = match p {
+            None => -1,
+            Some(rest) => (cb.len() - rest.len()) as i64,
+        };
         let line = COM_GetCurrentParseLine(&qs);
         let _ = writeln!(o, "sl {i} off {off} line {line}");
     }

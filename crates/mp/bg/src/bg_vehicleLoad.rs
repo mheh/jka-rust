@@ -15,6 +15,7 @@ use mp_qshared::shared::com_parse::{
 };
 use native_string::atof::atof;
 use native_string::atoi::atoi;
+use native_string::Q_strncpyzBytes;
 
 /// Raven `BG_ClearVehicleParseParms`.
 ///
@@ -32,7 +33,7 @@ pub fn BG_ClearVehicleParseParms(bg: &mut BgState) {
 pub fn BG_ParseVehWeaponParm(
     vehWeapon: *mut vehWeaponInfo_t,
     parmName: *mut c_char,
-    pValue: *mut c_char,
+    pValue: &str,
     // Threaded so the MP (`_JK2MP`) `VF_LSTRING` branch can bump the bg pool
     // (`BG_Alloc`); the game pool is unreachable from bg-tier code.
     bg: &mut BgState,
@@ -43,7 +44,7 @@ pub fn BG_ParseVehWeaponParm(
     callbacks: &mut dyn GameCallbacks,
 ) -> qboolean {
     unsafe {
-        let value = cstr_to_str(pValue);
+        let value = pValue;
         let b = vehWeapon as *mut u8;
         let mut i = 0usize;
         while i < NUM_VWEAP_PARMS {
@@ -157,42 +158,51 @@ pub fn VEH_LoadVehWeapon(
 ) -> c_int {
     unsafe {
         // `p` walks the `VehWeaponParms` text buffer via `COM_ParseExt`'s
-        // `*const *const c_char` cursor idiom.
-        let mut p: *const c_char = bg.VehWeaponParms.as_ptr() as *const c_char;
+        // byte-slice cursor idiom.
+        let veh_buf: Vec<u8> = bg
+            .VehWeaponParms
+            .iter()
+            .take_while(|&&c| c != 0)
+            .map(|&c| c as u8)
+            .collect();
+        let mut p: Option<&[u8]> = Some(&veh_buf);
         COM_BeginParseSession(&mut bg.qs, "vehWeapons");
 
         let veh_index = bg.numVehicleWeapons as usize;
         let vehWeapon: *mut vehWeaponInfo_t = &mut bg.g_vehWeaponInfo[veh_index];
 
         loop {
-            if p.is_null() {
+            if p.is_none() {
                 return VEH_WEAPON_NONE;
             }
-            let token = COM_ParseExt(&mut bg.qs, &mut p as *mut *const c_char, qtrue);
-            if *token == 0 {
+            let (token, rest) = COM_ParseExt(&mut bg.qs, p, true);
+            p = rest;
+            if token.is_empty() {
                 return qfalse as c_int;
             }
-            if Q_stricmp(token, vehWeaponName) == 0 {
+            if Q_stricmp(cstr(&token).as_ptr(), vehWeaponName) == 0 {
                 break;
             }
-            SkipBracedSection(&mut bg.qs, &mut p as *mut *const c_char);
+            p = SkipBracedSection(&mut bg.qs, p);
         }
-        if p.is_null() {
+        if p.is_none() {
             return VEH_WEAPON_NONE;
         }
 
-        let token = COM_ParseExt(&mut bg.qs, &mut p as *mut *const c_char, qtrue);
-        if *token == 0 {
+        let (token, rest) = COM_ParseExt(&mut bg.qs, p, true);
+        p = rest;
+        if token.is_empty() {
             return VEH_WEAPON_NONE;
         }
-        if Q_stricmp(token, cstr("{").as_ptr()) != 0 {
+        if !token.eq_ignore_ascii_case("{") {
             return VEH_WEAPON_NONE;
         }
 
         loop {
-            SkipRestOfLine(&mut bg.qs, &mut p as *mut *const c_char);
-            let token = COM_ParseExt(&mut bg.qs, &mut p as *mut *const c_char, qtrue);
-            if *token == 0 {
+            p = SkipRestOfLine(&mut bg.qs, p);
+            let (token, rest) = COM_ParseExt(&mut bg.qs, p, true);
+            p = rest;
+            if token.is_empty() {
                 let name = cstr_to_str(vehWeaponName);
                 traps.com_printf(
                     &format!(
@@ -203,13 +213,14 @@ pub fn VEH_LoadVehWeapon(
                 );
                 return VEH_WEAPON_NONE;
             }
-            if Q_stricmp(token, cstr("}").as_ptr()) == 0 {
+            if token.eq_ignore_ascii_case("}") {
                 break;
             }
             let mut parmName: [c_char; 128] = [0; 128];
-            Q_strncpyz(parmName.as_mut_ptr(), token, 128);
-            let value = COM_ParseExt(&mut bg.qs, &mut p as *mut *const c_char, qtrue);
-            if value.is_null() || *value == 0 {
+            Q_strncpyzBytes(&mut parmName, token.as_bytes(), 128);
+            let (value, rest) = COM_ParseExt(&mut bg.qs, p, true);
+            p = rest;
+            if value.is_empty() {
                 let pn = cstr_to_str(parmName.as_ptr());
                 traps.com_printf(
                     &format!(
@@ -221,14 +232,14 @@ pub fn VEH_LoadVehWeapon(
             } else if BG_ParseVehWeaponParm(
                 vehWeapon,
                 parmName.as_mut_ptr(),
-                value,
+                &value,
                 bg,
                 traps,
                 callbacks,
             ) == qfalse
             {
                 let pn = cstr_to_str(parmName.as_ptr());
-                let v = cstr_to_str(value);
+                let v = value;
                 traps.com_printf(
                     &format!(
                         "{}ERROR: Unknown Vehicle Weapon key/value pair '{}','{}'!\n",
@@ -363,7 +374,7 @@ pub fn BG_VehicleClampData(vehicle: *mut vehicleInfo_t) {
 pub fn BG_ParseVehicleParm(
     vehicle: *mut vehicleInfo_t,
     parmName: *mut c_char,
-    pValue: *mut c_char,
+    pValue: &str,
     // Threaded so the MP (`_JK2MP`) `VF_LSTRING` branch can bump the bg pool
     // (`BG_Alloc`); the game pool is unreachable from bg-tier code.
     bg: &mut BgState,
@@ -374,7 +385,7 @@ pub fn BG_ParseVehicleParm(
     callbacks: &mut dyn GameCallbacks,
 ) -> qboolean {
     unsafe {
-        let value = cstr_to_str(pValue);
+        let value = pValue;
         let b = vehicle as *mut u8;
         let mut i = 0usize;
         while vehicleFields[i].ofs != -1 {
@@ -501,7 +512,13 @@ pub fn VEH_LoadVehicle(
             BG_VehicleLoadParms(bg, traps);
         }
 
-        let mut p: *const c_char = bg.VehicleParms.as_ptr() as *const c_char;
+        let veh_buf: Vec<u8> = bg
+            .VehicleParms
+            .iter()
+            .take_while(|&&c| c != 0)
+            .map(|&c| c as u8)
+            .collect();
+        let mut p: Option<&[u8]> = Some(&veh_buf);
         COM_BeginParseSession(&mut bg.qs, "vehicles");
 
         let veh_index = bg.numVehicles as usize;
@@ -512,35 +529,38 @@ pub fn VEH_LoadVehicle(
         let mut weap_muzzle: [[c_char; 128]; 10] = [[0; 128]; 10];
 
         loop {
-            if p.is_null() {
+            if p.is_none() {
                 return VEHICLE_NONE;
             }
-            let token = COM_ParseExt(&mut bg.qs, &mut p as *mut *const c_char, qtrue);
-            if *token == 0 {
+            let (token, rest) = COM_ParseExt(&mut bg.qs, p, true);
+            p = rest;
+            if token.is_empty() {
                 return VEHICLE_NONE;
             }
-            if Q_stricmp(token, vehicleName) == 0 {
+            if Q_stricmp(cstr(&token).as_ptr(), vehicleName) == 0 {
                 break;
             }
-            SkipBracedSection(&mut bg.qs, &mut p as *mut *const c_char);
+            p = SkipBracedSection(&mut bg.qs, p);
         }
-        if p.is_null() {
+        if p.is_none() {
             return VEHICLE_NONE;
         }
 
-        let token = COM_ParseExt(&mut bg.qs, &mut p as *mut *const c_char, qtrue);
-        if *token == 0 {
+        let (token, rest) = COM_ParseExt(&mut bg.qs, p, true);
+        p = rest;
+        if token.is_empty() {
             return VEHICLE_NONE;
         }
-        if Q_stricmp(token, cstr("{").as_ptr()) != 0 {
+        if !token.eq_ignore_ascii_case("{") {
             return VEHICLE_NONE;
         }
 
         BG_VehicleSetDefaults(vehicle);
         loop {
-            SkipRestOfLine(&mut bg.qs, &mut p as *mut *const c_char);
-            let token = COM_ParseExt(&mut bg.qs, &mut p as *mut *const c_char, qtrue);
-            if *token == 0 {
+            p = SkipRestOfLine(&mut bg.qs, p);
+            let (token, rest) = COM_ParseExt(&mut bg.qs, p, true);
+            p = rest;
+            if token.is_empty() {
                 let name = cstr_to_str(vehicleName);
                 traps.com_printf(
                     &format!(
@@ -551,13 +571,14 @@ pub fn VEH_LoadVehicle(
                 );
                 return VEHICLE_NONE;
             }
-            if Q_stricmp(token, cstr("}").as_ptr()) == 0 {
+            if token.eq_ignore_ascii_case("}") {
                 break;
             }
             let mut parmName: [c_char; 128] = [0; 128];
-            Q_strncpyz(parmName.as_mut_ptr(), token, 128);
-            let value = COM_ParseExt(&mut bg.qs, &mut p as *mut *const c_char, qtrue);
-            if value.is_null() || *value == 0 {
+            Q_strncpyzBytes(&mut parmName, token.as_bytes(), 128);
+            let (value, rest) = COM_ParseExt(&mut bg.qs, p, true);
+            p = rest;
+            if value.is_empty() {
                 let pn = cstr_to_str(parmName.as_ptr());
                 traps.com_printf(
                     &format!(
@@ -567,27 +588,27 @@ pub fn VEH_LoadVehicle(
                     ),
                 );
             } else if Q_stricmp(cstr("weap1").as_ptr(), parmName.as_ptr()) == 0 {
-                Q_strncpyz(weap1.as_mut_ptr(), value, 128);
+                Q_strncpyzBytes(&mut weap1, value.as_bytes(), 128);
             } else if Q_stricmp(cstr("weap2").as_ptr(), parmName.as_ptr()) == 0 {
-                Q_strncpyz(weap2.as_mut_ptr(), value, 128);
+                Q_strncpyzBytes(&mut weap2, value.as_bytes(), 128);
             } else if let Some(n) = (1..=10).find(|n| {
                 Q_stricmp(
                     cstr(&format!("weapMuzzle{}", n)).as_ptr(),
                     parmName.as_ptr(),
                 ) == 0
             }) {
-                Q_strncpyz(weap_muzzle[n - 1].as_mut_ptr(), value, 128);
+                Q_strncpyzBytes(&mut weap_muzzle[n - 1], value.as_bytes(), 128);
             } else if BG_ParseVehicleParm(
                 vehicle,
                 parmName.as_mut_ptr(),
-                value,
+                &value,
                 bg,
                 traps,
                 callbacks,
             ) == qfalse
             {
                 let pn = cstr_to_str(parmName.as_ptr());
-                let v = cstr_to_str(value);
+                let v = value;
                 traps.com_printf(
                     &format!(
                         "{}ERROR: Unknown Vehicle key/value pair '{}', '{}'!\n",
@@ -604,7 +625,7 @@ pub fn VEH_LoadVehicle(
             if BG_ParseVehicleParm(
                 vehicle,
                 cstr("weap1").as_ptr() as *mut c_char,
-                weap1.as_mut_ptr(),
+                &cstr_to_str(weap1.as_ptr()),
                 bg,
                 traps,
                 callbacks,
@@ -624,7 +645,7 @@ pub fn VEH_LoadVehicle(
             if BG_ParseVehicleParm(
                 vehicle,
                 cstr("weap2").as_ptr() as *mut c_char,
-                weap2.as_mut_ptr(),
+                &cstr_to_str(weap2.as_ptr()),
                 bg,
                 traps,
                 callbacks,
@@ -646,7 +667,7 @@ pub fn VEH_LoadVehicle(
                 if BG_ParseVehicleParm(
                     vehicle,
                     cstr(&key).as_ptr() as *mut c_char,
-                    weap_muzzle[n - 1].as_mut_ptr(),
+                    &cstr_to_str(weap_muzzle[n - 1].as_ptr()),
                     bg,
                     traps,
                     callbacks,

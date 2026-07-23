@@ -411,25 +411,21 @@ pub fn BG_SoundIndex(sound: *mut c_char, callbacks: &mut dyn GameCallbacks) -> c
 /// Source: `oracle/codemp/game/bg_saberLoad.c:129-147`
 pub fn BG_ParseLiteral(
     qs: &mut QSharedScratch,
-    data: *mut *const c_char,
-    string: *const c_char,
+    data: &mut Option<&[u8]>,
+    string: &str,
     traps: &dyn BgTraps,
 ) -> qboolean {
-    unsafe {
-        let token = COM_ParseExt(qs, data, qtrue);
-        if *token == 0 {
-            traps.com_printf("unexpected EOF\n");
-            return qtrue;
-        }
-
-        if Q_stricmp(token as *const c_char, string) != 0 {
-            let s = std::ffi::CStr::from_ptr(string).to_string_lossy();
-            traps.com_printf(&format!("required string '{}' missing\n", s));
-            return qtrue;
-        }
-
-        qfalse
+    let (token, rest) = COM_ParseExt(qs, *data, true);
+    *data = rest;
+    if token.is_empty() {
+        traps.com_printf("unexpected EOF\n");
+        return qtrue;
     }
+    if !token.eq_ignore_ascii_case(string) {
+        traps.com_printf(&format!("required string '{}' missing\n", string));
+        return qtrue;
+    }
+    qfalse
 }
 
 /// Raven `TranslateSaberColor`.
@@ -946,19 +942,26 @@ pub fn WP_SaberParseParms(
         }
 
         // try to parse it out
-        let mut p: *const c_char = bg.SaberParms.as_ptr() as *const c_char;
+        let saber_buf: Vec<u8> = bg
+            .SaberParms
+            .iter()
+            .take_while(|&&c| c != 0)
+            .map(|&c| c as u8)
+            .collect();
+        let mut p: Option<&[u8]> = Some(&saber_buf);
         COM_BeginParseSession(&mut bg.qs, "saberinfo");
 
         // look for the right saber
         loop {
-            if p.is_null() {
+            if p.is_none() {
                 break;
             }
-            let token = COM_ParseExt(&mut bg.qs, &mut p, qtrue);
-            if *token == 0 {
+            let (token, rest) = COM_ParseExt(&mut bg.qs, p, true);
+            p = rest;
+            if token.is_empty() {
                 if triedDefault == qfalse {
                     // fall back to default and restart, should always be there
-                    p = bg.SaberParms.as_ptr() as *const c_char;
+                    p = Some(&saber_buf);
                     COM_BeginParseSession(&mut bg.qs, "saberinfo");
                     c_strcpy(useSaber.as_mut_ptr(), DEFAULT_SABER.as_ptr());
                     triedDefault = qtrue;
@@ -967,13 +970,13 @@ pub fn WP_SaberParseParms(
                 }
             }
 
-            if Q_stricmp(token as *const c_char, useSaber.as_ptr()) == 0 {
+            if Q_stricmp(cstr(&token).as_ptr(), useSaber.as_ptr()) == 0 {
                 break;
             }
 
-            SkipBracedSection(&mut bg.qs, &mut p);
+            p = SkipBracedSection(&mut bg.qs, p);
         }
-        if p.is_null() {
+        if p.is_none() {
             // even the default saber isn't found?
             return qfalse;
         }
@@ -981,14 +984,15 @@ pub fn WP_SaberParseParms(
         // got the name we're using for sure
         c_strcpy((*saber).name.as_mut_ptr(), useSaber.as_ptr());
 
-        if BG_ParseLiteral(&mut bg.qs, &mut p, c"{".as_ptr(), traps) != qfalse {
+        if BG_ParseLiteral(&mut bg.qs, &mut p, "{", traps) != qfalse {
             return qfalse;
         }
 
         // parse the saber info block
         loop {
-            let token = COM_ParseExt(&mut bg.qs, &mut p, qtrue);
-            if *token == 0 {
+            let (token, rest) = COM_ParseExt(&mut bg.qs, p, true);
+            p = rest;
+            if token.is_empty() {
                 let s = format!(
                     "ERROR: unexpected EOF while parsing '{}'\n",
                     cstr_to_str(useSaber.as_ptr())
@@ -997,15 +1001,13 @@ pub fn WP_SaberParseParms(
                 return qfalse;
             }
 
-            let tok = token as *const c_char;
-
-            if qstricmp_eq(tok, c"}") {
+            if token.eq_ignore_ascii_case("}") {
                 break;
             }
 
             macro_rules! parse_string_field {
                 () => {{
-                    let mut value: *const c_char = std::ptr::null();
+                    let mut value = String::new();
                     if COM_ParseString(&mut bg.qs, &mut p, &mut value, traps) != qfalse {
                         continue;
                     }
@@ -1015,7 +1017,7 @@ pub fn WP_SaberParseParms(
             macro_rules! parse_int_field {
                 ($n:expr) => {{
                     if COM_ParseInt(&mut bg.qs, &mut p, &mut $n, traps) != qfalse {
-                        SkipRestOfLine(&mut bg.qs, &mut p);
+                        p = SkipRestOfLine(&mut bg.qs, p);
                         continue;
                     }
                 }};
@@ -1023,7 +1025,7 @@ pub fn WP_SaberParseParms(
             macro_rules! parse_float_field {
                 ($f:expr) => {{
                     if COM_ParseFloat(&mut bg.qs, &mut p, &mut $f, traps) != qfalse {
-                        SkipRestOfLine(&mut bg.qs, &mut p);
+                        p = SkipRestOfLine(&mut bg.qs, p);
                         continue;
                     }
                 }};
@@ -1032,16 +1034,16 @@ pub fn WP_SaberParseParms(
             let s = &mut *saber;
 
             // saber fullName
-            if qstricmp_eq(tok, c"name") {
+            if token.eq_ignore_ascii_case("name") {
                 let value = parse_string_field!();
-                c_strcpy(s.fullName.as_mut_ptr(), value);
+                c_strcpy(s.fullName.as_mut_ptr(), cstr(&value).as_ptr());
                 continue;
             }
 
             // saber type
-            if qstricmp_eq(tok, c"saberType") {
+            if token.eq_ignore_ascii_case("saberType") {
                 let value = parse_string_field!();
-                let saberType = GetIDForString(SaberTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
+                let saberType = GetIDForString(SaberTable.as_ptr() as *mut stringID_table_t, &value);
                 if saberType >= saberType_t::SABER_SINGLE as c_int
                     && saberType <= saberType_t::NUM_SABERS as c_int
                 {
@@ -1051,40 +1053,40 @@ pub fn WP_SaberParseParms(
             }
 
             // saber hilt
-            if qstricmp_eq(tok, c"saberModel") {
+            if token.eq_ignore_ascii_case("saberModel") {
                 let value = parse_string_field!();
-                c_strcpy(s.model.as_mut_ptr(), value);
+                c_strcpy(s.model.as_mut_ptr(), cstr(&value).as_ptr());
                 continue;
             }
 
-            if qstricmp_eq(tok, c"customSkin") {
+            if token.eq_ignore_ascii_case("customSkin") {
                 let value = parse_string_field!();
-                s.skin = traps.r_register_skin(&cstr_to_str(value));
+                s.skin = traps.r_register_skin(&value);
                 continue;
             }
 
             // on sound
-            if qstricmp_eq(tok, c"soundOn") {
+            if token.eq_ignore_ascii_case("soundOn") {
                 let value = parse_string_field!();
-                s.soundOn = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.soundOn = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
 
             // loop sound
-            if qstricmp_eq(tok, c"soundLoop") {
+            if token.eq_ignore_ascii_case("soundLoop") {
                 let value = parse_string_field!();
-                s.soundLoop = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.soundLoop = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
 
             // off sound
-            if qstricmp_eq(tok, c"soundOff") {
+            if token.eq_ignore_ascii_case("soundOff") {
                 let value = parse_string_field!();
-                s.soundOff = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.soundOff = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
 
-            if qstricmp_eq(tok, c"numBlades") {
+            if token.eq_ignore_ascii_case("numBlades") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n < 1 || n > MAX_BLADES as c_int {
@@ -1101,17 +1103,17 @@ pub fn WP_SaberParseParms(
             }
 
             // saberColor
-            if Q_stricmpn(tok, c"saberColor".as_ptr(), 10) == 0 {
-                let toklen = std::ffi::CStr::from_ptr(tok).to_bytes().len();
+            if Q_stricmpn(cstr(&token).as_ptr(), c"saberColor".as_ptr(), 10) == 0 {
+                let toklen = token.len();
                 let mut n: c_int;
                 if toklen == 10 {
                     n = -1;
                 } else if toklen == 11 {
-                    n = atoi(tok.offset(10)) - 1;
+                    n = atoi(cstr(&token[10..]).as_ptr()) - 1;
                     if n > 7 || n < 1 {
                         let msg = format!(
                             "WARNING: bad saberColor '{}' in {}\n",
-                            cstr_to_str(tok),
+                            token,
                             cstr_to_str(useSaber.as_ptr())
                         );
                         traps.com_printf(&msg);
@@ -1120,7 +1122,7 @@ pub fn WP_SaberParseParms(
                 } else {
                     let msg = format!(
                         "WARNING: bad saberColor '{}' in {}\n",
-                        cstr_to_str(tok),
+                        token,
                         cstr_to_str(useSaber.as_ptr())
                     );
                     traps.com_printf(&msg);
@@ -1131,28 +1133,28 @@ pub fn WP_SaberParseParms(
 
                 if n == -1 {
                     // this fills in the rest of the blades with the same color by default
-                    let color = TranslateSaberColor(value, bg);
+                    let color = TranslateSaberColor(cstr(&value).as_ptr(), bg);
                     for i in 0..MAX_BLADES as c_int {
                         s.blade[i as usize].color = color;
                     }
                 } else {
-                    s.blade[n as usize].color = TranslateSaberColor(value, bg);
+                    s.blade[n as usize].color = TranslateSaberColor(cstr(&value).as_ptr(), bg);
                 }
                 continue;
             }
 
             // saber length
-            if Q_stricmpn(tok, c"saberLength".as_ptr(), 11) == 0 {
-                let toklen = std::ffi::CStr::from_ptr(tok).to_bytes().len();
+            if Q_stricmpn(cstr(&token).as_ptr(), c"saberLength".as_ptr(), 11) == 0 {
+                let toklen = token.len();
                 let n: c_int;
                 if toklen == 11 {
                     n = -1;
                 } else if toklen == 12 {
-                    let idx = atoi(tok.offset(11)) - 1;
+                    let idx = atoi(cstr(&token[11..]).as_ptr()) - 1;
                     if idx > 7 || idx < 1 {
                         let msg = format!(
                             "WARNING: bad saberLength '{}' in {}\n",
-                            cstr_to_str(tok),
+                            token,
                             cstr_to_str(useSaber.as_ptr())
                         );
                         traps.com_printf(&msg);
@@ -1162,7 +1164,7 @@ pub fn WP_SaberParseParms(
                 } else {
                     let msg = format!(
                         "WARNING: bad saberLength '{}' in {}\n",
-                        cstr_to_str(tok),
+                        token,
                         cstr_to_str(useSaber.as_ptr())
                     );
                     traps.com_printf(&msg);
@@ -1186,17 +1188,17 @@ pub fn WP_SaberParseParms(
             }
 
             // blade radius
-            if Q_stricmpn(tok, c"saberRadius".as_ptr(), 11) == 0 {
-                let toklen = std::ffi::CStr::from_ptr(tok).to_bytes().len();
+            if Q_stricmpn(cstr(&token).as_ptr(), c"saberRadius".as_ptr(), 11) == 0 {
+                let toklen = token.len();
                 let n: c_int;
                 if toklen == 11 {
                     n = -1;
                 } else if toklen == 12 {
-                    let idx = atoi(tok.offset(11)) - 1;
+                    let idx = atoi(cstr(&token[11..]).as_ptr()) - 1;
                     if idx > 7 || idx < 1 {
                         let msg = format!(
                             "WARNING: bad saberRadius '{}' in {}\n",
-                            cstr_to_str(tok),
+                            token,
                             cstr_to_str(useSaber.as_ptr())
                         );
                         traps.com_printf(&msg);
@@ -1206,7 +1208,7 @@ pub fn WP_SaberParseParms(
                 } else {
                     let msg = format!(
                         "WARNING: bad saberRadius '{}' in {}\n",
-                        cstr_to_str(tok),
+                        token,
                         cstr_to_str(useSaber.as_ptr())
                     );
                     traps.com_printf(&msg);
@@ -1229,10 +1231,10 @@ pub fn WP_SaberParseParms(
             }
 
             // locked saber style
-            if qstricmp_eq(tok, c"saberStyle") {
+            if token.eq_ignore_ascii_case("saberStyle") {
                 let value = parse_string_field!();
                 // OLD WAY: only allowed ONE style
-                let style = TranslateSaberStyle(value) as c_int;
+                let style = TranslateSaberStyle(cstr(&value).as_ptr()) as c_int;
                 // learn only this style
                 s.stylesLearned = 1 << style;
                 // forbid all other styles
@@ -1248,21 +1250,21 @@ pub fn WP_SaberParseParms(
             }
 
             // learned saber style
-            if qstricmp_eq(tok, c"saberStyleLearned") {
+            if token.eq_ignore_ascii_case("saberStyleLearned") {
                 let value = parse_string_field!();
-                s.stylesLearned |= 1 << (TranslateSaberStyle(value) as c_int);
+                s.stylesLearned |= 1 << (TranslateSaberStyle(cstr(&value).as_ptr()) as c_int);
                 continue;
             }
 
             // forbidden saber style
-            if qstricmp_eq(tok, c"saberStyleForbidden") {
+            if token.eq_ignore_ascii_case("saberStyleForbidden") {
                 let value = parse_string_field!();
-                s.stylesForbidden |= 1 << (TranslateSaberStyle(value) as c_int);
+                s.stylesForbidden |= 1 << (TranslateSaberStyle(cstr(&value).as_ptr()) as c_int);
                 continue;
             }
 
             // maxChain
-            if qstricmp_eq(tok, c"maxChain") {
+            if token.eq_ignore_ascii_case("maxChain") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 s.maxChain = n;
@@ -1270,7 +1272,7 @@ pub fn WP_SaberParseParms(
             }
 
             // lockable
-            if qstricmp_eq(tok, c"lockable") {
+            if token.eq_ignore_ascii_case("lockable") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n == 0 {
@@ -1280,7 +1282,7 @@ pub fn WP_SaberParseParms(
             }
 
             // throwable
-            if qstricmp_eq(tok, c"throwable") {
+            if token.eq_ignore_ascii_case("throwable") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n == 0 {
@@ -1290,7 +1292,7 @@ pub fn WP_SaberParseParms(
             }
 
             // disarmable
-            if qstricmp_eq(tok, c"disarmable") {
+            if token.eq_ignore_ascii_case("disarmable") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n == 0 {
@@ -1300,7 +1302,7 @@ pub fn WP_SaberParseParms(
             }
 
             // active blocking
-            if qstricmp_eq(tok, c"blocking") {
+            if token.eq_ignore_ascii_case("blocking") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n == 0 {
@@ -1310,7 +1312,7 @@ pub fn WP_SaberParseParms(
             }
 
             // twoHanded
-            if qstricmp_eq(tok, c"twoHanded") {
+            if token.eq_ignore_ascii_case("twoHanded") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1320,9 +1322,9 @@ pub fn WP_SaberParseParms(
             }
 
             // force power restrictions
-            if qstricmp_eq(tok, c"forceRestrict") {
+            if token.eq_ignore_ascii_case("forceRestrict") {
                 let value = parse_string_field!();
-                let fp = GetIDForString(FPTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
+                let fp = GetIDForString(FPTable.as_ptr() as *mut stringID_table_t, &value);
                 if fp >= FP_FIRST && fp < NUM_FORCE_POWERS as c_int {
                     s.forceRestrictions |= 1 << fp;
                 }
@@ -1330,7 +1332,7 @@ pub fn WP_SaberParseParms(
             }
 
             // lockBonus
-            if qstricmp_eq(tok, c"lockBonus") {
+            if token.eq_ignore_ascii_case("lockBonus") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 s.lockBonus = n;
@@ -1338,7 +1340,7 @@ pub fn WP_SaberParseParms(
             }
 
             // parryBonus
-            if qstricmp_eq(tok, c"parryBonus") {
+            if token.eq_ignore_ascii_case("parryBonus") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 s.parryBonus = n;
@@ -1346,7 +1348,7 @@ pub fn WP_SaberParseParms(
             }
 
             // breakParryBonus
-            if qstricmp_eq(tok, c"breakParryBonus") {
+            if token.eq_ignore_ascii_case("breakParryBonus") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 s.breakParryBonus = n;
@@ -1354,7 +1356,7 @@ pub fn WP_SaberParseParms(
             }
 
             // breakParryBonus2
-            if qstricmp_eq(tok, c"breakParryBonus2") {
+            if token.eq_ignore_ascii_case("breakParryBonus2") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 s.breakParryBonus2 = n;
@@ -1362,7 +1364,7 @@ pub fn WP_SaberParseParms(
             }
 
             // disarmBonus
-            if qstricmp_eq(tok, c"disarmBonus") {
+            if token.eq_ignore_ascii_case("disarmBonus") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 s.disarmBonus = n;
@@ -1370,7 +1372,7 @@ pub fn WP_SaberParseParms(
             }
 
             // disarmBonus2
-            if qstricmp_eq(tok, c"disarmBonus2") {
+            if token.eq_ignore_ascii_case("disarmBonus2") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 s.disarmBonus2 = n;
@@ -1378,14 +1380,14 @@ pub fn WP_SaberParseParms(
             }
 
             // single blade saber style
-            if qstricmp_eq(tok, c"singleBladeStyle") {
+            if token.eq_ignore_ascii_case("singleBladeStyle") {
                 let value = parse_string_field!();
-                s.singleBladeStyle = TranslateSaberStyle(value);
+                s.singleBladeStyle = TranslateSaberStyle(cstr(&value).as_ptr());
                 continue;
             }
 
             // single blade throwable
-            if qstricmp_eq(tok, c"singleBladeThrowable") {
+            if token.eq_ignore_ascii_case("singleBladeThrowable") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1395,21 +1397,21 @@ pub fn WP_SaberParseParms(
             }
 
             // broken replacement saber1 (right hand)
-            if qstricmp_eq(tok, c"brokenSaber1") {
+            if token.eq_ignore_ascii_case("brokenSaber1") {
                 let _value = parse_string_field!();
                 // saber->brokenSaber1 = G_NewString( value ); -- field not present in this port
                 continue;
             }
 
             // broken replacement saber2 (left hand)
-            if qstricmp_eq(tok, c"brokenSaber2") {
+            if token.eq_ignore_ascii_case("brokenSaber2") {
                 let _value = parse_string_field!();
                 // saber->brokenSaber2 = G_NewString( value ); -- field not present in this port
                 continue;
             }
 
             // spins and does damage on return from saberthrow
-            if qstricmp_eq(tok, c"returnDamage") {
+            if token.eq_ignore_ascii_case("returnDamage") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1419,31 +1421,31 @@ pub fn WP_SaberParseParms(
             }
 
             // spin sound (when thrown)
-            if qstricmp_eq(tok, c"spinSound") {
+            if token.eq_ignore_ascii_case("spinSound") {
                 let value = parse_string_field!();
-                s.spinSound = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.spinSound = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
 
             // swing sound - NOTE: must provide all 3!!!
-            if qstricmp_eq(tok, c"swingSound1") {
+            if token.eq_ignore_ascii_case("swingSound1") {
                 let value = parse_string_field!();
-                s.swingSound[0] = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.swingSound[0] = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
-            if qstricmp_eq(tok, c"swingSound2") {
+            if token.eq_ignore_ascii_case("swingSound2") {
                 let value = parse_string_field!();
-                s.swingSound[1] = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.swingSound[1] = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
-            if qstricmp_eq(tok, c"swingSound3") {
+            if token.eq_ignore_ascii_case("swingSound3") {
                 let value = parse_string_field!();
-                s.swingSound[2] = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.swingSound[2] = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
 
             // you move faster/slower when using this saber
-            if qstricmp_eq(tok, c"moveSpeedScale") {
+            if token.eq_ignore_ascii_case("moveSpeedScale") {
                 let mut f: f32 = 0.0;
                 parse_float_field!(f);
                 s.moveSpeedScale = f;
@@ -1451,7 +1453,7 @@ pub fn WP_SaberParseParms(
             }
 
             // plays normal attack animations faster/slower
-            if qstricmp_eq(tok, c"animSpeedScale") {
+            if token.eq_ignore_ascii_case("animSpeedScale") {
                 let mut f: f32 = 0.0;
                 parse_float_field!(f);
                 s.animSpeedScale = f;
@@ -1459,7 +1461,7 @@ pub fn WP_SaberParseParms(
             }
 
             // if non-zero, the saber will bounce back when it hits solid architecture
-            if qstricmp_eq(tok, c"bounceOnWalls") {
+            if token.eq_ignore_ascii_case("bounceOnWalls") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1469,7 +1471,7 @@ pub fn WP_SaberParseParms(
             }
 
             // if set, saber model is bolted to wrist, not in hand
-            if qstricmp_eq(tok, c"boltToWrist") {
+            if token.eq_ignore_ascii_case("boltToWrist") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1479,135 +1481,135 @@ pub fn WP_SaberParseParms(
             }
 
             // kata move
-            if qstricmp_eq(tok, c"kataMove") {
+            if token.eq_ignore_ascii_case("kataMove") {
                 let value = parse_string_field!();
-                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
+                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, &value);
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.kataMove = saberMove;
                 }
                 continue;
             }
             // lungeAtkMove move
-            if qstricmp_eq(tok, c"lungeAtkMove") {
+            if token.eq_ignore_ascii_case("lungeAtkMove") {
                 let value = parse_string_field!();
-                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
+                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, &value);
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.lungeAtkMove = saberMove;
                 }
                 continue;
             }
             // jumpAtkUpMove move
-            if qstricmp_eq(tok, c"jumpAtkUpMove") {
+            if token.eq_ignore_ascii_case("jumpAtkUpMove") {
                 let value = parse_string_field!();
-                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
+                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, &value);
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.jumpAtkUpMove = saberMove;
                 }
                 continue;
             }
             // jumpAtkFwdMove move
-            if qstricmp_eq(tok, c"jumpAtkFwdMove") {
+            if token.eq_ignore_ascii_case("jumpAtkFwdMove") {
                 let value = parse_string_field!();
-                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
+                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, &value);
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.jumpAtkFwdMove = saberMove;
                 }
                 continue;
             }
             // jumpAtkBackMove move
-            if qstricmp_eq(tok, c"jumpAtkBackMove") {
+            if token.eq_ignore_ascii_case("jumpAtkBackMove") {
                 let value = parse_string_field!();
-                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
+                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, &value);
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.jumpAtkBackMove = saberMove;
                 }
                 continue;
             }
             // jumpAtkRightMove move
-            if qstricmp_eq(tok, c"jumpAtkRightMove") {
+            if token.eq_ignore_ascii_case("jumpAtkRightMove") {
                 let value = parse_string_field!();
-                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
+                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, &value);
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.jumpAtkRightMove = saberMove;
                 }
                 continue;
             }
             // jumpAtkLeftMove move
-            if qstricmp_eq(tok, c"jumpAtkLeftMove") {
+            if token.eq_ignore_ascii_case("jumpAtkLeftMove") {
                 let value = parse_string_field!();
-                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
+                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, &value);
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.jumpAtkLeftMove = saberMove;
                 }
                 continue;
             }
             // readyAnim
-            if qstricmp_eq(tok, c"readyAnim") {
+            if token.eq_ignore_ascii_case("readyAnim") {
                 let value = parse_string_field!();
-                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.readyAnim = anim;
                 }
                 continue;
             }
             // drawAnim
-            if qstricmp_eq(tok, c"drawAnim") {
+            if token.eq_ignore_ascii_case("drawAnim") {
                 let value = parse_string_field!();
-                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.drawAnim = anim;
                 }
                 continue;
             }
             // putawayAnim
-            if qstricmp_eq(tok, c"putawayAnim") {
+            if token.eq_ignore_ascii_case("putawayAnim") {
                 let value = parse_string_field!();
-                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.putawayAnim = anim;
                 }
                 continue;
             }
             // tauntAnim
-            if qstricmp_eq(tok, c"tauntAnim") {
+            if token.eq_ignore_ascii_case("tauntAnim") {
                 let value = parse_string_field!();
-                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.tauntAnim = anim;
                 }
                 continue;
             }
             // bowAnim
-            if qstricmp_eq(tok, c"bowAnim") {
+            if token.eq_ignore_ascii_case("bowAnim") {
                 let value = parse_string_field!();
-                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.bowAnim = anim;
                 }
                 continue;
             }
             // meditateAnim
-            if qstricmp_eq(tok, c"meditateAnim") {
+            if token.eq_ignore_ascii_case("meditateAnim") {
                 let value = parse_string_field!();
-                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.meditateAnim = anim;
                 }
                 continue;
             }
             // flourishAnim
-            if qstricmp_eq(tok, c"flourishAnim") {
+            if token.eq_ignore_ascii_case("flourishAnim") {
                 let value = parse_string_field!();
-                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.flourishAnim = anim;
                 }
                 continue;
             }
             // gloatAnim
-            if qstricmp_eq(tok, c"gloatAnim") {
+            if token.eq_ignore_ascii_case("gloatAnim") {
                 let value = parse_string_field!();
-                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.gloatAnim = anim;
                 }
@@ -1615,7 +1617,7 @@ pub fn WP_SaberParseParms(
             }
 
             // if set, cannot do roll-stab move at end of roll
-            if qstricmp_eq(tok, c"noRollStab") {
+            if token.eq_ignore_ascii_case("noRollStab") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1624,7 +1626,7 @@ pub fn WP_SaberParseParms(
                 continue;
             }
             // if set, cannot do pull+attack move
-            if qstricmp_eq(tok, c"noPullAttack") {
+            if token.eq_ignore_ascii_case("noPullAttack") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1633,7 +1635,7 @@ pub fn WP_SaberParseParms(
                 continue;
             }
             // if set, cannot do back-stab moves
-            if qstricmp_eq(tok, c"noBackAttack") {
+            if token.eq_ignore_ascii_case("noBackAttack") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1642,7 +1644,7 @@ pub fn WP_SaberParseParms(
                 continue;
             }
             // if set, cannot do stabdown move
-            if qstricmp_eq(tok, c"noStabDown") {
+            if token.eq_ignore_ascii_case("noStabDown") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1651,7 +1653,7 @@ pub fn WP_SaberParseParms(
                 continue;
             }
             // if set, cannot side-run or forward-run on walls
-            if qstricmp_eq(tok, c"noWallRuns") {
+            if token.eq_ignore_ascii_case("noWallRuns") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1660,7 +1662,7 @@ pub fn WP_SaberParseParms(
                 continue;
             }
             // if set, cannot do backflip off wall or side-flips off walls
-            if qstricmp_eq(tok, c"noWallFlips") {
+            if token.eq_ignore_ascii_case("noWallFlips") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1669,7 +1671,7 @@ pub fn WP_SaberParseParms(
                 continue;
             }
             // if set, cannot grab wall & jump off
-            if qstricmp_eq(tok, c"noWallGrab") {
+            if token.eq_ignore_ascii_case("noWallGrab") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1678,7 +1680,7 @@ pub fn WP_SaberParseParms(
                 continue;
             }
             // if set, cannot roll
-            if qstricmp_eq(tok, c"noRolls") {
+            if token.eq_ignore_ascii_case("noRolls") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1687,7 +1689,7 @@ pub fn WP_SaberParseParms(
                 continue;
             }
             // if set, cannot do flips
-            if qstricmp_eq(tok, c"noFlips") {
+            if token.eq_ignore_ascii_case("noFlips") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1696,7 +1698,7 @@ pub fn WP_SaberParseParms(
                 continue;
             }
             // if set, cannot do cartwheels
-            if qstricmp_eq(tok, c"noCartwheels") {
+            if token.eq_ignore_ascii_case("noCartwheels") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1705,7 +1707,7 @@ pub fn WP_SaberParseParms(
                 continue;
             }
             // if set, cannot do kicks
-            if qstricmp_eq(tok, c"noKicks") {
+            if token.eq_ignore_ascii_case("noKicks") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1714,7 +1716,7 @@ pub fn WP_SaberParseParms(
                 continue;
             }
             // if set, cannot do the simultaneous attack left/right moves
-            if qstricmp_eq(tok, c"noMirrorAttacks") {
+            if token.eq_ignore_ascii_case("noMirrorAttacks") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1724,21 +1726,21 @@ pub fn WP_SaberParseParms(
             }
 
             // stays on in water
-            if qstricmp_eq(tok, c"onInWater") {
+            if token.eq_ignore_ascii_case("onInWater") {
                 // ignore in MP
-                SkipRestOfLine(&mut bg.qs, &mut p);
+                p = SkipRestOfLine(&mut bg.qs, p);
                 continue;
             }
 
-            if qstricmp_eq(tok, c"notInMP") {
+            if token.eq_ignore_ascii_case("notInMP") {
                 // ignore this
-                SkipRestOfLine(&mut bg.qs, &mut p);
+                p = SkipRestOfLine(&mut bg.qs, p);
                 continue;
             }
 
             // ===ABOVE THIS, ALL VALUES ARE GLOBAL TO THE SABER========================================================
             // bladeStyle2Start - where to start using the second set of blade data
-            if qstricmp_eq(tok, c"bladeStyle2Start") {
+            if token.eq_ignore_ascii_case("bladeStyle2Start") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 s.bladeStyle2Start = n;
@@ -1747,7 +1749,7 @@ pub fn WP_SaberParseParms(
             // ===BLADE-SPECIFIC FIELDS=================================================================================
 
             // ===PRIMARY BLADE====================================
-            if qstricmp_eq(tok, c"noWallMarks") {
+            if token.eq_ignore_ascii_case("noWallMarks") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1755,7 +1757,7 @@ pub fn WP_SaberParseParms(
                 }
                 continue;
             }
-            if qstricmp_eq(tok, c"noDlight") {
+            if token.eq_ignore_ascii_case("noDlight") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1763,7 +1765,7 @@ pub fn WP_SaberParseParms(
                 }
                 continue;
             }
-            if qstricmp_eq(tok, c"noBlade") {
+            if token.eq_ignore_ascii_case("noBlade") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1771,7 +1773,7 @@ pub fn WP_SaberParseParms(
                 }
                 continue;
             }
-            if qstricmp_eq(tok, c"trailStyle") {
+            if token.eq_ignore_ascii_case("trailStyle") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 s.trailStyle = n;
@@ -1780,37 +1782,37 @@ pub fn WP_SaberParseParms(
             // `g2MarksShader`/`g2WeaponMarkShader`: Raven's `#ifdef QAGAME` branch
             // is `SkipRestOfLine` (this crate is QAGAME/jampgame); the
             // `trap_R_RegisterShader` call is CGAME-only dead code here (§20).
-            if qstricmp_eq(tok, c"g2MarksShader") {
-                let mut value: *const c_char = std::ptr::null();
+            if token.eq_ignore_ascii_case("g2MarksShader") {
+                let mut value: String = String::new();
                 if COM_ParseString(&mut bg.qs, &mut p, &mut value, traps) != qfalse {
-                    SkipRestOfLine(&mut bg.qs, &mut p);
+                    p = SkipRestOfLine(&mut bg.qs, p);
                     continue;
                 }
-                SkipRestOfLine(&mut bg.qs, &mut p);
+                p = SkipRestOfLine(&mut bg.qs, p);
                 continue;
             }
-            if qstricmp_eq(tok, c"g2WeaponMarkShader") {
-                let mut value: *const c_char = std::ptr::null();
+            if token.eq_ignore_ascii_case("g2WeaponMarkShader") {
+                let mut value: String = String::new();
                 if COM_ParseString(&mut bg.qs, &mut p, &mut value, traps) != qfalse {
-                    SkipRestOfLine(&mut bg.qs, &mut p);
+                    p = SkipRestOfLine(&mut bg.qs, p);
                     continue;
                 }
-                SkipRestOfLine(&mut bg.qs, &mut p);
+                p = SkipRestOfLine(&mut bg.qs, p);
                 continue;
             }
-            if qstricmp_eq(tok, c"knockbackScale") {
+            if token.eq_ignore_ascii_case("knockbackScale") {
                 let mut f: f32 = 0.0;
                 parse_float_field!(f);
                 s.knockbackScale = f;
                 continue;
             }
-            if qstricmp_eq(tok, c"damageScale") {
+            if token.eq_ignore_ascii_case("damageScale") {
                 let mut f: f32 = 0.0;
                 parse_float_field!(f);
                 s.damageScale = f;
                 continue;
             }
-            if qstricmp_eq(tok, c"noDismemberment") {
+            if token.eq_ignore_ascii_case("noDismemberment") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1818,7 +1820,7 @@ pub fn WP_SaberParseParms(
                 }
                 continue;
             }
-            if qstricmp_eq(tok, c"noIdleEffect") {
+            if token.eq_ignore_ascii_case("noIdleEffect") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1826,7 +1828,7 @@ pub fn WP_SaberParseParms(
                 }
                 continue;
             }
-            if qstricmp_eq(tok, c"alwaysBlock") {
+            if token.eq_ignore_ascii_case("alwaysBlock") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1834,7 +1836,7 @@ pub fn WP_SaberParseParms(
                 }
                 continue;
             }
-            if qstricmp_eq(tok, c"noManualDeactivate") {
+            if token.eq_ignore_ascii_case("noManualDeactivate") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1842,7 +1844,7 @@ pub fn WP_SaberParseParms(
                 }
                 continue;
             }
-            if qstricmp_eq(tok, c"transitionDamage") {
+            if token.eq_ignore_ascii_case("transitionDamage") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1850,88 +1852,88 @@ pub fn WP_SaberParseParms(
                 }
                 continue;
             }
-            if qstricmp_eq(tok, c"splashRadius") {
+            if token.eq_ignore_ascii_case("splashRadius") {
                 let mut f: f32 = 0.0;
                 parse_float_field!(f);
                 s.splashRadius = f;
                 continue;
             }
-            if qstricmp_eq(tok, c"splashDamage") {
+            if token.eq_ignore_ascii_case("splashDamage") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 s.splashDamage = n;
                 continue;
             }
-            if qstricmp_eq(tok, c"splashKnockback") {
+            if token.eq_ignore_ascii_case("splashKnockback") {
                 let mut f: f32 = 0.0;
                 parse_float_field!(f);
                 s.splashKnockback = f;
                 continue;
             }
-            if qstricmp_eq(tok, c"hitSound1") {
+            if token.eq_ignore_ascii_case("hitSound1") {
                 let value = parse_string_field!();
-                s.hitSound[0] = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.hitSound[0] = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
-            if qstricmp_eq(tok, c"hitSound2") {
+            if token.eq_ignore_ascii_case("hitSound2") {
                 let value = parse_string_field!();
-                s.hitSound[1] = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.hitSound[1] = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
-            if qstricmp_eq(tok, c"hitSound3") {
+            if token.eq_ignore_ascii_case("hitSound3") {
                 let value = parse_string_field!();
-                s.hitSound[2] = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.hitSound[2] = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
-            if qstricmp_eq(tok, c"blockSound1") {
+            if token.eq_ignore_ascii_case("blockSound1") {
                 let value = parse_string_field!();
-                s.blockSound[0] = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.blockSound[0] = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
-            if qstricmp_eq(tok, c"blockSound2") {
+            if token.eq_ignore_ascii_case("blockSound2") {
                 let value = parse_string_field!();
-                s.blockSound[1] = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.blockSound[1] = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
-            if qstricmp_eq(tok, c"blockSound3") {
+            if token.eq_ignore_ascii_case("blockSound3") {
                 let value = parse_string_field!();
-                s.blockSound[2] = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.blockSound[2] = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
-            if qstricmp_eq(tok, c"bounceSound1") {
+            if token.eq_ignore_ascii_case("bounceSound1") {
                 let value = parse_string_field!();
-                s.bounceSound[0] = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.bounceSound[0] = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
-            if qstricmp_eq(tok, c"bounceSound2") {
+            if token.eq_ignore_ascii_case("bounceSound2") {
                 let value = parse_string_field!();
-                s.bounceSound[1] = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.bounceSound[1] = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
-            if qstricmp_eq(tok, c"bounceSound3") {
+            if token.eq_ignore_ascii_case("bounceSound3") {
                 let value = parse_string_field!();
-                s.bounceSound[2] = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.bounceSound[2] = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
             // block/hitPerson/hitOther/blade effects: QAGAME branch is
             // SkipRestOfLine (CGAME-only trap_FX_RegisterEffect dead here, §20).
-            if qstricmp_eq(tok, c"blockEffect") {
+            if token.eq_ignore_ascii_case("blockEffect") {
                 let _value = parse_string_field!();
                 continue;
             }
-            if qstricmp_eq(tok, c"hitPersonEffect") {
+            if token.eq_ignore_ascii_case("hitPersonEffect") {
                 let _value = parse_string_field!();
                 continue;
             }
-            if qstricmp_eq(tok, c"hitOtherEffect") {
+            if token.eq_ignore_ascii_case("hitOtherEffect") {
                 let _value = parse_string_field!();
                 continue;
             }
-            if qstricmp_eq(tok, c"bladeEffect") {
+            if token.eq_ignore_ascii_case("bladeEffect") {
                 let _value = parse_string_field!();
                 continue;
             }
-            if qstricmp_eq(tok, c"noClashFlare") {
+            if token.eq_ignore_ascii_case("noClashFlare") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1941,7 +1943,7 @@ pub fn WP_SaberParseParms(
             }
 
             // ===SECONDARY BLADE====================================
-            if qstricmp_eq(tok, c"noWallMarks2") {
+            if token.eq_ignore_ascii_case("noWallMarks2") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1949,7 +1951,7 @@ pub fn WP_SaberParseParms(
                 }
                 continue;
             }
-            if qstricmp_eq(tok, c"noDlight2") {
+            if token.eq_ignore_ascii_case("noDlight2") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1957,7 +1959,7 @@ pub fn WP_SaberParseParms(
                 }
                 continue;
             }
-            if qstricmp_eq(tok, c"noBlade2") {
+            if token.eq_ignore_ascii_case("noBlade2") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -1965,43 +1967,43 @@ pub fn WP_SaberParseParms(
                 }
                 continue;
             }
-            if qstricmp_eq(tok, c"trailStyle2") {
+            if token.eq_ignore_ascii_case("trailStyle2") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 s.trailStyle2 = n;
                 continue;
             }
-            if qstricmp_eq(tok, c"g2MarksShader2") {
-                let mut value: *const c_char = std::ptr::null();
+            if token.eq_ignore_ascii_case("g2MarksShader2") {
+                let mut value: String = String::new();
                 if COM_ParseString(&mut bg.qs, &mut p, &mut value, traps) != qfalse {
-                    SkipRestOfLine(&mut bg.qs, &mut p);
+                    p = SkipRestOfLine(&mut bg.qs, p);
                     continue;
                 }
-                SkipRestOfLine(&mut bg.qs, &mut p);
+                p = SkipRestOfLine(&mut bg.qs, p);
                 continue;
             }
-            if qstricmp_eq(tok, c"g2WeaponMarkShader2") {
-                let mut value: *const c_char = std::ptr::null();
+            if token.eq_ignore_ascii_case("g2WeaponMarkShader2") {
+                let mut value: String = String::new();
                 if COM_ParseString(&mut bg.qs, &mut p, &mut value, traps) != qfalse {
-                    SkipRestOfLine(&mut bg.qs, &mut p);
+                    p = SkipRestOfLine(&mut bg.qs, p);
                     continue;
                 }
-                SkipRestOfLine(&mut bg.qs, &mut p);
+                p = SkipRestOfLine(&mut bg.qs, p);
                 continue;
             }
-            if qstricmp_eq(tok, c"knockbackScale2") {
+            if token.eq_ignore_ascii_case("knockbackScale2") {
                 let mut f: f32 = 0.0;
                 parse_float_field!(f);
                 s.knockbackScale2 = f;
                 continue;
             }
-            if qstricmp_eq(tok, c"damageScale2") {
+            if token.eq_ignore_ascii_case("damageScale2") {
                 let mut f: f32 = 0.0;
                 parse_float_field!(f);
                 s.damageScale2 = f;
                 continue;
             }
-            if qstricmp_eq(tok, c"noDismemberment2") {
+            if token.eq_ignore_ascii_case("noDismemberment2") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -2009,7 +2011,7 @@ pub fn WP_SaberParseParms(
                 }
                 continue;
             }
-            if qstricmp_eq(tok, c"noIdleEffect2") {
+            if token.eq_ignore_ascii_case("noIdleEffect2") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -2017,7 +2019,7 @@ pub fn WP_SaberParseParms(
                 }
                 continue;
             }
-            if qstricmp_eq(tok, c"alwaysBlock2") {
+            if token.eq_ignore_ascii_case("alwaysBlock2") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -2025,7 +2027,7 @@ pub fn WP_SaberParseParms(
                 }
                 continue;
             }
-            if qstricmp_eq(tok, c"noManualDeactivate2") {
+            if token.eq_ignore_ascii_case("noManualDeactivate2") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -2033,7 +2035,7 @@ pub fn WP_SaberParseParms(
                 }
                 continue;
             }
-            if qstricmp_eq(tok, c"transitionDamage2") {
+            if token.eq_ignore_ascii_case("transitionDamage2") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -2041,86 +2043,86 @@ pub fn WP_SaberParseParms(
                 }
                 continue;
             }
-            if qstricmp_eq(tok, c"splashRadius2") {
+            if token.eq_ignore_ascii_case("splashRadius2") {
                 let mut f: f32 = 0.0;
                 parse_float_field!(f);
                 s.splashRadius2 = f;
                 continue;
             }
-            if qstricmp_eq(tok, c"splashDamage2") {
+            if token.eq_ignore_ascii_case("splashDamage2") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 s.splashDamage2 = n;
                 continue;
             }
-            if qstricmp_eq(tok, c"splashKnockback2") {
+            if token.eq_ignore_ascii_case("splashKnockback2") {
                 let mut f: f32 = 0.0;
                 parse_float_field!(f);
                 s.splashKnockback2 = f;
                 continue;
             }
-            if qstricmp_eq(tok, c"hit2Sound1") {
+            if token.eq_ignore_ascii_case("hit2Sound1") {
                 let value = parse_string_field!();
-                s.hit2Sound[0] = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.hit2Sound[0] = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
-            if qstricmp_eq(tok, c"hit2Sound2") {
+            if token.eq_ignore_ascii_case("hit2Sound2") {
                 let value = parse_string_field!();
-                s.hit2Sound[1] = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.hit2Sound[1] = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
-            if qstricmp_eq(tok, c"hit2Sound3") {
+            if token.eq_ignore_ascii_case("hit2Sound3") {
                 let value = parse_string_field!();
-                s.hit2Sound[2] = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.hit2Sound[2] = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
-            if qstricmp_eq(tok, c"block2Sound1") {
+            if token.eq_ignore_ascii_case("block2Sound1") {
                 let value = parse_string_field!();
-                s.block2Sound[0] = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.block2Sound[0] = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
-            if qstricmp_eq(tok, c"block2Sound2") {
+            if token.eq_ignore_ascii_case("block2Sound2") {
                 let value = parse_string_field!();
-                s.block2Sound[1] = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.block2Sound[1] = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
-            if qstricmp_eq(tok, c"block2Sound3") {
+            if token.eq_ignore_ascii_case("block2Sound3") {
                 let value = parse_string_field!();
-                s.block2Sound[2] = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.block2Sound[2] = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
-            if qstricmp_eq(tok, c"bounce2Sound1") {
+            if token.eq_ignore_ascii_case("bounce2Sound1") {
                 let value = parse_string_field!();
-                s.bounce2Sound[0] = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.bounce2Sound[0] = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
-            if qstricmp_eq(tok, c"bounce2Sound2") {
+            if token.eq_ignore_ascii_case("bounce2Sound2") {
                 let value = parse_string_field!();
-                s.bounce2Sound[1] = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.bounce2Sound[1] = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
-            if qstricmp_eq(tok, c"bounce2Sound3") {
+            if token.eq_ignore_ascii_case("bounce2Sound3") {
                 let value = parse_string_field!();
-                s.bounce2Sound[2] = BG_SoundIndex(value as *mut c_char, callbacks);
+                s.bounce2Sound[2] = BG_SoundIndex(cstr(&value).as_ptr() as *mut c_char, callbacks);
                 continue;
             }
-            if qstricmp_eq(tok, c"blockEffect2") {
+            if token.eq_ignore_ascii_case("blockEffect2") {
                 let _value = parse_string_field!();
                 continue;
             }
-            if qstricmp_eq(tok, c"hitPersonEffect2") {
+            if token.eq_ignore_ascii_case("hitPersonEffect2") {
                 let _value = parse_string_field!();
                 continue;
             }
-            if qstricmp_eq(tok, c"hitOtherEffect2") {
+            if token.eq_ignore_ascii_case("hitOtherEffect2") {
                 let _value = parse_string_field!();
                 continue;
             }
-            if qstricmp_eq(tok, c"bladeEffect2") {
+            if token.eq_ignore_ascii_case("bladeEffect2") {
                 let _value = parse_string_field!();
                 continue;
             }
-            if qstricmp_eq(tok, c"noClashFlare2") {
+            if token.eq_ignore_ascii_case("noClashFlare2") {
                 let mut n: c_int = 0;
                 parse_int_field!(n);
                 if n != 0 {
@@ -2136,12 +2138,12 @@ pub fn WP_SaberParseParms(
             {
                 let msg = format!(
                     "WARNING: unknown keyword '{}' while parsing '{}'\n",
-                    cstr_to_str(tok),
+                    token,
                     cstr_to_str(useSaber.as_ptr())
                 );
                 traps.com_printf(&msg);
             }
-            SkipRestOfLine(&mut bg.qs, &mut p);
+            p = SkipRestOfLine(&mut bg.qs, p);
         }
 
         // FIXME: precache the saberModel(s)?
@@ -2174,37 +2176,45 @@ pub fn WP_SaberParseParm(
         }
 
         // try to parse it out
-        let mut p: *const c_char = bg.SaberParms.as_ptr() as *const c_char;
+        let saber_buf: Vec<u8> = bg
+            .SaberParms
+            .iter()
+            .take_while(|&&c| c != 0)
+            .map(|&c| c as u8)
+            .collect();
+        let mut p: Option<&[u8]> = Some(&saber_buf);
         COM_BeginParseSession(&mut bg.qs, "saberinfo");
 
         // look for the right saber
         loop {
-            if p.is_null() {
+            if p.is_none() {
                 return qfalse;
             }
-            let token = COM_ParseExt(&mut bg.qs, &mut p, qtrue);
-            if *token == 0 {
+            let (token, rest) = COM_ParseExt(&mut bg.qs, p, true);
+            p = rest;
+            if token.is_empty() {
                 return qfalse;
             }
 
-            if Q_stricmp(token as *const c_char, saberName) == 0 {
+            if Q_stricmp(cstr(&token).as_ptr(), saberName) == 0 {
                 break;
             }
 
-            SkipBracedSection(&mut bg.qs, &mut p);
+            p = SkipBracedSection(&mut bg.qs, p);
         }
-        if p.is_null() {
+        if p.is_none() {
             return qfalse;
         }
 
-        if BG_ParseLiteral(&mut bg.qs, &mut p, c"{".as_ptr(), traps) != qfalse {
+        if BG_ParseLiteral(&mut bg.qs, &mut p, "{", traps) != qfalse {
             return qfalse;
         }
 
         // parse the saber info block
         loop {
-            let token = COM_ParseExt(&mut bg.qs, &mut p, qtrue);
-            if *token == 0 {
+            let (token, rest) = COM_ParseExt(&mut bg.qs, p, true);
+            p = rest;
+            if token.is_empty() {
                 let s = format!(
                     "ERROR: unexpected EOF while parsing '{}'\n",
                     cstr_to_str(saberName)
@@ -2213,20 +2223,20 @@ pub fn WP_SaberParseParm(
                 return qfalse;
             }
 
-            if qstricmp_eq(token as *const c_char, c"}") {
+            if token.eq_ignore_ascii_case("}") {
                 break;
             }
 
-            if Q_stricmp(token as *const c_char, parmname) == 0 {
-                let mut value: *const c_char = std::ptr::null();
+            if Q_stricmp(cstr(&token).as_ptr(), parmname) == 0 {
+                let mut value: String = String::new();
                 if COM_ParseString(&mut bg.qs, &mut p, &mut value, traps) != qfalse {
                     continue;
                 }
-                c_strcpy(saberData, value);
+                c_strcpy(saberData, cstr(&value).as_ptr());
                 return qtrue;
             }
 
-            SkipRestOfLine(&mut bg.qs, &mut p);
+            p = SkipRestOfLine(&mut bg.qs, p);
         }
 
         qfalse

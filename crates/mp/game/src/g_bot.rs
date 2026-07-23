@@ -39,61 +39,51 @@ pub fn trap_Cvar_VariableValue(ctx: &mut GameContext, var_name: &str) -> f32 {
 /// Raven `G_ParseInfos`.
 ///
 /// Source: `oracle/codemp/game/g_bot.c:50-99`
-pub fn G_ParseInfos(ctx: &mut GameContext, buf: *const c_char, max: c_int) -> Vec<String> {
-    unsafe {
-        let mut infos: Vec<String> = Vec::new();
-        let mut bufp = buf;
+pub fn G_ParseInfos(ctx: &mut GameContext, buf: &[u8], max: c_int) -> Vec<String> {
+    let mut infos: Vec<String> = Vec::new();
+    let mut bufp: Option<&[u8]> = Some(buf);
 
-        loop {
-            let token = cstr_to_str(COM_Parse(
-                &mut ctx.world.bg_state.qs,
-                &mut bufp as *mut *const c_char,
-            ));
-            if token.is_empty() {
-                break;
-            }
-            if token != "{" {
-                Com_Printf("Missing { in info file\n");
-                break;
-            }
-            if infos.len() as c_int == max {
-                Com_Printf("Max infos exceeded\n");
-                break;
-            }
-
-            let mut info = String::new();
-            loop {
-                let token = cstr_to_str(COM_ParseExt(
-                    &mut ctx.world.bg_state.qs,
-                    &mut bufp as *mut *const c_char,
-                    qtrue,
-                ));
-                if token.is_empty() {
-                    Com_Printf("Unexpected end of info file\n");
-                    break;
-                }
-                if token == "}" {
-                    break;
-                }
-                let key = token;
-
-                let token2 = cstr_to_str(COM_ParseExt(
-                    &mut ctx.world.bg_state.qs,
-                    &mut bufp as *mut *const c_char,
-                    qfalse,
-                ));
-                let value = if token2.is_empty() {
-                    "<NULL>".to_string()
-                } else {
-                    token2
-                };
-                Info_SetValueForKey(&mut info, &key, &value);
-            }
-
-            infos.push(info);
+    loop {
+        let (token, rest) = COM_Parse(&mut ctx.world.bg_state.qs, bufp);
+        bufp = rest;
+        if token.is_empty() {
+            break;
         }
-        infos
+        if token != "{" {
+            Com_Printf("Missing { in info file\n");
+            break;
+        }
+        if infos.len() as c_int == max {
+            Com_Printf("Max infos exceeded\n");
+            break;
+        }
+
+        let mut info = String::new();
+        loop {
+            let (token, rest) = COM_ParseExt(&mut ctx.world.bg_state.qs, bufp, true);
+            bufp = rest;
+            if token.is_empty() {
+                Com_Printf("Unexpected end of info file\n");
+                break;
+            }
+            if token == "}" {
+                break;
+            }
+            let key = token;
+
+            let (token2, rest) = COM_ParseExt(&mut ctx.world.bg_state.qs, bufp, false);
+            bufp = rest;
+            let value = if token2.is_empty() {
+                "<NULL>".to_string()
+            } else {
+                token2
+            };
+            Info_SetValueForKey(&mut info, &key, &value);
+        }
+
+        infos.push(info);
     }
+    infos
 }
 
 // Raven `g_bot.c` file-scope `#define`s (verified against the owning TU).
@@ -137,11 +127,7 @@ pub fn G_LoadArenasFromFile(ctx: &mut GameContext, filename: &str) {
     trap::FS_FCloseFile(ctx.engine, f);
 
     let g_numArenas = ctx.world.globals.g_numArenas;
-    let mut added = G_ParseInfos(
-        ctx,
-        buf.as_ptr() as *const c_char,
-        MAX_ARENAS - g_numArenas,
-    );
+    let mut added = G_ParseInfos(ctx, &buf, MAX_ARENAS - g_numArenas);
     ctx.world.globals.g_numArenas += added.len() as c_int;
     ctx.world.globals.g_arenaInfos.append(&mut added);
 }
@@ -981,7 +967,7 @@ pub fn G_LoadBotsFromFile(ctx: &mut GameContext, filename: &str) {
     trap::FS_FCloseFile(ctx.engine, f);
 
     let g_numBots = ctx.world.globals.g_numBots;
-    let mut added = G_ParseInfos(ctx, buf.as_ptr() as *const c_char, MAX_BOTS - g_numBots);
+    let mut added = G_ParseInfos(ctx, &buf, MAX_BOTS - g_numBots);
     ctx.world.globals.g_numBots += added.len() as c_int;
     ctx.world.globals.g_botInfos.append(&mut added);
 }

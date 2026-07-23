@@ -38,6 +38,7 @@ use crate::prelude::*;
 use crate::public::bg_loaded_anim::bgLoadedAnim_t;
 use mp_qshared::shared::com_parse::COM_Parse;
 use native_string::atof::atof_bytes;
+use native_string::atoi::atoi_bytes;
 use native_string::strncpyz_string;
 
 // Raven `#define MAX_ANIM_FILES 64`.
@@ -1983,10 +1984,10 @@ impl PmoveContext<'_> {
         mut animset: *mut animation_t,
         isHumanoid: qboolean,
     ) -> c_int {
-        let mut text_p: *const c_char;
+        let mut text_p: Option<&[u8]>;
         let mut len: c_int;
         let mut i: c_int;
-        let mut token: *mut c_char;
+        let mut token: String;
         // Raven's `fps` is a `float`; keeping it single-precision (and dividing
         // `1000.0f32 / fps`) matches C's float division before floor/ceil.
         let mut fps: f32;
@@ -1995,7 +1996,7 @@ impl PmoveContext<'_> {
         let mut nextIndex: c_int = self.bg.bgNumAllAnims;
         let mut dynAlloc: qboolean = 0;
         let mut wasLoaded: qboolean = 0;
-        let mut BGPAFtext: [c_char; 60000] = [0; 60000];
+        let mut BGPAFtext: [u8; 60000] = [0; 60000];
         let mut f: fileHandle_t = 0;
         let mut animNum: c_int;
 
@@ -2066,7 +2067,7 @@ impl PmoveContext<'_> {
             return 0;
         }
 
-        text_p = BGPAFtext.as_ptr();
+        text_p = Some(&BGPAFtext[..]);
 
         for i in 0..MAX_ANIMATIONS as c_int {
             unsafe {
@@ -2078,49 +2079,49 @@ impl PmoveContext<'_> {
         }
 
         loop {
-            token = COM_Parse(&mut self.bg.qs, &mut text_p);
+            let (t, rest) = COM_Parse(&mut self.bg.qs, text_p);
+            text_p = rest;
+            token = t;
 
-            if token.is_null() || unsafe { *token as u8 } == 0 {
+            if token.is_empty() {
                 break;
             }
 
-            animNum =
-                GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &unsafe {
-                    cstr_to_str(token)
-                });
+            animNum = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &token);
             if animNum == -1 {
                 continue;
             }
 
-            token = COM_Parse(&mut self.bg.qs, &mut text_p);
-            if token.is_null() {
-                break;
-            }
+            // Raven's per-field `if ( !token )` guards test the `COM_Parse`
+            // return, which is the `com_token` pointer — never NULL, so those
+            // guards are dead. The `&str` cursor makes them unrepresentable and
+            // their runtime effect (never break) is preserved by omission.
+            let (t, rest) = COM_Parse(&mut self.bg.qs, text_p);
+            text_p = rest;
+            token = t;
             unsafe {
-                (*animset.offset(animNum as isize)).firstFrame = (atoi(token) as c_int) as u16;
+                (*animset.offset(animNum as isize)).firstFrame =
+                    (atoi_bytes(token.as_bytes()) as c_int) as u16;
             }
 
-            token = COM_Parse(&mut self.bg.qs, &mut text_p);
-            if token.is_null() {
-                break;
-            }
+            let (t, rest) = COM_Parse(&mut self.bg.qs, text_p);
+            text_p = rest;
+            token = t;
             unsafe {
-                (*animset.offset(animNum as isize)).numFrames = atoi(token) as u16;
+                (*animset.offset(animNum as isize)).numFrames = atoi_bytes(token.as_bytes()) as u16;
             }
 
-            token = COM_Parse(&mut self.bg.qs, &mut text_p);
-            if token.is_null() {
-                break;
-            }
+            let (t, rest) = COM_Parse(&mut self.bg.qs, text_p);
+            text_p = rest;
+            token = t;
             unsafe {
-                (*animset.offset(animNum as isize)).loopFrames = atoi(token) as i8;
+                (*animset.offset(animNum as isize)).loopFrames = atoi_bytes(token.as_bytes()) as i8;
             }
 
-            token = COM_Parse(&mut self.bg.qs, &mut text_p);
-            if token.is_null() {
-                break;
-            }
-            fps = atof_bytes(unsafe { CStr::from_ptr(token) }.to_bytes()) as f32;
+            let (t, rest) = COM_Parse(&mut self.bg.qs, text_p);
+            text_p = rest;
+            token = t;
+            fps = atof_bytes(token.as_bytes()) as f32;
             if fps == 0.0 {
                 fps = 1.0;
             }
