@@ -29,6 +29,10 @@ pub fn install_hook() {
         let message = payload_message(info.payload());
         let record = format_record(location.as_deref(), &message);
         eprintln!("jampgame panic: {record}");
+        // The module's last words go to a fatal FFI abort with no unwinder to
+        // walk the stack — print the trace here or lose it (RUST_BACKTRACE has
+        // no effect on a custom hook).
+        eprintln!("{}", std::backtrace::Backtrace::force_capture());
         store(record);
     }));
 }

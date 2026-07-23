@@ -435,7 +435,13 @@ pub fn NPC_UpdateAngles(ctx: &mut GameContext, doPitch: qboolean, doYaw: qboolea
 /// Source: `oracle/codemp/game/NPC_utils.c:519-533`
 pub fn NPC_AimWiggle(ctx: &mut GameContext, enemy_org: &mut vec3_t) {
     let npc = ctx.world.globals.NPC;
-    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // §19: Raven reads the ambient `NPC` global, which is stale or NULL when
+    // this runs outside an NPC think (e.g. the G_SetEnemy/G_AlertTeam damage
+    // cascade) — stale gave retail wrong-but-crashless results, NULL crashed.
+    // Defined behavior: no current NPC = the no-op/failure return.
+    let Some(npc_id) = ctx.entity_id_of(npc) else {
+        return;
+    };
     // FLAG: gNPC_t (NPCInfo) derefs stay raw (recipe 2c).
     let npc_info = ctx.world.globals.NPCInfo;
 
@@ -943,7 +949,13 @@ pub fn NPC_SomeoneLookingAtMe(ctx: &mut GameContext, ent: EntityId) -> qboolean 
 /// Source: `oracle/codemp/game/NPC_utils.c:1069-1072`
 pub fn NPC_ClearLOS(ctx: &mut GameContext, start: vec3_t, end: vec3_t) -> qboolean {
     let npc = ctx.world.globals.NPC;
-    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // §19: Raven reads the ambient `NPC` global, which is stale or NULL when
+    // this runs outside an NPC think (e.g. the G_SetEnemy/G_AlertTeam damage
+    // cascade) — stale gave retail wrong-but-crashless results, NULL crashed.
+    // Defined behavior: no current NPC = the no-op/failure return.
+    let Some(npc_id) = ctx.entity_id_of(npc) else {
+        return qfalse;
+    };
     G_ClearLOS(ctx, npc_id, start, end)
 }
 
@@ -952,7 +964,13 @@ pub fn NPC_ClearLOS(ctx: &mut GameContext, start: vec3_t, end: vec3_t) -> qboole
 /// Source: `oracle/codemp/game/NPC_utils.c:1073-1076`
 pub fn NPC_ClearLOS5(ctx: &mut GameContext, end: vec3_t) -> qboolean {
     let npc = ctx.world.globals.NPC;
-    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // §19: Raven reads the ambient `NPC` global, which is stale or NULL when
+    // this runs outside an NPC think (e.g. the G_SetEnemy/G_AlertTeam damage
+    // cascade) — stale gave retail wrong-but-crashless results, NULL crashed.
+    // Defined behavior: no current NPC = the no-op/failure return.
+    let Some(npc_id) = ctx.entity_id_of(npc) else {
+        return qfalse;
+    };
     G_ClearLOS5(ctx, npc_id, end)
 }
 
@@ -961,7 +979,13 @@ pub fn NPC_ClearLOS5(ctx: &mut GameContext, end: vec3_t) -> qboolean {
 /// Source: `oracle/codemp/game/NPC_utils.c:1077-1080`
 pub fn NPC_ClearLOS4(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
     let npc = ctx.world.globals.NPC;
-    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // §19: Raven reads the ambient `NPC` global, which is stale or NULL when
+    // this runs outside an NPC think (e.g. the G_SetEnemy/G_AlertTeam damage
+    // cascade) — stale gave retail wrong-but-crashless results, NULL crashed.
+    // Defined behavior: no current NPC = the no-op/failure return.
+    let Some(npc_id) = ctx.entity_id_of(npc) else {
+        return qfalse;
+    };
     G_ClearLOS4(ctx, npc_id, ent)
 }
 
@@ -970,7 +994,13 @@ pub fn NPC_ClearLOS4(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
 /// Source: `oracle/codemp/game/NPC_utils.c:1081-1084`
 pub fn NPC_ClearLOS3(ctx: &mut GameContext, start: vec3_t, ent: Option<EntityId>) -> qboolean {
     let npc = ctx.world.globals.NPC;
-    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // §19: Raven reads the ambient `NPC` global, which is stale or NULL when
+    // this runs outside an NPC think (e.g. the G_SetEnemy/G_AlertTeam damage
+    // cascade) — stale gave retail wrong-but-crashless results, NULL crashed.
+    // Defined behavior: no current NPC = the no-op/failure return.
+    let Some(npc_id) = ctx.entity_id_of(npc) else {
+        return qfalse;
+    };
     G_ClearLOS3(ctx, npc_id, start, ent)
 }
 
@@ -979,7 +1009,13 @@ pub fn NPC_ClearLOS3(ctx: &mut GameContext, start: vec3_t, ent: Option<EntityId>
 /// Source: `oracle/codemp/game/NPC_utils.c:1085-1088`
 pub fn NPC_ClearLOS2(ctx: &mut GameContext, ent: Option<EntityId>, end: vec3_t) -> qboolean {
     let npc = ctx.world.globals.NPC;
-    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // §19: Raven reads the ambient `NPC` global, which is stale or NULL when
+    // this runs outside an NPC think (e.g. the G_SetEnemy/G_AlertTeam damage
+    // cascade) — stale gave retail wrong-but-crashless results, NULL crashed.
+    // Defined behavior: no current NPC = the no-op/failure return.
+    let Some(npc_id) = ctx.entity_id_of(npc) else {
+        return qfalse;
+    };
     G_ClearLOS2(ctx, npc_id, ent, end)
 }
 
@@ -1093,7 +1129,13 @@ pub fn NPC_ValidEnemy(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean 
 pub fn NPC_TargetVisible(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
     let ent_id = ent.unwrap();
     let npc = ctx.world.globals.NPC;
-    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // §19: Raven reads the ambient `NPC` global, which is stale or NULL when
+    // this runs outside an NPC think (e.g. the G_SetEnemy/G_AlertTeam damage
+    // cascade) — stale gave retail wrong-but-crashless results, NULL crashed.
+    // Defined behavior: no current NPC = the no-op/failure return.
+    let Some(npc_id) = ctx.entity_id_of(npc) else {
+        return qfalse;
+    };
     // FLAG: gNPC_t (NPCInfo) derefs stay raw (recipe 2c).
     let npc_info = ctx.world.globals.NPCInfo;
 
@@ -1205,7 +1247,13 @@ pub fn NPC_FindNearestEnemy(ctx: &mut GameContext, ent: EntityId) -> c_int {
 /// Source: `oracle/codemp/game/NPC_utils.c:1302-1348`
 pub fn NPC_PickEnemyExt(ctx: &mut GameContext, checkAlerts: qboolean) -> *mut gentity_t {
     let npc = ctx.world.globals.NPC;
-    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // §19: Raven reads the ambient `NPC` global, which is stale or NULL when
+    // this runs outside an NPC think (e.g. the G_SetEnemy/G_AlertTeam damage
+    // cascade) — stale gave retail wrong-but-crashless results, NULL crashed.
+    // Defined behavior: no current NPC = the no-op/failure return.
+    let Some(npc_id) = ctx.entity_id_of(npc) else {
+        return core::ptr::null_mut();
+    };
 
     //If we've asked for the closest enemy
     let ent_id = NPC_FindNearestEnemy(ctx, npc_id);
@@ -1282,7 +1330,13 @@ fn NPC_CheckPlayerDistance() -> qboolean {
 /// Source: `oracle/codemp/game/NPC_utils.c:1407-1461`
 pub fn NPC_FindEnemy(ctx: &mut GameContext, checkAlerts: qboolean) -> qboolean {
     let npc = ctx.world.globals.NPC;
-    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // §19: Raven reads the ambient `NPC` global, which is stale or NULL when
+    // this runs outside an NPC think (e.g. the G_SetEnemy/G_AlertTeam damage
+    // cascade) — stale gave retail wrong-but-crashless results, NULL crashed.
+    // Defined behavior: no current NPC = the no-op/failure return.
+    let Some(npc_id) = ctx.entity_id_of(npc) else {
+        return qfalse;
+    };
     // FLAG: gNPC_t (NPCInfo) + pool client (NPC) derefs stay raw (recipe 2c / trap 2b).
     let npc_info = ctx.world.globals.NPCInfo;
 
@@ -1346,7 +1400,13 @@ pub fn NPC_CheckEnemyExt(ctx: &mut GameContext, checkAlerts: qboolean) -> qboole
 /// Source: `oracle/codemp/game/NPC_utils.c:1491-1547`
 pub fn NPC_FacePosition(ctx: &mut GameContext, position: vec3_t, doPitch: qboolean) -> qboolean {
     let npc = ctx.world.globals.NPC;
-    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // §19: Raven reads the ambient `NPC` global, which is stale or NULL when
+    // this runs outside an NPC think (e.g. the G_SetEnemy/G_AlertTeam damage
+    // cascade) — stale gave retail wrong-but-crashless results, NULL crashed.
+    // Defined behavior: no current NPC = the no-op/failure return.
+    let Some(npc_id) = ctx.entity_id_of(npc) else {
+        return qfalse;
+    };
     // FLAG: gNPC_t (NPCInfo) + pool client (NPC/enemy) derefs stay raw (recipe 2c / trap 2b).
     let npc_info = ctx.world.globals.NPCInfo;
     let client = ctx.world.globals.client;
@@ -1461,7 +1521,13 @@ pub fn NPC_FaceEnemy(ctx: &mut GameContext, doPitch: qboolean) -> qboolean {
 /// Source: `oracle/codemp/game/NPC_utils.c:1588-1603`
 pub fn NPC_CheckCanAttackExt(ctx: &mut GameContext) -> qboolean {
     let npc = ctx.world.globals.NPC;
-    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // §19: Raven reads the ambient `NPC` global, which is stale or NULL when
+    // this runs outside an NPC think (e.g. the G_SetEnemy/G_AlertTeam damage
+    // cascade) — stale gave retail wrong-but-crashless results, NULL crashed.
+    // Defined behavior: no current NPC = the no-op/failure return.
+    let Some(npc_id) = ctx.entity_id_of(npc) else {
+        return qfalse;
+    };
     // FLAG: gNPC_t (NPCInfo) deref stays raw (recipe 2c).
     let npc_info = ctx.world.globals.NPCInfo;
 
@@ -1570,7 +1636,13 @@ pub fn NPC_CheckLookTarget(ctx: &mut GameContext, self_: EntityId) -> qboolean {
 /// Source: `oracle/codemp/game/NPC_utils.c:1687-1705`
 pub fn NPC_CheckCharmed(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
-    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // §19: Raven reads the ambient `NPC` global, which is stale or NULL when
+    // this runs outside an NPC think (e.g. the G_SetEnemy/G_AlertTeam damage
+    // cascade) — stale gave retail wrong-but-crashless results, NULL crashed.
+    // Defined behavior: no current NPC = the no-op/failure return.
+    let Some(npc_id) = ctx.entity_id_of(npc) else {
+        return;
+    };
     // FLAG: gNPC_t (NPCInfo) + pool client (NPC) derefs stay raw (recipe 2c / trap 2b).
     let npc_info = ctx.world.globals.NPCInfo;
 
@@ -1698,7 +1770,13 @@ pub fn NPC_EntRangeFromBolt(
 /// Source: `oracle/codemp/game/NPC_utils.c:1756-1759`
 pub fn NPC_EnemyRangeFromBolt(ctx: &mut GameContext, boltIndex: c_int) -> f32 {
     let npc = ctx.world.globals.NPC;
-    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // §19: Raven reads the ambient `NPC` global, which is stale or NULL when
+    // this runs outside an NPC think (e.g. the G_SetEnemy/G_AlertTeam damage
+    // cascade) — stale gave retail wrong-but-crashless results, NULL crashed.
+    // Defined behavior: no current NPC = the no-op/failure return.
+    let Some(npc_id) = ctx.entity_id_of(npc) else {
+        return f32::MAX;
+    };
     let enemy_id = ctx.world.entity(npc_id).enemy;
     NPC_EntRangeFromBolt(ctx, enemy_id, boltIndex)
 }
