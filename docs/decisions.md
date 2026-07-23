@@ -565,3 +565,14 @@ choices:
 
 Oracle-inherited duplication (inventory category 5) stays faithful per
 porting-rules §A2/§20 — no action pre-parity.
+
+## DEC-33 — l_struct + iteminfo/weaponinfo strings parked permanently (2026-07-23)
+
+`weaponinfo_t` is memcpy'd whole across the game ABI (`BotGetWeaponInfo`,
+`sv_game.rs`), freezing its `[c_char; MAX_STRINGFIELD]` fields and the
+`l_struct` fielddef offset filler that populates it. Converting the goal-only
+`iteminfo_t` strings would fork a duplicate parser beside l_struct for no wire
+or safety benefit. Ruling: the l_struct machinery, `iteminfo_t`/
+`weaponinfo_t`/`projectileinfo_t` string fields, and the `BotGoalName` export's
+interior stay as-is permanently. Internal-quality-only residue; cite this
+ruling rather than re-opening.
