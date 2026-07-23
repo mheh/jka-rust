@@ -15,9 +15,10 @@ use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::force_reload::ForceReload_e;
 use mp_qshared::shared::game_state::MAX_CONFIGSTRINGS;
 use mp_qshared::shared::limits::{MAX_CLIENTS, MAX_INFO_STRING, MAX_NAME_LENGTH, MAX_STRING_CHARS};
-use native_string::cstr::{buf_to_string, strncpyz_string};
+use native_string::cstr::strncpyz_string;
 use native_string::q_string::Q_stricmpBytes;
 use native_string::q_strncpyz::Q_strncpyzBytes;
+use native_string::{latin1_to_string, string_to_latin1};
 use native_string::Info_ValueForKey;
 use mp_qshared::shared::qboolean;
 
@@ -145,7 +146,9 @@ pub fn SV_SetConfigstring(
         // change the string in sv — the `Z_Free`/`CopyString` heap lifecycle is
         // now the `Vec<String>`'s own `Drop` on reassignment. `CopyString` is
         // unbounded, so the full `val` is stored (no `MAX_INFO_STRING` bound).
-        sv.sv.configstrings[index as usize] = buf_to_string(CStr::from_ptr(val).to_bytes());
+        // Latin-1-decode the raw game bytes: configstrings reach the wire (the
+        // "cs"/"bcs" server commands below), so every byte must survive verbatim.
+        sv.sv.configstrings[index as usize] = latin1_to_string(CStr::from_ptr(val).to_bytes());
     }
 
     // send it to all the clients if we aren't spawning a new server
@@ -190,7 +193,7 @@ pub fn SV_SetConfigstring(
                                 "{} {} \"{}\"\n",
                                 cmd,
                                 index,
-                                core::ffi::CStr::from_ptr(buf.as_ptr()).to_string_lossy()
+                                latin1_to_string(CStr::from_ptr(buf.as_ptr()).to_bytes())
                             ),
                         );
 
@@ -206,7 +209,7 @@ pub fn SV_SetConfigstring(
                         &format!(
                             "cs {} \"{}\"\n",
                             index,
-                            core::ffi::CStr::from_ptr(val).to_string_lossy()
+                            latin1_to_string(CStr::from_ptr(val).to_bytes())
                         ),
                     );
                 }
@@ -235,10 +238,11 @@ pub fn SV_GetConfigstring(sv: &mut Server, index: c_int, buffer: *mut c_char, bu
             return;
         }
         // Frozen trap seam: one bounded copy of the owned string into the game's
-        // `(buffer, bufferSize)`.
+        // `(buffer, bufferSize)`, emitted as LATIN-1 WIRE BYTES (one per char) —
+        // `as_bytes()` (UTF-8) would double-width a non-ASCII payload.
         Q_strncpyzBytes(
             core::slice::from_raw_parts_mut(buffer, bufferSize as usize),
-            sv.sv.configstrings[index as usize].as_bytes(),
+            &string_to_latin1(&sv.sv.configstrings[index as usize]),
             bufferSize as usize,
         );
     }
@@ -264,10 +268,11 @@ pub fn SV_GetUserinfo(
     unsafe {
         let client = &sv.svs.clients[index as usize] as *const client_t;
         // Frozen trap seam: one bounded copy of the owned userinfo string into
-        // the game's `(buffer, bufferSize)`.
+        // the game's `(buffer, bufferSize)`, emitted as LATIN-1 WIRE BYTES (one
+        // per char) — `as_bytes()` (UTF-8) would double-width a non-ASCII name.
         Q_strncpyzBytes(
             core::slice::from_raw_parts_mut(buffer, bufferSize as usize),
-            (*client).userinfo.as_bytes(),
+            &string_to_latin1(&(*client).userinfo),
             bufferSize as usize,
         );
     }
@@ -292,10 +297,15 @@ pub fn SV_SetUserinfo(common: &mut Common, sv: &mut Server, index: c_int, mut va
         let client = &mut sv.svs.clients[index as usize] as *mut client_t;
         // Raven `Q_strncpyz(cl->userinfo, val, sizeof(cl->userinfo))` — byte-
         // truncate `val` to MAX_INFO_STRING into the owned userinfo string.
-        (*client).userinfo = strncpyz_string(CStr::from_ptr(val).to_bytes(), MAX_INFO_STRING);
+        // Latin-1-decode the raw game bytes so a non-ASCII name survives verbatim
+        // to the wire (a lossy decode would corrupt it); one wire byte per char,
+        // so byte-truncation to MAX_INFO_STRING-1 is the wire-byte bound.
+        let raw = CStr::from_ptr(val).to_bytes();
+        (*client).userinfo = latin1_to_string(&raw[..raw.len().min(MAX_INFO_STRING - 1)]);
         // Raven `Q_strncpyz(cl->name, Info_ValueForKey(val,"name"), sizeof(cl->name))`
-        // — extract the name and byte-truncate to MAX_NAME_LENGTH into the String.
-        let name_src = Info_ValueForKey(&buf_to_string(CStr::from_ptr(val).to_bytes()), "name");
+        // — extract the name (from the full infostring) and byte-truncate to
+        // MAX_NAME_LENGTH into the String.
+        let name_src = Info_ValueForKey(&latin1_to_string(raw), "name");
         (*client).name = strncpyz_string(name_src.as_bytes(), MAX_NAME_LENGTH);
     }
 }

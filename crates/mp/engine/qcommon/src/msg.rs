@@ -35,6 +35,7 @@ use crate::z_memman_pc::Z_Malloc;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::limits::{BIG_INFO_STRING, GENTITYNUM_BITS, MAX_STRING_CHARS};
 use native_types::fileHandle_t;
+use native_string::{latin1_to_string, string_to_latin1};
 
 // The `sv`/`SV_GentityNum` cross-crate reach (server depends on qcommon) is
 // resolved through the sanctioned host edge `EngineHost::
@@ -2161,7 +2162,12 @@ pub fn MSG_WriteLong(common: &mut Common, sb: *mut msg_t, c: c_int) {
 ///
 /// Source: `oracle/codemp/qcommon/msg.cpp:328-354`
 pub fn MSG_WriteString(common: &mut Common, sb: *mut msg_t, s: &str) {
-    let l = s.len();
+    // Wire bytes are the bijective Latin-1 encoding of `s` (one byte per char),
+    // matching retail's byte-transparent chat/userinfo strings; `l` is the WIRE
+    // byte count (one per char), not `s.len()`'s UTF-8 width which would over-count
+    // non-ASCII. Pure-ASCII content is byte-identical to the prior `s.as_ptr()` path.
+    let bytes = string_to_latin1(s);
+    let l = bytes.len();
     if l >= MAX_STRING_CHARS {
         com_printf(common, "MSG_WriteString: MAX_STRING_CHARS");
         MSG_WriteData(common, sb, b"\0".as_ptr() as *const (), 1);
@@ -2171,7 +2177,7 @@ pub fn MSG_WriteString(common: &mut Common, sb: *mut msg_t, s: &str) {
     // `l` body bytes followed by the terminating NUL. `MSG_WriteData` is a plain
     // per-byte `MSG_WriteByte` loop, so writing the body then one NUL byte emits
     // the identical wire sequence with no scratch copy.
-    MSG_WriteData(common, sb, s.as_ptr() as *const (), l as c_int);
+    MSG_WriteData(common, sb, bytes.as_ptr() as *const (), l as c_int);
     MSG_WriteByte(common, sb, 0);
 }
 
@@ -2211,7 +2217,10 @@ pub fn MSG_WriteFloat(common: &mut Common, sb: *mut msg_t, f: f32) {
 ///
 /// Source: `oracle/codemp/qcommon/msg.cpp:356-383`
 pub fn MSG_WriteBigString(common: &mut Common, sb: *mut msg_t, s: &str) {
-    let l = s.len();
+    // Latin-1 wire bytes (one per char); `l` is the WIRE byte count, not the
+    // UTF-8 width. See `MSG_WriteString`.
+    let bytes = string_to_latin1(s);
+    let l = bytes.len();
     if l >= BIG_INFO_STRING {
         com_printf(common, "MSG_WriteString: BIG_INFO_STRING");
         MSG_WriteData(common, sb, b"\0".as_ptr() as *const (), 1);
@@ -2221,7 +2230,7 @@ pub fn MSG_WriteBigString(common: &mut Common, sb: *mut msg_t, s: &str) {
     // eurofix: remove this so we can chat in european languages...	-ste
     // (0xff-strip loop left commented in the oracle; not ported)
 
-    MSG_WriteData(common, sb, s.as_ptr() as *const (), l as c_int);
+    MSG_WriteData(common, sb, bytes.as_ptr() as *const (), l as c_int);
     MSG_WriteByte(common, sb, 0);
 }
 
@@ -2470,7 +2479,7 @@ pub fn MSG_ReadString(common: &mut Common, msg: *mut msg_t) -> String {
     }
     // some bonus protection, shouldn't occur cause server doesn't write such things
     string.truncate(cap - 1);
-    String::from_utf8_lossy(&string).into_owned()
+    latin1_to_string(&string)
 }
 
 /// Raven `MSG_ReadBigString`. As `MSG_ReadString` but bounded by
@@ -2496,7 +2505,7 @@ pub fn MSG_ReadBigString(common: &mut Common, msg: *mut msg_t) -> String {
             break;
         }
     }
-    String::from_utf8_lossy(&string).into_owned()
+    latin1_to_string(&string)
 }
 
 /// Raven `MSG_ReadStringLine`. As `MSG_ReadBigString` (bounded by
@@ -2521,7 +2530,7 @@ pub fn MSG_ReadStringLine(common: &mut Common, msg: *mut msg_t) -> String {
             break;
         }
     }
-    String::from_utf8_lossy(&string).into_owned()
+    latin1_to_string(&string)
 }
 
 /// Raven `MSG_ReadAngle16`. `SHORT2ANGLE(x)` = `(x)*(360.0/65536)`.

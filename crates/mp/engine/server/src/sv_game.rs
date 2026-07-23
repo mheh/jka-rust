@@ -71,6 +71,7 @@ use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::roff::RoffSystem;
 use mp_engine_qcommon::stringed::SE_GetString;
 use native_string::q_strncpyz::{Q_strncpyz, Q_strncpyzBytes};
+use native_string::{latin1_to_string, string_to_latin1};
 
 use crate::npcnav::Navigator;
 
@@ -395,7 +396,10 @@ pub fn SV_GameSendServerCommand(
     clientNum: c_int,
     text: *const c_char,
 ) {
-    let msg = unsafe { core::ffi::CStr::from_ptr(text) }.to_string_lossy();
+    // Wire-bound game-supplied string: Latin-1-decode the raw bytes so all 256
+    // byte values survive to the netchan (retail is byte-transparent); a lossy
+    // decode would mangle non-ASCII chat/print bytes.
+    let msg = latin1_to_string(unsafe { core::ffi::CStr::from_ptr(text) }.to_bytes());
     if clientNum == -1 {
         SV_SendServerCommand(common, sv, core::ptr::null_mut(), &msg);
     } else {
@@ -478,9 +482,11 @@ pub fn SV_GetServerinfo(common: &mut Common, buffer: *mut c_char, bufferSize: c_
     }
     let info = Cvar_InfoString(common, mp_qshared::shared::cvar::CVAR_SERVERINFO);
     unsafe {
-        Q_strncpyz(
+        // Trap copy serving a string the game re-broadcasts: emit LATIN-1 WIRE
+        // BYTES (one per char), not the UTF-8 width of the owned `String`.
+        Q_strncpyzBytes(
             core::slice::from_raw_parts_mut(buffer, bufferSize as usize),
-            &info,
+            &string_to_latin1(&info),
             bufferSize as usize,
         );
     }
@@ -924,10 +930,13 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_ARGV as isize {
             // Raven `Cmd_ArgvBuffer` inlined at its one caller: the module
             // out-buffer fill (caller-owned memory, caller-supplied length).
+            // The argv is served to the game as LATIN-1 WIRE BYTES (one byte per
+            // char), not UTF-8 — client-typed chat/name payload stays byte-exact
+            // across the trap seam so the game can echo it untouched to the wire.
             let len = *args.offset(3) as usize;
-            Q_strncpyz(
+            Q_strncpyzBytes(
                 core::slice::from_raw_parts_mut(vma(view.common, args, 2) as *mut c_char, len),
-                Cmd_Argv(view.common, *args.offset(1) as c_int),
+                &string_to_latin1(Cmd_Argv(view.common, *args.offset(1) as c_int)),
                 len,
             );
             return 0;
@@ -998,10 +1007,11 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_DROP_CLIENT as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
             let sv = sv_from_view(view);
-            // module-memory seam: one conversion at the trap arm.
-            let reason = core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
-                .to_string_lossy()
-                .into_owned();
+            // module-memory seam: one conversion at the trap arm. The drop
+            // reason reaches the wire (broadcast "print"/"disconnect"), so it is
+            // Latin-1-decoded for byte transparency, not lossy.
+            let reason =
+                latin1_to_string(core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char).to_bytes());
             SV_GameDropClient(view.common, sv, *args.offset(1) as c_int, &reason);
             return 0;
         } else if trap == G::G_SEND_SERVER_COMMAND as isize {

@@ -36,7 +36,11 @@ pub enum InfoSetResult {
 ///
 /// Source: `oracle/codemp/game/q_shared.c:1051-1100`
 pub fn Info_ValueForKey(s: &str, key: &str) -> String {
-    if s.len() >= BIG_INFO_STRING {
+    // Raven's `strlen(s)` bound counts wire bytes; under the Latin-1 wire-string
+    // discipline each stored char is one wire byte, so `chars().count()` is the
+    // wire length (`s.len()`'s UTF-8 width would over-count a non-ASCII payload
+    // up to 2x and falsely reject strings retail accepts). ASCII is unchanged.
+    if s.chars().count() >= BIG_INFO_STRING {
         // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
         panic!("Info_ValueForKey: oversize infostring");
     }
@@ -122,7 +126,8 @@ fn remove_key_walk(s: &mut String, key: &str) {
 ///
 /// Source: `oracle/codemp/game/q_shared.c:1147-1195`
 pub fn Info_RemoveKey(s: &mut String, key: &str) {
-    if s.len() >= MAX_INFO_STRING {
+    // Wire-byte bound (Latin-1: one byte per char); see `Info_ValueForKey`.
+    if s.chars().count() >= MAX_INFO_STRING {
         // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
         panic!("Info_RemoveKey: oversize infostring");
     }
@@ -133,7 +138,8 @@ pub fn Info_RemoveKey(s: &mut String, key: &str) {
 ///
 /// Source: `oracle/codemp/game/q_shared.c:1202-1250`
 pub fn Info_RemoveKey_Big(s: &mut String, key: &str) {
-    if s.len() >= BIG_INFO_STRING {
+    // Wire-byte bound (Latin-1: one byte per char); see `Info_ValueForKey`.
+    if s.chars().count() >= BIG_INFO_STRING {
         // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
         panic!("Info_RemoveKey_Big: oversize infostring");
     }
@@ -152,7 +158,8 @@ pub fn Info_Validate(s: &str) -> bool {
 ///
 /// Source: `oracle/codemp/game/q_shared.c:1280-1319`
 pub fn Info_SetValueForKey(s: &mut String, key: &str, value: &str) -> InfoSetResult {
-    if s.len() >= MAX_INFO_STRING {
+    // Wire-byte bound (Latin-1: one byte per char); see `Info_ValueForKey`.
+    if s.chars().count() >= MAX_INFO_STRING {
         // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
         panic!("Info_SetValueForKey: oversize infostring");
     }
@@ -167,7 +174,8 @@ pub fn Info_SetValueForKey(s: &mut String, key: &str, value: &str) -> InfoSetRes
     }
 
     let newi = format!("\\{key}\\{value}");
-    if newi.len() + s.len() > MAX_INFO_STRING {
+    // Wire-byte bound (Latin-1: one byte per char); see `Info_ValueForKey`.
+    if newi.chars().count() + s.chars().count() > MAX_INFO_STRING {
         return InfoSetResult::LengthExceeded;
     }
 
@@ -180,7 +188,8 @@ pub fn Info_SetValueForKey(s: &mut String, key: &str, value: &str) -> InfoSetRes
 ///
 /// Source: `oracle/codemp/game/q_shared.c:1328-1366`
 pub fn Info_SetValueForKey_Big(s: &mut String, key: &str, value: &str) -> InfoSetResult {
-    if s.len() >= BIG_INFO_STRING {
+    // Wire-byte bound (Latin-1: one byte per char); see `Info_ValueForKey`.
+    if s.chars().count() >= BIG_INFO_STRING {
         // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
         panic!("Info_SetValueForKey: oversize infostring");
     }
@@ -195,7 +204,8 @@ pub fn Info_SetValueForKey_Big(s: &mut String, key: &str, value: &str) -> InfoSe
     }
 
     let newi = format!("\\{key}\\{value}");
-    if newi.len() + s.len() > BIG_INFO_STRING {
+    // Wire-byte bound (Latin-1: one byte per char); see `Info_ValueForKey`.
+    if newi.chars().count() + s.chars().count() > BIG_INFO_STRING {
         return InfoSetResult::LengthExceeded;
     }
 

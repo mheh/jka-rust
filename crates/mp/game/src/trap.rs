@@ -229,7 +229,8 @@ use core::ffi::c_void;
 use mp_qshared::common::mp::gentity_s;
 use mp_qshared::common::mp::qcommon::sharedSetBoneIKStateParams_t;
 use mp_qshared::shared::{fileHandle_t, fsMode_t, qhandle_t, vec3_t, vmCvar_t};
-use native_string::{buf_to_string, cstr};
+use native_string::{buf_to_string, cstr, latin1_to_string, string_to_latin1};
+use std::ffi::CString;
 
 /// Raven `trap_AAS_EntityInfo` (`g_syscalls.c:655-657`) — `BOTLIB_AAS_ENTITY_INFO`.
 /// C: `void trap_AAS_EntityInfo(int entnum, void /* struct aas_entityinfo_s */ *info)`
@@ -267,7 +268,11 @@ pub fn Argv(engine: &Engine, n: c_int, buffer_len: usize) -> String {
         engine,
         GArgvArgs::new(n, buffer.as_mut_ptr() as *mut c_char, buffer_len as c_int),
     );
-    buf_to_string(&buffer)
+    // The engine serves argv as Latin-1 wire bytes (byte-transparent client
+    // input); decode 1:1 so a non-ASCII chat/name payload round-trips back onto
+    // the wire untouched. ASCII is identical to a lossy decode.
+    let nul = buffer.iter().position(|&b| b == 0).unwrap_or(buffer.len());
+    latin1_to_string(&buffer[..nul])
 }
 
 /// Raven `trap_BotAllocGoalState` (`g_syscalls.c:1075-1077`) — `BOTLIB_AI_ALLOC_GOAL_STATE`.
@@ -1930,9 +1935,14 @@ pub fn SendConsoleCommand(engine: &Engine, exec_when: c_int, text: &str) {
 /// Raven `trap_SendServerCommand` (`g_syscalls.c:114-116`) — `G_SEND_SERVER_COMMAND`.
 /// C: `void trap_SendServerCommand(int clientNum, const char *text)`
 pub fn SendServerCommand(engine: &Engine, clientNum: c_int, text: &str) {
+    // Encode as Latin-1 wire bytes (one per char): a chat/name payload the game
+    // read via `Argv` carries non-ASCII chars whose UTF-8 form (`cstr`) would
+    // re-widen on the wire. `CString::new` over the Latin-1 bytes keeps the
+    // NUL-terminated seam shape; ASCII is byte-identical to `cstr(text)`.
+    let wire = CString::new(string_to_latin1(text)).unwrap();
     <Engine as Execute<GSendServerCommand>>::execute(
         engine,
-        GSendServerCommandArgs::new(clientNum, cstr(text)),
+        GSendServerCommandArgs::new(clientNum, wire),
     )
 }
 

@@ -50,6 +50,7 @@ use mp_qshared::shared::q_string::{Com_sprintf, Q_strncmp, Q_strncpyz};
 use mp_qshared::shared::swap::BigShort;
 use mp_qshared::shared::{qboolean, qfalse, qtrue, MAX_STRING_CHARS};
 use native_string::cstr::buf_to_string;
+use native_string::string_to_latin1;
 use native_string::q_string::{Q_strcmp, Q_stricmp};
 use native_string::{Info_SetValueForKey, Info_ValueForKey};
 
@@ -180,9 +181,12 @@ pub fn SV_AddServerCommand(common: &mut Common, sv: &mut Server, client: *mut cl
             return;
         }
         let index = ((*client).reliableSequence & (MAX_RELIABLE_COMMANDS as c_int - 1)) as usize;
-        // Q_strncpyz needs a C string; build a nul-terminated copy of `cmd`.
-        let buf: Vec<c_char> = cmd
-            .bytes()
+        // Q_strncpyz needs a C string; build a nul-terminated copy of `cmd` in
+        // LATIN-1 WIRE BYTES (one per char) so a non-ASCII payload is stored in
+        // reliableCommands exactly as it goes on the wire — `cmd.bytes()` (UTF-8)
+        // would re-expand high chars to two bytes. ASCII is byte-identical.
+        let buf: Vec<c_char> = string_to_latin1(cmd)
+            .into_iter()
             .map(|b| b as c_char)
             .chain(core::iter::once(0))
             .collect();

@@ -213,7 +213,10 @@ pub fn ConcatArgs(ctx: &mut GameContext, start: c_int) -> String {
     let mut out = String::new();
     for i in start..c {
         let arg = trap::Argv(ctx.engine, i, MAX_STRING_CHARS);
-        let tlen = arg.len();
+        // Raven's `strlen(arg)` bound counts wire bytes; under Latin-1 each char
+        // is one wire byte, so `chars().count()` is the wire length (`len()`'s
+        // UTF-8 width would over-count a non-ASCII chat payload). ASCII unchanged.
+        let tlen = arg.chars().count();
         if len + tlen >= MAX_STRING_CHARS - 1 {
             break;
         }

@@ -23,6 +23,7 @@ use mp_engine_qcommon::qcommon::net_limits::{
 use mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e;
 use mp_engine_qcommon::vm_fns::VM_ArgPtrWord;
 use mp_host_interface::engine_host::EngineHost;
+use native_string::latin1_to_string;
 use mp_qshared::common::mp::cgame::refdef_t::MAX_MAP_AREA_BYTES;
 use mp_qshared::common::mp::game::g_public::{
     SVF_BOT, SVF_BROADCAST, SVF_NOCLIENT, SVF_NOTSINGLECLIENT, SVF_PORTAL, SVF_SINGLECLIENT,
@@ -179,14 +180,20 @@ pub fn SV_UpdateServerCommandsToClient(
                 svc_ops_e::svc_serverCommand as c_int,
             );
             mp_engine_qcommon::msg::MSG_WriteLong(common, msg, i);
+            // reliableCommands holds raw wire bytes ([c_char]); Latin-1-decode so
+            // MSG_WriteString re-emits every byte verbatim (a lossy decode would
+            // mangle non-ASCII chat before it reaches the netchan).
             MSG_WriteString(
                 common,
                 msg,
-                &CStr::from_ptr(
-                    (*client).reliableCommands[(i & (MAX_RELIABLE_COMMANDS as c_int - 1)) as usize]
-                        .as_ptr(),
-                )
-                .to_string_lossy(),
+                &latin1_to_string(
+                    CStr::from_ptr(
+                        (*client).reliableCommands
+                            [(i & (MAX_RELIABLE_COMMANDS as c_int - 1)) as usize]
+                            .as_ptr(),
+                    )
+                    .to_bytes(),
+                ),
             );
             i += 1;
         }

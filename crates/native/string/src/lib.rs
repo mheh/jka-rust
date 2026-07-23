@@ -21,7 +21,7 @@ pub mod stricmp;
 // The whole fn/const surface, flat at the crate root (module paths stay valid).
 pub use atof::{atof, atof_bytes};
 pub use atoi::{atoi, atoi_bytes};
-pub use cstr::{buf_to_string, cstr, strncpyz_string};
+pub use cstr::{buf_to_string, cstr, latin1_to_string, string_to_latin1, strncpyz_string};
 pub use ctype::{
     isdigit, isdigit_byte, islower, islower_byte, isspace, isspace_byte, isupper, isupper_byte,
     tolower, tolower_byte, toupper, toupper_byte,

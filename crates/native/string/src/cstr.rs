@@ -16,6 +16,28 @@ pub fn cstr(s: &str) -> CString {
     CString::new(s).unwrap()
 }
 
+/// Bijective Latin-1 decode of a wire/byte string into a `String`: every byte
+/// `b` becomes `char::from(b)` (U+0000..U+00FF), so all 256 byte values survive
+/// losslessly. This is the wire-string twin of [`buf_to_string`]'s lossy decode:
+/// use it wherever a byte string must stay byte-transparent (JKA chat/userinfo/
+/// configstrings carry non-ASCII escape bytes retail preserves verbatim), not
+/// where the bytes are genuinely UTF-8 text for display.
+pub fn latin1_to_string(bytes: &[u8]) -> String {
+    bytes.iter().map(|&b| char::from(b)).collect()
+}
+
+/// Bijective Latin-1 encode of a `String`/`&str` back to wire bytes: every char
+/// `c <= U+00FF` maps to its single byte `c as u8`, inverting [`latin1_to_string`].
+/// Chars above U+00FF are unreachable from our own Latin-1 decodes (they only
+/// arise from hand-written string literals with multi-byte codepoints); such a
+/// char maps to `b'.'` so the output stays one byte per char and never emits a
+/// truncated multi-byte UTF-8 sequence onto the wire.
+pub fn string_to_latin1(s: &str) -> Vec<u8> {
+    s.chars()
+        .map(|c| if (c as u32) <= 0xFF { c as u8 } else { b'.' })
+        .collect()
+}
+
 /// Byte-truncating `Q_strncpyz` into an owned `String` — the migrated-field
 /// twin of [`crate::q_strncpyz::Q_strncpyz`] for struct fields that became
 /// `String`. Takes `src` up to its first NUL, keeps at most `destsize - 1`
@@ -32,7 +54,7 @@ pub fn strncpyz_string(src: &[u8], destsize: usize) -> String {
 
 #[cfg(test)]
 mod cstr_tests {
-    use super::{buf_to_string, cstr};
+    use super::{buf_to_string, cstr, latin1_to_string, string_to_latin1};
 
     #[test]
     fn stops_at_nul() {
@@ -47,5 +69,28 @@ mod cstr_tests {
     #[test]
     fn cstr_round_trip() {
         assert_eq!(cstr("hello").to_bytes(), b"hello");
+    }
+
+    #[test]
+    fn latin1_all_256_bytes_round_trip() {
+        for b in 0u8..=255 {
+            let s = latin1_to_string(&[b]);
+            assert_eq!(s.chars().count(), 1, "byte {b:#04x} must be exactly one char");
+            let back = string_to_latin1(&s);
+            assert_eq!(back, vec![b], "byte {b:#04x} must round-trip identically");
+        }
+    }
+
+    #[test]
+    fn latin1_mixed_string_round_trips() {
+        let bytes: Vec<u8> = (0u8..=255).collect();
+        let s = latin1_to_string(&bytes);
+        assert_eq!(string_to_latin1(&s), bytes);
+    }
+
+    #[test]
+    fn string_to_latin1_defangs_wide_char() {
+        // A codepoint above U+00FF cannot come from our own decodes; it maps to '.'.
+        assert_eq!(string_to_latin1("\u{100}"), vec![b'.']);
     }
 }
