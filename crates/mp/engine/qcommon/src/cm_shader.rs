@@ -30,49 +30,18 @@ const S_COLOR_YELLOW: &str = "^3";
 
 // Sweep: extern forward-declares eliminated. Real qshared/in-crate callees
 // imported (`Q_stricmp`/`Q_strncpyz`/`Hunk_Alloc`/`com_error`). q_shared
-// parse helpers (`COM_ParseExt`/`Skip*`/`Com_sprintf`), this crate's own
+// parse helpers (`COM_Parse`/`Skip*`/`Com_sprintf`), this crate's own
 // unported `FS_*` (files.cpp subject) and `Z_Malloc`/`Z_Free` (z_memman_pc.cpp
 // subject) referenced at their canonical homes; reported.
-use std::ffi::CString;
-
 use crate::common::com_error;
 use crate::files_common::{FS_FreeFile, FS_ListFiles, FS_ReadFile};
 use crate::z_memman_pc::Hunk_Alloc;
 use crate::z_memman_pc::{Z_Free, Z_Malloc};
 use mp_qshared::shared::ha_pref;
 use mp_qshared::shared::q_string::Q_strncpyz;
-use mp_qshared::shared::q_string::{
-    COM_Parse, COM_ParseExt, SkipBracedSection, SkipRestOfLine, SkipWhitespace,
-};
+use mp_qshared::shared::q_string::{COM_Parse, SkipBracedSection, SkipRestOfLine};
 use native_string::atof;
 use native_string::q_string::Q_stricmp;
-
-/// `&str` adapter over qshared's pointer-cursor `SkipBracedSection`: runs the
-/// verbatim tokenizer over a NUL-terminated copy of the cursor and maps the
-/// consumed byte count back onto the borrow (behavior byte-identical).
-fn skip_braced_section(text: &mut &str) {
-    let _c = CString::new(*text).unwrap_or_default();
-    let start = _c.as_ptr();
-    let mut p: *const c_char = start;
-    SkipBracedSection(&mut p);
-    let consumed = if p.is_null() {
-        text.len()
-    } else {
-        ((p as usize) - (start as usize)).min(text.len())
-    };
-    *text = text.get(consumed..).unwrap_or("");
-}
-
-/// `&str` adapter over qshared's pointer-cursor `SkipRestOfLine` (see
-/// `skip_braced_section`).
-fn skip_rest_of_line(text: &mut &str) {
-    let _c = CString::new(*text).unwrap_or_default();
-    let start = _c.as_ptr();
-    let mut p: *const c_char = start;
-    SkipRestOfLine(&mut p);
-    let consumed = ((p as usize) - (start as usize)).min(text.len());
-    *text = text.get(consumed..).unwrap_or("");
-}
 
 /// Raven `SV_ParseSurfaceParm` — match the next token against `svInfoParms`,
 /// OR/AND-ing the shader's surface/content flags from the matching row.
@@ -127,26 +96,31 @@ pub fn CM_GetShaderInfo(cm: &mut CollisionWorld, shaderNum: c_int) -> *mut CCMSh
 ///
 /// Source: `oracle/codemp/qcommon/cm_shader.cpp:37-59`
 pub fn CM_CreateShaderTextHash(view: &mut EngineHostView) {
-    let mut p: *const c_char = view.cm.shaderText;
+    if view.cm.shaderText.is_null() {
+        return;
+    }
+    let base = view.cm.shaderText as usize;
+    // Borrow the raw `shaderText` buffer as `&str` so the native `COM_Parse`
+    // cursor can walk it; shader files are ASCII, so a byte offset into the
+    // view maps 1:1 onto `shaderText` (§19: non-UTF-8 shader text hashes as
+    // empty). Raven's redundant `SkipWhitespace` before `COM_ParseExt` leaves
+    // the post-token cursor identical, so it is dropped. Raven
+    // `new CCMShaderText(token, p)` → name → byte offset of the cursor past the
+    // label (§17).
+    // Source: `oracle/codemp/qcommon/cm_shader.cpp:37-59`
+    let text = unsafe { core::ffi::CStr::from_ptr(view.cm.shaderText) }
+        .to_str()
+        .unwrap_or("");
+    let mut cursor = text;
     // look for label
-    while !p.is_null() {
-        let mut hasNewLines: qboolean = qfalse;
-        p = SkipWhitespace(p, &mut hasNewLines);
-        let token = COM_ParseExt(&mut p, qtrue);
-        if unsafe { *token } == 0 {
+    loop {
+        let (token, rest) = COM_Parse(cursor, true);
+        if token.is_empty() {
             break;
         }
-        // Raven `new CCMShaderText(token, p)` captures name=token, mData=p (a
-        // pointer into `shaderText`); the idiomatic map stores name → byte
-        // offset of `p` within the `shaderText` buffer (§17).
-        // Source: `oracle/codemp/qcommon/cm_shader.cpp:16,55-56`
-        let name = unsafe { core::ffi::CStr::from_ptr(token) }
-            .to_string_lossy()
-            .into_owned();
-        let offset = (p as usize) - (view.cm.shaderText as usize);
-        view.cm.shaderTextTable.insert(name, offset);
-
-        SkipBracedSection(&mut p);
+        let offset = (rest.as_ptr() as usize) - base;
+        view.cm.shaderTextTable.insert(token, offset);
+        cursor = SkipBracedSection(rest);
     }
 }
 
@@ -423,7 +397,7 @@ pub fn CM_ParseShader(
         }
         // stage definition
         else if c0 == b'{' {
-            skip_braced_section(text);
+            *text = SkipBracedSection(*text);
             continue;
         }
         // material deprecated as of 11 Jan 01
@@ -491,7 +465,7 @@ pub fn CM_ParseShader(
             //			shader->depthForOpaque = atof( token );
 
             // skip any old gradient directions
-            skip_rest_of_line(text);
+            *text = SkipRestOfLine(*text);
             continue;
         }
     }

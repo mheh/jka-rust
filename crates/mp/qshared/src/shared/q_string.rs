@@ -8,12 +8,7 @@ use native_string::Q_stricmpBytes;
 use crate::shared::limits::MAX_TOKEN_CHARS;
 use crate::shared::q_format::{c_vsprintf, FmtArg};
 use crate::shared::string_id_table::stringID_table_t;
-use crate::shared::{qboolean, qfalse, qtrue, MAX_QPATH};
-
-// Parse-session state (mirrors Raven's file-static globals in q_shared.c);
-// module-island duplicate of the same statics in `mp_game`'s `q_shared.rs`.
-static mut COM_LINES: c_int = 0;
-static mut COM_TOKEN: [c_char; 1024] = [0; 1024]; // MAX_TOKEN_CHARS
+use crate::shared::MAX_QPATH;
 
 // va() rotating-buffer statics (2-slot rotating return buffer).
 static mut VA_STRING: [[c_char; 32000]; 2] = [[0; 32000]; 2];
@@ -253,211 +248,155 @@ pub fn COM_Compress(data_p: *mut c_char) -> c_int {
     }
 }
 
-/// Raven `SkipWhitespace`.
+/// Raven `COM_Parse` / `COM_ParseExt` — the native `&str` tokenizer.
 ///
-/// Source: `oracle/codemp/game/q_shared.c:336-351`
-pub fn SkipWhitespace(data: *const c_char, hasNewLines: *mut qboolean) -> *const c_char {
-    unsafe {
-        let mut c: c_int;
-        let mut p = data;
-
-        loop {
-            c = *p as c_int;
-            if c > b' ' as c_int {
-                break;
-            }
-            if c == 0 {
-                return std::ptr::null();
-            }
-            if c == b'\n' as c_int {
-                COM_LINES += 1;
-                *hasNewLines = qtrue;
-            }
-            p = p.offset(1);
-        }
-
-        p
-    }
-}
-
-/// Raven `COM_ParseExt`.
+/// Reshape: returns `(token, remaining)` over the borrow instead of Raven's
+/// `char **data` / `static char com_token[]` pointer channel. `allowLineBreaks`
+/// selects `COM_ParseExt(data, allowLineBreaks)`; Raven's `COM_Parse(data)` is
+/// the `qtrue` wrapper. Pure byte cursor — no `static mut`, no `CString`.
 ///
-/// Retained verbatim tokenizer core — the raw-pointer form is the floor of the
-/// `COM_Parse*` family and is not retired. Its remaining callers are all
-/// qshared-internal or the shader-text hash: the `&str` [`COM_Parse`] wrapper's
-/// own delegation (below), [`SkipBracedSection`], and qcommon's
-/// `CM_CreateShaderTextHash`. Engine consumers use the `&str` wrapper.
+/// Signed-`char` fidelity: retail win32 `char` is signed, so Raven's
+/// `SkipWhitespace` (`(c = *data) <= ' '`) and the word terminator (`c > 32`)
+/// sign-extend each byte — every byte `>= 0x80` is negative, i.e. counts as
+/// whitespace. Bytes are cast through `i8` here to reproduce that exactly: a
+/// high byte (a UTF-8 unit of a Latin-1 glyph) is whitespace-skipped and never
+/// enters an unquoted token, matching the oracle byte-for-byte. Quoted strings
+/// keep Raven's rule of storing every byte except `"`/NUL.
 ///
-/// Source: `oracle/codemp/game/q_shared.c:421-526`
-pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *mut c_char {
-    unsafe {
-        let mut c: c_int;
-        let mut len: c_int;
-        let mut hasNewLines = qfalse;
-        let mut data = *data_p;
-
-        len = 0;
-        COM_TOKEN[0] = 0;
-
-        // make sure incoming data is valid
-        if data.is_null() {
-            *data_p = std::ptr::null();
-            return (&raw mut COM_TOKEN).cast::<c_char>();
-        }
-
-        loop {
-            // skip whitespace
-            data = SkipWhitespace(data, &mut hasNewLines);
-            if data.is_null() {
-                *data_p = std::ptr::null();
-                return (&raw mut COM_TOKEN).cast::<c_char>();
-            }
-            if hasNewLines == qtrue && allowLineBreaks == qfalse {
-                *data_p = data;
-                return (&raw mut COM_TOKEN).cast::<c_char>();
-            }
-
-            c = *data as c_int;
-
-            // skip double slash comments
-            if c == b'/' as c_int && *data.offset(1) == b'/' as c_char {
-                data = data.offset(2);
-                while *data != 0 && *data != b'\n' as c_char {
-                    data = data.offset(1);
-                }
-            } else if c == b'/' as c_int && *data.offset(1) == b'*' as c_char {
-                data = data.offset(2);
-                while *data != 0 && !(*data == b'*' as c_char && *data.offset(1) == b'/' as c_char)
-                {
-                    data = data.offset(1);
-                }
-                if *data != 0 {
-                    data = data.offset(2);
-                }
-            } else {
-                break;
-            }
-        }
-
-        // handle quoted strings
-        if c == b'"' as c_int {
-            data = data.offset(1);
-            loop {
-                c = *data as c_int;
-                data = data.offset(1);
-                if c == b'"' as c_int || c == 0 {
-                    // Raven's quoted path omits the `len == MAX_TOKEN_CHARS`
-                    // reset the word path below applies, so a buffer-filling
-                    // token writes the terminator one past `com_token`. Clamp
-                    // to the last slot rather than reproduce that overrun.
-                    COM_TOKEN[len.min(MAX_TOKEN_CHARS as c_int - 1) as usize] = 0;
-                    *data_p = data as *const c_char;
-                    return (&raw mut COM_TOKEN).cast::<c_char>();
-                }
-                if len < MAX_TOKEN_CHARS as c_int {
-                    COM_TOKEN[len as usize] = c as c_char;
-                    len += 1;
-                }
-            }
-        }
-
-        // parse a regular word
-        loop {
-            if len < MAX_TOKEN_CHARS as c_int {
-                COM_TOKEN[len as usize] = c as c_char;
-                len += 1;
-            }
-            data = data.offset(1);
-            c = *data as c_int;
-            if c == b'\n' as c_int {
-                COM_LINES += 1;
-            }
-            if !(c > b' ' as c_int) {
-                break;
-            }
-        }
-
-        if len == MAX_TOKEN_CHARS as c_int {
-            len = 0;
-        }
-        COM_TOKEN[len as usize] = 0;
-
-        *data_p = data as *const c_char;
-        (&raw mut COM_TOKEN).cast::<c_char>()
-    }
-}
-
-/// Raven `COM_Parse` / `COM_ParseExt`.
-///
-/// Engine-island reshape: engine parsers walk a Rust `&str` cursor, so this
-/// returns `(token, remaining)` over the borrow rather than Raven's `char **data`
-/// / `static char com_token[]` pointer channel. `allowLineBreaks` selects
-/// `COM_ParseExt(data, allowLineBreaks)` — Raven's `COM_Parse(data)` is the
-/// `allowLineBreaks == qtrue` wrapper. The tokenizer is reused verbatim by
-/// copying the cursor into a NUL-terminated buffer and mapping the consumed byte
-/// count back onto the input slice.
-/// Source: `oracle/codemp/game/q_shared.c:295-298,421-526`
+/// Diverges (§19): Raven's `com_token[len] = 0` writes at exactly
+/// `MAX_TOKEN_CHARS` (a one-past overrun on the quoted path) are not
+/// reproduced — the token is length-bounded — while the word path's defined
+/// `if (len == MAX_TOKEN_CHARS) len = 0` whole-token discard is kept. An
+/// embedded NUL terminates parsing (Raven's C-string end), unlike the retired
+/// `CString` wrapper which emptied the whole input.
+/// Source: `oracle/codemp/game/q_shared.c:295-298,336-351,421-526`
 pub fn COM_Parse(data: &str, allowLineBreaks: bool) -> (String, &str) {
-    let c = std::ffi::CString::new(data).unwrap_or_default();
-    let start = c.as_ptr();
-    let mut p: *const c_char = start;
-    let token = COM_ParseExt(&mut p, if allowLineBreaks { qtrue } else { qfalse });
-    let token_str = unsafe { std::ffi::CStr::from_ptr(token) }
-        .to_string_lossy()
-        .into_owned();
-    let rest = if p.is_null() {
-        ""
-    } else {
-        let consumed = (p as usize) - (start as usize);
-        data.get(consumed..).unwrap_or("")
-    };
-    (token_str, rest)
-}
+    let bytes = data.as_bytes();
+    let n = bytes.len();
+    let mut i = 0usize;
+    let mut has_new_lines = false;
 
-/// Raven `SkipBracedSection`.
-///
-/// Source: `oracle/codemp/game/q_shared.c:685-701`
-pub fn SkipBracedSection(program: *mut *const c_char) {
-    unsafe {
-        let mut depth: c_int = 0;
+    // COM_ParseExt's leading loop: skip whitespace (SkipWhitespace) and
+    // `//` + `/* */` comments, re-running the whitespace skip after each.
+    'skip: loop {
         loop {
-            let token = COM_ParseExt(program, qtrue);
-            if *token.offset(1) == 0 {
-                if *token == b'{' as c_char {
-                    depth += 1;
-                } else if *token == b'}' as c_char {
-                    depth -= 1;
-                }
+            if i >= n {
+                return (String::new(), "");
             }
-            if !(depth != 0 && !(*program).is_null()) {
+            let b = bytes[i];
+            if (b as i8 as i32) > b' ' as i32 {
                 break;
+            }
+            if b == 0 {
+                return (String::new(), "");
+            }
+            if b == b'\n' {
+                has_new_lines = true;
+            }
+            i += 1;
+        }
+        if has_new_lines && !allowLineBreaks {
+            return (String::new(), &data[i..]);
+        }
+        if bytes[i] == b'/' && i + 1 < n && bytes[i + 1] == b'/' {
+            i += 2;
+            while i < n && bytes[i] != b'\n' {
+                i += 1;
+            }
+        } else if bytes[i] == b'/' && i + 1 < n && bytes[i + 1] == b'*' {
+            i += 2;
+            while i < n && !(bytes[i] == b'*' && i + 1 < n && bytes[i + 1] == b'/') {
+                i += 1;
+            }
+            if i < n {
+                i += 2;
+            }
+        } else {
+            break 'skip;
+        }
+    }
+
+    let mut token: Vec<u8> = Vec::new();
+
+    // handle quoted strings
+    if bytes[i] == b'"' {
+        i += 1;
+        loop {
+            if i >= n {
+                return (String::from_utf8_lossy(&token).into_owned(), "");
+            }
+            let ch = bytes[i];
+            i += 1;
+            if ch == b'"' || ch == 0 {
+                return (String::from_utf8_lossy(&token).into_owned(), &data[i..]);
+            }
+            if token.len() < MAX_TOKEN_CHARS as usize {
+                token.push(ch);
             }
         }
     }
+
+    // parse a regular word
+    loop {
+        if token.len() < MAX_TOKEN_CHARS as usize {
+            token.push(bytes[i]);
+        }
+        i += 1;
+        if i >= n || (bytes[i] as i8 as i32) <= b' ' as i32 {
+            break;
+        }
+    }
+    if token.len() == MAX_TOKEN_CHARS as usize {
+        token.clear();
+    }
+    (String::from_utf8_lossy(&token).into_owned(), &data[i..])
 }
 
-/// Raven `SkipRestOfLine`.
+/// Raven `SkipBracedSection` — native `&str` form: consume a balanced
+/// `{ ... }` block, returning the cursor past it.
+///
+/// Reshape: threads the `&str` cursor and returns the remainder instead of
+/// Raven's `char **program`. Raven's `*program != NULL` guard (loop-exhaustion
+/// safety for unbalanced input) maps to "the cursor has no further content";
+/// a `""` empty-token iteration changes neither `depth` nor the final position,
+/// so an empty remainder is a faithful stand-in.
+/// Source: `oracle/codemp/game/q_shared.c:685-701`
+pub fn SkipBracedSection(program: &str) -> &str {
+    let mut depth: c_int = 0;
+    let mut cursor = program;
+    loop {
+        let (token, rest) = COM_Parse(cursor, true);
+        cursor = rest;
+        if token.len() == 1 {
+            match token.as_bytes()[0] {
+                b'{' => depth += 1,
+                b'}' => depth -= 1,
+                _ => {}
+            }
+        }
+        if depth == 0 || cursor.is_empty() {
+            break;
+        }
+    }
+    cursor
+}
+
+/// Raven `SkipRestOfLine` — native `&str` form: consume through the next
+/// newline (inclusive), or to end of input / an embedded NUL.
 ///
 /// Source: `oracle/codemp/game/q_shared.c:708-721`
-pub fn SkipRestOfLine(data: *mut *const c_char) {
-    unsafe {
-        let mut p = *data;
-        let mut c: c_int;
-
-        loop {
-            c = *p as c_int;
-            p = p.offset(1);
-            if c == 0 {
-                break;
-            }
-            if c == b'\n' as c_int {
-                COM_LINES += 1;
-                break;
-            }
+pub fn SkipRestOfLine(data: &str) -> &str {
+    let bytes = data.as_bytes();
+    let n = bytes.len();
+    let mut i = 0usize;
+    while i < n {
+        let c = bytes[i];
+        i += 1;
+        if c == b'\n' || c == 0 {
+            break;
         }
-
-        *data = p;
     }
+    &data[i..]
 }
 
 /// Raven `COM_StripExtension`.
