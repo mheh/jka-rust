@@ -32,6 +32,8 @@ use crate::Server;
 use native_string::atoi::atoi;
 use native_string::cstr::{buf_to_string, cstr, strncpyz_string};
 use native_string::{Info_SetValueForKey, Info_ValueForKey};
+use native_string::string_to_latin1;
+use native_string::Q_strncpyzBytes;
 use native_string::q_string::{Q_strcmpBytes, Q_stricmp};
 
 use mp_engine_qcommon::msg::{MSG_ReadString, MSG_WriteBigString, MSG_WriteString};
@@ -1510,11 +1512,14 @@ pub fn SV_ClientCommand(
         SV_ExecuteClientCommand(view, sv, cl, &s, client_ok);
 
         (*cl).lastClientCommand = seq;
-        Com_sprintf(
-            (*cl).lastClientCommandString.as_mut_ptr(),
-            (*cl).lastClientCommandString.len() as c_int,
-            &s,
-        );
+        // Raven `Com_sprintf(lastClientCommandString, sizeof, "%s", s)` — a plain
+        // bounded copy. This buffer feeds SV_Netchan_Encode's XOR key and must
+        // hold the RAW WIRE BYTES of the command (the client keys off its own
+        // mirror copy): Latin-1-encode, never UTF-8, and never treat `s` as a
+        // format string (a '%' in a client command would be format-interpreted
+        // and desync the key stream — "Illegible server message" client-side).
+        let n = (*cl).lastClientCommandString.len();
+        Q_strncpyzBytes(&mut (*cl).lastClientCommandString, &string_to_latin1(&s), n);
 
         qtrue // continue procesing
     }

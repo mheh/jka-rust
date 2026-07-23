@@ -1,0 +1,2 @@
+chat bloc=162 bytes=21
+8f399eec4d84e5bab08d65bec3676f1c78f4f38800
