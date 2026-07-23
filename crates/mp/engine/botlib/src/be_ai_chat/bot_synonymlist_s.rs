@@ -2,35 +2,18 @@
 
 use core::ffi::c_ulong;
 
-use super::bot_synonym_s::bot_synonym_t;
+use super::bot_synonym_s::BotSynonym;
 
 /// Raven `bot_synonymlist_t` — a list with synonyms, keyed by context bitmask.
 ///
+/// Redesigned (porting-rules §F17): Raven's malloc'd `firstsynonym`/`next`
+/// pointer chain becomes an owned `Vec<BotSynonym>` (file order preserved) and
+/// the list itself lives in `BotLib.synonyms` as one element of a `Vec`.
+///
 /// Type definition source: `oracle/codemp/botlib/be_ai_chat.cpp:100-106`
-#[repr(C)]
-pub struct bot_synonymlist_t {
+#[derive(Default)]
+pub struct BotSynonymList {
     pub context: c_ulong,
     pub totalweight: f32,
-    pub firstsynonym: *mut bot_synonym_t,
-    pub next: *mut bot_synonymlist_t,
+    pub synonyms: Vec<BotSynonym>,
 }
-
-pub type bot_synonymlist_s = bot_synonymlist_t;
-
-#[cfg(target_pointer_width = "64")]
-const _: () = {
-    assert!(core::mem::size_of::<bot_synonymlist_t>() == 32);
-    assert!(core::mem::offset_of!(bot_synonymlist_t, context) == 0);
-    assert!(core::mem::offset_of!(bot_synonymlist_t, totalweight) == 8);
-    assert!(core::mem::offset_of!(bot_synonymlist_t, firstsynonym) == 16);
-    assert!(core::mem::offset_of!(bot_synonymlist_t, next) == 24);
-};
-// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
-#[cfg(target_pointer_width = "32")]
-const _: () = {
-    assert!(core::mem::size_of::<bot_synonymlist_t>() == 16);
-    assert!(core::mem::offset_of!(bot_synonymlist_t, context) == 0);
-    assert!(core::mem::offset_of!(bot_synonymlist_t, totalweight) == 4);
-    assert!(core::mem::offset_of!(bot_synonymlist_t, firstsynonym) == 8);
-    assert!(core::mem::offset_of!(bot_synonymlist_t, next) == 12);
-};

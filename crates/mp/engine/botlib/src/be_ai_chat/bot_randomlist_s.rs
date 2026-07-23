@@ -1,36 +1,19 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use core::ffi::c_char;
-
-use super::bot_randomstring_s::bot_randomstring_t;
-
-/// Raven `bot_randomlist_t` — a list with random strings.
+/// Raven `bot_randomlist_t` — a named list of random strings.
+///
+/// Redesigned (porting-rules §F17): Raven's `bot_randomstring_t
+/// *firstrandomstring` chain (each node a malloc'd `char *`) collapses to an
+/// owned `Vec<String>`, and the `next` sibling pointer becomes
+/// `BotLib.randomstrings`'s `Vec`. Raven builds `firstrandomstring` by
+/// *prepending*, so `strings` is stored in that reversed order (the loader
+/// inserts at the front) to keep `RandomString`'s index → string mapping
+/// byte-identical; `numstrings` is `strings.len()`.
 ///
 /// Type definition source: `oracle/codemp/botlib/be_ai_chat.cpp:84-90`
-#[repr(C)]
-pub struct bot_randomlist_t {
-    pub string: *mut c_char,
-    pub numstrings: i32,
-    pub firstrandomstring: *mut bot_randomstring_t,
-    pub next: *mut bot_randomlist_t,
+/// (`bot_randomstring_t` folded in from `:78-82`).
+#[derive(Default)]
+pub struct BotRandomList {
+    pub string: String,
+    pub strings: Vec<String>,
 }
-
-pub type bot_randomlist_s = bot_randomlist_t;
-
-#[cfg(target_pointer_width = "64")]
-const _: () = {
-    assert!(core::mem::size_of::<bot_randomlist_t>() == 32);
-    assert!(core::mem::offset_of!(bot_randomlist_t, string) == 0);
-    assert!(core::mem::offset_of!(bot_randomlist_t, numstrings) == 8);
-    assert!(core::mem::offset_of!(bot_randomlist_t, firstrandomstring) == 16);
-    assert!(core::mem::offset_of!(bot_randomlist_t, next) == 24);
-};
-// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
-#[cfg(target_pointer_width = "32")]
-const _: () = {
-    assert!(core::mem::size_of::<bot_randomlist_t>() == 16);
-    assert!(core::mem::offset_of!(bot_randomlist_t, string) == 0);
-    assert!(core::mem::offset_of!(bot_randomlist_t, numstrings) == 4);
-    assert!(core::mem::offset_of!(bot_randomlist_t, firstrandomstring) == 8);
-    assert!(core::mem::offset_of!(bot_randomlist_t, next) == 12);
-};

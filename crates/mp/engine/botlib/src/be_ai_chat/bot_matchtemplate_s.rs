@@ -2,38 +2,20 @@
 
 use core::ffi::c_ulong;
 
-use super::bot_matchpiece_s::bot_matchpiece_t;
+use super::bot_matchpiece_s::BotMatchPiece;
 
 /// Raven `bot_matchtemplate_t` — a match template keyed by context bitmask.
 ///
+/// Redesigned (porting-rules §F17): Raven's `first` piece chain becomes an
+/// owned `Vec<BotMatchPiece>` and the `next` sibling pointer becomes
+/// `BotLib.matchtemplates`'s `Vec` (file order preserved).
+///
 /// Type definition source: `oracle/codemp/botlib/be_ai_chat.cpp:124-131`
-#[repr(C)]
-pub struct bot_matchtemplate_t {
+#[derive(Default)]
+pub struct BotMatchTemplate {
     pub context: c_ulong,
-    pub r#type: i32,
+    /// Raven `type` — the match result type.
+    pub type_: i32,
     pub subtype: i32,
-    pub first: *mut bot_matchpiece_t,
-    pub next: *mut bot_matchtemplate_t,
+    pub first: Vec<BotMatchPiece>,
 }
-
-pub type bot_matchtemplate_s = bot_matchtemplate_t;
-
-#[cfg(target_pointer_width = "64")]
-const _: () = {
-    assert!(core::mem::size_of::<bot_matchtemplate_t>() == 32);
-    assert!(core::mem::offset_of!(bot_matchtemplate_t, context) == 0);
-    assert!(core::mem::offset_of!(bot_matchtemplate_t, r#type) == 8);
-    assert!(core::mem::offset_of!(bot_matchtemplate_t, subtype) == 12);
-    assert!(core::mem::offset_of!(bot_matchtemplate_t, first) == 16);
-    assert!(core::mem::offset_of!(bot_matchtemplate_t, next) == 24);
-};
-// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
-#[cfg(target_pointer_width = "32")]
-const _: () = {
-    assert!(core::mem::size_of::<bot_matchtemplate_t>() == 20);
-    assert!(core::mem::offset_of!(bot_matchtemplate_t, context) == 0);
-    assert!(core::mem::offset_of!(bot_matchtemplate_t, r#type) == 4);
-    assert!(core::mem::offset_of!(bot_matchtemplate_t, subtype) == 8);
-    assert!(core::mem::offset_of!(bot_matchtemplate_t, first) == 12);
-    assert!(core::mem::offset_of!(bot_matchtemplate_t, next) == 16);
-};

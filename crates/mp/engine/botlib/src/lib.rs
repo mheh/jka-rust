@@ -75,12 +75,13 @@ use crate::be_aas_def::aas_settings_s::aas_settings_t;
 use crate::be_aas_reach::aas_lreachability_s::aas_lreachability_t;
 use crate::be_aas_routealt::midrangearea_t;
 use crate::be_ai_char::bot_character_s::BotCharacter;
-use crate::be_ai_chat::bot_chatstate_s::bot_chatstate_t;
-use crate::be_ai_chat::bot_ichatdata_s::bot_ichatdata_t;
-use crate::be_ai_chat::bot_matchtemplate_s::bot_matchtemplate_t;
-use crate::be_ai_chat::bot_randomlist_s::bot_randomlist_t;
-use crate::be_ai_chat::bot_replychat_s::bot_replychat_t;
-use crate::be_ai_chat::bot_synonymlist_s::bot_synonymlist_t;
+use crate::be_ai_chat::bot_chat_s::{BotChat, BotChatHandle};
+use crate::be_ai_chat::bot_chatstate_s::BotChatState;
+use crate::be_ai_chat::bot_ichatdata_s::BotIChatData;
+use crate::be_ai_chat::bot_matchtemplate_s::BotMatchTemplate;
+use crate::be_ai_chat::bot_randomlist_s::BotRandomList;
+use crate::be_ai_chat::bot_replychat_s::BotReplyChat;
+use crate::be_ai_chat::bot_synonymlist_s::BotSynonymList;
 use crate::be_ai_goal::bot_goalstate_s::bot_goalstate_t;
 use crate::be_ai_goal::itemconfig_s::itemconfig_t;
 use crate::be_ai_goal::levelitem_s::levelitem_t;
@@ -205,9 +206,19 @@ pub struct BotLib {
     /// Raven `int bot_developer` — true if developer mode is on.
     /// Source: `oracle/codemp/botlib/be_interface.cpp` (`extern` be_interface.h:36)
     pub bot_developer: c_int,
-    /// Raven `bot_chatstate_t *botchatstates[MAX_CLIENTS+1]`.
+    /// Raven `bot_chatstate_t *botchatstates[MAX_CLIENTS+1]`. Redesigned (§F17)
+    /// to an owned slab: `Some` = an allocated chat state, `None` = Raven's null
+    /// slot. `BotAllocChatState`/`BotFreeChatState` set/clear a slot. Seated
+    /// (`MAX_CLIENTS + 1` `None`s) in `Default`, since a zeroed `Vec` is invalid.
     /// Source: `oracle/codemp/botlib/be_ai_chat.cpp:183`
-    pub botchatstates: [*mut bot_chatstate_t; MAX_CLIENTS + 1],
+    pub botchatstates: Vec<Option<BotChatState>>,
+    /// Redesigned (§F17) owner of the `bot_chat_t`s Raven malloc'd behind
+    /// `bot_chat_t *`. Both `BotChatState.chat` and `BotIChatData.chat` hold a
+    /// `BotChatHandle` into this append-with-hole-reuse arena (they alias the
+    /// same slot in the cached path); a `None` slot is free. Seated (`Vec::new`)
+    /// in `Default`.
+    /// Source: `oracle/codemp/botlib/be_ai_chat.cpp:72` (`bot_chat_t`)
+    pub botchats: Vec<Option<BotChat>>,
     /// Raven `bot_goalstate_t *botgoalstates[MAX_CLIENTS + 1]`.
     /// Source: `oracle/codemp/botlib/be_ai_goal.cpp:163`
     pub botgoalstates: [*mut bot_goalstate_t; MAX_CLIENTS + 1],
@@ -255,9 +266,11 @@ pub struct BotLib {
     /// Raven `int g_gametype`.
     /// Source: `oracle/codemp/botlib/be_ai_goal.cpp:176`
     pub g_gametype: c_int,
-    /// Raven `bot_ichatdata_t *ichatdata[MAX_CLIENTS]`.
+    /// Raven `bot_ichatdata_t *ichatdata[MAX_CLIENTS]`. Redesigned (§F17) to an
+    /// owned slab (`Some` = a cached chat-file entry, `None` = Raven's null
+    /// slot). Seated (`MAX_CLIENTS` `None`s) in `Default`.
     /// Source: `oracle/codemp/botlib/be_ai_chat.cpp:181`
-    pub ichatdata: [*mut bot_ichatdata_t; MAX_CLIENTS],
+    pub ichatdata: Vec<Option<BotIChatData>>,
     /// Raven `itemconfig_t *itemconfig`.
     /// Source: `oracle/codemp/botlib/be_ai_goal.cpp:165`
     pub itemconfig: *mut itemconfig_t,
@@ -271,9 +284,10 @@ pub struct BotLib {
     /// Raven `levelitem_t *levelitems`.
     /// Source: `oracle/codemp/botlib/be_ai_goal.cpp:169`
     pub levelitems: *mut levelitem_t,
-    /// Raven `bot_matchtemplate_t *matchtemplates`.
+    /// Raven `bot_matchtemplate_t *matchtemplates`. Redesigned (§F17) to an
+    /// owned `Vec` (file order); empty = Raven's null list. Seated in `Default`.
     /// Source: `oracle/codemp/botlib/be_ai_chat.cpp:188`
-    pub matchtemplates: *mut bot_matchtemplate_t,
+    pub matchtemplates: Vec<BotMatchTemplate>,
     /// Raven `int modeltypes[MAX_MODELS]`.
     /// Source: `oracle/codemp/botlib/be_ai_move.cpp:100`
     pub modeltypes: [c_int; MAX_MODELS as usize],
@@ -289,12 +303,15 @@ pub struct BotLib {
     /// Raven `libvar_t *offhandgrapple`.
     /// Source: `oracle/codemp/botlib/be_ai_move.cpp:96`
     pub offhandgrapple: LibVarHandle,
-    /// Raven `bot_randomlist_t *randomstrings`.
+    /// Raven `bot_randomlist_t *randomstrings`. Redesigned (§F17) to an owned
+    /// `Vec` (file order); empty = Raven's null list. Seated in `Default`.
     /// Source: `oracle/codemp/botlib/be_ai_chat.cpp:192`
-    pub randomstrings: *mut bot_randomlist_t,
-    /// Raven `bot_replychat_t *replychats`.
+    pub randomstrings: Vec<BotRandomList>,
+    /// Raven `bot_replychat_t *replychats`. Redesigned (§F17) to an owned `Vec`
+    /// in Raven's prepended (reverse-file) order; empty = Raven's null list.
+    /// Seated in `Default`.
     /// Source: `oracle/codemp/botlib/be_ai_chat.cpp:194`
-    pub replychats: *mut bot_replychat_t,
+    pub replychats: Vec<BotReplyChat>,
     /// Raven `libvar_t *saveroutingcache`.
     /// Source: `oracle/codemp/botlib/be_aas_main.cpp:32`
     pub saveroutingcache: LibVarHandle,
@@ -307,9 +324,10 @@ pub struct BotLib {
     /// Raven `libvar_t *sv_maxstep`.
     /// Source: `oracle/codemp/botlib/be_ai_move.cpp:89`
     pub sv_maxstep: LibVarHandle,
-    /// Raven `bot_synonymlist_t *synonyms`.
+    /// Raven `bot_synonymlist_t *synonyms`. Redesigned (§F17) to an owned `Vec`
+    /// (file order); empty = Raven's null list. Seated in `Default`.
     /// Source: `oracle/codemp/botlib/be_ai_chat.cpp:190`
-    pub synonyms: *mut bot_synonymlist_t,
+    pub synonyms: Vec<BotSynonymList>,
     /// Raven `libvar_t *weapindex_bfg10k`.
     /// Source: `oracle/codemp/botlib/be_ai_move.cpp:93`
     pub weapindex_bfg10k: LibVarHandle,
@@ -501,7 +519,9 @@ impl Default for BotLib {
     /// (null pointers, `0`, `None` fn-ptrs), matching Raven's zero-initialized
     /// file-scope globals. The exceptions are the owned-collection and reference
     /// fields whose all-zero bit pattern is *invalid* — `libvars`,
-    /// `globaldefines`, `sourceFiles`, `botcharacters`, `weightconfigs` (a
+    /// `globaldefines`, `sourceFiles`, `botcharacters`, `weightconfigs`, the
+    /// chat-AI collections (`botchatstates`, `botchats`, `ichatdata`,
+    /// `matchtemplates`, `randomstrings`, `replychats`, `synonyms`) (a
     /// `Vec`'s `NonNull` buffer pointer cannot be null) and `default_punctuations` (a `&'static`
     /// reference cannot be null); each is written explicitly before
     /// `assume_init`. Fields whose
@@ -531,6 +551,19 @@ impl Default for BotLib {
                 (0..=MAX_CLIENTS).map(|_| None).collect(),
             );
             core::ptr::write(core::ptr::addr_of_mut!((*ptr).weightconfigs), Vec::new());
+            core::ptr::write(
+                core::ptr::addr_of_mut!((*ptr).botchatstates),
+                (0..=MAX_CLIENTS).map(|_| None).collect(),
+            );
+            core::ptr::write(core::ptr::addr_of_mut!((*ptr).botchats), Vec::new());
+            core::ptr::write(
+                core::ptr::addr_of_mut!((*ptr).ichatdata),
+                (0..MAX_CLIENTS).map(|_| None).collect(),
+            );
+            core::ptr::write(core::ptr::addr_of_mut!((*ptr).matchtemplates), Vec::new());
+            core::ptr::write(core::ptr::addr_of_mut!((*ptr).randomstrings), Vec::new());
+            core::ptr::write(core::ptr::addr_of_mut!((*ptr).replychats), Vec::new());
+            core::ptr::write(core::ptr::addr_of_mut!((*ptr).synonyms), Vec::new());
             core::ptr::write(
                 core::ptr::addr_of_mut!((*ptr).default_punctuations),
                 DEFAULT_PUNCTUATIONS,
@@ -576,6 +609,34 @@ impl BotLib {
         }
         self.weightconfigs.push(Some(cfg));
         WeightConfigHandle(self.weightconfigs.len() - 1)
+    }
+
+    /// Resolve a `BotChatHandle` — the arena equivalent of dereferencing Raven's
+    /// `bot_chat_t *`. Panics on a freed (`None`) slot, which is Raven's
+    /// null-deref UB; callers null-check the handle (`is_none`) first.
+    #[inline]
+    pub fn botchat(&self, handle: BotChatHandle) -> &BotChat {
+        self.botchats[handle.0].as_ref().unwrap()
+    }
+
+    /// `&mut` twin of `botchat`.
+    #[inline]
+    pub fn botchat_mut(&mut self, handle: BotChatHandle) -> &mut BotChat {
+        self.botchats[handle.0].as_mut().unwrap()
+    }
+
+    /// Move `chat` into the chat arena, reusing a freed (`None`) slot when one
+    /// exists (mirroring Raven's heap reuse) and appending otherwise; returns
+    /// the slot's handle.
+    pub fn alloc_botchat(&mut self, chat: BotChat) -> BotChatHandle {
+        for (i, slot) in self.botchats.iter_mut().enumerate() {
+            if slot.is_none() {
+                *slot = Some(chat);
+                return BotChatHandle(i);
+            }
+        }
+        self.botchats.push(Some(chat));
+        BotChatHandle(self.botchats.len() - 1)
     }
 }
 

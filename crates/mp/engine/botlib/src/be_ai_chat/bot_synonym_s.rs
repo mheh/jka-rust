@@ -1,31 +1,14 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use core::ffi::c_char;
-
-/// Raven `bot_synonym_t` — a synonym list node.
+/// Raven `bot_synonym_t` — one synonym (string + weight) in a synonym list.
+///
+/// Redesigned (porting-rules §F17) from Raven's malloc'd `char *string` +
+/// `next` pointer into an owned value: the `String` owns its text and the
+/// sibling chain becomes the parent `BotSynonymList`'s `Vec<BotSynonym>`.
 ///
 /// Type definition source: `oracle/codemp/botlib/be_ai_chat.cpp:93-98`
-#[repr(C)]
-pub struct bot_synonym_t {
-    pub string: *mut c_char,
+#[derive(Default, Clone)]
+pub struct BotSynonym {
+    pub string: String,
     pub weight: f32,
-    pub next: *mut bot_synonym_t,
 }
-
-pub type bot_synonym_s = bot_synonym_t;
-
-#[cfg(target_pointer_width = "64")]
-const _: () = {
-    assert!(core::mem::size_of::<bot_synonym_t>() == 24);
-    assert!(core::mem::offset_of!(bot_synonym_t, string) == 0);
-    assert!(core::mem::offset_of!(bot_synonym_t, weight) == 8);
-    assert!(core::mem::offset_of!(bot_synonym_t, next) == 16);
-};
-// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
-#[cfg(target_pointer_width = "32")]
-const _: () = {
-    assert!(core::mem::size_of::<bot_synonym_t>() == 12);
-    assert!(core::mem::offset_of!(bot_synonym_t, string) == 0);
-    assert!(core::mem::offset_of!(bot_synonym_t, weight) == 4);
-    assert!(core::mem::offset_of!(bot_synonym_t, next) == 8);
-};
