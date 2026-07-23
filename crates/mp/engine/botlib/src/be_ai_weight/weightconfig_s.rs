@@ -1,10 +1,6 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use core::ffi::c_char;
-
-use mp_qshared::shared::MAX_QPATH;
-
-use super::weight_s::weight_t;
+use super::weight_s::Weight;
 
 /// Raven `WT_BALANCE` — fuzzy weight balance flag.
 ///
@@ -26,28 +22,23 @@ pub const MAX_WEIGHT_FILES: usize = 128;
 
 /// Raven `weightconfig_t` — a set of named fuzzy weights loaded from a file.
 ///
+/// Redesigned (porting-rules §F17): Raven's `numweights` + fixed
+/// `weight_t weights[MAX_WEIGHTS]` + `char filename[MAX_QPATH]` become an owned
+/// `Vec<Weight>` (length is the old `numweights`; `MAX_WEIGHTS` is still
+/// enforced as the load cap) and a `String`. Instances live in the `BotLib`
+/// weight-config arena, reached by `WeightConfigHandle`.
+///
 /// Type definition source: `oracle/codemp/botlib/be_ai_weight.h:39-44`
-#[repr(C)]
-pub struct weightconfig_t {
-    pub numweights: i32,
-    pub weights: [weight_t; MAX_WEIGHTS],
-    pub filename: [c_char; MAX_QPATH as usize],
+#[derive(Default)]
+pub struct WeightConfig {
+    pub filename: String,
+    pub weights: Vec<Weight>,
 }
 
-pub type weightconfig_s = weightconfig_t;
-
-#[cfg(target_pointer_width = "64")]
-const _: () = {
-    assert!(core::mem::size_of::<weightconfig_t>() == 2120);
-    assert!(core::mem::offset_of!(weightconfig_t, numweights) == 0);
-    assert!(core::mem::offset_of!(weightconfig_t, weights) == 8);
-    assert!(core::mem::offset_of!(weightconfig_t, filename) == 2056);
-};
-// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
-#[cfg(target_pointer_width = "32")]
-const _: () = {
-    assert!(core::mem::size_of::<weightconfig_t>() == 1092);
-    assert!(core::mem::offset_of!(weightconfig_t, numweights) == 0);
-    assert!(core::mem::offset_of!(weightconfig_t, weights) == 4);
-    assert!(core::mem::offset_of!(weightconfig_t, filename) == 1028);
-};
+/// Arena handle for a `WeightConfig` owned by `BotLib.weightconfigs` (§B5).
+///
+/// Replaces Raven's `weightconfig_t *` (held by `bot_goalstate_t`,
+/// `bot_weaponstate_t`, and the `weightFileList` cache). A `None` slot in the
+/// arena is Raven's null config; the handle is the slot index.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct WeightConfigHandle(pub usize);

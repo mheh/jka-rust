@@ -1,30 +1,16 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use core::ffi::c_char;
+use super::fuzzyseperator_s::FuzzySeperator;
 
-use super::fuzzyseperator_s::fuzzyseperator_t;
-
-/// Raven `weight_t` — named fuzzy weight (root of a separator tree).
+/// Raven `weight_t` — a named fuzzy weight rooting a separator tree.
+///
+/// Redesigned (porting-rules §F17): Raven's malloc'd `char *name` +
+/// `fuzzyseperator_t *firstseperator` become an owned `String` and an owned
+/// `Option<Box<FuzzySeperator>>` tree root.
 ///
 /// Type definition source: `oracle/codemp/botlib/be_ai_weight.h:32-36`
-#[repr(C)]
-pub struct weight_t {
-    pub name: *mut c_char,
-    pub firstseperator: *mut fuzzyseperator_t,
+#[derive(Default)]
+pub struct Weight {
+    pub name: String,
+    pub firstseperator: Option<Box<FuzzySeperator>>,
 }
-
-pub type weight_s = weight_t;
-
-#[cfg(target_pointer_width = "64")]
-const _: () = {
-    assert!(core::mem::size_of::<weight_t>() == 16);
-    assert!(core::mem::offset_of!(weight_t, name) == 0);
-    assert!(core::mem::offset_of!(weight_t, firstseperator) == 8);
-};
-// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
-#[cfg(target_pointer_width = "32")]
-const _: () = {
-    assert!(core::mem::size_of::<weight_t>() == 8);
-    assert!(core::mem::offset_of!(weight_t, name) == 0);
-    assert!(core::mem::offset_of!(weight_t, firstseperator) == 4);
-};

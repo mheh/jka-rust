@@ -41,7 +41,7 @@ use crate::be_ai_goal::bot_goalstate_s::{bot_goalstate_t, MAX_AVOIDGOALS, MAX_GO
 use crate::be_ai_goal::itemconfig_s::itemconfig_t;
 use crate::be_ai_goal::iteminfo_s::iteminfo_t;
 use crate::be_ai_goal::levelitem_s::levelitem_t;
-use crate::be_ai_weight::weightconfig_s::weightconfig_t;
+use crate::be_ai_weight::weightconfig_s::WeightConfigHandle;
 use crate::l_script::consts::TT_STRING;
 use crate::l_script::token_s::Token;
 use crate::l_struct::structdef_s::structdef_t;
@@ -591,12 +591,30 @@ pub fn BotInterbreedGoalFuzzyLogic(bot: &mut BotLib, parent1: c_int, parent2: c_
     let c = BotGoalStateFromHandle(bot, child);
 
     unsafe {
-        InterbreedWeightConfigs(
-            bot,
-            (*p1).itemweightconfig,
-            (*p2).itemweightconfig,
-            (*c).itemweightconfig,
-        );
+        let h1 = (*p1).itemweightconfig;
+        let h2 = (*p2).itemweightconfig;
+        let hc = (*c).itemweightconfig;
+        // Raven interbreeds the three arena-owned configs in place. To honor the
+        // single-owner arena + `&mut BotLib` (Print) borrow, take the three
+        // slots out, interbreed the owned locals, and put them back. Requires
+        // three mutually-distinct handles (the normal case: three different
+        // bots); an aliased call (e.g. parent==child) is a no-op — Raven's dormant
+        // genetic path would read partially-written data there.
+        if let (Some(h1), Some(h2), Some(hc)) = (h1, h2, hc) {
+            if h1 != h2 && h1 != hc && h2 != hc {
+                let cfg1 = bot.weightconfigs[h1.0].take();
+                let cfg2 = bot.weightconfigs[h2.0].take();
+                let mut cfgout = bot.weightconfigs[hc.0].take();
+                if let (Some(c1), Some(c2), Some(cout)) =
+                    (cfg1.as_ref(), cfg2.as_ref(), cfgout.as_mut())
+                {
+                    InterbreedWeightConfigs(bot, c1, c2, cout);
+                }
+                bot.weightconfigs[h1.0] = cfg1;
+                bot.weightconfigs[h2.0] = cfg2;
+                bot.weightconfigs[hc.0] = cfgout;
+            }
+        }
     }
 }
 
@@ -612,7 +630,9 @@ pub fn BotMutateGoalFuzzyLogic(
     let gs = BotGoalStateFromHandle(bot, goalstate);
 
     unsafe {
-        EvolveWeightConfig(common, (*gs).itemweightconfig);
+        if let Some(h) = (*gs).itemweightconfig {
+            EvolveWeightConfig(common, bot.weightconfig_mut(h));
+        }
     }
 }
 
@@ -621,7 +641,7 @@ pub fn BotMutateGoalFuzzyLogic(
 /// Source: `oracle/codemp/botlib/be_ai_goal.cpp:332-348`
 pub fn ItemWeightIndex(
     bot: &mut BotLib,
-    iwc: *mut weightconfig_t,
+    iwc: WeightConfigHandle,
     ic: *mut itemconfig_t,
 ) -> *mut c_int {
     unsafe {
@@ -634,7 +654,8 @@ pub fn ItemWeightIndex(
 
         for i in 0..numiteminfo {
             let classname = (*(*ic).iteminfo.add(i as usize)).classname.as_ptr() as *mut c_char;
-            let w = FindFuzzyWeight(iwc, classname);
+            let classname_str = std::ffi::CStr::from_ptr(classname).to_string_lossy();
+            let w = FindFuzzyWeight(bot.weightconfig(iwc), &classname_str);
             *index.add(i as usize) = w;
             if w < 0 {
                 let __m = std::ffi::CString::new(format!(
@@ -997,7 +1018,7 @@ pub fn BotFreeItemWeights(bot: &mut BotLib, goalstate: c_int) {
         return;
     }
     unsafe {
-        if !(*gs).itemweightconfig.is_null() {
+        if (*gs).itemweightconfig.is_some() {
             FreeWeightConfig(bot, (*gs).itemweightconfig);
         }
         if !(*gs).itemweightindex.is_null() {
@@ -1499,9 +1520,10 @@ pub fn BotChooseLTGItem(
         return qfalse;
     }
     unsafe {
-        if (*gs).itemweightconfig.is_null() {
+        if (*gs).itemweightconfig.is_none() {
             return qfalse;
         }
+        let iwc_handle = (*gs).itemweightconfig.unwrap();
         //get the area the bot is in
         let mut areanum = BotReachabilityArea(bot, origin, (*gs).client);
         //if the bot is in solid or if the area the bot is in has no reachability links
@@ -1545,8 +1567,12 @@ pub fn BotChooseLTGItem(
                 let iteminfo = (*ic).iteminfo.add(iteminfo_idx);
                 let weightnum = *(*gs).itemweightindex.add((*iteminfo).number as usize);
                 if weightnum >= 0 {
-                    let mut weight =
-                        FuzzyWeightUndecided(common, inventory, (*gs).itemweightconfig, weightnum);
+                    let mut weight = FuzzyWeightUndecided(
+                        common,
+                        inventory,
+                        bot.weightconfig(iwc_handle),
+                        weightnum,
+                    );
                     //HACK: to make dropped items more attractive
                     if (*li).timeout != 0.0 {
                         weight += bot.libvar(bot.droppedweight).value;
@@ -1643,9 +1669,10 @@ pub fn BotChooseNBGItem(
         return qfalse;
     }
     unsafe {
-        if (*gs).itemweightconfig.is_null() {
+        if (*gs).itemweightconfig.is_none() {
             return qfalse;
         }
+        let iwc_handle = (*gs).itemweightconfig.unwrap();
         //get the area the bot is in
         let mut areanum = BotReachabilityArea(bot, origin, (*gs).client);
         //if the bot is in solid or if the area the bot is in has no reachability links
@@ -1693,8 +1720,12 @@ pub fn BotChooseNBGItem(
                 let iteminfo = (*ic).iteminfo.add(iteminfo_idx);
                 let weightnum = *(*gs).itemweightindex.add((*iteminfo).number as usize);
                 if weightnum >= 0 {
-                    let mut weight =
-                        FuzzyWeightUndecided(common, inventory, (*gs).itemweightconfig, weightnum);
+                    let mut weight = FuzzyWeightUndecided(
+                        common,
+                        inventory,
+                        bot.weightconfig(iwc_handle),
+                        weightnum,
+                    );
                     //HACK: to make dropped items more attractive
                     if (*li).timeout != 0.0 {
                         weight += bot.libvar(bot.droppedweight).value;
@@ -1905,8 +1936,9 @@ pub fn BotLoadItemWeights(bot: &mut BotLib, goalstate: c_int, filename: *mut c_c
     }
     unsafe {
         //load the weight configuration
-        (*gs).itemweightconfig = ReadWeightConfig(bot, filename);
-        if (*gs).itemweightconfig.is_null() {
+        let filename_str = std::ffi::CStr::from_ptr(filename).to_string_lossy().into_owned();
+        (*gs).itemweightconfig = ReadWeightConfig(bot, &filename_str);
+        if (*gs).itemweightconfig.is_none() {
             bot.botimport.Print.unwrap()(
                 PRT_FATAL,
                 c"couldn't load weights\n".as_ptr() as *mut c_char,
@@ -1918,7 +1950,8 @@ pub fn BotLoadItemWeights(bot: &mut BotLib, goalstate: c_int, filename: *mut c_c
             return BLERR_CANNOTLOADITEMWEIGHTS;
         }
         //create the item weight index
-        (*gs).itemweightindex = ItemWeightIndex(bot, (*gs).itemweightconfig, bot.itemconfig);
+        (*gs).itemweightindex =
+            ItemWeightIndex(bot, (*gs).itemweightconfig.unwrap(), bot.itemconfig);
     }
     //everything went ok
     BLERR_NOERROR

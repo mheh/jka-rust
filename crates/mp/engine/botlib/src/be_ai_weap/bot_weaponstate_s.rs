@@ -1,30 +1,20 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use crate::be_ai_weight::weightconfig_s::weightconfig_t;
+use crate::be_ai_weight::weightconfig_s::WeightConfigHandle;
 
 /// Raven `bot_weaponstate_t` — the weapon state of a single bot.
 ///
+/// `weaponweightconfig` became a `WeightConfigHandle` into the `BotLib`
+/// weight-config arena (porting-rules §F17); the struct is botlib-internal
+/// (never crosses the ABI seam), so `#[repr(C)]` and its layout asserts are
+/// dropped. It stays zero-valid (`None`/null) for `GetClearedMemory`.
+///
 /// Type definition source: `oracle/codemp/botlib/be_ai_weap.cpp:105-109`
-#[repr(C)]
 pub struct bot_weaponstate_t {
     /// weapon weight configuration
-    pub weaponweightconfig: *mut weightconfig_t,
+    pub weaponweightconfig: Option<WeightConfigHandle>,
     /// weapon weight index
     pub weaponweightindex: *mut i32,
 }
 
 pub type bot_weaponstate_s = bot_weaponstate_t;
-
-#[cfg(target_pointer_width = "64")]
-const _: () = {
-    assert!(core::mem::size_of::<bot_weaponstate_t>() == 16);
-    assert!(core::mem::offset_of!(bot_weaponstate_t, weaponweightconfig) == 0);
-    assert!(core::mem::offset_of!(bot_weaponstate_t, weaponweightindex) == 8);
-};
-// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
-#[cfg(target_pointer_width = "32")]
-const _: () = {
-    assert!(core::mem::size_of::<bot_weaponstate_t>() == 8);
-    assert!(core::mem::offset_of!(bot_weaponstate_t, weaponweightconfig) == 0);
-    assert!(core::mem::offset_of!(bot_weaponstate_t, weaponweightindex) == 4);
-};

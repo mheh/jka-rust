@@ -1,44 +1,30 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-/// Raven `fuzzyseperator_t` — fuzzy logic weight tree separator node.
+/// Raven `fuzzyseperator_t` — a node in a fuzzy-logic weight decision tree.
+///
+/// Redesigned (porting-rules §F17) from Raven's malloc'd `child`/`next` raw
+/// pointers into an owned recursive shape: each node owns its `child` subtree
+/// and its `next` sibling as `Option<Box<FuzzySeperator>>`. Raven builds the
+/// tree as a pure ownership hierarchy (a sibling chain linked by `next`, each
+/// node optionally rooting a `child` sub-switch) with no shared or back
+/// pointers, so `Box` maps it exactly; the recursive walks
+/// (`FuzzyWeight_r`/`Evolve`/`Scale`/`Interbreed`) become `&`/`&mut` tree walks
+/// and `FreeFuzzySeperators_r` dissolves into `Drop`.
 ///
 /// Type definition source: `oracle/codemp/botlib/be_ai_weight.h:19-29`
-#[repr(C)]
-pub struct fuzzyseperator_t {
+#[derive(Default)]
+pub struct FuzzySeperator {
+    /// index in the inventory the case switches on
     pub index: i32,
+    /// case value (or `MAX_INVENTORYVALUE` for `default`)
     pub value: i32,
-    pub r#type: i32,
+    /// `WT_BALANCE` for a `balance(...)` leaf, else `0` (Raven `type`)
+    pub type_: i32,
     pub weight: f32,
     pub minweight: f32,
     pub maxweight: f32,
-    pub child: *mut fuzzyseperator_t,
-    pub next: *mut fuzzyseperator_t,
+    /// sub-switch evaluated when this case matches
+    pub child: Option<Box<FuzzySeperator>>,
+    /// next sibling case in the switch
+    pub next: Option<Box<FuzzySeperator>>,
 }
-
-pub type fuzzyseperator_s = fuzzyseperator_t;
-
-#[cfg(target_pointer_width = "64")]
-const _: () = {
-    assert!(core::mem::size_of::<fuzzyseperator_t>() == 40);
-    assert!(core::mem::offset_of!(fuzzyseperator_t, index) == 0);
-    assert!(core::mem::offset_of!(fuzzyseperator_t, value) == 4);
-    assert!(core::mem::offset_of!(fuzzyseperator_t, r#type) == 8);
-    assert!(core::mem::offset_of!(fuzzyseperator_t, weight) == 12);
-    assert!(core::mem::offset_of!(fuzzyseperator_t, minweight) == 16);
-    assert!(core::mem::offset_of!(fuzzyseperator_t, maxweight) == 20);
-    assert!(core::mem::offset_of!(fuzzyseperator_t, child) == 24);
-    assert!(core::mem::offset_of!(fuzzyseperator_t, next) == 32);
-};
-// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
-#[cfg(target_pointer_width = "32")]
-const _: () = {
-    assert!(core::mem::size_of::<fuzzyseperator_t>() == 32);
-    assert!(core::mem::offset_of!(fuzzyseperator_t, index) == 0);
-    assert!(core::mem::offset_of!(fuzzyseperator_t, value) == 4);
-    assert!(core::mem::offset_of!(fuzzyseperator_t, r#type) == 8);
-    assert!(core::mem::offset_of!(fuzzyseperator_t, weight) == 12);
-    assert!(core::mem::offset_of!(fuzzyseperator_t, minweight) == 16);
-    assert!(core::mem::offset_of!(fuzzyseperator_t, maxweight) == 20);
-    assert!(core::mem::offset_of!(fuzzyseperator_t, child) == 24);
-    assert!(core::mem::offset_of!(fuzzyseperator_t, next) == 28);
-};

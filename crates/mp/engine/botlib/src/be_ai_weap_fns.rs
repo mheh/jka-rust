@@ -24,7 +24,7 @@ use mp_qshared::shared::{qfalse, qtrue};
 
 use crate::be_ai_weap::bot_weaponstate_s::bot_weaponstate_t;
 use crate::be_ai_weap::weaponconfig_s::weaponconfig_t;
-use crate::be_ai_weight::weightconfig_s::weightconfig_t;
+use crate::be_ai_weight::weightconfig_s::WeightConfigHandle;
 use crate::be_ai_weight_fns::{FindFuzzyWeight, FreeWeightConfig, FuzzyWeight, ReadWeightConfig};
 use crate::l_libvar_fns::{LibVarSet, LibVarString, LibVarValue};
 use crate::l_memory_fns::{FreeMemory, GetClearedHunkMemory, GetClearedMemory};
@@ -546,7 +546,7 @@ pub fn LoadWeaponConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weaponc
 /// Source: `oracle/codemp/botlib/be_ai_weap.cpp:313-325`
 pub fn WeaponWeightIndex(
     bot: &mut BotLib,
-    wwc: *mut weightconfig_t,
+    wwc: WeightConfigHandle,
     wc: *mut weaponconfig_t,
 ) -> *mut c_int {
     unsafe {
@@ -557,8 +557,9 @@ pub fn WeaponWeightIndex(
         ) as *mut c_int;
 
         for i in 0..(*wc).numweapons {
-            *index.add(i as usize) =
-                FindFuzzyWeight(wwc, (*(*wc).weaponinfo.add(i as usize)).name.as_mut_ptr());
+            let name = CStr::from_ptr((*(*wc).weaponinfo.add(i as usize)).name.as_ptr())
+                .to_string_lossy();
+            *index.add(i as usize) = FindFuzzyWeight(bot.weightconfig(wwc), &name);
         }
         index
     }
@@ -573,7 +574,7 @@ pub fn BotFreeWeaponWeights(bot: &mut BotLib, weaponstate: c_int) {
         return;
     }
     unsafe {
-        if !(*ws).weaponweightconfig.is_null() {
+        if (*ws).weaponweightconfig.is_some() {
             FreeWeightConfig(bot, (*ws).weaponweightconfig);
         }
         if !(*ws).weaponweightindex.is_null() {
@@ -592,8 +593,9 @@ pub fn BotLoadWeaponWeights(bot: &mut BotLib, weaponstate: c_int, filename: *mut
     }
     BotFreeWeaponWeights(bot, weaponstate);
     unsafe {
-        (*ws).weaponweightconfig = ReadWeightConfig(bot, filename);
-        if (*ws).weaponweightconfig.is_null() {
+        let filename_str = CStr::from_ptr(filename).to_string_lossy().into_owned();
+        (*ws).weaponweightconfig = ReadWeightConfig(bot, &filename_str);
+        if (*ws).weaponweightconfig.is_none() {
             bot.botimport.Print.unwrap()(
                 PRT_FATAL,
                 c"couldn't load weapon config %s\n".as_ptr() as *mut c_char,
@@ -605,7 +607,7 @@ pub fn BotLoadWeaponWeights(bot: &mut BotLib, weaponstate: c_int, filename: *mut
             return BLERR_CANNOTLOADWEAPONCONFIG;
         }
         (*ws).weaponweightindex =
-            WeaponWeightIndex(bot, (*ws).weaponweightconfig, bot.weaponconfig);
+            WeaponWeightIndex(bot, (*ws).weaponweightconfig.unwrap(), bot.weaponconfig);
     }
     BLERR_NOERROR
 }
@@ -657,9 +659,10 @@ pub fn BotChooseBestFightWeapon(
 
     //if the bot has no weapon weight configuration
     unsafe {
-        if (*ws).weaponweightconfig.is_null() {
+        if (*ws).weaponweightconfig.is_none() {
             return 0;
         }
+        let wwc_handle = (*ws).weaponweightconfig.unwrap();
 
         let mut bestweight: f32 = 0.0;
         let mut bestweapon: c_int = 0;
@@ -671,7 +674,7 @@ pub fn BotChooseBestFightWeapon(
             if index < 0 {
                 continue;
             }
-            let weight = FuzzyWeight(inventory, (*ws).weaponweightconfig, index);
+            let weight = FuzzyWeight(inventory, bot.weightconfig(wwc_handle), index);
             if weight > bestweight {
                 bestweight = weight;
                 bestweapon = i;

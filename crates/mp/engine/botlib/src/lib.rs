@@ -87,6 +87,7 @@ use crate::be_ai_goal::levelitem_s::levelitem_t;
 use crate::be_ai_move::bot_movestate_s::bot_movestate_t;
 use crate::be_ai_weap::bot_weaponstate_s::bot_weaponstate_t;
 use crate::be_ai_weap::weaponconfig_s::weaponconfig_t;
+use crate::be_ai_weight::weightconfig_s::{WeightConfig, WeightConfigHandle, MAX_WEIGHT_FILES};
 use crate::be_interface::botlib_globals_s::botlib_globals_t;
 use crate::l_libvar::libvar_s::{LibVar, LibVarHandle};
 use crate::l_log::consts::MAX_LOGFILENAMESIZE;
@@ -467,10 +468,18 @@ pub struct BotLib {
     /// `AAS_ShowReachableAreas`).
     /// Source: `oracle/codemp/botlib/be_aas_debug.cpp:670`
     pub reach: crate::aasfile::aas_reachability_s::aas_reachability_t,
-    /// Raven `weightconfig_t *weightFileList[MAX_WEIGHT_FILES]`.
+    /// Raven `weightconfig_t *weightFileList[MAX_WEIGHT_FILES]` — the loaded
+    /// weight-config file cache. Redesigned (§F17) to hold `WeightConfigHandle`s
+    /// into `weightconfigs`; a `None` slot is Raven's null (empty) entry. The
+    /// array is zero-valid (`Option<WeightConfigHandle>` zeroes to `None`).
     /// Source: `oracle/codemp/botlib/be_ai_weight.cpp:34`
-    pub weightFileList: [*mut crate::be_ai_weight::weightconfig_s::weightconfig_t;
-        crate::be_ai_weight::weightconfig_s::MAX_WEIGHT_FILES],
+    pub weightFileList: [Option<WeightConfigHandle>; MAX_WEIGHT_FILES],
+    /// Redesigned (§F17) owner of the weight configs Raven malloc'd behind
+    /// `weightconfig_t *`. An append-with-hole-reuse arena; `WeightConfigHandle`
+    /// indexes it, a `None` slot is free (Raven's freed pointer). `Free*` maps to
+    /// clearing a slot (dropping the owned `Vec<Weight>`/`Box` trees/`String`s).
+    /// Seated (`Vec::new`) in `Default`, since a zeroed `Vec` is invalid.
+    pub weightconfigs: Vec<Option<WeightConfig>>,
 
     // --- be_ai_weap / be_aas_file globals and function-static hoists ---
     /// Raven `bot_weaponstate_t *botweaponstates[MAX_CLIENTS+1]`.
@@ -492,8 +501,8 @@ impl Default for BotLib {
     /// (null pointers, `0`, `None` fn-ptrs), matching Raven's zero-initialized
     /// file-scope globals. The exceptions are the owned-collection and reference
     /// fields whose all-zero bit pattern is *invalid* — `libvars`,
-    /// `globaldefines`, `sourceFiles`, `botcharacters` (a `Vec`'s `NonNull`
-    /// buffer pointer cannot be null) and `default_punctuations` (a `&'static`
+    /// `globaldefines`, `sourceFiles`, `botcharacters`, `weightconfigs` (a
+    /// `Vec`'s `NonNull` buffer pointer cannot be null) and `default_punctuations` (a `&'static`
     /// reference cannot be null); each is written explicitly before
     /// `assume_init`. Fields whose
     /// Raven definitions carry a real initializer (`iteminfo_struct`,
@@ -521,6 +530,7 @@ impl Default for BotLib {
                 core::ptr::addr_of_mut!((*ptr).botcharacters),
                 (0..=MAX_CLIENTS).map(|_| None).collect(),
             );
+            core::ptr::write(core::ptr::addr_of_mut!((*ptr).weightconfigs), Vec::new());
             core::ptr::write(
                 core::ptr::addr_of_mut!((*ptr).default_punctuations),
                 DEFAULT_PUNCTUATIONS,
@@ -538,6 +548,34 @@ impl BotLib {
     #[inline]
     pub fn libvar(&self, handle: LibVarHandle) -> &LibVar {
         &self.libvars[handle.0]
+    }
+
+    /// Resolve a `WeightConfigHandle` — the arena equivalent of dereferencing
+    /// Raven's `weightconfig_t *`. Panics on a freed (`None`) slot, which is
+    /// Raven's null-deref UB; callers null-check the handle (`is_none`) first.
+    #[inline]
+    pub fn weightconfig(&self, handle: WeightConfigHandle) -> &WeightConfig {
+        self.weightconfigs[handle.0].as_ref().unwrap()
+    }
+
+    /// `&mut` twin of `weightconfig`.
+    #[inline]
+    pub fn weightconfig_mut(&mut self, handle: WeightConfigHandle) -> &mut WeightConfig {
+        self.weightconfigs[handle.0].as_mut().unwrap()
+    }
+
+    /// Move `cfg` into the weight-config arena, reusing a freed (`None`) slot
+    /// when one exists (mirroring Raven's `FreeMemory`/`GetClearedMemory` heap
+    /// reuse) and appending otherwise; returns the slot's handle.
+    pub fn alloc_weightconfig(&mut self, cfg: WeightConfig) -> WeightConfigHandle {
+        for (i, slot) in self.weightconfigs.iter_mut().enumerate() {
+            if slot.is_none() {
+                *slot = Some(cfg);
+                return WeightConfigHandle(i);
+            }
+        }
+        self.weightconfigs.push(Some(cfg));
+        WeightConfigHandle(self.weightconfigs.len() - 1)
     }
 }
 
