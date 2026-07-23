@@ -5,7 +5,7 @@ use core::ffi::{c_char, c_int, CStr};
 
 use native_string::Q_stricmpBytes;
 
-use crate::shared::limits::{BIG_INFO_STRING, MAX_TOKEN_CHARS};
+use crate::shared::limits::MAX_TOKEN_CHARS;
 use crate::shared::q_format::{c_vsprintf, FmtArg};
 use crate::shared::string_id_table::stringID_table_t;
 use crate::shared::{qboolean, qfalse, qtrue, MAX_QPATH};
@@ -18,10 +18,6 @@ static mut COM_TOKEN: [c_char; 1024] = [0; 1024]; // MAX_TOKEN_CHARS
 // va() rotating-buffer statics (2-slot rotating return buffer).
 static mut VA_STRING: [[c_char; 32000]; 2] = [[0; 32000]; 2];
 static mut VA_INDEX: usize = 0;
-
-// Info_ValueForKey rotating-buffer statics (same rotating idiom as va()).
-static mut INFO_VALUE: [[c_char; 8192]; 2] = [[0; 8192]; 2]; // BIG_INFO_VALUE
-static mut INFO_VALUEINDEX: c_int = 0;
 
 /// Raven `Q_strncpyz`.
 ///
@@ -285,6 +281,12 @@ pub fn SkipWhitespace(data: *const c_char, hasNewLines: *mut qboolean) -> *const
 }
 
 /// Raven `COM_ParseExt`.
+///
+/// Retained verbatim tokenizer core — the raw-pointer form is the floor of the
+/// `COM_Parse*` family and is not retired. Its remaining callers are all
+/// qshared-internal or the shader-text hash: the `&str` [`COM_Parse`] wrapper's
+/// own delegation (below), [`SkipBracedSection`], and qcommon's
+/// `CM_CreateShaderTextHash`. Engine consumers use the `&str` wrapper.
 ///
 /// Source: `oracle/codemp/game/q_shared.c:421-526`
 pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *mut c_char {
@@ -550,71 +552,6 @@ pub fn va(format: *const c_char, args: &[FmtArg]) -> *mut c_char {
         *buf.offset(copy_len as isize) = 0;
 
         buf
-    }
-}
-
-/// Raven `Info_ValueForKey`.
-///
-/// Source: `oracle/codemp/game/q_shared.c:1051-1098`
-pub fn Info_ValueForKey(s: *const c_char, key: *const c_char) -> *mut c_char {
-    unsafe {
-        let mut pkey: [c_char; 8192] = [0; 8192]; // BIG_INFO_KEY
-        let mut o: *mut c_char;
-
-        if s.is_null() || key.is_null() {
-            return c"".as_ptr() as *mut c_char;
-        }
-
-        if c_strlen(s) >= BIG_INFO_STRING {
-            // Raven guards on `BIG_INFO_STRING` (8192), not `MAX_INFO_STRING`.
-            // Com_Error(ERR_DROP, ...) -> panic.
-            panic!("Info_ValueForKey: oversize infostring");
-        }
-
-        INFO_VALUEINDEX ^= 1;
-        let mut p = s;
-        if *p == b'\\' as c_char {
-            p = p.offset(1);
-        }
-
-        loop {
-            o = pkey.as_mut_ptr();
-            while *p != b'\\' as c_char {
-                if *p == 0 {
-                    return c"".as_ptr() as *mut c_char;
-                }
-                if o.offset_from(pkey.as_ptr()) < 8191 {
-                    *o = *p;
-                    o = o.offset(1);
-                }
-                p = p.offset(1);
-            }
-            *o = 0;
-            p = p.offset(1);
-
-            o = INFO_VALUE[INFO_VALUEINDEX as usize].as_mut_ptr();
-
-            while *p != b'\\' as c_char && *p != 0 {
-                if o.offset_from(INFO_VALUE[INFO_VALUEINDEX as usize].as_ptr()) < 8191 {
-                    *o = *p;
-                    o = o.offset(1);
-                }
-                p = p.offset(1);
-            }
-            *o = 0;
-
-            // Raven matches the key case-INSENSITIVELY (`!Q_stricmp(key,pkey)`).
-            if Q_stricmp(key, pkey.as_ptr() as *const c_char) == 0 {
-                return INFO_VALUE[INFO_VALUEINDEX as usize].as_mut_ptr();
-            }
-
-            if *p == 0 {
-                break;
-            }
-            p = p.offset(1);
-        }
-
-        c"".as_ptr() as *mut c_char
     }
 }
 

@@ -139,8 +139,8 @@ use mp_qshared::shared::{
 // Canonical homes for the qcommon/qshared free functions this file calls. The
 // `Cvar_*`/`Com_Milliseconds` bodies live in `mp_engine_qcommon` and take the
 // threaded `(common, cm, rm, host, …)` engine-host receivers with `*const
-// c_char` string params; `COM_ParseExt`/`Q_strncpyz` are the raw-pointer
-// `q_shared.c` primitives in `mp_qshared`.
+// c_char` string params; `COM_Parse`/`Q_strncpyz` are the `q_shared.c`
+// primitives in `mp_qshared` (`COM_Parse` walks a `&str` cursor).
 use libc::{atoi, strncpy};
 use mp_engine_qcommon::common_fns::Com_Milliseconds;
 use mp_engine_qcommon::cvar_fns::{
@@ -148,7 +148,7 @@ use mp_engine_qcommon::cvar_fns::{
     Cvar_VariableStringBuffer, Cvar_VariableValue,
 };
 use mp_engine_qcommon::files_common::{FS_FCloseFile, FS_Write};
-use mp_qshared::shared::q_string::COM_ParseExt;
+use mp_qshared::shared::q_string::COM_Parse;
 
 /// Raven `SV_NumForGentity`.
 ///
@@ -204,35 +204,57 @@ pub fn SV_LocateGameData(
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:337-367`
 pub fn SV_GetEntityToken(sv: &mut Server, buffer: *mut c_char, bufferSize: c_int) -> qboolean {
-    // Raven's `COM_Parse(&p)` is `COM_ParseExt(&p, qtrue)`; the raw-pointer
-    // primitive lives in `mp_qshared::shared::q_string`.
+    // Raven's `COM_Parse(&p)` is `COM_ParseExt(&p, qtrue)`. The persistent
+    // `entityParsePoint` cursor is decoded from the CM entity-string buffer at
+    // the boundary and walked via the idiomatic `&str` `COM_Parse`; the cursor
+    // field stays the ABI `*mut c_char`, set to `rest`'s position or null once
+    // the buffer is exhausted (matching Raven's `*data_p == NULL` terminus —
+    // the observable token/qboolean sequence is identical).
     unsafe {
         if sv.sv.mLocalSubBSPIndex == -1 {
-            let s = COM_ParseExt(
-                &mut sv.sv.entityParsePoint as *mut *mut c_char as *mut *const c_char,
-                qtrue,
-            );
+            let data = if sv.sv.entityParsePoint.is_null() {
+                ""
+            } else {
+                core::ffi::CStr::from_ptr(sv.sv.entityParsePoint)
+                    .to_str()
+                    .unwrap_or("")
+            };
+            let (token, rest) = COM_Parse(data, true);
+            sv.sv.entityParsePoint = if rest.is_empty() {
+                core::ptr::null_mut()
+            } else {
+                rest.as_ptr() as *mut c_char
+            };
             Q_strncpyzBytes(
                 core::slice::from_raw_parts_mut(buffer, bufferSize as usize),
-                core::ffi::CStr::from_ptr(s).to_bytes(),
+                token.as_bytes(),
                 bufferSize as usize,
             );
-            if sv.sv.entityParsePoint.is_null() && *s == 0 {
+            if sv.sv.entityParsePoint.is_null() && token.is_empty() {
                 qfalse
             } else {
                 qtrue
             }
         } else {
-            let s = COM_ParseExt(
-                &mut sv.sv.mLocalSubBSPEntityParsePoint as *mut *mut c_char as *mut *const c_char,
-                qtrue,
-            );
+            let data = if sv.sv.mLocalSubBSPEntityParsePoint.is_null() {
+                ""
+            } else {
+                core::ffi::CStr::from_ptr(sv.sv.mLocalSubBSPEntityParsePoint)
+                    .to_str()
+                    .unwrap_or("")
+            };
+            let (token, rest) = COM_Parse(data, true);
+            sv.sv.mLocalSubBSPEntityParsePoint = if rest.is_empty() {
+                core::ptr::null_mut()
+            } else {
+                rest.as_ptr() as *mut c_char
+            };
             Q_strncpyzBytes(
                 core::slice::from_raw_parts_mut(buffer, bufferSize as usize),
-                core::ffi::CStr::from_ptr(s).to_bytes(),
+                token.as_bytes(),
                 bufferSize as usize,
             );
-            if sv.sv.mLocalSubBSPEntityParsePoint.is_null() && *s == 0 {
+            if sv.sv.mLocalSubBSPEntityParsePoint.is_null() && token.is_empty() {
                 qfalse
             } else {
                 qtrue
