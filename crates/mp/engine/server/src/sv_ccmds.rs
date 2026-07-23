@@ -682,7 +682,10 @@ pub fn SV_DumpUser_f(common: &mut Common, sv: &mut Server) {
 
     com_printf(common, "userinfo\n");
     com_printf(common, "--------\n");
-    Info_Print(common, unsafe { (*cl).userinfo.as_ptr() });
+    // `Info_Print` keeps its `*const c_char` seam; bridge the owned userinfo
+    // string through a NUL-terminated holder.
+    let userinfo_c = CString::new(unsafe { (*cl).userinfo.as_str() }).unwrap_or_default();
+    Info_Print(common, userinfo_c.as_ptr());
 }
 
 /// Raven `SV_Map_f`.

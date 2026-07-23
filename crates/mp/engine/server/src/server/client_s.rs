@@ -10,27 +10,28 @@ use mp_engine_qcommon::qcommon::net_limits::{
 use mp_engine_qcommon::qcommon::netchan_t::netchan_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::qcommon::usercmd::usercmd_t;
-use mp_qshared::shared::{fileHandle_t, qboolean, MAX_INFO_STRING, MAX_STRING_CHARS};
+use mp_qshared::shared::{fileHandle_t, qboolean, MAX_STRING_CHARS};
 
 use super::client_snapshot_t::clientSnapshot_t;
 use super::client_state_t::clientState_t;
 
-// `MAX_INFO_STRING` (`q_shared.h:384`) imported from its canonical home in
-// `mp_qshared::shared`.
-
 /// Raven `client_t` — server-side per-client connection state.
 ///
 /// (§D12 internal-only shape: `client_t` never crosses the DLL seam — the game
-/// module sees `playerState`/`userinfo` only — so `name`/`downloadName` are
-/// owned `String`s and the old `#[repr(C)]` layout asserts are dropped. Index
+/// module sees `playerState`/`userinfo` only — so `userinfo`/`name`/
+/// `downloadName` are owned `String`s and the old `#[repr(C)]` layout asserts
+/// are dropped. Index
 /// math over `svs.clients` still uses `size_of::<client_t>()` as the Vec's
 /// element stride, which is repr-independent.)
 ///
 /// Type definition source: `oracle/codemp/qcommon/../server/server.h:124-182`
 pub struct client_t {
     pub state: clientState_t,
-    /// name, etc
-    pub userinfo: [c_char; MAX_INFO_STRING],
+    /// name, etc. Raven's `char userinfo[MAX_INFO_STRING]` — an owned `String`;
+    /// the wire/connect assembly sites reproduce the `MAX_INFO_STRING`
+    /// truncation bound on assignment (`strncpyz_string`), and the
+    /// `SV_GetUserinfo` trap serves a bounded copy into the game's `(buf,size)`.
+    pub userinfo: String,
 
     /// see if he has been sent an svc_setgame
     pub sentGamedir: qboolean,
@@ -118,14 +119,14 @@ pub type client_s = client_t;
 
 impl Default for client_t {
     /// Raven zero-fills `client_t` wholesale (`Z_Malloc` TAG-zeroed /
-    /// `Com_Memset`). Every field but the two owned `String`s is POD (no
+    /// `Com_Memset`). Every field but the three owned `String`s is POD (no
     /// `Drop`); the all-POD aggregates (`usercmd_t`, `frames`, `netchan_t`) use
-    /// per-field `zeroed()`, verified free of `String`/`Vec`/`Drop`; the two
-    /// name fields default to empty (`downloadName` empty == "no download").
+    /// per-field `zeroed()`, verified free of `String`/`Vec`/`Drop`; the three
+    /// string fields default to empty (`downloadName` empty == "no download").
     fn default() -> Self {
         client_t {
             state: clientState_t::CS_FREE,
-            userinfo: [0; MAX_INFO_STRING],
+            userinfo: String::new(),
             sentGamedir: 0,
             reliableCommands: [[0; MAX_STRING_CHARS]; MAX_RELIABLE_COMMANDS],
             reliableSequence: 0,

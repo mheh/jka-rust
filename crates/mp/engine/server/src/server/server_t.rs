@@ -6,7 +6,7 @@ use mp_engine_qcommon::cm::cmodel_s::cmodel_s;
 use mp_qshared::common::mp::qcommon::player_state::playerState_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::shared::limits::MAX_MODELS as MAX_MODELS_I32;
-use mp_qshared::shared::{qboolean, MAX_CONFIGSTRINGS, MAX_GENTITIES};
+use mp_qshared::shared::{qboolean, MAX_GENTITIES};
 
 use super::server_state_t::serverState_t;
 use super::sv_entity_s::svEntity_t;
@@ -24,8 +24,14 @@ pub const MAX_MODELS: usize = MAX_MODELS_I32 as usize;
 /// Raven `server_t`.
 ///
 /// Raven: non-`_XBOX` variant (`_XBOX` undefined) is the one this codebase ports.
+///
+/// (Internal-only shape, like `client_t`: `server_t` never crosses the DLL seam
+/// — the game module reaches `configstrings` only through the bounded
+/// `SV_GetConfigstring`/`SV_SetConfigstring` trap copies — so `configstrings`
+/// is an owned `Vec<String>` and the old `#[repr(C)]` layout asserts are
+/// dropped. There is exactly one instance (`Engine.sv.sv`), reached by
+/// reference, so no size/stride math depends on the layout.)
 /// Type definition source: `oracle/codemp/qcommon/../server/server.h:53-88`
-#[repr(C)]
 pub struct server_t {
     pub state: serverState_t,
     /// if true, send configstring changes during SS_LOADING
@@ -42,7 +48,12 @@ pub struct server_t {
     /// when time > nextFrameTime, process world
     pub nextFrameTime: c_int,
     pub models: [*mut cmodel_s; MAX_MODELS],
-    pub configstrings: [*mut c_char; MAX_CONFIGSTRINGS],
+    /// Raven's `char *configstrings[MAX_CONFIGSTRINGS]` — owned strings (each
+    /// slot was a `CopyString`'d heap block). Length is exactly
+    /// `MAX_CONFIGSTRINGS`; an empty string `""` is Raven's null slot
+    /// (`SV_GetConfigstring` returns `""` for null, `SV_SetConfigstring`'s
+    /// dedupe compares equal). Seated in `Engine::new`; reset in `SV_InitSV`.
+    pub configstrings: Vec<String>,
     pub svEntities: [svEntity_t; MAX_GENTITIES],
 
     /// used during game VM init
@@ -67,55 +78,3 @@ pub struct server_t {
 
     pub mSharedMemory: *mut c_char,
 }
-const _: () = assert!(core::mem::offset_of!(server_t, state) == 0);
-#[cfg(target_pointer_width = "64")]
-const _: () = {
-    assert!(core::mem::size_of::<server_t>() == 664960);
-    assert!(core::mem::offset_of!(server_t, restarting) == 4);
-    assert!(core::mem::offset_of!(server_t, serverId) == 8);
-    assert!(core::mem::offset_of!(server_t, restartedServerId) == 12);
-    assert!(core::mem::offset_of!(server_t, checksumFeed) == 16);
-    assert!(core::mem::offset_of!(server_t, snapshotCounter) == 20);
-    assert!(core::mem::offset_of!(server_t, timeResidual) == 24);
-    assert!(core::mem::offset_of!(server_t, nextFrameTime) == 28);
-    assert!(core::mem::offset_of!(server_t, models) == 32);
-    assert!(core::mem::offset_of!(server_t, configstrings) == 4128);
-    assert!(core::mem::offset_of!(server_t, svEntities) == 17728);
-    assert!(core::mem::offset_of!(server_t, entityParsePoint) == 664896);
-    assert!(core::mem::offset_of!(server_t, gentities) == 664904);
-    assert!(core::mem::offset_of!(server_t, gentitySize) == 664912);
-    assert!(core::mem::offset_of!(server_t, num_entities) == 664916);
-    assert!(core::mem::offset_of!(server_t, gameClients) == 664920);
-    assert!(core::mem::offset_of!(server_t, gameClientSize) == 664928);
-    assert!(core::mem::offset_of!(server_t, restartTime) == 664932);
-    assert!(core::mem::offset_of!(server_t, mLocalSubBSPIndex) == 664936);
-    assert!(core::mem::offset_of!(server_t, mLocalSubBSPModelOffset) == 664940);
-    assert!(core::mem::offset_of!(server_t, mLocalSubBSPEntityParsePoint) == 664944);
-    assert!(core::mem::offset_of!(server_t, mSharedMemory) == 664952);
-};
-// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
-#[cfg(target_pointer_width = "32")]
-const _: () = {
-    assert!(core::mem::size_of::<server_t>() == 647900);
-    assert!(core::mem::offset_of!(server_t, restarting) == 4);
-    assert!(core::mem::offset_of!(server_t, serverId) == 8);
-    assert!(core::mem::offset_of!(server_t, restartedServerId) == 12);
-    assert!(core::mem::offset_of!(server_t, checksumFeed) == 16);
-    assert!(core::mem::offset_of!(server_t, snapshotCounter) == 20);
-    assert!(core::mem::offset_of!(server_t, timeResidual) == 24);
-    assert!(core::mem::offset_of!(server_t, nextFrameTime) == 28);
-    assert!(core::mem::offset_of!(server_t, models) == 32);
-    assert!(core::mem::offset_of!(server_t, configstrings) == 2080);
-    assert!(core::mem::offset_of!(server_t, svEntities) == 8880);
-    assert!(core::mem::offset_of!(server_t, entityParsePoint) == 647856);
-    assert!(core::mem::offset_of!(server_t, gentities) == 647860);
-    assert!(core::mem::offset_of!(server_t, gentitySize) == 647864);
-    assert!(core::mem::offset_of!(server_t, num_entities) == 647868);
-    assert!(core::mem::offset_of!(server_t, gameClients) == 647872);
-    assert!(core::mem::offset_of!(server_t, gameClientSize) == 647876);
-    assert!(core::mem::offset_of!(server_t, restartTime) == 647880);
-    assert!(core::mem::offset_of!(server_t, mLocalSubBSPIndex) == 647884);
-    assert!(core::mem::offset_of!(server_t, mLocalSubBSPModelOffset) == 647888);
-    assert!(core::mem::offset_of!(server_t, mLocalSubBSPEntityParsePoint) == 647892);
-    assert!(core::mem::offset_of!(server_t, mSharedMemory) == 647896);
-};

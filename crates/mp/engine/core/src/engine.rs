@@ -4,6 +4,7 @@ use mp_engine_client::{Client, SoundSystem};
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::Common;
 use mp_engine_server::Server;
+use mp_qshared::shared::MAX_CONFIGSTRINGS;
 
 /// The engine-island aggregate. DEFINED here (the one crate that depends on all
 /// engine subcrates, so it can name Server/Client/etc. as fields). One value,
@@ -208,6 +209,11 @@ impl Engine {
             // array) — not zero-valid — written empty here; SV_Startup fills it
             // to sv_maxclients and SV_ChangeMaxClients/SV_Shutdown replace it.
             addr_of_mut!((*p).sv.svs.clients).write(Vec::new());
+            // Server sv.configstrings: owned Vec<String> (was a zero-valid
+            // [*mut c_char; MAX_CONFIGSTRINGS] of CopyString'd blocks) — not
+            // zero-valid — seated to MAX_CONFIGSTRINGS empty strings ("" ==
+            // Raven's null slot); SV_InitSV resets it, SV_SpawnServer refills it.
+            addr_of_mut!((*p).sv.sv.configstrings).write(vec![String::new(); MAX_CONFIGSTRINGS]);
             // Engine referee (sv_referee.rs) holds a Vec / Option<File> — not
             // zero-valid — so it is written in place through its Default
             // (RefMode::Off, empty buffers) before the Box is exposed.

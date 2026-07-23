@@ -61,8 +61,9 @@ use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
 use mp_qshared::common::mp::qcommon::player_state::playerState_t;
 use mp_qshared::common::mp::qcommon::usercmd::usercmd_t;
 use mp_qshared::shared::error_parm::errorParm_t;
-use mp_qshared::shared::q_string::Q_strncpyz;
+use mp_qshared::shared::limits::MAX_INFO_STRING;
 use mp_qshared::shared::{qfalse, qtrue};
+use native_string::cstr::strncpyz_string;
 
 use crate::server::client_s::client_t;
 use crate::server::client_state_t::clientState_t;
@@ -1339,13 +1340,10 @@ fn ref_inject_connect(view: &mut EngineHostView, sv: &mut Server, client: c_int,
         (*cl).netchan.remoteAddress.r#type = netadrtype_t::NA_LOOPBACK;
         (*cl).rate = 16384;
 
-        let mut ui = userinfo.to_vec();
-        ui.push(0);
-        Q_strncpyz(
-            (*cl).userinfo.as_mut_ptr(),
-            ui.as_ptr() as *const c_char,
-            (*cl).userinfo.len() as c_int,
-        );
+        // Raven `Q_strncpyz(cl->userinfo, userinfo, sizeof(cl->userinfo))` —
+        // byte-truncate the recorded bytes to MAX_INFO_STRING into the owned
+        // userinfo string.
+        (*cl).userinfo = strncpyz_string(userinfo, MAX_INFO_STRING);
     }
     VM_Call(
         view.common,

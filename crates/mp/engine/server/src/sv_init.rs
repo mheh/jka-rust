@@ -14,8 +14,10 @@ use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::force_reload::ForceReload_e;
 use mp_qshared::shared::game_state::MAX_CONFIGSTRINGS;
-use mp_qshared::shared::limits::{MAX_CLIENTS, MAX_NAME_LENGTH, MAX_STRING_CHARS};
+use mp_qshared::shared::limits::{MAX_CLIENTS, MAX_INFO_STRING, MAX_NAME_LENGTH, MAX_STRING_CHARS};
 use native_string::cstr::{buf_to_string, strncpyz_string};
+use native_string::q_string::Q_stricmpBytes;
+use native_string::q_strncpyz::Q_strncpyzBytes;
 use native_string::Info_ValueForKey;
 use mp_qshared::shared::qboolean;
 
@@ -41,8 +43,9 @@ use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
 // Canonical homes for the qcommon/qshared free functions this file calls
 // (sv_game.rs precedent): `Cvar_*`/`Com_Milliseconds`/`FS_FCloseFile` live in
 // `mp_engine_qcommon` and take the threaded `(common, cm, rm, host, …)`
-// engine-host receivers with `*const c_char` string params; `Q_strncpyz`/
-// `Q_stricmp` are the raw-pointer `q_shared.c` primitives in `mp_qshared`.
+// engine-host receivers with `*const c_char` string params; the pointer
+// `Q_strncpyz` is the raw-pointer `q_shared.c` primitive in `mp_qshared`
+// (kept for the `*mut c_char` scratch buffers below).
 use mp_abi::game::exports::MpGameExport;
 use mp_engine_qcommon::common_fns::{Com_Memset, Com_Milliseconds};
 use mp_engine_qcommon::cvar_fns::{
@@ -54,11 +57,9 @@ use mp_engine_qcommon::files_pc::{
     FS_ReferencedPakNames,
 };
 use mp_engine_qcommon::vm_fns::VM_ExplicitArgPtr;
-use mp_engine_qcommon::z_memman_pc::{
-    CopyString, Hunk_Clear, Hunk_SetMark, Z_Free, Z_Malloc,
-};
+use mp_engine_qcommon::z_memman_pc::{Hunk_Clear, Hunk_SetMark, Z_Free, Z_Malloc};
 use mp_qshared::shared::fileHandle_t;
-use mp_qshared::shared::q_string::{Q_stricmp, Q_strncpyz};
+use mp_qshared::shared::q_string::Q_strncpyz;
 use std::ffi::CString;
 
 use crate::sv_ccmds::SV_AddOperatorCommands;
@@ -76,9 +77,19 @@ use mp_engine_botlib::BotLib;
 /// Source: `oracle/codemp/server/sv_init.cpp:284-289`
 pub fn SV_InitSV(sv: &mut Server) {
     // `memset(&sv, 0, sizeof(sv))` — faithful full-struct clear via raw
-    // zero-write (the struct carries raw pointers with no `Default` derive).
+    // zero-write. `configstrings` is now an owned `Vec<String>`, so the raw
+    // zero cannot run over it (svs-memset precedent, `SV_Shutdown`): take out
+    // the old Vec and drop it (frees every stored string — the Raven
+    // `Z_Free` loop equivalent), zero the POD remainder, then write a fresh
+    // `MAX_CONFIGSTRINGS`-slot empty Vec back over those zeros without dropping
+    // the invalid zero header.
+    drop(core::mem::take(&mut sv.sv.configstrings));
     unsafe {
         core::ptr::write_bytes(&mut sv.sv as *mut _, 0u8, 1);
+        core::ptr::write(
+            addr_of_mut!(sv.sv.configstrings),
+            vec![String::new(); MAX_CONFIGSTRINGS],
+        );
     }
     sv.sv.mLocalSubBSPIndex = -1;
 }
@@ -124,14 +135,17 @@ pub fn SV_SetConfigstring(
     }
 
     unsafe {
-        // don't bother broadcasting an update if no change
-        if libc::strcmp(val, sv.sv.configstrings[index as usize]) == 0 {
+        // don't bother broadcasting an update if no change (Raven's
+        // `strcmp(val, configstrings[index]) == 0` maps to byte equality of the
+        // owned string).
+        if CStr::from_ptr(val).to_bytes() == sv.sv.configstrings[index as usize].as_bytes() {
             return;
         }
 
-        // change the string in sv
-        Z_Free(view.common, sv.sv.configstrings[index as usize] as *mut _);
-        sv.sv.configstrings[index as usize] = CopyString(view, val);
+        // change the string in sv — the `Z_Free`/`CopyString` heap lifecycle is
+        // now the `Vec<String>`'s own `Drop` on reassignment. `CopyString` is
+        // unbounded, so the full `val` is stored (no `MAX_INFO_STRING` bound).
+        sv.sv.configstrings[index as usize] = buf_to_string(CStr::from_ptr(val).to_bytes());
     }
 
     // send it to all the clients if we aren't spawning a new server
@@ -214,11 +228,19 @@ pub fn SV_GetConfigstring(sv: &mut Server, index: c_int, buffer: *mut c_char, bu
         panic!("SV_GetConfigstring: bad index {}\n", index);
     }
     unsafe {
-        if sv.sv.configstrings[index as usize].is_null() {
+        // "" == Raven's null slot: the empty-string branch returns the empty
+        // string exactly as the null branch did.
+        if sv.sv.configstrings[index as usize].is_empty() {
             *buffer = 0;
             return;
         }
-        Q_strncpyz(buffer, sv.sv.configstrings[index as usize], bufferSize);
+        // Frozen trap seam: one bounded copy of the owned string into the game's
+        // `(buffer, bufferSize)`.
+        Q_strncpyzBytes(
+            core::slice::from_raw_parts_mut(buffer, bufferSize as usize),
+            sv.sv.configstrings[index as usize].as_bytes(),
+            bufferSize as usize,
+        );
     }
 }
 
@@ -241,7 +263,13 @@ pub fn SV_GetUserinfo(
     }
     unsafe {
         let client = &sv.svs.clients[index as usize] as *const client_t;
-        Q_strncpyz(buffer, (*client).userinfo.as_ptr(), bufferSize);
+        // Frozen trap seam: one bounded copy of the owned userinfo string into
+        // the game's `(buffer, bufferSize)`.
+        Q_strncpyzBytes(
+            core::slice::from_raw_parts_mut(buffer, bufferSize as usize),
+            (*client).userinfo.as_bytes(),
+            bufferSize as usize,
+        );
     }
 }
 
@@ -262,11 +290,9 @@ pub fn SV_SetUserinfo(common: &mut Common, sv: &mut Server, index: c_int, mut va
         }
 
         let client = &mut sv.svs.clients[index as usize] as *mut client_t;
-        Q_strncpyz(
-            (*client).userinfo.as_mut_ptr(),
-            val,
-            (*client).userinfo.len() as c_int,
-        );
+        // Raven `Q_strncpyz(cl->userinfo, val, sizeof(cl->userinfo))` — byte-
+        // truncate `val` to MAX_INFO_STRING into the owned userinfo string.
+        (*client).userinfo = strncpyz_string(CStr::from_ptr(val).to_bytes(), MAX_INFO_STRING);
         // Raven `Q_strncpyz(cl->name, Info_ValueForKey(val,"name"), sizeof(cl->name))`
         // — extract the name and byte-truncate to MAX_NAME_LENGTH into the String.
         let name_src = Info_ValueForKey(&buf_to_string(CStr::from_ptr(val).to_bytes()), "name");
@@ -278,11 +304,9 @@ pub fn SV_SetUserinfo(common: &mut Common, sv: &mut Server, index: c_int, mut va
 ///
 /// Source: `oracle/codemp/server/sv_init.cpp:365-387`
 pub fn SV_ClearServer(common: &mut Common, sv: &mut Server) {
-    for i in 0..MAX_CONFIGSTRINGS {
-        if !sv.sv.configstrings[i].is_null() {
-            Z_Free(common, sv.sv.configstrings[i] as *mut ());
-        }
-    }
+    // Raven's `for (...) if (configstrings[i]) Z_Free(configstrings[i]);` is
+    // subsumed by `SV_InitSV` below: the owned `Vec<String>` frees every stored
+    // string when `SV_InitSV` takes-and-drops it before the struct zero.
 
     //	CM_ClearMap();
 
@@ -359,13 +383,17 @@ pub fn SV_AddConfigstring(
         }
 
         for i in 1..max {
-            if sv.sv.configstrings[(start + i) as usize].is_null()
-                || *sv.sv.configstrings[(start + i) as usize] == 0
-            {
+            // Raven's `!configstrings[i] || !configstrings[i][0]` (null-or-empty)
+            // is the owned string's `is_empty()`.
+            if sv.sv.configstrings[(start + i) as usize].is_empty() {
                 // Didn't find it
                 SV_SetConfigstring(view, sv, start + i, name);
                 break;
-            } else if Q_stricmp(sv.sv.configstrings[(start + i) as usize], name) == 0 {
+            } else if Q_stricmpBytes(
+                sv.sv.configstrings[(start + i) as usize].as_bytes(),
+                CStr::from_ptr(name).to_bytes(),
+            ) == 0
+            {
                 return i;
             }
         }
@@ -591,7 +619,8 @@ pub fn SV_SpawnServer(
     // wipe the entire per-level structure
     SV_ClearServer(view.common, sv);
     for i in 0..MAX_CONFIGSTRINGS {
-        sv.sv.configstrings[i] = CopyString(view, c"".as_ptr());
+        // Raven `configstrings[i] = CopyString("")` — the empty owned string.
+        sv.sv.configstrings[i] = String::new();
     }
 
     //rww - RAGDOLL_BEGIN

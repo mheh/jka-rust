@@ -33,7 +33,6 @@ use native_string::atoi::atoi;
 use native_string::cstr::{buf_to_string, cstr, strncpyz_string};
 use native_string::{Info_SetValueForKey, Info_ValueForKey};
 use native_string::q_string::{Q_strcmpBytes, Q_stricmp};
-use native_string::q_strncpyz::Q_strncpyz;
 
 use mp_engine_qcommon::msg::{MSG_ReadString, MSG_WriteBigString, MSG_WriteString};
 use mp_engine_qcommon::cmd_common::Cmd_Argv;
@@ -57,11 +56,10 @@ pub fn SV_ResetPureClient_f(cl: *mut client_t) {
 /// Source: `oracle/codemp/server/sv_client.cpp:1452-1500`
 pub fn SV_UserinfoChanged(view: &mut EngineHostView, cl: *mut client_t) {
     unsafe {
-        // Raven reads/writes `cl->userinfo` in place; the `&str`/`String` info
-        // API works a snapshot, written back after the one mutating set below.
-        let mut userinfo = buf_to_string(CStr::from_ptr((*cl).userinfo.as_ptr()).to_bytes());
-
-        let name = Info_ValueForKey(&userinfo, "name");
+        // Raven reads/writes `cl->userinfo` in place; the owned `String` field
+        // is read and mutated directly (the one set below is bounded to
+        // MAX_INFO_STRING inside `Info_SetValueForKey`).
+        let name = Info_ValueForKey(&(*cl).userinfo, "name");
         // Raven `Q_strncpyz(cl->name, ..., sizeof(cl->name))` — byte-truncate the
         // extracted name to MAX_NAME_LENGTH into the String field.
         (*cl).name = strncpyz_string(name.as_bytes(), MAX_NAME_LENGTH);
@@ -74,7 +72,7 @@ pub fn SV_UserinfoChanged(view: &mut EngineHostView, cl: *mut client_t) {
             // lans should not rate limit
             (*cl).rate = 99999;
         } else {
-            let val = Info_ValueForKey(&userinfo, "rate");
+            let val = Info_ValueForKey(&(*cl).userinfo, "rate");
             if !val.is_empty() {
                 let i = atoi(&val);
                 (*cl).rate = i;
@@ -88,21 +86,22 @@ pub fn SV_UserinfoChanged(view: &mut EngineHostView, cl: *mut client_t) {
             }
         }
 
-        let val = Info_ValueForKey(&userinfo, "handicap");
+        let val = Info_ValueForKey(&(*cl).userinfo, "handicap");
         if !val.is_empty() {
             let i = atoi(&val);
             if i <= 0 || i > 100 || val.len() > 4 {
+                // Raven mutates `cl->userinfo` in place; `Info_SetValueForKey`
+                // is internally bounded to MAX_INFO_STRING, so the old
+                // write-back copy is subsumed.
                 info_set_report(
-                    Info_SetValueForKey(&mut userinfo, "handicap", "100"),
+                    Info_SetValueForKey(&mut (*cl).userinfo, "handicap", "100"),
                     "Info string length exceeded\n",
                 );
-                let ui_len = (*cl).userinfo.len();
-                Q_strncpyz(&mut (*cl).userinfo, &userinfo, ui_len);
             }
         }
 
         // snaps command
-        let val = Info_ValueForKey(&userinfo, "snaps");
+        let val = Info_ValueForKey(&(*cl).userinfo, "snaps");
         if !val.is_empty() {
             let mut i = atoi(&val);
             if i < 1 {
@@ -387,12 +386,9 @@ pub fn SV_Disconnect_f(common: &mut Common, sv: &mut Server, cl: *mut client_t) 
 /// Source: `oracle/codemp/server/sv_client.cpp:1510-1535`
 pub fn SV_UpdateUserinfo_f(view: &mut EngineHostView, sv: &mut Server, cl: *mut client_t) {
     unsafe {
-        let ui_len = (*cl).userinfo.len();
-        Q_strncpyz(
-            &mut (*cl).userinfo,
-            mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, 1),
-            ui_len,
-        );
+        // Raven `Q_strncpyz(cl->userinfo, Cmd_Argv(1), sizeof(cl->userinfo))` —
+        // byte-truncate the argv to MAX_INFO_STRING into the owned userinfo.
+        (*cl).userinfo = strncpyz_string(Cmd_Argv(view.common, 1).as_bytes(), MAX_INFO_STRING);
 
         // FINAL_BUILD is not defined in this build (porting-rules FINAL_BUILD
         // precedent) — only the unconditional else-branch is live.
@@ -957,9 +953,10 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
             qport,
         );
 
-        // save the userinfo (owned info string into the client's C array)
-        let cl_ui_len = (*cl_ptr).userinfo.len();
-        Q_strncpyz(&mut (*cl_ptr).userinfo, &userinfo, cl_ui_len);
+        // save the userinfo. Raven `Q_strncpyz(cl->userinfo, userinfo,
+        // sizeof(cl->userinfo))` — byte-truncate to MAX_INFO_STRING into the
+        // owned userinfo string.
+        (*cl_ptr).userinfo = strncpyz_string(userinfo.as_bytes(), MAX_INFO_STRING);
 
         // get the game a chance to reject this connection or modify the userinfo
         // Real `&mut Server` in scope — reach the game VM directly (rule 7).
@@ -1131,19 +1128,16 @@ pub fn SV_SendClientGameState(view: &mut EngineHostView, sv: &mut Server, client
 
         // write the configstrings
         for start in 0..mp_qshared::shared::game_state::MAX_CONFIGSTRINGS {
-            let cs = sv.sv.configstrings[start as usize];
-            if !cs.is_null() && *cs != 0 {
+            let cs = &sv.sv.configstrings[start as usize];
+            // "" == Raven's null slot; Raven's `cs[0]` non-empty test is `!is_empty`.
+            if !cs.is_empty() {
                 mp_engine_qcommon::msg::MSG_WriteByte(
                     view.common,
                     &mut msg,
                     mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::svc_configstring as c_int,
                 );
                 mp_engine_qcommon::msg::MSG_WriteShort(view.common, &mut msg, start as c_int);
-                MSG_WriteBigString(
-                    view.common,
-                    &mut msg,
-                    &CStr::from_ptr(cs).to_string_lossy(),
-                );
+                MSG_WriteBigString(view.common, &mut msg, cs);
             }
         }
 
