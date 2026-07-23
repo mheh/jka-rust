@@ -5,6 +5,7 @@
 #![allow(non_camel_case_types, non_snake_case, clippy::missing_safety_doc)]
 
 use core::ffi::{c_char, c_int, c_ulong, c_void};
+use std::ffi::{CStr, CString};
 
 use mp_engine_qcommon::common::Common;
 use mp_qshared::common::mp::botlib::bot_consolemessage_s::bot_consolemessage_t;
@@ -16,6 +17,7 @@ use mp_qshared::shared::limits::MAX_CLIENTS;
 use mp_qshared::shared::q_string::Q_strncpyz;
 
 use crate::be_ai_chat::bot_chat_s::bot_chat_t;
+use crate::be_interface::botimport_print;
 use crate::be_ai_chat::bot_chatmessage_s::bot_chatmessage_t;
 use crate::be_ai_chat::bot_chatstate_s::{bot_chatstate_t, MAX_MESSAGE_SIZE};
 use crate::be_ai_chat::bot_chattype_s::bot_chattype_t;
@@ -39,9 +41,9 @@ use crate::be_ai_chat::chat_cpp_consts::{
     RCKFL_GENDERFEMALE, RCKFL_GENDERLESS, RCKFL_GENDERMALE, RCKFL_NAME, RCKFL_NOT, RCKFL_STRING,
     RCKFL_VARIABLES,
 };
-use crate::l_precomp::source_s::source_t;
+use crate::l_precomp::source_s::Source;
 use crate::l_script::consts::{TT_INTEGER, TT_NAME, TT_NUMBER, TT_PUNCTUATION, TT_STRING};
-use crate::l_script::token_s::token_t;
+use crate::l_script::token_s::Token;
 use crate::BotLib;
 
 use crate::be_aas_main::AAS_Time;
@@ -63,7 +65,7 @@ use mp_engine_qcommon::common_fns::{Com_Memcpy, Com_Memset};
 pub fn BotChatStateFromHandle(bot: &mut BotLib, handle: c_int) -> *mut bot_chatstate_t {
     if handle <= 0 || handle > MAX_CLIENTS as c_int {
         unsafe {
-            crate::be_interface::botimport_print(
+            botimport_print(
                 bot,
                 PRT_FATAL,
                 "chat state handle %d out of range\n",
@@ -73,7 +75,7 @@ pub fn BotChatStateFromHandle(bot: &mut BotLib, handle: c_int) -> *mut bot_chats
     }
     let cs = bot.botchatstates[handle as usize];
     if cs.is_null() {
-        unsafe { crate::be_interface::botimport_print(bot, PRT_FATAL, "invalid chat state %d\n") };
+        unsafe { botimport_print(bot, PRT_FATAL, "invalid chat state %d\n") };
         return core::ptr::null_mut();
     }
     cs
@@ -289,7 +291,7 @@ pub fn BotMatchVariable(
 ) {
     unsafe {
         if variable < 0 || variable >= MAX_MATCHVARIABLES as c_int {
-            crate::be_interface::botimport_print(
+            botimport_print(
                 bot,
                 PRT_FATAL,
                 "BotMatchVariable: variable out of range\n",
@@ -338,49 +340,49 @@ pub fn BotFindStringInList(
 /// Source: `oracle/codemp/botlib/be_ai_chat.cpp:2556-2590`
 pub fn BotPrintReplyChatKeys(bot: &mut BotLib, replychat: *mut bot_replychat_t) {
     unsafe {
-        crate::be_interface::botimport_print(bot, PRT_MESSAGE, "[");
+        botimport_print(bot, PRT_MESSAGE, "[");
         let mut key = (*replychat).keys;
         while !key.is_null() {
             let flags = (*key).flags;
             if flags & RCKFL_AND != 0 {
-                crate::be_interface::botimport_print(bot, PRT_MESSAGE, "&");
+                botimport_print(bot, PRT_MESSAGE, "&");
             } else if flags & RCKFL_NOT != 0 {
-                crate::be_interface::botimport_print(bot, PRT_MESSAGE, "!");
+                botimport_print(bot, PRT_MESSAGE, "!");
             }
             if flags & RCKFL_NAME != 0 {
-                crate::be_interface::botimport_print(bot, PRT_MESSAGE, "name");
+                botimport_print(bot, PRT_MESSAGE, "name");
             } else if flags & RCKFL_GENDERFEMALE != 0 {
-                crate::be_interface::botimport_print(bot, PRT_MESSAGE, "female");
+                botimport_print(bot, PRT_MESSAGE, "female");
             } else if flags & RCKFL_GENDERMALE != 0 {
-                crate::be_interface::botimport_print(bot, PRT_MESSAGE, "male");
+                botimport_print(bot, PRT_MESSAGE, "male");
             } else if flags & RCKFL_GENDERLESS != 0 {
-                crate::be_interface::botimport_print(bot, PRT_MESSAGE, "it");
+                botimport_print(bot, PRT_MESSAGE, "it");
             } else if flags & RCKFL_VARIABLES != 0 {
-                crate::be_interface::botimport_print(bot, PRT_MESSAGE, "(");
+                botimport_print(bot, PRT_MESSAGE, "(");
                 let mut mp = (*key).r#match;
                 while !mp.is_null() {
                     if (*mp).r#type == MT_STRING {
-                        crate::be_interface::botimport_print(bot, PRT_MESSAGE, "string");
+                        botimport_print(bot, PRT_MESSAGE, "string");
                     } else {
-                        crate::be_interface::botimport_print(bot, PRT_MESSAGE, "var");
+                        botimport_print(bot, PRT_MESSAGE, "var");
                     }
                     if !(*mp).next.is_null() {
-                        crate::be_interface::botimport_print(bot, PRT_MESSAGE, ", ");
+                        botimport_print(bot, PRT_MESSAGE, ", ");
                     }
                     mp = (*mp).next;
                 }
-                crate::be_interface::botimport_print(bot, PRT_MESSAGE, ")");
+                botimport_print(bot, PRT_MESSAGE, ")");
             } else if flags & RCKFL_STRING != 0 {
-                crate::be_interface::botimport_print(bot, PRT_MESSAGE, "string");
+                botimport_print(bot, PRT_MESSAGE, "string");
             }
             if !(*key).next.is_null() {
-                crate::be_interface::botimport_print(bot, PRT_MESSAGE, ", ");
+                botimport_print(bot, PRT_MESSAGE, ", ");
             } else {
-                crate::be_interface::botimport_print(bot, PRT_MESSAGE, "] = ...\n");
+                botimport_print(bot, PRT_MESSAGE, "] = ...\n");
             }
             key = (*key).next;
         }
-        crate::be_interface::botimport_print(bot, PRT_MESSAGE, "{\n");
+        botimport_print(bot, PRT_MESSAGE, "{\n");
     }
 }
 
@@ -449,7 +451,7 @@ pub fn BotQueueConsoleMessage(
     let m = AllocConsoleMessage(bot);
     if m.is_null() {
         unsafe {
-            crate::be_interface::botimport_print(bot, PRT_ERROR, "empty console message heap\n")
+            botimport_print(bot, PRT_ERROR, "empty console message heap\n")
         };
         return;
     }
@@ -888,7 +890,7 @@ pub fn BotDumpReplyChat(bot: &mut BotLib, replychat: *mut bot_replychat_t) {
 /// Source: `oracle/codemp/botlib/be_ai_chat.cpp:1704-1804`
 pub fn BotCheckValidReplyChatKeySet(
     bot: &mut BotLib,
-    source: *mut source_t,
+    source: &mut Source,
     keys: *mut bot_replychatkey_t,
 ) {
     unsafe {
@@ -947,7 +949,15 @@ pub fn BotCheckValidReplyChatKeySet(
                             m = (*m).next;
                         }
                         if !found {
-                            SourceWarning(bot, source, c"one of the match templates does not leave space for the key with the & prefix".as_ptr());
+                            let key_string = CStr::from_ptr((*key).string).to_string_lossy();
+                            SourceWarning(
+                                bot,
+                                source,
+                                &format!(
+                                    "one of the match templates does not leave space for the key {} with the & prefix",
+                                    key_string
+                                ),
+                            );
                         }
                     }
                     key2 = (*key2).next;
@@ -966,10 +976,15 @@ pub fn BotCheckValidReplyChatKeySet(
                     }
                     if (*key2).flags & RCKFL_STRING != 0 {
                         if StringContains((*key2).string, (*key).string, 0) != -1 {
+                            let key_string = CStr::from_ptr((*key).string).to_string_lossy();
+                            let key2_string = CStr::from_ptr((*key2).string).to_string_lossy();
                             SourceWarning(
                                 bot,
                                 source,
-                                c"the key with prefix ! is inside another key".as_ptr(),
+                                &format!(
+                                    "the key {} with prefix ! is inside the key {}",
+                                    key_string, key2_string
+                                ),
                             );
                         }
                     } else if (*key2).flags & RCKFL_VARIABLES != 0 {
@@ -979,7 +994,16 @@ pub fn BotCheckValidReplyChatKeySet(
                                 let mut ms = (*m).firststring;
                                 while !ms.is_null() {
                                     if StringContains((*ms).string, (*key).string, 0) != -1 {
-                                        SourceWarning(bot, source, c"the key with prefix ! is inside the match template string".as_ptr());
+                                        let key_string = CStr::from_ptr((*key).string).to_string_lossy();
+                                        let ms_string = CStr::from_ptr((*ms).string).to_string_lossy();
+                                        SourceWarning(
+                                            bot,
+                                            source,
+                                            &format!(
+                                                "the key {} with prefix ! is inside the match template string {}",
+                                                key_string, ms_string
+                                            ),
+                                        );
                                     }
                                     ms = (*ms).next;
                                 }
@@ -993,10 +1017,14 @@ pub fn BotCheckValidReplyChatKeySet(
             key = (*key).next;
         }
         if allprefixed {
-            SourceWarning(bot, source, c"all keys have a & or ! prefix".as_ptr());
+            SourceWarning(bot, source, "all keys have a & or ! prefix");
         }
         if hasvariableskey && hasstringkey {
-            SourceWarning(bot, source, c"variables from the match template(s) could be invalid when outputting one of the chat messages".as_ptr());
+            SourceWarning(
+                bot,
+                source,
+                "variables from the match template(s) could be invalid when outputting one of the chat messages",
+            );
         }
     }
 }
@@ -1333,7 +1361,7 @@ pub fn BotCheckChatMessageIntegrety(
                         }
                     }
                     _ => {
-                        crate::be_interface::botimport_print(
+                        botimport_print(
                             bot,
                             PRT_FATAL,
                             "BotCheckChatMessageIntegrety: invalid escape char\n",
@@ -1393,8 +1421,8 @@ pub fn BotNumInitialChats(bot: &mut BotLib, chatstate: c_int, r#type: *mut c_cha
         while !t.is_null() {
             if libc::strcasecmp((*t).name.as_ptr(), r#type) == 0 {
                 if LibVarGetValue(bot, "bot_testichat") != 0.0 {
-                    crate::be_interface::botimport_print(bot, PRT_MESSAGE, "chat lines\n");
-                    crate::be_interface::botimport_print(bot, PRT_MESSAGE, "-------------------\n");
+                    botimport_print(bot, PRT_MESSAGE, "chat lines\n");
+                    botimport_print(bot, PRT_MESSAGE, "-------------------\n");
                 }
                 return (*t).numchatmessages;
             }
@@ -1416,7 +1444,7 @@ pub fn BotEnterChat(bot: &mut BotLib, chatstate: c_int, clientto: c_int, sendto:
         if libc::strlen((*cs).chatmessage.as_ptr()) != 0 {
             BotRemoveTildes((*cs).chatmessage.as_mut_ptr());
             if LibVarGetValue(bot, "bot_testichat") != 0.0 {
-                crate::be_interface::botimport_print(bot, PRT_MESSAGE, "chatmessage\n");
+                botimport_print(bot, PRT_MESSAGE, "chatmessage\n");
             } else {
                 let msg = std::ffi::CStr::from_ptr((*cs).chatmessage.as_ptr())
                     .to_string_lossy()
@@ -1459,12 +1487,12 @@ pub fn BotAllocChatState(bot: &mut BotLib) -> c_int {
 pub fn BotFreeChatState(bot: &mut BotLib, handle: c_int) {
     if handle <= 0 || handle > MAX_CLIENTS as c_int {
         unsafe {
-            crate::be_interface::botimport_print(bot, PRT_FATAL, "chat state handle out of range\n")
+            botimport_print(bot, PRT_FATAL, "chat state handle out of range\n")
         };
         return;
     }
     if bot.botchatstates[handle as usize].is_null() {
-        unsafe { crate::be_interface::botimport_print(bot, PRT_FATAL, "invalid chat state\n") };
+        unsafe { botimport_print(bot, PRT_FATAL, "invalid chat state\n") };
         return;
     }
     if LibVarGetValue(bot, "bot_reloadcharacters") != 0.0 {
@@ -1575,7 +1603,7 @@ pub fn BotExpandChatMessage(
                             msgptr = msgptr.offset(1);
                         }
                         if num as usize > MAX_MATCHVARIABLES {
-                            crate::be_interface::botimport_print(
+                            botimport_print(
                                 bot,
                                 PRT_ERROR,
                                 "BotConstructChat: variable out of range\n",
@@ -1596,7 +1624,7 @@ pub fn BotExpandChatMessage(
                             }
                             let tlen = libc::strlen(temp.as_ptr()) as isize;
                             if len + tlen >= MAX_MESSAGE_SIZE as isize {
-                                crate::be_interface::botimport_print(
+                                botimport_print(
                                     bot,
                                     PRT_ERROR,
                                     "BotConstructChat: message too long\n",
@@ -1621,7 +1649,7 @@ pub fn BotExpandChatMessage(
                         }
                         let ptr = RandomString(common, bot, temp.as_mut_ptr());
                         if ptr.is_null() {
-                            crate::be_interface::botimport_print(
+                            botimport_print(
                                 bot,
                                 PRT_ERROR,
                                 "BotConstructChat: unknown random string\n",
@@ -1630,7 +1658,7 @@ pub fn BotExpandChatMessage(
                         }
                         let plen = libc::strlen(ptr) as isize;
                         if len + plen >= MAX_MESSAGE_SIZE as isize {
-                            crate::be_interface::botimport_print(
+                            botimport_print(
                                 bot,
                                 PRT_ERROR,
                                 "BotConstructChat: message too long\n",
@@ -1642,7 +1670,7 @@ pub fn BotExpandChatMessage(
                         expansion = 1;
                     }
                     _ => {
-                        crate::be_interface::botimport_print(
+                        botimport_print(
                             bot,
                             PRT_FATAL,
                             "BotConstructChat: invalid escape char\n",
@@ -1654,7 +1682,7 @@ pub fn BotExpandChatMessage(
                 len += 1;
                 msgptr = msgptr.offset(1);
                 if len as usize >= MAX_MESSAGE_SIZE {
-                    crate::be_interface::botimport_print(
+                    botimport_print(
                         bot,
                         PRT_ERROR,
                         "BotConstructChat: message too long\n",
@@ -1770,12 +1798,12 @@ pub fn BotConstructChatMessage(
             i += 1;
         }
         if i >= 10 {
-            crate::be_interface::botimport_print(
+            botimport_print(
                 bot,
                 PRT_WARNING,
                 "too many expansions in chat message\n",
             );
-            crate::be_interface::botimport_print(bot, PRT_WARNING, "chatmessage\n");
+            botimport_print(bot, PRT_WARNING, "chatmessage\n");
         }
     }
 }
@@ -2010,7 +2038,7 @@ pub fn BotReplyChat(
                         1,
                     );
                     BotRemoveTildes((*cs).chatmessage.as_mut_ptr());
-                    crate::be_interface::botimport_print(bot, PRT_MESSAGE, "chatmessage\n");
+                    botimport_print(bot, PRT_MESSAGE, "chatmessage\n");
                     m = (*m).next;
                 }
             } else {
@@ -2040,46 +2068,49 @@ pub fn BotLoadSynonyms(bot: &mut BotLib, filename: *mut c_char) -> *mut bot_syno
         let mut size: usize = 0;
         let mut synlist: *mut bot_synonymlist_t = core::ptr::null_mut();
         let mut ptr: *mut c_char = core::ptr::null_mut();
+        let filename_str = CStr::from_ptr(filename).to_string_lossy().into_owned();
         for pass in 0..2 {
             if pass != 0 && size != 0 {
                 ptr = GetClearedHunkMemory(bot, (size) as c_ulong) as *mut c_char;
             }
-            PC_SetBaseFolder(bot, BOTFILESBASEFOLDER.as_ptr() as *mut c_char);
-            let source = LoadSourceFile(bot, filename);
-            if source.is_null() {
-                crate::be_interface::botimport_print(bot, PRT_ERROR, "counldn't load file\n");
-                return core::ptr::null_mut();
-            }
+            PC_SetBaseFolder(bot, BOTFILESBASEFOLDER);
+            let mut source = match LoadSourceFile(bot, &filename_str) {
+                Some(s) => s,
+                None => {
+                    botimport_print(bot, PRT_ERROR, "counldn't load file\n");
+                    return core::ptr::null_mut();
+                }
+            };
             let mut context: c_ulong = 0;
             let mut contextlevel: isize = 0;
             let mut contextstack = [0 as c_ulong; 32];
             synlist = core::ptr::null_mut();
             let mut lastsyn: *mut bot_synonymlist_t = core::ptr::null_mut();
-            let mut token = core::mem::zeroed::<token_t>();
-            while PC_ReadToken(bot, source, &mut token) != 0 {
-                if token.r#type == TT_NUMBER {
+            let mut token = Token::default();
+            while PC_ReadToken(bot, &mut source, &mut token) != 0 {
+                if token.type_ == TT_NUMBER {
                     context |= token.intvalue as c_ulong;
                     contextstack[contextlevel as usize] = token.intvalue as c_ulong;
                     contextlevel += 1;
                     if contextlevel >= 32 {
-                        SourceError(bot, source, c"more than 32 context levels".as_ptr());
-                        FreeSource(bot, source);
+                        SourceError(bot, &source, "more than 32 context levels");
+                        FreeSource(source);
                         return core::ptr::null_mut();
                     }
-                    if PC_ExpectTokenString(bot, source, c"{".as_ptr() as *mut c_char) == 0 {
-                        FreeSource(bot, source);
+                    if PC_ExpectTokenString(bot, &mut source, "{") == 0 {
+                        FreeSource(source);
                         return core::ptr::null_mut();
                     }
-                } else if token.r#type == TT_PUNCTUATION {
-                    if libc::strcmp(token.string.as_ptr(), c"}".as_ptr()) == 0 {
+                } else if token.type_ == TT_PUNCTUATION {
+                    if token.string == "}" {
                         contextlevel -= 1;
                         if contextlevel < 0 {
-                            SourceError(bot, source, c"too many }".as_ptr());
-                            FreeSource(bot, source);
+                            SourceError(bot, &source, "too many }");
+                            FreeSource(source);
                             return core::ptr::null_mut();
                         }
                         context &= !contextstack[contextlevel as usize];
-                    } else if libc::strcmp(token.string.as_ptr(), c"[".as_ptr()) == 0 {
+                    } else if token.string == "[" {
                         size += core::mem::size_of::<bot_synonymlist_t>();
                         let mut syn: *mut bot_synonymlist_t = core::ptr::null_mut();
                         if pass != 0 {
@@ -2098,28 +2129,29 @@ pub fn BotLoadSynonyms(bot: &mut BotLib, filename: *mut c_char) -> *mut bot_syno
                         let mut numsynonyms = 0;
                         let mut lastsynonym: *mut bot_synonym_t = core::ptr::null_mut();
                         loop {
-                            if PC_ExpectTokenString(bot, source, c"(".as_ptr() as *mut c_char) == 0
-                                || PC_ExpectTokenType(bot, source, TT_STRING, 0, &mut token) == 0
+                            if PC_ExpectTokenString(bot, &mut source, "(") == 0
+                                || PC_ExpectTokenType(bot, &mut source, TT_STRING, 0, &mut token)
+                                    == 0
                             {
-                                FreeSource(bot, source);
+                                FreeSource(source);
                                 return core::ptr::null_mut();
                             }
-                            StripDoubleQuotes(token.string.as_mut_ptr());
-                            if libc::strlen(token.string.as_ptr()) == 0 {
-                                SourceError(bot, source, c"empty string".as_ptr());
-                                FreeSource(bot, source);
+                            StripDoubleQuotes(&mut token.string);
+                            if token.string.is_empty() {
+                                SourceError(bot, &source, "empty string");
+                                FreeSource(source);
                                 return core::ptr::null_mut();
                             }
-                            size += core::mem::size_of::<bot_synonym_t>()
-                                + libc::strlen(token.string.as_ptr())
-                                + 1;
+                            size += core::mem::size_of::<bot_synonym_t>() + token.string.len() + 1;
                             let mut synonym: *mut bot_synonym_t = core::ptr::null_mut();
                             if pass != 0 {
                                 synonym = ptr as *mut bot_synonym_t;
                                 ptr = ptr.add(core::mem::size_of::<bot_synonym_t>());
                                 (*synonym).string = ptr;
-                                ptr = ptr.add(libc::strlen(token.string.as_ptr()) + 1);
-                                libc::strcpy((*synonym).string, token.string.as_ptr());
+                                ptr = ptr.add(token.string.len() + 1);
+                                let token_string_c =
+                                    CString::new(token.string.as_str()).unwrap_or_default();
+                                libc::strcpy((*synonym).string, token_string_c.as_ptr());
                                 if !lastsynonym.is_null() {
                                     (*lastsynonym).next = synonym;
                                 } else {
@@ -2128,50 +2160,52 @@ pub fn BotLoadSynonyms(bot: &mut BotLib, filename: *mut c_char) -> *mut bot_syno
                                 lastsynonym = synonym;
                             }
                             numsynonyms += 1;
-                            if PC_ExpectTokenString(bot, source, c",".as_ptr() as *mut c_char) == 0
-                                || PC_ExpectTokenType(bot, source, TT_NUMBER, 0, &mut token) == 0
-                                || PC_ExpectTokenString(bot, source, c")".as_ptr() as *mut c_char)
+                            if PC_ExpectTokenString(bot, &mut source, ",") == 0
+                                || PC_ExpectTokenType(bot, &mut source, TT_NUMBER, 0, &mut token)
                                     == 0
+                                || PC_ExpectTokenString(bot, &mut source, ")") == 0
                             {
-                                FreeSource(bot, source);
+                                FreeSource(source);
                                 return core::ptr::null_mut();
                             }
                             if pass != 0 {
                                 (*synonym).weight = token.floatvalue as f32;
                                 (*syn).totalweight += (*synonym).weight;
                             }
-                            if PC_CheckTokenString(bot, source, c"]".as_ptr() as *mut c_char) != 0 {
+                            if PC_CheckTokenString(bot, &mut source, "]") != 0 {
                                 break;
                             }
-                            if PC_ExpectTokenString(bot, source, c",".as_ptr() as *mut c_char) == 0
-                            {
-                                FreeSource(bot, source);
+                            if PC_ExpectTokenString(bot, &mut source, ",") == 0 {
+                                FreeSource(source);
                                 return core::ptr::null_mut();
                             }
                         }
                         if numsynonyms < 2 {
-                            SourceError(
-                                bot,
-                                source,
-                                c"synonym must have at least two entries\n".as_ptr(),
-                            );
-                            FreeSource(bot, source);
+                            SourceError(bot, &source, "synonym must have at least two entries\n");
+                            FreeSource(source);
                             return core::ptr::null_mut();
                         }
                     } else {
-                        SourceError(bot, source, c"unexpected token".as_ptr());
-                        FreeSource(bot, source);
+                        SourceError(bot, &source, &format!("unexpected {}", token.string));
+                        FreeSource(source);
                         return core::ptr::null_mut();
                     }
                 }
             }
-            FreeSource(bot, source);
+            // Raven frees `source` before checking `contextlevel`, so
+            // `SourceError` on the "missing }" path reads an already-freed
+            // source there — undefined in C. `FreeSource` now consumes the
+            // value, so that ordering can't type-check; check-then-free below
+            // preserves the diagnostic (same message, same source state when
+            // printed) and frees exactly once either way.
             if contextlevel > 0 {
-                SourceError(bot, source, c"missing }".as_ptr());
+                SourceError(bot, &source, "missing }");
+                FreeSource(source);
                 return core::ptr::null_mut();
             }
+            FreeSource(source);
         }
-        crate::be_interface::botimport_print(bot, PRT_MESSAGE, "loaded synonyms\n");
+        botimport_print(bot, PRT_MESSAGE, "loaded synonyms\n");
         synlist
     }
 }
@@ -2181,52 +2215,59 @@ pub fn BotLoadSynonyms(bot: &mut BotLib, filename: *mut c_char) -> *mut bot_syno
 /// Source: `oracle/codemp/botlib/be_ai_chat.cpp:845-897`
 pub fn BotLoadChatMessage(
     bot: &mut BotLib,
-    source: *mut source_t,
+    source: &mut Source,
     chatmessagestring: *mut c_char,
 ) -> c_int {
     unsafe {
         let ptr = chatmessagestring;
         *ptr = 0;
-        let mut token = core::mem::zeroed::<token_t>();
+        let mut token = Token::default();
         loop {
             if PC_ExpectAnyToken(bot, source, &mut token) == 0 {
                 return 0;
             }
-            if token.r#type == TT_STRING {
-                StripDoubleQuotes(token.string.as_mut_ptr());
-                if libc::strlen(ptr) + libc::strlen(token.string.as_ptr()) + 1 > MAX_MESSAGE_SIZE {
-                    SourceError(bot, source, c"chat message too long\n".as_ptr());
+            if token.type_ == TT_STRING {
+                StripDoubleQuotes(&mut token.string);
+                if libc::strlen(ptr) + token.string.len() + 1 > MAX_MESSAGE_SIZE {
+                    SourceError(bot, source, "chat message too long\n");
                     return 0;
                 }
-                libc::strcat(ptr, token.string.as_ptr());
-            } else if token.r#type == TT_NUMBER && (token.subtype & TT_INTEGER) != 0 {
+                let token_string_c = CString::new(token.string.as_str()).unwrap_or_default();
+                libc::strcat(ptr, token_string_c.as_ptr());
+            } else if token.type_ == TT_NUMBER && (token.subtype & TT_INTEGER) != 0 {
                 if libc::strlen(ptr) + 7 > MAX_MESSAGE_SIZE {
-                    SourceError(bot, source, c"chat message too long\n".as_ptr());
+                    SourceError(bot, source, "chat message too long\n");
                     return 0;
                 }
                 let fmt = format!(
                     "{}v{}{}",
                     ESCAPE_CHAR as char, token.intvalue, ESCAPE_CHAR as char
                 );
-                let cs = std::ffi::CString::new(fmt).unwrap_or_default();
+                let cs = CString::new(fmt).unwrap_or_default();
                 libc::strcat(ptr, cs.as_ptr());
-            } else if token.r#type == TT_NAME {
+            } else if token.type_ == TT_NAME {
                 if libc::strlen(ptr) + 7 > MAX_MESSAGE_SIZE {
-                    SourceError(bot, source, c"chat message too long\n".as_ptr());
+                    SourceError(bot, source, "chat message too long\n");
                     return 0;
                 }
-                let name = std::ffi::CStr::from_ptr(token.string.as_ptr()).to_string_lossy();
-                let fmt = format!("{}r{}{}", ESCAPE_CHAR as char, name, ESCAPE_CHAR as char);
-                let cs = std::ffi::CString::new(fmt).unwrap_or_default();
+                let fmt = format!(
+                    "{}r{}{}",
+                    ESCAPE_CHAR as char, token.string, ESCAPE_CHAR as char
+                );
+                let cs = CString::new(fmt).unwrap_or_default();
                 libc::strcat(ptr, cs.as_ptr());
             } else {
-                SourceError(bot, source, c"unknown message component\n".as_ptr());
+                SourceError(
+                    bot,
+                    source,
+                    &format!("unknown message component {}\n", token.string),
+                );
                 return 0;
             }
-            if PC_CheckTokenString(bot, source, c";".as_ptr() as *mut c_char) != 0 {
+            if PC_CheckTokenString(bot, source, ";") != 0 {
                 break;
             }
-            if PC_ExpectTokenString(bot, source, c",".as_ptr() as *mut c_char) == 0 {
+            if PC_ExpectTokenString(bot, source, ",") == 0 {
                 return 0;
             }
         }
@@ -2237,35 +2278,40 @@ pub fn BotLoadChatMessage(
 /// Raven `BotLoadMatchPieces`.
 ///
 /// Source: `oracle/codemp/botlib/be_ai_chat.cpp:1122-1217`
+// Raven frees `source` deep inside this function on every failure path (the
+// nested-free pattern below), then the caller returns without freeing again.
+// The new `Source` ownership model only lets the owner (the top-level loader
+// that called `LoadSourceFile`) consume it via `FreeSource`, so this helper —
+// which only borrows `&mut Source` — can no longer free it itself; callers
+// now call `FreeSource` immediately after a null return instead (see
+// `BotLoadMatchTemplates` / `BotLoadReplyChat`). Pure bookkeeping relocation:
+// the file is still closed exactly once, at the same logical failure point.
 pub fn BotLoadMatchPieces(
     bot: &mut BotLib,
-    source: *mut source_t,
-    endtoken: *mut c_char,
+    source: &mut Source,
+    endtoken: &str,
 ) -> *mut bot_matchpiece_t {
     unsafe {
         let mut firstpiece: *mut bot_matchpiece_t = core::ptr::null_mut();
         let mut lastpiece: *mut bot_matchpiece_t = core::ptr::null_mut();
         let mut lastwasvariable = false;
-        let mut token = core::mem::zeroed::<token_t>();
+        let mut token = Token::default();
         while PC_ReadToken(bot, source, &mut token) != 0 {
-            if token.r#type == TT_NUMBER && (token.subtype & TT_INTEGER) != 0 {
+            if token.type_ == TT_NUMBER && (token.subtype & TT_INTEGER) != 0 {
                 if token.intvalue as usize >= MAX_MATCHVARIABLES {
                     SourceError(
                         bot,
                         source,
-                        c"can't have more than max match variables\n".as_ptr(),
+                        &format!(
+                            "can't have more than {} match variables\n",
+                            MAX_MATCHVARIABLES
+                        ),
                     );
-                    FreeSource(bot, source);
                     BotFreeMatchPieces(bot, firstpiece);
                     return core::ptr::null_mut();
                 }
                 if lastwasvariable {
-                    SourceError(
-                        bot,
-                        source,
-                        c"not allowed to have adjacent variables\n".as_ptr(),
-                    );
-                    FreeSource(bot, source);
+                    SourceError(bot, source, "not allowed to have adjacent variables\n");
                     BotFreeMatchPieces(bot, firstpiece);
                     return core::ptr::null_mut();
                 }
@@ -2283,7 +2329,7 @@ pub fn BotLoadMatchPieces(
                     firstpiece = matchpiece;
                 }
                 lastpiece = matchpiece;
-            } else if token.r#type == TT_STRING {
+            } else if token.type_ == TT_STRING {
                 let matchpiece = GetClearedHunkMemory(
                     bot,
                     (core::mem::size_of::<bot_matchpiece_t>()) as c_ulong,
@@ -2304,19 +2350,19 @@ pub fn BotLoadMatchPieces(
                     if !(*matchpiece).firststring.is_null()
                         && PC_ExpectTokenType(bot, source, TT_STRING, 0, &mut token) == 0
                     {
-                        FreeSource(bot, source);
                         BotFreeMatchPieces(bot, firstpiece);
                         return core::ptr::null_mut();
                     }
-                    StripDoubleQuotes(token.string.as_mut_ptr());
-                    let tlen = libc::strlen(token.string.as_ptr());
+                    StripDoubleQuotes(&mut token.string);
+                    let tlen = token.string.len();
                     let matchstring = GetClearedHunkMemory(
                         bot,
                         (core::mem::size_of::<bot_matchstring_t>() + tlen + 1) as c_ulong,
                     ) as *mut bot_matchstring_t;
                     (*matchstring).string =
                         (matchstring as *mut c_char).add(core::mem::size_of::<bot_matchstring_t>());
-                    libc::strcpy((*matchstring).string, token.string.as_ptr());
+                    let token_string_c = CString::new(token.string.as_str()).unwrap_or_default();
+                    libc::strcpy((*matchstring).string, token_string_c.as_ptr());
                     if tlen == 0 {
                         emptystring = true;
                     }
@@ -2327,7 +2373,7 @@ pub fn BotLoadMatchPieces(
                         (*matchpiece).firststring = matchstring;
                     }
                     lastmatchstring = matchstring;
-                    if PC_CheckTokenString(bot, source, c"|".as_ptr() as *mut c_char) == 0 {
+                    if PC_CheckTokenString(bot, source, "|") == 0 {
                         break;
                     }
                 }
@@ -2335,16 +2381,14 @@ pub fn BotLoadMatchPieces(
                     lastwasvariable = false;
                 }
             } else {
-                SourceError(bot, source, c"invalid token\n".as_ptr());
-                FreeSource(bot, source);
+                SourceError(bot, source, &format!("invalid token {}\n", token.string));
                 BotFreeMatchPieces(bot, firstpiece);
                 return core::ptr::null_mut();
             }
             if PC_CheckTokenString(bot, source, endtoken) != 0 {
                 break;
             }
-            if PC_ExpectTokenString(bot, source, c",".as_ptr() as *mut c_char) == 0 {
-                FreeSource(bot, source);
+            if PC_ExpectTokenString(bot, source, ",") == 0 {
                 BotFreeMatchPieces(bot, firstpiece);
                 return core::ptr::null_mut();
             }
@@ -2361,36 +2405,38 @@ pub fn BotLoadRandomStrings(bot: &mut BotLib, filename: *mut c_char) -> *mut bot
         let mut size: usize = 0;
         let mut ptr: *mut c_char = core::ptr::null_mut();
         let mut randomlist: *mut bot_randomlist_t = core::ptr::null_mut();
+        let filename_str = CStr::from_ptr(filename).to_string_lossy().into_owned();
         for pass in 0..2 {
             if pass != 0 && size != 0 {
                 ptr = GetClearedHunkMemory(bot, (size) as c_ulong) as *mut c_char;
             }
-            PC_SetBaseFolder(bot, BOTFILESBASEFOLDER.as_ptr() as *mut c_char);
-            let source = LoadSourceFile(bot, filename);
-            if source.is_null() {
-                crate::be_interface::botimport_print(bot, PRT_ERROR, "counldn't load file\n");
-                return core::ptr::null_mut();
-            }
-            randomlist = core::ptr::null_mut();
-            let mut lastrandom: *mut bot_randomlist_t = core::ptr::null_mut();
-            let mut token = core::mem::zeroed::<token_t>();
-            let mut chatmessagestring = [0 as c_char; MAX_MESSAGE_SIZE];
-            while PC_ReadToken(bot, source, &mut token) != 0 {
-                if token.r#type != TT_NAME {
-                    SourceError(bot, source, c"unknown random".as_ptr());
-                    FreeSource(bot, source);
+            PC_SetBaseFolder(bot, BOTFILESBASEFOLDER);
+            let mut source = match LoadSourceFile(bot, &filename_str) {
+                Some(s) => s,
+                None => {
+                    botimport_print(bot, PRT_ERROR, "counldn't load file\n");
                     return core::ptr::null_mut();
                 }
-                size += core::mem::size_of::<bot_randomlist_t>()
-                    + libc::strlen(token.string.as_ptr())
-                    + 1;
+            };
+            randomlist = core::ptr::null_mut();
+            let mut lastrandom: *mut bot_randomlist_t = core::ptr::null_mut();
+            let mut token = Token::default();
+            let mut chatmessagestring = [0 as c_char; MAX_MESSAGE_SIZE];
+            while PC_ReadToken(bot, &mut source, &mut token) != 0 {
+                if token.type_ != TT_NAME {
+                    SourceError(bot, &source, &format!("unknown random {}", token.string));
+                    FreeSource(source);
+                    return core::ptr::null_mut();
+                }
+                size += core::mem::size_of::<bot_randomlist_t>() + token.string.len() + 1;
                 let mut random: *mut bot_randomlist_t = core::ptr::null_mut();
                 if pass != 0 {
                     random = ptr as *mut bot_randomlist_t;
                     ptr = ptr.add(core::mem::size_of::<bot_randomlist_t>());
                     (*random).string = ptr;
-                    ptr = ptr.add(libc::strlen(token.string.as_ptr()) + 1);
-                    libc::strcpy((*random).string, token.string.as_ptr());
+                    ptr = ptr.add(token.string.len() + 1);
+                    let token_string_c = CString::new(token.string.as_str()).unwrap_or_default();
+                    libc::strcpy((*random).string, token_string_c.as_ptr());
                     (*random).firstrandomstring = core::ptr::null_mut();
                     (*random).numstrings = 0;
                     if !lastrandom.is_null() {
@@ -2400,15 +2446,15 @@ pub fn BotLoadRandomStrings(bot: &mut BotLib, filename: *mut c_char) -> *mut bot
                     }
                     lastrandom = random;
                 }
-                if PC_ExpectTokenString(bot, source, c"=".as_ptr() as *mut c_char) == 0
-                    || PC_ExpectTokenString(bot, source, c"{".as_ptr() as *mut c_char) == 0
+                if PC_ExpectTokenString(bot, &mut source, "=") == 0
+                    || PC_ExpectTokenString(bot, &mut source, "{") == 0
                 {
-                    FreeSource(bot, source);
+                    FreeSource(source);
                     return core::ptr::null_mut();
                 }
-                while PC_CheckTokenString(bot, source, c"}".as_ptr() as *mut c_char) == 0 {
-                    if BotLoadChatMessage(bot, source, chatmessagestring.as_mut_ptr()) == 0 {
-                        FreeSource(bot, source);
+                while PC_CheckTokenString(bot, &mut source, "}") == 0 {
+                    if BotLoadChatMessage(bot, &mut source, chatmessagestring.as_mut_ptr()) == 0 {
+                        FreeSource(source);
                         return core::ptr::null_mut();
                     }
                     size += core::mem::size_of::<bot_randomstring_t>()
@@ -2426,9 +2472,9 @@ pub fn BotLoadRandomStrings(bot: &mut BotLib, filename: *mut c_char) -> *mut bot
                     }
                 }
             }
-            FreeSource(bot, source);
+            FreeSource(source);
         }
-        crate::be_interface::botimport_print(bot, PRT_MESSAGE, "loaded random strings\n");
+        botimport_print(bot, PRT_MESSAGE, "loaded random strings\n");
         randomlist
     }
 }
@@ -2438,33 +2484,40 @@ pub fn BotLoadRandomStrings(bot: &mut BotLib, filename: *mut c_char) -> *mut bot
 /// Source: `oracle/codemp/botlib/be_ai_chat.cpp:1241-1333`
 pub fn BotLoadMatchTemplates(bot: &mut BotLib, matchfile: *mut c_char) -> *mut bot_matchtemplate_t {
     unsafe {
-        PC_SetBaseFolder(bot, BOTFILESBASEFOLDER.as_ptr() as *mut c_char);
-        let source = LoadSourceFile(bot, matchfile);
-        if source.is_null() {
-            crate::be_interface::botimport_print(bot, PRT_ERROR, "counldn't load file\n");
-            return core::ptr::null_mut();
-        }
+        PC_SetBaseFolder(bot, BOTFILESBASEFOLDER);
+        let matchfile_str = CStr::from_ptr(matchfile).to_string_lossy().into_owned();
+        let mut source = match LoadSourceFile(bot, &matchfile_str) {
+            Some(s) => s,
+            None => {
+                botimport_print(bot, PRT_ERROR, "counldn't load file\n");
+                return core::ptr::null_mut();
+            }
+        };
         let mut matches: *mut bot_matchtemplate_t = core::ptr::null_mut();
         let mut lastmatch: *mut bot_matchtemplate_t = core::ptr::null_mut();
-        let mut token = core::mem::zeroed::<token_t>();
-        while PC_ReadToken(bot, source, &mut token) != 0 {
-            if token.r#type != TT_NUMBER || (token.subtype & TT_INTEGER) == 0 {
-                SourceError(bot, source, c"expected integer\n".as_ptr());
+        let mut token = Token::default();
+        while PC_ReadToken(bot, &mut source, &mut token) != 0 {
+            if token.type_ != TT_NUMBER || (token.subtype & TT_INTEGER) == 0 {
+                SourceError(
+                    bot,
+                    &source,
+                    &format!("expected integer, found {}\n", token.string),
+                );
                 BotFreeMatchTemplates(bot, matches);
-                FreeSource(bot, source);
+                FreeSource(source);
                 return core::ptr::null_mut();
             }
             let context = token.intvalue as c_ulong;
-            if PC_ExpectTokenString(bot, source, c"{".as_ptr() as *mut c_char) == 0 {
+            if PC_ExpectTokenString(bot, &mut source, "{") == 0 {
                 BotFreeMatchTemplates(bot, matches);
-                FreeSource(bot, source);
+                FreeSource(source);
                 return core::ptr::null_mut();
             }
-            while PC_ReadToken(bot, source, &mut token) != 0 {
-                if libc::strcmp(token.string.as_ptr(), c"}".as_ptr()) == 0 {
+            while PC_ReadToken(bot, &mut source, &mut token) != 0 {
+                if token.string == "}" {
                     break;
                 }
-                PC_UnreadLastToken(bot, source);
+                PC_UnreadLastToken(&mut source);
                 let matchtemplate = GetClearedHunkMemory(
                     bot,
                     (core::mem::size_of::<bot_matchtemplate_t>()) as c_ulong,
@@ -2477,39 +2530,43 @@ pub fn BotLoadMatchTemplates(bot: &mut BotLib, matchfile: *mut c_char) -> *mut b
                     matches = matchtemplate;
                 }
                 lastmatch = matchtemplate;
-                (*matchtemplate).first =
-                    BotLoadMatchPieces(bot, source, c"=".as_ptr() as *mut c_char);
+                // `BotLoadMatchPieces` no longer frees `source` internally on
+                // failure (it only borrows `&mut Source`); free it here on
+                // the null-return path — see the comment on
+                // `BotLoadMatchPieces` above.
+                (*matchtemplate).first = BotLoadMatchPieces(bot, &mut source, "=");
                 if (*matchtemplate).first.is_null() {
                     BotFreeMatchTemplates(bot, matches);
+                    FreeSource(source);
                     return core::ptr::null_mut();
                 }
-                if PC_ExpectTokenString(bot, source, c"(".as_ptr() as *mut c_char) == 0
-                    || PC_ExpectTokenType(bot, source, TT_NUMBER, TT_INTEGER, &mut token) == 0
+                if PC_ExpectTokenString(bot, &mut source, "(") == 0
+                    || PC_ExpectTokenType(bot, &mut source, TT_NUMBER, TT_INTEGER, &mut token) == 0
                 {
                     BotFreeMatchTemplates(bot, matches);
-                    FreeSource(bot, source);
+                    FreeSource(source);
                     return core::ptr::null_mut();
                 }
                 (*matchtemplate).r#type = token.intvalue as i32;
-                if PC_ExpectTokenString(bot, source, c",".as_ptr() as *mut c_char) == 0
-                    || PC_ExpectTokenType(bot, source, TT_NUMBER, TT_INTEGER, &mut token) == 0
+                if PC_ExpectTokenString(bot, &mut source, ",") == 0
+                    || PC_ExpectTokenType(bot, &mut source, TT_NUMBER, TT_INTEGER, &mut token) == 0
                 {
                     BotFreeMatchTemplates(bot, matches);
-                    FreeSource(bot, source);
+                    FreeSource(source);
                     return core::ptr::null_mut();
                 }
                 (*matchtemplate).subtype = token.intvalue as i32;
-                if PC_ExpectTokenString(bot, source, c")".as_ptr() as *mut c_char) == 0
-                    || PC_ExpectTokenString(bot, source, c";".as_ptr() as *mut c_char) == 0
+                if PC_ExpectTokenString(bot, &mut source, ")") == 0
+                    || PC_ExpectTokenString(bot, &mut source, ";") == 0
                 {
                     BotFreeMatchTemplates(bot, matches);
-                    FreeSource(bot, source);
+                    FreeSource(source);
                     return core::ptr::null_mut();
                 }
             }
         }
-        FreeSource(bot, source);
-        crate::be_interface::botimport_print(bot, PRT_MESSAGE, "loaded match templates\n");
+        FreeSource(source);
+        botimport_print(bot, PRT_MESSAGE, "loaded match templates\n");
         matches
     }
 }
@@ -2525,19 +2582,22 @@ pub fn BotLoadReplyChat(
     unsafe {
         let mut chatmessagestring = [0 as c_char; MAX_MESSAGE_SIZE];
         let mut namebuffer = [0 as c_char; MAX_MESSAGE_SIZE];
-        PC_SetBaseFolder(bot, BOTFILESBASEFOLDER.as_ptr() as *mut c_char);
-        let source = LoadSourceFile(bot, filename);
-        if source.is_null() {
-            crate::be_interface::botimport_print(bot, PRT_ERROR, "counldn't load file\n");
-            return core::ptr::null_mut();
-        }
+        PC_SetBaseFolder(bot, BOTFILESBASEFOLDER);
+        let filename_str = CStr::from_ptr(filename).to_string_lossy().into_owned();
+        let mut source = match LoadSourceFile(bot, &filename_str) {
+            Some(s) => s,
+            None => {
+                botimport_print(bot, PRT_ERROR, "counldn't load file\n");
+                return core::ptr::null_mut();
+            }
+        };
         let mut replychatlist: *mut bot_replychat_t = core::ptr::null_mut();
-        let mut token = core::mem::zeroed::<token_t>();
-        while PC_ReadToken(bot, source, &mut token) != 0 {
-            if libc::strcmp(token.string.as_ptr(), c"[".as_ptr()) != 0 {
-                SourceError(bot, source, c"expected [".as_ptr());
+        let mut token = Token::default();
+        while PC_ReadToken(bot, &mut source, &mut token) != 0 {
+            if token.string != "[" {
+                SourceError(bot, &source, &format!("expected [, found {}", token.string));
                 BotFreeReplyChat(bot, replychatlist);
-                FreeSource(bot, source);
+                FreeSource(source);
                 return core::ptr::null_mut();
             }
             let replychat =
@@ -2556,47 +2616,51 @@ pub fn BotLoadReplyChat(
                 (*key).r#match = core::ptr::null_mut();
                 (*key).next = (*replychat).keys;
                 (*replychat).keys = key;
-                if PC_CheckTokenString(bot, source, c"&".as_ptr() as *mut c_char) != 0 {
+                if PC_CheckTokenString(bot, &mut source, "&") != 0 {
                     (*key).flags |= RCKFL_AND;
-                } else if PC_CheckTokenString(bot, source, c"!".as_ptr() as *mut c_char) != 0 {
+                } else if PC_CheckTokenString(bot, &mut source, "!") != 0 {
                     (*key).flags |= RCKFL_NOT;
                 }
-                if PC_CheckTokenString(bot, source, c"name".as_ptr() as *mut c_char) != 0 {
+                if PC_CheckTokenString(bot, &mut source, "name") != 0 {
                     (*key).flags |= RCKFL_NAME;
-                } else if PC_CheckTokenString(bot, source, c"female".as_ptr() as *mut c_char) != 0 {
+                } else if PC_CheckTokenString(bot, &mut source, "female") != 0 {
                     (*key).flags |= RCKFL_GENDERFEMALE;
-                } else if PC_CheckTokenString(bot, source, c"male".as_ptr() as *mut c_char) != 0 {
+                } else if PC_CheckTokenString(bot, &mut source, "male") != 0 {
                     (*key).flags |= RCKFL_GENDERMALE;
-                } else if PC_CheckTokenString(bot, source, c"it".as_ptr() as *mut c_char) != 0 {
+                } else if PC_CheckTokenString(bot, &mut source, "it") != 0 {
                     (*key).flags |= RCKFL_GENDERLESS;
-                } else if PC_CheckTokenString(bot, source, c"(".as_ptr() as *mut c_char) != 0 {
+                } else if PC_CheckTokenString(bot, &mut source, "(") != 0 {
                     (*key).flags |= RCKFL_VARIABLES;
-                    (*key).r#match = BotLoadMatchPieces(bot, source, c")".as_ptr() as *mut c_char);
+                    // See the comment on `BotLoadMatchPieces`: it no longer
+                    // frees `source` internally, so free it here on failure.
+                    (*key).r#match = BotLoadMatchPieces(bot, &mut source, ")");
                     if (*key).r#match.is_null() {
                         BotFreeReplyChat(bot, replychatlist);
+                        FreeSource(source);
                         return core::ptr::null_mut();
                     }
-                } else if PC_CheckTokenString(bot, source, c"<".as_ptr() as *mut c_char) != 0 {
+                } else if PC_CheckTokenString(bot, &mut source, "<") != 0 {
                     (*key).flags |= RCKFL_BOTNAMES;
                     libc::strcpy(namebuffer.as_mut_ptr(), c"".as_ptr());
                     loop {
-                        if PC_ExpectTokenType(bot, source, TT_STRING, 0, &mut token) == 0 {
+                        if PC_ExpectTokenType(bot, &mut source, TT_STRING, 0, &mut token) == 0 {
                             BotFreeReplyChat(bot, replychatlist);
-                            FreeSource(bot, source);
+                            FreeSource(source);
                             return core::ptr::null_mut();
                         }
-                        StripDoubleQuotes(token.string.as_mut_ptr());
+                        StripDoubleQuotes(&mut token.string);
                         if libc::strlen(namebuffer.as_ptr()) != 0 {
                             libc::strcat(namebuffer.as_mut_ptr(), c"\\".as_ptr());
                         }
-                        libc::strcat(namebuffer.as_mut_ptr(), token.string.as_ptr());
-                        if PC_CheckTokenString(bot, source, c",".as_ptr() as *mut c_char) == 0 {
+                        let token_string_c = CString::new(token.string.as_str()).unwrap_or_default();
+                        libc::strcat(namebuffer.as_mut_ptr(), token_string_c.as_ptr());
+                        if PC_CheckTokenString(bot, &mut source, ",") == 0 {
                             break;
                         }
                     }
-                    if PC_ExpectTokenString(bot, source, c">".as_ptr() as *mut c_char) == 0 {
+                    if PC_ExpectTokenString(bot, &mut source, ">") == 0 {
                         BotFreeReplyChat(bot, replychatlist);
-                        FreeSource(bot, source);
+                        FreeSource(source);
                         return core::ptr::null_mut();
                     }
                     let nlen = libc::strlen(namebuffer.as_ptr());
@@ -2604,40 +2668,41 @@ pub fn BotLoadReplyChat(
                     libc::strcpy((*key).string, namebuffer.as_ptr());
                 } else {
                     (*key).flags |= RCKFL_STRING;
-                    if PC_ExpectTokenType(bot, source, TT_STRING, 0, &mut token) == 0 {
+                    if PC_ExpectTokenType(bot, &mut source, TT_STRING, 0, &mut token) == 0 {
                         BotFreeReplyChat(bot, replychatlist);
-                        FreeSource(bot, source);
+                        FreeSource(source);
                         return core::ptr::null_mut();
                     }
-                    StripDoubleQuotes(token.string.as_mut_ptr());
-                    let tlen = libc::strlen(token.string.as_ptr());
+                    StripDoubleQuotes(&mut token.string);
+                    let token_string_c = CString::new(token.string.as_str()).unwrap_or_default();
+                    let tlen = token.string.len();
                     (*key).string = GetClearedHunkMemory(bot, (tlen + 1) as c_ulong) as *mut c_char;
-                    libc::strcpy((*key).string, token.string.as_ptr());
+                    libc::strcpy((*key).string, token_string_c.as_ptr());
                 }
-                PC_CheckTokenString(bot, source, c",".as_ptr() as *mut c_char);
-                if PC_CheckTokenString(bot, source, c"]".as_ptr() as *mut c_char) != 0 {
+                PC_CheckTokenString(bot, &mut source, ",");
+                if PC_CheckTokenString(bot, &mut source, "]") != 0 {
                     break;
                 }
             }
-            BotCheckValidReplyChatKeySet(bot, source, (*replychat).keys);
-            if PC_ExpectTokenString(bot, source, c"=".as_ptr() as *mut c_char) == 0
-                || PC_ExpectTokenType(bot, source, TT_NUMBER, 0, &mut token) == 0
+            BotCheckValidReplyChatKeySet(bot, &mut source, (*replychat).keys);
+            if PC_ExpectTokenString(bot, &mut source, "=") == 0
+                || PC_ExpectTokenType(bot, &mut source, TT_NUMBER, 0, &mut token) == 0
             {
                 BotFreeReplyChat(bot, replychatlist);
-                FreeSource(bot, source);
+                FreeSource(source);
                 return core::ptr::null_mut();
             }
             (*replychat).priority = token.floatvalue as f32;
-            if PC_ExpectTokenString(bot, source, c"{".as_ptr() as *mut c_char) == 0 {
+            if PC_ExpectTokenString(bot, &mut source, "{") == 0 {
                 BotFreeReplyChat(bot, replychatlist);
-                FreeSource(bot, source);
+                FreeSource(source);
                 return core::ptr::null_mut();
             }
             (*replychat).numchatmessages = 0;
-            while PC_CheckTokenString(bot, source, c"}".as_ptr() as *mut c_char) == 0 {
-                if BotLoadChatMessage(bot, source, chatmessagestring.as_mut_ptr()) == 0 {
+            while PC_CheckTokenString(bot, &mut source, "}") == 0 {
+                if BotLoadChatMessage(bot, &mut source, chatmessagestring.as_mut_ptr()) == 0 {
                     BotFreeReplyChat(bot, replychatlist);
-                    FreeSource(bot, source);
+                    FreeSource(source);
                     return core::ptr::null_mut();
                 }
                 let clen = libc::strlen(chatmessagestring.as_ptr());
@@ -2654,13 +2719,13 @@ pub fn BotLoadReplyChat(
                 (*replychat).numchatmessages += 1;
             }
         }
-        FreeSource(bot, source);
-        crate::be_interface::botimport_print(bot, PRT_MESSAGE, "loaded reply chat\n");
+        FreeSource(source);
+        botimport_print(bot, PRT_MESSAGE, "loaded reply chat\n");
         if bot.bot_developer != 0 {
             BotCheckReplyChatIntegrety(common, bot, replychatlist);
         }
         if replychatlist.is_null() {
-            crate::be_interface::botimport_print(bot, PRT_MESSAGE, "no rchats\n");
+            botimport_print(bot, PRT_MESSAGE, "no rchats\n");
         }
         replychatlist
     }
@@ -2682,63 +2747,72 @@ pub fn BotLoadInitialChat(
         let mut foundchat = false;
         let mut chatmessagestring = [0 as c_char; MAX_MESSAGE_SIZE];
         size = 0;
+        let chatfile_str = CStr::from_ptr(chatfile).to_string_lossy().into_owned();
+        let chatname_str = CStr::from_ptr(chatname).to_string_lossy().into_owned();
         for pass in 0..2 {
             if pass != 0 && size != 0 {
                 ptr = GetClearedMemory(bot, (size) as c_ulong) as *mut c_char;
             }
-            PC_SetBaseFolder(bot, BOTFILESBASEFOLDER.as_ptr() as *mut c_char);
-            let source = LoadSourceFile(bot, chatfile);
-            if source.is_null() {
-                crate::be_interface::botimport_print(bot, PRT_ERROR, "counldn't load file\n");
-                return core::ptr::null_mut();
-            }
+            PC_SetBaseFolder(bot, BOTFILESBASEFOLDER);
+            let mut source = match LoadSourceFile(bot, &chatfile_str) {
+                Some(s) => s,
+                None => {
+                    botimport_print(bot, PRT_ERROR, "counldn't load file\n");
+                    return core::ptr::null_mut();
+                }
+            };
             if pass != 0 {
                 chat = ptr as *mut bot_chat_t;
                 ptr = ptr.add(core::mem::size_of::<bot_chat_t>());
             }
             size = core::mem::size_of::<bot_chat_t>();
-            let mut token = core::mem::zeroed::<token_t>();
-            while PC_ReadToken(bot, source, &mut token) != 0 {
-                if libc::strcmp(token.string.as_ptr(), c"chat".as_ptr()) == 0 {
-                    if PC_ExpectTokenType(bot, source, TT_STRING, 0, &mut token) == 0 {
-                        FreeSource(bot, source);
+            let mut token = Token::default();
+            while PC_ReadToken(bot, &mut source, &mut token) != 0 {
+                if token.string == "chat" {
+                    if PC_ExpectTokenType(bot, &mut source, TT_STRING, 0, &mut token) == 0 {
+                        FreeSource(source);
                         return core::ptr::null_mut();
                     }
-                    StripDoubleQuotes(token.string.as_mut_ptr());
-                    if PC_ExpectTokenString(bot, source, c"{".as_ptr() as *mut c_char) == 0 {
-                        FreeSource(bot, source);
+                    StripDoubleQuotes(&mut token.string);
+                    if PC_ExpectTokenString(bot, &mut source, "{") == 0 {
+                        FreeSource(source);
                         return core::ptr::null_mut();
                     }
-                    if libc::strcasecmp(token.string.as_ptr(), chatname) == 0 {
+                    if token.string.eq_ignore_ascii_case(&chatname_str) {
                         foundchat = true;
                         loop {
-                            if PC_ExpectAnyToken(bot, source, &mut token) == 0 {
-                                FreeSource(bot, source);
+                            if PC_ExpectAnyToken(bot, &mut source, &mut token) == 0 {
+                                FreeSource(source);
                                 return core::ptr::null_mut();
                             }
-                            if libc::strcmp(token.string.as_ptr(), c"}".as_ptr()) == 0 {
+                            if token.string == "}" {
                                 break;
                             }
-                            if libc::strcmp(token.string.as_ptr(), c"type".as_ptr()) != 0 {
-                                SourceError(bot, source, c"expected type\n".as_ptr());
-                                FreeSource(bot, source);
+                            if token.string != "type" {
+                                SourceError(
+                                    bot,
+                                    &source,
+                                    &format!("expected type found {}\n", token.string),
+                                );
+                                FreeSource(source);
                                 return core::ptr::null_mut();
                             }
-                            if PC_ExpectTokenType(bot, source, TT_STRING, 0, &mut token) == 0
-                                || PC_ExpectTokenString(bot, source, c"{".as_ptr() as *mut c_char)
-                                    == 0
+                            if PC_ExpectTokenType(bot, &mut source, TT_STRING, 0, &mut token) == 0
+                                || PC_ExpectTokenString(bot, &mut source, "{") == 0
                             {
-                                FreeSource(bot, source);
+                                FreeSource(source);
                                 return core::ptr::null_mut();
                             }
-                            StripDoubleQuotes(token.string.as_mut_ptr());
+                            StripDoubleQuotes(&mut token.string);
                             let mut chattype: *mut bot_chattype_t = core::ptr::null_mut();
                             if pass != 0 {
                                 chattype = ptr as *mut bot_chattype_t;
-                                libc::strncpy(
+                                let token_string_c =
+                                    CString::new(token.string.as_str()).unwrap_or_default();
+                                Q_strncpyz(
                                     (*chattype).name.as_mut_ptr(),
-                                    token.string.as_ptr(),
-                                    MAX_CHATTYPE_NAME as usize,
+                                    token_string_c.as_ptr(),
+                                    MAX_CHATTYPE_NAME as c_int,
                                 );
                                 (*chattype).firstchatmessage = core::ptr::null_mut();
                                 (*chattype).next = (*chat).types;
@@ -2746,13 +2820,14 @@ pub fn BotLoadInitialChat(
                                 ptr = ptr.add(core::mem::size_of::<bot_chattype_t>());
                             }
                             size += core::mem::size_of::<bot_chattype_t>();
-                            while PC_CheckTokenString(bot, source, c"}".as_ptr() as *mut c_char)
-                                == 0
-                            {
-                                if BotLoadChatMessage(bot, source, chatmessagestring.as_mut_ptr())
-                                    == 0
+                            while PC_CheckTokenString(bot, &mut source, "}") == 0 {
+                                if BotLoadChatMessage(
+                                    bot,
+                                    &mut source,
+                                    chatmessagestring.as_mut_ptr(),
+                                ) == 0
                                 {
-                                    FreeSource(bot, source);
+                                    FreeSource(source);
                                     return core::ptr::null_mut();
                                 }
                                 if pass != 0 {
@@ -2777,30 +2852,30 @@ pub fn BotLoadInitialChat(
                     } else {
                         let mut indent = 1;
                         while indent != 0 {
-                            if PC_ExpectAnyToken(bot, source, &mut token) == 0 {
-                                FreeSource(bot, source);
+                            if PC_ExpectAnyToken(bot, &mut source, &mut token) == 0 {
+                                FreeSource(source);
                                 return core::ptr::null_mut();
                             }
-                            if libc::strcmp(token.string.as_ptr(), c"{".as_ptr()) == 0 {
+                            if token.string == "{" {
                                 indent += 1;
-                            } else if libc::strcmp(token.string.as_ptr(), c"}".as_ptr()) == 0 {
+                            } else if token.string == "}" {
                                 indent -= 1;
                             }
                         }
                     }
                 } else {
-                    SourceError(bot, source, c"unknown definition\n".as_ptr());
-                    FreeSource(bot, source);
+                    SourceError(bot, &source, &format!("unknown definition {}\n", token.string));
+                    FreeSource(source);
                     return core::ptr::null_mut();
                 }
             }
-            FreeSource(bot, source);
+            FreeSource(source);
             if !foundchat {
-                crate::be_interface::botimport_print(bot, PRT_ERROR, "couldn't find chat\n");
+                botimport_print(bot, PRT_ERROR, "couldn't find chat\n");
                 return core::ptr::null_mut();
             }
         }
-        crate::be_interface::botimport_print(bot, PRT_MESSAGE, "loaded chat\n");
+        botimport_print(bot, PRT_MESSAGE, "loaded chat\n");
         if bot.bot_developer != 0 {
             BotCheckInitialChatIntegrety(common, bot, chat);
         }
@@ -2844,13 +2919,13 @@ pub fn BotLoadChatFile(
                 return BLERR_NOERROR;
             }
             if avail == -1 {
-                crate::be_interface::botimport_print(bot, PRT_FATAL, "ichatdata table full\n");
+                botimport_print(bot, PRT_FATAL, "ichatdata table full\n");
                 return BLERR_CANNOTLOADICHAT;
             }
         }
         (*cs).chat = BotLoadInitialChat(common, bot, chatfile, chatname);
         if (*cs).chat.is_null() {
-            crate::be_interface::botimport_print(bot, PRT_FATAL, "couldn't load chat\n");
+            botimport_print(bot, PRT_FATAL, "couldn't load chat\n");
             return BLERR_CANNOTLOADICHAT;
         }
         if LibVarGetValue(bot, "bot_reloadcharacters") == 0.0 {

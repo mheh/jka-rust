@@ -12,6 +12,7 @@
 //! Source: `oracle/codemp/botlib/be_ai_goal.cpp`
 
 use core::ffi::{c_char, c_int, c_ulong};
+use std::ffi::{CStr, CString};
 
 use mp_engine_qcommon::common::Common;
 use mp_engine_qcommon::common_fns::{Com_Memcpy, Com_Memset};
@@ -42,7 +43,7 @@ use crate::be_ai_goal::iteminfo_s::iteminfo_t;
 use crate::be_ai_goal::levelitem_s::levelitem_t;
 use crate::be_ai_weight::weightconfig_s::weightconfig_t;
 use crate::l_script::consts::TT_STRING;
-use crate::l_script::token_s::token_t;
+use crate::l_script::token_s::Token;
 use crate::l_struct::structdef_s::structdef_t;
 use crate::BotLib;
 use crate::{campspot_t, maplocation_t};
@@ -72,6 +73,7 @@ use crate::l_precomp_fns::{
 };
 use crate::l_script_fns::StripDoubleQuotes;
 use crate::l_struct_fns::ReadStructure;
+use mp_qshared::shared::q_string::Q_strncpyz;
 use mp_qshared::shared::q_math::{_VectorAdd, _VectorScale, _VectorSubtract, VectorLength};
 
 // helper: vector arithmetic used inline below (mirrors the qshared q_math
@@ -1804,16 +1806,19 @@ pub fn LoadItemConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut itemconfi
         const MAX_PATH: usize = 260;
         let mut path = [0 as c_char; MAX_PATH];
         libc::strncpy(path.as_mut_ptr(), filename, MAX_PATH);
-        PC_SetBaseFolder(bot, BOTFILESBASEFOLDER.as_ptr() as *mut c_char);
-        let source = LoadSourceFile(bot, path.as_ptr());
-        if source.is_null() {
-            bot.botimport.Print.unwrap()(
-                PRT_ERROR,
-                c"counldn't load %s\n".as_ptr() as *mut c_char,
-                path.as_ptr(),
-            );
-            return core::ptr::null_mut();
-        }
+        PC_SetBaseFolder(bot, BOTFILESBASEFOLDER);
+        let path_str = CStr::from_ptr(path.as_ptr()).to_string_lossy().into_owned();
+        let mut source = match LoadSourceFile(bot, &path_str) {
+            Some(s) => s,
+            None => {
+                bot.botimport.Print.unwrap()(
+                    PRT_ERROR,
+                    c"counldn't load %s\n".as_ptr() as *mut c_char,
+                    path.as_ptr(),
+                );
+                return core::ptr::null_mut();
+            }
+        };
         //initialize item config
         let ic = GetClearedHunkMemory(
             bot,
@@ -1825,54 +1830,55 @@ pub fn LoadItemConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut itemconfi
             (ic as *mut u8).add(core::mem::size_of::<itemconfig_t>()) as *mut iteminfo_t;
         (*ic).numiteminfo = 0;
         //parse the item config file
-        let mut token: token_t = core::mem::zeroed();
-        while PC_ReadToken(bot, source, &mut token) != 0 {
-            if libc::strcmp(token.string.as_ptr(), c"iteminfo".as_ptr()) == 0 {
+        let mut token = Token::default();
+        while PC_ReadToken(bot, &mut source, &mut token) != 0 {
+            if token.string == "iteminfo" {
                 if (*ic).numiteminfo >= max_iteminfo {
-                    let __m = std::ffi::CString::new(format!(
-                        "more than {} item info defined\n",
-                        max_iteminfo
-                    ))
-                    .unwrap_or_default();
-                    SourceError(bot, source, __m.as_ptr());
+                    SourceError(
+                        bot,
+                        &source,
+                        &format!("more than {} item info defined\n", max_iteminfo),
+                    );
                     FreeMemory(bot, ic as *mut ());
-                    FreeSource(bot, source);
+                    FreeSource(source);
                     return core::ptr::null_mut();
                 }
                 let ii = (*ic).iteminfo.add((*ic).numiteminfo as usize);
                 Com_Memset(ii as *mut (), 0, core::mem::size_of::<iteminfo_t>());
-                if PC_ExpectTokenType(bot, source, TT_STRING, 0, &mut token) == 0 {
+                if PC_ExpectTokenType(bot, &mut source, TT_STRING, 0, &mut token) == 0 {
                     FreeMemory(bot, ic as *mut ());
-                    FreeMemory(bot, source as *mut ());
+                    // Raven `FreeMemory(source)` here (partial free/leak, oracle
+                    // be_ai_goal.cpp:297); owned drop frees fully — unobservable.
+                    FreeSource(source);
                     return core::ptr::null_mut();
                 }
-                StripDoubleQuotes(token.string.as_mut_ptr());
-                libc::strncpy(
+                StripDoubleQuotes(&mut token.string);
+                let classname_c = CString::new(token.string.as_str()).unwrap_or_default();
+                Q_strncpyz(
                     (*ii).classname.as_mut_ptr(),
-                    token.string.as_ptr(),
-                    core::mem::size_of_val(&(*ii).classname) - 1,
+                    classname_c.as_ptr(),
+                    core::mem::size_of_val(&(*ii).classname) as c_int,
                 );
                 let iteminfo_struct_ptr = &mut bot.iteminfo_struct as *mut structdef_t;
-                if ReadStructure(bot, source, iteminfo_struct_ptr, ii as *mut c_char) == 0 {
+                if ReadStructure(bot, &mut source, iteminfo_struct_ptr, ii as *mut c_char) == 0 {
                     FreeMemory(bot, ic as *mut ());
-                    FreeSource(bot, source);
+                    FreeSource(source);
                     return core::ptr::null_mut();
                 }
                 (*ii).number = (*ic).numiteminfo;
                 (*ic).numiteminfo += 1;
             } else {
-                let __m = std::ffi::CString::new(format!(
-                    "unknown definition {}\n",
-                    std::ffi::CStr::from_ptr(token.string.as_ptr()).to_string_lossy(),
-                ))
-                .unwrap_or_default();
-                SourceError(bot, source, __m.as_ptr());
+                SourceError(
+                    bot,
+                    &source,
+                    &format!("unknown definition {}\n", token.string),
+                );
                 FreeMemory(bot, ic as *mut ());
-                FreeSource(bot, source);
+                FreeSource(source);
                 return core::ptr::null_mut();
             }
         }
-        FreeSource(bot, source);
+        FreeSource(source);
 
         if (*ic).numiteminfo == 0 {
             bot.botimport.Print.unwrap()(

@@ -15,15 +15,23 @@
 //! Source: `oracle/codemp/botlib/l_struct.cpp`
 
 use core::ffi::{c_char, c_int};
+use std::ffi::CString;
 
 use libc::FILE;
 
+use mp_qshared::shared::q_string::Q_strncpyz;
 use mp_qshared::shared::{qfalse, qtrue};
 use native_types::qboolean;
 
-use crate::l_precomp::source_s::source_t;
-use crate::l_script::consts::{TT_LITERAL, TT_NUMBER, TT_PUNCTUATION};
-use crate::l_script::token_s::token_t;
+use crate::be_ai_goal::iteminfo_s::MAX_STRINGFIELD;
+use crate::l_precomp::source_s::Source;
+use crate::l_precomp_fns::{
+    PC_CheckTokenString, PC_ExpectAnyToken, PC_ExpectTokenString, PC_ExpectTokenType,
+    PC_UnreadLastToken, SourceError,
+};
+use crate::l_script::consts::{TT_FLOAT, TT_LITERAL, TT_NUMBER, TT_PUNCTUATION, TT_STRING};
+use crate::l_script::token_s::Token;
+use crate::l_script_fns::{StripDoubleQuotes, StripSingleQuotes};
 use crate::l_struct::fielddef_s::fielddef_t;
 use crate::l_struct::l_struct_consts::{
     FT_ARRAY, FT_BOUNDED, FT_CHAR, FT_FLOAT, FT_INT, FT_STRING, FT_STRUCT, FT_TYPE, FT_UNSIGNED,
@@ -220,67 +228,56 @@ pub fn WriteStructure(fp: *mut FILE, def: *mut structdef_t, structure: *mut c_ch
 /// Source: `oracle/codemp/botlib/l_struct.cpp:59-167`
 pub fn ReadNumber(
     bot: &mut BotLib,
-    source: *mut source_t,
+    source: &mut Source,
     fd: *mut fielddef_t,
     p: *mut (),
 ) -> qboolean {
     unsafe {
-        let mut token: token_t = core::mem::zeroed();
+        let mut token = Token::default();
         let mut negative: c_int = qfalse;
         let mut intval: i64;
         let mut intmin: i64 = 0;
         let mut intmax: i64 = 0;
         let floatval: f64;
 
-        if crate::l_precomp_fns::PC_ExpectAnyToken(bot, source, &mut token) == 0 {
+        if PC_ExpectAnyToken(bot, source, &mut token) == 0 {
             return 0;
         }
 
         //check for minus sign
-        if token.r#type == TT_PUNCTUATION {
+        if token.type_ == TT_PUNCTUATION {
             if (*fd).r#type & FT_UNSIGNED != 0 {
-                crate::l_precomp_fns::source_error!(
+                SourceError(
                     bot,
                     source,
-                    c"expected unsigned value, found %s".as_ptr() as *mut c_char,
-                    token.string.as_ptr(),
+                    &format!("expected unsigned value, found {}", token.string),
                 );
                 return 0;
             }
             //if not a minus sign
-            if libc::strcmp(token.string.as_ptr(), c"-".as_ptr()) != 0 {
-                crate::l_precomp_fns::source_error!(
+            if token.string != "-" {
+                SourceError(
                     bot,
                     source,
-                    c"unexpected punctuation %s".as_ptr() as *mut c_char,
-                    token.string.as_ptr(),
+                    &format!("unexpected punctuation {}", token.string),
                 );
                 return 0;
             }
             negative = qtrue;
             //read the number
-            if crate::l_precomp_fns::PC_ExpectAnyToken(bot, source, &mut token) == 0 {
+            if PC_ExpectAnyToken(bot, source, &mut token) == 0 {
                 return 0;
             }
         }
         //check if it is a number
-        if token.r#type != TT_NUMBER {
-            crate::l_precomp_fns::source_error!(
-                bot,
-                source,
-                c"expected number, found %s".as_ptr() as *mut c_char,
-                token.string.as_ptr(),
-            );
+        if token.type_ != TT_NUMBER {
+            SourceError(bot, source, &format!("expected number, found {}", token.string));
             return 0;
         }
         //check for a float value
-        if token.subtype & crate::l_script::consts::TT_FLOAT != 0 {
+        if token.subtype & TT_FLOAT != 0 {
             if ((*fd).r#type & FT_TYPE) != FT_FLOAT {
-                crate::l_precomp_fns::SourceError(
-                    bot,
-                    source,
-                    c"unexpected float".as_ptr() as *mut c_char,
-                );
+                SourceError(bot, source, "unexpected float");
                 return 0;
             }
             floatval = if negative != 0 {
@@ -290,12 +287,14 @@ pub fn ReadNumber(
             };
             if (*fd).r#type & FT_BOUNDED != 0 {
                 if floatval < (*fd).floatmin as f64 || floatval > (*fd).floatmax as f64 {
-                    crate::l_precomp_fns::source_error!(
+                    SourceError(
                         bot,
                         source,
-                        c"float out of range [%f, %f]".as_ptr() as *mut c_char,
-                        (*fd).floatmin as core::ffi::c_double,
-                        (*fd).floatmax as core::ffi::c_double,
+                        &format!(
+                            "float out of range [{:.6}, {:.6}]",
+                            (*fd).floatmin as core::ffi::c_double,
+                            (*fd).floatmax as core::ffi::c_double
+                        ),
                     );
                     return 0;
                 }
@@ -336,13 +335,13 @@ pub fn ReadNumber(
                 intmax = if intmax < fmax { intmax } else { fmax };
             }
             if intval < intmin || intval > intmax {
-                crate::l_precomp_fns::source_error!(
+                SourceError(
                     bot,
                     source,
-                    c"value %d out of range [%d, %d]".as_ptr() as *mut c_char,
-                    intval as c_int,
-                    intmin as c_int,
-                    intmax as c_int,
+                    &format!(
+                        "value {} out of range [{}, {}]",
+                        intval as c_int, intmin as c_int, intmax as c_int
+                    ),
                 );
                 return 0;
             }
@@ -350,13 +349,15 @@ pub fn ReadNumber(
             if (*fd).r#type & FT_BOUNDED != 0
                 && ((intval as f32) < (*fd).floatmin || (intval as f32) > (*fd).floatmax)
             {
-                crate::l_precomp_fns::source_error!(
+                SourceError(
                     bot,
                     source,
-                    c"value %d out of range [%f, %f]".as_ptr() as *mut c_char,
-                    intval as c_int,
-                    (*fd).floatmin as core::ffi::c_double,
-                    (*fd).floatmax as core::ffi::c_double,
+                    &format!(
+                        "value {} out of range [{:.6}, {:.6}]",
+                        intval as c_int,
+                        (*fd).floatmin as core::ffi::c_double,
+                        (*fd).floatmax as core::ffi::c_double
+                    ),
                 );
                 return 0;
             }
@@ -387,33 +388,23 @@ pub fn ReadNumber(
 /// Source: `oracle/codemp/botlib/l_struct.cpp:199-212`
 pub fn ReadString(
     bot: &mut BotLib,
-    source: *mut source_t,
+    source: &mut Source,
     fd: *mut fielddef_t,
     p: *mut (),
 ) -> c_int {
-    unsafe {
-        let mut token: token_t = core::mem::zeroed();
+    let mut token = Token::default();
 
-        if crate::l_precomp_fns::PC_ExpectTokenType(
-            bot,
-            source,
-            crate::l_script::consts::TT_STRING,
-            0,
-            &mut token,
-        ) == 0
-        {
-            return 0;
-        }
-        //remove the double quotes
-        crate::l_script_fns::StripDoubleQuotes(token.string.as_mut_ptr());
-        //copy the string
-        let max = crate::be_ai_goal::iteminfo_s::MAX_STRINGFIELD;
-        libc::strncpy(p as *mut c_char, token.string.as_ptr(), max);
-        //make sure the string is closed with a zero
-        *(p as *mut c_char).add(max - 1) = 0;
-        //
-        1
+    if PC_ExpectTokenType(bot, source, TT_STRING, 0, &mut token) == 0 {
+        return 0;
     }
+    //remove the double quotes
+    StripDoubleQuotes(&mut token.string);
+    //copy the string (bounded into the field's fixed MAX_STRINGFIELD buffer,
+    //preserving Raven's strncpy truncation + forced NUL terminator)
+    let token_string_c = CString::new(token.string.as_str()).unwrap_or_default();
+    Q_strncpyz(p as *mut c_char, token_string_c.as_ptr(), MAX_STRINGFIELD as c_int);
+    //
+    1
 }
 
 /// Raven `ReadChar` — read a char token: single-quoted literal, or fall
@@ -422,23 +413,25 @@ pub fn ReadString(
 /// Source: `oracle/codemp/botlib/l_struct.cpp:174-192`
 pub fn ReadChar(
     bot: &mut BotLib,
-    source: *mut source_t,
+    source: &mut Source,
     fd: *mut fielddef_t,
     p: *mut (),
 ) -> qboolean {
     unsafe {
-        let mut token: token_t = core::mem::zeroed();
+        let mut token = Token::default();
 
-        if crate::l_precomp_fns::PC_ExpectAnyToken(bot, source, &mut token) == 0 {
+        if PC_ExpectAnyToken(bot, source, &mut token) == 0 {
             return 0;
         }
 
         //take literals into account
-        if token.r#type == TT_LITERAL {
-            crate::l_script_fns::StripSingleQuotes(token.string.as_mut_ptr());
-            *(p as *mut c_char) = token.string[0];
+        if token.type_ == TT_LITERAL {
+            StripSingleQuotes(&mut token.string);
+            // Raven reads token.string[0]; an emptied literal ('') leaves the NUL
+            // terminator there, i.e. 0.
+            *(p as *mut c_char) = token.string.as_bytes().first().copied().unwrap_or(0) as c_char;
         } else {
-            crate::l_precomp_fns::PC_UnreadLastToken(bot, source);
+            PC_UnreadLastToken(source);
             if ReadNumber(bot, source, fd, p) == 0 {
                 return 0;
             }
@@ -453,48 +446,41 @@ pub fn ReadChar(
 /// Source: `oracle/codemp/botlib/l_struct.cpp:219-306`
 pub fn ReadStructure(
     bot: &mut BotLib,
-    source: *mut source_t,
+    source: &mut Source,
     def: *mut structdef_t,
     structure: *mut c_char,
 ) -> c_int {
     unsafe {
-        let mut token: token_t = core::mem::zeroed();
+        let mut token = Token::default();
         let mut fd: *mut fielddef_t;
         let mut p: *mut u8;
         let mut num: c_int;
 
-        if crate::l_precomp_fns::PC_ExpectTokenString(bot, source, c"{".as_ptr() as *mut c_char)
-            == 0
-        {
+        if PC_ExpectTokenString(bot, source, "{") == 0 {
             return 0;
         }
         loop {
-            if crate::l_precomp_fns::PC_ExpectAnyToken(bot, source, &mut token) == 0 {
+            if PC_ExpectAnyToken(bot, source, &mut token) == 0 {
                 return qfalse;
             }
             //if end of structure
-            if libc::strcmp(token.string.as_ptr(), c"}".as_ptr()) == 0 {
+            if token.string == "}" {
                 break;
             }
             //find the field with the name
-            fd = FindField((*def).fields, token.string.as_mut_ptr());
+            let token_string_c = CString::new(token.string.as_str()).unwrap_or_default();
+            fd = FindField((*def).fields, token_string_c.as_ptr() as *mut c_char);
             if fd.is_null() {
-                crate::l_precomp_fns::source_error!(
+                SourceError(
                     bot,
                     source,
-                    c"unknown structure field %s".as_ptr() as *mut c_char,
-                    token.string.as_ptr(),
+                    &format!("unknown structure field {}", token.string),
                 );
                 return qfalse;
             }
             if (*fd).r#type & FT_ARRAY != 0 {
                 num = (*fd).maxarray;
-                if crate::l_precomp_fns::PC_ExpectTokenString(
-                    bot,
-                    source,
-                    c"{".as_ptr() as *mut c_char,
-                ) == 0
-                {
+                if PC_ExpectTokenString(bot, source, "{") == 0 {
                     return qfalse;
                 }
             } else {
@@ -506,13 +492,7 @@ pub fn ReadStructure(
                 num -= 1;
                 cur > 0
             } {
-                if (*fd).r#type & FT_ARRAY != 0
-                    && crate::l_precomp_fns::PC_CheckTokenString(
-                        bot,
-                        source,
-                        c"}".as_ptr() as *mut c_char,
-                    ) != 0
-                {
+                if (*fd).r#type & FT_ARRAY != 0 && PC_CheckTokenString(bot, source, "}") != 0 {
                     break;
                 }
                 match (*fd).r#type & FT_TYPE {
@@ -542,11 +522,7 @@ pub fn ReadStructure(
                     }
                     x if x == FT_STRUCT => {
                         if (*fd).substruct.is_null() {
-                            crate::l_precomp_fns::SourceError(
-                                bot,
-                                source,
-                                c"BUG: no sub structure defined".as_ptr() as *mut c_char,
-                            );
+                            SourceError(bot, source, "BUG: no sub structure defined");
                             return qfalse;
                         }
                         // Raven ignores this recursive call's return value.
@@ -556,18 +532,17 @@ pub fn ReadStructure(
                     _ => {}
                 }
                 if (*fd).r#type & FT_ARRAY != 0 {
-                    if crate::l_precomp_fns::PC_ExpectAnyToken(bot, source, &mut token) == 0 {
+                    if PC_ExpectAnyToken(bot, source, &mut token) == 0 {
                         return qfalse;
                     }
-                    if libc::strcmp(token.string.as_ptr(), c"}".as_ptr()) == 0 {
+                    if token.string == "}" {
                         break;
                     }
-                    if libc::strcmp(token.string.as_ptr(), c",".as_ptr()) != 0 {
-                        crate::l_precomp_fns::source_error!(
+                    if token.string != "," {
+                        SourceError(
                             bot,
                             source,
-                            c"expected a comma, found %s".as_ptr() as *mut c_char,
-                            token.string.as_ptr(),
+                            &format!("expected a comma, found {}", token.string),
                         );
                         return qfalse;
                     }

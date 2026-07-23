@@ -9,6 +9,7 @@
 //! types, so `be_ai_weap.cpp`'s functions land here.
 
 use core::ffi::{c_char, c_int, c_ulong};
+use std::ffi::{CStr, CString};
 
 use mp_engine_qcommon::common_fns::{Com_Memcpy, Com_Memset};
 use mp_qshared::common::mp::botlib::botlib_error::{
@@ -28,7 +29,7 @@ use crate::be_ai_weight_fns::{FindFuzzyWeight, FreeWeightConfig, FuzzyWeight, Re
 use crate::l_libvar_fns::{LibVarSet, LibVarString, LibVarValue};
 use crate::l_memory_fns::{FreeMemory, GetClearedHunkMemory, GetClearedMemory};
 use crate::l_precomp_fns::{FreeSource, LoadSourceFile, PC_ReadToken, PC_SetBaseFolder};
-use crate::l_script::token_s::token_t;
+use crate::l_script::token_s::Token;
 use crate::l_struct::fielddef_s::fielddef_t;
 use crate::l_struct::l_struct_consts::{FT_ARRAY, FT_FLOAT, FT_INT, FT_STRING};
 use crate::l_struct::structdef_s::structdef_t;
@@ -365,16 +366,19 @@ pub fn LoadWeaponConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weaponc
         const MAX_PATH: usize = 260;
         let mut path = [0 as c_char; MAX_PATH];
         libc::strncpy(path.as_mut_ptr(), filename, MAX_PATH);
-        PC_SetBaseFolder(bot, BOTFILESBASEFOLDER.as_ptr() as *mut c_char);
-        let source = LoadSourceFile(bot, path.as_ptr());
-        if source.is_null() {
-            bot.botimport.Print.unwrap()(
-                PRT_ERROR,
-                c"counldn't load %s\n".as_ptr() as *mut c_char,
-                path.as_ptr(),
-            );
-            return core::ptr::null_mut();
-        }
+        PC_SetBaseFolder(bot, BOTFILESBASEFOLDER);
+        let path_str = CStr::from_ptr(path.as_ptr()).to_string_lossy().into_owned();
+        let mut source = match LoadSourceFile(bot, &path_str) {
+            Some(s) => s,
+            None => {
+                bot.botimport.Print.unwrap()(
+                    PRT_ERROR,
+                    c"counldn't load %s\n".as_ptr() as *mut c_char,
+                    path.as_ptr(),
+                );
+                return core::ptr::null_mut();
+            }
+        };
         //initialize weapon config
         let wc = GetClearedHunkMemory(
             bot,
@@ -391,9 +395,9 @@ pub fn LoadWeaponConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weaponc
         (*wc).numweapons = max_weaponinfo;
         (*wc).numprojectiles = 0;
         //parse the source file
-        let mut token: token_t = core::mem::zeroed();
-        while PC_ReadToken(bot, source, &mut token) != 0 {
-            if libc::strcmp(token.string.as_ptr(), c"weaponinfo".as_ptr()) == 0 {
+        let mut token = Token::default();
+        while PC_ReadToken(bot, &mut source, &mut token) != 0 {
+            if token.string == "weaponinfo" {
                 let mut weaponinfo: weaponinfo_t = core::mem::zeroed();
                 Com_Memset(
                     &mut weaponinfo as *mut _ as *mut (),
@@ -402,13 +406,13 @@ pub fn LoadWeaponConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weaponc
                 );
                 if ReadStructure(
                     bot,
-                    source,
+                    &mut source,
                     &mut weaponinfo_struct,
                     &mut weaponinfo as *mut _ as *mut c_char,
                 ) == 0
                 {
                     FreeMemory(bot, wc as *mut ());
-                    FreeSource(bot, source);
+                    FreeSource(source);
                     return core::ptr::null_mut();
                 }
                 if weaponinfo.number < 0 || weaponinfo.number >= max_weaponinfo {
@@ -419,7 +423,7 @@ pub fn LoadWeaponConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weaponc
                         path.as_ptr(),
                     );
                     FreeMemory(bot, wc as *mut ());
-                    FreeSource(bot, source);
+                    FreeSource(source);
                     return core::ptr::null_mut();
                 }
                 Com_Memcpy(
@@ -428,7 +432,7 @@ pub fn LoadWeaponConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weaponc
                     core::mem::size_of::<weaponinfo_t>(),
                 );
                 (*(*wc).weaponinfo.add(weaponinfo.number as usize)).valid = qtrue;
-            } else if libc::strcmp(token.string.as_ptr(), c"projectileinfo".as_ptr()) == 0 {
+            } else if token.string == "projectileinfo" {
                 if (*wc).numprojectiles >= max_projectileinfo {
                     bot.botimport.Print.unwrap()(
                         PRT_ERROR,
@@ -437,7 +441,7 @@ pub fn LoadWeaponConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weaponc
                         path.as_ptr(),
                     );
                     FreeMemory(bot, wc as *mut ());
-                    FreeSource(bot, source);
+                    FreeSource(source);
                     return core::ptr::null_mut();
                 }
                 Com_Memset(
@@ -447,29 +451,30 @@ pub fn LoadWeaponConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weaponc
                 );
                 if ReadStructure(
                     bot,
-                    source,
+                    &mut source,
                     &mut projectileinfo_struct,
                     (*wc).projectileinfo.add((*wc).numprojectiles as usize) as *mut c_char,
                 ) == 0
                 {
                     FreeMemory(bot, wc as *mut ());
-                    FreeSource(bot, source);
+                    FreeSource(source);
                     return core::ptr::null_mut();
                 }
                 (*wc).numprojectiles += 1;
             } else {
+                let token_string_c = CString::new(token.string.as_str()).unwrap_or_default();
                 bot.botimport.Print.unwrap()(
                     PRT_ERROR,
                     c"unknown definition %s in %s\n".as_ptr() as *mut c_char,
-                    token.string.as_ptr(),
+                    token_string_c.as_ptr(),
                     path.as_ptr(),
                 );
                 FreeMemory(bot, wc as *mut ());
-                FreeSource(bot, source);
+                FreeSource(source);
                 return core::ptr::null_mut();
             }
         }
-        FreeSource(bot, source);
+        FreeSource(source);
         //fix up weapons
         for i in 0..(*wc).numweapons {
             let wi = (*wc).weaponinfo.add(i as usize);

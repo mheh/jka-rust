@@ -89,16 +89,99 @@ use crate::be_ai_weap::weaponconfig_s::weaponconfig_t;
 use crate::be_interface::botlib_globals_s::botlib_globals_t;
 use crate::l_libvar::libvar_s::{LibVar, LibVarHandle};
 use crate::l_log::consts::MAX_LOGFILENAMESIZE;
-use crate::l_precomp::define_s::define_t;
+use crate::l_precomp::define_s::Define;
 use crate::l_precomp::precomp_consts::MAX_SOURCEFILES;
-use crate::l_precomp::source_s::source_t;
-use crate::l_script::punctuation_s::punctuation_t;
+use crate::l_precomp::source_s::Source;
+use crate::l_script::consts::{
+    P_ADD, P_ADD_ASSIGN, P_ASSIGN, P_ATSIGN, P_BACKSLASH, P_BIN_AND, P_BIN_AND_ASSIGN, P_BIN_NOT,
+    P_BIN_OR, P_BIN_OR_ASSIGN, P_BIN_XOR, P_BIN_XOR_ASSIGN, P_BRACECLOSE, P_BRACEOPEN, P_COLON,
+    P_COMMA, P_CPP1, P_CPP2, P_DEC, P_DIV, P_DIV_ASSIGN, P_DOLLAR, P_INC, P_LOGIC_AND, P_LOGIC_EQ,
+    P_LOGIC_GEQ, P_LOGIC_GREATER, P_LOGIC_LEQ, P_LOGIC_LESS, P_LOGIC_NOT, P_LOGIC_OR, P_LOGIC_UNEQ,
+    P_LSHIFT, P_LSHIFT_ASSIGN, P_MOD, P_MOD_ASSIGN, P_MUL, P_MUL_ASSIGN, P_PARENTHESESCLOSE,
+    P_PARENTHESESOPEN, P_PARMS, P_POINTERREF, P_PRECOMP, P_PRECOMPMERGE, P_QUESTIONMARK, P_REF,
+    P_RSHIFT, P_RSHIFT_ASSIGN, P_SEMICOLON, P_SQBRACKETCLOSE, P_SQBRACKETOPEN, P_SUB, P_SUB_ASSIGN,
+};
+use crate::l_script::punctuation_s::Punctuation;
 use crate::l_struct::structdef_s::structdef_t;
 
-/// Length of Raven's `default_punctuations[]` table for the MP (non-`DOLLAR`)
-/// build — 53 punctuation rows plus the trailing `{NULL, 0}` sentinel.
+/// Raven `default_punctuations[]` — the C/C++ operator table, longest match
+/// first, for the MP `DOLLAR` build (includes `$`). Raven's trailing
+/// `{NULL, 0}` sentinel is dropped: slice iteration ends at the slice bound.
 /// Source: `oracle/codemp/botlib/l_script.cpp:69-146`
-const DEFAULT_PUNCTUATIONS_LEN: usize = 54;
+pub const DEFAULT_PUNCTUATIONS: &[Punctuation] = &[
+    // binary operators
+    Punctuation { p: ">>=", n: P_RSHIFT_ASSIGN },
+    Punctuation { p: "<<=", n: P_LSHIFT_ASSIGN },
+    //
+    Punctuation { p: "...", n: P_PARMS },
+    // define merge operator
+    Punctuation { p: "##", n: P_PRECOMPMERGE },
+    // logic operators
+    Punctuation { p: "&&", n: P_LOGIC_AND },
+    Punctuation { p: "||", n: P_LOGIC_OR },
+    Punctuation { p: ">=", n: P_LOGIC_GEQ },
+    Punctuation { p: "<=", n: P_LOGIC_LEQ },
+    Punctuation { p: "==", n: P_LOGIC_EQ },
+    Punctuation { p: "!=", n: P_LOGIC_UNEQ },
+    // arithmatic operators
+    Punctuation { p: "*=", n: P_MUL_ASSIGN },
+    Punctuation { p: "/=", n: P_DIV_ASSIGN },
+    Punctuation { p: "%=", n: P_MOD_ASSIGN },
+    Punctuation { p: "+=", n: P_ADD_ASSIGN },
+    Punctuation { p: "-=", n: P_SUB_ASSIGN },
+    Punctuation { p: "++", n: P_INC },
+    Punctuation { p: "--", n: P_DEC },
+    // binary operators
+    Punctuation { p: "&=", n: P_BIN_AND_ASSIGN },
+    Punctuation { p: "|=", n: P_BIN_OR_ASSIGN },
+    Punctuation { p: "^=", n: P_BIN_XOR_ASSIGN },
+    Punctuation { p: ">>", n: P_RSHIFT },
+    Punctuation { p: "<<", n: P_LSHIFT },
+    // reference operators
+    Punctuation { p: "->", n: P_POINTERREF },
+    // C++
+    Punctuation { p: "::", n: P_CPP1 },
+    Punctuation { p: ".*", n: P_CPP2 },
+    // arithmatic operators
+    Punctuation { p: "*", n: P_MUL },
+    Punctuation { p: "/", n: P_DIV },
+    Punctuation { p: "%", n: P_MOD },
+    Punctuation { p: "+", n: P_ADD },
+    Punctuation { p: "-", n: P_SUB },
+    Punctuation { p: "=", n: P_ASSIGN },
+    // binary operators
+    Punctuation { p: "&", n: P_BIN_AND },
+    Punctuation { p: "|", n: P_BIN_OR },
+    Punctuation { p: "^", n: P_BIN_XOR },
+    Punctuation { p: "~", n: P_BIN_NOT },
+    // logic operators
+    Punctuation { p: "!", n: P_LOGIC_NOT },
+    Punctuation { p: ">", n: P_LOGIC_GREATER },
+    Punctuation { p: "<", n: P_LOGIC_LESS },
+    // reference operator
+    Punctuation { p: ".", n: P_REF },
+    // seperators
+    Punctuation { p: ",", n: P_COMMA },
+    Punctuation { p: ";", n: P_SEMICOLON },
+    // label indication
+    Punctuation { p: ":", n: P_COLON },
+    // if statement
+    Punctuation { p: "?", n: P_QUESTIONMARK },
+    // embracements
+    Punctuation { p: "(", n: P_PARENTHESESOPEN },
+    Punctuation { p: ")", n: P_PARENTHESESCLOSE },
+    Punctuation { p: "{", n: P_BRACEOPEN },
+    Punctuation { p: "}", n: P_BRACECLOSE },
+    Punctuation { p: "[", n: P_SQBRACKETOPEN },
+    Punctuation { p: "]", n: P_SQBRACKETCLOSE },
+    //
+    Punctuation { p: "\\", n: P_BACKSLASH },
+    // precompiler operator
+    Punctuation { p: "#", n: P_PRECOMP },
+    Punctuation { p: "$", n: P_DOLLAR },
+    // StringEd key
+    Punctuation { p: "@", n: P_ATSIGN },
+];
 
 /// Synthesized fork-2 owner of botlib's file-scope globals (Raven's
 /// `aasworld`, `botimport`, `be_botlib_export`, `libvarlist`, `bot_developer`,
@@ -150,10 +233,11 @@ pub struct BotLib {
     /// Raven `unsigned short crctable[257]`.
     /// Source: `oracle/codemp/botlib/l_crc.cpp:33`
     pub crctable: [c_ushort; 257],
-    /// Raven `punctuation_t default_punctuations[]` — the C/C++ operator table.
-    /// Populated at setup time (see `impl Default` below), not here.
+    /// Raven `punctuation_t default_punctuations[]` — the C/C++ operator table,
+    /// now the `DEFAULT_PUNCTUATIONS` const slice (seated in `Default`, since a
+    /// reference has no zero-valid bit pattern).
     /// Source: `oracle/codemp/botlib/l_script.cpp:69-146`
-    pub default_punctuations: [punctuation_t; DEFAULT_PUNCTUATIONS_LEN],
+    pub default_punctuations: &'static [Punctuation],
     /// Raven `libvar_t *droppedweight`.
     /// Source: `oracle/codemp/botlib/be_ai_goal.cpp:178`
     pub droppedweight: LibVarHandle,
@@ -259,9 +343,11 @@ pub struct BotLib {
     /// Raven function-static `float framereachability` (hoisted from `AAS_ContinueInitReachability`).
     /// Source: `oracle/codemp/botlib/be_aas_reach.cpp:4350`
     pub framereachability: f32,
-    /// Raven `define_t **globaldefines` (`DEFINEHASHING` build) — defines added to every loaded source.
+    /// Raven `define_t **globaldefines` (`DEFINEHASHING` build) — defines added
+    /// to every loaded source. Redesigned (porting-rules §F17) from the malloc'd
+    /// hash-chained list into an owned `Vec<Define>` arena (seated in `Default`).
     /// Source: `oracle/codemp/botlib/l_precomp.cpp:105`
-    pub globaldefines: *mut *mut define_t,
+    pub globaldefines: Vec<Define>,
     /// Raven function-static `unsigned short int *hidetraveltimes` (hoisted from `AAS_CreateAllRoutingCache`).
     /// Source: `oracle/codemp/botlib/be_aas_route.cpp:2067`
     pub hidetraveltimes: *mut c_ushort,
@@ -332,9 +418,12 @@ pub struct BotLib {
     /// Raven `int routingcachesize`.
     /// Source: `oracle/codemp/botlib/be_aas_route.cpp:67`
     pub routingcachesize: c_int,
-    /// Raven `source_t *sourceFiles[MAX_SOURCEFILES]`.
+    /// Raven `source_t *sourceFiles[MAX_SOURCEFILES]` — redesigned
+    /// (porting-rules §F17) into an owned slab keyed by the 1-based source
+    /// handle; a `None` slot is free. Pre-sized to `MAX_SOURCEFILES` (seated in
+    /// `Default`) so a handle indexes directly.
     /// Source: `oracle/codemp/botlib/l_precomp.cpp:3187`
-    pub sourceFiles: [*mut source_t; MAX_SOURCEFILES],
+    pub sourceFiles: Vec<Option<Source>>,
 
     // --- be_interface / be_aas_debug / be_ai_char / be_ai_weight globals ---
     /// Raven `botlib_export_t be_botlib_export` — the botlib export fn-ptr table.
@@ -396,25 +485,36 @@ impl Default for BotLib {
     /// raw pointers, `#[repr(C)]` structs of pointers/ints/floats, and arrays of
     /// those — none of which derive `Default`, but all of which are zero-valid
     /// (null pointers, `0`, `None` fn-ptrs), matching Raven's zero-initialized
-    /// file-scope globals. The lone exception is `libvars: Vec<LibVar>`, whose
-    /// all-zero bit pattern is an invalid `Vec` (its `NonNull` buffer pointer
-    /// cannot be null); it is written explicitly before `assume_init`. Fields
-    /// whose Raven definitions carry a real initializer (`default_punctuations`,
-    /// `iteminfo_struct`, `crctable`) are populated at setup time, not here. The
-    /// cached `LibVarHandle` fields (`sv_maxstep`, `cmd_grappleon`, …) default to
+    /// file-scope globals. The exceptions are the owned-collection and reference
+    /// fields whose all-zero bit pattern is *invalid* — `libvars`,
+    /// `globaldefines`, `sourceFiles` (a `Vec`'s `NonNull` buffer pointer cannot
+    /// be null) and `default_punctuations` (a `&'static` reference cannot be
+    /// null); each is written explicitly before `assume_init`. Fields whose
+    /// Raven definitions carry a real initializer (`iteminfo_struct`,
+    /// `crctable`) are populated at setup time, not here. The cached
+    /// `LibVarHandle` fields (`sv_maxstep`, `cmd_grappleon`, …) default to
     /// `LibVarHandle(0)`, matching Raven's null pointers: they are assigned real
     /// handles at setup (`BotSetupMoveAI`/`AAS_Setup`/…) before any read.
     fn default() -> Self {
-        // SAFETY: every field except `libvars` is zero-valid (raw pointers →
-        // null, `Option<fn>` → `None`, ints/floats/arrays → 0, `LibVarHandle` →
-        // index 0). `MaybeUninit::zeroed` never materializes a zeroed `Vec` as a
-        // valid value: the `libvars` slot is overwritten with a real empty `Vec`
-        // (via `ptr::write`, so the invalid zeroed bytes are not dropped) before
-        // `assume_init`.
+        // SAFETY: every field except the four seated below is zero-valid (raw
+        // pointers → null, `Option<fn>` → `None`, ints/floats/arrays → 0,
+        // `LibVarHandle` → index 0). `MaybeUninit::zeroed` never materializes a
+        // zeroed `Vec`/reference as a valid value: each such slot is overwritten
+        // with a real value (via `ptr::write`, so the invalid zeroed bytes are
+        // not dropped) before `assume_init`.
         let mut uninit = core::mem::MaybeUninit::<Self>::zeroed();
         let ptr = uninit.as_mut_ptr();
         unsafe {
             core::ptr::write(core::ptr::addr_of_mut!((*ptr).libvars), Vec::new());
+            core::ptr::write(core::ptr::addr_of_mut!((*ptr).globaldefines), Vec::new());
+            core::ptr::write(
+                core::ptr::addr_of_mut!((*ptr).sourceFiles),
+                (0..MAX_SOURCEFILES).map(|_| None).collect(),
+            );
+            core::ptr::write(
+                core::ptr::addr_of_mut!((*ptr).default_punctuations),
+                DEFAULT_PUNCTUATIONS,
+            );
             // Raven `int nofaceflood = qtrue` — the one non-zero static initializer.
             core::ptr::addr_of_mut!((*ptr).nofaceflood).write(1);
             uninit.assume_init()

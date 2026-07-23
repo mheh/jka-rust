@@ -23,6 +23,7 @@
 //! as Raven's C array indexing does.
 
 use core::ffi::{c_char, c_int, c_ulong};
+use std::ffi::{CStr, CString};
 
 use libc::{strcmp, strcpy, strlen, strncpy};
 use native_types::{qfalse, qtrue};
@@ -39,13 +40,12 @@ use crate::be_ai_char::consts::{
 use crate::l_libvar_fns::LibVarGetValue;
 use crate::l_log_fns::Log_Write;
 use crate::l_memory_fns::{FreeMemory, GetClearedMemory, GetMemory};
-use crate::l_precomp::source_s::source_t;
 use crate::l_precomp_fns::{
     FreeSource, LoadSourceFile, PC_ExpectAnyToken, PC_ExpectTokenString, PC_ExpectTokenType,
     PC_ReadToken, PC_SetBaseFolder, SourceError,
 };
 use crate::l_script::consts::{TT_FLOAT, TT_INTEGER, TT_NUMBER, TT_STRING};
-use crate::l_script::token_s::token_t;
+use crate::l_script::token_s::Token;
 use crate::l_script_fns::StripDoubleQuotes;
 use crate::BotLib;
 
@@ -509,16 +509,19 @@ pub fn BotLoadCharacterFromFile(
         let mut index: c_int;
         let mut foundcharacter = qfalse as c_int;
         //a bot character is parsed in two phases
-        PC_SetBaseFolder(bot, BOTFILESBASEFOLDER.as_ptr() as *mut c_char);
-        let source: *mut source_t = LoadSourceFile(bot, charfile);
-        if source.is_null() {
-            bot.botimport.Print.unwrap()(
-                PRT_ERROR,
-                c"counldn't load %s\n".as_ptr() as *mut c_char,
-                charfile,
-            );
-            return core::ptr::null_mut();
-        } //end if
+        PC_SetBaseFolder(bot, BOTFILESBASEFOLDER);
+        let charfile_str = CStr::from_ptr(charfile).to_string_lossy().into_owned();
+        let mut source = match LoadSourceFile(bot, &charfile_str) {
+            Some(s) => s,
+            None => {
+                bot.botimport.Print.unwrap()(
+                    PRT_ERROR,
+                    c"counldn't load %s\n".as_ptr() as *mut c_char,
+                    charfile,
+                );
+                return core::ptr::null_mut();
+            }
+        }; //end if
         let ch: *mut bot_character_t = GetClearedMemory(
             bot,
             (core::mem::size_of::<bot_character_t>()
@@ -528,17 +531,17 @@ pub fn BotLoadCharacterFromFile(
         strcpy((*ch).filename.as_mut_ptr(), charfile);
         // §19: `token` is Raven's C stack local, first written by `PC_ReadToken`
         // below before any read — zero-init to give it a defined start value.
-        let mut token: token_t = core::mem::zeroed();
-        while PC_ReadToken(bot, source, &mut token) != 0 {
-            if strcmp(token.string.as_ptr(), c"skill".as_ptr()) == 0 {
-                if PC_ExpectTokenType(bot, source, TT_NUMBER, 0, &mut token) == 0 {
-                    FreeSource(bot, source);
+        let mut token = Token::default();
+        while PC_ReadToken(bot, &mut source, &mut token) != 0 {
+            if token.string == "skill" {
+                if PC_ExpectTokenType(bot, &mut source, TT_NUMBER, 0, &mut token) == 0 {
+                    FreeSource(source);
                     BotFreeCharacterStrings(bot, ch);
                     FreeMemory(bot, ch as *mut ());
                     return core::ptr::null_mut();
                 } //end if
-                if PC_ExpectTokenString(bot, source, c"{".as_ptr() as *mut c_char) == 0 {
-                    FreeSource(bot, source);
+                if PC_ExpectTokenString(bot, &mut source, "{") == 0 {
+                    FreeSource(source);
                     BotFreeCharacterStrings(bot, ch);
                     FreeMemory(bot, ch as *mut ());
                     return core::ptr::null_mut();
@@ -547,55 +550,55 @@ pub fn BotLoadCharacterFromFile(
                 if skill < 0 || token.intvalue as c_int == skill {
                     foundcharacter = qtrue as c_int;
                     (*ch).skill = token.intvalue as f32;
-                    while PC_ExpectAnyToken(bot, source, &mut token) != 0 {
-                        if strcmp(token.string.as_ptr(), c"}".as_ptr()) == 0 {
+                    while PC_ExpectAnyToken(bot, &mut source, &mut token) != 0 {
+                        if token.string == "}" {
                             break;
                         } //end if
-                        if token.r#type != TT_NUMBER || (token.subtype & TT_INTEGER) == 0 {
-                            let __m = std::ffi::CString::new(format!(
-                                "expected integer index, found {}\n",
-                                core::ffi::CStr::from_ptr(token.string.as_ptr()).to_string_lossy()
-                            ))
-                            .unwrap_or_default();
-                            SourceError(bot, source, __m.as_ptr());
-                            FreeSource(bot, source);
+                        if token.type_ != TT_NUMBER || (token.subtype & TT_INTEGER) == 0 {
+                            SourceError(
+                                bot,
+                                &source,
+                                &format!("expected integer index, found {}\n", token.string),
+                            );
+                            FreeSource(source);
                             BotFreeCharacterStrings(bot, ch);
                             FreeMemory(bot, ch as *mut ());
                             return core::ptr::null_mut();
                         } //end if
                         index = token.intvalue as c_int;
                         if index < 0 || index > MAX_CHARACTERISTICS {
-                            let __m = std::ffi::CString::new(format!(
-                                "characteristic index out of range [0, {}]\n",
-                                MAX_CHARACTERISTICS
-                            ))
-                            .unwrap_or_default();
-                            SourceError(bot, source, __m.as_ptr());
-                            FreeSource(bot, source);
+                            SourceError(
+                                bot,
+                                &source,
+                                &format!(
+                                    "characteristic index out of range [0, {}]\n",
+                                    MAX_CHARACTERISTICS
+                                ),
+                            );
+                            FreeSource(source);
                             BotFreeCharacterStrings(bot, ch);
                             FreeMemory(bot, ch as *mut ());
                             return core::ptr::null_mut();
                         } //end if
                         let c = (*ch).c.as_mut_ptr().add(index as usize);
                         if (*c).r#type != 0 {
-                            let __m = std::ffi::CString::new(format!(
-                                "characteristic {} already initialized\n",
-                                index
-                            ))
-                            .unwrap_or_default();
-                            SourceError(bot, source, __m.as_ptr());
-                            FreeSource(bot, source);
+                            SourceError(
+                                bot,
+                                &source,
+                                &format!("characteristic {} already initialized\n", index),
+                            );
+                            FreeSource(source);
                             BotFreeCharacterStrings(bot, ch);
                             FreeMemory(bot, ch as *mut ());
                             return core::ptr::null_mut();
                         } //end if
-                        if PC_ExpectAnyToken(bot, source, &mut token) == 0 {
-                            FreeSource(bot, source);
+                        if PC_ExpectAnyToken(bot, &mut source, &mut token) == 0 {
+                            FreeSource(source);
                             BotFreeCharacterStrings(bot, ch);
                             FreeMemory(bot, ch as *mut ());
                             return core::ptr::null_mut();
                         } //end if
-                        if token.r#type == TT_NUMBER {
+                        if token.type_ == TT_NUMBER {
                             if (token.subtype & TT_FLOAT) != 0 {
                                 (*c).value._float = token.floatvalue as f32;
                                 (*c).r#type = CT_FLOAT;
@@ -603,20 +606,23 @@ pub fn BotLoadCharacterFromFile(
                                 (*c).value.integer = token.intvalue as i32;
                                 (*c).r#type = CT_INTEGER;
                             } //end else
-                        } else if token.r#type == TT_STRING {
-                            StripDoubleQuotes(token.string.as_mut_ptr());
-                            let len = strlen(token.string.as_ptr());
+                        } else if token.type_ == TT_STRING {
+                            StripDoubleQuotes(&mut token.string);
+                            let token_string_c = CString::new(token.string.as_str()).unwrap_or_default();
+                            let len = token.string.len();
                             (*c).value.string = GetMemory(bot, (len + 1) as c_ulong) as *mut c_char;
-                            strcpy((*c).value.string, token.string.as_ptr());
+                            strcpy((*c).value.string, token_string_c.as_ptr());
                             (*c).r#type = CT_STRING;
                         } else {
-                            let __m = std::ffi::CString::new(format!(
-                                "expected integer, float or string, found {}\n",
-                                core::ffi::CStr::from_ptr(token.string.as_ptr()).to_string_lossy()
-                            ))
-                            .unwrap_or_default();
-                            SourceError(bot, source, __m.as_ptr());
-                            FreeSource(bot, source);
+                            SourceError(
+                                bot,
+                                &source,
+                                &format!(
+                                    "expected integer, float or string, found {}\n",
+                                    token.string
+                                ),
+                            );
+                            FreeSource(source);
                             BotFreeCharacterStrings(bot, ch);
                             FreeMemory(bot, ch as *mut ());
                             return core::ptr::null_mut();
@@ -628,15 +634,15 @@ pub fn BotLoadCharacterFromFile(
                 else {
                     let mut indent: c_int = 1;
                     while indent != 0 {
-                        if PC_ExpectAnyToken(bot, source, &mut token) == 0 {
-                            FreeSource(bot, source);
+                        if PC_ExpectAnyToken(bot, &mut source, &mut token) == 0 {
+                            FreeSource(source);
                             BotFreeCharacterStrings(bot, ch);
                             FreeMemory(bot, ch as *mut ());
                             return core::ptr::null_mut();
                         } //end if
-                        if strcmp(token.string.as_ptr(), c"{".as_ptr()) == 0 {
+                        if token.string == "{" {
                             indent += 1;
-                        } else if strcmp(token.string.as_ptr(), c"}".as_ptr()) == 0 {
+                        } else if token.string == "}" {
                             indent -= 1;
                         } //end else if
                     } //end while
@@ -644,19 +650,18 @@ pub fn BotLoadCharacterFromFile(
             }
             //end if
             else {
-                let __m = std::ffi::CString::new(format!(
-                    "unknown definition {}\n",
-                    core::ffi::CStr::from_ptr(token.string.as_ptr()).to_string_lossy()
-                ))
-                .unwrap_or_default();
-                SourceError(bot, source, __m.as_ptr());
-                FreeSource(bot, source);
+                SourceError(
+                    bot,
+                    &source,
+                    &format!("unknown definition {}\n", token.string),
+                );
+                FreeSource(source);
                 BotFreeCharacterStrings(bot, ch);
                 FreeMemory(bot, ch as *mut ());
                 return core::ptr::null_mut();
             } //end else
         } //end while
-        FreeSource(bot, source);
+        FreeSource(source);
         //
         if foundcharacter == 0 {
             BotFreeCharacterStrings(bot, ch);

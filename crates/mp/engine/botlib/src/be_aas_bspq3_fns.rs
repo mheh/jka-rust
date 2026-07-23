@@ -25,6 +25,7 @@
 use core::ffi::c_char;
 use core::ffi::c_int;
 use core::ffi::c_ulong;
+use std::ffi::CString;
 
 use mp_qshared::shared::{qboolean, qfalse, qtrue};
 
@@ -36,7 +37,7 @@ use crate::be_aas_bsp::be_aas_bsp_consts::MAX_EPAIRKEY;
 use crate::be_aas_bspq3::be_aas_bspq3_cpp_consts::MAX_BSPENTITIES;
 use crate::be_aas_def::bsp_link_s::bsp_link_t;
 use crate::l_script::consts::{SCFL_NOSTRINGESCAPECHARS, SCFL_NOSTRINGWHITESPACES, TT_STRING};
-use crate::l_script::token_s::token_t;
+use crate::l_script::token_s::Token;
 use mp_qshared::common::mp::botlib::botlib_error::BLERR_NOERROR;
 
 use crate::BotLib;
@@ -400,34 +401,23 @@ pub fn AAS_DumpBSPData(bot: &mut BotLib) {
 /// Source: `oracle/codemp/botlib/be_aas_bspq3.cpp:362-426`
 pub fn AAS_ParseBSPEntities(bot: &mut BotLib) {
     unsafe {
-        let mut token = core::mem::zeroed::<token_t>();
+        let mut token = Token::default();
 
-        let script = LoadScriptMemory(
-            bot,
-            bot.bspworld.dentdata,
-            bot.bspworld.entdatasize,
-            c"entdata".as_ptr() as *mut c_char,
-        );
+        let entdata =
+            core::slice::from_raw_parts(bot.bspworld.dentdata as *const u8, bot.bspworld.entdatasize as usize);
+        let mut script = LoadScriptMemory(entdata, bot.bspworld.entdatasize, "entdata");
         SetScriptFlags(
-            script,
+            &mut script,
             SCFL_NOSTRINGWHITESPACES | SCFL_NOSTRINGESCAPECHARS, //SCFL_PRIMITIVE);
         );
 
         bot.bspworld.numentities = 1;
 
-        while PS_ReadToken(bot, script, &mut token) != 0 {
-            if libc::strcmp(token.string.as_ptr(), c"{".as_ptr()) != 0 {
-                // Reproduces Raven's `vsprintf`-into-buffer step before forwarding to
-                // `ScriptError` (see l_script_fns.rs script_error!).
-                let mut __se_text = [0 as c_char; 1024];
-                libc::sprintf(
-                    __se_text.as_mut_ptr(),
-                    c"invalid %s\n".as_ptr(),
-                    token.string.as_ptr(),
-                );
-                ScriptError(bot, script, __se_text.as_ptr());
+        while PS_ReadToken(bot, &mut script, &mut token) != 0 {
+            if token.string != "{" {
+                ScriptError(bot, &script, &format!("invalid {}\n", token.string));
                 AAS_FreeBSPEntities(bot);
-                FreeScript(bot, script);
+                FreeScript(script);
                 return;
             }
             if bot.bspworld.numentities >= MAX_BSPENTITIES {
@@ -441,8 +431,8 @@ pub fn AAS_ParseBSPEntities(bot: &mut BotLib) {
                 as *mut crate::be_aas_bspq3::bsp_entity_t;
             bot.bspworld.numentities += 1;
             (*ent).epairs = core::ptr::null_mut();
-            while PS_ReadToken(bot, script, &mut token) != 0 {
-                if libc::strcmp(token.string.as_ptr(), c"}".as_ptr()) == 0 {
+            while PS_ReadToken(bot, &mut script, &mut token) != 0 {
+                if token.string == "}" {
                     break;
                 }
                 let epair = GetClearedHunkMemory(
@@ -451,42 +441,35 @@ pub fn AAS_ParseBSPEntities(bot: &mut BotLib) {
                 ) as *mut crate::be_aas_bspq3::bsp_epair_t;
                 (*epair).next = (*ent).epairs;
                 (*ent).epairs = epair;
-                if token.r#type != TT_STRING {
-                    let mut __se_text = [0 as c_char; 1024];
-                    libc::sprintf(
-                        __se_text.as_mut_ptr(),
-                        c"invalid %s\n".as_ptr(),
-                        token.string.as_ptr(),
-                    );
-                    ScriptError(bot, script, __se_text.as_ptr());
+                if token.type_ != TT_STRING {
+                    ScriptError(bot, &script, &format!("invalid {}\n", token.string));
                     AAS_FreeBSPEntities(bot);
-                    FreeScript(bot, script);
+                    FreeScript(script);
                     return;
                 }
-                StripDoubleQuotes(token.string.as_mut_ptr());
-                (*epair).key =
-                    GetHunkMemory(bot, (libc::strlen(token.string.as_ptr()) + 1) as c_ulong)
-                        as *mut c_char;
-                libc::strcpy((*epair).key, token.string.as_ptr());
-                if PS_ExpectTokenType(bot, script, TT_STRING, 0, &mut token) == 0 {
+                StripDoubleQuotes(&mut token.string);
+                let key_c = CString::new(token.string.as_str()).unwrap_or_default();
+                (*epair).key = GetHunkMemory(bot, (token.string.len() + 1) as c_ulong) as *mut c_char;
+                libc::strcpy((*epair).key, key_c.as_ptr());
+                if PS_ExpectTokenType(bot, &mut script, TT_STRING, 0, &mut token) == 0 {
                     AAS_FreeBSPEntities(bot);
-                    FreeScript(bot, script);
+                    FreeScript(script);
                     return;
                 }
-                StripDoubleQuotes(token.string.as_mut_ptr());
+                StripDoubleQuotes(&mut token.string);
+                let value_c = CString::new(token.string.as_str()).unwrap_or_default();
                 (*epair).value =
-                    GetHunkMemory(bot, (libc::strlen(token.string.as_ptr()) + 1) as c_ulong)
-                        as *mut c_char;
-                libc::strcpy((*epair).value, token.string.as_ptr());
+                    GetHunkMemory(bot, (token.string.len() + 1) as c_ulong) as *mut c_char;
+                libc::strcpy((*epair).value, value_c.as_ptr());
             }
-            if libc::strcmp(token.string.as_ptr(), c"}".as_ptr()) != 0 {
-                ScriptError(bot, script, c"missing }\n".as_ptr() as *mut c_char);
+            if token.string != "}" {
+                ScriptError(bot, &script, "missing }\n");
                 AAS_FreeBSPEntities(bot);
-                FreeScript(bot, script);
+                FreeScript(script);
                 return;
             }
         }
-        FreeScript(bot, script);
+        FreeScript(script);
     }
 }
 

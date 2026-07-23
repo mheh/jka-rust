@@ -1,17 +1,24 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use core::ffi::{c_char, c_int};
+use core::ffi::c_int;
 
-use crate::l_script::token_s::token_t;
+use crate::l_script::token_s::Token;
 
 /// Raven `define_t` — a preprocessor `#define` macro entry.
 ///
-/// Raven: (none).
+/// Idiomatic redesign (porting-rules §F17): `char *name` owns its bytes as a
+/// `String`, and the malloc'd `token_t *parms` / `token_t *tokens` lists become
+/// owned `Vec<Token>`. The three intrusive links — `next` (definition list),
+/// `hashnext` (hash chain), `globalnext` (global-defines chain) — dissolve into
+/// the owner's arena-plus-buckets shape: a `Source` keeps `defines: Vec<Define>`
+/// with `definehash: Vec<Vec<usize>>` prepend-buckets, and `BotLib` keeps the
+/// global `globaldefines: Vec<Define>` arena.
+///
 /// Type definition source: `oracle/codemp/botlib/l_precomp.h:55-66`
-#[repr(C)]
-pub struct define_t {
+#[derive(Clone, Default)]
+pub struct Define {
     /// define name
-    pub name: *mut c_char,
+    pub name: String,
     /// define flags
     pub flags: c_int,
     /// > 0 if builtin define
@@ -19,36 +26,7 @@ pub struct define_t {
     /// number of define parameters
     pub numparms: c_int,
     /// define parameters
-    pub parms: *mut token_t,
+    pub parms: Vec<Token>,
     /// macro tokens (possibly containing parm tokens)
-    pub tokens: *mut token_t,
-    /// next defined macro in a list
-    pub next: *mut define_t,
-    /// next define in the hash chain
-    pub hashnext: *mut define_t,
-    /// used to link up the globald defines
-    pub globalnext: *mut define_t,
+    pub tokens: Vec<Token>,
 }
-
-pub type define_s = define_t;
-
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::size_of::<define_t>() == 64);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(define_t, name) == 0);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(define_t, flags) == 8);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(define_t, builtin) == 12);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(define_t, numparms) == 16);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(define_t, parms) == 24);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(define_t, tokens) == 32);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(define_t, next) == 40);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(define_t, hashnext) == 48);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(define_t, globalnext) == 56);
