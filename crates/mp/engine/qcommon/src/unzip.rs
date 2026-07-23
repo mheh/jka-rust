@@ -88,34 +88,36 @@ pub fn unzlocal_getLong(fin: *mut FILE, pX: *mut uLong) -> c_int {
 
 /// Raven `strcmpcasenosensitive_internal` — case-insensitive ASCII strcmp.
 ///
+/// Internal-only filename comparator (both callers below and `unzLocateFile` are
+/// in-crate), so it takes `&str`; an exhausted slice stands in for Raven's
+/// terminating NUL. The `a`-`z` uppercase fold and the signed-`char` ordering
+/// are reproduced exactly (`c as i8`), so ASCII path compares are byte-identical.
 /// Source: `oracle/codemp/qcommon/unzip.cpp:277-296`
-pub fn strcmpcasenosensitive_internal(fileName1: *const c_char, fileName2: *const c_char) -> c_int {
-    unsafe {
-        let mut p1 = fileName1;
-        let mut p2 = fileName2;
-        loop {
-            let mut c1 = *p1 as u8 as i8;
-            let mut c2 = *p2 as u8 as i8;
-            p1 = p1.add(1);
-            p2 = p2.add(1);
-            if (c1 as u8 as char) >= 'a' && (c1 as u8 as char) <= 'z' {
-                c1 -= 0x20;
-            }
-            if (c2 as u8 as char) >= 'a' && (c2 as u8 as char) <= 'z' {
-                c2 -= 0x20;
-            }
-            if c1 == 0 {
-                return if c2 == 0 { 0 } else { -1 };
-            }
-            if c2 == 0 {
-                return 1;
-            }
-            if c1 < c2 {
-                return -1;
-            }
-            if c1 > c2 {
-                return 1;
-            }
+pub fn strcmpcasenosensitive_internal(fileName1: &str, fileName2: &str) -> c_int {
+    let b1 = fileName1.as_bytes();
+    let b2 = fileName2.as_bytes();
+    let mut i = 0usize;
+    loop {
+        let mut c1 = if i < b1.len() { b1[i] } else { 0 };
+        let mut c2 = if i < b2.len() { b2[i] } else { 0 };
+        i += 1;
+        if c1.is_ascii_lowercase() {
+            c1 -= 0x20;
+        }
+        if c2.is_ascii_lowercase() {
+            c2 -= 0x20;
+        }
+        if c1 == 0 {
+            return if c2 == 0 { 0 } else { -1 };
+        }
+        if c2 == 0 {
+            return 1;
+        }
+        if (c1 as i8) < (c2 as i8) {
+            return -1;
+        }
+        if (c1 as i8) > (c2 as i8) {
+            return 1;
         }
     }
 }
@@ -439,8 +441,8 @@ pub fn unzGetGlobalComment(file: unzFile, szComment: *mut c_char, uSizeBuf: uLon
 ///
 /// Source: `oracle/codemp/qcommon/unzip.cpp:318-327`
 pub fn unzStringFileNameCompare(
-    fileName1: *const c_char,
-    fileName2: *const c_char,
+    fileName1: &str,
+    fileName2: &str,
     mut iCaseSensitivity: c_int,
 ) -> c_int {
     if iCaseSensitivity == 0 {
@@ -448,7 +450,13 @@ pub fn unzStringFileNameCompare(
     }
 
     if iCaseSensitivity == 1 {
-        return unsafe { libc::strcmp(fileName1, fileName2) };
+        // Raven `strcmp` — unsigned NUL-terminated byte ordering; the slice
+        // compare yields the same sign (all consumers test `== 0`).
+        return match fileName1.as_bytes().cmp(fileName2.as_bytes()) {
+            core::cmp::Ordering::Less => -1,
+            core::cmp::Ordering::Equal => 0,
+            core::cmp::Ordering::Greater => 1,
+        };
     }
 
     strcmpcasenosensitive_internal(fileName1, fileName2)
@@ -902,16 +910,16 @@ pub fn unzSetCurrentFileInfoPosition(file: unzFile, pos: c_ulong) -> c_int {
 /// positioned there on success (and restored to its prior position on failure).
 ///
 /// Source: `oracle/codemp/qcommon/unzip.cpp:827-867`
-pub fn unzLocateFile(file: unzFile, szFileName: *const c_char, iCaseSensitivity: c_int) -> c_int {
+pub fn unzLocateFile(file: unzFile, szFileName: &str, iCaseSensitivity: c_int) -> c_int {
     if file.is_null() {
         return UNZ_PARAMERROR;
     }
 
-    unsafe {
-        if libc::strlen(szFileName) >= UNZ_MAXFILENAMEINZIP as usize {
-            return UNZ_PARAMERROR;
-        }
+    if szFileName.len() >= UNZ_MAXFILENAMEINZIP as usize {
+        return UNZ_PARAMERROR;
+    }
 
+    unsafe {
         let s = file as *mut unz_s;
         if (*s).current_file_ok == 0 {
             return UNZ_END_OF_LIST_OF_FILE;
@@ -935,8 +943,13 @@ pub fn unzLocateFile(file: unzFile, szFileName: *const c_char, iCaseSensitivity:
                 core::ptr::null_mut(),
                 0,
             );
-            if unzStringFileNameCompare(szCurrentFileName.as_ptr(), szFileName, iCaseSensitivity)
-                == 0
+            let szCurrentFileName_str =
+                core::ffi::CStr::from_ptr(szCurrentFileName.as_ptr()).to_string_lossy();
+            if unzStringFileNameCompare(
+                szCurrentFileName_str.as_ref(),
+                szFileName,
+                iCaseSensitivity,
+            ) == 0
             {
                 return UNZ_OK;
             }

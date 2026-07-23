@@ -29,11 +29,13 @@ use crate::cm_terrain::CmLandScape;
 /// surface/content flag bits it ORs (and the solid-clearing mask it ANDs) into
 /// a shader.
 ///
+/// Internal-only table row (never crosses the ABI seam — read solely by
+/// `SV_ParseSurfaceParm`), so `name` is an idiomatic `&'static str` rather than
+/// Raven's `const char *`.
 /// Type definition source: `oracle/codemp/qcommon/cm_shader.cpp:220-224`
-#[repr(C)]
 #[derive(Clone, Copy)]
 pub struct InfoParm {
-    pub name: *const c_char,
+    pub name: &'static str,
     pub clearSolid: c_int,
     pub surfaceFlags: c_int,
     pub contents: c_int,
@@ -225,13 +227,15 @@ pub struct CollisionWorld {
 
     /// Raven `const char *svMaterialNames[MATERIAL_LAST]` — the `material`
     /// keyword table (`SV_ParseMaterial`), parallel to
-    /// `mp_qshared::shared::surface_flags::MATERIALS`.
+    /// `mp_qshared::shared::surface_flags::MATERIALS`. Internal-only (read solely
+    /// by `SV_ParseMaterial`, never crosses the seam), so the entries are
+    /// idiomatic `&'static str` rather than Raven's `const char *`.
     ///
     /// Source: `oracle/codemp/qcommon/cm_shader.cpp:285-287`
     ///
-    /// WRITELIST(cm.svMaterialNames): real string pointers, not zero — needs
+    /// WRITELIST(cm.svMaterialNames): real string data, not zero — needs
     /// `Engine::new` to `.write(CollisionWorld::init_svMaterialNames())`.
-    pub svMaterialNames: [*const c_char; MATERIAL_LAST as usize],
+    pub svMaterialNames: [&'static str; MATERIAL_LAST as usize],
 
     /// Raven `cmg.landScape` — the nullable terrain landscape, `Some` only on an
     /// RMG terrain map. Set by `register_terrain` / the Wave-20 `G_RMG_INIT` arm;
@@ -254,7 +258,7 @@ impl CollisionWorld {
     /// Source: `oracle/codemp/qcommon/cm_shader.cpp:226-259`
     pub fn init_svInfoParms() -> [InfoParm; NUM_SV_INFO_PARMS] {
         const fn p(
-            name: *const c_char,
+            name: &'static str,
             clear_solid: c_int,
             surface_flags: c_int,
             contents: c_int,
@@ -267,42 +271,32 @@ impl CollisionWorld {
             }
         }
         [
-            p(c"sky".as_ptr(), -1, SURF_SKY, 0),
-            p(c"slick".as_ptr(), -1, SURF_SLICK, 0),
-            p(c"nodamage".as_ptr(), -1, SURF_NODAMAGE, 0),
-            p(c"noimpact".as_ptr(), -1, SURF_NOIMPACT, 0),
-            p(c"nomarks".as_ptr(), -1, SURF_NOMARKS, 0),
-            p(c"nodraw".as_ptr(), -1, SURF_NODRAW, 0),
-            p(c"nosteps".as_ptr(), -1, SURF_NOSTEPS, 0),
-            p(c"nodlight".as_ptr(), -1, SURF_NODLIGHT, 0),
-            p(c"nonsolid".as_ptr(), !CONTENTS_SOLID, 0, 0),
-            p(c"nonopaque".as_ptr(), !CONTENTS_OPAQUE, 0, 0),
-            p(c"lava".as_ptr(), !CONTENTS_SOLID, 0, CONTENTS_LAVA),
-            p(c"water".as_ptr(), !CONTENTS_SOLID, 0, CONTENTS_WATER),
-            p(c"fog".as_ptr(), !CONTENTS_SOLID, 0, CONTENTS_FOG),
-            p(
-                c"playerclip".as_ptr(),
-                !CONTENTS_SOLID,
-                0,
-                CONTENTS_PLAYERCLIP,
-            ),
-            p(
-                c"monsterclip".as_ptr(),
-                !CONTENTS_SOLID,
-                0,
-                CONTENTS_MONSTERCLIP,
-            ),
-            p(c"botclip".as_ptr(), !CONTENTS_SOLID, 0, CONTENTS_BOTCLIP),
-            p(c"shotclip".as_ptr(), !CONTENTS_SOLID, 0, CONTENTS_SHOTCLIP),
-            p(c"trigger".as_ptr(), !CONTENTS_SOLID, 0, CONTENTS_TRIGGER),
-            p(c"nodrop".as_ptr(), !CONTENTS_SOLID, 0, CONTENTS_NODROP),
-            p(c"terrain".as_ptr(), !CONTENTS_SOLID, 0, CONTENTS_TERRAIN),
-            p(c"ladder".as_ptr(), !CONTENTS_SOLID, 0, CONTENTS_LADDER),
-            p(c"abseil".as_ptr(), !CONTENTS_SOLID, 0, CONTENTS_ABSEIL),
-            p(c"outside".as_ptr(), !CONTENTS_SOLID, 0, CONTENTS_OUTSIDE),
-            p(c"inside".as_ptr(), !CONTENTS_SOLID, 0, CONTENTS_INSIDE),
-            p(c"detail".as_ptr(), -1, 0, CONTENTS_DETAIL),
-            p(c"trans".as_ptr(), -1, 0, CONTENTS_TRANSLUCENT),
+            p("sky", -1, SURF_SKY, 0),
+            p("slick", -1, SURF_SLICK, 0),
+            p("nodamage", -1, SURF_NODAMAGE, 0),
+            p("noimpact", -1, SURF_NOIMPACT, 0),
+            p("nomarks", -1, SURF_NOMARKS, 0),
+            p("nodraw", -1, SURF_NODRAW, 0),
+            p("nosteps", -1, SURF_NOSTEPS, 0),
+            p("nodlight", -1, SURF_NODLIGHT, 0),
+            p("nonsolid", !CONTENTS_SOLID, 0, 0),
+            p("nonopaque", !CONTENTS_OPAQUE, 0, 0),
+            p("lava", !CONTENTS_SOLID, 0, CONTENTS_LAVA),
+            p("water", !CONTENTS_SOLID, 0, CONTENTS_WATER),
+            p("fog", !CONTENTS_SOLID, 0, CONTENTS_FOG),
+            p("playerclip", !CONTENTS_SOLID, 0, CONTENTS_PLAYERCLIP),
+            p("monsterclip", !CONTENTS_SOLID, 0, CONTENTS_MONSTERCLIP),
+            p("botclip", !CONTENTS_SOLID, 0, CONTENTS_BOTCLIP),
+            p("shotclip", !CONTENTS_SOLID, 0, CONTENTS_SHOTCLIP),
+            p("trigger", !CONTENTS_SOLID, 0, CONTENTS_TRIGGER),
+            p("nodrop", !CONTENTS_SOLID, 0, CONTENTS_NODROP),
+            p("terrain", !CONTENTS_SOLID, 0, CONTENTS_TERRAIN),
+            p("ladder", !CONTENTS_SOLID, 0, CONTENTS_LADDER),
+            p("abseil", !CONTENTS_SOLID, 0, CONTENTS_ABSEIL),
+            p("outside", !CONTENTS_SOLID, 0, CONTENTS_OUTSIDE),
+            p("inside", !CONTENTS_SOLID, 0, CONTENTS_INSIDE),
+            p("detail", -1, 0, CONTENTS_DETAIL),
+            p("trans", -1, 0, CONTENTS_TRANSLUCENT),
         ]
     }
 
@@ -311,40 +305,40 @@ impl CollisionWorld {
     /// field doc's writelist note.
     ///
     /// Source: `oracle/codemp/qcommon/cm_shader.cpp:285-287`; `game/surfaceflags.h:90-123`
-    pub fn init_svMaterialNames() -> [*const c_char; MATERIAL_LAST as usize] {
+    pub fn init_svMaterialNames() -> [&'static str; MATERIAL_LAST as usize] {
         [
-            c"none".as_ptr(),
-            c"solidwood".as_ptr(),
-            c"hollowwood".as_ptr(),
-            c"solidmetal".as_ptr(),
-            c"hollowmetal".as_ptr(),
-            c"shortgrass".as_ptr(),
-            c"longgrass".as_ptr(),
-            c"dirt".as_ptr(),
-            c"sand".as_ptr(),
-            c"gravel".as_ptr(),
-            c"glass".as_ptr(),
-            c"concrete".as_ptr(),
-            c"marble".as_ptr(),
-            c"water".as_ptr(),
-            c"snow".as_ptr(),
-            c"ice".as_ptr(),
-            c"flesh".as_ptr(),
-            c"mud".as_ptr(),
-            c"bpglass".as_ptr(),
-            c"dryleaves".as_ptr(),
-            c"greenleaves".as_ptr(),
-            c"fabric".as_ptr(),
-            c"canvas".as_ptr(),
-            c"rock".as_ptr(),
-            c"rubber".as_ptr(),
-            c"plastic".as_ptr(),
-            c"tiles".as_ptr(),
-            c"carpet".as_ptr(),
-            c"plaster".as_ptr(),
-            c"shatterglass".as_ptr(),
-            c"armor".as_ptr(),
-            c"computer".as_ptr(),
+            "none",
+            "solidwood",
+            "hollowwood",
+            "solidmetal",
+            "hollowmetal",
+            "shortgrass",
+            "longgrass",
+            "dirt",
+            "sand",
+            "gravel",
+            "glass",
+            "concrete",
+            "marble",
+            "water",
+            "snow",
+            "ice",
+            "flesh",
+            "mud",
+            "bpglass",
+            "dryleaves",
+            "greenleaves",
+            "fabric",
+            "canvas",
+            "rock",
+            "rubber",
+            "plastic",
+            "tiles",
+            "carpet",
+            "plaster",
+            "shatterglass",
+            "armor",
+            "computer",
         ]
     }
 

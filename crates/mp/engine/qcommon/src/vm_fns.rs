@@ -613,7 +613,7 @@ pub fn VM_LoadSymbols(view: &mut EngineHostView, vm: *mut vm_t) {
         let mut count: c_int = 0;
 
         loop {
-            let (token, rest) = COM_Parse(cursor);
+            let (token, rest) = COM_Parse(cursor, true);
             cursor = rest;
             if token.is_empty() {
                 break;
@@ -621,14 +621,14 @@ pub fn VM_LoadSymbols(view: &mut EngineHostView, vm: *mut vm_t) {
             let token_c = std::ffi::CString::new(token.clone()).unwrap();
             let segment = ParseHex(token_c.as_ptr());
             if segment != 0 {
-                let (_, rest) = COM_Parse(cursor);
+                let (_, rest) = COM_Parse(cursor, true);
                 cursor = rest;
-                let (_, rest) = COM_Parse(cursor);
+                let (_, rest) = COM_Parse(cursor, true);
                 cursor = rest;
                 continue; // only load code segment values
             }
 
-            let (token, rest) = COM_Parse(cursor);
+            let (token, rest) = COM_Parse(cursor, true);
             cursor = rest;
             if token.is_empty() {
                 view.print("WARNING: incomplete line at end of file\n");
@@ -637,7 +637,7 @@ pub fn VM_LoadSymbols(view: &mut EngineHostView, vm: *mut vm_t) {
             let token_c = std::ffi::CString::new(token).unwrap();
             let mut value = ParseHex(token_c.as_ptr());
 
-            let (token, rest) = COM_Parse(cursor);
+            let (token, rest) = COM_Parse(cursor, true);
             cursor = rest;
             if token.is_empty() {
                 view.print("WARNING: incomplete line at end of file\n");

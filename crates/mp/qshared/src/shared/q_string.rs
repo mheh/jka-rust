@@ -372,20 +372,21 @@ pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *m
     }
 }
 
-/// Raven `COM_Parse`.
+/// Raven `COM_Parse` / `COM_ParseExt`.
 ///
-/// Engine-island reshape: the engine's `VM_LoadSymbols` walks a Rust `&str`
-/// cursor, so this returns `(token, remaining)` over the borrow rather than
-/// Raven's `char **data` / `static char com_token[]` pointer channel. Behavior
-/// is `COM_ParseExt(data, qtrue)` — the tokenizer is reused verbatim by copying
-/// the cursor into a NUL-terminated buffer and mapping the consumed byte count
-/// back onto the input slice.
-/// Source: `oracle/codemp/game/q_shared.c:295-298`
-pub fn COM_Parse(data: &str) -> (String, &str) {
+/// Engine-island reshape: engine parsers walk a Rust `&str` cursor, so this
+/// returns `(token, remaining)` over the borrow rather than Raven's `char **data`
+/// / `static char com_token[]` pointer channel. `allowLineBreaks` selects
+/// `COM_ParseExt(data, allowLineBreaks)` — Raven's `COM_Parse(data)` is the
+/// `allowLineBreaks == qtrue` wrapper. The tokenizer is reused verbatim by
+/// copying the cursor into a NUL-terminated buffer and mapping the consumed byte
+/// count back onto the input slice.
+/// Source: `oracle/codemp/game/q_shared.c:295-298,421-526`
+pub fn COM_Parse(data: &str, allowLineBreaks: bool) -> (String, &str) {
     let c = std::ffi::CString::new(data).unwrap_or_default();
     let start = c.as_ptr();
     let mut p: *const c_char = start;
-    let token = COM_ParseExt(&mut p, qtrue);
+    let token = COM_ParseExt(&mut p, if allowLineBreaks { qtrue } else { qfalse });
     let token_str = unsafe { std::ffi::CStr::from_ptr(token) }
         .to_string_lossy()
         .into_owned();

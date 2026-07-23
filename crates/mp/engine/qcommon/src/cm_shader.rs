@@ -33,33 +33,59 @@ const S_COLOR_YELLOW: &str = "^3";
 // parse helpers (`COM_ParseExt`/`Skip*`/`Com_sprintf`), this crate's own
 // unported `FS_*` (files.cpp subject) and `Z_Malloc`/`Z_Free` (z_memman_pc.cpp
 // subject) referenced at their canonical homes; reported.
+use std::ffi::CString;
+
 use crate::common::com_error;
 use crate::files_common::{FS_FreeFile, FS_ListFiles, FS_ReadFile};
 use crate::z_memman_pc::Hunk_Alloc;
 use crate::z_memman_pc::{Z_Free, Z_Malloc};
 use mp_qshared::shared::ha_pref;
-use mp_qshared::shared::q_string;
-use mp_qshared::shared::q_string::{
-    COM_ParseExt, SkipBracedSection, SkipRestOfLine, SkipWhitespace,
-};
 use mp_qshared::shared::q_string::Q_strncpyz;
+use mp_qshared::shared::q_string::{
+    COM_Parse, COM_ParseExt, SkipBracedSection, SkipRestOfLine, SkipWhitespace,
+};
+use native_string::atof;
 use native_string::q_string::Q_stricmp;
+
+/// `&str` adapter over qshared's pointer-cursor `SkipBracedSection`: runs the
+/// verbatim tokenizer over a NUL-terminated copy of the cursor and maps the
+/// consumed byte count back onto the borrow (behavior byte-identical).
+fn skip_braced_section(text: &mut &str) {
+    let _c = CString::new(*text).unwrap_or_default();
+    let start = _c.as_ptr();
+    let mut p: *const c_char = start;
+    SkipBracedSection(&mut p);
+    let consumed = if p.is_null() {
+        text.len()
+    } else {
+        ((p as usize) - (start as usize)).min(text.len())
+    };
+    *text = text.get(consumed..).unwrap_or("");
+}
+
+/// `&str` adapter over qshared's pointer-cursor `SkipRestOfLine` (see
+/// `skip_braced_section`).
+fn skip_rest_of_line(text: &mut &str) {
+    let _c = CString::new(*text).unwrap_or_default();
+    let start = _c.as_ptr();
+    let mut p: *const c_char = start;
+    SkipRestOfLine(&mut p);
+    let consumed = ((p as usize) - (start as usize)).min(text.len());
+    *text = text.get(consumed..).unwrap_or("");
+}
 
 /// Raven `SV_ParseSurfaceParm` — match the next token against `svInfoParms`,
 /// OR/AND-ing the shader's surface/content flags from the matching row.
 ///
 /// Source: `oracle/codemp/qcommon/cm_shader.cpp:261-278`
-pub fn SV_ParseSurfaceParm(
-    cm: &mut CollisionWorld,
-    shader: *mut CCMShader,
-    text: *mut *const c_char,
-) {
+pub fn SV_ParseSurfaceParm(cm: &CollisionWorld, shader: *mut CCMShader, text: &mut &str) {
     let numsvInfoParms: c_int = cm.svInfoParms.len() as c_int;
 
-    let token = COM_ParseExt(text, qfalse);
+    let (token, rest) = COM_Parse(*text, false);
+    *text = rest;
     for i in 0..numsvInfoParms {
         let row = &cm.svInfoParms[i as usize];
-        if q_string::Q_stricmp(token, row.name) == 0 {
+        if Q_stricmp(&token, row.name) == 0 {
             unsafe {
                 (*shader).surfaceFlags |= row.surfaceFlags;
                 (*shader).contentFlags |= row.contents;
@@ -240,12 +266,13 @@ pub fn CM_FreeShaderText(common: &mut Common, cm: &mut CollisionWorld) {
 /// Source: `oracle/codemp/qcommon/cm_shader.cpp:290-309`
 pub fn SV_ParseMaterial(
     common: &mut Common,
-    cm: &mut CollisionWorld,
+    cm: &CollisionWorld,
     shader: *mut CCMShader,
-    text: *mut *const c_char,
+    text: &mut &str,
 ) {
-    let token = COM_ParseExt(text, qfalse);
-    if unsafe { *token } == 0 {
+    let (token, rest) = COM_Parse(*text, false);
+    *text = rest;
+    if token.is_empty() {
         crate::common::com_printf(
             common,
             &format!(
@@ -257,7 +284,7 @@ pub fn SV_ParseMaterial(
         return;
     }
     for i in 0..MATERIAL_LAST {
-        if q_string::Q_stricmp(token, cm.svMaterialNames[i as usize]) == 0 {
+        if Q_stricmp(&token, cm.svMaterialNames[i as usize]) == 0 {
             unsafe {
                 (*shader).surfaceFlags |= i;
             }
@@ -273,12 +300,13 @@ pub fn SV_ParseMaterial(
 pub fn CM_ParseVector(
     common: &mut Common,
     shader: *mut CCMShader,
-    text: *mut *const c_char,
+    text: &mut &str,
     count: c_int,
     v: *mut f32,
 ) -> qboolean {
-    let mut token = COM_ParseExt(text, qfalse);
-    if unsafe { libc::strcmp(token, c"(".as_ptr()) } != 0 {
+    let (token, rest) = COM_Parse(*text, false);
+    *text = rest;
+    if token != "(" {
         crate::common::com_printf(
             common,
             &format!(
@@ -291,8 +319,9 @@ pub fn CM_ParseVector(
     }
 
     for i in 0..count {
-        token = COM_ParseExt(text, qfalse);
-        if unsafe { *token } == 0 {
+        let (token, rest) = COM_Parse(*text, false);
+        *text = rest;
+        if token.is_empty() {
             crate::common::com_printf(
                 common,
                 &format!(
@@ -306,12 +335,13 @@ pub fn CM_ParseVector(
             return qfalse;
         }
         unsafe {
-            *v.add(i as usize) = libc::atof(token) as f32;
+            *v.add(i as usize) = atof(&token) as f32;
         }
     }
 
-    token = COM_ParseExt(text, qfalse);
-    if unsafe { libc::strcmp(token, c")".as_ptr()) } != 0 {
+    let (token, rest) = COM_Parse(*text, false);
+    *text = rest;
+    if token != ")" {
         crate::common::com_printf(
             common,
             &format!(
@@ -350,18 +380,19 @@ pub fn CM_LoadShaderText(view: &mut EngineHostView, forceReload: qboolean) {
 /// Source: `oracle/codemp/qcommon/cm_shader.cpp:361-454`
 pub fn CM_ParseShader(
     common: &mut Common,
-    cm: &mut CollisionWorld,
+    cm: &CollisionWorld,
     shader: *mut CCMShader,
-    text: *mut *const c_char,
+    text: &mut &str,
 ) {
-    let mut token = COM_ParseExt(text, qtrue);
-    if unsafe { *token } != b'{' as c_char {
+    let (token, rest) = COM_Parse(*text, true);
+    *text = rest;
+    if token.as_bytes().first() != Some(&b'{') {
         crate::common::com_printf(
             common,
             &format!(
                 "{}WARNING: expecting '{{', found '{}' instead in shader '{}'\n",
                 S_COLOR_YELLOW,
-                unsafe { core::ffi::CStr::from_ptr(token).to_string_lossy() },
+                token,
                 unsafe { core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_string_lossy() }
             ),
         );
@@ -369,8 +400,9 @@ pub fn CM_ParseShader(
     }
 
     loop {
-        token = COM_ParseExt(text, qtrue);
-        if unsafe { *token } == 0 {
+        let (token, rest) = COM_Parse(*text, true);
+        *text = rest;
+        if token.is_empty() {
             crate::common::com_printf(
                 common,
                 &format!(
@@ -384,64 +416,66 @@ pub fn CM_ParseShader(
             return;
         }
 
-        let c0 = unsafe { *token };
-        let token_str = unsafe { core::ffi::CStr::from_ptr(token).to_string_lossy() };
+        let c0 = token.as_bytes().first().copied().unwrap_or(0);
         // end of shader definition
-        if c0 == b'}' as c_char {
+        if c0 == b'}' {
             break;
         }
         // stage definition
-        else if c0 == b'{' as c_char {
-            SkipBracedSection(text);
+        else if c0 == b'{' {
+            skip_braced_section(text);
             continue;
         }
         // material deprecated as of 11 Jan 01
         // material undeprecated as of 7 May 01 - q3map_material deprecated
-        else if (Q_stricmp(&token_str, "material") == 0)
-            || (Q_stricmp(&token_str, "q3map_material") == 0)
-        {
+        else if (Q_stricmp(&token, "material") == 0) || (Q_stricmp(&token, "q3map_material") == 0) {
             SV_ParseMaterial(common, cm, shader, text);
         }
         // sun parms
         // q3map_sun deprecated as of 11 Jan 01
-        else if (Q_stricmp(&token_str, "sun") == 0)
-            || (Q_stricmp(&token_str, "q3map_sun") == 0)
-        {
+        else if (Q_stricmp(&token, "sun") == 0) || (Q_stricmp(&token, "q3map_sun") == 0) {
             //			float	a, b;
 
-            COM_ParseExt(text, qfalse);
+            let (_, rest) = COM_Parse(*text, false);
+            *text = rest;
             //			shader->sunLight[0] = atof( token );
-            COM_ParseExt(text, qfalse);
+            let (_, rest) = COM_Parse(*text, false);
+            *text = rest;
             //			shader->sunLight[1] = atof( token );
-            COM_ParseExt(text, qfalse);
+            let (_, rest) = COM_Parse(*text, false);
+            *text = rest;
             //			shader->sunLight[2] = atof( token );
 
             //			VectorNormalize( shader->sunLight );
 
-            COM_ParseExt(text, qfalse);
+            let (_, rest) = COM_Parse(*text, false);
+            *text = rest;
             //			a = atof( token );
             //			VectorScale( shader->sunLight, a, shader->sunLight);
 
-            COM_ParseExt(text, qfalse);
+            let (_, rest) = COM_Parse(*text, false);
+            *text = rest;
             //			a = DEG2RAD(atof( token ));
 
-            COM_ParseExt(text, qfalse);
+            let (_, rest) = COM_Parse(*text, false);
+            *text = rest;
             //			b = DEG2RAD(atof( token ));
 
             //			shader->sunDirection[0] = cos( a ) * cos( b );
             //			shader->sunDirection[1] = sin( a ) * cos( b );
             //			shader->sunDirection[2] = sin( b );
-        } else if Q_stricmp(&token_str, "surfaceParm") == 0 {
+        } else if Q_stricmp(&token, "surfaceParm") == 0 {
             SV_ParseSurfaceParm(cm, shader, text);
             continue;
-        } else if Q_stricmp(&token_str, "fogParms") == 0 {
+        } else if Q_stricmp(&token, "fogParms") == 0 {
             let mut fogColor: vec3_t = vec3_t::default();
             if CM_ParseVector(common, shader, text, 3, fogColor.as_mut_ptr()) == 0 {
                 return;
             }
 
-            token = COM_ParseExt(text, qfalse);
-            if unsafe { *token } == 0 {
+            let (token, rest) = COM_Parse(*text, false);
+            *text = rest;
+            if token.is_empty() {
                 crate::common::com_printf(
                     common,
                     &format!(
@@ -457,7 +491,7 @@ pub fn CM_ParseShader(
             //			shader->depthForOpaque = atof( token );
 
             // skip any old gradient directions
-            SkipRestOfLine(text);
+            skip_rest_of_line(text);
             continue;
         }
     }
@@ -479,8 +513,11 @@ pub fn CM_SetupShaderProperties(view: &mut EngineHostView) {
         let shader = CM_GetShaderInfo(view.cm, i);
         let def = CM_GetShaderText(view, unsafe { (*shader).shader.as_ptr() });
         if !def.is_null() {
-            CM_ParseShader(view.common, view.cm, shader, &mut { def }
-                as *mut *const c_char);
+            let def_str = unsafe { core::ffi::CStr::from_ptr(def) }
+                .to_string_lossy()
+                .into_owned();
+            let mut cursor: &str = &def_str;
+            CM_ParseShader(view.common, view.cm, shader, &mut cursor);
         }
     }
 }
@@ -513,8 +550,11 @@ pub fn CM_GetShaderInfo_ByName(view: &mut EngineHostView, name: *const c_char) -
     // Parse in any text if it exists
     let def = CM_GetShaderText(view, name);
     if !def.is_null() {
-        CM_ParseShader(view.common, view.cm, out, &mut { def }
-            as *mut *const c_char);
+        let def_str = unsafe { core::ffi::CStr::from_ptr(def) }
+            .to_string_lossy()
+            .into_owned();
+        let mut cursor: &str = &def_str;
+        CM_ParseShader(view.common, view.cm, out, &mut cursor);
     }
 
     view.cm.cmShaderTable.insert(out);
