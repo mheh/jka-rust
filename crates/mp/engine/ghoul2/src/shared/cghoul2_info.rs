@@ -17,7 +17,8 @@ use crate::ghoul2_system::BoneCacheId;
 use crate::shared::bolt_info_t::boltInfo_t;
 use crate::shared::bone_info_t::boneInfo_t;
 use crate::shared::surface_info_t::surfaceInfo_t;
-use core::ffi::c_void;
+use mp_host_interface::mdx::mdxa::MdxaView;
+use mp_host_interface::mdx::mdxm::MdxmView;
 use mp_qshared::shared::qhandle_t;
 
 /// Raven `CGhoul2Info` — one Ghoul2 model instance's full state.
@@ -93,16 +94,18 @@ pub struct CGhoul2Info {
     /// Raven `const model_s *currentModel` — opaque (never named as an
     /// `mp_renderer` type, same rationale as `mdxaHeader_t`/`mdxaSkel_t`,
     /// `G2SV-D5`); resolved/validated by `G2_SetupModelPointers` (`misc.rs`).
-    pub current_model: *const c_void,
+    /// Stored as the loader-block view (`None` ≡ the null pointer); the view's
+    /// `'static` contract is revalidated at each `G2_SetupModelPointers`.
+    pub current_model: Option<MdxmView<'static>>,
     /// Raven `int currentModelSize`.
     pub current_model_size: i32,
     /// Raven `const model_s *animModel` — opaque, see `current_model`.
-    pub anim_model: *const c_void,
+    pub anim_model: Option<MdxaView<'static>>,
     /// Raven `int currentAnimModelSize`.
     pub current_anim_model_size: i32,
     /// Raven `const mdxaHeader_t *aHeader` — opaque (`G2SV-D5`: `mdxaHeader_t`
     /// is never named as a Rust type here); read via `EngineHost::model_mdxa`.
-    pub a_header: *const c_void,
+    pub a_header: Option<MdxaView<'static>>,
 }
 
 impl Default for CGhoul2Info {
@@ -131,11 +134,11 @@ impl Default for CGhoul2Info {
             bone_cache: None,
             skin: 0,
             valid: false,
-            current_model: core::ptr::null(),
+            current_model: None,
             current_model_size: 0,
-            anim_model: core::ptr::null(),
+            anim_model: None,
             current_anim_model_size: 0,
-            a_header: core::ptr::null(),
+            a_header: None,
         }
     }
 }

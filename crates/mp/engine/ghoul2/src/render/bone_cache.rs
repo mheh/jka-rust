@@ -37,8 +37,6 @@
 //! reads (`G2_Find_Bone_ByNum`) never run; folded into `smooth_low`'s doc
 //! comment, not a separate stub.
 
-use core::ffi::c_void;
-
 use mp_host_interface::EngineHost;
 use mp_qshared::shared::{mdxaBone_t, qhandle_t, VectorNormalize};
 
@@ -123,10 +121,12 @@ pub struct CBoneCache {
     /// `0` by `G2_TransformGhoulBones` (`:2217`), never read live (only
     /// inside commented-out byte-arithmetic, `:1615-1687`).
     pub frame_size: i32,
-    /// Raven `const mdxaHeader_t *header` — the loader's parsed `.gla` block.
-    /// `*mut c_void` per `G2SV-D5`: this crate never names `mdxaHeader_t`;
-    /// sourced from `EngineHost::model_mdxa` at ctor time.
-    pub header: *mut c_void,
+    /// Raven `const mdxaHeader_t *header` — the loader's parsed `.gla` block,
+    /// stored as its byte view (`G2SV-D5`: this crate never names
+    /// `mdxaHeader_t`). Sourced from `EngineHost::model_mdxa` at ctor time and
+    /// revalidated once per transform pass in `g2_transform_ghoul_bones_inner`
+    /// (`render/skeleton.rs`, DEC-35); `None` ≡ the null pointer.
+    pub mdxa: Option<MdxaView<'static>>,
     /// Raven `const model_t *mod` — renamed (`mod` is a Rust keyword) and
     /// retyped to the `qhandle_t` the ctor received: `G2SV-D5` forbids naming
     /// `model_t` in this crate, and the live (non-`#if 0`) code path never
@@ -190,8 +190,8 @@ impl CBoneCache {
         // (NDEBUG in the frozen build), kept as `debug_assert`.
         let mdxa = host.model_mdxa(a_mod);
         debug_assert!(mdxa.is_some(), "CBoneCache::new: null mdxa header");
-        let mdxa = mdxa.unwrap();
-        let num_bones = mdxa.num_bones();
+        let view = mdxa.unwrap();
+        let num_bones = view.num_bones();
         let n = num_bones as usize;
 
         let bones = vec![SBoneCalc::default(); n];
@@ -200,12 +200,12 @@ impl CBoneCache {
 
         // Seed each bone's parent from the model's `mdxaSkel_t` (`:419-425`).
         for (i, bone) in final_bones.iter_mut().enumerate() {
-            bone.parent = mdxa.skel(i as i32).parent();
+            bone.parent = view.skel(i as i32).parent();
         }
 
         CBoneCache {
             frame_size: 0,
-            header: mdxa.block_ptr().cast_mut(),
+            mdxa,
             model: a_mod,
             bones,
             final_bones,
@@ -302,9 +302,9 @@ impl CBoneCache {
 
         // Un-scale then rescale by the basepose to remove squash/stretch. The
         // basepose matrices come from the model's `mdxaSkel_t`, read off the
-        // same opaque `header` block as the ctor (`G2SV-D5`).
-        // SAFETY: `header` is the live `.gla` block; `index` in `0..numBones`.
-        let skel = unsafe { MdxaView::from_block(self.header) }.skel(index);
+        // same `mdxa` view as the ctor (`G2SV-D5`); revalidated per transform
+        // pass, so `Some` on this render path.
+        let skel = self.mdxa.expect("CBoneCache::smooth_low: mdxa unrevalidated").skel(index);
         let base_pose_mat: mdxaBone_t = skel.base_pose_mat();
         let base_pose_mat_inv: mdxaBone_t = skel.base_pose_mat_inv();
 
@@ -469,7 +469,7 @@ mod tests {
     fn bare_cache(n: usize) -> CBoneCache {
         CBoneCache {
             frame_size: 0,
-            header: core::ptr::null_mut(),
+            mdxa: None,
             model: 0,
             bones: vec![SBoneCalc::default(); n],
             final_bones: vec![CTransformBone::default(); n],

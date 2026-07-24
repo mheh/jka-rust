@@ -58,8 +58,6 @@
 //!    copy and the real `blist` entry is untouched — reproducing this call
 //!    chain's original no-observed-write behavior exactly.
 
-use core::ffi::c_void;
-
 use mp_host_interface::EngineHost;
 use mp_qshared::shared::q_math::Create_Matrix;
 use mp_qshared::shared::{mdxaBone_t, qhandle_t, vec3_t, Eorientations};
@@ -124,15 +122,16 @@ const RAG_PCJ_IK_CONTROLLED: i32 = 0x08000;
 /// `mdxaHeader_t` named as a Rust type.
 ///
 /// Source: `oracle/codemp/ghoul2/G2_bones.cpp:38-69`
-pub fn g2_find_bone(anim_model: *const c_void, blist: &[boneInfo_t], bone_name: &str) -> i32 {
+pub fn g2_find_bone(anim_model: Option<MdxaView<'static>>, blist: &[boneInfo_t], bone_name: &str) -> i32 {
     for (i, bone) in blist.iter().enumerate() {
         if bone.boneNumber == -1 {
             continue;
         }
-        // Safety: an active bone slot's `boneNumber` indexes `anim_model`'s
-        // skeleton; callers hold `anim_model` non-null whenever `blist`
-        // carries an active bone, matching Raven's unchecked `mod->mdxa` deref.
-        if unsafe { MdxaView::from_block(anim_model) }
+        // An active bone slot's `boneNumber` indexes `anim_model`'s skeleton;
+        // callers hold `anim_model` non-`None` whenever `blist` carries an
+        // active bone, matching Raven's unchecked `mod->mdxa` deref.
+        if anim_model
+            .expect("G2_Find_Bone: null anim model with active bone")
             .skel(bone.boneNumber)
             .name_matches(bone_name)
         {
@@ -148,11 +147,10 @@ pub fn g2_find_bone(anim_model: *const c_void, blist: &[boneInfo_t], bone_name: 
 /// `-1` if `boneName` has no skeleton match.
 ///
 /// Source: `oracle/codemp/ghoul2/G2_bones.cpp:71-141`
-pub fn g2_add_bone(anim_model: *const c_void, blist: &mut Vec<boneInfo_t>, bone_name: &str) -> i32 {
-    // Safety: caller holds a valid, non-null anim model pointer whenever it
-    // expects a bone to actually be added (matches Raven's unchecked
-    // `mod->mdxa->numBones` deref).
-    let mdxa = unsafe { MdxaView::from_block(anim_model) };
+pub fn g2_add_bone(anim_model: Option<MdxaView<'static>>, blist: &mut Vec<boneInfo_t>, bone_name: &str) -> i32 {
+    // Caller holds a valid, non-`None` anim model whenever it expects a bone to
+    // actually be added (matches Raven's unchecked `mod->mdxa->numBones` deref).
+    let mdxa = anim_model.expect("G2_Add_Bone: null anim model");
     let num_bones = mdxa.num_bones();
     let mut x = 0i32;
     while x < num_bones {
@@ -249,7 +247,7 @@ pub fn g2_stop_bone_index(blist: &mut Vec<boneInfo_t>, index: i32, flags: i32) -
 /// Source: `oracle/codemp/ghoul2/G2_bones.cpp:227-419`
 #[allow(clippy::too_many_arguments)]
 pub fn g2_generate_matrix(
-    anim_model: *const c_void,
+    anim_model: Option<MdxaView<'static>>,
     blist: &mut Vec<boneInfo_t>,
     index: i32,
     angles: vec3_t,
@@ -302,11 +300,11 @@ pub fn g2_generate_matrix(
         Create_Matrix(new_angles, &mut bone_override);
 
         let bone_number = blist[idx].boneNumber;
-        // Safety: PREMULT/POSTMULT callers always pass a resolved
-        // `anim_model` (matches Raven's unchecked `mod->mdxa` dereference;
-        // the `*_Index` sibling rejects these flags before ever reaching
-        // here with a null model, per its own doc comment below).
-        let skel = unsafe { MdxaView::from_block(anim_model) }.skel(bone_number);
+        // PREMULT/POSTMULT callers always pass a resolved `anim_model` (matches
+        // Raven's unchecked `mod->mdxa` dereference; the `*_Index` sibling
+        // rejects these flags before ever reaching here with a null model, per
+        // its own doc comment below).
+        let skel = anim_model.expect("G2_Generate_Matrix: null anim model under PRE/POSTMULT").skel(bone_number);
         let base_pose_mat = skel.base_pose_mat();
         let base_pose_mat_inv = skel.base_pose_mat_inv();
 
@@ -456,7 +454,7 @@ pub fn g2_remove_bone(
     blist: &mut Vec<boneInfo_t>,
     bone_name: &str,
 ) -> bool {
-    debug_assert!(!ghl_info.anim_model.is_null());
+    debug_assert!(ghl_info.anim_model.is_some());
     let index = g2_find_bone(ghl_info.anim_model, blist, bone_name);
     g2_remove_bone_index(blist, index)
 }
@@ -491,10 +489,10 @@ pub fn g2_set_bone_anim(
         return true;
     }
     if index != -1 {
-        // Safety: `ghl_info.a_header` is a non-null `EngineHost::model_mdxa`
-        // block whenever this is reached with a valid instance (matches
-        // Raven's unchecked `ghlInfo->aHeader->numFrames` dereference).
-        let num_frames = unsafe { MdxaView::from_block(ghl_info.a_header) }.num_frames();
+        // `ghl_info.a_header` is a non-`None` `EngineHost::model_mdxa` block
+        // whenever this is reached with a valid instance (matches Raven's
+        // unchecked `ghlInfo->aHeader->numFrames` dereference).
+        let num_frames = ghl_info.a_header.expect("G2_Set_Bone_Anim: null aHeader").num_frames();
         return g2_set_bone_anim_index(
             blist,
             index,
@@ -681,10 +679,10 @@ pub fn g2_get_bone_anim(
             return false;
         }
     }
-    debug_assert!(!ghl_info.a_header.is_null());
-    // Safety: see the debug_assert above; matches Raven's unchecked
+    debug_assert!(ghl_info.a_header.is_some());
+    // See the debug_assert above; matches Raven's unchecked
     // `ghlInfo->aHeader->numFrames` dereference.
-    let num_frames = unsafe { MdxaView::from_block(ghl_info.a_header) }.num_frames();
+    let num_frames = ghl_info.a_header.expect("G2_Get_Bone_Anim: null aHeader").num_frames();
     g2_get_bone_anim_index(
         blist.as_slice(),
         index,
@@ -827,18 +825,17 @@ pub fn g2_set_bone_angles_matrix(
         if let Some(mod_m) = host.model_mdxm(model_list[model_index as usize]) {
             let anim_index = mod_m.anim_index();
             host.model_mdxa(anim_index)
-                .map_or(core::ptr::null(), |v| v.block_ptr())
         } else {
-            core::ptr::null()
+            None
         }
     } else {
         // GAP (module doc finding 2): `RE_RegisterModel(fileName)` has no
         // `EngineHost` service — reported upstream; treated the same as
         // `g2_is_paused`'s unresolved by-filename path.
-        core::ptr::null()
+        None
     };
 
-    if mod_a.is_null() {
+    if mod_a.is_none() {
         return false;
     }
 
@@ -928,7 +925,7 @@ pub fn g2_set_bone_angles_index(
     blist[index as usize].boneBlendStart = current_time;
     blist[index as usize].boneBlendTime = blend_time;
     g2_generate_matrix(
-        core::ptr::null(),
+        None,
         blist,
         index,
         angles,

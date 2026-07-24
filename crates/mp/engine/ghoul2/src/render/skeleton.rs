@@ -75,7 +75,6 @@ use mp_qshared::shared::q_math::{
 use mp_qshared::shared::{mdxaBone_t, vec3_t, VectorNormalize, VectorNormalizeRow};
 
 use crate::ghoul2_system::{BoneCacheArena, BoneCacheId, Ghoul2System};
-use mp_host_interface::mdx::mdxa::MdxaView;
 use mp_host_interface::mdx::mdxm::{MdxmSurfaceView, MdxmVertView, MdxmView};
 use crate::render::bone_cache::CBoneCache;
 use crate::render::bone_transform;
@@ -360,11 +359,11 @@ pub(crate) fn resolve_bolt_matrix_low(
 
     if bolt.boneNumber >= 0 {
         let evaluated = cache.eval_unsmooth(bolt.boneNumber);
-        // SAFETY: `cache.header` is the block `EngineHost::model_mdxa` handed
-        // back for this cache's model (`CBoneCache::new`/refresh); `boneNumber`
-        // is caller-set bone data, matching Raven's own unchecked read.
+        // `cache.mdxa` is the block `EngineHost::model_mdxa` handed back for
+        // this cache's model (`CBoneCache::new`/refresh); `boneNumber` is
+        // caller-set bone data, matching Raven's own unchecked read.
         let base_pose_mat: mdxaBone_t =
-            unsafe { MdxaView::from_block(cache.header) }.skel(bolt.boneNumber).base_pose_mat();
+            cache.mdxa.expect("resolve_bolt_matrix_low: mdxa unset").skel(bolt.boneNumber).base_pose_mat();
         let mut ret_matrix = IDENTITY_MATRIX;
         // Raven: `Multiply_3x4Matrix(&retMatrix, (mdxaBone_t*)&boneCache.
         // EvalUnsmooth(...), &skel->BasePoseMat);` — dest first arg.
@@ -465,9 +464,12 @@ fn g2_transform_ghoul_bones_inner(
         return;
     };
 
-    // Raven: `ghoul2.mBoneCache->mod=currentModel; header=aHeader;`
+    // Raven: `ghoul2.mBoneCache->mod=currentModel; header=aHeader;`. This is
+    // the once-per-transform-pass revalidation of the cache's stored view
+    // (DEC-35): the `let Some(header) = host.model_mdxa(...) else { return }`
+    // above already early-outs on eviction, so the store here is always fresh.
     cache.model = ghoul2.model;
-    cache.header = header.block_ptr().cast_mut();
+    cache.mdxa = Some(header);
 
     cache.smoothing_active = false;
     cache.unsquash = false;
@@ -660,11 +662,10 @@ pub fn g2_get_bone_matrix_low(
     };
 
     let evaluated = cache.eval(bone_num);
-    // SAFETY: `cache.header` is the block `EngineHost::model_mdxa` handed
-    // back for this cache's model; `bone_num` is caller-provided bone data,
-    // matching Raven's own unchecked read (its bounds assert is dead under
-    // `-DNDEBUG`).
-    let skel = unsafe { MdxaView::from_block(cache.header) }.skel(bone_num);
+    // `cache.mdxa` is the block `EngineHost::model_mdxa` handed back for this
+    // cache's model; `bone_num` is caller-provided bone data, matching Raven's
+    // own unchecked read (its bounds assert is dead under `-DNDEBUG`).
+    let skel = cache.mdxa.expect("g2_get_bone_matrix_low: mdxa unset").skel(bone_num);
     let base_ptr = skel.base_pose_mat_ptr() as *mut mdxaBone_t;
     let base_inv_ptr = skel.base_pose_mat_inv_ptr() as *mut mdxaBone_t;
     let base_pose_mat: mdxaBone_t = skel.base_pose_mat();
@@ -710,8 +711,8 @@ pub fn g2_get_bone_basepose(
         let id_ptr = &IDENTITY_MATRIX as *const mdxaBone_t as *mut mdxaBone_t;
         return (id_ptr, id_ptr);
     };
-    // SAFETY: see `g2_get_bone_matrix_low`.
-    let skel = unsafe { MdxaView::from_block(cache.header) }.skel(bone_num);
+    // See `g2_get_bone_matrix_low`.
+    let skel = cache.mdxa.expect("g2_get_bone_basepose: mdxa unset").skel(bone_num);
     (
         skel.base_pose_mat_ptr() as *mut mdxaBone_t,
         skel.base_pose_mat_inv_ptr() as *mut mdxaBone_t,
@@ -747,9 +748,9 @@ pub fn g2_rag_get_bone_base_pose_matrix_low(
     };
 
     let mut ret_matrix = IDENTITY_MATRIX;
-    // SAFETY: see `g2_get_bone_matrix_low`.
+    // See `g2_get_bone_matrix_low`.
     let base_pose_mat: mdxaBone_t =
-        unsafe { MdxaView::from_block(cache.header) }.skel(bone_num).base_pose_mat();
+        cache.mdxa.expect("g2_rag_get_bone_base_pose_matrix_low: mdxa unset").skel(bone_num).base_pose_mat();
     bone_transform::multiply_3x4_matrix(&mut ret_matrix, bone_matrix, &base_pose_mat);
 
     if scale[0] != 0.0 {
@@ -987,7 +988,7 @@ mod tests {
     fn test_bone_cache() -> CBoneCache {
         CBoneCache {
             frame_size: 0,
-            header: core::ptr::null_mut(),
+            mdxa: None,
             model: 0,
             bones: Vec::new(),
             final_bones: Vec::new(),

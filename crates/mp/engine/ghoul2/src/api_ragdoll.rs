@@ -66,8 +66,6 @@
 //! long as the callee never re-enters `Ghoul2System.info_array` for the same
 //! model index while the split pointer is live.
 
-use core::ffi::c_void;
-
 use mp_host_interface::EngineHost;
 use mp_qshared::common::mp::ghoul2::{
     BONE_ANGLES_IK, BONE_ANGLES_POSTMULT, BONE_ANGLES_PREMULT, BONE_ANGLES_RAGDOLL,
@@ -415,13 +413,10 @@ fn split_info(g2: &mut Ghoul2System, ghoul2: &CGhoul2Info_v, model: i32) -> *mut
 /// no cache exists yet.
 ///
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:591-599`
-fn g2_get_mod_a(g2: &Ghoul2System, info: &CGhoul2Info) -> *mut c_void {
+fn g2_get_mod_a(g2: &Ghoul2System, info: &CGhoul2Info) -> Option<MdxaView<'static>> {
     match info.bone_cache {
-        Some(id) => g2
-            .bone_caches
-            .get(id)
-            .map_or(core::ptr::null_mut(), |cache| cache.header),
-        None => core::ptr::null_mut(),
+        Some(id) => g2.bone_caches.get(id).and_then(|cache| cache.mdxa),
+        None => None,
     }
 }
 
@@ -438,15 +433,16 @@ fn g2_get_mod_a(g2: &Ghoul2System, info: &CGhoul2Info) -> *mut c_void {
 /// (`G2SV-D5`: `mdxaHeader_t`/`mdxaSkelOffsets_t`/`mdxaSkel_t` are never
 /// named here, so the wire sizes are replicated instead of imported from
 /// `mp_renderer::mdx_format`, which this crate may not depend on).
-fn skel_bone_name_matches(header: *const c_void, bone_number: i32, bone_name: &str) -> bool {
-    if header.is_null() || bone_number < 0 {
+fn skel_bone_name_matches(header: Option<MdxaView<'static>>, bone_number: i32, bone_name: &str) -> bool {
+    let Some(mdxa) = header else {
+        return false;
+    };
+    if bone_number < 0 {
         return false;
     }
-    // SAFETY: `header` is non-null here and trusted valid for the model's
-    // lifetime (see the invariant above); `stricmp` is byte-wise case-insensitive.
-    unsafe { MdxaView::from_block(header) }
-        .skel(bone_number)
-        .name_matches(bone_name)
+    // `header` is trusted valid for the model's lifetime (see the invariant
+    // above); `stricmp` is byte-wise case-insensitive.
+    mdxa.skel(bone_number).name_matches(bone_name)
 }
 
 /// Raven `int G2_Find_Bone_Rag(CGhoul2Info *ghlInfo, boneInfo_v &blist,
@@ -933,7 +929,7 @@ pub fn g2api_set_ragdoll(
     }
 
     let mod_a = g2_get_mod_a(g2, ghoul2.get(g2, model));
-    if mod_a.is_null() {
+    if mod_a.is_none() {
         return;
     }
     let cur_time = api_collision::g2api_get_time(g2, 0);
@@ -1407,14 +1403,14 @@ pub fn g2api_set_bone_ik_state(
         return true;
     };
 
-    if rmod_a.is_null() {
+    if rmod_a.is_none() {
         return false;
     }
     // `mod_a` (Raven `model_t *`) is the raw anim-model pointer; the port
-    // never names `model_t` (G2SV-D5) — `ghoul2.animModel` (`*const c_void`)
-    // already IS that pointer's port-time shape (`shared/cghoul2_info.rs`).
+    // never names `model_t` (G2SV-D5) — `ghoul2.animModel` already IS that
+    // pointer's port-time shape, an `Option<MdxaView>` (`shared/cghoul2_info.rs`).
     let anim_model = ghoul2.get(g2, model).anim_model;
-    if anim_model.is_null() {
+    if anim_model.is_none() {
         return false;
     }
 
@@ -1611,6 +1607,7 @@ fn find_rag_bone_index(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use core::ffi::c_void;
     use mp_host_interface::mock::MockHost;
 
     /// `skel_bone_name_matches`'s raw byte arithmetic is the trickiest part
@@ -1638,12 +1635,12 @@ mod tests {
         buf[skel0..skel0 + 11].copy_from_slice(b"model_root\0");
         buf[skel1..skel1 + 7].copy_from_slice(b"pelvis\0");
 
-        let header = buf.as_ptr() as *const c_void;
+        let header = Some(unsafe { MdxaView::from_block(buf.as_ptr() as *const c_void) });
         assert!(skel_bone_name_matches(header, 0, "MODEL_ROOT")); // stricmp: case-insensitive
         assert!(skel_bone_name_matches(header, 1, "pelvis"));
         assert!(!skel_bone_name_matches(header, 0, "pelvis"));
         assert!(!skel_bone_name_matches(header, 1, "model_root"));
-        assert!(!skel_bone_name_matches(core::ptr::null(), 0, "model_root"));
+        assert!(!skel_bone_name_matches(None, 0, "model_root"));
     }
 
     /// [`rag_random_angle_seed`] transcription check against the deterministic

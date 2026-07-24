@@ -30,7 +30,6 @@ use mp_host_interface::EngineHost;
 use mp_qshared::shared::{mdxaBone_t, qhandle_t, vec3_t, Eorientations};
 
 use crate::ghoul2_system::Ghoul2System;
-use mp_host_interface::mdx::mdxa::MdxaView;
 use crate::shared::cghoul2_info::CGhoul2Info;
 use crate::shared::cghoul2_info_v::CGhoul2Info_v;
 
@@ -568,10 +567,10 @@ pub fn g2api_set_bone_anim_index(
         return false;
     }
     ghl_info.skel_frame_num = 0;
-    // Safety: `res` is true, so `g2_setup_model_pointers` has populated
-    // `a_header` from a valid model (G2_API.cpp:1058 dereferences it
-    // unconditionally on this path — same faithful no-null-check transcription).
-    let num_frames = unsafe { MdxaView::from_block(ghl_info.a_header) }.num_frames();
+    // `res` is true, so `g2_setup_model_pointers` has populated `a_header` from
+    // a valid model (G2_API.cpp:1058 dereferences it unconditionally on this
+    // path — same faithful no-null-check transcription).
+    let num_frames = ghl_info.a_header.expect("G2API_SetBoneAnim: null aHeader").num_frames();
     crate::bones::g2_set_bone_anim_index(
         &mut ghl_info.blist,
         index,
@@ -645,13 +644,11 @@ pub fn g2api_does_bone_exist(
     if !crate::misc::g2_setup_model_pointers(host, ghl_info) {
         return false;
     }
-    let mdxa = ghl_info.a_header;
-    if mdxa.is_null() {
+    // `mdxa` is a block returned by `g2_setup_model_pointers` (ultimately
+    // `EngineHost::model_mdxa`); `num_bones` bounds the walk below.
+    let Some(mdxa) = ghl_info.a_header else {
         return false;
-    }
-    // Safety: `mdxa` is a non-null block returned by `g2_setup_model_pointers`
-    // (ultimately `EngineHost::model_mdxa`); `num_bones` bounds the walk below.
-    let mdxa = unsafe { MdxaView::from_block(mdxa) };
+    };
     let num_bones = mdxa.num_bones();
     for i in 0..num_bones {
         if mdxa.skel(i).name_matches(bone_name) {

@@ -93,12 +93,6 @@ impl<'a> MdxmView<'a> {
         Self { bytes: unsafe { slice::from_raw_parts(base, ofs_end as usize) } }
     }
 
-    /// The block base pointer — phase-②-transitional escape hatch for caches
-    /// that still store raw pointers, plus the reloaded-model size-compare.
-    pub fn block_ptr(&self) -> *const c_void {
-        self.bytes.as_ptr() as *const c_void
-    }
-
     /// `mdxmHeader_t->animIndex`.
     pub fn anim_index(&self) -> i32 {
         read_i32(self.bytes, OFS_ANIM_INDEX)

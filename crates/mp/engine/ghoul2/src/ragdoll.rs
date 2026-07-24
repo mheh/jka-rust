@@ -375,12 +375,9 @@ fn g2_get_bone_dependents(
     let Some(cache) = g2.bone_caches.get(cache_id) else {
         return 0;
     };
-    let header = cache.header;
-    if header.is_null() {
+    let Some(mdxa) = cache.mdxa else {
         return 0;
-    }
-    // SAFETY: `header` is the non-null `EngineHost::model_mdxa` block.
-    let mdxa = unsafe { MdxaView::from_block(header) };
+    };
     g2_get_bone_dependents_recurse(mdxa, bone_num, out)
 }
 
@@ -439,14 +436,10 @@ fn g2_rag_get_anim_matrix(
     let Some(cache) = g2.bone_caches.get(cache_id) else {
         return ZERO_BONE;
     };
-    let header = cache.header;
     let root_matrix = cache.root_matrix;
-    if header.is_null() {
+    let Some(mdxa) = cache.mdxa else {
         return ZERO_BONE;
-    }
-
-    // SAFETY: `header` is the non-null `EngineHost::model_mdxa` block.
-    let mdxa = unsafe { MdxaView::from_block(header) };
+    };
     let skel = mdxa.skel(bone_num);
     let name = skel.name_lossy();
 
@@ -460,7 +453,7 @@ fn g2_rag_get_anim_matrix(
     }
 
     let mut anim_matrix = ZERO_BONE;
-    uncompress_bone(&mut anim_matrix.matrix, bone_num, header, frame);
+    uncompress_bone(&mut anim_matrix.matrix, bone_num, mdxa, frame);
 
     let parent = skel.parent();
     let mut result = ZERO_BONE;
@@ -1316,12 +1309,9 @@ fn g2_rag_doll_settle_position_numero_trois_instances(
         if bone_number != 0 {
             let parent_blist_index = instances[idx].blist[blist_idx].parentBoneIndex;
             let resolved_parent = if parent_blist_index == -1 {
-                let a_header = instances[idx].a_header;
                 let anim_model = instances[idx].anim_model;
                 let mut found = -1i32;
-                if !a_header.is_null() {
-                    // SAFETY: `a_header` is the non-null `EngineHost::model_mdxa` block.
-                    let mdxa = unsafe { MdxaView::from_block(a_header) };
+                if let Some(mdxa) = instances[idx].a_header {
                     let mut b_parent_index = mdxa.skel(bone_number).parent();
                     while b_parent_index > 0 {
                         let pskel = mdxa.skel(b_parent_index);
@@ -2217,17 +2207,14 @@ pub fn g2_ik_reposition(
 ///
 /// Source: `oracle/codemp/ghoul2/G2_bones.cpp:2580-2605`
 pub fn g2_get_bone_name(ghoul2: &CGhoul2Info, blist: &[boneInfo_t], bone_num: i32) -> String {
-    if ghoul2.a_header.is_null() {
+    let Some(mdxa) = ghoul2.a_header else {
         return "BONE_NOT_FOUND".to_string();
-    }
+    };
     for entry in blist {
         if entry.boneNumber != bone_num {
             continue;
         }
-        // SAFETY: `a_header` is the non-null `EngineHost::model_mdxa` block.
-        return unsafe { MdxaView::from_block(ghoul2.a_header) }
-            .skel(entry.boneNumber)
-            .name_lossy();
+        return mdxa.skel(entry.boneNumber).name_lossy();
     }
     "BONE_NOT_FOUND".to_string()
 }

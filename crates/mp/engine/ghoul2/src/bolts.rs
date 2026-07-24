@@ -25,7 +25,6 @@
 
 use mp_host_interface::EngineHost;
 
-use mp_host_interface::mdx::mdxa::MdxaView;
 use crate::shared::bolt_info_t::boltInfo_t;
 use crate::shared::cghoul2_info::CGhoul2Info;
 use crate::shared::surface_info_t::surfaceInfo_t;
@@ -218,10 +217,10 @@ pub fn g2_add_bolt(
     }
 
     // no, check to see if it's a bone then
-    // SAFETY: `a_header` is the `EngineHost::model_mdxa` block
-    // `G2_SetupModelPointers` cached (the oracle's `mod_a->mdxa`, dereferenced
-    // unchecked there too); callers run setup first (`g2api_add_bolt`).
-    let mdxa = unsafe { MdxaView::from_block(ghl_info.a_header) };
+    // `a_header` is the `EngineHost::model_mdxa` block `G2_SetupModelPointers`
+    // cached (the oracle's `mod_a->mdxa`, dereferenced unchecked there too);
+    // callers run setup first (`g2api_add_bolt`).
+    let mdxa = ghl_info.a_header.expect("G2_Add_Bolt: null aHeader");
     let num_bones = mdxa.num_bones();
 
     // walk the entire list of bones in the gla file for this model and see if
@@ -401,6 +400,7 @@ pub fn g2_remove_redundant_bolts(
 mod tests {
     use super::*;
     use crate::shared::surface_info_t::surfaceInfo_t;
+    use mp_host_interface::mdx::mdxa::MdxaView;
     use mp_qshared::shared::mdxaBone_t;
 
     fn bolt(
@@ -509,7 +509,7 @@ mod tests {
         host.mdxm_blocks.insert(1, mdxm);
         let mut ghl = CGhoul2Info::default();
         ghl.model = 1;
-        ghl.a_header = mdxa.as_ptr() as *const core::ffi::c_void;
+        ghl.a_header = Some(unsafe { MdxaView::from_block(mdxa.as_ptr() as *const core::ffi::c_void) });
 
         let mut bltlist: Vec<boltInfo_t> = Vec::new();
         let slist: Vec<surfaceInfo_t> = Vec::new();

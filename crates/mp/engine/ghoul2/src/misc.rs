@@ -408,7 +408,7 @@ pub fn g2_setup_model_pointers(host: &mut impl EngineHost, ghl_info: &mut CGhoul
         };
 
         let mdxm = host.model_mdxm(ghl_info.model);
-        ghl_info.current_model = mdxm.map_or(core::ptr::null(), |v| v.block_ptr());
+        ghl_info.current_model = mdxm;
         if let Some(view) = mdxm {
             let ofs_end = view.ofs_end();
             if ghl_info.current_model_size != 0 && ghl_info.current_model_size != ofs_end {
@@ -421,9 +421,9 @@ pub fn g2_setup_model_pointers(host: &mut impl EngineHost, ghl_info: &mut CGhoul
 
             let anim_index = view.anim_index();
             let a_header = host.model_mdxa(anim_index);
-            ghl_info.anim_model = a_header.map_or(core::ptr::null(), |v| v.block_ptr());
+            ghl_info.anim_model = a_header;
             if let Some(a_view) = a_header {
-                ghl_info.a_header = a_view.block_ptr();
+                ghl_info.a_header = Some(a_view);
                 let a_ofs_end = a_view.ofs_end();
                 if ghl_info.current_anim_model_size != 0
                     && ghl_info.current_anim_model_size != a_ofs_end
@@ -439,11 +439,11 @@ pub fn g2_setup_model_pointers(host: &mut impl EngineHost, ghl_info: &mut CGhoul
         }
     }
     if !ghl_info.valid {
-        ghl_info.current_model = core::ptr::null();
+        ghl_info.current_model = None;
         ghl_info.current_model_size = 0;
-        ghl_info.anim_model = core::ptr::null();
+        ghl_info.anim_model = None;
         ghl_info.current_anim_model_size = 0;
-        ghl_info.a_header = core::ptr::null();
+        ghl_info.a_header = None;
     }
     ghl_info.valid
 }

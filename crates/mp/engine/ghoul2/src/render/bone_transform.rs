@@ -45,8 +45,6 @@
 //! range but is already landed in `bones.rs` as `g2_find_bone_in_list`
 //! (`crates/mp/engine/ghoul2/src/bones.rs:340`) — not re-stubbed here.
 
-use core::ffi::c_void;
-
 use mp_qshared::shared::{mdxaBone_t, vec4_t, VectorLength};
 
 use crate::matcomp::mc_uncompress_quat;
@@ -111,6 +109,10 @@ pub fn g2_transform_bone(bc: &mut CBoneCache, child: i32) {
     let child_idx = child as usize;
     let mut angle_override: i32 = 0;
 
+    // The cache's `.gla` view — revalidated once per transform pass in
+    // `g2_transform_ghoul_bones_inner` (DEC-35), so `Some` on this render path.
+    let mdxa = bc.mdxa.expect("g2_transform_bone: mdxa unrevalidated");
+
     // SAFETY: `root_bone_list` is set fresh each `G2_TransformGhoulBones`
     // call into the owning `CGhoul2Info::blist` (`render/bone_cache.rs`) and
     // stays valid for the whole `EvalLow` recursion that calls this
@@ -151,8 +153,7 @@ pub fn g2_transform_bone(bc: &mut CBoneCache, child: i32) {
 
         // should this animation be overridden by an animation in the bone list?
         if bone_override.flags & (BONE_ANIM_OVERRIDE_LOOP | BONE_ANIM_OVERRIDE) != 0 {
-            // SAFETY: same as the function-level note above.
-            let num_frames = unsafe { MdxaView::from_block(bc.header) }.num_frames();
+            let num_frames = mdxa.num_frames();
             let tb = &bc.bones[child_idx];
             let (current_frame, new_frame, backlerp) = g2_timing_model(
                 bone_override,
@@ -170,8 +171,7 @@ pub fn g2_transform_bone(bc: &mut CBoneCache, child: i32) {
     }
 
     // figure out where the location of the bone animation data is
-    // SAFETY: same as the function-level note above.
-    let num_frames = unsafe { MdxaView::from_block(bc.header) }.num_frames();
+    let num_frames = mdxa.num_frames();
     {
         let tb = &mut bc.bones[child_idx];
         if !(tb.new_frame >= 0 && tb.new_frame < num_frames) {
@@ -216,8 +216,8 @@ pub fn g2_transform_bone(bc: &mut CBoneCache, child: i32) {
         let back = blend_frame - (blend_frame as i32) as f32;
         let front = 1.0 - back;
 
-        uncompress_bone(&mut tbone[3].matrix, child, bc.header, blend_frame as i32);
-        uncompress_bone(&mut tbone[4].matrix, child, bc.header, blend_old_frame);
+        uncompress_bone(&mut tbone[3].matrix, child, mdxa, blend_frame as i32);
+        uncompress_bone(&mut tbone[4].matrix, child, mdxa, blend_old_frame);
 
         for r in 0..3 {
             for c in 0..4 {
@@ -230,7 +230,7 @@ pub fn g2_transform_bone(bc: &mut CBoneCache, child: i32) {
     // lerp this bone - use the temp space on the ref entity to put the bone
     // transforms into
     if backlerp == 0.0 {
-        uncompress_bone(&mut tbone[2].matrix, child, bc.header, current_frame);
+        uncompress_bone(&mut tbone[2].matrix, child, mdxa, current_frame);
 
         // blend in the other frame if we need to
         if blend_mode {
@@ -255,8 +255,8 @@ pub fn g2_transform_bone(bc: &mut CBoneCache, child: i32) {
         }
     } else {
         let frontlerp = 1.0 - backlerp;
-        uncompress_bone(&mut tbone[0].matrix, child, bc.header, new_frame);
-        uncompress_bone(&mut tbone[1].matrix, child, bc.header, current_frame);
+        uncompress_bone(&mut tbone[0].matrix, child, mdxa, new_frame);
+        uncompress_bone(&mut tbone[1].matrix, child, mdxa, current_frame);
 
         for r in 0..3 {
             for c in 0..4 {
@@ -294,9 +294,9 @@ pub fn g2_transform_bone(bc: &mut CBoneCache, child: i32) {
         let is_rag =
             (angle_override & BONE_ANGLES_RAGDOLL) != 0 || (angle_override & BONE_ANGLES_IK) != 0;
 
-        // SAFETY: same as the function-level note above; `bone_list_index`
-        // is non-negative here (see the invariant note at the top).
-        let skel = unsafe { MdxaView::from_block(bc.header) }.skel(child);
+        // `bone_list_index` is non-negative here (see the invariant note at
+        // the top).
+        let skel = mdxa.skel(child);
         let base_pose_mat = skel.base_pose_mat();
         let base_pose_mat_inv = skel.base_pose_mat_inv();
         let bone_override_matrix = unsafe { (*bc.root_bone_list)[bone_list_index as usize].matrix };
@@ -806,12 +806,9 @@ pub fn g2_create_matrix_from_quaterion(mat: &mut mdxaBone_t, quat: &vec4_t) {
 pub fn uncompress_bone(
     mat: &mut [[f32; 4]; 3],
     bone_index: i32,
-    header: *const c_void,
+    mdxa: MdxaView,
     frame: i32,
 ) {
-    // Safety: `header` is a valid, non-null `EngineHost::model_mdxa` block
-    // pointer for the whole `CBoneCache` lifetime (`G2SV-D5`, ruling 36).
-    let mdxa = unsafe { MdxaView::from_block(header) };
     let pool_index = mdxa.frame_bone_pool_index(frame, bone_index);
     mc_uncompress_quat(mat, mdxa.comp_bone(pool_index));
 }
@@ -819,6 +816,7 @@ pub fn uncompress_bone(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use core::ffi::c_void;
 
     fn identity() -> mdxaBone_t {
         let mut m = mdxaBone_t {
@@ -962,11 +960,12 @@ mod tests {
         comp[12..14].copy_from_slice(&32768u16.to_le_bytes());
 
         let header = buf.as_ptr() as *const c_void;
-        let pool_index = unsafe { MdxaView::from_block(header) }.frame_bone_pool_index(0, 0);
+        let mdxa = unsafe { MdxaView::from_block(header) };
+        let pool_index = mdxa.frame_bone_pool_index(0, 0);
         assert_eq!(pool_index, 0);
 
         let mut mat = [[9.0f32; 4]; 3];
-        uncompress_bone(&mut mat, 0, header, 0);
+        uncompress_bone(&mut mat, 0, mdxa, 0);
 
         let id = identity();
         for r in 0..3 {
