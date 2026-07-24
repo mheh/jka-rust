@@ -1,5 +1,7 @@
 # Idiom slice 4 — g_combat (DEC-31)
 
+> **Status: EXECUTED — merged to master (idiom era, DEC-31; slice 4 branch `idiom/g-combat`).**
+
 The centerpiece slice: g_combat.rs (6,348 lines, 47 fns) rewritten
 idiomatically. Branch: `idiom/g-combat`. Gates: referee 8/8 at every
 commit — the duel1-combat and ffa1 tapes cover every damage tick,

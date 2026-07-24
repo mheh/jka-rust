@@ -1,5 +1,7 @@
 # Engine lockstep referee — plan (SETTLED 2026-07-13)
 
+> **Status: COMPLETED — the lockstep referee is live (9 scenarios incl. real-map) and gates every commit.**
+
 User directive (2026-07-13, halting the statistical bot A/B): *"Make the
 referee in the engine work so we can run jampgame from Raven AND run our
 jampgame in unison, play frame-by-frame and see the differences."*

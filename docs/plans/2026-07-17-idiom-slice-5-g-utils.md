@@ -1,5 +1,7 @@
 # Idiom slice 5 — g_utils (DEC-31)
 
+> **Status: EXECUTED — merged to master (idiom era, DEC-31; slice 5 branch `idiom/g-utils`).**
+
 The shared toolbox (g_utils.rs, 2,752 lines, 66 fns). Branch:
 `idiom/g-utils`. Gates: referee 8/8 at every commit (spawns, temp
 events, sounds and use-targets fire on every tape frame).

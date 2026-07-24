@@ -24,10 +24,16 @@ revision are now also done:
   11,985 frames / 0 divergences; a 23-minute live human session re-judged
   offline to zero module state divergences.
 
-## Active campaign — referee close-out, then the unsafe finish
+## Referee close-out — DONE; the unsafe finish frozen by DEC-31
 
-The centralized step list (task list mirrors this; keep both current).
-Ordered; F-items float unordered.
+Items 1–4b landed 2026-07-15 (referee close-out). The safe-state items 6–8 were
+frozen by DEC-31 (2026-07-16) and superseded by the idiom era — the #13 string,
+DEC-32 dedup, DEC-34 qsort, DEC-35/#17 ghoul2, and #19 ctx-threading campaigns,
+all merged to master. The bg crate split (item 7) is done: `mp_bg` now holds the
+`bg_*` function bodies. Typed entity-view refactors (item 8) are deferred to the
+post-full-port great refactor. The active track is the client port
+(`docs/plans/2026-07-24-client-port/`). The historical checklist follows;
+F-items float unordered.
 
 1. **DONE 2026-07-15 (`d6ef7674`) — item-toss velocity.** `crandom()` is
    double-typed C; retyped f64, 27 sites audited. Replay-verified: digest at
@@ -87,13 +93,14 @@ Ordered; F-items float unordered.
    oracle cites, adversarially verified, fixes in referee-gated batches
    (soak + human-tape replay signature). Subsumes floating items F1/F2
    below.
-6. **Safe-state Stage 4** — overlay/shared-buffer casts behind typed seam
-   adapters (findings F5/F6) + the unsafe-retiring slice of porting-rules
-   §C7. Referee-gated shards. Plan:
+6. **Safe-state Stage 4** (FROZEN by DEC-31) — overlay/shared-buffer casts behind
+   typed seam adapters (findings F5/F6) + the unsafe-retiring slice of
+   porting-rules §C7. Referee-gated shards. Plan:
    `docs/plans/2026-07-12-safe-state-migration.md` (Stages 0–3 DONE).
-7. **Safe-state Stage 5** — bg crate split (ends the ruling-19 deferral;
-   mp_bg holds no fn bodies today — a split, not a dedup).
-8. **Ratify the seam split, then dissolve the tail.** The design sketch is
+7. **Safe-state Stage 5** (DONE) — bg crate split ended the ruling-19 deferral;
+   `mp_bg` now holds the `bg_*` function bodies.
+8. **Ratify the seam split, then dissolve the tail** (deferred to the
+   post-full-port great refactor). The design sketch is
    in `docs/roadmap-final-stages.md` Stage 2 (2026-07-14): `gentity_t`/
    `gclient_t` → `#[repr(C)] EntitySeam {s, r}`/`ps` registered arrays +
    parallel idiomatic arenas; module-chosen `LocateGameData` stride keeps
@@ -109,7 +116,7 @@ class descriptions):
   `435f7d57` (G_BounceMissile VectorScale 0.65). Method: grep oracle
   `game/*.c` for unsuffixed FP literals inside float expressions, map to
   Rust sites, fix as `(x as f64 * lit) as f32`. Reference idiom:
-  `crates/mp/game/src/bg_misc.rs` trajectory code (already correct).
+  `crates/mp/bg/src/bg_misc.rs` trajectory code (already correct).
 - **F2 — Class-bug sweep: dropped nullable-vec3 guards.** One batch ruling
   ("by-value vec3_t can never be null") erased real NULL semantics; four
   restored in `956101f7` (zero-vector sentinel). Method: grep

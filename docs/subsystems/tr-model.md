@@ -1,4 +1,12 @@
 # tr_model loader + model cache — MP engine (§F idiomatic reimplementation) Design
+
+> **Amended by DEC-35 (2026-07-24, `docs/plans/2026-07-24-client-port/` era):**
+> `model_mdxm`/`model_mdxa` no longer return `*mut c_void` — they return
+> `Option<MdxmRef<'static>>`/`Option<MdxaRef<'static>>` (typed views + the
+> parsed-once sidecar built at ingest, stored beside `disk_image`), with the
+> mdx view module hoisted to `mp_host_interface`. The `*mut c_void`
+> statements below are the pre-amendment record; G2SV-D5's substance (no
+> ghoul2→renderer edge, no second parse path) is unchanged.
 Status: FROZEN (delegated sign-off 2026-07-10, user default-decision grant)     Supersedes: none
 Decision prefix: TRM     Ledger deps: DEC-01 (renderer deferral), DEC-04 (per-mode),
 DEC-08 (Com_Error recovery), DEC-09 (verification); engine-fork-discovery rulings

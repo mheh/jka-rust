@@ -1,5 +1,7 @@
 # Idiom slice 3 — bg item-grab surface (DEC-31)
 
+> **Status: EXECUTED — merged to master (idiom era, DEC-31; slice 3 branch `idiom/bg-item-grab`).**
+
 Third slice: the bg_misc grab/inventory surface — the code shared with
 future cgame prediction — rewritten on ItemKind, retiring the bridge
 accessors from bg. Branch: `idiom/bg-item-grab`. Gates: referee 8/8

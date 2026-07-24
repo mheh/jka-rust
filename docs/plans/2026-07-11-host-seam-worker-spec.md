@@ -1,5 +1,7 @@
 # Host-seam migration — worker spec (W2/W3)
 
+> **Status: COMPLETED — worker spec for the executed host-seam restructure.**
+
 Contract types are already landed (commit `seam(w1)`), and are READ-ONLY for
 workers: `common/engine_host_view.rs` (the `EngineHostView` bundle + live
 `EngineHost` impl), `common/engine_hooks.rs` (view-typed hook fields),

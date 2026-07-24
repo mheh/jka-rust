@@ -1,5 +1,7 @@
 # Idiom slice 2 — g_missile (DEC-31)
 
+> **Status: EXECUTED — merged to master (idiom era, DEC-31; slice 2 branch `idiom/g-missile`).**
+
 Second idiom-era slice: the projectile subsystem (`g_missile.rs`, 10 fns,
 1,418 lines) rewritten idiomatically on the slice-1 exemplar patterns.
 Branch: `idiom/g-missile`. Gates: referee 8/8 (duel1-combat + ffa1 tapes

@@ -1,5 +1,7 @@
 # Idiom slice 6 — g_weapon (DEC-31)
 
+> **Status: EXECUTED — merged to master (idiom era, DEC-31; slice 6 branch `idiom/g-weapon`).**
+
 The weapon-fire surface (g_weapon.rs, 6,234 lines, ~90 fns). Branch:
 `idiom/g-weapon`. Gates: referee 8/8 at every commit (the ffa1 tape
 cycles weapons; every fire path and impact event is on tape).

@@ -43,7 +43,8 @@ rust-analyzer is stale in this workspace — **always confirm compilation with
 - `docs/audits/marker-inventory-2026-07-08.md` — validated open-work inventory
   (`TODO: Port` by verdict + PORT-NOTE re-grep); regenerated, never hand-edited.
 - `docs/roadmap-final-stages.md` — ordered post-parity roadmap (referee gates
-  everything; then safe-state migration and beyond).
+  everything). Stage 1 safe-state is frozen by DEC-31; the active track is the
+  client port, planned in `docs/plans/2026-07-24-client-port/`.
 - The completed type-port campaign docs (plan/scope/todo/oracle-types index)
   were removed 2026-07-06; history lives in git.
 
@@ -69,35 +70,34 @@ c_void-family modes). **jampgame transcription and integration are done**:
 engine-named modules and the `jampded` server executable on master pushes
 (`.github/workflows/build.yml`, rolling `latest` release; all module lanes
 enforced since the jampgame ILP32 assert pass).
-The `dangerous_implicit_autorefs` lint is allowed crate-wide in `mp_game`
-(documented in its lib.rs) pending the safe-state migration.
 
-**The MP dedicated-server engine island is closure-complete (workspace green
-2026-07-12).** The `jampDed` link set — `qcommon`, `botlib`, `server`, the seven
-C++ subsystems (ghoul2-server, ICARUS, RMG/terrain, NPC nav, StringEd, ROFF,
-headless renderer model/skin subset), and the native platform layer — is
-transcribed and integrated: `cargo check --workspace` is 0 errors, 343 tests
-pass (incl. §F oracle-parity goldens), and `qcommon`/`botlib`/`server` are closed
-with zero stubs, zero `TODO: Port` markers, and zero extern forward-decl blocks.
-Closure rulings are recorded in `docs/decisions.md` (DEC-13…DEC-22). Boot/
-lifecycle wiring is done (DEC-23 host seam; the server boots and hosted a live
-player 2026-07-12), and the engine-island ILP32 assert pass is done (cfg-32
-twin asserts; the i686 cross-check and every CI lane are enforced). The §3c
-referee swap is done (2026-07-12): real-map referee scenarios boot the real
-engine island (FS/CM/sv_world) inside the in-repo A/B harness and route the
-spatial syscall arms to the real `SV_GameSystemCalls`; oracle-vs-oracle is
-byte-identical over mp/duel1. The referee-findings batch is closed
-(2026-07-12): the spawn-pitch and 1-ULP angle findings were **harness-side FP
-semantics**, fixed by patching the oracle build to retail-win32 behavior
-(SnapVector `rint`, promote-to-double libm macros — `tools/referee-oracle/
-build.sh`), plus a genuine mock ABI-width bug (32-bit trap buffer sizes read
-as 64-bit). Six referee scenarios (three mock, three real-map mp/duel1 up to
-2000 frames / 430k syscalls) run byte-identical oracle-vs-rust and gate every
-commit. **The safe-state migration is executing**
-(`docs/plans/2026-07-12-safe-state-migration.md`): Stage 0 (accessor seam) and
-Stage 1's hub shards are landed — entity traffic converts to
-`EntityId`/`Option<EntityId>` at fn boundaries, referee-verified per shard;
-then the Stage-2 world-borrow flip retires `dangerous_implicit_autorefs`.
+**The MP dedicated-server engine is complete and hosts live play.** The
+`jampDed` link set — `qcommon`, `botlib`, `server`, the seven C++ subsystems
+(ghoul2-server, ICARUS, RMG/terrain, NPC nav, StringEd, ROFF, headless renderer
+model/skin subset), and the native platform layer — is transcribed, integrated,
+and closed: zero stubs, zero `TODO: Port` markers, zero extern forward-decl
+blocks. Closure and boot-seam rulings are DEC-13…DEC-23; the ILP32 assert pass
+(cfg-32 twin asserts, i686 cross-check) and every CI lane are enforced. The
+lockstep-referee suite (mock + real-map mp/duel1 + ffa1 scenarios, up to 2000
+frames / 430k syscalls; 9 tests) runs byte-identical oracle-vs-rust and gates
+every commit;
+the server boots, loads maps, and has hosted live players since 2026-07-12.
+
+**The idiomatic consolidation campaigns are done and merged to master:** the #13
+string campaign (owned `String`/`&str`, `bool`, Latin-1 wire discipline,
+`CString` removal), DEC-32 dedup (one canonical home per fn under `native/*`),
+DEC-34 (qsort — `bg_lib` body canonical, msvcrt tie-order closed), DEC-35 + task
+#17 (ghoul2 block ownership — mdx views in `mp_host_interface`, `EngineHost`
+hands out `MdxaRef`/`MdxmRef`, parsed-once sidecar), and task #19 (ctx threaded
+through `G_ModelIndex`/`G_SoundIndex`/`G_EffectIndex`; `strap_world` down to 4
+deliberate safe-state readers). The safe-state mechanical migration was frozen
+by DEC-31 (2026-07-16); the idiom era superseded it. Typed entity-view refactors
+are deferred to the post-full-port "great refactor."
+
+**Next track (ruled):** the `ui` module first, then `cgame` + renderer, toward a
+full `jamp` client — plans in
+`docs/plans/2026-07-24-client-port/{scoping,ui-plan,renderer-plan}.md`.
+Threading is permanently out of scope for this repo (fork-only).
 
 - **MP** (`jamp` engine) ships 3 loadable DLLs: `jampgame`, `cgame`, `ui`.
 - **SP** (`jasp` engine) ships **only** `jagame`; SP cgame/ui are statically

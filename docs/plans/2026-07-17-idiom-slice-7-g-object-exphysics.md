@@ -1,5 +1,7 @@
 # Idiom slice 7 — g_object + g_exphysics (DEC-31)
 
+> **Status: EXECUTED — merged to master (idiom era, DEC-31; slice 7 branch `idiom/g-object-exphysics`).**
+
 The two small physics files (g_object.rs 344 lines / 4 fns,
 g_exphysics.rs 300 lines / 1 fn). Branch: `idiom/g-object-exphysics`.
 Gates: referee 8/8 at every commit (G_RunObject drives tape asteroids;

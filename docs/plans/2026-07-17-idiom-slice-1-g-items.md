@@ -1,5 +1,7 @@
 # Idiom slice 1 — g_items (DEC-31)
 
+> **Status: EXECUTED — merged to master (idiom era, DEC-31; slice 1 branch `idiom/g-items`).**
+
 First idiom-era slice: the item subsystem (`g_items.rs` + the bg item
 surface it consumes) rewritten into idiomatic Rust, referee-gated by the
 duel1 scenarios plus the item-heavy `real-ffa1-items` gate (8685e955).

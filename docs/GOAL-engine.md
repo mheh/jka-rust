@@ -1,5 +1,13 @@
 # Goal — pure-Rust dedicated MP engine (`openjkded`)
 
+> Status (2026-07-24): COMPLETE. The `jampDed` link set is transcribed,
+> integrated, and closed (zero stubs, zero `TODO: Port`, zero extern
+> forward-decls); the pure-Rust server boots, loads maps, runs the game dylib,
+> and has hosted live players since 2026-07-12, gated by six lockstep-referee
+> scenarios (oracle-vs-rust byte-identical). Closure and boot rulings DEC-13…
+> DEC-23. The checklist below is kept as the historical campaign record; the
+> active track is now the client port (`docs/plans/2026-07-24-client-port/`).
+
 Build the Rust implementation of the codemp dedicated-server engine: a host
 that loads the existing game module dylibs (Rust or Raven-oracle, unmodified)
 and answers every syscall byte-identically to the C `openjkded`, verified

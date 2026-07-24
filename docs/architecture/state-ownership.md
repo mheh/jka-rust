@@ -1,5 +1,13 @@
 # State Ownership Design
 Status: FROZEN (user sign-off 2026-07-03)     Supersedes: none
+
+> **Amendment note (2026-07-24):** the frozen design below remains the
+> baseline; the 2026-07 idiom-era campaigns refined its concrete string/
+> ownership details on top of it — gentity strings are owned `String`s with
+> the level-lifetime `prefixStrings` arena for engine-visible slots (#13),
+> `native/*` holds the canonical C-runtime homes (DEC-32/34), model blocks
+> cross the host seam as typed views (DEC-35), and the index-fn strap cells
+> are gone (#19). Current state: `docs/decisions.md` + `docs/plans/`.
 Decision prefix: STATE     Ledger deps: DEC-01, DEC-03, DEC-04, DEC-05, DEC-07, DEC-08, DEC-09
 
 ## Standing context

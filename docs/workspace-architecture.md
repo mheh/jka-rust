@@ -52,6 +52,11 @@ crates/
     math/                    #   vec3/matrix/angles (q_math is identical math)
     platform/                #   OS/threads/paths (replaces win32/unix/mac + sys)
     containers/              #   Rust-native stand-ins for Ratl/Ravl/Rufl/Ragl
+    sort/                    #   native_sort: canonical qsort (bg_lib body;
+                             #   bg_lib retired, DEC-34)
+    string/                  #   native_string: cross-mode string ops (&str/char
+                             #   surface; the CString-removal seam, #13)
+    build-date/              #   native_build_date: build-stamp helper
     types/                   #   native_types: cross-mode Raven scalar/handle
                              #   primitives byte-identical across SP/MP
                              #   q_shared.h (qboolean + lowercase qtrue/qfalse,
@@ -86,6 +91,10 @@ crates/
                              #   "static"; default CEngine/NativeDll). Logic
                              #   crates import it so `mod trap` stays
                              #   non-generic and cfg-free (SEAM-D13).
+    host-interface/          # mp_host_interface: EngineHost/PlatformHost traits
+                             #   + MockHost fixture; owns the parsed-once mdx
+                             #   views (MdxaRef/MdxmRef) the engine hands the
+                             #   game (ghoul2 block ownership, DEC-35 / task #17)
     game/                    # mp_game logic (transport-agnostic; jampgame shell wraps it)
     cgame/                   # mp_cgame logic (transport-agnostic; cgame shell wraps it)
     ui/                      # mp_ui logic (transport-agnostic; ui shell wraps it)
@@ -116,7 +125,7 @@ crates/
 
 | Tier | Crate(s) | Raven source | Compiled/used by |
 | --- | --- | --- | --- |
-| -1 native | `native/{math,platform,containers,types}` | q_math (math only), platform dirs, Ra* template libs, cross-mode `q_shared.h` scalar/handle primitives | everything, cross-mode |
+| -1 native | `native/{math,platform,containers,sort,string,build-date,types}` | q_math (math only), platform dirs, Ra* template libs, `bg_lib` qsort (DEC-34), cross-mode string ops + `q_shared.h` scalar/handle primitives | everything, cross-mode |
 | transport | `abi-transport` | QVM word ABI + `GetGameAPI` table shape | both `*/abi`, both engines |
 | 0 qshared | `mp/qshared`, `sp/qshared` | `q_shared.{h,c}` | engine + game + cgame + ui (per mode) |
 | 1 bg | `mp/bg`, `sp/bg` | `bg_*` (pmove, weapons, saber, panimate, saga, vehicles) | game + cgame + ui (per mode) |

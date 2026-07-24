@@ -1,5 +1,7 @@
 # Idiom slice 8 — w_force (DEC-31)
 
+> **Status: EXECUTED — merged to master (idiom era, DEC-31; slice 8 branch `idiom/w-force`).**
+
 The force-power system (w_force.rs, 6,189 lines, 49 fns). Branch:
 `idiom/w-force`. w_saber follows as its own slice (the pair is too big
 for one). Gates: referee 8/8 at every commit (bots on the ffa1 tape

@@ -1,5 +1,7 @@
 # Idiom slice 9 — w_saber (DEC-31)
 
+> **Status: EXECUTED — merged to master (idiom era, DEC-31; slice 9 branch `idiom/w-saber`).**
+
 The saber system (w_saber.rs, 11,875 lines, 79 fns) — the biggest
 slice yet. Branch: `idiom/w-saber`. Gates: referee 8/8 at every commit
 (saber combat dominates the ffa1 tape).

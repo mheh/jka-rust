@@ -1,5 +1,7 @@
 # Safe-state migration — stage map (SETTLED 2026-07-12; Stage 1 executing)
 
+> **Status: PARTIALLY EXECUTED, then FROZEN by DEC-31 (2026-07-16) — stages 0-1 landed referee-verified; the remaining mechanical stages were superseded by the idiom era and the 2026-07-18…24 campaigns (#13 strings, DEC-32 dedup, DEC-35 ghoul2, #19 ctx).**
+
 Decomposition of roadmap **Stage 1 — Safe-state migration**
 (`docs/roadmap-final-stages.md`). All design decisions below were settled
 interactively with the user on 2026-07-12 (§3); execution began the same day.

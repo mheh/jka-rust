@@ -43,14 +43,17 @@ of the same source targets our engine later (registers/SSE2/addr-space wins;
 - bg crate split (ruling 19 deferral ends): bg modules move mp_game → mp_bg,
   tier discipline becomes crate-enforced; cgame reuses BgState/BgTraps.
 
-> Status (2026-07-12): EXECUTING — decomposed into sub-stages 0-5 with all
-> design decisions user-settled in
-> `docs/plans/2026-07-12-safe-state-migration.md` (the authority for this
-> stage). Sub-stage 0 (accessor seam) and the Stage-1 hub shards are landed,
-> each commit referee-byte-identical across six scenarios. NOTE: the
-> method-ization sketch in Stage 2 below is superseded on one point — the
-> user ruled gameplay fns STAY free fns ("keep the free function"); see the
-> plan doc §3.
+> Status (2026-07-24): FROZEN by DEC-31 (2026-07-16). The mechanical safe-state
+> migration ran through sub-stage 0 (accessor seam) and the Stage-1 hub shards
+> (each commit referee-byte-identical across six scenarios), then the idiom era
+> superseded it — the #13 string, DEC-32 dedup, DEC-34 qsort, DEC-35/#17 ghoul2,
+> and #19 ctx-threading campaigns landed instead (all merged to master). The bg
+> crate split IS done: `mp_bg` now holds the `bg_*` function bodies. The
+> remaining raw-pointer/entity-view retirement is deferred to the post-full-port
+> great refactor. Original plan authority:
+> `docs/plans/2026-07-12-safe-state-migration.md`. NOTE: the method-ization
+> sketch in Stage 2 below is superseded on one point — the user ruled gameplay
+> fns STAY free fns ("keep the free function"); see the plan doc §3.
 
 ## Stage 2 — API shape: Raven's vocabulary, Rust's grammar
 
@@ -144,3 +147,10 @@ pass 3 green → W (boot) → R (referee) → 1 (safe state) → 2 (API shape) �
 after R proves the pipeline on jampgame — same tooling, same workflow, their
 trap surfaces swapped in. R before cgame/ui: catch systematic porter error
 patterns once, cheaply, before stamping them into two more modules.
+
+> Update (2026-07-24): pass-3, W, and R are done; the MP game module and MP
+> dedicated-server engine host live play. Stage 1 is frozen (see above). The
+> active track is the client port — `ui` first, then `cgame` + renderer, toward
+> a full `jamp` client (`docs/plans/2026-07-24-client-port/`). Threading (a
+> prerequisite framing for Stage 3) is permanently out of scope for this repo;
+> it lives in the fork.

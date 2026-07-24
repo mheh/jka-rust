@@ -1,5 +1,7 @@
 # Ghoul2 block-ownership campaign (task #17)
 
+> **Status: COMPLETED 2026-07-24 — DEC-35 executed in 3 phases, merged to master `a40708dc`.**
+
 Ratified 2026-07-23 (sit-down; decisions D1-D4 below → DEC-35). Goal: retire
 raw `*mut c_void` model-block traffic across the EngineHost seam and the
 per-call `MdxaView::from_block`/`MdxmView::from_block` re-derivation pattern

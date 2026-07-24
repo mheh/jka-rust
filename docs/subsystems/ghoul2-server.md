@@ -158,7 +158,8 @@ Links only — never restated here:
   decision).** `mdxmHeader_t`/`mdxaHeader_t`/`mdxaSkel_t` live only in `mp_renderer`
   (`crates/mp/renderer/src/mdx_format/`, type-rosetta) and `G2SV-D5` forbids a
   `mp_engine_ghoul2` → `mp_renderer` crate edge. Ruling 36 honors that: `model_mdxm`/
-  `model_mdxa` return `*mut c_void` (the raw parsed-block pointer), **not** an
+  `model_mdxa` returned `*mut c_void` (superseded by DEC-35 — see the
+  amendment blockquote at the `G2SV-D15` entry below), **not** an
   `mp_renderer` struct — ghoul2 does its byte arithmetic off the returned pointer
   unchanged (`tr_ghoul2.cpp:416-421`), and `mp_engine_ghoul2` **never names** the
   mdxm/mdxa header types as Rust types. Any `mp_renderer` coupling lives in the
