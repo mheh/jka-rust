@@ -3,9 +3,13 @@
 //! vehicle/vehicle-weapon text-format loader.
 //!
 //! bg-tier fns that touch mutable `BgState` route through `bg: &mut BgState`
-//! (+ `traps: &dyn BgTraps` for engine calls) per rulings 12/15; this is
-//! jampgame (QAGAME, `_JK2MP`) only, so every `#elif CGAME`/`#else` SP/cgame/ui
-//! arm is dropped (porting-rules §20).
+//! (+ `traps: &dyn BgTraps` for engine calls) per rulings 12/15.
+//!
+//! PORT-NOTE (DEC-36 D5): Raven's per-module `#ifdef QAGAME` / `#elif CGAME` /
+//! `#ifdef WE_ARE_IN_THE_UI` arms are restored as [`GameCallbacks`] dispatch —
+//! this file is branch-free and each module's impl reproduces its own arm,
+//! including the arms Raven leaves empty. The SP-only (`#ifndef _JK2MP`) arms
+//! stay dropped (porting-rules §20): this crate is MP.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -28,8 +32,9 @@ pub fn BG_ClearVehicleParseParms(bg: &mut BgState) {
 /// Raven `BG_ParseVehWeaponParm`.
 ///
 /// Source: `oracle/codemp/game/bg_vehicleLoad.c:167-307`
-// This is jampgame (QAGAME) only: the `#elif CGAME`/`#else` arms of every
-// `#ifdef QAGAME` field type are dead here and dropped (porting-rules §20).
+// PORT-NOTE (DEC-36 D5): the per-module arms of the asset field types dispatch
+// through `GameCallbacks::veh_field_*`; each impl reproduces its own module's
+// `#ifdef` arm (including the ones that store nothing).
 pub fn BG_ParseVehWeaponParm(
     vehWeapon: *mut vehWeaponInfo_t,
     parmName: *mut c_char,
@@ -110,26 +115,36 @@ pub fn BG_ParseVehWeaponParm(
                     VF_WEAPON => {
                         // Raven: commented-out (`//*(int *)... = VEH_VehWeaponIndexForName(...)`).
                     }
-                    VF_MODEL | VF_MODEL_CLIENT => {
-                        *(b.add(field.ofs as usize) as *mut c_int) =
-                            callbacks.model_index(&value);
+                    VF_MODEL => {
+                        callbacks.veh_field_model(&value, b.add(field.ofs as usize) as *mut c_int);
                     }
-                    VF_EFFECT | VF_EFFECT_CLIENT => {
-                        *(b.add(field.ofs as usize) as *mut c_int) =
-                            callbacks.effect_index(&value);
+                    VF_MODEL_CLIENT => {
+                        callbacks
+                            .veh_field_model_client(&value, b.add(field.ofs as usize) as *mut c_int);
                     }
-                    VF_SHADER | VF_SHADER_NOMIP => {
-                        // QAGAME: neither `WE_ARE_IN_THE_UI` nor `CGAME`; dead here.
+                    VF_EFFECT => {
+                        callbacks.veh_field_effect(&value, b.add(field.ofs as usize) as *mut c_int);
+                    }
+                    VF_EFFECT_CLIENT => {
+                        callbacks.veh_field_effect_client(
+                            &value,
+                            b.add(field.ofs as usize) as *mut c_int,
+                        );
+                    }
+                    VF_SHADER => {
+                        callbacks.veh_field_shader(&value, b.add(field.ofs as usize) as *mut c_int);
+                    }
+                    VF_SHADER_NOMIP => {
+                        callbacks
+                            .veh_field_shader_nomip(&value, b.add(field.ofs as usize) as *mut c_int);
                     }
                     VF_SOUND => {
-                        *(b.add(field.ofs as usize) as *mut c_int) =
-                            callbacks.sound_index(&value);
+                        callbacks.veh_field_sound(&value, b.add(field.ofs as usize) as *mut c_int);
                     }
-                    // `VF_SOUND_CLIENT` (MP cgame only): the `#elif QAGAME` branch
-                    // comments out the `G_SoundIndex` — the game module leaves the
-                    // field untouched (cgame registers it via `trap_S_RegisterSound`).
-                    // Source: `oracle/codemp/game/bg_vehicleLoad.c:282-290`
-                    VF_SOUND_CLIENT => {}
+                    VF_SOUND_CLIENT => {
+                        callbacks
+                            .veh_field_sound_client(&value, b.add(field.ofs as usize) as *mut c_int);
+                    }
                     _ => return qfalse,
                 }
                 break;
@@ -251,9 +266,12 @@ pub fn VEH_LoadVehWeapon(
             }
         }
 
-        // QAGAME: the lock-on sound registrations are commented out here
-        // (`#ifdef QAGAME` arm is a no-op); the `#elif CGAME`/`#else` sound
-        // registrations are dead in jampgame and dropped (porting-rules §20).
+        if (*vehWeapon).fHoming != 0.0 {
+            // all lock-on weapons use these 2 sounds
+            // PORT-NOTE (DEC-36 D5): per-module arm — QAGAME's `G_SoundIndex`
+            // calls are commented out, cgame/ui register five samples.
+            callbacks.veh_weapon_homing_precache();
+        }
 
         let idx = bg.numVehicleWeapons;
         bg.numVehicleWeapons += 1;
@@ -370,7 +388,9 @@ pub fn BG_VehicleClampData(vehicle: *mut vehicleInfo_t) {
 /// Raven `BG_ParseVehicleParm`.
 ///
 /// Source: `oracle/codemp/game/bg_vehicleLoad.c:839-981`
-// QAGAME-only (porting-rules §20): `#elif CGAME`/`#else` arms dropped.
+// PORT-NOTE (DEC-36 D5): the per-module arms of the asset field types dispatch
+// through `GameCallbacks::veh_field_*`; each impl reproduces its own module's
+// `#ifdef` arm (including the ones that store nothing).
 pub fn BG_ParseVehicleParm(
     vehicle: *mut vehicleInfo_t,
     parmName: *mut c_char,
@@ -459,26 +479,36 @@ pub fn BG_ParseVehicleParm(
                         //*(b.add(field.ofs as usize) as *mut c_int) =
                         //    VEH_VehWeaponIndexForName(cstr(&value).as_ptr(), bg);
                     }
-                    VF_MODEL | VF_MODEL_CLIENT => {
-                        *(b.add(field.ofs as usize) as *mut c_int) =
-                            callbacks.model_index(&value);
+                    VF_MODEL => {
+                        callbacks.veh_field_model(&value, b.add(field.ofs as usize) as *mut c_int);
                     }
-                    VF_EFFECT | VF_EFFECT_CLIENT => {
-                        *(b.add(field.ofs as usize) as *mut c_int) =
-                            callbacks.effect_index(&value);
+                    VF_MODEL_CLIENT => {
+                        callbacks
+                            .veh_field_model_client(&value, b.add(field.ofs as usize) as *mut c_int);
                     }
-                    VF_SHADER | VF_SHADER_NOMIP => {
-                        // QAGAME: dead (neither WE_ARE_IN_THE_UI nor CGAME).
+                    VF_EFFECT => {
+                        callbacks.veh_field_effect(&value, b.add(field.ofs as usize) as *mut c_int);
+                    }
+                    VF_EFFECT_CLIENT => {
+                        callbacks.veh_field_effect_client(
+                            &value,
+                            b.add(field.ofs as usize) as *mut c_int,
+                        );
+                    }
+                    VF_SHADER => {
+                        callbacks.veh_field_shader(&value, b.add(field.ofs as usize) as *mut c_int);
+                    }
+                    VF_SHADER_NOMIP => {
+                        callbacks
+                            .veh_field_shader_nomip(&value, b.add(field.ofs as usize) as *mut c_int);
                     }
                     VF_SOUND => {
-                        *(b.add(field.ofs as usize) as *mut c_int) =
-                            callbacks.sound_index(&value);
+                        callbacks.veh_field_sound(&value, b.add(field.ofs as usize) as *mut c_int);
                     }
-                    // `VF_SOUND_CLIENT` (MP cgame only): the `#elif QAGAME` branch
-                    // comments out the `G_SoundIndex` — the game module leaves the
-                    // field untouched (cgame registers it via `trap_S_RegisterSound`).
-                    // Source: `oracle/codemp/game/bg_vehicleLoad.c:956-964`
-                    VF_SOUND_CLIENT => {}
+                    VF_SOUND_CLIENT => {
+                        callbacks
+                            .veh_field_sound_client(&value, b.add(field.ofs as usize) as *mut c_int);
+                    }
                     _ => return qfalse,
                 }
                 break;
@@ -706,13 +736,33 @@ pub fn VEH_LoadVehicle(
                 .model_index(&format!("models/players/{}/model.glm", model));
         }
 
-        // SP-only skin-registration block (`#ifndef _JK2MP`) and the MP
-        // cgame-only skin block (`#ifndef QAGAME`) are both dead in this
-        // jampgame (QAGAME, `_JK2MP`) build; dropped per porting-rules §20.
+        // The SP-only skin-registration block (`#ifndef _JK2MP`) stays dropped
+        // (porting-rules §20 — this crate is MP). PORT-NOTE (DEC-36 D5): the MP
+        // `#ifndef QAGAME` skin block is a per-module arm — cgame/ui register the
+        // skin, the game registers nothing. Raven's `va()` reads `vehicle->model`
+        // raw; a NULL model arrives here as `""` (the arm only fires when a skin
+        // is named, so a skinned model-less vehicle is the only difference).
+        let model = if (*vehicle).model.is_null() {
+            String::new()
+        } else {
+            cstr_to_str((*vehicle).model)
+        };
+        let skin = if (*vehicle).skin.is_null() {
+            String::new()
+        } else {
+            cstr_to_str((*vehicle).skin)
+        };
+        callbacks.vehicle_skin_precache(&model, &skin);
 
         BG_VehicleClampData(vehicle);
         BG_SetSharedVehicleFunctions(vehicle);
 
+        // misc effects... FIXME: not even used in MP, are they?
+        // PORT-NOTE (DEC-36 D5): these three sites are one-line per-module arms
+        // (`G_EffectIndex`/`G_SoundIndex` vs `trap_FX_RegisterEffect`/
+        // `trap_S_RegisterSound`, with no ui arm for the effects), so they ride
+        // the existing `effect_index`/`sound_index` upcalls rather than gaining
+        // dedicated methods.
         if (*vehicle).explosionDamage != 0 {
             callbacks.effect_index("ships/ship_explosion_mark");
         }
@@ -723,11 +773,10 @@ pub fn VEH_LoadVehicle(
             callbacks.effect_index("ships/swoop_dust");
         }
 
-        callbacks.effect_index("volumetric/black_smoke");
-        callbacks.effect_index("ships/fire");
-        callbacks.sound_index("sound/vehicles/common/release.wav");
-        // QAGAME: the CGAME-only shader/fx/hideRider registrations (`#elif
-        // CGAME`) are dead here; dropped per porting-rules §20.
+        // PORT-NOTE (DEC-36 D5): per-module arm — QAGAME indexes two effects and
+        // one sound, cgame registers a different radar/HUD set (widened when the
+        // vehicle hides its rider), the ui registers nothing.
+        callbacks.vehicle_load_precache((*vehicle).hideRider);
 
         let idx = bg.numVehicles;
         bg.numVehicles += 1;

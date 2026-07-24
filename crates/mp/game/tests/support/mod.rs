@@ -696,6 +696,48 @@ impl GameCallbacks for TestCallbacks {
     fn fighter_is_landed(&self, _e: c_int) -> qboolean {
         unreachable!()
     }
+
+    // DEC-36 D5 per-module bg arms: all live on the vehicle/siege load paths,
+    // which the pmove fixtures never reach.
+    fn veh_field_model(&mut self, _v: &str, _d: *mut c_int) {
+        unreachable!()
+    }
+    fn veh_field_model_client(&mut self, _v: &str, _d: *mut c_int) {
+        unreachable!()
+    }
+    fn veh_field_effect(&mut self, _v: &str, _d: *mut c_int) {
+        unreachable!()
+    }
+    fn veh_field_effect_client(&mut self, _v: &str, _d: *mut c_int) {
+        unreachable!()
+    }
+    fn veh_field_shader(&mut self, _v: &str, _d: *mut c_int) {
+        unreachable!()
+    }
+    fn veh_field_shader_nomip(&mut self, _v: &str, _d: *mut c_int) {
+        unreachable!()
+    }
+    fn veh_field_sound(&mut self, _v: &str, _d: *mut c_int) {
+        unreachable!()
+    }
+    fn veh_field_sound_client(&mut self, _v: &str, _d: *mut c_int) {
+        unreachable!()
+    }
+    fn veh_weapon_homing_precache(&mut self) {
+        unreachable!()
+    }
+    fn vehicle_skin_precache(&mut self, _m: &str, _s: &str) {
+        unreachable!()
+    }
+    fn vehicle_load_precache(&mut self, _h: qboolean) {
+        unreachable!()
+    }
+    fn siege_class_ui_portrait(&mut self, _s: &str) -> (c_int, String) {
+        unreachable!()
+    }
+    fn siege_class_shader(&mut self, _s: &str, _c: &str) -> c_int {
+        unreachable!()
+    }
 }
 
 // =================================== dump ====================================

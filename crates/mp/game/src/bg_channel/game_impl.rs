@@ -967,4 +967,79 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             FighterIsLanded((*ent).m_pVehicle, (*ent).playerState)
         }
     }
+
+    // ---------------------------------------------------------------------
+    // DEC-36 D5 — per-module bg arms, QAGAME side.
+    //
+    // Each method below reproduces this module's `#ifdef` arm exactly. Where
+    // Raven's QAGAME arm is empty — a commented-out call, or an `#ifdef` chain
+    // with no QAGAME branch — the body is empty and the destination slot is
+    // left untouched, matching the game DLL byte for byte.
+    // ---------------------------------------------------------------------
+
+    fn veh_field_model(&mut self, value: &str, dest: *mut c_int) {
+        // QAGAME: `*(int *)(b+ofs) = G_ModelIndex( value );`
+        // Source: `oracle/codemp/game/bg_vehicleLoad.c:231-237,905-911`
+        unsafe { *dest = self.model_index(value) }
+    }
+    fn veh_field_model_client(&mut self, value: &str, dest: *mut c_int) {
+        // QAGAME: the `G_ModelIndex` store is commented out under `#elif QAGAME`
+        // — the game module writes nothing.
+        // Source: `oracle/codemp/game/bg_vehicleLoad.c:238-246,912-920`
+    }
+    fn veh_field_effect(&mut self, value: &str, dest: *mut c_int) {
+        // QAGAME: `*(int *)(b+ofs) = G_EffectIndex( value );`
+        // Source: `oracle/codemp/game/bg_vehicleLoad.c:247-253,921-927`
+        unsafe { *dest = self.effect_index(value) }
+    }
+    fn veh_field_effect_client(&mut self, value: &str, dest: *mut c_int) {
+        // QAGAME: the `G_EffectIndex` store is commented out under `#elif QAGAME`
+        // — the game module writes nothing.
+        // Source: `oracle/codemp/game/bg_vehicleLoad.c:254-262,928-936`
+    }
+    fn veh_field_shader(&mut self, value: &str, dest: *mut c_int) {
+        // The `#ifdef WE_ARE_IN_THE_UI`/`#elif CGAME` chain has no QAGAME arm —
+        // the game module writes nothing.
+        // Source: `oracle/codemp/game/bg_vehicleLoad.c:263-269,937-943`
+    }
+    fn veh_field_shader_nomip(&mut self, value: &str, dest: *mut c_int) {
+        // Guarded `#ifndef QAGAME` — the game module writes nothing.
+        // Source: `oracle/codemp/game/bg_vehicleLoad.c:270-274,944-948`
+    }
+    fn veh_field_sound(&mut self, value: &str, dest: *mut c_int) {
+        // QAGAME: `*(int *)(b+ofs) = G_SoundIndex( value );`
+        // Source: `oracle/codemp/game/bg_vehicleLoad.c:275-281,949-955`
+        unsafe { *dest = self.sound_index(value) }
+    }
+    fn veh_field_sound_client(&mut self, value: &str, dest: *mut c_int) {
+        // QAGAME: the `G_SoundIndex` store is commented out under `#elif QAGAME`
+        // — the game module writes nothing.
+        // Source: `oracle/codemp/game/bg_vehicleLoad.c:282-290,956-964`
+    }
+    fn veh_weapon_homing_precache(&mut self) {
+        // Raven: "Hmm, no need fo have server register this, is there?" — both
+        // `G_SoundIndex` calls are commented out; the game registers nothing.
+        // Source: `oracle/codemp/game/bg_vehicleLoad.c:390-409`
+    }
+    fn vehicle_skin_precache(&mut self, model: &str, skin: &str) {
+        // Guarded `#ifndef QAGAME` — the game registers no vehicle skin.
+        // Source: `oracle/codemp/game/bg_vehicleLoad.c:1293-1299`
+    }
+    fn vehicle_load_precache(&mut self, hideRider: qboolean) {
+        // QAGAME arm; `hideRider` gates cgame-only radar shaders.
+        // Source: `oracle/codemp/game/bg_vehicleLoad.c:1336-1359`
+        self.effect_index("volumetric/black_smoke");
+        self.effect_index("ships/fire");
+        self.sound_index("sound/vehicles/common/release.wav");
+    }
+    fn siege_class_ui_portrait(&mut self, uishader: &str) -> (c_int, String) {
+        // QAGAME: `uiPortraitShader = 0` and `memset(uiPortrait, 0, ...)`.
+        // Source: `oracle/codemp/game/bg_saga.c:975-988`
+        (0, String::new())
+    }
+    fn siege_class_shader(&mut self, class_shader: &str, class_name: &str) -> c_int {
+        // QAGAME: `classShader = 0` — the shader is never registered server-side.
+        // Source: `oracle/codemp/game/bg_saga.c:994-1010`
+        0
+    }
 }

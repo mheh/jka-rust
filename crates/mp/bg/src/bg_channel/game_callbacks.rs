@@ -82,15 +82,31 @@ pub trait GameCallbacks {
     fn play_effect_id(&mut self, fxID: c_int, org: *const vec3_t, ang: *const vec3_t) -> c_int;
 
     /// Raven `G_SoundIndex(name)` — register/lookup a sound, return its index.
-    /// Source: `oracle/codemp/game/g_local.h:1002`
+    ///
+    /// PORT-NOTE (DEC-36 D5): also the per-module arm for the bg precache sites
+    /// Raven writes as `#ifdef QAGAME G_SoundIndex(...) #else
+    /// trap_S_RegisterSound(...)` — cgame/ui register the sample instead.
+    /// Source: `oracle/codemp/game/g_local.h:1002`;
+    /// `oracle/codemp/game/bg_vehicleLoad.c:1319-1326`
     fn sound_index(&mut self, name: &str) -> c_int;
 
     /// Raven `G_ModelIndex(name)`.
-    /// Source: `oracle/codemp/game/g_local.h:1001`
+    ///
+    /// PORT-NOTE (DEC-36 D5): also the per-module arm for the bg precache sites
+    /// Raven writes as `#ifdef QAGAME G_ModelIndex(...) #else
+    /// trap_R_RegisterModel(...)` — cgame/ui register the model instead.
+    /// Source: `oracle/codemp/game/g_local.h:1001`;
+    /// `oracle/codemp/game/bg_vehicleLoad.c:1262-1269`
     fn model_index(&mut self, name: &str) -> c_int;
 
     /// Raven `G_EffectIndex(name)`.
-    /// Source: `oracle/codemp/game/g_local.h:1004`
+    ///
+    /// PORT-NOTE (DEC-36 D5): also the per-module arm for the bg precache sites
+    /// Raven writes as `#ifdef QAGAME G_EffectIndex(...) #elif CGAME
+    /// trap_FX_RegisterEffect(...)` — the ui has no arm there and registers
+    /// nothing.
+    /// Source: `oracle/codemp/game/g_local.h:1004`;
+    /// `oracle/codemp/game/bg_vehicleLoad.c:1309-1334`
     fn effect_index(&mut self, name: &str) -> c_int;
 
     /// Raven cheap weapon-fire path fired from movement code (bg melee/impacts).
@@ -269,4 +285,99 @@ pub trait GameCallbacks {
     /// Source: `oracle/codemp/game/bg_slidemove.c:313-398`;
     /// `oracle/codemp/game/FighterNPC.c:300-308`.
     fn fighter_is_landed(&self, veh_ent_num: c_int) -> qboolean;
+
+    // ---------------------------------------------------------------------
+    // DEC-36 D5 — per-module bg arms.
+    //
+    // Raven compiles `bg_*.c` into game/cgame/ui and branches per module with
+    // `#ifdef QAGAME` / `#elif CGAME` / `#ifdef WE_ARE_IN_THE_UI`. Those arms
+    // dispatch here instead: bg stays branch-free and each module's impl
+    // reproduces its own arm exactly, including the arms Raven leaves empty
+    // (a commented-out call, or an `#ifdef` chain with no arm for that module).
+    //
+    // The `veh_field_*` methods take the destination slot rather than returning
+    // a value because Raven's per-module arm *is* the whole assignment
+    // statement `*(int *)(b+ofs) = ...;` — a module with no arm leaves the
+    // field untouched, which a returned value could not express.
+    // ---------------------------------------------------------------------
+
+    /// `BG_ParseVeh(Weapon)Parm` `VF_MODEL` arm: QAGAME stores `G_ModelIndex`,
+    /// cgame/ui store `trap_R_RegisterModel`.
+    /// Source: `oracle/codemp/game/bg_vehicleLoad.c:231-237,905-911`
+    fn veh_field_model(&mut self, value: &str, dest: *mut c_int);
+
+    /// `VF_MODEL_CLIENT` arm ("MP cgame only"): under `_JK2MP` the QAGAME arm is
+    /// the commented-out `//G_ModelIndex` — the game module writes nothing —
+    /// while cgame/ui store `trap_R_RegisterModel`.
+    /// Source: `oracle/codemp/game/bg_vehicleLoad.c:238-246,912-920`
+    fn veh_field_model_client(&mut self, value: &str, dest: *mut c_int);
+
+    /// `VF_EFFECT` arm: QAGAME stores `G_EffectIndex`, cgame stores
+    /// `trap_FX_RegisterEffect`; the `#ifdef` chain has no ui arm, so the ui
+    /// writes nothing.
+    /// Source: `oracle/codemp/game/bg_vehicleLoad.c:247-253,921-927`
+    fn veh_field_effect(&mut self, value: &str, dest: *mut c_int);
+
+    /// `VF_EFFECT_CLIENT` arm ("MP cgame only"): under `_JK2MP` the QAGAME arm
+    /// is the commented-out `//G_EffectIndex` and there is no ui arm — both
+    /// write nothing — while cgame stores `trap_FX_RegisterEffect`.
+    /// Source: `oracle/codemp/game/bg_vehicleLoad.c:254-262,928-936`
+    fn veh_field_effect_client(&mut self, value: &str, dest: *mut c_int);
+
+    /// `VF_SHADER` arm: the ui stores `trap_R_RegisterShaderNoMip`, cgame stores
+    /// `trap_R_RegisterShader`; the `#ifdef` chain has no QAGAME arm, so the
+    /// game writes nothing.
+    /// Source: `oracle/codemp/game/bg_vehicleLoad.c:263-269,937-943`
+    fn veh_field_shader(&mut self, value: &str, dest: *mut c_int);
+
+    /// `VF_SHADER_NOMIP` arm: cgame/ui store `trap_R_RegisterShaderNoMip` under
+    /// `#ifndef QAGAME`; the game writes nothing.
+    /// Source: `oracle/codemp/game/bg_vehicleLoad.c:270-274,944-948`
+    fn veh_field_shader_nomip(&mut self, value: &str, dest: *mut c_int);
+
+    /// `VF_SOUND` arm: QAGAME stores `G_SoundIndex`, cgame/ui store
+    /// `trap_S_RegisterSound`.
+    /// Source: `oracle/codemp/game/bg_vehicleLoad.c:275-281,949-955`
+    fn veh_field_sound(&mut self, value: &str, dest: *mut c_int);
+
+    /// `VF_SOUND_CLIENT` arm ("MP cgame only"): under `_JK2MP` the QAGAME arm is
+    /// the commented-out `//G_SoundIndex` — the game module writes nothing —
+    /// while cgame/ui store `trap_S_RegisterSound`.
+    /// Source: `oracle/codemp/game/bg_vehicleLoad.c:282-290,956-964`
+    fn veh_field_sound_client(&mut self, value: &str, dest: *mut c_int);
+
+    /// `VEH_LoadVehWeapon`'s lock-on precache for a homing vehicle weapon: the
+    /// QAGAME arm is two commented-out `G_SoundIndex` calls (nothing is
+    /// registered server-side); cgame and the ui each register the same five
+    /// lock-on samples.
+    /// Source: `oracle/codemp/game/bg_vehicleLoad.c:390-409`
+    fn veh_weapon_homing_precache(&mut self);
+
+    /// `VEH_LoadVehicle`'s `#ifndef QAGAME` skin precache: cgame/ui register
+    /// `models/players/<model>/model_<skin>.skin` when the vehicle names a skin;
+    /// the game registers nothing. `model`/`skin` are the `vehicleInfo_t`
+    /// strings as parsed (empty when Raven's pointer is NULL); the
+    /// `skin && skin[0]` guard is part of the arm and lives in the impl.
+    /// Source: `oracle/codemp/game/bg_vehicleLoad.c:1293-1299`
+    fn vehicle_skin_precache(&mut self, model: &str, skin: &str);
+
+    /// `VEH_LoadVehicle`'s trailing per-module precache block: QAGAME indexes
+    /// two effects and one sound, cgame registers a different radar/HUD set
+    /// (plus three more shaders when the vehicle hides its rider), and the ui
+    /// has no arm.
+    /// Source: `oracle/codemp/game/bg_vehicleLoad.c:1336-1359`
+    fn vehicle_load_precache(&mut self, hideRider: qboolean);
+
+    /// `BG_SiegeParseClassFile`'s `uishader` arm: game and cgame zero
+    /// `uiPortraitShader` and NUL-fill `uiPortrait`; the ui registers the shader
+    /// with `trap_R_RegisterShaderNoMip` and copies the name. Returns the
+    /// `(uiPortraitShader, uiPortrait)` pair this module's arm produces.
+    /// Source: `oracle/codemp/game/bg_saga.c:975-988`
+    fn siege_class_ui_portrait(&mut self, uishader: &str) -> (c_int, String);
+
+    /// `BG_SiegeParseClassFile`'s `class_shader` arm: the game stores 0; cgame
+    /// and ui store `trap_R_RegisterShaderNoMip` and print a `could not find
+    /// class_shader %s for class %s` error when it comes back 0.
+    /// Source: `oracle/codemp/game/bg_saga.c:994-1010`
+    fn siege_class_shader(&mut self, class_shader: &str, class_name: &str) -> c_int;
 }

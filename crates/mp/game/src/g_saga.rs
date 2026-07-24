@@ -16,6 +16,7 @@
 
 use crate::prelude::*;
 
+use crate::bg_channel::GameCallbacksImpl;
 use crate::client::gclient::gclient_t;
 use crate::client::player_team_state::playerTeamStateState_t;
 use crate::client::spectator_state::spectatorState_t;
@@ -317,10 +318,17 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
             }
 
             // Load the player class types
+            let mut callbacks = GameCallbacksImpl {
+                // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
+                // field; a raw store is required (bg-seam re-entry).
+                world: ctx.world_raw(),
+                engine: ctx.engine,
+            };
             BG_SiegeLoadClasses(
                 core::ptr::null_mut(),
                 &mut ctx.world.bg_state,
                 &crate::bg_channel::GameBgTraps::new(ctx.engine),
+                &mut callbacks,
             );
 
             if ctx.world.bg_state.bgNumSiegeClasses == 0 {
@@ -402,7 +410,7 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
             trap::SetConfigstring(ctx.engine, CS_SIEGE_OBJECTIVES, &cfg);
 
             // precache saber data for classes that use sabers on both teams
-            let mut callbacks = crate::bg_channel::GameCallbacksImpl {
+            let mut callbacks = GameCallbacksImpl {
                 // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
                 // field aliasing bg_state; a raw store is required (bg-seam re-entry).
                 world: ctx.world_raw(),

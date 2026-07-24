@@ -1070,6 +1070,8 @@ pub fn BG_SiegeParseClassFile(
     descBuffer: *mut siegeClassDesc_t,
     bg: &mut BgState,
     traps: &dyn BgTraps,
+    // Routes the `uishader`/`class_shader` per-module arms (DEC-36 D5).
+    callbacks: &mut dyn GameCallbacks,
 ) {
     unsafe {
         let mut f: fileHandle_t = 0;
@@ -1264,17 +1266,23 @@ pub fn BG_SiegeParseClassFile(
 
         if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "uishader") {
             Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
-            // QAGAME clears the shader handle and NUL-fills the portrait name
-            // (`memset(uiPortrait,0,...)`); only cgame/ui register the shader.
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].uiPortraitShader = 0;
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].uiPortrait = String::new();
+            // PORT-NOTE (DEC-36 D5): per-module arm — game/cgame zero the handle
+            // and NUL-fill the name, the ui registers the shader and copies it.
+            let (shader, portrait) =
+                callbacks.siege_class_ui_portrait(&cstr_to_str(parse_buf.as_ptr()));
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].uiPortraitShader = shader;
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].uiPortrait = portrait;
         } else {
             panic!("Siege class without uishader entry");
         }
 
         if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "class_shader") {
             Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].classShader = 0;
+            // PORT-NOTE (DEC-36 D5): per-module arm — the game stores 0, cgame/ui
+            // register the shader and report a miss.
+            let class_name = bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].name.clone();
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].classShader =
+                callbacks.siege_class_shader(&cstr_to_str(parse_buf.as_ptr()), &class_name);
             let title_length: usize = strlen(parse_buf.as_ptr());
             // Oracle only falls back to SPC_INFANTRY when the loop runs to
             // completion (`i >= SPC_MAX`); an early break on `arrayTitleLength >
@@ -1470,6 +1478,8 @@ pub fn BG_SiegeLoadClasses(
     descBuffer: *mut siegeClassDesc_t,
     bg: &mut BgState,
     traps: &dyn BgTraps,
+    // Threaded through to `BG_SiegeParseClassFile` for the shader arms (DEC-36 D5).
+    callbacks: &mut dyn GameCallbacks,
 ) {
     unsafe {
         let mut num_files: c_int;
@@ -1496,9 +1506,21 @@ pub fn BG_SiegeLoadClasses(
             strcat(filename.as_mut_ptr(), fileptr);
 
             if !descBuffer.is_null() {
-                BG_SiegeParseClassFile(filename.as_ptr(), &mut *descBuffer.offset(i), bg, traps);
+                BG_SiegeParseClassFile(
+                    filename.as_ptr(),
+                    &mut *descBuffer.offset(i),
+                    bg,
+                    traps,
+                    callbacks,
+                );
             } else {
-                BG_SiegeParseClassFile(filename.as_ptr(), core::ptr::null_mut(), bg, traps);
+                BG_SiegeParseClassFile(
+                    filename.as_ptr(),
+                    core::ptr::null_mut(),
+                    bg,
+                    traps,
+                    callbacks,
+                );
             }
 
             fileptr = fileptr.offset((filelen + 1) as isize);
@@ -1559,6 +1581,11 @@ pub fn BG_SiegeParseTeamFile(filename: *const c_char, bg: &mut BgState, traps: &
             panic!("Siege team with no name definition");
         }
 
+        // I don't entirely like doing things this way but it's the easiest way.
+        // PORT-NOTE (DEC-36 D5): the `#ifdef CGAME` arm here reads a
+        // `FriendlyShader` key and registers it; the `#else` arm covers BOTH game
+        // and ui and stores 0, so no dispatch is added — this one is cgame's to
+        // restore. Source: `oracle/codemp/game/bg_saga.c:1267-1275`
         bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].friendlyShader = 0;
 
         bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].numClasses = 0;
