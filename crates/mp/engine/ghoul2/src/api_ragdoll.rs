@@ -80,7 +80,7 @@ use mp_qshared::shared::{
 
 use crate::ghoul2_system::Ghoul2System;
 use crate::gore::crag_doll_params::CRagDollParams;
-use crate::mdx::mdxa::MdxaView;
+use mp_host_interface::mdx::mdxa::MdxaView;
 use crate::ragdoll_update_params::{RagDollUpdateKind, RagDollUpdateParams};
 use crate::shared::cghoul2_info::CGhoul2Info;
 use crate::shared::cghoul2_info_v::CGhoul2Info_v;

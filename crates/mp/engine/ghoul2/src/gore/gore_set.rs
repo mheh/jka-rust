@@ -69,7 +69,7 @@ use mp_qshared::shared::{mdxaBone_t, vec3_t};
 use crate::api_collision::g2api_get_time;
 use crate::ghoul2_system::Ghoul2System;
 use crate::gore::gore_texture_coordinates::{GoreTextureCoordinates, MAX_LODS};
-use crate::mdx::mdxm::MdxmSurfaceView;
+use mp_host_interface::mdx::mdxm::MdxmSurfaceView;
 use crate::gore::sgore_surface::SGoreSurface;
 use crate::shared::cghoul2_info::CGhoul2Info;
 

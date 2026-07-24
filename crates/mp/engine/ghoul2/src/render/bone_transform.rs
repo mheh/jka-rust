@@ -50,7 +50,7 @@ use core::ffi::c_void;
 use mp_qshared::shared::{mdxaBone_t, vec4_t, VectorLength};
 
 use crate::matcomp::mc_uncompress_quat;
-use crate::mdx::mdxa::MdxaView;
+use mp_host_interface::mdx::mdxa::MdxaView;
 use crate::render::bone_cache::CBoneCache;
 use crate::shared::bone_info_t::boneInfo_t;
 

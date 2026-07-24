@@ -62,7 +62,6 @@ use mp_host_interface::EngineHost;
 use mp_qshared::shared::qhandle_t;
 
 use crate::ghoul2_system::Ghoul2System;
-use crate::mdx::mdxm::MdxmView;
 use crate::shared::cghoul2_info::CGhoul2Info;
 use crate::shared::cghoul2_info_v::CGhoul2Info_v;
 
@@ -202,18 +201,15 @@ pub fn g2api_get_anim_file_name_index(
     // `g2` is threaded per ruling 11 but never reached (module comment above).
     let _ = g2;
 
-    let mdxm = host.model_mdxm(model_index);
-    if mdxm.is_null() {
+    let Some(mdxm) = host.model_mdxm(model_index) else {
         // Divergence (§19, Raven UB site, per this fn's doc comment above):
         // `mod_m`/`mod_m->mdxm` null is UB in the oracle; the port returns
         // `None` instead of dereferencing a null model.
         return None;
-    }
+    };
     // `mdxmHeader_t->animName` off the live loader block — `MdxmView` owns the
     // byte offset (`G2SV-D5`, this crate never names the `mdxm*` types).
-    // SAFETY: `mdxm` non-null (checked above), `EngineHost::model_mdxm`'s
-    // contract.
-    Some(unsafe { MdxmView::from_block(mdxm) }.anim_name())
+    Some(mdxm.anim_name())
 }
 
 /// Raven `char *G2API_GetGLAName(CGhoul2Info_v &ghoul2, int modelIndex)` —
@@ -256,7 +252,6 @@ pub fn g2api_get_gla_name(
     // through `ghlInfo->model`'s registered handle — `MdxmView` owns the byte
     // offset (`G2SV-D5`). Raven's `assert(currentModel && mdxm)` was dropped
     // above (NDEBUG); a null block is Raven UB (§19), so no guard is added here.
-    // SAFETY: the dropped assert guarantees a live, non-null block in practice.
-    let mdxm = host.model_mdxm(info.model);
-    Some(unsafe { MdxmView::from_block(mdxm) }.anim_name())
+    let mdxm = host.model_mdxm(info.model).unwrap();
+    Some(mdxm.anim_name())
 }

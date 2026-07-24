@@ -30,7 +30,7 @@ use mp_host_interface::EngineHost;
 use mp_qshared::shared::{mdxaBone_t, qhandle_t, vec3_t, Eorientations};
 
 use crate::ghoul2_system::Ghoul2System;
-use crate::mdx::mdxa::MdxaView;
+use mp_host_interface::mdx::mdxa::MdxaView;
 use crate::shared::cghoul2_info::CGhoul2Info;
 use crate::shared::cghoul2_info_v::CGhoul2Info_v;
 
@@ -704,7 +704,7 @@ pub fn g2api_animate_g2_models(g2: &mut Ghoul2System, ghoul2: &mut CGhoul2Info_v
 #[cfg(test)]
 mod tests {
     // The `mdxaHeader_t`/`mdxaSkel_t` byte-layout reads this file used to check
-    // locally now live in `crate::mdx::mdxa`'s own tests.
+    // locally now live in `mp_host_interface::mdx::mdxa`'s own tests.
 
     #[test]
     fn set_bone_anim_clamps_out_of_range_frames() {

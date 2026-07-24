@@ -38,7 +38,6 @@ use mp_host_interface::EngineHost;
 use mp_qshared::shared::error_parm::errorParm_t;
 
 use crate::ghoul2_system::Ghoul2System;
-use crate::mdx::mdxm::MdxmView;
 use crate::shared::cghoul2_info::CGhoul2Info;
 use crate::shared::cghoul2_info_v::CGhoul2Info_v;
 
@@ -223,8 +222,7 @@ pub fn g2api_get_surface_name(
         return NO_SURFACE.to_string();
     }
 
-    let mdxm = host.model_mdxm(ghl_info.model);
-    if mdxm.is_null() {
+    let Some(view) = host.model_mdxm(ghl_info.model) else {
         host.error(
             errorParm_t::ERR_DROP,
             &format!(
@@ -232,11 +230,7 @@ pub fn g2api_get_surface_name(
                 ghl_info.file_name
             ),
         );
-    }
-
-    // SAFETY: `mdxm` non-null past the error above (ERR_DROP diverges),
-    // matching Raven's own unchecked `mod->mdxm` reads (`G2_API.cpp:2373-2394`).
-    let view = unsafe { MdxmView::from_block(mdxm) };
+    };
     let num_surfaces = view.num_surfaces();
 
     // ok, I guess it's semi-valid for the user to be passing in surface > numSurfs

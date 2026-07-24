@@ -82,8 +82,6 @@ use mp_host_interface::EngineHost;
 use mp_qshared::shared::{errorParm_t, qhandle_t};
 
 use crate::ghoul2_system::Ghoul2System;
-use crate::mdx::mdxa::MdxaView;
-use crate::mdx::mdxm::MdxmView;
 use crate::shared::cghoul2_info::CGhoul2Info;
 use crate::shared::cghoul2_info_v::CGhoul2Info_v;
 
@@ -221,11 +219,8 @@ fn g2_test_model_pointers(ghl_info: &mut CGhoul2Info, host: &mut impl EngineHost
         };
 
         let mdxm = host.model_mdxm(ghl_info.model);
-        ghl_info.current_model = mdxm;
-        if !mdxm.is_null() {
-            // SAFETY: `mdxm` non-null, `EngineHost::model_mdxm`'s contract
-            // (`G2SV-D5`).
-            let view = unsafe { MdxmView::from_block(mdxm) };
+        ghl_info.current_model = mdxm.map_or(core::ptr::null(), |v| v.block_ptr());
+        if let Some(view) = mdxm {
             let ofs_end = view.ofs_end();
             if ghl_info.current_model_size != 0 && ghl_info.current_model_size != ofs_end {
                 host.error(
@@ -237,10 +232,9 @@ fn g2_test_model_pointers(ghl_info: &mut CGhoul2Info, host: &mut impl EngineHost
 
             let anim_index = view.anim_index();
             let a_header = host.model_mdxa(anim_index);
-            ghl_info.anim_model = a_header;
-            if !a_header.is_null() {
-                // SAFETY: `a_header` non-null, same contract as above.
-                let a_ofs_end = unsafe { MdxaView::from_block(a_header) }.ofs_end();
+            ghl_info.anim_model = a_header.map_or(core::ptr::null(), |v| v.block_ptr());
+            if let Some(a_view) = a_header {
+                let a_ofs_end = a_view.ofs_end();
                 if ghl_info.current_anim_model_size != 0
                     && ghl_info.current_anim_model_size != a_ofs_end
                 {
@@ -782,10 +776,8 @@ pub fn g2api_skinless_model(
 ) -> bool {
     let _ = g2; // threaded per ruling 11; unused by this particular body.
     if crate::misc::g2_setup_model_pointers(host, ghl_info) {
-        let mdxm = host.model_mdxm(ghl_info.model);
-        if !mdxm.is_null() {
-            // SAFETY: `mdxm` non-null, contract per `EngineHost::model_mdxm`.
-            return unsafe { MdxmView::from_block(mdxm) }
+        if let Some(view) = host.model_mdxm(ghl_info.model) {
+            return view
                 .hierarchy_iter()
                 .all(|s| s.shader_first_byte() == 0);
         }

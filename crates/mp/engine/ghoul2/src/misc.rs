@@ -167,8 +167,7 @@ use mp_qshared::shared::{errorParm_t, mdxaBone_t, qhandle_t, vec3_t, CollisionRe
 use crate::api_models::{g2_should_register_server, register_model, register_server_model};
 use crate::ghoul2_system::{BoneCacheId, Ghoul2System};
 use crate::gore::sskin_gore_data::SSkinGoreData;
-use crate::mdx::mdxa::MdxaView;
-use crate::mdx::mdxm::{MdxmSurfaceView, MdxmView};
+use mp_host_interface::mdx::mdxm::MdxmSurfaceView;
 use crate::render::bone_cache::eval_bone_cache;
 use crate::shared::bolt_info_t::boltInfo_t;
 use crate::shared::bone_info_t::boneInfo_t;
@@ -225,12 +224,10 @@ fn find_surface_view<'a>(
     index: i32,
     lod: i32,
 ) -> Option<MdxmSurfaceView<'a>> {
-    let mdxm = host.model_mdxm(model);
-    if mdxm.is_null() {
+    let Some(mdxm) = host.model_mdxm(model) else {
         return None;
-    }
-    // SAFETY: `mdxm` non-null, `EngineHost::model_mdxm`'s contract.
-    Some(unsafe { MdxmView::from_block(mdxm) }.find_surface(index, lod))
+    };
+    Some(mdxm.find_surface(index, lod))
 }
 
 /// Read one flat, bit-punned vertex slot (module-doc gap note #7): 5 `f32`s
@@ -290,13 +287,9 @@ fn identity_mdxa_bone() -> mdxaBone_t {
 /// Source: `oracle/codemp/ghoul2/G2_misc.cpp:279-304`
 pub fn g2_list_model_surfaces(host: &mut impl EngineHost, file_name: &str) {
     let model = register_model(host, file_name, "G2_Misc internal", "G2_API.cpp:282,312,359,2714");
-    let mdxm = host.model_mdxm(model);
-    if mdxm.is_null() {
+    let Some(view) = host.model_mdxm(model) else {
         return;
-    }
-    // SAFETY: `mdxm` non-null (checked above), `EngineHost::model_mdxm`'s
-    // contract.
-    let view = unsafe { MdxmView::from_block(mdxm) };
+    };
     let verbose = host.cvar_integer("r_verbose") != 0;
 
     for (x, surf) in view.hierarchy_iter().enumerate() {
@@ -328,19 +321,13 @@ pub fn g2_list_model_surfaces(host: &mut impl EngineHost, file_name: &str) {
 pub fn g2_list_model_bones(host: &mut impl EngineHost, file_name: &str, frame: i32) {
     let _ = frame;
     let mod_m = register_model(host, file_name, "G2_Misc internal", "G2_API.cpp:282,312,359,2714");
-    let mdxm = host.model_mdxm(mod_m);
-    if mdxm.is_null() {
+    let Some(mdxm) = host.model_mdxm(mod_m) else {
         return;
-    }
-    let anim_index = unsafe { MdxmView::from_block(mdxm) }.anim_index();
-    let header = host.model_mdxa(anim_index);
-    if header.is_null() {
+    };
+    let anim_index = mdxm.anim_index();
+    let Some(mdxa) = host.model_mdxa(anim_index) else {
         return;
-    }
-
-    // SAFETY: `header` non-null (checked above), `EngineHost::model_mdxa`'s
-    // contract.
-    let mdxa = unsafe { MdxaView::from_block(header) };
+    };
     let num_bones = mdxa.num_bones();
     let verbose = host.cvar_integer("r_verbose") != 0;
 
@@ -376,13 +363,10 @@ pub fn g2_list_model_bones(host: &mut impl EngineHost, file_name: &str, frame: i
 /// Source: `oracle/codemp/ghoul2/G2_misc.cpp:356-367`
 pub fn g2_get_anim_file_name(host: &mut impl EngineHost, file_name: &str) -> Option<String> {
     let model = register_model(host, file_name, "G2_Misc internal", "G2_API.cpp:282,312,359,2714");
-    let mdxm = host.model_mdxm(model);
-    if mdxm.is_null() {
+    let Some(mdxm) = host.model_mdxm(model) else {
         return None;
-    }
-    // SAFETY: `mdxm` non-null (checked above), `EngineHost::model_mdxm`'s
-    // contract.
-    let anim_name = unsafe { MdxmView::from_block(mdxm) }.anim_name();
+    };
+    let anim_name = mdxm.anim_name();
     if anim_name.is_empty() {
         return None;
     }
@@ -424,10 +408,8 @@ pub fn g2_setup_model_pointers(host: &mut impl EngineHost, ghl_info: &mut CGhoul
         };
 
         let mdxm = host.model_mdxm(ghl_info.model);
-        ghl_info.current_model = mdxm;
-        if !mdxm.is_null() {
-            // SAFETY: `mdxm` non-null, `EngineHost::model_mdxm`'s contract.
-            let view = unsafe { MdxmView::from_block(mdxm) };
+        ghl_info.current_model = mdxm.map_or(core::ptr::null(), |v| v.block_ptr());
+        if let Some(view) = mdxm {
             let ofs_end = view.ofs_end();
             if ghl_info.current_model_size != 0 && ghl_info.current_model_size != ofs_end {
                 host.error(
@@ -439,11 +421,10 @@ pub fn g2_setup_model_pointers(host: &mut impl EngineHost, ghl_info: &mut CGhoul
 
             let anim_index = view.anim_index();
             let a_header = host.model_mdxa(anim_index);
-            ghl_info.anim_model = a_header;
-            if !a_header.is_null() {
-                ghl_info.a_header = a_header;
-                // SAFETY: `a_header` non-null, same contract as above.
-                let a_ofs_end = unsafe { MdxaView::from_block(a_header) }.ofs_end();
+            ghl_info.anim_model = a_header.map_or(core::ptr::null(), |v| v.block_ptr());
+            if let Some(a_view) = a_header {
+                ghl_info.a_header = a_view.block_ptr();
+                let a_ofs_end = a_view.ofs_end();
                 if ghl_info.current_anim_model_size != 0
                     && ghl_info.current_anim_model_size != a_ofs_end
                 {
@@ -512,10 +493,8 @@ fn g2_decide_trace_lod(host: &mut impl EngineHost, ghoul2: &CGhoul2Info, use_lod
     if ghoul2.lod_bias > return_lod {
         return_lod = ghoul2.lod_bias;
     }
-    let mdxm = host.model_mdxm(ghoul2.model);
-    if !mdxm.is_null() {
-        // SAFETY: `mdxm` non-null, `EngineHost::model_mdxm`'s contract.
-        let num_lods = unsafe { MdxmView::from_block(mdxm) }.num_lods();
+    if let Some(view) = host.model_mdxm(ghoul2.model) {
+        let num_lods = view.num_lods();
         if return_lod >= num_lods {
             return_lod = num_lods - 1;
         }
@@ -648,16 +627,12 @@ fn g2_trace_surfaces(
     if ts.hit_one {
         return;
     }
-    let mdxm = host.model_mdxm(ts.current_model);
-    if mdxm.is_null() {
+    let Some(view) = host.model_mdxm(ts.current_model) else {
         return;
-    }
+    };
     let Some(surface) = find_surface_view(host, ts.current_model, ts.surface_num, ts.lod) else {
         return;
     };
-    // SAFETY: `mdxm` non-null (checked above), `EngineHost::model_mdxm`'s
-    // contract.
-    let view = unsafe { MdxmView::from_block(mdxm) };
     let this_surface_index = surface.this_surface_index();
     let surf_info = view.surf_hierarchy(this_surface_index);
 
@@ -1358,13 +1333,9 @@ fn g2_transform_surfaces(
     let Some(surface) = find_surface_view(host, current_model, surface_num, lod) else {
         return;
     };
-    let mdxm = host.model_mdxm(current_model);
-    if mdxm.is_null() {
+    let Some(view) = host.model_mdxm(current_model) else {
         return;
-    }
-    // SAFETY: `mdxm` non-null (checked above), `EngineHost::model_mdxm`'s
-    // contract.
-    let view = unsafe { MdxmView::from_block(mdxm) };
+    };
     let this_surface_index = surface.this_surface_index();
     let surf_info = view.surf_hierarchy(this_surface_index);
 
@@ -1450,16 +1421,15 @@ pub fn g2_transform_model(
         let model = ghoul2.get(g2, i).model;
 
         let lod = if apply_gore {
-            let mdxm = host.model_mdxm(model);
-            let num_lods = if mdxm.is_null() {
-                0
-            } else {
+            let num_lods = if let Some(view) = host.model_mdxm(model) {
                 // Divergence: reads `mdxmHeader_t::numLODs` in place of the
                 // separate `model_t::numLods` cache Raven checks here
                 // (`G2_misc.cpp:616`) — `EngineHost` exposes only the parsed
                 // `.glm` block, not `model_t` itself (`G2SV-D5`); the two
                 // agree for any model the loader actually built.
-                unsafe { MdxmView::from_block(mdxm) }.num_lods()
+                view.num_lods()
+            } else {
+                0
             };
             if use_lod >= num_lods {
                 ghoul2.get_mut(g2, i).transformed_verts_array = None;

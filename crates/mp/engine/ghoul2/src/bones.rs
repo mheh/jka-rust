@@ -65,8 +65,7 @@ use mp_qshared::shared::q_math::Create_Matrix;
 use mp_qshared::shared::{mdxaBone_t, qhandle_t, vec3_t, Eorientations};
 
 use crate::ghoul2_system::Ghoul2System;
-use crate::mdx::mdxa::MdxaView;
-use crate::mdx::mdxm::MdxmView;
+use mp_host_interface::mdx::mdxa::MdxaView;
 use crate::ragdoll_update_params::RagDollUpdateParams;
 use crate::render::bone_transform::g2_timing_model;
 use crate::shared::bone_info_t::boneInfo_t;
@@ -822,17 +821,15 @@ pub fn g2_set_bone_angles_matrix(
     let _ = (blend_time, current_time);
 
     let mod_a = if file_name.is_empty() {
-        let mod_m = host.model_mdxm(model_list[model_index as usize]);
         // Divergence (§19): Raven dereferences `mod_m->mdxm` unconditionally
         // (a null-deref UB path if the handle were bad); this picks the
         // defined fallback of treating a null block as "model not found".
-        if mod_m.is_null() {
-            core::ptr::null()
+        if let Some(mod_m) = host.model_mdxm(model_list[model_index as usize]) {
+            let anim_index = mod_m.anim_index();
+            host.model_mdxa(anim_index)
+                .map_or(core::ptr::null(), |v| v.block_ptr())
         } else {
-            // Safety: `mod_m` is a non-null `EngineHost::model_mdxm`-sourced
-            // mdxm header block (checked above).
-            let anim_index = unsafe { MdxmView::from_block(mod_m) }.anim_index();
-            host.model_mdxa(anim_index) as *const c_void
+            core::ptr::null()
         }
     } else {
         // GAP (module doc finding 2): `RE_RegisterModel(fileName)` has no

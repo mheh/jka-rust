@@ -43,7 +43,7 @@ use mp_host_interface::EngineHost;
 use mp_qshared::shared::{mdxaBone_t, qhandle_t, VectorNormalize};
 
 use crate::ghoul2_system::{BoneCacheId, Ghoul2System};
-use crate::mdx::mdxa::MdxaView;
+use mp_host_interface::mdx::mdxa::MdxaView;
 use crate::render::bone_transform::{g2_transform_bone, multiply_3x4_matrix};
 use crate::shared::bone_info_t::boneInfo_t;
 
@@ -188,11 +188,9 @@ impl CBoneCache {
         // reaches the same loader block over `EngineHost::model_mdxa` (`G2SV-D5`,
         // ruling 36). `assert(amod); assert(aheader)` (`:394-395`) — debug-only
         // (NDEBUG in the frozen build), kept as `debug_assert`.
-        let header = host.model_mdxa(a_mod);
-        debug_assert!(!header.is_null(), "CBoneCache::new: null mdxa header");
-
-        // SAFETY: `header` is the live `.gla` block from `model_mdxa`.
-        let mdxa = unsafe { MdxaView::from_block(header) };
+        let mdxa = host.model_mdxa(a_mod);
+        debug_assert!(mdxa.is_some(), "CBoneCache::new: null mdxa header");
+        let mdxa = mdxa.unwrap();
         let num_bones = mdxa.num_bones();
         let n = num_bones as usize;
 
@@ -207,7 +205,7 @@ impl CBoneCache {
 
         CBoneCache {
             frame_size: 0,
-            header,
+            header: mdxa.block_ptr().cast_mut(),
             model: a_mod,
             bones,
             final_bones,

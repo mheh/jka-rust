@@ -25,7 +25,7 @@
 
 use mp_host_interface::EngineHost;
 
-use crate::mdx::mdxa::MdxaView;
+use mp_host_interface::mdx::mdxa::MdxaView;
 use crate::shared::bolt_info_t::boltInfo_t;
 use crate::shared::cghoul2_info::CGhoul2Info;
 use crate::shared::surface_info_t::surfaceInfo_t;

@@ -103,8 +103,6 @@ use mp_host_interface::EngineHost;
 use mp_qshared::shared::qhandle_t;
 
 use crate::ghoul2_system::Ghoul2System;
-use crate::mdx::mdxa::MdxaView;
-use crate::mdx::mdxm::MdxmView;
 use crate::shared::cghoul2_info::CGhoul2Info;
 use crate::shared::cghoul2_info_v::CGhoul2Info_v;
 use crate::shared::surface_info_t::surfaceInfo_t;
@@ -160,11 +158,11 @@ pub fn g2_is_surface_legal(
     model: qhandle_t,
     surface_name: &str,
 ) -> Option<(i32, i32)> {
-    let mdxm = host.model_mdxm(model);
-    // SAFETY: every call site below has already established `model`'s
-    // `mdxm` is non-null (matching the oracle's own unchecked
-    // `mod_m->mdxm` dereference — this function itself has no null-check).
-    for (i, surf) in unsafe { MdxmView::from_block(mdxm) }.hierarchy_iter().enumerate() {
+    // Every call site below has already established `model`'s `mdxm` is
+    // non-null (matching the oracle's own unchecked `mod_m->mdxm` dereference
+    // — this function itself has no null-check).
+    let mdxm = host.model_mdxm(model).unwrap();
+    for (i, surf) in mdxm.hierarchy_iter().enumerate() {
         if surf.name_matches(surface_name) {
             return Some((i as i32, surf.flags()));
         }
@@ -191,8 +189,7 @@ fn g2_find_surface_by_name(
     slist: &[surfaceInfo_t],
     surface_name: &str,
 ) -> Option<i32> {
-    let mdxm = host.model_mdxm(ghl_info.model);
-    if mdxm.is_null() {
+    if host.model_mdxm(ghl_info.model).is_none() {
         // Raven: `assert(0); if (surfIndex) *surfIndex=-1; return 0;`
         // (`NDEBUG` no-ops the assert; the write-through/return are live).
         return None;
@@ -202,10 +199,10 @@ fn g2_find_surface_by_name(
         if entry.surface != 10000 && entry.surface != -1 {
             let this_surface_index =
                 crate::misc::g2_find_surface(host, ghl_info.model, entry.surface, 0);
-            let mdxm = host.model_mdxm(ghl_info.model);
-            // SAFETY: `mdxm` non-null (checked above); `this_surface_index`
-            // is the resolved hierarchy index for `entry.surface`.
-            let matches = unsafe { MdxmView::from_block(mdxm) }
+            // `mdxm` non-null (checked above); `this_surface_index` is the
+            // resolved hierarchy index for `entry.surface`.
+            let mdxm = host.model_mdxm(ghl_info.model).unwrap();
+            let matches = mdxm
                 .surf_hierarchy(this_surface_index)
                 .name_matches(surface_name);
             if matches {
@@ -234,7 +231,7 @@ pub fn g2_set_surface_on_off(
     surface_name: &str,
     off_flags: i32,
 ) -> bool {
-    if host.model_mdxm(ghl_info.model).is_null() {
+    if host.model_mdxm(ghl_info.model).is_none() {
         // Raven: `assert(0); return qfalse;`
         return false;
     }
@@ -296,7 +293,7 @@ pub fn g2_set_surface_on_off_from_skin(
         // the names have both been lowercased
         if shader_name == "*off" {
             g2_set_surface_on_off(host, ghl_info, surf_name, G2SURFACEFLAG_OFF);
-        } else if !host.model_mdxm(ghl_info.model).is_null() {
+        } else if host.model_mdxm(ghl_info.model).is_some() {
             // (a null `mdxm` here is Raven's unchecked `mod->mdxm` deref in
             // `G2_IsSurfaceLegal` — skipped instead, §19)
             // `Some` is Raven's `surfaceNum != -1`
@@ -327,8 +324,7 @@ pub fn g2_is_surface_off(
     slist: &[surfaceInfo_t],
     surface_name: &str,
 ) -> i32 {
-    let mdxm = host.model_mdxm(ghl_info.model);
-    if mdxm.is_null() {
+    if host.model_mdxm(ghl_info.model).is_none() {
         return 0;
     }
 
@@ -338,9 +334,9 @@ pub fn g2_is_surface_off(
 
     // ok, we didn't find it in the surface list. Lets look at the original
     // surface then.
-    let mdxm = host.model_mdxm(ghl_info.model);
-    // SAFETY: `mdxm` non-null (checked above).
-    for surf in unsafe { MdxmView::from_block(mdxm) }.hierarchy_iter() {
+    // `mdxm` non-null (checked above).
+    let mdxm = host.model_mdxm(ghl_info.model).unwrap();
+    for surf in mdxm.hierarchy_iter() {
         if surf.name_matches(surface_name) {
             return surf.flags();
         }
@@ -367,10 +363,10 @@ fn g2_find_recursive_surface(
     active_surfaces: &mut [i32],
 ) {
     let this_surface_index = crate::misc::g2_find_surface(host, current_model, surface_num, 0);
-    let mdxm = host.model_mdxm(current_model);
-    // SAFETY: `current_model` has already been validated non-null by
+    // `current_model` has already been validated non-null by
     // `g2_set_root_surface`'s own caller-side check.
-    let surf_info = unsafe { MdxmView::from_block(mdxm) }.surf_hierarchy(this_surface_index);
+    let mdxm = host.model_mdxm(current_model).unwrap();
+    let surf_info = mdxm.surf_hierarchy(this_surface_index);
 
     // see if we have an override surface in the surface list
     let surf_override = g2_find_override_surface(surface_num, root_list);
@@ -467,7 +463,7 @@ pub fn g2_set_root_surface(
     surface_name: &str,
 ) -> bool {
     let model = ghoul2.get(g2, model_index).model;
-    if host.model_mdxm(model).is_null() {
+    if host.model_mdxm(model).is_none() {
         return false;
     }
 
@@ -485,17 +481,15 @@ pub fn g2_set_root_surface(
 
     // ok, now the tricky bits. firstly, generate a list of active / on
     // surfaces below the root point.
-    let mdxm = host.model_mdxm(model);
-    // SAFETY: `mdxm` non-null (checked above).
-    let view = unsafe { MdxmView::from_block(mdxm) };
+    // `mdxm` non-null (checked above).
+    let view = host.model_mdxm(model).unwrap();
     let num_surfaces = view.num_surfaces();
     let mut active_surfaces = vec![0i32; num_surfaces.max(0) as usize];
 
     let anim_index = view.anim_index();
-    let mdxa = host.model_mdxa(anim_index);
-    // SAFETY: mirrors the oracle's own unchecked `mod_a->mdxa->numBones`
-    // dereference (`assert(...animModel)` above it is a dropped NDEBUG no-op).
-    let num_bones = unsafe { MdxaView::from_block(mdxa) }.num_bones();
+    // Mirrors the oracle's own unchecked `mod_a->mdxa->numBones` dereference
+    // (`assert(...animModel)` above it is a dropped NDEBUG no-op).
+    let num_bones = host.model_mdxa(anim_index).unwrap().num_bones();
     // Never mutated: `G2_ConstructUsedBoneList` (module doc-comment gap #3)
     // would populate this, but is not this file's to invent — it stays at
     // its `Z_Malloc` + `memset(0)` initial state.
@@ -625,10 +619,9 @@ fn decide_trace_lod(host: &mut impl EngineHost, ghl_info: &CGhoul2Info, use_lod:
         return_lod = ghl_info.lod_bias;
     }
 
-    let mdxm = host.model_mdxm(ghl_info.model);
-    // SAFETY: mirrors the oracle's own unchecked `ghoul2.currentModel->mdxm`
+    // Mirrors the oracle's own unchecked `ghoul2.currentModel->mdxm`
     // dereference (asserted non-null there; `NDEBUG` no-ops the assert).
-    let num_lods = unsafe { MdxmView::from_block(mdxm) }.num_lods();
+    let num_lods = host.model_mdxm(ghl_info.model).unwrap().num_lods();
 
     // now ensure that we haven't selected a lod that doesn't exist for this model.
     if return_lod >= num_lods {
@@ -685,10 +678,9 @@ pub fn g2_get_parent_surface(
     index: i32,
 ) -> i32 {
     let this_surface_index = crate::misc::g2_find_surface(host, ghl_info.model, index, 0);
-    let mdxm = host.model_mdxm(ghl_info.model);
-    // SAFETY: contract per `EngineHost::model_mdxm`; `this_surface_index` is
-    // the resolved hierarchy index.
-    unsafe { MdxmView::from_block(mdxm) }
+    // `this_surface_index` is the resolved hierarchy index.
+    host.model_mdxm(ghl_info.model)
+        .unwrap()
         .surf_hierarchy(this_surface_index)
         .parent_index()
 }
@@ -731,10 +723,9 @@ pub fn g2_is_surface_rendered(
     surface_name: &str,
     slist: &[surfaceInfo_t],
 ) -> i32 {
-    let mdxm = host.model_mdxm(ghl_info.model);
-    if mdxm.is_null() {
+    let Some(mdxm) = host.model_mdxm(ghl_info.model) else {
         return -1;
-    }
+    };
 
     // now travel up the skeleton to see if any of it's ancestors have a 'no
     // descendants' turned on. find the original surface in the surface list.
@@ -743,17 +734,17 @@ pub fn g2_is_surface_rendered(
         return -1;
     };
 
-    // SAFETY: `mdxm` non-null (checked above); `surf_num` is a hierarchy
-    // index, already resolved by `g2_is_surface_legal`'s own linear walk.
-    let mut surf_num = unsafe { MdxmView::from_block(mdxm) }
+    // `surf_num` is a hierarchy index, already resolved by
+    // `g2_is_surface_legal`'s own linear walk.
+    let mut surf_num = mdxm
         .surf_hierarchy(surf_num)
         .parent_index();
 
     // walk the surface hierarchy up until we hit the root.
     while surf_num != -1 {
-        let mdxm = host.model_mdxm(ghl_info.model);
-        // SAFETY: `mdxm` non-null (checked above); `surf_num` is a hierarchy index.
-        let parent_surf_info = unsafe { MdxmView::from_block(mdxm) }.surf_hierarchy(surf_num);
+        // `surf_num` is a hierarchy index.
+        let mdxm = host.model_mdxm(ghl_info.model).unwrap();
+        let parent_surf_info = mdxm.surf_hierarchy(surf_num);
         let parent_name = parent_surf_info.name_lossy();
 
         // find the original surface in the surface list. G2 was bug, above

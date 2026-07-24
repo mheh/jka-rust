@@ -55,6 +55,8 @@ use mp_qshared::shared::limits::{ENTITYNUM_NONE, MAX_GENTITIES};
 use mp_qshared::shared::{qboolean, qhandle_t, vec3_t};
 
 use crate::engine_host::EngineHost;
+use crate::mdx::mdxa::MdxaView;
+use crate::mdx::mdxm::MdxmView;
 use crate::platform_host::PlatformHost;
 use crate::vm_slot::VmSlot;
 
@@ -370,22 +372,24 @@ impl EngineHost for MockHost {
         self.model_registers.len() as qhandle_t
     }
 
-    fn model_mdxm(&mut self, model: qhandle_t) -> *mut c_void {
-        // NULL where Raven's model_t.mdxm is NULL (no fixture). The pointer is
+    fn model_mdxm(&mut self, model: qhandle_t) -> Option<MdxmView<'static>> {
+        // None where Raven's model_t.mdxm is NULL (no fixture). The pointer is
         // into the fixture Vec: stable until `mdxm_blocks` is next mutated.
+        // SAFETY: DEC-35 — the fixture block is a valid mdxm image; the view is
+        // valid until the map is next mutated (the test-fixture contract).
         self.mdxm_blocks
             .get_mut(&model)
-            .map(|b| b.as_mut_ptr() as *mut c_void)
-            .unwrap_or(core::ptr::null_mut())
+            .map(|b| unsafe { MdxmView::from_block(b.as_mut_ptr() as *const c_void) })
     }
 
-    fn model_mdxa(&mut self, model: qhandle_t) -> *mut c_void {
-        // NULL where Raven's model_t.mdxa is NULL (no fixture). Same pointer
+    fn model_mdxa(&mut self, model: qhandle_t) -> Option<MdxaView<'static>> {
+        // None where Raven's model_t.mdxa is NULL (no fixture). Same block
         // stability contract as `model_mdxm`.
+        // SAFETY: DEC-35 — the fixture block is a valid mdxa image; the view is
+        // valid until the map is next mutated (the test-fixture contract).
         self.mdxa_blocks
             .get_mut(&model)
-            .map(|b| b.as_mut_ptr() as *mut c_void)
-            .unwrap_or(core::ptr::null_mut())
+            .map(|b| unsafe { MdxaView::from_block(b.as_mut_ptr() as *const c_void) })
     }
 
     fn skin_surfaces(&mut self, h_skin: qhandle_t) -> Vec<(String, String)> {
@@ -791,19 +795,27 @@ mod tests {
     #[test]
     fn model_memory_serves_fixture_blocks_or_null() {
         let mut host = MockHost::new();
-        host.mdxm_blocks.insert(3, vec![0xAA, 0xBB]);
-        host.mdxa_blocks.insert(7, vec![0xCC]);
+        // A minimal self-describing mdxm image: header-sized, ofsEnd at 160.
+        let mut mdxm = vec![0u8; 164];
+        mdxm[152..156].copy_from_slice(&5i32.to_le_bytes()); // numSurfaces
+        mdxm[160..164].copy_from_slice(&164i32.to_le_bytes()); // ofsEnd
+        host.mdxm_blocks.insert(3, mdxm);
+        // A minimal self-describing mdxa image: ofsEnd at 96.
+        let mut mdxa = vec![0u8; 100];
+        mdxa[84..88].copy_from_slice(&9i32.to_le_bytes()); // numBones
+        mdxa[96..100].copy_from_slice(&100i32.to_le_bytes()); // ofsEnd
+        host.mdxa_blocks.insert(7, mdxa);
 
-        let m = host.model_mdxm(3);
-        assert!(!m.is_null());
-        assert_eq!(unsafe { *(m as *const u8) }, 0xAA);
-        let a = host.model_mdxa(7);
-        assert!(!a.is_null());
-        assert_eq!(unsafe { *(a as *const u8) }, 0xCC);
+        let m = host.model_mdxm(3).expect("fixture present");
+        assert_eq!(m.num_surfaces(), 5);
+        assert_eq!(m.ofs_end(), 164);
+        let a = host.model_mdxa(7).expect("fixture present");
+        assert_eq!(a.num_bones(), 9);
+        assert_eq!(a.ofs_end(), 100);
 
-        // Missing handle = NULL, and the two halves are independent.
-        assert!(host.model_mdxm(7).is_null());
-        assert!(host.model_mdxa(3).is_null());
+        // Missing handle = None, and the two halves are independent.
+        assert!(host.model_mdxm(7).is_none());
+        assert!(host.model_mdxa(3).is_none());
     }
 
     #[test]

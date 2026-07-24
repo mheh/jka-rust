@@ -143,7 +143,7 @@ use mp_qshared::shared::{
 use crate::api_collision::{g2api_get_time, g2api_give_me_vector_from_matrix};
 use crate::bones::g2_find_bone;
 use crate::ghoul2_system::Ghoul2System;
-use crate::mdx::mdxa::MdxaView;
+use mp_host_interface::mdx::mdxa::MdxaView;
 use crate::misc::g2_generate_world_matrix;
 use crate::ragdoll_update_params::RagDollUpdateParams;
 use crate::render::bone_transform::{multiply_3x4_matrix, uncompress_bone};

@@ -35,7 +35,6 @@ use mp_qshared::shared::q_math::TransformAndTranslatePoint;
 use mp_qshared::shared::{mdxaBone_t, vec3_t, CollisionRecord_t, Eorientations};
 
 use crate::ghoul2_system::{Ghoul2System, NUM_G2T_TIME};
-use crate::mdx::mdxm::MdxmView;
 use crate::shared::cghoul2_info::CGhoul2Info;
 use crate::shared::cghoul2_info_v::CGhoul2Info_v;
 
@@ -269,11 +268,11 @@ pub fn g2api_collision_detect_cache(
         // otherwise store it off!
         for idx in 0..ghoul2.size(g2) {
             let model = ghoul2.get(g2, idx).model;
-            let mdxm = host.model_mdxm(model);
-            // SAFETY: `mdxm` is this valid model's loader block (post
+            // `mdxm` is this valid model's loader block (post
             // `G2_SetupModelPointers`), matching Raven's own unchecked
             // `mod->mdxm->numSurfaces` read (`G2_API.cpp:2062`).
-            let num_surfaces = unsafe { MdxmView::from_block(mdxm) }.num_surfaces();
+            let mdxm = host.model_mdxm(model).unwrap();
+            let num_surfaces = mdxm.num_surfaces();
 
             let info = ghoul2.get_mut(g2, idx);
             if info.transformed_verts_array.is_none() || (info.flags & GHOUL2_ZONETRANSALLOC) == 0 {

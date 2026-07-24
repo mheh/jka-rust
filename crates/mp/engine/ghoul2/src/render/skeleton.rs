@@ -75,8 +75,8 @@ use mp_qshared::shared::q_math::{
 use mp_qshared::shared::{mdxaBone_t, vec3_t, VectorNormalize, VectorNormalizeRow};
 
 use crate::ghoul2_system::{BoneCacheArena, BoneCacheId, Ghoul2System};
-use crate::mdx::mdxa::MdxaView;
-use crate::mdx::mdxm::{MdxmSurfaceView, MdxmVertView, MdxmView};
+use mp_host_interface::mdx::mdxa::MdxaView;
+use mp_host_interface::mdx::mdxm::{MdxmSurfaceView, MdxmVertView, MdxmView};
 use crate::render::bone_cache::CBoneCache;
 use crate::render::bone_transform;
 use crate::shared::bolt_info_t::boltInfo_t;
@@ -380,11 +380,10 @@ pub(crate) fn resolve_bolt_matrix_low(
             }
         }
 
-        let mdxm_ptr = host.model_mdxm(cache.model);
-        // SAFETY: `mdxm` is `cache.model`'s loader block — non-null on the live
-        // bolt path (a built cache implies a valid model), matching the oracle's
-        // own unchecked `boneCache.mod->mdxm`.
-        let mdxm = unsafe { MdxmView::from_block(mdxm_ptr) };
+        // `mdxm` is `cache.model`'s loader block — non-null on the live bolt
+        // path (a built cache implies a valid model), matching the oracle's own
+        // unchecked `boneCache.mod->mdxm`.
+        let mdxm = host.model_mdxm(cache.model).unwrap();
         let mut surface: Option<MdxmSurfaceView> = None;
         if surf_info.is_none() {
             surface = Some(mdxm.find_surface(bolt.surfaceNumber, 0));
@@ -434,18 +433,17 @@ fn g2_transform_ghoul_bones_inner(
     // the already-cached opaque `ghoul2.a_header` field — same underlying
     // loader block, sanctioned single source of truth (module doc `##
     // Raven ground truth` / `G2SV-D15`).
-    let header = host.model_mdxa(ghoul2.model);
-    if header.is_null() {
+    let Some(header) = host.model_mdxa(ghoul2.model) else {
         // Divergence (§19): Raven's own non-null asserts are dead under
         // `-DNDEBUG`, so a genuine null here is oracle UB (a hard crash) that
         // in practice is never reached (`G2_SetupModelPointers` validates
         // first). Picking the defined "do nothing" behavior instead.
         return;
-    }
+    };
     // Raven: `if (!aHeader->numBones) { assert(0); return; }` — the assert is
     // a compiled no-op under NDEBUG, but the guard + `return` are real control
     // flow that survives.
-    if unsafe { MdxaView::from_block(header) }.num_bones() == 0 {
+    if header.num_bones() == 0 {
         return;
     }
 
@@ -469,7 +467,7 @@ fn g2_transform_ghoul_bones_inner(
 
     // Raven: `ghoul2.mBoneCache->mod=currentModel; header=aHeader;`
     cache.model = ghoul2.model;
-    cache.header = header;
+    cache.header = header.block_ptr().cast_mut();
 
     cache.smoothing_active = false;
     cache.unsquash = false;
@@ -933,7 +931,7 @@ mod tests {
     use mp_host_interface::mock::MockHost;
 
     // The `mdxaHeader_t`/`mdxaSkel_t` byte-layout reads this file's mdxa helpers
-    // used to check locally now live in `crate::mdx::mdxa`'s own tests.
+    // used to check locally now live in `mp_host_interface::mdx::mdxa`'s own tests.
 
     /// `resolve_bolt_matrix_low`'s three identity-fallback arms (no bone
     /// cache; out-of-range bolt index; a bolt with neither a bone nor a

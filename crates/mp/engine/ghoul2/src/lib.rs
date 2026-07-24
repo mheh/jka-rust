@@ -33,6 +33,5 @@ pub mod surfaces;
 
 pub mod gore;
 pub mod matcomp;
-pub mod mdx;
 pub mod render;
 pub mod shared;
