@@ -78,7 +78,7 @@ use mp_qshared::shared::{
 
 use crate::ghoul2_system::Ghoul2System;
 use crate::gore::crag_doll_params::CRagDollParams;
-use mp_host_interface::mdx::mdxa::MdxaView;
+use mp_host_interface::mdx::mdxa::MdxaRef;
 use crate::ragdoll_update_params::{RagDollUpdateKind, RagDollUpdateParams};
 use crate::shared::cghoul2_info::CGhoul2Info;
 use crate::shared::cghoul2_info_v::CGhoul2Info_v;
@@ -413,7 +413,7 @@ fn split_info(g2: &mut Ghoul2System, ghoul2: &CGhoul2Info_v, model: i32) -> *mut
 /// no cache exists yet.
 ///
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:591-599`
-fn g2_get_mod_a(g2: &Ghoul2System, info: &CGhoul2Info) -> Option<MdxaView<'static>> {
+fn g2_get_mod_a(g2: &Ghoul2System, info: &CGhoul2Info) -> Option<MdxaRef<'static>> {
     match info.bone_cache {
         Some(id) => g2.bone_caches.get(id).and_then(|cache| cache.mdxa),
         None => None,
@@ -433,7 +433,7 @@ fn g2_get_mod_a(g2: &Ghoul2System, info: &CGhoul2Info) -> Option<MdxaView<'stati
 /// (`G2SV-D5`: `mdxaHeader_t`/`mdxaSkelOffsets_t`/`mdxaSkel_t` are never
 /// named here, so the wire sizes are replicated instead of imported from
 /// `mp_renderer::mdx_format`, which this crate may not depend on).
-fn skel_bone_name_matches(header: Option<MdxaView<'static>>, bone_number: i32, bone_name: &str) -> bool {
+fn skel_bone_name_matches(header: Option<MdxaRef<'static>>, bone_number: i32, bone_name: &str) -> bool {
     let Some(mdxa) = header else {
         return false;
     };
@@ -1608,6 +1608,7 @@ fn find_rag_bone_index(
 mod tests {
     use super::*;
     use core::ffi::c_void;
+    use mp_host_interface::mdx::mdxa::{MdxaParsed, MdxaView};
     use mp_host_interface::mock::MockHost;
 
     /// `skel_bone_name_matches`'s raw byte arithmetic is the trickiest part
@@ -1634,8 +1635,12 @@ mod tests {
         let skel1 = MDXA_HEADER_SIZE + 8 + SKEL_SIZE;
         buf[skel0..skel0 + 11].copy_from_slice(b"model_root\0");
         buf[skel1..skel1 + 7].copy_from_slice(b"pelvis\0");
+        // numBones @84 — the parse-once sidecar sizes its skel table off it.
+        buf[84..88].copy_from_slice(&2i32.to_le_bytes());
 
-        let header = Some(unsafe { MdxaView::from_block(buf.as_ptr() as *const c_void) });
+        let view = unsafe { MdxaView::from_block(buf.as_ptr() as *const c_void) };
+        let parsed: &'static MdxaParsed = Box::leak(Box::new(MdxaParsed::parse(view)));
+        let header = Some(MdxaRef { parsed, view });
         assert!(skel_bone_name_matches(header, 0, "MODEL_ROOT")); // stricmp: case-insensitive
         assert!(skel_bone_name_matches(header, 1, "pelvis"));
         assert!(!skel_bone_name_matches(header, 0, "pelvis"));

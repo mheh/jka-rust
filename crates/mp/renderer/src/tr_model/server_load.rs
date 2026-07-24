@@ -353,6 +353,11 @@ impl RenderModels {
 
         // `#ifndef _M_IX86` skeletal/frame swaps (`:751-790`) — §20-dropped:
         // dead arm on the `_M_IX86` WinDed target (`TRM-D3`/ruling 54).
+
+        // DEC-35: build the parse-once `MdxaParsed` sidecar over the now
+        // swap-completed block (fresh-load path only; a cache hit returned above
+        // and keeps its already-built sidecar).
+        self.store_parsed_mdxa(mod_name);
         true
     }
 
@@ -550,6 +555,10 @@ impl RenderModels {
             }
         }
 
+        // DEC-35: build the parse-once `MdxmParsed` sidecar over the now
+        // swap-completed block (fresh-load path only; a cache hit returned above
+        // and keeps its already-built sidecar).
+        self.store_parsed_mdxm(mod_name);
         true
     }
 }

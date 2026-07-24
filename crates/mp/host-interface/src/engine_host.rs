@@ -15,8 +15,8 @@ use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::{qboolean, qhandle_t, vec3_t};
 
-use crate::mdx::mdxa::MdxaView;
-use crate::mdx::mdxm::MdxmView;
+use crate::mdx::mdxa::MdxaRef;
+use crate::mdx::mdxm::MdxmRef;
 use crate::vm_slot::VmSlot;
 
 /// Raven's host service surface for the server-side game subsystems.
@@ -141,15 +141,17 @@ pub trait EngineHost {
     /// Loader model memory, mesh half (ruling 36 / G2SV-D5 / DEC-35) — Raven
     /// `R_GetModelByHandle( model )->mdxm`: a view over the parsed `.glm`
     /// block (`mdxmHeader_t` at offset 0). `None` exactly where Raven's pointer
-    /// is NULL (not a GL2M model). No re-parsing — this is the loader's live
-    /// block. The `'static` is the campaign's documented soundness contract:
-    /// the view is valid until model eviction and revalidated by
-    /// `G2_SetupModelPointers` (the same contract the raw pointer carried, now
-    /// typed and conjured at this one seam).
+    /// is NULL (not a GL2M model). No re-parsing at the seam — this is the
+    /// loader's live block plus the parse-once `parsed` sidecar the renderer
+    /// built at ingest. The `'static` is the campaign's documented soundness
+    /// contract: the ref (both `parsed` and `view`) is valid until model
+    /// eviction and revalidated by `G2_SetupModelPointers` (the same contract
+    /// the raw pointer carried, now typed and conjured at this one seam; the
+    /// `parsed` sidecar is owned by the same registry entry, DEC-35).
     /// Source: `oracle/codemp/renderer/tr_local.h:1128` (`model_t.mdxm`);
     /// chain: `oracle/codemp/ghoul2/G2_API.cpp:2716-2721`
     /// (`R_GetModelByHandle`: `tr_model.cpp:593`)
-    fn model_mdxm(&mut self, model: qhandle_t) -> Option<MdxmView<'static>>;
+    fn model_mdxm(&mut self, model: qhandle_t) -> Option<MdxmRef<'static>>;
 
     /// Loader model memory, animation half (ruling 36 / G2SV-D5 / DEC-35) —
     /// Raven `R_GetModelByHandle( model )->mdxa`: a view over the parsed `.gla`
@@ -157,13 +159,14 @@ pub trait EngineHost {
     /// skeleton build, and ragdoll basepose resolve do byte arithmetic off
     /// it, `tr_ghoul2.cpp:416-421,614-615`). Callers reach the anim handle
     /// via the mesh header's `animIndex`, as `G2_SetupModelPointers` does.
-    /// The `'static` is the campaign's documented soundness contract: the view
-    /// is valid until model eviction and revalidated by `G2_SetupModelPointers`
-    /// (the same contract the raw pointer carried, now typed and conjured at
-    /// this one seam).
+    /// The `'static` is the campaign's documented soundness contract: the ref
+    /// (both `parsed` and `view`) is valid until model eviction and revalidated
+    /// by `G2_SetupModelPointers` (the same contract the raw pointer carried,
+    /// now typed and conjured at this one seam; the `parsed` sidecar is owned by
+    /// the same registry entry, DEC-35).
     /// Source: `oracle/codemp/renderer/tr_local.h:1129` (`model_t.mdxa`);
     /// chain: `oracle/codemp/ghoul2/G2_API.cpp:2735-2739`
-    fn model_mdxa(&mut self, model: qhandle_t) -> Option<MdxaView<'static>>;
+    fn model_mdxa(&mut self, model: qhandle_t) -> Option<MdxaRef<'static>>;
 
     /// Raven `R_GetSkinByHandle( hSkin )`, flattened to the one read the
     /// ghoul2 server consumer makes (`G2_SetSurfaceOnOffFromSkin`,
@@ -356,11 +359,11 @@ impl<T: EngineHost + ?Sized> EngineHost for &mut T {
         (**self).fs_write_file(qpath, data)
     }
 
-    fn model_mdxm(&mut self, model: qhandle_t) -> Option<MdxmView<'static>> {
+    fn model_mdxm(&mut self, model: qhandle_t) -> Option<MdxmRef<'static>> {
         (**self).model_mdxm(model)
     }
 
-    fn model_mdxa(&mut self, model: qhandle_t) -> Option<MdxaView<'static>> {
+    fn model_mdxa(&mut self, model: qhandle_t) -> Option<MdxaRef<'static>> {
         (**self).model_mdxa(model)
     }
 

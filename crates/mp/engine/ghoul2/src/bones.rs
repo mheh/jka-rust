@@ -63,7 +63,7 @@ use mp_qshared::shared::q_math::Create_Matrix;
 use mp_qshared::shared::{mdxaBone_t, qhandle_t, vec3_t, Eorientations};
 
 use crate::ghoul2_system::Ghoul2System;
-use mp_host_interface::mdx::mdxa::MdxaView;
+use mp_host_interface::mdx::mdxa::MdxaRef;
 use crate::ragdoll_update_params::RagDollUpdateParams;
 use crate::render::bone_transform::g2_timing_model;
 use crate::shared::bone_info_t::boneInfo_t;
@@ -122,7 +122,7 @@ const RAG_PCJ_IK_CONTROLLED: i32 = 0x08000;
 /// `mdxaHeader_t` named as a Rust type.
 ///
 /// Source: `oracle/codemp/ghoul2/G2_bones.cpp:38-69`
-pub fn g2_find_bone(anim_model: Option<MdxaView<'static>>, blist: &[boneInfo_t], bone_name: &str) -> i32 {
+pub fn g2_find_bone(anim_model: Option<MdxaRef<'static>>, blist: &[boneInfo_t], bone_name: &str) -> i32 {
     for (i, bone) in blist.iter().enumerate() {
         if bone.boneNumber == -1 {
             continue;
@@ -147,7 +147,7 @@ pub fn g2_find_bone(anim_model: Option<MdxaView<'static>>, blist: &[boneInfo_t],
 /// `-1` if `boneName` has no skeleton match.
 ///
 /// Source: `oracle/codemp/ghoul2/G2_bones.cpp:71-141`
-pub fn g2_add_bone(anim_model: Option<MdxaView<'static>>, blist: &mut Vec<boneInfo_t>, bone_name: &str) -> i32 {
+pub fn g2_add_bone(anim_model: Option<MdxaRef<'static>>, blist: &mut Vec<boneInfo_t>, bone_name: &str) -> i32 {
     // Caller holds a valid, non-`None` anim model whenever it expects a bone to
     // actually be added (matches Raven's unchecked `mod->mdxa->numBones` deref).
     let mdxa = anim_model.expect("G2_Add_Bone: null anim model");
@@ -247,7 +247,7 @@ pub fn g2_stop_bone_index(blist: &mut Vec<boneInfo_t>, index: i32, flags: i32) -
 /// Source: `oracle/codemp/ghoul2/G2_bones.cpp:227-419`
 #[allow(clippy::too_many_arguments)]
 pub fn g2_generate_matrix(
-    anim_model: Option<MdxaView<'static>>,
+    anim_model: Option<MdxaRef<'static>>,
     blist: &mut Vec<boneInfo_t>,
     index: i32,
     angles: vec3_t,
@@ -305,8 +305,8 @@ pub fn g2_generate_matrix(
         // rejects these flags before ever reaching here with a null model, per
         // its own doc comment below).
         let skel = anim_model.expect("G2_Generate_Matrix: null anim model under PRE/POSTMULT").skel(bone_number);
-        let base_pose_mat = skel.base_pose_mat();
-        let base_pose_mat_inv = skel.base_pose_mat_inv();
+        let base_pose_mat = skel.base_pose_mat;
+        let base_pose_mat_inv = skel.base_pose_mat_inv;
 
         let mut temp1 = mdxaBone_t {
             matrix: [[0.0; 4]; 3],

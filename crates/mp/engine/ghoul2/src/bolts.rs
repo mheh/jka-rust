@@ -400,7 +400,7 @@ pub fn g2_remove_redundant_bolts(
 mod tests {
     use super::*;
     use crate::shared::surface_info_t::surfaceInfo_t;
-    use mp_host_interface::mdx::mdxa::MdxaView;
+    use mp_host_interface::mdx::mdxa::{MdxaParsed, MdxaRef, MdxaView};
     use mp_qshared::shared::mdxaBone_t;
 
     fn bolt(
@@ -498,7 +498,9 @@ mod tests {
         let mut mdxa = vec![0u8; 100];
         mdxa[84..88].copy_from_slice(&1i32.to_ne_bytes());
         mdxa.extend_from_slice(&4i32.to_ne_bytes()); // offsets[0]
-        let mut skel = [0u8; 64 + 8];
+        // Full `mdxaSkel_t`: name(64)+flags(4)+parent(4)+base(48)+baseInv(48)+
+        // numChildren(4) — the parse-once sidecar decodes all of it.
+        let mut skel = [0u8; 172];
         skel[..8].copy_from_slice(b"testbone");
         mdxa.extend_from_slice(&skel);
         // ofsEnd @96: the block's total self-describing size (MdxaView::from_block).
@@ -509,7 +511,9 @@ mod tests {
         host.mdxm_blocks.insert(1, mdxm);
         let mut ghl = CGhoul2Info::default();
         ghl.model = 1;
-        ghl.a_header = Some(unsafe { MdxaView::from_block(mdxa.as_ptr() as *const core::ffi::c_void) });
+        let a_view = unsafe { MdxaView::from_block(mdxa.as_ptr() as *const core::ffi::c_void) };
+        let a_parsed: &'static MdxaParsed = Box::leak(Box::new(MdxaParsed::parse(a_view)));
+        ghl.a_header = Some(MdxaRef { parsed: a_parsed, view: a_view });
 
         let mut bltlist: Vec<boltInfo_t> = Vec::new();
         let slist: Vec<surfaceInfo_t> = Vec::new();

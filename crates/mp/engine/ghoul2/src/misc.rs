@@ -333,17 +333,17 @@ pub fn g2_list_model_bones(host: &mut impl EngineHost, file_name: &str, frame: i
 
     for x in 0..num_bones {
         let skel = mdxa.skel(x);
-        host.print(&format!("Bone {x} Name {}\n", skel.name_lossy()));
+        host.print(&format!("Bone {x} Name {}\n", skel.name));
 
         // `skel->BasePoseMat.matrix[0..2][3]` — the translation column.
-        let base = skel.base_pose_mat();
+        let base = skel.base_pose_mat;
         let px = base.matrix[0][3];
         let py = base.matrix[1][3];
         let pz = base.matrix[2][3];
         host.print(&format!("X pos {px}, Y pos {py}, Z pos {pz}\n"));
 
         if verbose {
-            let num_children = skel.num_children();
+            let num_children = skel.children.len() as i32;
             host.print(&format!("Num Descendants {num_children}\n"));
             for _ in 0..num_children {
                 // Raven copy/paste bug (module doc comment above): reprints

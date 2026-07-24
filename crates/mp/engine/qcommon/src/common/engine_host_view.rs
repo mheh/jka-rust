@@ -20,8 +20,8 @@
 use core::ffi::{c_char, c_int};
 
 use mp_host_interface::engine_host::EngineHost;
-use mp_host_interface::mdx::mdxa::MdxaView;
-use mp_host_interface::mdx::mdxm::MdxmView;
+use mp_host_interface::mdx::mdxa::{MdxaParsed, MdxaRef, MdxaView};
+use mp_host_interface::mdx::mdxm::{MdxmParsed, MdxmRef, MdxmView};
 use mp_host_interface::vm_slot::VmSlot;
 use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
@@ -220,41 +220,60 @@ impl EngineHost for EngineHostView<'_> {
     }
 
     /// Raven `R_GetModelByHandle( model )->mdxm` — renderer-installed accessor
-    /// (G2SV-D5 / DEC-35). `None` where the loader pointer is NULL.
+    /// (G2SV-D5 / DEC-35). `None` where the loader pointer is NULL. Composes the
+    /// block `view` and the parse-once `parsed` sidecar the renderer built at
+    /// ingest into one Copy [`MdxmRef`].
     /// Source: `oracle/codemp/renderer/tr_local.h:1128`
-    fn model_mdxm(&mut self, model: qhandle_t) -> Option<MdxmView<'static>> {
+    fn model_mdxm(&mut self, model: qhandle_t) -> Option<MdxmRef<'static>> {
         let f = self
             .common
             .hooks
             .R_ModelMdxm
             .expect("R_ModelMdxm hook — installed by the renderer at boot");
-        let p = f(self, model);
-        if p.is_null() {
+        let (block, parsed) = f(self, model);
+        if block.is_null() {
             return None;
         }
-        // SAFETY: DEC-35 — the one sanctioned conjure site. `p` is the loader's
-        // live parsed `.glm` block, valid until model eviction and revalidated
-        // by `G2_SetupModelPointers`.
-        Some(unsafe { MdxmView::from_block(p) })
+        // A non-null block with a null sidecar is a load-path bug (the renderer
+        // builds `parsed` at ingest for every block); one defined behavior.
+        debug_assert!(!parsed.is_null(), "model_mdxm: block without a parsed sidecar");
+        if parsed.is_null() {
+            return None;
+        }
+        // SAFETY: DEC-35 — the one sanctioned conjure site. `block` is the
+        // loader's live parsed `.glm` block and `parsed` the registry entry's
+        // `MdxmParsed`; both valid until model eviction and revalidated by
+        // `G2_SetupModelPointers`.
+        let view = unsafe { MdxmView::from_block(block) };
+        let parsed = unsafe { &*(parsed as *const MdxmParsed) };
+        Some(MdxmRef { parsed, view })
     }
 
     /// Raven `R_GetModelByHandle( model )->mdxa` — renderer-installed accessor
-    /// (G2SV-D5 / DEC-35). `None` where the loader pointer is NULL.
+    /// (G2SV-D5 / DEC-35). `None` where the loader pointer is NULL. Composes the
+    /// block `view` and the parse-once `parsed` sidecar into one [`MdxaRef`].
     /// Source: `oracle/codemp/renderer/tr_local.h:1129`
-    fn model_mdxa(&mut self, model: qhandle_t) -> Option<MdxaView<'static>> {
+    fn model_mdxa(&mut self, model: qhandle_t) -> Option<MdxaRef<'static>> {
         let f = self
             .common
             .hooks
             .R_ModelMdxa
             .expect("R_ModelMdxa hook — installed by the renderer at boot");
-        let p = f(self, model);
-        if p.is_null() {
+        let (block, parsed) = f(self, model);
+        if block.is_null() {
             return None;
         }
-        // SAFETY: DEC-35 — the one sanctioned conjure site. `p` is the loader's
-        // live parsed `.gla` block, valid until model eviction and revalidated
-        // by `G2_SetupModelPointers`.
-        Some(unsafe { MdxaView::from_block(p) })
+        debug_assert!(!parsed.is_null(), "model_mdxa: block without a parsed sidecar");
+        if parsed.is_null() {
+            return None;
+        }
+        // SAFETY: DEC-35 — the one sanctioned conjure site. `block` is the
+        // loader's live parsed `.gla` block and `parsed` the registry entry's
+        // `MdxaParsed`; both valid until model eviction and revalidated by
+        // `G2_SetupModelPointers`.
+        let view = unsafe { MdxaView::from_block(block) };
+        let parsed = unsafe { &*(parsed as *const MdxaParsed) };
+        Some(MdxaRef { parsed, view })
     }
 
     /// Raven `R_GetSkinByHandle`, flattened to the per-surface

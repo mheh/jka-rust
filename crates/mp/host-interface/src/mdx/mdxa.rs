@@ -158,6 +158,146 @@ impl<'a> MdxaSkelView<'a> {
     }
 }
 
+/// One parsed `mdxaSkel_t` (DEC-35 parse-once sidecar) — the bone-hierarchy
+/// data the transform/ragdoll paths re-decode every frame, decoded ONCE at
+/// model load. Indexed by bone number. Plain fields; only [`Self::name_matches`]
+/// carries the byte-exact case-insensitive semantics [`MdxaSkelView::name_matches`]
+/// had.
+///
+/// Source: `oracle/codemp/renderer/mdx_format.h:388-396`
+pub struct MdxaSkel {
+    /// `skel->name`, lossily decoded (bone names are ASCII, so lossless here).
+    pub name: String,
+    /// `skel->parent`.
+    pub parent: i32,
+    /// `skel->children[0..numChildren]`.
+    pub children: Vec<i32>,
+    /// `skel->BasePoseMat`.
+    pub base_pose_mat: mdxaBone_t,
+    /// `skel->BasePoseMatInv`.
+    pub base_pose_mat_inv: mdxaBone_t,
+}
+
+impl MdxaSkel {
+    /// `!Q_stricmp(skel->name, name)` — byte-identical to
+    /// [`MdxaSkelView::name_matches`] (case-insensitive over the NUL-stripped
+    /// name bytes; `name` is ASCII so the lossy `String` matches raw bytes).
+    pub fn name_matches(&self, name: &str) -> bool {
+        self.name.as_bytes().eq_ignore_ascii_case(name.as_bytes())
+    }
+}
+
+/// Parse-once index over an `mdxaHeader_t` block (DEC-35) — the header constants
+/// and the full `mdxaSkel_t` table, decoded once at model load instead of every
+/// bone every frame. The compressed bone pool and per-frame indices stay
+/// view-based (per-frame bulk data); this holds only the read-more-than-once
+/// data plus the pool offsets [`MdxaRef`] needs so the hot-path accessors never
+/// re-decode header constants.
+///
+/// Source: `oracle/codemp/renderer/mdx_format.h:349-424`
+pub struct MdxaParsed {
+    /// `mdxaHeader_t->numFrames`.
+    pub num_frames: i32,
+    /// `mdxaHeader_t->numBones`.
+    pub num_bones: i32,
+    /// `mdxaHeader_t->ofsFrames` — base of the `<frame,bone>` pool-index table.
+    pub ofs_frames: i32,
+    /// `mdxaHeader_t->ofsCompBonePool` — base of the 14-byte compressed bones.
+    pub ofs_comp_bone_pool: i32,
+    /// The `mdxaSkel_t` table, indexed by bone number.
+    pub skel: Vec<MdxaSkel>,
+}
+
+impl MdxaParsed {
+    /// Decode the header constants and `mdxaSkel_t` table from `view` once.
+    /// Pure over the block bytes; the renderer calls it at ingest and the mock
+    /// from its fixture bytes.
+    pub fn parse(view: MdxaView) -> Self {
+        let num_frames = view.num_frames();
+        let num_bones = view.num_bones();
+        let ofs_frames = read_i32(view.bytes, OFS_OFS_FRAMES);
+        let ofs_comp_bone_pool = read_i32(view.bytes, OFS_OFS_COMP_BONE_POOL);
+        // §19: a header-only/truncated block (whose `mdxaSkelOffsets_t` table
+        // does not fit before `ofsEnd` — a loader-test fixture; a real `.gla`
+        // always carries the full table) has no skel data. Raven's pointer walk
+        // past the block would be UB; the defined behavior is an empty index.
+        let mut skel = Vec::with_capacity(num_bones as usize);
+        if view.bytes.len() >= HEADER_SIZE + num_bones as usize * 4 {
+            for i in 0..num_bones {
+                let s = view.skel(i);
+                let children = (0..s.num_children()).map(|c| s.child(c as usize)).collect();
+                skel.push(MdxaSkel {
+                    name: s.name_lossy(),
+                    parent: s.parent(),
+                    children,
+                    base_pose_mat: s.base_pose_mat(),
+                    base_pose_mat_inv: s.base_pose_mat_inv(),
+                });
+            }
+        }
+        Self {
+            num_frames,
+            num_bones,
+            ofs_frames,
+            ofs_comp_bone_pool,
+            skel,
+        }
+    }
+}
+
+/// Copy façade pairing the parse-once [`MdxaParsed`] index with the live
+/// [`MdxaView`] over the same `.gla` block (DEC-35). Accessors keep the same
+/// names [`MdxaView`] exposes, routed to the cheap source: header constants and
+/// `skel` come from `parsed`; `frame_bone_pool_index`/`comp_bone` read the
+/// per-frame pool bytes from `view` with `parsed` constants (no per-call header
+/// decode). Same `'static` soundness contract as the bare view: valid until
+/// model eviction, revalidated by `G2_SetupModelPointers` — and `parsed` is
+/// owned by the same registry entry, dropped at eviction with the block.
+#[derive(Clone, Copy)]
+pub struct MdxaRef<'a> {
+    pub parsed: &'a MdxaParsed,
+    pub view: MdxaView<'a>,
+}
+
+impl<'a> MdxaRef<'a> {
+    /// `mdxaHeader_t->numFrames`.
+    pub fn num_frames(&self) -> i32 {
+        self.parsed.num_frames
+    }
+
+    /// `mdxaHeader_t->numBones`.
+    pub fn num_bones(&self) -> i32 {
+        self.parsed.num_bones
+    }
+
+    /// `mdxaHeader_t->ofsEnd` — read off the block (the `G2_SetupModelPointers`
+    /// size-change check, a setup-path read, not a per-frame one).
+    pub fn ofs_end(&self) -> i32 {
+        self.view.ofs_end()
+    }
+
+    /// Bone `i`'s parsed `mdxaSkel_t`.
+    pub fn skel(&self, i: i32) -> &'a MdxaSkel {
+        &self.parsed.skel[i as usize]
+    }
+
+    /// `G2_GetBonePoolIndex` — the compressed-bone pool index for
+    /// `<frame, bone>`, AND'd to 24 bits (per-frame bulk read off `view` with
+    /// the parsed `numBones`/`ofsFrames`, no header re-decode).
+    pub fn frame_bone_pool_index(&self, frame: i32, bone: i32) -> i32 {
+        let num_bones = self.parsed.num_bones;
+        let ofs = (frame * num_bones * 3) + (bone * 3);
+        read_i32(self.view.bytes, self.parsed.ofs_frames as usize + ofs as usize) & 0x00FF_FFFF
+    }
+
+    /// The 14-byte `mdxaCompQuatBone_t` at `pool_index` (per-frame bulk read off
+    /// `view` with the parsed `ofsCompBonePool`).
+    pub fn comp_bone(&self, pool_index: i32) -> &'a [u8] {
+        let start = self.parsed.ofs_comp_bone_pool as usize + pool_index as usize * COMP_QUAT_BONE_SIZE;
+        &self.view.bytes[start..start + COMP_QUAT_BONE_SIZE]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -183,6 +323,7 @@ mod tests {
                 skel.extend_from_slice(&v.to_le_bytes());
             }
         }
+        skel.extend_from_slice(&0i32.to_le_bytes()); // numChildren
         buf.extend_from_slice(&skel);
         let ofs_end = buf.len() as i32;
         buf[OFS_END..OFS_END + 4].copy_from_slice(&ofs_end.to_le_bytes());
@@ -204,5 +345,24 @@ mod tests {
         assert_eq!(skel.parent(), -1);
         assert_eq!(skel.base_pose_mat(), base);
         assert_eq!(skel.base_pose_mat_inv(), base_inv);
+    }
+
+    #[test]
+    fn parsed_and_ref_match_the_view() {
+        let base = mdxaBone_t { matrix: [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0]] };
+        let base_inv = mdxaBone_t { matrix: [[21.0, 22.0, 23.0, 24.0], [25.0, 26.0, 27.0, 28.0], [29.0, 30.0, 31.0, 32.0]] };
+        let buf = one_bone_mdxa(42, "Pelvis", base, base_inv);
+        let view = unsafe { MdxaView::from_block(buf.as_ptr() as *const c_void) };
+        let parsed = MdxaParsed::parse(view);
+        let r = MdxaRef { parsed: &parsed, view };
+        assert_eq!(r.num_frames(), 42);
+        assert_eq!(r.num_bones(), 1);
+        let skel = r.skel(0);
+        assert!(skel.name_matches("PELVIS"));
+        assert!(!skel.name_matches("head"));
+        assert_eq!(skel.name, "Pelvis");
+        assert_eq!(skel.parent, -1);
+        assert_eq!(skel.base_pose_mat, base);
+        assert_eq!(skel.base_pose_mat_inv, base_inv);
     }
 }

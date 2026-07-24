@@ -55,8 +55,8 @@ use mp_qshared::shared::limits::{ENTITYNUM_NONE, MAX_GENTITIES};
 use mp_qshared::shared::{qboolean, qhandle_t, vec3_t};
 
 use crate::engine_host::EngineHost;
-use crate::mdx::mdxa::MdxaView;
-use crate::mdx::mdxm::MdxmView;
+use crate::mdx::mdxa::{MdxaParsed, MdxaRef, MdxaView};
+use crate::mdx::mdxm::{MdxmParsed, MdxmRef, MdxmView};
 use crate::platform_host::PlatformHost;
 use crate::vm_slot::VmSlot;
 
@@ -372,24 +372,31 @@ impl EngineHost for MockHost {
         self.model_registers.len() as qhandle_t
     }
 
-    fn model_mdxm(&mut self, model: qhandle_t) -> Option<MdxmView<'static>> {
+    fn model_mdxm(&mut self, model: qhandle_t) -> Option<MdxmRef<'static>> {
         // None where Raven's model_t.mdxm is NULL (no fixture). The pointer is
         // into the fixture Vec: stable until `mdxm_blocks` is next mutated.
         // SAFETY: DEC-35 — the fixture block is a valid mdxm image; the view is
         // valid until the map is next mutated (the test-fixture contract).
-        self.mdxm_blocks
-            .get_mut(&model)
-            .map(|b| unsafe { MdxmView::from_block(b.as_mut_ptr() as *const c_void) })
+        // The parse-once sidecar is `Box::leak`ed for `'static` — test-only, so
+        // an unbounded leak is acceptable (this is the mock's DEC-35 conjure).
+        self.mdxm_blocks.get_mut(&model).map(|b| {
+            let view = unsafe { MdxmView::from_block(b.as_mut_ptr() as *const c_void) };
+            let parsed: &'static MdxmParsed = Box::leak(Box::new(MdxmParsed::parse(view)));
+            MdxmRef { parsed, view }
+        })
     }
 
-    fn model_mdxa(&mut self, model: qhandle_t) -> Option<MdxaView<'static>> {
+    fn model_mdxa(&mut self, model: qhandle_t) -> Option<MdxaRef<'static>> {
         // None where Raven's model_t.mdxa is NULL (no fixture). Same block
         // stability contract as `model_mdxm`.
         // SAFETY: DEC-35 — the fixture block is a valid mdxa image; the view is
         // valid until the map is next mutated (the test-fixture contract).
-        self.mdxa_blocks
-            .get_mut(&model)
-            .map(|b| unsafe { MdxaView::from_block(b.as_mut_ptr() as *const c_void) })
+        // Parse-once sidecar `Box::leak`ed for `'static` — test-only leak.
+        self.mdxa_blocks.get_mut(&model).map(|b| {
+            let view = unsafe { MdxaView::from_block(b.as_mut_ptr() as *const c_void) };
+            let parsed: &'static MdxaParsed = Box::leak(Box::new(MdxaParsed::parse(view)));
+            MdxaRef { parsed, view }
+        })
     }
 
     fn skin_surfaces(&mut self, h_skin: qhandle_t) -> Vec<(String, String)> {
@@ -795,22 +802,26 @@ mod tests {
     #[test]
     fn model_memory_serves_fixture_blocks_or_null() {
         let mut host = MockHost::new();
-        // A minimal self-describing mdxm image: header-sized, ofsEnd at 160.
+        // A minimal, well-formed self-describing mdxm image: header-sized with
+        // no surfaces/LODs (so the parse-once sidecar walks nothing), ofsEnd at
+        // 160.
         let mut mdxm = vec![0u8; 164];
-        mdxm[152..156].copy_from_slice(&5i32.to_le_bytes()); // numSurfaces
+        mdxm[152..156].copy_from_slice(&0i32.to_le_bytes()); // numSurfaces
+        mdxm[144..148].copy_from_slice(&0i32.to_le_bytes()); // numLODs
         mdxm[160..164].copy_from_slice(&164i32.to_le_bytes()); // ofsEnd
         host.mdxm_blocks.insert(3, mdxm);
-        // A minimal self-describing mdxa image: ofsEnd at 96.
+        // A minimal, well-formed self-describing mdxa image: no bones, ofsEnd at
+        // 96.
         let mut mdxa = vec![0u8; 100];
-        mdxa[84..88].copy_from_slice(&9i32.to_le_bytes()); // numBones
+        mdxa[84..88].copy_from_slice(&0i32.to_le_bytes()); // numBones
         mdxa[96..100].copy_from_slice(&100i32.to_le_bytes()); // ofsEnd
         host.mdxa_blocks.insert(7, mdxa);
 
         let m = host.model_mdxm(3).expect("fixture present");
-        assert_eq!(m.num_surfaces(), 5);
+        assert_eq!(m.num_surfaces(), 0);
         assert_eq!(m.ofs_end(), 164);
         let a = host.model_mdxa(7).expect("fixture present");
-        assert_eq!(a.num_bones(), 9);
+        assert_eq!(a.num_bones(), 0);
         assert_eq!(a.ofs_end(), 100);
 
         // Missing handle = None, and the two halves are independent.

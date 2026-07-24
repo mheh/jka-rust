@@ -12,6 +12,7 @@ use mp_qshared::shared::MAX_QPATH;
 // a 4-byte-aligned int/`char[64]`, so natural alignment adds no padding.
 const OFS_ANIM_NAME: usize = 4 + 4 + MAX_QPATH; // ident,version,name[]
 const OFS_ANIM_INDEX: usize = OFS_ANIM_NAME + MAX_QPATH; // ..animName[] -> 136
+const OFS_NUM_BONES: usize = OFS_ANIM_INDEX + 4; // 140
 const OFS_NUM_LODS: usize = OFS_ANIM_INDEX + 4 + 4; // ..animIndex,numBones -> 144
 const OFS_OFS_LODS: usize = OFS_NUM_LODS + 4; // 148
 const OFS_NUM_SURFACES: usize = OFS_OFS_LODS + 4; // 152
@@ -330,6 +331,195 @@ impl MdxmVertView<'_> {
     }
 }
 
+/// One parsed `mdxmSurfHierarchy_t` (DEC-35 parse-once sidecar) — the
+/// surface-hierarchy row the name/shader/child searches used to re-walk the
+/// variable-stride hierarchy for. Accessors mirror [`MdxmSurfHierarchyView`]
+/// exactly so consumers are unchanged.
+///
+/// Source: `oracle/codemp/renderer/mdx_format.h:187-195`
+pub struct MdxmSurfHierarchy {
+    /// `surf->name`, lossily decoded (surface names are ASCII).
+    name: String,
+    /// `surf->flags`.
+    flags: i32,
+    /// First byte of `surf->shader` (Raven's `surf->shader[0]` shaderless test).
+    shader_first_byte: u8,
+    /// `surf->parentIndex`.
+    parent_index: i32,
+    /// `surf->childIndexes[0..numChildren]`.
+    children: Vec<i32>,
+}
+
+impl MdxmSurfHierarchy {
+    /// `!Q_stricmp(surf->name, name)` — byte-identical to
+    /// [`MdxmSurfHierarchyView::name_matches`].
+    pub fn name_matches(&self, name: &str) -> bool {
+        self.name.as_bytes().eq_ignore_ascii_case(name.as_bytes())
+    }
+
+    /// `surf->name`, lossily decoded.
+    pub fn name_lossy(&self) -> String {
+        self.name.clone()
+    }
+
+    /// `surf->flags`.
+    pub fn flags(&self) -> i32 {
+        self.flags
+    }
+
+    /// First byte of `surf->shader`.
+    pub fn shader_first_byte(&self) -> u8 {
+        self.shader_first_byte
+    }
+
+    /// `surf->parentIndex`.
+    pub fn parent_index(&self) -> i32 {
+        self.parent_index
+    }
+
+    /// `surf->numChildren`.
+    pub fn num_children(&self) -> i32 {
+        self.children.len() as i32
+    }
+
+    /// `surf->childIndexes[i]`.
+    pub fn child(&self, i: i32) -> i32 {
+        self.children[i as usize]
+    }
+}
+
+/// Parse-once index over an `mdxmHeader_t` block (DEC-35) — the header
+/// constants, the surface-hierarchy table (killing the linear hierarchy walks),
+/// and a per-`(lod, surface)` byte-offset table so `find_surface` is an O(1)
+/// lookup instead of a re-walk of the LOD chain. Vertices/triangles/texcoords
+/// stay view-based (per-frame bulk data).
+///
+/// Source: `oracle/codemp/renderer/mdx_format.h:151-334`
+pub struct MdxmParsed {
+    /// `mdxmHeader_t->numBones`.
+    pub num_bones: i32,
+    /// `mdxmHeader_t->numLODs`.
+    pub num_lods: i32,
+    /// `mdxmHeader_t->numSurfaces` (same per LOD).
+    pub num_surfaces: i32,
+    /// `mdxmHeader_t->animIndex`.
+    pub anim_index: i32,
+    /// `mdxmHeader_t->animName`.
+    pub anim_name: String,
+    /// The `mdxmSurfHierarchy_t` table, in `thisSurfaceIndex` order.
+    pub hierarchy: Vec<MdxmSurfHierarchy>,
+    /// Absolute block byte offset of each surface's `mdxmSurface_t`, indexed
+    /// `[lod][surface]` — `find_surface(surface, lod)`'s O(1) table.
+    lod_surface_offsets: Vec<Vec<usize>>,
+}
+
+impl MdxmParsed {
+    /// Decode the header constants, surface hierarchy, and per-LOD surface
+    /// offsets from `view` once. Pure over the block bytes.
+    pub fn parse(view: MdxmView) -> Self {
+        let num_bones = read_i32(view.bytes, OFS_NUM_BONES);
+        let num_lods = view.num_lods();
+        let num_surfaces = view.num_surfaces();
+        let anim_index = view.anim_index();
+        let anim_name = view.anim_name();
+
+        let hierarchy = view
+            .hierarchy_iter()
+            .map(|s| MdxmSurfHierarchy {
+                name: s.name_lossy(),
+                flags: s.flags(),
+                shader_first_byte: s.shader_first_byte(),
+                parent_index: s.parent_index(),
+                children: (0..s.num_children()).map(|i| s.child(i)).collect(),
+            })
+            .collect();
+
+        // Mirror `MdxmView::find_surface`'s LOD-chain walk once, recording each
+        // surface's absolute offset per LOD.
+        let mut lod_surface_offsets = Vec::with_capacity(num_lods as usize);
+        let mut cursor = read_i32(view.bytes, OFS_OFS_LODS) as usize;
+        for _ in 0..num_lods {
+            let surf_base = cursor + LOD_HEADER_SIZE;
+            let offs = (0..num_surfaces as usize)
+                .map(|index| surf_base + read_i32(&view.bytes[surf_base..], 4 * index) as usize)
+                .collect();
+            lod_surface_offsets.push(offs);
+            cursor += read_i32(&view.bytes[cursor..], 0) as usize;
+        }
+
+        Self {
+            num_bones,
+            num_lods,
+            num_surfaces,
+            anim_index,
+            anim_name,
+            hierarchy,
+            lod_surface_offsets,
+        }
+    }
+}
+
+/// Copy façade pairing the parse-once [`MdxmParsed`] index with the live
+/// [`MdxmView`] over the same `.glm` block (DEC-35). Header constants and the
+/// hierarchy come from `parsed`; `find_surface` is an O(1) table lookup over
+/// `parsed` returning the same [`MdxmSurfaceView`] into `view` bytes;
+/// vertex/triangle reads stay on that surface view (per-frame bulk data). Same
+/// `'static` soundness contract as the bare view (see [`MdxaRef`]).
+///
+/// [`MdxaRef`]: crate::mdx::mdxa::MdxaRef
+#[derive(Clone, Copy)]
+pub struct MdxmRef<'a> {
+    pub parsed: &'a MdxmParsed,
+    pub view: MdxmView<'a>,
+}
+
+impl<'a> MdxmRef<'a> {
+    /// `mdxmHeader_t->animIndex`.
+    pub fn anim_index(&self) -> i32 {
+        self.parsed.anim_index
+    }
+
+    /// `mdxmHeader_t->animName`.
+    pub fn anim_name(&self) -> String {
+        self.parsed.anim_name.clone()
+    }
+
+    /// `mdxmHeader_t->numLODs`.
+    pub fn num_lods(&self) -> i32 {
+        self.parsed.num_lods
+    }
+
+    /// `mdxmHeader_t->numSurfaces` (same per LOD).
+    pub fn num_surfaces(&self) -> i32 {
+        self.parsed.num_surfaces
+    }
+
+    /// `mdxmHeader_t->ofsEnd` — read off the block (a setup-path size read).
+    pub fn ofs_end(&self) -> i32 {
+        self.view.ofs_end()
+    }
+
+    /// The parsed `mdxmSurfHierarchy_t` at `this_surface_index`.
+    pub fn surf_hierarchy(&self, this_surface_index: i32) -> &'a MdxmSurfHierarchy {
+        &self.parsed.hierarchy[this_surface_index as usize]
+    }
+
+    /// The parsed surface-hierarchy table walk (subsumes the sequential
+    /// re-walk [`MdxmView::hierarchy_iter`] did).
+    pub fn hierarchy_iter(&self) -> core::slice::Iter<'a, MdxmSurfHierarchy> {
+        self.parsed.hierarchy.iter()
+    }
+
+    /// Surface `index` within LOD `lod` — an O(1) parsed-offset lookup
+    /// returning the same [`MdxmSurfaceView`] over `view` bytes.
+    pub fn find_surface(&self, index: i32, lod: i32) -> MdxmSurfaceView<'a> {
+        let off = self.parsed.lod_surface_offsets[lod as usize][index as usize];
+        MdxmSurfaceView {
+            bytes: &self.view.bytes[off..],
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -472,5 +662,39 @@ mod tests {
         assert_eq!(vert.normal(), [1.0, 2.0, 3.0]);
         assert_eq!(vert.vert_coords(), [4.0, 5.0, 6.0]);
         assert_eq!(vert.num_weights(), 1);
+
+        // The parsed façade returns the same surface via its O(1) table.
+        let parsed = MdxmParsed::parse(v);
+        let r = MdxmRef { parsed: &parsed, view: v };
+        assert_eq!(r.num_surfaces(), 1);
+        assert_eq!(r.num_lods(), 1);
+        assert_eq!(r.anim_index(), 7);
+        let rs = r.find_surface(0, 0);
+        assert_eq!(rs.this_surface_index(), 3);
+        assert_eq!(rs.triangle(0), [10, 11, 12]);
+        assert_eq!(rs.bone_ref(0), 42);
+    }
+
+    #[test]
+    fn parsed_hierarchy_matches_the_view() {
+        let mut buf = header(1, 2, 0, HEADER_SIZE as i32 + 8);
+        buf.extend_from_slice(&8i32.to_le_bytes());
+        let entry0_size = MAX_QPATH + 4 + MAX_QPATH + 4 + 4 + 4;
+        buf.extend_from_slice(&(8 + entry0_size as i32).to_le_bytes());
+        push_surf_hier(&mut buf, "root", 0, -1, &[]);
+        push_surf_hier(&mut buf, "child", 0x100, 0, &[]);
+        let ofs_end = buf.len() as i32;
+        buf[OFS_END..OFS_END + 4].copy_from_slice(&ofs_end.to_le_bytes());
+
+        let v = unsafe { MdxmView::from_block(buf.as_ptr() as *const c_void) };
+        let parsed = MdxmParsed::parse(v);
+        let r = MdxmRef { parsed: &parsed, view: v };
+        let names: Vec<String> = r.hierarchy_iter().map(|s| s.name_lossy()).collect();
+        assert_eq!(names, ["root", "child"]);
+        assert!(r.surf_hierarchy(0).name_matches("ROOT"));
+        assert_eq!(r.surf_hierarchy(1).flags(), 0x100);
+        assert_eq!(r.surf_hierarchy(1).parent_index(), 0);
+        assert_eq!(r.surf_hierarchy(0).shader_first_byte(), b'x');
+        assert_eq!(r.surf_hierarchy(1).shader_first_byte(), 0);
     }
 }

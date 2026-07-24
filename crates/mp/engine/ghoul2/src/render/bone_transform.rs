@@ -48,7 +48,7 @@
 use mp_qshared::shared::{mdxaBone_t, vec4_t, VectorLength};
 
 use crate::matcomp::mc_uncompress_quat;
-use mp_host_interface::mdx::mdxa::MdxaView;
+use mp_host_interface::mdx::mdxa::MdxaRef;
 use crate::render::bone_cache::CBoneCache;
 use crate::shared::bone_info_t::boneInfo_t;
 
@@ -297,8 +297,8 @@ pub fn g2_transform_bone(bc: &mut CBoneCache, child: i32) {
         // `bone_list_index` is non-negative here (see the invariant note at
         // the top).
         let skel = mdxa.skel(child);
-        let base_pose_mat = skel.base_pose_mat();
-        let base_pose_mat_inv = skel.base_pose_mat_inv();
+        let base_pose_mat = skel.base_pose_mat;
+        let base_pose_mat_inv = skel.base_pose_mat_inv;
         let bone_override_matrix = unsafe { (*bc.root_bone_list)[bone_list_index as usize].matrix };
 
         if is_rag {
@@ -806,7 +806,7 @@ pub fn g2_create_matrix_from_quaterion(mat: &mut mdxaBone_t, quat: &vec4_t) {
 pub fn uncompress_bone(
     mat: &mut [[f32; 4]; 3],
     bone_index: i32,
-    mdxa: MdxaView,
+    mdxa: MdxaRef,
     frame: i32,
 ) {
     let pool_index = mdxa.frame_bone_pool_index(frame, bone_index);
@@ -817,6 +817,7 @@ pub fn uncompress_bone(
 mod tests {
     use super::*;
     use core::ffi::c_void;
+    use mp_host_interface::mdx::mdxa::{MdxaParsed, MdxaView};
 
     fn identity() -> mdxaBone_t {
         let mut m = mdxaBone_t {
@@ -935,7 +936,7 @@ mod tests {
         let ofs_end = buf.len() as i32;
         buf[76..80].copy_from_slice(&1i32.to_le_bytes()); // numFrames
         buf[80..84].copy_from_slice(&ofs_frames.to_le_bytes()); // ofsFrames
-        buf[84..88].copy_from_slice(&1i32.to_le_bytes()); // numBones
+        buf[84..88].copy_from_slice(&0i32.to_le_bytes()); // numBones (no skel table in this fixture)
         buf[88..92].copy_from_slice(&ofs_comp_bone_pool.to_le_bytes()); // ofsCompBonePool
         buf[OFS_END..OFS_END + 4].copy_from_slice(&ofs_end.to_le_bytes());
 
@@ -960,7 +961,9 @@ mod tests {
         comp[12..14].copy_from_slice(&32768u16.to_le_bytes());
 
         let header = buf.as_ptr() as *const c_void;
-        let mdxa = unsafe { MdxaView::from_block(header) };
+        let view = unsafe { MdxaView::from_block(header) };
+        let parsed: &'static MdxaParsed = Box::leak(Box::new(MdxaParsed::parse(view)));
+        let mdxa = MdxaRef { parsed, view };
         let pool_index = mdxa.frame_bone_pool_index(0, 0);
         assert_eq!(pool_index, 0);
 

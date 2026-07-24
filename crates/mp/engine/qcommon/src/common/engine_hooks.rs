@@ -147,11 +147,15 @@ pub struct EngineHooks {
     /// Source: `oracle/codemp/renderer/tr_model.cpp:1683`
     pub R_HunkClearCrap: Option<fn(&mut EngineHostView)>,
     /// Backs `EngineHost::model_mdxm` — Raven `R_GetModelByHandle(h)->mdxm`.
+    /// Returns `(block, parsed)`: the loader `.glm` block pointer and the DEC-35
+    /// parse-once `MdxmParsed` sidecar pointer, both null when absent.
     /// Source: `oracle/codemp/renderer/tr_local.h:1128`
-    pub R_ModelMdxm: Option<fn(&mut EngineHostView, qhandle_t) -> *mut c_void>,
+    pub R_ModelMdxm: Option<fn(&mut EngineHostView, qhandle_t) -> (*mut c_void, *const c_void)>,
     /// Backs `EngineHost::model_mdxa` — Raven `R_GetModelByHandle(h)->mdxa`.
+    /// Returns `(block, parsed)`: the loader `.gla` block pointer and the DEC-35
+    /// parse-once `MdxaParsed` sidecar pointer, both null when absent.
     /// Source: `oracle/codemp/renderer/tr_local.h:1129`
-    pub R_ModelMdxa: Option<fn(&mut EngineHostView, qhandle_t) -> *mut c_void>,
+    pub R_ModelMdxa: Option<fn(&mut EngineHostView, qhandle_t) -> (*mut c_void, *const c_void)>,
     /// Backs `EngineHost::skin_surfaces` — Raven `R_GetSkinByHandle` flattened
     /// (server skins name-pool ruling, 2026-07-12).
     /// Source: `oracle/codemp/renderer/tr_image.cpp:3342-3347`

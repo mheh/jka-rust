@@ -31,12 +31,17 @@
 //!
 //! Source: `oracle/codemp/renderer/tr_model.cpp:48-68,70-568`
 
+use core::ffi::c_void;
+
+use mp_host_interface::mdx::mdxa::{MdxaParsed, MdxaView};
+use mp_host_interface::mdx::mdxm::{MdxmParsed, MdxmView};
 use mp_host_interface::EngineHost;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
-use mp_qshared::shared::ForceReload_e;
+use mp_qshared::shared::{qhandle_t, ForceReload_e};
 
 use super::aligned_bytes::AlignedBytes;
 use super::render_models::RenderModels;
+use super::server_load::read_qpath;
 
 /// Raven `sDEFAULT_GLA_NAME ".gla"` — the program-internal default skeleton
 /// name, never disk-loaded (the `FakeGLAFile` intercept) and never dumped by
@@ -131,6 +136,21 @@ pub(crate) struct CachedEndianedModelBinary {
     ///
     /// Source: `oracle/codemp/renderer/tr_model.cpp:54,63`
     pak_file_checksum: i32,
+
+    /// DEC-35 parse-once sidecar for a `.glm` entry — the `MdxmParsed` index
+    /// built over [`disk_image`] once at ingest (after the endian swaps), read
+    /// out via [`RenderModels::model_mdxm_ptrs`]. `None` until built / for a
+    /// non-mdxm entry. Owned beside the block, so it drops exactly when the
+    /// block does (eviction).
+    ///
+    /// [`disk_image`]: CachedEndianedModelBinary::disk_image
+    parsed_mdxm: Option<MdxmParsed>,
+
+    /// DEC-35 parse-once sidecar for a `.gla` entry — the `MdxaParsed` index.
+    /// See [`parsed_mdxm`].
+    ///
+    /// [`parsed_mdxm`]: CachedEndianedModelBinary::parsed_mdxm
+    parsed_mdxa: Option<MdxaParsed>,
 }
 
 impl Default for CachedEndianedModelBinary {
@@ -144,6 +164,8 @@ impl Default for CachedEndianedModelBinary {
             shader_register_data: Vec::new(),
             last_level_used_on: -1,
             pak_file_checksum: -1,
+            parsed_mdxm: None,
+            parsed_mdxa: None,
         }
     }
 }
@@ -266,6 +288,86 @@ impl RenderModels {
             .as_mut_ptr();
 
         (ptr, already_found)
+    }
+
+    /// Build the DEC-35 parse-once `MdxmParsed` sidecar over the named entry's
+    /// swap-completed `.glm` block and store it beside the block. Called once by
+    /// `server_load_mdxm` on the fresh-load path (never on a cache hit, where
+    /// the sidecar already exists).
+    pub(crate) fn store_parsed_mdxm(&mut self, model_file_name: &str) {
+        let key = model_file_name.to_lowercase();
+        if let Some(entry) = self.cached.get_mut(&key) {
+            if let Some(disk_image) = &entry.disk_image {
+                // SAFETY: DEC-35 — `disk_image` is the live, endian-swap-completed
+                // `.glm` block (self-sized by `ofsEnd`); parsing is a pure read.
+                let view = unsafe { MdxmView::from_block(disk_image.as_ptr() as *const c_void) };
+                entry.parsed_mdxm = Some(MdxmParsed::parse(view));
+            }
+        }
+    }
+
+    /// Build the DEC-35 parse-once `MdxaParsed` sidecar over the named entry's
+    /// swap-completed `.gla` block. See [`Self::store_parsed_mdxm`].
+    pub(crate) fn store_parsed_mdxa(&mut self, model_file_name: &str) {
+        let key = model_file_name.to_lowercase();
+        if let Some(entry) = self.cached.get_mut(&key) {
+            if let Some(disk_image) = &entry.disk_image {
+                // SAFETY: DEC-35 — `disk_image` is the live, endian-swap-completed
+                // `.gla` block (self-sized by `ofsEnd`); parsing is a pure read.
+                let view = unsafe { MdxaView::from_block(disk_image.as_ptr() as *const c_void) };
+                entry.parsed_mdxa = Some(MdxaParsed::parse(view));
+            }
+        }
+    }
+
+    /// The DEC-35 `(block, parsed)` pair backing `EngineHost::model_mdxm` —
+    /// Raven `R_GetModelByHandle(h)->mdxm`. Resolves the model's `.glm` block
+    /// pointer and its parse-once sidecar (looked up by the model's cache-key
+    /// name); both null when the loader pointer is NULL.
+    pub(crate) fn model_mdxm_ptrs(&self, handle: qhandle_t) -> (*mut c_void, *const c_void) {
+        let m = self.get_model(handle);
+        let block = m.mdxm as *mut c_void;
+        if block.is_null() {
+            return (core::ptr::null_mut(), core::ptr::null());
+        }
+        let key = read_qpath(&m.name).to_lowercase();
+        let parsed = self
+            .cached
+            .get(&key)
+            .and_then(|e| e.parsed_mdxm.as_ref())
+            .map(|p| p as *const MdxmParsed as *const c_void)
+            .unwrap_or(core::ptr::null());
+        (block, parsed)
+    }
+
+    /// The DEC-35 `(block, parsed)` pair backing `EngineHost::model_mdxa` —
+    /// Raven `R_GetModelByHandle(h)->mdxa`, with the same `animIndex`
+    /// resolution the raw pointer path used (a GLM handle resolves its `.gla`
+    /// through `mdxm->animIndex`). Both null when the resolved loader pointer is
+    /// NULL.
+    pub(crate) fn model_mdxa_ptrs(&self, handle: qhandle_t) -> (*mut c_void, *const c_void) {
+        let m = self.get_model(handle);
+        let (block, owner_name) = if !m.mdxa.is_null() {
+            (m.mdxa as *mut c_void, read_qpath(&m.name))
+        } else if m.mdxm.is_null() {
+            return (core::ptr::null_mut(), core::ptr::null());
+        } else {
+            // SAFETY: `mdxm` is the loader's live parsed block for this handle.
+            let anim_index = unsafe { (*m.mdxm).animIndex };
+            let am = self.get_model(anim_index);
+            (am.mdxa as *mut c_void, read_qpath(&am.name))
+        };
+        if block.is_null() {
+            return (core::ptr::null_mut(), core::ptr::null());
+        }
+        let key = owner_name.to_lowercase();
+        let parsed = self
+            .cached
+            .get(&key)
+            .and_then(|e| e.parsed_mdxa.as_ref())
+            .map(|p| p as *const MdxaParsed as *const c_void)
+            .unwrap_or(core::ptr::null());
+        (block, parsed)
     }
 
     /// Raven `RE_RegisterModels_StoreShaderRequest` — pushes a
@@ -536,6 +638,8 @@ mod tests {
             shader_register_data: Vec::new(),
             last_level_used_on,
             pak_file_checksum,
+            parsed_mdxm: None,
+            parsed_mdxa: None,
         }
     }
 

@@ -61,32 +61,24 @@ fn r_hunk_clear_crap_hook(view: &mut EngineHostView) {
 }
 
 /// `EngineHost::model_mdxm` backing — Raven `R_GetModelByHandle(h)->mdxm`.
+/// Returns the `(block, parsed)` pair (DEC-35): the `.glm` block pointer and its
+/// parse-once `MdxmParsed` sidecar pointer, both null when absent.
 /// Source: `oracle/codemp/renderer/tr_local.h:1128`
-fn r_model_mdxm_hook(view: &mut EngineHostView, model: qhandle_t) -> *mut c_void {
+fn r_model_mdxm_hook(view: &mut EngineHostView, model: qhandle_t) -> (*mut c_void, *const c_void) {
     // SAFETY: view-constructor slot, single-threaded, no other live cast.
     let rm = unsafe { rm_from_view(view) };
-    rm.get_model(model).mdxm as *mut c_void
+    rm.model_mdxm_ptrs(model)
 }
 
 /// `EngineHost::model_mdxa` backing — Raven `R_GetModelByHandle(h)->mdxa`.
+/// Returns the `(block, parsed)` pair (DEC-35), with the same `animIndex`
+/// resolution the raw pointer path used (a GLM handle resolves its GLA through
+/// `mdxm->animIndex`). Both null when the resolved loader pointer is NULL.
 /// Source: `oracle/codemp/renderer/tr_local.h:1129`
-fn r_model_mdxa_hook(view: &mut EngineHostView, model: qhandle_t) -> *mut c_void {
+fn r_model_mdxa_hook(view: &mut EngineHostView, model: qhandle_t) -> (*mut c_void, *const c_void) {
     // SAFETY: view-constructor slot, single-threaded, no other live cast.
     let rm = unsafe { rm_from_view(view) };
-    let m = rm.get_model(model);
-    if !m.mdxa.is_null() {
-        return m.mdxa as *mut c_void;
-    }
-    // Raven reads the GLA header off the GLM's anim model —
-    // `R_GetModelByHandle(currentModel->mdxm->animIndex)->mdxa`
-    // (`tr_ghoul2.cpp:2092-2094`); a GLM handle resolves through its
-    // `animIndex` here so every G2SV-D15 header read lands on the GLA block.
-    if m.mdxm.is_null() {
-        return core::ptr::null_mut();
-    }
-    // SAFETY: `mdxm` is the loader's live parsed block for this handle.
-    let anim_index = unsafe { (*m.mdxm).animIndex };
-    rm.get_model(anim_index).mdxa as *mut c_void
+    rm.model_mdxa_ptrs(model)
 }
 
 /// `EngineHost::skin_surfaces` backing — Raven `R_GetSkinByHandle` flattened

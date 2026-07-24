@@ -75,7 +75,7 @@ use mp_qshared::shared::q_math::{
 use mp_qshared::shared::{mdxaBone_t, vec3_t, VectorNormalize, VectorNormalizeRow};
 
 use crate::ghoul2_system::{BoneCacheArena, BoneCacheId, Ghoul2System};
-use mp_host_interface::mdx::mdxm::{MdxmSurfaceView, MdxmVertView, MdxmView};
+use mp_host_interface::mdx::mdxm::{MdxmRef, MdxmSurfaceView, MdxmVertView};
 use crate::render::bone_cache::CBoneCache;
 use crate::render::bone_transform;
 use crate::shared::bolt_info_t::boltInfo_t;
@@ -171,7 +171,7 @@ fn g2_process_surface_bolt2(
     cache: &mut CBoneCache,
     surface: Option<MdxmSurfaceView>,
     surf_info: Option<&surfaceInfo_t>,
-    mdxm: MdxmView,
+    mdxm: MdxmRef,
 ) -> mdxaBone_t {
     let mut ret_matrix = IDENTITY_MATRIX;
 
@@ -363,7 +363,7 @@ pub(crate) fn resolve_bolt_matrix_low(
         // this cache's model (`CBoneCache::new`/refresh); `boneNumber` is
         // caller-set bone data, matching Raven's own unchecked read.
         let base_pose_mat: mdxaBone_t =
-            cache.mdxa.expect("resolve_bolt_matrix_low: mdxa unset").skel(bolt.boneNumber).base_pose_mat();
+            cache.mdxa.expect("resolve_bolt_matrix_low: mdxa unset").skel(bolt.boneNumber).base_pose_mat;
         let mut ret_matrix = IDENTITY_MATRIX;
         // Raven: `Multiply_3x4Matrix(&retMatrix, (mdxaBone_t*)&boneCache.
         // EvalUnsmooth(...), &skel->BasePoseMat);` — dest first arg.
@@ -666,9 +666,9 @@ pub fn g2_get_bone_matrix_low(
     // cache's model; `bone_num` is caller-provided bone data, matching Raven's
     // own unchecked read (its bounds assert is dead under `-DNDEBUG`).
     let skel = cache.mdxa.expect("g2_get_bone_matrix_low: mdxa unset").skel(bone_num);
-    let base_ptr = skel.base_pose_mat_ptr() as *mut mdxaBone_t;
-    let base_inv_ptr = skel.base_pose_mat_inv_ptr() as *mut mdxaBone_t;
-    let base_pose_mat: mdxaBone_t = skel.base_pose_mat();
+    let base_ptr = &skel.base_pose_mat as *const mdxaBone_t as *mut mdxaBone_t;
+    let base_inv_ptr = &skel.base_pose_mat_inv as *const mdxaBone_t as *mut mdxaBone_t;
+    let base_pose_mat: mdxaBone_t = skel.base_pose_mat;
 
     // Raven: `Multiply_3x4Matrix(&bolt, (mdxaBone_t*)&boneCache.Eval(boneNum),
     // &skel->BasePoseMat); // DEST FIRST ARG`
@@ -714,8 +714,8 @@ pub fn g2_get_bone_basepose(
     // See `g2_get_bone_matrix_low`.
     let skel = cache.mdxa.expect("g2_get_bone_basepose: mdxa unset").skel(bone_num);
     (
-        skel.base_pose_mat_ptr() as *mut mdxaBone_t,
-        skel.base_pose_mat_inv_ptr() as *mut mdxaBone_t,
+        &skel.base_pose_mat as *const mdxaBone_t as *mut mdxaBone_t,
+        &skel.base_pose_mat_inv as *const mdxaBone_t as *mut mdxaBone_t,
     )
 }
 
@@ -750,7 +750,7 @@ pub fn g2_rag_get_bone_base_pose_matrix_low(
     let mut ret_matrix = IDENTITY_MATRIX;
     // See `g2_get_bone_matrix_low`.
     let base_pose_mat: mdxaBone_t =
-        cache.mdxa.expect("g2_rag_get_bone_base_pose_matrix_low: mdxa unset").skel(bone_num).base_pose_mat();
+        cache.mdxa.expect("g2_rag_get_bone_base_pose_matrix_low: mdxa unset").skel(bone_num).base_pose_mat;
     bone_transform::multiply_3x4_matrix(&mut ret_matrix, bone_matrix, &base_pose_mat);
 
     if scale[0] != 0.0 {

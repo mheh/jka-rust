@@ -143,7 +143,7 @@ use mp_qshared::shared::{
 use crate::api_collision::{g2api_get_time, g2api_give_me_vector_from_matrix};
 use crate::bones::g2_find_bone;
 use crate::ghoul2_system::Ghoul2System;
-use mp_host_interface::mdx::mdxa::MdxaView;
+use mp_host_interface::mdx::mdxa::MdxaRef;
 use crate::misc::g2_generate_world_matrix;
 use crate::ragdoll_update_params::RagDollUpdateParams;
 use crate::render::bone_transform::{multiply_3x4_matrix, uncompress_bone};
@@ -381,22 +381,22 @@ fn g2_get_bone_dependents(
     g2_get_bone_dependents_recurse(mdxa, bone_num, out)
 }
 
-fn g2_get_bone_dependents_recurse(mdxa: MdxaView, bone_num: i32, out: &mut [i32]) -> i32 {
+fn g2_get_bone_dependents_recurse(mdxa: MdxaRef, bone_num: i32, out: &mut [i32]) -> i32 {
     let skel = mdxa.skel(bone_num);
-    let num_children = skel.num_children();
+    let num_children = skel.children.len() as i32;
     let mut written = 0usize;
     for i in 0..num_children as usize {
         if written >= out.len() {
             return written as i32;
         }
-        out[written] = skel.child(i);
+        out[written] = skel.children[i];
         written += 1;
     }
     for i in 0..num_children as usize {
         if written >= out.len() {
             break;
         }
-        let child = skel.child(i);
+        let child = skel.children[i];
         let num = g2_get_bone_dependents_recurse(mdxa, child, &mut out[written..]);
         written += num as usize;
     }
@@ -441,7 +441,7 @@ fn g2_rag_get_anim_matrix(
         return ZERO_BONE;
     };
     let skel = mdxa.skel(bone_num);
-    let name = skel.name_lossy();
+    let name = skel.name.clone();
 
     let bone_list_index = resolve_or_add_bone(ghoul2, &name);
     let Some(bli) = bone_list_index else {
@@ -455,12 +455,12 @@ fn g2_rag_get_anim_matrix(
     let mut anim_matrix = ZERO_BONE;
     uncompress_bone(&mut anim_matrix.matrix, bone_num, mdxa, frame);
 
-    let parent = skel.parent();
+    let parent = skel.parent;
     let mut result = ZERO_BONE;
     if bone_num > 0 && parent > -1 {
         // Recursively assure the parent's animFrameMatrix is set up first.
         let _ = g2_rag_get_anim_matrix(g2, ghoul2, parent, frame);
-        let pname = mdxa.skel(parent).name_lossy();
+        let pname = mdxa.skel(parent).name.clone();
         let Some(pbli) = resolve_or_add_bone(ghoul2, &pname) else {
             return ZERO_BONE;
         };
@@ -1312,11 +1312,11 @@ fn g2_rag_doll_settle_position_numero_trois_instances(
                 let anim_model = instances[idx].anim_model;
                 let mut found = -1i32;
                 if let Some(mdxa) = instances[idx].a_header {
-                    let mut b_parent_index = mdxa.skel(bone_number).parent();
+                    let mut b_parent_index = mdxa.skel(bone_number).parent;
                     while b_parent_index > 0 {
                         let pskel = mdxa.skel(b_parent_index);
-                        let pname = pskel.name_lossy();
-                        b_parent_index = pskel.parent();
+                        let pname = pskel.name.clone();
+                        b_parent_index = pskel.parent;
                         let bli = g2_find_bone(anim_model, &instances[idx].blist, &pname);
                         if bli != -1
                             && instances[idx].blist[bli as usize].flags & BONE_ANGLES_RAGDOLL != 0
@@ -2214,7 +2214,7 @@ pub fn g2_get_bone_name(ghoul2: &CGhoul2Info, blist: &[boneInfo_t], bone_num: i3
         if entry.boneNumber != bone_num {
             continue;
         }
-        return mdxa.skel(entry.boneNumber).name_lossy();
+        return mdxa.skel(entry.boneNumber).name.clone();
     }
     "BONE_NOT_FOUND".to_string()
 }

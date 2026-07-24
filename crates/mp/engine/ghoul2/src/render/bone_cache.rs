@@ -41,7 +41,7 @@ use mp_host_interface::EngineHost;
 use mp_qshared::shared::{mdxaBone_t, qhandle_t, VectorNormalize};
 
 use crate::ghoul2_system::{BoneCacheId, Ghoul2System};
-use mp_host_interface::mdx::mdxa::MdxaView;
+use mp_host_interface::mdx::mdxa::MdxaRef;
 use crate::render::bone_transform::{g2_transform_bone, multiply_3x4_matrix};
 use crate::shared::bone_info_t::boneInfo_t;
 
@@ -126,7 +126,7 @@ pub struct CBoneCache {
     /// `mdxaHeader_t`). Sourced from `EngineHost::model_mdxa` at ctor time and
     /// revalidated once per transform pass in `g2_transform_ghoul_bones_inner`
     /// (`render/skeleton.rs`, DEC-35); `None` ≡ the null pointer.
-    pub mdxa: Option<MdxaView<'static>>,
+    pub mdxa: Option<MdxaRef<'static>>,
     /// Raven `const model_t *mod` — renamed (`mod` is a Rust keyword) and
     /// retyped to the `qhandle_t` the ctor received: `G2SV-D5` forbids naming
     /// `model_t` in this crate, and the live (non-`#if 0`) code path never
@@ -200,7 +200,7 @@ impl CBoneCache {
 
         // Seed each bone's parent from the model's `mdxaSkel_t` (`:419-425`).
         for (i, bone) in final_bones.iter_mut().enumerate() {
-            bone.parent = view.skel(i as i32).parent();
+            bone.parent = view.skel(i as i32).parent;
         }
 
         CBoneCache {
@@ -305,8 +305,8 @@ impl CBoneCache {
         // same `mdxa` view as the ctor (`G2SV-D5`); revalidated per transform
         // pass, so `Some` on this render path.
         let skel = self.mdxa.expect("CBoneCache::smooth_low: mdxa unrevalidated").skel(index);
-        let base_pose_mat: mdxaBone_t = skel.base_pose_mat();
-        let base_pose_mat_inv: mdxaBone_t = skel.base_pose_mat_inv();
+        let base_pose_mat: mdxaBone_t = skel.base_pose_mat;
+        let base_pose_mat_inv: mdxaBone_t = skel.base_pose_mat_inv;
 
         let mut temp_matrix = mdxaBone_t {
             matrix: [[0.0; 4]; 3],
