@@ -2875,66 +2875,69 @@ pub fn G_ItemUsable(ctx: &mut GameContext, ps: *mut playerState_t, forcedUse: c_
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:2595-2670`
 pub fn Cmd_ToggleSaber_f(ctx: &mut GameContext, ent: EntityId) {
-    // `ent` is the commanding player, so its client slot is `ent.index()`.
-    let cidx = ent.index();
+    // Raven reads `ent->client` throughout — the entity's OWN client, which for
+    // NPCs is a pool client (entity number >= MAX_CLIENTS): WP_ForcePowersUpdate
+    // calls this for every saber wielder, so a `level.clients[ent.index()]`
+    // derivation is wrong for NPCs. Pool-client deref stays raw (trap 2b).
+    let client = ctx.world.entity(ent).client;
     let level_time = ctx.world.level.time;
 
-    if ctx.world.client(cidx).ps.fd.forceGripCripple != 0 {
+    if unsafe { &*client }.ps.fd.forceGripCripple != 0 {
         // if they are being gripped, don't let them unholster their saber
-        if ctx.world.client(cidx).ps.saberHolstered != 0 {
+        if unsafe { &*client }.ps.saberHolstered != 0 {
             return;
         }
     }
 
-    if ctx.world.client(cidx).ps.saberInFlight != qfalse {
-        if ctx.world.client(cidx).ps.saberEntityNum != 0 {
+    if unsafe { &*client }.ps.saberInFlight != qfalse {
+        if unsafe { &*client }.ps.saberEntityNum != 0 {
             // turn it off in midair
-            let saberent = EntityId(ctx.world.client(cidx).ps.saberEntityNum as u32);
+            let saberent = EntityId(unsafe { &*client }.ps.saberEntityNum as u32);
             crate::w_saber::saberKnockDown(ctx, saberent, ent, ent);
         }
         return;
     }
 
-    if ctx.world.client(cidx).ps.forceHandExtend != HANDEXTEND_NONE as c_int {
+    if unsafe { &*client }.ps.forceHandExtend != HANDEXTEND_NONE as c_int {
         return;
     }
 
-    if ctx.world.client(cidx).ps.weapon != WP_SABER {
+    if unsafe { &*client }.ps.weapon != WP_SABER {
         return;
     }
 
-    if ctx.world.client(cidx).ps.duelTime >= level_time {
+    if unsafe { &*client }.ps.duelTime >= level_time {
         return;
     }
 
-    if ctx.world.client(cidx).ps.saberLockTime >= level_time {
+    if unsafe { &*client }.ps.saberLockTime >= level_time {
         return;
     }
 
-    if ctx.world.client(cidx).ps.weaponTime < 1 {
-        if ctx.world.client(cidx).ps.saberHolstered == 2 {
-            ctx.world.client_mut(cidx).ps.saberHolstered = 0;
+    if unsafe { &*client }.ps.weaponTime < 1 {
+        if unsafe { &*client }.ps.saberHolstered == 2 {
+            unsafe { &mut *client }.ps.saberHolstered = 0;
 
-            let s0 = ctx.world.client(cidx).saber[0].soundOn;
+            let s0 = unsafe { &*client }.saber[0].soundOn;
             if s0 != 0 {
                 crate::g_utils::G_Sound(ctx, Some(ent), CHAN_AUTO as c_int, s0);
             }
-            let s1 = ctx.world.client(cidx).saber[1].soundOn;
+            let s1 = unsafe { &*client }.saber[1].soundOn;
             if s1 != 0 {
                 crate::g_utils::G_Sound(ctx, Some(ent), CHAN_AUTO as c_int, s1);
             }
         } else {
-            ctx.world.client_mut(cidx).ps.saberHolstered = 2;
-            let s0 = ctx.world.client(cidx).saber[0].soundOff;
+            unsafe { &mut *client }.ps.saberHolstered = 2;
+            let s0 = unsafe { &*client }.saber[0].soundOff;
             if s0 != 0 {
                 crate::g_utils::G_Sound(ctx, Some(ent), CHAN_AUTO as c_int, s0);
             }
-            let s1 = ctx.world.client(cidx).saber[1].soundOff;
-            if s1 != 0 && ctx.world.client(cidx).saber[1].model[0] != 0 {
+            let s1 = unsafe { &*client }.saber[1].soundOff;
+            if s1 != 0 && unsafe { &*client }.saber[1].model[0] != 0 {
                 crate::g_utils::G_Sound(ctx, Some(ent), CHAN_AUTO as c_int, s1);
             }
             // prevent anything from being done for 400ms after holster
-            ctx.world.client_mut(cidx).ps.weaponTime = 400;
+            unsafe { &mut *client }.ps.weaponTime = 400;
         }
     }
 }
