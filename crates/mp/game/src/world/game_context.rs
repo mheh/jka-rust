@@ -622,7 +622,7 @@ impl Dispatch<GameIcarusSoundindex> for GameContext<'_> {
         let m = self.world.gSharedBuffer.soundindex();
         let filename = m.filename.as_ptr() as *const c_char;
         // Raven discards `G_SoundIndex`'s handle here (registration side effect).
-        G_SoundIndex(&(unsafe { cstr_to_str(filename) }));
+        G_SoundIndex(self, &(unsafe { cstr_to_str(filename) }));
     }
 }
 

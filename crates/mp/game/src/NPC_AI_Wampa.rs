@@ -74,7 +74,7 @@ pub fn Wampa_SetBolts(ctx: &mut GameContext, self_: Option<EntityId>) {
 /// Source: `oracle/codemp/game/NPC_AI_Wampa.c:43-58`
 pub fn NPC_Wampa_Precache(ctx: &mut GameContext) {
     // Only the swipe sound is live; growl/snort loops are commented out
-    G_SoundIndex("sound/chars/rancor/swipehit.wav");
+    G_SoundIndex(ctx, "sound/chars/rancor/swipehit.wav");
 }
 
 /// Raven `Wampa_Idle`.
@@ -380,11 +380,12 @@ pub fn Wampa_Slash(ctx: &mut GameContext, boltIndex: c_int, backhand: qboolean) 
                 crate::q_math::AngleVectors(angs, Some(&mut pushDir), None, None);
                 crate::g_combat::G_Knockdown(ctx, Some(radius_id));
             }
+            let sound = G_SoundIndex(ctx, "sound/chars/rancor/swipehit.wav");
             crate::g_utils::G_Sound(
                 ctx,
                 Some(radius_id),
                 crate::prelude::CHAN_WEAPON,
-                G_SoundIndex("sound/chars/rancor/swipehit.wav"),
+                sound,
             );
         }
     }
@@ -796,11 +797,12 @@ pub fn NPC_BSWampa_Default(ctx: &mut GameContext) {
                         "sound/chars/wampa/misc/anger{}.wav",
                         ctx.world.bg_state.rng.Q_irand(1, 2)
                     );
+                    let sound = G_SoundIndex(ctx, &angrynoise_snd);
                     crate::g_utils::G_Sound(
                         ctx,
                         Some(npc_id),
                         crate::prelude::CHAN_VOICE,
-                        G_SoundIndex(&angrynoise_snd),
+                        sound,
                     );
 
                     let angrynoise = ctx.world.bg_state.rng.Q_irand(5000, 10000);
@@ -909,11 +911,12 @@ pub fn NPC_BSWampa_Default(ctx: &mut GameContext) {
             }
         } else {
             if crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"idlenoise".as_ptr()) != 0 {
+                let sound = G_SoundIndex(ctx, "sound/chars/wampa/misc/anger3.wav");
                 crate::g_utils::G_Sound(
                     ctx,
                     Some(npc_id),
                     crate::prelude::CHAN_AUTO,
-                    G_SoundIndex("sound/chars/wampa/misc/anger3.wav"),
+                    sound,
                 );
 
                 let idlenoise = ctx.world.bg_state.rng.Q_irand(2000, 4000);

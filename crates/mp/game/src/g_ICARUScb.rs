@@ -207,7 +207,7 @@ pub fn Q3_PlaySound(
     Q_strupr(final_name.as_mut_ptr());
     COM_StripExtension(final_name.as_ptr(), final_name.as_mut_ptr());
 
-    let sound_handle = G_SoundIndex(&(unsafe { cstr_to_str(final_name.as_ptr()) }));
+    let sound_handle = G_SoundIndex(ctx, &(unsafe { cstr_to_str(final_name.as_ptr()) }));
     let mut b_broadcast = qfalse;
 
     let classname = ctx.world.entity(id).classname_str();
@@ -2579,7 +2579,7 @@ pub fn Q3_SetLoopSound(ctx: &mut GameContext, entID: c_int, name: *const c_char)
         return;
     }
 
-    let index = G_SoundIndex(&(unsafe { cstr_to_str(name as *const c_char) }));
+    let index = G_SoundIndex(ctx, &(unsafe { cstr_to_str(name as *const c_char) }));
 
     if index != 0 {
         let e = ctx.world.entity_mut(id);

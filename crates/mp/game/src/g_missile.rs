@@ -225,23 +225,15 @@ pub fn G_BounceMissile(ctx: &mut GameContext, ent: EntityId, trace: &trace_t) {
             "sound/weapons/thermal/bounce{}.wav",
             ctx.world.bg_state.rng.Q_irand(1, 2)
         );
-        G_Sound(
-            ctx,
-            Some(ent),
-            CHAN_BODY as c_int,
-            G_SoundIndex(&sound_name),
-        );
+        let sound = G_SoundIndex(ctx, &sound_name);
+        G_Sound(ctx, Some(ent), CHAN_BODY as c_int, sound);
     } else if weapon == WP_SABER {
         let sound_name = format!(
             "sound/weapons/saber/bounce{}.wav",
             ctx.world.bg_state.rng.Q_irand(1, 3)
         );
-        G_Sound(
-            ctx,
-            Some(ent),
-            CHAN_BODY as c_int,
-            G_SoundIndex(&sound_name),
-        );
+        let sound = G_SoundIndex(ctx, &sound_name);
+        G_Sound(ctx, Some(ent), CHAN_BODY as c_int, sound);
     }
 
     let level_time = ctx.world.level.time;
@@ -434,12 +426,12 @@ pub fn G_MissileBounceEffect(ctx: &mut GameContext, ent: EntityId, org: vec3_t, 
     //FIXME: have an EV_BOUNCE_MISSILE event that checks the s.weapon and does the appropriate effect
     match ctx.entity(ent).s.weapon {
         WP_BOWCASTER => {
-            let fx = G_EffectIndex("bowcaster/deflect");
+            let fx = G_EffectIndex(ctx, "bowcaster/deflect");
             let currentOrigin = ctx.entity(ent).r.currentOrigin;
             G_PlayEffectID(fx, currentOrigin, dir);
         }
         WP_BLASTER | WP_BRYAR_PISTOL => {
-            let fx = G_EffectIndex("blaster/deflect");
+            let fx = G_EffectIndex(ctx, "blaster/deflect");
             let currentOrigin = ctx.entity(ent).r.currentOrigin;
             G_PlayEffectID(fx, currentOrigin, dir);
         }

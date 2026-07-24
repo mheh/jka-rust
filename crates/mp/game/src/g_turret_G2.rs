@@ -178,8 +178,8 @@ pub fn turretG2_set_models(ctx: &mut GameContext, self_: EntityId, dying: qboole
 
     if dying != 0 {
         if ctx.world.entity(self_).spawnflags & SPF_TURRETG2_TURBO == 0 {
-            let mi = G_ModelIndex(NAME2.to_str().unwrap());
-            let mi2 = G_ModelIndex(NAME.to_str().unwrap());
+            let mi = G_ModelIndex(ctx, NAME2.to_str().unwrap());
+            let mi2 = G_ModelIndex(ctx, NAME.to_str().unwrap());
             let e = ctx.world.entity_mut(self_);
             e.s.modelindex = mi;
             e.s.modelindex2 = mi2;
@@ -197,8 +197,8 @@ pub fn turretG2_set_models(ctx: &mut GameContext, self_: EntityId, dying: qboole
         ctx.world.entity_mut(self_).s.modelGhoul2 = 0;
     } else {
         if ctx.world.entity(self_).spawnflags & SPF_TURRETG2_TURBO == 0 {
-            let mi = G_ModelIndex(NAME.to_str().unwrap());
-            let mi2 = G_ModelIndex(NAME2.to_str().unwrap());
+            let mi = G_ModelIndex(ctx, NAME.to_str().unwrap());
+            let mi2 = G_ModelIndex(ctx, NAME2.to_str().unwrap());
             {
                 let e = ctx.world.entity_mut(self_);
                 e.s.modelindex = mi;
@@ -216,7 +216,7 @@ pub fn turretG2_set_models(ctx: &mut GameContext, self_: EntityId, dying: qboole
                 0,
             );
         } else {
-            let mi = G_ModelIndex(NAME3.to_str().unwrap());
+            let mi = G_ModelIndex(ctx, NAME3.to_str().unwrap());
             ctx.world.entity_mut(self_).s.modelindex = mi;
             // set the new one
             trap::G2API_InitGhoul2Model(
@@ -511,7 +511,8 @@ pub fn turretG2_fire(ctx: &mut GameContext, ent: EntityId, start: vec3_t, dir: &
         }
     } else {
         // Regular blaster turret: fire standard missile
-        G_PlayEffectID(G_EffectIndex("blaster/muzzle_flash"), org, ang);
+        let fx = G_EffectIndex(ctx, "blaster/muzzle_flash");
+        G_PlayEffectID(fx, org, ang);
         let bolt_id = G_Spawn(ctx);
 
         let ent_number = ctx.world.entity(ent).s.number;
@@ -875,9 +876,9 @@ pub fn turretG2_aim(ctx: &mut GameContext, self_: EntityId) {
     if diffYaw != 0.0 || diffPitch != 0.0 {
         // FIXME: turbolaser sounds
         let loop_sound = if spawnflags & SPF_TURRETG2_TURBO != 0 {
-            G_SoundIndex("sound/vehicles/weapons/turbolaser/turn.wav")
+            G_SoundIndex(ctx, "sound/vehicles/weapons/turbolaser/turn.wav")
         } else {
-            G_SoundIndex("sound/chars/turret/move.wav")
+            G_SoundIndex(ctx, "sound/chars/turret/move.wav")
         };
         ctx.world.entity_mut(self_).s.loopSound = loop_sound;
     } else {
@@ -898,12 +899,8 @@ pub fn turretG2_turnoff(ctx: &mut GameContext, self_: EntityId) {
     }
     // shut-down sound
     if ctx.world.entity(self_).spawnflags & SPF_TURRETG2_TURBO == 0 {
-        G_Sound(
-            ctx,
-            Some(self_),
-            CHAN_BODY as c_int,
-            G_SoundIndex("sound/chars/turret/shutdown.wav"),
-        );
+        let sound = G_SoundIndex(ctx, "sound/chars/turret/shutdown.wav");
+        G_Sound(ctx, Some(self_), CHAN_BODY as c_int, sound);
     }
 
     // make turret play ping sound for 5 seconds
@@ -930,12 +927,8 @@ pub fn turretG2_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean
         // We were active and alert, i.e. had an enemy in the last 3 secs
         if ctx.world.entity(self_).painDebounceTime < ctx.world.level.time {
             if ctx.world.entity(self_).spawnflags & SPF_TURRETG2_TURBO == 0 {
-                G_Sound(
-                    ctx,
-                    Some(self_),
-                    CHAN_BODY as c_int,
-                    G_SoundIndex("sound/chars/turret/ping.wav"),
-                );
+                let sound = G_SoundIndex(ctx, "sound/chars/turret/ping.wav");
+                G_Sound(ctx, Some(self_), CHAN_BODY as c_int, sound);
             }
             let t = ctx.world.level.time;
             ctx.world.entity_mut(self_).painDebounceTime = t + 1000;
@@ -1065,12 +1058,8 @@ pub fn turretG2_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean
                     // We haven't fired or acquired an enemy in the last 2
                     // seconds-start-up sound
                     if ctx.world.entity(self_).spawnflags & SPF_TURRETG2_TURBO == 0 {
-                        G_Sound(
-                            ctx,
-                            Some(self_),
-                            CHAN_BODY as c_int,
-                            G_SoundIndex("sound/chars/turret/startup.wav"),
-                        );
+                        let sound = G_SoundIndex(ctx, "sound/chars/turret/startup.wav");
+                        G_Sound(ctx, Some(self_), CHAN_BODY as c_int, sound);
                     }
 
                     // Wind up turrets for a bit
@@ -1360,8 +1349,8 @@ pub fn finish_spawning_turretG2(ctx: &mut GameContext, base: EntityId) {
     ctx.world.entity_mut(base).team = None;
 
     // Set up explosion effects
-    G_EffectIndex("turret/explode");
-    G_EffectIndex("sparks/spark_exp_nosnd");
+    G_EffectIndex(ctx, "turret/explode");
+    G_EffectIndex(ctx, "sparks/spark_exp_nosnd");
 
     // Set up callbacks
     {
@@ -1526,18 +1515,18 @@ pub fn finish_spawning_turretG2(ctx: &mut GameContext, base: EntityId) {
 
     // Precache special FX and moving sounds
     if ctx.world.entity(base).spawnflags & SPF_TURRETG2_TURBO != 0 {
-        let e1 = G_EffectIndex("turret/turb_muzzle_flash");
+        let e1 = G_EffectIndex(ctx, "turret/turb_muzzle_flash");
         ctx.world.entity_mut(base).genericValue13 = e1;
-        let e2 = G_EffectIndex("turret/turb_shot");
+        let e2 = G_EffectIndex(ctx, "turret/turb_shot");
         ctx.world.entity_mut(base).genericValue14 = e2;
-        let e3 = G_EffectIndex("turret/turb_impact");
+        let e3 = G_EffectIndex(ctx, "turret/turb_impact");
         ctx.world.entity_mut(base).genericValue15 = e3;
-        G_SoundIndex("sound/vehicles/weapons/turbolaser/turn.wav");
+        G_SoundIndex(ctx, "sound/vehicles/weapons/turbolaser/turn.wav");
     } else {
-        G_SoundIndex("sound/chars/turret/startup.wav");
-        G_SoundIndex("sound/chars/turret/shutdown.wav");
-        G_SoundIndex("sound/chars/turret/ping.wav");
-        G_SoundIndex("sound/chars/turret/move.wav");
+        G_SoundIndex(ctx, "sound/chars/turret/startup.wav");
+        G_SoundIndex(ctx, "sound/chars/turret/shutdown.wav");
+        G_SoundIndex(ctx, "sound/chars/turret/ping.wav");
+        G_SoundIndex(ctx, "sound/chars/turret/move.wav");
     }
 
     {

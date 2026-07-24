@@ -2288,7 +2288,7 @@ pub fn WP_FireRocket(ctx: &mut GameContext, ent: EntityId, altFire: bool) {
 /// Source: `oracle/codemp/game/g_weapon.c:1936-1970`
 pub fn thermalDetonatorExplode(ctx: &mut GameContext, ent: EntityId) {
     if ctx.world.entity(ent).count == 0 {
-        let snd = G_SoundIndex("sound/weapons/thermal/warning.wav");
+        let snd = G_SoundIndex(ctx, "sound/weapons/thermal/warning.wav");
         G_Sound(ctx, Some(ent), CHAN_WEAPON, snd);
         let now = ctx.world.level.time;
         let e = ctx.world.entity_mut(ent);
@@ -2413,6 +2413,7 @@ pub fn WP_FireThermalDetonator(
 
     let ent_num = ctx.world.entity(ent).s.number;
     let ent_health = ctx.world.entity(ent).health;
+    let sound = G_SoundIndex(ctx, "sound/weapons/thermal/thermloop.wav");
 
     {
         let b = ctx.world.entity_mut(bid);
@@ -2431,7 +2432,7 @@ pub fn WP_FireThermalDetonator(
             b.flags |= FL_BOUNCE_HALF;
         }
 
-        b.s.loopSound = G_SoundIndex("sound/weapons/thermal/thermloop.wav");
+        b.s.loopSound = sound;
         b.s.loopIsSoundset = qfalse;
 
         b.damage = TD_DAMAGE;
@@ -2864,7 +2865,7 @@ pub fn laserTrapThink(ctx: &mut GameContext, ent: EntityId) {
     // turn on the beam effect
     if ctx.world.entity(ent).s.eFlags & EF_FIRING == 0 {
         // arm me
-        let snd = G_SoundIndex("sound/weapons/laser_trap/warning.wav");
+        let snd = G_SoundIndex(ctx, "sound/weapons/laser_trap/warning.wav");
         G_Sound(ctx, Some(ent), CHAN_WEAPON, snd);
         ctx.world.entity_mut(ent).s.eFlags |= EF_FIRING;
     }
@@ -2938,7 +2939,7 @@ pub fn laserTrapStick(ctx: &mut GameContext, ent: EntityId, endpos: vec3_t, norm
         e.r.currentAngles = e.s.angles;
     }
 
-    let snd = G_SoundIndex("sound/weapons/laser_trap/stick.wav");
+    let snd = G_SoundIndex(ctx, "sound/weapons/laser_trap/stick.wav");
     G_Sound(ctx, Some(ent), CHAN_WEAPON, snd);
     if ctx.world.entity(ent).count != 0 {
         // a tripwire
@@ -2982,7 +2983,7 @@ pub fn laserTrapStick(ctx: &mut GameContext, ent: EntityId, endpos: vec3_t, norm
 
         if ctx.world.entity(ent).s.eFlags & EF_FIRING == 0 {
             // arm me
-            let snd = G_SoundIndex("sound/weapons/laser_trap/warning.wav");
+            let snd = G_SoundIndex(ctx, "sound/weapons/laser_trap/warning.wav");
             G_Sound(ctx, Some(ent), CHAN_WEAPON, snd);
             let e = ctx.world.entity_mut(ent);
             e.s.eFlags |= EF_FIRING;
@@ -3010,7 +3011,7 @@ pub fn CreateLaserTrap(ctx: &mut GameContext, laserTrap: EntityId, start: vec3_t
     // create a laser trap entity
     let owner_num = ctx.world.entity(owner).s.number;
     let now = ctx.world.level.time;
-    let modelidx = G_ModelIndex("models/weapons2/laser_trap/laser_trap_w.glm");
+    let modelidx = G_ModelIndex(ctx, "models/weapons2/laser_trap/laser_trap_w.glm");
     {
         ctx.ent_set(laserTrap, PrefixSet::ClassnameStatic(c"laserTrap"));
         let lt = ctx.world.entity_mut(laserTrap);
@@ -3305,7 +3306,7 @@ pub fn charge_stick(
         e.count = -1;
     }
 
-    let snd = G_SoundIndex("sound/weapons/detpack/stick.wav");
+    let snd = G_SoundIndex(ctx, "sound/weapons/detpack/stick.wav");
     G_Sound(ctx, Some(self_), CHAN_WEAPON, snd);
 
     let currentOrigin = ctx.world.entity(self_).r.currentOrigin;
@@ -3429,7 +3430,7 @@ pub fn drop_charge(ctx: &mut GameContext, self_: EntityId, start: vec3_t, dir: v
     let bid = G_Spawn(ctx);
     let self_num = ctx.world.entity(self_).s.number;
     let now = ctx.world.level.time;
-    let modelidx = G_ModelIndex("models/weapons2/detpack/det_pack_proj.glm");
+    let modelidx = G_ModelIndex(ctx, "models/weapons2/detpack/det_pack_proj.glm");
     let mut angles: vec3_t = [0.0; 3];
     vectoangles(dir, &mut angles);
     {
@@ -3543,7 +3544,7 @@ pub fn BlowDetpacks(ctx: &mut GameContext, ent: EntityId) {
                 let r = ctx.world.bg_state.rng.random();
                 ctx.world.entity_mut(found_id).nextthink =
                     ((now + 100) as f32 + r * 200.0) as c_int;
-                let snd = G_SoundIndex("sound/weapons/detpack/warning.wav");
+                let snd = G_SoundIndex(ctx, "sound/weapons/detpack/warning.wav");
                 G_Sound(ctx, Some(found_id), CHAN_BODY, snd);
             }
         }
@@ -4054,10 +4055,11 @@ pub fn WP_FireStunBaton(ctx: &mut GameContext, ent: EntityId, alt_fire: bool) {
         if ctx.world.entity(tr_ent_id).takedamage != 0 {
             G_PlayEffect((EFFECT_STUNHIT) as i32, tr.endpos, tr.plane.normal);
 
-            let sound_idx = G_SoundIndex(&format!(
-                    "sound/weapons/melee/punch{}",
-                    ctx.world.bg_state.rng.Q_irand(1, 4)
-                ));
+            let punch_snd = format!(
+                "sound/weapons/melee/punch{}",
+                ctx.world.bg_state.rng.Q_irand(1, 4)
+            );
+            let sound_idx = G_SoundIndex(ctx, &punch_snd);
             G_Sound(ctx, Some(tr_ent_id), CHAN_WEAPON, sound_idx);
             let dmg_dir = Some(&mut (*ctx.world_raw()).globals.forward); // STAGE-2b: irreducible — &mut world.globals.forward aliases the ctx passed to the same call.
             G_Damage(
@@ -4163,10 +4165,11 @@ pub fn WP_FireMelee(ctx: &mut GameContext, ent: EntityId, alt_fire: bool) {
             // FLAG: trace target may be an NPC (pool client); deref its client raw.
             let tr_ent_client = ctx.world.entity(tr_ent_id).client;
 
-            let sound_idx = G_SoundIndex(&format!(
-                    "sound/weapons/melee/punch{}",
-                    ctx.world.bg_state.rng.Q_irand(1, 4)
-                ));
+            let punch_snd = format!(
+                "sound/weapons/melee/punch{}",
+                ctx.world.bg_state.rng.Q_irand(1, 4)
+            );
+            let sound_idx = G_SoundIndex(ctx, &punch_snd);
             G_Sound(ctx, Some(ent), CHAN_AUTO, sound_idx);
 
             if ctx.world.entity(tr_ent_id).takedamage != 0 && !tr_ent_client.is_null() {
@@ -6091,7 +6094,7 @@ pub fn SP_emplaced_gun(ctx: &mut GameContext, ent: EntityId) {
     );
     ctx.world.entity_mut(ent).s.origin2[0] = constraint_out;
 
-    let modelidx = G_ModelIndex(name.to_str().unwrap());
+    let modelidx = G_ModelIndex(ctx, name.to_str().unwrap());
     let angles = ctx.world.entity(ent).s.angles;
     let origin = ctx.world.entity(ent).s.origin;
     {

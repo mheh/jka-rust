@@ -3018,7 +3018,7 @@ pub fn G_RunFrame(ctx: &mut GameContext, levelTime: c_int) {
                                     // play the choking sound
                                     let n = ctx.world.bg_state.rng.Q_irand(1, 3);
                                     let snd =
-                                        G_SoundIndex(&format!("*choke{}.wav", n));
+                                        G_SoundIndex(ctx, &format!("*choke{}.wav", n));
                                     let ent_id = ctx.entity_id_of(ent).unwrap();
                                     G_EntitySound(ctx, ent_id, CHAN_VOICE, snd);
 

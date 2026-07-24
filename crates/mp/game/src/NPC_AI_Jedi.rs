@@ -66,8 +66,8 @@ pub fn G_StartMatrixEffect(ent: &gentity_t) {
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:103-108`
 pub fn NPC_ShadowTrooper_Precache(ctx: &mut GameContext) {
     crate::g_items::RegisterItem(ctx, mp_bg::bg_misc::BG_FindItemForAmmo(ammo_t::AMMO_FORCE));
-    G_SoundIndex("sound/chars/shadowtrooper/cloak.wav");
-    G_SoundIndex("sound/chars/shadowtrooper/decloak.wav");
+    G_SoundIndex(ctx, "sound/chars/shadowtrooper/cloak.wav");
+    G_SoundIndex(ctx, "sound/chars/shadowtrooper/decloak.wav");
 }
 
 /// Raven `Jedi_ClearTimers`.
@@ -197,11 +197,11 @@ pub fn NPC_Jedi_PlayConfusionSound(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:182-189`
 pub fn Boba_Precache(ctx: &mut GameContext) {
-    G_SoundIndex("sound/boba/jeton.wav");
-    G_SoundIndex("sound/boba/jethover.wav");
-    G_SoundIndex("sound/effects/combustfire.mp3");
-    G_EffectIndex("boba/jet");
-    G_EffectIndex("boba/fthrw");
+    G_SoundIndex(ctx, "sound/boba/jeton.wav");
+    G_SoundIndex(ctx, "sound/boba/jethover.wav");
+    G_SoundIndex(ctx, "sound/effects/combustfire.mp3");
+    G_EffectIndex(ctx, "boba/jet");
+    G_EffectIndex(ctx, "boba/fthrw");
 }
 
 /// Raven `Boba_ChangeWeapon`.
@@ -214,7 +214,7 @@ pub fn Boba_ChangeWeapon(ctx: &mut GameContext, wp: c_int) {
         return;
     }
     crate::NPC_combat::NPC_ChangeWeapon(wp);
-    let snd = G_SoundIndex("sound/weapons/change.wav");
+    let snd = G_SoundIndex(ctx, "sound/weapons/change.wav");
     crate::g_utils::G_AddEvent(
         ctx.world.entity_mut(npc_id),
         entity_event_t::EV_GENERAL_SOUND as c_int,
@@ -430,7 +430,7 @@ pub fn Boba_FlyStart(ctx: &mut GameContext, self_: EntityId) {
             CHAN_ITEM as c_int,
             "sound/boba/jeton.wav");
         //jet loop sound
-        let loop_sound = G_SoundIndex("sound/boba/jethover.wav");
+        let loop_sound = G_SoundIndex(ctx, "sound/boba/jethover.wav");
         ctx.world.entity_mut(self_).s.loopSound = loop_sound;
         if !ctx.world.entity(self_).NPC.is_null() {
             ctx.world.entity_mut(self_).count = Q3_INFINITE; // SEEKER shot ammo count
@@ -621,7 +621,7 @@ pub fn Boba_StartFlameThrower(ctx: &mut GameContext, self_: EntityId) {
     BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::NEGATIVE_Y as c_int, &mut dir);
 
     crate::g_utils::G_PlayEffectID(
-        G_EffectIndex("boba/fthrw"),
+        G_EffectIndex(ctx, "boba/fthrw"),
         org,
         dir,
     );
@@ -1031,7 +1031,7 @@ pub fn Jedi_Cloak(ctx: &mut GameContext, self_: Option<EntityId>) {
                 }
 
                 let snd =
-                    G_SoundIndex("sound/chars/shadowtrooper/cloak.wav");
+                    G_SoundIndex(ctx, "sound/chars/shadowtrooper/cloak.wav");
                 crate::g_utils::G_Sound(ctx, Some(self_), CHAN_ITEM as c_int, snd);
             }
         }
@@ -1055,7 +1055,7 @@ pub fn Jedi_Decloak(ctx: &mut GameContext, self_: Option<EntityId>) {
                 }
 
                 let snd =
-                    G_SoundIndex("sound/chars/shadowtrooper/decloak.wav");
+                    G_SoundIndex(ctx, "sound/chars/shadowtrooper/decloak.wav");
                 crate::g_utils::G_Sound(ctx, Some(self_), CHAN_ITEM as c_int, snd);
             }
         }
@@ -3560,12 +3560,12 @@ pub fn Jedi_SaberBlockGo(
                                         0,
                                     );
                                 } else {
+                                    let sound = G_SoundIndex(ctx, "sound/weapons/force/jump.wav");
                                     crate::g_utils::G_Sound(
                                         ctx,
                                         Some(self_),
                                         CHAN_BODY as c_int,
-                                        G_SoundIndex("sound/weapons/force/jump.wav",
-                                        ),
+                                        sound,
                                     );
                                 }
                                 (*cmd).upmove = 0;

@@ -39,9 +39,9 @@ const MIN_DISTANCE_SQR: f32 = MIN_DISTANCE * MIN_DISTANCE;
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Remote.c:17-22`
 pub fn NPC_Remote_Precache(ctx: &mut GameContext) {
-    G_SoundIndex("sound/chars/remote/misc/fire.wav");
-    G_SoundIndex("sound/chars/remote/misc/hiss.wav");
-    G_EffectIndex("env/small_explode");
+    G_SoundIndex(ctx, "sound/chars/remote/misc/fire.wav");
+    G_SoundIndex(ctx, "sound/chars/remote/misc/hiss.wav");
+    G_EffectIndex(ctx, "env/small_explode");
 }
 
 /// Raven `NPC_Remote_Pain`.
@@ -109,11 +109,12 @@ pub fn Remote_MaintainHeight(ctx: &mut GameContext) {
                 unsafe {
                     (*client).ps.velocity[2] = ((*client).ps.velocity[2] + dif) / 2.0;
                 }
+                let sound = G_SoundIndex(ctx, "sound/chars/remote/misc/hiss.wav");
                 crate::g_utils::G_Sound(
                     ctx,
                     ctx.entity_id_of(npc),
                     CHAN_AUTO,
-                    G_SoundIndex("sound/chars/remote/misc/hiss.wav"),
+                    sound,
                 );
             }
         }
@@ -218,11 +219,12 @@ pub fn Remote_Strafe(ctx: &mut GameContext) {
             );
         }
 
+        let sound = G_SoundIndex(ctx, "sound/chars/remote/misc/hiss.wav");
         crate::g_utils::G_Sound(
             ctx,
             ctx.entity_id_of(npc),
             CHAN_AUTO,
-            G_SoundIndex("sound/chars/remote/misc/hiss.wav"),
+            sound,
         );
 
         unsafe {
@@ -351,7 +353,7 @@ pub fn Remote_Fire(ctx: &mut GameContext) {
     );
 
     crate::g_utils::G_PlayEffectID(
-        G_EffectIndex("bryar/muzzle_flash"),
+        G_EffectIndex(ctx, "bryar/muzzle_flash"),
         npc_origin,
         forward,
     );

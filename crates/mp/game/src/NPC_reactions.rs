@@ -1000,7 +1000,7 @@ pub fn NPC_Respond(ctx: &mut GameContext, self_: EntityId, userNum: c_int) {
                 "sound/chars/r2d2/misc/r2d2talk0{}.wav",
                 ctx.world.bg_state.rng.Q_irand(1, 3)
             );
-            let sound_index = G_SoundIndex(&sound_path);
+            let sound_index = G_SoundIndex(ctx, &sound_path);
             G_Sound(ctx, Some(self_), CHAN_AUTO, sound_index);
         }
         CLASS_R5D2 => {
@@ -1008,7 +1008,7 @@ pub fn NPC_Respond(ctx: &mut GameContext, self_: EntityId, userNum: c_int) {
                 "sound/chars/r5d2/misc/r5talk{}.wav",
                 ctx.world.bg_state.rng.Q_irand(1, 4)
             );
-            let sound_index = G_SoundIndex(&sound_path);
+            let sound_index = G_SoundIndex(ctx, &sound_path);
             G_Sound(ctx, Some(self_), CHAN_AUTO, sound_index);
         }
         CLASS_MOUSE => {
@@ -1016,7 +1016,7 @@ pub fn NPC_Respond(ctx: &mut GameContext, self_: EntityId, userNum: c_int) {
                 "sound/chars/mouse/misc/mousego{}.wav",
                 ctx.world.bg_state.rng.Q_irand(1, 3)
             );
-            let sound_index = G_SoundIndex(&sound_path);
+            let sound_index = G_SoundIndex(ctx, &sound_path);
             G_Sound(ctx, Some(self_), CHAN_AUTO, sound_index);
         }
         CLASS_GONK => {
@@ -1024,7 +1024,7 @@ pub fn NPC_Respond(ctx: &mut GameContext, self_: EntityId, userNum: c_int) {
                 "sound/chars/gonk/misc/gonktalk{}.wav",
                 ctx.world.bg_state.rng.Q_irand(1, 2)
             );
-            let sound_index = G_SoundIndex(&sound_path);
+            let sound_index = G_SoundIndex(ctx, &sound_path);
             G_Sound(ctx, Some(self_), CHAN_AUTO, sound_index);
         }
         _ => {}

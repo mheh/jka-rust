@@ -73,12 +73,12 @@ const MIN_DISTANCE: c_int = 64;
 /// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:20-28`
 pub fn NPC_Interrogator_Precache(ctx: &mut GameContext, self_: Option<EntityId>) {
     // STAGE-1: EntityId param (unused by the body; caller may pass null/`None`).
-    G_SoundIndex("sound/chars/interrogator/misc/torture_droid_lp");
-    G_SoundIndex("sound/chars/mark1/misc/anger.wav");
-    G_SoundIndex("sound/chars/probe/misc/talk");
-    G_SoundIndex("sound/chars/interrogator/misc/torture_droid_inject");
-    G_SoundIndex("sound/chars/interrogator/misc/int_droid_explo");
-    G_EffectIndex("explosions/droidexplosion1");
+    G_SoundIndex(ctx, "sound/chars/interrogator/misc/torture_droid_lp");
+    G_SoundIndex(ctx, "sound/chars/mark1/misc/anger.wav");
+    G_SoundIndex(ctx, "sound/chars/probe/misc/talk");
+    G_SoundIndex(ctx, "sound/chars/interrogator/misc/torture_droid_inject");
+    G_SoundIndex(ctx, "sound/chars/interrogator/misc/int_droid_explo");
+    G_EffectIndex(ctx, "explosions/droidexplosion1");
 }
 
 /// Raven `Interrogator_die`.
@@ -204,7 +204,7 @@ pub fn Interrogator_MaintainHeight(ctx: &mut GameContext) {
     let npc_id = ctx.entity_id_of(npc).unwrap();
     let npc_info = ctx.world.globals.NPCInfo;
 
-    let loop_sound = G_SoundIndex("sound/chars/interrogator/misc/torture_droid_lp");
+    let loop_sound = G_SoundIndex(ctx, "sound/chars/interrogator/misc/torture_droid_lp");
     ctx.world.entity_mut(npc_id).s.loopSound = loop_sound;
 
     // Update our angles regardless
@@ -493,13 +493,8 @@ pub fn Interrogator_Melee(ctx: &mut GameContext, visible: qboolean, advance: qbo
                     MOD_MELEE as c_int,
                 );
 
-                G_Sound(
-                    ctx,
-                    Some(npc_id),
-                    CHAN_AUTO,
-                    G_SoundIndex("sound/chars/interrogator/misc/torture_droid_inject.mp3",
-                    ),
-                );
+                let sound = G_SoundIndex(ctx, "sound/chars/interrogator/misc/torture_droid_inject.mp3");
+                G_Sound(ctx, Some(npc_id), CHAN_AUTO, sound);
             }
         }
     }

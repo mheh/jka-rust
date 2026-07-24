@@ -2155,21 +2155,21 @@ pub fn SP_misc_siege_item(ctx: &mut GameContext, ent: EntityId) {
 
         if !s.is_empty() {
             // We have a pickup sound, so index it now.
-            ctx.world.entity_mut(ent).noise_index = G_SoundIndex(&s);
+            ctx.world.entity_mut(ent).noise_index = G_SoundIndex(ctx, &s);
         }
 
         s = G_SpawnString(ctx, "deathfx", "").1;
 
         if !s.is_empty() {
             // We have a death effect, so index it now.
-            ctx.world.entity_mut(ent).genericValue3 = G_EffectIndex(&s);
+            ctx.world.entity_mut(ent).genericValue3 = G_EffectIndex(ctx, &s);
         }
 
         s = G_SpawnString(ctx, "respawnfx", "").1;
 
         if !s.is_empty() {
             // We have a respawn effect, so index it now.
-            ctx.world.entity_mut(ent).genericValue10 = G_EffectIndex(&s);
+            ctx.world.entity_mut(ent).genericValue10 = G_EffectIndex(ctx, &s);
         }
 
         s = G_SpawnString(ctx, "icon", "").1;
@@ -2183,7 +2183,7 @@ pub fn SP_misc_siege_item(ctx: &mut GameContext, ent: EntityId) {
         }
 
         let model = ctx.world.entity(ent).model.clone().unwrap_or_default();
-        ctx.world.entity_mut(ent).s.modelindex = G_ModelIndex(&model);
+        ctx.world.entity_mut(ent).s.modelindex = G_ModelIndex(ctx, &model);
 
         // Is the model a ghoul2 model?
         // Raven indexes `model[strlen(model) - 4]`, which underflows for names

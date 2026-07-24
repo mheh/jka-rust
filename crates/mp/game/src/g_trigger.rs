@@ -746,7 +746,7 @@ pub fn SP_trigger_multiple(ctx: &mut GameContext, ent_id: EntityId) {
     let (present, s) = G_SpawnString(ctx, "noise", "");
     if present != 0 {
         if !s.is_empty() {
-            ctx.world.entity_mut(ent_id).noise_index = G_SoundIndex(&s);
+            ctx.world.entity_mut(ent_id).noise_index = G_SoundIndex(ctx, &s);
         } else {
             ctx.world.entity_mut(ent_id).noise_index = 0;
         }
@@ -806,7 +806,7 @@ pub fn SP_trigger_once(ctx: &mut GameContext, ent_id: EntityId) {
     let (present, s) = G_SpawnString(ctx, "noise", "");
     if present != 0 {
         if !s.is_empty() {
-            ctx.world.entity_mut(ent_id).noise_index = G_SoundIndex(&s);
+            ctx.world.entity_mut(ent_id).noise_index = G_SoundIndex(ctx, &s);
         } else {
             ctx.world.entity_mut(ent_id).noise_index = 0;
         }
@@ -987,7 +987,7 @@ pub fn SP_trigger_lightningstrike(ctx: &mut GameContext, ent_id: EntityId) {
     }
 
     // get a configstring index for it
-    ctx.world.entity_mut(ent_id).genericValue2 = G_EffectIndex(&s);
+    ctx.world.entity_mut(ent_id).genericValue2 = G_EffectIndex(ctx, &s);
 
     if ctx.world.entity(ent_id).spawnflags & 1 != 0 {
         // START_OFF
@@ -1244,7 +1244,7 @@ pub fn SP_trigger_push(ctx: &mut GameContext, self_id: EntityId) {
     ctx.world.entity_mut(self_id).r.svFlags &= !SVF_NOCLIENT;
 
     // make sure the client precaches this sound
-    G_SoundIndex("sound/weapons/force/jump.wav");
+    G_SoundIndex(ctx, "sound/weapons/force/jump.wav");
 
     ctx.world.entity_mut(self_id).s.eType = ET_PUSH_TRIGGER as c_int;
 
@@ -1326,7 +1326,7 @@ pub fn SP_target_push(ctx: &mut GameContext, self_: EntityId) {
 
     if ctx.world.entity(self_).spawnflags & 1 != 0 {
         ctx.world.entity_mut(self_).noise_index =
-            G_SoundIndex("sound/weapons/force/jump.wav");
+            G_SoundIndex(ctx, "sound/weapons/force/jump.wav");
     } else {
         // G_SoundIndex("sound/misc/windfly.wav");
         ctx.world.entity_mut(self_).noise_index = 0;
@@ -1404,7 +1404,7 @@ pub fn SP_trigger_teleport(ctx: &mut GameContext, self_id: EntityId) {
     }
 
     // make sure the client precaches this sound
-    G_SoundIndex("sound/weapons/force/speed.wav");
+    G_SoundIndex(ctx, "sound/weapons/force/speed.wav");
 
     ctx.world.entity_mut(self_id).s.eType = ET_TELEPORT_TRIGGER as c_int;
     ctx.world.entity_mut(self_id).touch = Some(EntTouch::trigger_teleporter_touch).into();
@@ -1581,12 +1581,8 @@ pub fn hurt_touch(
                 MOD_FALLING as c_int,
             );
         } else {
-            G_EntitySound(
-                ctx,
-                other,
-                CHAN_VOICE,
-                G_SoundIndex("*falling1.wav"),
-            );
+            let sound = G_SoundIndex(ctx, "*falling1.wav");
+            G_EntitySound(ctx, other, CHAN_VOICE, sound);
         }
 
         ctx.world.entity_mut(self_).timestamp = 0; // do not ignore others
@@ -1642,10 +1638,10 @@ pub fn hurt_touch(
 pub fn SP_trigger_hurt(ctx: &mut GameContext, self_id: EntityId) {
     InitTrigger(ctx, self_id);
 
-    ctx.world.globals.gTrigFallSound = G_SoundIndex("*falling1.wav");
+    ctx.world.globals.gTrigFallSound = G_SoundIndex(ctx, "*falling1.wav");
 
     ctx.world.entity_mut(self_id).noise_index =
-        G_SoundIndex("sound/weapons/force/speed.wav");
+        G_SoundIndex(ctx, "sound/weapons/force/speed.wav");
     ctx.world.entity_mut(self_id).touch = Some(EntTouch::hurt_touch).into();
 
     if ctx.world.entity(self_id).damage == 0 {
@@ -2051,12 +2047,8 @@ pub fn hyperspace_touch(
                     (*other_client).ps.hyperSpaceAngles = ent_angles;
                 }
                 // sound
-                G_Sound(
-                    ctx,
-                    Some(other),
-                    CHAN_LOCAL,
-                    G_SoundIndex("sound/vehicles/common/hyperend.wav"),
-                );
+                let sound = G_SoundIndex(ctx, "sound/vehicles/common/hyperend.wav");
+                G_Sound(ctx, Some(other), CHAN_LOCAL, sound);
             }
         }
         return;
@@ -2116,7 +2108,7 @@ pub fn SP_trigger_hyperspace(ctx: &mut GameContext, self_id: EntityId) {
     ctx.world.entity_mut(self_id).radius = radius;
 
     // register the hyperspace end sound (start sounds are customized)
-    G_SoundIndex("sound/vehicles/common/hyperend.wav");
+    G_SoundIndex(ctx, "sound/vehicles/common/hyperend.wav");
 
     InitTrigger(ctx, self_id);
     ctx.world.entity_mut(self_id).r.contents = CONTENTS_TRIGGER;

@@ -575,16 +575,34 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         }
     }
     fn sound_index(&mut self, name: &str) -> c_int {
-        // ctx-free configstring lookup. Source: `g_utils.c` (`G_SoundIndex`).
-        G_SoundIndex(name)
+        // Source: `g_utils.c` (`G_SoundIndex`).
+        unsafe {
+            let mut ctx = GameContext {
+                world: &mut *self.world,
+                engine: self.engine,
+            };
+            G_SoundIndex(&mut ctx, name)
+        }
     }
     fn model_index(&mut self, name: &str) -> c_int {
-        // ctx-free configstring lookup. Source: `g_utils.c` (`G_ModelIndex`).
-        G_ModelIndex(name)
+        // Source: `g_utils.c` (`G_ModelIndex`).
+        unsafe {
+            let mut ctx = GameContext {
+                world: &mut *self.world,
+                engine: self.engine,
+            };
+            G_ModelIndex(&mut ctx, name)
+        }
     }
     fn effect_index(&mut self, name: &str) -> c_int {
-        // ctx-free configstring lookup. Source: `g_utils.c` (`G_EffectIndex`).
-        G_EffectIndex(name)
+        // Source: `g_utils.c` (`G_EffectIndex`).
+        unsafe {
+            let mut ctx = GameContext {
+                world: &mut *self.world,
+                engine: self.engine,
+            };
+            G_EffectIndex(&mut ctx, name)
+        }
     }
     fn cheap_weapon_fire(&mut self, entNum: c_int, weapon: c_int) {
         // Raven `G_CheapWeaponFire(entNum, ev)` takes the entity number directly.

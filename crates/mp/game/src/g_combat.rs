@@ -1513,22 +1513,23 @@ pub fn DeathFX(ctx: &mut GameContext, ent: Option<EntityId>) {
             effectPos = ctx.entity(ent).r.currentOrigin;
             effectPos[2] -= 20.0;
             crate::g_utils::G_PlayEffectID(
-                G_EffectIndex("env/small_explode"),
+                G_EffectIndex(ctx, "env/small_explode"),
                 effectPos,
                 defaultDir,
             );
+            let sound = G_SoundIndex(ctx, "sound/chars/mouse/misc/death1");
             crate::g_utils::G_Sound(
                 ctx,
                 Some(ent),
                 CHAN_AUTO,
-                G_SoundIndex("sound/chars/mouse/misc/death1"),
+                sound,
             );
         }
         class_t::CLASS_PROBE => {
             effectPos = ctx.entity(ent).r.currentOrigin;
             effectPos[2] += 50.0;
             crate::g_utils::G_PlayEffectID(
-                G_EffectIndex("explosions/probeexplosion1"),
+                G_EffectIndex(ctx, "explosions/probeexplosion1"),
                 effectPos,
                 defaultDir,
             );
@@ -1543,20 +1544,20 @@ pub fn DeathFX(ctx: &mut GameContext, ent: Option<EntityId>) {
             _VectorMA(ctx.entity(ent).r.currentOrigin, 20.0, right, &mut effectPos);
             effectPos[2] += 180.0;
             crate::g_utils::G_PlayEffectID(
-                G_EffectIndex("explosions/droidexplosion1"),
+                G_EffectIndex(ctx, "explosions/droidexplosion1"),
                 effectPos,
                 defaultDir,
             );
             _VectorMA(effectPos, -40.0, right, &mut effectPos);
             crate::g_utils::G_PlayEffectID(
-                G_EffectIndex("explosions/droidexplosion1"),
+                G_EffectIndex(ctx, "explosions/droidexplosion1"),
                 effectPos,
                 defaultDir,
             );
         }
         class_t::CLASS_SEEKER | class_t::CLASS_REMOTE => {
             crate::g_utils::G_PlayEffectID(
-                G_EffectIndex("env/small_explode"),
+                G_EffectIndex(ctx, "env/small_explode"),
                 ctx.entity(ent).r.currentOrigin,
                 defaultDir,
             );
@@ -1568,14 +1569,15 @@ pub fn DeathFX(ctx: &mut GameContext, ent: Option<EntityId>) {
                 "sound/chars/gonk/misc/death{}.wav",
                 ctx.world.bg_state.rng.Q_irand(1, 3)
             );
+            let sound = G_SoundIndex(ctx, &s);
             crate::g_utils::G_Sound(
                 ctx,
                 Some(ent),
                 CHAN_AUTO,
-                G_SoundIndex(&s),
+                sound,
             );
             crate::g_utils::G_PlayEffectID(
-                G_EffectIndex("env/med_explode"),
+                G_EffectIndex(ctx, "env/med_explode"),
                 effectPos,
                 defaultDir,
             );
@@ -1585,61 +1587,64 @@ pub fn DeathFX(ctx: &mut GameContext, ent: Option<EntityId>) {
             effectPos = ctx.entity(ent).r.currentOrigin;
             effectPos[2] -= 10.0;
             crate::g_utils::G_PlayEffectID(
-                G_EffectIndex("env/med_explode"),
+                G_EffectIndex(ctx, "env/med_explode"),
                 effectPos,
                 defaultDir,
             );
+            let sound = G_SoundIndex(ctx, "sound/chars/mark2/misc/mark2_explo");
             crate::g_utils::G_Sound(
                 ctx,
                 Some(ent),
                 CHAN_AUTO,
-                G_SoundIndex("sound/chars/mark2/misc/mark2_explo"),
+                sound,
             );
         }
         class_t::CLASS_PROTOCOL | class_t::CLASS_R5D2 => {
             effectPos = ctx.entity(ent).r.currentOrigin;
             effectPos[2] -= 10.0;
             crate::g_utils::G_PlayEffectID(
-                G_EffectIndex("env/med_explode"),
+                G_EffectIndex(ctx, "env/med_explode"),
                 effectPos,
                 defaultDir,
             );
+            let sound = G_SoundIndex(ctx, "sound/chars/mark2/misc/mark2_explo");
             crate::g_utils::G_Sound(
                 ctx,
                 Some(ent),
                 CHAN_AUTO,
-                G_SoundIndex("sound/chars/mark2/misc/mark2_explo"),
+                sound,
             );
         }
         class_t::CLASS_MARK2 => {
             effectPos = ctx.entity(ent).r.currentOrigin;
             effectPos[2] -= 15.0;
             crate::g_utils::G_PlayEffectID(
-                G_EffectIndex("explosions/droidexplosion1"),
+                G_EffectIndex(ctx, "explosions/droidexplosion1"),
                 effectPos,
                 defaultDir,
             );
+            let sound = G_SoundIndex(ctx, "sound/chars/mark2/misc/mark2_explo");
             crate::g_utils::G_Sound(
                 ctx,
                 Some(ent),
                 CHAN_AUTO,
-                G_SoundIndex("sound/chars/mark2/misc/mark2_explo"),
+                sound,
             );
         }
         class_t::CLASS_INTERROGATOR => {
             effectPos = ctx.entity(ent).r.currentOrigin;
             effectPos[2] -= 15.0;
             crate::g_utils::G_PlayEffectID(
-                G_EffectIndex("explosions/droidexplosion1"),
+                G_EffectIndex(ctx, "explosions/droidexplosion1"),
                 effectPos,
                 defaultDir,
             );
+            let sound = G_SoundIndex(ctx, "sound/chars/interrogator/misc/int_droid_explo");
             crate::g_utils::G_Sound(
                 ctx,
                 Some(ent),
                 CHAN_AUTO,
-                G_SoundIndex("sound/chars/interrogator/misc/int_droid_explo",
-                ),
+                sound,
             );
         }
         class_t::CLASS_MARK1 => {
@@ -1652,39 +1657,41 @@ pub fn DeathFX(ctx: &mut GameContext, ent: Option<EntityId>) {
             _VectorMA(ctx.entity(ent).r.currentOrigin, 10.0, right, &mut effectPos);
             effectPos[2] -= 15.0;
             crate::g_utils::G_PlayEffectID(
-                G_EffectIndex("explosions/droidexplosion1"),
+                G_EffectIndex(ctx, "explosions/droidexplosion1"),
                 effectPos,
                 defaultDir,
             );
             _VectorMA(effectPos, -20.0, right, &mut effectPos);
             crate::g_utils::G_PlayEffectID(
-                G_EffectIndex("explosions/droidexplosion1"),
+                G_EffectIndex(ctx, "explosions/droidexplosion1"),
                 effectPos,
                 defaultDir,
             );
             _VectorMA(effectPos, -20.0, right, &mut effectPos);
             crate::g_utils::G_PlayEffectID(
-                G_EffectIndex("explosions/droidexplosion1"),
+                G_EffectIndex(ctx, "explosions/droidexplosion1"),
                 effectPos,
                 defaultDir,
             );
+            let sound = G_SoundIndex(ctx, "sound/chars/mark1/misc/mark1_explo");
             crate::g_utils::G_Sound(
                 ctx,
                 Some(ent),
                 CHAN_AUTO,
-                G_SoundIndex("sound/chars/mark1/misc/mark1_explo"),
+                sound,
             );
         }
         class_t::CLASS_SENTRY => {
+            let sound = G_SoundIndex(ctx, "sound/chars/sentry/misc/sentry_explo");
             crate::g_utils::G_Sound(
                 ctx,
                 Some(ent),
                 CHAN_AUTO,
-                G_SoundIndex("sound/chars/sentry/misc/sentry_explo"),
+                sound,
             );
             effectPos = ctx.entity(ent).r.currentOrigin;
             crate::g_utils::G_PlayEffectID(
-                G_EffectIndex("env/med_explode"),
+                G_EffectIndex(ctx, "env/med_explode"),
                 effectPos,
                 defaultDir,
             );
@@ -2936,7 +2943,7 @@ pub fn player_die(
                     let mut up: vec3_t = [0.0; 3];
                     AngleVectors((*self_).r.currentAngles, None, None, Some(&mut up));
                     crate::g_utils::G_PlayEffectID(
-                        G_EffectIndex("chunks/r2d2head_veh"),
+                        G_EffectIndex(ctx, "chunks/r2d2head_veh"),
                         (*self_).r.currentOrigin,
                         up,
                     );
@@ -2947,7 +2954,7 @@ pub fn player_die(
                     let mut up: vec3_t = [0.0; 3];
                     AngleVectors((*self_).r.currentAngles, None, None, Some(&mut up));
                     crate::g_utils::G_PlayEffectID(
-                        G_EffectIndex("chunks/r5d2head_veh"),
+                        G_EffectIndex(ctx, "chunks/r5d2head_veh"),
                         (*self_).r.currentOrigin,
                         up,
                     );

@@ -88,18 +88,18 @@ const ARMOR_EFFECT_TIME: c_int = 500;
 ///
 /// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:42-57`
 pub fn NPC_GalakMech_Precache(ctx: &mut GameContext) {
-    G_SoundIndex("sound/weapons/galak/skewerhit.wav");
-    G_SoundIndex("sound/weapons/galak/lasercharge.wav");
-    G_SoundIndex("sound/weapons/galak/lasercutting.wav");
-    G_SoundIndex("sound/weapons/galak/laserdamage.wav");
+    G_SoundIndex(ctx, "sound/weapons/galak/skewerhit.wav");
+    G_SoundIndex(ctx, "sound/weapons/galak/lasercharge.wav");
+    G_SoundIndex(ctx, "sound/weapons/galak/lasercutting.wav");
+    G_SoundIndex(ctx, "sound/weapons/galak/laserdamage.wav");
 
-    G_EffectIndex("galak/trace_beam");
-    G_EffectIndex("galak/beam_warmup");
+    G_EffectIndex(ctx, "galak/trace_beam");
+    G_EffectIndex(ctx, "galak/beam_warmup");
     //	G_EffectIndex( "small_chunks");
-    G_EffectIndex("env/med_explode2");
-    G_EffectIndex("env/small_explode2");
-    G_EffectIndex("galak/explode");
-    G_EffectIndex("blaster/smoke_bolton");
+    G_EffectIndex(ctx, "env/med_explode2");
+    G_EffectIndex(ctx, "env/small_explode2");
+    G_EffectIndex(ctx, "galak/explode");
+    G_EffectIndex(ctx, "blaster/smoke_bolton");
     //	G_EffectIndex( "env/exp_trail_comp");
 }
 
@@ -193,13 +193,13 @@ pub fn GM_CreateExplosion(
 
         if doSmall != 0 {
             crate::g_utils::G_PlayEffectID(
-                G_EffectIndex("env/small_explode2"),
+                G_EffectIndex(ctx, "env/small_explode2"),
                 org,
                 dir,
             );
         } else {
             crate::g_utils::G_PlayEffectID(
-                G_EffectIndex("env/med_explode2"),
+                G_EffectIndex(ctx, "env/med_explode2"),
                 org,
                 dir,
             );
@@ -309,7 +309,7 @@ pub fn GM_Dying(ctx: &mut GameContext, self_: EntityId) {
             // one final, huge explosion
             let current_origin = ctx.world.entity(self_).r.currentOrigin;
             crate::g_utils::G_PlayEffectID(
-                G_EffectIndex("galak/explode"),
+                G_EffectIndex(ctx, "galak/explode"),
                 current_origin,
                 vec3_origin,
             );
@@ -741,7 +741,7 @@ pub fn NPC_GM_StartLaser(ctx: &mut GameContext) {
         // crate prelude, pass-3 symbol backfill).
         let current_origin = ctx.world.entity(npc_id).r.currentOrigin;
         crate::g_utils::G_PlayEffectID(
-            G_EffectIndex("galak/beam_warmup"),
+            G_EffectIndex(ctx, "galak/beam_warmup"),
             current_origin,
             vec3_origin,
         );
@@ -849,11 +849,11 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
                     ctx.world.entity_mut(npc_id).lockCount = 2;
                     let current_origin = ctx.world.entity(npc_id).r.currentOrigin;
                     crate::g_utils::G_PlayEffectID(
-                        G_EffectIndex("galak/trace_beam"),
+                        G_EffectIndex(ctx, "galak/trace_beam"),
                         current_origin,
                         vec3_origin,
                     );
-                    let loop_sound = G_SoundIndex("sound/weapons/galak/lasercutting.wav",
+                    let loop_sound = G_SoundIndex(ctx, "sound/weapons/galak/lasercutting.wav",
                     );
                     ctx.world.entity_mut(npc_id).s.loopSound = loop_sound;
                     if (*npc_info).coverTarg.is_none() {
@@ -865,7 +865,7 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
                             let muzzle = (*client).renderInfo.muzzlePoint;
                             crate::g_utils::G_SetOrigin(ctx.world.entity_mut(cover_id), muzzle);
                             ctx.world.entity_mut(cover_id).r.svFlags |= SVF_BROADCAST;
-                            let loop_sound2 = G_SoundIndex("sound/weapons/galak/lasercutting.wav",
+                            let loop_sound2 = G_SoundIndex(ctx, "sound/weapons/galak/lasercutting.wav",
                             );
                             ctx.world.entity_mut(cover_id).s.loopSound = loop_sound2;
                         }
@@ -926,13 +926,8 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
                             let trace_id = EntityId(trace.entityNum as u32);
                             if ctx.world.entity(trace_id).takedamage != 0 {
                                 // damage it
-                                crate::g_utils::G_SoundAtLoc(
-                                    ctx,
-                                    trace.endpos,
-                                    CHAN_AUTO,
-                                    G_SoundIndex("sound/weapons/galak/laserdamage.wav",
-                                    ),
-                                );
+                                let sound = G_SoundIndex(ctx, "sound/weapons/galak/laserdamage.wav");
+                                crate::g_utils::G_SoundAtLoc(ctx, trace.endpos, CHAN_AUTO, sound);
                                 crate::g_combat::G_Damage(
                                     ctx,
                                     Some(trace_id),
@@ -953,13 +948,8 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
                             );
                         }
                         if ctx.world.bg_state.rng.Q_irand(0, 5) == 0 {
-                            crate::g_utils::G_SoundAtLoc(
-                                ctx,
-                                trace.endpos,
-                                CHAN_AUTO,
-                                G_SoundIndex("sound/weapons/galak/laserdamage.wav",
-                                ),
-                            );
+                            let sound = G_SoundIndex(ctx, "sound/weapons/galak/laserdamage.wav");
+                            crate::g_utils::G_SoundAtLoc(ctx, trace.endpos, CHAN_AUTO, sound);
                         }
                     }
                 }

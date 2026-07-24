@@ -665,7 +665,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                     let trimmed = sound_s.split('/').next().unwrap_or(&sound_s);
                     let idx_s = format!("*${}", trimmed);
                     ctx.world.entity_mut(spawner).s.csSounds_Std =
-                        G_SoundIndex(&idx_s);
+                        G_SoundIndex(ctx, &idx_s);
                 }
                 continue;
             }
@@ -688,7 +688,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                     let trimmed = sound_s.split('/').next().unwrap_or(&sound_s);
                     let idx_s = format!("*${}", trimmed);
                     ctx.world.entity_mut(spawner).s.csSounds_Combat =
-                        G_SoundIndex(&idx_s);
+                        G_SoundIndex(ctx, &idx_s);
                 }
                 continue;
             }
@@ -711,7 +711,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                     let trimmed = sound_s.split('/').next().unwrap_or(&sound_s);
                     let idx_s = format!("*${}", trimmed);
                     ctx.world.entity_mut(spawner).s.csSounds_Extra =
-                        G_SoundIndex(&idx_s);
+                        G_SoundIndex(ctx, &idx_s);
                 }
                 continue;
             }
@@ -734,7 +734,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                     let trimmed = sound_s.split('/').next().unwrap_or(&sound_s);
                     let idx_s = format!("*${}", trimmed);
                     ctx.world.entity_mut(spawner).s.csSounds_Jedi =
-                        G_SoundIndex(&idx_s);
+                        G_SoundIndex(ctx, &idx_s);
                 }
                 continue;
             }
@@ -790,7 +790,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                     //append it after a *
                     model_name.push_str(&format!("*{}", cstr_to_str(custom_skin.as_ptr())));
                 }
-                G_ModelIndex(&model_name);
+                G_ModelIndex(ctx, &model_name);
             }
         }
 
@@ -2066,7 +2066,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
                     &mut callbacks,
                 );
                 let idx_s = format!("@{}", cstr_to_str(saber_name));
-                npcSaber1 = G_ModelIndex(&idx_s);
+                npcSaber1 = G_ModelIndex(ctx, &idx_s);
 
                 mp_bg::bg_misc::BG_TempFree(4096, &mut ctx.world.bg_state);
                 continue;
@@ -2114,7 +2114,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
                     } else {
                         //NPC->client->ps.dualSabers = qtrue;
                         let idx_s = format!("@{}", cstr_to_str(saber_name));
-                        npcSaber2 = G_ModelIndex(&idx_s);
+                        npcSaber2 = G_ModelIndex(ctx, &idx_s);
                     }
                     mp_bg::bg_misc::BG_TempFree(4096, &mut ctx.world.bg_state);
                 }
@@ -2399,7 +2399,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
 
             if npcSaber1 == 0 {
                 //use "kyle" for a default then
-                npcSaber1 = G_ModelIndex("@Kyle");
+                npcSaber1 = G_ModelIndex(ctx, "@Kyle");
                 let mut callbacks = crate::bg_channel::GameCallbacksImpl {
                     // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
                     // field aliasing bg_state; a raw store is required (bg-seam re-entry).

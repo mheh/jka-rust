@@ -482,7 +482,7 @@ pub fn SP_target_speaker(ctx: &mut GameContext, ent: EntityId) {
     // (`MAX_QPATH-1` bytes) for the sound-index lookup.
     let buffer = strncpyz_string(s.as_bytes(), MAX_QPATH as usize);
 
-    let noise_index = G_SoundIndex(&buffer);
+    let noise_index = G_SoundIndex(ctx, &buffer);
     let e = ctx.entity_mut(ent);
     e.noise_index = noise_index;
 

@@ -44,21 +44,21 @@ const LSTATE_ATTACKING: i32 = 5;
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sentry.c:37-57`
 pub fn NPC_Sentry_Precache(ctx: &mut GameContext) {
-    G_SoundIndex("sound/chars/sentry/misc/sentry_explo");
-    G_SoundIndex("sound/chars/sentry/misc/sentry_pain");
-    G_SoundIndex("sound/chars/sentry/misc/sentry_shield_open");
-    G_SoundIndex("sound/chars/sentry/misc/sentry_shield_close");
-    G_SoundIndex("sound/chars/sentry/misc/sentry_hover_1_lp");
-    G_SoundIndex("sound/chars/sentry/misc/sentry_hover_2_lp");
+    G_SoundIndex(ctx, "sound/chars/sentry/misc/sentry_explo");
+    G_SoundIndex(ctx, "sound/chars/sentry/misc/sentry_pain");
+    G_SoundIndex(ctx, "sound/chars/sentry/misc/sentry_shield_open");
+    G_SoundIndex(ctx, "sound/chars/sentry/misc/sentry_shield_close");
+    G_SoundIndex(ctx, "sound/chars/sentry/misc/sentry_hover_1_lp");
+    G_SoundIndex(ctx, "sound/chars/sentry/misc/sentry_hover_2_lp");
 
     for i in 1..4 {
         let talk_idx = i;
         let s = format!("sound/chars/sentry/misc/talk{}", talk_idx);
-        G_SoundIndex(&s);
+        G_SoundIndex(ctx, &s);
     }
 
-    G_EffectIndex("bryar/muzzle_flash");
-    G_EffectIndex("env/med_explode");
+    G_EffectIndex(ctx, "bryar/muzzle_flash");
+    G_EffectIndex(ctx, "env/med_explode");
 
     crate::g_items::RegisterItem(ctx, mp_bg::bg_misc::BG_FindItemForAmmo(AMMO_BLASTER));
 }
@@ -118,11 +118,12 @@ pub fn NPC_Sentry_Pain(
             BOTH_FLY_SHIELDED as c_int,
             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
         );
+        let sound = G_SoundIndex(ctx, "sound/chars/sentry/misc/sentry_pain");
         crate::g_utils::G_Sound(
             ctx,
             Some(self_),
             CHAN_AUTO,
-            G_SoundIndex("sound/chars/sentry/misc/sentry_pain"),
+            sound,
         );
 
         unsafe {
@@ -166,12 +167,12 @@ pub fn Sentry_Fire(ctx: &mut GameContext) {
         } else if (*NPCInfo).localState == LSTATE_ACTIVE {
             (*NPCInfo).localState = LSTATE_POWERING_UP;
 
+            let sound = G_SoundIndex(ctx, "sound/chars/sentry/misc/sentry_shield_open");
             crate::g_utils::G_Sound(
                 ctx,
                 Some(npc_id),
                 CHAN_AUTO,
-                G_SoundIndex("sound/chars/sentry/misc/sentry_shield_open",
-                ),
+                sound,
             );
             crate::npc_c::NPC_SetAnim(
                 ctx,
@@ -225,7 +226,7 @@ pub fn Sentry_Fire(ctx: &mut GameContext) {
         );
 
         crate::g_utils::G_PlayEffectID(
-            G_EffectIndex("bryar/muzzle_flash"),
+            G_EffectIndex(ctx, "bryar/muzzle_flash"),
             muzzle,
             forward,
         );
@@ -268,7 +269,7 @@ pub fn Sentry_MaintainHeight(ctx: &mut GameContext) {
     let client = ctx.world.entity(npc_id).client;
 
     unsafe {
-        ctx.world.entity_mut(npc_id).s.loopSound = G_SoundIndex("sound/chars/sentry/misc/sentry_hover_1_lp",
+        ctx.world.entity_mut(npc_id).s.loopSound = G_SoundIndex(ctx, "sound/chars/sentry/misc/sentry_hover_1_lp",
         );
 
         // Update our angles regardless
@@ -582,7 +583,7 @@ pub fn Sentry_AttackDecision(ctx: &mut GameContext) {
     Sentry_MaintainHeight(ctx);
 
     ctx.world.entity_mut(npc_id).s.loopSound =
-        G_SoundIndex("sound/chars/sentry/misc/sentry_hover_2_lp");
+        G_SoundIndex(ctx, "sound/chars/sentry/misc/sentry_hover_2_lp");
 
     unsafe {
         // randomly talk

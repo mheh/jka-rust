@@ -1984,7 +1984,7 @@ pub fn Cmd_VoiceCommand_f(ctx: &mut GameContext, ent: EntityId) {
             crate::g_utils::G_TempEntity(ctx, [0.0f32, 0.0, 0.0], EV_VOICECMD_SOUND as c_int);
         ctx.world.entity_mut(te_id).s.groundEntityNum = ent.index() as c_int;
         ctx.world.entity_mut(te_id).s.eventParm =
-            G_SoundIndex(names[i].unwrap().to_str().unwrap());
+            G_SoundIndex(ctx, names[i].unwrap().to_str().unwrap());
         ctx.world.entity_mut(te_id).r.svFlags |= SVF_BROADCAST;
     }
 }
@@ -3982,24 +3982,26 @@ pub fn ClientCommand(ctx: &mut GameContext, clientNum: c_int) {
                     //Doing this now at a stage in the throw, isntead of initially.
                     //other->client->ps.heldByClient = ent->s.number+1;
 
+                    let sound = G_SoundIndex(ctx, "*pain100.wav");
                     crate::g_utils::G_EntitySound(
                         ctx,
                         ctx.entity_id_of(other).unwrap(),
                         CHAN_VOICE as c_int,
-                        G_SoundIndex("*pain100.wav"),
+                        sound,
                     );
+                    let sound = G_SoundIndex(ctx, "*jump1.wav");
                     crate::g_utils::G_EntitySound(
                         ctx,
                         ctx.entity_id_of(ent).unwrap(),
                         CHAN_VOICE as c_int,
-                        G_SoundIndex("*jump1.wav"),
+                        sound,
                     );
+                    let sound = G_SoundIndex(ctx, "sound/movers/objects/objectHit.wav");
                     crate::g_utils::G_Sound(
                         ctx,
                         ctx.entity_id_of(other),
                         CHAN_AUTO as c_int,
-                        G_SoundIndex("sound/movers/objects/objectHit.wav",
-                        ),
+                        sound,
                     );
 
                     //see if we can move to be next to the hand.. if it's not clear, break the throw.
@@ -4060,11 +4062,12 @@ pub fn ClientCommand(ctx: &mut GameContext, clientNum: c_int) {
                         (*client).doingThrow = 0;
 
                         (*client).ps.forceHandExtend = HANDEXTEND_NONE as c_int;
+                        let sound = G_SoundIndex(ctx, "*pain25.wav");
                         crate::g_utils::G_EntitySound(
                             ctx,
                             ctx.entity_id_of(ent).unwrap(),
                             CHAN_VOICE as c_int,
-                            G_SoundIndex("*pain25.wav"),
+                            sound,
                         );
 
                         (*otherClient).ps.forceHandExtend = HANDEXTEND_NONE as c_int;

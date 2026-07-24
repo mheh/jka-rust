@@ -592,14 +592,14 @@ pub fn PlaceShield(ctx: &mut GameContext, playerent: EntityId) -> qboolean {
 
     if ctx.world.globals.shieldAttachSound == 0 {
         ctx.world.globals.shieldLoopSound =
-            G_SoundIndex("sound/movers/doors/forcefield_lp.wav");
+            G_SoundIndex(ctx, "sound/movers/doors/forcefield_lp.wav");
         ctx.world.globals.shieldAttachSound =
-            G_SoundIndex("sound/weapons/detpack/stick.wav");
+            G_SoundIndex(ctx, "sound/weapons/detpack/stick.wav");
         ctx.world.globals.shieldActivateSound =
-            G_SoundIndex("sound/movers/doors/forcefield_on.wav");
+            G_SoundIndex(ctx, "sound/movers/doors/forcefield_on.wav");
         ctx.world.globals.shieldDeactivateSound =
-            G_SoundIndex("sound/movers/doors/forcefield_off.wav");
-        ctx.world.globals.shieldDamageSound = G_SoundIndex("sound/effects/bumpfield.wav");
+            G_SoundIndex(ctx, "sound/movers/doors/forcefield_off.wav");
+        ctx.world.globals.shieldDamageSound = G_SoundIndex(ctx, "sound/effects/bumpfield.wav");
         // `shieldItem` (`static const gitem_t *`) is a function-scope
         // cache; recomputed each call here since the fn-scope caching
         // scheme isn't threaded through GameWorld for this local.
@@ -819,12 +819,8 @@ pub fn pas_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean {
     if ctx.entity(self_).aimDebounceTime > ctx.world.level.time {
         // time since we've been shut off
         if ctx.entity(self_).painDebounceTime < ctx.world.level.time {
-            G_Sound(
-                ctx,
-                Some(self_),
-                CHAN_BODY,
-                G_SoundIndex("sound/chars/turret/ping.wav"),
-            );
+            let sound = G_SoundIndex(ctx, "sound/chars/turret/ping.wav");
+            G_Sound(ctx, Some(self_), CHAN_BODY, sound);
             ctx.entity_mut(self_).painDebounceTime = ctx.world.level.time + 1000;
         }
     }
@@ -919,12 +915,8 @@ pub fn pas_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean {
                 // all things equal, keep current
                 if ctx.entity(self_).attackDebounceTime + 100 < ctx.world.level.time {
                     // We haven't fired or acquired an enemy in the last 2 seconds-start-up sound
-                    G_Sound(
-                        ctx,
-                        Some(self_),
-                        CHAN_BODY,
-                        G_SoundIndex("sound/chars/turret/startup.wav"),
-                    );
+                    let sound = G_SoundIndex(ctx, "sound/chars/turret/startup.wav");
+                    G_Sound(ctx, Some(self_), CHAN_BODY, sound);
 
                     // Wind up turrets for a bit
                     // C: `level.time + 900 + random()*200` — the int sum promotes
@@ -1002,12 +994,8 @@ pub fn pas_adjust_enemy(ctx: &mut GameContext, ent: EntityId) {
         // don't ping pong on and off
         ctx.entity_mut(ent).enemy = None;
         // shut-down sound
-        G_Sound(
-            ctx,
-            Some(ent),
-            CHAN_BODY,
-            G_SoundIndex("sound/chars/turret/shutdown.wav"),
-        );
+        let sound = G_SoundIndex(ctx, "sound/chars/turret/shutdown.wav");
+        G_Sound(ctx, Some(ent), CHAN_BODY, sound);
 
         // C: `level.time + 500 + random()*150` — single truncation of the
         // promoted-to-f32 sum. Source: `oracle/codemp/game/g_items.c:690`
@@ -1125,12 +1113,8 @@ pub fn pas_think(ctx: &mut GameContext, ent: EntityId) {
     }
 
     if ctx.entity(ent).genericValue8 + TURRET_LIFETIME < ctx.world.level.time {
-        G_Sound(
-            ctx,
-            Some(ent),
-            CHAN_BODY,
-            G_SoundIndex("sound/chars/turret/shutdown.wav"),
-        );
+        let sound = G_SoundIndex(ctx, "sound/chars/turret/shutdown.wav");
+        G_Sound(ctx, Some(ent), CHAN_BODY, sound);
         ctx.entity_mut(ent).s.bolt2 = ENTITYNUM_NONE;
         ctx.entity_mut(ent).s.fireflag = 2;
 
@@ -1253,12 +1237,8 @@ pub fn pas_think(ctx: &mut GameContext, ent: EntityId) {
             ctx.entity_mut(ent).attackDebounceTime = ctx.world.level.time + 200;
         } else {
             //ent->nextthink = 0;
-            G_Sound(
-                ctx,
-                Some(ent),
-                CHAN_BODY,
-                G_SoundIndex("sound/chars/turret/shutdown.wav"),
-            );
+            let sound = G_SoundIndex(ctx, "sound/chars/turret/shutdown.wav");
+            G_Sound(ctx, Some(ent), CHAN_BODY, sound);
             ctx.entity_mut(ent).s.bolt2 = ENTITYNUM_NONE;
             ctx.entity_mut(ent).s.fireflag = 2;
             ctx.entity_mut(ent).nextthink = ctx.world.level.time + TURRET_DEATH_DELAY;
@@ -1363,12 +1343,8 @@ pub fn SP_PAS(ctx: &mut GameContext, base: EntityId) {
 
     ctx.entity_mut(base).physicsObject = qtrue;
 
-    G_Sound(
-        ctx,
-        Some(base),
-        CHAN_BODY,
-        G_SoundIndex("sound/chars/turret/startup.wav"),
-    );
+    let sound = G_SoundIndex(ctx, "sound/chars/turret/startup.wav");
+    G_Sound(ctx, Some(base), CHAN_BODY, sound);
 }
 
 /// Raven `ItemUse_Sentry`.
@@ -1407,7 +1383,7 @@ pub fn ItemUse_Sentry(ctx: &mut GameContext, ent: Option<EntityId>) {
     let sentry = G_Spawn(ctx);
 
     ctx.ent_set(sentry, PrefixSet::ClassnameStatic(c"sentryGun"));
-    ctx.entity_mut(sentry).s.modelindex = G_ModelIndex("models/items/psgun.glm"); // replace ASAP
+    ctx.entity_mut(sentry).s.modelindex = G_ModelIndex(ctx, "models/items/psgun.glm"); // replace ASAP
 
     ctx.entity_mut(sentry).s.g2radius = 30;
     ctx.entity_mut(sentry).s.modelGhoul2 = 1;
@@ -1598,12 +1574,8 @@ pub fn Jetpack_On(ctx: &mut GameContext, ent: EntityId) {
         }
     }
 
-    G_Sound(
-        ctx,
-        Some(ent),
-        CHAN_AUTO,
-        G_SoundIndex("sound/boba/JETON"),
-    );
+    let sound = G_SoundIndex(ctx, "sound/boba/JETON");
+    G_Sound(ctx, Some(ent), CHAN_AUTO, sound);
 
     unsafe {
         (*cl).jetPackOn = qtrue;
@@ -1878,8 +1850,8 @@ pub fn EWebDisattach(ctx: &mut GameContext, owner: EntityId, eweb: EntityId) {
 /// Source: `oracle/codemp/game/g_items.c:1434-1439`
 pub fn EWebPrecache(ctx: &mut GameContext) {
     RegisterItem(ctx, BG_FindItemForWeapon(WP_TURRET));
-    G_EffectIndex("detpack/explosion.efx");
-    G_EffectIndex("turret/muzzle_flash.efx");
+    G_EffectIndex(ctx, "detpack/explosion.efx");
+    G_EffectIndex(ctx, "turret/muzzle_flash.efx");
 }
 
 /// Raven `EWebDie`.
@@ -2160,7 +2132,8 @@ pub fn EWebFire(ctx: &mut GameContext, owner: EntityId, eweb: EntityId) {
     // play the muzzle flash
     let mut dAng: vec3_t = [0.0; 3];
     vectoangles(d, &mut dAng);
-    G_PlayEffectID(G_EffectIndex("turret/muzzle_flash.efx"), p, dAng);
+    let fx = G_EffectIndex(ctx, "turret/muzzle_flash.efx");
+    G_PlayEffectID(fx, p, dAng);
 }
 
 /// Raven `EWebPositionUser`.
@@ -2458,7 +2431,7 @@ pub fn EWeb_Create(ctx: &mut GameContext, spawner: EntityId) -> *mut gentity_t {
     pub const EWEB_HEALTH: c_int = 200;
 
     let modelName = c"models/map_objects/hoth/eweb_model.glm";
-    let failSound = G_SoundIndex("sound/interface/shieldcon_empty");
+    let failSound = G_SoundIndex(ctx, "sound/interface/shieldcon_empty");
 
     let mins: vec3_t = [-32.0, -32.0, -24.0];
     let maxs: vec3_t = [32.0, 32.0, 24.0];
@@ -2572,7 +2545,7 @@ pub fn EWeb_Create(ctx: &mut GameContext, spawner: EntityId) -> *mut gentity_t {
     // set up the g2 model info
     ctx.entity_mut(ent).s.modelGhoul2 = 1;
     ctx.entity_mut(ent).s.g2radius = 128;
-    ctx.entity_mut(ent).s.modelindex = G_ModelIndex(modelName.to_str().unwrap());
+    ctx.entity_mut(ent).s.modelindex = G_ModelIndex(ctx, modelName.to_str().unwrap());
 
     trap::G2API_InitGhoul2Model(
         ctx.engine,
@@ -3100,7 +3073,7 @@ pub fn RespawnItem(ctx: &mut GameContext, ent: EntityId) {
             G_TempEntity(ctx, trBase, entity_event_t::EV_GLOBAL_SOUND as c_int)
         };
         let te = te_ptr;
-        ctx.entity_mut(te).s.eventParm = G_SoundIndex("sound/items/respawn1");
+        ctx.entity_mut(te).s.eventParm = G_SoundIndex(ctx, "sound/items/respawn1");
         ctx.entity_mut(te).r.svFlags |= SVF_BROADCAST;
     }
 
@@ -3893,7 +3866,7 @@ pub fn G_SpawnItem(ctx: &mut GameContext, ent: EntityId, item: ItemId) {
     e.physicsBounce = 0.50; // items are bouncy
 
     if matches!(it.kind, ItemKind::Powerup(_)) {
-        G_SoundIndex("sound/items/respawn1");
+        G_SoundIndex(ctx, "sound/items/respawn1");
         let speed_ptr = core::ptr::addr_of_mut!(ctx.world.g_entities[ent.index()].speed);
         G_SpawnFloat(ctx, c"noglobalsound".as_ptr(), c"0".as_ptr(), speed_ptr);
     }

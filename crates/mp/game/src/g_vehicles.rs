@@ -512,12 +512,8 @@ pub fn Board(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t)
                 if (ctx.world.entity(parent_id).spawnflags & 2) != 0 {
                     // was being suspended
                     ctx.world.entity_mut(parent_id).spawnflags &= !2;
-                    crate::g_utils::G_Sound(
-                        ctx,
-                        Some(parent_id),
-                        CHAN_AUTO,
-                        G_SoundIndex("sound/vehicles/common/release.wav"),
-                    );
+                    let sound = G_SoundIndex(ctx, "sound/vehicles/common/release.wav");
+                    crate::g_utils::G_Sound(ctx, Some(parent_id), CHAN_AUTO, sound);
                     let debounce = ctx.world.entity(parent_id).fly_sound_debounce_time;
                     if debounce != 0 {
                         // we should drop like a rock for a few seconds
@@ -889,7 +885,7 @@ pub fn StartDeathDelay(ctx: &mut GameContext, pVeh: *mut Vehicle_t, iDelayTimeOv
     }
 
     if unsafe { (*vi).flammable } != qfalse {
-        let snd = G_SoundIndex("sound/vehicles/common/fire_lp.wav");
+        let snd = G_SoundIndex(ctx, "sound/vehicles/common/fire_lp.wav");
         let client = ctx.world.entity(parent_id).client;
         ctx.world.entity_mut(parent_id).s.loopSound = snd;
         // FLAG: pool client (recipe 2b) — deref stays raw.
@@ -2417,12 +2413,8 @@ pub fn G_FlyVehicleDestroySurface(
         if !pilot.is_null() {
             // make the pilot scream to his death
             let pilot_id = ctx.entity_id_of(pilot).unwrap();
-            crate::g_utils::G_EntitySound(
-                ctx,
-                pilot_id,
-                CHAN_VOICE,
-                G_SoundIndex("*falling1.wav"),
-            );
+            let sound = G_SoundIndex(ctx, "*falling1.wav");
+            crate::g_utils::G_EntitySound(ctx, pilot_id, CHAN_VOICE, sound);
         }
     }
     // so we can check what's broken
@@ -2961,7 +2953,7 @@ pub fn DeathUpdate(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                         bottom[2] += 2.0;
                         fxAng = [-90.0, 0.0, 0.0];
                         crate::g_utils::G_PlayEffectID(
-                            G_EffectIndex("ships/ship_explosion_mark"),
+                            G_EffectIndex(ctx, "ships/ship_explosion_mark"),
                             trace.endpos,
                             fxAng,
                         );

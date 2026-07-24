@@ -1646,7 +1646,7 @@ pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean
             return qfalse;
         }
 
-        G_ModelIndex(&format!("${}", sp_npc_type.as_deref().unwrap_or("")));
+        G_ModelIndex(ctx, &format!("${}", sp_npc_type.as_deref().unwrap_or("")));
 
         let p_veh_info = &(&ctx.world.bg_state.g_vehicleInfo)[i_veh_index as usize];
         if !p_veh_info.model.is_null() && *p_veh_info.model != 0 {

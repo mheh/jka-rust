@@ -185,22 +185,22 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
 
         if ctx.world.speedLoopSound == 0 {
             //so that the client configstring is already modified with this when we need it
-            ctx.world.speedLoopSound = G_SoundIndex("sound/weapons/force/speedloop.wav");
+            ctx.world.speedLoopSound = G_SoundIndex(ctx, "sound/weapons/force/speedloop.wav");
         }
         if ctx.world.rageLoopSound == 0 {
-            ctx.world.rageLoopSound = G_SoundIndex("sound/weapons/force/rageloop.wav");
+            ctx.world.rageLoopSound = G_SoundIndex(ctx, "sound/weapons/force/rageloop.wav");
         }
         if ctx.world.absorbLoopSound == 0 {
-            ctx.world.absorbLoopSound = G_SoundIndex("sound/weapons/force/absorbloop.wav");
+            ctx.world.absorbLoopSound = G_SoundIndex(ctx, "sound/weapons/force/absorbloop.wav");
         }
         if ctx.world.protectLoopSound == 0 {
-            ctx.world.protectLoopSound = G_SoundIndex("sound/weapons/force/protectloop.wav");
+            ctx.world.protectLoopSound = G_SoundIndex(ctx, "sound/weapons/force/protectloop.wav");
         }
         if ctx.world.seeLoopSound == 0 {
-            ctx.world.seeLoopSound = G_SoundIndex("sound/weapons/force/seeloop.wav");
+            ctx.world.seeLoopSound = G_SoundIndex(ctx, "sound/weapons/force/seeloop.wav");
         }
         if ctx.world.ysalamiriLoopSound == 0 {
-            ctx.world.ysalamiriLoopSound = G_SoundIndex("sound/player/nullifyloop.wav");
+            ctx.world.ysalamiriLoopSound = G_SoundIndex(ctx, "sound/player/nullifyloop.wav");
         }
 
         if ent_etype == ET_NPC as c_int {
@@ -1230,7 +1230,8 @@ pub fn ForceHeal(ctx: &mut GameContext, self_: EntityId) {
         }
         //NOTE: Decided to make all levels instant.
 
-        G_Sound(ctx, Some(self_), CHAN_ITEM, G_SoundIndex("sound/weapons/force/heal.wav"));
+        let sound = G_SoundIndex(ctx, "sound/weapons/force/heal.wav");
+        G_Sound(ctx, Some(self_), CHAN_ITEM, sound);
     }
 }
 
@@ -1633,7 +1634,8 @@ pub fn ForceSpeed(ctx: &mut GameContext, self_: EntityId, forceDuration: c_int) 
         (*cl).ps.forceAllowDeactivateTime = level_time + 1500;
 
         WP_ForcePowerStart(ctx, self_, FP_SPEED, forceDuration);
-        G_Sound(ctx, Some(self_), CHAN_BODY, G_SoundIndex("sound/weapons/force/speed.wav"));
+        let sound = G_SoundIndex(ctx, "sound/weapons/force/speed.wav");
+        G_Sound(ctx, Some(self_), CHAN_BODY, sound);
         let loop_sound = ctx.world.speedLoopSound;
         G_Sound(ctx, Some(self_), TRACK_CHANNEL_2 as c_int, loop_sound);
     }
@@ -1667,7 +1669,8 @@ pub fn ForceSeeing(ctx: &mut GameContext, self_: EntityId) {
 
         WP_ForcePowerStart(ctx, self_, FP_SEE, 0);
 
-        G_Sound(ctx, Some(self_), CHAN_AUTO, G_SoundIndex("sound/weapons/force/see.wav"));
+        let sound = G_SoundIndex(ctx, "sound/weapons/force/see.wav");
+        G_Sound(ctx, Some(self_), CHAN_AUTO, sound);
         let loop_sound = ctx.world.seeLoopSound;
         G_Sound(ctx, Some(self_), TRACK_CHANNEL_5 as c_int, loop_sound);
     }
@@ -1799,12 +1802,8 @@ pub fn ForceRage(ctx: &mut GameContext, self_: EntityId) {
 
         WP_ForcePowerStart(ctx, self_, FP_RAGE, 0);
 
-        G_Sound(
-            ctx,
-            Some(self_),
-            TRACK_CHANNEL_4 as c_int,
-            G_SoundIndex("sound/weapons/force/rage.wav"),
-        );
+        let sound = G_SoundIndex(ctx, "sound/weapons/force/rage.wav");
+        G_Sound(ctx, Some(self_), TRACK_CHANNEL_4 as c_int, sound);
         let loop_sound = ctx.world.rageLoopSound;
         G_Sound(ctx, Some(self_), TRACK_CHANNEL_3 as c_int, loop_sound);
     }
@@ -1843,7 +1842,8 @@ pub fn ForceLightning(ctx: &mut GameContext, self_: EntityId) {
         (*cl).ps.forceHandExtend = HANDEXTEND_FORCE_HOLD as c_int;
         (*cl).ps.forceHandExtendTime = level_time + 20000;
 
-        G_Sound(ctx, Some(self_), CHAN_BODY, G_SoundIndex("sound/weapons/force/lightning"));
+        let sound = G_SoundIndex(ctx, "sound/weapons/force/lightning");
+        G_Sound(ctx, Some(self_), CHAN_BODY, sound);
 
         WP_ForcePowerStart(ctx, self_, FP_LIGHTNING, 500);
     }
@@ -1951,7 +1951,8 @@ pub fn ForceLightningDamage(
                             "sound/weapons/force/lightninghit{}",
                             ctx.world.bg_state.rng.Q_irand(1, 3)
                         );
-                        G_Sound(ctx, Some(te), CHAN_BODY, G_SoundIndex(&snd));
+                        let sound = G_SoundIndex(ctx, &snd);
+                        G_Sound(ctx, Some(te), CHAN_BODY, sound);
                     }
 
                     if (*tcl).ps.electrifyTime < (level_time + 400) {
@@ -2191,7 +2192,8 @@ pub fn ForceDrain(ctx: &mut GameContext, self_: EntityId) {
         (*cl).ps.forceHandExtend = HANDEXTEND_FORCE_HOLD as c_int;
         (*cl).ps.forceHandExtendTime = level_time + 20000;
 
-        G_Sound(ctx, Some(self_), CHAN_BODY, G_SoundIndex("sound/weapons/force/drain.wav"));
+        let sound = G_SoundIndex(ctx, "sound/weapons/force/drain.wav");
+        G_Sound(ctx, Some(self_), CHAN_BODY, sound);
 
         WP_ForcePowerStart(ctx, self_, FP_DRAIN, 500);
     }
@@ -2544,12 +2546,8 @@ pub fn ForceJumpCharge(ctx: &mut GameContext, self_: EntityId, ucmd: *mut usercm
 
         //need to play sound
         if (*cl).ps.fd.forceJumpCharge == 0.0 {
-            G_Sound(
-                ctx,
-                Some(self_),
-                TRACK_CHANNEL_1 as c_int,
-                G_SoundIndex("sound/weapons/force/jumpbuild.wav"),
-            );
+            let sound = G_SoundIndex(ctx, "sound/weapons/force/jumpbuild.wav");
+            G_Sound(ctx, Some(self_), TRACK_CHANNEL_1 as c_int, sound);
         }
 
         //Increment
@@ -2925,7 +2923,7 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
             AngleVectors((*tcl).renderInfo.eyeAngles, Some(&mut eyeDir), None, None);
             VectorNormalize(&mut eyeDir);
             G_PlayEffectID(
-                G_EffectIndex("force/force_touch"),
+                G_EffectIndex(ctx, "force/force_touch"),
                 (*tcl).renderInfo.eyePoint,
                 eyeDir,
             );
@@ -2942,7 +2940,7 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
                 //don't create a diversion less than 64 from you of if at power level 1
                 //use distraction anim instead
                 G_PlayEffectID(
-                    G_EffectIndex("force/force_touch"),
+                    G_EffectIndex(ctx, "force/force_touch"),
                     (*tr).endpos,
                     (*tr).plane.normal,
                 );
@@ -3009,7 +3007,8 @@ pub fn ForceTelepathy(ctx: &mut GameContext, self_: EntityId) {
         if ForceTelepathyCheckDirectNPCTarget(ctx, self_, &mut tr, &mut tookPower) {
             //hit an NPC directly
             (*cl).ps.forceAllowDeactivateTime = level_time + 1500;
-            G_Sound(ctx, Some(self_), CHAN_AUTO, G_SoundIndex("sound/weapons/force/distract.wav"));
+            let sound = G_SoundIndex(ctx, "sound/weapons/force/distract.wav");
+            G_Sound(ctx, Some(self_), CHAN_AUTO, sound);
             (*cl).ps.forceHandExtend = HANDEXTEND_FORCEPUSH as c_int;
             (*cl).ps.forceHandExtendTime = level_time + 1000;
             return;
@@ -3051,7 +3050,8 @@ pub fn ForceTelepathy(ctx: &mut GameContext, self_: EntityId) {
                     WP_ForcePowerStart(ctx, self_, FP_TELEPATHY, 0);
                 }
 
-                G_Sound(ctx, Some(self_), CHAN_AUTO, G_SoundIndex("sound/weapons/force/distract.wav"));
+                let sound = G_SoundIndex(ctx, "sound/weapons/force/distract.wav");
+                G_Sound(ctx, Some(self_), CHAN_AUTO, sound);
 
                 (*cl).ps.forceHandExtend = HANDEXTEND_FORCEPUSH as c_int;
                 (*cl).ps.forceHandExtendTime = level_time + 1000;
@@ -3121,7 +3121,8 @@ pub fn ForceTelepathy(ctx: &mut GameContext, self_: EntityId) {
                     WP_ForcePowerStart(ctx, self_, FP_TELEPATHY, 0);
                 }
 
-                G_Sound(ctx, Some(self_), CHAN_AUTO, G_SoundIndex("sound/weapons/force/distract.wav"));
+                let sound = G_SoundIndex(ctx, "sound/weapons/force/distract.wav");
+                G_Sound(ctx, Some(self_), CHAN_AUTO, sound);
 
                 (*cl).ps.forceHandExtend = HANDEXTEND_FORCEPUSH as c_int;
                 (*cl).ps.forceHandExtendTime = level_time + 1000;
@@ -3354,7 +3355,8 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: bool) {
         }
 
         if !pull && (*cl).ps.saberLockTime > level_time && (*cl).ps.saberLockFrame != 0 {
-            G_Sound(ctx, Some(self_), CHAN_BODY, G_SoundIndex("sound/weapons/force/push.wav"));
+            let sound = G_SoundIndex(ctx, "sound/weapons/force/push.wav");
+            G_Sound(ctx, Some(self_), CHAN_BODY, sound);
             (*cl).ps.powerups[PW_DISINT_4 as usize] = level_time + 1500;
 
             (*cl).ps.saberLockHits += (*cl).ps.fd.forcePowerLevel[FP_PUSH as usize] * 2;
@@ -3367,7 +3369,8 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: bool) {
 
         //make sure this plays and that you cannot press fire for about 1 second after this
         if pull {
-            G_Sound(ctx, Some(self_), CHAN_BODY, G_SoundIndex("sound/weapons/force/pull.wav"));
+            let sound = G_SoundIndex(ctx, "sound/weapons/force/pull.wav");
+            G_Sound(ctx, Some(self_), CHAN_BODY, sound);
             if (*cl).ps.forceHandExtend == HANDEXTEND_NONE as c_int {
                 (*cl).ps.forceHandExtend = HANDEXTEND_FORCEPULL as c_int;
                 if ctx.world.cvars.g_gametype.integer == GT_SIEGE as c_int
@@ -3382,7 +3385,8 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: bool) {
             (*cl).ps.powerups[PW_DISINT_4 as usize] = (*cl).ps.forceHandExtendTime + 200;
             (*cl).ps.powerups[PW_PULL as usize] = (*cl).ps.powerups[PW_DISINT_4 as usize];
         } else {
-            G_Sound(ctx, Some(self_), CHAN_BODY, G_SoundIndex("sound/weapons/force/push.wav"));
+            let sound = G_SoundIndex(ctx, "sound/weapons/force/push.wav");
+            G_Sound(ctx, Some(self_), CHAN_BODY, sound);
             if (*cl).ps.forceHandExtend == HANDEXTEND_NONE as c_int {
                 (*cl).ps.forceHandExtend = HANDEXTEND_FORCEPUSH as c_int;
                 (*cl).ps.forceHandExtendTime = level_time + 1000;
@@ -3792,11 +3796,13 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: bool) {
                     if otherPushPower != 0 && CanCounterThrow(ctx, push_list[x], Some(self_), pull)
                     {
                         if pull {
-                            G_Sound(ctx, Some(push_list[x]), CHAN_BODY, G_SoundIndex("sound/weapons/force/pull.wav"));
+                            let sound = G_SoundIndex(ctx, "sound/weapons/force/pull.wav");
+                            G_Sound(ctx, Some(push_list[x]), CHAN_BODY, sound);
                             (*pcl).ps.forceHandExtend = HANDEXTEND_FORCEPULL as c_int;
                             (*pcl).ps.forceHandExtendTime = level_time + 400;
                         } else {
-                            G_Sound(ctx, Some(push_list[x]), CHAN_BODY, G_SoundIndex("sound/weapons/force/push.wav"));
+                            let sound = G_SoundIndex(ctx, "sound/weapons/force/push.wav");
+                            G_Sound(ctx, Some(push_list[x]), CHAN_BODY, sound);
                             (*pcl).ps.forceHandExtend = HANDEXTEND_FORCEPUSH as c_int;
                             (*pcl).ps.forceHandExtendTime = level_time + 1000;
                         }
@@ -4172,7 +4178,8 @@ pub fn WP_ForcePowerStop(ctx: &mut GameContext, self_: EntityId, forcePower: for
             FP_PULL => {}
             FP_TELEPATHY => {
                 if wasActive & (1 << FP_TELEPATHY) != 0 {
-                    G_Sound(ctx, Some(self_), CHAN_AUTO, G_SoundIndex("sound/weapons/force/distractstop.wav"));
+                    let sound = G_SoundIndex(ctx, "sound/weapons/force/distractstop.wav");
+                    G_Sound(ctx, Some(self_), CHAN_AUTO, sound);
                 }
                 (*cl).ps.fd.forceMindtrickTargetIndex = 0;
                 (*cl).ps.fd.forceMindtrickTargetIndex2 = 0;
@@ -4201,7 +4208,8 @@ pub fn WP_ForcePowerStop(ctx: &mut GameContext, self_: EntityId, forcePower: for
                 {
                     //if we had our throat crushed in for more than half a second, gasp for air when we're let go
                     if wasActive & (1 << FP_GRIP) != 0 {
-                        G_EntitySound(ctx, grip_id, CHAN_VOICE, G_SoundIndex("*gasp.wav"));
+                        let sound = G_SoundIndex(ctx, "*gasp.wav");
+                        G_EntitySound(ctx, grip_id, CHAN_VOICE, sound);
                     }
                 }
 
@@ -4431,7 +4439,8 @@ pub fn DoGripAction(ctx: &mut GameContext, self_: EntityId, forcePower: forcePow
 
                 //Must play custom sounds on the actual entity. Don't use G_Sound (it creates a temp entity for the sound)
                 let snd = format!("*choke{}.wav", ctx.world.bg_state.rng.Q_irand(1, 3));
-                G_EntitySound(ctx, grip_id, CHAN_VOICE, G_SoundIndex(&snd));
+                let sound = G_SoundIndex(ctx, &snd);
+                G_EntitySound(ctx, grip_id, CHAN_VOICE, sound);
 
                 (*gcl).ps.forceHandExtend = HANDEXTEND_CHOKE as c_int;
                 (*gcl).ps.forceHandExtendTime = level_time + 2000;
@@ -4526,7 +4535,8 @@ pub fn DoGripAction(ctx: &mut GameContext, self_: EntityId, forcePower: forcePow
 
                 //Must play custom sounds on the actual entity. Don't use G_Sound (it creates a temp entity for the sound)
                 let snd = format!("*choke{}.wav", ctx.world.bg_state.rng.Q_irand(1, 3));
-                G_EntitySound(ctx, grip_id, CHAN_VOICE, G_SoundIndex(&snd));
+                let sound = G_SoundIndex(ctx, &snd);
+                G_EntitySound(ctx, grip_id, CHAN_VOICE, sound);
 
                 (*gcl).ps.forceHandExtend = HANDEXTEND_CHOKE as c_int;
                 (*gcl).ps.forceHandExtendTime = level_time + 2000;
@@ -5132,7 +5142,8 @@ pub fn SeekerDroneUpdate(ctx: &mut GameContext, self_: EntityId) {
         {
             (*cl).ps.genericEnemyIndex = (1024.0 + (*cl).ps.droneExistTime) as c_int;
             if (*cl).ps.droneFireTime < (level_time) as f32 {
-                G_Sound(ctx, Some(self_), CHAN_BODY, G_SoundIndex("sound/weapons/laser_trap/warning.wav"));
+                let sound = G_SoundIndex(ctx, "sound/weapons/laser_trap/warning.wav");
+                G_Sound(ctx, Some(self_), CHAN_BODY, sound);
                 (*cl).ps.droneFireTime = (level_time + 100) as f32;
             }
             return;
@@ -5263,7 +5274,8 @@ pub fn SeekerDroneUpdate(ctx: &mut GameContext, self_: EntityId) {
                         2000,
                         MOD_BLASTER as c_int,
                     );
-                    G_SoundAtLoc(ctx, org, CHAN_WEAPON, G_SoundIndex("sound/weapons/bryar/fire.wav"));
+                    let sound = G_SoundIndex(ctx, "sound/weapons/bryar/fire.wav");
+                    G_SoundAtLoc(ctx, org, CHAN_WEAPON, sound);
 
                     (*cl).ps.droneFireTime =
                         (level_time + ctx.world.bg_state.rng.Q_irand(400, 700)) as f32;
@@ -5492,7 +5504,8 @@ pub fn G_SpecialRollGetup(ctx: &mut GameContext, self_: EntityId) -> bool {
         }
 
         if rolled {
-            G_EntitySound(ctx, self_, CHAN_VOICE, G_SoundIndex("*jump1.wav"));
+            let sound = G_SoundIndex(ctx, "*jump1.wav");
+            G_EntitySound(ctx, self_, CHAN_VOICE, sound);
         }
 
         rolled
@@ -5601,12 +5614,8 @@ pub fn WP_ForcePowersUpdate(ctx: &mut GameContext, self_: Option<EntityId>, ucmd
                             (*cl).ps.forceHandExtendTime = level_time + 500;
                         //self->client->ps.velocity[2] = 400;
                         } else if (*cl).ps.quickerGetup != 0 {
-                            G_EntitySound(
-                                ctx,
-                                self_,
-                                CHAN_VOICE,
-                                G_SoundIndex("*jump1.wav"),
-                            );
+                            let sound = G_SoundIndex(ctx, "*jump1.wav");
+                            G_EntitySound(ctx, self_, CHAN_VOICE, sound);
                             (*cl).ps.forceDodgeAnim = 3;
                             (*cl).ps.forceHandExtendTime = level_time + 500;
                             (*cl).ps.velocity[2] = 300.0;
@@ -5624,12 +5633,8 @@ pub fn WP_ForcePowersUpdate(ctx: &mut GameContext, self_: Option<EntityId>, ucmd
                 {
                     (*cl).ps.forceDodgeAnim = 1;
                     (*cl).ps.forceHandExtendTime = level_time + 1000;
-                    G_EntitySound(
-                        ctx,
-                        self_,
-                        CHAN_VOICE,
-                        G_SoundIndex("*jump1.wav"),
-                    );
+                    let sound = G_SoundIndex(ctx, "*jump1.wav");
+                    G_EntitySound(ctx, self_, CHAN_VOICE, sound);
                     (*cl).ps.velocity[2] = 100.0;
                 } else if (*cl).ps.forceDodgeAnim == 0 {
                     (*cl).ps.forceHandExtendTime = level_time + 100;
@@ -6108,7 +6113,8 @@ pub fn Jedi_DodgeEvasion(
             if g_forceDodge == 2 {
                 ForceSpeed(ctx, self_, 500);
             } else {
-                G_Sound(ctx, Some(self_), CHAN_BODY, G_SoundIndex("sound/weapons/force/speed.wav"));
+                let sound = G_SoundIndex(ctx, "sound/weapons/force/speed.wav");
+                G_Sound(ctx, Some(self_), CHAN_BODY, sound);
             }
             return true;
         }

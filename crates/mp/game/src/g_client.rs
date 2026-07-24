@@ -440,12 +440,12 @@ pub fn JMSaberThink(ctx: &mut GameContext, ent: EntityId) {
         if enemy_client.is_null() || enemy_inuse == qfalse {
             // disconnected?
             let enemy_trbase = ctx.world.entity(enemy_id).s.pos.trBase;
+            let mi = G_ModelIndex(ctx, "models/weapons2/saber/saber_w.glm");
             let e = ctx.world.entity_mut(ent);
             e.s.pos.trBase = enemy_trbase;
             e.s.origin = enemy_trbase;
             e.r.currentOrigin = enemy_trbase;
-            e.s.modelindex = G_ModelIndex("models/weapons2/saber/saber_w.glm",
-            );
+            e.s.modelindex = mi;
             e.s.eFlags &= !EF_NODRAW;
             e.s.modelGhoul2 = 1;
             e.s.eType = ET_MISSILE as c_int;
@@ -603,7 +603,7 @@ pub fn SP_info_jedimaster_start(ctx: &mut GameContext, ent: EntityId) {
     ctx.world.entity_mut(ent).flags = FL_BOUNCE_HALF;
 
     ctx.world.entity_mut(ent).s.modelindex =
-        G_ModelIndex("models/weapons2/saber/saber_w.glm");
+        G_ModelIndex(ctx, "models/weapons2/saber/saber_w.glm");
     ctx.world.entity_mut(ent).s.modelGhoul2 = 1;
     ctx.world.entity_mut(ent).s.g2radius = 20;
     // (*ent).s.eType = ET_GENERAL;
@@ -2150,19 +2150,21 @@ pub fn G_BreakArm(ctx: &mut GameContext, ent: EntityId, arm: c_int) {
 
     // This could be combined into a single event. But I guess limbs don't break often
     // enough to worry about it.
+    let sound = G_SoundIndex(ctx, "*pain25.wav");
     G_EntitySound(
         ctx,
         ent,
         CHAN_VOICE,
-        G_SoundIndex("*pain25.wav"),
+        sound,
     );
     // FIXME: A nice bone snapping sound instead if possible
     let n = ctx.world.bg_state.rng.Q_irand(1, 3);
+    let sound = G_SoundIndex(ctx, &format!("sound/player/bodyfall_human{}.wav", n));
     G_Sound(
         ctx,
         Some(ent),
         CHAN_AUTO,
-        G_SoundIndex(&format!("sound/player/bodyfall_human{}.wav", n)),
+        sound,
     );
 }
 
@@ -3635,9 +3637,9 @@ pub fn SetupGameGhoul2Model(
                         if !(*ent).client.is_null() && (*((*ent).client)).NPC_class == CLASS_VEHICLE
                         {
                             // vehicles are tricky and send over their vehicle names as the model
-                            (*ent).s.modelindex = G_ModelIndex(&cstr_to_str(vehicleName.as_ptr()));
+                            (*ent).s.modelindex = G_ModelIndex(ctx, &cstr_to_str(vehicleName.as_ptr()));
                         } else {
-                            (*ent).s.modelindex = G_ModelIndex(&cstr_to_str(modelFullPath.as_ptr()));
+                            (*ent).s.modelindex = G_ModelIndex(ctx, &cstr_to_str(modelFullPath.as_ptr()));
                         }
                     }
                 }

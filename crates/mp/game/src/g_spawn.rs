@@ -282,7 +282,7 @@ pub fn G_CallSpawn(ctx: &mut GameContext, id: EntityId) -> qboolean {
         let healingsound = ctx.entity(id).healingsound.clone();
         if !healingsound.is_empty() {
             //yeah...this can be used for anything, so.. precache it if it's there
-            G_SoundIndex(&healingsound);
+            G_SoundIndex(ctx, &healingsound);
         }
         let ent_ptr = ctx.entity_mut(id) as *mut gentity_t;
         dispatch_spawn(ctx, sp, ent_ptr);

@@ -66,16 +66,16 @@ const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
 pub fn NPC_Probe_Precache(ctx: &mut GameContext) {
     for i in 1..4 {
         let s = format!("sound/chars/probe/misc/probetalk{}", i);
-        G_SoundIndex(&s);
+        G_SoundIndex(ctx, &s);
     }
-    G_SoundIndex("sound/chars/probe/misc/probedroidloop");
-    G_SoundIndex("sound/chars/probe/misc/anger1");
-    G_SoundIndex("sound/chars/probe/misc/fire");
+    G_SoundIndex(ctx, "sound/chars/probe/misc/probedroidloop");
+    G_SoundIndex(ctx, "sound/chars/probe/misc/anger1");
+    G_SoundIndex(ctx, "sound/chars/probe/misc/fire");
 
-    G_EffectIndex("chunks/probehead");
-    G_EffectIndex("env/med_explode2");
-    G_EffectIndex("explosions/probeexplosion1");
-    G_EffectIndex("bryar/muzzle_flash");
+    G_EffectIndex(ctx, "chunks/probehead");
+    G_EffectIndex(ctx, "env/med_explode2");
+    G_EffectIndex(ctx, "explosions/probeexplosion1");
+    G_EffectIndex(ctx, "bryar/muzzle_flash");
 
     RegisterItem(ctx, BG_FindItemForAmmo(AMMO_BLASTER));
     RegisterItem(ctx, BG_FindItemForWeapon(WP_BRYAR_PISTOL));
@@ -345,17 +345,13 @@ pub fn ImperialProbe_FireBlaster(ctx: &mut GameContext) {
     BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut muzzle1);
 
     G_PlayEffectID(
-        G_EffectIndex("bryar/muzzle_flash"),
+        G_EffectIndex(ctx, "bryar/muzzle_flash"),
         muzzle1,
         [0.0; 3],
     );
 
-    G_Sound(
-        ctx,
-        Some(npc_id),
-        CHAN_AUTO,
-        G_SoundIndex("sound/chars/probe/misc/fire"),
-    );
+    let sound = G_SoundIndex(ctx, "sound/chars/probe/misc/fire");
+    G_Sound(ctx, Some(npc_id), CHAN_AUTO, sound);
 
     if ctx.world.entity(npc_id).health != 0 {
         // `ctx.entity_id_of(enemy_ptr)` round-trips the entity's `.enemy`
@@ -635,7 +631,7 @@ pub fn ImperialProbe_Patrol(ctx: &mut GameContext) {
 
         if UpdateGoal(ctx) != core::ptr::null_mut() {
             // start loop sound once we move
-            let loop_sound = G_SoundIndex("sound/chars/probe/misc/probedroidloop");
+            let loop_sound = G_SoundIndex(ctx, "sound/chars/probe/misc/probedroidloop");
             ctx.world.entity_mut(npc_id).s.loopSound = loop_sound;
             ctx.world.globals.ucmd.buttons |= BUTTON_WALKING;
             NPC_MoveToGoal(ctx, 1);

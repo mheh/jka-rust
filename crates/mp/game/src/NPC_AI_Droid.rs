@@ -346,7 +346,7 @@ pub fn Droid_Spin(ctx: &mut GameContext) {
                 TIMER_Set(ctx, Some(npc_id), b"smoke\0".as_ptr() as *const c_char, 100);
                 let origin = ctx.world.entity(npc_id).r.currentOrigin;
                 G_PlayEffectID(
-                    G_EffectIndex("volumetric/droid_smoke"),
+                    G_EffectIndex(ctx, "volumetric/droid_smoke"),
                     origin,
                     dir,
                 );
@@ -362,7 +362,7 @@ pub fn Droid_Spin(ctx: &mut GameContext) {
                 );
                 let origin = ctx.world.entity(npc_id).r.currentOrigin;
                 G_PlayEffectID(
-                    G_EffectIndex("sparks/spark"),
+                    G_EffectIndex(ctx, "sparks/spark"),
                     origin,
                     dir,
                 );
@@ -472,19 +472,19 @@ pub fn NPC_Droid_Pain(
                             AngleVectors(current_angles, None, None, Some(&mut up));
                             let origin = ctx.world.entity(self_).r.currentOrigin;
                             G_PlayEffectID(
-                                G_EffectIndex("chunks/r5d2head_veh"),
+                                G_EffectIndex(ctx, "chunks/r5d2head_veh"),
                                 origin,
                                 up,
                             );
                         } else {
                             let origin = ctx.world.entity(self_).r.currentOrigin;
                             G_PlayEffectID(
-                                G_EffectIndex("small_chunks"),
+                                G_EffectIndex(ctx, "small_chunks"),
                                 origin,
                                 [0.0, 0.0, 0.0],
                             );
                             G_PlayEffectID(
-                                G_EffectIndex("chunks/r5d2head"),
+                                G_EffectIndex(ctx, "chunks/r5d2head"),
                                 origin,
                                 [0.0, 0.0, 0.0],
                             );
@@ -594,19 +594,19 @@ pub fn NPC_Droid_Pain(
                             AngleVectors(current_angles, None, None, Some(&mut up));
                             let origin = ctx.world.entity(self_).r.currentOrigin;
                             G_PlayEffectID(
-                                G_EffectIndex("chunks/r2d2head_veh"),
+                                G_EffectIndex(ctx, "chunks/r2d2head_veh"),
                                 origin,
                                 up,
                             );
                         } else {
                             let origin = ctx.world.entity(self_).r.currentOrigin;
                             G_PlayEffectID(
-                                G_EffectIndex("small_chunks"),
+                                G_EffectIndex(ctx, "small_chunks"),
                                 origin,
                                 [0.0, 0.0, 0.0],
                             );
                             G_PlayEffectID(
-                                G_EffectIndex("chunks/r2d2head"),
+                                G_EffectIndex(ctx, "chunks/r2d2head"),
                                 origin,
                                 [0.0, 0.0, 0.0],
                             );
@@ -709,12 +709,12 @@ pub fn Droid_Pain(ctx: &mut GameContext) {
 pub fn NPC_Mouse_Precache(ctx: &mut GameContext) {
     for i in 1..4 {
         let sound_path = format!("sound/chars/mouse/misc/mousego{}.wav", i);
-        G_SoundIndex(&sound_path);
+        G_SoundIndex(ctx, &sound_path);
     }
 
-    G_EffectIndex("env/small_explode");
-    G_SoundIndex("sound/chars/mouse/misc/death1");
-    G_SoundIndex("sound/chars/mouse/misc/mouse_lp");
+    G_EffectIndex(ctx, "env/small_explode");
+    G_SoundIndex(ctx, "sound/chars/mouse/misc/death1");
+    G_SoundIndex(ctx, "sound/chars/mouse/misc/mouse_lp");
 }
 
 /// Raven `NPC_R5D2_Precache`.
@@ -723,16 +723,16 @@ pub fn NPC_Mouse_Precache(ctx: &mut GameContext) {
 pub fn NPC_R5D2_Precache(ctx: &mut GameContext) {
     for i in 1..5 {
         let sound_path = format!("sound/chars/r5d2/misc/r5talk{}.wav", i);
-        G_SoundIndex(&sound_path);
+        G_SoundIndex(ctx, &sound_path);
     }
 
-    G_SoundIndex("sound/chars/mark2/misc/mark2_explo");
-    G_SoundIndex("sound/chars/r2d2/misc/r2_move_lp2.wav");
-    G_EffectIndex("env/med_explode");
-    G_EffectIndex("volumetric/droid_smoke");
-    G_EffectIndex("sparks/spark");
-    G_EffectIndex("chunks/r5d2head");
-    G_EffectIndex("chunks/r5d2head_veh");
+    G_SoundIndex(ctx, "sound/chars/mark2/misc/mark2_explo");
+    G_SoundIndex(ctx, "sound/chars/r2d2/misc/r2_move_lp2.wav");
+    G_EffectIndex(ctx, "env/med_explode");
+    G_EffectIndex(ctx, "volumetric/droid_smoke");
+    G_EffectIndex(ctx, "sparks/spark");
+    G_EffectIndex(ctx, "chunks/r5d2head");
+    G_EffectIndex(ctx, "chunks/r5d2head_veh");
 }
 
 /// Raven `NPC_R2D2_Precache`.
@@ -741,16 +741,16 @@ pub fn NPC_R5D2_Precache(ctx: &mut GameContext) {
 pub fn NPC_R2D2_Precache(ctx: &mut GameContext) {
     for i in 1..4 {
         let sound_path = format!("sound/chars/r2d2/misc/r2d2talk0{}.wav", i);
-        G_SoundIndex(&sound_path);
+        G_SoundIndex(ctx, &sound_path);
     }
 
-    G_SoundIndex("sound/chars/mark2/misc/mark2_explo");
-    G_SoundIndex("sound/chars/r2d2/misc/r2_move_lp.wav");
-    G_EffectIndex("env/med_explode");
-    G_EffectIndex("volumetric/droid_smoke");
-    G_EffectIndex("sparks/spark");
-    G_EffectIndex("chunks/r2d2head");
-    G_EffectIndex("chunks/r2d2head_veh");
+    G_SoundIndex(ctx, "sound/chars/mark2/misc/mark2_explo");
+    G_SoundIndex(ctx, "sound/chars/r2d2/misc/r2_move_lp.wav");
+    G_EffectIndex(ctx, "env/med_explode");
+    G_EffectIndex(ctx, "volumetric/droid_smoke");
+    G_EffectIndex(ctx, "sparks/spark");
+    G_EffectIndex(ctx, "chunks/r2d2head");
+    G_EffectIndex(ctx, "chunks/r2d2head_veh");
 }
 
 /// Raven `NPC_Gonk_Precache`.
@@ -758,14 +758,14 @@ pub fn NPC_R2D2_Precache(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:520-530`
 pub fn NPC_Gonk_Precache(ctx: &mut GameContext) {
     // SAFETY: string literals valid.
-    G_SoundIndex("sound/chars/gonk/misc/gonktalk1.wav");
-    G_SoundIndex("sound/chars/gonk/misc/gonktalk2.wav");
+    G_SoundIndex(ctx, "sound/chars/gonk/misc/gonktalk1.wav");
+    G_SoundIndex(ctx, "sound/chars/gonk/misc/gonktalk2.wav");
 
-    G_SoundIndex("sound/chars/gonk/misc/death1.wav");
-    G_SoundIndex("sound/chars/gonk/misc/death2.wav");
-    G_SoundIndex("sound/chars/gonk/misc/death3.wav");
+    G_SoundIndex(ctx, "sound/chars/gonk/misc/death1.wav");
+    G_SoundIndex(ctx, "sound/chars/gonk/misc/death2.wav");
+    G_SoundIndex(ctx, "sound/chars/gonk/misc/death3.wav");
 
-    G_EffectIndex("env/med_explode");
+    G_EffectIndex(ctx, "env/med_explode");
 }
 
 /// Raven `NPC_Protocol_Precache`.
@@ -773,8 +773,8 @@ pub fn NPC_Gonk_Precache(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:537-541`
 pub fn NPC_Protocol_Precache(ctx: &mut GameContext) {
     // SAFETY: string literals valid.
-    G_SoundIndex("sound/chars/mark2/misc/mark2_explo");
-    G_EffectIndex("env/med_explode");
+    G_SoundIndex(ctx, "sound/chars/mark2/misc/mark2_explo");
+    G_EffectIndex(ctx, "env/med_explode");
 }
 
 /// Raven `NPC_BSDroid_Default`.

@@ -43,15 +43,15 @@ const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark2.c:27-43`
 pub fn NPC_Mark2_Precache(ctx: &mut GameContext) {
-    G_SoundIndex("sound/chars/mark2/misc/mark2_explo");
-    G_SoundIndex("sound/chars/mark2/misc/mark2_pain");
-    G_SoundIndex("sound/chars/mark2/misc/mark2_fire");
-    G_SoundIndex("sound/chars/mark2/misc/mark2_move_lp");
+    G_SoundIndex(ctx, "sound/chars/mark2/misc/mark2_explo");
+    G_SoundIndex(ctx, "sound/chars/mark2/misc/mark2_pain");
+    G_SoundIndex(ctx, "sound/chars/mark2/misc/mark2_fire");
+    G_SoundIndex(ctx, "sound/chars/mark2/misc/mark2_move_lp");
 
-    G_EffectIndex("explosions/droidexplosion1");
-    G_EffectIndex("env/med_explode2");
-    G_EffectIndex("blaster/smoke_bolton");
-    G_EffectIndex("bryar/muzzle_flash");
+    G_EffectIndex(ctx, "explosions/droidexplosion1");
+    G_EffectIndex(ctx, "env/med_explode2");
+    G_EffectIndex(ctx, "blaster/smoke_bolton");
+    G_EffectIndex(ctx, "bryar/muzzle_flash");
 
     RegisterItem(ctx, BG_FindItemForWeapon(WP_BRYAR_PISTOL));
     RegisterItem(ctx, BG_FindItemForAmmo(AMMO_METAL_BOLTS));
@@ -94,12 +94,12 @@ pub fn NPC_Mark2_Part_Explode(ctx: &mut GameContext, self_: EntityId, bolt: c_in
         BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::NEGATIVE_Y as c_int, &mut dir);
 
         G_PlayEffectID(
-            G_EffectIndex("env/med_explode2"),
+            G_EffectIndex(ctx, "env/med_explode2"),
             org,
             dir,
         );
         G_PlayEffectID(
-            G_EffectIndex("blaster/smoke_bolton"),
+            G_EffectIndex(ctx, "blaster/smoke_bolton"),
             org,
             dir,
         );
@@ -138,12 +138,8 @@ pub fn NPC_Mark2_Pain(
         }
     }
 
-    G_Sound(
-        ctx,
-        Some(self_),
-        CHAN_AUTO,
-        G_SoundIndex("sound/chars/mark2/misc/mark2_pain"),
-    );
+    let sound = G_SoundIndex(ctx, "sound/chars/mark2/misc/mark2_pain");
+    G_Sound(ctx, Some(self_), CHAN_AUTO, sound);
 
     if ctx.world.entity(self_).count > 0 {
         let health = ctx.world.entity(self_).health;
@@ -255,17 +251,13 @@ pub fn Mark2_FireBlaster(ctx: &mut GameContext, advance: qboolean) {
     }
 
     G_PlayEffectID(
-        G_EffectIndex("bryar/muzzle_flash"),
+        G_EffectIndex(ctx, "bryar/muzzle_flash"),
         muzzle1,
         forward,
     );
 
-    G_Sound(
-        ctx,
-        Some(npc_id),
-        CHAN_AUTO,
-        G_SoundIndex("sound/chars/mark2/misc/mark2_fire"),
-    );
+    let sound = G_SoundIndex(ctx, "sound/chars/mark2/misc/mark2_fire");
+    G_Sound(ctx, Some(npc_id), CHAN_AUTO, sound);
 
     let missile_id = CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc_id, false);
     ctx.ent_set(missile_id, PrefixSet::ClassnameStatic(c"bryar_proj"));
