@@ -8,10 +8,10 @@
 //!
 //! Linkage note (2026-07-19): retail's JK2_game.vcproj excludes bg_lib.c from
 //! the native DLL, so retail bound **msvcrt's** qsort — a different unstable
-//! sort whose tie order can differ. The as-built referee oracle binds Darwin
-//! libc (same BSD lineage as this body). Whether to reproduce msvcrt's tie
-//! order instead is an open ruling; until then this is the one canonical
-//! body.
+//! sort whose tie order can differ. Ruled closed 2026-07-23 (DEC-34): this
+//! body is the one canonical qsort; msvcrt's tie order is never reproduced
+//! (the referee oracle binds this same bg_lib body, retail tie order was
+//! platform-variant anyway, and no call-site tie is compat-observable).
 //!
 //! Source: `oracle/codemp/game/bg_lib.c:80-181`
 

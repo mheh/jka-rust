@@ -576,3 +576,27 @@ or safety benefit. Ruling: the l_struct machinery, `iteminfo_t`/
 `weaponinfo_t`/`projectileinfo_t` string fields, and the `BotGoalName` export's
 interior stay as-is permanently. Internal-quality-only residue; cite this
 ruling rather than re-opening.
+
+## DEC-34 — bg_lib qsort body canonical; msvcrt tie-order question closed (2026-07-23)
+
+Retail's `JK2_game.vcproj` excludes `bg_lib.c` from the native game DLL, so the
+retail win32 DLL bound msvcrt's qsort, whose tie permutation differs from the
+BSD Bentley-McIlroy body `native_sort` transcribes. Ruling: `native_sort`'s
+bg_lib body is canonical everywhere; msvcrt's tie order is never reproduced.
+Grounds:
+
+1. The referee oracle binds Raven's own body, not msvcrt: `bg_lib.c`'s qsort
+   sits outside every `Q3_VM` guard and shadows libc in the oracle dylib
+   (`_qsort` defined `T`, no undefined import — `g_main.rs` design note,
+   2026-07-06). A/B tie parity is exact by construction, including the
+   first-frame all-scores-equal tie.
+2. There is no single retail tie order: win32 bound msvcrt, but Mac retail and
+   Linux dedicated bound their platforms' libcs — tie order was already
+   platform-variant across the shipped ecosystem.
+3. No tie is compat-observable at any call site: `SortRanks`/`SortClients` tie
+   order is scoreboard presentation only; `paksort` and
+   `SV_QsortEntityNumbers` cannot see equal keys; ghoul2 `QsortDistance` is an
+   inconsistent comparator already ruled onto `total_cmp` (§19); `vm_fns`
+   profiling is dev-only output.
+4. Microsoft's CRT source is proprietary — not transcribable under the
+   oracle-fidelity method even if wanted.
