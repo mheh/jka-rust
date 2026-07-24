@@ -22,52 +22,17 @@ the exact symbols the engines load. See
 crate graph and [`docs/porting-rules.md`](docs/porting-rules.md) for how code
 is ported.
 
-## Status (2026-07-15)
+## Status (2026-07-24)
 
-- **Type port: complete** (Waves 0–7, both trees). Every ABI-crossing struct
-  carries `size_of`/`offset_of!` static-asserts — a green build is the layout
-  test — with `target_pointer_width = "32"` twins (clang i386 ground truth)
-  across the `jampgame` crate tree.
-- **MP game module (`jampgame`): transcribed, integrated, and
-  lockstep-verified.** The built cdylib exports `dllEntry`/`vmMain`/
-  `GetModuleAPI`, with zero `todo!()` stubs and zero open `TODO: Port`
-  markers. Raven's compiled module and ours run side by side on live
-  servers under a lockstep referee that compares every entityState/
-  playerState byte and the per-frame syscall stream; a 23-minute live human
-  session (27,316 frames) replays with zero module state divergences and
-  call-for-call syscall parity at every client lifecycle frame. The
-  divergences it caught along the way — and the C-semantics lesson each one
-  taught — are cataloged in
-  [`docs/audits/referee-catches-2026-07.md`](docs/audits/referee-catches-2026-07.md);
-  its open list is currently empty.
-- **MP dedicated-server engine: closure complete, boots, and hosts live
-  sessions.** The full `jampDed` link set is transcribed, `cargo check
-  --workspace` is green, and the workspace test suite passes (incl. the §F
-  oracle-parity golden suites: GP2, ghoul2 bone/bolt/collision, ICARUS, RMG,
-  StringEd, ROFF, tr_model). `qcommon`, `botlib`, and `server` are closed —
-  zero stubs, markers, or extern forward-declaration blocks. The server
-  boots through init → map load → frame loop → client connect → shutdown
-  and has hosted live bot and human play since 2026-07-12; the client draw
-  surface is out of the dedicated scope by ruling (DEC-01).
-- **Host seam: live.** The engine island threads one borrowed world bundle
-  (`EngineHostView`, DEC-23) — the live `EngineHost` implementation behind the
-  §F subsystems and the `EngineHooks` upcall table.
-- **CI**: pushes to `master` run the full-workspace compile+test gate
-  (`cargo build --workspace` + the oracle parity suites, single-threaded),
-  build `jampgame` for Windows/Linux × x86/x86_64 × release/debug (all lanes
-  enforced), and publish the zips to the rolling
-  [`latest` release](../../releases/tag/latest) under the exact filenames the
-  engine loads (`jampgamex86.dll`, `jampgamex86_64.so`, …).
-- **Remaining roadmap** (ordered step list in [`docs/GOAL.md`](docs/GOAL.md)):
-  a file-by-file translation-bug audit of the game module against the oracle
-  (hunting the bug classes the referee has caught: double-typed C
-  expressions, dropped write-backs and NULL guards, integer width and
-  promotion); then the safe-state stages that retire the transcription's
-  raw-pointer scaffolding behind typed seam adapters; then the seam split in
-  `docs/roadmap-final-stages.md` Stage 2.
-- Architectural decisions live in
-  [`docs/decisions.md`](docs/decisions.md); older audits live under
-  [`docs/audits/`](docs/audits/).
+The MP game module (`jampgame`) and the MP dedicated-server engine are
+complete, lockstep-verified against Raven's binaries, and hosting live play;
+the idiomatic consolidation campaigns (owned strings, `bool`, threaded state,
+model-data views) are done on top of that parity. Next up: the `ui` module,
+then `cgame` and the renderer, toward a full `jamp` client — plans in
+[`docs/plans/2026-07-24-client-port/`](docs/plans/2026-07-24-client-port/).
+Architectural rulings live in [`docs/decisions.md`](docs/decisions.md);
+pushes to `master` run the full parity gate and publish loadable modules to
+the rolling [`latest` release](../../releases/tag/latest).
 
 ## If you've spent twenty years in `g_*.c`
 
