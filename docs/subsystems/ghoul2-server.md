@@ -1038,6 +1038,16 @@ whole roster's host-consuming bodies transcribe against the built 15-method trai
 Rejected leaving `G2SV-Q11` open or re-parsing model files in `mp_engine_ghoul2`
 (`G2SV-D5` forbids the re-parse; the accessors hand back the loader's live block).
 
+> **Amended by DEC-35 (2026-07-23,
+> `docs/plans/2026-07-23-ghoul2-ownership.md`):** the `*mut c_void` return
+> shape of `model_mdxm`/`model_mdxa` is superseded — the `mdx/` view module
+> hoisted to `mp_host_interface` (a crate below both consumers), so the
+> accessors return `MdxmView`/`MdxaView` (later `MdxmRef`/`MdxaRef` with a
+> parsed-once sidecar built by the loader at ingest). `G2SV-D5`'s substance is
+> unchanged: still no `mp_engine_ghoul2 -> mp_renderer` edge, still no second
+> file-parse path, and the accessors still hand back the loader's live block —
+> now typed.
+
 **G2SV-D16 (ruling 39b, 2026-07-09, pass 6).** The attach-trio
 `G2API_AttachInstanceToEntNum`/`G2API_ClearAttachedInstance`/`G2API_CleanEntAttachments`
 are **compiled no-ops kept as callable empty-body fns in `api_bolts.rs` per §C10**, NOT

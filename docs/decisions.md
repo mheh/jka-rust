@@ -600,3 +600,18 @@ Grounds:
    profiling is dev-only output.
 4. Microsoft's CRT source is proprietary — not transcribable under the
    oracle-fidelity method even if wanted.
+
+## DEC-35 — Ghoul2 block ownership: views at the seam, parsed-once sidecar (2026-07-23)
+
+Sit-down ruling for task #17 (full plan:
+`docs/plans/2026-07-23-ghoul2-ownership.md`). The `mdx/` view module hoists
+from `mp_engine_ghoul2` to `mp_host_interface`; `EngineHost::model_mdxm/mdxa`
+return `MdxmView`/`MdxaView` instead of `*mut c_void`; `CGhoul2Info` and
+`CBoneCache` store views (one conjure site at the EngineHost seam, down from
+59), with `G2_SetupModelPointers`-style revalidation extended to `CBoneCache`;
+the renderer builds an owned `MdxaParsed`/`MdxmParsed` index once at ingest
+(header constants, skel table, surface hierarchy — data read more than once
+per model lifetime), handed out as a Copy `MdxaRef`/`MdxmRef` pair; per-frame
+data (compressed bone pool, verts) stays view-based. Amends the letter of
+G2SV-D5/D15 (which forced the `*mut c_void` seam) while keeping their
+substance: no ghoul2→renderer crate edge, no duplicate file-parse path.
