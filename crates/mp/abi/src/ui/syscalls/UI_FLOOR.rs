@@ -27,7 +27,7 @@ impl UiFloorArgs {
     }
 }
 
-/// `UI_FLOOR` MP cgame imports syscall ABI token.
+/// `UI_FLOOR` MP UI imports syscall ABI token.
 ///
 /// Enum value source: `oracle/codemp/ui/ui_public.h:140`
 /// Output source: `oracle/codemp/client/cl_ui.cpp:675`

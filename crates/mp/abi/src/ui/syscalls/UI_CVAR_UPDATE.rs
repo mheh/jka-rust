@@ -9,12 +9,12 @@ use mp_qshared::shared::vmCvar_t;
 /// Refreshes a previously registered cvar mirror (`vmCvar_t`) from the engine's
 /// current cvar state. Mirrors the C ABI: `void trap_Cvar_Update(vmCvar_t *vmCvar)`.
 #[derive(Debug)]
-pub struct CgCvarUpdateArgs {
+pub struct UiCvarUpdateArgs {
     /// Pointer to the cvar mirror the engine should refresh in-place.
     cvar: *mut vmCvar_t,
 }
 
-impl CgCvarUpdateArgs {
+impl UiCvarUpdateArgs {
     pub fn new(cvar: *mut vmCvar_t) -> Self {
         Self { cvar }
     }
@@ -32,23 +32,23 @@ impl CgCvarUpdateArgs {
 /// Args source: `oracle/codemp/ui/ui_local.h:919`
 /// Output source: `oracle/codemp/client/cl_ui.cpp:872-874`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:872-874`
-pub struct CgCvarUpdate;
+pub struct UiCvarUpdate;
 
-impl OutboundSysCall for CgCvarUpdate {
+impl OutboundSysCall for UiCvarUpdate {
     type Import = MpUiImport;
-    type Args = CgCvarUpdateArgs;
+    type Args = UiCvarUpdateArgs;
     type Output = ();
 
     const IMPORT: MpUiImport = MpUiImport::UI_CVAR_UPDATE;
 }
 
-impl EncodeSysCall for CgCvarUpdate {
+impl EncodeSysCall for UiCvarUpdate {
     fn encode_syscall(args: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([ptr_to_word(args.cvar())])
     }
 }
 
-impl DecodeSysCallReturn for CgCvarUpdate {
+impl DecodeSysCallReturn for UiCvarUpdate {
     fn decode_return(_word: isize) -> Self::Output {
         ()
     }

@@ -29,7 +29,7 @@ impl UiAsinArgs {
     }
 }
 
-/// `UI_ASIN` MP cgame imports syscall ABI token.
+/// `UI_ASIN` MP UI imports syscall ABI token.
 ///
 /// Enum value source: `oracle/codemp/ui/ui_public.h:147`
 /// Output source: `oracle/codemp/client/cl_ui.cpp:685`

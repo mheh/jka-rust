@@ -14,12 +14,12 @@ use abi_transport::generic::{
 /// The engine ignores both arguments and returns 0; this syscall exists for
 /// debug/test instrumentation only.
 #[derive(Debug)]
-pub struct GTestprintfloatArgs {
+pub struct UiTestprintfloatArgs {
     string: CString,
     f: f32,
 }
 
-impl GTestprintfloatArgs {
+impl UiTestprintfloatArgs {
     pub fn new(string: CString, f: f32) -> Self {
         Self { string, f }
     }
@@ -36,23 +36,23 @@ impl GTestprintfloatArgs {
 /// `UI_TESTPRINTFLOAT` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/codemp/ui/ui_public.h:290`
-pub struct GTestprintfloat;
+pub struct UiTestprintfloat;
 
-impl OutboundSysCall for GTestprintfloat {
+impl OutboundSysCall for UiTestprintfloat {
     type Import = MpUiImport;
-    type Args = GTestprintfloatArgs;
+    type Args = UiTestprintfloatArgs;
     type Output = c_int;
 
     const IMPORT: MpUiImport = MpUiImport::UI_TESTPRINTFLOAT;
 }
 
-impl EncodeSysCall for GTestprintfloat {
+impl EncodeSysCall for UiTestprintfloat {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([ptr_to_word(a.string()), pass_float(a.f())])
     }
 }
 
-impl DecodeSysCallReturn for GTestprintfloat {
+impl DecodeSysCallReturn for UiTestprintfloat {
     fn decode_return(word: isize) -> Self::Output {
         word as c_int
     }

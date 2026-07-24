@@ -41,7 +41,7 @@ impl UiMatrixmultiplyArgs {
     }
 }
 
-/// `UI_MATRIXMULTIPLY` MP cgame imports syscall ABI token.
+/// `UI_MATRIXMULTIPLY` MP UI imports syscall ABI token.
 ///
 /// Enum value source: `oracle/codemp/ui/ui_public.h:137`
 /// Args source: `oracle/codemp/client/cl_ui.cpp:666`

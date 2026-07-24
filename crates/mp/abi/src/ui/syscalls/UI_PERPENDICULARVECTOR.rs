@@ -36,7 +36,7 @@ impl UiPerpendicularvectorArgs {
     }
 }
 
-/// `UI_PERPENDICULARVECTOR` MP cgame imports syscall ABI token.
+/// `UI_PERPENDICULARVECTOR` MP UI imports syscall ABI token.
 ///
 /// Enum value source: `oracle/codemp/ui/ui_public.h:139`
 /// Args source: `oracle/codemp/client/cl_ui.cpp:672`

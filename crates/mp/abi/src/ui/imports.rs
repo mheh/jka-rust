@@ -464,3 +464,15 @@ pub enum MpUiImport {
     /// Source: `oracle/codemp/ui/ui_public.h:188`
     UI_G2_ATTACHG2MODEL,
 }
+
+/// The module-side (encode) half of the SEAM-D6 enum<->wire-word pair: carries
+/// `C::IMPORT` into the raw syscall's `c_int` slot (`Execute<C> for CEngine`'s
+/// `C::Import: Into<i32>` bound). The engine-side (decode) half is the
+/// dispatcher's `TryFrom<i32>`.
+///
+/// Source: `docs/architecture/engine-seam.md` § `CEngine` (SEAM-D6).
+impl From<MpUiImport> for i32 {
+    fn from(v: MpUiImport) -> i32 {
+        v as i32
+    }
+}

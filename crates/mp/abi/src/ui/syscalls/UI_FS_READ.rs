@@ -15,13 +15,13 @@ use mp_qshared::shared::fileHandle_t;
 /// Args source: `oracle/codemp/ui/ui_syscalls.c:87-88`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:739-741`
 #[derive(Debug)]
-pub struct CgFsReadArgs {
+pub struct UiFsReadArgs {
     buffer: *mut u8,
     len: c_int,
     f: fileHandle_t,
 }
 
-impl CgFsReadArgs {
+impl UiFsReadArgs {
     /// Construct raw `trap_FS_Read` syscall args.
     ///
     /// # Safety
@@ -44,24 +44,24 @@ impl CgFsReadArgs {
     }
 }
 
-/// `UI_FS_READ` MP cgame imports syscall ABI token.
+/// `UI_FS_READ` MP UI imports syscall ABI token.
 ///
 /// Raven: `( void *buffer, int len, fileHandle_t f )`.
 /// Enum value source: `oracle/codemp/ui/ui_public.h:74`
 /// Args source: `oracle/codemp/ui/ui_syscalls.c:87-88`
 /// Output source: `oracle/codemp/client/cl_ui.cpp:741`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:739-741`
-pub struct CgFsRead;
+pub struct UiFsRead;
 
-impl OutboundSysCall for CgFsRead {
+impl OutboundSysCall for UiFsRead {
     type Import = MpUiImport;
-    type Args = CgFsReadArgs;
+    type Args = UiFsReadArgs;
     type Output = ();
 
     const IMPORT: MpUiImport = MpUiImport::UI_FS_READ;
 }
 
-impl EncodeSysCall for CgFsRead {
+impl EncodeSysCall for UiFsRead {
     fn encode_syscall(args: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(args.buffer() as *const u8),
@@ -71,7 +71,7 @@ impl EncodeSysCall for CgFsRead {
     }
 }
 
-impl DecodeSysCallReturn for CgFsRead {
+impl DecodeSysCallReturn for UiFsRead {
     fn decode_return(_word: isize) -> Self::Output {
         ()
     }

@@ -9,11 +9,11 @@ use abi_transport::generic::{
 
 /// `UI_R_REGISTERSKIN` outbound game-to-engine syscall.
 #[derive(Debug)]
-pub struct GRRegisterskinArgs {
+pub struct UiRRegisterskinArgs {
     name: CString,
 }
 
-impl GRRegisterskinArgs {
+impl UiRRegisterskinArgs {
     pub fn new(name: CString) -> Self {
         Self { name }
     }
@@ -26,23 +26,23 @@ impl GRRegisterskinArgs {
 /// `UI_R_REGISTERSKIN` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/codemp/ui/ui_public.h:506`
-pub struct GRRegisterskin;
+pub struct UiRRegisterskin;
 
-impl OutboundSysCall for GRRegisterskin {
+impl OutboundSysCall for UiRRegisterskin {
     type Import = MpUiImport;
-    type Args = GRRegisterskinArgs;
+    type Args = UiRRegisterskinArgs;
     type Output = qhandle_t;
 
     const IMPORT: MpUiImport = MpUiImport::UI_R_REGISTERSKIN;
 }
 
-impl EncodeSysCall for GRRegisterskin {
+impl EncodeSysCall for UiRRegisterskin {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([ptr_to_word(a.name.as_ptr())])
     }
 }
 
-impl DecodeSysCallReturn for GRRegisterskin {
+impl DecodeSysCallReturn for UiRRegisterskin {
     fn decode_return(word: isize) -> Self::Output {
         word as qhandle_t
     }

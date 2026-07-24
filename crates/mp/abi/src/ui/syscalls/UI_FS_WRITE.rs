@@ -15,13 +15,13 @@ use mp_qshared::shared::fileHandle_t;
 /// - args: `oracle/codemp/ui/ui_syscalls.c:91-92`
 /// - transport: `oracle/codemp/client/cl_ui.cpp:742-743`
 #[derive(Debug)]
-pub struct CgFsWriteArgs {
+pub struct UiFsWriteArgs {
     buffer: *const u8,
     len: c_int,
     f: fileHandle_t,
 }
 
-impl CgFsWriteArgs {
+impl UiFsWriteArgs {
     pub fn new(buffer: *const u8, len: c_int, f: fileHandle_t) -> Self {
         Self { buffer, len, f }
     }
@@ -39,15 +39,15 @@ impl CgFsWriteArgs {
     }
 }
 
-/// `UI_FS_WRITE` MP cgame imports syscall ABI token.
+/// `UI_FS_WRITE` MP UI imports syscall ABI token.
 ///
 /// Raven: `( const void *buffer, int len, fileHandle_t f );`
 /// Source: `oracle/codemp/ui/ui_public.h:75`
-pub struct CgFsWrite;
+pub struct UiFsWrite;
 
-impl OutboundSysCall for CgFsWrite {
+impl OutboundSysCall for UiFsWrite {
     type Import = MpUiImport;
-    type Args = CgFsWriteArgs;
+    type Args = UiFsWriteArgs;
     /// Output: wrapper is `void`; switch arm calls `FS_Write(...)` and returns
     /// `0` to the VM.
     ///
@@ -59,13 +59,13 @@ impl OutboundSysCall for CgFsWrite {
     const IMPORT: MpUiImport = MpUiImport::UI_FS_WRITE;
 }
 
-impl EncodeSysCall for CgFsWrite {
+impl EncodeSysCall for UiFsWrite {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([ptr_to_word(a.buffer), a.len as isize, a.f as isize])
     }
 }
 
-impl DecodeSysCallReturn for CgFsWrite {
+impl DecodeSysCallReturn for UiFsWrite {
     fn decode_return(_word: isize) -> Self::Output {
         ()
     }

@@ -28,7 +28,7 @@ impl UiAcosArgs {
     }
 }
 
-/// `UI_ACOS` MP cgame imports syscall ABI token.
+/// `UI_ACOS` MP UI imports syscall ABI token.
 ///
 /// Enum value source: `oracle/codemp/ui/ui_public.h:146`
 /// Output source: `oracle/codemp/client/cl_ui.cpp:683`

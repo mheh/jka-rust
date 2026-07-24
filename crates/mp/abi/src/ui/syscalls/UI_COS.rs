@@ -28,7 +28,7 @@ impl UiCosArgs {
     }
 }
 
-/// `UI_COS` MP cgame imports syscall ABI token.
+/// `UI_COS` MP UI imports syscall ABI token.
 ///
 /// Enum value source: `oracle/codemp/ui/ui_public.h:134`
 /// Output source: `oracle/codemp/client/cl_ui.cpp:660`

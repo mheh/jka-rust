@@ -12,11 +12,11 @@ use abi_transport::generic::{
 /// Args source: `oracle/codemp/ui/ui_syscalls.c:21`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:688`
 #[derive(Debug)]
-pub struct CgPrintArgs {
+pub struct UiPrintArgs {
     message: *const c_char,
 }
 
-impl CgPrintArgs {
+impl UiPrintArgs {
     /// Construct raw `trap_Print` syscall args.
     ///
     /// # Safety
@@ -31,7 +31,7 @@ impl CgPrintArgs {
     }
 }
 
-/// `UI_PRINT` MP cgame imports syscall ABI token.
+/// `UI_PRINT` MP UI imports syscall ABI token.
 ///
 /// Raven wrapper: `syscall( UI_PRINT, fmt );`
 /// Raven transport: `Com_Printf( "%s", VMA(1) );`
@@ -40,23 +40,23 @@ impl CgPrintArgs {
 /// Args source: `oracle/codemp/ui/ui_syscalls.c:21`
 /// Output source: `oracle/codemp/client/cl_ui.cpp:690`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:688`
-pub struct CgPrint;
+pub struct UiPrint;
 
-impl OutboundSysCall for CgPrint {
+impl OutboundSysCall for UiPrint {
     type Import = MpUiImport;
-    type Args = CgPrintArgs;
+    type Args = UiPrintArgs;
     type Output = ();
 
     const IMPORT: MpUiImport = MpUiImport::UI_PRINT;
 }
 
-impl EncodeSysCall for CgPrint {
+impl EncodeSysCall for UiPrint {
     fn encode_syscall(args: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([ptr_to_word(args.message())])
     }
 }
 
-impl DecodeSysCallReturn for CgPrint {
+impl DecodeSysCallReturn for UiPrint {
     fn decode_return(_word: isize) -> Self::Output {
         ()
     }

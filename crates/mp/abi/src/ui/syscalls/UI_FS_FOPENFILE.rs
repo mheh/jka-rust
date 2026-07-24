@@ -16,7 +16,7 @@ use mp_qshared::shared::fsMode_t;
 /// Args source: `oracle/codemp/ui/ui_syscalls.c:83-84`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:737-738`
 #[derive(Debug)]
-pub struct CgFsFopenfileArgs {
+pub struct UiFsFopenfileArgs {
     /// Null-terminated virtual-filesystem path, decoded by Raven as `VMA(1)`.
     qpath: *const c_char,
     /// Out pointer to the `fileHandle_t` slot, decoded by Raven as `VMA(2)`.
@@ -25,7 +25,7 @@ pub struct CgFsFopenfileArgs {
     mode: fsMode_t,
 }
 
-impl CgFsFopenfileArgs {
+impl UiFsFopenfileArgs {
     /// Construct raw `trap_FS_FOpenFile` syscall args.
     ///
     /// # Safety
@@ -48,7 +48,7 @@ impl CgFsFopenfileArgs {
     }
 }
 
-/// `UI_FS_FOPENFILE` MP cgame imports syscall ABI token.
+/// `UI_FS_FOPENFILE` MP UI imports syscall ABI token.
 ///
 /// Raven wrapper: `return syscall( UI_FS_FOPENFILE, qpath, f, mode );`
 /// Raven transport: `return FS_FOpenFileByMode( (const char *)VMA(1), (int *)VMA(2), (fsMode_t)args[3] );`
@@ -57,17 +57,17 @@ impl CgFsFopenfileArgs {
 /// Args source: `oracle/codemp/ui/ui_syscalls.c:83-84`
 /// Output source: `oracle/codemp/client/cl_ui.cpp:737-738`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:737-738`
-pub struct CgFsFopenfile;
+pub struct UiFsFopenfile;
 
-impl OutboundSysCall for CgFsFopenfile {
+impl OutboundSysCall for UiFsFopenfile {
     type Import = MpUiImport;
-    type Args = CgFsFopenfileArgs;
+    type Args = UiFsFopenfileArgs;
     type Output = c_int;
 
     const IMPORT: MpUiImport = MpUiImport::UI_FS_FOPENFILE;
 }
 
-impl EncodeSysCall for CgFsFopenfile {
+impl EncodeSysCall for UiFsFopenfile {
     fn encode_syscall(args: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(args.qpath()),
@@ -77,7 +77,7 @@ impl EncodeSysCall for CgFsFopenfile {
     }
 }
 
-impl DecodeSysCallReturn for CgFsFopenfile {
+impl DecodeSysCallReturn for UiFsFopenfile {
     fn decode_return(word: isize) -> Self::Output {
         word as c_int
     }

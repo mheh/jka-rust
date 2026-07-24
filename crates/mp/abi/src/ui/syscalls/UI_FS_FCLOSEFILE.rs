@@ -15,12 +15,12 @@ use abi_transport::generic::{
 /// - Output: `oracle/codemp/client/cl_ui.cpp:747`
 /// - Transport/switch: `oracle/codemp/client/cl_ui.cpp:745-747`
 #[derive(Debug)]
-pub struct CgFsFclosefileArgs {
+pub struct UiFsFclosefileArgs {
     /// File handle to close (`fileHandle_t`, which is `int` in C).
     pub f: c_int,
 }
 
-impl CgFsFclosefileArgs {
+impl UiFsFclosefileArgs {
     pub fn new(f: c_int) -> Self {
         Self { f }
     }
@@ -30,26 +30,26 @@ impl CgFsFclosefileArgs {
     }
 }
 
-/// `UI_FS_FCLOSEFILE` MP cgame imports syscall ABI token.
+/// `UI_FS_FCLOSEFILE` MP UI imports syscall ABI token.
 ///
 /// Raven: ( fileHandle_t f );
 /// Source: `oracle/codemp/ui/ui_public.h:76`
-pub struct CgFsFclosefile;
+pub struct UiFsFclosefile;
 
-impl OutboundSysCall for CgFsFclosefile {
+impl OutboundSysCall for UiFsFclosefile {
     type Import = MpUiImport;
-    type Args = CgFsFclosefileArgs;
+    type Args = UiFsFclosefileArgs;
     type Output = ();
 
     const IMPORT: MpUiImport = MpUiImport::UI_FS_FCLOSEFILE;
 }
 
-impl EncodeSysCall for CgFsFclosefile {
+impl EncodeSysCall for UiFsFclosefile {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([a.f as isize])
     }
 }
 
-impl DecodeSysCallReturn for CgFsFclosefile {
+impl DecodeSysCallReturn for UiFsFclosefile {
     fn decode_return(_word: isize) -> Self::Output {}
 }

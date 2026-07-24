@@ -328,8 +328,10 @@ version = "0.1.0"
 dependencies = [
  "mp_abi",
  "mp_bg",
+ "mp_engine_select",
  "mp_qshared",
  "mp_uishared",
+ "native_string",
  "native_types",
 ]
 

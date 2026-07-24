@@ -11,12 +11,12 @@ use abi_transport::generic::{
 /// Args source: `oracle/codemp/ui/ui_syscalls.c:25`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:691`
 #[derive(Debug)]
-pub struct CgErrorArgs {
+pub struct UiErrorArgs {
     /// NUL-terminated message string passed to `Com_Error`.
     message: *const c_char,
 }
 
-impl CgErrorArgs {
+impl UiErrorArgs {
     /// Construct raw `trap_Error` syscall args.
     ///
     /// # Safety
@@ -31,26 +31,26 @@ impl CgErrorArgs {
     }
 }
 
-/// `UI_ERROR` MP cgame imports syscall ABI token.
+/// `UI_ERROR` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/codemp/ui/ui_public.h:58`
-pub struct CgError;
+pub struct UiError;
 
-impl OutboundSysCall for CgError {
+impl OutboundSysCall for UiError {
     type Import = MpUiImport;
-    type Args = CgErrorArgs;
+    type Args = UiErrorArgs;
     type Output = ();
 
     const IMPORT: MpUiImport = MpUiImport::UI_ERROR;
 }
 
-impl EncodeSysCall for CgError {
+impl EncodeSysCall for UiError {
     fn encode_syscall(args: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([ptr_to_word(args.message())])
     }
 }
 
-impl DecodeSysCallReturn for CgError {
+impl DecodeSysCallReturn for UiError {
     /// Output source: `oracle/codemp/client/cl_ui.cpp:693`
     /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:691`
     fn decode_return(_word: isize) -> Self::Output {

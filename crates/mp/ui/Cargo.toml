@@ -8,8 +8,11 @@ name = "mp_ui"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+native_string = { path = "../../native/string" }
 native_types = { path = "../../native/types" }
 mp_qshared = { path = "../qshared" }
 mp_bg = { path = "../bg" }
 mp_uishared = { path = "../uishared" }
 mp_abi = { path = "../abi" }
+# SEAM-D13: the module-side transport alias (`mod trap`, UiContext.engine).
+mp_engine_select = { path = "../engine-select" }

@@ -28,7 +28,7 @@ impl UiSqrtArgs {
     }
 }
 
-/// `UI_SQRT` MP cgame imports syscall ABI token.
+/// `UI_SQRT` MP UI imports syscall ABI token.
 ///
 /// Enum value source: `oracle/codemp/ui/ui_public.h:136`
 /// Output source: `oracle/codemp/client/cl_ui.cpp:664`

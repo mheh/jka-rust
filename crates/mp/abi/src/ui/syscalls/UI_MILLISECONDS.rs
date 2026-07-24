@@ -14,38 +14,38 @@ use abi_transport::generic::{
 /// Transport source: `oracle/codemp/ui/ui_syscalls.c:30`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:694`
 #[derive(Debug, Default)]
-pub struct CgMillisecondsArgs;
+pub struct UiMillisecondsArgs;
 
-impl CgMillisecondsArgs {
+impl UiMillisecondsArgs {
     pub const fn new() -> Self {
         Self
     }
 }
 
-/// `UI_MILLISECONDS` MP cgame imports syscall ABI token.
+/// `UI_MILLISECONDS` MP UI imports syscall ABI token.
 ///
 /// Enum value source: `oracle/codemp/ui/ui_public.h:59`
 /// Output source: `oracle/codemp/ui/ui_syscalls.c:29`
 /// Output source: `oracle/codemp/ui/ui_syscalls.c:30`
 /// Output source: `oracle/codemp/client/cl_ui.cpp:695`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:694`
-pub struct CgMilliseconds;
+pub struct UiMilliseconds;
 
-impl OutboundSysCall for CgMilliseconds {
+impl OutboundSysCall for UiMilliseconds {
     type Import = MpUiImport;
-    type Args = CgMillisecondsArgs;
+    type Args = UiMillisecondsArgs;
     type Output = c_int;
 
     const IMPORT: MpUiImport = MpUiImport::UI_MILLISECONDS;
 }
 
-impl EncodeSysCall for CgMilliseconds {
+impl EncodeSysCall for UiMilliseconds {
     fn encode_syscall(_args: &Self::Args) -> SysCallTransport {
         SysCallTransport::empty()
     }
 }
 
-impl DecodeSysCallReturn for CgMilliseconds {
+impl DecodeSysCallReturn for UiMilliseconds {
     // `trap_Milliseconds` returns `int`; the engine's return word is that value.
     fn decode_return(word: isize) -> Self::Output {
         word as c_int

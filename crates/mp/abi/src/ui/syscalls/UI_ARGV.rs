@@ -14,13 +14,13 @@ use abi_transport::generic::{
 /// Args source: `oracle/codemp/ui/ui_syscalls.c:75`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:730`
 #[derive(Debug)]
-pub struct CgArgvArgs {
+pub struct UiArgvArgs {
     n: c_int,
     buffer: *mut c_char,
     buffer_length: c_int,
 }
 
-impl CgArgvArgs {
+impl UiArgvArgs {
     /// Construct raw `trap_Argv` syscall args.
     ///
     /// # Safety
@@ -46,23 +46,23 @@ impl CgArgvArgs {
     }
 }
 
-/// `UI_ARGV` MP cgame imports syscall ABI token.
+/// `UI_ARGV` MP UI imports syscall ABI token.
 ///
 /// Enum value source: `oracle/codemp/ui/ui_public.h:71`
 /// Args source: `oracle/codemp/ui/ui_syscalls.c:75`
 /// Output source: `oracle/codemp/client/cl_ui.cpp:732`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:730`
-pub struct CgArgv;
+pub struct UiArgv;
 
-impl OutboundSysCall for CgArgv {
+impl OutboundSysCall for UiArgv {
     type Import = MpUiImport;
-    type Args = CgArgvArgs;
+    type Args = UiArgvArgs;
     type Output = ();
 
     const IMPORT: MpUiImport = MpUiImport::UI_ARGV;
 }
 
-impl EncodeSysCall for CgArgv {
+impl EncodeSysCall for UiArgv {
     fn encode_syscall(args: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             args.n() as isize,
@@ -72,7 +72,7 @@ impl EncodeSysCall for CgArgv {
     }
 }
 
-impl DecodeSysCallReturn for CgArgv {
+impl DecodeSysCallReturn for UiArgv {
     fn decode_return(_word: isize) -> Self::Output {
         ()
     }

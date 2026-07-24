@@ -14,15 +14,15 @@ use abi_transport::generic::{
 /// Transport source: `oracle/codemp/ui/ui_syscalls.c:72`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:728`
 #[derive(Debug, Default)]
-pub struct CgArgcArgs;
+pub struct UiArgcArgs;
 
-impl CgArgcArgs {
+impl UiArgcArgs {
     pub const fn new() -> Self {
         Self
     }
 }
 
-/// `UI_ARGC` MP cgame imports syscall ABI token.
+/// `UI_ARGC` MP UI imports syscall ABI token.
 ///
 /// Returns the number of tokens in the current command string.
 /// C signature: `int trap_Argc( void )`
@@ -33,23 +33,23 @@ impl CgArgcArgs {
 /// Enum value source: `oracle/codemp/ui/ui_public.h:70`
 /// Output source: `oracle/codemp/client/cl_ui.cpp:729`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:728`
-pub struct CgArgc;
+pub struct UiArgc;
 
-impl OutboundSysCall for CgArgc {
+impl OutboundSysCall for UiArgc {
     type Import = MpUiImport;
-    type Args = CgArgcArgs;
+    type Args = UiArgcArgs;
     type Output = c_int;
 
     const IMPORT: MpUiImport = MpUiImport::UI_ARGC;
 }
 
-impl EncodeSysCall for CgArgc {
+impl EncodeSysCall for UiArgc {
     fn encode_syscall(_args: &Self::Args) -> SysCallTransport {
         SysCallTransport::empty()
     }
 }
 
-impl DecodeSysCallReturn for CgArgc {
+impl DecodeSysCallReturn for UiArgc {
     // `Cmd_Argc` returns an `int`; the engine's return word is that value.
     fn decode_return(word: isize) -> Self::Output {
         word as c_int

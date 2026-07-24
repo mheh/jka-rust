@@ -2,3 +2,4 @@
 
 pub mod keycodes;
 pub mod local;
+pub mod trap;

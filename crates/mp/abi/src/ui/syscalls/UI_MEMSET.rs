@@ -42,7 +42,7 @@ impl UiMemsetArgs {
     }
 }
 
-/// `UI_MEMSET` MP cgame imports syscall ABI token.
+/// `UI_MEMSET` MP UI imports syscall ABI token.
 ///
 /// Raven: `Com_Memset(VMA(1), args[2], args[3])`
 ///

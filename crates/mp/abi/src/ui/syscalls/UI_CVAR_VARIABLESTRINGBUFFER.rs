@@ -15,13 +15,13 @@ use abi_transport::generic::{
 /// Args source: `oracle/codemp/ui/ui_local.h:922`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:883-885`
 #[derive(Debug)]
-pub struct CgCvarVariablestringbufferArgs {
+pub struct UiCvarVariablestringbufferArgs {
     var_name: *const c_char,
     buffer: *mut c_char,
     bufsize: c_int,
 }
 
-impl CgCvarVariablestringbufferArgs {
+impl UiCvarVariablestringbufferArgs {
     /// Construct raw `trap_Cvar_VariableStringBuffer` syscall args.
     ///
     /// # Safety
@@ -56,17 +56,17 @@ impl CgCvarVariablestringbufferArgs {
 /// Args source: `oracle/codemp/ui/ui_syscalls.c:51-52`
 /// Output source: `oracle/codemp/client/cl_ui.cpp:883-885`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:883-885`
-pub struct CgCvarVariablestringbuffer;
+pub struct UiCvarVariablestringbuffer;
 
-impl OutboundSysCall for CgCvarVariablestringbuffer {
+impl OutboundSysCall for UiCvarVariablestringbuffer {
     type Import = MpUiImport;
-    type Args = CgCvarVariablestringbufferArgs;
+    type Args = UiCvarVariablestringbufferArgs;
     type Output = ();
 
     const IMPORT: MpUiImport = MpUiImport::UI_CVAR_VARIABLESTRINGBUFFER;
 }
 
-impl EncodeSysCall for CgCvarVariablestringbuffer {
+impl EncodeSysCall for UiCvarVariablestringbuffer {
     fn encode_syscall(args: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(args.var_name()),
@@ -76,7 +76,7 @@ impl EncodeSysCall for CgCvarVariablestringbuffer {
     }
 }
 
-impl DecodeSysCallReturn for CgCvarVariablestringbuffer {
+impl DecodeSysCallReturn for UiCvarVariablestringbuffer {
     fn decode_return(_word: isize) -> Self::Output {
         ()
     }

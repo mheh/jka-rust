@@ -32,7 +32,7 @@ impl UiAtan2Args {
     }
 }
 
-/// `UI_ATAN2` MP cgame imports syscall ABI token.
+/// `UI_ATAN2` MP UI imports syscall ABI token.
 ///
 /// Enum value source: `oracle/codemp/ui/ui_public.h:135`
 /// Output source: `oracle/codemp/client/cl_ui.cpp:662`

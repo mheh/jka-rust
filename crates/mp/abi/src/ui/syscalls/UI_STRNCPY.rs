@@ -44,7 +44,7 @@ impl UiStrncpyArgs {
     }
 }
 
-/// `UI_STRNCPY` MP cgame imports syscall ABI token.
+/// `UI_STRNCPY` MP UI imports syscall ABI token.
 ///
 /// Enum value source: `oracle/codemp/ui/ui_public.h:132`
 /// Output source: `oracle/codemp/client/cl_ui.cpp:656`

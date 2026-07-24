@@ -56,7 +56,7 @@ impl UiAnglevectorsArgs {
     }
 }
 
-/// `UI_ANGLEVECTORS` MP cgame imports syscall ABI token.
+/// `UI_ANGLEVECTORS` MP UI imports syscall ABI token.
 ///
 /// Enum value source: `oracle/codemp/ui/ui_public.h:138`
 /// Args source: `oracle/codemp/client/cl_ui.cpp:669`

@@ -15,12 +15,12 @@ use mp_qshared::shared::qboolean;
 /// Args source: `oracle/codemp/ui/ui_syscalls.c:525-526`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:989-990`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct CgKeyIsdownArgs {
+pub struct UiKeyIsdownArgs {
     /// Key number, read by Raven as `args[1]`.
     keynum: c_int,
 }
 
-impl CgKeyIsdownArgs {
+impl UiKeyIsdownArgs {
     pub const fn new(keynum: c_int) -> Self {
         Self { keynum }
     }
@@ -30,7 +30,7 @@ impl CgKeyIsdownArgs {
     }
 }
 
-/// `UI_KEY_ISDOWN` MP cgame imports syscall ABI token.
+/// `UI_KEY_ISDOWN` MP UI imports syscall ABI token.
 ///
 /// Raven wrapper: `return syscall( UI_KEY_ISDOWN, keynum );`
 /// Raven transport: `return Key_IsDown( args[1] );`
@@ -39,23 +39,23 @@ impl CgKeyIsdownArgs {
 /// Args source: `oracle/codemp/ui/ui_syscalls.c:525-526`
 /// Output source: `oracle/codemp/ui/ui_syscalls.c:525-526`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:989-990`
-pub struct CgKeyIsdown;
+pub struct UiKeyIsdown;
 
-impl OutboundSysCall for CgKeyIsdown {
+impl OutboundSysCall for UiKeyIsdown {
     type Import = MpUiImport;
-    type Args = CgKeyIsdownArgs;
+    type Args = UiKeyIsdownArgs;
     type Output = qboolean;
 
     const IMPORT: MpUiImport = MpUiImport::UI_KEY_ISDOWN;
 }
 
-impl EncodeSysCall for CgKeyIsdown {
+impl EncodeSysCall for UiKeyIsdown {
     fn encode_syscall(args: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([args.keynum() as isize])
     }
 }
 
-impl DecodeSysCallReturn for CgKeyIsdown {
+impl DecodeSysCallReturn for UiKeyIsdown {
     fn decode_return(word: isize) -> Self::Output {
         word as qboolean
     }

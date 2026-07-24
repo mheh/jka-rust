@@ -13,15 +13,15 @@ use abi_transport::generic::{
 /// Args source: `oracle/codemp/ui/ui_syscalls.c:529-530`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:991-992`
 #[derive(Debug, Default)]
-pub struct CgKeyGetcatcherArgs;
+pub struct UiKeyGetcatcherArgs;
 
-impl CgKeyGetcatcherArgs {
+impl UiKeyGetcatcherArgs {
     pub const fn new() -> Self {
         Self
     }
 }
 
-/// `UI_KEY_GETCATCHER` MP cgame imports syscall ABI token.
+/// `UI_KEY_GETCATCHER` MP UI imports syscall ABI token.
 ///
 /// C signature: `int trap_Key_GetCatcher(void)`.
 /// Raven transport: `return syscall( UI_KEY_GETCATCHER );`
@@ -32,23 +32,23 @@ impl CgKeyGetcatcherArgs {
 /// Output source: `oracle/codemp/ui/ui_syscalls.c:529-530`
 /// Output source: `oracle/codemp/client/cl_ui.cpp:991-992`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:991-992`
-pub struct CgKeyGetcatcher;
+pub struct UiKeyGetcatcher;
 
-impl OutboundSysCall for CgKeyGetcatcher {
+impl OutboundSysCall for UiKeyGetcatcher {
     type Import = MpUiImport;
-    type Args = CgKeyGetcatcherArgs;
+    type Args = UiKeyGetcatcherArgs;
     type Output = c_int;
 
     const IMPORT: MpUiImport = MpUiImport::UI_KEY_GETCATCHER;
 }
 
-impl EncodeSysCall for CgKeyGetcatcher {
+impl EncodeSysCall for UiKeyGetcatcher {
     fn encode_syscall(_args: &Self::Args) -> SysCallTransport {
         SysCallTransport::empty()
     }
 }
 
-impl DecodeSysCallReturn for CgKeyGetcatcher {
+impl DecodeSysCallReturn for UiKeyGetcatcher {
     // `Key_GetCatcher` returns an `int`; the engine's return word is that value.
     fn decode_return(word: isize) -> Self::Output {
         word as c_int

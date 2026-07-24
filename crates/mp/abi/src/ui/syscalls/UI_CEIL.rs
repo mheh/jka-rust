@@ -27,7 +27,7 @@ impl UiCeilArgs {
     }
 }
 
-/// `UI_CEIL` MP cgame imports syscall ABI token.
+/// `UI_CEIL` MP UI imports syscall ABI token.
 ///
 /// Enum value source: `oracle/codemp/ui/ui_public.h:141`
 /// Output source: `oracle/codemp/client/cl_ui.cpp:677`

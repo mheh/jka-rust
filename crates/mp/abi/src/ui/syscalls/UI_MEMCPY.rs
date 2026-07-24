@@ -40,7 +40,7 @@ impl UiMemcpyArgs {
     }
 }
 
-/// `UI_MEMCPY` MP cgame imports syscall ABI token.
+/// `UI_MEMCPY` MP UI imports syscall ABI token.
 ///
 /// Raven: "DO NOT EVER add a GAME/CGAME/UI generic call without adding a trap
 /// to match"; generic traps are shared and ordered from 100.

@@ -11,12 +11,12 @@ use abi_transport::generic::{
 ///
 /// C signature: `void testPrintInt( char *string, int i )`
 #[derive(Debug)]
-pub struct GTestprintintArgs {
+pub struct UiTestprintintArgs {
     string: CString,
     i: c_int,
 }
 
-impl GTestprintintArgs {
+impl UiTestprintintArgs {
     pub fn new(string: CString, i: c_int) -> Self {
         Self { string, i }
     }
@@ -33,23 +33,23 @@ impl GTestprintintArgs {
 /// `UI_TESTPRINTINT` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/codemp/ui/ui_public.h:289`
-pub struct GTestprintint;
+pub struct UiTestprintint;
 
-impl OutboundSysCall for GTestprintint {
+impl OutboundSysCall for UiTestprintint {
     type Import = MpUiImport;
-    type Args = GTestprintintArgs;
+    type Args = UiTestprintintArgs;
     type Output = ();
 
     const IMPORT: MpUiImport = MpUiImport::UI_TESTPRINTINT;
 }
 
-impl EncodeSysCall for GTestprintint {
+impl EncodeSysCall for UiTestprintint {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([ptr_to_word(a.string.as_ptr()), a.i as isize])
     }
 }
 
-impl DecodeSysCallReturn for GTestprintint {
+impl DecodeSysCallReturn for UiTestprintint {
     fn decode_return(_word: isize) -> Self::Output {
         ()
     }

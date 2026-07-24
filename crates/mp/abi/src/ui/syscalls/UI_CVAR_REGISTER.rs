@@ -15,7 +15,7 @@ use mp_qshared::shared::vmCvar_t;
 /// Args source: `oracle/codemp/ui/ui_syscalls.c:50-51`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:714-715`
 #[derive(Debug)]
-pub struct CgCvarRegisterArgs {
+pub struct UiCvarRegisterArgs {
     /// Optional module-side cvar mirror populated by the engine.
     cvar: *mut vmCvar_t,
     var_name: *const c_char,
@@ -23,7 +23,7 @@ pub struct CgCvarRegisterArgs {
     flags: c_int,
 }
 
-impl CgCvarRegisterArgs {
+impl UiCvarRegisterArgs {
     /// Construct raw `trap_Cvar_Register` syscall args.
     ///
     /// # Safety
@@ -61,24 +61,24 @@ impl CgCvarRegisterArgs {
     }
 }
 
-/// `UI_CVAR_REGISTER` MP cgame imports syscall ABI token.
+/// `UI_CVAR_REGISTER` MP UI imports syscall ABI token.
 ///
 /// Raven: `( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, int flags )`.
 /// Enum value source: `oracle/codemp/ui/ui_public.h:65`
 /// Args source: `oracle/codemp/ui/ui_syscalls.c:50-51`
 /// Output source: `oracle/codemp/client/cl_ui.cpp:716`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:714-715`
-pub struct CgCvarRegister;
+pub struct UiCvarRegister;
 
-impl OutboundSysCall for CgCvarRegister {
+impl OutboundSysCall for UiCvarRegister {
     type Import = MpUiImport;
-    type Args = CgCvarRegisterArgs;
+    type Args = UiCvarRegisterArgs;
     type Output = ();
 
     const IMPORT: MpUiImport = MpUiImport::UI_CVAR_REGISTER;
 }
 
-impl EncodeSysCall for CgCvarRegister {
+impl EncodeSysCall for UiCvarRegister {
     fn encode_syscall(args: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(args.cvar()),
@@ -89,7 +89,7 @@ impl EncodeSysCall for CgCvarRegister {
     }
 }
 
-impl DecodeSysCallReturn for CgCvarRegister {
+impl DecodeSysCallReturn for UiCvarRegister {
     // `trap_Cvar_Register` is `void`; Raven's switch returns 0 after registration.
     fn decode_return(_word: isize) -> Self::Output {}
 }

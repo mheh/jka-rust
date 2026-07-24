@@ -15,7 +15,7 @@ use abi_transport::generic::{
 /// Args source: `oracle/codemp/cgame/cg_local.h:2225`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:815-817`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct CgSStartlocalsoundArgs {
+pub struct UiSStartlocalsoundArgs {
     /// Sound handle (`sfxHandle_t`, Raven typedefs this as `int`), read as
     /// `args[1]`.
     sfx: c_int,
@@ -23,7 +23,7 @@ pub struct CgSStartlocalsoundArgs {
     channel_num: c_int,
 }
 
-impl CgSStartlocalsoundArgs {
+impl UiSStartlocalsoundArgs {
     pub const fn new(sfx: c_int, channel_num: c_int) -> Self {
         Self { sfx, channel_num }
     }
@@ -37,7 +37,7 @@ impl CgSStartlocalsoundArgs {
     }
 }
 
-/// `UI_S_STARTLOCALSOUND` MP cgame imports syscall ABI token.
+/// `UI_S_STARTLOCALSOUND` MP UI imports syscall ABI token.
 ///
 /// Raven wrapper: `syscall( UI_S_STARTLOCALSOUND, sfx, channelNum );`
 /// Raven transport: `S_StartLocalSound( args[1], args[2] ); return 0;`
@@ -47,23 +47,23 @@ impl CgSStartlocalsoundArgs {
 /// Output source: `oracle/codemp/ui/ui_syscalls.c:196-197`
 /// Output source: `oracle/codemp/client/cl_ui.cpp:815-817`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:815-817`
-pub struct CgSStartlocalsound;
+pub struct UiSStartlocalsound;
 
-impl OutboundSysCall for CgSStartlocalsound {
+impl OutboundSysCall for UiSStartlocalsound {
     type Import = MpUiImport;
-    type Args = CgSStartlocalsoundArgs;
+    type Args = UiSStartlocalsoundArgs;
     type Output = ();
 
     const IMPORT: MpUiImport = MpUiImport::UI_S_STARTLOCALSOUND;
 }
 
-impl EncodeSysCall for CgSStartlocalsound {
+impl EncodeSysCall for UiSStartlocalsound {
     fn encode_syscall(args: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([args.sfx() as isize, args.channel_num() as isize])
     }
 }
 
-impl DecodeSysCallReturn for CgSStartlocalsound {
+impl DecodeSysCallReturn for UiSStartlocalsound {
     // Raven returns 0; the C wrapper is `void`.
     fn decode_return(_word: isize) -> Self::Output {}
 }

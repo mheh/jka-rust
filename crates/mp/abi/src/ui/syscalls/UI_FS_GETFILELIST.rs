@@ -16,7 +16,7 @@ use abi_transport::generic::{
 /// Output source: `oracle/codemp/client/cl_ui.cpp:748-749`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:748-749`
 #[derive(Debug)]
-pub struct CgFsGetfilelistArgs {
+pub struct UiFsGetfilelistArgs {
     /// Null-terminated virtual-filesystem path, decoded by Raven as `VMA(1)`.
     path: *const c_char,
     /// Null-terminated extension filter, decoded by Raven as `VMA(2)`.
@@ -27,7 +27,7 @@ pub struct CgFsGetfilelistArgs {
     bufsize: c_int,
 }
 
-impl CgFsGetfilelistArgs {
+impl UiFsGetfilelistArgs {
     /// Construct raw `trap_FS_GetFileList` syscall args.
     ///
     /// # Safety
@@ -65,7 +65,7 @@ impl CgFsGetfilelistArgs {
     }
 }
 
-/// `UI_FS_GETFILELIST` MP cgame imports syscall ABI token.
+/// `UI_FS_GETFILELIST` MP UI imports syscall ABI token.
 ///
 /// Raven wrapper: `return syscall( UI_FS_GETFILELIST, path, extension, listbuf, bufsize );`
 /// Raven transport: `return FS_GetFileList( (const char *)VMA(1), (const char *)VMA(2), (char *)VMA(3), args[4] );`
@@ -74,17 +74,17 @@ impl CgFsGetfilelistArgs {
 /// Args source: `oracle/codemp/ui/ui_syscalls.c:99-100`
 /// Output source: `oracle/codemp/client/cl_ui.cpp:748-749`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:748-749`
-pub struct CgFsGetfilelist;
+pub struct UiFsGetfilelist;
 
-impl OutboundSysCall for CgFsGetfilelist {
+impl OutboundSysCall for UiFsGetfilelist {
     type Import = MpUiImport;
-    type Args = CgFsGetfilelistArgs;
+    type Args = UiFsGetfilelistArgs;
     type Output = c_int;
 
     const IMPORT: MpUiImport = MpUiImport::UI_FS_GETFILELIST;
 }
 
-impl EncodeSysCall for CgFsGetfilelist {
+impl EncodeSysCall for UiFsGetfilelist {
     fn encode_syscall(args: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(args.path()),
@@ -95,7 +95,7 @@ impl EncodeSysCall for CgFsGetfilelist {
     }
 }
 
-impl DecodeSysCallReturn for CgFsGetfilelist {
+impl DecodeSysCallReturn for UiFsGetfilelist {
     fn decode_return(word: isize) -> Self::Output {
         word as c_int
     }

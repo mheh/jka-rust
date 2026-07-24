@@ -14,12 +14,12 @@ use abi_transport::generic::{
 /// Args source: `oracle/codemp/ui/ui_syscalls.c:533-534`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:993-995`
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct CgKeySetcatcherArgs {
+pub struct UiKeySetcatcherArgs {
     /// Key catcher mask, read by Raven as `args[1]`.
     catcher: c_int,
 }
 
-impl CgKeySetcatcherArgs {
+impl UiKeySetcatcherArgs {
     pub const fn new(catcher: c_int) -> Self {
         Self { catcher }
     }
@@ -29,7 +29,7 @@ impl CgKeySetcatcherArgs {
     }
 }
 
-/// `UI_KEY_SETCATCHER` MP cgame imports syscall ABI token.
+/// `UI_KEY_SETCATCHER` MP UI imports syscall ABI token.
 ///
 /// Raven wrapper: `syscall( UI_KEY_SETCATCHER, catcher );`
 /// Raven transport: `Key_SetCatcher( args[1] ); return 0;`
@@ -38,23 +38,23 @@ impl CgKeySetcatcherArgs {
 /// Args source: `oracle/codemp/ui/ui_syscalls.c:533-534`
 /// Output source: `oracle/codemp/client/cl_ui.cpp:993-995`
 /// Transport/switch source: `oracle/codemp/client/cl_ui.cpp:993-995`
-pub struct CgKeySetcatcher;
+pub struct UiKeySetcatcher;
 
-impl OutboundSysCall for CgKeySetcatcher {
+impl OutboundSysCall for UiKeySetcatcher {
     type Import = MpUiImport;
-    type Args = CgKeySetcatcherArgs;
+    type Args = UiKeySetcatcherArgs;
     type Output = ();
 
     const IMPORT: MpUiImport = MpUiImport::UI_KEY_SETCATCHER;
 }
 
-impl EncodeSysCall for CgKeySetcatcher {
+impl EncodeSysCall for UiKeySetcatcher {
     fn encode_syscall(args: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([args.catcher() as isize])
     }
 }
 
-impl DecodeSysCallReturn for CgKeySetcatcher {
+impl DecodeSysCallReturn for UiKeySetcatcher {
     fn decode_return(_word: isize) -> Self::Output {
         ()
     }
