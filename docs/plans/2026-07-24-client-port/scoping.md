@@ -185,8 +185,10 @@ second, delivering the gameplay payoff on a proven process. Alternative
 ## Open decision points for the sit-down
 
 1. Ordering (above).
-2. Crate layout: `mp_ui`, `mp_cgame`, `mp_menu` (shared framework), bg
-   callback impls per module — names + dependency edges.
+2. Crate layout: NOT greenfield — `mp_ui`, `mp_cgame`, `mp_uishared`
+   (shared framework home) already exist as wired workspace members from
+   the type-port campaign; the decision is how each EVOLVES (esp.
+   mp_uishared → idiomatic MenuSystem), plus bg callback impls per module.
 3. CgWorld/UiWorld shapes as proposed (esp. pools→arena, callbacks→enum).
 4. sharedBuffer policy: byte-faithful at seam, typed inland (proposed).
 5. Referee rig design + what gets recorded.
