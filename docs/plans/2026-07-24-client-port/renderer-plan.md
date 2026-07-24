@@ -44,6 +44,15 @@ waves never wait on GL work.
      render-target/image goldens + wgpu command capture on fixed scenes
      (behavioral parity per §18), replacing the GL command-stream diff.
      Windowing/context via a thin platform layer (native tier).
+     **Deviation charter (to be ruled as a DEC at R0):** the renderer
+     interior is free to deviate from source — DEC-01's idiomatic-rewrite
+     lean generalizes: fixed edges are the module seam (refEntity/refdef),
+     the sim-visible headless model/collision subset (stays faithful +
+     referee-gated), and content semantics (assets render as authored, per
+     the frontend goldens). **Presentation-side threading is in scope on
+     the mainline** (Raven's frontend/backend + backEndData double-buffer
+     is the Q3 SMP design; wgpu multi-thread encoding is with the grain) —
+     simulation threading remains fork-only, unchanged.
   3. **Scope fence vs the engine island.** What the headless subset already
      owns (model/skin registry, mdx views + DEC-35 parsed sidecar) is the
      nucleus — the renderer port EXTENDS `crates/mp/renderer`, it does not
