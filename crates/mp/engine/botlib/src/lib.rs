@@ -512,6 +512,49 @@ pub struct BotLib {
     pub AAS_WriteAASLump_offset: c_int,
 }
 
+impl BotLib {
+    /// Seat every non-zero-valid field into an all-zero `BotLib` allocation —
+    /// THE canonical list (used by `Default` and by `Engine::new`'s
+    /// `alloc_zeroed` mass, which does NOT run `Default`). A zeroed `Vec` or
+    /// `&'static` reference is an invalid value: each is `ptr::write`-seated so
+    /// the zeroed bytes are never dropped. New owned fields MUST be added here.
+    ///
+    /// # Safety
+    /// `ptr` must point at a fully zeroed, writable `BotLib` allocation.
+    pub unsafe fn seat_zeroed(ptr: *mut Self) {
+        core::ptr::write(core::ptr::addr_of_mut!((*ptr).libvars), Vec::new());
+        core::ptr::write(core::ptr::addr_of_mut!((*ptr).globaldefines), Vec::new());
+        core::ptr::write(
+            core::ptr::addr_of_mut!((*ptr).sourceFiles),
+            (0..MAX_SOURCEFILES).map(|_| None).collect(),
+        );
+        core::ptr::write(
+            core::ptr::addr_of_mut!((*ptr).botcharacters),
+            (0..=MAX_CLIENTS).map(|_| None).collect(),
+        );
+        core::ptr::write(core::ptr::addr_of_mut!((*ptr).weightconfigs), Vec::new());
+        core::ptr::write(
+            core::ptr::addr_of_mut!((*ptr).botchatstates),
+            (0..=MAX_CLIENTS).map(|_| None).collect(),
+        );
+        core::ptr::write(core::ptr::addr_of_mut!((*ptr).botchats), Vec::new());
+        core::ptr::write(
+            core::ptr::addr_of_mut!((*ptr).ichatdata),
+            (0..MAX_CLIENTS).map(|_| None).collect(),
+        );
+        core::ptr::write(core::ptr::addr_of_mut!((*ptr).matchtemplates), Vec::new());
+        core::ptr::write(core::ptr::addr_of_mut!((*ptr).randomstrings), Vec::new());
+        core::ptr::write(core::ptr::addr_of_mut!((*ptr).replychats), Vec::new());
+        core::ptr::write(core::ptr::addr_of_mut!((*ptr).synonyms), Vec::new());
+        core::ptr::write(
+            core::ptr::addr_of_mut!((*ptr).default_punctuations),
+            DEFAULT_PUNCTUATIONS,
+        );
+        // Raven `int nofaceflood = qtrue` — the one non-zero static initializer.
+        core::ptr::addr_of_mut!((*ptr).nofaceflood).write(1);
+    }
+}
+
 impl Default for BotLib {
     /// Hand-written (NOT `#[derive]`): nearly every field is a faithful C type —
     /// raw pointers, `#[repr(C)]` structs of pointers/ints/floats, and arrays of
@@ -540,36 +583,7 @@ impl Default for BotLib {
         let mut uninit = core::mem::MaybeUninit::<Self>::zeroed();
         let ptr = uninit.as_mut_ptr();
         unsafe {
-            core::ptr::write(core::ptr::addr_of_mut!((*ptr).libvars), Vec::new());
-            core::ptr::write(core::ptr::addr_of_mut!((*ptr).globaldefines), Vec::new());
-            core::ptr::write(
-                core::ptr::addr_of_mut!((*ptr).sourceFiles),
-                (0..MAX_SOURCEFILES).map(|_| None).collect(),
-            );
-            core::ptr::write(
-                core::ptr::addr_of_mut!((*ptr).botcharacters),
-                (0..=MAX_CLIENTS).map(|_| None).collect(),
-            );
-            core::ptr::write(core::ptr::addr_of_mut!((*ptr).weightconfigs), Vec::new());
-            core::ptr::write(
-                core::ptr::addr_of_mut!((*ptr).botchatstates),
-                (0..=MAX_CLIENTS).map(|_| None).collect(),
-            );
-            core::ptr::write(core::ptr::addr_of_mut!((*ptr).botchats), Vec::new());
-            core::ptr::write(
-                core::ptr::addr_of_mut!((*ptr).ichatdata),
-                (0..MAX_CLIENTS).map(|_| None).collect(),
-            );
-            core::ptr::write(core::ptr::addr_of_mut!((*ptr).matchtemplates), Vec::new());
-            core::ptr::write(core::ptr::addr_of_mut!((*ptr).randomstrings), Vec::new());
-            core::ptr::write(core::ptr::addr_of_mut!((*ptr).replychats), Vec::new());
-            core::ptr::write(core::ptr::addr_of_mut!((*ptr).synonyms), Vec::new());
-            core::ptr::write(
-                core::ptr::addr_of_mut!((*ptr).default_punctuations),
-                DEFAULT_PUNCTUATIONS,
-            );
-            // Raven `int nofaceflood = qtrue` — the one non-zero static initializer.
-            core::ptr::addr_of_mut!((*ptr).nofaceflood).write(1);
+            Self::seat_zeroed(ptr);
             uninit.assume_init()
         }
     }

@@ -57,12 +57,12 @@ pub struct Engine {
     /// rulings 12 (`mp_engine_qcommon::roff`).
     pub roff: mp_engine_qcommon::roff::RoffSystem,
     /// botlib engine-side state (Raven's scattered `aasworld`/`botimport`/…
-    /// file-scope globals) — a direct, `Default`-initialized field per
-    /// STATE-Q2 CLOSED (engine-fork-discovery rulings 12/13/43), reached via
-    /// the `EngineHostView` split-borrow constructors (ruling 43). All-zero-
-    /// valid (`BotLib::default()` is `mem::zeroed()`, matching Raven's
-    /// zero-initialized BSS globals), so the `alloc_zeroed` mass covers it —
-    /// no explicit `Engine::new` write is required.
+    /// file-scope globals) — per STATE-Q2 CLOSED (engine-fork-discovery
+    /// rulings 12/13/43), reached via the `EngineHostView` split-borrow
+    /// constructors (ruling 43). NOT all-zero-valid since the botlib idiom
+    /// campaign gave it owned `Vec`/`&'static` fields: `Engine::new` runs
+    /// `BotLib::seat_zeroed` over the `alloc_zeroed` mass (the canonical seat
+    /// list `Default` also uses).
     pub bot: mp_engine_botlib::BotLib,
 }
 
@@ -132,6 +132,9 @@ impl Engine {
             addr_of_mut!((*p).render_models).write(Default::default());
             addr_of_mut!((*p).nav).write(Default::default());
             addr_of_mut!((*p).roff).write(Default::default());
+            // BotLib gained non-zero-valid owned fields (botlib idiom
+            // campaign); seat them over the zeroed mass — canonical list.
+            mp_engine_botlib::BotLib::seat_zeroed(addr_of_mut!((*p).bot));
             // cm.shaderTextTable: BTreeMap<String, usize>, not zero-valid.
             addr_of_mut!((*p).cm.shaderTextTable).write(Default::default());
             // cm.cmShaderTable: Vec-backed CmHashTable, not zero-valid.
