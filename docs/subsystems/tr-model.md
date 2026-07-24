@@ -7,6 +7,14 @@
 > mdx view module hoisted to `mp_host_interface`. The `*mut c_void`
 > statements below are the pre-amendment record; G2SV-D5's substance (no
 > ghoul2→renderer edge, no second parse path) is unchanged.
+
+> **As-built freeze record.** The signature blocks in this doc are the
+> frozen shapes the port was transcribed INTO, quoted as of their freeze
+> commit. The idiom-era campaigns (2026-07: #13/#20 `&str`/`String`/`bool`
+> waves, DEC-35 typed model views, #19 ctx threading) have since evolved
+> some of them — the live crate source is authoritative for CURRENT
+> signatures; divergences from today's code are not errors in this record.
+
 Status: FROZEN (delegated sign-off 2026-07-10, user default-decision grant)     Supersedes: none
 Decision prefix: TRM     Ledger deps: DEC-01 (renderer deferral), DEC-04 (per-mode),
 DEC-08 (Com_Error recovery), DEC-09 (verification); engine-fork-discovery rulings

@@ -47,6 +47,14 @@ divergences:
 ---
 
 # StringEd localization (CStringEdPackage) — MP engine (§F idiomatic reimplementation)
+
+> **As-built freeze record.** The signature blocks in this doc are the
+> frozen shapes the port was transcribed INTO, quoted as of their freeze
+> commit. The idiom-era campaigns (2026-07: #13/#20 `&str`/`String`/`bool`
+> waves, DEC-35 typed model views, #19 ctx threading) have since evolved
+> some of them — the live crate source is authoritative for CURRENT
+> signatures; divergences from today's code are not errors in this record.
+
 Status: FROZEN (delegated sign-off 2026-07-10, user default-decision grant)     Supersedes: none
 Decision prefix: SE     Ledger deps: DEC-09 (oracle-differential parity), DEC-04 (per-mode)
 

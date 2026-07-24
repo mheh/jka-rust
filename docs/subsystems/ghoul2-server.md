@@ -1,4 +1,12 @@
 # Server-side Ghoul2 + renderer bone/model internals Design
+
+> **As-built freeze record.** The signature blocks in this doc are the
+> frozen shapes the port was transcribed INTO, quoted as of their freeze
+> commit. The idiom-era campaigns (2026-07: #13/#20 `&str`/`String`/`bool`
+> waves, DEC-35 typed model views, #19 ctx threading) have since evolved
+> some of them — the live crate source is authoritative for CURRENT
+> signatures; divergences from today's code are not errors in this record.
+
 Status: FROZEN (user sign-off 2026-07-09)     Supersedes: none
 Decision prefix: G2SV     Ledger deps: DEC-04 (per-mode), DEC-09 (verification);
 engine-fork-discovery rulings 2 (state placement), 3 (fn-statics), 7 (this doc),

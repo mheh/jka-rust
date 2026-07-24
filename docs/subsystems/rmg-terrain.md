@@ -1,4 +1,12 @@
 # RMG + qcommon terrain classes (§F idiomatic reimplementation) Design
+
+> **As-built freeze record.** The signature blocks in this doc are the
+> frozen shapes the port was transcribed INTO, quoted as of their freeze
+> commit. The idiom-era campaigns (2026-07: #13/#20 `&str`/`String`/`bool`
+> waves, DEC-35 typed model views, #19 ctx threading) have since evolved
+> some of them — the live crate source is authoritative for CURRENT
+> signatures; divergences from today's code are not errors in this record.
+
 Status: FROZEN (user sign-off 2026-07-09)     Supersedes: none
 Amended: ruling 49 (2026-07-09) — CDraw32 §20-drop addendum (see Divergences)
 Decision prefix: RMG     Ledger deps: DEC-01, DEC-04, DEC-09
