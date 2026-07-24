@@ -42,12 +42,38 @@ def basename(cur):
     return Path(f.name).name if f else ""
 
 
-def is_game_c(cur):
+# ------------------------------------------------- module-parameterized filter
+# A module profile decides two things fnsweep must not hardwire: which .c files
+# are PORT TARGETS (collected as call-graph nodes), and how a callee's defining
+# file BUCKETS (in-module vs an already-satisfied dependency vs the trap seam).
+#
+# mp-game (default) is unchanged: every `/game/*.c` is a port target — including
+# bg_*.c and g_syscalls.c — and bg_*.c callees bucket as "bg" purely by name.
+#
+# mp-ui adds two exclusions that are satisfied DEPENDENCIES, not port targets:
+#   (a) codemp/game/bg_*.c — already ported as mp_bg; calls resolve to "bg".
+#   (b) codemp/ui/ui_syscalls.c — the trap seam (owned by crates/mp/abi/src/ui);
+#       every fn it defines (trap_* wrappers + PASSFLOAT/dllEntry) buckets as
+#       "syscall" so it never enters the in-module port graph.
+MODULE_FILTERS = {
+    "mp-game": dict(port_dir="/game/", seam_files=set()),
+    "mp-ui": dict(port_dir="/ui/", seam_files={"ui_syscalls.c"}),
+}
+# Active filter — set by build_manifest; defaults keep the mp-game path identical.
+_FILTER = MODULE_FILTERS["mp-game"]
+
+
+def is_port_target_c(cur):
+    """True if `cur` is defined in a .c file this module ports (a call-graph
+    node). Non-port dependency TUs (bg_*.c, ui_syscalls.c) are excluded here and
+    surface only as classified callees."""
     f = cur.location.file
     if not f:
         return False
     p = f.name.replace("\\", "/")
-    return p.endswith(".c") and "/game/" in p
+    if not (p.endswith(".c") and _FILTER["port_dir"] in p):
+        return False
+    return Path(p).name not in _FILTER["seam_files"]
 
 
 def is_file_scope_var(cur):
@@ -65,7 +91,11 @@ def cite(cur):
 
 # --------------------------------------------------------- callee bucketing
 def classify_callee(callee):
-    """One of: syscall | bg | in-module | libc/other."""
+    """One of: syscall | bg | in-module | libc/other.
+
+    `trap_*` and any fn defined in a module `seam_file` (ui_syscalls.c) bucket as
+    "syscall" (the trap seam); bg_*.c bodies bucket as "bg" (satisfied dep); all
+    other in-tree bodies are "in-module" port targets."""
     name = callee.spelling
     if name.startswith("trap_"):
         return "syscall"
@@ -73,7 +103,12 @@ def classify_callee(callee):
     if defn is not None:
         f = defn.location.file
         if f and f.name.startswith(str(C.SRC_ROOT)):
-            return "bg" if basename(defn).startswith("bg_") else "in-module"
+            bn = basename(defn)
+            if bn.startswith("bg_"):
+                return "bg"
+            if bn in _FILTER["seam_files"]:
+                return "syscall"
+            return "in-module"
         return "libc/other"
     # no body in the TU: engine import or libc/SDK prototype
     return "libc/other"
@@ -177,7 +212,10 @@ def analyze_fn(fn):
         "ret_type": fn.result_type.spelling,
         "params": [{"name": a.spelling, "type": a.type.spelling}
                    for a in fn.get_arguments()],
-        "variadic": fn.type.is_function_variadic(),
+        # FUNCTIONNOPROTO (old-style `void f()` with no prototype) has no
+        # variadic query — ui carries a few; treat them as non-variadic.
+        "variadic": (fn.type.kind == TypeKind.FUNCTIONPROTO
+                     and fn.type.is_function_variadic()),
         "callees": {"in-module": [], "bg": [], "syscall": [], "libc/other": []},
         "callee_usrs": [],          # in-module + bg targets, for the call graph
         "statics": [],              # function-scope static VAR_DECLs
@@ -264,7 +302,7 @@ def collect_functions(tu):
     def visit(cur):
         for c in cur.get_children():
             if c.kind == CursorKind.FUNCTION_DECL and c.is_definition() \
-                    and is_game_c(c):
+                    and is_port_target_c(c):
                 usr = c.get_usr()
                 if usr in seen:
                     continue
@@ -380,6 +418,8 @@ def condensed_waves(sccs, edges):
 
 # ------------------------------------------------------------------- main
 def build_manifest(module):
+    global _FILTER
+    _FILTER = MODULE_FILTERS.get(module, MODULE_FILTERS["mp-game"])
     tu = C.parse_tu(module, None, unity=True)
     diags = [d for d in tu.diagnostics if d.severity >= 3]
     parse_notes = defaultdict(int)
@@ -432,8 +472,32 @@ def build_manifest(module):
     for ci in range(len(sccs)):
         wave_hist[wave[ci]] += 1
 
+    # callee-edge census over ALL call sites (how the outgoing surface resolves):
+    # in-module port targets vs already-satisfied bg vs the trap seam vs libc.
+    callee_census = defaultdict(int)
+    callee_distinct = {"in-module": set(), "bg": set(), "syscall": set(),
+                       "libc/other": set()}
+    for f in funcs:
+        for bucket, entries in f["callees"].items():
+            callee_census[bucket] += len(entries)
+            for e in entries:
+                callee_distinct[bucket].add(e["name"])
+
+    lbl = {"mp-game": "jampgame", "mp-ui": "ui"}.get(module, module)
+    srcdesc = {"mp-ui": "oracle/codemp/ui/*.c (port targets; bg_*.c + "
+               "ui_syscalls.c parsed as satisfied deps/seam)"}.get(
+                   module, "oracle/codemp/game/*.c")
+
     stats = {
         "module": module,
+        "label": lbl,
+        "srcdesc": srcdesc,
+        "callee_census": {
+            "edges": {k: callee_census[k] for k in
+                      ("in-module", "bg", "syscall", "libc/other")},
+            "distinct": {k: len(callee_distinct[k]) for k in
+                         ("in-module", "bg", "syscall", "libc/other")},
+        },
         "total_functions": len(funcs),
         "total_loc": total_loc,
         "files_with_functions": len(by_file),
@@ -467,10 +531,12 @@ def build_manifest(module):
 def render_stats_md(manifest, skel_samples):
     s = manifest["stats"]
     cg = s["call_graph"]
+    label = s.get("label", "jampgame")
+    srcdesc = s.get("srcdesc", "oracle/codemp/game/*.c")
     o = []
-    o.append(f"# jampgame function manifest — stats ({s['module']})\n")
+    o.append(f"# {label} function manifest — stats ({s['module']})\n")
     o.append(f"Generated by `tools/closure-prototype/fnsweep.py` from a single "
-             f"unity libclang parse of `oracle/codemp/game/*.c`.\n")
+             f"unity libclang parse of `{srcdesc}`.\n")
     o.append("## Headline\n")
     o.append(f"- **Functions:** {s['total_functions']}")
     o.append(f"- **Total LOC (function extents):** {s['total_loc']:,}")
@@ -479,6 +545,20 @@ def render_stats_md(manifest, skel_samples):
     o.append(f"- **SCCs:** {cg['scc_count']} "
              f"({cg['nontrivial_scc_count']} non-trivial, largest = {cg['largest_scc']} fns)")
     o.append(f"- **Topological waves (SCC-condensed, deps-first):** {cg['wave_count']}\n")
+
+    cc = s.get("callee_census")
+    if cc:
+        o.append("## Callee resolution census\n")
+        o.append("Every call site from a port-target fn, bucketed by where the "
+                 "callee resolves. `bg` = already ported (mp_bg); `syscall` = trap "
+                 "seam (crates/mp/abi/src/ui, incl. ui_syscalls.c wrappers); "
+                 "`in-module` = ui port targets; `libc/other` = C runtime / engine "
+                 "prototypes with no body in the TU.\n")
+        o.append("| bucket | call-site edges | distinct callees |")
+        o.append("| --- | ---: | ---: |")
+        for k in ("in-module", "bg", "syscall", "libc/other"):
+            o.append(f"| {k} | {cc['edges'][k]} | {cc['distinct'][k]} |")
+        o.append("")
 
     o.append("## Wave structure (SCC-condensed)\n")
     o.append("Wave 0 = calls nothing in-module (leaves); wave N = 1 + max wave "
@@ -546,6 +626,47 @@ def render_stats_md(manifest, skel_samples):
     return "\n".join(o)
 
 
+def build_wave_partition(manifest):
+    """Leaves-first topological wave partition over the in-module call graph.
+    Each wave is a list of SCC groups; a mutual-recursion SCC (>1 fn) is one
+    atomic group that must port together. Waves are exactly the SCC-condensed
+    levels the manifest already stamped on every fn (wave 0 = calls nothing
+    in-module)."""
+    funcs = manifest["functions"]
+    by_scc = defaultdict(list)
+    scc_wave = {}
+    for f in funcs:
+        by_scc[f["scc"]].append(
+            {"name": f["name"], "file": f["file"], "line": f["line"],
+             "loc": f["loc"]})
+        scc_wave[f["scc"]] = f["wave"]
+    waves = defaultdict(list)
+    for scc, members in by_scc.items():
+        members.sort(key=lambda m: (m["file"], m["line"]))
+        waves[scc_wave[scc]].append({
+            "scc": scc, "size": len(members),
+            "mutual_recursion": len(members) > 1, "fns": members})
+    out_waves = []
+    for w in sorted(waves):
+        groups = sorted(waves[w], key=lambda g: (-g["size"], g["fns"][0]["name"]))
+        out_waves.append({
+            "wave": w,
+            "scc_groups": len(groups),
+            "fns": sum(g["size"] for g in groups),
+            "loc": sum(m["loc"] for g in groups for m in g["fns"]),
+            "mutual_recursion_groups": sum(1 for g in groups if g["mutual_recursion"]),
+            "groups": groups})
+    return {
+        "module": manifest["stats"]["module"],
+        "wave_count": len(out_waves),
+        "note": "Leaves-first topological waves over the in-module call graph "
+                "(bg/trap/libc callees excluded — they are satisfied deps). "
+                "wave 0 = calls nothing in-module; a fn enters wave N only when "
+                "every in-module callee sits in a lower wave. Each mutual-"
+                "recursion SCC (>1 fn) is one atomic group.",
+        "waves": out_waves}
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--module", default="mp-game")
@@ -565,15 +686,21 @@ def main():
     manifest = build_manifest(args.module)
     outdir = Path(args.out)
     outdir.mkdir(parents=True, exist_ok=True)
-    mpath = outdir / f"{args.module.split('-', 1)[1]}game-fn-manifest.json" \
-        if False else outdir / "jampgame-fn-manifest.json"
+    prefix = manifest["stats"]["label"]
+    mpath = outdir / f"{prefix}-fn-manifest.json"
     mpath.write_text(json.dumps(manifest, indent=1))
-    spath = outdir / "jampgame-fn-stats.md"
+    spath = outdir / f"{prefix}-fn-stats.md"
     spath.write_text(render_stats_md(manifest, skel_samples=None))
+    wpath = outdir / f"{prefix}-wave-partition.json"
+    wpath.write_text(json.dumps(build_wave_partition(manifest), indent=1))
+    cc = manifest["stats"]["callee_census"]["edges"]
     print(f"[fnsweep] {manifest['stats']['total_functions']} functions, "
           f"{manifest['stats']['total_loc']:,} LOC")
+    print(f"[fnsweep] callee edges: in-module={cc['in-module']} bg={cc['bg']} "
+          f"syscall={cc['syscall']} libc/other={cc['libc/other']}")
     print(f"[fnsweep] wrote {mpath}")
     print(f"[fnsweep] wrote {spath}")
+    print(f"[fnsweep] wrote {wpath}")
 
 
 if __name__ == "__main__":
