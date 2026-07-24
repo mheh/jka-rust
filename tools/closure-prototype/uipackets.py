@@ -78,7 +78,7 @@ UI_WORLD = "UiWorld"
 UI_CONTEXT = "UiContext"
 DISPLAY_CONTEXT = "DisplayContext"
 MENU_SYSTEM = "MenuSystem"
-CONFIG_FINALIZED = False  # flip True once U2 ratifies the root types
+CONFIG_FINALIZED = True  # U2 ratified 2026-07-24 (DEC-36, D1-D8)
 # =============================================================================
 
 # bg_lib.c-origin callees that are NOT mp_bg fns — Raven's own libc shims. They
@@ -229,26 +229,37 @@ def render_packet(cfile, wave, chunk, shard, n_shards, law, bg_sigs, trap_seam,
              f"file: `{cfile}`")
     o.append("")
 
-    # ---- CONFIG / root-type placeholder note
-    o.append("## ROOT-TYPE BINDINGS (PLACEHOLDER — finalized at U2)")
+    # ---- CONFIG / root-type bindings (DEC-36, ratified 2026-07-24)
+    o.append("## ROOT-TYPE BINDINGS (RATIFIED — DEC-36, U2 sit-down 2026-07-24)")
     o.append("")
-    o.append(f"The ui root types are ratified at the **U2 sit-down** BEFORE "
-             "transcription; this packet names state in placeholder terms only, "
-             "and the **field-level mapping is intentionally deferred** "
-             f"(CONFIG_FINALIZED = `{CONFIG_FINALIZED}`):")
-    o.append(f"- **`{UI_CONTEXT}`** — threaded handle the vmMain entrypoints own "
-             f"and pass inward (`{{ world: &mut {UI_WORLD}, engine, menus, dc, … }}`); "
-             "analog of `GameContext`. State is THREADED, not reached — no "
-             "`static mut`, no ambient cells (the G_SoundIndex lesson is day-one "
-             "law).")
-    o.append(f"- **`{UI_WORLD}`** — owned ui spine: `uiInfo_t` + ui_force.c "
+    o.append("The ui root types are RATIFIED (D1-D8; `docs/decisions.md` "
+             "DEC-36). Transcribe against these shapes — a shape question a "
+             "packet cannot answer is an escalation, never an invention:")
+    o.append(f"- **`{UI_CONTEXT}`** (D4) — `{{ world: &mut {UI_WORLD}, engine }}`, "
+             "owned by the vmMain entrypoints and passed inward; analog of "
+             "`GameContext`. State is THREADED, not reached — no `static mut`, "
+             "no ambient cells (the G_SoundIndex lesson is day-one law).")
+    o.append(f"- **`{UI_WORLD}`** (D1) — owned ui spine: `uiInfo_t` + ui_force.c "
              "globals + the per-file statics listed under each fn below, folded "
-             "into fields.")
-    o.append(f"- **`{MENU_SYSTEM}`** — ui_shared.c's owned menu framework "
-             "(menuDef/itemDef arena + indices, `String_Alloc` intern pool → "
-             f"owned table); owned by composition `{UI_WORLD}.menus`.")
-    o.append(f"- **`{DISPLAY_CONTEXT}`** — the render/text/cvar/feeder/ownerDraw/"
-             "sound vtable (Raven `displayContextDef_t`) as an idiomatic trait.")
+             "into fields — `String`/`bool`/`Vec` throughout (all Class C), "
+             "Raven field names kept.")
+    o.append(f"- **`{MENU_SYSTEM}`** (D2) — ui_shared.c's owned menu framework: "
+             "menuDef/itemDef arena + index handles (no `*mut` graph), "
+             "`String_Alloc` intern pool → owned string table, open-menu stack "
+             f"as indices; owned by composition `{UI_WORLD}.menus`.")
+    o.append(f"- **`{DISPLAY_CONTEXT}`** (D3) — an idiomatic trait REPLACING "
+             "Raven's `displayContextDef_t` fn-pointer struct (repr(C) asserts "
+             "retired by ruling; cgame later implements the same trait).")
+    o.append("- **bg arms** (D5) — bg's `#ifdef WE_ARE_IN_THE_UI`/`UI_EXPORTS` "
+             "branches are trait dispatch: ui implements `GameCallbacks` over "
+             "its trap layer (sound→`S_RegisterSound`, shader→"
+             "`R_RegisterShaderNoMip`); ui reuses mp_bg's animation module "
+             "(PORT-NOTE at the `UI_ParseAnimationFile` site).")
+    o.append("- **ABI arm** (D6) — legacy `vmMain`+`dllEntry` exports.")
+    o.append("- **Dead surface** (D7) — ui_players.c/ui_util.c and ui_main.c's "
+             "`UI_DrawOpponent`/`UI_DrawPlayerModel` static family are §20 dead "
+             "(not compiled in retail vcproj/q3asm; deleted in OpenJK): drop "
+             "with PORT-NOTEs, never port.")
     o.append("")
 
     # ---- law + dictionary

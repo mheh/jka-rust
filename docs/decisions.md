@@ -615,3 +615,40 @@ per model lifetime), handed out as a Copy `MdxaRef`/`MdxmRef` pair; per-frame
 data (compressed bone pool, verts) stays view-based. Amends the letter of
 G2SV-D5/D15 (which forced the `*mut c_void` seam) while keeping their
 substance: no ghoul2→renderer crate edge, no duplicate file-parse path.
+
+## DEC-36 — ui root types: UiWorld/MenuSystem/DisplayContext (U2 sit-down, 2026-07-24)
+
+Ratifies the ui-port root-type set (plan:
+`docs/plans/2026-07-24-client-port/ui-plan.md`, stage U2; rulings D1-D8):
+
+1. **`UiWorld`** — the owned ui spine: `uiInfo_t` + ui_force.c globals +
+   every file-scope static folded into fields; `String`/`bool`/`Vec`
+   throughout (the frozen-vs-free census proves all of it Class C /
+   module-private); Raven field names kept.
+2. **`MenuSystem`** — ui_shared.c's menu framework owned by composition
+   (`UiWorld.menus`): menuDef/itemDef arena + index handles replacing the
+   raw-pointer graph; `String_Alloc` intern pool → owned string table;
+   open-menu stack as indices.
+3. **`DisplayContext`** — an idiomatic trait REPLACING Raven's
+   `displayContextDef_t` fn-pointer struct; the faithful repr(C) port and
+   its layout asserts retire (blast radius verified: one MP consumer,
+   `uiInfo_t.uiDC`; SP's differently-shaped sibling is unrelated). cgame
+   later implements the same trait for `cgDC`.
+4. **`UiContext`** — `{ world: &mut UiWorld, engine }`, owned by the vmMain
+   entrypoints and threaded inward; analog of `GameContext`.
+5. **bg per-module arms** — Raven's `#ifdef WE_ARE_IN_THE_UI`/`UI_EXPORTS`/
+   `CGAME` branches in bg_vehicleLoad/bg_misc/bg_saga/bg_g2_utils become
+   `GameCallbacks` trait dispatch: the trait gains the methods the non-game
+   arms need (e.g. shader registration; game's impl stays faithful to its
+   arm, including Raven's commented-out no-ops); ui implements the trait
+   over its trap layer. ui reuses mp_bg's animation module instead of
+   porting Raven's hand-synced `UI_ParseAnimationFile` fork.
+6. **ABI arm** — legacy `vmMain`+`dllEntry` (the jampgame precedent; loads
+   under OpenJK's fallback arm and retail), basename `ui<ARCH><EXT>`.
+7. **Dead surface (§20)** — `ui_players.c` and `ui_util.c` are not compiled
+   into MP ui (absent from ui.vcproj and ui.q3asm; OpenJK deleted the files
+   outright); dropped, along with ui_main.c's `UI_DrawOpponent`/
+   `UI_DrawPlayerModel` static family (only call sites commented out).
+8. **Seam cleanups** — the unused duplicate `uiExport_t`/`uiImport_t` enums
+   in `mp_abi::ui::public` are deleted; copy-pasted `Cg*` wrapper type names
+   inside `mp_abi::ui::syscalls` renamed `Ui*`.
