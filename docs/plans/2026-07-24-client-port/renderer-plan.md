@@ -37,9 +37,13 @@ waves never wait on GL work.
      BSP/world load, PVS/cull, surface sorting, curve tessellation, mdx
      skinning, light grid — deterministic, golden-testable without GL.
      Backend = GL command submission (RB_* / tr_backend).
-  2. **GL strategy.** Recommendation: faithful GL1.x-era backend first
-     (rule A2 — parity before modernization; a modern backend is fork
-     material). Windowing/context via a thin platform layer (native tier).
+  2. **Backend strategy — DEC-01 is the standing lean: wgpu**, as an
+     idiomatic §F-track rewrite, explicitly NOT a fixed-function GL
+     transcription; DEC-01 says "re-confirm specifics at that time" — R0 IS
+     that re-confirmation. Consequence for validation: R4's gate becomes
+     render-target/image goldens + wgpu command capture on fixed scenes
+     (behavioral parity per §18), replacing the GL command-stream diff.
+     Windowing/context via a thin platform layer (native tier).
   3. **Scope fence vs the engine island.** What the headless subset already
      owns (model/skin registry, mdx views + DEC-35 parsed sidecar) is the
      nucleus — the renderer port EXTENDS `crates/mp/renderer`, it does not
@@ -80,11 +84,12 @@ waves never wait on GL work.
   BSP load of mp/duel1 (surfaces/nodes/lightgrid digests), tessellation and
   mdx-skinning outputs on fixed inputs. Committed goldens; `cargo test`
   needs no C++ toolchain (established §18 pattern).
-- **R4 — backend port.** The GL call layer behind the frontend, smallest
-  faithful surface first (clear/upload/draw for world + entities). Gates:
-  a GL command-stream logging shim records the call sequence on fixed
-  scenes; oracle-vs-rust stream diff + visual comparison. Unsafe confined
-  to the binding layer.
+- **R4 — backend port.** Per DEC-01's wgpu lean (re-confirmed at R0): an
+  idiomatic wgpu backend behind the faithful frontend, smallest surface
+  first (clear/upload/draw for world + entities). Gates: render-target/
+  image goldens + wgpu command capture on fixed scenes (§F behavioral
+  parity — the frontend goldens pin everything CPU-side, so backend diffs
+  localize to draw translation). Unsafe confined to the binding layer.
 - **R5 — windowed dev harness.** Before any client-engine work: a minimal
   host that opens a window, loads a map through our FS/CM, renders a
   scripted flythrough with test refEntities. This is the renderer's "live
