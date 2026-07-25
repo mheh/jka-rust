@@ -8,6 +8,7 @@ pub mod addpoly_arg;
 pub mod addsprite_arg;
 pub mod build_ident;
 pub mod cbuf_exec;
+pub mod cin_flags;
 #[path = "e_status.rs"]
 pub mod cinematic_status;
 pub mod collision;
@@ -35,6 +36,7 @@ pub mod hunk_pref;
 #[path = "qint64.rs"]
 pub mod int64;
 pub mod item_use_fail;
+pub mod keycatch;
 pub mod limits;
 pub mod mark_fragment;
 #[path = "pc_token_t.rs"]
@@ -45,6 +47,8 @@ pub mod q_math;
 pub mod q_string;
 pub mod saber_block_type;
 pub mod saber_blocked_type;
+pub mod screen;
+pub mod server_address;
 pub mod shared_eik_move_state;
 pub mod shared_erag_effector;
 pub mod shared_erag_phase;
@@ -74,6 +78,7 @@ pub use addpoly_arg::addpolyArgStruct_t;
 pub use addsprite_arg::addspriteArgStruct_t;
 pub use build_ident::{CPUSTRING, MAC_STATIC, PATH_SEP, Q3_VERSION, QDECL};
 pub use cbuf_exec::cbufExec_t;
+pub use cin_flags::{CIN_HOLD, CIN_LOOP, CIN_SHADER, CIN_SILENT, CIN_SYSTEM};
 pub use cinematic_status::{
     e_status, FMV_EOF, FMV_IDLE, FMV_ID_BLT, FMV_ID_IDLE, FMV_ID_WAIT, FMV_LOOPED, FMV_PLAY,
 };
@@ -101,6 +106,7 @@ pub use gen_cmds::genCmds_t;
 pub use hunk_pref::ha_pref;
 pub use int64::qint64;
 pub use item_use_fail::itemUseFail_t;
+pub use keycatch::{KEYCATCH_CGAME, KEYCATCH_CONSOLE, KEYCATCH_MESSAGE, KEYCATCH_UI};
 pub use limits::{
     BIG_INFO_STRING, ENTITYNUM_MAX_NORMAL, ENTITYNUM_NONE, ENTITYNUM_WORLD, GENTITYNUM_BITS,
     MAX_CLIENTS, MAX_CLIENTS_I32, MAX_GENTITIES, MAX_INFO_STRING, MAX_STRING_CHARS,
@@ -117,6 +123,8 @@ pub use q_math::{
 pub use native_math::rng::RAND_MAX;
 pub use saber_block_type::saberBlockType_t;
 pub use saber_blocked_type::saberBlockedType_t;
+pub use screen::{SCREEN_HEIGHT, SCREEN_WIDTH};
+pub use server_address::{AS_FAVORITES, AS_GLOBAL, AS_LOCAL, AS_MPLAYER};
 pub use shared_eik_move_state::sharedEIKMoveState;
 pub use shared_erag_effector::sharedERagEffector;
 pub use shared_erag_phase::sharedERagPhase;

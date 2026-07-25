@@ -25,6 +25,18 @@ use crate::shared::list_box_def_s::ListBoxDef;
 use crate::shared::menu_def_t::MenuDef;
 use crate::shared::menu_id::MenuId;
 use crate::shared::menu_system::{MenuSystem, MAX_DEFERRED_SCRIPT};
+use crate::shared::menudef::{
+    ITEM_ALIGN_CENTER, ITEM_ALIGN_RIGHT, ITEM_TYPE_BIND, ITEM_TYPE_EDITFIELD, ITEM_TYPE_LISTBOX,
+    ITEM_TYPE_MODEL, ITEM_TYPE_MULTI, ITEM_TYPE_NUMERICFIELD, ITEM_TYPE_OWNERDRAW,
+    ITEM_TYPE_SLIDER, ITEM_TYPE_TEXT, ITEM_TYPE_TEXTSCROLL, ITEM_TYPE_YESNO, UI_FORCE_RANK_ABSORB,
+    UI_FORCE_RANK_DRAIN, UI_FORCE_RANK_GRIP, UI_FORCE_RANK_HEAL, UI_FORCE_RANK_LEVITATION,
+    UI_FORCE_RANK_LIGHTNING, UI_FORCE_RANK_PROTECT, UI_FORCE_RANK_PULL, UI_FORCE_RANK_PUSH,
+    UI_FORCE_RANK_RAGE, UI_FORCE_RANK_SABERATTACK, UI_FORCE_RANK_SABERDEFEND,
+    UI_FORCE_RANK_SABERTHROW, UI_FORCE_RANK_SEE, UI_FORCE_RANK_SPEED, UI_FORCE_RANK_TEAM_FORCE,
+    UI_FORCE_RANK_TEAM_HEAL, UI_FORCE_RANK_TELEPATHY, UI_FORCE_SIDE, WINDOW_BORDER_FULL,
+    WINDOW_BORDER_HORZ, WINDOW_BORDER_KCGRADIENT, WINDOW_BORDER_VERT, WINDOW_STYLE_CINEMATIC,
+    WINDOW_STYLE_FILLED, WINDOW_STYLE_GRADIENT, WINDOW_STYLE_SHADER, WINDOW_STYLE_TEAMCOLOR,
+};
 use crate::shared::model_def_s::ModelDef;
 use crate::shared::multi_def_s::MultiDef;
 use crate::shared::rect_def_t::RectDef;
@@ -68,77 +80,6 @@ pub const WINDOW_FORCED: c_int = 0x0010_0000;
 /// Source: `oracle/codemp/ui/ui_shared.h:43`
 pub const WINDOW_POPUP: c_int = 0x0020_0000;
 
-/// Raven `#define WINDOW_STYLE_CINEMATIC 5`.
-/// Source: `oracle/ui/menudef.h:48`
-pub const WINDOW_STYLE_CINEMATIC: c_int = 5;
-
-/// Raven `#define ITEM_TYPE_EDITFIELD 4`.
-/// Source: `oracle/ui/menudef.h:13`
-pub const ITEM_TYPE_EDITFIELD: c_int = 4;
-/// Raven `#define ITEM_TYPE_LISTBOX 6`.
-/// Source: `oracle/ui/menudef.h:15`
-pub const ITEM_TYPE_LISTBOX: c_int = 6;
-/// Raven `#define ITEM_TYPE_TEXT 0`.
-/// Source: `oracle/ui/menudef.h:9`
-pub const ITEM_TYPE_TEXT: c_int = 0;
-/// Raven `#define ITEM_TYPE_MODEL 7`.
-/// Source: `oracle/ui/menudef.h:16`
-pub const ITEM_TYPE_MODEL: c_int = 7;
-/// Raven `#define ITEM_TYPE_OWNERDRAW 8`.
-/// Source: `oracle/ui/menudef.h:17`
-pub const ITEM_TYPE_OWNERDRAW: c_int = 8;
-/// Raven `#define ITEM_TYPE_NUMERICFIELD 9`.
-/// Source: `oracle/ui/menudef.h:18`
-pub const ITEM_TYPE_NUMERICFIELD: c_int = 9;
-/// Raven `#define ITEM_TYPE_SLIDER 10`.
-/// Source: `oracle/ui/menudef.h:19`
-pub const ITEM_TYPE_SLIDER: c_int = 10;
-/// Raven `#define ITEM_TYPE_YESNO 11`.
-/// Source: `oracle/ui/menudef.h:20`
-pub const ITEM_TYPE_YESNO: c_int = 11;
-/// Raven `#define ITEM_TYPE_MULTI 12`.
-/// Source: `oracle/ui/menudef.h:21`
-pub const ITEM_TYPE_MULTI: c_int = 12;
-/// Raven `#define ITEM_TYPE_BIND 13`.
-/// Source: `oracle/ui/menudef.h:22`
-pub const ITEM_TYPE_BIND: c_int = 13;
-/// Raven `#define ITEM_TYPE_TEXTSCROLL 14`.
-/// Source: `oracle/ui/menudef.h:23`
-pub const ITEM_TYPE_TEXTSCROLL: c_int = 14;
-
-/// Raven `#define ITEM_ALIGN_CENTER 1`.
-/// Source: `oracle/ui/menudef.h:26`
-pub const ITEM_ALIGN_CENTER: c_int = 1;
-/// Raven `#define ITEM_ALIGN_RIGHT 2`.
-/// Source: `oracle/ui/menudef.h:27`
-pub const ITEM_ALIGN_RIGHT: c_int = 2;
-
-/// Raven `#define WINDOW_STYLE_FILLED 1`.
-/// Source: `oracle/ui/menudef.h:44`
-pub const WINDOW_STYLE_FILLED: c_int = 1;
-/// Raven `#define WINDOW_STYLE_GRADIENT 2`.
-/// Source: `oracle/ui/menudef.h:45`
-pub const WINDOW_STYLE_GRADIENT: c_int = 2;
-/// Raven `#define WINDOW_STYLE_SHADER 3`.
-/// Source: `oracle/ui/menudef.h:46`
-pub const WINDOW_STYLE_SHADER: c_int = 3;
-/// Raven `#define WINDOW_STYLE_TEAMCOLOR 4`.
-/// Source: `oracle/ui/menudef.h:47`
-pub const WINDOW_STYLE_TEAMCOLOR: c_int = 4;
-
-/// Raven `#define WINDOW_BORDER_FULL 1`.
-/// Source: `oracle/ui/menudef.h:38`
-pub const WINDOW_BORDER_FULL: c_int = 1;
-/// Raven `#define WINDOW_BORDER_HORZ 2`.
-/// Source: `oracle/ui/menudef.h:39`
-pub const WINDOW_BORDER_HORZ: c_int = 2;
-/// Raven `#define WINDOW_BORDER_VERT 3`.
-/// Source: `oracle/ui/menudef.h:40`
-pub const WINDOW_BORDER_VERT: c_int = 3;
-/// Raven `#define WINDOW_BORDER_KCGRADIENT 4`.
-/// Source: `oracle/ui/menudef.h:41`
-pub const WINDOW_BORDER_KCGRADIENT: c_int = 4;
-
 /// Raven `#define WINDOW_INACTIVE 0x00000008`.
 /// Source: `oracle/codemp/ui/ui_shared.h:25`
 pub const WINDOW_INACTIVE: c_int = 0x0000_0008;
@@ -180,30 +121,6 @@ const SLIDER_THUMB_WIDTH: f32 = 12.0;
 /// Raven `#define SLIDER_THUMB_HEIGHT 20.0`.
 /// Source: `oracle/codemp/ui/ui_shared.h:103`
 const SLIDER_THUMB_HEIGHT: f32 = 20.0;
-
-/// Raven `#define UI_FORCE_SIDE 257` + the `UI_FORCE_RANK_*` family — the
-/// `ownerDraw` values [`Item_OwnerDraw_HandleKey`] special-cases for its mouse
-/// hit-test guard.
-/// Source: `oracle/ui/menudef.h:304-323`
-const UI_FORCE_SIDE: c_int = 257;
-const UI_FORCE_RANK_HEAL: c_int = 259;
-const UI_FORCE_RANK_LEVITATION: c_int = 260;
-const UI_FORCE_RANK_SPEED: c_int = 261;
-const UI_FORCE_RANK_PUSH: c_int = 262;
-const UI_FORCE_RANK_PULL: c_int = 263;
-const UI_FORCE_RANK_TELEPATHY: c_int = 264;
-const UI_FORCE_RANK_GRIP: c_int = 265;
-const UI_FORCE_RANK_LIGHTNING: c_int = 266;
-const UI_FORCE_RANK_RAGE: c_int = 267;
-const UI_FORCE_RANK_PROTECT: c_int = 268;
-const UI_FORCE_RANK_ABSORB: c_int = 269;
-const UI_FORCE_RANK_TEAM_HEAL: c_int = 270;
-const UI_FORCE_RANK_TEAM_FORCE: c_int = 271;
-const UI_FORCE_RANK_DRAIN: c_int = 272;
-const UI_FORCE_RANK_SEE: c_int = 273;
-const UI_FORCE_RANK_SABERATTACK: c_int = 274;
-const UI_FORCE_RANK_SABERDEFEND: c_int = 275;
-const UI_FORCE_RANK_SABERTHROW: c_int = 276;
 
 /// Raven `#define K_CHAR_FLAG 1024` — or'd onto a keynum to mark a
 /// translated-character event.

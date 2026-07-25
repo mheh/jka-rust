@@ -29,6 +29,7 @@ pub mod menu_def_t;
 pub mod menu_id;
 pub mod menu_scratch;
 pub mod menu_system;
+pub mod menudef;
 pub mod model_def_s;
 pub mod multi_def_s;
 pub mod rect_def_t;

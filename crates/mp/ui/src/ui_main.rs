@@ -31,11 +31,21 @@ use mp_qshared::shared::limits::MAX_NAME_LENGTH;
 use mp_qshared::shared::q_color::S_COLOR_RED;
 use mp_qshared::shared::q_string::COM_StripExtension;
 use mp_qshared::shared::{
-    connstate_t, fileHandle_t, qhandle_t, vec4_t, FS_READ, MAX_CLIENTS, MAX_INFO_STRING, MAX_QPATH,
-    MAX_STRING_CHARS, Q3_VERSION,
+    connstate_t, fileHandle_t, qhandle_t, vec4_t, AS_FAVORITES, CIN_LOOP, CIN_SILENT, FS_READ,
+    KEYCATCH_UI, MAX_CLIENTS, MAX_INFO_STRING, MAX_QPATH, MAX_STRING_CHARS, Q3_VERSION,
+    SCREEN_HEIGHT, SCREEN_WIDTH,
 };
 use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::menu_system::MAX_MENUFILE;
+use mp_uishared::shared::menudef::{
+    ITEM_TEXTSTYLE_BLINK, ITEM_TEXTSTYLE_NORMAL, ITEM_TEXTSTYLE_OUTLINED,
+    ITEM_TEXTSTYLE_OUTLINESHADOWED, ITEM_TEXTSTYLE_PULSE, ITEM_TEXTSTYLE_SHADOWED,
+    ITEM_TEXTSTYLE_SHADOWEDMORE, UI_CLANCINEMATIC, UI_MAPCINEMATIC, UI_NETMAPCINEMATIC,
+    UI_SHOW_ANYNONTEAMGAME, UI_SHOW_ANYTEAMGAME, UI_SHOW_DEMOAVAILABLE, UI_SHOW_FAVORITESERVERS,
+    UI_SHOW_FFA, UI_SHOW_LEADER, UI_SHOW_NETANYNONTEAMGAME, UI_SHOW_NETANYTEAMGAME,
+    UI_SHOW_NEWBESTTIME, UI_SHOW_NEWHIGHSCORE, UI_SHOW_NOTFAVORITESERVERS, UI_SHOW_NOTFFA,
+    UI_SHOW_NOTLEADER,
+};
 use mp_uishared::shared::rect_def_t::RectDef;
 use mp_uishared::ui_shared::{
     Menu_FindItemByName, Menu_GetFocused, Menus_AnyFullScreenVisible, UI_CleanupGhoul2,
@@ -57,46 +67,6 @@ use crate::world::ui_context::UiContext;
 use crate::world::ui_cvars::UiCvars;
 use crate::world::ui_world::{UiWorld, MAX_FORCE_CONFIGS};
 
-/// Raven `#define AS_FAVORITES 2` (with `AS_LOCAL`/`AS_GLOBAL`/`AS_MPLAYER`) —
-/// the `ui_netSource` server-browser source selector. No canonical qshared
-/// home ported yet, so this stays a file-local const.
-///
-/// Source: `oracle/codemp/game/q_shared.h:3025-3029`
-const AS_FAVORITES: c_int = 2;
-
-/// Raven `menudef.h` `UI_SHOW_*` ownerDraw visibility bitflags
-/// (`UI_OwnerDrawVisible`'s `flags` argument).
-///
-/// Source: `oracle/ui/menudef.h:144-156`
-const UI_SHOW_LEADER: c_int = 0x0000_0001;
-const UI_SHOW_NOTLEADER: c_int = 0x0000_0002;
-const UI_SHOW_FAVORITESERVERS: c_int = 0x0000_0004;
-const UI_SHOW_ANYNONTEAMGAME: c_int = 0x0000_0008;
-const UI_SHOW_ANYTEAMGAME: c_int = 0x0000_0010;
-const UI_SHOW_NEWHIGHSCORE: c_int = 0x0000_0020;
-const UI_SHOW_DEMOAVAILABLE: c_int = 0x0000_0040;
-const UI_SHOW_NEWBESTTIME: c_int = 0x0000_0080;
-const UI_SHOW_FFA: c_int = 0x0000_0100;
-const UI_SHOW_NOTFFA: c_int = 0x0000_0200;
-const UI_SHOW_NETANYNONTEAMGAME: c_int = 0x0000_0400;
-const UI_SHOW_NETANYTEAMGAME: c_int = 0x0000_0800;
-const UI_SHOW_NOTFAVORITESERVERS: c_int = 0x0000_1000;
-
-/// Raven `#define CIN_loop 2` / `#define CIN_silent 8` (`e_status` playback
-/// bits passed to `trap_CIN_PlayCinematic`). No canonical qshared home ported
-/// yet, so these stay file-local consts.
-///
-/// Source: `oracle/codemp/game/q_shared.h:516-518`
-const CIN_LOOP: c_int = 2;
-const CIN_SILENT: c_int = 8;
-
-/// Raven `#define KEYCATCH_UI 0x0002` — the key-catcher bit `trap_Key_SetCatcher`
-/// sets while a ui menu owns input. No canonical qshared home ported yet, so
-/// this stays a file-local const.
-///
-/// Source: `oracle/codemp/game/q_shared.h:1937`
-const KEYCATCH_UI: c_int = 0x0002;
-
 /// Raven `static const int numSkillLevels = sizeof(skillLevels) /
 /// sizeof(const char*)` — `skillLevels[]` (`ui_main.c:902-908`) has 5 rows;
 /// the table itself is compiled-in data that lands beside the fn that reads
@@ -104,20 +74,6 @@ const KEYCATCH_UI: c_int = 0x0002;
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:902-909`
 const NUM_SKILL_LEVELS: c_int = 5;
-
-/// Raven `menudef.h` `ITEM_TEXTSTYLE_*` — `Text_Paint`'s JK2-menu-style
-/// argument, mapped to `STYLE_BLINK`/`STYLE_DROPSHADOW` font-render bits. No
-/// canonical qshared home ported yet, so these stay file-local consts (same
-/// treatment as `AS_FAVORITES`/`CIN_LOOP` above).
-///
-/// Source: `oracle/ui/menudef.h:29-35`
-const ITEM_TEXTSTYLE_NORMAL: c_int = 0;
-const ITEM_TEXTSTYLE_BLINK: c_int = 1;
-const ITEM_TEXTSTYLE_PULSE: c_int = 2;
-const ITEM_TEXTSTYLE_SHADOWED: c_int = 3;
-const ITEM_TEXTSTYLE_OUTLINED: c_int = 4;
-const ITEM_TEXTSTYLE_OUTLINESHADOWED: c_int = 5;
-const ITEM_TEXTSTYLE_SHADOWEDMORE: c_int = 6;
 
 /// Raven `qfiles.h` `STYLE_DROPSHADOW`/`STYLE_BLINK` font-render bits
 /// (`Text_Paint`'s `iFontHandle` high bits). Already ported once as a
@@ -128,24 +84,6 @@ const ITEM_TEXTSTYLE_SHADOWEDMORE: c_int = 6;
 /// Source: `oracle/codemp/qcommon/qfiles.h:570-571`
 const STYLE_DROPSHADOW: u32 = 0x8000_0000;
 const STYLE_BLINK: u32 = 0x4000_0000;
-
-/// Raven `#define SCREEN_WIDTH 640` / `#define SCREEN_HEIGHT 480`. No
-/// canonical qshared home ported yet, so these stay file-local consts (same
-/// treatment as `AS_FAVORITES`/`CIN_LOOP` above).
-///
-/// Source: `oracle/codemp/game/q_shared.h:1029-1030`
-const SCREEN_WIDTH: c_int = 640;
-const SCREEN_HEIGHT: c_int = 480;
-
-/// Raven `#define UI_MAPCINEMATIC 244` / `UI_NETMAPCINEMATIC 246` /
-/// `UI_CLANCINEMATIC 251` — the negative-handle cinematic-slot tokens
-/// `UI_StopCinematic` decodes. No canonical qshared home ported yet, so these
-/// stay file-local consts (same treatment as `AS_FAVORITES`/`CIN_LOOP` above).
-///
-/// Source: `oracle/ui/menudef.h:291-298`
-const UI_MAPCINEMATIC: c_int = 244;
-const UI_NETMAPCINEMATIC: c_int = 246;
-const UI_CLANCINEMATIC: c_int = 251;
 
 /// Raven `#define MAX_Q3PLAYERMODELS 256`.
 ///
