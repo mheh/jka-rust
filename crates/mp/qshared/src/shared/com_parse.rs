@@ -93,7 +93,10 @@ pub fn COM_GetCurrentParseLine(qs: &QSharedScratch) -> c_int {
 /// Raven `COM_Parse` — `COM_ParseExt(data, qtrue)`.
 ///
 /// Source: `oracle/codemp/game/q_shared.c:295-298`
-pub fn COM_Parse<'a>(qs: &mut QSharedScratch, data: Option<&'a [u8]>) -> (String, Option<&'a [u8]>) {
+pub fn COM_Parse<'a>(
+    qs: &mut QSharedScratch,
+    data: Option<&'a [u8]>,
+) -> (String, Option<&'a [u8]>) {
     COM_ParseExt(qs, data, true)
 }
 
@@ -177,12 +180,18 @@ pub fn COM_ParseExt<'a>(
         loop {
             if i >= n {
                 // `c = *data++` reads the terminating NUL => close.
-                return (String::from_utf8_lossy(&token).into_owned(), Some(&bytes[n..]));
+                return (
+                    String::from_utf8_lossy(&token).into_owned(),
+                    Some(&bytes[n..]),
+                );
             }
             let c = bytes[i];
             i += 1;
             if c == b'"' || c == 0 {
-                return (String::from_utf8_lossy(&token).into_owned(), Some(&bytes[i..]));
+                return (
+                    String::from_utf8_lossy(&token).into_owned(),
+                    Some(&bytes[i..]),
+                );
             }
             if token.len() < MAX_TOKEN_CHARS as usize {
                 token.push(c);
@@ -211,7 +220,27 @@ pub fn COM_ParseExt<'a>(
         token.clear();
     }
 
-    (String::from_utf8_lossy(&token).into_owned(), Some(&bytes[i..]))
+    (
+        String::from_utf8_lossy(&token).into_owned(),
+        Some(&bytes[i..]),
+    )
+}
+
+/// Raven `COM_ParseString`.
+///
+/// Raven's guard `if ( s[0] == 0 )` tests `*s` — the (always non-NULL)
+/// `com_token` pointer `COM_ParseExt` just wrote into `*s` — not the token's
+/// first byte, so the `Com_Printf("unexpected EOF\n")` + `return qtrue`
+/// branch is dead. Ported with `COM_ParseExt`'s cursor-return shape
+/// (`(String, Option<&[u8]>)`) rather than Raven's `qboolean` out-param
+/// signature, matching this module's `COM_ParseExt` twin; the dead branch is
+/// dropped rather than reproduced as unreachable code.
+/// Source: `oracle/codemp/game/q_shared.c:588-598`
+pub fn COM_ParseString<'a>(
+    qs: &mut QSharedScratch,
+    data: Option<&'a [u8]>,
+) -> (String, Option<&'a [u8]>) {
+    COM_ParseExt(qs, data, false)
 }
 
 /// Raven `SkipBracedSection` — consume a balanced `{ ... }` block, returning the

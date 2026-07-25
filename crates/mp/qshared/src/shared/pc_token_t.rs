@@ -10,6 +10,27 @@ use core::ffi::{c_char, c_int};
 /// Definition source: `oracle/codemp/botlib/l_precomp.h:148`
 pub const MAX_TOKENLENGTH: usize = 1024;
 
+/// Raven `TT_STRING` — string token.
+///
+/// Source: `oracle/codemp/game/q_shared.h:1654`
+pub const TT_STRING: c_int = 1;
+/// Raven `TT_LITERAL` — literal token.
+///
+/// Source: `oracle/codemp/game/q_shared.h:1655`
+pub const TT_LITERAL: c_int = 2;
+/// Raven `TT_NUMBER` — number token.
+///
+/// Source: `oracle/codemp/game/q_shared.h:1656`
+pub const TT_NUMBER: c_int = 3;
+/// Raven `TT_NAME` — name token.
+///
+/// Source: `oracle/codemp/game/q_shared.h:1657`
+pub const TT_NAME: c_int = 4;
+/// Raven `TT_PUNCTUATION` — punctuation token.
+///
+/// Source: `oracle/codemp/game/q_shared.h:1658`
+pub const TT_PUNCTUATION: c_int = 5;
+
 /// Raven `pc_token_t` parser token.
 ///
 /// Type definition source: `oracle/codemp/game/q_shared.h:1657-1668`

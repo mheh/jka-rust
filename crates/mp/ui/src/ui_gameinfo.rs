@@ -7,6 +7,7 @@
 use core::ffi::c_char;
 use core::ffi::c_int;
 
+use mp_bg::public::{MAX_ARENAS_TEXT, MAX_BOTS_TEXT};
 use mp_qshared::shared::com_parse::{COM_Parse, COM_ParseExt};
 use mp_qshared::shared::q_color::S_COLOR_RED;
 use mp_qshared::shared::q_string::COM_Compress;
@@ -20,12 +21,6 @@ use crate::ui_atoms::Com_Printf;
 use crate::world::ui_context::UiContext;
 use crate::world::ui_gameinfo_state::{MAX_ARENAS, MAX_BOTS};
 use crate::world::ui_world::UiWorld;
-
-// Raven `ui_gameinfo.c` file-scope `#define`s (mirrored from `bg_public.h`,
-// per the g_bot.c analog — not centrally homed).
-// Source: `oracle/codemp/game/bg_public.h:1674,1677`
-const MAX_ARENAS_TEXT: usize = 8192;
-const MAX_BOTS_TEXT: usize = 8192;
 
 /// Raven `UI_GetBotInfoByNumber` — retrieve bot info string by numeric index.
 ///

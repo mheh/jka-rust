@@ -7,6 +7,7 @@ pub mod anim_number;
 pub mod anim_table;
 pub mod animation;
 pub mod animevent;
+pub mod arenas;
 pub mod bg_entity;
 pub mod bg_field;
 pub mod bg_itemlist;
@@ -62,6 +63,7 @@ pub mod transition_move_table;
 pub mod viewheight;
 pub mod weaponstate;
 
+pub use arenas::{MAX_ARENAS_TEXT, MAX_BOTS_TEXT};
 pub use bg_itemlist::{bg_itemlist, bg_numItems};
 pub use configstring::*;
 pub use entity_flags::*;

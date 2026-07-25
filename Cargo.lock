@@ -331,6 +331,7 @@ dependencies = [
  "mp_engine_select",
  "mp_qshared",
  "mp_uishared",
+ "native_math",
  "native_string",
  "native_types",
 ]

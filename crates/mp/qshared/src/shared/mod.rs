@@ -8,6 +8,7 @@ pub mod addpoly_arg;
 pub mod addsprite_arg;
 pub mod build_ident;
 pub mod cbuf_exec;
+pub mod char_sizes;
 pub mod cin_flags;
 #[path = "e_status.rs"]
 pub mod cinematic_status;
@@ -78,6 +79,10 @@ pub use addpoly_arg::addpolyArgStruct_t;
 pub use addsprite_arg::addspriteArgStruct_t;
 pub use build_ident::{CPUSTRING, MAC_STATIC, PATH_SEP, Q3_VERSION, QDECL};
 pub use cbuf_exec::cbufExec_t;
+pub use char_sizes::{
+    BIGCHAR_HEIGHT, BIGCHAR_WIDTH, GIANTCHAR_HEIGHT, GIANTCHAR_WIDTH, SMALLCHAR_HEIGHT,
+    SMALLCHAR_WIDTH, TINYCHAR_HEIGHT, TINYCHAR_WIDTH,
+};
 pub use cin_flags::{CIN_HOLD, CIN_LOOP, CIN_SHADER, CIN_SILENT, CIN_SYSTEM};
 pub use cinematic_status::{
     e_status, FMV_EOF, FMV_IDLE, FMV_ID_BLT, FMV_ID_IDLE, FMV_ID_WAIT, FMV_LOOPED, FMV_PLAY,
@@ -109,13 +114,18 @@ pub use item_use_fail::itemUseFail_t;
 pub use keycatch::{KEYCATCH_CGAME, KEYCATCH_CONSOLE, KEYCATCH_MESSAGE, KEYCATCH_UI};
 pub use limits::{
     BIG_INFO_STRING, ENTITYNUM_MAX_NORMAL, ENTITYNUM_NONE, ENTITYNUM_WORLD, GENTITYNUM_BITS,
-    MAX_CLIENTS, MAX_CLIENTS_I32, MAX_GENTITIES, MAX_INFO_STRING, MAX_STRING_CHARS,
+    MAX_CLIENTS, MAX_CLIENTS_I32, MAX_GENTITIES, MAX_INFO_STRING, MAX_INFO_VALUE, MAX_STRING_CHARS,
     SNAPFLAG_SERVERCOUNT,
 };
 pub use mark_fragment::markFragment_t;
-pub use pc_token::{pc_token_t, MAX_TOKENLENGTH};
+pub use pc_token::{
+    pc_token_t, MAX_TOKENLENGTH, TT_LITERAL, TT_NAME, TT_NUMBER, TT_PUNCTUATION, TT_STRING,
+};
 pub use print_parm::printParm_t;
-pub use q_color::{Q_IsColorString, Q_COLOR_ESCAPE};
+pub use q_color::{
+    colorBlack, colorBlue, colorCyan, colorDkGrey, colorGreen, colorLtGrey, colorMagenta,
+    colorMdGrey, colorRed, colorWhite, colorYellow, g_color_table, Q_IsColorString, Q_COLOR_ESCAPE,
+};
 pub use q_math::{
     _DotProduct, _VectorCopy, _VectorSubtract, VectorLength, VectorNormalize, VectorNormalizeRow,
 };

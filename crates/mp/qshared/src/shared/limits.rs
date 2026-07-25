@@ -33,6 +33,11 @@ pub const MAX_STRING_CHARS: usize = 1024;
 /// Source: `oracle/codemp/game/q_shared.h:384`
 pub const MAX_INFO_STRING: usize = 1024;
 
+/// Raven `MAX_INFO_VALUE`.
+///
+/// Source: `oracle/codemp/game/q_shared.h:386`
+pub const MAX_INFO_VALUE: usize = 1024;
+
 /// Raven `BIG_INFO_STRING` — used for system info key only.
 ///
 /// Source: `oracle/codemp/game/q_shared.h:388`

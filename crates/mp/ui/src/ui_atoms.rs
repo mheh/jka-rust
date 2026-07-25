@@ -13,31 +13,13 @@ use mp_qshared::shared::vec4_t;
 use mp_qshared::shared::FS_READ;
 use mp_qshared::shared::FS_WRITE;
 use mp_qshared::shared::MAX_QPATH;
+use mp_qshared::shared::{colorBlack, colorWhite};
+use mp_qshared::shared::{BIGCHAR_HEIGHT, BIGCHAR_WIDTH};
 use native_string::latin1_to_string;
 
 use crate::local::post_game_info_s::postGameInfo_t;
 use crate::trap;
 use crate::world::ui_context::UiContext;
-
-/// Raven `BIGCHAR_WIDTH`.
-///
-/// Source: `oracle/codemp/game/q_shared.h:1038`
-const BIGCHAR_WIDTH: c_int = 16;
-
-/// Raven `BIGCHAR_HEIGHT`.
-///
-/// Source: `oracle/codemp/game/q_shared.h:1039`
-const BIGCHAR_HEIGHT: c_int = 16;
-
-/// Raven `colorBlack`.
-///
-/// Source: `oracle/codemp/game/q_math.c:11`
-const COLOR_BLACK: vec4_t = [0.0, 0.0, 0.0, 1.0];
-
-/// Raven `colorWhite`.
-///
-/// Source: `oracle/codemp/game/q_math.c:18`
-const COLOR_WHITE: vec4_t = [1.0, 1.0, 1.0, 1.0];
 
 /// Raven `Com_Error` — formats and forwards a fatal error to the engine.
 ///
@@ -533,6 +515,6 @@ pub fn UI_DrawTextBox(ctx: &mut UiContext, x: c_int, y: c_int, width: c_int, lin
     let w = ((width + 1) * BIGCHAR_WIDTH) as f32;
     let h = ((lines + 1) * BIGCHAR_HEIGHT) as f32;
 
-    UI_FillRect(ctx, x_f, y_f, w, h, &COLOR_BLACK);
-    UI_DrawRect(ctx, x_f, y_f, w, h, &COLOR_WHITE);
+    UI_FillRect(ctx, x_f, y_f, w, h, &colorBlack);
+    UI_DrawRect(ctx, x_f, y_f, w, h, &colorWhite);
 }

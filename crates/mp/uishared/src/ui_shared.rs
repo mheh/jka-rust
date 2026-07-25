@@ -13,7 +13,9 @@ use core::ptr::null_mut;
 use mp_bg::public::anim_table::animTable;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::shared::q_string::{COM_Parse, GetIDForString};
-use mp_qshared::shared::{pc_token_t, qtrue, stringID_table_t, vec4_t, MAX_QPATH, MAX_TOKENLENGTH};
+use mp_qshared::shared::{
+    pc_token_t, qtrue, stringID_table_t, vec4_t, MAX_QPATH, MAX_TOKENLENGTH, TT_NUMBER,
+};
 use native_string::{atof, atoi, latin1_to_string, string_to_latin1, Q_stricmp};
 
 use crate::shared::display_context::DisplayContext;
@@ -117,13 +119,6 @@ const WINDOW_INTRANSITIONMODEL: c_int = 0x0400_0000;
 /// ghoul2 instance is valid.
 /// Source: `oracle/codemp/ui/ui_shared.h:251`
 const ITF_G2VALID: c_int = 0x0001;
-
-// PORT-NOTE: `TT_*` (parser token types) is a `q_shared.h` family (DEC-32 CONST
-// HOMES) not yet promoted to `mp_qshared::shared`; only `TT_NUMBER` is read in
-// this file, so it gets a local twin pending that promotion.
-/// Raven `#define TT_NUMBER 3` — number token.
-/// Source: `oracle/codemp/game/q_shared.h:1654-1658`
-const TT_NUMBER: c_int = 3;
 
 /// Raven `#define CURSOR_ARROW 0x00000002`.
 /// Source: `oracle/codemp/ui/ui_shared.h:54`

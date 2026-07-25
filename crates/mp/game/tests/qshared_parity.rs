@@ -24,16 +24,19 @@ use std::fmt::Write as _;
 use mp_game::prelude::cstr;
 use mp_game::q_shared::{
     va, COM_BeginParseSession, COM_Compress, COM_DefaultExtension, COM_GetCurrentParseLine,
-    COM_ParseExt, COM_StripExtension, Com_Clamp, Com_Clampi, Com_sprintf, Info_SetValueForKey,
-    Info_SetValueForKey_Big, QSharedScratch, Q_CleanStr, Q_PrintStrlen, Q_isalpha, Q_islower,
-    Q_isprint, Q_isupper, Q_strcat, Q_stricmp, Q_stricmpn, Q_strlwr, Q_strncmp, Q_strncpyz,
-    Q_strrchr, Q_strupr, SkipBracedSection, SkipRestOfLine,
+    COM_ParseExt, COM_StripExtension, Com_sprintf, Info_SetValueForKey, Info_SetValueForKey_Big,
+    QSharedScratch, Q_CleanStr, Q_PrintStrlen, Q_isalpha, Q_islower, Q_isprint, Q_isupper,
+    Q_strcat, Q_stricmp, Q_stricmpn, Q_strlwr, Q_strncmp, Q_strncpyz, Q_strrchr, Q_strupr,
+    SkipBracedSection, SkipRestOfLine,
 };
+use native_math::qmath::{Com_Clamp, Com_Clampi};
 use native_string::info::{Info_RemoveKey, Info_RemoveKey_Big, Info_Validate, Info_ValueForKey};
 use testkit::{compare, oracle_dir};
 
 fn read_fixture(name: &str) -> Vec<u8> {
-    let path = oracle_dir(env!("CARGO_MANIFEST_DIR")).join("fixtures/qshared").join(name);
+    let path = oracle_dir(env!("CARGO_MANIFEST_DIR"))
+        .join("fixtures/qshared")
+        .join(name);
     std::fs::read(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()))
 }
 

@@ -17,7 +17,8 @@ use mp_qshared::common::mp::qcommon::saber::saber_colors::{
 };
 use mp_qshared::common::mp::qcommon::saber::saber_type::saberType_t;
 use mp_qshared::shared::com_parse::{
-    COM_BeginParseSession, COM_ParseExt, QSharedScratch, SkipBracedSection, SkipRestOfLine,
+    COM_BeginParseSession, COM_ParseExt, COM_ParseString, QSharedScratch, SkipBracedSection,
+    SkipRestOfLine,
 };
 use mp_qshared::shared::q_color::S_COLOR_RED;
 use mp_qshared::shared::q_math::{_VectorMA, VectorSet};
@@ -554,11 +555,10 @@ pub fn UI_SaberParseParm(ctx: &mut UiContext, saberName: &str, parmname: &str) -
             }
 
             if token.eq_ignore_ascii_case(parmname) {
-                // `COM_ParseString` inlined: Raven's guard tests `s[0]`, the
-                // (always non-NULL) `com_token` pointer rather than the first token
-                // byte, so its EOF branch is dead and it always returns `qfalse`.
-                // Source: `oracle/codemp/game/q_shared.c:588-598`
-                let (value, _) = COM_ParseExt(&mut ctx.world.bg_state.qs, p, false);
+                // PORT-NOTE: `COM_ParseString`'s EOF guard is dead (see its
+                // doc comment) — this call never observes the `qtrue`/EOF
+                // branch.
+                let (value, _) = COM_ParseString(&mut ctx.world.bg_state.qs, p);
                 break 'parse Some(value);
             }
 

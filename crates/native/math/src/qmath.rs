@@ -319,6 +319,32 @@ pub fn ClampShort(i: c_int) -> c_short {
     i as c_short
 }
 
+/// Raven `Com_Clampi`.
+///
+/// Source: `oracle/codemp/game/q_shared.c:51-62`
+pub fn Com_Clampi(min: c_int, max: c_int, value: c_int) -> c_int {
+    if value < min {
+        return min;
+    }
+    if value > max {
+        return max;
+    }
+    value
+}
+
+/// Raven `Com_Clamp`.
+///
+/// Source: `oracle/codemp/game/q_shared.c:64-72`
+pub fn Com_Clamp(min: f32, max: f32, value: f32) -> f32 {
+    if value < min {
+        return min;
+    }
+    if value > max {
+        return max;
+    }
+    value
+}
+
 /// Raven `ClearBounds`.
 ///
 /// Source: `oracle/codemp/game/q_math.c:1129-1132`

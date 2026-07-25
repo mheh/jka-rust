@@ -31,7 +31,6 @@ pub use mp_qshared::shared::com_parse::{
     SkipBracedSection, SkipRestOfLine,
 };
 
-
 // ---------------------------------------------------------------------
 // Local helpers mirroring libc, faithful to the unchecked C semantics used
 // throughout this file (`strlen`/`strchr`/`strcmp`/`tolower`/`toupper`/
@@ -75,32 +74,6 @@ pub fn GetStringForID(table: *mut stringID_table_t, id: c_int) -> *const c_char 
         }
         std::ptr::null()
     }
-}
-
-/// Raven `Com_Clampi`.
-///
-/// Source: `oracle/codemp/game/q_shared.c:51-62`
-pub fn Com_Clampi(min: c_int, max: c_int, value: c_int) -> c_int {
-    if value < min {
-        return min;
-    }
-    if value > max {
-        return max;
-    }
-    value
-}
-
-/// Raven `Com_Clamp`.
-///
-/// Source: `oracle/codemp/game/q_shared.c:64-72`
-pub fn Com_Clamp(min: f32, max: f32, value: f32) -> f32 {
-    if value < min {
-        return min;
-    }
-    if value > max {
-        return max;
-    }
-    value
 }
 
 /// Raven `COM_SkipPath`.

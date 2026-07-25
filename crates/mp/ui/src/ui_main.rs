@@ -38,8 +38,8 @@ use mp_qshared::shared::q_color::S_COLOR_RED;
 use mp_qshared::shared::q_string::COM_StripExtension;
 use mp_qshared::shared::{
     connstate_t, fileHandle_t, qhandle_t, vec4_t, AS_FAVORITES, AS_LOCAL, CIN_LOOP, CIN_SILENT,
-    FS_READ, KEYCATCH_UI, MAX_CLIENTS, MAX_INFO_STRING, MAX_QPATH, MAX_STRING_CHARS, Q3_VERSION,
-    SCREEN_HEIGHT, SCREEN_WIDTH,
+    FS_READ, KEYCATCH_UI, MAX_CLIENTS, MAX_INFO_STRING, MAX_INFO_VALUE, MAX_QPATH,
+    MAX_STRING_CHARS, Q3_VERSION, SCREEN_HEIGHT, SCREEN_WIDTH,
 };
 use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::menu_system::MAX_MENUFILE;
@@ -58,6 +58,7 @@ use mp_uishared::ui_shared::{
     Display_KeyBindPending, LerpColor, Menu_FindItemByName, Menu_GetFocused,
     Menu_SetFeederSelection, Menus_AnyFullScreenVisible, String_Report, UI_CleanupGhoul2,
 };
+use native_math::qmath::Com_Clamp;
 use native_string::{
     atoi, buf_to_string, latin1_to_string, string_to_latin1, Info_ValueForKey, Q_CleanStr,
     Q_stricmp, Q_stricmpn, Q_strncpyz,
@@ -4512,11 +4513,7 @@ pub fn UI_DrawHandicap(
     iMenuFont: c_int,
 ) {
     let h = trap::Cvar_VariableValue(ctx.engine, "handicap");
-    // PORT-NOTE: Raven's `Com_Clamp(5, 100, h)`; its only Rust home today is
-    // `mp_game::q_shared`, which this crate does not depend on, so the identical
-    // clamp is spelled with the std method — same two comparisons, so NaN
-    // passes through in both.
-    let h = h.clamp(5.0, 100.0) as c_int;
+    let h = Com_Clamp(5.0, 100.0, h) as c_int;
     let i = 20 - h / 5;
 
     let text = HANDICAP_VALUES[i as usize].unwrap_or("");
@@ -4774,10 +4771,6 @@ pub fn UI_DrawSkinColor(
 
 /// Raven `UI_DrawJediNonJedi`.
 ///
-/// PORT-NOTE: Raven's `char info[MAX_INFO_VALUE]` buffer size has no ported
-/// `MAX_INFO_VALUE` reachable from this crate; reads with `MAX_INFO_STRING`
-/// like the rest of this file's `trap_GetConfigString` call sites.
-///
 /// Source: `oracle/codemp/ui/ui_main.c:2321-2353`
 #[allow(clippy::too_many_arguments)]
 pub fn UI_DrawJediNonJedi(
@@ -4795,7 +4788,7 @@ pub fn UI_DrawJediNonJedi(
     // afterward; preserved as a no-op to match Raven's control flow exactly.
     let _i = if val < min || val > max { min } else { val };
 
-    let _info = trap::GetConfigString(ctx.engine, CS_SERVERINFO, MAX_INFO_STRING as usize)
+    let _info = trap::GetConfigString(ctx.engine, CS_SERVERINFO, MAX_INFO_VALUE as usize)
         .unwrap_or_default();
 
     if !UI_TrueJediEnabled(ctx) {

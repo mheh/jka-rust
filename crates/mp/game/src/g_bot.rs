@@ -8,6 +8,7 @@ use crate::trap;
 use mp_bg::public::gametype::{
     GT_CTF, GT_CTY, GT_DUEL, GT_FFA, GT_HOLOCRON, GT_JEDIMASTER, GT_POWERDUEL, GT_SIEGE, GT_TEAM,
 };
+use mp_bg::public::{MAX_ARENAS_TEXT, MAX_BOTS_TEXT};
 use native_string::atof;
 use native_string::atoi;
 
@@ -21,10 +22,10 @@ use crate::g_session::G_ReadSessionData;
 use crate::g_team::{S_COLOR_RED, S_COLOR_YELLOW};
 use crate::level::bot_settings::bot_settings_t;
 use crate::q_shared::{COM_Parse, COM_ParseExt, Info_SetValueForKey};
-use native_string::{buf_to_string, strncpyz_string};
-use native_string::Info_ValueForKey;
-use native_string::{Q_CleanStr, Q_stricmp};
 use mp_bg::public::duel_team::duelTeam_t::{DUELTEAM_DOUBLE, DUELTEAM_LONE};
+use native_string::Info_ValueForKey;
+use native_string::{buf_to_string, strncpyz_string};
+use native_string::{Q_CleanStr, Q_stricmp};
 
 use mp_abi::game::syscalls::G_BOT_ALLOCATE_CLIENT::GBotAllocateClientArgs;
 
@@ -89,9 +90,7 @@ pub fn G_ParseInfos(ctx: &mut GameContext, buf: &[u8], max: c_int) -> Vec<String
 // Raven `g_bot.c` file-scope `#define`s (verified against the owning TU).
 // Source: `oracle/codemp/game/g_bot.c:9,13,19`
 const MAX_ARENAS: c_int = 1024;
-const MAX_ARENAS_TEXT: usize = 8192;
 const MAX_BOTS: c_int = 1024;
-const MAX_BOTS_TEXT: usize = 8192;
 const BOT_SPAWN_QUEUE_DEPTH: usize = 16;
 
 /// Raven `G_LoadArenasFromFile`.
@@ -213,7 +212,11 @@ pub fn G_DoesMapSupportGametype(ctx: &mut GameContext, mapname: &str, gametype: 
 /// Raven `G_RefreshNextMap`.
 ///
 /// Source: `oracle/codemp/game/g_bot.c:216-288`
-pub fn G_RefreshNextMap(ctx: &mut GameContext, gametype: c_int, forced: qboolean) -> Option<String> {
+pub fn G_RefreshNextMap(
+    ctx: &mut GameContext,
+    gametype: c_int,
+    forced: qboolean,
+) -> Option<String> {
     if ctx.world.cvars.g_autoMapCycle.integer == 0 && forced == 0 {
         return None;
     }
