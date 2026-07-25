@@ -404,8 +404,16 @@ pub fn Menu_GetMatchingItemByNumber(
     let mut count = 0;
     for &id in &menus.menu(menu).items {
         let it = menus.item(id);
-        if stricmp_eq(&it.window.name, name)
-            || (!it.window.group.is_empty() && stricmp_eq(&it.window.group, name))
+        if it
+            .window
+            .name
+            .as_deref()
+            .is_some_and(|n| stricmp_eq(n, name))
+            || it
+                .window
+                .group
+                .as_deref()
+                .is_some_and(|g| stricmp_eq(g, name))
         {
             if count == index {
                 return Some(id);
@@ -425,7 +433,13 @@ pub fn Menu_GetMatchingItemByNumber(
 pub fn Menu_FindItemByName(menus: &MenuSystem, menu: Option<MenuId>, p: &str) -> Option<ItemId> {
     let menu = menu?;
     for &id in &menus.menu(menu).items {
-        if stricmp_eq(p, &menus.item(id).window.name) {
+        if menus
+            .item(id)
+            .window
+            .name
+            .as_deref()
+            .is_some_and(|n| stricmp_eq(p, n))
+        {
             return Some(id);
         }
     }
@@ -454,7 +468,7 @@ pub fn Script_SetTeamColor(
 /// Source: `oracle/codemp/ui/ui_shared.c:1506-1514`
 pub fn Menus_FindByName(menus: &MenuSystem, p: &str) -> Option<MenuId> {
     for (i, m) in menus.menus.iter().enumerate() {
-        if stricmp_eq(&m.window.name, p) {
+        if m.window.name.as_deref().is_some_and(|n| stricmp_eq(n, p)) {
             return Some(MenuId::new(i));
         }
     }
@@ -585,8 +599,10 @@ pub fn Item_ListBox_MaxScroll(
 /// PORT-NOTE (§19 UB pick): Raven dereferences `editDef` unconditionally past
 /// the `editDef == NULL && item->cvar` early-return, which is only defined
 /// when `editDef` is non-NULL; the otherwise-unreachable
-/// (`editDef == None && cvar` empty) case here falls back to
-/// `EditFieldDef::default()` instead of a null deref.
+/// (`editDef == None && cvar == None`) case here falls back to
+/// `EditFieldDef::default()` instead of a null deref. Likewise Raven hands a
+/// NULL `item->cvar` straight to `getCVarValue` when `editDef` is non-NULL;
+/// that reads as `""` here.
 /// Source: `oracle/codemp/ui/ui_shared.c:2790-2821`
 pub fn Item_Slider_ThumbPosition(
     menus: &MenuSystem,
@@ -596,20 +612,20 @@ pub fn Item_Slider_ThumbPosition(
     let it = menus.item(item);
     let editDef = it.typeData.editField();
 
-    let mut x = if !it.text.is_empty() {
+    let mut x = if it.text.is_some() {
         it.textRect.x + it.textRect.w + 8.0
     } else {
         it.window.rect.x
     };
 
-    if editDef.is_none() && !it.cvar.is_empty() {
+    if editDef.is_none() && it.cvar.is_some() {
         return x;
     }
 
     let default_edit = EditFieldDef::default();
     let editDef = editDef.unwrap_or(&default_edit);
 
-    let mut value = dc.getCVarValue(&it.cvar);
+    let mut value = dc.getCVarValue(it.cvar.as_deref().unwrap_or(""));
     if value < editDef.minVal {
         value = editDef.minVal;
     } else if value > editDef.maxVal {
@@ -664,9 +680,9 @@ pub fn Item_Multi_FindCvarByValue(
     let mut value = 0.0f32;
     let mut buff = String::new();
     if multiPtr.strDef {
-        buff = dc.getCVarString(&it.cvar, 2048);
+        buff = dc.getCVarString(it.cvar.as_deref().unwrap_or(""), 2048);
     } else {
-        value = dc.getCVarValue(&it.cvar);
+        value = dc.getCVarValue(it.cvar.as_deref().unwrap_or(""));
     }
 
     for i in 0..multiPtr.cvarList.len() {
@@ -695,11 +711,12 @@ pub fn Item_Multi_Setting(menus: &MenuSystem, dc: &mut dyn DisplayContext, item:
     let mut value = 0.0f32;
     let mut buff = String::new();
     if multiPtr.strDef {
-        if !it.cvar.is_empty() {
-            buff = dc.getCVarString(&it.cvar, 2048);
+        if let Some(cvar) = it.cvar.as_deref() {
+            buff = dc.getCVarString(cvar, 2048);
         }
-    } else if !it.cvar.is_empty() {
-        value = dc.getCVarValue(&it.cvar);
+    } else if let Some(cvar) = it.cvar.as_deref() {
+        // Was a cvar given?
+        value = dc.getCVarValue(cvar);
     }
 
     for i in 0..multiPtr.cvarList.len() {
@@ -746,7 +763,7 @@ pub fn Scroll_Slider_ThumbFunc(menus: &MenuSystem, ds: &DisplayState, dc: &mut d
         None => return,
     };
 
-    let x = if !it.text.is_empty() {
+    let x = if it.text.is_some() {
         it.textRect.x + it.textRect.w + 8.0
     } else {
         it.window.rect.x
@@ -762,7 +779,7 @@ pub fn Scroll_Slider_ThumbFunc(menus: &MenuSystem, ds: &DisplayState, dc: &mut d
     value /= SLIDER_WIDTH;
     value *= editDef.maxVal - editDef.minVal;
     value += editDef.minVal;
-    dc.setCVar(&it.cvar, &format!("{:.6}", value));
+    dc.setCVar(it.cvar.as_deref().unwrap_or(""), &format!("{:.6}", value));
 }
 
 /// Raven `Item_StopCapture` — mouse-capture release hook; empty body.
@@ -1476,16 +1493,21 @@ pub fn Menu_ItemsMatchingGroup(
     let mut count = 0;
     for &id in &menus.menu(menu).items {
         let it = menus.item(id);
-        // PORT-NOTE: Raven distinguishes NULL (never parsed) from
-        // `String_Alloc("")` here; owned `String` collapses both — `Option<String>`
-        // conversion scheduled (U4 follow-up).
-        if it.window.name.is_empty() && it.window.group.is_empty() {
+        if it.window.name.is_none() && it.window.group.is_none() {
             dc.Print("^3WARNING: item has neither name or group\n");
             continue;
         }
 
-        if stricmp_eq(&it.window.name, name)
-            || (!it.window.group.is_empty() && stricmp_eq(&it.window.group, name))
+        if it
+            .window
+            .name
+            .as_deref()
+            .is_some_and(|n| stricmp_eq(n, name))
+            || it
+                .window
+                .group
+                .as_deref()
+                .is_some_and(|g| stricmp_eq(g, name))
         {
             count += 1;
         }
@@ -1797,19 +1819,17 @@ pub fn Item_YesNo_HandleKey(
         (it.window.rect, it.window.flags, it.cvar.clone())
     };
 
-    // PORT-NOTE: Raven distinguishes NULL (never parsed) from `String_Alloc("")`
-    // here; owned `String` collapses both — `Option<String>` conversion scheduled
-    // (U4 follow-up).
     if Rect_ContainsPoint(Some(&rect), ds.cursorx as f32, ds.cursory as f32)
         && flags & WINDOW_HASFOCUS != 0
-        && !cvar.is_empty()
     {
-        if key == A_MOUSE1 || key == A_ENTER || key == A_MOUSE2 || key == A_MOUSE3 {
-            let cur = dc.getCVarValue(&cvar);
-            // C `!DC->getCVarValue(...)`: nonzero -> 0, zero -> 1.
-            let newval: c_int = if cur != 0.0 { 0 } else { 1 };
-            dc.setCVar(&cvar, &format!("{}", newval));
-            return true;
+        if let Some(cvar) = cvar {
+            if key == A_MOUSE1 || key == A_ENTER || key == A_MOUSE2 || key == A_MOUSE3 {
+                let cur = dc.getCVarValue(&cvar);
+                // C `!DC->getCVarValue(...)`: nonzero -> 0, zero -> 1.
+                let newval: c_int = if cur != 0.0 { 0 } else { 1 };
+                dc.setCVar(&cvar, &format!("{}", newval));
+                return true;
+            }
         }
     }
 
@@ -1866,7 +1886,7 @@ pub fn Item_Multi_HandleKey(
         return false;
     }
 
-    let cvar = menus.item(item).cvar.clone();
+    let cvar = menus.item(item).cvar.clone().unwrap_or_default();
     let (strDef, cvarStr, cvarValue) = {
         let m = menus.item(item).typeData.multi().unwrap();
         (m.strDef, m.cvarStr.clone(), m.cvarValue.clone())
@@ -1922,17 +1942,14 @@ pub fn Item_Slider_HandleKey(
     };
 
     if flags & WINDOW_HASFOCUS != 0
-        && !cvar.is_empty()
+        && cvar.is_some()
         && Rect_ContainsPoint(Some(&rect), ds.cursorx as f32, ds.cursory as f32)
     {
         if key == A_MOUSE1 || key == A_ENTER || key == A_MOUSE2 || key == A_MOUSE3 {
             let editDef = menus.item(item).typeData.editField().copied();
             if let Some(editDef) = editDef {
                 let width = SLIDER_WIDTH;
-                // PORT-NOTE: Raven distinguishes NULL (never parsed) from
-                // `String_Alloc("")` here; owned `String` collapses both —
-                // `Option<String>` conversion scheduled (U4 follow-up).
-                let x = if !text.is_empty() {
+                let x = if text.is_some() {
                     textRect.x + textRect.w + 8.0
                 } else {
                     rect.x
@@ -1949,7 +1966,7 @@ pub fn Item_Slider_HandleKey(
                     value = work / width;
                     value *= editDef.maxVal - editDef.minVal;
                     value += editDef.minVal;
-                    dc.setCVar(&cvar, &format!("{:.6}", value));
+                    dc.setCVar(cvar.as_deref().unwrap_or(""), &format!("{:.6}", value));
                     return true;
                 }
             }
@@ -2001,8 +2018,7 @@ pub fn Rect_ToWindowCoords(rect: &mut RectDef, window: &WindowDef) {
 /// `seLanguageModCount`, the value the caller reads off its own
 /// `world.se_language`. The `#ifndef CGAME` guard picks the `ui` arm (this
 /// crate's only linkage so far — cgame's twin will special-case this branch
-/// out when it lands). Raven's `textPtr == NULL` bail has no owned-`String`
-/// counterpart — an empty text still runs the body, as in Raven.
+/// out when it lands).
 /// Source: `oracle/codemp/ui/ui_shared.c:4740-4791`
 #[allow(clippy::too_many_arguments)]
 pub fn Item_SetTextExtents(
@@ -2019,8 +2035,12 @@ pub fn Item_SetTextExtents(
         (it.text.clone(), it.r#type, it.textalignment, it.asset)
     };
     let textPtr = match text {
-        Some(s) => s.to_string(),
+        Some(s) => Some(s.to_string()),
         None => itemText.clone(),
+    };
+    let textPtr = match textPtr {
+        Some(s) => s,
+        None => return,
     };
 
     let it = menus.item(item);
@@ -2030,7 +2050,7 @@ pub fn Item_SetTextExtents(
     // keeps us from computing the widths and heights more than once
     if *width == 0
         || (itemType == ITEM_TYPE_OWNERDRAW && textalignment == ITEM_ALIGN_CENTER)
-        || (itemText.starts_with('@') && asset != seLanguageModCount)
+        || (itemText.as_deref().is_some_and(|t| t.starts_with('@')) && asset != seLanguageModCount)
     {
         let (textscale, iMenuFont, ownerDraw, cvar) = {
             let it = menus.item(item);
@@ -2047,12 +2067,11 @@ pub fn Item_SetTextExtents(
             && (textalignment == ITEM_ALIGN_CENTER || textalignment == ITEM_ALIGN_RIGHT)
         {
             originalWidth += dc.ownerDrawWidth(ownerDraw, textscale);
-        } else if itemType == ITEM_TYPE_EDITFIELD
-            && textalignment == ITEM_ALIGN_CENTER
-            && !cvar.is_empty()
-        {
-            let buff = dc.getCVarString(&cvar, 256);
-            originalWidth += dc.textWidth(&buff, textscale, iMenuFont);
+        } else if itemType == ITEM_TYPE_EDITFIELD && textalignment == ITEM_ALIGN_CENTER {
+            if let Some(cvar) = cvar.as_deref() {
+                let buff = dc.getCVarString(cvar, 256);
+                originalWidth += dc.textWidth(&buff, textscale, iMenuFont);
+            }
         }
 
         let w = dc.textWidth(&textPtr, textscale, iMenuFont);
@@ -2080,7 +2099,7 @@ pub fn Item_SetTextExtents(
         it.textRect.y = ty;
 
         // string package: mark language
-        if it.text.starts_with('@') {
+        if it.text.as_deref().is_some_and(|t| t.starts_with('@')) {
             it.asset = seLanguageModCount;
         }
     }
@@ -2141,7 +2160,7 @@ pub fn Item_Bind_HandleKey(
                 return true;
             }
             A_BACKSPACE => {
-                let cvar = menus.item(item).cvar.clone();
+                let cvar = menus.item(item).cvar.clone().unwrap_or_default();
                 let id = BindingIDFromName(menus, &cvar);
                 if id != -1 {
                     let idx = id as usize;
@@ -2181,7 +2200,7 @@ pub fn Item_Bind_HandleKey(
         }
     }
 
-    let cvar = menus.item(item).cvar.clone();
+    let cvar = menus.item(item).cvar.clone().unwrap_or_default();
     let id = BindingIDFromName(menus, &cvar);
 
     if id != -1 {
@@ -2438,7 +2457,7 @@ pub fn Menu_OverActiveItem(menus: &MenuSystem, menu: Option<MenuId>, x: f32, y: 
             }
 
             if Rect_ContainsPoint(Some(&it.window.rect), x, y) {
-                if it.r#type == ITEM_TYPE_TEXT && !it.text.is_empty() {
+                if it.r#type == ITEM_TYPE_TEXT && it.text.is_some() {
                     if Rect_ContainsPoint(Some(&it.window.rect), x, y) {
                         return true;
                     } else {

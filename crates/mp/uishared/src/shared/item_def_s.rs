@@ -44,7 +44,10 @@ pub struct ItemDef {
     /// ( optional ) style, normal and shadowed are it for now
     pub textStyle: c_int,
     /// display text
-    pub text: String,
+    ///
+    /// `None` = Raven's NULL (never parsed); `Some(s)` = `String_Alloc`'d,
+    /// possibly empty.
+    pub text: Option<String>,
     /// display text, 2nd line
     pub text2: String,
     /// ( optional ) text2 alignment x coord
@@ -82,7 +85,10 @@ pub struct ItemDef {
     /// select script
     pub leaveFocus: String,
     /// associated cvar
-    pub cvar: String,
+    ///
+    /// `None` = Raven's NULL (never parsed); `Some(s)` = `String_Alloc`'d,
+    /// possibly empty.
+    pub cvar: Option<String>,
     /// associated cvar for enable actions
     pub cvarTest: String,
     /// enable, disable, show, or hide based on value, this can contain a list
@@ -116,7 +122,8 @@ pub struct ItemDef {
 impl Default for ItemDef {
     /// Raven's `Item_Init` zeroes the item, then re-applies the window
     /// defaults; this is the zeroed half (`memset(item, 0, sizeof(itemDef_t))`)
-    /// with owned fields at their empty values.
+    /// with owned fields at their empty values and the NULL-preserving ones
+    /// (`text`, `cvar`) at `None`.
     ///
     /// Source: `oracle/codemp/ui/ui_shared.c` (`Item_Init`)
     fn default() -> Self {
@@ -130,7 +137,7 @@ impl Default for ItemDef {
             textaligny: 0.0,
             textscale: 0.0,
             textStyle: 0,
-            text: String::new(),
+            text: None,
             text2: String::new(),
             text2alignx: 0.0,
             text2aligny: 0.0,
@@ -148,7 +155,7 @@ impl Default for ItemDef {
             selectionPrev: String::new(),
             onFocus: String::new(),
             leaveFocus: String::new(),
-            cvar: String::new(),
+            cvar: None,
             cvarTest: String::new(),
             enableCvar: String::new(),
             cvarFlags: 0,

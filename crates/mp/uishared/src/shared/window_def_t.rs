@@ -19,9 +19,14 @@ pub struct WindowDef {
     pub rect: RectDef,
     /// screen coord rectangle
     pub rectClient: RectDef,
-    pub name: String,
+    /// `None` = Raven's NULL (never parsed); `Some(s)` = `String_Alloc`'d,
+    /// possibly empty.
+    pub name: Option<String>,
     /// if it belongs to a group
-    pub group: String,
+    ///
+    /// `None` = Raven's NULL (never parsed); `Some(s)` = `String_Alloc`'d,
+    /// possibly empty.
+    pub group: Option<String>,
     /// cinematic name
     pub cinematicName: String,
     /// cinematic handle
