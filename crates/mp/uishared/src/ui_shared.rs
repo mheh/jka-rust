@@ -10,10 +10,11 @@
 use core::ffi::{c_int, c_void};
 use core::ptr::null_mut;
 
+use mp_bg::public::anim_table::animTable;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
-use mp_qshared::shared::q_string::COM_Parse;
-use mp_qshared::shared::{pc_token_t, qtrue, vec4_t, MAX_TOKENLENGTH};
-use native_string::{atof, atoi, latin1_to_string, Q_stricmp};
+use mp_qshared::shared::q_string::{COM_Parse, GetIDForString};
+use mp_qshared::shared::{pc_token_t, qtrue, stringID_table_t, vec4_t, MAX_QPATH, MAX_TOKENLENGTH};
+use native_string::{atof, atoi, latin1_to_string, string_to_latin1, Q_stricmp};
 
 use crate::shared::display_context::DisplayContext;
 use crate::shared::display_state::DisplayState;
@@ -28,10 +29,10 @@ use crate::shared::menu_system::{MenuSystem, MAX_DEFERRED_SCRIPT};
 use crate::shared::menudef::{
     ITEM_ALIGN_CENTER, ITEM_ALIGN_RIGHT, ITEM_TYPE_BIND, ITEM_TYPE_EDITFIELD, ITEM_TYPE_LISTBOX,
     ITEM_TYPE_MODEL, ITEM_TYPE_MULTI, ITEM_TYPE_NUMERICFIELD, ITEM_TYPE_OWNERDRAW,
-    ITEM_TYPE_SLIDER, ITEM_TYPE_TEXT, ITEM_TYPE_TEXTSCROLL, ITEM_TYPE_YESNO, UI_FORCE_RANK_ABSORB,
-    UI_FORCE_RANK_DRAIN, UI_FORCE_RANK_GRIP, UI_FORCE_RANK_HEAL, UI_FORCE_RANK_LEVITATION,
-    UI_FORCE_RANK_LIGHTNING, UI_FORCE_RANK_PROTECT, UI_FORCE_RANK_PULL, UI_FORCE_RANK_PUSH,
-    UI_FORCE_RANK_RAGE, UI_FORCE_RANK_SABERATTACK, UI_FORCE_RANK_SABERDEFEND,
+    ITEM_TYPE_SLIDER, ITEM_TYPE_TEXT, ITEM_TYPE_TEXTSCROLL, ITEM_TYPE_YESNO, LISTBOX_IMAGE,
+    UI_FORCE_RANK_ABSORB, UI_FORCE_RANK_DRAIN, UI_FORCE_RANK_GRIP, UI_FORCE_RANK_HEAL,
+    UI_FORCE_RANK_LEVITATION, UI_FORCE_RANK_LIGHTNING, UI_FORCE_RANK_PROTECT, UI_FORCE_RANK_PULL,
+    UI_FORCE_RANK_PUSH, UI_FORCE_RANK_RAGE, UI_FORCE_RANK_SABERATTACK, UI_FORCE_RANK_SABERDEFEND,
     UI_FORCE_RANK_SABERTHROW, UI_FORCE_RANK_SEE, UI_FORCE_RANK_SPEED, UI_FORCE_RANK_TEAM_FORCE,
     UI_FORCE_RANK_TEAM_HEAL, UI_FORCE_RANK_TELEPATHY, UI_FORCE_SIDE, WINDOW_BORDER_FULL,
     WINDOW_BORDER_HORZ, WINDOW_BORDER_KCGRADIENT, WINDOW_BORDER_VERT, WINDOW_STYLE_CINEMATIC,
@@ -40,7 +41,10 @@ use crate::shared::menudef::{
 use crate::shared::model_def_s::ModelDef;
 use crate::shared::multi_def_s::MultiDef;
 use crate::shared::rect_def_t::RectDef;
-use crate::shared::text_scroll_def_s::TextScrollDef;
+use crate::shared::scroll_info_s::{
+    SCROLL_TIME_ADJUST, SCROLL_TIME_ADJUSTOFFSET, SCROLL_TIME_FLOOR,
+};
+use crate::shared::text_scroll_def_s::{TextScrollDef, MAX_TEXTSCROLL_LINES};
 use crate::shared::window_def_t::WindowDef;
 
 /// Raven `#define WINDOW_MOUSEOVER 0x00000001`.
@@ -104,6 +108,22 @@ pub const WINDOW_LB_PGDN: c_int = 0x0000_8000;
 /// Raven `#define WINDOW_PLAYERCOLOR 0x01000000`.
 /// Source: `oracle/codemp/ui/ui_shared.h:46`
 pub const WINDOW_PLAYERCOLOR: c_int = 0x0100_0000;
+/// Raven `#define WINDOW_INTRANSITIONMODEL 0x04000000` — delayed script
+/// waiting to run.
+/// Source: `oracle/codemp/ui/ui_shared.h:49`
+const WINDOW_INTRANSITIONMODEL: c_int = 0x0400_0000;
+
+/// Raven `#define ITF_G2VALID 0x0001` — indicates whether or not the item's
+/// ghoul2 instance is valid.
+/// Source: `oracle/codemp/ui/ui_shared.h:251`
+const ITF_G2VALID: c_int = 0x0001;
+
+// PORT-NOTE: `TT_*` (parser token types) is a `q_shared.h` family (DEC-32 CONST
+// HOMES) not yet promoted to `mp_qshared::shared`; only `TT_NUMBER` is read in
+// this file, so it gets a local twin pending that promotion.
+/// Raven `#define TT_NUMBER 3` — number token.
+/// Source: `oracle/codemp/game/q_shared.h:1654-1658`
+const TT_NUMBER: c_int = 3;
 
 /// Raven `#define CURSOR_ARROW 0x00000002`.
 /// Source: `oracle/codemp/ui/ui_shared.h:54`
@@ -2471,4 +2491,1132 @@ pub fn Menu_OverActiveItem(menus: &MenuSystem, menu: Option<MenuId>, x: f32, y: 
     }
 
     false
+}
+
+// ---------------------------------------------------------------------
+// wave 2
+// ---------------------------------------------------------------------
+
+/// Raven `PC_Float_Parse` — parse a (possibly negative-signed) numeric
+/// source token as a float.
+/// Source: `oracle/codemp/ui/ui_shared.c:465-485`
+pub fn PC_Float_Parse(dc: &mut dyn DisplayContext, handle: c_int, f: &mut f32) -> bool {
+    let mut token = zero_pc_token();
+    let mut negative = false;
+
+    if !dc.PC_ReadToken(handle, &mut token) {
+        return false;
+    }
+    if pc_token_str(&token).starts_with('-') {
+        if !dc.PC_ReadToken(handle, &mut token) {
+            return false;
+        }
+        negative = true;
+    }
+    if token.type_ != TT_NUMBER {
+        PC_SourceError(
+            dc,
+            handle,
+            &format!("expected float but found {}\n", pc_token_str(&token)),
+        );
+        return false;
+    }
+    *f = if negative {
+        -token.floatvalue
+    } else {
+        token.floatvalue
+    };
+    true
+}
+
+/// Raven `PC_Int_Parse` — parse a (possibly negative-signed) numeric source
+/// token as an int.
+/// Source: `oracle/codemp/ui/ui_shared.c:545-564`
+pub fn PC_Int_Parse(dc: &mut dyn DisplayContext, handle: c_int, i: &mut c_int) -> bool {
+    let mut token = zero_pc_token();
+    let mut negative = false;
+
+    if !dc.PC_ReadToken(handle, &mut token) {
+        return false;
+    }
+    if pc_token_str(&token).starts_with('-') {
+        if !dc.PC_ReadToken(handle, &mut token) {
+            return false;
+        }
+        negative = true;
+    }
+    if token.type_ != TT_NUMBER {
+        PC_SourceError(
+            dc,
+            handle,
+            &format!("expected integer but found {}\n", pc_token_str(&token)),
+        );
+        return false;
+    }
+    *i = token.intvalue;
+    if negative {
+        *i = -*i;
+    }
+    true
+}
+
+/// Raven `String_Parse` — parse one token off `p`, interning it into `out`
+/// via [`String_Alloc`].
+/// Source: `oracle/codemp/ui/ui_shared.c:607-616`
+pub fn String_Parse(p: &mut &str, out: &mut String) -> bool {
+    let (token, rest) = COM_Parse(p, false);
+    *p = rest;
+    if !token.is_empty() {
+        if let Some(alloc) = String_Alloc(Some(&token)) {
+            *out = alloc;
+            return true;
+        }
+    }
+    false
+}
+
+/// Raven `PC_String_Parse` — read one source token into `out` via
+/// [`String_Alloc`], special-casing the closing `"}"` to avoid interning a
+/// fresh copy of it every call.
+///
+/// PORT-NOTE: Raven's `static char *squiggy = "}"` is a string literal, not
+/// persisted state (see `MenuScratch`'s PORT-NOTE) — reproduced inline.
+/// Source: `oracle/codemp/ui/ui_shared.c:623-643`
+pub fn PC_String_Parse(dc: &mut dyn DisplayContext, handle: c_int, out: &mut String) -> bool {
+    let mut token = zero_pc_token();
+    if !dc.PC_ReadToken(handle, &mut token) {
+        return false;
+    }
+
+    let name = pc_token_str(&token);
+    if stricmp_eq(&name, "}") {
+        *out = "}".to_string();
+    } else {
+        *out = String_Alloc(Some(&name)).unwrap_or_default();
+    }
+    true
+}
+
+/// Raven `PC_Script_Parse` — read a `{ ... }` token run into `out` as one
+/// re-quoted, space-separated script string.
+///
+/// PORT-NOTE: Raven accumulates into a fixed `char script[2048]` (silently
+/// truncated by `Q_strcat`); the owned `String` grows unbounded instead,
+/// matching this file's other reshaped fixed-buffer accumulators (e.g.
+/// `BindingFromName`'s `g_nameBind1`).
+/// Source: `oracle/codemp/ui/ui_shared.c:650-681`
+pub fn PC_Script_Parse(dc: &mut dyn DisplayContext, handle: c_int, out: &mut String) -> bool {
+    let mut script = String::new();
+    let mut token = zero_pc_token();
+
+    if !dc.PC_ReadToken(handle, &mut token) {
+        return false;
+    }
+    if !stricmp_eq(&pc_token_str(&token), "{") {
+        return false;
+    }
+
+    loop {
+        if !dc.PC_ReadToken(handle, &mut token) {
+            return false;
+        }
+        let tokenStr = pc_token_str(&token);
+
+        if stricmp_eq(&tokenStr, "}") {
+            *out = String_Alloc(Some(&script)).unwrap_or_default();
+            return true;
+        }
+
+        // §19: Raven tests `token.string[1] != '\0'` on a reused token buffer, so
+        // an empty token still sees the previous token's stale byte and quotes.
+        if tokenStr.len() != 1 {
+            script.push_str(&format!("\"{}\"", tokenStr));
+        } else {
+            script.push_str(&tokenStr);
+        }
+        script.push(' ');
+    }
+}
+
+/// Raven `Menu_ShowGroup` — set/clear `WINDOW_VISIBLE` (and, when hiding,
+/// `WINDOW_HASFOCUS`) on every item in `menu` matching `groupName`.
+/// Source: `oracle/codemp/ui/ui_shared.c:1444-1465`
+pub fn Menu_ShowGroup(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    groupName: &str,
+    showFlag: bool,
+) {
+    let count = Menu_ItemsMatchingGroup(menus, dc, menu, groupName);
+    for j in 0..count {
+        if let Some(id) = Menu_GetMatchingItemByNumber(menus, menu, j, groupName) {
+            let it = menus.item_mut(id);
+            if showFlag {
+                it.window.flags |= WINDOW_VISIBLE;
+            } else {
+                it.window.flags &= !(WINDOW_VISIBLE | WINDOW_HASFOCUS);
+            }
+        }
+    }
+}
+
+/// Raven `Menu_ShowItemByName` — set/clear `WINDOW_VISIBLE` on every item in
+/// `menu` matching `p`, stopping the item's cinematic (if any) when hiding.
+/// Source: `oracle/codemp/ui/ui_shared.c:1467-1486`
+pub fn Menu_ShowItemByName(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    p: &str,
+    bShow: bool,
+) {
+    let count = Menu_ItemsMatchingGroup(menus, dc, menu, p);
+    for i in 0..count {
+        if let Some(id) = Menu_GetMatchingItemByNumber(menus, menu, i, p) {
+            let it = menus.item_mut(id);
+            if bShow {
+                it.window.flags |= WINDOW_VISIBLE;
+            } else {
+                it.window.flags &= !WINDOW_VISIBLE;
+                // stop cinematics playing in the window
+                if it.window.cinematic >= 0 {
+                    dc.stopCinematic(it.window.cinematic);
+                    it.window.cinematic = -1;
+                }
+            }
+        }
+    }
+}
+
+/// Raven `Menu_FadeItemByName` — start a fade-in/fade-out on every item in
+/// `menu` matching `p`.
+/// Source: `oracle/codemp/ui/ui_shared.c:1488-1504`
+pub fn Menu_FadeItemByName(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    p: &str,
+    fadeOut: bool,
+) {
+    let count = Menu_ItemsMatchingGroup(menus, dc, menu, p);
+    for i in 0..count {
+        if let Some(id) = Menu_GetMatchingItemByNumber(menus, menu, i, p) {
+            let it = menus.item_mut(id);
+            if fadeOut {
+                it.window.flags |= WINDOW_FADINGOUT | WINDOW_VISIBLE;
+                it.window.flags &= !WINDOW_FADINGIN;
+            } else {
+                it.window.flags |= WINDOW_VISIBLE | WINDOW_FADINGIN;
+                it.window.flags &= !WINDOW_FADINGOUT;
+            }
+        }
+    }
+}
+
+/// Raven `Menu_Transition3ItemByName` — start a two-target ghoul2
+/// bounds/FOV transition on every `ITEM_TYPE_MODEL` item in `menu` matching
+/// `p`.
+/// Source: `oracle/codemp/ui/ui_shared.c:1696-1744`
+#[allow(clippy::too_many_arguments)]
+pub fn Menu_Transition3ItemByName(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    p: &str,
+    minx: f32,
+    miny: f32,
+    minz: f32,
+    maxx: f32,
+    maxy: f32,
+    maxz: f32,
+    fovtx: f32,
+    fovty: f32,
+    time: c_int,
+    amt: f32,
+) {
+    let count = Menu_ItemsMatchingGroup(menus, dc, menu, p);
+    for i in 0..count {
+        if let Some(id) = Menu_GetMatchingItemByNumber(menus, menu, i, p) {
+            let it = menus.item_mut(id);
+            if it.r#type == ITEM_TYPE_MODEL {
+                it.window.flags |= WINDOW_INTRANSITIONMODEL | WINDOW_VISIBLE;
+                it.window.offsetTime = time;
+
+                if let Some(modelptr) = it.typeData.model_mut() {
+                    modelptr.fov_x2 = fovtx;
+                    modelptr.fov_y2 = fovty;
+                    modelptr.g2maxs2 = [maxx, maxy, maxz];
+                    modelptr.g2mins2 = [minx, miny, minz];
+
+                    // Raven's `abs()` is the int form: each float delta truncates
+                    // toward zero before the divide.
+                    modelptr.g2maxsEffect[0] =
+                        ((modelptr.g2maxs2[0] - modelptr.g2maxs[0]) as c_int).abs() as f32 / amt;
+                    modelptr.g2maxsEffect[1] =
+                        ((modelptr.g2maxs2[1] - modelptr.g2maxs[1]) as c_int).abs() as f32 / amt;
+                    modelptr.g2maxsEffect[2] =
+                        ((modelptr.g2maxs2[2] - modelptr.g2maxs[2]) as c_int).abs() as f32 / amt;
+
+                    modelptr.g2minsEffect[0] =
+                        ((modelptr.g2mins2[0] - modelptr.g2mins[0]) as c_int).abs() as f32 / amt;
+                    modelptr.g2minsEffect[1] =
+                        ((modelptr.g2mins2[1] - modelptr.g2mins[1]) as c_int).abs() as f32 / amt;
+                    modelptr.g2minsEffect[2] =
+                        ((modelptr.g2mins2[2] - modelptr.g2mins[2]) as c_int).abs() as f32 / amt;
+
+                    modelptr.fov_Effectx =
+                        ((modelptr.fov_x2 - modelptr.fov_x) as c_int).abs() as f32 / amt;
+                    modelptr.fov_Effecty =
+                        ((modelptr.fov_y2 - modelptr.fov_y) as c_int).abs() as f32 / amt;
+                }
+            }
+        }
+    }
+}
+
+/// Raven `Menu_ItemDisable` — set `disabled` on every item in `menu`
+/// matching `name`, clearing its mouseover flag too.
+/// Source: `oracle/codemp/ui/ui_shared.c:1845-1862`
+pub fn Menu_ItemDisable(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    name: &str,
+    disableFlag: c_int,
+) {
+    let count = Menu_ItemsMatchingGroup(menus, dc, menu, name);
+    // Loop through all items that have this name
+    for j in 0..count {
+        if let Some(id) = Menu_GetMatchingItemByNumber(menus, menu, j, name) {
+            let it = menus.item_mut(id);
+            it.disabled = disableFlag != 0;
+            // Just in case it had focus
+            it.window.flags &= !WINDOW_MOUSEOVER;
+        }
+    }
+}
+
+/// Raven `Menu_SetItemBackground` — set the background shader on every item
+/// in `menu` matching `itemName`.
+/// Source: `oracle/codemp/ui/ui_shared.c:2231-2251`
+pub fn Menu_SetItemBackground(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: Option<MenuId>,
+    itemName: &str,
+    background: &str,
+) {
+    // No menu???
+    let menu = match menu {
+        Some(m) => m,
+        None => return,
+    };
+
+    let count = Menu_ItemsMatchingGroup(menus, dc, menu, itemName);
+    for j in 0..count {
+        if let Some(id) = Menu_GetMatchingItemByNumber(menus, menu, j, itemName) {
+            let shader = dc.registerShaderNoMip(background);
+            menus.item_mut(id).window.background = shader;
+        }
+    }
+}
+
+/// Raven `Item_TextScroll_ThumbDrawPosition` — the thumb's draw-time y,
+/// following the cursor while the box has mouse capture.
+/// Source: `oracle/codemp/ui/ui_shared.c:2519-2537`
+pub fn Item_TextScroll_ThumbDrawPosition(
+    menus: &MenuSystem,
+    ds: &DisplayState,
+    item: ItemId,
+) -> c_int {
+    if menus.itemCapture == Some(item) {
+        let rect = menus.item(item).window.rect;
+        // Raven's `min`/`max` are `int`: the bounds truncate before the compare.
+        let min = (rect.y + SCROLLBAR_SIZE + 1.0) as c_int;
+        let max = (rect.y + rect.h - 2.0 * SCROLLBAR_SIZE - 1.0) as c_int;
+
+        if ds.cursory as f32 >= min as f32 + SCROLLBAR_SIZE / 2.0
+            && ds.cursory as f32 <= max as f32 + SCROLLBAR_SIZE / 2.0
+        {
+            return ds.cursory - (SCROLLBAR_SIZE / 2.0) as c_int;
+        }
+
+        return Item_TextScroll_ThumbPosition(menus, item);
+    }
+
+    Item_TextScroll_ThumbPosition(menus, item)
+}
+
+/// Raven `Item_TextScroll_OverLB` — which scrollbar hot-zone (if any)
+/// `(x, y)` is over.
+///
+/// PORT-NOTE: Raven's `scrollPtr`/`count` locals are read (`iLineCount`) but
+/// never used again in the body — a dead read, dropped here rather than
+/// transcribed as an inert `typeData.textScroll()` fetch.
+/// Source: `oracle/codemp/ui/ui_shared.c:2539-2585`
+pub fn Item_TextScroll_OverLB(menus: &MenuSystem, item: ItemId, x: f32, y: f32) -> c_int {
+    let rect = menus.item(item).window.rect;
+
+    let mut r = RectDef {
+        x: rect.x + rect.w - SCROLLBAR_SIZE,
+        y: rect.y,
+        w: SCROLLBAR_SIZE,
+        h: SCROLLBAR_SIZE,
+    };
+    if Rect_ContainsPoint(Some(&r), x, y) {
+        return WINDOW_LB_LEFTARROW;
+    }
+
+    r.y = rect.y + rect.h - SCROLLBAR_SIZE;
+    if Rect_ContainsPoint(Some(&r), x, y) {
+        return WINDOW_LB_RIGHTARROW;
+    }
+
+    let thumbstart = Item_TextScroll_ThumbPosition(menus, item);
+    r.y = thumbstart as f32;
+    if Rect_ContainsPoint(Some(&r), x, y) {
+        return WINDOW_LB_THUMB;
+    }
+
+    r.y = rect.y + SCROLLBAR_SIZE;
+    r.h = thumbstart as f32 - r.y;
+    if Rect_ContainsPoint(Some(&r), x, y) {
+        return WINDOW_LB_PGUP;
+    }
+
+    r.y = thumbstart as f32 + SCROLLBAR_SIZE;
+    r.h = rect.y + rect.h - SCROLLBAR_SIZE;
+    if Rect_ContainsPoint(Some(&r), x, y) {
+        return WINDOW_LB_PGDN;
+    }
+
+    0
+}
+
+/// Raven `Item_ListBox_ThumbDrawPosition` — the thumb's draw-time x/y,
+/// following the cursor while the box has mouse capture (horizontal or
+/// vertical, by `WINDOW_HORIZONTAL`).
+/// Source: `oracle/codemp/ui/ui_shared.c:2751-2788`
+pub fn Item_ListBox_ThumbDrawPosition(
+    menus: &MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+) -> c_int {
+    if menus.itemCapture == Some(item) {
+        let it = menus.item(item);
+        let rect = it.window.rect;
+        // Raven's `min`/`max` are `int`: the bounds truncate before the compare.
+        if it.window.flags & WINDOW_HORIZONTAL != 0 {
+            let min = (rect.x + SCROLLBAR_SIZE + 1.0) as c_int;
+            let max = (rect.x + rect.w - 2.0 * SCROLLBAR_SIZE - 1.0) as c_int;
+            if ds.cursorx as f32 >= min as f32 + SCROLLBAR_SIZE / 2.0
+                && ds.cursorx as f32 <= max as f32 + SCROLLBAR_SIZE / 2.0
+            {
+                return ds.cursorx - (SCROLLBAR_SIZE / 2.0) as c_int;
+            } else {
+                return Item_ListBox_ThumbPosition(menus, dc, item);
+            }
+        } else {
+            let min = (rect.y + SCROLLBAR_SIZE + 1.0) as c_int;
+            let max = (rect.y + rect.h - 2.0 * SCROLLBAR_SIZE - 1.0) as c_int;
+            if ds.cursory as f32 >= min as f32 + SCROLLBAR_SIZE / 2.0
+                && ds.cursory as f32 <= max as f32 + SCROLLBAR_SIZE / 2.0
+            {
+                return ds.cursory - (SCROLLBAR_SIZE / 2.0) as c_int;
+            } else {
+                return Item_ListBox_ThumbPosition(menus, dc, item);
+            }
+        }
+    } else {
+        Item_ListBox_ThumbPosition(menus, dc, item)
+    }
+}
+
+/// Raven `Item_ListBox_OverLB` — which scrollbar hot-zone (if any)
+/// `(x, y)` is over (horizontal, or vertical with the multi-column/image
+/// layout carrying only page-up/page-down/thumb).
+///
+/// PORT-NOTE (§19 UB pick): a `typeData` payload-type mismatch (unreachable
+/// under this file's own type dispatch) falls back to `elementWidth = 0.0`/
+/// `elementStyle = 0` instead of Raven's unconditional cast.
+/// Source: `oracle/codemp/ui/ui_shared.c:2837-2953`
+pub fn Item_ListBox_OverLB(
+    menus: &MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    x: f32,
+    y: f32,
+) -> c_int {
+    let it = menus.item(item);
+    let _count = dc.feederCount(it.special);
+    let listPtr = it.typeData.listBox();
+    let rect = it.window.rect;
+
+    if it.window.flags & WINDOW_HORIZONTAL != 0 {
+        // check if on left arrow
+        let mut r = RectDef {
+            x: rect.x,
+            y: rect.y + rect.h - SCROLLBAR_SIZE,
+            w: SCROLLBAR_SIZE,
+            h: SCROLLBAR_SIZE,
+        };
+        if Rect_ContainsPoint(Some(&r), x, y) {
+            return WINDOW_LB_LEFTARROW;
+        }
+
+        // check if on right arrow
+        r.x = rect.x + rect.w - SCROLLBAR_SIZE;
+        if Rect_ContainsPoint(Some(&r), x, y) {
+            return WINDOW_LB_RIGHTARROW;
+        }
+
+        // check if on thumb
+        let thumbstart = Item_ListBox_ThumbPosition(menus, dc, item);
+        r.x = thumbstart as f32;
+        if Rect_ContainsPoint(Some(&r), x, y) {
+            return WINDOW_LB_THUMB;
+        }
+
+        r.x = rect.x + SCROLLBAR_SIZE;
+        r.w = thumbstart as f32 - r.x;
+        if Rect_ContainsPoint(Some(&r), x, y) {
+            return WINDOW_LB_PGUP;
+        }
+
+        r.x = thumbstart as f32 + SCROLLBAR_SIZE;
+        r.w = rect.x + rect.w - SCROLLBAR_SIZE;
+        if Rect_ContainsPoint(Some(&r), x, y) {
+            return WINDOW_LB_PGDN;
+        }
+    }
+    // Vertical Scroll
+    else {
+        let elementWidth = listPtr.map(|l| l.elementWidth).unwrap_or(0.0);
+        let elementStyle = listPtr.map(|l| l.elementStyle).unwrap_or(0);
+
+        // Multiple rows and columns (since it's more than twice as wide as an element)
+        if rect.w > (elementWidth * 2.0) && elementStyle == LISTBOX_IMAGE {
+            let mut r = RectDef {
+                x: rect.x + rect.w - SCROLLBAR_SIZE,
+                y: rect.y,
+                w: SCROLLBAR_SIZE,
+                h: SCROLLBAR_SIZE,
+            };
+            if Rect_ContainsPoint(Some(&r), x, y) {
+                return WINDOW_LB_PGUP;
+            }
+
+            r.y = rect.y + rect.h - SCROLLBAR_SIZE;
+            if Rect_ContainsPoint(Some(&r), x, y) {
+                return WINDOW_LB_PGDN;
+            }
+
+            let thumbstart = Item_ListBox_ThumbPosition(menus, dc, item);
+            r.y = thumbstart as f32;
+            if Rect_ContainsPoint(Some(&r), x, y) {
+                return WINDOW_LB_THUMB;
+            }
+        } else {
+            let mut r = RectDef {
+                x: rect.x + rect.w - SCROLLBAR_SIZE,
+                y: rect.y,
+                w: SCROLLBAR_SIZE,
+                h: SCROLLBAR_SIZE,
+            };
+            if Rect_ContainsPoint(Some(&r), x, y) {
+                return WINDOW_LB_LEFTARROW;
+            }
+
+            r.y = rect.y + rect.h - SCROLLBAR_SIZE;
+            if Rect_ContainsPoint(Some(&r), x, y) {
+                return WINDOW_LB_RIGHTARROW;
+            }
+
+            let thumbstart = Item_ListBox_ThumbPosition(menus, dc, item);
+            r.y = thumbstart as f32;
+            if Rect_ContainsPoint(Some(&r), x, y) {
+                return WINDOW_LB_THUMB;
+            }
+
+            r.y = rect.y + SCROLLBAR_SIZE;
+            r.h = thumbstart as f32 - r.y;
+            if Rect_ContainsPoint(Some(&r), x, y) {
+                return WINDOW_LB_PGUP;
+            }
+
+            r.y = thumbstart as f32 + SCROLLBAR_SIZE;
+            r.h = rect.y + rect.h - SCROLLBAR_SIZE;
+            if Rect_ContainsPoint(Some(&r), x, y) {
+                return WINDOW_LB_PGDN;
+            }
+        }
+    }
+    0
+}
+
+/// Raven `Scroll_TextScroll_AutoFunc` — the text-scroll box's auto-scroll
+/// capture-func tick: repeat the captured scroll key on the throttle, easing
+/// the repeat interval down to the floor.
+///
+/// PORT-NOTE (§19 UB pick): Raven derefs `si->item` unconditionally (`si` is
+/// always `&scrollInfo` while a scroll capture is active); the
+/// otherwise-unreachable "no captured item" case here is a no-op instead of a
+/// null deref (see `Scroll_Slider_ThumbFunc`).
+/// Source: `oracle/codemp/ui/ui_shared.c:3831-3852`
+pub fn Scroll_TextScroll_AutoFunc(menus: &mut MenuSystem, ds: &DisplayState) {
+    let item = match menus.scrollInfo.item {
+        Some(id) => id,
+        None => return,
+    };
+
+    if ds.realTime > menus.scrollInfo.nextScrollTime {
+        // need to scroll which is done by simulating a click to the item
+        // this is done a bit sideways as the autoscroll "knows" that the item is a listbox
+        // so it calls it directly
+        let scrollKey = menus.scrollInfo.scrollKey;
+        Item_TextScroll_HandleKey(menus, ds, item, scrollKey, true, false);
+        menus.scrollInfo.nextScrollTime = ds.realTime + menus.scrollInfo.adjustValue;
+    }
+
+    if ds.realTime > menus.scrollInfo.nextAdjustTime {
+        menus.scrollInfo.nextAdjustTime = ds.realTime + SCROLL_TIME_ADJUST;
+        if menus.scrollInfo.adjustValue > SCROLL_TIME_FLOOR {
+            menus.scrollInfo.adjustValue -= SCROLL_TIME_ADJUSTOFFSET;
+        }
+    }
+}
+
+/// Raven `Scroll_TextScroll_ThumbFunc` — the text-scroll box's thumb-drag
+/// capture-func tick: track the cursor, then run the same auto-scroll
+/// throttle as [`Scroll_TextScroll_AutoFunc`].
+///
+/// PORT-NOTE (§19 UB pick): see `Scroll_TextScroll_AutoFunc`.
+/// Source: `oracle/codemp/ui/ui_shared.c:3854-3902`
+pub fn Scroll_TextScroll_ThumbFunc(menus: &mut MenuSystem, ds: &DisplayState) {
+    let item = match menus.scrollInfo.item {
+        Some(id) => id,
+        None => return,
+    };
+
+    if ds.cursory != menus.scrollInfo.yStart as c_int {
+        let rect = menus.item(item).window.rect;
+        let r = RectDef {
+            x: rect.x + rect.w - SCROLLBAR_SIZE - 1.0,
+            y: rect.y + SCROLLBAR_SIZE + 1.0,
+            h: rect.h - (SCROLLBAR_SIZE * 2.0) - 2.0,
+            w: SCROLLBAR_SIZE,
+        };
+        let max = Item_TextScroll_MaxScroll(menus, item);
+
+        let mut pos = ((ds.cursory as f32 - r.y - SCROLLBAR_SIZE / 2.0) * max as f32
+            / (r.h - SCROLLBAR_SIZE)) as c_int;
+        if pos < 0 {
+            pos = 0;
+        } else if pos > max {
+            pos = max;
+        }
+
+        if let Some(scrollPtr) = menus.item_mut(item).typeData.textScroll_mut() {
+            scrollPtr.startPos = pos;
+        }
+        menus.scrollInfo.yStart = ds.cursory as f32;
+    }
+
+    if ds.realTime > menus.scrollInfo.nextScrollTime {
+        // need to scroll which is done by simulating a click to the item
+        // this is done a bit sideways as the autoscroll "knows" that the item is a listbox
+        // so it calls it directly
+        let scrollKey = menus.scrollInfo.scrollKey;
+        Item_TextScroll_HandleKey(menus, ds, item, scrollKey, true, false);
+        menus.scrollInfo.nextScrollTime = ds.realTime + menus.scrollInfo.adjustValue;
+    }
+
+    if ds.realTime > menus.scrollInfo.nextAdjustTime {
+        menus.scrollInfo.nextAdjustTime = ds.realTime + SCROLL_TIME_ADJUST;
+        if menus.scrollInfo.adjustValue > SCROLL_TIME_FLOOR {
+            menus.scrollInfo.adjustValue -= SCROLL_TIME_ADJUSTOFFSET;
+        }
+    }
+}
+
+/// Raven `Display_CloseCinematics` — stop every defined menu's cinematics.
+/// Source: `oracle/codemp/ui/ui_shared.c:4409-4414`
+pub fn Display_CloseCinematics(menus: &mut MenuSystem, dc: &mut dyn DisplayContext) {
+    let count = menus.menus.len();
+    for i in 0..count {
+        Menu_CloseCinematics(menus, dc, Some(MenuId::new(i)));
+    }
+}
+
+/// Raven `ItemParse_asset_model_go` — load (or rebuild) an item's asset,
+/// either a ghoul2 `.glm` model (tracked for shutdown cleanup) or a plain
+/// `.md3` model.
+///
+/// PORT-NOTE (dead surface): the `#ifndef CGAME` guard picks the `ui` arm
+/// unconditionally, matching this file's existing convention (see
+/// `Window_Paint`'s PORT-NOTE) — this crate has only the `ui` linkage so far.
+/// Source: `oracle/codemp/ui/ui_shared.c:7567-7657`
+pub fn ItemParse_asset_model_go(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    name: &str,
+    runTimeLength: &mut c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+    *runTimeLength = 0;
+
+    // §19: Raven reads `&name[strlen(name) - 4]`, under-running the buffer for a
+    // name shorter than the suffix; the length guard is the defined choice.
+    let nameBytes = name.as_bytes();
+    if nameBytes.len() >= 4 && nameBytes[nameBytes.len() - 4..].eq_ignore_ascii_case(b".glm") {
+        // it's a ghoul2 model then
+        let ghoul2 = menus.item(item).ghoul2;
+        if !ghoul2.is_null() {
+            UI_ClearG2Pointer(menus, ghoul2); // remove from tracking list
+            let mut ptr = menus.item(item).ghoul2;
+            dc.G2API_CleanGhoul2Models(&mut ptr as *mut *mut c_void); // remove ghoul info
+            menus.item_mut(item).ghoul2 = ptr;
+            menus.item_mut(item).flags &= !ITF_G2VALID;
+        }
+
+        // §19: Raven derefs `modelPtr` unconditionally; a non-model `typeData`
+        // reads as the zeroed field here instead.
+        let g2skin = menus
+            .item(item)
+            .typeData
+            .model()
+            .map(|m| m.g2skin)
+            .unwrap_or(0);
+        let mut ghoul2Ptr = menus.item(item).ghoul2;
+        let g2Model =
+            dc.G2API_InitGhoul2Model(&mut ghoul2Ptr as *mut *mut c_void, name, 0, g2skin, 0, 0, 0);
+        menus.item_mut(item).ghoul2 = ghoul2Ptr;
+
+        if g2Model >= 0 {
+            UI_InsertG2Pointer(menus, menus.item(item).ghoul2); // remember it so we can free it when the ui shuts down.
+            menus.item_mut(item).flags |= ITF_G2VALID;
+
+            // §19: same zeroed-field stand-in for Raven's bare `modelPtr` deref.
+            let g2anim = menus
+                .item(item)
+                .typeData
+                .model()
+                .map(|m| m.g2anim)
+                .unwrap_or(0);
+            if g2anim != 0 {
+                // does the menu request this model be playing an animation?
+                let ghoul2 = menus.item(item).ghoul2;
+                let GLAName = dc.G2API_GetGLAName(ghoul2, 0, MAX_QPATH as usize);
+
+                if !GLAName.is_empty() {
+                    if GLAName.rfind('/').is_some() {
+                        // If this isn't true the gla path must be messed up somehow.
+                        //
+                        // DEFERRED: UI_ParseAnimationFile — ui reuses mp_bg's
+                        // animation module instead of Raven's hand-maintained
+                        // `bgAllAnims` copy (DEC-36 D5); `UI_ParseAnimationFile`
+                        // itself already carries that deferral at U0
+                        // (`crates/mp/ui/src/ui_main.rs:99-104`, same
+                        // `uiHumanoidAnimations`/`bgAllAnims`/`uiNumAllAnims`
+                        // fork), with no owned-shape reuse target designed yet —
+                        // this branch's bone-anim playback off a parsed
+                        // `animation.cfg` has nothing to transcribe against.
+                        // Consequence: `*runTimeLength` stays 0 rather than the
+                        // parsed animation's play length.
+                        // Source: `oracle/codemp/ui/ui_shared.c:7602-7631`
+                    }
+                }
+            }
+
+            // §19: same zeroed-field stand-in for Raven's bare `modelPtr` deref.
+            let g2skin = menus
+                .item(item)
+                .typeData
+                .model()
+                .map(|m| m.g2skin)
+                .unwrap_or(0);
+            if g2skin != 0 {
+                let ghoul2 = menus.item(item).ghoul2;
+                // this is going to set the surfs on/off matching the skin file
+                dc.G2API_SetSkin(ghoul2, 0, g2skin, g2skin);
+            }
+        }
+    } else if menus.item(item).asset == 0 {
+        // guess it's just an md3
+        let asset = dc.registerModel(name);
+        menus.item_mut(item).asset = asset;
+        menus.item_mut(item).flags &= !ITF_G2VALID;
+    }
+
+    true
+}
+
+/// Raven `ItemParse_model_g2skin` — parse an item's ghoul2 skin asset.
+///
+/// PORT-NOTE (§19 UB pick): a `typeData` payload-type mismatch (unreachable
+/// under this file's own type dispatch) drops the write instead of Raven's
+/// unconditional cast.
+/// Source: `oracle/codemp/ui/ui_shared.c:7811-7830`
+pub fn ItemParse_model_g2skin(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+
+    let mut token = zero_pc_token();
+    if !dc.PC_ReadToken(handle, &mut token) {
+        return false;
+    }
+
+    let name = pc_token_str(&token);
+    if name.is_empty() {
+        // it was parsed correctly so still return true.
+        return true;
+    }
+
+    let skin = dc.R_RegisterSkin(&name);
+    if let Some(modelPtr) = menus.item_mut(item).typeData.model_mut() {
+        modelPtr.g2skin = skin;
+    }
+
+    true
+}
+
+/// Raven `ItemParse_model_g2anim` — parse an item's ghoul2 animation by name
+/// off `mp_bg`'s reused `animTable` (DEC-36 D5).
+///
+/// PORT-NOTE: `animTable[n].id == n` for every entry (see the table's own
+/// doc comment), so [`GetIDForString`]'s returned id is the same value
+/// Raven's loop-index assignment (`modelPtr->g2anim = i`) would have written.
+/// `Com_Printf` (the not-found warning) is unreachable from this
+/// host-agnostic crate (see `String_Report`) — routed through `dc.Print`.
+///
+/// PORT-NOTE (§19 UB pick): a `typeData` payload-type mismatch drops the
+/// write instead of Raven's unconditional cast.
+/// Source: `oracle/codemp/ui/ui_shared.c:7833-7862`
+pub fn ItemParse_model_g2anim(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+
+    let mut token = zero_pc_token();
+    if !dc.PC_ReadToken(handle, &mut token) {
+        return false;
+    }
+
+    let name = pc_token_str(&token);
+    if name.is_empty() {
+        // it was parsed correctly so still return true.
+        return true;
+    }
+
+    let id = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &name);
+    if id != -1 {
+        // found it
+        if let Some(modelPtr) = menus.item_mut(item).typeData.model_mut() {
+            modelPtr.g2anim = id;
+        }
+        return true;
+    }
+
+    dc.Print(&format!("Could not find '{}' in the anim table\n", name));
+    true
+}
+
+/// Raven `ItemParse_model_g2skin_go` — set an item's ghoul2 skin by name (or
+/// clear it for an empty/absent `skinName`).
+///
+/// PORT-NOTE (§19 UB pick): a `typeData` payload-type mismatch drops the
+/// clear-path write instead of Raven's unconditional cast.
+/// Source: `oracle/codemp/ui/ui_shared.c:7865-7891`
+pub fn ItemParse_model_g2skin_go(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    skinName: Option<&str>,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+
+    if skinName.map(|s| s.is_empty()).unwrap_or(true) {
+        // it was parsed correctly so still return true.
+        if let Some(modelPtr) = menus.item_mut(item).typeData.model_mut() {
+            modelPtr.g2skin = 0;
+        }
+        let ghoul2 = menus.item(item).ghoul2;
+        dc.G2API_SetSkin(ghoul2, 0, 0, 0);
+        return true;
+    }
+    let skinName = skinName.unwrap();
+
+    // set skin
+    let ghoul2 = menus.item(item).ghoul2;
+    if !ghoul2.is_null() {
+        let defSkin = dc.R_RegisterSkin(skinName);
+        dc.G2API_SetSkin(ghoul2, 0, defSkin, defSkin);
+    }
+
+    true
+}
+
+/// Raven `ItemParse_model_g2anim_go` — set an item's ghoul2 animation by
+/// name (looked up in `mp_bg`'s reused `animTable`, DEC-36 D5).
+///
+/// PORT-NOTE: unlike `ItemParse_model_g2anim`, Raven assigns
+/// `animTable[i].id` here directly (not the loop index) — both are the same
+/// value (see that fn's PORT-NOTE), so this is `GetIDForString`'s return
+/// either way. `Com_Printf` is unreachable from this host-agnostic crate —
+/// routed through `dc.Print` (adds a `dc` param beyond the packet's
+/// classification, same as `Menu_ItemsMatchingGroup`).
+/// Source: `oracle/codemp/ui/ui_shared.c:7894-7919`
+pub fn ItemParse_model_g2anim_go(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    animName: Option<&str>,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+
+    let animName = match animName {
+        Some(s) if !s.is_empty() => s,
+        // it was parsed correctly so still return true.
+        _ => return true,
+    };
+
+    let id = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, animName);
+    if id != -1 {
+        // found it
+        if let Some(modelPtr) = menus.item_mut(item).typeData.model_mut() {
+            modelPtr.g2anim = id;
+        }
+        return true;
+    }
+
+    dc.Print(&format!(
+        "Could not find '{}' in the anim table\n",
+        animName
+    ));
+    true
+}
+
+/// Raven `ItemParse_notselectable` — mark a list box item as not selectable.
+/// Source: `oracle/codemp/ui/ui_shared.c:8029-8037`
+pub fn ItemParse_notselectable(menus: &mut MenuSystem, item: ItemId, _handle: c_int) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+    let it = menus.item_mut(item);
+    if it.r#type == ITEM_TYPE_LISTBOX {
+        if let Some(listPtr) = it.typeData.listBox_mut() {
+            listPtr.notselectable = true;
+        }
+    }
+    true
+}
+
+/// Raven `ItemParse_scrollhidden` — mark a list box item's scrollbar hidden.
+/// Source: `oracle/codemp/ui/ui_shared.c:8045-8056`
+pub fn ItemParse_scrollhidden(menus: &mut MenuSystem, item: ItemId, _handle: c_int) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+    let it = menus.item_mut(item);
+    if it.r#type == ITEM_TYPE_LISTBOX {
+        if let Some(listPtr) = it.typeData.listBox_mut() {
+            listPtr.scrollhidden = true;
+        }
+    }
+    true
+}
+
+// `Item_SetupKeywordHash` — ui_shared.c:8995-9002.
+//
+// DEFERRED: Item_SetupKeywordHash — builds `itemParseKeywordHash` by walking
+// `itemParseKeywords[]` through `KeywordHash_Add`, both of which carry the
+// same `keywordHash_t` deferral as `KeywordHash_Add`/`KeywordHash_Find` above
+// (no owned-shape item/menu keyword-dispatch design landed yet); nothing to
+// build the hash table against.
+// Source: `oracle/codemp/ui/ui_shared.c:8995-9002`
+
+// `Item_Parse` — ui_shared.c:9009-9040.
+//
+// DEFERRED: Item_Parse — dispatches item keywords through
+// `KeywordHash_Find(itemParseKeywordHash, ...)`, the same deferred
+// infrastructure as `Item_SetupKeywordHash` above.
+// Source: `oracle/codemp/ui/ui_shared.c:9009-9040`
+
+/// Raven `Item_TextScroll_BuildLines` — word-wrap a text-scroll item's
+/// `text` into `typeData.pLines`, asian-aware byte-cursor line breaking.
+///
+/// PORT-NOTE: Raven walks `psText`/`sLineForDisplay` as raw byte cursors
+/// (multi-byte glyphs advance more than one byte); this keeps that shape —
+/// `Vec<u8>` buffers and byte offsets — rather than `&str`/`char`, so
+/// `AnyLanguage_ReadCharFromString`'s advance count and the source-byte
+/// line-break math translate directly. `pLines` (an owned `Vec<String>`, see
+/// `TextScrollDef`'s PORT-NOTE) receives an empty `String` for Raven's "hole"
+/// case (`scrollPtr->pLines[iLineCount]` left `NULL` while `iLineCount` still
+/// increments, when a line collapses to pure leading whitespace), so the line
+/// count — and with it the scroll extent — stays identical.
+///
+/// §19 UB pick: `sLineForDisplay[psBestLineBreakSrcPos - psReadPosAtLineStart]
+/// = '\0'` truncates the OUTPUT buffer by a SOURCE-byte offset — exact only
+/// when every character on the line was single-byte; a multi-byte codepoint
+/// earlier on the line desyncs the two counts in Raven too (a latent
+/// aliasing quirk, not something this port invents). The `Vec<u8>` twin
+/// clamps the cut to the buffer's actual length instead of reading/writing
+/// past it, and saturates the subtraction — the leading-space skip advances
+/// `psReadPosAtLineStart` alone, so it can pass the best break position.
+/// Raven also derefs `item->text` unconditionally; `None` falls back to an
+/// empty string here instead of a null deref.
+///
+/// Source: `oracle/codemp/ui/ui_shared.c:9042-9255`
+pub fn Item_TextScroll_BuildLines(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+) {
+    let (text, rectW, textscale, iMenuFont) = {
+        let it = menus.item(item);
+        (
+            it.text.clone().unwrap_or_default(),
+            it.window.rect.w,
+            it.textscale,
+            it.iMenuFont,
+        )
+    };
+    let iBoxWidth = (rectW - SCROLLBAR_SIZE - 10.0) as c_int;
+
+    // string reference
+    let psText: Vec<u8> = if let Some(rest) = text.strip_prefix('@') {
+        string_to_latin1(&dc.SP_GetStringTextString(rest, 2048).unwrap_or_default())
+    } else {
+        string_to_latin1(&text)
+    };
+
+    let mut lines: Vec<String> = Vec::new();
+    let mut psCurrentTextReadPos: usize = 0;
+    let mut psReadPosAtLineStart: usize = 0;
+    let mut psBestLineBreakSrcPos: usize = 0;
+
+    while psCurrentTextReadPos < psText.len() && lines.len() < MAX_TEXTSCROLL_LINES {
+        // construct a line...
+        psCurrentTextReadPos = psReadPosAtLineStart;
+        let mut sLineForDisplay: Vec<u8> = Vec::new();
+        let mut assigned = false;
+        let mut psLastGood_s = psCurrentTextReadPos;
+
+        while psCurrentTextReadPos < psText.len() {
+            psLastGood_s = psCurrentTextReadPos;
+
+            // read letter...
+            let (uiLetter, iAdvanceCount, bIsTrailingPunctuation) =
+                dc.AnyLanguage_ReadCharFromString(&psText[psCurrentTextReadPos..]);
+            psCurrentTextReadPos += iAdvanceCount.max(0) as usize;
+
+            // concat onto string so far...
+            if uiLetter == 32 && sLineForDisplay.is_empty() {
+                // unless it's a space at the start of a line, in which case ignore it.
+                psReadPosAtLineStart += 1;
+                continue;
+            }
+
+            if uiLetter > 255 {
+                sLineForDisplay.push((uiLetter >> 8) as u8);
+                sLineForDisplay.push((uiLetter & 0xFF) as u8);
+            } else {
+                sLineForDisplay.push((uiLetter & 0xFF) as u8);
+            }
+
+            if uiLetter == b'\n' as u32 {
+                // explicit new line...
+                sLineForDisplay.pop(); // kill the CR
+                psReadPosAtLineStart = psCurrentTextReadPos;
+                psBestLineBreakSrcPos = psCurrentTextReadPos;
+
+                lines.push(latin1_to_string(&sLineForDisplay));
+                assigned = true;
+                break; // print this line
+            } else if dc.textWidth(&latin1_to_string(&sLineForDisplay), textscale, iMenuFont)
+                >= iBoxWidth
+            {
+                // reached screen edge, so cap off string at bytepos after last good position...
+                if uiLetter > 255 && bIsTrailingPunctuation && !dc.Language_UsesSpaces() {
+                    // Special case, don't consider line breaking if you're on an asian
+                    // punctuation char of a language that doesn't use spaces... (breakpoint
+                    // line only — no-op)
+                } else {
+                    if psBestLineBreakSrcPos == psReadPosAtLineStart {
+                        psBestLineBreakSrcPos = psLastGood_s;
+                    }
+
+                    let cut = psBestLineBreakSrcPos
+                        .saturating_sub(psReadPosAtLineStart)
+                        .min(sLineForDisplay.len());
+                    sLineForDisplay.truncate(cut);
+                    psReadPosAtLineStart = psBestLineBreakSrcPos;
+                    psCurrentTextReadPos = psBestLineBreakSrcPos;
+
+                    lines.push(latin1_to_string(&sLineForDisplay));
+                    assigned = true;
+                    break; // print this line
+                }
+            }
+
+            // record last-good linebreak pos... (ie if we've just concat'd a punctuation
+            // point (western or asian) or space)
+            if bIsTrailingPunctuation
+                || uiLetter == b' ' as u32
+                || (uiLetter > 255 && !dc.Language_UsesSpaces())
+            {
+                psBestLineBreakSrcPos = psCurrentTextReadPos;
+            }
+        }
+
+        // then this is the last line and we've just run out of text, no CR, no overflow etc...
+        // An empty buffer is Raven's NULL "hole" slot, which still bumps iLineCount.
+        if !assigned {
+            lines.push(latin1_to_string(&sLineForDisplay));
+        }
+    }
+
+    if let Some(scrollPtr) = menus.item_mut(item).typeData.textScroll_mut() {
+        scrollPtr.pLines = lines;
+    }
+}
+
+// `Menu_SetupKeywordHash` — ui_shared.c:9765-9772.
+//
+// DEFERRED: Menu_SetupKeywordHash — builds `menuParseKeywordHash` by walking
+// `menuParseKeywords[]` through `KeywordHash_Add`, the same deferred
+// infrastructure as `Item_SetupKeywordHash` above.
+// Source: `oracle/codemp/ui/ui_shared.c:9765-9772`
+
+// `Menu_Parse` — ui_shared.c:9779-9810.
+//
+// DEFERRED: Menu_Parse — dispatches menu keywords through
+// `KeywordHash_Find(menuParseKeywordHash, ...)`, the same deferred
+// infrastructure as `Item_Parse` above.
+// Source: `oracle/codemp/ui/ui_shared.c:9779-9810`
+
+/// Raven `Menu_CacheContents` — pre-roll `menu`'s window cinematic, every
+/// item's cinematic, and register its loop sound.
+/// Source: `oracle/codemp/ui/ui_shared.c:9945-9958`
+pub fn Menu_CacheContents(menus: &MenuSystem, dc: &mut dyn DisplayContext, menu: Option<MenuId>) {
+    let menu = match menu {
+        Some(m) => m,
+        None => return,
+    };
+
+    let m = menus.menu(menu);
+    Window_CacheContents(Some(&m.window), dc);
+    for &id in &m.items {
+        Item_CacheContents(menus, dc, Some(id));
+    }
+
+    if !m.soundName.is_empty() {
+        dc.registerSound(&m.soundName);
+    }
 }

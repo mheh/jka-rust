@@ -11,15 +11,22 @@ use mp_qshared::common::mp::qcommon::saber::saber_colors::{
     SABER_BLUE, SABER_GREEN, SABER_ORANGE, SABER_PURPLE, SABER_RED, SABER_YELLOW,
 };
 use mp_qshared::shared::cbuf_exec::cbufExec_t;
-use mp_qshared::shared::force_powers::{FORCE_LEVEL_1, FORCE_LIGHTSIDE};
+use mp_qshared::shared::force_powers::{FORCE_DARKSIDE, FORCE_LEVEL_1, FORCE_LIGHTSIDE};
+use mp_qshared::shared::FS_WRITE;
 use mp_qshared::shared::vec4_t;
+use mp_uishared::shared::display_context::DisplayContext;
+use mp_uishared::shared::menudef::FEEDER_FORCECFG;
 use mp_uishared::shared::rect_def_t::RectDef;
+use mp_uishared::ui_shared::Menu_SetFeederSelection;
+use native_string::Q_stricmp;
+use native_types::fileHandle_t;
 
 use crate::trap;
 use crate::world::ui_context::UiContext;
 use crate::world::ui_world::UiWorld;
 
-use super::ui_atoms::UI_DrawHandlePic;
+use super::ui_atoms::{Com_Printf, UI_Cvar_VariableString, UI_DrawHandlePic};
+use super::ui_main::UI_LoadForceConfig_List;
 
 /// Raven `UI_InitForceShaders` — registers the force-star and saber-color
 /// shaders used on the force-allocation screen.
@@ -185,5 +192,97 @@ pub fn UI_DrawForceStars(
         }
 
         xPos += width + pad;
+    }
+}
+
+/// Raven `UI_SaveForceTemplate` — writes the current force-power allocation
+/// to a `.fcf` template file under `forcecfg/light/` or `forcecfg/dark/`,
+/// then re-scans the force-config feeder list and selects the newly-saved
+/// entry (falling back to index 0 if the saved name doesn't match anything
+/// in the current-side range).
+///
+/// Source: `oracle/codemp/ui/ui_force.c:210-285`
+pub fn UI_SaveForceTemplate(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+    let selectedName = UI_Cvar_VariableString(ctx, "ui_SaveFCF");
+
+    if selectedName.is_empty() {
+        Com_Printf(ctx, "You did not provide a name for the template.\n");
+        return;
+    }
+
+    let mut f: fileHandle_t = 0;
+    if ctx.world.force.uiForceSide == FORCE_LIGHTSIDE {
+        // write it into the light side folder
+        trap::FS_FOpenFile(
+            ctx.engine,
+            &format!("forcecfg/light/{}.fcf", selectedName),
+            &mut f,
+            FS_WRITE,
+        );
+    } else {
+        // if it isn't light it must be dark
+        trap::FS_FOpenFile(
+            ctx.engine,
+            &format!("forcecfg/dark/{}.fcf", selectedName),
+            &mut f,
+            FS_WRITE,
+        );
+    }
+
+    if f == 0 {
+        Com_Printf(
+            ctx,
+            "There was an error writing the template file (read-only?).\n",
+        );
+        return;
+    }
+
+    let mut fcfString = format!(
+        "{}-{}-",
+        ctx.world.force.uiForceRank, ctx.world.force.uiForceSide
+    );
+    // PORT-NOTE: Raven takes only the first character of the formatted rank
+    // digit ("Just use the force digit even if multiple digits. Shouldn't be
+    // longer than 1.") — mirror that literally rather than writing the whole
+    // formatted number.
+    for rank in ctx.world.force.uiForcePowersRank {
+        if let Some(digit) = format!("{}", rank).chars().next() {
+            fcfString.push(digit);
+        }
+    }
+    fcfString.push('\n');
+
+    trap::FS_Write(ctx.engine, fcfString.as_bytes(), f);
+    trap::FS_FCloseFile(ctx.engine, f);
+
+    Com_Printf(ctx, &format!("Template saved as \"{}\".\n", selectedName));
+
+    // Now, update the FCF list
+    UI_LoadForceConfig_List(ctx);
+
+    // Then, scroll through and select the template for the file we just saved
+    let mut foundFeederItem = false;
+    let count = ctx.world.forceConfigNames.len();
+    for i in 0..count {
+        if Q_stricmp(&ctx.world.forceConfigNames[i], &selectedName) == 0
+            && ((ctx.world.force.uiForceSide == FORCE_LIGHTSIDE && ctx.world.forceConfigSide[i])
+                || (ctx.world.force.uiForceSide == FORCE_DARKSIDE && !ctx.world.forceConfigSide[i]))
+        {
+            let translated = UI_TranslateFCFIndex(ctx.world, i as c_int);
+            Menu_SetFeederSelection(
+                &mut ctx.world.menus,
+                dc,
+                None,
+                FEEDER_FORCECFG,
+                translated,
+                None,
+            );
+            foundFeederItem = true;
+        }
+    }
+
+    // Else, go back to 0
+    if !foundFeederItem {
+        Menu_SetFeederSelection(&mut ctx.world.menus, dc, None, FEEDER_FORCECFG, 0, None);
     }
 }

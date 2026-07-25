@@ -19,6 +19,26 @@ use crate::local::post_game_info_s::postGameInfo_t;
 use crate::trap;
 use crate::world::ui_context::UiContext;
 
+/// Raven `BIGCHAR_WIDTH`.
+///
+/// Source: `oracle/codemp/game/q_shared.h:1038`
+const BIGCHAR_WIDTH: c_int = 16;
+
+/// Raven `BIGCHAR_HEIGHT`.
+///
+/// Source: `oracle/codemp/game/q_shared.h:1039`
+const BIGCHAR_HEIGHT: c_int = 16;
+
+/// Raven `colorBlack`.
+///
+/// Source: `oracle/codemp/game/q_math.c:11`
+const COLOR_BLACK: vec4_t = [0.0, 0.0, 0.0, 1.0];
+
+/// Raven `colorWhite`.
+///
+/// Source: `oracle/codemp/game/q_math.c:18`
+const COLOR_WHITE: vec4_t = [1.0, 1.0, 1.0, 1.0];
+
 /// Raven `Com_Error` — formats and forwards a fatal error to the engine.
 ///
 /// Raven's `...`/`vsprintf` formatting collapses to `format!` (dictionary:
@@ -500,4 +520,19 @@ pub fn UI_DrawRect(ctx: &mut UiContext, x: f32, y: f32, width: f32, height: f32,
     UI_DrawSides(ctx, x, y, width, height);
 
     trap::R_SetColor(ctx.engine, None);
+}
+
+/// Raven `UI_DrawTextBox` — draws a text-box frame around text using filled and
+/// outlined rects, each offset by half a character width/height and sized by
+/// (width + 1) and (lines + 1) character units.
+///
+/// Source: `oracle/codemp/ui/ui_atoms.c:478-482`
+pub fn UI_DrawTextBox(ctx: &mut UiContext, x: c_int, y: c_int, width: c_int, lines: c_int) {
+    let x_f = (x + BIGCHAR_WIDTH / 2) as f32;
+    let y_f = (y + BIGCHAR_HEIGHT / 2) as f32;
+    let w = ((width + 1) * BIGCHAR_WIDTH) as f32;
+    let h = ((lines + 1) * BIGCHAR_HEIGHT) as f32;
+
+    UI_FillRect(ctx, x_f, y_f, w, h, &COLOR_BLACK);
+    UI_DrawRect(ctx, x_f, y_f, w, h, &COLOR_WHITE);
 }

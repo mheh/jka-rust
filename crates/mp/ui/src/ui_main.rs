@@ -5,10 +5,13 @@
 
 #![allow(non_snake_case)]
 
-use core::ffi::{c_int, c_void};
+use core::ffi::{c_char, c_int, c_void, CStr};
 
 use mp_abi::ui::public::ui_client_state_t::uiClientState_t;
 use mp_bg::bg_channel::BgState;
+use mp_bg::bg_saga::{
+    BG_SiegeFindThemeForTeam, BG_SiegeGetPairedValue, BG_SiegeGetValueGroup, BG_SiegeSetTeamTheme,
+};
 use mp_bg::public::configstring::{CS_PLAYERS, CS_SERVERINFO};
 use mp_bg::public::gametype::{
     GT_CTF, GT_CTY, GT_DUEL, GT_FFA, GT_HOLOCRON, GT_JEDIMASTER, GT_POWERDUEL, GT_SIEGE,
@@ -16,6 +19,9 @@ use mp_bg::public::gametype::{
 };
 use mp_bg::public::team::{TEAM_BLUE, TEAM_RED, TEAM_SPECTATOR};
 use mp_bg::saga::siege_class_t::siegeClass_t;
+use mp_bg::saga::siege_team_t::{
+    siegeTeam_t, MAX_SIEGE_INFO_SIZE, SIEGETEAM_TEAM1, SIEGETEAM_TEAM2,
+};
 use mp_bg::weapons::weapon_t::{WP_NONE, WP_NUM_WEAPONS, WP_SABER};
 use mp_qshared::common::mp::qcommon::saber::saber_colors::saber_colors_t;
 use mp_qshared::shared::cbuf_exec::cbufExec_t;
@@ -31,14 +37,15 @@ use mp_qshared::shared::limits::MAX_NAME_LENGTH;
 use mp_qshared::shared::q_color::S_COLOR_RED;
 use mp_qshared::shared::q_string::COM_StripExtension;
 use mp_qshared::shared::{
-    connstate_t, fileHandle_t, qhandle_t, vec4_t, AS_FAVORITES, CIN_LOOP, CIN_SILENT, FS_READ,
-    KEYCATCH_UI, MAX_CLIENTS, MAX_INFO_STRING, MAX_QPATH, MAX_STRING_CHARS, Q3_VERSION,
+    connstate_t, fileHandle_t, qhandle_t, vec4_t, AS_FAVORITES, AS_LOCAL, CIN_LOOP, CIN_SILENT,
+    FS_READ, KEYCATCH_UI, MAX_CLIENTS, MAX_INFO_STRING, MAX_QPATH, MAX_STRING_CHARS, Q3_VERSION,
     SCREEN_HEIGHT, SCREEN_WIDTH,
 };
 use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::menu_system::MAX_MENUFILE;
 use mp_uishared::shared::menudef::{
-    ITEM_TEXTSTYLE_BLINK, ITEM_TEXTSTYLE_NORMAL, ITEM_TEXTSTYLE_OUTLINED,
+    FEEDER_ALLMAPS, FEEDER_MAPS, FEEDER_SERVERS, FEEDER_SERVERSTATUS, FEEDER_SIEGE_TEAM1,
+    FEEDER_SIEGE_TEAM2, ITEM_TEXTSTYLE_BLINK, ITEM_TEXTSTYLE_NORMAL, ITEM_TEXTSTYLE_OUTLINED,
     ITEM_TEXTSTYLE_OUTLINESHADOWED, ITEM_TEXTSTYLE_PULSE, ITEM_TEXTSTYLE_SHADOWED,
     ITEM_TEXTSTYLE_SHADOWEDMORE, UI_CLANCINEMATIC, UI_MAPCINEMATIC, UI_NETMAPCINEMATIC,
     UI_SHOW_ANYNONTEAMGAME, UI_SHOW_ANYTEAMGAME, UI_SHOW_DEMOAVAILABLE, UI_SHOW_FAVORITESERVERS,
@@ -48,20 +55,28 @@ use mp_uishared::shared::menudef::{
 };
 use mp_uishared::shared::rect_def_t::RectDef;
 use mp_uishared::ui_shared::{
-    Menu_FindItemByName, Menu_GetFocused, Menus_AnyFullScreenVisible, UI_CleanupGhoul2,
+    Display_KeyBindPending, LerpColor, Menu_FindItemByName, Menu_GetFocused,
+    Menu_SetFeederSelection, Menus_AnyFullScreenVisible, String_Report, UI_CleanupGhoul2,
 };
-use native_string::{atoi, latin1_to_string, Info_ValueForKey, Q_CleanStr, Q_stricmp, Q_stricmpn};
+use native_string::{
+    atoi, buf_to_string, latin1_to_string, string_to_latin1, Info_ValueForKey, Q_CleanStr,
+    Q_stricmp, Q_stricmpn, Q_strncpyz,
+};
 
 use crate::keycodes::fake_ascii_t::fakeAscii_t;
+use crate::local::mod_info_t::ModInfo;
 use crate::local::pinglist_t::MAX_ADDRESSLENGTH;
 use crate::local::player_species_info_t::{PlayerSpeciesInfo, MAX_PLAYERMODELS};
+use crate::local::server_filter_s::ServerFilter;
 use crate::local::server_status_info_t::{
     ServerStatusInfo, MAX_SERVERSTATUS_LINES, MAX_SERVERSTATUS_TEXT,
 };
 use crate::local::tier_info::MAPS_PER_TIER;
 use crate::trap;
-use crate::ui_atoms::{Com_Printf, UI_Cvar_VariableString, UI_DrawHandlePic};
-use crate::ui_gameinfo::UI_GetNumBots;
+use crate::ui_atoms::{
+    Com_Error, Com_Printf, UI_Cvar_VariableString, UI_DrawHandlePic, UI_LoadBestScores,
+};
+use crate::ui_gameinfo::{UI_GetBotNameByNumber, UI_GetNumBots};
 use crate::ui_saber::{SaberColorToString, TranslateSaberColor};
 use crate::world::ui_context::UiContext;
 use crate::world::ui_cvars::UiCvars;
@@ -89,6 +104,97 @@ const STYLE_BLINK: u32 = 0x4000_0000;
 ///
 /// Source: `oracle/codemp/ui/ui_local.h:593`
 const MAX_Q3PLAYERMODELS: usize = 256;
+
+/// Raven `static const char *handicapValues[]` — compiled-in data (§C8),
+/// lands beside the fns that read it. The trailing Raven `NULL` sentinel
+/// becomes `None` (unread by this wave's fns, kept for fidelity).
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1895`
+const HANDICAP_VALUES: [Option<&str>; 21] = [
+    Some("None"),
+    Some("95"),
+    Some("90"),
+    Some("85"),
+    Some("80"),
+    Some("75"),
+    Some("70"),
+    Some("65"),
+    Some("60"),
+    Some("55"),
+    Some("50"),
+    Some("45"),
+    Some("40"),
+    Some("35"),
+    Some("30"),
+    Some("25"),
+    Some("20"),
+    Some("15"),
+    Some("10"),
+    Some("5"),
+    None,
+];
+
+/// Raven `static const char *skillLevels[]` — compiled-in data (§C8), lands
+/// beside the fns that read it. `NUM_SKILL_LEVELS` above is the derived count.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:902-908`
+const SKILL_LEVELS: [&str; NUM_SKILL_LEVELS as usize] =
+    ["SKILL1", "SKILL2", "SKILL3", "SKILL4", "SKILL5"];
+
+/// Raven `char *forceMasteryLevels[NUM_FORCE_MASTERY_LEVELS]` — `bg_misc.c`
+/// compiled-in data. Ui compiles `bg_misc.c` into its own link unit
+/// (`WE_ARE_IN_THE_UI`, DEC-36 addendum 11) and this table has no Rust port
+/// reachable from `mp_bg` yet, so it lands beside the ui fns that read it
+/// (§C8), same as `SKILL_LEVELS`/`HANDICAP_VALUES` above.
+///
+/// Source: `oracle/codemp/game/bg_misc.c:150-160`
+const FORCE_MASTERY_LEVELS: [&str; 8] = [
+    "MASTERY0", "MASTERY1", "MASTERY2", "MASTERY3", "MASTERY4", "MASTERY5", "MASTERY6", "MASTERY7",
+];
+
+/// Raven `static const serverFilter_t serverFilters[]` — compiled-in data
+/// (§C8), lands beside the fn that reads it.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:896-899`
+const SERVER_FILTERS: [ServerFilter; 2] = [
+    ServerFilter {
+        description: "MENUS_ALL",
+        basedir: "",
+    },
+    ServerFilter {
+        description: "MENUS_JEDI_ACADEMY",
+        basedir: "",
+    },
+];
+
+/// Raven `#define PULSE_DIVISOR 75` — no canonical qshared home reachable
+/// from this crate (same story as `STYLE_DROPSHADOW`/`STYLE_BLINK` above).
+///
+/// Source: `oracle/codemp/game/q_shared.h:486`
+const PULSE_DIVISOR: c_int = 75;
+
+/// Raven `#define FORCE_NONJEDI 0` — no canonical `ui_force.h` const home
+/// reachable from this crate yet.
+///
+/// Source: `oracle/codemp/ui/ui_force.h:4`
+const FORCE_NONJEDI: c_int = 0;
+
+/// Raven `#define MAX_MODS 64` — `modList`/`demoList`/`movieList` are `Vec`s
+/// here (no fixed backing array to overflow), but the cap still bounds how
+/// many entries each loader keeps, matching Raven's array-size ceiling.
+///
+/// Source: `oracle/codemp/ui/ui_local.h:590`
+const MAX_MODS: usize = 64;
+
+/// Raven `#define MAX_DEMOS 256`.
+///
+/// Source: `oracle/codemp/ui/ui_local.h:591`
+const MAX_DEMOS: c_int = 256;
+
+/// Raven `#define MAX_MOVIES 256`.
+///
+/// Source: `oracle/codemp/ui/ui_local.h:592`
+const MAX_MOVIES: c_int = 256;
 
 // DEFERRED: UI_AnimsetAlloc — part of the ui_main.c hand-maintained animation
 // fork (`bgAllAnims`/`uiNumAllAnims`/`UI_ParseAnimationFile`); DEC-36 D5 rules
@@ -4216,4 +4322,1961 @@ pub fn UI_StopServerRefresh(ctx: &mut UiContext) {
             ),
         );
     }
+}
+
+/// Raven `GetMonthAbbrevString`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:979-984`
+pub fn GetMonthAbbrevString(ctx: &mut UiContext, iMonth: c_int) -> String {
+    let p = GetCRDelineatedString(ctx, "MP_INGAME", "MONTHS", iMonth);
+    p.unwrap_or_else(|| "Jan".to_string()) // sanity
+}
+
+/// Raven `GetNetSourceString`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:999-1004`
+pub fn GetNetSourceString(ctx: &mut UiContext, iSource: c_int) -> String {
+    let p = GetCRDelineatedString(ctx, "MP_INGAME", "NET_SOURCES", iSource);
+    p.unwrap_or_else(|| "??".to_string())
+}
+
+/// Raven `Text_PaintWithCursor`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1133-1157`
+#[allow(clippy::too_many_arguments)]
+pub fn Text_PaintWithCursor(
+    ctx: &UiContext,
+    x: f32,
+    y: f32,
+    scale: f32,
+    color: vec4_t,
+    text: &str,
+    cursorPos: c_int,
+    cursor: char,
+    limit: c_int,
+    style: c_int,
+    iMenuFont: c_int,
+) {
+    Text_Paint(ctx, x, y, scale, color, text, 0.0, limit, style, iMenuFont);
+
+    // now print the cursor as well... (excuse the braces, it's for porting
+    // C++ to C)
+    {
+        let textLen = text.chars().count();
+        let iCopyCount = if limit != 0 {
+            textLen.min(limit as usize)
+        } else {
+            textLen
+        };
+        // §19: Raven's `min(iCopyCount, cursorPos)` fed a negative `cursorPos`
+        // to `strncpy` as a huge size_t; clamping at 0 is the defined choice.
+        let iCopyCount = iCopyCount.min(cursorPos.max(0) as usize);
+        let iCopyCount = iCopyCount.min(1024);
+
+        // copy text into temp buffer for pixel measure...
+        let sTemp: String = text.chars().take(iCopyCount).collect();
+
+        let iFontIndex = MenuFontToHandle(ctx.world, iMenuFont);
+        let iNextXpos = trap::R_Font_StrLenPixels(ctx.engine, &sTemp, iFontIndex, scale);
+
+        Text_Paint(
+            ctx,
+            x + iNextXpos as f32,
+            y,
+            scale,
+            color,
+            &cursor.to_string(),
+            0.0,
+            limit,
+            style | ITEM_TEXTSTYLE_BLINK,
+            iMenuFont,
+        );
+    }
+}
+
+/// Raven `Text_Paint_Limit`.
+///
+/// PORT-NOTE: Raven walks `text` through `trap_AnyLanguage_ReadCharFromString`
+/// byte-by-byte into a `char sTemp[4096]`; the port mirrors this over the
+/// Latin-1 byte view (`string_to_latin1`/`latin1_to_string`) instead of Rust
+/// `char`s, since the wrapper's contract is byte-oriented.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1162-1213`
+#[allow(clippy::too_many_arguments)]
+pub fn Text_Paint_Limit(
+    ctx: &mut UiContext,
+    maxX: &mut f32,
+    x: f32,
+    y: f32,
+    scale: f32,
+    color: vec4_t,
+    text: &str,
+    adjust: f32,
+    limit: c_int,
+    iMenuFont: c_int,
+) {
+    // this is kinda dirty, but...
+    let iFontIndex = MenuFontToHandle(ctx.world, iMenuFont);
+
+    let iPixelLen = trap::R_Font_StrLenPixels(ctx.engine, text, iFontIndex, scale);
+    if x + iPixelLen as f32 > *maxX {
+        // whole text won't fit, so we need to print just the amount that
+        // does... Ok, this is slow and tacky, but only called occasionally,
+        // and it works...
+        let bytes = string_to_latin1(text);
+        let mut psText: &[u8] = &bytes;
+        let mut sTemp: Vec<u8> = Vec::new();
+        let mut lastGoodLen = 0usize;
+
+        while !psText.is_empty() && psText[0] != 0 {
+            // Raven's while-condition order: the pixel probe runs before the
+            // `psOut` sanity bound, so the trailing probe still fires when the
+            // buffer is full.
+            let probe = latin1_to_string(&sTemp);
+            let probeLen = trap::R_Font_StrLenPixels(ctx.engine, &probe, iFontIndex, scale);
+            if x + probeLen as f32 > *maxX {
+                break;
+            }
+            if sTemp.len() >= 4095 {
+                break;
+            }
+            lastGoodLen = sTemp.len();
+
+            let (uiLetter, iAdvanceCount, _isTrailingPunctuation) =
+                trap::AnyLanguage_ReadCharFromString(ctx.engine, psText);
+            let advance = (iAdvanceCount as usize).min(psText.len().max(1));
+            psText = &psText[advance..];
+
+            if uiLetter > 255 {
+                sTemp.push((uiLetter >> 8) as u8);
+                sTemp.push((uiLetter & 0xFF) as u8);
+            } else {
+                sTemp.push((uiLetter & 0xFF) as u8);
+            }
+        }
+        sTemp.truncate(lastGoodLen);
+
+        *maxX = 0.0; // feedback
+        let sTemp = latin1_to_string(&sTemp);
+        Text_Paint(
+            ctx,
+            x,
+            y,
+            scale,
+            color,
+            &sTemp,
+            adjust,
+            limit,
+            ITEM_TEXTSTYLE_NORMAL,
+            iMenuFont,
+        );
+    } else {
+        // whole text fits fine, so print it all...
+        *maxX = x + iPixelLen as f32; // feedback the next position, as the caller expects
+        Text_Paint(
+            ctx,
+            x,
+            y,
+            scale,
+            color,
+            text,
+            adjust,
+            limit,
+            ITEM_TEXTSTYLE_NORMAL,
+            iMenuFont,
+        );
+    }
+}
+
+/// Raven `UI_Report`.
+///
+/// PORT-NOTE: `String_Report`'s ported shape takes `dc: &mut dyn
+/// DisplayContext` (DEC-36 addendum 12); `UiContext` does not implement the
+/// trait yet, so this fn threads `dc` in beside it (see escalations).
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1725-1729`
+pub fn UI_Report(dc: &mut dyn DisplayContext) {
+    String_Report(dc);
+    // Font_Report(); — Raven left this call commented out.
+}
+
+/// Raven `UI_DrawHandicap`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1897-1904`
+pub fn UI_DrawHandicap(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    let h = trap::Cvar_VariableValue(ctx.engine, "handicap");
+    // PORT-NOTE: Raven's `Com_Clamp(5, 100, h)`; its only Rust home today is
+    // `mp_game::q_shared`, which this crate does not depend on, so the identical
+    // clamp is spelled with the std method — same two comparisons, so NaN
+    // passes through in both.
+    let h = h.clamp(5.0, 100.0) as c_int;
+    let i = 20 - h / 5;
+
+    let text = HANDICAP_VALUES[i as usize].unwrap_or("");
+    Text_Paint(
+        ctx, rect.x, rect.y, scale, color, text, 0.0, 0, textStyle, iMenuFont,
+    );
+}
+
+/// Raven `UI_DrawClanName`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1906-1908`
+pub fn UI_DrawClanName(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    let teamName = UI_Cvar_VariableString(ctx, "ui_teamName");
+    Text_Paint(
+        ctx, rect.x, rect.y, scale, color, &teamName, 0.0, 0, textStyle, iMenuFont,
+    );
+}
+
+/// Raven `UI_DrawGameType`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1955-1958`
+pub fn UI_DrawGameType(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    let idx = ctx.world.cvars.ui_gameType.integer as usize;
+    // §19: past `numGameTypes` Raven read the fixed array's zeroed spare slot.
+    let gtEnum = ctx
+        .world
+        .gameTypes
+        .get(idx)
+        .map(|gt| gt.gtEnum)
+        .unwrap_or_default();
+    let name = UI_GetGameTypeName(ctx, gtEnum);
+    Text_Paint(
+        ctx, rect.x, rect.y, scale, color, &name, 0.0, 0, textStyle, iMenuFont,
+    );
+}
+
+/// Raven `UI_DrawNetGameType`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1960-1968`
+pub fn UI_DrawNetGameType(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    if ctx.world.cvars.ui_netGameType.integer < 0
+        || ctx.world.cvars.ui_netGameType.integer >= ctx.world.gameTypes.len() as c_int
+    {
+        trap::Cvar_Set(ctx.engine, "ui_netGameType", "0");
+        trap::Cvar_Set(ctx.engine, "ui_actualNetGameType", "0");
+    }
+    let idx = ctx.world.cvars.ui_netGameType.integer as usize;
+    // §19: past `numGameTypes` Raven read the fixed array's zeroed spare slot.
+    let gtEnum = ctx
+        .world
+        .gameTypes
+        .get(idx)
+        .map(|gt| gt.gtEnum)
+        .unwrap_or_default();
+    let name = UI_GetGameTypeName(ctx, gtEnum);
+    Text_Paint(
+        ctx, rect.x, rect.y, scale, color, &name, 0.0, 0, textStyle, iMenuFont,
+    );
+}
+
+/// Raven `UI_DrawAutoSwitch`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1970-1996`
+pub fn UI_DrawAutoSwitch(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    let switchVal = trap::Cvar_VariableValue(ctx.engine, "cg_autoswitch") as c_int;
+
+    let switchString = match switchVal {
+        2 => "AUTOSWITCH2",
+        3 => "AUTOSWITCH3",
+        0 => "AUTOSWITCH0",
+        _ => "AUTOSWITCH1",
+    };
+
+    let stripString = UI_GetStringEdString(ctx, "MP_INGAME", switchString);
+
+    Text_Paint(
+        ctx,
+        rect.x,
+        rect.y,
+        scale,
+        color,
+        &stripString,
+        0.0,
+        0,
+        textStyle,
+        iMenuFont,
+    );
+}
+
+/// Raven `UI_DrawJoinGameType`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1998-2006`
+pub fn UI_DrawJoinGameType(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    if ctx.world.cvars.ui_joinGameType.integer < 0
+        || ctx.world.cvars.ui_joinGameType.integer > ctx.world.joinGameTypes.len() as c_int
+    {
+        trap::Cvar_Set(ctx.engine, "ui_joinGameType", "0");
+    }
+
+    let idx = ctx.world.cvars.ui_joinGameType.integer as usize;
+    // §19: past `numJoinGameTypes` Raven read the fixed array's zeroed spare slot.
+    let gtEnum = ctx
+        .world
+        .joinGameTypes
+        .get(idx)
+        .map(|gt| gt.gtEnum)
+        .unwrap_or_default();
+    let name = UI_GetGameTypeName(ctx, gtEnum);
+    Text_Paint(
+        ctx, rect.x, rect.y, scale, color, &name, 0.0, 0, textStyle, iMenuFont,
+    );
+}
+
+/// Raven `UI_DrawSkill`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2084-2091`
+pub fn UI_DrawSkill(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    let mut i = trap::Cvar_VariableValue(ctx.engine, "g_spSkill") as c_int;
+    if i < 1 || i > NUM_SKILL_LEVELS {
+        i = 1;
+    }
+    let text = UI_GetStringEdString(ctx, "MP_INGAME", SKILL_LEVELS[(i - 1) as usize]);
+    Text_Paint(
+        ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+    );
+}
+
+/// Raven `UI_DrawGenericNum`.
+///
+/// PORT-NOTE: Raven's `type` param is a Rust keyword; renamed `kind` (§C — no
+/// behavior change, `kind` is unused in the body just like Raven's `type`).
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2094-2107`
+#[allow(clippy::too_many_arguments)]
+pub fn UI_DrawGenericNum(
+    ctx: &UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    val: c_int,
+    min: c_int,
+    max: c_int,
+    _kind: c_int,
+    iMenuFont: c_int,
+) {
+    // Raven computes `i` (clamped to `min`/`max`) here but never reads it —
+    // the `Com_sprintf` below formats the unclamped `val` — so `i` is dead;
+    // preserved as a no-op to match Raven's control flow exactly.
+    let _i = if val < min || val > max { min } else { val };
+
+    let s = format!("{}", val);
+    Text_Paint(
+        ctx, rect.x, rect.y, scale, color, &s, 0.0, 0, textStyle, iMenuFont,
+    );
+}
+
+/// Raven `UI_DrawForceMastery`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2109-2126`
+#[allow(clippy::too_many_arguments)]
+pub fn UI_DrawForceMastery(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    val: c_int,
+    min: c_int,
+    max: c_int,
+    iMenuFont: c_int,
+) {
+    let mut i = val;
+    if i < min {
+        i = min;
+    }
+    if i > max {
+        i = max;
+    }
+
+    let s = UI_GetStringEdString(ctx, "MP_INGAME", FORCE_MASTERY_LEVELS[i as usize]);
+    Text_Paint(
+        ctx, rect.x, rect.y, scale, color, &s, 0.0, 0, textStyle, iMenuFont,
+    );
+}
+
+/// Raven `UI_DrawSkinColor`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2129-2150`
+#[allow(clippy::too_many_arguments)]
+pub fn UI_DrawSkinColor(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    val: c_int,
+    _min: c_int,
+    _max: c_int,
+    iMenuFont: c_int,
+) {
+    let s = match val {
+        TEAM_RED => trap::SP_GetStringTextString(ctx.engine, "MENUS_TEAM_RED", 256),
+        TEAM_BLUE => trap::SP_GetStringTextString(ctx.engine, "MENUS_TEAM_BLUE", 256),
+        _ => trap::SP_GetStringTextString(ctx.engine, "MENUS_DEFAULT", 256),
+    }
+    .unwrap_or_default();
+
+    Text_Paint(
+        ctx, rect.x, rect.y, scale, color, &s, 0.0, 0, textStyle, iMenuFont,
+    );
+}
+
+/// Raven `UI_DrawJediNonJedi`.
+///
+/// PORT-NOTE: Raven's `char info[MAX_INFO_VALUE]` buffer size has no ported
+/// `MAX_INFO_VALUE` reachable from this crate; reads with `MAX_INFO_STRING`
+/// like the rest of this file's `trap_GetConfigString` call sites.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2321-2353`
+#[allow(clippy::too_many_arguments)]
+pub fn UI_DrawJediNonJedi(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    val: c_int,
+    min: c_int,
+    max: c_int,
+    iMenuFont: c_int,
+) {
+    // Raven computes `i` (clamped to `min`/`max`) here but never reads it
+    // afterward; preserved as a no-op to match Raven's control flow exactly.
+    let _i = if val < min || val > max { min } else { val };
+
+    let _info = trap::GetConfigString(ctx.engine, CS_SERVERINFO, MAX_INFO_STRING as usize)
+        .unwrap_or_default();
+
+    if !UI_TrueJediEnabled(ctx) {
+        // true jedi mode is not on, do not draw this button type
+        return;
+    }
+
+    let s = if val == FORCE_NONJEDI {
+        trap::SP_GetStringTextString(ctx.engine, "MENUS_NO", 256)
+    } else {
+        trap::SP_GetStringTextString(ctx.engine, "MENUS_YES", 256)
+    }
+    .unwrap_or_default();
+
+    Text_Paint(
+        ctx, rect.x, rect.y, scale, color, &s, 0.0, 0, textStyle, iMenuFont,
+    );
+}
+
+/// Raven `UI_DrawTeamName`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2355-2361`
+pub fn UI_DrawTeamName(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    blue: bool,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    let cvarName = if blue { "ui_blueTeam" } else { "ui_redTeam" };
+    let name = UI_Cvar_VariableString(ctx, cvarName);
+    let i = UI_TeamIndexFromName(ctx.world, &name);
+    if i >= 0 && (i as usize) < ctx.world.teamList.len() {
+        let teamName = ctx.world.teamList[i as usize].teamName.clone();
+        let text = format!("{}: {}", if blue { "Blue" } else { "Red" }, teamName);
+        Text_Paint(
+            ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+        );
+    }
+}
+
+/// Raven `UI_DrawTeamMember`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2363-2423`
+#[allow(clippy::too_many_arguments)]
+pub fn UI_DrawTeamMember(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    blue: bool,
+    num: c_int,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    // 0 - None
+    // 1 - Human
+    // 2..NumCharacters - Bot
+    let cvarName = if blue {
+        format!("ui_blueteam{}", num)
+    } else {
+        format!("ui_redteam{}", num)
+    };
+    let mut value = trap::Cvar_VariableValue(ctx.engine, &cvarName) as c_int;
+    let maxcl = trap::Cvar_VariableValue(ctx.engine, "sv_maxClients") as c_int;
+    let mut finalColor = color;
+    let mut numval = num;
+
+    numval *= 2;
+
+    if blue {
+        numval -= 1;
+    }
+
+    if numval > maxcl {
+        finalColor[0] *= 0.5;
+        finalColor[1] *= 0.5;
+        finalColor[2] *= 0.5;
+
+        value = -1;
+    }
+
+    let netGameIdx = ctx.world.cvars.ui_netGameType.integer as usize;
+    // §19: past `numGameTypes` Raven read the fixed array's zeroed spare slot.
+    let netGameType = ctx
+        .world
+        .gameTypes
+        .get(netGameIdx)
+        .map(|gt| gt.gtEnum)
+        .unwrap_or_default();
+    if netGameType == GT_SIEGE && value > 1 {
+        value = 1;
+    }
+
+    let text = if value <= 1 {
+        if value == -1 {
+            //text = "Closed";
+            UI_GetStringEdString(ctx, "MENUS", "CLOSED")
+        } else {
+            //text = "Human";
+            UI_GetStringEdString(ctx, "MENUS", "HUMAN")
+        }
+    } else {
+        let mut value = value - 2;
+        if value >= UI_GetNumBots(ctx.world) {
+            value = 1;
+        }
+        UI_GetBotNameByNumber(ctx, value)
+    };
+
+    Text_Paint(
+        ctx, rect.x, rect.y, scale, finalColor, &text, 0.0, 0, textStyle, iMenuFont,
+    );
+}
+
+/// Raven `UI_DrawMapTimeToBeat`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2455-2468`
+pub fn UI_DrawMapTimeToBeat(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    if ctx.world.cvars.ui_currentMap.integer < 0
+        || ctx.world.cvars.ui_currentMap.integer > ctx.world.mapList.len() as c_int
+    {
+        ctx.world.cvars.ui_currentMap.integer = 0;
+        trap::Cvar_Set(ctx.engine, "ui_currentMap", "0");
+    }
+
+    let mapIdx = ctx.world.cvars.ui_currentMap.integer as usize;
+    let gtIdx = ctx.world.cvars.ui_gameType.integer as usize;
+    // §19: past the live count Raven read each fixed array's zeroed spare slot.
+    let gtEnum = ctx
+        .world
+        .gameTypes
+        .get(gtIdx)
+        .map(|gt| gt.gtEnum)
+        .unwrap_or_default();
+    let time = ctx
+        .world
+        .mapList
+        .get(mapIdx)
+        .map(|m| m.timeToBeat[gtEnum as usize])
+        .unwrap_or_default();
+
+    let minutes = time / 60;
+    let seconds = time % 60;
+
+    let text = format!("{:02}:{:02}", minutes, seconds);
+    Text_Paint(
+        ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+    );
+}
+
+/// Raven `UI_DrawMapCinematic`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2472-2500`
+pub fn UI_DrawMapCinematic(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    net: bool,
+) {
+    let mut map = if net {
+        ctx.world.cvars.ui_currentNetMap.integer
+    } else {
+        ctx.world.cvars.ui_currentMap.integer
+    };
+    if map < 0 || map > ctx.world.mapList.len() as c_int {
+        if net {
+            ctx.world.cvars.ui_currentNetMap.integer = 0;
+            trap::Cvar_Set(ctx.engine, "ui_currentNetMap", "0");
+        } else {
+            ctx.world.cvars.ui_currentMap.integer = 0;
+            trap::Cvar_Set(ctx.engine, "ui_currentMap", "0");
+        }
+        map = 0;
+    }
+
+    let idx = map as usize;
+    // §19: past `mapCount` Raven read the map array's zeroed spare slot (whose
+    // `cinematic` 0 never reaches the write-back branches).
+    let mut cinematic = ctx
+        .world
+        .mapList
+        .get(idx)
+        .map(|m| m.cinematic)
+        .unwrap_or_default();
+    if cinematic >= -1 {
+        if cinematic == -1 {
+            let loadName = ctx.world.mapList[idx].mapLoadName.clone();
+            cinematic = trap::CIN_PlayCinematic(
+                ctx.engine,
+                &format!("{}.roq", loadName),
+                0,
+                0,
+                0,
+                0,
+                CIN_LOOP | CIN_SILENT,
+            );
+            ctx.world.mapList[idx].cinematic = cinematic;
+        }
+        if cinematic >= 0 {
+            trap::CIN_RunCinematic(ctx.engine, cinematic);
+            trap::CIN_SetExtents(
+                ctx.engine,
+                cinematic,
+                rect.x as c_int,
+                rect.y as c_int,
+                rect.w as c_int,
+                rect.h as c_int,
+            );
+            trap::CIN_DrawCinematic(ctx.engine, cinematic);
+        } else {
+            ctx.world.mapList[idx].cinematic = -2;
+        }
+    } else {
+        UI_DrawMapPreview(ctx, rect, scale, color, net);
+    }
+}
+
+/// Raven `UI_DrawNetMapCinematic`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2748-2761`
+pub fn UI_DrawNetMapCinematic(ctx: &mut UiContext, rect: &RectDef, scale: f32, color: vec4_t) {
+    if ctx.world.cvars.ui_currentNetMap.integer < 0
+        || ctx.world.cvars.ui_currentNetMap.integer > ctx.world.mapList.len() as c_int
+    {
+        ctx.world.cvars.ui_currentNetMap.integer = 0;
+        trap::Cvar_Set(ctx.engine, "ui_currentNetMap", "0");
+    }
+
+    if ctx.world.serverStatus.currentServerCinematic >= 0 {
+        let cinematic = ctx.world.serverStatus.currentServerCinematic;
+        trap::CIN_RunCinematic(ctx.engine, cinematic);
+        trap::CIN_SetExtents(
+            ctx.engine,
+            cinematic,
+            rect.x as c_int,
+            rect.y as c_int,
+            rect.w as c_int,
+            rect.h as c_int,
+        );
+        trap::CIN_DrawCinematic(ctx.engine, cinematic);
+    } else {
+        UI_DrawNetMapPreview(ctx, rect, scale, color);
+    }
+}
+
+/// Raven `UI_DrawNetFilter`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2765-2779`
+pub fn UI_DrawNetFilter(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    if ctx.world.cvars.ui_serverFilterType.integer < 0
+        || ctx.world.cvars.ui_serverFilterType.integer > SERVER_FILTERS.len() as c_int
+    {
+        ctx.world.cvars.ui_serverFilterType.integer = 0;
+    }
+
+    ctx.world.main.holdSPString =
+        trap::SP_GetStringTextString(ctx.engine, "MENUS_GAME", MAX_STRING_CHARS as usize)
+            .unwrap_or_default();
+
+    // §19: Raven's `> numServerFilters` bound let the index reach the array's
+    // zeroed spare slot; the empty description stands in for that read.
+    let description = SERVER_FILTERS
+        .get(ctx.world.cvars.ui_serverFilterType.integer as usize)
+        .map(|f| f.description)
+        .unwrap_or("")
+        .to_string();
+    ctx.world.main.holdSPString2 =
+        trap::SP_GetStringTextString(ctx.engine, &description, MAX_STRING_CHARS as usize)
+            .unwrap_or_default();
+
+    let text = format!(
+        "{} {}",
+        ctx.world.main.holdSPString, ctx.world.main.holdSPString2
+    );
+    Text_Paint(
+        ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+    );
+}
+
+/// Raven `UI_DrawTier`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2782-2789`
+pub fn UI_DrawTier(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    let mut i = trap::Cvar_VariableValue(ctx.engine, "ui_currentTier") as c_int;
+    if i < 0 || i >= ctx.world.tierList.len() as c_int {
+        i = 0;
+    }
+    // PORT-NOTE (§19): with no tiers loaded Raven read the zeroed
+    // `tierList[0]` slot (empty name); `.get` reproduces that.
+    let tierName = ctx
+        .world
+        .tierList
+        .get(i as usize)
+        .map(|t| t.tierName.clone())
+        .unwrap_or_default();
+    let text = format!("Tier: {}", tierName);
+    Text_Paint(
+        ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+    );
+}
+
+/// Raven `UI_DrawTierMapName`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2815-2827`
+pub fn UI_DrawTierMapName(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    let mut i = trap::Cvar_VariableValue(ctx.engine, "ui_currentTier") as c_int;
+    if i < 0 || i >= ctx.world.tierList.len() as c_int {
+        i = 0;
+    }
+    let mut j = trap::Cvar_VariableValue(ctx.engine, "ui_currentMap") as c_int;
+    if j < 0 || j > MAPS_PER_TIER as c_int {
+        j = 0;
+    }
+
+    // §19: Raven's `j > MAPS_PER_TIER` bound let `maps[j]` reach the struct's
+    // zeroed spare slot; the empty name stands in for that read.
+    let map = ctx
+        .world
+        .tierList
+        .get(i as usize)
+        .and_then(|t| t.maps.get(j as usize))
+        .cloned()
+        .unwrap_or_default();
+    let text = UI_EnglishMapName(ctx.world, &map);
+    Text_Paint(
+        ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+    );
+}
+
+/// Raven `UI_DrawTierGameType`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2829-2841`
+pub fn UI_DrawTierGameType(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    let mut i = trap::Cvar_VariableValue(ctx.engine, "ui_currentTier") as c_int;
+    if i < 0 || i >= ctx.world.tierList.len() as c_int {
+        i = 0;
+    }
+    let mut j = trap::Cvar_VariableValue(ctx.engine, "ui_currentMap") as c_int;
+    if j < 0 || j > MAPS_PER_TIER as c_int {
+        j = 0;
+    }
+
+    // §19: Raven's `j > MAPS_PER_TIER` bound let `gameTypes[j]` reach the
+    // struct's zeroed spare slot; the zeroed index stands in for that read.
+    let gtIdx = ctx
+        .world
+        .tierList
+        .get(i as usize)
+        .and_then(|t| t.gameTypes.get(j as usize))
+        .copied()
+        .unwrap_or_default() as usize;
+    let text = ctx
+        .world
+        .gameTypes
+        .get(gtIdx)
+        .map(|gt| gt.gameType.clone())
+        .unwrap_or_default();
+    Text_Paint(
+        ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+    );
+}
+
+/// Raven `UI_DrawAllMapsSelection`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2997-3002`
+pub fn UI_DrawAllMapsSelection(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    net: bool,
+    iMenuFont: c_int,
+) {
+    let map = if net {
+        ctx.world.cvars.ui_currentNetMap.integer
+    } else {
+        ctx.world.cvars.ui_currentMap.integer
+    };
+    if map >= 0 && map < ctx.world.mapList.len() as c_int {
+        let mapName = ctx.world.mapList[map as usize].mapName.clone();
+        Text_Paint(
+            ctx, rect.x, rect.y, scale, color, &mapName, 0.0, 0, textStyle, iMenuFont,
+        );
+    }
+}
+
+/// Raven `UI_DrawOpponentName`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:3004-3006`
+pub fn UI_DrawOpponentName(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    let name = UI_Cvar_VariableString(ctx, "ui_opponentName");
+    Text_Paint(
+        ctx, rect.x, rect.y, scale, color, &name, 0.0, 0, textStyle, iMenuFont,
+    );
+}
+
+/// Raven `UI_DrawBotName`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:3238-3247`
+pub fn UI_DrawBotName(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    let mut value = ctx.world.botIndex;
+    if value >= UI_GetNumBots(ctx.world) {
+        value = 0;
+    }
+    let text = UI_GetBotNameByNumber(ctx, value);
+    Text_Paint(
+        ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+    );
+}
+
+/// Raven `UI_DrawBotSkill`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:3249-3255`
+pub fn UI_DrawBotSkill(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    if ctx.world.skillIndex >= 0 && ctx.world.skillIndex < NUM_SKILL_LEVELS {
+        let text = UI_GetStringEdString(
+            ctx,
+            "MP_INGAME",
+            SKILL_LEVELS[ctx.world.skillIndex as usize],
+        );
+        Text_Paint(
+            ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+        );
+    }
+}
+
+/// Raven `UI_DrawRedBlue`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:3257-3260`
+pub fn UI_DrawRedBlue(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    let text = if ctx.world.redBlue == 0 {
+        UI_GetStringEdString(ctx, "MP_INGAME", "RED")
+    } else {
+        UI_GetStringEdString(ctx, "MP_INGAME", "BLUE")
+    };
+    Text_Paint(
+        ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+    );
+}
+
+/// Raven `UI_DrawSelectedPlayer`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:3339-3345`
+pub fn UI_DrawSelectedPlayer(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    if ctx.world.uiDC.realTime > ctx.world.playerRefresh {
+        ctx.world.playerRefresh = ctx.world.uiDC.realTime + 3000;
+        UI_BuildPlayerList(ctx);
+    }
+    let name = UI_Cvar_VariableString(ctx, "cg_selectedPlayerName");
+    Text_Paint(
+        ctx, rect.x, rect.y, scale, color, &name, 0.0, 0, textStyle, iMenuFont,
+    );
+}
+
+/// Raven `UI_DrawServerRefreshDate`.
+///
+/// PORT-NOTE: Raven feeds `holdSPString` (a localized string fetched via
+/// `trap_SP_GetStringTextString`) to `va()` as a printf-style format string
+/// with one `%s`/`%i`-shaped slot; the port substitutes the first `%i`
+/// occurrence directly rather than a general-purpose `printf` reimplementation.
+/// This assumes the localized string carries exactly one bare `%i` and no other
+/// conversion — to be confirmed against the shipped .str files at the live gate.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:3347-3369`
+pub fn UI_DrawServerRefreshDate(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    if ctx.world.serverStatus.refreshActive {
+        let lowLight: vec4_t = [
+            0.8 * color[0],
+            0.8 * color[1],
+            0.8 * color[2],
+            0.8 * color[3],
+        ];
+        let mut newColor: vec4_t = [0.0, 0.0, 0.0, 0.0];
+        // Raven divides two ints, so the pulse steps in 75ms plateaus.
+        let t = 0.5 + 0.5 * ((ctx.world.uiDC.realTime / PULSE_DIVISOR) as f32).sin();
+        LerpColor(color, lowLight, &mut newColor, t);
+
+        ctx.world.main.holdSPString = trap::SP_GetStringTextString(
+            ctx.engine,
+            "MP_INGAME_GETTINGINFOFORSERVERS",
+            MAX_STRING_CHARS as usize,
+        )
+        .unwrap_or_default();
+        let count = trap::LAN_GetServerCount(ctx.engine, ctx.world.cvars.ui_netSource.integer);
+        let text = ctx
+            .world
+            .main
+            .holdSPString
+            .replacen("%i", &format!("{}", count), 1);
+        Text_Paint(
+            ctx, rect.x, rect.y, scale, newColor, &text, 0.0, 0, textStyle, iMenuFont,
+        );
+    } else {
+        let cvarName = format!(
+            "ui_lastServerRefresh_{}",
+            ctx.world.cvars.ui_netSource.integer
+        );
+        let raw = UI_Cvar_VariableString(ctx, &cvarName);
+        // PORT-NOTE: Raven `Q_strncpyz(buff, ..., 64)` truncates to 63 usable
+        // bytes + a NUL; the owned `String` truncates to 63 chars.
+        let buff: String = raw.chars().take(63).collect();
+
+        ctx.world.main.holdSPString = trap::SP_GetStringTextString(
+            ctx.engine,
+            "MP_INGAME_SERVER_REFRESHTIME",
+            MAX_STRING_CHARS as usize,
+        )
+        .unwrap_or_default();
+
+        let text = format!("{}: {}", ctx.world.main.holdSPString, buff);
+        Text_Paint(
+            ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+        );
+    }
+}
+
+/// Raven `UI_DrawKeyBindStatus`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:3430-3438`
+pub fn UI_DrawKeyBindStatus(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    if Display_KeyBindPending(&ctx.world.menus) {
+        let text = UI_GetStringEdString(ctx, "MP_INGAME", "WAITING_FOR_NEW_KEY");
+        Text_Paint(
+            ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+        );
+    } else {
+        //Text_Paint(rect->x, rect->y, scale, color, "Press ENTER or CLICK to change, Press BACKSPACE to clear", 0, 0, textStyle,iMenuFont);
+    }
+}
+
+/// Reads a `glconfig_t` C string field. `glconfig_t` stays the frozen ABI
+/// struct (`vendor_string`/`version_string`/`renderer_string`/
+/// `extensions_string` are raw `*const c_char` the engine fills via
+/// `trap_GetGlconfig`); no safe string accessor exists on it yet in this
+/// crate, so this helper reads the pointer through a minimal seam-confined
+/// `unsafe` block (porting-rules §D11 — unsafe confined to the seam).
+fn glconfig_str(p: *const c_char) -> String {
+    if p.is_null() {
+        return String::new();
+    }
+    // SAFETY: `trap_GetGlconfig` fills these engine-owned C strings before any
+    // ui code reads `uiDC.glconfig`; the read is borrow-only, no ownership
+    // transfer or aliasing with Rust-owned memory.
+    latin1_to_string(unsafe { CStr::from_ptr(p) }.to_bytes())
+}
+
+/// Raven `UI_DrawGLInfo`.
+///
+/// PORT-NOTE (§19 shape note / escalation): see `glconfig_str` above for the
+/// one `unsafe` read this fn needs.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:3440-3487`
+pub fn UI_DrawGLInfo(
+    ctx: &UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    let glconfig = &ctx.world.uiDC.glconfig;
+    let vendor = glconfig_str(glconfig.vendor_string);
+    let version = glconfig_str(glconfig.version_string);
+    let renderer = glconfig_str(glconfig.renderer_string);
+    // Raven copies into `buff[4096]` with `Q_strncpyz`, truncating the list at
+    // 4095 wire bytes — one latin-1 char each after decode.
+    let extensions: String = glconfig_str(glconfig.extensions_string)
+        .chars()
+        .take(4095)
+        .collect();
+
+    Text_Paint(
+        ctx,
+        rect.x + 2.0,
+        rect.y,
+        scale,
+        color,
+        &format!("GL_VENDOR: {}", vendor),
+        0.0,
+        rect.w as c_int,
+        textStyle,
+        iMenuFont,
+    );
+    Text_Paint(
+        ctx,
+        rect.x + 2.0,
+        rect.y + 15.0,
+        scale,
+        color,
+        &format!("GL_VERSION: {}: {}", version, renderer),
+        0.0,
+        rect.w as c_int,
+        textStyle,
+        iMenuFont,
+    );
+    Text_Paint(
+        ctx,
+        rect.x + 2.0,
+        rect.y + 30.0,
+        scale,
+        color,
+        &format!(
+            "GL_PIXELFORMAT: color({}-bits) Z({}-bits) stencil({}-bits)",
+            glconfig.colorBits, glconfig.depthBits, glconfig.stencilBits
+        ),
+        0.0,
+        rect.w as c_int,
+        textStyle,
+        iMenuFont,
+    );
+
+    // build null terminated extension strings
+    //
+    // PORT-NOTE: Raven tokenizes `extensions_string` in place, writing '\0' at
+    // each space; `y` never changes inside that loop, so `y < rect->y + rect->h`
+    // is a one-shot gate rather than a running bound. Splitting is on the
+    // literal space only, and `lines[128]` caps the token count.
+    let mut y: c_int = (rect.y + 45.0) as c_int;
+    let lines: Vec<&str> = if (y as f32) < rect.y + rect.h {
+        extensions
+            .split(' ')
+            .filter(|s| !s.is_empty())
+            .take(128)
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let mut i = 0usize;
+    while i < lines.len() {
+        Text_Paint(
+            ctx,
+            rect.x + 2.0,
+            y as f32,
+            scale,
+            color,
+            lines[i],
+            0.0,
+            (rect.w / 2.0) as c_int,
+            textStyle,
+            iMenuFont,
+        );
+        i += 1;
+        if i < lines.len() {
+            Text_Paint(
+                ctx,
+                rect.x + rect.w / 2.0,
+                y as f32,
+                scale,
+                color,
+                lines[i],
+                0.0,
+                (rect.w / 2.0) as c_int,
+                textStyle,
+                iMenuFont,
+            );
+            i += 1;
+        }
+        y += 10;
+        if (y as f32) > rect.y + rect.h - 11.0 {
+            break;
+        }
+    }
+}
+
+/// Raven `UI_Effects_HandleKey`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:3913-3942`
+pub fn UI_Effects_HandleKey(
+    ctx: &mut UiContext,
+    _flags: c_int,
+    _special: &mut f32,
+    key: c_int,
+) -> bool {
+    if key == fakeAscii_t::A_MOUSE1 as c_int
+        || key == fakeAscii_t::A_MOUSE2 as c_int
+        || key == fakeAscii_t::A_ENTER as c_int
+        || key == fakeAscii_t::A_KP_ENTER as c_int
+    {
+        if !UI_TrueJediEnabled(ctx) {
+            let team = trap::Cvar_VariableValue(ctx.engine, "ui_myteam") as c_int;
+            if team == TEAM_RED || team == TEAM_BLUE {
+                return false;
+            }
+        }
+
+        if key == fakeAscii_t::A_MOUSE2 as c_int {
+            ctx.world.effectsColor -= 1;
+        } else {
+            ctx.world.effectsColor += 1;
+        }
+
+        if ctx.world.effectsColor > 5 {
+            ctx.world.effectsColor = 0;
+        } else if ctx.world.effectsColor < 0 {
+            ctx.world.effectsColor = 5;
+        }
+
+        trap::Cvar_SetValue(ctx.engine, "color1", ctx.world.effectsColor as f32);
+        return true;
+    }
+    false
+}
+
+/// Raven `UI_GameType_HandleKey`.
+///
+/// PORT-NOTE: `Menu_SetFeederSelection`'s ported shape takes `dc: &mut dyn
+/// DisplayContext` (DEC-36 addendum 12), so this fn carries a `dc` parameter
+/// alongside `ctx`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:4266-4297`
+pub fn UI_GameType_HandleKey(
+    ctx: &mut UiContext,
+    dc: &mut dyn DisplayContext,
+    _flags: c_int,
+    _special: &mut f32,
+    key: c_int,
+    resetMap: bool,
+) -> bool {
+    if key == fakeAscii_t::A_MOUSE1 as c_int
+        || key == fakeAscii_t::A_MOUSE2 as c_int
+        || key == fakeAscii_t::A_ENTER as c_int
+        || key == fakeAscii_t::A_KP_ENTER as c_int
+    {
+        let oldCount = UI_MapCountByGameType(ctx.world, true);
+
+        // hard coded mess here
+        if key == fakeAscii_t::A_MOUSE2 as c_int {
+            ctx.world.cvars.ui_gameType.integer -= 1;
+            if ctx.world.cvars.ui_gameType.integer == 2 {
+                ctx.world.cvars.ui_gameType.integer = 1;
+            } else if ctx.world.cvars.ui_gameType.integer < 2 {
+                ctx.world.cvars.ui_gameType.integer = ctx.world.gameTypes.len() as c_int - 1;
+            }
+        } else {
+            ctx.world.cvars.ui_gameType.integer += 1;
+            if ctx.world.cvars.ui_gameType.integer >= ctx.world.gameTypes.len() as c_int {
+                ctx.world.cvars.ui_gameType.integer = 1;
+            } else if ctx.world.cvars.ui_gameType.integer == 2 {
+                ctx.world.cvars.ui_gameType.integer = 3;
+            }
+        }
+
+        trap::Cvar_Set(
+            ctx.engine,
+            "ui_gameType",
+            &format!("{}", ctx.world.cvars.ui_gameType.integer),
+        );
+        UI_SetCapFragLimits(ctx, true);
+
+        let gtIdx = ctx.world.cvars.ui_gameType.integer as usize;
+        let mapIdx = ctx.world.cvars.ui_currentMap.integer as usize;
+        // §19: out of range Raven read each fixed array's zeroed spare slot and
+        // still called `UI_LoadBestScores` with the empty map name.
+        let mapLoadName = ctx
+            .world
+            .mapList
+            .get(mapIdx)
+            .map(|m| m.mapLoadName.clone())
+            .unwrap_or_default();
+        let gtEnum = ctx
+            .world
+            .gameTypes
+            .get(gtIdx)
+            .map(|gt| gt.gtEnum)
+            .unwrap_or_default();
+        UI_LoadBestScores(ctx, &mapLoadName, gtEnum);
+
+        if resetMap && oldCount != UI_MapCountByGameType(ctx.world, true) {
+            trap::Cvar_Set(ctx.engine, "ui_currentMap", "0");
+            Menu_SetFeederSelection(&mut ctx.world.menus, dc, None, FEEDER_MAPS, 0, None);
+        }
+        return true;
+    }
+    false
+}
+
+/// Raven `UI_NetGameType_HandleKey`.
+///
+/// PORT-NOTE: `_XBOX` arm dropped (retail MP never built for that target); the
+/// `Menu_SetFeederSelection` `dc` parameter follows the same DEC-36 addendum
+/// 12 shape as `UI_GameType_HandleKey` above.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:4322-4375`
+pub fn UI_NetGameType_HandleKey(
+    ctx: &mut UiContext,
+    dc: &mut dyn DisplayContext,
+    _flags: c_int,
+    _special: &mut f32,
+    key: c_int,
+) -> bool {
+    if key == fakeAscii_t::A_MOUSE1 as c_int
+        || key == fakeAscii_t::A_MOUSE2 as c_int
+        || key == fakeAscii_t::A_ENTER as c_int
+        || key == fakeAscii_t::A_KP_ENTER as c_int
+    {
+        if key == fakeAscii_t::A_MOUSE2 as c_int {
+            ctx.world.cvars.ui_netGameType.integer -= 1;
+            if UI_InSoloMenu(ctx.world) {
+                let idx = ctx.world.cvars.ui_netGameType.integer as usize;
+                if idx < ctx.world.gameTypes.len() && ctx.world.gameTypes[idx].gtEnum == GT_SIEGE {
+                    ctx.world.cvars.ui_netGameType.integer -= 1;
+                }
+            }
+        } else {
+            ctx.world.cvars.ui_netGameType.integer += 1;
+            if UI_InSoloMenu(ctx.world) {
+                let idx = ctx.world.cvars.ui_netGameType.integer as usize;
+                if idx < ctx.world.gameTypes.len() && ctx.world.gameTypes[idx].gtEnum == GT_SIEGE {
+                    ctx.world.cvars.ui_netGameType.integer += 1;
+                }
+            }
+        }
+
+        if ctx.world.cvars.ui_netGameType.integer < 0 {
+            ctx.world.cvars.ui_netGameType.integer = ctx.world.gameTypes.len() as c_int - 1;
+        } else if ctx.world.cvars.ui_netGameType.integer >= ctx.world.gameTypes.len() as c_int {
+            ctx.world.cvars.ui_netGameType.integer = 0;
+        }
+
+        trap::Cvar_Set(
+            ctx.engine,
+            "ui_netGameType",
+            &format!("{}", ctx.world.cvars.ui_netGameType.integer),
+        );
+        let gtIdx = ctx.world.cvars.ui_netGameType.integer as usize;
+        let gtEnum = if gtIdx < ctx.world.gameTypes.len() {
+            ctx.world.gameTypes[gtIdx].gtEnum
+        } else {
+            0
+        };
+        trap::Cvar_Set(ctx.engine, "ui_actualnetGameType", &format!("{}", gtEnum));
+        trap::Cvar_Set(ctx.engine, "ui_currentNetMap", "0");
+        UI_MapCountByGameType(ctx.world, false);
+        Menu_SetFeederSelection(&mut ctx.world.menus, dc, None, FEEDER_ALLMAPS, 0, None);
+        return true;
+    }
+    false
+}
+
+/// Raven `UI_OpponentName_HandleKey`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:4571-4581`
+pub fn UI_OpponentName_HandleKey(
+    ctx: &mut UiContext,
+    _flags: c_int,
+    _special: &mut f32,
+    key: c_int,
+) -> bool {
+    if key == fakeAscii_t::A_MOUSE1 as c_int
+        || key == fakeAscii_t::A_MOUSE2 as c_int
+        || key == fakeAscii_t::A_ENTER as c_int
+        || key == fakeAscii_t::A_KP_ENTER as c_int
+    {
+        if key == fakeAscii_t::A_MOUSE2 as c_int {
+            UI_PriorOpponent(ctx);
+        } else {
+            UI_NextOpponent(ctx);
+        }
+        return true;
+    }
+    false
+}
+
+/// Raven `UI_LoadMods`.
+///
+/// PORT-NOTE: `String_Alloc`'s pool-intern role is dropped — `ModInfo` owns
+/// `modName`/`modDescr` as plain `String`s (Class C), matching the rest of
+/// `UiWorld`'s owned-string convention.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:5039-5062`
+pub fn UI_LoadMods(ctx: &mut UiContext) {
+    ctx.world.modList.clear();
+
+    let mut dirlist = vec![0u8; 2048];
+    let numdirs = trap::FS_GetFileList(ctx.engine, "$modlist", "", &mut dirlist);
+
+    let mut offset = 0usize;
+    let mut i = 0;
+    while i < numdirs {
+        // §19: Raven walked the buffer on the returned count alone, so an
+        // overclaiming count over-read past it; the cursor is clamped instead.
+        offset = offset.min(dirlist.len());
+        let name_end = dirlist[offset..]
+            .iter()
+            .position(|&b| b == 0)
+            .unwrap_or(dirlist.len() - offset);
+        let modName = latin1_to_string(&dirlist[offset..offset + name_end]);
+
+        let desc_start = (offset + name_end + 1).min(dirlist.len());
+        let desc_end = dirlist[desc_start..]
+            .iter()
+            .position(|&b| b == 0)
+            .unwrap_or(dirlist.len() - desc_start);
+        let modDescr = latin1_to_string(&dirlist[desc_start..desc_start + desc_end]);
+
+        ctx.world.modList.push(ModInfo { modName, modDescr });
+
+        offset = desc_start + desc_end + 1;
+        i += 1;
+        if ctx.world.modList.len() >= MAX_MODS {
+            break;
+        }
+    }
+}
+
+/// Raven `UI_LoadMovies`.
+///
+/// PORT-NOTE: the `.roq` suffix check and `Q_strupr` both operate byte-wise on
+/// the raw NUL-separated listbuf before Latin-1 decoding (`eq_ignore_ascii_case`
+/// / `to_ascii_uppercase` on the decoded owned `String`), so a
+/// multi-byte-after-decode char never shifts the byte offsets the loop walks.
+/// Raven's `Q_strupr` folds only `a`-`z`, so the case mapping stays ASCII-only.
+/// `String_Alloc`'s pool-intern role is dropped, same as `UI_LoadMods` above.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:5070-5093`
+pub fn UI_LoadMovies(ctx: &mut UiContext) {
+    ctx.world.movieList.clear();
+
+    let mut movielist = vec![0u8; 4096];
+    let count = trap::FS_GetFileList(ctx.engine, "video", "roq", &mut movielist);
+
+    if count != 0 {
+        let count = if count > MAX_MOVIES {
+            MAX_MOVIES
+        } else {
+            count
+        };
+
+        let mut offset = 0usize;
+        let mut i = 0;
+        while i < count {
+            // §19: cursor clamped against an overclaiming count, as `UI_LoadMods`.
+            offset = offset.min(movielist.len());
+            let end = movielist[offset..]
+                .iter()
+                .position(|&b| b == 0)
+                .unwrap_or(movielist.len() - offset);
+            let mut raw_end = end;
+            if end >= 4 && movielist[offset + end - 4..offset + end].eq_ignore_ascii_case(b".roq") {
+                raw_end = end - 4;
+            }
+            let name = latin1_to_string(&movielist[offset..offset + raw_end]).to_ascii_uppercase();
+            ctx.world.movieList.push(name);
+
+            offset += end + 1;
+            i += 1;
+        }
+    }
+}
+
+/// Raven `UI_LoadDemos`.
+///
+/// PORT-NOTE: same byte-wise suffix-strip / decode-once shape as
+/// `UI_LoadMovies` above (the extension length varies with the protocol
+/// number here, so the strip width is computed per call instead of the fixed
+/// `4`).
+///
+/// Source: `oracle/codemp/ui/ui_main.c:5102-5130`
+pub fn UI_LoadDemos(ctx: &mut UiContext) {
+    let protocol = trap::Cvar_VariableValue(ctx.engine, "protocol") as c_int;
+    let demoExt = format!("dm_{}", protocol);
+
+    ctx.world.demoList.clear();
+
+    let mut demolist = vec![0u8; 4096];
+    let count = trap::FS_GetFileList(ctx.engine, "demos", &demoExt, &mut demolist);
+
+    let demoExt = format!(".dm_{}", protocol);
+    let ext_len = demoExt.len();
+
+    if count != 0 {
+        let count = if count > MAX_DEMOS { MAX_DEMOS } else { count };
+
+        let mut offset = 0usize;
+        let mut i = 0;
+        while i < count {
+            // §19: cursor clamped against an overclaiming count, as `UI_LoadMods`.
+            offset = offset.min(demolist.len());
+            let end = demolist[offset..]
+                .iter()
+                .position(|&b| b == 0)
+                .unwrap_or(demolist.len() - offset);
+            let mut raw_end = end;
+            if end >= ext_len
+                && demolist[offset + end - ext_len..offset + end]
+                    .eq_ignore_ascii_case(demoExt.as_bytes())
+            {
+                raw_end = end - ext_len;
+            }
+            let name = latin1_to_string(&demolist[offset..offset + raw_end]).to_ascii_uppercase();
+            ctx.world.demoList.push(name);
+
+            offset += end + 1;
+            i += 1;
+        }
+    }
+}
+
+/// Raven `UI_SetNextMap`.
+///
+/// PORT-NOTE: `Menu_SetFeederSelection`'s `dc` parameter follows the same
+/// DEC-36 addendum 12 shape noted on `UI_GameType_HandleKey` above; this fn
+/// makes no engine trap calls, so it takes `world`/`dc` rather than `ctx`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:5133-5142`
+pub fn UI_SetNextMap(
+    world: &mut UiWorld,
+    dc: &mut dyn DisplayContext,
+    actual: c_int,
+    index: c_int,
+) -> bool {
+    let mut i = actual + 1;
+    while i < world.mapList.len() as c_int {
+        if world.mapList[i as usize].active {
+            Menu_SetFeederSelection(
+                &mut world.menus,
+                dc,
+                None,
+                FEEDER_MAPS,
+                index + 1,
+                Some("skirmish"),
+            );
+            return true;
+        }
+        i += 1;
+    }
+    false
+}
+
+/// Raven `UI_BuildServerDisplayList`.
+///
+/// PORT-NOTE: `force` stays `c_int`, not `bool` — Raven's body compares it
+/// against the literal `2` (a tri-state "refresh but don't reset" caller
+/// convention), which a `bool` cannot represent.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:7763-7876`
+pub fn UI_BuildServerDisplayList(ctx: &mut UiContext, dc: &mut dyn DisplayContext, force: c_int) {
+    let mut force = force;
+
+    if !(force != 0 || ctx.world.uiDC.realTime > ctx.world.serverStatus.nextDisplayRefresh) {
+        return;
+    }
+    // if we shouldn't reset
+    if force == 2 {
+        force = 0;
+    }
+
+    // do motd updates here too
+    // The motd is Latin-1-decoded free text, so `strlen`'s wire-byte count is
+    // the decoded `char` count, not the UTF-8 byte length.
+    let motd = trap::Cvar_VariableStringBuffer(ctx.engine, "cl_motdString", MAX_STRING_CHARS);
+    let mut len = motd.chars().count();
+    let motd = if len == 0 {
+        "Welcome to Jedi Academy MP!".to_string()
+    } else {
+        motd
+    };
+    len = motd.chars().count();
+    ctx.world.serverStatus.motd = motd;
+    if len as c_int != ctx.world.serverStatus.motdLen {
+        ctx.world.serverStatus.motdLen = len as c_int;
+        ctx.world.serverStatus.motdWidth = -1;
+    }
+
+    if force != 0 {
+        ctx.world.scratch.UI_BuildServerDisplayList_numinvisible = 0;
+        // clear number of displayed servers
+        ctx.world.serverStatus.displayServers.clear();
+        ctx.world.serverStatus.numPlayersOnServers = 0;
+        // set list box index to zero
+        Menu_SetFeederSelection(&mut ctx.world.menus, dc, None, FEEDER_SERVERS, 0, None);
+        // mark all servers as visible so we store ping updates for them
+        trap::LAN_MarkServerVisible(ctx.engine, ctx.world.cvars.ui_netSource.integer, -1, true);
+    }
+
+    // get the server count (comes from the master)
+    let count = trap::LAN_GetServerCount(ctx.engine, ctx.world.cvars.ui_netSource.integer);
+    if count == -1 || (ctx.world.cvars.ui_netSource.integer == AS_LOCAL && count == 0) {
+        // still waiting on a response from the master
+        ctx.world.serverStatus.displayServers.clear();
+        ctx.world.serverStatus.numPlayersOnServers = 0;
+        ctx.world.serverStatus.nextDisplayRefresh = ctx.world.uiDC.realTime + 500;
+        return;
+    }
+
+    let mut i = 0;
+    while i < count {
+        // if we already got info for this server
+        if trap::LAN_ServerIsVisible(ctx.engine, ctx.world.cvars.ui_netSource.integer, i) == 0 {
+            i += 1;
+            continue;
+        }
+        // get the ping for this server
+        let ping = trap::LAN_GetServerPing(ctx.engine, ctx.world.cvars.ui_netSource.integer, i);
+        if ping > 0 || ctx.world.cvars.ui_netSource.integer == AS_FAVORITES {
+            let info = trap::LAN_GetServerInfo(
+                ctx.engine,
+                ctx.world.cvars.ui_netSource.integer,
+                i,
+                MAX_STRING_CHARS,
+            );
+
+            let clients = atoi(&Info_ValueForKey(&info, "clients"));
+            ctx.world.serverStatus.numPlayersOnServers += clients;
+
+            if ctx.world.cvars.ui_browserShowEmpty.integer == 0 && clients == 0 {
+                trap::LAN_MarkServerVisible(
+                    ctx.engine,
+                    ctx.world.cvars.ui_netSource.integer,
+                    i,
+                    false,
+                );
+                i += 1;
+                continue;
+            }
+
+            if ctx.world.cvars.ui_browserShowFull.integer == 0 {
+                let maxClients = atoi(&Info_ValueForKey(&info, "sv_maxclients"));
+                if clients == maxClients {
+                    trap::LAN_MarkServerVisible(
+                        ctx.engine,
+                        ctx.world.cvars.ui_netSource.integer,
+                        i,
+                        false,
+                    );
+                    i += 1;
+                    continue;
+                }
+            }
+
+            let joinIdx = ctx.world.cvars.ui_joinGameType.integer as usize;
+            // §19: past `numJoinGameTypes` Raven read the fixed array's zeroed
+            // spare slot, so the filter compared against gametype 0.
+            let joinGtEnum = ctx
+                .world
+                .joinGameTypes
+                .get(joinIdx)
+                .map(|gt| gt.gtEnum)
+                .unwrap_or_default();
+            if joinGtEnum != -1 {
+                let game = atoi(&Info_ValueForKey(&info, "gametype"));
+                if game != joinGtEnum {
+                    trap::LAN_MarkServerVisible(
+                        ctx.engine,
+                        ctx.world.cvars.ui_netSource.integer,
+                        i,
+                        false,
+                    );
+                    i += 1;
+                    continue;
+                }
+            }
+
+            if ctx.world.cvars.ui_serverFilterType.integer > 0 {
+                let filterIdx = ctx.world.cvars.ui_serverFilterType.integer as usize;
+                if filterIdx < SERVER_FILTERS.len()
+                    && Q_stricmp(
+                        &Info_ValueForKey(&info, "game"),
+                        SERVER_FILTERS[filterIdx].basedir,
+                    ) != 0
+                {
+                    trap::LAN_MarkServerVisible(
+                        ctx.engine,
+                        ctx.world.cvars.ui_netSource.integer,
+                        i,
+                        false,
+                    );
+                    i += 1;
+                    continue;
+                }
+            }
+            // make sure we never add a favorite server twice
+            if ctx.world.cvars.ui_netSource.integer == AS_FAVORITES {
+                UI_RemoveServerFromDisplayList(ctx.world, i);
+            }
+            // insert the server into the list
+            UI_BinaryServerInsertion(ctx, i);
+            // done with this server
+            if ping > 0 {
+                trap::LAN_MarkServerVisible(
+                    ctx.engine,
+                    ctx.world.cvars.ui_netSource.integer,
+                    i,
+                    false,
+                );
+                ctx.world.scratch.UI_BuildServerDisplayList_numinvisible += 1;
+            }
+        }
+        i += 1;
+    }
+
+    ctx.world.serverStatus.refreshtime = ctx.world.uiDC.realTime;
+}
+
+/// Raven `UI_BuildServerStatus`.
+///
+/// PORT-NOTE: `UI_GetServerStatusInfo`'s ported shape takes both `ctx` and a
+/// separate `info: Option<&mut ServerStatusInfo>`; Raven aliased its own
+/// `uiInfo.serverStatusInfo` as that out-param (trivial in C), which the
+/// borrow checker forbids passing through `ctx` twice, so the value is taken
+/// out of `ctx.world` for the call and put back after.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:8314-8340`
+pub fn UI_BuildServerStatus(ctx: &mut UiContext, dc: &mut dyn DisplayContext, force: bool) {
+    if ctx.world.nextFindPlayerRefresh != 0 {
+        return;
+    }
+    if !force {
+        if ctx.world.nextServerStatusRefresh == 0
+            || ctx.world.nextServerStatusRefresh > ctx.world.uiDC.realTime
+        {
+            return;
+        }
+    } else {
+        Menu_SetFeederSelection(&mut ctx.world.menus, dc, None, FEEDER_SERVERSTATUS, 0, None);
+        ctx.world.serverStatusInfo.lines.clear();
+        // reset all server status requests
+        trap::LAN_ServerStatus(ctx.engine, None, 0);
+    }
+    if ctx.world.serverStatus.currentServer < 0
+        || ctx.world.serverStatus.currentServer
+            > ctx.world.serverStatus.displayServers.len() as c_int
+        || ctx.world.serverStatus.displayServers.is_empty()
+    {
+        return;
+    }
+
+    let addr = ctx.world.serverStatusAddress.clone();
+    let mut info_local = core::mem::take(&mut ctx.world.serverStatusInfo);
+    let ok = UI_GetServerStatusInfo(ctx, &addr, Some(&mut info_local));
+    ctx.world.serverStatusInfo = info_local;
+
+    if ok {
+        ctx.world.nextServerStatusRefresh = 0;
+        UI_GetServerStatusInfo(ctx, &addr, None);
+    } else {
+        ctx.world.nextServerStatusRefresh = ctx.world.uiDC.realTime + 500;
+    }
+}
+
+/// Raven `UI_SetSiegeTeams`.
+///
+/// PORT-NOTE (§B5 / escalation): `BG_SiegeFindThemeForTeam` returns a raw
+/// `*mut siegeTeam_t` into `bg_state.bgSiegeTeams`; `UiMainState.siegeTeam1`/
+/// `siegeTeam2` carry the table index instead (per that field's own doc
+/// comment). The pointer is converted to an index by address arithmetic
+/// against the table's base pointer — a safe `usize` computation, no pointer
+/// dereference — matching the same convention the rest of the port uses for
+/// "pointer into an owned Rust table" fields (§B5). See escalations.
+///
+/// PORT-NOTE: `BG_SiegeSetTeamTheme`'s ported shape takes `themeName: *mut
+/// c_char`; `Q_strncpyz` (a safe `&mut [c_char]` writer) builds the buffer, so
+/// no `unsafe` is needed to pass its raw pointer through (porting-rules: raw
+/// pointers pass through calls without deref).
+///
+/// Source: `oracle/codemp/ui/ui_main.c:8358-8468`
+pub fn UI_SetSiegeTeams(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+    let mut mapname: Option<String> = None;
+    let mut info = String::new();
+
+    // Get the map name from the server info.
+    if let Some(cfg) = trap::GetConfigString(ctx.engine, CS_SERVERINFO, MAX_INFO_STRING) {
+        info = cfg;
+        mapname = Some(Info_ValueForKey(&info, "mapname"));
+    }
+
+    let mapname = match mapname {
+        Some(m) if !m.is_empty() => m,
+        _ => return,
+    };
+
+    let gametype = atoi(&Info_ValueForKey(&info, "g_gametype"));
+
+    // If the server we are connected to is not siege we cannot choose a class anyway.
+    if gametype != GT_SIEGE {
+        return;
+    }
+
+    // Raven's `Com_sprintf` into `levelname[MAX_QPATH]` truncates at 63 chars.
+    let levelname: String = format!("maps/{}.siege", mapname)
+        .chars()
+        .take(MAX_QPATH - 1)
+        .collect();
+    if levelname.is_empty() {
+        return;
+    }
+
+    let mut f: fileHandle_t = 0;
+    let len = trap::FS_FOpenFile(ctx.engine, &levelname, &mut f, FS_READ);
+
+    if f == 0 || len >= MAX_SIEGE_INFO_SIZE {
+        return;
+    }
+
+    trap::FS_Read(
+        ctx.engine,
+        &mut ctx.world.bg_state.siege_info[..len as usize],
+        f,
+    );
+    ctx.world.bg_state.siege_info[len as usize] = 0; // ensure null terminated
+
+    trap::FS_FCloseFile(ctx.engine, f);
+
+    // Found the .siege file.
+    let siege_info = buf_to_string(&ctx.world.bg_state.siege_info);
+
+    let (team1, team2) = match BG_SiegeGetValueGroup(&siege_info, "Teams") {
+        Some(teams) => {
+            let buf = trap::Cvar_VariableStringBuffer(ctx.engine, "cg_siegeTeam1", 1024);
+            let t1 = if !buf.is_empty() && Q_stricmp(&buf, "none") != 0 {
+                buf
+            } else {
+                BG_SiegeGetPairedValue(&teams, "team1").unwrap_or_default()
+            };
+
+            let buf = trap::Cvar_VariableStringBuffer(ctx.engine, "cg_siegeTeam2", 1024);
+            let t2 = if !buf.is_empty() && Q_stricmp(&buf, "none") != 0 {
+                buf
+            } else {
+                BG_SiegeGetPairedValue(&teams, "team2").unwrap_or_default()
+            };
+
+            (t1, t2)
+        }
+        None => return,
+    };
+
+    // Set the team themes so we know what classes to make available for selection.
+    if let Some(teamInfo) = BG_SiegeGetValueGroup(&siege_info, &team1) {
+        if let Some(btime) = BG_SiegeGetPairedValue(&teamInfo, "UseTeam") {
+            let mut buf: [c_char; 1024] = [0; 1024];
+            Q_strncpyz(&mut buf, &btime, 1024);
+            BG_SiegeSetTeamTheme(SIEGETEAM_TEAM1, buf.as_mut_ptr(), &mut ctx.world.bg_state);
+        }
+    }
+    if let Some(teamInfo) = BG_SiegeGetValueGroup(&siege_info, &team2) {
+        if let Some(btime) = BG_SiegeGetPairedValue(&teamInfo, "UseTeam") {
+            let mut buf: [c_char; 1024] = [0; 1024];
+            Q_strncpyz(&mut buf, &btime, 1024);
+            BG_SiegeSetTeamTheme(SIEGETEAM_TEAM2, buf.as_mut_ptr(), &mut ctx.world.bg_state);
+        }
+    }
+
+    let siegeTeam1_ptr = BG_SiegeFindThemeForTeam(SIEGETEAM_TEAM1, &ctx.world.bg_state);
+    let siegeTeam2_ptr = BG_SiegeFindThemeForTeam(SIEGETEAM_TEAM2, &ctx.world.bg_state);
+
+    let base = ctx.world.bg_state.bgSiegeTeams.as_ptr() as usize;
+    let elem_size = core::mem::size_of::<siegeTeam_t>();
+    let idx1 = (!siegeTeam1_ptr.is_null()).then(|| (siegeTeam1_ptr as usize - base) / elem_size);
+    let idx2 = (!siegeTeam2_ptr.is_null()).then(|| (siegeTeam2_ptr as usize - base) / elem_size);
+
+    ctx.world.main.siegeTeam1 = idx1;
+    ctx.world.main.siegeTeam2 = idx2;
+
+    // set the default description for the default selection
+    let classes_empty = match idx1 {
+        Some(i) => ctx.world.bg_state.bgSiegeTeams[i].classes[0].is_null(),
+        None => true,
+    };
+    if idx1.is_none() || classes_empty {
+        Com_Error(ctx, "Error loading teams in UI");
+    }
+
+    Menu_SetFeederSelection(&mut ctx.world.menus, dc, None, FEEDER_SIEGE_TEAM1, 0, None);
+    Menu_SetFeederSelection(&mut ctx.world.menus, dc, None, FEEDER_SIEGE_TEAM2, -1, None);
+}
+
+/// Raven `Text_PaintCenter`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:11069-11072`
+pub fn Text_PaintCenter(
+    ctx: &UiContext,
+    x: f32,
+    y: f32,
+    scale: f32,
+    color: vec4_t,
+    text: &str,
+    _adjust: f32,
+    iMenuFont: c_int,
+) {
+    let len = Text_Width(ctx, text, scale, iMenuFont);
+    Text_Paint(
+        ctx,
+        x - (len / 2) as f32,
+        y,
+        scale,
+        color,
+        text,
+        0.0,
+        0,
+        ITEM_TEXTSTYLE_SHADOWEDMORE,
+        iMenuFont,
+    );
 }

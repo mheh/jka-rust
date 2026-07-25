@@ -5,6 +5,7 @@
 #![allow(non_snake_case)]
 
 use core::ffi::c_char;
+use core::mem;
 
 use mp_bg::bg_channel::BgState;
 use mp_qshared::common::mp::cgame::ref_entity_t::{
@@ -15,7 +16,10 @@ use mp_qshared::common::mp::qcommon::saber::saber_colors::{
     saber_colors_t, SABER_BLUE, SABER_GREEN, SABER_ORANGE, SABER_PURPLE, SABER_RED, SABER_YELLOW,
 };
 use mp_qshared::common::mp::qcommon::saber::saber_type::saberType_t;
-use mp_qshared::shared::com_parse::{COM_ParseExt, QSharedScratch};
+use mp_qshared::shared::com_parse::{
+    COM_BeginParseSession, COM_ParseExt, QSharedScratch, SkipBracedSection, SkipRestOfLine,
+};
+use mp_qshared::shared::q_color::S_COLOR_RED;
 use mp_qshared::shared::q_math::{_VectorMA, VectorSet};
 use mp_qshared::shared::q_string::COM_Compress;
 use mp_qshared::shared::{fileHandle_t, vec3_t, FS_READ};
@@ -479,4 +483,90 @@ pub fn TranslateSaberType(name: &str) -> saberType_t {
         return saberType_t::SABER_SITH_SWORD;
     }
     saberType_t::SABER_SINGLE
+}
+
+/// Raven `UI_SaberParseParm` — looks up `saberName`'s block in the cached
+/// `.sab` extension text (`world.saber.SaberParms`) and returns the string
+/// value bound to `parmname` inside it.
+///
+/// PORT-NOTE: Raven's `char *saberData` out-param collapses into a returned
+/// `Option<String>` (dictionary: out-param -> return, `qboolean` success flag
+/// -> `Some`/`None`). `p` walks `SaberParms`'s bytes with the same
+/// `Option<&[u8]>` cursor shape `COM_ParseExt`/`UI_ParseLiteral` already use
+/// elsewhere in this file; the `while ( p )` search loop becomes a
+/// `while p.is_some()` loop with an early labeled `break` on a name match.
+///
+/// Source: `oracle/codemp/ui/ui_saber.c:92-164`
+pub fn UI_SaberParseParm(ctx: &mut UiContext, saberName: &str, parmname: &str) -> Option<String> {
+    if saberName.is_empty() {
+        return None;
+    }
+
+    // try to parse it out. The cursor walks the cached text, so the text moves
+    // out of `world.saber` for the parse and back afterwards — the rest of the
+    // context stays mutably reachable without copying it.
+    let saber_parms = mem::take(&mut ctx.world.saber.SaberParms);
+    let result = 'parse: {
+        let mut p: Option<&[u8]> = Some(saber_parms.as_bytes());
+        // A bogus name is passed in
+        COM_BeginParseSession(&mut ctx.world.bg_state.qs, "saberinfo");
+
+        // look for the right saber
+        'search: while p.is_some() {
+            let (token, rest) = COM_ParseExt(&mut ctx.world.bg_state.qs, p, true);
+            p = rest;
+            if token.is_empty() {
+                break 'parse None;
+            }
+
+            if token.eq_ignore_ascii_case(saberName) {
+                break 'search;
+            }
+
+            p = SkipBracedSection(&mut ctx.world.bg_state.qs, p);
+        }
+        if p.is_none() {
+            break 'parse None;
+        }
+
+        if UI_ParseLiteral(ctx, &mut p, "{") {
+            break 'parse None;
+        }
+
+        // parse the saber info block
+        loop {
+            let (token, rest) = COM_ParseExt(&mut ctx.world.bg_state.qs, p, true);
+            p = rest;
+            if token.is_empty() {
+                Com_Printf(
+                    ctx,
+                    &format!(
+                        "{}ERROR: unexpected EOF while parsing '{}'\n",
+                        S_COLOR_RED.to_str().unwrap(),
+                        saberName
+                    ),
+                );
+                break 'parse None;
+            }
+
+            if token.eq_ignore_ascii_case("}") {
+                break;
+            }
+
+            if token.eq_ignore_ascii_case(parmname) {
+                // `COM_ParseString` inlined: Raven's guard tests `s[0]`, the
+                // (always non-NULL) `com_token` pointer rather than the first token
+                // byte, so its EOF branch is dead and it always returns `qfalse`.
+                // Source: `oracle/codemp/game/q_shared.c:588-598`
+                let (value, _) = COM_ParseExt(&mut ctx.world.bg_state.qs, p, false);
+                break 'parse Some(value);
+            }
+
+            p = SkipRestOfLine(&mut ctx.world.bg_state.qs, p);
+        }
+
+        None
+    };
+    ctx.world.saber.SaberParms = saber_parms;
+    result
 }

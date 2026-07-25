@@ -345,6 +345,10 @@ pub fn Cvar_Update(engine: &Engine, cvar: &mut vmCvar_t) {
 /// Raven `trap_Cvar_VariableStringBuffer` — `UI_CVAR_VARIABLESTRINGBUFFER`
 /// (token: `mp_abi::ui::syscalls::UI_CVAR_VARIABLESTRINGBUFFER`).
 ///
+/// The out-buffer carries a cvar *value* — free text the engine treats as
+/// opaque bytes (`cl_motdString`, `sv_hostname`) — so it decodes Latin-1, one
+/// `char` per wire byte, like `Argv`.
+///
 /// C: `void trap_Cvar_VariableStringBuffer(const char *var_name, char *buffer, int bufsize)`
 /// Source: `oracle/codemp/ui/ui_syscalls.c:51-53`
 pub fn Cvar_VariableStringBuffer(engine: &Engine, var_name: &str, buffer_len: usize) -> String {
@@ -359,7 +363,8 @@ pub fn Cvar_VariableStringBuffer(engine: &Engine, var_name: &str, buffer_len: us
         )
     };
     <Engine as Execute<UiCvarVariablestringbuffer>>::execute(engine, args);
-    buf_to_string(&buffer)
+    let nul = buffer.iter().position(|&b| b == 0).unwrap_or(buffer.len());
+    latin1_to_string(&buffer[..nul])
 }
 
 /// Raven `trap_Cvar_VariableValue` — `UI_CVAR_VARIABLEVALUE`
