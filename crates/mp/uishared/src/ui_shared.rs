@@ -132,6 +132,10 @@ pub const WINDOW_LB_PGUP: c_int = 0x0000_4000;
 /// Raven `#define WINDOW_LB_PGDN 0x00008000`.
 /// Source: `oracle/codemp/ui/ui_shared.h:37`
 pub const WINDOW_LB_PGDN: c_int = 0x0000_8000;
+/// Raven `#define WINDOW_TIMEDVISIBLE 0x00800000` — visibility timing ( NOT
+/// implemented ).
+/// Source: `oracle/codemp/ui/ui_shared.h:45`
+pub const WINDOW_TIMEDVISIBLE: c_int = 0x0080_0000;
 /// Raven `#define WINDOW_PLAYERCOLOR 0x01000000`.
 /// Source: `oracle/codemp/ui/ui_shared.h:46`
 pub const WINDOW_PLAYERCOLOR: c_int = 0x0100_0000;
@@ -212,7 +216,11 @@ const K_CHAR_FLAG: c_int = 1024;
 // `crates/mp/ui/src/keycodes/fake_ascii_t.rs`'s `fakeAscii_t`.
 /// Source: `oracle/codemp/ui/keycodes.h:8-341`
 const A_BACKSPACE: c_int = 8;
+const A_TAB: c_int = 9;
 const A_ENTER: c_int = 10;
+const A_KP_ENTER: c_int = 13;
+const A_KP_PERIOD: c_int = 14;
+const A_KP_0: c_int = 16;
 const A_KP_1: c_int = 17;
 const A_KP_2: c_int = 18;
 const A_KP_3: c_int = 19;
@@ -222,8 +230,10 @@ const A_KP_7: c_int = 23;
 const A_KP_8: c_int = 24;
 const A_KP_9: c_int = 25;
 const A_ESCAPE: c_int = 27;
+const A_DELETE: c_int = 127;
 const A_MOUSE1: c_int = 141;
 const A_MOUSE2: c_int = 142;
+const A_INSERT: c_int = 143;
 const A_HOME: c_int = 144;
 const A_PAGE_UP: c_int = 145;
 const A_END: c_int = 157;
@@ -233,6 +243,13 @@ const A_CURSOR_UP: c_int = 170;
 const A_CURSOR_DOWN: c_int = 171;
 const A_CURSOR_LEFT: c_int = 172;
 const A_CURSOR_RIGHT: c_int = 173;
+
+// PORT-NOTE: `q_shared.h`'s font enum is anonymous (`enum { FONT_NONE,
+// FONT_SMALL=1, ... }`), so per the anonymous-enum convention these are
+// `const`s; local until the family gets a canonical `mp_qshared` home.
+/// Source: `oracle/codemp/game/q_shared.h:3176-3182`
+const FONT_MEDIUM: c_int = 2;
+const FONT_SMALL2: c_int = 4;
 
 /// Raven `itemFlags[]`, the `ItemParse_flag` lookup table (`"WINDOW_INACTIVE"`
 /// is the only entry the retail table carries before its NULL sentinel).
@@ -10299,4 +10316,522 @@ pub fn Display_MouseMove(
         }
     }
     true
+}
+
+/// Raven `Menus_OpenByName` — open menu `p` by name.
+/// Source: `oracle/codemp/ui/ui_shared.c:1523-1525`
+pub fn Menus_OpenByName(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    p: &str,
+) {
+    Menus_ActivateByName(menus, ds, dc, p);
+}
+
+/// Raven `Item_TextField_HandleKey` — text/numeric-field key handler: cvar
+/// insert/backspace/cursor navigation, then focus-switch keys (tab/arrows)
+/// hand off to the next/previous cursor item.
+///
+/// PORT-NOTE: the C `char buff[2048]` byte buffer and its `memmove` splices
+/// are reproduced with a fixed 2048-byte `Vec<u8>` of Latin-1 bytes
+/// (`string_to_latin1`/`latin1_to_string` round-trip, `copy_within` for
+/// `memmove` — translation dictionary) so the byte-offset arithmetic
+/// (`cursorPos`, clamped `len`, `editPtr->maxChars`) matches exactly; the
+/// trailing `!item->cvar` recheck inside the printable-char guard is always
+/// false given the outer `if (item->cvar)` guard already returned, so it is
+/// dropped.
+///
+/// PORT-NOTE (UB pick, porting-rules §19): Raven casts `item->typeData`
+/// straight to `editFieldDef_t *` with no NULL check; a NULL `typeData` is
+/// treated as a default-valued `EditFieldDef` (same pick as
+/// `Item_TextField_Paint`), and a write-back through it silently no-ops.
+///
+/// porting-rules §19: with `maxChars == 0` Raven's `buff[cursorPos] = key`
+/// and `memmove`s are unguarded past `buff[2048]` — a stack smash; the
+/// fixed-size `Vec` panics instead of writing out of bounds.
+///
+/// Source: `oracle/codemp/ui/ui_shared.c:3664-3829`
+pub fn Item_TextField_HandleKey(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    key: c_int,
+) -> bool {
+    let mut key = key;
+
+    let cvar = match menus.item(item).cvar.clone() {
+        Some(c) => c,
+        None => return false,
+    };
+
+    let mut editPtr = menus
+        .item(item)
+        .typeData
+        .editField()
+        .copied()
+        .unwrap_or_default();
+
+    let mut buff = string_to_latin1(&dc.getCVarString(&cvar, 2048));
+    let mut len = buff.len() as c_int;
+    buff.resize(2048, 0);
+    if editPtr.maxChars != 0 && len > editPtr.maxChars {
+        len = editPtr.maxChars;
+    }
+
+    let mut cursorPos = menus.item(item).cursorPos;
+
+    let commit = |menus: &mut MenuSystem, cursorPos: c_int, editPtr: &EditFieldDef| {
+        menus.item_mut(item).cursorPos = cursorPos;
+        if let Some(ep) = menus.item_mut(item).typeData.editField_mut() {
+            *ep = *editPtr;
+        }
+    };
+
+    let nul_str = |buff: &[u8]| -> String {
+        let nul = buff.iter().position(|&b| b == 0).unwrap_or(buff.len());
+        latin1_to_string(&buff[..nul])
+    };
+
+    if key & K_CHAR_FLAG != 0 {
+        key &= !K_CHAR_FLAG;
+
+        // ctrl-h is backspace
+        if key == (b'h' - b'a' + 1) as c_int {
+            if cursorPos > 0 {
+                let src = cursorPos as usize;
+                let dst = (cursorPos - 1) as usize;
+                let count = (len + 1 - cursorPos) as usize;
+                buff.copy_within(src..src + count, dst);
+                cursorPos -= 1;
+                if cursorPos < editPtr.paintOffset {
+                    editPtr.paintOffset -= 1;
+                }
+            }
+            dc.setCVar(&cvar, &nul_str(&buff));
+            commit(menus, cursorPos, &editPtr);
+            return true;
+        }
+
+        // ignore any non printable chars
+        if key < 32 {
+            return true;
+        }
+
+        if menus.item(item).r#type == ITEM_TYPE_NUMERICFIELD
+            && !(b'0' as c_int..=b'9' as c_int).contains(&key)
+        {
+            return false;
+        }
+
+        if !dc.getOverstrikeMode() {
+            if len == MAX_EDITFIELD as c_int - 1
+                || (editPtr.maxChars != 0 && len >= editPtr.maxChars)
+            {
+                return true;
+            }
+            let src = cursorPos as usize;
+            let dst = (cursorPos + 1) as usize;
+            let count = (len + 1 - cursorPos) as usize;
+            buff.copy_within(src..src + count, dst);
+        } else if editPtr.maxChars != 0 && cursorPos >= editPtr.maxChars {
+            return true;
+        }
+
+        buff[cursorPos as usize] = key as u8;
+
+        // rww - nul-terminate!
+        if cursorPos + 1 < 2048 {
+            buff[(cursorPos + 1) as usize] = 0;
+        } else {
+            buff[cursorPos as usize] = 0;
+        }
+
+        dc.setCVar(&cvar, &nul_str(&buff));
+
+        if cursorPos < len + 1 {
+            cursorPos += 1;
+            if editPtr.maxPaintChars != 0 && cursorPos > editPtr.maxPaintChars {
+                editPtr.paintOffset += 1;
+            }
+        }
+        commit(menus, cursorPos, &editPtr);
+    } else {
+        if key == A_DELETE || key == A_KP_PERIOD {
+            if cursorPos < len {
+                let src = (cursorPos + 1) as usize;
+                let dst = cursorPos as usize;
+                let count = (len - cursorPos) as usize;
+                buff.copy_within(src..src + count, dst);
+                dc.setCVar(&cvar, &nul_str(&buff));
+            }
+            return true;
+        }
+
+        if key == A_CURSOR_RIGHT || key == A_KP_6 {
+            if editPtr.maxPaintChars != 0 && cursorPos >= editPtr.maxPaintChars && cursorPos < len {
+                cursorPos += 1;
+                editPtr.paintOffset += 1;
+                commit(menus, cursorPos, &editPtr);
+                return true;
+            }
+            if cursorPos < len {
+                cursorPos += 1;
+            }
+            commit(menus, cursorPos, &editPtr);
+            return true;
+        }
+
+        if key == A_CURSOR_LEFT || key == A_KP_4 {
+            if cursorPos > 0 {
+                cursorPos -= 1;
+            }
+            if cursorPos < editPtr.paintOffset {
+                editPtr.paintOffset -= 1;
+            }
+            commit(menus, cursorPos, &editPtr);
+            return true;
+        }
+
+        if key == A_HOME || key == A_KP_7 {
+            cursorPos = 0;
+            editPtr.paintOffset = 0;
+            commit(menus, cursorPos, &editPtr);
+            return true;
+        }
+
+        if key == A_END || key == A_KP_1 {
+            cursorPos = len;
+            if cursorPos > editPtr.maxPaintChars {
+                editPtr.paintOffset = len - editPtr.maxPaintChars;
+            }
+            commit(menus, cursorPos, &editPtr);
+            return true;
+        }
+
+        if key == A_INSERT || key == A_KP_0 {
+            let over = dc.getOverstrikeMode();
+            dc.setOverstrikeMode(!over);
+            return true;
+        }
+    }
+
+    if key == A_TAB || key == A_CURSOR_DOWN || key == A_KP_2 {
+        // switching fields so reset printed text of edit field
+        Leaving_EditField(menus, item);
+        menus.g_editingField = false;
+        let parent = menus
+            .item(item)
+            .parent
+            .expect("Item_TextField_HandleKey: item has no parent");
+        let newItem = Menu_SetNextCursorItem(menus, ds, dc, parent);
+        if let Some(newItem) = newItem {
+            let t = menus.item(newItem).r#type;
+            if t == ITEM_TYPE_EDITFIELD || t == ITEM_TYPE_NUMERICFIELD {
+                menus.g_editItem = Some(newItem);
+                menus.g_editingField = true;
+            }
+        }
+    }
+
+    if key == A_CURSOR_UP || key == A_KP_8 {
+        // switching fields so reset printed text of edit field
+        Leaving_EditField(menus, item);
+        menus.g_editingField = false;
+        let parent = menus
+            .item(item)
+            .parent
+            .expect("Item_TextField_HandleKey: item has no parent");
+        let newItem = Menu_SetPrevCursorItem(menus, ds, dc, parent);
+        if let Some(newItem) = newItem {
+            let t = menus.item(newItem).r#type;
+            if t == ITEM_TYPE_EDITFIELD || t == ITEM_TYPE_NUMERICFIELD {
+                menus.g_editItem = Some(newItem);
+                menus.g_editingField = true;
+            }
+        }
+    }
+
+    if key == A_ENTER || key == A_KP_ENTER || key == A_ESCAPE {
+        return false;
+    }
+
+    true
+}
+
+/// Helper factoring the four identical x/y/w/h transition-clamp blocks in
+/// [`Item_Paint`]'s `WINDOW_INTRANSITION` handling (porting-rules §10 —
+/// preserve behavior, not control-flow shape): step `cur` toward `target` by
+/// `step`, clamping on overshoot. Returns `(newValue, reachedTarget)`, where
+/// `reachedTarget` is Raven's per-axis `done++`.
+/// Source: `oracle/codemp/ui/ui_shared.c:6477-6580`
+fn Item_Paint_transitionAxis(cur: f32, target: f32, step: f32) -> (f32, bool) {
+    if cur == target {
+        (cur, true)
+    } else if cur < target {
+        let mut v = cur + step;
+        if v > target {
+            v = target;
+            return (v, true);
+        }
+        (v, false)
+    } else {
+        let mut v = cur - step;
+        if v < target {
+            v = target;
+            return (v, true);
+        }
+        (v, false)
+    }
+}
+
+/// Raven `Item_Paint` — paint one item: orbit/transition its window, apply
+/// ownerdraw visibility and cvar show/hide, paint desc-text on mouseover, the
+/// window chrome, a debug-mode extents box, then dispatch to the type's paint
+/// fn.
+///
+/// PORT-NOTE: the `#ifdef _TRANS3` model-transition block (`g2mins2`/
+/// `g2maxs2`/fov transition) compiles into retail (`#define _TRANS3` at
+/// `ui_shared.c:1694`) but is unreachable: `WINDOW_INTRANSITIONMODEL` is set
+/// only by `Menu_Transition3ItemByName`, whose sole caller
+/// `Script_Transition3` has no `commandList[]` entry (`ui_shared.c:2196-2228`;
+/// same table gap as the `enable` note on `Script_Enable`).
+/// DEFERRED: `_TRANS3` model-transition block — if `transition3` ever becomes
+/// dispatchable, `ui_shared.c:6595-6838` must be ported.
+/// Source: `oracle/codemp/ui/ui_shared.c:6592-6839`
+///
+/// PORT-NOTE: `item == NULL` becomes `item: Option<ItemId>` (same convention
+/// as `Item_UpdatePosition`).
+///
+/// PORT-NOTE: `seLanguageModCount` threads in for the `Item_Text_Paint`-family
+/// calls, same shape as those fns' own doc notes.
+///
+/// PORT-NOTE: `item->window.ownerDrawFlags && DC->ownerDrawVisible` checked a
+/// fn-pointer for non-NULL; `DisplayContext::ownerDrawVisible` is always
+/// implemented (DEC-36 D3), so only the flags half of the condition survives.
+///
+/// PORT-NOTE: `#ifndef _XBOX`/`#else` picks the non-`_XBOX` (`WINDOW_MOUSEOVER`)
+/// arm — this is the PC/MP build.
+///
+/// PORT-NOTE: the `WINDOW_TIMEDVISIBLE` block is empty in Raven ("visibility
+/// timing ( NOT implemented )" — `ui_shared.h:45`), so no code is emitted for
+/// it here either.
+/// Source: `oracle/codemp/ui/ui_shared.c:6433-7013`
+pub fn Item_Paint(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: Option<ItemId>,
+    seLanguageModCount: c_int,
+) {
+    let item = match item {
+        Some(item) => item,
+        None => return,
+    };
+
+    let parent = menus
+        .item(item)
+        .parent
+        .expect("Item_Paint: item has no parent");
+
+    // WINDOW_ORBITING
+    if menus.item(item).window.flags & WINDOW_ORBITING != 0
+        && ds.realTime > menus.item(item).window.nextTime
+    {
+        let offsetTime = menus.item(item).window.offsetTime;
+        menus.item_mut(item).window.nextTime = ds.realTime + offsetTime;
+
+        let rectClient = menus.item(item).window.rectClient;
+        let rectEffects = menus.item(item).window.rectEffects;
+        let w = rectClient.w / 2.0;
+        let h = rectClient.h / 2.0;
+        let rx = rectClient.x + w - rectEffects.x;
+        let ry = rectClient.y + h - rectEffects.y;
+        let a: f32 = (3.0 * PI_F64 / 180.0) as f32;
+        let c = a.cos();
+        let s = a.sin();
+        menus.item_mut(item).window.rectClient.x = (rx * c - ry * s) + rectEffects.x - w;
+        menus.item_mut(item).window.rectClient.y = (rx * s + ry * c) + rectEffects.y - h;
+
+        Item_UpdatePosition(menus, dc, Some(item));
+    }
+
+    // WINDOW_INTRANSITION
+    if menus.item(item).window.flags & WINDOW_INTRANSITION != 0
+        && ds.realTime > menus.item(item).window.nextTime
+    {
+        let offsetTime = menus.item(item).window.offsetTime;
+        menus.item_mut(item).window.nextTime = ds.realTime + offsetTime;
+
+        let (rectClient, rectEffects, rectEffects2) = {
+            let w = &menus.item(item).window;
+            (w.rectClient, w.rectEffects, w.rectEffects2)
+        };
+
+        let (nx, dx) = Item_Paint_transitionAxis(rectClient.x, rectEffects.x, rectEffects2.x);
+        let (ny, dy) = Item_Paint_transitionAxis(rectClient.y, rectEffects.y, rectEffects2.y);
+        let (nw, dw) = Item_Paint_transitionAxis(rectClient.w, rectEffects.w, rectEffects2.w);
+        let (nh, dh) = Item_Paint_transitionAxis(rectClient.h, rectEffects.h, rectEffects2.h);
+        let mut done = 0;
+        if dx {
+            done += 1;
+        }
+        if dy {
+            done += 1;
+        }
+        if dw {
+            done += 1;
+        }
+        if dh {
+            done += 1;
+        }
+
+        {
+            let win = &mut menus.item_mut(item).window;
+            win.rectClient.x = nx;
+            win.rectClient.y = ny;
+            win.rectClient.w = nw;
+            win.rectClient.h = nh;
+        }
+
+        Item_UpdatePosition(menus, dc, Some(item));
+
+        if done == 4 {
+            menus.item_mut(item).window.flags &= !WINDOW_INTRANSITION;
+        }
+    }
+
+    // DEFERRED: `_TRANS3` model-transition block (`WINDOW_INTRANSITIONMODEL`)
+    // — compiled but unreachable: no `transition3` `commandList[]` entry ever
+    // sets the flag (see the fn doc note).
+    // Source: `oracle/codemp/ui/ui_shared.c:6595-6838`
+
+    let ownerDrawFlags = menus.item(item).window.ownerDrawFlags;
+    if ownerDrawFlags != 0 {
+        if !dc.ownerDrawVisible(ownerDrawFlags) {
+            menus.item_mut(item).window.flags &= !WINDOW_VISIBLE;
+        } else {
+            menus.item_mut(item).window.flags |= WINDOW_VISIBLE;
+        }
+    }
+
+    let cvarFlags = menus.item(item).cvarFlags;
+    if cvarFlags & (CVAR_SHOW | CVAR_HIDE) != 0
+        && !Item_EnableShowViaCvar(menus, dc, item, CVAR_SHOW)
+    {
+        return;
+    }
+
+    // WINDOW_TIMEDVISIBLE — empty in Raven (not implemented).
+
+    if menus.item(item).window.flags & WINDOW_VISIBLE == 0 {
+        return;
+    }
+
+    // JLFMOUSE — `#ifndef _XBOX` arm (PC/MP build).
+    if menus.item(item).window.flags & WINDOW_MOUSEOVER != 0 {
+        let descText = menus.item(item).descText.clone();
+        if !descText.is_empty() && !Display_KeyBindPending(menus) {
+            let mut textPtr = descText;
+            if let Some(rest) = textPtr.strip_prefix('@') {
+                // porting-rules §19: Raven's `char temp[MAX_STRING_CHARS]` is
+                // scoped to this `if` and `textPtr = temp` escapes it — the
+                // later reads go through a dead stack pointer. Owned `String`
+                // is the defined pick.
+                textPtr = dc
+                    .SP_GetStringTextString(rest, MAX_STRING_CHARS as usize)
+                    .unwrap_or_default();
+            }
+
+            let mut color: vec4_t = [0.0; 4];
+            Item_TextColor(menus, ds, dc, item, &mut color);
+
+            let (parentDescScale, descAlignment, descX, descY, descColor) = {
+                let p = menus.menu(parent);
+                (p.descScale, p.descAlignment, p.descX, p.descY, p.descColor)
+            };
+            let fDescScaleCopy = if parentDescScale != 0.0 {
+                parentDescScale
+            } else {
+                1.0
+            };
+            let mut fDescScale = fDescScaleCopy;
+            let mut iYadj: c_int = 0;
+            let textStyle = menus.item(item).textStyle;
+
+            loop {
+                let textWidth = dc.textWidth(&textPtr, fDescScale, FONT_SMALL2);
+
+                let xPos = if descAlignment == ITEM_ALIGN_RIGHT {
+                    descX - textWidth
+                } else if descAlignment == ITEM_ALIGN_CENTER {
+                    descX - (textWidth / 2)
+                } else {
+                    descX
+                };
+
+                if descAlignment == ITEM_ALIGN_CENTER && xPos + textWidth > SCREEN_WIDTH - 4 {
+                    fDescScale -= 0.001;
+                    continue;
+                }
+
+                if fDescScale != fDescScaleCopy {
+                    let iOriginalTextHeight = dc.textHeight(&textPtr, fDescScaleCopy, FONT_MEDIUM);
+                    iYadj = iOriginalTextHeight - dc.textHeight(&textPtr, fDescScale, FONT_MEDIUM);
+                }
+
+                dc.drawText(
+                    xPos as f32,
+                    (descY + iYadj) as f32,
+                    fDescScale,
+                    descColor,
+                    &textPtr,
+                    0.0,
+                    0,
+                    textStyle,
+                    FONT_SMALL2,
+                );
+                break;
+            }
+        }
+    }
+
+    // paint the rect first..
+    let (fadeAmount, fadeClamp, fadeCycle) = {
+        let p = menus.menu(parent);
+        (p.fadeAmount, p.fadeClamp, p.fadeCycle)
+    };
+    let mut window = menus.item(item).window.clone();
+    Window_Paint(menus, ds, dc, &mut window, fadeAmount, fadeClamp, fadeCycle);
+    menus.item_mut(item).window = window;
+
+    // Draw box to show rectangle extents, in debug mode
+    if menus.debugMode {
+        let color: vec4_t = [0.0, 1.0, 0.0, 1.0];
+        let rect = menus.item(item).window.rect;
+        dc.drawRect(rect.x, rect.y, rect.w, rect.h, 1.0, color);
+    }
+
+    let itemType = menus.item(item).r#type;
+    match itemType {
+        ITEM_TYPE_OWNERDRAW => Item_OwnerDraw_Paint(menus, ds, dc, Some(item), seLanguageModCount),
+        ITEM_TYPE_TEXT | ITEM_TYPE_BUTTON => {
+            Item_Text_Paint(menus, ds, dc, item, seLanguageModCount)
+        }
+        ITEM_TYPE_RADIOBUTTON => {}
+        ITEM_TYPE_CHECKBOX => {}
+        ITEM_TYPE_EDITFIELD | ITEM_TYPE_NUMERICFIELD => {
+            Item_TextField_Paint(menus, ds, dc, item, seLanguageModCount)
+        }
+        ITEM_TYPE_COMBO => {}
+        ITEM_TYPE_LISTBOX => Item_ListBox_Paint(menus, ds, dc, item),
+        ITEM_TYPE_TEXTSCROLL => Item_TextScroll_Paint(menus, ds, dc, item),
+        ITEM_TYPE_MODEL => Item_Model_Paint(menus, ds, dc, item),
+        ITEM_TYPE_YESNO => Item_YesNo_Paint(menus, ds, dc, item, seLanguageModCount),
+        ITEM_TYPE_MULTI => Item_Multi_Paint(menus, ds, dc, item, seLanguageModCount),
+        ITEM_TYPE_BIND => Item_Bind_Paint(menus, ds, dc, item, seLanguageModCount),
+        ITEM_TYPE_SLIDER => Item_Slider_Paint(menus, ds, dc, item, seLanguageModCount),
+        _ => {}
+    }
 }

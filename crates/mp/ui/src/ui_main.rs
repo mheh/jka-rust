@@ -8,6 +8,11 @@
 use core::ffi::{c_char, c_int, c_short, c_void, CStr};
 
 use mp_abi::ui::public::ui_client_state_t::uiClientState_t;
+use mp_abi::ui::public::ui_menu_command_t::{
+    uiMenuCommand_t, UIMENU_CLASSSEL, UIMENU_CLOSEALL, UIMENU_INGAME, UIMENU_MAIN, UIMENU_NONE,
+    UIMENU_PLAYERCONFIG, UIMENU_PLAYERFORCE, UIMENU_POSTGAME, UIMENU_SIEGEMESSAGE,
+    UIMENU_SIEGEOBJECTIVES, UIMENU_TEAM, UIMENU_VOICECHAT,
+};
 use mp_bg::bg_channel::BgState;
 use mp_bg::bg_misc::{forceMasteryPoints, BG_FindItemForHoldable, BG_FindItemForWeapon};
 use mp_bg::bg_saga::{
@@ -67,28 +72,30 @@ use mp_uishared::shared::menudef::{
     ITEM_TEXTSTYLE_OUTLINED, ITEM_TEXTSTYLE_OUTLINESHADOWED, ITEM_TEXTSTYLE_PULSE,
     ITEM_TEXTSTYLE_SHADOWED, ITEM_TEXTSTYLE_SHADOWEDMORE, UI_ALLMAPS_SELECTION, UI_AUTOSWITCHLIST,
     UI_BLUETEAM1, UI_BLUETEAM2, UI_BLUETEAM3, UI_BLUETEAM4, UI_BLUETEAM5, UI_BLUETEAM6,
-    UI_BLUETEAM7, UI_BLUETEAM8, UI_BLUETEAMNAME, UI_BOTNAME, UI_BOTSKILL, UI_CLANCINEMATIC,
-    UI_CLANLOGO, UI_CLANNAME, UI_CROSSHAIR, UI_EFFECTS, UI_FORCE_MASTERY_SET, UI_FORCE_POINTS,
-    UI_FORCE_RANK, UI_FORCE_RANK_HEAL, UI_FORCE_RANK_SABERTHROW, UI_FORCE_SIDE, UI_GAMETYPE,
-    UI_GLINFO, UI_HANDICAP, UI_JEDI_NONJEDI, UI_JOINGAMETYPE, UI_KEYBINDSTATUS, UI_MAPCINEMATIC,
-    UI_MAPPREVIEW, UI_MAPS_SELECTION, UI_MAP_TIMETOBEAT, UI_NETFILTER, UI_NETGAMETYPE,
-    UI_NETMAPCINEMATIC, UI_NETMAPPREVIEW, UI_NETSOURCE, UI_OPPONENTLOGO, UI_OPPONENTLOGO_METAL,
-    UI_OPPONENTLOGO_NAME, UI_OPPONENTMODEL, UI_OPPONENT_NAME, UI_PLAYERLOGO, UI_PLAYERLOGO_METAL,
-    UI_PLAYERLOGO_NAME, UI_PLAYERMODEL, UI_PREVIEWCINEMATIC, UI_REDBLUE, UI_REDTEAM1, UI_REDTEAM2,
-    UI_REDTEAM3, UI_REDTEAM4, UI_REDTEAM5, UI_REDTEAM6, UI_REDTEAM7, UI_REDTEAM8, UI_REDTEAMNAME,
-    UI_SELECTEDPLAYER, UI_SERVERMOTD, UI_SERVERREFRESHDATE, UI_SHOW_ANYNONTEAMGAME,
-    UI_SHOW_ANYTEAMGAME, UI_SHOW_DEMOAVAILABLE, UI_SHOW_FAVORITESERVERS, UI_SHOW_FFA,
-    UI_SHOW_LEADER, UI_SHOW_NETANYNONTEAMGAME, UI_SHOW_NETANYTEAMGAME, UI_SHOW_NEWBESTTIME,
-    UI_SHOW_NEWHIGHSCORE, UI_SHOW_NOTFAVORITESERVERS, UI_SHOW_NOTFFA, UI_SHOW_NOTLEADER, UI_SKILL,
-    UI_SKIN_COLOR, UI_STARTMAPCINEMATIC, UI_TIER, UI_TIERMAP1, UI_TIERMAP2, UI_TIERMAP3,
-    UI_TIER_GAMETYPE, UI_TIER_MAPNAME, UI_TOTALFORCESTARS, UI_VERSION,
+    UI_BLUETEAM7, UI_BLUETEAM8, UI_BLUETEAMNAME, UI_BOTNAME, UI_BOTSKILL, UI_CHAT_ATTACK,
+    UI_CHAT_DEFEND, UI_CHAT_MAIN, UI_CHAT_REPLY, UI_CHAT_REQUEST, UI_CHAT_SPOT, UI_CHAT_TACTICAL,
+    UI_CLANCINEMATIC, UI_CLANLOGO, UI_CLANNAME, UI_CROSSHAIR, UI_EFFECTS, UI_FORCE_MASTERY_SET,
+    UI_FORCE_POINTS, UI_FORCE_RANK, UI_FORCE_RANK_HEAL, UI_FORCE_RANK_SABERTHROW, UI_FORCE_SIDE,
+    UI_GAMETYPE, UI_GLINFO, UI_HANDICAP, UI_JEDI_NONJEDI, UI_JOINGAMETYPE, UI_KEYBINDSTATUS,
+    UI_MAPCINEMATIC, UI_MAPPREVIEW, UI_MAPS_SELECTION, UI_MAP_TIMETOBEAT, UI_NETFILTER,
+    UI_NETGAMETYPE, UI_NETMAPCINEMATIC, UI_NETMAPPREVIEW, UI_NETSOURCE, UI_OPPONENTLOGO,
+    UI_OPPONENTLOGO_METAL, UI_OPPONENTLOGO_NAME, UI_OPPONENTMODEL, UI_OPPONENT_NAME, UI_PLAYERLOGO,
+    UI_PLAYERLOGO_METAL, UI_PLAYERLOGO_NAME, UI_PLAYERMODEL, UI_PREVIEWCINEMATIC, UI_REDBLUE,
+    UI_REDTEAM1, UI_REDTEAM2, UI_REDTEAM3, UI_REDTEAM4, UI_REDTEAM5, UI_REDTEAM6, UI_REDTEAM7,
+    UI_REDTEAM8, UI_REDTEAMNAME, UI_SELECTEDPLAYER, UI_SERVERMOTD, UI_SERVERREFRESHDATE,
+    UI_SHOW_ANYNONTEAMGAME, UI_SHOW_ANYTEAMGAME, UI_SHOW_DEMOAVAILABLE, UI_SHOW_FAVORITESERVERS,
+    UI_SHOW_FFA, UI_SHOW_LEADER, UI_SHOW_NETANYNONTEAMGAME, UI_SHOW_NETANYTEAMGAME,
+    UI_SHOW_NEWBESTTIME, UI_SHOW_NEWHIGHSCORE, UI_SHOW_NOTFAVORITESERVERS, UI_SHOW_NOTFFA,
+    UI_SHOW_NOTLEADER, UI_SKILL, UI_SKIN_COLOR, UI_STARTMAPCINEMATIC, UI_TIER, UI_TIERMAP1,
+    UI_TIERMAP2, UI_TIERMAP3, UI_TIER_GAMETYPE, UI_TIER_MAPNAME, UI_TOTALFORCESTARS, UI_VERSION,
 };
 use mp_uishared::shared::rect_def_t::RectDef;
 use mp_uishared::ui_shared::{
-    Display_KeyBindPending, Int_Parse, ItemParse_asset_model_go, ItemParse_model_g2anim_go,
-    ItemParse_model_g2skin_go, Item_RunScript, LerpColor, Menu_FindItemByName, Menu_GetFocused,
-    Menu_SetFeederSelection, Menu_SetItemBackground, Menu_ShowGroup, Menu_ShowItemByName,
-    Menus_AnyFullScreenVisible, Menus_FindByName, PC_Color_Parse, PC_Float_Parse, PC_Int_Parse,
+    Display_KeyBindPending, Display_MouseMove, Int_Parse, ItemParse_asset_model_go,
+    ItemParse_model_g2anim_go, ItemParse_model_g2skin_go, Item_RunScript, LerpColor, Menu_Count,
+    Menu_FindItemByName, Menu_GetFocused, Menu_SetFeederSelection, Menu_SetItemBackground,
+    Menu_ShowGroup, Menu_ShowItemByName, Menus_ActivateByName, Menus_AnyFullScreenVisible,
+    Menus_CloseAll, Menus_FindByName, PC_Color_Parse, PC_Float_Parse, PC_Int_Parse,
     PC_Script_Parse, PC_String_Parse, String_Parse, String_Report, UI_CleanupGhoul2,
 };
 use native_math::qmath::Com_Clamp;
@@ -114,7 +121,11 @@ use crate::ui_atoms::{
     Com_Error, Com_Printf, UI_Cvar_VariableString, UI_DrawHandlePic, UI_FillRect,
     UI_LoadBestScores, UI_SetColor,
 };
-use crate::ui_force::{UI_DrawForceStars, UI_ForceConfigHandle};
+use crate::ui_force::{
+    UI_DrawForceStars, UI_ForceConfigHandle, UI_ForceMaxRank_HandleKey,
+    UI_ForcePowerRank_HandleKey, UI_ForceSide_HandleKey, UI_JediNonJedi_HandleKey,
+    UI_SkinColor_HandleKey, UpdateForceUsed,
+};
 use crate::ui_gameinfo::{UI_GetBotNameByNumber, UI_GetNumBots, MAX_MAPS};
 use crate::ui_saber::{
     SaberColorToString, TranslateSaberColor, UI_SaberAttachToChar, UI_SaberModelForSaber,
@@ -11117,4 +11128,372 @@ pub fn UI_FeederSelection(
     // MP surface — dropped, not compiled in the retail build.
 
     true
+}
+
+/// Raven `Load_Menu` — parses one `{ ... }` menu block off the given PC
+/// handle, forwarding every token string in between to [`UI_ParseMenu`].
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1778-1803`
+pub fn Load_Menu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, handle: c_int) -> bool {
+    let mut token = pc_token_t {
+        type_: 0,
+        subtype: 0,
+        intvalue: 0,
+        floatvalue: 0.0,
+        string: [0; MAX_TOKENLENGTH],
+    };
+
+    if !trap::PC_ReadToken(ctx.engine, handle, &mut token) {
+        return false;
+    }
+    if !pc_token_str(&token).starts_with('{') {
+        return false;
+    }
+
+    loop {
+        token = pc_token_t {
+            type_: 0,
+            subtype: 0,
+            intvalue: 0,
+            floatvalue: 0.0,
+            string: [0; MAX_TOKENLENGTH],
+        };
+
+        if !trap::PC_ReadToken(ctx.engine, handle, &mut token) {
+            return false;
+        }
+
+        let tokenStr = pc_token_str(&token);
+
+        if tokenStr.is_empty() {
+            return false;
+        }
+
+        if tokenStr.starts_with('}') {
+            return true;
+        }
+
+        UI_ParseMenu(ctx, dc, &tokenStr);
+    }
+}
+
+/// Raven `UI_OwnerDrawHandleKey` — dispatches a key event to the ownerdraw
+/// item's key handler by ownerdraw id.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:4798-4960`
+// not yet wired: the DC->ownerDrawHandleKey seam / UI_OwnerDraw are unported.
+#[allow(dead_code)]
+#[allow(clippy::too_many_lines)]
+fn UI_OwnerDrawHandleKey(
+    ctx: &mut UiContext,
+    dc: &mut dyn DisplayContext,
+    ownerDraw: c_int,
+    flags: c_int,
+    special: &mut f32,
+    key: c_int,
+) -> bool {
+    match ownerDraw {
+        UI_HANDICAP => return UI_Handicap_HandleKey(ctx, flags, special, key),
+        UI_SKIN_COLOR => {
+            return UI_SkinColor_HandleKey(
+                ctx,
+                dc,
+                flags,
+                Some(special),
+                key,
+                ctx.world.main.uiSkinColor,
+                TEAM_FREE,
+                TEAM_BLUE,
+                ownerDraw,
+            )
+        }
+        UI_FORCE_SIDE => {
+            return UI_ForceSide_HandleKey(
+                ctx,
+                dc,
+                flags,
+                Some(special),
+                key,
+                ctx.world.force.uiForceSide,
+                1,
+                2,
+                ownerDraw,
+            )
+        }
+        UI_JEDI_NONJEDI => {
+            return UI_JediNonJedi_HandleKey(
+                ctx,
+                dc,
+                flags,
+                Some(special),
+                key,
+                ctx.world.force.uiJediNonJedi,
+                0,
+                1,
+                ownerDraw,
+            )
+        }
+        UI_FORCE_MASTERY_SET => {
+            return UI_ForceMaxRank_HandleKey(
+                ctx,
+                dc,
+                flags,
+                Some(special),
+                key,
+                ctx.world.force.uiForceRank,
+                1,
+                MAX_FORCE_RANK,
+                ownerDraw,
+            )
+        }
+        UI_FORCE_RANK => {}
+        UI_CHAT_MAIN => return UI_Chat_Main_HandleKey(ctx.world, dc, key),
+        UI_CHAT_ATTACK => return UI_Chat_Attack_HandleKey(ctx.world, dc, key),
+        UI_CHAT_DEFEND => return UI_Chat_Defend_HandleKey(ctx.world, dc, key),
+        UI_CHAT_REQUEST => return UI_Chat_Request_HandleKey(ctx.world, dc, key),
+        UI_CHAT_REPLY => return UI_Chat_Reply_HandleKey(ctx.world, dc, key),
+        UI_CHAT_SPOT => return UI_Chat_Spot_HandleKey(ctx.world, dc, key),
+        UI_CHAT_TACTICAL => return UI_Chat_Tactical_HandleKey(ctx.world, dc, key),
+        UI_FORCE_RANK_HEAL..=UI_FORCE_RANK_SABERTHROW => {
+            // this will give us the index as long as UI_FORCE_RANK is always
+            // one below the first force rank index
+            let findex = (ownerDraw - UI_FORCE_RANK) - 1;
+            return UI_ForcePowerRank_HandleKey(
+                ctx,
+                dc,
+                flags,
+                Some(special),
+                key,
+                ctx.world.force.uiForcePowersRank[findex as usize],
+                0,
+                NUM_FORCE_POWER_LEVELS - 1,
+                ownerDraw,
+            );
+        }
+        UI_EFFECTS => return UI_Effects_HandleKey(ctx, flags, special, key),
+        UI_GAMETYPE => return UI_GameType_HandleKey(ctx, dc, flags, special, key, true),
+        UI_NETGAMETYPE => return UI_NetGameType_HandleKey(ctx, dc, flags, special, key),
+        UI_AUTOSWITCHLIST => return UI_AutoSwitch_HandleKey(ctx, flags, special, key),
+        UI_JOINGAMETYPE => return UI_JoinGameType_HandleKey(ctx, dc, flags, special, key),
+        UI_SKILL => return UI_Skill_HandleKey(ctx, flags, special, key),
+        UI_BLUETEAMNAME => return UI_TeamName_HandleKey(ctx, flags, special, key, true),
+        UI_REDTEAMNAME => return UI_TeamName_HandleKey(ctx, flags, special, key, false),
+        UI_BLUETEAM1 | UI_BLUETEAM2 | UI_BLUETEAM3 | UI_BLUETEAM4 | UI_BLUETEAM5 | UI_BLUETEAM6
+        | UI_BLUETEAM7 | UI_BLUETEAM8 => {
+            let iUse = if ownerDraw <= UI_BLUETEAM5 {
+                ownerDraw - UI_BLUETEAM1 + 1
+            } else {
+                // unpleasent hack because I don't want to move up all the
+                // UI_BLAHTEAM# defines
+                ownerDraw - 274
+            };
+            UI_TeamMember_HandleKey(ctx, flags, special, key, true, iUse);
+        }
+        UI_REDTEAM1 | UI_REDTEAM2 | UI_REDTEAM3 | UI_REDTEAM4 | UI_REDTEAM5 | UI_REDTEAM6
+        | UI_REDTEAM7 | UI_REDTEAM8 => {
+            let iUse = if ownerDraw <= UI_REDTEAM5 {
+                ownerDraw - UI_REDTEAM1 + 1
+            } else {
+                // unpleasent hack because I don't want to move up all the
+                // UI_BLAHTEAM# defines
+                ownerDraw - 277
+            };
+            UI_TeamMember_HandleKey(ctx, flags, special, key, false, iUse);
+        }
+        UI_NETSOURCE => {
+            UI_NetSource_HandleKey(ctx, dc, flags, special, key);
+        }
+        UI_NETFILTER => {
+            UI_NetFilter_HandleKey(ctx, dc, flags, special, key);
+        }
+        UI_OPPONENT_NAME => {
+            UI_OpponentName_HandleKey(ctx, flags, special, key);
+        }
+        UI_BOTNAME => return UI_BotName_HandleKey(ctx.world, flags, special, key),
+        UI_BOTSKILL => return UI_BotSkill_HandleKey(ctx.world, flags, special, key),
+        UI_REDBLUE => {
+            UI_RedBlue_HandleKey(ctx.world, flags, special, key);
+        }
+        UI_CROSSHAIR => {
+            UI_Crosshair_HandleKey(ctx, flags, special, key);
+        }
+        UI_SELECTEDPLAYER => {
+            UI_SelectedPlayer_HandleKey(ctx, flags, special, key);
+        }
+        // Raven's commented-out `UI_VOICECHAT` case and the `#ifdef _XBOX`
+        // `UI_XBOX_PASSCODE` case are dead in the retail MP build.
+        _ => {}
+    }
+
+    false
+}
+
+/// Raven `_UI_MouseEvent` — updates the cursor position and forwards the
+/// move to the focused menu.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:10871-10892`
+pub fn _UI_MouseEvent(ctx: &mut UiContext, dc: &mut dyn DisplayContext, dx: c_int, dy: c_int) {
+    // update mouse screen position
+    ctx.world.uiDC.cursorx += dx;
+    if ctx.world.uiDC.cursorx < 0 {
+        ctx.world.uiDC.cursorx = 0;
+    } else if ctx.world.uiDC.cursorx > SCREEN_WIDTH {
+        ctx.world.uiDC.cursorx = SCREEN_WIDTH;
+    }
+
+    ctx.world.uiDC.cursory += dy;
+    if ctx.world.uiDC.cursory < 0 {
+        ctx.world.uiDC.cursory = 0;
+    } else if ctx.world.uiDC.cursory > SCREEN_HEIGHT {
+        ctx.world.uiDC.cursory = SCREEN_HEIGHT;
+    }
+
+    if Menu_Count(&ctx.world.menus) > 0 {
+        // menuDef_t *menu = Menu_GetFocused();
+        // Menu_HandleMouseMove(menu, uiInfo.uiDC.cursorx, uiInfo.uiDC.cursory);
+        let cursorx = ctx.world.uiDC.cursorx;
+        let cursory = ctx.world.uiDC.cursory;
+        Display_MouseMove(
+            &mut ctx.world.menus,
+            &ctx.world.uiDC,
+            dc,
+            None,
+            cursorx,
+            cursory,
+        );
+    }
+}
+
+/// Raven `_UI_SetActiveMenu` — the ONLY way the menu system is brought up;
+/// ensures minimum menu data is cached, then activates the named menu for
+/// the requested `uiMenuCommand_t`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:10903-11028`
+#[allow(clippy::too_many_lines)]
+pub fn _UI_SetActiveMenu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menu: uiMenuCommand_t) {
+    // this should be the ONLY way the menu system is brought up
+    // enusure minumum menu data is cached
+    if Menu_Count(&ctx.world.menus) <= 0 {
+        return;
+    }
+
+    match menu {
+        UIMENU_NONE => {
+            let catcher = trap::Key_GetCatcher(ctx.engine);
+            trap::Key_SetCatcher(ctx.engine, catcher & !KEYCATCH_UI);
+            trap::Key_ClearStates(ctx.engine);
+            trap::Cvar_Set(ctx.engine, "cl_paused", "0");
+            Menus_CloseAll(&mut ctx.world.menus, dc);
+        }
+        UIMENU_MAIN => {
+            trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
+            if ctx.world.inGameLoad {
+                // DEFERRED: UI_LoadNonIngame — commented out in Raven at
+                // this call site (ui_main.c:10929). (ui-plan literal parity)
+                // Source: oracle/codemp/ui/ui_main.c:10927-10930
+            }
+
+            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "main");
+            let buf = trap::Cvar_VariableStringBuffer(ctx.engine, "com_errorMessage", 256);
+
+            if !buf.is_empty() {
+                if ctx.world.cvars.ui_singlePlayerActive.integer == 0 {
+                    Menus_ActivateByName(
+                        &mut ctx.world.menus,
+                        &ctx.world.uiDC,
+                        dc,
+                        "error_popmenu",
+                    );
+                } else {
+                    trap::Cvar_Set(ctx.engine, "com_errorMessage", "");
+                }
+            }
+        }
+        UIMENU_TEAM => {
+            trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
+            Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "team");
+        }
+        UIMENU_POSTGAME => {
+            trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
+            if ctx.world.inGameLoad {
+                // DEFERRED: UI_LoadNonIngame — commented out in Raven at
+                // this call site (ui_main.c:10964-10965). (ui-plan literal
+                // parity)
+                // Source: oracle/codemp/ui/ui_main.c:10963-10965
+            }
+            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "endofgame");
+        }
+        UIMENU_INGAME => {
+            trap::Cvar_Set(ctx.engine, "cl_paused", "1");
+            trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
+            UI_BuildPlayerList(ctx);
+            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "ingame");
+        }
+        UIMENU_PLAYERCONFIG => {
+            trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
+            UI_BuildPlayerList(ctx);
+            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "ingame_player");
+            UpdateForceUsed(ctx, dc);
+        }
+        UIMENU_PLAYERFORCE => {
+            trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
+            UI_BuildPlayerList(ctx);
+            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_ActivateByName(
+                &mut ctx.world.menus,
+                &ctx.world.uiDC,
+                dc,
+                "ingame_playerforce",
+            );
+            UpdateForceUsed(ctx, dc);
+        }
+        UIMENU_SIEGEMESSAGE => {
+            trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
+            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "siege_popmenu");
+        }
+        UIMENU_SIEGEOBJECTIVES => {
+            trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
+            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_ActivateByName(
+                &mut ctx.world.menus,
+                &ctx.world.uiDC,
+                dc,
+                "ingame_siegeobjectives",
+            );
+        }
+        UIMENU_VOICECHAT => {
+            // No chat in non-siege games.
+            if trap::Cvar_VariableValue(ctx.engine, "g_gametype") < GT_TEAM as f32 {
+                return;
+            }
+
+            trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
+            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_ActivateByName(
+                &mut ctx.world.menus,
+                &ctx.world.uiDC,
+                dc,
+                "ingame_voicechat",
+            );
+        }
+        UIMENU_CLOSEALL => {
+            Menus_CloseAll(&mut ctx.world.menus, dc);
+        }
+        UIMENU_CLASSSEL => {
+            trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
+            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_ActivateByName(
+                &mut ctx.world.menus,
+                &ctx.world.uiDC,
+                dc,
+                "ingame_siegeclass",
+            );
+        }
+        _ => {}
+    }
 }
