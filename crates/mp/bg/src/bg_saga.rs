@@ -1436,6 +1436,33 @@ pub fn BG_GetUIPortrait(
     }
 }
 
+/// Raven `siegeTeamX->classes[classIndex]->uiPortraitShader` — the siege
+/// feeder's class-portrait lookup as a safe accessor, so ui reads the
+/// bg-owned class arena without a raw deref (`teamIndex` is the caller's
+/// `bgSiegeTeams` slot, the ported stand-in for Raven's `siegeTeam_t *`).
+///
+/// Returns 0 on any null/out-of-range step, matching Raven's own
+/// `if (siegeTeam1->classes[index])` null path.
+/// Source: `oracle/codemp/ui/ui_main.c:9256-9289` (deref site);
+/// `oracle/codemp/game/bg_saga.h:82-88` (`siegeTeam_t`), `:54-80`
+/// (`siegeClass_t`)
+pub fn BG_SiegeTeamClassPortrait(teamIndex: usize, classIndex: c_int, bg: &BgState) -> qhandle_t {
+    unsafe {
+        let team = match bg.bgSiegeTeams.get(teamIndex) {
+            Some(t) => t,
+            None => return 0,
+        };
+        if classIndex < 0 {
+            return 0;
+        }
+        let cl = match team.classes.get(classIndex as usize) {
+            Some(c) if !c.is_null() => *c,
+            _ => return 0,
+        };
+        (*cl).uiPortraitShader
+    }
+}
+
 /// Raven `BG_GetClassOnBaseClass`.
 ///
 /// Raven: this is really getting ugly - looking to get the base class (within

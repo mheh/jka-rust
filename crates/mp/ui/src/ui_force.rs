@@ -6,18 +6,22 @@
 
 use core::ffi::c_int;
 
-use mp_bg::bg_misc::bgForcePowerCost;
+use mp_bg::bg_misc::forceMasteryPoints;
+use mp_bg::public::team::TEAM_SPECTATOR;
 use mp_qshared::common::mp::qcommon::saber::saber_colors::{
     SABER_BLUE, SABER_GREEN, SABER_ORANGE, SABER_PURPLE, SABER_RED, SABER_YELLOW,
 };
 use mp_qshared::shared::cbuf_exec::cbufExec_t;
-use mp_qshared::shared::force_powers::{FORCE_DARKSIDE, FORCE_LEVEL_1, FORCE_LIGHTSIDE};
-use mp_qshared::shared::FS_WRITE;
+use mp_qshared::shared::force_powers::{
+    FORCE_DARKSIDE, FORCE_LEVEL_1, FORCE_LIGHTSIDE, FP_LEVITATION, FP_SABERTHROW, FP_SABER_DEFENSE,
+    FP_SABER_OFFENSE, NUM_FORCE_POWERS, NUM_FORCE_POWER_LEVELS,
+};
 use mp_qshared::shared::vec4_t;
+use mp_qshared::shared::FS_WRITE;
 use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::menudef::FEEDER_FORCECFG;
 use mp_uishared::shared::rect_def_t::RectDef;
-use mp_uishared::ui_shared::Menu_SetFeederSelection;
+use mp_uishared::ui_shared::{Menu_SetFeederSelection, Menu_ShowItemByName, Menus_FindByName};
 use native_string::Q_stricmp;
 use native_types::fileHandle_t;
 
@@ -26,7 +30,17 @@ use crate::world::ui_context::UiContext;
 use crate::world::ui_world::UiWorld;
 
 use super::ui_atoms::{Com_Printf, UI_Cvar_VariableString, UI_DrawHandlePic};
-use super::ui_main::UI_LoadForceConfig_List;
+use super::ui_main::{UI_LoadForceConfig_List, UI_TeamName, UI_TrueJediEnabled};
+
+/// Raven `#define FORCE_NONJEDI 0`.
+///
+/// Source: `oracle/codemp/ui/ui_force.h:4`
+const FORCE_NONJEDI: c_int = 0;
+
+/// Raven `#define FORCE_JEDI 1`.
+///
+/// Source: `oracle/codemp/ui/ui_force.h:5`
+const FORCE_JEDI: c_int = 1;
 
 /// Raven `UI_InitForceShaders` — registers the force-star and saber-color
 /// shaders used on the force-allocation screen.
@@ -158,7 +172,7 @@ pub fn UI_DrawForceStars(
     }
 
     for i in FORCE_LEVEL_1..=max {
-        let star_color = bgForcePowerCost[forceindex as usize][i as usize];
+        let star_color = ctx.world.bg_state.bgForcePowerCost[forceindex as usize][i as usize];
 
         if ctx.world.force.uiForcePowersDisabled[forceindex as usize] {
             let gr_color: vec4_t = [0.2, 0.2, 0.2, 1.0];
@@ -284,5 +298,165 @@ pub fn UI_SaveForceTemplate(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
     // Else, go back to 0
     if !foundFeederItem {
         Menu_SetFeederSelection(&mut ctx.world.menus, dc, None, FEEDER_FORCECFG, 0, None);
+    }
+}
+
+/// Raven `UpdateForceUsed` — recomputes the force-power budget: locks in the
+/// max rank, ensures the level-1 jump/saber freebies, resolves jedi/non-jedi
+/// status in true-jedi mode (clearing or seeding saber offense and notifying
+/// the server via `forcechanged`), toggles saber-related menu items for the
+/// free-saber cvar, and clamps + re-prices every force power rank against the
+/// available point budget.
+///
+/// Source: `oracle/codemp/ui/ui_force.c:290-460`
+pub fn UpdateForceUsed(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+    // Currently we don't make a distinction between those that wish to play Jedi of lower than maximum skill.
+    ctx.world.force.uiForceRank = ctx.world.force.uiMaxRank;
+
+    ctx.world.force.uiForceUsed = 0;
+    ctx.world.force.uiForceAvailable = forceMasteryPoints[ctx.world.force.uiForceRank as usize];
+
+    // Make sure that we have one freebie in jump.
+    if ctx.world.force.uiForcePowersRank[FP_LEVITATION as usize] < 1 {
+        ctx.world.force.uiForcePowersRank[FP_LEVITATION as usize] = 1;
+    }
+
+    if UI_TrueJediEnabled(ctx) {
+        // true jedi mode is set
+        if ctx.world.force.uiJediNonJedi == -1 {
+            let mut x: c_int = 0;
+            let mut clear = false;
+            let mut update = false;
+            ctx.world.force.uiJediNonJedi = FORCE_NONJEDI;
+            while x < NUM_FORCE_POWERS {
+                // if any force power is set, we must be a jedi
+                if x == FP_LEVITATION || x == FP_SABER_OFFENSE {
+                    if ctx.world.force.uiForcePowersRank[x as usize] > 1 {
+                        ctx.world.force.uiJediNonJedi = FORCE_JEDI;
+                        break;
+                    } else if ctx.world.force.uiForcePowersRank[x as usize] > 0 {
+                        clear = true;
+                    }
+                } else if ctx.world.force.uiForcePowersRank[x as usize] > 0 {
+                    ctx.world.force.uiJediNonJedi = FORCE_JEDI;
+                    break;
+                }
+                x += 1;
+            }
+            if ctx.world.force.uiJediNonJedi == FORCE_JEDI {
+                if ctx.world.force.uiForcePowersRank[FP_SABER_OFFENSE as usize] < 1 {
+                    ctx.world.force.uiForcePowersRank[FP_SABER_OFFENSE as usize] = 1;
+                    update = true;
+                }
+            } else if clear {
+                let mut x: c_int = 0;
+                while x < NUM_FORCE_POWERS {
+                    // clear all force
+                    ctx.world.force.uiForcePowersRank[x as usize] = 0;
+                    x += 1;
+                }
+                update = true;
+            }
+            if update {
+                let myTeam = trap::Cvar_VariableValue(ctx.engine, "ui_myteam") as c_int;
+                if myTeam != TEAM_SPECTATOR {
+                    let team_name = UI_TeamName(myTeam).to_string();
+                    // will cause him to respawn, if it's been 5 seconds since last one
+                    UI_UpdateClientForcePowers(ctx, &team_name);
+                } else {
+                    // just update powers
+                    UI_UpdateClientForcePowers(ctx, "");
+                }
+            }
+        }
+    }
+
+    let menu = Menus_FindByName(&ctx.world.menus, "ingame_playerforce");
+    // Set the cost of the saberattack according to whether its free.
+    if ctx.world.cvars.ui_freeSaber.integer != 0 {
+        // Make saber free
+        // PORT-NOTE: Raven's `bgForcePowerCost` is a per-module mutable global;
+        // the runtime copy lives on `BgState` (DEC-36 addendum 11).
+        ctx.world.bg_state.bgForcePowerCost[FP_SABER_OFFENSE as usize][FORCE_LEVEL_1 as usize] = 0;
+        ctx.world.bg_state.bgForcePowerCost[FP_SABER_DEFENSE as usize][FORCE_LEVEL_1 as usize] = 0;
+        // Make sure that we have one freebie in saber if applicable.
+        if ctx.world.force.uiForcePowersRank[FP_SABER_OFFENSE as usize] < 1 {
+            ctx.world.force.uiForcePowersRank[FP_SABER_OFFENSE as usize] = 1;
+        }
+        if ctx.world.force.uiForcePowersRank[FP_SABER_DEFENSE as usize] < 1 {
+            ctx.world.force.uiForcePowersRank[FP_SABER_DEFENSE as usize] = 1;
+        }
+        if let Some(menu) = menu {
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "setFP_SABER_DEFENSE", true);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "setfp_saberthrow", true);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "effectentry", true);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "effectfield", true);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "nosaber", false);
+        }
+    } else {
+        // Make saber normal cost
+        ctx.world.bg_state.bgForcePowerCost[FP_SABER_OFFENSE as usize][FORCE_LEVEL_1 as usize] = 1;
+        ctx.world.bg_state.bgForcePowerCost[FP_SABER_DEFENSE as usize][FORCE_LEVEL_1 as usize] = 1;
+        // Also, check if there is no saberattack.  If there isn't, there had better not be any defense or throw!
+        if ctx.world.force.uiForcePowersRank[FP_SABER_OFFENSE as usize] < 1 {
+            ctx.world.force.uiForcePowersRank[FP_SABER_DEFENSE as usize] = 0;
+            ctx.world.force.uiForcePowersRank[FP_SABERTHROW as usize] = 0;
+            if let Some(menu) = menu {
+                Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "setfp_saberdefend", false);
+                Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "setfp_saberthrow", false);
+                Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "effectentry", false);
+                Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "effectfield", false);
+                Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "nosaber", true);
+            }
+        } else if let Some(menu) = menu {
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "setfp_saberdefend", true);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "setfp_saberthrow", true);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "effectentry", true);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "effectfield", true);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "nosaber", false);
+        }
+    }
+
+    // Make sure that we're still legal.
+    for curpower in 0..NUM_FORCE_POWERS {
+        // Make sure that our ranks are within legal limits.
+        if ctx.world.force.uiForcePowersRank[curpower as usize] < 0 {
+            ctx.world.force.uiForcePowersRank[curpower as usize] = 0;
+        } else if ctx.world.force.uiForcePowersRank[curpower as usize] >= NUM_FORCE_POWER_LEVELS {
+            ctx.world.force.uiForcePowersRank[curpower as usize] = NUM_FORCE_POWER_LEVELS - 1;
+        }
+
+        let mut currank = FORCE_LEVEL_1;
+        while currank <= ctx.world.force.uiForcePowersRank[curpower as usize] {
+            // Check on this force power
+            if ctx.world.force.uiForcePowersRank[curpower as usize] > 0 {
+                // Do not charge the player for the one freebie in jump, or if there is one in saber.
+                if (curpower == FP_LEVITATION && currank == FORCE_LEVEL_1)
+                    || (curpower == FP_SABER_OFFENSE
+                        && currank == FORCE_LEVEL_1
+                        && ctx.world.cvars.ui_freeSaber.integer != 0)
+                    || (curpower == FP_SABER_DEFENSE
+                        && currank == FORCE_LEVEL_1
+                        && ctx.world.cvars.ui_freeSaber.integer != 0)
+                {
+                    // Do nothing (written this way for clarity)
+                } else {
+                    // Check if we can accrue the cost of this power.
+                    let cost =
+                        ctx.world.bg_state.bgForcePowerCost[curpower as usize][currank as usize];
+                    if cost > ctx.world.force.uiForceAvailable {
+                        // We can't afford this power.  Break to the next one.
+                        // Remove this power from the player's roster.
+                        ctx.world.force.uiForcePowersRank[curpower as usize] = currank - 1;
+                        break;
+                    } else {
+                        // Sure we can afford it.
+                        ctx.world.force.uiForceUsed += cost;
+                        ctx.world.force.uiForceAvailable -= cost;
+                    }
+                }
+            }
+            currank += 1;
+        }
     }
 }

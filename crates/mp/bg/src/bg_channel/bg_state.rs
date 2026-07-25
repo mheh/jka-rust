@@ -18,6 +18,7 @@ use crate::prelude::*;
 use mp_qshared::shared::com_parse::QSharedScratch;
 
 use super::rng::Rng;
+use crate::bg_misc::{bgForcePowerCost, bgForcePowerCostSaberThrow};
 use crate::bg_panimate::MAX_ANIM_FILES;
 use crate::public::anim_number::animNumber_t;
 use crate::public::bg_loaded_anim::bgLoadedAnim_t;
@@ -143,6 +144,17 @@ pub struct BgState {
     /// Source: `oracle/codemp/game/bg_saga.h:113`
     pub siege_valid: c_int,
 
+    // --- `bg_misc.c` force-power cost table ---
+    /// Raven `int bgForcePowerCost[NUM_FORCE_POWERS][NUM_FORCE_POWER_LEVELS]`.
+    ///
+    /// A per-module *mutable* global: the ui link unit rewrites the
+    /// `FP_SABER_OFFENSE`/`FP_SABER_DEFENSE` level-1 rows for the free-saber
+    /// toggle (`ui_force.c:373-374,395-396`) and bg code in the same module
+    /// reads the mutated values, so the runtime copy lives here, seeded from
+    /// the `bg_misc` const table (`bgForcePowerCost` + the `FP_SABERTHROW` row).
+    /// Source: `oracle/codemp/game/bg_misc.c:174-195`
+    pub bgForcePowerCost: [[c_int; NUM_FORCE_POWER_LEVELS as usize]; NUM_FORCE_POWERS as usize],
+
     // --- `bg_misc.c` string pool ---
     /// Raven `static char bg_pool[MAX_POOL_SIZE]` — the `BG_Alloc` bump pool.
     /// Source: `oracle/codemp/game/bg_misc.c:3324`
@@ -184,6 +196,16 @@ impl BgState {
     /// each hosting module passes its own arm (§F20 duplicate-don't-unify).
     /// Source: `oracle/codemp/game/bg_misc.c:3311-3316`
     pub fn with_pool_size(pool_size: c_int) -> Self {
+        // Seed the runtime cost table from the `bg_misc` consts, folding the
+        // separately-held `FP_SABERTHROW` row back into its Raven row index
+        // (the same fold `bg_misc::force_power_cost` performed).
+        let mut forcePowerCost =
+            [[0 as c_int; NUM_FORCE_POWER_LEVELS as usize]; NUM_FORCE_POWERS as usize];
+        for (row, seed) in forcePowerCost.iter_mut().zip(bgForcePowerCost.iter()) {
+            *row = *seed;
+        }
+        forcePowerCost[FP_SABERTHROW as usize] = bgForcePowerCostSaberThrow;
+
         Self {
             qs: QSharedScratch::zeroed(),
             rng: Rng::new(),
@@ -270,6 +292,7 @@ impl BgState {
             // (bg_misc.c:3326) — not 0 — so the descending temp-alloc arithmetic
             // starts at the top of the pool. Same fixed-array pre-size convention
             // as `bgHumanoidAnimations`/`g_vehicleInfo` above.
+            bgForcePowerCost: forcePowerCost,
             bg_pool: vec![0; pool_size as usize],
             bg_poolSize: 0,
             bg_poolTail: pool_size,

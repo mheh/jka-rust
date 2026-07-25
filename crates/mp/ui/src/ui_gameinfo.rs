@@ -7,20 +7,31 @@
 use core::ffi::c_char;
 use core::ffi::c_int;
 
+use mp_bg::public::gametype::{
+    GT_CTF, GT_CTY, GT_DUEL, GT_FFA, GT_HOLOCRON, GT_JEDIMASTER, GT_POWERDUEL, GT_SIEGE, GT_TEAM,
+};
 use mp_bg::public::{MAX_ARENAS_TEXT, MAX_BOTS_TEXT};
 use mp_qshared::shared::com_parse::{COM_Parse, COM_ParseExt};
-use mp_qshared::shared::q_color::S_COLOR_RED;
+use mp_qshared::shared::cvar::{vmCvar_t, CVAR_INIT, CVAR_ROM};
+use mp_qshared::shared::q_color::{S_COLOR_RED, S_COLOR_YELLOW};
 use mp_qshared::shared::q_string::COM_Compress;
 use mp_qshared::shared::{fileHandle_t, FS_READ};
+use mp_uishared::ui_shared::UI_OutOfMemory;
 use native_string::info::{Info_SetValueForKey, Info_ValueForKey};
-use native_string::latin1_to_string;
 use native_string::q_string::Q_stricmp;
+use native_string::{buf_to_string, latin1_to_string};
 
+use crate::local::map_info::MapInfo;
 use crate::trap;
 use crate::ui_atoms::Com_Printf;
 use crate::world::ui_context::UiContext;
 use crate::world::ui_gameinfo_state::{MAX_ARENAS, MAX_BOTS};
 use crate::world::ui_world::UiWorld;
+
+/// Raven `#define MAX_MAPS 128`.
+///
+/// Source: `oracle/codemp/ui/ui_local.h:567`
+pub const MAX_MAPS: usize = 128;
 
 /// Raven `UI_GetBotInfoByNumber` — retrieve bot info string by numeric index.
 ///
@@ -248,4 +259,146 @@ pub fn UI_LoadBotsFromFile(ctx: &mut UiContext, filename: &str) {
     let max = MAX_BOTS as c_int - ctx.world.gameinfo.ui_botInfos.len() as c_int;
     let mut added = UI_ParseInfos(ctx, &text, max);
     ctx.world.gameinfo.ui_botInfos.append(&mut added);
+}
+
+/// Raven `UI_LoadArenas` — parse every `scripts/*.arena` file into
+/// `ui_arenaInfos`, then build `uiInfo.mapList` from the parsed entries
+/// (map name/load name/levelshot path and game-type bits).
+///
+/// Source: `oracle/codemp/ui/ui_gameinfo.c:125-202`
+pub fn UI_LoadArenas(ctx: &mut UiContext) {
+    // PORT-NOTE: Raven resets `ui_numArenas = 0; uiInfo.mapCount = 0;` — the
+    // owned `Vec`s carry the count as `len()`, so clearing is the equivalent.
+    ctx.world.gameinfo.ui_arenaInfos.clear();
+    ctx.world.mapList.clear();
+
+    // get all arenas from .arena files
+    let mut dirlist = vec![0u8; 1024];
+    let numdirs = trap::FS_GetFileList(ctx.engine, "scripts", ".arena", &mut dirlist);
+    let dirnames = latin1_to_string(&dirlist);
+    let mut dirptrs = dirnames.split('\0');
+    for _ in 0..numdirs {
+        let dirptr = match dirptrs.next() {
+            Some(d) => d,
+            None => break,
+        };
+        let filename = format!("scripts/{}", dirptr);
+        UI_LoadArenasFromFile(ctx, &filename);
+    }
+
+    if UI_OutOfMemory() {
+        trap::Print(
+            ctx.engine,
+            &format!(
+                "{}WARNING: not anough memory in pool to load all arenas\n",
+                S_COLOR_YELLOW.to_str().unwrap()
+            ),
+        );
+    }
+
+    for n in 0..ctx.world.gameinfo.ui_arenaInfos.len() {
+        // determine type
+        let arena_info = ctx.world.gameinfo.ui_arenaInfos[n].clone();
+
+        let mapLoadName = Info_ValueForKey(&arena_info, "map");
+        let mapName = Info_ValueForKey(&arena_info, "longname");
+        let imageName = format!("levelshots/{}", mapLoadName);
+
+        let mut typeBits: c_int = 0;
+        let gtype = Info_ValueForKey(&arena_info, "type");
+        // if no type specified, it will be treated as "ffa"
+        if !gtype.is_empty() {
+            if gtype.contains("ffa") {
+                typeBits |= 1 << GT_FFA;
+            }
+            if gtype.contains("team") {
+                typeBits |= 1 << GT_TEAM;
+            }
+            if gtype.contains("holocron") {
+                typeBits |= 1 << GT_HOLOCRON;
+            }
+            if gtype.contains("jedimaster") {
+                typeBits |= 1 << GT_JEDIMASTER;
+            }
+            if gtype.contains("duel") {
+                typeBits |= 1 << GT_DUEL;
+                typeBits |= 1 << GT_POWERDUEL;
+            }
+            if gtype.contains("powerduel") {
+                typeBits |= 1 << GT_DUEL;
+                typeBits |= 1 << GT_POWERDUEL;
+            }
+            if gtype.contains("siege") {
+                typeBits |= 1 << GT_SIEGE;
+            }
+            if gtype.contains("ctf") {
+                typeBits |= 1 << GT_CTF;
+            }
+            if gtype.contains("cty") {
+                typeBits |= 1 << GT_CTY;
+            }
+        } else {
+            typeBits |= 1 << GT_FFA;
+        }
+
+        ctx.world.mapList.push(MapInfo {
+            cinematic: -1,
+            mapLoadName,
+            mapName,
+            levelShot: -1,
+            imageName,
+            typeBits,
+            ..Default::default()
+        });
+
+        if ctx.world.mapList.len() >= MAX_MAPS {
+            break;
+        }
+    }
+}
+
+/// Raven `UI_LoadBots` — register `g_botsFile`, load its bot defs (falling
+/// back to `botfiles/bots.txt`), then parse every `scripts/*.bot` file into
+/// `ui_botInfos`.
+///
+/// Source: `oracle/codemp/ui/ui_gameinfo.c:260-289`
+pub fn UI_LoadBots(ctx: &mut UiContext) {
+    // PORT-NOTE: Raven resets `ui_numBots = 0` — the owned `Vec` carries the
+    // count as `len()`, so clearing is the equivalent.
+    ctx.world.gameinfo.ui_botInfos.clear();
+
+    let mut botsFile = vmCvar_t::zeroed();
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut botsFile),
+        "g_botsFile",
+        "",
+        CVAR_INIT | CVAR_ROM,
+    );
+    let botsFile_string = buf_to_string(
+        &botsFile
+            .string
+            .iter()
+            .map(|&c| c as u8)
+            .collect::<Vec<u8>>(),
+    );
+    if !botsFile_string.is_empty() {
+        UI_LoadBotsFromFile(ctx, &botsFile_string);
+    } else {
+        UI_LoadBotsFromFile(ctx, "botfiles/bots.txt");
+    }
+
+    // get all bots from .bot files
+    let mut dirlist = vec![0u8; 1024];
+    let numdirs = trap::FS_GetFileList(ctx.engine, "scripts", ".bot", &mut dirlist);
+    let dirnames = latin1_to_string(&dirlist);
+    let mut dirptrs = dirnames.split('\0');
+    for _ in 0..numdirs {
+        let dirptr = match dirptrs.next() {
+            Some(d) => d,
+            None => break,
+        };
+        let filename = format!("scripts/{}", dirptr);
+        UI_LoadBotsFromFile(ctx, &filename);
+    }
 }

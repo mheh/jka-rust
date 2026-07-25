@@ -263,38 +263,46 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
 
         if ctx.world.cvars.g_forceBasedTeams.integer != 0 {
             if (*cl).sess.sessionTeam == TEAM_RED {
+                let saberOnly = HasSetSaberOnly(ctx) as qboolean;
                 warnClient = (BG_LegalizedForcePowers(
+                    &ctx.world.bg_state,
                     &mut forcePowers,
                     maxRank,
-                    HasSetSaberOnly(ctx) as qboolean,
+                    saberOnly,
                     FORCE_DARKSIDE as c_int,
                     gametype,
                     ctx.world.cvars.g_forcePowerDisable.integer,
                 ) == 0) as qboolean;
             } else if (*cl).sess.sessionTeam == TEAM_BLUE {
+                let saberOnly = HasSetSaberOnly(ctx) as qboolean;
                 warnClient = (BG_LegalizedForcePowers(
+                    &ctx.world.bg_state,
                     &mut forcePowers,
                     maxRank,
-                    HasSetSaberOnly(ctx) as qboolean,
+                    saberOnly,
                     FORCE_LIGHTSIDE as c_int,
                     gametype,
                     ctx.world.cvars.g_forcePowerDisable.integer,
                 ) == 0) as qboolean;
             } else {
+                let saberOnly = HasSetSaberOnly(ctx) as qboolean;
                 warnClient = (BG_LegalizedForcePowers(
+                    &ctx.world.bg_state,
                     &mut forcePowers,
                     maxRank,
-                    HasSetSaberOnly(ctx) as qboolean,
+                    saberOnly,
                     0,
                     gametype,
                     ctx.world.cvars.g_forcePowerDisable.integer,
                 ) == 0) as qboolean;
             }
         } else {
+            let saberOnly = HasSetSaberOnly(ctx) as qboolean;
             warnClient = (BG_LegalizedForcePowers(
+                &ctx.world.bg_state,
                 &mut forcePowers,
                 maxRank,
-                HasSetSaberOnly(ctx) as qboolean,
+                saberOnly,
                 0,
                 gametype,
                 ctx.world.cvars.g_forcePowerDisable.integer,

@@ -25,7 +25,7 @@ use mp_qshared::shared::q_math::{_VectorMA, VectorSet};
 use mp_qshared::shared::q_string::COM_Compress;
 use mp_qshared::shared::{fileHandle_t, vec3_t, FS_READ};
 use mp_uishared::shared::menu_system::MAX_MENUFILE;
-use native_string::latin1_to_string;
+use native_string::{atof, atoi, latin1_to_string};
 use native_types::qfalse;
 
 use crate::trap;
@@ -569,4 +569,191 @@ pub fn UI_SaberParseParm(ctx: &mut UiContext, saberName: &str, parmname: &str) -
     };
     ctx.world.saber.SaberParms = saber_parms;
     result
+}
+
+/// Raven `UI_SaberModelForSaber` — looks up `saberModel` for `saberName`.
+///
+/// PORT-NOTE: `char *saberModel` out-param + `qboolean` found-flag collapses
+/// into `UI_SaberParseParm`'s `Option<String>` (dictionary: out-param ->
+/// return).
+///
+/// Source: `oracle/codemp/ui/ui_saber.c:167-170`
+pub fn UI_SaberModelForSaber(ctx: &mut UiContext, saberName: &str) -> Option<String> {
+    UI_SaberParseParm(ctx, saberName, "saberModel")
+}
+
+/// Raven `UI_SaberSkinForSaber` — looks up `customSkin` for `saberName`.
+///
+/// Source: `oracle/codemp/ui/ui_saber.c:172-175`
+pub fn UI_SaberSkinForSaber(ctx: &mut UiContext, saberName: &str) -> Option<String> {
+    UI_SaberParseParm(ctx, saberName, "customSkin")
+}
+
+/// Raven `UI_SaberTypeForSaber` — looks up `saberType` for `saberName`.
+///
+/// Source: `oracle/codemp/ui/ui_saber.c:177-180`
+pub fn UI_SaberTypeForSaber(ctx: &mut UiContext, saberName: &str) -> Option<String> {
+    UI_SaberParseParm(ctx, saberName, "saberType")
+}
+
+/// Raven `UI_SaberNumBladesForSaber` — looks up `numBlades` for `saberName`,
+/// clamped to `[1, 8]` (defaulting to `1` when unparsed/missing).
+///
+/// Source: `oracle/codemp/ui/ui_saber.c:182-197`
+pub fn UI_SaberNumBladesForSaber(ctx: &mut UiContext, saberName: &str) -> i32 {
+    let numBladesString = UI_SaberParseParm(ctx, saberName, "numBlades").unwrap_or_default();
+    let mut numBlades = atoi(&numBladesString);
+    if numBlades < 1 {
+        numBlades = 1;
+    } else if numBlades > 8 {
+        numBlades = 8;
+    }
+    numBlades
+}
+
+/// Raven `UI_SaberShouldDrawBlade` — whether blade `bladeNum` of `saberName`
+/// should be drawn, per the (optionally two-style) `noBlade`/`noBlade2`
+/// bitmask parms gated by `bladeStyle2Start`.
+///
+/// Source: `oracle/codemp/ui/ui_saber.c:199-230`
+pub fn UI_SaberShouldDrawBlade(ctx: &mut UiContext, saberName: &str, bladeNum: i32) -> bool {
+    let mut bladeStyle2Start = 0;
+    let mut noBlade = 0;
+
+    let bladeStyle2StartString =
+        UI_SaberParseParm(ctx, saberName, "bladeStyle2Start").unwrap_or_default();
+    if !bladeStyle2StartString.is_empty() {
+        bladeStyle2Start = atoi(&bladeStyle2StartString);
+    }
+
+    if bladeStyle2Start != 0 && bladeNum >= bladeStyle2Start {
+        // use second blade style
+        let noBladeString = UI_SaberParseParm(ctx, saberName, "noBlade2").unwrap_or_default();
+        if !noBladeString.is_empty() {
+            noBlade = atoi(&noBladeString);
+        }
+    } else {
+        // use first blade style
+        let noBladeString = UI_SaberParseParm(ctx, saberName, "noBlade").unwrap_or_default();
+        if !noBladeString.is_empty() {
+            noBlade = atoi(&noBladeString);
+        }
+    }
+
+    noBlade == 0
+}
+
+/// Raven `UI_IsSaberTwoHanded` — whether `saberName` is held two-handed
+/// (`twoHanded` parm; undefined defaults to `qfalse`).
+///
+/// Source: `oracle/codemp/ui/ui_saber.c:233-244`
+pub fn UI_IsSaberTwoHanded(ctx: &mut UiContext, saberName: &str) -> bool {
+    let twoHandedString = UI_SaberParseParm(ctx, saberName, "twoHanded").unwrap_or_default();
+    if twoHandedString.is_empty() {
+        // not defined defaults to "no"
+        return false;
+    }
+    atoi(&twoHandedString) != 0
+}
+
+/// Raven `UI_SaberBladeLengthForSaber` — blade length for `saberName`'s blade
+/// `bladeNum`: `saberLength` (default `40.0`), overridden by the per-blade
+/// `saberLength<N+1>` parm when present, each clamped to `>= 0.0`.
+///
+/// Source: `oracle/codemp/ui/ui_saber.c:246-271`
+pub fn UI_SaberBladeLengthForSaber(ctx: &mut UiContext, saberName: &str, bladeNum: i32) -> f32 {
+    let mut length = 40.0f32;
+
+    let lengthString = UI_SaberParseParm(ctx, saberName, "saberLength").unwrap_or_default();
+    if !lengthString.is_empty() {
+        length = atof(&lengthString) as f32;
+        if length < 0.0 {
+            length = 0.0;
+        }
+    }
+
+    let perBlade = UI_SaberParseParm(ctx, saberName, &format!("saberLength{}", bladeNum + 1))
+        .unwrap_or_default();
+    if !perBlade.is_empty() {
+        length = atof(&perBlade) as f32;
+        if length < 0.0 {
+            length = 0.0;
+        }
+    }
+
+    length
+}
+
+/// Raven `UI_SaberBladeRadiusForSaber` — blade radius for `saberName`'s blade
+/// `bladeNum`: `saberRadius` (default `3.0`), overridden by the per-blade
+/// `saberRadius<N+1>` parm when present, each clamped to `>= 0.0`.
+///
+/// Source: `oracle/codemp/ui/ui_saber.c:273-298`
+pub fn UI_SaberBladeRadiusForSaber(ctx: &mut UiContext, saberName: &str, bladeNum: i32) -> f32 {
+    let mut radius = 3.0f32;
+
+    let radiusString = UI_SaberParseParm(ctx, saberName, "saberRadius").unwrap_or_default();
+    if !radiusString.is_empty() {
+        radius = atof(&radiusString) as f32;
+        if radius < 0.0 {
+            radius = 0.0;
+        }
+    }
+
+    let perBlade = UI_SaberParseParm(ctx, saberName, &format!("saberRadius{}", bladeNum + 1))
+        .unwrap_or_default();
+    if !perBlade.is_empty() {
+        radius = atof(&perBlade) as f32;
+        if radius < 0.0 {
+            radius = 0.0;
+        }
+    }
+
+    radius
+}
+
+/// Raven `UI_SaberProperNameForSaber` — the display name for `saberName`
+/// (`name` parm); a leading `@` marks a string-package reference, translated
+/// through `trap_SP_GetStringTextString`.
+///
+/// PORT-NOTE: the `qboolean ret` return (whether `name` was found at all)
+/// collapses into the `Option<String>` return per the out-param dictionary —
+/// `None` on not-found, `Some(<proper name>)` (translated, or the raw
+/// stringed name) when found. Raven writes into the caller's own buffer
+/// (`ui_main.c:8793,8799`) and discards the `trap_SP_GetStringTextString`
+/// return, so a lookup miss leaves that buffer's prior contents; this port
+/// falls back to the empty string (`unwrap_or_default`).
+///
+/// Source: `oracle/codemp/ui/ui_saber.c:300-317`
+pub fn UI_SaberProperNameForSaber(ctx: &mut UiContext, saberName: &str) -> Option<String> {
+    let stringedSaberName = UI_SaberParseParm(ctx, saberName, "name")?;
+    // if it's a stringed reference translate it
+    if stringedSaberName.starts_with('@') {
+        let translated = trap::SP_GetStringTextString(ctx.engine, &stringedSaberName[1..], 1024);
+        Some(translated.unwrap_or_default())
+    } else {
+        // no stringed so just use it as it
+        Some(stringedSaberName)
+    }
+}
+
+/// Raven `UI_SaberValidForPlayerInMP` — whether `saberName` is usable in MP
+/// (`notInMP` parm; undefined, empty, or `0` all default to allowed).
+///
+/// Source: `oracle/codemp/ui/ui_saber.c:319-334`
+pub fn UI_SaberValidForPlayerInMP(ctx: &mut UiContext, saberName: &str) -> bool {
+    match UI_SaberParseParm(ctx, saberName, "notInMP") {
+        None => {
+            // not defined, default is yes
+            true
+        }
+        Some(allowed) => {
+            if allowed.is_empty() {
+                // not defined, default is yes
+                true
+            } else {
+                atoi(&allowed) == 0
+            }
+        }
+    }
 }

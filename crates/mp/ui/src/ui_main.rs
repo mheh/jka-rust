@@ -5,25 +5,29 @@
 
 #![allow(non_snake_case)]
 
-use core::ffi::{c_char, c_int, c_void, CStr};
+use core::ffi::{c_char, c_int, c_short, c_void, CStr};
 
 use mp_abi::ui::public::ui_client_state_t::uiClientState_t;
 use mp_bg::bg_channel::BgState;
 use mp_bg::bg_saga::{
-    BG_SiegeFindThemeForTeam, BG_SiegeGetPairedValue, BG_SiegeGetValueGroup, BG_SiegeSetTeamTheme,
+    BG_GetUIPortrait, BG_SiegeCountBaseClass, BG_SiegeFindThemeForTeam, BG_SiegeGetPairedValue,
+    BG_SiegeGetValueGroup, BG_SiegeSetTeamTheme, BG_SiegeTeamClassPortrait,
 };
 use mp_bg::public::configstring::{CS_PLAYERS, CS_SERVERINFO};
 use mp_bg::public::gametype::{
     GT_CTF, GT_CTY, GT_DUEL, GT_FFA, GT_HOLOCRON, GT_JEDIMASTER, GT_POWERDUEL, GT_SIEGE,
     GT_SINGLE_PLAYER, GT_TEAM,
 };
+use mp_bg::public::holdable::HI_NUM_HOLDABLE;
 use mp_bg::public::team::{TEAM_BLUE, TEAM_RED, TEAM_SPECTATOR};
 use mp_bg::saga::siege_class_t::siegeClass_t;
+use mp_bg::saga::siege_player_class_flags_t::siegePlayerClassFlags_t::{SPC_INFANTRY, SPC_MAX};
 use mp_bg::saga::siege_team_t::{
     siegeTeam_t, MAX_SIEGE_INFO_SIZE, SIEGETEAM_TEAM1, SIEGETEAM_TEAM2,
 };
 use mp_bg::weapons::weapon_t::{WP_NONE, WP_NUM_WEAPONS, WP_SABER};
-use mp_qshared::common::mp::qcommon::saber::saber_colors::saber_colors_t;
+use mp_qshared::common::mp::qcommon::qtime::qtime_t;
+use mp_qshared::common::mp::qcommon::saber::saber_colors::{saber_colors_t, SABER_BLUE, SABER_RED};
 use mp_qshared::shared::cbuf_exec::cbufExec_t;
 use mp_qshared::shared::com_parse::{COM_BeginParseSession, COM_ParseExt, QSharedScratch};
 use mp_qshared::shared::cvar::{
@@ -31,40 +35,56 @@ use mp_qshared::shared::cvar::{
     CVAR_TEMP,
 };
 use mp_qshared::shared::force_powers::{
-    FP_LEVITATION, FP_SABER_DEFENSE, FP_SABER_OFFENSE, NUM_FORCE_POWERS,
+    FORCE_DARKSIDE, FORCE_LIGHTSIDE, FP_LEVITATION, FP_SABER_DEFENSE, FP_SABER_OFFENSE,
+    MAX_FORCE_RANK, NUM_FORCE_POWERS,
 };
 use mp_qshared::shared::limits::MAX_NAME_LENGTH;
 use mp_qshared::shared::q_color::S_COLOR_RED;
-use mp_qshared::shared::q_string::COM_StripExtension;
+use mp_qshared::shared::q_string::{COM_Parse, COM_StripExtension};
 use mp_qshared::shared::{
-    connstate_t, fileHandle_t, qhandle_t, vec4_t, AS_FAVORITES, AS_LOCAL, CIN_LOOP, CIN_SILENT,
-    FS_READ, KEYCATCH_UI, MAX_CLIENTS, MAX_INFO_STRING, MAX_INFO_VALUE, MAX_QPATH,
-    MAX_STRING_CHARS, Q3_VERSION, SCREEN_HEIGHT, SCREEN_WIDTH,
+    colorWhite, connstate_t, fileHandle_t, qhandle_t, vec4_t, AS_FAVORITES, AS_GLOBAL, AS_LOCAL,
+    AS_MPLAYER, CIN_LOOP, CIN_SILENT, FS_READ, KEYCATCH_UI, MAX_CLIENTS, MAX_INFO_STRING,
+    MAX_INFO_VALUE, MAX_QPATH, MAX_STRING_CHARS, Q3_VERSION, SCREEN_HEIGHT, SCREEN_WIDTH,
 };
 use mp_uishared::shared::display_context::DisplayContext;
+use mp_uishared::shared::menu_id::MenuId;
 use mp_uishared::shared::menu_system::MAX_MENUFILE;
 use mp_uishared::shared::menudef::{
-    FEEDER_ALLMAPS, FEEDER_MAPS, FEEDER_SERVERS, FEEDER_SERVERSTATUS, FEEDER_SIEGE_TEAM1,
-    FEEDER_SIEGE_TEAM2, ITEM_TEXTSTYLE_BLINK, ITEM_TEXTSTYLE_NORMAL, ITEM_TEXTSTYLE_OUTLINED,
-    ITEM_TEXTSTYLE_OUTLINESHADOWED, ITEM_TEXTSTYLE_PULSE, ITEM_TEXTSTYLE_SHADOWED,
-    ITEM_TEXTSTYLE_SHADOWEDMORE, UI_CLANCINEMATIC, UI_MAPCINEMATIC, UI_NETMAPCINEMATIC,
+    FEEDER_ALLMAPS, FEEDER_CINEMATICS, FEEDER_COLORCHOICES, FEEDER_DEMOS, FEEDER_FINDPLAYER,
+    FEEDER_FORCECFG, FEEDER_MAPS, FEEDER_MODS, FEEDER_MOVES, FEEDER_MOVES_TITLES,
+    FEEDER_PLAYER_LIST, FEEDER_PLAYER_SKIN_HEAD, FEEDER_PLAYER_SKIN_LEGS, FEEDER_PLAYER_SKIN_TORSO,
+    FEEDER_PLAYER_SPECIES, FEEDER_Q3HEADS, FEEDER_SABER_SINGLE_INFO, FEEDER_SABER_STAFF_INFO,
+    FEEDER_SERVERS, FEEDER_SERVERSTATUS, FEEDER_SIEGE_BASE_CLASS, FEEDER_SIEGE_CLASS_FORCE,
+    FEEDER_SIEGE_CLASS_INVENTORY, FEEDER_SIEGE_CLASS_WEAPONS, FEEDER_SIEGE_TEAM1,
+    FEEDER_SIEGE_TEAM2, FEEDER_TEAM_LIST, ITEM_TEXTSTYLE_BLINK, ITEM_TEXTSTYLE_NORMAL,
+    ITEM_TEXTSTYLE_OUTLINED, ITEM_TEXTSTYLE_OUTLINESHADOWED, ITEM_TEXTSTYLE_PULSE,
+    ITEM_TEXTSTYLE_SHADOWED, ITEM_TEXTSTYLE_SHADOWEDMORE, UI_ALLMAPS_SELECTION, UI_BLUETEAM1,
+    UI_BLUETEAM2, UI_BLUETEAM3, UI_BLUETEAM4, UI_BLUETEAM5, UI_BLUETEAM6, UI_BLUETEAM7,
+    UI_BLUETEAM8, UI_BLUETEAMNAME, UI_CLANCINEMATIC, UI_CLANNAME, UI_FORCE_RANK,
+    UI_FORCE_RANK_HEAL, UI_FORCE_RANK_SABERTHROW, UI_FORCE_SIDE, UI_GAMETYPE, UI_HANDICAP,
+    UI_JEDI_NONJEDI, UI_KEYBINDSTATUS, UI_MAPCINEMATIC, UI_NETFILTER, UI_NETMAPCINEMATIC,
+    UI_NETSOURCE, UI_OPPONENT_NAME, UI_REDTEAM1, UI_REDTEAM2, UI_REDTEAM3, UI_REDTEAM4,
+    UI_REDTEAM5, UI_REDTEAM6, UI_REDTEAM7, UI_REDTEAM8, UI_REDTEAMNAME, UI_SERVERREFRESHDATE,
     UI_SHOW_ANYNONTEAMGAME, UI_SHOW_ANYTEAMGAME, UI_SHOW_DEMOAVAILABLE, UI_SHOW_FAVORITESERVERS,
     UI_SHOW_FFA, UI_SHOW_LEADER, UI_SHOW_NETANYNONTEAMGAME, UI_SHOW_NETANYTEAMGAME,
     UI_SHOW_NEWBESTTIME, UI_SHOW_NEWHIGHSCORE, UI_SHOW_NOTFAVORITESERVERS, UI_SHOW_NOTFFA,
-    UI_SHOW_NOTLEADER,
+    UI_SHOW_NOTLEADER, UI_SKILL, UI_SKIN_COLOR, UI_TIER, UI_TIER_GAMETYPE, UI_TIER_MAPNAME,
 };
 use mp_uishared::shared::rect_def_t::RectDef;
 use mp_uishared::ui_shared::{
-    Display_KeyBindPending, LerpColor, Menu_FindItemByName, Menu_GetFocused,
-    Menu_SetFeederSelection, Menus_AnyFullScreenVisible, String_Report, UI_CleanupGhoul2,
+    Display_KeyBindPending, Int_Parse, ItemParse_model_g2skin_go, LerpColor, Menu_FindItemByName,
+    Menu_GetFocused, Menu_SetFeederSelection, Menu_SetItemBackground, Menu_ShowItemByName,
+    Menus_AnyFullScreenVisible, Menus_FindByName, String_Parse, String_Report, UI_CleanupGhoul2,
 };
 use native_math::qmath::Com_Clamp;
 use native_string::{
-    atoi, buf_to_string, latin1_to_string, string_to_latin1, Info_ValueForKey, Q_CleanStr,
+    atof, atoi, buf_to_string, latin1_to_string, string_to_latin1, Info_ValueForKey, Q_CleanStr,
     Q_stricmp, Q_stricmpn, Q_strncpyz,
 };
 
 use crate::keycodes::fake_ascii_t::fakeAscii_t;
+use crate::local::game_type_info::GameTypeInfo;
+use crate::local::map_info::{MapInfo, MAX_GAMETYPES};
 use crate::local::mod_info_t::ModInfo;
 use crate::local::pinglist_t::MAX_ADDRESSLENGTH;
 use crate::local::player_species_info_t::{PlayerSpeciesInfo, MAX_PLAYERMODELS};
@@ -75,12 +95,14 @@ use crate::local::server_status_info_t::{
 use crate::local::tier_info::MAPS_PER_TIER;
 use crate::trap;
 use crate::ui_atoms::{
-    Com_Error, Com_Printf, UI_Cvar_VariableString, UI_DrawHandlePic, UI_LoadBestScores,
+    Com_Error, Com_Printf, UI_Cvar_VariableString, UI_DrawHandlePic, UI_FillRect,
+    UI_LoadBestScores, UI_SetColor,
 };
-use crate::ui_gameinfo::{UI_GetBotNameByNumber, UI_GetNumBots};
+use crate::ui_gameinfo::{UI_GetBotNameByNumber, UI_GetNumBots, MAX_MAPS};
 use crate::ui_saber::{SaberColorToString, TranslateSaberColor};
 use crate::world::ui_context::UiContext;
 use crate::world::ui_cvars::UiCvars;
+use crate::world::ui_main_state::MAX_SABER_HILTS;
 use crate::world::ui_world::{UiWorld, MAX_FORCE_CONFIGS};
 
 /// Raven `static const int numSkillLevels = sizeof(skillLevels) /
@@ -105,6 +127,416 @@ const STYLE_BLINK: u32 = 0x4000_0000;
 ///
 /// Source: `oracle/codemp/ui/ui_local.h:593`
 const MAX_Q3PLAYERMODELS: usize = 256;
+
+/// Raven's movedata sound ids — an anonymous `enum` (no tag, no typedef name),
+/// so they stay plain consts at the `short` width `datpadmovedata_t.sound`
+/// stores them in.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:360-368`
+const MDS_NONE: c_short = 0;
+const MDS_FORCE_JUMP: c_short = 1;
+const MDS_ROLL: c_short = 2;
+const MDS_SABER: c_short = 3;
+
+/// Raven's datapad move-title ids — likewise an anonymous `enum`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:370-379`
+const MD_MOVE_TITLE_MAX: c_int = 6;
+
+/// Raven `#define MAX_MOVES 16`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:404`
+const MAX_MOVES: usize = 16;
+
+/// Raven `datpadmovedata_t` — one datapad move row. Compiled-in data lands
+/// beside the fns that read it (§C8), so the row type is file-local here
+/// rather than a `local/` type module; Raven likewise declares it inside
+/// `ui_main.c`.
+///
+/// Type definition source: `oracle/codemp/ui/ui_main.c:406-412`
+#[doc(alias = "datpadmovedata_t")]
+#[allow(dead_code)]
+struct DatpadMoveData {
+    title: Option<&'static str>,
+    desc: Option<&'static str>,
+    anim: Option<&'static str>,
+    sound: c_short,
+}
+
+/// Raven `static datpadmovedata_t datapadMoveData[MD_MOVE_TITLE_MAX][MAX_MOVES]`.
+///
+/// Raven: Some hard coded badness. At some point maybe this should be
+/// externalized to a .dat file.
+/// Source: `oracle/codemp/ui/ui_main.c:414-523`
+const DATAPAD_MOVE_DATA: [[DatpadMoveData; MAX_MOVES]; MD_MOVE_TITLE_MAX as usize] = [
+    // Acrobatics
+    [
+        MOVE(
+            "@MENUS_FORCE_JUMP1",
+            "@MENUS_FORCE_JUMP1_DESC",
+            "BOTH_FORCEJUMP1",
+            MDS_FORCE_JUMP,
+        ),
+        MOVE(
+            "@MENUS_FORCE_FLIP",
+            "@MENUS_FORCE_FLIP_DESC",
+            "BOTH_FLIP_F",
+            MDS_FORCE_JUMP,
+        ),
+        MOVE("@MENUS_ROLL", "@MENUS_ROLL_DESC", "BOTH_ROLL_F", MDS_ROLL),
+        MOVE(
+            "@MENUS_BACKFLIP_OFF_WALL",
+            "@MENUS_BACKFLIP_OFF_WALL_DESC",
+            "BOTH_WALL_FLIP_BACK1",
+            MDS_FORCE_JUMP,
+        ),
+        MOVE(
+            "@MENUS_SIDEFLIP_OFF_WALL",
+            "@MENUS_SIDEFLIP_OFF_WALL_DESC",
+            "BOTH_WALL_FLIP_RIGHT",
+            MDS_FORCE_JUMP,
+        ),
+        MOVE(
+            "@MENUS_WALL_RUN",
+            "@MENUS_WALL_RUN_DESC",
+            "BOTH_WALL_RUN_RIGHT",
+            MDS_FORCE_JUMP,
+        ),
+        MOVE(
+            "@MENUS_WALL_GRAB_JUMP",
+            "@MENUS_WALL_GRAB_JUMP_DESC",
+            "BOTH_FORCEWALLREBOUND_FORWARD",
+            MDS_FORCE_JUMP,
+        ),
+        MOVE(
+            "@MENUS_RUN_UP_WALL_BACKFLIP",
+            "@MENUS_RUN_UP_WALL_BACKFLIP_DESC",
+            "BOTH_FORCEWALLRUNFLIP_START",
+            MDS_FORCE_JUMP,
+        ),
+        MOVE(
+            "@MENUS_JUMPUP_FROM_KNOCKDOWN",
+            "@MENUS_JUMPUP_FROM_KNOCKDOWN_DESC",
+            "BOTH_KNOCKDOWN3",
+            MDS_NONE,
+        ),
+        MOVE(
+            "@MENUS_JUMPKICK_FROM_KNOCKDOWN",
+            "@MENUS_JUMPKICK_FROM_KNOCKDOWN_DESC",
+            "BOTH_KNOCKDOWN2",
+            MDS_NONE,
+        ),
+        MOVE(
+            "@MENUS_ROLL_FROM_KNOCKDOWN",
+            "@MENUS_ROLL_FROM_KNOCKDOWN_DESC",
+            "BOTH_KNOCKDOWN1",
+            MDS_NONE,
+        ),
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+    ],
+    // Single Saber, Fast Style
+    [
+        MOVE(
+            "@MENUS_STAB_BACK",
+            "@MENUS_STAB_BACK_DESC",
+            "BOTH_A2_STABBACK1",
+            MDS_SABER,
+        ),
+        MOVE(
+            "@MENUS_LUNGE_ATTACK",
+            "@MENUS_LUNGE_ATTACK_DESC",
+            "BOTH_LUNGE2_B__T_",
+            MDS_SABER,
+        ),
+        MOVE(
+            "@MENUS_FAST_ATTACK_KATA",
+            "@MENUS_FAST_ATTACK_KATA_DESC",
+            "BOTH_A1_SPECIAL",
+            MDS_SABER,
+        ),
+        MOVE(
+            "@MENUS_ATTACK_ENEMYONGROUND",
+            "@MENUS_ATTACK_ENEMYONGROUND_DESC",
+            "BOTH_STABDOWN",
+            MDS_FORCE_JUMP,
+        ),
+        MOVE(
+            "@MENUS_CARTWHEEL",
+            "@MENUS_CARTWHEEL_DESC",
+            "BOTH_ARIAL_RIGHT",
+            MDS_FORCE_JUMP,
+        ),
+        MOVE(
+            "@MENUS_BOTH_ROLL_STAB",
+            "@MENUS_BOTH_ROLL_STAB2_DESC",
+            "BOTH_ROLL_STAB",
+            MDS_SABER,
+        ),
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+    ],
+    // Single Saber, Medium Style
+    [
+        MOVE(
+            "@MENUS_SLASH_BACK",
+            "@MENUS_SLASH_BACK_DESC",
+            "BOTH_ATTACK_BACK",
+            MDS_SABER,
+        ),
+        MOVE(
+            "@MENUS_FLIP_ATTACK",
+            "@MENUS_FLIP_ATTACK_DESC",
+            "BOTH_JUMPFLIPSLASHDOWN1",
+            MDS_FORCE_JUMP,
+        ),
+        MOVE(
+            "@MENUS_MEDIUM_ATTACK_KATA",
+            "@MENUS_MEDIUM_ATTACK_KATA_DESC",
+            "BOTH_A2_SPECIAL",
+            MDS_SABER,
+        ),
+        MOVE(
+            "@MENUS_ATTACK_ENEMYONGROUND",
+            "@MENUS_ATTACK_ENEMYONGROUND_DESC",
+            "BOTH_STABDOWN",
+            MDS_FORCE_JUMP,
+        ),
+        MOVE(
+            "@MENUS_CARTWHEEL",
+            "@MENUS_CARTWHEEL_DESC",
+            "BOTH_ARIAL_RIGHT",
+            MDS_FORCE_JUMP,
+        ),
+        MOVE(
+            "@MENUS_BOTH_ROLL_STAB",
+            "@MENUS_BOTH_ROLL_STAB2_DESC",
+            "BOTH_ROLL_STAB",
+            MDS_SABER,
+        ),
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+    ],
+    // Single Saber, Strong Style
+    [
+        MOVE(
+            "@MENUS_SLASH_BACK",
+            "@MENUS_SLASH_BACK_DESC",
+            "BOTH_ATTACK_BACK",
+            MDS_SABER,
+        ),
+        MOVE(
+            "@MENUS_JUMP_ATTACK",
+            "@MENUS_JUMP_ATTACK_DESC",
+            "BOTH_FORCELEAP2_T__B_",
+            MDS_FORCE_JUMP,
+        ),
+        MOVE(
+            "@MENUS_STRONG_ATTACK_KATA",
+            "@MENUS_STRONG_ATTACK_KATA_DESC",
+            "BOTH_A3_SPECIAL",
+            MDS_SABER,
+        ),
+        MOVE(
+            "@MENUS_ATTACK_ENEMYONGROUND",
+            "@MENUS_ATTACK_ENEMYONGROUND_DESC",
+            "BOTH_STABDOWN",
+            MDS_FORCE_JUMP,
+        ),
+        MOVE(
+            "@MENUS_CARTWHEEL",
+            "@MENUS_CARTWHEEL_DESC",
+            "BOTH_ARIAL_RIGHT",
+            MDS_FORCE_JUMP,
+        ),
+        MOVE(
+            "@MENUS_BOTH_ROLL_STAB",
+            "@MENUS_BOTH_ROLL_STAB2_DESC",
+            "BOTH_ROLL_STAB",
+            MDS_SABER,
+        ),
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+    ],
+    // Dual Sabers
+    [
+        MOVE(
+            "@MENUS_SLASH_BACK",
+            "@MENUS_SLASH_BACK_DESC",
+            "BOTH_ATTACK_BACK",
+            MDS_SABER,
+        ),
+        MOVE(
+            "@MENUS_FLIP_FORWARD_ATTACK",
+            "@MENUS_FLIP_FORWARD_ATTACK_DESC",
+            "BOTH_JUMPATTACK6",
+            MDS_FORCE_JUMP,
+        ),
+        MOVE(
+            "@MENUS_DUAL_SABERS_TWIRL",
+            "@MENUS_DUAL_SABERS_TWIRL_DESC",
+            "BOTH_SPINATTACK6",
+            MDS_SABER,
+        ),
+        MOVE(
+            "@MENUS_ATTACK_ENEMYONGROUND",
+            "@MENUS_ATTACK_ENEMYONGROUND_DESC",
+            "BOTH_STABDOWN_DUAL",
+            MDS_FORCE_JUMP,
+        ),
+        MOVE(
+            "@MENUS_DUAL_SABER_BARRIER",
+            "@MENUS_DUAL_SABER_BARRIER_DESC",
+            "BOTH_A6_SABERPROTECT",
+            MDS_SABER,
+        ),
+        MOVE(
+            "@MENUS_DUAL_STAB_FRONT_BACK",
+            "@MENUS_DUAL_STAB_FRONT_BACK_DESC",
+            "BOTH_A6_FB",
+            MDS_SABER,
+        ),
+        MOVE(
+            "@MENUS_DUAL_STAB_LEFT_RIGHT",
+            "@MENUS_DUAL_STAB_LEFT_RIGHT_DESC",
+            "BOTH_A6_LR",
+            MDS_SABER,
+        ),
+        MOVE(
+            "@MENUS_CARTWHEEL",
+            "@MENUS_CARTWHEEL_DESC",
+            "BOTH_ARIAL_RIGHT",
+            MDS_FORCE_JUMP,
+        ),
+        MOVE(
+            "@MENUS_BOTH_ROLL_STAB",
+            "@MENUS_BOTH_ROLL_STAB_DESC",
+            "BOTH_ROLL_STAB",
+            MDS_SABER,
+        ),
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+    ],
+    // Saber Staff
+    [
+        MOVE(
+            "@MENUS_STAB_BACK",
+            "@MENUS_STAB_BACK_DESC",
+            "BOTH_A2_STABBACK1",
+            MDS_SABER,
+        ),
+        MOVE(
+            "@MENUS_BACK_FLIP_ATTACK",
+            "@MENUS_BACK_FLIP_ATTACK_DESC",
+            "BOTH_JUMPATTACK7",
+            MDS_FORCE_JUMP,
+        ),
+        MOVE(
+            "@MENUS_SABER_STAFF_TWIRL",
+            "@MENUS_SABER_STAFF_TWIRL_DESC",
+            "BOTH_SPINATTACK7",
+            MDS_SABER,
+        ),
+        MOVE(
+            "@MENUS_ATTACK_ENEMYONGROUND",
+            "@MENUS_ATTACK_ENEMYONGROUND_DESC",
+            "BOTH_STABDOWN_STAFF",
+            MDS_FORCE_JUMP,
+        ),
+        MOVE(
+            "@MENUS_SPINNING_KATA",
+            "@MENUS_SPINNING_KATA_DESC",
+            "BOTH_A7_SOULCAL",
+            MDS_SABER,
+        ),
+        MOVE(
+            "@MENUS_KICK1",
+            "@MENUS_KICK1_DESC",
+            "BOTH_A7_KICK_F",
+            MDS_FORCE_JUMP,
+        ),
+        MOVE(
+            "@MENUS_JUMP_KICK",
+            "@MENUS_JUMP_KICK_DESC",
+            "BOTH_A7_KICK_F_AIR",
+            MDS_FORCE_JUMP,
+        ),
+        MOVE(
+            "@MENUS_BUTTERFLY_ATTACK",
+            "@MENUS_BUTTERFLY_ATTACK_DESC",
+            "BOTH_BUTTERFLY_FR1",
+            MDS_SABER,
+        ),
+        MOVE(
+            "@MENUS_BOTH_ROLL_STAB",
+            "@MENUS_BOTH_ROLL_STAB2_DESC",
+            "BOTH_ROLL_STAB",
+            MDS_SABER,
+        ),
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+        NO_MOVE,
+    ],
+];
+
+/// One populated `DATAPAD_MOVE_DATA` row.
+const fn MOVE(
+    title: &'static str,
+    desc: &'static str,
+    anim: &'static str,
+    sound: c_short,
+) -> DatpadMoveData {
+    DatpadMoveData {
+        title: Some(title),
+        desc: Some(desc),
+        anim: Some(anim),
+        sound,
+    }
+}
+
+/// Raven's `NULL, NULL, 0, MDS_NONE` padding row.
+const NO_MOVE: DatpadMoveData = DatpadMoveData {
+    title: None,
+    desc: None,
+    anim: None,
+    sound: MDS_NONE,
+};
 
 /// Raven `static const char *handicapValues[]` — compiled-in data (§C8),
 /// lands beside the fns that read it. The trailing Raven `NULL` sentinel
@@ -6272,4 +6704,1816 @@ pub fn Text_PaintCenter(
         ITEM_TEXTSTYLE_SHADOWEDMORE,
         iMenuFont,
     );
+}
+
+/// Raven `UI_DrawForceSide`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2152-2230`
+#[allow(clippy::too_many_arguments)]
+pub fn UI_DrawForceSide(
+    ctx: &mut UiContext,
+    dc: &mut dyn DisplayContext,
+    rect: &RectDef,
+    scale: f32,
+    color: &mut vec4_t,
+    textStyle: c_int,
+    val: c_int,
+    _min: c_int,
+    _max: c_int,
+    iMenuFont: c_int,
+) {
+    let info = trap::GetConfigString(ctx.engine, CS_SERVERINFO, MAX_INFO_VALUE).unwrap_or_default();
+
+    if atoi(&Info_ValueForKey(&info, "g_forceBasedTeams")) != 0 {
+        let myteam = trap::Cvar_VariableValue(ctx.engine, "ui_myteam") as c_int;
+        match myteam {
+            TEAM_RED => {
+                ctx.world.force.uiForceSide = FORCE_DARKSIDE;
+                color[0] = 0.2;
+                color[1] = 0.2;
+                color[2] = 0.2;
+            }
+            TEAM_BLUE => {
+                ctx.world.force.uiForceSide = FORCE_LIGHTSIDE;
+                color[0] = 0.2;
+                color[1] = 0.2;
+                color[2] = 0.2;
+            }
+            _ => {}
+        }
+    }
+
+    let s;
+    if val == FORCE_LIGHTSIDE {
+        s = trap::SP_GetStringTextString(ctx.engine, "MENUS_FORCEDESC_LIGHT", 256)
+            .unwrap_or_default();
+        if let Some(menu) = Menus_FindByName(&ctx.world.menus, "forcealloc") {
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "lightpowers", true);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "darkpowers", false);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "darkpowers_team", false);
+            // (ui_gameType.integer >= GT_TEAM))
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "lightpowers_team", true);
+        }
+        if let Some(menu) = Menus_FindByName(&ctx.world.menus, "ingame_playerforce") {
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "lightpowers", true);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "darkpowers", false);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "darkpowers_team", false);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "lightpowers_team", true);
+        }
+    } else {
+        s = trap::SP_GetStringTextString(ctx.engine, "MENUS_FORCEDESC_DARK", 256)
+            .unwrap_or_default();
+        if let Some(menu) = Menus_FindByName(&ctx.world.menus, "forcealloc") {
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "lightpowers", false);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "lightpowers_team", false);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "darkpowers", true);
+            // (ui_gameType.integer >= GT_TEAM))
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "darkpowers_team", true);
+        }
+        if let Some(menu) = Menus_FindByName(&ctx.world.menus, "ingame_playerforce") {
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "lightpowers", false);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "lightpowers_team", false);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "darkpowers", true);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "darkpowers_team", true);
+        }
+    }
+
+    Text_Paint(
+        ctx, rect.x, rect.y, scale, *color, &s, 0.0, 0, textStyle, iMenuFont,
+    );
+}
+
+/// Raven `UpdateBotButtons`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2549-2571`
+pub fn UpdateBotButtons(world: &mut UiWorld, dc: &mut dyn DisplayContext) {
+    let menu = match Menu_GetFocused(&world.menus) {
+        Some(m) => m,
+        None => return,
+    };
+
+    if world.gameTypes[world.cvars.ui_netGameType.integer as usize].gtEnum == GT_SIEGE {
+        Menu_ShowItemByName(&mut world.menus, dc, menu, "humanbotfield", false);
+        Menu_ShowItemByName(&mut world.menus, dc, menu, "humanbotnonfield", true);
+    } else {
+        Menu_ShowItemByName(&mut world.menus, dc, menu, "humanbotfield", true);
+        Menu_ShowItemByName(&mut world.menus, dc, menu, "humanbotnonfield", false);
+    }
+}
+
+/// Raven `UpdateForceStatus`.
+///
+/// Currently we don't make a distinction between those that wish to play Jedi
+/// of lower than maximum skill.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2573-2723`
+pub fn UpdateForceStatus(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+    if let Some(menu) = Menus_FindByName(&ctx.world.menus, "ingame_player") {
+        let info =
+            trap::GetConfigString(ctx.engine, CS_SERVERINFO, MAX_INFO_STRING).unwrap_or_default();
+
+        // already have serverinfo at this point for stuff below. Don't
+        // bother trying to use ui_forcePowerDisable.
+        let disabledForce = atoi(&Info_ValueForKey(&info, "g_forcePowerDisable"));
+        let allForceDisabled = UI_AllForceDisabled(disabledForce);
+        let trueJedi = UI_TrueJediEnabled(ctx);
+
+        if !trueJedi || allForceDisabled {
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "jedinonjedi", false);
+        } else {
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "jedinonjedi", true);
+        }
+        if allForceDisabled || (trueJedi && ctx.world.force.uiJediNonJedi == FORCE_NONJEDI) {
+            // No force stuff.
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "noforce", true);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "yesforce", false);
+            // We don't want the saber explanation to say "configure saber
+            // attack 1" since we can't.
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "sabernoneconfigme", false);
+        } else {
+            UI_SetForceDisabled(ctx.world, disabledForce);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "noforce", false);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "yesforce", true);
+        }
+
+        // Moved this to happen after it's done with force power disabling
+        // stuff.
+        if ctx.world.force.uiForcePowersRank[FP_SABER_OFFENSE as usize] > 0
+            || ctx.world.cvars.ui_freeSaber.integer != 0
+        {
+            // Show lightsaber stuff.
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "nosaber", false);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "yessaber", true);
+        } else {
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "nosaber", true);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "yessaber", false);
+        }
+
+        // The leftmost button should be "apply" unless you are in spectator,
+        // where you can join any team.
+        let myteam = trap::Cvar_VariableValue(ctx.engine, "ui_myteam") as c_int;
+        if myteam != TEAM_SPECTATOR {
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerapply", true);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerforcejoin", false);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerforcered", true);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerforceblue", true);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerforcespectate", true);
+        } else {
+            // Set or reset buttons based on choices.
+            if atoi(&Info_ValueForKey(&info, "g_gametype")) >= GT_TEAM {
+                // This is a team-based game.
+                Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerforcespectate", true);
+
+                // This is disabled, always show both sides from spectator.
+                Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerforcered", true);
+                Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerforceblue", true);
+            } else {
+                Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerforcered", false);
+                Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerforceblue", false);
+            }
+
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerapply", false);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerforcejoin", true);
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerforcespectate", true);
+        }
+    }
+
+    if !UI_TrueJediEnabled(ctx) {
+        // Take the current team and force a skin color based on it.
+        let myteam = trap::Cvar_VariableValue(ctx.engine, "ui_myteam") as c_int;
+        match myteam {
+            TEAM_RED => {
+                ctx.world.main.uiSkinColor = TEAM_RED;
+                ctx.world.effectsColor = SABER_RED;
+            }
+            TEAM_BLUE => {
+                ctx.world.main.uiSkinColor = TEAM_BLUE;
+                ctx.world.effectsColor = SABER_BLUE;
+            }
+            _ => {
+                let info = trap::GetConfigString(ctx.engine, CS_SERVERINFO, MAX_INFO_STRING)
+                    .unwrap_or_default();
+
+                if atoi(&Info_ValueForKey(&info, "g_gametype")) >= GT_TEAM {
+                    ctx.world.main.uiSkinColor = mp_bg::public::team::TEAM_FREE;
+                } else {
+                    // A bit of a hack so non-team games will remember which
+                    // skin set you chose in the player menu.
+                    ctx.world.main.uiSkinColor = ctx.world.main.uiHoldSkinColor;
+                }
+            }
+        }
+    }
+}
+
+/// Raven `UI_DrawNetSource`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2727-2737`
+pub fn UI_DrawNetSource(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    textStyle: c_int,
+    iMenuFont: c_int,
+) {
+    if ctx.world.cvars.ui_netSource.integer < 0
+        || ctx.world.cvars.ui_netSource.integer > ctx.world.gameTypes.len() as c_int
+    {
+        ctx.world.cvars.ui_netSource.integer = 0;
+    }
+
+    ctx.world.main.holdSPString =
+        trap::SP_GetStringTextString(ctx.engine, "MENUS_SOURCE", MAX_STRING_CHARS)
+            .unwrap_or_default();
+    let netSourceIdx = ctx.world.cvars.ui_netSource.integer;
+    let netSource = GetNetSourceString(ctx, netSourceIdx);
+    let s = format!("{} {}", ctx.world.main.holdSPString, netSource);
+    Text_Paint(
+        ctx, rect.x, rect.y, scale, color, &s, 0.0, 0, textStyle, iMenuFont,
+    );
+}
+
+/// Raven `UI_OwnerDrawWidth`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:3008-3236`
+#[allow(clippy::too_many_lines)]
+pub fn UI_OwnerDrawWidth(ctx: &mut UiContext, ownerDraw: c_int, scale: f32) -> c_int {
+    let mut s: Option<String> = None;
+
+    match ownerDraw {
+        UI_HANDICAP => {
+            let h =
+                Com_Clamp(5.0, 100.0, trap::Cvar_VariableValue(ctx.engine, "handicap")) as c_int;
+            let i = 20 - h / 5;
+            s = HANDICAP_VALUES[i as usize].map(|v| v.to_string());
+        }
+        UI_SKIN_COLOR => {
+            let skinColor = ctx.world.main.uiSkinColor;
+            s = Some(match skinColor {
+                TEAM_RED => UI_GetStringEdString(ctx, "MENUS", "TEAM_RED"),
+                TEAM_BLUE => UI_GetStringEdString(ctx, "MENUS", "TEAM_BLUE"),
+                _ => UI_GetStringEdString(ctx, "MENUS", "DEFAULT"),
+            });
+        }
+        UI_FORCE_SIDE => {
+            let mut i = ctx.world.force.uiForceSide;
+            if i < 1 || i > 2 {
+                i = 1;
+            }
+            s = Some(if i == FORCE_LIGHTSIDE {
+                UI_GetStringEdString(ctx, "MENUS", "FORCEDESC_LIGHT")
+            } else {
+                UI_GetStringEdString(ctx, "MENUS", "FORCEDESC_DARK")
+            });
+        }
+        UI_JEDI_NONJEDI => {
+            let mut i = ctx.world.force.uiJediNonJedi;
+            if i < 0 || i > 1 {
+                i = 0;
+            }
+            s = Some(if i == FORCE_NONJEDI {
+                UI_GetStringEdString(ctx, "MENUS", "NO")
+            } else {
+                UI_GetStringEdString(ctx, "MENUS", "YES")
+            });
+        }
+        UI_FORCE_RANK => {
+            let mut i = ctx.world.force.uiForceRank;
+            if i < 1 || i > MAX_FORCE_RANK {
+                i = 1;
+            }
+            s = Some(UI_GetStringEdString(
+                ctx,
+                "MP_INGAME",
+                FORCE_MASTERY_LEVELS[i as usize],
+            ));
+        }
+        UI_FORCE_RANK_HEAL..=UI_FORCE_RANK_SABERTHROW => {
+            // this will give us the index as long as UI_FORCE_RANK is always
+            // one below the first force rank index
+            let findex = (ownerDraw - UI_FORCE_RANK) - 1;
+            s = Some(format!(
+                "{}",
+                ctx.world.force.uiForcePowersRank[findex as usize]
+            ));
+        }
+        UI_CLANNAME => {
+            s = Some(UI_Cvar_VariableString(ctx, "ui_teamName"));
+        }
+        UI_GAMETYPE => {
+            let idx = ctx.world.cvars.ui_gameType.integer as usize;
+            // §19: past `numGameTypes` Raven read the fixed array's zeroed spare slot.
+            s = Some(
+                ctx.world
+                    .gameTypes
+                    .get(idx)
+                    .map(|gt| gt.gameType.clone())
+                    .unwrap_or_default(),
+            );
+        }
+        UI_SKILL => {
+            let mut i = trap::Cvar_VariableValue(ctx.engine, "g_spSkill") as c_int;
+            if i < 1 || i > NUM_SKILL_LEVELS {
+                i = 1;
+            }
+            s = Some(UI_GetStringEdString(
+                ctx,
+                "MP_INGAME",
+                SKILL_LEVELS[(i - 1) as usize],
+            ));
+        }
+        UI_BLUETEAMNAME => {
+            let blueTeam = UI_Cvar_VariableString(ctx, "ui_blueTeam");
+            let i = UI_TeamIndexFromName(ctx.world, &blueTeam);
+            if i >= 0 && (i as usize) < ctx.world.teamList.len() {
+                let label = UI_GetStringEdString(ctx, "MENUS", "TEAM_BLUE");
+                s = Some(format!(
+                    "{}: {}",
+                    label, ctx.world.teamList[i as usize].teamName
+                ));
+            }
+        }
+        UI_REDTEAMNAME => {
+            let redTeam = UI_Cvar_VariableString(ctx, "ui_redTeam");
+            let i = UI_TeamIndexFromName(ctx.world, &redTeam);
+            if i >= 0 && (i as usize) < ctx.world.teamList.len() {
+                let label = UI_GetStringEdString(ctx, "MENUS", "TEAM_RED");
+                s = Some(format!(
+                    "{}: {}",
+                    label, ctx.world.teamList[i as usize].teamName
+                ));
+            }
+        }
+        UI_BLUETEAM1 | UI_BLUETEAM2 | UI_BLUETEAM3 | UI_BLUETEAM4 | UI_BLUETEAM5 | UI_BLUETEAM6
+        | UI_BLUETEAM7 | UI_BLUETEAM8 => {
+            let iUse = if ownerDraw <= UI_BLUETEAM5 {
+                ownerDraw - UI_BLUETEAM1 + 1
+            } else {
+                // unpleasant hack because I don't want to move up all the
+                // UI_BLAHTEAM# defines
+                ownerDraw - 274
+            };
+            let mut value =
+                trap::Cvar_VariableValue(ctx.engine, &format!("ui_blueteam{}", iUse)) as c_int;
+            let text = if value <= 1 {
+                "Human".to_string()
+            } else {
+                value -= 2;
+                if value as usize >= ctx.world.aliasList.len() {
+                    value = 1;
+                }
+                ctx.world.aliasList[value as usize].name.clone()
+            };
+            s = Some(format!("{}. {}", iUse, text));
+        }
+        UI_REDTEAM1 | UI_REDTEAM2 | UI_REDTEAM3 | UI_REDTEAM4 | UI_REDTEAM5 | UI_REDTEAM6
+        | UI_REDTEAM7 | UI_REDTEAM8 => {
+            let iUse = if ownerDraw <= UI_REDTEAM5 {
+                ownerDraw - UI_REDTEAM1 + 1
+            } else {
+                ownerDraw - 277
+            };
+            let mut value =
+                trap::Cvar_VariableValue(ctx.engine, &format!("ui_redteam{}", iUse)) as c_int;
+            let text = if value <= 1 {
+                "Human".to_string()
+            } else {
+                value -= 2;
+                if value as usize >= ctx.world.aliasList.len() {
+                    value = 1;
+                }
+                ctx.world.aliasList[value as usize].name.clone()
+            };
+            s = Some(format!("{}. {}", iUse, text));
+        }
+        UI_NETSOURCE => {
+            if ctx.world.cvars.ui_netSource.integer < 0
+                || ctx.world.cvars.ui_netSource.integer > ctx.world.joinGameTypes.len() as c_int
+            {
+                ctx.world.cvars.ui_netSource.integer = 0;
+            }
+            ctx.world.main.holdSPString =
+                trap::SP_GetStringTextString(ctx.engine, "MENUS_SOURCE", MAX_STRING_CHARS)
+                    .unwrap_or_default();
+            let idx = ctx.world.cvars.ui_netSource.integer;
+            let netSource = GetNetSourceString(ctx, idx);
+            s = Some(format!("{} {}", ctx.world.main.holdSPString, netSource));
+        }
+        UI_NETFILTER => {
+            if ctx.world.cvars.ui_serverFilterType.integer < 0
+                || ctx.world.cvars.ui_serverFilterType.integer > SERVER_FILTERS.len() as c_int
+            {
+                ctx.world.cvars.ui_serverFilterType.integer = 0;
+            }
+            ctx.world.main.holdSPString =
+                trap::SP_GetStringTextString(ctx.engine, "MENUS_GAME", MAX_STRING_CHARS)
+                    .unwrap_or_default();
+            let filterIdx = ctx.world.cvars.ui_serverFilterType.integer as usize;
+            // §19: Raven's `>` guard lets `== numServerFilters` read one past the table.
+            let description = SERVER_FILTERS
+                .get(filterIdx)
+                .map(|f| f.description)
+                .unwrap_or("");
+            ctx.world.main.holdSPString2 =
+                trap::SP_GetStringTextString(ctx.engine, description, MAX_STRING_CHARS)
+                    .unwrap_or_default();
+
+            s = Some(format!(
+                "{} {}",
+                ctx.world.main.holdSPString, ctx.world.main.holdSPString2
+            ));
+        }
+        UI_TIER | UI_TIER_MAPNAME | UI_TIER_GAMETYPE | UI_ALLMAPS_SELECTION | UI_OPPONENT_NAME => {}
+        UI_KEYBINDSTATUS => {
+            if Display_KeyBindPending(&ctx.world.menus) {
+                s = Some(UI_GetStringEdString(
+                    ctx,
+                    "MP_INGAME",
+                    "WAITING_FOR_NEW_KEY",
+                ));
+            }
+            // else: Raven leaves the "Press ENTER or CLICK..." line commented
+            // out — no fallback text.
+        }
+        UI_SERVERREFRESHDATE => {
+            let netSourceIdx = ctx.world.cvars.ui_netSource.integer;
+            s = Some(UI_Cvar_VariableString(
+                ctx,
+                &format!("ui_lastServerRefresh_{}", netSourceIdx),
+            ));
+        }
+        _ => {}
+    }
+
+    if let Some(text) = s {
+        Text_Width(ctx, &text, scale, 0)
+    } else {
+        0
+    }
+}
+
+/// Raven `UI_DrawServerMOTD`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:3371-3428`
+pub fn UI_DrawServerMOTD(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    iMenuFont: c_int,
+) {
+    if ctx.world.serverStatus.motdLen != 0 {
+        if ctx.world.serverStatus.motdWidth == -1 {
+            ctx.world.serverStatus.motdWidth = 0;
+            ctx.world.serverStatus.motdPaintX = rect.x as c_int + 1;
+            ctx.world.serverStatus.motdPaintX2 = -1;
+        }
+
+        if ctx.world.serverStatus.motdOffset > ctx.world.serverStatus.motdLen {
+            ctx.world.serverStatus.motdOffset = 0;
+            ctx.world.serverStatus.motdPaintX = rect.x as c_int + 1;
+            ctx.world.serverStatus.motdPaintX2 = -1;
+        }
+
+        if ctx.world.uiDC.realTime > ctx.world.serverStatus.motdTime {
+            ctx.world.serverStatus.motdTime = ctx.world.uiDC.realTime + 10;
+            if ctx.world.serverStatus.motdPaintX <= rect.x as c_int + 2 {
+                if ctx.world.serverStatus.motdOffset < ctx.world.serverStatus.motdLen {
+                    let offset = ctx.world.serverStatus.motdOffset as usize;
+                    let remaining = ctx.world.serverStatus.motd[offset..].to_string();
+                    let width = Text_Width(ctx, &remaining, scale, 1);
+                    ctx.world.serverStatus.motdPaintX += width - 1;
+                    ctx.world.serverStatus.motdOffset += 1;
+                } else {
+                    ctx.world.serverStatus.motdOffset = 0;
+                    if ctx.world.serverStatus.motdPaintX2 >= 0 {
+                        ctx.world.serverStatus.motdPaintX = ctx.world.serverStatus.motdPaintX2;
+                    } else {
+                        ctx.world.serverStatus.motdPaintX = rect.x as c_int + rect.w as c_int - 2;
+                    }
+                    ctx.world.serverStatus.motdPaintX2 = -1;
+                }
+            } else {
+                ctx.world.serverStatus.motdPaintX -= 2;
+                if ctx.world.serverStatus.motdPaintX2 >= 0 {
+                    ctx.world.serverStatus.motdPaintX2 -= 2;
+                }
+            }
+        }
+
+        let paintX = ctx.world.serverStatus.motdPaintX as f32;
+        let y = rect.y + rect.h - 3.0;
+        let mut maxX = rect.x + rect.w - 2.0;
+        let offset = ctx.world.serverStatus.motdOffset as usize;
+        let text = ctx.world.serverStatus.motd[offset..].to_string();
+        Text_Paint_Limit(
+            ctx, &mut maxX, paintX, y, scale, color, &text, 0.0, 0, iMenuFont,
+        );
+        if ctx.world.serverStatus.motdPaintX2 >= 0 {
+            let paintX2 = ctx.world.serverStatus.motdPaintX2 as f32;
+            let motd = ctx.world.serverStatus.motd.clone();
+            let motdOffset = ctx.world.serverStatus.motdOffset;
+            let mut maxX2 = rect.x + rect.w - 2.0;
+            Text_Paint_Limit(
+                ctx, &mut maxX2, paintX2, y, scale, color, &motd, 0.0, motdOffset, iMenuFont,
+            );
+        }
+        if ctx.world.serverStatus.motdOffset != 0 && maxX > 0.0 {
+            // if we have an offset (we are skipping the first part of the
+            // string) and we fit the string
+            if ctx.world.serverStatus.motdPaintX2 == -1 {
+                ctx.world.serverStatus.motdPaintX2 = rect.x as c_int + rect.w as c_int - 2;
+            }
+        } else {
+            ctx.world.serverStatus.motdPaintX2 = -1;
+        }
+    }
+}
+
+/// Raven `UI_JoinGameType_HandleKey`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:4402-4422`
+pub fn UI_JoinGameType_HandleKey(
+    ctx: &mut UiContext,
+    dc: &mut dyn DisplayContext,
+    _flags: c_int,
+    _special: &mut f32,
+    key: c_int,
+) -> bool {
+    if key == fakeAscii_t::A_MOUSE1 as c_int
+        || key == fakeAscii_t::A_MOUSE2 as c_int
+        || key == fakeAscii_t::A_ENTER as c_int
+        || key == fakeAscii_t::A_KP_ENTER as c_int
+    {
+        if key == fakeAscii_t::A_MOUSE2 as c_int {
+            ctx.world.cvars.ui_joinGameType.integer -= 1;
+        } else {
+            ctx.world.cvars.ui_joinGameType.integer += 1;
+        }
+
+        if ctx.world.cvars.ui_joinGameType.integer < 0 {
+            ctx.world.cvars.ui_joinGameType.integer = ctx.world.joinGameTypes.len() as c_int - 1;
+        } else if ctx.world.cvars.ui_joinGameType.integer >= ctx.world.joinGameTypes.len() as c_int
+        {
+            ctx.world.cvars.ui_joinGameType.integer = 0;
+        }
+
+        let idx = ctx.world.cvars.ui_joinGameType.integer;
+        trap::Cvar_Set(ctx.engine, "ui_joinGameType", &format!("{}", idx));
+        UI_BuildServerDisplayList(ctx, dc, 1);
+        return true;
+    }
+    false
+}
+
+/// Raven `UI_NetFilter_HandleKey`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:4551-4569`
+pub fn UI_NetFilter_HandleKey(
+    ctx: &mut UiContext,
+    dc: &mut dyn DisplayContext,
+    _flags: c_int,
+    _special: &mut f32,
+    key: c_int,
+) -> bool {
+    if key == fakeAscii_t::A_MOUSE1 as c_int
+        || key == fakeAscii_t::A_MOUSE2 as c_int
+        || key == fakeAscii_t::A_ENTER as c_int
+        || key == fakeAscii_t::A_KP_ENTER as c_int
+    {
+        if key == fakeAscii_t::A_MOUSE2 as c_int {
+            ctx.world.cvars.ui_serverFilterType.integer -= 1;
+        } else {
+            ctx.world.cvars.ui_serverFilterType.integer += 1;
+        }
+
+        if ctx.world.cvars.ui_serverFilterType.integer >= SERVER_FILTERS.len() as c_int {
+            ctx.world.cvars.ui_serverFilterType.integer = 0;
+        } else if ctx.world.cvars.ui_serverFilterType.integer < 0 {
+            ctx.world.cvars.ui_serverFilterType.integer = SERVER_FILTERS.len() as c_int - 1;
+        }
+        UI_BuildServerDisplayList(ctx, dc, 1);
+        return true;
+    }
+    false
+}
+
+/// Raven `UI_StartSkirmish`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:5145-5253`
+#[allow(clippy::too_many_lines)]
+pub fn UI_StartSkirmish(ctx: &mut UiContext, dc: &mut dyn DisplayContext, next: bool) {
+    let temp = trap::Cvar_VariableValue(ctx.engine, "g_gametype") as c_int;
+    trap::Cvar_Set(ctx.engine, "ui_gameType", &format!("{}", temp));
+
+    if next {
+        let index = trap::Cvar_VariableValue(ctx.engine, "ui_mapIndex") as c_int;
+        let _ = UI_MapCountByGameType(ctx.world, true);
+        let mut actual = 0;
+        let _ = UI_SelectedMap(ctx.world, index, &mut actual);
+        if UI_SetNextMap(ctx.world, dc, actual, index) {
+            // handled
+        } else {
+            let mut special = 0.0_f32;
+            UI_GameType_HandleKey(
+                ctx,
+                dc,
+                0,
+                &mut special,
+                fakeAscii_t::A_MOUSE1 as c_int,
+                false,
+            );
+            let _ = UI_MapCountByGameType(ctx.world, true);
+            Menu_SetFeederSelection(
+                &mut ctx.world.menus,
+                dc,
+                None,
+                FEEDER_MAPS,
+                0,
+                Some("skirmish"),
+            );
+        }
+    }
+
+    let g = ctx.world.gameTypes[ctx.world.cvars.ui_gameType.integer as usize].gtEnum;
+    trap::Cvar_SetValue(ctx.engine, "g_gametype", g as f32);
+    let mapLoadName = ctx.world.mapList[ctx.world.cvars.ui_currentMap.integer as usize]
+        .mapLoadName
+        .clone();
+    trap::Cmd_ExecuteText(
+        ctx.engine,
+        cbufExec_t::EXEC_APPEND as c_int,
+        &format!("wait ; wait ; map {}\n", mapLoadName),
+    );
+    let skill = trap::Cvar_VariableValue(ctx.engine, "g_spSkill");
+    let mapName = ctx.world.mapList[ctx.world.cvars.ui_currentMap.integer as usize]
+        .mapName
+        .clone();
+    trap::Cvar_Set(ctx.engine, "ui_scoreMap", &mapName);
+
+    let opponentName = UI_Cvar_VariableString(ctx, "ui_opponentName");
+    let mut k = UI_TeamIndexFromName(ctx.world, &opponentName);
+
+    trap::Cvar_Set(ctx.engine, "ui_singlePlayerActive", "1");
+
+    // set up sp overrides, will be replaced on postgame
+    let temp = trap::Cvar_VariableValue(ctx.engine, "capturelimit") as c_int;
+    trap::Cvar_Set(ctx.engine, "ui_saveCaptureLimit", &format!("{}", temp));
+    let temp = trap::Cvar_VariableValue(ctx.engine, "fraglimit") as c_int;
+    trap::Cvar_Set(ctx.engine, "ui_saveFragLimit", &format!("{}", temp));
+    let temp = trap::Cvar_VariableValue(ctx.engine, "duel_fraglimit") as c_int;
+    trap::Cvar_Set(ctx.engine, "ui_saveDuelLimit", &format!("{}", temp));
+
+    UI_SetCapFragLimits(ctx, false);
+
+    let temp = trap::Cvar_VariableValue(ctx.engine, "cg_drawTimer") as c_int;
+    trap::Cvar_Set(ctx.engine, "ui_drawTimer", &format!("{}", temp));
+    let temp = trap::Cvar_VariableValue(ctx.engine, "g_doWarmup") as c_int;
+    trap::Cvar_Set(ctx.engine, "ui_doWarmup", &format!("{}", temp));
+    let temp = trap::Cvar_VariableValue(ctx.engine, "g_friendlyFire") as c_int;
+    trap::Cvar_Set(ctx.engine, "ui_friendlyFire", &format!("{}", temp));
+    let temp = trap::Cvar_VariableValue(ctx.engine, "sv_maxClients") as c_int;
+    trap::Cvar_Set(ctx.engine, "ui_maxClients", &format!("{}", temp));
+    let temp = trap::Cvar_VariableValue(ctx.engine, "g_warmup") as c_int;
+    trap::Cvar_Set(ctx.engine, "ui_Warmup", &format!("{}", temp));
+    let temp = trap::Cvar_VariableValue(ctx.engine, "sv_pure") as c_int;
+    trap::Cvar_Set(ctx.engine, "ui_pure", &format!("{}", temp));
+
+    trap::Cvar_Set(ctx.engine, "cg_cameraOrbit", "0");
+    trap::Cvar_Set(ctx.engine, "cg_thirdPerson", "0");
+    trap::Cvar_Set(ctx.engine, "cg_drawTimer", "1");
+    trap::Cvar_Set(ctx.engine, "g_doWarmup", "1");
+    trap::Cvar_Set(ctx.engine, "g_warmup", "15");
+    trap::Cvar_Set(ctx.engine, "sv_pure", "0");
+    trap::Cvar_Set(ctx.engine, "g_friendlyFire", "0");
+    // g_redTeam/g_blueTeam sets stay commented out, matching Raven.
+
+    if trap::Cvar_VariableValue(ctx.engine, "ui_recordSPDemo") != 0.0 {
+        let mapLoadName = ctx.world.mapList[ctx.world.cvars.ui_currentMap.integer as usize]
+            .mapLoadName
+            .clone();
+        let buff = format!("{}_{}", mapLoadName, g);
+        trap::Cvar_Set(ctx.engine, "ui_recordSPDemoName", &buff);
+    }
+
+    let mut delay: c_int = 500;
+
+    if g == GT_DUEL || g == GT_POWERDUEL {
+        let cur = ctx.world.cvars.ui_currentMap.integer as usize;
+        let temp = ctx.world.mapList[cur].teamMembers * 2;
+        trap::Cvar_Set(ctx.engine, "sv_maxClients", &format!("{}", temp));
+        let opponentName = ctx.world.mapList[cur].opponentName.clone();
+        // Raven's literal is two adjacent string constants that concatenate
+        // to `"wait ; addbot %s %f , %i \n"` (the stray `""` is Raven's own
+        // formatting, preserved here).
+        let buff = format!("wait ; addbot {} {:.6} , {} \n", opponentName, skill, delay);
+        trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_APPEND as c_int, &buff);
+    } else if g == GT_HOLOCRON || g == GT_JEDIMASTER {
+        let cur = ctx.world.cvars.ui_currentMap.integer as usize;
+        let teamMembers = ctx.world.mapList[cur].teamMembers;
+        let temp = teamMembers * 2;
+        trap::Cvar_Set(ctx.engine, "sv_maxClients", &format!("{}", temp));
+        for i in 0..teamMembers {
+            let name = ctx.world.teamList[k as usize].teamMembers[i as usize].clone();
+            let ai = UI_AIFromName(ctx.world, &name);
+            let color = if g == GT_HOLOCRON { "" } else { "Blue" };
+            let buff = format!(
+                "addbot \"{}\" {:.6} {} {} {}\n",
+                ai, skill, color, delay, name
+            );
+            trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_APPEND as c_int, &buff);
+            delay += 500;
+        }
+        let teamName = UI_Cvar_VariableString(ctx, "ui_teamName");
+        k = UI_TeamIndexFromName(ctx.world, &teamName);
+        for i in 0..(teamMembers - 1) {
+            let name = ctx.world.teamList[k as usize].teamMembers[i as usize].clone();
+            let ai = UI_AIFromName(ctx.world, &name);
+            let color = if g == GT_HOLOCRON { "" } else { "Red" };
+            let buff = format!(
+                "addbot \"{}\" {:.6} {} {} {}\n",
+                ai, skill, color, delay, name
+            );
+            trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_APPEND as c_int, &buff);
+            delay += 500;
+        }
+    } else {
+        let cur = ctx.world.cvars.ui_currentMap.integer as usize;
+        let teamMembers = ctx.world.mapList[cur].teamMembers;
+        let temp = teamMembers * 2;
+        trap::Cvar_Set(ctx.engine, "sv_maxClients", &format!("{}", temp));
+        for i in 0..teamMembers {
+            let name = ctx.world.teamList[k as usize].teamMembers[i as usize].clone();
+            let ai = UI_AIFromName(ctx.world, &name);
+            let color = if g == GT_FFA { "" } else { "Blue" };
+            let buff = format!(
+                "addbot \"{}\" {:.6} {} {} {}\n",
+                ai, skill, color, delay, name
+            );
+            trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_APPEND as c_int, &buff);
+            delay += 500;
+        }
+        let teamName = UI_Cvar_VariableString(ctx, "ui_teamName");
+        k = UI_TeamIndexFromName(ctx.world, &teamName);
+        for i in 0..(teamMembers - 1) {
+            let name = ctx.world.teamList[k as usize].teamMembers[i as usize].clone();
+            let ai = UI_AIFromName(ctx.world, &name);
+            let color = if g == GT_FFA { "" } else { "Red" };
+            let buff = format!(
+                "addbot \"{}\" {:.6} {} {} {}\n",
+                ai, skill, color, delay, name
+            );
+            trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_APPEND as c_int, &buff);
+            delay += 500;
+        }
+    }
+    if g >= GT_TEAM {
+        trap::Cmd_ExecuteText(
+            ctx.engine,
+            cbufExec_t::EXEC_APPEND as c_int,
+            "wait 5; team Red\n",
+        );
+    }
+}
+
+/// Raven `UI_SetBotButton`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:5546-5572`
+pub fn UI_SetBotButton(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+    let gameType = trap::Cvar_VariableValue(ctx.engine, "g_gametype") as c_int;
+    let server = trap::Cvar_VariableValue(ctx.engine, "sv_running") as c_int;
+    let name = "addBot";
+
+    // If in siege or a client, don't show add bot button.
+    if gameType == GT_SIEGE || server == 0 {
+        // If it's not siege, don't worry about it.
+        let menu = match Menu_GetFocused(&ctx.world.menus) {
+            Some(m) => m,
+            None => return,
+        };
+
+        if Menu_FindItemByName(&ctx.world.menus, Some(menu), name).is_some() {
+            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, name, false);
+        }
+    }
+}
+
+/// Raven `UI_SetSiegeObjectiveGraphicPos`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:5680-5718`
+pub fn UI_SetSiegeObjectiveGraphicPos(
+    ctx: &mut UiContext,
+    menu: MenuId,
+    itemName: &str,
+    cvarName: &str,
+) {
+    let item = match Menu_FindItemByName(&ctx.world.menus, Some(menu), itemName) {
+        Some(i) => i,
+        None => return,
+    };
+
+    // get cvar data
+    let cvarBuf = trap::Cvar_VariableStringBuffer(ctx.engine, cvarName, 1024);
+    let mut p: &str = &cvarBuf;
+    let mut holdVal = String::new();
+
+    if String_Parse(&mut p, &mut holdVal) {
+        let x = atof(&holdVal) as f32;
+        if String_Parse(&mut p, &mut holdVal) {
+            let y = atof(&holdVal) as f32;
+            if String_Parse(&mut p, &mut holdVal) {
+                let w = atof(&holdVal) as f32;
+                if String_Parse(&mut p, &mut holdVal) {
+                    let h = atof(&holdVal) as f32;
+
+                    let it = ctx.world.menus.item_mut(item);
+                    it.window.rectClient.x = x;
+                    it.window.rectClient.y = y;
+                    it.window.rectClient.w = w;
+                    it.window.rectClient.h = h;
+
+                    it.window.rect.x = it.window.rectClient.x;
+                    it.window.rect.y = it.window.rectClient.y;
+                    it.window.rect.w = it.window.rectClient.w;
+                    it.window.rect.h = it.window.rectClient.h;
+                }
+            }
+        }
+    }
+}
+
+/// Raven `UI_UpdateCharacterSkin`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:6048-6085`
+pub fn UI_UpdateCharacterSkin(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+    let menu = match Menu_GetFocused(&ctx.world.menus) {
+        Some(m) => m,
+        None => return,
+    };
+
+    let item = match Menu_FindItemByName(&ctx.world.menus, Some(menu), "character") {
+        Some(i) => i,
+        None => {
+            let menuName = ctx
+                .world
+                .menus
+                .menu(menu)
+                .window
+                .name
+                .clone()
+                .unwrap_or_default();
+            Com_Error(
+                ctx,
+                &format!(
+                    "UI_UpdateCharacterSkin: Could not find item (character) in menu ({})",
+                    menuName
+                ),
+            );
+            return;
+        }
+    };
+
+    let model = trap::Cvar_VariableStringBuffer(ctx.engine, "ui_char_model", MAX_QPATH);
+    let head = trap::Cvar_VariableStringBuffer(ctx.engine, "ui_char_skin_head", MAX_QPATH);
+    let torso = trap::Cvar_VariableStringBuffer(ctx.engine, "ui_char_skin_torso", MAX_QPATH);
+    let legs = trap::Cvar_VariableStringBuffer(ctx.engine, "ui_char_skin_legs", MAX_QPATH);
+
+    let skin = format!("models/players/{}/|{}|{}|{}", model, head, torso, legs);
+
+    ItemParse_model_g2skin_go(&mut ctx.world.menus, dc, item, Some(&skin));
+}
+
+/// Raven `UI_SiegeClassCnt`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:7516-7527`
+pub fn UI_SiegeClassCnt(ctx: &mut UiContext, dc: &mut dyn DisplayContext, team: c_int) {
+    UI_SetSiegeTeams(ctx, dc);
+
+    let infantry = BG_SiegeCountBaseClass(team, 0, &ctx.world.bg_state);
+    trap::Cvar_Set(ctx.engine, "ui_infantry_cnt", &format!("{}", infantry));
+    let vanguard = BG_SiegeCountBaseClass(team, 1, &ctx.world.bg_state);
+    trap::Cvar_Set(ctx.engine, "ui_vanguard_cnt", &format!("{}", vanguard));
+    let support = BG_SiegeCountBaseClass(team, 2, &ctx.world.bg_state);
+    trap::Cvar_Set(ctx.engine, "ui_support_cnt", &format!("{}", support));
+    let jedi = BG_SiegeCountBaseClass(team, 3, &ctx.world.bg_state);
+    trap::Cvar_Set(ctx.engine, "ui_jedi_cnt", &format!("{}", jedi));
+    let demo = BG_SiegeCountBaseClass(team, 4, &ctx.world.bg_state);
+    trap::Cvar_Set(ctx.engine, "ui_demo_cnt", &format!("{}", demo));
+    let heavy = BG_SiegeCountBaseClass(team, 5, &ctx.world.bg_state);
+    trap::Cvar_Set(ctx.engine, "ui_heavy_cnt", &format!("{}", heavy));
+}
+
+/// Raven `UI_UpdateSiegeStatusIcons`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:7559-7592`
+pub fn UI_UpdateSiegeStatusIcons(world: &mut UiWorld, dc: &mut dyn DisplayContext) {
+    let menu = match Menu_GetFocused(&world.menus) {
+        Some(m) => m,
+        None => return,
+    };
+
+    for i in 0..7 {
+        Menu_SetItemBackground(
+            &mut world.menus,
+            dc,
+            Some(menu),
+            &format!("wpnicon0{}", i),
+            &format!("*ui_class_weapon{}", i),
+        );
+    }
+
+    for i in 0..7 {
+        Menu_SetItemBackground(
+            &mut world.menus,
+            dc,
+            Some(menu),
+            &format!("itemicon0{}", i),
+            &format!("*ui_class_item{}", i),
+        );
+    }
+
+    for i in 0..10 {
+        Menu_SetItemBackground(
+            &mut world.menus,
+            dc,
+            Some(menu),
+            &format!("forceicon0{}", i),
+            &format!("*ui_class_power{}", i),
+        );
+    }
+
+    for i in 10..15 {
+        Menu_SetItemBackground(
+            &mut world.menus,
+            dc,
+            Some(menu),
+            &format!("forceicon{}", i),
+            &format!("*ui_class_power{}", i),
+        );
+    }
+}
+
+/// Raven `UI_FeederCount`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:8475-8694`
+#[allow(clippy::too_many_lines)]
+pub fn UI_FeederCount(ctx: &mut UiContext, dc: &mut dyn DisplayContext, feederID: f32) -> c_int {
+    match feederID as c_int {
+        FEEDER_SABER_SINGLE_INFO => {
+            let mut count = 0;
+            for i in 0..MAX_SABER_HILTS {
+                match ctx.world.main.saberSingleHiltInfo.get(i) {
+                    Some(s) if !s.is_empty() => count += 1,
+                    _ => break,
+                }
+            }
+            return count;
+        }
+        FEEDER_SABER_STAFF_INFO => {
+            let mut count = 0;
+            for i in 0..MAX_SABER_HILTS {
+                match ctx.world.main.saberStaffHiltInfo.get(i) {
+                    Some(s) if !s.is_empty() => count += 1,
+                    _ => break,
+                }
+            }
+            return count;
+        }
+        FEEDER_Q3HEADS => return UI_HeadCountByColor(ctx.world),
+        FEEDER_SIEGE_TEAM1 => {
+            if ctx.world.main.siegeTeam1.is_none() {
+                UI_SetSiegeTeams(ctx, dc);
+                if ctx.world.main.siegeTeam1.is_none() {
+                    return 0;
+                }
+            }
+            let idx = ctx.world.main.siegeTeam1.unwrap();
+            return ctx.world.bg_state.bgSiegeTeams[idx].numClasses;
+        }
+        FEEDER_SIEGE_TEAM2 => {
+            if ctx.world.main.siegeTeam2.is_none() {
+                UI_SetSiegeTeams(ctx, dc);
+                if ctx.world.main.siegeTeam2.is_none() {
+                    return 0;
+                }
+            }
+            let idx = ctx.world.main.siegeTeam2.unwrap();
+            return ctx.world.bg_state.bgSiegeTeams[idx].numClasses;
+        }
+        FEEDER_FORCECFG => {
+            return if ctx.world.force.uiForceSide == FORCE_LIGHTSIDE {
+                ctx.world.forceConfigNames.len() as c_int - ctx.world.forceConfigLightIndexBegin
+            } else {
+                ctx.world.forceConfigLightIndexBegin + 1
+            };
+        }
+        FEEDER_CINEMATICS => return ctx.world.movieList.len() as c_int,
+        FEEDER_MAPS | FEEDER_ALLMAPS => {
+            let single = feederID as c_int == FEEDER_MAPS;
+            return UI_MapCountByGameType(ctx.world, single);
+        }
+        FEEDER_SERVERS => return ctx.world.serverStatus.displayServers.len() as c_int,
+        FEEDER_SERVERSTATUS => return ctx.world.serverStatusInfo.lines.len() as c_int,
+        FEEDER_FINDPLAYER => return ctx.world.foundPlayerServerAddresses.len() as c_int,
+        FEEDER_PLAYER_LIST => {
+            if ctx.world.uiDC.realTime > ctx.world.playerRefresh {
+                ctx.world.playerRefresh = ctx.world.uiDC.realTime + 3000;
+                UI_BuildPlayerList(ctx);
+            }
+            return ctx.world.playerNames.len() as c_int;
+        }
+        FEEDER_TEAM_LIST => {
+            if ctx.world.uiDC.realTime > ctx.world.playerRefresh {
+                ctx.world.playerRefresh = ctx.world.uiDC.realTime + 3000;
+                UI_BuildPlayerList(ctx);
+            }
+            return ctx.world.teamNames.len() as c_int;
+        }
+        FEEDER_MODS => return ctx.world.modList.len() as c_int,
+        FEEDER_DEMOS => return ctx.world.demoList.len() as c_int,
+        FEEDER_MOVES => {
+            let mut count = 0;
+            for i in 0..MAX_MOVES {
+                if DATAPAD_MOVE_DATA[ctx.world.movesTitleIndex as usize][i]
+                    .title
+                    .is_some()
+                {
+                    count += 1;
+                }
+            }
+            return count;
+        }
+        FEEDER_MOVES_TITLES => return MD_MOVE_TITLE_MAX,
+        FEEDER_PLAYER_SPECIES => return ctx.world.playerSpecies.len() as c_int,
+        FEEDER_PLAYER_SKIN_HEAD => {
+            let idx = ctx.world.playerSpeciesIndex as usize;
+            return ctx.world.playerSpecies[idx].SkinHeadNames.len() as c_int;
+        }
+        FEEDER_PLAYER_SKIN_TORSO => {
+            let idx = ctx.world.playerSpeciesIndex as usize;
+            return ctx.world.playerSpecies[idx].SkinTorsoNames.len() as c_int;
+        }
+        FEEDER_PLAYER_SKIN_LEGS => {
+            let idx = ctx.world.playerSpeciesIndex as usize;
+            return ctx.world.playerSpecies[idx].SkinLegNames.len() as c_int;
+        }
+        FEEDER_COLORCHOICES => {
+            let idx = ctx.world.playerSpeciesIndex as usize;
+            return ctx.world.playerSpecies[idx].ColorShader.len() as c_int;
+        }
+        FEEDER_SIEGE_BASE_CLASS => {
+            let team = trap::Cvar_VariableValue(ctx.engine, "ui_team") as c_int;
+            let baseClass = trap::Cvar_VariableValue(ctx.engine, "ui_siege_class") as c_int;
+
+            if team == SIEGETEAM_TEAM1 || team == SIEGETEAM_TEAM2 {
+                // Is it a valid base class?
+                if baseClass >= SPC_INFANTRY as c_int && baseClass < SPC_MAX as c_int {
+                    return BG_SiegeCountBaseClass(team, baseClass as i16, &ctx.world.bg_state);
+                }
+            }
+            return 0;
+        }
+        // Get the count of weapons.
+        FEEDER_SIEGE_CLASS_WEAPONS => {
+            let mut count = 0;
+            for i in 0..WP_NUM_WEAPONS {
+                let info = trap::Cvar_VariableStringBuffer(
+                    ctx.engine,
+                    &format!("ui_class_weapon{}", i),
+                    MAX_STRING_CHARS,
+                );
+                if Q_stricmp(&info, "gfx/2d/select") != 0 {
+                    count += 1;
+                }
+            }
+            return count;
+        }
+        // Get the count of inventory.
+        FEEDER_SIEGE_CLASS_INVENTORY => {
+            let mut count = 0;
+            for i in 0..HI_NUM_HOLDABLE {
+                let info = trap::Cvar_VariableStringBuffer(
+                    ctx.engine,
+                    &format!("ui_class_item{}", i),
+                    MAX_STRING_CHARS,
+                );
+                // A hack so health and ammo dispenser icons don't show up.
+                if Q_stricmp(&info, "gfx/2d/select") != 0
+                    && Q_stricmp(&info, "gfx/hud/i_icon_healthdisp") != 0
+                    && Q_stricmp(&info, "gfx/hud/i_icon_ammodisp") != 0
+                {
+                    count += 1;
+                }
+            }
+            return count;
+        }
+        // Get the count of force powers.
+        FEEDER_SIEGE_CLASS_FORCE => {
+            let mut count = 0;
+            for i in 0..NUM_FORCE_POWERS {
+                let info = trap::Cvar_VariableStringBuffer(
+                    ctx.engine,
+                    &format!("ui_class_power{}", i),
+                    MAX_STRING_CHARS,
+                );
+                if Q_stricmp(&info, "gfx/2d/select") != 0 {
+                    count += 1;
+                }
+            }
+            return count;
+        }
+        _ => {}
+    }
+
+    0
+}
+
+/// Raven `UI_FeederItemImage`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:9174-9434`
+#[allow(clippy::too_many_lines)]
+pub fn UI_FeederItemImage(
+    ctx: &mut UiContext,
+    dc: &mut dyn DisplayContext,
+    feederID: f32,
+    index: c_int,
+) -> qhandle_t {
+    let feeder = feederID as c_int;
+
+    if feeder == FEEDER_SABER_SINGLE_INFO {
+        return 0;
+    } else if feeder == FEEDER_SABER_STAFF_INFO {
+        return 0;
+    } else if feeder == FEEDER_Q3HEADS {
+        let mut actual = 0;
+        let _ = UI_SelectedTeamHead(ctx.world, index, &mut actual);
+        let index = actual;
+
+        if index >= 0 && (index as usize) < ctx.world.q3HeadNames.len() {
+            // we want it to load them as it draws them, like the TA feeder
+            let selModel = trap::Cvar_VariableValue(ctx.engine, "ui_selectedModelIndex") as c_int;
+
+            if selModel != -1 && ctx.world.q3SelectedHead != selModel {
+                ctx.world.q3SelectedHead = selModel;
+                Menu_SetFeederSelection(
+                    &mut ctx.world.menus,
+                    dc,
+                    None,
+                    FEEDER_Q3HEADS,
+                    selModel,
+                    None,
+                );
+            }
+
+            if ctx.world.q3HeadIcons[index as usize] == 0 {
+                // this isn't the best way of doing this I guess, but I didn't
+                // want a whole seperate string array for storing shader
+                // names. I can't just replace q3HeadNames with the shader
+                // name, because we print what's in q3HeadNames and the icon
+                // name would look funny.
+                //
+                // PORT-NOTE (§19 UB pick): Raven scans backward from the end
+                // of the name for '/' with no lower bound — a name with no
+                // slash underflows the C loop (UB). `rfind` returning `None`
+                // (no slash) falls back to index 0, a defined substitute.
+                let headName = ctx.world.q3HeadNames[index as usize].clone();
+                let slash = headName.rfind('/').unwrap_or(0);
+                let skinPlace = &headName[slash.saturating_add(1).min(headName.len())..];
+
+                // now, build a full path out of what's in q3HeadNames, into
+                // iconNameFromSkinName
+                let full = format!("models/players/{}", headName);
+                let slash2 = full.rfind('/').unwrap_or(0);
+                let mut iconNameFromSkinName = full[..=slash2].to_string();
+                iconNameFromSkinName.push_str("icon_");
+                iconNameFromSkinName.push_str(skinPlace);
+
+                // and now we are ready to register (thankfully this will only
+                // happen once)
+                ctx.world.q3HeadIcons[index as usize] =
+                    trap::R_RegisterShaderNoMip(ctx.engine, &iconNameFromSkinName);
+            }
+            return ctx.world.q3HeadIcons[index as usize];
+        }
+    } else if feeder == FEEDER_SIEGE_TEAM1 {
+        if ctx.world.main.siegeTeam1.is_none() {
+            UI_SetSiegeTeams(ctx, dc);
+            if ctx.world.main.siegeTeam1.is_none() {
+                return 0;
+            }
+        }
+        let idx = ctx.world.main.siegeTeam1.unwrap();
+        return BG_SiegeTeamClassPortrait(idx, index, &ctx.world.bg_state);
+    } else if feeder == FEEDER_SIEGE_TEAM2 {
+        if ctx.world.main.siegeTeam2.is_none() {
+            UI_SetSiegeTeams(ctx, dc);
+            if ctx.world.main.siegeTeam2.is_none() {
+                return 0;
+            }
+        }
+        let idx = ctx.world.main.siegeTeam2.unwrap();
+        return BG_SiegeTeamClassPortrait(idx, index, &ctx.world.bg_state);
+    } else if feeder == FEEDER_ALLMAPS || feeder == FEEDER_MAPS {
+        let mut actual = 0;
+        let _ = UI_SelectedMap(ctx.world, index, &mut actual);
+        let index = actual;
+        if index >= 0 && (index as usize) < ctx.world.mapList.len() {
+            if ctx.world.mapList[index as usize].levelShot == -1 {
+                let imageName = ctx.world.mapList[index as usize].imageName.clone();
+                ctx.world.mapList[index as usize].levelShot =
+                    trap::R_RegisterShaderNoMip(ctx.engine, &imageName);
+            }
+            return ctx.world.mapList[index as usize].levelShot;
+        }
+    } else if feeder == FEEDER_PLAYER_SKIN_HEAD {
+        let speciesIdx = ctx.world.playerSpeciesIndex as usize;
+        if index >= 0 && (index as usize) < ctx.world.playerSpecies[speciesIdx].SkinHeadNames.len()
+        {
+            let name = ctx.world.playerSpecies[speciesIdx].Name.clone();
+            let skin = ctx.world.playerSpecies[speciesIdx].SkinHeadNames[index as usize].clone();
+            return trap::R_RegisterShaderNoMip(
+                ctx.engine,
+                &format!("models/players/{}/icon_{}", name, skin),
+            );
+        }
+    } else if feeder == FEEDER_PLAYER_SKIN_TORSO {
+        let speciesIdx = ctx.world.playerSpeciesIndex as usize;
+        if index >= 0 && (index as usize) < ctx.world.playerSpecies[speciesIdx].SkinTorsoNames.len()
+        {
+            let name = ctx.world.playerSpecies[speciesIdx].Name.clone();
+            let skin = ctx.world.playerSpecies[speciesIdx].SkinTorsoNames[index as usize].clone();
+            return trap::R_RegisterShaderNoMip(
+                ctx.engine,
+                &format!("models/players/{}/icon_{}", name, skin),
+            );
+        }
+    } else if feeder == FEEDER_PLAYER_SKIN_LEGS {
+        let speciesIdx = ctx.world.playerSpeciesIndex as usize;
+        if index >= 0 && (index as usize) < ctx.world.playerSpecies[speciesIdx].SkinLegNames.len() {
+            let name = ctx.world.playerSpecies[speciesIdx].Name.clone();
+            let skin = ctx.world.playerSpecies[speciesIdx].SkinLegNames[index as usize].clone();
+            return trap::R_RegisterShaderNoMip(
+                ctx.engine,
+                &format!("models/players/{}/icon_{}", name, skin),
+            );
+        }
+    } else if feeder == FEEDER_COLORCHOICES {
+        let speciesIdx = ctx.world.playerSpeciesIndex as usize;
+        if index >= 0 && (index as usize) < ctx.world.playerSpecies[speciesIdx].ColorShader.len() {
+            let shader = ctx.world.playerSpecies[speciesIdx].ColorShader[index as usize].clone();
+            return trap::R_RegisterShaderNoMip(ctx.engine, &shader);
+        }
+    } else if feeder == FEEDER_SIEGE_BASE_CLASS {
+        let team = trap::Cvar_VariableValue(ctx.engine, "ui_team") as c_int;
+        let baseClass = trap::Cvar_VariableValue(ctx.engine, "ui_siege_class") as c_int;
+
+        if team == SIEGETEAM_TEAM1 || team == SIEGETEAM_TEAM2 {
+            // Is it a valid base class?
+            if baseClass >= SPC_INFANTRY as c_int && baseClass < SPC_MAX as c_int && index >= 0 {
+                return BG_GetUIPortrait(team, baseClass as i16, index as i16, &ctx.world.bg_state);
+            }
+        }
+    } else if feeder == FEEDER_SIEGE_CLASS_WEAPONS {
+        let mut validCnt = 0;
+        for i in 0..WP_NUM_WEAPONS {
+            let info = trap::Cvar_VariableStringBuffer(
+                ctx.engine,
+                &format!("ui_class_weapon{}", i),
+                MAX_STRING_CHARS,
+            );
+            if Q_stricmp(&info, "gfx/2d/select") != 0 {
+                if validCnt == index {
+                    return trap::R_RegisterShaderNoMip(ctx.engine, &info);
+                }
+                validCnt += 1;
+            }
+        }
+    } else if feeder == FEEDER_SIEGE_CLASS_INVENTORY {
+        let mut validCnt = 0;
+        for i in 0..HI_NUM_HOLDABLE {
+            let info = trap::Cvar_VariableStringBuffer(
+                ctx.engine,
+                &format!("ui_class_item{}", i),
+                MAX_STRING_CHARS,
+            );
+            // A hack so health and ammo dispenser icons don't show up.
+            if Q_stricmp(&info, "gfx/2d/select") != 0
+                && Q_stricmp(&info, "gfx/hud/i_icon_healthdisp") != 0
+                && Q_stricmp(&info, "gfx/hud/i_icon_ammodisp") != 0
+            {
+                if validCnt == index {
+                    return trap::R_RegisterShaderNoMip(ctx.engine, &info);
+                }
+                validCnt += 1;
+            }
+        }
+    } else if feeder == FEEDER_SIEGE_CLASS_FORCE {
+        let mut slotI: c_int = 0;
+        let mut validCnt = 0;
+
+        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
+            if let Some(item) =
+                Menu_FindItemByName(&ctx.world.menus, Some(menu), "base_class_force_feed")
+            {
+                if let Some(listPtr) = ctx.world.menus.item(item).typeData.listBox() {
+                    slotI = listPtr.startPos;
+                }
+            }
+        }
+
+        for i in 0..NUM_FORCE_POWERS {
+            let info = trap::Cvar_VariableStringBuffer(
+                ctx.engine,
+                &format!("ui_class_power{}", i),
+                MAX_STRING_CHARS,
+            );
+            if Q_stricmp(&info, "gfx/2d/select") != 0 {
+                if validCnt == index {
+                    let info2 = trap::Cvar_VariableStringBuffer(
+                        ctx.engine,
+                        &format!("ui_class_powerlevel{}", validCnt),
+                        MAX_STRING_CHARS,
+                    );
+                    trap::Cvar_Set(
+                        ctx.engine,
+                        &format!("ui_class_powerlevelslot{}", index - slotI),
+                        &info2,
+                    );
+                    return trap::R_RegisterShaderNoMip(ctx.engine, &info);
+                }
+                validCnt += 1;
+            }
+        }
+    }
+
+    0
+}
+
+/// Raven `GameType_Parse`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:9997-10056`
+pub fn GameType_Parse(ctx: &mut UiContext, p: &mut &str, join: bool) -> bool {
+    let (token, rest) = COM_Parse(p, true);
+    *p = rest;
+
+    if !token.starts_with('{') {
+        return false;
+    }
+
+    if join {
+        ctx.world.joinGameTypes.clear();
+    } else {
+        ctx.world.gameTypes.clear();
+    }
+
+    loop {
+        let (token, rest) = COM_Parse(p, true);
+        *p = rest;
+
+        if Q_stricmp(&token, "}") == 0 {
+            return true;
+        }
+
+        if token.is_empty() {
+            return false;
+        }
+
+        if token.starts_with('{') {
+            // two tokens per line, character name and sex
+            let mut gameType = String::new();
+            let mut gtEnum: c_int = 0;
+            if !String_Parse(p, &mut gameType) || !Int_Parse(p, &mut gtEnum) {
+                return false;
+            }
+
+            if join {
+                if ctx.world.joinGameTypes.len() < MAX_GAMETYPES {
+                    ctx.world
+                        .joinGameTypes
+                        .push(GameTypeInfo { gameType, gtEnum });
+                } else {
+                    Com_Printf(ctx, "Too many net game types, last one replace!\n");
+                }
+            } else if ctx.world.gameTypes.len() < MAX_GAMETYPES {
+                ctx.world.gameTypes.push(GameTypeInfo { gameType, gtEnum });
+            } else {
+                Com_Printf(ctx, "Too many game types, last one replace!\n");
+            }
+
+            let (token2, rest2) = COM_Parse(p, true);
+            *p = rest2;
+            if !token2.starts_with('}') {
+                return false;
+            }
+        }
+    }
+}
+
+/// Raven `MapList_Parse`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:10058-10120`
+pub fn MapList_Parse(ctx: &mut UiContext, p: &mut &str) -> bool {
+    let (token, rest) = COM_Parse(p, true);
+    *p = rest;
+
+    if !token.starts_with('{') {
+        return false;
+    }
+
+    ctx.world.mapList.clear();
+
+    loop {
+        let (token, rest) = COM_Parse(p, true);
+        *p = rest;
+
+        if Q_stricmp(&token, "}") == 0 {
+            return true;
+        }
+
+        if token.is_empty() {
+            return false;
+        }
+
+        if token.starts_with('{') {
+            let mut mapName = String::new();
+            let mut mapLoadName = String::new();
+            let mut teamMembers: c_int = 0;
+            if !String_Parse(p, &mut mapName)
+                || !String_Parse(p, &mut mapLoadName)
+                || !Int_Parse(p, &mut teamMembers)
+            {
+                return false;
+            }
+
+            let mut opponentName = String::new();
+            if !String_Parse(p, &mut opponentName) {
+                return false;
+            }
+
+            let mut typeBits: c_int = 0;
+            let mut timeToBeat = [0; MAX_GAMETYPES];
+
+            loop {
+                let (token2, rest2) = COM_Parse(p, true);
+                *p = rest2;
+                match token2.as_bytes().first().copied() {
+                    Some(b @ b'0'..=b'9') => {
+                        let digit = (b - b'0') as usize;
+                        typeBits |= 1 << digit;
+                        let mut time: c_int = 0;
+                        if !Int_Parse(p, &mut time) {
+                            return false;
+                        }
+                        if digit < timeToBeat.len() {
+                            timeToBeat[digit] = time;
+                        }
+                    }
+                    _ => break,
+                }
+            }
+
+            let levelShotName = format!("levelshots/{}_small", mapLoadName);
+            let levelShot = trap::R_RegisterShaderNoMip(ctx.engine, &levelShotName);
+
+            if ctx.world.mapList.len() < MAX_MAPS {
+                ctx.world.mapList.push(MapInfo {
+                    mapName,
+                    mapLoadName,
+                    opponentName,
+                    teamMembers,
+                    typeBits,
+                    cinematic: -1,
+                    timeToBeat,
+                    levelShot,
+                    ..Default::default()
+                });
+            } else {
+                Com_Printf(ctx, "Too many maps, last one replaced!\n");
+            }
+        }
+    }
+}
+
+/// Raven `UI_DisplayDownloadInfo`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:11075-11163`
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+pub fn UI_DisplayDownloadInfo(
+    ctx: &mut UiContext,
+    downloadName: &str,
+    centerPoint: f32,
+    yStart: f32,
+    scale: f32,
+    iMenuFont: c_int,
+) {
+    let colorLtGreyAlpha: vec4_t = [0.0, 0.0, 0.0, 0.5];
+
+    UI_FillRect(
+        ctx,
+        0.0,
+        0.0,
+        SCREEN_WIDTH as f32,
+        SCREEN_HEIGHT as f32,
+        &colorLtGreyAlpha,
+    );
+
+    // "Downloading:"
+    let sDownLoading = GetCRDelineatedString(ctx, "MENUS", "DOWNLOAD_STUFF", 0).unwrap_or_default();
+    // "Estimated time left:"
+    let sEstimatedTimeLeft =
+        GetCRDelineatedString(ctx, "MENUS", "DOWNLOAD_STUFF", 1).unwrap_or_default();
+    // "Transfer rate:"
+    let sTransferRate =
+        GetCRDelineatedString(ctx, "MENUS", "DOWNLOAD_STUFF", 2).unwrap_or_default();
+    // "of"
+    let sOf = GetCRDelineatedString(ctx, "MENUS", "DOWNLOAD_STUFF", 3).unwrap_or_default();
+    // "copied"
+    let sCopied = GetCRDelineatedString(ctx, "MENUS", "DOWNLOAD_STUFF", 4).unwrap_or_default();
+    // "sec."
+    let sSec = GetCRDelineatedString(ctx, "MENUS", "DOWNLOAD_STUFF", 5).unwrap_or_default();
+
+    let downloadSize = trap::Cvar_VariableValue(ctx.engine, "cl_downloadSize") as c_int;
+    let downloadCount = trap::Cvar_VariableValue(ctx.engine, "cl_downloadCount") as c_int;
+    let downloadTime = trap::Cvar_VariableValue(ctx.engine, "cl_downloadTime") as c_int;
+
+    let leftWidth: f32 = 320.0;
+
+    UI_SetColor(ctx, Some(&colorWhite));
+
+    Text_PaintCenter(
+        ctx,
+        centerPoint,
+        yStart + 112.0,
+        scale,
+        colorWhite,
+        &sDownLoading,
+        0.0,
+        iMenuFont,
+    );
+    Text_PaintCenter(
+        ctx,
+        centerPoint,
+        yStart + 192.0,
+        scale,
+        colorWhite,
+        &sEstimatedTimeLeft,
+        0.0,
+        iMenuFont,
+    );
+    Text_PaintCenter(
+        ctx,
+        centerPoint,
+        yStart + 248.0,
+        scale,
+        colorWhite,
+        &sTransferRate,
+        0.0,
+        iMenuFont,
+    );
+
+    let s = if downloadSize > 0 {
+        format!("{} ({}%)", downloadName, downloadCount * 100 / downloadSize)
+    } else {
+        downloadName.to_string()
+    };
+
+    Text_PaintCenter(
+        ctx,
+        centerPoint,
+        yStart + 136.0,
+        scale,
+        colorWhite,
+        &s,
+        0.0,
+        iMenuFont,
+    );
+
+    let dlSizeBuf = UI_ReadableSize(downloadCount);
+    let totalSizeBuf = UI_ReadableSize(downloadSize);
+
+    if downloadCount < 4096 || downloadTime == 0 {
+        Text_PaintCenter(
+            ctx,
+            leftWidth,
+            yStart + 216.0,
+            scale,
+            colorWhite,
+            "estimating",
+            0.0,
+            iMenuFont,
+        );
+        Text_PaintCenter(
+            ctx,
+            leftWidth,
+            yStart + 160.0,
+            scale,
+            colorWhite,
+            &format!("({} {} {} {})", dlSizeBuf, sOf, totalSizeBuf, sCopied),
+            0.0,
+            iMenuFont,
+        );
+    } else {
+        let xferRate = if (ctx.world.uiDC.realTime - downloadTime) / 1000 != 0 {
+            downloadCount / ((ctx.world.uiDC.realTime - downloadTime) / 1000)
+        } else {
+            0
+        };
+        let xferRateBuf = UI_ReadableSize(xferRate);
+
+        // Extrapolate estimated completion time.
+        if downloadSize != 0 && xferRate != 0 {
+            let n = downloadSize / xferRate; // estimated time for entire d/l in secs
+
+            // We do it in K (/1024) because we'd overflow around 4MB.
+            let dlTimeBuf =
+                UI_PrintTime((n - (((downloadCount / 1024) * n) / (downloadSize / 1024))) * 1000);
+
+            Text_PaintCenter(
+                ctx,
+                leftWidth,
+                yStart + 216.0,
+                scale,
+                colorWhite,
+                &dlTimeBuf,
+                0.0,
+                iMenuFont,
+            );
+            Text_PaintCenter(
+                ctx,
+                leftWidth,
+                yStart + 160.0,
+                scale,
+                colorWhite,
+                &format!("({} {} {} {})", dlSizeBuf, sOf, totalSizeBuf, sCopied),
+                0.0,
+                iMenuFont,
+            );
+        } else {
+            Text_PaintCenter(
+                ctx,
+                leftWidth,
+                yStart + 216.0,
+                scale,
+                colorWhite,
+                "estimating",
+                0.0,
+                iMenuFont,
+            );
+            if downloadSize != 0 {
+                Text_PaintCenter(
+                    ctx,
+                    leftWidth,
+                    yStart + 160.0,
+                    scale,
+                    colorWhite,
+                    &format!("({} {} {} {})", dlSizeBuf, sOf, totalSizeBuf, sCopied),
+                    0.0,
+                    iMenuFont,
+                );
+            } else {
+                Text_PaintCenter(
+                    ctx,
+                    leftWidth,
+                    yStart + 160.0,
+                    scale,
+                    colorWhite,
+                    &format!("({} {})", dlSizeBuf, sCopied),
+                    0.0,
+                    iMenuFont,
+                );
+            }
+        }
+
+        if xferRate != 0 {
+            Text_PaintCenter(
+                ctx,
+                leftWidth,
+                yStart + 272.0,
+                scale,
+                colorWhite,
+                &format!("{}/{}", xferRateBuf, sSec),
+                0.0,
+                iMenuFont,
+            );
+        }
+    }
+}
+
+/// Raven `UI_DoServerRefresh`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:11596-11632`
+pub fn UI_DoServerRefresh(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+    let mut wait = false;
+
+    if !ctx.world.serverStatus.refreshActive {
+        return;
+    }
+    if ctx.world.cvars.ui_netSource.integer != AS_FAVORITES {
+        if ctx.world.cvars.ui_netSource.integer == AS_LOCAL {
+            if trap::LAN_GetServerCount(ctx.engine, ctx.world.cvars.ui_netSource.integer) == 0 {
+                wait = true;
+            }
+        } else if trap::LAN_GetServerCount(ctx.engine, ctx.world.cvars.ui_netSource.integer) < 0 {
+            wait = true;
+        }
+    }
+
+    if ctx.world.uiDC.realTime < ctx.world.serverStatus.refreshtime && wait {
+        return;
+    }
+
+    // if still trying to retrieve pings
+    if trap::LAN_UpdateVisiblePings(ctx.engine, ctx.world.cvars.ui_netSource.integer) {
+        ctx.world.serverStatus.refreshtime = ctx.world.uiDC.realTime + 1000;
+    } else if !wait {
+        // get the last servers in the list
+        UI_BuildServerDisplayList(ctx, dc, 2);
+        // stop the refresh
+        UI_StopServerRefresh(ctx);
+    }
+    //
+    UI_BuildServerDisplayList(ctx, dc, 0);
+}
+
+/// Raven `UI_StartServerRefresh`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:11639-11688`
+pub fn UI_StartServerRefresh(ctx: &mut UiContext, full: bool) {
+    let mut q = qtime_t {
+        tm_sec: 0,
+        tm_min: 0,
+        tm_hour: 0,
+        tm_mday: 0,
+        tm_mon: 0,
+        tm_year: 0,
+        tm_wday: 0,
+        tm_yday: 0,
+        tm_isdst: 0,
+    };
+    trap::RealTime(ctx.engine, &mut q);
+    let netSourceIdx = ctx.world.cvars.ui_netSource.integer;
+    let month = GetMonthAbbrevString(ctx, q.tm_mon);
+    let value = format!(
+        "{}-{}, {} @ {}:{:2}",
+        month,
+        q.tm_mday,
+        1900 + q.tm_year,
+        q.tm_hour,
+        q.tm_min
+    );
+    trap::Cvar_Set(
+        ctx.engine,
+        &format!("ui_lastServerRefresh_{}", netSourceIdx),
+        &value,
+    );
+
+    if !full {
+        UI_UpdatePendingPings(ctx);
+        return;
+    }
+
+    ctx.world.serverStatus.refreshActive = true;
+    ctx.world.serverStatus.nextDisplayRefresh = ctx.world.uiDC.realTime + 1000;
+    // clear number of displayed servers
+    ctx.world.serverStatus.displayServers.clear();
+    ctx.world.serverStatus.numPlayersOnServers = 0;
+    // mark all servers as visible so we store ping updates for them
+    trap::LAN_MarkServerVisible(ctx.engine, ctx.world.cvars.ui_netSource.integer, -1, true);
+    // reset all the pings
+    trap::LAN_ResetPings(ctx.engine, ctx.world.cvars.ui_netSource.integer);
+    //
+    if ctx.world.cvars.ui_netSource.integer == AS_LOCAL {
+        trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_NOW as c_int, "localservers\n");
+        ctx.world.serverStatus.refreshtime = ctx.world.uiDC.realTime + 1000;
+        return;
+    }
+
+    ctx.world.serverStatus.refreshtime = ctx.world.uiDC.realTime + 5000;
+    // Optimatch is handled elsewhere (retail excludes _XBOX).
+    if ctx.world.cvars.ui_netSource.integer == AS_GLOBAL
+        || ctx.world.cvars.ui_netSource.integer == AS_MPLAYER
+    {
+        let i = if ctx.world.cvars.ui_netSource.integer == AS_GLOBAL {
+            0
+        } else {
+            1
+        };
+
+        let ptr = UI_Cvar_VariableString(ctx, "debug_protocol");
+        if !ptr.is_empty() {
+            trap::Cmd_ExecuteText(
+                ctx.engine,
+                cbufExec_t::EXEC_NOW as c_int,
+                &format!("globalservers {} {}\n", i, ptr),
+            );
+        } else {
+            let protocol = trap::Cvar_VariableValue(ctx.engine, "protocol") as c_int;
+            trap::Cmd_ExecuteText(
+                ctx.engine,
+                cbufExec_t::EXEC_NOW as c_int,
+                &format!("globalservers {} {}\n", i, protocol),
+            );
+        }
+    }
 }

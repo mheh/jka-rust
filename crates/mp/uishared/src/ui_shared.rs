@@ -14,37 +14,40 @@ use mp_bg::public::anim_table::animTable;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::shared::q_string::{COM_Parse, GetIDForString};
 use mp_qshared::shared::{
-    pc_token_t, qtrue, stringID_table_t, vec4_t, MAX_QPATH, MAX_TOKENLENGTH, TT_NUMBER,
+    cbufExec_t, pc_token_t, qtrue, stringID_table_t, vec4_t, CHAN_AUTO, MAX_QPATH,
+    MAX_STRING_CHARS, MAX_TOKENLENGTH, TT_NUMBER,
 };
 use native_string::{atof, atoi, latin1_to_string, string_to_latin1, Q_stricmp};
 
+use crate::shared::capture_func::CaptureFunc;
 use crate::shared::display_context::DisplayContext;
 use crate::shared::display_state::DisplayState;
 use crate::shared::edit_field_def_s::{EditFieldDef, MAX_EDITFIELD};
 use crate::shared::item_def_s::ItemDef;
 use crate::shared::item_id::ItemId;
 use crate::shared::item_payload::ItemPayload;
-use crate::shared::list_box_def_s::ListBoxDef;
+use crate::shared::list_box_def_s::{ListBoxDef, MAX_LB_COLUMNS};
 use crate::shared::menu_def_t::MenuDef;
 use crate::shared::menu_id::MenuId;
 use crate::shared::menu_system::{MenuSystem, MAX_DEFERRED_SCRIPT};
 use crate::shared::menudef::{
-    ITEM_ALIGN_CENTER, ITEM_ALIGN_RIGHT, ITEM_TYPE_BIND, ITEM_TYPE_EDITFIELD, ITEM_TYPE_LISTBOX,
-    ITEM_TYPE_MODEL, ITEM_TYPE_MULTI, ITEM_TYPE_NUMERICFIELD, ITEM_TYPE_OWNERDRAW,
-    ITEM_TYPE_SLIDER, ITEM_TYPE_TEXT, ITEM_TYPE_TEXTSCROLL, ITEM_TYPE_YESNO, LISTBOX_IMAGE,
-    UI_FORCE_RANK_ABSORB, UI_FORCE_RANK_DRAIN, UI_FORCE_RANK_GRIP, UI_FORCE_RANK_HEAL,
-    UI_FORCE_RANK_LEVITATION, UI_FORCE_RANK_LIGHTNING, UI_FORCE_RANK_PROTECT, UI_FORCE_RANK_PULL,
-    UI_FORCE_RANK_PUSH, UI_FORCE_RANK_RAGE, UI_FORCE_RANK_SABERATTACK, UI_FORCE_RANK_SABERDEFEND,
+    FEEDER_LANGUAGES, FEEDER_PLAYER_SPECIES, ITEM_ALIGN_CENTER, ITEM_ALIGN_RIGHT, ITEM_TYPE_BIND,
+    ITEM_TYPE_EDITFIELD, ITEM_TYPE_LISTBOX, ITEM_TYPE_MODEL, ITEM_TYPE_MULTI,
+    ITEM_TYPE_NUMERICFIELD, ITEM_TYPE_OWNERDRAW, ITEM_TYPE_SLIDER, ITEM_TYPE_TEXT,
+    ITEM_TYPE_TEXTSCROLL, ITEM_TYPE_YESNO, LISTBOX_IMAGE, UI_FORCE_RANK_ABSORB,
+    UI_FORCE_RANK_DRAIN, UI_FORCE_RANK_GRIP, UI_FORCE_RANK_HEAL, UI_FORCE_RANK_LEVITATION,
+    UI_FORCE_RANK_LIGHTNING, UI_FORCE_RANK_PROTECT, UI_FORCE_RANK_PULL, UI_FORCE_RANK_PUSH,
+    UI_FORCE_RANK_RAGE, UI_FORCE_RANK_SABERATTACK, UI_FORCE_RANK_SABERDEFEND,
     UI_FORCE_RANK_SABERTHROW, UI_FORCE_RANK_SEE, UI_FORCE_RANK_SPEED, UI_FORCE_RANK_TEAM_FORCE,
     UI_FORCE_RANK_TEAM_HEAL, UI_FORCE_RANK_TELEPATHY, UI_FORCE_SIDE, WINDOW_BORDER_FULL,
     WINDOW_BORDER_HORZ, WINDOW_BORDER_KCGRADIENT, WINDOW_BORDER_VERT, WINDOW_STYLE_CINEMATIC,
     WINDOW_STYLE_FILLED, WINDOW_STYLE_GRADIENT, WINDOW_STYLE_SHADER, WINDOW_STYLE_TEAMCOLOR,
 };
 use crate::shared::model_def_s::ModelDef;
-use crate::shared::multi_def_s::MultiDef;
+use crate::shared::multi_def_s::{MultiDef, MAX_MULTI_CVARS};
 use crate::shared::rect_def_t::RectDef;
 use crate::shared::scroll_info_s::{
-    SCROLL_TIME_ADJUST, SCROLL_TIME_ADJUSTOFFSET, SCROLL_TIME_FLOOR,
+    SCROLL_TIME_ADJUST, SCROLL_TIME_ADJUSTOFFSET, SCROLL_TIME_FLOOR, SCROLL_TIME_START,
 };
 use crate::shared::text_scroll_def_s::{TextScrollDef, MAX_TEXTSCROLL_LINES};
 use crate::shared::window_def_t::WindowDef;
@@ -92,6 +95,10 @@ pub const WINDOW_INACTIVE: c_int = 0x0000_0008;
 /// Raven `#define WINDOW_FORECOLORSET 0x00000200`.
 /// Source: `oracle/codemp/ui/ui_shared.h:31`
 pub const WINDOW_FORECOLORSET: c_int = 0x0000_0200;
+/// Raven `#define WINDOW_BACKCOLORSET 0x00400000` — backcolor was explicitly
+/// set.
+/// Source: `oracle/codemp/ui/ui_shared.h:44`
+pub const WINDOW_BACKCOLORSET: c_int = 0x0040_0000;
 /// Raven `#define WINDOW_LB_LEFTARROW 0x00000800`.
 /// Source: `oracle/codemp/ui/ui_shared.h:33`
 pub const WINDOW_LB_LEFTARROW: c_int = 0x0000_0800;
@@ -119,6 +126,28 @@ const WINDOW_INTRANSITIONMODEL: c_int = 0x0400_0000;
 /// ghoul2 instance is valid.
 /// Source: `oracle/codemp/ui/ui_shared.h:251`
 const ITF_G2VALID: c_int = 0x0001;
+/// Raven `#define ITF_ISCHARACTER 0x0002` — a character item, uses customRGBA.
+/// Source: `oracle/codemp/ui/ui_shared.h:252`
+const ITF_ISCHARACTER: c_int = 0x0002;
+/// Raven `#define ITF_ISSABER 0x0004` — first saber item, draws blade.
+/// Source: `oracle/codemp/ui/ui_shared.h:253`
+const ITF_ISSABER: c_int = 0x0004;
+/// Raven `#define ITF_ISSABER2 0x0008` — second saber item, draws blade.
+/// Source: `oracle/codemp/ui/ui_shared.h:254`
+const ITF_ISSABER2: c_int = 0x0008;
+
+/// Raven `#define CVAR_ENABLE 0x00000001`.
+/// Source: `oracle/codemp/ui/ui_shared.h:246`
+const CVAR_ENABLE: c_int = 0x0000_0001;
+/// Raven `#define CVAR_DISABLE 0x00000002`.
+/// Source: `oracle/codemp/ui/ui_shared.h:247`
+const CVAR_DISABLE: c_int = 0x0000_0002;
+/// Raven `#define CVAR_SHOW 0x00000004`.
+/// Source: `oracle/codemp/ui/ui_shared.h:248`
+const CVAR_SHOW: c_int = 0x0000_0004;
+/// Raven `#define CVAR_HIDE 0x00000008`.
+/// Source: `oracle/codemp/ui/ui_shared.h:249`
+const CVAR_HIDE: c_int = 0x0000_0008;
 
 /// Raven `#define CURSOR_ARROW 0x00000002`.
 /// Source: `oracle/codemp/ui/ui_shared.h:54`
@@ -3613,5 +3642,3627 @@ pub fn Menu_CacheContents(menus: &MenuSystem, dc: &mut dyn DisplayContext, menu:
 
     if !m.soundName.is_empty() {
         dc.registerSound(&m.soundName);
+    }
+}
+
+// ---------------------------------------------------------------------
+// wave 3
+// ---------------------------------------------------------------------
+
+/// Raven `String_Init` — reset the menu/open-menu counts and re-derive the
+/// controls table.
+///
+/// PORT-NOTE (D2 pool retirement): `strHandle[]`/`strHandleCount`/
+/// `strPoolIndex` reset the retired string-intern pool (see `String_Alloc`'s
+/// PORT-NOTE) — `MenuSystem` has no such table, so nothing to zero.
+/// `menuCount`/`openMenuCount` are `menus.menus`/`menus.menuStack` lengths;
+/// clearing both arenas is the owned-shape equivalent.
+///
+/// PORT-NOTE: `Item_SetupKeywordHash`/`Menu_SetupKeywordHash` stay `//
+/// DEFERRED:` (see their sites above) — the keyword-hash infrastructure they
+/// build isn't ported, so there is nothing to call here.
+///
+/// PORT-NOTE: `if (DC && DC->getBindingBuf)` null-checks the file-scope `DC`
+/// pointer and its `getBindingBuf` fn-pointer slot; `dc: &mut dyn
+/// DisplayContext` is always live and always implements every method (same
+/// collapse as `Script_SetTeamColor`'s PORT-NOTE), so the guard becomes an
+/// unconditional call.
+/// Source: `oracle/codemp/ui/ui_shared.c:363-378`
+pub fn String_Init(menus: &mut MenuSystem, dc: &mut dyn DisplayContext) {
+    menus.menus.clear();
+    menus.menuStack.clear();
+    UI_InitMemory();
+    Controls_GetConfig(menus, dc);
+}
+
+/// Raven `PC_Color_Parse` — parse 4 floats from the source into `c`.
+/// Source: `oracle/codemp/ui/ui_shared.c:510-521`
+pub fn PC_Color_Parse(dc: &mut dyn DisplayContext, handle: c_int, c: &mut vec4_t) -> bool {
+    for i in 0..4 {
+        let mut f = 0.0;
+        if !PC_Float_Parse(dc, handle, &mut f) {
+            return false;
+        }
+        c[i] = f;
+    }
+    true
+}
+
+/// Raven `PC_Rect_Parse` — parse `x`, `y`, `w`, `h` from the source into `r`.
+/// Source: `oracle/codemp/ui/ui_shared.c:589-600`
+pub fn PC_Rect_Parse(dc: &mut dyn DisplayContext, handle: c_int, r: &mut RectDef) -> bool {
+    if PC_Float_Parse(dc, handle, &mut r.x)
+        && PC_Float_Parse(dc, handle, &mut r.y)
+        && PC_Float_Parse(dc, handle, &mut r.w)
+        && PC_Float_Parse(dc, handle, &mut r.h)
+    {
+        return true;
+    }
+    false
+}
+
+/// Raven `Item_SetScreenCoords` — reposition `item`'s window rect at
+/// (`x`, `y`) plus its client offset (and border, if any), invalidating its
+/// cached text rect and, for a text-scroll item, its wrapped lines.
+///
+/// PORT-NOTE: Raven's `item == NULL` guard becomes `item: Option<ItemId>`.
+/// Source: `oracle/codemp/ui/ui_shared.c:891-930`
+pub fn Item_SetScreenCoords(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: Option<ItemId>,
+    x: f32,
+    y: f32,
+) {
+    let item = match item {
+        Some(item) => item,
+        None => return,
+    };
+
+    let mut x = x;
+    let mut y = y;
+    {
+        let it = menus.item_mut(item);
+        if it.window.border != 0 {
+            x += it.window.borderSize;
+            y += it.window.borderSize;
+        }
+
+        it.window.rect.x = x + it.window.rectClient.x;
+        it.window.rect.y = y + it.window.rectClient.y;
+        it.window.rect.w = it.window.rectClient.w;
+        it.window.rect.h = it.window.rectClient.h;
+
+        // force the text rects to recompute
+        it.textRect.w = 0.0;
+        it.textRect.h = 0.0;
+    }
+
+    if menus.item(item).r#type == ITEM_TYPE_TEXTSCROLL {
+        if let Some(scrollPtr) = menus.item_mut(item).typeData.textScroll_mut() {
+            scrollPtr.startPos = 0;
+            scrollPtr.endPos = 0;
+        }
+
+        Item_TextScroll_BuildLines(menus, dc, item);
+    }
+}
+
+/// Raven `Script_SetColor` — set `item.window`'s `backColor`/`foreColor`/
+/// `borderColor` from the script args (`<name> <r> <g> <b> <a>`).
+///
+/// PORT-NOTE: every `Script_*`/`ItemParse_*` handler in `commandDef_t
+/// commandList[]` shares the uniform `(menus, dc, item, args) -> bool` shape
+/// established by the already-ported `Script_SetTeamColor`/`Script_Defer`
+/// (the C fn-ptr table this file's dictionary maps to a Rust dispatch); `dc`
+/// is unused here (Raven's body never reaches `DC->`) but stays in the
+/// signature for that uniformity.
+/// Source: `oracle/codemp/ui/ui_shared.c:1063-1103`
+pub fn Script_SetColor(
+    menus: &mut MenuSystem,
+    _dc: &mut dyn DisplayContext,
+    item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut name = String::new();
+    // expecting type of color to set and 4 args for the color
+    if String_Parse(args, &mut name) {
+        let it = menus.item_mut(item);
+        let target: Option<fn(&mut WindowDef) -> &mut vec4_t> = if stricmp_eq(&name, "backcolor") {
+            it.window.flags |= WINDOW_BACKCOLORSET;
+            Some(|w: &mut WindowDef| &mut w.backColor)
+        } else if stricmp_eq(&name, "forecolor") {
+            it.window.flags |= WINDOW_FORECOLORSET;
+            Some(|w: &mut WindowDef| &mut w.foreColor)
+        } else if stricmp_eq(&name, "bordercolor") {
+            Some(|w: &mut WindowDef| &mut w.borderColor)
+        } else {
+            None
+        };
+
+        if let Some(get) = target {
+            let out = get(&mut it.window);
+            for i in 0..4 {
+                let mut f = 0.0;
+                if !Float_Parse(args, &mut f) {
+                    return true;
+                }
+                out[i] = f;
+            }
+        }
+    }
+
+    true
+}
+
+/// Raven `Script_SetAsset` — set an item's asset by name.
+///
+/// PORT-NOTE: Raven's `ITEM_TYPE_MODEL` branch is an empty block (`{ }`) in
+/// the oracle source — no assignment happens; kept as a literal no-op.
+/// Source: `oracle/codemp/ui/ui_shared.c:1105-1117`
+pub fn Script_SetAsset(
+    menus: &mut MenuSystem,
+    _dc: &mut dyn DisplayContext,
+    item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut name = String::new();
+    // expecting name to set asset to
+    if String_Parse(args, &mut name) {
+        // check for a model
+        if menus.item(item).r#type == ITEM_TYPE_MODEL {
+            // (Raven: empty block — no-op)
+        }
+    }
+    true
+}
+
+/// Raven `Script_SetBackground` — set `item.window.background` to the
+/// registered shader named by the script arg.
+/// Source: `oracle/codemp/ui/ui_shared.c:1119-1128`
+pub fn Script_SetBackground(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut name = String::new();
+    // expecting name to set asset to
+    if String_Parse(args, &mut name) {
+        let shader = dc.registerShaderNoMip(&name);
+        menus.item_mut(item).window.background = shader;
+    }
+    true
+}
+
+/// Raven `Script_SetItemRectCvar` — copy a named item's `rectClient`/`rect`
+/// (offset by the parent menu's rect) from 4 whitespace-separated floats
+/// held in a cvar; zeroes the target rect on any parse failure.
+/// Source: `oracle/codemp/ui/ui_shared.c:1130-1191`
+pub fn Script_SetItemRectCvar(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut itemName = String::new();
+    let mut cvarName = String::new();
+    let mut item2: Option<ItemId> = None;
+
+    // expecting item group and cvar to get value from
+    if String_Parse(args, &mut itemName) && String_Parse(args, &mut cvarName) {
+        let parent = menus.item(item).parent;
+        item2 = Menu_FindItemByName(menus, parent, &itemName);
+
+        if let Some(id2) = item2 {
+            // get cvar data
+            let cvarBuf = dc.getCVarString(&cvarName, 1024);
+
+            let mut holdBuf: &str = &cvarBuf;
+            let mut holdVal = String::new();
+            if String_Parse(&mut holdBuf, &mut holdVal) {
+                let menuRect = parent
+                    .map(|m| menus.menu(m).window.rect)
+                    .unwrap_or_default();
+
+                menus.item_mut(id2).window.rectClient.x = atof(&holdVal) as f32 + menuRect.x;
+                if String_Parse(&mut holdBuf, &mut holdVal) {
+                    menus.item_mut(id2).window.rectClient.y = atof(&holdVal) as f32 + menuRect.y;
+                    if String_Parse(&mut holdBuf, &mut holdVal) {
+                        menus.item_mut(id2).window.rectClient.w = atof(&holdVal) as f32;
+                        if String_Parse(&mut holdBuf, &mut holdVal) {
+                            menus.item_mut(id2).window.rectClient.h = atof(&holdVal) as f32;
+
+                            let rc = menus.item(id2).window.rectClient;
+                            let it2 = menus.item_mut(id2);
+                            it2.window.rect.x = rc.x;
+                            it2.window.rect.y = rc.y;
+                            it2.window.rect.w = rc.w;
+                            it2.window.rect.h = rc.h;
+
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Default values in case things screw up
+    if let Some(id2) = item2 {
+        let it2 = menus.item_mut(id2);
+        it2.window.rectClient.x = 0.0;
+        it2.window.rectClient.y = 0.0;
+        it2.window.rectClient.w = 0.0;
+        it2.window.rectClient.h = 0.0;
+    }
+
+    // Com_Printf(S_COLOR_YELLOW"WARNING: SetItemRectCvar: problems. Set cvar to 0's\n" );
+
+    true
+}
+
+/// Raven `Script_SetItemBackground` — set the background shader on every
+/// item matching a named item/group in `item`'s parent menu.
+/// Source: `oracle/codemp/ui/ui_shared.c:1193-1204`
+pub fn Script_SetItemBackground(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut itemName = String::new();
+    let mut name = String::new();
+
+    // expecting name of shader
+    if String_Parse(args, &mut itemName) && String_Parse(args, &mut name) {
+        let parent = menus.item(item).parent;
+        Menu_SetItemBackground(menus, dc, parent, &itemName, &name);
+    }
+    true
+}
+
+/// Raven `Script_SetItemColor` — set `backcolor`/`forecolor`/`bordercolor`
+/// on every item matching a named item/group (optionally a `*cvar`
+/// indirection) in `item`'s parent menu.
+/// Source: `oracle/codemp/ui/ui_shared.c:1250-1312`
+pub fn Script_SetItemColor(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut itemname = String::new();
+    let mut name = String::new();
+
+    // expecting type of color to set and 4 args for the color
+    if String_Parse(args, &mut itemname) && String_Parse(args, &mut name) {
+        // Is is specifying a cvar to get the item name from?
+        if itemname.starts_with('*') {
+            let cvarName = itemname[1..].to_string();
+            itemname = dc.getCVarString(&cvarName, 1024);
+        }
+
+        let parent = match menus.item(item).parent {
+            Some(m) => m,
+            None => return true,
+        };
+        let count = Menu_ItemsMatchingGroup(menus, dc, parent, &itemname);
+
+        let mut color: vec4_t = [0.0; 4];
+        if !Color_Parse(args, &mut color) {
+            return true;
+        }
+
+        for j in 0..count {
+            if let Some(id2) = Menu_GetMatchingItemByNumber(menus, parent, j, &itemname) {
+                let it2 = menus.item_mut(id2);
+                let out: Option<&mut vec4_t> = if stricmp_eq(&name, "backcolor") {
+                    Some(&mut it2.window.backColor)
+                } else if stricmp_eq(&name, "forecolor") {
+                    it2.window.flags |= WINDOW_FORECOLORSET;
+                    Some(&mut it2.window.foreColor)
+                } else if stricmp_eq(&name, "bordercolor") {
+                    Some(&mut it2.window.borderColor)
+                } else {
+                    None
+                };
+
+                if let Some(out) = out {
+                    for i in 0..4 {
+                        out[i] = color[i];
+                    }
+                }
+            }
+        }
+    }
+
+    true
+}
+
+/// Raven `Script_SetItemColorCvar` — like [`Script_SetItemColor`] but reads
+/// the 4 color floats from a named cvar's whitespace-separated value instead
+/// of the script args.
+/// Source: `oracle/codemp/ui/ui_shared.c:1314-1401`
+pub fn Script_SetItemColorCvar(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut itemname = String::new();
+    let mut name = String::new();
+
+    // expecting type of color to set and 4 args for the color
+    if String_Parse(args, &mut itemname) && String_Parse(args, &mut name) {
+        // Is is specifying a cvar to get the item name from?
+        if itemname.starts_with('*') {
+            let cvarName = itemname[1..].to_string();
+            itemname = dc.getCVarString(&cvarName, 1024);
+        }
+
+        let parent = match menus.item(item).parent {
+            Some(m) => m,
+            None => return true,
+        };
+        let count = Menu_ItemsMatchingGroup(menus, dc, parent, &itemname);
+
+        // Get the cvar with the color
+        let mut colorCvarName = String::new();
+        if !String_Parse(args, &mut colorCvarName) {
+            return true;
+        }
+
+        let mut color: vec4_t = [0.0; 4];
+        let cvarBuf = dc.getCVarString(&colorCvarName, 1024);
+        let mut holdBuf: &str = &cvarBuf;
+        let mut holdVal = String::new();
+        if String_Parse(&mut holdBuf, &mut holdVal) {
+            color[0] = atof(&holdVal) as f32;
+            if String_Parse(&mut holdBuf, &mut holdVal) {
+                color[1] = atof(&holdVal) as f32;
+                if String_Parse(&mut holdBuf, &mut holdVal) {
+                    color[2] = atof(&holdVal) as f32;
+                    if String_Parse(&mut holdBuf, &mut holdVal) {
+                        color[3] = atof(&holdVal) as f32;
+                    }
+                }
+            }
+        }
+
+        for j in 0..count {
+            if let Some(id2) = Menu_GetMatchingItemByNumber(menus, parent, j, &itemname) {
+                let it2 = menus.item_mut(id2);
+                let out: Option<&mut vec4_t> = if stricmp_eq(&name, "backcolor") {
+                    Some(&mut it2.window.backColor)
+                } else if stricmp_eq(&name, "forecolor") {
+                    it2.window.flags |= WINDOW_FORECOLORSET;
+                    Some(&mut it2.window.foreColor)
+                } else if stricmp_eq(&name, "bordercolor") {
+                    Some(&mut it2.window.borderColor)
+                } else {
+                    None
+                };
+
+                if let Some(out) = out {
+                    for i in 0..4 {
+                        out[i] = color[i];
+                    }
+                }
+            }
+        }
+    }
+
+    true
+}
+
+/// Raven `Script_SetItemRect` — offset every item matching a named
+/// item/group in `item`'s parent menu to the parsed rect (rect origin
+/// relative to the parent menu's rect).
+/// Source: `oracle/codemp/ui/ui_shared.c:1403-1442`
+pub fn Script_SetItemRect(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut itemname = String::new();
+
+    // expecting type of color to set and 4 args for the color
+    if String_Parse(args, &mut itemname) {
+        let parent = match menus.item(item).parent {
+            Some(m) => m,
+            None => return true,
+        };
+        let count = Menu_ItemsMatchingGroup(menus, dc, parent, &itemname);
+
+        let mut rect = RectDef::default();
+        if !Rect_Parse(args, &mut rect) {
+            return true;
+        }
+
+        let menuRect = menus.menu(parent).window.rect;
+
+        for j in 0..count {
+            if let Some(id2) = Menu_GetMatchingItemByNumber(menus, parent, j, &itemname) {
+                let it2 = menus.item_mut(id2);
+                it2.window.rect.x = rect.x + menuRect.x;
+                it2.window.rect.y = rect.y + menuRect.y;
+                it2.window.rect.w = rect.w;
+                it2.window.rect.h = rect.h;
+            }
+        }
+    }
+    true
+}
+
+/// Raven `Script_Show` — set `WINDOW_VISIBLE` on every item matching a
+/// named item/group in `item`'s parent menu.
+/// Source: `oracle/codemp/ui/ui_shared.c:1591-1599`
+pub fn Script_Show(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut name = String::new();
+    if String_Parse(args, &mut name) {
+        if let Some(parent) = menus.item(item).parent {
+            Menu_ShowItemByName(menus, dc, parent, &name, true);
+        }
+    }
+    true
+}
+
+/// Raven `Script_Hide` — clear `WINDOW_VISIBLE` on every item matching a
+/// named item/group in `item`'s parent menu.
+/// Source: `oracle/codemp/ui/ui_shared.c:1601-1609`
+pub fn Script_Hide(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut name = String::new();
+    if String_Parse(args, &mut name) {
+        if let Some(parent) = menus.item(item).parent {
+            Menu_ShowItemByName(menus, dc, parent, &name, false);
+        }
+    }
+    true
+}
+
+/// Raven `Script_FadeIn` — start a fade-in on every item matching a named
+/// item/group in `item`'s parent menu.
+/// Source: `oracle/codemp/ui/ui_shared.c:1611-1620`
+pub fn Script_FadeIn(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut name = String::new();
+    if String_Parse(args, &mut name) {
+        if let Some(parent) = menus.item(item).parent {
+            Menu_FadeItemByName(menus, dc, parent, &name, false);
+        }
+    }
+
+    true
+}
+
+/// Raven `Script_FadeOut` — start a fade-out on every item matching a named
+/// item/group in `item`'s parent menu.
+/// Source: `oracle/codemp/ui/ui_shared.c:1622-1630`
+pub fn Script_FadeOut(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut name = String::new();
+    if String_Parse(args, &mut name) {
+        if let Some(parent) = menus.item(item).parent {
+            Menu_FadeItemByName(menus, dc, parent, &name, true);
+        }
+    }
+    true
+}
+
+/// Raven `Script_Disable` — set/clear the `disabled` flag (and clear
+/// mouseover) on every item matching a named item/group (optionally a
+/// `*cvar` indirection) in the currently-focused menu.
+/// Source: `oracle/codemp/ui/ui_shared.c:1865-1891`
+pub fn Script_Disable(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    _item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut name = String::new();
+
+    if String_Parse(args, &mut name) {
+        // Is is specifying a cvar to get the item name from?
+        if name.starts_with('*') {
+            let cvarName = name[1..].to_string();
+            name = dc.getCVarString(&cvarName, 1024);
+        }
+
+        let mut value = 0;
+        if Int_Parse(args, &mut value) {
+            if let Some(menu) = Menu_GetFocused(menus) {
+                Menu_ItemDisable(menus, dc, menu, &name, value);
+            }
+        }
+    }
+
+    true
+}
+
+/// Raven `Script_SetPlayerModel` — set the `model` cvar to the script arg.
+/// Source: `oracle/codemp/ui/ui_shared.c:1986-1995`
+pub fn Script_SetPlayerModel(
+    _menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    _item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut name = String::new();
+    if String_Parse(args, &mut name) {
+        dc.setCVar("model", &name);
+    }
+
+    true
+}
+
+/// Raven `Script_Transition3` — parse a full 3-source/3-target transition
+/// (position, model-preview bounds, fov, duration, blend amount) off the
+/// script args and start it on the named item/group.
+///
+/// PORT-NOTE: dead in Raven — `commandList[]` (`ui_shared.c:2196-2228`) has no
+/// entry for it, so no script can reach it.
+///
+/// PORT-NOTE (§19 UB pick): the trailing warning reads `name`, which Raven
+/// leaves uninitialized if the very first `String_Parse` fails; this port
+/// initializes it empty instead of reproducing that read of uninitialized
+/// memory.
+/// Source: `oracle/codemp/ui/ui_shared.c:2062-2125`
+pub fn Script_Transition3(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut name = String::new();
+    let mut value = String::new();
+
+    if String_Parse(args, &mut name) {
+        if String_Parse(args, &mut value) {
+            let minx = atof(&value) as f32;
+            if String_Parse(args, &mut value) {
+                let miny = atof(&value) as f32;
+                if String_Parse(args, &mut value) {
+                    let minz = atof(&value) as f32;
+                    if String_Parse(args, &mut value) {
+                        let maxx = atof(&value) as f32;
+                        if String_Parse(args, &mut value) {
+                            let maxy = atof(&value) as f32;
+                            if String_Parse(args, &mut value) {
+                                let maxz = atof(&value) as f32;
+                                if String_Parse(args, &mut value) {
+                                    let fovtx = atof(&value) as f32;
+                                    if String_Parse(args, &mut value) {
+                                        let fovty = atof(&value) as f32;
+                                        if String_Parse(args, &mut value) {
+                                            let time = atoi(&value);
+                                            if String_Parse(args, &mut value) {
+                                                let amt = atof(&value) as f32;
+                                                // set up the variables
+                                                if let Some(parent) = menus.item(item).parent {
+                                                    Menu_Transition3ItemByName(
+                                                        menus, dc, parent, &name, minx, miny, minz,
+                                                        maxx, maxy, maxz, fovtx, fovty, time, amt,
+                                                    );
+                                                }
+                                                return true;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    dc.Print(&format!(
+        "^3WARNING: Script_Transition2: error parsing '{}'\n",
+        name
+    ));
+    true
+}
+
+/// Raven `Script_SetCvar` — set a cvar from the script args.
+/// Source: `oracle/codemp/ui/ui_shared.c:2150-2158`
+pub fn Script_SetCvar(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    _item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let _ = menus;
+    let mut cvar = String::new();
+    let mut val = String::new();
+    if String_Parse(args, &mut cvar) && String_Parse(args, &mut val) {
+        dc.setCVar(&cvar, &val);
+    }
+    true
+}
+
+/// Raven `Script_SetCvarToCvar` — copy one cvar's value into another.
+/// Source: `oracle/codemp/ui/ui_shared.c:2160-2168`
+pub fn Script_SetCvarToCvar(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    _item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let _ = menus;
+    let mut cvar = String::new();
+    let mut val = String::new();
+    if String_Parse(args, &mut cvar) && String_Parse(args, &mut val) {
+        let cvarBuf = dc.getCVarString(&val, 1024);
+        dc.setCVar(&cvar, &cvarBuf);
+    }
+    true
+}
+
+/// Raven `Script_Exec` — append a console command from the script args.
+/// Source: `oracle/codemp/ui/ui_shared.c:2170-2176`
+pub fn Script_Exec(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    _item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let _ = menus;
+    let mut val = String::new();
+    if String_Parse(args, &mut val) {
+        dc.executeText(cbufExec_t::EXEC_APPEND as c_int, &format!("{} ; ", val));
+    }
+    true
+}
+
+/// Raven `Script_Play` — play a local sound named by the script arg.
+/// Source: `oracle/codemp/ui/ui_shared.c:2178-2184`
+pub fn Script_Play(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    _item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let _ = menus;
+    let mut val = String::new();
+    if String_Parse(args, &mut val) {
+        let sfx = dc.registerSound(&val);
+        dc.startLocalSound(sfx, CHAN_AUTO);
+    }
+    true
+}
+
+/// Raven `Script_playLooped` — start a looped background track named by the
+/// script arg.
+/// Source: `oracle/codemp/ui/ui_shared.c:2186-2193`
+pub fn Script_playLooped(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    _item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let _ = menus;
+    let mut val = String::new();
+    if String_Parse(args, &mut val) {
+        dc.stopBackgroundTrack();
+        dc.startBackgroundTrack(&val, &val, false);
+    }
+    true
+}
+
+/// Raven `Menu_SetItemText` — set the display text (or `*cvar` indirection)
+/// on every item matching `itemName` (by name or group) in `menu`.
+/// Source: `oracle/codemp/ui/ui_shared.c:2254-2302`
+pub fn Menu_SetItemText(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: Option<MenuId>,
+    itemName: &str,
+    text: &str,
+) {
+    // No menu???
+    let menu = match menu {
+        Some(m) => m,
+        None => return,
+    };
+
+    let count = Menu_ItemsMatchingGroup(menus, dc, menu, itemName);
+
+    for j in 0..count {
+        let item = match Menu_GetMatchingItemByNumber(menus, menu, j, itemName) {
+            Some(id) => id,
+            None => continue,
+        };
+
+        if let Some(stripped) = text.strip_prefix('*') {
+            let it = menus.item_mut(item);
+            // Null this out because this would take presidence over cvar text.
+            it.text = None;
+            it.cvar = Some(stripped.to_string());
+            // Just copying what was in ItemParse_cvar()
+            // PORT-NOTE (§19 UB pick): Raven's unconditional `editFieldDef_t*` cast
+            // type-puns non-edit-field payloads (ui_shared.c:2276-2283); write only
+            // when the payload really is an edit field.
+            if let Some(editPtr) = it.typeData.editField_mut() {
+                editPtr.minVal = -1.0;
+                editPtr.maxVal = -1.0;
+                editPtr.defVal = -1.0;
+            }
+        } else {
+            menus.item_mut(item).text = Some(text.to_string());
+            if menus.item(item).r#type == ITEM_TYPE_TEXTSCROLL {
+                if let Some(scrollPtr) = menus.item_mut(item).typeData.textScroll_mut() {
+                    scrollPtr.startPos = 0;
+                    scrollPtr.endPos = 0;
+                }
+                Item_TextScroll_BuildLines(menus, dc, item);
+            }
+        }
+    }
+}
+
+/// Local dispatch table replacing Raven's `commandDef_t commandList[]`
+/// (`ui_shared.c` file-scope, `scriptCommandCount` entries) that
+/// `Item_RunScript` walks by `Q_stricmp`-ing the leading command token
+/// against each entry's name.
+///
+/// PORT-NOTE: the keys below are the oracle table's literal command strings.
+/// The entries not yet ported — `open`, `close`, `setitemtext`, `setfocus`,
+/// `transition`, `orbit`, `scale`, `rundeferred`, `transition2` — fall through
+/// to `None` (routed to `dc.runScript`, matching Raven's un-dispatched-command
+/// path) until a later wave adds them. Raven's table has no `enable` entry
+/// (and none for `transition3`), so neither is dispatchable here.
+/// Source: `oracle/codemp/ui/ui_shared.c:2196-2228` (the table),
+/// `oracle/codemp/ui/ui_shared.c:2306-2357` (the walk this replaces)
+fn dispatch_script_command(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    command: &str,
+    args: &mut &str,
+) -> Option<bool> {
+    if stricmp_eq(command, "setasset") {
+        Some(Script_SetAsset(menus, dc, item, args))
+    } else if stricmp_eq(command, "setbackground") {
+        Some(Script_SetBackground(menus, dc, item, args))
+    } else if stricmp_eq(command, "setitembackground") {
+        Some(Script_SetItemBackground(menus, dc, item, args))
+    } else if stricmp_eq(command, "setitemrectcvar") {
+        Some(Script_SetItemRectCvar(menus, dc, item, args))
+    } else if stricmp_eq(command, "setcolor") {
+        Some(Script_SetColor(menus, dc, item, args))
+    } else if stricmp_eq(command, "setitemcolor") {
+        Some(Script_SetItemColor(menus, dc, item, args))
+    } else if stricmp_eq(command, "setitemcolorcvar") {
+        Some(Script_SetItemColorCvar(menus, dc, item, args))
+    } else if stricmp_eq(command, "setteamcolor") {
+        Some(Script_SetTeamColor(menus, dc, item, args))
+    } else if stricmp_eq(command, "setitemrect") {
+        Some(Script_SetItemRect(menus, dc, item, args))
+    } else if stricmp_eq(command, "show") {
+        Some(Script_Show(menus, dc, item, args))
+    } else if stricmp_eq(command, "hide") {
+        Some(Script_Hide(menus, dc, item, args))
+    } else if stricmp_eq(command, "setcvar") {
+        Some(Script_SetCvar(menus, dc, item, args))
+    } else if stricmp_eq(command, "exec") {
+        Some(Script_Exec(menus, dc, item, args))
+    } else if stricmp_eq(command, "play") {
+        Some(Script_Play(menus, dc, item, args))
+    } else if stricmp_eq(command, "playlooped") {
+        Some(Script_playLooped(menus, dc, item, args))
+    } else if stricmp_eq(command, "setplayermodel") {
+        Some(Script_SetPlayerModel(menus, dc, item, args))
+    } else if stricmp_eq(command, "setcvartocvar") {
+        Some(Script_SetCvarToCvar(menus, dc, item, args))
+    } else if stricmp_eq(command, "fadein") {
+        Some(Script_FadeIn(menus, dc, item, args))
+    } else if stricmp_eq(command, "fadeout") {
+        Some(Script_FadeOut(menus, dc, item, args))
+    } else if stricmp_eq(command, "disable") {
+        Some(Script_Disable(menus, dc, item, args))
+    } else if stricmp_eq(command, "defer") {
+        Some(Script_Defer(menus, dc, item, args))
+    } else {
+        None
+    }
+}
+
+/// Raven `Item_RunScript` — tokenize `s` as a `;`-separated command script
+/// and run each command through [`dispatch_script_command`] (Raven's
+/// `commandList[]` walk), falling back to the host's own script parser
+/// (`DC->runScript`) for anything not in that table.
+///
+/// PORT-NOTE: `Q_strcat(script, 2048, s)`'s fixed 2048-byte buffer truncates
+/// at a valid char boundary (`Script_Defer`'s established pattern).
+/// Source: `oracle/codemp/ui/ui_shared.c:2306-2357`
+pub fn Item_RunScript(menus: &mut MenuSystem, dc: &mut dyn DisplayContext, item: ItemId, s: &str) {
+    if s.is_empty() {
+        return;
+    }
+
+    let mut script = s.to_string();
+    if script.len() >= 2048 {
+        let mut cut = 2047;
+        while cut > 0 && !script.is_char_boundary(cut) {
+            cut -= 1;
+        }
+        script.truncate(cut);
+    }
+
+    let mut p: &str = &script;
+    loop {
+        let mut command = String::new();
+
+        // expect command then arguments, ; ends command, empty ends script
+        if !String_Parse(&mut p, &mut command) {
+            return;
+        }
+
+        if command == ";" {
+            continue;
+        }
+
+        match dispatch_script_command(menus, dc, item, &command, &mut p) {
+            Some(ran) => {
+                // Allow a script command to stop processing the script.
+                if !ran {
+                    return;
+                }
+            }
+            // not in our auto list, pass to handler
+            None => dc.runScript(&mut p),
+        }
+    }
+}
+
+/// Raven `Item_EnableShowViaCvar` — should `item` be enabled/shown given
+/// `flag` and its `enableCvar`/`cvarTest` values?
+///
+/// PORT-NOTE: Raven's `Q_strncpyz(script, item->enableCvar, 2048)` copies
+/// into a fixed buffer before parsing; `enableCvar` is already an owned
+/// `String`, so the copy collapses to parsing it directly.
+/// Source: `oracle/codemp/ui/ui_shared.c:2360-2395`
+pub fn Item_EnableShowViaCvar(
+    menus: &MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    flag: c_int,
+) -> bool {
+    let it = menus.item(item);
+    let enableCvar = it.enableCvar.clone();
+    let cvarTest = it.cvarTest.clone();
+    let cvarFlags = it.cvarFlags;
+
+    if !enableCvar.is_empty() && !cvarTest.is_empty() {
+        let buff = dc.getCVarString(&cvarTest, 2048);
+
+        let mut p: &str = &enableCvar;
+        loop {
+            let mut val = String::new();
+            // expect value then ; or empty, empty ends list
+            if !String_Parse(&mut p, &mut val) {
+                return !(cvarFlags & flag != 0);
+            }
+
+            if val == ";" {
+                continue;
+            }
+
+            // enable it if any of the values are true
+            if cvarFlags & flag != 0 {
+                if stricmp_eq(&buff, &val) {
+                    return true;
+                }
+            } else {
+                // disable it if any of the values are true
+                if stricmp_eq(&buff, &val) {
+                    return false;
+                }
+            }
+        }
+    }
+    true
+}
+
+/// Raven `Item_TextScroll_MouseEnter` — refresh a text-scroll item's
+/// scrollbar hot-zone flags for the mouse at `(x, y)`.
+/// Source: `oracle/codemp/ui/ui_shared.c:2587-2591`
+pub fn Item_TextScroll_MouseEnter(menus: &mut MenuSystem, item: ItemId, x: f32, y: f32) {
+    menus.item_mut(item).window.flags &= !(WINDOW_LB_LEFTARROW
+        | WINDOW_LB_RIGHTARROW
+        | WINDOW_LB_THUMB
+        | WINDOW_LB_PGUP
+        | WINDOW_LB_PGDN);
+    let flags = Item_TextScroll_OverLB(menus, item, x, y);
+    menus.item_mut(item).window.flags |= flags;
+}
+
+/// Raven `Item_ListBox_MouseEnter` — refresh a list box's scrollbar hot-zone
+/// flags for the mouse at `(x, y)`, then (if no hot zone is hit) update the
+/// selection cursor from the pointer position.
+///
+/// PORT-NOTE (§19 UB pick): a `typeData` payload-type mismatch (unreachable
+/// under this file's own type dispatch) is a no-op instead of Raven's
+/// null-deref UB.
+/// Source: `oracle/codemp/ui/ui_shared.c:2956-3026`
+pub fn Item_ListBox_MouseEnter(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    x: f32,
+    y: f32,
+) {
+    menus.item_mut(item).window.flags &= !(WINDOW_LB_LEFTARROW
+        | WINDOW_LB_RIGHTARROW
+        | WINDOW_LB_THUMB
+        | WINDOW_LB_PGUP
+        | WINDOW_LB_PGDN);
+
+    let flags = Item_ListBox_OverLB(menus, dc, item, x, y);
+    menus.item_mut(item).window.flags |= flags;
+
+    let windowFlags = menus.item(item).window.flags;
+    let blocked = windowFlags
+        & (WINDOW_LB_LEFTARROW
+            | WINDOW_LB_RIGHTARROW
+            | WINDOW_LB_THUMB
+            | WINDOW_LB_PGUP
+            | WINDOW_LB_PGDN)
+        != 0;
+
+    if windowFlags & WINDOW_HORIZONTAL != 0 {
+        if !blocked {
+            let listPtr = match menus.item(item).typeData.listBox() {
+                Some(l) => l.clone(),
+                None => return,
+            };
+            // check for selection hit as we have exhausted buttons and thumb
+            if listPtr.elementStyle == LISTBOX_IMAGE {
+                let rect = menus.item(item).window.rect;
+                let r = RectDef {
+                    x: rect.x,
+                    y: rect.y,
+                    h: rect.h - SCROLLBAR_SIZE,
+                    w: rect.w - listPtr.drawPadding as f32,
+                };
+                if Rect_ContainsPoint(Some(&r), x, y) {
+                    let mut cursorPos =
+                        ((x - r.x) / listPtr.elementWidth) as c_int + listPtr.startPos;
+                    if cursorPos >= listPtr.endPos {
+                        cursorPos = listPtr.endPos;
+                    }
+                    if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                        l.cursorPos = cursorPos;
+                    }
+                }
+            }
+            // else: text hit.. (Raven: empty block)
+        }
+    } else if !blocked {
+        // Window Vertical Scroll — calc which element the mouse is over
+        let listPtr = match menus.item(item).typeData.listBox() {
+            Some(l) => l.clone(),
+            None => return,
+        };
+        let rect = menus.item(item).window.rect;
+        let r = RectDef {
+            x: rect.x,
+            y: rect.y,
+            w: rect.w - SCROLLBAR_SIZE,
+            h: rect.h - listPtr.drawPadding as f32,
+        };
+        if Rect_ContainsPoint(Some(&r), x, y) {
+            let cursorPos;
+            // Multiple rows and columns (since it's more than twice as wide as an element)
+            if rect.w > (listPtr.elementWidth * 2.0) && listPtr.elementStyle == LISTBOX_IMAGE {
+                let row = ((y - 2.0 - r.y) / listPtr.elementHeight) as c_int;
+                // Raven's `(int) r.w / listPtr->elementWidth` casts `r.w` alone, so
+                // the divide is float with a truncated numerator.
+                let rowLength = ((r.w as c_int) as f32 / listPtr.elementWidth) as c_int;
+                let column = ((x - r.x) / listPtr.elementWidth) as c_int;
+
+                let mut cp = row * rowLength + column + listPtr.startPos;
+                if cp >= listPtr.endPos {
+                    cp = listPtr.endPos;
+                }
+                cursorPos = cp;
+            } else {
+                // single column
+                let mut cp = ((y - 2.0 - r.y) / listPtr.elementHeight) as c_int + listPtr.startPos;
+                if cp > listPtr.endPos {
+                    cp = listPtr.endPos;
+                }
+                cursorPos = cp;
+            }
+            if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                l.cursorPos = cursorPos;
+            }
+        }
+    }
+}
+
+/// Raven `Item_StartCapture` — give the mouse-capture scroll handler to
+/// `item`'s scrollbar/thumb hot zone under the cursor (if any).
+/// Source: `oracle/codemp/ui/ui_shared.c:4022-4095`
+pub fn Item_StartCapture(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    key: c_int,
+) {
+    let itemType = menus.item(item).r#type;
+    let cursorx = ds.cursorx as f32;
+    let cursory = ds.cursory as f32;
+
+    if itemType == ITEM_TYPE_EDITFIELD
+        || itemType == ITEM_TYPE_NUMERICFIELD
+        || itemType == ITEM_TYPE_LISTBOX
+    {
+        let flags = Item_ListBox_OverLB(menus, dc, item, cursorx, cursory);
+        if flags & (WINDOW_LB_LEFTARROW | WINDOW_LB_RIGHTARROW) != 0 {
+            menus.scrollInfo.nextScrollTime = ds.realTime + SCROLL_TIME_START;
+            menus.scrollInfo.nextAdjustTime = ds.realTime + SCROLL_TIME_ADJUST;
+            menus.scrollInfo.adjustValue = SCROLL_TIME_START;
+            menus.scrollInfo.scrollKey = key;
+            menus.scrollInfo.scrollDir = flags & WINDOW_LB_LEFTARROW != 0;
+            menus.scrollInfo.item = Some(item);
+            menus.captureFunc = CaptureFunc::ScrollListBoxAuto;
+            menus.itemCapture = Some(item);
+        } else if flags & WINDOW_LB_THUMB != 0 {
+            menus.scrollInfo.scrollKey = key;
+            menus.scrollInfo.item = Some(item);
+            menus.scrollInfo.xStart = cursorx;
+            menus.scrollInfo.yStart = cursory;
+            menus.captureFunc = CaptureFunc::ScrollListBoxThumb;
+            menus.itemCapture = Some(item);
+        }
+    } else if itemType == ITEM_TYPE_TEXTSCROLL {
+        let flags = Item_TextScroll_OverLB(menus, item, cursorx, cursory);
+        if flags & (WINDOW_LB_LEFTARROW | WINDOW_LB_RIGHTARROW) != 0 {
+            menus.scrollInfo.nextScrollTime = ds.realTime + SCROLL_TIME_START;
+            menus.scrollInfo.nextAdjustTime = ds.realTime + SCROLL_TIME_ADJUST;
+            menus.scrollInfo.adjustValue = SCROLL_TIME_START;
+            menus.scrollInfo.scrollKey = key;
+            menus.scrollInfo.scrollDir = flags & WINDOW_LB_LEFTARROW != 0;
+            menus.scrollInfo.item = Some(item);
+            menus.captureFunc = CaptureFunc::ScrollTextScrollAuto;
+            menus.itemCapture = Some(item);
+        } else if flags & WINDOW_LB_THUMB != 0 {
+            menus.scrollInfo.scrollKey = key;
+            menus.scrollInfo.item = Some(item);
+            menus.scrollInfo.xStart = cursorx;
+            menus.scrollInfo.yStart = cursory;
+            menus.captureFunc = CaptureFunc::ScrollTextScrollThumb;
+            menus.itemCapture = Some(item);
+        }
+    } else if itemType == ITEM_TYPE_SLIDER {
+        let flags = Item_Slider_OverSlider(menus, dc, item, cursorx, cursory);
+        if flags & WINDOW_LB_THUMB != 0 {
+            menus.scrollInfo.scrollKey = key;
+            menus.scrollInfo.item = Some(item);
+            menus.scrollInfo.xStart = cursorx;
+            menus.scrollInfo.yStart = cursory;
+            menus.captureFunc = CaptureFunc::ScrollSliderThumb;
+            menus.itemCapture = Some(item);
+        }
+    }
+}
+
+/// Raven `Item_TextScroll_Paint` — paint a text-scroll item's scrollbar,
+/// refresh its lines from its cvar (if any), then paint the visible lines.
+///
+/// PORT-NOTE (§19 UB pick): a `typeData` payload-type mismatch (unreachable
+/// under this file's own type dispatch) is a no-op instead of Raven's
+/// null-deref UB. `pLines`' NULL "hole" slots (see `TextScrollDef`'s
+/// PORT-NOTE) are empty-string entries — the `if (!text) continue;` guard
+/// becomes an empty-string check.
+/// Source: `oracle/codemp/ui/ui_shared.c:5911-5974`
+pub fn Item_TextScroll_Paint(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+) {
+    let mut scrollPtr = match menus.item(item).typeData.textScroll().cloned() {
+        Some(s) => s,
+        None => return,
+    };
+
+    // Raven reads `count` before the cvar-driven `Item_TextScroll_BuildLines`
+    // rebuild below, so the paint loop walks the pre-rebuild line count.
+    let count = scrollPtr.pLines.len() as c_int;
+
+    let rect = menus.item(item).window.rect;
+
+    // draw scrollbar to right side of the window
+    let x = rect.x + rect.w - SCROLLBAR_SIZE - 1.0;
+    let mut y = rect.y + 1.0;
+    dc.drawHandlePic(
+        x,
+        y,
+        SCROLLBAR_SIZE,
+        SCROLLBAR_SIZE,
+        ds.Assets.scrollBarArrowUp,
+    );
+    y += SCROLLBAR_SIZE - 1.0;
+
+    scrollPtr.endPos = scrollPtr.startPos;
+    let barSize = rect.h - (SCROLLBAR_SIZE * 2.0);
+    dc.drawHandlePic(x, y, SCROLLBAR_SIZE, barSize + 1.0, ds.Assets.scrollBar);
+    y += barSize - 1.0;
+    dc.drawHandlePic(
+        x,
+        y,
+        SCROLLBAR_SIZE,
+        SCROLLBAR_SIZE,
+        ds.Assets.scrollBarArrowDown,
+    );
+
+    // thumb
+    let mut thumb = Item_TextScroll_ThumbDrawPosition(menus, ds, item) as f32;
+    if thumb > y - SCROLLBAR_SIZE - 1.0 {
+        thumb = y - SCROLLBAR_SIZE - 1.0;
+    }
+    dc.drawHandlePic(
+        x,
+        thumb,
+        SCROLLBAR_SIZE,
+        SCROLLBAR_SIZE,
+        ds.Assets.scrollBarThumb,
+    );
+
+    if let Some(cvar) = menus.item(item).cvar.clone() {
+        let cvartext = dc.getCVarString(&cvar, 1024);
+        menus.item_mut(item).text = Some(cvartext);
+        Item_TextScroll_BuildLines(menus, dc, item);
+        // `Item_TextScroll_BuildLines` rewrote `typeData`; refresh the local copy.
+        scrollPtr = menus
+            .item(item)
+            .typeData
+            .textScroll()
+            .cloned()
+            .unwrap_or(scrollPtr);
+        // Raven's earlier `endPos = startPos` write landed on the live struct and
+        // survives the rebuild (`BuildLines` never touches either field).
+        scrollPtr.endPos = scrollPtr.startPos;
+    }
+
+    // adjust size for item painting
+    let it = menus.item(item);
+    let mut size = it.window.rect.h - 2.0;
+    let x = it.window.rect.x + it.textalignx + 1.0;
+    let mut y = it.window.rect.y + it.textaligny + 1.0;
+    let textscale = it.textscale;
+    let foreColor = it.window.foreColor;
+    let textStyle = it.textStyle;
+    let iMenuFont = it.iMenuFont;
+
+    let mut i = scrollPtr.startPos;
+    while i < count {
+        // A stale `count` past the rebuilt line list is Raven's memset-NULL slot.
+        let text = scrollPtr
+            .pLines
+            .get(i as usize)
+            .cloned()
+            .unwrap_or_default();
+        if text.is_empty() {
+            i += 1;
+            continue;
+        }
+
+        dc.drawText(
+            x + 4.0,
+            y,
+            textscale,
+            foreColor,
+            &text,
+            0.0,
+            0,
+            textStyle,
+            iMenuFont,
+        );
+
+        size -= scrollPtr.lineHeight;
+        if size < scrollPtr.lineHeight {
+            scrollPtr.drawPadding = (scrollPtr.lineHeight - size) as c_int;
+            break;
+        }
+
+        scrollPtr.endPos += 1;
+        y += scrollPtr.lineHeight;
+        i += 1;
+    }
+
+    if let Some(sp) = menus.item_mut(item).typeData.textScroll_mut() {
+        *sp = scrollPtr;
+    }
+}
+
+/// Raven `Item_ListBox_Paint` — paint a list box's scrollbar and visible
+/// elements (image or text/column style, horizontal or vertical).
+///
+/// PORT-NOTE: Raven declares several of its loop locals (`count`, `i`, `i2`)
+/// `float`; this port keeps them the natural `c_int` the feeder/element
+/// counts already are (same collapse as `Item_TextScroll_MaxScroll`'s
+/// PORT-NOTE). Debug-only (`_DEBUG`) and Xbox-only (`_XBOX`) build arms are
+/// dropped per porting-rules §20 (dead surface on this port's targets). A
+/// `typeData` payload-type mismatch (unreachable under this file's own type
+/// dispatch) is a no-op instead of Raven's null-deref UB.
+/// Source: `oracle/codemp/ui/ui_shared.c:5979-6367`
+pub fn Item_ListBox_Paint(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+) {
+    let mut listPtr = match menus.item(item).typeData.listBox().cloned() {
+        Some(l) => l,
+        None => return,
+    };
+
+    // the listbox is horizontal or vertical and has a fixed size scroll bar going either direction
+    // elements are enumerated from the DC and either text or image handles are acquired from the DC as well
+    // textscale is used to size the text, textalignx and textaligny are used to size image elements
+    // there is no clipping available so only the last completely visible item is painted
+    let special = menus.item(item).special;
+    let count = dc.feederCount(special);
+
+    let maxIndex = if count != 0 { count - 1 } else { count };
+
+    if listPtr.startPos > maxIndex {
+        // probably changed feeders, so reset
+        listPtr.startPos = 0;
+        // Raven's reset lands on the live payload, which the scroll/thumb helpers
+        // below re-read; flush it before they run.
+        if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+            l.startPos = 0;
+        }
+    }
+
+    let mut cursorPos = menus.item(item).cursorPos;
+    if cursorPos > maxIndex {
+        // probably changed feeders, so reset
+        cursorPos = maxIndex;
+        menus.item_mut(item).cursorPos = cursorPos;
+        // NOTE : might consider moving this to any spot in here we change the cursor position
+        dc.feederSelection(special, cursorPos, None);
+    }
+
+    let rect = menus.item(item).window.rect;
+    let windowFlags = menus.item(item).window.flags;
+    let borderSize = menus.item(item).window.borderSize;
+    let borderColor = menus.item(item).window.borderColor;
+    let outlineColor = menus.item(item).window.outlineColor;
+    let textscale = menus.item(item).textscale;
+    let foreColor = menus.item(item).window.foreColor;
+    let textStyle = menus.item(item).textStyle;
+    let iMenuFont = menus.item(item).iMenuFont;
+    let textaligny = menus.item(item).textaligny;
+
+    // default is vertical if horizontal flag is not here
+    if windowFlags & WINDOW_HORIZONTAL != 0 {
+        if !listPtr.scrollhidden {
+            // draw scrollbar in bottom of the window
+            // bar
+            if Item_ListBox_MaxScroll(menus, dc, item) > 0 {
+                let mut x = rect.x + 1.0;
+                let y = rect.y + rect.h - SCROLLBAR_SIZE - 1.0;
+                dc.drawHandlePic(
+                    x,
+                    y,
+                    SCROLLBAR_SIZE,
+                    SCROLLBAR_SIZE,
+                    ds.Assets.scrollBarArrowLeft,
+                );
+                x += SCROLLBAR_SIZE - 1.0;
+                let barWidth = rect.w - (SCROLLBAR_SIZE * 2.0);
+                dc.drawHandlePic(x, y, barWidth + 1.0, SCROLLBAR_SIZE, ds.Assets.scrollBar);
+                x += barWidth - 1.0;
+                dc.drawHandlePic(
+                    x,
+                    y,
+                    SCROLLBAR_SIZE,
+                    SCROLLBAR_SIZE,
+                    ds.Assets.scrollBarArrowRight,
+                );
+                // thumb
+                let mut thumb = Item_ListBox_ThumbDrawPosition(menus, ds, dc, item) as f32;
+                if thumb > x - SCROLLBAR_SIZE - 1.0 {
+                    thumb = x - SCROLLBAR_SIZE - 1.0;
+                }
+                dc.drawHandlePic(
+                    thumb,
+                    y,
+                    SCROLLBAR_SIZE,
+                    SCROLLBAR_SIZE,
+                    ds.Assets.scrollBarThumb,
+                );
+            } else if listPtr.startPos > 0 {
+                listPtr.startPos = 0;
+            }
+        }
+
+        listPtr.endPos = listPtr.startPos;
+        let mut sizeWidth = rect.w - 2.0;
+
+        if listPtr.elementStyle == LISTBOX_IMAGE {
+            let mut x = rect.x + 1.0;
+            let y = rect.y + 1.0;
+            let mut i = listPtr.startPos;
+            while i < count {
+                let image = dc.feederItemImage(special, i);
+                if image != 0 {
+                    // PORT-NOTE: the `#ifndef CGAME` (ui) arm, per this file's convention.
+                    if windowFlags & WINDOW_PLAYERCOLOR != 0 {
+                        let color: vec4_t = [
+                            (dc.getCVarValue("ui_char_color_red") as c_int) as f32 / 255.0,
+                            (dc.getCVarValue("ui_char_color_green") as c_int) as f32 / 255.0,
+                            (dc.getCVarValue("ui_char_color_blue") as c_int) as f32 / 255.0,
+                            1.0,
+                        ];
+                        dc.setColor(Some(color));
+                    }
+                    dc.drawHandlePic(
+                        x + 1.0,
+                        y + 1.0,
+                        listPtr.elementWidth - 2.0,
+                        listPtr.elementHeight - 2.0,
+                        image,
+                    );
+                }
+
+                if i == cursorPos {
+                    dc.drawRect(
+                        x,
+                        y,
+                        listPtr.elementWidth - 1.0,
+                        listPtr.elementHeight - 1.0,
+                        borderSize,
+                        borderColor,
+                    );
+                }
+
+                sizeWidth -= listPtr.elementWidth;
+                if sizeWidth < listPtr.elementWidth {
+                    listPtr.drawPadding = sizeWidth as c_int;
+                    break;
+                }
+                x += listPtr.elementWidth;
+                listPtr.endPos += 1;
+                i += 1;
+            }
+        }
+        // else: text style — Raven's body is an empty block (no-op).
+    } else {
+        // A vertical list box
+        if !listPtr.scrollhidden {
+            // draw scrollbar to right side of the window
+            let x = rect.x + rect.w - SCROLLBAR_SIZE - 1.0;
+            let mut y = rect.y + 1.0;
+            dc.drawHandlePic(
+                x,
+                y,
+                SCROLLBAR_SIZE,
+                SCROLLBAR_SIZE,
+                ds.Assets.scrollBarArrowUp,
+            );
+            y += SCROLLBAR_SIZE - 1.0;
+
+            listPtr.endPos = listPtr.startPos;
+            // Raven's write lands on the live payload before the thumb helper below.
+            if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                l.endPos = listPtr.endPos;
+            }
+            let barHeight = rect.h - (SCROLLBAR_SIZE * 2.0);
+            dc.drawHandlePic(x, y, SCROLLBAR_SIZE, barHeight + 1.0, ds.Assets.scrollBar);
+            y += barHeight - 1.0;
+            dc.drawHandlePic(
+                x,
+                y,
+                SCROLLBAR_SIZE,
+                SCROLLBAR_SIZE,
+                ds.Assets.scrollBarArrowDown,
+            );
+            // thumb
+            let mut thumb = Item_ListBox_ThumbDrawPosition(menus, ds, dc, item) as f32;
+            if thumb > y - SCROLLBAR_SIZE - 1.0 {
+                thumb = y - SCROLLBAR_SIZE - 1.0;
+            }
+            dc.drawHandlePic(
+                x,
+                thumb,
+                SCROLLBAR_SIZE,
+                SCROLLBAR_SIZE,
+                ds.Assets.scrollBarThumb,
+            );
+        }
+
+        // adjust size for item painting
+        let mut sizeWidth = rect.w - 2.0;
+        let mut sizeHeight = rect.h - 2.0;
+
+        if listPtr.elementStyle == LISTBOX_IMAGE {
+            // Multiple rows and columns (since it's more than twice as wide as an element)
+            if rect.w > (listPtr.elementWidth * 2.0) {
+                let mut startPos = listPtr.startPos;
+                let mut y = rect.y + 1.0;
+                let mut i2 = startPos;
+                while i2 < count {
+                    let mut x = rect.x + 1.0;
+                    sizeWidth = rect.w - 2.0;
+                    // print a row
+                    let mut i = startPos;
+                    while i < count {
+                        let image = dc.feederItemImage(special, i);
+                        if image != 0 {
+                            if windowFlags & WINDOW_PLAYERCOLOR != 0 {
+                                let color: vec4_t = [
+                                    (dc.getCVarValue("ui_char_color_red") as c_int) as f32 / 255.0,
+                                    (dc.getCVarValue("ui_char_color_green") as c_int) as f32
+                                        / 255.0,
+                                    (dc.getCVarValue("ui_char_color_blue") as c_int) as f32 / 255.0,
+                                    1.0,
+                                ];
+                                dc.setColor(Some(color));
+                            }
+                            dc.drawHandlePic(
+                                x + 1.0,
+                                y + 1.0,
+                                listPtr.elementWidth - 2.0,
+                                listPtr.elementHeight - 2.0,
+                                image,
+                            );
+                        }
+
+                        if i == cursorPos {
+                            dc.drawRect(
+                                x,
+                                y,
+                                listPtr.elementWidth - 1.0,
+                                listPtr.elementHeight - 1.0,
+                                borderSize,
+                                borderColor,
+                            );
+                        }
+
+                        sizeWidth -= listPtr.elementWidth;
+                        if sizeWidth < listPtr.elementWidth {
+                            listPtr.drawPadding = sizeWidth as c_int;
+                            break;
+                        }
+                        x += listPtr.elementWidth;
+                        listPtr.endPos += 1;
+                        i += 1;
+                    }
+
+                    sizeHeight -= listPtr.elementHeight;
+                    if sizeHeight < listPtr.elementHeight {
+                        listPtr.drawPadding = sizeHeight as c_int;
+                        break;
+                    }
+                    // NOTE : Is endPos supposed to be valid or not? It was being used as a valid entry but I changed those
+                    // few spots that were causing bugs
+                    listPtr.endPos += 1;
+                    startPos = listPtr.endPos;
+                    y += listPtr.elementHeight;
+                    i2 += 1;
+                }
+            } else {
+                // single column
+                let x = rect.x + 1.0;
+                let mut y = rect.y + 1.0;
+                let mut i = listPtr.startPos;
+                while i < count {
+                    let image = dc.feederItemImage(special, i);
+                    if image != 0 {
+                        dc.drawHandlePic(
+                            x + 1.0,
+                            y + 1.0,
+                            listPtr.elementWidth - 2.0,
+                            listPtr.elementHeight - 2.0,
+                            image,
+                        );
+                    }
+
+                    if i == cursorPos {
+                        dc.drawRect(
+                            x,
+                            y,
+                            listPtr.elementWidth - 1.0,
+                            listPtr.elementHeight - 1.0,
+                            borderSize,
+                            borderColor,
+                        );
+                    }
+
+                    listPtr.endPos += 1;
+                    sizeHeight -= listPtr.elementHeight;
+                    if sizeHeight < listPtr.elementHeight {
+                        listPtr.drawPadding = (listPtr.elementHeight - sizeHeight) as c_int;
+                        break;
+                    }
+                    y += listPtr.elementHeight;
+                    i += 1;
+                }
+            }
+        } else {
+            let x = rect.x + 1.0;
+            // MPMOVED: the plain `y = rect.y + 1` assignment above this in the
+            // oracle is immediately overwritten by this one before use.
+            let mut y = rect.y + 1.0 - listPtr.elementHeight;
+            let mut i = listPtr.startPos;
+
+            while i < count {
+                if listPtr.numColumns > 0 {
+                    for j in 0..listPtr.numColumns {
+                        let mut imageStartX = listPtr.columnInfo[j as usize].pos;
+                        let (text, optionalImage1, optionalImage2, optionalImage3) =
+                            dc.feederItemText(special, i, j);
+
+                        let text = match text {
+                            Some(t) => t,
+                            None => continue,
+                        };
+
+                        let text = if let Some(stripped) = text.strip_prefix('@') {
+                            // PORT-NOTE: `trap_SP_GetStringTextString` -> `dc.SP_GetStringTextString`;
+                            // a failed lookup falls back to the empty string rather than Raven's
+                            // unset `temp[MAX_STRING_CHARS]` buffer.
+                            dc.SP_GetStringTextString(stripped, MAX_STRING_CHARS)
+                                .unwrap_or_default()
+                        } else {
+                            text
+                        };
+
+                        // textyOffset stays 0 outside the `_XBOX` arm this port doesn't build.
+                        dc.drawText(
+                            x + 4.0 + listPtr.columnInfo[j as usize].pos as f32,
+                            y + listPtr.elementHeight + textaligny,
+                            textscale,
+                            foreColor,
+                            &text,
+                            0.0,
+                            listPtr.columnInfo[j as usize].maxChars,
+                            textStyle,
+                            iMenuFont,
+                        );
+
+                        if j < listPtr.numColumns - 1 {
+                            imageStartX = listPtr.columnInfo[(j + 1) as usize].pos;
+                        }
+                        dc.setColor(None);
+                        if optionalImage3 >= 0 {
+                            dc.drawHandlePic(
+                                imageStartX as f32 - listPtr.elementHeight * 3.0,
+                                y + listPtr.elementHeight + 2.0,
+                                listPtr.elementHeight,
+                                listPtr.elementHeight,
+                                optionalImage3,
+                            );
+                        }
+                        if optionalImage2 >= 0 {
+                            dc.drawHandlePic(
+                                imageStartX as f32 - listPtr.elementHeight * 2.0,
+                                y + listPtr.elementHeight + 2.0,
+                                listPtr.elementHeight,
+                                listPtr.elementHeight,
+                                optionalImage2,
+                            );
+                        }
+                        if optionalImage1 >= 0 {
+                            dc.drawHandlePic(
+                                imageStartX as f32 - listPtr.elementHeight,
+                                y + listPtr.elementHeight + 2.0,
+                                listPtr.elementHeight,
+                                listPtr.elementHeight,
+                                optionalImage1,
+                            );
+                        }
+                    }
+                } else {
+                    let (text, optionalImage1, optionalImage2, optionalImage3) =
+                        dc.feederItemText(special, i, 0);
+                    if optionalImage1 >= 0 || optionalImage2 >= 0 || optionalImage3 >= 0 {
+                        // (Raven: commented-out drawHandlePic — no-op)
+                    } else if let Some(text) = text {
+                        dc.drawText(
+                            x + 4.0,
+                            y + textaligny,
+                            textscale,
+                            foreColor,
+                            &text,
+                            0.0,
+                            0,
+                            textStyle,
+                            iMenuFont,
+                        );
+                    }
+                }
+
+                if i == cursorPos {
+                    dc.fillRect(
+                        x + 2.0,
+                        y + listPtr.elementHeight + 2.0,
+                        rect.w - SCROLLBAR_SIZE - 4.0,
+                        listPtr.elementHeight,
+                        outlineColor,
+                    );
+                }
+
+                sizeHeight -= listPtr.elementHeight;
+                if sizeHeight < listPtr.elementHeight {
+                    listPtr.drawPadding = (listPtr.elementHeight - sizeHeight) as c_int;
+                    break;
+                }
+                listPtr.endPos += 1;
+                y += listPtr.elementHeight;
+                i += 1;
+            }
+        }
+    }
+
+    if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+        *l = listPtr;
+    }
+}
+
+/// Raven `ItemParse_name` — parse an item's window name.
+/// Source: `oracle/codemp/ui/ui_shared.c:7380-7385`
+pub fn ItemParse_name(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    let mut name = String::new();
+    if !PC_String_Parse(dc, handle, &mut name) {
+        return false;
+    }
+    menus.item_mut(item).window.name = Some(name);
+    true
+}
+
+/// Raven `ItemParse_text` — parse an item's display text.
+/// Source: `oracle/codemp/ui/ui_shared.c:7399-7404`
+pub fn ItemParse_text(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    let mut text = String::new();
+    if !PC_String_Parse(dc, handle, &mut text) {
+        return false;
+    }
+    menus.item_mut(item).text = Some(text);
+    true
+}
+
+/// Raven `ItemParse_descText` — parse an item's description text.
+/// Source: `oracle/codemp/ui/ui_shared.c:7412-7422`
+pub fn ItemParse_descText(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    let mut descText = String::new();
+    if !PC_String_Parse(dc, handle, &mut descText) {
+        return false;
+    }
+    menus.item_mut(item).descText = descText;
+    true
+}
+
+/// Raven `ItemParse_text2` — parse an item's second-line display text.
+/// Source: `oracle/codemp/ui/ui_shared.c:7431-7441`
+pub fn ItemParse_text2(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    let mut text2 = String::new();
+    if !PC_String_Parse(dc, handle, &mut text2) {
+        return false;
+    }
+    menus.item_mut(item).text2 = text2;
+    true
+}
+
+/// Raven `ItemParse_text2alignx` — parse the second-line text's x alignment.
+/// Source: `oracle/codemp/ui/ui_shared.c:7448-7455`
+pub fn ItemParse_text2alignx(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    PC_Float_Parse(dc, handle, &mut menus.item_mut(item).text2alignx)
+}
+
+/// Raven `ItemParse_text2aligny` — parse the second-line text's y alignment.
+/// Source: `oracle/codemp/ui/ui_shared.c:7462-7469`
+pub fn ItemParse_text2aligny(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    PC_Float_Parse(dc, handle, &mut menus.item_mut(item).text2aligny)
+}
+
+/// Raven `ItemParse_group` — parse an item's group name.
+/// Source: `oracle/codemp/ui/ui_shared.c:7472-7477`
+pub fn ItemParse_group(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    let mut group = String::new();
+    if !PC_String_Parse(dc, handle, &mut group) {
+        return false;
+    }
+    menus.item_mut(item).window.group = Some(group);
+    true
+}
+
+/// Raven `ItemParse_asset_model` — parse an item's model asset path, with the
+/// `ui_char_model` name a special-cased indirection through that cvar.
+///
+/// PORT-NOTE: the `#ifndef CGAME` (ui) arm, per this file's convention.
+/// Source: `oracle/codemp/ui/ui_shared.c:7659-7684`
+pub fn ItemParse_asset_model(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+
+    let mut token = zero_pc_token();
+    if !dc.PC_ReadToken(handle, &mut token) {
+        return false;
+    }
+    let mut temp = pc_token_str(&token);
+
+    if stricmp_eq(&temp, "ui_char_model") {
+        let ui_char_model = dc.getCVarString("ui_char_model", MAX_QPATH as usize);
+        temp = format!("models/players/{}/model.glm", ui_char_model);
+    }
+
+    let mut animRunLength: c_int = 0;
+    ItemParse_asset_model_go(menus, dc, item, &temp, &mut animRunLength)
+}
+
+/// Raven `ItemParse_model_origin` — parse an item model's origin.
+///
+/// PORT-NOTE (§19 UB pick): a `typeData` payload-type mismatch (unreachable
+/// under this file's own type dispatch) fails the parse instead of Raven's
+/// null-deref UB.
+/// Source: `oracle/codemp/ui/ui_shared.c:7697-7710`
+pub fn ItemParse_model_origin(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+
+    let modelPtr = match menus.item_mut(item).typeData.model_mut() {
+        Some(m) => m,
+        None => return false,
+    };
+
+    if PC_Float_Parse(dc, handle, &mut modelPtr.origin[0]) {
+        if PC_Float_Parse(dc, handle, &mut modelPtr.origin[1]) {
+            if PC_Float_Parse(dc, handle, &mut modelPtr.origin[2]) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Raven `ItemParse_model_fovx` — parse an item model's horizontal fov.
+///
+/// PORT-NOTE (§19 UB pick): a `typeData` payload-type mismatch (unreachable
+/// under this file's own type dispatch) fails the parse instead of Raven's
+/// null-deref UB.
+/// Source: `oracle/codemp/ui/ui_shared.c:7713-7722`
+pub fn ItemParse_model_fovx(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+
+    let modelPtr = match menus.item_mut(item).typeData.model_mut() {
+        Some(m) => m,
+        None => return false,
+    };
+    PC_Float_Parse(dc, handle, &mut modelPtr.fov_x)
+}
+
+/// Raven `ItemParse_model_fovy` — parse an item model's vertical fov.
+///
+/// PORT-NOTE (§19 UB pick): a `typeData` payload-type mismatch (unreachable
+/// under this file's own type dispatch) fails the parse instead of Raven's
+/// null-deref UB.
+/// Source: `oracle/codemp/ui/ui_shared.c:7725-7734`
+pub fn ItemParse_model_fovy(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+
+    let modelPtr = match menus.item_mut(item).typeData.model_mut() {
+        Some(m) => m,
+        None => return false,
+    };
+    PC_Float_Parse(dc, handle, &mut modelPtr.fov_y)
+}
+
+/// Raven `ItemParse_model_rotation` — parse an item model's rotation speed.
+///
+/// PORT-NOTE (§19 UB pick): a `typeData` payload-type mismatch (unreachable
+/// under this file's own type dispatch) fails the parse instead of Raven's
+/// null-deref UB.
+/// Source: `oracle/codemp/ui/ui_shared.c:7737-7746`
+pub fn ItemParse_model_rotation(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+
+    let modelPtr = match menus.item_mut(item).typeData.model_mut() {
+        Some(m) => m,
+        None => return false,
+    };
+    PC_Int_Parse(dc, handle, &mut modelPtr.rotationSpeed)
+}
+
+/// Raven `ItemParse_model_angle` — parse an item model's static angle.
+///
+/// PORT-NOTE (§19 UB pick): a `typeData` payload-type mismatch (unreachable
+/// under this file's own type dispatch) fails the parse instead of Raven's
+/// null-deref UB.
+/// Source: `oracle/codemp/ui/ui_shared.c:7749-7758`
+pub fn ItemParse_model_angle(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+
+    let modelPtr = match menus.item_mut(item).typeData.model_mut() {
+        Some(m) => m,
+        None => return false,
+    };
+    PC_Int_Parse(dc, handle, &mut modelPtr.angle)
+}
+
+/// Raven `ItemParse_model_g2mins` — parse an item model's ghoul2 mins.
+///
+/// PORT-NOTE (§19 UB pick): a `typeData` payload-type mismatch (unreachable
+/// under this file's own type dispatch) fails the parse instead of Raven's
+/// null-deref UB.
+/// Source: `oracle/codemp/ui/ui_shared.c:7761-7774`
+pub fn ItemParse_model_g2mins(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+
+    let modelPtr = match menus.item_mut(item).typeData.model_mut() {
+        Some(m) => m,
+        None => return false,
+    };
+
+    if PC_Float_Parse(dc, handle, &mut modelPtr.g2mins[0]) {
+        if PC_Float_Parse(dc, handle, &mut modelPtr.g2mins[1]) {
+            if PC_Float_Parse(dc, handle, &mut modelPtr.g2mins[2]) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Raven `ItemParse_model_g2maxs` — parse an item model's ghoul2 maxs.
+///
+/// PORT-NOTE (§19 UB pick): a `typeData` payload-type mismatch (unreachable
+/// under this file's own type dispatch) fails the parse instead of Raven's
+/// null-deref UB.
+/// Source: `oracle/codemp/ui/ui_shared.c:7777-7790`
+pub fn ItemParse_model_g2maxs(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+
+    let modelPtr = match menus.item_mut(item).typeData.model_mut() {
+        Some(m) => m,
+        None => return false,
+    };
+
+    if PC_Float_Parse(dc, handle, &mut modelPtr.g2maxs[0]) {
+        if PC_Float_Parse(dc, handle, &mut modelPtr.g2maxs[1]) {
+            if PC_Float_Parse(dc, handle, &mut modelPtr.g2maxs[2]) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Raven `ItemParse_model_g2scale` — parse an item model's ghoul2 scale.
+///
+/// PORT-NOTE (§19 UB pick): a `typeData` payload-type mismatch (unreachable
+/// under this file's own type dispatch) fails the parse instead of Raven's
+/// null-deref UB.
+/// Source: `oracle/codemp/ui/ui_shared.c:7793-7806`
+pub fn ItemParse_model_g2scale(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+
+    let modelPtr = match menus.item_mut(item).typeData.model_mut() {
+        Some(m) => m,
+        None => return false,
+    };
+
+    if PC_Float_Parse(dc, handle, &mut modelPtr.g2scale[0]) {
+        if PC_Float_Parse(dc, handle, &mut modelPtr.g2scale[1]) {
+            if PC_Float_Parse(dc, handle, &mut modelPtr.g2scale[2]) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Raven `ItemParse_rectcvar` — read a cvar name token, then read the item's
+/// `window.rectClient` (x/y/w/h) out of a space-separated cvar string.
+///
+/// Raven's trailing comment: "There may be no cvar built for this, and
+/// that's okay. . . I guess." — a partial/missing cvar string leaves the rect
+/// fields at whatever they were and still returns success.
+/// Source: `oracle/codemp/ui/ui_shared.c:7922-7959`
+pub fn ItemParse_rectcvar(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    // get Cvar name
+    let mut token = zero_pc_token();
+    if !dc.PC_ReadToken(handle, &mut token) {
+        return false;
+    }
+    let name = pc_token_str(&token);
+
+    // get cvar data
+    let cvarBuf = dc.getCVarString(&name, 1024);
+
+    let mut holdBuf: &str = &cvarBuf;
+    let mut holdVal = String::new();
+    if String_Parse(&mut holdBuf, &mut holdVal) {
+        menus.item_mut(item).window.rectClient.x = atof(&holdVal) as f32;
+        if String_Parse(&mut holdBuf, &mut holdVal) {
+            menus.item_mut(item).window.rectClient.y = atof(&holdVal) as f32;
+            if String_Parse(&mut holdBuf, &mut holdVal) {
+                menus.item_mut(item).window.rectClient.w = atof(&holdVal) as f32;
+                if String_Parse(&mut holdBuf, &mut holdVal) {
+                    menus.item_mut(item).window.rectClient.h = atof(&holdVal) as f32;
+                    return true;
+                }
+            }
+        }
+    }
+
+    // There may be no cvar built for this, and that's okay. . . I guess.
+    true
+}
+
+/// Raven `ItemParse_style` — parse the item's window style.
+/// Source: `oracle/codemp/ui/ui_shared.c:8010-8019`
+pub fn ItemParse_style(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_Int_Parse(dc, handle, &mut menus.item_mut(item).window.style) {
+        dc.Print("^3Unknown item style value");
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_type` — parse the item type, then re-derive its
+/// `typeData` payload from it.
+/// Source: `oracle/codemp/ui/ui_shared.c:8087-8097`
+pub fn ItemParse_type(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_Int_Parse(dc, handle, &mut menus.item_mut(item).r#type) {
+        return false;
+    }
+    Item_ValidateTypeData(menus.item_mut(item));
+    true
+}
+
+/// Raven `ItemParse_elementwidth` — parse a listbox item's element width.
+///
+/// PORT-NOTE (§19 UB pick): Raven casts `typeData` unconditionally after
+/// `Item_ValidateTypeData` without a NULL check; a payload-type mismatch
+/// (unreachable under this file's own type dispatch) fails the parse instead
+/// of Raven's null-deref UB, matching the `ItemParse_model_g2scale` pick.
+/// Source: `oracle/codemp/ui/ui_shared.c:8101-8110`
+pub fn ItemParse_elementwidth(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+
+    let listPtr = match menus.item_mut(item).typeData.listBox_mut() {
+        Some(l) => l,
+        None => return false,
+    };
+    if !PC_Float_Parse(dc, handle, &mut listPtr.elementWidth) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_elementheight` — parse a listbox item's element height.
+///
+/// PORT-NOTE (§19 UB pick): same unconditional-cast pick as
+/// `ItemParse_elementwidth`.
+/// Source: `oracle/codemp/ui/ui_shared.c:8114-8123`
+pub fn ItemParse_elementheight(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+
+    let listPtr = match menus.item_mut(item).typeData.listBox_mut() {
+        Some(l) => l,
+        None => return false,
+    };
+    if !PC_Float_Parse(dc, handle, &mut listPtr.elementHeight) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_feeder` — parse the item's feeder id into `special`.
+/// Source: `oracle/codemp/ui/ui_shared.c:8126-8131`
+pub fn ItemParse_feeder(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_Float_Parse(dc, handle, &mut menus.item_mut(item).special) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_elementtype` — parse a listbox item's element style.
+/// Source: `oracle/codemp/ui/ui_shared.c:8135-8146`
+pub fn ItemParse_elementtype(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+    if menus.item(item).typeData.is_none() {
+        return false;
+    }
+    let listPtr = match menus.item_mut(item).typeData.listBox_mut() {
+        Some(l) => l,
+        None => return false,
+    };
+    if !PC_Int_Parse(dc, handle, &mut listPtr.elementStyle) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_columns` — parse a listbox item's column count (capped
+/// at `MAX_LB_COLUMNS`) and each column's pos/width/maxChars triple.
+/// Source: `oracle/codemp/ui/ui_shared.c:8149-8177`
+pub fn ItemParse_columns(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+    if menus.item(item).typeData.is_none() {
+        return false;
+    }
+
+    let mut num: c_int = 0;
+    if !PC_Int_Parse(dc, handle, &mut num) {
+        return false;
+    }
+    if num > MAX_LB_COLUMNS as c_int {
+        num = MAX_LB_COLUMNS as c_int;
+    }
+
+    let listPtr = match menus.item_mut(item).typeData.listBox_mut() {
+        Some(l) => l,
+        None => return false,
+    };
+    listPtr.numColumns = num;
+    for i in 0..num {
+        let mut pos: c_int = 0;
+        let mut width: c_int = 0;
+        let mut maxChars: c_int = 0;
+        if PC_Int_Parse(dc, handle, &mut pos)
+            && PC_Int_Parse(dc, handle, &mut width)
+            && PC_Int_Parse(dc, handle, &mut maxChars)
+        {
+            listPtr.columnInfo[i as usize].pos = pos;
+            listPtr.columnInfo[i as usize].width = width;
+            listPtr.columnInfo[i as usize].maxChars = maxChars;
+        } else {
+            return false;
+        }
+    }
+    true
+}
+
+/// Raven `ItemParse_border` — parse the item's window border style.
+/// Source: `oracle/codemp/ui/ui_shared.c:8179-8184`
+pub fn ItemParse_border(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_Int_Parse(dc, handle, &mut menus.item_mut(item).window.border) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_bordersize` — parse the item's window border size.
+/// Source: `oracle/codemp/ui/ui_shared.c:8186-8191`
+pub fn ItemParse_bordersize(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_Float_Parse(dc, handle, &mut menus.item_mut(item).window.borderSize) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_visible` — set `WINDOW_VISIBLE` when the parsed value is
+/// non-zero (never clears it).
+/// Source: `oracle/codemp/ui/ui_shared.c:8193-8203`
+pub fn ItemParse_visible(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    let mut i: c_int = 0;
+    if !PC_Int_Parse(dc, handle, &mut i) {
+        return false;
+    }
+    if i != 0 {
+        menus.item_mut(item).window.flags |= WINDOW_VISIBLE;
+    }
+    true
+}
+
+/// Raven `ItemParse_ownerdraw` — parse the item's ownerdraw id and force the
+/// item type to `ITEM_TYPE_OWNERDRAW`.
+/// Source: `oracle/codemp/ui/ui_shared.c:8205-8211`
+pub fn ItemParse_ownerdraw(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_Int_Parse(dc, handle, &mut menus.item_mut(item).window.ownerDraw) {
+        return false;
+    }
+    menus.item_mut(item).r#type = ITEM_TYPE_OWNERDRAW;
+    true
+}
+
+/// Raven `ItemParse_align` — parse the item's alignment.
+/// Source: `oracle/codemp/ui/ui_shared.c:8213-8218`
+pub fn ItemParse_align(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_Int_Parse(dc, handle, &mut menus.item_mut(item).alignment) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_isCharacter` — set/clear `ITF_ISCHARACTER` from the
+/// parsed flag value.
+/// Source: `oracle/codemp/ui/ui_shared.c:8227-8244`
+pub fn ItemParse_isCharacter(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    let mut flag: c_int = 0;
+    if PC_Int_Parse(dc, handle, &mut flag) {
+        if flag != 0 {
+            menus.item_mut(item).flags |= ITF_ISCHARACTER;
+        } else {
+            menus.item_mut(item).flags &= !ITF_ISCHARACTER;
+        }
+        return true;
+    }
+    false
+}
+
+/// Raven `ItemParse_textalign` — parse the item's text alignment.
+/// Source: `oracle/codemp/ui/ui_shared.c:8252-8262`
+pub fn ItemParse_textalign(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_Int_Parse(dc, handle, &mut menus.item_mut(item).textalignment) {
+        dc.Print("^3Unknown text alignment value");
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_textalignx` — parse the item's text alignment x offset.
+/// Source: `oracle/codemp/ui/ui_shared.c:8264-8269`
+pub fn ItemParse_textalignx(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_Float_Parse(dc, handle, &mut menus.item_mut(item).textalignx) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_textaligny` — parse the item's text alignment y offset.
+/// Source: `oracle/codemp/ui/ui_shared.c:8271-8276`
+pub fn ItemParse_textaligny(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_Float_Parse(dc, handle, &mut menus.item_mut(item).textaligny) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_textscale` — parse the item's text scale.
+/// Source: `oracle/codemp/ui/ui_shared.c:8278-8283`
+pub fn ItemParse_textscale(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_Float_Parse(dc, handle, &mut menus.item_mut(item).textscale) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_textstyle` — parse the item's text style.
+/// Source: `oracle/codemp/ui/ui_shared.c:8285-8290`
+pub fn ItemParse_textstyle(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_Int_Parse(dc, handle, &mut menus.item_mut(item).textStyle) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_invertyesno` — parse the item's invert-yes/no flag.
+/// Source: `oracle/codemp/ui/ui_shared.c:8298-8305`
+pub fn ItemParse_invertyesno(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_Int_Parse(dc, handle, &mut menus.item_mut(item).invertYesNo) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_xoffset` — parse the item's x offset.
+///
+/// PORT-NOTE: faithful transcription of an oracle bug — `PC_Int_Parse`
+/// *succeeding* returns `qfalse`, and failing falls through to `qtrue`
+/// (porting-rules §A2: port ugly behavior faithfully, get green, refactor
+/// behind the passing diff later).
+/// Source: `oracle/codemp/ui/ui_shared.c:8312-8319`
+pub fn ItemParse_xoffset(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if PC_Int_Parse(dc, handle, &mut menus.item_mut(item).xoffset) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_backcolor` — parse the item's window back color (4
+/// floats).
+/// Source: `oracle/codemp/ui/ui_shared.c:8322-8333`
+pub fn ItemParse_backcolor(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    for i in 0..4 {
+        let mut f: f32 = 0.0;
+        if !PC_Float_Parse(dc, handle, &mut f) {
+            return false;
+        }
+        menus.item_mut(item).window.backColor[i] = f;
+    }
+    true
+}
+
+/// Raven `ItemParse_forecolor` — parse the item's window fore color (4
+/// floats); a negative component is the player-color special case
+/// (`WINDOW_PLAYERCOLOR`) and stops the parse early without an error.
+/// Source: `oracle/codemp/ui/ui_shared.c:8335-8354`
+pub fn ItemParse_forecolor(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    for i in 0..4 {
+        let mut f: f32 = 0.0;
+        if !PC_Float_Parse(dc, handle, &mut f) {
+            return false;
+        }
+
+        if f < 0.0 {
+            // special case for player color
+            menus.item_mut(item).window.flags |= WINDOW_PLAYERCOLOR;
+            return true;
+        }
+
+        let it = menus.item_mut(item);
+        it.window.foreColor[i] = f;
+        it.window.flags |= WINDOW_FORECOLORSET;
+    }
+    true
+}
+
+/// Raven `ItemParse_bordercolor` — parse the item's window border color (4
+/// floats).
+/// Source: `oracle/codemp/ui/ui_shared.c:8356-8367`
+pub fn ItemParse_bordercolor(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    for i in 0..4 {
+        let mut f: f32 = 0.0;
+        if !PC_Float_Parse(dc, handle, &mut f) {
+            return false;
+        }
+        menus.item_mut(item).window.borderColor[i] = f;
+    }
+    true
+}
+
+/// Raven `ItemParse_cinematic` — parse the item's cinematic name.
+/// Source: `oracle/codemp/ui/ui_shared.c:8386-8391`
+pub fn ItemParse_cinematic(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_String_Parse(dc, handle, &mut menus.item_mut(item).window.cinematicName) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_doubleClick` — parse a listbox item's double-click
+/// script.
+/// Source: `oracle/codemp/ui/ui_shared.c:8393-8407`
+pub fn ItemParse_doubleClick(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+    if menus.item(item).typeData.is_none() {
+        return false;
+    }
+
+    let listPtr = match menus.item_mut(item).typeData.listBox_mut() {
+        Some(l) => l,
+        None => return false,
+    };
+    if !PC_Script_Parse(dc, handle, &mut listPtr.doubleClick) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_onFocus` — parse the item's on-focus script.
+/// Source: `oracle/codemp/ui/ui_shared.c:8409-8414`
+pub fn ItemParse_onFocus(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_Script_Parse(dc, handle, &mut menus.item_mut(item).onFocus) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_leaveFocus` — parse the item's leave-focus script.
+/// Source: `oracle/codemp/ui/ui_shared.c:8416-8421`
+pub fn ItemParse_leaveFocus(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_Script_Parse(dc, handle, &mut menus.item_mut(item).leaveFocus) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_mouseEnter` — parse the item's mouse-enter script.
+/// Source: `oracle/codemp/ui/ui_shared.c:8423-8428`
+pub fn ItemParse_mouseEnter(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_Script_Parse(dc, handle, &mut menus.item_mut(item).mouseEnter) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_mouseExit` — parse the item's mouse-exit script.
+/// Source: `oracle/codemp/ui/ui_shared.c:8430-8435`
+pub fn ItemParse_mouseExit(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_Script_Parse(dc, handle, &mut menus.item_mut(item).mouseExit) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_mouseEnterText` — parse the item's mouse-enter-text
+/// script.
+/// Source: `oracle/codemp/ui/ui_shared.c:8437-8442`
+pub fn ItemParse_mouseEnterText(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_Script_Parse(dc, handle, &mut menus.item_mut(item).mouseEnterText) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_mouseExitText` — parse the item's mouse-exit-text
+/// script.
+/// Source: `oracle/codemp/ui/ui_shared.c:8444-8449`
+pub fn ItemParse_mouseExitText(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_Script_Parse(dc, handle, &mut menus.item_mut(item).mouseExitText) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_action` — parse the item's select (action) script.
+/// Source: `oracle/codemp/ui/ui_shared.c:8451-8456`
+pub fn ItemParse_action(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_Script_Parse(dc, handle, &mut menus.item_mut(item).action) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_special` — parse the item's `special` value.
+/// Source: `oracle/codemp/ui/ui_shared.c:8458-8463`
+pub fn ItemParse_special(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_Float_Parse(dc, handle, &mut menus.item_mut(item).special) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_cvarTest` — parse the item's enable-test cvar name.
+/// Source: `oracle/codemp/ui/ui_shared.c:8465-8470`
+pub fn ItemParse_cvarTest(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if !PC_String_Parse(dc, handle, &mut menus.item_mut(item).cvarTest) {
+        return false;
+    }
+    true
+}
+
+/// Raven `ItemParse_cvar` — parse an item's associated cvar name, resetting
+/// its edit-field limits to Raven's `-1`/`-1`/`-1` sentinel when it has one.
+///
+/// PORT-NOTE (§19 UB pick): Raven's unconditional `editFieldDef_t*` cast
+/// type-puns a non-edit-field payload's memory (ui_shared.c:8484-8497); a
+/// payload-type mismatch drops the write here instead.
+/// Source: `oracle/codemp/ui/ui_shared.c:8472-8500`
+pub fn ItemParse_cvar(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+    let mut cvar = String::new();
+    if !PC_String_Parse(dc, handle, &mut cvar) {
+        return false;
+    }
+    menus.item_mut(item).cvar = Some(cvar);
+
+    let it = menus.item_mut(item);
+    if !it.typeData.is_none() {
+        match it.r#type {
+            ITEM_TYPE_EDITFIELD
+            | ITEM_TYPE_NUMERICFIELD
+            | ITEM_TYPE_YESNO
+            | ITEM_TYPE_BIND
+            | ITEM_TYPE_SLIDER
+            | ITEM_TYPE_TEXT => {
+                if let Some(editPtr) = it.typeData.editField_mut() {
+                    editPtr.minVal = -1.0;
+                    editPtr.maxVal = -1.0;
+                    editPtr.defVal = -1.0;
+                }
+            }
+            _ => {}
+        }
+    }
+    true
+}
+
+/// Raven `ItemParse_font` — parse an item's font index.
+/// Source: `oracle/codemp/ui/ui_shared.c:8502-8510`
+pub fn ItemParse_font(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+    PC_Int_Parse(dc, handle, &mut menus.item_mut(item).iMenuFont)
+}
+
+/// Raven `ItemParse_maxChars` — parse an edit field's max character count.
+///
+/// PORT-NOTE (§19 UB pick): a `typeData` payload-type mismatch (unreachable
+/// under this file's own type dispatch) drops the write instead of Raven's
+/// unconditional cast.
+/// Source: `oracle/codemp/ui/ui_shared.c:8513-8527`
+pub fn ItemParse_maxChars(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+    if menus.item(item).typeData.is_none() {
+        return false;
+    }
+
+    let mut maxChars: c_int = 0;
+    if !PC_Int_Parse(dc, handle, &mut maxChars) {
+        return false;
+    }
+    if let Some(editPtr) = menus.item_mut(item).typeData.editField_mut() {
+        editPtr.maxChars = maxChars;
+    }
+    true
+}
+
+/// Raven `ItemParse_maxPaintChars` — parse an edit field's max painted
+/// character count.
+///
+/// PORT-NOTE (§19 UB pick): see `ItemParse_maxChars`.
+/// Source: `oracle/codemp/ui/ui_shared.c:8529-8543`
+pub fn ItemParse_maxPaintChars(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+    if menus.item(item).typeData.is_none() {
+        return false;
+    }
+
+    let mut maxChars: c_int = 0;
+    if !PC_Int_Parse(dc, handle, &mut maxChars) {
+        return false;
+    }
+    if let Some(editPtr) = menus.item_mut(item).typeData.editField_mut() {
+        editPtr.maxPaintChars = maxChars;
+    }
+    true
+}
+
+/// Raven `ItemParse_maxLineChars` — parse a text-scroll box's max characters
+/// per line.
+///
+/// PORT-NOTE (§19 UB pick): a `typeData` payload-type mismatch (unreachable
+/// under this file's own type dispatch) drops the write instead of Raven's
+/// unconditional cast.
+/// Source: `oracle/codemp/ui/ui_shared.c:8545-8563`
+pub fn ItemParse_maxLineChars(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+    if menus.item(item).typeData.is_none() {
+        return false;
+    }
+
+    let mut maxChars: c_int = 0;
+    if !PC_Int_Parse(dc, handle, &mut maxChars) {
+        return false;
+    }
+    if let Some(scrollPtr) = menus.item_mut(item).typeData.textScroll_mut() {
+        scrollPtr.maxLineChars = maxChars;
+    }
+    true
+}
+
+/// Raven `ItemParse_lineHeight` — parse a text-scroll box's line height.
+///
+/// PORT-NOTE (§19 UB pick): see `ItemParse_maxLineChars`.
+/// Source: `oracle/codemp/ui/ui_shared.c:8565-8583`
+pub fn ItemParse_lineHeight(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+    if menus.item(item).typeData.is_none() {
+        return false;
+    }
+
+    let mut height: c_int = 0;
+    if !PC_Int_Parse(dc, handle, &mut height) {
+        return false;
+    }
+    if let Some(scrollPtr) = menus.item_mut(item).typeData.textScroll_mut() {
+        scrollPtr.lineHeight = height as f32;
+    }
+    true
+}
+
+/// Raven `ItemParse_cvarFloat` — parse a numeric edit field's cvar and its
+/// default/min/max range, in one four-token chain.
+///
+/// PORT-NOTE (§19 UB pick): the `typeData` cast is unconditional in Raven
+/// (the `editPtr` local is assigned once, before any parse); each parsed
+/// value is written the moment its own `PC_*_Parse` succeeds (matching
+/// Raven's inline out-param writes inside the `&&` chain — a later parse
+/// failing still leaves the earlier writes applied), with a payload-type
+/// mismatch dropping the edit-field write instead of Raven's unconditional
+/// cast.
+/// Source: `oracle/codemp/ui/ui_shared.c:8585-8599`
+pub fn ItemParse_cvarFloat(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+    if menus.item(item).typeData.is_none() {
+        return false;
+    }
+
+    let mut cvar = String::new();
+    if !PC_String_Parse(dc, handle, &mut cvar) {
+        return false;
+    }
+    menus.item_mut(item).cvar = Some(cvar);
+
+    let mut defVal = 0.0f32;
+    if !PC_Float_Parse(dc, handle, &mut defVal) {
+        return false;
+    }
+    if let Some(editPtr) = menus.item_mut(item).typeData.editField_mut() {
+        editPtr.defVal = defVal;
+    }
+
+    let mut minVal = 0.0f32;
+    if !PC_Float_Parse(dc, handle, &mut minVal) {
+        return false;
+    }
+    if let Some(editPtr) = menus.item_mut(item).typeData.editField_mut() {
+        editPtr.minVal = minVal;
+    }
+
+    let mut maxVal = 0.0f32;
+    if !PC_Float_Parse(dc, handle, &mut maxVal) {
+        return false;
+    }
+    if let Some(editPtr) = menus.item_mut(item).typeData.editField_mut() {
+        editPtr.maxVal = maxVal;
+    }
+
+    true
+}
+
+/// Raven `ItemParse_cvarStrList` — parse a multi-value item's string cycle
+/// list (`{ "label" "cvarvalue" ... }`), or special-case the `"feeder"`
+/// keyword for the player-species/language pickers.
+///
+/// PORT-NOTE: `MultiDef`'s three parallel `[MAX_MULTI_CVARS]` arrays are
+/// owned `Vec`s (see the type's own doc); `multiPtr->count = 0` is the vecs'
+/// `clear()`. Raven's `(int)psString > 0` pointer-validity check (always
+/// true once `PC_String_Parse` reports success) collapses.
+///
+/// DEFERRED: the `feeder == FEEDER_PLAYER_SPECIES`/`FEEDER_LANGUAGES`
+/// branches populate the cycle list from `uiInfo.playerSpecies`/
+/// `uiInfo.languageCount` (and the `currLanguage`/`languageString` file
+/// statics) — `uiInfo` lives on `crates/mp/ui/src/world/ui_world.rs`'s
+/// `UiWorld` (mp_ui-only), unreachable from this host-agnostic crate (no
+/// `mp_ui` dependency, no `UiWorld`/`UiContext` in scope, and no
+/// `DisplayContext`/`MenuSystem` field carries it). The `"feeder"` token
+/// check and unconditional `return true` are transcribed; the population
+/// loops are not — escalated, needs a host callback (e.g. a `DisplayContext`
+/// method) to thread the species/language table through.
+/// Source: `oracle/codemp/ui/ui_shared.c:8604-8694`
+pub fn ItemParse_cvarStrList(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+    if menus.item(item).typeData.is_none() {
+        return false;
+    }
+    if let Some(multiPtr) = menus.item_mut(item).typeData.multi_mut() {
+        multiPtr.cvarList.clear();
+        multiPtr.cvarStr.clear();
+        multiPtr.strDef = true;
+    }
+
+    let mut token = zero_pc_token();
+    if !dc.PC_ReadToken(handle, &mut token) {
+        return false;
+    }
+    let tokenStr = pc_token_str(&token);
+    let special = menus.item(item).special;
+
+    if stricmp_eq(&tokenStr, "feeder") && special == FEEDER_PLAYER_SPECIES as f32 {
+        // DEFERRED: uiInfo.playerSpecies population — see fn doc.
+        return true;
+    }
+    // languages
+    if stricmp_eq(&tokenStr, "feeder") && special == FEEDER_LANGUAGES as f32 {
+        // DEFERRED: uiInfo.languageCount population — see fn doc.
+        return true;
+    }
+
+    if !tokenStr.starts_with('{') {
+        return false;
+    }
+
+    let mut pass = 0;
+    loop {
+        let mut psString = String::new();
+        if !PC_String_Parse(dc, handle, &mut psString) {
+            PC_SourceError(dc, handle, "end of file inside menu item\n");
+            return false;
+        }
+
+        if !psString.is_empty() {
+            if psString.starts_with('}') {
+                return true;
+            }
+            if psString.starts_with(',') || psString.starts_with(';') {
+                continue;
+            }
+        }
+
+        if let Some(multiPtr) = menus.item_mut(item).typeData.multi_mut() {
+            if pass == 0 {
+                multiPtr.cvarList.push(psString);
+                pass = 1;
+            } else {
+                multiPtr.cvarStr.push(psString);
+                pass = 0;
+                if multiPtr.cvarList.len() >= MAX_MULTI_CVARS {
+                    return false;
+                }
+            }
+        }
+    }
+}
+
+/// Raven `ItemParse_cvarFloatList` — parse a multi-value item's numeric
+/// cycle list (`{ "label" value ... }`).
+///
+/// PORT-NOTE: see `ItemParse_cvarStrList` — `count = 0` is the vecs'
+/// `clear()`; the `(int)string > 0` pointer-validity check collapses.
+/// Source: `oracle/codemp/ui/ui_shared.c:8696-8759`
+pub fn ItemParse_cvarFloatList(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    Item_ValidateTypeData(menus.item_mut(item));
+    if menus.item(item).typeData.is_none() {
+        return false;
+    }
+    if let Some(multiPtr) = menus.item_mut(item).typeData.multi_mut() {
+        multiPtr.cvarList.clear();
+        multiPtr.cvarValue.clear();
+        multiPtr.strDef = false;
+    }
+
+    let mut token = zero_pc_token();
+    if !dc.PC_ReadToken(handle, &mut token) {
+        return false;
+    }
+    let tokenStr = pc_token_str(&token);
+    if !tokenStr.starts_with('{') {
+        return false;
+    }
+
+    loop {
+        let mut string = String::new();
+        if !PC_String_Parse(dc, handle, &mut string) {
+            PC_SourceError(dc, handle, "end of file inside menu item\n");
+            return false;
+        }
+
+        if !string.is_empty() {
+            if string.starts_with('}') {
+                return true;
+            }
+            if string.starts_with(',') || string.starts_with(';') {
+                continue;
+            }
+        }
+
+        // Raven writes `cvarList[count]` before the parse but only advances `count`
+        // on success, so a failed parse leaves the pair uncommitted.
+        let mut value = 0.0f32;
+        if !PC_Float_Parse(dc, handle, &mut value) {
+            return false;
+        }
+
+        if let Some(multiPtr) = menus.item_mut(item).typeData.multi_mut() {
+            multiPtr.cvarList.push(string);
+            multiPtr.cvarValue.push(value);
+            if multiPtr.cvarList.len() >= MAX_MULTI_CVARS {
+                return false;
+            }
+        }
+    }
+}
+
+/// Raven `ItemParse_ownerdrawFlag` — OR an ownerdraw show-flag into the
+/// item's window.
+/// Source: `oracle/codemp/ui/ui_shared.c:8778-8785`
+pub fn ItemParse_ownerdrawFlag(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    let mut i: c_int = 0;
+    if !PC_Int_Parse(dc, handle, &mut i) {
+        return false;
+    }
+    menus.item_mut(item).window.ownerDrawFlags |= i;
+    true
+}
+
+/// Raven `ItemParse_enableCvar` — parse the item's enable-cvar script and
+/// mark it `CVAR_ENABLE`.
+/// Source: `oracle/codemp/ui/ui_shared.c:8787-8793`
+pub fn ItemParse_enableCvar(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if PC_Script_Parse(dc, handle, &mut menus.item_mut(item).enableCvar) {
+        menus.item_mut(item).cvarFlags = CVAR_ENABLE;
+        return true;
+    }
+    false
+}
+
+/// Raven `ItemParse_disableCvar` — parse the item's enable-cvar script and
+/// mark it `CVAR_DISABLE`.
+/// Source: `oracle/codemp/ui/ui_shared.c:8795-8801`
+pub fn ItemParse_disableCvar(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if PC_Script_Parse(dc, handle, &mut menus.item_mut(item).enableCvar) {
+        menus.item_mut(item).cvarFlags = CVAR_DISABLE;
+        return true;
+    }
+    false
+}
+
+/// Raven `ItemParse_showCvar` — parse the item's enable-cvar script and mark
+/// it `CVAR_SHOW`.
+/// Source: `oracle/codemp/ui/ui_shared.c:8803-8809`
+pub fn ItemParse_showCvar(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if PC_Script_Parse(dc, handle, &mut menus.item_mut(item).enableCvar) {
+        menus.item_mut(item).cvarFlags = CVAR_SHOW;
+        return true;
+    }
+    false
+}
+
+/// Raven `ItemParse_hideCvar` — parse the item's enable-cvar script and mark
+/// it `CVAR_HIDE`.
+/// Source: `oracle/codemp/ui/ui_shared.c:8811-8817`
+pub fn ItemParse_hideCvar(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    if PC_Script_Parse(dc, handle, &mut menus.item_mut(item).enableCvar) {
+        menus.item_mut(item).cvarFlags = CVAR_HIDE;
+        return true;
+    }
+    false
+}
+
+/// Raven `ItemParse_Appearance_slot` — parse the item's appearance-order
+/// slot.
+/// Source: `oracle/codemp/ui/ui_shared.c:8824-8831`
+pub fn ItemParse_Appearance_slot(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    PC_Int_Parse(dc, handle, &mut menus.item_mut(item).appearanceSlot)
+}
+
+/// Raven `ItemParse_isSaber` — mark/unmark an item as drawing the first
+/// saber blade.
+///
+/// PORT-NOTE: Raven's `#ifndef CGAME` guard restricts this whole body to the
+/// ui host at compile time; `mp_uishared` carries no compile-time host
+/// distinction (DEC-36 D3 threads the host through `dc`/state params at
+/// runtime, not `#ifdef`), so the flag toggle below runs for every host.
+///
+/// DEFERRED: the saber-glow-cache/parms-load call
+/// (`UI_CacheSaberGlowGraphics`, `UI_SaberLoadParms`, gated on
+/// `ui_saber_parms_parsed`) — those are ported in `crates/mp/ui/src/
+/// ui_saber.rs` taking `ctx: &mut UiContext`, and `ui_saber_parms_parsed`
+/// lives on `ctx.world.saber` (`crates/mp/ui/src/world/ui_saber_state.rs`);
+/// `mp_uishared` is host-agnostic (no `mp_ui` dependency, no `UiContext` in
+/// scope), so neither is reachable from this fn. Escalated — needs a host
+/// callback (e.g. a `DisplayContext` method) to thread this through.
+/// Source: `oracle/codemp/ui/ui_shared.c:8833-8859`
+pub fn ItemParse_isSaber(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    let mut i: c_int = 0;
+    if PC_Int_Parse(dc, handle, &mut i) {
+        if i != 0 {
+            menus.item_mut(item).flags |= ITF_ISSABER;
+        } else {
+            menus.item_mut(item).flags &= !ITF_ISSABER;
+        }
+        return true;
+    }
+    false
+}
+
+/// Raven `ItemParse_isSaber2` — mark/unmark an item as drawing the second
+/// saber blade.
+///
+/// PORT-NOTE: see `ItemParse_isSaber`.
+///
+/// DEFERRED: see `ItemParse_isSaber`.
+/// Source: `oracle/codemp/ui/ui_shared.c:8865-8890`
+pub fn ItemParse_isSaber2(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    let mut i: c_int = 0;
+    if PC_Int_Parse(dc, handle, &mut i) {
+        if i != 0 {
+            menus.item_mut(item).flags |= ITF_ISSABER2;
+        } else {
+            menus.item_mut(item).flags &= !ITF_ISSABER2;
+        }
+        return true;
+    }
+    false
+}
+
+/// Raven `MenuParse_font` — parse a menu's font, registering the medium font
+/// asset the first time any menu sets one.
+///
+/// PORT-NOTE: Raven's `itemDef_t *item` parameter is immediately cast to
+/// `menuDef_t *menu` (this file's shared `MenuParse_*` callback signature);
+/// this takes the `MenuId` the cast resolves to directly. `DC->Assets.*`
+/// (the `DC->` data tail) becomes `ds.Assets.*`; the commented-out
+/// `DC->registerFont` call stays dropped (dead even in the oracle).
+/// Source: `oracle/codemp/ui/ui_shared.c:9291-9302`
+pub fn MenuParse_font(
+    menus: &mut MenuSystem,
+    ds: &mut DisplayState,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    let mut font = String::new();
+    if !PC_String_Parse(dc, handle, &mut font) {
+        return false;
+    }
+    if !ds.Assets.fontRegistered {
+        ds.Assets.qhMediumFont = dc.RegisterFont(&font);
+        ds.Assets.fontRegistered = true;
+    }
+    menus.menu_mut(menu).font = font;
+    true
+}
+
+/// Raven `MenuParse_name` — parse a menu's window name.
+///
+/// PORT-NOTE: see `MenuParse_font` — the `itemDef_t *` cast to `menuDef_t *`
+/// becomes a direct `MenuId`. Raven's `"main"` name check has a
+/// commented-out body (`WINDOW_HASFOCUS`) and is dead even in the oracle.
+/// Source: `oracle/codemp/ui/ui_shared.c:9304-9314`
+pub fn MenuParse_name(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    let mut name = String::new();
+    if !PC_String_Parse(dc, handle, &mut name) {
+        return false;
+    }
+    menus.menu_mut(menu).window.name = Some(name);
+    true
+}
+
+/// Raven `MenuParse_fullscreen` — parse whether a menu covers the entire
+/// screen.
+///
+/// PORT-NOTE: see `MenuParse_font` — the `itemDef_t *` cast to `menuDef_t *`
+/// becomes a direct `MenuId`.
+/// Source: `oracle/codemp/ui/ui_shared.c:9316-9322`
+pub fn MenuParse_fullscreen(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    let mut v: c_int = 0;
+    if !PC_Int_Parse(dc, handle, &mut v) {
+        return false;
+    }
+    menus.menu_mut(menu).fullScreen = v != 0;
+    true
+}
+
+/// Raven `MenuParse_style` — parse a menu's window style.
+///
+/// PORT-NOTE: `Com_Printf` is unreachable from this host-agnostic crate (see
+/// `String_Report`) — routed through `dc.Print`.
+/// Source: `oracle/codemp/ui/ui_shared.c:9337-9348`
+pub fn MenuParse_style(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    if !PC_Int_Parse(dc, handle, &mut menus.menu_mut(menu).window.style) {
+        dc.Print("^3Unknown menu style value");
+        return false;
+    }
+    true
+}
+
+/// Raven `MenuParse_visible` — set `WINDOW_VISIBLE` on a menu if its parsed
+/// flag is nonzero.
+/// Source: `oracle/codemp/ui/ui_shared.c:9350-9361`
+pub fn MenuParse_visible(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    let mut i: c_int = 0;
+    if !PC_Int_Parse(dc, handle, &mut i) {
+        return false;
+    }
+    if i != 0 {
+        menus.menu_mut(menu).window.flags |= WINDOW_VISIBLE;
+    }
+    true
+}
+
+/// Raven `MenuParse_onOpen` — parse a menu's on-open script.
+/// Source: `oracle/codemp/ui/ui_shared.c:9363-9369`
+pub fn MenuParse_onOpen(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    PC_Script_Parse(dc, handle, &mut menus.menu_mut(menu).onOpen)
+}
+
+/// Raven `MenuParse_onClose` — parse a menu's on-close script.
+/// Source: `oracle/codemp/ui/ui_shared.c:9371-9377`
+pub fn MenuParse_onClose(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    PC_Script_Parse(dc, handle, &mut menus.menu_mut(menu).onClose)
+}
+
+/// Raven `MenuParse_onAccept` — parse a menu's on-accept script.
+/// Source: `oracle/codemp/ui/ui_shared.c:9385-9394`
+pub fn MenuParse_onAccept(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    PC_Script_Parse(dc, handle, &mut menus.menu_mut(menu).onAccept)
+}
+
+/// Raven `MenuParse_onESC` — parse a menu's on-escape script.
+/// Source: `oracle/codemp/ui/ui_shared.c:9396-9402`
+pub fn MenuParse_onESC(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    PC_Script_Parse(dc, handle, &mut menus.menu_mut(menu).onESC)
+}
+
+/// Raven `MenuParse_border` — parse a menu window's border style.
+/// Source: `oracle/codemp/ui/ui_shared.c:9406-9412`
+pub fn MenuParse_border(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    PC_Int_Parse(dc, handle, &mut menus.menu_mut(menu).window.border)
+}
+
+/// Raven `MenuParse_borderSize` — parse a menu window's border size.
+/// Source: `oracle/codemp/ui/ui_shared.c:9414-9420`
+pub fn MenuParse_borderSize(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    PC_Float_Parse(dc, handle, &mut menus.menu_mut(menu).window.borderSize)
+}
+
+/// Raven `MenuParse_backcolor` — parse a menu window's back color (4
+/// floats).
+/// Source: `oracle/codemp/ui/ui_shared.c:9422-9434`
+pub fn MenuParse_backcolor(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    for i in 0..4 {
+        let mut f = 0.0f32;
+        if !PC_Float_Parse(dc, handle, &mut f) {
+            return false;
+        }
+        menus.menu_mut(menu).window.backColor[i] = f;
+    }
+    true
+}
+
+/// Raven `MenuParse_descAlignment` — parse a menu's description-text
+/// alignment.
+///
+/// PORT-NOTE: `Com_Printf` is unreachable from this host-agnostic crate (see
+/// `String_Report`) — routed through `dc.Print`.
+/// Source: `oracle/codemp/ui/ui_shared.c:9441-9452`
+pub fn MenuParse_descAlignment(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    if !PC_Int_Parse(dc, handle, &mut menus.menu_mut(menu).descAlignment) {
+        dc.Print("^3Unknown desc alignment value");
+        return false;
+    }
+    true
+}
+
+/// Raven `MenuParse_descX` — parse a menu's description-text x position.
+/// Source: `oracle/codemp/ui/ui_shared.c:9459-9468`
+pub fn MenuParse_descX(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    PC_Int_Parse(dc, handle, &mut menus.menu_mut(menu).descX)
+}
+
+/// Raven `MenuParse_descY` — parse a menu's description-text y position.
+/// Source: `oracle/codemp/ui/ui_shared.c:9475-9484`
+pub fn MenuParse_descY(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    PC_Int_Parse(dc, handle, &mut menus.menu_mut(menu).descY)
+}
+
+/// Raven `MenuParse_descScale` — parse a menu's description-text scale.
+/// Source: `oracle/codemp/ui/ui_shared.c:9491-9500`
+pub fn MenuParse_descScale(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    PC_Float_Parse(dc, handle, &mut menus.menu_mut(menu).descScale)
+}
+
+/// Raven `MenuParse_descColor` — parse a menu's description-text color (4
+/// floats).
+/// Source: `oracle/codemp/ui/ui_shared.c:9507-9522`
+pub fn MenuParse_descColor(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    for i in 0..4 {
+        let mut f = 0.0f32;
+        if !PC_Float_Parse(dc, handle, &mut f) {
+            return false;
+        }
+        menus.menu_mut(menu).descColor[i] = f;
+    }
+    true
+}
+
+/// Raven `MenuParse_forecolor` — parse a menu window's fore color (4
+/// floats), special-casing a negative component as the player-color flag.
+/// Source: `oracle/codemp/ui/ui_shared.c:9524-9542`
+pub fn MenuParse_forecolor(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    for i in 0..4 {
+        let mut f = 0.0f32;
+        if !PC_Float_Parse(dc, handle, &mut f) {
+            return false;
+        }
+        if f < 0.0 {
+            // special case for player color
+            menus.menu_mut(menu).window.flags |= WINDOW_PLAYERCOLOR;
+            return true;
+        }
+        menus.menu_mut(menu).window.foreColor[i] = f;
+        menus.menu_mut(menu).window.flags |= WINDOW_FORECOLORSET;
+    }
+    true
+}
+
+/// Raven `MenuParse_bordercolor` — parse a menu window's border color (4
+/// floats).
+/// Source: `oracle/codemp/ui/ui_shared.c:9544-9556`
+pub fn MenuParse_bordercolor(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    for i in 0..4 {
+        let mut f = 0.0f32;
+        if !PC_Float_Parse(dc, handle, &mut f) {
+            return false;
+        }
+        menus.menu_mut(menu).window.borderColor[i] = f;
+    }
+    true
+}
+
+/// Raven `MenuParse_focuscolor` — parse a menu's focus color (4 floats).
+/// Source: `oracle/codemp/ui/ui_shared.c:9558-9570`
+pub fn MenuParse_focuscolor(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    for i in 0..4 {
+        let mut f = 0.0f32;
+        if !PC_Float_Parse(dc, handle, &mut f) {
+            return false;
+        }
+        menus.menu_mut(menu).focusColor[i] = f;
+    }
+    true
+}
+
+/// Raven `MenuParse_disablecolor` — parse a menu's disable color (4 floats).
+/// Source: `oracle/codemp/ui/ui_shared.c:9572-9583`
+pub fn MenuParse_disablecolor(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    for i in 0..4 {
+        let mut f = 0.0f32;
+        if !PC_Float_Parse(dc, handle, &mut f) {
+            return false;
+        }
+        menus.menu_mut(menu).disableColor[i] = f;
+    }
+    true
+}
+
+/// Raven `MenuParse_cinematic` — parse a menu window's cinematic name.
+/// Source: `oracle/codemp/ui/ui_shared.c:9605-9612`
+pub fn MenuParse_cinematic(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    PC_String_Parse(dc, handle, &mut menus.menu_mut(menu).window.cinematicName)
+}
+
+/// Raven `MenuParse_ownerdrawFlag` — OR an ownerdraw flag into a menu
+/// window's `ownerDrawFlags`.
+/// Source: `oracle/codemp/ui/ui_shared.c:9614-9623`
+pub fn MenuParse_ownerdrawFlag(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    let mut i: c_int = 0;
+    if !PC_Int_Parse(dc, handle, &mut i) {
+        return false;
+    }
+    menus.menu_mut(menu).window.ownerDrawFlags |= i;
+    true
+}
+
+/// Raven `MenuParse_ownerdraw` — parse a menu window's `ownerDraw` id.
+/// Source: `oracle/codemp/ui/ui_shared.c:9625-9632`
+pub fn MenuParse_ownerdraw(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    PC_Int_Parse(dc, handle, &mut menus.menu_mut(menu).window.ownerDraw)
+}
+
+/// Raven `MenuParse_soundLoop` — parse a menu's looping sound name.
+/// Source: `oracle/codemp/ui/ui_shared.c:9650-9657`
+pub fn MenuParse_soundLoop(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    PC_String_Parse(dc, handle, &mut menus.menu_mut(menu).soundName)
+}
+
+/// Raven `MenuParse_fadeClamp` — parse a menu's fade clamp.
+/// Source: `oracle/codemp/ui/ui_shared.c:9659-9666`
+pub fn MenuParse_fadeClamp(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    PC_Float_Parse(dc, handle, &mut menus.menu_mut(menu).fadeClamp)
+}
+
+/// Raven `MenuParse_fadeAmount` — parse a menu's fade amount.
+/// Source: `oracle/codemp/ui/ui_shared.c:9668-9675`
+pub fn MenuParse_fadeAmount(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    PC_Float_Parse(dc, handle, &mut menus.menu_mut(menu).fadeAmount)
+}
+
+/// Raven `MenuParse_fadeCycle` — parse a menu's fade cycle.
+/// Source: `oracle/codemp/ui/ui_shared.c:9678-9685`
+pub fn MenuParse_fadeCycle(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    PC_Int_Parse(dc, handle, &mut menus.menu_mut(menu).fadeCycle)
+}
+
+// `MenuParse_itemDef` — ui_shared.c:9688-9700.
+//
+// DEFERRED: MenuParse_itemDef — its body is one call to `Item_Parse`, which
+// stays `// DEFERRED:` at its own site (ui_shared.c:9009-9040) because the
+// `keywordHash_t` item-keyword dispatch it drives isn't ported; only its
+// caller, the deferred `menuParseKeywords[]` table, would reference this.
+// Source: `oracle/codemp/ui/ui_shared.c:9688-9700`
+
+/// Raven `MenuParse_appearanceIncrement` — parse a menu's appearance
+/// increment.
+/// Source: `oracle/codemp/ui/ui_shared.c:9706-9715`
+pub fn MenuParse_appearanceIncrement(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    PC_Float_Parse(dc, handle, &mut menus.menu_mut(menu).appearanceIncrement)
+}
+
+/// Raven `Display_CacheAll` — cache the render assets of every defined menu.
+/// Source: `oracle/codemp/ui/ui_shared.c:9960-9965`
+pub fn Display_CacheAll(menus: &MenuSystem, dc: &mut dyn DisplayContext) {
+    for i in 0..menus.menus.len() {
+        Menu_CacheContents(menus, dc, Some(MenuId::new(i)));
     }
 }

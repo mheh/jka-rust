@@ -50,6 +50,9 @@ pub const forceMasteryPoints: [c_int; 8] = [0, 5, 10, 20, 30, 50, 75, 100];
 
 /// Raven `bgForcePowerCost[NUM_FORCE_POWERS][NUM_FORCE_POWER_LEVELS]`.
 ///
+/// Raven's array is a per-module *mutable* global (ui's free-saber toggle
+/// writes it); this const is the seed, and `BgState::bgForcePowerCost` carries
+/// the runtime copy every module reads and ui writes.
 /// Source: `oracle/codemp/game/bg_misc.c:174-195`
 pub const bgForcePowerCost: [[c_int; 4]; 17] = [
     [0, 2, 4, 6], // FP_HEAL
@@ -216,16 +219,13 @@ pub static WeaponAttackAnim: [c_int; 19] = [
     0,                           // WP_TURRET (implicit C zero-init; oracle omits this slot)
 ];
 
-/// Cost lookup helper folding `bgForcePowerCostSaberThrow` back into the
-/// `[fp index][fp level]` shape the Raven source indexes directly. See the
-/// note on `bgForcePowerCost` above.
+/// Cost lookup helper reading the module's runtime table on `BgState` (the
+/// saberthrow row is folded in at seeding; the ui free-saber toggle mutates
+/// the saber level-1 rows, and Raven's `BG_LegalizedForcePowers` sees those
+/// writes). See the note on `bgForcePowerCost` above.
 #[inline]
-fn force_power_cost(fp: c_int, level: c_int) -> c_int {
-    if fp as usize == FP_SABERTHROW as usize {
-        bgForcePowerCostSaberThrow[level as usize]
-    } else {
-        bgForcePowerCost[fp as usize][level as usize]
-    }
+fn force_power_cost(bg: &BgState, fp: c_int, level: c_int) -> c_int {
+    bg.bgForcePowerCost[fp as usize][level as usize]
 }
 
 /// Raven `BG_FileExists`.
@@ -356,6 +356,7 @@ pub fn BG_ParseField(
 ///
 /// Source: `oracle/codemp/game/bg_misc.c:439-732`
 pub fn BG_LegalizedForcePowers(
+    bg: &BgState,
     powerOut: &mut String,
     maxRank: c_int,
     freeSaber: qboolean,
@@ -439,13 +440,13 @@ pub fn BG_LegalizedForcePowers(
         for i in 0..NUM_FORCE_POWERS_USIZE {
             let mut count_down = final_powers[i];
             while count_down > 0 {
-                used_points += force_power_cost(i as c_int, count_down);
+                used_points += force_power_cost(bg, i as c_int, count_down);
                 if count_down == 1
                     && (i == FP_LEVITATION as usize
                         || (i == FP_SABER_OFFENSE as usize && freeSaber != 0)
                         || (i == FP_SABER_DEFENSE as usize && freeSaber != 0))
                 {
-                    used_points -= force_power_cost(i as c_int, count_down);
+                    used_points -= force_power_cost(bg, i as c_int, count_down);
                 }
                 count_down -= 1;
             }
@@ -477,6 +478,7 @@ pub fn BG_LegalizedForcePowers(
                                             || freeSaber == 0))
                                 {
                                     used_points -= force_power_cost(
+                                        bg,
                                         which_one as c_int,
                                         final_powers[which_one],
                                     );
@@ -492,7 +494,7 @@ pub fn BG_LegalizedForcePowers(
                                         && (c != FP_SABER_OFFENSE as usize || freeSaber == 0)
                                         && (c != FP_SABER_DEFENSE as usize || freeSaber == 0))
                                 {
-                                    used_points -= force_power_cost(c as c_int, final_powers[c]);
+                                    used_points -= force_power_cost(bg, c as c_int, final_powers[c]);
                                     final_powers[c] -= 1;
                                 } else {
                                     break;
