@@ -60,10 +60,11 @@ pub const MAX_SCROLLTEXT_LINES: usize = 64;
 /// the fixed arrays they filled (`aliasCount`, `teamCount`, `numGameTypes`,
 /// `numJoinGameTypes`, `playerCount`, `myTeamCount`, `mapCount`, `tierCount`,
 /// `modCount`, `demoCount`, `movieCount`, `scrolltextLineCount`,
-/// `numFoundPlayerServers`, `q3HeadCount`, `forceConfigCount`,
-/// `playerSpeciesCount`). Each array is a `Vec` here and its count is
-/// `Vec::len()`, so the paired int does not survive. Counts with no array
-/// behind them (`characterCount`, `languageCount`, …) do.
+/// `q3HeadCount`, `forceConfigCount`, `playerSpeciesCount`). Each array is a
+/// `Vec` here and its count is `Vec::len()`, so the paired int does not
+/// survive. Counts with no array behind them (`characterCount`,
+/// `languageCount`, …) do. `numFoundPlayerServers` is the one exception and
+/// survives as a field — see its doc.
 ///
 /// Type definition source: `oracle/codemp/ui/ui_local.h:729-843`
 pub struct UiWorld {
@@ -148,6 +149,15 @@ pub struct UiWorld {
     pub foundPlayerServerAddresses: Vec<String>,
     pub foundPlayerServerNames: Vec<String>,
     pub currentFoundPlayerServer: c_int,
+
+    /// Raven `int numFoundPlayerServers` — 1-based count over
+    /// `foundPlayerServerAddresses`/`foundPlayerServerNames`.
+    ///
+    /// Restored despite the count-field-elimination convention above: `0` and
+    /// `1` are distinct observable states no `Vec` length can represent, and
+    /// the reserved trailing slot at `[count - 1]` is feeder-visible.
+    /// Source: `oracle/codemp/ui/ui_local.h:807`
+    pub numFoundPlayerServers: c_int,
     pub nextFindPlayerRefresh: c_int,
 
     pub currentCrosshair: c_int,
@@ -272,6 +282,7 @@ impl Default for UiWorld {
             foundPlayerServerAddresses: Vec::new(),
             foundPlayerServerNames: Vec::new(),
             currentFoundPlayerServer: 0,
+            numFoundPlayerServers: 0,
             nextFindPlayerRefresh: 0,
             currentCrosshair: 0,
             startPostGameTime: 0,

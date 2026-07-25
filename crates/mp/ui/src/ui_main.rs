@@ -101,6 +101,7 @@ use crate::keycodes::fake_ascii_t::fakeAscii_t;
 use crate::local::game_type_info::GameTypeInfo;
 use crate::local::map_info::{MapInfo, MAX_GAMETYPES};
 use crate::local::mod_info_t::ModInfo;
+use crate::local::pending_server_status_t::{PendingServerStatus, MAX_SERVERSTATUSREQUESTS};
 use crate::local::pinglist_t::MAX_ADDRESSLENGTH;
 use crate::local::player_species_info_t::{PlayerSpeciesInfo, MAX_PLAYERMODELS};
 use crate::local::server_filter_s::ServerFilter;
@@ -122,7 +123,7 @@ use crate::ui_saber::{
 use crate::world::ui_context::UiContext;
 use crate::world::ui_cvars::UiCvars;
 use crate::world::ui_main_state::MAX_SABER_HILTS;
-use crate::world::ui_world::{UiWorld, MAX_FORCE_CONFIGS};
+use crate::world::ui_world::{UiWorld, MAX_FORCE_CONFIGS, MAX_FOUNDPLAYER_SERVERS};
 
 /// Raven `static const int numSkillLevels = sizeof(skillLevels) /
 /// sizeof(const char*)` — `skillLevels[]` (`ui_main.c:902-908`) has 5 rows;
@@ -4437,6 +4438,282 @@ pub fn UI_GetServerStatusInfo(
     true
 }
 
+/// Runtime `va()`-style substitution for a localized-string format fetched
+/// from `trap_SP_GetStringTextString` (the template is data, not a Rust
+/// `format!` literal). Walks the template once, replacing each `%d`/`%i`/`%s`
+/// conversion in the order it appears with the next argument.
+///
+/// Port-local helper — no Raven counterpart. Bare `%i`/`%d`/`%s` only; flag,
+/// width and precision forms are unsupported, which rests on the shipped .str
+/// files carrying nothing else (the live-gate item parked in the
+/// `UI_DrawServerRefreshDate` PORT-NOTE).
+fn va_runtime(template: &str, args: &[&str]) -> String {
+    let mut out = String::with_capacity(template.len());
+    let mut chars = template.chars().peekable();
+    let mut arg_iter = args.iter();
+    while let Some(c) = chars.next() {
+        if c == '%' {
+            if let Some(&next) = chars.peek() {
+                if next == 'd' || next == 'i' || next == 's' {
+                    chars.next();
+                    if let Some(a) = arg_iter.next() {
+                        out.push_str(a);
+                        continue;
+                    }
+                }
+            }
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// Writes `value` at `slot` of a `Vec` standing in for a fixed C array,
+/// growing the backing store when `slot` is one past the end. Raven indexed
+/// `foundPlayerServerAddresses`/`Names` directly; the `Vec`s only ever grow,
+/// never shrink, so a slot below the length is an in-place overwrite.
+fn store_at(vec: &mut Vec<String>, slot: usize, value: String) {
+    if slot < vec.len() {
+        vec[slot] = value;
+    } else {
+        vec.push(value);
+    }
+}
+
+/// Raven `UI_BuildFindPlayerList`.
+///
+/// PORT-NOTE: Raven's fn-scope `static int numFound, numTimeOuts` persist on
+/// `ctx.world.scratch` (`UI_BuildFindPlayerList_numFound`/`_numTimeOuts`).
+///
+/// PORT-NOTE: `numFoundPlayerServers` survives as a `UiWorld` field (see its
+/// doc); the two `Vec`s are grow-only backing store mirroring Raven's C
+/// arrays, so a fresh search resets only the counter and leaves stale slots
+/// in place exactly as Raven does.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:8164-8307`
+#[allow(clippy::too_many_lines)]
+pub fn UI_BuildFindPlayerList(ctx: &mut UiContext, dc: &mut dyn DisplayContext, force: bool) {
+    if !force {
+        if ctx.world.nextFindPlayerRefresh == 0
+            || ctx.world.nextFindPlayerRefresh > ctx.world.uiDC.realTime
+        {
+            return;
+        }
+    } else {
+        ctx.world.pendingServerStatus = PendingServerStatus::default();
+        ctx.world.numFoundPlayerServers = 0;
+        ctx.world.currentFoundPlayerServer = 0;
+        ctx.world.findPlayerName =
+            trap::Cvar_VariableStringBuffer(ctx.engine, "ui_findPlayer", MAX_STRING_CHARS as usize);
+        ctx.world.findPlayerName = Q_CleanStr(&ctx.world.findPlayerName);
+        // should have a string of some length
+        if ctx.world.findPlayerName.is_empty() {
+            ctx.world.nextFindPlayerRefresh = 0;
+            return;
+        }
+        // set resend time
+        let mut resend = ctx.world.cvars.ui_serverStatusTimeOut.integer / 2 - 10;
+        if resend < 50 {
+            resend = 50;
+        }
+        trap::Cvar_Set(
+            ctx.engine,
+            "cl_serverStatusResendTime",
+            &format!("{resend}"),
+        );
+        // reset all server status requests
+        trap::LAN_ServerStatus(ctx.engine, None, 0);
+        //
+        ctx.world.numFoundPlayerServers = 1;
+
+        ctx.world.main.holdSPString =
+            trap::SP_GetStringTextString(ctx.engine, "MENUS_SEARCHING", MAX_STRING_CHARS as usize)
+                .unwrap_or_default();
+        let numFound = ctx.world.scratch.UI_BuildFindPlayerList_numFound;
+        let msg = va_runtime(
+            &ctx.world.main.holdSPString,
+            &[
+                &format!("{}", ctx.world.pendingServerStatus.num),
+                &format!("{numFound}"),
+            ],
+        );
+        trap::Cvar_Set(ctx.engine, "ui_playerServersFound", &msg);
+
+        ctx.world.scratch.UI_BuildFindPlayerList_numFound = 0;
+        ctx.world.scratch.UI_BuildFindPlayerList_numTimeOuts += 1;
+    }
+
+    for i in 0..MAX_SERVERSTATUSREQUESTS {
+        // if this pending server is valid
+        if ctx.world.pendingServerStatus.server[i].valid {
+            // try to get the server status for this server
+            let adrstr = ctx.world.pendingServerStatus.server[i].adrstr.clone();
+            let mut info = ServerStatusInfo::default();
+            if UI_GetServerStatusInfo(ctx, &adrstr, Some(&mut info)) {
+                //
+                ctx.world.scratch.UI_BuildFindPlayerList_numFound += 1;
+                // parse through the server status lines
+                for line in &info.lines {
+                    // should have ping info
+                    if line[2].is_empty() {
+                        continue;
+                    }
+                    // clean string first
+                    let name: String = line[3].chars().take(MAX_NAME_LENGTH + 1).collect();
+                    let name = Q_CleanStr(&name);
+                    // if the player name is a substring
+                    if stristr(&name, &ctx.world.findPlayerName).is_some() {
+                        // add to found server list if we have space (always leave space for a line with the number found)
+                        if ctx.world.numFoundPlayerServers < MAX_FOUNDPLAYER_SERVERS as c_int - 1 {
+                            //
+                            let slot = (ctx.world.numFoundPlayerServers - 1) as usize;
+                            let adrstr = ctx.world.pendingServerStatus.server[i].adrstr.clone();
+                            let serverName = ctx.world.pendingServerStatus.server[i].name.clone();
+                            store_at(&mut ctx.world.foundPlayerServerAddresses, slot, adrstr);
+                            store_at(&mut ctx.world.foundPlayerServerNames, slot, serverName);
+                            ctx.world.numFoundPlayerServers += 1;
+                        } else {
+                            // can't add any more so we're done
+                            ctx.world.pendingServerStatus.num =
+                                ctx.world.serverStatus.displayServers.len() as c_int;
+                        }
+                    }
+                }
+
+                ctx.world.main.holdSPString = trap::SP_GetStringTextString(
+                    ctx.engine,
+                    "MENUS_SEARCHING",
+                    MAX_STRING_CHARS as usize,
+                )
+                .unwrap_or_default();
+                let numFound = ctx.world.scratch.UI_BuildFindPlayerList_numFound;
+                let msg = va_runtime(
+                    &ctx.world.main.holdSPString,
+                    &[
+                        &format!("{}", ctx.world.pendingServerStatus.num),
+                        &format!("{numFound}"),
+                    ],
+                );
+                trap::Cvar_Set(ctx.engine, "ui_playerServersFound", &msg);
+                // retrieved the server status so reuse this spot
+                ctx.world.pendingServerStatus.server[i].valid = false;
+            }
+        }
+        // if empty pending slot or timed out
+        if !ctx.world.pendingServerStatus.server[i].valid
+            || ctx.world.pendingServerStatus.server[i].startTime
+                < ctx.world.uiDC.realTime - ctx.world.cvars.ui_serverStatusTimeOut.integer
+        {
+            if ctx.world.pendingServerStatus.server[i].valid {
+                ctx.world.scratch.UI_BuildFindPlayerList_numTimeOuts += 1;
+            }
+            // reset server status request for this address
+            let adrstr = ctx.world.pendingServerStatus.server[i].adrstr.clone();
+            UI_GetServerStatusInfo(ctx, &adrstr, None);
+            // reuse pending slot
+            ctx.world.pendingServerStatus.server[i].valid = false;
+            // if we didn't try to get the status of all servers in the main browser yet
+            if ctx.world.pendingServerStatus.num
+                < ctx.world.serverStatus.displayServers.len() as c_int
+            {
+                ctx.world.pendingServerStatus.server[i].startTime = ctx.world.uiDC.realTime;
+                let num = ctx.world.pendingServerStatus.num as usize;
+                let displayServer = ctx.world.serverStatus.displayServers[num];
+                let netSource = ctx.world.cvars.ui_netSource.integer;
+                ctx.world.pendingServerStatus.server[i].adrstr = trap::LAN_GetServerAddressString(
+                    ctx.engine,
+                    netSource,
+                    displayServer,
+                    MAX_ADDRESSLENGTH,
+                );
+                let infoString = trap::LAN_GetServerInfo(
+                    ctx.engine,
+                    netSource,
+                    displayServer,
+                    MAX_STRING_CHARS as usize,
+                );
+                // PORT-NOTE: Raven `Q_strncpyz` into `char name[MAX_ADDRESSLENGTH]`.
+                ctx.world.pendingServerStatus.server[i].name =
+                    Info_ValueForKey(&infoString, "hostname")
+                        .chars()
+                        .take(MAX_ADDRESSLENGTH - 1)
+                        .collect();
+                ctx.world.pendingServerStatus.server[i].valid = true;
+                ctx.world.pendingServerStatus.num += 1;
+
+                ctx.world.main.holdSPString = trap::SP_GetStringTextString(
+                    ctx.engine,
+                    "MENUS_SEARCHING",
+                    MAX_STRING_CHARS as usize,
+                )
+                .unwrap_or_default();
+                let numFound = ctx.world.scratch.UI_BuildFindPlayerList_numFound;
+                let msg = va_runtime(
+                    &ctx.world.main.holdSPString,
+                    &[
+                        &format!("{}", ctx.world.pendingServerStatus.num),
+                        &format!("{numFound}"),
+                    ],
+                );
+                trap::Cvar_Set(ctx.engine, "ui_playerServersFound", &msg);
+                //
+            }
+        }
+    }
+    let mut i = 0;
+    while i < MAX_SERVERSTATUSREQUESTS {
+        if ctx.world.pendingServerStatus.server[i].valid {
+            break;
+        }
+        i += 1;
+    }
+    // if still trying to retrieve server status info
+    if i < MAX_SERVERSTATUSREQUESTS {
+        ctx.world.nextFindPlayerRefresh = ctx.world.uiDC.realTime + 25;
+    } else {
+        // add a line that shows the number of servers found
+        if ctx.world.numFoundPlayerServers == 0 {
+            // porting-rules §19: Raven's `Com_sprintf(...foundPlayerServerNames
+            // [numFoundPlayerServers-1]...)` is a negative-index write that
+            // lands in the adjacent array's last slot — UB, ported as a no-op.
+            // The branch is unreachable anyway: every path here has already set
+            // the counter to 1.
+        } else {
+            ctx.world.main.holdSPString = trap::SP_GetStringTextString(
+                ctx.engine,
+                "MENUS_SERVERS_FOUNDWITH",
+                MAX_STRING_CHARS as usize,
+            )
+            .unwrap_or_default();
+            let plural = if ctx.world.numFoundPlayerServers == 2 {
+                ""
+            } else {
+                "s"
+            };
+            let findPlayerName = ctx.world.findPlayerName.clone();
+            let msg = va_runtime(
+                &ctx.world.main.holdSPString,
+                &[
+                    &format!("{}", ctx.world.numFoundPlayerServers - 1),
+                    plural,
+                    &findPlayerName,
+                ],
+            );
+            trap::Cvar_Set(ctx.engine, "ui_playerServersFound", &msg);
+        }
+        ctx.world.nextFindPlayerRefresh = 0;
+        // show the server status info for the selected server
+        let currentFoundPlayerServer = ctx.world.currentFoundPlayerServer;
+        UI_FeederSelection(
+            ctx,
+            dc,
+            FEEDER_FINDPLAYER as f32,
+            currentFoundPlayerServer,
+            None,
+        );
+    }
+}
+
 /// Raven `UI_StopCinematic`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:10188-10213`
@@ -5773,10 +6050,10 @@ pub fn UI_DrawSelectedPlayer(
 ///
 /// PORT-NOTE: Raven feeds `holdSPString` (a localized string fetched via
 /// `trap_SP_GetStringTextString`) to `va()` as a printf-style format string
-/// with one `%s`/`%i`-shaped slot; the port substitutes the first `%i`
-/// occurrence directly rather than a general-purpose `printf` reimplementation.
-/// This assumes the localized string carries exactly one bare `%i` and no other
-/// conversion — to be confirmed against the shipped .str files at the live gate.
+/// with one `%s`/`%i`-shaped slot; the port substitutes it via `va_runtime`
+/// rather than a general-purpose `printf` reimplementation. This assumes the
+/// localized string carries exactly one bare `%i` and no other conversion — to
+/// be confirmed against the shipped .str files at the live gate.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:3347-3369`
 pub fn UI_DrawServerRefreshDate(
@@ -5806,11 +6083,7 @@ pub fn UI_DrawServerRefreshDate(
         )
         .unwrap_or_default();
         let count = trap::LAN_GetServerCount(ctx.engine, ctx.world.cvars.ui_netSource.integer);
-        let text = ctx
-            .world
-            .main
-            .holdSPString
-            .replacen("%i", &format!("{}", count), 1);
+        let text = va_runtime(&ctx.world.main.holdSPString, &[&format!("{count}")]);
         Text_Paint(
             ctx, rect.x, rect.y, scale, newColor, &text, 0.0, 0, textStyle, iMenuFont,
         );
@@ -7598,9 +7871,81 @@ pub fn UI_UpdateCharacterSkin(ctx: &mut UiContext, dc: &mut dyn DisplayContext) 
     let torso = trap::Cvar_VariableStringBuffer(ctx.engine, "ui_char_skin_torso", MAX_QPATH);
     let legs = trap::Cvar_VariableStringBuffer(ctx.engine, "ui_char_skin_legs", MAX_QPATH);
 
-    let skin = format!("models/players/{}/|{}|{}|{}", model, head, torso, legs);
+    // PORT-NOTE: Raven `Com_sprintf` into `char skin[MAX_QPATH]`.
+    let skin: String = format!("models/players/{}/|{}|{}|{}", model, head, torso, legs)
+        .chars()
+        .take(MAX_QPATH - 1)
+        .collect();
 
     ItemParse_model_g2skin_go(&mut ctx.world.menus, dc, item, Some(&skin));
+}
+
+/// Raven `UI_UpdateCharacter` — `Get current menu`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:6153-6188`
+pub fn UI_UpdateCharacter(ctx: &mut UiContext, dc: &mut dyn DisplayContext, changedModel: bool) {
+    let menu = match Menu_GetFocused(&ctx.world.menus) {
+        Some(m) => m,
+        None => return,
+    };
+
+    let item = match Menu_FindItemByName(&ctx.world.menus, Some(menu), "character") {
+        Some(i) => i,
+        None => {
+            let menuName = ctx
+                .world
+                .menus
+                .menu(menu)
+                .window
+                .name
+                .clone()
+                .unwrap_or_default();
+            Com_Error(
+                ctx,
+                &format!(
+                    "UI_UpdateCharacter: Could not find item (character) in menu ({})",
+                    menuName
+                ),
+            );
+            return;
+        }
+    };
+
+    let animString = buf_to_string(
+        &ctx.world
+            .cvars
+            .ui_char_anim
+            .string
+            .iter()
+            .map(|&c| c as u8)
+            .collect::<Vec<u8>>(),
+    );
+    ItemParse_model_g2anim_go(&mut ctx.world.menus, dc, item, Some(&animString));
+
+    let modelName = UI_Cvar_VariableString(ctx, "ui_char_model");
+    // PORT-NOTE: Raven `Com_sprintf` into `char modelPath[MAX_QPATH]`.
+    let modelPath: String = format!("models/players/{}/model.glm", modelName)
+        .chars()
+        .take(MAX_QPATH - 1)
+        .collect();
+    let mut animRunLength: c_int = 0;
+    let _ = ItemParse_asset_model_go(
+        &mut ctx.world.menus,
+        dc,
+        item,
+        &modelPath,
+        &mut animRunLength,
+    );
+
+    if changedModel {
+        // set all skins to first skin since we don't know you always have all skins
+        // FIXME: could try to keep the same spot in each list as you swtich models
+        UI_FeederSelection(ctx, dc, FEEDER_PLAYER_SKIN_HEAD as f32, 0, Some(item)); // fixme, this is not really the right item!!
+        UI_FeederSelection(ctx, dc, FEEDER_PLAYER_SKIN_TORSO as f32, 0, Some(item));
+        UI_FeederSelection(ctx, dc, FEEDER_PLAYER_SKIN_LEGS as f32, 0, Some(item));
+        UI_FeederSelection(ctx, dc, FEEDER_COLORCHOICES as f32, 0, Some(item));
+    }
+    UI_UpdateCharacterSkin(ctx, dc);
 }
 
 /// Raven `UI_SiegeClassCnt`.
@@ -7734,7 +8079,7 @@ pub fn UI_FeederCount(ctx: &mut UiContext, dc: &mut dyn DisplayContext, feederID
         }
         FEEDER_SERVERS => return ctx.world.serverStatus.displayServers.len() as c_int,
         FEEDER_SERVERSTATUS => return ctx.world.serverStatusInfo.lines.len() as c_int,
-        FEEDER_FINDPLAYER => return ctx.world.foundPlayerServerAddresses.len() as c_int,
+        FEEDER_FINDPLAYER => return ctx.world.numFoundPlayerServers,
         FEEDER_PLAYER_LIST => {
             if ctx.world.uiDC.realTime > ctx.world.playerRefresh {
                 ctx.world.playerRefresh = ctx.world.uiDC.realTime + 3000;
@@ -8944,6 +9289,53 @@ pub fn Asset_Parse(ctx: &mut UiContext, dc: &mut dyn DisplayContext, handle: c_i
     }
 }
 
+/// Raven `UI_ParseMenu`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1731-1776`
+pub fn UI_ParseMenu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menuFile: &str) {
+    let handle = trap::PC_LoadSource(ctx.engine, menuFile);
+    if handle == 0 {
+        return;
+    }
+
+    loop {
+        let mut token = pc_token_t {
+            type_: 0,
+            subtype: 0,
+            intvalue: 0,
+            floatvalue: 0.0,
+            string: [0; MAX_TOKENLENGTH],
+        };
+        if !trap::PC_ReadToken(ctx.engine, handle, &mut token) {
+            break;
+        }
+
+        let tokenStr = pc_token_str(&token);
+
+        if tokenStr.as_bytes().first() == Some(&b'}') {
+            break;
+        }
+
+        if Q_stricmp(&tokenStr, "assetGlobalDef") == 0 {
+            if Asset_Parse(ctx, dc, handle) {
+                continue;
+            } else {
+                break;
+            }
+        }
+
+        if Q_stricmp(&tokenStr, "menudef") == 0 {
+            // start a new menu
+            // DEFERRED: `Menu_New(handle)` — the callee is deferred at its own
+            // definition site (crates/mp/uishared/src/ui_shared.rs) because
+            // `Menu_Parse`'s `keywordHash_t` menu-keyword dispatch is not
+            // ported, so this call has no reachable body in the ported tree.
+            // Source: `oracle/codemp/ui/ui_main.c:1772`, `oracle/codemp/ui/ui_shared.c:9817-9827`
+        }
+    }
+    trap::PC_FreeSource(ctx.engine, handle);
+}
+
 /// Raven `UI_OwnerDraw`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:3510-3779`
@@ -9913,8 +10305,19 @@ pub fn UI_FeederItemText(
             }
         }
     } else if feeder == FEEDER_FINDPLAYER {
-        if index >= 0 && (index as usize) < ctx.world.foundPlayerServerNames.len() {
-            return ctx.world.foundPlayerServerNames[index as usize].clone();
+        if index >= 0 && index < ctx.world.numFoundPlayerServers {
+            //return uiInfo.foundPlayerServerAddresses[index];
+            // PORT-NOTE (stale-slot model): the `Vec`s are grow-only backing
+            // store for Raven's fixed arrays, so slots below the counter that
+            // this search never rewrote keep their stale contents — as in
+            // Raven — while the reserved slot at `[count - 1]`, which Raven
+            // reads as zeroed cold memory, may not exist yet and reads as "".
+            return ctx
+                .world
+                .foundPlayerServerNames
+                .get(index as usize)
+                .cloned()
+                .unwrap_or_default();
         }
     } else if feeder == FEEDER_PLAYER_LIST {
         if index >= 0 && (index as usize) < ctx.world.playerNames.len() {
@@ -10615,11 +11018,15 @@ pub fn UI_FeederSelection(
         // no-op — Raven's branch body is commented out.
     } else if feederID == FEEDER_FINDPLAYER {
         ctx.world.currentFoundPlayerServer = index;
-        if index < ctx.world.foundPlayerServerAddresses.len() as c_int - 1 {
+        //
+        if index < ctx.world.numFoundPlayerServers - 1 {
             // build a new server status for this server
-            let addr = ctx.world.foundPlayerServerAddresses
-                [ctx.world.currentFoundPlayerServer as usize]
-                .clone();
+            let addr = ctx
+                .world
+                .foundPlayerServerAddresses
+                .get(ctx.world.currentFoundPlayerServer as usize)
+                .cloned()
+                .unwrap_or_default();
             // PORT-NOTE: Raven `Q_strncpyz` into `char
             // serverStatusAddress[MAX_ADDRESSLENGTH]`.
             ctx.world.serverStatusAddress = addr.chars().take(MAX_ADDRESSLENGTH - 1).collect();

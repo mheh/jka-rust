@@ -22,8 +22,8 @@ use mp_qshared::shared::vec4_t;
 use mp_qshared::shared::{FS_READ, FS_WRITE, MAX_INFO_VALUE};
 use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::menudef::{
-    FEEDER_FORCECFG, UI_FORCE_RANK, UI_FORCE_RANK_LEVITATION, UI_FORCE_RANK_SABERATTACK,
-    UI_FORCE_RANK_SABERDEFEND,
+    FEEDER_FORCECFG, FEEDER_Q3HEADS, UI_FORCE_RANK, UI_FORCE_RANK_LEVITATION,
+    UI_FORCE_RANK_SABERATTACK, UI_FORCE_RANK_SABERDEFEND,
 };
 use mp_uishared::shared::rect_def_t::RectDef;
 use mp_uishared::ui_shared::{Menu_SetFeederSelection, Menu_ShowItemByName, Menus_FindByName};
@@ -36,7 +36,9 @@ use crate::world::ui_context::UiContext;
 use crate::world::ui_world::UiWorld;
 
 use super::ui_atoms::{Com_Printf, UI_Cvar_VariableString, UI_DrawHandlePic};
-use super::ui_main::{UI_LoadForceConfig_List, UI_TeamName, UI_TrueJediEnabled};
+use super::ui_main::{
+    UI_FeederSelection, UI_LoadForceConfig_List, UI_TeamName, UI_TrueJediEnabled,
+};
 
 /// Raven `#define FORCE_NONJEDI 0`.
 ///
@@ -1328,4 +1330,53 @@ pub fn UI_ForceConfigHandle(
     // ui_force.c's own fns, only its in-module callees, so the dc thread is
     // derived from `UpdateForceUsed`'s already-ported shape.
     UpdateForceUsed(ctx, dc);
+}
+
+/// Raven `UI_SkinColor_HandleKey` — cycles the skin-color selector on
+/// confirm keys, then re-selects the feeder entry for the current head.
+///
+/// Source: `oracle/codemp/ui/ui_force.c:762-797`
+#[allow(clippy::too_many_arguments)]
+pub fn UI_SkinColor_HandleKey(
+    ctx: &mut UiContext,
+    dc: &mut dyn DisplayContext,
+    _flags: c_int,
+    _special: Option<&mut f32>,
+    key: c_int,
+    num: c_int,
+    min: c_int,
+    max: c_int,
+    _type_: c_int,
+) -> bool {
+    if key == fakeAscii_t::A_MOUSE1 as c_int
+        || key == fakeAscii_t::A_MOUSE2 as c_int
+        || key == fakeAscii_t::A_ENTER as c_int
+        || key == fakeAscii_t::A_KP_ENTER as c_int
+    {
+        let mut i = num;
+
+        if key == fakeAscii_t::A_MOUSE2 as c_int {
+            i -= 1;
+        } else {
+            i += 1;
+        }
+
+        if i < min {
+            i = max;
+        } else if i > max {
+            i = min;
+        }
+
+        let num = i;
+
+        ctx.world.main.uiSkinColor = num;
+
+        ctx.world.main.uiHoldSkinColor = ctx.world.main.uiSkinColor;
+
+        let q3SelectedHead = ctx.world.q3SelectedHead;
+        UI_FeederSelection(ctx, dc, FEEDER_Q3HEADS as f32, q3SelectedHead, None);
+
+        return true;
+    }
+    false
 }

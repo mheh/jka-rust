@@ -20,7 +20,7 @@ use mp_qshared::shared::q_math::{AnglesToAxis, VectorSet};
 use mp_qshared::shared::q_string::{COM_Parse, GetIDForString};
 use mp_qshared::shared::{
     cbufExec_t, pc_token_t, qtrue, stringID_table_t, vec3_t, vec4_t, CHAN_AUTO, CHAN_LOCAL_SOUND,
-    MAX_QPATH, MAX_STRING_CHARS, MAX_TOKENLENGTH, TT_NUMBER,
+    MAX_QPATH, MAX_STRING_CHARS, MAX_TOKENLENGTH, SCREEN_WIDTH, TT_NUMBER,
 };
 use native_string::{atof, atoi, latin1_to_string, string_to_latin1, Q_stricmp};
 
@@ -35,7 +35,9 @@ use crate::shared::item_payload::ItemPayload;
 use crate::shared::list_box_def_s::{ListBoxDef, MAX_LB_COLUMNS};
 use crate::shared::menu_def_t::MenuDef;
 use crate::shared::menu_id::MenuId;
-use crate::shared::menu_system::{MenuSystem, DOUBLE_CLICK_DELAY, MAX_DEFERRED_SCRIPT};
+use crate::shared::menu_system::{
+    MenuSystem, DOUBLE_CLICK_DELAY, MAX_DEFERRED_SCRIPT, MAX_OPEN_MENUS,
+};
 use crate::shared::menudef::{
     FEEDER_LANGUAGES, FEEDER_PLAYER_SPECIES, ITEM_ALIGN_CENTER, ITEM_ALIGN_LEFT, ITEM_ALIGN_RIGHT,
     ITEM_TEXTSTYLE_BLINK, ITEM_TYPE_BIND, ITEM_TYPE_BUTTON, ITEM_TYPE_CHECKBOX, ITEM_TYPE_COMBO,
@@ -248,6 +250,9 @@ const KEYWORDHASH_SIZE: i32 = 512;
 /// Raven `#define SLIDER_WIDTH 96.0`.
 /// Source: `oracle/codemp/ui/ui_shared.h:100`
 const SLIDER_WIDTH: f32 = 96.0;
+/// Raven `#define SLIDER_HEIGHT 16.0`.
+/// Source: `oracle/codemp/ui/ui_shared.h:101`
+const SLIDER_HEIGHT: f32 = 16.0;
 
 /// Raven `#define BLINK_DIVISOR 200`.
 /// Source: `oracle/codemp/game/q_shared.h:485`
@@ -9464,3 +9469,834 @@ pub fn Menu_HandleMouseMove(
 // it drives isn't ported, so this parse entrypoint has no reachable body and
 // no caller in the ported tree.
 // Source: `oracle/codemp/ui/ui_shared.c:9817-9827`
+
+/// Raven `Menu_SetPrevCursorItem` — move `menu`'s cursor to the previous
+/// focusable item, wrapping once; restores the original cursor if nothing
+/// takes focus.
+/// Source: `oracle/codemp/ui/ui_shared.c:4329-4358`
+pub fn Menu_SetPrevCursorItem(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+) -> Option<ItemId> {
+    let mut wrapped = false;
+    let oldCursor = menus.menu(menu).cursorItem;
+    let itemCount = menus.menu(menu).items.len() as c_int;
+
+    if menus.menu(menu).cursorItem < 0 {
+        menus.menu_mut(menu).cursorItem = itemCount - 1;
+        wrapped = true;
+    }
+
+    while menus.menu(menu).cursorItem > -1 {
+        menus.menu_mut(menu).cursorItem -= 1;
+        if menus.menu(menu).cursorItem < 0 {
+            if wrapped {
+                break;
+            }
+            wrapped = true;
+            menus.menu_mut(menu).cursorItem = itemCount - 1;
+        }
+
+        let cursorItem = menus.menu(menu).cursorItem;
+        // Raven tolerates an entry `cursorItem >= itemCount`: it reads a NULL
+        // slot, `Item_SetFocus` rejects it, and the loop keeps going.
+        let item = match menus.menu(menu).items.get(cursorItem as usize) {
+            Some(&i) => i,
+            None => continue,
+        };
+        if Item_SetFocus(menus, ds, dc, item, ds.cursorx as f32, ds.cursory as f32) {
+            let rect = menus.item(item).window.rect;
+            Menu_HandleMouseMove(menus, ds, dc, Some(menu), rect.x + 1.0, rect.y + 1.0);
+            return Some(item);
+        }
+    }
+    menus.menu_mut(menu).cursorItem = oldCursor;
+    None
+}
+
+/// Raven `Menu_SetNextCursorItem` — move `menu`'s cursor to the next
+/// focusable item, wrapping once; restores the original cursor if nothing
+/// takes focus.
+///
+/// PORT-NOTE (restructured): Raven's post-wrap pass reads the NULL slot at
+/// `items[itemCount]` (in bounds while `itemCount < MAX_MENUITEMS`),
+/// `Item_SetFocus` rejects NULL, and the loop test then exits — so the
+/// `break` is behaviorally identical; porting-rules §19 covers only the
+/// `itemCount == MAX_MENUITEMS` corner, where Raven's read is out of bounds.
+/// Source: `oracle/codemp/ui/ui_shared.c:4360-4387`
+pub fn Menu_SetNextCursorItem(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+) -> Option<ItemId> {
+    let mut wrapped = false;
+    let oldCursor = menus.menu(menu).cursorItem;
+    let itemCount = menus.menu(menu).items.len() as c_int;
+
+    if menus.menu(menu).cursorItem == -1 {
+        menus.menu_mut(menu).cursorItem = 0;
+        wrapped = true;
+    }
+
+    while menus.menu(menu).cursorItem < itemCount {
+        menus.menu_mut(menu).cursorItem += 1;
+        if menus.menu(menu).cursorItem >= itemCount {
+            if !wrapped {
+                wrapped = true;
+                menus.menu_mut(menu).cursorItem = 0;
+            } else {
+                // See the restructure PORT-NOTE above.
+                break;
+            }
+        }
+
+        let cursorItem = menus.menu(menu).cursorItem;
+        let item = menus.menu(menu).items[cursorItem as usize];
+        if Item_SetFocus(menus, ds, dc, item, ds.cursorx as f32, ds.cursory as f32) {
+            let rect = menus.item(item).window.rect;
+            Menu_HandleMouseMove(menus, ds, dc, Some(menu), rect.x + 1.0, rect.y + 1.0);
+            return Some(item);
+        }
+    }
+    menus.menu_mut(menu).cursorItem = oldCursor;
+    None
+}
+
+/// Raven `Item_TextField_Paint` — paint a text-field item: its label via
+/// `Item_Text_Paint`, then the (optionally `@`-string-referenced) cvar value,
+/// drawn with a blink cursor when focused and mid-edit.
+///
+/// PORT-NOTE: `seLanguageModCount` threads in for the `Item_Text_Paint` call,
+/// same shape as that fn's own doc note.
+///
+/// PORT-NOTE: the C `buff + editPtr->paintOffset` byte-offset slice is a
+/// Latin-1 byte cut, not a `char` cut (native_string dictionary); reproduced
+/// via the `string_to_latin1`/`latin1_to_string` round-trip so a multi-byte
+/// decoded character does not shift the cut point.
+///
+/// PORT-NOTE (UB pick, porting-rules §19): a NULL `item->typeData` (Raven
+/// dereferences `editPtr->paintOffset` unconditionally) is treated as
+/// `paintOffset == 0`.
+/// Source: `oracle/codemp/ui/ui_shared.c:5024-5062`
+pub fn Item_TextField_Paint(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    seLanguageModCount: c_int,
+) {
+    Item_Text_Paint(menus, ds, dc, item, seLanguageModCount);
+
+    let mut buff = String::new();
+    let cvar = menus.item(item).cvar.clone();
+    if let Some(cvar) = cvar {
+        buff = dc.getCVarString(&cvar, 1024);
+        if buff.starts_with('@') {
+            // string reference
+            buff = dc
+                .SP_GetStringTextString(&buff[1..], 1024)
+                .unwrap_or_default();
+        }
+    }
+
+    let parent = menus
+        .item(item)
+        .parent
+        .expect("Item_TextField_Paint: item has no parent");
+    let focusColor = menus.menu(parent).focusColor;
+    let flags = menus.item(item).window.flags;
+
+    let mut newColor: vec4_t = [0.0; 4];
+    if flags & WINDOW_HASFOCUS != 0 {
+        let mut lowLight: vec4_t = [0.0; 4];
+        for i in 0..4 {
+            lowLight[i] = 0.8 * focusColor[i];
+        }
+        LerpColor(
+            focusColor,
+            lowLight,
+            &mut newColor,
+            0.5 + 0.5 * ((ds.realTime / PULSE_DIVISOR) as f32).sin(),
+        );
+    } else {
+        newColor = menus.item(item).window.foreColor;
+    }
+
+    let hasText = menus
+        .item(item)
+        .text
+        .as_deref()
+        .is_some_and(|t| !t.is_empty());
+    let offset = if hasText { 8.0 } else { 0.0 };
+
+    let editingField = menus.g_editingField;
+    let paintOffset = menus
+        .item(item)
+        .typeData
+        .editField()
+        .map(|e| e.paintOffset)
+        .unwrap_or(0);
+
+    let buffBytes = string_to_latin1(&buff);
+    let start = (paintOffset.max(0) as usize).min(buffBytes.len());
+    let visible = latin1_to_string(&buffBytes[start..]);
+
+    let it = menus.item(item);
+    let (textRectX, textRectY, textRectW, textscale, textStyle, iMenuFont, cursorPos, windowRectW) = (
+        it.textRect.x,
+        it.textRect.y,
+        it.textRect.w,
+        it.textscale,
+        it.textStyle,
+        it.iMenuFont,
+        it.cursorPos,
+        it.window.rect.w,
+    );
+
+    if flags & WINDOW_HASFOCUS != 0 && editingField {
+        let cursor = if dc.getOverstrikeMode() { b'_' } else { b'|' };
+        dc.drawTextWithCursor(
+            textRectX + textRectW + offset,
+            textRectY,
+            textscale,
+            newColor,
+            &visible,
+            cursorPos - paintOffset,
+            cursor,
+            windowRectW as c_int,
+            textStyle,
+            iMenuFont,
+        );
+    } else {
+        dc.drawText(
+            textRectX + textRectW + offset,
+            textRectY,
+            textscale,
+            newColor,
+            &visible,
+            0.0,
+            windowRectW as c_int,
+            textStyle,
+            iMenuFont,
+        );
+    }
+}
+
+/// Raven `Item_YesNo_Paint` — paint a yes/no item: focus/blink color, then
+/// the localized YES/NO string (label first if the item has text).
+///
+/// PORT-NOTE: the `#ifdef _XBOX` arm (an `xoffset`-adjusted `drawText` call)
+/// is dead surface on this port's only build target and is dropped, matching
+/// this file's other `_XBOX` arms.
+/// Source: `oracle/codemp/ui/ui_shared.c:5064-5126`
+pub fn Item_YesNo_Paint(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    seLanguageModCount: c_int,
+) {
+    let cvar = menus.item(item).cvar.clone();
+    let value = match &cvar {
+        Some(c) => dc.getCVarValue(c),
+        None => 0.0,
+    };
+
+    let parent = menus
+        .item(item)
+        .parent
+        .expect("Item_YesNo_Paint: item has no parent");
+    let focusColor = menus.menu(parent).focusColor;
+    let flags = menus.item(item).window.flags;
+
+    let mut newColor: vec4_t = [0.0; 4];
+    if flags & WINDOW_HASFOCUS != 0 {
+        let mut lowLight: vec4_t = [0.0; 4];
+        for i in 0..4 {
+            lowLight[i] = 0.8 * focusColor[i];
+        }
+        LerpColor(
+            focusColor,
+            lowLight,
+            &mut newColor,
+            0.5 + 0.5 * ((ds.realTime / PULSE_DIVISOR) as f32).sin(),
+        );
+    } else {
+        newColor = menus.item(item).window.foreColor;
+    }
+
+    let sYES = dc
+        .SP_GetStringTextString("MENUS_YES", 20)
+        .unwrap_or_default();
+    let sNO = dc
+        .SP_GetStringTextString("MENUS_NO", 20)
+        .unwrap_or_default();
+
+    let invertYesNo = menus.item(item).invertYesNo;
+    let yesnovalue = if invertYesNo != 0 {
+        if value == 0.0 {
+            &sYES
+        } else {
+            &sNO
+        }
+    } else if value != 0.0 {
+        &sYES
+    } else {
+        &sNO
+    };
+
+    let hasText = menus.item(item).text.is_some();
+    if hasText {
+        Item_Text_Paint(menus, ds, dc, item, seLanguageModCount);
+        let it = menus.item(item);
+        let (x, y, textscale, textStyle, iMenuFont) = (
+            it.textRect.x + it.textRect.w + 8.0,
+            it.textRect.y,
+            it.textscale,
+            it.textStyle,
+            it.iMenuFont,
+        );
+        dc.drawText(
+            x, y, textscale, newColor, yesnovalue, 0.0, 0, textStyle, iMenuFont,
+        );
+    } else {
+        let it = menus.item(item);
+        let (x, y, textscale, textStyle, iMenuFont) = (
+            it.textRect.x,
+            it.textRect.y,
+            it.textscale,
+            it.textStyle,
+            it.iMenuFont,
+        );
+        dc.drawText(
+            x, y, textscale, newColor, yesnovalue, 0.0, 0, textStyle, iMenuFont,
+        );
+    }
+}
+
+/// Raven `Item_Multi_Paint` — paint a multi-choice item: focus/blink color,
+/// then its current setting text (resolved through the `@` string-table or
+/// `*` cvar-name indirection `Item_Multi_Setting` can return).
+///
+/// PORT-NOTE: the `#ifdef _XBOX` arm is dead surface, dropped as elsewhere in
+/// this file.
+/// Source: `oracle/codemp/ui/ui_shared.c:5128-5170`
+pub fn Item_Multi_Paint(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    seLanguageModCount: c_int,
+) {
+    let parent = menus
+        .item(item)
+        .parent
+        .expect("Item_Multi_Paint: item has no parent");
+    let focusColor = menus.menu(parent).focusColor;
+    let flags = menus.item(item).window.flags;
+
+    let mut newColor: vec4_t = [0.0; 4];
+    if flags & WINDOW_HASFOCUS != 0 {
+        let mut lowLight: vec4_t = [0.0; 4];
+        for i in 0..4 {
+            lowLight[i] = 0.8 * focusColor[i];
+        }
+        LerpColor(
+            focusColor,
+            lowLight,
+            &mut newColor,
+            0.5 + 0.5 * ((ds.realTime / PULSE_DIVISOR) as f32).sin(),
+        );
+    } else {
+        newColor = menus.item(item).window.foreColor;
+    }
+
+    let mut text = Item_Multi_Setting(menus, dc, item);
+    if let Some(rest) = text.strip_prefix('@') {
+        // string reference
+        text = dc
+            .SP_GetStringTextString(rest, MAX_STRING_CHARS)
+            .unwrap_or_default();
+    } else if let Some(rest) = text.strip_prefix('*') {
+        // Is is specifying a cvar to get the item name from?
+        text = dc.getCVarString(rest, MAX_STRING_CHARS);
+    }
+
+    let hasText = menus.item(item).text.is_some();
+    if hasText {
+        Item_Text_Paint(menus, ds, dc, item, seLanguageModCount);
+        let it = menus.item(item);
+        let (x, y, textscale, textStyle, iMenuFont) = (
+            it.textRect.x + it.textRect.w + 8.0,
+            it.textRect.y,
+            it.textscale,
+            it.textStyle,
+            it.iMenuFont,
+        );
+        dc.drawText(
+            x, y, textscale, newColor, &text, 0.0, 0, textStyle, iMenuFont,
+        );
+    } else {
+        let it = menus.item(item);
+        let (x, y, textscale, textStyle, iMenuFont) = (
+            it.textRect.x + it.xoffset as f32,
+            it.textRect.y,
+            it.textscale,
+            it.textStyle,
+            it.iMenuFont,
+        );
+        dc.drawText(
+            x, y, textscale, newColor, &text, 0.0, 0, textStyle, iMenuFont,
+        );
+    }
+}
+
+/// Raven `Item_Slider_Paint` — paint a slider item: focus/blink color, label
+/// (if any), the slider bar, then the thumb at its current value position.
+/// Source: `oracle/codemp/ui/ui_shared.c:5443-5473`
+pub fn Item_Slider_Paint(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    seLanguageModCount: c_int,
+) {
+    let cvar = menus.item(item).cvar.clone();
+    // PORT-NOTE: Raven computes `value` here but never reads it afterward
+    // (ui_shared.c:5448-5473) — kept for parity as an unused binding.
+    let _value = match &cvar {
+        Some(c) => dc.getCVarValue(c),
+        None => 0.0,
+    };
+
+    let parent = menus
+        .item(item)
+        .parent
+        .expect("Item_Slider_Paint: item has no parent");
+    let focusColor = menus.menu(parent).focusColor;
+    let flags = menus.item(item).window.flags;
+
+    let mut newColor: vec4_t = [0.0; 4];
+    if flags & WINDOW_HASFOCUS != 0 {
+        let mut lowLight: vec4_t = [0.0; 4];
+        for i in 0..4 {
+            lowLight[i] = 0.8 * focusColor[i];
+        }
+        LerpColor(
+            focusColor,
+            lowLight,
+            &mut newColor,
+            0.5 + 0.5 * ((ds.realTime / PULSE_DIVISOR) as f32).sin(),
+        );
+    } else {
+        newColor = menus.item(item).window.foreColor;
+    }
+
+    let y = menus.item(item).window.rect.y;
+    let hasText = menus.item(item).text.is_some();
+    let mut x;
+    if hasText {
+        Item_Text_Paint(menus, ds, dc, item, seLanguageModCount);
+        let it = menus.item(item);
+        x = it.textRect.x + it.textRect.w + 8.0;
+    } else {
+        x = menus.item(item).window.rect.x;
+    }
+
+    dc.setColor(Some(newColor));
+    let sliderBar = ds.Assets.sliderBar;
+    dc.drawHandlePic(x, y, SLIDER_WIDTH, SLIDER_HEIGHT, sliderBar);
+
+    x = Item_Slider_ThumbPosition(menus, dc, item);
+    let sliderThumb = ds.Assets.sliderThumb;
+    dc.drawHandlePic(
+        x - (SLIDER_THUMB_WIDTH / 2.0),
+        y - 2.0,
+        SLIDER_THUMB_WIDTH,
+        SLIDER_THUMB_HEIGHT,
+        sliderThumb,
+    );
+}
+
+/// Raven `Item_Bind_Paint` — paint a key-bind item: focus color (red when
+/// this is the item awaiting a new binding), label, then the bound key
+/// name(s), shrinking the scale until it fits on-screen.
+///
+/// PORT-NOTE (UB pick, porting-rules §19): Raven calls
+/// `BindingFromName(item->cvar)` unconditionally once `item->text` is set,
+/// even though `item->cvar` can independently be NULL (`Q_stricmp(NULL, …)`
+/// would crash). Picking the defined empty-string reading for that case.
+/// Source: `oracle/codemp/ui/ui_shared.c:5475-5546`
+pub fn Item_Bind_Paint(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    seLanguageModCount: c_int,
+) {
+    let maxChars = menus
+        .item(item)
+        .typeData
+        .editField()
+        .map(|e| e.maxPaintChars)
+        .unwrap_or(0);
+
+    let cvar = menus.item(item).cvar.clone();
+    let value = match &cvar {
+        Some(c) => dc.getCVarValue(c),
+        None => 0.0,
+    };
+
+    let parent = menus
+        .item(item)
+        .parent
+        .expect("Item_Bind_Paint: item has no parent");
+    let focusColor = menus.menu(parent).focusColor;
+    let flags = menus.item(item).window.flags;
+
+    let mut newColor: vec4_t = [0.0; 4];
+    if flags & WINDOW_HASFOCUS != 0 {
+        let lowLight: vec4_t = if menus.g_bindItem == Some(item) {
+            [0.8 * 1.0, 0.8 * 0.0, 0.8 * 0.0, 0.8 * 1.0]
+        } else {
+            [
+                0.8 * focusColor[0],
+                0.8 * focusColor[1],
+                0.8 * focusColor[2],
+                0.8 * focusColor[3],
+            ]
+        };
+        LerpColor(
+            focusColor,
+            lowLight,
+            &mut newColor,
+            0.5 + 0.5 * ((ds.realTime / PULSE_DIVISOR) as f32).sin(),
+        );
+    } else {
+        newColor = menus.item(item).window.foreColor;
+    }
+
+    let hasText = menus.item(item).text.is_some();
+    if hasText {
+        Item_Text_Paint(menus, ds, dc, item, seLanguageModCount);
+        BindingFromName(menus, dc, cvar.as_deref().unwrap_or(""));
+
+        let mut textScale = menus.item(item).textscale;
+        let iMenuFont = menus.item(item).iMenuFont;
+        let g_nameBind1 = menus.g_nameBind1.clone();
+        let mut textWidth = dc.textWidth(&g_nameBind1, textScale, iMenuFont) as f32;
+        let it = menus.item(item);
+        let startingXPos = (it.textRect.x + it.textRect.w + 8.0) as c_int;
+
+        while (startingXPos as f32 + textWidth) >= SCREEN_WIDTH as f32 {
+            textScale -= 0.05;
+            textWidth = dc.textWidth(&g_nameBind1, textScale, iMenuFont) as f32;
+        }
+
+        let itemTextscale = menus.item(item).textscale;
+        let mut yAdj = 0;
+        if textScale != itemTextscale {
+            let textHeight = dc.textHeight(&g_nameBind1, itemTextscale, iMenuFont);
+            yAdj = textHeight - dc.textHeight(&g_nameBind1, textScale, iMenuFont);
+        }
+
+        let textRectY = menus.item(item).textRect.y;
+        let textStyle = menus.item(item).textStyle;
+        dc.drawText(
+            startingXPos as f32,
+            textRectY + yAdj as f32,
+            textScale,
+            newColor,
+            &g_nameBind1,
+            0.0,
+            maxChars,
+            textStyle,
+            iMenuFont,
+        );
+    } else {
+        let it = menus.item(item);
+        let (textRectX, textRectY, textscale, textStyle, iMenuFont) = (
+            it.textRect.x,
+            it.textRect.y,
+            it.textscale,
+            it.textStyle,
+            it.iMenuFont,
+        );
+        // PORT-NOTE: Raven's `(value != 0) ? "FIXME" : "FIXME"` — both arms
+        // are the literal string `"FIXME"` in the oracle source; transcribed
+        // verbatim (dead ternary in the oracle, not a translation gap).
+        let _ = value;
+        dc.drawText(
+            textRectX, textRectY, textscale, newColor, "FIXME", 0.0, maxChars, textStyle, iMenuFont,
+        );
+    }
+}
+
+/// Raven `Item_OwnerDraw_Paint` — paint an owner-draw item through the
+/// host's `ownerDrawItem` callback, resolving fade, per-value color ranges,
+/// focus/blink/disabled color, and label offset first.
+///
+/// PORT-NOTE: Raven's `if (DC->ownerDrawItem)`/`DC->getValue` fn-pointer
+/// null-checks are dropped — `DisplayContext::ownerDrawItem`/`getValue` are
+/// non-optional trait methods, so the guards are always true.
+/// Source: `oracle/codemp/ui/ui_shared.c:6370-6430`
+pub fn Item_OwnerDraw_Paint(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: Option<ItemId>,
+    seLanguageModCount: c_int,
+) {
+    let item = match item {
+        Some(i) => i,
+        None => return,
+    };
+
+    let parent = menus
+        .item(item)
+        .parent
+        .expect("Item_OwnerDraw_Paint: item has no parent");
+    let (fadeClamp, fadeCycle, fadeAmount, focusColor, disableColor) = {
+        let m = menus.menu(parent);
+        (
+            m.fadeClamp,
+            m.fadeCycle,
+            m.fadeAmount,
+            m.focusColor,
+            m.disableColor,
+        )
+    };
+
+    {
+        let it = menus.item_mut(item);
+        Fade(
+            ds,
+            &mut it.window.flags,
+            &mut it.window.foreColor[3],
+            fadeClamp,
+            &mut it.window.nextTime,
+            fadeCycle,
+            true,
+            fadeAmount,
+        );
+    }
+
+    let mut color = menus.item(item).window.foreColor;
+
+    let numColors = menus.item(item).numColors;
+    if numColors > 0 {
+        let ownerDraw = menus.item(item).window.ownerDraw;
+        let f = dc.getValue(ownerDraw);
+        let it = menus.item(item);
+        for i in 0..numColors as usize {
+            let range = it.colorRanges[i];
+            if f >= range.low && f <= range.high {
+                color = range.color;
+                break;
+            }
+        }
+    }
+
+    let flags = menus.item(item).window.flags;
+    let textStyle = menus.item(item).textStyle;
+    if flags & WINDOW_HASFOCUS != 0 {
+        let mut lowLight: vec4_t = [0.0; 4];
+        for i in 0..4 {
+            lowLight[i] = 0.8 * focusColor[i];
+        }
+        LerpColor(
+            focusColor,
+            lowLight,
+            &mut color,
+            0.5 + 0.5 * ((ds.realTime / PULSE_DIVISOR) as f32).sin(),
+        );
+    } else if textStyle == ITEM_TEXTSTYLE_BLINK && (ds.realTime / BLINK_DIVISOR) & 1 == 0 {
+        let foreColor = menus.item(item).window.foreColor;
+        let mut lowLight: vec4_t = [0.0; 4];
+        for i in 0..4 {
+            lowLight[i] = 0.8 * foreColor[i];
+        }
+        LerpColor(
+            foreColor,
+            lowLight,
+            &mut color,
+            0.5 + 0.5 * ((ds.realTime / PULSE_DIVISOR) as f32).sin(),
+        );
+    }
+
+    if menus.item(item).disabled {
+        color = disableColor;
+    }
+
+    let cvarFlags = menus.item(item).cvarFlags;
+    if cvarFlags & (CVAR_ENABLE | CVAR_DISABLE) != 0
+        && !Item_EnableShowViaCvar(menus, dc, item, CVAR_ENABLE)
+    {
+        color = disableColor;
+    }
+
+    let textIsSome = menus.item(item).text.is_some();
+    if textIsSome {
+        Item_Text_Paint(menus, ds, dc, item, seLanguageModCount);
+        let hasNonEmptyText = menus
+            .item(item)
+            .text
+            .as_deref()
+            .is_some_and(|t| !t.is_empty());
+        let it = menus.item(item);
+        let (
+            textRectX,
+            textRectW,
+            windowY,
+            windowW,
+            windowH,
+            textaligny,
+            ownerDraw,
+            ownerDrawFlags,
+            alignment,
+            special,
+            textscale,
+            background,
+            iMenuFont,
+        ) = (
+            it.textRect.x,
+            it.textRect.w,
+            it.window.rect.y,
+            it.window.rect.w,
+            it.window.rect.h,
+            it.textaligny,
+            it.window.ownerDraw,
+            it.window.ownerDrawFlags,
+            it.alignment,
+            it.special,
+            it.textscale,
+            it.window.background,
+            it.iMenuFont,
+        );
+        let x = if hasNonEmptyText {
+            // +8 is an offset kludge to properly align owner draw items that
+            // have text combined with them
+            textRectX + textRectW + 8.0
+        } else {
+            textRectX + textRectW
+        };
+        dc.ownerDrawItem(
+            x,
+            windowY,
+            windowW,
+            windowH,
+            0.0,
+            textaligny,
+            ownerDraw,
+            ownerDrawFlags,
+            alignment,
+            special,
+            textscale,
+            color,
+            background,
+            textStyle,
+            iMenuFont,
+        );
+    } else {
+        let it = menus.item(item);
+        dc.ownerDrawItem(
+            it.window.rect.x,
+            it.window.rect.y,
+            it.window.rect.w,
+            it.window.rect.h,
+            it.textalignx,
+            it.textaligny,
+            it.window.ownerDraw,
+            it.window.ownerDrawFlags,
+            it.alignment,
+            it.special,
+            it.textscale,
+            color,
+            it.window.background,
+            it.textStyle,
+            it.iMenuFont,
+        );
+    }
+}
+
+/// Raven `Menus_ActivateByName` — activate the menu named `p`, pushing the
+/// previously-focused menu onto the open-menu stack; clears focus on every
+/// other menu.
+///
+/// PORT-NOTE (UB pick, porting-rules §19): a NULL `window.name`
+/// (`Q_stricmp(NULL, p)` crashes in Raven) is treated as "never matches".
+/// Source: `oracle/codemp/ui/ui_shared.c:7096-7117`
+pub fn Menus_ActivateByName(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    p: &str,
+) -> Option<MenuId> {
+    let mut m: Option<MenuId> = None;
+    let focus = Menu_GetFocused(menus);
+
+    for i in 0..menus.menuCount() as usize {
+        let id = MenuId::new(i);
+        let name = menus.menu(id).window.name.clone();
+        if name.as_deref().is_some_and(|n| stricmp_eq(n, p)) {
+            m = Some(id);
+            Menus_Activate(menus, dc, id);
+            if menus.openMenuCount() < MAX_OPEN_MENUS as c_int {
+                if let Some(focusMenu) = focus {
+                    menus.menuStack.push(focusMenu);
+                }
+            }
+        } else {
+            menus.menu_mut(id).window.flags &= !WINDOW_HASFOCUS;
+        }
+    }
+
+    Display_CloseCinematics(menus, dc);
+
+    // Want to handle a mouse move on the new menu in case your already over
+    // an item
+    Menu_HandleMouseMove(menus, ds, dc, m, ds.cursorx as f32, ds.cursory as f32);
+
+    m
+}
+
+/// Raven `Display_MouseMove` — with a `menu` handle, translate its window by
+/// `(x, y)`; otherwise dispatch the mouse move to the focused popup menu, or
+/// to every menu if none is a popup.
+///
+/// PORT-NOTE: the `#ifdef _XBOX` unconditional-`qtrue` early-return arm is
+/// dead surface, dropped as elsewhere in this file.
+/// Source: `oracle/codemp/ui/ui_shared.c:9873-9901`
+pub fn Display_MouseMove(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    p: Option<MenuId>,
+    x: c_int,
+    y: c_int,
+) -> bool {
+    match p {
+        None => {
+            let menu = Menu_GetFocused(menus);
+            if let Some(m) = menu {
+                if menus.menu(m).window.flags & WINDOW_POPUP != 0 {
+                    Menu_HandleMouseMove(menus, ds, dc, Some(m), x as f32, y as f32);
+                    return true;
+                }
+            }
+            for i in 0..menus.menuCount() as usize {
+                let id = MenuId::new(i);
+                Menu_HandleMouseMove(menus, ds, dc, Some(id), x as f32, y as f32);
+            }
+        }
+        Some(m) => {
+            menus.menu_mut(m).window.rect.x += x as f32;
+            menus.menu_mut(m).window.rect.y += y as f32;
+            Menu_UpdatePosition(menus, dc, Some(m));
+        }
+    }
+    true
+}
