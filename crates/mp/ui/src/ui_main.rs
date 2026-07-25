@@ -45,8 +45,8 @@ use mp_qshared::shared::cvar::{
     CVAR_TEMP,
 };
 use mp_qshared::shared::force_powers::{
-    FORCE_DARKSIDE, FORCE_LIGHTSIDE, FP_LEVITATION, FP_SABER_DEFENSE, FP_SABER_OFFENSE,
-    MAX_FORCE_RANK, NUM_FORCE_POWERS, NUM_FORCE_POWER_LEVELS,
+    FORCE_DARKSIDE, FORCE_LIGHTSIDE, FP_LEVITATION, FP_PULL, FP_PUSH, FP_SABERTHROW,
+    FP_SABER_DEFENSE, FP_SABER_OFFENSE, MAX_FORCE_RANK, NUM_FORCE_POWERS, NUM_FORCE_POWER_LEVELS,
 };
 use mp_qshared::shared::limits::MAX_NAME_LENGTH;
 use mp_qshared::shared::q_color::{S_COLOR_RED, S_COLOR_YELLOW};
@@ -91,13 +91,15 @@ use mp_uishared::shared::menudef::{
 };
 use mp_uishared::shared::rect_def_t::RectDef;
 use mp_uishared::ui_shared::{
-    Display_KeyBindPending, Display_MouseMove, Int_Parse, ItemParse_asset_model_go,
-    ItemParse_model_g2anim_go, ItemParse_model_g2skin_go, Item_RunScript, LerpColor, Menu_Count,
-    Menu_FindItemByName, Menu_GetFocused, Menu_Reset, Menu_SetFeederSelection,
-    Menu_SetItemBackground, Menu_ShowGroup, Menu_ShowItemByName, Menus_ActivateByName,
-    Menus_AnyFullScreenVisible, Menus_CloseAll, Menus_FindByName, Menus_OpenByName, PC_Color_Parse,
-    PC_Float_Parse, PC_Int_Parse, PC_Script_Parse, PC_String_Parse, String_Parse, String_Report,
-    UI_CleanupGhoul2,
+    Controls_GetConfig, Controls_SetConfig, Display_KeyBindPending, Display_MouseMove, Int_Parse,
+    ItemParse_asset_model_go, ItemParse_model_g2anim_go, ItemParse_model_g2skin_go, Item_RunScript,
+    LerpColor, Menu_Count, Menu_FindItemByName, Menu_GetFocused, Menu_GetMatchingItemByNumber,
+    Menu_HandleKey, Menu_ItemDisable, Menu_ItemsMatchingGroup, Menu_Paint, Menu_Reset,
+    Menu_SetFeederSelection, Menu_SetItemBackground, Menu_ShowGroup, Menu_ShowItemByName,
+    Menus_ActivateByName, Menus_AnyFullScreenVisible, Menus_CloseAll, Menus_CloseByName,
+    Menus_FindByName, Menus_OpenByName, PC_Color_Parse, PC_Float_Parse, PC_Int_Parse,
+    PC_Script_Parse, PC_String_Parse, String_Init, String_Parse, String_Report, UI_CleanupGhoul2,
+    UI_InitMemory, WINDOW_MOUSEOVER,
 };
 use native_math::qmath::Com_Clamp;
 use native_string::{
@@ -119,18 +121,21 @@ use crate::local::server_status_info_t::{
 use crate::local::tier_info::MAPS_PER_TIER;
 use crate::trap;
 use crate::ui_atoms::{
-    Com_Error, Com_Printf, UI_Cvar_VariableString, UI_DrawHandlePic, UI_FillRect,
+    Com_Error, Com_Printf, UI_ClearScores, UI_Cvar_VariableString, UI_DrawHandlePic, UI_FillRect,
     UI_LoadBestScores, UI_SetColor,
 };
 use crate::ui_force::{
     UI_DrawForceStars, UI_ForceConfigHandle, UI_ForceMaxRank_HandleKey,
-    UI_ForcePowerRank_HandleKey, UI_ForceSide_HandleKey, UI_JediNonJedi_HandleKey,
-    UI_SkinColor_HandleKey, UpdateForceUsed,
+    UI_ForcePowerRank_HandleKey, UI_ForceSide_HandleKey, UI_InitForceShaders,
+    UI_JediNonJedi_HandleKey, UI_SaveForceTemplate, UI_SkinColor_HandleKey,
+    UI_UpdateClientForcePowers, UI_UpdateForcePowers, UpdateForceUsed,
 };
-use crate::ui_gameinfo::{UI_GetBotNameByNumber, UI_GetNumBots, MAX_MAPS};
+use crate::ui_gameinfo::{
+    UI_GetBotNameByNumber, UI_GetNumBots, UI_LoadArenas, UI_LoadBots, MAX_MAPS,
+};
 use crate::ui_saber::{
-    SaberColorToString, TranslateSaberColor, UI_SaberAttachToChar, UI_SaberModelForSaber,
-    UI_SaberProperNameForSaber, UI_SaberSkinForSaber, UI_SaberTypeForSaber,
+    SaberColorToString, TranslateSaberColor, UI_SaberAttachToChar, UI_SaberGetHiltInfo,
+    UI_SaberModelForSaber, UI_SaberProperNameForSaber, UI_SaberSkinForSaber, UI_SaberTypeForSaber,
 };
 use crate::world::ui_context::UiContext;
 use crate::world::ui_cvars::UiCvars;
@@ -4450,14 +4455,16 @@ pub fn UI_GetServerStatusInfo(
     true
 }
 
-/// Runtime `va()`-style substitution for a localized-string format fetched
-/// from `trap_SP_GetStringTextString` (the template is data, not a Rust
-/// `format!` literal). Walks the template once, replacing each `%d`/`%i`/`%s`
-/// conversion in the order it appears with the next argument.
+/// Runtime `va()`-style substitution for a format string that is data rather
+/// than a Rust `format!` literal — localized templates fetched from
+/// `trap_SP_GetStringTextString`, and the menu-script format strings the
+/// `orders`/`voiceOrders` arms parse out of a `.menu` file. Walks the template
+/// once, replacing each `%d`/`%i`/`%s` conversion in the order it appears with
+/// the next argument.
 ///
 /// Port-local helper — no Raven counterpart. Bare `%i`/`%d`/`%s` only; flag,
 /// width and precision forms are unsupported, which rests on the shipped .str
-/// files carrying nothing else (the live-gate item parked in the
+/// and .menu files carrying nothing else (the live-gate item parked in the
 /// `UI_DrawServerRefreshDate` PORT-NOTE).
 fn va_runtime(template: &str, args: &[&str]) -> String {
     let mut out = String::with_capacity(template.len());
@@ -11634,8 +11641,6 @@ fn UI_DeferMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &m
 /// reports `needpass`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:7938-7977`
-// not yet wired: UI_RunMenuScript's "checkpassword" arm (ui_main.c:6428-6434) is unported.
-#[allow(dead_code)]
 fn UI_CheckPassword(ctx: &mut UiContext, dc: &mut dyn DisplayContext) -> bool {
     let index = ctx.world.serverStatus.currentServer;
     if index < 0 || index as usize >= ctx.world.serverStatus.displayServers.len() {
@@ -11675,4 +11680,1693 @@ fn UI_CheckPassword(ctx: &mut UiContext, dc: &mut dyn DisplayContext) -> bool {
     // }
 
     true
+}
+
+/// Raven `#define PLAYERS_PER_TEAM 8//5`.
+///
+/// Source: `oracle/codemp/ui/ui_local.h:569`
+const PLAYERS_PER_TEAM: c_int = 8;
+
+// PORT-NOTE: `q_shared.h`'s font enum is anonymous (`enum { FONT_NONE,
+// FONT_SMALL=1, ... }`), so per the anonymous-enum convention this is a
+// `const`; local (mirrors `mp_uishared::ui_shared`'s own file-local copy).
+/// Source: `oracle/codemp/game/q_shared.h:3176-3182`
+const FONT_MEDIUM: c_int = 2;
+
+/// Latin-1-decode a fixed `c_char` buffer (an ABI-crossing struct field, e.g.
+/// `uiClientState_t`'s `servername`/`messageString`/`updateInfoString`) into
+/// an owned `String`, stopping at the first NUL — the byte-seam twin of
+/// [`trap::Cvar_VariableStringBuffer`]'s own NUL-trim.
+///
+/// Port-local helper — no Raven counterpart.
+fn cchars_to_string(buf: &[c_char]) -> String {
+    let bytes: Vec<u8> = buf.iter().map(|&c| c as u8).collect();
+    let nul = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
+    latin1_to_string(&bytes[..nul])
+}
+
+/// Raven `UI_Load` — (re)loads the menu set from scratch, preserving the
+/// currently focused menu's name so it can be reactivated afterward.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1854-1893`
+pub fn UI_Load(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+    let menu = Menu_GetFocused(&ctx.world.menus);
+    let lastName = match menu {
+        Some(m) => ctx
+            .world
+            .menus
+            .menu(m)
+            .window
+            .name
+            .clone()
+            .unwrap_or_default(),
+        None => String::new(),
+    };
+
+    let mut menuSet = if ctx.world.inGameLoad {
+        "ui/jampingame.txt".to_string()
+    } else {
+        UI_Cvar_VariableString(ctx, "ui_menuFilesMP")
+    };
+    if menuSet.is_empty() {
+        menuSet = "ui/jampmenus.txt".to_string();
+    }
+
+    String_Init(&mut ctx.world.menus, dc);
+
+    // PORT-NOTE: the non-`PRE_RELEASE_TADEMO` arm is the retail build
+    // (`ui_main.c:1881-1885`); the demo `demogameinfo.txt` arm is dropped.
+    UI_ParseGameInfo(ctx, "ui/jamp/gameinfo.txt");
+    UI_LoadArenas(ctx);
+    UI_LoadBots(ctx);
+
+    UI_LoadMenus(ctx, dc, &menuSet, true);
+    Menus_CloseAll(&mut ctx.world.menus, dc);
+    Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, &lastName);
+}
+
+/// Raven `UI_RunMenuScript` — dispatches a menu `uiScript` command by its
+/// leading token.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:6190-7507`
+// not yet wired: the `runScript` DC slot (DEC-36 D3) has no vmMain caller yet.
+#[allow(dead_code)]
+#[allow(clippy::too_many_lines)]
+fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut &str) {
+    let mut name = String::new();
+    if !String_Parse(args, &mut name) {
+        return;
+    }
+
+    if Q_stricmp(&name, "StartServer") == 0 {
+        let mut added: c_int = 0;
+        let skill: f32;
+        let warmupTime: c_int;
+        let doWarmup: c_int;
+
+        trap::Cvar_Set(ctx.engine, "cg_thirdPerson", "0");
+        trap::Cvar_Set(ctx.engine, "cg_cameraOrbit", "0");
+        // for Solo games I set this to 1 in the menu and don't want it stomped here,
+        // this cvar seems to be reset to 0 in all the proper places so... -dmv
+        // trap_Cvar_Set("ui_singlePlayerActive", "0");
+
+        // if a solo game is started, automatically turn dedicated off here (don't want to do it in the menu, might get annoying)
+        if trap::Cvar_VariableValue(ctx.engine, "ui_singlePlayerActive") != 0.0 {
+            trap::Cvar_Set(ctx.engine, "dedicated", "0");
+        } else {
+            let clamped = Com_Clamp(0.0, 2.0, ctx.world.cvars.ui_dedicated.integer as f32);
+            trap::Cvar_SetValue(ctx.engine, "dedicated", clamped);
+        }
+        let gtEnum = ctx
+            .world
+            .gameTypes
+            .get(ctx.world.cvars.ui_netGameType.integer as usize)
+            .map(|gt| gt.gtEnum)
+            .unwrap_or_default();
+        trap::Cvar_SetValue(ctx.engine, "g_gametype", Com_Clamp(0.0, 8.0, gtEnum as f32));
+        // trap_Cvar_Set("g_redTeam", UI_Cvar_VariableString("ui_teamName"));
+        // trap_Cvar_Set("g_blueTeam", UI_Cvar_VariableString("ui_opponentName"));
+        let mapLoadName = ctx
+            .world
+            .mapList
+            .get(ctx.world.cvars.ui_currentNetMap.integer as usize)
+            .map(|m| m.mapLoadName.clone())
+            .unwrap_or_default();
+        trap::Cmd_ExecuteText(
+            ctx.engine,
+            cbufExec_t::EXEC_APPEND as c_int,
+            &format!("wait ; wait ; map {}\n", mapLoadName),
+        );
+        skill = trap::Cvar_VariableValue(ctx.engine, "g_spSkill");
+
+        // Cap the warmup values in case the user tries a dumb setting.
+        warmupTime = trap::Cvar_VariableValue(ctx.engine, "g_warmup") as c_int;
+        doWarmup = trap::Cvar_VariableValue(ctx.engine, "g_doWarmup") as c_int;
+
+        if doWarmup != 0 && warmupTime < 1 {
+            trap::Cvar_Set(ctx.engine, "g_doWarmup", "0");
+        }
+        if warmupTime < 5 {
+            trap::Cvar_Set(ctx.engine, "g_warmup", "5");
+        }
+        if warmupTime > 120 {
+            trap::Cvar_Set(ctx.engine, "g_warmup", "120");
+        }
+
+        if trap::Cvar_VariableValue(ctx.engine, "g_gametype") == GT_DUEL as f32
+            || trap::Cvar_VariableValue(ctx.engine, "g_gametype") == GT_POWERDUEL as f32
+        {
+            // always set fraglimit 1 when starting a duel game
+            trap::Cvar_Set(ctx.engine, "fraglimit", "1");
+            trap::Cvar_Set(ctx.engine, "timelimit", "0");
+        }
+
+        for i in 0..PLAYERS_PER_TEAM {
+            let bot =
+                trap::Cvar_VariableValue(ctx.engine, &format!("ui_blueteam{}", i + 1)) as c_int;
+            let maxcl = trap::Cvar_VariableValue(ctx.engine, "sv_maxClients") as c_int;
+
+            if bot > 1 {
+                let mut numval = i + 1;
+                numval *= 2;
+                numval -= 1;
+
+                if numval <= maxcl {
+                    let botName = UI_GetBotNameByNumber(ctx, bot - 2);
+                    let buff = if ctx.world.cvars.ui_actualNetGameType.integer >= GT_TEAM as c_int {
+                        format!("addbot \"{}\" {:.6} {}\n", botName, skill, "Blue")
+                    } else {
+                        format!("addbot \"{}\" {:.6} \n", botName, skill)
+                    };
+                    trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_APPEND as c_int, &buff);
+                    added += 1;
+                }
+            }
+            let bot =
+                trap::Cvar_VariableValue(ctx.engine, &format!("ui_redteam{}", i + 1)) as c_int;
+            if bot > 1 {
+                let mut numval = i + 1;
+                numval *= 2;
+
+                if numval <= maxcl {
+                    let botName = UI_GetBotNameByNumber(ctx, bot - 2);
+                    let buff = if ctx.world.cvars.ui_actualNetGameType.integer >= GT_TEAM as c_int {
+                        format!("addbot \"{}\" {:.6} {}\n", botName, skill, "Red")
+                    } else {
+                        format!("addbot \"{}\" {:.6} \n", botName, skill)
+                    };
+                    trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_APPEND as c_int, &buff);
+                    added += 1;
+                }
+            }
+            if added >= maxcl {
+                // this means the client filled up all their slots in the UI with bots. So stretch out an extra slot for them, and then stop adding bots.
+                trap::Cvar_Set(ctx.engine, "sv_maxClients", &format!("{}", added + 1));
+                break;
+            }
+        }
+    } else if Q_stricmp(&name, "updateSPMenu") == 0 {
+        UI_SetCapFragLimits(ctx, true);
+        let _ = UI_MapCountByGameType(ctx.world, true);
+        let idx = UI_GetIndexFromSelection(ctx.world, ctx.world.cvars.ui_currentMap.integer);
+        ctx.world.cvars.ui_mapIndex.integer = idx;
+        trap::Cvar_Set(ctx.engine, "ui_mapIndex", &format!("{}", idx));
+        Menu_SetFeederSelection(
+            &mut ctx.world.menus,
+            dc,
+            None,
+            FEEDER_MAPS,
+            idx,
+            Some("skirmish"),
+        );
+        let mut special = 0.0_f32;
+        UI_GameType_HandleKey(
+            ctx,
+            dc,
+            0,
+            &mut special,
+            fakeAscii_t::A_MOUSE1 as c_int,
+            false,
+        );
+        let mut special2 = 0.0_f32;
+        UI_GameType_HandleKey(
+            ctx,
+            dc,
+            0,
+            &mut special2,
+            fakeAscii_t::A_MOUSE2 as c_int,
+            false,
+        );
+    } else if Q_stricmp(&name, "resetDefaults") == 0 {
+        trap::Cmd_ExecuteText(
+            ctx.engine,
+            cbufExec_t::EXEC_APPEND as c_int,
+            "cvar_restart\n",
+        );
+        trap::Cmd_ExecuteText(
+            ctx.engine,
+            cbufExec_t::EXEC_APPEND as c_int,
+            "exec mpdefault.cfg\n",
+        );
+        trap::Cmd_ExecuteText(
+            ctx.engine,
+            cbufExec_t::EXEC_APPEND as c_int,
+            "vid_restart\n",
+        );
+        trap::Cvar_Set(ctx.engine, "com_introPlayed", "1");
+        // PORT-NOTE: the `#ifdef USE_CD_KEY` `getCDKey`/`verifyCDKey` arms are
+        // dead retail-MP surface (`USE_CD_KEY` never defined for MP) — dropped.
+    } else if Q_stricmp(&name, "loadArenas") == 0 {
+        UI_LoadArenas(ctx);
+        let _ = UI_MapCountByGameType(ctx.world, false);
+        Menu_SetFeederSelection(
+            &mut ctx.world.menus,
+            dc,
+            None,
+            FEEDER_ALLMAPS,
+            ctx.world.main.gUISelectedMap,
+            Some("createserver"),
+        );
+        ctx.world.force.uiForceRank =
+            trap::Cvar_VariableValue(ctx.engine, "g_maxForceRank") as c_int;
+    } else if Q_stricmp(&name, "saveControls") == 0 {
+        Controls_SetConfig(&ctx.world.menus, dc, true);
+    } else if Q_stricmp(&name, "loadControls") == 0 {
+        Controls_GetConfig(&mut ctx.world.menus, dc);
+    } else if Q_stricmp(&name, "clearError") == 0 {
+        trap::Cvar_Set(ctx.engine, "com_errorMessage", "");
+    } else if Q_stricmp(&name, "loadGameInfo") == 0 {
+        UI_ParseGameInfo(ctx, "ui/jamp/gameinfo.txt");
+        let mapLoadName = ctx
+            .world
+            .mapList
+            .get(ctx.world.cvars.ui_currentMap.integer as usize)
+            .map(|m| m.mapLoadName.clone())
+            .unwrap_or_default();
+        let gtEnum = ctx
+            .world
+            .gameTypes
+            .get(ctx.world.cvars.ui_gameType.integer as usize)
+            .map(|gt| gt.gtEnum)
+            .unwrap_or_default();
+        UI_LoadBestScores(ctx, &mapLoadName, gtEnum);
+    } else if Q_stricmp(&name, "resetScores") == 0 {
+        UI_ClearScores(ctx);
+    } else if Q_stricmp(&name, "RefreshServers") == 0 {
+        UI_StartServerRefresh(ctx, true);
+        UI_BuildServerDisplayList(ctx, dc, 1);
+    } else if Q_stricmp(&name, "RefreshFilter") == 0 {
+        UI_StartServerRefresh(ctx, false);
+        UI_BuildServerDisplayList(ctx, dc, 1);
+    } else if Q_stricmp(&name, "RunSPDemo") == 0 {
+        if ctx.world.demoAvailable {
+            let mapLoadName = ctx
+                .world
+                .mapList
+                .get(ctx.world.cvars.ui_currentMap.integer as usize)
+                .map(|m| m.mapLoadName.clone())
+                .unwrap_or_default();
+            let gtEnum = ctx
+                .world
+                .gameTypes
+                .get(ctx.world.cvars.ui_gameType.integer as usize)
+                .map(|gt| gt.gtEnum)
+                .unwrap_or_default();
+            trap::Cmd_ExecuteText(
+                ctx.engine,
+                cbufExec_t::EXEC_APPEND as c_int,
+                &format!("demo {}_{}\n", mapLoadName, gtEnum),
+            );
+        }
+    } else if Q_stricmp(&name, "LoadDemos") == 0 {
+        UI_LoadDemos(ctx);
+    } else if Q_stricmp(&name, "LoadMovies") == 0 {
+        UI_LoadMovies(ctx);
+    } else if Q_stricmp(&name, "LoadMods") == 0 {
+        UI_LoadMods(ctx);
+    } else if Q_stricmp(&name, "playMovie") == 0 {
+        if ctx.world.previewMovie >= 0 {
+            trap::CIN_StopCinematic(ctx.engine, ctx.world.previewMovie);
+        }
+        let movie = ctx
+            .world
+            .movieList
+            .get(ctx.world.movieIndex as usize)
+            .cloned()
+            .unwrap_or_default();
+        trap::Cmd_ExecuteText(
+            ctx.engine,
+            cbufExec_t::EXEC_APPEND as c_int,
+            &format!("cinematic {}.roq 2\n", movie),
+        );
+    } else if Q_stricmp(&name, "RunMod") == 0 {
+        let modName = ctx
+            .world
+            .modList
+            .get(ctx.world.modIndex as usize)
+            .map(|m| m.modName.clone())
+            .unwrap_or_default();
+        trap::Cvar_Set(ctx.engine, "fs_game", &modName);
+        trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_APPEND as c_int, "vid_restart;");
+    } else if Q_stricmp(&name, "RunDemo") == 0 {
+        let demo = ctx
+            .world
+            .demoList
+            .get(ctx.world.demoIndex as usize)
+            .cloned()
+            .unwrap_or_default();
+        trap::Cmd_ExecuteText(
+            ctx.engine,
+            cbufExec_t::EXEC_APPEND as c_int,
+            &format!("demo \"{}\"\n", demo),
+        );
+    } else if Q_stricmp(&name, "Quake3") == 0 {
+        trap::Cvar_Set(ctx.engine, "fs_game", "");
+        trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_APPEND as c_int, "vid_restart;");
+    } else if Q_stricmp(&name, "closeJoin") == 0 {
+        if ctx.world.serverStatus.refreshActive {
+            UI_StopServerRefresh(ctx);
+            ctx.world.serverStatus.nextDisplayRefresh = 0;
+            ctx.world.nextServerStatusRefresh = 0;
+            ctx.world.nextFindPlayerRefresh = 0;
+            UI_BuildServerDisplayList(ctx, dc, 1);
+        } else {
+            Menus_CloseByName(&mut ctx.world.menus, dc, "joinserver");
+            Menus_OpenByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "main");
+        }
+    } else if Q_stricmp(&name, "StopRefresh") == 0 {
+        UI_StopServerRefresh(ctx);
+        ctx.world.serverStatus.nextDisplayRefresh = 0;
+        ctx.world.nextServerStatusRefresh = 0;
+        ctx.world.nextFindPlayerRefresh = 0;
+    } else if Q_stricmp(&name, "UpdateFilter") == 0 {
+        if ctx.world.cvars.ui_netSource.integer == AS_LOCAL {
+            UI_StartServerRefresh(ctx, true);
+        }
+        UI_BuildServerDisplayList(ctx, dc, 1);
+        UI_FeederSelection(ctx, dc, FEEDER_SERVERS as f32, 0, None);
+    } else if Q_stricmp(&name, "ServerStatus") == 0 {
+        let idx = ctx.world.serverStatus.currentServer;
+        let n = ctx
+            .world
+            .serverStatus
+            .displayServers
+            .get(idx as usize)
+            .copied()
+            .unwrap_or(0);
+        ctx.world.serverStatusAddress = trap::LAN_GetServerAddressString(
+            ctx.engine,
+            ctx.world.cvars.ui_netSource.integer,
+            n,
+            MAX_ADDRESSLENGTH,
+        );
+        UI_BuildServerStatus(ctx, dc, true);
+    } else if Q_stricmp(&name, "FoundPlayerServerStatus") == 0 {
+        let idx = ctx.world.currentFoundPlayerServer;
+        let addr = ctx
+            .world
+            .foundPlayerServerAddresses
+            .get(idx as usize)
+            .cloned()
+            .unwrap_or_default();
+        // PORT-NOTE: Raven `Q_strncpyz(..., MAX_ADDRESSLENGTH)` truncation.
+        ctx.world.serverStatusAddress = addr
+            .chars()
+            .take(MAX_ADDRESSLENGTH.saturating_sub(1))
+            .collect();
+        UI_BuildServerStatus(ctx, dc, true);
+        Menu_SetFeederSelection(&mut ctx.world.menus, dc, None, FEEDER_FINDPLAYER, 0, None);
+    } else if Q_stricmp(&name, "FindPlayer") == 0 {
+        UI_BuildFindPlayerList(ctx, dc, true);
+        // clear the displayed server status info
+        ctx.world.serverStatusInfo.lines.clear();
+        Menu_SetFeederSelection(&mut ctx.world.menus, dc, None, FEEDER_FINDPLAYER, 0, None);
+    } else if Q_stricmp(&name, "checkservername") == 0 {
+        UI_CheckServerName(ctx);
+    } else if Q_stricmp(&name, "checkpassword") == 0 {
+        if UI_CheckPassword(ctx, dc) {
+            UI_JoinServer(ctx);
+        }
+    } else if Q_stricmp(&name, "JoinServer") == 0 {
+        UI_JoinServer(ctx);
+    } else if Q_stricmp(&name, "FoundPlayerJoinServer") == 0 {
+        trap::Cvar_Set(ctx.engine, "ui_singlePlayerActive", "0");
+        let idx = ctx.world.currentFoundPlayerServer;
+        if idx >= 0 && idx < ctx.world.numFoundPlayerServers {
+            if let Some(addr) = ctx
+                .world
+                .foundPlayerServerAddresses
+                .get(idx as usize)
+                .cloned()
+            {
+                trap::Cmd_ExecuteText(
+                    ctx.engine,
+                    cbufExec_t::EXEC_APPEND as c_int,
+                    &format!("connect {}\n", addr),
+                );
+            }
+        }
+    } else if Q_stricmp(&name, "Quit") == 0 {
+        trap::Cvar_Set(ctx.engine, "ui_singlePlayerActive", "0");
+        trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_NOW as c_int, "quit");
+    } else if Q_stricmp(&name, "Controls") == 0 {
+        trap::Cvar_Set(ctx.engine, "cl_paused", "1");
+        trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
+        Menus_CloseAll(&mut ctx.world.menus, dc);
+        Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "setup_menu2");
+    } else if Q_stricmp(&name, "Leave") == 0 {
+        trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_APPEND as c_int, "disconnect\n");
+        trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
+        Menus_CloseAll(&mut ctx.world.menus, dc);
+        Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "main");
+    } else if Q_stricmp(&name, "getvideosetup") == 0 {
+        UI_GetVideoSetup(ctx);
+    } else if Q_stricmp(&name, "getsaberhiltinfo") == 0 {
+        let (single, staff) = UI_SaberGetHiltInfo(ctx);
+        ctx.world.main.saberSingleHiltInfo = single;
+        ctx.world.main.saberStaffHiltInfo = staff;
+    // On the solo game creation screen, we can't see siege maps
+    } else if Q_stricmp(&name, "checkforsiege") == 0 {
+        let gtEnum = ctx
+            .world
+            .gameTypes
+            .get(ctx.world.cvars.ui_netGameType.integer as usize)
+            .map(|gt| gt.gtEnum)
+            .unwrap_or_default();
+        if gtEnum == GT_SIEGE as c_int {
+            // fake out the handler to advance to the next game type
+            let mut special = 0.0_f32;
+            UI_NetGameType_HandleKey(ctx, dc, 0, &mut special, fakeAscii_t::A_MOUSE1 as c_int);
+        }
+    } else if Q_stricmp(&name, "updatevideosetup") == 0 {
+        UI_UpdateVideoSetup(ctx);
+    } else if Q_stricmp(&name, "ServerSort") == 0 {
+        let mut sortColumn: c_int = 0;
+        if Int_Parse(args, &mut sortColumn) {
+            // if same column we're already sorting on then flip the direction
+            if sortColumn == ctx.world.serverStatus.sortKey {
+                ctx.world.serverStatus.sortDir = (ctx.world.serverStatus.sortDir == 0) as c_int;
+            }
+            // make sure we sort again
+            UI_ServersSort(ctx, sortColumn, true);
+        }
+    } else if Q_stricmp(&name, "nextSkirmish") == 0 {
+        UI_StartSkirmish(ctx, dc, true);
+    } else if Q_stricmp(&name, "SkirmishStart") == 0 {
+        UI_StartSkirmish(ctx, dc, false);
+    } else if Q_stricmp(&name, "closeingame") == 0 {
+        let catcher = trap::Key_GetCatcher(ctx.engine);
+        trap::Key_SetCatcher(ctx.engine, catcher & !KEYCATCH_UI);
+        trap::Key_ClearStates(ctx.engine);
+        trap::Cvar_Set(ctx.engine, "cl_paused", "0");
+        Menus_CloseAll(&mut ctx.world.menus, dc);
+    } else if Q_stricmp(&name, "voteMap") == 0 {
+        let idx = ctx.world.cvars.ui_currentNetMap.integer;
+        if idx >= 0 && (idx as usize) < ctx.world.mapList.len() {
+            let mapLoadName = ctx.world.mapList[idx as usize].mapLoadName.clone();
+            trap::Cmd_ExecuteText(
+                ctx.engine,
+                cbufExec_t::EXEC_APPEND as c_int,
+                &format!("callvote map {}\n", mapLoadName),
+            );
+        }
+    } else if Q_stricmp(&name, "voteKick") == 0 {
+        let idx = ctx.world.playerIndex;
+        if idx >= 0 && (idx as usize) < ctx.world.playerIndexes.len() {
+            let clientNum = ctx.world.playerIndexes[idx as usize];
+            trap::Cmd_ExecuteText(
+                ctx.engine,
+                cbufExec_t::EXEC_APPEND as c_int,
+                &format!("callvote clientkick \"{}\"\n", clientNum),
+            );
+        }
+    } else if Q_stricmp(&name, "voteGame") == 0 {
+        let idx = ctx.world.cvars.ui_netGameType.integer;
+        if idx >= 0 && (idx as usize) < ctx.world.gameTypes.len() {
+            let gt = ctx.world.gameTypes[idx as usize].gtEnum;
+            trap::Cmd_ExecuteText(
+                ctx.engine,
+                cbufExec_t::EXEC_APPEND as c_int,
+                &format!("callvote g_gametype {}\n", gt),
+            );
+        }
+    } else if Q_stricmp(&name, "voteLeader") == 0 {
+        let idx = ctx.world.teamIndex;
+        if idx >= 0 && (idx as usize) < ctx.world.teamNames.len() {
+            let teamName = ctx.world.teamNames[idx as usize].clone();
+            trap::Cmd_ExecuteText(
+                ctx.engine,
+                cbufExec_t::EXEC_APPEND as c_int,
+                &format!("callteamvote leader \"{}\"\n", teamName),
+            );
+        }
+    } else if Q_stricmp(&name, "voteTeamKick") == 0 {
+        let idx = ctx.world.teamIndex;
+        if idx >= 0 && (idx as usize) < ctx.world.teamNames.len() {
+            let teamName = ctx.world.teamNames[idx as usize].clone();
+            trap::Cmd_ExecuteText(
+                ctx.engine,
+                cbufExec_t::EXEC_APPEND as c_int,
+                &format!("callteamvote kick \"{}\"\n", teamName),
+            );
+        }
+    } else if Q_stricmp(&name, "addBot") == 0 {
+        // PORT-NOTE: Raven's if/else here execute an identical body in both
+        // arms (`ui_main.c:6523-6528`); collapsed to one call (§10 — behavior
+        // preserved, shape is not). The discriminant stays: it is a trap call,
+        // so dropping it would perturb the syscall stream.
+        let _ = trap::Cvar_VariableValue(ctx.engine, "g_gametype");
+        let botName = UI_GetBotNameByNumber(ctx, ctx.world.botIndex);
+        let color = if ctx.world.redBlue == 0 {
+            "Red"
+        } else {
+            "Blue"
+        };
+        trap::Cmd_ExecuteText(
+            ctx.engine,
+            cbufExec_t::EXEC_APPEND as c_int,
+            &format!(
+                "addbot \"{}\" {} {}\n",
+                botName,
+                ctx.world.skillIndex + 1,
+                color
+            ),
+        );
+    } else if Q_stricmp(&name, "addFavorite") == 0 {
+        if ctx.world.cvars.ui_netSource.integer != AS_FAVORITES {
+            let idx = ctx.world.serverStatus.currentServer;
+            let n = ctx
+                .world
+                .serverStatus
+                .displayServers
+                .get(idx as usize)
+                .copied()
+                .unwrap_or(0);
+            let buff = trap::LAN_GetServerInfo(
+                ctx.engine,
+                ctx.world.cvars.ui_netSource.integer,
+                n,
+                MAX_STRING_CHARS as usize,
+            );
+            // PORT-NOTE: Raven `Q_strncpyz(..., MAX_NAME_LENGTH)` truncation.
+            let hostname: String = Info_ValueForKey(&buff, "hostname")
+                .chars()
+                .take(MAX_NAME_LENGTH.saturating_sub(1))
+                .collect();
+            let addr: String = Info_ValueForKey(&buff, "addr")
+                .chars()
+                .take(MAX_NAME_LENGTH.saturating_sub(1))
+                .collect();
+            if !hostname.is_empty() && !addr.is_empty() {
+                let res = trap::LAN_AddServer(ctx.engine, AS_FAVORITES, &hostname, &addr);
+                if res == 0 {
+                    // server already in the list
+                    Com_Printf(ctx, "Favorite already in list\n");
+                } else if res == -1 {
+                    // list full
+                    Com_Printf(ctx, "Favorite list full\n");
+                } else {
+                    // successfully added
+                    Com_Printf(ctx, &format!("Added favorite server {}\n", addr));
+                }
+            }
+        }
+    } else if Q_stricmp(&name, "deleteFavorite") == 0 {
+        if ctx.world.cvars.ui_netSource.integer == AS_FAVORITES {
+            let idx = ctx.world.serverStatus.currentServer;
+            let n = ctx
+                .world
+                .serverStatus
+                .displayServers
+                .get(idx as usize)
+                .copied()
+                .unwrap_or(0);
+            let buff = trap::LAN_GetServerInfo(
+                ctx.engine,
+                ctx.world.cvars.ui_netSource.integer,
+                n,
+                MAX_STRING_CHARS as usize,
+            );
+            let addr: String = Info_ValueForKey(&buff, "addr")
+                .chars()
+                .take(MAX_NAME_LENGTH.saturating_sub(1))
+                .collect();
+            if !addr.is_empty() {
+                trap::LAN_RemoveServer(ctx.engine, AS_FAVORITES, &addr);
+            }
+        }
+    } else if Q_stricmp(&name, "createFavorite") == 0 {
+        // rww - don't know why this check was here.. why would you want to only add new favorites when the filter was favorites?
+        let favName: String = UI_Cvar_VariableString(ctx, "ui_favoriteName")
+            .chars()
+            .take(MAX_NAME_LENGTH.saturating_sub(1))
+            .collect();
+        let addr: String = UI_Cvar_VariableString(ctx, "ui_favoriteAddress")
+            .chars()
+            .take(MAX_NAME_LENGTH.saturating_sub(1))
+            .collect();
+        if !addr.is_empty() {
+            let res = trap::LAN_AddServer(ctx.engine, AS_FAVORITES, &favName, &addr);
+            if res == 0 {
+                // server already in the list
+                Com_Printf(ctx, "Favorite already in list\n");
+            } else if res == -1 {
+                // list full
+                Com_Printf(ctx, "Favorite list full\n");
+            } else {
+                // successfully added
+                Com_Printf(ctx, &format!("Added favorite server {}\n", addr));
+            }
+        }
+    } else if Q_stricmp(&name, "orders") == 0 {
+        let mut orders = String::new();
+        if String_Parse(args, &mut orders) {
+            let selectedPlayer = trap::Cvar_VariableValue(ctx.engine, "cg_selectedPlayer") as c_int;
+            // PORT-NOTE (§19 UB pick): Raven indexes `teamClientNums[selectedPlayer]`
+            // with no lower-bound check (`ui_main.c:6612-6615`) — a negative
+            // `selectedPlayer` is a real C OOB read. `.get()` picks "out of
+            // range" as the defined behavior.
+            if selectedPlayer < ctx.world.teamNames.len() as c_int {
+                let clientNum = ctx
+                    .world
+                    .teamClientNums
+                    .get(selectedPlayer.max(0) as usize)
+                    .copied()
+                    .unwrap_or(0);
+                let text = va_runtime(&orders, &[&format!("{}", clientNum)]);
+                trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_APPEND as c_int, &text);
+                trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_APPEND as c_int, "\n");
+            } else {
+                for i in 0..ctx.world.teamNames.len() {
+                    let selfName = UI_Cvar_VariableString(ctx, "name");
+                    if Q_stricmp(&selfName, &ctx.world.teamNames[i]) == 0 {
+                        continue;
+                    }
+                    let text = va_runtime(&orders, &[&ctx.world.teamNames[i]]);
+                    trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_APPEND as c_int, &text);
+                    trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_APPEND as c_int, "\n");
+                }
+            }
+            let catcher = trap::Key_GetCatcher(ctx.engine);
+            trap::Key_SetCatcher(ctx.engine, catcher & !KEYCATCH_UI);
+            trap::Key_ClearStates(ctx.engine);
+            trap::Cvar_Set(ctx.engine, "cl_paused", "0");
+            Menus_CloseAll(&mut ctx.world.menus, dc);
+        }
+    } else if Q_stricmp(&name, "voiceOrdersTeam") == 0 {
+        let mut orders = String::new();
+        if String_Parse(args, &mut orders) {
+            let selectedPlayer = trap::Cvar_VariableValue(ctx.engine, "cg_selectedPlayer") as c_int;
+            if selectedPlayer == ctx.world.teamNames.len() as c_int {
+                trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_APPEND as c_int, &orders);
+                trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_APPEND as c_int, "\n");
+            }
+            let catcher = trap::Key_GetCatcher(ctx.engine);
+            trap::Key_SetCatcher(ctx.engine, catcher & !KEYCATCH_UI);
+            trap::Key_ClearStates(ctx.engine);
+            trap::Cvar_Set(ctx.engine, "cl_paused", "0");
+            Menus_CloseAll(&mut ctx.world.menus, dc);
+        }
+    } else if Q_stricmp(&name, "voiceOrders") == 0 {
+        let mut orders = String::new();
+        if String_Parse(args, &mut orders) {
+            let selectedPlayer = trap::Cvar_VariableValue(ctx.engine, "cg_selectedPlayer") as c_int;
+            let text = if selectedPlayer == ctx.world.teamNames.len() as c_int {
+                va_runtime(&orders, &[&format!("{}", -1)])
+            } else {
+                // PORT-NOTE (§19 UB pick): Raven indexes `teamClientNums[selectedPlayer]`
+                // unguarded (`ui_main.c:6660`) — negative, or above the live team count
+                // (stale slots up to `MAX_CLIENTS`), both read garbage; 0 is the pick.
+                let clientNum = ctx
+                    .world
+                    .teamClientNums
+                    .get(selectedPlayer.max(0) as usize)
+                    .copied()
+                    .unwrap_or(0);
+                va_runtime(&orders, &[&format!("{}", clientNum)])
+            };
+            trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_APPEND as c_int, &text);
+            trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_APPEND as c_int, "\n");
+
+            let catcher = trap::Key_GetCatcher(ctx.engine);
+            trap::Key_SetCatcher(ctx.engine, catcher & !KEYCATCH_UI);
+            trap::Key_ClearStates(ctx.engine);
+            trap::Cvar_Set(ctx.engine, "cl_paused", "0");
+            Menus_CloseAll(&mut ctx.world.menus, dc);
+        }
+    } else if Q_stricmp(&name, "setForce") == 0 {
+        let mut teamArg = String::new();
+        if String_Parse(args, &mut teamArg) {
+            if Q_stricmp("none", &teamArg) == 0 {
+                UI_UpdateClientForcePowers(ctx, "");
+            } else if Q_stricmp("same", &teamArg) == 0 {
+                // stay on current team
+                let myTeam = trap::Cvar_VariableValue(ctx.engine, "ui_myteam") as c_int;
+                if myTeam != TEAM_SPECTATOR as c_int {
+                    // will cause him to respawn, if it's been 5 seconds since last one
+                    let teamName = UI_TeamName(myTeam).to_string();
+                    UI_UpdateClientForcePowers(ctx, &teamName);
+                } else {
+                    // just update powers
+                    UI_UpdateClientForcePowers(ctx, "");
+                }
+            } else {
+                UI_UpdateClientForcePowers(ctx, &teamArg);
+            }
+        } else {
+            UI_UpdateClientForcePowers(ctx, "");
+        }
+    } else if Q_stricmp(&name, "setsiegeclassandteam") == 0 {
+        let team = trap::Cvar_VariableValue(ctx.engine, "ui_holdteam") as c_int;
+        let oldteam = trap::Cvar_VariableValue(ctx.engine, "ui_startsiegeteam") as c_int;
+        let mut goTeam = true;
+
+        // PORT-NOTE: `newclassString` is fetched but never read in Raven —
+        // the dead local is preserved for parity (the trap call still fires).
+        let _newclass_string = trap::Cvar_VariableStringBuffer(ctx.engine, "ui_mySiegeClass", 512);
+        let startclassString =
+            trap::Cvar_VariableStringBuffer(ctx.engine, "ui_startsiegeclass", 512);
+
+        // Was just a spectator - is still just a spectator
+        if oldteam == team && oldteam == 3 {
+            goTeam = false;
+        } else if oldteam == team {
+            // Classes match?
+            if ctx.world.main.g_UIGloballySelectedSiegeClass != -1 {
+                let className = ctx
+                    .world
+                    .bg_state
+                    .bgSiegeClasses
+                    .get(ctx.world.main.g_UIGloballySelectedSiegeClass as usize)
+                    .map(|c| c.name.clone())
+                    .unwrap_or_default();
+                if startclassString == className {
+                    goTeam = false;
+                }
+            }
+        }
+
+        if goTeam {
+            // PORT-NOTE: the three `team == 1/2/3` arms all set the same
+            // cvar to the same value in Raven (`ui_main.c:6732-6744`);
+            // collapsed to one condition (§10).
+            if team == 1 || team == 2 || team == 3 {
+                trap::Cvar_Set(ctx.engine, "ui_team", &format!("{}", team));
+            }
+
+            if ctx.world.main.g_UIGloballySelectedSiegeClass != -1 {
+                let className = ctx
+                    .world
+                    .bg_state
+                    .bgSiegeClasses
+                    .get(ctx.world.main.g_UIGloballySelectedSiegeClass as usize)
+                    .map(|c| c.name.clone())
+                    .unwrap_or_default();
+                trap::Cmd_ExecuteText(
+                    ctx.engine,
+                    cbufExec_t::EXEC_APPEND as c_int,
+                    &format!("siegeclass \"{}\"\n", className),
+                );
+            }
+        }
+    } else if Q_stricmp(&name, "setBotButton") == 0 {
+        UI_SetBotButton(ctx, dc);
+    } else if Q_stricmp(&name, "saveTemplate") == 0 {
+        UI_SaveForceTemplate(ctx, dc);
+    } else if Q_stricmp(&name, "refreshForce") == 0 {
+        UI_UpdateForcePowers(ctx, dc);
+    } else if Q_stricmp(&name, "glCustom") == 0 {
+        trap::Cvar_Set(ctx.engine, "ui_r_glCustom", "4");
+    } else if Q_stricmp(&name, "setMovesListDefault") == 0 {
+        ctx.world.movesTitleIndex = 2;
+    } else if Q_stricmp(&name, "resetMovesList") == 0 {
+        if let Some(menu) = Menus_FindByName(&ctx.world.menus, "rulesMenu_moves") {
+            // update saber models
+            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "character") {
+                // See `UI_FeederSelection`'s own PORT-NOTE: `ctx` and `item`'s
+                // home arena can't be borrowed at once, so the item is cloned
+                // out and written back.
+                let mut charItem = ctx.world.menus.item(item).clone();
+                UI_SaberAttachToChar(ctx, &mut charItem);
+                *ctx.world.menus.item_mut(item) = charItem;
+            }
+        }
+
+        trap::Cvar_Set(ctx.engine, "ui_move_desc", " ");
+    } else if Q_stricmp(&name, "resetcharacterlistboxes") == 0 {
+        UI_ResetCharacterListBoxes(ctx.world);
+    } else if Q_stricmp(&name, "setMoveCharacter") == 0 {
+        UI_GetCharacterCvars(ctx);
+
+        ctx.world.movesTitleIndex = 0;
+
+        if let Some(menu) = Menus_FindByName(&ctx.world.menus, "rulesMenu_moves") {
+            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "character") {
+                if ctx.world.menus.item(item).typeData.model().is_some() {
+                    let baseAnim =
+                        DATAPAD_MOVE_TITLE_BASE_ANIMS[ctx.world.movesTitleIndex as usize];
+                    ctx.world.movesBaseAnim = baseAnim.to_string();
+                    ItemParse_model_g2anim_go(&mut ctx.world.menus, dc, item, Some(baseAnim));
+                    ctx.world.moveAnimTime = 0;
+
+                    let charModel = UI_Cvar_VariableString(ctx, "ui_char_model");
+                    // PORT-NOTE: Raven's `Com_sprintf` into `modelPath[MAX_QPATH]`
+                    // truncates at 63 chars (unreachable for real model names).
+                    let modelPath = format!("models/players/{}/model.glm", charModel);
+                    let mut animRunLength: c_int = 0;
+                    ItemParse_asset_model_go(
+                        &mut ctx.world.menus,
+                        dc,
+                        item,
+                        &modelPath,
+                        &mut animRunLength,
+                    );
+
+                    UI_UpdateCharacterSkin(ctx, dc);
+                    let mut charItem = ctx.world.menus.item(item).clone();
+                    UI_SaberAttachToChar(ctx, &mut charItem);
+                    *ctx.world.menus.item_mut(item) = charItem;
+                }
+            }
+        }
+    } else if Q_stricmp(&name, "character") == 0 {
+        UI_UpdateCharacter(ctx, dc, false);
+    } else if Q_stricmp(&name, "characterchanged") == 0 {
+        UI_UpdateCharacter(ctx, dc, true);
+    } else if Q_stricmp(&name, "updatecharcvars") == 0 || Q_stricmp(&name, "updatecharmodel") == 0 {
+        UI_UpdateCharacterCvars(ctx);
+    } else if Q_stricmp(&name, "getcharcvars") == 0 {
+        UI_GetCharacterCvars(ctx);
+    } else if Q_stricmp(&name, "char_skin") == 0 {
+        UI_UpdateCharacterSkin(ctx, dc);
+    } else if Q_stricmp(&name, "setui_dualforcepower") == 0 {
+        let forcePowerDisable =
+            trap::Cvar_VariableValue(ctx.engine, "g_forcePowerDisable") as c_int;
+        let mut forceBitFlag: c_int = 0;
+
+        // Turn off all powers but a few
+        for i in 0..NUM_FORCE_POWERS {
+            if i != FP_LEVITATION
+                && i != FP_PUSH
+                && i != FP_PULL
+                && i != FP_SABERTHROW
+                && i != FP_SABER_DEFENSE
+                && i != FP_SABER_OFFENSE
+            {
+                forceBitFlag |= 1 << i;
+            }
+        }
+
+        if forcePowerDisable == 0 {
+            trap::Cvar_Set(ctx.engine, "ui_dualforcepower", "0");
+        } else if forcePowerDisable == forceBitFlag {
+            trap::Cvar_Set(ctx.engine, "ui_dualforcepower", "2");
+        } else {
+            trap::Cvar_Set(ctx.engine, "ui_dualforcepower", "1");
+        }
+    } else if Q_stricmp(&name, "dualForcePowers") == 0 {
+        let dualforcePower = trap::Cvar_VariableValue(ctx.engine, "ui_dualforcepower") as c_int;
+        let mut forcePowerDisable: c_int = 0;
+
+        if dualforcePower == 0 {
+            // All force powers
+            forcePowerDisable = 0;
+        } else if dualforcePower == 1 {
+            // Remove All force powers
+            // PORT-NOTE (§19 UB pick): Raven's `forcePowerDisable` is read via
+            // `|=` here with no prior assignment on this branch
+            // (`ui_main.c:6886-6893`) — genuinely uninitialized in C. `0` is
+            // picked as the defined starting value.
+            // Same for the fall-through path (`dualforcePower` none of 0/1/2), where
+            // Raven writes the uninitialized value straight to the cvar; 0 covers both.
+            // It was set to something, so might as well make sure it got all flags set.
+            for i in 0..NUM_FORCE_POWERS {
+                forcePowerDisable |= 1 << i;
+            }
+        } else if dualforcePower == 2 {
+            // Limited force powers
+            forcePowerDisable = 0;
+
+            // Turn off all powers but a few
+            for i in 0..NUM_FORCE_POWERS {
+                if i != FP_LEVITATION
+                    && i != FP_PUSH
+                    && i != FP_PULL
+                    && i != FP_SABERTHROW
+                    && i != FP_SABER_DEFENSE
+                    && i != FP_SABER_OFFENSE
+                {
+                    forcePowerDisable |= 1 << i;
+                }
+            }
+        }
+
+        trap::Cvar_Set(
+            ctx.engine,
+            "g_forcePowerDisable",
+            &format!("{}", forcePowerDisable),
+        );
+    } else if Q_stricmp(&name, "forcePowersDisable") == 0 {
+        let mut forcePowerDisable =
+            trap::Cvar_VariableValue(ctx.engine, "g_forcePowerDisable") as c_int;
+
+        // It was set to something, so might as well make sure it got all flags set.
+        if forcePowerDisable != 0 {
+            for i in 0..NUM_FORCE_POWERS {
+                forcePowerDisable |= 1 << i;
+            }
+
+            trap::Cvar_Set(
+                ctx.engine,
+                "g_forcePowerDisable",
+                &format!("{}", forcePowerDisable),
+            );
+        }
+    } else if Q_stricmp(&name, "weaponDisable") == 0 {
+        let gtEnum = ctx
+            .world
+            .gameTypes
+            .get(ctx.world.cvars.ui_netGameType.integer as usize)
+            .map(|gt| gt.gtEnum)
+            .unwrap_or_default();
+        let cvarString = if gtEnum == GT_DUEL as c_int || gtEnum == GT_POWERDUEL as c_int {
+            "g_duelWeaponDisable"
+        } else {
+            "g_weaponDisable"
+        };
+
+        let mut weaponDisable = trap::Cvar_VariableValue(ctx.engine, cvarString) as c_int;
+
+        // It was set to something, so might as well make sure it got all flags set.
+        if weaponDisable != 0 {
+            for i in 0..WP_NUM_WEAPONS {
+                if i != WP_SABER {
+                    weaponDisable |= 1 << i;
+                }
+            }
+
+            trap::Cvar_Set(ctx.engine, cvarString, &format!("{}", weaponDisable));
+        }
+    // If this is siege, change all the bots to humans, because we faked it earlier
+    //  swapping humans for bots on the menu
+    } else if Q_stricmp(&name, "setSiegeNoBots") == 0 {
+        let gtEnum = ctx
+            .world
+            .gameTypes
+            .get(ctx.world.cvars.ui_netGameType.integer as usize)
+            .map(|gt| gt.gtEnum)
+            .unwrap_or_default();
+        if gtEnum == GT_SIEGE as c_int {
+            // hmm, I guess I'll set bot_minplayers to 0 here too. -rww
+            trap::Cvar_Set(ctx.engine, "bot_minplayers", "0");
+
+            for i in 1..9 {
+                let blueValue =
+                    trap::Cvar_VariableValue(ctx.engine, &format!("ui_blueteam{}", i)) as c_int;
+                if blueValue > 1 {
+                    trap::Cvar_Set(ctx.engine, &format!("ui_blueteam{}", i), "1");
+                }
+
+                let redValue =
+                    trap::Cvar_VariableValue(ctx.engine, &format!("ui_redteam{}", i)) as c_int;
+                if redValue > 1 {
+                    trap::Cvar_Set(ctx.engine, &format!("ui_redteam{}", i), "1");
+                }
+            }
+        }
+    } else if Q_stricmp(&name, "clearmouseover") == 0 {
+        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
+            let mut itemName = String::new();
+            String_Parse(args, &mut itemName);
+
+            let count = Menu_ItemsMatchingGroup(&ctx.world.menus, dc, menu, &itemName);
+
+            for j in 0..count {
+                if let Some(item) =
+                    Menu_GetMatchingItemByNumber(&ctx.world.menus, menu, j, &itemName)
+                {
+                    ctx.world.menus.item_mut(item).window.flags &= !WINDOW_MOUSEOVER;
+                }
+            }
+        }
+    } else if Q_stricmp(&name, "updateForceStatus") == 0 {
+        UpdateForceStatus(ctx, dc);
+    } else if Q_stricmp(&name, "update") == 0 {
+        let mut name2 = String::new();
+        if String_Parse(args, &mut name2) {
+            UI_Update(ctx, &name2);
+        }
+    } else if Q_stricmp(&name, "setBotButtons") == 0 {
+        UpdateBotButtons(ctx.world, dc);
+    } else if Q_stricmp(&name, "getsabercvars") == 0 {
+        UI_GetSaberCvars(ctx);
+    } else if Q_stricmp(&name, "setsaberboxesandhilts") == 0 {
+        UI_SetSaberBoxesandHilts(ctx);
+    } else if Q_stricmp(&name, "saber_type") == 0 {
+        UI_UpdateSaberType(ctx);
+    } else if Q_stricmp(&name, "saber_hilt") == 0 {
+        UI_UpdateSaberHilt(ctx, dc, false);
+    } else if Q_stricmp(&name, "saber_color") == 0 {
+        UI_UpdateSaberColor(false);
+    } else if Q_stricmp(&name, "setscreensaberhilt") == 0 {
+        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
+            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "hiltbut") {
+                let idx = ctx.world.menus.item(item).cursorPos as usize;
+                if let Some(hilt) = ctx.world.main.saberSingleHiltInfo.get(idx).cloned() {
+                    trap::Cvar_Set(ctx.engine, "ui_saber", &hilt);
+                }
+            }
+        }
+    } else if Q_stricmp(&name, "setscreensaberhilt1") == 0 {
+        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
+            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "hiltbut1") {
+                let idx = ctx.world.menus.item(item).cursorPos as usize;
+                if let Some(hilt) = ctx.world.main.saberSingleHiltInfo.get(idx).cloned() {
+                    trap::Cvar_Set(ctx.engine, "ui_saber", &hilt);
+                }
+            }
+        }
+    } else if Q_stricmp(&name, "setscreensaberhilt2") == 0 {
+        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
+            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "hiltbut2") {
+                let idx = ctx.world.menus.item(item).cursorPos as usize;
+                if let Some(hilt) = ctx.world.main.saberSingleHiltInfo.get(idx).cloned() {
+                    trap::Cvar_Set(ctx.engine, "ui_saber2", &hilt);
+                }
+            }
+        }
+    } else if Q_stricmp(&name, "setscreensaberstaff") == 0 {
+        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
+            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "hiltbut_staves")
+            {
+                let idx = ctx.world.menus.item(item).cursorPos as usize;
+                // PORT-NOTE: Raven checks `saberSingleHiltInfo[cursorPos]` but
+                // sets from `saberStaffHiltInfo[cursorPos]`
+                // (`ui_main.c:7115-7119`) — faithfully preserved quirk.
+                if ctx.world.main.saberSingleHiltInfo.get(idx).is_some() {
+                    if let Some(hilt) = ctx.world.main.saberStaffHiltInfo.get(idx).cloned() {
+                        trap::Cvar_Set(ctx.engine, "ui_saber", &hilt);
+                    }
+                }
+            }
+        }
+    } else if Q_stricmp(&name, "saber2_hilt") == 0 {
+        UI_UpdateSaberHilt(ctx, dc, true);
+    } else if Q_stricmp(&name, "saber2_color") == 0 {
+        UI_UpdateSaberColor(true);
+    } else if Q_stricmp(&name, "updatesabercvars") == 0 {
+        UI_UpdateSaberCvars(ctx);
+    } else if Q_stricmp(&name, "updatesiegeobjgraphics") == 0 {
+        let team = trap::Cvar_VariableValue(ctx.engine, "ui_team") as c_int;
+        trap::Cvar_Set(ctx.engine, "ui_holdteam", &format!("{}", team));
+
+        UI_UpdateSiegeObjectiveGraphics(ctx, dc);
+    } else if Q_stricmp(&name, "setsiegeobjbuttons") == 0 {
+        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
+            // Set the new item to the background
+            let mut itemArg = String::new();
+            if String_Parse(args, &mut itemArg) {
+                // Set the old button to it's original background
+                let currentItemName =
+                    trap::Cvar_VariableStringBuffer(ctx.engine, "currentObjMapIconItem", 512);
+                if let Some(item) =
+                    Menu_FindItemByName(&ctx.world.menus, Some(menu), &currentItemName)
+                {
+                    // A cvar holding the name of a cvar - how crazy is that?
+                    let windowName = ctx
+                        .world
+                        .menus
+                        .item(item)
+                        .window
+                        .name
+                        .clone()
+                        .unwrap_or_default();
+                    let bgCvarName = trap::Cvar_VariableStringBuffer(
+                        ctx.engine,
+                        "currentObjMapIconBackground",
+                        512,
+                    );
+                    let bg = trap::Cvar_VariableStringBuffer(ctx.engine, &bgCvarName, 512);
+                    Menu_SetItemBackground(&mut ctx.world.menus, dc, Some(menu), &windowName, &bg);
+
+                    // Re-enable this button
+                    Menu_ItemDisable(&mut ctx.world.menus, dc, menu, &windowName, 0);
+                }
+
+                // Set the new item to the given background
+                if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), &itemArg) {
+                    // store item name
+                    let windowName = ctx
+                        .world
+                        .menus
+                        .item(item)
+                        .window
+                        .name
+                        .clone()
+                        .unwrap_or_default();
+                    trap::Cvar_Set(ctx.engine, "currentObjMapIconItem", &windowName);
+                    let mut cvarNormalArg = String::new();
+                    if String_Parse(args, &mut cvarNormalArg) {
+                        // Store normal background
+                        trap::Cvar_Set(ctx.engine, "currentObjMapIconBackground", &cvarNormalArg);
+                        // Get higlight background
+                        let mut cvarLitArg = String::new();
+                        if String_Parse(args, &mut cvarLitArg) {
+                            // set hightlight background
+                            let lit = trap::Cvar_VariableStringBuffer(ctx.engine, &cvarLitArg, 512);
+                            Menu_SetItemBackground(
+                                &mut ctx.world.menus,
+                                dc,
+                                Some(menu),
+                                &windowName,
+                                &lit,
+                            );
+                            // Disable button
+                            Menu_ItemDisable(&mut ctx.world.menus, dc, menu, &windowName, 1);
+                        }
+                    }
+                }
+            }
+        }
+    } else if Q_stricmp(&name, "updatesiegeclasscnt") == 0 {
+        let mut teamArg = String::new();
+        if String_Parse(args, &mut teamArg) {
+            UI_SiegeClassCnt(ctx, dc, atoi(&teamArg));
+        }
+    } else if Q_stricmp(&name, "updatesiegecvars") == 0 {
+        let team = trap::Cvar_VariableValue(ctx.engine, "ui_holdteam") as c_int;
+        let baseClass = trap::Cvar_VariableValue(ctx.engine, "ui_siege_class") as c_int;
+
+        UI_UpdateCvarsForClass(ctx, dc, team, baseClass, 0);
+    // Save current team and class
+    } else if Q_stricmp(&name, "setteamclassicons") == 0 {
+        let team = trap::Cvar_VariableValue(ctx.engine, "ui_holdteam") as c_int;
+        let classString = trap::Cvar_VariableStringBuffer(ctx.engine, "ui_mySiegeClass", 512);
+
+        trap::Cvar_Set(ctx.engine, "ui_startsiegeteam", &format!("{}", team));
+        trap::Cvar_Set(ctx.engine, "ui_startsiegeclass", &classString);
+
+        // If player is already on a team, set up icons to show it.
+        UI_FindCurrentSiegeTeamClass(ctx, dc);
+    } else if Q_stricmp(&name, "updatesiegeweapondesc") == 0 {
+        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
+            if let Some(item) =
+                Menu_FindItemByName(&ctx.world.menus, Some(menu), "base_class_weapons_feed")
+            {
+                let idx = ctx.world.menus.item(item).cursorPos;
+                let info = trap::Cvar_VariableStringBuffer(
+                    ctx.engine,
+                    &format!("ui_class_weapondesc{}", idx),
+                    MAX_INFO_VALUE as usize,
+                );
+                trap::Cvar_Set(ctx.engine, "ui_itemforceinvdesc", &info);
+            }
+        }
+    } else if Q_stricmp(&name, "updatesiegeinventorydesc") == 0 {
+        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
+            if let Some(item) =
+                Menu_FindItemByName(&ctx.world.menus, Some(menu), "base_class_inventory_feed")
+            {
+                let idx = ctx.world.menus.item(item).cursorPos;
+                let info = trap::Cvar_VariableStringBuffer(
+                    ctx.engine,
+                    &format!("ui_class_itemdesc{}", idx),
+                    MAX_INFO_VALUE as usize,
+                );
+                trap::Cvar_Set(ctx.engine, "ui_itemforceinvdesc", &info);
+            }
+        }
+    } else if Q_stricmp(&name, "updatesiegeforcedesc") == 0 {
+        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
+            if let Some(item) =
+                Menu_FindItemByName(&ctx.world.menus, Some(menu), "base_class_force_feed")
+            {
+                let idx = ctx.world.menus.item(item).cursorPos;
+                let info = trap::Cvar_VariableStringBuffer(
+                    ctx.engine,
+                    &format!("ui_class_power{}", idx),
+                    MAX_STRING_CHARS,
+                );
+
+                // count them up
+                for i in 0..NUM_FORCE_POWERS {
+                    if HOLOCRON_ICONS[i as usize] == info {
+                        trap::Cvar_Set(
+                            ctx.engine,
+                            "ui_itemforceinvdesc",
+                            FORCEPOWER_DESC[i as usize],
+                        );
+                    }
+                }
+            }
+        }
+    } else if Q_stricmp(&name, "resetitemdescription") == 0 {
+        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
+            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "itemdescription")
+            {
+                if let Some(listPtr) = ctx.world.menus.item_mut(item).typeData.listBox_mut() {
+                    listPtr.startPos = 0;
+                    listPtr.cursorPos = 0;
+                }
+                ctx.world.menus.item_mut(item).cursorPos = 0;
+            }
+        }
+    } else if Q_stricmp(&name, "resetsiegelistboxes") == 0 {
+        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
+            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "description") {
+                if let Some(listPtr) = ctx.world.menus.item_mut(item).typeData.listBox_mut() {
+                    listPtr.startPos = 0;
+                }
+                ctx.world.menus.item_mut(item).cursorPos = 0;
+            }
+        }
+
+        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
+            if let Some(item) =
+                Menu_FindItemByName(&ctx.world.menus, Some(menu), "base_class_weapons_feed")
+            {
+                if let Some(listPtr) = ctx.world.menus.item_mut(item).typeData.listBox_mut() {
+                    listPtr.startPos = 0;
+                }
+                ctx.world.menus.item_mut(item).cursorPos = 0;
+            }
+
+            if let Some(item) =
+                Menu_FindItemByName(&ctx.world.menus, Some(menu), "base_class_inventory_feed")
+            {
+                if let Some(listPtr) = ctx.world.menus.item_mut(item).typeData.listBox_mut() {
+                    listPtr.startPos = 0;
+                }
+                ctx.world.menus.item_mut(item).cursorPos = 0;
+            }
+
+            if let Some(item) =
+                Menu_FindItemByName(&ctx.world.menus, Some(menu), "base_class_force_feed")
+            {
+                if let Some(listPtr) = ctx.world.menus.item_mut(item).typeData.listBox_mut() {
+                    listPtr.startPos = 0;
+                }
+                ctx.world.menus.item_mut(item).cursorPos = 0;
+            }
+        }
+    } else if Q_stricmp(&name, "updatesiegestatusicons") == 0 {
+        UI_UpdateSiegeStatusIcons(ctx.world, dc);
+    } else if Q_stricmp(&name, "setcurrentNetMap") == 0 {
+        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
+            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "maplist") {
+                if let Some(listPtr) = ctx.world.menus.item(item).typeData.listBox() {
+                    trap::Cvar_Set(
+                        ctx.engine,
+                        "ui_currentNetMap",
+                        &format!("{}", listPtr.cursorPos),
+                    );
+                }
+            }
+        }
+    } else if Q_stricmp(&name, "resetmaplist") == 0 {
+        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
+            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "maplist") {
+                let (special, cursorPos) = {
+                    let it = ctx.world.menus.item(item);
+                    (it.special, it.cursorPos)
+                };
+                // PORT-NOTE: Raven calls through `uiInfo.uiDC.feederSelection`,
+                // the vtable slot `_UI_Init` wired to `UI_FeederSelection`
+                // (dropped — DEC-36 D3 replaces the fn-ptr table); called
+                // directly here since that assignment is its only implementor.
+                UI_FeederSelection(ctx, dc, special, cursorPos, Some(item));
+            }
+        }
+    } else if Q_stricmp(&name, "getmousepitch") == 0 {
+        let v = if trap::Cvar_VariableValue(ctx.engine, "m_pitch") >= 0.0 {
+            "0"
+        } else {
+            "1"
+        };
+        trap::Cvar_Set(ctx.engine, "ui_mousePitch", v);
+    } else if Q_stricmp(&name, "clampmaxplayers") == 0 {
+        UI_ClampMaxPlayers(ctx);
+        // PORT-NOTE: the `#ifdef _XBOX` XBL script arms (`initaccountlist`,
+        // `createaccount`, `logonlive`, ..., `setvoicemask`) are dead
+        // non-retail-MP surface (`_XBOX` never defined for MP) — dropped.
+    } else {
+        Com_Printf(ctx, &format!("unknown UI script {}\n", name));
+    }
+}
+
+/// Raven `_UI_Init` — one-time per-`_UI_Init` setup (cvars, the ui memory
+/// pool, aspect-ratio scale/bias, the initial menu load, cached scores).
+///
+/// PORT-NOTE: the `DC` fn-pointer assignment block (`uiInfo.uiDC.setColor =
+/// &UI_SetColor;` ... `uiInfo.uiDC.runCinematicFrame =
+/// &UI_RunCinematicFrame;`, `ui_main.c:10701-10758`) and the `Init_Display`
+/// call immediately after it (`ui_main.c:10760`) are dropped — DEC-36 D3 replaces the vtable with the
+/// `DisplayContext` trait threaded per-call, matching `Init_Display`'s own
+/// DEFERRED note (`crates/mp/uishared/src/ui_shared.rs:421-428`); there is no
+/// `DC` field left for either to assign.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:10661-10824`
+pub fn _UI_Init(ctx: &mut UiContext, dc: &mut dyn DisplayContext, inGameLoad: bool) {
+    // register this freakin thing now
+    let mut siegeTeamSwitch = vmCvar_t::default();
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut siegeTeamSwitch),
+        "g_siegeTeamSwitch",
+        "1",
+        CVAR_SERVERINFO | CVAR_ARCHIVE,
+    );
+
+    // Get the list of possible languages
+    // this does a dir scan, so use carefully
+    ctx.world.languageCount = trap::SP_GetNumLanguages(ctx.engine);
+
+    ctx.world.inGameLoad = inGameLoad;
+
+    // initialize all these cvars to "0"
+    UI_SiegeSetCvarsForClass(ctx, None);
+
+    // DEFERRED: UI_SiegeInit — see its own DEFERRED note just above this fn
+    // in this file (bg traits (`BgTraps`/`GameCallbacks`) not wired into
+    // `mp_ui` yet).
+    // Source: `oracle/codemp/ui/ui_main.c:10677`
+
+    UI_UpdateForcePowers(ctx, dc);
+
+    UI_RegisterCvars(ctx);
+    UI_InitMemory();
+
+    // cache redundant calulations
+    trap::GetGlconfig(ctx.engine, &mut ctx.world.uiDC.glconfig);
+
+    // for 640x480 virtualized screen
+    ctx.world.uiDC.yscale = (ctx.world.uiDC.glconfig.vidHeight as f64 * (1.0 / 480.0)) as f32;
+    ctx.world.uiDC.xscale = (ctx.world.uiDC.glconfig.vidWidth as f64 * (1.0 / 640.0)) as f32;
+    if ctx.world.uiDC.glconfig.vidWidth * 480 > ctx.world.uiDC.glconfig.vidHeight * 640 {
+        // wide screen
+        ctx.world.uiDC.bias =
+            (0.5 * (ctx.world.uiDC.glconfig.vidWidth as f64
+                - (ctx.world.uiDC.glconfig.vidHeight as f64 * (640.0 / 480.0)))) as f32;
+    } else {
+        // no wide screen
+        ctx.world.uiDC.bias = 0.0;
+    }
+
+    // UI_Load();
+
+    UI_BuildPlayerModel_List(ctx, inGameLoad);
+
+    String_Init(&mut ctx.world.menus, dc);
+
+    ctx.world.uiDC.cursor = trap::R_RegisterShaderNoMip(ctx.engine, "menu/art/3_cursor2");
+    ctx.world.uiDC.whiteShader = trap::R_RegisterShaderNoMip(ctx.engine, "white");
+
+    AssetCache(ctx);
+
+    let _start = trap::Milliseconds(ctx.engine);
+
+    // PORT-NOTE: `teamCount`/`aliasCount` fold into their arrays' lengths
+    // (§C8 count-field elimination); `characterCount` survives as a scalar
+    // field (`UiWorld` doc).
+    ctx.world.teamList.clear();
+    ctx.world.characterCount = 0;
+    ctx.world.aliasList.clear();
+
+    UI_ParseGameInfo(ctx, "ui/jamp/gameinfo.txt");
+
+    let mut menuSet = UI_Cvar_VariableString(ctx, "ui_menuFilesMP");
+    if menuSet.is_empty() {
+        menuSet = "ui/jampmenus.txt".to_string();
+    }
+
+    if inGameLoad {
+        UI_LoadMenus(ctx, dc, "ui/jampingame.txt", true);
+    } else if ctx.world.cvars.ui_bypassMainMenuLoad.integer == 0 {
+        UI_LoadMenus(ctx, dc, &menuSet, true);
+    }
+
+    // get this now, jic the menus change again trying to setName before getName
+    let uiName = UI_Cvar_VariableString(ctx, "name");
+    trap::Cvar_Register(ctx.engine, None, "ui_name", &uiName, CVAR_INTERNAL);
+
+    Menus_CloseAll(&mut ctx.world.menus, dc);
+
+    trap::LAN_LoadCachedServers(ctx.engine);
+    let mapLoadName = ctx
+        .world
+        .mapList
+        .get(ctx.world.cvars.ui_currentMap.integer as usize)
+        .map(|m| m.mapLoadName.clone())
+        .unwrap_or_default();
+    let gtEnum = ctx
+        .world
+        .gameTypes
+        .get(ctx.world.cvars.ui_gameType.integer as usize)
+        .map(|gt| gt.gtEnum)
+        .unwrap_or_default();
+    UI_LoadBestScores(ctx, &mapLoadName, gtEnum);
+
+    UI_BuildQ3Model_List(ctx);
+    UI_LoadBots(ctx);
+
+    UI_LoadForceConfig_List(ctx);
+
+    UI_InitForceShaders(ctx);
+
+    // sets defaults for ui temp cvars
+    ctx.world.effectsColor = trap::Cvar_VariableValue(ctx.engine, "color1") as c_int;
+    ctx.world.currentCrosshair = trap::Cvar_VariableValue(ctx.engine, "cg_drawCrosshair") as c_int;
+    trap::Cvar_Set(
+        ctx.engine,
+        "ui_mousePitch",
+        if trap::Cvar_VariableValue(ctx.engine, "m_pitch") >= 0.0 {
+            "0"
+        } else {
+            "1"
+        },
+    );
+    trap::Cvar_Set(
+        ctx.engine,
+        "ui_mousePitchVeh",
+        if trap::Cvar_VariableValue(ctx.engine, "m_pitchVeh") >= 0.0 {
+            "0"
+        } else {
+            "1"
+        },
+    );
+
+    ctx.world.serverStatus.currentServerCinematic = -1;
+    ctx.world.previewMovie = -1;
+
+    trap::Cvar_Register(ctx.engine, None, "debug_protocol", "", 0);
+
+    trap::Cvar_Set(
+        ctx.engine,
+        "ui_actualNetGameType",
+        &format!("{}", ctx.world.cvars.ui_netGameType.integer),
+    );
+}
+
+/// Raven `_UI_KeyEvent` — dispatches a key event to the focused menu, or
+/// closes out the UI key-catcher when no menu is open.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:10837-10863`
+pub fn _UI_KeyEvent(ctx: &mut UiContext, dc: &mut dyn DisplayContext, key: c_int, down: bool) {
+    if Menu_Count(&ctx.world.menus) > 0 {
+        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
+            // PORT-NOTE: the `#ifdef _XBOX` `UpdateDemoTimer()` call
+            // (`ui_main.c:10843-10847`) is dead non-retail-MP surface — dropped.
+            if key == fakeAscii_t::A_ESCAPE as c_int
+                && down
+                && !Menus_AnyFullScreenVisible(&ctx.world.menus)
+            {
+                Menus_CloseAll(&mut ctx.world.menus, dc);
+            } else {
+                Menu_HandleKey(
+                    &mut ctx.world.menus,
+                    &ctx.world.uiDC,
+                    dc,
+                    Some(menu),
+                    key,
+                    down,
+                );
+            }
+        } else {
+            let catcher = trap::Key_GetCatcher(ctx.engine);
+            trap::Key_SetCatcher(ctx.engine, catcher & !KEYCATCH_UI);
+            trap::Key_ClearStates(ctx.engine);
+            trap::Cvar_Set(ctx.engine, "cl_paused", "0");
+        }
+    }
+
+    //if ((s > 0) && (s != menu_null_sound)) {
+    //  trap_S_StartLocalSound( s, CHAN_LOCAL_SOUND );
+    //}
+}
+
+/// Raven `UI_LoadNonIngame` — loads the non-in-game menu set without
+/// resetting the menu framework.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:10894-10901`
+pub fn UI_LoadNonIngame(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+    let mut menuSet = UI_Cvar_VariableString(ctx, "ui_menuFilesMP");
+    if menuSet.is_empty() {
+        menuSet = "ui/jampmenus.txt".to_string();
+    }
+    UI_LoadMenus(ctx, dc, &menuSet, false);
+    ctx.world.inGameLoad = false;
+}
+
+/// Raven `UI_DrawConnectScreen` — paints the "Connecting to..." overlay while
+/// the client is establishing a server connection.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:11173-11270`
+#[allow(clippy::too_many_lines)]
+pub fn UI_DrawConnectScreen(ctx: &mut UiContext, dc: &mut dyn DisplayContext, overlay: bool) {
+    let menu = Menus_FindByName(&ctx.world.menus, "Connect");
+
+    if !overlay {
+        if let Some(m) = menu {
+            let seLanguageModCount = ctx.world.cvars.se_language.modificationCount;
+            Menu_Paint(
+                &mut ctx.world.menus,
+                &ctx.world.uiDC,
+                dc,
+                Some(m),
+                true,
+                seLanguageModCount,
+            );
+        }
+    }
+
+    let centerPoint: f32;
+    let yStart: f32;
+    let scale: f32;
+    if !overlay {
+        centerPoint = 320.0;
+        yStart = 130.0;
+        scale = 1.0; // -ste
+    } else {
+        // centerPoint/yStart/scale are assigned here in Raven too, but the
+        // unconditional `return` right after makes them dead in this arm
+        // (`ui_main.c:11193-11198`) — preserved faithfully.
+        return;
+    }
+
+    // see what information we should display
+    let mut cstate = uiClientState_t {
+        connState: connstate_t::CA_UNINITIALIZED,
+        connectPacketCount: 0,
+        clientNum: 0,
+        servername: [0; MAX_STRING_CHARS],
+        updateInfoString: [0; MAX_STRING_CHARS],
+        messageString: [0; MAX_STRING_CHARS],
+    };
+    trap::GetClientState(ctx.engine, &mut cstate);
+
+    if let Some(info) = trap::GetConfigString(ctx.engine, CS_SERVERINFO, MAX_INFO_VALUE as usize) {
+        let sStringEdTemp = trap::SP_GetStringTextString(ctx.engine, "MENUS_LOADING_MAPNAME", 256)
+            .unwrap_or_default();
+        let mapname = Info_ValueForKey(&info, "mapname");
+        Text_PaintCenter(
+            ctx,
+            centerPoint,
+            yStart,
+            scale,
+            colorWhite,
+            &va_runtime(&sStringEdTemp, &[&mapname]),
+            0.0,
+            FONT_MEDIUM,
+        );
+    }
+
+    let servername = cchars_to_string(&cstate.servername);
+    if Q_stricmp(&servername, "localhost") == 0 {
+        let sStringEdTemp =
+            trap::SP_GetStringTextString(ctx.engine, "MENUS_STARTING_UP", 256).unwrap_or_default();
+        Text_PaintCenter(
+            ctx,
+            centerPoint,
+            yStart + 48.0,
+            scale,
+            colorWhite,
+            &sStringEdTemp,
+            ITEM_TEXTSTYLE_SHADOWEDMORE as f32,
+            FONT_MEDIUM,
+        );
+    } else {
+        let sStringEdTemp = trap::SP_GetStringTextString(ctx.engine, "MENUS_CONNECTING_TO", 256)
+            .unwrap_or_default();
+        // PORT-NOTE (§19 UB pick): Raven `strcpy`s the formatted string into
+        // `char text[256]` (`ui_main.c:11215`) — overrunnable; the owned `String` is
+        // the defined pick.
+        let text = va_runtime(&sStringEdTemp, &[&servername]);
+        Text_PaintCenter(
+            ctx,
+            centerPoint,
+            yStart + 48.0,
+            scale,
+            colorWhite,
+            &text,
+            ITEM_TEXTSTYLE_SHADOWEDMORE as f32,
+            FONT_MEDIUM,
+        );
+    }
+
+    // display global MOTD at bottom
+    let updateInfoString = cchars_to_string(&cstate.updateInfoString);
+    let motd = Info_ValueForKey(&updateInfoString, "motd");
+    Text_PaintCenter(
+        ctx,
+        centerPoint,
+        425.0,
+        scale,
+        colorWhite,
+        &motd,
+        0.0,
+        FONT_MEDIUM,
+    );
+    // print any server info (server full, bad version, etc)
+    if (cstate.connState as c_int) < (connstate_t::CA_CONNECTED as c_int) {
+        let messageString = cchars_to_string(&cstate.messageString);
+        Text_PaintCenter(
+            ctx,
+            centerPoint,
+            yStart + 176.0,
+            scale,
+            colorWhite,
+            &messageString,
+            0.0,
+            FONT_MEDIUM,
+        );
+    }
+
+    if (ctx.world.main.lastConnState as c_int) > (cstate.connState as c_int) {
+        ctx.world.main.lastLoadingText.clear();
+    }
+    ctx.world.main.lastConnState = cstate.connState;
+
+    let s: String = match cstate.connState {
+        connstate_t::CA_CONNECTING => {
+            let sStringEdTemp =
+                trap::SP_GetStringTextString(ctx.engine, "MENUS_AWAITING_CONNECTION", 256)
+                    .unwrap_or_default();
+            va_runtime(&sStringEdTemp, &[&format!("{}", cstate.connectPacketCount)])
+        }
+        connstate_t::CA_CHALLENGING => {
+            let sStringEdTemp =
+                trap::SP_GetStringTextString(ctx.engine, "MENUS_AWAITING_CHALLENGE", 256)
+                    .unwrap_or_default();
+            va_runtime(&sStringEdTemp, &[&format!("{}", cstate.connectPacketCount)])
+        }
+        connstate_t::CA_CONNECTED => {
+            let downloadName = trap::Cvar_VariableStringBuffer(
+                ctx.engine,
+                "cl_downloadName",
+                MAX_INFO_VALUE as usize,
+            );
+            if !downloadName.is_empty() {
+                UI_DisplayDownloadInfo(ctx, &downloadName, centerPoint, yStart, scale, FONT_MEDIUM);
+                return;
+            }
+            trap::SP_GetStringTextString(ctx.engine, "MENUS_AWAITING_GAMESTATE", 256)
+                .unwrap_or_default()
+        }
+        connstate_t::CA_LOADING | connstate_t::CA_PRIMED => return,
+        _ => return,
+    };
+
+    if Q_stricmp(&servername, "localhost") != 0 {
+        Text_PaintCenter(
+            ctx,
+            centerPoint,
+            yStart + 80.0,
+            scale,
+            colorWhite,
+            &s,
+            0.0,
+            FONT_MEDIUM,
+        );
+    }
+    // password required / connection rejected information goes here
 }

@@ -5,7 +5,7 @@
 /// Raven kept `static void (*captureFunc)(void *p)` plus `static void
 /// *captureData`; every one of the five assignment sites paired a
 /// `Scroll_*_Func` with `captureData = &scrollInfo`, and the single call site
-/// (`Display_HandleKey`'s idle path) invoked it with that same pointer. The
+/// (`Menu_PaintAll`'s per-frame dispatch) invoked it with that same pointer. The
 /// closed function-pointer set becomes an enum dispatched by `match`
 /// (translation dictionary), and `captureData` drops out — it was always
 /// `&scrollInfo`, which the framework already owns.

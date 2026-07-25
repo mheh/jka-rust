@@ -6,15 +6,19 @@
 
 use core::ffi::c_int;
 
+use mp_bg::public::configstring::CS_SERVERINFO;
 use mp_qshared::shared::cbuf_exec::cbufExec_t;
 use mp_qshared::shared::fileHandle_t;
 use mp_qshared::shared::qhandle_t;
 use mp_qshared::shared::vec4_t;
 use mp_qshared::shared::FS_READ;
 use mp_qshared::shared::FS_WRITE;
+use mp_qshared::shared::MAX_INFO_STRING;
 use mp_qshared::shared::MAX_QPATH;
 use mp_qshared::shared::{colorBlack, colorWhite};
 use mp_qshared::shared::{BIGCHAR_HEIGHT, BIGCHAR_WIDTH};
+use native_string::atoi;
+use native_string::info::Info_ValueForKey;
 use native_string::latin1_to_string;
 
 use mp_uishared::shared::display_context::DisplayContext;
@@ -22,6 +26,7 @@ use mp_uishared::ui_shared::Display_CacheAll;
 
 use crate::local::post_game_info_s::postGameInfo_t;
 use crate::trap;
+use crate::ui_main::UI_ShowPostGame;
 use crate::world::ui_context::UiContext;
 
 /// Raven `Com_Error` — formats and forwards a fatal error to the engine.
@@ -539,4 +544,129 @@ pub fn UI_Cache_f(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
             trap::Print(ctx.engine, &format!("model {}\n", ctx.world.q3HeadNames[i]));
         }
     }
+}
+
+/// Raven `UI_CalcPostGameStats` — reconciles the just-finished match's score
+/// against the saved best (loading/writing `games/<map>_<gametype>.game`),
+/// tallies bonuses, restores the ui-overridden server cvars, and pushes the
+/// result into the score cvars / post-game screen.
+///
+/// PORT-NOTE (DisplayContext threading): calls `UI_ShowPostGame`, which takes
+/// `dc: &mut dyn DisplayContext` (DEC-36 addendum 12); this fn threads `dc`
+/// through as well. Recorded as an escalation per the wave10 packet note (the
+/// threading digest only listed `UiContext`/`UiWorld` channels).
+///
+/// Source: `oracle/codemp/ui/ui_atoms.c:194-288`
+pub fn UI_CalcPostGameStats(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+    let info =
+        trap::GetConfigString(ctx.engine, CS_SERVERINFO, MAX_INFO_STRING).unwrap_or_default();
+    // PORT-NOTE: Raven `Q_strncpyz(map, Info_ValueForKey(info, "mapname"), sizeof(map))`.
+    let map: String = Info_ValueForKey(&info, "mapname")
+        .chars()
+        .take(MAX_QPATH as usize - 1)
+        .collect();
+    let game = atoi(&Info_ValueForKey(&info, "g_gametype"));
+
+    // PORT-NOTE: Raven `Com_sprintf` into `char fileName[MAX_QPATH]`.
+    let fileName: String = format!("games/{}_{}.game", map, game)
+        .chars()
+        .take(MAX_QPATH as usize - 1)
+        .collect();
+
+    let mut oldInfo = postGameInfo_from_bytes(&[0u8; POST_GAME_INFO_SIZE]);
+    let mut f: fileHandle_t = 0;
+    if trap::FS_FOpenFile(ctx.engine, &fileName, &mut f, FS_READ) >= 0 {
+        let mut sizeBuf = [0u8; 4];
+        trap::FS_Read(ctx.engine, &mut sizeBuf, f);
+        let size = i32::from_ne_bytes(sizeBuf);
+        if size as usize == POST_GAME_INFO_SIZE {
+            let mut infoBuf = [0u8; POST_GAME_INFO_SIZE];
+            trap::FS_Read(ctx.engine, &mut infoBuf, f);
+            oldInfo = postGameInfo_from_bytes(&infoBuf);
+        }
+        trap::FS_FCloseFile(ctx.engine, f);
+    }
+
+    let mut newInfo = postGameInfo_from_bytes(&[0u8; POST_GAME_INFO_SIZE]);
+    newInfo.accuracy = atoi(&UI_Argv(ctx, 3));
+    newInfo.impressives = atoi(&UI_Argv(ctx, 4));
+    newInfo.excellents = atoi(&UI_Argv(ctx, 5));
+    newInfo.defends = atoi(&UI_Argv(ctx, 6));
+    newInfo.assists = atoi(&UI_Argv(ctx, 7));
+    newInfo.gauntlets = atoi(&UI_Argv(ctx, 8));
+    newInfo.baseScore = atoi(&UI_Argv(ctx, 9));
+    newInfo.perfects = atoi(&UI_Argv(ctx, 10));
+    newInfo.redScore = atoi(&UI_Argv(ctx, 11));
+    newInfo.blueScore = atoi(&UI_Argv(ctx, 12));
+    let time = atoi(&UI_Argv(ctx, 13));
+    newInfo.captures = atoi(&UI_Argv(ctx, 14));
+
+    newInfo.time = ((time as f32 - trap::Cvar_VariableValue(ctx.engine, "ui_matchStartTime"))
+        / 1000.0) as c_int;
+    let mapIdx = ctx.world.cvars.ui_currentMap.integer as usize;
+    // PORT-NOTE (§19 UB pick): out-of-range `ui_currentMap`/`g_gametype` index past
+    // Raven's live counts into the fixed arrays' garbage (`ui_atoms.c:236`); 0 is the pick.
+    let adjustedTime = ctx
+        .world
+        .mapList
+        .get(mapIdx)
+        .and_then(|m| m.timeToBeat.get(game as usize))
+        .copied()
+        .unwrap_or(0);
+    if newInfo.time < adjustedTime {
+        newInfo.timeBonus = (adjustedTime - newInfo.time) * 10;
+    } else {
+        newInfo.timeBonus = 0;
+    }
+
+    if newInfo.redScore > newInfo.blueScore && newInfo.blueScore <= 0 {
+        newInfo.shutoutBonus = 100;
+    } else {
+        newInfo.shutoutBonus = 0;
+    }
+
+    newInfo.skillBonus = trap::Cvar_VariableValue(ctx.engine, "g_spSkill") as c_int;
+    if newInfo.skillBonus <= 0 {
+        newInfo.skillBonus = 1;
+    }
+    newInfo.score = newInfo.baseScore + newInfo.shutoutBonus + newInfo.timeBonus;
+    newInfo.score *= newInfo.skillBonus;
+
+    // see if the score is higher for this one
+    let newHigh = newInfo.redScore > newInfo.blueScore && newInfo.score > oldInfo.score;
+
+    if newHigh {
+        // if so write out the new one
+        ctx.world.newHighScoreTime = ctx.world.uiDC.realTime + 20000;
+        if trap::FS_FOpenFile(ctx.engine, &fileName, &mut f, FS_WRITE) >= 0 {
+            trap::FS_Write(ctx.engine, &(POST_GAME_INFO_SIZE as i32).to_ne_bytes(), f);
+            trap::FS_Write(ctx.engine, &postGameInfo_to_bytes(&newInfo), f);
+            trap::FS_FCloseFile(ctx.engine, f);
+        }
+    }
+
+    if newInfo.time < oldInfo.time {
+        ctx.world.newBestTime = ctx.world.uiDC.realTime + 20000;
+    }
+
+    // put back all the ui overrides
+    let saveCaptureLimit = UI_Cvar_VariableString(ctx, "ui_saveCaptureLimit");
+    trap::Cvar_Set(ctx.engine, "capturelimit", &saveCaptureLimit);
+    let saveFragLimit = UI_Cvar_VariableString(ctx, "ui_saveFragLimit");
+    trap::Cvar_Set(ctx.engine, "fraglimit", &saveFragLimit);
+    let saveDuelLimit = UI_Cvar_VariableString(ctx, "ui_saveDuelLimit");
+    trap::Cvar_Set(ctx.engine, "duel_fraglimit", &saveDuelLimit);
+    let drawTimer = UI_Cvar_VariableString(ctx, "ui_drawTimer");
+    trap::Cvar_Set(ctx.engine, "cg_drawTimer", &drawTimer);
+    let doWarmup = UI_Cvar_VariableString(ctx, "ui_doWarmup");
+    trap::Cvar_Set(ctx.engine, "g_doWarmup", &doWarmup);
+    let warmup = UI_Cvar_VariableString(ctx, "ui_Warmup");
+    trap::Cvar_Set(ctx.engine, "g_Warmup", &warmup);
+    let pure = UI_Cvar_VariableString(ctx, "ui_pure");
+    trap::Cvar_Set(ctx.engine, "sv_pure", &pure);
+    let friendlyFire = UI_Cvar_VariableString(ctx, "ui_friendlyFire");
+    trap::Cvar_Set(ctx.engine, "g_friendlyFire", &friendlyFire);
+
+    UI_SetBestScores(ctx, &newInfo, true);
+    UI_ShowPostGame(ctx, dc, newHigh);
 }

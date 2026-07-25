@@ -11217,3 +11217,83 @@ pub fn Item_Paint(
         _ => {}
     }
 }
+
+/// Raven `Menu_PaintAll` — dispatch the active scroll-capture handler, then
+/// paint every defined menu, then (debug mode) an FPS/cursor overlay.
+///
+/// PORT-NOTE (`captureFunc`): the closed `Scroll_*Func` pointer set
+/// (`crate::shared::capture_func::CaptureFunc`) is dispatched by `match`;
+/// `captureData` drops out (it was always `&scrollInfo`, which `MenuSystem`
+/// already owns) per the `CaptureFunc` doc.
+///
+/// PORT-NOTE: `se_language.modificationCount` is an `mp_ui`-owned `vmCvar_t`
+/// this host-agnostic crate cannot reach as cached state; threaded in as
+/// `seLanguageModCount`, the value the caller reads off its own
+/// `world.cvars.se_language`.
+///
+/// Source: `oracle/codemp/ui/ui_shared.c:9833-9848`
+pub fn Menu_PaintAll(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    seLanguageModCount: c_int,
+) {
+    match menus.captureFunc {
+        CaptureFunc::None => {}
+        CaptureFunc::ScrollListBoxAuto => Scroll_ListBox_AutoFunc(menus, ds, dc),
+        CaptureFunc::ScrollListBoxThumb => Scroll_ListBox_ThumbFunc(menus, ds, dc),
+        CaptureFunc::ScrollTextScrollAuto => Scroll_TextScroll_AutoFunc(menus, ds),
+        CaptureFunc::ScrollTextScrollThumb => Scroll_TextScroll_ThumbFunc(menus, ds),
+        CaptureFunc::ScrollSliderThumb => Scroll_Slider_ThumbFunc(menus, ds, dc),
+    }
+
+    for i in 0..menus.menus.len() {
+        let menu = MenuId::new(i);
+        Menu_Paint(menus, ds, dc, Some(menu), false, seLanguageModCount);
+    }
+
+    if menus.debugMode {
+        let v: vec4_t = [1.0, 1.0, 1.0, 1.0];
+        dc.drawText(
+            5.0,
+            25.0,
+            0.75,
+            v,
+            &format!("fps: {:.6}", ds.FPS),
+            0.0,
+            0,
+            0,
+            0,
+        );
+        dc.drawText(
+            5.0,
+            45.0,
+            0.75,
+            v,
+            &format!("x: {}  y:{}", ds.cursorx, ds.cursory),
+            0.0,
+            0,
+            0,
+            0,
+        );
+    }
+}
+
+/// Raven `Display_HandleKey` — route a keystroke to the item currently
+/// capturing the mouse, else the focused menu.
+///
+/// Source: `oracle/codemp/ui/ui_shared.c:9918-9926`
+pub fn Display_HandleKey(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    key: c_int,
+    down: bool,
+    x: c_int,
+    y: c_int,
+) {
+    let menu = Display_CaptureItem(menus, x, y).or_else(|| Menu_GetFocused(menus));
+    if let Some(menu) = menu {
+        Menu_HandleKey(menus, ds, dc, Some(menu), key, down);
+    }
+}
