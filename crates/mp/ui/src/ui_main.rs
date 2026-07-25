@@ -7,6 +7,7 @@
 
 use core::ffi::{c_char, c_int, c_short, c_void, CStr};
 
+use mp_abi::ui::exports::MpUiExport;
 use mp_abi::ui::public::ui_client_state_t::uiClientState_t;
 use mp_abi::ui::public::ui_menu_command_t::{
     uiMenuCommand_t, UIMENU_CLASSSEL, UIMENU_CLOSEALL, UIMENU_INGAME, UIMENU_MAIN, UIMENU_NONE,
@@ -36,6 +37,7 @@ use mp_bg::saga::siege_team_t::{
     siegeTeam_t, MAX_SIEGE_INFO_SIZE, SIEGETEAM_TEAM1, SIEGETEAM_TEAM2,
 };
 use mp_bg::weapons::weapon_t::{WP_NONE, WP_NUM_WEAPONS, WP_SABER};
+use mp_engine_select::Engine;
 use mp_qshared::common::mp::qcommon::qtime::qtime_t;
 use mp_qshared::common::mp::qcommon::saber::saber_colors::{saber_colors_t, SABER_BLUE, SABER_RED};
 use mp_qshared::shared::cbuf_exec::cbufExec_t;
@@ -121,8 +123,8 @@ use crate::local::server_status_info_t::{
 use crate::local::tier_info::MAPS_PER_TIER;
 use crate::trap;
 use crate::ui_atoms::{
-    Com_Error, Com_Printf, UI_ClearScores, UI_Cvar_VariableString, UI_DrawHandlePic, UI_FillRect,
-    UI_LoadBestScores, UI_SetColor,
+    Com_Error, Com_Printf, UI_ClearScores, UI_ConsoleCommand, UI_Cvar_VariableString,
+    UI_DrawHandlePic, UI_FillRect, UI_LoadBestScores, UI_SetColor,
 };
 use crate::ui_force::{
     UI_DrawForceStars, UI_ForceConfigHandle, UI_ForceMaxRank_HandleKey,
@@ -13529,4 +13531,106 @@ pub fn _UI_Refresh(ctx: &mut UiContext, dc: &mut dyn DisplayContext, realtime: c
     // PORT-NOTE: the remaining Raven block (painting the force-power rank
     // message text) is dead: Raven itself wraps it in `/* ... */` ("For now,
     // don't bother."), so it never compiled in retail.
+}
+
+/// Raven `vmMain` — the ABI dispatch shell (D6) that owns the one [`UiWorld`]
+/// and engine transport for the call, builds a [`UiContext`] over them, and
+/// routes the command to the matching `_UI_*`/`UI_*` handler.
+///
+/// PORT-NOTE: Raven's `command` arm values are `MpUiExport` (`mp_abi::ui`)
+/// discriminants; matched via `x if x == Variant as c_int` guards (the house
+/// pattern for C fn-ptr-table/enum-switch dispatch elsewhere, e.g.
+/// `mp_game::npc_c`'s `bState_t` dispatch). `qboolean` returns from callees
+/// (`_UI_IsFullscreen`, `UI_ConsoleCommand`) convert back to the C
+/// `0`/`1` wire values Raven's `qtrue`/`qfalse` carried.
+///
+/// PORT-NOTE: `UI_API_VERSION` (`#define UI_API_VERSION 7`,
+/// `oracle/codemp/ui/ui_public.h:6`) has no ported const home yet; inlined
+/// literally at the one call site.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:579-625`
+pub fn vmMain(
+    world: &mut UiWorld,
+    engine: &Engine,
+    dc: &mut dyn DisplayContext,
+    command: c_int,
+    arg0: c_int,
+    arg1: c_int,
+    _arg2: c_int,
+    _arg3: c_int,
+    _arg4: c_int,
+    _arg5: c_int,
+    _arg6: c_int,
+    _arg7: c_int,
+    _arg8: c_int,
+    _arg9: c_int,
+    _arg10: c_int,
+    _arg11: c_int,
+) -> c_int {
+    let mut ctx = UiContext { world, engine };
+
+    match command {
+        x if x == MpUiExport::UI_GETAPIVERSION as c_int => {
+            // PORT-NOTE: UI_API_VERSION — see fn doc comment.
+            7
+        }
+
+        x if x == MpUiExport::UI_INIT as c_int => {
+            _UI_Init(&mut ctx, dc, arg0 != 0);
+            0
+        }
+
+        x if x == MpUiExport::UI_SHUTDOWN as c_int => {
+            _UI_Shutdown(&mut ctx, dc);
+            0
+        }
+
+        x if x == MpUiExport::UI_KEY_EVENT as c_int => {
+            _UI_KeyEvent(&mut ctx, dc, arg0, arg1 != 0);
+            0
+        }
+
+        x if x == MpUiExport::UI_MOUSE_EVENT as c_int => {
+            _UI_MouseEvent(&mut ctx, dc, arg0, arg1);
+            0
+        }
+
+        x if x == MpUiExport::UI_REFRESH as c_int => {
+            _UI_Refresh(&mut ctx, dc, arg0);
+            0
+        }
+
+        x if x == MpUiExport::UI_IS_FULLSCREEN as c_int => _UI_IsFullscreen(ctx.world) as c_int,
+
+        x if x == MpUiExport::UI_SET_ACTIVE_MENU as c_int => {
+            // PORT-NOTE: arg0 is a `uiMenuCommand_t` wire value; Raven passes
+            // it through as the enum directly (the C switch's own arg has no
+            // conversion). See escalations — a genuine `c_int -> uiMenuCommand_t`
+            // conversion belongs at the trap/ABI boundary, not invented here.
+            _UI_SetActiveMenu(&mut ctx, dc, arg0 as uiMenuCommand_t);
+            0
+        }
+
+        x if x == MpUiExport::UI_CONSOLE_COMMAND as c_int => {
+            UI_ConsoleCommand(&mut ctx, dc, arg0) as c_int
+        }
+
+        x if x == MpUiExport::UI_DRAW_CONNECT_SCREEN as c_int => {
+            UI_DrawConnectScreen(&mut ctx, dc, arg0 != 0);
+            0
+        }
+
+        // UI_HASUNIQUECDKEY // mod authors need to observe this
+        x if x == MpUiExport::UI_HASUNIQUECDKEY as c_int => {
+            // bk010117 - change this to qfalse for mods!
+            1
+        }
+
+        x if x == MpUiExport::UI_MENU_RESET as c_int => {
+            Menu_Reset(&mut ctx.world.menus);
+            0
+        }
+
+        _ => -1,
+    }
 }
