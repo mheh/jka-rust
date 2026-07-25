@@ -1,19 +1,17 @@
-#![allow(non_camel_case_types, non_snake_case)]
+//! `ServerFilter` — Raven `serverFilter_t`.
 
-use core::ffi::c_char;
-
-/// Raven `serverFilter_t`.
+/// Raven `serverFilter_s` (typedef `serverFilter_t`) — one row of the
+/// server-browser mod filter table.
+///
+/// The only instance is the compiled-in `static const serverFilter_t
+/// serverFilters[]`, so both strings stay `&'static str`.
 ///
 /// Type definition source: `oracle/codemp/ui/ui_local.h:649-652`
-#[repr(C)]
-pub struct serverFilter_t {
-    pub description: *const c_char,
-    pub basedir: *const c_char,
+/// Source: `oracle/codemp/ui/ui_main.c:896-900` (`serverFilters`)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[doc(alias = "serverFilter_s")]
+#[doc(alias = "serverFilter_t")]
+pub struct ServerFilter {
+    pub description: &'static str,
+    pub basedir: &'static str,
 }
-
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::size_of::<serverFilter_t>() == 16);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(serverFilter_t, description) == 0);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(serverFilter_t, basedir) == 8);

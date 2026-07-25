@@ -1,16 +1,14 @@
-#![allow(non_camel_case_types, non_snake_case)]
+//! `GameTypeInfo` — Raven `gameTypeInfo`.
 
-use core::ffi::c_char;
+use core::ffi::c_int;
 
-/// Raven `gameTypeInfo`.
+/// Raven `gameTypeInfo` — a gametype's menu label and its `GT_*` enum value.
 ///
 /// Type definition source: `oracle/codemp/ui/ui_local.h:624-627`
-#[repr(C)]
-pub struct gameTypeInfo {
-    pub gameType: *const c_char,
-    pub gtEnum: i32,
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[doc(alias = "gameTypeInfo")]
+#[allow(non_snake_case)]
+pub struct GameTypeInfo {
+    pub gameType: String,
+    pub gtEnum: c_int,
 }
-
-const _: () = assert!(core::mem::size_of::<gameTypeInfo>() == 16);
-const _: () = assert!(core::mem::offset_of!(gameTypeInfo, gameType) == 0);
-const _: () = assert!(core::mem::offset_of!(gameTypeInfo, gtEnum) == 8);

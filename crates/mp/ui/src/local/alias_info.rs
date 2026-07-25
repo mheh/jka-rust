@@ -1,18 +1,12 @@
-#![allow(non_camel_case_types, non_snake_case)]
+//! `AliasInfo` — Raven `aliasInfo`.
 
-use core::ffi::c_char;
-
-/// Raven `aliasInfo`.
+/// Raven `aliasInfo` — one bot-alias row parsed out of the team arena file.
 ///
 /// Type definition source: `oracle/codemp/ui/ui_local.h:608-612`
-#[repr(C)]
-pub struct aliasInfo {
-    pub name: *const c_char,
-    pub ai: *const c_char,
-    pub action: *const c_char,
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[doc(alias = "aliasInfo")]
+pub struct AliasInfo {
+    pub name: String,
+    pub ai: String,
+    pub action: String,
 }
-
-const _: () = assert!(core::mem::size_of::<aliasInfo>() == 24);
-const _: () = assert!(core::mem::offset_of!(aliasInfo, name) == 0);
-const _: () = assert!(core::mem::offset_of!(aliasInfo, ai) == 8);
-const _: () = assert!(core::mem::offset_of!(aliasInfo, action) == 16);

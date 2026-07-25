@@ -652,3 +652,11 @@ Ratifies the ui-port root-type set (plan:
 8. **Seam cleanups** — the unused duplicate `uiExport_t`/`uiImport_t` enums
    in `mp_abi::ui::public` are deleted; copy-pasted `Cg*` wrapper type names
    inside `mp_abi::ui::syscalls` renamed `Ui*`.
+
+**U3 addenda (2026-07-24):** (9) `DisplayContext` carries ONLY the callback
+surface — `MenuSystem`/`DisplayState` thread beside it as struct fields of the
+host context (the `GameContext` field-split-borrow precedent), never through
+trait accessors. (10) The force-mastery anonymous enum hoisted to its DEC-32
+canonical home `mp_bg::public::force_mastery` (and `MAX_FORCE_RANK` to
+`mp_qshared::shared::force_powers`); the `mp_game`/`mp_ui` private copies
+deleted.

@@ -1,21 +1,23 @@
-#![allow(non_camel_case_types, non_snake_case)]
+//! `PendingServerStatus` — Raven `pendingServerStatus_t`.
 
-use super::pending_server_t::pendingServer_t;
+use core::ffi::c_int;
 
-/// `MAX_SERVERSTATUSREQUESTS`.
+use super::pending_server_t::PendingServer;
+
+/// Raven `#define MAX_SERVERSTATUSREQUESTS 16`.
 ///
 /// Source: `oracle/codemp/game/q_shared.h:3062`
-const MAX_SERVERSTATUSREQUESTS: usize = 16;
+pub const MAX_SERVERSTATUSREQUESTS: usize = 16;
 
-/// Raven `pendingServerStatus_t`.
+/// Raven `pendingServerStatus_t` — the find-player poller's fixed request
+/// slots. The array stays fixed-size: slots are addressed by request index and
+/// individually validated by `PendingServer::valid`, not appended to.
 ///
 /// Type definition source: `oracle/codemp/ui/ui_local.h:698-701`
-#[repr(C)]
-pub struct pendingServerStatus_t {
-    pub num: i32,
-    pub server: [pendingServer_t; MAX_SERVERSTATUSREQUESTS],
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[doc(alias = "pendingServerStatus_t")]
+#[allow(non_snake_case)]
+pub struct PendingServerStatus {
+    pub num: c_int,
+    pub server: [PendingServer; MAX_SERVERSTATUSREQUESTS],
 }
-
-const _: () = assert!(core::mem::size_of::<pendingServerStatus_t>() == 2244);
-const _: () = assert!(core::mem::offset_of!(pendingServerStatus_t, num) == 0);
-const _: () = assert!(core::mem::offset_of!(pendingServerStatus_t, server) == 4);

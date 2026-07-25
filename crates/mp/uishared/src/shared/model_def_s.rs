@@ -1,20 +1,22 @@
-#![allow(non_camel_case_types, non_snake_case)]
+//! `ModelDef` — Raven `modelDef_s`/`modelDef_t`.
 
-use core::ffi::{c_float, c_int};
+use core::ffi::c_int;
 
 use mp_qshared::shared::vec3_t;
 
-/// Raven `modelDef_s` (typedef `modelDef_t`) — a 3D model preview definition
-/// used by UI item defs.
+/// Raven `modelDef_s` (typedef `modelDef_t`) — a 3D model preview definition,
+/// one of the `itemDef_t::typeData` payloads.
 ///
 /// Type definition source: `oracle/codemp/ui/ui_shared.h:208-224`
-#[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct modelDef_s {
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[doc(alias = "modelDef_s")]
+#[doc(alias = "modelDef_t")]
+#[allow(non_snake_case)]
+pub struct ModelDef {
     pub angle: c_int,
     pub origin: vec3_t,
-    pub fov_x: c_float,
-    pub fov_y: c_float,
+    pub fov_x: f32,
+    pub fov_y: f32,
     pub rotationSpeed: c_int,
 
     /// required
@@ -33,28 +35,8 @@ pub struct modelDef_s {
     pub g2maxs2: vec3_t,
     pub g2minsEffect: vec3_t,
     pub g2maxsEffect: vec3_t,
-    pub fov_x2: c_float,
-    pub fov_y2: c_float,
-    pub fov_Effectx: c_float,
-    pub fov_Effecty: c_float,
+    pub fov_x2: f32,
+    pub fov_y2: f32,
+    pub fov_Effectx: f32,
+    pub fov_Effecty: f32,
 }
-
-const _: () = assert!(core::mem::size_of::<modelDef_s>() == 136);
-const _: () = assert!(core::mem::offset_of!(modelDef_s, angle) == 0);
-const _: () = assert!(core::mem::offset_of!(modelDef_s, origin) == 4);
-const _: () = assert!(core::mem::offset_of!(modelDef_s, fov_x) == 16);
-const _: () = assert!(core::mem::offset_of!(modelDef_s, fov_y) == 20);
-const _: () = assert!(core::mem::offset_of!(modelDef_s, rotationSpeed) == 24);
-const _: () = assert!(core::mem::offset_of!(modelDef_s, g2mins) == 28);
-const _: () = assert!(core::mem::offset_of!(modelDef_s, g2maxs) == 40);
-const _: () = assert!(core::mem::offset_of!(modelDef_s, g2scale) == 52);
-const _: () = assert!(core::mem::offset_of!(modelDef_s, g2skin) == 64);
-const _: () = assert!(core::mem::offset_of!(modelDef_s, g2anim) == 68);
-const _: () = assert!(core::mem::offset_of!(modelDef_s, g2mins2) == 72);
-const _: () = assert!(core::mem::offset_of!(modelDef_s, g2maxs2) == 84);
-const _: () = assert!(core::mem::offset_of!(modelDef_s, g2minsEffect) == 96);
-const _: () = assert!(core::mem::offset_of!(modelDef_s, g2maxsEffect) == 108);
-const _: () = assert!(core::mem::offset_of!(modelDef_s, fov_x2) == 120);
-const _: () = assert!(core::mem::offset_of!(modelDef_s, fov_y2) == 124);
-const _: () = assert!(core::mem::offset_of!(modelDef_s, fov_Effectx) == 128);
-const _: () = assert!(core::mem::offset_of!(modelDef_s, fov_Effecty) == 132);

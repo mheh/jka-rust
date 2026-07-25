@@ -1,16 +1,19 @@
-#![allow(non_camel_case_types, non_snake_case)]
+//! `PingList` — Raven `pinglist_t`.
 
-use core::ffi::c_char;
+use core::ffi::c_int;
 
-/// Raven `pinglist_t`.
+/// Raven `#define MAX_ADDRESSLENGTH 64`.
+///
+/// Source: `oracle/codemp/ui/ui_local.h:571`
+pub const MAX_ADDRESSLENGTH: usize = 64;
+
+/// Raven `pinglist_t` — one outstanding server ping (address + issue time).
 ///
 /// Type definition source: `oracle/codemp/ui/ui_local.h:654-657`
-#[repr(C)]
-pub struct pinglist_t {
-    pub adrstr: [c_char; 64],
-    pub start: i32,
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[doc(alias = "pinglist_t")]
+#[allow(non_snake_case)]
+pub struct PingList {
+    pub adrstr: String,
+    pub start: c_int,
 }
-
-const _: () = assert!(core::mem::size_of::<pinglist_t>() == 68);
-const _: () = assert!(core::mem::offset_of!(pinglist_t, adrstr) == 0);
-const _: () = assert!(core::mem::offset_of!(pinglist_t, start) == 64);

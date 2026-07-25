@@ -1,58 +1,56 @@
-#![allow(non_camel_case_types, non_snake_case)]
+//! `MenuDef` — Raven `menuDef_t`.
 
-use core::ffi::{c_char, c_float, c_int};
+use core::ffi::c_int;
 
-use mp_qshared::shared::{qboolean, vec4_t};
+use mp_qshared::shared::vec4_t;
 
-use super::item_def_s::itemDef_t;
-use super::window_def_t::windowDef_t;
+use super::item_id::ItemId;
+use super::window_def_t::WindowDef;
 
-/// Raven `Window` — alias for `windowDef_t` used by menu/item headers.
-///
-/// Type definition source: `oracle/codemp/ui/ui_shared.h:146`
-pub type Window = windowDef_t;
-
-/// Raven `MAX_MENUITEMS`.
+/// Raven `#define MAX_MENUITEMS 256`.
 ///
 /// Source: `oracle/codemp/ui/ui_shared.h:17`
 pub const MAX_MENUITEMS: usize = 256;
 
-/// Raven `menuDef_t` — a UI menu definition (window plus its items).
+/// Raven `menuDef_t` — a UI menu definition (window plus the items it owns).
+///
+/// PORT-NOTE: Raven's `itemDef_t *items[MAX_MENUITEMS]` + `itemCount` become
+/// `Vec<ItemId>` into [`MenuSystem::items`](super::menu_system::MenuSystem)
+/// (porting-rules §B5); `itemCount` is `items.len()`.
 ///
 /// Type definition source: `oracle/codemp/ui/ui_shared.h:307-336`
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct menuDef_t {
-    pub window: Window,
+#[derive(Debug, Clone, PartialEq, Default)]
+#[doc(alias = "menuDef_t")]
+#[allow(non_snake_case)]
+pub struct MenuDef {
+    pub window: WindowDef,
     /// font
-    pub font: *const c_char,
+    pub font: String,
     /// covers entire screen
-    pub fullScreen: qboolean,
-    /// number of items;
-    pub itemCount: c_int,
+    pub fullScreen: bool,
     pub fontIndex: c_int,
     /// which item as the cursor
     pub cursorItem: c_int,
     pub fadeCycle: c_int,
-    pub fadeClamp: c_float,
-    pub fadeAmount: c_float,
+    pub fadeClamp: f32,
+    pub fadeAmount: f32,
     /// run when the menu is first opened
-    pub onOpen: *const c_char,
+    pub onOpen: String,
     /// run when the menu is closed
-    pub onClose: *const c_char,
-    //JLFACCEPT
+    pub onClose: String,
+    // JLFACCEPT
     /// run when menu is closed with acceptance
-    pub onAccept: *const c_char,
+    pub onAccept: String,
     /// run when the menu is closed
-    pub onESC: *const c_char,
+    pub onESC: String,
     /// background loop sound for menu
-    pub soundName: *const c_char,
+    pub soundName: String,
     /// focus color for items
     pub focusColor: vec4_t,
     /// focus color for items
     pub disableColor: vec4_t,
     /// items this menu contains
-    pub items: [*mut itemDef_t; MAX_MENUITEMS],
+    pub items: Vec<ItemId>,
     /// X position of description
     pub descX: c_int,
     /// X position of description
@@ -62,63 +60,10 @@ pub struct menuDef_t {
     /// Description of alignment
     pub descAlignment: c_int,
     /// Description scale
-    pub descScale: c_float,
+    pub descScale: f32,
     /// when next item should appear
-    pub appearanceTime: c_float,
+    pub appearanceTime: f32,
     /// current item displayed
     pub appearanceCnt: c_int,
-    pub appearanceIncrement: c_float,
+    pub appearanceIncrement: f32,
 }
-
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::size_of::<menuDef_t>() == 2400);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, window) == 0);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, font) == 192);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, fullScreen) == 200);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, itemCount) == 204);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, fontIndex) == 208);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, cursorItem) == 212);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, fadeCycle) == 216);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, fadeClamp) == 220);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, fadeAmount) == 224);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, onOpen) == 232);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, onClose) == 240);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, onAccept) == 248);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, onESC) == 256);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, soundName) == 264);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, focusColor) == 272);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, disableColor) == 288);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, items) == 304);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, descX) == 2352);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, descY) == 2356);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, descColor) == 2360);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, descAlignment) == 2376);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, descScale) == 2380);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, appearanceTime) == 2384);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, appearanceCnt) == 2388);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(menuDef_t, appearanceIncrement) == 2392);

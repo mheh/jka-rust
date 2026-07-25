@@ -1,39 +1,25 @@
-#![allow(non_camel_case_types, non_snake_case)]
+//! `MultiDef` — Raven `multiDef_s`/`multiDef_t`.
 
-use core::ffi::{c_char, c_int};
+/// Raven `#define MAX_MULTI_CVARS 32`.
+///
+/// Source: `oracle/codemp/ui/ui_shared.h:198`
+pub const MAX_MULTI_CVARS: usize = 32;
 
-use mp_qshared::shared::qboolean;
-
-// Raven `#define MAX_MULTI_CVARS 32`.
-// Source: `oracle/codemp/ui/ui_shared.h:198`
-const MAX_MULTI_CVARS: usize = 32;
-
-/// Raven `multiDef_s` — multi-value cvar list/string/value tables for combo-box items.
+/// Raven `multiDef_s` (typedef `multiDef_t`) — the multi-value cvar list a
+/// combo-box item cycles through, one of the `itemDef_t::typeData` payloads.
+///
+/// PORT-NOTE: Raven's three parallel `[MAX_MULTI_CVARS]` arrays plus `count`
+/// become parallel `Vec`s (`count` is `cvarList.len()`); `strDef` still selects
+/// whether `cvarStr` or `cvarValue` carries the value.
 ///
 /// Type definition source: `oracle/codemp/ui/ui_shared.h:200-206`
-#[repr(C)]
-pub struct multiDef_s {
-    pub cvarList: [*const c_char; MAX_MULTI_CVARS],
-    pub cvarStr: [*const c_char; MAX_MULTI_CVARS],
-    pub cvarValue: [f32; MAX_MULTI_CVARS],
-    pub count: c_int,
-    pub strDef: qboolean,
+#[derive(Debug, Clone, PartialEq, Default)]
+#[doc(alias = "multiDef_s")]
+#[doc(alias = "multiDef_t")]
+#[allow(non_snake_case)]
+pub struct MultiDef {
+    pub cvarList: Vec<String>,
+    pub cvarStr: Vec<String>,
+    pub cvarValue: Vec<f32>,
+    pub strDef: bool,
 }
-
-/// Raven `multiDef_t` — `typedef struct multiDef_s multiDef_t`.
-///
-/// Type definition source: `oracle/codemp/ui/ui_shared.h:200-206`
-pub type multiDef_t = multiDef_s;
-
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::size_of::<multiDef_t>() == 648);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(multiDef_t, cvarList) == 0);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(multiDef_t, cvarStr) == 256);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(multiDef_t, cvarValue) == 512);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(multiDef_t, count) == 640);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(multiDef_t, strDef) == 644);

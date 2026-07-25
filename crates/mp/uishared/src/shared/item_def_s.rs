@@ -1,27 +1,34 @@
-#![allow(non_camel_case_types, non_snake_case)]
+//! `ItemDef` — Raven `itemDef_s`/`itemDef_t`.
 
-use core::ffi::{c_char, c_float, c_int, c_void};
+use core::ffi::{c_int, c_void};
+use core::ptr::null_mut;
 
-use mp_qshared::shared::{qboolean, qhandle_t, sfxHandle_t};
+use mp_qshared::shared::{qhandle_t, sfxHandle_t};
 
-use super::color_range_def_t::colorRangeDef_t;
-use super::rect_def_t::rectDef_t;
-use super::window_def_t::windowDef_t;
+use super::color_range_def_t::ColorRangeDef;
+use super::item_payload::ItemPayload;
+use super::menu_id::MenuId;
+use super::rect_def_t::RectDef;
+use super::window_def_t::WindowDef;
 
-// Raven `#define MAX_COLOR_RANGES 10`.
-// Source: `oracle/codemp/ui/ui_shared.h:18`
-const MAX_COLOR_RANGES: usize = 10;
+/// Raven `#define MAX_COLOR_RANGES 10`.
+///
+/// Source: `oracle/codemp/ui/ui_shared.h:18`
+pub const MAX_COLOR_RANGES: usize = 10;
 
-/// Raven `itemDef_s` — a single UI item (text, button, listbox, combo, etc.) within a menu.
+/// Raven `itemDef_s` (typedef `itemDef_t`) — a single UI item (text, button,
+/// radiobutton, checkbox, textfield, listbox, combo, model, …) within a menu.
 ///
 /// Type definition source: `oracle/codemp/ui/ui_shared.h:258-305`
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct itemDef_s {
+#[derive(Debug, Clone, PartialEq)]
+#[doc(alias = "itemDef_s")]
+#[doc(alias = "itemDef_t")]
+#[allow(non_snake_case)]
+pub struct ItemDef {
     /// common positional, border, style, layout info
-    pub window: windowDef_t,
+    pub window: WindowDef,
     /// rectangle the text ( if any ) consumes
-    pub textRect: rectDef_t,
+    pub textRect: RectDef,
     /// text, button, radiobutton, checkbox, textfield, listbox, combo
     pub r#type: c_int,
     /// left center right
@@ -29,169 +36,134 @@ pub struct itemDef_s {
     /// ( optional ) alignment for text within rect based on text width
     pub textalignment: c_int,
     /// ( optional ) text alignment x coord
-    pub textalignx: c_float,
+    pub textalignx: f32,
     /// ( optional ) text alignment x coord
-    pub textaligny: c_float,
+    pub textaligny: f32,
     /// scale percentage from 72pts
-    pub textscale: c_float,
+    pub textscale: f32,
     /// ( optional ) style, normal and shadowed are it for now
     pub textStyle: c_int,
     /// display text
-    pub text: *const c_char,
+    pub text: String,
     /// display text, 2nd line
-    pub text2: *const c_char,
+    pub text2: String,
     /// ( optional ) text2 alignment x coord
-    pub text2alignx: c_float,
+    pub text2alignx: f32,
     /// ( optional ) text2 alignment y coord
-    pub text2aligny: c_float,
-    /// menu owner
-    pub parent: *mut c_void,
+    pub text2aligny: f32,
+    /// menu owner (Raven's `void *parent`, always a `menuDef_t *`)
+    pub parent: Option<MenuId>,
     /// handle to asset
     pub asset: qhandle_t,
-    /// ghoul2 instance if available instead of a model.
+    /// ghoul2 instance if available instead of a model. The engine `new`s and
+    /// `delete`s the instance on its own heap and hands back only the handle
+    /// value, so the module keeps it as an opaque token and never reads
+    /// through it (scoping census, ghoul2 fields).
     pub ghoul2: *mut c_void,
     /// flags like g2valid, character, saber, saber2, etc.
     pub flags: c_int,
     /// mouse enter script
-    pub mouseEnterText: *const c_char,
+    pub mouseEnterText: String,
     /// mouse exit script
-    pub mouseExitText: *const c_char,
+    pub mouseExitText: String,
     /// mouse enter script
-    pub mouseEnter: *const c_char,
+    pub mouseEnter: String,
     /// mouse exit script
-    pub mouseExit: *const c_char,
+    pub mouseExit: String,
     /// select script
-    pub action: *const c_char,
+    pub action: String,
     // JLFACCEPT MPMOVED
-    pub accept: *const c_char,
+    pub accept: String,
     // JLFDPADSCRIPT
-    pub selectionNext: *const c_char,
-    pub selectionPrev: *const c_char,
+    pub selectionNext: String,
+    pub selectionPrev: String,
     /// select script
-    pub onFocus: *const c_char,
+    pub onFocus: String,
     /// select script
-    pub leaveFocus: *const c_char,
+    pub leaveFocus: String,
     /// associated cvar
-    pub cvar: *const c_char,
+    pub cvar: String,
     /// associated cvar for enable actions
-    pub cvarTest: *const c_char,
+    pub cvarTest: String,
     /// enable, disable, show, or hide based on value, this can contain a list
-    pub enableCvar: *const c_char,
+    pub enableCvar: String,
     /// what type of action to take on cvarenables
     pub cvarFlags: c_int,
     pub focusSound: sfxHandle_t,
     /// number of color ranges
     pub numColors: c_int,
-    pub colorRanges: [colorRangeDef_t; MAX_COLOR_RANGES],
+    pub colorRanges: [ColorRangeDef; MAX_COLOR_RANGES],
     /// used for feeder id's etc.. diff per type
-    pub special: c_float,
+    pub special: f32,
     /// cursor position in characters
     pub cursorPos: c_int,
-    /// type specific data ptr's
-    pub typeData: *mut c_void,
+    /// type specific data (Raven's pool-allocated `void *typeData`)
+    pub typeData: ItemPayload,
     /// Description text
-    pub descText: *const c_char,
+    pub descText: String,
     /// order of appearance
     pub appearanceSlot: c_int,
-    /// FONT_SMALL,FONT_MEDIUM,FONT_LARGE // changed from 'font' so I could see what didn't
-    /// compile, and differentiate between font handles returned from RegisterFont -ste
+    /// FONT_SMALL,FONT_MEDIUM,FONT_LARGE // changed from 'font' so I could see
+    /// what didn't compile, and differentiate between font handles returned
+    /// from RegisterFont -ste
     pub iMenuFont: c_int,
     /// Does this item ignore mouse and keyboard focus
-    pub disabled: qboolean,
+    pub disabled: bool,
     pub invertYesNo: c_int,
     pub xoffset: c_int,
 }
 
-/// Raven `itemDef_t` — `typedef struct itemDef_s itemDef_t`.
-///
-/// Type definition source: `oracle/codemp/ui/ui_shared.h:258-305`
-pub type itemDef_t = itemDef_s;
-
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::size_of::<itemDef_t>() == 704);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, window) == 0);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, textRect) == 192);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, r#type) == 208);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, alignment) == 212);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, textalignment) == 216);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, textalignx) == 220);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, textaligny) == 224);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, textscale) == 228);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, textStyle) == 232);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, text) == 240);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, text2) == 248);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, text2alignx) == 256);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, text2aligny) == 260);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, parent) == 264);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, asset) == 272);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, ghoul2) == 280);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, flags) == 288);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, mouseEnterText) == 296);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, mouseExitText) == 304);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, mouseEnter) == 312);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, mouseExit) == 320);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, action) == 328);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, accept) == 336);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, selectionNext) == 344);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, selectionPrev) == 352);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, onFocus) == 360);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, leaveFocus) == 368);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, cvar) == 376);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, cvarTest) == 384);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, enableCvar) == 392);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, cvarFlags) == 400);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, focusSound) == 404);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, numColors) == 408);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, colorRanges) == 412);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, special) == 652);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, cursorPos) == 656);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, typeData) == 664);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, descText) == 672);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, appearanceSlot) == 680);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, iMenuFont) == 684);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, disabled) == 688);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, invertYesNo) == 692);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemDef_t, xoffset) == 696);
+impl Default for ItemDef {
+    /// Raven's `Item_Init` zeroes the item, then re-applies the window
+    /// defaults; this is the zeroed half (`memset(item, 0, sizeof(itemDef_t))`)
+    /// with owned fields at their empty values.
+    ///
+    /// Source: `oracle/codemp/ui/ui_shared.c` (`Item_Init`)
+    fn default() -> Self {
+        ItemDef {
+            window: WindowDef::default(),
+            textRect: RectDef::default(),
+            r#type: 0,
+            alignment: 0,
+            textalignment: 0,
+            textalignx: 0.0,
+            textaligny: 0.0,
+            textscale: 0.0,
+            textStyle: 0,
+            text: String::new(),
+            text2: String::new(),
+            text2alignx: 0.0,
+            text2aligny: 0.0,
+            parent: None,
+            asset: 0,
+            ghoul2: null_mut(),
+            flags: 0,
+            mouseEnterText: String::new(),
+            mouseExitText: String::new(),
+            mouseEnter: String::new(),
+            mouseExit: String::new(),
+            action: String::new(),
+            accept: String::new(),
+            selectionNext: String::new(),
+            selectionPrev: String::new(),
+            onFocus: String::new(),
+            leaveFocus: String::new(),
+            cvar: String::new(),
+            cvarTest: String::new(),
+            enableCvar: String::new(),
+            cvarFlags: 0,
+            focusSound: 0,
+            numColors: 0,
+            colorRanges: [ColorRangeDef::default(); MAX_COLOR_RANGES],
+            special: 0.0,
+            cursorPos: 0,
+            typeData: ItemPayload::None,
+            descText: String::new(),
+            appearanceSlot: 0,
+            iMenuFont: 0,
+            disabled: false,
+            invertYesNo: 0,
+            xoffset: 0,
+        }
+    }
+}

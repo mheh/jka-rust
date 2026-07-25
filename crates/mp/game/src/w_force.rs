@@ -38,6 +38,7 @@
 use crate::npc::g_npc_t::gNPC_t;
 use crate::prelude::*;
 use mp_bg::local::force_power_needed::forcePowerNeeded;
+use mp_bg::public::force_mastery::{FORCE_MASTERY_JEDI_MASTER, NUM_FORCE_MASTERY_LEVELS};
 use mp_bg::public::duel_team::duelTeam_t::DUELTEAM_LONE;
 use native_string::atoi_bytes;
 use native_string::strncpyz_string;
@@ -53,19 +54,6 @@ unsafe fn ent_base(ctx: &mut GameContext) -> *const gentity_t {
     ctx.world.g_entities.as_ptr()
 }
 
-// Raven force-mastery-level anonymous enum (bg_public.h) → int-wide consts per
-// the enum-vs-alias rule (anonymous enum → `const`s). Only the two spellings the
-// ported bodies name are surfaced.
-// Source: `oracle/codemp/game/bg_public.h:383-392`
-pub const FORCE_MASTERY_UNINITIATED: c_int = 0;
-pub const FORCE_MASTERY_INITIATE: c_int = 1;
-pub const FORCE_MASTERY_PADAWAN: c_int = 2;
-pub const FORCE_MASTERY_JEDI: c_int = 3;
-pub const FORCE_MASTERY_JEDI_GUARDIAN: c_int = 4;
-pub const FORCE_MASTERY_JEDI_ADEPT: c_int = 5;
-pub const FORCE_MASTERY_JEDI_KNIGHT: c_int = 6;
-pub const FORCE_MASTERY_JEDI_MASTER: c_int = 7;
-pub const NUM_FORCE_MASTERY_LEVELS: c_int = 8;
 use crate::ai_main::{InFieldOfVision, OrgVisible};
 use crate::client::player_team_state::playerTeamStateState_t;
 use crate::client::spectator_state::spectatorState_t;

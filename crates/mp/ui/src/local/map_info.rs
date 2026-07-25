@@ -1,39 +1,29 @@
-#![allow(non_camel_case_types, non_snake_case)]
+//! `MapInfo` — Raven `mapInfo`.
 
-use core::ffi::c_char;
+use core::ffi::c_int;
 
-use mp_qshared::shared::{qboolean, qhandle_t};
+use mp_qshared::shared::qhandle_t;
 
-/// `MAX_GAMETYPES`.
+/// Raven `#define MAX_GAMETYPES 16`.
 ///
 /// Source: `oracle/codemp/ui/ui_local.h:566`
-const MAX_GAMETYPES: usize = 16;
+pub const MAX_GAMETYPES: usize = 16;
 
-/// Raven `mapInfo`.
+/// Raven `mapInfo` — one map row of the arena list the map/browser menus draw.
 ///
 /// Type definition source: `oracle/codemp/ui/ui_local.h:629-640`
-#[repr(C)]
-pub struct mapInfo {
-    pub mapName: *const c_char,
-    pub mapLoadName: *const c_char,
-    pub imageName: *const c_char,
-    pub opponentName: *const c_char,
-    pub teamMembers: i32,
-    pub typeBits: i32,
-    pub cinematic: i32,
-    pub timeToBeat: [i32; MAX_GAMETYPES],
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[doc(alias = "mapInfo")]
+#[allow(non_snake_case)]
+pub struct MapInfo {
+    pub mapName: String,
+    pub mapLoadName: String,
+    pub imageName: String,
+    pub opponentName: String,
+    pub teamMembers: c_int,
+    pub typeBits: c_int,
+    pub cinematic: c_int,
+    pub timeToBeat: [c_int; MAX_GAMETYPES],
     pub levelShot: qhandle_t,
-    pub active: qboolean,
+    pub active: bool,
 }
-
-const _: () = assert!(core::mem::size_of::<mapInfo>() == 120);
-const _: () = assert!(core::mem::offset_of!(mapInfo, mapName) == 0);
-const _: () = assert!(core::mem::offset_of!(mapInfo, mapLoadName) == 8);
-const _: () = assert!(core::mem::offset_of!(mapInfo, imageName) == 16);
-const _: () = assert!(core::mem::offset_of!(mapInfo, opponentName) == 24);
-const _: () = assert!(core::mem::offset_of!(mapInfo, teamMembers) == 32);
-const _: () = assert!(core::mem::offset_of!(mapInfo, typeBits) == 36);
-const _: () = assert!(core::mem::offset_of!(mapInfo, cinematic) == 40);
-const _: () = assert!(core::mem::offset_of!(mapInfo, timeToBeat) == 44);
-const _: () = assert!(core::mem::offset_of!(mapInfo, levelShot) == 108);
-const _: () = assert!(core::mem::offset_of!(mapInfo, active) == 112);

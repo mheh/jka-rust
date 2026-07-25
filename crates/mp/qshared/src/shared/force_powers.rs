@@ -52,6 +52,11 @@ pub const FORCE_LEVEL_5: c_int = FORCE_LEVEL_4 + 1;
 pub const FORCE_LIGHTSIDE: c_int = 1;
 pub const FORCE_DARKSIDE: c_int = 2;
 
+/// Raven `#define MAX_FORCE_RANK 7`.
+///
+/// Source: `oracle/codemp/game/q_shared.h:2146`
+pub const MAX_FORCE_RANK: c_int = 7;
+
 /// Raven `FORCE_POWER_MAX` — max value of a single force-power level's point cost.
 ///
 /// Source: `oracle/codemp/game/w_saber.h:27`

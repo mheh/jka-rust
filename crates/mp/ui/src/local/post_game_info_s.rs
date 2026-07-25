@@ -1,8 +1,15 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-/// Raven `postGameInfo_t`.
+/// Raven `postGameInfo_t` — the single-player post-game score record.
+///
+/// Stays layout-frozen through the ui idiom port: `UI_LoadBestScores`/
+/// `UI_SetBestScores` read and write the struct's raw bytes to disk with
+/// `trap_FS_Read(&newInfo, sizeof(postGameInfo_t), f)` and gate on
+/// `size == sizeof(postGameInfo_t)`, so the layout is an on-disk file format,
+/// not module-private state.
 ///
 /// Type definition source: `oracle/codemp/ui/ui_local.h:1125-1142`
+/// Source: `oracle/codemp/ui/ui_atoms.c:83-130`
 #[repr(C)]
 pub struct postGameInfo_t {
     pub score: i32,
