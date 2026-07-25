@@ -14,8 +14,8 @@ use mp_bg::public::anim_table::animTable;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::shared::q_string::{COM_Parse, GetIDForString};
 use mp_qshared::shared::{
-    cbufExec_t, pc_token_t, qtrue, stringID_table_t, vec4_t, CHAN_AUTO, MAX_QPATH,
-    MAX_STRING_CHARS, MAX_TOKENLENGTH, TT_NUMBER,
+    cbufExec_t, pc_token_t, qtrue, stringID_table_t, vec4_t, CHAN_AUTO, CHAN_LOCAL_SOUND,
+    MAX_QPATH, MAX_STRING_CHARS, MAX_TOKENLENGTH, TT_NUMBER,
 };
 use native_string::{atof, atoi, latin1_to_string, string_to_latin1, Q_stricmp};
 
@@ -32,10 +32,11 @@ use crate::shared::menu_def_t::MenuDef;
 use crate::shared::menu_id::MenuId;
 use crate::shared::menu_system::{MenuSystem, DOUBLE_CLICK_DELAY, MAX_DEFERRED_SCRIPT};
 use crate::shared::menudef::{
-    FEEDER_LANGUAGES, FEEDER_PLAYER_SPECIES, ITEM_ALIGN_CENTER, ITEM_ALIGN_RIGHT,
-    ITEM_TEXTSTYLE_BLINK, ITEM_TYPE_BIND, ITEM_TYPE_EDITFIELD, ITEM_TYPE_LISTBOX, ITEM_TYPE_MODEL,
-    ITEM_TYPE_MULTI, ITEM_TYPE_NUMERICFIELD, ITEM_TYPE_OWNERDRAW, ITEM_TYPE_SLIDER, ITEM_TYPE_TEXT,
-    ITEM_TYPE_TEXTSCROLL, ITEM_TYPE_YESNO, LISTBOX_IMAGE, UI_FORCE_RANK_ABSORB,
+    FEEDER_LANGUAGES, FEEDER_PLAYER_SPECIES, ITEM_ALIGN_CENTER, ITEM_ALIGN_LEFT, ITEM_ALIGN_RIGHT,
+    ITEM_TEXTSTYLE_BLINK, ITEM_TYPE_BIND, ITEM_TYPE_BUTTON, ITEM_TYPE_CHECKBOX, ITEM_TYPE_COMBO,
+    ITEM_TYPE_EDITFIELD, ITEM_TYPE_LISTBOX, ITEM_TYPE_MODEL, ITEM_TYPE_MULTI,
+    ITEM_TYPE_NUMERICFIELD, ITEM_TYPE_OWNERDRAW, ITEM_TYPE_RADIOBUTTON, ITEM_TYPE_SLIDER,
+    ITEM_TYPE_TEXT, ITEM_TYPE_TEXTSCROLL, ITEM_TYPE_YESNO, LISTBOX_IMAGE, UI_FORCE_RANK_ABSORB,
     UI_FORCE_RANK_DRAIN, UI_FORCE_RANK_GRIP, UI_FORCE_RANK_HEAL, UI_FORCE_RANK_LEVITATION,
     UI_FORCE_RANK_LIGHTNING, UI_FORCE_RANK_PROTECT, UI_FORCE_RANK_PULL, UI_FORCE_RANK_PUSH,
     UI_FORCE_RANK_RAGE, UI_FORCE_RANK_SABERATTACK, UI_FORCE_RANK_SABERDEFEND,
@@ -77,6 +78,12 @@ pub const WINDOW_DECORATION: c_int = 0x0000_0010;
 /// Raven `#define WINDOW_HORIZONTAL 0x00000400`.
 /// Source: `oracle/codemp/ui/ui_shared.h:32`
 pub const WINDOW_HORIZONTAL: c_int = 0x0000_0400;
+/// Raven `#define WINDOW_INTRANSITION 0x00000100` — window is in transition.
+/// Source: `oracle/codemp/ui/ui_shared.h:30`
+pub const WINDOW_INTRANSITION: c_int = 0x0000_0100;
+/// Raven `#define WINDOW_ORBITING 0x00010000` — item is in orbit.
+/// Source: `oracle/codemp/ui/ui_shared.h:38`
+pub const WINDOW_ORBITING: c_int = 0x0001_0000;
 /// Raven `#define WINDOW_OOB_CLICK 0x00020000`.
 /// Source: `oracle/codemp/ui/ui_shared.h:39`
 pub const WINDOW_OOB_CLICK: c_int = 0x0002_0000;
@@ -132,13 +139,13 @@ const WINDOW_INTRANSITIONMODEL: c_int = 0x0400_0000;
 const ITF_G2VALID: c_int = 0x0001;
 /// Raven `#define ITF_ISCHARACTER 0x0002` — a character item, uses customRGBA.
 /// Source: `oracle/codemp/ui/ui_shared.h:252`
-const ITF_ISCHARACTER: c_int = 0x0002;
+pub const ITF_ISCHARACTER: c_int = 0x0002;
 /// Raven `#define ITF_ISSABER 0x0004` — first saber item, draws blade.
 /// Source: `oracle/codemp/ui/ui_shared.h:253`
 pub const ITF_ISSABER: c_int = 0x0004;
 /// Raven `#define ITF_ISSABER2 0x0008` — second saber item, draws blade.
 /// Source: `oracle/codemp/ui/ui_shared.h:254`
-const ITF_ISSABER2: c_int = 0x0008;
+pub const ITF_ISSABER2: c_int = 0x0008;
 
 /// Raven `#define CVAR_ENABLE 0x00000001`.
 /// Source: `oracle/codemp/ui/ui_shared.h:246`
@@ -8147,4 +8154,733 @@ pub fn MenuParse_outlinecolor(
     handle: c_int,
 ) -> bool {
     PC_Color_Parse(dc, handle, &mut menus.menu_mut(menu).window.outlineColor)
+}
+
+/// Raven `Menu_PostParse` — snap a full-screen menu's window to the virtual
+/// screen rect, then recompute every item's screen position.
+///
+/// PORT-NOTE: Raven's `menu == NULL` guard becomes `menu: Option<MenuId>`.
+/// Source: `oracle/codemp/ui/ui_shared.c:979-990`
+pub fn Menu_PostParse(menus: &mut MenuSystem, dc: &mut dyn DisplayContext, menu: Option<MenuId>) {
+    let menu = match menu {
+        Some(m) => m,
+        None => return,
+    };
+    if menus.menu(menu).fullScreen {
+        let w = &mut menus.menu_mut(menu).window;
+        w.rect.x = 0.0;
+        w.rect.y = 0.0;
+        w.rect.w = 640.0;
+        w.rect.h = 480.0;
+    }
+    Menu_UpdatePosition(menus, dc, Some(menu));
+}
+
+/// Raven `Menus_ShowByName` — activate the menu named `p`, if defined.
+/// Source: `oracle/codemp/ui/ui_shared.c:1516-1521`
+pub fn Menus_ShowByName(menus: &mut MenuSystem, dc: &mut dyn DisplayContext, p: &str) {
+    if let Some(menu) = Menus_FindByName(menus, p) {
+        Menus_Activate(menus, dc, menu);
+    }
+}
+
+/// Raven `Menus_CloseByName` — run the named menu's close script and hide it,
+/// handing focus to whatever is now on top of the open-menu stack (if the
+/// closed menu had it).
+///
+/// PORT-NOTE: Raven's `openMenuCount -= 1; menuStack[openMenuCount]->flags
+/// |= WINDOW_HASFOCUS; menuStack[openMenuCount] = NULL;` triple is exactly
+/// `menuStack.pop()` — the arena's `menuStack: Vec<MenuId>` makes
+/// `openMenuCount` `menuStack.len()` (§B5).
+/// Source: `oracle/codemp/ui/ui_shared.c:1535-1569`
+pub fn Menus_CloseByName(menus: &mut MenuSystem, dc: &mut dyn DisplayContext, p: &str) {
+    let menu = match Menus_FindByName(menus, p) {
+        Some(m) => m,
+        None => return,
+    };
+
+    // Run the close script for the menu
+    Menu_RunCloseScript(menus, dc, Some(menu));
+
+    // If this window had the focus then take it away
+    if menus.menu(menu).window.flags & WINDOW_HASFOCUS != 0 {
+        // If there is something still in the open menu list then
+        // set it to have focus now
+        if let Some(top) = menus.menuStack.pop() {
+            menus.menu_mut(top).window.flags |= WINDOW_HASFOCUS;
+        }
+    }
+
+    // Window is now invisible and doesnt have focus
+    menus.menu_mut(menu).window.flags &= !(WINDOW_VISIBLE | WINDOW_HASFOCUS);
+}
+
+/// Raven `Menus_CloseAll` — run every defined menu's close script, hide them
+/// all, and clear the open-menu stack.
+/// Source: `oracle/codemp/ui/ui_shared.c:1573-1589`
+pub fn Menus_CloseAll(menus: &mut MenuSystem, dc: &mut dyn DisplayContext) {
+    menus.g_waitingForKey = false;
+
+    for i in 0..menus.menus.len() {
+        let id = MenuId::new(i);
+        Menu_RunCloseScript(menus, dc, Some(id));
+        menus.menu_mut(id).window.flags &= !(WINDOW_HASFOCUS | WINDOW_VISIBLE);
+    }
+
+    // Clear the menu stack
+    menus.menuStack.clear();
+
+    menus.FPMessageTime = 0;
+}
+
+/// The source rect of a [`Menu_TransitionItemByName`] transition: either the
+/// caller's own `rectDef_t` or Raven's defaulted `&item->window.rect`, which is
+/// a *live* pointer into the first matching item — `Item_UpdatePosition` writes
+/// that rect at the end of every iteration, so later items read the mutated
+/// values.
+/// Source: `oracle/codemp/ui/ui_shared.c:1670-1673,1683`
+#[derive(Clone, Copy)]
+enum TransitionRectFrom {
+    Explicit(RectDef),
+    Live(ItemId),
+}
+
+/// Raven `Menu_TransitionItemByName` — kick off a rect-to-rect transition on
+/// every item in `menu` matching group `p`.
+///
+/// PORT-NOTE: Raven's `if (!rectFrom) rectFrom = &item->window.rect;`
+/// reassigns the *outer* local, so the first matching item lacking a
+/// `rectFrom` fixes the source for every later item too — and it stays a live
+/// pointer into that item's rect, which `Item_UpdatePosition` mutates each
+/// iteration; [`TransitionRectFrom::Live`] re-reads it per use.
+/// `abs()` on the `rectDef_t` field diffs is Raven's *integer* `abs` (float
+/// args truncate to `int` first) — faithfully kept, not `f32::abs`.
+/// Source: `oracle/codemp/ui/ui_shared.c:1660-1686`
+#[allow(clippy::too_many_arguments)]
+pub fn Menu_TransitionItemByName(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    p: &str,
+    rectFrom: Option<RectDef>,
+    rectTo: &RectDef,
+    time: c_int,
+    amt: f32,
+) {
+    let mut rectFrom = rectFrom.map(TransitionRectFrom::Explicit);
+    let count = Menu_ItemsMatchingGroup(menus, dc, menu, p);
+    for i in 0..count {
+        if let Some(item) = Menu_GetMatchingItemByNumber(menus, menu, i, p) {
+            // if there are more than one of these with the same name, they'll
+            // all use the FIRST one's FROM.
+            let rf = match *rectFrom.get_or_insert(TransitionRectFrom::Live(item)) {
+                TransitionRectFrom::Explicit(r) => r,
+                TransitionRectFrom::Live(id) => menus.item(id).window.rect,
+            };
+            {
+                let it = menus.item_mut(item);
+                it.window.flags |= WINDOW_INTRANSITION | WINDOW_VISIBLE;
+                it.window.offsetTime = time;
+                it.window.rectClient = rf;
+                it.window.rectEffects = *rectTo;
+                it.window.rectEffects2.x = ((rectTo.x - rf.x) as c_int).abs() as f32 / amt;
+                it.window.rectEffects2.y = ((rectTo.y - rf.y) as c_int).abs() as f32 / amt;
+                it.window.rectEffects2.w = ((rectTo.w - rf.w) as c_int).abs() as f32 / amt;
+                it.window.rectEffects2.h = ((rectTo.h - rf.h) as c_int).abs() as f32 / amt;
+            }
+            Item_UpdatePosition(menus, dc, Some(item));
+        }
+    }
+}
+
+/// Raven `Menu_OrbitItemByName` — start every item in `menu` matching group
+/// `p` orbiting around `(cx, cy)`, starting from `(x, y)`.
+/// Source: `oracle/codemp/ui/ui_shared.c:1826-1843`
+#[allow(clippy::too_many_arguments)]
+pub fn Menu_OrbitItemByName(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    p: &str,
+    x: f32,
+    y: f32,
+    cx: f32,
+    cy: f32,
+    time: c_int,
+) {
+    let count = Menu_ItemsMatchingGroup(menus, dc, menu, p);
+    for i in 0..count {
+        if let Some(item) = Menu_GetMatchingItemByNumber(menus, menu, i, p) {
+            {
+                let it = menus.item_mut(item);
+                it.window.flags |= WINDOW_ORBITING | WINDOW_VISIBLE;
+                it.window.offsetTime = time;
+                it.window.rectEffects.x = cx;
+                it.window.rectEffects.y = cy;
+                it.window.rectClient.x = x;
+                it.window.rectClient.y = y;
+            }
+            Item_UpdatePosition(menus, dc, Some(item));
+        }
+    }
+}
+
+/// Raven `Script_SetFocus` — the `setfocus` script command: give focus to a
+/// named sibling item (unless it's a decoration or already focused), run its
+/// `onFocus` script and play the item-focus sound.
+///
+/// Raven's `#ifdef _XBOX` arm (`Item_SetFocus(focusItem, 0, 0)`) is dead on
+/// every retail/live target (porting-rules §20); the `#else` arm
+/// (`focusItem->window.flags |= WINDOW_HASFOCUS`) is transcribed.
+/// Source: `oracle/codemp/ui/ui_shared.c:1956-1984`
+pub fn Script_SetFocus(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut name = String::new();
+
+    if String_Parse(args, &mut name) {
+        let parent = menus.item(item).parent;
+        if let Some(focusItem) = Menu_FindItemByName(menus, parent, &name) {
+            let flags = menus.item(focusItem).window.flags;
+            if flags & WINDOW_DECORATION == 0 && flags & WINDOW_HASFOCUS == 0 {
+                Menu_ClearFocus(menus, dc, parent);
+
+                menus.item_mut(focusItem).window.flags |= WINDOW_HASFOCUS;
+
+                let onFocus = menus.item(focusItem).onFocus.clone();
+                if !onFocus.is_empty() {
+                    Item_RunScript(menus, dc, focusItem, &onFocus);
+                }
+                if ds.Assets.itemFocusSound != 0 {
+                    dc.startLocalSound(ds.Assets.itemFocusSound, CHAN_LOCAL_SOUND);
+                }
+            }
+        }
+    }
+
+    true
+}
+
+/// Raven `Item_SetFocus` — give `item` the focus (text items only if `(x,
+/// y)` lands in their text rect, everything else unconditionally), clearing
+/// whatever had it and running the relevant `onFocus` script(s) plus the
+/// focus sound.
+///
+/// PORT-NOTE (§19 UB pick): Raven's closing loop derefs `parent`
+/// unconditionally to find `item`'s cursor index, even though the comment at
+/// `bk001206` notes `parent` "can be NULL"; the otherwise-unreachable
+/// no-parent case here is a no-op instead of a null deref.
+/// Source: `oracle/codemp/ui/ui_shared.c:2399-2480`
+pub fn Item_SetFocus(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    x: f32,
+    y: f32,
+) -> bool {
+    let flags = menus.item(item).window.flags;
+    if flags & WINDOW_DECORATION != 0 || flags & WINDOW_HASFOCUS != 0 || flags & WINDOW_VISIBLE == 0
+    {
+        return false;
+    }
+
+    let parent = menus.item(item).parent;
+
+    if menus.item(item).disabled {
+        return false;
+    }
+
+    let cvarFlags = menus.item(item).cvarFlags;
+    if cvarFlags & (CVAR_ENABLE | CVAR_DISABLE) != 0
+        && !Item_EnableShowViaCvar(menus, dc, item, CVAR_ENABLE)
+    {
+        return false;
+    }
+
+    if cvarFlags & (CVAR_SHOW | CVAR_HIDE) != 0
+        && !Item_EnableShowViaCvar(menus, dc, item, CVAR_SHOW)
+    {
+        return false;
+    }
+
+    let oldFocus = Menu_ClearFocus(menus, dc, parent);
+
+    let mut sfx = ds.Assets.itemFocusSound;
+    let mut playSound = false;
+
+    let itemType = menus.item(item).r#type;
+    if itemType == ITEM_TYPE_TEXT {
+        let mut r = menus.item(item).textRect;
+        r.y -= r.h;
+
+        if Rect_ContainsPoint(Some(&r), x, y) {
+            menus.item_mut(item).window.flags |= WINDOW_HASFOCUS;
+            let focusSound = menus.item(item).focusSound;
+            if focusSound != 0 {
+                sfx = focusSound;
+            }
+            playSound = true;
+        } else if let Some(oldFocusId) = oldFocus {
+            menus.item_mut(oldFocusId).window.flags |= WINDOW_HASFOCUS;
+            let onFocus = menus.item(oldFocusId).onFocus.clone();
+            if !onFocus.is_empty() {
+                Item_RunScript(menus, dc, oldFocusId, &onFocus);
+            }
+        }
+    } else {
+        menus.item_mut(item).window.flags |= WINDOW_HASFOCUS;
+        let onFocus = menus.item(item).onFocus.clone();
+        if !onFocus.is_empty() {
+            Item_RunScript(menus, dc, item, &onFocus);
+        }
+        let focusSound = menus.item(item).focusSound;
+        if focusSound != 0 {
+            sfx = focusSound;
+        }
+        playSound = true;
+    }
+
+    if playSound {
+        dc.startLocalSound(sfx, CHAN_LOCAL_SOUND);
+    }
+
+    if let Some(parentId) = parent {
+        let items = menus.menu(parentId).items.clone();
+        for (i, id) in items.iter().enumerate() {
+            if *id == item {
+                menus.menu_mut(parentId).cursorItem = i as c_int;
+                break;
+            }
+        }
+    }
+
+    true
+}
+
+/// Raven `Scroll_ListBox_AutoFunc` — the listbox's auto-scroll capture-func
+/// tick: repeat the captured scroll key on the throttle, easing the repeat
+/// interval down to the floor.
+///
+/// PORT-NOTE (§19 UB pick): see `Scroll_TextScroll_AutoFunc` — Raven derefs
+/// `si->item` unconditionally; the otherwise-unreachable "no captured item"
+/// case here is a no-op.
+/// Source: `oracle/codemp/ui/ui_shared.c:3904-3920`
+pub fn Scroll_ListBox_AutoFunc(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+) {
+    let item = match menus.scrollInfo.item {
+        Some(id) => id,
+        None => return,
+    };
+
+    if ds.realTime > menus.scrollInfo.nextScrollTime {
+        // need to scroll which is done by simulating a click to the item
+        // this is done a bit sideways as the autoscroll "knows" that the item is a listbox
+        // so it calls it directly
+        let scrollKey = menus.scrollInfo.scrollKey;
+        Item_ListBox_HandleKey(menus, ds, dc, item, scrollKey, true, false);
+        menus.scrollInfo.nextScrollTime = ds.realTime + menus.scrollInfo.adjustValue;
+    }
+
+    if ds.realTime > menus.scrollInfo.nextAdjustTime {
+        menus.scrollInfo.nextAdjustTime = ds.realTime + SCROLL_TIME_ADJUST;
+        if menus.scrollInfo.adjustValue > SCROLL_TIME_FLOOR {
+            menus.scrollInfo.adjustValue -= SCROLL_TIME_ADJUSTOFFSET;
+        }
+    }
+}
+
+/// Raven `Scroll_ListBox_ThumbFunc` — the listbox's thumb-drag capture-func
+/// tick: track the cursor along the scrollbar's axis (horizontal or
+/// vertical, splitting rows for a multi-column image listbox), then run the
+/// same auto-scroll throttle as [`Scroll_ListBox_AutoFunc`].
+///
+/// PORT-NOTE (§19 UB pick): Raven derefs `si->item` and casts `typeData`
+/// unconditionally; the otherwise-unreachable (no captured item / non-listbox
+/// payload) case here is a no-op instead of a null deref (see
+/// `Scroll_Slider_ThumbFunc`).
+/// Source: `oracle/codemp/ui/ui_shared.c:3922-3995`
+pub fn Scroll_ListBox_ThumbFunc(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+) {
+    let item = match menus.scrollInfo.item {
+        Some(id) => id,
+        None => return,
+    };
+    if menus.item(item).typeData.listBox().is_none() {
+        return;
+    }
+
+    if menus.item(item).window.flags & WINDOW_HORIZONTAL != 0 {
+        if ds.cursorx == menus.scrollInfo.xStart as c_int {
+            return;
+        }
+        let rect = menus.item(item).window.rect;
+        let r = RectDef {
+            x: rect.x + SCROLLBAR_SIZE + 1.0,
+            y: rect.y + rect.h - SCROLLBAR_SIZE - 1.0,
+            h: SCROLLBAR_SIZE,
+            w: rect.w - (SCROLLBAR_SIZE * 2.0) - 2.0,
+        };
+        let max = Item_ListBox_MaxScroll(menus, dc, item);
+
+        let mut pos = ((ds.cursorx as f32 - r.x - SCROLLBAR_SIZE / 2.0) * max as f32
+            / (r.w - SCROLLBAR_SIZE)) as c_int;
+        if pos < 0 {
+            pos = 0;
+        } else if pos > max {
+            pos = max;
+        }
+        if let Some(listPtr) = menus.item_mut(item).typeData.listBox_mut() {
+            listPtr.startPos = pos;
+        }
+        menus.scrollInfo.xStart = ds.cursorx as f32;
+    } else if ds.cursory != menus.scrollInfo.yStart as c_int {
+        let rect = menus.item(item).window.rect;
+        let r = RectDef {
+            x: rect.x + rect.w - SCROLLBAR_SIZE - 1.0,
+            y: rect.y + SCROLLBAR_SIZE + 1.0,
+            h: rect.h - (SCROLLBAR_SIZE * 2.0) - 2.0,
+            w: SCROLLBAR_SIZE,
+        };
+        let max = Item_ListBox_MaxScroll(menus, dc, item);
+
+        let (elementWidth, elementStyle) = {
+            let l = menus.item(item).typeData.listBox().unwrap();
+            (l.elementWidth, l.elementStyle)
+        };
+
+        let mut pos: c_int;
+        if rect.w > (elementWidth * 2.0) && elementStyle == LISTBOX_IMAGE {
+            let rowLength = (rect.w / elementWidth) as c_int;
+            let rowMax = max / rowLength;
+            pos = ((ds.cursory as f32 - r.y - SCROLLBAR_SIZE / 2.0) * rowMax as f32
+                / (r.h - SCROLLBAR_SIZE)) as c_int;
+            pos *= rowLength;
+        } else {
+            pos = ((ds.cursory as f32 - r.y - SCROLLBAR_SIZE / 2.0) * max as f32
+                / (r.h - SCROLLBAR_SIZE)) as c_int;
+        }
+
+        if pos < 0 {
+            pos = 0;
+        } else if pos > max {
+            pos = max;
+        }
+        if let Some(listPtr) = menus.item_mut(item).typeData.listBox_mut() {
+            listPtr.startPos = pos;
+        }
+        menus.scrollInfo.yStart = ds.cursory as f32;
+    }
+
+    if ds.realTime > menus.scrollInfo.nextScrollTime {
+        // need to scroll which is done by simulating a click to the item
+        // this is done a bit sideways as the autoscroll "knows" that the item is a listbox
+        // so it calls it directly
+        let scrollKey = menus.scrollInfo.scrollKey;
+        Item_ListBox_HandleKey(menus, ds, dc, item, scrollKey, true, false);
+        menus.scrollInfo.nextScrollTime = ds.realTime + menus.scrollInfo.adjustValue;
+    }
+
+    if ds.realTime > menus.scrollInfo.nextAdjustTime {
+        menus.scrollInfo.nextAdjustTime = ds.realTime + SCROLL_TIME_ADJUST;
+        if menus.scrollInfo.adjustValue > SCROLL_TIME_FLOOR {
+            menus.scrollInfo.adjustValue -= SCROLL_TIME_ADJUSTOFFSET;
+        }
+    }
+}
+
+/// Raven `Item_HandleKey` — the generic per-item key router: release/start
+/// mouse capture, then (on key-down) dispatch to the type-specific handler.
+///
+/// PORT-NOTE: Raven's `captureFunc`/`captureData` release triple becomes
+/// clearing `MenuSystem::captureFunc`/`itemCapture` (`captureData` drops out
+/// — see `CaptureFunc`'s doc comment). The `ITEM_TYPE_BUTTON` `#ifdef _XBOX`
+/// arm is dead on every retail/live target (porting-rules §20); the `#else`
+/// (`qfalse`) arm is transcribed. The commented-out
+/// `Item_TextField_HandleKey` call under `ITEM_TYPE_EDITFIELD`/
+/// `ITEM_TYPE_NUMERICFIELD` was never live in the oracle either — dropped.
+/// Source: `oracle/codemp/ui/ui_shared.c:4176-4261`
+pub fn Item_HandleKey(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    key: c_int,
+    down: bool,
+) -> bool {
+    if let Some(captured) = menus.itemCapture {
+        Item_StopCapture(captured);
+        menus.itemCapture = None;
+        menus.captureFunc = CaptureFunc::None;
+    } else if down && (key == A_MOUSE1 || key == A_MOUSE2 || key == A_MOUSE3) {
+        Item_StartCapture(menus, ds, dc, item, key);
+    }
+
+    if !down {
+        return false;
+    }
+
+    let itemType = menus.item(item).r#type;
+    match itemType {
+        ITEM_TYPE_BUTTON => false,
+        ITEM_TYPE_RADIOBUTTON => false,
+        ITEM_TYPE_CHECKBOX => false,
+        ITEM_TYPE_EDITFIELD | ITEM_TYPE_NUMERICFIELD => {
+            if key == A_MOUSE1 || key == A_MOUSE2 || key == A_ENTER {
+                // §19: Raven casts `item->typeData` to `editFieldDef_t *`
+                // unchecked; the typed payload no-ops on the (unreachable)
+                // mismatch instead of reinterpreting foreign bytes.
+                let it = menus.item(item);
+                let hasCvarAndPtr = it.cvar.is_some() && it.typeData.editField().is_some();
+                if hasCvarAndPtr {
+                    if let Some(editPtr) = menus.item_mut(item).typeData.editField_mut() {
+                        editPtr.paintOffset = 0;
+                    }
+                }
+            }
+            false
+        }
+        ITEM_TYPE_COMBO => false,
+        ITEM_TYPE_LISTBOX => Item_ListBox_HandleKey(menus, ds, dc, item, key, down, false),
+        ITEM_TYPE_TEXTSCROLL => Item_TextScroll_HandleKey(menus, ds, item, key, down, false),
+        ITEM_TYPE_YESNO => Item_YesNo_HandleKey(menus, ds, dc, item, key),
+        ITEM_TYPE_MULTI => Item_Multi_HandleKey(menus, ds, dc, item, key),
+        ITEM_TYPE_OWNERDRAW => Item_OwnerDraw_HandleKey(menus, ds, dc, Some(item), key),
+        ITEM_TYPE_BIND => Item_Bind_HandleKey(menus, ds, dc, item, key, down),
+        ITEM_TYPE_SLIDER => Item_Slider_HandleKey(menus, ds, dc, item, key, down),
+        _ => false,
+    }
+}
+
+/// Raven `Item_Text_AutoWrapped_Paint` — paint `item`'s display text,
+/// word-wrapping at its window width by re-measuring the growing line on
+/// every character (Raven's O(n^2) walk, kept as-is).
+///
+/// PORT-NOTE: Raven walks `char *p`/`char buff[2048]` as raw bytes; this
+/// walks `string_to_latin1(textPtr)`'s bytes the same way, decoding back to
+/// `&str` only at the `DC->` call sites (Latin-1 discipline at the
+/// trait-call byte seam). The comment "(this will break widechar languages)"
+/// is Raven's own; preserved as-is (no Unicode-aware rewrap here).
+/// Source: `oracle/codemp/ui/ui_shared.c:4828-4909`
+pub fn Item_Text_AutoWrapped_Paint(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+) {
+    let it = menus.item(item);
+    let textPtr = if let Some(t) = it.text.clone() {
+        t
+    } else if let Some(cvar) = it.cvar.clone() {
+        dc.getCVarString(&cvar, 2048)
+    } else {
+        return;
+    };
+
+    // string reference
+    let textPtr = if let Some(rest) = textPtr.strip_prefix('@') {
+        dc.SP_GetStringTextString(rest, 2048).unwrap_or_default()
+    } else {
+        textPtr
+    };
+
+    if textPtr.is_empty() {
+        return;
+    }
+
+    let mut color = vec4_t::default();
+    Item_TextColor(menus, ds, dc, item, &mut color);
+
+    let (textscale, iMenuFont, rectW, textalignment, textalignx, textStyle) = {
+        let it = menus.item(item);
+        (
+            it.textscale,
+            it.iMenuFont,
+            it.window.rect.w,
+            it.textalignment,
+            it.textalignx,
+            it.textStyle,
+        )
+    };
+    let height = dc.textHeight(&textPtr, textscale, iMenuFont);
+    let mut y = menus.item(item).textaligny;
+
+    let p = string_to_latin1(&textPtr);
+    let mut idx: usize = 0;
+    // `buff` is Raven's `char buff[2048]` — the bytes up to its NUL — and `len`
+    // its separate string length; a wrap zeroes `len` but leaves `buff` holding
+    // the previous line, which the next `textWidth` still measures.
+    // §19: Raven's fixed `buff[2048]` overruns on a >2047-byte segment (UB);
+    // the unbounded `Vec` is the defined pick.
+    let mut buff: Vec<u8> = Vec::new();
+    let mut len: usize = 0;
+    let mut newLine: usize = 0;
+    let mut newLinePtr: usize = 0;
+    let mut newLineWidth: c_int = 0;
+    let mut textWidth: c_int = 0;
+
+    loop {
+        let ch = if idx < p.len() { p[idx] } else { 0u8 };
+        if ch == b' ' || ch == b'\t' || ch == b'\n' || ch == 0 {
+            newLine = len;
+            newLinePtr = idx + 1;
+            newLineWidth = textWidth;
+        }
+        textWidth = dc.textWidth(&latin1_to_string(&buff), textscale, 0);
+        if (newLine != 0 && (textWidth as f32) > rectW) || ch == b'\n' || ch == 0 {
+            if len != 0 {
+                let mut tx = menus.item(item).textRect.x;
+                if textalignment == ITEM_ALIGN_LEFT {
+                    tx = textalignx;
+                } else if textalignment == ITEM_ALIGN_RIGHT {
+                    tx = textalignx - newLineWidth as f32;
+                } else if textalignment == ITEM_ALIGN_CENTER {
+                    tx = textalignx - (newLineWidth / 2) as f32;
+                }
+                let mut ty = y;
+                let window = menus.item(item).window.clone();
+                ToWindowCoords(&mut tx, &mut ty, &window);
+                {
+                    let it = menus.item_mut(item);
+                    it.textRect.x = tx;
+                    it.textRect.y = ty;
+                }
+
+                // Raven `buff[newLine] = '\0'` — the NUL moves back to the
+                // wrap point and stays there until the next character is written.
+                buff.truncate(newLine);
+                let line = latin1_to_string(&buff);
+                dc.drawText(
+                    tx, ty, textscale, color, &line, 0.0, 0, textStyle, iMenuFont,
+                );
+            }
+            if ch == 0 {
+                break;
+            }
+            y += height as f32 + 5.0;
+            idx = newLinePtr;
+            len = 0;
+            newLine = 0;
+            newLineWidth = 0;
+            continue;
+        }
+        // Raven `buff[len++] = *p++; buff[len] = '\0';`
+        buff.truncate(len);
+        buff.push(ch);
+        len += 1;
+        idx += 1;
+    }
+}
+
+/// Raven `Item_Text_Wrapped_Paint` — paint `item`'s display text split into
+/// lines on `\r`, each spaced by the cached text height.
+///
+/// PORT-NOTE: see `Item_SetTextExtents` — `seLanguageModCount` threads in the
+/// caller's `se_language.modificationCount` read (this crate cannot reach it
+/// as cached state).
+/// Source: `oracle/codemp/ui/ui_shared.c:4911-4959`
+pub fn Item_Text_Wrapped_Paint(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    seLanguageModCount: c_int,
+) {
+    // now paint the text and/or any optional images
+    // default to left
+    let it = menus.item(item);
+    let textPtr = if let Some(t) = it.text.clone() {
+        t
+    } else if let Some(cvar) = it.cvar.clone() {
+        dc.getCVarString(&cvar, 1024)
+    } else {
+        return;
+    };
+
+    // string reference
+    let textPtr = if let Some(rest) = textPtr.strip_prefix('@') {
+        dc.SP_GetStringTextString(rest, 1024).unwrap_or_default()
+    } else {
+        textPtr
+    };
+
+    if textPtr.is_empty() {
+        return;
+    }
+
+    let mut color = vec4_t::default();
+    Item_TextColor(menus, ds, dc, item, &mut color);
+
+    let mut width: c_int = 0;
+    let mut height: c_int = 0;
+    Item_SetTextExtents(
+        menus,
+        dc,
+        item,
+        &mut width,
+        &mut height,
+        Some(&textPtr),
+        seLanguageModCount,
+    );
+
+    let it = menus.item(item);
+    let x = it.textRect.x;
+    let mut y = it.textRect.y;
+    let textscale = it.textscale;
+    let textStyle = it.textStyle;
+    let iMenuFont = it.iMenuFont;
+
+    // §19: Raven `strncpy`s each `\r`-segment into a fixed `char buff[1024]`,
+    // which overruns on a >1023-byte segment (UB); slicing is the defined pick.
+    let bytes = string_to_latin1(&textPtr);
+    let mut start: usize = 0;
+    loop {
+        match bytes[start..].iter().position(|&b| b == b'\r') {
+            Some(off) => {
+                let p = start + off;
+                let line = latin1_to_string(&bytes[start..p]);
+                dc.drawText(x, y, textscale, color, &line, 0.0, 0, textStyle, iMenuFont);
+                y += height as f32 + 2.0;
+                start = p + 1;
+            }
+            None => break,
+        }
+    }
+    let rest = latin1_to_string(&bytes[start..]);
+    dc.drawText(x, y, textscale, color, &rest, 0.0, 0, textStyle, iMenuFont);
+}
+
+/// Raven `Menu_ScrollFeeder` — simulate a listbox scroll-key press on the
+/// item in `menu` whose `special` matches `feeder`.
+/// Source: `oracle/codemp/ui/ui_shared.c:7046-7056`
+pub fn Menu_ScrollFeeder(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    menu: Option<MenuId>,
+    feeder: c_int,
+    down: bool,
+) {
+    let menu = match menu {
+        Some(m) => m,
+        None => return,
+    };
+    let items = menus.menu(menu).items.clone();
+    for id in items {
+        if menus.item(id).special == feeder as f32 {
+            let key = if down { A_CURSOR_DOWN } else { A_CURSOR_UP };
+            Item_ListBox_HandleKey(menus, ds, dc, id, key, true, true);
+            return;
+        }
+    }
 }

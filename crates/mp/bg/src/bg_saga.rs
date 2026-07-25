@@ -642,7 +642,8 @@ pub fn BG_SiegeGetValueGroup(buf: &str, group: &str) -> Option<String> {
                             }
                         }
 
-                        return Some(String::from_utf8_lossy(&out).into_owned()); // we got it.
+                        return Some(String::from_utf8_lossy(&out).into_owned());
+                    // we got it.
                     } else {
                         panic!("Error parsing group in file, unexpected EOF before opening bracket while looking for group");
                         // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
@@ -815,7 +816,10 @@ pub fn BG_SiegeGetPairedValue(buf: &str, key: &str) -> Option<String> {
                         // make sure we didn't stop on a comment, if we did then this is considered an error in the file.
                         if Q_stricmpBytes(&check_key, key.as_bytes()) == 0 {
                             // guess so. Parse along to the next valid character, then put that into the output buffer and return 1.
-                            while (at(i) == b' ' || at(i) == b'\n' || at(i) == b'\r' || at(i) == TAB)
+                            while (at(i) == b' '
+                                || at(i) == b'\n'
+                                || at(i) == b'\r'
+                                || at(i) == TAB)
                                 && at(i) != 0
                             {
                                 i += 1;
@@ -856,9 +860,12 @@ pub fn BG_SiegeGetPairedValue(buf: &str, key: &str) -> Option<String> {
                                     }
                                 }
 
-                                return Some(String::from_utf8_lossy(&out).into_owned()); // we got it.
+                                return Some(String::from_utf8_lossy(&out).into_owned());
+                            // we got it.
                             } else {
-                                panic!("Error parsing file, unexpected EOF while looking for valud");
+                                panic!(
+                                    "Error parsing file, unexpected EOF while looking for valud"
+                                );
                                 // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
                             }
                         } else {
@@ -1171,7 +1178,8 @@ pub fn BG_SiegeParseClassFile(
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].hasForcedSaberColor = qfalse;
         }
 
-        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "saber2color") {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "saber2color")
+        {
             Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedSaber2Color =
                 atoi(parse_buf.as_ptr());
@@ -1196,7 +1204,8 @@ pub fn BG_SiegeParseClassFile(
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].weapons |= 1 << WP_MELEE;
         }
 
-        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "forcepowers") {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "forcepowers")
+        {
             Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             BG_SiegeTranslateForcePowers(
                 parse_buf.as_mut_ptr(),
@@ -1229,7 +1238,8 @@ pub fn BG_SiegeParseClassFile(
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxhealth = 100;
         }
 
-        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "starthealth") {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "starthealth")
+        {
             Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].starthealth = atoi(parse_buf.as_ptr());
         } else {
@@ -1276,11 +1286,14 @@ pub fn BG_SiegeParseClassFile(
             panic!("Siege class without uishader entry");
         }
 
-        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "class_shader") {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "class_shader")
+        {
             Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             // PORT-NOTE (DEC-36 D5): per-module arm — the game stores 0, cgame/ui
             // register the shader and report a miss.
-            let class_name = bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].name.clone();
+            let class_name = bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]
+                .name
+                .clone();
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].classShader =
                 callbacks.siege_class_shader(&cstr_to_str(parse_buf.as_ptr()), &class_name);
             let title_length: usize = strlen(parse_buf.as_ptr());
@@ -1372,34 +1385,37 @@ pub fn BG_SiegeCountBaseClass(team: c_int, classIndex: c_short, bg: &BgState) ->
 
 /// Raven `BG_GetUIPortraitFile`.
 ///
+/// Raven's `char *` return is `NULL` on the not-found paths and the class's
+/// `uiPortrait` otherwise (possibly the empty string) — `Option<String>` keeps
+/// the two apart so callers can reproduce the `if (holdBuf)` test.
 /// Source: `oracle/codemp/game/bg_saga.c:1094-1121`
 pub fn BG_GetUIPortraitFile(
     team: c_int,
     classIndex: c_short,
     cntIndex: c_short,
     bg: &BgState,
-) -> String {
+) -> Option<String> {
     unsafe {
         let mut count: isize = 0;
         let mut i: isize;
 
         let stm = BG_SiegeFindThemeForTeam(team, bg);
         if stm.is_null() {
-            return String::new();
+            return None;
         }
 
         i = 0;
         while i < (*stm).numClasses as isize {
             if (*(*stm).classes[i as usize]).playerClass == classIndex {
                 if count == cntIndex as isize {
-                    return (*(*stm).classes[i as usize]).uiPortrait.clone();
+                    return Some((*(*stm).classes[i as usize]).uiPortrait.clone());
                 }
                 count += 1;
             }
             i += 1;
         }
 
-        String::new()
+        None
     }
 }
 
@@ -1563,7 +1579,10 @@ pub fn BG_SiegeFindClassByName(classname: &str, bg: &BgState) -> *mut siegeClass
     let mut i: isize = 0;
 
     while i < bg.bgNumSiegeClasses as isize {
-        if bg.bgSiegeClasses[i as usize].name.eq_ignore_ascii_case(classname) {
+        if bg.bgSiegeClasses[i as usize]
+            .name
+            .eq_ignore_ascii_case(classname)
+        {
             return &bg.bgSiegeClasses[i as usize] as *const siegeClass_t as *mut siegeClass_t;
         }
         i += 1;
@@ -1675,12 +1694,8 @@ pub fn BG_SiegeLoadTeams(bg: &mut BgState, traps: &dyn BgTraps) {
 
         bg.bgNumSiegeTeams = 0;
 
-        num_files = traps.fs_getfilelist(
-            "ext_data/Siege/Teams",
-            ".team",
-            filelist.as_mut_ptr(),
-            4096,
-        );
+        num_files =
+            traps.fs_getfilelist("ext_data/Siege/Teams", ".team", filelist.as_mut_ptr(), 4096);
         fileptr = filelist.as_mut_ptr();
 
         i = 0;
@@ -1836,7 +1851,10 @@ pub fn BG_SiegeFindClassIndexByName(classname: &str, bg: &BgState) -> c_int {
     let mut i: isize = 0;
 
     while i < bg.bgNumSiegeClasses as isize {
-        if bg.bgSiegeClasses[i as usize].name.eq_ignore_ascii_case(classname) {
+        if bg.bgSiegeClasses[i as usize]
+            .name
+            .eq_ignore_ascii_case(classname)
+        {
             return i as c_int;
         }
         i += 1;

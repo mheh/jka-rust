@@ -4,7 +4,7 @@
 
 #![allow(non_snake_case)]
 
-use core::ffi::{c_char, c_int};
+use core::ffi::{c_char, c_int, c_void};
 use core::mem;
 
 use mp_bg::bg_channel::BgState;
@@ -27,7 +27,7 @@ use mp_qshared::shared::q_string::COM_Compress;
 use mp_qshared::shared::{fileHandle_t, mdxaBone_t, vec3_t, Eorientations, FS_READ, MAX_QPATH};
 use mp_uishared::shared::item_def_s::ItemDef;
 use mp_uishared::shared::menu_system::MAX_MENUFILE;
-use mp_uishared::ui_shared::{String_Alloc, ITF_ISSABER};
+use mp_uishared::ui_shared::{String_Alloc, ITF_ISCHARACTER, ITF_ISSABER, ITF_ISSABER2};
 use native_string::{atof, atoi, latin1_to_string};
 use native_types::qfalse;
 
@@ -767,11 +767,10 @@ pub fn UI_SaberValidForPlayerInMP(ctx: &mut UiContext, saberName: &str) -> bool 
 /// when the tag is missing), then draws it with `UI_DoSaber`.
 ///
 /// PORT-NOTE: Raven's `char *tagName = va(...)` becomes a `format!`; the
-/// `tagHack` `qboolean` stays a `bool`. `item->ghoul2`/`&(item->ghoul2)` both
-/// pass the field's raw `*mut c_void` token straight through per the
-/// already-ported `trap::G2API_*` wrapper shapes (LAW — `G2API_HasGhoul2ModelOnIndex`
-/// and `G2API_AddBolt` both take a single `*mut c_void`, not a double pointer,
-/// despite the oracle's `&(item->ghoul2)` call site).
+/// `tagHack` `qboolean` stays a `bool`. `G2API_HasGhoul2ModelOnIndex` takes the
+/// ADDRESS of the `ghoul2` slot (the engine derefs arg1 as `CGhoul2Info_v **` —
+/// `cl_ui.cpp:1341`), while `G2API_AddBolt`/`G2API_GetBoltMatrix` take the
+/// handle value itself.
 ///
 /// Source: `oracle/codemp/ui/ui_saber.c:614-846`
 #[allow(clippy::too_many_arguments)]
@@ -794,7 +793,10 @@ pub fn UI_SaberDrawBlade(
             trap::Cvar_VariableStringBuffer(ctx.engine, "ui_saber2_color", MAX_QPATH);
     }
 
-    if !trap::G2API_HasGhoul2ModelOnIndex(ctx.engine, item.ghoul2, saberModel) {
+    // Raven `&(item->ghoul2)`: the engine only reads the slot here, so the
+    // shared borrow is cast to the seam's `*mut c_void` slot token.
+    let g2slot = &item.ghoul2 as *const *mut c_void as *mut c_void;
+    if !trap::G2API_HasGhoul2ModelOnIndex(ctx.engine, g2slot, saberModel) {
         // invalid index!
         return;
     }
@@ -1266,4 +1268,140 @@ pub fn UI_SaberGetHiltInfo(ctx: &mut UiContext) -> (Vec<String>, Vec<String>) {
     ctx.world.saber.SaberParms = saber_parms;
 
     (singleHilts, staffHilts)
+}
+
+/// Raven `UI_SaberDrawBlades` — draws every blade of `item`'s hacked
+/// sabermoves-character saber(s), or of the currently-equipped `ui_saber`/
+/// `ui_saber2` (falling back to `"kyle"` when invalid in MP).
+///
+/// Raven: `NOTE: only allows one saber type in view at a time`.
+///
+/// PORT-NOTE: `char saber[MAX_QPATH]`/`saber[0]` truthiness collapses to a
+/// `String`/`is_empty()` check (dictionary: fixed C string buffer -> owned
+/// `String`).
+///
+/// Source: `oracle/codemp/ui/ui_saber.c:952-1017`
+pub fn UI_SaberDrawBlades(ctx: &mut UiContext, item: &ItemDef, origin: vec3_t, angles: vec3_t) {
+    let mut numSabers = 1;
+
+    if (item.flags & ITF_ISCHARACTER) != 0 && ctx.world.movesTitleIndex == 4 {
+        // MD_DUAL_SABERS
+        numSabers = 2;
+    }
+
+    for saberNum in 0..numSabers {
+        let mut saber: String;
+        let saberModel: c_int;
+
+        if (item.flags & ITF_ISCHARACTER) != 0 {
+            // hacked sabermoves sabers in character's hand
+            saber = UI_GetSaberForMenu(ctx, saberNum);
+            saberModel = saberNum + 1;
+        } else if (item.flags & ITF_ISSABER) != 0 {
+            saber = trap::Cvar_VariableStringBuffer(ctx.engine, "ui_saber", MAX_QPATH);
+            if !UI_SaberValidForPlayerInMP(ctx, &saber) {
+                trap::Cvar_Set(ctx.engine, "ui_saber", "kyle");
+                saber = trap::Cvar_VariableStringBuffer(ctx.engine, "ui_saber", MAX_QPATH);
+            }
+            saberModel = 0;
+        } else if (item.flags & ITF_ISSABER2) != 0 {
+            saber = trap::Cvar_VariableStringBuffer(ctx.engine, "ui_saber2", MAX_QPATH);
+            if !UI_SaberValidForPlayerInMP(ctx, &saber) {
+                trap::Cvar_Set(ctx.engine, "ui_saber2", "kyle");
+                saber = trap::Cvar_VariableStringBuffer(ctx.engine, "ui_saber2", MAX_QPATH);
+            }
+            saberModel = 0;
+        } else {
+            return;
+        }
+
+        if !saber.is_empty() {
+            let numBlades = UI_SaberNumBladesForSaber(ctx, &saber);
+            if numBlades != 0 {
+                // okay, here we go, time to draw each blade...
+                let saberTypeString = UI_SaberTypeForSaber(ctx, &saber).unwrap_or_default();
+                let saberType = TranslateSaberType(&saberTypeString);
+                for curBlade in 0..numBlades {
+                    if UI_SaberShouldDrawBlade(ctx, &saber, curBlade) {
+                        UI_SaberDrawBlade(
+                            ctx, item, &saber, saberModel, saberType, origin, angles, curBlade,
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Raven `UI_SaberAttachToChar` — rebuilds `item`'s bolted-on saber ghoul2
+/// model(s) (single, or two for `MD_DUAL_SABERS`) from the currently-equipped
+/// saber(s), attaching each to the `*r_hand`/`*l_hand` bolt.
+///
+/// PORT-NOTE: `G2API_HasGhoul2ModelOnIndex`/`G2API_RemoveGhoul2Model`/
+/// `G2API_InitGhoul2Model` take the ADDRESS of the `ghoul2` slot (the engine
+/// derefs arg1 as `CGhoul2Info_v **` — `cl_ui.cpp:1341,1348`), while
+/// `G2API_SetSkin`/`G2API_AddBolt`/`G2API_AttachG2Model` take the handle value.
+///
+/// Source: `oracle/codemp/ui/ui_saber.c:1019-1075`
+pub fn UI_SaberAttachToChar(ctx: &mut UiContext, item: &mut ItemDef) {
+    let mut numSabers = 1;
+
+    let g2slot = &mut item.ghoul2 as *mut *mut c_void as *mut c_void;
+    if trap::G2API_HasGhoul2ModelOnIndex(ctx.engine, g2slot, 2) {
+        // remove any extra models
+        trap::G2API_RemoveGhoul2Model(ctx.engine, g2slot, 2);
+    }
+    if trap::G2API_HasGhoul2ModelOnIndex(ctx.engine, g2slot, 1) {
+        // remove any extra models
+        trap::G2API_RemoveGhoul2Model(ctx.engine, g2slot, 1);
+    }
+
+    if ctx.world.movesTitleIndex == 4 {
+        // MD_DUAL_SABERS
+        numSabers = 2;
+    }
+
+    for saberNum in 0..numSabers {
+        // bolt sabers
+        let saber = UI_GetSaberForMenu(ctx, saberNum);
+
+        if let Some(modelPath) = UI_SaberModelForSaber(ctx, &saber) {
+            // successfully found a model
+            let g2Saber = trap::G2API_InitGhoul2Model(
+                ctx.engine,
+                &mut item.ghoul2 as *mut *mut c_void,
+                &modelPath,
+                0,
+                0,
+                0,
+                0,
+                0,
+            );
+            if g2Saber != 0 {
+                // get the customSkin, if any
+                if let Some(skinPath) = UI_SaberSkinForSaber(ctx, &saber) {
+                    let g2skin = trap::R_RegisterSkin(ctx.engine, &skinPath);
+                    // this is going to set the surfs on/off matching the skin file
+                    trap::G2API_SetSkin(ctx.engine, item.ghoul2, g2Saber, 0, g2skin);
+                } else {
+                    // turn off custom skin
+                    trap::G2API_SetSkin(ctx.engine, item.ghoul2, g2Saber, 0, 0);
+                }
+
+                let boltNum = if saberNum == 0 {
+                    trap::G2API_AddBolt(ctx.engine, item.ghoul2, 0, "*r_hand")
+                } else {
+                    trap::G2API_AddBolt(ctx.engine, item.ghoul2, 0, "*l_hand")
+                };
+                trap::G2API_AttachG2Model(
+                    ctx.engine,
+                    item.ghoul2,
+                    g2Saber,
+                    item.ghoul2,
+                    boltNum,
+                    0,
+                );
+            }
+        }
+    }
 }

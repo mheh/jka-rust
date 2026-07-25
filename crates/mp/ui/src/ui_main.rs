@@ -11,8 +11,9 @@ use mp_abi::ui::public::ui_client_state_t::uiClientState_t;
 use mp_bg::bg_channel::BgState;
 use mp_bg::bg_misc::{forceMasteryPoints, BG_FindItemForHoldable, BG_FindItemForWeapon};
 use mp_bg::bg_saga::{
-    BG_GetUIPortrait, BG_SiegeCountBaseClass, BG_SiegeFindThemeForTeam, BG_SiegeGetPairedValue,
-    BG_SiegeGetValueGroup, BG_SiegeSetTeamTheme, BG_SiegeTeamClassPortrait,
+    BG_GetClassOnBaseClass, BG_GetUIPortrait, BG_GetUIPortraitFile, BG_SiegeCountBaseClass,
+    BG_SiegeFindThemeForTeam, BG_SiegeGetPairedValue, BG_SiegeGetValueGroup, BG_SiegeSetTeamTheme,
+    BG_SiegeTeamClassPortrait,
 };
 use mp_bg::public::configstring::{CS_PLAYERS, CS_SERVERINFO};
 use mp_bg::public::gametype::{
@@ -9972,9 +9973,13 @@ pub fn UI_FeederItemText(
 /// Raven: called every time a class is selected from a feeder, sets info for
 /// shaders to be displayed in the menu about the class -rww
 ///
+/// PORT-NOTE: Raven passed the `siegeClass_t *` itself; the port threads its
+/// index into `world.bg_state.bgSiegeClasses` (§B5) so no reference into
+/// `bg_state` aliases `ctx` across a `&mut ctx` use.
+///
 /// Source: `oracle/codemp/ui/ui_main.c:9441-9592`
 #[allow(clippy::too_many_lines)]
-pub fn UI_SiegeSetCvarsForClass(ctx: &mut UiContext, scl: Option<&siegeClass_t>) {
+pub fn UI_SiegeSetCvarsForClass(ctx: &mut UiContext, sclIndex: Option<usize>) {
     // let's clear the things out first
     for i in 0..WP_NUM_WEAPONS {
         trap::Cvar_Set(
@@ -9998,27 +10003,40 @@ pub fn UI_SiegeSetCvarsForClass(ctx: &mut UiContext, scl: Option<&siegeClass_t>)
 
     trap::Cvar_Set(ctx.engine, "ui_class_icon", "");
 
-    let scl = match scl {
+    let sclIndex = match sclIndex {
         // no select?
-        Some(scl) => scl,
+        Some(sclIndex) => sclIndex,
         None => return,
     };
+
+    // The class's fields are read out up front; the borrow of `bg_state` ends
+    // here, so nothing below aliases it.
+    let scl = &ctx.world.bg_state.bgSiegeClasses[sclIndex];
+    let weapons = scl.weapons;
+    let saber1 = scl.saber1.clone();
+    let saber2 = scl.saber2.clone();
+    let invenItems = scl.invenItems;
+    let forcePowerLevels = scl.forcePowerLevels;
+    let maxhealth = scl.maxhealth;
+    let maxarmor = scl.maxarmor;
+    let speed = scl.speed;
+    let classShader = scl.classShader;
 
     // set cvars for which weaps we have
     let mut i = 0;
     let mut count: c_int = 0;
     trap::Cvar_Set(ctx.engine, &format!("ui_class_weapondesc{}", count), " "); // Blank it out to start with
     while i < WP_NUM_WEAPONS {
-        if scl.weapons & (1 << i) != 0 {
+        if weapons & (1 << i) != 0 {
             if i == WP_SABER {
                 // we want to see what kind of saber they have, and set the
                 // cvar based on that
-                let saberType = if !scl.saber1.is_empty() && !scl.saber2.is_empty() {
+                let saberType = if !saber1.is_empty() && !saber2.is_empty() {
                     "gfx/hud/w_icon_duallightsaber".to_string()
                     // fixme: need saber data access on ui to determine if
                     // staff, "gfx/hud/w_icon_saberstaff"
-                } else if !scl.saber1.is_empty() {
-                    match UI_SaberTypeForSaber(ctx, &scl.saber1) {
+                } else if !saber1.is_empty() {
+                    match UI_SaberTypeForSaber(ctx, &saber1) {
                         Some(buf) if Q_stricmp(&buf, "SABER_STAFF") == 0 => {
                             "gfx/hud/w_icon_saberstaff".to_string()
                         }
@@ -10063,7 +10081,7 @@ pub fn UI_SiegeSetCvarsForClass(ctx: &mut UiContext, scl: Option<&siegeClass_t>)
     let mut count: c_int = 0;
 
     while i < HI_NUM_HOLDABLE {
-        if scl.invenItems & (1 << i) != 0 {
+        if invenItems & (1 << i) != 0 {
             let item = BG_FindItemForHoldable(i);
             trap::Cvar_Set(
                 ctx.engine,
@@ -10093,11 +10111,11 @@ pub fn UI_SiegeSetCvarsForClass(ctx: &mut UiContext, scl: Option<&siegeClass_t>)
             // Zero this out to start.
         }
 
-        if scl.forcePowerLevels[i as usize] != 0 {
+        if forcePowerLevels[i as usize] != 0 {
             trap::Cvar_Set(
                 ctx.engine,
                 &format!("ui_class_powerlevel{}", count),
-                &format!("{}", scl.forcePowerLevels[i as usize]),
+                &format!("{}", forcePowerLevels[i as usize]),
             );
             trap::Cvar_Set(
                 ctx.engine,
@@ -10111,13 +10129,13 @@ pub fn UI_SiegeSetCvarsForClass(ctx: &mut UiContext, scl: Option<&siegeClass_t>)
     }
 
     // now health and armor
-    trap::Cvar_Set(ctx.engine, "ui_class_health", &format!("{}", scl.maxhealth));
-    trap::Cvar_Set(ctx.engine, "ui_class_armor", &format!("{}", scl.maxarmor));
-    trap::Cvar_Set(ctx.engine, "ui_class_speed", &format!("{:.2}", scl.speed));
+    trap::Cvar_Set(ctx.engine, "ui_class_health", &format!("{}", maxhealth));
+    trap::Cvar_Set(ctx.engine, "ui_class_armor", &format!("{}", maxarmor));
+    trap::Cvar_Set(ctx.engine, "ui_class_speed", &format!("{:.2}", speed));
 
     // now get the icon path based on the shader index
-    let shader = if scl.classShader != 0 {
-        trap::R_ShaderNameFromIndex(ctx.engine, scl.classShader, MAX_QPATH)
+    let shader = if classShader != 0 {
+        trap::R_ShaderNameFromIndex(ctx.engine, classShader, MAX_QPATH)
     } else {
         // no shader
         String::new()
@@ -10166,6 +10184,79 @@ pub fn UI_ParseGameInfo(ctx: &mut UiContext, teamFile: &str) {
         if Q_stricmp(&token, "maps") == 0 {
             // start a new menu
             MapList_Parse(ctx, &mut p);
+        }
+    }
+}
+
+/// Raven `UI_UpdateCvarsForClass`.
+///
+/// PORT-NOTE: `BG_GetClassOnBaseClass` returns a raw `*mut siegeClass_t` into
+/// `world.bg_state.bgSiegeClasses` (DEC-36 addendum 11); the deref is confined
+/// to computing the class index, which is what gets threaded onward — no
+/// reference into `bg_state` stays live across a `&mut ctx` use.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:9596-9639`
+pub fn UI_UpdateCvarsForClass(
+    ctx: &mut UiContext,
+    dc: &mut dyn DisplayContext,
+    team: c_int,
+    baseClass: c_int,
+    index: c_int,
+) {
+    // Is it a valid team
+    if team == SIEGETEAM_TEAM1 || team == SIEGETEAM_TEAM2 {
+        // Is it a valid base class?
+        if baseClass >= SPC_INFANTRY as c_int && baseClass < SPC_MAX as c_int {
+            // A valid index?
+            if index >= 0
+                && index < BG_SiegeCountBaseClass(team, baseClass as c_short, &ctx.world.bg_state)
+            {
+                if ctx.world.main.g_siegedFeederForcedSet == 0 {
+                    let holdClass = BG_GetClassOnBaseClass(
+                        team,
+                        baseClass as c_short,
+                        index as c_short,
+                        &ctx.world.bg_state,
+                    );
+                    if !holdClass.is_null() {
+                        // clicked a valid item
+                        let classNum = {
+                            let scl = unsafe { &*holdClass };
+                            UI_SiegeClassNum(&ctx.world.bg_state, scl)
+                        };
+                        ctx.world.main.g_UIGloballySelectedSiegeClass = classNum;
+                        // §19: Raven indexes the fixed `g_UIClassDescriptions` array
+                        // unchecked; the `Vec` index can't be out of range because
+                        // `UI_SiegeClassNum` returns 0 on a miss (panic unreachable).
+                        let siegeClassNum = classNum as usize;
+                        let desc = ctx.world.main.g_UIClassDescriptions[siegeClassNum].clone();
+                        trap::Cvar_Set(ctx.engine, "ui_classDesc", &desc);
+                        ctx.world.main.g_siegedFeederForcedSet = 1;
+                        Menu_SetFeederSelection(
+                            &mut ctx.world.menus,
+                            dc,
+                            None,
+                            FEEDER_SIEGE_BASE_CLASS,
+                            -1,
+                            None,
+                        );
+                        UI_SiegeSetCvarsForClass(ctx, Some(siegeClassNum));
+
+                        let holdBuf = BG_GetUIPortraitFile(
+                            team,
+                            baseClass as c_short,
+                            index as c_short,
+                            &ctx.world.bg_state,
+                        );
+                        if let Some(holdBuf) = holdBuf {
+                            trap::Cvar_Set(ctx.engine, "ui_classPortrait", &holdBuf);
+                        }
+                    }
+                }
+                ctx.world.main.g_siegedFeederForcedSet = 0;
+            } else {
+                trap::Cvar_Set(ctx.engine, "ui_classDesc", " ");
+            }
         }
     }
 }

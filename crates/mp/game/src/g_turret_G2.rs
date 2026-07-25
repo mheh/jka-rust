@@ -33,14 +33,14 @@ use crate::q_math::{
     vectoangles, AngleNormalize360, AngleSubtract, AngleVectors, VectorLengthSquared,
     VectorNormalize,
 };
-use native_string::atoi_bytes;
-use native_string::Q_stricmp;
 use crate::NPC_combat::G_SetEnemy;
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_bg::bg_misc::snap_vector;
 use mp_bg::bg_misc::BG_GiveMeVectorFromMatrix;
 use mp_bg::bg_misc::{BG_EvaluateTrajectory, BG_FindItemForWeapon};
+use native_string::atoi_bytes;
+use native_string::Q_stricmp;
 
 /// Raven `bg_public.h:625-660` `EFFECT_*` enum ordinal (`combatEffects_e` —
 /// not yet type-ported); transcribed locally as its raw ordinal (10).
@@ -185,7 +185,9 @@ pub fn turretG2_set_models(ctx: &mut GameContext, self_: EntityId, dying: qboole
             e.s.modelindex2 = mi2;
         }
 
-        let ghoul2 = ctx.world.entity(self_).ghoul2;
+        // Raven `&self->ghoul2`: the engine derefs arg1 as `CGhoul2Info_v **`
+        // (`sv_game.rs:3326`), so the seam takes the slot's address.
+        let ghoul2 = &mut ctx.world.entity_mut(self_).ghoul2 as *mut *mut c_void as *mut c_void;
         trap::G2API_RemoveGhoul2Model(
             ctx.engine,
             mp_abi::game::syscalls::G_G2_REMOVEGHOUL2MODEL::GG2Removeghoul2ModelArgs::new(
