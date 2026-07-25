@@ -676,3 +676,108 @@ site `UI_Version`); the concrete implementor is a U5-built carrier over
 split borrows of `UiWorld` — `UiContext` itself can NOT implement the trait
 (it owns `world.menus`/`world.uiDC`, which must stay independently borrowable
 while `dc` is live).
+
+## DEC-37 — renderer deviation charter + architecture (R0 sit-down, 2026-07-25)
+
+Ratifies the R0 deviation charter and the renderer architecture, all 17 agenda
+items ruled (brief prepared against oracle + external references; the brief
+itself stays out of repo docs per the external-reference rule):
+
+1. **Deviation charter, verbatim.** The renderer interior is free — no oracle
+   matching. Three edges stay fixed: the VM trap seam (`CG_R_*`/`UI_R_*`
+   syscalls + the ported `refEntity_t`/`refdef_t` family), asset semantics
+   (shader-script grammar, BSP/model/font/image/roq meaning, retail look), and
+   the sim-visible model/collision subset. Presentation-side threading is in
+   scope on mainline. (There is no coherent Raven interior to transcribe: MP
+   gutted Q3's SMP — empty `R_InitCommandBuffers`, backend inline,
+   `oracle/codemp/renderer/tr_cmds.cpp:72-80,105-107`.)
+2. **Threading topology** — two long-lived threads + shared rayon pool: sim/VM
+   thread builds an owned `FrameData` (sealed at EndFrame, posted over a
+   bounded channel with recycled buffers); render thread owns the GPU and does
+   cull → sort → skinning dispatch → encode → submit → present; pool does
+   asset decode + skinning/deform jobs.
+3. **State-partition law** — `RenderAssets` (CPU, immutable-after-publish,
+   Arc-shared, readable from the sim thread) vs `GpuResources`
+   (render-thread-only). Invariant, verified exhaustively at R2: **no trap
+   query may touch GPU state.** Every synchronous seam query reads CPU data
+   only.
+4. **`refexport_t` deleted.** MP statically links the renderer (no
+   `refimport_t`; eight cgame traps bypass the table —
+   `oracle/codemp/client/cl_cgame.cpp:943-1720`); nothing crosses a C ABI
+   through it in our stack, so the repr(C) port retires at R2. The boundary is
+   a plain Rust trait / direct calls.
+5. **Shader translation: one renderer, swappable shader backend** behind a
+   stage-program seam over the parsed `ShaderDef` IR. Backend #1 (baseline,
+   built first): faithful uber-shader — one WGSL program, per-stage uniform
+   records driving the closed `CGEN_*`/`AGEN_*`/`TCGEN_*`/`TMOD_*` grammar;
+   the parity reference and the ui-slice dependency. Backend #2 (early
+   second): **PBR uber-shader** consuming AI-generated material sidecars
+   (normal/roughness/AO) — sidecar generation is a **separate tool**
+   (disk-cached, content-hash keyed; ML runtime never enters the game
+   binary); lighting directionality (lightgrid-derived, later deluxe
+   maps/cubemap probes) scoped to this backend. Per-shader WGSL codegen stays
+   an optional future backend-internal optimization behind the same seam.
+   Frame-level AI (upscaling/post) is orthogonal — it lives in the pass
+   graph, not the shader backends.
+6. **Pipelines** — lazy `HashMap<PipelineKey, RenderPipeline>` keyed on real
+   fixed-function state only (blend, depth compare/write, cull, polygon
+   offset, color mask, vertex layout, target format); `alphaFunc` is a
+   fragment `discard`, not a key; `EndRegistration` warms the cache.
+7. **Geometry** — static world vertex/index buffers built once at map load
+   (grouped by shader+lightmap), curves tessellated once, md3 keyframes
+   uploaded once with VS lerp; dynamic ring buffer only for 2D/polys/sprites/
+   marks/deformed surfaces. Dlights become a per-draw light list evaluated in
+   the fragment shader (`MAX_DLIGHTS 32` bound), replacing the extra tess
+   pass. Raven's per-frame 1000-vertex `tess` rebuild is discarded.
+8. **Deforms split** — `wave`/`normal`/`bulge`/`move` in the vertex shader;
+   `autosprite`/`autosprite2`/`text0-7` as CPU pool jobs into the ring buffer.
+9. **Ghoul2: GPU skinning** — the already-ported bone math
+   (`crates/mp/engine/ghoul2/src/render/`) produces the matrix palette (one
+   bone path shared with sim), uploaded to a storage buffer; the VS blends
+   from the packed mdxm weights (two parallel attribute streams → two vertex
+   buffers). CPU-pool skinning retained as fallback + golden reference.
+10. **Gamma/overbright: numbers not mechanisms** — force `overbrightBits = 1`
+    unconditionally (windowed = fullscreen retail); keep `identityLight`, the
+    lightmap/lightgrid shift with renormalize-don't-clamp
+    (`oracle/codemp/renderer/tr_bsp.cpp` behavior) exactly, the fog-color
+    premultiply, the cinematic tint, and the 2×2 box mip filter; gamma +
+    overbright applied as an output pass using retail's exact
+    `pow(x, 1/gamma) << shift` curve; only `r_intensity` bakes into textures.
+    Hardware ramps and the windowed-mode overbright clamp are discarded.
+11. **Asset cache** — generation-counted handle tables over
+    `Arc<RenderAssets>`; registration stays synchronous (retail contract; no
+    provisional handles) with decode/upload parallelized inside the call.
+    Retail identity quirks reproduced: lower-cased extension-stripped image
+    cache key, mismatched-params cache hit only warns, same name + different
+    lightmap config = distinct shader instance (no `_2d`/`_vertex` name
+    mangling). Material sidecars from ruling 5 are read here.
+12. **Flares + the standing tiebreak** — implement the oracle's deferred
+    flare behavior (`oracle/codemp/renderer/tr_flares.cpp`); wherever retail
+    and OpenJK diverge, **the oracle wins** — retail is the asset-semantics
+    edge.
+13. **Scope fences** — MDR dropped (no loader references it); Xbox/
+    `VV_LIGHTING`/`bumpmap`/`specularmap` dropped (compiled out of shipped
+    PC build); `RE_Scissor` does not exist, not invented; mini-refentity
+    chain ports the live pad-and-forward shim only (real chain is `#if 0`);
+    CJK glyph pages deferred (`Language_*` stays in the seam). Terrain/RMG,
+    weather/world effects, automap, surface sprites, dynamic glow,
+    distortion/refraction all stay in scope, sequenced last.
+14. **Slice order: 2D-first** — R4a 2D backend (window/wgpu/StretchPic/fonts/
+    shader parse/asset tables — runs the entire ui module) → R4b
+    `RDF_NOWORLDMODEL` scenes (completes ui; GPU skinning) → R3 world
+    (oracle-golden-gated; PBR backend starts after) → R4c effects tail → R5
+    dev harness + cl_* island.
+15. **Validation** — layered: oracle-differential CPU goldens (§18 pattern,
+    `tools/renderer-oracle/`, no GPU in CI) + draw-list goldens
+    (self-referential) + perceptual image comparison at fixed camera poses +
+    a shader-zoo scene. CPU/draw-list goldens gate CI; the image gate is a
+    manual wave-boundary step.
+16. **Crate layout** — `crates/mp/renderer` stays CPU-only (assets, parse,
+    cull/sort, existing `tr_model`; `jampded`'s link is untouched, goldens
+    run GPU-free); a sibling GPU crate owns the wgpu backend; `native/gpu` +
+    winit in `native/platform` per DEC-01/DEC-02.
+17. **SP: design both modes now** (user ruling, against the brief's
+    MP-first recommendation): R2's seam inventory covers SP's `refEntity_t`/
+    renderfx variants and its statically-linked call sites alongside MP's
+    traps; interior scene/asset types are mode-agnostic by construction; SP
+    divergences become edge adapters + quirk flags, never a second renderer.
