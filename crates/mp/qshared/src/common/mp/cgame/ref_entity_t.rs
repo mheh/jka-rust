@@ -191,6 +191,18 @@ pub struct refEntity_t {
     // Ghoul2 Insert End
 }
 
+impl refEntity_t {
+    /// memset-parity constructor for Raven's `memset( &ent, 0, sizeof(ent) )` —
+    /// zeroes the union tail bytes and padding a field literal cannot reach.
+    /// (POD layout: all-zero is a valid value for every field, null `ghoul2`
+    /// included.)
+    #[must_use]
+    pub fn zeroed() -> Self {
+        // SAFETY: every field is a POD scalar/array/union of scalars.
+        unsafe { core::mem::zeroed() }
+    }
+}
+
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::size_of::<refEntity_t>() == 216);
 #[cfg(target_pointer_width = "64")]

@@ -7,14 +7,19 @@
 
 #![allow(non_snake_case)]
 
+use core::f64::consts::PI as PI_F64;
 use core::ffi::{c_int, c_void};
 use core::ptr::null_mut;
 
 use mp_bg::public::anim_table::animTable;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
+use mp_qshared::common::mp::cgame::refdef_t::{
+    refdef_t, MAX_MAP_AREA_BYTES, MAX_RENDER_STRINGS, MAX_RENDER_STRING_LENGTH,
+};
+use mp_qshared::shared::q_math::{AnglesToAxis, VectorSet};
 use mp_qshared::shared::q_string::{COM_Parse, GetIDForString};
 use mp_qshared::shared::{
-    cbufExec_t, pc_token_t, qtrue, stringID_table_t, vec4_t, CHAN_AUTO, CHAN_LOCAL_SOUND,
+    cbufExec_t, pc_token_t, qtrue, stringID_table_t, vec3_t, vec4_t, CHAN_AUTO, CHAN_LOCAL_SOUND,
     MAX_QPATH, MAX_STRING_CHARS, MAX_TOKENLENGTH, TT_NUMBER,
 };
 use native_string::{atof, atoi, latin1_to_string, string_to_latin1, Q_stricmp};
@@ -146,6 +151,22 @@ pub const ITF_ISSABER: c_int = 0x0004;
 /// Raven `#define ITF_ISSABER2 0x0008` — second saber item, draws blade.
 /// Source: `oracle/codemp/ui/ui_shared.h:254`
 pub const ITF_ISSABER2: c_int = 0x0008;
+/// Raven `#define ITF_ISANYSABER (ITF_ISSABER|ITF_ISSABER2)` — either saber.
+/// Source: `oracle/codemp/ui/ui_shared.h:256`
+pub const ITF_ISANYSABER: c_int = ITF_ISSABER | ITF_ISSABER2;
+
+/// Raven `#define RDF_NOWORLDMODEL 1` — used for player configuration screen.
+///
+/// No prior home in the port; ui_shared.c is its only caller so far.
+/// Source: `oracle/codemp/cgame/tr_types.h:57`
+const RDF_NOWORLDMODEL: c_int = 1;
+/// Raven `#define RF_LIGHTING_ORIGIN 0x00080` — use `lightingOrigin` instead
+/// of `origin`.
+/// Source: `oracle/codemp/cgame/tr_types.h:28`
+const RF_LIGHTING_ORIGIN: c_int = 0x0080;
+/// Raven `#define RF_NOSHADOW 0x00040` — don't add stencil shadows.
+/// Source: `oracle/codemp/cgame/tr_types.h:26`
+const RF_NOSHADOW: c_int = 0x0040;
 
 /// Raven `#define CVAR_ENABLE 0x00000001`.
 /// Source: `oracle/codemp/ui/ui_shared.h:246`
@@ -8884,3 +8905,562 @@ pub fn Menu_ScrollFeeder(
         }
     }
 }
+
+/// Raven `Script_Close` — close a menu group (or all menus) by name.
+/// Source: `oracle/codemp/ui/ui_shared.c:1642-1657`
+pub fn Script_Close(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    _item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut name = String::new();
+    if String_Parse(args, &mut name) {
+        if stricmp_eq(&name, "all") {
+            Menus_CloseAll(menus, dc);
+        } else {
+            Menus_CloseByName(menus, dc, &name);
+        }
+    }
+
+    true
+}
+
+/// Raven `Script_Transition` — animate a named item group from one rect to
+/// another.
+/// Source: `oracle/codemp/ui/ui_shared.c:1808-1824`
+pub fn Script_Transition(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut name = String::new();
+    let mut rectFrom = RectDef::default();
+    let mut rectTo = RectDef::default();
+    let mut time = 0;
+    let mut amt = 0.0f32;
+
+    if String_Parse(args, &mut name)
+        && Rect_Parse(args, &mut rectFrom)
+        && Rect_Parse(args, &mut rectTo)
+        && Int_Parse(args, &mut time)
+        && Float_Parse(args, &mut amt)
+    {
+        if let Some(parent) = menus.item(item).parent {
+            Menu_TransitionItemByName(menus, dc, parent, &name, Some(rectFrom), &rectTo, time, amt);
+        }
+    }
+
+    true
+}
+
+/// Raven `Script_Scale` — scale every item in the named group about its own
+/// center, transitioning each to its scaled rect.
+/// Source: `oracle/codemp/ui/ui_shared.c:1895-1937`
+pub fn Script_Scale(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut name = String::new();
+    if String_Parse(args, &mut name) {
+        // Is is specifying a cvar to get the item name from?
+        if let Some(rest) = name.strip_prefix('*') {
+            name = dc.getCVarString(rest, 1024);
+        }
+
+        let parent = menus.item(item).parent;
+        let count = match parent {
+            Some(p) => Menu_ItemsMatchingGroup(menus, dc, p, &name),
+            None => 0,
+        };
+
+        let mut scale = 0.0f32;
+        if Float_Parse(args, &mut scale) {
+            if let Some(parent) = parent {
+                for j in 0..count {
+                    if let Some(itemFound) = Menu_GetMatchingItemByNumber(menus, parent, j, &name) {
+                        let rectSrc = menus.item(itemFound).window.rect;
+                        let h = rectSrc.h * scale;
+                        let w = rectSrc.w * scale;
+                        let rectTo = RectDef {
+                            w,
+                            h,
+                            x: rectSrc.x + (rectSrc.h - h) / 2.0,
+                            y: rectSrc.y + (rectSrc.w - w) / 2.0,
+                        };
+                        Menu_TransitionItemByName(menus, dc, parent, &name, None, &rectTo, 1, 1.0);
+                    }
+                }
+            }
+        }
+    }
+
+    true
+}
+
+/// Raven `Script_Orbit` — orbit the named item group around a center point.
+/// Source: `oracle/codemp/ui/ui_shared.c:1939-1954`
+pub fn Script_Orbit(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut name = String::new();
+    if String_Parse(args, &mut name) {
+        let mut x = 0.0f32;
+        let mut y = 0.0f32;
+        let mut cx = 0.0f32;
+        let mut cy = 0.0f32;
+        let mut time = 0;
+        if Float_Parse(args, &mut x)
+            && Float_Parse(args, &mut y)
+            && Float_Parse(args, &mut cx)
+            && Float_Parse(args, &mut cy)
+            && Int_Parse(args, &mut time)
+        {
+            if let Some(parent) = menus.item(item).parent {
+                Menu_OrbitItemByName(menus, dc, parent, &name, x, y, cx, cy, time);
+            }
+        }
+    }
+
+    true
+}
+
+/// Raven `Script_Transition2` — animate a named item group to a rect parsed
+/// with `ParseRect`/`COM_ParseFloat` rather than `Rect_Parse`/`Float_Parse`.
+///
+/// PORT-NOTE: `!COM_ParseFloat(...)` (true on parse *success*, Raven's
+/// reversed polarity) is this file's local `parseFloatOrFail` twin (see
+/// `ParseRect`'s doc), same call.
+/// Source: `oracle/codemp/ui/ui_shared.c:2027-2047`
+pub fn Script_Transition2(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut name = String::new();
+    if String_Parse(args, &mut name) {
+        let mut rectTo = RectDef::default();
+        let mut time = 0;
+        let mut amt = 0.0f32;
+
+        if ParseRect(args, &mut rectTo)
+            && Int_Parse(args, &mut time)
+            && !parseFloatOrFail(args, &mut amt)
+        {
+            if let Some(parent) = menus.item(item).parent {
+                Menu_TransitionItemByName(menus, dc, parent, &name, None, &rectTo, time, amt);
+            }
+        } else {
+            dc.Print(&format!(
+                "^3WARNING: Script_Transition2: error parsing '{}'\n",
+                name
+            ));
+        }
+    }
+
+    true
+}
+
+/// Raven `Item_Text_Paint` — paint an item's display text (and optional
+/// second line), routing through the wrapped/auto-wrapped variants first.
+///
+/// PORT-NOTE: `seLanguageModCount` threads in the caller's
+/// `se_language.modificationCount` read (see `Item_SetTextExtents`'s
+/// doc) — added beyond the packet's literal C signature because this fn
+/// calls `Item_SetTextExtents`/`Item_Text_Wrapped_Paint`, both of which need
+/// it.
+/// Source: `oracle/codemp/ui/ui_shared.c:4961-5017`
+pub fn Item_Text_Paint(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    seLanguageModCount: c_int,
+) {
+    let flags = menus.item(item).window.flags;
+    if flags & WINDOW_WRAPPED != 0 {
+        Item_Text_Wrapped_Paint(menus, ds, dc, item, seLanguageModCount);
+        return;
+    }
+    if flags & WINDOW_AUTOWRAPPED != 0 {
+        Item_Text_AutoWrapped_Paint(menus, ds, dc, item);
+        return;
+    }
+
+    let it = menus.item(item);
+    let mut textPtr = match it.text.clone() {
+        Some(t) => t,
+        None => match it.cvar.clone() {
+            Some(cvar) => dc.getCVarString(&cvar, 1024),
+            None => return,
+        },
+    };
+
+    // string reference
+    if let Some(rest) = textPtr.strip_prefix('@') {
+        textPtr = dc.SP_GetStringTextString(rest, 1024).unwrap_or_default();
+    }
+
+    // this needs to go here as it sets extents for cvar types as well
+    let mut width: c_int = 0;
+    let mut height: c_int = 0;
+    Item_SetTextExtents(
+        menus,
+        dc,
+        item,
+        &mut width,
+        &mut height,
+        Some(&textPtr),
+        seLanguageModCount,
+    );
+
+    if textPtr.is_empty() {
+        return;
+    }
+
+    let mut color = vec4_t::default();
+    Item_TextColor(menus, ds, dc, item, &mut color);
+
+    let (x, y, textscale, textStyle, iMenuFont) = {
+        let it = menus.item(item);
+        (
+            it.textRect.x,
+            it.textRect.y,
+            it.textscale,
+            it.textStyle,
+            it.iMenuFont,
+        )
+    };
+    dc.drawText(
+        x, y, textscale, color, &textPtr, 0.0, 0, textStyle, iMenuFont,
+    );
+
+    // Is there a second line of text?
+    // PORT-NOTE: `text2` stays `String` — Raven's NULL test differs only for a
+    // non-NULL empty `text2`, which `ItemParse_text2` never stores.
+    let text2 = menus.item(item).text2.clone();
+    if !text2.is_empty() {
+        let mut textPtr2 = text2;
+        if let Some(rest) = textPtr2.strip_prefix('@') {
+            textPtr2 = dc.SP_GetStringTextString(rest, 1024).unwrap_or_default();
+        }
+        let mut color2 = vec4_t::default();
+        Item_TextColor(menus, ds, dc, item, &mut color2);
+        let (x2, y2, textscale2, textStyle2, iMenuFont2) = {
+            let it = menus.item(item);
+            (
+                it.textRect.x + it.text2alignx,
+                it.textRect.y + it.text2aligny,
+                it.textscale,
+                it.textStyle,
+                it.iMenuFont,
+            )
+        };
+        dc.drawText(
+            x2, y2, textscale2, color2, &textPtr2, 0.0, 0, textStyle2, iMenuFont2,
+        );
+    }
+}
+
+/// Raven `Item_Model_Paint` — render a model-preview item's ghoul2/static
+/// model into its own mini scene.
+///
+/// PORT-NOTE (dead surface): the `#ifndef CGAME` guards throughout pick the
+/// `ui` arm (this crate's only linkage so far — cgame's twin will
+/// special-case them out when it lands, same as `Item_SetTextExtents`).
+///
+/// DEFERRED: the "moves datapad anim" block (`uiInfo.moveAnimTime`,
+/// `uiInfo.movesBaseAnim`, the multi-part saber/knockdown animation state
+/// machine, `UI_UpdateCharacterSkin`) reads/writes `uiInfo`, which lives on
+/// `crates/mp/ui/src/world/ui_world.rs`'s `UiWorld` (mp_ui-only) and is
+/// unreachable from this host-agnostic crate — same shape as the
+/// `ItemParse_cvarStrList` feeder-population DEFERRED.
+/// Source: `oracle/codemp/ui/ui_shared.c:5709-5778`
+///
+/// DEFERRED: `UI_SaberDrawBlades`'s ported home
+/// (`oracle/codemp/ui/ui_saber.c:952-1017`) takes `ctx: &mut UiContext`
+/// (mp_ui-only per `tools/closure-prototype/out/ui/ported-signatures.txt`),
+/// unreachable from this host-agnostic crate (no `mp_ui` dependency, no
+/// `UiContext`/`DisplayContext` method carries the saber-blade draw). Needs a
+/// `DisplayContext`-routed equivalent or a restructure that threads it back
+/// through the host.
+/// Source: `oracle/codemp/ui/ui_shared.c:5880-5883`
+pub fn Item_Model_Paint(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+) {
+    // PORT-NOTE: `typeData.model()` stands in for Raven's unchecked
+    // `(modelDef_t*)item->typeData` cast + NULL test (`listBox_mut` precedent).
+    let modelPtr = match menus.item(item).typeData.model() {
+        Some(m) => *m,
+        None => return,
+    };
+
+    // DEFERRED: moves datapad anim block — see fn doc.
+
+    let (rect, ghoul2, flags, asset) = {
+        let it = menus.item(item);
+        (it.window.rect, it.ghoul2, it.flags, it.asset)
+    };
+
+    // setup the refdef
+    let mut refdef = refdef_t {
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        fov_x: 0.0,
+        fov_y: 0.0,
+        vieworg: [0.0; 3],
+        viewangles: [0.0; 3],
+        viewaxis: [[0.0; 3]; 3],
+        viewContents: 0,
+        time: 0,
+        rdflags: 0,
+        areamask: [0; MAX_MAP_AREA_BYTES],
+        text: [[0; MAX_RENDER_STRING_LENGTH]; MAX_RENDER_STRINGS],
+    };
+
+    refdef.rdflags = RDF_NOWORLDMODEL;
+    // `AxisClear( refdef.viewaxis )` — `native_math::qmath::AxisClear` is not
+    // re-exported by `mp_qshared::shared::q_math` (and `native_math` is not a
+    // dep of this crate), so its identity-basis body is written out here.
+    VectorSet(&mut refdef.viewaxis[0], 1.0, 0.0, 0.0);
+    VectorSet(&mut refdef.viewaxis[1], 0.0, 1.0, 0.0);
+    VectorSet(&mut refdef.viewaxis[2], 0.0, 0.0, 1.0);
+    let x = rect.x + 1.0;
+    let y = rect.y + 1.0;
+    let w = rect.w - 2.0;
+    let h = rect.h - 2.0;
+
+    refdef.x = (x * ds.xscale) as i32;
+    refdef.y = (y * ds.yscale) as i32;
+    refdef.width = (w * ds.xscale) as i32;
+    refdef.height = (h * ds.yscale) as i32;
+
+    // Raven declares `mins`/`maxs` uninitialized; both branches below assign
+    // them, so the bindings stay deferred (Rust definite-init artifact).
+    let mut mins: vec3_t;
+    let mut maxs: vec3_t;
+    if !ghoul2.is_null() {
+        // ghoul2 models don't have bounds, so we have to parse them.
+        mins = modelPtr.g2mins;
+        maxs = modelPtr.g2maxs;
+
+        if mins == [0.0; 3] && maxs == [0.0; 3] {
+            // we'll use defaults then I suppose.
+            VectorSet(&mut mins, -16.0, -16.0, -24.0);
+            VectorSet(&mut maxs, 16.0, 16.0, 32.0);
+        }
+    } else {
+        let (dcMins, dcMaxs) = dc.modelBounds(asset);
+        mins = dcMins;
+        maxs = dcMaxs;
+    }
+
+    let mut origin: vec3_t = [0.0; 3];
+    origin[2] = -0.5 * (mins[2] + maxs[2]);
+    origin[1] = 0.5 * (mins[1] + maxs[1]);
+
+    // calculate distance so the model nearly fills the box
+    let len = 0.5 * (maxs[2] - mins[2]);
+    origin[0] = len / 0.268; // len / tan( fov/2 )
+
+    refdef.fov_x = if modelPtr.fov_x != 0.0 {
+        modelPtr.fov_x
+    } else {
+        ((refdef.width as f32 / 640.0 * 90.0) as i32) as f32
+    };
+    refdef.fov_y = if modelPtr.fov_y != 0.0 {
+        modelPtr.fov_y
+    } else {
+        // Raven's `atan2`/`tan`/`M_PI` chain is `double` from `fov_x / 360`
+        // onward (only the `/ 360` stays `float`), rounded to `float` once here.
+        let t = (f64::from(refdef.fov_x / 360.0) * PI_F64).tan();
+        (f64::from(refdef.height).atan2(f64::from(refdef.width) / t) * (360.0 / PI_F64)) as f32
+    };
+
+    dc.clearScene();
+    refdef.time = ds.realTime;
+
+    // add the model
+    // `memset( &ent, 0, sizeof(ent) )`.
+    let mut ent = refEntity_t::zeroed();
+
+    // use item storage to track
+    let mut angles: vec3_t = [0.0; 3];
+    let isAnySaber = flags & ITF_ISANYSABER != 0 && flags & ITF_ISCHARACTER == 0;
+    if isAnySaber {
+        // hack to put saber on it's side
+        if modelPtr.rotationSpeed != 0 {
+            VectorSet(
+                &mut angles,
+                modelPtr.angle as f32 + refdef.time as f32 / modelPtr.rotationSpeed as f32,
+                0.0,
+                90.0,
+            );
+        } else {
+            VectorSet(&mut angles, modelPtr.angle as f32, 0.0, 90.0);
+        }
+    } else if modelPtr.rotationSpeed != 0 {
+        VectorSet(
+            &mut angles,
+            0.0,
+            modelPtr.angle as f32 + refdef.time as f32 / modelPtr.rotationSpeed as f32,
+            0.0,
+        );
+    } else {
+        VectorSet(&mut angles, 0.0, modelPtr.angle as f32, 0.0);
+    }
+
+    AnglesToAxis(angles, ent.axis.as_mut_ptr());
+
+    if !ghoul2.is_null() {
+        ent.ghoul2 = ghoul2;
+        ent.radius = 1000.0;
+        ent.customSkin = modelPtr.g2skin;
+
+        ent.modelScale = modelPtr.g2scale;
+        UI_ScaleModelAxis(&mut ent);
+        if flags & ITF_ISCHARACTER != 0 {
+            // PORT-NOTE: `ui_char_color_*` read live through `dc.getCVarValue`
+            // instead of Raven's cached `vmCvar_t`s — see `Window_Paint`.
+            ent.shaderRGBA[0] = (dc.getCVarValue("ui_char_color_red") as c_int) as u8;
+            ent.shaderRGBA[1] = (dc.getCVarValue("ui_char_color_green") as c_int) as u8;
+            ent.shaderRGBA[2] = (dc.getCVarValue("ui_char_color_blue") as c_int) as u8;
+            ent.shaderRGBA[3] = 255;
+        }
+        if flags & ITF_ISANYSABER != 0 {
+            // DEFERRED: UI_SaberDrawBlades( item, origin, angles ) — see fn doc.
+        }
+    } else {
+        ent.hModel = asset;
+    }
+    ent.origin = origin;
+    ent.oldorigin = ent.origin;
+
+    // Set up lighting
+    ent.lightingOrigin = origin;
+    ent.renderfx = RF_LIGHTING_ORIGIN | RF_NOSHADOW;
+
+    dc.addRefEntityToScene(&ent);
+    dc.renderScene(&refdef);
+}
+
+/// Raven `Menu_HandleMouseMove` — set mouse-over/focus state for `menu`'s
+/// items under the cursor.
+///
+/// PORT-NOTE (dead surface): Raven's `#ifdef _XBOX return; #endif` guard at
+/// the top (the whole fn is a no-op on that dead platform) is dropped, same
+/// treatment as this file's other `_XBOX` arms.
+/// Source: `oracle/codemp/ui/ui_shared.c:7126-7210`
+pub fn Menu_HandleMouseMove(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    menu: Option<MenuId>,
+    x: f32,
+    y: f32,
+) {
+    let menu = match menu {
+        Some(m) => m,
+        None => return,
+    };
+
+    if menus.menu(menu).window.flags & (WINDOW_VISIBLE | WINDOW_FORCED) == 0 {
+        return;
+    }
+
+    if menus.itemCapture.is_some() {
+        // Item_MouseMove(itemCapture, x, y);
+        return;
+    }
+
+    if menus.g_waitingForKey || menus.g_editingField {
+        return;
+    }
+
+    let mut focusSet = false;
+    let items = menus.menu(menu).items.clone();
+
+    // FIXME: this is the whole issue of focus vs. mouse over..
+    // need a better overall solution as i don't like going through everything twice
+    for pass in 0..2 {
+        for &itemId in &items {
+            let (itFlags, disabled, cvarFlags) = {
+                let it = menus.item(itemId);
+                (it.window.flags, it.disabled, it.cvarFlags)
+            };
+
+            if itFlags & (WINDOW_VISIBLE | WINDOW_FORCED) == 0 {
+                continue;
+            }
+
+            if disabled {
+                continue;
+            }
+
+            // items can be enabled and disabled based on cvars
+            if cvarFlags & (CVAR_ENABLE | CVAR_DISABLE) != 0
+                && !Item_EnableShowViaCvar(menus, dc, itemId, CVAR_ENABLE)
+            {
+                continue;
+            }
+
+            if cvarFlags & (CVAR_SHOW | CVAR_HIDE) != 0
+                && !Item_EnableShowViaCvar(menus, dc, itemId, CVAR_SHOW)
+            {
+                continue;
+            }
+
+            let rect = menus.item(itemId).window.rect;
+            if Rect_ContainsPoint(Some(&rect), x, y) {
+                if pass == 1 {
+                    let overItem = itemId;
+                    let (overType, overHasText) = {
+                        let it = menus.item(overItem);
+                        (it.r#type, it.text.is_some())
+                    };
+                    if overType == ITEM_TYPE_TEXT && overHasText {
+                        let overRect = menus.item(overItem).window.rect;
+                        if !Rect_ContainsPoint(Some(&overRect), x, y) {
+                            continue;
+                        }
+                    }
+                    // if we are over an item
+                    if IsVisible(menus.item(overItem).window.flags) {
+                        // different one
+                        Item_MouseEnter(menus, dc, Some(overItem), x, y);
+                        // Item_SetMouseOver(overItem, qtrue);
+
+                        // if item is not a decoration see if it can take focus
+                        if !focusSet {
+                            focusSet = Item_SetFocus(menus, ds, dc, overItem, x, y);
+                        }
+                    }
+                }
+            } else if itFlags & WINDOW_MOUSEOVER != 0 {
+                Item_MouseLeave(menus, dc, Some(itemId));
+                Item_SetMouseOver(menus, Some(itemId), false);
+            }
+        }
+    }
+}
+
+// `Menu_New` — ui_shared.c:9817-9827.
+//
+// DEFERRED: Menu_New — its body is `Menu_Init` + `Menu_Parse` + (on success)
+// `Menu_PostParse`; `Menu_Parse` stays `// DEFERRED:` at its own site
+// (ui_shared.c:9779-9810) because the `keywordHash_t` menu-keyword dispatch
+// it drives isn't ported, so this parse entrypoint has no reachable body and
+// no caller in the ported tree.
+// Source: `oracle/codemp/ui/ui_shared.c:9817-9827`

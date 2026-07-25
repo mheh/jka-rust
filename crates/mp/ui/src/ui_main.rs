@@ -48,11 +48,12 @@ use mp_qshared::shared::q_color::{S_COLOR_RED, S_COLOR_YELLOW};
 use mp_qshared::shared::q_string::{COM_Parse, COM_StripExtension};
 use mp_qshared::shared::{
     colorWhite, connstate_t, fileHandle_t, pc_token_t, qhandle_t, vec4_t, AS_FAVORITES, AS_GLOBAL,
-    AS_LOCAL, AS_MPLAYER, CIN_LOOP, CIN_SILENT, FS_READ, KEYCATCH_UI, MAX_CLIENTS, MAX_INFO_STRING,
-    MAX_INFO_VALUE, MAX_QPATH, MAX_STRING_CHARS, MAX_TOKENLENGTH, Q3_VERSION, SCREEN_HEIGHT,
-    SCREEN_WIDTH,
+    AS_LOCAL, AS_MPLAYER, CHAN_LOCAL, CIN_LOOP, CIN_SILENT, FS_READ, KEYCATCH_UI, MAX_CLIENTS,
+    MAX_INFO_STRING, MAX_INFO_VALUE, MAX_QPATH, MAX_STRING_CHARS, MAX_TOKENLENGTH, Q3_VERSION,
+    SCREEN_HEIGHT, SCREEN_WIDTH,
 };
 use mp_uishared::shared::display_context::DisplayContext;
+use mp_uishared::shared::item_id::ItemId;
 use mp_uishared::shared::menu_id::MenuId;
 use mp_uishared::shared::menu_system::MAX_MENUFILE;
 use mp_uishared::shared::menudef::{
@@ -84,11 +85,11 @@ use mp_uishared::shared::menudef::{
 };
 use mp_uishared::shared::rect_def_t::RectDef;
 use mp_uishared::ui_shared::{
-    Display_KeyBindPending, Int_Parse, ItemParse_asset_model_go, ItemParse_model_g2skin_go,
-    Item_RunScript, LerpColor, Menu_FindItemByName, Menu_GetFocused, Menu_SetFeederSelection,
-    Menu_SetItemBackground, Menu_ShowGroup, Menu_ShowItemByName, Menus_AnyFullScreenVisible,
-    Menus_FindByName, PC_Color_Parse, PC_Float_Parse, PC_Int_Parse, PC_Script_Parse,
-    PC_String_Parse, String_Parse, String_Report, UI_CleanupGhoul2,
+    Display_KeyBindPending, Int_Parse, ItemParse_asset_model_go, ItemParse_model_g2anim_go,
+    ItemParse_model_g2skin_go, Item_RunScript, LerpColor, Menu_FindItemByName, Menu_GetFocused,
+    Menu_SetFeederSelection, Menu_SetItemBackground, Menu_ShowGroup, Menu_ShowItemByName,
+    Menus_AnyFullScreenVisible, Menus_FindByName, PC_Color_Parse, PC_Float_Parse, PC_Int_Parse,
+    PC_Script_Parse, PC_String_Parse, String_Parse, String_Report, UI_CleanupGhoul2,
 };
 use native_math::qmath::Com_Clamp;
 use native_string::{
@@ -112,11 +113,11 @@ use crate::ui_atoms::{
     Com_Error, Com_Printf, UI_Cvar_VariableString, UI_DrawHandlePic, UI_FillRect,
     UI_LoadBestScores, UI_SetColor,
 };
-use crate::ui_force::UI_DrawForceStars;
+use crate::ui_force::{UI_DrawForceStars, UI_ForceConfigHandle};
 use crate::ui_gameinfo::{UI_GetBotNameByNumber, UI_GetNumBots, MAX_MAPS};
 use crate::ui_saber::{
-    SaberColorToString, TranslateSaberColor, UI_SaberModelForSaber, UI_SaberProperNameForSaber,
-    UI_SaberSkinForSaber, UI_SaberTypeForSaber,
+    SaberColorToString, TranslateSaberColor, UI_SaberAttachToChar, UI_SaberModelForSaber,
+    UI_SaberProperNameForSaber, UI_SaberSkinForSaber, UI_SaberTypeForSaber,
 };
 use crate::world::ui_context::UiContext;
 use crate::world::ui_cvars::UiCvars;
@@ -8594,6 +8595,42 @@ const DATAPAD_MOVE_TITLE_DATA: [&str; MD_MOVE_TITLE_MAX as usize] = [
     "@MENUS_SABER_STAFF",
 ];
 
+/// Raven `char *datapadMoveTitleBaseAnims[MD_MOVE_TITLE_MAX]`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:394-402`
+const DATAPAD_MOVE_TITLE_BASE_ANIMS: [&str; MD_MOVE_TITLE_MAX as usize] = [
+    "BOTH_RUN1",
+    "BOTH_SABERFAST_STANCE",
+    "BOTH_STAND2",
+    "BOTH_SABERSLOW_STANCE",
+    "BOTH_SABERDUAL_STANCE",
+    "BOTH_SABERSTAFF_STANCE",
+];
+
+/// Raven `char *forcepowerDesc[NUM_FORCE_POWERS]`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:26-46`
+const FORCEPOWER_DESC: [&str; NUM_FORCE_POWERS as usize] = [
+    "@MENUS_OF_EFFECT_JEDI_ONLY_NEFFECT",
+    "@MENUS_DURATION_IMMEDIATE_NAREA",
+    "@MENUS_DURATION_5_SECONDS_NAREA",
+    "@MENUS_DURATION_INSTANTANEOUS",
+    "@MENUS_INSTANTANEOUS_EFFECT_NAREA",
+    "@MENUS_DURATION_VARIABLE_20",
+    "@MENUS_DURATION_INSTANTANEOUS_NAREA",
+    "@MENUS_OF_EFFECT_LIVING_PERSONS",
+    "@MENUS_DURATION_VARIABLE_10",
+    "@MENUS_DURATION_VARIABLE_NAREA",
+    "@MENUS_DURATION_CONTINUOUS_NAREA",
+    "@MENUS_OF_EFFECT_JEDI_ALLIES_NEFFECT",
+    "@MENUS_EFFECT_JEDI_ALLIES_NEFFECT",
+    "@MENUS_VARIABLE_NAREA_OF_EFFECT",
+    "@MENUS_EFFECT_NAREA_OF_EFFECT",
+    "@SP_INGAME_FORCE_SABER_OFFENSE_DESC",
+    "@SP_INGAME_FORCE_SABER_DEFENSE_DESC",
+    "@SP_INGAME_FORCE_SABER_THROW_DESC",
+];
+
 /// Raven `char *HolocronIcons[]` (`oracle/codemp/cgame/holocronicons.h`,
 /// `#include`d by `ui_main.c:22`) — indexed by `forcePowers_t`.
 ///
@@ -10259,4 +10296,418 @@ pub fn UI_UpdateCvarsForClass(
             }
         }
     }
+}
+
+/// Raven `UI_FeederSelection`.
+///
+/// PORT-NOTE: `UI_SaberAttachToChar` takes `&mut ItemDef` while `item` lives
+/// in the `MenuSystem` arena inside `ctx.world`; borrowing `ctx` (for the
+/// trap calls `UI_SaberAttachToChar` makes internally) and `ctx.world.menus`
+/// (for the item) at once is not expressible, so the FEEDER_MOVES arm clones
+/// the item out, calls through the clone, and writes it back — mirroring
+/// nothing upstream (this is the first landed call site) and flagged as an
+/// escalation.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:9642-9994`
+#[allow(clippy::too_many_lines)]
+pub fn UI_FeederSelection(
+    ctx: &mut UiContext,
+    dc: &mut dyn DisplayContext,
+    feederFloat: f32,
+    index: c_int,
+    item: Option<ItemId>,
+) -> bool {
+    let mut index = index;
+    let feederID = feederFloat as c_int;
+
+    if feederID == FEEDER_Q3HEADS {
+        let mut actual = 0;
+        let _ = UI_SelectedTeamHead(ctx.world, index, &mut actual);
+        ctx.world.q3SelectedHead = index;
+        trap::Cvar_Set(ctx.engine, "ui_selectedModelIndex", &format!("{}", index));
+        index = actual;
+        if index >= 0 && index < ctx.world.q3HeadNames.len() as c_int {
+            let headName = ctx.world.q3HeadNames[index as usize].clone();
+            // standard model
+            trap::Cvar_Set(ctx.engine, "model", &headName);
+            // standard colors
+            trap::Cvar_Set(ctx.engine, "char_color_red", "255");
+            trap::Cvar_Set(ctx.engine, "char_color_green", "255");
+            trap::Cvar_Set(ctx.engine, "char_color_blue", "255");
+        }
+    } else if feederID == FEEDER_MOVES {
+        if let Some(menu) = Menus_FindByName(&ctx.world.menus, "rulesMenu_moves") {
+            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "character") {
+                if ctx.world.menus.item(item).typeData.model().is_some() {
+                    let anim =
+                        DATAPAD_MOVE_DATA[ctx.world.movesTitleIndex as usize][index as usize].anim;
+                    ItemParse_model_g2anim_go(&mut ctx.world.menus, dc, item, anim);
+
+                    let charModel = UI_Cvar_VariableString(ctx, "ui_char_model");
+                    // PORT-NOTE: Raven's `Com_sprintf` into `modelPath[MAX_QPATH]`
+                    // truncates at 63 chars (unreachable for real model names).
+                    let modelPath = format!("models/players/{}/model.glm", charModel);
+                    let mut animRunLength: c_int = 0;
+                    ItemParse_asset_model_go(
+                        &mut ctx.world.menus,
+                        dc,
+                        item,
+                        &modelPath,
+                        &mut animRunLength,
+                    );
+                    UI_UpdateCharacterSkin(ctx, dc);
+
+                    ctx.world.moveAnimTime = ctx.world.uiDC.realTime + animRunLength;
+
+                    let move_ =
+                        &DATAPAD_MOVE_DATA[ctx.world.movesTitleIndex as usize][index as usize];
+                    if move_.anim.is_some() {
+                        // Play sound for anim
+                        if move_.sound == MDS_FORCE_JUMP {
+                            trap::S_StartLocalSound(
+                                ctx.engine,
+                                ctx.world.uiDC.Assets.moveJumpSound,
+                                CHAN_LOCAL,
+                            );
+                        } else if move_.sound == MDS_ROLL {
+                            trap::S_StartLocalSound(
+                                ctx.engine,
+                                ctx.world.uiDC.Assets.moveRollSound,
+                                CHAN_LOCAL,
+                            );
+                        } else if move_.sound == MDS_SABER {
+                            // Randomly choose one sound
+                            let soundI = ctx.world.bg_state.rng.Q_irand(1, 6);
+                            let soundPtr = match soundI {
+                                2 => ctx.world.uiDC.Assets.datapadmoveSaberSound2,
+                                3 => ctx.world.uiDC.Assets.datapadmoveSaberSound3,
+                                4 => ctx.world.uiDC.Assets.datapadmoveSaberSound4,
+                                5 => ctx.world.uiDC.Assets.datapadmoveSaberSound5,
+                                6 => ctx.world.uiDC.Assets.datapadmoveSaberSound6,
+                                _ => ctx.world.uiDC.Assets.datapadmoveSaberSound1,
+                            };
+                            trap::S_StartLocalSound(ctx.engine, soundPtr, CHAN_LOCAL);
+                        }
+
+                        if let Some(desc) = DATAPAD_MOVE_DATA[ctx.world.movesTitleIndex as usize]
+                            [index as usize]
+                            .desc
+                        {
+                            trap::Cvar_Set(ctx.engine, "ui_move_desc", desc);
+                        }
+                    }
+
+                    // See the PORT-NOTE above `UI_FeederSelection`: `ctx` and
+                    // `item`'s home arena can't be borrowed at once, so the
+                    // item is cloned out and written back.
+                    let mut charItem = ctx.world.menus.item(item).clone();
+                    UI_SaberAttachToChar(ctx, &mut charItem);
+                    *ctx.world.menus.item_mut(item) = charItem;
+                }
+            }
+        }
+    } else if feederID == FEEDER_MOVES_TITLES {
+        ctx.world.movesTitleIndex = index as i16;
+        ctx.world.movesBaseAnim =
+            DATAPAD_MOVE_TITLE_BASE_ANIMS[ctx.world.movesTitleIndex as usize].to_string();
+        if let Some(menu) = Menus_FindByName(&ctx.world.menus, "rulesMenu_moves") {
+            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "character") {
+                if ctx.world.menus.item(item).typeData.model().is_some() {
+                    ctx.world.movesBaseAnim = DATAPAD_MOVE_TITLE_BASE_ANIMS
+                        [ctx.world.movesTitleIndex as usize]
+                        .to_string();
+                    let baseAnim = ctx.world.movesBaseAnim.clone();
+                    ItemParse_model_g2anim_go(&mut ctx.world.menus, dc, item, Some(&baseAnim));
+
+                    let charModel = UI_Cvar_VariableString(ctx, "ui_char_model");
+                    // PORT-NOTE: Raven's `Com_sprintf` into `modelPath[MAX_QPATH]`
+                    // truncates at 63 chars (unreachable for real model names).
+                    let modelPath = format!("models/players/{}/model.glm", charModel);
+                    let mut animRunLength: c_int = 0;
+                    ItemParse_asset_model_go(
+                        &mut ctx.world.menus,
+                        dc,
+                        item,
+                        &modelPath,
+                        &mut animRunLength,
+                    );
+
+                    UI_UpdateCharacterSkin(ctx, dc);
+                }
+            }
+        }
+    } else if feederID == FEEDER_SIEGE_TEAM1 {
+        if ctx.world.main.g_siegedFeederForcedSet == 0 {
+            if let Some(teamIdx) = ctx.world.main.siegeTeam1 {
+                // §19 (Raven UB): `siegeTeam1->classes[index]` with the live
+                // `index == -1` call from `UI_SetSiegeTeams` reads the zero tail
+                // of `siegeTeam_t::name`, i.e. a NULL class; `UI_SiegeClassNum`
+                // falls off its loop and returns 0.
+                // SAFETY: a non-null `classPtr` points into
+                // `world.bg_state.bgSiegeClasses` (DEC-36 addendum 11); the
+                // deref is confined to computing the class index, mirroring
+                // `UI_UpdateCvarsForClass`'s established pattern.
+                let classPtr = usize::try_from(index)
+                    .ok()
+                    .and_then(|i| {
+                        ctx.world.bg_state.bgSiegeTeams[teamIdx]
+                            .classes
+                            .get(i)
+                            .copied()
+                    })
+                    .filter(|p| !p.is_null());
+                let classNum = match classPtr {
+                    Some(p) => UI_SiegeClassNum(&ctx.world.bg_state, unsafe { &*p }),
+                    None => 0,
+                };
+                ctx.world.main.g_UIGloballySelectedSiegeClass = classNum;
+                let desc = ctx.world.main.g_UIClassDescriptions[classNum as usize].clone();
+                trap::Cvar_Set(ctx.engine, "ui_classDesc", &desc);
+
+                // g_siegedFeederForcedSet = 1;
+                // Menu_SetFeederSelection(NULL, FEEDER_SIEGE_TEAM2, -1, NULL);
+
+                UI_SiegeSetCvarsForClass(ctx, classPtr.map(|_| classNum as usize));
+            }
+        }
+        ctx.world.main.g_siegedFeederForcedSet = 0;
+    } else if feederID == FEEDER_SIEGE_TEAM2 {
+        if ctx.world.main.g_siegedFeederForcedSet == 0 {
+            if let Some(teamIdx) = ctx.world.main.siegeTeam2 {
+                // §19 (Raven UB) + SAFETY: see the `FEEDER_SIEGE_TEAM1` arm
+                // above — `UI_SetSiegeTeams` calls this arm with `index == -1`.
+                let classPtr = usize::try_from(index)
+                    .ok()
+                    .and_then(|i| {
+                        ctx.world.bg_state.bgSiegeTeams[teamIdx]
+                            .classes
+                            .get(i)
+                            .copied()
+                    })
+                    .filter(|p| !p.is_null());
+                let classNum = match classPtr {
+                    Some(p) => UI_SiegeClassNum(&ctx.world.bg_state, unsafe { &*p }),
+                    None => 0,
+                };
+                ctx.world.main.g_UIGloballySelectedSiegeClass = classNum;
+                let desc = ctx.world.main.g_UIClassDescriptions[classNum as usize].clone();
+                trap::Cvar_Set(ctx.engine, "ui_classDesc", &desc);
+
+                // g_siegedFeederForcedSet = 1;
+                // Menu_SetFeederSelection(NULL, FEEDER_SIEGE_TEAM2, -1, NULL);
+
+                UI_SiegeSetCvarsForClass(ctx, classPtr.map(|_| classNum as usize));
+            }
+        }
+        ctx.world.main.g_siegedFeederForcedSet = 0;
+    } else if feederID == FEEDER_FORCECFG {
+        let mut newindex = index;
+
+        if ctx.world.force.uiForceSide == FORCE_LIGHTSIDE {
+            newindex += ctx.world.forceConfigLightIndexBegin;
+            if newindex >= ctx.world.forceConfigNames.len() as c_int {
+                return false;
+            }
+        } else {
+            // else dark
+            newindex += ctx.world.forceConfigDarkIndexBegin;
+            if newindex >= ctx.world.forceConfigNames.len() as c_int
+                || newindex > ctx.world.forceConfigLightIndexBegin
+            {
+                // dark gets read in before light
+                return false;
+            }
+        }
+
+        if index >= 0 && index < ctx.world.forceConfigNames.len() as c_int {
+            let oldindex = ctx.world.forceConfigSelected;
+            UI_ForceConfigHandle(ctx, dc, oldindex, index);
+            ctx.world.forceConfigSelected = index;
+        }
+    } else if feederID == FEEDER_MAPS || feederID == FEEDER_ALLMAPS {
+        let map = if feederID == FEEDER_ALLMAPS {
+            ctx.world.cvars.ui_currentNetMap.integer
+        } else {
+            ctx.world.cvars.ui_currentMap.integer
+        };
+        if ctx.world.mapList[map as usize].cinematic >= 0 {
+            let cinematic = ctx.world.mapList[map as usize].cinematic;
+            trap::CIN_StopCinematic(ctx.engine, cinematic);
+            ctx.world.mapList[map as usize].cinematic = -1;
+        }
+
+        let mut actual = 0;
+        let checkValid = UI_SelectedMap(ctx.world, index, &mut actual);
+
+        if checkValid.is_empty() {
+            // this isn't a valid map to select, so reselect the current
+            index = ctx.world.cvars.ui_mapIndex.integer;
+            let _ = UI_SelectedMap(ctx.world, index, &mut actual);
+        }
+
+        trap::Cvar_Set(ctx.engine, "ui_mapIndex", &format!("{}", index));
+        ctx.world.main.gUISelectedMap = index;
+        ctx.world.cvars.ui_mapIndex.integer = index;
+
+        if feederID == FEEDER_MAPS {
+            ctx.world.cvars.ui_currentMap.integer = actual;
+            trap::Cvar_Set(ctx.engine, "ui_currentMap", &format!("{}", actual));
+            let mapIdx = ctx.world.cvars.ui_currentMap.integer as usize;
+            let loadName = ctx.world.mapList[mapIdx].mapLoadName.clone();
+            let cinematic = trap::CIN_PlayCinematic(
+                ctx.engine,
+                &format!("{}.roq", loadName),
+                0,
+                0,
+                0,
+                0,
+                CIN_LOOP | CIN_SILENT,
+            );
+            ctx.world.mapList[mapIdx].cinematic = cinematic;
+            let gtEnum = ctx.world.gameTypes[ctx.world.cvars.ui_gameType.integer as usize].gtEnum;
+            UI_LoadBestScores(ctx, &loadName, gtEnum);
+            // trap::Cvar_Set(ctx.engine, "ui_opponentModel", ...opponentName);
+            // updateOpponentModel = true;
+        } else {
+            ctx.world.cvars.ui_currentNetMap.integer = actual;
+            trap::Cvar_Set(ctx.engine, "ui_currentNetMap", &format!("{}", actual));
+            let mapIdx = ctx.world.cvars.ui_currentNetMap.integer as usize;
+            let loadName = ctx.world.mapList[mapIdx].mapLoadName.clone();
+            let cinematic = trap::CIN_PlayCinematic(
+                ctx.engine,
+                &format!("{}.roq", loadName),
+                0,
+                0,
+                0,
+                0,
+                CIN_LOOP | CIN_SILENT,
+            );
+            ctx.world.mapList[mapIdx].cinematic = cinematic;
+        }
+    } else if feederID == FEEDER_SERVERS {
+        ctx.world.serverStatus.currentServer = index;
+        let info = trap::LAN_GetServerInfo(
+            ctx.engine,
+            ctx.world.cvars.ui_netSource.integer,
+            ctx.world.serverStatus.displayServers[index as usize],
+            MAX_STRING_CHARS,
+        );
+        let mapName = Info_ValueForKey(&info, "mapname");
+        ctx.world.serverStatus.currentServerPreview =
+            trap::R_RegisterShaderNoMip(ctx.engine, &format!("levelshots/{}", mapName));
+        if ctx.world.serverStatus.currentServerCinematic >= 0 {
+            let cinematic = ctx.world.serverStatus.currentServerCinematic;
+            trap::CIN_StopCinematic(ctx.engine, cinematic);
+            ctx.world.serverStatus.currentServerCinematic = -1;
+        }
+        if !mapName.is_empty() {
+            ctx.world.serverStatus.currentServerCinematic = trap::CIN_PlayCinematic(
+                ctx.engine,
+                &format!("{}.roq", mapName),
+                0,
+                0,
+                0,
+                0,
+                CIN_LOOP | CIN_SILENT,
+            );
+        }
+    } else if feederID == FEEDER_SERVERSTATUS {
+        // no-op — Raven's branch body is commented out.
+    } else if feederID == FEEDER_FINDPLAYER {
+        ctx.world.currentFoundPlayerServer = index;
+        if index < ctx.world.foundPlayerServerAddresses.len() as c_int - 1 {
+            // build a new server status for this server
+            let addr = ctx.world.foundPlayerServerAddresses
+                [ctx.world.currentFoundPlayerServer as usize]
+                .clone();
+            // PORT-NOTE: Raven `Q_strncpyz` into `char
+            // serverStatusAddress[MAX_ADDRESSLENGTH]`.
+            ctx.world.serverStatusAddress = addr.chars().take(MAX_ADDRESSLENGTH - 1).collect();
+            Menu_SetFeederSelection(&mut ctx.world.menus, dc, None, FEEDER_SERVERSTATUS, 0, None);
+            UI_BuildServerStatus(ctx, dc, true);
+        }
+    } else if feederID == FEEDER_PLAYER_LIST {
+        ctx.world.playerIndex = index;
+    } else if feederID == FEEDER_TEAM_LIST {
+        ctx.world.teamIndex = index;
+    } else if feederID == FEEDER_MODS {
+        ctx.world.modIndex = index;
+    } else if feederID == FEEDER_CINEMATICS {
+        ctx.world.movieIndex = index;
+        if ctx.world.previewMovie >= 0 {
+            trap::CIN_StopCinematic(ctx.engine, ctx.world.previewMovie);
+        }
+        ctx.world.previewMovie = -1;
+    } else if feederID == FEEDER_DEMOS {
+        ctx.world.demoIndex = index;
+    } else if feederID == FEEDER_COLORCHOICES {
+        let speciesIdx = ctx.world.playerSpeciesIndex as usize;
+        if index >= 0
+            && (index as usize) < ctx.world.playerSpecies[speciesIdx].ColorActionText.len()
+        {
+            let script =
+                ctx.world.playerSpecies[speciesIdx].ColorActionText[index as usize].clone();
+            // §19 (Raven UB): this is the only arm that uses `item`, and three
+            // call sites pass NULL — Raven would deref it in the `Script_*`
+            // handlers' `item->parent`; the port skips the call instead.
+            if let Some(item) = item {
+                Item_RunScript(&mut ctx.world.menus, dc, item, &script);
+            }
+        }
+    } else if feederID == FEEDER_PLAYER_SKIN_HEAD {
+        let speciesIdx = ctx.world.playerSpeciesIndex as usize;
+        if index >= 0 && (index as usize) < ctx.world.playerSpecies[speciesIdx].SkinHeadNames.len()
+        {
+            let skin = ctx.world.playerSpecies[speciesIdx].SkinHeadNames[index as usize].clone();
+            trap::Cvar_Set(ctx.engine, "ui_char_skin_head", &skin);
+        }
+    } else if feederID == FEEDER_PLAYER_SKIN_TORSO {
+        let speciesIdx = ctx.world.playerSpeciesIndex as usize;
+        if index >= 0 && (index as usize) < ctx.world.playerSpecies[speciesIdx].SkinTorsoNames.len()
+        {
+            let skin = ctx.world.playerSpecies[speciesIdx].SkinTorsoNames[index as usize].clone();
+            trap::Cvar_Set(ctx.engine, "ui_char_skin_torso", &skin);
+        }
+    } else if feederID == FEEDER_PLAYER_SKIN_LEGS {
+        let speciesIdx = ctx.world.playerSpeciesIndex as usize;
+        if index >= 0 && (index as usize) < ctx.world.playerSpecies[speciesIdx].SkinLegNames.len() {
+            let skin = ctx.world.playerSpecies[speciesIdx].SkinLegNames[index as usize].clone();
+            trap::Cvar_Set(ctx.engine, "ui_char_skin_legs", &skin);
+        }
+    } else if feederID == FEEDER_PLAYER_SPECIES {
+        ctx.world.playerSpeciesIndex = index;
+    } else if feederID == FEEDER_LANGUAGES {
+        ctx.world.languageCountIndex = index;
+    } else if feederID == FEEDER_SIEGE_BASE_CLASS {
+        let team = trap::Cvar_VariableValue(ctx.engine, "ui_team") as c_int;
+        let baseClass = trap::Cvar_VariableValue(ctx.engine, "ui_siege_class") as c_int;
+        UI_UpdateCvarsForClass(ctx, dc, team, baseClass, index);
+    } else if feederID == FEEDER_SIEGE_CLASS_WEAPONS {
+        // trap::Cvar_VariableStringBuffer(&format!("ui_class_weapondesc{}", index), ...);
+        // trap::Cvar_Set(ctx.engine, "ui_itemforceinvdesc", &info);
+    } else if feederID == FEEDER_SIEGE_CLASS_INVENTORY {
+        // trap::Cvar_VariableStringBuffer(&format!("ui_class_itemdesc{}", index), ...);
+        // trap::Cvar_Set(ctx.engine, "ui_itemforceinvdesc", &info);
+    } else if feederID == FEEDER_SIEGE_CLASS_FORCE {
+        let info = trap::Cvar_VariableStringBuffer(
+            ctx.engine,
+            &format!("ui_class_power{}", index),
+            MAX_STRING_CHARS,
+        );
+
+        // count them up
+        for i in 0..NUM_FORCE_POWERS {
+            if HOLOCRON_ICONS[i as usize] == info {
+                trap::Cvar_Set(
+                    ctx.engine,
+                    "ui_itemforceinvdesc",
+                    FORCEPOWER_DESC[i as usize],
+                );
+            }
+        }
+    }
+    // PORT-NOTE: the `#ifdef _XBOX` feeders (`FEEDER_XBL_*`) are non-retail
+    // MP surface — dropped, not compiled in the retail build.
+
+    true
 }

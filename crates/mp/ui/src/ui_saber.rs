@@ -9,9 +9,7 @@ use core::mem;
 
 use mp_bg::bg_channel::BgState;
 use mp_bg::bg_misc::BG_GiveMeVectorFromMatrix;
-use mp_qshared::common::mp::cgame::ref_entity_t::{
-    refEntity_t, refEntity_t_data, refEntity_t_sprite, refEntity_t_uMini, refEntity_t_uRefEnt,
-};
+use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::qcommon::saber::saber_colors::{
     saber_colors_t, SABER_BLUE, SABER_GREEN, SABER_ORANGE, SABER_PURPLE, SABER_RED, SABER_YELLOW,
@@ -29,7 +27,6 @@ use mp_uishared::shared::item_def_s::ItemDef;
 use mp_uishared::shared::menu_system::MAX_MENUFILE;
 use mp_uishared::ui_shared::{String_Alloc, ITF_ISCHARACTER, ITF_ISSABER, ITF_ISSABER2};
 use native_string::{atof, atoi, latin1_to_string};
-use native_types::qfalse;
 
 use crate::trap;
 use crate::ui_atoms::{Com_Error, Com_Printf};
@@ -293,48 +290,8 @@ pub fn UI_DoSaber(
     // Raven: the light-add call is commented out in the source (needs an
     // averaged RGB across all active saber blades) — nothing to port.
 
-    // `memset(&saber, 0, sizeof(refEntity_t))` — zero every field, including
-    // the union members, as a full literal (porting-rules: no `unsafe`).
-    let mut saber = refEntity_t {
-        reType: refEntityType_t::RT_MODEL,
-        renderfx: 0,
-        hModel: 0,
-        axis: [[0.0; 3]; 3],
-        nonNormalizedAxes: qfalse,
-        origin: [0.0; 3],
-        oldorigin: [0.0; 3],
-        customShader: 0,
-        shaderRGBA: [0; 4],
-        shaderTexCoord: [0.0; 2],
-        radius: 0.0,
-        rotation: 0.0,
-        shaderTime: 0.0,
-        frame: 0,
-        lightingOrigin: [0.0; 3],
-        shadowPlane: 0.0,
-        oldframe: 0,
-        backlerp: 0.0,
-        skinNum: 0,
-        customSkin: 0,
-        uRefEnt: refEntity_t_uRefEnt {
-            uMini: refEntity_t_uMini {
-                miniStart: 0,
-                miniCount: 0,
-            },
-        },
-        data: refEntity_t_data {
-            sprite: refEntity_t_sprite {
-                rotation: 0.0,
-                radius: 0.0,
-                vertRGBA: [[0; 4]; 4],
-            },
-        },
-        endTime: 0.0,
-        saberLength: 0.0,
-        angles: [0.0; 3],
-        modelScale: [0.0; 3],
-        ghoul2: core::ptr::null_mut(),
-    };
+    // `memset(&saber, 0, sizeof(refEntity_t))`.
+    let mut saber = refEntity_t::zeroed();
 
     // Saber glow is it's own ref type because it uses a ton of sprites, otherwise it would eat up too many
     //	refEnts to do each glow blob individually
