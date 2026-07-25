@@ -10,3 +10,4 @@
 //! `displayContextDef_t` function-pointer table (DEC-36 D3).
 
 pub mod shared;
+pub mod ui_shared;

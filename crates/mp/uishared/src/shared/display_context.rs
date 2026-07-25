@@ -1,10 +1,10 @@
 //! `DisplayContext` — the trait that replaces Raven's `displayContextDef_t`.
 
-use core::ffi::c_int;
+use core::ffi::{c_int, c_void};
 
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
-use mp_qshared::shared::{qhandle_t, sfxHandle_t, vec3_t, vec4_t};
+use mp_qshared::shared::{pc_token_t, qhandle_t, sfxHandle_t, vec3_t, vec4_t};
 
 use super::item_id::ItemId;
 
@@ -299,4 +299,97 @@ pub trait DisplayContext {
 
     /// Raven `void (*runCinematicFrame)(int handle)`.
     fn runCinematicFrame(&mut self, handle: c_int);
+
+    // ---- Host trap surface beyond the fn-pointer table ----
+    //
+    // Raven's `ui_shared.c` also calls these module traps directly (both hosts
+    // compile the TU against their own syscall table). `mp_uishared` is
+    // host-agnostic, so they route through this trait too — same D3 seam, same
+    // dictionary shapes as the host's `trap.rs` wrappers, so each impl is pure
+    // delegation. Census: `grep -o "trap_[A-Za-z0-9_]*" oracle/codemp/ui/ui_shared.c`.
+
+    /// Raven `trap_Milliseconds()`.
+    fn Milliseconds(&mut self) -> c_int;
+
+    /// Raven `trap_Cvar_SetValue(const char *var_name, float value)`.
+    fn setCVarValue(&mut self, cvar: &str, value: f32);
+
+    /// Raven `trap_Key_IsDown(int keynum)`.
+    fn Key_IsDown(&mut self, keynum: c_int) -> bool;
+
+    /// Raven `trap_Key_GetCatcher()`.
+    fn Key_GetCatcher(&mut self) -> c_int;
+
+    /// Raven `trap_Key_SetCatcher(int catcher)`.
+    fn Key_SetCatcher(&mut self, catcher: c_int);
+
+    /// Raven `trap_Key_ClearStates()`.
+    fn Key_ClearStates(&mut self);
+
+    /// Raven `trap_PC_ReadToken(int handle, pc_token_t *pc_token)`.
+    fn PC_ReadToken(&mut self, handle: c_int, pc_token: &mut pc_token_t) -> bool;
+
+    /// Raven `trap_PC_SourceFileAndLine(int handle, char *filename, int *line)`
+    /// — returns `(status, filename, line)`.
+    fn PC_SourceFileAndLine(&mut self, handle: c_int, buffer_len: usize) -> (c_int, String, c_int);
+
+    /// Raven `trap_SP_GetStringTextString(const char *text, char *buffer, int
+    /// bufferLength)` — `None` when the lookup fails.
+    fn SP_GetStringTextString(&mut self, text: &str, buffer_len: usize) -> Option<String>;
+
+    /// Raven `trap_R_RegisterSkin(const char *name)`.
+    fn R_RegisterSkin(&mut self, name: &str) -> qhandle_t;
+
+    /// Raven `trap_GetLanguageName(const int languageIndex, char *buffer)`.
+    fn GetLanguageName(&mut self, languageIndex: c_int, buffer_len: usize) -> String;
+
+    /// Raven `trap_G2API_InitGhoul2Model(...)` — ghoul2 handles stay opaque
+    /// `*mut c_void` (U1 convention).
+    #[allow(clippy::too_many_arguments)]
+    fn G2API_InitGhoul2Model(
+        &mut self,
+        ghoul2Ptr: *mut *mut c_void,
+        fileName: &str,
+        modelIndex: c_int,
+        customSkin: qhandle_t,
+        customShader: qhandle_t,
+        modelFlags: c_int,
+        lodBias: c_int,
+    ) -> c_int;
+
+    /// Raven `trap_G2API_SetSkin(void *ghoul2, int modelIndex, qhandle_t
+    /// customSkin, qhandle_t renderSkin)`.
+    fn G2API_SetSkin(
+        &mut self,
+        ghoul2: *mut c_void,
+        modelIndex: c_int,
+        customSkin: qhandle_t,
+        renderSkin: qhandle_t,
+    ) -> bool;
+
+    /// Raven `trap_G2API_CleanGhoul2Models(void **ghoul2Ptr)`.
+    fn G2API_CleanGhoul2Models(&mut self, ghoul2Ptr: *mut *mut c_void);
+
+    /// Raven `trap_G2API_SetBoneAnim(...)`.
+    #[allow(clippy::too_many_arguments)]
+    fn G2API_SetBoneAnim(
+        &mut self,
+        ghoul2: *mut c_void,
+        modelIndex: c_int,
+        boneName: &str,
+        startFrame: c_int,
+        endFrame: c_int,
+        flags: c_int,
+        animSpeed: f32,
+        currentTime: c_int,
+        setFrame: f32,
+        blendTime: c_int,
+    ) -> bool;
+
+    /// Raven `trap_G2API_GetGLAName(void *ghoul2, int modelIndex, char *fillBuf)`.
+    fn G2API_GetGLAName(&mut self, ghoul2: *mut c_void, modelIndex: c_int, buffer_len: usize)
+        -> String;
+
+    /// Raven `trap_G2_HaveWeGhoul2Models(void *ghoul2)`.
+    fn G2_HaveWeGhoul2Models(&mut self, ghoul2: *mut c_void) -> bool;
 }
