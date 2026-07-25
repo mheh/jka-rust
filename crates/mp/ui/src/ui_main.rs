@@ -93,10 +93,11 @@ use mp_uishared::shared::rect_def_t::RectDef;
 use mp_uishared::ui_shared::{
     Display_KeyBindPending, Display_MouseMove, Int_Parse, ItemParse_asset_model_go,
     ItemParse_model_g2anim_go, ItemParse_model_g2skin_go, Item_RunScript, LerpColor, Menu_Count,
-    Menu_FindItemByName, Menu_GetFocused, Menu_SetFeederSelection, Menu_SetItemBackground,
-    Menu_ShowGroup, Menu_ShowItemByName, Menus_ActivateByName, Menus_AnyFullScreenVisible,
-    Menus_CloseAll, Menus_FindByName, PC_Color_Parse, PC_Float_Parse, PC_Int_Parse,
-    PC_Script_Parse, PC_String_Parse, String_Parse, String_Report, UI_CleanupGhoul2,
+    Menu_FindItemByName, Menu_GetFocused, Menu_Reset, Menu_SetFeederSelection,
+    Menu_SetItemBackground, Menu_ShowGroup, Menu_ShowItemByName, Menus_ActivateByName,
+    Menus_AnyFullScreenVisible, Menus_CloseAll, Menus_FindByName, Menus_OpenByName, PC_Color_Parse,
+    PC_Float_Parse, PC_Int_Parse, PC_Script_Parse, PC_String_Parse, String_Parse, String_Report,
+    UI_CleanupGhoul2,
 };
 use native_math::qmath::Com_Clamp;
 use native_string::{
@@ -11496,4 +11497,182 @@ pub fn _UI_SetActiveMenu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menu:
         }
         _ => {}
     }
+}
+
+/// Raven `UI_ShowPostGame` — resets the camera/third-person/killserver cvars
+/// and activates the postgame menu, remembering whether a new high score was
+/// set.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1216-1222`
+pub fn UI_ShowPostGame(ctx: &mut UiContext, dc: &mut dyn DisplayContext, newHigh: bool) {
+    trap::Cvar_Set(ctx.engine, "cg_cameraOrbit", "0");
+    trap::Cvar_Set(ctx.engine, "cg_thirdPerson", "0");
+    trap::Cvar_Set(ctx.engine, "sv_killserver", "1");
+    ctx.world.soundHighScore = newHigh;
+    _UI_SetActiveMenu(ctx, dc, UIMENU_POSTGAME);
+}
+
+/// Raven `UI_LoadMenus` — loads the compiled menu-definition source (falling
+/// back to the retail default file), then walks `loadmenu` tokens off it,
+/// forwarding each menu block to [`Load_Menu`].
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1805-1852`
+pub fn UI_LoadMenus(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menuFile: &str, reset: bool) {
+    // PORT-NOTE: Raven's `start = trap_Milliseconds()` only feeds the
+    // commented-out timing `Com_Printf` (`ui_main.c:1847`); the syscall is
+    // kept for seam ordering and the dead value bound as `_start`.
+    let _start = trap::Milliseconds(ctx.engine);
+
+    trap::PC_LoadGlobalDefines(ctx.engine, "ui/jamp/menudef.h");
+
+    let mut handle = trap::PC_LoadSource(ctx.engine, menuFile);
+    if handle == 0 {
+        Com_Printf(
+            ctx,
+            &format!(
+                "{}menu file not found: {}, using default\n",
+                S_COLOR_YELLOW.to_str().unwrap(),
+                menuFile
+            ),
+        );
+        handle = trap::PC_LoadSource(ctx.engine, "ui/jampmenus.txt");
+        if handle == 0 {
+            // PORT-NOTE: Raven's `va()` format string has no `%s` conversion
+            // despite passing `menuFile` — the extra vararg is silently
+            // dropped by the underlying printf-style formatter. Preserved
+            // faithfully: `menuFile` is not interpolated here either.
+            trap::Error(
+                ctx.engine,
+                &format!(
+                    "{}default menu file not found: ui/menus.txt, unable to continue!\n",
+                    S_COLOR_RED.to_str().unwrap()
+                ),
+            );
+        }
+    }
+
+    if reset {
+        Menu_Reset(&mut ctx.world.menus);
+    }
+
+    loop {
+        let mut token = pc_token_t {
+            type_: 0,
+            subtype: 0,
+            intvalue: 0,
+            floatvalue: 0.0,
+            string: [0; MAX_TOKENLENGTH],
+        };
+        if !trap::PC_ReadToken(ctx.engine, handle, &mut token) {
+            break;
+        }
+        let tokenStr = pc_token_str(&token);
+        if tokenStr.is_empty() || tokenStr.starts_with('}') {
+            break;
+        }
+
+        if Q_stricmp(&tokenStr, "loadmenu") == 0 {
+            if Load_Menu(ctx, dc, handle) {
+                continue;
+            } else {
+                break;
+            }
+        }
+    }
+
+    // Com_Printf("UI menu load time = %d milli seconds\n", trap_Milliseconds() - start);
+
+    trap::PC_FreeSource(ctx.engine, handle);
+
+    trap::PC_RemoveAllGlobalDefines(ctx.engine);
+}
+
+/// Raven `UI_DeferMenuScript` — handles the `VideoSetup`/`RulesBackout`
+/// deferred-menu-script custom cases, opening a warning menu when deferral
+/// applies.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:5417-5462`
+// not yet wired: the DC->deferScript seam (ui_main.c:10730) is unported.
+#[allow(dead_code)]
+fn UI_DeferMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut &str) -> bool {
+    // Whats the reason for being deferred?
+    let mut name = String::new();
+    if !String_Parse(args, &mut name) {
+        return false;
+    }
+
+    // Handle the custom cases
+    if Q_stricmp(&name, "VideoSetup") == 0 {
+        // No warning menu specified
+        let mut warningMenuName = String::new();
+        if !String_Parse(args, &mut warningMenuName) {
+            return false;
+        }
+
+        // Defer if the video options were modified
+        let deferred = trap::Cvar_VariableValue(ctx.engine, "ui_r_modified") != 0.0;
+
+        if deferred {
+            // Open the warning menu
+            Menus_OpenByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, &warningMenuName);
+        }
+
+        return deferred;
+    } else if Q_stricmp(&name, "RulesBackout") == 0 {
+        let deferred = trap::Cvar_VariableValue(ctx.engine, "ui_rules_backout") != 0.0;
+
+        trap::Cvar_Set(ctx.engine, "ui_rules_backout", "0");
+
+        return deferred;
+    }
+
+    false
+}
+
+/// Raven `UI_CheckPassword` — looks up the currently-selected server-browser
+/// entry's info string and opens the password-request menu when the server
+/// reports `needpass`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:7938-7977`
+// not yet wired: UI_RunMenuScript's "checkpassword" arm (ui_main.c:6428-6434) is unported.
+#[allow(dead_code)]
+fn UI_CheckPassword(ctx: &mut UiContext, dc: &mut dyn DisplayContext) -> bool {
+    let index = ctx.world.serverStatus.currentServer;
+    if index < 0 || index as usize >= ctx.world.serverStatus.displayServers.len() {
+        // warning?
+        return false;
+    }
+
+    let info = trap::LAN_GetServerInfo(
+        ctx.engine,
+        ctx.world.cvars.ui_netSource.integer,
+        ctx.world.serverStatus.displayServers[index as usize],
+        MAX_STRING_CHARS as usize,
+    );
+
+    if atoi(&Info_ValueForKey(&info, "needpass")) != 0 {
+        Menus_OpenByName(
+            &mut ctx.world.menus,
+            &ctx.world.uiDC,
+            dc,
+            "password_request",
+        );
+        return false;
+    }
+
+    // This isn't going to make it (too late in dev), like James said I should check to see when we receive
+    // a packet *if* we do indeed get a 0 ping just make it 1 so then a 0 ping is guaranteed to be bad
+    //
+    // also check ping!
+    // ping = atoi(Info_ValueForKey(info, "ping"));
+    // NOTE : PING -- it's very questionable as to whether a ping of < 0 or <= 0 indicates a bad server
+    // what I do know, is that getting "ping" from the ServerInfo on a bad server returns 0.
+    // So I'm left with no choice but to not allow you to enter a server with a ping of 0
+    // if( ping <= 0 )
+    // {
+    // 	Menus_OpenByName("bad_server");
+    // 	return qfalse;
+    // }
+
+    true
 }

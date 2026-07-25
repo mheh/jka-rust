@@ -20,7 +20,7 @@ use mp_qshared::shared::q_math::{AnglesToAxis, VectorSet};
 use mp_qshared::shared::q_string::{COM_Parse, GetIDForString};
 use mp_qshared::shared::{
     cbufExec_t, pc_token_t, qtrue, stringID_table_t, vec3_t, vec4_t, CHAN_AUTO, CHAN_LOCAL_SOUND,
-    MAX_QPATH, MAX_STRING_CHARS, MAX_TOKENLENGTH, SCREEN_WIDTH, TT_NUMBER,
+    MAX_QPATH, MAX_STRING_CHARS, MAX_TOKENLENGTH, SCREEN_HEIGHT, SCREEN_WIDTH, TT_NUMBER,
 };
 use native_string::{atof, atoi, latin1_to_string, string_to_latin1, Q_stricmp};
 
@@ -236,6 +236,8 @@ const A_MOUSE2: c_int = 142;
 const A_INSERT: c_int = 143;
 const A_HOME: c_int = 144;
 const A_PAGE_UP: c_int = 145;
+const A_F11: c_int = 151;
+const A_F12: c_int = 152;
 const A_END: c_int = 157;
 const A_PAGE_DOWN: c_int = 158;
 const A_MOUSE3: c_int = 166;
@@ -4159,6 +4161,22 @@ pub fn Script_SetItemRect(
     true
 }
 
+/// Raven `Script_Open` — parse a menu name and open it (`Menus_OpenByName`).
+/// Source: `oracle/codemp/ui/ui_shared.c:1632-1640`
+pub fn Script_Open(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    _item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut name = String::new();
+    if String_Parse(args, &mut name) {
+        Menus_OpenByName(menus, ds, dc, &name);
+    }
+    true
+}
+
 /// Raven `Script_Show` — set `WINDOW_VISIBLE` on every item matching a
 /// named item/group in `item`'s parent menu.
 /// Source: `oracle/codemp/ui/ui_shared.c:1591-1599`
@@ -4489,11 +4507,12 @@ pub fn Menu_SetItemText(
 /// against each entry's name.
 ///
 /// PORT-NOTE: the keys below are the oracle table's literal command strings.
-/// The entries not yet ported — `open`, `close`, `setitemtext`, `setfocus`,
-/// `transition`, `orbit`, `scale`, `rundeferred`, `transition2` — fall through
-/// to `None` (routed to `dc.runScript`, matching Raven's un-dispatched-command
-/// path) until a later wave adds them. Raven's table has no `enable` entry
-/// (and none for `transition3`), so neither is dispatchable here.
+/// `open`, `close`, `setitemtext`, `setfocus`, `transition`, `orbit`, `scale`,
+/// `rundeferred`, `transition2` are all ported as fns but not yet dispatched
+/// here — they fall through to `None` (routed to `dc.runScript`, matching
+/// Raven's un-dispatched-command path) until the dispatch wire-up wave adds
+/// their arms. Raven's table has no `enable` entry (and none for
+/// `transition3`), so neither is dispatchable here.
 /// Source: `oracle/codemp/ui/ui_shared.c:2196-2228` (the table),
 /// `oracle/codemp/ui/ui_shared.c:2306-2357` (the walk this replaces)
 fn dispatch_script_command(
@@ -7483,6 +7502,369 @@ pub fn Menu_RunCloseScript(
         menus.ui_deferredScriptItem = None;
     }
     menus.items.truncate(idx);
+}
+
+/// Raven `Menus_HandleOOBClick` — mouse-click-outside-window handling: close
+/// `menu` if the click landed outside its window with `WINDOW_OOB_CLICK` set,
+/// activate/focus whichever open menu the cursor is actually over, and
+/// unpause when no menu remains visible.
+///
+/// PORT-NOTE: `menu: Option<MenuId>` mirrors Raven's `if (menu) { ... }`
+/// pointer-null guard. Raven's `#ifdef _XBOX` early-return arm (forced mouse
+/// move + key forward) is Xbox-only surface, not compiled in the PC/MP
+/// build; the `#ifndef _XBOX` branch below is the retail path.
+/// `DC->Pause`'s fn-pointer-truthy guard drops per DEC-36 D3 (the trait
+/// method is always implemented).
+/// Source: `oracle/codemp/ui/ui_shared.c:4453-4487`
+pub fn Menus_HandleOOBClick(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    menu: Option<MenuId>,
+    key: c_int,
+    down: bool,
+) {
+    let Some(menu) = menu else {
+        return;
+    };
+
+    let cursorx = ds.cursorx as f32;
+    let cursory = ds.cursory as f32;
+
+    // basically the behaviour we are looking for is if there are windows in the stack.. see if
+    // the cursor is within any of them.. if not close them otherwise activate them and pass the
+    // key on.. force a mouse move to activate focus and script stuff
+    if down && menus.menu(menu).window.flags & WINDOW_OOB_CLICK != 0 {
+        Menu_RunCloseScript(menus, dc, Some(menu));
+        menus.menu_mut(menu).window.flags &= !(WINDOW_HASFOCUS | WINDOW_VISIBLE);
+    }
+
+    let menuCount = menus.menus.len();
+    for i in 0..menuCount {
+        let candidate = MenuId::new(i);
+        if Menu_OverActiveItem(menus, Some(candidate), cursorx, cursory) {
+            Menu_RunCloseScript(menus, dc, Some(menu));
+            menus.menu_mut(menu).window.flags &= !(WINDOW_HASFOCUS | WINDOW_VISIBLE);
+            Menus_Activate(menus, dc, candidate);
+            Menu_HandleMouseMove(menus, ds, dc, Some(candidate), cursorx, cursory);
+            Menu_HandleKey(menus, ds, dc, Some(candidate), key, down);
+        }
+    }
+
+    if Display_VisibleMenuCount(menus) == 0 {
+        dc.Pause(false);
+    }
+    Display_CloseCinematics(menus, dc);
+}
+
+/// Raven `Menu_HandleKey` — the menu framework's key-event entry point:
+/// bind-capture and edit-field routing first, then out-of-window click
+/// detection, then per-item key handling, then the default per-key menu
+/// navigation.
+///
+/// PORT-NOTE: Raven's fn-scope (non-`static`) `qboolean inHandler` is
+/// reinitialized to `qfalse` on every call and never read after being set —
+/// its `if (inHandler) return;` guard at entry can never fire and every
+/// `inHandler = qfalse;` before a `return` is a dead store. Dropped; only the
+/// genuinely persistent `static qboolean inHandleKey` (→
+/// `menus.scratch.inHandleKey`) survives as state.
+///
+/// PORT-NOTE: `g_bindItem`/`g_editItem` are read unconditionally in Raven
+/// (guarded only by `g_waitingForKey`/`g_editingField`, which are set only
+/// alongside the matching item); the `if let Some(..)` here preserves that
+/// invariant defensively without changing observed behavior.
+///
+/// PORT-NOTE: the `A_ESCAPE`/`onAccept` cases build a transient scratch item
+/// carrying only `parent = menu` to hand `Item_RunScript` a script-command
+/// context, same convention as [`Menu_RunCloseScript`]/`Menus_Activate`'s
+/// `onOpen`.
+///
+/// PORT-NOTE: Raven's `A_JOY0`-`A_JOY4`/`A_AUX0`-`A_AUX16` cases are explicit
+/// no-op `break;`s; the `_` catch-all below is behaviorally identical.
+/// Source: `oracle/codemp/ui/ui_shared.c:4490-4725`
+pub fn Menu_HandleKey(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    menu: Option<MenuId>,
+    key: c_int,
+    down: bool,
+) {
+    if menus.g_waitingForKey && down {
+        if let Some(bindItem) = menus.g_bindItem {
+            Item_Bind_HandleKey(menus, ds, dc, bindItem, key, down);
+        }
+        return;
+    }
+
+    if menus.g_editingField && down {
+        if let Some(editItem) = menus.g_editItem {
+            if !Item_TextField_HandleKey(menus, ds, dc, editItem, key) {
+                menus.g_editingField = false;
+                menus.g_editItem = None;
+                return;
+            } else if key == A_MOUSE1 || key == A_MOUSE2 || key == A_MOUSE3 {
+                // switching fields so reset printed text of edit field
+                Leaving_EditField(menus, editItem);
+                menus.g_editingField = false;
+                menus.g_editItem = None;
+                Display_MouseMove(menus, ds, dc, None, ds.cursorx, ds.cursory);
+            } else if key == A_TAB || key == A_CURSOR_UP || key == A_CURSOR_DOWN {
+                return;
+            }
+        }
+    }
+
+    let Some(menu) = menu else {
+        return;
+    };
+
+    // see if the mouse is within the window bounds and if so is this a mouse click
+    if down
+        && menus.menu(menu).window.flags & WINDOW_POPUP == 0
+        && !Rect_ContainsPoint(
+            Some(&menus.menu(menu).window.rect),
+            ds.cursorx as f32,
+            ds.cursory as f32,
+        )
+    {
+        if !menus.scratch.inHandleKey && (key == A_MOUSE1 || key == A_MOUSE2 || key == A_MOUSE3) {
+            menus.scratch.inHandleKey = true;
+            Menus_HandleOOBClick(menus, ds, dc, Some(menu), key, down);
+            menus.scratch.inHandleKey = false;
+            return;
+        }
+    }
+
+    // get the item with focus
+    let mut item: Option<ItemId> = None;
+    let itemCount = menus.menu(menu).items.len();
+    for i in 0..itemCount {
+        let candidate = menus.menu(menu).items[i];
+        if menus.item(candidate).window.flags & WINDOW_HASFOCUS != 0 {
+            item = Some(candidate);
+        }
+    }
+
+    // Ignore if disabled
+    if let Some(it) = item {
+        if menus.item(it).disabled {
+            return;
+        }
+    }
+
+    if let Some(it) = item {
+        if Item_HandleKey(menus, ds, dc, it, key, down) {
+            // It is possible for an item to be disable after Item_HandleKey is run (like in Voice Chat)
+            if !menus.item(it).disabled {
+                Item_Action(menus, dc, Some(it));
+            }
+            return;
+        }
+    }
+
+    if !down {
+        return;
+    }
+
+    // default handling
+    match key {
+        A_F11 => {
+            if dc.getCVarValue("developer") != 0.0 {
+                menus.debugMode = !menus.debugMode;
+            }
+        }
+        A_F12 => {
+            if dc.getCVarValue("developer") != 0.0 {
+                dc.executeText(cbufExec_t::EXEC_APPEND as c_int, "screenshot\n");
+            }
+        }
+        A_KP_8 | A_CURSOR_UP => {
+            Menu_SetPrevCursorItem(menus, ds, dc, menu);
+        }
+        A_ESCAPE => {
+            if !menus.g_waitingForKey && !menus.menu(menu).onESC.is_empty() {
+                let onESC = menus.menu(menu).onESC.clone();
+                let idx = menus.items.len();
+                let scratch = ItemId::new(idx);
+                menus.items.push(ItemDef {
+                    parent: Some(menu),
+                    ..Default::default()
+                });
+                Item_RunScript(menus, dc, scratch, &onESC);
+                menus.items.truncate(idx);
+            }
+            menus.g_waitingForKey = false;
+        }
+        A_TAB | A_KP_2 | A_CURSOR_DOWN => {
+            Menu_SetNextCursorItem(menus, ds, dc, menu);
+        }
+        A_MOUSE1 | A_MOUSE2 => {
+            if let Some(it) = item {
+                let itype = menus.item(it).r#type;
+                if itype == ITEM_TYPE_TEXT {
+                    if Rect_ContainsPoint(
+                        Some(&menus.item(it).window.rect),
+                        ds.cursorx as f32,
+                        ds.cursory as f32,
+                    ) {
+                        Item_Action(menus, dc, Some(it));
+                    }
+                } else if itype == ITEM_TYPE_EDITFIELD || itype == ITEM_TYPE_NUMERICFIELD {
+                    if Rect_ContainsPoint(
+                        Some(&menus.item(it).window.rect),
+                        ds.cursorx as f32,
+                        ds.cursory as f32,
+                    ) {
+                        Item_Action(menus, dc, Some(it));
+                        menus.item_mut(it).cursorPos = 0;
+                        menus.g_editingField = true;
+                        menus.g_editItem = Some(it);
+                        dc.setOverstrikeMode(true);
+                    }
+                }
+                //JLFACCEPT
+                // add new types here as needed
+                /* Notes:
+                    Most controls will use the dpad to move through the selection possibilies.  Buttons are the only exception.
+                    Buttons will be assumed to all be on one menu together.  If the start or A button is pressed on a control focus, that
+                    means that the menu is accepted and move onto the next menu.  If the start or A button is pressed on a button focus it
+                    should just process the action and not support the accept functionality.
+                */
+                else if itype == ITEM_TYPE_MULTI
+                    || itype == ITEM_TYPE_YESNO
+                    || itype == ITEM_TYPE_SLIDER
+                {
+                    if Item_HandleAccept(menus, dc, it) {
+                        // Item processed it overriding the menu processing
+                        return;
+                    } else if !menus.menu(menu).onAccept.is_empty() {
+                        let onAccept = menus.menu(menu).onAccept.clone();
+                        let idx = menus.items.len();
+                        let scratch = ItemId::new(idx);
+                        menus.items.push(ItemDef {
+                            parent: Some(menu),
+                            ..Default::default()
+                        });
+                        Item_RunScript(menus, dc, scratch, &onAccept);
+                        menus.items.truncate(idx);
+                    }
+                } else if Rect_ContainsPoint(
+                    Some(&menus.item(it).window.rect),
+                    ds.cursorx as f32,
+                    ds.cursory as f32,
+                ) {
+                    Item_Action(menus, dc, Some(it));
+                }
+            }
+        }
+        A_KP_ENTER | A_ENTER => {
+            if let Some(it) = item {
+                let itype = menus.item(it).r#type;
+                if itype == ITEM_TYPE_EDITFIELD || itype == ITEM_TYPE_NUMERICFIELD {
+                    menus.item_mut(it).cursorPos = 0;
+                    menus.g_editingField = true;
+                    menus.g_editItem = Some(it);
+                    dc.setOverstrikeMode(true);
+                } else {
+                    Item_Action(menus, dc, item);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Raven `Menu_Paint` — paint `menu`'s background/border/chrome and every
+/// item it owns (respecting timed order-of-appearance), plus a debug-mode
+/// extents box.
+///
+/// PORT-NOTE: `seLanguageModCount` threads in for the `Item_Paint` call, same
+/// convention as `Item_Paint`'s own doc note. `DC->ownerDrawVisible`'s
+/// fn-pointer-truthy guard drops per DEC-36 D3 (always implemented); only the
+/// flags half of the condition survives.
+/// Source: `oracle/codemp/ui/ui_shared.c:7212-7272`
+pub fn Menu_Paint(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    menu: Option<MenuId>,
+    forcePaint: bool,
+    seLanguageModCount: c_int,
+) {
+    let Some(menu) = menu else {
+        return;
+    };
+
+    if menus.menu(menu).window.flags & WINDOW_VISIBLE == 0 && !forcePaint {
+        return;
+    }
+
+    let ownerDrawFlags = menus.menu(menu).window.ownerDrawFlags;
+    if ownerDrawFlags != 0 && !dc.ownerDrawVisible(ownerDrawFlags) {
+        return;
+    }
+
+    if forcePaint {
+        menus.menu_mut(menu).window.flags |= WINDOW_FORCED;
+    }
+
+    // draw the background if necessary
+    if menus.menu(menu).fullScreen {
+        // implies a background shader
+        // FIXME: make sure we have a default shader if fullscreen is set with no background
+        let background = menus.menu(menu).window.background;
+        dc.drawHandlePic(
+            0.0,
+            0.0,
+            SCREEN_WIDTH as f32,
+            SCREEN_HEIGHT as f32,
+            background,
+        );
+    } else if menus.menu(menu).window.background != 0 {
+        // this allows a background shader without being full screen
+        // UI_DrawHandlePic(menu->window.rect.x, menu->window.rect.y, menu->window.rect.w, menu->window.rect.h, menu->backgroundShader);
+    }
+
+    // paint the background and or border
+    let (fadeAmount, fadeClamp, fadeCycle) = {
+        let m = menus.menu(menu);
+        (m.fadeAmount, m.fadeClamp, m.fadeCycle)
+    };
+    let mut window = menus.menu(menu).window.clone();
+    Window_Paint(menus, ds, dc, &mut window, fadeAmount, fadeClamp, fadeCycle);
+    menus.menu_mut(menu).window = window;
+
+    // Loop through all items for the menu and paint them
+    let itemCount = menus.menu(menu).items.len();
+    for i in 0..itemCount {
+        let it = menus.menu(menu).items[i];
+        if menus.item(it).appearanceSlot == 0 {
+            Item_Paint(menus, ds, dc, Some(it), seLanguageModCount);
+        } else {
+            // Timed order of appearance
+            if menus.menu(menu).appearanceTime < ds.realTime as f32 {
+                // Time to show another item
+                let increment = menus.menu(menu).appearanceIncrement;
+                menus.menu_mut(menu).appearanceTime = ds.realTime as f32 + increment;
+                menus.menu_mut(menu).appearanceCnt += 1;
+            }
+
+            if menus.item(it).appearanceSlot <= menus.menu(menu).appearanceCnt {
+                Item_Paint(menus, ds, dc, Some(it), seLanguageModCount);
+            }
+        }
+    }
+
+    if menus.debugMode {
+        let mut color: vec4_t = [0.0; 4];
+        color[0] = 1.0;
+        color[2] = 1.0;
+        color[3] = 1.0;
+        color[1] = 0.0;
+        let rect = menus.menu(menu).window.rect;
+        dc.drawRect(rect.x, rect.y, rect.w, rect.h, 1.0, color);
+    }
 }
 
 /// Raven `Script_RunDeferred` — the `rundeferred` script command: run the
