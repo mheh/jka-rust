@@ -7,8 +7,10 @@
 use core::ffi::c_int;
 
 use mp_bg::public::configstring::CS_SERVERINFO;
+use mp_bg::public::gametype::GT_SIEGE;
 use mp_qshared::shared::cbuf_exec::cbufExec_t;
 use mp_qshared::shared::fileHandle_t;
+use mp_qshared::shared::keycatch::KEYCATCH_UI;
 use mp_qshared::shared::qhandle_t;
 use mp_qshared::shared::vec4_t;
 use mp_qshared::shared::FS_READ;
@@ -20,12 +22,17 @@ use mp_qshared::shared::{BIGCHAR_HEIGHT, BIGCHAR_WIDTH};
 use native_string::atoi;
 use native_string::info::Info_ValueForKey;
 use native_string::latin1_to_string;
+use native_string::q_string::Q_stricmp;
 
 use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::ui_shared::Display_CacheAll;
+use mp_uishared::ui_shared::Menus_ActivateByName;
+use mp_uishared::ui_shared::Menus_CloseAll;
 
 use crate::local::post_game_info_s::postGameInfo_t;
 use crate::trap;
+use crate::ui_main::UI_Load;
+use crate::ui_main::UI_Report;
 use crate::ui_main::UI_ShowPostGame;
 use crate::world::ui_context::UiContext;
 
@@ -669,4 +676,99 @@ pub fn UI_CalcPostGameStats(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
 
     UI_SetBestScores(ctx, &newInfo, true);
     UI_ShowPostGame(ctx, dc, newHigh);
+}
+
+/// Raven `UI_ConsoleCommand` — dispatches the `ui_*` console-command family;
+/// returns whether the command was consumed by the ui module.
+///
+/// PORT-NOTE (DisplayContext threading): `Menus_CloseAll`/`Menus_ActivateByName`
+/// take a `dc: &mut dyn DisplayContext` (DEC-36 addendum 12); the threading
+/// digest only listed `UiContext`/`UiWorld` channels, so this fn threads `dc`
+/// through as well. Recorded as an escalation.
+///
+/// Source: `oracle/codemp/ui/ui_atoms.c:296-382`
+pub fn UI_ConsoleCommand(
+    ctx: &mut UiContext,
+    dc: &mut dyn DisplayContext,
+    realTime: c_int,
+) -> bool {
+    ctx.world.uiDC.frameTime = realTime - ctx.world.uiDC.realTime;
+    ctx.world.uiDC.realTime = realTime;
+
+    let cmd = UI_Argv(ctx, 0);
+
+    // ensure minimum menu data is available
+    //Menu_Cache();
+
+    if Q_stricmp(&cmd, "ui_test") == 0 {
+        UI_ShowPostGame(ctx, dc, true);
+    }
+
+    if Q_stricmp(&cmd, "ui_report") == 0 {
+        UI_Report(dc);
+        return true;
+    }
+
+    if Q_stricmp(&cmd, "ui_load") == 0 {
+        UI_Load(ctx, dc);
+        return true;
+    }
+
+    if Q_stricmp(&cmd, "ui_opensiegemenu") == 0 {
+        if trap::Cvar_VariableValue(ctx.engine, "g_gametype") == GT_SIEGE as f32 {
+            Menus_CloseAll(&mut ctx.world.menus, dc);
+            let arg1 = UI_Argv(ctx, 1);
+            if Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, &arg1).is_some() {
+                trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
+            }
+        }
+        return true;
+    }
+
+    if Q_stricmp(&cmd, "ui_openmenu") == 0 {
+        //if ( trap_Cvar_VariableValue ( "developer" ) )
+        {
+            Menus_CloseAll(&mut ctx.world.menus, dc);
+            let arg1 = UI_Argv(ctx, 1);
+            if Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, &arg1).is_some() {
+                trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
+            }
+            return true;
+        }
+    }
+
+    /*
+    if ( Q_stricmp (cmd, "remapShader") == 0 ) {
+        if (trap_Argc() == 4) {
+            char shader1[MAX_QPATH];
+            char shader2[MAX_QPATH];
+            Q_strncpyz(shader1, UI_Argv(1), sizeof(shader1));
+            Q_strncpyz(shader2, UI_Argv(2), sizeof(shader2));
+            trap_R_RemapShader(shader1, shader2, UI_Argv(3));
+            return qtrue;
+        }
+    }
+    */
+
+    if Q_stricmp(&cmd, "postgame") == 0 {
+        UI_CalcPostGameStats(ctx, dc);
+        return true;
+    }
+
+    if Q_stricmp(&cmd, "ui_cache") == 0 {
+        UI_Cache_f(ctx, dc);
+        return true;
+    }
+
+    if Q_stricmp(&cmd, "ui_teamOrders") == 0 {
+        //UI_TeamOrdersMenu_f();
+        return true;
+    }
+
+    if Q_stricmp(&cmd, "ui_cdkey") == 0 {
+        //UI_CDKeyMenu_f();
+        return true;
+    }
+
+    false
 }

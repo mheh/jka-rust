@@ -45,7 +45,7 @@ use mp_qshared::shared::cvar::{
     CVAR_TEMP,
 };
 use mp_qshared::shared::force_powers::{
-    FORCE_DARKSIDE, FORCE_LIGHTSIDE, FP_LEVITATION, FP_PULL, FP_PUSH, FP_SABERTHROW,
+    FORCE_DARKSIDE, FORCE_LEVEL_1, FORCE_LIGHTSIDE, FP_LEVITATION, FP_PULL, FP_PUSH, FP_SABERTHROW,
     FP_SABER_DEFENSE, FP_SABER_OFFENSE, MAX_FORCE_RANK, NUM_FORCE_POWERS, NUM_FORCE_POWER_LEVELS,
 };
 use mp_qshared::shared::limits::MAX_NAME_LENGTH;
@@ -94,12 +94,12 @@ use mp_uishared::ui_shared::{
     Controls_GetConfig, Controls_SetConfig, Display_KeyBindPending, Display_MouseMove, Int_Parse,
     ItemParse_asset_model_go, ItemParse_model_g2anim_go, ItemParse_model_g2skin_go, Item_RunScript,
     LerpColor, Menu_Count, Menu_FindItemByName, Menu_GetFocused, Menu_GetMatchingItemByNumber,
-    Menu_HandleKey, Menu_ItemDisable, Menu_ItemsMatchingGroup, Menu_Paint, Menu_Reset,
-    Menu_SetFeederSelection, Menu_SetItemBackground, Menu_ShowGroup, Menu_ShowItemByName,
-    Menus_ActivateByName, Menus_AnyFullScreenVisible, Menus_CloseAll, Menus_CloseByName,
-    Menus_FindByName, Menus_OpenByName, PC_Color_Parse, PC_Float_Parse, PC_Int_Parse,
-    PC_Script_Parse, PC_String_Parse, String_Init, String_Parse, String_Report, UI_CleanupGhoul2,
-    UI_InitMemory, WINDOW_MOUSEOVER,
+    Menu_HandleKey, Menu_ItemDisable, Menu_ItemsMatchingGroup, Menu_Paint, Menu_PaintAll,
+    Menu_Reset, Menu_SetFeederSelection, Menu_SetItemBackground, Menu_ShowGroup,
+    Menu_ShowItemByName, Menus_ActivateByName, Menus_AnyFullScreenVisible, Menus_CloseAll,
+    Menus_CloseByName, Menus_FindByName, Menus_OpenByName, PC_Color_Parse, PC_Float_Parse,
+    PC_Int_Parse, PC_Script_Parse, PC_String_Parse, String_Init, String_Parse, String_Report,
+    UI_CleanupGhoul2, UI_InitMemory, WINDOW_MOUSEOVER,
 };
 use native_math::qmath::Com_Clamp;
 use native_string::{
@@ -127,7 +127,7 @@ use crate::ui_atoms::{
 use crate::ui_force::{
     UI_DrawForceStars, UI_ForceConfigHandle, UI_ForceMaxRank_HandleKey,
     UI_ForcePowerRank_HandleKey, UI_ForceSide_HandleKey, UI_InitForceShaders,
-    UI_JediNonJedi_HandleKey, UI_SaveForceTemplate, UI_SkinColor_HandleKey,
+    UI_JediNonJedi_HandleKey, UI_ReadLegalForce, UI_SaveForceTemplate, UI_SkinColor_HandleKey,
     UI_UpdateClientForcePowers, UI_UpdateForcePowers, UpdateForceUsed,
 };
 use crate::ui_gameinfo::{
@@ -149,6 +149,11 @@ use crate::world::ui_world::{UiWorld, MAX_FORCE_CONFIGS, MAX_FOUNDPLAYER_SERVERS
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:902-909`
 const NUM_SKILL_LEVELS: c_int = 5;
+
+/// Raven `#define UI_FPS_FRAMES 4` (`_UI_Refresh`'s FPS-averaging ring size).
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1257`
+const UI_FPS_FRAMES: c_int = 4;
 
 /// Raven `qfiles.h` `STYLE_DROPSHADOW`/`STYLE_BLINK` font-render bits
 /// (`Text_Paint`'s `iFontHandle` high bits). Already ported once as a
@@ -13369,4 +13374,159 @@ pub fn UI_DrawConnectScreen(ctx: &mut UiContext, dc: &mut dyn DisplayContext, ov
         );
     }
     // password required / connection rejected information goes here
+}
+
+/// Raven `_UI_Refresh` — advances the ui frame clock and ghoul2 timer, paints
+/// the open menu stack and cursor, refreshes the server/find-player lists,
+/// and applies the rank-change / free-saber force-power side effects.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1258-1421`
+pub fn _UI_Refresh(ctx: &mut UiContext, dc: &mut dyn DisplayContext, realtime: c_int) {
+    //if ( !( trap_Key_GetCatcher() & KEYCATCH_UI ) ) {
+    //	return;
+    //}
+
+    // ghoul2 timer must be explicitly updated during ui rendering.
+    trap::G2API_SetTime(ctx.engine, realtime, 0);
+    trap::G2API_SetTime(ctx.engine, realtime, 1);
+
+    ctx.world.uiDC.frameTime = realtime - ctx.world.uiDC.realTime;
+    ctx.world.uiDC.realTime = realtime;
+
+    let idx = ctx.world.scratch.UI_Refresh_index;
+    ctx.world.scratch.UI_Refresh_previousTimes[(idx % UI_FPS_FRAMES) as usize] =
+        ctx.world.uiDC.frameTime;
+    ctx.world.scratch.UI_Refresh_index += 1;
+    if ctx.world.scratch.UI_Refresh_index > UI_FPS_FRAMES {
+        // average multiple frames together to smooth changes out a bit
+        let mut total = 0;
+        for i in 0..UI_FPS_FRAMES {
+            total += ctx.world.scratch.UI_Refresh_previousTimes[i as usize];
+        }
+        if total == 0 {
+            total = 1;
+        }
+        ctx.world.uiDC.FPS = (1000 * UI_FPS_FRAMES / total) as f32;
+    }
+
+    UI_UpdateCvars(ctx);
+
+    if Menu_Count(&ctx.world.menus) > 0 {
+        // paint all the menus
+        let seLanguageModCount = ctx.world.cvars.se_language.modificationCount;
+        Menu_PaintAll(
+            &mut ctx.world.menus,
+            &ctx.world.uiDC,
+            dc,
+            seLanguageModCount,
+        );
+        // refresh server browser list
+        UI_DoServerRefresh(ctx, dc);
+        // refresh server status
+        UI_BuildServerStatus(ctx, dc, false);
+        // refresh find player list
+        UI_BuildFindPlayerList(ctx, dc, false);
+    }
+
+    // draw cursor
+    // PORT-NOTE: Raven guards the cursor draw with `#ifndef _XBOX`
+    // (ui_main.c:1303-1309); `_XBOX` is never defined on the platforms this
+    // port targets, so the draw is unconditional here.
+    UI_SetColor(ctx, None);
+    if Menu_Count(&ctx.world.menus) > 0 {
+        let cursor = ctx.world.uiDC.Assets.cursor;
+        UI_DrawHandlePic(
+            ctx,
+            ctx.world.uiDC.cursorx as f32,
+            ctx.world.uiDC.cursory as f32,
+            48.0,
+            48.0,
+            cursor,
+        );
+    }
+
+    // PORT-NOTE: Raven's `#ifndef NDEBUG` cursor-coordinate debug readout was
+    // already dead in the oracle (`//FIXME` + commented-out `UI_DrawString`
+    // call, ui_main.c:1311-1318) — nothing to transcribe.
+
+    if ctx.world.cvars.ui_rankChange.integer != 0 {
+        ctx.world.menus.FPMessageTime = realtime + 3000;
+
+        if ctx.world.main.parsedFPMessage.is_empty()
+        /*&& uiMaxRank > ui_rankChange.integer*/
+        {
+            let printMessage = UI_GetStringEdString(ctx, "MP_INGAME", "SET_NEW_RANK");
+            // PORT-NOTE: Raven copies `printMessage` byte-for-byte into
+            // `parsedFPMessage[1024]`, inserting a '\n' immediately BEFORE the
+            // next space once a run exceeds 64 chars (the space is kept, so a
+            // break reads "\n "). StringEd text is Latin-1, so the walk is over
+            // Latin-1 bytes — `String::as_bytes()` would give UTF-8 and
+            // double-count non-ASCII against the 64-char run and the 1024 cap.
+            // porting-rules §19: Raven tests `p < 1024` at the loop top but can
+            // write twice per iteration plus a NUL, so `p` reaches 1025 and
+            // overruns `parsedFPMessage[1024]`; the port keeps the same loop
+            // test with owned bytes — no overrun.
+            let src = string_to_latin1(&printMessage);
+            let mut out: Vec<u8> = Vec::new();
+            let mut linecount = 0;
+            let mut i = 0;
+            while i < src.len() && out.len() < 1024 {
+                out.push(src[i]);
+                i += 1;
+                linecount += 1;
+                if linecount > 64 && i < src.len() && src[i] == b' ' {
+                    out.push(b'\n');
+                    linecount = 0;
+                }
+            }
+            ctx.world.main.parsedFPMessage = latin1_to_string(&out);
+        }
+
+        //if (uiMaxRank > ui_rankChange.integer)
+        {
+            ctx.world.force.uiMaxRank = ctx.world.cvars.ui_rankChange.integer;
+            ctx.world.force.uiForceRank = ctx.world.force.uiMaxRank;
+
+            /*
+            while (x < NUM_FORCE_POWERS)
+            {
+                //For now just go ahead and clear force powers upon rank change
+                uiForcePowersRank[x] = 0;
+                x++;
+            }
+            uiForcePowersRank[FP_LEVITATION] = 1;
+            uiForceUsed = 0;
+            */
+
+            // Use BG_LegalizedForcePowers and transfer the result into the UI force settings
+            UI_ReadLegalForce(ctx, dc);
+        }
+
+        if ctx.world.cvars.ui_freeSaber.integer != 0
+            && ctx.world.force.uiForcePowersRank[FP_SABER_OFFENSE as usize] < 1
+        {
+            ctx.world.force.uiForcePowersRank[FP_SABER_OFFENSE as usize] = 1;
+        }
+        if ctx.world.cvars.ui_freeSaber.integer != 0
+            && ctx.world.force.uiForcePowersRank[FP_SABER_DEFENSE as usize] < 1
+        {
+            ctx.world.force.uiForcePowersRank[FP_SABER_DEFENSE as usize] = 1;
+        }
+        trap::Cvar_Set(ctx.engine, "ui_rankChange", "0");
+
+        // remember to update the force power count after changing the max rank
+        UpdateForceUsed(ctx, dc);
+    }
+
+    if ctx.world.cvars.ui_freeSaber.integer != 0 {
+        ctx.world.bg_state.bgForcePowerCost[FP_SABER_OFFENSE as usize][FORCE_LEVEL_1 as usize] = 0;
+        ctx.world.bg_state.bgForcePowerCost[FP_SABER_DEFENSE as usize][FORCE_LEVEL_1 as usize] = 0;
+    } else {
+        ctx.world.bg_state.bgForcePowerCost[FP_SABER_OFFENSE as usize][FORCE_LEVEL_1 as usize] = 1;
+        ctx.world.bg_state.bgForcePowerCost[FP_SABER_DEFENSE as usize][FORCE_LEVEL_1 as usize] = 1;
+    }
+
+    // PORT-NOTE: the remaining Raven block (painting the force-power rank
+    // message text) is dead: Raven itself wraps it in `/* ... */` ("For now,
+    // don't bother."), so it never compiled in retail.
 }
