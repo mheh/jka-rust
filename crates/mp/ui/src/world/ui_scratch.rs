@@ -17,7 +17,7 @@ use core::ffi::c_int;
 /// `UI_FeederSelection` were all `static` only so a `const char *` could be
 /// returned or so a 1 KB buffer stayed off the stack; owned returns (§C7)
 /// dissolve every one of them.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct UiScratch {
     /// Raven `UI_BuildServerDisplayList`'s `static int numinvisible` — how many
     /// servers the last pass filtered out, compared against the current pass to
@@ -41,6 +41,11 @@ pub struct UiScratch {
     /// Raven `UI_FeederItemText`'s `static int lastTime`.
     /// Source: `oracle/codemp/ui/ui_main.c:8780` (`UI_FeederItemText`)
     pub UI_FeederItemText_lastTime: c_int,
+    /// Raven `UI_FeederItemText`'s `static char info[MAX_STRING_CHARS]` — the
+    /// server-info string the FEEDER_SERVERS arm reuses while `lastColumn`/
+    /// `lastTime` say the cached parse is still current.
+    /// Source: `oracle/codemp/ui/ui_main.c:8779` (`UI_FeederItemText`)
+    pub UI_FeederItemText_info: String,
 
     /// Raven `_UI_Refresh`'s `static int index` — cursor into the FPS ring.
     /// Source: `oracle/codemp/ui/ui_main.c` (`_UI_Refresh`)

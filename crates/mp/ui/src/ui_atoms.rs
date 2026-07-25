@@ -17,6 +17,9 @@ use mp_qshared::shared::{colorBlack, colorWhite};
 use mp_qshared::shared::{BIGCHAR_HEIGHT, BIGCHAR_WIDTH};
 use native_string::latin1_to_string;
 
+use mp_uishared::shared::display_context::DisplayContext;
+use mp_uishared::ui_shared::Display_CacheAll;
+
 use crate::local::post_game_info_s::postGameInfo_t;
 use crate::trap;
 use crate::world::ui_context::UiContext;
@@ -517,4 +520,23 @@ pub fn UI_DrawTextBox(ctx: &mut UiContext, x: c_int, y: c_int, width: c_int, lin
 
     UI_FillRect(ctx, x_f, y_f, w, h, &colorBlack);
     UI_DrawRect(ctx, x_f, y_f, w, h, &colorWhite);
+}
+
+/// Raven `UI_Cache_f` — console command: cache all menu render assets; if
+/// invoked with 2 args, also print the list of head model names.
+///
+/// PORT-NOTE (DisplayContext threading): the threading digest indicated only
+/// `UiContext` and `UiWorld` state channels, but `Display_CacheAll` requires a
+/// `DisplayContext` trait object to perform caching. Per DEC-36 addendum 12, ui
+/// functions that call DisplayContext-using callees take `dc: &mut dyn
+/// DisplayContext` as a parameter. This function records an escalation.
+///
+/// Source: `oracle/codemp/ui/ui_atoms.c:178-187`
+pub fn UI_Cache_f(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+    Display_CacheAll(&ctx.world.menus, dc);
+    if trap::Argc(ctx.engine) == 2 {
+        for i in 0..ctx.world.q3HeadNames.len() {
+            trap::Print(ctx.engine, &format!("model {}\n", ctx.world.q3HeadNames[i]));
+        }
+    }
 }

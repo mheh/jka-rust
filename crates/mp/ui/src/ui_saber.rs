@@ -4,10 +4,11 @@
 
 #![allow(non_snake_case)]
 
-use core::ffi::c_char;
+use core::ffi::{c_char, c_int};
 use core::mem;
 
 use mp_bg::bg_channel::BgState;
+use mp_bg::bg_misc::BG_GiveMeVectorFromMatrix;
 use mp_qshared::common::mp::cgame::ref_entity_t::{
     refEntity_t, refEntity_t_data, refEntity_t_sprite, refEntity_t_uMini, refEntity_t_uRefEnt,
 };
@@ -21,16 +22,19 @@ use mp_qshared::shared::com_parse::{
     SkipRestOfLine,
 };
 use mp_qshared::shared::q_color::S_COLOR_RED;
-use mp_qshared::shared::q_math::{_VectorMA, VectorSet};
+use mp_qshared::shared::q_math::{_VectorMA, vec3_origin, VectorNormalize, VectorSet};
 use mp_qshared::shared::q_string::COM_Compress;
-use mp_qshared::shared::{fileHandle_t, vec3_t, FS_READ};
+use mp_qshared::shared::{fileHandle_t, mdxaBone_t, vec3_t, Eorientations, FS_READ, MAX_QPATH};
+use mp_uishared::shared::item_def_s::ItemDef;
 use mp_uishared::shared::menu_system::MAX_MENUFILE;
+use mp_uishared::ui_shared::{String_Alloc, ITF_ISSABER};
 use native_string::{atof, atoi, latin1_to_string};
 use native_types::qfalse;
 
 use crate::trap;
 use crate::ui_atoms::{Com_Error, Com_Printf};
 use crate::world::ui_context::UiContext;
+use crate::world::ui_main_state::MAX_SABER_HILTS;
 use crate::world::ui_saber_state::MAX_SABER_DATA_SIZE;
 
 /// Raven `UI_CacheSaberGlowGraphics` — registers the twelve saber blade
@@ -756,4 +760,510 @@ pub fn UI_SaberValidForPlayerInMP(ctx: &mut UiContext, saberName: &str) -> bool 
             }
         }
     }
+}
+
+/// Raven `UI_SaberDrawBlade` — computes one saber blade's world origin/axis
+/// off the model's bolt tag (or a fallback `*flash` tag / hardcoded offsets
+/// when the tag is missing), then draws it with `UI_DoSaber`.
+///
+/// PORT-NOTE: Raven's `char *tagName = va(...)` becomes a `format!`; the
+/// `tagHack` `qboolean` stays a `bool`. `item->ghoul2`/`&(item->ghoul2)` both
+/// pass the field's raw `*mut c_void` token straight through per the
+/// already-ported `trap::G2API_*` wrapper shapes (LAW — `G2API_HasGhoul2ModelOnIndex`
+/// and `G2API_AddBolt` both take a single `*mut c_void`, not a double pointer,
+/// despite the oracle's `&(item->ghoul2)` call site).
+///
+/// Source: `oracle/codemp/ui/ui_saber.c:614-846`
+#[allow(clippy::too_many_arguments)]
+pub fn UI_SaberDrawBlade(
+    ctx: &mut UiContext,
+    item: &ItemDef,
+    saberName: &str,
+    saberModel: c_int,
+    saberType: saberType_t,
+    origin: vec3_t,
+    angles: vec3_t,
+    bladeNum: i32,
+) {
+    let bladeColorString: String;
+    if (item.flags & ITF_ISSABER) != 0 && saberModel < 2 {
+        bladeColorString = trap::Cvar_VariableStringBuffer(ctx.engine, "ui_saber_color", MAX_QPATH);
+    } else {
+        // if ( item->flags&ITF_ISSABER2 ) - presumed
+        bladeColorString =
+            trap::Cvar_VariableStringBuffer(ctx.engine, "ui_saber2_color", MAX_QPATH);
+    }
+
+    if !trap::G2API_HasGhoul2ModelOnIndex(ctx.engine, item.ghoul2, saberModel) {
+        // invalid index!
+        return;
+    }
+
+    let bladeColor = TranslateSaberColor(&bladeColorString, &mut ctx.world.bg_state);
+
+    let bladeLength = UI_SaberBladeLengthForSaber(ctx, saberName, bladeNum);
+    let bladeRadius = UI_SaberBladeRadiusForSaber(ctx, saberName, bladeNum);
+
+    let tagName = format!("*blade{}", bladeNum + 1);
+    let mut bolt = trap::G2API_AddBolt(ctx.engine, item.ghoul2, saberModel, &tagName);
+
+    let mut tagHack = false;
+    if bolt == -1 {
+        tagHack = true;
+        // hmm, just fall back to the most basic tag (this will also make it work with
+        // pre-JKA saber models
+        bolt = trap::G2API_AddBolt(ctx.engine, item.ghoul2, saberModel, "*flash");
+        if bolt == -1 {
+            // no tag_flash either?!!
+            bolt = 0;
+        }
+    }
+
+    let mut boltMatrix = mdxaBone_t {
+        matrix: [[0.0; 4]; 3],
+    };
+    // NULL was cgs.model_draw
+    trap::G2API_GetBoltMatrix(
+        ctx.engine,
+        item.ghoul2,
+        saberModel,
+        bolt,
+        &mut boltMatrix,
+        &angles,
+        &origin,
+        ctx.world.uiDC.realTime,
+        None,
+        &vec3_origin,
+    );
+
+    // work the matrix axis stuff into the original axis and origins used.
+    let mut bladeOrigin: vec3_t = [0.0; 3];
+    let mut axis: [vec3_t; 3] = [[0.0; 3]; 3];
+    BG_GiveMeVectorFromMatrix(
+        &boltMatrix,
+        Eorientations::ORIGIN as c_int,
+        &mut bladeOrigin,
+    );
+    // front (was NEGATIVE_Y, but the md3->glm exporter screws up this tag somethin'
+    // awful) ...changed this back to NEGATIVE_Y
+    BG_GiveMeVectorFromMatrix(
+        &boltMatrix,
+        Eorientations::NEGATIVE_Y as c_int,
+        &mut axis[0],
+    );
+    // right ... and changed this to NEGATIVE_X
+    BG_GiveMeVectorFromMatrix(
+        &boltMatrix,
+        Eorientations::NEGATIVE_X as c_int,
+        &mut axis[1],
+    );
+    // up
+    BG_GiveMeVectorFromMatrix(
+        &boltMatrix,
+        Eorientations::POSITIVE_Z as c_int,
+        &mut axis[2],
+    );
+
+    // Where do I get scale from?
+    // scale = DC->xscale;
+    let scale = 1.0f32;
+
+    if tagHack {
+        match saberType {
+            saberType_t::SABER_SINGLE => {
+                let mut out = bladeOrigin;
+                _VectorMA(bladeOrigin, scale, axis[0], &mut out);
+                bladeOrigin = out;
+            }
+            saberType_t::SABER_DAGGER | saberType_t::SABER_LANCE => {}
+            saberType_t::SABER_STAFF => {
+                if bladeNum == 0 {
+                    let mut out = bladeOrigin;
+                    _VectorMA(bladeOrigin, 12.0 * scale, axis[0], &mut out);
+                    bladeOrigin = out;
+                }
+                if bladeNum == 1 {
+                    axis[0] = [-axis[0][0], -axis[0][1], -axis[0][2]];
+                    let mut out = bladeOrigin;
+                    _VectorMA(bladeOrigin, 12.0 * scale, axis[0], &mut out);
+                    bladeOrigin = out;
+                }
+            }
+            saberType_t::SABER_BROAD => {
+                if bladeNum == 0 {
+                    let mut out = bladeOrigin;
+                    _VectorMA(bladeOrigin, -1.0 * scale, axis[1], &mut out);
+                    bladeOrigin = out;
+                } else if bladeNum == 1 {
+                    let mut out = bladeOrigin;
+                    _VectorMA(bladeOrigin, 1.0 * scale, axis[1], &mut out);
+                    bladeOrigin = out;
+                }
+            }
+            saberType_t::SABER_PRONG => {
+                if bladeNum == 0 {
+                    let mut out = bladeOrigin;
+                    _VectorMA(bladeOrigin, -3.0 * scale, axis[1], &mut out);
+                    bladeOrigin = out;
+                } else if bladeNum == 1 {
+                    let mut out = bladeOrigin;
+                    _VectorMA(bladeOrigin, 3.0 * scale, axis[1], &mut out);
+                    bladeOrigin = out;
+                }
+            }
+            saberType_t::SABER_ARC => {
+                axis[1] = [
+                    axis[1][0] - axis[2][0],
+                    axis[1][1] - axis[2][1],
+                    axis[1][2] - axis[2][2],
+                ];
+                let mut normalized = axis[1];
+                VectorNormalize(&mut normalized);
+                axis[1] = normalized;
+                match bladeNum {
+                    0 => {
+                        let mut out = bladeOrigin;
+                        _VectorMA(bladeOrigin, 8.0 * scale, axis[0], &mut out);
+                        bladeOrigin = out;
+                        axis[0] = [axis[0][0] * 0.75, axis[0][1] * 0.75, axis[0][2] * 0.75];
+                        axis[1] = [axis[1][0] * 0.25, axis[1][1] * 0.25, axis[1][2] * 0.25];
+                        axis[0] = [
+                            axis[0][0] + axis[1][0],
+                            axis[0][1] + axis[1][1],
+                            axis[0][2] + axis[1][2],
+                        ];
+                    }
+                    1 => {
+                        axis[0] = [axis[0][0] * 0.25, axis[0][1] * 0.25, axis[0][2] * 0.25];
+                        axis[1] = [axis[1][0] * 0.75, axis[1][1] * 0.75, axis[1][2] * 0.75];
+                        axis[0] = [
+                            axis[0][0] + axis[1][0],
+                            axis[0][1] + axis[1][1],
+                            axis[0][2] + axis[1][2],
+                        ];
+                    }
+                    2 => {
+                        let mut out = bladeOrigin;
+                        _VectorMA(bladeOrigin, -8.0 * scale, axis[0], &mut out);
+                        bladeOrigin = out;
+                        axis[0] = [axis[0][0] * -0.25, axis[0][1] * -0.25, axis[0][2] * -0.25];
+                        axis[1] = [axis[1][0] * 0.75, axis[1][1] * 0.75, axis[1][2] * 0.75];
+                        axis[0] = [
+                            axis[0][0] + axis[1][0],
+                            axis[0][1] + axis[1][1],
+                            axis[0][2] + axis[1][2],
+                        ];
+                    }
+                    3 => {
+                        let mut out = bladeOrigin;
+                        _VectorMA(bladeOrigin, -16.0 * scale, axis[0], &mut out);
+                        bladeOrigin = out;
+                        axis[0] = [axis[0][0] * -0.75, axis[0][1] * -0.75, axis[0][2] * -0.75];
+                        axis[1] = [axis[1][0] * 0.25, axis[1][1] * 0.25, axis[1][2] * 0.25];
+                        axis[0] = [
+                            axis[0][0] + axis[1][0],
+                            axis[0][1] + axis[1][1],
+                            axis[0][2] + axis[1][2],
+                        ];
+                    }
+                    _ => {}
+                }
+            }
+            saberType_t::SABER_SAI => {
+                if bladeNum == 1 {
+                    let mut out = bladeOrigin;
+                    _VectorMA(bladeOrigin, -3.0 * scale, axis[1], &mut out);
+                    bladeOrigin = out;
+                } else if bladeNum == 2 {
+                    let mut out = bladeOrigin;
+                    _VectorMA(bladeOrigin, 3.0 * scale, axis[1], &mut out);
+                    bladeOrigin = out;
+                }
+            }
+            saberType_t::SABER_CLAW => match bladeNum {
+                0 => {
+                    let mut out = bladeOrigin;
+                    _VectorMA(bladeOrigin, 2.0 * scale, axis[0], &mut out);
+                    bladeOrigin = out;
+                    let mut out2 = bladeOrigin;
+                    _VectorMA(bladeOrigin, 2.0 * scale, axis[2], &mut out2);
+                    bladeOrigin = out2;
+                }
+                1 => {
+                    let mut out = bladeOrigin;
+                    _VectorMA(bladeOrigin, 2.0 * scale, axis[0], &mut out);
+                    bladeOrigin = out;
+                    let mut out2 = bladeOrigin;
+                    _VectorMA(bladeOrigin, 2.0 * scale, axis[2], &mut out2);
+                    bladeOrigin = out2;
+                    let mut out3 = bladeOrigin;
+                    _VectorMA(bladeOrigin, 2.0 * scale, axis[1], &mut out3);
+                    bladeOrigin = out3;
+                }
+                2 => {
+                    let mut out = bladeOrigin;
+                    _VectorMA(bladeOrigin, 2.0 * scale, axis[0], &mut out);
+                    bladeOrigin = out;
+                    let mut out2 = bladeOrigin;
+                    _VectorMA(bladeOrigin, 2.0 * scale, axis[2], &mut out2);
+                    bladeOrigin = out2;
+                    let mut out3 = bladeOrigin;
+                    _VectorMA(bladeOrigin, -2.0 * scale, axis[1], &mut out3);
+                    bladeOrigin = out3;
+                }
+                _ => {}
+            },
+            saberType_t::SABER_STAR => match bladeNum {
+                0 => {
+                    let mut out = bladeOrigin;
+                    _VectorMA(bladeOrigin, 8.0 * scale, axis[0], &mut out);
+                    bladeOrigin = out;
+                }
+                1 => {
+                    axis[0] = [axis[0][0] * 0.33, axis[0][1] * 0.33, axis[0][2] * 0.33];
+                    axis[2] = [axis[2][0] * 0.67, axis[2][1] * 0.67, axis[2][2] * 0.67];
+                    axis[0] = [
+                        axis[0][0] + axis[2][0],
+                        axis[0][1] + axis[2][1],
+                        axis[0][2] + axis[2][2],
+                    ];
+                    let mut out = bladeOrigin;
+                    _VectorMA(bladeOrigin, 8.0 * scale, axis[0], &mut out);
+                    bladeOrigin = out;
+                }
+                2 => {
+                    axis[0] = [axis[0][0] * -0.33, axis[0][1] * -0.33, axis[0][2] * -0.33];
+                    axis[2] = [axis[2][0] * 0.67, axis[2][1] * 0.67, axis[2][2] * 0.67];
+                    axis[0] = [
+                        axis[0][0] + axis[2][0],
+                        axis[0][1] + axis[2][1],
+                        axis[0][2] + axis[2][2],
+                    ];
+                    let mut out = bladeOrigin;
+                    _VectorMA(bladeOrigin, 8.0 * scale, axis[0], &mut out);
+                    bladeOrigin = out;
+                }
+                3 => {
+                    axis[0] = [-axis[0][0], -axis[0][1], -axis[0][2]];
+                    let mut out = bladeOrigin;
+                    _VectorMA(bladeOrigin, 8.0 * scale, axis[0], &mut out);
+                    bladeOrigin = out;
+                }
+                4 => {
+                    axis[0] = [axis[0][0] * -0.33, axis[0][1] * -0.33, axis[0][2] * -0.33];
+                    axis[2] = [axis[2][0] * -0.67, axis[2][1] * -0.67, axis[2][2] * -0.67];
+                    axis[0] = [
+                        axis[0][0] + axis[2][0],
+                        axis[0][1] + axis[2][1],
+                        axis[0][2] + axis[2][2],
+                    ];
+                    let mut out = bladeOrigin;
+                    _VectorMA(bladeOrigin, 8.0 * scale, axis[0], &mut out);
+                    bladeOrigin = out;
+                }
+                5 => {
+                    axis[0] = [axis[0][0] * 0.33, axis[0][1] * 0.33, axis[0][2] * 0.33];
+                    axis[2] = [axis[2][0] * -0.67, axis[2][1] * -0.67, axis[2][2] * -0.67];
+                    axis[0] = [
+                        axis[0][0] + axis[2][0],
+                        axis[0][1] + axis[2][1],
+                        axis[0][2] + axis[2][2],
+                    ];
+                    let mut out = bladeOrigin;
+                    _VectorMA(bladeOrigin, 8.0 * scale, axis[0], &mut out);
+                    bladeOrigin = out;
+                }
+                _ => {}
+            },
+            saberType_t::SABER_TRIDENT => match bladeNum {
+                0 => {
+                    let mut out = bladeOrigin;
+                    _VectorMA(bladeOrigin, 24.0 * scale, axis[0], &mut out);
+                    bladeOrigin = out;
+                }
+                1 => {
+                    let mut out = bladeOrigin;
+                    _VectorMA(bladeOrigin, -6.0 * scale, axis[1], &mut out);
+                    bladeOrigin = out;
+                    let mut out2 = bladeOrigin;
+                    _VectorMA(bladeOrigin, 24.0 * scale, axis[0], &mut out2);
+                    bladeOrigin = out2;
+                }
+                2 => {
+                    let mut out = bladeOrigin;
+                    _VectorMA(bladeOrigin, 6.0 * scale, axis[1], &mut out);
+                    bladeOrigin = out;
+                    let mut out2 = bladeOrigin;
+                    _VectorMA(bladeOrigin, 24.0 * scale, axis[0], &mut out2);
+                    bladeOrigin = out2;
+                }
+                3 => {
+                    let mut out = bladeOrigin;
+                    _VectorMA(bladeOrigin, -32.0 * scale, axis[0], &mut out);
+                    bladeOrigin = out;
+                    axis[0] = [-axis[0][0], -axis[0][1], -axis[0][2]];
+                }
+                _ => {}
+            },
+            saberType_t::SABER_SITH_SWORD => {
+                // no blade
+            }
+            _ => {}
+        }
+    }
+    if saberType == saberType_t::SABER_SITH_SWORD {
+        // draw no blade
+        return;
+    }
+
+    UI_DoSaber(
+        ctx,
+        bladeOrigin,
+        axis[0],
+        bladeLength,
+        bladeLength,
+        bladeRadius,
+        bladeColor,
+    );
+}
+
+/// Raven `UI_GetSaberForMenu` — resolves `ui_saber`/`ui_saber2`'s current
+/// value (falling back to `"kyle"` when the cvar names a saber invalid in
+/// MP), then applies the current move-style's single/staff override.
+///
+/// PORT-NOTE: Raven's `char *saber` out-param collapses into a returned
+/// `String` (dictionary: out-param -> return).
+///
+/// Source: `oracle/codemp/ui/ui_saber.c:894-950`
+pub fn UI_GetSaberForMenu(ctx: &mut UiContext, saberNum: i32) -> String {
+    let mut saber: String;
+
+    if saberNum == 0 {
+        saber = trap::Cvar_VariableStringBuffer(ctx.engine, "ui_saber", MAX_QPATH);
+        if !UI_SaberValidForPlayerInMP(ctx, &saber) {
+            trap::Cvar_Set(ctx.engine, "ui_saber", "kyle");
+            saber = trap::Cvar_VariableStringBuffer(ctx.engine, "ui_saber", MAX_QPATH);
+        }
+    } else {
+        saber = trap::Cvar_VariableStringBuffer(ctx.engine, "ui_saber2", MAX_QPATH);
+        if !UI_SaberValidForPlayerInMP(ctx, &saber) {
+            trap::Cvar_Set(ctx.engine, "ui_saber2", "kyle");
+            saber = trap::Cvar_VariableStringBuffer(ctx.engine, "ui_saber2", MAX_QPATH);
+        }
+    }
+
+    // read this from the sabers.cfg
+    let saberTypeString = UI_SaberTypeForSaber(ctx, &saber).unwrap_or_default();
+    let mut saberType = saberType_t::SABER_NONE;
+    if !saberTypeString.is_empty() {
+        saberType = TranslateSaberType(&saberTypeString);
+    }
+
+    match ctx.world.movesTitleIndex {
+        0 => {
+            // MD_ACROBATICS
+        }
+        1 | 2 | 3 => {
+            // MD_SINGLE_FAST / MD_SINGLE_MEDIUM / MD_SINGLE_STRONG
+            if saberType != saberType_t::SABER_SINGLE {
+                saber = "single_1".to_string();
+            }
+        }
+        4 => {
+            // MD_DUAL_SABERS
+            if saberType != saberType_t::SABER_SINGLE {
+                saber = "single_1".to_string();
+            }
+        }
+        5 => {
+            // MD_SABER_STAFF
+            if saberType == saberType_t::SABER_SINGLE || saberType == saberType_t::SABER_NONE {
+                saber = "dual_1".to_string();
+            }
+        }
+        _ => {}
+    }
+
+    saber
+}
+
+/// Raven `UI_SaberGetHiltInfo` — walks the cached `.sab` block text
+/// (`world.saber.SaberParms`), sorting each MP-valid saber name into the
+/// single-hilt or staff-hilt list by `UI_IsSaberTwoHanded`, each capped at
+/// `MAX_SABER_HILTS - 1` entries.
+///
+/// PORT-NOTE: Raven's two `const char *singleHilts[MAX_SABER_HILTS]`/
+/// `staffHilts[MAX_SABER_HILTS]` out-params (NULL-terminated) collapse into a
+/// returned `(Vec<String>, Vec<String>)` (dictionary: out-param -> return;
+/// the NULL terminator has no analog on an owned `Vec`). The digest's
+/// `UiWorld`-only channel omits `ctx` because it does not name the trap seam,
+/// but the overflow-warning path calls the already-ported `Com_Printf(ctx,
+/// ..)`, so `ctx` threads through here too.
+///
+/// Source: `oracle/codemp/ui/ui_saber.c:1080-1143`
+pub fn UI_SaberGetHiltInfo(ctx: &mut UiContext) -> (Vec<String>, Vec<String>) {
+    let mut singleHilts: Vec<String> = Vec::new();
+    let mut staffHilts: Vec<String> = Vec::new();
+
+    // go through all the loaded sabers and put the valid ones in the proper list
+    let saber_parms = mem::take(&mut ctx.world.saber.SaberParms);
+    let mut p: Option<&[u8]> = Some(saber_parms.as_bytes());
+    COM_BeginParseSession(&mut ctx.world.bg_state.qs, "saberlist");
+
+    // look for a saber
+    while p.is_some() {
+        let (token, rest) = COM_ParseExt(&mut ctx.world.bg_state.qs, p, true);
+        p = rest;
+        if token.is_empty() {
+            // invalid name
+            continue;
+        }
+        let saberName = String_Alloc(Some(&token)).unwrap_or_default();
+        // see if there's a "{" on the next line
+        p = SkipRestOfLine(&mut ctx.world.bg_state.qs, p);
+
+        if UI_ParseLiteralSilent(&mut p, "{") {
+            // nope, not a name, keep looking
+            continue;
+        }
+
+        // this is a saber name
+        if !UI_SaberValidForPlayerInMP(ctx, &saberName) {
+            p = SkipBracedSection(&mut ctx.world.bg_state.qs, p);
+            continue;
+        }
+
+        if UI_IsSaberTwoHanded(ctx, &saberName) {
+            // -1 because we have to NULL terminate the list
+            if staffHilts.len() < MAX_SABER_HILTS - 1 {
+                staffHilts.push(saberName);
+            } else {
+                Com_Printf(
+                    ctx,
+                    &format!(
+                        "WARNING: too many two-handed sabers, ignoring saber '{}'\n",
+                        saberName
+                    ),
+                );
+            }
+        } else {
+            // -1 because we have to NULL terminate the list
+            if singleHilts.len() < MAX_SABER_HILTS - 1 {
+                singleHilts.push(saberName);
+            } else {
+                Com_Printf(
+                    ctx,
+                    &format!(
+                        "WARNING: too many one-handed sabers, ignoring saber '{}'\n",
+                        saberName
+                    ),
+                );
+            }
+        }
+        // skip the whole braced section and move on to the next entry
+        p = SkipBracedSection(&mut ctx.world.bg_state.qs, p);
+    }
+    ctx.world.saber.SaberParms = saber_parms;
+
+    (singleHilts, staffHilts)
 }

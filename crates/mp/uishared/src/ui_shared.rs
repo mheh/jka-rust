@@ -20,20 +20,21 @@ use mp_qshared::shared::{
 use native_string::{atof, atoi, latin1_to_string, string_to_latin1, Q_stricmp};
 
 use crate::shared::capture_func::CaptureFunc;
+use crate::shared::color_range_def_t::ColorRangeDef;
 use crate::shared::display_context::DisplayContext;
 use crate::shared::display_state::DisplayState;
 use crate::shared::edit_field_def_s::{EditFieldDef, MAX_EDITFIELD};
-use crate::shared::item_def_s::ItemDef;
+use crate::shared::item_def_s::{ItemDef, MAX_COLOR_RANGES};
 use crate::shared::item_id::ItemId;
 use crate::shared::item_payload::ItemPayload;
 use crate::shared::list_box_def_s::{ListBoxDef, MAX_LB_COLUMNS};
 use crate::shared::menu_def_t::MenuDef;
 use crate::shared::menu_id::MenuId;
-use crate::shared::menu_system::{MenuSystem, MAX_DEFERRED_SCRIPT};
+use crate::shared::menu_system::{MenuSystem, DOUBLE_CLICK_DELAY, MAX_DEFERRED_SCRIPT};
 use crate::shared::menudef::{
-    FEEDER_LANGUAGES, FEEDER_PLAYER_SPECIES, ITEM_ALIGN_CENTER, ITEM_ALIGN_RIGHT, ITEM_TYPE_BIND,
-    ITEM_TYPE_EDITFIELD, ITEM_TYPE_LISTBOX, ITEM_TYPE_MODEL, ITEM_TYPE_MULTI,
-    ITEM_TYPE_NUMERICFIELD, ITEM_TYPE_OWNERDRAW, ITEM_TYPE_SLIDER, ITEM_TYPE_TEXT,
+    FEEDER_LANGUAGES, FEEDER_PLAYER_SPECIES, ITEM_ALIGN_CENTER, ITEM_ALIGN_RIGHT,
+    ITEM_TEXTSTYLE_BLINK, ITEM_TYPE_BIND, ITEM_TYPE_EDITFIELD, ITEM_TYPE_LISTBOX, ITEM_TYPE_MODEL,
+    ITEM_TYPE_MULTI, ITEM_TYPE_NUMERICFIELD, ITEM_TYPE_OWNERDRAW, ITEM_TYPE_SLIDER, ITEM_TYPE_TEXT,
     ITEM_TYPE_TEXTSCROLL, ITEM_TYPE_YESNO, LISTBOX_IMAGE, UI_FORCE_RANK_ABSORB,
     UI_FORCE_RANK_DRAIN, UI_FORCE_RANK_GRIP, UI_FORCE_RANK_HEAL, UI_FORCE_RANK_LEVITATION,
     UI_FORCE_RANK_LIGHTNING, UI_FORCE_RANK_PROTECT, UI_FORCE_RANK_PULL, UI_FORCE_RANK_PUSH,
@@ -67,6 +68,9 @@ pub const WINDOW_FADINGOUT: c_int = 0x0000_0020;
 /// Raven `#define WINDOW_FADINGIN 0x00000040`.
 /// Source: `oracle/codemp/ui/ui_shared.h:28`
 pub const WINDOW_FADINGIN: c_int = 0x0000_0040;
+/// Raven `#define WINDOW_MOUSEOVERTEXT 0x00000080`.
+/// Source: `oracle/codemp/ui/ui_shared.h:29`
+pub const WINDOW_MOUSEOVERTEXT: c_int = 0x0000_0080;
 /// Raven `#define WINDOW_DECORATION 0x00000010`.
 /// Source: `oracle/codemp/ui/ui_shared.h:26`
 pub const WINDOW_DECORATION: c_int = 0x0000_0010;
@@ -131,7 +135,7 @@ const ITF_G2VALID: c_int = 0x0001;
 const ITF_ISCHARACTER: c_int = 0x0002;
 /// Raven `#define ITF_ISSABER 0x0004` — first saber item, draws blade.
 /// Source: `oracle/codemp/ui/ui_shared.h:253`
-const ITF_ISSABER: c_int = 0x0004;
+pub const ITF_ISSABER: c_int = 0x0004;
 /// Raven `#define ITF_ISSABER2 0x0008` — second saber item, draws blade.
 /// Source: `oracle/codemp/ui/ui_shared.h:254`
 const ITF_ISSABER2: c_int = 0x0008;
@@ -182,6 +186,8 @@ const A_ENTER: c_int = 10;
 const A_KP_1: c_int = 17;
 const A_KP_2: c_int = 18;
 const A_KP_3: c_int = 19;
+const A_KP_4: c_int = 20;
+const A_KP_6: c_int = 22;
 const A_KP_7: c_int = 23;
 const A_KP_8: c_int = 24;
 const A_KP_9: c_int = 25;
@@ -214,6 +220,13 @@ const KEYWORDHASH_SIZE: i32 = 512;
 /// Raven `#define SLIDER_WIDTH 96.0`.
 /// Source: `oracle/codemp/ui/ui_shared.h:100`
 const SLIDER_WIDTH: f32 = 96.0;
+
+/// Raven `#define BLINK_DIVISOR 200`.
+/// Source: `oracle/codemp/game/q_shared.h:485`
+const BLINK_DIVISOR: c_int = 200;
+/// Raven `#define PULSE_DIVISOR 75`.
+/// Source: `oracle/codemp/game/q_shared.h:486`
+const PULSE_DIVISOR: c_int = 75;
 
 // PORT-NOTE: Raven's `MAX_KEYS` is the sentinel last member of the
 // `fakeAscii_t` enum (`oracle/codemp/ui/keycodes.h:8-341`, 320 named codes
@@ -7265,4 +7278,873 @@ pub fn Display_CacheAll(menus: &MenuSystem, dc: &mut dyn DisplayContext) {
     for i in 0..menus.menus.len() {
         Menu_CacheContents(menus, dc, Some(MenuId::new(i)));
     }
+}
+
+/// Raven `Item_UpdatePosition` — recompute `item`'s screen position from its
+/// parent menu's origin (plus border inset, if bordered).
+///
+/// PORT-NOTE: Raven's `item == NULL || item->parent == NULL` guard becomes
+/// `item: Option<ItemId>` plus the arena's `Option<MenuId>` parent link.
+/// Source: `oracle/codemp/ui/ui_shared.c:933-956`
+pub fn Item_UpdatePosition(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: Option<ItemId>,
+) {
+    let item = match item {
+        Some(id) => id,
+        None => return,
+    };
+    let parent = match menus.item(item).parent {
+        Some(p) => p,
+        None => return,
+    };
+
+    let m = menus.menu(parent);
+    let mut x = m.window.rect.x;
+    let mut y = m.window.rect.y;
+    if m.window.border != 0 {
+        x += m.window.borderSize;
+        y += m.window.borderSize;
+    }
+
+    Item_SetScreenCoords(menus, dc, Some(item), x, y);
+}
+
+/// Raven `Menu_UpdatePosition` — recompute every item's screen position from
+/// `menu`'s origin (plus border inset, if bordered).
+///
+/// PORT-NOTE: Raven's `menu == NULL` guard becomes `menu: Option<MenuId>`.
+/// Source: `oracle/codemp/ui/ui_shared.c:959-977`
+pub fn Menu_UpdatePosition(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: Option<MenuId>,
+) {
+    let menu = match menu {
+        Some(m) => m,
+        None => return,
+    };
+
+    let m = menus.menu(menu);
+    let mut x = m.window.rect.x;
+    let mut y = m.window.rect.y;
+    if m.window.border != 0 {
+        x += m.window.borderSize;
+        y += m.window.borderSize;
+    }
+
+    let items = menus.menu(menu).items.clone();
+    for it in items {
+        Item_SetScreenCoords(menus, dc, Some(it), x, y);
+    }
+}
+
+/// Raven `Menu_ClearFocus` — clear `WINDOW_HASFOCUS` on every item in `menu`
+/// (running each cleared item's `leaveFocus` script), returning the item that
+/// had focus, if any.
+///
+/// PORT-NOTE: Raven's `menu == NULL` guard becomes `menu: Option<MenuId>`;
+/// `leaveFocus`'s pointer-truthy guard becomes `!leaveFocus.is_empty()`
+/// (`Item_Action`'s pattern below).
+/// Source: `oracle/codemp/ui/ui_shared.c:992-1011`
+pub fn Menu_ClearFocus(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: Option<MenuId>,
+) -> Option<ItemId> {
+    let menu = menu?;
+    let items = menus.menu(menu).items.clone();
+    let mut ret = None;
+
+    for id in items {
+        if menus.item(id).window.flags & WINDOW_HASFOCUS != 0 {
+            ret = Some(id);
+        }
+        menus.item_mut(id).window.flags &= !WINDOW_HASFOCUS;
+
+        let leaveFocus = menus.item(id).leaveFocus.clone();
+        if !leaveFocus.is_empty() {
+            Item_RunScript(menus, dc, id, &leaveFocus);
+        }
+    }
+
+    ret
+}
+
+/// Raven `Script_SetItemText` — the `setitemtext` script command: set the
+/// display text of the item(s) named by the first token in `menu`'s sibling
+/// items.
+/// Source: `oracle/codemp/ui/ui_shared.c:1206-1217`
+pub fn Script_SetItemText(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    args: &mut &str,
+) -> bool {
+    let mut itemName = String::new();
+    let mut text = String::new();
+
+    // expecting text
+    if String_Parse(args, &mut itemName) && String_Parse(args, &mut text) {
+        let parent = menus.item(item).parent;
+        Menu_SetItemText(menus, dc, parent, &itemName, &text);
+    }
+    true
+}
+
+/// Raven `Menu_RunCloseScript` — run `menu`'s `onClose` script, if the menu is
+/// visible and has one.
+///
+/// PORT-NOTE: Raven builds a transient stack-local `itemDef_t` carrying only
+/// `parent = menu` to hand `Item_RunScript` a script-command context (its
+/// `setitemrect`/`show`/etc. commands read `item->parent` for the enclosing
+/// menu, never the item itself here); the arena equivalent is a scratch slot
+/// pushed for the call and truncated off immediately after, so no permanent
+/// item is left behind. `onClose`'s pointer-truthy guard becomes
+/// `!onClose.is_empty()`.
+/// Source: `oracle/codemp/ui/ui_shared.c:1527-1533`
+pub fn Menu_RunCloseScript(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: Option<MenuId>,
+) {
+    let menu = match menu {
+        Some(m) => m,
+        None => return,
+    };
+
+    let m = menus.menu(menu);
+    if m.window.flags & WINDOW_VISIBLE == 0 || m.onClose.is_empty() {
+        return;
+    }
+    let onClose = m.onClose.clone();
+
+    let idx = menus.items.len();
+    let scratch = ItemId::new(idx);
+    menus.items.push(ItemDef {
+        parent: Some(menu),
+        ..Default::default()
+    });
+    Item_RunScript(menus, dc, scratch, &onClose);
+    // §19 divergence: an onClose `defer` stored Raven's stack-local `itemDef_t`,
+    // which `rundeferred` then read dead-frame (UB); clearing it is the defined pick.
+    if menus.ui_deferredScriptItem == Some(scratch) {
+        menus.ui_deferredScriptItem = None;
+    }
+    menus.items.truncate(idx);
+}
+
+/// Raven `Script_RunDeferred` — the `rundeferred` script command: run the
+/// script suspended by [`Script_Defer`], if one is pending.
+///
+/// PORT-NOTE: Raven's own body never reads `item`/`args` either (kept for
+/// signature parity).
+/// Source: `oracle/codemp/ui/ui_shared.c:1794-1806`
+pub fn Script_RunDeferred(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    _item: ItemId,
+    _args: &mut &str,
+) -> bool {
+    // Make sure there is something to run.
+    if menus.ui_deferredScript.is_empty() || menus.ui_deferredScriptItem.is_none() {
+        return true;
+    }
+
+    // Run the deferred script now
+    let script = menus.ui_deferredScript.clone();
+    let deferredItem = menus.ui_deferredScriptItem.unwrap();
+    Item_RunScript(menus, dc, deferredItem, &script);
+
+    true
+}
+
+/// Raven `Item_MouseEnter` — refresh `item`'s mouse-over/mouse-over-text flags
+/// (and run the matching enter/exit scripts) for the mouse at `(x, y)`.
+///
+/// PORT-NOTE: Raven's `#ifndef _XBOX` arm (the retail/live one) is kept; the
+/// `#else` (`item->flags & WINDOW_HASFOCUS`) is dead surface, dropped per
+/// porting-rules §20.
+/// Source: `oracle/codemp/ui/ui_shared.c:3028-3088`
+pub fn Item_MouseEnter(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: Option<ItemId>,
+    x: f32,
+    y: f32,
+) {
+    let item = match item {
+        Some(id) => id,
+        None => return,
+    };
+
+    let disabled = menus.item(item).disabled;
+    let mut r = menus.item(item).textRect;
+    r.y -= r.h;
+    // in the text rect?
+
+    // items can be enabled and disabled
+    if disabled {
+        return;
+    }
+
+    // items can be enabled and disabled based on cvars
+    let cvarFlags = menus.item(item).cvarFlags;
+    if cvarFlags & (CVAR_ENABLE | CVAR_DISABLE) != 0
+        && !Item_EnableShowViaCvar(menus, dc, item, CVAR_ENABLE)
+    {
+        return;
+    }
+
+    if cvarFlags & (CVAR_SHOW | CVAR_HIDE) != 0
+        && !Item_EnableShowViaCvar(menus, dc, item, CVAR_SHOW)
+    {
+        return;
+    }
+
+    if Rect_ContainsPoint(Some(&r), x, y) {
+        if menus.item(item).window.flags & WINDOW_MOUSEOVERTEXT == 0 {
+            let mouseEnterText = menus.item(item).mouseEnterText.clone();
+            Item_RunScript(menus, dc, item, &mouseEnterText);
+            menus.item_mut(item).window.flags |= WINDOW_MOUSEOVERTEXT;
+        }
+        if menus.item(item).window.flags & WINDOW_MOUSEOVER == 0 {
+            let mouseEnter = menus.item(item).mouseEnter.clone();
+            Item_RunScript(menus, dc, item, &mouseEnter);
+            menus.item_mut(item).window.flags |= WINDOW_MOUSEOVER;
+        }
+    } else {
+        // not in the text rect
+        if menus.item(item).window.flags & WINDOW_MOUSEOVERTEXT != 0 {
+            // if we were
+            let mouseExitText = menus.item(item).mouseExitText.clone();
+            Item_RunScript(menus, dc, item, &mouseExitText);
+            menus.item_mut(item).window.flags &= !WINDOW_MOUSEOVERTEXT;
+        }
+        if menus.item(item).window.flags & WINDOW_MOUSEOVER == 0 {
+            let mouseEnter = menus.item(item).mouseEnter.clone();
+            Item_RunScript(menus, dc, item, &mouseEnter);
+            menus.item_mut(item).window.flags |= WINDOW_MOUSEOVER;
+        }
+
+        let itype = menus.item(item).r#type;
+        if itype == ITEM_TYPE_LISTBOX {
+            Item_ListBox_MouseEnter(menus, dc, item, x, y);
+        } else if itype == ITEM_TYPE_TEXTSCROLL {
+            Item_TextScroll_MouseEnter(menus, item, x, y);
+        }
+    }
+}
+
+/// Raven `Item_MouseLeave` — run `item`'s exit script(s) and clear its
+/// mouse-over flags/list-box arrow hot zones.
+/// Source: `oracle/codemp/ui/ui_shared.c:3090-3099`
+pub fn Item_MouseLeave(menus: &mut MenuSystem, dc: &mut dyn DisplayContext, item: Option<ItemId>) {
+    let item = match item {
+        Some(id) => id,
+        None => return,
+    };
+
+    if menus.item(item).window.flags & WINDOW_MOUSEOVERTEXT != 0 {
+        let mouseExitText = menus.item(item).mouseExitText.clone();
+        Item_RunScript(menus, dc, item, &mouseExitText);
+        menus.item_mut(item).window.flags &= !WINDOW_MOUSEOVERTEXT;
+    }
+    let mouseExit = menus.item(item).mouseExit.clone();
+    Item_RunScript(menus, dc, item, &mouseExit);
+    menus.item_mut(item).window.flags &= !(WINDOW_LB_RIGHTARROW | WINDOW_LB_LEFTARROW);
+}
+
+/// Raven `Item_ListBox_HandleKey` — list-box key/mouse handling: horizontal or
+/// vertical cursor movement, scrollbar hit-testing, selection, and paging.
+///
+/// PORT-NOTE (§19 UB pick): Raven casts `item->typeData` to `listBoxDef_t *`
+/// unconditionally; a payload-type mismatch (unreachable under this file's
+/// own type dispatch, since only list-box items reach this handler) returns
+/// `false` here instead of a null deref.
+/// PORT-NOTE: Raven's `#ifndef _XBOX` arm (the retail/live one, cursor-key
+/// early-return-on-clamp and mouse-position focus test) is kept throughout;
+/// the `#else`/`#ifdef _XBOX` arms are dead surface, dropped per
+/// porting-rules §20. `down` is unused — Raven's own body never reads it
+/// either (kept for signature parity).
+/// Source: `oracle/codemp/ui/ui_shared.c:3220-3475`
+pub fn Item_ListBox_HandleKey(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    key: c_int,
+    _down: bool,
+    force: bool,
+) -> bool {
+    if menus.item(item).typeData.listBox().is_none() {
+        return false;
+    }
+
+    let special = menus.item(item).special;
+    let rect = menus.item(item).window.rect;
+    let windowFlags = menus.item(item).window.flags;
+
+    let count = dc.feederCount(special);
+
+    let inFocus = force
+        || (Rect_ContainsPoint(Some(&rect), ds.cursorx as f32, ds.cursory as f32)
+            && windowFlags & WINDOW_HASFOCUS != 0);
+    if !inFocus {
+        return false;
+    }
+
+    let max = Item_ListBox_MaxScroll(menus, dc, item);
+    let viewmax: c_int;
+
+    if windowFlags & WINDOW_HORIZONTAL != 0 {
+        let elementWidth = menus.item(item).typeData.listBox().unwrap().elementWidth;
+        viewmax = (rect.w / elementWidth) as c_int;
+
+        if key == A_CURSOR_LEFT || key == A_KP_4 {
+            let notselectable = menus.item(item).typeData.listBox().unwrap().notselectable;
+            if !notselectable {
+                let mut cursorPos = menus.item(item).typeData.listBox().unwrap().cursorPos;
+                cursorPos -= 1;
+                if cursorPos < 0 {
+                    if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                        l.cursorPos = 0;
+                    }
+                    return false;
+                }
+                let mut startPos = menus.item(item).typeData.listBox().unwrap().startPos;
+                if cursorPos < startPos {
+                    startPos = cursorPos;
+                    if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                        l.cursorPos = cursorPos;
+                        l.startPos = startPos;
+                    }
+                    return false;
+                }
+                if cursorPos >= startPos + viewmax {
+                    startPos = cursorPos - viewmax + 1;
+                }
+                if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                    l.cursorPos = cursorPos;
+                    l.startPos = startPos;
+                }
+                menus.item_mut(item).cursorPos = cursorPos;
+                dc.feederSelection(special, cursorPos, None);
+            } else if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                l.startPos -= 1;
+                if l.startPos < 0 {
+                    l.startPos = 0;
+                }
+            }
+            return true;
+        }
+        if key == A_CURSOR_RIGHT || key == A_KP_6 {
+            let notselectable = menus.item(item).typeData.listBox().unwrap().notselectable;
+            if !notselectable {
+                let mut cursorPos = menus.item(item).typeData.listBox().unwrap().cursorPos;
+                cursorPos += 1;
+                let mut startPos = menus.item(item).typeData.listBox().unwrap().startPos;
+                if cursorPos < startPos {
+                    startPos = cursorPos;
+                    if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                        l.cursorPos = cursorPos;
+                        l.startPos = startPos;
+                    }
+                    return false;
+                }
+                if cursorPos >= count {
+                    cursorPos = count - 1;
+                    if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                        l.cursorPos = cursorPos;
+                    }
+                    return false;
+                }
+                if cursorPos >= startPos + viewmax {
+                    startPos = cursorPos - viewmax + 1;
+                }
+                if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                    l.cursorPos = cursorPos;
+                    l.startPos = startPos;
+                }
+                menus.item_mut(item).cursorPos = cursorPos;
+                dc.feederSelection(special, cursorPos, None);
+            } else if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                l.startPos += 1;
+                if l.startPos >= count {
+                    l.startPos = count - 1;
+                }
+            }
+            return true;
+        }
+    } else {
+        let (elementWidth, elementHeight, elementStyle) = {
+            let l = menus.item(item).typeData.listBox().unwrap();
+            (l.elementWidth, l.elementHeight, l.elementStyle)
+        };
+        // Multiple rows and columns (since it's more than twice as wide as an element)
+        if rect.w > (elementWidth * 2.0) && elementStyle == LISTBOX_IMAGE {
+            viewmax = (rect.w / elementWidth) as c_int;
+        } else {
+            viewmax = (rect.h / elementHeight) as c_int;
+        }
+
+        if key == A_CURSOR_UP || key == A_KP_8 {
+            let notselectable = menus.item(item).typeData.listBox().unwrap().notselectable;
+            if !notselectable {
+                let mut cursorPos = menus.item(item).typeData.listBox().unwrap().cursorPos;
+                cursorPos -= 1;
+                if cursorPos < 0 {
+                    if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                        l.cursorPos = 0;
+                    }
+                    return false;
+                }
+                let mut startPos = menus.item(item).typeData.listBox().unwrap().startPos;
+                if cursorPos < startPos {
+                    startPos = cursorPos;
+                    if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                        l.cursorPos = cursorPos;
+                        l.startPos = startPos;
+                    }
+                    return false;
+                }
+                if cursorPos >= startPos + viewmax {
+                    startPos = cursorPos - viewmax + 1;
+                }
+                if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                    l.cursorPos = cursorPos;
+                    l.startPos = startPos;
+                }
+                menus.item_mut(item).cursorPos = cursorPos;
+                dc.feederSelection(special, cursorPos, None);
+            } else if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                l.startPos -= 1;
+                if l.startPos < 0 {
+                    l.startPos = 0;
+                }
+            }
+            return true;
+        }
+        if key == A_CURSOR_DOWN || key == A_KP_2 {
+            let notselectable = menus.item(item).typeData.listBox().unwrap().notselectable;
+            if !notselectable {
+                let mut cursorPos = menus.item(item).typeData.listBox().unwrap().cursorPos;
+                cursorPos += 1;
+                let mut startPos = menus.item(item).typeData.listBox().unwrap().startPos;
+                if cursorPos < startPos {
+                    startPos = cursorPos;
+                    if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                        l.cursorPos = cursorPos;
+                        l.startPos = startPos;
+                    }
+                    return false;
+                }
+                if cursorPos >= count {
+                    cursorPos = count - 1;
+                    if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                        l.cursorPos = cursorPos;
+                    }
+                    return false;
+                }
+                if cursorPos >= startPos + viewmax {
+                    startPos = cursorPos - viewmax + 1;
+                }
+                if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                    l.cursorPos = cursorPos;
+                    l.startPos = startPos;
+                }
+                menus.item_mut(item).cursorPos = cursorPos;
+                dc.feederSelection(special, cursorPos, None);
+            } else if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                l.startPos += 1;
+                if l.startPos > max {
+                    l.startPos = max;
+                }
+            }
+            return true;
+        }
+    }
+
+    // mouse hit
+    if key == A_MOUSE1 || key == A_MOUSE2 {
+        let flags = menus.item(item).window.flags;
+        if flags & WINDOW_LB_LEFTARROW != 0 {
+            if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                l.startPos -= 1;
+                if l.startPos < 0 {
+                    l.startPos = 0;
+                }
+            }
+        } else if flags & WINDOW_LB_RIGHTARROW != 0 {
+            // one down
+            if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                l.startPos += 1;
+                if l.startPos > max {
+                    l.startPos = max;
+                }
+            }
+        } else if flags & WINDOW_LB_PGUP != 0 {
+            // page up
+            if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                l.startPos -= viewmax;
+                if l.startPos < 0 {
+                    l.startPos = 0;
+                }
+            }
+        } else if flags & WINDOW_LB_PGDN != 0 {
+            // page down
+            if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                l.startPos += viewmax;
+                if l.startPos > max {
+                    l.startPos = max;
+                }
+            }
+        } else if flags & WINDOW_LB_THUMB != 0 {
+            // Display_SetCaptureItem(item); — commented out in the oracle.
+        } else {
+            // select an item
+            let doubleClick = menus
+                .item(item)
+                .typeData
+                .listBox()
+                .map(|l| l.doubleClick.clone())
+                .unwrap_or_default();
+            if ds.realTime < menus.lastListBoxClickTime && !doubleClick.is_empty() {
+                Item_RunScript(menus, dc, item, &doubleClick);
+            }
+            menus.lastListBoxClickTime = ds.realTime + DOUBLE_CLICK_DELAY;
+
+            let prePos = menus.item(item).cursorPos;
+            let lbCursorPos = menus
+                .item(item)
+                .typeData
+                .listBox()
+                .map(|l| l.cursorPos)
+                .unwrap_or(prePos);
+            menus.item_mut(item).cursorPos = lbCursorPos;
+            if !dc.feederSelection(special, lbCursorPos, Some(item)) {
+                menus.item_mut(item).cursorPos = prePos;
+                if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                    l.cursorPos = prePos;
+                }
+            }
+        }
+        return true;
+    }
+    if key == A_HOME || key == A_KP_7 {
+        // home
+        if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+            l.startPos = 0;
+        }
+        return true;
+    }
+    if key == A_END || key == A_KP_1 {
+        // end
+        if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+            l.startPos = max;
+        }
+        return true;
+    }
+    if key == A_PAGE_UP || key == A_KP_9 {
+        // page up
+        let notselectable = menus
+            .item(item)
+            .typeData
+            .listBox()
+            .map(|l| l.notselectable)
+            .unwrap_or(true);
+        if !notselectable {
+            let (mut cursorPos, mut startPos) = {
+                let l = menus.item(item).typeData.listBox().unwrap();
+                (l.cursorPos, l.startPos)
+            };
+            cursorPos -= viewmax;
+            if cursorPos < 0 {
+                cursorPos = 0;
+            }
+            if cursorPos < startPos {
+                startPos = cursorPos;
+            }
+            if cursorPos >= startPos + viewmax {
+                startPos = cursorPos - viewmax + 1;
+            }
+            if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                l.cursorPos = cursorPos;
+                l.startPos = startPos;
+            }
+            menus.item_mut(item).cursorPos = cursorPos;
+            dc.feederSelection(special, cursorPos, None);
+        } else if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+            l.startPos -= viewmax;
+            if l.startPos < 0 {
+                l.startPos = 0;
+            }
+        }
+        return true;
+    }
+    if key == A_PAGE_DOWN || key == A_KP_3 {
+        // page down
+        let notselectable = menus
+            .item(item)
+            .typeData
+            .listBox()
+            .map(|l| l.notselectable)
+            .unwrap_or(true);
+        if !notselectable {
+            let (mut cursorPos, mut startPos) = {
+                let l = menus.item(item).typeData.listBox().unwrap();
+                (l.cursorPos, l.startPos)
+            };
+            cursorPos += viewmax;
+            if cursorPos < startPos {
+                startPos = cursorPos;
+            }
+            if cursorPos >= count {
+                cursorPos = count - 1;
+            }
+            if cursorPos >= startPos + viewmax {
+                startPos = cursorPos - viewmax + 1;
+            }
+            if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+                l.cursorPos = cursorPos;
+                l.startPos = startPos;
+            }
+            menus.item_mut(item).cursorPos = cursorPos;
+            dc.feederSelection(special, cursorPos, None);
+        } else if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
+            l.startPos += viewmax;
+            if l.startPos > max {
+                l.startPos = max;
+            }
+        }
+        return true;
+    }
+
+    false
+}
+
+/// Raven `Item_HandleAccept` — run `item`'s `accept` script, if it has one.
+/// Source: `oracle/codemp/ui/ui_shared.c:4271-4279`
+pub fn Item_HandleAccept(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+) -> bool {
+    let accept = menus.item(item).accept.clone();
+    if !accept.is_empty() {
+        Item_RunScript(menus, dc, item, &accept);
+        return true;
+    }
+    false
+}
+
+/// Raven `Item_Action` — run `item`'s `action` script, if any.
+///
+/// PORT-NOTE: Raven's `item == NULL` guard becomes `item: Option<ItemId>`.
+/// Source: `oracle/codemp/ui/ui_shared.c:4321-4325`
+pub fn Item_Action(menus: &mut MenuSystem, dc: &mut dyn DisplayContext, item: Option<ItemId>) {
+    if let Some(item) = item {
+        let action = menus.item(item).action.clone();
+        Item_RunScript(menus, dc, item, &action);
+    }
+}
+
+/// Raven `Menus_Activate` — mark `menu` focused and visible, run its `onOpen`
+/// script, start its background sound loop, and reset its appearance timer.
+///
+/// PORT-NOTE (dead surface): Raven's `#ifdef _XBOX` tail (three
+/// `ui_hideXcallout` cvar resets) is dead on every retail/live target this
+/// port ships; dropped per porting-rules §20. Its transient stack-local
+/// `itemDef_t` (carrying `parent = menu` for `onOpen`'s script context) takes
+/// the same scratch-arena-slot shape as `Menu_RunCloseScript`. `soundName`'s
+/// pointer-truthy-and-non-empty guard becomes `!soundName.is_empty()`.
+/// Source: `oracle/codemp/ui/ui_shared.c:4416-4440`
+pub fn Menus_Activate(menus: &mut MenuSystem, dc: &mut dyn DisplayContext, menu: MenuId) {
+    menus.menu_mut(menu).window.flags |= WINDOW_HASFOCUS | WINDOW_VISIBLE;
+
+    let onOpen = menus.menu(menu).onOpen.clone();
+    if !onOpen.is_empty() {
+        let idx = menus.items.len();
+        let scratch = ItemId::new(idx);
+        menus.items.push(ItemDef {
+            parent: Some(menu),
+            ..Default::default()
+        });
+        Item_RunScript(menus, dc, scratch, &onOpen);
+        // §19 divergence: see `Menu_RunCloseScript` — a deferred scratch slot is
+        // cleared rather than left dangling.
+        if menus.ui_deferredScriptItem == Some(scratch) {
+            menus.ui_deferredScriptItem = None;
+        }
+        menus.items.truncate(idx);
+    }
+
+    let soundName = menus.menu(menu).soundName.clone();
+    if !soundName.is_empty() {
+        // you don't want to stop the background track since it will reset s_rawend
+        dc.startBackgroundTrack(&soundName, &soundName, false);
+    }
+
+    menus.menu_mut(menu).appearanceTime = 0.0;
+    Display_CloseCinematics(menus, dc);
+}
+
+/// Raven `Item_TextColor` — the pulse/blink/disabled color an item's text
+/// should paint with right now.
+///
+/// PORT-NOTE: Raven's `item->enableCvar && *item->enableCvar && item->cvarTest
+/// && *item->cvarTest` (both pointer-truthy-and-non-empty) becomes
+/// `!enableCvar.is_empty() && !cvarTest.is_empty()` (`Item_EnableShowViaCvar`'s
+/// established pattern).
+/// Source: `oracle/codemp/ui/ui_shared.c:4793-4826`
+pub fn Item_TextColor(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    newColor: &mut vec4_t,
+) {
+    let parent = menus
+        .item(item)
+        .parent
+        .expect("Item_TextColor: item has no parent");
+    let m = menus.menu(parent);
+    let fadeClamp = m.fadeClamp;
+    let fadeCycle = m.fadeCycle;
+    let fadeAmount = m.fadeAmount;
+    let focusColor = m.focusColor;
+    let disableColor = m.disableColor;
+
+    {
+        let it = menus.item_mut(item);
+        Fade(
+            ds,
+            &mut it.window.flags,
+            &mut it.window.foreColor[3],
+            fadeClamp,
+            &mut it.window.nextTime,
+            fadeCycle,
+            true,
+            fadeAmount,
+        );
+    }
+
+    let it = menus.item(item);
+    if it.window.flags & WINDOW_HASFOCUS != 0 {
+        let mut lowLight: vec4_t = [0.0; 4];
+        for i in 0..4 {
+            lowLight[i] = 0.8 * focusColor[i];
+        }
+        LerpColor(
+            focusColor,
+            lowLight,
+            newColor,
+            0.5 + 0.5 * ((ds.realTime / PULSE_DIVISOR) as f32).sin(),
+        );
+    } else if it.textStyle == ITEM_TEXTSTYLE_BLINK && (ds.realTime / BLINK_DIVISOR) & 1 == 0 {
+        let foreColor = it.window.foreColor;
+        let mut lowLight: vec4_t = [0.0; 4];
+        for i in 0..4 {
+            lowLight[i] = 0.8 * foreColor[i];
+        }
+        LerpColor(
+            foreColor,
+            lowLight,
+            newColor,
+            0.5 + 0.5 * ((ds.realTime / PULSE_DIVISOR) as f32).sin(),
+        );
+        // items can be enabled and disabled based on cvars
+    } else {
+        *newColor = it.window.foreColor;
+    }
+
+    if it.disabled {
+        *newColor = disableColor;
+    }
+
+    if !it.enableCvar.is_empty() && !it.cvarTest.is_empty() {
+        let cvarFlags = it.cvarFlags;
+        if cvarFlags & (CVAR_ENABLE | CVAR_DISABLE) != 0
+            && !Item_EnableShowViaCvar(menus, dc, item, CVAR_ENABLE)
+        {
+            *newColor = disableColor;
+        }
+    }
+}
+
+/// Raven `ItemParse_rect` — parse an item window's client rectangle.
+/// Source: `oracle/codemp/ui/ui_shared.c:7962-7967`
+pub fn ItemParse_rect(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    PC_Rect_Parse(dc, handle, &mut menus.item_mut(item).window.rectClient)
+}
+
+/// Raven `ItemParse_outlinecolor` — parse an item window's outline color.
+/// Source: `oracle/codemp/ui/ui_shared.c:8369-8374`
+pub fn ItemParse_outlinecolor(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    PC_Color_Parse(dc, handle, &mut menus.item_mut(item).window.outlineColor)
+}
+
+/// Raven `ItemParse_addColorRange` — append a color range to an item's
+/// `colorRanges` list, if there is room.
+/// Source: `oracle/codemp/ui/ui_shared.c:8763-8776`
+pub fn ItemParse_addColorRange(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    let mut color = ColorRangeDef::default();
+
+    if PC_Float_Parse(dc, handle, &mut color.low)
+        && PC_Float_Parse(dc, handle, &mut color.high)
+        && PC_Color_Parse(dc, handle, &mut color.color)
+    {
+        let it = menus.item_mut(item);
+        if (it.numColors as usize) < MAX_COLOR_RANGES {
+            it.colorRanges[it.numColors as usize] = color;
+            it.numColors += 1;
+        }
+        return true;
+    }
+    false
+}
+
+/// Raven `MenuParse_rect` — parse a menu window's rectangle.
+///
+/// PORT-NOTE: Raven's `itemDef_t *item` parameter is immediately cast to
+/// `menuDef_t *menu` (see `MenuParse_background`'s PORT-NOTE); this takes the
+/// `MenuId` the cast resolves to directly.
+/// Source: `oracle/codemp/ui/ui_shared.c:9324-9330`
+pub fn MenuParse_rect(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    PC_Rect_Parse(dc, handle, &mut menus.menu_mut(menu).window.rect)
+}
+
+/// Raven `MenuParse_outlinecolor` — parse a menu window's outline color.
+///
+/// PORT-NOTE: see `MenuParse_rect` — the `itemDef_t *` cast to `menuDef_t *`
+/// becomes a direct `MenuId`.
+/// Source: `oracle/codemp/ui/ui_shared.c:9586-9592`
+pub fn MenuParse_outlinecolor(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    PC_Color_Parse(dc, handle, &mut menus.menu_mut(menu).window.outlineColor)
 }
