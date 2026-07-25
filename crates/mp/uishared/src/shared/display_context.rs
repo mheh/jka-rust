@@ -387,8 +387,12 @@ pub trait DisplayContext {
     ) -> bool;
 
     /// Raven `trap_G2API_GetGLAName(void *ghoul2, int modelIndex, char *fillBuf)`.
-    fn G2API_GetGLAName(&mut self, ghoul2: *mut c_void, modelIndex: c_int, buffer_len: usize)
-        -> String;
+    fn G2API_GetGLAName(
+        &mut self,
+        ghoul2: *mut c_void,
+        modelIndex: c_int,
+        buffer_len: usize,
+    ) -> String;
 
     /// Raven `trap_G2_HaveWeGhoul2Models(void *ghoul2)`.
     fn G2_HaveWeGhoul2Models(&mut self, ghoul2: *mut c_void) -> bool;

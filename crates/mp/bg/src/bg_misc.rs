@@ -1874,10 +1874,15 @@ pub fn BG_TempAlloc(size: c_int, bg: &mut BgState) -> *mut c_void {
     unsafe { bg.bg_pool.as_mut_ptr().add(bg.bg_poolTail as usize) as *mut c_void }
 }
 
-// Raven `MAX_POOL_SIZE` — QAGAME (jampgame) arm; CGAME/ui arms are dropped
-// per porting-rules §20 (MP jampgame only).
+// Raven `MAX_POOL_SIZE` — QAGAME (jampgame) arm. Raven sizes the pool per
+// module with `#define` arms; each hosting module passes its arm to
+// `BgState::with_pool_size` (§F20 duplicate-don't-unify).
 // Source: `oracle/codemp/game/bg_misc.c:3311-3316`
 pub const MAX_POOL_SIZE: c_int = 3000000;
+
+/// Raven `MAX_POOL_SIZE` — `UI_EXPORT` (ui module) arm (DEC-36 addendum 11).
+/// Source: `oracle/codemp/game/bg_misc.c:3311-3316`
+pub const MAX_POOL_SIZE_UI: c_int = 512000;
 
 /// Raven `BG_TempFree`.
 ///

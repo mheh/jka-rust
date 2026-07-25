@@ -341,6 +341,7 @@ version = "0.1.0"
 dependencies = [
  "mp_bg",
  "mp_qshared",
+ "native_string",
  "native_types",
 ]
 

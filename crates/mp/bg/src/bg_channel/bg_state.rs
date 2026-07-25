@@ -172,7 +172,18 @@ pub struct BgState {
 impl BgState {
     /// A freshly zeroed session state with the LCG seeded to Raven's
     /// `holdrand = 0x89abcdef`; all tables empty until their loaders run.
+    /// The `BG_Alloc` pool gets the QAGAME arm's `MAX_POOL_SIZE`; a module
+    /// with a different Raven pool arm (ui: 512000, DEC-36 addendum 11) uses
+    /// [`BgState::with_pool_size`].
     pub fn new() -> Self {
+        Self::with_pool_size(crate::bg_misc::MAX_POOL_SIZE)
+    }
+
+    /// [`BgState::new`] with an explicit `BG_Alloc` pool size — Raven sized
+    /// `bg_pool[MAX_POOL_SIZE]` per module (`#define` arms in bg_misc.c), so
+    /// each hosting module passes its own arm (§F20 duplicate-don't-unify).
+    /// Source: `oracle/codemp/game/bg_misc.c:3311-3316`
+    pub fn with_pool_size(pool_size: c_int) -> Self {
         Self {
             qs: QSharedScratch::zeroed(),
             rng: Rng::new(),
@@ -259,9 +270,9 @@ impl BgState {
             // (bg_misc.c:3326) — not 0 — so the descending temp-alloc arithmetic
             // starts at the top of the pool. Same fixed-array pre-size convention
             // as `bgHumanoidAnimations`/`g_vehicleInfo` above.
-            bg_pool: vec![0; crate::bg_misc::MAX_POOL_SIZE as usize],
+            bg_pool: vec![0; pool_size as usize],
             bg_poolSize: 0,
-            bg_poolTail: crate::bg_misc::MAX_POOL_SIZE,
+            bg_poolTail: pool_size,
             c_pmove: 0,
             bg_fighterAltControl: 0,
         }

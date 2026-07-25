@@ -660,3 +660,19 @@ trait accessors. (10) The force-mastery anonymous enum hoisted to its DEC-32
 canonical home `mp_bg::public::force_mastery` (and `MAX_FORCE_RANK` to
 `mp_qshared::shared::force_powers`); the `mp_game`/`mp_ui` private copies
 deleted.
+
+**U4 addenda (2026-07-24):** (11) **ui owns a `BgState`** —
+`UiWorld.bg_state: BgState`, mirroring Raven's ui link unit compiling the bg
+files itself (`WE_ARE_IN_THE_UI`): its own rand state (`bg_state.rng` — the
+saber-flicker `crandom()`/`Q_irand` route), its own siege tables, its own
+parse scratch, and its own `BG_Alloc` pool at Raven's `UI_EXPORT` arm
+(`MAX_POOL_SIZE_UI = 512000`, `bg_misc.c:3311-3316`; `BgState` gained
+`with_pool_size`, §F20 duplicate-don't-unify — closes the parked pool-size
+question; cgame's 2048000 arm noted for later). `ui_saber.rs` twins thread
+`bg: &mut BgState` like their `bg_saberLoad.rs` counterparts. (12) Ruling 9
+fallout, host side: `mp_ui` fns that call `DC->` callbacks take
+`dc: &mut dyn DisplayContext` as a parameter beside their state params (first
+site `UI_Version`); the concrete implementor is a U5-built carrier over
+split borrows of `UiWorld` — `UiContext` itself can NOT implement the trait
+(it owns `world.menus`/`world.uiDC`, which must stay independently borrowable
+while `dc` is live).

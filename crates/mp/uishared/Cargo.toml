@@ -7,6 +7,7 @@ edition = "2021"
 name = "mp_uishared"
 
 [dependencies]
+native_string = { path = "../../native/string" }
 native_types = { path = "../../native/types" }
 mp_qshared = { path = "../qshared" }
 mp_bg = { path = "../bg" }

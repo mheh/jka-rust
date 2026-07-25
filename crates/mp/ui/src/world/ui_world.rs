@@ -4,6 +4,8 @@
 
 use core::ffi::c_int;
 
+use mp_bg::bg_channel::BgState;
+use mp_bg::bg_misc::MAX_POOL_SIZE_UI;
 use mp_qshared::shared::qhandle_t;
 use mp_qshared::shared::sfxHandle_t;
 use mp_uishared::shared::display_state::DisplayState;
@@ -206,6 +208,14 @@ pub struct UiWorld {
     /// ui-tier function-local persistent scratch.
     /// Source: `super::ui_scratch::UiScratch`
     pub scratch: UiScratch,
+
+    /// The ui module's own bg-tier state — Raven compiled the bg files into
+    /// the ui link unit (`WE_ARE_IN_THE_UI`), giving ui its own copies of the
+    /// bg globals (rand state, siege class tables, parse scratch, `BG_Alloc`
+    /// pool at the 512000 ui arm). DEC-36 addendum 11 (D5's second-implementor
+    /// story).
+    /// Source: `oracle/codemp/game/bg_misc.c:3311-3316`
+    pub bg_state: BgState,
 }
 
 impl Default for UiWorld {
@@ -218,6 +228,7 @@ impl Default for UiWorld {
         UiWorld {
             uiDC: DisplayState::default(),
             menus: MenuSystem::default(),
+            bg_state: BgState::with_pool_size(MAX_POOL_SIZE_UI),
             newHighScoreTime: 0,
             newBestTime: 0,
             showPostGameTime: 0,
