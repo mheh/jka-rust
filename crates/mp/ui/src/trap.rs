@@ -308,6 +308,18 @@ pub fn Cvar_Set(engine: &Engine, var_name: &str, value: &str) {
     <Engine as Execute<UiCvarSet>>::execute(engine, args)
 }
 
+/// Raven `trap_Cvar_Set` with a NULL `value` — the engine substitutes the
+/// cvar's `resetString`, i.e. a reset-to-default.
+///
+/// C: `trap_Cvar_Set(var_name, NULL)`
+/// Source: `oracle/codemp/qcommon/cvar.cpp:322-323`, `oracle/codemp/ui/ui_main.c:6032-6033`
+pub fn Cvar_Reset(engine: &Engine, var_name: &str) {
+    let var_name_c = cstr(var_name);
+    // SAFETY: the name outlives the synchronous syscall the Args feed.
+    let args = unsafe { UiCvarSetArgs::new(var_name_c.as_ptr(), null()) };
+    <Engine as Execute<UiCvarSet>>::execute(engine, args)
+}
+
 /// Raven `trap_Cvar_SetValue` — `UI_CVAR_SETVALUE`
 /// (token: `mp_abi::ui::syscalls::UI_CVAR_SETVALUE`).
 ///

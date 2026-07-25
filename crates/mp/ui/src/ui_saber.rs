@@ -4,6 +4,8 @@
 
 #![allow(non_snake_case)]
 
+use core::ffi::c_char;
+
 use mp_bg::bg_channel::BgState;
 use mp_qshared::common::mp::cgame::ref_entity_t::{
     refEntity_t, refEntity_t_data, refEntity_t_sprite, refEntity_t_uMini, refEntity_t_uRefEnt,
@@ -15,11 +17,16 @@ use mp_qshared::common::mp::qcommon::saber::saber_colors::{
 use mp_qshared::common::mp::qcommon::saber::saber_type::saberType_t;
 use mp_qshared::shared::com_parse::{COM_ParseExt, QSharedScratch};
 use mp_qshared::shared::q_math::{_VectorMA, VectorSet};
-use mp_qshared::shared::vec3_t;
+use mp_qshared::shared::q_string::COM_Compress;
+use mp_qshared::shared::{fileHandle_t, vec3_t, FS_READ};
+use mp_uishared::shared::menu_system::MAX_MENUFILE;
+use native_string::latin1_to_string;
 use native_types::qfalse;
 
 use crate::trap;
+use crate::ui_atoms::{Com_Error, Com_Printf};
 use crate::world::ui_context::UiContext;
+use crate::world::ui_saber_state::MAX_SABER_DATA_SIZE;
 
 /// Raven `UI_CacheSaberGlowGraphics` — registers the twelve saber blade
 /// glow/core shaders (two per color) into `UiWorld.saber`.
@@ -54,6 +61,34 @@ pub fn UI_CacheSaberGlowGraphics(ctx: &mut UiContext) {
         trap::R_RegisterShaderNoMip(ctx.engine, "gfx/effects/sabers/purple_line");
 }
 
+/// Raven `UI_ParseLiteral` — consumes one token and reports whether it did
+/// NOT match `string` (`qtrue` on EOF or a mismatch — printing a diagnostic
+/// either way — `qfalse` when the token matched).
+///
+/// PORT-NOTE: same in/out `Option<&[u8]>` cursor shape as `UI_ParseLiteralSilent`
+/// (genuinely read-modify-write); `Q_stricmp(token, string) != 0` becomes
+/// `!token.eq_ignore_ascii_case(string)`. Unlike the silent twin this fn
+/// forwards diagnostics through the engine, so it threads `ctx` — and with it
+/// the session's `COM_ParseExt` scratch (`ctx.world.bg_state.qs`).
+///
+/// Source: `oracle/codemp/ui/ui_saber.c:54-72`
+pub fn UI_ParseLiteral(ctx: &mut UiContext, data: &mut Option<&[u8]>, string: &str) -> bool {
+    let (token, remaining) = COM_ParseExt(&mut ctx.world.bg_state.qs, *data, true);
+    *data = remaining;
+
+    if token.is_empty() {
+        Com_Printf(ctx, "unexpected EOF\n");
+        return true;
+    }
+
+    if !token.eq_ignore_ascii_case(string) {
+        Com_Printf(ctx, &format!("required string '{}' missing\n", string));
+        return true;
+    }
+
+    false
+}
+
 /// Raven `UI_ParseLiteralSilent` — consumes one token and reports whether it
 /// was NOT the expected literal (`qtrue` on EOF or a mismatch, `qfalse` when
 /// the token matched `string`).
@@ -82,6 +117,106 @@ pub fn UI_ParseLiteralSilent(data: &mut Option<&[u8]>, string: &str) -> bool {
     }
 
     false
+}
+
+/// Raven `UI_SaberLoadParms` — reads every `ext_data/sabers/*.sab` extension
+/// file and concatenates their (comment/whitespace-compressed) text into the
+/// hilt-parse buffer every `UI_SaberLoad*` lookup reparses.
+///
+/// PORT-NOTE: Raven's `char saberExtensionListBuf[2048]`/`marker` pointer
+/// walk becomes a byte-offset walk over a fixed `[u8; 2048]` list buffer and
+/// a `String` accumulator (`world.saber.SaberParms`) — `totallen` collapses
+/// to `SaberParms.chars().count()` (wire bytes, one per Latin-1 char),
+/// `*(marker-1) == '}'` to `SaberParms.ends_with('}')`.
+/// `trap_FS_GetFileList` NUL-separates names inside `listbuf` (per the
+/// wrapper's doc); each entry is decoded with `latin1_to_string` (opaque
+/// engine-filled bytes, #13 discipline) to match the filesystem-path
+/// dictionary entry. Raven's two `Com_Error( ERR_FATAL, ... )` calls never
+/// return (longjmp out of the ui module); the port makes that explicit with
+/// an early `return` since there is no Rust analog of the longjmp.
+///
+/// Source: `oracle/codemp/ui/ui_saber.c:336-400`
+pub fn UI_SaberLoadParms(ctx: &mut UiContext) {
+    ctx.world.saber.ui_saber_parms_parsed = true;
+    UI_CacheSaberGlowGraphics(ctx);
+
+    ctx.world.saber.SaberParms.clear();
+
+    let mut listbuf = [0u8; 2048];
+    let file_cnt = trap::FS_GetFileList(ctx.engine, "ext_data/sabers", ".sab", &mut listbuf);
+
+    let mut offset = 0usize;
+    for _ in 0..file_cnt {
+        // PORT-NOTE: an unterminated tail ends the walk rather than running off the
+        // buffer.
+        if offset >= listbuf.len() {
+            break;
+        }
+        let end = listbuf[offset..]
+            .iter()
+            .position(|&b| b == 0)
+            .map(|p| offset + p)
+            .unwrap_or(listbuf.len());
+        let hold = latin1_to_string(&listbuf[offset..end]);
+        offset = end + 1;
+
+        let mut f: fileHandle_t = 0;
+        let len = trap::FS_FOpenFile(
+            ctx.engine,
+            &format!("ext_data/sabers/{}", hold),
+            &mut f,
+            FS_READ,
+        );
+
+        if f == 0 {
+            continue;
+        }
+
+        if len == -1 {
+            Com_Printf(ctx, &format!("UI_SaberLoadParms: error reading {}\n", hold));
+            continue;
+        }
+
+        if len as usize > MAX_MENUFILE {
+            Com_Error(
+                ctx,
+                &format!(
+                    "UI_SaberLoadParms: file {} too large to read (max={})",
+                    hold, MAX_MENUFILE
+                ),
+            );
+            return;
+        }
+
+        // PORT-NOTE (§19): Raven writes `buffer[len] = 0` one past its fixed array;
+        // the owned buffer carries the extra byte.
+        let mut buffer = vec![0u8; len as usize + 1];
+        trap::FS_Read(ctx.engine, &mut buffer[..len as usize], f);
+        trap::FS_FCloseFile(ctx.engine, f);
+        buffer[len as usize] = 0;
+
+        if !ctx.world.saber.SaberParms.is_empty() && ctx.world.saber.SaberParms.ends_with('}') {
+            ctx.world.saber.SaberParms.push(' ');
+        }
+
+        let compressed_len = COM_Compress(buffer.as_mut_ptr() as *mut c_char);
+        let compressed = latin1_to_string(&buffer[..compressed_len as usize]);
+
+        // Raven's `totallen` counts wire bytes; each Latin-1 char is one wire byte.
+        if ctx.world.saber.SaberParms.chars().count() + compressed.chars().count()
+            >= MAX_SABER_DATA_SIZE
+        {
+            Com_Error(
+                ctx,
+                &format!(
+                    "UI_SaberLoadParms: ran out of space before reading {}\n(you must make the .sab files smaller)",
+                    hold
+                ),
+            );
+            return;
+        }
+        ctx.world.saber.SaberParms.push_str(&compressed);
+    }
 }
 
 /// Raven `UI_DoSaber` — draws one saber blade's glow blob and hot core into

@@ -5,17 +5,19 @@
 
 #![allow(non_snake_case)]
 
-use core::ffi::c_int;
+use core::ffi::{c_int, c_void};
 
 use mp_abi::ui::public::ui_client_state_t::uiClientState_t;
 use mp_bg::bg_channel::BgState;
 use mp_bg::public::configstring::{CS_PLAYERS, CS_SERVERINFO};
 use mp_bg::public::gametype::{
-    GT_DUEL, GT_FFA, GT_HOLOCRON, GT_JEDIMASTER, GT_POWERDUEL, GT_SINGLE_PLAYER, GT_TEAM,
+    GT_CTF, GT_CTY, GT_DUEL, GT_FFA, GT_HOLOCRON, GT_JEDIMASTER, GT_POWERDUEL, GT_SIEGE,
+    GT_SINGLE_PLAYER, GT_TEAM,
 };
 use mp_bg::public::team::{TEAM_BLUE, TEAM_RED, TEAM_SPECTATOR};
 use mp_bg::saga::siege_class_t::siegeClass_t;
 use mp_bg::weapons::weapon_t::{WP_NONE, WP_NUM_WEAPONS, WP_SABER};
+use mp_qshared::common::mp::qcommon::saber::saber_colors::saber_colors_t;
 use mp_qshared::shared::cbuf_exec::cbufExec_t;
 use mp_qshared::shared::com_parse::{COM_BeginParseSession, COM_ParseExt, QSharedScratch};
 use mp_qshared::shared::cvar::{
@@ -35,12 +37,22 @@ use mp_qshared::shared::{
 use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::menu_system::MAX_MENUFILE;
 use mp_uishared::shared::rect_def_t::RectDef;
-use native_string::{atoi, latin1_to_string, Info_ValueForKey, Q_CleanStr, Q_stricmp};
+use mp_uishared::ui_shared::{
+    Menu_FindItemByName, Menu_GetFocused, Menus_AnyFullScreenVisible, UI_CleanupGhoul2,
+};
+use native_string::{atoi, latin1_to_string, Info_ValueForKey, Q_CleanStr, Q_stricmp, Q_stricmpn};
 
 use crate::keycodes::fake_ascii_t::fakeAscii_t;
-use crate::local::player_species_info_t::PlayerSpeciesInfo;
-use crate::local::server_status_info_t::ServerStatusInfo;
+use crate::local::pinglist_t::MAX_ADDRESSLENGTH;
+use crate::local::player_species_info_t::{PlayerSpeciesInfo, MAX_PLAYERMODELS};
+use crate::local::server_status_info_t::{
+    ServerStatusInfo, MAX_SERVERSTATUS_LINES, MAX_SERVERSTATUS_TEXT,
+};
+use crate::local::tier_info::MAPS_PER_TIER;
 use crate::trap;
+use crate::ui_atoms::{Com_Printf, UI_Cvar_VariableString, UI_DrawHandlePic};
+use crate::ui_gameinfo::UI_GetNumBots;
+use crate::ui_saber::{SaberColorToString, TranslateSaberColor};
 use crate::world::ui_context::UiContext;
 use crate::world::ui_cvars::UiCvars;
 use crate::world::ui_world::{UiWorld, MAX_FORCE_CONFIGS};
@@ -93,11 +105,103 @@ const KEYCATCH_UI: c_int = 0x0002;
 /// Source: `oracle/codemp/ui/ui_main.c:902-909`
 const NUM_SKILL_LEVELS: c_int = 5;
 
+/// Raven `menudef.h` `ITEM_TEXTSTYLE_*` — `Text_Paint`'s JK2-menu-style
+/// argument, mapped to `STYLE_BLINK`/`STYLE_DROPSHADOW` font-render bits. No
+/// canonical qshared home ported yet, so these stay file-local consts (same
+/// treatment as `AS_FAVORITES`/`CIN_LOOP` above).
+///
+/// Source: `oracle/ui/menudef.h:29-35`
+const ITEM_TEXTSTYLE_NORMAL: c_int = 0;
+const ITEM_TEXTSTYLE_BLINK: c_int = 1;
+const ITEM_TEXTSTYLE_PULSE: c_int = 2;
+const ITEM_TEXTSTYLE_SHADOWED: c_int = 3;
+const ITEM_TEXTSTYLE_OUTLINED: c_int = 4;
+const ITEM_TEXTSTYLE_OUTLINESHADOWED: c_int = 5;
+const ITEM_TEXTSTYLE_SHADOWEDMORE: c_int = 6;
+
+/// Raven `qfiles.h` `STYLE_DROPSHADOW`/`STYLE_BLINK` font-render bits
+/// (`Text_Paint`'s `iFontHandle` high bits). Already ported once as a
+/// `mp_engine_qcommon` const (`qfiles/font_style.rs`), but `mp_ui` has no
+/// dependency on that crate, so these stay file-local consts (same fidelity,
+/// same values).
+///
+/// Source: `oracle/codemp/qcommon/qfiles.h:570-571`
+const STYLE_DROPSHADOW: u32 = 0x8000_0000;
+const STYLE_BLINK: u32 = 0x4000_0000;
+
+/// Raven `#define SCREEN_WIDTH 640` / `#define SCREEN_HEIGHT 480`. No
+/// canonical qshared home ported yet, so these stay file-local consts (same
+/// treatment as `AS_FAVORITES`/`CIN_LOOP` above).
+///
+/// Source: `oracle/codemp/game/q_shared.h:1029-1030`
+const SCREEN_WIDTH: c_int = 640;
+const SCREEN_HEIGHT: c_int = 480;
+
+/// Raven `#define UI_MAPCINEMATIC 244` / `UI_NETMAPCINEMATIC 246` /
+/// `UI_CLANCINEMATIC 251` — the negative-handle cinematic-slot tokens
+/// `UI_StopCinematic` decodes. No canonical qshared home ported yet, so these
+/// stay file-local consts (same treatment as `AS_FAVORITES`/`CIN_LOOP` above).
+///
+/// Source: `oracle/ui/menudef.h:291-298`
+const UI_MAPCINEMATIC: c_int = 244;
+const UI_NETMAPCINEMATIC: c_int = 246;
+const UI_CLANCINEMATIC: c_int = 251;
+
+/// Raven `#define MAX_Q3PLAYERMODELS 256`.
+///
+/// Source: `oracle/codemp/ui/ui_local.h:593`
+const MAX_Q3PLAYERMODELS: usize = 256;
+
 // DEFERRED: UI_AnimsetAlloc — part of the ui_main.c hand-maintained animation
 // fork (`bgAllAnims`/`uiNumAllAnims`/`UI_ParseAnimationFile`); DEC-36 D5 rules
 // ui reuses mp_bg's animation module instead of Raven's manually synced copy
 // (see `UiMainState`'s PORT-NOTE, which drops the same fork's state fields).
 // Source: `oracle/codemp/ui/ui_main.c:645-651`
+
+// DEFERRED: UI_ParseAnimationFile — same hand-maintained animation fork as
+// UI_AnimsetAlloc above; its state (`uiHumanoidAnimations`, `UIPAFtext`,
+// `UIPAFtextLoaded`, `bgAllAnims`, `uiNumAllAnims`) was dropped at U2 per the
+// same DEC-36 D5 ruling, so there is nothing left to thread this fn's body
+// through.
+// Source: `oracle/codemp/ui/ui_main.c:664-863`
+
+/// Raven `GetCRDelineatedString`.
+///
+/// Raven kept the result in a function-scope `static char sTemp[256]`; the
+/// idiomatic port returns the owned `String` (or `None` for Raven's `NULL`
+/// out-of-range return) directly instead of reusing a shared buffer.
+///
+/// PORT-NOTE (§19): Raven `strcpy`s the line into `char sTemp[256]` (an overrun
+/// for longer lines); the owned `String` returns it untruncated.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:954-976`
+pub fn GetCRDelineatedString(
+    ctx: &mut UiContext,
+    psStripFileRef: &str,
+    psStripStringRef: &str,
+    iIndex: c_int,
+) -> Option<String> {
+    let psList = UI_GetStringEdString(ctx, psStripFileRef, psStripStringRef);
+    let mut rest = psList.as_str();
+
+    // Raven's `while (iIndex--)` tests before the decrement, so a negative index
+    // walks to the end of the list and falls out through the OOR return.
+    let mut i = iIndex;
+    while i != 0 {
+        match rest.find('\n') {
+            Some(pos) => rest = &rest[pos + 1..],
+            None => return None, // OOR
+        }
+        i -= 1;
+    }
+
+    let sTemp = match rest.find('\n') {
+        Some(pos) => &rest[..pos],
+        None => rest,
+    };
+
+    Some(sTemp.to_string())
+}
 
 /// Raven `UI_TeamName`.
 ///
@@ -206,6 +310,26 @@ pub fn _UI_DrawTopBottom(ctx: &mut UiContext, x: f32, y: f32, w: f32, h: f32, si
     );
 }
 
+/// Raven `_UI_DrawRect`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1065-1072`
+pub fn _UI_DrawRect(
+    ctx: &mut UiContext,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    size: f32,
+    color: &vec4_t,
+) {
+    trap::R_SetColor(ctx.engine, Some(color));
+
+    _UI_DrawTopBottom(ctx, x, y, width, height, size);
+    _UI_DrawSides(ctx, x, y, width, height, size);
+
+    trap::R_SetColor(ctx.engine, None);
+}
+
 /// Raven `MenuFontToHandle`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:1075-1086`
@@ -217,6 +341,68 @@ pub fn MenuFontToHandle(world: &UiWorld, iMenuFont: c_int) -> qhandle_t {
         4 => world.uiDC.Assets.qhSmall2Font,
         _ => world.uiDC.Assets.qhMediumFont,
     }
+}
+
+/// Raven `Text_Width`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1089-1094`
+pub fn Text_Width(ctx: &UiContext, text: &str, scale: f32, iMenuFont: c_int) -> c_int {
+    let iFontIndex = MenuFontToHandle(ctx.world, iMenuFont);
+    trap::R_Font_StrLenPixels(ctx.engine, text, iFontIndex, scale)
+}
+
+/// Raven `Text_Height`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1096-1101`
+pub fn Text_Height(ctx: &UiContext, _text: &str, scale: f32, iMenuFont: c_int) -> c_int {
+    let iFontIndex = MenuFontToHandle(ctx.world, iMenuFont);
+    trap::R_Font_HeightPixels(ctx.engine, iFontIndex, scale)
+}
+
+/// Raven `Text_Paint`.
+///
+/// PORT-NOTE: the JK2-menu-style-to-SOF2-printstring-ctrl-code `switch`
+/// (`ITEM_TEXTSTYLE_*` → `STYLE_BLINK`/`STYLE_DROPSHADOW`) is transcribed as a
+/// `match`; both file-local const families are defined above (no canonical
+/// qshared/qcommon home reachable from this crate).
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1103-1130`
+#[allow(clippy::too_many_arguments)]
+pub fn Text_Paint(
+    ctx: &UiContext,
+    x: f32,
+    y: f32,
+    scale: f32,
+    color: vec4_t,
+    text: &str,
+    _adjust: f32,
+    limit: c_int,
+    style: c_int,
+    iMenuFont: c_int,
+) {
+    let iFontIndex = MenuFontToHandle(ctx.world, iMenuFont);
+    // kludge.. convert JK2 menu styles to SOF2 printstring ctrl codes...
+    let iStyleOR: c_int = match style {
+        ITEM_TEXTSTYLE_NORMAL => 0,                           // JK2 normal text
+        ITEM_TEXTSTYLE_BLINK => STYLE_BLINK as c_int,         // JK2 fast blinking
+        ITEM_TEXTSTYLE_PULSE => STYLE_BLINK as c_int,         // JK2 slow pulsing
+        ITEM_TEXTSTYLE_SHADOWED => STYLE_DROPSHADOW as c_int, // JK2 drop shadow
+        ITEM_TEXTSTYLE_OUTLINED => STYLE_DROPSHADOW as c_int, // JK2 drop shadow
+        ITEM_TEXTSTYLE_OUTLINESHADOWED => STYLE_DROPSHADOW as c_int, // JK2 drop shadow
+        ITEM_TEXTSTYLE_SHADOWEDMORE => STYLE_DROPSHADOW as c_int, // JK2 drop shadow
+        _ => 0,
+    };
+
+    trap::R_Font_DrawString(
+        ctx.engine,
+        x as c_int,                          // int ox
+        y as c_int,                          // int oy
+        text,                                // const char *text
+        &color,                              // paletteRGBA_c c
+        iStyleOR | iFontIndex,               // const int iFontHandle
+        if limit == 0 { -1 } else { limit }, // iCharLimit (-1 = none)
+        scale,                               // const float scale = 1.0f
+    );
 }
 
 /// Raven `UI_GetStringEdString`.
@@ -275,6 +461,28 @@ pub fn GetMenuBuffer(ctx: &mut UiContext, filename: &str) -> String {
     latin1_to_string(&buf)
 }
 
+/// Raven `UI_DrawCenteredPic`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1229-1234`
+pub fn UI_DrawCenteredPic(ctx: &mut UiContext, image: qhandle_t, w: c_int, h: c_int) {
+    let x = (SCREEN_WIDTH - w) / 2;
+    let y = (SCREEN_HEIGHT - h) / 2;
+    UI_DrawHandlePic(ctx, x as f32, y as f32, w as f32, h as f32, image);
+}
+
+/// Raven `_UI_Shutdown`.
+///
+/// PORT-NOTE: `UI_CleanupGhoul2` calls through `DisplayContext` (its ported
+/// shape takes `dc: &mut dyn DisplayContext`, DEC-36 addendum 12), so this fn
+/// carries a `dc` parameter alongside `ctx` even though Raven's own body has
+/// no `DC->` call (see escalations).
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1432-1435`
+pub fn _UI_Shutdown(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+    trap::LAN_SaveCachedServers(ctx.engine);
+    UI_CleanupGhoul2(&mut ctx.world.menus, dc);
+}
+
 /// Raven `UI_SetCapFragLimits`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:1911-1922`
@@ -291,6 +499,25 @@ pub fn UI_SetCapFragLimits(ctx: &mut UiContext, uiVars: bool) {
     }
 }
 
+/// Raven `UI_GetGameTypeName`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:1924-1950`
+pub fn UI_GetGameTypeName(ctx: &mut UiContext, gtEnum: c_int) -> String {
+    match gtEnum {
+        GT_FFA => UI_GetStringEdString(ctx, "MENUS", "FREE_FOR_ALL"), //"Free For All";
+        GT_HOLOCRON => UI_GetStringEdString(ctx, "MENUS", "HOLOCRON_FFA"), //"Holocron FFA";
+        GT_JEDIMASTER => UI_GetStringEdString(ctx, "MENUS", "SAGA"),  //"Jedi Master";??
+        GT_SINGLE_PLAYER => UI_GetStringEdString(ctx, "MENUS", "SAGA"), //"Team FFA";
+        GT_DUEL => UI_GetStringEdString(ctx, "MENUS", "DUEL"),        //"Team FFA";
+        GT_POWERDUEL => UI_GetStringEdString(ctx, "MENUS", "POWERDUEL"), //"Team FFA";
+        GT_TEAM => UI_GetStringEdString(ctx, "MENUS", "TEAM_FFA"),    //"Team FFA";
+        GT_SIEGE => UI_GetStringEdString(ctx, "MENUS", "SIEGE"),      //"Siege";
+        GT_CTF => UI_GetStringEdString(ctx, "MENUS", "CAPTURE_THE_FLAG"), //"Capture the Flag";
+        GT_CTY => UI_GetStringEdString(ctx, "MENUS", "CAPTURE_THE_YSALIMARI"), //"Capture the Ysalamiri";
+        _ => UI_GetStringEdString(ctx, "MENUS", "SAGA"),                       //"Team FFA";
+    }
+}
+
 /// Raven `UI_TeamIndexFromName`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:2010-2023`
@@ -304,6 +531,81 @@ pub fn UI_TeamIndexFromName(world: &UiWorld, name: &str) -> c_int {
     }
 
     0
+}
+
+/// Raven `UI_DrawClanLogo`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2025-2040`
+pub fn UI_DrawClanLogo(ctx: &mut UiContext, rect: &RectDef, _scale: f32, color: vec4_t) {
+    let teamName = UI_Cvar_VariableString(ctx, "ui_teamName");
+    let i = UI_TeamIndexFromName(ctx.world, &teamName);
+    if i >= 0 && (i as usize) < ctx.world.teamList.len() {
+        trap::R_SetColor(ctx.engine, Some(&color));
+
+        if ctx.world.teamList[i as usize].teamIcon == -1 {
+            let imageName = ctx.world.teamList[i as usize].imageName.clone();
+            ctx.world.teamList[i as usize].teamIcon =
+                trap::R_RegisterShaderNoMip(ctx.engine, &imageName);
+            ctx.world.teamList[i as usize].teamIcon_Metal =
+                trap::R_RegisterShaderNoMip(ctx.engine, &format!("{}_metal", imageName));
+            ctx.world.teamList[i as usize].teamIcon_Name =
+                trap::R_RegisterShaderNoMip(ctx.engine, &format!("{}_name", imageName));
+        }
+
+        let icon = ctx.world.teamList[i as usize].teamIcon;
+        UI_DrawHandlePic(ctx, rect.x, rect.y, rect.w, rect.h, icon);
+        trap::R_SetColor(ctx.engine, None);
+    }
+}
+
+/// Raven `UI_DrawClanCinematic`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2042-2068`
+pub fn UI_DrawClanCinematic(ctx: &mut UiContext, rect: &RectDef, _scale: f32, color: vec4_t) {
+    let teamName = UI_Cvar_VariableString(ctx, "ui_teamName");
+    let i = UI_TeamIndexFromName(ctx.world, &teamName);
+    if i >= 0 && (i as usize) < ctx.world.teamList.len() {
+        let idx = i as usize;
+
+        if ctx.world.teamList[idx].cinematic >= -2 {
+            if ctx.world.teamList[idx].cinematic == -1 {
+                let imageName = ctx.world.teamList[idx].imageName.clone();
+                ctx.world.teamList[idx].cinematic = trap::CIN_PlayCinematic(
+                    ctx.engine,
+                    &format!("{}.roq", imageName),
+                    0,
+                    0,
+                    0,
+                    0,
+                    CIN_LOOP | CIN_SILENT,
+                );
+            }
+            if ctx.world.teamList[idx].cinematic >= 0 {
+                let cinematic = ctx.world.teamList[idx].cinematic;
+                trap::CIN_RunCinematic(ctx.engine, cinematic);
+                trap::CIN_SetExtents(
+                    ctx.engine,
+                    cinematic,
+                    rect.x as c_int,
+                    rect.y as c_int,
+                    rect.w as c_int,
+                    rect.h as c_int,
+                );
+                trap::CIN_DrawCinematic(ctx.engine, cinematic);
+            } else {
+                trap::R_SetColor(ctx.engine, Some(&color));
+                let icon = ctx.world.teamList[idx].teamIcon_Metal;
+                UI_DrawHandlePic(ctx, rect.x, rect.y, rect.w, rect.h, icon);
+                trap::R_SetColor(ctx.engine, None);
+                ctx.world.teamList[idx].cinematic = -2;
+            }
+        } else {
+            trap::R_SetColor(ctx.engine, Some(&color));
+            let icon = ctx.world.teamList[idx].teamIcon;
+            UI_DrawHandlePic(ctx, rect.x, rect.y, rect.w, rect.h, icon);
+            trap::R_SetColor(ctx.engine, None);
+        }
+    }
 }
 
 /// Raven `UI_DrawPreviewCinematic`.
@@ -391,6 +693,30 @@ pub fn UI_AllForceDisabled(force: c_int) -> bool {
     false
 }
 
+/// Raven `UI_TrueJediEnabled`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2291-2319`
+pub fn UI_TrueJediEnabled(ctx: &mut UiContext) -> bool {
+    let info =
+        trap::GetConfigString(ctx.engine, CS_SERVERINFO, MAX_INFO_STRING).unwrap_or_default();
+
+    // already have serverinfo at this point for stuff below. Don't bother
+    // trying to use ui_forcePowerDisable.
+    let disabledForce = atoi(&Info_ValueForKey(&info, "g_forcePowerDisable"));
+    let allForceDisabled = UI_AllForceDisabled(disabledForce);
+    let gametype = atoi(&Info_ValueForKey(&info, "g_gametype"));
+    let saberOnly = UI_HasSetSaberOnly(ctx);
+
+    let trueJedi =
+        if gametype == GT_HOLOCRON || gametype == GT_JEDIMASTER || saberOnly || allForceDisabled {
+            0
+        } else {
+            atoi(&Info_ValueForKey(&info, "g_jediVmerc"))
+        };
+
+    trueJedi != 0
+}
+
 /// Raven `UI_SetForceDisabled`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:2502-2547`
@@ -422,6 +748,107 @@ pub fn UI_SetForceDisabled(world: &mut UiWorld, force: c_int) {
     }
 }
 
+/// Raven `UI_DrawEffects`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2425-2428`
+pub fn UI_DrawEffects(ctx: &mut UiContext, rect: &RectDef, _scale: f32, _color: vec4_t) {
+    // PORT-NOTE (§19): Raven read a stale fixed-array slot here; guarded to a
+    // skipped draw (there is no fallback shader).
+    let idx = ctx.world.effectsColor;
+    if idx < 0 || idx as usize >= ctx.world.force.uiSaberColorShaders.len() {
+        return;
+    }
+    let shader = ctx.world.force.uiSaberColorShaders[idx as usize];
+    UI_DrawHandlePic(ctx, rect.x, rect.y, rect.w, rect.h, shader);
+}
+
+/// Raven `UI_DrawMapPreview`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2430-2452`
+pub fn UI_DrawMapPreview(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    _scale: f32,
+    _color: vec4_t,
+    net: bool,
+) {
+    let mut map = if net {
+        ctx.world.cvars.ui_currentNetMap.integer
+    } else {
+        ctx.world.cvars.ui_currentMap.integer
+    };
+    if map < 0 || map > ctx.world.mapList.len() as c_int {
+        if net {
+            ctx.world.cvars.ui_currentNetMap.integer = 0;
+            trap::Cvar_Set(ctx.engine, "ui_currentNetMap", "0");
+        } else {
+            ctx.world.cvars.ui_currentMap.integer = 0;
+            trap::Cvar_Set(ctx.engine, "ui_currentMap", "0");
+        }
+        map = 0;
+    }
+
+    let idx = map as usize;
+    // PORT-NOTE (§19): `map == mapCount` clears Raven's guard and reads a stale
+    // fixed-array slot (levelShot 0); guarded to the unknown-map fallback below.
+    if idx >= ctx.world.mapList.len() {
+        let shader = trap::R_RegisterShaderNoMip(ctx.engine, "menu/art/unknownmap_mp");
+        UI_DrawHandlePic(ctx, rect.x, rect.y, rect.w, rect.h, shader);
+        return;
+    }
+    if ctx.world.mapList[idx].levelShot == -1 {
+        let imageName = ctx.world.mapList[idx].imageName.clone();
+        ctx.world.mapList[idx].levelShot = trap::R_RegisterShaderNoMip(ctx.engine, &imageName);
+    }
+
+    if ctx.world.mapList[idx].levelShot > 0 {
+        let shot = ctx.world.mapList[idx].levelShot;
+        UI_DrawHandlePic(ctx, rect.x, rect.y, rect.w, rect.h, shot);
+    } else {
+        let shader = trap::R_RegisterShaderNoMip(ctx.engine, "menu/art/unknownmap_mp");
+        UI_DrawHandlePic(ctx, rect.x, rect.y, rect.w, rect.h, shader);
+    }
+}
+
+/// Raven `UI_DrawNetMapPreview`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2739-2746`
+pub fn UI_DrawNetMapPreview(ctx: &mut UiContext, rect: &RectDef, _scale: f32, _color: vec4_t) {
+    if ctx.world.serverStatus.currentServerPreview > 0 {
+        let preview = ctx.world.serverStatus.currentServerPreview;
+        UI_DrawHandlePic(ctx, rect.x, rect.y, rect.w, rect.h, preview);
+    } else {
+        let shader = trap::R_RegisterShaderNoMip(ctx.engine, "menu/art/unknownmap_mp");
+        UI_DrawHandlePic(ctx, rect.x, rect.y, rect.w, rect.h, shader);
+    }
+}
+
+/// Raven `UI_DrawTierMap`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2791-2803`
+pub fn UI_DrawTierMap(ctx: &mut UiContext, rect: &RectDef, index: c_int) {
+    let mut i = trap::Cvar_VariableValue(ctx.engine, "ui_currentTier") as c_int;
+    if i < 0 || i as usize >= ctx.world.tierList.len() {
+        i = 0;
+    }
+
+    let tierIdx = i as usize;
+    let mapIdx = index as usize;
+    // PORT-NOTE (§19): Raven read a stale fixed-array slot here; guarded to a
+    // skipped draw (there is no fallback shader).
+    if tierIdx >= ctx.world.tierList.len() || mapIdx >= MAPS_PER_TIER {
+        return;
+    }
+    if ctx.world.tierList[tierIdx].mapHandles[mapIdx] == -1 {
+        let mapName = ctx.world.tierList[tierIdx].maps[mapIdx].clone();
+        ctx.world.tierList[tierIdx].mapHandles[mapIdx] =
+            trap::R_RegisterShaderNoMip(ctx.engine, &format!("levelshots/{}", mapName));
+    }
+
+    let handle = ctx.world.tierList[tierIdx].mapHandles[mapIdx];
+    UI_DrawHandlePic(ctx, rect.x, rect.y, rect.w, rect.h, handle);
+}
+
 /// Raven `UI_EnglishMapName`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:2805-2813`
@@ -444,6 +871,219 @@ pub fn UI_AIFromName(world: &UiWorld, name: &str) -> String {
         }
     }
     "Kyle".to_string()
+}
+
+/// Raven `UI_NextOpponent`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2886-2900`
+pub fn UI_NextOpponent(ctx: &mut UiContext) {
+    let opponentName = UI_Cvar_VariableString(ctx, "ui_opponentName");
+    let mut i = UI_TeamIndexFromName(ctx.world, &opponentName);
+    let teamName = UI_Cvar_VariableString(ctx, "ui_teamName");
+    let j = UI_TeamIndexFromName(ctx.world, &teamName);
+
+    i += 1;
+    if i >= ctx.world.teamList.len() as c_int {
+        i = 0;
+    }
+    if i == j {
+        i += 1;
+        if i >= ctx.world.teamList.len() as c_int {
+            i = 0;
+        }
+    }
+    let name = ctx.world.teamList[i as usize].teamName.clone();
+    trap::Cvar_Set(ctx.engine, "ui_opponentName", &name);
+}
+
+/// Raven `UI_PriorOpponent`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2902-2916`
+pub fn UI_PriorOpponent(ctx: &mut UiContext) {
+    let opponentName = UI_Cvar_VariableString(ctx, "ui_opponentName");
+    let mut i = UI_TeamIndexFromName(ctx.world, &opponentName);
+    let teamName = UI_Cvar_VariableString(ctx, "ui_teamName");
+    let j = UI_TeamIndexFromName(ctx.world, &teamName);
+
+    i -= 1;
+    if i < 0 {
+        i = ctx.world.teamList.len() as c_int - 1;
+    }
+    if i == j {
+        i -= 1;
+        if i < 0 {
+            i = ctx.world.teamList.len() as c_int - 1;
+        }
+    }
+    let name = ctx.world.teamList[i as usize].teamName.clone();
+    trap::Cvar_Set(ctx.engine, "ui_opponentName", &name);
+}
+
+/// Raven `UI_DrawPlayerLogo`.
+///
+/// PORT-NOTE: Raven's param is `vec3_t`, but `UI_OwnerDraw` hands it a real
+/// `vec4_t` and `trap_R_SetColor` reads all four floats; the port takes
+/// `vec4_t` and passes it through unchanged. Same for
+/// `UI_DrawPlayerLogoMetal`/`Name` and the `UI_DrawOpponentLogo*` family below.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2918-2930`
+pub fn UI_DrawPlayerLogo(ctx: &mut UiContext, rect: &RectDef, color: vec4_t) {
+    let teamName = UI_Cvar_VariableString(ctx, "ui_teamName");
+    let i = UI_TeamIndexFromName(ctx.world, &teamName) as usize;
+    // PORT-NOTE (§19): Raven read a stale fixed-array slot here when no team is
+    // loaded; guarded to a skipped draw (there is no fallback icon).
+    if i >= ctx.world.teamList.len() {
+        return;
+    }
+
+    if ctx.world.teamList[i].teamIcon == -1 {
+        let imageName = ctx.world.teamList[i].imageName.clone();
+        ctx.world.teamList[i].teamIcon = trap::R_RegisterShaderNoMip(ctx.engine, &imageName);
+        ctx.world.teamList[i].teamIcon_Metal =
+            trap::R_RegisterShaderNoMip(ctx.engine, &format!("{}_metal", imageName));
+        ctx.world.teamList[i].teamIcon_Name =
+            trap::R_RegisterShaderNoMip(ctx.engine, &format!("{}_name", imageName));
+    }
+
+    trap::R_SetColor(ctx.engine, Some(&color));
+    let icon = ctx.world.teamList[i].teamIcon;
+    UI_DrawHandlePic(ctx, rect.x, rect.y, rect.w, rect.h, icon);
+    trap::R_SetColor(ctx.engine, None);
+}
+
+/// Raven `UI_DrawPlayerLogoMetal`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2932-2943`
+pub fn UI_DrawPlayerLogoMetal(ctx: &mut UiContext, rect: &RectDef, color: vec4_t) {
+    let teamName = UI_Cvar_VariableString(ctx, "ui_teamName");
+    let i = UI_TeamIndexFromName(ctx.world, &teamName) as usize;
+    // PORT-NOTE (§19): Raven read a stale fixed-array slot here when no team is
+    // loaded; guarded to a skipped draw (there is no fallback icon).
+    if i >= ctx.world.teamList.len() {
+        return;
+    }
+
+    if ctx.world.teamList[i].teamIcon == -1 {
+        let imageName = ctx.world.teamList[i].imageName.clone();
+        ctx.world.teamList[i].teamIcon = trap::R_RegisterShaderNoMip(ctx.engine, &imageName);
+        ctx.world.teamList[i].teamIcon_Metal =
+            trap::R_RegisterShaderNoMip(ctx.engine, &format!("{}_metal", imageName));
+        ctx.world.teamList[i].teamIcon_Name =
+            trap::R_RegisterShaderNoMip(ctx.engine, &format!("{}_name", imageName));
+    }
+
+    trap::R_SetColor(ctx.engine, Some(&color));
+    let icon = ctx.world.teamList[i].teamIcon_Metal;
+    UI_DrawHandlePic(ctx, rect.x, rect.y, rect.w, rect.h, icon);
+    trap::R_SetColor(ctx.engine, None);
+}
+
+/// Raven `UI_DrawPlayerLogoName`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2945-2956`
+pub fn UI_DrawPlayerLogoName(ctx: &mut UiContext, rect: &RectDef, color: vec4_t) {
+    let teamName = UI_Cvar_VariableString(ctx, "ui_teamName");
+    let i = UI_TeamIndexFromName(ctx.world, &teamName) as usize;
+    // PORT-NOTE (§19): Raven read a stale fixed-array slot here when no team is
+    // loaded; guarded to a skipped draw (there is no fallback icon).
+    if i >= ctx.world.teamList.len() {
+        return;
+    }
+
+    if ctx.world.teamList[i].teamIcon == -1 {
+        let imageName = ctx.world.teamList[i].imageName.clone();
+        ctx.world.teamList[i].teamIcon = trap::R_RegisterShaderNoMip(ctx.engine, &imageName);
+        ctx.world.teamList[i].teamIcon_Metal =
+            trap::R_RegisterShaderNoMip(ctx.engine, &format!("{}_metal", imageName));
+        ctx.world.teamList[i].teamIcon_Name =
+            trap::R_RegisterShaderNoMip(ctx.engine, &format!("{}_name", imageName));
+    }
+
+    trap::R_SetColor(ctx.engine, Some(&color));
+    let icon = ctx.world.teamList[i].teamIcon_Name;
+    UI_DrawHandlePic(ctx, rect.x, rect.y, rect.w, rect.h, icon);
+    trap::R_SetColor(ctx.engine, None);
+}
+
+/// Raven `UI_DrawOpponentLogo`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2958-2969`
+pub fn UI_DrawOpponentLogo(ctx: &mut UiContext, rect: &RectDef, color: vec4_t) {
+    let opponentName = UI_Cvar_VariableString(ctx, "ui_opponentName");
+    let i = UI_TeamIndexFromName(ctx.world, &opponentName) as usize;
+    // PORT-NOTE (§19): Raven read a stale fixed-array slot here when no team is
+    // loaded; guarded to a skipped draw (there is no fallback icon).
+    if i >= ctx.world.teamList.len() {
+        return;
+    }
+
+    if ctx.world.teamList[i].teamIcon == -1 {
+        let imageName = ctx.world.teamList[i].imageName.clone();
+        ctx.world.teamList[i].teamIcon = trap::R_RegisterShaderNoMip(ctx.engine, &imageName);
+        ctx.world.teamList[i].teamIcon_Metal =
+            trap::R_RegisterShaderNoMip(ctx.engine, &format!("{}_metal", imageName));
+        ctx.world.teamList[i].teamIcon_Name =
+            trap::R_RegisterShaderNoMip(ctx.engine, &format!("{}_name", imageName));
+    }
+
+    trap::R_SetColor(ctx.engine, Some(&color));
+    let icon = ctx.world.teamList[i].teamIcon;
+    UI_DrawHandlePic(ctx, rect.x, rect.y, rect.w, rect.h, icon);
+    trap::R_SetColor(ctx.engine, None);
+}
+
+/// Raven `UI_DrawOpponentLogoMetal`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2971-2982`
+pub fn UI_DrawOpponentLogoMetal(ctx: &mut UiContext, rect: &RectDef, color: vec4_t) {
+    let opponentName = UI_Cvar_VariableString(ctx, "ui_opponentName");
+    let i = UI_TeamIndexFromName(ctx.world, &opponentName) as usize;
+    // PORT-NOTE (§19): Raven read a stale fixed-array slot here when no team is
+    // loaded; guarded to a skipped draw (there is no fallback icon).
+    if i >= ctx.world.teamList.len() {
+        return;
+    }
+
+    if ctx.world.teamList[i].teamIcon == -1 {
+        let imageName = ctx.world.teamList[i].imageName.clone();
+        ctx.world.teamList[i].teamIcon = trap::R_RegisterShaderNoMip(ctx.engine, &imageName);
+        ctx.world.teamList[i].teamIcon_Metal =
+            trap::R_RegisterShaderNoMip(ctx.engine, &format!("{}_metal", imageName));
+        ctx.world.teamList[i].teamIcon_Name =
+            trap::R_RegisterShaderNoMip(ctx.engine, &format!("{}_name", imageName));
+    }
+
+    trap::R_SetColor(ctx.engine, Some(&color));
+    let icon = ctx.world.teamList[i].teamIcon_Metal;
+    UI_DrawHandlePic(ctx, rect.x, rect.y, rect.w, rect.h, icon);
+    trap::R_SetColor(ctx.engine, None);
+}
+
+/// Raven `UI_DrawOpponentLogoName`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:2984-2995`
+pub fn UI_DrawOpponentLogoName(ctx: &mut UiContext, rect: &RectDef, color: vec4_t) {
+    let opponentName = UI_Cvar_VariableString(ctx, "ui_opponentName");
+    let i = UI_TeamIndexFromName(ctx.world, &opponentName) as usize;
+    // PORT-NOTE (§19): Raven read a stale fixed-array slot here when no team is
+    // loaded; guarded to a skipped draw (there is no fallback icon).
+    if i >= ctx.world.teamList.len() {
+        return;
+    }
+
+    if ctx.world.teamList[i].teamIcon == -1 {
+        let imageName = ctx.world.teamList[i].imageName.clone();
+        ctx.world.teamList[i].teamIcon = trap::R_RegisterShaderNoMip(ctx.engine, &imageName);
+        ctx.world.teamList[i].teamIcon_Metal =
+            trap::R_RegisterShaderNoMip(ctx.engine, &format!("{}_metal", imageName));
+        ctx.world.teamList[i].teamIcon_Name =
+            trap::R_RegisterShaderNoMip(ctx.engine, &format!("{}_name", imageName));
+    }
+
+    trap::R_SetColor(ctx.engine, Some(&color));
+    let icon = ctx.world.teamList[i].teamIcon_Name;
+    UI_DrawHandlePic(ctx, rect.x, rect.y, rect.w, rect.h, icon);
+    trap::R_SetColor(ctx.engine, None);
 }
 
 /// Raven `UI_BuildPlayerList`.
@@ -855,6 +1495,19 @@ pub fn UI_RedBlue_HandleKey(
 /// Source: `oracle/codemp/ui/ui_shared.h:104`
 const NUM_CROSSHAIRS: c_int = 9;
 
+/// Raven `UI_DrawCrosshair`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:3262-3269`
+pub fn UI_DrawCrosshair(ctx: &mut UiContext, rect: &RectDef, _scale: f32, color: vec4_t) {
+    trap::R_SetColor(ctx.engine, Some(&color));
+    if ctx.world.currentCrosshair < 0 || ctx.world.currentCrosshair >= NUM_CROSSHAIRS {
+        ctx.world.currentCrosshair = 0;
+    }
+    let shader = ctx.world.uiDC.Assets.crosshairShader[ctx.world.currentCrosshair as usize];
+    UI_DrawHandlePic(ctx, rect.x, rect.y, rect.w, rect.h, shader);
+    trap::R_SetColor(ctx.engine, None);
+}
+
 /// Raven `UI_Crosshair_HandleKey`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:4640-4657`
@@ -886,6 +1539,200 @@ pub fn UI_Crosshair_HandleKey(
             &format!("{}", ctx.world.currentCrosshair),
         );
         return true;
+    }
+    false
+}
+
+/// Raven `UI_InSoloMenu`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:4300-4320`
+pub fn UI_InSoloMenu(world: &UiWorld) -> bool {
+    // Get current menu (either video or ingame video, I would assume)
+    let menu = Menu_GetFocused(&world.menus);
+
+    if menu.is_none() {
+        return false;
+    }
+
+    Menu_FindItemByName(&world.menus, menu, "solo_gametypefield").is_some()
+}
+
+/// Raven `UI_TeamName_HandleKey`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:4449-4471`
+pub fn UI_TeamName_HandleKey(
+    ctx: &mut UiContext,
+    _flags: c_int,
+    _special: &mut f32,
+    key: c_int,
+    blue: bool,
+) -> bool {
+    if key == fakeAscii_t::A_MOUSE1 as c_int
+        || key == fakeAscii_t::A_MOUSE2 as c_int
+        || key == fakeAscii_t::A_ENTER as c_int
+        || key == fakeAscii_t::A_KP_ENTER as c_int
+    {
+        let cvarName = if blue { "ui_blueTeam" } else { "ui_redTeam" };
+        let current = UI_Cvar_VariableString(ctx, cvarName);
+        let mut i = UI_TeamIndexFromName(ctx.world, &current);
+
+        if key == fakeAscii_t::A_MOUSE2 as c_int {
+            i -= 1;
+        } else {
+            i += 1;
+        }
+
+        if i >= ctx.world.teamList.len() as c_int {
+            i = 0;
+        } else if i < 0 {
+            i = ctx.world.teamList.len() as c_int - 1;
+        }
+
+        let name = ctx.world.teamList[i as usize].teamName.clone();
+        trap::Cvar_Set(ctx.engine, cvarName, &name);
+
+        return true;
+    }
+    false
+}
+
+/// Raven `UI_TeamMember_HandleKey`.
+///
+/// Raven's comment: 0 - None, 1 - Human, 2..NumCharacters - Bot.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:4473-4524`
+pub fn UI_TeamMember_HandleKey(
+    ctx: &mut UiContext,
+    _flags: c_int,
+    _special: &mut f32,
+    key: c_int,
+    blue: bool,
+    num: c_int,
+) -> bool {
+    if key == fakeAscii_t::A_MOUSE1 as c_int
+        || key == fakeAscii_t::A_MOUSE2 as c_int
+        || key == fakeAscii_t::A_ENTER as c_int
+        || key == fakeAscii_t::A_KP_ENTER as c_int
+    {
+        let cvar = if blue {
+            format!("ui_blueteam{}", num)
+        } else {
+            format!("ui_redteam{}", num)
+        };
+        let mut value = trap::Cvar_VariableValue(ctx.engine, &cvar) as c_int;
+        let maxcl = trap::Cvar_VariableValue(ctx.engine, "sv_maxClients") as c_int;
+        let mut numval = num;
+
+        numval *= 2;
+        if blue {
+            numval -= 1;
+        }
+
+        if numval > maxcl {
+            return false;
+        }
+
+        if value < 1 {
+            value = 1;
+        }
+
+        if key == fakeAscii_t::A_MOUSE2 as c_int {
+            value -= 1;
+        } else {
+            value += 1;
+        }
+
+        if value >= UI_GetNumBots(ctx.world) + 2 {
+            value = 1;
+        } else if value < 1 {
+            value = UI_GetNumBots(ctx.world) + 2 - 1;
+        }
+
+        trap::Cvar_Set(ctx.engine, &cvar, &format!("{}", value));
+        return true;
+    }
+    false
+}
+
+/// Raven `UI_BotName_HandleKey`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:4583-4613`
+pub fn UI_BotName_HandleKey(
+    world: &mut UiWorld,
+    _flags: c_int,
+    _special: &mut f32,
+    key: c_int,
+) -> bool {
+    if key == fakeAscii_t::A_MOUSE1 as c_int
+        || key == fakeAscii_t::A_MOUSE2 as c_int
+        || key == fakeAscii_t::A_ENTER as c_int
+        || key == fakeAscii_t::A_KP_ENTER as c_int
+    {
+        let mut value = world.botIndex;
+
+        if key == fakeAscii_t::A_MOUSE2 as c_int {
+            value -= 1;
+        } else {
+            value += 1;
+        }
+
+        if value >= UI_GetNumBots(world) {
+            value = 0;
+        } else if value < 0 {
+            value = UI_GetNumBots(world) - 1;
+        }
+        world.botIndex = value;
+        return true;
+    }
+    false
+}
+
+/// Raven `UI_SelectedPlayer_HandleKey`.
+///
+/// Raven's own body never returns `qtrue` from inside the key-match block —
+/// it always falls through to the trailing `return qfalse`, transcribed
+/// faithfully (porting-rules §2: no speculative behavior fix).
+///
+/// Source: `oracle/codemp/ui/ui_main.c:4661-4691`
+pub fn UI_SelectedPlayer_HandleKey(
+    ctx: &mut UiContext,
+    _flags: c_int,
+    _special: &mut f32,
+    key: c_int,
+) -> bool {
+    if key == fakeAscii_t::A_MOUSE1 as c_int
+        || key == fakeAscii_t::A_MOUSE2 as c_int
+        || key == fakeAscii_t::A_ENTER as c_int
+        || key == fakeAscii_t::A_KP_ENTER as c_int
+    {
+        UI_BuildPlayerList(ctx);
+        if !ctx.world.teamLeader {
+            return false;
+        }
+
+        let mut selected = trap::Cvar_VariableValue(ctx.engine, "cg_selectedPlayer") as c_int;
+
+        if key == fakeAscii_t::A_MOUSE2 as c_int {
+            selected -= 1;
+        } else {
+            selected += 1;
+        }
+
+        // Raven `uiInfo.myTeamCount` — folded into `teamNames.len()` (§B3).
+        let myTeamCount = ctx.world.teamNames.len() as c_int;
+        if selected > myTeamCount {
+            selected = 0;
+        } else if selected < 0 {
+            selected = myTeamCount;
+        }
+
+        if selected == myTeamCount {
+            trap::Cvar_Set(ctx.engine, "cg_selectedPlayerName", "Everyone");
+        } else {
+            let name = ctx.world.teamNames[selected as usize].clone();
+            trap::Cvar_Set(ctx.engine, "cg_selectedPlayerName", &name);
+        }
+        trap::Cvar_Set(ctx.engine, "cg_selectedPlayer", &format!("{}", selected));
     }
     false
 }
@@ -937,6 +1784,130 @@ pub fn UI_ServersSort(ctx: &mut UiContext, column: c_int, force: bool) {
         .serverStatus
         .displayServers
         .sort_by(|a, b| trap::LAN_CompareServers(engine, source, sortKey, sortDir, *a, *b).cmp(&0));
+}
+
+/// Raven `UI_Update`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:5255-5406`
+pub fn UI_Update(ctx: &mut UiContext, name: &str) {
+    let val = trap::Cvar_VariableValue(ctx.engine, name) as c_int;
+
+    if Q_stricmp(name, "s_khz") == 0 {
+        trap::Cmd_ExecuteText(
+            ctx.engine,
+            cbufExec_t::EXEC_APPEND as c_int,
+            "snd_restart\n",
+        );
+        return;
+    }
+
+    if Q_stricmp(name, "ui_SetName") == 0 {
+        let uiName = UI_Cvar_VariableString(ctx, "ui_Name");
+        trap::Cvar_Set(ctx.engine, "name", &uiName);
+    } else if Q_stricmp(name, "ui_setRate") == 0 {
+        let rate = trap::Cvar_VariableValue(ctx.engine, "rate");
+        if rate >= 5000.0 {
+            trap::Cvar_Set(ctx.engine, "cl_maxpackets", "30");
+            trap::Cvar_Set(ctx.engine, "cl_packetdup", "1");
+        } else if rate >= 4000.0 {
+            trap::Cvar_Set(ctx.engine, "cl_maxpackets", "15");
+            // favor less prediction errors when there's packet loss
+            trap::Cvar_Set(ctx.engine, "cl_packetdup", "2");
+        } else {
+            trap::Cvar_Set(ctx.engine, "cl_maxpackets", "15");
+            // favor lower bandwidth
+            trap::Cvar_Set(ctx.engine, "cl_packetdup", "1");
+        }
+    } else if Q_stricmp(name, "ui_GetName") == 0 {
+        let clName = UI_Cvar_VariableString(ctx, "name");
+        trap::Cvar_Set(ctx.engine, "ui_Name", &clName);
+    } else if Q_stricmp(name, "ui_r_colorbits") == 0 {
+        match val {
+            0 => trap::Cvar_SetValue(ctx.engine, "ui_r_depthbits", 0.0),
+            16 => trap::Cvar_SetValue(ctx.engine, "ui_r_depthbits", 16.0),
+            32 => trap::Cvar_SetValue(ctx.engine, "ui_r_depthbits", 24.0),
+            _ => {}
+        }
+    } else if Q_stricmp(name, "ui_r_lodbias") == 0 {
+        match val {
+            0 => trap::Cvar_SetValue(ctx.engine, "ui_r_subdivisions", 4.0),
+            1 => trap::Cvar_SetValue(ctx.engine, "ui_r_subdivisions", 12.0),
+            2 => trap::Cvar_SetValue(ctx.engine, "ui_r_subdivisions", 20.0),
+            _ => {}
+        }
+    } else if Q_stricmp(name, "ui_r_glCustom") == 0 {
+        match val {
+            0 => {
+                // high quality
+                trap::Cvar_SetValue(ctx.engine, "ui_r_fullScreen", 1.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_subdivisions", 4.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_lodbias", 0.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_colorbits", 32.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_depthbits", 24.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_picmip", 0.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_mode", 4.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_texturebits", 32.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_fastSky", 0.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_inGameVideo", 1.0);
+                trap::Cvar_Set(ctx.engine, "ui_r_texturemode", "GL_LINEAR_MIPMAP_LINEAR");
+            }
+            1 => {
+                // normal
+                trap::Cvar_SetValue(ctx.engine, "ui_r_fullScreen", 1.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_subdivisions", 4.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_lodbias", 0.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_colorbits", 0.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_depthbits", 24.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_picmip", 1.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_mode", 3.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_texturebits", 0.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_fastSky", 0.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_inGameVideo", 1.0);
+                trap::Cvar_Set(ctx.engine, "ui_r_texturemode", "GL_LINEAR_MIPMAP_LINEAR");
+            }
+            2 => {
+                // fast
+                trap::Cvar_SetValue(ctx.engine, "ui_r_fullScreen", 1.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_subdivisions", 12.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_lodbias", 1.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_colorbits", 0.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_depthbits", 0.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_picmip", 2.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_mode", 3.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_texturebits", 0.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_fastSky", 1.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_inGameVideo", 0.0);
+                trap::Cvar_Set(ctx.engine, "ui_r_texturemode", "GL_LINEAR_MIPMAP_NEAREST");
+            }
+            3 => {
+                // fastest
+                trap::Cvar_SetValue(ctx.engine, "ui_r_fullScreen", 1.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_subdivisions", 20.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_lodbias", 2.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_colorbits", 16.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_depthbits", 16.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_mode", 3.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_picmip", 3.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_texturebits", 16.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_fastSky", 1.0);
+                trap::Cvar_SetValue(ctx.engine, "ui_r_inGameVideo", 0.0);
+                trap::Cvar_Set(ctx.engine, "ui_r_texturemode", "GL_LINEAR_MIPMAP_NEAREST");
+            }
+            _ => {}
+        }
+    } else if Q_stricmp(name, "ui_mousePitch") == 0 {
+        if val == 0 {
+            trap::Cvar_SetValue(ctx.engine, "m_pitch", 0.022);
+        } else {
+            trap::Cvar_SetValue(ctx.engine, "m_pitch", -0.022);
+        }
+    } else if Q_stricmp(name, "ui_mousePitchVeh") == 0 {
+        if val == 0 {
+            trap::Cvar_SetValue(ctx.engine, "m_pitchVeh", 0.022);
+        } else {
+            trap::Cvar_SetValue(ctx.engine, "m_pitchVeh", -0.022);
+        }
+    }
 }
 
 /// Raven `UI_UpdateSaberType`.
@@ -1433,7 +2404,9 @@ pub fn UI_LoadForceConfig_List(ctx: &mut UiContext) {
         };
 
         let names = latin1_to_string(&filelist);
-        let mut fileptrs = names.split('\0').filter(|s| !s.is_empty());
+        // Raven walks `fileptr += filelen+1` — empty entries are consumed,
+        // not skipped, so no is_empty filter (entry i must stay entry i).
+        let mut fileptrs = names.split('\0');
 
         let mut j = 0;
         while j < numfiles && ctx.world.forceConfigNames.len() < MAX_FORCE_CONFIGS {
@@ -2340,5 +3313,969 @@ pub fn UI_RegisterCvars(ctx: &mut UiContext) {
 pub fn UI_UpdateCvars(ctx: &mut UiContext) {
     for cv in UI_CVAR_TABLE.iter() {
         trap::Cvar_Update(ctx.engine, ctx.world.cvars.field_mut(cv.field));
+    }
+}
+
+/// Raven `UI_UpdateVideoSetup`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:5473-5493`
+pub fn UI_UpdateVideoSetup(ctx: &mut UiContext) {
+    let r_mode = UI_Cvar_VariableString(ctx, "ui_r_mode");
+    trap::Cvar_Set(ctx.engine, "r_mode", &r_mode);
+    let r_fullscreen = UI_Cvar_VariableString(ctx, "ui_r_fullscreen");
+    trap::Cvar_Set(ctx.engine, "r_fullscreen", &r_fullscreen);
+    let r_colorbits = UI_Cvar_VariableString(ctx, "ui_r_colorbits");
+    trap::Cvar_Set(ctx.engine, "r_colorbits", &r_colorbits);
+    let r_lodbias = UI_Cvar_VariableString(ctx, "ui_r_lodbias");
+    trap::Cvar_Set(ctx.engine, "r_lodbias", &r_lodbias);
+    let r_picmip = UI_Cvar_VariableString(ctx, "ui_r_picmip");
+    trap::Cvar_Set(ctx.engine, "r_picmip", &r_picmip);
+    let r_texturebits = UI_Cvar_VariableString(ctx, "ui_r_texturebits");
+    trap::Cvar_Set(ctx.engine, "r_texturebits", &r_texturebits);
+    let r_texturemode = UI_Cvar_VariableString(ctx, "ui_r_texturemode");
+    trap::Cvar_Set(ctx.engine, "r_texturemode", &r_texturemode);
+    let r_detailtextures = UI_Cvar_VariableString(ctx, "ui_r_detailtextures");
+    trap::Cvar_Set(ctx.engine, "r_detailtextures", &r_detailtextures);
+    let r_ext_compress_textures = UI_Cvar_VariableString(ctx, "ui_r_ext_compress_textures");
+    trap::Cvar_Set(
+        ctx.engine,
+        "r_ext_compress_textures",
+        &r_ext_compress_textures,
+    );
+    let r_depthbits = UI_Cvar_VariableString(ctx, "ui_r_depthbits");
+    trap::Cvar_Set(ctx.engine, "r_depthbits", &r_depthbits);
+    let r_subdivisions = UI_Cvar_VariableString(ctx, "ui_r_subdivisions");
+    trap::Cvar_Set(ctx.engine, "r_subdivisions", &r_subdivisions);
+    let r_fastSky = UI_Cvar_VariableString(ctx, "ui_r_fastSky");
+    trap::Cvar_Set(ctx.engine, "r_fastSky", &r_fastSky);
+    let r_inGameVideo = UI_Cvar_VariableString(ctx, "ui_r_inGameVideo");
+    trap::Cvar_Set(ctx.engine, "r_inGameVideo", &r_inGameVideo);
+    let r_allowExtensions = UI_Cvar_VariableString(ctx, "ui_r_allowExtensions");
+    trap::Cvar_Set(ctx.engine, "r_allowExtensions", &r_allowExtensions);
+    let cg_shadows = UI_Cvar_VariableString(ctx, "ui_cg_shadows");
+    trap::Cvar_Set(ctx.engine, "cg_shadows", &cg_shadows);
+    trap::Cvar_Set(ctx.engine, "ui_r_modified", "0");
+
+    trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_APPEND as c_int, "vid_restart;");
+}
+
+/// Raven `UI_GetVideoSetup`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:5503-5542`
+pub fn UI_GetVideoSetup(ctx: &mut UiContext) {
+    // Make sure the cvars are registered as read only.
+    trap::Cvar_Register(
+        ctx.engine,
+        None,
+        "ui_r_glCustom",
+        "4",
+        CVAR_ROM | CVAR_INTERNAL | CVAR_ARCHIVE,
+    );
+
+    trap::Cvar_Register(ctx.engine, None, "ui_r_mode", "0", CVAR_ROM | CVAR_INTERNAL);
+    trap::Cvar_Register(
+        ctx.engine,
+        None,
+        "ui_r_fullscreen",
+        "0",
+        CVAR_ROM | CVAR_INTERNAL,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        None,
+        "ui_r_colorbits",
+        "0",
+        CVAR_ROM | CVAR_INTERNAL,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        None,
+        "ui_r_lodbias",
+        "0",
+        CVAR_ROM | CVAR_INTERNAL,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        None,
+        "ui_r_picmip",
+        "0",
+        CVAR_ROM | CVAR_INTERNAL,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        None,
+        "ui_r_texturebits",
+        "0",
+        CVAR_ROM | CVAR_INTERNAL,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        None,
+        "ui_r_texturemode",
+        "0",
+        CVAR_ROM | CVAR_INTERNAL,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        None,
+        "ui_r_detailtextures",
+        "0",
+        CVAR_ROM | CVAR_INTERNAL,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        None,
+        "ui_r_ext_compress_textures",
+        "0",
+        CVAR_ROM | CVAR_INTERNAL,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        None,
+        "ui_r_depthbits",
+        "0",
+        CVAR_ROM | CVAR_INTERNAL,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        None,
+        "ui_r_subdivisions",
+        "0",
+        CVAR_ROM | CVAR_INTERNAL,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        None,
+        "ui_r_fastSky",
+        "0",
+        CVAR_ROM | CVAR_INTERNAL,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        None,
+        "ui_r_inGameVideo",
+        "0",
+        CVAR_ROM | CVAR_INTERNAL,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        None,
+        "ui_r_allowExtensions",
+        "0",
+        CVAR_ROM | CVAR_INTERNAL,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        None,
+        "ui_cg_shadows",
+        "0",
+        CVAR_ROM | CVAR_INTERNAL,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        None,
+        "ui_r_modified",
+        "0",
+        CVAR_ROM | CVAR_INTERNAL,
+    );
+
+    // Copy over the real video cvars into their temporary counterparts
+    let r_mode = UI_Cvar_VariableString(ctx, "r_mode");
+    trap::Cvar_Set(ctx.engine, "ui_r_mode", &r_mode);
+    let r_colorbits = UI_Cvar_VariableString(ctx, "r_colorbits");
+    trap::Cvar_Set(ctx.engine, "ui_r_colorbits", &r_colorbits);
+    let r_fullscreen = UI_Cvar_VariableString(ctx, "r_fullscreen");
+    trap::Cvar_Set(ctx.engine, "ui_r_fullscreen", &r_fullscreen);
+    let r_lodbias = UI_Cvar_VariableString(ctx, "r_lodbias");
+    trap::Cvar_Set(ctx.engine, "ui_r_lodbias", &r_lodbias);
+    let r_picmip = UI_Cvar_VariableString(ctx, "r_picmip");
+    trap::Cvar_Set(ctx.engine, "ui_r_picmip", &r_picmip);
+    let r_texturebits = UI_Cvar_VariableString(ctx, "r_texturebits");
+    trap::Cvar_Set(ctx.engine, "ui_r_texturebits", &r_texturebits);
+    let r_texturemode = UI_Cvar_VariableString(ctx, "r_texturemode");
+    trap::Cvar_Set(ctx.engine, "ui_r_texturemode", &r_texturemode);
+    let r_detailtextures = UI_Cvar_VariableString(ctx, "r_detailtextures");
+    trap::Cvar_Set(ctx.engine, "ui_r_detailtextures", &r_detailtextures);
+    let r_ext_compress_textures = UI_Cvar_VariableString(ctx, "r_ext_compress_textures");
+    trap::Cvar_Set(
+        ctx.engine,
+        "ui_r_ext_compress_textures",
+        &r_ext_compress_textures,
+    );
+    let r_depthbits = UI_Cvar_VariableString(ctx, "r_depthbits");
+    trap::Cvar_Set(ctx.engine, "ui_r_depthbits", &r_depthbits);
+    let r_subdivisions = UI_Cvar_VariableString(ctx, "r_subdivisions");
+    trap::Cvar_Set(ctx.engine, "ui_r_subdivisions", &r_subdivisions);
+    let r_fastSky = UI_Cvar_VariableString(ctx, "r_fastSky");
+    trap::Cvar_Set(ctx.engine, "ui_r_fastSky", &r_fastSky);
+    let r_inGameVideo = UI_Cvar_VariableString(ctx, "r_inGameVideo");
+    trap::Cvar_Set(ctx.engine, "ui_r_inGameVideo", &r_inGameVideo);
+    let r_allowExtensions = UI_Cvar_VariableString(ctx, "r_allowExtensions");
+    trap::Cvar_Set(ctx.engine, "ui_r_allowExtensions", &r_allowExtensions);
+    let cg_shadows = UI_Cvar_VariableString(ctx, "cg_shadows");
+    trap::Cvar_Set(ctx.engine, "ui_cg_shadows", &cg_shadows);
+    trap::Cvar_Set(ctx.engine, "ui_r_modified", "0");
+}
+
+/// Raven `UI_UpdateCharacterCvars`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:5575-5602`
+pub fn UI_UpdateCharacterCvars(ctx: &mut UiContext) {
+    let model = trap::Cvar_VariableStringBuffer(ctx.engine, "ui_char_model", MAX_QPATH as usize);
+    let head = trap::Cvar_VariableStringBuffer(ctx.engine, "ui_char_skin_head", MAX_QPATH as usize);
+    let torso =
+        trap::Cvar_VariableStringBuffer(ctx.engine, "ui_char_skin_torso", MAX_QPATH as usize);
+    let legs = trap::Cvar_VariableStringBuffer(ctx.engine, "ui_char_skin_legs", MAX_QPATH as usize);
+
+    // PORT-NOTE: Raven `Com_sprintf` into `char skin[MAX_QPATH]`.
+    let skin: String = format!("{}/{}|{}|{}", model, head, torso, legs)
+        .chars()
+        .take(MAX_QPATH as usize - 1)
+        .collect();
+
+    trap::Cvar_Set(ctx.engine, "model", &skin);
+
+    let char_color_red = UI_Cvar_VariableString(ctx, "ui_char_color_red");
+    trap::Cvar_Set(ctx.engine, "char_color_red", &char_color_red);
+    let char_color_green = UI_Cvar_VariableString(ctx, "ui_char_color_green");
+    trap::Cvar_Set(ctx.engine, "char_color_green", &char_color_green);
+    let char_color_blue = UI_Cvar_VariableString(ctx, "ui_char_color_blue");
+    trap::Cvar_Set(ctx.engine, "char_color_blue", &char_color_blue);
+    trap::Cvar_Set(ctx.engine, "ui_selectedModelIndex", "-1");
+}
+
+/// Raven `UI_GetCharacterCvars`.
+///
+/// PORT-NOTE: Raven's `strrchr`/`strchr` pointer walk over the mutable
+/// `"model"` cvar string is transcribed as byte-offset splits over the owned
+/// `String` (the delimiters `/` and `|` are single-byte ASCII, so byte offsets
+/// stay char-boundary-safe under the Latin-1 discipline); the `assert(p2)`
+/// guards on the second and third `|` become `.expect(..)`, matching Raven's
+/// abort-on-violation behavior.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:5604-5678`
+pub fn UI_GetCharacterCvars(ctx: &mut UiContext) {
+    let char_color_red = UI_Cvar_VariableString(ctx, "char_color_red");
+    trap::Cvar_Set(ctx.engine, "ui_char_color_red", &char_color_red);
+    let char_color_green = UI_Cvar_VariableString(ctx, "char_color_green");
+    trap::Cvar_Set(ctx.engine, "ui_char_color_green", &char_color_green);
+    let char_color_blue = UI_Cvar_VariableString(ctx, "char_color_blue");
+    trap::Cvar_Set(ctx.engine, "ui_char_color_blue", &char_color_blue);
+
+    let model = UI_Cvar_VariableString(ctx, "model");
+    if let Some(slash) = model.rfind('/') {
+        if model.contains('|') {
+            // we have a multipart custom jedi
+            let base = model[..slash].to_string();
+            let rest = &model[slash + 1..];
+
+            let p1 = rest
+                .find('|')
+                .expect("multipart custom jedi model string missing '|' separator");
+            let skinhead = rest[..p1].to_string();
+            let rest2 = &rest[p1 + 1..];
+
+            let p2 = rest2
+                .find('|')
+                .expect("multipart custom jedi model string missing second '|' separator");
+            let skintorso = rest2[..p2].to_string();
+            let skinlower = rest2[p2 + 1..].to_string();
+
+            trap::Cvar_Set(ctx.engine, "ui_char_model", &base);
+            trap::Cvar_Set(ctx.engine, "ui_char_skin_head", &skinhead);
+            trap::Cvar_Set(ctx.engine, "ui_char_skin_torso", &skintorso);
+            trap::Cvar_Set(ctx.engine, "ui_char_skin_legs", &skinlower);
+
+            for i in 0..ctx.world.playerSpecies.len() {
+                if Q_stricmp(&base, &ctx.world.playerSpecies[i].Name) == 0 {
+                    ctx.world.playerSpeciesIndex = i as c_int;
+                    break;
+                }
+            }
+            return;
+        }
+    }
+
+    let model = UI_Cvar_VariableString(ctx, "ui_char_model");
+    for i in 0..ctx.world.playerSpecies.len() {
+        if Q_stricmp(&model, &ctx.world.playerSpecies[i].Name) == 0 {
+            ctx.world.playerSpeciesIndex = i as c_int;
+            return; // FOUND IT, don't fall through
+        }
+    }
+    // nope, didn't find it.
+    ctx.world.playerSpeciesIndex = 0; // jic
+    let name = ctx.world.playerSpecies[ctx.world.playerSpeciesIndex as usize]
+        .Name
+        .clone();
+    trap::Cvar_Set(ctx.engine, "ui_char_model", &name);
+    trap::Cvar_Set(ctx.engine, "ui_char_skin_head", "head_a1");
+    trap::Cvar_Set(ctx.engine, "ui_char_skin_torso", "torso_a1");
+    trap::Cvar_Set(ctx.engine, "ui_char_skin_legs", "lower_a1");
+}
+
+/// Raven `UI_UpdateSaberCvars`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:5851-5865`
+pub fn UI_UpdateSaberCvars(ctx: &mut UiContext) {
+    let saber1 = UI_Cvar_VariableString(ctx, "ui_saber");
+    trap::Cvar_Set(ctx.engine, "saber1", &saber1);
+    let saber2 = UI_Cvar_VariableString(ctx, "ui_saber2");
+    trap::Cvar_Set(ctx.engine, "saber2", &saber2);
+
+    let saber_color = UI_Cvar_VariableString(ctx, "ui_saber_color");
+    let colorI = TranslateSaberColor(&saber_color, &mut ctx.world.bg_state);
+    trap::Cvar_Set(ctx.engine, "color1", &format!("{}", colorI));
+    let g_saber_color = UI_Cvar_VariableString(ctx, "ui_saber_color");
+    trap::Cvar_Set(ctx.engine, "g_saber_color", &g_saber_color);
+
+    let saber2_color = UI_Cvar_VariableString(ctx, "ui_saber2_color");
+    let colorI = TranslateSaberColor(&saber2_color, &mut ctx.world.bg_state);
+    trap::Cvar_Set(ctx.engine, "color2", &format!("{}", colorI));
+    let g_saber2_color = UI_Cvar_VariableString(ctx, "ui_saber2_color");
+    trap::Cvar_Set(ctx.engine, "g_saber2_color", &g_saber2_color);
+}
+
+/// Raven `UI_SetSaberBoxesandHilts`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:5868-5942`
+pub fn UI_SetSaberBoxesandHilts(ctx: &mut UiContext) {
+    // Get current menu (either video or ingame video, I would assume)
+    let menu = match Menu_GetFocused(&ctx.world.menus) {
+        Some(m) => m,
+        None => return,
+    };
+
+    let sType = trap::Cvar_VariableStringBuffer(ctx.engine, "ui_saber_type", MAX_QPATH as usize);
+
+    let mut getBig = false;
+
+    if Q_stricmp("dual", &sType) != 0 {
+        getBig = true;
+    } else if Q_stricmp("staff", &sType) != 0 {
+        getBig = true;
+    }
+
+    if !getBig {
+        return;
+    }
+
+    if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "box2middle") {
+        let window = &mut ctx.world.menus.item_mut(item).window;
+        window.rect.x = 212.0;
+        window.rect.y = 126.0;
+        window.rect.w = 219.0;
+        window.rect.h = 44.0;
+    }
+
+    if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "box2bottom") {
+        let window = &mut ctx.world.menus.item_mut(item).window;
+        window.rect.x = 212.0;
+        window.rect.y = 170.0;
+        window.rect.w = 219.0;
+        window.rect.h = 60.0;
+    }
+
+    if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "box3middle") {
+        let window = &mut ctx.world.menus.item_mut(item).window;
+        window.rect.x = 418.0;
+        window.rect.y = 126.0;
+        window.rect.w = 219.0;
+        window.rect.h = 44.0;
+    }
+
+    if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "box3bottom") {
+        let window = &mut ctx.world.menus.item_mut(item).window;
+        window.rect.x = 418.0;
+        window.rect.y = 170.0;
+        window.rect.w = 219.0;
+        window.rect.h = 60.0;
+    }
+}
+
+/// Raven `UI_GetSaberCvars`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:6026-6039`
+pub fn UI_GetSaberCvars(ctx: &mut UiContext) {
+    let saber1 = UI_Cvar_VariableString(ctx, "saber1");
+    trap::Cvar_Set(ctx.engine, "ui_saber", &saber1);
+    let saber2 = UI_Cvar_VariableString(ctx, "saber2");
+    trap::Cvar_Set(ctx.engine, "ui_saber2", &saber2);
+
+    let color1 = trap::Cvar_VariableValue(ctx.engine, "color1") as saber_colors_t;
+    match SaberColorToString(color1) {
+        Some(s) => trap::Cvar_Set(ctx.engine, "g_saber_color", s),
+        None => trap::Cvar_Reset(ctx.engine, "g_saber_color"),
+    }
+    let color2 = trap::Cvar_VariableValue(ctx.engine, "color2") as saber_colors_t;
+    match SaberColorToString(color2) {
+        Some(s) => trap::Cvar_Set(ctx.engine, "g_saber2_color", s),
+        None => trap::Cvar_Reset(ctx.engine, "g_saber2_color"),
+    }
+
+    let g_saber_color = UI_Cvar_VariableString(ctx, "g_saber_color");
+    trap::Cvar_Set(ctx.engine, "ui_saber_color", &g_saber_color);
+    let g_saber2_color = UI_Cvar_VariableString(ctx, "g_saber2_color");
+    trap::Cvar_Set(ctx.engine, "ui_saber2_color", &g_saber2_color);
+}
+
+/// Raven `UI_ResetCharacterListBoxes`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:6087-6142`
+pub fn UI_ResetCharacterListBoxes(world: &mut UiWorld) {
+    let menu = match Menu_GetFocused(&world.menus) {
+        Some(m) => m,
+        None => return,
+    };
+
+    for name in ["headlistbox", "torsolistbox", "lowerlistbox", "colorbox"] {
+        if let Some(item) = Menu_FindItemByName(&world.menus, Some(menu), name) {
+            let itemDef = world.menus.item_mut(item);
+            if let Some(listPtr) = itemDef.typeData.listBox_mut() {
+                listPtr.cursorPos = 0;
+            }
+            itemDef.cursorPos = 0;
+        }
+    }
+}
+
+/// Raven `UI_BinaryServerInsertion`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:7724-7756`
+pub fn UI_BinaryServerInsertion(ctx: &mut UiContext, num: c_int) {
+    // use binary search to insert server
+    let mut len = ctx.world.serverStatus.displayServers.len() as c_int;
+    let mut mid = len;
+    let mut offset: c_int = 0;
+    let mut res: c_int = 0;
+
+    while mid > 0 {
+        mid = len >> 1;
+
+        let source = ctx.world.cvars.ui_netSource.integer;
+        let sortKey = ctx.world.serverStatus.sortKey;
+        let sortDir = ctx.world.serverStatus.sortDir;
+        let s2 = ctx.world.serverStatus.displayServers[(offset + mid) as usize];
+        res = trap::LAN_CompareServers(ctx.engine, source, sortKey, sortDir, num, s2);
+
+        // if equal
+        if res == 0 {
+            UI_InsertServerIntoDisplayList(ctx.world, num, offset + mid);
+            return;
+        }
+        // if larger
+        else if res == 1 {
+            offset += mid;
+            len -= mid;
+        }
+        // if smaller
+        else {
+            len -= mid;
+        }
+    }
+    if res == 1 {
+        offset += 1;
+    }
+    UI_InsertServerIntoDisplayList(ctx.world, num, offset);
+}
+
+/// Raven `UI_GetServerStatusInfo`.
+///
+/// PORT-NOTE: Raven walks `info->text` in place with a `char *p`, nulling
+/// delimiters as it goes and storing dangling pointers into the same buffer;
+/// the port walks an owned `Vec<char>` with a byte-free character cursor
+/// (`pos`) and copies each resolved substring instead of aliasing the buffer.
+/// `info->pings`/the raw `lines[i][0]` pointer trick for the player index is
+/// replaced by formatting the index directly into the owned cell.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:8048-8139`
+pub fn UI_GetServerStatusInfo(
+    ctx: &mut UiContext,
+    serverAddress: &str,
+    info: Option<&mut ServerStatusInfo>,
+) -> bool {
+    let Some(info) = info else {
+        trap::LAN_ServerStatus(ctx.engine, Some(serverAddress), 0);
+        return false;
+    };
+
+    *info = ServerStatusInfo::default();
+    let (status, text) =
+        trap::LAN_ServerStatus(ctx.engine, Some(serverAddress), MAX_SERVERSTATUS_TEXT);
+    if status == 0 {
+        return false;
+    }
+
+    // PORT-NOTE: Raven `Q_strncpyz` into `char address[MAX_ADDRESSLENGTH]`.
+    info.address = serverAddress.chars().take(MAX_ADDRESSLENGTH - 1).collect();
+    info.lines.push([
+        "Address".to_string(),
+        String::new(),
+        String::new(),
+        info.address.clone(),
+    ]);
+
+    let buf: Vec<char> = text.chars().collect();
+    let find_from = |from: usize, needle: char| -> Option<usize> {
+        buf[from..]
+            .iter()
+            .position(|&c| c == needle)
+            .map(|off| from + off)
+    };
+
+    // get the cvars
+    let mut pos: usize = 0;
+    loop {
+        if pos >= buf.len() {
+            pos = buf.len();
+            break;
+        }
+        let bs = match find_from(pos, '\\') {
+            Some(i) => i,
+            None => {
+                pos = buf.len();
+                break;
+            }
+        };
+        let after_bs = bs + 1;
+        if after_bs < buf.len() && buf[after_bs] == '\\' {
+            pos = after_bs;
+            break;
+        }
+        if after_bs >= buf.len() {
+            pos = buf.len();
+            break;
+        }
+        let key_start = after_bs;
+        let bs2 = match find_from(key_start, '\\') {
+            Some(i) => i,
+            None => {
+                pos = buf.len();
+                break;
+            }
+        };
+        let key: String = buf[key_start..bs2].iter().collect();
+        let value_start = bs2 + 1;
+        let value_end = find_from(value_start, '\\').unwrap_or(buf.len());
+        let value: String = buf[value_start..value_end].iter().collect();
+
+        info.lines.push([key, String::new(), String::new(), value]);
+        pos = value_start;
+        if info.lines.len() >= MAX_SERVERSTATUS_LINES {
+            // PORT-NOTE: Raven NUL-terminates a value only on the following
+            // iteration, so the cap-break leaves the last value running to the end
+            // of `info->text`.
+            let tail: String = buf[value_start..].iter().collect();
+            if let Some(last) = info.lines.last_mut() {
+                last[3] = tail;
+            }
+            break;
+        }
+    }
+
+    // get the player list
+    if info.lines.len() < MAX_SERVERSTATUS_LINES - 3 {
+        // empty line
+        info.lines
+            .push([String::new(), String::new(), String::new(), String::new()]);
+        // header
+        info.lines.push([
+            "num".to_string(),
+            "score".to_string(),
+            "ping".to_string(),
+            "name".to_string(),
+        ]);
+        // parse players
+        let mut i: c_int = 0;
+        loop {
+            if pos >= buf.len() {
+                break;
+            }
+            if buf[pos] == '\\' {
+                pos += 1;
+            }
+            if pos >= buf.len() {
+                break;
+            }
+            let score_start = pos;
+            let sp1 = match find_from(pos, ' ') {
+                Some(o) => o,
+                None => break,
+            };
+            let score: String = buf[score_start..sp1].iter().collect();
+            pos = sp1 + 1;
+
+            let ping_start = pos;
+            let sp2 = match find_from(pos, ' ') {
+                Some(o) => o,
+                None => break,
+            };
+            let ping: String = buf[ping_start..sp2].iter().collect();
+            pos = sp2 + 1;
+
+            let name_start = pos;
+            let name_end = find_from(name_start, '\\').unwrap_or(buf.len());
+            let name: String = buf[name_start..name_end].iter().collect();
+
+            info.lines.push([format!("{}", i), score, ping, name]);
+            if info.lines.len() >= MAX_SERVERSTATUS_LINES {
+                // PORT-NOTE: Raven NUL-terminates the name only after this cap
+                // check, so the cap-break leaves it running to the end of
+                // `info->text`.
+                let tail: String = buf[name_start..].iter().collect();
+                if let Some(last) = info.lines.last_mut() {
+                    last[3] = tail;
+                }
+                break;
+            }
+
+            if name_end >= buf.len() {
+                break;
+            }
+            pos = name_end + 1;
+            i += 1;
+        }
+    }
+
+    UI_SortServerStatusInfo(info);
+    true
+}
+
+/// Raven `UI_StopCinematic`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:10188-10213`
+pub fn UI_StopCinematic(ctx: &mut UiContext, handle: c_int) {
+    if handle >= 0 {
+        trap::CIN_StopCinematic(ctx.engine, handle);
+    } else {
+        let handle = handle.abs();
+        if handle == UI_MAPCINEMATIC {
+            let idx = ctx.world.cvars.ui_currentMap.integer as usize;
+            if ctx.world.mapList[idx].cinematic >= 0 {
+                let cinematic = ctx.world.mapList[idx].cinematic;
+                trap::CIN_StopCinematic(ctx.engine, cinematic);
+                ctx.world.mapList[idx].cinematic = -1;
+            }
+        } else if handle == UI_NETMAPCINEMATIC {
+            if ctx.world.serverStatus.currentServerCinematic >= 0 {
+                let cinematic = ctx.world.serverStatus.currentServerCinematic;
+                trap::CIN_StopCinematic(ctx.engine, cinematic);
+                ctx.world.serverStatus.currentServerCinematic = -1;
+            }
+        } else if handle == UI_CLANCINEMATIC {
+            let teamName = UI_Cvar_VariableString(ctx, "ui_teamName");
+            let i = UI_TeamIndexFromName(ctx.world, &teamName);
+            if i >= 0 && (i as usize) < ctx.world.teamList.len() {
+                let idx = i as usize;
+                if ctx.world.teamList[idx].cinematic >= 0 {
+                    let cinematic = ctx.world.teamList[idx].cinematic;
+                    trap::CIN_StopCinematic(ctx.engine, cinematic);
+                    ctx.world.teamList[idx].cinematic = -1;
+                }
+            }
+        }
+    }
+}
+
+/// Raven `UI_BuildQ3Model_List`.
+///
+/// PORT-NOTE: the `/*...*/`-commented-out `fpath`/`trap_FS_FOpenFile` probe
+/// (superseded by `bIsImageFile`, per Raven's own comment) is dead and is
+/// dropped, matching Raven's compiled-out behavior.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:10330-10441`
+pub fn UI_BuildQ3Model_List(ctx: &mut UiContext) {
+    ctx.world.q3HeadNames.clear();
+    ctx.world.q3HeadIcons.clear();
+
+    // iterate directory of all player models
+    let mut dirlist = vec![0u8; 2048];
+    let numdirs = trap::FS_GetFileList(ctx.engine, "models/players", "/", &mut dirlist);
+    let dirnames = latin1_to_string(&dirlist);
+    let mut dirptrs = dirnames.split('\0');
+
+    let mut i = 0;
+    while i < numdirs && ctx.world.q3HeadNames.len() < MAX_Q3PLAYERMODELS {
+        let dirptr_raw = match dirptrs.next() {
+            Some(d) => d,
+            None => break,
+        };
+        let dirptr = dirptr_raw.strip_suffix('/').unwrap_or(dirptr_raw);
+
+        if dirptr == "." || dirptr == ".." {
+            i += 1;
+            continue;
+        }
+
+        let mut filelist = vec![0u8; 2048];
+        let numfiles = trap::FS_GetFileList(
+            ctx.engine,
+            &format!("models/players/{}", dirptr),
+            "skin",
+            &mut filelist,
+        );
+        let filenames = latin1_to_string(&filelist);
+        let mut fileptrs = filenames.split('\0');
+
+        let mut j = 0;
+        while j < numfiles && ctx.world.q3HeadNames.len() < MAX_Q3PLAYERMODELS {
+            let fileptr = match fileptrs.next() {
+                Some(f) => f,
+                None => break,
+            };
+
+            let mut skinname = COM_StripExtension(fileptr);
+            if let Some(k) = skinname.find('_') {
+                skinname = skinname[k..].to_string();
+            }
+
+            // PORT-NOTE (§19): Raven takes `&skinname[1]` unconditionally (past the
+            // terminator when the stripped name is empty); the empty case is skipped.
+            if !skinname.is_empty() {
+                // Raven `check = &skinname[1]` — skip exactly one character.
+                let check: String = skinname.chars().skip(1).collect();
+                if bIsImageFile(ctx, dirptr, &check) {
+                    // if it exists
+                    if skinname.starts_with('_') {
+                        // change character to append properly
+                        skinname.replace_range(0..1, "/");
+                    }
+
+                    let candidate = format!("{}{}", dirptr, skinname);
+                    // check for dupes
+                    let iconExists = ctx
+                        .world
+                        .q3HeadNames
+                        .iter()
+                        .any(|n| Q_stricmp(&candidate, n) == 0);
+
+                    if !iconExists {
+                        // PORT-NOTE: Raven `Com_sprintf` into `q3HeadNames[i][64]`.
+                        let candidate: String = candidate.chars().take(63).collect();
+                        ctx.world.q3HeadNames.push(candidate);
+                        // rww - we are now registering them as they are drawn like the
+                        // TA feeder, so as to decrease UI load time.
+                        ctx.world.q3HeadIcons.push(0);
+                    }
+                }
+            }
+
+            if ctx.world.q3HeadNames.len() >= MAX_Q3PLAYERMODELS {
+                return;
+            }
+            j += 1;
+        }
+        i += 1;
+    }
+}
+
+// DEFERRED: UI_SiegeInit — its bg calls' real ported shapes
+// (`BG_SiegeLoadClasses(descBuffer: *mut siegeClassDesc_t, bg: &mut BgState,
+// traps: &dyn BgTraps, callbacks: &mut dyn GameCallbacks)`,
+// `BG_SiegeLoadTeams(bg: &mut BgState, traps: &dyn BgTraps)`) require a
+// `&dyn BgTraps` and a `&mut dyn GameCallbacks` instance; ui has neither an
+// implementor nor a wiring point for either trait yet (DEC-36 addendum 11/12
+// name the traits, but `impl BgTraps for ...` / `impl GameCallbacks for ...`
+// have not landed in `mp_ui`), and `g_UIClassDescriptions` is an owned
+// `Vec<String>` with no `*mut siegeClassDesc_t` buffer to hand `descBuffer`.
+// Source: `oracle/codemp/ui/ui_main.c:10443-10460`
+// Source: `crates/mp/bg/src/bg_saga.rs:1477-1492` (real `BG_SiegeLoadClasses` shape)
+// Source: `crates/mp/bg/src/bg_channel/bg_traps.rs:21` (`trait BgTraps`)
+// Source: `crates/mp/bg/src/bg_channel/game_callbacks.rs:21` (`trait GameCallbacks`)
+
+/// Raven `UI_BuildPlayerModel_List`.
+///
+/// PORT-NOTE: the `trap_Cvar_VariableValue("fs_copyfiles") > 0` `.skin`
+/// re-open/close probe (a filesystem cache-warm side effect with no
+/// observable state change) is transcribed as a fire-and-discard trap pair,
+/// matching Raven's own discarded `f`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:10515-10654`
+pub fn UI_BuildPlayerModel_List(ctx: &mut UiContext, inGameLoad: bool) {
+    ctx.world.playerSpecies.clear();
+    ctx.world.playerSpeciesIndex = 0;
+
+    // iterate directory of all player models
+    let mut dirlist = vec![0u8; 2048];
+    let numdirs = trap::FS_GetFileList(ctx.engine, "models/players", "/", &mut dirlist);
+    let dirnames = latin1_to_string(&dirlist);
+    let mut dirptrs = dirnames.split('\0');
+
+    let mut i = 0;
+    while i < numdirs {
+        let dirptr_raw = match dirptrs.next() {
+            Some(d) => d,
+            None => break,
+        };
+        // Raven tests `dirlen` on the raw entry, then strips one trailing '/'.
+        if dirptr_raw.is_empty() {
+            i += 1;
+            continue;
+        }
+        let dirptr = dirptr_raw
+            .strip_suffix('/')
+            .unwrap_or(dirptr_raw)
+            .to_string();
+
+        if dirptr == "." || dirptr == ".." {
+            i += 1;
+            continue;
+        }
+
+        let fpath = format!("models/players/{}/PlayerChoice.txt", dirptr);
+        let mut f: fileHandle_t = 0;
+        let filelen = trap::FS_FOpenFile(ctx.engine, &fpath, &mut f, FS_READ);
+
+        if f != 0 {
+            // PORT-NOTE (§19): Raven freads into `char buffer[2048]` (overrun for
+            // larger files, embedded NUL ends the parse); the whole-file read takes
+            // the defined behavior.
+            let mut buffer = vec![0u8; filelen as usize];
+            trap::FS_Read(ctx.engine, &mut buffer, f);
+            trap::FS_FCloseFile(ctx.engine, f);
+            let buffer = latin1_to_string(&buffer);
+            // Raven's `buffer[filelen] = 0` NUL-terminates; a NUL inside the file
+            // ends the parse there.
+            let buffer = match buffer.find('\0') {
+                Some(n) => buffer[..n].to_string(),
+                None => buffer,
+            };
+
+            // record this species
+            let mut species = PlayerSpeciesInfo {
+                // PORT-NOTE: Raven `Q_strncpyz` into `playerSpecies[].Name[64]`.
+                Name: dirptr.chars().take(63).collect(),
+                ..PlayerSpeciesInfo::default()
+            };
+
+            if !UI_ParseColorData(&mut ctx.world.bg_state.qs, &buffer, &mut species, &fpath) {
+                Com_Printf(
+                    ctx,
+                    &format!(
+                        "{}UI_BuildPlayerModel_List: Errors parsing '{}'\n",
+                        S_COLOR_RED.to_str().unwrap(),
+                        fpath
+                    ),
+                );
+            }
+
+            let mut filelist = vec![0u8; 2048];
+            let numfiles = trap::FS_GetFileList(
+                ctx.engine,
+                &format!("models/players/{}", dirptr),
+                ".skin",
+                &mut filelist,
+            );
+            let filenames = latin1_to_string(&filelist);
+            let mut fileptrs = filenames.split('\0');
+
+            let mut iSkinParts: c_int = 0;
+            let mut j = 0;
+            while j < numfiles {
+                let fileptr = match fileptrs.next() {
+                    Some(f) => f,
+                    None => break,
+                };
+
+                if trap::Cvar_VariableValue(ctx.engine, "fs_copyfiles") > 0.0 {
+                    let mut f2: fileHandle_t = 0;
+                    trap::FS_FOpenFile(
+                        ctx.engine,
+                        &format!("models/players/{}/{}", dirptr, fileptr),
+                        &mut f2,
+                        FS_READ,
+                    );
+                    if f2 != 0 {
+                        trap::FS_FCloseFile(ctx.engine, f2);
+                    }
+                }
+
+                let skinname = COM_StripExtension(fileptr);
+
+                if bIsImageFile(ctx, &dirptr, &skinname) {
+                    // if it exists.
+                    // PORT-NOTE: Raven `Q_strncpyz` into `Skin*Names[][16]`.
+                    let stored: String = skinname.chars().take(15).collect();
+                    if Q_stricmpn(&skinname, "head_", 5) == 0 {
+                        if species.SkinHeadNames.len() < MAX_PLAYERMODELS {
+                            species.SkinHeadNames.push(stored);
+                            iSkinParts |= 1 << 0;
+                        }
+                    } else if Q_stricmpn(&skinname, "torso_", 6) == 0 {
+                        if species.SkinTorsoNames.len() < MAX_PLAYERMODELS {
+                            species.SkinTorsoNames.push(stored);
+                            iSkinParts |= 1 << 1;
+                        }
+                    } else if Q_stricmpn(&skinname, "lower_", 6) == 0 {
+                        if species.SkinLegNames.len() < MAX_PLAYERMODELS {
+                            species.SkinLegNames.push(stored);
+                            iSkinParts |= 1 << 2;
+                        }
+                    }
+                }
+                j += 1;
+            }
+
+            if iSkinParts != 7 {
+                // didn't get a skin for each, then skip this model.
+                i += 1;
+                continue;
+            }
+
+            ctx.world.playerSpecies.push(species);
+            if !inGameLoad && ctx.world.cvars.ui_PrecacheModels.integer != 0 {
+                let mut ghoul2: *mut c_void = core::ptr::null_mut();
+                let modelPath = format!("models/players/{}/model.glm", dirptr);
+                let g2Model =
+                    trap::G2API_InitGhoul2Model(ctx.engine, &mut ghoul2, &modelPath, 0, 0, 0, 0, 0);
+                if g2Model >= 0 {
+                    trap::G2API_CleanGhoul2Models(ctx.engine, &mut ghoul2);
+                }
+            }
+
+            if ctx.world.playerSpecies.len() >= MAX_PLAYERMODELS {
+                return;
+            }
+        }
+        i += 1;
+    }
+}
+
+/// Raven `_UI_IsFullscreen`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:11030-11032`
+pub fn _UI_IsFullscreen(world: &UiWorld) -> bool {
+    Menus_AnyFullScreenVisible(&world.menus)
+}
+
+/// Raven `UI_StopServerRefresh`.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:11569-11588`
+pub fn UI_StopServerRefresh(ctx: &mut UiContext) {
+    if !ctx.world.serverStatus.refreshActive {
+        // not currently refreshing
+        return;
+    }
+    ctx.world.serverStatus.refreshActive = false;
+    Com_Printf(
+        ctx,
+        &format!(
+            "{} servers listed in browser with {} players.\n",
+            ctx.world.serverStatus.displayServers.len(),
+            ctx.world.serverStatus.numPlayersOnServers
+        ),
+    );
+    let count = trap::LAN_GetServerCount(ctx.engine, ctx.world.cvars.ui_netSource.integer);
+    let numDisplayServers = ctx.world.serverStatus.displayServers.len() as c_int;
+    if count - numDisplayServers > 0 {
+        let maxPing = trap::Cvar_VariableValue(ctx.engine, "cl_maxPing") as c_int;
+        Com_Printf(
+            ctx,
+            &format!(
+                "{} servers not listed due to filters, packet loss, or pings higher than {}\n",
+                count - numDisplayServers,
+                maxPing
+            ),
+        );
     }
 }

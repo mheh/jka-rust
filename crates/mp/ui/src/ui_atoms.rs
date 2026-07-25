@@ -7,8 +7,13 @@
 use core::ffi::c_int;
 
 use mp_qshared::shared::cbuf_exec::cbufExec_t;
+use mp_qshared::shared::fileHandle_t;
 use mp_qshared::shared::qhandle_t;
 use mp_qshared::shared::vec4_t;
+use mp_qshared::shared::FS_READ;
+use mp_qshared::shared::FS_WRITE;
+use mp_qshared::shared::MAX_QPATH;
+use native_string::latin1_to_string;
 
 use crate::local::post_game_info_s::postGameInfo_t;
 use crate::trap;
@@ -49,11 +54,7 @@ pub fn UI_ClampCvar(min: f32, max: f32, value: f32) -> f32 {
 ///
 /// Source: `oracle/codemp/ui/ui_atoms.c:59-61`
 pub fn UI_StartDemoLoop(ctx: &mut UiContext) {
-    trap::Cmd_ExecuteText(
-        ctx.engine,
-        cbufExec_t::EXEC_APPEND as c_int,
-        "d1\n",
-    );
+    trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_APPEND as c_int, "d1\n");
 }
 
 /// Raven `UI_Argv` — returns the `arg`th console-command argument.
@@ -348,15 +349,155 @@ pub fn UI_UpdateScreen(ctx: &mut UiContext) {
 /// `(x, y, width, height)`.
 ///
 /// Source: `oracle/codemp/ui/ui_atoms.c:484-493`
-pub fn UI_CursorInRect(
-    ctx: &UiContext,
-    x: c_int,
-    y: c_int,
-    width: c_int,
-    height: c_int,
-) -> bool {
+pub fn UI_CursorInRect(ctx: &UiContext, x: c_int, y: c_int, width: c_int, height: c_int) -> bool {
     !(ctx.world.uiDC.cursorx < x
         || ctx.world.uiDC.cursory < y
         || ctx.world.uiDC.cursorx > x + width
         || ctx.world.uiDC.cursory > y + height)
+}
+
+/// `postGameInfo_t`'s on-disk byte width — Raven's `sizeof(postGameInfo_t)`.
+const POST_GAME_INFO_SIZE: usize = core::mem::size_of::<postGameInfo_t>();
+
+// PORT-NOTE: Raven reads/writes `postGameInfo_t` as raw struct bytes
+// (`trap_FS_Read(&newInfo, sizeof(postGameInfo_t), f)`). No `unsafe` cast is
+// available under the dictionary, so the byte layout is reproduced field by
+// field (native-endian, matching the on-disk host-native layout).
+fn postGameInfo_from_bytes(buf: &[u8]) -> postGameInfo_t {
+    let read = |i: usize| i32::from_ne_bytes(buf[i * 4..i * 4 + 4].try_into().unwrap());
+    postGameInfo_t {
+        score: read(0),
+        redScore: read(1),
+        blueScore: read(2),
+        perfects: read(3),
+        accuracy: read(4),
+        impressives: read(5),
+        excellents: read(6),
+        defends: read(7),
+        assists: read(8),
+        gauntlets: read(9),
+        captures: read(10),
+        time: read(11),
+        timeBonus: read(12),
+        shutoutBonus: read(13),
+        skillBonus: read(14),
+        baseScore: read(15),
+    }
+}
+
+fn postGameInfo_to_bytes(info: &postGameInfo_t) -> [u8; POST_GAME_INFO_SIZE] {
+    let mut buf = [0u8; POST_GAME_INFO_SIZE];
+    let fields = [
+        info.score,
+        info.redScore,
+        info.blueScore,
+        info.perfects,
+        info.accuracy,
+        info.impressives,
+        info.excellents,
+        info.defends,
+        info.assists,
+        info.gauntlets,
+        info.captures,
+        info.time,
+        info.timeBonus,
+        info.shutoutBonus,
+        info.skillBonus,
+        info.baseScore,
+    ];
+    for (i, v) in fields.iter().enumerate() {
+        buf[i * 4..i * 4 + 4].copy_from_slice(&v.to_ne_bytes());
+    }
+    buf
+}
+
+/// Raven `UI_LoadBestScores` — loads a saved post-game score snapshot for
+/// `map`/`game` off disk into the `ui_score*` cvars, and probes whether a
+/// matching demo file exists.
+///
+/// Source: `oracle/codemp/ui/ui_atoms.c:118-140`
+pub fn UI_LoadBestScores(ctx: &mut UiContext, map: &str, game: c_int) {
+    let mut newInfo = postGameInfo_from_bytes(&[0u8; POST_GAME_INFO_SIZE]);
+
+    // PORT-NOTE: Raven `Com_sprintf` into `char fileName[MAX_QPATH]`.
+    let fileName: String = format!("games/{}_{}.game", map, game)
+        .chars()
+        .take(MAX_QPATH as usize - 1)
+        .collect();
+    let mut f: fileHandle_t = 0;
+    if trap::FS_FOpenFile(ctx.engine, &fileName, &mut f, FS_READ) >= 0 {
+        let mut sizeBuf = [0u8; 4];
+        trap::FS_Read(ctx.engine, &mut sizeBuf, f);
+        let size = i32::from_ne_bytes(sizeBuf);
+        if size as usize == POST_GAME_INFO_SIZE {
+            let mut infoBuf = [0u8; POST_GAME_INFO_SIZE];
+            trap::FS_Read(ctx.engine, &mut infoBuf, f);
+            newInfo = postGameInfo_from_bytes(&infoBuf);
+        }
+        trap::FS_FCloseFile(ctx.engine, f);
+    }
+    UI_SetBestScores(ctx, &newInfo, false);
+
+    let protocol = trap::Cvar_VariableValue(ctx.engine, "protocol") as c_int;
+    // PORT-NOTE: Raven `Com_sprintf` into `char fileName[MAX_QPATH]`.
+    let demoName: String = format!("demos/{}_{}.dm_{}", map, game, protocol)
+        .chars()
+        .take(MAX_QPATH as usize - 1)
+        .collect();
+    ctx.world.demoAvailable = false;
+    if trap::FS_FOpenFile(ctx.engine, &demoName, &mut f, FS_READ) >= 0 {
+        ctx.world.demoAvailable = true;
+        trap::FS_FCloseFile(ctx.engine, f);
+    }
+}
+
+/// Raven `UI_ClearScores` — zeroes every saved post-game score file under
+/// `games/` and resets the `ui_score*` cvars.
+///
+/// Source: `oracle/codemp/ui/ui_atoms.c:147-174`
+pub fn UI_ClearScores(ctx: &mut UiContext) {
+    let mut gameList = [0u8; 4096];
+    let count = trap::FS_GetFileList(ctx.engine, "games", "game", &mut gameList);
+
+    let newInfo = postGameInfo_from_bytes(&[0u8; POST_GAME_INFO_SIZE]);
+
+    if count > 0 {
+        let mut offset = 0usize;
+        for _ in 0..count {
+            // PORT-NOTE: an unterminated tail ends the walk rather than running off
+            // the buffer.
+            if offset >= gameList.len() {
+                break;
+            }
+            let end = gameList[offset..]
+                .iter()
+                .position(|&b| b == 0)
+                .map(|p| offset + p)
+                .unwrap_or(gameList.len());
+            let gameFile = latin1_to_string(&gameList[offset..end]);
+            let mut f: fileHandle_t = 0;
+            if trap::FS_FOpenFile(ctx.engine, &format!("games/{}", gameFile), &mut f, FS_WRITE) >= 0
+            {
+                trap::FS_Write(ctx.engine, &(POST_GAME_INFO_SIZE as i32).to_ne_bytes(), f);
+                trap::FS_Write(ctx.engine, &postGameInfo_to_bytes(&newInfo), f);
+                trap::FS_FCloseFile(ctx.engine, f);
+            }
+            offset = end + 1;
+        }
+    }
+
+    UI_SetBestScores(ctx, &newInfo, false);
+}
+
+/// Raven `UI_DrawRect` — draws a 1px border rectangle around `(x, y, width,
+/// height)` in `color`.
+///
+/// Source: `oracle/codemp/ui/ui_atoms.c:460-467`
+pub fn UI_DrawRect(ctx: &mut UiContext, x: f32, y: f32, width: f32, height: f32, color: &vec4_t) {
+    trap::R_SetColor(ctx.engine, Some(color));
+
+    UI_DrawTopBottom(ctx, x, y, width, height);
+    UI_DrawSides(ctx, x, y, width, height);
+
+    trap::R_SetColor(ctx.engine, None);
 }

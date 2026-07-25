@@ -6,15 +6,20 @@
 
 use core::ffi::c_int;
 
+use mp_bg::bg_misc::bgForcePowerCost;
 use mp_qshared::common::mp::qcommon::saber::saber_colors::{
     SABER_BLUE, SABER_GREEN, SABER_ORANGE, SABER_PURPLE, SABER_RED, SABER_YELLOW,
 };
 use mp_qshared::shared::cbuf_exec::cbufExec_t;
-use mp_qshared::shared::force_powers::FORCE_LIGHTSIDE;
+use mp_qshared::shared::force_powers::{FORCE_LEVEL_1, FORCE_LIGHTSIDE};
+use mp_qshared::shared::vec4_t;
+use mp_uishared::shared::rect_def_t::RectDef;
 
 use crate::trap;
 use crate::world::ui_context::UiContext;
 use crate::world::ui_world::UiWorld;
+
+use super::ui_atoms::UI_DrawHandlePic;
 
 /// Raven `UI_InitForceShaders` — registers the force-star and saber-color
 /// shaders used on the force-allocation screen.
@@ -117,4 +122,68 @@ pub fn UI_TranslateFCFIndex(world: &UiWorld, index: c_int) -> c_int {
     }
 
     index - world.forceConfigDarkIndexBegin
+}
+
+/// Raven `UI_DrawForceStars` — draws a row of force-power stars on a force
+/// UI screen, with shading for disabled powers.
+///
+/// Source: `oracle/codemp/ui/ui_force.c:129-171`
+pub fn UI_DrawForceStars(
+    ctx: &mut UiContext,
+    rect: &RectDef,
+    _scale: f32,
+    _color: &vec4_t,
+    _textStyle: c_int,
+    forceindex: c_int,
+    val: c_int,
+    min: c_int,
+    max: c_int,
+) {
+    // Raven `int xPos = rect->x` — the origin truncates to int and advances by
+    // ints, so every draw lands on the truncated position.
+    let mut xPos: c_int = rect.x as c_int;
+    let width: c_int = 16;
+    let pad: c_int = 4;
+
+    let mut v = val;
+    if v < min || v > max {
+        v = min;
+    }
+
+    for i in FORCE_LEVEL_1..=max {
+        let star_color = bgForcePowerCost[forceindex as usize][i as usize];
+
+        if ctx.world.force.uiForcePowersDisabled[forceindex as usize] {
+            let gr_color: vec4_t = [0.2, 0.2, 0.2, 1.0];
+            trap::R_SetColor(ctx.engine, Some(&gr_color));
+        }
+
+        if v >= i {
+            // Draw a star.
+            UI_DrawHandlePic(
+                ctx,
+                xPos as f32,
+                rect.y + 6.0,
+                width as f32,
+                width as f32,
+                ctx.world.force.uiForceStarShaders[star_color as usize][1],
+            );
+        } else {
+            // Draw a circle.
+            UI_DrawHandlePic(
+                ctx,
+                xPos as f32,
+                rect.y + 6.0,
+                width as f32,
+                width as f32,
+                ctx.world.force.uiForceStarShaders[star_color as usize][0],
+            );
+        }
+
+        if ctx.world.force.uiForcePowersDisabled[forceindex as usize] {
+            trap::R_SetColor(ctx.engine, None);
+        }
+
+        xPos += width + pad;
+    }
 }
