@@ -33,10 +33,10 @@ use crate::shared::item_def_s::{ItemDef, MAX_COLOR_RANGES};
 use crate::shared::item_id::ItemId;
 use crate::shared::item_payload::ItemPayload;
 use crate::shared::list_box_def_s::{ListBoxDef, MAX_LB_COLUMNS};
-use crate::shared::menu_def_t::MenuDef;
+use crate::shared::menu_def_t::{MenuDef, MAX_MENUITEMS};
 use crate::shared::menu_id::MenuId;
 use crate::shared::menu_system::{
-    MenuSystem, DOUBLE_CLICK_DELAY, MAX_DEFERRED_SCRIPT, MAX_OPEN_MENUS,
+    MenuSystem, DOUBLE_CLICK_DELAY, MAX_DEFERRED_SCRIPT, MAX_MENUS, MAX_OPEN_MENUS,
 };
 use crate::shared::menudef::{
     FEEDER_LANGUAGES, FEEDER_PLAYER_SPECIES, ITEM_ALIGN_CENTER, ITEM_ALIGN_LEFT, ITEM_ALIGN_RIGHT,
@@ -2450,17 +2450,19 @@ pub fn Item_ValidateTypeData(item: &mut ItemDef) {
 
 // `KeywordHash_Add` — ui_shared.c:7347-7358.
 // `KeywordHash_Find` — ui_shared.c:7360-7371.
+// `Item_SetupKeywordHash` — ui_shared.c:8995-9002.
+// `Menu_SetupKeywordHash` — ui_shared.c:9765-9772.
 //
-// DEFERRED: KeywordHash_Add, KeywordHash_Find — the `keywordHash_t` node type
-// these operate on (a hand-rolled hash-bucket linked list over
-// `itemParseKeywords[]`/`menuParseKeywords[]`, Raven's per-keyword C
-// fn-pointer tables) is not ported; the translation dictionary routes closed
-// C fn-pointer tables to `match` dispatch, which is the expected owned shape
-// for the item/menu keyword parser once it lands — at that point this
-// hash-bucket infrastructure has no owned-shape target to transcribe against
-// (inventing an ad-hoc `keywordHash_t` port here would front-run that design
-// point). Flagged as an escalation for the wave-planning follow-up.
-// Source: `oracle/codemp/ui/ui_shared.c:7326-7371`
+// DROPPED (porting-rules §20 dead surface): `KeywordHash_Add`/`KeywordHash_Find`
+// and the two table-building wrappers around them operate on `keywordHash_t`, a
+// hand-rolled hash-bucket linked list over `itemParseKeywords[]`/
+// `menuParseKeywords[]` (Raven's per-keyword C fn-pointer tables). The
+// translation dictionary routes closed C fn-pointer tables to `match`
+// dispatch — the owned shape `Item_Parse`/`Menu_Parse` use directly
+// (`dispatch_item_keyword`/`dispatch_menu_keyword` below), so the hash
+// infrastructure itself has no owned-shape target and is dropped rather than
+// transcribed; every other DEFERRED note for this cluster points back here.
+// Source: `oracle/codemp/ui/ui_shared.c:7326-7371,8995-9002,9765-9772`
 
 /// Raven `ItemParse_flag` — parse an item's `WINDOW_*` style flag keyword.
 ///
@@ -3523,19 +3525,261 @@ pub fn ItemParse_scrollhidden(menus: &mut MenuSystem, item: ItemId, _handle: c_i
 
 // `Item_SetupKeywordHash` — ui_shared.c:8995-9002.
 //
-// DEFERRED: Item_SetupKeywordHash — builds `itemParseKeywordHash` by walking
-// `itemParseKeywords[]` through `KeywordHash_Add`, both of which carry the
-// same `keywordHash_t` deferral as `KeywordHash_Add`/`KeywordHash_Find` above
-// (no owned-shape item/menu keyword-dispatch design landed yet); nothing to
-// build the hash table against.
+// DROPPED — see the `KeywordHash_Add`/`KeywordHash_Find` note above.
 // Source: `oracle/codemp/ui/ui_shared.c:8995-9002`
 
-// `Item_Parse` — ui_shared.c:9009-9040.
-//
-// DEFERRED: Item_Parse — dispatches item keywords through
-// `KeywordHash_Find(itemParseKeywordHash, ...)`, the same deferred
-// infrastructure as `Item_SetupKeywordHash` above.
-// Source: `oracle/codemp/ui/ui_shared.c:9009-9040`
+/// Local dispatch table replacing Raven's `keywordHash_t itemParseKeywords[]`
+/// (`ui_shared.c:8892-8986`) that `Item_Parse` walked through
+/// `KeywordHash_Find` — see the `KeywordHash_Add`/`KeywordHash_Find` DROPPED
+/// note above. A `match`-like `if`/`else if` chain over `stricmp_eq`
+/// (`Q_stricmp`-equal) in the table's original entry order, one arm per
+/// entry, calling the already-ported `ItemParse_*` leaf with its own actual
+/// signature (most take `dc`; the handful of flag-only parsers —
+/// `autowrapped`, `decoration`, `horizontalscroll`, `notselectable`,
+/// `wrapped`, `scrollhidden` — don't).
+///
+/// The `"xoffset\t\t"` entry (`ui_shared.c:8980`) carries two literal
+/// embedded tab characters inside the keyword string itself — confirmed
+/// against the raw oracle bytes, not a rendering artifact. `Q_stricmp`
+/// compares the full string, so this entry can never match a plain
+/// `"xoffset"` token off the lexer; ported verbatim (literal `\t\t` in the
+/// Rust string), this keyword stays exactly as unreachable here as it is in
+/// the oracle.
+/// Source: `oracle/codemp/ui/ui_shared.c:8892-8986`
+fn dispatch_item_keyword(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    keyword: &str,
+    handle: c_int,
+) -> Option<bool> {
+    if stricmp_eq(keyword, "action") {
+        Some(ItemParse_action(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "addColorRange") {
+        Some(ItemParse_addColorRange(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "align") {
+        Some(ItemParse_align(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "autowrapped") {
+        Some(ItemParse_autowrapped(menus, item, handle))
+    } else if stricmp_eq(keyword, "appearance_slot") {
+        Some(ItemParse_Appearance_slot(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "asset_model") {
+        Some(ItemParse_asset_model(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "asset_shader") {
+        Some(ItemParse_asset_shader(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "backcolor") {
+        Some(ItemParse_backcolor(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "background") {
+        Some(ItemParse_background(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "border") {
+        Some(ItemParse_border(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "bordercolor") {
+        Some(ItemParse_bordercolor(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "bordersize") {
+        Some(ItemParse_bordersize(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "cinematic") {
+        Some(ItemParse_cinematic(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "columns") {
+        Some(ItemParse_columns(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "cvar") {
+        Some(ItemParse_cvar(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "cvarFloat") {
+        Some(ItemParse_cvarFloat(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "cvarFloatList") {
+        Some(ItemParse_cvarFloatList(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "cvarStrList") {
+        Some(ItemParse_cvarStrList(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "cvarTest") {
+        Some(ItemParse_cvarTest(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "desctext") {
+        Some(ItemParse_descText(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "decoration") {
+        Some(ItemParse_decoration(menus, item, handle))
+    } else if stricmp_eq(keyword, "disableCvar") {
+        Some(ItemParse_disableCvar(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "doubleclick") {
+        Some(ItemParse_doubleClick(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "elementheight") {
+        Some(ItemParse_elementheight(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "elementtype") {
+        Some(ItemParse_elementtype(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "elementwidth") {
+        Some(ItemParse_elementwidth(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "enableCvar") {
+        Some(ItemParse_enableCvar(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "feeder") {
+        Some(ItemParse_feeder(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "flag") {
+        Some(ItemParse_flag(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "focusSound") {
+        Some(ItemParse_focusSound(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "font") {
+        Some(ItemParse_font(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "forecolor") {
+        Some(ItemParse_forecolor(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "group") {
+        Some(ItemParse_group(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "hideCvar") {
+        Some(ItemParse_hideCvar(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "horizontalscroll") {
+        Some(ItemParse_horizontalscroll(menus, item, handle))
+    } else if stricmp_eq(keyword, "isCharacter") {
+        Some(ItemParse_isCharacter(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "isSaber") {
+        Some(ItemParse_isSaber(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "isSaber2") {
+        Some(ItemParse_isSaber2(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "leaveFocus") {
+        Some(ItemParse_leaveFocus(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "maxChars") {
+        Some(ItemParse_maxChars(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "maxPaintChars") {
+        Some(ItemParse_maxPaintChars(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "model_angle") {
+        Some(ItemParse_model_angle(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "model_fovx") {
+        Some(ItemParse_model_fovx(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "model_fovy") {
+        Some(ItemParse_model_fovy(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "model_origin") {
+        Some(ItemParse_model_origin(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "model_rotation") {
+        Some(ItemParse_model_rotation(menus, dc, item, handle))
+    //rww - g2 begin
+    } else if stricmp_eq(keyword, "model_g2mins") {
+        Some(ItemParse_model_g2mins(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "model_g2maxs") {
+        Some(ItemParse_model_g2maxs(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "model_g2scale") {
+        Some(ItemParse_model_g2scale(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "model_g2skin") {
+        Some(ItemParse_model_g2skin(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "model_g2anim") {
+        Some(ItemParse_model_g2anim(menus, dc, item, handle))
+    //rww - g2 end
+    } else if stricmp_eq(keyword, "mouseEnter") {
+        Some(ItemParse_mouseEnter(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "mouseEnterText") {
+        Some(ItemParse_mouseEnterText(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "mouseExit") {
+        Some(ItemParse_mouseExit(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "mouseExitText") {
+        Some(ItemParse_mouseExitText(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "name") {
+        Some(ItemParse_name(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "notselectable") {
+        Some(ItemParse_notselectable(menus, item, handle))
+    } else if stricmp_eq(keyword, "onFocus") {
+        Some(ItemParse_onFocus(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "outlinecolor") {
+        Some(ItemParse_outlinecolor(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "ownerdraw") {
+        Some(ItemParse_ownerdraw(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "ownerdrawFlag") {
+        Some(ItemParse_ownerdrawFlag(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "rect") {
+        Some(ItemParse_rect(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "rectcvar") {
+        Some(ItemParse_rectcvar(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "showCvar") {
+        Some(ItemParse_showCvar(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "special") {
+        Some(ItemParse_special(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "style") {
+        Some(ItemParse_style(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "text") {
+        Some(ItemParse_text(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "textalign") {
+        Some(ItemParse_textalign(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "textalignx") {
+        Some(ItemParse_textalignx(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "textaligny") {
+        Some(ItemParse_textaligny(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "textscale") {
+        Some(ItemParse_textscale(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "textstyle") {
+        Some(ItemParse_textstyle(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "text2") {
+        Some(ItemParse_text2(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "text2alignx") {
+        Some(ItemParse_text2alignx(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "text2aligny") {
+        Some(ItemParse_text2aligny(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "type") {
+        Some(ItemParse_type(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "visible") {
+        Some(ItemParse_visible(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "wrapped") {
+        Some(ItemParse_wrapped(menus, item, handle))
+    // Text scroll specific
+    } else if stricmp_eq(keyword, "maxLineChars") {
+        Some(ItemParse_maxLineChars(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "lineHeight") {
+        Some(ItemParse_lineHeight(menus, dc, item, handle))
+    } else if stricmp_eq(keyword, "invertyesno") {
+        Some(ItemParse_invertyesno(menus, dc, item, handle))
+    //JLF MPMOVED
+    } else if stricmp_eq(keyword, "scrollhidden") {
+        Some(ItemParse_scrollhidden(menus, item, handle))
+    } else if stricmp_eq(keyword, "xoffset\t\t") {
+        // PORT-NOTE: faithful reproduction of the oracle table typo — see
+        // this fn's doc comment.
+        Some(ItemParse_xoffset(menus, dc, item, handle))
+    //JLF end
+    } else {
+        None
+    }
+}
+
+/// Raven `Item_Parse` — read one `itemDef { ... }` block off `handle` into
+/// `item`, dispatching each keyword token through `itemParseKeywords[]`.
+///
+/// PORT-NOTE: `KeywordHash_Find(itemParseKeywordHash, token.string)` becomes
+/// [`dispatch_item_keyword`] (see its doc comment and the
+/// `KeywordHash_Add`/`KeywordHash_Find` DROPPED note above).
+/// Source: `oracle/codemp/ui/ui_shared.c:9009-9040`
+pub fn Item_Parse(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    handle: c_int,
+) -> bool {
+    let mut token = zero_pc_token();
+    if !dc.PC_ReadToken(handle, &mut token) {
+        return false;
+    }
+    if !pc_token_str(&token).starts_with('{') {
+        return false;
+    }
+
+    loop {
+        if !dc.PC_ReadToken(handle, &mut token) {
+            PC_SourceError(dc, handle, "end of file inside menu item\n");
+            return false;
+        }
+
+        let tokenStr = pc_token_str(&token);
+        if tokenStr.starts_with('}') {
+            return true;
+        }
+
+        match dispatch_item_keyword(menus, dc, item, &tokenStr, handle) {
+            None => {
+                PC_SourceError(dc, handle, &format!("unknown menu item keyword {tokenStr}"));
+                continue;
+            }
+            Some(true) => {}
+            Some(false) => {
+                PC_SourceError(
+                    dc,
+                    handle,
+                    &format!("couldn't parse menu item keyword {tokenStr}"),
+                );
+                return false;
+            }
+        }
+    }
+}
 
 /// Raven `Item_TextScroll_BuildLines` — word-wrap a text-scroll item's
 /// `text` into `typeData.pLines`, asian-aware byte-cursor line breaking.
@@ -3678,17 +3922,151 @@ pub fn Item_TextScroll_BuildLines(
 
 // `Menu_SetupKeywordHash` — ui_shared.c:9765-9772.
 //
-// DEFERRED: Menu_SetupKeywordHash — builds `menuParseKeywordHash` by walking
-// `menuParseKeywords[]` through `KeywordHash_Add`, the same deferred
-// infrastructure as `Item_SetupKeywordHash` above.
+// DROPPED — see the `KeywordHash_Add`/`KeywordHash_Find` note above.
 // Source: `oracle/codemp/ui/ui_shared.c:9765-9772`
 
-// `Menu_Parse` — ui_shared.c:9779-9810.
-//
-// DEFERRED: Menu_Parse — dispatches menu keywords through
-// `KeywordHash_Find(menuParseKeywordHash, ...)`, the same deferred
-// infrastructure as `Item_Parse` above.
-// Source: `oracle/codemp/ui/ui_shared.c:9779-9810`
+/// Local dispatch table replacing Raven's `keywordHash_t menuParseKeywords[]`
+/// (`ui_shared.c:9717-9756`) that `Menu_Parse` walked through
+/// `KeywordHash_Find` — see [`dispatch_item_keyword`]'s doc comment (same
+/// shape, menu-table entries in their original order). `MenuParse_font` is
+/// the one entry that also needs `ds` (mutable — it lazily registers the
+/// shared medium-font asset); `outOfBoundsClick`/`popup` don't need `dc`.
+/// Source: `oracle/codemp/ui/ui_shared.c:9717-9756`
+fn dispatch_menu_keyword(
+    menus: &mut MenuSystem,
+    ds: &mut DisplayState,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    keyword: &str,
+    handle: c_int,
+) -> Option<bool> {
+    if stricmp_eq(keyword, "appearanceIncrement") {
+        Some(MenuParse_appearanceIncrement(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "backcolor") {
+        Some(MenuParse_backcolor(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "background") {
+        Some(MenuParse_background(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "border") {
+        Some(MenuParse_border(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "bordercolor") {
+        Some(MenuParse_bordercolor(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "borderSize") {
+        Some(MenuParse_borderSize(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "cinematic") {
+        Some(MenuParse_cinematic(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "descAlignment") {
+        Some(MenuParse_descAlignment(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "desccolor") {
+        Some(MenuParse_descColor(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "descX") {
+        Some(MenuParse_descX(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "descY") {
+        Some(MenuParse_descY(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "descScale") {
+        Some(MenuParse_descScale(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "disablecolor") {
+        Some(MenuParse_disablecolor(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "fadeAmount") {
+        Some(MenuParse_fadeAmount(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "fadeClamp") {
+        Some(MenuParse_fadeClamp(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "fadeCycle") {
+        Some(MenuParse_fadeCycle(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "focuscolor") {
+        Some(MenuParse_focuscolor(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "font") {
+        Some(MenuParse_font(menus, ds, dc, menu, handle))
+    } else if stricmp_eq(keyword, "forecolor") {
+        Some(MenuParse_forecolor(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "fullscreen") {
+        Some(MenuParse_fullscreen(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "itemDef") {
+        Some(MenuParse_itemDef(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "name") {
+        Some(MenuParse_name(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "onClose") {
+        Some(MenuParse_onClose(menus, dc, menu, handle))
+    //JLFACCEPT MPMOVED
+    } else if stricmp_eq(keyword, "onAccept") {
+        Some(MenuParse_onAccept(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "onESC") {
+        Some(MenuParse_onESC(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "outOfBoundsClick") {
+        Some(MenuParse_outOfBounds(menus, menu, handle))
+    } else if stricmp_eq(keyword, "onOpen") {
+        Some(MenuParse_onOpen(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "outlinecolor") {
+        Some(MenuParse_outlinecolor(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "ownerdraw") {
+        Some(MenuParse_ownerdraw(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "ownerdrawFlag") {
+        Some(MenuParse_ownerdrawFlag(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "popup") {
+        Some(MenuParse_popup(menus, menu, handle))
+    } else if stricmp_eq(keyword, "rect") {
+        Some(MenuParse_rect(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "soundLoop") {
+        Some(MenuParse_soundLoop(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "style") {
+        Some(MenuParse_style(menus, dc, menu, handle))
+    } else if stricmp_eq(keyword, "visible") {
+        Some(MenuParse_visible(menus, dc, menu, handle))
+    } else {
+        None
+    }
+}
+
+/// Raven `Menu_Parse` — read one `menudef { ... }` block off `handle` into
+/// `menu`, dispatching each keyword token through `menuParseKeywords[]`.
+///
+/// PORT-NOTE: `KeywordHash_Find(menuParseKeywordHash, token.string)` becomes
+/// [`dispatch_menu_keyword`] (see its doc comment). `ds` threads through only
+/// because `MenuParse_font` needs it; `Item_Parse`'s equivalent dispatch has
+/// no such entry, so it stays `ds`-free.
+/// Source: `oracle/codemp/ui/ui_shared.c:9779-9810`
+pub fn Menu_Parse(
+    menus: &mut MenuSystem,
+    ds: &mut DisplayState,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    let mut token = zero_pc_token();
+    if !dc.PC_ReadToken(handle, &mut token) {
+        return false;
+    }
+    if !pc_token_str(&token).starts_with('{') {
+        return false;
+    }
+
+    loop {
+        if !dc.PC_ReadToken(handle, &mut token) {
+            PC_SourceError(dc, handle, "end of file inside menu\n");
+            return false;
+        }
+
+        let tokenStr = pc_token_str(&token);
+        if tokenStr.starts_with('}') {
+            return true;
+        }
+
+        match dispatch_menu_keyword(menus, ds, dc, menu, &tokenStr, handle) {
+            None => {
+                PC_SourceError(dc, handle, &format!("unknown menu keyword {tokenStr}"));
+                continue;
+            }
+            Some(true) => {}
+            Some(false) => {
+                PC_SourceError(
+                    dc,
+                    handle,
+                    &format!("couldn't parse menu keyword {tokenStr}"),
+                );
+                return false;
+            }
+        }
+    }
+}
 
 /// Raven `Menu_CacheContents` — pre-roll `menu`'s window cinematic, every
 /// item's cinematic, and register its loop sound.
@@ -3721,11 +4099,13 @@ pub fn Menu_CacheContents(menus: &MenuSystem, dc: &mut dyn DisplayContext, menu:
 /// `strPoolIndex` reset the retired string-intern pool (see `String_Alloc`'s
 /// PORT-NOTE) — `MenuSystem` has no such table, so nothing to zero.
 /// `menuCount`/`openMenuCount` are `menus.menus`/`menus.menuStack` lengths;
-/// clearing both arenas is the owned-shape equivalent.
+/// clearing both arenas is the owned-shape equivalent. `UI_InitMemory` itself
+/// reclaims the item arena — `menus.items` is the owned form of that pool.
 ///
-/// PORT-NOTE: `Item_SetupKeywordHash`/`Menu_SetupKeywordHash` stay `//
-/// DEFERRED:` (see their sites above) — the keyword-hash infrastructure they
-/// build isn't ported, so there is nothing to call here.
+/// PORT-NOTE: `Item_SetupKeywordHash`/`Menu_SetupKeywordHash` are DROPPED
+/// (see the `KeywordHash_Add`/`KeywordHash_Find` note above) — `Item_Parse`/
+/// `Menu_Parse` dispatch through `match`-like chains that need no
+/// table-building step, so there is nothing to call here.
 ///
 /// PORT-NOTE: `if (DC && DC->getBindingBuf)` null-checks the file-scope `DC`
 /// pointer and its `getBindingBuf` fn-pointer slot; `dc: &mut dyn
@@ -3736,6 +4116,14 @@ pub fn Menu_CacheContents(menus: &MenuSystem, dc: &mut dyn DisplayContext, menu:
 pub fn String_Init(menus: &mut MenuSystem, dc: &mut dyn DisplayContext) {
     menus.menus.clear();
     menus.menuStack.clear();
+    // Raven: UI_InitMemory()'s allocPoint = 0 recycles every UI_Alloc'd itemDef_t.
+    menus.items.clear();
+    // §19: Raven leaves these four `itemDef_t *` statics pointing into the
+    // recycled pool (UB on the next read); `None` is the defined pick.
+    menus.itemCapture = None;
+    menus.g_bindItem = None;
+    menus.g_editItem = None;
+    menus.scrollInfo.item = None;
     UI_InitMemory();
     Controls_GetConfig(menus, dc);
 }
@@ -4506,17 +4894,15 @@ pub fn Menu_SetItemText(
 /// `Item_RunScript` walks by `Q_stricmp`-ing the leading command token
 /// against each entry's name.
 ///
-/// PORT-NOTE: the keys below are the oracle table's literal command strings.
-/// `open`, `close`, `setitemtext`, `setfocus`, `transition`, `orbit`, `scale`,
-/// `rundeferred`, `transition2` are all ported as fns but not yet dispatched
-/// here — they fall through to `None` (routed to `dc.runScript`, matching
-/// Raven's un-dispatched-command path) until the dispatch wire-up wave adds
-/// their arms. Raven's table has no `enable` entry (and none for
-/// `transition3`), so neither is dispatchable here.
+/// PORT-NOTE: the keys below are the oracle table's literal command strings;
+/// every `commandList[]` entry is dispatched here. The only gaps are Raven's
+/// own: the table has no `enable` entry and none for `transition3`, so
+/// neither is dispatchable.
 /// Source: `oracle/codemp/ui/ui_shared.c:2196-2228` (the table),
 /// `oracle/codemp/ui/ui_shared.c:2306-2357` (the walk this replaces)
 fn dispatch_script_command(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     item: ItemId,
     command: &str,
@@ -4538,6 +4924,8 @@ fn dispatch_script_command(
         Some(Script_SetItemColorCvar(menus, dc, item, args))
     } else if stricmp_eq(command, "setteamcolor") {
         Some(Script_SetTeamColor(menus, dc, item, args))
+    } else if stricmp_eq(command, "setfocus") {
+        Some(Script_SetFocus(menus, ds, dc, item, args))
     } else if stricmp_eq(command, "setitemrect") {
         Some(Script_SetItemRect(menus, dc, item, args))
     } else if stricmp_eq(command, "show") {
@@ -4564,6 +4952,22 @@ fn dispatch_script_command(
         Some(Script_Disable(menus, dc, item, args))
     } else if stricmp_eq(command, "defer") {
         Some(Script_Defer(menus, dc, item, args))
+    } else if stricmp_eq(command, "open") {
+        Some(Script_Open(menus, ds, dc, item, args))
+    } else if stricmp_eq(command, "close") {
+        Some(Script_Close(menus, ds, dc, item, args))
+    } else if stricmp_eq(command, "setitemtext") {
+        Some(Script_SetItemText(menus, dc, item, args))
+    } else if stricmp_eq(command, "transition") {
+        Some(Script_Transition(menus, dc, item, args))
+    } else if stricmp_eq(command, "orbit") {
+        Some(Script_Orbit(menus, dc, item, args))
+    } else if stricmp_eq(command, "scale") {
+        Some(Script_Scale(menus, dc, item, args))
+    } else if stricmp_eq(command, "rundeferred") {
+        Some(Script_RunDeferred(menus, ds, dc, item, args))
+    } else if stricmp_eq(command, "transition2") {
+        Some(Script_Transition2(menus, dc, item, args))
     } else {
         None
     }
@@ -4577,7 +4981,13 @@ fn dispatch_script_command(
 /// PORT-NOTE: `Q_strcat(script, 2048, s)`'s fixed 2048-byte buffer truncates
 /// at a valid char boundary (`Script_Defer`'s established pattern).
 /// Source: `oracle/codemp/ui/ui_shared.c:2306-2357`
-pub fn Item_RunScript(menus: &mut MenuSystem, dc: &mut dyn DisplayContext, item: ItemId, s: &str) {
+pub fn Item_RunScript(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: ItemId,
+    s: &str,
+) {
     if s.is_empty() {
         return;
     }
@@ -4604,7 +5014,7 @@ pub fn Item_RunScript(menus: &mut MenuSystem, dc: &mut dyn DisplayContext, item:
             continue;
         }
 
-        match dispatch_script_command(menus, dc, item, &command, &mut p) {
+        match dispatch_script_command(menus, ds, dc, item, &command, &mut p) {
             Some(ran) => {
                 // Allow a script command to stop processing the script.
                 if !ran {
@@ -7321,13 +7731,38 @@ pub fn MenuParse_fadeCycle(
     PC_Int_Parse(dc, handle, &mut menus.menu_mut(menu).fadeCycle)
 }
 
-// `MenuParse_itemDef` — ui_shared.c:9688-9700.
-//
-// DEFERRED: MenuParse_itemDef — its body is one call to `Item_Parse`, which
-// stays `// DEFERRED:` at its own site (ui_shared.c:9009-9040) because the
-// `keywordHash_t` item-keyword dispatch it drives isn't ported; only its
-// caller, the deferred `menuParseKeywords[]` table, would reference this.
-// Source: `oracle/codemp/ui/ui_shared.c:9688-9700`
+/// Raven `MenuParse_itemDef` — parse and append one `itemDef { ... }` block
+/// to `menu`'s item list.
+///
+/// PORT-NOTE: Raven's `UI_Alloc`'d `itemDef_t*` slot becomes a push onto
+/// [`MenuSystem::items`] (porting-rules §B5); on an `Item_Parse` failure the
+/// pushed-but-unlinked arena entry is left in place rather than popped
+/// (Raven's pool slot is written but never linked in either, since
+/// `menu->itemCount` isn't incremented on this path — both leak the same
+/// way). `MAX_MENUITEMS` is checked before any allocation happens, matching
+/// Raven's early-out: past the cap this fn does not read the item's token
+/// stream at all (a latent oracle desync bug at >256 items per menu, ported
+/// faithfully rather than "fixed").
+/// Source: `oracle/codemp/ui/ui_shared.c:9688-9700`
+pub fn MenuParse_itemDef(
+    menus: &mut MenuSystem,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+    handle: c_int,
+) -> bool {
+    if menus.menu(menu).items.len() < MAX_MENUITEMS {
+        let id = ItemId::new(menus.items.len());
+        menus.items.push(ItemDef::default());
+        Item_Init(menus.item_mut(id));
+        if !Item_Parse(menus, dc, id, handle) {
+            return false;
+        }
+        Item_InitControls(menus, Some(id));
+        menus.item_mut(id).parent = Some(menu);
+        menus.menu_mut(menu).items.push(id);
+    }
+    true
+}
 
 /// Raven `MenuParse_appearanceIncrement` — parse a menu's appearance
 /// increment.
@@ -7419,6 +7854,7 @@ pub fn Menu_UpdatePosition(
 /// Source: `oracle/codemp/ui/ui_shared.c:992-1011`
 pub fn Menu_ClearFocus(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     menu: Option<MenuId>,
 ) -> Option<ItemId> {
@@ -7434,7 +7870,7 @@ pub fn Menu_ClearFocus(
 
         let leaveFocus = menus.item(id).leaveFocus.clone();
         if !leaveFocus.is_empty() {
-            Item_RunScript(menus, dc, id, &leaveFocus);
+            Item_RunScript(menus, ds, dc, id, &leaveFocus);
         }
     }
 
@@ -7475,6 +7911,7 @@ pub fn Script_SetItemText(
 /// Source: `oracle/codemp/ui/ui_shared.c:1527-1533`
 pub fn Menu_RunCloseScript(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     menu: Option<MenuId>,
 ) {
@@ -7495,7 +7932,7 @@ pub fn Menu_RunCloseScript(
         parent: Some(menu),
         ..Default::default()
     });
-    Item_RunScript(menus, dc, scratch, &onClose);
+    Item_RunScript(menus, ds, dc, scratch, &onClose);
     // §19 divergence: an onClose `defer` stored Raven's stack-local `itemDef_t`,
     // which `rundeferred` then read dead-frame (UB); clearing it is the defined pick.
     if menus.ui_deferredScriptItem == Some(scratch) {
@@ -7535,7 +7972,7 @@ pub fn Menus_HandleOOBClick(
     // the cursor is within any of them.. if not close them otherwise activate them and pass the
     // key on.. force a mouse move to activate focus and script stuff
     if down && menus.menu(menu).window.flags & WINDOW_OOB_CLICK != 0 {
-        Menu_RunCloseScript(menus, dc, Some(menu));
+        Menu_RunCloseScript(menus, ds, dc, Some(menu));
         menus.menu_mut(menu).window.flags &= !(WINDOW_HASFOCUS | WINDOW_VISIBLE);
     }
 
@@ -7543,9 +7980,9 @@ pub fn Menus_HandleOOBClick(
     for i in 0..menuCount {
         let candidate = MenuId::new(i);
         if Menu_OverActiveItem(menus, Some(candidate), cursorx, cursory) {
-            Menu_RunCloseScript(menus, dc, Some(menu));
+            Menu_RunCloseScript(menus, ds, dc, Some(menu));
             menus.menu_mut(menu).window.flags &= !(WINDOW_HASFOCUS | WINDOW_VISIBLE);
-            Menus_Activate(menus, dc, candidate);
+            Menus_Activate(menus, ds, dc, candidate);
             Menu_HandleMouseMove(menus, ds, dc, Some(candidate), cursorx, cursory);
             Menu_HandleKey(menus, ds, dc, Some(candidate), key, down);
         }
@@ -7657,7 +8094,7 @@ pub fn Menu_HandleKey(
         if Item_HandleKey(menus, ds, dc, it, key, down) {
             // It is possible for an item to be disable after Item_HandleKey is run (like in Voice Chat)
             if !menus.item(it).disabled {
-                Item_Action(menus, dc, Some(it));
+                Item_Action(menus, ds, dc, Some(it));
             }
             return;
         }
@@ -7691,7 +8128,7 @@ pub fn Menu_HandleKey(
                     parent: Some(menu),
                     ..Default::default()
                 });
-                Item_RunScript(menus, dc, scratch, &onESC);
+                Item_RunScript(menus, ds, dc, scratch, &onESC);
                 menus.items.truncate(idx);
             }
             menus.g_waitingForKey = false;
@@ -7708,7 +8145,7 @@ pub fn Menu_HandleKey(
                         ds.cursorx as f32,
                         ds.cursory as f32,
                     ) {
-                        Item_Action(menus, dc, Some(it));
+                        Item_Action(menus, ds, dc, Some(it));
                     }
                 } else if itype == ITEM_TYPE_EDITFIELD || itype == ITEM_TYPE_NUMERICFIELD {
                     if Rect_ContainsPoint(
@@ -7716,7 +8153,7 @@ pub fn Menu_HandleKey(
                         ds.cursorx as f32,
                         ds.cursory as f32,
                     ) {
-                        Item_Action(menus, dc, Some(it));
+                        Item_Action(menus, ds, dc, Some(it));
                         menus.item_mut(it).cursorPos = 0;
                         menus.g_editingField = true;
                         menus.g_editItem = Some(it);
@@ -7735,7 +8172,7 @@ pub fn Menu_HandleKey(
                     || itype == ITEM_TYPE_YESNO
                     || itype == ITEM_TYPE_SLIDER
                 {
-                    if Item_HandleAccept(menus, dc, it) {
+                    if Item_HandleAccept(menus, ds, dc, it) {
                         // Item processed it overriding the menu processing
                         return;
                     } else if !menus.menu(menu).onAccept.is_empty() {
@@ -7746,7 +8183,7 @@ pub fn Menu_HandleKey(
                             parent: Some(menu),
                             ..Default::default()
                         });
-                        Item_RunScript(menus, dc, scratch, &onAccept);
+                        Item_RunScript(menus, ds, dc, scratch, &onAccept);
                         menus.items.truncate(idx);
                     }
                 } else if Rect_ContainsPoint(
@@ -7754,7 +8191,7 @@ pub fn Menu_HandleKey(
                     ds.cursorx as f32,
                     ds.cursory as f32,
                 ) {
-                    Item_Action(menus, dc, Some(it));
+                    Item_Action(menus, ds, dc, Some(it));
                 }
             }
         }
@@ -7767,7 +8204,7 @@ pub fn Menu_HandleKey(
                     menus.g_editItem = Some(it);
                     dc.setOverstrikeMode(true);
                 } else {
-                    Item_Action(menus, dc, item);
+                    Item_Action(menus, ds, dc, item);
                 }
             }
         }
@@ -7875,6 +8312,7 @@ pub fn Menu_Paint(
 /// Source: `oracle/codemp/ui/ui_shared.c:1794-1806`
 pub fn Script_RunDeferred(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     _item: ItemId,
     _args: &mut &str,
@@ -7887,7 +8325,7 @@ pub fn Script_RunDeferred(
     // Run the deferred script now
     let script = menus.ui_deferredScript.clone();
     let deferredItem = menus.ui_deferredScriptItem.unwrap();
-    Item_RunScript(menus, dc, deferredItem, &script);
+    Item_RunScript(menus, ds, dc, deferredItem, &script);
 
     true
 }
@@ -7901,6 +8339,7 @@ pub fn Script_RunDeferred(
 /// Source: `oracle/codemp/ui/ui_shared.c:3028-3088`
 pub fn Item_MouseEnter(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     item: Option<ItemId>,
     x: f32,
@@ -7938,12 +8377,12 @@ pub fn Item_MouseEnter(
     if Rect_ContainsPoint(Some(&r), x, y) {
         if menus.item(item).window.flags & WINDOW_MOUSEOVERTEXT == 0 {
             let mouseEnterText = menus.item(item).mouseEnterText.clone();
-            Item_RunScript(menus, dc, item, &mouseEnterText);
+            Item_RunScript(menus, ds, dc, item, &mouseEnterText);
             menus.item_mut(item).window.flags |= WINDOW_MOUSEOVERTEXT;
         }
         if menus.item(item).window.flags & WINDOW_MOUSEOVER == 0 {
             let mouseEnter = menus.item(item).mouseEnter.clone();
-            Item_RunScript(menus, dc, item, &mouseEnter);
+            Item_RunScript(menus, ds, dc, item, &mouseEnter);
             menus.item_mut(item).window.flags |= WINDOW_MOUSEOVER;
         }
     } else {
@@ -7951,12 +8390,12 @@ pub fn Item_MouseEnter(
         if menus.item(item).window.flags & WINDOW_MOUSEOVERTEXT != 0 {
             // if we were
             let mouseExitText = menus.item(item).mouseExitText.clone();
-            Item_RunScript(menus, dc, item, &mouseExitText);
+            Item_RunScript(menus, ds, dc, item, &mouseExitText);
             menus.item_mut(item).window.flags &= !WINDOW_MOUSEOVERTEXT;
         }
         if menus.item(item).window.flags & WINDOW_MOUSEOVER == 0 {
             let mouseEnter = menus.item(item).mouseEnter.clone();
-            Item_RunScript(menus, dc, item, &mouseEnter);
+            Item_RunScript(menus, ds, dc, item, &mouseEnter);
             menus.item_mut(item).window.flags |= WINDOW_MOUSEOVER;
         }
 
@@ -7972,7 +8411,12 @@ pub fn Item_MouseEnter(
 /// Raven `Item_MouseLeave` — run `item`'s exit script(s) and clear its
 /// mouse-over flags/list-box arrow hot zones.
 /// Source: `oracle/codemp/ui/ui_shared.c:3090-3099`
-pub fn Item_MouseLeave(menus: &mut MenuSystem, dc: &mut dyn DisplayContext, item: Option<ItemId>) {
+pub fn Item_MouseLeave(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: Option<ItemId>,
+) {
     let item = match item {
         Some(id) => id,
         None => return,
@@ -7980,11 +8424,11 @@ pub fn Item_MouseLeave(menus: &mut MenuSystem, dc: &mut dyn DisplayContext, item
 
     if menus.item(item).window.flags & WINDOW_MOUSEOVERTEXT != 0 {
         let mouseExitText = menus.item(item).mouseExitText.clone();
-        Item_RunScript(menus, dc, item, &mouseExitText);
+        Item_RunScript(menus, ds, dc, item, &mouseExitText);
         menus.item_mut(item).window.flags &= !WINDOW_MOUSEOVERTEXT;
     }
     let mouseExit = menus.item(item).mouseExit.clone();
-    Item_RunScript(menus, dc, item, &mouseExit);
+    Item_RunScript(menus, ds, dc, item, &mouseExit);
     menus.item_mut(item).window.flags &= !(WINDOW_LB_RIGHTARROW | WINDOW_LB_LEFTARROW);
 }
 
@@ -8243,7 +8687,7 @@ pub fn Item_ListBox_HandleKey(
                 .map(|l| l.doubleClick.clone())
                 .unwrap_or_default();
             if ds.realTime < menus.lastListBoxClickTime && !doubleClick.is_empty() {
-                Item_RunScript(menus, dc, item, &doubleClick);
+                Item_RunScript(menus, ds, dc, item, &doubleClick);
             }
             menus.lastListBoxClickTime = ds.realTime + DOUBLE_CLICK_DELAY;
 
@@ -8360,12 +8804,13 @@ pub fn Item_ListBox_HandleKey(
 /// Source: `oracle/codemp/ui/ui_shared.c:4271-4279`
 pub fn Item_HandleAccept(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     item: ItemId,
 ) -> bool {
     let accept = menus.item(item).accept.clone();
     if !accept.is_empty() {
-        Item_RunScript(menus, dc, item, &accept);
+        Item_RunScript(menus, ds, dc, item, &accept);
         return true;
     }
     false
@@ -8375,10 +8820,15 @@ pub fn Item_HandleAccept(
 ///
 /// PORT-NOTE: Raven's `item == NULL` guard becomes `item: Option<ItemId>`.
 /// Source: `oracle/codemp/ui/ui_shared.c:4321-4325`
-pub fn Item_Action(menus: &mut MenuSystem, dc: &mut dyn DisplayContext, item: Option<ItemId>) {
+pub fn Item_Action(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    item: Option<ItemId>,
+) {
     if let Some(item) = item {
         let action = menus.item(item).action.clone();
-        Item_RunScript(menus, dc, item, &action);
+        Item_RunScript(menus, ds, dc, item, &action);
     }
 }
 
@@ -8392,7 +8842,12 @@ pub fn Item_Action(menus: &mut MenuSystem, dc: &mut dyn DisplayContext, item: Op
 /// the same scratch-arena-slot shape as `Menu_RunCloseScript`. `soundName`'s
 /// pointer-truthy-and-non-empty guard becomes `!soundName.is_empty()`.
 /// Source: `oracle/codemp/ui/ui_shared.c:4416-4440`
-pub fn Menus_Activate(menus: &mut MenuSystem, dc: &mut dyn DisplayContext, menu: MenuId) {
+pub fn Menus_Activate(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    menu: MenuId,
+) {
     menus.menu_mut(menu).window.flags |= WINDOW_HASFOCUS | WINDOW_VISIBLE;
 
     let onOpen = menus.menu(menu).onOpen.clone();
@@ -8403,7 +8858,7 @@ pub fn Menus_Activate(menus: &mut MenuSystem, dc: &mut dyn DisplayContext, menu:
             parent: Some(menu),
             ..Default::default()
         });
-        Item_RunScript(menus, dc, scratch, &onOpen);
+        Item_RunScript(menus, ds, dc, scratch, &onOpen);
         // §19 divergence: see `Menu_RunCloseScript` — a deferred scratch slot is
         // cleared rather than left dangling.
         if menus.ui_deferredScriptItem == Some(scratch) {
@@ -8603,9 +9058,14 @@ pub fn Menu_PostParse(menus: &mut MenuSystem, dc: &mut dyn DisplayContext, menu:
 
 /// Raven `Menus_ShowByName` — activate the menu named `p`, if defined.
 /// Source: `oracle/codemp/ui/ui_shared.c:1516-1521`
-pub fn Menus_ShowByName(menus: &mut MenuSystem, dc: &mut dyn DisplayContext, p: &str) {
+pub fn Menus_ShowByName(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    p: &str,
+) {
     if let Some(menu) = Menus_FindByName(menus, p) {
-        Menus_Activate(menus, dc, menu);
+        Menus_Activate(menus, ds, dc, menu);
     }
 }
 
@@ -8618,14 +9078,19 @@ pub fn Menus_ShowByName(menus: &mut MenuSystem, dc: &mut dyn DisplayContext, p: 
 /// `menuStack.pop()` — the arena's `menuStack: Vec<MenuId>` makes
 /// `openMenuCount` `menuStack.len()` (§B5).
 /// Source: `oracle/codemp/ui/ui_shared.c:1535-1569`
-pub fn Menus_CloseByName(menus: &mut MenuSystem, dc: &mut dyn DisplayContext, p: &str) {
+pub fn Menus_CloseByName(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    p: &str,
+) {
     let menu = match Menus_FindByName(menus, p) {
         Some(m) => m,
         None => return,
     };
 
     // Run the close script for the menu
-    Menu_RunCloseScript(menus, dc, Some(menu));
+    Menu_RunCloseScript(menus, ds, dc, Some(menu));
 
     // If this window had the focus then take it away
     if menus.menu(menu).window.flags & WINDOW_HASFOCUS != 0 {
@@ -8643,12 +9108,12 @@ pub fn Menus_CloseByName(menus: &mut MenuSystem, dc: &mut dyn DisplayContext, p:
 /// Raven `Menus_CloseAll` — run every defined menu's close script, hide them
 /// all, and clear the open-menu stack.
 /// Source: `oracle/codemp/ui/ui_shared.c:1573-1589`
-pub fn Menus_CloseAll(menus: &mut MenuSystem, dc: &mut dyn DisplayContext) {
+pub fn Menus_CloseAll(menus: &mut MenuSystem, ds: &DisplayState, dc: &mut dyn DisplayContext) {
     menus.g_waitingForKey = false;
 
     for i in 0..menus.menus.len() {
         let id = MenuId::new(i);
-        Menu_RunCloseScript(menus, dc, Some(id));
+        Menu_RunCloseScript(menus, ds, dc, Some(id));
         menus.menu_mut(id).window.flags &= !(WINDOW_HASFOCUS | WINDOW_VISIBLE);
     }
 
@@ -8772,13 +9237,13 @@ pub fn Script_SetFocus(
         if let Some(focusItem) = Menu_FindItemByName(menus, parent, &name) {
             let flags = menus.item(focusItem).window.flags;
             if flags & WINDOW_DECORATION == 0 && flags & WINDOW_HASFOCUS == 0 {
-                Menu_ClearFocus(menus, dc, parent);
+                Menu_ClearFocus(menus, ds, dc, parent);
 
                 menus.item_mut(focusItem).window.flags |= WINDOW_HASFOCUS;
 
                 let onFocus = menus.item(focusItem).onFocus.clone();
                 if !onFocus.is_empty() {
-                    Item_RunScript(menus, dc, focusItem, &onFocus);
+                    Item_RunScript(menus, ds, dc, focusItem, &onFocus);
                 }
                 if ds.Assets.itemFocusSound != 0 {
                     dc.startLocalSound(ds.Assets.itemFocusSound, CHAN_LOCAL_SOUND);
@@ -8833,7 +9298,7 @@ pub fn Item_SetFocus(
         return false;
     }
 
-    let oldFocus = Menu_ClearFocus(menus, dc, parent);
+    let oldFocus = Menu_ClearFocus(menus, ds, dc, parent);
 
     let mut sfx = ds.Assets.itemFocusSound;
     let mut playSound = false;
@@ -8854,14 +9319,14 @@ pub fn Item_SetFocus(
             menus.item_mut(oldFocusId).window.flags |= WINDOW_HASFOCUS;
             let onFocus = menus.item(oldFocusId).onFocus.clone();
             if !onFocus.is_empty() {
-                Item_RunScript(menus, dc, oldFocusId, &onFocus);
+                Item_RunScript(menus, ds, dc, oldFocusId, &onFocus);
             }
         }
     } else {
         menus.item_mut(item).window.flags |= WINDOW_HASFOCUS;
         let onFocus = menus.item(item).onFocus.clone();
         if !onFocus.is_empty() {
-            Item_RunScript(menus, dc, item, &onFocus);
+            Item_RunScript(menus, ds, dc, item, &onFocus);
         }
         let focusSound = menus.item(item).focusSound;
         if focusSound != 0 {
@@ -9314,6 +9779,7 @@ pub fn Menu_ScrollFeeder(
 /// Source: `oracle/codemp/ui/ui_shared.c:1642-1657`
 pub fn Script_Close(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     _item: ItemId,
     args: &mut &str,
@@ -9321,9 +9787,9 @@ pub fn Script_Close(
     let mut name = String::new();
     if String_Parse(args, &mut name) {
         if stricmp_eq(&name, "all") {
-            Menus_CloseAll(menus, dc);
+            Menus_CloseAll(menus, ds, dc);
         } else {
-            Menus_CloseByName(menus, dc, &name);
+            Menus_CloseByName(menus, ds, dc, &name);
         }
     }
 
@@ -9843,7 +10309,7 @@ pub fn Menu_HandleMouseMove(
                     // if we are over an item
                     if IsVisible(menus.item(overItem).window.flags) {
                         // different one
-                        Item_MouseEnter(menus, dc, Some(overItem), x, y);
+                        Item_MouseEnter(menus, ds, dc, Some(overItem), x, y);
                         // Item_SetMouseOver(overItem, qtrue);
 
                         // if item is not a decoration see if it can take focus
@@ -9853,21 +10319,47 @@ pub fn Menu_HandleMouseMove(
                     }
                 }
             } else if itFlags & WINDOW_MOUSEOVER != 0 {
-                Item_MouseLeave(menus, dc, Some(itemId));
+                Item_MouseLeave(menus, ds, dc, Some(itemId));
                 Item_SetMouseOver(menus, Some(itemId), false);
             }
         }
     }
 }
 
-// `Menu_New` — ui_shared.c:9817-9827.
-//
-// DEFERRED: Menu_New — its body is `Menu_Init` + `Menu_Parse` + (on success)
-// `Menu_PostParse`; `Menu_Parse` stays `// DEFERRED:` at its own site
-// (ui_shared.c:9779-9810) because the `keywordHash_t` menu-keyword dispatch
-// it drives isn't ported, so this parse entrypoint has no reachable body and
-// no caller in the ported tree.
-// Source: `oracle/codemp/ui/ui_shared.c:9817-9827`
+/// Raven `Menu_New` — parse one `menudef { ... }` block into a fresh menu
+/// slot, registering it only on success.
+///
+/// PORT-NOTE: `menuDef_t *menu = &Menus[menuCount]` (taken before the
+/// `MAX_MENUS` check) becomes a push onto [`MenuSystem::menus`] gated by the
+/// same `menus.menus.len() < MAX_MENUS` check Raven guards the rest of the
+/// body with — past the cap, Raven neither inits nor parses (so this fn's
+/// token stream is left unread too, the same latent desync as
+/// `MenuParse_itemDef`'s cap). `menuCount++` only happens after `Menu_Parse`
+/// succeeds; the owned-arena equivalent of "never counted" is popping the
+/// pushed-but-failed [`MenuDef`] back off, restoring `menus.menus.len()` to
+/// what it was (Raven's fixed slot is simply never counted and gets
+/// overwritten by the next `Menu_New` call — same externally observable
+/// effect). `Menu_Parse` needs `ds` mutably (`MenuParse_font`); `Menu_Init`
+/// only reads it, so the same `&mut DisplayState` reborrows immutably for
+/// that call.
+/// Source: `oracle/codemp/ui/ui_shared.c:9817-9827`
+pub fn Menu_New(
+    menus: &mut MenuSystem,
+    ds: &mut DisplayState,
+    dc: &mut dyn DisplayContext,
+    handle: c_int,
+) {
+    if menus.menus.len() < MAX_MENUS {
+        let id = MenuId::new(menus.menus.len());
+        menus.menus.push(MenuDef::default());
+        Menu_Init(menus.menu_mut(id), ds);
+        if Menu_Parse(menus, ds, dc, id, handle) {
+            Menu_PostParse(menus, dc, Some(id));
+        } else {
+            menus.menus.pop();
+        }
+    }
+}
 
 /// Raven `Menu_SetPrevCursorItem` — move `menu`'s cursor to the previous
 /// focusable item, wrapping once; restores the original cursor if nothing
@@ -10642,7 +11134,7 @@ pub fn Menus_ActivateByName(
         let name = menus.menu(id).window.name.clone();
         if name.as_deref().is_some_and(|n| stricmp_eq(n, p)) {
             m = Some(id);
-            Menus_Activate(menus, dc, id);
+            Menus_Activate(menus, ds, dc, id);
             if menus.openMenuCount() < MAX_OPEN_MENUS as c_int {
                 if let Some(focusMenu) = focus {
                     menus.menuStack.push(focusMenu);

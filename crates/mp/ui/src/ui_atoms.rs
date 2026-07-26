@@ -716,7 +716,7 @@ pub fn UI_ConsoleCommand(
 
     if Q_stricmp(&cmd, "ui_opensiegemenu") == 0 {
         if trap::Cvar_VariableValue(ctx.engine, "g_gametype") == GT_SIEGE as f32 {
-            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
             let arg1 = UI_Argv(ctx, 1);
             if Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, &arg1).is_some() {
                 trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
@@ -728,7 +728,7 @@ pub fn UI_ConsoleCommand(
     if Q_stricmp(&cmd, "ui_openmenu") == 0 {
         //if ( trap_Cvar_VariableValue ( "developer" ) )
         {
-            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
             let arg1 = UI_Argv(ctx, 1);
             if Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, &arg1).is_some() {
                 trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);

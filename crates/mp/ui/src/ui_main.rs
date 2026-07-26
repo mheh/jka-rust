@@ -96,7 +96,7 @@ use mp_uishared::ui_shared::{
     Controls_GetConfig, Controls_SetConfig, Display_KeyBindPending, Display_MouseMove, Int_Parse,
     ItemParse_asset_model_go, ItemParse_model_g2anim_go, ItemParse_model_g2skin_go, Item_RunScript,
     LerpColor, Menu_Count, Menu_FindItemByName, Menu_GetFocused, Menu_GetMatchingItemByNumber,
-    Menu_HandleKey, Menu_ItemDisable, Menu_ItemsMatchingGroup, Menu_Paint, Menu_PaintAll,
+    Menu_HandleKey, Menu_ItemDisable, Menu_ItemsMatchingGroup, Menu_New, Menu_Paint, Menu_PaintAll,
     Menu_Reset, Menu_SetFeederSelection, Menu_SetItemBackground, Menu_ShowGroup,
     Menu_ShowItemByName, Menus_ActivateByName, Menus_AnyFullScreenVisible, Menus_CloseAll,
     Menus_CloseByName, Menus_FindByName, Menus_OpenByName, PC_Color_Parse, PC_Float_Parse,
@@ -9352,11 +9352,7 @@ pub fn UI_ParseMenu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menuFile: 
 
         if Q_stricmp(&tokenStr, "menudef") == 0 {
             // start a new menu
-            // DEFERRED: `Menu_New(handle)` — the callee is deferred at its own
-            // definition site (crates/mp/uishared/src/ui_shared.rs) because
-            // `Menu_Parse`'s `keywordHash_t` menu-keyword dispatch is not
-            // ported, so this call has no reachable body in the ported tree.
-            // Source: `oracle/codemp/ui/ui_main.c:1772`, `oracle/codemp/ui/ui_shared.c:9817-9827`
+            Menu_New(&mut ctx.world.menus, &mut ctx.world.uiDC, dc, handle);
         }
     }
     trap::PC_FreeSource(ctx.engine, handle);
@@ -9689,7 +9685,7 @@ pub fn UI_Chat_Main_HandleKey(
 
     if let Some(item) = item {
         let action = world.menus.item(item).action.clone();
-        Item_RunScript(&mut world.menus, dc, item, &action);
+        Item_RunScript(&mut world.menus, &world.uiDC, dc, item, &action);
     }
 
     true
@@ -9720,7 +9716,7 @@ pub fn UI_Chat_Attack_HandleKey(
 
     if let Some(item) = item {
         let action = world.menus.item(item).action.clone();
-        Item_RunScript(&mut world.menus, dc, item, &action);
+        Item_RunScript(&mut world.menus, &world.uiDC, dc, item, &action);
     }
 
     true
@@ -9753,7 +9749,7 @@ pub fn UI_Chat_Defend_HandleKey(
 
     if let Some(item) = item {
         let action = world.menus.item(item).action.clone();
-        Item_RunScript(&mut world.menus, dc, item, &action);
+        Item_RunScript(&mut world.menus, &world.uiDC, dc, item, &action);
     }
 
     true
@@ -9790,7 +9786,7 @@ pub fn UI_Chat_Request_HandleKey(
 
     if let Some(item) = item {
         let action = world.menus.item(item).action.clone();
-        Item_RunScript(&mut world.menus, dc, item, &action);
+        Item_RunScript(&mut world.menus, &world.uiDC, dc, item, &action);
     }
 
     true
@@ -9825,7 +9821,7 @@ pub fn UI_Chat_Reply_HandleKey(
 
     if let Some(item) = item {
         let action = world.menus.item(item).action.clone();
-        Item_RunScript(&mut world.menus, dc, item, &action);
+        Item_RunScript(&mut world.menus, &world.uiDC, dc, item, &action);
     }
 
     true
@@ -9858,7 +9854,7 @@ pub fn UI_Chat_Spot_HandleKey(
 
     if let Some(item) = item {
         let action = world.menus.item(item).action.clone();
-        Item_RunScript(&mut world.menus, dc, item, &action);
+        Item_RunScript(&mut world.menus, &world.uiDC, dc, item, &action);
     }
 
     true
@@ -9895,7 +9891,7 @@ pub fn UI_Chat_Tactical_HandleKey(
 
     if let Some(item) = item {
         let action = world.menus.item(item).action.clone();
-        Item_RunScript(&mut world.menus, dc, item, &action);
+        Item_RunScript(&mut world.menus, &world.uiDC, dc, item, &action);
     }
 
     true
@@ -9961,12 +9957,12 @@ pub fn UI_FindCurrentSiegeTeamClass(ctx: &mut UiContext, dc: &mut dyn DisplayCon
     if myTeam == TEAM_RED {
         if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "onteam1") {
             let action = ctx.world.menus.item(item).action.clone();
-            Item_RunScript(&mut ctx.world.menus, dc, item, &action);
+            Item_RunScript(&mut ctx.world.menus, &ctx.world.uiDC, dc, item, &action);
         }
     } else if myTeam == TEAM_BLUE {
         if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "onteam2") {
             let action = ctx.world.menus.item(item).action.clone();
-            Item_RunScript(&mut ctx.world.menus, dc, item, &action);
+            Item_RunScript(&mut ctx.world.menus, &ctx.world.uiDC, dc, item, &action);
         }
     }
 
@@ -9991,7 +9987,7 @@ pub fn UI_FindCurrentSiegeTeamClass(ctx: &mut UiContext, dc: &mut dyn DisplayCon
 
     if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), itemname) {
         let action = ctx.world.menus.item(item).action.clone();
-        Item_RunScript(&mut ctx.world.menus, dc, item, &action);
+        Item_RunScript(&mut ctx.world.menus, &ctx.world.uiDC, dc, item, &action);
     }
 }
 
@@ -11084,7 +11080,7 @@ pub fn UI_FeederSelection(
             // call sites pass NULL — Raven would deref it in the `Script_*`
             // handlers' `item->parent`; the port skips the call instead.
             if let Some(item) = item {
-                Item_RunScript(&mut ctx.world.menus, dc, item, &script);
+                Item_RunScript(&mut ctx.world.menus, &ctx.world.uiDC, dc, item, &script);
             }
         }
     } else if feederID == FEEDER_PLAYER_SKIN_HEAD {
@@ -11398,7 +11394,7 @@ pub fn _UI_SetActiveMenu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menu:
             trap::Key_SetCatcher(ctx.engine, catcher & !KEYCATCH_UI);
             trap::Key_ClearStates(ctx.engine);
             trap::Cvar_Set(ctx.engine, "cl_paused", "0");
-            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
         }
         UIMENU_MAIN => {
             trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
@@ -11408,7 +11404,7 @@ pub fn _UI_SetActiveMenu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menu:
                 // Source: oracle/codemp/ui/ui_main.c:10927-10930
             }
 
-            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
             Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "main");
             let buf = trap::Cvar_VariableStringBuffer(ctx.engine, "com_errorMessage", 256);
 
@@ -11437,27 +11433,27 @@ pub fn _UI_SetActiveMenu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menu:
                 // parity)
                 // Source: oracle/codemp/ui/ui_main.c:10963-10965
             }
-            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
             Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "endofgame");
         }
         UIMENU_INGAME => {
             trap::Cvar_Set(ctx.engine, "cl_paused", "1");
             trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
             UI_BuildPlayerList(ctx);
-            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
             Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "ingame");
         }
         UIMENU_PLAYERCONFIG => {
             trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
             UI_BuildPlayerList(ctx);
-            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
             Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "ingame_player");
             UpdateForceUsed(ctx, dc);
         }
         UIMENU_PLAYERFORCE => {
             trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
             UI_BuildPlayerList(ctx);
-            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
             Menus_ActivateByName(
                 &mut ctx.world.menus,
                 &ctx.world.uiDC,
@@ -11468,12 +11464,12 @@ pub fn _UI_SetActiveMenu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menu:
         }
         UIMENU_SIEGEMESSAGE => {
             trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
-            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
             Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "siege_popmenu");
         }
         UIMENU_SIEGEOBJECTIVES => {
             trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
-            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
             Menus_ActivateByName(
                 &mut ctx.world.menus,
                 &ctx.world.uiDC,
@@ -11488,7 +11484,7 @@ pub fn _UI_SetActiveMenu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menu:
             }
 
             trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
-            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
             Menus_ActivateByName(
                 &mut ctx.world.menus,
                 &ctx.world.uiDC,
@@ -11497,11 +11493,11 @@ pub fn _UI_SetActiveMenu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menu:
             );
         }
         UIMENU_CLOSEALL => {
-            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
         }
         UIMENU_CLASSSEL => {
             trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
-            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
             Menus_ActivateByName(
                 &mut ctx.world.menus,
                 &ctx.world.uiDC,
@@ -11748,7 +11744,7 @@ pub fn UI_Load(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
     UI_LoadBots(ctx);
 
     UI_LoadMenus(ctx, dc, &menuSet, true);
-    Menus_CloseAll(&mut ctx.world.menus, dc);
+    Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
     Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, &lastName);
 }
 
@@ -12038,7 +12034,7 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
             ctx.world.nextFindPlayerRefresh = 0;
             UI_BuildServerDisplayList(ctx, dc, 1);
         } else {
-            Menus_CloseByName(&mut ctx.world.menus, dc, "joinserver");
+            Menus_CloseByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "joinserver");
             Menus_OpenByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "main");
         }
     } else if Q_stricmp(&name, "StopRefresh") == 0 {
@@ -12119,12 +12115,12 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
     } else if Q_stricmp(&name, "Controls") == 0 {
         trap::Cvar_Set(ctx.engine, "cl_paused", "1");
         trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
-        Menus_CloseAll(&mut ctx.world.menus, dc);
+        Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
         Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "setup_menu2");
     } else if Q_stricmp(&name, "Leave") == 0 {
         trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_APPEND as c_int, "disconnect\n");
         trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
-        Menus_CloseAll(&mut ctx.world.menus, dc);
+        Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
         Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "main");
     } else if Q_stricmp(&name, "getvideosetup") == 0 {
         UI_GetVideoSetup(ctx);
@@ -12166,7 +12162,7 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
         trap::Key_SetCatcher(ctx.engine, catcher & !KEYCATCH_UI);
         trap::Key_ClearStates(ctx.engine);
         trap::Cvar_Set(ctx.engine, "cl_paused", "0");
-        Menus_CloseAll(&mut ctx.world.menus, dc);
+        Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
     } else if Q_stricmp(&name, "voteMap") == 0 {
         let idx = ctx.world.cvars.ui_currentNetMap.integer;
         if idx >= 0 && (idx as usize) < ctx.world.mapList.len() {
@@ -12358,7 +12354,7 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
             trap::Key_SetCatcher(ctx.engine, catcher & !KEYCATCH_UI);
             trap::Key_ClearStates(ctx.engine);
             trap::Cvar_Set(ctx.engine, "cl_paused", "0");
-            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
         }
     } else if Q_stricmp(&name, "voiceOrdersTeam") == 0 {
         let mut orders = String::new();
@@ -12372,7 +12368,7 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
             trap::Key_SetCatcher(ctx.engine, catcher & !KEYCATCH_UI);
             trap::Key_ClearStates(ctx.engine);
             trap::Cvar_Set(ctx.engine, "cl_paused", "0");
-            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
         }
     } else if Q_stricmp(&name, "voiceOrders") == 0 {
         let mut orders = String::new();
@@ -12399,7 +12395,7 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
             trap::Key_SetCatcher(ctx.engine, catcher & !KEYCATCH_UI);
             trap::Key_ClearStates(ctx.engine);
             trap::Cvar_Set(ctx.engine, "cl_paused", "0");
-            Menus_CloseAll(&mut ctx.world.menus, dc);
+            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
         }
     } else if Q_stricmp(&name, "setForce") == 0 {
         let mut teamArg = String::new();
@@ -13096,7 +13092,7 @@ pub fn _UI_Init(ctx: &mut UiContext, dc: &mut dyn DisplayContext, inGameLoad: bo
     let uiName = UI_Cvar_VariableString(ctx, "name");
     trap::Cvar_Register(ctx.engine, None, "ui_name", &uiName, CVAR_INTERNAL);
 
-    Menus_CloseAll(&mut ctx.world.menus, dc);
+    Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
 
     trap::LAN_LoadCachedServers(ctx.engine);
     let mapLoadName = ctx
@@ -13167,7 +13163,7 @@ pub fn _UI_KeyEvent(ctx: &mut UiContext, dc: &mut dyn DisplayContext, key: c_int
                 && down
                 && !Menus_AnyFullScreenVisible(&ctx.world.menus)
             {
-                Menus_CloseAll(&mut ctx.world.menus, dc);
+                Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
             } else {
                 Menu_HandleKey(
                     &mut ctx.world.menus,
