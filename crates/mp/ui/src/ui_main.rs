@@ -18,9 +18,10 @@ use mp_bg::bg_channel::BgState;
 use mp_bg::bg_misc::{forceMasteryPoints, BG_FindItemForHoldable, BG_FindItemForWeapon};
 use mp_bg::bg_saga::{
     BG_GetClassOnBaseClass, BG_GetUIPortrait, BG_GetUIPortraitFile, BG_SiegeCountBaseClass,
-    BG_SiegeFindThemeForTeam, BG_SiegeGetPairedValue, BG_SiegeGetValueGroup, BG_SiegeSetTeamTheme,
-    BG_SiegeTeamClassPortrait,
+    BG_SiegeFindThemeForTeam, BG_SiegeGetPairedValue, BG_SiegeGetValueGroup, BG_SiegeLoadClasses,
+    BG_SiegeLoadTeams, BG_SiegeSetTeamTheme, BG_SiegeTeamClassPortrait,
 };
+use mp_bg::cstr_util::cstr_to_str;
 use mp_bg::public::configstring::{CS_PLAYERS, CS_SERVERINFO};
 use mp_bg::public::gametype::{
     GT_CTF, GT_CTY, GT_DUEL, GT_FFA, GT_HOLOCRON, GT_JEDIMASTER, GT_POWERDUEL, GT_SIEGE,
@@ -28,7 +29,8 @@ use mp_bg::public::gametype::{
 };
 use mp_bg::public::holdable::HI_NUM_HOLDABLE;
 use mp_bg::public::team::{TEAM_BLUE, TEAM_FREE, TEAM_RED, TEAM_SPECTATOR};
-use mp_bg::saga::siege_class_t::siegeClass_t;
+use mp_bg::saga::siege_class_desc_t::{siegeClassDesc_t, SIEGE_CLASS_DESC_LEN};
+use mp_bg::saga::siege_class_t::{siegeClass_t, MAX_SIEGE_CLASSES};
 use mp_bg::saga::siege_player_class_flags_t::siegePlayerClassFlags_t::{
     SPC_DEMOLITIONIST, SPC_HEAVY_WEAPONS, SPC_INFANTRY, SPC_JEDI, SPC_MAX, SPC_SUPPORT,
     SPC_VANGUARD,
@@ -109,6 +111,7 @@ use native_string::{
     Q_stricmp, Q_stricmpn, Q_strncpyz,
 };
 
+use crate::bg_channel::{UiBgTraps, UiGameCallbacks};
 use crate::keycodes::fake_ascii_t::fakeAscii_t;
 use crate::local::game_type_info::GameTypeInfo;
 use crate::local::map_info::{MapInfo, MAX_GAMETYPES};
@@ -4868,19 +4871,54 @@ pub fn UI_BuildQ3Model_List(ctx: &mut UiContext) {
     }
 }
 
-// DEFERRED: UI_SiegeInit — its bg calls' real ported shapes
-// (`BG_SiegeLoadClasses(descBuffer: *mut siegeClassDesc_t, bg: &mut BgState,
-// traps: &dyn BgTraps, callbacks: &mut dyn GameCallbacks)`,
-// `BG_SiegeLoadTeams(bg: &mut BgState, traps: &dyn BgTraps)`) require a
-// `&dyn BgTraps` and a `&mut dyn GameCallbacks` instance; ui has neither an
-// implementor nor a wiring point for either trait yet (DEC-36 addendum 11/12
-// name the traits, but `impl BgTraps for ...` / `impl GameCallbacks for ...`
-// have not landed in `mp_ui`), and `g_UIClassDescriptions` is an owned
-// `Vec<String>` with no `*mut siegeClassDesc_t` buffer to hand `descBuffer`.
-// Source: `oracle/codemp/ui/ui_main.c:10443-10460`
-// Source: `crates/mp/bg/src/bg_saga.rs:1477-1492` (real `BG_SiegeLoadClasses` shape)
-// Source: `crates/mp/bg/src/bg_channel/bg_traps.rs:21` (`trait BgTraps`)
-// Source: `crates/mp/bg/src/bg_channel/game_callbacks.rs:21` (`trait GameCallbacks`)
+/// Raven `UI_SiegeInit`.
+///
+/// `BG_SiegeLoadClasses` takes a `siegeClassDesc_t *descBuffer` — a real
+/// `[siegeClassDesc_t; MAX_SIEGE_CLASSES]`-shaped buffer, not the owned
+/// `Vec<String>` `g_UIClassDescriptions` is; the buffer is built here, handed
+/// to the bg loader by raw pointer (matching Raven exactly, ui is the only
+/// caller across the codebase that passes a non-null `descBuffer` — game/cgame
+/// both call `BG_SiegeLoadClasses(NULL)`), and the populated `desc` C strings
+/// are copied into `g_UIClassDescriptions` afterward, one per loaded class.
+///
+/// Source: `oracle/codemp/ui/ui_main.c:10442-10460`
+pub fn UI_SiegeInit(ctx: &mut UiContext) {
+    let traps = UiBgTraps::new(ctx.engine);
+    let mut callbacks = UiGameCallbacks::new(ctx.engine);
+
+    // Load the player class types
+    let mut descBuffer: Vec<siegeClassDesc_t> = (0..MAX_SIEGE_CLASSES)
+        .map(|_| siegeClassDesc_t {
+            desc: [0; SIEGE_CLASS_DESC_LEN],
+        })
+        .collect();
+    BG_SiegeLoadClasses(
+        descBuffer.as_mut_ptr(),
+        &mut ctx.world.bg_state,
+        &traps,
+        &mut callbacks,
+    );
+
+    if ctx.world.bg_state.bgNumSiegeClasses == 0 {
+        // We didn't find any?!
+        Com_Error(ctx, "Couldn't find any player classes for Siege");
+    }
+
+    // `cstr_to_str` (UTF-8) is the deliberate inverse of bg's write — bg_saga
+    // stores `val.as_bytes()` (UTF-8) into `desc`; converting this leaf alone
+    // to Latin-1 would double-decode (task #35 must fix the chain coherently).
+    ctx.world.main.g_UIClassDescriptions = (0..ctx.world.bg_state.bgNumSiegeClasses as usize)
+        .map(|i| unsafe { cstr_to_str(descBuffer[i].desc.as_ptr()) })
+        .collect();
+
+    // Now load the teams since we have class data.
+    BG_SiegeLoadTeams(&mut ctx.world.bg_state, &traps);
+
+    if ctx.world.bg_state.bgNumSiegeTeams == 0 {
+        // React same as with classes.
+        Com_Error(ctx, "Couldn't find any player teams for Siege");
+    }
+}
 
 /// Raven `UI_BuildPlayerModel_List`.
 ///
@@ -13029,10 +13067,7 @@ pub fn _UI_Init(ctx: &mut UiContext, dc: &mut dyn DisplayContext, inGameLoad: bo
     // initialize all these cvars to "0"
     UI_SiegeSetCvarsForClass(ctx, None);
 
-    // DEFERRED: UI_SiegeInit — see its own DEFERRED note just above this fn
-    // in this file (bg traits (`BgTraps`/`GameCallbacks`) not wired into
-    // `mp_ui` yet).
-    // Source: `oracle/codemp/ui/ui_main.c:10677`
+    UI_SiegeInit(ctx);
 
     UI_UpdateForcePowers(ctx, dc);
 

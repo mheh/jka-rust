@@ -1,5 +1,6 @@
 //! `mp_ui` crate — the MP `ui` module (`oracle/codemp/ui`).
 
+pub mod bg_channel;
 pub mod keycodes;
 pub mod local;
 pub mod trap;
