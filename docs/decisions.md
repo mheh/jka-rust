@@ -836,6 +836,21 @@ Three user rulings from the U5 one-by-one sit-down:
    zero-call methods are all trap forwarders (spot-check vs §20 dead surface
    before implementing them). `feederItemText`'s dc-free signature is
    faithful to Raven — do not "fix" it.
+
+   **Revision (same day, ratified):** implementation proved the carrier-type
+   wording unbuildable — a carrier holding the world (safe or raw) beside the
+   ported fns' live `&mut UiContext` is the same two-mutable-paths hazard this
+   ruling rejects (rustc E0499 proof; session scratchpad borrowtest/). Ruled
+   shape: **`UiContext { world, engine }` implements `DisplayContext` itself**
+   — the hoist of `menus`/`uiDC` out of `UiWorld` dissolves DEC-36 addendum
+   12's objection — and `mp_ui` fns take `(ctx, menus, ds)` in place of
+   `(ctx, dc)`, passing `ctx` where a dc is wanted. Zero unsafe, `ds` stays
+   `&DisplayState` (measured: no dc-routed target writes `DisplayState`), all
+   Kind-B trait methods widen to take the caller's `menus`/`ds` (not just the
+   7), and `UI_StopCinematic`/`UI_PlayCinematic` shed `ctx` for
+   `(world, engine)`. Of the 15 dead-call trait methods, 7 are §20 dead
+   surface (no `DC->` call site in the oracle tree) and panic-with-subject;
+   the other 8 back live untranscribed `trap_*` sites and got wrappers.
 2. **ui WORLD lifetime → STATE-D6 addendum** (recorded in
    `docs/architecture/state-ownership.md` same-day): per-module world
    lifetime follows the module's own Raven semantics — construct-on-INIT for

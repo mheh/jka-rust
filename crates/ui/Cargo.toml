@@ -16,3 +16,13 @@ mp_ui = { path = "../mp/ui" }
 # names types straight from these two crates, same as `mp_ui` itself does.
 mp_qshared = { path = "../mp/qshared" }
 mp_uishared = { path = "../mp/uishared" }
+
+[dev-dependencies]
+# ABI smoke test (tests/abi_smoke.rs): drive the BUILT cdylib through the real
+# engine contract, mirroring `crates/jampgame`'s. `mp_engine_qcommon` supplies
+# the inbound C-variadic syscall trampoline + `arm_game_slot`; `native_platform`
+# the libloading-based module loader; `mp_abi` the export wire numbers and
+# `UI_API_VERSION`.
+mp_engine_qcommon = { path = "../mp/engine/qcommon" }
+native_platform = { path = "../native/platform" }
+mp_abi = { path = "../mp/abi" }

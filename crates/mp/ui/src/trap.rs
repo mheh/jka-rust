@@ -75,8 +75,20 @@ use mp_abi::ui::syscalls::UI_GETCLIENTSTATE::{UiGetclientstate, UiGetclientstate
 use mp_abi::ui::syscalls::UI_GETCONFIGSTRING::{UiGetconfigstring, UiGetconfigstringArgs};
 use mp_abi::ui::syscalls::UI_GETGLCONFIG::{UiGetglconfig, UiGetglconfigArgs};
 use mp_abi::ui::syscalls::UI_KEY_CLEARSTATES::{UiKeyClearstates, UiKeyClearstatesArgs};
+use mp_abi::ui::syscalls::UI_KEY_GETBINDINGBUF::{UiKeyGetbindingbuf, UiKeyGetbindingbufArgs};
 use mp_abi::ui::syscalls::UI_KEY_GETCATCHER::{UiKeyGetcatcher, UiKeyGetcatcherArgs};
+use mp_abi::ui::syscalls::UI_KEY_GETOVERSTRIKEMODE::{
+    UiKeyGetoverstrikemode, UiKeyGetoverstrikemodeArgs,
+};
+use mp_abi::ui::syscalls::UI_KEY_ISDOWN::{UiKeyIsdown, UiKeyIsdownArgs};
+use mp_abi::ui::syscalls::UI_KEY_KEYNUMTOSTRINGBUF::{
+    UiKeyKeynumtostringbuf, UiKeyKeynumtostringbufArgs,
+};
+use mp_abi::ui::syscalls::UI_KEY_SETBINDING::{UiKeySetbinding, UiKeySetbindingArgs};
 use mp_abi::ui::syscalls::UI_KEY_SETCATCHER::{UiKeySetcatcher, UiKeySetcatcherArgs};
+use mp_abi::ui::syscalls::UI_KEY_SETOVERSTRIKEMODE::{
+    UiKeySetoverstrikemode, UiKeySetoverstrikemodeArgs,
+};
 use mp_abi::ui::syscalls::UI_LANGUAGE_USESSPACES::{
     UiLanguageUsesspaces, UiLanguageUsesspacesArgs,
 };
@@ -120,17 +132,21 @@ use mp_abi::ui::syscalls::UI_REAL_TIME::{UiRealTime, UiRealTimeArgs};
 use mp_abi::ui::syscalls::UI_R_ADDREFENTITYTOSCENE::{
     UiRAddrefentitytoscene, UiRAddrefentitytosceneArgs,
 };
+use mp_abi::ui::syscalls::UI_R_CLEARSCENE::{UiRClearscene, UiRClearsceneArgs};
 use mp_abi::ui::syscalls::UI_R_DRAWSTRETCHPIC::{UiRDrawstretchpic, UiRDrawstretchpicArgs};
 use mp_abi::ui::syscalls::UI_R_FONT_DRAWSTRING::{UiRFontDrawstring, UiRFontDrawstringArgs};
 use mp_abi::ui::syscalls::UI_R_FONT_STRHEIGHTPIXELS::{
     UiRFontStrheightpixels, UiRFontStrheightpixelsArgs,
 };
 use mp_abi::ui::syscalls::UI_R_FONT_STRLENPIXELS::{UiRFontStrlenpixels, UiRFontStrlenpixelsArgs};
+use mp_abi::ui::syscalls::UI_R_MODELBOUNDS::{UiRModelbounds, UiRModelboundsArgs};
 use mp_abi::ui::syscalls::UI_R_REGISTERFONT::{UiRRegisterfont, UiRRegisterfontArgs};
+use mp_abi::ui::syscalls::UI_R_REGISTERMODEL::{UiRRegistermodel, UiRRegistermodelArgs};
 use mp_abi::ui::syscalls::UI_R_REGISTERSHADERNOMIP::{
     UiRRegistershadernomip, UiRRegistershadernomipArgs,
 };
 use mp_abi::ui::syscalls::UI_R_REGISTERSKIN::{UiRRegisterskin, UiRRegisterskinArgs};
+use mp_abi::ui::syscalls::UI_R_RENDERSCENE::{UiRRenderscene, UiRRendersceneArgs};
 use mp_abi::ui::syscalls::UI_R_SETCOLOR::{UiRSetcolor, UiRSetcolorArgs};
 use mp_abi::ui::syscalls::UI_R_SHADERNAMEFROMINDEX::{
     UiRShadernamefromindex, UiRShadernamefromindexArgs,
@@ -141,12 +157,19 @@ use mp_abi::ui::syscalls::UI_SP_GETSTRINGTEXTSTRING::{
     UiSpGetstringtextstring, UiSpGetstringtextstringArgs,
 };
 use mp_abi::ui::syscalls::UI_S_REGISTERSOUND::{UiSRegistersound, UiSRegistersoundArgs};
+use mp_abi::ui::syscalls::UI_S_STARTBACKGROUNDTRACK::{
+    UiSStartbackgroundtrack, UiSStartbackgroundtrackArgs,
+};
 use mp_abi::ui::syscalls::UI_S_STARTLOCALSOUND::{UiSStartlocalsound, UiSStartlocalsoundArgs};
+use mp_abi::ui::syscalls::UI_S_STOPBACKGROUNDTRACK::{
+    UiSStopbackgroundtrack, UiSStopbackgroundtrackArgs,
+};
 use mp_abi::ui::syscalls::UI_UPDATESCREEN::{UiUpdatescreen, UiUpdatescreenArgs};
 use mp_abi::Execute;
 use mp_engine_select::Engine;
 use mp_qshared::common::mp::cgame::glconfig_t::glconfig_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
+use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_qshared::common::mp::qcommon::qtime_t;
 use mp_qshared::shared::{
     fileHandle_t, fsMode_t, mdxaBone_t, pc_token_t, qhandle_t, sfxHandle_t, vec3_t, vec4_t,
@@ -769,6 +792,28 @@ pub fn Key_ClearStates(engine: &Engine) {
     <Engine as Execute<UiKeyClearstates>>::execute(engine, UiKeyClearstatesArgs::new())
 }
 
+/// Raven `trap_Key_GetBindingBuf` — `UI_KEY_GETBINDINGBUF`
+/// (token: `mp_abi::ui::syscalls::UI_KEY_GETBINDINGBUF`).
+///
+/// C: `void trap_Key_GetBindingBuf(int keynum, char *buf, int buflen)`
+/// Source: `oracle/codemp/ui/ui_syscalls.c:222-224`
+///
+/// The out-buffer carries a binding — console command text the engine treats
+/// as opaque bytes — so it decodes Latin-1, like `Cmd_ExecuteText`'s argument.
+pub fn Key_GetBindingBuf(engine: &Engine, keynum: c_int, buffer_len: usize) -> String {
+    let mut buffer = vec![0u8; buffer_len];
+    <Engine as Execute<UiKeyGetbindingbuf>>::execute(
+        engine,
+        UiKeyGetbindingbufArgs::new(
+            keynum,
+            buffer.as_mut_ptr() as *mut c_char,
+            buffer_len as c_int,
+        ),
+    );
+    let nul = buffer.iter().position(|&b| b == 0).unwrap_or(buffer.len());
+    latin1_to_string(&buffer[..nul])
+}
+
 /// Raven `trap_Key_GetCatcher` — `UI_KEY_GETCATCHER`
 /// (token: `mp_abi::ui::syscalls::UI_KEY_GETCATCHER`).
 ///
@@ -778,6 +823,62 @@ pub fn Key_GetCatcher(engine: &Engine) -> c_int {
     <Engine as Execute<UiKeyGetcatcher>>::execute(engine, UiKeyGetcatcherArgs::new())
 }
 
+/// Raven `trap_Key_GetOverstrikeMode` — `UI_KEY_GETOVERSTRIKEMODE`
+/// (token: `mp_abi::ui::syscalls::UI_KEY_GETOVERSTRIKEMODE`).
+///
+/// C: `qboolean trap_Key_GetOverstrikeMode(void)`
+/// Source: `oracle/codemp/ui/ui_syscalls.c:234-236`
+pub fn Key_GetOverstrikeMode(engine: &Engine) -> bool {
+    <Engine as Execute<UiKeyGetoverstrikemode>>::execute(engine, UiKeyGetoverstrikemodeArgs::new())
+        != 0
+}
+
+/// Raven `trap_Key_IsDown` — `UI_KEY_ISDOWN`
+/// (token: `mp_abi::ui::syscalls::UI_KEY_ISDOWN`).
+///
+/// C: `qboolean trap_Key_IsDown(int keynum)`
+/// Source: `oracle/codemp/ui/ui_syscalls.c:230-232`
+pub fn Key_IsDown(engine: &Engine, keynum: c_int) -> bool {
+    <Engine as Execute<UiKeyIsdown>>::execute(engine, UiKeyIsdownArgs::new(keynum)) != 0
+}
+
+/// Raven `trap_Key_KeynumToStringBuf` — `UI_KEY_KEYNUMTOSTRINGBUF`
+/// (token: `mp_abi::ui::syscalls::UI_KEY_KEYNUMTOSTRINGBUF`).
+///
+/// C: `void trap_Key_KeynumToStringBuf(int keynum, char *buf, int buflen)`
+/// Source: `oracle/codemp/ui/ui_syscalls.c:218-220`
+///
+/// The out-buffer carries a key *name* — an identifier, not free text — so it
+/// decodes UTF-8-transparently like the other name buffers.
+pub fn Key_KeynumToStringBuf(engine: &Engine, keynum: c_int, buffer_len: usize) -> String {
+    let mut buffer = vec![0u8; buffer_len];
+    <Engine as Execute<UiKeyKeynumtostringbuf>>::execute(
+        engine,
+        UiKeyKeynumtostringbufArgs::new(
+            keynum,
+            buffer.as_mut_ptr() as *mut c_char,
+            buffer_len as c_int,
+        ),
+    );
+    buf_to_string(&buffer)
+}
+
+/// Raven `trap_Key_SetBinding` — `UI_KEY_SETBINDING`
+/// (token: `mp_abi::ui::syscalls::UI_KEY_SETBINDING`).
+///
+/// C: `void trap_Key_SetBinding(int keynum, const char *binding)`
+/// Source: `oracle/codemp/ui/ui_syscalls.c:226-228`
+///
+/// The binding is console command text, so it crosses as Latin-1 — the
+/// `Cmd_ExecuteText` pair for `Key_GetBindingBuf`.
+pub fn Key_SetBinding(engine: &Engine, keynum: c_int, binding: &str) {
+    let binding_c = CString::new(string_to_latin1(binding)).unwrap();
+    <Engine as Execute<UiKeySetbinding>>::execute(
+        engine,
+        UiKeySetbindingArgs::new(keynum, binding_c.as_ptr()),
+    )
+}
+
 /// Raven `trap_Key_SetCatcher` — `UI_KEY_SETCATCHER`
 /// (token: `mp_abi::ui::syscalls::UI_KEY_SETCATCHER`).
 ///
@@ -785,6 +886,18 @@ pub fn Key_GetCatcher(engine: &Engine) -> c_int {
 /// Source: `oracle/codemp/ui/ui_syscalls.c:250-252`
 pub fn Key_SetCatcher(engine: &Engine, catcher: c_int) {
     <Engine as Execute<UiKeySetcatcher>>::execute(engine, UiKeySetcatcherArgs::new(catcher))
+}
+
+/// Raven `trap_Key_SetOverstrikeMode` — `UI_KEY_SETOVERSTRIKEMODE`
+/// (token: `mp_abi::ui::syscalls::UI_KEY_SETOVERSTRIKEMODE`).
+///
+/// C: `void trap_Key_SetOverstrikeMode(qboolean state)`
+/// Source: `oracle/codemp/ui/ui_syscalls.c:238-240`
+pub fn Key_SetOverstrikeMode(engine: &Engine, state: bool) {
+    <Engine as Execute<UiKeySetoverstrikemode>>::execute(
+        engine,
+        UiKeySetoverstrikemodeArgs::new(c_int::from(state)),
+    )
 }
 
 /// Raven `trap_LAN_AddServer` — `UI_LAN_ADDSERVER`
@@ -1116,6 +1229,15 @@ pub fn R_AddRefEntityToScene(engine: &Engine, re: &refEntity_t) {
     )
 }
 
+/// Raven `trap_R_ClearScene` — `UI_R_CLEARSCENE`
+/// (token: `mp_abi::ui::syscalls::UI_R_CLEARSCENE`).
+///
+/// C: `void trap_R_ClearScene(void)`
+/// Source: `oracle/codemp/ui/ui_syscalls.c:170-172`
+pub fn R_ClearScene(engine: &Engine) {
+    <Engine as Execute<UiRClearscene>>::execute(engine, UiRClearsceneArgs::new())
+}
+
 /// Raven `trap_R_DrawStretchPic` — `UI_R_DRAWSTRETCHPIC`
 /// (token: `mp_abi::ui::syscalls::UI_R_DRAWSTRETCHPIC`).
 ///
@@ -1196,6 +1318,23 @@ pub fn R_Font_StrLenPixels(engine: &Engine, text: &str, iFontIndex: c_int, scale
     )
 }
 
+/// Raven `trap_R_ModelBounds` — `UI_R_MODELBOUNDS`
+/// (token: `mp_abi::ui::syscalls::UI_R_MODELBOUNDS`).
+///
+/// C: `void trap_R_ModelBounds(clipHandle_t model, vec3_t mins, vec3_t maxs)`
+/// Source: `oracle/codemp/ui/ui_syscalls.c:198-200`
+///
+/// The two engine-filled arrays become the return value.
+pub fn R_ModelBounds(engine: &Engine, model: c_int) -> (vec3_t, vec3_t) {
+    let mut mins: vec3_t = [0.0; 3];
+    let mut maxs: vec3_t = [0.0; 3];
+    <Engine as Execute<UiRModelbounds>>::execute(
+        engine,
+        UiRModelboundsArgs::new(model, &mut mins as *mut vec3_t, &mut maxs as *mut vec3_t),
+    );
+    (mins, maxs)
+}
+
 /// Raven `trap_R_RegisterFont` — `UI_R_REGISTERFONT`
 /// (token: `mp_abi::ui::syscalls::UI_R_REGISTERFONT`).
 ///
@@ -1206,6 +1345,19 @@ pub fn R_RegisterFont(engine: &Engine, fontName: &str) -> qhandle_t {
     <Engine as Execute<UiRRegisterfont>>::execute(
         engine,
         UiRRegisterfontArgs::new(font_name_c.as_ptr()),
+    )
+}
+
+/// Raven `trap_R_RegisterModel` — `UI_R_REGISTERMODEL`
+/// (token: `mp_abi::ui::syscalls::UI_R_REGISTERMODEL`).
+///
+/// C: `qhandle_t trap_R_RegisterModel(const char *name)`
+/// Source: `oracle/codemp/ui/ui_syscalls.c:103-105`
+pub fn R_RegisterModel(engine: &Engine, name: &str) -> qhandle_t {
+    let name_c = cstr(name);
+    <Engine as Execute<UiRRegistermodel>>::execute(
+        engine,
+        UiRRegistermodelArgs::new(name_c.as_ptr()),
     )
 }
 
@@ -1243,6 +1395,18 @@ pub fn R_RegisterShaderNoMip(engine: &Engine, name: &str) -> qhandle_t {
 /// Source: `oracle/codemp/ui/ui_syscalls.c:107-109`
 pub fn R_RegisterSkin(engine: &Engine, name: &str) -> qhandle_t {
     <Engine as Execute<UiRRegisterskin>>::execute(engine, UiRRegisterskinArgs::new(cstr(name)))
+}
+
+/// Raven `trap_R_RenderScene` — `UI_R_RENDERSCENE`
+/// (token: `mp_abi::ui::syscalls::UI_R_RENDERSCENE`).
+///
+/// C: `void trap_R_RenderScene(const refdef_t *fd)`
+/// Source: `oracle/codemp/ui/ui_syscalls.c:186-188`
+pub fn R_RenderScene(engine: &Engine, fd: &refdef_t) {
+    <Engine as Execute<UiRRenderscene>>::execute(
+        engine,
+        UiRRendersceneArgs::new(fd as *const refdef_t as *const c_void),
+    )
 }
 
 /// Raven `trap_R_SetColor` — `UI_R_SETCOLOR`
@@ -1327,6 +1491,29 @@ pub fn S_RegisterSound(engine: &Engine, sample: &str) -> sfxHandle_t {
     )
 }
 
+/// Raven `trap_S_StartBackgroundTrack` — `UI_S_STARTBACKGROUNDTRACK`
+/// (token: `mp_abi::ui::syscalls::UI_S_STARTBACKGROUNDTRACK`).
+///
+/// C: `void trap_S_StartBackgroundTrack(const char *intro, const char *loop, qboolean bReturnWithoutStarting)`
+/// Source: `oracle/codemp/ui/ui_syscalls.c:396-398`
+pub fn S_StartBackgroundTrack(
+    engine: &Engine,
+    intro: &str,
+    loop_: &str,
+    bReturnWithoutStarting: bool,
+) {
+    let intro_c = cstr(intro);
+    let loop_c = cstr(loop_);
+    <Engine as Execute<UiSStartbackgroundtrack>>::execute(
+        engine,
+        UiSStartbackgroundtrackArgs::new(
+            intro_c.as_ptr(),
+            loop_c.as_ptr(),
+            c_int::from(bReturnWithoutStarting),
+        ),
+    )
+}
+
 /// Raven `trap_S_StartLocalSound` — `UI_S_STARTLOCALSOUND`
 /// (token: `mp_abi::ui::syscalls::UI_S_STARTLOCALSOUND`).
 ///
@@ -1337,6 +1524,15 @@ pub fn S_StartLocalSound(engine: &Engine, sfx: sfxHandle_t, channelNum: c_int) {
         engine,
         UiSStartlocalsoundArgs::new(sfx, channelNum),
     )
+}
+
+/// Raven `trap_S_StopBackgroundTrack` — `UI_S_STOPBACKGROUNDTRACK`
+/// (token: `mp_abi::ui::syscalls::UI_S_STOPBACKGROUNDTRACK`).
+///
+/// C: `void trap_S_StopBackgroundTrack(void)`
+/// Source: `oracle/codemp/ui/ui_syscalls.c:392-394`
+pub fn S_StopBackgroundTrack(engine: &Engine) {
+    <Engine as Execute<UiSStopbackgroundtrack>>::execute(engine, UiSStopbackgroundtrackArgs::new())
 }
 
 /// Raven `trap_UpdateScreen` — `UI_UPDATESCREEN`
