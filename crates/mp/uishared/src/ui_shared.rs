@@ -16,6 +16,9 @@ use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::refdef_t::{
     refdef_t, MAX_MAP_AREA_BYTES, MAX_RENDER_STRINGS, MAX_RENDER_STRING_LENGTH,
 };
+use mp_qshared::common::mp::ghoul2::bone_flags::{
+    BONE_ANIM_OVERRIDE_FREEZE, BONE_ANIM_OVERRIDE_LOOP,
+};
 use mp_qshared::shared::q_math::{AnglesToAxis, VectorSet};
 use mp_qshared::shared::q_string::{COM_Parse, GetIDForString};
 use mp_qshared::shared::{
@@ -3280,9 +3283,15 @@ pub fn Display_CloseCinematics(menus: &mut MenuSystem, dc: &mut dyn DisplayConte
 /// PORT-NOTE (dead surface): the `#ifndef CGAME` guard picks the `ui` arm
 /// unconditionally, matching this file's existing convention (see
 /// `Window_Paint`'s PORT-NOTE) — this crate has only the `ui` linkage so far.
+///
+/// PORT-NOTE: `ds` is an added param beyond Raven's signature — the
+/// `modelPtr->g2anim` branch below needs `DC->realTime` for its
+/// `G2API_SetBoneAnim` call, and `DisplayState` (DEC-36's `DC->` data tail)
+/// threads beside `dc`, never through it (DEC-38 ruling 9).
 /// Source: `oracle/codemp/ui/ui_shared.c:7567-7657`
 pub fn ItemParse_asset_model_go(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     item: ItemId,
     name: &str,
@@ -3335,21 +3344,42 @@ pub fn ItemParse_asset_model_go(
                 let GLAName = dc.G2API_GetGLAName(ghoul2, 0, MAX_QPATH as usize);
 
                 if !GLAName.is_empty() {
-                    if GLAName.rfind('/').is_some() {
+                    if let Some(slashIdx) = GLAName.rfind('/') {
                         // If this isn't true the gla path must be messed up somehow.
                         //
-                        // DEFERRED: UI_ParseAnimationFile — ui reuses mp_bg's
-                        // animation module instead of Raven's hand-maintained
-                        // `bgAllAnims` copy (DEC-36 D5); `UI_ParseAnimationFile`
-                        // itself already carries that deferral at U0
-                        // (`crates/mp/ui/src/ui_main.rs:99-104`, same
-                        // `uiHumanoidAnimations`/`bgAllAnims`/`uiNumAllAnims`
-                        // fork), with no owned-shape reuse target designed yet —
-                        // this branch's bone-anim playback off a parsed
-                        // `animation.cfg` has nothing to transcribe against.
-                        // Consequence: `*runTimeLength` stays 0 rather than the
-                        // parsed animation's play length.
-                        // Source: `oracle/codemp/ui/ui_shared.c:7602-7631`
+                        // Raven: `strcpy(slash, "/animation.cfg")` — truncate the
+                        // GLA path at its last '/' and append the literal suffix.
+                        let animCfgPath = format!("{}/animation.cfg", &GLAName[..slashIdx]);
+
+                        if let Some(anim) = dc.UI_ParseAnimationFile(&animCfgPath, g2anim) {
+                            // We parsed out the animation info for whatever model this is
+                            let sFrame = anim.firstFrame as c_int;
+                            let eFrame = sFrame + anim.numFrames as c_int;
+                            let mut flags = BONE_ANIM_OVERRIDE_FREEZE;
+                            let time = ds.realTime;
+                            let animSpeed = 50.0f32 / anim.frameLerp as f32;
+                            let blendTime = 150;
+
+                            if anim.loopFrames != -1 {
+                                flags |= BONE_ANIM_OVERRIDE_LOOP;
+                            }
+
+                            let ghoul2 = menus.item(item).ghoul2;
+                            dc.G2API_SetBoneAnim(
+                                ghoul2,
+                                0,
+                                "model_root",
+                                sFrame,
+                                eFrame,
+                                flags,
+                                animSpeed,
+                                time,
+                                -1.0,
+                                blendTime,
+                            );
+                            *runTimeLength =
+                                anim.frameLerp as c_int * (anim.numFrames as c_int - 2);
+                        }
                     }
                 }
             }
@@ -3580,6 +3610,7 @@ pub fn ItemParse_scrollhidden(menus: &mut MenuSystem, item: ItemId, _handle: c_i
 /// Source: `oracle/codemp/ui/ui_shared.c:8892-8986`
 fn dispatch_item_keyword(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     item: ItemId,
     keyword: &str,
@@ -3596,7 +3627,7 @@ fn dispatch_item_keyword(
     } else if stricmp_eq(keyword, "appearance_slot") {
         Some(ItemParse_Appearance_slot(menus, dc, item, handle))
     } else if stricmp_eq(keyword, "asset_model") {
-        Some(ItemParse_asset_model(menus, dc, item, handle))
+        Some(ItemParse_asset_model(menus, ds, dc, item, handle))
     } else if stricmp_eq(keyword, "asset_shader") {
         Some(ItemParse_asset_shader(menus, dc, item, handle))
     } else if stricmp_eq(keyword, "backcolor") {
@@ -3772,6 +3803,7 @@ fn dispatch_item_keyword(
 /// Source: `oracle/codemp/ui/ui_shared.c:9009-9040`
 pub fn Item_Parse(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     item: ItemId,
     handle: c_int,
@@ -3795,7 +3827,7 @@ pub fn Item_Parse(
             return true;
         }
 
-        match dispatch_item_keyword(menus, dc, item, &tokenStr, handle) {
+        match dispatch_item_keyword(menus, ds, dc, item, &tokenStr, handle) {
             None => {
                 PC_SourceError(dc, handle, &format!("unknown menu item keyword {tokenStr}"));
                 continue;
@@ -3966,8 +3998,9 @@ pub fn Item_TextScroll_BuildLines(
 /// (`ui_shared.c:9717-9756`) that `Menu_Parse` walked through
 /// `KeywordHash_Find` — see [`dispatch_item_keyword`]'s doc comment (same
 /// shape, menu-table entries in their original order). `MenuParse_font` is
-/// the one entry that also needs `ds` (mutable — it lazily registers the
-/// shared medium-font asset); `outOfBoundsClick`/`popup` don't need `dc`.
+/// the one entry that needs `ds` mutably (it lazily registers the shared
+/// medium-font asset); `MenuParse_itemDef` takes it shared, for
+/// `ItemParse_asset_model`; `outOfBoundsClick`/`popup` don't need `dc`.
 /// Source: `oracle/codemp/ui/ui_shared.c:9717-9756`
 fn dispatch_menu_keyword(
     menus: &mut MenuSystem,
@@ -4018,7 +4051,7 @@ fn dispatch_menu_keyword(
     } else if stricmp_eq(keyword, "fullscreen") {
         Some(MenuParse_fullscreen(menus, dc, menu, handle))
     } else if stricmp_eq(keyword, "itemDef") {
-        Some(MenuParse_itemDef(menus, dc, menu, handle))
+        Some(MenuParse_itemDef(menus, ds, dc, menu, handle))
     } else if stricmp_eq(keyword, "name") {
         Some(MenuParse_name(menus, dc, menu, handle))
     } else if stricmp_eq(keyword, "onClose") {
@@ -4057,9 +4090,9 @@ fn dispatch_menu_keyword(
 /// `menu`, dispatching each keyword token through `menuParseKeywords[]`.
 ///
 /// PORT-NOTE: `KeywordHash_Find(menuParseKeywordHash, token.string)` becomes
-/// [`dispatch_menu_keyword`] (see its doc comment). `ds` threads through only
-/// because `MenuParse_font` needs it; `Item_Parse`'s equivalent dispatch has
-/// no such entry, so it stays `ds`-free.
+/// [`dispatch_menu_keyword`] (see its doc comment). `ds` threads through for
+/// `MenuParse_font` and on down `MenuParse_itemDef`/`Item_Parse` for
+/// `ItemParse_asset_model`.
 /// Source: `oracle/codemp/ui/ui_shared.c:9779-9810`
 pub fn Menu_Parse(
     menus: &mut MenuSystem,
@@ -5972,9 +6005,16 @@ pub fn ItemParse_group(
 /// `ui_char_model` name a special-cased indirection through that cvar.
 ///
 /// PORT-NOTE: the `#ifndef CGAME` (ui) arm, per this file's convention.
+///
+/// PORT-NOTE: `ds` threads down the keyword-dispatch chain
+/// (`Item_Parse`/`dispatch_item_keyword`) to reach
+/// `ItemParse_asset_model_go`'s `DC->realTime` read: `UI_LoadNonIngame`
+/// re-parses every menu file mid-session (`ui_main.c:10894-10901`), long
+/// after `_UI_Refresh` has set `realTime`.
 /// Source: `oracle/codemp/ui/ui_shared.c:7659-7684`
 pub fn ItemParse_asset_model(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     item: ItemId,
     handle: c_int,
@@ -5993,7 +6033,7 @@ pub fn ItemParse_asset_model(
     }
 
     let mut animRunLength: c_int = 0;
-    ItemParse_asset_model_go(menus, dc, item, &temp, &mut animRunLength)
+    ItemParse_asset_model_go(menus, ds, dc, item, &temp, &mut animRunLength)
 }
 
 /// Raven `ItemParse_model_origin` — parse an item model's origin.
@@ -7057,16 +7097,17 @@ pub fn ItemParse_cvarFloat(
 /// `clear()`. Raven's `(int)psString > 0` pointer-validity check (always
 /// true once `PC_String_Parse` reports success) collapses.
 ///
-/// DEFERRED: the `feeder == FEEDER_PLAYER_SPECIES`/`FEEDER_LANGUAGES`
-/// branches populate the cycle list from `uiInfo.playerSpecies`/
-/// `uiInfo.languageCount` (and the `currLanguage`/`languageString` file
-/// statics) — `uiInfo` lives on `crates/mp/ui/src/world/ui_world.rs`'s
-/// `UiWorld` (mp_ui-only), unreachable from this host-agnostic crate (no
-/// `mp_ui` dependency, no `UiWorld`/`UiContext` in scope, and no
-/// `DisplayContext`/`MenuSystem` field carries it). The `"feeder"` token
-/// check and unconditional `return true` are transcribed; the population
-/// loops are not — escalated, needs a host callback (e.g. a `DisplayContext`
-/// method) to thread the species/language table through.
+/// The `feeder == FEEDER_PLAYER_SPECIES`/`FEEDER_LANGUAGES` branches populate
+/// the cycle list from `uiInfo.playerSpecies`/`uiInfo.languageCount` (and the
+/// `currLanguage`/`languageString` file statics) — `uiInfo` lives on
+/// `crates/mp/ui/src/world/ui_world.rs`'s `UiWorld` (mp_ui-only), unreachable
+/// from this host-agnostic crate (no `mp_ui` dependency, no `UiWorld`/
+/// `UiContext` in scope, and no `DisplayContext`/`MenuSystem` field carries
+/// it). Routed through `dc.UI_PlayerSpeciesCvarStrList`/
+/// `dc.UI_LanguageCvarStrList` — each returns the already-built
+/// `(cvarList label, cvarStr value)` pairs so this fn only pushes them onto
+/// the item's `MultiDef` (see those methods' docs on `DisplayContext` for the
+/// per-branch oracle cite and the `currLanguage` double-call PORT-NOTE).
 /// Source: `oracle/codemp/ui/ui_shared.c:8604-8694`
 pub fn ItemParse_cvarStrList(
     menus: &mut MenuSystem,
@@ -7091,13 +7132,29 @@ pub fn ItemParse_cvarStrList(
     let tokenStr = pc_token_str(&token);
     let special = menus.item(item).special;
 
+    // porting-rules §19: both feeder loops write `cvarList[count]` for every
+    // species/language with no `MAX_MULTI_CVARS` bound in Raven (a latent
+    // overrun the general parse path below guards); `Vec::push` is the
+    // defined pick.
     if stricmp_eq(&tokenStr, "feeder") && special == FEEDER_PLAYER_SPECIES as f32 {
-        // DEFERRED: uiInfo.playerSpecies population — see fn doc.
+        let pairs = dc.UI_PlayerSpeciesCvarStrList();
+        if let Some(multiPtr) = menus.item_mut(item).typeData.multi_mut() {
+            for (label, value) in pairs {
+                multiPtr.cvarList.push(label);
+                multiPtr.cvarStr.push(value);
+            }
+        }
         return true;
     }
     // languages
     if stricmp_eq(&tokenStr, "feeder") && special == FEEDER_LANGUAGES as f32 {
-        // DEFERRED: uiInfo.languageCount population — see fn doc.
+        let pairs = dc.UI_LanguageCvarStrList();
+        if let Some(multiPtr) = menus.item_mut(item).typeData.multi_mut() {
+            for (label, value) in pairs {
+                multiPtr.cvarList.push(label);
+                multiPtr.cvarStr.push(value);
+            }
+        }
         return true;
     }
 
@@ -7301,15 +7358,6 @@ pub fn ItemParse_Appearance_slot(
 /// ui host at compile time; `mp_uishared` carries no compile-time host
 /// distinction (DEC-36 D3 threads the host through `dc`/state params at
 /// runtime, not `#ifdef`), so the flag toggle below runs for every host.
-///
-/// DEFERRED: the saber-glow-cache/parms-load call
-/// (`UI_CacheSaberGlowGraphics`, `UI_SaberLoadParms`, gated on
-/// `ui_saber_parms_parsed`) — those are ported in `crates/mp/ui/src/
-/// ui_saber.rs` taking `ctx: &mut UiContext`, and `ui_saber_parms_parsed`
-/// lives on `ctx.world.saber` (`crates/mp/ui/src/world/ui_saber_state.rs`);
-/// `mp_uishared` is host-agnostic (no `mp_ui` dependency, no `UiContext` in
-/// scope), so neither is reachable from this fn. Escalated — needs a host
-/// callback (e.g. a `DisplayContext` method) to thread this through.
 /// Source: `oracle/codemp/ui/ui_shared.c:8833-8859`
 pub fn ItemParse_isSaber(
     menus: &mut MenuSystem,
@@ -7321,6 +7369,7 @@ pub fn ItemParse_isSaber(
     if PC_Int_Parse(dc, handle, &mut i) {
         if i != 0 {
             menus.item_mut(item).flags |= ITF_ISSABER;
+            dc.UI_CacheSaberGlowGraphics();
         } else {
             menus.item_mut(item).flags &= !ITF_ISSABER;
         }
@@ -7333,8 +7382,6 @@ pub fn ItemParse_isSaber(
 /// saber blade.
 ///
 /// PORT-NOTE: see `ItemParse_isSaber`.
-///
-/// DEFERRED: see `ItemParse_isSaber`.
 /// Source: `oracle/codemp/ui/ui_shared.c:8865-8890`
 pub fn ItemParse_isSaber2(
     menus: &mut MenuSystem,
@@ -7346,6 +7393,7 @@ pub fn ItemParse_isSaber2(
     if PC_Int_Parse(dc, handle, &mut i) {
         if i != 0 {
             menus.item_mut(item).flags |= ITF_ISSABER2;
+            dc.UI_CacheSaberGlowGraphics();
         } else {
             menus.item_mut(item).flags &= !ITF_ISSABER2;
         }
@@ -7793,6 +7841,7 @@ pub fn MenuParse_fadeCycle(
 /// Source: `oracle/codemp/ui/ui_shared.c:9688-9700`
 pub fn MenuParse_itemDef(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     menu: MenuId,
     handle: c_int,
@@ -7801,7 +7850,7 @@ pub fn MenuParse_itemDef(
         let id = ItemId::new(menus.items.len());
         menus.items.push(ItemDef::default());
         Item_Init(menus.item_mut(id));
-        if !Item_Parse(menus, dc, id, handle) {
+        if !Item_Parse(menus, ds, dc, id, handle) {
             return false;
         }
         Item_InitControls(menus, Some(id));
@@ -10125,22 +10174,14 @@ pub fn Item_Text_Paint(
 /// `ui` arm (this crate's only linkage so far — cgame's twin will
 /// special-case them out when it lands, same as `Item_SetTextExtents`).
 ///
-/// DEFERRED: the "moves datapad anim" block (`uiInfo.moveAnimTime`,
-/// `uiInfo.movesBaseAnim`, the multi-part saber/knockdown animation state
-/// machine, `UI_UpdateCharacterSkin`) reads/writes `uiInfo`, which lives on
-/// `crates/mp/ui/src/world/ui_world.rs`'s `UiWorld` (mp_ui-only) and is
-/// unreachable from this host-agnostic crate — same shape as the
-/// `ItemParse_cvarStrList` feeder-population DEFERRED.
+/// PORT-NOTE: Raven's `modelPtr` is a pointer into `item->typeData`'s live
+/// storage, so the "moves datapad anim" block's writes (through
+/// `ItemParse_asset_model_go`/`UI_UpdateCharacterSkin`, routed here via
+/// `dc.UI_MovesDatapadAnimTick`) land in the same struct the rest of this fn
+/// reads. A value-copied `modelPtr` taken before that tick would go stale
+/// against it, so the copy below is taken (and the NULL check repeated)
+/// *after* the tick runs, not before.
 /// Source: `oracle/codemp/ui/ui_shared.c:5709-5778`
-///
-/// DEFERRED: `UI_SaberDrawBlades`'s ported home
-/// (`oracle/codemp/ui/ui_saber.c:952-1017`) takes `ctx: &mut UiContext`
-/// (mp_ui-only per `tools/closure-prototype/out/ui/ported-signatures.txt`),
-/// unreachable from this host-agnostic crate (no `mp_ui` dependency, no
-/// `UiContext`/`DisplayContext` method carries the saber-blade draw). Needs a
-/// `DisplayContext`-routed equivalent or a restructure that threads it back
-/// through the host.
-/// Source: `oracle/codemp/ui/ui_shared.c:5880-5883`
 pub fn Item_Model_Paint(
     menus: &mut MenuSystem,
     ds: &DisplayState,
@@ -10149,12 +10190,17 @@ pub fn Item_Model_Paint(
 ) {
     // PORT-NOTE: `typeData.model()` stands in for Raven's unchecked
     // `(modelDef_t*)item->typeData` cast + NULL test (`listBox_mut` precedent).
+    if menus.item(item).typeData.model().is_none() {
+        return;
+    }
+
+    // a moves datapad anim is playing
+    dc.UI_MovesDatapadAnimTick(ds, menus, item);
+
     let modelPtr = match menus.item(item).typeData.model() {
         Some(m) => *m,
         None => return,
     };
-
-    // DEFERRED: moves datapad anim block — see fn doc.
 
     let (rect, ghoul2, flags, asset) = {
         let it = menus.item(item);
@@ -10289,7 +10335,8 @@ pub fn Item_Model_Paint(
             ent.shaderRGBA[3] = 255;
         }
         if flags & ITF_ISANYSABER != 0 {
-            // DEFERRED: UI_SaberDrawBlades( item, origin, angles ) — see fn doc.
+            // hack, draw the saber blade!
+            dc.UI_SaberDrawBlades(ds, menus.item(item), origin, angles);
         }
     } else {
         ent.hModel = asset;

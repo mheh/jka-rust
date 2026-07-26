@@ -2,11 +2,13 @@
 
 use core::ffi::{c_int, c_void};
 
+use mp_bg::public::animation::animation_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_qshared::shared::{pc_token_t, qhandle_t, sfxHandle_t, vec3_t, vec4_t};
 
 use super::display_state::DisplayState;
+use super::item_def_s::ItemDef;
 use super::item_id::ItemId;
 use super::menu_system::MenuSystem;
 
@@ -434,4 +436,109 @@ pub trait DisplayContext {
 
     /// Raven `trap_G2_HaveWeGhoul2Models(void *ghoul2)`.
     fn G2_HaveWeGhoul2Models(&mut self, ghoul2: *mut c_void) -> bool;
+
+    // ---- ui-module saber draw/cache (`#ifndef CGAME`) ----
+    //
+    // `ui_shared.c:41-53` hoists `extern void UI_SaberDrawBlades(...)`,
+    // `extern void UI_SaberLoadParms(void)`, `extern qboolean
+    // ui_saber_parms_parsed`, and `extern void UI_CacheSaberGlowGraphics(void)`
+    // inside `#ifndef CGAME	// Defined in ui_main.c, not in the namespace` —
+    // cgame's `ui_shared.c` translation unit never declares or calls these,
+    // so its call sites (`ItemParse_isSaber`/`ItemParse_isSaber2`,
+    // `Item_Model_Paint`) simply don't exist in that build. No cgame
+    // `DisplayContext` impl exists yet; when one lands, its arms for these two
+    // methods have nothing in `ui_shared.c` to route to and should panic
+    // naming the subject (same "dead per-host slot" treatment `ui`'s own impl
+    // gives the seven `_UI_Init` slots nothing calls).
+
+    /// Raven `UI_CacheSaberGlowGraphics()` plus the `ui_saber_parms_parsed`-
+    /// gated `UI_SaberLoadParms()` that follows it at both call sites —
+    /// bundled into one hook because `ui_saber_parms_parsed` lives on
+    /// `UiContext`-only state (`ctx.world.saber`, `crates/mp/ui/src/world/
+    /// ui_saber_state.rs`) unreachable from this host-agnostic trait boundary.
+    /// Source: `oracle/codemp/ui/ui_shared.c:8844-8847,8874-8877`
+    fn UI_CacheSaberGlowGraphics(&mut self);
+
+    /// Raven `UI_SaberDrawBlades(itemDef_t *item, vec3_t origin, vec3_t
+    /// angles)` — draws `item`'s saber blade(s) into the model-preview scene.
+    /// Source: `oracle/codemp/ui/ui_shared.c:5882`; fn body
+    /// `oracle/codemp/ui/ui_saber.c:952-1017`
+    fn UI_SaberDrawBlades(
+        &mut self,
+        ds: &DisplayState,
+        item: &ItemDef,
+        origin: vec3_t,
+        angles: vec3_t,
+    );
+
+    // ---- ui-module character-animation application (`#ifndef CGAME`) ----
+    //
+    // `ItemParse_asset_model_go`'s `modelPtr->g2anim` branch and the "a moves
+    // datapad anim is playing" block at the top of `Item_Model_Paint`
+    // (`ui_shared.c:5709-5769`) both read/write ui-only state unreachable from
+    // this host-agnostic crate: the first needs `UI_ParseAnimationFile`'s
+    // `bgAllAnims` table, which DEC-36 D5 reuses from `mp_bg`'s `BgState`
+    // (`ctx.world.bg_state`) instead of transcribing Raven's hand-synced
+    // `ui_main.c` fork; the second needs `uiInfo.moveAnimTime`/
+    // `uiInfo.movesBaseAnim`, which live on `UiWorld` (`ctx.world.moveAnimTime`/
+    // `ctx.world.movesBaseAnim`, `crates/mp/ui/src/world/ui_world.rs`).
+
+    /// Raven's `UI_ParseAnimationFile(GLAName, NULL, qfalse)` call plus the
+    /// `bgAllAnims[animIndex].anims[modelPtr->g2anim]` array lookup that
+    /// follows it, both inlined in `ItemParse_asset_model_go` — bundled into
+    /// one hook because ui reuses `mp_bg`'s animation module (DEC-36 D5)
+    /// instead of porting the `ui_main.c` fork, and the parsed-file cache
+    /// (`BgState.bgAllAnims`) is `UiWorld`-only state. Returns `None` for
+    /// Raven's `animIndex == -1` parse-failure return, which the caller
+    /// treats as "skip the `G2API_SetBoneAnim` call, leave `*runTimeLength`
+    /// at 0" (the guarding `if` in the oracle).
+    /// Source: `oracle/codemp/ui/ui_shared.c:7602-7611`; anim-parse fn body
+    /// `oracle/codemp/ui/ui_main.c:664-863` (ui's hand-synced fork, not
+    /// transcribed) / reused `oracle/codemp/game/bg_panimate.c:2339-2580`
+    /// (`BG_ParseAnimationFile`, DEC-36 D5)
+    fn UI_ParseAnimationFile(&mut self, filename: &str, g2anim: c_int) -> Option<animation_t>;
+
+    /// Raven's "a moves datapad anim is playing" block (`uiInfo.moveAnimTime`,
+    /// `uiInfo.movesBaseAnim`, the multi-part saber/knockdown animation state
+    /// machine, `UI_UpdateCharacterSkin`, `UI_SaberAttachToChar`) at the top
+    /// of `Item_Model_Paint` — bundled into one hook because all of it reads/
+    /// writes `UiWorld`-only state unreachable from this host-agnostic trait
+    /// boundary. A no-op unless `ctx.world.moveAnimTime` is armed and expired
+    /// (the oracle's own guard), so this is safe to call unconditionally at
+    /// the top of every `Item_Model_Paint`.
+    /// Source: `oracle/codemp/ui/ui_shared.c:5709-5769`
+    fn UI_MovesDatapadAnimTick(&mut self, ds: &DisplayState, menus: &mut MenuSystem, item: ItemId);
+
+    // ---- ui-module species/language cycle-list population (`#ifndef CGAME`) ----
+    //
+    // `ItemParse_cvarStrList`'s `feeder == FEEDER_PLAYER_SPECIES` /
+    // `FEEDER_LANGUAGES` branches (`ui_shared.c:8623-8644`) walk
+    // `uiInfo.playerSpecies`/`uiInfo.languageCount` — both `UiWorld`-only state
+    // (`ctx.world.playerSpecies`, `ctx.world.languageCount`, `crates/mp/ui/src/
+    // world/ui_world.rs`) unreachable from this host-agnostic trait boundary.
+    // Each hook returns the already-built `(cvarList label, cvarStr value)`
+    // pairs, so `ItemParse_cvarStrList` only has to push them onto the item's
+    // `MultiDef` — same "bundle the UiWorld-only read" shape as
+    // `UI_MovesDatapadAnimTick` above.
+
+    /// Raven's `feeder == FEEDER_PLAYER_SPECIES` population loop —
+    /// `multiPtr->cvarList[i] = strupr(va("@MENUS_%s", uiInfo.playerSpecies[i].Name))`
+    /// (the translation-lookup key), `multiPtr->cvarStr[i] =
+    /// uiInfo.playerSpecies[i].Name` (the cvar value).
+    /// Source: `oracle/codemp/ui/ui_shared.c:8623-8629`
+    fn UI_PlayerSpeciesCvarStrList(&mut self) -> Vec<(String, String)>;
+
+    /// Raven's `feeder == FEEDER_LANGUAGES` population loop — `multiPtr->
+    /// cvarList[i] = languageString` (the file-static constant translation
+    /// key `"@MENUS_MYLANGUAGE"`), `multiPtr->cvarStr[i] =
+    /// trap_GetLanguageName(i)`.
+    ///
+    /// PORT-NOTE: Raven calls `trap_GetLanguageName` twice per index into the
+    /// same `currLanguage[i]` buffer — once "for the displayed text" (whose
+    /// result is immediately discarded: the label is the constant key, never
+    /// `currLanguage`), once for the cvar value actually stored into
+    /// `cvarStr`. Both are emitted, the first discarded, so the syscall trace
+    /// matches.
+    /// Source: `oracle/codemp/ui/ui_shared.c:8631-8644`
+    fn UI_LanguageCvarStrList(&mut self) -> Vec<(String, String)>;
 }

@@ -22,12 +22,13 @@ use std::fmt::Write as _;
 use std::os::raw::c_char;
 use std::path::{Path, PathBuf};
 
+use mp_bg::public::animation::animation_t;
 use mp_engine_botlib::l_precomp_fns::{LoadSourceMemory, PC_ReadTokenHandle, PC_SourceFileAndLine};
 use mp_engine_botlib::BotLib;
 use mp_qshared::shared::{pc_token_t, qhandle_t, sfxHandle_t, vec3_t, vec4_t};
 use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::display_state::DisplayState;
-use mp_uishared::shared::item_def_s::MAX_COLOR_RANGES;
+use mp_uishared::shared::item_def_s::{ItemDef, MAX_COLOR_RANGES};
 use mp_uishared::shared::item_id::ItemId;
 use mp_uishared::shared::item_payload::ItemPayload;
 use mp_uishared::shared::list_box_def_s::MAX_LB_COLUMNS;
@@ -582,6 +583,51 @@ impl DisplayContext for TestDisplayContext {
 
     fn G2_HaveWeGhoul2Models(&mut self, _ghoul2: *mut c_void) -> bool {
         false
+    }
+
+    fn UI_CacheSaberGlowGraphics(&mut self) {
+        not_on_tested_path("UI_CacheSaberGlowGraphics")
+    }
+
+    fn UI_SaberDrawBlades(
+        &mut self,
+        _ds: &DisplayState,
+        _item: &ItemDef,
+        _origin: vec3_t,
+        _angles: vec3_t,
+    ) {
+        not_on_tested_path("UI_SaberDrawBlades")
+    }
+
+    fn UI_ParseAnimationFile(&mut self, _filename: &str, _g2anim: c_int) -> Option<animation_t> {
+        // Never reached: `ItemParse_asset_model_go`'s call is gated on a
+        // non-empty `G2API_GetGLAName` result, which this double always
+        // returns "" for (see the struct doc comment).
+        not_on_tested_path("UI_ParseAnimationFile")
+    }
+
+    fn UI_MovesDatapadAnimTick(
+        &mut self,
+        _ds: &DisplayState,
+        _menus: &mut MenuSystem,
+        _item: ItemId,
+    ) {
+        // Never reached: this parse-golden pipeline never calls
+        // `Item_Model_Paint` (parsing only, no paint).
+        not_on_tested_path("UI_MovesDatapadAnimTick")
+    }
+
+    fn UI_PlayerSpeciesCvarStrList(&mut self) -> Vec<(String, String)> {
+        // Never reached: no fixture parses a `cvarStrList { feeder ... }`
+        // with `special == FEEDER_PLAYER_SPECIES` (only the plain
+        // `cvarStrList { "label" "value" ... }` form is exercised).
+        not_on_tested_path("UI_PlayerSpeciesCvarStrList")
+    }
+
+    fn UI_LanguageCvarStrList(&mut self) -> Vec<(String, String)> {
+        // Never reached: no fixture parses a `cvarStrList { feeder ... }`
+        // with `special == FEEDER_LANGUAGES`.
+        not_on_tested_path("UI_LanguageCvarStrList")
     }
 }
 

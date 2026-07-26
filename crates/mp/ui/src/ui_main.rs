@@ -23,6 +23,8 @@ use mp_bg::bg_saga::{
     BG_SiegeLoadTeams, BG_SiegeSetTeamTheme, BG_SiegeTeamClassPortrait,
 };
 use mp_bg::cstr_util::cstr_to_str;
+use mp_bg::public::anim_number::animNumber_t;
+use mp_bg::public::anim_table::animTable;
 use mp_bg::public::configstring::{CS_PLAYERS, CS_SERVERINFO};
 use mp_bg::public::gametype::{
     GT_CTF, GT_CTY, GT_DUEL, GT_FFA, GT_HOLOCRON, GT_JEDIMASTER, GT_POWERDUEL, GT_SIEGE,
@@ -680,18 +682,23 @@ const MAX_DEMOS: c_int = 256;
 /// Source: `oracle/codemp/ui/ui_local.h:592`
 const MAX_MOVIES: c_int = 256;
 
-// DEFERRED: UI_AnimsetAlloc — part of the ui_main.c hand-maintained animation
-// fork (`bgAllAnims`/`uiNumAllAnims`/`UI_ParseAnimationFile`); DEC-36 D5 rules
-// ui reuses mp_bg's animation module instead of Raven's manually synced copy
-// (see `UiMainState`'s PORT-NOTE, which drops the same fork's state fields).
-// Source: `oracle/codemp/ui/ui_main.c:645-651`
-
-// DEFERRED: UI_ParseAnimationFile — same hand-maintained animation fork as
-// UI_AnimsetAlloc above; its state (`uiHumanoidAnimations`, `UIPAFtext`,
-// `UIPAFtextLoaded`, `bgAllAnims`, `uiNumAllAnims`) was dropped at U2 per the
-// same DEC-36 D5 ruling, so there is nothing left to thread this fn's body
-// through.
-// Source: `oracle/codemp/ui/ui_main.c:664-863`
+// NOT PORTED (by design, DEC-36 D5): UI_AnimsetAlloc / UI_ParseAnimationFile —
+// the ui_main.c hand-maintained animation fork (`bgAllAnims`/`uiNumAllAnims`/
+// `uiHumanoidAnimations`/`UIPAFtext`/`UIPAFtextLoaded`). Its state was dropped
+// at U2 (see `UiMainState`'s PORT-NOTE); ui reuses `mp_bg`'s animation module
+// instead of transcribing this hand-synced copy — the landing spot is
+// `DisplayContext::UI_ParseAnimationFile`
+// (`crates/mp/uishared/src/shared/display_context.rs`, impl
+// `crates/mp/ui/src/ui_display_context.rs`), which calls `mp_bg`'s
+// `BG_ParseAnimationFile` against `ctx.world.bg_state.bgAllAnims`. Verified by
+// direct source diff: the parsed `animation_t` VALUES are identical
+// (`firstFrame`/`numFrames`/`loopFrames`/`frameLerp`). The caching/index layers
+// around them do differ — bg's dup-scan starts at `i = 0` vs ui's `i = 1`, bg
+// special-cases `players/rockettrooper/` into slot 1, and bg's index counter
+// advances on `nextIndex > 1` vs ui's `nextIndex != 0` — but none of that is
+// reachable through the ui caller, which uses the returned index only to fetch
+// the anims it just parsed.
+// Source: `oracle/codemp/ui/ui_main.c:645-651,664-863`
 
 /// Raven `GetCRDelineatedString`.
 ///
@@ -4792,11 +4799,17 @@ pub fn UI_StopCinematic(ctx: &mut UiContext, handle: c_int) {
     } else {
         let handle = handle.abs();
         if handle == UI_MAPCINEMATIC {
+            // porting-rules §19: an out-of-range `ui_currentMap` indexes
+            // Raven's fixed zeroed `mapList[MAX_MAPS]` past the parsed entries;
+            // the port reproduces that zeroed read (0 / "") so the trap
+            // sequence is unchanged, and only the write-back is skipped.
             let idx = ctx.world.cvars.ui_currentMap.integer as usize;
-            if ctx.world.mapList[idx].cinematic >= 0 {
-                let cinematic = ctx.world.mapList[idx].cinematic;
+            let cinematic = ctx.world.mapList.get(idx).map(|m| m.cinematic).unwrap_or(0);
+            if cinematic >= 0 {
                 trap::CIN_StopCinematic(ctx.engine, cinematic);
-                ctx.world.mapList[idx].cinematic = -1;
+                if let Some(m) = ctx.world.mapList.get_mut(idx) {
+                    m.cinematic = -1;
+                }
             }
         } else if handle == UI_NETMAPCINEMATIC {
             if ctx.world.serverStatus.currentServerCinematic >= 0 {
@@ -8089,7 +8102,7 @@ pub fn UI_UpdateCharacter(
         .take(MAX_QPATH - 1)
         .collect();
     let mut animRunLength: c_int = 0;
-    let _ = ItemParse_asset_model_go(menus, ctx, item, &modelPath, &mut animRunLength);
+    let _ = ItemParse_asset_model_go(menus, ds, ctx, item, &modelPath, &mut animRunLength);
 
     if changedModel {
         // set all skins to first skin since we don't know you always have all skins
@@ -8121,6 +8134,127 @@ pub fn UI_UpdateCharacter(
         UI_FeederSelection(ctx, menus, ds, FEEDER_COLORCHOICES as f32, 0, Some(item));
     }
     UI_UpdateCharacterSkin(ctx, menus);
+}
+
+/// Raven's "a moves datapad anim is playing" block — the top of
+/// `Item_Model_Paint`, routed here through `DisplayContext::
+/// UI_MovesDatapadAnimTick` (mp_uishared is host-agnostic; this state is
+/// `UiWorld`-only). Once `ctx.world.moveAnimTime` is armed and its window
+/// expires, chains the next animation in a multi-part saber/knockdown
+/// sequence (or falls back to `ctx.world.movesBaseAnim`), then refreshes the
+/// character skin and reattaches the saber models — the same tail every
+/// other `ctx.world.moveAnimTime` writer in this file already runs
+/// (`UI_FeederSelection`'s `FEEDER_MOVES`/`FEEDER_MOVES_TITLES` arms,
+/// `UI_RunMenuScript`'s `setMoveCharacter`/`resetMovesList` arms).
+///
+/// PORT-NOTE: `item` is the SAME `itemDef_t` for every call in a given
+/// datapad session (`Menu_FindItemByName(menus, "rulesMenu_moves", "character")`
+/// upstream), matching Raven's `uiInfo.moveAnimTime` being a single global
+/// flag applied to whichever model item is being painted — preserved as-is,
+/// not special-cased.
+/// Source: `oracle/codemp/ui/ui_shared.c:5709-5769`
+pub fn UI_MovesDatapadAnimTick(
+    ctx: &mut UiContext,
+    ds: &DisplayState,
+    menus: &mut MenuSystem,
+    item: ItemId,
+) {
+    if ctx.world.moveAnimTime == 0 || ctx.world.moveAnimTime >= ds.realTime {
+        return;
+    }
+    if menus.item(item).typeData.model().is_none() {
+        return;
+    }
+
+    let charModel = UI_Cvar_VariableString(ctx, "ui_char_model");
+    // PORT-NOTE: Raven `Com_sprintf` into `char modelPath[MAX_QPATH]` truncates
+    // at 63 chars (unreachable for real model names).
+    let modelPath: String = format!("models/players/{}/model.glm", charModel)
+        .chars()
+        .take(MAX_QPATH - 1)
+        .collect();
+
+    let g2anim = menus
+        .item(item)
+        .typeData
+        .model()
+        .map(|m| m.g2anim)
+        .unwrap_or(0);
+
+    let mut animRunLength: c_int = 0;
+
+    // HACKHACKHACK: check for any multi-part anim sequences, and play the
+    // next anim, if needbe
+    if g2anim == animNumber_t::BOTH_FORCEWALLREBOUND_FORWARD as c_int
+        || g2anim == animNumber_t::BOTH_FORCEJUMP1 as c_int
+    {
+        let nextAnim =
+            unsafe { cstr_to_str(animTable[animNumber_t::BOTH_FORCEINAIR1 as usize].name) };
+        ItemParse_model_g2anim_go(menus, ctx, item, Some(&nextAnim));
+        ItemParse_asset_model_go(menus, ds, ctx, item, &modelPath, &mut animRunLength);
+        if animRunLength == 0 {
+            animRunLength = 500;
+        }
+        ctx.world.moveAnimTime = animRunLength + ds.realTime;
+    } else if g2anim == animNumber_t::BOTH_FORCEINAIR1 as c_int {
+        let nextAnim =
+            unsafe { cstr_to_str(animTable[animNumber_t::BOTH_FORCELAND1 as usize].name) };
+        ItemParse_model_g2anim_go(menus, ctx, item, Some(&nextAnim));
+        ItemParse_asset_model_go(menus, ds, ctx, item, &modelPath, &mut animRunLength);
+        ctx.world.moveAnimTime = animRunLength + ds.realTime;
+    } else if g2anim == animNumber_t::BOTH_FORCEWALLRUNFLIP_START as c_int {
+        let nextAnim = unsafe {
+            cstr_to_str(animTable[animNumber_t::BOTH_FORCEWALLRUNFLIP_END as usize].name)
+        };
+        ItemParse_model_g2anim_go(menus, ctx, item, Some(&nextAnim));
+        ItemParse_asset_model_go(menus, ds, ctx, item, &modelPath, &mut animRunLength);
+        ctx.world.moveAnimTime = animRunLength + ds.realTime;
+    } else if g2anim == animNumber_t::BOTH_FORCELONGLEAP_START as c_int {
+        let nextAnim =
+            unsafe { cstr_to_str(animTable[animNumber_t::BOTH_FORCELONGLEAP_LAND as usize].name) };
+        ItemParse_model_g2anim_go(menus, ctx, item, Some(&nextAnim));
+        ItemParse_asset_model_go(menus, ds, ctx, item, &modelPath, &mut animRunLength);
+        ctx.world.moveAnimTime = animRunLength + ds.realTime;
+    } else if g2anim == animNumber_t::BOTH_KNOCKDOWN3 as c_int {
+        // on front - into force getup
+        trap::S_StartLocalSound(ctx.engine, ds.Assets.moveJumpSound, CHAN_LOCAL);
+        let nextAnim =
+            unsafe { cstr_to_str(animTable[animNumber_t::BOTH_FORCE_GETUP_F1 as usize].name) };
+        ItemParse_model_g2anim_go(menus, ctx, item, Some(&nextAnim));
+        ItemParse_asset_model_go(menus, ds, ctx, item, &modelPath, &mut animRunLength);
+        ctx.world.moveAnimTime = animRunLength + ds.realTime;
+    } else if g2anim == animNumber_t::BOTH_KNOCKDOWN2 as c_int {
+        // on back - kick forward getup
+        trap::S_StartLocalSound(ctx.engine, ds.Assets.moveJumpSound, CHAN_LOCAL);
+        let nextAnim =
+            unsafe { cstr_to_str(animTable[animNumber_t::BOTH_GETUP_BROLL_F as usize].name) };
+        ItemParse_model_g2anim_go(menus, ctx, item, Some(&nextAnim));
+        ItemParse_asset_model_go(menus, ds, ctx, item, &modelPath, &mut animRunLength);
+        ctx.world.moveAnimTime = animRunLength + ds.realTime;
+    } else if g2anim == animNumber_t::BOTH_KNOCKDOWN1 as c_int {
+        // on back - roll-away
+        trap::S_StartLocalSound(ctx.engine, ds.Assets.moveRollSound, CHAN_LOCAL);
+        let nextAnim =
+            unsafe { cstr_to_str(animTable[animNumber_t::BOTH_GETUP_BROLL_R as usize].name) };
+        ItemParse_model_g2anim_go(menus, ctx, item, Some(&nextAnim));
+        ItemParse_asset_model_go(menus, ds, ctx, item, &modelPath, &mut animRunLength);
+        ctx.world.moveAnimTime = animRunLength + ds.realTime;
+    } else {
+        let baseAnim = ctx.world.movesBaseAnim.clone();
+        ItemParse_model_g2anim_go(menus, ctx, item, Some(&baseAnim));
+        ItemParse_asset_model_go(menus, ds, ctx, item, &modelPath, &mut animRunLength);
+        ctx.world.moveAnimTime = 0;
+    }
+
+    UI_UpdateCharacterSkin(ctx, menus);
+
+    // update saber models
+    //
+    // See `UI_FeederSelection`'s own PORT-NOTE: `ctx` and `item`'s home arena
+    // can't be borrowed at once, so the item is cloned out and written back.
+    let mut charItem = menus.item(item).clone();
+    UI_SaberAttachToChar(ctx, &mut charItem);
+    *menus.item_mut(item) = charItem;
 }
 
 /// Raven `UI_SiegeClassCnt`.
@@ -10230,7 +10364,12 @@ pub fn UI_UpdateSiegeObjectiveGraphics(ctx: &mut UiContext, menus: &mut MenuSyst
 /// Raven `UI_UpdateSaberHilt`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:5963-6018`
-pub fn UI_UpdateSaberHilt(ctx: &mut UiContext, menus: &mut MenuSystem, secondSaber: bool) {
+pub fn UI_UpdateSaberHilt(
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    secondSaber: bool,
+) {
     let menu = match Menu_GetFocused(menus) {
         // Get current menu (either video or ingame video, I would assume)
         Some(m) => m,
@@ -10267,8 +10406,8 @@ pub fn UI_UpdateSaberHilt(ctx: &mut UiContext, menus: &mut MenuSystem, secondSab
     if let Some(modelPath) = UI_SaberModelForSaber(ctx, &model) {
         // successfully found a model
         let mut animRunLength = 0;
-        ItemParse_asset_model_go(menus, ctx, item, &modelPath, &mut animRunLength); // set the model
-                                                                                    // get the customSkin, if any
+        ItemParse_asset_model_go(menus, ds, ctx, item, &modelPath, &mut animRunLength); // set the model
+                                                                                        // get the customSkin, if any
         if let Some(skinPath) = UI_SaberSkinForSaber(ctx, &model) {
             ItemParse_model_g2skin_go(menus, ctx, item, Some(&skinPath));
         // apply the skin
@@ -10946,7 +11085,7 @@ pub fn UI_FeederSelection(
                     // truncates at 63 chars (unreachable for real model names).
                     let modelPath = format!("models/players/{}/model.glm", charModel);
                     let mut animRunLength: c_int = 0;
-                    ItemParse_asset_model_go(menus, ctx, item, &modelPath, &mut animRunLength);
+                    ItemParse_asset_model_go(menus, ds, ctx, item, &modelPath, &mut animRunLength);
                     UI_UpdateCharacterSkin(ctx, menus);
 
                     ctx.world.moveAnimTime = ds.realTime + animRunLength;
@@ -11016,7 +11155,7 @@ pub fn UI_FeederSelection(
                     // truncates at 63 chars (unreachable for real model names).
                     let modelPath = format!("models/players/{}/model.glm", charModel);
                     let mut animRunLength: c_int = 0;
-                    ItemParse_asset_model_go(menus, ctx, item, &modelPath, &mut animRunLength);
+                    ItemParse_asset_model_go(menus, ds, ctx, item, &modelPath, &mut animRunLength);
 
                     UI_UpdateCharacterSkin(ctx, menus);
                 }
@@ -11116,10 +11255,21 @@ pub fn UI_FeederSelection(
         } else {
             ctx.world.cvars.ui_currentMap.integer
         };
-        if ctx.world.mapList[map as usize].cinematic >= 0 {
-            let cinematic = ctx.world.mapList[map as usize].cinematic;
+        // porting-rules §19: an out-of-range `ui_currentMap`/`ui_currentNetMap`
+        // indexes Raven's fixed zeroed `mapList[MAX_MAPS]` past the parsed
+        // entries; the port reproduces that zeroed read (0 / "") so the trap
+        // sequence is unchanged, and only the write-back is skipped.
+        let cinematic = ctx
+            .world
+            .mapList
+            .get(map as usize)
+            .map(|m| m.cinematic)
+            .unwrap_or(0);
+        if cinematic >= 0 {
             trap::CIN_StopCinematic(ctx.engine, cinematic);
-            ctx.world.mapList[map as usize].cinematic = -1;
+            if let Some(m) = ctx.world.mapList.get_mut(map as usize) {
+                m.cinematic = -1;
+            }
         }
 
         let mut actual = 0;
@@ -11138,8 +11288,18 @@ pub fn UI_FeederSelection(
         if feederID == FEEDER_MAPS {
             ctx.world.cvars.ui_currentMap.integer = actual;
             trap::Cvar_Set(ctx.engine, "ui_currentMap", &format!("{}", actual));
+            // porting-rules §19: out-of-range `ui_currentMap`/`ui_gameType`
+            // index Raven's fixed zeroed `mapList[MAX_MAPS]`/`gameTypes[]` past
+            // the parsed entries; the port reproduces those zeroed reads
+            // ("" / 0) so the trap sequence is unchanged, and only the
+            // write-back is skipped.
             let mapIdx = ctx.world.cvars.ui_currentMap.integer as usize;
-            let loadName = ctx.world.mapList[mapIdx].mapLoadName.clone();
+            let loadName = ctx
+                .world
+                .mapList
+                .get(mapIdx)
+                .map(|m| m.mapLoadName.clone())
+                .unwrap_or_default();
             let cinematic = trap::CIN_PlayCinematic(
                 ctx.engine,
                 &format!("{}.roq", loadName),
@@ -11149,16 +11309,29 @@ pub fn UI_FeederSelection(
                 0,
                 CIN_LOOP | CIN_SILENT,
             );
-            ctx.world.mapList[mapIdx].cinematic = cinematic;
-            let gtEnum = ctx.world.gameTypes[ctx.world.cvars.ui_gameType.integer as usize].gtEnum;
+            if let Some(m) = ctx.world.mapList.get_mut(mapIdx) {
+                m.cinematic = cinematic;
+            }
+            let gtEnum = ctx
+                .world
+                .gameTypes
+                .get(ctx.world.cvars.ui_gameType.integer as usize)
+                .map(|g| g.gtEnum)
+                .unwrap_or(0);
             UI_LoadBestScores(ctx, &loadName, gtEnum);
             // trap::Cvar_Set(ctx.engine, "ui_opponentModel", ...opponentName);
             // updateOpponentModel = true;
         } else {
             ctx.world.cvars.ui_currentNetMap.integer = actual;
             trap::Cvar_Set(ctx.engine, "ui_currentNetMap", &format!("{}", actual));
+            // porting-rules §19: same zeroed-slot model as the FEEDER_MAPS arm.
             let mapIdx = ctx.world.cvars.ui_currentNetMap.integer as usize;
-            let loadName = ctx.world.mapList[mapIdx].mapLoadName.clone();
+            let loadName = ctx
+                .world
+                .mapList
+                .get(mapIdx)
+                .map(|m| m.mapLoadName.clone())
+                .unwrap_or_default();
             let cinematic = trap::CIN_PlayCinematic(
                 ctx.engine,
                 &format!("{}.roq", loadName),
@@ -11168,14 +11341,28 @@ pub fn UI_FeederSelection(
                 0,
                 CIN_LOOP | CIN_SILENT,
             );
-            ctx.world.mapList[mapIdx].cinematic = cinematic;
+            if let Some(m) = ctx.world.mapList.get_mut(mapIdx) {
+                m.cinematic = cinematic;
+            }
         }
     } else if feederID == FEEDER_SERVERS {
         ctx.world.serverStatus.currentServer = index;
+        // porting-rules §19: an out-of-range `index` indexes Raven's fixed
+        // zeroed `displayServers[MAX_DISPLAY_SERVERS]` past the listed
+        // entries; the port reproduces that zeroed read (0) so the trap
+        // sequence is unchanged (first live-gate crash site, empty browser on
+        // open-script select).
+        let serverNum = ctx
+            .world
+            .serverStatus
+            .displayServers
+            .get(index as usize)
+            .copied()
+            .unwrap_or(0);
         let info = trap::LAN_GetServerInfo(
             ctx.engine,
             ctx.world.cvars.ui_netSource.integer,
-            ctx.world.serverStatus.displayServers[index as usize],
+            serverNum,
             MAX_STRING_CHARS,
         );
         let mapName = Info_ValueForKey(&info, "mapname");
@@ -12674,7 +12861,7 @@ pub fn UI_RunMenuScript(
                     // truncates at 63 chars (unreachable for real model names).
                     let modelPath = format!("models/players/{}/model.glm", charModel);
                     let mut animRunLength: c_int = 0;
-                    ItemParse_asset_model_go(menus, ctx, item, &modelPath, &mut animRunLength);
+                    ItemParse_asset_model_go(menus, ds, ctx, item, &modelPath, &mut animRunLength);
 
                     UI_UpdateCharacterSkin(ctx, menus);
                     let mut charItem = menus.item(item).clone();
@@ -12857,7 +13044,7 @@ pub fn UI_RunMenuScript(
     } else if Q_stricmp(&name, "saber_type") == 0 {
         UI_UpdateSaberType(ctx);
     } else if Q_stricmp(&name, "saber_hilt") == 0 {
-        UI_UpdateSaberHilt(ctx, menus, false);
+        UI_UpdateSaberHilt(ctx, menus, ds, false);
     } else if Q_stricmp(&name, "saber_color") == 0 {
         UI_UpdateSaberColor(false);
     } else if Q_stricmp(&name, "setscreensaberhilt") == 0 {
@@ -12902,7 +13089,7 @@ pub fn UI_RunMenuScript(
             }
         }
     } else if Q_stricmp(&name, "saber2_hilt") == 0 {
-        UI_UpdateSaberHilt(ctx, menus, true);
+        UI_UpdateSaberHilt(ctx, menus, ds, true);
     } else if Q_stricmp(&name, "saber2_color") == 0 {
         UI_UpdateSaberColor(true);
     } else if Q_stricmp(&name, "updatesabercvars") == 0 {

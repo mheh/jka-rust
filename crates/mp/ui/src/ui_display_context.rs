@@ -24,24 +24,31 @@
 #![allow(non_snake_case)]
 
 use core::ffi::{c_int, c_void};
+use std::ffi::CString;
+use std::ptr::null_mut;
 
+use mp_bg::bg_panimate::BG_ParseAnimationFile;
+use mp_bg::public::animation::animation_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
-use mp_qshared::shared::{pc_token_t, qhandle_t, sfxHandle_t, vec3_t, vec4_t};
+use mp_qshared::shared::{pc_token_t, qfalse, qhandle_t, sfxHandle_t, vec3_t, vec4_t};
 use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::display_state::DisplayState;
+use mp_uishared::shared::item_def_s::ItemDef;
 use mp_uishared::shared::item_id::ItemId;
 use mp_uishared::shared::menu_system::MenuSystem;
 
+use crate::bg_channel::{UiBgTraps, UiGameCallbacks};
 use crate::trap;
 use crate::ui_atoms::{UI_DrawHandlePic, UI_FillRect, UI_SetColor};
 use crate::ui_main::{
     _UI_DrawRect, _UI_DrawSides, _UI_DrawTopBottom, Text_Height, Text_Paint, Text_PaintWithCursor,
     Text_Width, UI_DeferMenuScript, UI_DrawCinematic, UI_FeederCount, UI_FeederItemImage,
-    UI_FeederItemText, UI_FeederSelection, UI_GetTeamColor, UI_GetValue, UI_OwnerDraw,
-    UI_OwnerDrawHandleKey, UI_OwnerDrawVisible, UI_OwnerDrawWidth, UI_Pause, UI_PlayCinematic,
-    UI_RunCinematicFrame, UI_RunMenuScript, UI_StopCinematic,
+    UI_FeederItemText, UI_FeederSelection, UI_GetTeamColor, UI_GetValue, UI_MovesDatapadAnimTick,
+    UI_OwnerDraw, UI_OwnerDrawHandleKey, UI_OwnerDrawVisible, UI_OwnerDrawWidth, UI_Pause,
+    UI_PlayCinematic, UI_RunCinematicFrame, UI_RunMenuScript, UI_StopCinematic,
 };
+use crate::ui_saber::{UI_CacheSaberGlowGraphics, UI_SaberDrawBlades, UI_SaberLoadParms};
 use crate::world::ui_context::UiContext;
 
 impl<'e> DisplayContext for UiContext<'e> {
@@ -717,5 +724,98 @@ impl<'e> DisplayContext for UiContext<'e> {
     /// Raven `trap_G2_HaveWeGhoul2Models` (`ui_shared.c` direct call).
     fn G2_HaveWeGhoul2Models(&mut self, ghoul2: *mut c_void) -> bool {
         trap::G2_HaveWeGhoul2Models(self.engine, ghoul2)
+    }
+
+    /// Raven `UI_CacheSaberGlowGraphics()` + the `ui_saber_parms_parsed`-gated
+    /// `UI_SaberLoadParms()` (`ItemParse_isSaber`/`ItemParse_isSaber2`,
+    /// `ui_shared.c:8844-8847,8874-8877`).
+    fn UI_CacheSaberGlowGraphics(&mut self) {
+        UI_CacheSaberGlowGraphics(self);
+        if !self.world.saber.ui_saber_parms_parsed {
+            UI_SaberLoadParms(self);
+        }
+    }
+
+    /// Raven `UI_SaberDrawBlades(item, origin, angles)` (`ui_shared.c:5882`).
+    fn UI_SaberDrawBlades(
+        &mut self,
+        ds: &DisplayState,
+        item: &ItemDef,
+        origin: vec3_t,
+        angles: vec3_t,
+    ) {
+        UI_SaberDrawBlades(self, ds, item, origin, angles);
+    }
+
+    /// Raven's `UI_ParseAnimationFile(GLAName, NULL, qfalse)` call plus the
+    /// `bgAllAnims[animIndex].anims[modelPtr->g2anim]` lookup
+    /// (`ItemParse_asset_model_go`, `ui_shared.c:7602-7611`) — routed to
+    /// `mp_bg`'s `BG_ParseAnimationFile` (DEC-36 D5 reuse) against
+    /// `self.world.bg_state`'s `bgAllAnims` cache, mirroring `UI_SiegeInit`'s
+    /// `UiBgTraps`/`UiGameCallbacks` construction.
+    fn UI_ParseAnimationFile(&mut self, filename: &str, g2anim: c_int) -> Option<animation_t> {
+        let traps = UiBgTraps::new(self.engine);
+        let mut callbacks = UiGameCallbacks::new(self.engine);
+        // An interior NUL can't reach C's `const char*`; `None` here is the
+        // caller's "skip the `G2API_SetBoneAnim` call" path.
+        let filename_c = match CString::new(filename) {
+            Ok(s) => s,
+            Err(_) => return None,
+        };
+
+        let animIndex = BG_ParseAnimationFile(
+            &mut self.world.bg_state,
+            &traps,
+            &mut callbacks,
+            filename_c.as_ptr(),
+            null_mut(),
+            qfalse,
+        );
+        if animIndex < 0 {
+            return None;
+        }
+
+        // Raven: `&bgAllAnims[animIndex].anims[modelPtr->g2anim]` — an
+        // unchecked array-of-arrays index, ported as-is (no bounds check
+        // added beyond Raven's own); `anims` is non-null whenever
+        // `BG_ParseAnimationFile` returned a non-negative index.
+        let anims = self.world.bg_state.bgAllAnims[animIndex as usize].anims;
+        if anims.is_null() {
+            return None;
+        }
+        Some(unsafe { *anims.add(g2anim as usize) })
+    }
+
+    /// Raven's "a moves datapad anim is playing" block (`Item_Model_Paint`,
+    /// `ui_shared.c:5709-5769`).
+    fn UI_MovesDatapadAnimTick(&mut self, ds: &DisplayState, menus: &mut MenuSystem, item: ItemId) {
+        UI_MovesDatapadAnimTick(self, ds, menus, item);
+    }
+
+    /// Raven's `feeder == FEEDER_PLAYER_SPECIES` population loop
+    /// (`ItemParse_cvarStrList`, `ui_shared.c:8623-8629`).
+    fn UI_PlayerSpeciesCvarStrList(&mut self) -> Vec<(String, String)> {
+        self.world
+            .playerSpecies
+            .iter()
+            .map(|species| {
+                let label = format!("@MENUS_{}", species.Name).to_ascii_uppercase();
+                (label, species.Name.clone())
+            })
+            .collect()
+    }
+
+    /// Raven's `feeder == FEEDER_LANGUAGES` population loop
+    /// (`ItemParse_cvarStrList`, `ui_shared.c:8631-8644`).
+    fn UI_LanguageCvarStrList(&mut self) -> Vec<(String, String)> {
+        (0..self.world.languageCount)
+            .map(|i| {
+                // Raven: "The displayed text" call, whose result is discarded
+                // (the label is the constant key) — emitted for trace parity.
+                let _ = trap::GetLanguageName(self.engine, i, 128);
+                let name = trap::GetLanguageName(self.engine, i, 128);
+                ("@MENUS_MYLANGUAGE".to_string(), name)
+            })
+            .collect()
     }
 }

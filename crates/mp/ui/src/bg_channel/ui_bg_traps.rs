@@ -3,16 +3,19 @@
 //! `mp_bg::bg_channel::BgTraps` is the bg tier's outbound engine surface
 //! (`crates/mp/bg/src/bg_channel/bg_traps.rs`); the game tier's implementor is
 //! [`mp_game`'s `GameBgTraps`](../../../game/src/bg_channel/game_impl.rs).
-//! ui's sole `&dyn BgTraps` consumer is [`crate::ui_main::UI_SiegeInit`]'s
+//! ui's `&dyn BgTraps` consumers are [`crate::ui_main::UI_SiegeInit`]'s
 //! siege-loader call chain (`BG_SiegeLoadClasses`/`BG_SiegeLoadTeams` and the
-//! `BG_SiegeParseClassFile`/`BG_SiegeParseTeamFile` they call) — verified by
+//! `BG_SiegeParseClassFile`/`BG_SiegeParseTeamFile` they call — verified by
 //! reading every `traps.*` call in `crates/mp/bg/src/bg_saga.rs`'s siege-load
-//! path: `fs_getfilelist`, `fs_fopen`, `fs_read`, `fs_fclose`, `com_printf`.
-//! Every other `BgTraps` method is unreachable from ui and panics loudly with
-//! its Raven subject (porting-rules §14: no silent no-ops); several also have
-//! no `UI_*` syscall at all (`trace`/`pointcontents`/`snap_vector`/
-//! `fx_play_effect_id`/`g2api_get_surface_render_status` — ui never traces the
-//! world or plays view-model effects).
+//! path: `fs_getfilelist`, `fs_fopen`, `fs_read`, `fs_fclose`, `com_printf`)
+//! and [`DisplayContext::UI_ParseAnimationFile`](crate::ui_display_context)'s
+//! `BG_ParseAnimationFile` call (`fs_fopen`/`fs_read`/`fs_fclose` again, plus
+//! `com_error` on its oversized-file guard). Every other `BgTraps` method is
+//! unreachable from ui and panics loudly with its Raven subject
+//! (porting-rules §14: no silent no-ops); several also have no `UI_*` syscall
+//! at all (`trace`/`pointcontents`/`snap_vector`/`fx_play_effect_id`/
+//! `g2api_get_surface_render_status` — ui never traces the world or plays
+//! view-model effects).
 
 #![allow(non_snake_case)]
 
@@ -68,13 +71,15 @@ impl BgTraps for UiBgTraps<'_> {
 
     fn fs_fopen(&self, qpath: &str, f: *mut fileHandle_t, mode: fsMode_t) -> c_int {
         // Real delegation — `BG_SiegeParseClassFile`/`BG_SiegeParseTeamFile` open
-        // every `.scl`/`.team` file through this. Raven: `trap_FS_FOpenFile`.
-        // SAFETY: callers (the bg siege loader) hand a valid, live out-slot.
+        // every `.scl`/`.team` file through this, and `BG_ParseAnimationFile`
+        // opens `animation.cfg` the same way. Raven: `trap_FS_FOpenFile`.
+        // SAFETY: callers (the bg siege loader / anim parser) hand a valid,
+        // live out-slot.
         trap::FS_FOpenFile(self.engine, qpath, unsafe { &mut *f }, mode)
     }
     fn fs_read(&self, buffer: *mut c_void, len: c_int, f: fileHandle_t) {
-        // Real delegation — reads the opened `.scl`/`.team` file body.
-        // Raven: `trap_FS_Read`.
+        // Real delegation — reads the opened `.scl`/`.team`/`animation.cfg`
+        // file body. Raven: `trap_FS_Read`.
         // SAFETY: callers hand a buffer at least `len` bytes wide.
         let buf = unsafe { core::slice::from_raw_parts_mut(buffer as *mut u8, len as usize) };
         trap::FS_Read(self.engine, buf, f)
@@ -298,11 +303,13 @@ impl BgTraps for UiBgTraps<'_> {
         // report. Raven: `Com_Printf` -> `trap_Print`.
         trap::Print(self.engine, msg)
     }
-    fn com_error(&self, _error_level: c_int, _msg: &str) {
-        // The siege loader never calls `traps.com_error` — its own fatal paths
-        // (`bgNumSiegeClasses`/`bgNumSiegeTeams` empty) are the *caller*'s
-        // (`UI_SiegeInit`'s) `Com_Error`, not this trait method.
+    fn com_error(&self, _error_level: c_int, msg: &str) {
+        // Real delegation — `BG_ParseAnimationFile`'s oversized-animation.cfg
+        // guard (`DisplayContext::UI_ParseAnimationFile`'s call chain) reaches
+        // this; the siege loader itself still never calls it (its fatal paths
+        // are the *caller*'s, `UI_SiegeInit`'s, `Com_Error`).
+        // Raven: `Com_Error` -> `trap_Error`.
         // Source: `oracle/codemp/game/g_main.c:1208-1217`
-        unreachable!("trap_Error via Com_Error is unreachable from ui: UI_SiegeInit's siege-loader path never calls traps.com_error")
+        trap::Error(self.engine, msg)
     }
 }

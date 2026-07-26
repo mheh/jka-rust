@@ -1166,8 +1166,20 @@ pub fn UI_SaberGetHiltInfo(ctx: &mut UiContext) -> (Vec<String>, Vec<String>) {
     let mut singleHilts: Vec<String> = Vec::new();
     let mut staffHilts: Vec<String> = Vec::new();
 
-    // go through all the loaded sabers and put the valid ones in the proper list
-    let saber_parms = mem::take(&mut ctx.world.saber.SaberParms);
+    // go through all the loaded sabers and put the valid ones in the proper list.
+    //
+    // PORT-NOTE (bugfix): this walk clones `SaberParms` rather than
+    // `mem::take`ing it (unlike `UI_SaberParseParm`'s narrower take/restore),
+    // because the loop body below calls `UI_SaberValidForPlayerInMP` and
+    // `UI_IsSaberTwoHanded`, which each recurse into `UI_SaberParseParm` —
+    // itself taking `ctx.world.saber.SaberParms` to walk it independently. A
+    // `mem::take` here left the field emptied for the whole outer loop, so
+    // every reentrant `UI_SaberParseParm` call searched an empty string and
+    // always returned "not found": `notInMP` silently defaulted to allowed
+    // (leaking NPC-only sabers into the hilt list) and `twoHanded` silently
+    // defaulted to false (staff sabers mis-bucketed into `singleHilts`).
+    // Raven has no such hazard (`SaberParms` is a plain file-static array).
+    let saber_parms = ctx.world.saber.SaberParms.clone();
     let mut p: Option<&[u8]> = Some(saber_parms.as_bytes());
     COM_BeginParseSession(&mut ctx.world.bg_state.qs, "saberlist");
 
@@ -1224,7 +1236,6 @@ pub fn UI_SaberGetHiltInfo(ctx: &mut UiContext) -> (Vec<String>, Vec<String>) {
         // skip the whole braced section and move on to the next entry
         p = SkipBracedSection(&mut ctx.world.bg_state.qs, p);
     }
-    ctx.world.saber.SaberParms = saber_parms;
 
     (singleHilts, staffHilts)
 }

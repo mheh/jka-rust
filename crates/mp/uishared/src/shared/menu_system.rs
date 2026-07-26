@@ -5,7 +5,7 @@
 
 use core::ffi::{c_int, c_void};
 
-use super::bind_t::Bind;
+use super::bind_t::{default_bindings, Bind};
 use super::capture_func::CaptureFunc;
 use super::item_def_s::ItemDef;
 use super::item_id::ItemId;
@@ -69,7 +69,7 @@ pub const DOUBLE_CLICK_DELAY: c_int = 300;
 /// table. Porting-rules §C9 (manual alloc/free → ownership).
 ///
 /// Source: `oracle/codemp/ui/ui_shared.c:97-160,284-288,1571,1756-1757,5407-5408,7487,8601`
-#[derive(Debug, Default)]
+#[derive(Debug)]
 #[allow(non_snake_case)]
 pub struct MenuSystem {
     /// Raven `menuDef_t Menus[MAX_MENUS]` + `int menuCount` — the defined-menu
@@ -166,6 +166,44 @@ pub struct MenuSystem {
 
     /// Framework function-local persistent scratch.
     pub scratch: MenuScratch,
+}
+
+impl Default for MenuSystem {
+    /// Every other field zeroes/empties exactly as `#[derive(Default)]` would
+    /// give it; `g_bindings` alone cannot, because Raven's `g_bindings[]` is
+    /// file-scope *static* data (`oracle/codemp/ui/ui_shared.c:5190-5292`) —
+    /// always populated from process start, never built by a runtime call a
+    /// port could forget to make. `default_bindings()` reproduces that
+    /// guarantee: a `MenuSystem` can't exist with an empty table (previously
+    /// the derive gave every fresh `MenuSystem` an empty `Vec`, so
+    /// `BindingFromName`'s `g_bindings` scan matched nothing and every
+    /// controls-menu row painted "???", bound or not — the table itself had
+    /// never been transcribed).
+    fn default() -> Self {
+        MenuSystem {
+            menus: Default::default(),
+            items: Default::default(),
+            menuStack: Default::default(),
+            scrollInfo: Default::default(),
+            captureFunc: Default::default(),
+            itemCapture: Default::default(),
+            g_waitingForKey: Default::default(),
+            g_editingField: Default::default(),
+            g_bindItem: Default::default(),
+            g_editItem: Default::default(),
+            debugMode: Default::default(),
+            lastListBoxClickTime: Default::default(),
+            FPMessageTime: Default::default(),
+            ui_deferredScript: Default::default(),
+            ui_deferredScriptItem: Default::default(),
+            g_bindings: default_bindings(),
+            g_nameBind1: Default::default(),
+            g_nameBind2: Default::default(),
+            currLanguage: Default::default(),
+            ui_G2PtrTracker: Default::default(),
+            scratch: Default::default(),
+        }
+    }
 }
 
 impl MenuSystem {
