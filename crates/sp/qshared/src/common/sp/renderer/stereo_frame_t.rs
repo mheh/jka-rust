@@ -4,7 +4,7 @@
 
 /// Raven `stereoFrame_t` — which eye a frame is rendered for.
 ///
-/// Type definition source: `oracle/code/renderer/tr_types.h:183-187`
+/// Type definition source: `oracle/code/renderer/tr_types.h:179-183`
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum stereoFrame_t {

@@ -803,6 +803,10 @@ itself stays out of repo docs per the external-reference rule):
   (matching the oracle's own `refEntity_t e;` composition), collapsing the
   duplicated field sets so the layout-assert block lands once for
   ui/cgame/renderer.
+  *(Amended at the R2 Gate-2 round: `trRefdef_t` composition is
+  layout-impossible — it is NOT a superset of `refdef_t` (field-level proof
+  in `docs/subsystems/renderer-r2-design.md` R2-D6); A3 applies to
+  `trRefEntity_t` alone, which is already landed.)*
 - **A4. Housekeeping approved:** read `tr_image.cpp`'s image-table
   declaration before finalizing the RenderAssets registry count (the flare
   half shrank: R1 established `tr_flares.cpp` is dead in retail MP — absent
@@ -814,6 +818,79 @@ itself stays out of repo docs per the external-reference rule):
   `tr_quicksprite.cpp` is in the retail MP compile set and the R1 srcglob;
   simply un-ported R3 scope) — ruling 17's mode-agnostic-interior claim
   stands without asterisk.
+
+**DEC-37 R2 addenda, second sit-down (ratified 2026-07-26):**
+
+- **A5. Arena capacity semantics.** Shader/skin/model arenas soft-cap at
+  their oracle `MAX_*` constants (16384/1024/1024) and reproduce retail's
+  table-full console warning; registration failure returns the oracle's
+  failure value (default/0 handle), not a Rust `Result`. The image arena is
+  unbounded, matching its real oracle backing store (`tr_image.cpp`'s
+  `AllocatedImages` std::map; the `MAX_DRAWIMAGES` check is commented out in
+  retail) — with a name→handle map beside it mirroring the lower-cased
+  extension-stripped key scheme.
+- **A6. Light styles are synchronous CPU state**, not `FrameData` events:
+  `R_Set/GetLightStyle` mutate/read a live RenderAssets-adjacent table at
+  trap time; frames snapshot the table at scene-render marks. R3 caveat: the
+  wave porting the backend style consumer must verify snapshot-vs-live
+  timing against the oracle.
+- **A7. Defers approved**: FrameData buffer-recycling mechanics settle at R4
+  (lean: fixed 2-3 buffer pool + return channel; R2 freezes only the
+  event-stream shape); `RC_AUTO_MAP`'s full command shape gets its targeted
+  oracle read at the first automap wave; `subImageCommand_t` dead-vs-internal
+  gets its grep before R3 scope-freezes; the generic `Handle<K>`/`Arena<T>`
+  infra carries a doc-comment citing the `AlignedBytes` justified-exception
+  precedent (no `Source:` line — new Rust infra implementing ruling 11).
+- **A8. The R2 design doc is RATIFIED** and lands as
+  `docs/subsystems/renderer-r2-design.md` (owned-world sketch, A1
+  disposition table, seam-composition plan, SP/MP edge adapters,
+  verification strategy, slice hooks). R2 is closed; R3 tooling is
+  unblocked.
+
+**DEC-37 R2 addenda, doc-review fix round (ratified 2026-07-26):**
+
+- **A5 amendment — per-registry failure semantics (measured).** Retail's
+  overflow behavior differs per registry: shaders warn and return
+  `tr.defaultShader` (`oracle/codemp/renderer/tr_shader.cpp:2760-2761`),
+  skins warn and return handle 0 (`tr_image.cpp:3139-3141`), models are
+  SILENT and return 0 (`tr_model.cpp:614-616`, `:1044-1045`). Fallback
+  VALUES are reproduced exactly (rendering-observable — keeps the
+  differential rigs free of phantom diffs); warnings keep retail's
+  shader/skin prints PLUS a port-added, clearly-marked warning on the
+  silent model overflow (charter interior freedom, debugging aid).
+  `Arena<T>` gains a per-registry fallback handle so `tr.defaultShader` is
+  expressible. *(Fallback-field mechanism superseded by A12's slot-0
+  pre-population — the default entry lives IN slot 0; failure returns
+  `Handle{0,0}`.)*
+- **A9. RenderAssets mutation path = sim-owned master + republish.** The
+  sim/registration side owns the master `RenderAssets`; synchronous
+  mutations (register shader/model/skin, remap_shader) go through
+  `Arc::make_mut` copy-on-write and the new `Arc` publishes at the next
+  frame boundary. No locks; the render thread's view is immutable within a
+  frame. Light styles stay A6-adjacent (a separate sim-owned table
+  snapshotted at scene marks), not inside the `Arc`.
+
+**DEC-37 R2 addenda, Gate-2 re-review round (ratified 2026-07-26):**
+
+- **A10. Automap init is a sim-side A9 mutation.** `CG_R_INITWIREFRAMEAUTO`'s
+  live arm (`oracle/codemp/renderer/tr_world.cpp:1205-1231`) rebuilds the
+  wireframe automap by walking the world nodes and returns validity
+  synchronously — an event cannot answer the caller, so the wireframe data
+  becomes a `RenderAssets` member built sim-side through the A9 mutation
+  path (pure CPU work; ruling 3 intact). The doc's prior
+  synchronous-read classification is corrected.
+- **A11. Light-style snapshot carrier.** `FrameEvent::RenderScene` gains
+  `light_styles: [[u8; 4]; MAX_LIGHT_STYLES]` (256 bytes) — the operational
+  form of A6's snapshot-at-scene-marks; the render-side consumers
+  (`tr_surface`/`tr_shade`/`tr_light`) read the frame's snapshot. R3
+  snapshot-timing caveat unchanged.
+- **A12. Slot-0 pre-population.** Each capped arena pre-populates slot 0 at
+  init with the oracle's reserved default entry (models[0] MOD_BAD,
+  skins[0] default skin, shader 0 default shader);
+  `Handle{index:0, generation:0}` IS that live default and every oracle
+  `return 0` failure path returns it — `qhandle_t` 0 maps to slot 0 as the
+  identity at the seam, so retail's render-the-default-on-failure behavior
+  falls out exactly.
 
 ## DEC-38 — ui U5 rulings: DisplayContext carrier, WORLD lifetime, siege gating (2026-07-25)
 
