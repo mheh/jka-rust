@@ -4,6 +4,7 @@
 
 pub mod hook_install;
 pub mod mdx_format;
+pub mod render_state;
 pub mod tr_landscape;
 pub mod tr_local;
 pub mod tr_model;
