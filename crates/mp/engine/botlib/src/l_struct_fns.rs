@@ -21,6 +21,7 @@ use libc::FILE;
 
 use mp_qshared::shared::q_string::Q_strncpyz;
 use mp_qshared::shared::{qfalse, qtrue};
+use native_string::string_to_latin1;
 use native_types::qboolean;
 
 use crate::be_ai_goal::iteminfo_s::MAX_STRINGFIELD;
@@ -271,7 +272,11 @@ pub fn ReadNumber(
         }
         //check if it is a number
         if token.type_ != TT_NUMBER {
-            SourceError(bot, source, &format!("expected number, found {}", token.string));
+            SourceError(
+                bot,
+                source,
+                &format!("expected number, found {}", token.string),
+            );
             return 0;
         }
         //check for a float value
@@ -386,12 +391,7 @@ pub fn ReadNumber(
 /// `MAX_STRINGFIELD` buffer at `p`.
 ///
 /// Source: `oracle/codemp/botlib/l_struct.cpp:199-212`
-pub fn ReadString(
-    bot: &mut BotLib,
-    source: &mut Source,
-    fd: *mut fielddef_t,
-    p: *mut (),
-) -> c_int {
+pub fn ReadString(bot: &mut BotLib, source: &mut Source, fd: *mut fielddef_t, p: *mut ()) -> c_int {
     let mut token = Token::default();
 
     if PC_ExpectTokenType(bot, source, TT_STRING, 0, &mut token) == 0 {
@@ -402,7 +402,11 @@ pub fn ReadString(
     //copy the string (bounded into the field's fixed MAX_STRINGFIELD buffer,
     //preserving Raven's strncpy truncation + forced NUL terminator)
     let token_string_c = CString::new(token.string.as_str()).unwrap_or_default();
-    Q_strncpyz(p as *mut c_char, token_string_c.as_ptr(), MAX_STRINGFIELD as c_int);
+    Q_strncpyz(
+        p as *mut c_char,
+        token_string_c.as_ptr(),
+        MAX_STRINGFIELD as c_int,
+    );
     //
     1
 }
@@ -429,7 +433,10 @@ pub fn ReadChar(
             StripSingleQuotes(&mut token.string);
             // Raven reads token.string[0]; an emptied literal ('') leaves the NUL
             // terminator there, i.e. 0.
-            *(p as *mut c_char) = token.string.as_bytes().first().copied().unwrap_or(0) as c_char;
+            *(p as *mut c_char) = string_to_latin1(&token.string)
+                .first()
+                .copied()
+                .unwrap_or(0) as c_char;
         } else {
             PC_UnreadLastToken(source);
             if ReadNumber(bot, source, fd, p) == 0 {

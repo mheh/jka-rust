@@ -1,0 +1,72 @@
+// retail.menu — a hand-authored, retail-shaped menu exercising the common
+// keyword surface a real jampmenus.txt-style menu uses (window chrome, a
+// couple of text/button items, a cvar-backed editfield). Not copied from any
+// shipped asset.
+{
+	name			"ui_sample_menu"
+	fullscreen		1
+	rect			0 0 640 480
+	style			1
+	border			1
+	borderSize		1
+	backcolor		0 0 0 0.6
+	bordercolor		0.5 0.5 0.5 1
+	forecolor		1 1 1 1
+	focuscolor		1 0.7 0 1
+	background		"menu/art/main_bg"
+	fadeClamp		1
+	fadeAmount		0.1
+	fadeCycle		1
+	font			"fonts/briggs"
+	onOpen			{ play "sound/menu/open.wav" ; }
+	onClose			{ play "sound/menu/close.wav" ; }
+	onESC			{ close ui_sample_menu ; }
+	visible			1
+
+	itemDef
+	{
+		name			"title"
+		rect			20 20 300 40
+		type			0
+		style			0
+		textscale		0.6
+		textalign		0
+		forecolor		1 1 1 1
+		text			"Sample Menu"
+		visible			1
+		decoration
+	}
+
+	itemDef
+	{
+		name			"play_button"
+		rect			20 80 200 30
+		type			1
+		style			1
+		text			"Play"
+		textscale		0.5
+		forecolor		1 1 1 1
+		backcolor		0.2 0.2 0.2 1
+		border			1
+		bordercolor		0.6 0.6 0.6 1
+		visible			1
+		action			{ play "sound/menu/select.wav" ; uiScript StartGame ; }
+		mouseEnter		{ play "sound/menu/enter.wav" ; }
+		onFocus			{ setitemcolor play_button forecolor 1 1 0 1 ; }
+		leaveFocus		{ setitemcolor play_button forecolor 1 1 1 1 ; }
+	}
+
+	itemDef
+	{
+		name			"player_name"
+		rect			20 130 200 20
+		type			4
+		style			1
+		cvar			"ui_playerName"
+		maxChars		32
+		maxPaintChars	20
+		textscale		0.45
+		forecolor		1 1 1 1
+		visible			1
+	}
+}

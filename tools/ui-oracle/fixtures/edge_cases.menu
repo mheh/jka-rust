@@ -1,0 +1,116 @@
+// edge_cases.menu -- targeted edge-case coverage for the menu-parse pipeline.
+// Five source blocks (A-E), driven by EIGHT Menu_New(handle) calls against
+// the one shared token stream (tools/ui-oracle/main.cpp, `ui_dump
+// fixtures/edge_cases.menu 8`) -- more calls than blocks, because block C's
+// brace-truncation bug (see its comment below) desyncs the stream by one
+// brace level and it takes three extra Menu_New attempts to resync. The
+// attempt -> block mapping (also what crates/mp/uishared's
+// menu_parse_goldens.rs test must reproduce call-for-call):
+//   attempt 0: block A  -> ok   (menuCount 1)
+//   attempt 1: block B  -> ok   (menuCount 2)
+//   attempt 2: block C  -> ok   (menuCount 3, itemCount 0 -- truncated early)
+//   attempt 3: desync   -> error (reads block C's dangling "itemDef" token,
+//                                  not "{"; Menu_Parse rejects it immediately)
+//   attempt 4: desync   -> ok   (menuCount 4 -- block C's own leftover
+//                                  `itemDef { name "..." rect ... }` body
+//                                  gets misread as an entire menu block in
+//                                  its own right, since its "{"/"}" pair
+//                                  looks like a valid, self-contained one)
+//   attempt 5: desync   -> error (reads block C's real outer "}", which was
+//                                  never consumed; not "{", rejected)
+//   attempt 6: block D  -> ok   (menuCount 5 -- back in sync)
+//   attempt 7: block E  -> error (truncated at EOF, as designed; never counted)
+// Block E (truncated / missing closing brace) is deliberately LAST: nothing
+// can follow unterminated input.
+
+// ---- A: unknown keyword recovery ----
+// Menu_Parse's dispatch (ui_shared.c:9799-9803) reports an error via
+// PC_SourceError and `continue`s past an unrecognized keyword rather than
+// aborting -- the menu still parses to completion. The bogus keyword's
+// "argument" token (123) is itself read as the *next* keyword attempt (the
+// failed lookup never consumes an argument), so this exercises two
+// consecutive recovery cycles before `rect` is reached.
+{
+	name "unknown_keyword_recovery"
+	totallyBogusKeyword 123
+	rect 0 0 100 100
+	visible 1
+}
+
+// ---- B: the dead "xoffset" keyword ----
+// itemParseKeywords[]'s registration for xoffset (ui_shared.c:8980) is the
+// string literal "xoffset\t\t" -- two trailing tab characters baked into
+// the source -- so KeywordHash_Find can never match a real "xoffset" token
+// against it. dispatch_item_keyword's None arm (unrecognized keyword) fires
+// for BOTH "xoffset" and its argument token "5" (read as the next keyword
+// attempt, same recovery shape as block A); the itemDef and the enclosing
+// menu still parse successfully. (ItemParse_xoffset itself separately has
+// an inverted-condition bug -- `if (PC_Int_Parse(...)) return qfalse;` --
+// but the registration typo means that handler can never actually run.)
+{
+	name "xoffset_bug"
+	rect 0 0 100 100
+	itemDef
+	{
+		name "item_with_xoffset"
+		rect 0 0 10 10
+		type 12
+		xoffset 5
+	}
+}
+
+// ---- C: nested braces in a group script (desyncs the token stream) ----
+// PC_Script_Parse (ui_shared.c:650-679) is not brace-counting: it copies
+// tokens verbatim until the very first "}" token, so a script body
+// containing its own { } pair truncates early -- here, at the "}" that
+// closes "{ nested }", not the one that closes the onOpen block itself.
+// The dangling tokens left after that early terminator ("cmd2" then the
+// outer "}" onOpen was supposed to consume) are picked up by the normal
+// menu-keyword dispatch loop: "cmd2" logs as an unknown keyword (recovery,
+// see block A), and the stray "}" is then read as THIS menu's own
+// terminator -- one brace level early. The menu still reports a
+// successful parse (Menu_Parse never sees an actual error), but with a
+// truncated onOpen script and itemCount 0: the itemDef below is never
+// reached as PART OF this menu. Its tokens are still sitting unconsumed in
+// the stream, though, and the file-level header comment above traces the
+// three extra Menu_New attempts (3-5) it takes the next callers to chew
+// through that leftover text and resynchronize -- a genuine Raven bug this
+// harness surfaces as a byte-for-byte-reproducible three-call cascade,
+// not just a single wrong parse.
+{
+	name "nested_braces"
+	rect 0 0 100 100
+	onOpen { cmd1 { nested } cmd2 }
+	itemDef
+	{
+		name "unreached_by_nested_braces_truncation"
+		rect 0 0 10 10
+	}
+}
+
+// ---- D: quoted string with high-byte Latin-1 characters ----
+// Raw Latin-1 bytes (not UTF-8), matching the game-text wire discipline
+// (see e063c38d "Latin-1 decode consolidation"): e9 (e-acute), ef
+// (i-diaeresis), dc (U-diaeresis), a9 (copyright sign).
+{
+	name "latin1_text"
+	rect 0 0 100 100
+	itemDef
+	{
+		name "latin1_item"
+		rect 0 0 10 10
+		type 0
+		text "Café naïve Über ©"
+		visible 1
+	}
+}
+
+// ---- E: missing closing brace (truncated at EOF) ----
+// Menu_Parse's inner loop (ui_shared.c:9789-9793) hits end-of-tokens before
+// a "}" and reports "end of file inside menu", returning qfalse; Menu_New
+// pops the pushed-but-failed menu (never counted). MUST be last: nothing can
+// follow truncated input.
+{
+	name "truncated_no_closing_brace"
+	rect 0 0 100 100
+	visible 1

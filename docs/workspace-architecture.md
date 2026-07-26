@@ -150,7 +150,7 @@ Module logic crates (per mode; transport-agnostic — no ABI/cdylib concerns):
 | `mp/ui` | `mp/qshared`, `mp/bg`, `mp/uishared`, `mp/abi`, `mp/engine-select` |
 | `mp/engine-select` | `abi-transport` (concrete `CEngine`/`Static` backends) |
 | `mp/bg` | `mp/qshared` |
-| `mp/uishared` | `mp/qshared`, `mp/bg` |
+| `mp/uishared` | `mp/qshared`, `mp/bg` (dev-only: `mp/engine/botlib`, driving the real tokenizer in the menu-parse golden test — not a shipping edge) |
 | `mp/abi` | `abi-transport`, `mp/qshared` |
 | `mp/qshared` | `native/math`, `native/platform` |
 | `abi-transport` | `native/platform` (re-exports its `RawSyscall`/`RawVmMain` fn-pointer aliases) |

@@ -49,6 +49,7 @@ use core::ffi::{c_char, c_int, c_long};
 use std::ffi::{CStr, CString};
 
 use libc::time;
+use native_string::string_to_latin1;
 
 use crate::l_precomp::builtin_defines::{
     BUILTIN_DATE, BUILTIN_FILE, BUILTIN_LINE, BUILTIN_STDC, BUILTIN_TIME,
@@ -77,7 +78,8 @@ use crate::l_script::consts::{
 use crate::l_script::script_s::Script;
 use crate::l_script::token_s::Token;
 use crate::l_script_fns::{
-    EndOfScript, LoadScriptFile, LoadScriptMemory, PS_ReadToken, PS_SetBaseFolder, StripDoubleQuotes,
+    EndOfScript, LoadScriptFile, LoadScriptMemory, PS_ReadToken, PS_SetBaseFolder,
+    StripDoubleQuotes,
 };
 use crate::BotLib;
 
@@ -132,7 +134,8 @@ pub fn SourceError(bot: &mut BotLib, source: &Source, text: &str) {
         Some(s) => (s.filename.as_str(), s.line),
         None => ("", 0),
     };
-    let msg = CString::new(format!("file {}, line {}: {}\n", filename, line, text)).unwrap_or_default();
+    let msg =
+        CString::new(format!("file {}, line {}: {}\n", filename, line, text)).unwrap_or_default();
     unsafe {
         (bot.botimport.Print.unwrap())(PRT_ERROR, c"%s".as_ptr() as *mut c_char, msg.as_ptr());
     }
@@ -148,7 +151,8 @@ pub fn SourceWarning(bot: &mut BotLib, source: &Source, text: &str) {
         Some(s) => (s.filename.as_str(), s.line),
         None => ("", 0),
     };
-    let msg = CString::new(format!("file {}, line {}: {}\n", filename, line, text)).unwrap_or_default();
+    let msg =
+        CString::new(format!("file {}, line {}: {}\n", filename, line, text)).unwrap_or_default();
     unsafe {
         (bot.botimport.Print.unwrap())(PRT_WARNING, c"%s".as_ptr() as *mut c_char, msg.as_ptr());
     }
@@ -1125,7 +1129,11 @@ fn PC_ReadDefineParms(
     let mut token = Token::default();
 
     if PC_ReadSourceToken(bot, source, &mut token) == 0 {
-        SourceError(bot, source, &format!("define {} missing parms", define.name));
+        SourceError(
+            bot,
+            source,
+            &format!("define {} missing parms", define.name),
+        );
         return None;
     }
     //
@@ -1142,7 +1150,11 @@ fn PC_ReadDefineParms(
     // if no leading "("
     if token.string != "(" {
         PC_UnreadSourceToken(source, &token);
-        SourceError(bot, source, &format!("define {} missing parms", define.name));
+        SourceError(
+            bot,
+            source,
+            &format!("define {} missing parms", define.name),
+        );
         return None;
     }
     // read the define parameters
@@ -1311,7 +1323,11 @@ fn PC_Directive_undef(bot: &mut BotLib, source: &mut Source) -> c_int {
     }
     if token.type_ != TT_NAME {
         PC_UnreadSourceToken(source, &token);
-        SourceError(bot, source, &format!("expected name, found {}", token.string));
+        SourceError(
+            bot,
+            source,
+            &format!("expected name, found {}", token.string),
+        );
         return qfalse;
     }
     // #if DEFINEHASHING (live)
@@ -1637,11 +1653,7 @@ fn PC_ExpandDefine(
                     // stringize the define parameter tokens
                     list.push(PC_StringizeTokens(&parms[np as usize]));
                 } else {
-                    SourceWarning(
-                        bot,
-                        source,
-                        "stringizing operator without define parameter",
-                    );
+                    SourceWarning(bot, source, "stringizing operator without define parameter");
                     dti += 1;
                     continue;
                 }
@@ -1806,27 +1818,75 @@ fn PC_Directive_evalfloat(bot: &mut BotLib, source: &mut Source) -> c_int {
 /// `{NULL, NULL}` sentinel dissolves (slice iteration ends at the bound).
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:2535-2551`.
 const directives: &[Directive] = &[
-    Directive { name: "if", func: PC_Directive_if },
-    Directive { name: "ifdef", func: PC_Directive_ifdef },
-    Directive { name: "ifndef", func: PC_Directive_ifndef },
-    Directive { name: "elif", func: PC_Directive_elif },
-    Directive { name: "else", func: PC_Directive_else },
-    Directive { name: "endif", func: PC_Directive_endif },
-    Directive { name: "include", func: PC_Directive_include },
-    Directive { name: "define", func: PC_Directive_define },
-    Directive { name: "undef", func: PC_Directive_undef },
-    Directive { name: "line", func: PC_Directive_line },
-    Directive { name: "error", func: PC_Directive_error },
-    Directive { name: "pragma", func: PC_Directive_pragma },
-    Directive { name: "eval", func: PC_Directive_eval },
-    Directive { name: "evalfloat", func: PC_Directive_evalfloat },
+    Directive {
+        name: "if",
+        func: PC_Directive_if,
+    },
+    Directive {
+        name: "ifdef",
+        func: PC_Directive_ifdef,
+    },
+    Directive {
+        name: "ifndef",
+        func: PC_Directive_ifndef,
+    },
+    Directive {
+        name: "elif",
+        func: PC_Directive_elif,
+    },
+    Directive {
+        name: "else",
+        func: PC_Directive_else,
+    },
+    Directive {
+        name: "endif",
+        func: PC_Directive_endif,
+    },
+    Directive {
+        name: "include",
+        func: PC_Directive_include,
+    },
+    Directive {
+        name: "define",
+        func: PC_Directive_define,
+    },
+    Directive {
+        name: "undef",
+        func: PC_Directive_undef,
+    },
+    Directive {
+        name: "line",
+        func: PC_Directive_line,
+    },
+    Directive {
+        name: "error",
+        func: PC_Directive_error,
+    },
+    Directive {
+        name: "pragma",
+        func: PC_Directive_pragma,
+    },
+    Directive {
+        name: "eval",
+        func: PC_Directive_eval,
+    },
+    Directive {
+        name: "evalfloat",
+        func: PC_Directive_evalfloat,
+    },
 ];
 
 /// Raven `dollardirectives[]` — file-scope `$`-directive dispatch table.
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:2648-2653`.
 const dollardirectives: &[Directive] = &[
-    Directive { name: "evalint", func: PC_DollarDirective_evalint },
-    Directive { name: "evalfloat", func: PC_DollarDirective_evalfloat },
+    Directive {
+        name: "evalint",
+        func: PC_DollarDirective_evalint,
+    },
+    Directive {
+        name: "evalfloat",
+        func: PC_DollarDirective_evalfloat,
+    },
 ];
 
 /// Raven `PC_ReadDirective` — dispatch a `#`-directive to its handler.
@@ -2518,7 +2578,9 @@ pub fn PC_LoadSourceHandle(bot: &mut BotLib, filename: *const c_char) -> c_int {
         return 0;
     }
     PS_SetBaseFolder(bot, "");
-    let filename = unsafe { CStr::from_ptr(filename) }.to_string_lossy().into_owned();
+    let filename = unsafe { CStr::from_ptr(filename) }
+        .to_string_lossy()
+        .into_owned();
     let source = match LoadSourceFile(bot, &filename) {
         Some(s) => s,
         None => return 0,
@@ -2554,7 +2616,10 @@ pub fn PC_SourceFileAndLine(
 
     // strcpy(filename, source->filename)
     unsafe {
-        let bytes = source.filename.as_bytes();
+        // Latin-1 bytes, not the String's UTF-8 storage — callers size the C
+        // buffer by Latin-1 length (a high-byte path would mojibake AND
+        // over-write under the UTF-8 byte count).
+        let bytes = string_to_latin1(&source.filename);
         for (i, &b) in bytes.iter().enumerate() {
             *filename.add(i) = b as c_char;
         }
@@ -2578,8 +2643,8 @@ pub fn PC_CheckOpenSourceHandles(bot: &mut BotLib) {
                 .last()
                 .map(|s| s.filename.as_str())
                 .unwrap_or("");
-            let msg =
-                CString::new(format!("file {} still open in precompiler\n", name)).unwrap_or_default();
+            let msg = CString::new(format!("file {} still open in precompiler\n", name))
+                .unwrap_or_default();
             unsafe {
                 print(PRT_ERROR, c"%s".as_ptr() as *mut c_char, msg.as_ptr());
             }
@@ -2624,6 +2689,16 @@ pub fn PC_LoadGlobalDefines(bot: &mut BotLib, filename: *const c_char) -> c_int 
 /// (Raven's unbounded `strcpy` would overrun by one byte for a max-length token,
 /// §F19).
 ///
+/// `Token.string` holds the tokenizer's own Latin-1 decode (each wire byte
+/// pushed back as `byte as char`, e.g. `l_script_fns.rs`'s `PS_ReadToken`) —
+/// a high-byte char like U+00E9 is ONE decoded character, not the two UTF-8
+/// bytes it happens to occupy in Rust's `String` storage. The copy back into
+/// `pc_token_t::string` (Raven's raw wire-byte buffer) must invert that
+/// per-char, not slice the `String`'s UTF-8 bytes: `.as_bytes()` would hand
+/// back `[0xC3, 0xA9]` for that one character (mojibake once the C side —
+/// or the oracle-parity golden test — reads it back as Latin-1), found via
+/// `crates/mp/uishared/tests/menu_parse_goldens.rs`'s Latin-1 fixture.
+///
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:3253-3273`
 pub fn PC_ReadTokenHandle(bot: &mut BotLib, handle: c_int, pc_token: *mut pc_token_t) -> c_int {
     if handle < 1 || handle >= MAX_SOURCEFILES as c_int {
@@ -2643,10 +2718,13 @@ pub fn PC_ReadTokenHandle(bot: &mut BotLib, handle: c_int, pc_token: *mut pc_tok
         StripDoubleQuotes(&mut token.string);
     }
     unsafe {
-        let bytes = token.string.as_bytes();
+        // Latin-1 re-encode (inverts the tokenizer's `byte as char` decode),
+        // NOT `token.string.as_bytes()` (that's the `String`'s UTF-8 storage,
+        // wrong for any char above U+007F) — see the doc comment.
+        let bytes = string_to_latin1(&token.string);
         let n = bytes.len().min(MAX_TOKENLENGTH - 1);
-        for i in 0..n {
-            (*pc_token).string[i] = bytes[i] as c_char;
+        for (i, &b) in bytes.iter().take(n).enumerate() {
+            (*pc_token).string[i] = b as c_char;
         }
         (*pc_token).string[n] = 0;
         (*pc_token).type_ = token.type_;

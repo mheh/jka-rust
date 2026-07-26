@@ -1,0 +1,178 @@
+// broad_item_keywords.menu — a wide (not exhaustive) sweep of
+// itemParseKeywords[] (oracle/codemp/ui/ui_shared.c:8892-8985), grouped by
+// item type family so each keyword lands on a typeData shape it's valid for.
+// `type` is always the first keyword in each itemDef: Item_ValidateTypeData
+// allocates the typeData payload from item->type on first touch, so setting
+// it later would allocate the wrong payload shape for a family's keywords
+// (see ItemParse_type, ui_shared.c:8087-8097).
+//
+// `xoffset` is deliberately NOT exercised here: its registration in
+// itemParseKeywords[] (ui_shared.c:8980) is the string literal
+// "xoffset\t\t" (two trailing tab characters baked into the source), so
+// KeywordHash_Find can never match a real "xoffset" token against it —
+// the keyword is permanently dead in every retail .menu file. (Its handler,
+// ItemParse_xoffset at ui_shared.c:8312-8319, separately has an
+// inverted-condition bug — `if (PC_Int_Parse(...)) return qfalse;` — that
+// would abort the enclosing itemDef/menu on what should be a successful
+// parse, but that handler can never actually run.) See edge_cases.menu for
+// the observable behavior: "xoffset" and its argument are each logged and
+// skipped as unrecognized keywords, and parsing continues successfully.
+{
+	name "broad_item_keywords"
+	rect 0 0 640 480
+
+	// ---- EDITFIELD family: text/style/color/script/cvar keywords ----
+	itemDef
+	{
+		type			4
+		name			"edit1"
+		rect			10 10 200 20
+		style			1
+		textalign		1
+		textalignx		2
+		textaligny		3
+		textscale		0.45
+		textstyle		3
+		text			"Name:"
+		text2			"(second line)"
+		text2alignx		4
+		text2aligny		5
+		forecolor		1 1 1 1
+		backcolor		0.2 0.2 0.2 1
+		bordercolor		0.6 0.6 0.6 1
+		outlinecolor	0.3 0.3 0.3 1
+		border			1
+		bordersize		1.5
+		cvar			"ui_playerName"
+		cvarFloat		"ui_editSlider" 0.5 0 1
+		cvarTest		"ui_playerNameValid"
+		enableCvar		{ cg_draw2d ; }
+		maxChars		32
+		maxPaintChars	20
+		special			3.5
+		action			{ play "sound/menu/select.wav" ; }
+		mouseEnter		{ play "sound/menu/enter.wav" ; }
+		mouseEnterText	{ setitemtext status "editing name" ; }
+		mouseExit		{ play "sound/menu/exit.wav" ; }
+		// (a bare, non-empty token here -- not an empty quoted string; see
+		// PC_Script_Parse's handling of the LATTER at ui_shared.c:673, a
+		// documented Raven UB the port picks a defined behavior for that this
+		// specific oracle binary's incidental stack contents do not always
+		// match -- porting-rules §19, kept out of this shared fixture)
+		mouseExitText	{ setitemtext status none ; }
+		onFocus			{ setitemcolor edit1 forecolor 1 1 0 1 ; }
+		leaveFocus		{ setitemcolor edit1 forecolor 1 1 1 1 ; }
+		// ItemParse_flag (ui_shared.c:7975-7998) loops `while (styles[i])`
+		// but indexes `itemFlags[i]` — a 2-element table (one real entry
+		// plus a NULL sentinel) walked with a 6-element loop bound. Any
+		// value other than the one real entry reads `itemFlags[i].string
+		// == NULL` at i=1 and crashes on the ensuing `Q_stricmp(_, NULL)`.
+		// Genuine Raven UB (§19); only the one in-bounds value is safe to
+		// put in a shared fixture.
+		flag			WINDOW_INACTIVE
+		decoration
+		wrapped
+		autowrapped
+		horizontalscroll
+		visible			1
+		align			0
+		isCharacter		0
+		focusSound		"sound/menu/focus.wav"
+		desctext		"Player name entry field"
+		appearance_slot	1
+		addColorRange	0 50 1 0 0 1
+		addColorRange	50 100 0 1 0 1
+		rectcvar		"ui_editRectCvar"
+	}
+
+	// ---- MULTI family: cvarFloatList/cvarStrList/invertyesno/cvar-flag keywords ----
+	itemDef
+	{
+		type			12
+		name			"multi1"
+		rect			10 40 200 20
+		cvarFloatList	{ "Low" 0 "Medium" 1 "High" 2 }
+		// Bare (unquoted) tokens, not "quoted" strings: PC_ReadToken
+		// (oracle/codemp/botlib/l_precomp.cpp:PC_ReadToken, "recursively
+		// concatenate strings that are behind each other") auto-concatenates
+		// ADJACENT quoted-string tokens like C adjacent string literals —
+		// `"Off" "0" "On" "1"` would silently collapse into the single
+		// token "Off0On1". cvarFloatList escapes this naturally (its second
+		// half is an unquoted number, breaking the string/string adjacency);
+		// cvarStrList's four values are all read via PC_String_Parse
+		// (quote-agnostic), so bare words are both safe and correct here.
+		cvarStrList		{ Off 0 On 1 }
+		invertyesno		1
+		showCvar		{ cg_draw2d ; }
+		hideCvar		{ cg_drawFPS ; }
+		disableCvar		{ cg_drawCrosshair ; }
+	}
+
+	// ---- MODEL family: asset_model/model_* keywords ----
+	itemDef
+	{
+		type			7
+		name			"model1"
+		rect			10 70 100 100
+		asset_model		"models/players/kyle/model.glm"
+		model_angle		45
+		model_origin	0 0 0
+		model_fovx		90
+		model_fovy		60
+		model_rotation	5
+		model_g2mins	-16 -16 0
+		model_g2maxs	16 16 64
+		model_g2scale	1 1 1
+		model_g2skin	"models/players/kyle/model_default.skin"
+		model_g2anim	"not_a_real_animation_name"
+		isSaber			0
+		isSaber2		0
+	}
+
+	// ---- LISTBOX family: columns/element*/feeder/doubleclick keywords ----
+	itemDef
+	{
+		type			6
+		name			"list1"
+		rect			10 180 200 100
+		columns			2 0 50 10 60 80 20
+		elementwidth	64
+		elementheight	32
+		elementtype		1
+		notselectable
+		scrollhidden
+		doubleclick		{ uiScript RefreshServers ; }
+		feeder			4
+	}
+
+	// ---- TEXTSCROLL family: text-scroll specific keywords ----
+	itemDef
+	{
+		type			14
+		name			"scroll1"
+		rect			10 290 200 60
+		text			"hi"
+		maxLineChars	40
+		lineHeight		12
+	}
+
+	// ---- OWNERDRAW family: ownerdraw/ownerdrawFlag ----
+	itemDef
+	{
+		name			"owner1"
+		rect			10 360 100 20
+		ownerdraw		42
+		ownerdrawFlag	1
+		visible			1
+	}
+
+	// ---- asset_shader/background/cinematic ----
+	itemDef
+	{
+		name			"shader1"
+		rect			120 360 100 20
+		asset_shader	"gfx/2d/shader1"
+		background		"gfx/2d/back1"
+		cinematic		"loop_cin"
+	}
+}

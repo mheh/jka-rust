@@ -1,0 +1,528 @@
+== attempt 0: ok (menuCount now 1) ==
+== menuCount 1 ==
+== menu 0 ==
+  window.rect: (0.000000, 0.000000, 640.000000, 480.000000)
+  window.rectClient: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.name: |broad_item_keywords|
+  window.group: <NULL>
+  window.cinematicName: ||
+  window.cinematic: -1
+  window.style: 0
+  window.border: 0
+  window.ownerDraw: 0
+  window.ownerDrawFlags: 0
+  window.borderSize: 1.000000
+  window.flags: 0
+  window.rectEffects: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.rectEffects2: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.offsetTime: 0
+  window.nextTime: 0
+  window.foreColor: (1.000000, 1.000000, 1.000000, 1.000000)
+  window.backColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.borderColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.outlineColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.background: 0
+font: ||
+fullScreen: false
+fontIndex: 0
+cursorItem: -1
+fadeCycle: 0
+fadeClamp: 0.000000
+fadeAmount: 0.000000
+onOpen: ||
+onClose: ||
+onAccept: ||
+onESC: ||
+soundName: ||
+focusColor: (0.000000, 0.000000, 0.000000, 0.000000)
+disableColor: (0.000000, 0.000000, 0.000000, 0.000000)
+itemCount: 7
+descX: 0
+descY: 0
+descColor: (0.000000, 0.000000, 0.000000, 0.000000)
+descAlignment: 0
+descScale: 0.000000
+appearanceTime: 0.000000
+appearanceCnt: 0
+appearanceIncrement: 0.000000
+ == item 0 ==
+  window.rect: (11.500000, 11.500000, 200.000000, 20.000000)
+  window.rectClient: (10.000000, 10.000000, 200.000000, 20.000000)
+  window.name: |edit1|
+  window.group: <NULL>
+  window.cinematicName: ||
+  window.cinematic: -1
+  window.style: 1
+  window.border: 1
+  window.ownerDraw: 0
+  window.ownerDrawFlags: 0
+  window.borderSize: 1.500000
+  window.flags: 787996
+  window.rectEffects: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.rectEffects2: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.offsetTime: 0
+  window.nextTime: 0
+  window.foreColor: (1.000000, 1.000000, 1.000000, 1.000000)
+  window.backColor: (0.200000, 0.200000, 0.200000, 1.000000)
+  window.borderColor: (0.600000, 0.600000, 0.600000, 1.000000)
+  window.outlineColor: (0.300000, 0.300000, 0.300000, 1.000000)
+  window.background: 0
+  textRect: (0.000000, 0.000000, 0.000000, 0.000000)
+  type: 4
+  alignment: 0
+  textalignment: 1
+  textalignx: 2.000000
+  textaligny: 3.000000
+  textscale: 0.450000
+  textStyle: 3
+  text: |Name:|
+  text2: |(second line)|
+  text2alignx: 4.000000
+  text2aligny: 5.000000
+  asset: 0
+  flags: 0
+  mouseEnterText: |"setitemtext" "status" "editing name" ; |
+  mouseExitText: |"setitemtext" "status" "none" ; |
+  mouseEnter: |"play" "sound/menu/enter.wav" ; |
+  mouseExit: |"play" "sound/menu/exit.wav" ; |
+  action: |"play" "sound/menu/select.wav" ; |
+  accept: ||
+  selectionNext: ||
+  selectionPrev: ||
+  onFocus: |"setitemcolor" "edit1" "forecolor" 1 1 0 1 ; |
+  leaveFocus: |"setitemcolor" "edit1" "forecolor" 1 1 1 1 ; |
+  cvar: |ui_editSlider|
+  cvarTest: |ui_playerNameValid|
+  enableCvar: |"cg_draw2d" ; |
+  cvarFlags: 1
+  focusSound: 3000
+  numColors: 2
+  colorRanges[0]: low=0.000000 high=50.000000 color=(1.000000, 0.000000, 0.000000, 1.000000)
+  colorRanges[1]: low=50.000000 high=100.000000 color=(0.000000, 1.000000, 0.000000, 1.000000)
+  special: 3.500000
+  cursorPos: 0
+  typeData: editfield
+    minVal: 0.000000
+    maxVal: 1.000000
+    defVal: 0.500000
+    range: 0.000000
+    maxChars: 32
+    maxPaintChars: 20
+    paintOffset: 0
+  descText: |Player name entry field|
+  appearanceSlot: 1
+  iMenuFont: 0
+  disabled: false
+  invertYesNo: 0
+  xoffset: 0
+ == item 1 ==
+  window.rect: (10.000000, 40.000000, 200.000000, 20.000000)
+  window.rectClient: (10.000000, 40.000000, 200.000000, 20.000000)
+  window.name: |multi1|
+  window.group: <NULL>
+  window.cinematicName: ||
+  window.cinematic: -1
+  window.style: 0
+  window.border: 0
+  window.ownerDraw: 0
+  window.ownerDrawFlags: 0
+  window.borderSize: 1.000000
+  window.flags: 0
+  window.rectEffects: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.rectEffects2: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.offsetTime: 0
+  window.nextTime: 0
+  window.foreColor: (1.000000, 1.000000, 1.000000, 1.000000)
+  window.backColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.borderColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.outlineColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.background: 0
+  textRect: (0.000000, 0.000000, 0.000000, 0.000000)
+  type: 12
+  alignment: 0
+  textalignment: 0
+  textalignx: 0.000000
+  textaligny: 0.000000
+  textscale: 0.550000
+  textStyle: 0
+  text: <NULL>
+  text2: ||
+  text2alignx: 0.000000
+  text2aligny: 0.000000
+  asset: 0
+  flags: 0
+  mouseEnterText: ||
+  mouseExitText: ||
+  mouseEnter: ||
+  mouseExit: ||
+  action: ||
+  accept: ||
+  selectionNext: ||
+  selectionPrev: ||
+  onFocus: ||
+  leaveFocus: ||
+  cvar: <NULL>
+  cvarTest: ||
+  enableCvar: |"cg_drawCrosshair" ; |
+  cvarFlags: 2
+  focusSound: 0
+  numColors: 0
+  special: 0.000000
+  cursorPos: 0
+  typeData: multi
+    strDef: true
+    count: 2
+    cvarList[0]: |Off|
+    cvarStr[0]: |0|
+    cvarList[1]: |On|
+    cvarStr[1]: |1|
+  descText: ||
+  appearanceSlot: 0
+  iMenuFont: 0
+  disabled: false
+  invertYesNo: 1
+  xoffset: 0
+ == item 2 ==
+  window.rect: (10.000000, 70.000000, 100.000000, 100.000000)
+  window.rectClient: (10.000000, 70.000000, 100.000000, 100.000000)
+  window.name: |model1|
+  window.group: <NULL>
+  window.cinematicName: ||
+  window.cinematic: -1
+  window.style: 0
+  window.border: 0
+  window.ownerDraw: 0
+  window.ownerDrawFlags: 0
+  window.borderSize: 1.000000
+  window.flags: 0
+  window.rectEffects: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.rectEffects2: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.offsetTime: 0
+  window.nextTime: 0
+  window.foreColor: (1.000000, 1.000000, 1.000000, 1.000000)
+  window.backColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.borderColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.outlineColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.background: 0
+  textRect: (0.000000, 0.000000, 0.000000, 0.000000)
+  type: 7
+  alignment: 0
+  textalignment: 0
+  textalignx: 0.000000
+  textaligny: 0.000000
+  textscale: 0.550000
+  textStyle: 0
+  text: <NULL>
+  text2: ||
+  text2alignx: 0.000000
+  text2aligny: 0.000000
+  asset: 0
+  flags: 1
+  mouseEnterText: ||
+  mouseExitText: ||
+  mouseEnter: ||
+  mouseExit: ||
+  action: ||
+  accept: ||
+  selectionNext: ||
+  selectionPrev: ||
+  onFocus: ||
+  leaveFocus: ||
+  cvar: <NULL>
+  cvarTest: ||
+  enableCvar: ||
+  cvarFlags: 0
+  focusSound: 0
+  numColors: 0
+  special: 0.000000
+  cursorPos: 0
+  typeData: model
+    angle: 45
+    origin: (0.000000, 0.000000, 0.000000)
+    fov_x: 90.000000
+    fov_y: 60.000000
+    rotationSpeed: 5
+    g2mins: (-16.000000, -16.000000, 0.000000)
+    g2maxs: (16.000000, 16.000000, 64.000000)
+    g2scale: (1.000000, 1.000000, 1.000000)
+    g2skin: 4000
+    g2anim: 0
+    g2mins2: (0.000000, 0.000000, 0.000000)
+    g2maxs2: (0.000000, 0.000000, 0.000000)
+    g2minsEffect: (0.000000, 0.000000, 0.000000)
+    g2maxsEffect: (0.000000, 0.000000, 0.000000)
+    fov_x2: 0.000000
+    fov_y2: 0.000000
+    fov_Effectx: 0.000000
+    fov_Effecty: 0.000000
+  descText: ||
+  appearanceSlot: 0
+  iMenuFont: 0
+  disabled: false
+  invertYesNo: 0
+  xoffset: 0
+ == item 3 ==
+  window.rect: (10.000000, 180.000000, 200.000000, 100.000000)
+  window.rectClient: (10.000000, 180.000000, 200.000000, 100.000000)
+  window.name: |list1|
+  window.group: <NULL>
+  window.cinematicName: ||
+  window.cinematic: -1
+  window.style: 0
+  window.border: 0
+  window.ownerDraw: 0
+  window.ownerDrawFlags: 0
+  window.borderSize: 1.000000
+  window.flags: 0
+  window.rectEffects: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.rectEffects2: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.offsetTime: 0
+  window.nextTime: 0
+  window.foreColor: (1.000000, 1.000000, 1.000000, 1.000000)
+  window.backColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.borderColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.outlineColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.background: 0
+  textRect: (0.000000, 0.000000, 0.000000, 0.000000)
+  type: 6
+  alignment: 0
+  textalignment: 0
+  textalignx: 0.000000
+  textaligny: 0.000000
+  textscale: 0.550000
+  textStyle: 0
+  text: <NULL>
+  text2: ||
+  text2alignx: 0.000000
+  text2aligny: 0.000000
+  asset: 0
+  flags: 0
+  mouseEnterText: ||
+  mouseExitText: ||
+  mouseEnter: ||
+  mouseExit: ||
+  action: ||
+  accept: ||
+  selectionNext: ||
+  selectionPrev: ||
+  onFocus: ||
+  leaveFocus: ||
+  cvar: <NULL>
+  cvarTest: ||
+  enableCvar: ||
+  cvarFlags: 0
+  focusSound: 0
+  numColors: 0
+  special: 4.000000
+  cursorPos: 0
+  typeData: listbox
+    startPos: 0
+    endPos: 0
+    drawPadding: 0
+    cursorPos: 0
+    elementWidth: 64.000000
+    elementHeight: 32.000000
+    elementStyle: 1
+    numColumns: 2
+    columnInfo[0]: pos=0 width=50 maxChars=10
+    columnInfo[1]: pos=60 width=80 maxChars=20
+    doubleClick: |"uiScript" "RefreshServers" ; |
+    notselectable: true
+    scrollhidden: true
+  descText: ||
+  appearanceSlot: 0
+  iMenuFont: 0
+  disabled: false
+  invertYesNo: 0
+  xoffset: 0
+ == item 4 ==
+  window.rect: (10.000000, 290.000000, 200.000000, 60.000000)
+  window.rectClient: (10.000000, 290.000000, 200.000000, 60.000000)
+  window.name: |scroll1|
+  window.group: <NULL>
+  window.cinematicName: ||
+  window.cinematic: -1
+  window.style: 0
+  window.border: 0
+  window.ownerDraw: 0
+  window.ownerDrawFlags: 0
+  window.borderSize: 1.000000
+  window.flags: 0
+  window.rectEffects: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.rectEffects2: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.offsetTime: 0
+  window.nextTime: 0
+  window.foreColor: (1.000000, 1.000000, 1.000000, 1.000000)
+  window.backColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.borderColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.outlineColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.background: 0
+  textRect: (0.000000, 0.000000, 0.000000, 0.000000)
+  type: 14
+  alignment: 0
+  textalignment: 0
+  textalignx: 0.000000
+  textaligny: 0.000000
+  textscale: 0.550000
+  textStyle: 0
+  text: |hi|
+  text2: ||
+  text2alignx: 0.000000
+  text2aligny: 0.000000
+  asset: 0
+  flags: 0
+  mouseEnterText: ||
+  mouseExitText: ||
+  mouseEnter: ||
+  mouseExit: ||
+  action: ||
+  accept: ||
+  selectionNext: ||
+  selectionPrev: ||
+  onFocus: ||
+  leaveFocus: ||
+  cvar: <NULL>
+  cvarTest: ||
+  enableCvar: ||
+  cvarFlags: 0
+  focusSound: 0
+  numColors: 0
+  special: 0.000000
+  cursorPos: 0
+  typeData: textscroll
+    startPos: 0
+    endPos: 0
+    lineHeight: 12.000000
+    maxLineChars: 40
+    drawPadding: 0
+    iLineCount: 1
+    pLines[0]: |hi|
+  descText: ||
+  appearanceSlot: 0
+  iMenuFont: 0
+  disabled: false
+  invertYesNo: 0
+  xoffset: 0
+ == item 5 ==
+  window.rect: (10.000000, 360.000000, 100.000000, 20.000000)
+  window.rectClient: (10.000000, 360.000000, 100.000000, 20.000000)
+  window.name: |owner1|
+  window.group: <NULL>
+  window.cinematicName: ||
+  window.cinematic: -1
+  window.style: 0
+  window.border: 0
+  window.ownerDraw: 42
+  window.ownerDrawFlags: 1
+  window.borderSize: 1.000000
+  window.flags: 4
+  window.rectEffects: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.rectEffects2: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.offsetTime: 0
+  window.nextTime: 0
+  window.foreColor: (1.000000, 1.000000, 1.000000, 1.000000)
+  window.backColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.borderColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.outlineColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.background: 0
+  textRect: (0.000000, 0.000000, 0.000000, 0.000000)
+  type: 8
+  alignment: 0
+  textalignment: 0
+  textalignx: 0.000000
+  textaligny: 0.000000
+  textscale: 0.550000
+  textStyle: 0
+  text: <NULL>
+  text2: ||
+  text2alignx: 0.000000
+  text2aligny: 0.000000
+  asset: 0
+  flags: 0
+  mouseEnterText: ||
+  mouseExitText: ||
+  mouseEnter: ||
+  mouseExit: ||
+  action: ||
+  accept: ||
+  selectionNext: ||
+  selectionPrev: ||
+  onFocus: ||
+  leaveFocus: ||
+  cvar: <NULL>
+  cvarTest: ||
+  enableCvar: ||
+  cvarFlags: 0
+  focusSound: 0
+  numColors: 0
+  special: 0.000000
+  cursorPos: 0
+  typeData: none
+  descText: ||
+  appearanceSlot: 0
+  iMenuFont: 0
+  disabled: false
+  invertYesNo: 0
+  xoffset: 0
+ == item 6 ==
+  window.rect: (120.000000, 360.000000, 100.000000, 20.000000)
+  window.rectClient: (120.000000, 360.000000, 100.000000, 20.000000)
+  window.name: |shader1|
+  window.group: <NULL>
+  window.cinematicName: |loop_cin|
+  window.cinematic: -1
+  window.style: 0
+  window.border: 0
+  window.ownerDraw: 0
+  window.ownerDrawFlags: 0
+  window.borderSize: 1.000000
+  window.flags: 0
+  window.rectEffects: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.rectEffects2: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.offsetTime: 0
+  window.nextTime: 0
+  window.foreColor: (1.000000, 1.000000, 1.000000, 1.000000)
+  window.backColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.borderColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.outlineColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.background: 1001
+  textRect: (0.000000, 0.000000, 0.000000, 0.000000)
+  type: 0
+  alignment: 0
+  textalignment: 0
+  textalignx: 0.000000
+  textaligny: 0.000000
+  textscale: 0.550000
+  textStyle: 0
+  text: <NULL>
+  text2: ||
+  text2alignx: 0.000000
+  text2aligny: 0.000000
+  asset: 1000
+  flags: 0
+  mouseEnterText: ||
+  mouseExitText: ||
+  mouseEnter: ||
+  mouseExit: ||
+  action: ||
+  accept: ||
+  selectionNext: ||
+  selectionPrev: ||
+  onFocus: ||
+  leaveFocus: ||
+  cvar: <NULL>
+  cvarTest: ||
+  enableCvar: ||
+  cvarFlags: 0
+  focusSound: 0
+  numColors: 0
+  special: 0.000000
+  cursorPos: 0
+  typeData: none
+  descText: ||
+  appearanceSlot: 0
+  iMenuFont: 0
+  disabled: false
+  invertYesNo: 0
+  xoffset: 0
+== end ==

@@ -1,0 +1,116 @@
+== attempt 0: ok (menuCount now 1) ==
+== menuCount 1 ==
+== menu 0 ==
+  window.rect: (0.000000, 0.000000, 640.000000, 480.000000)
+  window.rectClient: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.name: |menu_all_keywords|
+  window.group: <NULL>
+  window.cinematicName: |intro_cin|
+  window.cinematic: -1
+  window.style: 2
+  window.border: 1
+  window.ownerDraw: 5
+  window.ownerDrawFlags: 2
+  window.borderSize: 2.500000
+  window.flags: 2228740
+  window.rectEffects: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.rectEffects2: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.offsetTime: 0
+  window.nextTime: 0
+  window.foreColor: (0.900000, 0.150000, 0.250000, 0.350000)
+  window.backColor: (0.100000, 0.200000, 0.300000, 0.400000)
+  window.borderColor: (0.500000, 0.600000, 0.700000, 0.800000)
+  window.outlineColor: (0.130000, 0.240000, 0.350000, 0.460000)
+  window.background: 1000
+font: |fonts/briggs|
+fullScreen: true
+fontIndex: 0
+cursorItem: -1
+fadeCycle: 100
+fadeClamp: 0.500000
+fadeAmount: 0.250000
+onOpen: |"play" "sound/open.wav" ; |
+onClose: |"play" "sound/close.wav" ; |
+onAccept: |"play" "sound/accept.wav" ; |
+onESC: |"close" "menu_all_keywords" ; |
+soundName: |sound/loop.wav|
+focusColor: (0.110000, 0.220000, 0.330000, 0.440000)
+disableColor: (0.120000, 0.230000, 0.340000, 0.450000)
+itemCount: 1
+descX: 5
+descY: 6
+descColor: (0.140000, 0.240000, 0.340000, 0.440000)
+descAlignment: 1
+descScale: 0.750000
+appearanceTime: 0.000000
+appearanceCnt: 0
+appearanceIncrement: 0.050000
+ == item 0 ==
+  window.rect: (2.500000, 2.500000, 10.000000, 10.000000)
+  window.rectClient: (0.000000, 0.000000, 10.000000, 10.000000)
+  window.name: |dummy_item|
+  window.group: <NULL>
+  window.cinematicName: ||
+  window.cinematic: -1
+  window.style: 0
+  window.border: 0
+  window.ownerDraw: 0
+  window.ownerDrawFlags: 0
+  window.borderSize: 1.000000
+  window.flags: 4
+  window.rectEffects: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.rectEffects2: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.offsetTime: 0
+  window.nextTime: 0
+  window.foreColor: (1.000000, 1.000000, 1.000000, 1.000000)
+  window.backColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.borderColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.outlineColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.background: 0
+  textRect: (0.000000, 0.000000, 0.000000, 0.000000)
+  type: 0
+  alignment: 0
+  textalignment: 0
+  textalignx: 0.000000
+  textaligny: 0.000000
+  textscale: 0.550000
+  textStyle: 0
+  text: <NULL>
+  text2: ||
+  text2alignx: 0.000000
+  text2aligny: 0.000000
+  asset: 0
+  flags: 0
+  mouseEnterText: ||
+  mouseExitText: ||
+  mouseEnter: ||
+  mouseExit: ||
+  action: ||
+  accept: ||
+  selectionNext: ||
+  selectionPrev: ||
+  onFocus: ||
+  leaveFocus: ||
+  cvar: <NULL>
+  cvarTest: ||
+  enableCvar: ||
+  cvarFlags: 0
+  focusSound: 0
+  numColors: 0
+  special: 0.000000
+  cursorPos: 0
+  typeData: editfield
+    minVal: 0.000000
+    maxVal: 0.000000
+    defVal: 0.000000
+    range: 0.000000
+    maxChars: 0
+    maxPaintChars: 0
+    paintOffset: 0
+  descText: ||
+  appearanceSlot: 0
+  iMenuFont: 0
+  disabled: false
+  invertYesNo: 0
+  xoffset: 0
+== end ==

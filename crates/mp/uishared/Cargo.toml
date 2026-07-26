@@ -11,3 +11,11 @@ native_string = { path = "../../native/string" }
 native_types = { path = "../../native/types" }
 mp_qshared = { path = "../qshared" }
 mp_bg = { path = "../bg" }
+
+[dev-dependencies]
+# menu_parse_goldens.rs drives the SAME production botlib tokenizer the live
+# ui/cgame hosts use (Menu_New/Menu_Parse's trap_PC_ReadToken ultimately
+# reaches it) rather than a hand-rolled test-only tokenizer, so the golden
+# comparison is genuine end-to-end parity, not parity against an
+# approximation. Test-only: mp_uishared's own dependency graph stays as-is.
+mp_engine_botlib = { path = "../engine/botlib" }

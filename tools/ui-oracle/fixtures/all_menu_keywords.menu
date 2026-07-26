@@ -1,0 +1,46 @@
+// all_menu_keywords.menu — exercises every entry of menuParseKeywords[]
+// (oracle/codemp/ui/ui_shared.c:9717-9756) exactly once, in table order.
+{
+	appearanceIncrement	0.05
+	backcolor			0.1 0.2 0.3 0.4
+	background			"menu/art/back"
+	border				1
+	bordercolor			0.5 0.6 0.7 0.8
+	borderSize			2.5
+	cinematic			"intro_cin"
+	descAlignment		1
+	desccolor			0.14 0.24 0.34 0.44
+	descX				5
+	descY				6
+	descScale			0.75
+	disablecolor		0.12 0.23 0.34 0.45
+	fadeAmount			0.25
+	fadeClamp			0.5
+	fadeCycle			100
+	focuscolor			0.11 0.22 0.33 0.44
+	font				"fonts/briggs"
+	forecolor			0.9 0.15 0.25 0.35
+	fullscreen			1
+	name				"menu_all_keywords"
+	onClose				{ play "sound/close.wav" ; }
+	onAccept			{ play "sound/accept.wav" ; }
+	onESC				{ close menu_all_keywords ; }
+	outOfBoundsClick
+	onOpen				{ play "sound/open.wav" ; }
+	outlinecolor		0.13 0.24 0.35 0.46
+	ownerdraw			5
+	ownerdrawFlag		2
+	popup
+	rect				10 20 300 400
+	soundLoop			"sound/loop.wav"
+	style				2
+	visible				1
+
+	itemDef
+	{
+		name	"dummy_item"
+		rect	0 0 10 10
+		type	0
+		visible	1
+	}
+}

@@ -1,0 +1,245 @@
+== attempt 0: ok (menuCount now 1) ==
+== menuCount 1 ==
+== menu 0 ==
+  window.rect: (0.000000, 0.000000, 640.000000, 480.000000)
+  window.rectClient: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.name: |ui_sample_menu|
+  window.group: <NULL>
+  window.cinematicName: ||
+  window.cinematic: -1
+  window.style: 1
+  window.border: 1
+  window.ownerDraw: 0
+  window.ownerDrawFlags: 0
+  window.borderSize: 1.000000
+  window.flags: 516
+  window.rectEffects: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.rectEffects2: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.offsetTime: 0
+  window.nextTime: 0
+  window.foreColor: (1.000000, 1.000000, 1.000000, 1.000000)
+  window.backColor: (0.000000, 0.000000, 0.000000, 0.600000)
+  window.borderColor: (0.500000, 0.500000, 0.500000, 1.000000)
+  window.outlineColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.background: 1000
+font: |fonts/briggs|
+fullScreen: true
+fontIndex: 0
+cursorItem: -1
+fadeCycle: 1
+fadeClamp: 1.000000
+fadeAmount: 0.100000
+onOpen: |"play" "sound/menu/open.wav" ; |
+onClose: |"play" "sound/menu/close.wav" ; |
+onAccept: ||
+onESC: |"close" "ui_sample_menu" ; |
+soundName: ||
+focusColor: (1.000000, 0.700000, 0.000000, 1.000000)
+disableColor: (0.000000, 0.000000, 0.000000, 0.000000)
+itemCount: 3
+descX: 0
+descY: 0
+descColor: (0.000000, 0.000000, 0.000000, 0.000000)
+descAlignment: 0
+descScale: 0.000000
+appearanceTime: 0.000000
+appearanceCnt: 0
+appearanceIncrement: 0.000000
+ == item 0 ==
+  window.rect: (21.000000, 21.000000, 300.000000, 40.000000)
+  window.rectClient: (20.000000, 20.000000, 300.000000, 40.000000)
+  window.name: |title|
+  window.group: <NULL>
+  window.cinematicName: ||
+  window.cinematic: -1
+  window.style: 0
+  window.border: 0
+  window.ownerDraw: 0
+  window.ownerDrawFlags: 0
+  window.borderSize: 1.000000
+  window.flags: 532
+  window.rectEffects: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.rectEffects2: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.offsetTime: 0
+  window.nextTime: 0
+  window.foreColor: (1.000000, 1.000000, 1.000000, 1.000000)
+  window.backColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.borderColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.outlineColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.background: 0
+  textRect: (0.000000, 0.000000, 0.000000, 0.000000)
+  type: 0
+  alignment: 0
+  textalignment: 0
+  textalignx: 0.000000
+  textaligny: 0.000000
+  textscale: 0.600000
+  textStyle: 0
+  text: |Sample Menu|
+  text2: ||
+  text2alignx: 0.000000
+  text2aligny: 0.000000
+  asset: 0
+  flags: 0
+  mouseEnterText: ||
+  mouseExitText: ||
+  mouseEnter: ||
+  mouseExit: ||
+  action: ||
+  accept: ||
+  selectionNext: ||
+  selectionPrev: ||
+  onFocus: ||
+  leaveFocus: ||
+  cvar: <NULL>
+  cvarTest: ||
+  enableCvar: ||
+  cvarFlags: 0
+  focusSound: 0
+  numColors: 0
+  special: 0.000000
+  cursorPos: 0
+  typeData: editfield
+    minVal: 0.000000
+    maxVal: 0.000000
+    defVal: 0.000000
+    range: 0.000000
+    maxChars: 0
+    maxPaintChars: 0
+    paintOffset: 0
+  descText: ||
+  appearanceSlot: 0
+  iMenuFont: 0
+  disabled: false
+  invertYesNo: 0
+  xoffset: 0
+ == item 1 ==
+  window.rect: (22.000000, 82.000000, 200.000000, 30.000000)
+  window.rectClient: (20.000000, 80.000000, 200.000000, 30.000000)
+  window.name: |play_button|
+  window.group: <NULL>
+  window.cinematicName: ||
+  window.cinematic: -1
+  window.style: 1
+  window.border: 1
+  window.ownerDraw: 0
+  window.ownerDrawFlags: 0
+  window.borderSize: 1.000000
+  window.flags: 516
+  window.rectEffects: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.rectEffects2: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.offsetTime: 0
+  window.nextTime: 0
+  window.foreColor: (1.000000, 1.000000, 1.000000, 1.000000)
+  window.backColor: (0.200000, 0.200000, 0.200000, 1.000000)
+  window.borderColor: (0.600000, 0.600000, 0.600000, 1.000000)
+  window.outlineColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.background: 0
+  textRect: (0.000000, 0.000000, 0.000000, 0.000000)
+  type: 1
+  alignment: 0
+  textalignment: 0
+  textalignx: 0.000000
+  textaligny: 0.000000
+  textscale: 0.500000
+  textStyle: 0
+  text: |Play|
+  text2: ||
+  text2alignx: 0.000000
+  text2aligny: 0.000000
+  asset: 0
+  flags: 0
+  mouseEnterText: ||
+  mouseExitText: ||
+  mouseEnter: |"play" "sound/menu/enter.wav" ; |
+  mouseExit: ||
+  action: |"play" "sound/menu/select.wav" ; "uiScript" "StartGame" ; |
+  accept: ||
+  selectionNext: ||
+  selectionPrev: ||
+  onFocus: |"setitemcolor" "play_button" "forecolor" 1 1 0 1 ; |
+  leaveFocus: |"setitemcolor" "play_button" "forecolor" 1 1 1 1 ; |
+  cvar: <NULL>
+  cvarTest: ||
+  enableCvar: ||
+  cvarFlags: 0
+  focusSound: 0
+  numColors: 0
+  special: 0.000000
+  cursorPos: 0
+  typeData: none
+  descText: ||
+  appearanceSlot: 0
+  iMenuFont: 0
+  disabled: false
+  invertYesNo: 0
+  xoffset: 0
+ == item 2 ==
+  window.rect: (21.000000, 131.000000, 200.000000, 20.000000)
+  window.rectClient: (20.000000, 130.000000, 200.000000, 20.000000)
+  window.name: |player_name|
+  window.group: <NULL>
+  window.cinematicName: ||
+  window.cinematic: -1
+  window.style: 1
+  window.border: 0
+  window.ownerDraw: 0
+  window.ownerDrawFlags: 0
+  window.borderSize: 1.000000
+  window.flags: 516
+  window.rectEffects: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.rectEffects2: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.offsetTime: 0
+  window.nextTime: 0
+  window.foreColor: (1.000000, 1.000000, 1.000000, 1.000000)
+  window.backColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.borderColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.outlineColor: (0.000000, 0.000000, 0.000000, 0.000000)
+  window.background: 0
+  textRect: (0.000000, 0.000000, 0.000000, 0.000000)
+  type: 4
+  alignment: 0
+  textalignment: 0
+  textalignx: 0.000000
+  textaligny: 0.000000
+  textscale: 0.450000
+  textStyle: 0
+  text: <NULL>
+  text2: ||
+  text2alignx: 0.000000
+  text2aligny: 0.000000
+  asset: 0
+  flags: 0
+  mouseEnterText: ||
+  mouseExitText: ||
+  mouseEnter: ||
+  mouseExit: ||
+  action: ||
+  accept: ||
+  selectionNext: ||
+  selectionPrev: ||
+  onFocus: ||
+  leaveFocus: ||
+  cvar: |ui_playerName|
+  cvarTest: ||
+  enableCvar: ||
+  cvarFlags: 0
+  focusSound: 0
+  numColors: 0
+  special: 0.000000
+  cursorPos: 0
+  typeData: editfield
+    minVal: -1.000000
+    maxVal: -1.000000
+    defVal: -1.000000
+    range: 0.000000
+    maxChars: 32
+    maxPaintChars: 20
+    paintOffset: 0
+  descText: ||
+  appearanceSlot: 0
+  iMenuFont: 0
+  disabled: false
+  invertYesNo: 0
+  xoffset: 0
+== end ==

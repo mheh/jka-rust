@@ -166,6 +166,7 @@ dependencies = [
  "mp_engine_qcommon",
  "mp_game",
  "mp_qshared",
+ "native_string",
  "native_types",
 ]
 
@@ -341,6 +342,7 @@ name = "mp_uishared"
 version = "0.1.0"
 dependencies = [
  "mp_bg",
+ "mp_engine_botlib",
  "mp_qshared",
  "native_string",
  "native_types",
