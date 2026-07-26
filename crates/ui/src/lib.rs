@@ -1,38 +1,194 @@
-//! `ui` — the MP ui module cdylib shell (SEAM-D10). Interim stub exports
-//! relocated here from the retired `abi_transport::entrypoints::qvm` module
-//! (LOAD-D4 supersession: exports are per-shell); the live SEAM-D10 shape
-//! (`ENGINE` OnceLock + `Dispatch` match, mirroring `jampgame`) lands in a
-//! later slice. Bodies verbatim from the old stubs; plain `extern "C"` kept —
-//! the `extern "C-unwind"` flip is the SEAM-D12 sweep, untouched here.
-//!
-//! //TODO: Port ui live entrypoint exports (vmMain match, SEAM-D10)
-//! // Source: oracle/codemp/ui/ui_main.c:579
+//! `ui` — the MP ui module cdylib shell (SEAM-D10). Thin: hosts the
+//! `ENGINE: OnceLock<CEngine>` static (SEAM-D1), the `WORLD: WorldCell`
+//! static (STATE-D6), the live entrypoint exports, and the `vmMain` export
+//! forwarding into `mp_ui::ui_main::vmMain` — which owns the `MpUiExport`
+//! match and builds the `UiContext` receiver (see `vm_main_dispatch`'s
+//! doc). The logic crate `mp_ui` has no entrypoint/`OnceLock`/`WorldCell`
+//! code of its own. Structure, naming and safety comments mirror the
+//! `jampgame` shell (`crates/jampgame/src/lib.rs`) exactly except where ui's
+//! own contract genuinely differs — each such spot is called out at the
+//! divergence.
+
+use std::panic::AssertUnwindSafe;
+use std::sync::OnceLock;
+
+mod display_context_stub;
+mod panic_guard;
+mod world_cell;
 
 use abi_transport::entrypoints::{AbiCommand, AbiWord, RawSyscall};
+use abi_transport::generic::engine::CEngine;
+use abi_transport::generic::word_to_c_int;
+use mp_ui::ui_main::vmMain as mp_ui_vm_main;
+use mp_ui::world::ui_world::UiWorld;
 
-/// Raven/OpenJK QVM-style `dllEntry` export (interim stub).
+use crate::display_context_stub::UnbuiltDisplayContext;
+use crate::world_cell::WorldCell;
+
+/// The single outbound-syscall backend seam global (SEAM-D1, porting-rules §B6
+/// exception — `vmMain` takes no context argument). Set once at `dllEntry`.
+static ENGINE: OnceLock<CEngine> = OnceLock::new();
+
+/// The module island's one owned `UiWorld` across `vmMain` calls (STATE-D6,
+/// the second sanctioned static exemption). Bootstrapped lazily on the first
+/// `vmMain` call of any kind (see `vm_main_dispatch`'s bootstrap doc — this is
+/// the one genuine divergence from `jampgame`'s `WORLD`, which is built on the
+/// `GAME_INIT` command specifically).
+static WORLD: WorldCell = WorldCell::new();
+
+/// Raven `dllEntry` (`ui_atoms.c`-style stub, same shape as
+/// `g_syscalls.c:14-16`). Stores the engine syscall trampoline into the one
+/// `OnceLock<CEngine>`. `extern "C-unwind"` (SEAM-D12), matching `jampgame`.
+///
+/// PANIC POLICY (2026-07-08, mirrored from `jampgame`): `dllEntry` runs BEFORE
+/// the engine syscall pointer is armed, so there is no `Com_Error`/`UI_Error`
+/// path to route a failure through yet. Its only sound failure mode is
+/// `eprintln!` + `std::process::abort()` — a panic must never unwind raw
+/// across the `extern "C-unwind"` boundary into the C engine (UB). The capture
+/// hook is installed FIRST so any panic in the remaining setup is still
+/// recorded with `file:line`.
+///
+/// DIVERGENCE from `jampgame`: `mp_ui`'s `Com_Error`/`Com_Printf`
+/// (`ui_atoms.rs`) take `ctx: &mut UiContext` directly and route through
+/// `trap::Error`/`trap::Print` at the call site — unlike `mp_game`'s
+/// `com_boundary` global-sink pattern, ui has no engine-wide `Com_Printf`/
+/// `Com_Error` C callback to register, so there is no `set_com_print_sink`/
+/// `set_com_error_sink` counterpart here.
 #[no_mangle]
-pub extern "C" fn dllEntry(_syscall: RawSyscall) {}
+pub extern "C-unwind" fn dllEntry(syscall: RawSyscall) {
+    let armed = std::panic::catch_unwind(AssertUnwindSafe(|| {
+        panic_guard::install_hook();
+        ENGINE.set(CEngine::new(syscall)).ok();
+    }));
+    if armed.is_err() {
+        let msg = panic_guard::take().unwrap_or_else(|| "panic in dllEntry".to_string());
+        eprintln!("ui: fatal panic during dllEntry (engine error path not yet armed): {msg}");
+        std::process::abort();
+    }
+}
 
-/// Raven/OpenJK QVM-style `vmMain` export (interim stub).
+/// Raven `vmMain` (`ui_main.c:579`) — the single engine→ui choke point.
+/// `extern "C-unwind"` (SEAM-D12), and deliberately NO `catch_unwind`
+/// (foreign-exception ruling, user 2026-07-12, mirrored from `jampgame`): the
+/// HOST ENGINE's error exception passes back THROUGH these frames on every
+/// in-trap `Com_Error`/`UI_Error` — our Rust engine's `ComError` (a foreign
+/// exception to this image's runtime) or retail's MSVC C++ `throw` — and a
+/// `catch_unwind` intercepting a foreign exception is an instant abort. The
+/// module never throws across this boundary itself: every deliberate error is
+/// the `UI_ERROR` trap (`ui_atoms::Com_Error` → `trap::Error`), and a genuine
+/// module bug prints `file:line — message` via the `panic_guard` hook and
+/// then dies fatally, exactly as a crashing C module would (LIFE-D3: real bug
+/// → fatal).
 #[no_mangle]
 #[allow(clippy::too_many_arguments)]
-pub extern "C" fn vmMain(
-    _command: AbiCommand,
-    _arg0: AbiWord,
-    _arg1: AbiWord,
-    _arg2: AbiWord,
-    _arg3: AbiWord,
-    _arg4: AbiWord,
-    _arg5: AbiWord,
-    _arg6: AbiWord,
-    _arg7: AbiWord,
-    _arg8: AbiWord,
-    _arg9: AbiWord,
-    _arg10: AbiWord,
-    _arg11: AbiWord,
+pub extern "C-unwind" fn vmMain(
+    command: AbiCommand,
+    arg0: AbiWord,
+    arg1: AbiWord,
+    arg2: AbiWord,
+    arg3: AbiWord,
+    arg4: AbiWord,
+    arg5: AbiWord,
+    arg6: AbiWord,
+    arg7: AbiWord,
+    arg8: AbiWord,
+    arg9: AbiWord,
+    arg10: AbiWord,
+    arg11: AbiWord,
 ) -> AbiWord {
-    0
+    vm_main_dispatch(
+        command, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11,
+    )
+}
+
+/// The decoded-dispatch body of [`vmMain`]. Bootstraps/derives the `WORLD`
+/// pointer, builds the placeholder [`UnbuiltDisplayContext`] `dc` (see its
+/// module doc), and forwards the decoded `AbiWord` words into
+/// `mp_ui::ui_main::vmMain` — which itself builds the `UiContext` receiver and
+/// runs the exhaustive `MpUiExport` match (SEAM-D3/D8), mirroring
+/// `jampgame::vm_main_dispatch`'s shape.
+///
+/// BOOTSTRAP (STATE-D6, DIVERGES from `jampgame`'s `GAME_INIT`-gated
+/// rebuild): Raven's `uiInfo_t uiInfo` (`ui_local.h:729-843`) is a single
+/// file-scope static that `_UI_Init` only mutates in place
+/// (`oracle/codemp/ui/ui_main.c:10661` onward has no `memset`/reinit) — it is
+/// never freed or rebuilt across a `UI_SHUTDOWN`/`UI_INIT` pair, unlike
+/// `g_entities`/`level`, which `G_InitGame` re-creates every level restart.
+/// There is no ui command analogous to `GAME_INIT` that must run first and
+/// "create" the world, so `WORLD` is instead populated lazily on the FIRST
+/// `vmMain` call of ANY kind (in practice `UI_GETAPIVERSION`, which the
+/// engine always calls before `UI_INIT`) and is never torn down on
+/// `UI_SHUTDOWN` — the same persistence Raven's static gave `uiInfo`.
+#[allow(clippy::too_many_arguments)]
+fn vm_main_dispatch(
+    command: AbiCommand,
+    arg0: AbiWord,
+    arg1: AbiWord,
+    arg2: AbiWord,
+    arg3: AbiWord,
+    arg4: AbiWord,
+    arg5: AbiWord,
+    arg6: AbiWord,
+    arg7: AbiWord,
+    arg8: AbiWord,
+    arg9: AbiWord,
+    arg10: AbiWord,
+    arg11: AbiWord,
+) -> AbiWord {
+    // SAFETY: single-threaded per Raven's contract; no reentrancy is possible
+    // before the world exists (STATE-D6). See the fn doc for why the
+    // bootstrap condition is "cell empty", not "command == some INIT arm".
+    unsafe {
+        if (*WORLD.0.get()).is_none() {
+            // UiWorld is ~34 KB (Vec/String throughout), so the Box::new
+            // temporary transits the engine's stack safely — unlike GameWorld's
+            // ~1.4 MB, which needed jampgame's zeroed_boxed path.
+            *WORLD.0.get() = Some(Box::new(UiWorld::default()));
+        }
+    }
+
+    // SAFETY: single-threaded per Raven's contract; each (possibly reentrant)
+    // entry derives its OWN raw `*mut UiWorld` — aliasing raw pointers are
+    // sound; a dispatch-spanning `&mut` would be UB (STATE-D6 discipline). The
+    // cell holds `Box<UiWorld>`; `&mut **b` reborrows through the Box to the
+    // same `*mut UiWorld` the whole downstream (`UiContext`) expects.
+    // SAFETY: the single owned island the shell keeps alive for the whole
+    // call (STATE-D1/D6); this is THE seam reborrow — everything downstream
+    // is a checked borrow of it (Stage 2a).
+    let world: &mut UiWorld = unsafe {
+        let b = (*WORLD.0.get())
+            .as_mut()
+            .expect("the bootstrap above always populates WORLD first");
+        &mut **b
+    };
+    let engine = ENGINE.get().expect("dllEntry set ENGINE");
+
+    // The placeholder DisplayContext implementor — see its module doc
+    // (`display_context_stub.rs`): no ui DisplayContext is built yet, so
+    // every method it has panics loudly, naming itself, the instant a live
+    // call reaches it.
+    let mut dc = UnbuiltDisplayContext;
+
+    let result = mp_ui_vm_main(
+        world,
+        engine,
+        &mut dc,
+        command,
+        word_to_c_int(arg0),
+        word_to_c_int(arg1),
+        word_to_c_int(arg2),
+        word_to_c_int(arg3),
+        word_to_c_int(arg4),
+        word_to_c_int(arg5),
+        word_to_c_int(arg6),
+        word_to_c_int(arg7),
+        word_to_c_int(arg8),
+        word_to_c_int(arg9),
+        word_to_c_int(arg10),
+        word_to_c_int(arg11),
+    );
+
+    result as AbiWord
 }
 
 // `GetModuleAPI` is deliberately NOT exported (SEAM-Q7 ruling, 2026-07-06,

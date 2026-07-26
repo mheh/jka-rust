@@ -545,6 +545,9 @@ name = "ui"
 version = "0.1.0"
 dependencies = [
  "abi_transport",
+ "mp_qshared",
+ "mp_ui",
+ "mp_uishared",
 ]
 
 [[package]]

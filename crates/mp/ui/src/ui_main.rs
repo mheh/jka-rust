@@ -14,6 +14,7 @@ use mp_abi::ui::public::ui_menu_command_t::{
     UIMENU_PLAYERCONFIG, UIMENU_PLAYERFORCE, UIMENU_POSTGAME, UIMENU_SIEGEMESSAGE,
     UIMENU_SIEGEOBJECTIVES, UIMENU_TEAM, UIMENU_VOICECHAT,
 };
+use mp_abi::ui::public::UI_API_VERSION;
 use mp_bg::bg_channel::BgState;
 use mp_bg::bg_misc::{forceMasteryPoints, BG_FindItemForHoldable, BG_FindItemForWeapon};
 use mp_bg::bg_saga::{
@@ -13569,17 +13570,15 @@ pub fn _UI_Refresh(ctx: &mut UiContext, dc: &mut dyn DisplayContext, realtime: c
 /// routes the command to the matching `_UI_*`/`UI_*` handler.
 ///
 /// PORT-NOTE: Raven's `command` arm values are `MpUiExport` (`mp_abi::ui`)
-/// discriminants; matched via `x if x == Variant as c_int` guards (the house
-/// pattern for C fn-ptr-table/enum-switch dispatch elsewhere, e.g.
-/// `mp_game::npc_c`'s `bState_t` dispatch). `qboolean` returns from callees
-/// (`_UI_IsFullscreen`, `UI_ConsoleCommand`) convert back to the C
-/// `0`/`1` wire values Raven's `qtrue`/`qfalse` carried.
-///
-/// PORT-NOTE: `UI_API_VERSION` (`#define UI_API_VERSION 7`,
-/// `oracle/codemp/ui/ui_public.h:6`) has no ported const home yet; inlined
-/// literally at the one call site.
+/// discriminants. The pre-decode `MpUiExport::try_from(command)` reproduces
+/// Raven's post-switch fall-through `return -1` (`ui_main.c:624`) at the
+/// conversion's `Err`; the match itself stays exhaustive over the valid
+/// variants (SEAM-D6, the `mp_game`/`jampgame` shell precedent). `qboolean`
+/// returns from callees (`_UI_IsFullscreen`, `UI_ConsoleCommand`) convert back
+/// to the C `0`/`1` wire values Raven's `qtrue`/`qfalse` carried.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:579-625`
+#[allow(clippy::too_many_arguments)]
 pub fn vmMain(
     world: &mut UiWorld,
     engine: &Engine,
@@ -13600,40 +13599,41 @@ pub fn vmMain(
 ) -> c_int {
     let mut ctx = UiContext { world, engine };
 
-    match command {
-        x if x == MpUiExport::UI_GETAPIVERSION as c_int => {
-            // PORT-NOTE: UI_API_VERSION — see fn doc comment.
-            7
-        }
+    let Ok(export) = MpUiExport::try_from(command) else {
+        return -1;
+    };
 
-        x if x == MpUiExport::UI_INIT as c_int => {
+    match export {
+        MpUiExport::UI_GETAPIVERSION => UI_API_VERSION,
+
+        MpUiExport::UI_INIT => {
             _UI_Init(&mut ctx, dc, arg0 != 0);
             0
         }
 
-        x if x == MpUiExport::UI_SHUTDOWN as c_int => {
+        MpUiExport::UI_SHUTDOWN => {
             _UI_Shutdown(&mut ctx, dc);
             0
         }
 
-        x if x == MpUiExport::UI_KEY_EVENT as c_int => {
+        MpUiExport::UI_KEY_EVENT => {
             _UI_KeyEvent(&mut ctx, dc, arg0, arg1 != 0);
             0
         }
 
-        x if x == MpUiExport::UI_MOUSE_EVENT as c_int => {
+        MpUiExport::UI_MOUSE_EVENT => {
             _UI_MouseEvent(&mut ctx, dc, arg0, arg1);
             0
         }
 
-        x if x == MpUiExport::UI_REFRESH as c_int => {
+        MpUiExport::UI_REFRESH => {
             _UI_Refresh(&mut ctx, dc, arg0);
             0
         }
 
-        x if x == MpUiExport::UI_IS_FULLSCREEN as c_int => _UI_IsFullscreen(ctx.world) as c_int,
+        MpUiExport::UI_IS_FULLSCREEN => _UI_IsFullscreen(ctx.world) as c_int,
 
-        x if x == MpUiExport::UI_SET_ACTIVE_MENU as c_int => {
+        MpUiExport::UI_SET_ACTIVE_MENU => {
             // PORT-NOTE: arg0 is a `uiMenuCommand_t` wire value; Raven passes
             // it through as the enum directly (the C switch's own arg has no
             // conversion). See escalations — a genuine `c_int -> uiMenuCommand_t`
@@ -13642,26 +13642,22 @@ pub fn vmMain(
             0
         }
 
-        x if x == MpUiExport::UI_CONSOLE_COMMAND as c_int => {
-            UI_ConsoleCommand(&mut ctx, dc, arg0) as c_int
-        }
+        MpUiExport::UI_CONSOLE_COMMAND => UI_ConsoleCommand(&mut ctx, dc, arg0) as c_int,
 
-        x if x == MpUiExport::UI_DRAW_CONNECT_SCREEN as c_int => {
+        MpUiExport::UI_DRAW_CONNECT_SCREEN => {
             UI_DrawConnectScreen(&mut ctx, dc, arg0 != 0);
             0
         }
 
         // UI_HASUNIQUECDKEY // mod authors need to observe this
-        x if x == MpUiExport::UI_HASUNIQUECDKEY as c_int => {
+        MpUiExport::UI_HASUNIQUECDKEY => {
             // bk010117 - change this to qfalse for mods!
             1
         }
 
-        x if x == MpUiExport::UI_MENU_RESET as c_int => {
+        MpUiExport::UI_MENU_RESET => {
             Menu_Reset(&mut ctx.world.menus);
             0
         }
-
-        _ => -1,
     }
 }
