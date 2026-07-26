@@ -5,10 +5,12 @@
 use std::ffi::CString;
 
 /// Decode a NUL-terminated (or full-length) byte buffer into an owned
-/// `String` (lossy) — the read twin of [`crate::q_strncpyz::Q_strncpyzBytes`].
+/// `String` — the read twin of [`crate::q_strncpyz::Q_strncpyzBytes`]. Decodes
+/// Latin-1 via [`latin1_to_string`], so every byte survives (C string data is
+/// bytes, not UTF-8); ASCII is unaffected.
 pub fn buf_to_string(buf: &[u8]) -> String {
     let end = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
-    String::from_utf8_lossy(&buf[..end]).into_owned()
+    latin1_to_string(&buf[..end])
 }
 
 /// NUL-terminated copy of `s` for a `const char *` argument.
@@ -18,10 +20,10 @@ pub fn cstr(s: &str) -> CString {
 
 /// Bijective Latin-1 decode of a wire/byte string into a `String`: every byte
 /// `b` becomes `char::from(b)` (U+0000..U+00FF), so all 256 byte values survive
-/// losslessly. This is the wire-string twin of [`buf_to_string`]'s lossy decode:
-/// use it wherever a byte string must stay byte-transparent (JKA chat/userinfo/
-/// configstrings carry non-ASCII escape bytes retail preserves verbatim), not
-/// where the bytes are genuinely UTF-8 text for display.
+/// losslessly. This is the decode for every game-domain byte string (chat/
+/// userinfo/configstrings, file tokens, enumerated filenames) — retail carries
+/// non-ASCII bytes verbatim, and a lossy UTF-8 decode would fold them all onto
+/// U+FFFD. Reserve `String::from_utf8*` for bytes that are genuinely UTF-8 text.
 pub fn latin1_to_string(bytes: &[u8]) -> String {
     bytes.iter().map(|&b| char::from(b)).collect()
 }
@@ -41,15 +43,15 @@ pub fn string_to_latin1(s: &str) -> Vec<u8> {
 /// Byte-truncating `Q_strncpyz` into an owned `String` — the migrated-field
 /// twin of [`crate::q_strncpyz::Q_strncpyz`] for struct fields that became
 /// `String`. Takes `src` up to its first NUL, keeps at most `destsize - 1`
-/// bytes (Raven's `sizeof(dest)` bound), and lossy-decodes. A zero `destsize`
-/// yields the empty string (Raven's `destsize < 1` is a `Com_Error`).
+/// bytes (Raven's `sizeof(dest)` bound), and Latin-1-decodes the result. A zero
+/// `destsize` yields the empty string (Raven's `destsize < 1` is a `Com_Error`).
 pub fn strncpyz_string(src: &[u8], destsize: usize) -> String {
     if destsize == 0 {
         return String::new();
     }
     let end = src.iter().position(|&b| b == 0).unwrap_or(src.len());
     let n = end.min(destsize - 1);
-    String::from_utf8_lossy(&src[..n]).into_owned()
+    latin1_to_string(&src[..n])
 }
 
 #[cfg(test)]

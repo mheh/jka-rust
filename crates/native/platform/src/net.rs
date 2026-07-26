@@ -17,6 +17,8 @@ use core::ffi::{c_char, c_int, c_void};
 use std::ffi::{CStr, CString};
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 
+use native_string::latin1_to_string;
+
 /// Raven `ip_socket` (unix) — the UDP socket fd; 0 until `NET_OpenIP` binds it.
 ///
 /// Source: `oracle/codemp/unix/unix_net.c:31`
@@ -237,7 +239,7 @@ pub fn sys_console_input() -> Option<String> {
 
     // text[len-1] = 0: rip off the '\n' and terminate.
     let line = &text[..(len as usize - 1)];
-    Some(String::from_utf8_lossy(line).into_owned())
+    Some(latin1_to_string(line))
 }
 
 /// Raven `MAX_IPS` — capacity of the local-interface address table.

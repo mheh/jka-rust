@@ -20,6 +20,7 @@ use std::ffi::CStr;
 use std::sync::OnceLock;
 
 use native_string::filter::Com_FilterPathBytes;
+use native_string::latin1_to_string;
 
 /// `MAX_FOUND_FILES` — Raven's stack list cap in `Sys_ListFiles`.
 /// Source: `oracle/codemp/unix/unix_shared.cpp:103`
@@ -150,7 +151,7 @@ unsafe fn Sys_ListFilteredFiles(
         if !Com_FilterPathBytes(filter.as_bytes(), &relname, false) {
             continue;
         }
-        list.push(String::from_utf8_lossy(&relname).into_owned());
+        list.push(latin1_to_string(&relname));
     }
 
     libc::closedir(fdir);
@@ -230,7 +231,7 @@ pub fn Sys_ListFiles(
             if list.len() == MAX_FOUND_FILES - 1 {
                 break;
             }
-            list.push(String::from_utf8_lossy(&dname).into_owned());
+            list.push(latin1_to_string(&dname));
         }
 
         libc::closedir(fdir);

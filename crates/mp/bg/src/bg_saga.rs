@@ -26,6 +26,7 @@ use crate::prelude::*;
 use mp_qshared::shared::q_string::Q_strcmp;
 use mp_qshared::shared::q_string::Q_stricmp;
 use native_string::atof::atof_bytes;
+use native_string::latin1_to_string;
 use native_string::{Q_stricmpBytes, Q_strncpyzBytes};
 // `strlen` resolves to `Q_strlen` (the `g_spawn.rs` precedent for aliasing the
 // libc name); `strcpy`/`strcat` are the file-local unchecked helpers below,
@@ -642,7 +643,7 @@ pub fn BG_SiegeGetValueGroup(buf: &str, group: &str) -> Option<String> {
                             }
                         }
 
-                        return Some(String::from_utf8_lossy(&out).into_owned());
+                        return Some(latin1_to_string(&out));
                     // we got it.
                     } else {
                         panic!("Error parsing group in file, unexpected EOF before opening bracket while looking for group");
@@ -860,7 +861,7 @@ pub fn BG_SiegeGetPairedValue(buf: &str, key: &str) -> Option<String> {
                                     }
                                 }
 
-                                return Some(String::from_utf8_lossy(&out).into_owned());
+                                return Some(latin1_to_string(&out));
                             // we got it.
                             } else {
                                 panic!(

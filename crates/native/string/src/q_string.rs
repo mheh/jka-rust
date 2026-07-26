@@ -7,6 +7,8 @@
 
 use core::ffi::{c_char, c_int};
 
+use crate::cstr::{latin1_to_string, string_to_latin1};
+
 /// One C-string byte as Raven's widened `int`: in-bounds bytes sign-extend
 /// (`char` is signed), the end of the slice reads as the NUL.
 fn c_at(s: &[u8], i: usize) -> c_int {
@@ -90,7 +92,7 @@ pub fn Q_CleanStr(string: &str) -> String {
         }
         i += 1;
     }
-    String::from_utf8_lossy(&out).into_owned()
+    latin1_to_string(&out)
 }
 
 /// Raven `Q_strncmp` over raw bytes.
@@ -176,16 +178,21 @@ pub fn Q_strcat(dest: &mut [c_char], size: usize, src: &str) {
 /// [`Q_strcat`] for locals that became `String`. Appends `src` after `dest`,
 /// keeping at most `size - 1` total bytes (Raven's `Q_strncpyz(dest+l1, src,
 /// size-l1)` bound); panics where Raven `Com_Error(ERR_FATAL, "Q_strcat: already
-/// overflowed")` fires. Byte-truncating, lossy-decoded on the appended slice.
+/// overflowed")` fires.
+///
+/// Lengths and the truncation are taken in the Latin-1 byte domain (one stored
+/// char = one C byte), so `strlen(dest)` and the copy bound match Raven's on a
+/// non-ASCII payload and the cut never lands inside a UTF-8 sequence.
 ///
 /// Source: `oracle/codemp/game/q_shared.c:929-937`
 pub fn strcat_string(dest: &mut String, size: usize, src: &str) {
-    let l1 = dest.len();
+    let l1 = dest.chars().count();
     if l1 >= size {
         panic!("Q_strcat: already overflowed");
     }
-    let n = src.as_bytes().len().min(size - l1 - 1);
-    dest.push_str(&String::from_utf8_lossy(&src.as_bytes()[..n]));
+    let src_bytes = string_to_latin1(src);
+    let n = src_bytes.len().min(size - l1 - 1);
+    dest.push_str(&latin1_to_string(&src_bytes[..n]));
 }
 
 #[cfg(test)]

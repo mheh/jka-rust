@@ -5,6 +5,7 @@
 //!
 //! Source: `oracle/codemp/game/q_shared.c:1057-1366`
 
+use crate::cstr::latin1_to_string;
 use crate::q_string::Q_stricmpBytes;
 
 /// Raven `MAX_INFO_STRING`.
@@ -70,7 +71,7 @@ pub fn Info_ValueForKey(s: &str, key: &str) -> String {
         let value = &b[vstart..p];
 
         if Q_stricmpBytes(key.as_bytes(), pkey) == 0 {
-            return String::from_utf8_lossy(value).into_owned();
+            return latin1_to_string(value);
         }
 
         if p >= b.len() {

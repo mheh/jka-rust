@@ -3,6 +3,7 @@
 
 use core::ffi::{c_char, c_int, CStr};
 
+use native_string::latin1_to_string;
 use native_string::Q_stricmpBytes;
 
 use crate::shared::limits::MAX_TOKEN_CHARS;
@@ -318,12 +319,12 @@ pub fn COM_Parse(data: &str, allowLineBreaks: bool) -> (String, &str) {
         i += 1;
         loop {
             if i >= n {
-                return (String::from_utf8_lossy(&token).into_owned(), "");
+                return (latin1_to_string(&token), "");
             }
             let ch = bytes[i];
             i += 1;
             if ch == b'"' || ch == 0 {
-                return (String::from_utf8_lossy(&token).into_owned(), &data[i..]);
+                return (latin1_to_string(&token), &data[i..]);
             }
             if token.len() < MAX_TOKEN_CHARS as usize {
                 token.push(ch);
@@ -344,7 +345,7 @@ pub fn COM_Parse(data: &str, allowLineBreaks: bool) -> (String, &str) {
     if token.len() == MAX_TOKEN_CHARS as usize {
         token.clear();
     }
-    (String::from_utf8_lossy(&token).into_owned(), &data[i..])
+    (latin1_to_string(&token), &data[i..])
 }
 
 /// Raven `SkipBracedSection` — native `&str` form: consume a balanced

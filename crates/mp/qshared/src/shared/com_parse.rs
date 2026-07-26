@@ -20,9 +20,9 @@
 //! bytes with signed-`char` math: the qshared golden fixture deliberately
 //! carries invalid-UTF-8 high bytes (`0x80`/`0xa0`/…) to pin exactly that rule,
 //! which a `&str` cannot hold without UB, and sanitizing them would silently
-//! gut the coverage. Parsed **tokens** come back as owned `String` (high bytes
-//! never enter a word token — they are whitespace — so the lossy decode is a
-//! no-op in practice), which is where consumers actually want text.
+//! gut the coverage. Parsed **tokens** come back as owned `String`, decoded
+//! Latin-1 (bijective byte↔char) so a high byte inside a quoted token survives
+//! verbatim; that is where consumers actually want text.
 //!
 //! Line counting is IDENTICAL to the pointer version (`COM_GetCurrentParseLine`
 //! numbers unchanged): `com_lines` increments only for `\n` skipped as leading
@@ -39,6 +39,7 @@
 use core::ffi::{c_char, c_int};
 
 use crate::shared::limits::MAX_TOKEN_CHARS;
+use native_string::latin1_to_string;
 use native_string::Q_strncpyzBytes;
 
 /// Raven's `q_shared.c` file-static parse/format state, moved into
@@ -180,18 +181,12 @@ pub fn COM_ParseExt<'a>(
         loop {
             if i >= n {
                 // `c = *data++` reads the terminating NUL => close.
-                return (
-                    String::from_utf8_lossy(&token).into_owned(),
-                    Some(&bytes[n..]),
-                );
+                return (latin1_to_string(&token), Some(&bytes[n..]));
             }
             let c = bytes[i];
             i += 1;
             if c == b'"' || c == 0 {
-                return (
-                    String::from_utf8_lossy(&token).into_owned(),
-                    Some(&bytes[i..]),
-                );
+                return (latin1_to_string(&token), Some(&bytes[i..]));
             }
             if token.len() < MAX_TOKEN_CHARS as usize {
                 token.push(c);
@@ -220,10 +215,7 @@ pub fn COM_ParseExt<'a>(
         token.clear();
     }
 
-    (
-        String::from_utf8_lossy(&token).into_owned(),
-        Some(&bytes[i..]),
-    )
+    (latin1_to_string(&token), Some(&bytes[i..]))
 }
 
 /// Raven `COM_ParseString`.

@@ -2,6 +2,8 @@
 //! component with no per-mode behavior, byte-identical MP/SP (DEC-32 twin
 //! hoist); both sides' `gp2` modules re-export from here.
 
+use crate::cstr::latin1_to_string;
+
 /// Raven `MAX_TOKEN_SIZE` — a token that fills the buffer is discarded as empty.
 /// Source: `oracle/codemp/qcommon/GenericParser2.cpp:12`
 /// Source: `oracle/code/game/genericparser2.cpp:21` (SP twin)
@@ -150,7 +152,7 @@ impl<'a> Tokenizer<'a> {
         }
         self.pos = Some(p);
 
-        String::from_utf8_lossy(&token).into_owned()
+        latin1_to_string(&token)
     }
 }
 
