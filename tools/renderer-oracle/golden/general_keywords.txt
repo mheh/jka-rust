@@ -1,0 +1,4234 @@
+=== textures/oracle_test/gen_cull_none ===
+name = "textures/oracle_test/gen_cull_none"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_TWO_SIDED(2)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1021 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_cull_twosided ===
+name = "textures/oracle_test/gen_cull_twosided"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_TWO_SIDED(2)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1022 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_cull_disable ===
+name = "textures/oracle_test/gen_cull_disable"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_TWO_SIDED(2)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1023 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_cull_back ===
+name = "textures/oracle_test/gen_cull_back"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_BACK_SIDED(1)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1024 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_cull_backside ===
+name = "textures/oracle_test/gen_cull_backside"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_BACK_SIDED(1)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1025 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_cull_backsided ===
+name = "textures/oracle_test/gen_cull_backsided"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_BACK_SIDED(1)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1026 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_cull_invalid ===
+name = "textures/oracle_test/gen_cull_invalid"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1027 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_cull_default ===
+name = "textures/oracle_test/gen_cull_default"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1028 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_sort_portal ===
+name = "textures/oracle_test/gen_sort_portal"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 1.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1029 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_sort_sky ===
+name = "textures/oracle_test/gen_sort_sky"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 2.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1030 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_sort_opaque ===
+name = "textures/oracle_test/gen_sort_opaque"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1031 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_sort_decal ===
+name = "textures/oracle_test/gen_sort_decal"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 4.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1032 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_sort_seethrough ===
+name = "textures/oracle_test/gen_sort_seethrough"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 5.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1033 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_sort_banner ===
+name = "textures/oracle_test/gen_sort_banner"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 6.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_NONE(0)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1034 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_sort_additive ===
+name = "textures/oracle_test/gen_sort_additive"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 15.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_NONE(0)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1035 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_sort_nearest ===
+name = "textures/oracle_test/gen_sort_nearest"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 21.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_NONE(0)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1036 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_sort_underwater ===
+name = "textures/oracle_test/gen_sort_underwater"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 13.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_NONE(0)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1037 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_sort_inside ===
+name = "textures/oracle_test/gen_sort_inside"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 7.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_NONE(0)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1038 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_sort_mid_inside ===
+name = "textures/oracle_test/gen_sort_mid_inside"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 8.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_NONE(0)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1039 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_sort_middle ===
+name = "textures/oracle_test/gen_sort_middle"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 9.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_NONE(0)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1040 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_sort_mid_outside ===
+name = "textures/oracle_test/gen_sort_mid_outside"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 10.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_NONE(0)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1041 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_sort_outside ===
+name = "textures/oracle_test/gen_sort_outside"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 11.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_NONE(0)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1042 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_sort_numeric ===
+name = "textures/oracle_test/gen_sort_numeric"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 7.500000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_NONE(0)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1043 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_portal ===
+name = "textures/oracle_test/gen_portal"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 1.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1044 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_skyparms_full ===
+name = "textures/oracle_test/gen_skyparms_full"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 12.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = { cloudHeight=512.000000 outerbox=[
+  [0]  outerbox = { name="textures/oracle_test/sky_rt" width=64 height=64 texnum=1045 mipmap=1 allowPicmip=1 wrapClampMode=10496 }
+  [1]  outerbox = { name="textures/oracle_test/sky_lf" width=64 height=64 texnum=1046 mipmap=1 allowPicmip=1 wrapClampMode=10496 }
+  [2]  outerbox = { name="textures/oracle_test/sky_bk" width=64 height=64 texnum=1047 mipmap=1 allowPicmip=1 wrapClampMode=10496 }
+  [3]  outerbox = { name="textures/oracle_test/sky_ft" width=64 height=64 texnum=1048 mipmap=1 allowPicmip=1 wrapClampMode=10496 }
+  [4]  outerbox = { name="textures/oracle_test/sky_up" width=64 height=64 texnum=1049 mipmap=1 allowPicmip=1 wrapClampMode=10496 }
+  [5]  outerbox = { name="textures/oracle_test/sky_dn" width=64 height=64 texnum=1050 mipmap=1 allowPicmip=1 wrapClampMode=10496 }
+] }
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_NONE(0)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 0
+
+=== textures/oracle_test/gen_skyparms_default_height ===
+name = "textures/oracle_test/gen_skyparms_default_height"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 12.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = { cloudHeight=512.000000 outerbox=[
+  [0]  outerbox = NULL
+  [1]  outerbox = NULL
+  [2]  outerbox = NULL
+  [3]  outerbox = NULL
+  [4]  outerbox = NULL
+  [5]  outerbox = NULL
+] }
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_NONE(0)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 0
+
+=== textures/oracle_test/gen_deform_wave ===
+name = "textures/oracle_test/gen_deform_wave"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 1
+ deform[0] = { deformation=DEFORM_WAVE(1) moveVector=(0.000000,0.000000,0.000000) deformationSpread=0.010000 bulgeWidth=0.000000 bulgeHeight=0.000000 bulgeSpeed=0.000000
+    deformationWave = { func=GF_SIN(1) base=0.100000 amplitude=0.200000 phase=0.300000 frequency=0.400000 }
+ }
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1051 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_deform_wave_zerodiv ===
+name = "textures/oracle_test/gen_deform_wave_zerodiv"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 1
+ deform[0] = { deformation=DEFORM_WAVE(1) moveVector=(0.000000,0.000000,0.000000) deformationSpread=100.000000 bulgeWidth=0.000000 bulgeHeight=0.000000 bulgeSpeed=0.000000
+    deformationWave = { func=GF_SIN(1) base=0.100000 amplitude=0.200000 phase=0.300000 frequency=0.400000 }
+ }
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1052 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_deform_normal ===
+name = "textures/oracle_test/gen_deform_normal"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 1
+ deform[0] = { deformation=DEFORM_NORMALS(2) moveVector=(0.000000,0.000000,0.000000) deformationSpread=0.000000 bulgeWidth=0.000000 bulgeHeight=0.000000 bulgeSpeed=0.000000
+    deformationWave = { func=GF_NONE(0) base=0.000000 amplitude=0.250000 phase=0.000000 frequency=1.500000 }
+ }
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1053 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_deform_move ===
+name = "textures/oracle_test/gen_deform_move"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 1
+ deform[0] = { deformation=DEFORM_MOVE(4) moveVector=(1.000000,2.000000,3.000000) deformationSpread=0.000000 bulgeWidth=0.000000 bulgeHeight=0.000000 bulgeSpeed=0.000000
+    deformationWave = { func=GF_TRIANGLE(3) base=0.100000 amplitude=0.200000 phase=0.300000 frequency=0.400000 }
+ }
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1054 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_deform_bulge ===
+name = "textures/oracle_test/gen_deform_bulge"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 1
+ deform[0] = { deformation=DEFORM_BULGE(3) moveVector=(0.000000,0.000000,0.000000) deformationSpread=0.000000 bulgeWidth=10.000000 bulgeHeight=20.000000 bulgeSpeed=30.000000
+    deformationWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+ }
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1055 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_deform_projectionshadow ===
+name = "textures/oracle_test/gen_deform_projectionshadow"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 1
+ deform[0] = { deformation=DEFORM_PROJECTION_SHADOW(5) moveVector=(0.000000,0.000000,0.000000) deformationSpread=0.000000 bulgeWidth=0.000000 bulgeHeight=0.000000 bulgeSpeed=0.000000
+    deformationWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+ }
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1056 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_deform_autosprite ===
+name = "textures/oracle_test/gen_deform_autosprite"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 1
+ deform[0] = { deformation=DEFORM_AUTOSPRITE(6) moveVector=(0.000000,0.000000,0.000000) deformationSpread=0.000000 bulgeWidth=0.000000 bulgeHeight=0.000000 bulgeSpeed=0.000000
+    deformationWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+ }
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1057 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_deform_autosprite2 ===
+name = "textures/oracle_test/gen_deform_autosprite2"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 1
+ deform[0] = { deformation=DEFORM_AUTOSPRITE2(7) moveVector=(0.000000,0.000000,0.000000) deformationSpread=0.000000 bulgeWidth=0.000000 bulgeHeight=0.000000 bulgeSpeed=0.000000
+    deformationWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+ }
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1058 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_deform_text3 ===
+name = "textures/oracle_test/gen_deform_text3"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 1
+ deform[0] = { deformation=DEFORM_TEXT3(11) moveVector=(0.000000,0.000000,0.000000) deformationSpread=0.000000 bulgeWidth=0.000000 bulgeHeight=0.000000 bulgeSpeed=0.000000
+    deformationWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+ }
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1059 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_deform_text_clamped ===
+name = "textures/oracle_test/gen_deform_text_clamped"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 1
+ deform[0] = { deformation=DEFORM_TEXT0(8) moveVector=(0.000000,0.000000,0.000000) deformationSpread=0.000000 bulgeWidth=0.000000 bulgeHeight=0.000000 bulgeSpeed=0.000000
+    deformationWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+ }
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1060 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_deform_unknown ===
+name = "textures/oracle_test/gen_deform_unknown"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 1
+ deform[0] = { deformation=DEFORM_NONE(0) moveVector=(0.000000,0.000000,0.000000) deformationSpread=0.000000 bulgeWidth=0.000000 bulgeHeight=0.000000 bulgeSpeed=0.000000
+    deformationWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+ }
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1061 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_deform_overflow ===
+name = "textures/oracle_test/gen_deform_overflow"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 12.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 1
+explicitlyDefined = 0
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_NONE(0)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 3
+ deform[0] = { deformation=DEFORM_AUTOSPRITE(6) moveVector=(0.000000,0.000000,0.000000) deformationSpread=0.000000 bulgeWidth=0.000000 bulgeHeight=0.000000 bulgeSpeed=0.000000
+    deformationWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+ }
+ deform[1] = { deformation=DEFORM_AUTOSPRITE2(7) moveVector=(0.000000,0.000000,0.000000) deformationSpread=0.000000 bulgeWidth=0.000000 bulgeHeight=0.000000 bulgeSpeed=0.000000
+    deformationWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+ }
+ deform[2] = { deformation=DEFORM_PROJECTION_SHADOW(5) moveVector=(0.000000,0.000000,0.000000) deformationSpread=0.000000 bulgeWidth=0.000000 bulgeHeight=0.000000 bulgeSpeed=0.000000
+    deformationWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+ }
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 0
+
+=== textures/oracle_test/gen_nomipmaps ===
+name = "textures/oracle_test/gen_nomipmaps"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 1
+noPicMip = 1
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1062 mipmap=0 allowPicmip=0 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_nopicmip ===
+name = "textures/oracle_test/gen_nopicmip"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 1
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1063 mipmap=1 allowPicmip=0 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_noglfog ===
+name = "textures/oracle_test/gen_noglfog"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1064 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_polygonoffset ===
+name = "textures/oracle_test/gen_polygonoffset"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 4.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 1
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1065 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_notc ===
+name = "textures/oracle_test/gen_notc"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 1
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1066 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_entitymergable ===
+name = "textures/oracle_test/gen_entitymergable"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 1
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1067 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_light ===
+name = "textures/oracle_test/gen_light"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1068 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_clamptime ===
+name = "textures/oracle_test/gen_clamptime"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 500.500000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1069 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_fogparms ===
+name = "textures/oracle_test/gen_fogparms"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = { color=(0.250000,0.500000,0.750000) depthForOpaque=128.500000 }
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1070 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_material ===
+name = "textures/oracle_test/gen_material"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000003
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1071 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_q3map_material ===
+name = "textures/oracle_test/gen_q3map_material"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x0000000a
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1072 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_sun ===
+name = "textures/oracle_test/gen_sun"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1073 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_surfacelight ===
+name = "textures/oracle_test/gen_surfacelight"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1074 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_lightcolor ===
+name = "textures/oracle_test/gen_lightcolor"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1075 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_tesssize ===
+name = "textures/oracle_test/gen_tesssize"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1076 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_q3map_catchall ===
+name = "textures/oracle_test/gen_q3map_catchall"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1077 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_qer_catchall ===
+name = "textures/oracle_test/gen_qer_catchall"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1078 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_surfaceparm_nonsolid ===
+name = "textures/oracle_test/gen_surfaceparm_nonsolid"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008000
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1079 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_surfaceparm_water ===
+name = "textures/oracle_test/gen_surfaceparm_water"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008004
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1080 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_surfaceparm_trigger ===
+name = "textures/oracle_test/gen_surfaceparm_trigger"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00000400
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1081 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_surfaceparm_sky ===
+name = "textures/oracle_test/gen_surfaceparm_sky"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00002000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1082 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_surfaceparm_slick ===
+name = "textures/oracle_test/gen_surfaceparm_slick"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00004000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1083 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_surfaceparm_nodraw ===
+name = "textures/oracle_test/gen_surfaceparm_nodraw"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00200000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1084 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_surfaceparm_trans ===
+name = "textures/oracle_test/gen_surfaceparm_trans"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x80008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1085 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_surfaceparm_detail ===
+name = "textures/oracle_test/gen_surfaceparm_detail"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x08008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1086 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_surfaceparm_unknown ===
+name = "textures/oracle_test/gen_surfaceparm_unknown"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 3.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_EQUAL(1)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 1
+ stage[0]:
+  active = 1
+  isDetail = 0
+  index = 0
+  lightmapStyle = 0
+  bundle[0]:
+  image = { name="textures/oracle_test/flat" width=64 height=64 texnum=1087 mipmap=1 allowPicmip=1 wrapClampMode=10497 }
+    tcGen = TCGEN_TEXTURE(6)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+  bundle[1]:
+  image = NULL
+    tcGen = TCGEN_BAD(0)
+    numTexMods = 0
+    numImageAnimations = 0
+    imageAnimationSpeed = 0.000000
+    isLightmap = 0
+    oneShotAnimMap = 0
+    vertexLightmap = 0
+    isVideoMap = 0
+    videoMapHandle = 0
+    rgbWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    rgbGen = CGEN_IDENTITY(2)
+    alphaWave = { func=GF_NONE(0) base=0.000000 amplitude=0.000000 phase=0.000000 frequency=0.000000 }
+    alphaGen = AGEN_SKIP(1)
+  constantColor = [0,0,0,0]
+  stateBits = 0x00000100
+  adjustColorsForFog = ACFF_NONE(0)
+  mGLFogColorOverride = GLFOGOVERRIDE_NONE(0)
+  ss = NULL
+  glow = 0
+
+=== textures/oracle_test/gen_sky_zero_stages ===
+name = "textures/oracle_test/gen_sky_zero_stages"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 12.000000
+surfaceFlags = 0x00002000
+contentFlags = 0x00008001
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = { cloudHeight=640.000000 outerbox=[
+  [0]  outerbox = { name="textures/oracle_test/sky_rt" width=64 height=64 texnum=1088 mipmap=1 allowPicmip=1 wrapClampMode=10496 }
+  [1]  outerbox = { name="textures/oracle_test/sky_lf" width=64 height=64 texnum=1089 mipmap=1 allowPicmip=1 wrapClampMode=10496 }
+  [2]  outerbox = { name="textures/oracle_test/sky_bk" width=64 height=64 texnum=1090 mipmap=1 allowPicmip=1 wrapClampMode=10496 }
+  [3]  outerbox = { name="textures/oracle_test/sky_ft" width=64 height=64 texnum=1091 mipmap=1 allowPicmip=1 wrapClampMode=10496 }
+  [4]  outerbox = { name="textures/oracle_test/sky_up" width=64 height=64 texnum=1092 mipmap=1 allowPicmip=1 wrapClampMode=10496 }
+  [5]  outerbox = { name="textures/oracle_test/sky_dn" width=64 height=64 texnum=1093 mipmap=1 allowPicmip=1 wrapClampMode=10496 }
+] }
+fogParms = NULL
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 1
+noPicMip = 1
+noTC = 0
+fogPass = FP_NONE(0)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 0
+
+=== textures/oracle_test/gen_fog_zero_stages ===
+name = "textures/oracle_test/gen_fog_zero_stages"
+lightmapIndex = [-1,-1,-1,-1]
+styles = [0,255,255,255]
+sort = 12.000000
+surfaceFlags = 0x00000000
+contentFlags = 0x00008008
+defaultShader = 0
+explicitlyDefined = 1
+entityMergable = 0
+isBumpMap = 0
+sky = NULL
+fogParms = { color=(0.100000,0.100000,0.200000) depthForOpaque=256.000000 }
+portalRange = 0.000000
+multitextureEnv = 0x0
+cullType = CT_FRONT_SIDED(0)
+polygonOffset = 0
+noMipMaps = 0
+noPicMip = 0
+noTC = 0
+fogPass = FP_LE(2)
+bumpVector = (0.000000,0.000000,0.000000)
+numDeforms = 0
+clampTime = 0.000000
+timeOffset = 0.000000
+hasGlow = 0
+remappedShader = NULL
+numUnfoggedPasses = 0
+

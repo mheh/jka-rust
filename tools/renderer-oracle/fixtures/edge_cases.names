@@ -1,0 +1,6 @@
+textures/oracle_test/edge_unknown_general_keyword
+textures/oracle_test/edge_unknown_stage_keyword
+textures/oracle_test/edge_empty_stage
+textures/oracle_test/edge_tcmod_overflow
+textures/oracle_test/edge_truncated_stage
+textures/oracle_test/edge_name_not_in_shader_text
