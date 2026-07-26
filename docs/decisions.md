@@ -941,3 +941,32 @@ Three user rulings from the U5 one-by-one sit-down:
    class-determination block branches on the bool. Closes the divergence
    activated by the ui implementors (87abf20a review finding 12; task #36).
 
+## DEC-39 — post-parity comment sweep: Raven-verbatim + cites, two-pass shape (2026-07-26)
+
+User ruling. Timing: **post-parity in all modules** (after jampgame + engine +
+ui + cgame + renderer are done) — not before, because in-flight waves keep
+producing comments in the current house style and the port tooling/review loop
+still consumes the doc comments until then.
+
+1. **Pass 1 — strip to Raven-verbatim + cites.** Deletion-heavy sweep of every
+   crate: port-added explanatory prose is removed except where the code is
+   genuinely hard to follow (short, load-bearing notes only); PORT-NOTE
+   scaffolds deleted (per the standing comment policy). What stays, exactly:
+   - **Raven comments, verbatim** — including the entity `QUAKED`/spawnflag
+     documentation blocks with their original Raven formatting preserved
+     character-for-character (user: "the raven formatting for the entities
+     where we see what the spawnflags mean").
+   - **`Source:` cites** — retained; they are load-bearing infrastructure
+     (badge/assert tooling greps them, oracle review navigates by them, the
+     SP-as-diff port depends on them). May be compressed to a bare
+     `// codemp/...:<line>` form.
+   - Safety-invariant comments on `unsafe`, and the layout-assert blocks.
+2. **Pass 2 — optional organic-style rewrite** (the "reads like a real team
+   wrote it" pass): style details deferred to a sit-down when pass 1 is
+   reached — not designed now (user: "when it comes to it, we'll figure that
+   out").
+3. **Mechanical gate for both passes:** comments-only — strip comments from
+   both sides of every file diff and require byte-identical token streams; any
+   worker that touched code is auto-rejected. `cargo build --workspace` green;
+   referee run as belt-and-suspenders though comments cannot affect it.
+
