@@ -20,12 +20,15 @@ slicing, threading digests, LAW call surface, oracle slices) are exactly right.
 `enginepackets.py` is therefore left BYTE-UNTOUCHED — its output is a frozen
 record of the engine port.
 
-The carrier vocabulary is `docs/subsystems/renderer-r2-design.md` (FROZEN) and
-NOTHING ELSE. A Raven global this generator cannot map from that document's
-`## State ownership` / `### A1 disposition table` / `### FrameData` /
-`## Decisions` rows is emitted as **UNMAPPED — escalate**, in the packet and in
-`out/renderer/state-home-report.md`, for the user's ruling. The generator never
-invents a carrier.
+The carrier vocabulary is `docs/subsystems/renderer-r2-design.md` (FROZEN) PLUS
+`docs/decisions.md` DEC-37 Addenda A13 (2026-07-26) and NOTHING ELSE. The R2
+doc's `## State ownership` / `### A1 disposition table` / `### FrameData` /
+`## Decisions` rows home 31 named globals; Addenda A13 ruled the remaining 336
+the R2 doc left UNMAPPED as five closed families (cvars, GL/WGL pointers,
+TU-local file statics, tr_shader.cpp parse state, dropped Ghoul2 timers) — see
+`state_home()`. A Raven global neither vocabulary can map is emitted as
+**UNMAPPED — escalate**, in the packet and in `out/renderer/state-home-report
+.md`, for the user's ruling. The generator never invents a carrier.
 
 Output (out/renderer/):
   packets/_PREAMBLE.md      shared conventions handed to every porter alongside
@@ -38,14 +41,14 @@ Output (out/renderer/):
                             all sliced VERBATIM, never retyped.
   packets/<stem>.wave<N>[.shard<K>].md
                             one packet per (wave, file[, shard]): interior-safety
-                            banner, per-fn threading digest with the R2 state
+                            banner, per-fn threading digest with the R2/A13 state
                             home of every global/static touched, verbatim oracle
                             source, and the resolved (LAW) call surface.
   packets-manifest.json     every packet + every fn -> its packet, plus the
                             machine-check block.
-  state-home-report.md      the implemented state-home mapping table + the
-                            UNMAPPED families (user-ruling queue) + the
-                            fn-scope-static census.
+  state-home-report.md      the implemented state-home mapping table (R2 doc +
+                            DEC-37 Addenda A13 ruling) + any UNMAPPED residue +
+                            the fn-scope-static census.
 
 Usage:
   python3 rendererpackets.py                 # all 14 waves
@@ -361,18 +364,25 @@ def registration_hint(name):
     return None
 
 
-# --- UNMAPPED family keys (report grouping only — never a carrier) -----------
+# --- ruled family keys (report grouping only — never a carrier) --------------
 CVAR_TYPE = re.compile(r"\bcvar_t\s*\*")
 GL_PTR = re.compile(r"^(qgl|qwgl)")
 
 
-def family_of(g):
-    """Report-grouping key for an UNMAPPED global (NOT a carrier)."""
+def ruling_family_of(g):
+    """Report-grouping key for a DEC-37 Addenda A13-ruled global (mapped, not
+    a carrier — the carrier text lives in `state_home()`)."""
     if GL_PTR.match(g["name"]):
-        return "GL/WGL entry-point function pointers (qgl*/qwgl*)"
+        return "A13.2 — GL/WGL entry-point pointers (`qgl*`/`qwgl*`)"
     if CVAR_TYPE.search(g["type"]):
-        return "cvar handles (`cvar_t *`)"
-    return f"`{g['file']}` file-scope state"
+        return "A13.1 — renderer cvars (`cvar_t *`)"
+    if G2_PERF_RE.match(g["name"]):
+        return "A13.5 — Ghoul2 profiling timers (DROPPED)"
+    if g["file"] == "tr_shader.cpp" and g["name"] in SHADER_PARSE_LOCALS:
+        return "A13.4 — tr_shader.cpp parse scratch (`ShaderParseState`)"
+    if g["file"] == "tr_shader.cpp" and g["name"] in SHADER_TEXT_CACHE:
+        return "A13.4 — tr_shader.cpp shader-text cache (`RenderAssets`)"
+    return f"A13.3 — `{g['file']}` file-scope state"
 
 
 OUTSIDE = (
@@ -388,18 +398,73 @@ EXTERN_TU = (
     "never a new renderer field — confirm the owner at port time.")
 OUTSIDE_BASIS = "outside R2's scope (not a renderer-owned global)"
 
+# =============================================================================
+# DEC-37 Addenda A13 (2026-07-26, R3-prep state-home sit-down) — `docs/
+# decisions.md` "Addenda A13". The R2 doc (above) froze the root types but
+# homed only the globals its own tables name; the packet generator's UNMAPPED
+# report (336 globals) was ruled as five families, one-by-one. These are RULED
+# carriers, not R2-doc rows — cited `DEC-37 A13.<n>`, never `R2 ...`.
+# =============================================================================
+G2_PERF_RE = re.compile(r"^(G2PerformanceCounter_|G2PerformanceTimer_|G2Time_)")
+
+# A13.4: tr_shader.cpp parse scratch -> a `ShaderParseState` LOCAL (alive one
+# parse, never stored) vs. the shader-text cache -> `RenderAssets` fields
+# beside `shader_lookup`. Every other tr_shader.cpp static (infoParms,
+# materialNames, stylesDefault, the lightmaps* arrays, g_strGlow*ShaderARB)
+# falls to the A13.3 blanket rule below (const tables -> `const`).
+SHADER_PARSE_LOCALS = {"shader", "stages", "texMods", "collapse"}
+SHADER_TEXT_CACHE = {"s_shaderText", "shaderTextHashTable", "deferLoad"}
+
+RENDERER_CVARS = (
+    "`RendererCvars` — one owned struct, one field per cvar, registered in "
+    "`R_Register` and threaded as a carrier (the engine-island `EngineCvars` "
+    "precedent); reads go through the engine cvar table live")
+GL_ENTRY_DEFERRED = (
+    "**DEFERRED: R4** — no R3 home; `qgl*`/`qwgl*` dissolve into the R4 wgpu "
+    "rewrite (DEC-01). Backend fns' GL calls carry a `// DEFERRED: R4` cite; "
+    "a frontend fn must never grow a GL dependency")
+A13_3_STATIC = (
+    "per-subsystem owned state struct, NAMED BY THIS WAVE if this file's "
+    "wave is where the subsystem lands (§B3/B6, DEC-37 A13.3): sim-side or "
+    "render-side per where the subsystem executes; genuinely-const tables → "
+    "`const`; init-once tables → fields filled at subsystem init; a static "
+    "crossing the sim/render boundary ESCALATES")
+SHADER_PARSE_STATE = (
+    "`ShaderParseState` — a LOCAL threaded through the `ParseShader` call "
+    "chain, alive for one parse only, never stored state")
+SHADER_TEXT_CACHE_HOME = (
+    "`RenderAssets` — shader-text cache fields beside the ruled "
+    "`shader_lookup` (`s_shaderText`/`shaderTextHashTable`/`deferLoad`)")
+G2_TIMER_DROPPED = (
+    "**DROPPED** — `G2_PERFORMANCE_ANALYSIS` is compiled only `#ifndef "
+    "FINAL_BUILD` (`oracle/codemp/game/q_shared.h:44-46`); retail compiles "
+    "the timers and their call sites out. Do NOT transcribe this touch — "
+    "record the drop in a module-doc note (§20 dead surface).")
+
+A13_1_BASIS = "DEC-37 A13.1"
+A13_2_BASIS = "DEC-37 A13.2 (RULED — no longer an escalation)"
+A13_3_BASIS = "DEC-37 A13.3"
+A13_4_BASIS = "DEC-37 A13.4"
+A13_5_BASIS = "DEC-37 A13.5"
+
 
 def state_home(name, file, decl_files=(), defined=frozenset(),
-               census=frozenset()):
-    """(carrier, basis) for one Raven global, or None -> UNMAPPED.
+               census=frozenset(), types=None):
+    """(carrier, basis) for one Raven global — every renderer global now
+    resolves to one (DEC-37 Addenda A13 closed the UNMAPPED queue: all 336
+    globals it left open are ruled as five families below).
 
     Looked up by the global's DECLARING oracle file first (from the manifest's
     `globals` census — a body may read a global declared in another TU), then by
-    the touching file, then by the unambiguous by-name rows. Two mechanical
-    non-renderer verdicts run last, before UNMAPPED: a name absent from the
-    renderer census is declared outside the renderer TU set entirely, and a name
-    present but never DEFINED there is an `extern` whose owner is another
-    subsystem — neither is renderer state R2 could have homed."""
+    the touching file, then by the unambiguous by-name rows (R2-doc rows, all
+    of the above). Two mechanical non-renderer verdicts run next: a name absent
+    from the renderer census is declared outside the renderer TU set entirely,
+    and a name present but never DEFINED there is an `extern` whose owner is
+    another subsystem — neither is renderer state R2 could have homed. What's
+    left is exactly DEC-37 Addenda A13's five ruled families, tried in the
+    order the addendum lists them (cvars, GL/WGL pointers, dropped Ghoul2
+    timers, tr_shader.cpp parse state, the TU-local-static blanket rule)."""
+    types = types or {}
     for df in decl_files:
         r = EXACT.get((df, name))
         if r:
@@ -414,13 +479,27 @@ def state_home(name, file, decl_files=(), defined=frozenset(),
         return (OUTSIDE, OUTSIDE_BASIS)
     if defined and name in census and name not in defined:
         return (EXTERN_TU, OUTSIDE_BASIS)
-    return None
+    # DEC-37 Addenda A13 — the five ruled families, exhaustive over what's left.
+    if CVAR_TYPE.search(types.get(name, "")):
+        return (RENDERER_CVARS, A13_1_BASIS)
+    if GL_PTR.match(name):
+        return (GL_ENTRY_DEFERRED, A13_2_BASIS)
+    if G2_PERF_RE.match(name):
+        return (G2_TIMER_DROPPED, A13_5_BASIS)
+    if file == "tr_shader.cpp" and name in SHADER_PARSE_LOCALS:
+        return (SHADER_PARSE_STATE, A13_4_BASIS)
+    if file == "tr_shader.cpp" and name in SHADER_TEXT_CACHE:
+        return (SHADER_TEXT_CACHE_HOME, A13_4_BASIS)
+    return (A13_3_STATIC, A13_3_BASIS)
 
 
 _SHORT = [
     ("**SPLIT**", "SPLIT (`RenderAssets` + `FrameState`)"),
     ("**DISSOLVED**", "DISSOLVED"),
     ("**DEAD**", "DEAD"),
+    ("**DROPPED**", "DROPPED (A13.5, dead surface)"),
+    ("**DEFERRED: R4**", "DEFERRED: R4 (GL/WGL — A13.2)"),
+    ("per-subsystem owned state struct", "per-subsystem state struct (A13.3)"),
     ("**NOT renderer state**", "engine-owned (outside the renderer)"),
     ("**NOT this TU's state**", "extern, owned elsewhere"),
     ("the **`FrameData`", "`FrameData` under construction"),
@@ -703,9 +782,14 @@ def render_preamble(law):
              "the headless model/collision subset, and content semantics are "
              "fixed; the renderer interior is an idiomatic §F rewrite.")
     o.append("- **A state home this packet marks UNMAPPED is an ESCALATION, "
-             "never an invention.** R2 is the only carrier vocabulary; if the "
-             "global you need has no R2 row, leave a cited `// DEFERRED:` and "
-             "raise it — do NOT create a field, a `static`, or a `lazy_static`.")
+             "never an invention.** R2 (`docs/subsystems/renderer-r2-design"
+             ".md`) plus `docs/decisions.md` DEC-37 Addenda A13 is the "
+             "complete carrier vocabulary — A13 closed the UNMAPPED queue "
+             "R2 left open (cvars, GL/WGL pointers, TU-local file statics, "
+             "tr_shader.cpp parse state, dropped Ghoul2 timers). If the "
+             "global you need still has no row in either, leave a cited "
+             "`// DEFERRED:` and raise it — do NOT create a field, a "
+             "`static`, or a `lazy_static`.")
     o.append("- **Never re-port an already-ported fn.** The headless island "
              "(`crates/mp/renderer/src/tr_model`, `tr_local`, `tr_public`) is "
              "live jampded code; packets flag every fn whose name already "
@@ -747,7 +831,7 @@ def render_preamble(law):
 
 def render_packet(cfile, wave, units, shard, n_shards, law_sigs, inmod_sig,
                   wave_of, ported, dirs, unmapped_sink, decl_of, defined,
-                  census):
+                  census, types):
     chunk = [f for u in units for f in u]
     own = {f["name"] for f in chunk}
     dest, escaped = destination(cfile, dirs)
@@ -810,7 +894,7 @@ def render_packet(cfile, wave, units, shard, n_shards, law_sigs, inmod_sig,
         for acc, key in (("read", "globals_read"), ("write", "globals_write")):
             for g in f[key]:
                 home = state_home(g["name"], cfile, decl_of.get(g["name"], ()),
-                                  defined, census)
+                                  defined, census, types)
                 if home is None:
                     unmapped_rows.append((f["name"], g["name"], acc, g["cite"]))
                     unmapped_sink.append((g["name"], cfile, f["name"], acc))
@@ -877,7 +961,7 @@ def render_packet(cfile, wave, units, shard, n_shards, law_sigs, inmod_sig,
         gwrites = [g for g in gwrites if not GL_PTR.match(g)]
         homes = []
         for g in dict.fromkeys(greads + gwrites):
-            h = state_home(g, cfile, decl_of.get(g, ()), defined, census)
+            h = state_home(g, cfile, decl_of.get(g, ()), defined, census, types)
             homes.append(short_home(h[0]) if h else "**UNMAPPED**")
         chans = []
         if homes:
@@ -1050,42 +1134,60 @@ def render_packet(cfile, wave, units, shard, n_shards, law_sigs, inmod_sig,
 
 # ---------------------------------------------------------------- report
 def render_report(globals_by_name, unmapped_hits, statics, fn_count,
-                  wave_hist, packets, decl_of, defined, census):
-    mapped, unmapped, outside = [], [], []
+                  wave_hist, packets, decl_of, defined, census, types):
+    mapped_r2, mapped_ruling, unmapped, outside = [], [], [], []
     for g in sorted(globals_by_name.values(), key=lambda g: (g["file"], g["name"])):
         home = state_home(g["name"], g["file"], decl_of.get(g["name"], ()),
-                          defined, census)
+                          defined, census, types)
         if home is None:
             unmapped.append((g, home))
         elif home[1] == OUTSIDE_BASIS:
             outside.append((g, home))
+        elif home[1].startswith("DEC-37 A13"):
+            mapped_ruling.append((g, home))
         else:
-            mapped.append((g, home))
+            mapped_r2.append((g, home))
     touch = Counter(n for n, _f, _fn, _a in unmapped_hits)
 
+    n_cvar = sum(1 for g, _ in mapped_ruling if CVAR_TYPE.search(g["type"]))
+    n_gl = sum(1 for g, _ in mapped_ruling if GL_PTR.match(g["name"]))
+    n_g2 = sum(1 for g, _ in mapped_ruling if G2_PERF_RE.match(g["name"]))
+    n_shader_a13_4 = sum(1 for g, _ in mapped_ruling
+                        if g["file"] == "tr_shader.cpp"
+                        and (g["name"] in SHADER_PARSE_LOCALS
+                             or g["name"] in SHADER_TEXT_CACHE))
+    n_a13_3 = len(mapped_ruling) - n_cvar - n_gl - n_g2 - n_shader_a13_4
+
     o = []
-    o.append("# Renderer R3 packets — state-home mapping + UNMAPPED report")
+    o.append("# Renderer R3 packets — state-home mapping report")
     o.append("")
     o.append("Generated by `tools/closure-prototype/rendererpackets.py`. The "
              "carrier vocabulary is `docs/subsystems/renderer-r2-design.md` "
-             "(FROZEN, 2026-07-26) and nothing else — every mapped row cites "
-             "the R2 row it transcribes; every unmapped family is a **user "
-             "ruling item**, never a generator guess.")
+             "(FROZEN, 2026-07-26) **plus** `docs/decisions.md` DEC-37 "
+             "Addenda A13 (2026-07-26) — every R2-mapped row cites the R2 "
+             "row it transcribes; every ruled row cites the `A13.<n>` item "
+             "that homes it. Nothing here is a generator guess: A13 closed "
+             "the UNMAPPED queue this report used to carry, so every "
+             "renderer global now resolves to a carrier.")
     o.append("")
     o.append(f"- renderer fns: **{fn_count}**  ·  file-scope globals: "
              f"**{len(globals_by_name)}**  ·  fn-scope statics: "
              f"**{len(statics)}**")
-    o.append(f"- globals MAPPED to an R2 carrier: **{len(mapped)}**  ·  "
-             f"not renderer state (`extern`/outside the TU set): "
+    o.append(f"- globals mapped by the R2 doc: **{len(mapped_r2)}**  ·  "
+             f"mapped by DEC-37 Addenda A13 ruling: **{len(mapped_ruling)}** "
+             f"(A13.1 cvars: {n_cvar}, A13.2 GL/WGL pointers: {n_gl}, A13.3 "
+             f"TU-local file statics: {n_a13_3}, A13.4 tr_shader.cpp parse "
+             f"state: {n_shader_a13_4}, A13.5 dropped Ghoul2 timers: {n_g2})  "
+             f"·  not renderer state (`extern`/outside the TU set): "
              f"**{len(outside)}**  ·  UNMAPPED: **{len(unmapped)}**")
     o.append(f"- packets emitted: **{len(packets)}** over waves "
              + ", ".join(f"{w}({n})" for w, n in sorted(wave_hist.items())))
     o.append("")
-    o.append("## Mapped — implemented state-home table")
+    o.append("## Mapped — implemented state-home table (R2 doc)")
     o.append("")
     o.append("| Raven global | oracle file | C type | R2 carrier | basis |")
     o.append("| --- | --- | --- | --- | --- |")
-    for g, home in mapped:
+    for g, home in mapped_r2:
         o.append(f"| `{g['name']}` | `{g['file']}` | `{g['type']}` | "
                  f"{home[0]} | {home[1]} |")
     o.append("")
@@ -1112,30 +1214,35 @@ def render_report(globals_by_name, unmapped_hits, statics, fn_count,
              else "declared outside the renderer TU set")
         o.append(f"| `{g['name']}` | `{g['file']}` | `{g['type']}` | {v} |")
     o.append("")
-    o.append("## UNMAPPED — queued for user ruling")
+    o.append("## Mapped by ruling — DEC-37 Addenda A13")
     o.append("")
-    o.append("R2 froze the root types but homes only the globals its "
+    o.append("R2 froze the root types but homed only the globals its "
              "`## State ownership` / `### FrameData` / A1 rows name. The "
-             "families below have NO R2 carrier. Packets mark every touch "
-             "`UNMAPPED — escalate`; a wave cannot fold them into a struct "
-             "until they are ruled. Grouped by family, with the number of "
-             "packet-level touches (fn × access) each takes in the current "
-             "wave set.")
+             "336 globals that left UNMAPPED were ruled, family-by-family, "
+             "in `docs/decisions.md` DEC-37 Addenda A13 (2026-07-26) — none "
+             "of them is an escalation anymore. Each family's carrier + "
+             "basis is stated once; every packet threads the touch to it "
+             "directly (its STATE HOMES table carries the per-fn row).")
     o.append("")
     fams = defaultdict(list)
-    for g, _ in unmapped:
-        fams[family_of(g)].append(g)
-    for fam in sorted(fams, key=lambda k: -len(fams[k])):
+    for g, _home in mapped_ruling:
+        fams[ruling_family_of(g)].append(g)
+    for fam in sorted(fams):
         gs = sorted(fams[fam], key=lambda g: g["name"])
-        hits = sum(touch.get(g["name"], 0) for g in gs)
-        o.append(f"### {fam} — {len(gs)} global(s), {hits} touch(es)")
+        rep = gs[0]
+        home = state_home(rep["name"], rep["file"], decl_of.get(rep["name"], ()),
+                          defined, census, types)
+        o.append(f"### {fam} — {len(gs)} global(s)")
         o.append("")
-        o.append("| global | file | C type | static | touches |")
-        o.append("| --- | --- | --- | --- | ---: |")
+        o.append(f"**Carrier:** {home[0]}")
+        o.append("")
+        o.append(f"**Basis:** {home[1]}")
+        o.append("")
+        o.append("| global | file | C type | static |")
+        o.append("| --- | --- | --- | --- |")
         for g in gs:
             o.append(f"| `{g['name']}` | `{g['file']}` | `{g['type']}` | "
-                     f"{'yes' if g['static'] else 'no'} | "
-                     f"{touch.get(g['name'], 0)} |")
+                     f"{'yes' if g['static'] else 'no'} |")
         o.append("")
     o.append("## Fn-scope statics (49) — no R2 carrier by construction")
     o.append("")
@@ -1150,7 +1257,7 @@ def render_report(globals_by_name, unmapped_hits, statics, fn_count,
         o.append(f"| `{s['fn']}` | `{s['file']}` | `{s['name']}` | "
                  f"`{s['type']}` |")
     o.append("")
-    return "\n".join(o), mapped, unmapped, outside
+    return "\n".join(o), mapped_r2, mapped_ruling, unmapped, outside
 
 
 # ------------------------------------------------------------------- main
@@ -1180,11 +1287,13 @@ def main():
     # global name -> the oracle file(s) that DECLARE it (manifest globals census)
     decl_of = defaultdict(list)
     census, defined = set(), set()
+    types = {}
     for g in manifest["globals"]:
         decl_of[g["name"]].append(g["file"])
         census.add(g["name"])
         if not g["extern"]:
             defined.add(g["name"])
+        types.setdefault(g["name"], g["type"])
 
     # already-ported names (renderer crate only — the live headless subset)
     ported = {}
@@ -1223,7 +1332,8 @@ def main():
             shard = (si + 1) if n > 1 else None
             text = render_packet(cfile, wave, chunk_units, shard, n, law_sigs,
                                  inmod_sig, wave_of, ported, dirs,
-                                 unmapped_hits, decl_of, defined, census)
+                                 unmapped_hits, decl_of, defined, census,
+                                 types)
             base = re.sub(r"\.(cpp|c)$", "", cfile)
             fname = (f"{base}.wave{wave}"
                      + (f".shard{shard}" if shard else "") + ".md")
@@ -1243,9 +1353,9 @@ def main():
                 **({"shard": shard, "shards_total": n} if shard else {})})
 
     globals_by_name = {(g["file"], g["name"]): g for g in manifest["globals"]}
-    report, mapped, unmapped, outside = render_report(
+    report, mapped, mapped_ruling, unmapped, outside = render_report(
         globals_by_name, unmapped_hits, manifest["statics_census"], len(funcs),
-        wave_hist, man, decl_of, defined, census)
+        wave_hist, man, decl_of, defined, census, types)
     (OUT / "state-home-report.md").write_text(report)
 
     # ---- machine checks
@@ -1273,14 +1383,16 @@ def main():
     out_manifest = {
         "generated_by": "tools/closure-prototype/rendererpackets.py",
         "module": manifest["stats"]["module"],
-        "carrier_vocabulary": "docs/subsystems/renderer-r2-design.md (FROZEN)",
+        "carrier_vocabulary": "docs/subsystems/renderer-r2-design.md (FROZEN) "
+                              "+ docs/decisions.md DEC-37 Addenda A13",
         "waves_generated": covered,
         "packets": len(man),
         "fns_packeted": sum(e["fns"] for e in man),
         "loc_packeted": sum(e["loc"] for e in man),
         "state_homes": {
             "globals_total": len(globals_by_name),
-            "globals_mapped": len(mapped),
+            "globals_mapped_r2_doc": len(mapped),
+            "globals_mapped_dec37_a13": len(mapped_ruling),
             "globals_not_renderer_state": len(outside),
             "globals_unmapped": len(unmapped),
             "unmapped_touches_in_generated_waves": len(unmapped_hits),
@@ -1302,7 +1414,8 @@ def main():
     print(f"[rendererpackets] {len(man)} packets, "
           f"{sum(e['fns'] for e in man)} fns, "
           f"{sum(e['loc'] for e in man):,} LOC -> out/renderer/packets/")
-    print(f"[rendererpackets] state homes: {len(mapped)} mapped / "
+    print(f"[rendererpackets] state homes: {len(mapped)} mapped (R2 doc) / "
+          f"{len(mapped_ruling)} mapped (DEC-37 A13) / "
           f"{len(outside)} not-renderer-state / "
           f"{len(unmapped)} UNMAPPED globals ({len(unmapped_hits)} touches in "
           f"the generated waves); {len(manifest['statics_census'])} fn-scope "
