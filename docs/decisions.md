@@ -892,6 +892,41 @@ itself stays out of repo docs per the external-reference rule):
   identity at the seam, so retail's render-the-default-on-failure behavior
   falls out exactly.
 
+**Addenda A13 (2026-07-26, R3-prep state-home sit-down):** the R2 doc froze
+the root types but homed only the globals its rows name; the packet
+generator's UNMAPPED report (336 globals) was ruled as five families,
+one-by-one:
+
+- **A13.1 Renderer cvars (125 `cvar_t*` handles).** One owned
+  `RendererCvars` struct, one field per cvar, registered in `R_Register`
+  and threaded as a carrier — the engine-island `EngineCvars` precedent.
+  Reads go through the engine cvar table live; R4 may later snapshot what
+  the render thread needs (Q3-SMP-style FrameData snapshot REJECTED for
+  now as premature).
+- **A13.2 GL/WGL entry pointers (52 `qgl*`/`qwgl*`).** No R3 home — per
+  DEC-01 they dissolve into the R4 wgpu rewrite. Backend fns' GL calls
+  carry `// DEFERRED: R4` cites; a frontend fn must never grow a GL
+  dependency. Stub-GL-trait REJECTED (throwaway surface against DEC-01's
+  not-a-GL-transcription ruling).
+- **A13.3 TU-local working statics (~120 across 20 files).** Blanket rule:
+  each file's statics become an owned per-subsystem state struct (§B3/B6),
+  placed sim-side or render-side per where the subsystem executes, **named
+  by the wave that ports the file**. Genuinely-const tables → `const`;
+  init-once tables (e.g. `s_gammatable`) → fields filled at subsystem
+  init. A static that crosses the sim/render boundary escalates instead of
+  being placed silently.
+- **A13.4 Shader-parse statics (16).** Parse scratch
+  (`shader`/`stages`/`texMods`/`collapse`) → a `ShaderParseState` local
+  threaded through the `ParseShader` chain, alive only during one parse —
+  NOT stored state. The shader-text cache
+  (`s_shaderText`/`shaderTextHashTable`/`deferLoad`) → `RenderAssets`
+  beside the ruled `shader_lookup`.
+- **A13.5 Ghoul2 profiling timers (19 `G2PerformanceTimer_*`/`G2Time_*`).**
+  Dropped per §20 dead surface with a module-doc note:
+  `G2_PERFORMANCE_ANALYSIS` is defined only `#ifndef FINAL_BUILD`
+  (`oracle/codemp/game/q_shared.h:44-46`) — retail compiles the timers and
+  their call sites out.
+
 ## DEC-38 — ui U5 rulings: DisplayContext carrier, WORLD lifetime, siege gating (2026-07-25)
 
 Three user rulings from the U5 one-by-one sit-down:
