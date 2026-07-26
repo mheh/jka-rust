@@ -13,6 +13,7 @@
 
 pub mod aligned_bytes;
 pub mod cached_model_binary;
+pub mod frontend;
 pub mod render_models;
 pub mod server_load;
 pub mod server_skin;
