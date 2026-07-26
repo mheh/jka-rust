@@ -1295,30 +1295,38 @@ pub fn BG_SiegeParseClassFile(
             let class_name = bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]
                 .name
                 .clone();
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].classShader =
+            let (class_shader, run_class_determination) =
                 callbacks.siege_class_shader(&cstr_to_str(parse_buf.as_ptr()), &class_name);
-            let title_length: usize = strlen(parse_buf.as_ptr());
-            // Oracle only falls back to SPC_INFANTRY when the loop runs to
-            // completion (`i >= SPC_MAX`); an early break on `arrayTitleLength >
-            // titleLength` leaves playerClass unchanged. bg_saga.c:1034.
-            let mut i: i16 = 0;
-            while i < SPC_MAX as i16 {
-                let array_title_length: usize = strlen(classTitles[i as usize].as_ptr());
-                if array_title_length > title_length {
-                    break;
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].classShader = class_shader;
+            // DEC-38 item 3: QAGAME runs this block unconditionally
+            // (`#ifdef QAGAME` arm has no `else` gate); cgame/ui only run it in
+            // the `#else` arm's `else` (i.e. when the shader was found).
+            // Source: `oracle/codemp/game/bg_saga.c:994-1039`
+            if run_class_determination {
+                let title_length: usize = strlen(parse_buf.as_ptr());
+                // Oracle only falls back to SPC_INFANTRY when the loop runs to
+                // completion (`i >= SPC_MAX`); an early break on `arrayTitleLength >
+                // titleLength` leaves playerClass unchanged. bg_saga.c:1034.
+                let mut i: i16 = 0;
+                while i < SPC_MAX as i16 {
+                    let array_title_length: usize = strlen(classTitles[i as usize].as_ptr());
+                    if array_title_length > title_length {
+                        break;
+                    }
+
+                    let hold_buf = parse_buf.as_ptr().add(title_length - array_title_length);
+                    if Q_strcmp(hold_buf, classTitles[i as usize].as_ptr()) == 0 {
+                        bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].playerClass = i;
+                        break;
+                    }
+                    i += 1;
                 }
 
-                let hold_buf = parse_buf.as_ptr().add(title_length - array_title_length);
-                if Q_strcmp(hold_buf, classTitles[i as usize].as_ptr()) == 0 {
-                    bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].playerClass = i;
-                    break;
+                // In case the icon name doesn't match up
+                if i >= SPC_MAX as i16 {
+                    bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].playerClass =
+                        SPC_INFANTRY as i16;
                 }
-                i += 1;
-            }
-
-            // In case the icon name doesn't match up
-            if i >= SPC_MAX as i16 {
-                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].playerClass = SPC_INFANTRY as i16;
             }
         } else {
             //No entry!  Bad bad bad

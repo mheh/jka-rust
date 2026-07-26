@@ -378,6 +378,17 @@ pub trait GameCallbacks {
     /// `BG_SiegeParseClassFile`'s `class_shader` arm: the game stores 0; cgame
     /// and ui store `trap_R_RegisterShaderNoMip` and print a `could not find
     /// class_shader %s for class %s` error when it comes back 0.
-    /// Source: `oracle/codemp/game/bg_saga.c:994-1010`
-    fn siege_class_shader(&mut self, class_shader: &str, class_name: &str) -> c_int;
+    ///
+    /// The trailing "very hacky way to determine class" block
+    /// (`bg_saga.rs`'s class-determination span) is gated differently per
+    /// module: the QAGAME `#ifdef` arm has no `else` and runs the block
+    /// unconditionally (`bg_saga.c:994-1039`); the cgame/ui `#else` arm gates
+    /// it under an `else` — only when the shader was found (nonzero handle).
+    /// The bool return threads that gate to the caller.
+    /// Source: `oracle/codemp/game/bg_saga.c:994-1039`
+    fn siege_class_shader(
+        &mut self,
+        class_shader: &str,
+        class_name: &str,
+    ) -> (c_int /* handle */, bool /* run class determination */);
 }

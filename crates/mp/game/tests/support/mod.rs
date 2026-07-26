@@ -735,7 +735,7 @@ impl GameCallbacks for TestCallbacks {
     fn siege_class_ui_portrait(&mut self, _s: &str) -> (c_int, String) {
         unreachable!()
     }
-    fn siege_class_shader(&mut self, _s: &str, _c: &str) -> c_int {
+    fn siege_class_shader(&mut self, _s: &str, _c: &str) -> (c_int, bool) {
         unreachable!()
     }
 }

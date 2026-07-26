@@ -304,12 +304,14 @@ impl GameCallbacks for UiGameCallbacks<'_> {
         let shader = trap::R_RegisterShaderNoMip(self.engine, uishader);
         (shader, uishader.to_string())
     }
-    fn siege_class_shader(&mut self, class_shader: &str, class_name: &str) -> c_int {
+    fn siege_class_shader(&mut self, class_shader: &str, class_name: &str) -> (c_int, bool) {
         // Real delegation — the cgame/ui shared `#else` arm of
-        // `bg_saga.c:994-1010`: register the shader with
+        // `bg_saga.c:994-1039`: register the shader with
         // `trap_R_RegisterShaderNoMip` and, on a miss, print the same
         // `could not find class_shader` diagnostic Raven's `Com_Printf` does
-        // (the game arm stores 0 and never registers or reports).
+        // (the game arm stores 0 and never registers or reports). The `else`
+        // that gates the class-determination block fires only when the
+        // shader was found, so the returned bool mirrors `handle != 0`.
         let shader = trap::R_RegisterShaderNoMip(self.engine, class_shader);
         if shader == 0 {
             trap::Print(
@@ -320,6 +322,6 @@ impl GameCallbacks for UiGameCallbacks<'_> {
                 ),
             );
         }
-        shader
+        (shader, shader != 0)
     }
 }

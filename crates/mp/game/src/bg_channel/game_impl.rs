@@ -1037,9 +1037,11 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // Source: `oracle/codemp/game/bg_saga.c:975-988`
         (0, String::new())
     }
-    fn siege_class_shader(&mut self, class_shader: &str, class_name: &str) -> c_int {
+    fn siege_class_shader(&mut self, class_shader: &str, class_name: &str) -> (c_int, bool) {
         // QAGAME: `classShader = 0` — the shader is never registered server-side.
-        // Source: `oracle/codemp/game/bg_saga.c:994-1010`
-        0
+        // The `#ifdef QAGAME` arm has no `else` gate, so the class-determination
+        // block runs unconditionally.
+        // Source: `oracle/codemp/game/bg_saga.c:994-1039`
+        (0, true)
     }
 }
