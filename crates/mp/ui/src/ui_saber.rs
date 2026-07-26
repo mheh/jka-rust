@@ -23,6 +23,7 @@ use mp_qshared::shared::q_color::S_COLOR_RED;
 use mp_qshared::shared::q_math::{_VectorMA, vec3_origin, VectorNormalize, VectorSet};
 use mp_qshared::shared::q_string::COM_Compress;
 use mp_qshared::shared::{fileHandle_t, mdxaBone_t, vec3_t, Eorientations, FS_READ, MAX_QPATH};
+use mp_uishared::shared::display_state::DisplayState;
 use mp_uishared::shared::item_def_s::ItemDef;
 use mp_uishared::shared::menu_system::MAX_MENUFILE;
 use mp_uishared::ui_shared::{String_Alloc, ITF_ISCHARACTER, ITF_ISSABER, ITF_ISSABER2};
@@ -733,6 +734,7 @@ pub fn UI_SaberValidForPlayerInMP(ctx: &mut UiContext, saberName: &str) -> bool 
 #[allow(clippy::too_many_arguments)]
 pub fn UI_SaberDrawBlade(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     item: &ItemDef,
     saberName: &str,
     saberModel: c_int,
@@ -790,7 +792,7 @@ pub fn UI_SaberDrawBlade(
         &mut boltMatrix,
         &angles,
         &origin,
-        ctx.world.uiDC.realTime,
+        ds.realTime,
         None,
         &vec3_origin,
     );
@@ -1238,7 +1240,13 @@ pub fn UI_SaberGetHiltInfo(ctx: &mut UiContext) -> (Vec<String>, Vec<String>) {
 /// `String`).
 ///
 /// Source: `oracle/codemp/ui/ui_saber.c:952-1017`
-pub fn UI_SaberDrawBlades(ctx: &mut UiContext, item: &ItemDef, origin: vec3_t, angles: vec3_t) {
+pub fn UI_SaberDrawBlades(
+    ctx: &mut UiContext,
+    ds: &DisplayState,
+    item: &ItemDef,
+    origin: vec3_t,
+    angles: vec3_t,
+) {
     let mut numSabers = 1;
 
     if (item.flags & ITF_ISCHARACTER) != 0 && ctx.world.movesTitleIndex == 4 {
@@ -1281,7 +1289,7 @@ pub fn UI_SaberDrawBlades(ctx: &mut UiContext, item: &ItemDef, origin: vec3_t, a
                 for curBlade in 0..numBlades {
                     if UI_SaberShouldDrawBlade(ctx, &saber, curBlade) {
                         UI_SaberDrawBlade(
-                            ctx, item, &saber, saberModel, saberType, origin, angles, curBlade,
+                            ctx, ds, item, &saber, saberModel, saberType, origin, angles, curBlade,
                         );
                     }
                 }

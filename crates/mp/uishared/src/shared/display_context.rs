@@ -6,7 +6,9 @@ use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_qshared::shared::{pc_token_t, qhandle_t, sfxHandle_t, vec3_t, vec4_t};
 
+use super::display_state::DisplayState;
 use super::item_id::ItemId;
+use super::menu_system::MenuSystem;
 
 /// Everything the menu framework needs from the module hosting it.
 ///
@@ -20,13 +22,14 @@ use super::item_id::ItemId;
 /// The signatures are the dictionary's: `const char *` → `&str`, `qboolean` →
 /// `bool`, out-params → returns, `char *buf, int buflen` → returned `String`.
 ///
-/// The trait carries ONLY the callback surface (U3 ruling, 2026-07-24):
-/// `MenuSystem` and `DisplayState` are NOT reached through it — they thread
-/// beside it as struct fields of the host's context (the `GameContext.world` /
-/// `.engine` precedent), so framework code gets field-level split borrows: a
-/// paint loop can hold an arena item while calling a draw callback. Raven
-/// reached both through `DC->` and file-scope globals; the data tail
-/// (`DC->realTime`, `DC->Assets.*`, `DC->cursorx`) lives in `DisplayState`.
+/// State threading (DEC-38 ruling 1, revised 2026-07-25): the re-entrant and
+/// state-reading slots take the CALLER's `menus: &mut MenuSystem` / `ds:
+/// &DisplayState` back as leading params — the caller hands over its own
+/// borrows, so callback mutations are visible on return with zero aliasing
+/// (porting-rule B4). The remaining slots (trap forwarders and pure draws)
+/// stay state-free. The data tail (`DC->realTime`, `DC->Assets.*`,
+/// `DC->cursorx`) lives in `DisplayState`, a sibling of `MenuSystem` in the
+/// host's owned `UiState` — never a field reached through the implementor.
 ///
 /// Type definition source: `oracle/codemp/ui/ui_shared.h:400-477`
 #[allow(non_snake_case)]
@@ -62,6 +65,7 @@ pub trait DisplayContext {
     #[allow(clippy::too_many_arguments)]
     fn drawText(
         &mut self,
+        ds: &DisplayState,
         x: f32,
         y: f32,
         scale: f32,
@@ -74,10 +78,10 @@ pub trait DisplayContext {
     );
 
     /// Raven `int (*textWidth)(const char *text, float scale, int iMenuFont)`.
-    fn textWidth(&mut self, text: &str, scale: f32, iMenuFont: c_int) -> c_int;
+    fn textWidth(&mut self, ds: &DisplayState, text: &str, scale: f32, iMenuFont: c_int) -> c_int;
 
     /// Raven `int (*textHeight)(const char *text, float scale, int iMenuFont)`.
-    fn textHeight(&mut self, text: &str, scale: f32, iMenuFont: c_int) -> c_int;
+    fn textHeight(&mut self, ds: &DisplayState, text: &str, scale: f32, iMenuFont: c_int) -> c_int;
 
     /// Raven `qhandle_t (*registerModel)(const char *p)`.
     fn registerModel(&mut self, p: &str) -> qhandle_t;
@@ -87,16 +91,25 @@ pub trait DisplayContext {
     fn modelBounds(&mut self, model: qhandle_t) -> (vec3_t, vec3_t);
 
     /// Raven `void (*fillRect)(float x, float y, float w, float h, const vec4_t color)`.
-    fn fillRect(&mut self, x: f32, y: f32, w: f32, h: f32, color: vec4_t);
+    fn fillRect(&mut self, ds: &DisplayState, x: f32, y: f32, w: f32, h: f32, color: vec4_t);
 
     /// Raven `void (*drawRect)(float x, float y, float w, float h, float size, const vec4_t color)`.
-    fn drawRect(&mut self, x: f32, y: f32, w: f32, h: f32, size: f32, color: vec4_t);
+    fn drawRect(
+        &mut self,
+        ds: &DisplayState,
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        size: f32,
+        color: vec4_t,
+    );
 
     /// Raven `void (*drawSides)(float x, float y, float w, float h, float size)`.
-    fn drawSides(&mut self, x: f32, y: f32, w: f32, h: f32, size: f32);
+    fn drawSides(&mut self, ds: &DisplayState, x: f32, y: f32, w: f32, h: f32, size: f32);
 
     /// Raven `void (*drawTopBottom)(float x, float y, float w, float h, float size)`.
-    fn drawTopBottom(&mut self, x: f32, y: f32, w: f32, h: f32, size: f32);
+    fn drawTopBottom(&mut self, ds: &DisplayState, x: f32, y: f32, w: f32, h: f32, size: f32);
 
     /// Raven `void (*clearScene)()`.
     fn clearScene(&mut self);
@@ -150,6 +163,8 @@ pub trait DisplayContext {
     #[allow(clippy::too_many_arguments)]
     fn ownerDrawItem(
         &mut self,
+        menus: &mut MenuSystem,
+        ds: &DisplayState,
         x: f32,
         y: f32,
         w: f32,
@@ -171,14 +186,14 @@ pub trait DisplayContext {
     fn getValue(&mut self, ownerDraw: c_int) -> f32;
 
     /// Raven `qboolean (*ownerDrawVisible)(int flags)`.
-    fn ownerDrawVisible(&mut self, flags: c_int) -> bool;
+    fn ownerDrawVisible(&mut self, ds: &DisplayState, flags: c_int) -> bool;
 
     /// Raven `void (*runScript)(char **p)` — the callee consumes tokens off the
     /// script cursor, so the `char **` becomes a `&str` cursor.
-    fn runScript(&mut self, p: &mut &str);
+    fn runScript(&mut self, menus: &mut MenuSystem, ds: &DisplayState, p: &mut &str);
 
     /// Raven `qboolean (*deferScript)(char **p)`.
-    fn deferScript(&mut self, p: &mut &str) -> bool;
+    fn deferScript(&mut self, menus: &mut MenuSystem, ds: &DisplayState, p: &mut &str) -> bool;
 
     /// Raven `void (*getTeamColor)(vec4_t *color)` — out-param becomes the
     /// return value.
@@ -200,6 +215,7 @@ pub trait DisplayContext {
     #[allow(clippy::too_many_arguments)]
     fn drawTextWithCursor(
         &mut self,
+        ds: &DisplayState,
         x: f32,
         y: f32,
         scale: f32,
@@ -226,6 +242,8 @@ pub trait DisplayContext {
     /// handlers both read and rewrite it.
     fn ownerDrawHandleKey(
         &mut self,
+        menus: &mut MenuSystem,
+        ds: &DisplayState,
         ownerDraw: c_int,
         flags: c_int,
         special: &mut f32,
@@ -233,7 +251,7 @@ pub trait DisplayContext {
     ) -> bool;
 
     /// Raven `int (*feederCount)(float feederID)`.
-    fn feederCount(&mut self, feederID: f32) -> c_int;
+    fn feederCount(&mut self, menus: &mut MenuSystem, ds: &DisplayState, feederID: f32) -> c_int;
 
     /// Raven `const char *(*feederItemText)(float feederID, int index,
     /// int column, qhandle_t *handle1, qhandle_t *handle2, qhandle_t *handle3)`
@@ -241,16 +259,30 @@ pub trait DisplayContext {
     /// NULL return.
     fn feederItemText(
         &mut self,
+        ds: &DisplayState,
         feederID: f32,
         index: c_int,
         column: c_int,
     ) -> (Option<String>, qhandle_t, qhandle_t, qhandle_t);
 
     /// Raven `qhandle_t (*feederItemImage)(float feederID, int index)`.
-    fn feederItemImage(&mut self, feederID: f32, index: c_int) -> qhandle_t;
+    fn feederItemImage(
+        &mut self,
+        menus: &mut MenuSystem,
+        ds: &DisplayState,
+        feederID: f32,
+        index: c_int,
+    ) -> qhandle_t;
 
     /// Raven `qboolean (*feederSelection)(float feederID, int index, itemDef_t *item)`.
-    fn feederSelection(&mut self, feederID: f32, index: c_int, item: Option<ItemId>) -> bool;
+    fn feederSelection(
+        &mut self,
+        menus: &mut MenuSystem,
+        ds: &DisplayState,
+        feederID: f32,
+        index: c_int,
+        item: Option<ItemId>,
+    ) -> bool;
 
     /// Raven `void (*keynumToStringBuf)(int keynum, char *buf, int buflen)`.
     fn keynumToStringBuf(&mut self, keynum: c_int, buflen: usize) -> String;
@@ -276,7 +308,13 @@ pub trait DisplayContext {
     fn Pause(&mut self, b: bool);
 
     /// Raven `int (*ownerDrawWidth)(int ownerDraw, float scale)`.
-    fn ownerDrawWidth(&mut self, ownerDraw: c_int, scale: f32) -> c_int;
+    fn ownerDrawWidth(
+        &mut self,
+        menus: &mut MenuSystem,
+        ds: &DisplayState,
+        ownerDraw: c_int,
+        scale: f32,
+    ) -> c_int;
 
     /// Raven `sfxHandle_t (*registerSound)(const char *name)`.
     fn registerSound(&mut self, name: &str) -> sfxHandle_t;

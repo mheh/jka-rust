@@ -8,8 +8,6 @@ use mp_bg::bg_channel::BgState;
 use mp_bg::bg_misc::MAX_POOL_SIZE_UI;
 use mp_qshared::shared::qhandle_t;
 use mp_qshared::shared::sfxHandle_t;
-use mp_uishared::shared::display_state::DisplayState;
-use mp_uishared::shared::menu_system::MenuSystem;
 
 use crate::local::alias_info::AliasInfo;
 use crate::local::game_type_info::GameTypeInfo;
@@ -50,6 +48,10 @@ pub const MAX_SCROLLTEXT_LINES: usize = 64;
 /// single instance and hand it inward inside a
 /// [`UiContext`](super::ui_context::UiContext) (§B3/§B4).
 ///
+/// Raven's `uiDC` member and `ui_shared.c`'s menu-framework globals are NOT
+/// here: they are sibling fields of [`UiState`](super::ui_state::UiState), so
+/// the ported fns can hold them beside a live `UiContext` (DEC-38 ruling 1).
+///
 /// The scoping census settled that ui has **zero** Class-A engine-retained
 /// memory — no `trap` registers a pointer into module memory and every ui trap
 /// is copy-semantics — so the whole island is Class C and lands idiomatic:
@@ -68,18 +70,6 @@ pub const MAX_SCROLLTEXT_LINES: usize = 64;
 ///
 /// Type definition source: `oracle/codemp/ui/ui_local.h:729-843`
 pub struct UiWorld {
-    /// Raven `displayContextDef_t uiDC` — reduced to its data tail; the
-    /// function-pointer half is the `DisplayContext` trait `UiContext`
-    /// implements (DEC-36 D3).
-    /// Source: `oracle/codemp/ui/ui_local.h:730`
-    pub uiDC: DisplayState,
-
-    /// The menu framework, owned by composition (DEC-36 D2). Raven kept it as
-    /// `ui_shared.c`'s file-scope `Menus[]`/`menuStack[]`/pool globals inside
-    /// the same link unit.
-    /// Source: `oracle/codemp/ui/ui_shared.c:111-115`
-    pub menus: MenuSystem,
-
     pub newHighScoreTime: c_int,
     pub newBestTime: c_int,
     pub showPostGameTime: c_int,
@@ -236,8 +226,6 @@ impl Default for UiWorld {
     /// Source: `oracle/codemp/ui/ui_main.c:875`
     fn default() -> Self {
         UiWorld {
-            uiDC: DisplayState::default(),
-            menus: MenuSystem::default(),
             bg_state: BgState::with_pool_size(MAX_POOL_SIZE_UI),
             newHighScoreTime: 0,
             newBestTime: 0,

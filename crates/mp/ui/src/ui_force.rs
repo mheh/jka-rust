@@ -20,7 +20,8 @@ use mp_qshared::shared::force_powers::{
 };
 use mp_qshared::shared::vec4_t;
 use mp_qshared::shared::{FS_READ, FS_WRITE, MAX_INFO_VALUE};
-use mp_uishared::shared::display_context::DisplayContext;
+use mp_uishared::shared::display_state::DisplayState;
+use mp_uishared::shared::menu_system::MenuSystem;
 use mp_uishared::shared::menudef::{
     FEEDER_FORCECFG, FEEDER_Q3HEADS, UI_FORCE_RANK, UI_FORCE_RANK_LEVITATION,
     UI_FORCE_RANK_SABERATTACK, UI_FORCE_RANK_SABERDEFEND,
@@ -224,7 +225,7 @@ pub fn UI_DrawForceStars(
 /// in the current-side range).
 ///
 /// Source: `oracle/codemp/ui/ui_force.c:210-285`
-pub fn UI_SaveForceTemplate(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+pub fn UI_SaveForceTemplate(ctx: &mut UiContext, menus: &mut MenuSystem, ds: &DisplayState) {
     let selectedName = UI_Cvar_VariableString(ctx, "ui_SaveFCF");
 
     if selectedName.is_empty() {
@@ -291,21 +292,14 @@ pub fn UI_SaveForceTemplate(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
                 || (ctx.world.force.uiForceSide == FORCE_DARKSIDE && !ctx.world.forceConfigSide[i]))
         {
             let translated = UI_TranslateFCFIndex(ctx.world, i as c_int);
-            Menu_SetFeederSelection(
-                &mut ctx.world.menus,
-                dc,
-                None,
-                FEEDER_FORCECFG,
-                translated,
-                None,
-            );
+            Menu_SetFeederSelection(menus, ds, ctx, None, FEEDER_FORCECFG, translated, None);
             foundFeederItem = true;
         }
     }
 
     // Else, go back to 0
     if !foundFeederItem {
-        Menu_SetFeederSelection(&mut ctx.world.menus, dc, None, FEEDER_FORCECFG, 0, None);
+        Menu_SetFeederSelection(menus, ds, ctx, None, FEEDER_FORCECFG, 0, None);
     }
 }
 
@@ -317,7 +311,7 @@ pub fn UI_SaveForceTemplate(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
 /// available point budget.
 ///
 /// Source: `oracle/codemp/ui/ui_force.c:290-460`
-pub fn UpdateForceUsed(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+pub fn UpdateForceUsed(ctx: &mut UiContext, menus: &mut MenuSystem) {
     // Currently we don't make a distinction between those that wish to play Jedi of lower than maximum skill.
     ctx.world.force.uiForceRank = ctx.world.force.uiMaxRank;
 
@@ -379,7 +373,7 @@ pub fn UpdateForceUsed(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
         }
     }
 
-    let menu = Menus_FindByName(&ctx.world.menus, "ingame_playerforce");
+    let menu = Menus_FindByName(menus, "ingame_playerforce");
     // Set the cost of the saberattack according to whether its free.
     if ctx.world.cvars.ui_freeSaber.integer != 0 {
         // Make saber free
@@ -395,11 +389,11 @@ pub fn UpdateForceUsed(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
             ctx.world.force.uiForcePowersRank[FP_SABER_DEFENSE as usize] = 1;
         }
         if let Some(menu) = menu {
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "setFP_SABER_DEFENSE", true);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "setfp_saberthrow", true);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "effectentry", true);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "effectfield", true);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "nosaber", false);
+            Menu_ShowItemByName(menus, ctx, menu, "setFP_SABER_DEFENSE", true);
+            Menu_ShowItemByName(menus, ctx, menu, "setfp_saberthrow", true);
+            Menu_ShowItemByName(menus, ctx, menu, "effectentry", true);
+            Menu_ShowItemByName(menus, ctx, menu, "effectfield", true);
+            Menu_ShowItemByName(menus, ctx, menu, "nosaber", false);
         }
     } else {
         // Make saber normal cost
@@ -410,18 +404,18 @@ pub fn UpdateForceUsed(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
             ctx.world.force.uiForcePowersRank[FP_SABER_DEFENSE as usize] = 0;
             ctx.world.force.uiForcePowersRank[FP_SABERTHROW as usize] = 0;
             if let Some(menu) = menu {
-                Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "setfp_saberdefend", false);
-                Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "setfp_saberthrow", false);
-                Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "effectentry", false);
-                Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "effectfield", false);
-                Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "nosaber", true);
+                Menu_ShowItemByName(menus, ctx, menu, "setfp_saberdefend", false);
+                Menu_ShowItemByName(menus, ctx, menu, "setfp_saberthrow", false);
+                Menu_ShowItemByName(menus, ctx, menu, "effectentry", false);
+                Menu_ShowItemByName(menus, ctx, menu, "effectfield", false);
+                Menu_ShowItemByName(menus, ctx, menu, "nosaber", true);
             }
         } else if let Some(menu) = menu {
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "setfp_saberdefend", true);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "setfp_saberthrow", true);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "effectentry", true);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "effectfield", true);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "nosaber", false);
+            Menu_ShowItemByName(menus, ctx, menu, "setfp_saberdefend", true);
+            Menu_ShowItemByName(menus, ctx, menu, "setfp_saberthrow", true);
+            Menu_ShowItemByName(menus, ctx, menu, "effectentry", true);
+            Menu_ShowItemByName(menus, ctx, menu, "effectfield", true);
+            Menu_ShowItemByName(menus, ctx, menu, "nosaber", false);
         }
     }
 
@@ -475,7 +469,7 @@ pub fn UpdateForceUsed(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
 /// back into the UI's force state.
 ///
 /// Source: `oracle/codemp/ui/ui_force.c:465-629`
-pub fn UI_ReadLegalForce(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+pub fn UI_ReadLegalForce(ctx: &mut UiContext, menus: &mut MenuSystem) {
     // First, stick them into a string.
     let mut fcfString = format!(
         "{}-{}-",
@@ -625,7 +619,7 @@ pub fn UI_ReadLegalForce(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
         ctx.world.force.uiForcePowersRank[FP_SABER_DEFENSE as usize] = 1;
     }
 
-    UpdateForceUsed(ctx, dc);
+    UpdateForceUsed(ctx, menus);
 
     if updateForceLater {
         ctx.world.force.gTouchedForce = true;
@@ -639,7 +633,7 @@ pub fn UI_ReadLegalForce(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
 /// cvar is empty or malformed.
 ///
 /// Source: `oracle/codemp/ui/ui_force.c:631-758`
-pub fn UI_UpdateForcePowers(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+pub fn UI_UpdateForcePowers(ctx: &mut UiContext, menus: &mut MenuSystem) {
     let forcePowers = UI_Cvar_VariableString(ctx, "forcepowers");
     let chars: Vec<char> = forcePowers.chars().collect();
     let mut i = 0usize;
@@ -740,7 +734,7 @@ pub fn UI_UpdateForcePowers(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
         UI_UpdateClientForcePowers(ctx, "");
     }
 
-    UpdateForceUsed(ctx, dc);
+    UpdateForceUsed(ctx, menus);
 }
 
 /// Raven `UI_ForceSide_HandleKey` — cycles the light/dark side selector
@@ -751,7 +745,8 @@ pub fn UI_UpdateForcePowers(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
 #[allow(clippy::too_many_arguments)]
 pub fn UI_ForceSide_HandleKey(
     ctx: &mut UiContext,
-    dc: &mut dyn DisplayContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     _flags: c_int,
     _special: Option<&mut f32>,
     key: c_int,
@@ -781,7 +776,7 @@ pub fn UI_ForceSide_HandleKey(
 
         // update the feeder item selection, it might be different depending
         // on side
-        Menu_SetFeederSelection(&mut ctx.world.menus, dc, None, FEEDER_FORCECFG, 0, None);
+        Menu_SetFeederSelection(menus, ds, ctx, None, FEEDER_FORCECFG, 0, None);
 
         if key == fakeAscii_t::A_MOUSE2 as c_int {
             i -= 1;
@@ -810,7 +805,7 @@ pub fn UI_ForceSide_HandleKey(
             x += 1;
         }
 
-        UpdateForceUsed(ctx, dc);
+        UpdateForceUsed(ctx, menus);
 
         ctx.world.force.gTouchedForce = true;
         return true;
@@ -827,7 +822,7 @@ pub fn UI_ForceSide_HandleKey(
 #[allow(clippy::too_many_arguments)]
 pub fn UI_JediNonJedi_HandleKey(
     ctx: &mut UiContext,
-    dc: &mut dyn DisplayContext,
+    menus: &mut MenuSystem,
     _flags: c_int,
     _special: Option<&mut f32>,
     key: c_int,
@@ -899,7 +894,7 @@ pub fn UI_JediNonJedi_HandleKey(
             }
         }
 
-        UpdateForceUsed(ctx, dc);
+        UpdateForceUsed(ctx, menus);
 
         ctx.world.force.gTouchedForce = true;
         return true;
@@ -914,7 +909,7 @@ pub fn UI_JediNonJedi_HandleKey(
 #[allow(clippy::too_many_arguments)]
 pub fn UI_ForceMaxRank_HandleKey(
     ctx: &mut UiContext,
-    dc: &mut dyn DisplayContext,
+    menus: &mut MenuSystem,
     _flags: c_int,
     _special: Option<&mut f32>,
     key: c_int,
@@ -949,7 +944,7 @@ pub fn UI_ForceMaxRank_HandleKey(
         trap::Cvar_Set(ctx.engine, "g_maxForceRank", &format!("{}", num));
 
         // The update force used will remove overallocated powers automatically.
-        UpdateForceUsed(ctx, dc);
+        UpdateForceUsed(ctx, menus);
 
         ctx.world.force.gTouchedForce = true;
 
@@ -967,7 +962,7 @@ pub fn UI_ForceMaxRank_HandleKey(
 #[allow(clippy::too_many_arguments)]
 pub fn UI_ForcePowerRank_HandleKey(
     ctx: &mut UiContext,
-    dc: &mut dyn DisplayContext,
+    menus: &mut MenuSystem,
     _flags: c_int,
     _special: Option<&mut f32>,
     key: c_int,
@@ -1054,7 +1049,7 @@ pub fn UI_ForcePowerRank_HandleKey(
             ctx.world.force.uiForcePowersRank[forcepower] -= 1;
         }
 
-        UpdateForceUsed(ctx, dc);
+        UpdateForceUsed(ctx, menus);
 
         ctx.world.force.gTouchedForce = true;
 
@@ -1072,7 +1067,7 @@ pub fn UI_ForcePowerRank_HandleKey(
 /// Source: `oracle/codemp/ui/ui_force.c:1110-1345`
 pub fn UI_ForceConfigHandle(
     ctx: &mut UiContext,
-    dc: &mut dyn DisplayContext,
+    menus: &mut MenuSystem,
     oldindex: c_int,
     newindex: c_int,
 ) {
@@ -1099,7 +1094,7 @@ pub fn UI_ForceConfigHandle(
         ctx.world.force.uiForceRank = ctx.world.force.gCustRank;
         ctx.world.force.uiForceSide = ctx.world.force.gCustSide;
 
-        UpdateForceUsed(ctx, dc);
+        UpdateForceUsed(ctx, menus);
         return;
     }
 
@@ -1323,13 +1318,13 @@ pub fn UI_ForceConfigHandle(
         ctx.world.force.uiForcePowersRank[FP_SABER_DEFENSE as usize] = 1;
     }
 
-    // PORT-NOTE: `UpdateForceUsed` calls `DC->` menu-item toggles (DEC-36
-    // addendum 12), so this fn threads `dc: &mut dyn DisplayContext` even
-    // though the packet's C signature (`void UI_ForceConfigHandle(int, int)`)
-    // shows no such param — the resolved-signature index does not carry
-    // ui_force.c's own fns, only its in-module callees, so the dc thread is
-    // derived from `UpdateForceUsed`'s already-ported shape.
-    UpdateForceUsed(ctx, dc);
+    // PORT-NOTE: `UpdateForceUsed` calls `DC->` menu-item toggles, so this fn
+    // threads `menus` even though the packet's C signature
+    // (`void UI_ForceConfigHandle(int, int)`) shows no such param — the
+    // resolved-signature index does not carry ui_force.c's own fns, only its
+    // in-module callees, so the thread is derived from `UpdateForceUsed`'s
+    // already-ported shape. `ctx` doubles as the `dc` (DEC-38 ruling 1).
+    UpdateForceUsed(ctx, menus);
 }
 
 /// Raven `UI_SkinColor_HandleKey` — cycles the skin-color selector on
@@ -1339,7 +1334,8 @@ pub fn UI_ForceConfigHandle(
 #[allow(clippy::too_many_arguments)]
 pub fn UI_SkinColor_HandleKey(
     ctx: &mut UiContext,
-    dc: &mut dyn DisplayContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     _flags: c_int,
     _special: Option<&mut f32>,
     key: c_int,
@@ -1374,7 +1370,7 @@ pub fn UI_SkinColor_HandleKey(
         ctx.world.main.uiHoldSkinColor = ctx.world.main.uiSkinColor;
 
         let q3SelectedHead = ctx.world.q3SelectedHead;
-        UI_FeederSelection(ctx, dc, FEEDER_Q3HEADS as f32, q3SelectedHead, None);
+        UI_FeederSelection(ctx, menus, ds, FEEDER_Q3HEADS as f32, q3SelectedHead, None);
 
         return true;
     }

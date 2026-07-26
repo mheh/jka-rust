@@ -24,7 +24,8 @@ use native_string::info::Info_ValueForKey;
 use native_string::latin1_to_string;
 use native_string::q_string::Q_stricmp;
 
-use mp_uishared::shared::display_context::DisplayContext;
+use mp_uishared::shared::display_state::DisplayState;
+use mp_uishared::shared::menu_system::MenuSystem;
 use mp_uishared::ui_shared::Display_CacheAll;
 use mp_uishared::ui_shared::Menus_ActivateByName;
 use mp_uishared::ui_shared::Menus_CloseAll;
@@ -289,7 +290,15 @@ pub fn UI_DrawHandlePic(ctx: &mut UiContext, x: f32, y: f32, w: f32, h: f32, hSh
 /// shader, then resets the renderer color to white.
 ///
 /// Source: `oracle/codemp/ui/ui_atoms.c:436-442`
-pub fn UI_FillRect(ctx: &mut UiContext, x: f32, y: f32, width: f32, height: f32, color: &vec4_t) {
+pub fn UI_FillRect(
+    ctx: &mut UiContext,
+    ds: &DisplayState,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    color: &vec4_t,
+) {
     trap::R_SetColor(ctx.engine, Some(color));
 
     trap::R_DrawStretchPic(
@@ -302,7 +311,7 @@ pub fn UI_FillRect(ctx: &mut UiContext, x: f32, y: f32, width: f32, height: f32,
         0.0,
         0.0,
         0.0,
-        ctx.world.uiDC.whiteShader,
+        ds.whiteShader,
     );
 
     trap::R_SetColor(ctx.engine, None);
@@ -311,8 +320,8 @@ pub fn UI_FillRect(ctx: &mut UiContext, x: f32, y: f32, width: f32, height: f32,
 /// Raven `UI_DrawSides` — draws the left/right 1px border sides of a rect.
 ///
 /// Source: `oracle/codemp/ui/ui_atoms.c:444-447`
-pub fn UI_DrawSides(ctx: &mut UiContext, x: f32, y: f32, w: f32, h: f32) {
-    let whiteShader = ctx.world.uiDC.whiteShader;
+pub fn UI_DrawSides(ctx: &mut UiContext, ds: &DisplayState, x: f32, y: f32, w: f32, h: f32) {
+    let whiteShader = ds.whiteShader;
     trap::R_DrawStretchPic(ctx.engine, x, y, 1.0, h, 0.0, 0.0, 0.0, 0.0, whiteShader);
     trap::R_DrawStretchPic(
         ctx.engine,
@@ -331,8 +340,8 @@ pub fn UI_DrawSides(ctx: &mut UiContext, x: f32, y: f32, w: f32, h: f32) {
 /// Raven `UI_DrawTopBottom` — draws the top/bottom 1px border edges of a rect.
 ///
 /// Source: `oracle/codemp/ui/ui_atoms.c:449-452`
-pub fn UI_DrawTopBottom(ctx: &mut UiContext, x: f32, y: f32, w: f32, h: f32) {
-    let whiteShader = ctx.world.uiDC.whiteShader;
+pub fn UI_DrawTopBottom(ctx: &mut UiContext, ds: &DisplayState, x: f32, y: f32, w: f32, h: f32) {
+    let whiteShader = ds.whiteShader;
     trap::R_DrawStretchPic(ctx.engine, x, y, w, 1.0, 0.0, 0.0, 0.0, 0.0, whiteShader);
     trap::R_DrawStretchPic(
         ctx.engine,
@@ -366,11 +375,8 @@ pub fn UI_UpdateScreen(ctx: &mut UiContext) {
 /// `(x, y, width, height)`.
 ///
 /// Source: `oracle/codemp/ui/ui_atoms.c:484-493`
-pub fn UI_CursorInRect(ctx: &UiContext, x: c_int, y: c_int, width: c_int, height: c_int) -> bool {
-    !(ctx.world.uiDC.cursorx < x
-        || ctx.world.uiDC.cursory < y
-        || ctx.world.uiDC.cursorx > x + width
-        || ctx.world.uiDC.cursory > y + height)
+pub fn UI_CursorInRect(ds: &DisplayState, x: c_int, y: c_int, width: c_int, height: c_int) -> bool {
+    !(ds.cursorx < x || ds.cursory < y || ds.cursorx > x + width || ds.cursory > y + height)
 }
 
 /// `postGameInfo_t`'s on-disk byte width — Raven's `sizeof(postGameInfo_t)`.
@@ -510,11 +516,19 @@ pub fn UI_ClearScores(ctx: &mut UiContext) {
 /// height)` in `color`.
 ///
 /// Source: `oracle/codemp/ui/ui_atoms.c:460-467`
-pub fn UI_DrawRect(ctx: &mut UiContext, x: f32, y: f32, width: f32, height: f32, color: &vec4_t) {
+pub fn UI_DrawRect(
+    ctx: &mut UiContext,
+    ds: &DisplayState,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    color: &vec4_t,
+) {
     trap::R_SetColor(ctx.engine, Some(color));
 
-    UI_DrawTopBottom(ctx, x, y, width, height);
-    UI_DrawSides(ctx, x, y, width, height);
+    UI_DrawTopBottom(ctx, ds, x, y, width, height);
+    UI_DrawSides(ctx, ds, x, y, width, height);
 
     trap::R_SetColor(ctx.engine, None);
 }
@@ -524,28 +538,33 @@ pub fn UI_DrawRect(ctx: &mut UiContext, x: f32, y: f32, width: f32, height: f32,
 /// (width + 1) and (lines + 1) character units.
 ///
 /// Source: `oracle/codemp/ui/ui_atoms.c:478-482`
-pub fn UI_DrawTextBox(ctx: &mut UiContext, x: c_int, y: c_int, width: c_int, lines: c_int) {
+pub fn UI_DrawTextBox(
+    ctx: &mut UiContext,
+    ds: &DisplayState,
+    x: c_int,
+    y: c_int,
+    width: c_int,
+    lines: c_int,
+) {
     let x_f = (x + BIGCHAR_WIDTH / 2) as f32;
     let y_f = (y + BIGCHAR_HEIGHT / 2) as f32;
     let w = ((width + 1) * BIGCHAR_WIDTH) as f32;
     let h = ((lines + 1) * BIGCHAR_HEIGHT) as f32;
 
-    UI_FillRect(ctx, x_f, y_f, w, h, &colorBlack);
-    UI_DrawRect(ctx, x_f, y_f, w, h, &colorWhite);
+    UI_FillRect(ctx, ds, x_f, y_f, w, h, &colorBlack);
+    UI_DrawRect(ctx, ds, x_f, y_f, w, h, &colorWhite);
 }
 
 /// Raven `UI_Cache_f` — console command: cache all menu render assets; if
 /// invoked with 2 args, also print the list of head model names.
 ///
-/// PORT-NOTE (DisplayContext threading): the threading digest indicated only
-/// `UiContext` and `UiWorld` state channels, but `Display_CacheAll` requires a
-/// `DisplayContext` trait object to perform caching. Per DEC-36 addendum 12, ui
-/// functions that call DisplayContext-using callees take `dc: &mut dyn
-/// DisplayContext` as a parameter. This function records an escalation.
+/// PORT-NOTE (DisplayContext threading): `Display_CacheAll` needs the `dc`
+/// trait object; `ctx` IS it (DEC-38 ruling 1), so only the framework's `menus`
+/// borrow threads beside it.
 ///
 /// Source: `oracle/codemp/ui/ui_atoms.c:178-187`
-pub fn UI_Cache_f(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
-    Display_CacheAll(&ctx.world.menus, dc);
+pub fn UI_Cache_f(ctx: &mut UiContext, menus: &mut MenuSystem) {
+    Display_CacheAll(menus, ctx);
     if trap::Argc(ctx.engine) == 2 {
         for i in 0..ctx.world.q3HeadNames.len() {
             trap::Print(ctx.engine, &format!("model {}\n", ctx.world.q3HeadNames[i]));
@@ -558,13 +577,12 @@ pub fn UI_Cache_f(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
 /// tallies bonuses, restores the ui-overridden server cvars, and pushes the
 /// result into the score cvars / post-game screen.
 ///
-/// PORT-NOTE (DisplayContext threading): calls `UI_ShowPostGame`, which takes
-/// `dc: &mut dyn DisplayContext` (DEC-36 addendum 12); this fn threads `dc`
-/// through as well. Recorded as an escalation per the wave10 packet note (the
-/// threading digest only listed `UiContext`/`UiWorld` channels).
+/// PORT-NOTE (DisplayContext threading): calls `UI_ShowPostGame`, which reaches
+/// the framework; `ctx` is the `dc` (DEC-38 ruling 1) and `menus`/`ds` thread
+/// beside it.
 ///
 /// Source: `oracle/codemp/ui/ui_atoms.c:194-288`
-pub fn UI_CalcPostGameStats(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+pub fn UI_CalcPostGameStats(ctx: &mut UiContext, menus: &mut MenuSystem, ds: &DisplayState) {
     let info =
         trap::GetConfigString(ctx.engine, CS_SERVERINFO, MAX_INFO_STRING).unwrap_or_default();
     // PORT-NOTE: Raven `Q_strncpyz(map, Info_ValueForKey(info, "mapname"), sizeof(map))`.
@@ -644,7 +662,7 @@ pub fn UI_CalcPostGameStats(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
 
     if newHigh {
         // if so write out the new one
-        ctx.world.newHighScoreTime = ctx.world.uiDC.realTime + 20000;
+        ctx.world.newHighScoreTime = ds.realTime + 20000;
         if trap::FS_FOpenFile(ctx.engine, &fileName, &mut f, FS_WRITE) >= 0 {
             trap::FS_Write(ctx.engine, &(POST_GAME_INFO_SIZE as i32).to_ne_bytes(), f);
             trap::FS_Write(ctx.engine, &postGameInfo_to_bytes(&newInfo), f);
@@ -653,7 +671,7 @@ pub fn UI_CalcPostGameStats(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
     }
 
     if newInfo.time < oldInfo.time {
-        ctx.world.newBestTime = ctx.world.uiDC.realTime + 20000;
+        ctx.world.newBestTime = ds.realTime + 20000;
     }
 
     // put back all the ui overrides
@@ -675,25 +693,25 @@ pub fn UI_CalcPostGameStats(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
     trap::Cvar_Set(ctx.engine, "g_friendlyFire", &friendlyFire);
 
     UI_SetBestScores(ctx, &newInfo, true);
-    UI_ShowPostGame(ctx, dc, newHigh);
+    UI_ShowPostGame(ctx, menus, ds, newHigh);
 }
 
 /// Raven `UI_ConsoleCommand` — dispatches the `ui_*` console-command family;
 /// returns whether the command was consumed by the ui module.
 ///
 /// PORT-NOTE (DisplayContext threading): `Menus_CloseAll`/`Menus_ActivateByName`
-/// take a `dc: &mut dyn DisplayContext` (DEC-36 addendum 12); the threading
-/// digest only listed `UiContext`/`UiWorld` channels, so this fn threads `dc`
-/// through as well. Recorded as an escalation.
+/// take `(menus, ds, dc)`; `ctx` is the `dc` (DEC-38 ruling 1), so `menus`/`ds`
+/// thread beside it.
 ///
 /// Source: `oracle/codemp/ui/ui_atoms.c:296-382`
 pub fn UI_ConsoleCommand(
     ctx: &mut UiContext,
-    dc: &mut dyn DisplayContext,
+    menus: &mut MenuSystem,
+    ds: &mut DisplayState,
     realTime: c_int,
 ) -> bool {
-    ctx.world.uiDC.frameTime = realTime - ctx.world.uiDC.realTime;
-    ctx.world.uiDC.realTime = realTime;
+    ds.frameTime = realTime - ds.realTime;
+    ds.realTime = realTime;
 
     let cmd = UI_Argv(ctx, 0);
 
@@ -701,24 +719,24 @@ pub fn UI_ConsoleCommand(
     //Menu_Cache();
 
     if Q_stricmp(&cmd, "ui_test") == 0 {
-        UI_ShowPostGame(ctx, dc, true);
+        UI_ShowPostGame(ctx, menus, ds, true);
     }
 
     if Q_stricmp(&cmd, "ui_report") == 0 {
-        UI_Report(dc);
+        UI_Report(ctx);
         return true;
     }
 
     if Q_stricmp(&cmd, "ui_load") == 0 {
-        UI_Load(ctx, dc);
+        UI_Load(ctx, menus, ds);
         return true;
     }
 
     if Q_stricmp(&cmd, "ui_opensiegemenu") == 0 {
         if trap::Cvar_VariableValue(ctx.engine, "g_gametype") == GT_SIEGE as f32 {
-            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
+            Menus_CloseAll(menus, ds, ctx);
             let arg1 = UI_Argv(ctx, 1);
-            if Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, &arg1).is_some() {
+            if Menus_ActivateByName(menus, ds, ctx, &arg1).is_some() {
                 trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
             }
         }
@@ -728,9 +746,9 @@ pub fn UI_ConsoleCommand(
     if Q_stricmp(&cmd, "ui_openmenu") == 0 {
         //if ( trap_Cvar_VariableValue ( "developer" ) )
         {
-            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
+            Menus_CloseAll(menus, ds, ctx);
             let arg1 = UI_Argv(ctx, 1);
-            if Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, &arg1).is_some() {
+            if Menus_ActivateByName(menus, ds, ctx, &arg1).is_some() {
                 trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
             }
             return true;
@@ -751,12 +769,12 @@ pub fn UI_ConsoleCommand(
     */
 
     if Q_stricmp(&cmd, "postgame") == 0 {
-        UI_CalcPostGameStats(ctx, dc);
+        UI_CalcPostGameStats(ctx, menus, ds);
         return true;
     }
 
     if Q_stricmp(&cmd, "ui_cache") == 0 {
-        UI_Cache_f(ctx, dc);
+        UI_Cache_f(ctx, menus);
         return true;
     }
 

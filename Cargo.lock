@@ -549,9 +549,7 @@ dependencies = [
  "abi_transport",
  "mp_abi",
  "mp_engine_qcommon",
- "mp_qshared",
  "mp_ui",
- "mp_uishared",
  "native_platform",
 ]
 

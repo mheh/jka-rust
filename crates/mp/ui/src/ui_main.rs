@@ -63,8 +63,10 @@ use mp_qshared::shared::{
     SCREEN_HEIGHT, SCREEN_WIDTH,
 };
 use mp_uishared::shared::display_context::DisplayContext;
+use mp_uishared::shared::display_state::DisplayState;
 use mp_uishared::shared::item_id::ItemId;
 use mp_uishared::shared::menu_id::MenuId;
+use mp_uishared::shared::menu_system::MenuSystem;
 use mp_uishared::shared::menu_system::MAX_MENUFILE;
 use mp_uishared::shared::menudef::{
     FEEDER_ALLMAPS, FEEDER_CINEMATICS, FEEDER_COLORCHOICES, FEEDER_DEMOS, FEEDER_FINDPLAYER,
@@ -146,6 +148,7 @@ use crate::ui_saber::{
 use crate::world::ui_context::UiContext;
 use crate::world::ui_cvars::UiCvars;
 use crate::world::ui_main_state::MAX_SABER_HILTS;
+use crate::world::ui_state::UiState;
 use crate::world::ui_world::{UiWorld, MAX_FORCE_CONFIGS, MAX_FOUNDPLAYER_SERVERS};
 
 /// Raven `static const int numSkillLevels = sizeof(skillLevels) /
@@ -746,45 +749,40 @@ pub fn UI_TeamName(team: c_int) -> &'static str {
 /// Raven `AssetCache`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:1009-1045`
-pub fn AssetCache(ctx: &mut UiContext) {
-    ctx.world.uiDC.Assets.gradientBar =
-        trap::R_RegisterShaderNoMip(ctx.engine, "ui/assets/gradientbar2.tga");
-    ctx.world.uiDC.Assets.fxBasePic = trap::R_RegisterShaderNoMip(ctx.engine, "menu/art/fx_base");
-    ctx.world.uiDC.Assets.fxPic[0] = trap::R_RegisterShaderNoMip(ctx.engine, "menu/art/fx_red");
-    ctx.world.uiDC.Assets.fxPic[1] = trap::R_RegisterShaderNoMip(ctx.engine, "menu/art/fx_orange");
-    ctx.world.uiDC.Assets.fxPic[2] = trap::R_RegisterShaderNoMip(ctx.engine, "menu/art/fx_yel");
-    ctx.world.uiDC.Assets.fxPic[3] = trap::R_RegisterShaderNoMip(ctx.engine, "menu/art/fx_grn");
-    ctx.world.uiDC.Assets.fxPic[4] = trap::R_RegisterShaderNoMip(ctx.engine, "menu/art/fx_blue");
-    ctx.world.uiDC.Assets.fxPic[5] = trap::R_RegisterShaderNoMip(ctx.engine, "menu/art/fx_purple");
-    ctx.world.uiDC.Assets.fxPic[6] = trap::R_RegisterShaderNoMip(ctx.engine, "menu/art/fx_white");
-    ctx.world.uiDC.Assets.scrollBar =
-        trap::R_RegisterShaderNoMip(ctx.engine, "gfx/menus/scrollbar.tga");
-    ctx.world.uiDC.Assets.scrollBarArrowDown =
+pub fn AssetCache(ctx: &mut UiContext, ds: &mut DisplayState) {
+    ds.Assets.gradientBar = trap::R_RegisterShaderNoMip(ctx.engine, "ui/assets/gradientbar2.tga");
+    ds.Assets.fxBasePic = trap::R_RegisterShaderNoMip(ctx.engine, "menu/art/fx_base");
+    ds.Assets.fxPic[0] = trap::R_RegisterShaderNoMip(ctx.engine, "menu/art/fx_red");
+    ds.Assets.fxPic[1] = trap::R_RegisterShaderNoMip(ctx.engine, "menu/art/fx_orange");
+    ds.Assets.fxPic[2] = trap::R_RegisterShaderNoMip(ctx.engine, "menu/art/fx_yel");
+    ds.Assets.fxPic[3] = trap::R_RegisterShaderNoMip(ctx.engine, "menu/art/fx_grn");
+    ds.Assets.fxPic[4] = trap::R_RegisterShaderNoMip(ctx.engine, "menu/art/fx_blue");
+    ds.Assets.fxPic[5] = trap::R_RegisterShaderNoMip(ctx.engine, "menu/art/fx_purple");
+    ds.Assets.fxPic[6] = trap::R_RegisterShaderNoMip(ctx.engine, "menu/art/fx_white");
+    ds.Assets.scrollBar = trap::R_RegisterShaderNoMip(ctx.engine, "gfx/menus/scrollbar.tga");
+    ds.Assets.scrollBarArrowDown =
         trap::R_RegisterShaderNoMip(ctx.engine, "gfx/menus/scrollbar_arrow_dwn_a.tga");
-    ctx.world.uiDC.Assets.scrollBarArrowUp =
+    ds.Assets.scrollBarArrowUp =
         trap::R_RegisterShaderNoMip(ctx.engine, "gfx/menus/scrollbar_arrow_up_a.tga");
-    ctx.world.uiDC.Assets.scrollBarArrowLeft =
+    ds.Assets.scrollBarArrowLeft =
         trap::R_RegisterShaderNoMip(ctx.engine, "gfx/menus/scrollbar_arrow_left.tga");
-    ctx.world.uiDC.Assets.scrollBarArrowRight =
+    ds.Assets.scrollBarArrowRight =
         trap::R_RegisterShaderNoMip(ctx.engine, "gfx/menus/scrollbar_arrow_right.tga");
-    ctx.world.uiDC.Assets.scrollBarThumb =
+    ds.Assets.scrollBarThumb =
         trap::R_RegisterShaderNoMip(ctx.engine, "gfx/menus/scrollbar_thumb.tga");
-    ctx.world.uiDC.Assets.sliderBar = trap::R_RegisterShaderNoMip(ctx.engine, "menu/new/slider");
-    ctx.world.uiDC.Assets.sliderThumb =
-        trap::R_RegisterShaderNoMip(ctx.engine, "menu/new/sliderthumb");
+    ds.Assets.sliderBar = trap::R_RegisterShaderNoMip(ctx.engine, "menu/new/slider");
+    ds.Assets.sliderThumb = trap::R_RegisterShaderNoMip(ctx.engine, "menu/new/sliderthumb");
 
     // Icons for various server settings.
-    ctx.world.uiDC.Assets.needPass = trap::R_RegisterShaderNoMip(ctx.engine, "gfx/menus/needpass");
-    ctx.world.uiDC.Assets.noForce = trap::R_RegisterShaderNoMip(ctx.engine, "gfx/menus/noforce");
-    ctx.world.uiDC.Assets.forceRestrict =
-        trap::R_RegisterShaderNoMip(ctx.engine, "gfx/menus/forcerestrict");
-    ctx.world.uiDC.Assets.saberOnly =
-        trap::R_RegisterShaderNoMip(ctx.engine, "gfx/menus/saberonly");
-    ctx.world.uiDC.Assets.trueJedi = trap::R_RegisterShaderNoMip(ctx.engine, "gfx/menus/truejedi");
+    ds.Assets.needPass = trap::R_RegisterShaderNoMip(ctx.engine, "gfx/menus/needpass");
+    ds.Assets.noForce = trap::R_RegisterShaderNoMip(ctx.engine, "gfx/menus/noforce");
+    ds.Assets.forceRestrict = trap::R_RegisterShaderNoMip(ctx.engine, "gfx/menus/forcerestrict");
+    ds.Assets.saberOnly = trap::R_RegisterShaderNoMip(ctx.engine, "gfx/menus/saberonly");
+    ds.Assets.trueJedi = trap::R_RegisterShaderNoMip(ctx.engine, "gfx/menus/truejedi");
 
-    for n in 0..ctx.world.uiDC.Assets.crosshairShader.len() {
+    for n in 0..ds.Assets.crosshairShader.len() {
         let letter = (b'a' + n as u8) as char;
-        ctx.world.uiDC.Assets.crosshairShader[n] =
+        ds.Assets.crosshairShader[n] =
             trap::R_RegisterShaderNoMip(ctx.engine, &format!("gfx/2d/crosshair{}", letter));
     }
 
@@ -796,9 +794,17 @@ pub fn AssetCache(ctx: &mut UiContext) {
 /// Raven `_UI_DrawSides`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:1047-1051`
-pub fn _UI_DrawSides(ctx: &mut UiContext, x: f32, y: f32, w: f32, h: f32, size: f32) {
-    let size = size * ctx.world.uiDC.xscale;
-    let white = ctx.world.uiDC.whiteShader;
+pub fn _UI_DrawSides(
+    ctx: &mut UiContext,
+    ds: &DisplayState,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    size: f32,
+) {
+    let size = size * ds.xscale;
+    let white = ds.whiteShader;
     trap::R_DrawStretchPic(ctx.engine, x, y, size, h, 0.0, 0.0, 0.0, 0.0, white);
     trap::R_DrawStretchPic(
         ctx.engine,
@@ -817,9 +823,17 @@ pub fn _UI_DrawSides(ctx: &mut UiContext, x: f32, y: f32, w: f32, h: f32, size: 
 /// Raven `_UI_DrawTopBottom`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:1053-1057`
-pub fn _UI_DrawTopBottom(ctx: &mut UiContext, x: f32, y: f32, w: f32, h: f32, size: f32) {
-    let size = size * ctx.world.uiDC.yscale;
-    let white = ctx.world.uiDC.whiteShader;
+pub fn _UI_DrawTopBottom(
+    ctx: &mut UiContext,
+    ds: &DisplayState,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    size: f32,
+) {
+    let size = size * ds.yscale;
+    let white = ds.whiteShader;
     trap::R_DrawStretchPic(ctx.engine, x, y, w, size, 0.0, 0.0, 0.0, 0.0, white);
     trap::R_DrawStretchPic(
         ctx.engine,
@@ -840,6 +854,7 @@ pub fn _UI_DrawTopBottom(ctx: &mut UiContext, x: f32, y: f32, w: f32, h: f32, si
 /// Source: `oracle/codemp/ui/ui_main.c:1065-1072`
 pub fn _UI_DrawRect(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     x: f32,
     y: f32,
     width: f32,
@@ -849,8 +864,8 @@ pub fn _UI_DrawRect(
 ) {
     trap::R_SetColor(ctx.engine, Some(color));
 
-    _UI_DrawTopBottom(ctx, x, y, width, height, size);
-    _UI_DrawSides(ctx, x, y, width, height, size);
+    _UI_DrawTopBottom(ctx, ds, x, y, width, height, size);
+    _UI_DrawSides(ctx, ds, x, y, width, height, size);
 
     trap::R_SetColor(ctx.engine, None);
 }
@@ -858,29 +873,41 @@ pub fn _UI_DrawRect(
 /// Raven `MenuFontToHandle`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:1075-1086`
-pub fn MenuFontToHandle(world: &UiWorld, iMenuFont: c_int) -> qhandle_t {
+pub fn MenuFontToHandle(ds: &DisplayState, iMenuFont: c_int) -> qhandle_t {
     match iMenuFont {
-        1 => world.uiDC.Assets.qhSmallFont,
-        2 => world.uiDC.Assets.qhMediumFont,
-        3 => world.uiDC.Assets.qhBigFont,
-        4 => world.uiDC.Assets.qhSmall2Font,
-        _ => world.uiDC.Assets.qhMediumFont,
+        1 => ds.Assets.qhSmallFont,
+        2 => ds.Assets.qhMediumFont,
+        3 => ds.Assets.qhBigFont,
+        4 => ds.Assets.qhSmall2Font,
+        _ => ds.Assets.qhMediumFont,
     }
 }
 
 /// Raven `Text_Width`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:1089-1094`
-pub fn Text_Width(ctx: &UiContext, text: &str, scale: f32, iMenuFont: c_int) -> c_int {
-    let iFontIndex = MenuFontToHandle(ctx.world, iMenuFont);
+pub fn Text_Width(
+    ctx: &UiContext,
+    ds: &DisplayState,
+    text: &str,
+    scale: f32,
+    iMenuFont: c_int,
+) -> c_int {
+    let iFontIndex = MenuFontToHandle(ds, iMenuFont);
     trap::R_Font_StrLenPixels(ctx.engine, text, iFontIndex, scale)
 }
 
 /// Raven `Text_Height`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:1096-1101`
-pub fn Text_Height(ctx: &UiContext, _text: &str, scale: f32, iMenuFont: c_int) -> c_int {
-    let iFontIndex = MenuFontToHandle(ctx.world, iMenuFont);
+pub fn Text_Height(
+    ctx: &UiContext,
+    ds: &DisplayState,
+    _text: &str,
+    scale: f32,
+    iMenuFont: c_int,
+) -> c_int {
+    let iFontIndex = MenuFontToHandle(ds, iMenuFont);
     trap::R_Font_HeightPixels(ctx.engine, iFontIndex, scale)
 }
 
@@ -895,6 +922,7 @@ pub fn Text_Height(ctx: &UiContext, _text: &str, scale: f32, iMenuFont: c_int) -
 #[allow(clippy::too_many_arguments)]
 pub fn Text_Paint(
     ctx: &UiContext,
+    ds: &DisplayState,
     x: f32,
     y: f32,
     scale: f32,
@@ -905,7 +933,7 @@ pub fn Text_Paint(
     style: c_int,
     iMenuFont: c_int,
 ) {
-    let iFontIndex = MenuFontToHandle(ctx.world, iMenuFont);
+    let iFontIndex = MenuFontToHandle(ds, iMenuFont);
     // kludge.. convert JK2 menu styles to SOF2 printstring ctrl codes...
     let iStyleOR: c_int = match style {
         ITEM_TEXTSTYLE_NORMAL => 0,                           // JK2 normal text
@@ -997,15 +1025,14 @@ pub fn UI_DrawCenteredPic(ctx: &mut UiContext, image: qhandle_t, w: c_int, h: c_
 
 /// Raven `_UI_Shutdown`.
 ///
-/// PORT-NOTE: `UI_CleanupGhoul2` calls through `DisplayContext` (its ported
-/// shape takes `dc: &mut dyn DisplayContext`, DEC-36 addendum 12), so this fn
-/// carries a `dc` parameter alongside `ctx` even though Raven's own body has
-/// no `DC->` call (see escalations).
+/// PORT-NOTE: `UI_CleanupGhoul2` is `ui_shared.c` framework code, so it takes
+/// `menus` beside the `dc` (`ctx` itself, DEC-38 ruling 1) even though Raven's
+/// own body has no `DC->` call.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:1432-1435`
-pub fn _UI_Shutdown(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+pub fn _UI_Shutdown(ctx: &mut UiContext, menus: &mut MenuSystem) {
     trap::LAN_SaveCachedServers(ctx.engine);
-    UI_CleanupGhoul2(&mut ctx.world.menus, dc);
+    UI_CleanupGhoul2(menus, ctx);
 }
 
 /// Raven `UI_SetCapFragLimits`.
@@ -1704,20 +1731,22 @@ pub fn UI_BuildPlayerList(ctx: &mut UiContext) {
 
 /// Raven `UI_Version`.
 ///
-/// PORT-NOTE: `uiDC.textWidth`/`uiDC.drawText` are `DisplayContext` trait
-/// methods (DEC-36 D3); the trait is imported here, but `impl DisplayContext
-/// for UiContext` has not landed yet (see escalations).
+/// Raven calls `uiDC.textWidth`/`uiDC.drawText` through the vtable; the ported
+/// shape keeps that routing — `ctx` IS the `DisplayContext` implementor
+/// (DEC-38 ruling 1, revised), so the two calls stay `DC->` calls.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:3494-3501`
 pub fn UI_Version(
-    dc: &mut dyn DisplayContext,
+    ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
     iMenuFont: c_int,
 ) {
-    let width = dc.textWidth(Q3_VERSION, scale, iMenuFont);
-    dc.drawText(
+    let width = ctx.textWidth(ds, Q3_VERSION, scale, iMenuFont);
+    ctx.drawText(
+        ds,
         rect.x - width as f32,
         rect.y,
         scale,
@@ -1733,7 +1762,7 @@ pub fn UI_Version(
 /// Raven `UI_OwnerDrawVisible`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:3781-3891`
-pub fn UI_OwnerDrawVisible(ctx: &mut UiContext, flags: c_int) -> bool {
+pub fn UI_OwnerDrawVisible(ctx: &mut UiContext, ds: &DisplayState, flags: c_int) -> bool {
     let mut vis = true;
     let mut flags = flags;
 
@@ -1833,7 +1862,7 @@ pub fn UI_OwnerDrawVisible(ctx: &mut UiContext, flags: c_int) -> bool {
         }
 
         if flags & UI_SHOW_NEWHIGHSCORE != 0 {
-            if ctx.world.newHighScoreTime < ctx.world.uiDC.realTime {
+            if ctx.world.newHighScoreTime < ds.realTime {
                 vis = false;
             } else if ctx.world.soundHighScore
                 && trap::Cvar_VariableValue(ctx.engine, "sv_killserver") == 0.0
@@ -1846,7 +1875,7 @@ pub fn UI_OwnerDrawVisible(ctx: &mut UiContext, flags: c_int) -> bool {
         }
 
         if flags & UI_SHOW_NEWBESTTIME != 0 {
-            if ctx.world.newBestTime < ctx.world.uiDC.realTime {
+            if ctx.world.newBestTime < ds.realTime {
                 vis = false;
             }
             flags &= !UI_SHOW_NEWBESTTIME;
@@ -2023,12 +2052,18 @@ const NUM_CROSSHAIRS: c_int = 9;
 /// Raven `UI_DrawCrosshair`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:3262-3269`
-pub fn UI_DrawCrosshair(ctx: &mut UiContext, rect: &RectDef, _scale: f32, color: vec4_t) {
+pub fn UI_DrawCrosshair(
+    ctx: &mut UiContext,
+    ds: &DisplayState,
+    rect: &RectDef,
+    _scale: f32,
+    color: vec4_t,
+) {
     trap::R_SetColor(ctx.engine, Some(&color));
     if ctx.world.currentCrosshair < 0 || ctx.world.currentCrosshair >= NUM_CROSSHAIRS {
         ctx.world.currentCrosshair = 0;
     }
-    let shader = ctx.world.uiDC.Assets.crosshairShader[ctx.world.currentCrosshair as usize];
+    let shader = ds.Assets.crosshairShader[ctx.world.currentCrosshair as usize];
     UI_DrawHandlePic(ctx, rect.x, rect.y, rect.w, rect.h, shader);
     trap::R_SetColor(ctx.engine, None);
 }
@@ -2071,15 +2106,15 @@ pub fn UI_Crosshair_HandleKey(
 /// Raven `UI_InSoloMenu`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:4300-4320`
-pub fn UI_InSoloMenu(world: &UiWorld) -> bool {
+pub fn UI_InSoloMenu(menus: &MenuSystem) -> bool {
     // Get current menu (either video or ingame video, I would assume)
-    let menu = Menu_GetFocused(&world.menus);
+    let menu = Menu_GetFocused(menus);
 
     if menu.is_none() {
         return false;
     }
 
-    Menu_FindItemByName(&world.menus, menu, "solo_gametypefield").is_some()
+    Menu_FindItemByName(menus, menu, "solo_gametypefield").is_some()
 }
 
 /// Raven `UI_TeamName_HandleKey`.
@@ -2840,11 +2875,11 @@ pub fn UI_GetIndexFromSelection(world: &UiWorld, actual: c_int) -> c_int {
 /// Raven `UI_UpdatePendingPings`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:8771-8778`
-pub fn UI_UpdatePendingPings(ctx: &mut UiContext) {
+pub fn UI_UpdatePendingPings(ctx: &mut UiContext, ds: &DisplayState) {
     let source = ctx.world.cvars.ui_netSource.integer;
     trap::LAN_ResetPings(ctx.engine, source);
     ctx.world.serverStatus.refreshActive = true;
-    ctx.world.serverStatus.refreshtime = ctx.world.uiDC.realTime + 1000;
+    ctx.world.serverStatus.refreshtime = ds.realTime + 1000;
 }
 
 /// Raven `UI_Pause`.
@@ -4164,9 +4199,9 @@ pub fn UI_UpdateSaberCvars(ctx: &mut UiContext) {
 /// Raven `UI_SetSaberBoxesandHilts`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:5868-5942`
-pub fn UI_SetSaberBoxesandHilts(ctx: &mut UiContext) {
+pub fn UI_SetSaberBoxesandHilts(ctx: &mut UiContext, menus: &mut MenuSystem) {
     // Get current menu (either video or ingame video, I would assume)
-    let menu = match Menu_GetFocused(&ctx.world.menus) {
+    let menu = match Menu_GetFocused(menus) {
         Some(m) => m,
         None => return,
     };
@@ -4185,32 +4220,32 @@ pub fn UI_SetSaberBoxesandHilts(ctx: &mut UiContext) {
         return;
     }
 
-    if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "box2middle") {
-        let window = &mut ctx.world.menus.item_mut(item).window;
+    if let Some(item) = Menu_FindItemByName(menus, Some(menu), "box2middle") {
+        let window = &mut menus.item_mut(item).window;
         window.rect.x = 212.0;
         window.rect.y = 126.0;
         window.rect.w = 219.0;
         window.rect.h = 44.0;
     }
 
-    if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "box2bottom") {
-        let window = &mut ctx.world.menus.item_mut(item).window;
+    if let Some(item) = Menu_FindItemByName(menus, Some(menu), "box2bottom") {
+        let window = &mut menus.item_mut(item).window;
         window.rect.x = 212.0;
         window.rect.y = 170.0;
         window.rect.w = 219.0;
         window.rect.h = 60.0;
     }
 
-    if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "box3middle") {
-        let window = &mut ctx.world.menus.item_mut(item).window;
+    if let Some(item) = Menu_FindItemByName(menus, Some(menu), "box3middle") {
+        let window = &mut menus.item_mut(item).window;
         window.rect.x = 418.0;
         window.rect.y = 126.0;
         window.rect.w = 219.0;
         window.rect.h = 44.0;
     }
 
-    if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "box3bottom") {
-        let window = &mut ctx.world.menus.item_mut(item).window;
+    if let Some(item) = Menu_FindItemByName(menus, Some(menu), "box3bottom") {
+        let window = &mut menus.item_mut(item).window;
         window.rect.x = 418.0;
         window.rect.y = 170.0;
         window.rect.w = 219.0;
@@ -4247,15 +4282,15 @@ pub fn UI_GetSaberCvars(ctx: &mut UiContext) {
 /// Raven `UI_ResetCharacterListBoxes`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:6087-6142`
-pub fn UI_ResetCharacterListBoxes(world: &mut UiWorld) {
-    let menu = match Menu_GetFocused(&world.menus) {
+pub fn UI_ResetCharacterListBoxes(menus: &mut MenuSystem) {
+    let menu = match Menu_GetFocused(menus) {
         Some(m) => m,
         None => return,
     };
 
     for name in ["headlistbox", "torsolistbox", "lowerlistbox", "colorbox"] {
-        if let Some(item) = Menu_FindItemByName(&world.menus, Some(menu), name) {
-            let itemDef = world.menus.item_mut(item);
+        if let Some(item) = Menu_FindItemByName(menus, Some(menu), name) {
+            let itemDef = menus.item_mut(item);
             if let Some(listPtr) = itemDef.typeData.listBox_mut() {
                 listPtr.cursorPos = 0;
             }
@@ -4522,11 +4557,14 @@ fn store_at(vec: &mut Vec<String>, slot: usize, value: String) {
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:8164-8307`
 #[allow(clippy::too_many_lines)]
-pub fn UI_BuildFindPlayerList(ctx: &mut UiContext, dc: &mut dyn DisplayContext, force: bool) {
+pub fn UI_BuildFindPlayerList(
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    force: bool,
+) {
     if !force {
-        if ctx.world.nextFindPlayerRefresh == 0
-            || ctx.world.nextFindPlayerRefresh > ctx.world.uiDC.realTime
-        {
+        if ctx.world.nextFindPlayerRefresh == 0 || ctx.world.nextFindPlayerRefresh > ds.realTime {
             return;
         }
     } else {
@@ -4632,7 +4670,7 @@ pub fn UI_BuildFindPlayerList(ctx: &mut UiContext, dc: &mut dyn DisplayContext, 
         // if empty pending slot or timed out
         if !ctx.world.pendingServerStatus.server[i].valid
             || ctx.world.pendingServerStatus.server[i].startTime
-                < ctx.world.uiDC.realTime - ctx.world.cvars.ui_serverStatusTimeOut.integer
+                < ds.realTime - ctx.world.cvars.ui_serverStatusTimeOut.integer
         {
             if ctx.world.pendingServerStatus.server[i].valid {
                 ctx.world.scratch.UI_BuildFindPlayerList_numTimeOuts += 1;
@@ -4646,7 +4684,7 @@ pub fn UI_BuildFindPlayerList(ctx: &mut UiContext, dc: &mut dyn DisplayContext, 
             if ctx.world.pendingServerStatus.num
                 < ctx.world.serverStatus.displayServers.len() as c_int
             {
-                ctx.world.pendingServerStatus.server[i].startTime = ctx.world.uiDC.realTime;
+                ctx.world.pendingServerStatus.server[i].startTime = ds.realTime;
                 let num = ctx.world.pendingServerStatus.num as usize;
                 let displayServer = ctx.world.serverStatus.displayServers[num];
                 let netSource = ctx.world.cvars.ui_netSource.integer;
@@ -4699,7 +4737,7 @@ pub fn UI_BuildFindPlayerList(ctx: &mut UiContext, dc: &mut dyn DisplayContext, 
     }
     // if still trying to retrieve server status info
     if i < MAX_SERVERSTATUSREQUESTS {
-        ctx.world.nextFindPlayerRefresh = ctx.world.uiDC.realTime + 25;
+        ctx.world.nextFindPlayerRefresh = ds.realTime + 25;
     } else {
         // add a line that shows the number of servers found
         if ctx.world.numFoundPlayerServers == 0 {
@@ -4736,7 +4774,8 @@ pub fn UI_BuildFindPlayerList(ctx: &mut UiContext, dc: &mut dyn DisplayContext, 
         let currentFoundPlayerServer = ctx.world.currentFoundPlayerServer;
         UI_FeederSelection(
             ctx,
-            dc,
+            menus,
+            ds,
             FEEDER_FINDPLAYER as f32,
             currentFoundPlayerServer,
             None,
@@ -5082,8 +5121,8 @@ pub fn UI_BuildPlayerModel_List(ctx: &mut UiContext, inGameLoad: bool) {
 /// Raven `_UI_IsFullscreen`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:11030-11032`
-pub fn _UI_IsFullscreen(world: &UiWorld) -> bool {
-    Menus_AnyFullScreenVisible(&world.menus)
+pub fn _UI_IsFullscreen(menus: &MenuSystem) -> bool {
+    Menus_AnyFullScreenVisible(menus)
 }
 
 /// Raven `UI_StopServerRefresh`.
@@ -5140,6 +5179,7 @@ pub fn GetNetSourceString(ctx: &mut UiContext, iSource: c_int) -> String {
 #[allow(clippy::too_many_arguments)]
 pub fn Text_PaintWithCursor(
     ctx: &UiContext,
+    ds: &DisplayState,
     x: f32,
     y: f32,
     scale: f32,
@@ -5151,7 +5191,9 @@ pub fn Text_PaintWithCursor(
     style: c_int,
     iMenuFont: c_int,
 ) {
-    Text_Paint(ctx, x, y, scale, color, text, 0.0, limit, style, iMenuFont);
+    Text_Paint(
+        ctx, ds, x, y, scale, color, text, 0.0, limit, style, iMenuFont,
+    );
 
     // now print the cursor as well... (excuse the braces, it's for porting
     // C++ to C)
@@ -5170,11 +5212,12 @@ pub fn Text_PaintWithCursor(
         // copy text into temp buffer for pixel measure...
         let sTemp: String = text.chars().take(iCopyCount).collect();
 
-        let iFontIndex = MenuFontToHandle(ctx.world, iMenuFont);
+        let iFontIndex = MenuFontToHandle(ds, iMenuFont);
         let iNextXpos = trap::R_Font_StrLenPixels(ctx.engine, &sTemp, iFontIndex, scale);
 
         Text_Paint(
             ctx,
+            ds,
             x + iNextXpos as f32,
             y,
             scale,
@@ -5199,6 +5242,7 @@ pub fn Text_PaintWithCursor(
 #[allow(clippy::too_many_arguments)]
 pub fn Text_Paint_Limit(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     maxX: &mut f32,
     x: f32,
     y: f32,
@@ -5210,7 +5254,7 @@ pub fn Text_Paint_Limit(
     iMenuFont: c_int,
 ) {
     // this is kinda dirty, but...
-    let iFontIndex = MenuFontToHandle(ctx.world, iMenuFont);
+    let iFontIndex = MenuFontToHandle(ds, iMenuFont);
 
     let iPixelLen = trap::R_Font_StrLenPixels(ctx.engine, text, iFontIndex, scale);
     if x + iPixelLen as f32 > *maxX {
@@ -5254,6 +5298,7 @@ pub fn Text_Paint_Limit(
         let sTemp = latin1_to_string(&sTemp);
         Text_Paint(
             ctx,
+            ds,
             x,
             y,
             scale,
@@ -5269,6 +5314,7 @@ pub fn Text_Paint_Limit(
         *maxX = x + iPixelLen as f32; // feedback the next position, as the caller expects
         Text_Paint(
             ctx,
+            ds,
             x,
             y,
             scale,
@@ -5285,12 +5331,11 @@ pub fn Text_Paint_Limit(
 /// Raven `UI_Report`.
 ///
 /// PORT-NOTE: `String_Report`'s ported shape takes `dc: &mut dyn
-/// DisplayContext` (DEC-36 addendum 12); `UiContext` does not implement the
-/// trait yet, so this fn threads `dc` in beside it (see escalations).
+/// DisplayContext`; `ctx` IS that `dc` (DEC-38 ruling 1), so it passes itself.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:1725-1729`
-pub fn UI_Report(dc: &mut dyn DisplayContext) {
-    String_Report(dc);
+pub fn UI_Report(ctx: &mut UiContext) {
+    String_Report(ctx);
     // Font_Report(); — Raven left this call commented out.
 }
 
@@ -5299,6 +5344,7 @@ pub fn UI_Report(dc: &mut dyn DisplayContext) {
 /// Source: `oracle/codemp/ui/ui_main.c:1897-1904`
 pub fn UI_DrawHandicap(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -5311,7 +5357,7 @@ pub fn UI_DrawHandicap(
 
     let text = HANDICAP_VALUES[i as usize].unwrap_or("");
     Text_Paint(
-        ctx, rect.x, rect.y, scale, color, text, 0.0, 0, textStyle, iMenuFont,
+        ctx, ds, rect.x, rect.y, scale, color, text, 0.0, 0, textStyle, iMenuFont,
     );
 }
 
@@ -5320,6 +5366,7 @@ pub fn UI_DrawHandicap(
 /// Source: `oracle/codemp/ui/ui_main.c:1906-1908`
 pub fn UI_DrawClanName(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -5328,7 +5375,7 @@ pub fn UI_DrawClanName(
 ) {
     let teamName = UI_Cvar_VariableString(ctx, "ui_teamName");
     Text_Paint(
-        ctx, rect.x, rect.y, scale, color, &teamName, 0.0, 0, textStyle, iMenuFont,
+        ctx, ds, rect.x, rect.y, scale, color, &teamName, 0.0, 0, textStyle, iMenuFont,
     );
 }
 
@@ -5337,6 +5384,7 @@ pub fn UI_DrawClanName(
 /// Source: `oracle/codemp/ui/ui_main.c:1955-1958`
 pub fn UI_DrawGameType(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -5353,7 +5401,7 @@ pub fn UI_DrawGameType(
         .unwrap_or_default();
     let name = UI_GetGameTypeName(ctx, gtEnum);
     Text_Paint(
-        ctx, rect.x, rect.y, scale, color, &name, 0.0, 0, textStyle, iMenuFont,
+        ctx, ds, rect.x, rect.y, scale, color, &name, 0.0, 0, textStyle, iMenuFont,
     );
 }
 
@@ -5362,6 +5410,7 @@ pub fn UI_DrawGameType(
 /// Source: `oracle/codemp/ui/ui_main.c:1960-1968`
 pub fn UI_DrawNetGameType(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -5384,7 +5433,7 @@ pub fn UI_DrawNetGameType(
         .unwrap_or_default();
     let name = UI_GetGameTypeName(ctx, gtEnum);
     Text_Paint(
-        ctx, rect.x, rect.y, scale, color, &name, 0.0, 0, textStyle, iMenuFont,
+        ctx, ds, rect.x, rect.y, scale, color, &name, 0.0, 0, textStyle, iMenuFont,
     );
 }
 
@@ -5393,6 +5442,7 @@ pub fn UI_DrawNetGameType(
 /// Source: `oracle/codemp/ui/ui_main.c:1970-1996`
 pub fn UI_DrawAutoSwitch(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -5412,6 +5462,7 @@ pub fn UI_DrawAutoSwitch(
 
     Text_Paint(
         ctx,
+        ds,
         rect.x,
         rect.y,
         scale,
@@ -5429,6 +5480,7 @@ pub fn UI_DrawAutoSwitch(
 /// Source: `oracle/codemp/ui/ui_main.c:1998-2006`
 pub fn UI_DrawJoinGameType(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -5451,7 +5503,7 @@ pub fn UI_DrawJoinGameType(
         .unwrap_or_default();
     let name = UI_GetGameTypeName(ctx, gtEnum);
     Text_Paint(
-        ctx, rect.x, rect.y, scale, color, &name, 0.0, 0, textStyle, iMenuFont,
+        ctx, ds, rect.x, rect.y, scale, color, &name, 0.0, 0, textStyle, iMenuFont,
     );
 }
 
@@ -5460,6 +5512,7 @@ pub fn UI_DrawJoinGameType(
 /// Source: `oracle/codemp/ui/ui_main.c:2084-2091`
 pub fn UI_DrawSkill(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -5472,7 +5525,7 @@ pub fn UI_DrawSkill(
     }
     let text = UI_GetStringEdString(ctx, "MP_INGAME", SKILL_LEVELS[(i - 1) as usize]);
     Text_Paint(
-        ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+        ctx, ds, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
     );
 }
 
@@ -5485,6 +5538,7 @@ pub fn UI_DrawSkill(
 #[allow(clippy::too_many_arguments)]
 pub fn UI_DrawGenericNum(
     ctx: &UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -5502,7 +5556,7 @@ pub fn UI_DrawGenericNum(
 
     let s = format!("{}", val);
     Text_Paint(
-        ctx, rect.x, rect.y, scale, color, &s, 0.0, 0, textStyle, iMenuFont,
+        ctx, ds, rect.x, rect.y, scale, color, &s, 0.0, 0, textStyle, iMenuFont,
     );
 }
 
@@ -5512,6 +5566,7 @@ pub fn UI_DrawGenericNum(
 #[allow(clippy::too_many_arguments)]
 pub fn UI_DrawForceMastery(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -5531,7 +5586,7 @@ pub fn UI_DrawForceMastery(
 
     let s = UI_GetStringEdString(ctx, "MP_INGAME", FORCE_MASTERY_LEVELS[i as usize]);
     Text_Paint(
-        ctx, rect.x, rect.y, scale, color, &s, 0.0, 0, textStyle, iMenuFont,
+        ctx, ds, rect.x, rect.y, scale, color, &s, 0.0, 0, textStyle, iMenuFont,
     );
 }
 
@@ -5541,6 +5596,7 @@ pub fn UI_DrawForceMastery(
 #[allow(clippy::too_many_arguments)]
 pub fn UI_DrawSkinColor(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -5558,7 +5614,7 @@ pub fn UI_DrawSkinColor(
     .unwrap_or_default();
 
     Text_Paint(
-        ctx, rect.x, rect.y, scale, color, &s, 0.0, 0, textStyle, iMenuFont,
+        ctx, ds, rect.x, rect.y, scale, color, &s, 0.0, 0, textStyle, iMenuFont,
     );
 }
 
@@ -5568,6 +5624,7 @@ pub fn UI_DrawSkinColor(
 #[allow(clippy::too_many_arguments)]
 pub fn UI_DrawJediNonJedi(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -5597,7 +5654,7 @@ pub fn UI_DrawJediNonJedi(
     .unwrap_or_default();
 
     Text_Paint(
-        ctx, rect.x, rect.y, scale, color, &s, 0.0, 0, textStyle, iMenuFont,
+        ctx, ds, rect.x, rect.y, scale, color, &s, 0.0, 0, textStyle, iMenuFont,
     );
 }
 
@@ -5606,6 +5663,7 @@ pub fn UI_DrawJediNonJedi(
 /// Source: `oracle/codemp/ui/ui_main.c:2355-2361`
 pub fn UI_DrawTeamName(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -5620,7 +5678,7 @@ pub fn UI_DrawTeamName(
         let teamName = ctx.world.teamList[i as usize].teamName.clone();
         let text = format!("{}: {}", if blue { "Blue" } else { "Red" }, teamName);
         Text_Paint(
-            ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+            ctx, ds, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
         );
     }
 }
@@ -5631,6 +5689,7 @@ pub fn UI_DrawTeamName(
 #[allow(clippy::too_many_arguments)]
 pub fn UI_DrawTeamMember(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -5695,7 +5754,7 @@ pub fn UI_DrawTeamMember(
     };
 
     Text_Paint(
-        ctx, rect.x, rect.y, scale, finalColor, &text, 0.0, 0, textStyle, iMenuFont,
+        ctx, ds, rect.x, rect.y, scale, finalColor, &text, 0.0, 0, textStyle, iMenuFont,
     );
 }
 
@@ -5704,6 +5763,7 @@ pub fn UI_DrawTeamMember(
 /// Source: `oracle/codemp/ui/ui_main.c:2455-2468`
 pub fn UI_DrawMapTimeToBeat(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -5738,7 +5798,7 @@ pub fn UI_DrawMapTimeToBeat(
 
     let text = format!("{:02}:{:02}", minutes, seconds);
     Text_Paint(
-        ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+        ctx, ds, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
     );
 }
 
@@ -5843,6 +5903,7 @@ pub fn UI_DrawNetMapCinematic(ctx: &mut UiContext, rect: &RectDef, scale: f32, c
 /// Source: `oracle/codemp/ui/ui_main.c:2765-2779`
 pub fn UI_DrawNetFilter(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -5875,7 +5936,7 @@ pub fn UI_DrawNetFilter(
         ctx.world.main.holdSPString, ctx.world.main.holdSPString2
     );
     Text_Paint(
-        ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+        ctx, ds, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
     );
 }
 
@@ -5884,6 +5945,7 @@ pub fn UI_DrawNetFilter(
 /// Source: `oracle/codemp/ui/ui_main.c:2782-2789`
 pub fn UI_DrawTier(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -5904,7 +5966,7 @@ pub fn UI_DrawTier(
         .unwrap_or_default();
     let text = format!("Tier: {}", tierName);
     Text_Paint(
-        ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+        ctx, ds, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
     );
 }
 
@@ -5913,6 +5975,7 @@ pub fn UI_DrawTier(
 /// Source: `oracle/codemp/ui/ui_main.c:2815-2827`
 pub fn UI_DrawTierMapName(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -5939,7 +6002,7 @@ pub fn UI_DrawTierMapName(
         .unwrap_or_default();
     let text = UI_EnglishMapName(ctx.world, &map);
     Text_Paint(
-        ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+        ctx, ds, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
     );
 }
 
@@ -5948,6 +6011,7 @@ pub fn UI_DrawTierMapName(
 /// Source: `oracle/codemp/ui/ui_main.c:2829-2841`
 pub fn UI_DrawTierGameType(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -5979,7 +6043,7 @@ pub fn UI_DrawTierGameType(
         .map(|gt| gt.gameType.clone())
         .unwrap_or_default();
     Text_Paint(
-        ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+        ctx, ds, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
     );
 }
 
@@ -5988,6 +6052,7 @@ pub fn UI_DrawTierGameType(
 /// Source: `oracle/codemp/ui/ui_main.c:2997-3002`
 pub fn UI_DrawAllMapsSelection(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -6003,7 +6068,7 @@ pub fn UI_DrawAllMapsSelection(
     if map >= 0 && map < ctx.world.mapList.len() as c_int {
         let mapName = ctx.world.mapList[map as usize].mapName.clone();
         Text_Paint(
-            ctx, rect.x, rect.y, scale, color, &mapName, 0.0, 0, textStyle, iMenuFont,
+            ctx, ds, rect.x, rect.y, scale, color, &mapName, 0.0, 0, textStyle, iMenuFont,
         );
     }
 }
@@ -6013,6 +6078,7 @@ pub fn UI_DrawAllMapsSelection(
 /// Source: `oracle/codemp/ui/ui_main.c:3004-3006`
 pub fn UI_DrawOpponentName(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -6021,7 +6087,7 @@ pub fn UI_DrawOpponentName(
 ) {
     let name = UI_Cvar_VariableString(ctx, "ui_opponentName");
     Text_Paint(
-        ctx, rect.x, rect.y, scale, color, &name, 0.0, 0, textStyle, iMenuFont,
+        ctx, ds, rect.x, rect.y, scale, color, &name, 0.0, 0, textStyle, iMenuFont,
     );
 }
 
@@ -6030,6 +6096,7 @@ pub fn UI_DrawOpponentName(
 /// Source: `oracle/codemp/ui/ui_main.c:3238-3247`
 pub fn UI_DrawBotName(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -6042,7 +6109,7 @@ pub fn UI_DrawBotName(
     }
     let text = UI_GetBotNameByNumber(ctx, value);
     Text_Paint(
-        ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+        ctx, ds, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
     );
 }
 
@@ -6051,6 +6118,7 @@ pub fn UI_DrawBotName(
 /// Source: `oracle/codemp/ui/ui_main.c:3249-3255`
 pub fn UI_DrawBotSkill(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -6064,7 +6132,7 @@ pub fn UI_DrawBotSkill(
             SKILL_LEVELS[ctx.world.skillIndex as usize],
         );
         Text_Paint(
-            ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+            ctx, ds, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
         );
     }
 }
@@ -6074,6 +6142,7 @@ pub fn UI_DrawBotSkill(
 /// Source: `oracle/codemp/ui/ui_main.c:3257-3260`
 pub fn UI_DrawRedBlue(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -6086,7 +6155,7 @@ pub fn UI_DrawRedBlue(
         UI_GetStringEdString(ctx, "MP_INGAME", "BLUE")
     };
     Text_Paint(
-        ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+        ctx, ds, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
     );
 }
 
@@ -6095,19 +6164,20 @@ pub fn UI_DrawRedBlue(
 /// Source: `oracle/codemp/ui/ui_main.c:3339-3345`
 pub fn UI_DrawSelectedPlayer(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
     textStyle: c_int,
     iMenuFont: c_int,
 ) {
-    if ctx.world.uiDC.realTime > ctx.world.playerRefresh {
-        ctx.world.playerRefresh = ctx.world.uiDC.realTime + 3000;
+    if ds.realTime > ctx.world.playerRefresh {
+        ctx.world.playerRefresh = ds.realTime + 3000;
         UI_BuildPlayerList(ctx);
     }
     let name = UI_Cvar_VariableString(ctx, "cg_selectedPlayerName");
     Text_Paint(
-        ctx, rect.x, rect.y, scale, color, &name, 0.0, 0, textStyle, iMenuFont,
+        ctx, ds, rect.x, rect.y, scale, color, &name, 0.0, 0, textStyle, iMenuFont,
     );
 }
 
@@ -6123,6 +6193,7 @@ pub fn UI_DrawSelectedPlayer(
 /// Source: `oracle/codemp/ui/ui_main.c:3347-3369`
 pub fn UI_DrawServerRefreshDate(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -6138,7 +6209,7 @@ pub fn UI_DrawServerRefreshDate(
         ];
         let mut newColor: vec4_t = [0.0, 0.0, 0.0, 0.0];
         // Raven divides two ints, so the pulse steps in 75ms plateaus.
-        let t = 0.5 + 0.5 * ((ctx.world.uiDC.realTime / PULSE_DIVISOR) as f32).sin();
+        let t = 0.5 + 0.5 * ((ds.realTime / PULSE_DIVISOR) as f32).sin();
         LerpColor(color, lowLight, &mut newColor, t);
 
         ctx.world.main.holdSPString = trap::SP_GetStringTextString(
@@ -6150,7 +6221,7 @@ pub fn UI_DrawServerRefreshDate(
         let count = trap::LAN_GetServerCount(ctx.engine, ctx.world.cvars.ui_netSource.integer);
         let text = va_runtime(&ctx.world.main.holdSPString, &[&format!("{count}")]);
         Text_Paint(
-            ctx, rect.x, rect.y, scale, newColor, &text, 0.0, 0, textStyle, iMenuFont,
+            ctx, ds, rect.x, rect.y, scale, newColor, &text, 0.0, 0, textStyle, iMenuFont,
         );
     } else {
         let cvarName = format!(
@@ -6171,7 +6242,7 @@ pub fn UI_DrawServerRefreshDate(
 
         let text = format!("{}: {}", ctx.world.main.holdSPString, buff);
         Text_Paint(
-            ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+            ctx, ds, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
         );
     }
 }
@@ -6181,16 +6252,18 @@ pub fn UI_DrawServerRefreshDate(
 /// Source: `oracle/codemp/ui/ui_main.c:3430-3438`
 pub fn UI_DrawKeyBindStatus(
     ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
     textStyle: c_int,
     iMenuFont: c_int,
 ) {
-    if Display_KeyBindPending(&ctx.world.menus) {
+    if Display_KeyBindPending(menus) {
         let text = UI_GetStringEdString(ctx, "MP_INGAME", "WAITING_FOR_NEW_KEY");
         Text_Paint(
-            ctx, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
+            ctx, ds, rect.x, rect.y, scale, color, &text, 0.0, 0, textStyle, iMenuFont,
         );
     } else {
         //Text_Paint(rect->x, rect->y, scale, color, "Press ENTER or CLICK to change, Press BACKSPACE to clear", 0, 0, textStyle,iMenuFont);
@@ -6221,13 +6294,14 @@ fn glconfig_str(p: *const c_char) -> String {
 /// Source: `oracle/codemp/ui/ui_main.c:3440-3487`
 pub fn UI_DrawGLInfo(
     ctx: &UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
     textStyle: c_int,
     iMenuFont: c_int,
 ) {
-    let glconfig = &ctx.world.uiDC.glconfig;
+    let glconfig = &ds.glconfig;
     let vendor = glconfig_str(glconfig.vendor_string);
     let version = glconfig_str(glconfig.version_string);
     let renderer = glconfig_str(glconfig.renderer_string);
@@ -6240,6 +6314,7 @@ pub fn UI_DrawGLInfo(
 
     Text_Paint(
         ctx,
+        ds,
         rect.x + 2.0,
         rect.y,
         scale,
@@ -6252,6 +6327,7 @@ pub fn UI_DrawGLInfo(
     );
     Text_Paint(
         ctx,
+        ds,
         rect.x + 2.0,
         rect.y + 15.0,
         scale,
@@ -6264,6 +6340,7 @@ pub fn UI_DrawGLInfo(
     );
     Text_Paint(
         ctx,
+        ds,
         rect.x + 2.0,
         rect.y + 30.0,
         scale,
@@ -6299,6 +6376,7 @@ pub fn UI_DrawGLInfo(
     while i < lines.len() {
         Text_Paint(
             ctx,
+            ds,
             rect.x + 2.0,
             y as f32,
             scale,
@@ -6313,6 +6391,7 @@ pub fn UI_DrawGLInfo(
         if i < lines.len() {
             Text_Paint(
                 ctx,
+                ds,
                 rect.x + rect.w / 2.0,
                 y as f32,
                 scale,
@@ -6373,14 +6452,15 @@ pub fn UI_Effects_HandleKey(
 
 /// Raven `UI_GameType_HandleKey`.
 ///
-/// PORT-NOTE: `Menu_SetFeederSelection`'s ported shape takes `dc: &mut dyn
-/// DisplayContext` (DEC-36 addendum 12), so this fn carries a `dc` parameter
-/// alongside `ctx`.
+/// PORT-NOTE: `Menu_SetFeederSelection` is framework code taking
+/// `(menus, ds, dc)`; `ctx` is the `dc` (DEC-38 ruling 1), so this fn threads
+/// `menus`/`ds` beside it.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:4266-4297`
 pub fn UI_GameType_HandleKey(
     ctx: &mut UiContext,
-    dc: &mut dyn DisplayContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     _flags: c_int,
     _special: &mut f32,
     key: c_int,
@@ -6437,7 +6517,7 @@ pub fn UI_GameType_HandleKey(
 
         if resetMap && oldCount != UI_MapCountByGameType(ctx.world, true) {
             trap::Cvar_Set(ctx.engine, "ui_currentMap", "0");
-            Menu_SetFeederSelection(&mut ctx.world.menus, dc, None, FEEDER_MAPS, 0, None);
+            Menu_SetFeederSelection(menus, ds, ctx, None, FEEDER_MAPS, 0, None);
         }
         return true;
     }
@@ -6453,7 +6533,8 @@ pub fn UI_GameType_HandleKey(
 /// Source: `oracle/codemp/ui/ui_main.c:4322-4375`
 pub fn UI_NetGameType_HandleKey(
     ctx: &mut UiContext,
-    dc: &mut dyn DisplayContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     _flags: c_int,
     _special: &mut f32,
     key: c_int,
@@ -6465,7 +6546,7 @@ pub fn UI_NetGameType_HandleKey(
     {
         if key == fakeAscii_t::A_MOUSE2 as c_int {
             ctx.world.cvars.ui_netGameType.integer -= 1;
-            if UI_InSoloMenu(ctx.world) {
+            if UI_InSoloMenu(menus) {
                 let idx = ctx.world.cvars.ui_netGameType.integer as usize;
                 if idx < ctx.world.gameTypes.len() && ctx.world.gameTypes[idx].gtEnum == GT_SIEGE {
                     ctx.world.cvars.ui_netGameType.integer -= 1;
@@ -6473,7 +6554,7 @@ pub fn UI_NetGameType_HandleKey(
             }
         } else {
             ctx.world.cvars.ui_netGameType.integer += 1;
-            if UI_InSoloMenu(ctx.world) {
+            if UI_InSoloMenu(menus) {
                 let idx = ctx.world.cvars.ui_netGameType.integer as usize;
                 if idx < ctx.world.gameTypes.len() && ctx.world.gameTypes[idx].gtEnum == GT_SIEGE {
                     ctx.world.cvars.ui_netGameType.integer += 1;
@@ -6501,7 +6582,7 @@ pub fn UI_NetGameType_HandleKey(
         trap::Cvar_Set(ctx.engine, "ui_actualnetGameType", &format!("{}", gtEnum));
         trap::Cvar_Set(ctx.engine, "ui_currentNetMap", "0");
         UI_MapCountByGameType(ctx.world, false);
-        Menu_SetFeederSelection(&mut ctx.world.menus, dc, None, FEEDER_ALLMAPS, 0, None);
+        Menu_SetFeederSelection(menus, ds, ctx, None, FEEDER_ALLMAPS, 0, None);
         return true;
     }
     false
@@ -6668,23 +6749,24 @@ pub fn UI_LoadDemos(ctx: &mut UiContext) {
 
 /// Raven `UI_SetNextMap`.
 ///
-/// PORT-NOTE: `Menu_SetFeederSelection`'s `dc` parameter follows the same
-/// DEC-36 addendum 12 shape noted on `UI_GameType_HandleKey` above; this fn
-/// makes no engine trap calls, so it takes `world`/`dc` rather than `ctx`.
+/// PORT-NOTE: `Menu_SetFeederSelection` takes `(menus, ds, dc)`; `ctx` is the
+/// `dc` (DEC-38 ruling 1), the same shape noted on `UI_GameType_HandleKey`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:5133-5142`
 pub fn UI_SetNextMap(
-    world: &mut UiWorld,
-    dc: &mut dyn DisplayContext,
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     actual: c_int,
     index: c_int,
 ) -> bool {
     let mut i = actual + 1;
-    while i < world.mapList.len() as c_int {
-        if world.mapList[i as usize].active {
+    while i < ctx.world.mapList.len() as c_int {
+        if ctx.world.mapList[i as usize].active {
             Menu_SetFeederSelection(
-                &mut world.menus,
-                dc,
+                menus,
+                ds,
+                ctx,
                 None,
                 FEEDER_MAPS,
                 index + 1,
@@ -6704,10 +6786,15 @@ pub fn UI_SetNextMap(
 /// convention), which a `bool` cannot represent.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:7763-7876`
-pub fn UI_BuildServerDisplayList(ctx: &mut UiContext, dc: &mut dyn DisplayContext, force: c_int) {
+pub fn UI_BuildServerDisplayList(
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    force: c_int,
+) {
     let mut force = force;
 
-    if !(force != 0 || ctx.world.uiDC.realTime > ctx.world.serverStatus.nextDisplayRefresh) {
+    if !(force != 0 || ds.realTime > ctx.world.serverStatus.nextDisplayRefresh) {
         return;
     }
     // if we shouldn't reset
@@ -6738,7 +6825,7 @@ pub fn UI_BuildServerDisplayList(ctx: &mut UiContext, dc: &mut dyn DisplayContex
         ctx.world.serverStatus.displayServers.clear();
         ctx.world.serverStatus.numPlayersOnServers = 0;
         // set list box index to zero
-        Menu_SetFeederSelection(&mut ctx.world.menus, dc, None, FEEDER_SERVERS, 0, None);
+        Menu_SetFeederSelection(menus, ds, ctx, None, FEEDER_SERVERS, 0, None);
         // mark all servers as visible so we store ping updates for them
         trap::LAN_MarkServerVisible(ctx.engine, ctx.world.cvars.ui_netSource.integer, -1, true);
     }
@@ -6749,7 +6836,7 @@ pub fn UI_BuildServerDisplayList(ctx: &mut UiContext, dc: &mut dyn DisplayContex
         // still waiting on a response from the master
         ctx.world.serverStatus.displayServers.clear();
         ctx.world.serverStatus.numPlayersOnServers = 0;
-        ctx.world.serverStatus.nextDisplayRefresh = ctx.world.uiDC.realTime + 500;
+        ctx.world.serverStatus.nextDisplayRefresh = ds.realTime + 500;
         return;
     }
 
@@ -6859,7 +6946,7 @@ pub fn UI_BuildServerDisplayList(ctx: &mut UiContext, dc: &mut dyn DisplayContex
         i += 1;
     }
 
-    ctx.world.serverStatus.refreshtime = ctx.world.uiDC.realTime;
+    ctx.world.serverStatus.refreshtime = ds.realTime;
 }
 
 /// Raven `UI_BuildServerStatus`.
@@ -6871,18 +6958,22 @@ pub fn UI_BuildServerDisplayList(ctx: &mut UiContext, dc: &mut dyn DisplayContex
 /// out of `ctx.world` for the call and put back after.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:8314-8340`
-pub fn UI_BuildServerStatus(ctx: &mut UiContext, dc: &mut dyn DisplayContext, force: bool) {
+pub fn UI_BuildServerStatus(
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    force: bool,
+) {
     if ctx.world.nextFindPlayerRefresh != 0 {
         return;
     }
     if !force {
-        if ctx.world.nextServerStatusRefresh == 0
-            || ctx.world.nextServerStatusRefresh > ctx.world.uiDC.realTime
+        if ctx.world.nextServerStatusRefresh == 0 || ctx.world.nextServerStatusRefresh > ds.realTime
         {
             return;
         }
     } else {
-        Menu_SetFeederSelection(&mut ctx.world.menus, dc, None, FEEDER_SERVERSTATUS, 0, None);
+        Menu_SetFeederSelection(menus, ds, ctx, None, FEEDER_SERVERSTATUS, 0, None);
         ctx.world.serverStatusInfo.lines.clear();
         // reset all server status requests
         trap::LAN_ServerStatus(ctx.engine, None, 0);
@@ -6904,7 +6995,7 @@ pub fn UI_BuildServerStatus(ctx: &mut UiContext, dc: &mut dyn DisplayContext, fo
         ctx.world.nextServerStatusRefresh = 0;
         UI_GetServerStatusInfo(ctx, &addr, None);
     } else {
-        ctx.world.nextServerStatusRefresh = ctx.world.uiDC.realTime + 500;
+        ctx.world.nextServerStatusRefresh = ds.realTime + 500;
     }
 }
 
@@ -6924,7 +7015,7 @@ pub fn UI_BuildServerStatus(ctx: &mut UiContext, dc: &mut dyn DisplayContext, fo
 /// pointers pass through calls without deref).
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:8358-8468`
-pub fn UI_SetSiegeTeams(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+pub fn UI_SetSiegeTeams(ctx: &mut UiContext, menus: &mut MenuSystem, ds: &DisplayState) {
     let mut mapname: Option<String> = None;
     let mut info = String::new();
 
@@ -7031,8 +7122,8 @@ pub fn UI_SetSiegeTeams(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
         Com_Error(ctx, "Error loading teams in UI");
     }
 
-    Menu_SetFeederSelection(&mut ctx.world.menus, dc, None, FEEDER_SIEGE_TEAM1, 0, None);
-    Menu_SetFeederSelection(&mut ctx.world.menus, dc, None, FEEDER_SIEGE_TEAM2, -1, None);
+    Menu_SetFeederSelection(menus, ds, ctx, None, FEEDER_SIEGE_TEAM1, 0, None);
+    Menu_SetFeederSelection(menus, ds, ctx, None, FEEDER_SIEGE_TEAM2, -1, None);
 }
 
 /// Raven `Text_PaintCenter`.
@@ -7040,6 +7131,7 @@ pub fn UI_SetSiegeTeams(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
 /// Source: `oracle/codemp/ui/ui_main.c:11069-11072`
 pub fn Text_PaintCenter(
     ctx: &UiContext,
+    ds: &DisplayState,
     x: f32,
     y: f32,
     scale: f32,
@@ -7048,9 +7140,10 @@ pub fn Text_PaintCenter(
     _adjust: f32,
     iMenuFont: c_int,
 ) {
-    let len = Text_Width(ctx, text, scale, iMenuFont);
+    let len = Text_Width(ctx, ds, text, scale, iMenuFont);
     Text_Paint(
         ctx,
+        ds,
         x - (len / 2) as f32,
         y,
         scale,
@@ -7069,7 +7162,8 @@ pub fn Text_PaintCenter(
 #[allow(clippy::too_many_arguments)]
 pub fn UI_DrawForceSide(
     ctx: &mut UiContext,
-    dc: &mut dyn DisplayContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: &mut vec4_t,
@@ -7104,57 +7198,57 @@ pub fn UI_DrawForceSide(
     if val == FORCE_LIGHTSIDE {
         s = trap::SP_GetStringTextString(ctx.engine, "MENUS_FORCEDESC_LIGHT", 256)
             .unwrap_or_default();
-        if let Some(menu) = Menus_FindByName(&ctx.world.menus, "forcealloc") {
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "lightpowers", true);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "darkpowers", false);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "darkpowers_team", false);
+        if let Some(menu) = Menus_FindByName(menus, "forcealloc") {
+            Menu_ShowItemByName(menus, ctx, menu, "lightpowers", true);
+            Menu_ShowItemByName(menus, ctx, menu, "darkpowers", false);
+            Menu_ShowItemByName(menus, ctx, menu, "darkpowers_team", false);
             // (ui_gameType.integer >= GT_TEAM))
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "lightpowers_team", true);
+            Menu_ShowItemByName(menus, ctx, menu, "lightpowers_team", true);
         }
-        if let Some(menu) = Menus_FindByName(&ctx.world.menus, "ingame_playerforce") {
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "lightpowers", true);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "darkpowers", false);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "darkpowers_team", false);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "lightpowers_team", true);
+        if let Some(menu) = Menus_FindByName(menus, "ingame_playerforce") {
+            Menu_ShowItemByName(menus, ctx, menu, "lightpowers", true);
+            Menu_ShowItemByName(menus, ctx, menu, "darkpowers", false);
+            Menu_ShowItemByName(menus, ctx, menu, "darkpowers_team", false);
+            Menu_ShowItemByName(menus, ctx, menu, "lightpowers_team", true);
         }
     } else {
         s = trap::SP_GetStringTextString(ctx.engine, "MENUS_FORCEDESC_DARK", 256)
             .unwrap_or_default();
-        if let Some(menu) = Menus_FindByName(&ctx.world.menus, "forcealloc") {
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "lightpowers", false);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "lightpowers_team", false);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "darkpowers", true);
+        if let Some(menu) = Menus_FindByName(menus, "forcealloc") {
+            Menu_ShowItemByName(menus, ctx, menu, "lightpowers", false);
+            Menu_ShowItemByName(menus, ctx, menu, "lightpowers_team", false);
+            Menu_ShowItemByName(menus, ctx, menu, "darkpowers", true);
             // (ui_gameType.integer >= GT_TEAM))
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "darkpowers_team", true);
+            Menu_ShowItemByName(menus, ctx, menu, "darkpowers_team", true);
         }
-        if let Some(menu) = Menus_FindByName(&ctx.world.menus, "ingame_playerforce") {
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "lightpowers", false);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "lightpowers_team", false);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "darkpowers", true);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "darkpowers_team", true);
+        if let Some(menu) = Menus_FindByName(menus, "ingame_playerforce") {
+            Menu_ShowItemByName(menus, ctx, menu, "lightpowers", false);
+            Menu_ShowItemByName(menus, ctx, menu, "lightpowers_team", false);
+            Menu_ShowItemByName(menus, ctx, menu, "darkpowers", true);
+            Menu_ShowItemByName(menus, ctx, menu, "darkpowers_team", true);
         }
     }
 
     Text_Paint(
-        ctx, rect.x, rect.y, scale, *color, &s, 0.0, 0, textStyle, iMenuFont,
+        ctx, ds, rect.x, rect.y, scale, *color, &s, 0.0, 0, textStyle, iMenuFont,
     );
 }
 
 /// Raven `UpdateBotButtons`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:2549-2571`
-pub fn UpdateBotButtons(world: &mut UiWorld, dc: &mut dyn DisplayContext) {
-    let menu = match Menu_GetFocused(&world.menus) {
+pub fn UpdateBotButtons(ctx: &mut UiContext, menus: &mut MenuSystem) {
+    let menu = match Menu_GetFocused(menus) {
         Some(m) => m,
         None => return,
     };
 
-    if world.gameTypes[world.cvars.ui_netGameType.integer as usize].gtEnum == GT_SIEGE {
-        Menu_ShowItemByName(&mut world.menus, dc, menu, "humanbotfield", false);
-        Menu_ShowItemByName(&mut world.menus, dc, menu, "humanbotnonfield", true);
+    if ctx.world.gameTypes[ctx.world.cvars.ui_netGameType.integer as usize].gtEnum == GT_SIEGE {
+        Menu_ShowItemByName(menus, ctx, menu, "humanbotfield", false);
+        Menu_ShowItemByName(menus, ctx, menu, "humanbotnonfield", true);
     } else {
-        Menu_ShowItemByName(&mut world.menus, dc, menu, "humanbotfield", true);
-        Menu_ShowItemByName(&mut world.menus, dc, menu, "humanbotnonfield", false);
+        Menu_ShowItemByName(menus, ctx, menu, "humanbotfield", true);
+        Menu_ShowItemByName(menus, ctx, menu, "humanbotnonfield", false);
     }
 }
 
@@ -7164,8 +7258,8 @@ pub fn UpdateBotButtons(world: &mut UiWorld, dc: &mut dyn DisplayContext) {
 /// of lower than maximum skill.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:2573-2723`
-pub fn UpdateForceStatus(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
-    if let Some(menu) = Menus_FindByName(&ctx.world.menus, "ingame_player") {
+pub fn UpdateForceStatus(ctx: &mut UiContext, menus: &mut MenuSystem) {
+    if let Some(menu) = Menus_FindByName(menus, "ingame_player") {
         let info =
             trap::GetConfigString(ctx.engine, CS_SERVERINFO, MAX_INFO_STRING).unwrap_or_default();
 
@@ -7176,21 +7270,21 @@ pub fn UpdateForceStatus(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
         let trueJedi = UI_TrueJediEnabled(ctx);
 
         if !trueJedi || allForceDisabled {
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "jedinonjedi", false);
+            Menu_ShowItemByName(menus, ctx, menu, "jedinonjedi", false);
         } else {
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "jedinonjedi", true);
+            Menu_ShowItemByName(menus, ctx, menu, "jedinonjedi", true);
         }
         if allForceDisabled || (trueJedi && ctx.world.force.uiJediNonJedi == FORCE_NONJEDI) {
             // No force stuff.
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "noforce", true);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "yesforce", false);
+            Menu_ShowItemByName(menus, ctx, menu, "noforce", true);
+            Menu_ShowItemByName(menus, ctx, menu, "yesforce", false);
             // We don't want the saber explanation to say "configure saber
             // attack 1" since we can't.
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "sabernoneconfigme", false);
+            Menu_ShowItemByName(menus, ctx, menu, "sabernoneconfigme", false);
         } else {
             UI_SetForceDisabled(ctx.world, disabledForce);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "noforce", false);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "yesforce", true);
+            Menu_ShowItemByName(menus, ctx, menu, "noforce", false);
+            Menu_ShowItemByName(menus, ctx, menu, "yesforce", true);
         }
 
         // Moved this to happen after it's done with force power disabling
@@ -7199,39 +7293,39 @@ pub fn UpdateForceStatus(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
             || ctx.world.cvars.ui_freeSaber.integer != 0
         {
             // Show lightsaber stuff.
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "nosaber", false);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "yessaber", true);
+            Menu_ShowItemByName(menus, ctx, menu, "nosaber", false);
+            Menu_ShowItemByName(menus, ctx, menu, "yessaber", true);
         } else {
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "nosaber", true);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "yessaber", false);
+            Menu_ShowItemByName(menus, ctx, menu, "nosaber", true);
+            Menu_ShowItemByName(menus, ctx, menu, "yessaber", false);
         }
 
         // The leftmost button should be "apply" unless you are in spectator,
         // where you can join any team.
         let myteam = trap::Cvar_VariableValue(ctx.engine, "ui_myteam") as c_int;
         if myteam != TEAM_SPECTATOR {
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerapply", true);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerforcejoin", false);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerforcered", true);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerforceblue", true);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerforcespectate", true);
+            Menu_ShowItemByName(menus, ctx, menu, "playerapply", true);
+            Menu_ShowItemByName(menus, ctx, menu, "playerforcejoin", false);
+            Menu_ShowItemByName(menus, ctx, menu, "playerforcered", true);
+            Menu_ShowItemByName(menus, ctx, menu, "playerforceblue", true);
+            Menu_ShowItemByName(menus, ctx, menu, "playerforcespectate", true);
         } else {
             // Set or reset buttons based on choices.
             if atoi(&Info_ValueForKey(&info, "g_gametype")) >= GT_TEAM {
                 // This is a team-based game.
-                Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerforcespectate", true);
+                Menu_ShowItemByName(menus, ctx, menu, "playerforcespectate", true);
 
                 // This is disabled, always show both sides from spectator.
-                Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerforcered", true);
-                Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerforceblue", true);
+                Menu_ShowItemByName(menus, ctx, menu, "playerforcered", true);
+                Menu_ShowItemByName(menus, ctx, menu, "playerforceblue", true);
             } else {
-                Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerforcered", false);
-                Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerforceblue", false);
+                Menu_ShowItemByName(menus, ctx, menu, "playerforcered", false);
+                Menu_ShowItemByName(menus, ctx, menu, "playerforceblue", false);
             }
 
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerapply", false);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerforcejoin", true);
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, "playerforcespectate", true);
+            Menu_ShowItemByName(menus, ctx, menu, "playerapply", false);
+            Menu_ShowItemByName(menus, ctx, menu, "playerforcejoin", true);
+            Menu_ShowItemByName(menus, ctx, menu, "playerforcespectate", true);
         }
     }
 
@@ -7268,6 +7362,7 @@ pub fn UpdateForceStatus(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
 /// Source: `oracle/codemp/ui/ui_main.c:2727-2737`
 pub fn UI_DrawNetSource(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -7287,7 +7382,7 @@ pub fn UI_DrawNetSource(
     let netSource = GetNetSourceString(ctx, netSourceIdx);
     let s = format!("{} {}", ctx.world.main.holdSPString, netSource);
     Text_Paint(
-        ctx, rect.x, rect.y, scale, color, &s, 0.0, 0, textStyle, iMenuFont,
+        ctx, ds, rect.x, rect.y, scale, color, &s, 0.0, 0, textStyle, iMenuFont,
     );
 }
 
@@ -7295,7 +7390,13 @@ pub fn UI_DrawNetSource(
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:3008-3236`
 #[allow(clippy::too_many_lines)]
-pub fn UI_OwnerDrawWidth(ctx: &mut UiContext, ownerDraw: c_int, scale: f32) -> c_int {
+pub fn UI_OwnerDrawWidth(
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    ownerDraw: c_int,
+    scale: f32,
+) -> c_int {
     let mut s: Option<String> = None;
 
     match ownerDraw {
@@ -7483,7 +7584,7 @@ pub fn UI_OwnerDrawWidth(ctx: &mut UiContext, ownerDraw: c_int, scale: f32) -> c
         }
         UI_TIER | UI_TIER_MAPNAME | UI_TIER_GAMETYPE | UI_ALLMAPS_SELECTION | UI_OPPONENT_NAME => {}
         UI_KEYBINDSTATUS => {
-            if Display_KeyBindPending(&ctx.world.menus) {
+            if Display_KeyBindPending(menus) {
                 s = Some(UI_GetStringEdString(
                     ctx,
                     "MP_INGAME",
@@ -7504,7 +7605,7 @@ pub fn UI_OwnerDrawWidth(ctx: &mut UiContext, ownerDraw: c_int, scale: f32) -> c
     }
 
     if let Some(text) = s {
-        Text_Width(ctx, &text, scale, 0)
+        Text_Width(ctx, ds, &text, scale, 0)
     } else {
         0
     }
@@ -7515,6 +7616,7 @@ pub fn UI_OwnerDrawWidth(ctx: &mut UiContext, ownerDraw: c_int, scale: f32) -> c
 /// Source: `oracle/codemp/ui/ui_main.c:3371-3428`
 pub fn UI_DrawServerMOTD(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     rect: &RectDef,
     scale: f32,
     color: vec4_t,
@@ -7533,13 +7635,13 @@ pub fn UI_DrawServerMOTD(
             ctx.world.serverStatus.motdPaintX2 = -1;
         }
 
-        if ctx.world.uiDC.realTime > ctx.world.serverStatus.motdTime {
-            ctx.world.serverStatus.motdTime = ctx.world.uiDC.realTime + 10;
+        if ds.realTime > ctx.world.serverStatus.motdTime {
+            ctx.world.serverStatus.motdTime = ds.realTime + 10;
             if ctx.world.serverStatus.motdPaintX <= rect.x as c_int + 2 {
                 if ctx.world.serverStatus.motdOffset < ctx.world.serverStatus.motdLen {
                     let offset = ctx.world.serverStatus.motdOffset as usize;
                     let remaining = ctx.world.serverStatus.motd[offset..].to_string();
-                    let width = Text_Width(ctx, &remaining, scale, 1);
+                    let width = Text_Width(ctx, ds, &remaining, scale, 1);
                     ctx.world.serverStatus.motdPaintX += width - 1;
                     ctx.world.serverStatus.motdOffset += 1;
                 } else {
@@ -7565,7 +7667,7 @@ pub fn UI_DrawServerMOTD(
         let offset = ctx.world.serverStatus.motdOffset as usize;
         let text = ctx.world.serverStatus.motd[offset..].to_string();
         Text_Paint_Limit(
-            ctx, &mut maxX, paintX, y, scale, color, &text, 0.0, 0, iMenuFont,
+            ctx, ds, &mut maxX, paintX, y, scale, color, &text, 0.0, 0, iMenuFont,
         );
         if ctx.world.serverStatus.motdPaintX2 >= 0 {
             let paintX2 = ctx.world.serverStatus.motdPaintX2 as f32;
@@ -7573,7 +7675,7 @@ pub fn UI_DrawServerMOTD(
             let motdOffset = ctx.world.serverStatus.motdOffset;
             let mut maxX2 = rect.x + rect.w - 2.0;
             Text_Paint_Limit(
-                ctx, &mut maxX2, paintX2, y, scale, color, &motd, 0.0, motdOffset, iMenuFont,
+                ctx, ds, &mut maxX2, paintX2, y, scale, color, &motd, 0.0, motdOffset, iMenuFont,
             );
         }
         if ctx.world.serverStatus.motdOffset != 0 && maxX > 0.0 {
@@ -7593,7 +7695,8 @@ pub fn UI_DrawServerMOTD(
 /// Source: `oracle/codemp/ui/ui_main.c:4402-4422`
 pub fn UI_JoinGameType_HandleKey(
     ctx: &mut UiContext,
-    dc: &mut dyn DisplayContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     _flags: c_int,
     _special: &mut f32,
     key: c_int,
@@ -7618,7 +7721,7 @@ pub fn UI_JoinGameType_HandleKey(
 
         let idx = ctx.world.cvars.ui_joinGameType.integer;
         trap::Cvar_Set(ctx.engine, "ui_joinGameType", &format!("{}", idx));
-        UI_BuildServerDisplayList(ctx, dc, 1);
+        UI_BuildServerDisplayList(ctx, menus, ds, 1);
         return true;
     }
     false
@@ -7629,7 +7732,8 @@ pub fn UI_JoinGameType_HandleKey(
 /// Source: `oracle/codemp/ui/ui_main.c:4551-4569`
 pub fn UI_NetFilter_HandleKey(
     ctx: &mut UiContext,
-    dc: &mut dyn DisplayContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     _flags: c_int,
     _special: &mut f32,
     key: c_int,
@@ -7650,7 +7754,7 @@ pub fn UI_NetFilter_HandleKey(
         } else if ctx.world.cvars.ui_serverFilterType.integer < 0 {
             ctx.world.cvars.ui_serverFilterType.integer = SERVER_FILTERS.len() as c_int - 1;
         }
-        UI_BuildServerDisplayList(ctx, dc, 1);
+        UI_BuildServerDisplayList(ctx, menus, ds, 1);
         return true;
     }
     false
@@ -7660,7 +7764,12 @@ pub fn UI_NetFilter_HandleKey(
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:5145-5253`
 #[allow(clippy::too_many_lines)]
-pub fn UI_StartSkirmish(ctx: &mut UiContext, dc: &mut dyn DisplayContext, next: bool) {
+pub fn UI_StartSkirmish(
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    next: bool,
+) {
     let temp = trap::Cvar_VariableValue(ctx.engine, "g_gametype") as c_int;
     trap::Cvar_Set(ctx.engine, "ui_gameType", &format!("{}", temp));
 
@@ -7669,27 +7778,21 @@ pub fn UI_StartSkirmish(ctx: &mut UiContext, dc: &mut dyn DisplayContext, next: 
         let _ = UI_MapCountByGameType(ctx.world, true);
         let mut actual = 0;
         let _ = UI_SelectedMap(ctx.world, index, &mut actual);
-        if UI_SetNextMap(ctx.world, dc, actual, index) {
+        if UI_SetNextMap(ctx, menus, ds, actual, index) {
             // handled
         } else {
             let mut special = 0.0_f32;
             UI_GameType_HandleKey(
                 ctx,
-                dc,
+                menus,
+                ds,
                 0,
                 &mut special,
                 fakeAscii_t::A_MOUSE1 as c_int,
                 false,
             );
             let _ = UI_MapCountByGameType(ctx.world, true);
-            Menu_SetFeederSelection(
-                &mut ctx.world.menus,
-                dc,
-                None,
-                FEEDER_MAPS,
-                0,
-                Some("skirmish"),
-            );
+            Menu_SetFeederSelection(menus, ds, ctx, None, FEEDER_MAPS, 0, Some("skirmish"));
         }
     }
 
@@ -7837,7 +7940,7 @@ pub fn UI_StartSkirmish(ctx: &mut UiContext, dc: &mut dyn DisplayContext, next: 
 /// Raven `UI_SetBotButton`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:5546-5572`
-pub fn UI_SetBotButton(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+pub fn UI_SetBotButton(ctx: &mut UiContext, menus: &mut MenuSystem) {
     let gameType = trap::Cvar_VariableValue(ctx.engine, "g_gametype") as c_int;
     let server = trap::Cvar_VariableValue(ctx.engine, "sv_running") as c_int;
     let name = "addBot";
@@ -7845,13 +7948,13 @@ pub fn UI_SetBotButton(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
     // If in siege or a client, don't show add bot button.
     if gameType == GT_SIEGE || server == 0 {
         // If it's not siege, don't worry about it.
-        let menu = match Menu_GetFocused(&ctx.world.menus) {
+        let menu = match Menu_GetFocused(menus) {
             Some(m) => m,
             None => return,
         };
 
-        if Menu_FindItemByName(&ctx.world.menus, Some(menu), name).is_some() {
-            Menu_ShowItemByName(&mut ctx.world.menus, dc, menu, name, false);
+        if Menu_FindItemByName(menus, Some(menu), name).is_some() {
+            Menu_ShowItemByName(menus, ctx, menu, name, false);
         }
     }
 }
@@ -7861,11 +7964,12 @@ pub fn UI_SetBotButton(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
 /// Source: `oracle/codemp/ui/ui_main.c:5680-5718`
 pub fn UI_SetSiegeObjectiveGraphicPos(
     ctx: &mut UiContext,
+    menus: &mut MenuSystem,
     menu: MenuId,
     itemName: &str,
     cvarName: &str,
 ) {
-    let item = match Menu_FindItemByName(&ctx.world.menus, Some(menu), itemName) {
+    let item = match Menu_FindItemByName(menus, Some(menu), itemName) {
         Some(i) => i,
         None => return,
     };
@@ -7884,7 +7988,7 @@ pub fn UI_SetSiegeObjectiveGraphicPos(
                 if String_Parse(&mut p, &mut holdVal) {
                     let h = atof(&holdVal) as f32;
 
-                    let it = ctx.world.menus.item_mut(item);
+                    let it = menus.item_mut(item);
                     it.window.rectClient.x = x;
                     it.window.rectClient.y = y;
                     it.window.rectClient.w = w;
@@ -7903,23 +8007,16 @@ pub fn UI_SetSiegeObjectiveGraphicPos(
 /// Raven `UI_UpdateCharacterSkin`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:6048-6085`
-pub fn UI_UpdateCharacterSkin(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
-    let menu = match Menu_GetFocused(&ctx.world.menus) {
+pub fn UI_UpdateCharacterSkin(ctx: &mut UiContext, menus: &mut MenuSystem) {
+    let menu = match Menu_GetFocused(menus) {
         Some(m) => m,
         None => return,
     };
 
-    let item = match Menu_FindItemByName(&ctx.world.menus, Some(menu), "character") {
+    let item = match Menu_FindItemByName(menus, Some(menu), "character") {
         Some(i) => i,
         None => {
-            let menuName = ctx
-                .world
-                .menus
-                .menu(menu)
-                .window
-                .name
-                .clone()
-                .unwrap_or_default();
+            let menuName = menus.menu(menu).window.name.clone().unwrap_or_default();
             Com_Error(
                 ctx,
                 &format!(
@@ -7942,29 +8039,27 @@ pub fn UI_UpdateCharacterSkin(ctx: &mut UiContext, dc: &mut dyn DisplayContext) 
         .take(MAX_QPATH - 1)
         .collect();
 
-    ItemParse_model_g2skin_go(&mut ctx.world.menus, dc, item, Some(&skin));
+    ItemParse_model_g2skin_go(menus, ctx, item, Some(&skin));
 }
 
 /// Raven `UI_UpdateCharacter` — `Get current menu`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:6153-6188`
-pub fn UI_UpdateCharacter(ctx: &mut UiContext, dc: &mut dyn DisplayContext, changedModel: bool) {
-    let menu = match Menu_GetFocused(&ctx.world.menus) {
+pub fn UI_UpdateCharacter(
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    changedModel: bool,
+) {
+    let menu = match Menu_GetFocused(menus) {
         Some(m) => m,
         None => return,
     };
 
-    let item = match Menu_FindItemByName(&ctx.world.menus, Some(menu), "character") {
+    let item = match Menu_FindItemByName(menus, Some(menu), "character") {
         Some(i) => i,
         None => {
-            let menuName = ctx
-                .world
-                .menus
-                .menu(menu)
-                .window
-                .name
-                .clone()
-                .unwrap_or_default();
+            let menuName = menus.menu(menu).window.name.clone().unwrap_or_default();
             Com_Error(
                 ctx,
                 &format!(
@@ -7985,7 +8080,7 @@ pub fn UI_UpdateCharacter(ctx: &mut UiContext, dc: &mut dyn DisplayContext, chan
             .map(|&c| c as u8)
             .collect::<Vec<u8>>(),
     );
-    ItemParse_model_g2anim_go(&mut ctx.world.menus, dc, item, Some(&animString));
+    ItemParse_model_g2anim_go(menus, ctx, item, Some(&animString));
 
     let modelName = UI_Cvar_VariableString(ctx, "ui_char_model");
     // PORT-NOTE: Raven `Com_sprintf` into `char modelPath[MAX_QPATH]`.
@@ -7994,30 +8089,50 @@ pub fn UI_UpdateCharacter(ctx: &mut UiContext, dc: &mut dyn DisplayContext, chan
         .take(MAX_QPATH - 1)
         .collect();
     let mut animRunLength: c_int = 0;
-    let _ = ItemParse_asset_model_go(
-        &mut ctx.world.menus,
-        dc,
-        item,
-        &modelPath,
-        &mut animRunLength,
-    );
+    let _ = ItemParse_asset_model_go(menus, ctx, item, &modelPath, &mut animRunLength);
 
     if changedModel {
         // set all skins to first skin since we don't know you always have all skins
         // FIXME: could try to keep the same spot in each list as you swtich models
-        UI_FeederSelection(ctx, dc, FEEDER_PLAYER_SKIN_HEAD as f32, 0, Some(item)); // fixme, this is not really the right item!!
-        UI_FeederSelection(ctx, dc, FEEDER_PLAYER_SKIN_TORSO as f32, 0, Some(item));
-        UI_FeederSelection(ctx, dc, FEEDER_PLAYER_SKIN_LEGS as f32, 0, Some(item));
-        UI_FeederSelection(ctx, dc, FEEDER_COLORCHOICES as f32, 0, Some(item));
+        UI_FeederSelection(
+            ctx,
+            menus,
+            ds,
+            FEEDER_PLAYER_SKIN_HEAD as f32,
+            0,
+            Some(item),
+        ); // fixme, this is not really the right item!!
+        UI_FeederSelection(
+            ctx,
+            menus,
+            ds,
+            FEEDER_PLAYER_SKIN_TORSO as f32,
+            0,
+            Some(item),
+        );
+        UI_FeederSelection(
+            ctx,
+            menus,
+            ds,
+            FEEDER_PLAYER_SKIN_LEGS as f32,
+            0,
+            Some(item),
+        );
+        UI_FeederSelection(ctx, menus, ds, FEEDER_COLORCHOICES as f32, 0, Some(item));
     }
-    UI_UpdateCharacterSkin(ctx, dc);
+    UI_UpdateCharacterSkin(ctx, menus);
 }
 
 /// Raven `UI_SiegeClassCnt`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:7516-7527`
-pub fn UI_SiegeClassCnt(ctx: &mut UiContext, dc: &mut dyn DisplayContext, team: c_int) {
-    UI_SetSiegeTeams(ctx, dc);
+pub fn UI_SiegeClassCnt(
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    team: c_int,
+) {
+    UI_SetSiegeTeams(ctx, menus, ds);
 
     let infantry = BG_SiegeCountBaseClass(team, 0, &ctx.world.bg_state);
     trap::Cvar_Set(ctx.engine, "ui_infantry_cnt", &format!("{}", infantry));
@@ -8036,16 +8151,16 @@ pub fn UI_SiegeClassCnt(ctx: &mut UiContext, dc: &mut dyn DisplayContext, team: 
 /// Raven `UI_UpdateSiegeStatusIcons`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:7559-7592`
-pub fn UI_UpdateSiegeStatusIcons(world: &mut UiWorld, dc: &mut dyn DisplayContext) {
-    let menu = match Menu_GetFocused(&world.menus) {
+pub fn UI_UpdateSiegeStatusIcons(ctx: &mut UiContext, menus: &mut MenuSystem) {
+    let menu = match Menu_GetFocused(menus) {
         Some(m) => m,
         None => return,
     };
 
     for i in 0..7 {
         Menu_SetItemBackground(
-            &mut world.menus,
-            dc,
+            menus,
+            ctx,
             Some(menu),
             &format!("wpnicon0{}", i),
             &format!("*ui_class_weapon{}", i),
@@ -8054,8 +8169,8 @@ pub fn UI_UpdateSiegeStatusIcons(world: &mut UiWorld, dc: &mut dyn DisplayContex
 
     for i in 0..7 {
         Menu_SetItemBackground(
-            &mut world.menus,
-            dc,
+            menus,
+            ctx,
             Some(menu),
             &format!("itemicon0{}", i),
             &format!("*ui_class_item{}", i),
@@ -8064,8 +8179,8 @@ pub fn UI_UpdateSiegeStatusIcons(world: &mut UiWorld, dc: &mut dyn DisplayContex
 
     for i in 0..10 {
         Menu_SetItemBackground(
-            &mut world.menus,
-            dc,
+            menus,
+            ctx,
             Some(menu),
             &format!("forceicon0{}", i),
             &format!("*ui_class_power{}", i),
@@ -8074,8 +8189,8 @@ pub fn UI_UpdateSiegeStatusIcons(world: &mut UiWorld, dc: &mut dyn DisplayContex
 
     for i in 10..15 {
         Menu_SetItemBackground(
-            &mut world.menus,
-            dc,
+            menus,
+            ctx,
             Some(menu),
             &format!("forceicon{}", i),
             &format!("*ui_class_power{}", i),
@@ -8087,7 +8202,12 @@ pub fn UI_UpdateSiegeStatusIcons(world: &mut UiWorld, dc: &mut dyn DisplayContex
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:8475-8694`
 #[allow(clippy::too_many_lines)]
-pub fn UI_FeederCount(ctx: &mut UiContext, dc: &mut dyn DisplayContext, feederID: f32) -> c_int {
+pub fn UI_FeederCount(
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    feederID: f32,
+) -> c_int {
     match feederID as c_int {
         FEEDER_SABER_SINGLE_INFO => {
             let mut count = 0;
@@ -8112,7 +8232,7 @@ pub fn UI_FeederCount(ctx: &mut UiContext, dc: &mut dyn DisplayContext, feederID
         FEEDER_Q3HEADS => return UI_HeadCountByColor(ctx.world),
         FEEDER_SIEGE_TEAM1 => {
             if ctx.world.main.siegeTeam1.is_none() {
-                UI_SetSiegeTeams(ctx, dc);
+                UI_SetSiegeTeams(ctx, menus, ds);
                 if ctx.world.main.siegeTeam1.is_none() {
                     return 0;
                 }
@@ -8122,7 +8242,7 @@ pub fn UI_FeederCount(ctx: &mut UiContext, dc: &mut dyn DisplayContext, feederID
         }
         FEEDER_SIEGE_TEAM2 => {
             if ctx.world.main.siegeTeam2.is_none() {
-                UI_SetSiegeTeams(ctx, dc);
+                UI_SetSiegeTeams(ctx, menus, ds);
                 if ctx.world.main.siegeTeam2.is_none() {
                     return 0;
                 }
@@ -8146,15 +8266,15 @@ pub fn UI_FeederCount(ctx: &mut UiContext, dc: &mut dyn DisplayContext, feederID
         FEEDER_SERVERSTATUS => return ctx.world.serverStatusInfo.lines.len() as c_int,
         FEEDER_FINDPLAYER => return ctx.world.numFoundPlayerServers,
         FEEDER_PLAYER_LIST => {
-            if ctx.world.uiDC.realTime > ctx.world.playerRefresh {
-                ctx.world.playerRefresh = ctx.world.uiDC.realTime + 3000;
+            if ds.realTime > ctx.world.playerRefresh {
+                ctx.world.playerRefresh = ds.realTime + 3000;
                 UI_BuildPlayerList(ctx);
             }
             return ctx.world.playerNames.len() as c_int;
         }
         FEEDER_TEAM_LIST => {
-            if ctx.world.uiDC.realTime > ctx.world.playerRefresh {
-                ctx.world.playerRefresh = ctx.world.uiDC.realTime + 3000;
+            if ds.realTime > ctx.world.playerRefresh {
+                ctx.world.playerRefresh = ds.realTime + 3000;
                 UI_BuildPlayerList(ctx);
             }
             return ctx.world.teamNames.len() as c_int;
@@ -8264,7 +8384,8 @@ pub fn UI_FeederCount(ctx: &mut UiContext, dc: &mut dyn DisplayContext, feederID
 #[allow(clippy::too_many_lines)]
 pub fn UI_FeederItemImage(
     ctx: &mut UiContext,
-    dc: &mut dyn DisplayContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     feederID: f32,
     index: c_int,
 ) -> qhandle_t {
@@ -8285,14 +8406,7 @@ pub fn UI_FeederItemImage(
 
             if selModel != -1 && ctx.world.q3SelectedHead != selModel {
                 ctx.world.q3SelectedHead = selModel;
-                Menu_SetFeederSelection(
-                    &mut ctx.world.menus,
-                    dc,
-                    None,
-                    FEEDER_Q3HEADS,
-                    selModel,
-                    None,
-                );
+                Menu_SetFeederSelection(menus, ds, ctx, None, FEEDER_Q3HEADS, selModel, None);
             }
 
             if ctx.world.q3HeadIcons[index as usize] == 0 {
@@ -8327,7 +8441,7 @@ pub fn UI_FeederItemImage(
         }
     } else if feeder == FEEDER_SIEGE_TEAM1 {
         if ctx.world.main.siegeTeam1.is_none() {
-            UI_SetSiegeTeams(ctx, dc);
+            UI_SetSiegeTeams(ctx, menus, ds);
             if ctx.world.main.siegeTeam1.is_none() {
                 return 0;
             }
@@ -8336,7 +8450,7 @@ pub fn UI_FeederItemImage(
         return BG_SiegeTeamClassPortrait(idx, index, &ctx.world.bg_state);
     } else if feeder == FEEDER_SIEGE_TEAM2 {
         if ctx.world.main.siegeTeam2.is_none() {
-            UI_SetSiegeTeams(ctx, dc);
+            UI_SetSiegeTeams(ctx, menus, ds);
             if ctx.world.main.siegeTeam2.is_none() {
                 return 0;
             }
@@ -8441,11 +8555,9 @@ pub fn UI_FeederItemImage(
         let mut slotI: c_int = 0;
         let mut validCnt = 0;
 
-        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
-            if let Some(item) =
-                Menu_FindItemByName(&ctx.world.menus, Some(menu), "base_class_force_feed")
-            {
-                if let Some(listPtr) = ctx.world.menus.item(item).typeData.listBox() {
+        if let Some(menu) = Menu_GetFocused(menus) {
+            if let Some(item) = Menu_FindItemByName(menus, Some(menu), "base_class_force_feed") {
+                if let Some(listPtr) = menus.item(item).typeData.listBox() {
                     slotI = listPtr.startPos;
                 }
             }
@@ -8630,6 +8742,7 @@ pub fn MapList_Parse(ctx: &mut UiContext, p: &mut &str) -> bool {
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 pub fn UI_DisplayDownloadInfo(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     downloadName: &str,
     centerPoint: f32,
     yStart: f32,
@@ -8640,6 +8753,7 @@ pub fn UI_DisplayDownloadInfo(
 
     UI_FillRect(
         ctx,
+        ds,
         0.0,
         0.0,
         SCREEN_WIDTH as f32,
@@ -8672,6 +8786,7 @@ pub fn UI_DisplayDownloadInfo(
 
     Text_PaintCenter(
         ctx,
+        ds,
         centerPoint,
         yStart + 112.0,
         scale,
@@ -8682,6 +8797,7 @@ pub fn UI_DisplayDownloadInfo(
     );
     Text_PaintCenter(
         ctx,
+        ds,
         centerPoint,
         yStart + 192.0,
         scale,
@@ -8692,6 +8808,7 @@ pub fn UI_DisplayDownloadInfo(
     );
     Text_PaintCenter(
         ctx,
+        ds,
         centerPoint,
         yStart + 248.0,
         scale,
@@ -8709,6 +8826,7 @@ pub fn UI_DisplayDownloadInfo(
 
     Text_PaintCenter(
         ctx,
+        ds,
         centerPoint,
         yStart + 136.0,
         scale,
@@ -8724,6 +8842,7 @@ pub fn UI_DisplayDownloadInfo(
     if downloadCount < 4096 || downloadTime == 0 {
         Text_PaintCenter(
             ctx,
+            ds,
             leftWidth,
             yStart + 216.0,
             scale,
@@ -8734,6 +8853,7 @@ pub fn UI_DisplayDownloadInfo(
         );
         Text_PaintCenter(
             ctx,
+            ds,
             leftWidth,
             yStart + 160.0,
             scale,
@@ -8743,8 +8863,8 @@ pub fn UI_DisplayDownloadInfo(
             iMenuFont,
         );
     } else {
-        let xferRate = if (ctx.world.uiDC.realTime - downloadTime) / 1000 != 0 {
-            downloadCount / ((ctx.world.uiDC.realTime - downloadTime) / 1000)
+        let xferRate = if (ds.realTime - downloadTime) / 1000 != 0 {
+            downloadCount / ((ds.realTime - downloadTime) / 1000)
         } else {
             0
         };
@@ -8760,6 +8880,7 @@ pub fn UI_DisplayDownloadInfo(
 
             Text_PaintCenter(
                 ctx,
+                ds,
                 leftWidth,
                 yStart + 216.0,
                 scale,
@@ -8770,6 +8891,7 @@ pub fn UI_DisplayDownloadInfo(
             );
             Text_PaintCenter(
                 ctx,
+                ds,
                 leftWidth,
                 yStart + 160.0,
                 scale,
@@ -8781,6 +8903,7 @@ pub fn UI_DisplayDownloadInfo(
         } else {
             Text_PaintCenter(
                 ctx,
+                ds,
                 leftWidth,
                 yStart + 216.0,
                 scale,
@@ -8792,6 +8915,7 @@ pub fn UI_DisplayDownloadInfo(
             if downloadSize != 0 {
                 Text_PaintCenter(
                     ctx,
+                    ds,
                     leftWidth,
                     yStart + 160.0,
                     scale,
@@ -8803,6 +8927,7 @@ pub fn UI_DisplayDownloadInfo(
             } else {
                 Text_PaintCenter(
                     ctx,
+                    ds,
                     leftWidth,
                     yStart + 160.0,
                     scale,
@@ -8817,6 +8942,7 @@ pub fn UI_DisplayDownloadInfo(
         if xferRate != 0 {
             Text_PaintCenter(
                 ctx,
+                ds,
                 leftWidth,
                 yStart + 272.0,
                 scale,
@@ -8832,7 +8958,7 @@ pub fn UI_DisplayDownloadInfo(
 /// Raven `UI_DoServerRefresh`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:11596-11632`
-pub fn UI_DoServerRefresh(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+pub fn UI_DoServerRefresh(ctx: &mut UiContext, menus: &mut MenuSystem, ds: &DisplayState) {
     let mut wait = false;
 
     if !ctx.world.serverStatus.refreshActive {
@@ -8848,27 +8974,27 @@ pub fn UI_DoServerRefresh(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
         }
     }
 
-    if ctx.world.uiDC.realTime < ctx.world.serverStatus.refreshtime && wait {
+    if ds.realTime < ctx.world.serverStatus.refreshtime && wait {
         return;
     }
 
     // if still trying to retrieve pings
     if trap::LAN_UpdateVisiblePings(ctx.engine, ctx.world.cvars.ui_netSource.integer) {
-        ctx.world.serverStatus.refreshtime = ctx.world.uiDC.realTime + 1000;
+        ctx.world.serverStatus.refreshtime = ds.realTime + 1000;
     } else if !wait {
         // get the last servers in the list
-        UI_BuildServerDisplayList(ctx, dc, 2);
+        UI_BuildServerDisplayList(ctx, menus, ds, 2);
         // stop the refresh
         UI_StopServerRefresh(ctx);
     }
     //
-    UI_BuildServerDisplayList(ctx, dc, 0);
+    UI_BuildServerDisplayList(ctx, menus, ds, 0);
 }
 
 /// Raven `UI_StartServerRefresh`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:11639-11688`
-pub fn UI_StartServerRefresh(ctx: &mut UiContext, full: bool) {
+pub fn UI_StartServerRefresh(ctx: &mut UiContext, ds: &DisplayState, full: bool) {
     let mut q = qtime_t {
         tm_sec: 0,
         tm_min: 0,
@@ -8898,12 +9024,12 @@ pub fn UI_StartServerRefresh(ctx: &mut UiContext, full: bool) {
     );
 
     if !full {
-        UI_UpdatePendingPings(ctx);
+        UI_UpdatePendingPings(ctx, ds);
         return;
     }
 
     ctx.world.serverStatus.refreshActive = true;
-    ctx.world.serverStatus.nextDisplayRefresh = ctx.world.uiDC.realTime + 1000;
+    ctx.world.serverStatus.nextDisplayRefresh = ds.realTime + 1000;
     // clear number of displayed servers
     ctx.world.serverStatus.displayServers.clear();
     ctx.world.serverStatus.numPlayersOnServers = 0;
@@ -8914,11 +9040,11 @@ pub fn UI_StartServerRefresh(ctx: &mut UiContext, full: bool) {
     //
     if ctx.world.cvars.ui_netSource.integer == AS_LOCAL {
         trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_NOW as c_int, "localservers\n");
-        ctx.world.serverStatus.refreshtime = ctx.world.uiDC.realTime + 1000;
+        ctx.world.serverStatus.refreshtime = ds.realTime + 1000;
         return;
     }
 
-    ctx.world.serverStatus.refreshtime = ctx.world.uiDC.realTime + 5000;
+    ctx.world.serverStatus.refreshtime = ds.realTime + 5000;
     // Optimatch is handled elsewhere (retail excludes _XBOX).
     if ctx.world.cvars.ui_netSource.integer == AS_GLOBAL
         || ctx.world.cvars.ui_netSource.integer == AS_MPLAYER
@@ -9078,7 +9204,7 @@ fn pc_token_str(token: &pc_token_t) -> String {
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:1463-1722`
 #[allow(clippy::too_many_lines)]
-pub fn Asset_Parse(ctx: &mut UiContext, dc: &mut dyn DisplayContext, handle: c_int) -> bool {
+pub fn Asset_Parse(ctx: &mut UiContext, ds: &mut DisplayState, handle: c_int) -> bool {
     let mut token = pc_token_t {
         type_: 0,
         subtype: 0,
@@ -9117,62 +9243,58 @@ pub fn Asset_Parse(ctx: &mut UiContext, dc: &mut dyn DisplayContext, handle: c_i
         if Q_stricmp(&tokenStr, "font") == 0 {
             let mut pointSize = 0;
             if !trap::PC_ReadToken(ctx.engine, handle, &mut token)
-                || !PC_Int_Parse(dc, handle, &mut pointSize)
+                || !PC_Int_Parse(ctx, handle, &mut pointSize)
             {
                 return false;
             }
-            ctx.world.uiDC.Assets.qhMediumFont =
-                trap::R_RegisterFont(ctx.engine, &pc_token_str(&token));
-            ctx.world.uiDC.Assets.fontRegistered = true;
+            ds.Assets.qhMediumFont = trap::R_RegisterFont(ctx.engine, &pc_token_str(&token));
+            ds.Assets.fontRegistered = true;
             continue;
         }
 
         if Q_stricmp(&tokenStr, "smallFont") == 0 {
             let mut pointSize = 0;
             if !trap::PC_ReadToken(ctx.engine, handle, &mut token)
-                || !PC_Int_Parse(dc, handle, &mut pointSize)
+                || !PC_Int_Parse(ctx, handle, &mut pointSize)
             {
                 return false;
             }
-            ctx.world.uiDC.Assets.qhSmallFont =
-                trap::R_RegisterFont(ctx.engine, &pc_token_str(&token));
+            ds.Assets.qhSmallFont = trap::R_RegisterFont(ctx.engine, &pc_token_str(&token));
             continue;
         }
 
         if Q_stricmp(&tokenStr, "small2Font") == 0 {
             let mut pointSize = 0;
             if !trap::PC_ReadToken(ctx.engine, handle, &mut token)
-                || !PC_Int_Parse(dc, handle, &mut pointSize)
+                || !PC_Int_Parse(ctx, handle, &mut pointSize)
             {
                 return false;
             }
-            ctx.world.uiDC.Assets.qhSmall2Font =
-                trap::R_RegisterFont(ctx.engine, &pc_token_str(&token));
+            ds.Assets.qhSmall2Font = trap::R_RegisterFont(ctx.engine, &pc_token_str(&token));
             continue;
         }
 
         if Q_stricmp(&tokenStr, "bigFont") == 0 {
             let mut pointSize = 0;
             if !trap::PC_ReadToken(ctx.engine, handle, &mut token)
-                || !PC_Int_Parse(dc, handle, &mut pointSize)
+                || !PC_Int_Parse(ctx, handle, &mut pointSize)
             {
                 return false;
             }
-            ctx.world.uiDC.Assets.qhBigFont =
-                trap::R_RegisterFont(ctx.engine, &pc_token_str(&token));
+            ds.Assets.qhBigFont = trap::R_RegisterFont(ctx.engine, &pc_token_str(&token));
             continue;
         }
 
         if Q_stricmp(&tokenStr, "cursor") == 0 {
             let mut cursorStr = String::new();
-            if !PC_String_Parse(dc, handle, &mut cursorStr) {
+            if !PC_String_Parse(ctx, handle, &mut cursorStr) {
                 // Raven passes `S_COLOR_YELLOW` as the FORMAT string, so retail
                 // prints only "^3". Source: `oracle/codemp/ui/ui_main.c:1528`
                 Com_Printf(ctx, S_COLOR_YELLOW.to_str().unwrap());
                 return false;
             }
-            ctx.world.uiDC.Assets.cursorStr = cursorStr.clone();
-            ctx.world.uiDC.Assets.cursor = trap::R_RegisterShaderNoMip(ctx.engine, &cursorStr);
+            ds.Assets.cursorStr = cursorStr.clone();
+            ds.Assets.cursor = trap::R_RegisterShaderNoMip(ctx.engine, &cursorStr);
             continue;
         }
 
@@ -9181,8 +9303,7 @@ pub fn Asset_Parse(ctx: &mut UiContext, dc: &mut dyn DisplayContext, handle: c_i
             if !trap::PC_ReadToken(ctx.engine, handle, &mut token) {
                 return false;
             }
-            ctx.world.uiDC.Assets.gradientBar =
-                trap::R_RegisterShaderNoMip(ctx.engine, &pc_token_str(&token));
+            ds.Assets.gradientBar = trap::R_RegisterShaderNoMip(ctx.engine, &pc_token_str(&token));
             continue;
         }
 
@@ -9191,8 +9312,7 @@ pub fn Asset_Parse(ctx: &mut UiContext, dc: &mut dyn DisplayContext, handle: c_i
             if !trap::PC_ReadToken(ctx.engine, handle, &mut token) {
                 return false;
             }
-            ctx.world.uiDC.Assets.menuEnterSound =
-                trap::S_RegisterSound(ctx.engine, &pc_token_str(&token));
+            ds.Assets.menuEnterSound = trap::S_RegisterSound(ctx.engine, &pc_token_str(&token));
             continue;
         }
 
@@ -9201,8 +9321,7 @@ pub fn Asset_Parse(ctx: &mut UiContext, dc: &mut dyn DisplayContext, handle: c_i
             if !trap::PC_ReadToken(ctx.engine, handle, &mut token) {
                 return false;
             }
-            ctx.world.uiDC.Assets.menuExitSound =
-                trap::S_RegisterSound(ctx.engine, &pc_token_str(&token));
+            ds.Assets.menuExitSound = trap::S_RegisterSound(ctx.engine, &pc_token_str(&token));
             continue;
         }
 
@@ -9211,8 +9330,7 @@ pub fn Asset_Parse(ctx: &mut UiContext, dc: &mut dyn DisplayContext, handle: c_i
             if !trap::PC_ReadToken(ctx.engine, handle, &mut token) {
                 return false;
             }
-            ctx.world.uiDC.Assets.itemFocusSound =
-                trap::S_RegisterSound(ctx.engine, &pc_token_str(&token));
+            ds.Assets.itemFocusSound = trap::S_RegisterSound(ctx.engine, &pc_token_str(&token));
             continue;
         }
 
@@ -9221,73 +9339,70 @@ pub fn Asset_Parse(ctx: &mut UiContext, dc: &mut dyn DisplayContext, handle: c_i
             if !trap::PC_ReadToken(ctx.engine, handle, &mut token) {
                 return false;
             }
-            ctx.world.uiDC.Assets.menuBuzzSound =
-                trap::S_RegisterSound(ctx.engine, &pc_token_str(&token));
+            ds.Assets.menuBuzzSound = trap::S_RegisterSound(ctx.engine, &pc_token_str(&token));
             continue;
         }
 
         if Q_stricmp(&tokenStr, "fadeClamp") == 0 {
-            if !PC_Float_Parse(dc, handle, &mut ctx.world.uiDC.Assets.fadeClamp) {
+            if !PC_Float_Parse(ctx, handle, &mut ds.Assets.fadeClamp) {
                 return false;
             }
             continue;
         }
 
         if Q_stricmp(&tokenStr, "fadeCycle") == 0 {
-            if !PC_Int_Parse(dc, handle, &mut ctx.world.uiDC.Assets.fadeCycle) {
+            if !PC_Int_Parse(ctx, handle, &mut ds.Assets.fadeCycle) {
                 return false;
             }
             continue;
         }
 
         if Q_stricmp(&tokenStr, "fadeAmount") == 0 {
-            if !PC_Float_Parse(dc, handle, &mut ctx.world.uiDC.Assets.fadeAmount) {
+            if !PC_Float_Parse(ctx, handle, &mut ds.Assets.fadeAmount) {
                 return false;
             }
             continue;
         }
 
         if Q_stricmp(&tokenStr, "shadowX") == 0 {
-            if !PC_Float_Parse(dc, handle, &mut ctx.world.uiDC.Assets.shadowX) {
+            if !PC_Float_Parse(ctx, handle, &mut ds.Assets.shadowX) {
                 return false;
             }
             continue;
         }
 
         if Q_stricmp(&tokenStr, "shadowY") == 0 {
-            if !PC_Float_Parse(dc, handle, &mut ctx.world.uiDC.Assets.shadowY) {
+            if !PC_Float_Parse(ctx, handle, &mut ds.Assets.shadowY) {
                 return false;
             }
             continue;
         }
 
         if Q_stricmp(&tokenStr, "shadowColor") == 0 {
-            if !PC_Color_Parse(dc, handle, &mut ctx.world.uiDC.Assets.shadowColor) {
+            if !PC_Color_Parse(ctx, handle, &mut ds.Assets.shadowColor) {
                 return false;
             }
-            ctx.world.uiDC.Assets.shadowFadeClamp = ctx.world.uiDC.Assets.shadowColor[3];
+            ds.Assets.shadowFadeClamp = ds.Assets.shadowColor[3];
             continue;
         }
 
         if Q_stricmp(&tokenStr, "moveRollSound") == 0 {
             if trap::PC_ReadToken(ctx.engine, handle, &mut token) {
-                ctx.world.uiDC.Assets.moveRollSound =
-                    trap::S_RegisterSound(ctx.engine, &pc_token_str(&token));
+                ds.Assets.moveRollSound = trap::S_RegisterSound(ctx.engine, &pc_token_str(&token));
             }
             continue;
         }
 
         if Q_stricmp(&tokenStr, "moveJumpSound") == 0 {
             if trap::PC_ReadToken(ctx.engine, handle, &mut token) {
-                ctx.world.uiDC.Assets.moveJumpSound =
-                    trap::S_RegisterSound(ctx.engine, &pc_token_str(&token));
+                ds.Assets.moveJumpSound = trap::S_RegisterSound(ctx.engine, &pc_token_str(&token));
             }
             continue;
         }
 
         if Q_stricmp(&tokenStr, "datapadmoveSaberSound1") == 0 {
             if trap::PC_ReadToken(ctx.engine, handle, &mut token) {
-                ctx.world.uiDC.Assets.datapadmoveSaberSound1 =
+                ds.Assets.datapadmoveSaberSound1 =
                     trap::S_RegisterSound(ctx.engine, &pc_token_str(&token));
             }
             continue;
@@ -9295,7 +9410,7 @@ pub fn Asset_Parse(ctx: &mut UiContext, dc: &mut dyn DisplayContext, handle: c_i
 
         if Q_stricmp(&tokenStr, "datapadmoveSaberSound2") == 0 {
             if trap::PC_ReadToken(ctx.engine, handle, &mut token) {
-                ctx.world.uiDC.Assets.datapadmoveSaberSound2 =
+                ds.Assets.datapadmoveSaberSound2 =
                     trap::S_RegisterSound(ctx.engine, &pc_token_str(&token));
             }
             continue;
@@ -9303,7 +9418,7 @@ pub fn Asset_Parse(ctx: &mut UiContext, dc: &mut dyn DisplayContext, handle: c_i
 
         if Q_stricmp(&tokenStr, "datapadmoveSaberSound3") == 0 {
             if trap::PC_ReadToken(ctx.engine, handle, &mut token) {
-                ctx.world.uiDC.Assets.datapadmoveSaberSound3 =
+                ds.Assets.datapadmoveSaberSound3 =
                     trap::S_RegisterSound(ctx.engine, &pc_token_str(&token));
             }
             continue;
@@ -9311,7 +9426,7 @@ pub fn Asset_Parse(ctx: &mut UiContext, dc: &mut dyn DisplayContext, handle: c_i
 
         if Q_stricmp(&tokenStr, "datapadmoveSaberSound4") == 0 {
             if trap::PC_ReadToken(ctx.engine, handle, &mut token) {
-                ctx.world.uiDC.Assets.datapadmoveSaberSound4 =
+                ds.Assets.datapadmoveSaberSound4 =
                     trap::S_RegisterSound(ctx.engine, &pc_token_str(&token));
             }
             continue;
@@ -9319,7 +9434,7 @@ pub fn Asset_Parse(ctx: &mut UiContext, dc: &mut dyn DisplayContext, handle: c_i
 
         if Q_stricmp(&tokenStr, "datapadmoveSaberSound5") == 0 {
             if trap::PC_ReadToken(ctx.engine, handle, &mut token) {
-                ctx.world.uiDC.Assets.datapadmoveSaberSound5 =
+                ds.Assets.datapadmoveSaberSound5 =
                     trap::S_RegisterSound(ctx.engine, &pc_token_str(&token));
             }
             continue;
@@ -9327,7 +9442,7 @@ pub fn Asset_Parse(ctx: &mut UiContext, dc: &mut dyn DisplayContext, handle: c_i
 
         if Q_stricmp(&tokenStr, "datapadmoveSaberSound6") == 0 {
             if trap::PC_ReadToken(ctx.engine, handle, &mut token) {
-                ctx.world.uiDC.Assets.datapadmoveSaberSound6 =
+                ds.Assets.datapadmoveSaberSound6 =
                     trap::S_RegisterSound(ctx.engine, &pc_token_str(&token));
             }
             continue;
@@ -9336,7 +9451,7 @@ pub fn Asset_Parse(ctx: &mut UiContext, dc: &mut dyn DisplayContext, handle: c_i
         // precaching various sound files used in the menus
         if Q_stricmp(&tokenStr, "precacheSound") == 0 {
             let mut tempStr = String::new();
-            if PC_Script_Parse(dc, handle, &mut tempStr) {
+            if PC_Script_Parse(ctx, handle, &mut tempStr) {
                 let mut p: &str = &tempStr;
                 loop {
                     let (soundFile, rest) = COM_Parse(p, false);
@@ -9357,7 +9472,12 @@ pub fn Asset_Parse(ctx: &mut UiContext, dc: &mut dyn DisplayContext, handle: c_i
 /// Raven `UI_ParseMenu`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:1731-1776`
-pub fn UI_ParseMenu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menuFile: &str) {
+pub fn UI_ParseMenu(
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &mut DisplayState,
+    menuFile: &str,
+) {
     let handle = trap::PC_LoadSource(ctx.engine, menuFile);
     if handle == 0 {
         return;
@@ -9382,7 +9502,7 @@ pub fn UI_ParseMenu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menuFile: 
         }
 
         if Q_stricmp(&tokenStr, "assetGlobalDef") == 0 {
-            if Asset_Parse(ctx, dc, handle) {
+            if Asset_Parse(ctx, ds, handle) {
                 continue;
             } else {
                 break;
@@ -9391,7 +9511,7 @@ pub fn UI_ParseMenu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menuFile: 
 
         if Q_stricmp(&tokenStr, "menudef") == 0 {
             // start a new menu
-            Menu_New(&mut ctx.world.menus, &mut ctx.world.uiDC, dc, handle);
+            Menu_New(menus, ds, ctx, handle);
         }
     }
     trap::PC_FreeSource(ctx.engine, handle);
@@ -9403,7 +9523,8 @@ pub fn UI_ParseMenu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menuFile: 
 #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
 pub fn UI_OwnerDraw(
     ctx: &mut UiContext,
-    dc: &mut dyn DisplayContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     x: f32,
     y: f32,
     w: f32,
@@ -9429,12 +9550,13 @@ pub fn UI_OwnerDraw(
 
     match ownerDraw {
         UI_HANDICAP => {
-            UI_DrawHandicap(ctx, &rect, scale, color, textStyle, iMenuFont);
+            UI_DrawHandicap(ctx, ds, &rect, scale, color, textStyle, iMenuFont);
         }
         UI_SKIN_COLOR => {
             let uiSkinColor = ctx.world.main.uiSkinColor;
             UI_DrawSkinColor(
                 ctx,
+                ds,
                 &rect,
                 scale,
                 color,
@@ -9449,7 +9571,8 @@ pub fn UI_OwnerDraw(
             let uiForceSide = ctx.world.force.uiForceSide;
             UI_DrawForceSide(
                 ctx,
-                dc,
+                menus,
+                ds,
                 &rect,
                 scale,
                 &mut color,
@@ -9464,6 +9587,7 @@ pub fn UI_OwnerDraw(
             let uiJediNonJedi = ctx.world.force.uiJediNonJedi;
             UI_DrawJediNonJedi(
                 ctx,
+                ds,
                 &rect,
                 scale,
                 color,
@@ -9478,6 +9602,7 @@ pub fn UI_OwnerDraw(
             let uiForceAvailable = ctx.world.force.uiForceAvailable;
             UI_DrawGenericNum(
                 ctx,
+                ds,
                 &rect,
                 scale,
                 color,
@@ -9493,6 +9618,7 @@ pub fn UI_OwnerDraw(
             let uiForceRank = ctx.world.force.uiForceRank;
             UI_DrawForceMastery(
                 ctx,
+                ds,
                 &rect,
                 scale,
                 color,
@@ -9533,7 +9659,7 @@ pub fn UI_OwnerDraw(
         // (Raven leaves this call commented out).
         UI_PLAYERMODEL => {}
         UI_CLANNAME => {
-            UI_DrawClanName(ctx, &rect, scale, color, textStyle, iMenuFont);
+            UI_DrawClanName(ctx, ds, &rect, scale, color, textStyle, iMenuFont);
         }
         UI_CLANLOGO => {
             UI_DrawClanLogo(ctx, &rect, scale, color);
@@ -9545,22 +9671,22 @@ pub fn UI_OwnerDraw(
             UI_DrawPreviewCinematic(ctx, &rect, scale, color);
         }
         UI_GAMETYPE => {
-            UI_DrawGameType(ctx, &rect, scale, color, textStyle, iMenuFont);
+            UI_DrawGameType(ctx, ds, &rect, scale, color, textStyle, iMenuFont);
         }
         UI_NETGAMETYPE => {
-            UI_DrawNetGameType(ctx, &rect, scale, color, textStyle, iMenuFont);
+            UI_DrawNetGameType(ctx, ds, &rect, scale, color, textStyle, iMenuFont);
         }
         UI_AUTOSWITCHLIST => {
-            UI_DrawAutoSwitch(ctx, &rect, scale, color, textStyle, iMenuFont);
+            UI_DrawAutoSwitch(ctx, ds, &rect, scale, color, textStyle, iMenuFont);
         }
         UI_JOINGAMETYPE => {
-            UI_DrawJoinGameType(ctx, &rect, scale, color, textStyle, iMenuFont);
+            UI_DrawJoinGameType(ctx, ds, &rect, scale, color, textStyle, iMenuFont);
         }
         UI_MAPPREVIEW => {
             UI_DrawMapPreview(ctx, &rect, scale, color, true);
         }
         UI_MAP_TIMETOBEAT => {
-            UI_DrawMapTimeToBeat(ctx, &rect, scale, color, textStyle, iMenuFont);
+            UI_DrawMapTimeToBeat(ctx, ds, &rect, scale, color, textStyle, iMenuFont);
         }
         UI_MAPCINEMATIC => {
             UI_DrawMapCinematic(ctx, &rect, scale, color, false);
@@ -9569,15 +9695,15 @@ pub fn UI_OwnerDraw(
             UI_DrawMapCinematic(ctx, &rect, scale, color, true);
         }
         UI_SKILL => {
-            UI_DrawSkill(ctx, &rect, scale, color, textStyle, iMenuFont);
+            UI_DrawSkill(ctx, ds, &rect, scale, color, textStyle, iMenuFont);
         }
         // Raven leaves `UI_DrawTotalForceStars` commented out.
         UI_TOTALFORCESTARS => {}
         UI_BLUETEAMNAME => {
-            UI_DrawTeamName(ctx, &rect, scale, color, true, textStyle, iMenuFont);
+            UI_DrawTeamName(ctx, ds, &rect, scale, color, true, textStyle, iMenuFont);
         }
         UI_REDTEAMNAME => {
-            UI_DrawTeamName(ctx, &rect, scale, color, false, textStyle, iMenuFont);
+            UI_DrawTeamName(ctx, ds, &rect, scale, color, false, textStyle, iMenuFont);
         }
         UI_BLUETEAM1 | UI_BLUETEAM2 | UI_BLUETEAM3 | UI_BLUETEAM4 | UI_BLUETEAM5 | UI_BLUETEAM6
         | UI_BLUETEAM7 | UI_BLUETEAM8 => {
@@ -9588,7 +9714,9 @@ pub fn UI_OwnerDraw(
                 // UI_BLAHTEAM# defines
                 ownerDraw - 274
             };
-            UI_DrawTeamMember(ctx, &rect, scale, color, true, iUse, textStyle, iMenuFont);
+            UI_DrawTeamMember(
+                ctx, ds, &rect, scale, color, true, iUse, textStyle, iMenuFont,
+            );
         }
         UI_REDTEAM1 | UI_REDTEAM2 | UI_REDTEAM3 | UI_REDTEAM4 | UI_REDTEAM5 | UI_REDTEAM6
         | UI_REDTEAM7 | UI_REDTEAM8 => {
@@ -9597,10 +9725,12 @@ pub fn UI_OwnerDraw(
             } else {
                 ownerDraw - 277
             };
-            UI_DrawTeamMember(ctx, &rect, scale, color, false, iUse, textStyle, iMenuFont);
+            UI_DrawTeamMember(
+                ctx, ds, &rect, scale, color, false, iUse, textStyle, iMenuFont,
+            );
         }
         UI_NETSOURCE => {
-            UI_DrawNetSource(ctx, &rect, scale, color, textStyle, iMenuFont);
+            UI_DrawNetSource(ctx, ds, &rect, scale, color, textStyle, iMenuFont);
         }
         UI_NETMAPPREVIEW => {
             UI_DrawNetMapPreview(ctx, &rect, scale, color);
@@ -9609,10 +9739,10 @@ pub fn UI_OwnerDraw(
             UI_DrawNetMapCinematic(ctx, &rect, scale, color);
         }
         UI_NETFILTER => {
-            UI_DrawNetFilter(ctx, &rect, scale, color, textStyle, iMenuFont);
+            UI_DrawNetFilter(ctx, ds, &rect, scale, color, textStyle, iMenuFont);
         }
         UI_TIER => {
-            UI_DrawTier(ctx, &rect, scale, color, textStyle, iMenuFont);
+            UI_DrawTier(ctx, ds, &rect, scale, color, textStyle, iMenuFont);
         }
         // PORT-NOTE (§20 dead surface, D7): `UI_DrawOpponent` is dead (Raven
         // leaves this call commented out).
@@ -9645,49 +9775,49 @@ pub fn UI_OwnerDraw(
             UI_DrawOpponentLogoName(ctx, &rect, color);
         }
         UI_TIER_MAPNAME => {
-            UI_DrawTierMapName(ctx, &rect, scale, color, textStyle, iMenuFont);
+            UI_DrawTierMapName(ctx, ds, &rect, scale, color, textStyle, iMenuFont);
         }
         UI_TIER_GAMETYPE => {
-            UI_DrawTierGameType(ctx, &rect, scale, color, textStyle, iMenuFont);
+            UI_DrawTierGameType(ctx, ds, &rect, scale, color, textStyle, iMenuFont);
         }
         UI_ALLMAPS_SELECTION => {
-            UI_DrawAllMapsSelection(ctx, &rect, scale, color, textStyle, true, iMenuFont);
+            UI_DrawAllMapsSelection(ctx, ds, &rect, scale, color, textStyle, true, iMenuFont);
         }
         UI_MAPS_SELECTION => {
-            UI_DrawAllMapsSelection(ctx, &rect, scale, color, textStyle, false, iMenuFont);
+            UI_DrawAllMapsSelection(ctx, ds, &rect, scale, color, textStyle, false, iMenuFont);
         }
         UI_OPPONENT_NAME => {
-            UI_DrawOpponentName(ctx, &rect, scale, color, textStyle, iMenuFont);
+            UI_DrawOpponentName(ctx, ds, &rect, scale, color, textStyle, iMenuFont);
         }
         UI_BOTNAME => {
-            UI_DrawBotName(ctx, &rect, scale, color, textStyle, iMenuFont);
+            UI_DrawBotName(ctx, ds, &rect, scale, color, textStyle, iMenuFont);
         }
         UI_BOTSKILL => {
-            UI_DrawBotSkill(ctx, &rect, scale, color, textStyle, iMenuFont);
+            UI_DrawBotSkill(ctx, ds, &rect, scale, color, textStyle, iMenuFont);
         }
         UI_REDBLUE => {
-            UI_DrawRedBlue(ctx, &rect, scale, color, textStyle, iMenuFont);
+            UI_DrawRedBlue(ctx, ds, &rect, scale, color, textStyle, iMenuFont);
         }
         UI_CROSSHAIR => {
-            UI_DrawCrosshair(ctx, &rect, scale, color);
+            UI_DrawCrosshair(ctx, ds, &rect, scale, color);
         }
         UI_SELECTEDPLAYER => {
-            UI_DrawSelectedPlayer(ctx, &rect, scale, color, textStyle, iMenuFont);
+            UI_DrawSelectedPlayer(ctx, ds, &rect, scale, color, textStyle, iMenuFont);
         }
         UI_SERVERREFRESHDATE => {
-            UI_DrawServerRefreshDate(ctx, &rect, scale, color, textStyle, iMenuFont);
+            UI_DrawServerRefreshDate(ctx, ds, &rect, scale, color, textStyle, iMenuFont);
         }
         UI_SERVERMOTD => {
-            UI_DrawServerMOTD(ctx, &rect, scale, color, iMenuFont);
+            UI_DrawServerMOTD(ctx, ds, &rect, scale, color, iMenuFont);
         }
         UI_GLINFO => {
-            UI_DrawGLInfo(ctx, &rect, scale, color, textStyle, iMenuFont);
+            UI_DrawGLInfo(ctx, ds, &rect, scale, color, textStyle, iMenuFont);
         }
         UI_KEYBINDSTATUS => {
-            UI_DrawKeyBindStatus(ctx, &rect, scale, color, textStyle, iMenuFont);
+            UI_DrawKeyBindStatus(ctx, menus, ds, &rect, scale, color, textStyle, iMenuFont);
         }
         UI_VERSION => {
-            UI_Version(dc, &rect, scale, color, iMenuFont);
+            UI_Version(ctx, ds, &rect, scale, color, iMenuFont);
         }
         _ => {}
     }
@@ -9697,34 +9827,35 @@ pub fn UI_OwnerDraw(
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:3949-3996`
 pub fn UI_Chat_Main_HandleKey(
-    world: &mut UiWorld,
-    dc: &mut dyn DisplayContext,
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     key: c_int,
 ) -> bool {
-    let menu = match Menu_GetFocused(&world.menus) {
+    let menu = match Menu_GetFocused(menus) {
         Some(m) => m,
         None => return false,
     };
 
     let item = if key == fakeAscii_t::A_1 as c_int || key == fakeAscii_t::A_PLING as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "attack")
+        Menu_FindItemByName(menus, Some(menu), "attack")
     } else if key == fakeAscii_t::A_2 as c_int || key == fakeAscii_t::A_AT as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "defend")
+        Menu_FindItemByName(menus, Some(menu), "defend")
     } else if key == fakeAscii_t::A_3 as c_int || key == fakeAscii_t::A_HASH as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "request")
+        Menu_FindItemByName(menus, Some(menu), "request")
     } else if key == fakeAscii_t::A_4 as c_int || key == fakeAscii_t::A_STRING as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "reply")
+        Menu_FindItemByName(menus, Some(menu), "reply")
     } else if key == fakeAscii_t::A_5 as c_int || key == fakeAscii_t::A_PERCENT as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "spot")
+        Menu_FindItemByName(menus, Some(menu), "spot")
     } else if key == fakeAscii_t::A_6 as c_int || key == fakeAscii_t::A_CARET as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "tactics")
+        Menu_FindItemByName(menus, Some(menu), "tactics")
     } else {
         return false;
     };
 
     if let Some(item) = item {
-        let action = world.menus.item(item).action.clone();
-        Item_RunScript(&mut world.menus, &world.uiDC, dc, item, &action);
+        let action = menus.item(item).action.clone();
+        Item_RunScript(menus, ds, ctx, item, &action);
     }
 
     true
@@ -9734,28 +9865,29 @@ pub fn UI_Chat_Main_HandleKey(
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:3999-4034`
 pub fn UI_Chat_Attack_HandleKey(
-    world: &mut UiWorld,
-    dc: &mut dyn DisplayContext,
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     key: c_int,
 ) -> bool {
-    let menu = match Menu_GetFocused(&world.menus) {
+    let menu = match Menu_GetFocused(menus) {
         Some(m) => m,
         None => return false,
     };
 
     let item = if key == fakeAscii_t::A_1 as c_int || key == fakeAscii_t::A_PLING as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "att_01")
+        Menu_FindItemByName(menus, Some(menu), "att_01")
     } else if key == fakeAscii_t::A_2 as c_int || key == fakeAscii_t::A_AT as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "att_02")
+        Menu_FindItemByName(menus, Some(menu), "att_02")
     } else if key == fakeAscii_t::A_3 as c_int || key == fakeAscii_t::A_HASH as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "att_03")
+        Menu_FindItemByName(menus, Some(menu), "att_03")
     } else {
         return false;
     };
 
     if let Some(item) = item {
-        let action = world.menus.item(item).action.clone();
-        Item_RunScript(&mut world.menus, &world.uiDC, dc, item, &action);
+        let action = menus.item(item).action.clone();
+        Item_RunScript(menus, ds, ctx, item, &action);
     }
 
     true
@@ -9765,30 +9897,31 @@ pub fn UI_Chat_Attack_HandleKey(
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:4037-4076`
 pub fn UI_Chat_Defend_HandleKey(
-    world: &mut UiWorld,
-    dc: &mut dyn DisplayContext,
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     key: c_int,
 ) -> bool {
-    let menu = match Menu_GetFocused(&world.menus) {
+    let menu = match Menu_GetFocused(menus) {
         Some(m) => m,
         None => return false,
     };
 
     let item = if key == fakeAscii_t::A_1 as c_int || key == fakeAscii_t::A_PLING as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "def_01")
+        Menu_FindItemByName(menus, Some(menu), "def_01")
     } else if key == fakeAscii_t::A_2 as c_int || key == fakeAscii_t::A_AT as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "def_02")
+        Menu_FindItemByName(menus, Some(menu), "def_02")
     } else if key == fakeAscii_t::A_3 as c_int || key == fakeAscii_t::A_HASH as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "def_03")
+        Menu_FindItemByName(menus, Some(menu), "def_03")
     } else if key == fakeAscii_t::A_4 as c_int || key == fakeAscii_t::A_STRING as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "def_04")
+        Menu_FindItemByName(menus, Some(menu), "def_04")
     } else {
         return false;
     };
 
     if let Some(item) = item {
-        let action = world.menus.item(item).action.clone();
-        Item_RunScript(&mut world.menus, &world.uiDC, dc, item, &action);
+        let action = menus.item(item).action.clone();
+        Item_RunScript(menus, ds, ctx, item, &action);
     }
 
     true
@@ -9798,34 +9931,35 @@ pub fn UI_Chat_Defend_HandleKey(
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:4079-4126`
 pub fn UI_Chat_Request_HandleKey(
-    world: &mut UiWorld,
-    dc: &mut dyn DisplayContext,
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     key: c_int,
 ) -> bool {
-    let menu = match Menu_GetFocused(&world.menus) {
+    let menu = match Menu_GetFocused(menus) {
         Some(m) => m,
         None => return false,
     };
 
     let item = if key == fakeAscii_t::A_1 as c_int || key == fakeAscii_t::A_PLING as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "req_01")
+        Menu_FindItemByName(menus, Some(menu), "req_01")
     } else if key == fakeAscii_t::A_2 as c_int || key == fakeAscii_t::A_AT as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "req_02")
+        Menu_FindItemByName(menus, Some(menu), "req_02")
     } else if key == fakeAscii_t::A_3 as c_int || key == fakeAscii_t::A_HASH as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "req_03")
+        Menu_FindItemByName(menus, Some(menu), "req_03")
     } else if key == fakeAscii_t::A_4 as c_int || key == fakeAscii_t::A_STRING as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "req_04")
+        Menu_FindItemByName(menus, Some(menu), "req_04")
     } else if key == fakeAscii_t::A_5 as c_int || key == fakeAscii_t::A_PERCENT as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "req_05")
+        Menu_FindItemByName(menus, Some(menu), "req_05")
     } else if key == fakeAscii_t::A_6 as c_int || key == fakeAscii_t::A_CARET as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "req_06")
+        Menu_FindItemByName(menus, Some(menu), "req_06")
     } else {
         return false;
     };
 
     if let Some(item) = item {
-        let action = world.menus.item(item).action.clone();
-        Item_RunScript(&mut world.menus, &world.uiDC, dc, item, &action);
+        let action = menus.item(item).action.clone();
+        Item_RunScript(menus, ds, ctx, item, &action);
     }
 
     true
@@ -9835,32 +9969,33 @@ pub fn UI_Chat_Request_HandleKey(
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:4129-4172`
 pub fn UI_Chat_Reply_HandleKey(
-    world: &mut UiWorld,
-    dc: &mut dyn DisplayContext,
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     key: c_int,
 ) -> bool {
-    let menu = match Menu_GetFocused(&world.menus) {
+    let menu = match Menu_GetFocused(menus) {
         Some(m) => m,
         None => return false,
     };
 
     let item = if key == fakeAscii_t::A_1 as c_int || key == fakeAscii_t::A_PLING as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "rep_01")
+        Menu_FindItemByName(menus, Some(menu), "rep_01")
     } else if key == fakeAscii_t::A_2 as c_int || key == fakeAscii_t::A_AT as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "rep_02")
+        Menu_FindItemByName(menus, Some(menu), "rep_02")
     } else if key == fakeAscii_t::A_3 as c_int || key == fakeAscii_t::A_HASH as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "rep_03")
+        Menu_FindItemByName(menus, Some(menu), "rep_03")
     } else if key == fakeAscii_t::A_4 as c_int || key == fakeAscii_t::A_STRING as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "rep_04")
+        Menu_FindItemByName(menus, Some(menu), "rep_04")
     } else if key == fakeAscii_t::A_5 as c_int || key == fakeAscii_t::A_PERCENT as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "rep_05")
+        Menu_FindItemByName(menus, Some(menu), "rep_05")
     } else {
         return false;
     };
 
     if let Some(item) = item {
-        let action = world.menus.item(item).action.clone();
-        Item_RunScript(&mut world.menus, &world.uiDC, dc, item, &action);
+        let action = menus.item(item).action.clone();
+        Item_RunScript(menus, ds, ctx, item, &action);
     }
 
     true
@@ -9870,30 +10005,31 @@ pub fn UI_Chat_Reply_HandleKey(
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:4175-4214`
 pub fn UI_Chat_Spot_HandleKey(
-    world: &mut UiWorld,
-    dc: &mut dyn DisplayContext,
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     key: c_int,
 ) -> bool {
-    let menu = match Menu_GetFocused(&world.menus) {
+    let menu = match Menu_GetFocused(menus) {
         Some(m) => m,
         None => return false,
     };
 
     let item = if key == fakeAscii_t::A_1 as c_int || key == fakeAscii_t::A_PLING as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "spot_01")
+        Menu_FindItemByName(menus, Some(menu), "spot_01")
     } else if key == fakeAscii_t::A_2 as c_int || key == fakeAscii_t::A_AT as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "spot_02")
+        Menu_FindItemByName(menus, Some(menu), "spot_02")
     } else if key == fakeAscii_t::A_3 as c_int || key == fakeAscii_t::A_HASH as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "spot_03")
+        Menu_FindItemByName(menus, Some(menu), "spot_03")
     } else if key == fakeAscii_t::A_4 as c_int || key == fakeAscii_t::A_STRING as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "spot_04")
+        Menu_FindItemByName(menus, Some(menu), "spot_04")
     } else {
         return false;
     };
 
     if let Some(item) = item {
-        let action = world.menus.item(item).action.clone();
-        Item_RunScript(&mut world.menus, &world.uiDC, dc, item, &action);
+        let action = menus.item(item).action.clone();
+        Item_RunScript(menus, ds, ctx, item, &action);
     }
 
     true
@@ -9903,34 +10039,35 @@ pub fn UI_Chat_Spot_HandleKey(
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:4217-4264`
 pub fn UI_Chat_Tactical_HandleKey(
-    world: &mut UiWorld,
-    dc: &mut dyn DisplayContext,
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     key: c_int,
 ) -> bool {
-    let menu = match Menu_GetFocused(&world.menus) {
+    let menu = match Menu_GetFocused(menus) {
         Some(m) => m,
         None => return false,
     };
 
     let item = if key == fakeAscii_t::A_1 as c_int || key == fakeAscii_t::A_PLING as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "tac_01")
+        Menu_FindItemByName(menus, Some(menu), "tac_01")
     } else if key == fakeAscii_t::A_2 as c_int || key == fakeAscii_t::A_AT as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "tac_02")
+        Menu_FindItemByName(menus, Some(menu), "tac_02")
     } else if key == fakeAscii_t::A_3 as c_int || key == fakeAscii_t::A_HASH as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "tac_03")
+        Menu_FindItemByName(menus, Some(menu), "tac_03")
     } else if key == fakeAscii_t::A_4 as c_int || key == fakeAscii_t::A_STRING as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "tac_04")
+        Menu_FindItemByName(menus, Some(menu), "tac_04")
     } else if key == fakeAscii_t::A_5 as c_int || key == fakeAscii_t::A_PERCENT as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "tac_05")
+        Menu_FindItemByName(menus, Some(menu), "tac_05")
     } else if key == fakeAscii_t::A_6 as c_int || key == fakeAscii_t::A_CARET as c_int {
-        Menu_FindItemByName(&world.menus, Some(menu), "tac_06")
+        Menu_FindItemByName(menus, Some(menu), "tac_06")
     } else {
         return false;
     };
 
     if let Some(item) = item {
-        let action = world.menus.item(item).action.clone();
-        Item_RunScript(&mut world.menus, &world.uiDC, dc, item, &action);
+        let action = menus.item(item).action.clone();
+        Item_RunScript(menus, ds, ctx, item, &action);
     }
 
     true
@@ -9941,7 +10078,8 @@ pub fn UI_Chat_Tactical_HandleKey(
 /// Source: `oracle/codemp/ui/ui_main.c:4526-4549`
 pub fn UI_NetSource_HandleKey(
     ctx: &mut UiContext,
-    dc: &mut dyn DisplayContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     _flags: c_int,
     _special: &mut f32,
     key: c_int,
@@ -9963,9 +10101,9 @@ pub fn UI_NetSource_HandleKey(
             ctx.world.cvars.ui_netSource.integer = NUM_NET_SOURCES - 1;
         }
 
-        UI_BuildServerDisplayList(ctx, dc, 1);
+        UI_BuildServerDisplayList(ctx, menus, ds, 1);
         if ctx.world.cvars.ui_netSource.integer != AS_GLOBAL {
-            UI_StartServerRefresh(ctx, true);
+            UI_StartServerRefresh(ctx, ds, true);
         }
         trap::Cvar_Set(
             ctx.engine,
@@ -9980,10 +10118,14 @@ pub fn UI_NetSource_HandleKey(
 /// Raven `UI_FindCurrentSiegeTeamClass`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:5720-5803`
-pub fn UI_FindCurrentSiegeTeamClass(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+pub fn UI_FindCurrentSiegeTeamClass(
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+) {
     let myTeam = trap::Cvar_VariableValue(ctx.engine, "ui_myteam") as c_int;
 
-    let menu = match Menu_GetFocused(&ctx.world.menus) {
+    let menu = match Menu_GetFocused(menus) {
         Some(m) => m,
         None => return,
     };
@@ -9994,14 +10136,14 @@ pub fn UI_FindCurrentSiegeTeamClass(ctx: &mut UiContext, dc: &mut dyn DisplayCon
 
     // If the player is on a team,
     if myTeam == TEAM_RED {
-        if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "onteam1") {
-            let action = ctx.world.menus.item(item).action.clone();
-            Item_RunScript(&mut ctx.world.menus, &ctx.world.uiDC, dc, item, &action);
+        if let Some(item) = Menu_FindItemByName(menus, Some(menu), "onteam1") {
+            let action = menus.item(item).action.clone();
+            Item_RunScript(menus, ds, ctx, item, &action);
         }
     } else if myTeam == TEAM_BLUE {
-        if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "onteam2") {
-            let action = ctx.world.menus.item(item).action.clone();
-            Item_RunScript(&mut ctx.world.menus, &ctx.world.uiDC, dc, item, &action);
+        if let Some(item) = Menu_FindItemByName(menus, Some(menu), "onteam2") {
+            let action = menus.item(item).action.clone();
+            Item_RunScript(menus, ds, ctx, item, &action);
         }
     }
 
@@ -10024,46 +10166,46 @@ pub fn UI_FindCurrentSiegeTeamClass(ctx: &mut UiContext, dc: &mut dyn DisplayCon
         return;
     };
 
-    if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), itemname) {
-        let action = ctx.world.menus.item(item).action.clone();
-        Item_RunScript(&mut ctx.world.menus, &ctx.world.uiDC, dc, item, &action);
+    if let Some(item) = Menu_FindItemByName(menus, Some(menu), itemname) {
+        let action = menus.item(item).action.clone();
+        Item_RunScript(menus, ds, ctx, item, &action);
     }
 }
 
 /// Raven `UI_UpdateSiegeObjectiveGraphics`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:5805-5847`
-pub fn UI_UpdateSiegeObjectiveGraphics(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
-    let menu = match Menu_GetFocused(&ctx.world.menus) {
+pub fn UI_UpdateSiegeObjectiveGraphics(ctx: &mut UiContext, menus: &mut MenuSystem) {
+    let menu = match Menu_GetFocused(menus) {
         Some(m) => m,
         None => return,
     };
 
     // Hiding a bunch of fields because the opening section of the siege menu
     // was getting too long
-    Menu_ShowGroup(&mut ctx.world.menus, dc, menu, "class_button", false);
-    Menu_ShowGroup(&mut ctx.world.menus, dc, menu, "class_count", false);
-    Menu_ShowGroup(&mut ctx.world.menus, dc, menu, "feeders", false);
-    Menu_ShowGroup(&mut ctx.world.menus, dc, menu, "classdescription", false);
-    Menu_ShowGroup(&mut ctx.world.menus, dc, menu, "minidesc", false);
-    Menu_ShowGroup(&mut ctx.world.menus, dc, menu, "obj_longdesc", false);
-    Menu_ShowGroup(&mut ctx.world.menus, dc, menu, "objective_pic", false);
-    Menu_ShowGroup(&mut ctx.world.menus, dc, menu, "stats", false);
-    Menu_ShowGroup(&mut ctx.world.menus, dc, menu, "forcepowerlevel", false);
+    Menu_ShowGroup(menus, ctx, menu, "class_button", false);
+    Menu_ShowGroup(menus, ctx, menu, "class_count", false);
+    Menu_ShowGroup(menus, ctx, menu, "feeders", false);
+    Menu_ShowGroup(menus, ctx, menu, "classdescription", false);
+    Menu_ShowGroup(menus, ctx, menu, "minidesc", false);
+    Menu_ShowGroup(menus, ctx, menu, "obj_longdesc", false);
+    Menu_ShowGroup(menus, ctx, menu, "objective_pic", false);
+    Menu_ShowGroup(menus, ctx, menu, "stats", false);
+    Menu_ShowGroup(menus, ctx, menu, "forcepowerlevel", false);
 
     // Get objective icons for each team
     for teamI in 1..3 {
         for objI in 1..8 {
             Menu_SetItemBackground(
-                &mut ctx.world.menus,
-                dc,
+                menus,
+                ctx,
                 Some(menu),
                 &format!("tm{}_icon{}", teamI, objI),
                 &format!("*team{}_objective{}_mapicon", teamI, objI),
             );
             Menu_SetItemBackground(
-                &mut ctx.world.menus,
-                dc,
+                menus,
+                ctx,
                 Some(menu),
                 &format!("tm{}_l_icon{}", teamI, objI),
                 &format!("*team{}_objective{}_mapicon", teamI, objI),
@@ -10076,6 +10218,7 @@ pub fn UI_UpdateSiegeObjectiveGraphics(ctx: &mut UiContext, dc: &mut dyn Display
         for objI in 1..8 {
             UI_SetSiegeObjectiveGraphicPos(
                 ctx,
+                menus,
                 menu,
                 &format!("tm{}_icon{}", teamI, objI),
                 &format!("team{}_objective{}_mappos", teamI, objI),
@@ -10087,8 +10230,8 @@ pub fn UI_UpdateSiegeObjectiveGraphics(ctx: &mut UiContext, dc: &mut dyn Display
 /// Raven `UI_UpdateSaberHilt`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:5963-6018`
-pub fn UI_UpdateSaberHilt(ctx: &mut UiContext, dc: &mut dyn DisplayContext, secondSaber: bool) {
-    let menu = match Menu_GetFocused(&ctx.world.menus) {
+pub fn UI_UpdateSaberHilt(ctx: &mut UiContext, menus: &mut MenuSystem, secondSaber: bool) {
+    let menu = match Menu_GetFocused(menus) {
         // Get current menu (either video or ingame video, I would assume)
         Some(m) => m,
         None => return,
@@ -10100,17 +10243,10 @@ pub fn UI_UpdateSaberHilt(ctx: &mut UiContext, dc: &mut dyn DisplayContext, seco
         ("saber", "ui_saber")
     };
 
-    let item = match Menu_FindItemByName(&ctx.world.menus, Some(menu), itemName) {
+    let item = match Menu_FindItemByName(menus, Some(menu), itemName) {
         Some(i) => i,
         None => {
-            let menuName = ctx
-                .world
-                .menus
-                .menu(menu)
-                .window
-                .name
-                .clone()
-                .unwrap_or_default();
+            let menuName = menus.menu(menu).window.name.clone().unwrap_or_default();
             Com_Error(
                 ctx,
                 &format!(
@@ -10126,24 +10262,18 @@ pub fn UI_UpdateSaberHilt(ctx: &mut UiContext, dc: &mut dyn DisplayContext, seco
 
     // §19 divergence: Raven's `item->text = model` aliases the stack buffer and
     // dangles after return (`oracle/codemp/ui/ui_main.c:6001`); the clone is the defined pick.
-    ctx.world.menus.item_mut(item).text = Some(model.clone());
+    menus.item_mut(item).text = Some(model.clone());
     // read this from the sabers.cfg
     if let Some(modelPath) = UI_SaberModelForSaber(ctx, &model) {
         // successfully found a model
         let mut animRunLength = 0;
-        ItemParse_asset_model_go(
-            &mut ctx.world.menus,
-            dc,
-            item,
-            &modelPath,
-            &mut animRunLength,
-        ); // set the model
-           // get the customSkin, if any
+        ItemParse_asset_model_go(menus, ctx, item, &modelPath, &mut animRunLength); // set the model
+                                                                                    // get the customSkin, if any
         if let Some(skinPath) = UI_SaberSkinForSaber(ctx, &model) {
-            ItemParse_model_g2skin_go(&mut ctx.world.menus, dc, item, Some(&skinPath));
+            ItemParse_model_g2skin_go(menus, ctx, item, Some(&skinPath));
         // apply the skin
         } else {
-            ItemParse_model_g2skin_go(&mut ctx.world.menus, dc, item, None); // apply the skin
+            ItemParse_model_g2skin_go(menus, ctx, item, None); // apply the skin
         }
     }
 }
@@ -10171,6 +10301,7 @@ fn feeder_buf_clamp(s: String, max: usize) -> String {
 #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
 pub fn UI_FeederItemText(
     ctx: &mut UiContext,
+    ds: &DisplayState,
     feederID: f32,
     index: c_int,
     column: c_int,
@@ -10245,7 +10376,7 @@ pub fn UI_FeederItemText(
         if index >= 0 && index < ctx.world.serverStatus.displayServers.len() as c_int {
             let serverNum = ctx.world.serverStatus.displayServers[index as usize];
             if ctx.world.scratch.UI_FeederItemText_lastColumn != column
-                || ctx.world.scratch.UI_FeederItemText_lastTime > ctx.world.uiDC.realTime + 5000
+                || ctx.world.scratch.UI_FeederItemText_lastTime > ds.realTime + 5000
             {
                 ctx.world.scratch.UI_FeederItemText_info = trap::LAN_GetServerInfo(
                     ctx.engine,
@@ -10254,7 +10385,7 @@ pub fn UI_FeederItemText(
                     MAX_STRING_CHARS,
                 );
                 ctx.world.scratch.UI_FeederItemText_lastColumn = column;
-                ctx.world.scratch.UI_FeederItemText_lastTime = ctx.world.uiDC.realTime;
+                ctx.world.scratch.UI_FeederItemText_lastTime = ds.realTime;
             }
             let info = ctx.world.scratch.UI_FeederItemText_info.clone();
 
@@ -10268,7 +10399,7 @@ pub fn UI_FeederItemText(
                         return Info_ValueForKey(&info, "addr");
                     } else {
                         if atoi(&Info_ValueForKey(&info, "needpass")) != 0 {
-                            *handle3 = ctx.world.uiDC.Assets.needPass;
+                            *handle3 = ds.Assets.needPass;
                         }
                         let gametype = atoi(&Info_ValueForKey(&info, "gametype"));
                         if gametype != GT_JEDIMASTER {
@@ -10279,10 +10410,10 @@ pub fn UI_FeederItemText(
                             if UI_AllForceDisabled(restrictedForce) {
                                 // all force powers are disabled
                                 allForceDisabled = true;
-                                *handle2 = ctx.world.uiDC.Assets.noForce;
+                                *handle2 = ds.Assets.noForce;
                             } else if restrictedForce != 0 {
                                 // at least one force power is disabled
-                                *handle2 = ctx.world.uiDC.Assets.forceRestrict;
+                                *handle2 = ds.Assets.forceRestrict;
                             }
 
                             let wDisable = atoi(&Info_ValueForKey(&info, "wdisable"));
@@ -10294,7 +10425,7 @@ pub fn UI_FeederItemText(
                                 i += 1;
                             }
                             if saberOnly {
-                                *handle1 = ctx.world.uiDC.Assets.saberOnly;
+                                *handle1 = ds.Assets.saberOnly;
                             } else if atoi(&Info_ValueForKey(&info, "truejedi")) != 0
                                 && gametype != GT_HOLOCRON
                                 && gametype != GT_JEDIMASTER
@@ -10302,7 +10433,7 @@ pub fn UI_FeederItemText(
                                 && !allForceDisabled
                             {
                                 // truejedi is on and allowed in this mode
-                                *handle1 = ctx.world.uiDC.Assets.trueJedi;
+                                *handle1 = ds.Assets.trueJedi;
                             }
                         }
                         if ctx.world.cvars.ui_netSource.integer == AS_LOCAL {
@@ -10699,7 +10830,8 @@ pub fn UI_ParseGameInfo(ctx: &mut UiContext, teamFile: &str) {
 /// Source: `oracle/codemp/ui/ui_main.c:9596-9639`
 pub fn UI_UpdateCvarsForClass(
     ctx: &mut UiContext,
-    dc: &mut dyn DisplayContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     team: c_int,
     baseClass: c_int,
     index: c_int,
@@ -10734,8 +10866,9 @@ pub fn UI_UpdateCvarsForClass(
                         trap::Cvar_Set(ctx.engine, "ui_classDesc", &desc);
                         ctx.world.main.g_siegedFeederForcedSet = 1;
                         Menu_SetFeederSelection(
-                            &mut ctx.world.menus,
-                            dc,
+                            menus,
+                            ds,
+                            ctx,
                             None,
                             FEEDER_SIEGE_BASE_CLASS,
                             -1,
@@ -10766,7 +10899,7 @@ pub fn UI_UpdateCvarsForClass(
 ///
 /// PORT-NOTE: `UI_SaberAttachToChar` takes `&mut ItemDef` while `item` lives
 /// in the `MenuSystem` arena inside `ctx.world`; borrowing `ctx` (for the
-/// trap calls `UI_SaberAttachToChar` makes internally) and `ctx.world.menus`
+/// trap calls `UI_SaberAttachToChar` makes internally) and `menus`
 /// (for the item) at once is not expressible, so the FEEDER_MOVES arm clones
 /// the item out, calls through the clone, and writes it back — mirroring
 /// nothing upstream (this is the first landed call site) and flagged as an
@@ -10776,7 +10909,8 @@ pub fn UI_UpdateCvarsForClass(
 #[allow(clippy::too_many_lines)]
 pub fn UI_FeederSelection(
     ctx: &mut UiContext,
-    dc: &mut dyn DisplayContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     feederFloat: f32,
     index: c_int,
     item: Option<ItemId>,
@@ -10800,28 +10934,22 @@ pub fn UI_FeederSelection(
             trap::Cvar_Set(ctx.engine, "char_color_blue", "255");
         }
     } else if feederID == FEEDER_MOVES {
-        if let Some(menu) = Menus_FindByName(&ctx.world.menus, "rulesMenu_moves") {
-            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "character") {
-                if ctx.world.menus.item(item).typeData.model().is_some() {
+        if let Some(menu) = Menus_FindByName(menus, "rulesMenu_moves") {
+            if let Some(item) = Menu_FindItemByName(menus, Some(menu), "character") {
+                if menus.item(item).typeData.model().is_some() {
                     let anim =
                         DATAPAD_MOVE_DATA[ctx.world.movesTitleIndex as usize][index as usize].anim;
-                    ItemParse_model_g2anim_go(&mut ctx.world.menus, dc, item, anim);
+                    ItemParse_model_g2anim_go(menus, ctx, item, anim);
 
                     let charModel = UI_Cvar_VariableString(ctx, "ui_char_model");
                     // PORT-NOTE: Raven's `Com_sprintf` into `modelPath[MAX_QPATH]`
                     // truncates at 63 chars (unreachable for real model names).
                     let modelPath = format!("models/players/{}/model.glm", charModel);
                     let mut animRunLength: c_int = 0;
-                    ItemParse_asset_model_go(
-                        &mut ctx.world.menus,
-                        dc,
-                        item,
-                        &modelPath,
-                        &mut animRunLength,
-                    );
-                    UI_UpdateCharacterSkin(ctx, dc);
+                    ItemParse_asset_model_go(menus, ctx, item, &modelPath, &mut animRunLength);
+                    UI_UpdateCharacterSkin(ctx, menus);
 
-                    ctx.world.moveAnimTime = ctx.world.uiDC.realTime + animRunLength;
+                    ctx.world.moveAnimTime = ds.realTime + animRunLength;
 
                     let move_ =
                         &DATAPAD_MOVE_DATA[ctx.world.movesTitleIndex as usize][index as usize];
@@ -10830,25 +10958,25 @@ pub fn UI_FeederSelection(
                         if move_.sound == MDS_FORCE_JUMP {
                             trap::S_StartLocalSound(
                                 ctx.engine,
-                                ctx.world.uiDC.Assets.moveJumpSound,
+                                ds.Assets.moveJumpSound,
                                 CHAN_LOCAL,
                             );
                         } else if move_.sound == MDS_ROLL {
                             trap::S_StartLocalSound(
                                 ctx.engine,
-                                ctx.world.uiDC.Assets.moveRollSound,
+                                ds.Assets.moveRollSound,
                                 CHAN_LOCAL,
                             );
                         } else if move_.sound == MDS_SABER {
                             // Randomly choose one sound
                             let soundI = ctx.world.bg_state.rng.Q_irand(1, 6);
                             let soundPtr = match soundI {
-                                2 => ctx.world.uiDC.Assets.datapadmoveSaberSound2,
-                                3 => ctx.world.uiDC.Assets.datapadmoveSaberSound3,
-                                4 => ctx.world.uiDC.Assets.datapadmoveSaberSound4,
-                                5 => ctx.world.uiDC.Assets.datapadmoveSaberSound5,
-                                6 => ctx.world.uiDC.Assets.datapadmoveSaberSound6,
-                                _ => ctx.world.uiDC.Assets.datapadmoveSaberSound1,
+                                2 => ds.Assets.datapadmoveSaberSound2,
+                                3 => ds.Assets.datapadmoveSaberSound3,
+                                4 => ds.Assets.datapadmoveSaberSound4,
+                                5 => ds.Assets.datapadmoveSaberSound5,
+                                6 => ds.Assets.datapadmoveSaberSound6,
+                                _ => ds.Assets.datapadmoveSaberSound1,
                             };
                             trap::S_StartLocalSound(ctx.engine, soundPtr, CHAN_LOCAL);
                         }
@@ -10864,9 +10992,9 @@ pub fn UI_FeederSelection(
                     // See the PORT-NOTE above `UI_FeederSelection`: `ctx` and
                     // `item`'s home arena can't be borrowed at once, so the
                     // item is cloned out and written back.
-                    let mut charItem = ctx.world.menus.item(item).clone();
+                    let mut charItem = menus.item(item).clone();
                     UI_SaberAttachToChar(ctx, &mut charItem);
-                    *ctx.world.menus.item_mut(item) = charItem;
+                    *menus.item_mut(item) = charItem;
                 }
             }
         }
@@ -10874,29 +11002,23 @@ pub fn UI_FeederSelection(
         ctx.world.movesTitleIndex = index as i16;
         ctx.world.movesBaseAnim =
             DATAPAD_MOVE_TITLE_BASE_ANIMS[ctx.world.movesTitleIndex as usize].to_string();
-        if let Some(menu) = Menus_FindByName(&ctx.world.menus, "rulesMenu_moves") {
-            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "character") {
-                if ctx.world.menus.item(item).typeData.model().is_some() {
+        if let Some(menu) = Menus_FindByName(menus, "rulesMenu_moves") {
+            if let Some(item) = Menu_FindItemByName(menus, Some(menu), "character") {
+                if menus.item(item).typeData.model().is_some() {
                     ctx.world.movesBaseAnim = DATAPAD_MOVE_TITLE_BASE_ANIMS
                         [ctx.world.movesTitleIndex as usize]
                         .to_string();
                     let baseAnim = ctx.world.movesBaseAnim.clone();
-                    ItemParse_model_g2anim_go(&mut ctx.world.menus, dc, item, Some(&baseAnim));
+                    ItemParse_model_g2anim_go(menus, ctx, item, Some(&baseAnim));
 
                     let charModel = UI_Cvar_VariableString(ctx, "ui_char_model");
                     // PORT-NOTE: Raven's `Com_sprintf` into `modelPath[MAX_QPATH]`
                     // truncates at 63 chars (unreachable for real model names).
                     let modelPath = format!("models/players/{}/model.glm", charModel);
                     let mut animRunLength: c_int = 0;
-                    ItemParse_asset_model_go(
-                        &mut ctx.world.menus,
-                        dc,
-                        item,
-                        &modelPath,
-                        &mut animRunLength,
-                    );
+                    ItemParse_asset_model_go(menus, ctx, item, &modelPath, &mut animRunLength);
 
-                    UI_UpdateCharacterSkin(ctx, dc);
+                    UI_UpdateCharacterSkin(ctx, menus);
                 }
             }
         }
@@ -10929,7 +11051,7 @@ pub fn UI_FeederSelection(
                 trap::Cvar_Set(ctx.engine, "ui_classDesc", &desc);
 
                 // g_siegedFeederForcedSet = 1;
-                // Menu_SetFeederSelection(NULL, FEEDER_SIEGE_TEAM2, -1, NULL);
+                // Menu_SetFeederSelection(NULL, ds, FEEDER_SIEGE_TEAM2, -1, NULL);
 
                 UI_SiegeSetCvarsForClass(ctx, classPtr.map(|_| classNum as usize));
             }
@@ -10958,7 +11080,7 @@ pub fn UI_FeederSelection(
                 trap::Cvar_Set(ctx.engine, "ui_classDesc", &desc);
 
                 // g_siegedFeederForcedSet = 1;
-                // Menu_SetFeederSelection(NULL, FEEDER_SIEGE_TEAM2, -1, NULL);
+                // Menu_SetFeederSelection(NULL, ds, FEEDER_SIEGE_TEAM2, -1, NULL);
 
                 UI_SiegeSetCvarsForClass(ctx, classPtr.map(|_| classNum as usize));
             }
@@ -10985,7 +11107,7 @@ pub fn UI_FeederSelection(
 
         if index >= 0 && index < ctx.world.forceConfigNames.len() as c_int {
             let oldindex = ctx.world.forceConfigSelected;
-            UI_ForceConfigHandle(ctx, dc, oldindex, index);
+            UI_ForceConfigHandle(ctx, menus, oldindex, index);
             ctx.world.forceConfigSelected = index;
         }
     } else if feederID == FEEDER_MAPS || feederID == FEEDER_ALLMAPS {
@@ -11091,8 +11213,8 @@ pub fn UI_FeederSelection(
             // PORT-NOTE: Raven `Q_strncpyz` into `char
             // serverStatusAddress[MAX_ADDRESSLENGTH]`.
             ctx.world.serverStatusAddress = addr.chars().take(MAX_ADDRESSLENGTH - 1).collect();
-            Menu_SetFeederSelection(&mut ctx.world.menus, dc, None, FEEDER_SERVERSTATUS, 0, None);
-            UI_BuildServerStatus(ctx, dc, true);
+            Menu_SetFeederSelection(menus, ds, ctx, None, FEEDER_SERVERSTATUS, 0, None);
+            UI_BuildServerStatus(ctx, menus, ds, true);
         }
     } else if feederID == FEEDER_PLAYER_LIST {
         ctx.world.playerIndex = index;
@@ -11119,7 +11241,7 @@ pub fn UI_FeederSelection(
             // call sites pass NULL — Raven would deref it in the `Script_*`
             // handlers' `item->parent`; the port skips the call instead.
             if let Some(item) = item {
-                Item_RunScript(&mut ctx.world.menus, &ctx.world.uiDC, dc, item, &script);
+                Item_RunScript(menus, ds, ctx, item, &script);
             }
         }
     } else if feederID == FEEDER_PLAYER_SKIN_HEAD {
@@ -11149,7 +11271,7 @@ pub fn UI_FeederSelection(
     } else if feederID == FEEDER_SIEGE_BASE_CLASS {
         let team = trap::Cvar_VariableValue(ctx.engine, "ui_team") as c_int;
         let baseClass = trap::Cvar_VariableValue(ctx.engine, "ui_siege_class") as c_int;
-        UI_UpdateCvarsForClass(ctx, dc, team, baseClass, index);
+        UI_UpdateCvarsForClass(ctx, menus, ds, team, baseClass, index);
     } else if feederID == FEEDER_SIEGE_CLASS_WEAPONS {
         // trap::Cvar_VariableStringBuffer(&format!("ui_class_weapondesc{}", index), ...);
         // trap::Cvar_Set(ctx.engine, "ui_itemforceinvdesc", &info);
@@ -11184,7 +11306,12 @@ pub fn UI_FeederSelection(
 /// handle, forwarding every token string in between to [`UI_ParseMenu`].
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:1778-1803`
-pub fn Load_Menu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, handle: c_int) -> bool {
+pub fn Load_Menu(
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &mut DisplayState,
+    handle: c_int,
+) -> bool {
     let mut token = pc_token_t {
         type_: 0,
         subtype: 0,
@@ -11223,7 +11350,7 @@ pub fn Load_Menu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, handle: c_int
             return true;
         }
 
-        UI_ParseMenu(ctx, dc, &tokenStr);
+        UI_ParseMenu(ctx, menus, ds, &tokenStr);
     }
 }
 
@@ -11231,12 +11358,11 @@ pub fn Load_Menu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, handle: c_int
 /// item's key handler by ownerdraw id.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:4798-4960`
-// not yet wired: the DC->ownerDrawHandleKey seam / UI_OwnerDraw are unported.
-#[allow(dead_code)]
 #[allow(clippy::too_many_lines)]
-fn UI_OwnerDrawHandleKey(
+pub fn UI_OwnerDrawHandleKey(
     ctx: &mut UiContext,
-    dc: &mut dyn DisplayContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     ownerDraw: c_int,
     flags: c_int,
     special: &mut f32,
@@ -11247,7 +11373,8 @@ fn UI_OwnerDrawHandleKey(
         UI_SKIN_COLOR => {
             return UI_SkinColor_HandleKey(
                 ctx,
-                dc,
+                menus,
+                ds,
                 flags,
                 Some(special),
                 key,
@@ -11260,7 +11387,8 @@ fn UI_OwnerDrawHandleKey(
         UI_FORCE_SIDE => {
             return UI_ForceSide_HandleKey(
                 ctx,
-                dc,
+                menus,
+                ds,
                 flags,
                 Some(special),
                 key,
@@ -11273,7 +11401,7 @@ fn UI_OwnerDrawHandleKey(
         UI_JEDI_NONJEDI => {
             return UI_JediNonJedi_HandleKey(
                 ctx,
-                dc,
+                menus,
                 flags,
                 Some(special),
                 key,
@@ -11286,7 +11414,7 @@ fn UI_OwnerDrawHandleKey(
         UI_FORCE_MASTERY_SET => {
             return UI_ForceMaxRank_HandleKey(
                 ctx,
-                dc,
+                menus,
                 flags,
                 Some(special),
                 key,
@@ -11297,20 +11425,20 @@ fn UI_OwnerDrawHandleKey(
             )
         }
         UI_FORCE_RANK => {}
-        UI_CHAT_MAIN => return UI_Chat_Main_HandleKey(ctx.world, dc, key),
-        UI_CHAT_ATTACK => return UI_Chat_Attack_HandleKey(ctx.world, dc, key),
-        UI_CHAT_DEFEND => return UI_Chat_Defend_HandleKey(ctx.world, dc, key),
-        UI_CHAT_REQUEST => return UI_Chat_Request_HandleKey(ctx.world, dc, key),
-        UI_CHAT_REPLY => return UI_Chat_Reply_HandleKey(ctx.world, dc, key),
-        UI_CHAT_SPOT => return UI_Chat_Spot_HandleKey(ctx.world, dc, key),
-        UI_CHAT_TACTICAL => return UI_Chat_Tactical_HandleKey(ctx.world, dc, key),
+        UI_CHAT_MAIN => return UI_Chat_Main_HandleKey(ctx, menus, ds, key),
+        UI_CHAT_ATTACK => return UI_Chat_Attack_HandleKey(ctx, menus, ds, key),
+        UI_CHAT_DEFEND => return UI_Chat_Defend_HandleKey(ctx, menus, ds, key),
+        UI_CHAT_REQUEST => return UI_Chat_Request_HandleKey(ctx, menus, ds, key),
+        UI_CHAT_REPLY => return UI_Chat_Reply_HandleKey(ctx, menus, ds, key),
+        UI_CHAT_SPOT => return UI_Chat_Spot_HandleKey(ctx, menus, ds, key),
+        UI_CHAT_TACTICAL => return UI_Chat_Tactical_HandleKey(ctx, menus, ds, key),
         UI_FORCE_RANK_HEAL..=UI_FORCE_RANK_SABERTHROW => {
             // this will give us the index as long as UI_FORCE_RANK is always
             // one below the first force rank index
             let findex = (ownerDraw - UI_FORCE_RANK) - 1;
             return UI_ForcePowerRank_HandleKey(
                 ctx,
-                dc,
+                menus,
                 flags,
                 Some(special),
                 key,
@@ -11321,10 +11449,10 @@ fn UI_OwnerDrawHandleKey(
             );
         }
         UI_EFFECTS => return UI_Effects_HandleKey(ctx, flags, special, key),
-        UI_GAMETYPE => return UI_GameType_HandleKey(ctx, dc, flags, special, key, true),
-        UI_NETGAMETYPE => return UI_NetGameType_HandleKey(ctx, dc, flags, special, key),
+        UI_GAMETYPE => return UI_GameType_HandleKey(ctx, menus, ds, flags, special, key, true),
+        UI_NETGAMETYPE => return UI_NetGameType_HandleKey(ctx, menus, ds, flags, special, key),
         UI_AUTOSWITCHLIST => return UI_AutoSwitch_HandleKey(ctx, flags, special, key),
-        UI_JOINGAMETYPE => return UI_JoinGameType_HandleKey(ctx, dc, flags, special, key),
+        UI_JOINGAMETYPE => return UI_JoinGameType_HandleKey(ctx, menus, ds, flags, special, key),
         UI_SKILL => return UI_Skill_HandleKey(ctx, flags, special, key),
         UI_BLUETEAMNAME => return UI_TeamName_HandleKey(ctx, flags, special, key, true),
         UI_REDTEAMNAME => return UI_TeamName_HandleKey(ctx, flags, special, key, false),
@@ -11351,10 +11479,10 @@ fn UI_OwnerDrawHandleKey(
             UI_TeamMember_HandleKey(ctx, flags, special, key, false, iUse);
         }
         UI_NETSOURCE => {
-            UI_NetSource_HandleKey(ctx, dc, flags, special, key);
+            UI_NetSource_HandleKey(ctx, menus, ds, flags, special, key);
         }
         UI_NETFILTER => {
-            UI_NetFilter_HandleKey(ctx, dc, flags, special, key);
+            UI_NetFilter_HandleKey(ctx, menus, ds, flags, special, key);
         }
         UI_OPPONENT_NAME => {
             UI_OpponentName_HandleKey(ctx, flags, special, key);
@@ -11382,35 +11510,34 @@ fn UI_OwnerDrawHandleKey(
 /// move to the focused menu.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:10871-10892`
-pub fn _UI_MouseEvent(ctx: &mut UiContext, dc: &mut dyn DisplayContext, dx: c_int, dy: c_int) {
+pub fn _UI_MouseEvent(
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &mut DisplayState,
+    dx: c_int,
+    dy: c_int,
+) {
     // update mouse screen position
-    ctx.world.uiDC.cursorx += dx;
-    if ctx.world.uiDC.cursorx < 0 {
-        ctx.world.uiDC.cursorx = 0;
-    } else if ctx.world.uiDC.cursorx > SCREEN_WIDTH {
-        ctx.world.uiDC.cursorx = SCREEN_WIDTH;
+    ds.cursorx += dx;
+    if ds.cursorx < 0 {
+        ds.cursorx = 0;
+    } else if ds.cursorx > SCREEN_WIDTH {
+        ds.cursorx = SCREEN_WIDTH;
     }
 
-    ctx.world.uiDC.cursory += dy;
-    if ctx.world.uiDC.cursory < 0 {
-        ctx.world.uiDC.cursory = 0;
-    } else if ctx.world.uiDC.cursory > SCREEN_HEIGHT {
-        ctx.world.uiDC.cursory = SCREEN_HEIGHT;
+    ds.cursory += dy;
+    if ds.cursory < 0 {
+        ds.cursory = 0;
+    } else if ds.cursory > SCREEN_HEIGHT {
+        ds.cursory = SCREEN_HEIGHT;
     }
 
-    if Menu_Count(&ctx.world.menus) > 0 {
+    if Menu_Count(menus) > 0 {
         // menuDef_t *menu = Menu_GetFocused();
         // Menu_HandleMouseMove(menu, uiInfo.uiDC.cursorx, uiInfo.uiDC.cursory);
-        let cursorx = ctx.world.uiDC.cursorx;
-        let cursory = ctx.world.uiDC.cursory;
-        Display_MouseMove(
-            &mut ctx.world.menus,
-            &ctx.world.uiDC,
-            dc,
-            None,
-            cursorx,
-            cursory,
-        );
+        let cursorx = ds.cursorx;
+        let cursory = ds.cursory;
+        Display_MouseMove(menus, ds, ctx, None, cursorx, cursory);
     }
 }
 
@@ -11420,10 +11547,15 @@ pub fn _UI_MouseEvent(ctx: &mut UiContext, dc: &mut dyn DisplayContext, dx: c_in
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:10903-11028`
 #[allow(clippy::too_many_lines)]
-pub fn _UI_SetActiveMenu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menu: uiMenuCommand_t) {
+pub fn _UI_SetActiveMenu(
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    menu: uiMenuCommand_t,
+) {
     // this should be the ONLY way the menu system is brought up
     // enusure minumum menu data is cached
-    if Menu_Count(&ctx.world.menus) <= 0 {
+    if Menu_Count(menus) <= 0 {
         return;
     }
 
@@ -11433,7 +11565,7 @@ pub fn _UI_SetActiveMenu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menu:
             trap::Key_SetCatcher(ctx.engine, catcher & !KEYCATCH_UI);
             trap::Key_ClearStates(ctx.engine);
             trap::Cvar_Set(ctx.engine, "cl_paused", "0");
-            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
+            Menus_CloseAll(menus, ds, ctx);
         }
         UIMENU_MAIN => {
             trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
@@ -11443,18 +11575,13 @@ pub fn _UI_SetActiveMenu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menu:
                 // Source: oracle/codemp/ui/ui_main.c:10927-10930
             }
 
-            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
-            Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "main");
+            Menus_CloseAll(menus, ds, ctx);
+            Menus_ActivateByName(menus, ds, ctx, "main");
             let buf = trap::Cvar_VariableStringBuffer(ctx.engine, "com_errorMessage", 256);
 
             if !buf.is_empty() {
                 if ctx.world.cvars.ui_singlePlayerActive.integer == 0 {
-                    Menus_ActivateByName(
-                        &mut ctx.world.menus,
-                        &ctx.world.uiDC,
-                        dc,
-                        "error_popmenu",
-                    );
+                    Menus_ActivateByName(menus, ds, ctx, "error_popmenu");
                 } else {
                     trap::Cvar_Set(ctx.engine, "com_errorMessage", "");
                 }
@@ -11462,7 +11589,7 @@ pub fn _UI_SetActiveMenu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menu:
         }
         UIMENU_TEAM => {
             trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
-            Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "team");
+            Menus_ActivateByName(menus, ds, ctx, "team");
         }
         UIMENU_POSTGAME => {
             trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
@@ -11472,49 +11599,39 @@ pub fn _UI_SetActiveMenu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menu:
                 // parity)
                 // Source: oracle/codemp/ui/ui_main.c:10963-10965
             }
-            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
-            Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "endofgame");
+            Menus_CloseAll(menus, ds, ctx);
+            Menus_ActivateByName(menus, ds, ctx, "endofgame");
         }
         UIMENU_INGAME => {
             trap::Cvar_Set(ctx.engine, "cl_paused", "1");
             trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
             UI_BuildPlayerList(ctx);
-            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
-            Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "ingame");
+            Menus_CloseAll(menus, ds, ctx);
+            Menus_ActivateByName(menus, ds, ctx, "ingame");
         }
         UIMENU_PLAYERCONFIG => {
             trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
             UI_BuildPlayerList(ctx);
-            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
-            Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "ingame_player");
-            UpdateForceUsed(ctx, dc);
+            Menus_CloseAll(menus, ds, ctx);
+            Menus_ActivateByName(menus, ds, ctx, "ingame_player");
+            UpdateForceUsed(ctx, menus);
         }
         UIMENU_PLAYERFORCE => {
             trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
             UI_BuildPlayerList(ctx);
-            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
-            Menus_ActivateByName(
-                &mut ctx.world.menus,
-                &ctx.world.uiDC,
-                dc,
-                "ingame_playerforce",
-            );
-            UpdateForceUsed(ctx, dc);
+            Menus_CloseAll(menus, ds, ctx);
+            Menus_ActivateByName(menus, ds, ctx, "ingame_playerforce");
+            UpdateForceUsed(ctx, menus);
         }
         UIMENU_SIEGEMESSAGE => {
             trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
-            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
-            Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "siege_popmenu");
+            Menus_CloseAll(menus, ds, ctx);
+            Menus_ActivateByName(menus, ds, ctx, "siege_popmenu");
         }
         UIMENU_SIEGEOBJECTIVES => {
             trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
-            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
-            Menus_ActivateByName(
-                &mut ctx.world.menus,
-                &ctx.world.uiDC,
-                dc,
-                "ingame_siegeobjectives",
-            );
+            Menus_CloseAll(menus, ds, ctx);
+            Menus_ActivateByName(menus, ds, ctx, "ingame_siegeobjectives");
         }
         UIMENU_VOICECHAT => {
             // No chat in non-siege games.
@@ -11523,26 +11640,16 @@ pub fn _UI_SetActiveMenu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menu:
             }
 
             trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
-            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
-            Menus_ActivateByName(
-                &mut ctx.world.menus,
-                &ctx.world.uiDC,
-                dc,
-                "ingame_voicechat",
-            );
+            Menus_CloseAll(menus, ds, ctx);
+            Menus_ActivateByName(menus, ds, ctx, "ingame_voicechat");
         }
         UIMENU_CLOSEALL => {
-            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
+            Menus_CloseAll(menus, ds, ctx);
         }
         UIMENU_CLASSSEL => {
             trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
-            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
-            Menus_ActivateByName(
-                &mut ctx.world.menus,
-                &ctx.world.uiDC,
-                dc,
-                "ingame_siegeclass",
-            );
+            Menus_CloseAll(menus, ds, ctx);
+            Menus_ActivateByName(menus, ds, ctx, "ingame_siegeclass");
         }
         _ => {}
     }
@@ -11553,12 +11660,17 @@ pub fn _UI_SetActiveMenu(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menu:
 /// set.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:1216-1222`
-pub fn UI_ShowPostGame(ctx: &mut UiContext, dc: &mut dyn DisplayContext, newHigh: bool) {
+pub fn UI_ShowPostGame(
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    newHigh: bool,
+) {
     trap::Cvar_Set(ctx.engine, "cg_cameraOrbit", "0");
     trap::Cvar_Set(ctx.engine, "cg_thirdPerson", "0");
     trap::Cvar_Set(ctx.engine, "sv_killserver", "1");
     ctx.world.soundHighScore = newHigh;
-    _UI_SetActiveMenu(ctx, dc, UIMENU_POSTGAME);
+    _UI_SetActiveMenu(ctx, menus, ds, UIMENU_POSTGAME);
 }
 
 /// Raven `UI_LoadMenus` — loads the compiled menu-definition source (falling
@@ -11566,7 +11678,13 @@ pub fn UI_ShowPostGame(ctx: &mut UiContext, dc: &mut dyn DisplayContext, newHigh
 /// forwarding each menu block to [`Load_Menu`].
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:1805-1852`
-pub fn UI_LoadMenus(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menuFile: &str, reset: bool) {
+pub fn UI_LoadMenus(
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &mut DisplayState,
+    menuFile: &str,
+    reset: bool,
+) {
     // PORT-NOTE: Raven's `start = trap_Milliseconds()` only feeds the
     // commented-out timing `Com_Printf` (`ui_main.c:1847`); the syscall is
     // kept for seam ordering and the dead value bound as `_start`.
@@ -11601,7 +11719,7 @@ pub fn UI_LoadMenus(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menuFile: 
     }
 
     if reset {
-        Menu_Reset(&mut ctx.world.menus);
+        Menu_Reset(menus);
     }
 
     loop {
@@ -11621,7 +11739,7 @@ pub fn UI_LoadMenus(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menuFile: 
         }
 
         if Q_stricmp(&tokenStr, "loadmenu") == 0 {
-            if Load_Menu(ctx, dc, handle) {
+            if Load_Menu(ctx, menus, ds, handle) {
                 continue;
             } else {
                 break;
@@ -11641,9 +11759,12 @@ pub fn UI_LoadMenus(ctx: &mut UiContext, dc: &mut dyn DisplayContext, menuFile: 
 /// applies.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:5417-5462`
-// not yet wired: the DC->deferScript seam (ui_main.c:10730) is unported.
-#[allow(dead_code)]
-fn UI_DeferMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut &str) -> bool {
+pub fn UI_DeferMenuScript(
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    args: &mut &str,
+) -> bool {
     // Whats the reason for being deferred?
     let mut name = String::new();
     if !String_Parse(args, &mut name) {
@@ -11663,7 +11784,7 @@ fn UI_DeferMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &m
 
         if deferred {
             // Open the warning menu
-            Menus_OpenByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, &warningMenuName);
+            Menus_OpenByName(menus, ds, ctx, &warningMenuName);
         }
 
         return deferred;
@@ -11683,7 +11804,7 @@ fn UI_DeferMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &m
 /// reports `needpass`.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:7938-7977`
-fn UI_CheckPassword(ctx: &mut UiContext, dc: &mut dyn DisplayContext) -> bool {
+fn UI_CheckPassword(ctx: &mut UiContext, menus: &mut MenuSystem, ds: &DisplayState) -> bool {
     let index = ctx.world.serverStatus.currentServer;
     if index < 0 || index as usize >= ctx.world.serverStatus.displayServers.len() {
         // warning?
@@ -11698,12 +11819,7 @@ fn UI_CheckPassword(ctx: &mut UiContext, dc: &mut dyn DisplayContext) -> bool {
     );
 
     if atoi(&Info_ValueForKey(&info, "needpass")) != 0 {
-        Menus_OpenByName(
-            &mut ctx.world.menus,
-            &ctx.world.uiDC,
-            dc,
-            "password_request",
-        );
+        Menus_OpenByName(menus, ds, ctx, "password_request");
         return false;
     }
 
@@ -11751,17 +11867,10 @@ fn cchars_to_string(buf: &[c_char]) -> String {
 /// currently focused menu's name so it can be reactivated afterward.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:1854-1893`
-pub fn UI_Load(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
-    let menu = Menu_GetFocused(&ctx.world.menus);
+pub fn UI_Load(ctx: &mut UiContext, menus: &mut MenuSystem, ds: &mut DisplayState) {
+    let menu = Menu_GetFocused(menus);
     let lastName = match menu {
-        Some(m) => ctx
-            .world
-            .menus
-            .menu(m)
-            .window
-            .name
-            .clone()
-            .unwrap_or_default(),
+        Some(m) => menus.menu(m).window.name.clone().unwrap_or_default(),
         None => String::new(),
     };
 
@@ -11774,7 +11883,7 @@ pub fn UI_Load(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
         menuSet = "ui/jampmenus.txt".to_string();
     }
 
-    String_Init(&mut ctx.world.menus, dc);
+    String_Init(menus, ctx);
 
     // PORT-NOTE: the non-`PRE_RELEASE_TADEMO` arm is the retail build
     // (`ui_main.c:1881-1885`); the demo `demogameinfo.txt` arm is dropped.
@@ -11782,19 +11891,22 @@ pub fn UI_Load(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
     UI_LoadArenas(ctx);
     UI_LoadBots(ctx);
 
-    UI_LoadMenus(ctx, dc, &menuSet, true);
-    Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
-    Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, &lastName);
+    UI_LoadMenus(ctx, menus, ds, &menuSet, true);
+    Menus_CloseAll(menus, ds, ctx);
+    Menus_ActivateByName(menus, ds, ctx, &lastName);
 }
 
 /// Raven `UI_RunMenuScript` — dispatches a menu `uiScript` command by its
 /// leading token.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:6190-7507`
-// not yet wired: the `runScript` DC slot (DEC-36 D3) has no vmMain caller yet.
-#[allow(dead_code)]
 #[allow(clippy::too_many_lines)]
-fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut &str) {
+pub fn UI_RunMenuScript(
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    args: &mut &str,
+) {
     let mut name = String::new();
     if !String_Parse(args, &mut name) {
         return;
@@ -11913,18 +12025,12 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
         let idx = UI_GetIndexFromSelection(ctx.world, ctx.world.cvars.ui_currentMap.integer);
         ctx.world.cvars.ui_mapIndex.integer = idx;
         trap::Cvar_Set(ctx.engine, "ui_mapIndex", &format!("{}", idx));
-        Menu_SetFeederSelection(
-            &mut ctx.world.menus,
-            dc,
-            None,
-            FEEDER_MAPS,
-            idx,
-            Some("skirmish"),
-        );
+        Menu_SetFeederSelection(menus, ds, ctx, None, FEEDER_MAPS, idx, Some("skirmish"));
         let mut special = 0.0_f32;
         UI_GameType_HandleKey(
             ctx,
-            dc,
+            menus,
+            ds,
             0,
             &mut special,
             fakeAscii_t::A_MOUSE1 as c_int,
@@ -11933,7 +12039,8 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
         let mut special2 = 0.0_f32;
         UI_GameType_HandleKey(
             ctx,
-            dc,
+            menus,
+            ds,
             0,
             &mut special2,
             fakeAscii_t::A_MOUSE2 as c_int,
@@ -11961,20 +12068,24 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
     } else if Q_stricmp(&name, "loadArenas") == 0 {
         UI_LoadArenas(ctx);
         let _ = UI_MapCountByGameType(ctx.world, false);
+        // `ctx` is the `dc` argument here, so the selected-map read is hoisted
+        // out of the call — it would otherwise borrow `ctx` twice.
+        let selectedMap = ctx.world.main.gUISelectedMap;
         Menu_SetFeederSelection(
-            &mut ctx.world.menus,
-            dc,
+            menus,
+            ds,
+            ctx,
             None,
             FEEDER_ALLMAPS,
-            ctx.world.main.gUISelectedMap,
+            selectedMap,
             Some("createserver"),
         );
         ctx.world.force.uiForceRank =
             trap::Cvar_VariableValue(ctx.engine, "g_maxForceRank") as c_int;
     } else if Q_stricmp(&name, "saveControls") == 0 {
-        Controls_SetConfig(&ctx.world.menus, dc, true);
+        Controls_SetConfig(menus, ctx, true);
     } else if Q_stricmp(&name, "loadControls") == 0 {
-        Controls_GetConfig(&mut ctx.world.menus, dc);
+        Controls_GetConfig(menus, ctx);
     } else if Q_stricmp(&name, "clearError") == 0 {
         trap::Cvar_Set(ctx.engine, "com_errorMessage", "");
     } else if Q_stricmp(&name, "loadGameInfo") == 0 {
@@ -11995,11 +12106,11 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
     } else if Q_stricmp(&name, "resetScores") == 0 {
         UI_ClearScores(ctx);
     } else if Q_stricmp(&name, "RefreshServers") == 0 {
-        UI_StartServerRefresh(ctx, true);
-        UI_BuildServerDisplayList(ctx, dc, 1);
+        UI_StartServerRefresh(ctx, ds, true);
+        UI_BuildServerDisplayList(ctx, menus, ds, 1);
     } else if Q_stricmp(&name, "RefreshFilter") == 0 {
-        UI_StartServerRefresh(ctx, false);
-        UI_BuildServerDisplayList(ctx, dc, 1);
+        UI_StartServerRefresh(ctx, ds, false);
+        UI_BuildServerDisplayList(ctx, menus, ds, 1);
     } else if Q_stricmp(&name, "RunSPDemo") == 0 {
         if ctx.world.demoAvailable {
             let mapLoadName = ctx
@@ -12071,10 +12182,10 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
             ctx.world.serverStatus.nextDisplayRefresh = 0;
             ctx.world.nextServerStatusRefresh = 0;
             ctx.world.nextFindPlayerRefresh = 0;
-            UI_BuildServerDisplayList(ctx, dc, 1);
+            UI_BuildServerDisplayList(ctx, menus, ds, 1);
         } else {
-            Menus_CloseByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "joinserver");
-            Menus_OpenByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "main");
+            Menus_CloseByName(menus, ds, ctx, "joinserver");
+            Menus_OpenByName(menus, ds, ctx, "main");
         }
     } else if Q_stricmp(&name, "StopRefresh") == 0 {
         UI_StopServerRefresh(ctx);
@@ -12083,10 +12194,10 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
         ctx.world.nextFindPlayerRefresh = 0;
     } else if Q_stricmp(&name, "UpdateFilter") == 0 {
         if ctx.world.cvars.ui_netSource.integer == AS_LOCAL {
-            UI_StartServerRefresh(ctx, true);
+            UI_StartServerRefresh(ctx, ds, true);
         }
-        UI_BuildServerDisplayList(ctx, dc, 1);
-        UI_FeederSelection(ctx, dc, FEEDER_SERVERS as f32, 0, None);
+        UI_BuildServerDisplayList(ctx, menus, ds, 1);
+        UI_FeederSelection(ctx, menus, ds, FEEDER_SERVERS as f32, 0, None);
     } else if Q_stricmp(&name, "ServerStatus") == 0 {
         let idx = ctx.world.serverStatus.currentServer;
         let n = ctx
@@ -12102,7 +12213,7 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
             n,
             MAX_ADDRESSLENGTH,
         );
-        UI_BuildServerStatus(ctx, dc, true);
+        UI_BuildServerStatus(ctx, menus, ds, true);
     } else if Q_stricmp(&name, "FoundPlayerServerStatus") == 0 {
         let idx = ctx.world.currentFoundPlayerServer;
         let addr = ctx
@@ -12116,17 +12227,17 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
             .chars()
             .take(MAX_ADDRESSLENGTH.saturating_sub(1))
             .collect();
-        UI_BuildServerStatus(ctx, dc, true);
-        Menu_SetFeederSelection(&mut ctx.world.menus, dc, None, FEEDER_FINDPLAYER, 0, None);
+        UI_BuildServerStatus(ctx, menus, ds, true);
+        Menu_SetFeederSelection(menus, ds, ctx, None, FEEDER_FINDPLAYER, 0, None);
     } else if Q_stricmp(&name, "FindPlayer") == 0 {
-        UI_BuildFindPlayerList(ctx, dc, true);
+        UI_BuildFindPlayerList(ctx, menus, ds, true);
         // clear the displayed server status info
         ctx.world.serverStatusInfo.lines.clear();
-        Menu_SetFeederSelection(&mut ctx.world.menus, dc, None, FEEDER_FINDPLAYER, 0, None);
+        Menu_SetFeederSelection(menus, ds, ctx, None, FEEDER_FINDPLAYER, 0, None);
     } else if Q_stricmp(&name, "checkservername") == 0 {
         UI_CheckServerName(ctx);
     } else if Q_stricmp(&name, "checkpassword") == 0 {
-        if UI_CheckPassword(ctx, dc) {
+        if UI_CheckPassword(ctx, menus, ds) {
             UI_JoinServer(ctx);
         }
     } else if Q_stricmp(&name, "JoinServer") == 0 {
@@ -12154,13 +12265,13 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
     } else if Q_stricmp(&name, "Controls") == 0 {
         trap::Cvar_Set(ctx.engine, "cl_paused", "1");
         trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
-        Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
-        Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "setup_menu2");
+        Menus_CloseAll(menus, ds, ctx);
+        Menus_ActivateByName(menus, ds, ctx, "setup_menu2");
     } else if Q_stricmp(&name, "Leave") == 0 {
         trap::Cmd_ExecuteText(ctx.engine, cbufExec_t::EXEC_APPEND as c_int, "disconnect\n");
         trap::Key_SetCatcher(ctx.engine, KEYCATCH_UI);
-        Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
-        Menus_ActivateByName(&mut ctx.world.menus, &ctx.world.uiDC, dc, "main");
+        Menus_CloseAll(menus, ds, ctx);
+        Menus_ActivateByName(menus, ds, ctx, "main");
     } else if Q_stricmp(&name, "getvideosetup") == 0 {
         UI_GetVideoSetup(ctx);
     } else if Q_stricmp(&name, "getsaberhiltinfo") == 0 {
@@ -12178,7 +12289,14 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
         if gtEnum == GT_SIEGE as c_int {
             // fake out the handler to advance to the next game type
             let mut special = 0.0_f32;
-            UI_NetGameType_HandleKey(ctx, dc, 0, &mut special, fakeAscii_t::A_MOUSE1 as c_int);
+            UI_NetGameType_HandleKey(
+                ctx,
+                menus,
+                ds,
+                0,
+                &mut special,
+                fakeAscii_t::A_MOUSE1 as c_int,
+            );
         }
     } else if Q_stricmp(&name, "updatevideosetup") == 0 {
         UI_UpdateVideoSetup(ctx);
@@ -12193,15 +12311,15 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
             UI_ServersSort(ctx, sortColumn, true);
         }
     } else if Q_stricmp(&name, "nextSkirmish") == 0 {
-        UI_StartSkirmish(ctx, dc, true);
+        UI_StartSkirmish(ctx, menus, ds, true);
     } else if Q_stricmp(&name, "SkirmishStart") == 0 {
-        UI_StartSkirmish(ctx, dc, false);
+        UI_StartSkirmish(ctx, menus, ds, false);
     } else if Q_stricmp(&name, "closeingame") == 0 {
         let catcher = trap::Key_GetCatcher(ctx.engine);
         trap::Key_SetCatcher(ctx.engine, catcher & !KEYCATCH_UI);
         trap::Key_ClearStates(ctx.engine);
         trap::Cvar_Set(ctx.engine, "cl_paused", "0");
-        Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
+        Menus_CloseAll(menus, ds, ctx);
     } else if Q_stricmp(&name, "voteMap") == 0 {
         let idx = ctx.world.cvars.ui_currentNetMap.integer;
         if idx >= 0 && (idx as usize) < ctx.world.mapList.len() {
@@ -12393,7 +12511,7 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
             trap::Key_SetCatcher(ctx.engine, catcher & !KEYCATCH_UI);
             trap::Key_ClearStates(ctx.engine);
             trap::Cvar_Set(ctx.engine, "cl_paused", "0");
-            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
+            Menus_CloseAll(menus, ds, ctx);
         }
     } else if Q_stricmp(&name, "voiceOrdersTeam") == 0 {
         let mut orders = String::new();
@@ -12407,7 +12525,7 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
             trap::Key_SetCatcher(ctx.engine, catcher & !KEYCATCH_UI);
             trap::Key_ClearStates(ctx.engine);
             trap::Cvar_Set(ctx.engine, "cl_paused", "0");
-            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
+            Menus_CloseAll(menus, ds, ctx);
         }
     } else if Q_stricmp(&name, "voiceOrders") == 0 {
         let mut orders = String::new();
@@ -12434,7 +12552,7 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
             trap::Key_SetCatcher(ctx.engine, catcher & !KEYCATCH_UI);
             trap::Key_ClearStates(ctx.engine);
             trap::Cvar_Set(ctx.engine, "cl_paused", "0");
-            Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
+            Menus_CloseAll(menus, ds, ctx);
         }
     } else if Q_stricmp(&name, "setForce") == 0 {
         let mut teamArg = String::new();
@@ -12512,43 +12630,43 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
             }
         }
     } else if Q_stricmp(&name, "setBotButton") == 0 {
-        UI_SetBotButton(ctx, dc);
+        UI_SetBotButton(ctx, menus);
     } else if Q_stricmp(&name, "saveTemplate") == 0 {
-        UI_SaveForceTemplate(ctx, dc);
+        UI_SaveForceTemplate(ctx, menus, ds);
     } else if Q_stricmp(&name, "refreshForce") == 0 {
-        UI_UpdateForcePowers(ctx, dc);
+        UI_UpdateForcePowers(ctx, menus);
     } else if Q_stricmp(&name, "glCustom") == 0 {
         trap::Cvar_Set(ctx.engine, "ui_r_glCustom", "4");
     } else if Q_stricmp(&name, "setMovesListDefault") == 0 {
         ctx.world.movesTitleIndex = 2;
     } else if Q_stricmp(&name, "resetMovesList") == 0 {
-        if let Some(menu) = Menus_FindByName(&ctx.world.menus, "rulesMenu_moves") {
+        if let Some(menu) = Menus_FindByName(menus, "rulesMenu_moves") {
             // update saber models
-            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "character") {
+            if let Some(item) = Menu_FindItemByName(menus, Some(menu), "character") {
                 // See `UI_FeederSelection`'s own PORT-NOTE: `ctx` and `item`'s
                 // home arena can't be borrowed at once, so the item is cloned
                 // out and written back.
-                let mut charItem = ctx.world.menus.item(item).clone();
+                let mut charItem = menus.item(item).clone();
                 UI_SaberAttachToChar(ctx, &mut charItem);
-                *ctx.world.menus.item_mut(item) = charItem;
+                *menus.item_mut(item) = charItem;
             }
         }
 
         trap::Cvar_Set(ctx.engine, "ui_move_desc", " ");
     } else if Q_stricmp(&name, "resetcharacterlistboxes") == 0 {
-        UI_ResetCharacterListBoxes(ctx.world);
+        UI_ResetCharacterListBoxes(menus);
     } else if Q_stricmp(&name, "setMoveCharacter") == 0 {
         UI_GetCharacterCvars(ctx);
 
         ctx.world.movesTitleIndex = 0;
 
-        if let Some(menu) = Menus_FindByName(&ctx.world.menus, "rulesMenu_moves") {
-            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "character") {
-                if ctx.world.menus.item(item).typeData.model().is_some() {
+        if let Some(menu) = Menus_FindByName(menus, "rulesMenu_moves") {
+            if let Some(item) = Menu_FindItemByName(menus, Some(menu), "character") {
+                if menus.item(item).typeData.model().is_some() {
                     let baseAnim =
                         DATAPAD_MOVE_TITLE_BASE_ANIMS[ctx.world.movesTitleIndex as usize];
                     ctx.world.movesBaseAnim = baseAnim.to_string();
-                    ItemParse_model_g2anim_go(&mut ctx.world.menus, dc, item, Some(baseAnim));
+                    ItemParse_model_g2anim_go(menus, ctx, item, Some(baseAnim));
                     ctx.world.moveAnimTime = 0;
 
                     let charModel = UI_Cvar_VariableString(ctx, "ui_char_model");
@@ -12556,31 +12674,25 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
                     // truncates at 63 chars (unreachable for real model names).
                     let modelPath = format!("models/players/{}/model.glm", charModel);
                     let mut animRunLength: c_int = 0;
-                    ItemParse_asset_model_go(
-                        &mut ctx.world.menus,
-                        dc,
-                        item,
-                        &modelPath,
-                        &mut animRunLength,
-                    );
+                    ItemParse_asset_model_go(menus, ctx, item, &modelPath, &mut animRunLength);
 
-                    UI_UpdateCharacterSkin(ctx, dc);
-                    let mut charItem = ctx.world.menus.item(item).clone();
+                    UI_UpdateCharacterSkin(ctx, menus);
+                    let mut charItem = menus.item(item).clone();
                     UI_SaberAttachToChar(ctx, &mut charItem);
-                    *ctx.world.menus.item_mut(item) = charItem;
+                    *menus.item_mut(item) = charItem;
                 }
             }
         }
     } else if Q_stricmp(&name, "character") == 0 {
-        UI_UpdateCharacter(ctx, dc, false);
+        UI_UpdateCharacter(ctx, menus, ds, false);
     } else if Q_stricmp(&name, "characterchanged") == 0 {
-        UI_UpdateCharacter(ctx, dc, true);
+        UI_UpdateCharacter(ctx, menus, ds, true);
     } else if Q_stricmp(&name, "updatecharcvars") == 0 || Q_stricmp(&name, "updatecharmodel") == 0 {
         UI_UpdateCharacterCvars(ctx);
     } else if Q_stricmp(&name, "getcharcvars") == 0 {
         UI_GetCharacterCvars(ctx);
     } else if Q_stricmp(&name, "char_skin") == 0 {
-        UI_UpdateCharacterSkin(ctx, dc);
+        UI_UpdateCharacterSkin(ctx, menus);
     } else if Q_stricmp(&name, "setui_dualforcepower") == 0 {
         let forcePowerDisable =
             trap::Cvar_VariableValue(ctx.engine, "g_forcePowerDisable") as c_int;
@@ -12717,71 +12829,68 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
             }
         }
     } else if Q_stricmp(&name, "clearmouseover") == 0 {
-        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
+        if let Some(menu) = Menu_GetFocused(menus) {
             let mut itemName = String::new();
             String_Parse(args, &mut itemName);
 
-            let count = Menu_ItemsMatchingGroup(&ctx.world.menus, dc, menu, &itemName);
+            let count = Menu_ItemsMatchingGroup(menus, ctx, menu, &itemName);
 
             for j in 0..count {
-                if let Some(item) =
-                    Menu_GetMatchingItemByNumber(&ctx.world.menus, menu, j, &itemName)
-                {
-                    ctx.world.menus.item_mut(item).window.flags &= !WINDOW_MOUSEOVER;
+                if let Some(item) = Menu_GetMatchingItemByNumber(menus, menu, j, &itemName) {
+                    menus.item_mut(item).window.flags &= !WINDOW_MOUSEOVER;
                 }
             }
         }
     } else if Q_stricmp(&name, "updateForceStatus") == 0 {
-        UpdateForceStatus(ctx, dc);
+        UpdateForceStatus(ctx, menus);
     } else if Q_stricmp(&name, "update") == 0 {
         let mut name2 = String::new();
         if String_Parse(args, &mut name2) {
             UI_Update(ctx, &name2);
         }
     } else if Q_stricmp(&name, "setBotButtons") == 0 {
-        UpdateBotButtons(ctx.world, dc);
+        UpdateBotButtons(ctx, menus);
     } else if Q_stricmp(&name, "getsabercvars") == 0 {
         UI_GetSaberCvars(ctx);
     } else if Q_stricmp(&name, "setsaberboxesandhilts") == 0 {
-        UI_SetSaberBoxesandHilts(ctx);
+        UI_SetSaberBoxesandHilts(ctx, menus);
     } else if Q_stricmp(&name, "saber_type") == 0 {
         UI_UpdateSaberType(ctx);
     } else if Q_stricmp(&name, "saber_hilt") == 0 {
-        UI_UpdateSaberHilt(ctx, dc, false);
+        UI_UpdateSaberHilt(ctx, menus, false);
     } else if Q_stricmp(&name, "saber_color") == 0 {
         UI_UpdateSaberColor(false);
     } else if Q_stricmp(&name, "setscreensaberhilt") == 0 {
-        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
-            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "hiltbut") {
-                let idx = ctx.world.menus.item(item).cursorPos as usize;
+        if let Some(menu) = Menu_GetFocused(menus) {
+            if let Some(item) = Menu_FindItemByName(menus, Some(menu), "hiltbut") {
+                let idx = menus.item(item).cursorPos as usize;
                 if let Some(hilt) = ctx.world.main.saberSingleHiltInfo.get(idx).cloned() {
                     trap::Cvar_Set(ctx.engine, "ui_saber", &hilt);
                 }
             }
         }
     } else if Q_stricmp(&name, "setscreensaberhilt1") == 0 {
-        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
-            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "hiltbut1") {
-                let idx = ctx.world.menus.item(item).cursorPos as usize;
+        if let Some(menu) = Menu_GetFocused(menus) {
+            if let Some(item) = Menu_FindItemByName(menus, Some(menu), "hiltbut1") {
+                let idx = menus.item(item).cursorPos as usize;
                 if let Some(hilt) = ctx.world.main.saberSingleHiltInfo.get(idx).cloned() {
                     trap::Cvar_Set(ctx.engine, "ui_saber", &hilt);
                 }
             }
         }
     } else if Q_stricmp(&name, "setscreensaberhilt2") == 0 {
-        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
-            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "hiltbut2") {
-                let idx = ctx.world.menus.item(item).cursorPos as usize;
+        if let Some(menu) = Menu_GetFocused(menus) {
+            if let Some(item) = Menu_FindItemByName(menus, Some(menu), "hiltbut2") {
+                let idx = menus.item(item).cursorPos as usize;
                 if let Some(hilt) = ctx.world.main.saberSingleHiltInfo.get(idx).cloned() {
                     trap::Cvar_Set(ctx.engine, "ui_saber2", &hilt);
                 }
             }
         }
     } else if Q_stricmp(&name, "setscreensaberstaff") == 0 {
-        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
-            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "hiltbut_staves")
-            {
-                let idx = ctx.world.menus.item(item).cursorPos as usize;
+        if let Some(menu) = Menu_GetFocused(menus) {
+            if let Some(item) = Menu_FindItemByName(menus, Some(menu), "hiltbut_staves") {
+                let idx = menus.item(item).cursorPos as usize;
                 // PORT-NOTE: Raven checks `saberSingleHiltInfo[cursorPos]` but
                 // sets from `saberStaffHiltInfo[cursorPos]`
                 // (`ui_main.c:7115-7119`) — faithfully preserved quirk.
@@ -12793,7 +12902,7 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
             }
         }
     } else if Q_stricmp(&name, "saber2_hilt") == 0 {
-        UI_UpdateSaberHilt(ctx, dc, true);
+        UI_UpdateSaberHilt(ctx, menus, true);
     } else if Q_stricmp(&name, "saber2_color") == 0 {
         UI_UpdateSaberColor(true);
     } else if Q_stricmp(&name, "updatesabercvars") == 0 {
@@ -12802,50 +12911,34 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
         let team = trap::Cvar_VariableValue(ctx.engine, "ui_team") as c_int;
         trap::Cvar_Set(ctx.engine, "ui_holdteam", &format!("{}", team));
 
-        UI_UpdateSiegeObjectiveGraphics(ctx, dc);
+        UI_UpdateSiegeObjectiveGraphics(ctx, menus);
     } else if Q_stricmp(&name, "setsiegeobjbuttons") == 0 {
-        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
+        if let Some(menu) = Menu_GetFocused(menus) {
             // Set the new item to the background
             let mut itemArg = String::new();
             if String_Parse(args, &mut itemArg) {
                 // Set the old button to it's original background
                 let currentItemName =
                     trap::Cvar_VariableStringBuffer(ctx.engine, "currentObjMapIconItem", 512);
-                if let Some(item) =
-                    Menu_FindItemByName(&ctx.world.menus, Some(menu), &currentItemName)
-                {
+                if let Some(item) = Menu_FindItemByName(menus, Some(menu), &currentItemName) {
                     // A cvar holding the name of a cvar - how crazy is that?
-                    let windowName = ctx
-                        .world
-                        .menus
-                        .item(item)
-                        .window
-                        .name
-                        .clone()
-                        .unwrap_or_default();
+                    let windowName = menus.item(item).window.name.clone().unwrap_or_default();
                     let bgCvarName = trap::Cvar_VariableStringBuffer(
                         ctx.engine,
                         "currentObjMapIconBackground",
                         512,
                     );
                     let bg = trap::Cvar_VariableStringBuffer(ctx.engine, &bgCvarName, 512);
-                    Menu_SetItemBackground(&mut ctx.world.menus, dc, Some(menu), &windowName, &bg);
+                    Menu_SetItemBackground(menus, ctx, Some(menu), &windowName, &bg);
 
                     // Re-enable this button
-                    Menu_ItemDisable(&mut ctx.world.menus, dc, menu, &windowName, 0);
+                    Menu_ItemDisable(menus, ctx, menu, &windowName, 0);
                 }
 
                 // Set the new item to the given background
-                if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), &itemArg) {
+                if let Some(item) = Menu_FindItemByName(menus, Some(menu), &itemArg) {
                     // store item name
-                    let windowName = ctx
-                        .world
-                        .menus
-                        .item(item)
-                        .window
-                        .name
-                        .clone()
-                        .unwrap_or_default();
+                    let windowName = menus.item(item).window.name.clone().unwrap_or_default();
                     trap::Cvar_Set(ctx.engine, "currentObjMapIconItem", &windowName);
                     let mut cvarNormalArg = String::new();
                     if String_Parse(args, &mut cvarNormalArg) {
@@ -12856,15 +12949,9 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
                         if String_Parse(args, &mut cvarLitArg) {
                             // set hightlight background
                             let lit = trap::Cvar_VariableStringBuffer(ctx.engine, &cvarLitArg, 512);
-                            Menu_SetItemBackground(
-                                &mut ctx.world.menus,
-                                dc,
-                                Some(menu),
-                                &windowName,
-                                &lit,
-                            );
+                            Menu_SetItemBackground(menus, ctx, Some(menu), &windowName, &lit);
                             // Disable button
-                            Menu_ItemDisable(&mut ctx.world.menus, dc, menu, &windowName, 1);
+                            Menu_ItemDisable(menus, ctx, menu, &windowName, 1);
                         }
                     }
                 }
@@ -12873,13 +12960,13 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
     } else if Q_stricmp(&name, "updatesiegeclasscnt") == 0 {
         let mut teamArg = String::new();
         if String_Parse(args, &mut teamArg) {
-            UI_SiegeClassCnt(ctx, dc, atoi(&teamArg));
+            UI_SiegeClassCnt(ctx, menus, ds, atoi(&teamArg));
         }
     } else if Q_stricmp(&name, "updatesiegecvars") == 0 {
         let team = trap::Cvar_VariableValue(ctx.engine, "ui_holdteam") as c_int;
         let baseClass = trap::Cvar_VariableValue(ctx.engine, "ui_siege_class") as c_int;
 
-        UI_UpdateCvarsForClass(ctx, dc, team, baseClass, 0);
+        UI_UpdateCvarsForClass(ctx, menus, ds, team, baseClass, 0);
     // Save current team and class
     } else if Q_stricmp(&name, "setteamclassicons") == 0 {
         let team = trap::Cvar_VariableValue(ctx.engine, "ui_holdteam") as c_int;
@@ -12889,13 +12976,11 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
         trap::Cvar_Set(ctx.engine, "ui_startsiegeclass", &classString);
 
         // If player is already on a team, set up icons to show it.
-        UI_FindCurrentSiegeTeamClass(ctx, dc);
+        UI_FindCurrentSiegeTeamClass(ctx, menus, ds);
     } else if Q_stricmp(&name, "updatesiegeweapondesc") == 0 {
-        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
-            if let Some(item) =
-                Menu_FindItemByName(&ctx.world.menus, Some(menu), "base_class_weapons_feed")
-            {
-                let idx = ctx.world.menus.item(item).cursorPos;
+        if let Some(menu) = Menu_GetFocused(menus) {
+            if let Some(item) = Menu_FindItemByName(menus, Some(menu), "base_class_weapons_feed") {
+                let idx = menus.item(item).cursorPos;
                 let info = trap::Cvar_VariableStringBuffer(
                     ctx.engine,
                     &format!("ui_class_weapondesc{}", idx),
@@ -12905,11 +12990,10 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
             }
         }
     } else if Q_stricmp(&name, "updatesiegeinventorydesc") == 0 {
-        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
-            if let Some(item) =
-                Menu_FindItemByName(&ctx.world.menus, Some(menu), "base_class_inventory_feed")
+        if let Some(menu) = Menu_GetFocused(menus) {
+            if let Some(item) = Menu_FindItemByName(menus, Some(menu), "base_class_inventory_feed")
             {
-                let idx = ctx.world.menus.item(item).cursorPos;
+                let idx = menus.item(item).cursorPos;
                 let info = trap::Cvar_VariableStringBuffer(
                     ctx.engine,
                     &format!("ui_class_itemdesc{}", idx),
@@ -12919,11 +13003,9 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
             }
         }
     } else if Q_stricmp(&name, "updatesiegeforcedesc") == 0 {
-        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
-            if let Some(item) =
-                Menu_FindItemByName(&ctx.world.menus, Some(menu), "base_class_force_feed")
-            {
-                let idx = ctx.world.menus.item(item).cursorPos;
+        if let Some(menu) = Menu_GetFocused(menus) {
+            if let Some(item) = Menu_FindItemByName(menus, Some(menu), "base_class_force_feed") {
+                let idx = menus.item(item).cursorPos;
                 let info = trap::Cvar_VariableStringBuffer(
                     ctx.engine,
                     &format!("ui_class_power{}", idx),
@@ -12943,60 +13025,54 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
             }
         }
     } else if Q_stricmp(&name, "resetitemdescription") == 0 {
-        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
-            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "itemdescription")
-            {
-                if let Some(listPtr) = ctx.world.menus.item_mut(item).typeData.listBox_mut() {
+        if let Some(menu) = Menu_GetFocused(menus) {
+            if let Some(item) = Menu_FindItemByName(menus, Some(menu), "itemdescription") {
+                if let Some(listPtr) = menus.item_mut(item).typeData.listBox_mut() {
                     listPtr.startPos = 0;
                     listPtr.cursorPos = 0;
                 }
-                ctx.world.menus.item_mut(item).cursorPos = 0;
+                menus.item_mut(item).cursorPos = 0;
             }
         }
     } else if Q_stricmp(&name, "resetsiegelistboxes") == 0 {
-        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
-            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "description") {
-                if let Some(listPtr) = ctx.world.menus.item_mut(item).typeData.listBox_mut() {
+        if let Some(menu) = Menu_GetFocused(menus) {
+            if let Some(item) = Menu_FindItemByName(menus, Some(menu), "description") {
+                if let Some(listPtr) = menus.item_mut(item).typeData.listBox_mut() {
                     listPtr.startPos = 0;
                 }
-                ctx.world.menus.item_mut(item).cursorPos = 0;
+                menus.item_mut(item).cursorPos = 0;
             }
         }
 
-        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
-            if let Some(item) =
-                Menu_FindItemByName(&ctx.world.menus, Some(menu), "base_class_weapons_feed")
-            {
-                if let Some(listPtr) = ctx.world.menus.item_mut(item).typeData.listBox_mut() {
+        if let Some(menu) = Menu_GetFocused(menus) {
+            if let Some(item) = Menu_FindItemByName(menus, Some(menu), "base_class_weapons_feed") {
+                if let Some(listPtr) = menus.item_mut(item).typeData.listBox_mut() {
                     listPtr.startPos = 0;
                 }
-                ctx.world.menus.item_mut(item).cursorPos = 0;
+                menus.item_mut(item).cursorPos = 0;
             }
 
-            if let Some(item) =
-                Menu_FindItemByName(&ctx.world.menus, Some(menu), "base_class_inventory_feed")
+            if let Some(item) = Menu_FindItemByName(menus, Some(menu), "base_class_inventory_feed")
             {
-                if let Some(listPtr) = ctx.world.menus.item_mut(item).typeData.listBox_mut() {
+                if let Some(listPtr) = menus.item_mut(item).typeData.listBox_mut() {
                     listPtr.startPos = 0;
                 }
-                ctx.world.menus.item_mut(item).cursorPos = 0;
+                menus.item_mut(item).cursorPos = 0;
             }
 
-            if let Some(item) =
-                Menu_FindItemByName(&ctx.world.menus, Some(menu), "base_class_force_feed")
-            {
-                if let Some(listPtr) = ctx.world.menus.item_mut(item).typeData.listBox_mut() {
+            if let Some(item) = Menu_FindItemByName(menus, Some(menu), "base_class_force_feed") {
+                if let Some(listPtr) = menus.item_mut(item).typeData.listBox_mut() {
                     listPtr.startPos = 0;
                 }
-                ctx.world.menus.item_mut(item).cursorPos = 0;
+                menus.item_mut(item).cursorPos = 0;
             }
         }
     } else if Q_stricmp(&name, "updatesiegestatusicons") == 0 {
-        UI_UpdateSiegeStatusIcons(ctx.world, dc);
+        UI_UpdateSiegeStatusIcons(ctx, menus);
     } else if Q_stricmp(&name, "setcurrentNetMap") == 0 {
-        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
-            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "maplist") {
-                if let Some(listPtr) = ctx.world.menus.item(item).typeData.listBox() {
+        if let Some(menu) = Menu_GetFocused(menus) {
+            if let Some(item) = Menu_FindItemByName(menus, Some(menu), "maplist") {
+                if let Some(listPtr) = menus.item(item).typeData.listBox() {
                     trap::Cvar_Set(
                         ctx.engine,
                         "ui_currentNetMap",
@@ -13006,17 +13082,17 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
             }
         }
     } else if Q_stricmp(&name, "resetmaplist") == 0 {
-        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
-            if let Some(item) = Menu_FindItemByName(&ctx.world.menus, Some(menu), "maplist") {
+        if let Some(menu) = Menu_GetFocused(menus) {
+            if let Some(item) = Menu_FindItemByName(menus, Some(menu), "maplist") {
                 let (special, cursorPos) = {
-                    let it = ctx.world.menus.item(item);
+                    let it = menus.item(item);
                     (it.special, it.cursorPos)
                 };
                 // PORT-NOTE: Raven calls through `uiInfo.uiDC.feederSelection`,
                 // the vtable slot `_UI_Init` wired to `UI_FeederSelection`
                 // (dropped — DEC-36 D3 replaces the fn-ptr table); called
                 // directly here since that assignment is its only implementor.
-                UI_FeederSelection(ctx, dc, special, cursorPos, Some(item));
+                UI_FeederSelection(ctx, menus, ds, special, cursorPos, Some(item));
             }
         }
     } else if Q_stricmp(&name, "getmousepitch") == 0 {
@@ -13048,7 +13124,12 @@ fn UI_RunMenuScript(ctx: &mut UiContext, dc: &mut dyn DisplayContext, args: &mut
 /// `DC` field left for either to assign.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:10661-10824`
-pub fn _UI_Init(ctx: &mut UiContext, dc: &mut dyn DisplayContext, inGameLoad: bool) {
+pub fn _UI_Init(
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &mut DisplayState,
+    inGameLoad: bool,
+) {
     // register this freakin thing now
     let mut siegeTeamSwitch = vmCvar_t::default();
     trap::Cvar_Register(
@@ -13070,37 +13151,37 @@ pub fn _UI_Init(ctx: &mut UiContext, dc: &mut dyn DisplayContext, inGameLoad: bo
 
     UI_SiegeInit(ctx);
 
-    UI_UpdateForcePowers(ctx, dc);
+    UI_UpdateForcePowers(ctx, menus);
 
     UI_RegisterCvars(ctx);
     UI_InitMemory();
 
     // cache redundant calulations
-    trap::GetGlconfig(ctx.engine, &mut ctx.world.uiDC.glconfig);
+    trap::GetGlconfig(ctx.engine, &mut ds.glconfig);
 
     // for 640x480 virtualized screen
-    ctx.world.uiDC.yscale = (ctx.world.uiDC.glconfig.vidHeight as f64 * (1.0 / 480.0)) as f32;
-    ctx.world.uiDC.xscale = (ctx.world.uiDC.glconfig.vidWidth as f64 * (1.0 / 640.0)) as f32;
-    if ctx.world.uiDC.glconfig.vidWidth * 480 > ctx.world.uiDC.glconfig.vidHeight * 640 {
+    ds.yscale = (ds.glconfig.vidHeight as f64 * (1.0 / 480.0)) as f32;
+    ds.xscale = (ds.glconfig.vidWidth as f64 * (1.0 / 640.0)) as f32;
+    if ds.glconfig.vidWidth * 480 > ds.glconfig.vidHeight * 640 {
         // wide screen
-        ctx.world.uiDC.bias =
-            (0.5 * (ctx.world.uiDC.glconfig.vidWidth as f64
-                - (ctx.world.uiDC.glconfig.vidHeight as f64 * (640.0 / 480.0)))) as f32;
+        ds.bias = (0.5
+            * (ds.glconfig.vidWidth as f64 - (ds.glconfig.vidHeight as f64 * (640.0 / 480.0))))
+            as f32;
     } else {
         // no wide screen
-        ctx.world.uiDC.bias = 0.0;
+        ds.bias = 0.0;
     }
 
     // UI_Load();
 
     UI_BuildPlayerModel_List(ctx, inGameLoad);
 
-    String_Init(&mut ctx.world.menus, dc);
+    String_Init(menus, ctx);
 
-    ctx.world.uiDC.cursor = trap::R_RegisterShaderNoMip(ctx.engine, "menu/art/3_cursor2");
-    ctx.world.uiDC.whiteShader = trap::R_RegisterShaderNoMip(ctx.engine, "white");
+    ds.cursor = trap::R_RegisterShaderNoMip(ctx.engine, "menu/art/3_cursor2");
+    ds.whiteShader = trap::R_RegisterShaderNoMip(ctx.engine, "white");
 
-    AssetCache(ctx);
+    AssetCache(ctx, ds);
 
     let _start = trap::Milliseconds(ctx.engine);
 
@@ -13119,16 +13200,16 @@ pub fn _UI_Init(ctx: &mut UiContext, dc: &mut dyn DisplayContext, inGameLoad: bo
     }
 
     if inGameLoad {
-        UI_LoadMenus(ctx, dc, "ui/jampingame.txt", true);
+        UI_LoadMenus(ctx, menus, ds, "ui/jampingame.txt", true);
     } else if ctx.world.cvars.ui_bypassMainMenuLoad.integer == 0 {
-        UI_LoadMenus(ctx, dc, &menuSet, true);
+        UI_LoadMenus(ctx, menus, ds, &menuSet, true);
     }
 
     // get this now, jic the menus change again trying to setName before getName
     let uiName = UI_Cvar_VariableString(ctx, "name");
     trap::Cvar_Register(ctx.engine, None, "ui_name", &uiName, CVAR_INTERNAL);
 
-    Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
+    Menus_CloseAll(menus, ds, ctx);
 
     trap::LAN_LoadCachedServers(ctx.engine);
     let mapLoadName = ctx
@@ -13190,25 +13271,21 @@ pub fn _UI_Init(ctx: &mut UiContext, dc: &mut dyn DisplayContext, inGameLoad: bo
 /// closes out the UI key-catcher when no menu is open.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:10837-10863`
-pub fn _UI_KeyEvent(ctx: &mut UiContext, dc: &mut dyn DisplayContext, key: c_int, down: bool) {
-    if Menu_Count(&ctx.world.menus) > 0 {
-        if let Some(menu) = Menu_GetFocused(&ctx.world.menus) {
+pub fn _UI_KeyEvent(
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    key: c_int,
+    down: bool,
+) {
+    if Menu_Count(menus) > 0 {
+        if let Some(menu) = Menu_GetFocused(menus) {
             // PORT-NOTE: the `#ifdef _XBOX` `UpdateDemoTimer()` call
             // (`ui_main.c:10843-10847`) is dead non-retail-MP surface — dropped.
-            if key == fakeAscii_t::A_ESCAPE as c_int
-                && down
-                && !Menus_AnyFullScreenVisible(&ctx.world.menus)
-            {
-                Menus_CloseAll(&mut ctx.world.menus, &ctx.world.uiDC, dc);
+            if key == fakeAscii_t::A_ESCAPE as c_int && down && !Menus_AnyFullScreenVisible(menus) {
+                Menus_CloseAll(menus, ds, ctx);
             } else {
-                Menu_HandleKey(
-                    &mut ctx.world.menus,
-                    &ctx.world.uiDC,
-                    dc,
-                    Some(menu),
-                    key,
-                    down,
-                );
+                Menu_HandleKey(menus, ds, ctx, Some(menu), key, down);
             }
         } else {
             let catcher = trap::Key_GetCatcher(ctx.engine);
@@ -13227,12 +13304,12 @@ pub fn _UI_KeyEvent(ctx: &mut UiContext, dc: &mut dyn DisplayContext, key: c_int
 /// resetting the menu framework.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:10894-10901`
-pub fn UI_LoadNonIngame(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
+pub fn UI_LoadNonIngame(ctx: &mut UiContext, menus: &mut MenuSystem, ds: &mut DisplayState) {
     let mut menuSet = UI_Cvar_VariableString(ctx, "ui_menuFilesMP");
     if menuSet.is_empty() {
         menuSet = "ui/jampmenus.txt".to_string();
     }
-    UI_LoadMenus(ctx, dc, &menuSet, false);
+    UI_LoadMenus(ctx, menus, ds, &menuSet, false);
     ctx.world.inGameLoad = false;
 }
 
@@ -13241,20 +13318,18 @@ pub fn UI_LoadNonIngame(ctx: &mut UiContext, dc: &mut dyn DisplayContext) {
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:11173-11270`
 #[allow(clippy::too_many_lines)]
-pub fn UI_DrawConnectScreen(ctx: &mut UiContext, dc: &mut dyn DisplayContext, overlay: bool) {
-    let menu = Menus_FindByName(&ctx.world.menus, "Connect");
+pub fn UI_DrawConnectScreen(
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    overlay: bool,
+) {
+    let menu = Menus_FindByName(menus, "Connect");
 
     if !overlay {
         if let Some(m) = menu {
             let seLanguageModCount = ctx.world.cvars.se_language.modificationCount;
-            Menu_Paint(
-                &mut ctx.world.menus,
-                &ctx.world.uiDC,
-                dc,
-                Some(m),
-                true,
-                seLanguageModCount,
-            );
+            Menu_Paint(menus, ds, ctx, Some(m), true, seLanguageModCount);
         }
     }
 
@@ -13289,6 +13364,7 @@ pub fn UI_DrawConnectScreen(ctx: &mut UiContext, dc: &mut dyn DisplayContext, ov
         let mapname = Info_ValueForKey(&info, "mapname");
         Text_PaintCenter(
             ctx,
+            ds,
             centerPoint,
             yStart,
             scale,
@@ -13305,6 +13381,7 @@ pub fn UI_DrawConnectScreen(ctx: &mut UiContext, dc: &mut dyn DisplayContext, ov
             trap::SP_GetStringTextString(ctx.engine, "MENUS_STARTING_UP", 256).unwrap_or_default();
         Text_PaintCenter(
             ctx,
+            ds,
             centerPoint,
             yStart + 48.0,
             scale,
@@ -13322,6 +13399,7 @@ pub fn UI_DrawConnectScreen(ctx: &mut UiContext, dc: &mut dyn DisplayContext, ov
         let text = va_runtime(&sStringEdTemp, &[&servername]);
         Text_PaintCenter(
             ctx,
+            ds,
             centerPoint,
             yStart + 48.0,
             scale,
@@ -13337,6 +13415,7 @@ pub fn UI_DrawConnectScreen(ctx: &mut UiContext, dc: &mut dyn DisplayContext, ov
     let motd = Info_ValueForKey(&updateInfoString, "motd");
     Text_PaintCenter(
         ctx,
+        ds,
         centerPoint,
         425.0,
         scale,
@@ -13350,6 +13429,7 @@ pub fn UI_DrawConnectScreen(ctx: &mut UiContext, dc: &mut dyn DisplayContext, ov
         let messageString = cchars_to_string(&cstate.messageString);
         Text_PaintCenter(
             ctx,
+            ds,
             centerPoint,
             yStart + 176.0,
             scale,
@@ -13385,7 +13465,15 @@ pub fn UI_DrawConnectScreen(ctx: &mut UiContext, dc: &mut dyn DisplayContext, ov
                 MAX_INFO_VALUE as usize,
             );
             if !downloadName.is_empty() {
-                UI_DisplayDownloadInfo(ctx, &downloadName, centerPoint, yStart, scale, FONT_MEDIUM);
+                UI_DisplayDownloadInfo(
+                    ctx,
+                    ds,
+                    &downloadName,
+                    centerPoint,
+                    yStart,
+                    scale,
+                    FONT_MEDIUM,
+                );
                 return;
             }
             trap::SP_GetStringTextString(ctx.engine, "MENUS_AWAITING_GAMESTATE", 256)
@@ -13398,6 +13486,7 @@ pub fn UI_DrawConnectScreen(ctx: &mut UiContext, dc: &mut dyn DisplayContext, ov
     if Q_stricmp(&servername, "localhost") != 0 {
         Text_PaintCenter(
             ctx,
+            ds,
             centerPoint,
             yStart + 80.0,
             scale,
@@ -13415,7 +13504,12 @@ pub fn UI_DrawConnectScreen(ctx: &mut UiContext, dc: &mut dyn DisplayContext, ov
 /// and applies the rank-change / free-saber force-power side effects.
 ///
 /// Source: `oracle/codemp/ui/ui_main.c:1258-1421`
-pub fn _UI_Refresh(ctx: &mut UiContext, dc: &mut dyn DisplayContext, realtime: c_int) {
+pub fn _UI_Refresh(
+    ctx: &mut UiContext,
+    menus: &mut MenuSystem,
+    ds: &mut DisplayState,
+    realtime: c_int,
+) {
     //if ( !( trap_Key_GetCatcher() & KEYCATCH_UI ) ) {
     //	return;
     //}
@@ -13424,12 +13518,11 @@ pub fn _UI_Refresh(ctx: &mut UiContext, dc: &mut dyn DisplayContext, realtime: c
     trap::G2API_SetTime(ctx.engine, realtime, 0);
     trap::G2API_SetTime(ctx.engine, realtime, 1);
 
-    ctx.world.uiDC.frameTime = realtime - ctx.world.uiDC.realTime;
-    ctx.world.uiDC.realTime = realtime;
+    ds.frameTime = realtime - ds.realTime;
+    ds.realTime = realtime;
 
     let idx = ctx.world.scratch.UI_Refresh_index;
-    ctx.world.scratch.UI_Refresh_previousTimes[(idx % UI_FPS_FRAMES) as usize] =
-        ctx.world.uiDC.frameTime;
+    ctx.world.scratch.UI_Refresh_previousTimes[(idx % UI_FPS_FRAMES) as usize] = ds.frameTime;
     ctx.world.scratch.UI_Refresh_index += 1;
     if ctx.world.scratch.UI_Refresh_index > UI_FPS_FRAMES {
         // average multiple frames together to smooth changes out a bit
@@ -13440,26 +13533,21 @@ pub fn _UI_Refresh(ctx: &mut UiContext, dc: &mut dyn DisplayContext, realtime: c
         if total == 0 {
             total = 1;
         }
-        ctx.world.uiDC.FPS = (1000 * UI_FPS_FRAMES / total) as f32;
+        ds.FPS = (1000 * UI_FPS_FRAMES / total) as f32;
     }
 
     UI_UpdateCvars(ctx);
 
-    if Menu_Count(&ctx.world.menus) > 0 {
+    if Menu_Count(menus) > 0 {
         // paint all the menus
         let seLanguageModCount = ctx.world.cvars.se_language.modificationCount;
-        Menu_PaintAll(
-            &mut ctx.world.menus,
-            &ctx.world.uiDC,
-            dc,
-            seLanguageModCount,
-        );
+        Menu_PaintAll(menus, ds, ctx, seLanguageModCount);
         // refresh server browser list
-        UI_DoServerRefresh(ctx, dc);
+        UI_DoServerRefresh(ctx, menus, ds);
         // refresh server status
-        UI_BuildServerStatus(ctx, dc, false);
+        UI_BuildServerStatus(ctx, menus, ds, false);
         // refresh find player list
-        UI_BuildFindPlayerList(ctx, dc, false);
+        UI_BuildFindPlayerList(ctx, menus, ds, false);
     }
 
     // draw cursor
@@ -13467,12 +13555,12 @@ pub fn _UI_Refresh(ctx: &mut UiContext, dc: &mut dyn DisplayContext, realtime: c
     // (ui_main.c:1303-1309); `_XBOX` is never defined on the platforms this
     // port targets, so the draw is unconditional here.
     UI_SetColor(ctx, None);
-    if Menu_Count(&ctx.world.menus) > 0 {
-        let cursor = ctx.world.uiDC.Assets.cursor;
+    if Menu_Count(menus) > 0 {
+        let cursor = ds.Assets.cursor;
         UI_DrawHandlePic(
             ctx,
-            ctx.world.uiDC.cursorx as f32,
-            ctx.world.uiDC.cursory as f32,
+            ds.cursorx as f32,
+            ds.cursory as f32,
             48.0,
             48.0,
             cursor,
@@ -13484,7 +13572,7 @@ pub fn _UI_Refresh(ctx: &mut UiContext, dc: &mut dyn DisplayContext, realtime: c
     // call, ui_main.c:1311-1318) — nothing to transcribe.
 
     if ctx.world.cvars.ui_rankChange.integer != 0 {
-        ctx.world.menus.FPMessageTime = realtime + 3000;
+        menus.FPMessageTime = realtime + 3000;
 
         if ctx.world.main.parsedFPMessage.is_empty()
         /*&& uiMaxRank > ui_rankChange.integer*/
@@ -13533,7 +13621,7 @@ pub fn _UI_Refresh(ctx: &mut UiContext, dc: &mut dyn DisplayContext, realtime: c
             */
 
             // Use BG_LegalizedForcePowers and transfer the result into the UI force settings
-            UI_ReadLegalForce(ctx, dc);
+            UI_ReadLegalForce(ctx, menus);
         }
 
         if ctx.world.cvars.ui_freeSaber.integer != 0
@@ -13549,7 +13637,7 @@ pub fn _UI_Refresh(ctx: &mut UiContext, dc: &mut dyn DisplayContext, realtime: c
         trap::Cvar_Set(ctx.engine, "ui_rankChange", "0");
 
         // remember to update the force power count after changing the max rank
-        UpdateForceUsed(ctx, dc);
+        UpdateForceUsed(ctx, menus);
     }
 
     if ctx.world.cvars.ui_freeSaber.integer != 0 {
@@ -13565,9 +13653,14 @@ pub fn _UI_Refresh(ctx: &mut UiContext, dc: &mut dyn DisplayContext, realtime: c
     // don't bother."), so it never compiled in retail.
 }
 
-/// Raven `vmMain` — the ABI dispatch shell (D6) that owns the one [`UiWorld`]
-/// and engine transport for the call, builds a [`UiContext`] over them, and
-/// routes the command to the matching `_UI_*`/`UI_*` handler.
+/// Raven `vmMain` — the ABI dispatch shell (D6) that takes the one
+/// [`UiState`] and engine transport for the call, splits the state into its
+/// three disjoint borrows (DEC-38 ruling 1), builds a [`UiContext`] over the
+/// world half, and routes the command to the matching `_UI_*`/`UI_*` handler.
+///
+/// The split is why the ported handlers take `(ctx, menus, ds)`: `ctx` IS the
+/// `DisplayContext` the menu framework calls back through, so `menus`/`ds`
+/// must be borrows the framework holds beside it, never through it.
 ///
 /// PORT-NOTE: Raven's `command` arm values are `MpUiExport` (`mp_abi::ui`)
 /// discriminants. The pre-decode `MpUiExport::try_from(command)` reproduces
@@ -13580,9 +13673,8 @@ pub fn _UI_Refresh(ctx: &mut UiContext, dc: &mut dyn DisplayContext, realtime: c
 /// Source: `oracle/codemp/ui/ui_main.c:579-625`
 #[allow(clippy::too_many_arguments)]
 pub fn vmMain(
-    world: &mut UiWorld,
+    state: &mut UiState,
     engine: &Engine,
-    dc: &mut dyn DisplayContext,
     command: c_int,
     arg0: c_int,
     arg1: c_int,
@@ -13597,6 +13689,11 @@ pub fn vmMain(
     _arg10: c_int,
     _arg11: c_int,
 ) -> c_int {
+    let UiState {
+        world,
+        menus,
+        uiDC: ds,
+    } = state;
     let mut ctx = UiContext { world, engine };
 
     let Ok(export) = MpUiExport::try_from(command) else {
@@ -13607,45 +13704,45 @@ pub fn vmMain(
         MpUiExport::UI_GETAPIVERSION => UI_API_VERSION,
 
         MpUiExport::UI_INIT => {
-            _UI_Init(&mut ctx, dc, arg0 != 0);
+            _UI_Init(&mut ctx, menus, ds, arg0 != 0);
             0
         }
 
         MpUiExport::UI_SHUTDOWN => {
-            _UI_Shutdown(&mut ctx, dc);
+            _UI_Shutdown(&mut ctx, menus);
             0
         }
 
         MpUiExport::UI_KEY_EVENT => {
-            _UI_KeyEvent(&mut ctx, dc, arg0, arg1 != 0);
+            _UI_KeyEvent(&mut ctx, menus, ds, arg0, arg1 != 0);
             0
         }
 
         MpUiExport::UI_MOUSE_EVENT => {
-            _UI_MouseEvent(&mut ctx, dc, arg0, arg1);
+            _UI_MouseEvent(&mut ctx, menus, ds, arg0, arg1);
             0
         }
 
         MpUiExport::UI_REFRESH => {
-            _UI_Refresh(&mut ctx, dc, arg0);
+            _UI_Refresh(&mut ctx, menus, ds, arg0);
             0
         }
 
-        MpUiExport::UI_IS_FULLSCREEN => _UI_IsFullscreen(ctx.world) as c_int,
+        MpUiExport::UI_IS_FULLSCREEN => _UI_IsFullscreen(menus) as c_int,
 
         MpUiExport::UI_SET_ACTIVE_MENU => {
             // PORT-NOTE: arg0 is a `uiMenuCommand_t` wire value; Raven passes
             // it through as the enum directly (the C switch's own arg has no
             // conversion). See escalations — a genuine `c_int -> uiMenuCommand_t`
             // conversion belongs at the trap/ABI boundary, not invented here.
-            _UI_SetActiveMenu(&mut ctx, dc, arg0 as uiMenuCommand_t);
+            _UI_SetActiveMenu(&mut ctx, menus, ds, arg0 as uiMenuCommand_t);
             0
         }
 
-        MpUiExport::UI_CONSOLE_COMMAND => UI_ConsoleCommand(&mut ctx, dc, arg0) as c_int,
+        MpUiExport::UI_CONSOLE_COMMAND => UI_ConsoleCommand(&mut ctx, menus, ds, arg0) as c_int,
 
         MpUiExport::UI_DRAW_CONNECT_SCREEN => {
-            UI_DrawConnectScreen(&mut ctx, dc, arg0 != 0);
+            UI_DrawConnectScreen(&mut ctx, menus, ds, arg0 != 0);
             0
         }
 
@@ -13656,7 +13753,7 @@ pub fn vmMain(
         }
 
         MpUiExport::UI_MENU_RESET => {
-            Menu_Reset(&mut ctx.world.menus);
+            Menu_Reset(menus);
             0
         }
     }

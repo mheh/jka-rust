@@ -596,11 +596,12 @@ pub fn Menus_FindByName(menus: &MenuSystem, p: &str) -> Option<MenuId> {
 /// Source: `oracle/codemp/ui/ui_shared.c:1767-1784`
 pub fn Script_Defer(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     item: ItemId,
     args: &mut &str,
 ) -> bool {
-    if dc.deferScript(args) {
+    if dc.deferScript(menus, ds, args) {
         menus.ui_deferredScriptItem = Some(item);
         let mut s = (*args).to_string();
         if s.len() >= MAX_DEFERRED_SCRIPT {
@@ -679,22 +680,28 @@ pub fn Item_TextScroll_MaxScroll(menus: &MenuSystem, item: ItemId) -> c_int {
 /// back to 0.
 /// Source: `oracle/codemp/ui/ui_shared.c:2707-2722`
 pub fn Item_ListBox_MaxScroll(
-    menus: &MenuSystem,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     item: ItemId,
 ) -> c_int {
-    let it = menus.item(item);
-    let listPtr = match it.typeData.listBox() {
-        Some(l) => l,
+    // `dc.feederCount` takes `menus` itself (DEC-38 ruling 1), so no arena
+    // borrow may be live across the call; the fields are re-read AFTER it,
+    // preserving Raven's read order (`ui_shared.c:2707-2722`).
+    let special = menus.item(item).special;
+    let count = dc.feederCount(menus, ds, special);
+    let (elementWidth, elementHeight) = match menus.item(item).typeData.listBox() {
+        Some(l) => (l.elementWidth, l.elementHeight),
         None => return 0,
     };
-    let count = dc.feederCount(it.special);
+    let flags = menus.item(item).window.flags;
+    let rect = menus.item(item).window.rect;
     // Raven assigns the whole float expression to `int max` — one truncation
     // at the end, not on the division alone.
-    let max = if it.window.flags & WINDOW_HORIZONTAL != 0 {
-        (count as f32 - it.window.rect.w / listPtr.elementWidth + 1.0) as c_int
+    let max = if flags & WINDOW_HORIZONTAL != 0 {
+        (count as f32 - rect.w / elementWidth + 1.0) as c_int
     } else {
-        (count as f32 - it.window.rect.h / listPtr.elementHeight + 1.0) as c_int
+        (count as f32 - rect.h / elementHeight + 1.0) as c_int
     };
     if max < 0 {
         0
@@ -1460,7 +1467,7 @@ pub fn Window_Paint(
 
     if menus.debugMode {
         let color: vec4_t = [1.0, 1.0, 1.0, 1.0];
-        dc.drawRect(w.rect.x, w.rect.y, w.rect.w, w.rect.h, 1.0, color);
+        dc.drawRect(ds, w.rect.x, w.rect.y, w.rect.w, w.rect.h, 1.0, color);
     }
 
     if w.style == 0 && w.border == 0 {
@@ -1493,7 +1500,14 @@ pub fn Window_Paint(
             dc.drawHandlePic(fillRect.x, fillRect.y, fillRect.w, fillRect.h, w.background);
             dc.setColor(None);
         } else {
-            dc.fillRect(fillRect.x, fillRect.y, fillRect.w, fillRect.h, w.backColor);
+            dc.fillRect(
+                ds,
+                fillRect.x,
+                fillRect.y,
+                fillRect.w,
+                fillRect.h,
+                w.backColor,
+            );
         }
     } else if w.style == WINDOW_STYLE_GRADIENT {
         // gradient bar
@@ -1518,8 +1532,10 @@ pub fn Window_Paint(
         dc.drawHandlePic(fillRect.x, fillRect.y, fillRect.w, fillRect.h, w.background);
         dc.setColor(None);
     } else if w.style == WINDOW_STYLE_TEAMCOLOR {
+        // Raven UB: `UI_GetTeamColor` has an empty body, so C fills with the
+        // caller's uninitialized `vec4_t color` (§19); zeros are the pick.
         color = dc.getTeamColor();
-        dc.fillRect(fillRect.x, fillRect.y, fillRect.w, fillRect.h, color);
+        dc.fillRect(ds, fillRect.x, fillRect.y, fillRect.w, fillRect.h, color);
     } else if w.style == WINDOW_STYLE_CINEMATIC {
         if w.cinematic == -1 {
             w.cinematic = dc.playCinematic(
@@ -1554,9 +1570,18 @@ pub fn Window_Paint(
                 color[1] = 0.5;
             }
             color[3] = 1.0;
-            dc.drawRect(w.rect.x, w.rect.y, w.rect.w, w.rect.h, w.borderSize, color);
+            dc.drawRect(
+                ds,
+                w.rect.x,
+                w.rect.y,
+                w.rect.w,
+                w.rect.h,
+                w.borderSize,
+                color,
+            );
         } else {
             dc.drawRect(
+                ds,
                 w.rect.x,
                 w.rect.y,
                 w.rect.w,
@@ -1568,12 +1593,12 @@ pub fn Window_Paint(
     } else if w.border == WINDOW_BORDER_HORZ {
         // top/bottom
         dc.setColor(Some(w.borderColor));
-        dc.drawTopBottom(w.rect.x, w.rect.y, w.rect.w, w.rect.h, w.borderSize);
+        dc.drawTopBottom(ds, w.rect.x, w.rect.y, w.rect.w, w.rect.h, w.borderSize);
         dc.setColor(None);
     } else if w.border == WINDOW_BORDER_VERT {
         // left right
         dc.setColor(Some(w.borderColor));
-        dc.drawSides(w.rect.x, w.rect.y, w.rect.w, w.rect.h, w.borderSize);
+        dc.drawSides(ds, w.rect.x, w.rect.y, w.rect.w, w.rect.h, w.borderSize);
         dc.setColor(None);
     } else if w.border == WINDOW_BORDER_KCGRADIENT {
         // this is just two gradient bars along each horz edge
@@ -1785,11 +1810,12 @@ pub fn Item_TextScroll_HandleKey(
 /// `startPos = 0` instead of a null deref (see `Item_ListBox_MaxScroll`).
 /// Source: `oracle/codemp/ui/ui_shared.c:2724-2749`
 pub fn Item_ListBox_ThumbPosition(
-    menus: &MenuSystem,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     item: ItemId,
 ) -> c_int {
-    let max = Item_ListBox_MaxScroll(menus, dc, item);
+    let max = Item_ListBox_MaxScroll(menus, ds, dc, item);
     let it = menus.item(item);
     let startPos = it.typeData.listBox().map(|l| l.startPos).unwrap_or(0);
 
@@ -1909,7 +1935,7 @@ pub fn Item_OwnerDraw_HandleKey(
     }
 
     let mut special = menus.item(item).special;
-    let result = dc.ownerDrawHandleKey(ownerDraw, ownerDrawFlags, &mut special, key);
+    let result = dc.ownerDrawHandleKey(menus, ds, ownerDraw, ownerDrawFlags, &mut special, key);
     menus.item_mut(item).special = special;
     result
 }
@@ -2018,7 +2044,7 @@ pub fn Item_Multi_HandleKey(
     // its a feeder?
     let special = menus.item(item).special;
     if special != 0.0 {
-        dc.feederSelection(special, current, Some(item));
+        dc.feederSelection(menus, ds, special, current, Some(item));
     }
 
     true
@@ -2132,6 +2158,7 @@ pub fn Rect_ToWindowCoords(rect: &mut RectDef, window: &WindowDef) {
 #[allow(clippy::too_many_arguments)]
 pub fn Item_SetTextExtents(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     item: ItemId,
     width: &mut c_int,
@@ -2170,21 +2197,21 @@ pub fn Item_SetTextExtents(
                 it.cvar.clone(),
             )
         };
-        let mut originalWidth = dc.textWidth(&textPtr, textscale, iMenuFont);
+        let mut originalWidth = dc.textWidth(ds, &textPtr, textscale, iMenuFont);
 
         if itemType == ITEM_TYPE_OWNERDRAW
             && (textalignment == ITEM_ALIGN_CENTER || textalignment == ITEM_ALIGN_RIGHT)
         {
-            originalWidth += dc.ownerDrawWidth(ownerDraw, textscale);
+            originalWidth += dc.ownerDrawWidth(menus, ds, ownerDraw, textscale);
         } else if itemType == ITEM_TYPE_EDITFIELD && textalignment == ITEM_ALIGN_CENTER {
             if let Some(cvar) = cvar.as_deref() {
                 let buff = dc.getCVarString(cvar, 256);
-                originalWidth += dc.textWidth(&buff, textscale, iMenuFont);
+                originalWidth += dc.textWidth(ds, &buff, textscale, iMenuFont);
             }
         }
 
-        let w = dc.textWidth(&textPtr, textscale, iMenuFont);
-        let h = dc.textHeight(&textPtr, textscale, iMenuFont);
+        let w = dc.textWidth(ds, &textPtr, textscale, iMenuFont);
+        let h = dc.textHeight(ds, &textPtr, textscale, iMenuFont);
         *width = w;
         *height = h;
 
@@ -2366,6 +2393,7 @@ pub fn Menu_Init(menu: &mut MenuDef, ds: &DisplayState) {
 /// Source: `oracle/codemp/ui/ui_shared.c:7060-7084`
 pub fn Menu_SetFeederSelection(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     menu: Option<MenuId>,
     feeder: c_int,
@@ -2398,7 +2426,7 @@ pub fn Menu_SetFeederSelection(
             menus.item_mut(id).cursorPos = index;
             let cursorPos = menus.item(id).cursorPos;
             let special = menus.item(id).special;
-            dc.feederSelection(special, cursorPos, None);
+            dc.feederSelection(menus, ds, special, cursorPos, None);
             return;
         }
     }
@@ -2990,7 +3018,7 @@ pub fn Item_TextScroll_OverLB(menus: &MenuSystem, item: ItemId, x: f32, y: f32) 
 /// vertical, by `WINDOW_HORIZONTAL`).
 /// Source: `oracle/codemp/ui/ui_shared.c:2751-2788`
 pub fn Item_ListBox_ThumbDrawPosition(
-    menus: &MenuSystem,
+    menus: &mut MenuSystem,
     ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     item: ItemId,
@@ -3007,7 +3035,7 @@ pub fn Item_ListBox_ThumbDrawPosition(
             {
                 return ds.cursorx - (SCROLLBAR_SIZE / 2.0) as c_int;
             } else {
-                return Item_ListBox_ThumbPosition(menus, dc, item);
+                return Item_ListBox_ThumbPosition(menus, ds, dc, item);
             }
         } else {
             let min = (rect.y + SCROLLBAR_SIZE + 1.0) as c_int;
@@ -3017,11 +3045,11 @@ pub fn Item_ListBox_ThumbDrawPosition(
             {
                 return ds.cursory - (SCROLLBAR_SIZE / 2.0) as c_int;
             } else {
-                return Item_ListBox_ThumbPosition(menus, dc, item);
+                return Item_ListBox_ThumbPosition(menus, ds, dc, item);
             }
         }
     } else {
-        Item_ListBox_ThumbPosition(menus, dc, item)
+        Item_ListBox_ThumbPosition(menus, ds, dc, item)
     }
 }
 
@@ -3034,14 +3062,18 @@ pub fn Item_ListBox_ThumbDrawPosition(
 /// `elementStyle = 0` instead of Raven's unconditional cast.
 /// Source: `oracle/codemp/ui/ui_shared.c:2837-2953`
 pub fn Item_ListBox_OverLB(
-    menus: &MenuSystem,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     item: ItemId,
     x: f32,
     y: f32,
 ) -> c_int {
+    // Same copy-out as `Item_ListBox_MaxScroll`: `dc.feederCount` takes `menus`,
+    // so nothing may borrow the arena across it.
+    let special = menus.item(item).special;
+    let _count = dc.feederCount(menus, ds, special);
     let it = menus.item(item);
-    let _count = dc.feederCount(it.special);
     let listPtr = it.typeData.listBox();
     let rect = it.window.rect;
 
@@ -3064,7 +3096,7 @@ pub fn Item_ListBox_OverLB(
         }
 
         // check if on thumb
-        let thumbstart = Item_ListBox_ThumbPosition(menus, dc, item);
+        let thumbstart = Item_ListBox_ThumbPosition(menus, ds, dc, item);
         r.x = thumbstart as f32;
         if Rect_ContainsPoint(Some(&r), x, y) {
             return WINDOW_LB_THUMB;
@@ -3104,7 +3136,7 @@ pub fn Item_ListBox_OverLB(
                 return WINDOW_LB_PGDN;
             }
 
-            let thumbstart = Item_ListBox_ThumbPosition(menus, dc, item);
+            let thumbstart = Item_ListBox_ThumbPosition(menus, ds, dc, item);
             r.y = thumbstart as f32;
             if Rect_ContainsPoint(Some(&r), x, y) {
                 return WINDOW_LB_THUMB;
@@ -3125,7 +3157,7 @@ pub fn Item_ListBox_OverLB(
                 return WINDOW_LB_RIGHTARROW;
             }
 
-            let thumbstart = Item_ListBox_ThumbPosition(menus, dc, item);
+            let thumbstart = Item_ListBox_ThumbPosition(menus, ds, dc, item);
             r.y = thumbstart as f32;
             if Rect_ContainsPoint(Some(&r), x, y) {
                 return WINDOW_LB_THUMB;
@@ -3808,6 +3840,7 @@ pub fn Item_Parse(
 /// Source: `oracle/codemp/ui/ui_shared.c:9042-9255`
 pub fn Item_TextScroll_BuildLines(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     item: ItemId,
 ) {
@@ -3872,8 +3905,12 @@ pub fn Item_TextScroll_BuildLines(
                 lines.push(latin1_to_string(&sLineForDisplay));
                 assigned = true;
                 break; // print this line
-            } else if dc.textWidth(&latin1_to_string(&sLineForDisplay), textscale, iMenuFont)
-                >= iBoxWidth
+            } else if dc.textWidth(
+                ds,
+                &latin1_to_string(&sLineForDisplay),
+                textscale,
+                iMenuFont,
+            ) >= iBoxWidth
             {
                 // reached screen edge, so cap off string at bytepos after last good position...
                 if uiLetter > 255 && bIsTrailingPunctuation && !dc.Language_UsesSpaces() {
@@ -4162,6 +4199,7 @@ pub fn PC_Rect_Parse(dc: &mut dyn DisplayContext, handle: c_int, r: &mut RectDef
 /// Source: `oracle/codemp/ui/ui_shared.c:891-930`
 pub fn Item_SetScreenCoords(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     item: Option<ItemId>,
     x: f32,
@@ -4197,7 +4235,7 @@ pub fn Item_SetScreenCoords(
             scrollPtr.endPos = 0;
         }
 
-        Item_TextScroll_BuildLines(menus, dc, item);
+        Item_TextScroll_BuildLines(menus, ds, dc, item);
     }
 }
 
@@ -4843,6 +4881,7 @@ pub fn Script_playLooped(
 /// Source: `oracle/codemp/ui/ui_shared.c:2254-2302`
 pub fn Menu_SetItemText(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     menu: Option<MenuId>,
     itemName: &str,
@@ -4883,7 +4922,7 @@ pub fn Menu_SetItemText(
                     scrollPtr.startPos = 0;
                     scrollPtr.endPos = 0;
                 }
-                Item_TextScroll_BuildLines(menus, dc, item);
+                Item_TextScroll_BuildLines(menus, ds, dc, item);
             }
         }
     }
@@ -4951,23 +4990,23 @@ fn dispatch_script_command(
     } else if stricmp_eq(command, "disable") {
         Some(Script_Disable(menus, dc, item, args))
     } else if stricmp_eq(command, "defer") {
-        Some(Script_Defer(menus, dc, item, args))
+        Some(Script_Defer(menus, ds, dc, item, args))
     } else if stricmp_eq(command, "open") {
         Some(Script_Open(menus, ds, dc, item, args))
     } else if stricmp_eq(command, "close") {
         Some(Script_Close(menus, ds, dc, item, args))
     } else if stricmp_eq(command, "setitemtext") {
-        Some(Script_SetItemText(menus, dc, item, args))
+        Some(Script_SetItemText(menus, ds, dc, item, args))
     } else if stricmp_eq(command, "transition") {
-        Some(Script_Transition(menus, dc, item, args))
+        Some(Script_Transition(menus, ds, dc, item, args))
     } else if stricmp_eq(command, "orbit") {
-        Some(Script_Orbit(menus, dc, item, args))
+        Some(Script_Orbit(menus, ds, dc, item, args))
     } else if stricmp_eq(command, "scale") {
-        Some(Script_Scale(menus, dc, item, args))
+        Some(Script_Scale(menus, ds, dc, item, args))
     } else if stricmp_eq(command, "rundeferred") {
         Some(Script_RunDeferred(menus, ds, dc, item, args))
     } else if stricmp_eq(command, "transition2") {
-        Some(Script_Transition2(menus, dc, item, args))
+        Some(Script_Transition2(menus, ds, dc, item, args))
     } else {
         None
     }
@@ -5022,7 +5061,7 @@ pub fn Item_RunScript(
                 }
             }
             // not in our auto list, pass to handler
-            None => dc.runScript(&mut p),
+            None => dc.runScript(menus, ds, &mut p),
         }
     }
 }
@@ -5099,6 +5138,7 @@ pub fn Item_TextScroll_MouseEnter(menus: &mut MenuSystem, item: ItemId, x: f32, 
 /// Source: `oracle/codemp/ui/ui_shared.c:2956-3026`
 pub fn Item_ListBox_MouseEnter(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     item: ItemId,
     x: f32,
@@ -5110,7 +5150,7 @@ pub fn Item_ListBox_MouseEnter(
         | WINDOW_LB_PGUP
         | WINDOW_LB_PGDN);
 
-    let flags = Item_ListBox_OverLB(menus, dc, item, x, y);
+    let flags = Item_ListBox_OverLB(menus, ds, dc, item, x, y);
     menus.item_mut(item).window.flags |= flags;
 
     let windowFlags = menus.item(item).window.flags;
@@ -5211,7 +5251,7 @@ pub fn Item_StartCapture(
         || itemType == ITEM_TYPE_NUMERICFIELD
         || itemType == ITEM_TYPE_LISTBOX
     {
-        let flags = Item_ListBox_OverLB(menus, dc, item, cursorx, cursory);
+        let flags = Item_ListBox_OverLB(menus, ds, dc, item, cursorx, cursory);
         if flags & (WINDOW_LB_LEFTARROW | WINDOW_LB_RIGHTARROW) != 0 {
             menus.scrollInfo.nextScrollTime = ds.realTime + SCROLL_TIME_START;
             menus.scrollInfo.nextAdjustTime = ds.realTime + SCROLL_TIME_ADJUST;
@@ -5327,7 +5367,7 @@ pub fn Item_TextScroll_Paint(
     if let Some(cvar) = menus.item(item).cvar.clone() {
         let cvartext = dc.getCVarString(&cvar, 1024);
         menus.item_mut(item).text = Some(cvartext);
-        Item_TextScroll_BuildLines(menus, dc, item);
+        Item_TextScroll_BuildLines(menus, ds, dc, item);
         // `Item_TextScroll_BuildLines` rewrote `typeData`; refresh the local copy.
         scrollPtr = menus
             .item(item)
@@ -5364,6 +5404,7 @@ pub fn Item_TextScroll_Paint(
         }
 
         dc.drawText(
+            ds,
             x + 4.0,
             y,
             textscale,
@@ -5418,7 +5459,7 @@ pub fn Item_ListBox_Paint(
     // textscale is used to size the text, textalignx and textaligny are used to size image elements
     // there is no clipping available so only the last completely visible item is painted
     let special = menus.item(item).special;
-    let count = dc.feederCount(special);
+    let count = dc.feederCount(menus, ds, special);
 
     let maxIndex = if count != 0 { count - 1 } else { count };
 
@@ -5438,7 +5479,7 @@ pub fn Item_ListBox_Paint(
         cursorPos = maxIndex;
         menus.item_mut(item).cursorPos = cursorPos;
         // NOTE : might consider moving this to any spot in here we change the cursor position
-        dc.feederSelection(special, cursorPos, None);
+        dc.feederSelection(menus, ds, special, cursorPos, None);
     }
 
     let rect = menus.item(item).window.rect;
@@ -5457,7 +5498,7 @@ pub fn Item_ListBox_Paint(
         if !listPtr.scrollhidden {
             // draw scrollbar in bottom of the window
             // bar
-            if Item_ListBox_MaxScroll(menus, dc, item) > 0 {
+            if Item_ListBox_MaxScroll(menus, ds, dc, item) > 0 {
                 let mut x = rect.x + 1.0;
                 let y = rect.y + rect.h - SCROLLBAR_SIZE - 1.0;
                 dc.drawHandlePic(
@@ -5503,7 +5544,7 @@ pub fn Item_ListBox_Paint(
             let y = rect.y + 1.0;
             let mut i = listPtr.startPos;
             while i < count {
-                let image = dc.feederItemImage(special, i);
+                let image = dc.feederItemImage(menus, ds, special, i);
                 if image != 0 {
                     // PORT-NOTE: the `#ifndef CGAME` (ui) arm, per this file's convention.
                     if windowFlags & WINDOW_PLAYERCOLOR != 0 {
@@ -5526,6 +5567,7 @@ pub fn Item_ListBox_Paint(
 
                 if i == cursorPos {
                     dc.drawRect(
+                        ds,
                         x,
                         y,
                         listPtr.elementWidth - 1.0,
@@ -5606,7 +5648,7 @@ pub fn Item_ListBox_Paint(
                     // print a row
                     let mut i = startPos;
                     while i < count {
-                        let image = dc.feederItemImage(special, i);
+                        let image = dc.feederItemImage(menus, ds, special, i);
                         if image != 0 {
                             if windowFlags & WINDOW_PLAYERCOLOR != 0 {
                                 let color: vec4_t = [
@@ -5629,6 +5671,7 @@ pub fn Item_ListBox_Paint(
 
                         if i == cursorPos {
                             dc.drawRect(
+                                ds,
                                 x,
                                 y,
                                 listPtr.elementWidth - 1.0,
@@ -5666,7 +5709,7 @@ pub fn Item_ListBox_Paint(
                 let mut y = rect.y + 1.0;
                 let mut i = listPtr.startPos;
                 while i < count {
-                    let image = dc.feederItemImage(special, i);
+                    let image = dc.feederItemImage(menus, ds, special, i);
                     if image != 0 {
                         dc.drawHandlePic(
                             x + 1.0,
@@ -5679,6 +5722,7 @@ pub fn Item_ListBox_Paint(
 
                     if i == cursorPos {
                         dc.drawRect(
+                            ds,
                             x,
                             y,
                             listPtr.elementWidth - 1.0,
@@ -5710,7 +5754,7 @@ pub fn Item_ListBox_Paint(
                     for j in 0..listPtr.numColumns {
                         let mut imageStartX = listPtr.columnInfo[j as usize].pos;
                         let (text, optionalImage1, optionalImage2, optionalImage3) =
-                            dc.feederItemText(special, i, j);
+                            dc.feederItemText(ds, special, i, j);
 
                         let text = match text {
                             Some(t) => t,
@@ -5729,6 +5773,7 @@ pub fn Item_ListBox_Paint(
 
                         // textyOffset stays 0 outside the `_XBOX` arm this port doesn't build.
                         dc.drawText(
+                            ds,
                             x + 4.0 + listPtr.columnInfo[j as usize].pos as f32,
                             y + listPtr.elementHeight + textaligny,
                             textscale,
@@ -5774,11 +5819,12 @@ pub fn Item_ListBox_Paint(
                     }
                 } else {
                     let (text, optionalImage1, optionalImage2, optionalImage3) =
-                        dc.feederItemText(special, i, 0);
+                        dc.feederItemText(ds, special, i, 0);
                     if optionalImage1 >= 0 || optionalImage2 >= 0 || optionalImage3 >= 0 {
                         // (Raven: commented-out drawHandlePic — no-op)
                     } else if let Some(text) = text {
                         dc.drawText(
+                            ds,
                             x + 4.0,
                             y + textaligny,
                             textscale,
@@ -5794,6 +5840,7 @@ pub fn Item_ListBox_Paint(
 
                 if i == cursorPos {
                     dc.fillRect(
+                        ds,
                         x + 2.0,
                         y + listPtr.elementHeight + 2.0,
                         rect.w - SCROLLBAR_SIZE - 4.0,
@@ -7792,6 +7839,7 @@ pub fn Display_CacheAll(menus: &MenuSystem, dc: &mut dyn DisplayContext) {
 /// Source: `oracle/codemp/ui/ui_shared.c:933-956`
 pub fn Item_UpdatePosition(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     item: Option<ItemId>,
 ) {
@@ -7812,7 +7860,7 @@ pub fn Item_UpdatePosition(
         y += m.window.borderSize;
     }
 
-    Item_SetScreenCoords(menus, dc, Some(item), x, y);
+    Item_SetScreenCoords(menus, ds, dc, Some(item), x, y);
 }
 
 /// Raven `Menu_UpdatePosition` — recompute every item's screen position from
@@ -7822,6 +7870,7 @@ pub fn Item_UpdatePosition(
 /// Source: `oracle/codemp/ui/ui_shared.c:959-977`
 pub fn Menu_UpdatePosition(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     menu: Option<MenuId>,
 ) {
@@ -7840,7 +7889,7 @@ pub fn Menu_UpdatePosition(
 
     let items = menus.menu(menu).items.clone();
     for it in items {
-        Item_SetScreenCoords(menus, dc, Some(it), x, y);
+        Item_SetScreenCoords(menus, ds, dc, Some(it), x, y);
     }
 }
 
@@ -7883,6 +7932,7 @@ pub fn Menu_ClearFocus(
 /// Source: `oracle/codemp/ui/ui_shared.c:1206-1217`
 pub fn Script_SetItemText(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     item: ItemId,
     args: &mut &str,
@@ -7893,7 +7943,7 @@ pub fn Script_SetItemText(
     // expecting text
     if String_Parse(args, &mut itemName) && String_Parse(args, &mut text) {
         let parent = menus.item(item).parent;
-        Menu_SetItemText(menus, dc, parent, &itemName, &text);
+        Menu_SetItemText(menus, ds, dc, parent, &itemName, &text);
     }
     true
 }
@@ -8238,7 +8288,7 @@ pub fn Menu_Paint(
     }
 
     let ownerDrawFlags = menus.menu(menu).window.ownerDrawFlags;
-    if ownerDrawFlags != 0 && !dc.ownerDrawVisible(ownerDrawFlags) {
+    if ownerDrawFlags != 0 && !dc.ownerDrawVisible(ds, ownerDrawFlags) {
         return;
     }
 
@@ -8300,7 +8350,7 @@ pub fn Menu_Paint(
         color[3] = 1.0;
         color[1] = 0.0;
         let rect = menus.menu(menu).window.rect;
-        dc.drawRect(rect.x, rect.y, rect.w, rect.h, 1.0, color);
+        dc.drawRect(ds, rect.x, rect.y, rect.w, rect.h, 1.0, color);
     }
 }
 
@@ -8401,7 +8451,7 @@ pub fn Item_MouseEnter(
 
         let itype = menus.item(item).r#type;
         if itype == ITEM_TYPE_LISTBOX {
-            Item_ListBox_MouseEnter(menus, dc, item, x, y);
+            Item_ListBox_MouseEnter(menus, ds, dc, item, x, y);
         } else if itype == ITEM_TYPE_TEXTSCROLL {
             Item_TextScroll_MouseEnter(menus, item, x, y);
         }
@@ -8462,7 +8512,7 @@ pub fn Item_ListBox_HandleKey(
     let rect = menus.item(item).window.rect;
     let windowFlags = menus.item(item).window.flags;
 
-    let count = dc.feederCount(special);
+    let count = dc.feederCount(menus, ds, special);
 
     let inFocus = force
         || (Rect_ContainsPoint(Some(&rect), ds.cursorx as f32, ds.cursory as f32)
@@ -8471,7 +8521,7 @@ pub fn Item_ListBox_HandleKey(
         return false;
     }
 
-    let max = Item_ListBox_MaxScroll(menus, dc, item);
+    let max = Item_ListBox_MaxScroll(menus, ds, dc, item);
     let viewmax: c_int;
 
     if windowFlags & WINDOW_HORIZONTAL != 0 {
@@ -8506,7 +8556,7 @@ pub fn Item_ListBox_HandleKey(
                     l.startPos = startPos;
                 }
                 menus.item_mut(item).cursorPos = cursorPos;
-                dc.feederSelection(special, cursorPos, None);
+                dc.feederSelection(menus, ds, special, cursorPos, None);
             } else if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
                 l.startPos -= 1;
                 if l.startPos < 0 {
@@ -8544,7 +8594,7 @@ pub fn Item_ListBox_HandleKey(
                     l.startPos = startPos;
                 }
                 menus.item_mut(item).cursorPos = cursorPos;
-                dc.feederSelection(special, cursorPos, None);
+                dc.feederSelection(menus, ds, special, cursorPos, None);
             } else if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
                 l.startPos += 1;
                 if l.startPos >= count {
@@ -8593,7 +8643,7 @@ pub fn Item_ListBox_HandleKey(
                     l.startPos = startPos;
                 }
                 menus.item_mut(item).cursorPos = cursorPos;
-                dc.feederSelection(special, cursorPos, None);
+                dc.feederSelection(menus, ds, special, cursorPos, None);
             } else if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
                 l.startPos -= 1;
                 if l.startPos < 0 {
@@ -8631,7 +8681,7 @@ pub fn Item_ListBox_HandleKey(
                     l.startPos = startPos;
                 }
                 menus.item_mut(item).cursorPos = cursorPos;
-                dc.feederSelection(special, cursorPos, None);
+                dc.feederSelection(menus, ds, special, cursorPos, None);
             } else if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
                 l.startPos += 1;
                 if l.startPos > max {
@@ -8699,7 +8749,7 @@ pub fn Item_ListBox_HandleKey(
                 .map(|l| l.cursorPos)
                 .unwrap_or(prePos);
             menus.item_mut(item).cursorPos = lbCursorPos;
-            if !dc.feederSelection(special, lbCursorPos, Some(item)) {
+            if !dc.feederSelection(menus, ds, special, lbCursorPos, Some(item)) {
                 menus.item_mut(item).cursorPos = prePos;
                 if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
                     l.cursorPos = prePos;
@@ -8750,7 +8800,7 @@ pub fn Item_ListBox_HandleKey(
                 l.startPos = startPos;
             }
             menus.item_mut(item).cursorPos = cursorPos;
-            dc.feederSelection(special, cursorPos, None);
+            dc.feederSelection(menus, ds, special, cursorPos, None);
         } else if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
             l.startPos -= viewmax;
             if l.startPos < 0 {
@@ -8787,7 +8837,7 @@ pub fn Item_ListBox_HandleKey(
                 l.startPos = startPos;
             }
             menus.item_mut(item).cursorPos = cursorPos;
-            dc.feederSelection(special, cursorPos, None);
+            dc.feederSelection(menus, ds, special, cursorPos, None);
         } else if let Some(l) = menus.item_mut(item).typeData.listBox_mut() {
             l.startPos += viewmax;
             if l.startPos > max {
@@ -9041,7 +9091,12 @@ pub fn MenuParse_outlinecolor(
 ///
 /// PORT-NOTE: Raven's `menu == NULL` guard becomes `menu: Option<MenuId>`.
 /// Source: `oracle/codemp/ui/ui_shared.c:979-990`
-pub fn Menu_PostParse(menus: &mut MenuSystem, dc: &mut dyn DisplayContext, menu: Option<MenuId>) {
+pub fn Menu_PostParse(
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    menu: Option<MenuId>,
+) {
     let menu = match menu {
         Some(m) => m,
         None => return,
@@ -9053,7 +9108,7 @@ pub fn Menu_PostParse(menus: &mut MenuSystem, dc: &mut dyn DisplayContext, menu:
         w.rect.w = 640.0;
         w.rect.h = 480.0;
     }
-    Menu_UpdatePosition(menus, dc, Some(menu));
+    Menu_UpdatePosition(menus, ds, dc, Some(menu));
 }
 
 /// Raven `Menus_ShowByName` — activate the menu named `p`, if defined.
@@ -9149,6 +9204,7 @@ enum TransitionRectFrom {
 #[allow(clippy::too_many_arguments)]
 pub fn Menu_TransitionItemByName(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     menu: MenuId,
     p: &str,
@@ -9178,7 +9234,7 @@ pub fn Menu_TransitionItemByName(
                 it.window.rectEffects2.w = ((rectTo.w - rf.w) as c_int).abs() as f32 / amt;
                 it.window.rectEffects2.h = ((rectTo.h - rf.h) as c_int).abs() as f32 / amt;
             }
-            Item_UpdatePosition(menus, dc, Some(item));
+            Item_UpdatePosition(menus, ds, dc, Some(item));
         }
     }
 }
@@ -9189,6 +9245,7 @@ pub fn Menu_TransitionItemByName(
 #[allow(clippy::too_many_arguments)]
 pub fn Menu_OrbitItemByName(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     menu: MenuId,
     p: &str,
@@ -9210,7 +9267,7 @@ pub fn Menu_OrbitItemByName(
                 it.window.rectClient.x = x;
                 it.window.rectClient.y = y;
             }
-            Item_UpdatePosition(menus, dc, Some(item));
+            Item_UpdatePosition(menus, ds, dc, Some(item));
         }
     }
 }
@@ -9421,7 +9478,7 @@ pub fn Scroll_ListBox_ThumbFunc(
             h: SCROLLBAR_SIZE,
             w: rect.w - (SCROLLBAR_SIZE * 2.0) - 2.0,
         };
-        let max = Item_ListBox_MaxScroll(menus, dc, item);
+        let max = Item_ListBox_MaxScroll(menus, ds, dc, item);
 
         let mut pos = ((ds.cursorx as f32 - r.x - SCROLLBAR_SIZE / 2.0) * max as f32
             / (r.w - SCROLLBAR_SIZE)) as c_int;
@@ -9442,7 +9499,7 @@ pub fn Scroll_ListBox_ThumbFunc(
             h: rect.h - (SCROLLBAR_SIZE * 2.0) - 2.0,
             w: SCROLLBAR_SIZE,
         };
-        let max = Item_ListBox_MaxScroll(menus, dc, item);
+        let max = Item_ListBox_MaxScroll(menus, ds, dc, item);
 
         let (elementWidth, elementStyle) = {
             let l = menus.item(item).typeData.listBox().unwrap();
@@ -9602,7 +9659,7 @@ pub fn Item_Text_AutoWrapped_Paint(
             it.textStyle,
         )
     };
-    let height = dc.textHeight(&textPtr, textscale, iMenuFont);
+    let height = dc.textHeight(ds, &textPtr, textscale, iMenuFont);
     let mut y = menus.item(item).textaligny;
 
     let p = string_to_latin1(&textPtr);
@@ -9626,7 +9683,7 @@ pub fn Item_Text_AutoWrapped_Paint(
             newLinePtr = idx + 1;
             newLineWidth = textWidth;
         }
-        textWidth = dc.textWidth(&latin1_to_string(&buff), textscale, 0);
+        textWidth = dc.textWidth(ds, &latin1_to_string(&buff), textscale, 0);
         if (newLine != 0 && (textWidth as f32) > rectW) || ch == b'\n' || ch == 0 {
             if len != 0 {
                 let mut tx = menus.item(item).textRect.x;
@@ -9651,7 +9708,7 @@ pub fn Item_Text_AutoWrapped_Paint(
                 buff.truncate(newLine);
                 let line = latin1_to_string(&buff);
                 dc.drawText(
-                    tx, ty, textscale, color, &line, 0.0, 0, textStyle, iMenuFont,
+                    ds, tx, ty, textscale, color, &line, 0.0, 0, textStyle, iMenuFont,
                 );
             }
             if ch == 0 {
@@ -9715,6 +9772,7 @@ pub fn Item_Text_Wrapped_Paint(
     let mut height: c_int = 0;
     Item_SetTextExtents(
         menus,
+        ds,
         dc,
         item,
         &mut width,
@@ -9739,7 +9797,9 @@ pub fn Item_Text_Wrapped_Paint(
             Some(off) => {
                 let p = start + off;
                 let line = latin1_to_string(&bytes[start..p]);
-                dc.drawText(x, y, textscale, color, &line, 0.0, 0, textStyle, iMenuFont);
+                dc.drawText(
+                    ds, x, y, textscale, color, &line, 0.0, 0, textStyle, iMenuFont,
+                );
                 y += height as f32 + 2.0;
                 start = p + 1;
             }
@@ -9747,7 +9807,9 @@ pub fn Item_Text_Wrapped_Paint(
         }
     }
     let rest = latin1_to_string(&bytes[start..]);
-    dc.drawText(x, y, textscale, color, &rest, 0.0, 0, textStyle, iMenuFont);
+    dc.drawText(
+        ds, x, y, textscale, color, &rest, 0.0, 0, textStyle, iMenuFont,
+    );
 }
 
 /// Raven `Menu_ScrollFeeder` — simulate a listbox scroll-key press on the
@@ -9801,6 +9863,7 @@ pub fn Script_Close(
 /// Source: `oracle/codemp/ui/ui_shared.c:1808-1824`
 pub fn Script_Transition(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     item: ItemId,
     args: &mut &str,
@@ -9818,7 +9881,17 @@ pub fn Script_Transition(
         && Float_Parse(args, &mut amt)
     {
         if let Some(parent) = menus.item(item).parent {
-            Menu_TransitionItemByName(menus, dc, parent, &name, Some(rectFrom), &rectTo, time, amt);
+            Menu_TransitionItemByName(
+                menus,
+                ds,
+                dc,
+                parent,
+                &name,
+                Some(rectFrom),
+                &rectTo,
+                time,
+                amt,
+            );
         }
     }
 
@@ -9830,6 +9903,7 @@ pub fn Script_Transition(
 /// Source: `oracle/codemp/ui/ui_shared.c:1895-1937`
 pub fn Script_Scale(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     item: ItemId,
     args: &mut &str,
@@ -9861,7 +9935,9 @@ pub fn Script_Scale(
                             x: rectSrc.x + (rectSrc.h - h) / 2.0,
                             y: rectSrc.y + (rectSrc.w - w) / 2.0,
                         };
-                        Menu_TransitionItemByName(menus, dc, parent, &name, None, &rectTo, 1, 1.0);
+                        Menu_TransitionItemByName(
+                            menus, ds, dc, parent, &name, None, &rectTo, 1, 1.0,
+                        );
                     }
                 }
             }
@@ -9875,6 +9951,7 @@ pub fn Script_Scale(
 /// Source: `oracle/codemp/ui/ui_shared.c:1939-1954`
 pub fn Script_Orbit(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     item: ItemId,
     args: &mut &str,
@@ -9893,7 +9970,7 @@ pub fn Script_Orbit(
             && Int_Parse(args, &mut time)
         {
             if let Some(parent) = menus.item(item).parent {
-                Menu_OrbitItemByName(menus, dc, parent, &name, x, y, cx, cy, time);
+                Menu_OrbitItemByName(menus, ds, dc, parent, &name, x, y, cx, cy, time);
             }
         }
     }
@@ -9910,6 +9987,7 @@ pub fn Script_Orbit(
 /// Source: `oracle/codemp/ui/ui_shared.c:2027-2047`
 pub fn Script_Transition2(
     menus: &mut MenuSystem,
+    ds: &DisplayState,
     dc: &mut dyn DisplayContext,
     item: ItemId,
     args: &mut &str,
@@ -9925,7 +10003,7 @@ pub fn Script_Transition2(
             && !parseFloatOrFail(args, &mut amt)
         {
             if let Some(parent) = menus.item(item).parent {
-                Menu_TransitionItemByName(menus, dc, parent, &name, None, &rectTo, time, amt);
+                Menu_TransitionItemByName(menus, ds, dc, parent, &name, None, &rectTo, time, amt);
             }
         } else {
             dc.Print(&format!(
@@ -9983,6 +10061,7 @@ pub fn Item_Text_Paint(
     let mut height: c_int = 0;
     Item_SetTextExtents(
         menus,
+        ds,
         dc,
         item,
         &mut width,
@@ -10009,7 +10088,7 @@ pub fn Item_Text_Paint(
         )
     };
     dc.drawText(
-        x, y, textscale, color, &textPtr, 0.0, 0, textStyle, iMenuFont,
+        ds, x, y, textscale, color, &textPtr, 0.0, 0, textStyle, iMenuFont,
     );
 
     // Is there a second line of text?
@@ -10034,7 +10113,7 @@ pub fn Item_Text_Paint(
             )
         };
         dc.drawText(
-            x2, y2, textscale2, color2, &textPtr2, 0.0, 0, textStyle2, iMenuFont2,
+            ds, x2, y2, textscale2, color2, &textPtr2, 0.0, 0, textStyle2, iMenuFont2,
         );
     }
 }
@@ -10354,7 +10433,7 @@ pub fn Menu_New(
         menus.menus.push(MenuDef::default());
         Menu_Init(menus.menu_mut(id), ds);
         if Menu_Parse(menus, ds, dc, id, handle) {
-            Menu_PostParse(menus, dc, Some(id));
+            Menu_PostParse(menus, ds, dc, Some(id));
         } else {
             menus.menus.pop();
         }
@@ -10550,6 +10629,7 @@ pub fn Item_TextField_Paint(
     if flags & WINDOW_HASFOCUS != 0 && editingField {
         let cursor = if dc.getOverstrikeMode() { b'_' } else { b'|' };
         dc.drawTextWithCursor(
+            ds,
             textRectX + textRectW + offset,
             textRectY,
             textscale,
@@ -10563,6 +10643,7 @@ pub fn Item_TextField_Paint(
         );
     } else {
         dc.drawText(
+            ds,
             textRectX + textRectW + offset,
             textRectY,
             textscale,
@@ -10651,7 +10732,7 @@ pub fn Item_YesNo_Paint(
             it.iMenuFont,
         );
         dc.drawText(
-            x, y, textscale, newColor, yesnovalue, 0.0, 0, textStyle, iMenuFont,
+            ds, x, y, textscale, newColor, yesnovalue, 0.0, 0, textStyle, iMenuFont,
         );
     } else {
         let it = menus.item(item);
@@ -10663,7 +10744,7 @@ pub fn Item_YesNo_Paint(
             it.iMenuFont,
         );
         dc.drawText(
-            x, y, textscale, newColor, yesnovalue, 0.0, 0, textStyle, iMenuFont,
+            ds, x, y, textscale, newColor, yesnovalue, 0.0, 0, textStyle, iMenuFont,
         );
     }
 }
@@ -10728,7 +10809,7 @@ pub fn Item_Multi_Paint(
             it.iMenuFont,
         );
         dc.drawText(
-            x, y, textscale, newColor, &text, 0.0, 0, textStyle, iMenuFont,
+            ds, x, y, textscale, newColor, &text, 0.0, 0, textStyle, iMenuFont,
         );
     } else {
         let it = menus.item(item);
@@ -10740,7 +10821,7 @@ pub fn Item_Multi_Paint(
             it.iMenuFont,
         );
         dc.drawText(
-            x, y, textscale, newColor, &text, 0.0, 0, textStyle, iMenuFont,
+            ds, x, y, textscale, newColor, &text, 0.0, 0, textStyle, iMenuFont,
         );
     }
 }
@@ -10878,25 +10959,26 @@ pub fn Item_Bind_Paint(
         let mut textScale = menus.item(item).textscale;
         let iMenuFont = menus.item(item).iMenuFont;
         let g_nameBind1 = menus.g_nameBind1.clone();
-        let mut textWidth = dc.textWidth(&g_nameBind1, textScale, iMenuFont) as f32;
+        let mut textWidth = dc.textWidth(ds, &g_nameBind1, textScale, iMenuFont) as f32;
         let it = menus.item(item);
         let startingXPos = (it.textRect.x + it.textRect.w + 8.0) as c_int;
 
         while (startingXPos as f32 + textWidth) >= SCREEN_WIDTH as f32 {
             textScale -= 0.05;
-            textWidth = dc.textWidth(&g_nameBind1, textScale, iMenuFont) as f32;
+            textWidth = dc.textWidth(ds, &g_nameBind1, textScale, iMenuFont) as f32;
         }
 
         let itemTextscale = menus.item(item).textscale;
         let mut yAdj = 0;
         if textScale != itemTextscale {
-            let textHeight = dc.textHeight(&g_nameBind1, itemTextscale, iMenuFont);
-            yAdj = textHeight - dc.textHeight(&g_nameBind1, textScale, iMenuFont);
+            let textHeight = dc.textHeight(ds, &g_nameBind1, itemTextscale, iMenuFont);
+            yAdj = textHeight - dc.textHeight(ds, &g_nameBind1, textScale, iMenuFont);
         }
 
         let textRectY = menus.item(item).textRect.y;
         let textStyle = menus.item(item).textStyle;
         dc.drawText(
+            ds,
             startingXPos as f32,
             textRectY + yAdj as f32,
             textScale,
@@ -10921,7 +11003,8 @@ pub fn Item_Bind_Paint(
         // verbatim (dead ternary in the oracle, not a translation gap).
         let _ = value;
         dc.drawText(
-            textRectX, textRectY, textscale, newColor, "FIXME", 0.0, maxChars, textStyle, iMenuFont,
+            ds, textRectX, textRectY, textscale, newColor, "FIXME", 0.0, maxChars, textStyle,
+            iMenuFont,
         );
     }
 }
@@ -11075,6 +11158,8 @@ pub fn Item_OwnerDraw_Paint(
             textRectX + textRectW
         };
         dc.ownerDrawItem(
+            menus,
+            ds,
             x,
             windowY,
             windowW,
@@ -11094,6 +11179,8 @@ pub fn Item_OwnerDraw_Paint(
     } else {
         let it = menus.item(item);
         dc.ownerDrawItem(
+            menus,
+            ds,
             it.window.rect.x,
             it.window.rect.y,
             it.window.rect.w,
@@ -11186,7 +11273,7 @@ pub fn Display_MouseMove(
         Some(m) => {
             menus.menu_mut(m).window.rect.x += x as f32;
             menus.menu_mut(m).window.rect.y += y as f32;
-            Menu_UpdatePosition(menus, dc, Some(m));
+            Menu_UpdatePosition(menus, ds, dc, Some(m));
         }
     }
     true
@@ -11528,7 +11615,7 @@ pub fn Item_Paint(
         menus.item_mut(item).window.rectClient.x = (rx * c - ry * s) + rectEffects.x - w;
         menus.item_mut(item).window.rectClient.y = (rx * s + ry * c) + rectEffects.y - h;
 
-        Item_UpdatePosition(menus, dc, Some(item));
+        Item_UpdatePosition(menus, ds, dc, Some(item));
     }
 
     // WINDOW_INTRANSITION
@@ -11569,7 +11656,7 @@ pub fn Item_Paint(
             win.rectClient.h = nh;
         }
 
-        Item_UpdatePosition(menus, dc, Some(item));
+        Item_UpdatePosition(menus, ds, dc, Some(item));
 
         if done == 4 {
             menus.item_mut(item).window.flags &= !WINDOW_INTRANSITION;
@@ -11583,7 +11670,7 @@ pub fn Item_Paint(
 
     let ownerDrawFlags = menus.item(item).window.ownerDrawFlags;
     if ownerDrawFlags != 0 {
-        if !dc.ownerDrawVisible(ownerDrawFlags) {
+        if !dc.ownerDrawVisible(ds, ownerDrawFlags) {
             menus.item_mut(item).window.flags &= !WINDOW_VISIBLE;
         } else {
             menus.item_mut(item).window.flags |= WINDOW_VISIBLE;
@@ -11635,7 +11722,7 @@ pub fn Item_Paint(
             let textStyle = menus.item(item).textStyle;
 
             loop {
-                let textWidth = dc.textWidth(&textPtr, fDescScale, FONT_SMALL2);
+                let textWidth = dc.textWidth(ds, &textPtr, fDescScale, FONT_SMALL2);
 
                 let xPos = if descAlignment == ITEM_ALIGN_RIGHT {
                     descX - textWidth
@@ -11651,11 +11738,14 @@ pub fn Item_Paint(
                 }
 
                 if fDescScale != fDescScaleCopy {
-                    let iOriginalTextHeight = dc.textHeight(&textPtr, fDescScaleCopy, FONT_MEDIUM);
-                    iYadj = iOriginalTextHeight - dc.textHeight(&textPtr, fDescScale, FONT_MEDIUM);
+                    let iOriginalTextHeight =
+                        dc.textHeight(ds, &textPtr, fDescScaleCopy, FONT_MEDIUM);
+                    iYadj =
+                        iOriginalTextHeight - dc.textHeight(ds, &textPtr, fDescScale, FONT_MEDIUM);
                 }
 
                 dc.drawText(
+                    ds,
                     xPos as f32,
                     (descY + iYadj) as f32,
                     fDescScale,
@@ -11684,7 +11774,7 @@ pub fn Item_Paint(
     if menus.debugMode {
         let color: vec4_t = [0.0, 1.0, 0.0, 1.0];
         let rect = menus.item(item).window.rect;
-        dc.drawRect(rect.x, rect.y, rect.w, rect.h, 1.0, color);
+        dc.drawRect(ds, rect.x, rect.y, rect.w, rect.h, 1.0, color);
     }
 
     let itemType = menus.item(item).r#type;
@@ -11747,6 +11837,7 @@ pub fn Menu_PaintAll(
     if menus.debugMode {
         let v: vec4_t = [1.0, 1.0, 1.0, 1.0];
         dc.drawText(
+            ds,
             5.0,
             25.0,
             0.75,
@@ -11758,6 +11849,7 @@ pub fn Menu_PaintAll(
             0,
         );
         dc.drawText(
+            ds,
             5.0,
             45.0,
             0.75,

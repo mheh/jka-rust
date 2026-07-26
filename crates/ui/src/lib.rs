@@ -2,8 +2,8 @@
 //! `ENGINE: OnceLock<CEngine>` static (SEAM-D1), the `WORLD: WorldCell`
 //! static (STATE-D6), the live entrypoint exports, and the `vmMain` export
 //! forwarding into `mp_ui::ui_main::vmMain` — which owns the `MpUiExport`
-//! match and builds the `UiContext` receiver (see `vm_main_dispatch`'s
-//! doc). The logic crate `mp_ui` has no entrypoint/`OnceLock`/`WorldCell`
+//! match, splits the `UiState` into its three disjoint borrows and builds the
+//! `UiContext` receiver (DEC-38 ruling 1; see `vm_main_dispatch`'s doc). The logic crate `mp_ui` has no entrypoint/`OnceLock`/`WorldCell`
 //! code of its own. Structure, naming and safety comments mirror the
 //! `jampgame` shell (`crates/jampgame/src/lib.rs`) exactly except where ui's
 //! own contract genuinely differs — each such spot is called out at the
@@ -12,7 +12,6 @@
 use std::panic::AssertUnwindSafe;
 use std::sync::OnceLock;
 
-mod display_context_stub;
 mod panic_guard;
 mod world_cell;
 
@@ -20,16 +19,15 @@ use abi_transport::entrypoints::{AbiCommand, AbiWord, RawSyscall};
 use abi_transport::generic::engine::CEngine;
 use abi_transport::generic::word_to_c_int;
 use mp_ui::ui_main::vmMain as mp_ui_vm_main;
-use mp_ui::world::ui_world::UiWorld;
+use mp_ui::world::ui_state::UiState;
 
-use crate::display_context_stub::UnbuiltDisplayContext;
 use crate::world_cell::WorldCell;
 
 /// The single outbound-syscall backend seam global (SEAM-D1, porting-rules §B6
 /// exception — `vmMain` takes no context argument). Set once at `dllEntry`.
 static ENGINE: OnceLock<CEngine> = OnceLock::new();
 
-/// The module island's one owned `UiWorld` across `vmMain` calls (STATE-D6,
+/// The module island's one owned `UiState` across `vmMain` calls (STATE-D6,
 /// the second sanctioned static exemption). Bootstrapped lazily on the first
 /// `vmMain` call of any kind (see `vm_main_dispatch`'s bootstrap doc — this is
 /// the one genuine divergence from `jampgame`'s `WORLD`, which is built on the
@@ -102,11 +100,11 @@ pub extern "C-unwind" fn vmMain(
 }
 
 /// The decoded-dispatch body of [`vmMain`]. Bootstraps/derives the `WORLD`
-/// pointer, builds the placeholder [`UnbuiltDisplayContext`] `dc` (see its
-/// module doc), and forwards the decoded `AbiWord` words into
-/// `mp_ui::ui_main::vmMain` — which itself builds the `UiContext` receiver and
-/// runs the exhaustive `MpUiExport` match (SEAM-D3/D8), mirroring
-/// `jampgame::vm_main_dispatch`'s shape.
+/// pointer and forwards the decoded `AbiWord` words into
+/// `mp_ui::ui_main::vmMain` — which splits the `UiState` into `world`/`menus`/
+/// `uiDC`, builds the `UiContext` receiver (itself the module's
+/// `DisplayContext`, DEC-38 ruling 1) and runs the exhaustive `MpUiExport`
+/// match (SEAM-D3/D8), mirroring `jampgame::vm_main_dispatch`'s shape.
 ///
 /// BOOTSTRAP (STATE-D6, DIVERGES from `jampgame`'s `GAME_INIT`-gated
 /// rebuild): Raven's `uiInfo_t uiInfo` (`ui_local.h:729-843`) is a single
@@ -140,22 +138,24 @@ fn vm_main_dispatch(
     // bootstrap condition is "cell empty", not "command == some INIT arm".
     unsafe {
         if (*WORLD.0.get()).is_none() {
-            // UiWorld is ~34 KB (Vec/String throughout), so the Box::new
+            // UiState is ~34 KB (Vec/String throughout), so the Box::new
             // temporary transits the engine's stack safely — unlike GameWorld's
             // ~1.4 MB, which needed jampgame's zeroed_boxed path.
-            *WORLD.0.get() = Some(Box::new(UiWorld::default()));
+            *WORLD.0.get() = Some(Box::new(UiState::default()));
         }
     }
 
-    // SAFETY: single-threaded per Raven's contract; each (possibly reentrant)
-    // entry derives its OWN raw `*mut UiWorld` — aliasing raw pointers are
-    // sound; a dispatch-spanning `&mut` would be UB (STATE-D6 discipline). The
-    // cell holds `Box<UiWorld>`; `&mut **b` reborrows through the Box to the
-    // same `*mut UiWorld` the whole downstream (`UiContext`) expects.
-    // SAFETY: the single owned island the shell keeps alive for the whole
-    // call (STATE-D1/D6); this is THE seam reborrow — everything downstream
-    // is a checked borrow of it (Stage 2a).
-    let world: &mut UiWorld = unsafe {
+    // SAFETY: single-threaded per Raven's contract, and — unlike jampgame,
+    // whose traps can re-enter vmMain and therefore thread a raw `*mut` per
+    // STATE-D6 — a single dispatch-spanning `&mut UiState` is sound HERE
+    // because no ui trap re-enters vmMain: the one engine chain that would
+    // (`trap_UpdateScreen` → `SCR_UpdateScreen` → `VM_Call(uivm, UI_REFRESH)`)
+    // is dead — `UI_UpdateScreen` has zero call sites in the ui tree (oracle
+    // and port alike), and `executeText` script paths use `EXEC_APPEND`.
+    // `mp_ui::vmMain` splits this one borrow into the three disjoint field
+    // borrows the ported fns thread. If a re-entering ui trap is ever wired,
+    // this must convert to jampgame's raw-pointer threading.
+    let state: &mut UiState = unsafe {
         let b = (*WORLD.0.get())
             .as_mut()
             .expect("the bootstrap above always populates WORLD first");
@@ -163,16 +163,9 @@ fn vm_main_dispatch(
     };
     let engine = ENGINE.get().expect("dllEntry set ENGINE");
 
-    // The placeholder DisplayContext implementor — see its module doc
-    // (`display_context_stub.rs`): no ui DisplayContext is built yet, so
-    // every method it has panics loudly, naming itself, the instant a live
-    // call reaches it.
-    let mut dc = UnbuiltDisplayContext;
-
     let result = mp_ui_vm_main(
-        world,
+        state,
         engine,
-        &mut dc,
         command,
         word_to_c_int(arg0),
         word_to_c_int(arg1),

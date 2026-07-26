@@ -122,6 +122,7 @@ impl DisplayContext for TestDisplayContext {
 
     fn drawText(
         &mut self,
+        _ds: &DisplayState,
         _x: f32,
         _y: f32,
         _scale: f32,
@@ -135,12 +136,24 @@ impl DisplayContext for TestDisplayContext {
         not_on_tested_path("drawText")
     }
 
-    fn textWidth(&mut self, text: &str, scale: f32, _iMenuFont: c_int) -> c_int {
+    fn textWidth(
+        &mut self,
+        _ds: &DisplayState,
+        text: &str,
+        scale: f32,
+        _iMenuFont: c_int,
+    ) -> c_int {
         // Latin-1 byte length mirrors the C dumper's strlen, not UTF-8 .len().
         (string_to_latin1(text).len() as f32 * 8.0 * scale) as c_int
     }
 
-    fn textHeight(&mut self, _text: &str, _scale: f32, _iMenuFont: c_int) -> c_int {
+    fn textHeight(
+        &mut self,
+        _ds: &DisplayState,
+        _text: &str,
+        _scale: f32,
+        _iMenuFont: c_int,
+    ) -> c_int {
         not_on_tested_path("textHeight")
     }
 
@@ -154,19 +167,36 @@ impl DisplayContext for TestDisplayContext {
         not_on_tested_path("modelBounds")
     }
 
-    fn fillRect(&mut self, _x: f32, _y: f32, _w: f32, _h: f32, _color: vec4_t) {
+    fn fillRect(&mut self, _ds: &DisplayState, _x: f32, _y: f32, _w: f32, _h: f32, _color: vec4_t) {
         not_on_tested_path("fillRect")
     }
 
-    fn drawRect(&mut self, _x: f32, _y: f32, _w: f32, _h: f32, _size: f32, _color: vec4_t) {
+    fn drawRect(
+        &mut self,
+        _ds: &DisplayState,
+        _x: f32,
+        _y: f32,
+        _w: f32,
+        _h: f32,
+        _size: f32,
+        _color: vec4_t,
+    ) {
         not_on_tested_path("drawRect")
     }
 
-    fn drawSides(&mut self, _x: f32, _y: f32, _w: f32, _h: f32, _size: f32) {
+    fn drawSides(&mut self, _ds: &DisplayState, _x: f32, _y: f32, _w: f32, _h: f32, _size: f32) {
         not_on_tested_path("drawSides")
     }
 
-    fn drawTopBottom(&mut self, _x: f32, _y: f32, _w: f32, _h: f32, _size: f32) {
+    fn drawTopBottom(
+        &mut self,
+        _ds: &DisplayState,
+        _x: f32,
+        _y: f32,
+        _w: f32,
+        _h: f32,
+        _size: f32,
+    ) {
         not_on_tested_path("drawTopBottom")
     }
 
@@ -230,6 +260,8 @@ impl DisplayContext for TestDisplayContext {
 
     fn ownerDrawItem(
         &mut self,
+        _menus: &mut MenuSystem,
+        _ds: &DisplayState,
         _x: f32,
         _y: f32,
         _w: f32,
@@ -253,15 +285,15 @@ impl DisplayContext for TestDisplayContext {
         not_on_tested_path("getValue")
     }
 
-    fn ownerDrawVisible(&mut self, _flags: c_int) -> bool {
+    fn ownerDrawVisible(&mut self, _ds: &DisplayState, _flags: c_int) -> bool {
         not_on_tested_path("ownerDrawVisible")
     }
 
-    fn runScript(&mut self, _p: &mut &str) {
+    fn runScript(&mut self, _menus: &mut MenuSystem, _ds: &DisplayState, _p: &mut &str) {
         not_on_tested_path("runScript")
     }
 
-    fn deferScript(&mut self, _p: &mut &str) -> bool {
+    fn deferScript(&mut self, _menus: &mut MenuSystem, _ds: &DisplayState, _p: &mut &str) -> bool {
         not_on_tested_path("deferScript")
     }
 
@@ -283,6 +315,7 @@ impl DisplayContext for TestDisplayContext {
 
     fn drawTextWithCursor(
         &mut self,
+        _ds: &DisplayState,
         _x: f32,
         _y: f32,
         _scale: f32,
@@ -311,6 +344,8 @@ impl DisplayContext for TestDisplayContext {
 
     fn ownerDrawHandleKey(
         &mut self,
+        _menus: &mut MenuSystem,
+        _ds: &DisplayState,
         _ownerDraw: c_int,
         _flags: c_int,
         _special: &mut f32,
@@ -319,12 +354,18 @@ impl DisplayContext for TestDisplayContext {
         not_on_tested_path("ownerDrawHandleKey")
     }
 
-    fn feederCount(&mut self, _feederID: f32) -> c_int {
+    fn feederCount(
+        &mut self,
+        _menus: &mut MenuSystem,
+        _ds: &DisplayState,
+        _feederID: f32,
+    ) -> c_int {
         not_on_tested_path("feederCount")
     }
 
     fn feederItemText(
         &mut self,
+        _ds: &DisplayState,
         _feederID: f32,
         _index: c_int,
         _column: c_int,
@@ -332,11 +373,24 @@ impl DisplayContext for TestDisplayContext {
         not_on_tested_path("feederItemText")
     }
 
-    fn feederItemImage(&mut self, _feederID: f32, _index: c_int) -> qhandle_t {
+    fn feederItemImage(
+        &mut self,
+        _menus: &mut MenuSystem,
+        _ds: &DisplayState,
+        _feederID: f32,
+        _index: c_int,
+    ) -> qhandle_t {
         not_on_tested_path("feederItemImage")
     }
 
-    fn feederSelection(&mut self, _feederID: f32, _index: c_int, _item: Option<ItemId>) -> bool {
+    fn feederSelection(
+        &mut self,
+        _menus: &mut MenuSystem,
+        _ds: &DisplayState,
+        _feederID: f32,
+        _index: c_int,
+        _item: Option<ItemId>,
+    ) -> bool {
         not_on_tested_path("feederSelection")
     }
 
@@ -371,7 +425,13 @@ impl DisplayContext for TestDisplayContext {
         not_on_tested_path("Pause")
     }
 
-    fn ownerDrawWidth(&mut self, _ownerDraw: c_int, _scale: f32) -> c_int {
+    fn ownerDrawWidth(
+        &mut self,
+        _menus: &mut MenuSystem,
+        _ds: &DisplayState,
+        _ownerDraw: c_int,
+        _scale: f32,
+    ) -> c_int {
         not_on_tested_path("ownerDrawWidth")
     }
 

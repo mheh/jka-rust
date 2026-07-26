@@ -12,10 +12,6 @@ crate-type = ["cdylib"]
 # SEAM-D10: the thin cdylib shell depends on abi_transport AND its logic crate.
 abi_transport = { path = "../abi-transport" }
 mp_ui = { path = "../mp/ui" }
-# The placeholder DisplayContext implementor (`display_context_stub.rs`)
-# names types straight from these two crates, same as `mp_ui` itself does.
-mp_qshared = { path = "../mp/qshared" }
-mp_uishared = { path = "../mp/uishared" }
 
 [dev-dependencies]
 # ABI smoke test (tests/abi_smoke.rs): drive the BUILT cdylib through the real

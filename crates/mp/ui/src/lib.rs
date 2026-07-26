@@ -5,6 +5,7 @@ pub mod keycodes;
 pub mod local;
 pub mod trap;
 pub mod ui_atoms;
+pub mod ui_display_context;
 pub mod ui_force;
 pub mod ui_gameinfo;
 pub mod ui_main;
