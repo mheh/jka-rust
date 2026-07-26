@@ -781,3 +781,71 @@ itself stays out of repo docs per the external-reference rule):
     renderfx variants and its statically-linked call sites alongside MP's
     traps; interior scene/asset types are mode-agnostic by construction; SP
     divergences become edge adapters + quirk flags, never a second renderer.
+
+**DEC-37 R2 addenda (ratified 2026-07-25, one-by-one sit-down):**
+
+- **A1. `FrameData` = lean design + disposition table.** The channel message
+  (ruling 2) is designed from the frozen per-frame trap surface (the 57
+  `CG_R_*`/`UI_R_*` `Args` types + refexport call list), specified as an
+  **ordered event stream** (2D commands and scene renders keep their
+  interleaving), NOT a field mirror of `backEndData_t` — which mixes frontend
+  inputs with `drawSurfs`, a frontend *output* that never crosses our channel
+  (cull/sort run render-side per ruling 2). R2 must produce a **disposition
+  table**: every `backEndData_t` field and every render command → crosses in
+  `FrameData` / stays render-side / dead.
+- **A2. Registries: four typed arenas.** image/shader/skin/model each get
+  their own arena (matching the oracle's four independent `MAX_*` arrays)
+  with `(index: u32, generation: u32)` handles — filling in ruling 11's
+  committed generation-counted shape; per-kind typing catches cross-kind
+  handle mixups at compile time.
+- **A3. Compose seam types by value.** `trRefEntity_t`/`trRefdef_t` wrap
+  `mp_qshared`'s `refEntity_t`/`refdef_t` by value at R2 rewrite time
+  (matching the oracle's own `refEntity_t e;` composition), collapsing the
+  duplicated field sets so the layout-assert block lands once for
+  ui/cgame/renderer.
+- **A4. Housekeeping approved:** read `tr_image.cpp`'s image-table
+  declaration before finalizing the RenderAssets registry count (the flare
+  half shrank: R1 established `tr_flares.cpp` is dead in retail MP — absent
+  from `jk2mp.vcproj`, sole caller commented out at `tr_backend.cpp:1244` —
+  so ruling 12's flare scope resolves to *no MP flares*); spot-check
+  `mnode_s.rs` against the non-XBOX `tr_local.h:917-934` branch before R2
+  closes; DEC-37 bucket assignments are provisional until R3 waves exercise
+  real call sites. `tr_quicksprite` is NOT SP-only (222-line
+  `tr_quicksprite.cpp` is in the retail MP compile set and the R1 srcglob;
+  simply un-ported R3 scope) — ruling 17's mode-agnostic-interior claim
+  stands without asterisk.
+
+## DEC-38 — ui U5 rulings: DisplayContext carrier, WORLD lifetime, siege gating (2026-07-25)
+
+Three user rulings from the U5 one-by-one sit-down:
+
+1. **DisplayContext carrier = thread-the-borrow.** The 7 re-entrant trait
+   methods (`ownerDrawItem`, `runScript`, `deferScript`, `ownerDrawHandleKey`,
+   `feederCount`, `feederItemImage`, `feederSelection`) are widened to take
+   the CALLER's borrows (`menus: &mut MenuSystem`, + `ds` where needed) —
+   mutations are visible on return, no aliasing (porting-rule B4 "state is
+   threaded, not reached"). Consequence: `MenuSystem` hoists out of the
+   world-struct borrow that the carrier holds — the carrier is built over
+   split borrows of `UiWorld` (Engine + the non-menus remainder), and every
+   `ctx.world.menus` path updates mechanically. Raw-reborrow (`*mut UiWorld`
+   in the carrier while callers hold `&mut MenuSystem`) was REJECTED: two
+   live mutable paths to the same `MenuSystem` is UB in Rust's aliasing
+   model, not confined unsafe. Routing facts (session survey): 47/74 methods
+   are pure trap forwarders (14 need trivial new `trap.rs` wrappers), 27
+   route to ported `UI_*` logic, 59 have live `dc.` call sites; the 15
+   zero-call methods are all trap forwarders (spot-check vs §20 dead surface
+   before implementing them). `feederItemText`'s dc-free signature is
+   faithful to Raven — do not "fix" it.
+2. **ui WORLD lifetime → STATE-D6 addendum** (recorded in
+   `docs/architecture/state-ownership.md` same-day): per-module world
+   lifetime follows the module's own Raven semantics — construct-on-INIT for
+   game (`level` re-created per map), lazy-and-persistent for ui (`uiInfo`
+   file-scope static, never reinitialized, nothing freed on shutdown).
+3. **Siege class-determination gating**: `GameCallbacks::siege_class_shader`
+   widens to `-> (c_int /* handle */, bool /* run class determination */)`.
+   game's impl returns `(0, true)` always (QAGAME runs the block
+   unconditionally, `bg_saga.c:994-1039` `#ifdef` arm); ui's returns
+   `(handle, handle != 0)` (the `#else` arm's `else` gating). `bg_saga.rs`'s
+   class-determination block branches on the bool. Closes the divergence
+   activated by the ui implementors (87abf20a review finding 12; task #36).
+

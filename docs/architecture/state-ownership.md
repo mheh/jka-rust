@@ -1071,6 +1071,19 @@ pub extern "C-unwind" fn vmMain(command: AbiCommand, /* arg0..arg11: AbiWord */)
   zeroed-`GameWorld` construction (was STATE-Q6 → STATE-D9) and the mutating-command
   receiver (was STATE-Q5 → STATE-D8, `GameContext` below — `WorldPtr` superseded 2026-07-03).
 
+**STATE-D6 addendum — per-module world lifetime (ratified 2026-07-25, DEC-38).**
+The construct-on-INIT / take-out-on-SHUTDOWN discipline above transcribes *game's*
+Raven semantics (`level` is re-created every `G_InitGame`). It is not a universal
+shell law: each module's `WorldCell` lifetime follows **that module's own Raven
+semantics**. ui's `uiInfo` is a file-scope static that `_UI_Init` mutates in place
+(no memset, `ui_main.c:10661`+), `_UI_Shutdown` frees nothing (`:1432-1435`), and
+no INIT-analog command exists — so `crates/ui`'s `WORLD` bootstraps lazily on the
+first `vmMain` call and is **never** taken out on `UI_SHUTDOWN` (a Rust static in
+the cdylib dies with the module image, exactly like the C global). cgame rules its
+own lifetime against its own oracle semantics when its shell lands. The frozen
+access discipline (confined unsafe, single-threaded Sync argument, raw-pointer
+threading) is unchanged and governs all shells.
+
 ### `GameContext` — the `Dispatch<C>` receiver (STATE-D8, FROZEN HERE)
 
 *Amendment (2026-07-03 — supersedes `WorldPtr`, resolves SEAM-Q12): the receiver is
