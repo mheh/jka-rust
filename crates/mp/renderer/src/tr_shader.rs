@@ -590,18 +590,31 @@ pub fn R_CreateExtendedName(name: &str, mode: Option<LightmapNameMode>) -> Strin
     extended_name
 }
 
+/// The bare `Com_Memset(&shader, 0, …)` + `Com_Memset(&stages, 0, …)` pair,
+/// with no `contentFlags` seed — the reset the oracle open-codes at
+/// `RE_RegisterShaderFromImage` (`tr_shader.cpp:3619-3620`) and
+/// `CreateInternalShaders` (`tr_shader.cpp:4141-4142`). Only
+/// `ClearGlobalShader` adds `CONTENTS_SOLID|CONTENTS_OPAQUE` on top, so those
+/// two callers leave `content_flags` at 0.
+///
+/// `mGLFogColorOverride = GLFOGOVERRIDE_NONE` is the memset's own zero value
+/// (`FogColorOverride::None` is `Default`), so the per-stage init is just
+/// `MAX_SHADER_STAGES` default stages.
+fn reset_global_shader_bare() -> ShaderParseState {
+    let mut state = ShaderParseState::default();
+    for _ in 0..MAX_SHADER_STAGES {
+        state.stages.push(ShaderStageParse::default());
+    }
+    state
+}
+
 /// Raven `ClearGlobalShader` — constructs the per-parse scratch state fresh
 /// (idiomatic equivalent of zeroing the file-scope `shader`/`stages` globals
 /// at the start of every `ParseShader` call, §C9 out-param -> return value).
 ///
 /// Source: `oracle/codemp/renderer/tr_shader.cpp:234-246`
 pub fn ClearGlobalShader() -> ShaderParseState {
-    let mut state = ShaderParseState::default();
-    for _ in 0..MAX_SHADER_STAGES {
-        let mut stage = ShaderStageParse::default();
-        stage.gl_fog_color_override = FogColorOverride::None;
-        state.stages.push(stage);
-    }
+    let mut state = reset_global_shader_bare();
     state.content_flags = CONTENTS_SOLID | CONTENTS_OPAQUE;
     state
 }
@@ -3227,4 +3240,291 @@ pub fn FinishShader(
     // precedent as this file's `ss->vertSkew` no-op note above).
 
     GeneratePermanentShader(assets, common, state)
+}
+
+/// Raven `R_FindServerShader`.
+///
+/// `mipRawImage` is read nowhere in the oracle body — its presence is kept
+/// for call-site fidelity (porting-rules §A2: no speculative behavior
+/// removal), unused here (`RE_RegisterShaderFromImage` below has the same
+/// property).
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:3560-3596`
+pub fn R_FindServerShader(
+    assets: &mut RenderAssets,
+    common: &mut Common,
+    cvars: &RendererCvars,
+    name: &str,
+    lightmap_index: &[i32],
+    styles: &[u8],
+    _mip_raw_image: bool,
+) -> ShaderHandle {
+    if name.is_empty() {
+        return ShaderHandle::slot_zero(); // tr.defaultShader
+    }
+
+    let stripped_name = COM_StripExtension(name);
+
+    //
+    // see if the shader is already loaded
+    //
+    // NOTE: if there was no shader or image available with the name strippedName
+    // then a default shader is created with lightmapIndex == LIGHTMAP_NONE, so we
+    // have to check all default shaders otherwise for every call to R_FindShader
+    // with that same strippedName a new default shader is created.
+    if let Some(candidates) = assets.shader_lookup.get(&stripped_name) {
+        for &candidate in candidates {
+            if let Some(sh) = assets.shaders.get(candidate) {
+                if IsShader(sh, &stripped_name, lightmap_index, styles) {
+                    return candidate;
+                }
+            }
+        }
+    }
+
+    // clear the global shader
+    let mut state = ClearGlobalShader();
+    state.name = stripped_name;
+    state
+        .lightmap_index
+        .copy_from_slice(&lightmap_index[..MAXLIGHTMAPS]);
+    state.styles.copy_from_slice(&styles[..MAXLIGHTMAPS]);
+
+    state.default_shader = true;
+    FinishShader(assets, common, cvars, &mut state)
+}
+
+/// Raven `RE_RegisterShaderFromImage`.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:3598-3682`
+pub fn RE_RegisterShaderFromImage(
+    assets: &mut RenderAssets,
+    common: &mut Common,
+    cvars: &RendererCvars,
+    name: &str,
+    lightmap_index: &[i32],
+    styles: &[u8],
+    image: ImageHandle,
+    _mip_raw_image: bool,
+) -> ShaderHandle {
+    // `generateHashValue`/`hashTable` walk -> the same `shader_lookup` bucket
+    // walk `R_FindServerShader` above uses; the lookup key is always the
+    // *stripped* name (matching `GeneratePermanentShader`'s key derivation),
+    // even though — unlike `R_FindServerShader` — this fn stores the raw,
+    // unstripped `name` into `shader.name`/compares candidates against it
+    // (oracle: `IsShader(sh, name, ...)`, not `IsShader(sh, strippedName,
+    // ...)`). That asymmetry is safe: `IsShader` compares the full,
+    // unstripped name, so the stripped-key bucket is a superset of the
+    // raw-key bucket — every candidate the raw name would reach is walked,
+    // and the extra ones are rejected by the same full-name compare the
+    // oracle applies. Accept/reject is identical either way.
+    let lookup_key = COM_StripExtension(name);
+
+    //
+    // see if the shader is already loaded
+    //
+    // NOTE: if there was no shader or image available with the name strippedName
+    // then a default shader is created with lightmapIndex == LIGHTMAP_NONE, so we
+    // have to check all default shaders otherwise for every call to R_FindShader
+    // with that same strippedName a new default shader is created.
+    if let Some(candidates) = assets.shader_lookup.get(&lookup_key) {
+        for &candidate in candidates {
+            if let Some(sh) = assets.shaders.get(candidate) {
+                if IsShader(sh, name, lightmap_index, styles) {
+                    return candidate;
+                }
+            }
+        }
+    }
+
+    // clear the global shader
+    //
+    // The oracle open-codes the bare `Com_Memset(&shader…)`/`Com_Memset(
+    // &stages…)` pair here rather than calling `ClearGlobalShader`, so
+    // `content_flags` stays 0 — the `CONTENTS_SOLID|CONTENTS_OPAQUE` seed is
+    // `ClearGlobalShader`'s alone (`tr_shader.cpp:238-245`).
+    // Source: oracle/codemp/renderer/tr_shader.cpp:3619-3620
+    let mut state = reset_global_shader_bare();
+    state.name = name.to_string();
+    state
+        .lightmap_index
+        .copy_from_slice(&lightmap_index[..MAXLIGHTMAPS]);
+    state.styles.copy_from_slice(&styles[..MAXLIGHTMAPS]);
+
+    // PORT-NOTE: the oracle's `for (i = 0; i < MAX_SHADER_STAGES; i++)
+    // stages[i].bundle[0].texMods = texMods[i];` loop dissolves —
+    // `texMods[MAX_SHADER_STAGES]` was a scratch array aliased by pointer
+    // into `stages[i].bundle[0].texMods`; `TextureBundleParse::tex_mods` is
+    // already its own owned `Vec` per stage (`ShaderParseState`'s doc
+    // comment), so there is nothing left to copy from.
+
+    //
+    // create the default shading commands
+    //
+    if state.lightmap_index[0] == LIGHTMAP_NONE {
+        // dynamic colors at vertexes
+        state.stages[0].bundle[0].image = Some(image);
+        state.stages[0].active = true;
+        state.stages[0].rgb_gen = ColorGen::LightingDiffuse;
+        state.stages[0].state_bits = GLS_DEFAULT as u32;
+    } else if state.lightmap_index[0] == LIGHTMAP_BY_VERTEX {
+        // explicit colors at vertexes
+        state.stages[0].bundle[0].image = Some(image);
+        state.stages[0].active = true;
+        state.stages[0].rgb_gen = ColorGen::ExactVertex;
+        state.stages[0].alpha_gen = AlphaGen::Skip;
+        state.stages[0].state_bits = GLS_DEFAULT as u32;
+    } else if state.lightmap_index[0] == LIGHTMAP_2D {
+        // GUI elements
+        state.stages[0].bundle[0].image = Some(image);
+        state.stages[0].active = true;
+        state.stages[0].rgb_gen = ColorGen::Vertex;
+        state.stages[0].alpha_gen = AlphaGen::Vertex;
+        state.stages[0].state_bits =
+            // DEFERRED: `GLS_DEPTHTEST_DISABLE` — not present in this
+            // packet's FILE-SCOPE CONSTANTS section nor in this fn's own
+            // oracle slice; never-guess rule (porting-rules §A2, packet
+            // preamble rule 12). ORed in as 0 until a later wave ports it.
+            // Source: oracle/codemp/renderer/tr_local.h (GLS_DEPTHTEST_DISABLE)
+            (GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA) as u32;
+    } else if state.lightmap_index[0] == LIGHTMAP_WHITEIMAGE {
+        // fullbright level
+        // DEFERRED: `RenderAssets::white_image` — `tr.whiteImage` has no R3
+        // home yet (same gap `tr_backend.rs`'s `GL_Bind` flags for
+        // `default_image`/`dlight_image` — owned by a later `tr_image`
+        // wave); stage 0's image stays unset here.
+        // Source: oracle/codemp/renderer/tr_shader.cpp:3656
+        state.stages[0].active = true;
+        state.stages[0].rgb_gen = ColorGen::IdentityLighting;
+        state.stages[0].state_bits = GLS_DEFAULT as u32;
+
+        state.stages[1].bundle[0].image = Some(image);
+        state.stages[1].active = true;
+        state.stages[1].rgb_gen = ColorGen::Identity;
+        state.stages[1].state_bits |= (GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO) as u32;
+    } else {
+        // two pass lightmap
+        //
+        // `tr.lightmaps[shader.lightmapIndex[0]]` is unchecked oracle array
+        // indexing (UB on an out-of-range index); `.get(...).copied()` picks
+        // the one defined behavior — `None` — per porting-rules §19.
+        let lm_idx = state.lightmap_index[0] as usize;
+        state.stages[0].bundle[0].image = assets.lightmaps.get(lm_idx).copied();
+        state.stages[0].bundle[0].is_lightmap = true;
+        state.stages[0].active = true;
+        // lightmaps are scaled on creation for identitylight
+        state.stages[0].rgb_gen = ColorGen::Identity;
+        state.stages[0].state_bits = GLS_DEFAULT as u32;
+
+        state.stages[1].bundle[0].image = Some(image);
+        state.stages[1].active = true;
+        state.stages[1].rgb_gen = ColorGen::Identity;
+        state.stages[1].state_bits |= (GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO) as u32;
+    }
+
+    FinishShader(assets, common, cvars, &mut state)
+}
+
+/// Raven `CreateInternalShaders`.
+///
+/// PORT-NOTE: `arena.rs`'s `Arena::new_with_slot0` doc comment (A12) names
+/// this fn as the shaders registry's slot-0 constructor — `Handle{0,0}` must
+/// resolve to the `"<default>"` shader built below. This transcription calls
+/// `FinishShader` for all three markers exactly as the oracle does, relying
+/// on `assets.shaders` already being `Arena::new_with_slot0`-constructed by
+/// whichever fn calls `CreateInternalShaders` (no `RenderAssets` constructor
+/// has landed in this crate yet — out of this wave's file/scope). Flagged as
+/// an open wiring question for that wave, not resolved here.
+///
+/// The oracle reuses the SAME file-scope `shader`/`stages` globals across all
+/// three `FinishShader` calls below — only `.name`/`.sort`/`.defaultShader`
+/// are overwritten between blocks 2 and 3, the reset happens only once, at
+/// the top. This transcription reuses the same `state` binding for the same
+/// reason (matches oracle exactly, not a simplification).
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:4137-4251`
+pub fn CreateInternalShaders(
+    assets: &mut RenderAssets,
+    common: &mut Common,
+    cvars: &RendererCvars,
+) {
+    // tr.numShaders = 0; — the Arena-backed registry has no explicit counter
+    // to reset (R2-D3); `sorted_shaders` is cleared to match the oracle's
+    // "start the registry over" intent.
+    //
+    // PORT-NOTE: clearing only `sorted_shaders` is asymmetric against the
+    // oracle's single `tr.numShaders = 0`, which invalidates the whole
+    // registry (both the array and every `hashTable` bucket pointing into
+    // it). The matching `shader_lookup` reset is `R_InitShaders`' job — it is
+    // the fn that owns registry teardown/rebuild and calls this one — and
+    // lands with that fn in a later wave.
+    assets.sorted_shaders.clear();
+
+    // init the default shader
+    //
+    // Bare `Com_Memset(&shader…)`/`Com_Memset(&stages…)`, not
+    // `ClearGlobalShader` — `content_flags` stays 0 here (the
+    // `CONTENTS_SOLID|CONTENTS_OPAQUE` seed lives only in
+    // `ClearGlobalShader`, `tr_shader.cpp:238-245`).
+    // Source: oracle/codemp/renderer/tr_shader.cpp:4141-4142
+    let mut state = reset_global_shader_bare();
+    state.name = "<default>".to_string();
+
+    // memcpy(shader.lightmapIndex, lightmapsNone, sizeof(shader.lightmapIndex));
+    // memcpy(shader.styles, stylesDefault, sizeof(shader.styles));
+    // DEFERRED: `lightmapsNone`/`stylesDefault` — these file-scope static
+    // const tables are neither in this packet's FILE-SCOPE CONSTANTS section
+    // nor visible in this fn's own oracle slice; never-guess rule
+    // (porting-rules §A2, packet preamble rule 12). `state.lightmap_index`/
+    // `state.styles` stay at `ClearGlobalShader`'s zero-initialized default.
+    // Source: oracle/codemp/renderer/tr_shader.cpp:4146-4147
+
+    // PORT-NOTE: the texMods-copy loop dissolves — see
+    // `RE_RegisterShaderFromImage`'s identical note above.
+
+    // DEFERRED: `RenderAssets::default_image` — `tr.defaultImage` has no R3
+    // home yet (same gap `tr_backend.rs`'s `GL_Bind` flags for
+    // `default_image`/`dlight_image` — owned by a later `tr_image` wave);
+    // stage 0's image stays unset. This cascades into `FinishShader`'s own
+    // "missing texture" warning/deactivation path for all three shaders
+    // built below, since they share this stage-0 state (see fn doc).
+    // Source: oracle/codemp/renderer/tr_shader.cpp:4152
+    state.stages[0].active = true;
+    state.stages[0].state_bits = GLS_DEFAULT as u32;
+
+    let _default_shader = FinishShader(assets, common, cvars, &mut state);
+    // tr.defaultShader = ... — no separate field needed: `ShaderHandle::
+    // slot_zero()` already IS the live default shader by construction (A12),
+    // the convention every other fn in this file uses (`R_FindShaderByName`,
+    // `R_GetShaderByHandle`, `GeneratePermanentShader`'s overflow fallback).
+
+    // shadow shader is just a marker
+    state.name = "<stencil shadow>".to_string();
+    state.sort = shaderSort_t::SS_BANNER as i32 as f32;
+    let _shadow_shader = FinishShader(assets, common, cvars, &mut state);
+    // tr.shadowShader = ... — DEFERRED: no `RenderAssets`/`FrameState` field
+    // homes this handle yet (same "singleton shader pointer" gap as
+    // `defaultShader`'s tier-2-audit row); no in-packet consumer reads it.
+
+    // distortion shader is just a marker
+    state.name = "internal_distortion".to_string();
+    state.sort = shaderSort_t::SS_BLEND0 as i32 as f32;
+    state.default_shader = false;
+    let _distortion_shader = FinishShader(assets, common, cvars, &mut state);
+    state.default_shader = true;
+    // tr.distortionShader = ... — DEFERRED, same as shadowShader above.
+
+    // #ifndef _XBOX — GLOWXXX glow vertex/pixel program setup.
+    // DEFERRED: R4 — every touched surface (`qglGenProgramsARB`,
+    // `qglBindProgramARB`, `qglProgramStringARB`, `qglGetIntegerv`,
+    // `qglCombinerParameteriNV`, `qglGenLists`, `qglNewList`,
+    // `qglCombinerInputNV`, `qglCombinerOutputNV`, `qglFinalCombinerInputNV`,
+    // `qglEndList`) is `qgl*`/`qwgl*` GL/WGL surface — no R3 home, dissolves
+    // into the R4 wgpu rewrite (DEC-01/DEC-37 A13.2, packet STATE HOMES row).
+    // `g_strGlowVShaderARB`/`g_strGlowPShaderARB` (the ASCII program source
+    // byte strings) and `tr.glowVShader`/`tr.glowPShader` (the resulting
+    // program-handle fields) are also genuinely absent from this packet (not
+    // in FILE-SCOPE CONSTANTS, not in this fn's own oracle slice) —
+    // never-guess rule.
+    // Source: oracle/codemp/renderer/tr_shader.cpp:4170-4250
 }

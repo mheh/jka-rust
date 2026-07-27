@@ -6,8 +6,14 @@
 // transcription, matching the rest of the renderer/engine crates.
 #![allow(non_snake_case)]
 
+use native_math::qmath::{
+    _DotProduct, _VectorScale, _VectorSubtract, CrossProduct, PerpendicularVectorMP,
+    RotatePointAroundVector, VectorNormalize2,
+};
+
 use mp_engine_qcommon::common::{com_error, com_printf, Common};
 use mp_qshared::common::mp::cgame::mini_ref_entity_s::miniRefEntity_t;
+use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::shared::error_parm::errorParm_t;
@@ -15,12 +21,14 @@ use mp_qshared::shared::qhandle_t;
 
 use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_event::FrameEvent;
+use crate::render_state::frame_state::FrameState;
 use crate::render_state::placeholders::{PolyVert, RefEntity, Vec3};
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
-use crate::tr_local::decal_poly_s::decalPoly_t;
+use crate::tr_local::decal_poly_s::{decalPoly_t, MAX_VERTS_ON_DECAL_POLY};
 use crate::tr_main::{DrawSurf, R_AddDrawSurf, SurfaceGeometry};
+use crate::tr_marks::{MarkNode, R_MarkFragments};
 use crate::tr_shader::R_GetShaderByHandle;
 
 // This wave threads `RenderAssets`, `FrameData`/`FrameEvent` and `Common`
@@ -876,5 +884,207 @@ pub fn R_AddDecals(
                 break;
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------------
+// wave 3
+// ---------------------------------------------------------------------
+
+/// Raven `MAX_DECAL_FRAGMENTS` — the `R_MarkFragments` fragment-buffer bound
+/// `RE_AddDecalToScene` passes through.
+///
+/// Source: `oracle/codemp/renderer/tr_scene.cpp:514`
+const MAX_DECAL_FRAGMENTS: usize = 128;
+
+/// Raven `MAX_DECAL_POINTS` — the `R_MarkFragments` point-buffer bound
+/// `RE_AddDecalToScene` passes through.
+///
+/// Source: `oracle/codemp/renderer/tr_scene.cpp:515`
+const MAX_DECAL_POINTS: usize = 384;
+
+/// Raven `RE_AddDecalToScene`.
+///
+/// `frame`/`assets`/`scene`/`cvars`/`common` mirror this file's established
+/// wave-2 `R_AddDecals`/`RE_AllocDecal` threading; `refdef_time` stands in for
+/// `tr.refdef.time` for the same STATE HOMES reason those two fns already
+/// carry it as an explicit param (`TrRefdef` has no `time` field yet, this
+/// wave is scoped to `tr_scene.rs` only). `world_root`/`frame_state` are new
+/// to this wave: they are the two extra params `tr_marks`' landed (idiomatic,
+/// not the oracle's raw C shape) `R_MarkFragments` signature requires
+/// (`MarkNode` BSP-walk root and `FrameState::view_count`) — this fn is
+/// `R_MarkFragments`'s only caller so far, so they thread straight through
+/// rather than being invented state on this file's own carrier.
+///
+/// `alphaFade` (`_alpha_fade` — unread past the parameter list, same as the
+/// oracle body: no `decalPoly_t` field it could write to, and no branch reads
+/// it) mirrors the oracle signature for fidelity but is otherwise dead, as it
+/// is in the oracle itself.
+///
+/// `PerpendicularVector` -> `PerpendicularVectorMP`: the resolved-call-surface
+/// table flagged this name unconfirmed, but `tr_surface.rs`'s own
+/// `PerpendicularVector` transcription (and `q_math.rs`'s
+/// `PerpendicularVectorMP as PerpendicularVector` re-export) already establish
+/// it as this codebase's MP idiom, so no escalation is needed.
+///
+/// `assert(decalShader)` -> `debug_assert!(decal_shader != 0)`.
+///
+/// Source: `oracle/codemp/renderer/tr_scene.cpp:517-613`
+#[allow(clippy::too_many_arguments)]
+pub fn RE_AddDecalToScene(
+    frame: &mut FrameData,
+    assets: &RenderAssets,
+    scene: &mut SceneState,
+    cvars: &RendererCvars,
+    common: &mut Common,
+    world_root: &mut MarkNode,
+    frame_state: &mut FrameState,
+    refdef_time: i32,
+    decal_shader: qhandle_t,
+    origin: Vec3,
+    dir: Vec3,
+    orientation: f32,
+    red: f32,
+    green: f32,
+    blue: f32,
+    alpha: f32,
+    _alpha_fade: bool,
+    radius: f32,
+    temporary: bool,
+) {
+    debug_assert!(decal_shader != 0);
+
+    let r_markcount = common.cvar(cvars.r_markcount).integer;
+    if r_markcount <= 0 && !temporary {
+        return;
+    }
+
+    if radius <= 0.0 {
+        com_error(
+            errorParm_t::ERR_FATAL,
+            "RE_AddDecalToScene:  called with <= 0 radius".to_string(),
+        );
+    }
+
+    // create the texture axis
+    let mut axis: [Vec3; 3] = [[0.0; 3]; 3];
+    VectorNormalize2(dir, &mut axis[0]);
+    let axis0 = axis[0];
+    PerpendicularVectorMP(&mut axis[1], axis0);
+    let axis1 = axis[1];
+    RotatePointAroundVector(&mut axis[2], axis0, axis1, orientation);
+    let axis2 = axis[2];
+    CrossProduct(axis0, axis2, &mut axis[1]);
+    let axis1 = axis[1];
+
+    // C's `0.5 * 1.0 / radius` promotes to double (bare literals); f64
+    // intermediate, rounded once at the assignment (ruling 12).
+    let tex_coord_scale = (0.5f64 * 1.0f64 / radius as f64) as f32;
+
+    // create the full polygon
+    let mut original_points: [Vec3; 4] = [[0.0; 3]; 4];
+    for i in 0..3usize {
+        original_points[0][i] = origin[i] - radius * axis1[i] - radius * axis2[i];
+        original_points[1][i] = origin[i] + radius * axis1[i] - radius * axis2[i];
+        original_points[2][i] = origin[i] + radius * axis1[i] + radius * axis2[i];
+        original_points[3][i] = origin[i] - radius * axis1[i] + radius * axis2[i];
+    }
+
+    // get the fragments
+    let mut projection: Vec3 = [0.0; 3];
+    _VectorScale(dir, -20.0, &mut projection);
+    let mut mark_points: Vec<Vec3> = Vec::new();
+    let mut mark_fragments = Vec::new();
+    let num_fragments = R_MarkFragments(
+        &original_points,
+        projection,
+        MAX_DECAL_POINTS,
+        &mut mark_points,
+        MAX_DECAL_FRAGMENTS,
+        &mut mark_fragments,
+        world_root,
+        frame_state,
+    );
+
+    // §19: C's out-of-range float->byte conversion is UB; Rust's `as u8`
+    // saturates, which is the one defined behavior picked here.
+    let colors: [u8; 4] = [
+        (red * 255.0) as u8,
+        (green * 255.0) as u8,
+        (blue * 255.0) as u8,
+        (alpha * 255.0) as u8,
+    ];
+
+    let zero_vert = polyVert_t {
+        xyz: [0.0; 3],
+        st: [0.0; 2],
+        modulate: [0; 4],
+    };
+
+    for i in 0..num_fragments as usize {
+        let mf = mark_fragments[i];
+
+        // we have an upper limit on the complexity of polygons that we store
+        // persistantly
+        let num_points = if mf.numPoints > MAX_VERTS_ON_DECAL_POLY as i32 {
+            MAX_VERTS_ON_DECAL_POLY as i32
+        } else {
+            mf.numPoints
+        };
+        // Raven clamps `mf->numPoints` in place; `mf` is a `Copy` snapshot
+        // here, so the clamp is written back to the owning element too.
+        // Source: oracle/codemp/renderer/tr_scene.cpp:578-581
+        mark_fragments[i].numPoints = num_points;
+
+        let mut verts: [PolyVert; MAX_VERTS_ON_DECAL_POLY] = [zero_vert; MAX_VERTS_ON_DECAL_POLY];
+        for j in 0..num_points as usize {
+            let point = mark_points[mf.firstPoint as usize + j];
+            verts[j].xyz = point;
+
+            let mut delta: Vec3 = [0.0; 3];
+            _VectorSubtract(point, origin, &mut delta);
+            // Both `st[]` writes are `0.5 + float_expr` — the bare `0.5`
+            // double literal promotes the whole RHS to double before the
+            // implicit truncation back to `float` (ruling 12).
+            verts[j].st[0] = (0.5f64 + (_DotProduct(delta, axis1) * tex_coord_scale) as f64) as f32;
+            verts[j].st[1] = (0.5f64 + (_DotProduct(delta, axis2) * tex_coord_scale) as f64) as f32;
+
+            // `*(int *)v->modulate = *(int *)colors;` reinterpret-casts to
+            // copy all 4 bytes in one shot; a plain array assignment copies
+            // the same 4 bytes without the raw-pointer cast the
+            // interior-safety law forbids.
+            verts[j].modulate = colors;
+        }
+
+        // if it is a temporary (shadow) mark, add it immediately and forget
+        // about it
+        if temporary {
+            RE_AddPolyToScene(
+                frame,
+                assets,
+                common,
+                decal_shader,
+                &verts[..num_points as usize],
+                num_points as usize,
+                1,
+            );
+            continue;
+        }
+
+        // otherwise save it persistantly
+        let (decal_type, decal_index) =
+            RE_AllocDecal(scene, cvars, &*common, refdef_time, DECALPOLY_TYPE_NORMAL);
+        let decal = &mut scene.decal_polys[decal_type][decal_index];
+        decal.time = refdef_time;
+        decal.shader = decal_shader;
+        decal.poly.numVerts = num_points;
+        decal.color[0] = red;
+        decal.color[1] = green;
+        decal.color[2] = blue;
+        decal.color[3] = alpha;
+        // `memcpy( decal->verts, verts, mf->numPoints * sizeof( verts[0] ) );`
+        // — both sides are `polyVert_t` (`Copy`), so a slice copy reproduces
+        // the byte-count-bounded memcpy without a raw pointer.
+        decal.verts[..num_points as usize].copy_from_slice(&verts[..num_points as usize]);
     }
 }

@@ -1478,3 +1478,44 @@ pub fn r_g_cull_model(
         _ => CULL_IN,
     }
 }
+
+// ---------------------------------------------------------------------------
+// R3 wave 3 (`tr_ghoul2.wave3.md`).
+//
+// RECONCILED, NOT RE-PORTED (marker law: "never re-port an already-ported
+// fn" — preamble). All three of this wave's assigned fns are already
+// canonically ported in `mp_engine_ghoul2` (the same DEC-32 one-home surface
+// this file's wave-1/wave-2 header comments already established for
+// `CBoneCache` and friends) and are consumed from there rather than
+// re-declared here:
+//
+// - `EvalLow` -> `mp_engine_ghoul2::render::bone_cache::CBoneCache::
+//   eval_low` — a *private* method (the memoized-recursion core
+//   `CBoneCache::Eval`/`EvalUnsmooth`/`EvalRender` call internally, same
+//   already-ported-elsewhere status this file's wave-1 header documents for
+//   `SmoothLow`); nothing in this file needs to call it directly.
+// - `RootMatrix` -> `mp_engine_ghoul2::render::skeleton::root_matrix` — also
+//   private there (module-doc gap note: not named in the doc's own
+//   method-transcription roster, ported anyway), mutually recursive with
+//   `g2_construct_ghoul_skeleton` matching this wave's own SCC 330 grouping.
+// - `G2_ConstructGhoulSkeleton` ->
+//   `mp_engine_ghoul2::render::skeleton::g2_construct_ghoul_skeleton`
+//   (`pub fn`).
+//
+// `identityMatrix` — this wave's STATE HOMES row for both `RootMatrix` and
+// `G2_ConstructGhoulSkeleton` (DEC-37 A13.3: "genuinely-const tables ->
+// const") — is already named in this very file as [`IDENTITY_MATRIX`] (wave
+// 2, above); no new state carrier is needed even had these bodies been
+// re-transcribed here. The `G2_PERFORMANCE_ANALYSIS`-only touches this
+// wave's STATE HOMES table flags (`G2PerformanceTimer_
+// G2_ConstructGhoulSkeleton` read, `G2Time_G2_ConstructGhoulSkeleton` write)
+// are dead surface under this build (DEC-37 A13.5, matching this file's own
+// module doc comment, which already states the same drop applies to every
+// ported function in this file).
+//
+// None of this wave's three fns are called by anything else already ported
+// in this file (checked against the packet's own SCC 330/in-module-callee
+// digests and a grep of this file for `RootMatrix`/`root_matrix`/
+// `ConstructGhoulSkeleton`/`EvalLow`), so no re-export was needed to keep
+// this wave's live call graph closed.
+// ---------------------------------------------------------------------------

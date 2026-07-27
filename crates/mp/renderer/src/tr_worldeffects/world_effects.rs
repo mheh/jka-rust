@@ -7,10 +7,12 @@
 use core::ffi::c_int;
 
 use mp_engine_qcommon::cm_test::CM_PointContents;
+use mp_engine_qcommon::cmd_common::Cmd_ArgsBuffer;
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::{com_error, com_printf};
 use mp_engine_qcommon::common_fns::Com_Milliseconds;
+use mp_engine_qcommon::cvar_fns::Cvar_VariableIntegerValue;
 use mp_qshared::shared::com_parse::{COM_ParseExt, QSharedScratch};
 use mp_qshared::shared::vec3_t;
 use mp_qshared::shared::{
@@ -1904,4 +1906,24 @@ pub fn R_IsPuffing() -> bool {
 /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1505-1508`
 pub fn R_ShutdownWorldEffects(state: &mut WorldEffectsState, host: &mut EngineHostView) {
     state.R_InitWorldEffects(host);
+}
+
+/// Raven `R_WorldEffect_f` — the `worldeffect` console-command handler.
+///
+/// `state`/`qs`/`host` are threaded in rather than reached (porting-rules
+/// §B4), matching `WorldEffectsState::R_WorldEffectCommand`'s own signature
+/// (`host.common` supplies `Cvar_VariableIntegerValue`'s `Common`).
+///
+/// Raven's `char temp[2048]` scratch is [`Cmd_ArgsBuffer`]'s owned return; its
+/// `sizeof(temp)` becomes the `buffer_length` cap.
+/// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1583-1591`
+pub fn R_WorldEffect_f(
+    state: &mut WorldEffectsState,
+    qs: &mut QSharedScratch,
+    host: &mut EngineHostView,
+) {
+    if Cvar_VariableIntegerValue(host.common, "sv_cheats") != 0 {
+        let temp = Cmd_ArgsBuffer(host.common, 2048);
+        state.R_WorldEffectCommand(qs, host, Some(temp.as_bytes()));
+    }
 }

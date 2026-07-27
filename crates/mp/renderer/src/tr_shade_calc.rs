@@ -1245,3 +1245,219 @@ pub fn RB_CalcDiffuseEntityColor(colors: &mut [[u8; 4]], normal: &[[f32; 4]], en
         c[3] = ent.shader_rgba[3];
     }
 }
+
+/// Raven `static float EvalWaveFormClamped( const waveForm_t *wf )`.
+///
+/// `EvalWaveForm`'s own dissolved params (`noise`/`refdef_time`/
+/// `refdef_float_time`/`shader_time`/`assets`/`shader_name`) thread straight
+/// through, same collapse this file already applies at every `EvalWaveForm`
+/// call site.
+///
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:58-73`
+fn EvalWaveFormClamped(
+    wf: &waveForm_t,
+    noise: &NoiseState,
+    refdef_time: i32,
+    refdef_float_time: f32,
+    shader_time: f32,
+    assets: &RenderAssets,
+    shader_name: &str,
+) -> f32 {
+    let glow = EvalWaveForm(
+        wf,
+        noise,
+        refdef_time,
+        refdef_float_time,
+        shader_time,
+        assets,
+        shader_name,
+    );
+
+    if glow < 0.0 {
+        return 0.0;
+    }
+
+    if glow > 1.0 {
+        return 1.0;
+    }
+
+    glow
+}
+
+/// Raven `void RB_CalcStretchTexCoords( const waveForm_t *wf, float *st )`.
+///
+/// Same uninitialized-`tmi.type`/`tmi.wave` handling as
+/// `RB_CalcRotateTexCoords` (the oracle never sets either field and
+/// `RB_CalcTransformTexCoords` never reads them; zeroed here rather than left
+/// as observable UB). `EvalWaveForm`'s dissolved params thread straight
+/// through, same as `EvalWaveFormClamped` above.
+///
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:78-94`
+pub fn RB_CalcStretchTexCoords(
+    wf: &waveForm_t,
+    st: &mut [[f32; 2]],
+    noise: &NoiseState,
+    refdef_time: i32,
+    refdef_float_time: f32,
+    shader_time: f32,
+    assets: &RenderAssets,
+    shader_name: &str,
+) {
+    let p = 1.0f32
+        / EvalWaveForm(
+            wf,
+            noise,
+            refdef_time,
+            refdef_float_time,
+            shader_time,
+            assets,
+            shader_name,
+        );
+
+    let tmi = texModInfo_t {
+        r#type: texMod_t::TMOD_NONE,
+        wave: waveForm_t {
+            func: genFunc_t::GF_NONE,
+            base: 0.0,
+            amplitude: 0.0,
+            phase: 0.0,
+            frequency: 0.0,
+        },
+        matrix: [[p, 0.0], [0.0, p]],
+        translate: [0.5f32 - 0.5f32 * p, 0.5f32 - 0.5f32 * p],
+    };
+
+    RB_CalcTransformTexCoords(&tmi, st);
+}
+
+/// Raven `void RB_CalcDeformVertexes( deformStage_t *ds )`.
+///
+/// `tess.xyz`/`tess.normal`/`tess.numVertexes` are `tess`-dissolved
+/// (R2 `## State ownership` row `tess`) — threaded as slices (`xyz` mutated
+/// in place, `normal` read-only, same split `RB_CalcDeformNormals` uses);
+/// `tess.shaderTime` collapses to a plain `f32`; `EvalWaveForm`'s/
+/// `TableForFunc`'s dissolved params (`noise`/`refdef_time`/
+/// `refdef_float_time`/`assets`/`shader_name`) thread straight through, same
+/// as `RB_CalcMoveVertexes`.
+///
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:110-152`
+pub fn RB_CalcDeformVertexes(
+    ds: &deformStage_t,
+    xyz: &mut [[f32; 4]],
+    normal: &[[f32; 4]],
+    noise: &NoiseState,
+    refdef_time: i32,
+    refdef_float_time: f32,
+    shader_time: f32,
+    assets: &RenderAssets,
+    shader_name: &str,
+) {
+    if ds.deformationWave.frequency == 0.0 {
+        let scale = EvalWaveForm(
+            &ds.deformationWave,
+            noise,
+            refdef_time,
+            refdef_float_time,
+            shader_time,
+            assets,
+            shader_name,
+        );
+
+        for (v, n) in xyz.iter_mut().zip(normal.iter()) {
+            let mut offset = [0.0f32; 3];
+            _VectorScale([n[0], n[1], n[2]], scale, &mut offset);
+
+            v[0] += offset[0];
+            v[1] += offset[1];
+            v[2] += offset[2];
+        }
+    } else {
+        let table = TableForFunc(ds.deformationWave.func, assets, shader_name);
+
+        for (v, n) in xyz.iter_mut().zip(normal.iter()) {
+            let off = (v[0] + v[1] + v[2]) * ds.deformationSpread;
+
+            let scale = WAVEVALUE(
+                table,
+                ds.deformationWave.base,
+                ds.deformationWave.amplitude,
+                ds.deformationWave.phase + off,
+                ds.deformationWave.frequency,
+                shader_time,
+            );
+
+            let mut offset = [0.0f32; 3];
+            _VectorScale([n[0], n[1], n[2]], scale, &mut offset);
+
+            v[0] += offset[0];
+            v[1] += offset[1];
+            v[2] += offset[2];
+        }
+    }
+}
+
+/// Raven `void RB_CalcWaveColor( const waveForm_t *wf, unsigned char *dstColors )`.
+///
+/// `tess.shaderTime` collapses to a plain `f32`; `tess.numVertexes` is
+/// `dst_colors.len()`. `tr.identityLight` is R2 `## State ownership`
+/// row-`tr`-SPLIT frontend scratch, homed on `FrameState::identity_light`
+/// (`crate::render_state::frame_state`, landed by the `tr_light` R3 wave) —
+/// collapsed to a plain `f32` parameter, matching this file's established
+/// scalar-collapse pattern for every other dissolved single-field read
+/// (`refdef_time` etc.) rather than threading the whole struct.
+/// `int *colors = (int *)dstColors` / `*(int *)color` (pack-then-broadcast
+/// through a raw `int` reinterpretation) collapses to a single owned
+/// `[u8; 4]` broadcast directly — the interior-safety law forbids the
+/// pointer casts, and skipping the round-trip through `int` reproduces the
+/// same bytes (no endianness dependency: both casts target the same byte
+/// order), same reasoning as `RB_CalcDiffuseEntityColor` above.
+///
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:817-847`
+pub fn RB_CalcWaveColor(
+    wf: &waveForm_t,
+    dst_colors: &mut [[u8; 4]],
+    noise: &NoiseState,
+    refdef_time: i32,
+    refdef_float_time: f32,
+    shader_time: f32,
+    identity_light: f32,
+    assets: &RenderAssets,
+    shader_name: &str,
+) {
+    let mut glow = match wf.func {
+        genFunc_t::GF_NOISE => {
+            wf.base
+                + R_NoiseGet4f(
+                    noise,
+                    0.0,
+                    0.0,
+                    0.0,
+                    (shader_time + wf.phase) * wf.frequency,
+                ) * wf.amplitude
+        }
+        _ => {
+            EvalWaveForm(
+                wf,
+                noise,
+                refdef_time,
+                refdef_float_time,
+                shader_time,
+                assets,
+                shader_name,
+            ) * identity_light
+        }
+    };
+
+    if glow < 0.0 {
+        glow = 0.0;
+    } else if glow > 1.0 {
+        glow = 1.0;
+    }
+
+    let v = myftol(255.0 * glow) as u8;
+    let color: [u8; 4] = [v, v, v, 255];
+
+    for c in dst_colors.iter_mut() {
+        *c = color;
+    }
+}

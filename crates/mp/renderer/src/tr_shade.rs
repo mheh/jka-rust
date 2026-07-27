@@ -177,12 +177,9 @@ pub fn ForceAlpha(_dst_colors: &mut [u8], _force_ent_alpha: i32) {
 /// on whether `qglLockArraysEXT` is bound when the cvar is unset).
 ///
 /// DEFERRED: R4 — every branch is gated by state with no R3 carrier yet:
-/// `r_primitives->integer` needs a live cvar-value read (`RendererCvars`
-/// holds only `Option<CvarHandle>` — the renderer's cvar-value-read seam
-/// isn't wired yet, same DEFERRED reason as `RB_DrawBuffer`'s `r_clear`
-/// dependency, DEC-37 A13.1); `qglLockArraysEXT`'s bound-or-not fallback has
-/// no R3 home (this packet's `STATE HOMES` row for it: DEFERRED R4, DEC-37
-/// A13.2); and every terminal action is a GL call
+/// `qglLockArraysEXT`'s bound-or-not fallback has no R3 home (this packet's
+/// `STATE HOMES` row for it: DEFERRED R4, DEC-37 A13.2); and every terminal
+/// action is a GL call
 /// (`qglDrawElements`/`qglArrayElement`, `R_ArrayElementDiscrete`) or the
 /// `qglArrayElement` engine-seam receiver this wave doesn't resolve (this
 /// packet's `STATE HOMES` rows for `qglArrayElement`/`qglDrawElements`: "NOT
@@ -409,4 +406,45 @@ pub fn ProjectDlightTexture(_gpu: &mut GpuResources) {
 pub fn RB_FogPass(_gpu: &mut GpuResources) {
     // DEFERRED: R4 — RB_FogPass (see doc comment above)
     // Source: oracle/codemp/renderer/tr_shade.cpp:1182-1209
+}
+
+/// Raven `RB_EndSurface` — closes out the current tessellated surface batch:
+/// validates the tess-buffer overflow guards, special-cases the shadow
+/// shader, applies the sort-order/skybox-portal debug cutoffs, accumulates
+/// performance counters, dispatches to the shader's stage-iterator function,
+/// then draws the `r_showtris`/`r_shownormals` debug overlays and resets
+/// `tess.numIndexes`.
+///
+/// DEFERRED: R4 — every input is unavailable at this R3 wave: `input->
+/// numIndexes`/`.indexes`/`.xyz`/`.shader`/`.currentStageIteratorFunc`/
+/// `.numVertexes`/`.fogNum`/`.numPasses` are the dissolved `tess`
+/// (`shaderCommands_t`, R2 `## State ownership` row `tess`; no R3 carrier
+/// ever) — including the very first guard (`input->numIndexes == 0`), so no
+/// downstream line is even reachable without it; `tr.shadowShader` has no
+/// `RenderAssets` field landed by any prior wave (only the tier-2
+/// `tr_globals_t::shadowShader` raw pointer exists, scaffolding this wave may
+/// not extend); `skyboxportal`/`drawskyboxportal`
+/// are per-subsystem owned state this packet's `STATE HOMES` marks "NAMED BY
+/// THIS WAVE if this file's wave is where the subsystem lands" — this wave's
+/// one fn only reads them, never a write site that would justify naming the
+/// carrier, so they stay unmapped rather than invented (DEC-37 A13.3);
+/// `backEnd.refdef.rdflags` needs a `TrRefdef` field not landed (only
+/// `fov_x`/`fov_y`/`view_origin`/`view_axis` are real —
+/// `render_state::placeholders`); `backEnd.pc.c_shaders`/`c_vertexes`/
+/// `c_indexes`/`c_totalIndexes` need `BackEndCounters` fields not landed
+/// (still the empty tier-3 placeholder, fields land with the R4 backend
+/// wave); `com_developer`/`com_sv_running` are this packet's `STATE HOMES`
+/// "NOT renderer state ... confirm the exact receiver at port time" rows,
+/// unconfirmed; `RB_StageIteratorSky`'s fn-pointer comparison
+/// (`tess.currentStageIteratorFunc == RB_StageIteratorSky`) has no receiver
+/// for the same `tess` reason. `GLimp_LogComment`'s already-ported signature
+/// takes a raw `*mut c_char` (tier-1-adjacent engine surface, not this file's
+/// to reshape) — calling it would need an unsafe pointer construction the
+/// interior-safety law forbids, moot regardless since that call is only
+/// reached past every guard above. No computation survives once every input
+/// above is removed.
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:2391-2474`
+pub fn RB_EndSurface(_gpu: &mut GpuResources) {
+    todo!("Port RB_EndSurface — oracle/codemp/renderer/tr_shade.cpp:2391-2474")
 }

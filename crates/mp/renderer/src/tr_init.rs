@@ -1030,6 +1030,62 @@ pub fn R_ScreenShotTGA_f(view: &mut EngineHostView, assets: &RenderAssets) {
     }
 }
 
+/// Raven `R_ScreenShot_f`.
+///
+/// Mirrors the `R_ScreenShotTGA_f` precedent above (same fn-scope-static and
+/// `R_LevelShot`-deferred-whole gaps, same `todo!()`-at-the-site treatment
+/// rather than deferring the whole function): the "levelshot" branch calls
+/// `R_LevelShot`, DEFERRED WHOLE above (no callable Rust fn exists — blocked
+/// on `tr.world->baseName`'s missing state home plus the R4 `qglReadPixels`
+/// gap). The free-filename-scan `else` branch needs the fn-scope static
+/// `lastNumber` (`static int lastNumber = -1`), classified genuine
+/// cross-frame state (kind 3, three-kind rule) with NO R2 carrier assigned
+/// (preamble: "a kind-3 static is an escalation… never an invented field").
+/// Both blocking points are transcribed as `todo!()` at the exact site that
+/// needs them; the explicit-filename path (`Cmd_Argc() == 2 && !silent`) has
+/// neither gap and runs for real.
+///
+/// `Com_sprintf`/`va` -> `format!` per the translation dictionary (the
+/// `R_ScreenshotFilename`/`R_ScreenShotTGA_f` precedent).
+///
+/// Source: `oracle/codemp/renderer/tr_init.cpp:762-815`
+pub fn R_ScreenShot_f(view: &mut EngineHostView, assets: &RenderAssets) {
+    if Cmd_Argv(view.common, 1) == "levelshot" {
+        todo!(
+            "Port R_LevelShot call — R_LevelShot is DEFERRED WHOLE above (tr_init.rs); oracle/codemp/renderer/tr_init.cpp:768-770"
+        )
+    }
+
+    let silent = Cmd_Argv(view.common, 1) == "silent";
+
+    let checkname = if Cmd_Argc(view.common) == 2 && !silent {
+        // explicit filename
+        format!("screenshots/{}.jpg", Cmd_Argv(view.common, 1))
+    } else {
+        // scan for a free filename
+        //
+        // if we have saved a previous screenshot, don't scan again, because
+        // recording demo avis can involve thousands of shots
+        todo!(
+            "Port R_ScreenShot_f's free-filename scan — needs fn-scope static `lastNumber` (kind-3, no R2 carrier assigned); oracle/codemp/renderer/tr_init.cpp:787-805"
+        )
+    };
+
+    R_TakeScreenshotJPEG(
+        view.common,
+        assets,
+        0,
+        0,
+        assets.glconfig.vid_width,
+        assets.glconfig.vid_height,
+        &checkname,
+    );
+
+    if !silent {
+        com_printf(view.common, &format!("Wrote {}\n", checkname));
+    }
+}
+
 /// Raven `GL_SetDefaultState`.
 ///
 /// Every `qgl*` call in this fn (`qglClearDepth`/`qglCullFace`/

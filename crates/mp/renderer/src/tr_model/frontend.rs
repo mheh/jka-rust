@@ -71,6 +71,18 @@ use crate::tr_local::model_s::model_t;
 // - `R_SVModelInit` -> `RenderModels::model_init` (`render_models.rs`),
 //   folded with `R_ModelInit` per §C10 (bare wrapper, always-compiled
 //   dedicated-live entry).
+//
+// PORT-NOTE: R3 wave-3 packet `tr_model.wave3.md` lists 2 fns; BOTH are
+// already reconciled in this subsystem (`_PREAMBLE.md` "Never re-port an
+// already-ported fn" — same wave-planning gap as wave-0/wave-1/wave-2
+// above). Nothing new to transcribe:
+// - `RE_RegisterMedia_LevelLoadBegin` ->
+//   `RenderModels::media_level_load_begin` (`cached_model_binary.rs`).
+// - `RE_RegisterMedia_LevelLoadEnd` -> deliberately NOT ported: its sole
+//   caller is the client `cl_cgame.cpp:1942`, zero dedicated callers
+//   (`TRM-D5`/ruling 59b, already documented in `cached_model_binary.rs`'s
+//   module doc "§20-dropped, no stub"); the live dedicated eviction path is
+//   `RenderModels::models_level_load_end`.
 
 /// The crate's single [`MdxmView`] handout over a `model_t`'s `.glm` block.
 ///

@@ -23,6 +23,7 @@
 // `view`/`ori`/`refdef` fields land with real shapes, call sites here take
 // `&frame.view`/`&frame.ori` slices instead of the tier-2 types directly.
 
+use crate::render_state::frame_state::FrameState;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::tr_local::fog_t::fog_t;
@@ -1419,4 +1420,43 @@ pub fn IsMirror(
         return false;
     }
     false
+}
+
+// ===== wave 3 =====
+
+/// Raven `SurfIsOffscreen` — tessellates `drawSurf` and answers whether its
+/// screen-space footprint can be culled before a portal/mirror scene is
+/// rendered through it (trivial-reject on clip-plane flags, then a
+/// backface/nearest-vertex distance test against the surface's
+/// `portalRange`, deferring to `IsMirror` for the mirror early-out).
+///
+/// DEFERRED: R4 — every step past `R_DecomposeSort`/`RB_BeginSurface` reads
+/// or writes `tess` (`tess.numVertexes`, `tess.xyz`, `tess.indexes`,
+/// `tess.normal`, `tess.shader->portalRange`), which R2's `## State
+/// ownership` row dissolves into R4's tessellation/vertex-building pipeline
+/// ("no single global scratch buffer survives the new topology" — R4
+/// concern, not an R3 field; same reasoning `tr_shade.rs::RB_BeginSurface`,
+/// `tr_shadows.rs::R_RenderShadowEdges`/`RB_ProjectionShadowDeform` already
+/// carry). The surface-kind dispatch this fn drives to populate `tess`
+/// (`rb_surfaceTable[*drawSurf->surface](drawSurf->surface)`, this file's
+/// packet STATE HOMES row) is itself the R4 tessellation step, not a
+/// separable CPU computation — there is no partial body to transcribe.
+/// `clipDest` is an unused out-param in the oracle itself (never referenced
+/// in the 871-961 body) — dropped from the port entirely, not merely
+/// deferred. `R_RotateForViewer`/`R_DecomposeSort`/`RB_BeginSurface`/
+/// `IsMirror` (in-module, lower-wave) and `VectorLengthSquared` (inline
+/// header helper) are threaded through the signature per the R_CullModel
+/// precedent (`tr_mesh.rs`) so a later R4 wave's fix is a body-only fill, not
+/// a signature change.
+///
+/// Source: `oracle/codemp/renderer/tr_main.cpp:871-961`
+pub fn SurfIsOffscreen<S>(
+    _draw_surf: &DrawSurf<S>,
+    _sorted_shaders: &[ShaderHandle],
+    _entities: &[trRefEntity_t],
+    _view: &mut viewParms_t,
+    _scratch: &mut TrMainScratch,
+    _frame: &mut FrameState,
+) -> bool {
+    todo!("Port SurfIsOffscreen — oracle/codemp/renderer/tr_main.cpp:871-961 (R4: tess tessellation pipeline, R2 `## State ownership` row `tess`)")
 }

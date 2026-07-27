@@ -14,13 +14,19 @@ use std::collections::HashMap;
 use mp_engine_qcommon::common::common::com_printf;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::error::com_error;
+use mp_engine_qcommon::common::Common;
 use mp_engine_qcommon::cvar_fns::Cvar_Set;
 use mp_engine_qcommon::files_common::{FS_FCloseFile, FS_FOpenFileRead, FS_ReadFileVec};
 use mp_engine_qcommon::qfiles::dfontdat_s::{dfontdat_t, GLYPH_COUNT};
+use mp_engine_qcommon::qfiles::font_style::{SET_MASK, STYLE_BLINK, STYLE_DROPSHADOW};
 use mp_engine_qcommon::qfiles::glyph_info_t::glyphInfo_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::q_string::COM_StripExtension;
-use mp_qshared::shared::{fileHandle_t, MAX_QPATH};
+use mp_qshared::shared::{fileHandle_t, g_color_table, MAX_QPATH};
+
+use crate::render_state::frame_data::FrameData;
+use crate::render_state::render_assets::RenderAssets;
+use crate::tr_cmds::{RE_SetColor, RE_StretchPic};
 
 /// Raven `sFILENAME_THAI_WIDTHS`.
 /// Source: `oracle/codemp/renderer/tr_font.cpp:75`
@@ -1894,4 +1900,589 @@ pub fn R_ReloadFonts_f(view: &mut EngineHostView, font: &mut FontState) {
             "Problem encountered finding current fonts, ignoring.\n",
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// R3 wave 3 (`tr_font.wave3.md`)
+//
+// `CFontInfo::GetCollapsedAsianCode` — the packet's other wave-3 fn — is
+// RECONCILED, not re-ported: it already exists above as the
+// `impl CFontInfo` method (`:1008-1042`), transcribed from the exact same
+// oracle slice (`tr_font.cpp:1217-1235`) by an earlier wave, including the
+// same Korean/Taiwanese/Japanese/Chinese-collapse DEFERRED this packet's
+// oracle source would also require. Nothing to add.
+// ---------------------------------------------------------------------------
+
+/// Extracts the `CFontInfo` at `iFont` out of [`FontState::g_vFontArray`] so
+/// its `&mut self` methods (which themselves take `&FontState` for Asian/Thai
+/// lookups) can run without holding an aliasing `&mut`/`&` pair on `font` at
+/// once — arena+id pattern, porting-rules §B5. Callers restore it with
+/// [`put_font_back`] before returning.
+///
+/// PORT-NOTE: a panic unwinding through a caller's body between the take and
+/// the put-back leaves the arena slot `None` (the font is dropped, and later
+/// lookups of that handle fail). Acceptable here because the only panics
+/// reachable in this crate's engine context are `todo!()`/`expect` on
+/// unported surface, which are session-fatal — nothing observes the emptied
+/// slot. Revisit (scope guard / restore-on-drop) if any caller's body ever
+/// returns `Result` and unwinds as normal control flow.
+fn take_font(font: &mut FontState, iFont: i32) -> Option<Box<CFontInfo>> {
+    let idx = usize::try_from(iFont).ok()?;
+    font.g_vFontArray.get_mut(idx)?.take()
+}
+
+/// Restores a `CFontInfo` extracted by [`take_font`].
+fn put_font_back(font: &mut FontState, iFont: i32, curfont: Box<CFontInfo>) {
+    if let Ok(idx) = usize::try_from(iFont) {
+        if let Some(slot) = font.g_vFontArray.get_mut(idx) {
+            *slot = Some(curfont);
+        }
+    }
+}
+
+/// Raven `ColorIndex` — a `q_shared.h` inline macro (`((c) - '0') & 0x07`)
+/// with no ported Rust home yet; kept private here alongside [`Round`], same
+/// precedent (canonical home stays `q_shared`'s when it lands, DEC-32). Its
+/// formula is already independently transcribed and verified at
+/// `crates/mp/game/src/g_client.rs:1524` (`ClientCleanName`); reproduced here
+/// rather than imported since that copy is a game-crate-local fn, not a
+/// public one this crate could depend on.
+///
+/// Source: `oracle/codemp/game/q_shared.h:1158`
+fn ColorIndex(c: u8) -> i32 {
+    (c as i32 - '0' as i32) & 0x07
+}
+
+/// Raven `RE_Font_StrLenPixels`.
+///
+/// PORT-NOTE: `curfont->GetLetterHorizAdvance` takes `&mut self` (it may
+/// mutate the font's Asian-glyph scratch via `GetLetter`), so the `CFontInfo`
+/// is extracted from `font` for the walk and restored before returning
+/// ([`take_font`]/[`put_font_back`]) rather than holding an aliasing
+/// `&mut`/`&` pair on `font` at once.
+///
+/// PORT-NOTE: `GetLanguageEnum()` is unported (file-head DEFERRED, `:31-53`);
+/// threaded in as `eLanguage`, same as every other caller in this file.
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:1321-1374`
+pub fn RE_Font_StrLenPixels(
+    font: &mut FontState,
+    eLanguage: Language_e,
+    psText: &[u8],
+    iFontHandle: i32,
+    fScale: f32,
+) -> i32 {
+    let iFont = match GetFont(font, eLanguage, iFontHandle) {
+        Some(i) => i,
+        None => return 0,
+    };
+    let mut curfont = match take_font(font, iFont) {
+        Some(f) => f,
+        None => return 0,
+    };
+
+    let mut fScaleA = fScale;
+    if Language_IsAsian(eLanguage) && fScale > 0.7f32 {
+        fScaleA = fScale * 0.75f32;
+    }
+
+    let mut iMaxWidth = 0;
+    let mut iThisWidth = 0;
+    let mut pos = 0usize;
+    // §19 sibling of `AnyLanguage_ReadCharFromString`'s own note: `&[u8]` has
+    // no NUL terminator, so `while(*psText)` becomes a length check.
+    while pos < psText.len() {
+        let (uiLetter, iAdvanceCount, _) =
+            AnyLanguage_ReadCharFromString(font, eLanguage, &psText[pos..], false);
+        pos += iAdvanceCount as usize;
+
+        if uiLetter == '^' as u32 {
+            let next = psText.get(pos).copied().unwrap_or(0);
+            if next >= b'0' && next <= b'9' {
+                let (_, iAdvanceCount2, _) =
+                    AnyLanguage_ReadCharFromString(font, eLanguage, &psText[pos..], false);
+                pos += iAdvanceCount2 as usize;
+                continue;
+            }
+        }
+
+        if uiLetter == 0x0A {
+            iThisWidth = 0;
+        } else {
+            let iPixelAdvance = curfont.GetLetterHorizAdvance(font, eLanguage, uiLetter);
+
+            let fValue = iPixelAdvance as f32
+                * if uiLetter > font.g_iNonScaledCharRange as u32 {
+                    fScaleA
+                } else {
+                    fScale
+                };
+            iThisWidth += if curfont.mbRoundCalcs {
+                Round(fValue)
+            } else {
+                fValue as i32
+            };
+            if iThisWidth > iMaxWidth {
+                iMaxWidth = iThisWidth;
+            }
+        }
+    }
+
+    put_font_back(font, iFont, curfont);
+    iMaxWidth
+}
+
+/// Raven `RE_Font_StrLenChars`.
+///
+/// Raven: logic for this function's letter counting must be kept same in
+/// this function and `RE_Font_DrawString()`.
+///
+/// PORT-NOTE: `GetLanguageEnum()` is unported (file-head DEFERRED, `:31-53`);
+/// threaded in as `eLanguage`.
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:1378-1413`
+pub fn RE_Font_StrLenChars(font: &FontState, eLanguage: Language_e, psText: &[u8]) -> i32 {
+    // in other words, colour codes and CR/LF don't count as chars, all else does...
+    //
+    let mut iCharCount = 0;
+    let mut pos = 0usize;
+    while pos < psText.len() {
+        let (uiLetter, iAdvanceCount, _) =
+            AnyLanguage_ReadCharFromString(font, eLanguage, &psText[pos..], false);
+        pos += iAdvanceCount as usize;
+
+        if uiLetter == '^' as u32 {
+            // colour code (note next-char skip)
+            let next = psText.get(pos).copied().unwrap_or(0);
+            if next >= b'0' && next <= b'9' {
+                pos += 1;
+            } else {
+                iCharCount += 1;
+            }
+        } else if uiLetter == 10 {
+            // linefeed
+        } else if uiLetter == 13 {
+            // return
+        } else if uiLetter == '_' as u32 {
+            // special word-break hack
+            let next = psText.get(pos).copied().unwrap_or(0);
+            iCharCount += if eLanguage == Language_e::eThai && next as u32 >= TIS_GLYPHS_START {
+                0
+            } else {
+                1
+            };
+        } else {
+            iCharCount += 1;
+        }
+    }
+
+    iCharCount
+}
+
+/// Raven `RE_Font_HeightPixels`.
+///
+/// PORT-NOTE: `GetLanguageEnum()` is unported (file-head DEFERRED, `:31-53`);
+/// threaded in as `eLanguage`.
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:1415-1426`
+pub fn RE_Font_HeightPixels(
+    font: &mut FontState,
+    eLanguage: Language_e,
+    iFontHandle: i32,
+    fScale: f32,
+) -> i32 {
+    let iFont = match GetFont(font, eLanguage, iFontHandle) {
+        Some(i) => i,
+        None => return 0,
+    };
+    match font
+        .g_vFontArray
+        .get(iFont as usize)
+        .and_then(|f| f.as_deref())
+    {
+        Some(curfont) => {
+            let fValue = curfont.GetPointSize() as f32 * fScale;
+            if curfont.mbRoundCalcs {
+                Round(fValue)
+            } else {
+                fValue as i32
+            }
+        }
+        None => 0,
+    }
+}
+
+/// Raven's `RE_Font_DrawString`-local `static const vec4_t v4DKGREY2 =
+/// {0.15f, 0.15f, 0.15f, 1};` — a kind-1 const table (three-kind rule), never
+/// mutated, so a plain `const` replaces it.
+/// Source: `oracle/codemp/renderer/tr_font.cpp:1511`
+const V4_DK_GREY2: [f32; 4] = [0.15, 0.15, 0.15, 1.0];
+
+/// The shared "draw one glyph" tail `RE_Font_DrawString`'s per-letter switch
+/// falls into once its `case '_'`/`case '^'` special checks don't apply (the
+/// `default:` arm, plus both of those cases' fallthroughs into it).
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:1568-1610`
+#[allow(clippy::too_many_arguments)]
+fn draw_font_glyph(
+    curfont: &mut CFontInfo,
+    font: &FontState,
+    eLanguage: Language_e,
+    frame: &mut FrameData,
+    assets: &RenderAssets,
+    common: &mut Common,
+    x: i32,
+    ox: i32,
+    oy: i32,
+    iAsianYAdjust: i32,
+    fScale: f32,
+    fScaleA: f32,
+    iMaxPixelWidth: i32,
+    uiLetter: u32,
+) -> (i32, bool) {
+    // Description of pLetter
+    let (mut pLetter, hShader) = curfont.GetLetter(font, eLanguage, uiLetter, true);
+    if pLetter.width == 0 {
+        let (dotLetter, _) = curfont.GetLetter(font, eLanguage, '.' as u32, false);
+        pLetter = dotLetter;
+    }
+
+    let fThisScale = if uiLetter > font.g_iNonScaledCharRange as u32 {
+        fScaleA
+    } else {
+        fScale
+    };
+
+    let mut x = x;
+    // sigh, super-language-specific hack...
+    //
+    if uiLetter == TIS_SARA_AM && eLanguage == Language_e::eThai {
+        x -= Round(7.0f32 * fThisScale);
+    }
+
+    let iAdvancePixels = Round(pLetter.horizAdvance as f32 * fThisScale);
+    // yeuch
+    let bNextTextWouldOverflow =
+        iMaxPixelWidth != -1 && ((x + iAdvancePixels) - ox) > iMaxPixelWidth;
+
+    if !bNextTextWouldOverflow {
+        // this 'mbRoundCalcs' stuff is crap, but the only way to make the
+        // font code work. Sigh...
+        //
+        let baseline_term = if curfont.mbRoundCalcs {
+            Round(pLetter.baseline as f32 * fThisScale) as f32
+        } else {
+            pLetter.baseline as f32 * fThisScale
+        };
+        let mut y = (oy as f32 - baseline_term) as i32;
+        if curfont.m_fAltSBCSFontScaleFactor != -1.0 {
+            // I'm sick and tired of going round in circles trying to do this
+            // legally, so bollocks to it
+            y += 3;
+        }
+
+        let hShader = hShader.expect("GetLetter(bWantShader=true) always returns Some");
+
+        let w = if curfont.mbRoundCalcs {
+            Round(pLetter.width as f32 * fThisScale) as f32
+        } else {
+            pLetter.width as f32 * fThisScale
+        };
+        let h = if curfont.mbRoundCalcs {
+            Round(pLetter.height as f32 * fThisScale) as f32
+        } else {
+            pLetter.height as f32 * fThisScale
+        };
+
+        RE_StretchPic(
+            frame,
+            assets,
+            common,
+            (x + Round(pLetter.horizOffset as f32 * fScale)) as f32, // float x
+            (if uiLetter > font.g_iNonScaledCharRange as u32 {
+                y - iAsianYAdjust
+            } else {
+                y
+            }) as f32, // float y
+            w,                                                       // float w
+            h,                                                       // float h
+            pLetter.s,                                               // float s1
+            pLetter.t,                                               // float t1
+            pLetter.s2,                                              // float s2
+            pLetter.t2,                                              // float t2
+            hShader,                                                 // qhandle_t hShader
+        );
+
+        x += iAdvancePixels;
+    }
+
+    (x, bNextTextWouldOverflow)
+}
+
+/// Raven `RE_Font_DrawString`'s body, once `curfont` is already resolved —
+/// see the public [`RE_Font_DrawString`]'s PORT-NOTEs for why this split
+/// exists (the recursive dropshadow call, `gbInShadow`, and the `curfont`
+/// arena take/put-back all interact here).
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:1491-1613`
+#[allow(clippy::too_many_arguments)]
+fn RE_Font_DrawString_body(
+    curfont: &mut CFontInfo,
+    font: &FontState,
+    eLanguage: Language_e,
+    frame: &mut FrameData,
+    assets: &RenderAssets,
+    common: &mut Common,
+    ox: i32,
+    oy: i32,
+    psText: &[u8],
+    rgba: Option<[f32; 4]>,
+    iFontHandle: i32,
+    iMaxPixelWidth: i32,
+    fScale: f32,
+    bInShadow: bool,
+) {
+    let mut fScaleA = fScale;
+    let mut iAsianYAdjust = 0i32;
+    if Language_IsAsian(eLanguage) && fScale > 0.7f32 {
+        fScaleA = fScale * 0.75f32;
+        // ruling 12: Raven's own `/*Round*/` comment marks this Round() call
+        // as deliberately disabled — plain float->int truncation on
+        // assignment, not rounding.
+        iAsianYAdjust = (((curfont.GetPointSize() as f32 * fScale)
+            - (curfont.GetPointSize() as f32 * fScaleA))
+            / 2.0f32) as i32;
+    }
+
+    // Draw a dropshadow if required
+    if (iFontHandle as u32) & STYLE_DROPSHADOW != 0 {
+        let offset = Round(curfont.GetPointSize() as f32 * fScale * 0.075f32);
+
+        RE_Font_DrawString_body(
+            curfont,
+            font,
+            eLanguage,
+            frame,
+            assets,
+            common,
+            ox + offset,
+            oy + offset,
+            psText,
+            Some(V4_DK_GREY2),
+            iFontHandle & (SET_MASK as i32),
+            iMaxPixelWidth,
+            fScale,
+            true,
+        );
+    }
+
+    RE_SetColor(frame, rgba);
+
+    let mut x = ox;
+    let mut oy = oy + Round((curfont.GetHeight() - (curfont.GetDescender() >> 1)) as f32 * fScale);
+
+    let mut bNextTextWouldOverflow = false;
+    let mut pos = 0usize;
+    while pos < psText.len() && !bNextTextWouldOverflow {
+        let (uiLetter, iAdvanceCount, _) =
+            AnyLanguage_ReadCharFromString(font, eLanguage, &psText[pos..], false);
+        pos += iAdvanceCount as usize;
+
+        if uiLetter == 10 {
+            // linefeed
+            x = ox;
+            oy += Round(curfont.GetPointSize() as f32 * fScale);
+            if Language_IsAsian(eLanguage) {
+                // this only comes into effect when playing in asian for "A
+                // long time ago in a galaxy" etc, all other text is
+                // line-broken in feeder functions
+                oy += 4;
+            }
+        } else if uiLetter == 13 {
+            // Return
+        } else if uiLetter == 32 {
+            // Space
+            let (pLetter, _) = curfont.GetLetter(font, eLanguage, ' ' as u32, false);
+            x += Round(pLetter.horizAdvance as f32 * fScale);
+            // yeuch
+            bNextTextWouldOverflow = iMaxPixelWidth != -1 && (x - ox) > iMaxPixelWidth;
+        } else if uiLetter == '_' as u32 {
+            // has a special word-break usage if in Thai (and followed by a
+            // thai char), and should not be displayed, else treat as normal
+            let next = psText.get(pos).copied().unwrap_or(0);
+            if !(eLanguage == Language_e::eThai && next as u32 >= TIS_GLYPHS_START) {
+                // else drop through and display as normal...
+                let (new_x, overflow) = draw_font_glyph(
+                    curfont,
+                    font,
+                    eLanguage,
+                    frame,
+                    assets,
+                    common,
+                    x,
+                    ox,
+                    oy,
+                    iAsianYAdjust,
+                    fScale,
+                    fScaleA,
+                    iMaxPixelWidth,
+                    uiLetter,
+                );
+                x = new_x;
+                bNextTextWouldOverflow = overflow;
+            }
+        } else if uiLetter == '^' as u32 {
+            if let Some(&next) = psText.get(pos).filter(|&&b| (b'0'..=b'9').contains(&b)) {
+                let colour = ColorIndex(next);
+                // *psText++
+                pos += 1;
+                if !bInShadow {
+                    RE_SetColor(frame, Some(g_color_table[colour as usize]));
+                }
+            } else {
+                // purposely falls through (to the default glyph draw)
+                let (new_x, overflow) = draw_font_glyph(
+                    curfont,
+                    font,
+                    eLanguage,
+                    frame,
+                    assets,
+                    common,
+                    x,
+                    ox,
+                    oy,
+                    iAsianYAdjust,
+                    fScale,
+                    fScaleA,
+                    iMaxPixelWidth,
+                    uiLetter,
+                );
+                x = new_x;
+                bNextTextWouldOverflow = overflow;
+            }
+        } else {
+            let (new_x, overflow) = draw_font_glyph(
+                curfont,
+                font,
+                eLanguage,
+                frame,
+                assets,
+                common,
+                x,
+                ox,
+                oy,
+                iAsianYAdjust,
+                fScale,
+                fScaleA,
+                iMaxPixelWidth,
+                uiLetter,
+            );
+            x = new_x;
+            bNextTextWouldOverflow = overflow;
+        }
+    }
+}
+
+/// Raven `RE_Font_DrawString`.
+///
+/// PORT-NOTE: `GetLanguageEnum()` is unported (file-head DEFERRED, `:31-53`);
+/// threaded in as `eLanguage`.
+///
+/// PORT-NOTE: `g_color_table` (the packet's STATE HOMES row calls it "not
+/// renderer state... already homed by the engine port, confirm the exact
+/// receiver at port time") is already a ported `mp_qshared` const
+/// (`crates/mp/qshared/src/shared/q_color.rs`), not an engine-owned field —
+/// used directly, resolving that row's "confirm at port time" instruction.
+///
+/// PORT-NOTE: the fn-scope `static qboolean gbInShadow` (`:1432`) never
+/// survives past a single top-level call — it is set `true` immediately
+/// before the recursive dropshadow call and reset `false` right after, and
+/// its own comment says it "MUST default to" `qfalse`. It carries no
+/// cross-call state (not R2's kind-3), so rather than an escalation it is
+/// threaded as [`RE_Font_DrawString_body`]'s `bInShadow` parameter, `false`
+/// at this public entry and `true` only on the recursive shadow call — the
+/// same static-to-parameter transform this file already applies to
+/// `GetLanguageEnum` (porting-rules §10/§B4).
+///
+/// PORT-NOTE: `curfont` is resolved once via `GetFont`/[`take_font`] here;
+/// the recursive dropshadow call reuses the SAME extracted `&mut CFontInfo`
+/// (`RE_Font_DrawString_body` calls itself directly) instead of re-deriving
+/// it through a second `GetFont`/arena-take, which the arena-ownership model
+/// can't do anyway while the outer `curfont` is still checked out. This is
+/// behavior-preserving: `SET_MASK` only strips the `STYLE_DROPSHADOW`/
+/// `STYLE_BLINK` display bits from the recursive call's handle, not the
+/// font-selection bits, so Raven's own re-resolution would land on the same
+/// `CFontInfo` pointer either way (porting-rules §10: control flow
+/// preserved, not shape).
+///
+/// PORT-NOTE: Raven's `!psText` null-pointer guard has no Rust equivalent (a
+/// `&[u8]` can't be null) and is dropped; an empty slice still runs the rest
+/// of the function exactly as an empty C string would — the `RE_SetColor`
+/// side effect still fires, the per-letter loop just never executes.
+///
+/// PORT-NOTE: Raven's `Sys_Milliseconds()` blink phase is threaded in as
+/// `milliseconds` rather than reached (porting-rules §B4): its ported home
+/// `mp_engine_core::lifecycle::sys_milliseconds` cannot be called from here —
+/// `mp_engine_core` already depends on `mp_renderer`, so the reverse edge
+/// would cycle (ruling, wave-3 escalation). The caller (the trap layer, which
+/// owns real time) supplies it. Only this public entry takes it: `SET_MASK`
+/// strips `STYLE_BLINK` from the recursive dropshadow call's handle, so
+/// [`RE_Font_DrawString_body`] can never re-run the gate.
+///
+/// `rgba` is `Option` because the seam's `const float *rgba` is nullable —
+/// Raven passes it straight to `RE_SetColor`, whose NULL case means white
+/// (`colorWhite`); that is already [`RE_SetColor`]'s own `Option` model, so
+/// this entry forwards the parameter unchanged rather than fabricating a
+/// color here.
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:1430-1614`
+#[allow(clippy::too_many_arguments)]
+pub fn RE_Font_DrawString(
+    font: &mut FontState,
+    eLanguage: Language_e,
+    frame: &mut FrameData,
+    assets: &RenderAssets,
+    common: &mut Common,
+    ox: i32,
+    oy: i32,
+    psText: &[u8],
+    rgba: Option<[f32; 4]>,
+    iFontHandle: i32,
+    iMaxPixelWidth: i32,
+    fScale: f32,
+    milliseconds: i32,
+) {
+    if (iFontHandle as u32) & STYLE_BLINK != 0 {
+        if ((milliseconds >> 7) & 1) != 0 {
+            return;
+        }
+    }
+
+    let iFont = match GetFont(font, eLanguage, iFontHandle) {
+        Some(i) => i,
+        None => return,
+    };
+    let mut curfont = match take_font(font, iFont) {
+        Some(c) => c,
+        None => return,
+    };
+
+    RE_Font_DrawString_body(
+        &mut curfont,
+        font,
+        eLanguage,
+        frame,
+        assets,
+        common,
+        ox,
+        oy,
+        psText,
+        rgba,
+        iFontHandle,
+        iMaxPixelWidth,
+        fScale,
+        false,
+    );
+
+    put_font_back(font, iFont, curfont);
 }

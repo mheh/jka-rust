@@ -8,14 +8,19 @@ use core::ffi::c_int;
 
 use mp_engine_qcommon::cm_load::{CM_LeafArea, CM_LeafCluster};
 use mp_engine_qcommon::cm_test::{CM_ClusterPVSBits, CM_PointLeafnum};
+use mp_engine_qcommon::cm_trace::CM_BoxTrace;
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::EngineHostView;
 use mp_engine_qcommon::files_common::{
     FS_FCloseFile, FS_FOpenFileRead, FS_FOpenFileWrite, FS_Read, FS_Write,
 };
-use mp_qshared::shared::{cplane_t, qhandle_t, vec3_t};
+use mp_qshared::common::mp::trace_t::trace_t;
+use mp_qshared::shared::{
+    cplane_t, qhandle_t, vec3_t, CONTENTS_SOLID, CONTENTS_TERRAIN, SURF_NOIMPACT,
+};
 use native_math::qmath::{
-    _DotProduct, _VectorScale, _VectorSubtract, vec3_origin, CrossProduct, VectorCompare,
+    _DotProduct, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin, CrossProduct,
+    VectorCompare, VectorInverse, VectorLength, VectorSet,
 };
 use native_types::fileHandle_t;
 
@@ -24,9 +29,11 @@ use crate::render_state::frame_event::FrameEvent;
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
+use crate::tr_local::cull_type_t::cullType_t;
 use crate::tr_local::dlight_s::dlight_t;
 use crate::tr_local::msurface_s::{msurface_t, SurfaceRef, SurfaceRefMut};
 use crate::tr_local::orientationr_t::orientationr_t;
+use crate::tr_local::shader_s::shader_t;
 use crate::tr_local::srf_grid_mesh_s::srfGridMesh_t;
 use crate::tr_local::srf_surface_face_t::srfSurfaceFace_t;
 use crate::tr_local::srf_triangles_t::srfTriangles_t;
@@ -969,3 +976,249 @@ pub fn R_CullGrid(
 // UNMAPPED is an ESCALATION, never an invention"), not something this wave
 // can invent a carrier for.
 // Source: oracle/codemp/renderer/tr_world.cpp:990-1036
+
+/// Raven `R_CullSurface` — decide whether a world surface is entirely
+/// outside the current view: dispatch bezier-grid/triangle-soup surfaces to
+/// their already-ported cullers, and for planar (`SF_FACE`) surfaces do
+/// backface + (optional, cvar-gated) "roof" culling before the epsilon'd
+/// front/back plane test. `qboolean` collapsed to `bool` (§C7).
+///
+/// PORT-NOTE: the oracle's `surfaceType_t *surface` parameter is the tagged
+/// pointer `msurface_t::data` addresses; taking `surf: &msurface_t` and
+/// dispatching through `msurface_t::surface_kind` (tier-2 quarantine, §D11)
+/// mirrors `R_DlightSurface`'s established treatment of the same tagged
+/// union in this file, rather than threading a bare `surfaceType_t` pointer.
+///
+/// PORT-NOTE: `R_CullGrid`/`R_CullTriSurf` (this file, already ported)
+/// needed their own globals threaded in as plain parameters once their
+/// bodies landed; calling them from here means `R_CullSurface` inherits
+/// that same threaded surface — `current_entity_num`/`r_nocurves_integer`
+/// and the six `c_*_cull_patch_*` counters exist on this signature solely to
+/// forward to `R_CullGrid`, not because `R_CullSurface` itself reads them.
+///
+/// PORT-NOTE: `r_nocull`/`r_facePlaneCull`/`r_cullRoofFaces`/
+/// `r_roofCullCeilDist` (STATE HOMES → `RendererCvars`) and `tr.ori`
+/// (STATE HOMES SPLIT → `FrameState::frame.ori`) are threaded straight
+/// through as plain parameters, matching the cvar/`ori`/`frustum` threading
+/// already established for `R_CullTriSurf`/`R_CullGrid` in this same file.
+///
+/// PORT-NOTE: the six `static` locals inside the (rarely-taken)
+/// `r_cullRoofFaces` branch (`i`, `tr`, `basePoint`, `endPoint`, `nNormal`,
+/// `v`) are always fully written before they are read on every path through
+/// this block — Raven's `static` here is a stack-avoidance micro-optimization
+/// for a "very slow, only for automap screenshots" branch (per the oracle's
+/// own comment), not persisted cross-call state (three-kind rule: nothing
+/// survives to the next call), so they become ordinary function-local
+/// `let mut` bindings, never a carrier field.
+///
+/// Source: `oracle/codemp/renderer/tr_world.cpp:138-275`
+#[allow(clippy::too_many_arguments)]
+pub fn R_CullSurface(
+    surf: &msurface_t,
+    shader: &shader_t,
+    view: &mut EngineHostView<'_>,
+    ori: &orientationr_t,
+    frustum: &[cplane_t; 4],
+    current_entity_num: i32,
+    r_nocull_integer: i32,
+    r_nocurves_integer: i32,
+    r_face_plane_cull_integer: i32,
+    r_cull_roof_faces_integer: i32,
+    r_roof_cull_ceil_dist_value: f32,
+    c_sphere_cull_patch_out: &mut i32,
+    c_sphere_cull_patch_clip: &mut i32,
+    c_sphere_cull_patch_in: &mut i32,
+    c_box_cull_patch_out: &mut i32,
+    c_box_cull_patch_in: &mut i32,
+    c_box_cull_patch_clip: &mut i32,
+) -> bool {
+    if r_nocull_integer != 0 {
+        return false;
+    }
+
+    let face = match surf.surface_kind() {
+        SurfaceRef::Grid(grid) => {
+            return R_CullGrid(
+                grid,
+                current_entity_num,
+                r_nocurves_integer,
+                r_nocull_integer,
+                ori,
+                frustum,
+                c_sphere_cull_patch_out,
+                c_sphere_cull_patch_clip,
+                c_sphere_cull_patch_in,
+                c_box_cull_patch_out,
+                c_box_cull_patch_in,
+                c_box_cull_patch_clip,
+            );
+        }
+        SurfaceRef::Triangles(tris) => {
+            return R_CullTriSurf(tris, r_nocull_integer, ori, frustum);
+        }
+        SurfaceRef::Face(face) => face,
+        SurfaceRef::Other => return false,
+    };
+
+    if matches!(shader.cullType, cullType_t::CT_TWO_SIDED) {
+        return false;
+    }
+
+    // face culling
+    if r_face_plane_cull_integer == 0 {
+        return false;
+    }
+
+    if r_cull_roof_faces_integer != 0 {
+        // Very slow, but this is only intended for taking shots for automap images.
+        if face.plane.normal[2] > 0.0 && face.numPoints > 0 {
+            // it's facing up I guess
+
+            // The fact that this point is in the middle of the array has no
+            // relation to the orientation in the surface outline.
+            let mut base_point = face.point((face.numPoints / 2) as usize);
+            base_point[2] += 2.0;
+
+            // the endpoint will be 8192 units from the chosen point in the
+            // direction of the surface normal
+
+            // just go straight up I guess, for now (slight hack)
+            let mut n_normal: vec3_t = [0.0; 3];
+            VectorSet(&mut n_normal, 0.0, 0.0, 1.0);
+            let mut end_point: vec3_t = [0.0; 3];
+            _VectorMA(base_point, 8192.0, n_normal, &mut end_point);
+
+            let mut trace = trace_t::zeroed();
+            // PORT-NOTE: the `*mut trace_t` out-param is the already-ported
+            // engine `CM_BoxTrace` signature's own shape, not a new interior
+            // type this file introduces; taking `&mut` as a pointer at the
+            // call site needs no `unsafe`.
+            CM_BoxTrace(
+                view,
+                &mut trace as *mut trace_t,
+                base_point,
+                end_point,
+                vec3_origin,
+                vec3_origin,
+                0,
+                CONTENTS_SOLID | CONTENTS_TERRAIN,
+                0,
+            );
+
+            if trace.startsolid == 0
+                && trace.allsolid == 0
+                && (trace.fraction == 1.0 || (trace.surfaceFlags & SURF_NOIMPACT) != 0)
+            {
+                // either hit nothing or sky, so this surface is near the top
+                // of the level I guess. Or the floor of a really tall room,
+                // but if that's the case we're just screwed.
+                let mut v: vec3_t = [0.0; 3];
+                _VectorSubtract(base_point, trace.endpos, &mut v);
+                if trace.fraction == 1.0 || VectorLength(v) < r_roof_cull_ceil_dist_value {
+                    // ignore it if it's not close to the top, unless it just
+                    // hit nothing
+
+                    // Let's try to dig back into the brush based on the
+                    // negative direction of the plane, and if we pop out on
+                    // the other side we'll see if it's ground or not.
+                    let mut i: i32 = 4;
+                    n_normal = face.plane.normal;
+                    VectorInverse(&mut n_normal);
+
+                    while i < 4096 {
+                        _VectorMA(base_point, i as f32, n_normal, &mut end_point);
+                        CM_BoxTrace(
+                            view,
+                            &mut trace as *mut trace_t,
+                            end_point,
+                            end_point,
+                            vec3_origin,
+                            vec3_origin,
+                            0,
+                            CONTENTS_SOLID | CONTENTS_TERRAIN,
+                            0,
+                        );
+                        if trace.startsolid == 0 && trace.allsolid == 0 && trace.fraction == 1.0 {
+                            // in the clear
+                            break;
+                        }
+                        i += 1;
+                    }
+                    if i < 4096 {
+                        // Make sure we got into clearance
+                        base_point = end_point;
+                        base_point[2] -= 2.0;
+
+                        // just go straight down I guess, for now (slight hack)
+                        VectorSet(&mut n_normal, 0.0, 0.0, -1.0);
+                        _VectorMA(base_point, 4096.0, n_normal, &mut end_point);
+
+                        // trace a second time from the clear point in the
+                        // inverse normal direction of the surface. If we hit
+                        // something within a set amount of units, we will
+                        // assume it's a bridge type object and leave it to be
+                        // drawn. Otherwise we will assume it is a roof or
+                        // other obstruction and cull it out.
+                        CM_BoxTrace(
+                            view,
+                            &mut trace as *mut trace_t,
+                            base_point,
+                            end_point,
+                            vec3_origin,
+                            vec3_origin,
+                            0,
+                            CONTENTS_SOLID | CONTENTS_TERRAIN,
+                            0,
+                        );
+
+                        if trace.startsolid == 0
+                            && trace.allsolid == 0
+                            && (trace.fraction != 1.0 && (trace.surfaceFlags & SURF_NOIMPACT) == 0)
+                        {
+                            // if we hit nothing or a noimpact going down then
+                            // this is probably "ground".
+                            _VectorSubtract(base_point, trace.endpos, &mut end_point);
+                            if VectorLength(end_point) > r_roof_cull_ceil_dist_value {
+                                // 128 (by default) is our maximum tolerance,
+                                // above that will be removed
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let d = _DotProduct(ori.viewOrigin, face.plane.normal);
+
+    // don't cull exactly on the plane, because there are levels of rounding
+    // through the BSP, ICD, and hardware that may cause pixel gaps if an
+    // epsilon isn't allowed here
+    if matches!(shader.cullType, cullType_t::CT_FRONT_SIDED) {
+        if d < face.plane.dist - 8.0 {
+            return true;
+        }
+    } else if d > face.plane.dist + 8.0 {
+        return true;
+    }
+
+    false
+}
+
+// DEFERRED: R_GenerateWireframeMap — blocked by the same gap as
+// `R_RecursiveWireframeSurf` above, and calls it as its only real work past
+// the entry marking loop: (1) `tr.world->nodes[i].visframe = tr.visCount`
+// needs a per-node runtime visibility-frame field the tier-3 `Node`
+// replacement (`crate::tr_bsp::Node`) does not carry (only the fields
+// `R_LoadNodesAndLeafs` parses from the BSP file) and `WorldAsset` has no
+// parallel per-node scratch array either; (2) `R_RecursiveWireframeSurf`
+// itself is a `// DEFERRED:` comment above with no callable body, for the
+// same reason plus the `WorldAsset::mark_surfaces` index-resolution gap it
+// documents. Both are state-home omissions per the preamble ("a state home
+// this packet marks UNMAPPED is an ESCALATION, never an invention"), not
+// something this wave can invent a carrier for — `memset(&g_autoMapFrame,
+// 0, ...)` (the one step this wave *could* perform, as `WireframeAutomap`
+// already exists) is not worth transcribing in isolation from the loop and
+// recursive walk it exists to set up for.
+// Source: oracle/codemp/renderer/tr_world.cpp:1039-1064

@@ -23,7 +23,7 @@ use native_math::qmath::Com_Clamp;
 
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::gpu_resources::GpuResources;
-use crate::render_state::image_asset::ImageHandle;
+use crate::render_state::image_asset::{ImageAsset, ImageHandle};
 use crate::render_state::placeholders::GlConfig;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
@@ -1729,4 +1729,197 @@ pub fn R_DeleteTextures(
 ) {
     R_Images_Clear(sim, state);
     GL_ResetBinds(gpu);
+}
+
+// ============================================================================
+// wave 3
+// ============================================================================
+
+/// Raven `R_CreateImage`.
+///
+/// Registration path per this packet's STATE HOMES table (`R2-D3`/`R2-D4`):
+/// the oracle's `Z_Malloc`-then-`AllocatedImages[name] = image` sequence
+/// becomes one `Arena<ImageAsset>::insert` + `image_names` map insert at the
+/// end, through `Arc::make_mut(&mut sim.published)` (A9), matching every
+/// other `RenderAssets` registry write in this file. The image arena is
+/// unbounded (A5) so `insert` never fails — this fn's Rust return type is a
+/// bare `ImageHandle`, not `Option`, matching the oracle's "always succeeds"
+/// contract (`Z_Malloc` panics rather than returning NULL on OOM, oracle-side
+/// only).
+///
+/// Two named constants block real CPU logic and are DEFERRED rather than
+/// guessed (never-guess rule): `GL_CLAMP`/`GL_CLAMP_TO_EDGE` gate the
+/// `glWrapClampMode` clamp-to-edge substitution at `:1214-1216` and again
+/// (GL-call-only, see below) at `:1264`. Both are absent from this packet's
+/// FILE-SCOPE CONSTANTS section and this fn's own oracle slice, and are the
+/// same unresolved wrap-mode family `GL_TextureMode`/`R_ImageList_f` (wave 1,
+/// same file) already flagged as unresolvable — `gl_wrap_clamp_mode` is
+/// threaded through unmodified rather than fabricating either enum value.
+/// `glConfig.clampToEdgeAvailable` — the substitution's other conjunct at
+/// `:1214` — is a co-blocker in its own right: it has no R3 home (`glConfig`
+/// is R4 GL-capability state, STATE HOMES table), so even with both enum
+/// values in hand the `if` could not be evaluated.
+/// This propagates to both the `R_FindImageFile_NoLoad` lookup key/warn
+/// comparisons below and the final stored `ImageAsset::wrap_clamp_mode`
+/// field — the oracle would apply the substitution before both uses.
+///
+/// The entire `qglActiveTextureARB`-gated `GL_SelectTexture`/`GL_Bind`/
+/// `bRectangle` GL-target-selection block (`:1254-1270`) is DEFERRED: R4 —
+/// `qglActiveTextureARB`'s presence has no R3 home (STATE HOMES table) so
+/// even the guarding `if` cannot be evaluated, and `image->texnum` (the GL
+/// bind target both branches address) has no R3 home either (`ImageAsset`'s
+/// own doc comment). It has no effect on any `ImageAsset` field: the stored
+/// `wrapClampMode` is already set from the un-substituted
+/// `gl_wrap_clamp_mode` before this block runs in the oracle, and the
+/// block's own `glWrapClampMode = GL_CLAMP_TO_EDGE` reassignment
+/// (`:1264`) only feeds the deferred `qglTexParameterf` calls past it, never
+/// the stored field.
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:1204-1298
+pub fn R_CreateImage(
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    name: &str,
+    pic: &[u8],
+    width: i32,
+    height: i32,
+    format: i32,
+    mipmap: bool,
+    allow_picmip: bool,
+    allow_tc: bool,
+    gl_wrap_clamp_mode: i32,
+    b_rectangle: bool,
+) -> ImageHandle {
+    if name.len() >= MAX_QPATH as usize {
+        com_error(
+            errorParm_t::ERR_DROP,
+            format!("R_CreateImage: \"{}\" is too long\n", name),
+        );
+    }
+
+    // DEFERRED: `glWrapClampMode == GL_CLAMP -> GL_CLAMP_TO_EDGE`
+    // substitution not applied — see the doc comment above.
+    // Source: oracle/codemp/renderer/tr_image.cpp:1214-1216
+
+    // Raven: only images whose name starts with '*' and whose last path
+    // component is "lightmapNNN" are lightmaps.
+    let mut is_lightmap = false;
+    if name.starts_with('*') {
+        if let Some(slash) = name.rfind('/') {
+            if name[slash + 1..].starts_with("lightmap") {
+                is_lightmap = true;
+            }
+        }
+    }
+
+    if (width & (width - 1)) != 0 || (height & (height - 1)) != 0 {
+        com_error(
+            errorParm_t::ERR_FATAL,
+            format!(
+                "R_CreateImage: {} dimensions ({} x {}) not power of 2!\n",
+                name, width, height
+            ),
+        );
+    }
+
+    if let Some(handle) = R_FindImageFile_NoLoad(
+        sim,
+        view,
+        models,
+        Some(name),
+        mipmap,
+        allow_picmip,
+        gl_wrap_clamp_mode,
+    ) {
+        return handle;
+    }
+
+    // Raven: `image = (image_t*) Z_Malloc(sizeof(image_t), TAG_IMAGE_T,
+    // qtrue);` — replaced by the `Arena<ImageAsset>::insert` at the end of
+    // this fn (owned Rust storage, porting-rules §C9), matching
+    // `R_Images_DeleteImageContents`'s identical `Z_Free` reconciliation
+    // above. `bZeroit = qtrue` zero-initializes every field this fn doesn't
+    // explicitly set below (e.g. `frameUsed`), matching `ImageAsset::default`.
+    // Source: oracle/codemp/renderer/tr_image.cpp:1236-1237
+
+    // Raven: `image->texnum = 1024 + giTextureBindNum++;` — texnum's target
+    // field has no R3 home (`ImageAsset`'s own doc comment: "lands with the
+    // R4 GPU wave"), but the increment side effect still runs: "the ++ is of
+    // course staggeringly important..." (Raven comment) — later images
+    // depend on it having advanced.
+    state.gi_texture_bind_num += 1;
+
+    let last_level_used_on = models.media_get_level();
+
+    // DEFERRED: R4 — the `qglActiveTextureARB`-gated GL-target-selection
+    // block; see the doc comment above.
+    // Source: oracle/codemp/renderer/tr_image.cpp:1254-1270
+
+    // Raven: `Upload32((unsigned *)pic, format, …)` — the `(unsigned *)pic`
+    // reinterpret-cast becomes an owned little-endian byte->u32 collection
+    // (interior-safety law forbids a raw reinterpret cast), matching
+    // `R_MipMap`'s identical `to_le_bytes`/`from_le_bytes` precedent in this
+    // same file.
+    //
+    // PORT-NOTE: the owned copy also drops Raven's in-place write-back —
+    // `Upload32` scales/mips through the caller's `pic` buffer — but no
+    // oracle caller reads `pic` after the call, so the divergence is
+    // unobservable.
+    let pixel_count = (width * height).max(0) as usize;
+    let mut data: Vec<u32> = pic[..pixel_count * 4]
+        .chunks_exact(4)
+        .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+        .collect();
+
+    let (internal_format, out_width, out_height) = Upload32(
+        view,
+        cvars,
+        &*sim.published,
+        &*state,
+        gpu,
+        &mut data,
+        format,
+        mipmap,
+        allow_picmip,
+        is_lightmap,
+        allow_tc,
+        width as u16,
+        height as u16,
+        b_rectangle,
+    );
+
+    // DEFERRED: R4 — `qglTexParameterf(uiTarget, GL_TEXTURE_WRAP_S/T, …)` x2,
+    // `qglBindTexture(uiTarget, 0)`, and `glState.currenttextures
+    // [glState.currenttmu] = 0` (`GpuResources::gl_state` is a named
+    // placeholder with no `currenttextures`/`currenttmu` fields yet).
+    // Source: oracle/codemp/renderer/tr_image.cpp:1281-1285
+
+    // Raven: `Q_strncpyz(image->imgName, name, …)` at `:1248` is overwritten
+    // by this second `Q_strncpyz(image->imgName, psNewName, …)` before
+    // `image` is read again — only the final mapped name is transcribed.
+    let p_name = GenerateImageMappingName(name);
+
+    let assets = Arc::make_mut(&mut sim.published);
+    let handle = assets.images.insert(ImageAsset {
+        img_name: p_name.clone(),
+        width: out_width as i32,
+        height: out_height as i32,
+        frame_used: 0,
+        internal_format,
+        wrap_clamp_mode: gl_wrap_clamp_mode,
+        mipmap,
+        allow_picmip,
+        last_level_used_on,
+    });
+    assets.image_names.insert(p_name, handle);
+
+    // DEFERRED: R4 — `if (bRectangle) { qglDisable(uiTarget);
+    // qglEnable(GL_TEXTURE_2D); }` restore.
+    // Source: oracle/codemp/renderer/tr_image.cpp:1291-1295
+
+    handle
 }

@@ -174,8 +174,42 @@ pub fn Cmd_Wait_f(common: &mut Common) {
 
 // Raven `Cmd_ArgvBuffer` (cmd_common.cpp:324-326) is inlined at its one
 // caller, sv_game's `G_ARGV` trap arm (the module out-buffer seam).
-// Raven `Cmd_ArgsBuffer` (cmd_common.cpp:383-385) has no caller in the
-// dedicated island (its consumers are the client/UI trap arms) — dropped.
+// Raven `Cmd_ArgsBuffer` (cmd_common.cpp:383-385) had no caller in the
+// dedicated island (its consumers are the client/UI trap arms) and was
+// dropped there; the client-side caller has since arrived (the renderer's
+// `R_WorldEffect_f`), so it is ported below.
+
+/// `Cmd_ArgsBuffer`. Raven: "The interpreted versions use this because they
+/// can't have pointers returned to them." The caller's `char *buffer` +
+/// `bufferLength` pair becomes the owned return of [`Cmd_Args`], truncated by
+/// Raven's `Q_strncpyz` to `buffer_length - 1` bytes (backed off to the
+/// nearest `char` boundary so the return stays a `String`).
+///
+/// PORT-NOTE: the truncation length is measured in UTF-8 bytes, which
+/// overstates the Latin-1 wire length for any byte >= 0x80; the sole call site
+/// passes 2048, far inside the cap, so no live path can hit the difference.
+///
+/// Source: `oracle/codemp/qcommon/cmd_common.cpp:383-385`
+pub fn Cmd_ArgsBuffer(common: &Common, buffer_length: usize) -> String {
+    // Raven's `Q_strncpyz` fatals on a zero-length destination.
+    // Source: oracle/codemp/game/q_shared.c:834-836
+    if buffer_length < 1 {
+        com_error(
+            errorParm_t::ERR_FATAL,
+            "Q_strncpyz: destsize < 1".to_string(),
+        );
+    }
+
+    let mut args = Cmd_Args(common);
+    let mut max = buffer_length.saturating_sub(1);
+    if args.len() > max {
+        while !args.is_char_boundary(max) {
+            max -= 1;
+        }
+        args.truncate(max);
+    }
+    args
+}
 
 /// `Cbuf_AddText`.
 ///

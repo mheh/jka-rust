@@ -144,3 +144,69 @@ pub fn r_cull_model(
 ) -> i32 {
     todo!("Port R_CullModel — oracle/codemp/renderer/tr_mesh.cpp:58-137")
 }
+
+// ===== wave 3 =====
+
+/// Raven `void R_AddMD3Surfaces(trRefEntity_t *ent)` — validates `ent`'s
+/// current/old MD3 frame indices, computes LOD, culls the merged bounding
+/// box, sets up lighting, resolves the fog volume, then walks every MD3
+/// surface resolving its shader (custom shader / custom skin / per-surface
+/// MD3 shader) and pushing shadow + main draw-surf entries.
+// DEFERRED: R_AddMD3Surfaces — whole-fn, four independent blockers this wave
+// cannot supply (out of this file's edit scope in every case):
+//   - `tr.currentModel` (`header = tr.currentModel->md3[lod]`, `ent->e.frame
+//     %= tr.currentModel->md3[0]->numFrames`) has no landing field on
+//     `FrameState` — the identical blocker this file's own `r_compute_lod`
+//     deferral already recorded ("`tr.currentModel` has no landing field on
+//     `FrameState` yet ... owned by the `tr_main` wave").
+//   - The on-disk MD3 surface-array walk (`(md3Surface_t *)((byte *)header +
+//     header->ofsSurfaces)`, then per-surface `ofsShaders`/`ofsEnd`) has no
+//     SAFE quarantine accessor to call — `tr_surface.rs::LerpMeshVertexes`
+//     already recorded the identical finding for this exact struct family:
+//     "`md3Surface_t *surf` input has no ported Rust type anywhere in the
+//     crate yet (out-of-packet — no `tr_model`/MD3 wave has landed it)". The
+//     only existing Rust code touching this offset family is raw/`unsafe`
+//     (`tr_model/frontend.rs`, `tr_model/server_load.rs`), and this file
+//     bans unsafe outright.
+//   - `tr.viewParms.isPortal` (`personalModel = ... && !tr.viewParms.
+//     isPortal`) has no landed field — `FrameState::view` is still the empty
+//     `ViewParms {}` placeholder, the same UNMAPPED finding
+//     `tr_shade.rs:303` already recorded ("`backEnd.viewParms.isPortal` has
+//     no landed field").
+//   - The skin-resolution branch (`tr.skins[hSkin]->numSurfaces`/
+//     `->surfaces[j]->name`/`->shader`, `tr.numSkins`) needs per-surface skin
+//     data `RenderAssets::skins: Arena<SkinAsset>` does not carry yet
+//     (`SkinAsset {}` is still an empty placeholder, owned by the `tr_image`
+//     wave). The live reconciled skin API, `RenderModels::skin_surfaces`
+//     (`tr_model/server_skins.rs:283`, PORT-NOTE at `tr_image.rs:878`),
+//     returns a flattened `Vec<(surface_name, shader_name)>` with no
+//     `ShaderHandle`/`.sort`/`.defaultShader` to reproduce the oracle's
+//     `shader->sort == SS_OPAQUE`/`shader->defaultShader` warning checks —
+//     bridging it would require inventing a shader-name→handle resolver not
+//     in this packet's resolved call surface, so it is flagged rather than
+//     bridged.
+//   - `RF_THIRD_PERSON`/`RF_WRAP_FRAMES`/`RF_NOSHADOW`/`RF_DEPTHHACK`/
+//     `RF_SHADOW_PLANE` (the `renderfx` bit tests) are genuinely absent: not
+//     in this packet's (nonexistent) `## FILE-SCOPE CONSTANTS` section and
+//     not found anywhere else in the crate — never-guess-a-constant.
+// `ent->e.frame`/`oldframe`/`customShader`/`customSkin`/`skinNum`/`renderfx`
+// themselves ARE readable straight off the tier-1 `refEntity_t` embedded in
+// `trRefEntity_t.e` (same carve-out `tr_main.rs::R_RotateForEntity`/this
+// file's own `r_cull_model` already use) — only the four blockers above are
+// out of reach. `ent`/`r_shadows_integer` (the `RendererCvars::r_shadows`
+// cvar, threaded the same way `tr_shadows.rs::RB_ShadowFinish` threads it)
+// are threaded as the already-ported shapes so a later wave's fix is a
+// body-only fill, not a signature change; `header` itself is left off the
+// signature because it is derived from the blocked `tr.currentModel` field
+// above, not an independent input.
+// Source: `oracle/codemp/renderer/tr_mesh.cpp:281-420`
+pub fn r_add_md3_surfaces(
+    _common: &mut Common,
+    _cvars: &RendererCvars,
+    _r_shadows_integer: i32,
+    _assets: &RenderAssets,
+    _frame: &FrameState,
+    _ent: &mut trRefEntity_t,
+) {
+    todo!("Port R_AddMD3Surfaces — oracle/codemp/renderer/tr_mesh.cpp:281-420")
+}

@@ -286,8 +286,8 @@ pub fn RB_SetColor(frame: &mut FrameState, color: [f32; 4]) {
 /// DEFERRED: R4 — GL-only (qglDrawBuffer/qglClear/qglClearColor) plus three
 /// not-yet-landed dependencies: `RenderAssets::world`'s `WorldAsset` fog
 /// fields (`global_fog`/`fogs`, tr_bsp/tr_world wave), the `r_clear` cvar's
-/// live integer value (the renderer's cvar-value-read seam isn't wired yet —
-/// `RendererCvars` holds only the `Option<CvarHandle>`, A13.1), and
+/// live integer value (read via `Common::cvar(handle)` once this fn's carrier threads
+/// `common` (see `tr_scene.rs`'s `r_markcount` precedent, A13.1), and
 /// `Q_irand`'s receiver (R2 assigns the renderer none — digest note). The
 /// oracle's `data`/`cmd + 1` command-buffer walk also dissolves per A1.
 ///
@@ -345,7 +345,7 @@ pub fn EndPixelShader(pixel_shader: &PixelShaderState) {
 ///
 /// DEFERRED: R4 — every dependency past the one field write below is
 /// unhomed:
-/// - the renderer's cvar-value-read seam isn't wired yet (`RendererCvars`
+/// - this fn's carrier does not yet thread `common` for `Common::cvar` reads (`RendererCvars`
 ///   holds only `Option<CvarHandle>`, A13.1) — `r_finish`/`r_measureOverdraw`/
 ///   `r_shadows`/`r_fastsky`/`r_DynamicGlow`'s live values can't be read;
 /// - `TrRefdef` (`FrameState::refdef`) only carries the `tr_backend` wave-0
@@ -468,7 +468,7 @@ pub fn RE_UploadCinematic(
 /// `r_DynamicGlowDelta` each pass.
 ///
 /// DEFERRED: R4 — entirely GL/cvar-value/GPU-texture-handle driven: the
-/// cvar-value-read seam isn't wired yet (`r_DynamicGlowIntensity`/
+/// carrier does not yet thread `common` for cvar reads (`r_DynamicGlowIntensity`/
 /// `r_DynamicGlowPasses`/`r_DynamicGlowDelta`'s live values, A13.1);
 /// `tr.glowVShader`/`glowPShader`/`screenGlow`/`blurImage` are GL program/
 /// texture handles with no R2-assigned carrier (GPU-facing state, an R4
@@ -493,7 +493,7 @@ pub fn RB_BlurGlowTexture(
 /// 2D orthographic mode.
 ///
 /// DEFERRED: R4 — entirely GL/cvar-value/GPU-texture-handle driven: the
-/// cvar-value-read seam isn't wired yet (`r_DynamicGlow`/
+/// carrier does not yet thread `common` for cvar reads (`r_DynamicGlow`/
 /// `r_DynamicGlowHeight`/`r_DynamicGlowSoft`/`r_DynamicGlowWidth`'s live
 /// values, A13.1); `tr.sceneImage`/`blurImage` are GL texture handles with
 /// no R2-assigned carrier (GPU-facing state, an R4 concern); every `qgl*`
@@ -653,7 +653,7 @@ pub fn RB_RotatePic2(
 /// DEFERRED: R4 — `qglClear`/`qglFinish` and the per-image
 /// `GL_Bind`/`qglBegin(GL_QUADS)`.../`qglEnd()` quad draw are GL-only
 /// (DEC-37 A13.2); the `r_showImages->integer == 2` proportional-size branch
-/// additionally needs the renderer's cvar-value-read seam, not wired yet
+/// additionally needs `common` threaded for `Common::cvar` reads
 /// (`RendererCvars` holds only `Option<CvarHandle>`, A13.1). The tile-grid
 /// math (`x`/`y`/`w`/`h` per image) and the iteration walk are real CPU logic
 /// and land here.
@@ -683,7 +683,7 @@ pub fn RB_ShowImages(
 
         // DEFERRED: R4 — r_showImages->integer == 2 proportional resize
         // (`w *= image->width / 512.0; h *= image->height / 512.0;`): the
-        // renderer's cvar-value-read seam isn't wired yet (RendererCvars
+        // fn's carrier does not yet thread `common` for cvar reads (RendererCvars
         // holds only Option<CvarHandle>, A13.1)
         // Source: oracle/codemp/renderer/tr_backend.cpp:1802-1805
         let _ = (cvars, x, y, w, h);

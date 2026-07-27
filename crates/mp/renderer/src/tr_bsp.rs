@@ -1615,3 +1615,54 @@ fn R_LoadSubmodels(ctx: &BspLoadContext, l: &lump_t, world: &mut WorldAsset, ind
         );
     }
 }
+
+// --- R3 wave 3 ---------------------------------------------------------
+
+/// Raven `R_TryStitchingPatch`.
+///
+/// PORT-NOTE: same "no state channel" / plain-`world_data` shape as its
+/// `R_StitchPatches`/`R_FixSharedVertexLodError` siblings above — no
+/// licensed `WorldAsset::surfaces` carrier exists yet for `worldData.surfaces`
+/// (see the top-of-file wave-1 note), so this walks a plain `world_data: &mut
+/// [GridMesh]` slice instead; `worldData.numsurfaces` is `world_data.len()`.
+/// The oracle caches `grid1 = worldData.surfaces[grid1num].data` once before
+/// the loop and never re-fetches it, but `lodRadius`/`lodOrigin` (the only
+/// fields read off `grid1` here) are never mutated by `R_StitchPatches`, so
+/// re-indexing `world_data[grid1num]` fresh each iteration is behaviorally
+/// identical and avoids holding a stale reference across the mutating call
+/// (interior-safety law: no raw pointers to alias here in the first place).
+/// The oracle's `grid2->surfaceType != SF_GRID` guard is transcribed
+/// verbatim, same as `R_FixSharedVertexLodError_r`'s identical guard, even
+/// though every element of `world_data` is already a `GridMesh` here
+/// (porting-rules §2).
+///
+/// Source: `oracle/codemp/renderer/tr_bsp.cpp:1250-1274`
+pub fn R_TryStitchingPatch(grid1num: usize, world_data: &mut [GridMesh]) -> i32 {
+    let mut numstitches = 0i32;
+    for j in 0..world_data.len() {
+        //
+        // if this surface is not a grid
+        if !matches!(world_data[j].surface_type, surfaceType_t::SF_GRID) {
+            continue;
+        }
+        // grids in the same LOD group should have the exact same lod radius
+        if world_data[grid1num].lod_radius != world_data[j].lod_radius {
+            continue;
+        }
+        // grids in the same LOD group should have the exact same lod origin
+        if world_data[grid1num].lod_origin[0] != world_data[j].lod_origin[0] {
+            continue;
+        }
+        if world_data[grid1num].lod_origin[1] != world_data[j].lod_origin[1] {
+            continue;
+        }
+        if world_data[grid1num].lod_origin[2] != world_data[j].lod_origin[2] {
+            continue;
+        }
+        //
+        while R_StitchPatches(grid1num, j, world_data) {
+            numstitches += 1;
+        }
+    }
+    numstitches
+}
