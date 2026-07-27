@@ -6,6 +6,7 @@ pub mod gl_constants;
 pub mod hook_install;
 pub mod mdx_format;
 pub mod render_state;
+pub mod tr_arioche;
 pub mod tr_backend;
 pub mod tr_bsp;
 pub mod tr_cmds;
