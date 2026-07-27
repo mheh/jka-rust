@@ -570,6 +570,95 @@ def oracle_c_sig(f):
     return f"{f['ret_type']}{star}{owner}{f['name']}({params});"
 
 
+# ------------------------------------------------- file-scope constants
+# WAVE-1 GAP FIX (2026-07-26): packets carried only each fn's own oracle
+# slice, never the file-scope `#define`s / const tables a few lines above it
+# in the same TU — transcribers stubbed fns on "constant not in my slice"
+# (SKY_SUBDIVISIONS `tr_sky.cpp:7`, DECAL_FADE_TIME `tr_scene.cpp:380`,
+# WIND_GUST_DECAY `tr_surfacesprites.cpp:57`, MAX_EDGE_DEFS
+# `tr_shadows.cpp:26`, POINTCACHE_CELL_SIZE `tr_WorldEffects.cpp:51`, ~19
+# fns total). `file_scope_constants()` pulls every such define/table into
+# the packet, verbatim with oracle line numbers, so the excuse no longer
+# applies.
+_INCLUDE_GUARD_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*_H_?$')
+_DEFINE_RE = re.compile(r'^\s*#\s*define\s+([A-Za-z_]\w*)')
+_TABLE_START_RE = re.compile(
+    r'^static\s+(?:const\s+)?[\w:<>]+(?:\s*\*+)?\s+\w+'
+    r'(?:\s*\[[^\]]*\])*\s*=\s*\{')
+_TABLE_MAX_LOC = 40
+
+
+def file_scope_constants(cfile):
+    """[(start_line, end_line), ...] — every file-scope `#define` (continuation
+    lines included) and small `static const`/`static ...[] = {...}` table in
+    one renderer TU, in source order. Heuristic (deliberately simple, per the
+    fix spec): a `#define` at any indent whose macro name doesn't look like an
+    include guard (`*_H`/`*_H_`) is a constant; a `static ... = {` line
+    starting at COLUMN 0 (this codebase always indents fn-local statics) opens
+    a table, brace-matched to its closing `};` and capped at ~40 LOC — a
+    longer block is real data, not a constant, and is skipped (not truncated,
+    so nothing half-verbatim ships)."""
+    ls = lines_of(cfile)
+    n = len(ls)
+    entries = []
+    i = 0
+    while i < n:
+        line = ls[i]
+        m = _DEFINE_RE.match(line)
+        if m:
+            if _INCLUDE_GUARD_RE.match(m.group(1)):
+                i += 1
+                continue
+            start = i
+            while ls[i].rstrip().endswith("\\") and i + 1 < n:
+                i += 1
+            entries.append((start + 1, i + 1))
+            i += 1
+            continue
+        if _TABLE_START_RE.match(line):
+            start = i
+            depth = line.count("{") - line.count("}")
+            j = i
+            while depth > 0 and j + 1 < n:
+                j += 1
+                depth += ls[j].count("{") - ls[j].count("}")
+            if depth == 0 and (j - start + 1) <= _TABLE_MAX_LOC:
+                entries.append((start + 1, j + 1))
+            i = j + 1
+            continue
+        i += 1
+    return entries
+
+
+def render_file_scope_constants(cfile):
+    """The packet's `## FILE-SCOPE CONSTANTS` section, or `None` if the TU has
+    none. Verbatim, oracle-line-numbered — these are IN-PACKET, closing the
+    "constant not in my slice" deferral gap."""
+    entries = file_scope_constants(cfile)
+    if not entries:
+        return None
+    o = [
+        "## FILE-SCOPE CONSTANTS (verbatim)",
+        "",
+        f"Every file-scope `#define` and small `static const` table in "
+        f"`{cfile}` (oracle line numbers below). **These are IN-PACKET** — a "
+        "constant listed here is not a deferral excuse; use it directly. A "
+        "constant a fn below needs that is NEITHER here NOR in that fn's own "
+        "oracle slice still follows the never-guess rule (§A2/porting-rules): "
+        "leave a cited `// DEFERRED:`, never invent a value.",
+        "",
+        "```c",
+    ]
+    for a, b in entries:
+        o.append(numbered_slice(cfile, a, b))
+        o.append("")
+    if o and o[-1] == "":
+        o.pop()
+    o.append("```")
+    o.append("")
+    return "\n".join(o)
+
+
 # ------------------------------------------------------------- doc law slices
 def doc_slice(path, start, end=None):
     """Verbatim slice of a markdown doc between two headings (authoritative
@@ -795,6 +884,15 @@ def render_preamble(law):
              "live jampded code; packets flag every fn whose name already "
              "exists in the crate — reconcile, never fork a second port.")
     o.append("- **Fn-scope statics:** " + THREE_KIND)
+    o.append("- **A packet's `## FILE-SCOPE CONSTANTS` section is IN-PACKET.** "
+             "Every `#define`/small const table that sits above a fn in its "
+             "own TU is pulled into that fn's packet verbatim, with oracle "
+             "line numbers — \"the constant isn't in my slice\" is not a "
+             "deferral excuse once it's listed there. A constant that is "
+             "neither in that section NOR in the fn's own oracle slice is "
+             "genuinely absent from the packet and still follows the "
+             "never-guess rule: leave a cited `// DEFERRED:`, never invent "
+             "a value.")
     o.append("")
     o.append(INTERIOR_LAW_BANNER)
     o.append("")
@@ -861,6 +959,10 @@ def render_packet(cfile, wave, units, shard, n_shards, law_sigs, inmod_sig,
     o.append("")
     o.append(INTERIOR_LAW_BANNER)
     o.append("")
+
+    const_section = render_file_scope_constants(cfile)
+    if const_section:
+        o.append(const_section)
 
     cyclic = [u for u in units if len(u) > 1]
     if cyclic:
