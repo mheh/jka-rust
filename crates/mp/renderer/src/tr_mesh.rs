@@ -4,12 +4,14 @@
 
 use mp_engine_qcommon::common::Common;
 use mp_engine_qcommon::qfiles::md3_header_t::md3Header_t;
-use mp_qshared::shared::vec3_t;
+use mp_qshared::shared::{cplane_t, vec3_t};
 
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::placeholders::RefEntity;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
+use crate::tr_local::orientationr_t::orientationr_t;
+use crate::tr_local::tr_ref_entity_t::trRefEntity_t;
 use crate::tr_model::render_models::RenderModels;
 
 /// Raven `float ProjectRadius(float r, vec3_t location)` — projects a
@@ -97,4 +99,48 @@ pub fn r_compute_lod(
     _ent: &RefEntity,
 ) -> i32 {
     todo!("Port R_ComputeLOD — oracle/codemp/renderer/tr_mesh.cpp:173-236")
+}
+
+/// Raven `static int R_CullModel(md3Header_t *header, trRefEntity_t *ent)` —
+/// culls an MD3 model against the view frustum: first a bounding-sphere test
+/// against the current (and, when animating, previous) frame's
+/// `localOrigin`/`radius` — skipped for non-normalized-axis (upscaled)
+/// entities — then, only when the sphere test doesn't already resolve to
+/// IN/OUT, a bounding-box test against the interpolated old/new frame
+/// bounds.
+// DEFERRED: R_CullModel — two blockers this wave cannot supply (whole-fn
+// deferral, no body transcribed):
+//   - the on-disk MD3 frame-array walk (`(md3Frame_t *)((byte *)header +
+//     header->ofsFrames) + ent->e.frame`/`oldframe`) has no SAFE quarantine
+//     accessor to call: the only existing Rust walk of this exact shape is
+//     `tr_model/frontend.rs::r_model_bounds`'s `header`/`ofsFrames`/
+//     `md3Frame_t` cast (`oracle/codemp/renderer/tr_model.cpp:1811-1836`),
+//     and that fn is `pub unsafe fn` — calling it needs an `unsafe` block at
+//     the call site, and this file bans unsafe outright (task rule: "UNSAFE
+//     IS BANNED IN THIS FILE ... If none fits, leave todo!() ... report it as
+//     an escalation"). `ent.e.frame`/`oldframe`/`nonNormalizedAxes` are
+//     themselves readable straight off the tier-1 `refEntity_t` embedded in
+//     `trRefEntity_t.e` (same carve-out `tr_main.rs::R_RotateForEntity`
+//     already uses for `ent.e.reType`/`axis`) — only the frame-array walk
+//     is blocked.
+//   - `tr.pc.c_sphere_cull_md3_in/clip/out`/`c_box_cull_md3_in/clip/out`
+//     (`frontEndCounters_t`) have no `FrameState` field home: the same
+//     UNMAPPED finding `tr_cmds.rs`'s `R_PerformanceCounters` deferral
+//     already recorded — "`tr.pc` (`frontEndCounters_t`) has no R2/
+//     placeholder home at all ... UNMAPPED, not invented, per the preamble's
+//     ... rule" (`tr_cmds.rs:203-208`).
+// `header`/`ent` are threaded as the already-ported tier-1/tier-2 shapes and
+// `R_CullLocalBox`/`R_CullLocalPointAndRadius`'s own params (`ori`,
+// `r_nocull_integer`, `frustum`) threaded straight through per their STATE
+// HOMES in `tr_main.rs`, so a later wave's fix is a body-only fill, not a
+// signature change.
+// Source: `oracle/codemp/renderer/tr_mesh.cpp:58-137`
+pub fn r_cull_model(
+    _header: &md3Header_t,
+    _ent: &trRefEntity_t,
+    _ori: &orientationr_t,
+    _r_nocull_integer: i32,
+    _frustum: &[cplane_t; 4],
+) -> i32 {
+    todo!("Port R_CullModel — oracle/codemp/renderer/tr_mesh.cpp:58-137")
 }

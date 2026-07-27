@@ -6,6 +6,11 @@
 // transcription, matching the rest of the renderer/engine crates.
 #![allow(non_snake_case)]
 
+use native_math::qmath::{
+    _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorSubtract, AddPointToBounds,
+    ClearBoundsMP, CrossProduct, Q_rsqrt, VectorInverse, VectorNormalize2,
+};
+
 use mp_qshared::shared::q_math::BoxOnPlaneSideRef;
 use mp_qshared::shared::surface_flags::{CONTENTS_FOG, SURF_NOIMPACT, SURF_NOMARKS};
 use mp_qshared::shared::{cplane_t, markFragment_t, vec3_t};
@@ -159,16 +164,55 @@ pub struct MarkSurface {
     pub data: MarkSurfaceData,
 }
 
-/// Owned replacement for `msurface_t.data`'s tagged `surfaceType_t *` union —
-/// only the variants `R_BoxSurfaces_r` inspects (`SF_FACE`'s embedded plane,
-/// and `SF_GRID`); every other kind collapses to `Other`.
+/// Owned replacement for `msurface_t.data`'s tagged `surfaceType_t *` union.
+///
+/// `R_BoxSurfaces_r` (wave 0) only ever needed `SF_FACE`'s plane to decide
+/// view-count skips, so it defined `Face`/`Grid`/`Other` with the plane as
+/// the sole payload. `R_MarkFragments` (this wave) walks the *geometry*
+/// itself — the grid's triangulated quads and the face's index-addressed
+/// point soup — which the skip-only shape can't carry. Both payload-bearing
+/// variants are extended here with the same fields the tier-2 quarantine
+/// accessors already expose for the real oracle types (`srfSurfaceFace_t
+/// ::point`/`::indices`, `srfGridMesh_t::width`/`height`/`verts` —
+/// `tr_local/{srf_surface_face_t,srf_grid_mesh_s}.rs`), so reconciling this
+/// scoped-local stand-in with the real world arena at integration is a
+/// straight field rename, not a reshape. All-owned per the interior-safety
+/// law — no raw pointers.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:656-678,799-812`
 #[derive(Clone)]
 pub enum MarkSurfaceData {
-    Face { plane: cplane_t },
-    Grid,
+    /// `srfSurfaceFace_t`'s plane plus its point/index soup — `points[i]` is
+    /// the `srfSurfaceFace_t::point(i)` result (leading xyz triple of vertex
+    /// `i`), `indexes` is `srfSurfaceFace_t::indices()`.
+    Face {
+        plane: cplane_t,
+        points: Vec<vec3_t>,
+        indexes: Vec<i32>,
+    },
+    /// `srfGridMesh_t`'s `width`/`height`/flattened `verts` (row-major,
+    /// `width * height` entries) — only `xyz`/`normal` survive per vertex,
+    /// the only fields `R_MarkFragments`'s grid walk reads.
+    Grid {
+        width: i32,
+        height: i32,
+        verts: Vec<MarkGridVert>,
+    },
     Other,
+}
+
+/// Scoped-local stand-in for the `drawVert_t` fields `R_MarkFragments`'s grid
+/// walk reads (`xyz`, `normal`) — see [`MarkSurfaceData::Grid`]'s doc. Not a
+/// second port of `drawVert_t` (`crates/mp/engine/qcommon/src/qfiles/
+/// draw_vert_t.rs`, which carries `st`/`lightmap`/`color` too and isn't
+/// `Clone`); this file needs `Clone` (`MarkSurfaceData` derives it) and only
+/// these two fields.
+///
+/// Type definition source: `oracle/codemp/qcommon/../qcommon/qfiles.h:514-520`
+#[derive(Clone, Copy)]
+pub struct MarkGridVert {
+    pub xyz: vec3_t,
+    pub normal: vec3_t,
 }
 
 /// Raven `R_BoxSurfaces_r`.
@@ -224,7 +268,7 @@ pub fn R_BoxSurfaces_r(
             surf.view_count = frame.view_count;
         }
         // extra check for surfaces to avoid list overflows
-        else if let MarkSurfaceData::Face { plane } = &mut surf.data {
+        else if let MarkSurfaceData::Face { plane, .. } = &mut surf.data {
             // the face plane should go through the box. Raven hands
             // `BoxOnPlaneSide` the stored `srfSurfaceFace_t::plane` itself
             // (`tr_marks.cpp:153`), not a copy.
@@ -236,7 +280,7 @@ pub fn R_BoxSurfaces_r(
                 // don't add faces that make sharp angles with the projection direction
                 surf.view_count = frame.view_count;
             }
-        } else if !matches!(surf.data, MarkSurfaceData::Grid) {
+        } else if !matches!(surf.data, MarkSurfaceData::Grid { .. }) {
             surf.view_count = frame.view_count;
         }
         // check the viewCount because the surface may have
@@ -302,4 +346,268 @@ pub fn R_AddMarkFragments(
         numPoints: points.len() as i32,
     });
     point_buffer.extend_from_slice(&points);
+}
+
+/// Renderer-local `MARKER_OFFSET` — the oracle's own trailing comment reads
+/// `// 1`, but the shipped literal is `0`; every `VectorMA(point,
+/// MARKER_OFFSET, normal, out)` call below is transcribed literally rather
+/// than collapsed away, matching the oracle's arithmetic shape.
+///
+/// Source: `oracle/codemp/renderer/tr_marks.cpp:11`
+const MARKER_OFFSET: f32 = 0.0;
+
+/// Raven's repeated `VectorCopy(dv->xyz, out); VectorMA(out, MARKER_OFFSET,
+/// dv->normal, out);` pair (`tr_marks.cpp:342-343` and five further sites) —
+/// the in-place `VectorMA` reads and writes the same slot it was just copied
+/// into, so the pair collapses to one `_VectorMA` call against the original
+/// `xyz` (porting-rules §10: control-flow shape is free, behavior is fixed).
+fn marker_point(xyz: vec3_t, normal: vec3_t) -> vec3_t {
+    let mut out: vec3_t = [0.0; 3];
+    _VectorMA(xyz, MARKER_OFFSET, normal, &mut out);
+    out
+}
+
+/// Raven `R_MarkFragments`.
+///
+/// PORT-NOTE: out-params→returns (dictionary): `pointBuffer`/`fragmentBuffer`
+/// become `&mut Vec<T>` (as `R_AddMarkFragments` already established);
+/// `returnedPoints`/`returnedFragments` fold into `.len()`. `numPoints` folds
+/// into `points.len()`. The oracle zeroes `returnedPoints`/`returnedFragments`
+/// at entry (`tr_marks.cpp:307-308`), so `.len()` stands in for them only
+/// because callers pass freshly-empty buffers — the precondition this fn
+/// assumes.
+///
+/// PORT-NOTE: `tr.world->nodes` (the BSP root `R_BoxSurfaces_r` walks) has no
+/// live carrier yet — `RenderAssets::world` is still an empty R3-wave
+/// placeholder this file may not grow (module-level note above) — so the
+/// root is threaded in explicitly as `world_root`, the same shape
+/// `R_BoxSurfaces_r` itself already takes (state threaded, not reached:
+/// porting-rules §B4). `tr.viewCount` threads via `FrameState::view_count`
+/// (`frame`), mutated here then read by `R_BoxSurfaces_r`.
+///
+/// Source: `oracle/codemp/renderer/tr_marks.cpp:245-448`
+pub fn R_MarkFragments(
+    points: &[vec3_t],
+    projection: vec3_t,
+    max_points: usize,
+    point_buffer: &mut Vec<vec3_t>,
+    max_fragments: usize,
+    fragment_buffer: &mut Vec<markFragment_t>,
+    world_root: &mut MarkNode,
+    frame: &mut FrameState,
+) -> i32 {
+    // increment view count for double check prevention
+    frame.view_count += 1;
+
+    let mut projection_dir: vec3_t = [0.0; 3];
+    VectorNormalize2(projection, &mut projection_dir);
+
+    // find all the brushes that are to be considered
+    let mut mins: vec3_t = [0.0; 3];
+    let mut maxs: vec3_t = [0.0; 3];
+    ClearBoundsMP(&mut mins, &mut maxs);
+    for p in points {
+        AddPointToBounds(*p, &mut mins, &mut maxs);
+
+        let mut temp: vec3_t = [0.0; 3];
+        _VectorAdd(*p, projection, &mut temp);
+        AddPointToBounds(temp, &mut mins, &mut maxs);
+
+        // make sure we get all the leafs (also the one(s) in front of the hit surface)
+        _VectorMA(*p, -20.0, projection_dir, &mut temp);
+        AddPointToBounds(temp, &mut mins, &mut maxs);
+    }
+
+    let num_points = points.len().min(MAX_VERTS_ON_POLY);
+
+    // create the bounding planes for the to be projected polygon
+    let mut normals: Vec<vec3_t> = vec![[0.0; 3]; num_points + 2];
+    let mut dists: Vec<f32> = vec![0.0; num_points + 2];
+    for i in 0..num_points {
+        let mut v1: vec3_t = [0.0; 3];
+        let mut v2: vec3_t = [0.0; 3];
+        _VectorSubtract(points[(i + 1) % num_points], points[i], &mut v1);
+        _VectorAdd(points[i], projection, &mut v2);
+        let v2_copy = v2;
+        _VectorSubtract(points[i], v2_copy, &mut v2);
+        CrossProduct(v1, v2, &mut normals[i]);
+        // VectorNormalizeFast( normals[i] ) — inline header helper, no
+        // existing equivalent; `Q_rsqrt`-based body matches the standard
+        // `ilength = Q_rsqrt(DotProduct(v,v)); v *= ilength;` shape (same
+        // pattern as `tr_shade_calc.rs::RB_CalcEnvironmentTexCoords`).
+        let ilength = Q_rsqrt(_DotProduct(normals[i], normals[i]));
+        normals[i][0] *= ilength;
+        normals[i][1] *= ilength;
+        normals[i][2] *= ilength;
+        dists[i] = _DotProduct(normals[i], points[i]);
+    }
+    // add near and far clipping planes for projection
+    _VectorCopy(projection_dir, &mut normals[num_points]);
+    dists[num_points] = _DotProduct(normals[num_points], points[0]) - 32.0;
+    _VectorCopy(projection_dir, &mut normals[num_points + 1]);
+    VectorInverse(&mut normals[num_points + 1]);
+    dists[num_points + 1] = _DotProduct(normals[num_points + 1], points[0]) - 20.0;
+    // Raven: numPlanes = numPoints + 2; — folds into normals/dists.len()
+    // (both sized exactly num_points + 2 above), no separate count needed.
+
+    let mut surfaces: Vec<MarkSurfaceData> = Vec::new();
+    R_BoxSurfaces_r(
+        world_root,
+        mins,
+        maxs,
+        &mut surfaces,
+        64,
+        projection_dir,
+        frame,
+    );
+    //assert(numsurfaces <= 64);
+    //assert(numsurfaces != 64);
+
+    for surf in &surfaces {
+        match surf {
+            MarkSurfaceData::Grid {
+                width,
+                height,
+                verts,
+            } => {
+                let width = *width as usize;
+                let height = *height as usize;
+                for m in 0..height.saturating_sub(1) {
+                    for n in 0..width.saturating_sub(1) {
+                        // We triangulate the grid and chop all triangles within
+                        // the bounding planes of the to be projected polygon.
+                        // LOD is not taken into account, not such a big deal though.
+                        //
+                        // It's probably much nicer to chop the grid itself and deal
+                        // with this grid as a normal SF_GRID surface so LOD will
+                        // be applied. However the LOD of that chopped grid must
+                        // be synced with the LOD of the original curve.
+                        // One way to do this; the chopped grid shares vertices with
+                        // the original curve. When LOD is applied to the original
+                        // curve the unused vertices are flagged. Now the chopped curve
+                        // should skip the flagged vertices. This still leaves the
+                        // problems with the vertices at the chopped grid edges.
+                        //
+                        // To avoid issues when LOD applied to "hollow curves" (like
+                        // the ones around many jump pads) we now just add a 2 unit
+                        // offset to the triangle vertices.
+                        // The offset is added in the vertex normal vector direction
+                        // so all triangles will still fit together.
+                        // The 2 unit offset should avoid pretty much all LOD problems.
+                        let base = m * width + n;
+                        let dv0 = verts[base];
+                        let dv_w = verts[base + width];
+                        let dv1 = verts[base + 1];
+                        let dv_w1 = verts[base + width + 1];
+
+                        // first triangle: dv0, dv[width], dv1
+                        let mut clip_points = [
+                            marker_point(dv0.xyz, dv0.normal),
+                            marker_point(dv_w.xyz, dv_w.normal),
+                            marker_point(dv1.xyz, dv1.normal),
+                        ];
+                        // check the normal of this triangle
+                        let mut v1: vec3_t = [0.0; 3];
+                        let mut v2: vec3_t = [0.0; 3];
+                        _VectorSubtract(clip_points[0], clip_points[1], &mut v1);
+                        _VectorSubtract(clip_points[2], clip_points[1], &mut v2);
+                        let mut normal: vec3_t = [0.0; 3];
+                        CrossProduct(v1, v2, &mut normal);
+                        let ilength = Q_rsqrt(_DotProduct(normal, normal));
+                        normal[0] *= ilength;
+                        normal[1] *= ilength;
+                        normal[2] *= ilength;
+                        if _DotProduct(normal, projection_dir) < -0.1 {
+                            // add the fragments of this triangle
+                            R_AddMarkFragments(
+                                &clip_points,
+                                &normals,
+                                &dists,
+                                max_points,
+                                point_buffer,
+                                fragment_buffer,
+                            );
+                            if fragment_buffer.len() == max_fragments {
+                                // not enough space for more fragments
+                                return fragment_buffer.len() as i32;
+                            }
+                        }
+
+                        // second triangle: dv1, dv[width], dv[width+1]
+                        clip_points = [
+                            marker_point(dv1.xyz, dv1.normal),
+                            marker_point(dv_w.xyz, dv_w.normal),
+                            marker_point(dv_w1.xyz, dv_w1.normal),
+                        ];
+                        // check the normal of this triangle
+                        _VectorSubtract(clip_points[0], clip_points[1], &mut v1);
+                        _VectorSubtract(clip_points[2], clip_points[1], &mut v2);
+                        CrossProduct(v1, v2, &mut normal);
+                        let ilength = Q_rsqrt(_DotProduct(normal, normal));
+                        normal[0] *= ilength;
+                        normal[1] *= ilength;
+                        normal[2] *= ilength;
+                        if _DotProduct(normal, projection_dir) < -0.05 {
+                            // add the fragments of this triangle
+                            R_AddMarkFragments(
+                                &clip_points,
+                                &normals,
+                                &dists,
+                                max_points,
+                                point_buffer,
+                                fragment_buffer,
+                            );
+                            if fragment_buffer.len() == max_fragments {
+                                // not enough space for more fragments
+                                return fragment_buffer.len() as i32;
+                            }
+                        }
+                    }
+                }
+            }
+            MarkSurfaceData::Face {
+                plane,
+                points: face_points,
+                indexes,
+            } => {
+                // check the normal of this face
+                if _DotProduct(plane.normal, projection_dir) > -0.5 {
+                    continue;
+                }
+
+                // §19: `chunks_exact` drops a malformed non-multiple-of-3 index
+                // tail; the C `k += 3` loop over-reads past `numIndices` and
+                // emits a garbage fragment (`tr_marks.cpp:413`) — defined
+                // behavior picked over the UB.
+                for chunk in indexes.chunks_exact(3) {
+                    let clip_points: [vec3_t; 3] = [
+                        marker_point(face_points[chunk[0] as usize], plane.normal),
+                        marker_point(face_points[chunk[1] as usize], plane.normal),
+                        marker_point(face_points[chunk[2] as usize], plane.normal),
+                    ];
+                    // add the fragments of this face
+                    R_AddMarkFragments(
+                        &clip_points,
+                        &normals,
+                        &dists,
+                        max_points,
+                        point_buffer,
+                        fragment_buffer,
+                    );
+                    if fragment_buffer.len() == max_fragments {
+                        // not enough space for more fragments
+                        return fragment_buffer.len() as i32;
+                    }
+                }
+            }
+            MarkSurfaceData::Other => {
+                // ignore all other world surfaces
+                // might be cool to also project polygons on a triangle soup
+                // however this will probably create huge amounts of extra polys
+                // even more than the projection onto curves
+                continue;
+            }
+        }
+    }
+    fragment_buffer.len() as i32
 }

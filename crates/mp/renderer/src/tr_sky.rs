@@ -27,6 +27,7 @@ use native_math::qmath::VectorNormalize;
 
 use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::image_asset::ImageHandle;
+use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::tr_backend::GL_Bind;
 use crate::tr_local::view_parms_t::viewParms_t;
@@ -629,6 +630,204 @@ pub fn R_InitSkyTexCoords(height_cloud: f32, view: &mut viewParms_t, sky: &mut S
 
                 sky.cloud_tex_coords[i][t as usize][s as usize] = [s_rad, t_rad];
             }
+        }
+    }
+}
+
+/// Raven `RB_ClipSkyPolygons`.
+///
+/// DEFERRED: R4 — the clip loop's every read comes from `input`
+/// (`shaderCommands_t *`, the same dissolved type as the global `tess` — R2
+/// `## State ownership` row `tess`: "dissolved into R4's
+/// tessellation/vertex-building pipeline ... no single global scratch
+/// buffer survives the new topology"; no R3 type exists for
+/// `input->numIndexes`/`->xyz`/`->indexes` to be read from). No computation
+/// survives once `input` is removed — the loop's only output (`p[j]`, via
+/// `VectorSubtract` against `backEnd.viewParms.ori.origin`) feeds straight
+/// into the already-ported `ClipSkyPolygon`. `ClearSkyBox`'s reset at the top
+/// of the fn is unconditional and independent of `input`, so it is
+/// transcribed for real (porting-rules: port the surrounding CPU logic,
+/// defer only the blocked piece). `_view` threads `backEnd.viewParms` for
+/// the deferred leg's future completion (top-of-file PORT-NOTE precedent).
+///
+/// Source: `oracle/codemp/renderer/tr_sky.cpp:244-261`
+pub fn RB_ClipSkyPolygons(_view: &viewParms_t, sky: &mut SkyState) {
+    ClearSkyBox(sky);
+
+    // DEFERRED: R4 — the `for (i = 0; i < input->numIndexes; i += 3)` clip
+    // loop (see doc comment above)
+    // Source: oracle/codemp/renderer/tr_sky.cpp:251-260
+}
+
+/// Raven `DrawSkyBox`.
+///
+/// The `HALF_SKY_SUBDIVISIONS`-scaled bounds keep the oracle's plain C
+/// float->int truncating cast (`porting-rules §C10` — no `myftol` call in
+/// this body, unlike sibling `FillCloudBox`/`R_BuildCloudData`'s
+/// `FillCloudBox`, which does call it). The `floor`/`ceil` calls are the
+/// `<math.h>` double overloads (no `floorf`/`ceilf`), so wave-0 ruling 12
+/// applies the same f64-intermediate, round-once treatment `FillCloudBox`
+/// already used for its identical expression shape.
+/// `Com_Memset( s_skyTexCoords, 0, sizeof( s_skyTexCoords ) )` translates to
+/// a direct zero-fill: the target is an owned `Vec<Vec<_>>`, not a raw
+/// buffer, and this file bans `unsafe` even for tier-2 raw-pointer reads, so
+/// the already-ported `Com_Memset(dest: *mut (), ...)` cannot be called here.
+///
+/// `sky` carries `sky_min`/`sky_max` (write)/`sky_mins`/`sky_maxs`
+/// (write)/`sky_points`/`sky_tex_coords` (`SkyState`, DEC-37 A13.3 — already
+/// landed by wave 0/1, not newly named here). `view` threads
+/// `backEnd.viewParms` into `MakeSkyVec` (top-of-file PORT-NOTE precedent).
+///
+/// `shader->sky->outerbox[i]` feeds `DrawSkySide`'s `image` argument, but
+/// `ShaderAsset::sky` is still the empty `SkyParms` placeholder
+/// (`render_state/placeholders.rs` — untouched by wave 0, fields land with
+/// the `tr_shader` wave that ports `skyParms_t`) — `outerbox` has no landed
+/// field, and this file cannot extend `placeholders.rs` (out of scope):
+/// DEFERRED, `todo!()`, not a guess. `gpu`/`shader_handle` are kept unread
+/// for call-site signature parity (same "kept for signature parity only"
+/// precedent this file's own `FillCloudBox` already established for its
+/// `_shader` param) — nothing downstream of the `outerbox` gap is reachable
+/// to read them.
+///
+/// Source: `oracle/codemp/renderer/tr_sky.cpp:378-446`
+pub fn DrawSkyBox(
+    _gpu: &mut GpuResources,
+    _shader_handle: ShaderHandle,
+    view: &viewParms_t,
+    sky: &mut SkyState,
+) {
+    sky.sky_min = 0.0;
+    sky.sky_max = 1.0;
+
+    for row in sky.sky_tex_coords.iter_mut() {
+        for cell in row.iter_mut() {
+            *cell = [0.0, 0.0];
+        }
+    }
+
+    for i in 0..6usize {
+        let half = HALF_SKY_SUBDIVISIONS as f64;
+        sky.sky_mins[0][i] = ((sky.sky_mins[0][i] as f64 * half).floor() / half) as f32;
+        sky.sky_mins[1][i] = ((sky.sky_mins[1][i] as f64 * half).floor() / half) as f32;
+        sky.sky_maxs[0][i] = ((sky.sky_maxs[0][i] as f64 * half).ceil() / half) as f32;
+        sky.sky_maxs[1][i] = ((sky.sky_maxs[1][i] as f64 * half).ceil() / half) as f32;
+
+        if sky.sky_mins[0][i] >= sky.sky_maxs[0][i] || sky.sky_mins[1][i] >= sky.sky_maxs[1][i] {
+            continue;
+        }
+
+        let mut sky_mins_subd = [
+            (sky.sky_mins[0][i] * HALF_SKY_SUBDIVISIONS as f32) as i32,
+            (sky.sky_mins[1][i] * HALF_SKY_SUBDIVISIONS as f32) as i32,
+        ];
+        let mut sky_maxs_subd = [
+            (sky.sky_maxs[0][i] * HALF_SKY_SUBDIVISIONS as f32) as i32,
+            (sky.sky_maxs[1][i] * HALF_SKY_SUBDIVISIONS as f32) as i32,
+        ];
+
+        if sky_mins_subd[0] < -HALF_SKY_SUBDIVISIONS {
+            sky_mins_subd[0] = -HALF_SKY_SUBDIVISIONS;
+        } else if sky_mins_subd[0] > HALF_SKY_SUBDIVISIONS {
+            sky_mins_subd[0] = HALF_SKY_SUBDIVISIONS;
+        }
+        if sky_mins_subd[1] < -HALF_SKY_SUBDIVISIONS {
+            sky_mins_subd[1] = -HALF_SKY_SUBDIVISIONS;
+        } else if sky_mins_subd[1] > HALF_SKY_SUBDIVISIONS {
+            sky_mins_subd[1] = HALF_SKY_SUBDIVISIONS;
+        }
+
+        if sky_maxs_subd[0] < -HALF_SKY_SUBDIVISIONS {
+            sky_maxs_subd[0] = -HALF_SKY_SUBDIVISIONS;
+        } else if sky_maxs_subd[0] > HALF_SKY_SUBDIVISIONS {
+            sky_maxs_subd[0] = HALF_SKY_SUBDIVISIONS;
+        }
+        if sky_maxs_subd[1] < -HALF_SKY_SUBDIVISIONS {
+            sky_maxs_subd[1] = -HALF_SKY_SUBDIVISIONS;
+        } else if sky_maxs_subd[1] > HALF_SKY_SUBDIVISIONS {
+            sky_maxs_subd[1] = HALF_SKY_SUBDIVISIONS;
+        }
+
+        // iterate through the subdivisions
+        for t in
+            (sky_mins_subd[1] + HALF_SKY_SUBDIVISIONS)..=(sky_maxs_subd[1] + HALF_SKY_SUBDIVISIONS)
+        {
+            for s in (sky_mins_subd[0] + HALF_SKY_SUBDIVISIONS)
+                ..=(sky_maxs_subd[0] + HALF_SKY_SUBDIVISIONS)
+            {
+                let (xyz, st) = MakeSkyVec(
+                    (s - HALF_SKY_SUBDIVISIONS) as f32 / HALF_SKY_SUBDIVISIONS as f32,
+                    (t - HALF_SKY_SUBDIVISIONS) as f32 / HALF_SKY_SUBDIVISIONS as f32,
+                    i,
+                    view,
+                    sky,
+                );
+                sky.sky_tex_coords[t as usize][s as usize] = st;
+                sky.sky_points[t as usize][s as usize] = xyz;
+            }
+        }
+
+        // DEFERRED: skyParms_t.outerbox — SkyParms interior not yet landed
+        // (see doc comment above); lands with a later tr_shader wave
+        // Source: oracle/codemp/renderer/tr_local.h:449-452
+        todo!("Port skyParms_t.outerbox — oracle/codemp/renderer/tr_local.h:449-452");
+    }
+}
+
+/// Raven `R_BuildCloudData`.
+///
+/// `input->shader` resolves through `RenderAssets::shaders` (same
+/// handle-threading translation as sibling `DrawSkyBox`, and the same
+/// `if let Some(...)` guard convention this crate already uses at
+/// `assets.shaders.get(...)` call sites). `assert( shader->sky )` becomes
+/// `debug_assert!` (existing precedent, e.g. `tr_scene.rs`'s
+/// `debug_assert!(ent.renderfx >= 0)`) — `ShaderAsset::sky` is a real,
+/// landed `Option<SkyParms>` field, so the assert itself is checkable even
+/// though `SkyParms`'s interior is still the empty wave-0 placeholder.
+///
+/// `sky_min`/`sky_max`'s RHS mixes an unsuffixed (`double`) literal with an
+/// `f`-suffixed one (`1.0 / 256.0f`), so the divide promotes to `f64` and
+/// rounds once at the assignment (wave-0 ruling 12) — Raven's own
+/// `// FIXME: not correct?` comment is kept verbatim. `tess.numIndexes = 0;
+/// tess.numVertexes = 0;` write the dissolved `tess`/`shaderCommands_t` (R2
+/// `## State ownership` row `tess`, no R3 carrier — DEFERRED).
+///
+/// `input->shader->sky->cloudHeight` gates the `FillCloudBox` loop, but
+/// `ShaderAsset::sky`'s interior (`SkyParms`) has no landed `cloudHeight`
+/// field yet (same placeholder as `DrawSkyBox`'s `outerbox` gap, and this
+/// file cannot extend `placeholders.rs`): DEFERRED, `todo!()`, not a guess.
+/// `input->shader->numUnfoggedPasses` is real
+/// (`ShaderAsset::num_unfogged_passes`) and threads straight into the
+/// already-ported `FillCloudBox`.
+///
+/// Source: `oracle/codemp/renderer/tr_sky.cpp:596-619`
+#[allow(unreachable_code, unused_variables)]
+pub fn R_BuildCloudData(
+    assets: &RenderAssets,
+    shader_handle: ShaderHandle,
+    view: &viewParms_t,
+    sky: &mut SkyState,
+) {
+    let Some(shader) = assets.shaders.get(shader_handle) else {
+        return;
+    };
+
+    debug_assert!(shader.sky.is_some(), "R_BuildCloudData: shader->sky");
+
+    // FIXME: not correct?
+    sky.sky_min = (1.0_f64 / 256.0_f64) as f32;
+    sky.sky_max = (255.0_f64 / 256.0_f64) as f32;
+
+    // DEFERRED: R4 — tess.numIndexes = 0; tess.numVertexes = 0; (dissolved
+    // `tess`/`shaderCommands_t`, R2 `## State ownership` row `tess`, no R3
+    // carrier)
+    // Source: oracle/codemp/renderer/tr_sky.cpp:609-610
+
+    // DEFERRED: skyParms_t.cloudHeight — SkyParms interior not yet landed
+    // (see doc comment above); lands with a later tr_shader wave
+    // Source: oracle/codemp/renderer/tr_local.h:449-452
+    if todo!("Port skyParms_t.cloudHeight — oracle/codemp/renderer/tr_local.h:449-452") {
+        for i in 0..shader.num_unfogged_passes {
+            FillCloudBox(shader_handle, i, view, sky);
         }
     }
 }

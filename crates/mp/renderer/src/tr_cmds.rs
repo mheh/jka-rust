@@ -195,3 +195,35 @@ pub fn RE_RotatePic2(
 // same). No `FrameEvent` variant exists for this wave to push.
 // (R2 `### A1 disposition table` row `RC_AUTO_MAP`; `R2-D8`)
 // Source: `oracle/codemp/renderer/tr_cmds.cpp:302-312`
+
+// DEFERRED: R_PerformanceCounters — every branch past the `r_speeds` cvar
+// check, plus the unconditional reset every path (including the early
+// `!r_speeds->integer` return) shares at the end, needs state homes this
+// wave cannot supply:
+//   - `tr.pc` (`frontEndCounters_t`) has no R2/placeholder home at all. The
+//     `## State ownership` row for `tr`'s "frontend scratch/counters"
+//     bucket names `FrameState` only generically — no wave has landed a
+//     `pc` field there, and `render_state::placeholders` has no
+//     `FrontEndCounters` type. UNMAPPED, not invented, per the preamble's
+//     "leave a cited `// DEFERRED:`... do NOT create a field" rule.
+//   - `backEnd.pc` (`backEndCounters_t`'s `c_shaders`/`c_surfaces`/
+//     `c_vertexes`/`c_indexes`/`c_totalIndexes`/`c_overDraw`/
+//     `c_dlightVertexes`/`c_dlightIndexes`/`c_flareAdds`/`c_flareTests`/
+//     `c_flareRenders` fields) are explicitly owned by "the R4 backend
+//     wave", per `BackEndCounters`'s own doc comment
+//     (`render_state/placeholders.rs:176-181`) — not this R3 wave.
+//   - `tr.viewParms.zFar` is explicitly owned by "the tr_main R3 wave", per
+//     `ViewParms`'s own doc comment (`render_state/placeholders.rs:159-166`)
+//     — also not this wave.
+//   - `tr.viewCluster` (same frontend-scratch bucket as `tr.pc`) has no
+//     field home either.
+// No branch — including the `r_speeds->integer == 7` texture/buffer-size
+// print, whose own inputs (`glConfig`, `RendererCvars::r_texturebits`) are
+// otherwise available — can be transcribed standalone, because every path
+// shares the trailing unconditional reset of both blocked counter structs.
+// Nothing in the ported crate calls `R_PerformanceCounters` yet (its sole
+// caller, `RB_ExecuteRenderCommands`, lands in a later wave per
+// `tr_cmds.wave7.md`), so no stub is required for compilation.
+// (R2 `## State ownership` row `tr` frontend scratch/counters, row
+// `backEnd`; `placeholders.rs` `BackEndCounters`/`ViewParms` doc comments)
+// Source: `oracle/codemp/renderer/tr_cmds.cpp:12-64`

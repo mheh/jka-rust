@@ -1553,3 +1553,180 @@ pub fn R_Resample(
         }
     }
 }
+
+// ============================================================================
+// wave 2
+// ============================================================================
+
+/// Raven `Upload32`.
+///
+/// ESCALATION: the entire function body lives inside `if (format == GL_RGBA)`
+/// (the oracle's `else` arm is empty — `tr_image.cpp:764-766`) — `GL_RGBA`'s
+/// numeric value is not in this packet or the target file. This exact
+/// constant is already marked the same way at this file's `R_LoadImage`
+/// (wave 0, `//TODO: Port GL_RGBA`); reused here rather than guessing a
+/// second, possibly-inconsistent value. Nothing past that first comparison
+/// is separable from it, so this is `todo!()`'d at the exact blocking point,
+/// matching the `GL_TextureMode` precedent directly above (wave 1, same
+/// file: "transcribe everything computable, `todo!()` at the exact blocking
+/// point"). Once `GL_RGBA` lands, the body also needs: `TrImageState`
+/// extended with the `mipBlendColors[16][4]` blend table (STATE HOMES row
+/// "NAMED BY THIS WAVE", DEC-37 A13.3 — not added here since nothing
+/// consumes it while the function stays blocked, porting-rules §A2 no
+/// speculative behavior); `RenderAssets::glconfig.max_texture_size`/
+/// `.texture_compression` (already landed fields, `R_BytesPerTex`/
+/// `tr_init.rs` precedent) for the picmip-clamp and format-select logic; and
+/// the R4 `qglTexImage2D`/`qglTexParameterf` GL entry points (DEC-37 A13.2,
+/// unhomed) for the upload/mipmap-refresh calls this fn's own threading
+/// digest already flags DEFERRED.
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:584-786
+pub fn Upload32(
+    _view: &mut EngineHostView,
+    _cvars: &RendererCvars,
+    _assets: &RenderAssets,
+    _state: &TrImageState,
+    _gpu: &mut GpuResources,
+    _data: &mut [u32],
+    format: i32,
+    _mipmap: bool,
+    _picmip: bool,
+    _is_lightmap: bool,
+    _allow_tc: bool,
+    _upload_width: u16,
+    _upload_height: u16,
+    _b_rectangle: bool,
+) -> (i32, u16, u16) {
+    let _ = format;
+    //TODO: Port GL_RGBA
+    // Source: oracle/codemp/renderer/tr_image.cpp:599 (`if (format == GL_RGBA)`
+    // — GL_RGBA's numeric value is not in this packet or the target file; see
+    // the doc comment above)
+    todo!(
+        "Port Upload32 — blocked on unresolved GL_RGBA format constant, oracle/codemp/renderer/tr_image.cpp:584-786"
+    )
+}
+
+/// Raven `R_Images_DeleteLightMaps`.
+///
+/// The std::map iteration + erase-on-match collapses to the same
+/// collect-then-delete shape as `R_Images_Clear` (wave 1), avoiding a live
+/// borrow of `RenderAssets::images` across arena mutation: images whose name
+/// matches the oracle's loose `imgName[0] == '*' && strstr(imgName,
+/// "lightmap")` check are collected first, then each is deleted through the
+/// already-ported `R_Images_DeleteImageContents` (empties the arena slot)
+/// with its `image_names` entry removed alongside — `R_Images_
+/// DeleteImageContents` alone only touches the arena, matching `R_Images_
+/// DeleteImage`'s (wave 1) identical two-registry cleanup (`R2-D3`/`R2-D4`).
+/// The oracle's `bEraseOccured` erase-in-place iterator dance has no R2
+/// carrier of its own (see `R_Images_StartIteration`'s PORT-NOTE) — the
+/// collect-first shape sidesteps it entirely.
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:1006-1031
+pub fn R_Images_DeleteLightMaps(sim: &mut RenderAssetsSim, gpu: &mut GpuResources) {
+    let _ = R_Images_StartIteration(&sim.published);
+    let mut cursor = 0usize;
+    let mut targets = Vec::new();
+    while let Some(handle) = R_Images_GetNextIteration(&sim.published, &mut cursor) {
+        if let Some(image) = sim.published.images.get(handle) {
+            // loose check, but should be ok
+            if image.img_name.starts_with('*') && image.img_name.contains("lightmap") {
+                targets.push((handle, image.img_name.clone()));
+            }
+        }
+    }
+
+    for (handle, name) in targets {
+        R_Images_DeleteImageContents(sim, handle);
+        Arc::make_mut(&mut sim.published).image_names.remove(&name);
+    }
+
+    GL_ResetBinds(gpu);
+}
+
+/// Raven `RE_RegisterImages_LevelLoadEnd`.
+///
+/// `qboolean` return preserved as `bool` (§C7, already out-param-free in the
+/// oracle). Same collect-then-delete arena-mutation shape as `R_Images_
+/// DeleteLightMaps` above — `R_Images_DeleteImageContents` empties the arena
+/// slot, the matching `image_names` entry is removed alongside (`R_Images_
+/// DeleteImage`'s two-registry cleanup precedent, `R2-D3`/`R2-D4`).
+/// `RE_RegisterMedia_GetLevel()` reconciles to the already-live
+/// `RenderModels::media_get_level` (`tr_model/cached_model_binary.rs`, per
+/// this file's `tr_model` PORT-NOTE above — reconciled, not re-ported). The
+/// commented-out `MAX_DRAWIMAGES` warning block (`tr_image.cpp:1134-1141`,
+/// already dead in the oracle) is not transcribed.
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:1097-1148
+pub fn RE_RegisterImages_LevelLoadEnd(
+    sim: &mut RenderAssetsSim,
+    gpu: &mut GpuResources,
+    view: &mut EngineHostView,
+    models: &RenderModels,
+) -> bool {
+    Com_DPrintf(
+        view.common,
+        &format!(
+            "{}RE_RegisterImages_LevelLoadEnd():\n",
+            S_COLOR_RED.to_str().expect("S_COLOR_RED is ASCII")
+        ),
+    );
+
+    let mut erase_occured = false;
+
+    let _ = R_Images_StartIteration(&sim.published);
+    let mut cursor = 0usize;
+    let mut targets = Vec::new();
+    while let Some(handle) = R_Images_GetNextIteration(&sim.published, &mut cursor) {
+        if let Some(image) = sim.published.images.get(handle) {
+            // don't un-register system shaders (*fog, *dlight, *white,
+            // *default), but DO de-register lightmaps
+            // ("*<mapname>/lightmap%d")
+            if !image.img_name.starts_with('*') || image.img_name.contains('/') {
+                // image used on this level?
+                if image.last_level_used_on != models.media_get_level() {
+                    // nope, so dump it...
+                    Com_DPrintf(
+                        view.common,
+                        &format!(
+                            "{}Dumping image \"{}\"\n",
+                            S_COLOR_RED.to_str().expect("S_COLOR_RED is ASCII"),
+                            image.img_name
+                        ),
+                    );
+                    targets.push((handle, image.img_name.clone()));
+                }
+            }
+        }
+    }
+
+    for (handle, name) in targets {
+        R_Images_DeleteImageContents(sim, handle);
+        Arc::make_mut(&mut sim.published).image_names.remove(&name);
+        erase_occured = true;
+    }
+
+    Com_DPrintf(
+        view.common,
+        &format!(
+            "{}RE_RegisterImages_LevelLoadEnd(): Ok\n",
+            S_COLOR_RED.to_str().expect("S_COLOR_RED is ASCII")
+        ),
+    );
+
+    GL_ResetBinds(gpu);
+
+    erase_occured
+}
+
+/// Raven `R_DeleteTextures`.
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:2942-2946
+pub fn R_DeleteTextures(
+    sim: &mut RenderAssetsSim,
+    state: &mut TrImageState,
+    gpu: &mut GpuResources,
+) {
+    R_Images_Clear(sim, state);
+    GL_ResetBinds(gpu);
+}

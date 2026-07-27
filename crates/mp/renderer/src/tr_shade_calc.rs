@@ -31,6 +31,7 @@ use crate::tr_local::orientationr_t::orientationr_t;
 use crate::tr_local::tex_mod_info_t::texModInfo_t;
 use crate::tr_local::tex_mod_t::texMod_t;
 use crate::tr_local::wave_form_t::waveForm_t;
+use crate::tr_noise::{get_noise_time, NoiseState, R_NoiseGet4f};
 
 // This wave threads `RenderAssets` (`## State ownership` row `tr` registries
 // SPLIT) and `RefEntity` (`crate::render_state::placeholders`, owned by the
@@ -1057,5 +1058,190 @@ pub fn RB_CalcDiffuseColor(
         c[2] = j as u8;
 
         c[3] = 255;
+    }
+}
+
+/// Raven `static float EvalWaveForm( const waveForm_t *wf )`.
+///
+/// `backEnd.refdef.floatTime`/`backEnd.refdef.time` and `tess.shaderTime` are
+/// `tess`/`refdef`-dissolved (`trRefdef_t`'s `floatTime`/`time` haven't landed
+/// on `TrRefdef` yet, matching this file's existing `refdef_time: i32`
+/// collapse pattern) — threaded as explicit scalar params;
+/// `TableForFunc`'s `assets`/`shader_name` thread through unchanged.
+///
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:40-56`
+fn EvalWaveForm(
+    wf: &waveForm_t,
+    noise: &NoiseState,
+    refdef_time: i32,
+    refdef_float_time: f32,
+    shader_time: f32,
+    assets: &RenderAssets,
+    shader_name: &str,
+) -> f32 {
+    match wf.func {
+        genFunc_t::GF_NOISE => {
+            wf.base
+                + R_NoiseGet4f(
+                    noise,
+                    0.0,
+                    0.0,
+                    0.0,
+                    (refdef_float_time + wf.phase) * wf.frequency,
+                ) * wf.amplitude
+        }
+        genFunc_t::GF_RAND => {
+            // `backEnd.refdef.time + wf->phase` is `int + float`, promoting to
+            // float; the result truncates toward zero on the implicit
+            // float->int conversion into `GetNoiseTime`'s `int t` parameter
+            // (standard C conversion, not `myftol`/FISTP) — `as i32` matches.
+            if get_noise_time(noise, (refdef_time as f32 + wf.phase) as i32) <= wf.frequency {
+                wf.base + wf.amplitude
+            } else {
+                wf.base
+            }
+        }
+        _ => {
+            let table = TableForFunc(wf.func, assets, shader_name);
+            WAVEVALUE(
+                table,
+                wf.base,
+                wf.amplitude,
+                wf.phase,
+                wf.frequency,
+                shader_time,
+            )
+        }
+    }
+}
+
+/// Raven `void RB_CalcDeformNormals( deformStage_t *ds )`.
+///
+/// `tess.xyz`/`tess.normal`/`tess.numVertexes` are `tess`-dissolved, threaded
+/// as slices (`xyz` read-only, `normal` mutated in place); `tess.shaderTime`
+/// collapses to a plain `f32`. `VectorNormalizeFast` is an inline header
+/// helper with no existing equivalent (resolved call surface) — inlined via
+/// `Q_rsqrt`, matching this file's established
+/// `RB_CalcEnvironmentTexCoords`/`RB_CalcSpecularAlpha` pattern.
+///
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:161-185`
+pub fn RB_CalcDeformNormals(
+    ds: &deformStage_t,
+    xyz: &[[f32; 4]],
+    normal: &mut [[f32; 4]],
+    shader_time: f32,
+    noise: &NoiseState,
+) {
+    for (v, n) in xyz.iter().zip(normal.iter_mut()) {
+        let scale = 0.98f32;
+        let scale = R_NoiseGet4f(
+            noise,
+            v[0] * scale,
+            v[1] * scale,
+            v[2] * scale,
+            shader_time * ds.deformationWave.frequency,
+        );
+        n[0] += ds.deformationWave.amplitude * scale;
+
+        let scale = 0.98f32;
+        let scale = R_NoiseGet4f(
+            noise,
+            100.0 + v[0] * scale,
+            v[1] * scale,
+            v[2] * scale,
+            shader_time * ds.deformationWave.frequency,
+        );
+        n[1] += ds.deformationWave.amplitude * scale;
+
+        let scale = 0.98f32;
+        let scale = R_NoiseGet4f(
+            noise,
+            200.0 + v[0] * scale,
+            v[1] * scale,
+            v[2] * scale,
+            shader_time * ds.deformationWave.frequency,
+        );
+        n[2] += ds.deformationWave.amplitude * scale;
+
+        // VectorNormalizeFast( normal )
+        let n3 = [n[0], n[1], n[2]];
+        let ilength = Q_rsqrt(_DotProduct(n3, n3));
+        n[0] *= ilength;
+        n[1] *= ilength;
+        n[2] *= ilength;
+    }
+}
+
+/// Raven `void RB_CalcDiffuseEntityColor( unsigned char *colors )`.
+///
+/// PORT-NOTE: the oracle's `if ( !backEnd.currentEntity )` branch calls
+/// `RB_CalcDiffuseColor(colors)` for the "error" fallback but has no
+/// `return;` after it — control falls straight through into
+/// `ent = backEnd.currentEntity;` and its unconditional dereferences
+/// (`VectorCopy(ent->ambientLight, ...)` etc.) on a possibly-null `ent`, a
+/// genuine Raven UB path (porting-rules §19). It is also unreachable under
+/// any defined interpretation: `RB_CalcDiffuseColor`'s own port (this file,
+/// above) already requires `ent: &RefEntity` by value, so the null branch
+/// could never actually supply it. Picked defined behavior: `current_entity`
+/// threads as `ent: &RefEntity` (always valid), matching this file's
+/// established precedent for the identical unconditional-deref-without-guard
+/// pattern (`RB_CalcDiffuseColor`/`RB_CalcDisintegrateColors` above); the dead
+/// fallback branch is dropped.
+///
+/// `tess.xyz` (`v`) is walked but never dereferenced in the oracle loop body
+/// (same finding as `RB_CalcDiffuseColor`), so it is not threaded as a
+/// parameter — only `tess.normal`/output `colors` are live reads/writes.
+/// `*(int *)&ambientLightInt` / `*(int *)&colors[i*4] = ambientLightInt` (a
+/// pack into an `int` immediately unpacked back to bytes via a second
+/// reinterpret-cast) collapses to a single owned `[u8; 4]` built directly in
+/// byte order — the interior-safety law forbids both pointer casts, and
+/// skipping the round-trip through `int` reproduces the same bytes on any
+/// platform (no endianness dependency, since both casts targeted the same
+/// byte order).
+///
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:1399-1463`
+pub fn RB_CalcDiffuseEntityColor(colors: &mut [[u8; 4]], normal: &[[f32; 4]], ent: &RefEntity) {
+    let ambient_light = ent.ambient_light;
+    let directed_light = ent.directed_light;
+    let light_dir = ent.light_dir;
+
+    let r = ent.shader_rgba[0] as f32 / 255.0;
+    let g = ent.shader_rgba[1] as f32 / 255.0;
+    let b = ent.shader_rgba[2] as f32 / 255.0;
+
+    let ambient_light_int: [u8; 4] = [
+        myftol(r * ambient_light[0]) as u8,
+        myftol(g * ambient_light[1]) as u8,
+        myftol(b * ambient_light[2]) as u8,
+        ent.shader_rgba[3],
+    ];
+
+    for (n, c) in normal.iter().zip(colors.iter_mut()) {
+        let n3 = [n[0], n[1], n[2]];
+        let incoming = _DotProduct(n3, light_dir);
+        if incoming <= 0.0 {
+            *c = ambient_light_int;
+            continue;
+        }
+
+        let mut j = ambient_light[0] + incoming * directed_light[0];
+        if j > 255.0 {
+            j = 255.0;
+        }
+        c[0] = myftol(j * r) as u8;
+
+        let mut j = ambient_light[1] + incoming * directed_light[1];
+        if j > 255.0 {
+            j = 255.0;
+        }
+        c[1] = myftol(j * g) as u8;
+
+        let mut j = ambient_light[2] + incoming * directed_light[2];
+        if j > 255.0 {
+            j = 255.0;
+        }
+        c[2] = myftol(j * b) as u8;
+
+        c[3] = ent.shader_rgba[3];
     }
 }

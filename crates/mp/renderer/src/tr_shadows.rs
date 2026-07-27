@@ -167,6 +167,71 @@ pub fn RB_ShadowFinish(r_shadows_integer: i32, glconfig: &GlConfig) {
     // Source: oracle/codemp/renderer/tr_shadows.cpp:418-461
 }
 
+/// Raven `RB_ShadowTessEnd` — retail dispatcher for the tessellated-shadow
+/// silhouette pass: always forwards to `RB_DoShadowTessEnd` with no light
+/// position.
+///
+/// PORT-NOTE: the compiled retail body is the `#else` leg of `#if 0` (line
+/// 197-198); the `#if 0`-guarded per-entity `directedLight` early return and
+/// the (further `/* */`-commented-out) per-dlight `RB_DoShadowTessEnd` loop
+/// above it are dead code in the retail build — matches this file's dead-code
+/// drop precedent (`R_RenderShadowEdges`, `RB_DoShadowTessEnd`'s own
+/// `#if 1`/`#if 0` note). `RB_DoShadowTessEnd`'s ported (wave-1) Rust
+/// signature takes no `lightPos` argument (its body is itself deferred whole
+/// to R4), so this call passes nothing rather than an unused `None`.
+///
+/// Source: `oracle/codemp/renderer/tr_shadows.cpp:160-200`
+pub fn RB_ShadowTessEnd() {
+    RB_DoShadowTessEnd();
+}
+
+/// Raven `RB_DistortionFill` — draws the full-screen refraction/distortion
+/// blend quad(s) (saber-trail and similar effects) into the previously
+/// captured screen-copy texture, stencil-masked to the affected region.
+///
+/// `glconfig` is `RenderAssets::glconfig` (STATE HOMES row, sim-readable —
+/// B11); `alpha`/`stretch`/`pre_post`/`negate` are the
+/// `FrameEvent::SetRefractionProp` payload fields (STATE HOMES rows
+/// `tr_distortion*`), threaded in rather than reached for.
+///
+/// DEFERRED: R4 — past the two guards below, the entire remaining body is
+/// the fixed-function GL sequence (`qglEnable`/`qglStencilFunc`/
+/// `qglStencilOp`/`qglDisable(GL_CLIP_PLANE0)`/`GL_Cull`/`qglMatrixMode`/
+/// `qglPushMatrix`/`qglLoadIdentity`/`qglOrtho`/`GL_State`/
+/// `qglBegin`..`qglEnd`/`qglColor4f`/`qglTexCoord2f`/`qglVertex2f`/
+/// `qglPopMatrix`) — unhomed until R4 (DEC-01/DEC-37; `GpuResources::gl_state`
+/// is a named placeholder), matching this file's `RB_ShadowFinish`
+/// guard-then-defer precedent. The `spost`/`spost2` stretch-animation
+/// arithmetic (`sin(tr.refdef.time*0.0005f)`/`sin(tr.refdef.time*0.0008f)`)
+/// exists solely to parameterize that GL sequence and additionally has no R3
+/// carrier to read from yet: `FrameState::refdef` (`TrRefdef`) does not carry
+/// a `time` field (landed with a later `tr_scene`/`tr_main` wave), matching
+/// this crate's `RB_Hyperspace` (`tr_backend.rs`) precedent of deferring
+/// `refdef.time`-driven arithmetic alongside its GL consumer.
+///
+/// Source: `oracle/codemp/renderer/tr_shadows.cpp:579-708`
+pub fn RB_DistortionFill(
+    glconfig: &GlConfig,
+    alpha: f32,
+    stretch: f32,
+    pre_post: bool,
+    negate: bool,
+) {
+    if glconfig.stencil_bits < 4 {
+        return;
+    }
+
+    //ok, cap the stupid thing now I guess
+    if !pre_post {
+        RB_CaptureScreenImage();
+    }
+
+    // DEFERRED: R4 — RB_DistortionFill stencil/blend-quad GL sequence (see
+    // doc comment above).
+    // Source: oracle/codemp/renderer/tr_shadows.cpp:596-707
+    let _ = (alpha, stretch, negate);
+}
+
 /// Raven `RB_CaptureScreenImage` — copies a centered screen region into
 /// `tr.screenImage`, clamped to the GL implementation's max texture size and
 /// the current viewport.

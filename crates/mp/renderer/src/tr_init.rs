@@ -6,6 +6,7 @@
 
 use core::ffi::c_int;
 
+use mp_engine_qcommon::cmd_common::{Cmd_Argc, Cmd_Argv};
 use mp_engine_qcommon::common::common::{com_printf, Common};
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::cvar_fns::{Cvar_Get, Cvar_Set, Cvar_VariableString};
@@ -17,9 +18,13 @@ use mp_qshared::shared::cvar::{
 use mp_qshared::shared::q_color::S_COLOR_YELLOW;
 use native_platform::Sys_LowPhysicalMemory;
 
+use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
+use crate::tr_backend::GL_TexEnv;
+use crate::tr_image::{GL_TextureMode, TrImageState};
+use crate::tr_shader::GL_MODULATE;
 
 /// `VidModeTable` — the built-in video-mode list `R_GetModeInfo`/
 /// `R_ModeList_f` index by small integer (DEC-37 A13.3 — NAMED BY THIS WAVE:
@@ -889,12 +894,12 @@ pub fn R_Register(view: &mut EngineHostView, cvars: &mut RendererCvars) {
     // build's live configuration (see doc comment above).
     // Source: oracle/codemp/renderer/tr_init.cpp:1188-1197
 
-    // TODO: Port R_Modellist_f
+    //TODO: Port R_Modellist_f
     // Source: oracle/codemp/renderer/tr_init.cpp:1199
     // Registered unconditionally (outside `#ifndef DEDICATED`) as
     // "modellist" — not yet ported anywhere in this crate.
 
-    // TODO: Port R_ModeList_f Cmd_AddCommand wiring
+    //TODO: Port R_ModeList_f Cmd_AddCommand wiring
     // Source: oracle/codemp/renderer/tr_init.cpp:1201
     // `R_ModeList_f` (this file — `common: &mut Common, vidmodes:
     // &VidModeTable`) is already ported but does not fit `CmdFunction =
@@ -902,8 +907,199 @@ pub fn R_Register(view: &mut EngineHostView, cvars: &mut RendererCvars) {
     // cmd_function_t.rs:12`) — no renderer-state-carrying adapter is
     // licensed by this packet's resolved call surface.
 
-    // TODO: Port RE_RegisterModels_Info_f
+    //TODO: Port RE_RegisterModels_Info_f
     // Source: oracle/codemp/renderer/tr_init.cpp:1203
     // Registered unconditionally (outside `#ifndef DEDICATED`) as
     // "modelcacheinfo" — not yet ported anywhere in this crate.
+}
+
+/// Raven `R_TakeScreenshotJPEG`.
+///
+/// `Hunk_AllocateTempMemory`/`Hunk_FreeTempMemory` collapse to an owned
+/// local `Vec<u8>`, matching the `R_TakeScreenshot` precedent above
+/// (porting-rules §C9).
+///
+/// The gamma-correct gate (`tr.overbrightBits > 0 && glConfig
+/// .deviceSupportsGamma`) needs `tr.overbrightBits` — `trGlobals_t`
+/// frontend scratch -> `RenderWorld::frame: FrameState` (`## State
+/// ownership` "tr frontend scratch/counters" row); not yet landed on
+/// `FrameState` (same gap `GfxInfo_f`/`R_TakeScreenshot` above already
+/// flag) — the whole conditional (and its `R_GammaCorrect` call) is
+/// skipped rather than guessed (porting-rules §A2).
+///
+/// Source: `oracle/codemp/renderer/tr_init.cpp:578-596`
+// `x`/`y`/`width`/`height` are read only by the R4-deferred `qglReadPixels`
+// call below.
+#[allow(unused_variables)]
+pub fn R_TakeScreenshotJPEG(
+    common: &mut Common,
+    assets: &RenderAssets,
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+    file_name: &str,
+) {
+    let vid_width = assets.glconfig.vid_width;
+    let vid_height = assets.glconfig.vid_height;
+
+    let buffer = vec![0u8; (vid_width * vid_height * 4).max(0) as usize];
+
+    // DEFERRED: R4 — `qglReadPixels( x, y, width, height, GL_RGBA,
+    // GL_UNSIGNED_BYTE, buffer )`: the fixed-function GL surface has no R3
+    // home (DEC-01/DEC-37 A13.2 — `GpuResources::gl_state` is a named
+    // placeholder until the wgpu rewrite). `buffer` stays zero-filled until
+    // R4 fills it; the surrounding CPU logic is still ported per this
+    // wave's threading digest ("port the CPU logic").
+    // Source: oracle/codemp/renderer/tr_init.cpp:584
+
+    // gamma correct — DEFERRED: `tr.overbrightBits`, see doc comment above.
+    // Source: oracle/codemp/renderer/tr_init.cpp:586-589
+
+    // `FS_WriteFile( fileName, buffer, 1 )` — "create path": the oracle
+    // writes a single byte of `buffer` ahead of `SaveJPG`'s own write,
+    // which creates the destination file/path `SaveJPG` then reopens.
+    // Transcribed literally (size `1`, not the full buffer).
+    FS_WriteFile(common, file_name, buffer.as_ptr() as *const (), 1);
+
+    // DEFERRED: `SaveJPG` — entirely a vendored-libjpeg compression
+    // pipeline with no Rust-crate jpeg-encode seam wired in this workspace
+    // (see the `SaveJPG` DEFERRED-WHOLE block, `tr_image.rs:1338-1352`,
+    // which this caller inherits verbatim per its own note: "extending
+    // wave 0's jpegDest-family precedent... to the caller").
+    // Source: oracle/codemp/renderer/tr_init.cpp:592
+
+    // `Hunk_FreeTempMemory(buffer)` — no-op: `buffer` (owned `Vec<u8>`)
+    // drops here (porting-rules §C9).
+}
+
+/// Raven `R_ScreenShotTGA_f`.
+///
+/// The "levelshot" branch calls `R_LevelShot`, which — despite this wave's
+/// RESOLVED CALL SURFACE listing it as already landed in wave 1
+/// (`oracle/codemp/renderer/tr_init.cpp:632-691`) — is actually DEFERRED
+/// WHOLE above (no callable Rust fn exists; blocked on `tr.world
+/// ->baseName`'s missing state home plus the R4 `qglReadPixels` gap): a
+/// wave-planning discrepancy, raised as an escalation rather than silently
+/// reconciled. The free-filename-scan `else` branch needs the fn-scope
+/// static `lastNumber` (`static int lastNumber = -1`), classified genuine
+/// cross-frame state (kind 3, three-kind rule) with NO R2 carrier assigned
+/// (preamble: "a kind-3 static is an escalation… never an invented
+/// field"). Both blocking points are transcribed as `todo!()` at the exact
+/// site that needs them — the `GL_TextureMode`
+/// `modes[6]`/`Taiwanese_CollapseBig5Code` precedent: transcribe
+/// everything computable, block only at the dependency itself — rather
+/// than deferring the whole function; the explicit-filename path
+/// (`Cmd_Argc() == 2 && !silent`) has neither gap and runs for real.
+///
+/// `Com_sprintf`/`va` -> `format!` per the translation dictionary (the
+/// `R_ScreenshotFilename` precedent above).
+///
+/// Source: `oracle/codemp/renderer/tr_init.cpp:705-759`
+pub fn R_ScreenShotTGA_f(view: &mut EngineHostView, assets: &RenderAssets) {
+    if Cmd_Argv(view.common, 1) == "levelshot" {
+        todo!(
+            "Port R_LevelShot call — R_LevelShot is DEFERRED WHOLE above (tr_init.rs); oracle/codemp/renderer/tr_init.cpp:711-714"
+        )
+    }
+
+    let silent = Cmd_Argv(view.common, 1) == "silent";
+
+    let checkname = if Cmd_Argc(view.common) == 2 && !silent {
+        // explicit filename
+        format!("screenshots/{}.tga", Cmd_Argv(view.common, 1))
+    } else {
+        // scan for a free filename
+        todo!(
+            "Port R_ScreenShotTGA_f's free-filename scan — needs fn-scope static `lastNumber` (kind-3, no R2 carrier assigned); oracle/codemp/renderer/tr_init.cpp:722-749"
+        )
+    };
+
+    R_TakeScreenshot(
+        view.common,
+        assets,
+        0,
+        0,
+        assets.glconfig.vid_width,
+        assets.glconfig.vid_height,
+        &checkname,
+    );
+
+    if !silent {
+        com_printf(view.common, &format!("Wrote {}\n", checkname));
+    }
+}
+
+/// Raven `GL_SetDefaultState`.
+///
+/// Every `qgl*` call in this fn (`qglClearDepth`/`qglCullFace`/
+/// `qglColor4f`/`qglDisable`/`qglEnable`/`qglEnableClientState`/
+/// `qglShadeModel`/`qglDepthFunc`/`qglPolygonMode`/`qglDepthMask`) is the
+/// fixed-function GL surface DEC-01/DEC-37 leave unhomed until the R4 wgpu
+/// rewrite (A13.2) — each is left as a cited `// DEFERRED: R4` rather than
+/// a stub body. The `qglActiveTextureARB` non-null multitexture-support
+/// gate is the same kind of gap (STATE HOMES: no R3 home), so its whole
+/// guarded block (the `GL_SelectTexture`/`GL_TextureMode`/`GL_TexEnv`/
+/// `qglDisable` sequence) is skipped rather than guessed at (porting-rules
+/// §A2) — the unconditional `GL_TextureMode`/`GL_TexEnv` calls below it
+/// still run. `glState.glStateBits` writes into `GpuResources::gl_state`
+/// (`GlStatePlaceholder`), which the R2 design leaves field-less until R4
+/// defines the real pipeline/bind-group cache — the write has no field to
+/// land on yet.
+///
+/// Source: `oracle/codemp/renderer/tr_init.cpp:822-865`
+pub fn GL_SetDefaultState(
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    assets: &RenderAssets,
+    state: &mut TrImageState,
+    gpu: &mut GpuResources,
+) {
+    // DEFERRED: R4 — qglClearDepth(1.0f); qglCullFace(GL_FRONT);
+    // qglColor4f(1,1,1,1). Fixed-function GL surface, no R3 home (DEC-01/
+    // DEC-37 A13.2).
+    // Source: oracle/codemp/renderer/tr_init.cpp:824-828
+
+    // DEFERRED: R4 — the `qglActiveTextureARB` non-null multitexture-
+    // support gate has no R3 home (STATE HOMES: "declared outside the
+    // renderer TU set… already homed by the engine port… confirm the exact
+    // receiver at port time"); its guarded block
+    // (`GL_SelectTexture(1)`/`GL_TextureMode`/`GL_TexEnv(GL_MODULATE)`/
+    // `qglDisable(GL_TEXTURE_2D)`/`GL_SelectTexture(0)`) is skipped whole
+    // rather than guessed at (porting-rules §A2) — the unconditional
+    // `GL_TextureMode`/`GL_TexEnv` calls below it still run.
+    // Source: oracle/codemp/renderer/tr_init.cpp:832-838
+
+    // DEFERRED: R4 — qglEnable(GL_TEXTURE_2D). Fixed-function GL surface.
+    // Source: oracle/codemp/renderer/tr_init.cpp:840
+
+    let texture_mode = view.common.cvar(cvars.r_textureMode).string.clone();
+    GL_TextureMode(view, cvars, assets, state, gpu, &texture_mode);
+    GL_TexEnv(gpu, GL_MODULATE as u32);
+
+    // DEFERRED: R4 — qglShadeModel(GL_SMOOTH); qglDepthFunc(GL_LEQUAL);
+    // qglEnableClientState(GL_VERTEX_ARRAY). Fixed-function GL surface, no
+    // R3 home. (`qglShadeModel` is absent from this wave's own GL/WGL
+    // entry-point digest list — a digest gap, not a different disposition:
+    // it is still the same `qgl*` surface.)
+    // Source: oracle/codemp/renderer/tr_init.cpp:844-849
+
+    // `glState.glStateBits = GLS_DEPTHTEST_DISABLE | GLS_DEPTHMASK_TRUE;` —
+    // DEFERRED: `GpuResources::gl_state` (`GlStatePlaceholder`) carries no
+    // fields yet (R2 leaves the pipeline/bind-group cache to R4); nothing
+    // to write to. The `GLS_*` bit-flag `#define`s are also not yet ported
+    // to Rust consts (same gap `GL_State`'s doc comment in `tr_backend.rs`
+    // already flags).
+    // Source: oracle/codemp/renderer/tr_init.cpp:854
+
+    // DEFERRED: R4 — qglPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    // qglDepthMask(GL_TRUE); qglDisable(GL_DEPTH_TEST);
+    // qglEnable(GL_SCISSOR_TEST); qglDisable(GL_CULL_FACE);
+    // qglDisable(GL_BLEND). Fixed-function GL surface, no R3 home.
+    // Source: oracle/codemp/renderer/tr_init.cpp:856-861
+
+    // `#ifdef _XBOX qglDisable( GL_LIGHTING ) #endif` dropped — MP retail
+    // builds the non-`_XBOX` branch (established precedent, `R_Register`
+    // doc comment above).
+    // Source: oracle/codemp/renderer/tr_init.cpp:862-864
 }

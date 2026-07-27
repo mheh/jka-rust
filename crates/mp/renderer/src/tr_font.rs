@@ -82,6 +82,10 @@ const KSC5601_HANGUL_LOBYTE_LOBOUND: u8 = 0xA0;
 /// Source: `oracle/codemp/renderer/tr_font.cpp:259`
 const KSC5601_HANGUL_LOBYTE_HIBOUND: u8 = 0xFF;
 
+/// Raven `KSC5601_HANGUL_CODES_PER_ROW` — 2 more than the number of glyphs.
+/// Source: `oracle/codemp/renderer/tr_font.cpp:260`
+const KSC5601_HANGUL_CODES_PER_ROW: u32 = 96;
+
 /// Raven `BIG5_HIBYTE_START0` — misc chars + level 1 hanzi (all Big5 ranges
 /// inclusive).
 /// Source: `oracle/codemp/renderer/tr_font.cpp:307`
@@ -147,6 +151,12 @@ const SHIFTJIS_LOBYTE_START1: u8 = 0x80;
 /// Source: `oracle/codemp/renderer/tr_font.cpp:398`
 const SHIFTJIS_LOBYTE_STOP1: u8 = 0xFC;
 
+/// Raven `SHIFTJIS_CODES_PER_ROW`.
+/// Source: `oracle/codemp/renderer/tr_font.cpp:399`
+const SHIFTJIS_CODES_PER_ROW: u32 =
+    ((SHIFTJIS_LOBYTE_STOP0 as u32 - SHIFTJIS_LOBYTE_START0 as u32) + 1)
+        + ((SHIFTJIS_LOBYTE_STOP1 as u32 - SHIFTJIS_LOBYTE_START1 as u32) + 1);
+
 /// Raven `GB_HIBYTE_START` — range is...
 /// Source: `oracle/codemp/renderer/tr_font.cpp:482`
 const GB_HIBYTE_START: u8 = 0xA1;
@@ -163,6 +173,10 @@ const GB_LOBYTE_LOBOUND: u8 = 0xA0;
 /// points, but NULLs in charsets for these codes).
 /// Source: `oracle/codemp/renderer/tr_font.cpp:485`
 const GB_LOBYTE_HIBOUND: u8 = 0xFF;
+
+/// Raven `GB_CODES_PER_ROW` — 1 more than the number of glyphs.
+/// Source: `oracle/codemp/renderer/tr_font.cpp:486`
+const GB_CODES_PER_ROW: u32 = 95;
 
 /// Raven `TIS_GLYPHS_START`.
 /// Source: `oracle/codemp/renderer/tr_font.cpp:551`
@@ -1182,6 +1196,20 @@ pub fn Korean_ValidKSC5601Hangul_uiCode(uiCode: u32) -> bool {
     Korean_ValidKSC5601Hangul((uiCode >> 8) as u8, (uiCode & 0xFF) as u8)
 }
 
+/// Raven `Korean_CollapseKSC5601HangulCode`.
+///
+/// Raven: sneaky maths on both bytes, reduce to 0x0000 onwards.
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:284-293`
+pub fn Korean_CollapseKSC5601HangulCode(mut uiCode: u32) -> i32 {
+    if Korean_ValidKSC5601Hangul_uiCode(uiCode) {
+        uiCode -= (KSC5601_HANGUL_HIBYTE_START as u32 * 256) + KSC5601_HANGUL_LOBYTE_LOBOUND as u32;
+        uiCode = ((uiCode >> 8) * KSC5601_HANGUL_CODES_PER_ROW) + (uiCode & 0xFF);
+        return uiCode as i32;
+    }
+    0
+}
+
 /// Per-subsystem owned state for the Asian-glyph + font-registry code
 /// (DEC-37 A13.3) — homes `g_iNonScaledCharRange` (write sites `:299,381`,
 /// and this shard's `:476,544,646`), the font registry
@@ -1347,6 +1375,31 @@ pub fn Japanese_IsTrailingPunctuation(uiCode: u32) -> bool {
     false
 }
 
+/// Raven `Japanese_CollapseShiftJISCode`.
+///
+/// Raven: sneaky maths on both bytes, reduce to 0x0000 onwards.
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:448-469`
+pub fn Japanese_CollapseShiftJISCode(mut uiCode: u32) -> i32 {
+    if Japanese_ValidShiftJISCode_uiCode(uiCode) {
+        uiCode -= ((SHIFTJIS_HIBYTE_START0 as u32) << 8) | SHIFTJIS_LOBYTE_START0 as u32;
+
+        if (uiCode & 0xFF) >= (SHIFTJIS_LOBYTE_START1 as u32) - SHIFTJIS_LOBYTE_START0 as u32 {
+            uiCode -= (SHIFTJIS_LOBYTE_START1 as u32 - SHIFTJIS_LOBYTE_STOP0 as u32) - 1;
+        }
+
+        if ((uiCode >> 8) & 0xFF) >= (SHIFTJIS_HIBYTE_START1 as u32) - SHIFTJIS_HIBYTE_START0 as u32
+        {
+            uiCode -= ((SHIFTJIS_HIBYTE_START1 as u32 - SHIFTJIS_HIBYTE_STOP0 as u32) - 1) << 8;
+        }
+
+        uiCode = ((uiCode >> 8) * SHIFTJIS_CODES_PER_ROW) + (uiCode & 0xFF);
+
+        return uiCode as i32;
+    }
+    0
+}
+
 /// Raven `Japanese_InitFields`.
 /// Source: `oracle/codemp/renderer/tr_font.cpp:472-478`
 pub fn Japanese_InitFields(font: &mut FontState) -> LanguageFontFields {
@@ -1394,6 +1447,21 @@ pub fn Chinese_IsTrailingPunctuation(uiCode: u32) -> bool {
     false
 }
 
+/// Raven `Chinese_CollapseGBCode`.
+///
+/// Raven: sneaky maths on both bytes, reduce to 0x0000 onwards.
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:527-537`
+pub fn Chinese_CollapseGBCode(mut uiCode: u32) -> i32 {
+    if Chinese_ValidGBCode_uiCode(uiCode) {
+        uiCode -= (GB_HIBYTE_START as u32 * 256) + GB_LOBYTE_LOBOUND as u32;
+        uiCode = ((uiCode >> 8) * GB_CODES_PER_ROW) + (uiCode & 0xFF);
+        return uiCode as i32;
+    }
+
+    0
+}
+
 /// Raven `Chinese_InitFields`.
 /// Source: `oracle/codemp/renderer/tr_font.cpp:539-545`
 pub fn Chinese_InitFields(font: &mut FontState) -> LanguageFontFields {
@@ -1431,7 +1499,10 @@ pub fn Thai_ValidTISCode(font: &FontState, psString: &[u8]) -> (u32, i32) {
     let mut code_chars = [0u8; 4]; // important that we clear all 4 bytes in sChars here
     let mut bytes_matched = 3;
     for i in 0..3usize {
-        code_chars[i] = psString[i];
+        // §19: sibling of `AnyLanguage_ReadCharFromString`'s second-byte read —
+        // C walks into the NUL terminator on a short string, so a missing byte
+        // reads as 0 here rather than panicking.
+        code_chars[i] = psString.get(i).copied().unwrap_or(0);
 
         let code = u32::from_le_bytes(code_chars);
         let iIndex = font.g_ThaiCodes.GetValidIndex(code as i32);
@@ -1480,6 +1551,117 @@ pub fn Thai_InitFields(font: &mut FontState) -> LanguageFontFields {
         psLang: "tha",
         m_iAsianGlyphsAcross: 32,
     }
+}
+
+/// Raven `AnyLanguage_ReadCharFromString`.
+///
+/// PORT-NOTE: `GetLanguageEnum()` is unported (file-head DEFERRED,
+/// `:31-53`); threaded in as `eLanguage`, same as every other caller in this
+/// file. Raven's `const byte *psString = (const byte *)psText` sign-promote
+/// dodge needs no equivalent — `&[u8]` is already unsigned. The optional
+/// `int *piAdvanceCount` out-param is not optional in Raven (always written),
+/// so it is simply the tuple's second element; the optional
+/// `qboolean *pbIsTrailingPunctuation` becomes the `bWantTrailingPunctuation`
+/// request flag plus a `Option<bool>` third element, mirroring
+/// [`CFontInfo::GetLetter`]'s `bWantShader`/`Option<i32>` pair.
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:659-779`
+pub fn AnyLanguage_ReadCharFromString(
+    font: &FontState,
+    eLanguage: Language_e,
+    psString: &[u8],
+    bWantTrailingPunctuation: bool,
+) -> (u32, i32, Option<bool>) {
+    // §19: the double-byte arms read `psString[1]` on a one-character string,
+    // where C reads the NUL terminator (0); `&[u8]` has no terminator, so the
+    // second byte reads as 0 when absent instead of panicking.
+    let second = psString.get(1).copied().unwrap_or(0);
+
+    match eLanguage {
+        Language_e::eKorean => {
+            if Korean_ValidKSC5601Hangul(psString[0], second) {
+                let uiLetter = (psString[0] as u32 * 256) + second as u32;
+                let piAdvanceCount = 2;
+
+                // not going to bother testing for korean punctuation here, since korean already
+                //	uses spaces, and I don't have the punctuation glyphs defined, only the basic 2350 hanguls
+                //
+                let pbIsTrailingPunctuation = bWantTrailingPunctuation.then_some(false);
+
+                return (uiLetter, piAdvanceCount, pbIsTrailingPunctuation);
+            }
+        }
+        Language_e::eTaiwanese => {
+            if Taiwanese_ValidBig5Code((psString[0] as u32 * 256) + second as u32) {
+                let uiLetter = (psString[0] as u32 * 256) + second as u32;
+                let piAdvanceCount = 2;
+
+                // need to ask if this is a trailing (ie like a comma or full-stop) punctuation?...
+                //
+                let pbIsTrailingPunctuation =
+                    bWantTrailingPunctuation.then(|| Taiwanese_IsTrailingPunctuation(uiLetter));
+
+                return (uiLetter, piAdvanceCount, pbIsTrailingPunctuation);
+            }
+        }
+        Language_e::eJapanese => {
+            if Japanese_ValidShiftJISCode(psString[0], second) {
+                let uiLetter = (psString[0] as u32 * 256) + second as u32;
+                let piAdvanceCount = 2;
+
+                // need to ask if this is a trailing (ie like a comma or full-stop) punctuation?...
+                //
+                let pbIsTrailingPunctuation =
+                    bWantTrailingPunctuation.then(|| Japanese_IsTrailingPunctuation(uiLetter));
+
+                return (uiLetter, piAdvanceCount, pbIsTrailingPunctuation);
+            }
+        }
+        Language_e::eChinese => {
+            if Chinese_ValidGBCode_uiCode((psString[0] as u32 * 256) + second as u32) {
+                let uiLetter = (psString[0] as u32 * 256) + second as u32;
+                let piAdvanceCount = 2;
+
+                // need to ask if this is a trailing (ie like a comma or full-stop) punctuation?...
+                //
+                let pbIsTrailingPunctuation =
+                    bWantTrailingPunctuation.then(|| Chinese_IsTrailingPunctuation(uiLetter));
+
+                return (uiLetter, piAdvanceCount, pbIsTrailingPunctuation);
+            }
+        }
+        Language_e::eThai => {
+            let (uiLetter, iThaiBytes) = Thai_ValidTISCode(font, psString);
+            if uiLetter != 0 {
+                let piAdvanceCount = iThaiBytes;
+
+                let pbIsTrailingPunctuation =
+                    bWantTrailingPunctuation.then(|| Thai_IsTrailingPunctuation(uiLetter));
+
+                return (uiLetter, piAdvanceCount, pbIsTrailingPunctuation);
+            }
+        }
+        // Raven's `switch` has no `default` arm for the remaining (Western/
+        // Russian/Polish) languages — they fall straight to the shared
+        // single-byte tail below.
+        _ => {}
+    }
+
+    // ... must not have been an MBCS code...
+    //
+    let uiLetter = psString[0] as u32;
+    let piAdvanceCount = 1;
+
+    let pbIsTrailingPunctuation = bWantTrailingPunctuation.then(|| {
+        uiLetter == b'!' as u32
+            || uiLetter == b'?' as u32
+            || uiLetter == b',' as u32
+            || uiLetter == b'.' as u32
+            || uiLetter == b';' as u32
+            || uiLetter == b':' as u32
+    });
+
+    (uiLetter, piAdvanceCount, pbIsTrailingPunctuation)
 }
 
 /// Raven `Language_IsAsian`.
@@ -1577,6 +1759,45 @@ pub fn GetFont_SBCSOverride(
     }
 
     None
+}
+
+/// Raven `GetFont`.
+///
+/// PORT-NOTE: `GetLanguageEnum()` is unported (file-head DEFERRED,
+/// `:31-53`); threaded in as `eLanguage`, forwarded to
+/// [`GetFont_SBCSOverride`] exactly as its own PORT-NOTE requires.
+///
+/// PORT-NOTE: this packet's RESOLVED CALL SURFACE lists `GetFont_Actual` as
+/// already ported in a lower wave; grepping this crate shows it does not
+/// exist yet — the same wave-planning defect [`GetFont_SBCSOverride`]'s
+/// PORT-NOTE already raised for the identical fn. `pFont`/the returned
+/// `CFontInfo *` are `FontState::g_vFontArray` indices per the arena+id
+/// pattern this file already uses; every step this fn can perform without
+/// `GetFont_Actual` is transcribed faithfully, only the initial lookup is
+/// left as a cited `todo!()`.
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:1299-1318`
+#[allow(unreachable_code, unused_variables)]
+pub fn GetFont(font: &mut FontState, eLanguage: Language_e, index: i32) -> Option<i32> {
+    let _ = index;
+    //TODO: Port GetFont_Actual
+    // Source: oracle/codemp/renderer/tr_font.cpp:1301
+    let pFont: Option<i32> =
+        todo!("Port GetFont's GetFont_Actual call — oracle/codemp/renderer/tr_font.cpp:1301");
+
+    if let Some(iFont) = pFont {
+        // any SBCS overrides? (this has to be pretty quick, and is (sort of))...
+        //
+        for entry in g_SBCSOverrideLanguages.iter() {
+            let pAltFont =
+                GetFont_SBCSOverride(font, eLanguage, iFont, entry.m_eLanguage, entry.m_psName);
+            if pAltFont.is_some() {
+                return pAltFont;
+            }
+        }
+    }
+
+    pFont
 }
 
 /// Raven `R_InitFonts`.

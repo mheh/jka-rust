@@ -92,6 +92,13 @@ pub struct SceneState {
     /// Raven `re_decalPolyTotal[NUM_DECAL_POLY_TYPES]` — decal per-type
     /// running total. Same PORT-NOTE as `decal_polys`.
     pub decal_poly_total: Vec<i32>,
+    /// Raven `R_AddDecals`'s `static int lastMarkCount` — cross-frame
+    /// `r_markcount` latch driving the one-shot "cvar changed -> clear the
+    /// decal pool" reset. Initialised to the oracle's `-1` sentinel ("never
+    /// sampled"), which suppresses the clear on the first call.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_scene.cpp:624`
+    pub last_mark_count: i32,
 }
 
 impl Default for SceneState {
@@ -101,6 +108,7 @@ impl Default for SceneState {
             decal_polys: Vec::new(),
             decal_poly_head: Vec::new(),
             decal_poly_total: Vec::new(),
+            last_mark_count: -1,
         }
     }
 }
@@ -777,4 +785,96 @@ pub fn RE_AllocDecal(
     set_decal_head(scene, type_ as usize, new_head);
 
     (type_ as usize, head)
+}
+
+// ---------------------------------------------------------------------
+// wave 2
+// ---------------------------------------------------------------------
+
+/// Raven `R_AddDecals`.
+///
+/// `refdef_time` stands in for `tr.refdef.time` — same STATE HOMES caveat as
+/// `RE_FreeDecal`/`RE_AllocDecal` (`TrRefdef` has no `time` field yet and this
+/// wave is scoped to `tr_scene.rs` only; escalate a field-merge if a later
+/// wave needs it back from `FrameState` directly).
+///
+/// `type_` walks `DECALPOLY_TYPE_NORMAL..=DECALPOLY_TYPE_FADE` rather than
+/// the oracle's `DECALPOLY_TYPE_MAX` sentinel: `DECALPOLY_TYPE_MAX` is not
+/// itself in this packet's FILE-SCOPE CONSTANTS section nor this fn's own
+/// oracle slice, so its numeric value is never invented — the loop still
+/// covers exactly the same two already-ported, cited members
+/// (`DECALPOLY_TYPE_NORMAL = 0`, `DECALPOLY_TYPE_FADE = 1`, wave-1) that a
+/// sequential C enum's `_MAX` sentinel would bound.
+///
+/// Source: `oracle/codemp/renderer/tr_scene.cpp:620-690`
+pub fn R_AddDecals(
+    frame: &mut FrameData,
+    assets: &RenderAssets,
+    scene: &mut SceneState,
+    cvars: &RendererCvars,
+    common: &mut Common,
+    refdef_time: i32,
+) {
+    let r_markcount = common.cvar(cvars.r_markcount).integer;
+
+    // `static int lastMarkCount` is homed on `SceneState` (DEC-37 A13.3 — this
+    // file's own state carrier), initialised to the oracle's `-1` sentinel.
+    // Source: oracle/codemp/renderer/tr_scene.cpp:624,626-634
+    if r_markcount != scene.last_mark_count {
+        if scene.last_mark_count != -1 {
+            RE_ClearDecals(scene);
+        }
+
+        scene.last_mark_count = r_markcount;
+    }
+
+    if r_markcount <= 0 {
+        return;
+    }
+
+    for type_ in DECALPOLY_TYPE_NORMAL..=DECALPOLY_TYPE_FADE {
+        let mut decal_poly = decal_head(scene, type_ as usize);
+
+        loop {
+            ensure_decal_pool(scene, type_ as usize, decal_poly as usize + 1);
+            let p = scene.decal_polys[type_ as usize][decal_poly as usize];
+
+            if p.time != 0 {
+                if p.fadetime != 0 {
+                    // fade all marks out with time
+                    let t = refdef_time - p.time;
+                    if t < DECAL_FADE_TIME {
+                        let fade = 255.0f32 * (1.0 - (t as f32 / DECAL_FADE_TIME as f32));
+                        let num_verts = p.poly.numVerts as usize;
+
+                        for j in 0..num_verts {
+                            scene.decal_polys[type_ as usize][decal_poly as usize].verts[j]
+                                .modulate[3] = fade as u8;
+                        }
+
+                        let verts: Vec<PolyVert> = scene.decal_polys[type_ as usize]
+                            [decal_poly as usize]
+                            .verts[..num_verts]
+                            .to_vec();
+                        RE_AddPolyToScene(frame, assets, common, p.shader, &verts, num_verts, 1);
+                    } else {
+                        RE_FreeDecal(scene, cvars, &*common, refdef_time, type_, decal_poly);
+                    }
+                } else {
+                    let num_verts = p.poly.numVerts as usize;
+                    let verts: Vec<PolyVert> = p.verts[..num_verts].to_vec();
+                    RE_AddPolyToScene(frame, assets, common, p.shader, &verts, num_verts, 1);
+                }
+            }
+
+            decal_poly += 1;
+            if decal_poly >= r_markcount {
+                decal_poly = 0;
+            }
+
+            if decal_poly == decal_head(scene, type_ as usize) {
+                break;
+            }
+        }
+    }
 }

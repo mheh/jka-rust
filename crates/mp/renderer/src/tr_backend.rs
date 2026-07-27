@@ -15,6 +15,8 @@ use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::placeholders::Vec3;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
+use crate::render_state::shader_asset::ShaderHandle;
+use crate::tr_image::{R_Images_GetNextIteration, R_Images_StartIteration};
 use crate::tr_local::cull_type_t::cullType_t;
 
 // `R_WorldCoordToScreenCoordFloat` threads `RenderAssets::glconfig`
@@ -501,4 +503,201 @@ pub fn RB_BlurGlowTexture(
 pub fn RB_DrawGlowOverlay(_gpu: &mut GpuResources, _assets: &RenderAssets, _cvars: &RendererCvars) {
     // DEFERRED: R4 — RB_DrawGlowOverlay (see doc comment above) (DEC-37 A13.2)
     // Source: oracle/codemp/renderer/tr_backend.cpp:2192-2325
+}
+
+/// Raven `RB_RotatePic` — the `RC_ROTATE_PIC` backend command: rotates a
+/// stretched pic about its top-right corner (`x + w`, `y`) and draws it as a
+/// `GL_QUADS` quad. The oracle's `data`/`cmd + 1` command-buffer walk
+/// dissolves — the caller supplies the already-decoded
+/// `FrameEvent::DrawRotatePic` payload directly (`R2-D2`/A1); `cmd->shader`
+/// becomes the `shader: ShaderHandle` payload field per the tier-2
+/// transition audit's `rotatePicCommand_t`/`shader_t` rows.
+///
+/// The oracle's `image = &shader->stages[0].bundle[0].image[0]` is a plain
+/// re-fetch of `bundle[0].image` (indexing a pointer field with `[0]` is
+/// `*image`, so `&image[0]` is `image` itself) — a real nullable pointer,
+/// not a structurally-non-null address-of; landed here as
+/// `ShaderStage::image` and the `if (image)` guard as an `Option` check. A
+/// stale/invalid `shader` handle or a shader with no stages yet (`stages` is
+/// still populated empty by every current `GeneratePermanentShader` call —
+/// its per-stage copy loop is a separate, later wave) both fall through the
+/// same `None` path as a genuinely unset image, matching the oracle's
+/// "skip drawing" outcome (porting-rules §19).
+///
+/// DEFERRED: R4 — past that guard, every effect (`qglColor4ubv`/
+/// `qglPushMatrix`/`qglTranslatef`/`qglRotatef`, `GL_Bind`'s own innards, the
+/// `qglBegin(GL_QUADS)`/`qglTexCoord2f`/`qglVertex2f` quad, and
+/// `qglEnd`/`qglPopMatrix`) is GL-only (DEC-37 A13.2).
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1498-1540`
+pub fn RB_RotatePic(
+    frame: &mut FrameState,
+    gpu: &mut GpuResources,
+    assets: &RenderAssets,
+    shader: ShaderHandle,
+    _x: f32,
+    _y: f32,
+    _w: f32,
+    _h: f32,
+    _a: f32,
+    _s1: f32,
+    _t1: f32,
+    _s2: f32,
+    _t2: f32,
+) {
+    let image = assets
+        .shaders
+        .get(shader)
+        .and_then(|s| s.stages.first())
+        .and_then(|stage| stage.image);
+
+    if let Some(image) = image {
+        if !frame.projection_2d {
+            RB_SetGL2D(frame, gpu, assets);
+        }
+
+        // DEFERRED: R4 — qglColor4ubv/qglPushMatrix/qglTranslatef/qglRotatef
+        // (see doc comment above) (DEC-37 A13.2)
+        // Source: oracle/codemp/renderer/tr_backend.cpp:1514-1518
+
+        GL_Bind(gpu, Some(image));
+
+        // DEFERRED: R4 — the qglBegin(GL_QUADS)/qglTexCoord2f/qglVertex2f
+        // quad and qglEnd/qglPopMatrix (see doc comment above) (DEC-37 A13.2)
+        // Source: oracle/codemp/renderer/tr_backend.cpp:1521-1536
+    }
+}
+
+/// Raven `RB_RotatePic2` — `RB_RotatePic`'s centered-rotation twin: rotates a
+/// stretched pic about its own center rather than its top-right corner, and
+/// additionally applies the shader's first stage's blend state before
+/// drawing. The oracle's `data`/`cmd + 1` command-buffer walk dissolves — the
+/// caller supplies the already-decoded `FrameEvent::DrawRotatePic2` payload
+/// directly (`R2-D2`/A1); `cmd->shader` becomes the `shader: ShaderHandle`
+/// payload field.
+///
+/// Two landable guards: `shader->numUnfoggedPasses` is a real
+/// `ShaderAsset::num_unfogged_passes` field, and `image = &shader->stages[0]
+/// .bundle[0].image[0]` is a plain re-fetch of `bundle[0].image` (a real
+/// nullable pointer — see `RB_RotatePic`'s doc comment), now
+/// `ShaderStage::image`. An invalid/stale `shader` handle, or one whose
+/// `stages` is still populated empty (`GeneratePermanentShader`'s per-stage
+/// copy loop is a separate, later wave), both fall back to "no passes"/"no
+/// image" (skip drawing) rather than the oracle's implicit
+/// always-valid-pointer assumption (porting-rules §19).
+///
+/// `shader->stages[0].stateBits` feeding the first `GL_State` call is also
+/// real, as `ShaderStage::state_bits`.
+///
+/// DEFERRED: R4 — past both guards, every effect (`qglColor4ubv`/
+/// `qglPushMatrix`/`qglTranslatef`/`qglRotatef`, `GL_Bind`/the first
+/// `GL_State`'s own innards, the `qglBegin(GL_QUADS)`/`qglTexCoord2f`/
+/// `qglVertex2f` quad, `qglEnd`/`qglPopMatrix`, and the trailing "Hmmm, this
+/// is not too cool" `GL_State(GLS_DEPTHTEST_DISABLE | GLS_SRCBLEND_SRC_ALPHA
+/// | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA)` restore) is GL-only; the trailing
+/// call's `GLS_*` flags are also left undecoded, same treatment as
+/// `GL_State`'s own body (DEC-37 A13.2).
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1547-1607`
+pub fn RB_RotatePic2(
+    frame: &mut FrameState,
+    gpu: &mut GpuResources,
+    assets: &RenderAssets,
+    shader: ShaderHandle,
+    _x: f32,
+    _y: f32,
+    _w: f32,
+    _h: f32,
+    _a: f32,
+    _s1: f32,
+    _t1: f32,
+    _s2: f32,
+    _t2: f32,
+) {
+    let shader_asset = assets.shaders.get(shader);
+
+    let num_unfogged_passes = shader_asset.map(|s| s.num_unfogged_passes).unwrap_or(0);
+
+    if num_unfogged_passes == 0 {
+        return;
+    }
+
+    let first_stage = shader_asset.and_then(|s| s.stages.first());
+    let image = first_stage.and_then(|stage| stage.image);
+
+    if let Some(image) = image {
+        if !frame.projection_2d {
+            RB_SetGL2D(frame, gpu, assets);
+        }
+
+        // Get our current blend mode, etc.
+        let state_bits = first_stage.map(|stage| stage.state_bits).unwrap_or(0);
+        GL_State(gpu, state_bits);
+
+        // DEFERRED: R4 — qglColor4ubv/qglPushMatrix/qglTranslatef/qglRotatef
+        // (see doc comment above) (DEC-37 A13.2)
+        // Source: oracle/codemp/renderer/tr_backend.cpp:1571-1576
+
+        GL_Bind(gpu, Some(image));
+
+        // DEFERRED: R4 — the qglBegin(GL_QUADS)/qglTexCoord2f/qglVertex2f
+        // quad, qglEnd/qglPopMatrix, and the trailing "Hmmm, this is not too
+        // cool" GL_State restore (see doc comment above) (DEC-37 A13.2)
+        // Source: oracle/codemp/renderer/tr_backend.cpp:1579-1602
+    }
+}
+
+/// Raven `RB_ShowImages` — the `r_showImages` debug view: tiles every
+/// registered image across the screen in a 20-column grid.
+///
+/// DEFERRED: R4 — `qglClear`/`qglFinish` and the per-image
+/// `GL_Bind`/`qglBegin(GL_QUADS)`.../`qglEnd()` quad draw are GL-only
+/// (DEC-37 A13.2); the `r_showImages->integer == 2` proportional-size branch
+/// additionally needs the renderer's cvar-value-read seam, not wired yet
+/// (`RendererCvars` holds only `Option<CvarHandle>`, A13.1). The tile-grid
+/// math (`x`/`y`/`w`/`h` per image) and the iteration walk are real CPU logic
+/// and land here.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1776-1829`
+pub fn RB_ShowImages(
+    frame: &mut FrameState,
+    gpu: &mut GpuResources,
+    assets: &RenderAssets,
+    cvars: &RendererCvars,
+) {
+    if !frame.projection_2d {
+        RB_SetGL2D(frame, gpu, assets);
+    }
+
+    // DEFERRED: R4 — qglClear(GL_COLOR_BUFFER_BIT) / qglFinish() (DEC-37 A13.2)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:1785-1787
+
+    let mut i: i32 = 0;
+    let _ = R_Images_StartIteration(assets);
+    let mut cursor = 0usize;
+    while let Some(handle) = R_Images_GetNextIteration(assets, &mut cursor) {
+        let w = (assets.glconfig.vid_width / 20) as f32;
+        let h = (assets.glconfig.vid_height / 15) as f32;
+        let x = (i % 20) as f32 * w;
+        let y = (i / 20) as f32 * h;
+
+        // DEFERRED: R4 — r_showImages->integer == 2 proportional resize
+        // (`w *= image->width / 512.0; h *= image->height / 512.0;`): the
+        // renderer's cvar-value-read seam isn't wired yet (RendererCvars
+        // holds only Option<CvarHandle>, A13.1)
+        // Source: oracle/codemp/renderer/tr_backend.cpp:1802-1805
+        let _ = (cvars, x, y, w, h);
+
+        // DEFERRED: R4 — GL_Bind(image) + qglBegin(GL_QUADS)/qglTexCoord2f/
+        // qglVertex2f x4/qglEnd() quad draw (GL-only, DEC-37 A13.2); GL_Bind's
+        // own body is itself deferred pending the glState.currenttextures
+        // cache wiring.
+        // Source: oracle/codemp/renderer/tr_backend.cpp:1807-1821
+        GL_Bind(gpu, Some(handle));
+
+        i += 1;
+    }
+
+    // DEFERRED: R4 — qglFinish() (DEC-37 A13.2)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:1825
 }

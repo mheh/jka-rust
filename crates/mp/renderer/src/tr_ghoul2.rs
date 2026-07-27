@@ -13,9 +13,10 @@
 //! timer touches per the same ruling (DEC-37 A13.5) without a per-site note.
 
 use mp_qshared::shared::q_math::{
-    _DotProduct, _VectorMA, _VectorSubtract, CrossProduct, DotProductRow, VectorNormalize2,
+    _DotProduct, _VectorMA, _VectorSubtract, vec3_origin, CrossProduct, DotProductRow,
+    VectorNormalize2,
 };
-use mp_qshared::shared::{mdxaBone_t, vec3_t, VectorNormalize};
+use mp_qshared::shared::{cplane_t, mdxaBone_t, vec3_t, VectorNormalize};
 
 use mp_host_interface::mdx::mdxa::{MdxaRef, MdxaView};
 use mp_host_interface::mdx::mdxm::{MdxmSurfaceView, MdxmVertView, MdxmView};
@@ -25,10 +26,12 @@ use mp_host_interface::EngineHost;
 // consumed from `mp_engine_ghoul2` (the DEC-35 canonical port of the very same
 // `tr_ghoul2.cpp` definitions), never re-declared in this crate.
 use mp_engine_ghoul2::bolts::g2_find_bolt_surface_num;
-use mp_engine_ghoul2::ghoul2_system::{BoneCacheArena, BoneCacheId};
+use mp_engine_ghoul2::bones::{g2_add_bone, g2_find_bone};
+use mp_engine_ghoul2::ghoul2_system::{BoneCacheArena, BoneCacheId, Ghoul2System};
 use mp_engine_ghoul2::misc::g2_setup_model_pointers;
 use mp_engine_ghoul2::render::bone_cache::CBoneCache;
-use mp_engine_ghoul2::render::bone_transform::multiply_3x4_matrix;
+use mp_engine_ghoul2::render::bone_transform::{multiply_3x4_matrix, uncompress_bone};
+use mp_engine_ghoul2::render::skeleton::g2_get_bone_matrix_low;
 use mp_engine_ghoul2::shared::bolt_info_t::boltInfo_t;
 use mp_engine_ghoul2::shared::bone_info_t::boneInfo_t;
 use mp_engine_ghoul2::shared::cghoul2_info::CGhoul2Info;
@@ -47,6 +50,8 @@ use crate::render_state::shader_asset::ShaderHandle;
 use crate::render_state::skin_asset::SkinHandle;
 use crate::tr_local::crenderable_surface::CRenderableSurface;
 use crate::tr_local::model_s::model_t;
+use crate::tr_local::orientationr_t::orientationr_t;
+use crate::tr_main::{R_CullLocalPointAndRadius, CULL_CLIP, CULL_IN, CULL_OUT};
 use crate::tr_mesh::project_radius;
 use crate::tr_model::frontend::mdxm_view_of;
 use crate::tr_shade_calc::myftol;
@@ -1192,4 +1197,284 @@ pub fn g2_process_surface_bolt2(
     }
 
     ret_matrix
+}
+
+// ---------------------------------------------------------------------------
+// R3 wave 2 (`tr_ghoul2.wave2.md`).
+//
+// RECONCILED, NOT RE-PORTED (marker law: "never re-port an already-ported
+// fn" — preamble). Two of this wave's five assigned fns are already
+// canonically ported in `mp_engine_ghoul2` (the same DEC-32 one-home surface
+// this file's wave-1 header comment established for `CBoneCache` and
+// friends) and are consumed from there rather than re-declared here:
+//
+// - `G2_TransformBone` ->
+//   `mp_engine_ghoul2::render::bone_transform::g2_transform_bone` (`pub fn`).
+// - `G2_GetBoltMatrixLow` ->
+//   `mp_engine_ghoul2::render::skeleton::g2_get_bolt_matrix_low` (`pub fn`).
+//
+// Neither is called by this wave's other three fns (checked against the
+// packet's own "in-module callees" digests), so no re-export was needed to
+// keep this wave's live call graph closed.
+// ---------------------------------------------------------------------------
+
+/// Raven's file-scope `const static mdxaBone_t identityMatrix`
+/// (`tr_ghoul2.cpp:128-133`) — cross-verified against the byte-identical
+/// private copy `mp_engine_ghoul2::render::skeleton` already carries for this
+/// exact oracle constant. A `static` (not `const`) item, matching that copy's
+/// own rationale: the "yikes"/no-cache fallback paths below hand out a stable
+/// `*mut mdxaBone_t` into it, mirroring Raven's own
+/// `const_cast<mdxaBone_t *>(&identityMatrix)`.
+static IDENTITY_MATRIX: mdxaBone_t = mdxaBone_t {
+    matrix: [
+        [0.0, -1.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+    ],
+};
+
+/// Zero `mdxaBone_t` — the defined fallback [`g2_rag_get_anim_matrix`] below
+/// returns on the (NDEBUG-stripped-assert) missing-bone-cache/mdxa paths a
+/// §19 UB pick backs (oracle would null-deref there). Matches
+/// `mp_engine_ghoul2::ragdoll`'s own private `ZERO_BONE` constant for the
+/// same oracle function.
+const ZERO_BONE: mdxaBone_t = mdxaBone_t {
+    matrix: [[0.0; 4]; 3],
+};
+
+/// Raven `int G2_GetParentBoneMatrixLow(CGhoul2Info &ghoul2, int boneNum,
+/// const vec3_t scale, mdxaBone_t &retMatrix, mdxaBone_t *&retBasepose,
+/// mdxaBone_t *&retBaseposeInv)`. Out-params -> return value: every path but
+/// the no-bone-cache one writes all three, so the write-or-not is expressed
+/// as `Option` rather than inventing a value Raven never computes (its
+/// caller only reads `retMatrix`/`retBasepose`/`retBaseposeInv` when the
+/// returned `parent != -1` combined with a live cache — matching the
+/// `(parent, Option<...>)` shape below one-for-one). `world_matrix` is not
+/// in the oracle signature: it threads Raven's file-scope `worldMatrix`
+/// global through to the wave-1-ported [`g2_get_bone_matrix_low`] this fn
+/// calls, which already made that same global an explicit parameter
+/// (`render/skeleton.rs` module-doc note) — porting-rules §B4, this
+/// parameter grows the same threading choice up one call level rather than
+/// inventing a new one.
+///
+/// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:780-803`
+pub fn g2_get_parent_bone_matrix_low(
+    g2: &mut Ghoul2System,
+    ghoul2: &CGhoul2Info,
+    bone_num: i32,
+    scale: vec3_t,
+    world_matrix: &mdxaBone_t,
+) -> (i32, Option<(mdxaBone_t, *mut mdxaBone_t, *mut mdxaBone_t)>) {
+    let mut parent = -1;
+    let mut out = None;
+
+    // Read the parent index + mdxa header off the cache first, then drop the
+    // borrow before the possible `g2_get_bone_matrix_low(g2, ...)` call below
+    // (which needs `g2` free for its own `&mut` bone-cache lookup).
+    let cache_state = ghoul2
+        .bone_cache
+        .and_then(|id| g2.bone_caches.get(id))
+        .map(|cache| (cache.get_parent(bone_num), cache.mdxa));
+
+    if let Some((p, mdxa)) = cache_state {
+        parent = p;
+        let num_bones = mdxa
+            .expect("G2_GetParentBoneMatrixLow: bone cache has no mdxa header")
+            .num_bones();
+        if parent < 0 || parent >= num_bones {
+            parent = -1;
+            // yikes
+            let id_ptr = &IDENTITY_MATRIX as *const mdxaBone_t as *mut mdxaBone_t;
+            out = Some((IDENTITY_MATRIX, id_ptr, id_ptr));
+        } else {
+            out = Some(g2_get_bone_matrix_low(
+                g2,
+                ghoul2,
+                parent,
+                scale,
+                world_matrix,
+            ));
+        }
+    }
+
+    (parent, out)
+}
+
+/// Raven's private `G2_Find_Bone`-then-`G2_Add_Bone` idiom
+/// `G2_RagGetAnimMatrix` uses twice (`tr_ghoul2.cpp:1441-1450,1481-1486`) — a
+/// blank bone name never resolves (Raven: `if (!skel->name || !skel->name[0])
+/// bListIndex=-1;`).
+fn resolve_or_add_bone(ghoul2: &mut CGhoul2Info, name: &str) -> Option<usize> {
+    if name.is_empty() {
+        return None;
+    }
+    let mut idx = g2_find_bone(ghoul2.anim_model, &ghoul2.blist, name);
+    if idx == -1 {
+        idx = g2_add_bone(ghoul2.anim_model, &mut ghoul2.blist, name);
+    }
+    if idx == -1 {
+        None
+    } else {
+        Some(idx as usize)
+    }
+}
+
+/// Raven `void G2_RagGetAnimMatrix(CGhoul2Info &ghoul2, const int boneNum,
+/// mdxaBone_t &matrix, const int frame)`. Out-param `matrix` -> return value
+/// (§C7; every path writes it).
+///
+/// PORT-NOTE: `mp_engine_ghoul2::ragdoll::g2_rag_get_anim_matrix` already
+/// carries this exact oracle function's logic as a private "stopgap" helper
+/// serving the ragdoll solver — not reusable here (private, and
+/// `crates/mp/engine/ghoul2` is out of this wave's edit scope per the
+/// workflow instructions, the same reconciliation this file's
+/// `g2_process_surface_bolt2` (wave 1) already documents). Duplicated across
+/// the wave boundary rather than silently diverging; flagged for a future
+/// dedup pass (make one of the two copies `pub(crate)`/`pub` and delegate).
+/// The state-carrier parameter is `bone_caches: &BoneCacheArena` rather than
+/// the whole `Ghoul2System` (unlike the `ragdoll.rs` twin), matching this
+/// file's own established convention ([`g2_get_bone_name_from_skel`],
+/// [`g2_needs_recalc`], wave 0/1).
+///
+/// `assert(ghoul2.mBoneCache)`/`assert(ghoul2.animModel)`/
+/// `assert(bListIndex != -1)`/`assert(parentBlistIndex != -1)`/
+/// `assert(pbone.hasAnimFrameMatrix == frame)` are compiled out under
+/// `-DNDEBUG` (house convention); the no-cache/no-mdxa/unresolved-bone paths
+/// that assert would have guarded instead return [`ZERO_BONE`] — a §19 UB
+/// pick (the oracle would null-deref/read-uninit there), not invented. That
+/// covers the empty-skeleton-name path too: `tr_ghoul2.cpp:1437-1452` sets
+/// `bListIndex = -1` for a blank `skel->name`, then in a release build indexes
+/// `ghoul2.mBlist[-1]` past the failed assert; [`resolve_or_add_bone`] returns
+/// `None` there and this fn returns [`ZERO_BONE`] instead.
+///
+/// Oracle UB, second site: the oracle binds `boneInfo_t &bone =
+/// ghoul2.mBlist[bListIndex]` at `:1455`, *before* the recursive call at
+/// `:1470` whose `G2_Add_Bone` can reallocate `mBlist` and dangle that
+/// reference; the port re-indexes `ghoul2.blist[bli]` after the recursion
+/// returns, which is the same result whenever no reallocation happened.
+///
+/// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:1417-1539`
+pub fn g2_rag_get_anim_matrix(
+    bone_caches: &BoneCacheArena,
+    ghoul2: &mut CGhoul2Info,
+    bone_num: i32,
+    frame: i32,
+) -> mdxaBone_t {
+    let Some(cache) = ghoul2.bone_cache.and_then(|id| bone_caches.get(id)) else {
+        return ZERO_BONE;
+    };
+    let root_matrix = cache.root_matrix;
+    let Some(mdxa) = cache.mdxa else {
+        return ZERO_BONE;
+    };
+
+    // find/add the bone in the list
+    let skel = mdxa.skel(bone_num);
+    let name = skel.name.clone();
+    let Some(bli) = resolve_or_add_bone(ghoul2, &name) else {
+        return ZERO_BONE;
+    };
+
+    if ghoul2.blist[bli].hasAnimFrameMatrix == frame {
+        // already calculated so just grab it
+        return ghoul2.blist[bli].animFrameMatrix;
+    }
+
+    // get the base matrix for the specified frame
+    let mut anim_matrix = ZERO_BONE;
+    uncompress_bone(&mut anim_matrix.matrix, bone_num, mdxa, frame);
+
+    let parent = skel.parent;
+    let mut result = ZERO_BONE;
+    if bone_num > 0 && parent > -1 {
+        // recursively call to assure all parent matrices are set up
+        let _ = g2_rag_get_anim_matrix(bone_caches, ghoul2, parent, frame);
+
+        // assign the new skel ptr for our parent
+        let pname = mdxa.skel(parent).name.clone();
+
+        // taking bone matrix for the skeleton frame and parent's
+        // animFrameMatrix into account, determine our final animFrameMatrix
+        let Some(pbli) = resolve_or_add_bone(ghoul2, &pname) else {
+            return ZERO_BONE;
+        };
+        let parent_anim_matrix = ghoul2.blist[pbli].animFrameMatrix;
+        multiply_3x4_matrix(&mut result, &parent_anim_matrix, &anim_matrix);
+    } else {
+        // root
+        multiply_3x4_matrix(&mut result, &root_matrix, &anim_matrix);
+    }
+
+    // never need to figure it out again
+    let bone = &mut ghoul2.blist[bli];
+    bone.animFrameMatrix = result;
+    bone.hasAnimFrameMatrix = frame;
+    result
+}
+
+/// Raven `static int R_GCullModel(trRefEntity_t *ent)` — culls `ent`'s
+/// bounding sphere against the view frustum, bumping the matching
+/// `tr.pc.c_sphere_cull_md3_{out,in,clip}` perf counter.
+///
+/// `ent->e.modelScale`/`ent->e.radius` are threaded as explicit
+/// `model_scale`/`radius` parameters rather than read off `RefEntity` — same
+/// rationale [`g2_compute_lod`] (this file, wave 1) already documents for the
+/// same two fields, and `ent->e.origin` is unread here (oracle culls around
+/// `vec3_origin`, not the entity's world position). The three `tr.pc.*`
+/// counters have no state carrier yet (`FrameState::counters: BackEndCounters`
+/// is still the R4-backend-wave empty placeholder, `render_state::
+/// placeholders`, out of this file's edit scope) — threaded as explicit
+/// `&mut i32` outs instead of reaching into that empty struct, matching the
+/// established precedent `tr_world.rs`'s `R_DlightFace`/`R_DlightGrid` set
+/// for the identical `BackEndCounters`-is-empty situation (PORT-NOTE there:
+/// "state is threaded, not reached", porting-rules §4). `ori`/
+/// `r_nocull_integer`/`frustum` are [`R_CullLocalPointAndRadius`]'s own
+/// (wave 1) already-threaded parameters, forwarded through unchanged.
+///
+/// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:896-930`
+#[allow(clippy::too_many_arguments)]
+pub fn r_g_cull_model(
+    model_scale: vec3_t,
+    radius: f32,
+    ori: &orientationr_t,
+    r_nocull_integer: i32,
+    frustum: &[cplane_t; 4],
+    c_sphere_cull_md3_out: &mut i32,
+    c_sphere_cull_md3_in: &mut i32,
+    c_sphere_cull_md3_clip: &mut i32,
+) -> i32 {
+    // scale the radius if need be
+    let mut largest_scale = model_scale[0];
+    if model_scale[1] > largest_scale {
+        largest_scale = model_scale[1];
+    }
+    if model_scale[2] > largest_scale {
+        largest_scale = model_scale[2];
+    }
+    if largest_scale == 0.0 {
+        largest_scale = 1.0;
+    }
+
+    // cull bounding sphere
+    match R_CullLocalPointAndRadius(
+        vec3_origin,
+        radius * largest_scale,
+        ori,
+        r_nocull_integer,
+        frustum,
+    ) {
+        CULL_OUT => {
+            *c_sphere_cull_md3_out += 1;
+            CULL_OUT
+        }
+        CULL_IN => {
+            *c_sphere_cull_md3_in += 1;
+            CULL_IN
+        }
+        CULL_CLIP => {
+            *c_sphere_cull_md3_clip += 1;
+            CULL_IN
+        }
+        _ => CULL_IN,
+    }
 }

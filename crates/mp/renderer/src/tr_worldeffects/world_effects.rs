@@ -11,18 +11,20 @@ use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::{com_error, com_printf};
 use mp_engine_qcommon::common_fns::Com_Milliseconds;
+use mp_qshared::shared::com_parse::{COM_ParseExt, QSharedScratch};
 use mp_qshared::shared::vec3_t;
 use mp_qshared::shared::{
     errorParm_t, CONTENTS_INSIDE, CONTENTS_OUTSIDE, CONTENTS_SOLID, CONTENTS_WATER,
 };
 use native_math::qmath::{MakeNormalVectors, VectorNormalize};
 use native_math::rng::{Rng, RAND_MAX};
+use native_string::atoi;
 
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::render_assets::RenderAssets;
 use crate::tr_backend::SetViewportAndScissor;
-use crate::tr_worldeffects::sparticle::SParticle;
+use crate::tr_shader::ParseVector;
 
 /// Raven `POINTCACHE_CELL_SIZE` — the weather point-cache cell edge length.
 /// Both preprocessor branches (`_XBOX` and the PC `#else`) define the same
@@ -35,6 +37,16 @@ pub const POINTCACHE_CELL_SIZE: f32 = 96.0;
 /// `COutside::mWeatherZones` (its `full()` bound).
 /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:46`
 pub const MAX_WEATHER_ZONES: usize = 10;
+
+/// Raven `MAX_WIND_ZONES` — the `ratl::vector_vs` capacity backing
+/// `mWindZones` (its `full()` bound).
+/// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:45`
+pub const MAX_WIND_ZONES: usize = 10;
+
+/// Raven `MAX_PARTICLE_CLOUDS` — the `ratl::vector_vs` capacity backing
+/// `mParticleClouds` (its `full()` bound).
+/// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:48`
+pub const MAX_PARTICLE_CLOUDS: usize = 5;
 
 /// Raven `WE_flrand`.
 ///
@@ -238,6 +250,58 @@ impl SIntRange {
     }
 }
 
+/// Raven `CWeatherParticle` — one weather particle: alpha, render/fade
+/// flags, position, velocity and mass.
+///
+/// Raven's `TFlags mFlags` is `ratl::bits_vs<FLAG_MAX>`, a four-bit set held
+/// in one word and cleared by its default constructor; a `u32` bit mask
+/// indexed by the `FLAG_*` constants below carries it.
+///
+/// Type definition source: `oracle/codemp/renderer/tr_WorldEffects.cpp:251-271`
+pub struct CWeatherParticle {
+    pub mAlpha: f32,
+    pub mFlags: u32,
+    pub mPosition: vec3_t,
+    pub mVelocity: vec3_t,
+    /// Raven: "A higher number will more greatly resist force and result in
+    /// greater gravity".
+    pub mMass: f32,
+}
+
+impl CWeatherParticle {
+    /// Raven `CWeatherParticle::FLAG_RENDER`.
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:254-263`
+    pub const FLAG_RENDER: u32 = 0;
+    /// Raven `CWeatherParticle::FLAG_FADEIN`.
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:254-263`
+    pub const FLAG_FADEIN: u32 = 1;
+    /// Raven `CWeatherParticle::FLAG_FADEOUT`.
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:254-263`
+    pub const FLAG_FADEOUT: u32 = 2;
+    /// Raven `CWeatherParticle::FLAG_RESPAWN`.
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:254-263`
+    pub const FLAG_RESPAWN: u32 = 3;
+    /// Raven `CWeatherParticle::FLAG_MAX` — the `TFlags` bit width.
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:254-263`
+    pub const FLAG_MAX: u32 = 4;
+
+    // PORT-NOTE: not a named Raven symbol — `new CWeatherParticle[count]`
+    // default-constructs each element: `mFlags`'s `ratl::bits_vs` ctor clears
+    // every bit, the four POD members are left indeterminate. §19: reading
+    // indeterminate storage is UB; zero is the one defined value picked here,
+    // and it is unobservable — `CWeatherParticleCloud::Initialize` writes all
+    // four for every element immediately after allocating.
+    fn zeroed() -> Self {
+        Self {
+            mAlpha: 0.0,
+            mFlags: 0,
+            mPosition: [0.0; 3],
+            mVelocity: [0.0; 3],
+            mMass: 0.0,
+        }
+    }
+}
+
 /// Raven `CWindZone` — one wind-zone volume (bounds + velocity distribution).
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_WorldEffects.cpp:276-356`
@@ -315,6 +379,34 @@ impl CWindZone {
             for i in 0..3 {
                 self.mCurrentVelocity[i] += delta_velocity[i];
             }
+        }
+    }
+
+    // PORT-NOTE: not a named Raven symbol — `ratl::vector_vs::push_back()`
+    // default-constructs the new element in place (a no-op ctor; `CWindZone`
+    // has no explicit constructor in the oracle), and every call site
+    // immediately follows with `.Initialize()`, which this wave confirms
+    // sets all 10 fields (§B3: no field is read before `Initialize` writes
+    // it). This helper is that zero-valued placeholder, standing in for the
+    // C++ implicit default ctor's emplace slot.
+    fn zeroed() -> Self {
+        Self {
+            mRBounds: SVecRange {
+                mMins: [0.0; 3],
+                mMaxs: [0.0; 3],
+            },
+            mGlobal: false,
+            mRVelocity: SVecRange {
+                mMins: [0.0; 3],
+                mMaxs: [0.0; 3],
+            },
+            mMaxDeltaVelocityPerUpdate: 0.0,
+            mRDuration: SIntRange { mMin: 0, mMax: 0 },
+            mChanceOfDeadTime: 0.0,
+            mRDeadTime: SIntRange { mMin: 0, mMax: 0 },
+            mCurrentVelocity: [0.0; 3],
+            mTargetVelocity: [0.0; 3],
+            mTargetVelocityTimeRemaining: 0,
         }
     }
 }
@@ -753,10 +845,10 @@ pub struct CWeatherParticleCloud {
     // an optional handle into `RenderAssets::images`.
     pub mImage: Option<ImageHandle>,
     pub mParticleCount: i32,
-    // PORT-NOTE: Raven's `mParticles` is a `delete[]`-owned heap array; owned
-    // `Vec<SParticle>` (`sparticle.rs`) replaces the manual alloc/free
+    // PORT-NOTE: Raven's `mParticles` is a `new[]`/`delete[]`-owned heap array
+    // of `CWeatherParticle`; an owned `Vec` replaces the manual alloc/free
     // (porting-rules §C9).
-    pub mParticles: Vec<SParticle>,
+    pub mParticles: Vec<CWeatherParticle>,
     pub mPopulated: bool,
     pub mOrientWithVelocity: bool,
     pub mWaterParticles: bool,
@@ -880,6 +972,63 @@ impl CWeatherParticleCloud {
         this
     }
 
+    /// Raven `CWeatherParticleCloud::Initialize` — "Create Image, Particles,
+    /// And Setup All Values".
+    ///
+    /// Raven declares `int VertexCount=4`; Rust has no default arguments, so
+    /// every call site passes it explicitly. `rng` carries `mMass.Pick`'s
+    /// msvcrt `rand()` stream, threaded rather than reached (porting-rules
+    /// §B4).
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:902-945`
+    pub fn Initialize(&mut self, rng: &mut Rng, count: i32, texture_path: &str, vertex_count: i32) {
+        self.Reset();
+        debug_assert!(self.mParticleCount == 0 && self.mParticles.is_empty());
+        debug_assert!(self.mImage.is_none());
+
+        // Create The Image
+        //------------------
+        // DEFERRED: `mImage = R_FindImageFile(texturePath, qfalse, qfalse,
+        // qfalse, GL_CLAMP)`, its `Com_Error(ERR_DROP, "CWeatherParticleCloud:
+        // Could not texture %s")` miss path, and the `GL_Bind(mImage)` that
+        // follows. The loading `R_FindImageFile` has no home in this crate yet
+        // (only `R_FindImageFile_NoLoad` landed, `tr_image.rs`), and `GL_Bind`
+        // is itself an already-DEFERRED R4 no-op (`tr_backend.rs`, DEC-37
+        // A13.2). `mImage` stays `None`; nothing below reads it.
+        // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:908-916
+        let _ = texture_path;
+
+        // Create The Particles
+        //----------------------
+        self.mParticleCount = count;
+        // §19: `new CWeatherParticle[count]` is UB for a negative `count` (the
+        // `spacedust` branch's `atoi` can produce one); an empty buffer is the
+        // defined behavior picked here — every walk of it runs
+        // `0..mParticleCount`, so none of them indexes it.
+        self.mParticles = (0..count.max(0))
+            .map(|_| CWeatherParticle::zeroed())
+            .collect();
+
+        for particle_num in 0..self.mParticleCount {
+            // Raven's `part = &(mParticles[particleNum])` is an index here,
+            // not a borrow, so `mMass.Pick` can write through it while
+            // `mMass` is read (porting-rules §B5).
+            let part = particle_num as usize;
+            self.mParticles[part].mPosition = [0.0; 3];
+            self.mParticles[part].mVelocity = [0.0; 3];
+            self.mParticles[part].mAlpha = 0.0;
+            self.mMass.Pick(rng, &mut self.mParticles[part].mMass);
+        }
+
+        self.mVertexCount = vertex_count;
+
+        // DEFERRED: R4 — `mGLModeEnum = (mVertexCount==3)?GL_TRIANGLES:
+        // GL_QUADS` (the `_XBOX` `GL_POINTS` branch is not this build).
+        // `mGLModeEnum` is read only by `Render`, itself DEFERRED to R4, and
+        // its GL wire constants have no home in this crate (no constant
+        // guessing) — so the field is not on this type.
+        // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:937-944
+    }
+
     /// Raven `CWeatherParticleCloud::Reset`.
     ///
     /// Raven's body: "// TODO: Free Image?" — an unresolved Raven-side TODO,
@@ -957,13 +1106,11 @@ impl CWeatherParticleCloud {
     /// - `backEnd.viewParms.ori.origin`/`.axis[0..2]` — `OrientationR`/
     ///   `ViewParms` are still empty placeholder structs, landed by the
     ///   not-yet-run `tr_main` R3 wave (R2-D7(b)).
-    /// - `CWeatherParticle::mMass`/`mAlpha` — the oracle class has these
-    ///   fields, but the already-ported `SParticle` (`sparticle.rs`, wave 0)
-    ///   carries only `pos`/`velocity`/`flags` (a wave-0 completeness gap);
-    ///   `sparticle.rs` is outside this wave's file-editing authority (only
-    ///   `world_effects.rs` is in scope), so the whole per-particle loop body
-    ///   — which needs both fields throughout — is deferred as one unit
-    ///   rather than scattered field-by-field.
+    /// - `mOutside` — the per-particle loop's `mOutside.PointOutside(pos,
+    ///   mWidth, mHeight)` needs `COutside` threaded into this signature, a
+    ///   seam change this fn's wave does not own; the loop body is deferred
+    ///   as one unit rather than scattered, and is unreachable behind the
+    ///   `orientationr_t` block above regardless.
     /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1039-1306`
     // Deferred `todo!()` escalation sites (cited above) diverge, leaving the rest
     // of this body statically unreachable and its inputs unread until the value
@@ -1105,15 +1252,14 @@ impl CWeatherParticleCloud {
         self.mParticleCountRender = 0;
         for particle_num in 0..self.mParticleCount {
             let _ = particle_num;
-            // DEFERRED: whole per-particle body — needs `CWeatherParticle
-            // ::mMass`/`mAlpha`, not on the already-ported `SParticle`
-            // (`sparticle.rs`, wave 0; see this fn's doc comment). Escalated
-            // as one block rather than scattered field-by-field.
-            //TODO: Port CWeatherParticle::mMass
-            //TODO: Port CWeatherParticle::mAlpha
+            // DEFERRED: whole per-particle body — needs `mOutside`
+            // (`COutside::PointOutside`) threaded into this signature (see
+            // this fn's doc comment). Escalated as one block rather than
+            // scattered statement-by-statement.
+            //TODO: Port CWeatherParticleCloud::Update
             // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:1174-1298
             todo!(
-                "Port CWeatherParticle::mMass/mAlpha — oracle/codemp/renderer/tr_WorldEffects.cpp:1174-1298"
+                "Port CWeatherParticleCloud::Update per-particle loop — oracle/codemp/renderer/tr_WorldEffects.cpp:1174-1298"
             );
         }
         self.mPopulated = true;
@@ -1346,6 +1492,400 @@ impl WorldEffectsState {
     /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:2009-2012`
     pub fn R_IsRaining(&self) -> bool {
         !self.mParticleClouds.is_empty()
+    }
+
+    /// Raven `R_WorldEffectCommand`.
+    ///
+    /// `qs` is `COM_ParseExt`/`ParseVector`'s parse scratch
+    /// (`q_shared.c`'s TU-invisible `com_lines`/`com_parsename` statics,
+    /// already relocated off any Rust global — porting-rules §B3/§B4);
+    /// `host` carries `Com_Printf`'s `Common` (via `host.common`) for the
+    /// same reason. `command` is Raven's `const char *command`, threaded as
+    /// a byte-slice cursor mutated by repeated `COM_ParseExt` calls in place
+    /// of the `const char **text` out-param idiom (porting-rules §C7).
+    ///
+    /// `ParseVector` names a shader only to format its two warning strings.
+    /// Raven's call site here reads whatever `shader.name` happened to hold
+    /// left over from the last shader parse — residual state this fn cannot
+    /// reconstruct, and with no bearing on control flow (only the returned
+    /// `bool` and the written `v[]` matter). An empty name is passed; the
+    /// only externally-visible difference is the text of an unrelated debug
+    /// warning, never a return value or written vector component.
+    ///
+    /// `strcmpi` -> `str::eq_ignore_ascii_case` matches this crate's
+    /// established idiom (`tr_shader.rs`'s `NameToAFunc`/`NameToSrcBlendMode`
+    /// etc.), not a `native_string` call.
+    ///
+    /// Every cloud-spawning branch's `mParticleClouds.push_back()` (which
+    /// default-constructs in place, then is filled through the returned
+    /// reference) becomes a `CWeatherParticleCloud::new()` local pushed once
+    /// its fields are written.
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1593-1986`
+    pub fn R_WorldEffectCommand(
+        &mut self,
+        qs: &mut QSharedScratch,
+        host: &mut EngineHostView,
+        command: Option<&[u8]>,
+    ) {
+        if command.is_none() {
+            return;
+        }
+        let mut cursor = command;
+
+        let (token, rest) = COM_ParseExt(qs, cursor, false);
+        cursor = rest;
+        // The oracle's `if (!token) return;` is dead code — `COM_ParseExt` never
+        // returns NULL, only the empty string — so an empty token falls through
+        // every `strcmpi` to the trailing help-print `else`, as it does here.
+
+        // Die - clean up the whole weather system -rww
+        if token.eq_ignore_ascii_case("die") {
+            R_ShutdownWorldEffects(self, host);
+            return;
+        }
+        // Clear - Removes All Particle Clouds And Wind Zones
+        //----------------------------------------------------
+        else if token.eq_ignore_ascii_case("clear") {
+            for cloud in &mut self.mParticleClouds {
+                cloud.Reset();
+            }
+            self.mParticleClouds.clear();
+            self.mWindZones.clear();
+        }
+        // Freeze / UnFreeze - Stops All Particle Motion Updates
+        //--------------------------------------------------------
+        else if token.eq_ignore_ascii_case("freeze") {
+            self.mFrozen = !self.mFrozen;
+        }
+        // Add a zone
+        //---------------
+        else if token.eq_ignore_ascii_case("zone") {
+            let mut mins: vec3_t = [0.0; 3];
+            let mut maxs: vec3_t = [0.0; 3];
+            if ParseVector(qs, &mut cursor, host.common, "", 3, &mut mins)
+                && ParseVector(qs, &mut cursor, host.common, "", 3, &mut maxs)
+            {
+                self.mOutside.AddWeatherZone(mins, maxs);
+            }
+        }
+        // Basic Wind
+        //------------
+        else if token.eq_ignore_ascii_case("wind") {
+            if self.mWindZones.len() >= MAX_WIND_ZONES {
+                return;
+            }
+            let mut n_wind = CWindZone::zeroed();
+            n_wind.Initialize();
+            self.mWindZones.push(n_wind);
+        }
+        // Constant Wind
+        //---------------
+        else if token.eq_ignore_ascii_case("constantwind") {
+            if self.mWindZones.len() >= MAX_WIND_ZONES {
+                return;
+            }
+            let mut n_wind = CWindZone::zeroed();
+            n_wind.Initialize();
+            if !ParseVector(
+                qs,
+                &mut cursor,
+                host.common,
+                "",
+                3,
+                &mut n_wind.mCurrentVelocity,
+            ) {
+                n_wind.mCurrentVelocity = [0.0; 3];
+                n_wind.mCurrentVelocity[1] = 800.0;
+            }
+            n_wind.mTargetVelocityTimeRemaining = -1;
+            self.mWindZones.push(n_wind);
+        }
+        // Gusting Wind
+        //--------------
+        else if token.eq_ignore_ascii_case("gustingwind") {
+            if self.mWindZones.len() >= MAX_WIND_ZONES {
+                return;
+            }
+            let mut n_wind = CWindZone::zeroed();
+            n_wind.Initialize();
+            n_wind.mRVelocity.mMins = [-3000.0; 3];
+            n_wind.mRVelocity.mMins[2] = -100.0;
+            n_wind.mRVelocity.mMaxs = [3000.0; 3];
+            n_wind.mRVelocity.mMaxs[2] = 100.0;
+
+            n_wind.mMaxDeltaVelocityPerUpdate = 10.0;
+
+            n_wind.mRDuration.mMin = 1000;
+            n_wind.mRDuration.mMax = 3000;
+
+            n_wind.mChanceOfDeadTime = 0.5;
+            n_wind.mRDeadTime.mMin = 2000;
+            n_wind.mRDeadTime.mMax = 4000;
+
+            self.mWindZones.push(n_wind);
+        }
+        // Create A Rain Storm
+        //---------------------
+        else if token.eq_ignore_ascii_case("lightrain") {
+            if self.mParticleClouds.len() >= MAX_PARTICLE_CLOUDS {
+                return;
+            }
+            let mut n_cloud = CWeatherParticleCloud::new();
+            n_cloud.Initialize(&mut self.rng, 500, "gfx/world/rain.jpg", 3);
+            n_cloud.mHeight = 80.0;
+            n_cloud.mWidth = 1.2;
+            n_cloud.mGravity = 2000.0;
+            n_cloud.mFilterMode = 1;
+            n_cloud.mBlendMode = 1;
+            n_cloud.mFade = 100.0;
+            n_cloud.mColor = [0.5; 4];
+            n_cloud.mOrientWithVelocity = true;
+            n_cloud.mWaterParticles = true;
+            self.mParticleClouds.push(n_cloud);
+        }
+        // Create A Rain Storm
+        //---------------------
+        else if token.eq_ignore_ascii_case("rain") {
+            if self.mParticleClouds.len() >= MAX_PARTICLE_CLOUDS {
+                return;
+            }
+            let mut n_cloud = CWeatherParticleCloud::new();
+            n_cloud.Initialize(&mut self.rng, 1000, "gfx/world/rain.jpg", 3);
+            n_cloud.mHeight = 80.0;
+            n_cloud.mWidth = 1.2;
+            n_cloud.mGravity = 2000.0;
+            n_cloud.mFilterMode = 1;
+            n_cloud.mBlendMode = 1;
+            n_cloud.mFade = 100.0;
+            n_cloud.mColor = [0.5; 4];
+            n_cloud.mOrientWithVelocity = true;
+            n_cloud.mWaterParticles = true;
+            self.mParticleClouds.push(n_cloud);
+        }
+        // Create A Rain Storm
+        //---------------------
+        else if token.eq_ignore_ascii_case("acidrain") {
+            if self.mParticleClouds.len() >= MAX_PARTICLE_CLOUDS {
+                return;
+            }
+            let mut n_cloud = CWeatherParticleCloud::new();
+            n_cloud.Initialize(&mut self.rng, 1000, "gfx/world/rain.jpg", 3);
+            n_cloud.mHeight = 80.0;
+            n_cloud.mWidth = 2.0;
+            n_cloud.mGravity = 2000.0;
+            n_cloud.mFilterMode = 1;
+            n_cloud.mBlendMode = 1;
+            n_cloud.mFade = 100.0;
+
+            n_cloud.mColor[0] = 0.34;
+            n_cloud.mColor[1] = 0.70;
+            n_cloud.mColor[2] = 0.34;
+            n_cloud.mColor[3] = 0.70;
+
+            n_cloud.mOrientWithVelocity = true;
+            n_cloud.mWaterParticles = true;
+            self.mParticleClouds.push(n_cloud);
+
+            self.mOutside.mOutsidePain = 0.1;
+        }
+        // Create A Rain Storm
+        //---------------------
+        else if token.eq_ignore_ascii_case("heavyrain") {
+            if self.mParticleClouds.len() >= MAX_PARTICLE_CLOUDS {
+                return;
+            }
+            let mut n_cloud = CWeatherParticleCloud::new();
+            n_cloud.Initialize(&mut self.rng, 1000, "gfx/world/rain.jpg", 3);
+            n_cloud.mHeight = 80.0;
+            n_cloud.mWidth = 1.2;
+            n_cloud.mGravity = 2800.0;
+            n_cloud.mFilterMode = 1;
+            n_cloud.mBlendMode = 1;
+            n_cloud.mFade = 15.0;
+            n_cloud.mColor = [0.5; 4];
+            n_cloud.mOrientWithVelocity = true;
+            n_cloud.mWaterParticles = true;
+            self.mParticleClouds.push(n_cloud);
+        }
+        // Create A Snow Storm
+        //---------------------
+        else if token.eq_ignore_ascii_case("snow") {
+            if self.mParticleClouds.len() >= MAX_PARTICLE_CLOUDS {
+                return;
+            }
+            let mut n_cloud = CWeatherParticleCloud::new();
+            // The PC `#else` arm: `Initialize(1000, …)` takes Raven's default
+            // `VertexCount=4` (the `_XBOX` arm's `1` and its `mWidth = 0.05f`
+            // are not this build).
+            n_cloud.Initialize(&mut self.rng, 1000, "gfx/effects/snowflake1.bmp", 4);
+            n_cloud.mBlendMode = 1;
+            n_cloud.mRotationChangeNext = 0;
+            n_cloud.mColor = [0.75; 4];
+            n_cloud.mWaterParticles = true;
+            self.mParticleClouds.push(n_cloud);
+        }
+        // Create A Some stuff
+        //---------------------
+        else if token.eq_ignore_ascii_case("spacedust") {
+            if self.mParticleClouds.len() >= MAX_PARTICLE_CLOUDS {
+                return;
+            }
+            // Raven advances `command` past the count token; this is the last
+            // parse in the fn, so the advanced cursor is never read again.
+            let (count_token, _) = COM_ParseExt(qs, cursor, false);
+            let count = atoi(&count_token);
+
+            let mut n_cloud = CWeatherParticleCloud::new();
+            n_cloud.Initialize(&mut self.rng, count, "gfx/effects/snowpuff1.tga", 4);
+            n_cloud.mHeight = 1.2;
+            n_cloud.mWidth = 1.2;
+            n_cloud.mGravity = 0.0;
+            n_cloud.mBlendMode = 1;
+            n_cloud.mRotationChangeNext = 0;
+            n_cloud.mColor = [0.75; 4];
+            n_cloud.mWaterParticles = true;
+            n_cloud.mMass.mMax = 30.0;
+            n_cloud.mMass.mMin = 10.0;
+            n_cloud.mSpawnRange.mMins[0] = -1500.0;
+            n_cloud.mSpawnRange.mMins[1] = -1500.0;
+            n_cloud.mSpawnRange.mMins[2] = -1500.0;
+            n_cloud.mSpawnRange.mMaxs[0] = 1500.0;
+            n_cloud.mSpawnRange.mMaxs[1] = 1500.0;
+            n_cloud.mSpawnRange.mMaxs[2] = 1500.0;
+            self.mParticleClouds.push(n_cloud);
+        }
+        // Create A Sand Storm
+        //---------------------
+        else if token.eq_ignore_ascii_case("sand") {
+            if self.mParticleClouds.len() >= MAX_PARTICLE_CLOUDS {
+                return;
+            }
+            let mut n_cloud = CWeatherParticleCloud::new();
+            n_cloud.Initialize(&mut self.rng, 400, "gfx/effects/alpha_smoke2b.tga", 4);
+
+            n_cloud.mGravity = 0.0;
+            n_cloud.mWidth = 70.0;
+            n_cloud.mHeight = 70.0;
+            n_cloud.mColor[0] = 0.9;
+            n_cloud.mColor[1] = 0.6;
+            n_cloud.mColor[2] = 0.0;
+            n_cloud.mColor[3] = 0.5;
+            n_cloud.mFade = 5.0;
+            n_cloud.mMass.mMax = 30.0;
+            n_cloud.mMass.mMin = 10.0;
+            n_cloud.mSpawnRange.mMins[2] = -150.0;
+            n_cloud.mSpawnRange.mMaxs[2] = 150.0;
+
+            n_cloud.mRotationChangeNext = 0;
+            self.mParticleClouds.push(n_cloud);
+        }
+        // Create Blowing Clouds Of Fog
+        //------------------------------
+        else if token.eq_ignore_ascii_case("fog") {
+            if self.mParticleClouds.len() >= MAX_PARTICLE_CLOUDS {
+                return;
+            }
+            let mut n_cloud = CWeatherParticleCloud::new();
+            n_cloud.Initialize(&mut self.rng, 60, "gfx/effects/alpha_smoke2b.tga", 4);
+            n_cloud.mBlendMode = 1;
+            n_cloud.mGravity = 0.0;
+            n_cloud.mWidth = 70.0;
+            n_cloud.mHeight = 70.0;
+            n_cloud.mColor = [0.2; 4];
+            n_cloud.mFade = 5.0;
+            n_cloud.mMass.mMax = 30.0;
+            n_cloud.mMass.mMin = 10.0;
+            n_cloud.mSpawnRange.mMins[2] = -150.0;
+            n_cloud.mSpawnRange.mMaxs[2] = 150.0;
+
+            n_cloud.mRotationChangeNext = 0;
+            self.mParticleClouds.push(n_cloud);
+        }
+        // Create Heavy Rain Particle Cloud
+        //-----------------------------------
+        else if token.eq_ignore_ascii_case("heavyrainfog") {
+            if self.mParticleClouds.len() >= MAX_PARTICLE_CLOUDS {
+                return;
+            }
+            let mut n_cloud = CWeatherParticleCloud::new();
+            n_cloud.Initialize(&mut self.rng, 70, "gfx/effects/alpha_smoke2b.tga", 4);
+            n_cloud.mBlendMode = 1;
+            n_cloud.mGravity = 0.0;
+            n_cloud.mWidth = 100.0;
+            n_cloud.mHeight = 100.0;
+            n_cloud.mColor = [0.3; 4];
+            n_cloud.mFade = 1.0;
+            n_cloud.mMass.mMax = 10.0;
+            n_cloud.mMass.mMin = 5.0;
+
+            n_cloud.mSpawnRange.mMins = [-(n_cloud.mSpawnPlaneDistance * 1.25); 3];
+            n_cloud.mSpawnRange.mMaxs = [n_cloud.mSpawnPlaneDistance * 1.25; 3];
+            n_cloud.mSpawnRange.mMins[2] = -150.0;
+            n_cloud.mSpawnRange.mMaxs[2] = 150.0;
+
+            n_cloud.mRotationChangeNext = 0;
+            self.mParticleClouds.push(n_cloud);
+        }
+        // Create Blowing Clouds Of Fog
+        //------------------------------
+        else if token.eq_ignore_ascii_case("light_fog") {
+            if self.mParticleClouds.len() >= MAX_PARTICLE_CLOUDS {
+                return;
+            }
+            let mut n_cloud = CWeatherParticleCloud::new();
+            n_cloud.Initialize(&mut self.rng, 40, "gfx/effects/alpha_smoke2b.tga", 4);
+            n_cloud.mBlendMode = 1;
+            n_cloud.mGravity = 0.0;
+            n_cloud.mWidth = 100.0;
+            n_cloud.mHeight = 100.0;
+            n_cloud.mColor[0] = 0.19;
+            n_cloud.mColor[1] = 0.6;
+            n_cloud.mColor[2] = 0.7;
+            n_cloud.mColor[3] = 0.12;
+            n_cloud.mFade = 0.10;
+            n_cloud.mMass.mMax = 30.0;
+            n_cloud.mMass.mMin = 10.0;
+            n_cloud.mSpawnRange.mMins[2] = -150.0;
+            n_cloud.mSpawnRange.mMaxs[2] = 150.0;
+
+            n_cloud.mRotationChangeNext = 0;
+            self.mParticleClouds.push(n_cloud);
+        } else if token.eq_ignore_ascii_case("outsideshake") {
+            self.mOutside.mOutsideShake = !self.mOutside.mOutsideShake;
+        } else if token.eq_ignore_ascii_case("outsidepain") {
+            // Raven `mOutsidePain = !mOutsidePain;` — a float `!` coerces to
+            // bool first, so the result is only ever `0.0`/`1.0`, preserved
+            // as written (porting-rules §A2).
+            self.mOutside.mOutsidePain = if self.mOutside.mOutsidePain != 0.0 {
+                0.0
+            } else {
+                1.0
+            };
+        } else {
+            com_printf(
+                host.common,
+                "Weather Effect: Please enter a valid command.\n",
+            );
+            com_printf(host.common, "\tclear\n");
+            com_printf(host.common, "\tfreeze\n");
+            com_printf(host.common, "\tzone (mins) (maxs)\n");
+            com_printf(host.common, "\twind\n");
+            com_printf(host.common, "\tconstantwind (velocity)\n");
+            com_printf(host.common, "\tgustingwind\n");
+            com_printf(host.common, "\twindzone (mins) (maxs) (velocity)\n");
+            com_printf(host.common, "\tlightrain\n");
+            com_printf(host.common, "\train\n");
+            com_printf(host.common, "\tacidrain\n");
+            com_printf(host.common, "\theavyrain\n");
+            com_printf(host.common, "\tsnow\n");
+            com_printf(host.common, "\tspacedust\n");
+            com_printf(host.common, "\tsand\n");
+            com_printf(host.common, "\tfog\n");
+            com_printf(host.common, "\theavyrainfog\n");
+            com_printf(host.common, "\tlight_fog\n");
+            com_printf(host.common, "\toutsideshake\n");
+            com_printf(host.common, "\toutsidepain\n");
+        }
     }
 }
 

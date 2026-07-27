@@ -39,13 +39,15 @@ use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::shared::q_math::{
     _DotProduct as DotProduct, _VectorAdd as VectorAdd, _VectorCopy as VectorCopy,
     _VectorMA as VectorMA, _VectorScale as VectorScale, _VectorSubtract as VectorSubtract,
-    DistanceSquared, SetPlaneSignbits, VectorClear, VectorLength,
+    vec3_origin, CrossProduct, DistanceSquared, PerpendicularVector, SetPlaneSignbits, VectorClear,
+    VectorLength,
 };
 use mp_qshared::shared::{cplane_t, orientation_t, vec3_t, vec4_t};
-// `PlaneFromPoints` has no `mp_qshared::shared::q_math` re-export (unlike the
-// other `q_math` helpers above); taken from its canonical `native_math` home,
-// the same edge `tr_shade_calc` uses for `Q_rsqrt`.
-use native_math::qmath::PlaneFromPoints;
+// `PlaneFromPoints`/`RotatePointAroundVector` have no `mp_qshared::shared::
+// q_math` re-export (unlike the other `q_math` helpers above); taken from
+// their canonical `native_math` home, the same edge `tr_shade_calc` uses for
+// `Q_rsqrt`.
+use native_math::qmath::{PlaneFromPoints, RotatePointAroundVector};
 
 /// Raven `CULL_IN` — completely unclipped.
 ///
@@ -100,6 +102,13 @@ const MAX_SHADERS: usize = 16384;
 /// Raven `MAX_ENTITIES` — cited directly from the R2 design's `backEndData_t`
 /// disposition entry ("entities[MAX_ENTITIES=2048]").
 const MAX_ENTITIES: i32 = 2048;
+
+/// Raven `TR_WORLDENT` — local copy of the private const already ported at
+/// `tr_scene.rs` (not `pub` there, so not reachable from here); `MAX_ENTITIES
+/// - 1`, this file's own `MAX_ENTITIES` const above.
+///
+/// Source: `oracle/codemp/cgame/tr_types.h:15`
+const TR_WORLDENT: i32 = MAX_ENTITIES - 1;
 
 /// Raven `QSORT_*` sort-key shifts.
 ///
@@ -1151,4 +1160,263 @@ pub fn qsortFast<S>(surfs: &mut [DrawSurf<S>]) {
 pub fn R_DebugPolygon(_color: i32, _num_points: i32, _points: &[f32]) {
     // DEFERRED: R4 — R_DebugPolygon (see doc comment above) (DEC-37 A13.2 / DEC-01)
     // Source: oracle/codemp/renderer/tr_main.cpp:1540-1564
+}
+
+// ===== wave 2 =====
+
+/// Raven `R_GetPortalOrientations`. Out-params `surface`/`camera`/
+/// `pvsOrigin`/`mirror` -> return value: `Some((surface, camera, pvsOrigin,
+/// mirror))` on `qtrue`, `None` on `qfalse`. On the `qfalse` path the oracle
+/// leaves `surface`/`camera` only partially written (axis set, origin not) —
+/// dead data no caller reads once the `qboolean` return says "don't render
+/// anything" (see the oracle's own trailing comment), so the `None` arm
+/// carries nothing, per the out-param -> return-value dictionary entry.
+///
+/// `draw_surf_surface` is `drawSurf->surface` (the only `drawSurf_t` field
+/// this fn reads). `entities` is `tr.refdef.entities` (length =
+/// `tr.refdef.num_entities`, STATE HOMES SPLIT — threaded as a slice per this
+/// file's `R_SpriteFogNum`/`fogs` precedent). `refdef_time` is
+/// `tr.refdef.time` (only read in the continuous/bobbing camera-rotation
+/// branch). `view` is `tr.viewParms` (threaded through to
+/// `R_RotateForEntity`, read-only here). `scratch` carries
+/// `preTransEntMatrix` (DEC-37 A13.3, `TrMainScratch`), threaded through to
+/// `R_RotateForEntity`.
+///
+/// PORT-NOTE: the oracle also writes `tr.currentEntityNum`/`tr.currentEntity`
+/// (STATE HOMES SPLIT row: `RenderWorld::frame: FrameState`) right before
+/// calling `R_RotateForEntity`. This wave is scoped to `tr_main.rs` only
+/// (cannot add a field to `render_state/frame_state.rs`) — same precedent as
+/// `tr_scene.rs`'s `R_AddPolygonSurfaces` — so the write stays a local
+/// computation (`current_entity` below); escalate a `FrameState` field-merge
+/// if a later wave needs to read either value back outside this call.
+///
+/// Source: `oracle/codemp/renderer/tr_main.cpp:687-804`
+pub fn R_GetPortalOrientations(
+    draw_surf_surface: Option<&SurfaceGeometry>,
+    entity_num: i32,
+    entities: &[trRefEntity_t],
+    refdef_time: i32,
+    view: &viewParms_t,
+    scratch: &mut TrMainScratch,
+) -> Option<(orientation_t, orientation_t, vec3_t, bool)> {
+    // create plane axis for the portal we are seeing
+    let original_plane = R_PlaneForSurface(draw_surf_surface);
+    let mut plane_normal = original_plane.normal;
+    let mut plane_dist = original_plane.dist;
+    let mut original_plane_dist = original_plane.dist;
+
+    // rotate the plane if necessary
+    if entity_num != TR_WORLDENT {
+        let current_entity = &entities[entity_num as usize];
+
+        // get the orientation of the entity
+        let ori = R_RotateForEntity(current_entity, view, scratch);
+
+        // rotate the plane, but keep the non-rotated version for matching
+        // against the portalSurface entities
+        plane_normal = R_LocalNormalToWorld(original_plane.normal, &ori);
+        plane_dist = original_plane.dist + DotProduct(plane_normal, ori.origin);
+
+        // translate the original plane
+        original_plane_dist = original_plane.dist + DotProduct(original_plane.normal, ori.origin);
+    }
+
+    let mut surface_axis: [vec3_t; 3] = [[0.0; 3]; 3];
+    VectorCopy(plane_normal, &mut surface_axis[0]);
+    // Raven reads `surfaceAxis[0]` while writing `surfaceAxis[1]`; the read
+    // value is snapshotted first so the read-before-write order is preserved
+    // under Rust's whole-array borrow of the index expression.
+    let surface_axis_0 = surface_axis[0];
+    PerpendicularVector(&mut surface_axis[1], surface_axis_0);
+    CrossProduct(surface_axis[0], surface_axis[1], &mut surface_axis[2]);
+
+    // locate the portal entity closest to this plane.
+    // origin will be the origin of the portal, origin2 will be
+    // the origin of the camera
+    for e in entities {
+        if e.e.reType != refEntityType_t::RT_PORTALSURFACE {
+            continue;
+        }
+
+        let d = DotProduct(e.e.origin, original_plane.normal) - original_plane_dist;
+        if d > 64.0 || d < -64.0 {
+            continue;
+        }
+
+        // get the pvsOrigin from the entity
+        let pvs_origin = e.e.oldorigin;
+
+        // if the entity is just a mirror, don't use as a camera point
+        if e.e.oldorigin[0] == e.e.origin[0]
+            && e.e.oldorigin[1] == e.e.origin[1]
+            && e.e.oldorigin[2] == e.e.origin[2]
+        {
+            let mut surface_origin: vec3_t = [0.0; 3];
+            VectorScale(plane_normal, plane_dist, &mut surface_origin);
+
+            let mut camera_origin: vec3_t = [0.0; 3];
+            VectorCopy(surface_origin, &mut camera_origin);
+
+            let mut camera_axis0: vec3_t = [0.0; 3];
+            VectorSubtract(vec3_origin, surface_axis[0], &mut camera_axis0);
+
+            let surface = orientation_t {
+                origin: surface_origin,
+                axis: surface_axis,
+            };
+            let camera = orientation_t {
+                origin: camera_origin,
+                axis: [camera_axis0, surface_axis[1], surface_axis[2]],
+            };
+
+            return Some((surface, camera, pvs_origin, true));
+        }
+
+        // project the origin onto the surface plane to get
+        // an origin point we can rotate around
+        let d = DotProduct(e.e.origin, plane_normal) - plane_dist;
+        let mut surface_origin: vec3_t = [0.0; 3];
+        VectorMA(e.e.origin, -d, surface_axis[0], &mut surface_origin);
+
+        // now get the camera origin and orientation
+        let mut camera_origin: vec3_t = [0.0; 3];
+        VectorCopy(e.e.oldorigin, &mut camera_origin);
+        // PORT-NOTE: `AxisCopy(e->e.axis, camera->axis)` is a straight
+        // 3-element `vec3_t` array copy (`native_math::qmath::AxisCopy`'s own
+        // body: `out[0]=in[0]; out[1]=in[1]; out[2]=in[2];`); transcribed as
+        // a plain array assignment rather than round-tripping through that
+        // raw-pointer signature (interior-safety law: no new pointer casts
+        // in this file for a same-effect array copy).
+        let mut camera_axis = e.e.axis;
+
+        VectorSubtract(vec3_origin, camera_axis[0], &mut camera_axis[0]);
+        VectorSubtract(vec3_origin, camera_axis[1], &mut camera_axis[1]);
+
+        // optionally rotate
+        if e.e.oldframe != 0 {
+            if e.e.frame != 0 {
+                // continuous rotate
+                let rot_d = (refdef_time as f32 / 1000.0) * e.e.frame as f32;
+                let mut transformed: vec3_t = [0.0; 3];
+                VectorCopy(camera_axis[1], &mut transformed);
+                // Read `cameraAxis[0]` before the write to `cameraAxis[1]`, as
+                // Raven's argument evaluation does; Rust borrows the whole array.
+                let camera_axis_0 = camera_axis[0];
+                RotatePointAroundVector(&mut camera_axis[1], camera_axis_0, transformed, rot_d);
+                CrossProduct(camera_axis[0], camera_axis[1], &mut camera_axis[2]);
+            } else {
+                // bobbing rotate, with skinNum being the rotation offset
+                // C `sin` is a double fn; f64 intermediate per wave-0 ruling
+                // 12 (the `* 0.003f` multiply itself stays float — `0.003f`
+                // is a float literal, not a double one).
+                let bob = refdef_time as f32 * 0.003;
+                let mut rot_d = f64::sin(bob as f64) as f32;
+                rot_d = e.e.skinNum as f32 + rot_d * 4.0;
+                let mut transformed: vec3_t = [0.0; 3];
+                VectorCopy(camera_axis[1], &mut transformed);
+                let camera_axis_0 = camera_axis[0];
+                RotatePointAroundVector(&mut camera_axis[1], camera_axis_0, transformed, rot_d);
+                CrossProduct(camera_axis[0], camera_axis[1], &mut camera_axis[2]);
+            }
+        } else if e.e.skinNum != 0 {
+            let rot_d = e.e.skinNum as f32;
+            let mut transformed: vec3_t = [0.0; 3];
+            VectorCopy(camera_axis[1], &mut transformed);
+            let camera_axis_0 = camera_axis[0];
+            RotatePointAroundVector(&mut camera_axis[1], camera_axis_0, transformed, rot_d);
+            CrossProduct(camera_axis[0], camera_axis[1], &mut camera_axis[2]);
+        }
+
+        let surface = orientation_t {
+            origin: surface_origin,
+            axis: surface_axis,
+        };
+        let camera = orientation_t {
+            origin: camera_origin,
+            axis: camera_axis,
+        };
+
+        return Some((surface, camera, pvs_origin, false));
+    }
+
+    // if we didn't locate a portal entity, don't render anything.
+    // We don't want to just treat it as a mirror, because without a
+    // portal entity the server won't have communicated a proper entity set
+    // in the snapshot
+
+    // unfortunately, with local movement prediction it is easily possible
+    // to see a surface before the server has communicated the matching
+    // portal surface entity, so we don't want to print anything here...
+
+    None
+}
+
+/// Raven `IsMirror`.
+///
+/// `draw_surf_surface`/`entity_num`/`entities`/`view`/`scratch` as
+/// `R_GetPortalOrientations` above (this fn is the oracle's near-verbatim
+/// duplicate of that one's plane-setup prefix, minus the camera/pvsOrigin
+/// outputs — it only needs to answer "is this portal surface a plain
+/// mirror?").
+///
+/// PORT-NOTE: the oracle's rotated-plane branch here also computes
+/// `plane.normal`/`plane.dist` (`R_LocalNormalToWorld` + a `DotProduct`
+/// offset, exactly as in `R_GetPortalOrientations`), but `IsMirror` never
+/// reads either afterward — a dead store, kept in the oracle only because
+/// this fn is a copy-paste of `R_GetPortalOrientations`' prefix. Dropped
+/// here (porting-rules §10: preserve behavior, not shape; `R_LocalNormalToWorld`
+/// is pure, so dropping its unread result changes no observable behavior).
+/// The `R_RotateForEntity` call itself is kept — its `ori.origin` return
+/// value feeds `original_plane_dist`'s translation below, and its side
+/// effects are the same `tr.currentEntityNum`/`tr.currentEntity`/`tr.ori`
+/// writes documented on `R_GetPortalOrientations` (same wave-scope
+/// escalation: computed locally here, not persisted to `FrameState`).
+///
+/// Source: `oracle/codemp/renderer/tr_main.cpp:806-864`
+pub fn IsMirror(
+    draw_surf_surface: Option<&SurfaceGeometry>,
+    entity_num: i32,
+    entities: &[trRefEntity_t],
+    view: &viewParms_t,
+    scratch: &mut TrMainScratch,
+) -> bool {
+    // create plane axis for the portal we are seeing
+    let original_plane = R_PlaneForSurface(draw_surf_surface);
+    let mut original_plane_dist = original_plane.dist;
+
+    // rotate the plane if necessary
+    if entity_num != TR_WORLDENT {
+        let current_entity = &entities[entity_num as usize];
+
+        // get the orientation of the entity
+        let ori = R_RotateForEntity(current_entity, view, scratch);
+
+        // translate the original plane
+        original_plane_dist = original_plane.dist + DotProduct(original_plane.normal, ori.origin);
+    }
+
+    // locate the portal entity closest to this plane.
+    // origin will be the origin of the portal, origin2 will be
+    // the origin of the camera
+    for e in entities {
+        if e.e.reType != refEntityType_t::RT_PORTALSURFACE {
+            continue;
+        }
+
+        let d = DotProduct(e.e.origin, original_plane.normal) - original_plane_dist;
+        if d > 64.0 || d < -64.0 {
+            continue;
+        }
+
+        // if the entity is just a mirror, don't use as a camera point
+        if e.e.oldorigin[0] == e.e.origin[0]
+            && e.e.oldorigin[1] == e.e.origin[1]
+            && e.e.oldorigin[2] == e.e.origin[2]
+        {
+            return true;
+        }
+
+        return false;
+    }
+    false
 }

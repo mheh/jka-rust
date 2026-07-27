@@ -2,9 +2,15 @@
 //!
 //! Source: `oracle/codemp/renderer/tr_quicksprite.cpp`
 
+use mp_engine_qcommon::common::Common;
 use mp_qshared::common::mp::cgame::color4ub_t::color4ub_t;
 use mp_qshared::shared::{vec2_t, vec4_t};
 
+use crate::render_state::frame_state::FrameState;
+use crate::render_state::gpu_resources::GpuResources;
+use crate::render_state::render_assets::RenderAssets;
+use crate::render_state::renderer_cvars::RendererCvars;
+use crate::tr_backend::GL_State;
 use crate::tr_local::stage_vars::SHADER_MAX_VERTEXES;
 use crate::tr_local::texture_bundle_t::textureBundle_t;
 
@@ -166,5 +172,89 @@ impl CQuickSpriteSystem {
         }
 
         self.next_vert += 4;
+    }
+
+    /// Raven `CQuickSpriteSystem::Flush`.
+    ///
+    /// Only the CPU-portable slice survives untouched here: the empty-batch
+    /// early-out and the final `mNextVert = 0` reclaim. Every other line is
+    /// either a fixed-function GL call (DEC-37 A13.2, no R3 home) or gated on
+    /// a state carrier no prior wave has landed — see the per-block notes.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_quicksprite.cpp:52-144`
+    pub fn flush(
+        &mut self,
+        gpu: &mut GpuResources,
+        _assets: &RenderAssets,
+        _frame: &mut FrameState,
+        _common: &Common,
+        _cvars: &RendererCvars,
+    ) {
+        if self.next_vert == 0 {
+            return;
+        }
+
+        // R_BindAnimatedImage( mTexBundle );
+        // DEFERRED: mTexBundle is not a stored field on CQuickSpriteSystem —
+        // `StartGroup` (wave 1) deferred storing it under the interior-
+        // safety law (see StartGroup's own doc comment above); `Flush`, its
+        // sole reader, is the fn that would need the carrier and is out of
+        // that wave's scope. No R3 behavior is lost by deferring the call
+        // itself: `R_BindAnimatedImage`'s own body
+        // (`crates/mp/renderer/src/tr_shade.rs:231-249`) is already DEFERRED
+        // R4 for every branch except `bundle.is_video_map`, which this call
+        // site could never legitimately reach without a real bundle to
+        // inspect.
+        // Source: oracle/codemp/renderer/tr_quicksprite.cpp:80
+        GL_State(gpu, self.gl_state_bits);
+
+        // DEFERRED: R4 — qglTexCoordPointer/qglEnableClientState(GL_TEXTURE_
+        // COORD_ARRAY)/qglEnableClientState(GL_COLOR_ARRAY)/qglColorPointer/
+        // qglVertexPointer (DEC-37 A13.2). Fixed-function GL immediate-mode
+        // array setup, no R3 home; the backend is an idiomatic wgpu rewrite.
+        // Source: oracle/codemp/renderer/tr_quicksprite.cpp:86-92
+
+        // DEFERRED: R4 — `if ( qglLockArraysEXT ) { qglLockArraysEXT(0,
+        // mNextVert); GLimp_LogComment(...); }` (DEC-37 A13.2, same ruling as
+        // this packet's `Flush`/`qglLockArraysEXT` STATE HOMES row: no R3
+        // home for the fixed-function-extension pointer check).
+        // Source: oracle/codemp/renderer/tr_quicksprite.cpp:94-98
+
+        // DEFERRED: R4 — qglDrawArrays(GL_QUADS, 0, mNextVert) (DEC-37
+        // A13.2). The main-pass draw call itself.
+        // Source: oracle/codemp/renderer/tr_quicksprite.cpp:100
+
+        // backEnd.pc.c_vertexes += mNextVert;
+        // backEnd.pc.c_indexes += mNextVert;
+        // backEnd.pc.c_totalIndexes += mNextVert;
+        // DEFERRED: `FrameState::counters` (`BackEndCounters`,
+        // `render_state/placeholders.rs`) is still the R3 wave-0 landing
+        // placeholder with zero fields — its own module doc lists it among
+        // the types "untouched by wave-0, stay empty"; no prior wave has
+        // landed `backEndCounters_t`'s `c_vertexes`/`c_indexes`/
+        // `c_totalIndexes` onto it, and this file may not extend a struct
+        // outside its own module (porting-rules §17 / the wave contract).
+        // Source: oracle/codemp/renderer/tr_quicksprite.cpp:102-104
+
+        // if (mUseFog && (r_drawfog->integer != 2 || mFogIndex !=
+        // tr.world->globalFog)) { ... }
+        // DEFERRED: the whole software-fog pass. `tr.world->globalFog` and
+        // `tr.world->fogs[mFogIndex]` (`fog_t::colorInt`) are unavailable —
+        // `WorldAsset`'s own doc comment states its fog array "land[s] with
+        // the rest of the tr_bsp/tr_world waves", not yet ported; `tr.
+        // fogImage` has no `RenderAssets` field landed by any prior wave
+        // either. Even with those, the pass is GL-only beyond the fog-struct
+        // read (`GL_Bind`/`GL_State`/qgl* calls, DEC-37 A13.2), so deferring
+        // the block wholesale — rather than reading the fog data just to
+        // discard it into deferred GL calls — matches this file's existing
+        // convention (`R_DrawElements`/`DrawNormals` in `tr_shade.rs`).
+        // Source: oracle/codemp/renderer/tr_quicksprite.cpp:106-132
+
+        // DEFERRED: R4 — `if (qglUnlockArraysEXT) { qglUnlockArraysEXT();
+        // GLimp_LogComment(...); }` (DEC-37 A13.2, same ruling as this
+        // packet's `Flush`/`qglUnlockArraysEXT` STATE HOMES row).
+        // Source: oracle/codemp/renderer/tr_quicksprite.cpp:136-141
+
+        self.next_vert = 0;
     }
 }

@@ -35,4 +35,5 @@ pub mod render_assets_sim;
 pub mod render_world;
 pub mod renderer_cvars;
 pub mod shader_asset;
+pub mod shader_stage;
 pub mod skin_asset;

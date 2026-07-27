@@ -9,13 +9,14 @@
 // callers landing in later R3 waves.
 #![allow(dead_code)]
 
-use core::mem::size_of;
+use core::mem::{replace, size_of};
 
 use mp_engine_qcommon::common::{com_error, com_printf, Common};
 use mp_engine_qcommon::qfiles::dleaf_t::dleaf_t;
+use mp_engine_qcommon::qfiles::dmodel_t::dmodel_t;
 use mp_engine_qcommon::qfiles::dnode_t::dnode_t;
 use mp_engine_qcommon::qfiles::dplane_t::dplane_t;
-use mp_engine_qcommon::qfiles::draw_vert_t::{drawVert_t, MAXLIGHTMAPS};
+use mp_engine_qcommon::qfiles::draw_vert_t::MAXLIGHTMAPS;
 use mp_engine_qcommon::qfiles::dshader_t::dshader_t;
 use mp_engine_qcommon::qfiles::lump_t::lump_t;
 use mp_qshared::shared::q_math::PlaneTypeForNormal;
@@ -25,6 +26,9 @@ use mp_qshared::shared::{cplane_t, errorParm_t, MAX_QPATH};
 
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::placeholders::{Vec3, WorldAsset};
+use crate::tr_curve::{
+    empty_grid_mesh, GridMesh, R_GridInsertColumn, R_GridInsertRow, MAX_GRID_SIZE,
+};
 use crate::tr_local::mgrid_t::mgrid_t;
 use crate::tr_local::surface_type_t::surfaceType_t;
 
@@ -121,47 +125,23 @@ pub struct Node {
     pub nummarksurfaces: i32,
 }
 
-/// Owned replacement for Raven `bmodel_t`'s culling bounds — this wave
-/// (`R_LoadLightGrid`) only reads `bounds`; `firstSurface`/`numSurfaces`
-/// land with the wave that ports `R_LoadSubmodels` (tier-2 transition
-/// audit, Group 1: `bmodel_t` row).
+/// Owned replacement for Raven `bmodel_t`'s culling bounds — wave 1
+/// (`R_LoadLightGrid`) only reads `bounds`; this wave (`R_LoadSubmodels`)
+/// adds `first_surface`/`num_surfaces` (tier-2 transition audit, Group 1:
+/// `bmodel_t` row). `first_surface` is the parsed lump index — same
+/// index-not-pointer treatment as `R_LoadMarksurfaces`'s `mark_surfaces`
+/// above — since no `WorldAsset::surfaces` (`msurface_t` array) carrier
+/// exists yet for it to address into (see `R_LoadSubmodels`'s doc comment).
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:938-942`
 #[derive(Clone)]
 pub struct BModel {
     pub bounds: [Vec3; 2],
-}
-
-/// Owned replacement for Raven `srfGridMesh_t`'s vertex data — `verts`
-/// becomes an owned `Vec<drawVert_t>` sized by `(width, height)`, replacing
-/// the C flexible-array trick (tier-2 transition audit, Group 1:
-/// `srfGridMesh_t` row). This wave (the LOD-stitching functions,
-/// `R_FixSharedVertexLodError_r`) adds `surface_type`/`lod_radius`/
-/// `lod_origin`/`lod_fixed`/`width_lod_error`/`height_lod_error` — the
-/// fields those functions read/write. `tr_curve.rs` independently owns a
-/// full `srfGridMesh_t` stand-in of its own (`R_CreateSurfaceGridMesh`'s
-/// return shape) — this file's `GridMesh` stays a separate, narrower
-/// scoped-local type (same pattern as `tr_main::SurfaceGeometry`/
-/// `tr_marks::MarkSurfaceData`), because `R_MergedWidthPoints`/
-/// `R_MergedHeightPoints` (already ported, wave 0) are typed against it.
-///
-/// Type definition source: `oracle/codemp/renderer/tr_local.h:750-774`
-pub struct GridMesh {
-    pub surface_type: surfaceType_t,
-    pub width: i32,
-    pub height: i32,
-    pub verts: Vec<drawVert_t>,
-    /// `lodRadius`.
-    pub lod_radius: f32,
-    /// `lodOrigin`.
-    pub lod_origin: Vec3,
-    /// `lodFixed` — `2` once `R_FixSharedVertexLodError_r` has stitched
-    /// this patch's LOD errors against a matching group.
-    pub lod_fixed: i32,
-    /// `widthLodError`.
-    pub width_lod_error: Vec<f32>,
-    /// `heightLodError`.
-    pub height_lod_error: Vec<f32>,
+    /// `firstSurface` — parsed lump index, not yet a live range into an
+    /// owned surface array (no `WorldAsset::surfaces` carrier exists).
+    pub first_surface: usize,
+    /// `numSurfaces`.
+    pub num_surfaces: i32,
 }
 
 /// Decodes a Latin-1, NUL-terminated fixed-size name buffer (the on-disk BSP
@@ -560,11 +540,14 @@ pub fn R_GetEntityToken(world: &mut WorldAsset, size: i32) -> (bool, String) {
 /// same slice — the split-borrow helper `R_FixSharedVertexLodError_r`'s
 /// recursion needs (its `grid1`/`grid2` alias one array in the oracle,
 /// interior-safety law: pointer aliasing becomes an index pair over one
-/// owned slice instead of two independent raw pointers). `a == b` is not a
-/// case the oracle's recursion produces (the caller always resumes the
-/// search at `start`, and `grid1` is always positioned before `start` in
-/// every real call chain); panics rather than silently aliasing if it ever
-/// does (porting-rules §19 — pick one defined behavior for what is
+/// owned slice instead of two independent raw pointers). `a == b` is
+/// unreachable here because the caller applies the oracle's own
+/// `lodFixed == 2` guard (`tr_bsp.cpp:689-692`) before splitting: the parent
+/// frame sets `grid2->lodFixed = 2` at `tr_bsp.cpp:777` *before* recursing
+/// with that same grid as `grid1` at `:778`, so the recursive frame's loop
+/// skips its own `grid1` index on the guard and never reaches this call with
+/// `a == b`. It panics rather than silently aliasing if that ordering is ever
+/// broken (porting-rules §19 — pick one defined behavior for what is
 /// otherwise nonsensical input).
 fn split_grid_pair(world_data: &mut [GridMesh], a: usize, b: usize) -> (&GridMesh, &mut GridMesh) {
     if a < b {
@@ -599,18 +582,22 @@ pub fn R_FixSharedVertexLodError_r(start: usize, grid1_idx: usize, world_data: &
     while j < world_data.len() {
         let mut recurse = false;
         {
-            let (grid1, grid2) = split_grid_pair(world_data, grid1_idx, j);
-
+            // The two `grid2`-only guards read through plain immutable indexing
+            // *before* the split borrow: the `lodFixed == 2` guard is what makes
+            // `j == grid1_idx` unreachable at `split_grid_pair` (see its doc).
             // if this surface is not a grid
-            if !matches!(grid2.surface_type, surfaceType_t::SF_GRID) {
+            if !matches!(world_data[j].surface_type, surfaceType_t::SF_GRID) {
                 j += 1;
                 continue;
             }
             // if the LOD errors are already fixed for this patch
-            if grid2.lod_fixed == 2 {
+            if world_data[j].lod_fixed == 2 {
                 j += 1;
                 continue;
             }
+
+            let (grid1, grid2) = split_grid_pair(world_data, grid1_idx, j);
+
             // grids in the same LOD group should have the exact same lod radius
             if grid1.lod_radius != grid2.lod_radius {
                 j += 1;
@@ -793,7 +780,7 @@ pub fn R_FixSharedVertexLodError_r(start: usize, grid1_idx: usize, world_data: &
 /// modeling that corruption.
 ///
 /// Source: `oracle/codemp/renderer/tr_bsp.cpp:1314-1339`
-pub fn R_MovePatchSurfacesToHunk(_world_data: &mut [crate::tr_curve::GridMesh]) {
+pub fn R_MovePatchSurfacesToHunk(_world_data: &mut [GridMesh]) {
     // No-op under the owned-Vec ownership model — see PORT-NOTE above.
 }
 
@@ -1014,4 +1001,617 @@ pub fn R_LoadLightGrid(
     }
 
     world.light_grid_data = Some(light_grid_data);
+}
+
+// --- R3 wave 2 ---------------------------------------------------------
+
+/// Raven `R_FixSharedVertexLodError`.
+///
+/// PORT-NOTE: same "no state channel" / plain-`world_data` shape as the
+/// wave-1 sibling `R_FixSharedVertexLodError_r` it drives (see the top-of-
+/// file wave-1 note) — no licensed `WorldAsset::surfaces` carrier exists yet
+/// for `worldData.surfaces`, so this walks a plain `world_data: &mut
+/// [GridMesh]` slice instead.
+///
+/// Source: `oracle/codemp/renderer/tr_bsp.cpp:793-811`
+pub fn R_FixSharedVertexLodError(world_data: &mut [GridMesh]) {
+    for i in 0..world_data.len() {
+        //
+        // if this surface is not a grid
+        if !matches!(world_data[i].surface_type, surfaceType_t::SF_GRID) {
+            continue;
+        }
+        //
+        if world_data[i].lod_fixed != 0 {
+            continue;
+        }
+        //
+        world_data[i].lod_fixed = 2;
+        // recursively fix other patches in the same LOD group
+        R_FixSharedVertexLodError_r(i + 1, i, world_data);
+    }
+}
+
+/// Raven's repeated `if (fabs(v1[i] - v2[i]) > .1) continue;` triple — true
+/// when any component differs by more than `tol`. `fabs()` takes a double:
+/// the f32 difference promotes and the comparand is a double literal
+/// (ruling 12).
+fn vectors_differ(v1: Vec3, v2: Vec3, tol: f64) -> bool {
+    ((v1[0] - v2[0]) as f64).abs() > tol
+        || ((v1[1] - v2[1]) as f64).abs() > tol
+        || ((v1[2] - v2[2]) as f64).abs() > tol
+}
+
+/// Raven's `fabs(v1[0]-v2[0]) < .01 && fabs(v1[1]-v2[1]) < .01 &&
+/// fabs(v1[2]-v2[2]) < .01` conjunction — every component within `tol`. Kept
+/// distinct from `vectors_differ` because the strict `<` and `>` forms differ
+/// exactly at `tol`.
+fn vectors_coincide(v1: Vec3, v2: Vec3, tol: f64) -> bool {
+    ((v1[0] - v2[0]) as f64).abs() < tol
+        && ((v1[1] - v2[1]) as f64).abs() < tol
+        && ((v1[2] - v2[2]) as f64).abs() < tol
+}
+
+/// Reads `grid1->widthLodError[k+1]` / `heightLodError[k+1]` at the insert
+/// sites of `R_StitchPatches`'s two descending-`k` passes
+/// (`oracle/codemp/renderer/tr_bsp.cpp:1029-1233`), where `k` starts at
+/// `width-1`/`height-1` — so `k+1` indexes one past the `width`/`height`-entry
+/// table on the first iteration, a C heap over-read (porting-rules §19: the
+/// defined behavior picked here is the last valid entry). The ascending-`k`
+/// passes stay in range and index the table directly.
+fn lod_error_clamped(table: &[f32], index: i32) -> f32 {
+    let last = table.len().saturating_sub(1);
+    table[(index.max(0) as usize).min(last)]
+}
+
+/// The grid edit `R_StitchPatches` found — Raven's
+/// `R_GridInsertColumn`/`R_GridInsertRow` call plus its already-evaluated
+/// arguments, read off `grid1` at the oracle's own read point (before the
+/// insert reshapes `grid2`).
+enum StitchInsert {
+    Column {
+        column: usize,
+        row: usize,
+        point: Vec3,
+        loderror: f32,
+    },
+    Row {
+        row: usize,
+        column: usize,
+        point: Vec3,
+        loderror: f32,
+    },
+}
+
+/// The read-only search half of Raven `R_StitchPatches` — every one of the
+/// oracle's eight insert sites is immediately followed by `return qtrue`, so
+/// the whole scan runs before any mutation and can hand its single edit back
+/// to the caller (porting-rules C10: control-flow shape may change).
+/// `grid1`/`grid2` are two shared borrows of one slice rather than
+/// `split_grid_pair`'s `&`/`&mut` split: nothing is written here, and
+/// `R_TryStitchingPatch` (`tr_bsp.cpp:1247-1262`) does call this with
+/// `grid1num == j`.
+///
+/// Source: `oracle/codemp/renderer/tr_bsp.cpp:819-1234`
+fn stitch_scan(grid1: &GridMesh, grid2: &GridMesh) -> Option<StitchInsert> {
+    for n in 0..2i32 {
+        //
+        let offset1 = if n != 0 {
+            (grid1.height - 1) * grid1.width
+        } else {
+            0
+        };
+        if R_MergedWidthPoints(grid1, offset1) {
+            continue;
+        }
+        let mut k = 0i32;
+        while k < grid1.width - 2 {
+            for m in 0..2i32 {
+                if grid2.width >= MAX_GRID_SIZE as i32 {
+                    break;
+                }
+                let offset2 = if m != 0 {
+                    (grid2.height - 1) * grid2.width
+                } else {
+                    0
+                };
+                //if (R_MergedWidthPoints(grid2, offset2))
+                //	continue;
+                for l in 0..grid2.width - 1 {
+                    //
+                    let v1 = grid1.verts[(k + offset1) as usize].xyz;
+                    let v2 = grid2.verts[(l + offset2) as usize].xyz;
+                    if vectors_differ(v1, v2, 0.1) {
+                        continue;
+                    }
+
+                    let v1 = grid1.verts[(k + 2 + offset1) as usize].xyz;
+                    let v2 = grid2.verts[(l + 1 + offset2) as usize].xyz;
+                    if vectors_differ(v1, v2, 0.1) {
+                        continue;
+                    }
+                    //
+                    let v1 = grid2.verts[(l + offset2) as usize].xyz;
+                    let v2 = grid2.verts[(l + 1 + offset2) as usize].xyz;
+                    if vectors_coincide(v1, v2, 0.01) {
+                        continue;
+                    }
+                    //
+                    //Com_Printf ("found highest LoD crack between two patches\n" );
+                    // insert column into grid2 right after after column l
+                    let row = if m != 0 { grid2.height - 1 } else { 0 };
+                    return Some(StitchInsert::Column {
+                        column: (l + 1) as usize,
+                        row: row as usize,
+                        point: grid1.verts[(k + 1 + offset1) as usize].xyz,
+                        loderror: grid1.width_lod_error[(k + 1) as usize],
+                    });
+                }
+            }
+            for m in 0..2i32 {
+                if grid2.height >= MAX_GRID_SIZE as i32 {
+                    break;
+                }
+                let offset2 = if m != 0 { grid2.width - 1 } else { 0 };
+                //if (R_MergedHeightPoints(grid2, offset2))
+                //	continue;
+                for l in 0..grid2.height - 1 {
+                    //
+                    let v1 = grid1.verts[(k + offset1) as usize].xyz;
+                    let v2 = grid2.verts[(grid2.width * l + offset2) as usize].xyz;
+                    if vectors_differ(v1, v2, 0.1) {
+                        continue;
+                    }
+
+                    let v1 = grid1.verts[(k + 2 + offset1) as usize].xyz;
+                    let v2 = grid2.verts[(grid2.width * (l + 1) + offset2) as usize].xyz;
+                    if vectors_differ(v1, v2, 0.1) {
+                        continue;
+                    }
+                    //
+                    let v1 = grid2.verts[(grid2.width * l + offset2) as usize].xyz;
+                    let v2 = grid2.verts[(grid2.width * (l + 1) + offset2) as usize].xyz;
+                    if vectors_coincide(v1, v2, 0.01) {
+                        continue;
+                    }
+                    //
+                    //Com_Printf ("found highest LoD crack between two patches\n" );
+                    // insert row into grid2 right after after row l
+                    let column = if m != 0 { grid2.width - 1 } else { 0 };
+                    return Some(StitchInsert::Row {
+                        row: (l + 1) as usize,
+                        column: column as usize,
+                        point: grid1.verts[(k + 1 + offset1) as usize].xyz,
+                        loderror: grid1.width_lod_error[(k + 1) as usize],
+                    });
+                }
+            }
+            k += 2;
+        }
+    }
+    for n in 0..2i32 {
+        //
+        let offset1 = if n != 0 { grid1.width - 1 } else { 0 };
+        if R_MergedHeightPoints(grid1, offset1) {
+            continue;
+        }
+        let mut k = 0i32;
+        while k < grid1.height - 2 {
+            for m in 0..2i32 {
+                if grid2.width >= MAX_GRID_SIZE as i32 {
+                    break;
+                }
+                let offset2 = if m != 0 {
+                    (grid2.height - 1) * grid2.width
+                } else {
+                    0
+                };
+                //if (R_MergedWidthPoints(grid2, offset2))
+                //	continue;
+                for l in 0..grid2.width - 1 {
+                    //
+                    let v1 = grid1.verts[(grid1.width * k + offset1) as usize].xyz;
+                    let v2 = grid2.verts[(l + offset2) as usize].xyz;
+                    if vectors_differ(v1, v2, 0.1) {
+                        continue;
+                    }
+
+                    let v1 = grid1.verts[(grid1.width * (k + 2) + offset1) as usize].xyz;
+                    let v2 = grid2.verts[(l + 1 + offset2) as usize].xyz;
+                    if vectors_differ(v1, v2, 0.1) {
+                        continue;
+                    }
+                    //
+                    let v1 = grid2.verts[(l + offset2) as usize].xyz;
+                    let v2 = grid2.verts[((l + 1) + offset2) as usize].xyz;
+                    if vectors_coincide(v1, v2, 0.01) {
+                        continue;
+                    }
+                    //
+                    //Com_Printf ("found highest LoD crack between two patches\n" );
+                    // insert column into grid2 right after after column l
+                    let row = if m != 0 { grid2.height - 1 } else { 0 };
+                    return Some(StitchInsert::Column {
+                        column: (l + 1) as usize,
+                        row: row as usize,
+                        point: grid1.verts[(grid1.width * (k + 1) + offset1) as usize].xyz,
+                        loderror: grid1.height_lod_error[(k + 1) as usize],
+                    });
+                }
+            }
+            for m in 0..2i32 {
+                if grid2.height >= MAX_GRID_SIZE as i32 {
+                    break;
+                }
+                let offset2 = if m != 0 { grid2.width - 1 } else { 0 };
+                //if (R_MergedHeightPoints(grid2, offset2))
+                //	continue;
+                for l in 0..grid2.height - 1 {
+                    //
+                    let v1 = grid1.verts[(grid1.width * k + offset1) as usize].xyz;
+                    let v2 = grid2.verts[(grid2.width * l + offset2) as usize].xyz;
+                    if vectors_differ(v1, v2, 0.1) {
+                        continue;
+                    }
+
+                    let v1 = grid1.verts[(grid1.width * (k + 2) + offset1) as usize].xyz;
+                    let v2 = grid2.verts[(grid2.width * (l + 1) + offset2) as usize].xyz;
+                    if vectors_differ(v1, v2, 0.1) {
+                        continue;
+                    }
+                    //
+                    let v1 = grid2.verts[(grid2.width * l + offset2) as usize].xyz;
+                    let v2 = grid2.verts[(grid2.width * (l + 1) + offset2) as usize].xyz;
+                    if vectors_coincide(v1, v2, 0.01) {
+                        continue;
+                    }
+                    //
+                    //Com_Printf ("found highest LoD crack between two patches\n" );
+                    // insert row into grid2 right after after row l
+                    let column = if m != 0 { grid2.width - 1 } else { 0 };
+                    return Some(StitchInsert::Row {
+                        row: (l + 1) as usize,
+                        column: column as usize,
+                        point: grid1.verts[(grid1.width * (k + 1) + offset1) as usize].xyz,
+                        loderror: grid1.height_lod_error[(k + 1) as usize],
+                    });
+                }
+            }
+            k += 2;
+        }
+    }
+    for n in 0..2i32 {
+        //
+        let offset1 = if n != 0 {
+            (grid1.height - 1) * grid1.width
+        } else {
+            0
+        };
+        if R_MergedWidthPoints(grid1, offset1) {
+            continue;
+        }
+        let mut k = grid1.width - 1;
+        while k > 1 {
+            for m in 0..2i32 {
+                if grid2.width >= MAX_GRID_SIZE as i32 {
+                    break;
+                }
+                let offset2 = if m != 0 {
+                    (grid2.height - 1) * grid2.width
+                } else {
+                    0
+                };
+                //if (R_MergedWidthPoints(grid2, offset2))
+                //	continue;
+                for l in 0..grid2.width - 1 {
+                    //
+                    let v1 = grid1.verts[(k + offset1) as usize].xyz;
+                    let v2 = grid2.verts[(l + offset2) as usize].xyz;
+                    if vectors_differ(v1, v2, 0.1) {
+                        continue;
+                    }
+
+                    let v1 = grid1.verts[(k - 2 + offset1) as usize].xyz;
+                    let v2 = grid2.verts[(l + 1 + offset2) as usize].xyz;
+                    if vectors_differ(v1, v2, 0.1) {
+                        continue;
+                    }
+                    //
+                    let v1 = grid2.verts[(l + offset2) as usize].xyz;
+                    let v2 = grid2.verts[((l + 1) + offset2) as usize].xyz;
+                    if vectors_coincide(v1, v2, 0.01) {
+                        continue;
+                    }
+                    //
+                    //Com_Printf ("found highest LoD crack between two patches\n" );
+                    // insert column into grid2 right after after column l
+                    let row = if m != 0 { grid2.height - 1 } else { 0 };
+                    return Some(StitchInsert::Column {
+                        column: (l + 1) as usize,
+                        row: row as usize,
+                        point: grid1.verts[(k - 1 + offset1) as usize].xyz,
+                        loderror: lod_error_clamped(&grid1.width_lod_error, k + 1),
+                    });
+                }
+            }
+            for m in 0..2i32 {
+                if grid2.height >= MAX_GRID_SIZE as i32 {
+                    break;
+                }
+                let offset2 = if m != 0 { grid2.width - 1 } else { 0 };
+                //if (R_MergedHeightPoints(grid2, offset2))
+                //	continue;
+                for l in 0..grid2.height - 1 {
+                    //
+                    let v1 = grid1.verts[(k + offset1) as usize].xyz;
+                    let v2 = grid2.verts[(grid2.width * l + offset2) as usize].xyz;
+                    if vectors_differ(v1, v2, 0.1) {
+                        continue;
+                    }
+
+                    let v1 = grid1.verts[(k - 2 + offset1) as usize].xyz;
+                    let v2 = grid2.verts[(grid2.width * (l + 1) + offset2) as usize].xyz;
+                    if vectors_differ(v1, v2, 0.1) {
+                        continue;
+                    }
+                    //
+                    let v1 = grid2.verts[(grid2.width * l + offset2) as usize].xyz;
+                    let v2 = grid2.verts[(grid2.width * (l + 1) + offset2) as usize].xyz;
+                    if vectors_coincide(v1, v2, 0.01) {
+                        continue;
+                    }
+                    //
+                    //Com_Printf ("found highest LoD crack between two patches\n" );
+                    // insert row into grid2 right after after row l
+                    let column = if m != 0 { grid2.width - 1 } else { 0 };
+                    // Raven's lone `if (!grid2) break;` null check on the
+                    // insert result lives here (`tr_bsp.cpp:1124`); it is
+                    // honoured by `R_StitchPatches`'s pre-insert capacity
+                    // check, uniformly for all eight sites.
+                    return Some(StitchInsert::Row {
+                        row: (l + 1) as usize,
+                        column: column as usize,
+                        point: grid1.verts[(k - 1 + offset1) as usize].xyz,
+                        loderror: lod_error_clamped(&grid1.width_lod_error, k + 1),
+                    });
+                }
+            }
+            k -= 2;
+        }
+    }
+    for n in 0..2i32 {
+        //
+        let offset1 = if n != 0 { grid1.width - 1 } else { 0 };
+        if R_MergedHeightPoints(grid1, offset1) {
+            continue;
+        }
+        let mut k = grid1.height - 1;
+        while k > 1 {
+            for m in 0..2i32 {
+                if grid2.width >= MAX_GRID_SIZE as i32 {
+                    break;
+                }
+                let offset2 = if m != 0 {
+                    (grid2.height - 1) * grid2.width
+                } else {
+                    0
+                };
+                //if (R_MergedWidthPoints(grid2, offset2))
+                //	continue;
+                for l in 0..grid2.width - 1 {
+                    //
+                    let v1 = grid1.verts[(grid1.width * k + offset1) as usize].xyz;
+                    let v2 = grid2.verts[(l + offset2) as usize].xyz;
+                    if vectors_differ(v1, v2, 0.1) {
+                        continue;
+                    }
+
+                    let v1 = grid1.verts[(grid1.width * (k - 2) + offset1) as usize].xyz;
+                    let v2 = grid2.verts[(l + 1 + offset2) as usize].xyz;
+                    if vectors_differ(v1, v2, 0.1) {
+                        continue;
+                    }
+                    //
+                    let v1 = grid2.verts[(l + offset2) as usize].xyz;
+                    let v2 = grid2.verts[((l + 1) + offset2) as usize].xyz;
+                    if vectors_coincide(v1, v2, 0.01) {
+                        continue;
+                    }
+                    //
+                    //Com_Printf ("found highest LoD crack between two patches\n" );
+                    // insert column into grid2 right after after column l
+                    let row = if m != 0 { grid2.height - 1 } else { 0 };
+                    return Some(StitchInsert::Column {
+                        column: (l + 1) as usize,
+                        row: row as usize,
+                        point: grid1.verts[(grid1.width * (k - 1) + offset1) as usize].xyz,
+                        loderror: lod_error_clamped(&grid1.height_lod_error, k + 1),
+                    });
+                }
+            }
+            for m in 0..2i32 {
+                if grid2.height >= MAX_GRID_SIZE as i32 {
+                    break;
+                }
+                let offset2 = if m != 0 { grid2.width - 1 } else { 0 };
+                //if (R_MergedHeightPoints(grid2, offset2))
+                //	continue;
+                for l in 0..grid2.height - 1 {
+                    //
+                    let v1 = grid1.verts[(grid1.width * k + offset1) as usize].xyz;
+                    let v2 = grid2.verts[(grid2.width * l + offset2) as usize].xyz;
+                    if vectors_differ(v1, v2, 0.1) {
+                        continue;
+                    }
+
+                    let v1 = grid1.verts[(grid1.width * (k - 2) + offset1) as usize].xyz;
+                    let v2 = grid2.verts[(grid2.width * (l + 1) + offset2) as usize].xyz;
+                    if vectors_differ(v1, v2, 0.1) {
+                        continue;
+                    }
+                    //
+                    let v1 = grid2.verts[(grid2.width * l + offset2) as usize].xyz;
+                    let v2 = grid2.verts[(grid2.width * (l + 1) + offset2) as usize].xyz;
+                    if vectors_coincide(v1, v2, 0.01) {
+                        continue;
+                    }
+                    //
+                    //Com_Printf ("found highest LoD crack between two patches\n" );
+                    // insert row into grid2 right after after row l
+                    let column = if m != 0 { grid2.width - 1 } else { 0 };
+                    return Some(StitchInsert::Row {
+                        row: (l + 1) as usize,
+                        column: column as usize,
+                        point: grid1.verts[(grid1.width * (k - 1) + offset1) as usize].xyz,
+                        loderror: lod_error_clamped(&grid1.height_lod_error, k + 1),
+                    });
+                }
+            }
+            k -= 2;
+        }
+    }
+    None
+}
+
+/// Raven `R_StitchPatches` — fixes one highest-LOD crack between two patches
+/// in the same LOD group, returning whether it changed anything.
+///
+/// `R_GridInsertColumn`/`R_GridInsertRow` (`tr_curve.rs`) take the grid by
+/// value, so `grid2` is moved out of its slot with `core::mem::replace` and
+/// the returned grid moved back — the owned-slice form of the oracle's
+/// `worldData.surfaces[grid2num].data = (surfaceType_t *) grid2;` repoint.
+///
+/// PORT-NOTE: same "no state channel" / plain-`world_data` shape as its
+/// `R_FixSharedVertexLodError` siblings above — no licensed
+/// `WorldAsset::surfaces` carrier exists yet for `worldData.surfaces`.
+///
+/// Source: `oracle/codemp/renderer/tr_bsp.cpp:819-1235`
+pub fn R_StitchPatches(grid1num: usize, grid2num: usize, world_data: &mut [GridMesh]) -> bool {
+    let insert = stitch_scan(&world_data[grid1num], &world_data[grid2num]);
+    let Some(insert) = insert else {
+        return false;
+    };
+
+    // The callee bails (`None`) exactly when the grid is already
+    // `MAX_GRID_SIZE` wide/tall, which `stitch_scan`'s own `>= MAX_GRID_SIZE`
+    // guards already exclude; re-checked before the move so a bail can never
+    // consume the grid out of its slot.
+    let fits = match insert {
+        StitchInsert::Column { .. } => world_data[grid2num].width < MAX_GRID_SIZE as i32,
+        StitchInsert::Row { .. } => world_data[grid2num].height < MAX_GRID_SIZE as i32,
+    };
+    if !fits {
+        return false;
+    }
+
+    let grid2 = replace(&mut world_data[grid2num], empty_grid_mesh());
+    let stitched = match insert {
+        StitchInsert::Column {
+            column,
+            row,
+            point,
+            loderror,
+        } => R_GridInsertColumn(grid2, column, row, point, loderror),
+        StitchInsert::Row {
+            row,
+            column,
+            point,
+            loderror,
+        } => R_GridInsertRow(grid2, row, column, point, loderror),
+    };
+
+    match stitched {
+        Some(mut grid2) => {
+            grid2.lod_stitched = 0;
+            world_data[grid2num] = grid2;
+            true
+        }
+        // Unreachable — see the `fits` check above.
+        None => false,
+    }
+}
+
+/// Raven `R_LoadSubmodels`.
+///
+/// PORT-NOTE: the lump-parsing half (bounds/`firstSurface`/`numSurfaces` per
+/// submodel, feeding `WorldAsset::bmodels`) is fully ported below — it needs
+/// no tier-2 access. The per-submodel `model_t` registration half is a
+/// documented escalation (porting-rules §14 — the gap panics loudly rather
+/// than silently dropping the registration): the packet's resolved call
+/// surface names `R_AllocModel`/`RE_InsertModelIntoHash` as already-landed
+/// (wave 0/wave 1), but the real landed shapes
+/// (`RenderModels::r_alloc_model`/`re_insert_model_into_hash`,
+/// `tr_model/render_models.rs:258,295`) are `pub(super)` — visible inside
+/// `tr_model` only, unreachable from `tr_bsp.rs` (a sibling module, not an
+/// ancestor). Even with access, wiring `model.bmodel` (`*mut bmodel_t`,
+/// still tier-2 raw-pointer, `tr_local/model_s.rs`) at this submodel, or
+/// `bmodel_t.firstSurface` (`*mut msurface_t`, `tr_local/bmodel_t.rs`) at a
+/// surface range, needs raw-pointer construction with no safe quarantine
+/// accessor — forbidden by this file's interior-safety law ("UNSAFE IS
+/// BANNED IN THIS FILE"). Both are escalations for the integrate phase /
+/// wave-planning, not numeric guesses.
+///
+/// Source: `oracle/codemp/renderer/tr_bsp.cpp:1421-1467`
+fn R_LoadSubmodels(ctx: &BspLoadContext, l: &lump_t, world: &mut WorldAsset, index: i32) {
+    let entry_size = size_of::<dmodel_t>();
+    if (l.filelen as usize) % entry_size != 0 {
+        com_error(
+            errorParm_t::ERR_DROP,
+            format!("LoadMap: funny lump size in {}", world.name),
+        );
+    }
+    let count = l.filelen as usize / entry_size;
+    let base = l.fileofs as usize;
+
+    let mut bmodels = Vec::with_capacity(count);
+    for i in 0..count {
+        let rec = &ctx.file_base[base + i * entry_size..base + (i + 1) * entry_size];
+
+        let mut mins = [0.0f32; 3];
+        let mut maxs = [0.0f32; 3];
+        for j in 0..3 {
+            mins[j] = LittleFloat(f32::from_le_bytes(
+                rec[j * 4..j * 4 + 4].try_into().unwrap(),
+            ));
+            maxs[j] = LittleFloat(f32::from_le_bytes(
+                rec[12 + j * 4..16 + j * 4].try_into().unwrap(),
+            ));
+        }
+        let first_surface = LittleLong(i32::from_le_bytes(rec[24..28].try_into().unwrap()));
+        let num_surfaces = LittleLong(i32::from_le_bytes(rec[28..32].try_into().unwrap()));
+
+        bmodels.push(BModel {
+            bounds: [mins, maxs],
+            first_surface: first_surface as usize,
+            num_surfaces,
+        });
+
+        // model = R_AllocModel(); assert(model != NULL);
+        // model->type = MOD_BRUSH; model->bmodel = out;
+        // if (index) sprintf(model->name, "*%d-%d", index, i), model->bspInstance = qtrue;
+        // else sprintf(model->name, "*%d", i);
+        // RE_InsertModelIntoHash(model->name, model);
+        // See the ESCALATION doc comment above — genuinely unreachable from
+        // this file today. Deferred to after the loop (below) so the safe
+        // bounds/surface-range parsing above always completes and
+        // `world.bmodels` is always fully populated before the escalation
+        // fires, rather than aborting partway through the lump.
+    }
+
+    world.bmodels = bmodels;
+
+    //TODO: Port R_LoadSubmodels model_t registration
+    // Source: oracle/codemp/renderer/tr_bsp.cpp:1433-1463
+    if count > 0 {
+        let _ = index;
+        todo!(
+            "Port R_LoadSubmodels model_t registration — RenderModels::r_alloc_model/\
+             re_insert_model_into_hash are pub(super) (unreachable from tr_bsp.rs), and \
+             model_t.bmodel/bmodel_t.firstSurface are tier-2 raw-pointer fields with no \
+             safe accessor to wire under the interior-safety law. R_LoadSubmodels as a \
+             whole is unusable until that model_t registration lands — every non-empty \
+             submodel lump trips this — \
+             oracle/codemp/renderer/tr_bsp.cpp:1433-1463"
+        );
+    }
 }

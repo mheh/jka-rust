@@ -15,6 +15,7 @@ use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::error::com_error;
 use mp_engine_qcommon::files_common::{FS_ListFiles, FS_ReadFileVec};
 use mp_engine_qcommon::qfiles::draw_vert_t::MAXLIGHTMAPS;
+use mp_engine_qcommon::qfiles::light_style_limits::LS_UNUSED;
 use mp_qshared::shared::com_parse::{COM_ParseExt, QSharedScratch, SkipBracedSection};
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::q_color::S_COLOR_YELLOW;
@@ -28,10 +29,12 @@ use mp_qshared::shared::surface_flags::{
     SURF_NOMARKS, SURF_NOMISCENTS, SURF_NOSTEPS, SURF_SKY, SURF_SLICK,
 };
 use native_string::atof::atof;
+use native_string::Q_stricmpn;
 
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::placeholders::SkyParms;
 use crate::render_state::render_assets::RenderAssets;
+use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::{ShaderAsset, ShaderHandle};
 use crate::tr_local::shader_sort_t::shaderSort_t;
 use crate::tr_local::tex_mod_t::texMod_t;
@@ -65,10 +68,18 @@ pub const MAX_SHADER_STAGES: usize = 8;
 /// Source: `oracle/codemp/renderer/tr_local.h:107`
 pub const NUM_TEXTURE_BUNDLES: usize = 2;
 
+/// Raven `MAX_SHADER_DEFORMS`. Not itself in this wave's packet, but already
+/// ported (privately) as `tr_local::shader_s::MAX_SHADER_DEFORMS` — the value
+/// is re-declared `pub`-visible here rather than re-guessed (that constant
+/// isn't exported from its file).
+///
+/// Source: `oracle/codemp/renderer/tr_local.h:309`
+const MAX_SHADER_DEFORMS: usize = 3;
+
 // GLS_* state-bit `#define`s this file's `NameTo*` functions return
-// (translation dictionary point 8: `#define` -> `const`). Only the subset
-// `NameToAFunc`/`NameToSrcBlendMode`/`NameToDstBlendMode` need.
-// Source: `oracle/codemp/renderer/tr_local.h:1648-1667,1676-1680`
+// (translation dictionary point 8: `#define` -> `const`), plus the field
+// masks and depth-mask/default bits `FinishShader` tests.
+// Source: `oracle/codemp/renderer/tr_local.h:1648-1682`
 pub const GLS_SRCBLEND_ZERO: i32 = 0x0000_0001;
 pub const GLS_SRCBLEND_ONE: i32 = 0x0000_0002;
 pub const GLS_SRCBLEND_DST_COLOR: i32 = 0x0000_0003;
@@ -78,6 +89,9 @@ pub const GLS_SRCBLEND_ONE_MINUS_SRC_ALPHA: i32 = 0x0000_0006;
 pub const GLS_SRCBLEND_DST_ALPHA: i32 = 0x0000_0007;
 pub const GLS_SRCBLEND_ONE_MINUS_DST_ALPHA: i32 = 0x0000_0008;
 pub const GLS_SRCBLEND_ALPHA_SATURATE: i32 = 0x0000_0009;
+/// Raven `GLS_SRCBLEND_BITS` — source-blend field mask.
+/// Source: `oracle/codemp/renderer/tr_local.h:1657`
+pub const GLS_SRCBLEND_BITS: i32 = 0x0000_000f;
 pub const GLS_DSTBLEND_ZERO: i32 = 0x0000_0010;
 pub const GLS_DSTBLEND_ONE: i32 = 0x0000_0020;
 pub const GLS_DSTBLEND_SRC_COLOR: i32 = 0x0000_0030;
@@ -86,6 +100,15 @@ pub const GLS_DSTBLEND_SRC_ALPHA: i32 = 0x0000_0050;
 pub const GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA: i32 = 0x0000_0060;
 pub const GLS_DSTBLEND_DST_ALPHA: i32 = 0x0000_0070;
 pub const GLS_DSTBLEND_ONE_MINUS_DST_ALPHA: i32 = 0x0000_0080;
+/// Raven `GLS_DSTBLEND_BITS` — destination-blend field mask.
+/// Source: `oracle/codemp/renderer/tr_local.h:1667`
+pub const GLS_DSTBLEND_BITS: i32 = 0x0000_00f0;
+/// Raven `GLS_DEPTHMASK_TRUE`.
+/// Source: `oracle/codemp/renderer/tr_local.h:1669`
+pub const GLS_DEPTHMASK_TRUE: i32 = 0x0000_0100;
+/// Raven `GLS_DEFAULT` — `#define GLS_DEFAULT GLS_DEPTHMASK_TRUE`.
+/// Source: `oracle/codemp/renderer/tr_local.h:1682`
+pub const GLS_DEFAULT: i32 = GLS_DEPTHMASK_TRUE;
 pub const GLS_ATEST_GT_0: u32 = 0x1000_0000;
 pub const GLS_ATEST_LT_80: u32 = 0x2000_0000;
 pub const GLS_ATEST_GE_80: u32 = 0x4000_0000;
@@ -236,6 +259,54 @@ impl Default for FogColorOverride {
     }
 }
 
+/// Raven `acff_t` (alpha combine function format), reproduced locally — same
+/// rationale as `ColorGen`/`GenFunc` above (needs `Clone`/`Copy`, out of scope
+/// for the tier-2 `acff_t` file this wave may not touch).
+///
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:272-277`
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum AdjustColorsForFog {
+    None,
+    ModulateRgb,
+    ModulateRgba,
+    ModulateAlpha,
+}
+impl Default for AdjustColorsForFog {
+    fn default() -> AdjustColorsForFog {
+        AdjustColorsForFog::None
+    }
+}
+
+/// Raven `deform_t`, reproduced locally — same rationale as `ColorGen`/
+/// `GenFunc` above (needs `Clone`/`Copy`, out of scope for the tier-2
+/// `deform_t` file this wave may not touch).
+///
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:207-224`
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Deform {
+    None,
+    Wave,
+    Normals,
+    Bulge,
+    Move,
+    ProjectionShadow,
+    Autosprite,
+    Autosprite2,
+    Text0,
+    Text1,
+    Text2,
+    Text3,
+    Text4,
+    Text5,
+    Text6,
+    Text7,
+}
+impl Default for Deform {
+    fn default() -> Deform {
+        Deform::None
+    }
+}
+
 /// Raven `waveForm_t`.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:287-294`
@@ -258,6 +329,23 @@ pub struct TexModInfo {
     pub wave: WaveForm,
     pub matrix: [[f32; 2]; 2],
     pub translate: [f32; 2],
+}
+
+/// Owned form of Raven `deformStage_t` (tier-2 transition audit, Group 2
+/// `shader_t::deforms` row): `moveVector` (`vec3_t`) -> owned `[f32; 3]`,
+/// `deformationWave` -> the local `WaveForm` (not the tier-2 `waveForm_t`, so
+/// this type can derive `Clone`/`Copy`, same rationale as `ShaderStageParse`).
+///
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:310-320`
+#[derive(Clone, Copy, Default)]
+pub struct DeformStage {
+    pub deformation: Deform,
+    pub move_vector: [f32; 3],
+    pub deformation_wave: WaveForm,
+    pub deformation_spread: f32,
+    pub bulge_width: f32,
+    pub bulge_height: f32,
+    pub bulge_speed: f32,
 }
 
 /// Owned form of Raven `textureBundle_t` (tier-2 transition audit, Group 2
@@ -320,6 +408,19 @@ pub struct ShaderStageParse {
     pub bundle: [TextureBundleParse; NUM_TEXTURE_BUNDLES],
     pub gl_fog_color_override: FogColorOverride,
     pub ss: Option<Box<SurfaceSpriteParse>>,
+    /// `isDetail` — added by wave 2 (`FinishShader`'s detail-texture strip).
+    pub is_detail: bool,
+    /// `index` — added by wave 2 (`FinishShader`'s `stageIndex` stamp).
+    /// Raven's field is a `u8`; widened to `i32` (layout-free interior,
+    /// bounded by `MAX_SHADER_STAGES`, same widening rationale as
+    /// `ShaderAsset::num_unfogged_passes`).
+    pub index: i32,
+    /// `lightmapStyle` — added by wave 2 (`FinishShader`'s multi-lightmap
+    /// style loop).
+    pub lightmap_style: u8,
+    /// `adjustColorsForFog` — added by wave 2; computed by `FinishShader`'s
+    /// "determine sort order and fog color adjustment" block.
+    pub adjust_colors_for_fog: AdjustColorsForFog,
 }
 
 /// Per-`ParseShader`-call scratch — the oracle file-scope globals `shader`
@@ -356,6 +457,13 @@ pub struct ShaderParseState {
     pub num_unfogged_passes: i32,
     pub sky: Option<SkyParms>,
     pub stages: Vec<ShaderStageParse>,
+    /// `polygonOffset` — added by wave 2 (`FinishShader`'s decal-sort rule).
+    pub polygon_offset: bool,
+    /// `deforms[MAX_SHADER_DEFORMS]`/`numDeforms` — added by wave 2
+    /// (`ParseDeform`); the owned `Vec`'s length is the count, so no separate
+    /// `numDeforms` field is needed (§C9-style out-param -> the collection's
+    /// own length).
+    pub deforms: Vec<DeformStage>,
 }
 
 /// Mechanical replacement for the oracle's `lightmapIndex ==
@@ -500,12 +608,18 @@ pub fn ClearGlobalShader() -> ShaderParseState {
 
 /// Raven `ParseVector`.
 ///
+/// The file-scope `shader` global is read here only to name the shader in the
+/// two warning strings, so this takes the name directly (`shader_name`)
+/// rather than a whole `&ShaderParseState`: shader-path callers pass
+/// `&state.name`, and the non-shader caller (`R_WorldEffectCommand`) passes
+/// what it actually has instead of fabricating a parse state.
+///
 /// Source: `oracle/codemp/renderer/tr_shader.cpp:323-350`
 pub fn ParseVector<'a>(
     qs: &mut QSharedScratch,
     text: &mut Option<&'a [u8]>,
     common: &mut Common,
-    state: &ShaderParseState,
+    shader_name: &str,
     count: usize,
     v: &mut [f32],
 ) -> bool {
@@ -519,7 +633,7 @@ pub fn ParseVector<'a>(
             common,
             &format!(
                 "{}WARNING: missing parenthesis in shader '{}'\n",
-                warn, state.name
+                warn, shader_name
             ),
         );
         return false;
@@ -533,7 +647,7 @@ pub fn ParseVector<'a>(
                 common,
                 &format!(
                     "{}WARNING: missing vector element in shader '{}'\n",
-                    warn, state.name
+                    warn, shader_name
                 ),
             );
             return false;
@@ -548,7 +662,7 @@ pub fn ParseVector<'a>(
             common,
             &format!(
                 "{}WARNING: missing parenthesis in shader '{}'\n",
-                warn, state.name
+                warn, shader_name
             ),
         );
         return false;
@@ -2422,18 +2536,17 @@ pub fn ParseTexMod(
 /// Raven `GeneratePermanentShader`.
 ///
 /// DEFERRED: the per-stage copy loop (`:2782-2803`, `newShader->stages[i] =
-/// stages[i]` plus its per-bundle `texMods` copy) and the `fogPass`
-/// assignment (`:2768-2772`) need `ShaderAsset::stages`/`::fog_pass`, which
-/// don't exist yet — `shader_asset.rs`'s own doc comment already flags
-/// `stages`/`deforms`/`fogParms` as landing "with the later tr_shader waves
-/// that read them" (`crates/mp/renderer/src/render_state/shader_asset.rs`),
-/// and that file is outside this wave's APPEND scope (this wave may only
-/// touch `crates/mp/renderer/src/tr_shader.rs`). Every other field of the
-/// whole-struct copy (`:2766`), the arena registration + capacity guard
-/// (`Arena::insert`'s existing `MAX_SHADERS` soft cap returning `Handle{0,0}`
-/// — A5/A12), `SortNewShader`, and the `hashTable` chain (`:2807-2809`,
-/// folded into `RenderAssets::shader_lookup` per this packet's STATE HOMES
-/// row) are transcribed here.
+/// stages[i]` plus its per-bundle `texMods` copy) needs a full
+/// `ShaderStageParse` -> `ShaderStage` per-field transcription (not this
+/// wave's scope — `ShaderAsset::stages` itself is real, landed field-empty
+/// below); the `fogPass` assignment (`:2768-2772`) needs
+/// `ShaderAsset::fog_pass`, which doesn't exist yet (`shader_asset.rs`'s own
+/// doc comment: lands "with the later tr_shader waves that read
+/// them"). Every other field of the whole-struct copy (`:2766`), the arena
+/// registration + capacity guard (`Arena::insert`'s existing `MAX_SHADERS`
+/// soft cap returning `Handle{0,0}` — A5/A12), `SortNewShader`, and the
+/// `hashTable` chain (`:2807-2809`, folded into `RenderAssets::shader_lookup`
+/// per this packet's STATE HOMES row) are transcribed here.
 ///
 /// Source: `oracle/codemp/renderer/tr_shader.cpp:2753-2812`
 pub fn GeneratePermanentShader(
@@ -2457,6 +2570,11 @@ pub fn GeneratePermanentShader(
         explicitly_defined: state.explicitly_defined,
         num_unfogged_passes: state.num_unfogged_passes,
         sky: state.sky.clone(),
+        // `stages[i] = ...` per-stage copy loop below is still DEFERRED
+        // (needs the `ShaderStageParse` -> `ShaderStage` per-field copy, not
+        // this wave's scope) — an empty `Vec` is the faithful stand-in for
+        // the oracle's not-yet-populated `newShader->stages`.
+        stages: Vec::new(),
     };
 
     // if ( shader.sort <= SS_SEE_THROUGH ) newShader->fogPass = FP_EQUAL;
@@ -2481,7 +2599,8 @@ pub fn GeneratePermanentShader(
     }
 
     // size = ...; newShader->stages = Hunk_Alloc(...); for (...) { ... }
-    // DEFERRED: `ShaderAsset::stages` has no home yet — see fn doc above.
+    // DEFERRED: the per-stage copy loop — see fn doc above (`ShaderAsset::stages`
+    // itself is real, populated empty above; the loop body is out of scope).
 
     SortNewShader(assets, new_shader_handle);
 
@@ -2511,18 +2630,601 @@ pub fn R_CreateBlendedStage(
     _handle: i32,
     _idx: usize,
 ) {
-    //TODO: Port ShaderAsset::stages
-    // Source: oracle/codemp/renderer/tr_local.h:459-530 (`shader_t::stages`)
-    // — `work->stages[0]` (the registered shader's first pass, the payload
-    // `R_CopyStage` copies into `stages[idx]`) has no home on `ShaderAsset`
-    // yet (`crates/mp/renderer/src/render_state/shader_asset.rs`'s own doc
-    // comment: lands "with the later tr_shader waves that read them"); that
-    // file is outside this wave's APPEND scope (this wave may only touch
-    // `crates/mp/renderer/src/tr_shader.rs`).
-    // `GLS_DEPTHMASK_TRUE` is `0x00000100`
-    // (oracle/codemp/renderer/tr_local.h:1669) — no longer a gap; it lands
-    // with the body, which is still blocked on `ShaderAsset::stages` above.
+    //TODO: Port R_CreateBlendedStage
+    // Source: oracle/codemp/renderer/tr_shader.cpp:4012-4026
+    // `ShaderAsset::stages` is now real, but `work->stages[0]` (the
+    // registered shader's first pass, the payload `R_CopyStage` copies into
+    // `stages[idx]`) has no live payload yet: `GeneratePermanentShader`'s
+    // per-stage copy loop that would populate a registered shader's `stages`
+    // is still deferred (see that fn's doc comment). `ShaderStage` also
+    // doesn't carry `rgbGen`/`alphaGen`/`ss` yet, which this fn's body needs
+    // to write.
     todo!(
-        "Port R_CreateBlendedStage — oracle/codemp/renderer/tr_shader.cpp:4012-4026 (blocked on ShaderAsset::stages, see marker above)"
+        "Port R_CreateBlendedStage — oracle/codemp/renderer/tr_shader.cpp:4012-4026 (blocked on GeneratePermanentShader's stage-copy loop + ShaderStage::rgb_gen/alpha_gen/ss)"
     )
+}
+
+/// Raven `ParseDeform`.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:1936-2076`
+pub fn ParseDeform(
+    state: &mut ShaderParseState,
+    qs: &mut QSharedScratch,
+    text: &mut Option<&[u8]>,
+    common: &mut Common,
+) {
+    let warn = S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII");
+
+    let (token, rest) = COM_ParseExt(qs, *text, false);
+    *text = rest;
+    if token.is_empty() {
+        com_printf(
+            common,
+            &format!(
+                "{}WARNING: missing deform parm in shader '{}'\n",
+                warn, state.name
+            ),
+        );
+        return;
+    }
+
+    if state.deforms.len() == MAX_SHADER_DEFORMS {
+        com_printf(
+            common,
+            &format!("{}WARNING: MAX_SHADER_DEFORMS in '{}'\n", warn, state.name),
+        );
+        return;
+    }
+
+    // `shader.deforms[shader.numDeforms] = (deformStage_t *)Hunk_Alloc(...); ds
+    // = shader.deforms[shader.numDeforms]; shader.numDeforms++;` collapses to
+    // a `Vec::push` — the owned `deforms` Vec is this wave's replacement for
+    // the fixed `deforms[MAX_SHADER_DEFORMS]` slot array (§C9 out-param ->
+    // owned collection; the Vec's own length replaces the separate
+    // `numDeforms` counter).
+    state.deforms.push(DeformStage::default());
+    let idx = state.deforms.len() - 1;
+
+    if token.eq_ignore_ascii_case("projectionShadow") {
+        state.deforms[idx].deformation = Deform::ProjectionShadow;
+        return;
+    }
+
+    if token.eq_ignore_ascii_case("autosprite") {
+        state.deforms[idx].deformation = Deform::Autosprite;
+        return;
+    }
+
+    if token.eq_ignore_ascii_case("autosprite2") {
+        state.deforms[idx].deformation = Deform::Autosprite2;
+        return;
+    }
+
+    if Q_stricmpn(&token, "text", 4) == 0 {
+        // n = token[4] - '0' — `token[4]` reads the byte one past a
+        // 4-character-matched prefix (the oracle's null-terminated buffer
+        // guarantees a defined byte there, `'\0'` when `token` is exactly
+        // "text"); the owned `String` has no trailing null, so a missing
+        // 5th byte is treated as `0` — same effective result, since
+        // `'\0' - '0'` is negative either way and the guard below clamps
+        // both cases to `n = 0`.
+        let byte4 = token.as_bytes().get(4).copied().unwrap_or(0);
+        let mut n = byte4 as i32 - b'0' as i32;
+        if n < 0 || n > 7 {
+            n = 0;
+        }
+        state.deforms[idx].deformation = match n {
+            0 => Deform::Text0,
+            1 => Deform::Text1,
+            2 => Deform::Text2,
+            3 => Deform::Text3,
+            4 => Deform::Text4,
+            5 => Deform::Text5,
+            6 => Deform::Text6,
+            _ => Deform::Text7,
+        };
+        return;
+    }
+
+    if token.eq_ignore_ascii_case("bulge") {
+        let (token, rest) = COM_ParseExt(qs, *text, false);
+        *text = rest;
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing deformVertexes bulge parm in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        state.deforms[idx].bulge_width = atof(&token) as f32;
+
+        let (token, rest) = COM_ParseExt(qs, *text, false);
+        *text = rest;
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing deformVertexes bulge parm in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        state.deforms[idx].bulge_height = atof(&token) as f32;
+
+        let (token, rest) = COM_ParseExt(qs, *text, false);
+        *text = rest;
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing deformVertexes bulge parm in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        state.deforms[idx].bulge_speed = atof(&token) as f32;
+
+        state.deforms[idx].deformation = Deform::Bulge;
+        return;
+    }
+
+    if token.eq_ignore_ascii_case("wave") {
+        let (token, rest) = COM_ParseExt(qs, *text, false);
+        *text = rest;
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing deformVertexes parm in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+
+        // wave-0 ruling 12: `atof` returns `double`; `1.0f / atof(token)`
+        // promotes `1.0f` to `double` for the division, rounding once at the
+        // assignment to the `float` field. The oracle calls `atof(token)`
+        // twice (once in the `!= 0` guard, once in the division) — collapsed
+        // to a single call here since `atof` is a pure parse of the same
+        // token with no side effects (porting-rules §C10, preserve behavior
+        // not shape).
+        let divisor = atof(&token);
+        if divisor != 0.0 {
+            state.deforms[idx].deformation_spread = (1.0f64 / divisor) as f32;
+        } else {
+            state.deforms[idx].deformation_spread = 100.0;
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: illegal div value of 0 in deformVertexes command for shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+        }
+
+        let mut wave = WaveForm::default();
+        ParseWaveForm(qs, text, common, state, &mut wave);
+        state.deforms[idx].deformation_wave = wave;
+        state.deforms[idx].deformation = Deform::Wave;
+        return;
+    }
+
+    if token.eq_ignore_ascii_case("normal") {
+        let (token, rest) = COM_ParseExt(qs, *text, false);
+        *text = rest;
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing deformVertexes parm in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        state.deforms[idx].deformation_wave.amplitude = atof(&token) as f32;
+
+        let (token, rest) = COM_ParseExt(qs, *text, false);
+        *text = rest;
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing deformVertexes parm in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        state.deforms[idx].deformation_wave.frequency = atof(&token) as f32;
+
+        state.deforms[idx].deformation = Deform::Normals;
+        return;
+    }
+
+    if token.eq_ignore_ascii_case("move") {
+        for i in 0..3usize {
+            let (token, rest) = COM_ParseExt(qs, *text, false);
+            *text = rest;
+            if token.is_empty() {
+                com_printf(
+                    common,
+                    &format!(
+                        "{}WARNING: missing deformVertexes parm in shader '{}'\n",
+                        warn, state.name
+                    ),
+                );
+                return;
+            }
+            state.deforms[idx].move_vector[i] = atof(&token) as f32;
+        }
+
+        let mut wave = WaveForm::default();
+        ParseWaveForm(qs, text, common, state, &mut wave);
+        state.deforms[idx].deformation_wave = wave;
+        state.deforms[idx].deformation = Deform::Move;
+        return;
+    }
+
+    com_printf(
+        common,
+        &format!(
+            "{}WARNING: unknown deformVertexes subtype '{}' found in shader '{}'\n",
+            warn, token, state.name
+        ),
+    );
+}
+
+/// Raven `FinishShader`.
+///
+/// DEFERRED (never-guess rule, porting-rules §A2 / packet marker law): a
+/// handful of oracle globals/macros this fn reads have no value anywhere in
+/// this packet — each site below carries its own cited `// DEFERRED:` marker
+/// rather than one blanket note:
+/// - `tr.whiteImage` (`:3015`) — `RenderAssets` has no field for it yet
+///   (only `RenderAssets::lightmaps` exists — this packet's STATE HOMES row
+///   for `tr` names exactly that split); adding one is outside this wave's
+///   APPEND scope (`render_assets.rs`, a different file).
+/// - `lightmapsNone`/`stylesDefault` (`:3244-3245`) — file-scope default
+///   tables; their contents aren't given anywhere in this packet.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:2941-3275`
+pub fn FinishShader(
+    assets: &mut RenderAssets,
+    common: &mut Common,
+    cvars: &RendererCvars,
+    state: &mut ShaderParseState,
+) -> ShaderHandle {
+    let warn = S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII");
+
+    let mut has_lightmap_stage = false;
+    // Raven's `vertexLightmap` — set `qfalse` once, never reassigned
+    // anywhere in this function (the `rgbGen == CGEN_VERTEX` setter is
+    // commented out in the oracle); the `if (vertexLightmap)` branch below
+    // is dead but kept for fidelity.
+    let vertex_lightmap = false;
+
+    //
+    // set sky stuff appropriate
+    //
+    if state.sky.is_some() {
+        state.sort = shaderSort_t::SS_ENVIRONMENT as i32 as f32;
+    }
+
+    //
+    // set polygon offset
+    //
+    if state.polygon_offset && state.sort == 0.0 {
+        state.sort = shaderSort_t::SS_DECAL as i32 as f32;
+    }
+
+    let mut lm_stage = MAX_SHADER_STAGES;
+    for i in 0..MAX_SHADER_STAGES {
+        if state.stages[i].active && state.stages[i].bundle[0].is_lightmap {
+            lm_stage = i;
+            break;
+        }
+    }
+
+    if lm_stage < MAX_SHADER_STAGES {
+        if state.lightmap_index[0] == LIGHTMAP_BY_VERTEX {
+            if lm_stage == 0 {
+                // copy the rest down over the lightmap slot
+                for i in lm_stage..MAX_SHADER_STAGES - 1 {
+                    state.stages[i] = state.stages[i + 1].clone();
+                }
+                state.stages[MAX_SHADER_STAGES - 1] = ShaderStageParse::default();
+                // change blending on the moved down stage
+                state.stages[lm_stage].state_bits = GLS_DEFAULT as u32;
+            }
+            // change anything that was moved down (or the *white if LM is
+            // first) to use vertex color
+            state.stages[lm_stage].rgb_gen = ColorGen::ExactVertex;
+            state.stages[lm_stage].alpha_gen = AlphaGen::Skip;
+            lm_stage = MAX_SHADER_STAGES; // skip the style checking below
+        }
+    }
+
+    if lm_stage < MAX_SHADER_STAGES {
+        let mut num_styles: i32 = 0;
+        while (num_styles as usize) < MAXLIGHTMAPS {
+            if state.styles[num_styles as usize] >= LS_UNUSED {
+                break;
+            }
+            num_styles += 1;
+        }
+        num_styles -= 1;
+
+        if num_styles > 0 {
+            let n_styles = num_styles as usize;
+
+            let mut i = MAX_SHADER_STAGES - 1;
+            while i > lm_stage + n_styles {
+                state.stages[i] = state.stages[i - n_styles].clone();
+                i -= 1;
+            }
+
+            for i in 0..n_styles {
+                state.stages[lm_stage + i + 1] = state.stages[lm_stage].clone();
+                if state.lightmap_index[i + 1] == LIGHTMAP_BY_VERTEX {
+                    // DEFERRED: `tr.whiteImage` — see fn doc above.
+                    // Source: oracle/codemp/renderer/tr_shader.cpp:3015
+                } else if state.lightmap_index[i + 1] < 0 {
+                    com_error(
+                        errorParm_t::ERR_DROP,
+                        format!(
+                            "FinishShader: light style with no light map or vertex color for shader {}",
+                            state.name
+                        ),
+                    );
+                } else {
+                    let lm_idx = state.lightmap_index[i + 1] as usize;
+                    state.stages[lm_stage + i + 1].bundle[0].image = Some(assets.lightmaps[lm_idx]);
+                    state.stages[lm_stage + i + 1].bundle[0].tc_gen = match i {
+                        0 => TexCoordGen::Lightmap1,
+                        1 => TexCoordGen::Lightmap2,
+                        _ => TexCoordGen::Lightmap3,
+                    };
+                }
+                state.stages[lm_stage + i + 1].rgb_gen = ColorGen::LightmapStyle;
+                state.stages[lm_stage + i + 1].state_bits &=
+                    !((GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS) as u32);
+                state.stages[lm_stage + i + 1].state_bits |=
+                    (GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE) as u32;
+            }
+        }
+
+        let mut i = 0i32;
+        while i <= num_styles {
+            state.stages[lm_stage + i as usize].lightmap_style = state.styles[i as usize];
+            i += 1;
+        }
+    }
+
+    //
+    // set appropriate stage information
+    //
+    let mut stage_index: i32 = 0;
+    let mut stage: usize = 0;
+    while stage < MAX_SHADER_STAGES {
+        if !state.stages[stage].active {
+            break;
+        }
+
+        // check for a missing texture
+        if state.stages[stage].bundle[0].image.is_none() {
+            com_printf(
+                common,
+                &format!("{}Shader {} has a stage with no image\n", warn, state.name),
+            );
+            state.stages[stage].active = false;
+            stage += 1;
+            continue;
+        }
+
+        //
+        // ditch this stage if it's detail and detail textures are disabled
+        //
+        if state.stages[stage].is_detail && common.cvar(cvars.r_detailTextures).integer == 0 {
+            if stage < MAX_SHADER_STAGES - 1 {
+                for i in stage..MAX_SHADER_STAGES - 1 {
+                    state.stages[i] = state.stages[i + 1].clone();
+                }
+                // rww - 9-13-01 [1-26-01-sof2] — clear the last one moved down
+                state.stages[MAX_SHADER_STAGES - 1] = ShaderStageParse::default();
+                // Raven's `stage--` here (paired with the mandatory
+                // `continue` -> for-loop `stage++`) nets to "leave `stage`
+                // unchanged" — re-examine the same index next iteration
+                // ("look at this stage next time around").
+            } else {
+                stage += 1;
+            }
+            continue;
+        }
+
+        state.stages[stage].index = stage_index;
+
+        //
+        // default texture coordinate generation
+        //
+        if state.stages[stage].bundle[0].is_lightmap {
+            if state.stages[stage].bundle[0].tc_gen == TexCoordGen::Bad {
+                state.stages[stage].bundle[0].tc_gen = TexCoordGen::Lightmap;
+            }
+            has_lightmap_stage = true;
+        } else if state.stages[stage].bundle[0].tc_gen == TexCoordGen::Bad {
+            state.stages[stage].bundle[0].tc_gen = TexCoordGen::Texture;
+        }
+
+        // not a true lightmap but we want to leave existing behaviour in
+        // place and not print out a warning
+        // PORT-NOTE: Raven's `rgbGen == CGEN_VERTEX` -> `vertexLightmap =
+        // qtrue` setter is commented out in the oracle; stays commented out.
+
+        // Scalar reads hoisted ahead of the field writes below (one `&mut`
+        // element at a time); every one is the same value the oracle reads at
+        // its own site.
+        let blend_bits_mask = (GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS) as u32;
+        let state_bits = state.stages[stage].state_bits;
+        let stage0_state_bits = state.stages[0].state_bits;
+        let blend_bits = (state_bits & blend_bits_mask) as i32;
+
+        //
+        // determine sort order and fog color adjustment
+        //
+        if blend_bits != 0 && (stage0_state_bits & blend_bits_mask) != 0 {
+            let blend_src_bits = (state_bits & GLS_SRCBLEND_BITS as u32) as i32;
+            let blend_dst_bits = (state_bits & GLS_DSTBLEND_BITS as u32) as i32;
+
+            // fog color adjustment only works for blend modes that have a
+            // contribution that aproaches 0 as the modulate values aproach 0 --
+            // GL_ONE, GL_ONE
+            // GL_ZERO, GL_ONE_MINUS_SRC_COLOR
+            // GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA
+
+            // modulate, additive
+            if (blend_src_bits == GLS_SRCBLEND_ONE && blend_dst_bits == GLS_DSTBLEND_ONE)
+                || (blend_src_bits == GLS_SRCBLEND_ZERO
+                    && blend_dst_bits == GLS_DSTBLEND_ONE_MINUS_SRC_COLOR)
+            {
+                state.stages[stage].adjust_colors_for_fog = AdjustColorsForFog::ModulateRgb;
+            }
+            // strict blend
+            else if blend_src_bits == GLS_SRCBLEND_SRC_ALPHA
+                && blend_dst_bits == GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA
+            {
+                state.stages[stage].adjust_colors_for_fog = AdjustColorsForFog::ModulateAlpha;
+            }
+            // premultiplied alpha
+            else if blend_src_bits == GLS_SRCBLEND_ONE
+                && blend_dst_bits == GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA
+            {
+                state.stages[stage].adjust_colors_for_fog = AdjustColorsForFog::ModulateRgba;
+            } else {
+                // we can't adjust this one correctly, so it won't be exactly
+                // correct in fog
+            }
+
+            // don't screw with sort order if this is a portal or environment
+            if state.sort == 0.0 {
+                // see through item, like a grill or grate
+                if (state_bits & GLS_DEPTHMASK_TRUE as u32) != 0 {
+                    state.sort = shaderSort_t::SS_SEE_THROUGH as i32 as f32;
+                } else if blend_src_bits == GLS_SRCBLEND_ONE && blend_dst_bits == GLS_DSTBLEND_ONE {
+                    // GL_ONE GL_ONE needs to come a bit later
+                    state.sort = shaderSort_t::SS_BLEND1 as i32 as f32;
+                } else {
+                    state.sort = shaderSort_t::SS_BLEND0 as i32 as f32;
+                }
+                // Raven's commented-out SS_BLEND2/SS_BLEND1/SS_BLEND0 variant
+                // of this else-branch stays commented out.
+            }
+        }
+
+        //rww - begin hw fog
+        let is_lightmap = state.stages[stage].bundle[0].is_lightmap;
+        let alpha_gen = state.stages[stage].alpha_gen;
+        let next_is_lightmap =
+            stage < MAX_SHADER_STAGES - 1 && state.stages[stage + 1].bundle[0].is_lightmap;
+        state.stages[stage].gl_fog_color_override =
+            if blend_bits == (GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE) {
+                FogColorOverride::Black
+            } else if blend_bits == (GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE)
+                && alpha_gen == AlphaGen::LightingSpecular
+                && stage != 0
+            {
+                FogColorOverride::Black
+            } else if blend_bits == (GLS_SRCBLEND_ZERO | GLS_DSTBLEND_ZERO) {
+                FogColorOverride::White
+            } else if blend_bits == (GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO) {
+                FogColorOverride::White
+            } else if blend_bits == 0 && stage != 0 {
+                FogColorOverride::White
+            } else if blend_bits == 0 && is_lightmap && next_is_lightmap {
+                // multiple light map blending
+                FogColorOverride::White
+            } else if blend_bits == (GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO) && is_lightmap {
+                //I don't know, it works. -rww
+                FogColorOverride::White
+            } else if blend_bits == (GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO) {
+                //I don't know, it works. -rww
+                FogColorOverride::Black
+            } else if blend_bits == (GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE_MINUS_SRC_COLOR) {
+                //I don't know, it works. -rww
+                FogColorOverride::Black
+            } else {
+                FogColorOverride::None
+            };
+        //rww - end hw fog
+        // Source: oracle/codemp/renderer/tr_shader.cpp:3095-3211
+
+        stage_index += 1;
+        stage += 1;
+    }
+
+    // there are times when you will need to manually apply a sort to
+    // opaque alpha tested shaders that have later blend passes
+    if state.sort == 0.0 {
+        state.sort = shaderSort_t::SS_OPAQUE as i32 as f32;
+    }
+
+    //
+    // if we are in r_vertexLight mode, never use a lightmap texture
+    //
+    if stage > 1
+        && common.cvar(cvars.r_vertexLight).integer != 0
+        && common.cvar(cvars.r_uiFullScreen).integer == 0
+    {
+        // Raven: `stage = VertexLightingCollapse();` is commented out
+        // ("since this does bad things, I am commenting it out for now").
+        has_lightmap_stage = false;
+    }
+
+    //
+    // look for multitexture potential
+    //
+    if stage > 1 && CollapseMultitexture(state) {
+        stage -= 1;
+    }
+
+    if state.lightmap_index[0] >= 0 && !has_lightmap_stage {
+        if vertex_lightmap {
+            // Raven: commented-out `ri.DPrintf` — dead branch, `vertex_lightmap`
+            // is never set `true` anywhere in this function.
+        } else {
+            com_printf(
+                common,
+                &format!(
+                    "WARNING: shader '{}' has lightmap but no lightmap stage!\n",
+                    state.name
+                ),
+            );
+            // DEFERRED: `lightmapsNone`/`stylesDefault` — see fn doc above.
+            // Source: oracle/codemp/renderer/tr_shader.cpp:3244-3245
+        }
+    }
+
+    //
+    // compute number of passes
+    //
+    state.num_unfogged_passes = stage as i32;
+
+    // fogonly shaders don't have any normal passes
+    if stage == 0 {
+        state.sort = shaderSort_t::SS_FOG as i32 as f32;
+    }
+
+    // PORT-NOTE: the oracle's final `for ( stage = 1; stage <
+    // shader.numUnfoggedPasses; stage++ )` loop (`:3260-3272`) only reads
+    // `stages[stage].isDetail`/`.active`/`.bundle[0].isLightmap` and performs
+    // no mutation, I/O, or other observable effect — dead code, dropped (same
+    // precedent as this file's `ss->vertSkew` no-op note above).
+
+    GeneratePermanentShader(assets, common, state)
 }

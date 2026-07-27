@@ -30,7 +30,9 @@ use crate::tr_local::orientationr_t::orientationr_t;
 use crate::tr_local::srf_grid_mesh_s::srfGridMesh_t;
 use crate::tr_local::srf_surface_face_t::srfSurfaceFace_t;
 use crate::tr_local::srf_triangles_t::srfTriangles_t;
-use crate::tr_main::{R_CullLocalBox, CULL_OUT};
+use crate::tr_main::{
+    R_CullLocalBox, R_CullLocalPointAndRadius, R_CullPointAndRadius, CULL_CLIP, CULL_IN, CULL_OUT,
+};
 use crate::tr_model::render_models::RenderModels;
 
 /// Raven `Q_CastShort2Float` — widen a packed lightgrid short to a float.
@@ -859,3 +861,111 @@ pub fn R_MarkLeaves(
     // DEFERRED: R_MarkLeaves — see doc comment above.
     // Source: oracle/codemp/renderer/tr_world.cpp:1830-1900
 }
+
+/// Raven `MAX_ENTITIES` — local copy of the private const already ported at
+/// `tr_main.rs` (not `pub` there); cited directly from the R2 design's
+/// `backEndData_t` disposition entry ("entities[MAX_ENTITIES=2048]").
+const MAX_ENTITIES: i32 = 2048;
+
+/// Raven `TR_WORLDENT` — local copy of the private const already ported at
+/// `tr_main.rs`/`tr_scene.rs` (neither `pub` there, so not reachable from
+/// here); `MAX_ENTITIES - 1`, this file's own `MAX_ENTITIES` const above.
+///
+/// Source: `oracle/codemp/cgame/tr_types.h:15`
+const TR_WORLDENT: i32 = MAX_ENTITIES - 1;
+
+/// Raven `R_CullGrid` — frustum-cull a bezier-patch (grid) surface, tallying
+/// the sphere/box cull-stat counters, `qboolean` collapsed to `bool` (§C7).
+///
+/// PORT-NOTE: `current_entity_num` is `tr.currentEntityNum` (STATE HOMES
+/// SPLIT row → `RenderWorld::frame: FrameState`, still an empty placeholder
+/// for this field), threaded straight in as a plain parameter — same
+/// precedent as `R_GetPortalOrientations`'s `entity_num` (`tr_main.rs`).
+///
+/// PORT-NOTE: `r_nocurves_integer` (`r_nocurves->integer`, STATE HOMES row →
+/// `RendererCvars`) and `r_nocull_integer`/`ori`/`frustum` (needed only to
+/// satisfy `R_CullLocalPointAndRadius`/`R_CullPointAndRadius`/
+/// `R_CullLocalBox`'s already-ported signatures) are threaded straight
+/// through as plain parameters, mirroring `R_CullTriSurf`'s established
+/// threading in this same file ("read through the live engine cvar table by
+/// the caller, threaded in here rather than reached for").
+///
+/// PORT-NOTE: the six `tr.pc.c_*_cull_patch_*` counters (`BackEndCounters`,
+/// R4 backend wave — still an empty placeholder) are threaded directly as
+/// `&mut i32` outs, mirroring `R_DlightFace`/`R_DlightSurface`'s established
+/// counter threading in this same file and `tr_ghoul2.rs`'s
+/// `c_sphere_cull_md3_*` precedent.
+///
+/// Source: `oracle/codemp/renderer/tr_world.cpp:77-125`
+#[allow(clippy::too_many_arguments)]
+pub fn R_CullGrid(
+    cv: &srfGridMesh_t,
+    current_entity_num: i32,
+    r_nocurves_integer: i32,
+    r_nocull_integer: i32,
+    ori: &orientationr_t,
+    frustum: &[cplane_t; 4],
+    c_sphere_cull_patch_out: &mut i32,
+    c_sphere_cull_patch_clip: &mut i32,
+    c_sphere_cull_patch_in: &mut i32,
+    c_box_cull_patch_out: &mut i32,
+    c_box_cull_patch_in: &mut i32,
+    c_box_cull_patch_clip: &mut i32,
+) -> bool {
+    if r_nocurves_integer != 0 {
+        return true;
+    }
+
+    let sphere_cull = if current_entity_num != TR_WORLDENT {
+        R_CullLocalPointAndRadius(
+            cv.localOrigin,
+            cv.meshRadius,
+            ori,
+            r_nocull_integer,
+            frustum,
+        )
+    } else {
+        R_CullPointAndRadius(cv.localOrigin, cv.meshRadius, r_nocull_integer, frustum)
+    };
+
+    // check for trivial reject
+    if sphere_cull == CULL_OUT {
+        *c_sphere_cull_patch_out += 1;
+        return true;
+    } else if sphere_cull == CULL_CLIP {
+        // check bounding box if necessary
+        *c_sphere_cull_patch_clip += 1;
+
+        let box_cull = R_CullLocalBox(cv.meshBounds, r_nocull_integer, ori, frustum);
+
+        if box_cull == CULL_OUT {
+            *c_box_cull_patch_out += 1;
+            return true;
+        } else if box_cull == CULL_IN {
+            *c_box_cull_patch_in += 1;
+        } else {
+            *c_box_cull_patch_clip += 1;
+        }
+    } else {
+        *c_sphere_cull_patch_in += 1;
+    }
+
+    false
+}
+
+// DEFERRED: R_RecursiveWireframeSurf — needs two carriers R2 has not
+// licensed yet: (1) a per-node runtime visibility-frame field
+// (`node->visframe`) to compare against `tr.visCount` — the tier-3 `Node`
+// replacement (`tr_bsp::Node`, landed by the tr_bsp wave-1 node/leaf loader)
+// carries only the fields `R_LoadNodesAndLeafs` parses from the BSP file and
+// has no scratch field for this, and `FrameState` has no parallel per-node
+// array either; (2) `WorldAsset::mark_surfaces: Vec<u32>` is a set of
+// surface *indices* with no backing `Vec` of surfaces to resolve them
+// against yet (no `Surface` tagged-union home exists in R2 for
+// `msurface_t.data` — the same gap `tr_bsp.rs`'s wave-1 top-of-file note and
+// `R_StitchPatches`'s escalation both name), so even a resolved index has no
+// `R_EvaluateWireframeSurf`-callable surface to hand it. Both gaps are
+// state-home omissions per the preamble ("a state home this packet marks
+// UNMAPPED is an ESCALATION, never an invention"), not something this wave
+// can invent a carrier for.
+// Source: oracle/codemp/renderer/tr_world.cpp:990-1036

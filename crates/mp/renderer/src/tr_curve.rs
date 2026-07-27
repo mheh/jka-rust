@@ -6,10 +6,11 @@
 // transcription, matching the rest of the renderer/engine crates.
 #![allow(non_snake_case)]
 
+use mp_engine_qcommon::common::Common;
 use mp_engine_qcommon::qfiles::draw_vert_t::{drawVert_t, MAXLIGHTMAPS};
 use mp_qshared::shared::q_math::{
-    _VectorAdd, _VectorScale, _VectorSubtract, CrossProduct, VectorClear, VectorLength,
-    VectorLengthSquared, VectorNormalize2,
+    _DotProduct, _VectorAdd, _VectorScale, _VectorSubtract, CrossProduct, VectorClear,
+    VectorLength, VectorLengthSquared, VectorNormalize, VectorNormalize2,
 };
 use mp_qshared::shared::vec3_t;
 // PORT-NOTE: `native_math` is not yet a direct `mp_renderer` dependency
@@ -19,6 +20,7 @@ use mp_qshared::shared::vec3_t;
 // edge; the call sites below are otherwise final.
 use native_math::qmath::{AddPointToBounds, ClearBoundsMP};
 
+use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_local::surface_type_t::surfaceType_t;
 
 /// Raven `MAX_GRID_SIZE` — the bezier-patch control-grid bound.
@@ -40,10 +42,12 @@ pub type ErrorTable = [[f32; MAX_GRID_SIZE]; 2];
 
 /// Owned replacement for the tier-2 `srfGridMesh_t`
 /// (`crates/mp/renderer/src/tr_local/srf_grid_mesh_s.rs`) — a bezier-patch
-/// tessellated surface. Named by this wave (DEC-37 A13.3): the R2 tier-2
-/// transition audit assigns `srfGridMesh_t`'s pointer fields
-/// (`widthLodError`/`heightLodError: *mut f32`, `verts: [drawVert_t; 1]`
-/// C flexible-array) to owned `Vec` forms "as each subsystem's logic
+/// tessellated surface. The single canonical `srfGridMesh_t` replacement for
+/// the renderer: `tr_curve.rs` (tessellation/insertion) and `tr_bsp.rs`
+/// (LOD-error fixing, patch stitching) both use this type. Named by DEC-37
+/// A13.3: the R2 tier-2 transition audit assigns `srfGridMesh_t`'s pointer
+/// fields (`widthLodError`/`heightLodError: *mut f32`, `verts: [drawVert_t;
+/// 1]` C flexible-array) to owned `Vec` forms "as each subsystem's logic
 /// lands" — `tr_curve.cpp` (this file) is the bezier-patch tessellation
 /// subsystem that owns that transition.
 ///
@@ -56,15 +60,48 @@ pub struct GridMesh {
     pub mesh_bounds: [vec3_t; 2],
     pub local_origin: vec3_t,
     pub mesh_radius: f32,
+    /// `lodOrigin`.
     pub lod_origin: vec3_t,
+    /// `lodRadius`.
     pub lod_radius: f32,
+    /// `lodFixed` — `2` once `R_FixSharedVertexLodError_r` (`tr_bsp.rs`) has
+    /// stitched this patch's LOD errors against a matching group.
     pub lod_fixed: i32,
+    /// `lodStitched` — cleared by `R_StitchPatches` (`tr_bsp.rs`) whenever a
+    /// crack fix reshapes the grid, so the patch is revisited.
     pub lod_stitched: i32,
     pub width: i32,
     pub height: i32,
+    /// `widthLodError`.
     pub width_lod_error: Vec<f32>,
+    /// `heightLodError`.
     pub height_lod_error: Vec<f32>,
     pub verts: Vec<drawVert_t>,
+}
+
+/// An empty `GridMesh` placeholder — stands in for a grid that has been moved
+/// out of an owned `[GridMesh]` slot to be handed to
+/// `R_GridInsertColumn`/`R_GridInsertRow` by value (`tr_bsp::R_StitchPatches`,
+/// which repoints `worldData.surfaces[grid2num].data` at the returned grid).
+/// A helper rather than a `Default` impl for the same reason as
+/// `zero_draw_vert`: `drawVert_t` derives neither `Default` nor `Clone`.
+pub fn empty_grid_mesh() -> GridMesh {
+    GridMesh {
+        surface_type: surfaceType_t::SF_BAD,
+        dlight_bits: 0,
+        mesh_bounds: [[0.0; 3]; 2],
+        local_origin: [0.0; 3],
+        mesh_radius: 0.0,
+        lod_origin: [0.0; 3],
+        lod_radius: 0.0,
+        lod_fixed: 0,
+        lod_stitched: 0,
+        width: 0,
+        height: 0,
+        width_lod_error: Vec::new(),
+        height_lod_error: Vec::new(),
+        verts: Vec::new(),
+    }
 }
 
 /// `drawVert_t` (`crates/mp/engine/qcommon/src/qfiles/draw_vert_t.rs`) is
@@ -553,4 +590,195 @@ pub fn R_GridInsertRow(
     new_grid.lod_radius = lod_radius;
     new_grid.lod_origin = lod_origin;
     Some(new_grid)
+}
+
+/// Raven `R_SubdividePatchToGrid`.
+///
+/// `points` is Raven's `drawVert_t points[MAX_PATCH_SIZE*MAX_PATCH_SIZE]`
+/// out-of-packet fixed array — kept as a slice (translation dictionary:
+/// array param → slice); every index used below (`points[j*width+i]`) stays
+/// in range for any `width`/`height` the caller passes, matching the
+/// oracle's own unchecked indexing.
+///
+/// `r_subdivisions` reads through the live engine cvar table
+/// (`RendererCvars::r_subdivisions`, DEC-37 A13.1 — this packet's STATE
+/// HOMES row), the `tr_main.rs` `R_SetupProjection` `common.cvar(handle)`
+/// precedent.
+///
+/// Source: `oracle/codemp/renderer/tr_curve.cpp:349-504`
+pub fn R_SubdividePatchToGrid(
+    mut width: usize,
+    mut height: usize,
+    points: &[drawVert_t],
+    common: &Common,
+    cvars: &RendererCvars,
+) -> GridMesh {
+    let mut ctrl = zero_control_grid();
+    let mut error_table: ErrorTable = [[0.0; MAX_GRID_SIZE]; 2];
+
+    for i in 0..width {
+        for j in 0..height {
+            ctrl[j][i] = copy_draw_vert(&points[j * width + i]);
+        }
+    }
+
+    let r_subdivisions_value = common.cvar(cvars.r_subdivisions).value;
+
+    for dir in 0..2usize {
+        for j in 0..MAX_GRID_SIZE {
+            error_table[dir][j] = 0.0;
+        }
+
+        // horizontal subdivisions
+        let mut j: usize = 0;
+        while j + 2 < width {
+            // check subdivided midpoints against control points
+
+            // FIXME: also check midpoints of adjacent patches against the control points
+            // this would basically stitch all patches in the same LOD group together.
+
+            let mut max_len: f32 = 0.0;
+            for i in 0..height {
+                // calculate the point on the curve
+                let mut midxyz: vec3_t = [0.0; 3];
+                for l in 0..3usize {
+                    midxyz[l] =
+                        (ctrl[i][j].xyz[l] + ctrl[i][j + 1].xyz[l] * 2.0 + ctrl[i][j + 2].xyz[l])
+                            * 0.25;
+                }
+
+                // see how far off the line it is
+                // using dist-from-line will not account for internal
+                // texture warping, but it gives a lot less polygons than
+                // dist-from-midpoint
+                _VectorSubtract(midxyz, ctrl[i][j].xyz, &mut midxyz);
+                let mut dir_vec: vec3_t = [0.0; 3];
+                _VectorSubtract(ctrl[i][j + 2].xyz, ctrl[i][j].xyz, &mut dir_vec);
+                VectorNormalize(&mut dir_vec);
+
+                let d = _DotProduct(midxyz, dir_vec);
+                let mut projected: vec3_t = [0.0; 3];
+                _VectorScale(dir_vec, d, &mut projected);
+                _VectorSubtract(midxyz, projected, &mut midxyz);
+                let len = VectorLengthSquared(midxyz); // we will do the sqrt later
+
+                if len > max_len {
+                    max_len = len;
+                }
+            }
+
+            // C `sqrt()` promotes its argument to double; f64 intermediate
+            // per wave-0 ruling 12, rounded to f32 once at the assignment
+            // (C's own narrowing point).
+            max_len = (max_len as f64).sqrt() as f32;
+            // if all the points are on the lines, remove the entire columns
+            if max_len < 0.1 {
+                error_table[dir][j + 1] = 999.0;
+                j += 2;
+                continue;
+            }
+
+            // see if we want to insert subdivided columns
+            if width + 2 > MAX_GRID_SIZE {
+                error_table[dir][j + 1] = 1.0 / max_len;
+                j += 2;
+                continue; // can't subdivide any more
+            }
+
+            if max_len <= r_subdivisions_value {
+                error_table[dir][j + 1] = 1.0 / max_len;
+                j += 2;
+                continue; // didn't need subdivision
+            }
+
+            error_table[dir][j + 2] = 1.0 / max_len;
+
+            // insert two columns and replace the peak
+            width += 2;
+            for i in 0..height {
+                let prev = LerpDrawVert(&ctrl[i][j], &ctrl[i][j + 1]);
+                let next = LerpDrawVert(&ctrl[i][j + 1], &ctrl[i][j + 2]);
+                let mid = LerpDrawVert(&prev, &next);
+
+                let mut k = width - 1;
+                while k > j + 3 {
+                    ctrl[i][k] = copy_draw_vert(&ctrl[i][k - 2]);
+                    k -= 1;
+                }
+                ctrl[i][j + 1] = prev;
+                ctrl[i][j + 2] = mid;
+                ctrl[i][j + 3] = next;
+            }
+
+            // back up and recheck this set again, it may need more
+            // subdivision. Raven's `j -= 2;` here is immediately followed by
+            // the C `for` loop's own `j += 2` increment, netting `j`
+            // unchanged; this `while` form reproduces that by simply not
+            // advancing `j` on this path.
+        }
+
+        Transpose(width, height, &mut ctrl);
+        let t = width;
+        width = height;
+        height = t;
+    }
+
+    // put all the aproximating points on the curve
+    PutPointsOnCurve(&mut ctrl, width, height);
+
+    // cull out any rows or columns that are colinear
+    // `i + 1 < width` rather than `i < width - 1`: the C `int` comparison is
+    // safe at `width == 0`, the `usize` subtraction would underflow. Same
+    // predicate for every reachable `width`.
+    // Source: `oracle/codemp/renderer/tr_curve.cpp:460`
+    let mut i: usize = 1;
+    while i + 1 < width {
+        if error_table[0][i] == 999.0 {
+            let mut j = i + 1;
+            while j < width {
+                for k in 0..height {
+                    ctrl[k][j - 1] = copy_draw_vert(&ctrl[k][j]);
+                }
+                error_table[0][j - 1] = error_table[0][j];
+                j += 1;
+            }
+            width -= 1;
+        }
+        i += 1;
+    }
+
+    // `i + 1 < height`: underflow guard, as above.
+    // Source: `oracle/codemp/renderer/tr_curve.cpp:473`
+    let mut i: usize = 1;
+    while i + 1 < height {
+        if error_table[1][i] == 999.0 {
+            let mut j = i + 1;
+            while j < height {
+                for k in 0..width {
+                    ctrl[j - 1][k] = copy_draw_vert(&ctrl[j][k]);
+                }
+                error_table[1][j - 1] = error_table[1][j];
+                j += 1;
+            }
+            height -= 1;
+        }
+        i += 1;
+    }
+
+    // flip for longest tristrips as an optimization
+    // the results should be visually identical with or
+    // without this step
+    if height > width {
+        Transpose(width, height, &mut ctrl);
+        InvertErrorTable(&mut error_table, width, height);
+        let t = width;
+        width = height;
+        height = t;
+        InvertCtrl(width, height, &mut ctrl);
+    }
+
+    // calculate normals
+    MakeMeshNormals(width, height, &mut ctrl);
+
+    R_CreateSurfaceGridMesh(width, height, &ctrl, &error_table)
 }

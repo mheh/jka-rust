@@ -17,8 +17,14 @@ use native_math::qmath::{vectoangles, AngleVectors, CrossProduct, PITCH, ROLL, Y
 
 use crate::render_state::placeholders::RefEntity;
 use crate::render_state::renderer_cvars::RendererCvars;
+use crate::tr_local::orientationr_t::orientationr_t;
 use crate::tr_local::shader_stage_t::shaderStage_t;
+use crate::tr_main::{R_WorldNormalToEntity, TrMainScratch};
 use crate::tr_quicksprite::CQuickSpriteSystem;
+use crate::tr_shader::{
+    GLS_DSTBLEND_ONE, GLS_SRCBLEND_ONE, SURFSPRITE_EFFECT, SURFSPRITE_ORIENTED,
+    SURFSPRITE_VERTICAL, SURFSPRITE_WEATHERFX,
+};
 use crate::tr_worldeffects::world_effects::{R_IsPuffing, WindZoneState, WorldEffectsState};
 
 /// Per-subsystem owned state for `tr_surfacesprites.cpp`'s render-thread
@@ -49,11 +55,27 @@ pub struct SurfaceSpriteState {
     /// `ssrightvectors` — per-frame table of candidate billboard right
     /// vectors, indexed by `right_vector_count`.
     pub ss_right_vectors: Vec<vec3_t>,
+    /// `ssViewOrigin` — per-frame view/entity-local origin, written by
+    /// `RB_DrawSurfaceSprites`'s entity-transform check.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_surfacesprites.cpp:1429,1438`
+    pub ss_view_origin: vec3_t,
     /// `ssViewRight` — per-frame view right vector for oriented/effect
     /// sprites.
     pub ss_view_right: vec3_t,
     /// `ssViewUp` — per-frame view up vector for oriented/effect sprites.
     pub ss_view_up: vec3_t,
+    /// `SSAdditiveTransparency` — whether the active stage's blend mode is
+    /// additive (`GLS_SRCBLEND_ONE|GLS_DSTBLEND_ONE`), scaling the light
+    /// value in the (deferred) per-vertex draw loops.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_surfacesprites.cpp:1413-1421`
+    pub ss_additive_transparency: bool,
+    /// `SSUsingFog` — whether the active stage's fog pass is live this call
+    /// (`tess.fogNum && tess.shader->fogPass && r_drawfog->value`).
+    ///
+    /// Source: `oracle/codemp/renderer/tr_surfacesprites.cpp:1401-1411`
+    pub ss_using_fog: bool,
 
     // --- fields below landed by the `R_SurfaceSpriteFrameUpdate` wave-1
     // transcription. The file-scope declarations for all of them sit above
@@ -846,4 +868,154 @@ pub fn RB_DrawEffectSurfaceSprites(
 ) {
     // DEFERRED: R4 — RB_DrawEffectSurfaceSprites (see doc comment above)
     // Source: oracle/codemp/renderer/tr_surfacesprites.cpp:1156-1387
+}
+
+/// Raven `RB_DrawSurfaceSprites`.
+///
+/// `input` (`shaderCommands_t *`) is dropped: the oracle body never reads it
+/// directly, only forwards it to the three `RB_Draw*SurfaceSprites` callees,
+/// which already dropped it themselves (dissolved with `tess`, R2 `##
+/// State ownership` row `tess`).
+///
+/// `backEnd.viewParms.ori`/`backEnd.ori` thread as the already-real tier-2
+/// `orientationr_t` (`view_ori`/`ori`) rather than `FrameState::view`/`::ori`
+/// — those R2 carriers are still empty landing placeholders
+/// (`render_state::placeholders::ViewParms`/`OrientationR`), the same
+/// `tr_main.rs` wave-0 precedent this crate already establishes (see that
+/// file's top-of-file PORT-NOTE).
+///
+/// `backEnd.currentEntity != ssLastEntityDrawn` and `backEnd.currentEntity ==
+/// &tr.worldEntity` are both pointer-identity comparisons with no owned-value
+/// equivalent (`RefEntity` has no `PartialEq`, and identity isn't
+/// reproducible from a by-value `Option<RefEntity>` snapshot) — threaded as
+/// caller-resolved `is_new_entity`/`is_world_entity` bools, the
+/// `Autosprite2Deform` (`tr_shade_calc.rs:722-725`) precedent for the
+/// identical `backEnd.currentEntity != &tr.worldEntity` comparison.
+/// `current_entity` is the value `ssLastEntityDrawn` is set to when
+/// `is_new_entity` — `SurfaceSpriteState::ss_last_entity_drawn`'s own
+/// PORT-NOTE names this fn as the wave that must settle the read/write it
+/// left open.
+///
+/// Three genuine blockers blow through the rest of the body every call (none
+/// gated behind data this fn can resolve), so everything after the first one
+/// is statically unreachable until they land — same treatment as this file's
+/// `R_SurfaceSpriteFrameUpdate` `flrand` sites:
+/// - `tess.fogNum`/`tess.shader->fogPass` — `tess` is R4-dissolved, no R3
+///   carrier exists (R2 `## State ownership` row `tess`).
+/// - `GLS_SRCBLEND_BITS`/`GLS_DSTBLEND_BITS` — the mask `#define`s live in
+///   `tr_local.h`, not this file's FILE-SCOPE CONSTANTS section or this fn's
+///   own oracle slice; never-guess rule (porting-rules §A2).
+/// - `stage.ss->surfaceSpriteType` — `shaderStage_t::ss` is a tier-2 `*mut
+///   surfaceSprite_t` with no safe quarantine accessor; unsafe is banned in
+///   this file (escalated, not read raw).
+///
+/// Source: `oracle/codemp/renderer/tr_surfacesprites.cpp:1393-1462`
+#[allow(unreachable_code, unused_variables)]
+pub fn RB_DrawSurfaceSprites(
+    stage: &shaderStage_t,
+    quick_sprite: &mut CQuickSpriteSystem,
+    state: &mut SurfaceSpriteState,
+    wind: &WindZoneState,
+    effects: &WorldEffectsState,
+    common: &mut Common,
+    cvars: &RendererCvars,
+    refdef_time: i32,
+    refdef_fov_x: f32,
+    view_ori: &orientationr_t,
+    ori: &orientationr_t,
+    scratch: &TrMainScratch,
+    current_entity: Option<RefEntity>,
+    is_new_entity: bool,
+    is_world_entity: bool,
+) {
+    let glbits = stage.stateBits;
+
+    R_SurfaceSpriteFrameUpdate(
+        state,
+        wind,
+        effects,
+        common,
+        cvars,
+        refdef_time,
+        refdef_fov_x,
+    );
+
+    //
+    // Check fog
+    //
+    // DEFERRED: R4 — tess.fogNum/tess.shader->fogPass. `tess` dissolves into
+    // R4's tessellation/vertex-building pipeline; no R3 carrier exists (R2
+    // `## State ownership` row `tess`). Blocks both the SSUsingFog write and
+    // the StartGroup fog-index argument below.
+    // Source: oracle/codemp/renderer/tr_surfacesprites.cpp:1402-1411
+    let use_fog: bool = todo!(
+        "DEFERRED: tess.fogNum/tess.shader->fogPass — needs R4 tessellation carrier, oracle/codemp/renderer/tr_surfacesprites.cpp:1402"
+    );
+
+    state.ss_using_fog = use_fog;
+    if use_fog {
+        // tess.fogNum — same R4-tessellation blocker as `use_fog` above.
+        // Source: oracle/codemp/renderer/tr_surfacesprites.cpp:1405
+        let fog_num: i32 = todo!(
+            "DEFERRED: tess.fogNum — needs R4 tessellation carrier, oracle/codemp/renderer/tr_surfacesprites.cpp:1405"
+        );
+        quick_sprite.start_group(&stage.bundle[0], glbits, fog_num);
+    } else {
+        // `StartGroup(&stage->bundle[0], glbits)` — the oracle's default
+        // `fog_index = -1` argument, made explicit for the Rust signature.
+        quick_sprite.start_group(&stage.bundle[0], glbits, -1);
+    }
+
+    // Special provision in case the transparency is additive.
+    // DEFERRED: GLS_SRCBLEND_BITS/GLS_DSTBLEND_BITS — the mask `#define`s
+    // live in `tr_local.h`, not this file's FILE-SCOPE CONSTANTS section or
+    // this fn's own oracle slice; never-guess rule (porting-rules §A2).
+    // Source: oracle/codemp/renderer/tr_surfacesprites.cpp:1414
+    let srcblend_dstblend_bits: u32 = todo!(
+        "DEFERRED: GLS_SRCBLEND_BITS|GLS_DSTBLEND_BITS — oracle/codemp/renderer/tr_local.h (mask #defines)"
+    );
+    state.ss_additive_transparency =
+        (glbits & srcblend_dstblend_bits) == (GLS_SRCBLEND_ONE as u32 | GLS_DSTBLEND_ONE as u32);
+
+    // Check if this is a new entity transformation (incl. world entity), and
+    // update the appropriate vectors if so.
+    if is_new_entity {
+        if is_world_entity {
+            // Drawing the world, so our job is dead-easy, in the viewparms
+            state.ss_view_origin = view_ori.origin;
+            state.ss_view_right = view_ori.axis[1];
+            state.ss_view_up = view_ori.axis[2];
+        } else {
+            // Drawing an entity, so we need to transform the viewparms to
+            // the model's coordinate system
+            // R_WorldPointToEntity (backEnd.viewParms.ori.origin, ssViewOrigin);
+            state.ss_view_right = R_WorldNormalToEntity(view_ori.axis[1], scratch);
+            state.ss_view_up = R_WorldNormalToEntity(view_ori.axis[2], scratch);
+            state.ss_view_origin = ori.viewOrigin;
+            // R_WorldToLocal(backEnd.viewParms.ori.axis[1], ssViewRight);
+            // R_WorldToLocal(backEnd.viewParms.ori.axis[2], ssViewUp);
+        }
+        state.ss_last_entity_drawn = current_entity;
+    }
+
+    //TODO: Port shaderStage_t::ss
+    // `*mut surfaceSprite_t` has no safe quarantine accessor and unsafe is
+    // banned in this file — escalated rather than read raw.
+    // Source: oracle/codemp/renderer/tr_local.h:394-427 (shaderStage_t::ss);
+    // oracle/codemp/renderer/tr_surfacesprites.cpp:1445
+    let surface_sprite_type: i32 = todo!(
+        "Port shaderStage_t::ss — needs tier-2 quarantine accessor, oracle/codemp/renderer/tr_local.h:420"
+    );
+    match surface_sprite_type {
+        SURFSPRITE_VERTICAL => RB_DrawVerticalSurfaceSprites(stage, state, quick_sprite),
+        SURFSPRITE_ORIENTED => RB_DrawOrientedSurfaceSprites(stage, state, quick_sprite),
+        SURFSPRITE_EFFECT | SURFSPRITE_WEATHERFX => {
+            RB_DrawEffectSurfaceSprites(stage, state, quick_sprite)
+        }
+        _ => {}
+    }
+
+    quick_sprite.end_group();
+
+    state.ss_surfaces += 1;
 }

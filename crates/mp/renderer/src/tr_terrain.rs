@@ -51,14 +51,19 @@ use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::cvar_fns::Cvar_Get;
 use mp_engine_qcommon::z_memman_pc::Z_Free;
 use mp_qshared::shared::cvar::CVAR_CHEAT;
-use mp_qshared::shared::q_math::{_VectorSubtract, CrossProduct, DistanceSquared, VectorNormalize};
+use mp_qshared::shared::q_math::{
+    _DotProduct, _VectorAdd, _VectorMA, _VectorScale, _VectorSubtract, CrossProduct,
+    DistanceSquared, VectorNormalize,
+};
 use mp_qshared::shared::{qhandle_t, vec3_t};
 
+use crate::render_state::frame_state::FrameState;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_landscape::ctrland_scape::CTRLandScape;
 use crate::tr_landscape::ctrpatch::CTRPatch;
 use crate::tr_landscape::spatch_info::TPatchInfo;
+use crate::tr_light::R_LightForPoint;
 use crate::tr_local::srf_terrain_s::srfTerrain_t;
 use crate::tr_local::surface_type_t::surfaceType_t;
 use crate::tr_local::tr_refdef_t::trRefdef_t;
@@ -295,6 +300,131 @@ impl CTRLandScape {
         for x in 0..real_width {
             let normal = render_map[(offset - real_width + x) as usize].normal;
             render_map[(offset + x) as usize].normal = normal;
+        }
+    }
+
+    /// Raven `CTRLandScape::CalculateLighting` — computes each terxel's
+    /// vertex normal (averaged from its four attached face normals) and the
+    /// resulting lit tint.
+    ///
+    /// Raven reaches `tr.overbrightBits` through the frontend-scratch global
+    /// and `common->GetBaseWaterHeight()` through the `CCMLandScape`
+    /// back-pointer; both are threaded explicitly (`frame`/`land`, §B4),
+    /// matching this file's established parameter shape.
+    /// `R_LightForPoint`'s already-ported idiomatic signature returns
+    /// `Option<(ambient, directed, direction)>` in place of the oracle's
+    /// `int` return plus three out-params (dictionary: out-params->returns);
+    /// `!R_LightForPoint(...)` becomes the `None` arm.
+    ///
+    /// `Com_Clampi(0.0f, 1.0f, DotProduct(...))` / `Com_Clampi(0.0f, 255.0f,
+    /// tint[N])` pass float literals/values to the `int`-typed
+    /// `Com_Clampi(c_int, c_int, c_int) -> c_int`; Raven's C compiles this
+    /// via an implicit float->int truncating conversion at the call
+    /// boundary, preserved faithfully here as an explicit `as c_int` cast
+    /// (porting-rules §A2 — no speculative "should be a float clamp"
+    /// cleanup). `(byte)Com_Clampi(...) >> tr.overbrightBits` integer-
+    /// promotes the byte to `i32` for the shift before truncating back on
+    /// assignment, matching this crate's established
+    /// `R_ColorShiftLightingBytes` idiom (`tr_bsp.rs`).
+    ///
+    /// `(1.0 - dp) * 0.5` uses unsuffixed C double literals against a float
+    /// `dp`, promoting the whole expression to `f64` before `VectorScale`'s
+    /// `f32` parameter narrows it back once — wave-0 ruling 12.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_terrain.cpp:409-477`
+    pub fn calculate_lighting(
+        &mut self,
+        land: &CmLandScape,
+        common: &Common,
+        cvars: &RendererCvars,
+        assets: &RenderAssets,
+        frame: &FrameState,
+    ) {
+        let width = land.width();
+        let height = land.height();
+        let real_width = land.real_width();
+        let real_area = land.real_area() as usize;
+        let base_water_height = land.base_water_height();
+        let overbright_bits = frame.overbright_bits;
+
+        let render_map = self.render_map_mut(real_area);
+
+        let mut offset: c_int = 0;
+
+        // Work out the vertex normal (average of every attached face normal) and apply to the direction of the light
+        for y in 0..height {
+            for x in 0..width {
+                offset = (y * real_width) + x;
+                let o = offset as usize;
+
+                // Work out average normal
+                let mut total = render_map[o].normal;
+                _VectorAdd(total, render_map[o + 1].normal, &mut total);
+                _VectorAdd(
+                    total,
+                    render_map[o + real_width as usize + 1].normal,
+                    &mut total,
+                );
+                _VectorAdd(
+                    total,
+                    render_map[o + real_width as usize].normal,
+                    &mut total,
+                );
+                VectorNormalize(&mut total);
+
+                let coords = render_map[o].coords;
+                let Some((mut ambient, directed, direction)) =
+                    R_LightForPoint(common, cvars, assets, frame, coords)
+                else {
+                    let v = (255i32 >> overbright_bits) as u8;
+                    render_map[o].tint[0] = v;
+                    render_map[o].tint[1] = v;
+                    render_map[o].tint[2] = v;
+                    render_map[o].tint[3] = 255;
+                    continue;
+                };
+
+                if coords[2] < base_water_height as f32 {
+                    _VectorScale(ambient, 0.75, &mut ambient);
+                }
+
+                // Both normalised, so -1.0 < dp < 1.0
+                let dot = _DotProduct(direction, total);
+                let mut dp = Com_Clampi(0, 1, dot as c_int) as f32;
+                dp = dp.powf(3.0);
+                let scale = ((1.0f64 - dp as f64) * 0.5) as f32;
+                _VectorScale(ambient, scale, &mut ambient);
+                let mut tint: vec3_t = [0.0; 3];
+                _VectorMA(ambient, dp, directed, &mut tint);
+
+                let r = ((Com_Clampi(0, 255, tint[0] as c_int) as i32) >> overbright_bits) as u8;
+                let g = ((Com_Clampi(0, 255, tint[1] as c_int) as i32) >> overbright_bits) as u8;
+                let b = ((Com_Clampi(0, 255, tint[2] as c_int) as i32) >> overbright_bits) as u8;
+                render_map[o].tint[0] = r;
+                render_map[o].tint[1] = g;
+                render_map[o].tint[2] = b;
+                render_map[o].tint[3] = 0xff;
+
+                // Raven:
+                // mRenderMap[offset].tint[0] += tr.identityLight * 32;
+                // mRenderMap[offset].tint[1] += tr.identityLight * 32;
+                // mRenderMap[offset].tint[2] += tr.identityLight * 32;
+            }
+            render_map[offset as usize + 1].tint[0] = render_map[offset as usize].tint[0];
+            render_map[offset as usize + 1].tint[1] = render_map[offset as usize].tint[1];
+            render_map[offset as usize + 1].tint[2] = render_map[offset as usize].tint[2];
+            render_map[offset as usize + 1].tint[3] = 0xff;
+        }
+        // Duplicate bottom line
+        offset = height * real_width;
+        for x in 0..real_width {
+            render_map[(offset + x) as usize].tint[0] =
+                render_map[(offset - real_width + x) as usize].tint[0];
+            render_map[(offset + x) as usize].tint[1] =
+                render_map[(offset - real_width + x) as usize].tint[1];
+            render_map[(offset + x) as usize].tint[2] =
+                render_map[(offset - real_width + x) as usize].tint[2];
+            render_map[(offset + x) as usize].tint[3] = 0xff;
         }
     }
 

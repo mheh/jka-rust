@@ -59,6 +59,18 @@ use crate::tr_local::model_s::model_t;
 //
 // The remaining 2, `R_LerpTag` and `R_ModelBounds`, have no existing port —
 // transcribed below.
+//
+// PORT-NOTE: R3 wave-2 packet `tr_model.wave2.md` lists 2 fns; BOTH are
+// already live in this subsystem (`_PREAMBLE.md` "Never re-port an
+// already-ported fn" — same wave-planning gap as wave-0/wave-1 above).
+// Reconciled here, nothing new to transcribe:
+// - `ServerLoadMDXA` -> `RenderModels::server_load_mdxa` (`server_load.rs`),
+//   including the `#ifndef _M_IX86` skeletal/frame swap §20-drop
+//   (`TRM-D3`/ruling 54: dead arm on the `_M_IX86` WinDed target) and the
+//   `TRM-D4`/ruling 58 `AlignedBytes` cast discipline.
+// - `R_SVModelInit` -> `RenderModels::model_init` (`render_models.rs`),
+//   folded with `R_ModelInit` per §C10 (bare wrapper, always-compiled
+//   dedicated-live entry).
 
 /// The crate's single [`MdxmView`] handout over a `model_t`'s `.glm` block.
 ///
