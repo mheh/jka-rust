@@ -1666,3 +1666,46 @@ pub fn R_TryStitchingPatch(grid1num: usize, world_data: &mut [GridMesh]) -> i32 
     }
     numstitches
 }
+
+// --- R3 wave 4 ---------------------------------------------------------
+
+/// Raven `R_StitchAllPatches`.
+///
+/// PORT-NOTE: same "no state channel" / plain-`world_data` shape as its
+/// `R_TryStitchingPatch`/`R_StitchPatches` siblings above — no licensed
+/// `WorldAsset::surfaces` carrier exists yet for `worldData.surfaces` (see
+/// the top-of-file wave-1 note), so this walks a plain `world_data: &mut
+/// [GridMesh]` slice instead; `worldData.numsurfaces` is `world_data.len()`.
+/// `numstitches` is transcribed as a local accumulator even though its only
+/// oracle consumer, the trailing `Com_Printf`, is commented out in the
+/// oracle itself — dead by construction, not a Rust-side drop
+/// (porting-rules §2).
+///
+/// Source: `oracle/codemp/renderer/tr_bsp.cpp:1281-1307`
+pub fn R_StitchAllPatches(world_data: &mut [GridMesh]) {
+    let mut numstitches = 0i32;
+    loop {
+        let mut stitched = false;
+        for i in 0..world_data.len() {
+            //
+            // if this surface is not a grid
+            if !matches!(world_data[i].surface_type, surfaceType_t::SF_GRID) {
+                continue;
+            }
+            //
+            if world_data[i].lod_stitched != 0 {
+                continue;
+            }
+            //
+            world_data[i].lod_stitched = 1;
+            stitched = true;
+            //
+            numstitches += R_TryStitchingPatch(i, world_data);
+        }
+        if !stitched {
+            break;
+        }
+    }
+    let _ = numstitches;
+    //	Com_Printf ("stitched %d LoD cracks\n", numstitches );
+}

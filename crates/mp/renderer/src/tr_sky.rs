@@ -16,18 +16,21 @@
 // established. Flagged for the integrator: once `FrameState::view` lands a
 // real shape, thread `&frame.view` instead.
 
-use mp_engine_qcommon::common::com_error;
+use mp_engine_qcommon::common::{com_error, Common};
 use mp_engine_qcommon::common_fns::Q_acos;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::q_math::{
     _DotProduct as DotProduct, _VectorAdd as VectorAdd, _VectorScale as VectorScale, vec3_origin,
+    CrossProduct, PerpendicularVector,
 };
 use mp_qshared::shared::vec3_t;
 use native_math::qmath::VectorNormalize;
 
+use crate::render_state::frame_state::FrameState;
 use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::render_assets::RenderAssets;
+use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::tr_backend::GL_Bind;
 use crate::tr_local::view_parms_t::viewParms_t;
@@ -830,4 +833,83 @@ pub fn R_BuildCloudData(
             FillCloudBox(shader_handle, i, view, sky);
         }
     }
+}
+
+/// Raven `RB_DrawSun` — wave 4.
+///
+/// `frame` carries `backEnd.skyRenderedThisView`
+/// (`FrameState::sky_rendered_this_view`) and `tr.sunDirection`
+/// (`FrameState::sun_direction`, landed by an earlier wave — R2
+/// `## State ownership` row "`tr` frontend scratch/counters"). `common`/
+/// `cvars` read `r_drawSun` through the live engine cvar table (DEC-37
+/// A13.1 — the established `common.cvar(cvars.r_x).integer` idiom this
+/// crate already uses, e.g. `tr_light.rs`'s `R_SetupEntityLightingGrid`).
+/// `view` is `backEnd.viewParms` (tier-2 `viewParms_t`, `zFar` only — the
+/// same top-of-file PORT-NOTE precedent this file's `DrawSkyBox`/
+/// `FillCloudBox` already established for the identical `backEnd.viewParms`
+/// object).
+///
+/// `dist`/`size`: Raven's `zFar / 1.75` and `dist * 0.4` both mix an
+/// unsuffixed (`double`) literal with a `float` operand, so each divide/
+/// multiply promotes to `f64` and rounds back to `f32` once at the
+/// assignment (wave-0 ruling 12).
+///
+/// `qglLoadMatrixf`/`qglTranslatef`/`qglDepthRange` are unhomed GL/WGL entry
+/// points (DEC-01/DEC-37, `GpuResources::gl_state` a named placeholder until
+/// R4) — DEFERRED at their call sites; the surrounding CPU math (`dist`/
+/// `size`/`origin`/`vec1`/`vec2`) is transcribed for real, since none of it
+/// depends on a GL call's result.
+///
+/// `RB_BeginSurface( tr.sunShader, tess.fogNum )` through `RB_EndSurface()`
+/// (the whole quad-stamp body building the sun's four tess vertices) is
+/// DEFERRED whole: every write inside targets the dissolved `tess`/
+/// `shaderCommands_t` global (R2 `## State ownership` row `tess` — "no
+/// single global scratch buffer survives the new topology"), and
+/// `tr.sunShader` itself has no R3 carrier — R2's `## State ownership` names
+/// `tr.sunDirection`'s home on `FrameState` but no home for `sunShader`, so
+/// even `RB_BeginSurface`'s `shader: ShaderHandle` argument cannot be
+/// produced without inventing a handle. Escalate: a `tr.sunShader` carrier
+/// row is needed before this leg can port for real.
+///
+/// Source: `oracle/codemp/renderer/tr_sky.cpp:687-772`
+pub fn RB_DrawSun(frame: &FrameState, common: &Common, cvars: &RendererCvars, view: &viewParms_t) {
+    if !frame.sky_rendered_this_view {
+        return;
+    }
+    if common.cvar(cvars.r_drawSun).integer == 0 {
+        return;
+    }
+
+    // DEFERRED: R4 — qglLoadMatrixf(backEnd.viewParms.world.modelMatrix);
+    // qglTranslatef(backEnd.viewParms.ori.origin[0..2]) (DEC-37 A13.2,
+    // unhomed GL/WGL entry points)
+    // Source: oracle/codemp/renderer/tr_sky.cpp:699-700
+
+    let dist = (view.zFar as f64 / 1.75_f64) as f32; // div sqrt(3)
+    let size = (dist as f64 * 0.4_f64) as f32;
+
+    let mut origin: vec3_t = [0.0; 3];
+    VectorScale(frame.sun_direction, dist, &mut origin);
+    let mut vec1: vec3_t = [0.0; 3];
+    PerpendicularVector(&mut vec1, frame.sun_direction);
+    let mut vec2: vec3_t = [0.0; 3];
+    CrossProduct(frame.sun_direction, vec1, &mut vec2);
+
+    VectorScale(vec1, size, &mut vec1);
+    VectorScale(vec2, size, &mut vec2);
+
+    // farthest depth range
+    // DEFERRED: R4 — qglDepthRange(1.0, 1.0);
+    // Source: oracle/codemp/renderer/tr_sky.cpp:713
+
+    // FIXME: use quad stamp
+    // DEFERRED: R4 — RB_BeginSurface(tr.sunShader, tess.fogNum) through
+    // RB_EndSurface() (see doc comment above: dissolved `tess`, unhomed
+    // `tr.sunShader`)
+    // Source: oracle/codemp/renderer/tr_sky.cpp:716-768
+    let _ = origin; // consumed only by the deferred tess-quad block above
+
+    // back to normal depth range
+    // DEFERRED: R4 — qglDepthRange(0.0, 1.0);
+    // Source: oracle/codemp/renderer/tr_sky.cpp:771
 }

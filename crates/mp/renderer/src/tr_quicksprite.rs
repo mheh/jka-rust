@@ -241,9 +241,8 @@ impl CQuickSpriteSystem {
         // DEFERRED: the whole software-fog pass. `tr.world->globalFog` and
         // `tr.world->fogs[mFogIndex]` (`fog_t::colorInt`) are unavailable —
         // `WorldAsset`'s own doc comment states its fog array "land[s] with
-        // the rest of the tr_bsp/tr_world waves", not yet ported; `tr.
-        // fogImage` has no `RenderAssets` field landed by any prior wave
-        // either. Even with those, the pass is GL-only beyond the fog-struct
+        // the rest of the tr_bsp/tr_world waves", not yet ported.
+        // Even with those, the pass is GL-only beyond the fog-struct
         // read (`GL_Bind`/`GL_State`/qgl* calls, DEC-37 A13.2), so deferring
         // the block wholesale — rather than reading the fog data just to
         // discard it into deferred GL calls — matches this file's existing

@@ -7,7 +7,10 @@
 #![allow(non_snake_case)]
 
 use mp_engine_qcommon::common::com_error;
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
+use mp_engine_qcommon::common::Common;
 use mp_qshared::shared::error_parm::errorParm_t;
+use native_math::rng::Rng;
 
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::gpu_resources::GpuResources;
@@ -18,6 +21,8 @@ use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::tr_image::{R_Images_GetNextIteration, R_Images_StartIteration};
 use crate::tr_local::cull_type_t::cullType_t;
+use crate::tr_main::{DrawSurf, SurfaceGeometry};
+use crate::tr_worldeffects::world_effects::{WindZoneState, WorldEffectsState};
 
 // `R_WorldCoordToScreenCoordFloat` threads `RenderAssets::glconfig`
 // (`crate::render_state::placeholders::GlConfig`) and `FrameState::refdef`
@@ -64,9 +69,10 @@ pub struct PixelShaderState {
 /// compares against `glState.currenttextures[glState.currenttmu]` before
 /// issuing `qglBindTexture` and stamping `image->frameUsed = tr.frameCount`.
 ///
-/// DEFERRED: R4 — every touched field lives on a placeholder still owned by
-/// a later wave: `RenderAssets`' `default_image`/`dlight_image`/`frame_count`
-/// registry state and `ImageAsset::texnum`/`frame_used` (tr_image wave), and
+/// DEFERRED: R4 — `RenderAssets::default_image`/`dlight_image` have landed,
+/// but every value this fn actually compares and stores has not:
+/// `ImageAsset::texnum` (the whole `texnum` decision, R4 GPU wave),
+/// `ImageAsset::frame_used` against `FrameState::frame_count`, and
 /// `GpuResources::gl_state`'s `currenttextures`/`currenttmu` cache (a named
 /// placeholder until R4 defines the real pipeline/bind-group cache). The
 /// bind decision and the `qglBindTexture` call are GL-only regardless
@@ -700,4 +706,171 @@ pub fn RB_ShowImages(
 
     // DEFERRED: R4 — qglFinish() (DEC-37 A13.2)
     // Source: oracle/codemp/renderer/tr_backend.cpp:1825
+}
+
+/// Raven `RB_RenderDrawSurfList` — the core backend draw loop: walks a sorted
+/// `drawSurf_t` list, decomposing each surface's sort key into
+/// entity/shader/fog/dlight, batching consecutive surfaces that share a
+/// (shader, fog, dlight, entity-mergable) key into one `RB_BeginSurface`/
+/// `RB_EndSurface` tess batch, deferring distortion/force-alpha/force-post
+/// entities into a last `g_postRenders` pass, then re-drawing that pass.
+///
+/// Every real dependency this loop touches is still unhomed at this wave:
+/// - `tess` dissolves into R4's tessellation/vertex-building pipeline (R2
+///   `## State ownership` row `tess`) — `tess.shaderTime`/`.shader` have no
+///   R3 carrier, so the `RB_ShadowFinish`'s `!didShadowPass && shader &&
+///   shader->sort > SS_BANNER` gate and every `tess.shaderTime = ...` write
+///   fall with it.
+/// - `FrameState::counters` (`backEnd.pc`, `BackEndCounters`) is still the
+///   empty tier-3 placeholder — no field backs `backEnd.pc.c_surfaces +=
+///   numDrawSurfs`.
+/// - `TrRefdef` (`FrameState::refdef`) only carries `fov_x`/`fov_y`/
+///   `view_origin`/`view_axis` — no `entities`/`num_dlights`/`dlights`/
+///   `floatTime`, so every `backEnd.refdef.entities[entityNum]` /
+///   `.dlights` read (the RF_DISTORTION/RF_FORCEPOST/RF_FORCE_ENT_ALPHA/
+///   RF_NODEPTH/RF_DEPTHHACK renderfx tests, the postRender entity fetch)
+///   is blocked.
+/// - `tr.worldEntity` has no landed carrier — it is not one of the named
+///   `## State ownership` `tr` sub-fields, and `FrameState::current_entity`/
+///   `entity_2d` are the scene-entity/2D-entity slots, neither the world
+///   entity default `backEnd.currentEntity = &tr.worldEntity;` needs.
+/// - `ViewParms`/`OrientationR` (`FrameState::view`/`ori`) are still empty
+///   placeholders, yet `R_RotateForEntity`'s already-ported signature
+///   (`tr_main.rs`) takes the tier-2 raw `viewParms_t` and returns a raw
+///   `orientationr_t` — there is no owned field to store that result in
+///   without reintroducing a tier-2 shape into new state (interior-safety
+///   law), so the call is not reachable as landed.
+/// - `rb_surfaceTable[*drawSurf->surface]`'s per-surface-kind dispatch has no
+///   ported callees in this wave's resolved call surface (`RB_SurfaceFace`/
+///   `RB_SurfaceGrid`/... are a later wave) — `DrawSurf<S>::surface`'s tagged
+///   dispatch stays unresolved regardless of the state above.
+/// - `g_bRenderGlowingObjects`/`g_postRenders`/`g_numPostRenders`/
+///   `rb_surfaceTable`/`tr_stencilled` are this packet's STATE HOMES rows
+///   marked "NAMED BY THIS WAVE if this file's wave is where the subsystem
+///   lands" (DEC-37 A13.3); every real read/write site of them sits behind
+///   the blocked state above (the postRender decision itself needs
+///   `backEnd.refdef.entities[entityNum].e.renderfx`), so there is no
+///   landable use site that would justify inventing the carrier struct now —
+///   same "stay unmapped rather than invented" call `RB_EndSurface`'s port
+///   made for `skyboxportal`/`drawskyboxportal` (`tr_shade.rs`).
+/// - `qglLoadMatrixf`/`qglDepthRange`/`qglCopyTexImage2D` are GL-only
+///   (DEC-37 A13.2).
+/// - `RB_CaptureScreenImage`/`RB_DistortionFill`/`RB_ShadowFinish`/
+///   `RB_BeginSurface`/`RB_EndSurface`/`R_TransformDlights`/
+///   `R_WorldCoordToScreenCoord`/`GL_Bind` are all callable (in-module,
+///   already ported), but every call site in this body is gated by the
+///   blocked state above.
+///
+/// No computation survives once every input above is removed; the
+/// `#ifdef __MACOS__`/`_XBOX` branches (`Sys_PumpEvents` event-pump crutch,
+/// the `#if 0` dead texture-copy experiment, the commented-out distortion
+/// alternate paths) are not compiled on this target and drop with it.
+///
+/// Whole-body deferral: no partial body survives, so this lands as a loud
+/// `todo!()` rather than a silent no-op (whole-fn-deferral convention —
+/// partial-body fns keep DEFERRED comments instead).
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:705-1249`
+pub fn RB_RenderDrawSurfList(
+    frame: &mut FrameState,
+    gpu: &mut GpuResources,
+    assets: &RenderAssets,
+    draw_surfs: &[DrawSurf<SurfaceGeometry<'_>>],
+) {
+    let _ = (frame, gpu, assets, draw_surfs);
+    todo!("Port RB_RenderDrawSurfList — oracle/codemp/renderer/tr_backend.cpp:705-1249")
+}
+
+/// Raven `RB_SwapBuffers` — the `RC_SWAP_BUFFERS` backend command: flushes
+/// any in-flight 2D tess batch, runs the `r_showImages` debug view, measures
+/// overdraw via a stencil readback, finishes the GL pipe if needed, logs a
+/// frame-boundary trace comment, and presents the frame. The oracle's
+/// `data`/`cmd + 1` command-buffer walk dissolves — `swapBuffersCommand_t`
+/// carries no payload past its `RC_SWAP_BUFFERS` tag, so this fn takes no
+/// decoded-event argument (`R2-D2`/A1).
+///
+/// - `tess.numIndexes`/`RB_EndSurface()` flush and `tess.numIndexes`-summed
+///   overdraw/`glState.finishCalled` gate are all `tess`/`GpuResources
+///   ::gl_state`-dependent — `tess` dissolves into R4's pipeline (R2 `##
+///   State ownership` row `tess`), `gl_state` is a named placeholder until
+///   R4 (DEC-37 A13.2).
+/// - `r_showImages->integer` gates a real call: `common` threaded for
+///   `Common::cvar` reads is established practice (`tr_image.rs`'s
+///   anisotropy-clamp read is precedent), so this lands as
+///   `RB_ShowImages(frame, gpu, assets, cvars)`.
+/// - `r_measureOverdraw`'s live integer value gates the stencil-readback
+///   block (`Hunk_AllocateTempMemory`/`qglReadPixels`/`Hunk_FreeTempMemory`,
+///   `backEnd.pc.c_overDraw += sum`), which is additionally blocked by
+///   `FrameState::counters` (`BackEndCounters`) still being the empty tier-3
+///   placeholder — no field to accumulate into — so that block stays
+///   deferred.
+/// - `qglFinish()` is GL-only (DEC-37 A13.2).
+/// - `GLimp_LogComment`'s already-ported signature takes a raw `*mut c_char`
+///   (tier-1-adjacent engine surface) — same "would need an unsafe pointer
+///   construction the interior-safety law forbids" ruling `RB_EndSurface`'s
+///   port made for this exact call (`tr_shade.rs`).
+/// - `GLimp_EndFrame`/`GLimp_LogComment` additionally have no reachable path
+///   from this crate at all: both live in `mp_engine_client::null::
+///   null_glimp`, but `crates/mp/renderer/Cargo.toml` does not depend on
+///   `mp_engine_client` — escalated rather than adding an undeclared
+///   cross-crate edge out of this packet's scope.
+///
+/// The `r_showImages->integer` gated `RB_ShowImages()` call and the
+/// unconditional `backEnd.projection2D = qfalse;` field write land here.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1838-1884`
+pub fn RB_SwapBuffers(
+    frame: &mut FrameState,
+    gpu: &mut GpuResources,
+    assets: &RenderAssets,
+    cvars: &RendererCvars,
+    common: &Common,
+) {
+    // DEFERRED: R4/A13.1 — the rest of RB_SwapBuffers (see doc comment
+    // above), including the GLimp_EndFrame present call — GLimp_EndFrame has
+    // no reachable path from this crate today (mp_renderer does not depend
+    // on mp_engine_client; escalated)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:1842-1880
+
+    // texture swapping test
+    if common.cvar(cvars.r_showImages).integer != 0 {
+        RB_ShowImages(frame, gpu, assets, cvars);
+    }
+
+    frame.projection_2d = false;
+}
+
+/// Raven `RB_WorldEffects` — the `RC_WORLD_EFFECTS` backend command: flushes
+/// any in-flight tess batch, runs the outdoor weather/wind particle-cloud
+/// pass, then re-opens a tess batch for whatever shader was still active. The
+/// oracle's `data`/`cmd + 1` command-buffer walk dissolves — the caller
+/// supplies whatever `RC_WORLD_EFFECTS` needs directly (`R2-D2`/A1);
+/// `drawBufferCommand_t` carries no fields this fn reads.
+///
+/// The two `tess`-gated flush/reopen calls have no guard left to evaluate —
+/// `tess` dissolves into R4's tessellation/vertex-building pipeline (R2 `##
+/// State ownership` row `tess`; no R3 carrier ever holds `tess.shader`/
+/// `.numIndexes`/`.fogNum`) — so `RB_EndSurface`/`RB_BeginSurface` stay
+/// uncalled here rather than guessed at. `RB_RenderWorldEffects` itself
+/// carries no `tess` gate and lands unconditionally, threaded per its
+/// already-ported signature (`tr_worldeffects/world_effects.rs`).
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1886-1905`
+pub fn RB_WorldEffects(
+    world_effects: &mut WorldEffectsState,
+    wind: &mut WindZoneState,
+    assets: &RenderAssets,
+    frame: &FrameState,
+    host: &mut EngineHostView,
+    rng: &mut Rng,
+) {
+    // DEFERRED: R4 — tess.shader && tess.numIndexes guard + RB_EndSurface()
+    // flush (see doc comment above)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:1893-1896
+
+    world_effects.RB_RenderWorldEffects(wind, assets, frame, host, rng);
+
+    // DEFERRED: R4 — tess.shader guard + RB_BeginSurface(tess.shader,
+    // tess.fogNum) reopen (see doc comment above)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:1899-1902
 }

@@ -1461,3 +1461,42 @@ pub fn RB_CalcWaveColor(
         *c = color;
     }
 }
+
+/// Raven `void RB_CalcWaveAlpha( const waveForm_t *wf, unsigned char *dstColors )`.
+///
+/// `tess.numVertexes` collapses to `dst_colors.len()`; `EvalWaveFormClamped`'s
+/// dissolved params thread straight through, same as this file's other
+/// `EvalWaveForm`/`EvalWaveFormClamped` call sites (`RB_CalcStretchTexCoords`
+/// etc.). `v = 255 * glow` assigns a `float` into `int v` — a C truncating
+/// (toward-zero) conversion, not `myftol`'s FISTP rounding, so `as i32`
+/// matches; the loop only ever writes the low byte (`dstColors[3] = v`), so
+/// the intermediate `i32` narrows via `as u8` to reproduce the same 8-bit
+/// truncation as the oracle's implicit `unsigned char = int` store.
+///
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:871-885`
+pub fn RB_CalcWaveAlpha(
+    wf: &waveForm_t,
+    dst_colors: &mut [[u8; 4]],
+    noise: &NoiseState,
+    refdef_time: i32,
+    refdef_float_time: f32,
+    shader_time: f32,
+    assets: &RenderAssets,
+    shader_name: &str,
+) {
+    let glow = EvalWaveFormClamped(
+        wf,
+        noise,
+        refdef_time,
+        refdef_float_time,
+        shader_time,
+        assets,
+        shader_name,
+    );
+
+    let v = (255.0 * glow) as i32;
+
+    for c in dst_colors.iter_mut() {
+        c[3] = v as u8;
+    }
+}

@@ -202,6 +202,38 @@ impl CTRLandScape {
         }
     }
 
+    /// Raven `CTRLandScape::Render` — renders every visible patch, then all
+    /// water for visible patches with water.
+    // DEFERRED: R4/tr_bsp — blocked on four independent unresolved
+    // dependencies, none satisfiable from this file alone:
+    //   1. `tess.shader != current->mShader` reads the DISSOLVED `tess`
+    //      global (R2 `## State ownership` row `tess`: "no single global
+    //      scratch buffer survives the new topology" — an R4 concern, not
+    //      an R3 field).
+    //   2. `current->mPatch->Render(current->mPart)` is `CTRPatch::Render`,
+    //      already DEFERRED R4 earlier in this file (funnels into `tess`
+    //      via `RecurseRender`, itself absent from this wave's packet).
+    //   3. Walking `mSortedPatches` (a raw `TPatchInfo *`) to reach
+    //      `current->mPatch->isVisible()` has no existing quarantined
+    //      accessor on `CTRLandScape` (unlike `mTRPatches`/`mRenderMap`,
+    //      which have `patch_mut`/`render_map_mut`) — adding one is a
+    //      `ctrland_scape.rs` change, out of this wave's single-file scope,
+    //      and a raw deref here would be unsafe, banned in this crate.
+    //   4. The water pass's `patch->RenderWater()` is `CTRPatch::RenderWater`
+    //      (verbatim `RenderWaterVert` sibling), also DEFERRED R4 above —
+    //      writes only into the same DISSOLVED `tess`.
+    //   5. `RB_EndSurface`, this fn's only in-module callee besides
+    //      `RB_BeginSurface`, is itself an unimplemented `todo!()` stub
+    //      upstream (`tr_shade.rs:448`).
+    // No CPU logic survives independent of these blockers — matches this
+    // file's existing `RenderCorner`/`CTRPatch::Render`/`RenderWaterVert`
+    // treatment above, and the header PORT-NOTE's own forward reference to
+    // "the zero-arg `CTRLandScape::Render()`".
+    // Source: `oracle/codemp/renderer/tr_terrain.cpp:291-334`
+    pub fn render(&mut self) {
+        todo!("Port CTRLandScape::Render — oracle/codemp/renderer/tr_terrain.cpp:291-334")
+    }
+
     /// Raven `CTRLandScape::CalculateRegion`.
     ///
     /// Raven's `#if _DEBUG mCycleCount++` has no field to increment: the

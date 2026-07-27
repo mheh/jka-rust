@@ -2900,10 +2900,6 @@ pub fn ParseDeform(
 /// handful of oracle globals/macros this fn reads have no value anywhere in
 /// this packet — each site below carries its own cited `// DEFERRED:` marker
 /// rather than one blanket note:
-/// - `tr.whiteImage` (`:3015`) — `RenderAssets` has no field for it yet
-///   (only `RenderAssets::lightmaps` exists — this packet's STATE HOMES row
-///   for `tr` names exactly that split); adding one is outside this wave's
-///   APPEND scope (`render_assets.rs`, a different file).
 /// - `lightmapsNone`/`stylesDefault` (`:3244-3245`) — file-scope default
 ///   tables; their contents aren't given anywhere in this packet.
 ///
@@ -2986,8 +2982,7 @@ pub fn FinishShader(
             for i in 0..n_styles {
                 state.stages[lm_stage + i + 1] = state.stages[lm_stage].clone();
                 if state.lightmap_index[i + 1] == LIGHTMAP_BY_VERTEX {
-                    // DEFERRED: `tr.whiteImage` — see fn doc above.
-                    // Source: oracle/codemp/renderer/tr_shader.cpp:3015
+                    state.stages[lm_stage + i + 1].bundle[0].image = assets.white_image;
                 } else if state.lightmap_index[i + 1] < 0 {
                     com_error(
                         errorParm_t::ERR_DROP,
@@ -3389,11 +3384,7 @@ pub fn RE_RegisterShaderFromImage(
             (GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA) as u32;
     } else if state.lightmap_index[0] == LIGHTMAP_WHITEIMAGE {
         // fullbright level
-        // DEFERRED: `RenderAssets::white_image` — `tr.whiteImage` has no R3
-        // home yet (same gap `tr_backend.rs`'s `GL_Bind` flags for
-        // `default_image`/`dlight_image` — owned by a later `tr_image`
-        // wave); stage 0's image stays unset here.
-        // Source: oracle/codemp/renderer/tr_shader.cpp:3656
+        state.stages[0].bundle[0].image = assets.white_image;
         state.stages[0].active = true;
         state.stages[0].rgb_gen = ColorGen::IdentityLighting;
         state.stages[0].state_bits = GLS_DEFAULT as u32;
@@ -3482,13 +3473,7 @@ pub fn CreateInternalShaders(
     // PORT-NOTE: the texMods-copy loop dissolves — see
     // `RE_RegisterShaderFromImage`'s identical note above.
 
-    // DEFERRED: `RenderAssets::default_image` — `tr.defaultImage` has no R3
-    // home yet (same gap `tr_backend.rs`'s `GL_Bind` flags for
-    // `default_image`/`dlight_image` — owned by a later `tr_image` wave);
-    // stage 0's image stays unset. This cascades into `FinishShader`'s own
-    // "missing texture" warning/deactivation path for all three shaders
-    // built below, since they share this stage-0 state (see fn doc).
-    // Source: oracle/codemp/renderer/tr_shader.cpp:4152
+    state.stages[0].bundle[0].image = assets.default_image;
     state.stages[0].active = true;
     state.stages[0].state_bits = GLS_DEFAULT as u32;
 

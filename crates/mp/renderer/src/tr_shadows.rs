@@ -149,9 +149,9 @@ pub fn RB_DoShadowTessEnd() {
 /// `GL_State`/`qglBegin`..`qglEnd`/`qglDisable`/`qglPopMatrix`) — unhomed
 /// until R4 (DEC-01/DEC-37; `GpuResources::gl_state` is a named
 /// placeholder), matching this file's `GL_Cull`-guard-then-defer precedent
-/// (`tr_backend.rs`). `tr.whiteImage` also has no R3 carrier yet (STATE
-/// HOMES `tr` SPLIT row names only the registries/`FrameState` scratch, not
-/// this frontend singleton handle).
+/// (`tr_backend.rs`). `tr.whiteImage` has an R3 carrier
+/// (`RenderAssets::white_image`), but `GL_Bind` is itself a DEFERRED-R4
+/// no-op, so nothing here becomes computable.
 ///
 /// Source: `oracle/codemp/renderer/tr_shadows.cpp:406-461`
 pub fn RB_ShadowFinish(r_shadows_integer: i32, glconfig: &GlConfig) {
@@ -242,10 +242,10 @@ pub fn RB_DistortionFill(
 /// a named placeholder) — matches this crate's `RB_Hyperspace`
 /// (`tr_backend.rs`) precedent of deferring GL-only-consumed arithmetic
 /// alongside its GL call rather than stranding an orphan return value.
-/// `GL_Bind(tr.screenImage)` is also unhomed: `tr.screenImage`/
-/// `tr.whiteImage` are frontend singleton image handles with no R3 carrier
-/// (STATE HOMES `tr` SPLIT row names only the registries and `FrameState`
-/// scratch, not these). `glConfig.vidWidth`/`vidHeight`/`maxTextureSize`
+/// `GL_Bind(tr.screenImage)` is also unhomed: `tr.screenImage` is a frontend
+/// singleton image handle with no R3 carrier (STATE HOMES `tr` SPLIT row
+/// names only the registries and `FrameState` scratch, not this one).
+/// `glConfig.vidWidth`/`vidHeight`/`maxTextureSize`
 /// (`RenderAssets::glconfig`) are real R3 carriers and would drive this
 /// arithmetic once `GL_Bind`/`qglCopyTexImage2D` land.
 ///

@@ -28,6 +28,33 @@ pub struct RenderAssets {
     /// extension-stripped name (`GenerateImageMappingName`,
     /// `oracle/codemp/renderer/tr_image.cpp:1287-1289`).
     pub image_names: HashMap<String, ImageHandle>,
+    /// `tr.defaultImage` — the "*default" checker box `R_CreateDefaultImage`
+    /// builds once at init; `GL_Bind`'s `NULL image` fallback and
+    /// `CreateInternalShaders`' stage-0 image. Session-lifetime,
+    /// registry-adjacent singleton (`R2-D1`), `Option` because it is unset
+    /// until `R_CreateBuiltinImages` runs.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1329`
+    pub default_image: Option<ImageHandle>,
+    /// `tr.fogImage` — the "*fog" `FOG_S`x`FOG_T` distance/depth lookup
+    /// texture built by `R_CreateFogImage`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1331`
+    pub fog_image: Option<ImageHandle>,
+    /// `tr.dlightImage` — Raven: "inverse-quare highlight for projective
+    /// adding"; built by `R_CreateDlightImage`, and `GL_Bind`'s `r_nobind`
+    /// override target.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1332`
+    pub dlight_image: Option<ImageHandle>,
+    /// `tr.whiteImage` — Raven: "full of 0xff"; read by `FinishShader`'s
+    /// `LIGHTMAP_BY_VERTEX` style path and `R_FindShader`'s
+    /// `LIGHTMAP_WHITEIMAGE` fullbright path. Written by
+    /// `R_CreateBuiltinImages` (not yet ported), so it stays `None` until
+    /// that fn lands.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1334`
+    pub white_image: Option<ImageHandle>,
     /// `tr.lightmaps[MAX_LIGHTMAPS]` — `image_t*` in the oracle, folded into
     /// `images` rather than a fifth arena; this is the **positional** index
     /// `R_FindShader` reads by small integer

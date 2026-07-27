@@ -20,7 +20,14 @@ use mp_qshared::shared::q_color::{S_COLOR_RED, S_COLOR_YELLOW};
 use mp_qshared::shared::q_string::COM_StripExtension;
 use mp_qshared::shared::{fileHandle_t, MAX_QPATH};
 use native_math::qmath::Com_Clamp;
+use native_string::q_string::Q_stricmp;
 
+use crate::gl_constants::{
+    GL_CLAMP, GL_CLAMP_TO_EDGE, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, GL_COMPRESSED_RGB_S3TC_DXT1_EXT,
+    GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR_MIPMAP_NEAREST, GL_NEAREST,
+    GL_NEAREST_MIPMAP_LINEAR, GL_NEAREST_MIPMAP_NEAREST, GL_REPEAT, GL_RGB4_S3TC, GL_RGB5, GL_RGB8,
+    GL_RGBA, GL_RGBA4, GL_RGBA8,
+};
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::image_asset::{ImageAsset, ImageHandle};
@@ -122,25 +129,18 @@ impl Default for TrImageState {
         TrImageState {
             gamma_table: [0; 256],
             intensity_table: [0; 256],
-            gl_filter_min: 0,
-            gl_filter_max: 0,
-            gi_texture_bind_num: 0,
+            // Raven: `int gl_filter_min = GL_LINEAR_MIPMAP_NEAREST;`
+            // Source: oracle/codemp/renderer/tr_image.cpp:38
+            gl_filter_min: GL_LINEAR_MIPMAP_NEAREST,
+            // Raven: `int gl_filter_max = GL_LINEAR;`
+            // Source: oracle/codemp/renderer/tr_image.cpp:39
+            gl_filter_max: GL_LINEAR,
+            // Raven: `int giTextureBindNum = 1024;`
+            // Source: oracle/codemp/renderer/tr_image.cpp:536
+            gi_texture_bind_num: 1024,
         }
     }
 }
-
-// PORT-NOTE: standard OpenGL / `GL_EXT_texture_compression_s3tc` enum
-// values, transcribed from general knowledge rather than the oracle header
-// (this wave's rule forbids opening `oracle/`) — flag for a header diff if a
-// reviewer has direct access. `GL_RGB4_S3TC` mirrors the pre-EXT id
-// Software `tr_image.c` define of the same name/value.
-const GL_RGBA4: i32 = 0x8056;
-const GL_RGB5: i32 = 0x8050;
-const GL_RGBA8: i32 = 0x8058;
-const GL_RGB8: i32 = 0x8051;
-const GL_RGB4_S3TC: i32 = 0x83A1;
-const GL_COMPRESSED_RGB_S3TC_DXT1_EXT: i32 = 0x83F0;
-const GL_COMPRESSED_RGBA_S3TC_DXT5_EXT: i32 = 0x83F3;
 
 /// Raven `#define LANCZOS3 3.0` — `R_Resample`'s filter-window radius. Not
 /// guessed: this exact value is already load-bearing in this same file as
@@ -903,38 +903,93 @@ pub fn R_SetColorMappings(
 // wave 1
 // ============================================================================
 
+/// Raven file-scope `textureMode_t modes[]` — the six named minify/magnify
+/// filter pairs `GL_TextureMode` matches a console argument against. The
+/// struct collapses to a tuple; the GL filter enums come from
+/// `crate::gl_constants` (Khronos-registry values, not oracle-derived).
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:54-67
+const TEXTURE_MODES: [(&str, i32, i32); 6] = [
+    ("GL_NEAREST", GL_NEAREST, GL_NEAREST),
+    ("GL_LINEAR", GL_LINEAR, GL_LINEAR),
+    (
+        "GL_NEAREST_MIPMAP_NEAREST",
+        GL_NEAREST_MIPMAP_NEAREST,
+        GL_NEAREST,
+    ),
+    (
+        "GL_LINEAR_MIPMAP_NEAREST",
+        GL_LINEAR_MIPMAP_NEAREST,
+        GL_LINEAR,
+    ),
+    (
+        "GL_NEAREST_MIPMAP_LINEAR",
+        GL_NEAREST_MIPMAP_LINEAR,
+        GL_NEAREST,
+    ),
+    (
+        "GL_LINEAR_MIPMAP_LINEAR",
+        GL_LINEAR_MIPMAP_LINEAR,
+        GL_LINEAR,
+    ),
+];
+
 /// Raven `GL_TextureMode`.
 ///
-/// ESCALATION: `modes[6]` (name + `GL_TEXTURE_MIN_FILTER`/`MAG_FILTER` enum
-/// pair) is declared immediately above `tr_image.cpp:99`, outside this
-/// packet's verbatim oracle slice — its GL enum values are not guessable per
-/// wave law ("never guess a numeric constant… the RF_* bit-value guesses
-/// were wave-0 BLOCKERs"). The function's very first statement depends on
-/// it (`modes[i].name` compared against the console arg), so nothing above
-/// the lookup is separable from it — left as a cited `todo!()` rather than
-/// fabricated, matching the `Taiwanese_CollapseBig5Code` precedent
-/// (`tr_font.rs`: transcribe everything computable, `todo!()` at the exact
-/// blocking point). `gl_filter_min`/`gl_filter_max` land on `TrImageState`
-/// (A13.3, named by this wave) once the table is available; the
-/// `qglTexParameterf` mipmap-refresh loop past it is DEFERRED: R4 regardless
-/// (fixed-function GL surface, DEC-37 A13.2).
+/// The `for`/`break`/`if (i == 6)` search-then-test idiom becomes an iterator
+/// `position` (§C10 — control-flow behavior preserved, shape free).
+///
+/// DEFERRED: R4 — the mipmap-refresh loop past the anisotropy clamp
+/// (`R_Images_StartIteration`/`GL_Bind`/`qglTexParameterf`, `:126-142`) has
+/// no CPU-visible effect: `GL_Bind` is itself a DEFERRED-R4 no-op
+/// (`tr_backend.rs`) and every other call in the loop body is fixed-function
+/// GL surface (DEC-37 A13.2).
 ///
 /// Source: oracle/codemp/renderer/tr_image.cpp:99-143
 pub fn GL_TextureMode(
-    _view: &mut EngineHostView,
-    _cvars: &RendererCvars,
-    _assets: &RenderAssets,
-    _state: &mut TrImageState,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    assets: &RenderAssets,
+    state: &mut TrImageState,
     _gpu: &mut GpuResources,
-    _string: &str,
+    string: &str,
 ) {
-    //TODO: Port modes
-    // Source: oracle/codemp/renderer/tr_image.cpp (modes[6] filter-mode
-    // table, declared immediately above :99 — not included in this packet's
-    // verbatim slice)
-    todo!(
-        "Port GL_TextureMode's modes[6] table — oracle/codemp/renderer/tr_image.cpp:99-143 (modes[] declared above :99, not in this packet)"
-    )
+    let found = TEXTURE_MODES
+        .iter()
+        .position(|(name, _, _)| Q_stricmp(name, string) == 0);
+
+    let i = match found {
+        Some(i) => i,
+        None => {
+            com_printf(view.common, "bad filter name\n");
+            for (name, _, _) in TEXTURE_MODES.iter() {
+                com_printf(view.common, &format!("{}\n", name));
+            }
+            return;
+        }
+    };
+
+    state.gl_filter_min = TEXTURE_MODES[i].1;
+    state.gl_filter_max = TEXTURE_MODES[i].2;
+
+    // If the level they requested is less than possible, set the max possible...
+    let aniso = view
+        .common
+        .cvar(cvars.r_ext_texture_filter_anisotropic)
+        .value;
+    if aniso > assets.glconfig.max_texture_filter_anisotropy {
+        Cvar_Set(
+            view,
+            "r_ext_texture_filter_anisotropic",
+            &format!("{:.6}", assets.glconfig.max_texture_filter_anisotropy),
+        );
+    }
+
+    // change all the existing mipmap texture objects
+    //
+    // DEFERRED: R4 — the whole `R_Images_GetNextIteration` loop; see the doc
+    // comment above.
+    // Source: oracle/codemp/renderer/tr_image.cpp:126-142
 }
 
 /// Raven `R_SumOfUsedImages`.
@@ -973,17 +1028,6 @@ pub fn R_SumOfUsedImages(assets: &RenderAssets, frame: &FrameState, use_format: 
 }
 
 /// Raven `R_ImageList_f`.
-///
-/// ESCALATION (partial): `image->wrapClampMode`'s `GL_REPEAT`/`GL_CLAMP`/
-/// `GL_CLAMP_TO_EDGE` named branches are not resolvable — their values are
-/// not in this packet or the target file (the `internalFormat` switch just
-/// above reuses `GL_RGBA4`/`GL_RGB5`/`GL_RGBA8`/`GL_RGB8`/`GL_RGB4_S3TC`/
-/// `GL_COMPRESSED_RGB_S3TC_DXT1_EXT`/`GL_COMPRESSED_RGBA_S3TC_DXT5_EXT`,
-/// already landed in this file by wave 0, so those ARE reused here — but no
-/// wrap-mode constant is present anywhere this wave can read). The wrap
-/// column falls through to the oracle's own numeric default-case format
-/// (`"%4i ", image->wrapClampMode`) for every mode, not just unrecognized
-/// ones, until the three named constants land.
 ///
 /// Source: oracle/codemp/renderer/tr_image.cpp:235-312
 pub fn R_ImageList_f(view: &mut EngineHostView, assets: &RenderAssets) {
@@ -1030,14 +1074,12 @@ pub fn R_ImageList_f(view: &mut EngineHostView, assets: &RenderAssets) {
             _ => com_printf(view.common, "???? "),
         }
 
-        //TODO: Port GL_REPEAT
-        //TODO: Port GL_CLAMP
-        //TODO: Port GL_CLAMP_TO_EDGE
-        // Source: oracle/codemp/renderer/tr_image.cpp:289-302 (wrap-mode GL
-        // enum values not resolvable without oracle access; wave law forbids
-        // guessing numeric constants — falls through to the default-case
-        // numeric format for every mode)
-        com_printf(view.common, &format!("{:4} ", image.wrap_clamp_mode));
+        match image.wrap_clamp_mode {
+            GL_REPEAT => com_printf(view.common, "rept "),
+            GL_CLAMP => com_printf(view.common, "clmp "),
+            GL_CLAMP_TO_EDGE => com_printf(view.common, "clpE "),
+            _ => com_printf(view.common, &format!("{:4} ", image.wrap_clamp_mode)),
+        }
 
         com_printf(view.common, &format!("{}\n", image.img_name));
         i += 1;
@@ -1385,23 +1427,19 @@ fn com_default_extension(path: &str, extension: &str) -> String {
 
 /// Raven `R_LoadImage`.
 ///
-/// Out-params (`pic`/`width`/`height`) collapse to a return value (§C7).
-/// `*format` is unconditionally `GL_RGBA` on every reachable path (assigned
-/// once at entry, never reassigned) — its numeric value is not in this
-/// packet or the target file and is left out of the return rather than
-/// guessed (wave law: never guess a numeric constant); a reviewer restoring
-/// it needs only the one always-true assignment, not new control flow.
+/// Out-params (`pic`/`width`/`height`/`format`) collapse to a return value
+/// (§C7). `*format` is unconditionally `GL_RGBA` on every reachable path
+/// (assigned once at entry, never reassigned), so the returned tuple's fourth
+/// member is that constant on every `Some` arm.
 ///
 /// Source: oracle/codemp/renderer/tr_image.cpp:2228-2256
-pub fn R_LoadImage(view: &mut EngineHostView, shortname: &str) -> Option<(Vec<u8>, i32, i32)> {
-    //TODO: Port GL_RGBA
-    // Source: oracle/codemp/renderer/tr_image.cpp:2235 (`*format = GL_RGBA;`
-    // — value not in packet/target file, dropped from the return per the
-    // doc comment above)
+pub fn R_LoadImage(view: &mut EngineHostView, shortname: &str) -> Option<(Vec<u8>, i32, i32, i32)> {
+    // *format = GL_RGBA;
+    let format = GL_RGBA;
 
     let name = com_default_extension(&COM_StripExtension(shortname), ".jpg");
-    if let Some(result) = LoadJPG(view, &name) {
-        return Some(result);
+    if let Some((pic, width, height)) = LoadJPG(view, &name) {
+        return Some((pic, width, height, format));
     }
 
     // DEFERRED: `LoadPNG32` — vendored libpng, no Rust-crate seam wired in
@@ -1414,8 +1452,8 @@ pub fn R_LoadImage(view: &mut EngineHostView, shortname: &str) -> Option<(Vec<u8
     let _name_png = com_default_extension(&COM_StripExtension(shortname), ".png");
 
     let name = com_default_extension(&COM_StripExtension(shortname), ".tga");
-    if let Some(result) = LoadTGA(view, &name) {
-        return Some(result);
+    if let Some((pic, width, height)) = LoadTGA(view, &name) {
+        return Some((pic, width, height, format));
     }
 
     None
@@ -1560,25 +1598,16 @@ pub fn R_Resample(
 
 /// Raven `Upload32`.
 ///
-/// ESCALATION: the entire function body lives inside `if (format == GL_RGBA)`
-/// (the oracle's `else` arm is empty — `tr_image.cpp:764-766`) — `GL_RGBA`'s
-/// numeric value is not in this packet or the target file. This exact
-/// constant is already marked the same way at this file's `R_LoadImage`
-/// (wave 0, `//TODO: Port GL_RGBA`); reused here rather than guessing a
-/// second, possibly-inconsistent value. Nothing past that first comparison
-/// is separable from it, so this is `todo!()`'d at the exact blocking point,
-/// matching the `GL_TextureMode` precedent directly above (wave 1, same
-/// file: "transcribe everything computable, `todo!()` at the exact blocking
-/// point"). Once `GL_RGBA` lands, the body also needs: `TrImageState`
-/// extended with the `mipBlendColors[16][4]` blend table (STATE HOMES row
-/// "NAMED BY THIS WAVE", DEC-37 A13.3 — not added here since nothing
-/// consumes it while the function stays blocked, porting-rules §A2 no
-/// speculative behavior); `RenderAssets::glconfig.max_texture_size`/
-/// `.texture_compression` (already landed fields, `R_BytesPerTex`/
-/// `tr_init.rs` precedent) for the picmip-clamp and format-select logic; and
-/// the R4 `qglTexImage2D`/`qglTexParameterf` GL entry points (DEC-37 A13.2,
-/// unhomed) for the upload/mipmap-refresh calls this fn's own threading
-/// digest already flags DEFERRED.
+/// ESCALATION: the whole body (the oracle's `if (format == GL_RGBA)` arm; its
+/// `else` is empty, `tr_image.cpp:764-766`) is a later wave's work — the
+/// `format` comparison itself is now resolvable (`GL_RGBA` landed in
+/// `crate::gl_constants`), but the body still needs `TrImageState` extended
+/// with the `mipBlendColors[16][4]` blend table (STATE HOMES row "NAMED BY
+/// THIS WAVE", DEC-37 A13.3 — not added while nothing consumes it,
+/// porting-rules §A2 no speculative behavior) and the R4
+/// `qglTexImage2D`/`qglTexParameterf` GL entry points (DEC-37 A13.2, unhomed)
+/// for the upload/mipmap-refresh calls this fn's own threading digest already
+/// flags DEFERRED.
 ///
 /// Source: oracle/codemp/renderer/tr_image.cpp:584-786
 pub fn Upload32(
@@ -1598,13 +1627,11 @@ pub fn Upload32(
     _b_rectangle: bool,
 ) -> (i32, u16, u16) {
     let _ = format;
-    //TODO: Port GL_RGBA
-    // Source: oracle/codemp/renderer/tr_image.cpp:599 (`if (format == GL_RGBA)`
-    // — GL_RGBA's numeric value is not in this packet or the target file; see
-    // the doc comment above)
-    todo!(
-        "Port Upload32 — blocked on unresolved GL_RGBA format constant, oracle/codemp/renderer/tr_image.cpp:584-786"
-    )
+    //TODO: Port Upload32
+    // Source: oracle/codemp/renderer/tr_image.cpp:584-786 (blocked on the
+    // `mipBlendColors[16][4]` table's state home and the R4 GL upload
+    // surface; see the doc comment above)
+    todo!("Port Upload32 — oracle/codemp/renderer/tr_image.cpp:584-786")
 }
 
 /// Raven `R_Images_DeleteLightMaps`.
@@ -1747,21 +1774,13 @@ pub fn R_DeleteTextures(
 /// contract (`Z_Malloc` panics rather than returning NULL on OOM, oracle-side
 /// only).
 ///
-/// Two named constants block real CPU logic and are DEFERRED rather than
-/// guessed (never-guess rule): `GL_CLAMP`/`GL_CLAMP_TO_EDGE` gate the
-/// `glWrapClampMode` clamp-to-edge substitution at `:1214-1216` and again
-/// (GL-call-only, see below) at `:1264`. Both are absent from this packet's
-/// FILE-SCOPE CONSTANTS section and this fn's own oracle slice, and are the
-/// same unresolved wrap-mode family `GL_TextureMode`/`R_ImageList_f` (wave 1,
-/// same file) already flagged as unresolvable — `gl_wrap_clamp_mode` is
-/// threaded through unmodified rather than fabricating either enum value.
-/// `glConfig.clampToEdgeAvailable` — the substitution's other conjunct at
-/// `:1214` — is a co-blocker in its own right: it has no R3 home (`glConfig`
-/// is R4 GL-capability state, STATE HOMES table), so even with both enum
-/// values in hand the `if` could not be evaluated.
-/// This propagates to both the `R_FindImageFile_NoLoad` lookup key/warn
-/// comparisons below and the final stored `ImageAsset::wrap_clamp_mode`
-/// field — the oracle would apply the substitution before both uses.
+/// The `glWrapClampMode == GL_CLAMP -> GL_CLAMP_TO_EDGE` substitution at
+/// `:1214-1216` is applied: `GL_CLAMP`/`GL_CLAMP_TO_EDGE` now live in
+/// `crate::gl_constants` and `glConfig.clampToEdgeAvailable` is the landed
+/// `RenderAssets::glconfig.clamp_to_edge_available` field, so both former
+/// blockers are closed. The substituted mode feeds the
+/// `R_FindImageFile_NoLoad` lookup below and the stored
+/// `ImageAsset::wrap_clamp_mode`, matching the oracle's ordering.
 ///
 /// The entire `qglActiveTextureARB`-gated `GL_SelectTexture`/`GL_Bind`/
 /// `bRectangle` GL-target-selection block (`:1254-1270`) is DEFERRED: R4 —
@@ -1801,9 +1820,10 @@ pub fn R_CreateImage(
         );
     }
 
-    // DEFERRED: `glWrapClampMode == GL_CLAMP -> GL_CLAMP_TO_EDGE`
-    // substitution not applied — see the doc comment above.
-    // Source: oracle/codemp/renderer/tr_image.cpp:1214-1216
+    let mut gl_wrap_clamp_mode = gl_wrap_clamp_mode;
+    if sim.published.glconfig.clamp_to_edge_available && gl_wrap_clamp_mode == GL_CLAMP {
+        gl_wrap_clamp_mode = GL_CLAMP_TO_EDGE;
+    }
 
     // Raven: only images whose name starts with '*' and whose last path
     // component is "lightmapNNN" are lightmaps.
@@ -1922,4 +1942,356 @@ pub fn R_CreateImage(
     // Source: oracle/codemp/renderer/tr_image.cpp:1291-1295
 
     handle
+}
+
+// ============================================================================
+// wave 4
+// ============================================================================
+
+/// Raven `R_CreateAutomapImage` (rwwRMG).
+///
+/// `bRectangle` (`R_CreateImage`'s trailing Rust param) is not in the oracle
+/// call — a C++ default-parameter argument, `false`, matching the oracle's
+/// omission.
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:1301-1305
+pub fn R_CreateAutomapImage(
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    name: &str,
+    pic: &[u8],
+    width: i32,
+    height: i32,
+    mipmap: bool,
+    allow_picmip: bool,
+    allow_tc: bool,
+    gl_wrap_clamp_mode: i32,
+) {
+    R_CreateImage(
+        view,
+        cvars,
+        sim,
+        models,
+        state,
+        gpu,
+        name,
+        pic,
+        width,
+        height,
+        GL_RGBA,
+        mipmap,
+        allow_picmip,
+        allow_tc,
+        gl_wrap_clamp_mode,
+        false,
+    );
+}
+
+/// Raven `R_FindImageFile`.
+///
+/// `const char *name`'s NULL check becomes `Option<&str>` (idiomatic
+/// nullable-pointer translation, matching `R_FindImageFile_NoLoad`'s
+/// identical treatment, wave 1, same file). `com_dedicated->integer` resolves
+/// to `view.common.cvar(view.common.com_dedicated).integer` — the accessor
+/// this packet's STATE HOMES table left as "confirm the exact receiver at
+/// port time"; `Common::com_dedicated: Option<CvarHandle>` plus `Common::
+/// cvar` is the established live-read pattern used throughout the engine
+/// crates (`crates/mp/engine/server/src/sv_main.rs` and others). `glConfig
+/// .clampToEdgeAvailable` resolves to the landed `RenderAssets::glconfig
+/// .clamp_to_edge_available` field (`R2` STATE OWNERSHIP `glConfig` row); the
+/// clamp-to-edge substitution it guards is applied here as well as inside
+/// `R_CreateImage`, exactly as Raven's own comment demands ("need to do this
+/// here as well as in R_CreateImage, or R_FindImageFile_NoLoad() may complain
+/// about different clamp parms used...").
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:2532-2577
+pub fn R_FindImageFile(
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    name: Option<&str>,
+    mipmap: bool,
+    allow_picmip: bool,
+    allow_tc: bool,
+    gl_wrap_clamp_mode: i32,
+) -> Option<ImageHandle> {
+    let name = name?;
+
+    if view.common.cvar(view.common.com_dedicated).integer != 0 {
+        // stop ghoul2 horribleness as regards image loading from server
+        return None;
+    }
+
+    // need to do this here as well as in R_CreateImage, or
+    // R_FindImageFile_NoLoad() may complain about different clamp parms
+    // used...
+    let mut gl_wrap_clamp_mode = gl_wrap_clamp_mode;
+    if sim.published.glconfig.clamp_to_edge_available && gl_wrap_clamp_mode == GL_CLAMP {
+        gl_wrap_clamp_mode = GL_CLAMP_TO_EDGE;
+    }
+
+    if let Some(handle) = R_FindImageFile_NoLoad(
+        sim,
+        view,
+        models,
+        Some(name),
+        mipmap,
+        allow_picmip,
+        gl_wrap_clamp_mode,
+    ) {
+        return Some(handle);
+    }
+
+    // load the pic from disk
+    let (pic, width, height, format) = R_LoadImage(view, name)?;
+
+    // refuse to find any files not power of 2 dims...
+    if (width & (width - 1)) != 0 || (height & (height - 1)) != 0 {
+        com_printf(
+            view.common,
+            &format!(
+                "Refusing to load non-power-2-dims({},{}) pic \"{}\"...\n",
+                width, height, name
+            ),
+        );
+        return None;
+    }
+
+    let image = R_CreateImage(
+        view,
+        cvars,
+        sim,
+        models,
+        state,
+        gpu,
+        name,
+        &pic,
+        width,
+        height,
+        format,
+        mipmap,
+        allow_picmip,
+        allow_tc,
+        gl_wrap_clamp_mode,
+        false,
+    );
+
+    // `Z_Free(pic)` — no explicit free needed; `pic: Vec<u8>` is owned and
+    // drops on its own (porting-rules §C9).
+    Some(image)
+}
+
+/// Raven file-scope `#define DLIGHT_SIZE 16` (`R_CreateDlightImage`'s
+/// fallback-blob dimension). FILE-SCOPE CONSTANT, in-packet.
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:2585
+const DLIGHT_SIZE: usize = 16;
+
+/// Raven `R_CreateDlightImage`.
+///
+/// `R_LoadImage`'s `pic` out-param becomes the `Option` returned by the
+/// already-ported `R_LoadImage` (wave 1, this file) — the oracle's
+/// `if (pic) { … } else { … }` becomes the `Some`/`None` match. The fallback
+/// blob's `4000 / d` is `float / float` promoted from the `int` literal,
+/// truncated on assignment to the `int b` lvalue (matching C's implicit
+/// float->int conversion, not a rounding cast).
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:2586-2625
+pub fn R_CreateDlightImage(
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    state: &mut TrImageState,
+    gpu: &mut GpuResources,
+) {
+    if let Some((pic, width, height, _format)) = R_LoadImage(view, "gfx/2d/dlight") {
+        let handle = R_CreateImage(
+            view, cvars, sim, models, state, gpu, "*dlight", &pic, width, height, GL_RGBA, false,
+            false, false, GL_CLAMP, false,
+        );
+        Arc::make_mut(&mut sim.published).dlight_image = Some(handle);
+        // `Z_Free(pic)` — `pic: Vec<u8>` is owned and drops on its own
+        // (porting-rules §C9).
+    } else {
+        // if we dont get a successful load
+        //
+        // make a centered inverse-square falloff blob for dynamic lighting
+        let half = (DLIGHT_SIZE / 2) as f32;
+        let mut data = [[[0u8; 4]; DLIGHT_SIZE]; DLIGHT_SIZE];
+        for x in 0..DLIGHT_SIZE {
+            for y in 0..DLIGHT_SIZE {
+                let dx = half - 0.5 - x as f32;
+                let dy = half - 0.5 - y as f32;
+                let d = dx * dx + dy * dy;
+
+                let mut b = (4000.0f32 / d) as i32;
+                if b > 255 {
+                    b = 255;
+                } else if b < 75 {
+                    b = 0;
+                }
+                data[y][x][0] = b as u8;
+                data[y][x][1] = b as u8;
+                data[y][x][2] = b as u8;
+                data[y][x][3] = 255;
+            }
+        }
+
+        // `(byte *)data` — the raw reinterpret of the `[y][x][c]` array to a
+        // flat byte run becomes an owned flatten (interior-safety law forbids
+        // the cast); row-major order is identical.
+        let flat: Vec<u8> = data.iter().flatten().flatten().copied().collect();
+        let handle = R_CreateImage(
+            view,
+            cvars,
+            sim,
+            models,
+            state,
+            gpu,
+            "*dlight",
+            &flat,
+            DLIGHT_SIZE as i32,
+            DLIGHT_SIZE as i32,
+            GL_RGBA,
+            false,
+            false,
+            false,
+            GL_CLAMP,
+            false,
+        );
+        Arc::make_mut(&mut sim.published).dlight_image = Some(handle);
+    }
+}
+
+/// Raven file-scope `#define FOG_S 256` / `#define FOG_T 32`
+/// (`R_CreateFogImage`'s lookup-texture dimensions). FILE-SCOPE CONSTANTS,
+/// in-packet.
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:2687-2688
+const FOG_S: i32 = 256;
+const FOG_T: i32 = 32;
+
+/// Raven `R_CreateFogImage`.
+///
+/// Raven's `Hunk_AllocateTempMemory`/`Hunk_FreeTempMemory` scratch pair
+/// becomes an owned local `Vec` (porting-rules §C9), matching `R_MipMap2`'s
+/// identical precedent in this same file. The dead local `float g = 2.0;`
+/// (assigned, never read again in the oracle body) is dropped rather than
+/// transcribed, matching this file's established dead-read-skip convention
+/// (`LoadTGAPalletteImage`).
+///
+/// DEFERRED: R4 — the trailing `qglTexParameterfv(GL_TEXTURE_2D,
+/// GL_TEXTURE_BORDER_COLOR, borderColor)` call (and with it the
+/// `borderColor[4]` local it is the only consumer of) is a pure GL entry
+/// point (DEC-37 A13.2, R2's own STATE HOMES row for this fn: "GL entry
+/// points called: `qglTexParameterfv`… R2 leaves these entry points
+/// unhomed").
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:2689-2723
+pub fn R_CreateFogImage(
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    state: &mut TrImageState,
+    gpu: &mut GpuResources,
+) {
+    // S is distance, T is depth
+    let mut data = vec![0u8; (FOG_S * FOG_T * 4).max(0) as usize];
+    for x in 0..FOG_S {
+        for y in 0..FOG_T {
+            let d = R_FogFactor(
+                &sim.published,
+                (x as f32 + 0.5) / FOG_S as f32,
+                (y as f32 + 0.5) / FOG_T as f32,
+            );
+
+            let idx = ((y * FOG_S + x) * 4) as usize;
+            data[idx] = 255;
+            data[idx + 1] = 255;
+            data[idx + 2] = 255;
+            data[idx + 3] = (255.0 * d) as u8;
+        }
+    }
+
+    // standard openGL clamping doesn't really do what we want -- it includes
+    // the border color at the edges.  OpenGL 1.2 has clamp-to-edge, which
+    // does what we want.
+    let handle = R_CreateImage(
+        view, cvars, sim, models, state, gpu, "*fog", &data, FOG_S, FOG_T, GL_RGBA, false, false,
+        false, GL_CLAMP, false,
+    );
+    Arc::make_mut(&mut sim.published).fog_image = Some(handle);
+
+    // DEFERRED: R4 — `borderColor[4] = {1,1,1,1}` +
+    // `qglTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR,
+    // borderColor)`; see the doc comment above.
+    // Source: oracle/codemp/renderer/tr_image.cpp:2717-2722
+}
+
+/// Raven file-scope `#define DEFAULT_SIZE 16` (`R_CreateDefaultImage`'s
+/// texture dimension). FILE-SCOPE CONSTANT, in-packet.
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:2730
+const DEFAULT_SIZE: usize = 16;
+
+/// Raven `R_CreateDefaultImage`.
+///
+/// `Com_Memset( data, 32, sizeof( data ) )`'s raw-pointer signature is
+/// tier-1-only (interior-safety law) — replaced by an array literal
+/// zero-fill-with-32, matching `tr_sky.rs`'s `DrawSkyBox`/`Com_Memset`
+/// precedent ("the already-ported `Com_Memset(dest: *mut (), ...)` cannot be
+/// called here").
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:2731-2759
+pub fn R_CreateDefaultImage(
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    state: &mut TrImageState,
+    gpu: &mut GpuResources,
+) {
+    // the default image will be a box, to allow you to see the mapping
+    // coordinates
+    let mut data = [[[32u8; 4]; DEFAULT_SIZE]; DEFAULT_SIZE];
+    for x in 0..DEFAULT_SIZE {
+        for c in 0..4usize {
+            data[0][x][c] = 255;
+            data[x][0][c] = 255;
+            data[DEFAULT_SIZE - 1][x][c] = 255;
+            data[x][DEFAULT_SIZE - 1][c] = 255;
+        }
+    }
+
+    // `(byte *)data` — flattened rather than reinterpret-cast (interior-safety
+    // law); row-major order is identical.
+    let flat: Vec<u8> = data.iter().flatten().flatten().copied().collect();
+    let handle = R_CreateImage(
+        view,
+        cvars,
+        sim,
+        models,
+        state,
+        gpu,
+        "*default",
+        &flat,
+        DEFAULT_SIZE as i32,
+        DEFAULT_SIZE as i32,
+        GL_RGBA,
+        true,
+        false,
+        false,
+        GL_REPEAT,
+        false,
+    );
+    Arc::make_mut(&mut sim.published).default_image = Some(handle);
 }

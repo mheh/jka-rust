@@ -14,6 +14,7 @@ use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
+use crate::render_state::shader_stage::ShaderStage;
 use crate::tr_local::gl_index_t::glIndex_t;
 use crate::tr_shader::TextureBundleParse;
 
@@ -203,8 +204,8 @@ pub fn R_DrawElements(_gpu: &mut GpuResources, _cvars: &RendererCvars, _indexes:
 /// - the fullbright/lightmap fast path needs a live `r_fullbright->value`
 ///   read (`RendererCvars` holds only `Option<CvarHandle>` — the cvar-value
 ///   -read seam isn't wired yet, same reason as `RB_DrawBuffer`'s `r_clear`
-///   dependency, DEC-37 A13.1) and `tr.whiteImage`, which has no
-///   `RenderAssets` field landed by any prior wave;
+///   dependency, DEC-37 A13.1); `tr.whiteImage` is homed
+///   (`RenderAssets::white_image`) but only feeds the deferred `GL_Bind`;
 /// - the single-frame path (`bundle->numImageAnimations <= 1`) is reachable
 ///   only once the fullbright branch above is known not to have returned,
 ///   so it inherits that same block;
@@ -447,4 +448,51 @@ pub fn RB_FogPass(_gpu: &mut GpuResources) {
 /// Source: `oracle/codemp/renderer/tr_shade.cpp:2391-2474`
 pub fn RB_EndSurface(_gpu: &mut GpuResources) {
     todo!("Port RB_EndSurface — oracle/codemp/renderer/tr_shade.cpp:2391-2474")
+}
+
+/// Raven `ComputeTexCoords` — for one shader stage, generates the base
+/// texture coordinates for each of `NUM_TEXTURE_BUNDLES` bundles
+/// (`TCGEN_IDENTITY`/`TEXTURE`/`LIGHTMAP`.../`VECTOR`/`FOG`/
+/// `ENVIRONMENT_MAPPED`), then walks that bundle's `texMods` list applying
+/// the `TMOD_*` coordinate modifiers (turbulent/scroll/scale/stretch/
+/// transform/rotate/entity-translate) in sequence. Oracle's signature takes
+/// only `shaderStage_t *pStage` — no `frame`/`tess` argument — so this fn's
+/// parameter is `_stage: &ShaderStage`, not `FrameState`.
+///
+/// DEFERRED: R4 — every input and the sole output are unavailable at this R3
+/// wave: the write target `tess.svars.texcoords[b]` and the read sources
+/// `tess.numVertexes`/`.texCoords`/`.xyz` are the dissolved `tess` (R2 `##
+/// State ownership` row `tess`, no R3 carrier ever — including the loop
+/// bound, so no `TCGEN_*`/`TMOD_*` case is even reachable without it); the
+/// error-path read `tess.shader->name` is the same dissolved receiver.
+/// `pStage->bundle[b]` (`tcGen`/`tcGenVectors`/`numTexMods`/`texMods`) needs
+/// per-bundle fields `ShaderStage` doesn't carry — only `image`/`state_bits`/
+/// `active` are real (`render_state::shader_stage`'s own doc comment: "The
+/// remaining `shaderStage_t` fields (`bundle[1]`, ... `index`,
+/// `lightmapStyle`, `isDetail`) have no reader yet"; `bundle[0]`'s own
+/// `tcGen`/`tcGenVectors`/`texMods` aren't among the landed fields either).
+/// The `TMOD_ENTITY_TRANSLATE` leg additionally needs
+/// `backEnd.currentEntity->e.shaderTexCoord`, a `RefEntity` field no prior
+/// wave landed (`render_state::placeholders::RefEntity`'s doc comment: real
+/// fields land "field-by-field as call sites need them" — `shaderTexCoord`
+/// is not among them, and this file may not add one out of the wave that
+/// actually reads it downstream). No computation survives once every input
+/// above is removed — this includes the entire per-bundle `TCGEN_*`
+/// dispatch and the `TMOD_*` modifier loop, since their sole inputs are the
+/// dissolved `tess` and the un-landed `pStage`/`backEnd.currentEntity`
+/// fields; the wave-0..3 in-module callees this fn would otherwise call
+/// (`RB_CalcEnvironmentTexCoords`/`RB_CalcFogTexCoords`/
+/// `RB_CalcRotateTexCoords`/`RB_CalcScaleTexCoords`/`RB_CalcScrollTexCoords`/
+/// `RB_CalcStretchTexCoords`/`RB_CalcTransformTexCoords`/
+/// `RB_CalcTurbulentTexCoords`) all take the same dissolved `tess.xyz`/
+/// `tess.svars.texcoords[b]` buffers as their `st`/`xyz` arguments, so none
+/// has a value to call with here.
+///
+/// Whole-body deferral: no partial body survives, so this lands as a loud
+/// `todo!()` rather than a silent no-op (whole-fn-deferral convention —
+/// partial-body fns keep DEFERRED comments instead).
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:1809-1927`
+pub fn ComputeTexCoords(_stage: &ShaderStage) {
+    todo!("Port ComputeTexCoords — oracle/codemp/renderer/tr_shade.cpp:1809-1927")
 }

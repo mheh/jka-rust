@@ -24,6 +24,7 @@ use crate::render_state::placeholders::RefEntity;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_local::orientationr_t::orientationr_t;
 use crate::tr_local::srf_display_list_s::srfDisplayList_t;
+use crate::tr_local::srf_grid_mesh_s::srfGridMesh_t;
 use crate::tr_local::surface_type_t::surfaceType_t;
 use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_main::{R_TransformClipToWindow, R_TransformModelToClip};
@@ -388,4 +389,70 @@ pub fn RB_TestZFlare(
         / ((2.0 * depth - 1.0) * view.projectionMatrix[11] - view.projectionMatrix[10]);
 
     (-eye[2] - -screen_z) < 24.0
+}
+
+/// Raven `RB_CheckOverflow` — flushes the current tessellation buffer
+/// (`RB_EndSurface`/`RB_BeginSurface`) if adding `verts` more vertexes /
+/// `indexes` more indexes would overflow `SHADER_MAX_VERTEXES`/
+/// `SHADER_MAX_INDEXES` (half the vertex budget when the current shader is
+/// `tr.shadowShader`), then `Com_Error(ERR_DROP, ...)`s if the request alone
+/// can never fit even a fresh buffer.
+///
+/// DEFERRED: R4 — every read/write target is `tess`
+/// (`shaderCommands_t`: `.shader`, `.numVertexes`, `.numIndexes`), which
+/// dissolves entirely into R4's tessellation/vertex-building pipeline with no
+/// replacement scratch carrier at R3 (packet STATE HOMES row `RB_CheckOverflow`
+/// / `tess`; R2 `## State ownership` row `tess`). `tr.shadowShader` (the
+/// other read) is the packet's `tr` SPLIT row's shadow-shader field, but
+/// comparing it against `tess.shader` is meaningless without `tess` itself.
+/// The two in-module callees this fn guards with (`RB_EndSurface`,
+/// `RB_BeginSurface`) are themselves still `todo!()`/DEFERRED tess-dependent
+/// stubs (`tr_shade.rs:156-159,448-450`) — no partial CPU logic survives
+/// dropping `tess`.
+///
+/// Whole-body deferral: no partial body survives, so this lands as a loud
+/// `todo!()` rather than a silent no-op (whole-fn-deferral convention —
+/// partial-body fns keep DEFERRED comments instead).
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:30-52`
+pub fn RB_CheckOverflow(verts: i32, indexes: i32, frame: &mut FrameState) {
+    let _ = (verts, indexes, frame);
+    todo!("Port RB_CheckOverflow — oracle/codemp/renderer/tr_surface.cpp:30-52")
+}
+
+/// Raven `RB_SurfaceGrid` — tessellates a bezier-patch grid surface (`cv`)
+/// into the tessellation buffer at the current LOD, splitting the LOD'd
+/// width/height point sets into vertex/index strips and issuing multiple
+/// `RB_EndSurface`/`RB_BeginSurface` flush passes if a single pass would
+/// overflow the buffer.
+///
+/// DEFERRED: R4/escalation — every write target is `tess`
+/// (`shaderCommands_t`: `.xyz`, `.normal`, `.texCoords`, `.vertexColors`,
+/// `.vertexDlightBits`, `.dlightBits`, `.indexes`, `.numVertexes`,
+/// `.numIndexes`), which dissolves entirely into R4's tessellation/
+/// vertex-building pipeline with no replacement scratch carrier at R3
+/// (packet STATE HOMES row `RB_SurfaceGrid` / `tess`; R2 `## State ownership`
+/// row `tess`). Even the read side is blocked independently: `cv`'s
+/// `widthLodError`/`heightLodError`/`verts` fields are raw pointers on the
+/// tier-2 `srfGridMesh_t` (`tr_local/srf_grid_mesh_s.rs`) with no quarantine
+/// accessor in this wave's licensed list (`SurfaceRef`/`surface_kind`,
+/// `srf_surface_face_t` point/indices, `bmodel_t::surfaces`, `model_s::
+/// bmodel`, `srf_terrain_s::landscape`, `ctrland_scape` accessors,
+/// `mdxm_view_of`) — dereferencing them here would be new unsafe, banned by
+/// this wave's law. The two in-module callees this fn flushes through
+/// (`RB_EndSurface`, `RB_BeginSurface`) are themselves still `todo!()`/
+/// DEFERRED tess-dependent stubs (`tr_shade.rs:156-159,448-450`); the other
+/// two callees (`ComputeFinalVertexColor`, `LodErrorForVolume`) are
+/// themselves `todo!()` stubs in this same file pending the same `tess`/
+/// `FrameState::ori`/`::view` gaps. No partial CPU logic survives dropping
+/// both the write target and the read source.
+///
+/// Whole-body deferral: no partial body survives, so this lands as a loud
+/// `todo!()` rather than a silent no-op (whole-fn-deferral convention —
+/// partial-body fns keep DEFERRED comments instead).
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:1572-1764`
+pub fn RB_SurfaceGrid(cv: &srfGridMesh_t, frame: &mut FrameState) {
+    let _ = (cv, frame);
+    todo!("Port RB_SurfaceGrid — oracle/codemp/renderer/tr_surface.cpp:1572-1764")
 }

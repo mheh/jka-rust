@@ -38,7 +38,8 @@ use crate::tr_local::srf_grid_mesh_s::srfGridMesh_t;
 use crate::tr_local::srf_surface_face_t::srfSurfaceFace_t;
 use crate::tr_local::srf_triangles_t::srfTriangles_t;
 use crate::tr_main::{
-    R_CullLocalBox, R_CullLocalPointAndRadius, R_CullPointAndRadius, CULL_CLIP, CULL_IN, CULL_OUT,
+    DrawSurf, R_AddDrawSurf, R_CullLocalBox, R_CullLocalPointAndRadius, R_CullPointAndRadius,
+    CULL_CLIP, CULL_IN, CULL_OUT,
 };
 use crate::tr_model::render_models::RenderModels;
 
@@ -1222,3 +1223,196 @@ pub fn R_CullSurface(
 // already exists) is not worth transcribing in isolation from the loop and
 // recursive walk it exists to set up for.
 // Source: oracle/codemp/renderer/tr_world.cpp:1039-1064
+
+// ===== wave 4 =====
+
+/// Raven `QSORT_ENTITYNUM_SHIFT` — restated from `tr_main.rs`'s own local
+/// `const` (not `pub` there, so not reachable from this file); same value,
+/// same rationale as `tr_scene.rs`'s own restatement of it.
+///
+/// Source: `oracle/codemp/renderer/tr_local.h:1226-1228`
+const QSORT_ENTITYNUM_SHIFT: u32 = 7;
+
+/// Raven `R_AddWorldSurface`.
+///
+/// STATE HOMES: `tr.viewCount` -> `view_count` (`FrameState::view_count`,
+/// SPLIT `RenderAssets`/`FrameState`, R2 `## State ownership`); `tr.ori`/
+/// `frustum`/the `r_*_integer` cvars/the `c_*_cull_patch_*` counters are the
+/// same `RendererCvars`/`FrameState` carriers `R_CullSurface` already
+/// threads (this fn is its caller, so it threads the identical set further
+/// up rather than re-deriving them — porting-rules §4). `shader` is threaded
+/// in explicitly rather than dereferenced from `surf->shader` (a raw
+/// `*mut shader_s` tier-2 field with no quarantine accessor — interior-
+/// safety law): `R_CullSurface`'s own already-ported signature establishes
+/// this same convention (`surf`/`shader` as two separate params), so the
+/// caller supplying both is the settled shape, not a new one. `dlightBits`
+/// out-param-by-return stays a `mut` parameter per this file's own
+/// `R_DlightFace`/`R_DlightGrid` precedent. `current_entity_num` (`tr.
+/// currentEntityNum`) is threaded in rather than hardcoded to `TR_WORLDENT`
+/// (unlike `tr_scene.rs`'s `R_AddPolygonSurfaces`): the oracle's caller for
+/// this fn is not in this wave's packet and Raven's `R_AddWorldSurface` also
+/// backs inline-brush-model surface addition (non-world entities), so a
+/// fixed world-entity value would be speculative (porting-rules §A2 — no
+/// guessing); `shifted_entity_num` is derived from it the same way
+/// `R_AddPolygonSurfaces` derives its own. `rdf_nofog` (`tr.refdef.rdflags &
+/// RDF_NOFOG`) is threaded in for the same reason — `TrRefdef` has no
+/// `rdflags` field yet (same gap `tr_scene.rs`'s `R_AddPolygonSurfaces`
+/// already flags), so the caller supplies the resolved bool.
+///
+/// PORT-NOTE: the oracle's `#ifdef _ALT_AUTOMAP_METHOD` branch (an alternate
+/// immediate-mode-GL automap render path) is dropped as dead surface
+/// (porting-rules §20) — no `#define _ALT_AUTOMAP_METHOD` exists anywhere in
+/// the tree, and every other automap fn in this file
+/// (`R_DrawWireframeAutomap`, `R_EvaluateWireframeSurf`) already lives under
+/// the matching `#ifndef` arm. Only the compiled `#else` path (the plain
+/// `R_AddDrawSurf` call) is transcribed. `surf.data`'s tagged-union pointer
+/// is read through the existing `msurface_t::surface_kind`/`surface_kind_mut`
+/// quarantine accessors (§D11) and passed straight through as the
+/// `R_AddDrawSurf` generic's `SurfaceRef<'a>` payload — `SurfaceGeometry`
+/// (this file's siblings' `S` choice) has no `Grid` variant, so `SurfaceRef`
+/// (already covering Face/Grid/Triangles/Other) is the correct instantiation
+/// for a world surface.
+///
+/// Source: `oracle/codemp/renderer/tr_world.cpp:408-555`
+#[allow(clippy::too_many_arguments)]
+pub fn R_AddWorldSurface<'a>(
+    surf: &'a mut msurface_t,
+    mut dlight_bits: i32,
+    no_view_count: bool,
+    view_count: i32,
+    shader: &shader_t,
+    current_entity_num: i32,
+    r_nocull_integer: i32,
+    r_nocurves_integer: i32,
+    r_face_plane_cull_integer: i32,
+    r_cull_roof_faces_integer: i32,
+    r_roof_cull_ceil_dist_value: f32,
+    rdf_nofog: bool,
+    view: &mut EngineHostView<'_>,
+    ori: &orientationr_t,
+    frustum: &[cplane_t; 4],
+    c_sphere_cull_patch_out: &mut i32,
+    c_sphere_cull_patch_clip: &mut i32,
+    c_sphere_cull_patch_in: &mut i32,
+    c_box_cull_patch_out: &mut i32,
+    c_box_cull_patch_in: &mut i32,
+    c_box_cull_patch_clip: &mut i32,
+    dlights: &[dlight_t],
+    dlight_surfaces_culled: &mut u32,
+    dlight_surfaces: &mut u32,
+    draw_surfs: &mut Vec<DrawSurf<SurfaceRef<'a>>>,
+) {
+    if !no_view_count {
+        if surf.viewCount == view_count {
+            // already in this view, but lets make sure all the dlight bits are set
+            match surf.surface_kind_mut() {
+                SurfaceRefMut::Face(face) => face.dlightBits |= dlight_bits,
+                SurfaceRefMut::Grid(grid) => grid.dlightBits |= dlight_bits,
+                SurfaceRefMut::Triangles(tris) => tris.dlightBits |= dlight_bits,
+                SurfaceRefMut::Other => {}
+            }
+            return;
+        }
+        surf.viewCount = view_count;
+        // FIXME: bmodel fog?
+    }
+
+    // try to cull before dlighting or adding
+    if R_CullSurface(
+        surf,
+        shader,
+        view,
+        ori,
+        frustum,
+        current_entity_num,
+        r_nocull_integer,
+        r_nocurves_integer,
+        r_face_plane_cull_integer,
+        r_cull_roof_faces_integer,
+        r_roof_cull_ceil_dist_value,
+        c_sphere_cull_patch_out,
+        c_sphere_cull_patch_clip,
+        c_sphere_cull_patch_in,
+        c_box_cull_patch_out,
+        c_box_cull_patch_in,
+        c_box_cull_patch_clip,
+    ) {
+        return;
+    }
+
+    // check for dlighting
+    if dlight_bits != 0 {
+        dlight_bits = R_DlightSurface(
+            surf,
+            dlight_bits,
+            dlights,
+            dlight_surfaces_culled,
+            dlight_surfaces,
+        );
+        dlight_bits = (dlight_bits != 0) as i32;
+    }
+
+    let fog_index = surf.fogIndex;
+    let shifted_entity_num = current_entity_num << QSORT_ENTITYNUM_SHIFT;
+    R_AddDrawSurf(
+        surf.surface_kind(),
+        shader.sortedIndex,
+        shifted_entity_num,
+        rdf_nofog,
+        fog_index,
+        dlight_bits,
+        draw_surfs,
+    );
+}
+
+/// Raven `R_InitializeWireframeAutomap`.
+///
+/// STATE HOMES: `r_autoMapDisable` -> `r_auto_map_disable_integer`
+/// (`RendererCvars`, resolved by the caller — same "cvar ints threaded in
+/// resolved, not reached for" convention `R_CullSurface` already
+/// established in this file for `r_nocull_integer` and friends; a `None`
+/// handle and a registered-but-zero cvar are observably identical for this
+/// guard, so the collapse loses nothing). `tr.world`/`tr.world->nodes` ->
+/// `assets.world`/`.nodes` (`RenderAssets`, SPLIT registries, R2 `## State
+/// ownership`). `g_autoMapValid` -> `automap.valid` (`WireframeAutomap`,
+/// already NAMED BY THIS FILE per DEC-37 A13.3, see the struct's own doc
+/// comment above) — the qboolean out-of-band return is this fn's own return
+/// value, matching the oracle's `return (qboolean)g_autoMapValid`.
+///
+/// DEFERRED: the `R_GenerateWireframeMap(tr.world->nodes)` call — that fn
+/// has no callable body in this file (see the `// DEFERRED: R_GenerateWireframeMap`
+/// note directly above), blocked on the identical `Node`/`WorldAsset`
+/// per-node-visframe gap. The oracle's own observable contract does not
+/// depend on what that call populates: `g_autoMapValid` is set whenever a
+/// world with nodes is present, independent of the generate step's success,
+/// so `automap.valid` is set here to match that contract exactly (no
+/// speculative behavior invented — porting-rules §A2); the wireframe surface
+/// list itself (`automap.surfs`) stays whatever `R_DestroyWireframeMap` just
+/// cleared it to until the blocking wave lands and this call slots in
+/// unchanged.
+/// Source: `oracle/codemp/renderer/tr_world.cpp:1039-1064` (R_GenerateWireframeMap)
+///
+/// Source: `oracle/codemp/renderer/tr_world.cpp:1205-1231`
+pub fn R_InitializeWireframeAutomap(
+    automap: &mut WireframeAutomap,
+    assets: &RenderAssets,
+    r_auto_map_disable_integer: i32,
+) -> bool {
+    if r_auto_map_disable_integer != 0 {
+        return false;
+    }
+
+    if let Some(world) = assets.world.as_ref() {
+        if !world.nodes.is_empty() {
+            R_DestroyWireframeMap(automap);
+
+            // DEFERRED: R_GenerateWireframeMap(tr.world->nodes) — see this
+            // fn's own doc comment above.
+            // Source: oracle/codemp/renderer/tr_world.cpp:1039-1064,1225
+
+            automap.valid = true;
+        }
+    }
+
+    automap.valid
+}

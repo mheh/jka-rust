@@ -2,6 +2,7 @@
 //TODO: Port renderer subsystem (rd-vanilla logic; types already ported)
 // Source: oracle/codemp/renderer/ (DEC-01: renderer port deferred)
 
+pub mod gl_constants;
 pub mod hook_install;
 pub mod mdx_format;
 pub mod render_state;

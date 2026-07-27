@@ -434,8 +434,7 @@ pub fn RE_ClearDecals(scene: &mut SceneState) {
 /// bit-7 start; DEC-37 ruling 1: the sort key is pure renderer interior, only
 /// its resulting relative order is observable) — not re-derived here.
 ///
-/// Source: `oracle/codemp/renderer/tr_local.h:130` (field comment:
-/// `currentEntityNum << QSORT_ENTITYNUM_SHIFT`)
+/// Source: `oracle/codemp/renderer/tr_local.h:1226-1228`
 const QSORT_ENTITYNUM_SHIFT: u32 = 7;
 
 /// Raven `R_AddPolygonSurfaces`.
