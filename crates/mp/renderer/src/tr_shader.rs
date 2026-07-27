@@ -30,9 +30,11 @@ use mp_qshared::shared::surface_flags::{
 use native_string::atof::atof;
 
 use crate::render_state::image_asset::ImageHandle;
+use crate::render_state::placeholders::SkyParms;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::shader_asset::{ShaderAsset, ShaderHandle};
 use crate::tr_local::shader_sort_t::shaderSort_t;
+use crate::tr_local::tex_mod_t::texMod_t;
 
 // PORT-NOTE: this wave is `tr_shader`'s first (wave 0) — the R3 wave the
 // tier-2 transition audit assigns `ShaderAsset`'s fields to
@@ -331,6 +333,13 @@ pub struct ShaderStageParse {
 /// dissolves entirely: `TextureBundleParse::tex_mods` is already its own
 /// owned `Vec`, so there is nothing left to point at.
 ///
+/// `default_shader`/`explicitly_defined`/`num_unfogged_passes`/`sky` mirror
+/// the same-named `ShaderAsset` fields (already real, landed wave-0) — the
+/// `shader_t` global's own copies of them. No wave-1 fn writes them (that is
+/// `ParseShader`'s job, unported); they stay at `ClearGlobalShader`'s
+/// zero-initialized default until that wave lands, exactly like every other
+/// unread `shader_t` field this scratch doesn't carry yet.
+///
 /// Source: `oracle/codemp/renderer/tr_shader.cpp` (`shader`, `stages`,
 /// `texMods`)
 #[derive(Default)]
@@ -342,6 +351,10 @@ pub struct ShaderParseState {
     pub surface_flags: i32,
     pub content_flags: i32,
     pub multitexture_env: i32,
+    pub default_shader: bool,
+    pub explicitly_defined: bool,
+    pub num_unfogged_passes: i32,
+    pub sky: Option<SkyParms>,
     pub stages: Vec<ShaderStageParse>,
 }
 
@@ -1962,4 +1975,554 @@ pub fn ScanAndLoadShaderFiles(
 pub fn R_CopyStage(orig: &ShaderStageParse, stage: &mut ShaderStageParse) {
     // Assumption: this stage has not been collapsed
     *stage = orig.clone(); // Just copy the whole thing!
+}
+
+/// Raven `ParseWaveForm`.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:520-564`
+pub fn ParseWaveForm(
+    qs: &mut QSharedScratch,
+    text: &mut Option<&[u8]>,
+    common: &mut Common,
+    state: &ShaderParseState,
+    wave: &mut WaveForm,
+) {
+    let warn = S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII");
+
+    let (token, rest) = COM_ParseExt(qs, *text, false);
+    *text = rest;
+    if token.is_empty() {
+        com_printf(
+            common,
+            &format!(
+                "{}WARNING: missing waveform parm in shader '{}'\n",
+                warn, state.name
+            ),
+        );
+        return;
+    }
+    wave.func = NameToGenFunc(state, common, &token);
+
+    // BASE, AMP, PHASE, FREQ
+    let (token, rest) = COM_ParseExt(qs, *text, false);
+    *text = rest;
+    if token.is_empty() {
+        com_printf(
+            common,
+            &format!(
+                "{}WARNING: missing waveform parm in shader '{}'\n",
+                warn, state.name
+            ),
+        );
+        return;
+    }
+    wave.base = atof(&token) as f32;
+
+    let (token, rest) = COM_ParseExt(qs, *text, false);
+    *text = rest;
+    if token.is_empty() {
+        com_printf(
+            common,
+            &format!(
+                "{}WARNING: missing waveform parm in shader '{}'\n",
+                warn, state.name
+            ),
+        );
+        return;
+    }
+    wave.amplitude = atof(&token) as f32;
+
+    let (token, rest) = COM_ParseExt(qs, *text, false);
+    *text = rest;
+    if token.is_empty() {
+        com_printf(
+            common,
+            &format!(
+                "{}WARNING: missing waveform parm in shader '{}'\n",
+                warn, state.name
+            ),
+        );
+        return;
+    }
+    wave.phase = atof(&token) as f32;
+
+    let (token, rest) = COM_ParseExt(qs, *text, false);
+    *text = rest;
+    if token.is_empty() {
+        com_printf(
+            common,
+            &format!(
+                "{}WARNING: missing waveform parm in shader '{}'\n",
+                warn, state.name
+            ),
+        );
+        return;
+    }
+    wave.frequency = atof(&token) as f32;
+}
+
+/// Raven `TR_MAX_TEXMODS`.
+///
+/// Source: `oracle/codemp/renderer/tr_local.h:296`
+pub const TR_MAX_TEXMODS: usize = 4;
+
+/// Raven `ParseTexMod`.
+///
+/// The oracle takes `const char *_text` **by value** and parses through a
+/// local `const char **text = &_text`, so the caller's own cursor is never
+/// advanced — `text` stays a plain `&[u8]` here rather than the
+/// `&mut Option<&[u8]>` cursor `ParseWaveForm` takes.
+///
+/// `stage->bundle[0].numTexMods` is `tex_mods.len()` (the owned `Vec`
+/// replaced the count field); `tmi` is the freshly-pushed last element.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:572-794`
+pub fn ParseTexMod(
+    text: &[u8],
+    stage: &mut ShaderStageParse,
+    qs: &mut QSharedScratch,
+    state: &ShaderParseState,
+    common: &mut Common,
+) {
+    let warn = S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII");
+
+    if stage.bundle[0].tex_mods.len() == TR_MAX_TEXMODS {
+        com_error(
+            errorParm_t::ERR_DROP,
+            format!("ERROR: too many tcMod stages in shader '{}'\n", state.name),
+        );
+    }
+
+    stage.bundle[0].tex_mods.push(TexModInfo::default());
+    let tmi_index = stage.bundle[0].tex_mods.len() - 1;
+
+    let mut cursor: Option<&[u8]> = Some(text);
+    let (token, rest) = COM_ParseExt(qs, cursor, false);
+    cursor = rest;
+
+    //
+    // turb
+    //
+    if token.eq_ignore_ascii_case("turb") {
+        let (token, rest) = COM_ParseExt(qs, cursor, false);
+        cursor = rest;
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing tcMod turb parms in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        stage.bundle[0].tex_mods[tmi_index].wave.base = atof(&token) as f32;
+        let (token, rest) = COM_ParseExt(qs, cursor, false);
+        cursor = rest;
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing tcMod turb in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        stage.bundle[0].tex_mods[tmi_index].wave.amplitude = atof(&token) as f32;
+        let (token, rest) = COM_ParseExt(qs, cursor, false);
+        cursor = rest;
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing tcMod turb in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        stage.bundle[0].tex_mods[tmi_index].wave.phase = atof(&token) as f32;
+        let (token, _rest) = COM_ParseExt(qs, cursor, false);
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing tcMod turb in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        stage.bundle[0].tex_mods[tmi_index].wave.frequency = atof(&token) as f32;
+
+        stage.bundle[0].tex_mods[tmi_index].kind = texMod_t::TMOD_TURBULENT as i32;
+    }
+    //
+    // scale
+    //
+    else if token.eq_ignore_ascii_case("scale") {
+        let (token, rest) = COM_ParseExt(qs, cursor, false);
+        cursor = rest;
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing scale parms in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        stage.bundle[0].tex_mods[tmi_index].translate[0] = atof(&token) as f32; //scale unioned
+
+        let (token, _rest) = COM_ParseExt(qs, cursor, false);
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing scale parms in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        stage.bundle[0].tex_mods[tmi_index].translate[1] = atof(&token) as f32; //scale unioned
+        stage.bundle[0].tex_mods[tmi_index].kind = texMod_t::TMOD_SCALE as i32;
+    }
+    //
+    // scroll
+    //
+    else if token.eq_ignore_ascii_case("scroll") {
+        let (token, rest) = COM_ParseExt(qs, cursor, false);
+        cursor = rest;
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing scale scroll parms in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        stage.bundle[0].tex_mods[tmi_index].translate[0] = atof(&token) as f32; //scroll unioned
+        let (token, _rest) = COM_ParseExt(qs, cursor, false);
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing scale scroll parms in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        stage.bundle[0].tex_mods[tmi_index].translate[1] = atof(&token) as f32; //scroll unioned
+        stage.bundle[0].tex_mods[tmi_index].kind = texMod_t::TMOD_SCROLL as i32;
+    }
+    //
+    // stretch
+    //
+    else if token.eq_ignore_ascii_case("stretch") {
+        let (token, rest) = COM_ParseExt(qs, cursor, false);
+        cursor = rest;
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing stretch parms in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        stage.bundle[0].tex_mods[tmi_index].wave.func = NameToGenFunc(state, common, &token);
+
+        let (token, rest) = COM_ParseExt(qs, cursor, false);
+        cursor = rest;
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing stretch parms in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        stage.bundle[0].tex_mods[tmi_index].wave.base = atof(&token) as f32;
+
+        let (token, rest) = COM_ParseExt(qs, cursor, false);
+        cursor = rest;
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing stretch parms in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        stage.bundle[0].tex_mods[tmi_index].wave.amplitude = atof(&token) as f32;
+
+        let (token, rest) = COM_ParseExt(qs, cursor, false);
+        cursor = rest;
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing stretch parms in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        stage.bundle[0].tex_mods[tmi_index].wave.phase = atof(&token) as f32;
+
+        let (token, _rest) = COM_ParseExt(qs, cursor, false);
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing stretch parms in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        stage.bundle[0].tex_mods[tmi_index].wave.frequency = atof(&token) as f32;
+
+        stage.bundle[0].tex_mods[tmi_index].kind = texMod_t::TMOD_STRETCH as i32;
+    }
+    //
+    // transform
+    //
+    else if token.eq_ignore_ascii_case("transform") {
+        let (token, rest) = COM_ParseExt(qs, cursor, false);
+        cursor = rest;
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing transform parms in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        stage.bundle[0].tex_mods[tmi_index].matrix[0][0] = atof(&token) as f32;
+
+        let (token, rest) = COM_ParseExt(qs, cursor, false);
+        cursor = rest;
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing transform parms in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        stage.bundle[0].tex_mods[tmi_index].matrix[0][1] = atof(&token) as f32;
+
+        let (token, rest) = COM_ParseExt(qs, cursor, false);
+        cursor = rest;
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing transform parms in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        stage.bundle[0].tex_mods[tmi_index].matrix[1][0] = atof(&token) as f32;
+
+        let (token, rest) = COM_ParseExt(qs, cursor, false);
+        cursor = rest;
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing transform parms in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        stage.bundle[0].tex_mods[tmi_index].matrix[1][1] = atof(&token) as f32;
+
+        let (token, rest) = COM_ParseExt(qs, cursor, false);
+        cursor = rest;
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing transform parms in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        stage.bundle[0].tex_mods[tmi_index].translate[0] = atof(&token) as f32;
+
+        let (token, _rest) = COM_ParseExt(qs, cursor, false);
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing transform parms in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        stage.bundle[0].tex_mods[tmi_index].translate[1] = atof(&token) as f32;
+
+        stage.bundle[0].tex_mods[tmi_index].kind = texMod_t::TMOD_TRANSFORM as i32;
+    }
+    //
+    // rotate
+    //
+    else if token.eq_ignore_ascii_case("rotate") {
+        let (token, _rest) = COM_ParseExt(qs, cursor, false);
+        if token.is_empty() {
+            com_printf(
+                common,
+                &format!(
+                    "{}WARNING: missing tcMod rotate parms in shader '{}'\n",
+                    warn, state.name
+                ),
+            );
+            return;
+        }
+        stage.bundle[0].tex_mods[tmi_index].translate[0] = atof(&token) as f32; //rotateSpeed unioned
+        stage.bundle[0].tex_mods[tmi_index].kind = texMod_t::TMOD_ROTATE as i32;
+    }
+    //
+    // entityTranslate
+    //
+    else if token.eq_ignore_ascii_case("entityTranslate") {
+        stage.bundle[0].tex_mods[tmi_index].kind = texMod_t::TMOD_ENTITY_TRANSLATE as i32;
+    } else {
+        com_printf(
+            common,
+            &format!(
+                "{}WARNING: unknown tcMod '{}' in shader '{}'\n",
+                warn, token, state.name
+            ),
+        );
+    }
+}
+
+/// Raven `GeneratePermanentShader`.
+///
+/// DEFERRED: the per-stage copy loop (`:2782-2803`, `newShader->stages[i] =
+/// stages[i]` plus its per-bundle `texMods` copy) and the `fogPass`
+/// assignment (`:2768-2772`) need `ShaderAsset::stages`/`::fog_pass`, which
+/// don't exist yet — `shader_asset.rs`'s own doc comment already flags
+/// `stages`/`deforms`/`fogParms` as landing "with the later tr_shader waves
+/// that read them" (`crates/mp/renderer/src/render_state/shader_asset.rs`),
+/// and that file is outside this wave's APPEND scope (this wave may only
+/// touch `crates/mp/renderer/src/tr_shader.rs`). Every other field of the
+/// whole-struct copy (`:2766`), the arena registration + capacity guard
+/// (`Arena::insert`'s existing `MAX_SHADERS` soft cap returning `Handle{0,0}`
+/// — A5/A12), `SortNewShader`, and the `hashTable` chain (`:2807-2809`,
+/// folded into `RenderAssets::shader_lookup` per this packet's STATE HOMES
+/// row) are transcribed here.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:2753-2812`
+pub fn GeneratePermanentShader(
+    assets: &mut RenderAssets,
+    common: &mut Common,
+    state: &ShaderParseState,
+) -> ShaderHandle {
+    // *newShader = shader; — whole-struct copy of every field `ShaderAsset`
+    // currently declares (interior-safety law: no `..Default::default()`
+    // masking payload).
+    let new_shader = ShaderAsset {
+        name: state.name.clone(),
+        lightmap_index: state.lightmap_index,
+        styles: state.styles,
+        sort: state.sort,
+        sorted_index: 0, // set below by `SortNewShader`
+        surface_flags: state.surface_flags,
+        content_flags: state.content_flags,
+        multitexture_env: state.multitexture_env,
+        default_shader: state.default_shader,
+        explicitly_defined: state.explicitly_defined,
+        num_unfogged_passes: state.num_unfogged_passes,
+        sky: state.sky.clone(),
+    };
+
+    // if ( shader.sort <= SS_SEE_THROUGH ) newShader->fogPass = FP_EQUAL;
+    // else if ( shader.contentFlags & CONTENTS_FOG ) newShader->fogPass = FP_LE;
+    // DEFERRED: `ShaderAsset::fog_pass` has no home yet — see fn doc above
+    // (`docs/subsystems/renderer-r2-design.md` Group 2 `shader_t` row).
+
+    // tr.shaders[tr.numShaders] = newShader; newShader->index = tr.numShaders;
+    // tr.sortedShaders[tr.numShaders] = newShader; newShader->sortedIndex = tr.numShaders;
+    // tr.numShaders++;
+    let new_shader_handle = assets.shaders.insert(new_shader);
+    if new_shader_handle == ShaderHandle::slot_zero() {
+        // `Arena::insert` already returned the live default entry on
+        // overflow (A12); this mutator owns the print — the packet's STATE
+        // HOMES row: "overflow warns (Com_Printf) and returns Handle{0,0}".
+        //Com_Printf (S_COLOR_YELLOW  "WARNING: GeneratePermanentShader - MAX_SHADERS hit\n");
+        com_printf(
+            common,
+            "WARNING: GeneratePermanentShader - MAX_SHADERS hit\n",
+        );
+        return new_shader_handle;
+    }
+
+    // size = ...; newShader->stages = Hunk_Alloc(...); for (...) { ... }
+    // DEFERRED: `ShaderAsset::stages` has no home yet — see fn doc above.
+
+    SortNewShader(assets, new_shader_handle);
+
+    // const int hash = generateHashValue(newShader->name, FILE_HASH_SIZE);
+    // newShader->next = hashTable[hash]; hashTable[hash] = newShader;
+    // `generateHashValue` deliberately not reproduced (same precedent as
+    // `tr_model/render_models.rs`) — `shader_lookup` is a name-keyed map,
+    // walked by `R_FindShaderByName`/`IsShader` (already ported wave-0), not
+    // a numeric-hash bucket chain.
+    let lookup_key = COM_StripExtension(&state.name);
+    assets
+        .shader_lookup
+        .entry(lookup_key)
+        .or_default()
+        .push(new_shader_handle);
+
+    new_shader_handle
+}
+
+/// Raven `R_CreateBlendedStage`.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:4012-4026`
+pub fn R_CreateBlendedStage(
+    _assets: &RenderAssets,
+    _common: &mut Common,
+    _state: &mut ShaderParseState,
+    _handle: i32,
+    _idx: usize,
+) {
+    //TODO: Port ShaderAsset::stages
+    // Source: oracle/codemp/renderer/tr_local.h:459-530 (`shader_t::stages`)
+    // — `work->stages[0]` (the registered shader's first pass, the payload
+    // `R_CopyStage` copies into `stages[idx]`) has no home on `ShaderAsset`
+    // yet (`crates/mp/renderer/src/render_state/shader_asset.rs`'s own doc
+    // comment: lands "with the later tr_shader waves that read them"); that
+    // file is outside this wave's APPEND scope (this wave may only touch
+    // `crates/mp/renderer/src/tr_shader.rs`).
+    // `GLS_DEPTHMASK_TRUE` is `0x00000100`
+    // (oracle/codemp/renderer/tr_local.h:1669) — no longer a gap; it lands
+    // with the body, which is still blocked on `ShaderAsset::stages` above.
+    todo!(
+        "Port R_CreateBlendedStage — oracle/codemp/renderer/tr_shader.cpp:4012-4026 (blocked on ShaderAsset::stages, see marker above)"
+    )
 }

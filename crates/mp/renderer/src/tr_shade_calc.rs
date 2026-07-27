@@ -11,19 +11,25 @@
 
 use core::f32::consts::PI;
 
-use mp_engine_qcommon::common::com_error;
+use mp_engine_qcommon::common::{com_error, com_printf, Common};
 use mp_qshared::shared::error_parm::errorParm_t;
-use mp_qshared::shared::q_math::{_DotProduct, _VectorSubtract, VectorLengthSquared};
+use mp_qshared::shared::q_color::S_COLOR_YELLOW;
+use mp_qshared::shared::q_math::{
+    _DotProduct, _VectorMA, _VectorScale, _VectorSubtract, CrossProduct, VectorLengthSquared,
+    VectorNormalize,
+};
 use mp_qshared::shared::vec3_t;
 use native_math::qmath::Q_rsqrt;
 
 use crate::render_state::placeholders::RefEntity;
 use crate::render_state::render_assets::RenderAssets;
+use crate::tr_image::R_FogFactor;
 use crate::tr_local::deform_stage_t::deformStage_t;
 use crate::tr_local::fog_t::fog_t;
 use crate::tr_local::gen_func_t::genFunc_t;
 use crate::tr_local::orientationr_t::orientationr_t;
 use crate::tr_local::tex_mod_info_t::texModInfo_t;
+use crate::tr_local::tex_mod_t::texMod_t;
 use crate::tr_local::wave_form_t::waveForm_t;
 
 // This wave threads `RenderAssets` (`## State ownership` row `tr` registries
@@ -90,6 +96,23 @@ const FUNCTABLE_MASK: i32 = FUNCTABLE_SIZE as i32 - 1;
 /// oracle's `off & FUNCTABLE_MASK` bitwise wrap on `int off`.
 fn functable_index(off: i32) -> usize {
     (off & FUNCTABLE_MASK) as usize
+}
+
+/// Raven `WAVEVALUE( table, base, amplitude, phase, freq )` — the macro as an
+/// inline fn; `tess.shaderTime` is `tess`-dissolved into the `shader_time`
+/// parameter, matching this file's other dissolved reads.
+///
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:9`
+fn WAVEVALUE(
+    table: &[f32],
+    base: f32,
+    amplitude: f32,
+    phase: f32,
+    freq: f32,
+    shader_time: f32,
+) -> f32 {
+    base + table[functable_index(myftol((phase + shader_time * freq) * FUNCTABLE_SIZE as f32))]
+        * amplitude
 }
 
 /// Raven `RF_DISINTEGRATE1` — does a procedural hole-ripping thing.
@@ -644,5 +667,395 @@ pub fn RB_CalcDisintegrateVertDeform(
                 // xyz[2] += normal[2] * 1;
             }
         }
+    }
+}
+
+/// Raven `void RB_CalcMoveVertexes( deformStage_t *ds )`.
+///
+/// `tess.xyz`/`tess.numVertexes` are `tess`-dissolved (mutated-in-place
+/// slice); `tess.shaderTime` collapses to a plain `f32`; `tess.shader->name`
+/// (used only by `TableForFunc`'s error path) collapses to `shader_name`,
+/// same as `RB_CalcBulgeVertexes`.
+///
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:265-285`
+pub fn RB_CalcMoveVertexes(
+    ds: &deformStage_t,
+    xyz: &mut [[f32; 4]],
+    shader_time: f32,
+    assets: &RenderAssets,
+    shader_name: &str,
+) {
+    let table = TableForFunc(ds.deformationWave.func, assets, shader_name);
+
+    let scale = WAVEVALUE(
+        table,
+        ds.deformationWave.base,
+        ds.deformationWave.amplitude,
+        ds.deformationWave.phase,
+        ds.deformationWave.frequency,
+        shader_time,
+    );
+
+    let mut offset = [0.0f32; 3];
+    _VectorScale(ds.moveVector, scale, &mut offset);
+
+    for v in xyz.iter_mut() {
+        v[0] += offset[0];
+        v[1] += offset[1];
+        v[2] += offset[2];
+    }
+}
+
+/// Raven `int edgeVerts[6][2]` — the 4-vertex sprite quad's six edges, each a
+/// pair of vertex offsets within the quad (DEC-37 A13.3 kind 1: never
+/// mutated, so a `const`).
+///
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:453-460`
+const EDGE_VERTS: [[usize; 2]; 6] = [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]];
+
+/// Raven `static void Autosprite2Deform( void )`.
+///
+/// `tess.xyz`/`tess.indexes`/`tess.numVertexes`/`tess.numIndexes` are
+/// `tess`-dissolved, threaded as slices (`numIndexes` collapses to
+/// `indexes.len()`); `tess.shader->name` collapses to `shader_name`.
+/// `backEnd.currentEntity != &tr.worldEntity` has no home on the owned
+/// `RefEntity`/`FrameState` yet (the world-entity sentinel isn't modeled),
+/// so the caller resolves the comparison and threads the `bool` result —
+/// same out-param collapse this file already applies to `backEnd.refdef.time`.
+/// `backEnd.ori`/`backEnd.viewParms.ori` thread as the already-real
+/// `orientationr_t`, matching `RB_CalcFogTexCoords`'s `ori`/`view_ori` split.
+///
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:462-562`
+pub fn Autosprite2Deform(
+    xyz: &mut [[f32; 4]],
+    indexes: &[i32],
+    shader_name: &str,
+    is_world_entity: bool,
+    ori: &orientationr_t,
+    view_ori: &orientationr_t,
+    common: &mut Common,
+) {
+    let num_vertexes = xyz.len() as i32;
+    if num_vertexes & 3 != 0 {
+        com_printf(
+            common,
+            &format!(
+                "{}Autosprite2 shader {} had odd vertex count",
+                S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII"),
+                shader_name
+            ),
+        );
+    }
+    if indexes.len() as i32 != (num_vertexes >> 2) * 6 {
+        com_printf(
+            common,
+            &format!(
+                "{}Autosprite2 shader {} had odd index count",
+                S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII"),
+                shader_name
+            ),
+        );
+    }
+
+    let forward = if is_world_entity {
+        view_ori.axis[0]
+    } else {
+        GlobalVectorToLocal(view_ori.axis[0], ori)
+    };
+
+    // this is a lot of work for two triangles...
+    // we could precalculate a lot of it is an issue, but it would mess up
+    // the shader abstraction
+    let mut i = 0usize;
+    let mut idx_base = 0usize;
+    while i < xyz.len() {
+        // find the midpoint
+        let quad = [xyz[i], xyz[i + 1], xyz[i + 2], xyz[i + 3]];
+
+        // identify the two shortest edges
+        let mut nums = [0usize; 2];
+        let mut lengths = [999999.0f32; 2];
+
+        for j in 0..6 {
+            let edge = EDGE_VERTS[j];
+            let v1 = quad[edge[0]];
+            let v2 = quad[edge[1]];
+
+            let mut temp = [0.0f32; 3];
+            _VectorSubtract([v1[0], v1[1], v1[2]], [v2[0], v2[1], v2[2]], &mut temp);
+
+            let l = _DotProduct(temp, temp);
+            if l < lengths[0] {
+                nums[1] = nums[0];
+                lengths[1] = lengths[0];
+                nums[0] = j;
+                lengths[0] = l;
+            } else if l < lengths[1] {
+                nums[1] = j;
+                lengths[1] = l;
+            }
+        }
+
+        let mut mid = [[0.0f32; 3]; 2];
+        for j in 0..2 {
+            let edge = EDGE_VERTS[nums[j]];
+            let v1 = quad[edge[0]];
+            let v2 = quad[edge[1]];
+
+            mid[j][0] = 0.5f32 * (v1[0] + v2[0]);
+            mid[j][1] = 0.5f32 * (v1[1] + v2[1]);
+            mid[j][2] = 0.5f32 * (v1[2] + v2[2]);
+        }
+
+        // find the vector of the major axis
+        let mut major = [0.0f32; 3];
+        _VectorSubtract(mid[1], mid[0], &mut major);
+
+        // cross this with the view direction to get minor axis
+        let mut minor = [0.0f32; 3];
+        CrossProduct(major, forward, &mut minor);
+        VectorNormalize(&mut minor);
+
+        // re-project the points
+        for j in 0..2 {
+            let edge = EDGE_VERTS[nums[j]];
+
+            // `0.5 * sqrt(...)` — the oracle's `0.5` here has no `f` suffix
+            // and `sqrt` promotes its argument to double, so this evaluates
+            // in f64 and rounds to f32 once (wave-0 ruling 12).
+            let l = (0.5f64 * (lengths[j] as f64).sqrt()) as f32;
+
+            // we need to see which direction this edge
+            // is used to determine direction of projection
+            let mut k = 0usize;
+            while k < 5 {
+                if indexes[idx_base + k] == i as i32 + edge[0] as i32
+                    && indexes[idx_base + k + 1] == i as i32 + edge[1] as i32
+                {
+                    break;
+                }
+                k += 1;
+            }
+
+            let (scale1, scale2) = if k == 5 { (l, -l) } else { (-l, l) };
+
+            let idx0 = i + edge[0];
+            let idx1 = i + edge[1];
+
+            let mut out0 = [0.0f32; 3];
+            _VectorMA(mid[j], scale1, minor, &mut out0);
+            xyz[idx0][0] = out0[0];
+            xyz[idx0][1] = out0[1];
+            xyz[idx0][2] = out0[2];
+
+            let mut out1 = [0.0f32; 3];
+            _VectorMA(mid[j], scale2, minor, &mut out1);
+            xyz[idx1][0] = out1[0];
+            xyz[idx1][1] = out1[1];
+            xyz[idx1][2] = out1[2];
+        }
+
+        i += 4;
+        idx_base += 6;
+    }
+}
+
+/// Raven `void RB_CalcModulateColorsByFog( unsigned char *colors )`.
+///
+/// `tess.numVertexes`-sized `texCoords[SHADER_MAX_VERTEXES][2]` scratch
+/// becomes a `Vec` sized to the actual vertex count (`xyz.len()`) rather than
+/// the oracle's fixed max-capacity stack buffer — the oracle only ever reads
+/// the first `numVertexes` entries, so this is behaviorally identical without
+/// needing the unported `SHADER_MAX_VERTEXES` constant. `tess.xyz` collapses
+/// to the `xyz` slice `RB_CalcFogTexCoords` needs; `fog`/`ori`/`view_ori`
+/// thread through to that same already-ported callee. `assets` carries
+/// `tr.fogTable` for `R_FogFactor` (porting-rules §B4).
+///
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:896-911`
+pub fn RB_CalcModulateColorsByFog(
+    colors: &mut [[u8; 4]],
+    xyz: &[[f32; 4]],
+    fog: &fog_t,
+    ori: &orientationr_t,
+    view_ori: &orientationr_t,
+    assets: &RenderAssets,
+) {
+    // calculate texcoords so we can derive density
+    // this is not wasted, because it would only have
+    // been previously called if the surface was opaque
+    let mut tex_coords = vec![[0.0f32; 2]; xyz.len()];
+    RB_CalcFogTexCoords(&mut tex_coords, xyz, fog, ori, view_ori);
+
+    for (c, st) in colors.iter_mut().zip(tex_coords.iter()) {
+        // C: `1.0` is a double, so the subtraction runs in f64 and rounds
+        // once on store to `float f` (ruling 12).
+        let f = (1.0f64 - R_FogFactor(assets, st[0], st[1]) as f64) as f32;
+        c[0] = (c[0] as f32 * f) as u8;
+        c[1] = (c[1] as f32 * f) as u8;
+        c[2] = (c[2] as f32 * f) as u8;
+    }
+}
+
+/// Raven `void RB_CalcModulateAlphasByFog( unsigned char *colors )`.
+///
+/// Same `texCoords`/`tess.xyz`/`assets` collapse as
+/// `RB_CalcModulateColorsByFog`.
+///
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:922-935`
+pub fn RB_CalcModulateAlphasByFog(
+    colors: &mut [[u8; 4]],
+    xyz: &[[f32; 4]],
+    fog: &fog_t,
+    ori: &orientationr_t,
+    view_ori: &orientationr_t,
+    assets: &RenderAssets,
+) {
+    // calculate texcoords so we can derive density
+    // this is not wasted, because it would only have
+    // been previously called if the surface was opaque
+    let mut tex_coords = vec![[0.0f32; 2]; xyz.len()];
+    RB_CalcFogTexCoords(&mut tex_coords, xyz, fog, ori, view_ori);
+
+    for (c, st) in colors.iter_mut().zip(tex_coords.iter()) {
+        // C: `1.0` is a double, so the subtraction runs in f64 and rounds
+        // once on store to `float f` (ruling 12).
+        let f = (1.0f64 - R_FogFactor(assets, st[0], st[1]) as f64) as f32;
+        c[3] = (c[3] as f32 * f) as u8;
+    }
+}
+
+/// Raven `void RB_CalcModulateRGBAsByFog( unsigned char *colors )`.
+///
+/// Same `texCoords`/`tess.xyz`/`assets` collapse as
+/// `RB_CalcModulateColorsByFog`.
+///
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:946-962`
+pub fn RB_CalcModulateRGBAsByFog(
+    colors: &mut [[u8; 4]],
+    xyz: &[[f32; 4]],
+    fog: &fog_t,
+    ori: &orientationr_t,
+    view_ori: &orientationr_t,
+    assets: &RenderAssets,
+) {
+    // calculate texcoords so we can derive density
+    // this is not wasted, because it would only have
+    // been previously called if the surface was opaque
+    let mut tex_coords = vec![[0.0f32; 2]; xyz.len()];
+    RB_CalcFogTexCoords(&mut tex_coords, xyz, fog, ori, view_ori);
+
+    for (c, st) in colors.iter_mut().zip(tex_coords.iter()) {
+        // C: `1.0` is a double, so the subtraction runs in f64 and rounds
+        // once on store to `float f` (ruling 12).
+        let f = (1.0f64 - R_FogFactor(assets, st[0], st[1]) as f64) as f32;
+        c[0] = (c[0] as f32 * f) as u8;
+        c[1] = (c[1] as f32 * f) as u8;
+        c[2] = (c[2] as f32 * f) as u8;
+        c[3] = (c[3] as f32 * f) as u8;
+    }
+}
+
+/// Raven `void RB_CalcRotateTexCoords( float degsPerSecond, float *st )`.
+///
+/// `tess.shaderTime` collapses to a plain `f32`; `tr.sinTable` comes through
+/// `RenderAssets`. Raven leaves `texModInfo_t tmi`'s `.type`/`.wave` fields
+/// uninitialized stack garbage — `RB_CalcTransformTexCoords` never reads
+/// them, so they're zeroed here instead (`TMOD_NONE`/`GF_NONE`, both the
+/// oracle's `= 0` enumerator) rather than left as observable UB.
+///
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:1179-1202`
+pub fn RB_CalcRotateTexCoords(
+    degs_per_second: f32,
+    st: &mut [[f32; 2]],
+    shader_time: f32,
+    assets: &RenderAssets,
+) {
+    let time_scale = shader_time;
+
+    let degs = -degs_per_second * time_scale;
+    let index = (degs * (FUNCTABLE_SIZE as f32 / 360.0f32)) as i32;
+
+    let sin_table = &assets.function_tables.sin_table;
+    let sin_value = sin_table[functable_index(index)];
+    let cos_value = sin_table[functable_index(index + FUNCTABLE_SIZE as i32 / 4)];
+
+    // `0.5 - 0.5 * cosValue + 0.5 * sinValue` — the oracle's `0.5` literals
+    // have no `f` suffix, promoting this arithmetic to double; evaluate in
+    // f64 and round to f32 once at the assignment into `tmi.translate`
+    // (wave-0 ruling 12).
+    let translate0 = (0.5f64 - 0.5f64 * cos_value as f64 + 0.5f64 * sin_value as f64) as f32;
+    let translate1 = (0.5f64 - 0.5f64 * sin_value as f64 - 0.5f64 * cos_value as f64) as f32;
+
+    let tmi = texModInfo_t {
+        r#type: texMod_t::TMOD_NONE,
+        wave: waveForm_t {
+            func: genFunc_t::GF_NONE,
+            base: 0.0,
+            amplitude: 0.0,
+            phase: 0.0,
+            frequency: 0.0,
+        },
+        matrix: [[cos_value, sin_value], [-sin_value, cos_value]],
+        translate: [translate0, translate1],
+    };
+
+    RB_CalcTransformTexCoords(&tmi, st);
+}
+
+/// Raven `void RB_CalcDiffuseColor( unsigned char *colors )`.
+///
+/// `backEnd.currentEntity` is dereferenced unconditionally in the oracle (no
+/// null guard) — `ent: &RefEntity` is the defined-behavior replacement
+/// (porting-rules §19), matching `RB_CalcDisintegrateColors`. The oracle
+/// walks `tess.xyz` (`v`) in lockstep with `tess.normal` but never actually
+/// dereferences `v` in the loop body, so it's not threaded as a parameter —
+/// only `tess.normal`/`tess.numVertexes` (the `normal`/`colors.len()`
+/// dictionary collapse) are live reads. `ent->ambientLightInt` has no home
+/// on `RefEntity` yet (not among the fields an earlier wave landed, and this
+/// wave may not extend `placeholders.rs`), so it threads as an explicit
+/// `i32` parameter — the same scalar-collapse pattern this file already uses
+/// for `backEnd.refdef.time`. `*(int *)&colors[i*4] = ambientLightInt` (raw
+/// pointer reinterpretation) becomes `ambient_light_int.to_le_bytes()` — the
+/// interior-safety law forbids the pointer cast, and `to_le_bytes` reproduces
+/// the same byte layout on the little-endian target platforms.
+///
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:1344-1392`
+pub fn RB_CalcDiffuseColor(
+    colors: &mut [[u8; 4]],
+    normal: &[[f32; 4]],
+    ent: &RefEntity,
+    ambient_light_int: i32,
+) {
+    let ambient_light = ent.ambient_light;
+    let directed_light = ent.directed_light;
+    let light_dir = ent.light_dir;
+
+    for (n, c) in normal.iter().zip(colors.iter_mut()) {
+        let n3 = [n[0], n[1], n[2]];
+        let incoming = _DotProduct(n3, light_dir);
+        if incoming <= 0.0 {
+            *c = ambient_light_int.to_le_bytes();
+            continue;
+        }
+
+        let mut j = myftol(ambient_light[0] + incoming * directed_light[0]);
+        if j > 255 {
+            j = 255;
+        }
+        c[0] = j as u8;
+
+        let mut j = myftol(ambient_light[1] + incoming * directed_light[1]);
+        if j > 255 {
+            j = 255;
+        }
+        c[1] = j as u8;
+
+        let mut j = myftol(ambient_light[2] + incoming * directed_light[2]);
+        if j > 255 {
+            j = 255;
+        }
+        c[2] = j as u8;
+
+        c[3] = 255;
     }
 }

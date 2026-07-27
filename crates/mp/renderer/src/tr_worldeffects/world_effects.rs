@@ -15,9 +15,13 @@ use mp_qshared::shared::vec3_t;
 use mp_qshared::shared::{
     errorParm_t, CONTENTS_INSIDE, CONTENTS_OUTSIDE, CONTENTS_SOLID, CONTENTS_WATER,
 };
+use native_math::qmath::{MakeNormalVectors, VectorNormalize};
 use native_math::rng::{Rng, RAND_MAX};
 
+use crate::render_state::frame_state::FrameState;
 use crate::render_state::image_asset::ImageHandle;
+use crate::render_state::render_assets::RenderAssets;
+use crate::tr_backend::SetViewportAndScissor;
 use crate::tr_worldeffects::sparticle::SParticle;
 
 /// Raven `POINTCACHE_CELL_SIZE` — the weather point-cache cell edge length.
@@ -150,6 +154,18 @@ impl SVecRange {
         (v[0] > self.mMins[0] && v[1] > self.mMins[1] && v[2] > self.mMins[2])
             && (v[0] < self.mMaxs[0] && v[1] < self.mMaxs[1] && v[2] < self.mMaxs[2])
     }
+
+    /// Raven `SVecRange::Pick`.
+    ///
+    /// Raven's `CVec3&` out-param becomes the `v: &mut vec3_t` out-param
+    /// (porting-rules §C7); `WE_flrand` is threaded through `rng` rather than
+    /// reaching the msvcrt `rand()` stream (porting-rules §B4).
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:156-161`
+    pub fn Pick(&self, rng: &mut Rng, v: &mut vec3_t) {
+        v[0] = WE_flrand(rng, self.mMins[0], self.mMaxs[0]);
+        v[1] = WE_flrand(rng, self.mMins[1], self.mMaxs[1]);
+        v[2] = WE_flrand(rng, self.mMins[2], self.mMaxs[2]);
+    }
 }
 
 /// Raven `SFloatRange` — a min/max float range.
@@ -176,6 +192,15 @@ impl SFloatRange {
     /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:218-221`
     pub fn In(&self, v: f32) -> bool {
         v > self.mMin && v < self.mMax
+    }
+
+    /// Raven `SFloatRange::Pick`.
+    ///
+    /// Raven's `float&` out-param becomes the `v: &mut f32` out-param
+    /// (porting-rules §C7).
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:214-217`
+    pub fn Pick(&self, rng: &mut Rng, v: &mut f32) {
+        *v = WE_flrand(rng, self.mMin, self.mMax);
     }
 }
 
@@ -254,6 +279,44 @@ impl CWindZone {
         self.mTargetVelocity = [0.0; 3];
         self.mTargetVelocityTimeRemaining = 0;
     }
+
+    /// Raven `CWindZone::Update`.
+    ///
+    /// `FloatRand`/`SIntRange::Pick`/`SVecRange::Pick` are threaded through
+    /// `rng` rather than reaching the msvcrt `rand()` stream (porting-rules
+    /// §B4). Raven's `CVec3::ScaleAdd`/`operator*=` are expanded component-
+    /// wise (no `vec3_t` operator overloads under the interior-safety law).
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:327-355`
+    pub fn Update(&mut self, rng: &mut Rng) {
+        if self.mTargetVelocityTimeRemaining == 0 {
+            if FloatRand(rng) < self.mChanceOfDeadTime {
+                self.mTargetVelocityTimeRemaining = self.mRDeadTime.Pick(rng);
+                self.mTargetVelocity = [0.0; 3];
+            } else {
+                self.mTargetVelocityTimeRemaining = self.mRDuration.Pick(rng);
+                self.mRVelocity.Pick(rng, &mut self.mTargetVelocity);
+            }
+        } else if self.mTargetVelocityTimeRemaining != -1 {
+            self.mTargetVelocityTimeRemaining -= 1;
+
+            let mut delta_velocity: vec3_t = [
+                self.mTargetVelocity[0] - self.mCurrentVelocity[0],
+                self.mTargetVelocity[1] - self.mCurrentVelocity[1],
+                self.mTargetVelocity[2] - self.mCurrentVelocity[2],
+            ];
+            let mut delta_velocity_len = VectorNormalize(&mut delta_velocity);
+            if delta_velocity_len > self.mMaxDeltaVelocityPerUpdate {
+                delta_velocity_len = self.mMaxDeltaVelocityPerUpdate;
+            }
+            // Raven `DeltaVelocity *= (DeltaVelocityLen);`
+            for i in 0..3 {
+                delta_velocity[i] *= delta_velocity_len;
+            }
+            for i in 0..3 {
+                self.mCurrentVelocity[i] += delta_velocity[i];
+            }
+        }
+    }
 }
 
 /// Raven's wind-zone globals (`mGlobalWindDirection`, `mGlobalWindSpeed`) —
@@ -266,6 +329,14 @@ impl CWindZone {
 pub struct WindZoneState {
     pub global_wind_direction: vec3_t,
     pub global_wind_speed: f32,
+    /// Raven `mGlobalWindVelocity` — the un-normalized accumulated velocity
+    /// `RB_RenderWorldEffects` sums every global `CWindZone`'s
+    /// `mCurrentVelocity` into each frame, then normalizes into
+    /// `global_wind_direction`/`global_wind_speed`. Same DEC-37 A13.3 kind-3
+    /// static promotion as the two fields above.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp` (`mGlobalWindVelocity`)
+    pub global_wind_velocity: vec3_t,
 }
 
 impl WindZoneState {
@@ -644,6 +715,31 @@ pub struct WorldEffectsState {
     ///
     /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1491`
     pub rng: Rng,
+    /// Raven `mFrozen` — freezes wind-zone/particle-cloud updates while
+    /// still true when set (`CWeatherParticleCloud::Update`'s early return,
+    /// `RB_RenderWorldEffects`'s wind-zone update guard). Same DEC-37 A13.3
+    /// promotion as `mOutside`/`mParticleClouds`/`mWindZones` above.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp` (`mFrozen`)
+    pub mFrozen: bool,
+    /// Raven `mMillisecondsElapsed` — this frame's clamped `backEnd.refdef
+    /// .frametime`, written by `RB_RenderWorldEffects` and read nowhere else
+    /// in this wave's fns (kept for fidelity; `mSecondsElapsed` is the
+    /// derived value consumers read).
+    ///
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp` (`mMillisecondsElapsed`)
+    pub mMillisecondsElapsed: f32,
+    /// Raven `mSecondsElapsed` — `mMillisecondsElapsed / 1000`, read by every
+    /// `CWeatherParticleCloud::Update` this frame.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp` (`mSecondsElapsed`)
+    pub mSecondsElapsed: f32,
+    /// Raven `mParticlesRendered` — the debug counter each cloud's `Render`
+    /// accumulates into (`if (false) Com_Printf(...)` — Raven's own dead
+    /// debug print, preserved verbatim per porting-rules §A2).
+    ///
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp` (`mParticlesRendered`)
+    pub mParticlesRendered: i32,
 }
 
 /// Raven `CWeatherParticleCloud` — one weather-particle emitter (rain/snow
@@ -685,6 +781,43 @@ pub struct CWeatherParticleCloud {
     pub mRotationChangeTimer: SIntRange,
     pub mMass: SFloatRange,
     pub mFrictionInverse: f32,
+    // PORT-NOTE: the fields below aren't set by `Reset` (Raven's own
+    // `CWeatherParticleCloud::Reset` body doesn't touch them either — they
+    // are only ever written by `Update`, every call, before being read) and
+    // so aren't part of this packet's `Reset` excerpt or this type's
+    // originally-ported field set; added here because `Update`/`Render`
+    // (this wave) need them. Zero-initialized in `new()`, matching every
+    // caller's unconditional overwrite before first read.
+    /// Raven `mCameraPosition` — this frame's view origin.
+    pub mCameraPosition: vec3_t,
+    /// Raven `mCameraForward` — this frame's view forward axis.
+    pub mCameraForward: vec3_t,
+    /// Raven `mCameraLeft` — this frame's view left axis, scaled by
+    /// `mWidth`/rotated by the cloud's billboard rotation.
+    pub mCameraLeft: vec3_t,
+    /// Raven `mCameraDown` — this frame's view down axis, scaled by
+    /// `mHeight`/rotated by the cloud's billboard rotation.
+    pub mCameraDown: vec3_t,
+    /// Raven `mRange` — this frame's spawn/despawn box, `mCameraPosition +
+    /// mSpawnRange`.
+    pub mRange: SVecRange,
+    /// Raven `mCameraLeftPlusUp` — `mCameraLeft - mCameraDown` (`mVertexCount
+    /// == 4`) or `mCameraDown + mCameraLeft` otherwise.
+    pub mCameraLeftPlusUp: vec3_t,
+    /// Raven `mCameraLeftMinusUp` — `mCameraLeft + mCameraDown`
+    /// (`mVertexCount == 4` only).
+    pub mCameraLeftMinusUp: vec3_t,
+    /// Raven `mSpawnPlaneNorm` — normalized `force` when `UseSpawnPlane()`.
+    pub mSpawnPlaneNorm: vec3_t,
+    /// Raven `mSpawnSpeed` — `force`'s pre-normalize length.
+    pub mSpawnSpeed: f32,
+    /// Raven `mSpawnPlaneRight`/`mSpawnPlaneUp` — `MakeNormalVectors
+    /// (mSpawnPlaneNorm)`'s output basis.
+    pub mSpawnPlaneRight: vec3_t,
+    pub mSpawnPlaneUp: vec3_t,
+    /// Raven `mParticleCountRender` — this frame's render-eligible particle
+    /// count, written by `Update` and read by `Render`.
+    pub mParticleCountRender: i32,
 }
 
 impl CWeatherParticleCloud {
@@ -727,6 +860,21 @@ impl CWeatherParticleCloud {
                 mMax: 0.0,
             },
             mFrictionInverse: 0.0,
+            mCameraPosition: [0.0; 3],
+            mCameraForward: [0.0; 3],
+            mCameraLeft: [0.0; 3],
+            mCameraDown: [0.0; 3],
+            mRange: SVecRange {
+                mMins: [0.0; 3],
+                mMaxs: [0.0; 3],
+            },
+            mCameraLeftPlusUp: [0.0; 3],
+            mCameraLeftMinusUp: [0.0; 3],
+            mSpawnPlaneNorm: [0.0; 3],
+            mSpawnSpeed: 0.0,
+            mSpawnPlaneRight: [0.0; 3],
+            mSpawnPlaneUp: [0.0; 3],
+            mParticleCountRender: 0,
         };
         this.Reset();
         this
@@ -794,6 +942,203 @@ impl CWeatherParticleCloud {
     pub fn UseSpawnPlane(&self) -> bool {
         self.mGravity != 0.0
     }
+
+    /// Raven `CWeatherParticleCloud::Update`.
+    ///
+    /// `_frame` carries `backEnd.viewParms.ori`'s origin/axis; `frozen` is
+    /// `mFrozen`; `wind_velocity` is `mGlobalWindVelocity`; `seconds_elapsed`
+    /// is `mSecondsElapsed` — all threaded rather than reached
+    /// (porting-rules §B4). `CVec3` operator overloads
+    /// (`+=`/`-=`/`*=`/`ScaleAdd`) are expanded component-wise (interior-
+    /// safety law: `vec3_t` is `[f32; 3]`, no operator overloads).
+    ///
+    /// Two dependencies are genuinely out-of-packet for this wave (escalated
+    /// via `todo!()`, not invented):
+    /// - `backEnd.viewParms.ori.origin`/`.axis[0..2]` — `OrientationR`/
+    ///   `ViewParms` are still empty placeholder structs, landed by the
+    ///   not-yet-run `tr_main` R3 wave (R2-D7(b)).
+    /// - `CWeatherParticle::mMass`/`mAlpha` — the oracle class has these
+    ///   fields, but the already-ported `SParticle` (`sparticle.rs`, wave 0)
+    ///   carries only `pos`/`velocity`/`flags` (a wave-0 completeness gap);
+    ///   `sparticle.rs` is outside this wave's file-editing authority (only
+    ///   `world_effects.rs` is in scope), so the whole per-particle loop body
+    ///   — which needs both fields throughout — is deferred as one unit
+    ///   rather than scattered field-by-field.
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1039-1306`
+    // Deferred `todo!()` escalation sites (cited above) diverge, leaving the rest
+    // of this body statically unreachable and its inputs unread until the value
+    // they wait on lands.
+    #[allow(unreachable_code, unused_variables)]
+    pub fn Update(
+        &mut self,
+        rng: &mut Rng,
+        _frame: &FrameState,
+        frozen: bool,
+        wind_velocity: vec3_t,
+        seconds_elapsed: f32,
+    ) {
+        // Compute Camera
+        //----------------
+        //TODO: Port orientationr_t (viewParms_t::ori origin/axis)
+        // Source: oracle/codemp/renderer/tr_local.h:109-114,629-644
+        // (`OrientationR`/`ViewParms` are still empty placeholders — landed
+        // by the not-yet-run `tr_main` R3 wave); used at
+        // oracle/codemp/renderer/tr_WorldEffects.cpp:1061-1064
+        let (camera_position, camera_forward, camera_left0, camera_down0): (
+            vec3_t,
+            vec3_t,
+            vec3_t,
+            vec3_t,
+        ) = todo!(
+            "Port orientationr_t (viewParms_t::ori) — oracle/codemp/renderer/tr_WorldEffects.cpp:1061-1064"
+        );
+        self.mCameraPosition = camera_position;
+        self.mCameraForward = camera_forward;
+        self.mCameraLeft = camera_left0;
+        self.mCameraDown = camera_down0;
+
+        if self.mRotationChangeNext != -1 {
+            if self.mRotationChangeNext == 0 {
+                self.mRotation.Pick(rng, &mut self.mRotationDeltaTarget);
+                self.mRotationChangeNext = self.mRotationChangeTimer.Pick(rng);
+                if self.mRotationChangeNext <= 0 {
+                    self.mRotationChangeNext = 1;
+                }
+            }
+            self.mRotationChangeNext -= 1;
+
+            let rotation_delta_difference = self.mRotationDeltaTarget - self.mRotationDelta;
+            // `0.01` is a double literal, so `fabsf`'s float result promotes
+            // and the comparison runs in f64 (ruling 12).
+            if rotation_delta_difference.abs() as f64 > 0.01 {
+                self.mRotationDelta += rotation_delta_difference; // Blend To New Delta
+            }
+            self.mRotationCurrent += self.mRotationDelta * seconds_elapsed;
+            let s = self.mRotationCurrent.sin();
+            let c = self.mRotationCurrent.cos();
+
+            let temp_cam_left = self.mCameraLeft;
+
+            for i in 0..3 {
+                self.mCameraLeft[i] *= c * self.mWidth;
+            }
+            for i in 0..3 {
+                self.mCameraLeft[i] += self.mCameraDown[i] * (s * self.mWidth * -1.0);
+            }
+
+            for i in 0..3 {
+                self.mCameraDown[i] *= c * self.mHeight;
+            }
+            for i in 0..3 {
+                self.mCameraDown[i] += temp_cam_left[i] * (s * self.mHeight);
+            }
+        } else {
+            for i in 0..3 {
+                self.mCameraLeft[i] *= self.mWidth;
+                self.mCameraDown[i] *= self.mHeight;
+            }
+        }
+
+        // Compute Global Force
+        //----------------------
+        let mut force: vec3_t = [0.0, 0.0, -1.0 * self.mGravity];
+        for i in 0..3 {
+            force[i] += wind_velocity[i];
+        }
+
+        // Update Range
+        //--------------
+        for i in 0..3 {
+            self.mRange.mMins[i] = self.mCameraPosition[i] + self.mSpawnRange.mMins[i];
+            self.mRange.mMaxs[i] = self.mCameraPosition[i] + self.mSpawnRange.mMaxs[i];
+        }
+
+        // If Using A Spawn Plane, Increase The Range Box A Bit To Account For Rotation On The Spawn Plane
+        //-------------------------------------------------------------------------------------------------
+        if self.UseSpawnPlane() {
+            for dim in 0..3 {
+                // `±0.01` are double literals, so `force[dim]` promotes and
+                // both comparisons run in f64 (ruling 12).
+                if force[dim] as f64 > 0.01 {
+                    self.mRange.mMins[dim] -= self.mSpawnPlaneDistance / 2.0;
+                } else if (force[dim] as f64) < -0.01 {
+                    self.mRange.mMaxs[dim] += self.mSpawnPlaneDistance / 2.0;
+                }
+            }
+            self.mSpawnPlaneNorm = force;
+            self.mSpawnSpeed = VectorNormalize(&mut self.mSpawnPlaneNorm);
+            MakeNormalVectors(
+                self.mSpawnPlaneNorm,
+                &mut self.mSpawnPlaneRight,
+                &mut self.mSpawnPlaneUp,
+            );
+            if self.mOrientWithVelocity {
+                self.mCameraDown = self.mSpawnPlaneNorm;
+                for i in 0..3 {
+                    self.mCameraDown[i] *= self.mHeight * -1.0;
+                }
+            }
+        }
+
+        // Optimization For Quad Position Calculation
+        //--------------------------------------------
+        if self.mVertexCount == 4 {
+            for i in 0..3 {
+                self.mCameraLeftPlusUp[i] = self.mCameraLeft[i] - self.mCameraDown[i];
+                self.mCameraLeftMinusUp[i] = self.mCameraLeft[i] + self.mCameraDown[i];
+            }
+        } else {
+            // should really be called mCamera Left + Down
+            for i in 0..3 {
+                self.mCameraLeftPlusUp[i] = self.mCameraDown[i] + self.mCameraLeft[i];
+            }
+        }
+
+        // Stop All Additional Processing
+        //--------------------------------
+        if frozen {
+            return;
+        }
+
+        // Now Update All Particles
+        //--------------------------
+        self.mParticleCountRender = 0;
+        for particle_num in 0..self.mParticleCount {
+            let _ = particle_num;
+            // DEFERRED: whole per-particle body — needs `CWeatherParticle
+            // ::mMass`/`mAlpha`, not on the already-ported `SParticle`
+            // (`sparticle.rs`, wave 0; see this fn's doc comment). Escalated
+            // as one block rather than scattered field-by-field.
+            //TODO: Port CWeatherParticle::mMass
+            //TODO: Port CWeatherParticle::mAlpha
+            // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:1174-1298
+            todo!(
+                "Port CWeatherParticle::mMass/mAlpha — oracle/codemp/renderer/tr_WorldEffects.cpp:1174-1298"
+            );
+        }
+        self.mPopulated = true;
+    }
+
+    /// Raven `CWeatherParticleCloud::Render`.
+    ///
+    /// DEFERRED: R4 — the entire body is immediate-mode GL drawing
+    /// (`qglBegin`/`qglColor4f`/`qglVertex3f*`/`qglTexCoord2f`/`qglEnd`/
+    /// `qglPushMatrix`/`qglPopMatrix`/`qglPointSize`/`qglPointParameterf*EXT`/
+    /// `qglEnable`/`qglMatrixMode`/`qglTexParameterf`), gated on GL wire
+    /// constants (`GLS_ALPHA`, `GL_POINTS`, `GL_MODELVIEW`, `GL_TEXTURE_2D`,
+    /// `GL_TEXTURE_MIN_FILTER`, `GL_TEXTURE_MAG_FILTER`, `GL_LINEAR`,
+    /// `GL_NEAREST`, `GL_POINT_SIZE_MIN_EXT`, `GL_POINT_SIZE_MAX_EXT`,
+    /// `GL_DISTANCE_ATTENUATION_EXT`) this packet does not carry — never
+    /// guessed (porting-rules: no numeric-constant guessing). The in-module
+    /// callees (`GL_State`/`GL_Bind`/`GL_Cull`) are themselves already
+    /// DEFERRED no-ops at their own definitions (`tr_backend.rs`, DEC-37
+    /// A13.2); R2 leaves the fixed-function GL surface with no R3 home — it
+    /// dissolves into R4's wgpu rewrite (`GpuResources::gl_state` is a named
+    /// placeholder). Only the CPU-only counter effect survives this wave.
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1311-1480`
+    pub fn Render(&self, particles_rendered: &mut i32) {
+        *particles_rendered += self.mParticleCountRender;
+    }
 }
 
 impl Default for CWeatherParticleCloud {
@@ -855,6 +1200,131 @@ impl WorldEffectsState {
         self.mOutside.Reset();
     }
 
+    /// Raven `RB_RenderWorldEffects`.
+    ///
+    /// `wind` carries the `mGlobalWindDirection`/`mGlobalWindSpeed`/
+    /// `mGlobalWindVelocity` trio (`WindZoneState`); `assets` is the
+    /// sim-published `RenderAssets` (`tr.world`'s SPLIT half); `frame` is the
+    /// render-thread `FrameState` (`backEnd`'s half); `host` carries
+    /// `mOutside.Cache`'s engine/collision access and `Com_Printf`'s
+    /// `Common`; all threaded rather than reached (porting-rules §B4).
+    ///
+    /// Two state homes this wave's packet promises (`## State ownership`)
+    /// aren't actually populated on their landed placeholder types yet —
+    /// `TrRefdef::rdflags`/`frametime` (`tr_scene` R3 wave) and
+    /// `world_t::bmodels[0].bounds` (`tr_bsp`/`tr_world` R3 wave, folded into
+    /// `WorldAsset`) — genuinely out-of-packet for this wave; escalated via
+    /// `todo!()` at the exact read sites rather than invented.
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1513-1580`
+    // Deferred `todo!()` escalation sites (cited above) diverge, leaving the rest
+    // of this body statically unreachable and its inputs unread until the value
+    // they wait on lands.
+    #[allow(unreachable_code, unused_variables)]
+    pub fn RB_RenderWorldEffects(
+        &mut self,
+        wind: &mut WindZoneState,
+        assets: &RenderAssets,
+        frame: &FrameState,
+        host: &mut EngineHostView,
+        rng: &mut Rng,
+    ) {
+        // Raven: "no world rendering or no world or no particle clouds"
+        //
+        // Raven's `||` chain short-circuits left-to-right in C same as Rust;
+        // the `rdflags` read is nested in a block so `!tr.world`/an empty
+        // `mParticleClouds` still return early without forcing the blocked
+        // read below (preserves the oracle's evaluation order rather than
+        // widening the panic surface).
+        //TODO: Port trRefdef_t::rdflags
+        // Source: oracle/codemp/renderer/tr_local.h:563-598 (`rdflags` is not
+        // yet a field on the landed `TrRefdef` — lands with the `tr_scene`
+        // R3 wave, not this one); guard reads both `tr.refdef.rdflags &
+        // RDF_NOWORLDMODEL` and `backEnd.refdef.rdflags & RDF_SKYBOXPORTAL`
+        // at oracle/codemp/renderer/tr_WorldEffects.cpp:1515-1521
+        if assets.world.is_none()
+            || {
+                let rdflags_blocked: bool = todo!(
+                    "Port trRefdef_t::rdflags — oracle/codemp/renderer/tr_WorldEffects.cpp:1515-1521"
+                );
+                rdflags_blocked
+            }
+            || self.mParticleClouds.is_empty()
+        {
+            return;
+        }
+
+        SetViewportAndScissor(frame);
+        // DEFERRED: R4 — qglMatrixMode(GL_MODELVIEW)/qglLoadMatrixf(backEnd
+        // .viewParms.world.modelMatrix): fixed-function GL surface, no R3
+        // home (DEC-37 A13.2); `viewParms_t::world.modelMatrix` is also not
+        // yet a field on the landed `ViewParms` (`tr_main` R3 wave).
+        // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:1524-1525
+
+        // Calculate Elapsed Time For Scale Purposes
+        //-------------------------------------------
+        //TODO: Port trRefdef_t::frametime
+        // Source: oracle/codemp/renderer/tr_local.h:563-598 (`frametime` is
+        // not yet a field on the landed `TrRefdef` — `tr_scene` R3 wave);
+        // used at oracle/codemp/renderer/tr_WorldEffects.cpp:1530
+        let frametime: f32 =
+            todo!("Port trRefdef_t::frametime — oracle/codemp/renderer/tr_WorldEffects.cpp:1530");
+        self.mMillisecondsElapsed = frametime;
+        if self.mMillisecondsElapsed < 1.0 {
+            self.mMillisecondsElapsed = 1.0;
+        }
+        if self.mMillisecondsElapsed > 1000.0 {
+            self.mMillisecondsElapsed = 1000.0;
+        }
+        self.mSecondsElapsed = self.mMillisecondsElapsed / 1000.0;
+
+        // Make Sure We Are Always Outside Cached
+        //----------------------------------------
+        if !self.mOutside.Initialized() {
+            //TODO: Port bmodel_t (world.bmodels[0].bounds)
+            // Source: oracle/codemp/renderer/tr_local.h:1039-1090
+            // (`world_t::bmodels` is not yet a field on the landed
+            // `WorldAsset` — `tr_bsp`/`tr_world` R3 wave); used at
+            // oracle/codemp/renderer/tr_WorldEffects.cpp:1546
+            let world_bmodel_bounds: Option<[vec3_t; 2]> = todo!(
+                "Port bmodel_t (world.bmodels[0].bounds) — oracle/codemp/renderer/tr_WorldEffects.cpp:1546"
+            );
+            self.mOutside.Cache(host, world_bmodel_bounds);
+        } else {
+            // Update All Wind Zones
+            //-----------------------
+            if !self.mFrozen {
+                wind.global_wind_velocity = [0.0; 3];
+                for wz in 0..self.mWindZones.len() {
+                    self.mWindZones[wz].Update(rng);
+                    if self.mWindZones[wz].mGlobal {
+                        for i in 0..3 {
+                            wind.global_wind_velocity[i] += self.mWindZones[wz].mCurrentVelocity[i];
+                        }
+                    }
+                }
+                wind.global_wind_direction = wind.global_wind_velocity;
+                wind.global_wind_speed = VectorNormalize(&mut wind.global_wind_direction);
+            }
+
+            // Update All Particle Clouds
+            //----------------------------
+            self.mParticlesRendered = 0;
+            let frozen = self.mFrozen;
+            let seconds_elapsed = self.mSecondsElapsed;
+            let wind_velocity = wind.global_wind_velocity;
+            for i in 0..self.mParticleClouds.len() {
+                self.mParticleClouds[i].Update(rng, frame, frozen, wind_velocity, seconds_elapsed);
+                self.mParticleClouds[i].Render(&mut self.mParticlesRendered);
+            }
+            if false {
+                com_printf(
+                    host.common,
+                    &format!("Weather: {} Particles Rendered\n", self.mParticlesRendered),
+                );
+            }
+        }
+    }
+
     /// Raven `R_GetChanceOfSaberFizz`.
     /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1990-2007`
     pub fn R_GetChanceOfSaberFizz(&self) -> f32 {
@@ -884,4 +1354,14 @@ impl WorldEffectsState {
 pub fn R_IsPuffing() -> bool {
     // Raven: "Eh? Don't want surfacesprites to know this?"
     false
+}
+
+/// Raven `R_ShutdownWorldEffects` — delegates to `R_InitWorldEffects`.
+///
+/// A bare Raven fn wrapping a class-owned method; `state`/`host` threaded in
+/// rather than reached (porting-rules §B4), matching
+/// `WorldEffectsState::R_InitWorldEffects`'s own signature.
+/// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1505-1508`
+pub fn R_ShutdownWorldEffects(state: &mut WorldEffectsState, host: &mut EngineHostView) {
+    state.R_InitWorldEffects(host);
 }

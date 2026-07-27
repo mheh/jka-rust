@@ -23,19 +23,23 @@
 // `view`/`ori`/`refdef` fields land with real shapes, call sites here take
 // `&frame.view`/`&frame.ori` slices instead of the tier-2 types directly.
 
+use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::tr_local::fog_t::fog_t;
 use crate::tr_local::orientationr_t::orientationr_t;
+use crate::tr_local::tr_ref_entity_t::trRefEntity_t;
 use crate::tr_local::view_parms_t::viewParms_t;
 
 use core::f64::consts::PI;
 
+use mp_engine_qcommon::common::Common;
 use mp_engine_qcommon::qfiles::draw_vert_t::drawVert_t;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
+use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::shared::q_math::{
     _DotProduct as DotProduct, _VectorAdd as VectorAdd, _VectorCopy as VectorCopy,
     _VectorMA as VectorMA, _VectorScale as VectorScale, _VectorSubtract as VectorSubtract,
-    DistanceSquared, SetPlaneSignbits, VectorClear,
+    DistanceSquared, SetPlaneSignbits, VectorClear, VectorLength,
 };
 use mp_qshared::shared::{cplane_t, orientation_t, vec3_t, vec4_t};
 // `PlaneFromPoints` has no `mp_qshared::shared::q_math` re-export (unlike the
@@ -65,22 +69,26 @@ pub const CULL_OUT: i32 = 2;
 /// Source: `oracle/codemp/game/q_shared.h`
 const PLANE_NON_AXIAL: u8 = 3;
 
-/// Raven `RDF_NOWORLDMODEL`. Value confirmed against the already-ported
-/// `crates/mp/uishared/src/ui_shared.rs:171` (`refdef.rdflags =
-/// RDF_NOWORLDMODEL`), which reuses the same literal.
+/// Raven `RDF_NOWORLDMODEL`.
 ///
-/// Source: `oracle/codemp/cgame/tr_types.h`
+/// Raven: used for player configuration screen.
+///
+/// Source: `oracle/codemp/cgame/tr_types.h:57`
 const RDF_NOWORLDMODEL: i32 = 1;
 
-// PORT-NOTE: RDF_AUTOMAP/RDF_NOFOG have no already-ported anchor anywhere in
-// this tree to confirm their bit value against — `tr_types.h`'s RDF_* block
-// isn't in this packet's oracle slice, and cgame (the only other rdflags
-// writer) isn't ported yet. Values below follow the same RDF_* bit-flag
-// family as the confirmed `RDF_NOWORLDMODEL`; flagged for confirmation
-// against `oracle/codemp/cgame/tr_types.h` the next time that header's RDF_*
-// block is actually read by a porter.
-const RDF_AUTOMAP: i32 = 1 << 12;
-const RDF_NOFOG: i32 = 1 << 8;
+/// Raven `RDF_AUTOMAP`.
+///
+/// Raven: means this scene is to draw the automap -rww.
+///
+/// Source: `oracle/codemp/cgame/tr_types.h:63`
+const RDF_AUTOMAP: i32 = 32;
+
+/// Raven `RDF_NOFOG`.
+///
+/// Raven: no global fog in this scene (but still brush fog) -rww.
+///
+/// Source: `oracle/codemp/cgame/tr_types.h:64`
+const RDF_NOFOG: i32 = 64;
 
 /// Raven `MAX_SHADERS` (non-`_XBOX` branch) — local copy of the private
 /// const already ported at `tr_local::tr_globals_t` (not `pub`, so not
@@ -93,20 +101,9 @@ const MAX_SHADERS: usize = 16384;
 /// disposition entry ("entities[MAX_ENTITIES=2048]").
 const MAX_ENTITIES: i32 = 2048;
 
-// PORT-NOTE: QSORT_FOGNUM_SHIFT/QSORT_ENTITYNUM_SHIFT/QSORT_SHADERNUM_SHIFT
-// (tr_local.h #defines) aren't in this packet's resolved call surface and
-// this file's oracle slice doesn't show their header block. `R_AddDrawSurf`/
-// `R_DecomposeSort`'s sort key is pure renderer interior (DEC-37 ruling 1:
-// never serialized, never compared against the oracle byte-for-byte — only
-// its resulting *relative order* is observable) so the exact shift amounts
-// don't need to match Raven's literal macro values, only preserve field
-// priority (shader > entity > fog > dlight) with non-overlapping bit ranges.
-// Derived here from what IS certain from the verbatim oracle body:
-// `dlightMap = sort & 3` (2 bits, bits 0-1) and `fogNum = (sort>>SHIFT) & 31`
-// (5 bits) are literal in the packet's `R_DecomposeSort` source; entity needs
-// `MAX_ENTITIES=2048` => 11 bits, shader needs `MAX_SHADERS=16384` => 14
-// bits. 2+5+11+14 = 32, so this packing exactly fills a u32 with zero
-// overlap: dlight[0-1], fog[2-6], entity[7-17], shader[18-31].
+/// Raven `QSORT_*` sort-key shifts.
+///
+/// Source: `oracle/codemp/renderer/tr_local.h:1226-1228`
 const QSORT_FOGNUM_SHIFT: u32 = 2;
 const QSORT_ENTITYNUM_SHIFT: u32 = 7;
 const QSORT_SHADERNUM_SHIFT: u32 = 18;
@@ -712,4 +709,446 @@ pub fn R_DecomposeSort(
     let entity_num = ((sort >> QSORT_ENTITYNUM_SHIFT) as i32) & (MAX_ENTITIES - 1);
     let dlight_map = (sort & 3) as i32;
     (entity_num, shader, fog_num, dlight_map)
+}
+
+// ===== wave 1 =====
+
+/// Raven `R_CullLocalPointAndRadius`.
+///
+/// `ori`/`r_nocull_integer`/`frustum` as `R_CullLocalBox`/`R_CullPointAndRadius`
+/// above (`R_LocalPointToWorld` needs `ori`; `R_CullPointAndRadius` needs the
+/// cvar + frustum pair).
+///
+/// Source: `oracle/codemp/renderer/tr_main.cpp:109-116`
+pub fn R_CullLocalPointAndRadius(
+    pt: vec3_t,
+    radius: f32,
+    ori: &orientationr_t,
+    r_nocull_integer: i32,
+    frustum: &[cplane_t; 4],
+) -> i32 {
+    let transformed = R_LocalPointToWorld(pt, ori);
+    R_CullPointAndRadius(transformed, radius, r_nocull_integer, frustum)
+}
+
+/// Raven `R_RotateForEntity`. Out-param `ori` -> return value.
+///
+/// `ent` is `trRefEntity_t` (tier-2 `tr_local::tr_ref_entity_t`, read through
+/// its existing shape per the interior-safety law's carve-out — the owned
+/// `RefEntity` placeholder (`render_state::placeholders`) doesn't carry
+/// `axis`/`nonNormalizedAxes` yet, so this wave threads the tier-2 shape
+/// directly, the same precedent this file's top-of-file PORT-NOTE set for
+/// `orientationr_t`/`viewParms_t`). `view` is `tr.viewParms` (read only:
+/// `.world`, `.ori.origin`). `scratch` carries `preTransEntMatrix` (DEC-37
+/// A13.3, `TrMainScratch` above — written here, read by
+/// `R_WorldNormalToEntity`).
+///
+/// Source: `oracle/codemp/renderer/tr_main.cpp:302-360`
+pub fn R_RotateForEntity(
+    ent: &trRefEntity_t,
+    view: &viewParms_t,
+    scratch: &mut TrMainScratch,
+) -> orientationr_t {
+    if ent.e.reType != refEntityType_t::RT_MODEL {
+        // Whole-struct copy of `viewParms->world` — every `orientationr_t`
+        // field, no defaulted tail.
+        return orientationr_t {
+            origin: view.world.origin,
+            axis: view.world.axis,
+            viewOrigin: view.world.viewOrigin,
+            modelMatrix: view.world.modelMatrix,
+        };
+    }
+
+    let mut ori = orientationr_t {
+        origin: ent.e.origin,
+        axis: ent.e.axis,
+        viewOrigin: [0.0; 3],
+        modelMatrix: [0.0; 16],
+    };
+
+    let m = &mut scratch.pre_trans_ent_matrix;
+    m[0] = ori.axis[0][0];
+    m[4] = ori.axis[1][0];
+    m[8] = ori.axis[2][0];
+    m[12] = ori.origin[0];
+
+    m[1] = ori.axis[0][1];
+    m[5] = ori.axis[1][1];
+    m[9] = ori.axis[2][1];
+    m[13] = ori.origin[1];
+
+    m[2] = ori.axis[0][2];
+    m[6] = ori.axis[1][2];
+    m[10] = ori.axis[2][2];
+    m[14] = ori.origin[2];
+
+    m[3] = 0.0;
+    m[7] = 0.0;
+    m[11] = 0.0;
+    m[15] = 1.0;
+
+    ori.modelMatrix = myGlMultMatrix(&scratch.pre_trans_ent_matrix, &view.world.modelMatrix);
+
+    // calculate the viewer origin in the model's space
+    // needed for fog, specular, and environment mapping
+    let mut delta: vec3_t = [0.0; 3];
+    VectorSubtract(view.ori.origin, ori.origin, &mut delta);
+
+    // compensate for scale in the axes if necessary
+    let axis_length = if ent.e.nonNormalizedAxes != 0 {
+        let len = VectorLength(ori.axis[0]);
+        if len == 0.0 {
+            0.0
+        } else {
+            1.0 / len
+        }
+    } else {
+        1.0
+    };
+
+    ori.viewOrigin[0] = DotProduct(delta, ori.axis[0]) * axis_length;
+    ori.viewOrigin[1] = DotProduct(delta, ori.axis[1]) * axis_length;
+    ori.viewOrigin[2] = DotProduct(delta, ori.axis[2]) * axis_length;
+
+    ori
+}
+
+/// Raven `s_flipMatrix` — file-scope const table (kind 1 of the fn-scope
+/// statics rule, DEC-37 A13.3).
+///
+/// Raven: convert from our coordinate system (looking down X) to OpenGL's
+/// coordinate system (looking down -Z). The non-`_XBOX` branch is the one MP
+/// retail builds.
+///
+/// Source: `oracle/codemp/renderer/tr_main.cpp:17-31`
+// Raven's own `static float s_flipMatrix[16]` name is kept (file-wide
+// Raven-casing convention); it is a static, not a `#define`.
+#[allow(non_upper_case_globals)]
+const s_flipMatrix: [f32; 16] = [
+    0.0, 0.0, -1.0, 0.0, //
+    -1.0, 0.0, 0.0, 0.0, //
+    0.0, 1.0, 0.0, 0.0, //
+    0.0, 0.0, 0.0, 1.0,
+];
+
+/// Raven `R_RotateForViewer`. Out-param (via `tr.ori`) -> return value.
+///
+/// `view` is `tr.viewParms` (`.ori.origin` read; `.world` written — the
+/// STATE HOMES SPLIT row's `RenderWorld::frame: FrameState` bucket, still
+/// the not-yet-populated `ViewParms`/`OrientationR` placeholders at this
+/// wave, so threaded as the tier-2 `viewParms_t` directly per this file's
+/// top-of-file PORT-NOTE). The return value is `tr.ori`.
+///
+/// Source: `oracle/codemp/renderer/tr_main.cpp:369-409`
+pub fn R_RotateForViewer(view: &mut viewParms_t) -> orientationr_t {
+    // `Com_Memset(&tr.ori, 0, sizeof(tr.ori))` — the struct literal below is
+    // the zeroed starting point; the diagonal writes right after it match
+    // the oracle's follow-up `axis[i][i] = 1` assignments exactly.
+    let mut ori = orientationr_t {
+        origin: [0.0; 3],
+        axis: [[0.0; 3]; 3],
+        viewOrigin: view.ori.origin,
+        modelMatrix: [0.0; 16],
+    };
+    ori.axis[0][0] = 1.0;
+    ori.axis[1][1] = 1.0;
+    ori.axis[2][2] = 1.0;
+
+    // transform by the camera placement
+    let origin = view.ori.origin;
+
+    let mut viewer_matrix = [0.0f32; 16];
+    viewer_matrix[0] = view.ori.axis[0][0];
+    viewer_matrix[4] = view.ori.axis[0][1];
+    viewer_matrix[8] = view.ori.axis[0][2];
+    viewer_matrix[12] = -origin[0] * viewer_matrix[0]
+        + -origin[1] * viewer_matrix[4]
+        + -origin[2] * viewer_matrix[8];
+
+    viewer_matrix[1] = view.ori.axis[1][0];
+    viewer_matrix[5] = view.ori.axis[1][1];
+    viewer_matrix[9] = view.ori.axis[1][2];
+    viewer_matrix[13] = -origin[0] * viewer_matrix[1]
+        + -origin[1] * viewer_matrix[5]
+        + -origin[2] * viewer_matrix[9];
+
+    viewer_matrix[2] = view.ori.axis[2][0];
+    viewer_matrix[6] = view.ori.axis[2][1];
+    viewer_matrix[10] = view.ori.axis[2][2];
+    viewer_matrix[14] = -origin[0] * viewer_matrix[2]
+        + -origin[1] * viewer_matrix[6]
+        + -origin[2] * viewer_matrix[10];
+
+    viewer_matrix[3] = 0.0;
+    viewer_matrix[7] = 0.0;
+    viewer_matrix[11] = 0.0;
+    viewer_matrix[15] = 1.0;
+
+    // convert from our coordinate system (looking down X)
+    // to OpenGL's coordinate system (looking down -Z)
+    ori.modelMatrix = myGlMultMatrix(&viewer_matrix, &s_flipMatrix);
+
+    // Whole-struct copy of `tr.ori` into `tr.viewParms.world` — every
+    // `orientationr_t` field, no defaulted tail.
+    view.world = orientationr_t {
+        origin: ori.origin,
+        axis: ori.axis,
+        viewOrigin: ori.viewOrigin,
+        modelMatrix: ori.modelMatrix,
+    };
+
+    ori
+}
+
+/// Raven `R_SetupProjection`.
+///
+/// `view` is `tr.viewParms` (`.zFar` read after `SetFarClip` writes it,
+/// `.projectionMatrix` written). `refdef_rdflags`/`refdef_fov_x`/
+/// `refdef_fov_y` are `tr.refdef.rdflags`/`fov_x`/`fov_y` — threaded as bare
+/// scalars rather than `render_state::placeholders::TrRefdef` to match this
+/// wave's own `SetFarClip` precedent (wave 0, already takes
+/// `refdef_rdflags: i32` directly; `rdflags` itself isn't a landed
+/// `TrRefdef` field yet). `distance_cull` is `tr.distanceCull`
+/// (`RenderAssets::distance_cull`, B11) — passed straight through to
+/// `SetFarClip`. `r_znear` reads through the live engine cvar table
+/// (`RendererCvars::r_znear`, DEC-37 A13.1), the `tr_light.rs`
+/// `R_SetupEntityLightingGrid` precedent for `common.cvar(handle)`.
+///
+/// Only the non-`_XBOX` projection-matrix branch is transcribed — MP never
+/// builds `_XBOX`.
+///
+/// Source: `oracle/codemp/renderer/tr_main.cpp:494-559`
+pub fn R_SetupProjection(
+    view: &mut viewParms_t,
+    refdef_rdflags: i32,
+    refdef_fov_x: f32,
+    refdef_fov_y: f32,
+    distance_cull: f32,
+    common: &Common,
+    cvars: &RendererCvars,
+) {
+    // dynamically compute far clip plane distance
+    SetFarClip(refdef_rdflags, view, distance_cull);
+
+    //
+    // set up projection matrix
+    //
+    let z_near = common.cvar(cvars.r_znear).value;
+    let z_far = view.zFar;
+
+    // C promotes to double (M_PI, tan()); f64 intermediate per wave-0 ruling
+    // 12, rounded to f32 once at the assignment (C's own narrowing point).
+    let ymax = (z_near as f64 * f64::tan(refdef_fov_y as f64 * PI / 360.0)) as f32;
+    let ymin = -ymax;
+
+    let xmax = (z_near as f64 * f64::tan(refdef_fov_x as f64 * PI / 360.0)) as f32;
+    let xmin = -xmax;
+
+    let width = xmax - xmin;
+    let height = ymax - ymin;
+    let depth = z_far - z_near;
+
+    view.projectionMatrix[0] = 2.0 * z_near / width;
+    view.projectionMatrix[4] = 0.0;
+    view.projectionMatrix[8] = (xmax + xmin) / width; // normally 0
+    view.projectionMatrix[12] = 0.0;
+
+    view.projectionMatrix[1] = 0.0;
+    view.projectionMatrix[5] = 2.0 * z_near / height;
+    view.projectionMatrix[9] = (ymax + ymin) / height; // normally 0
+    view.projectionMatrix[13] = 0.0;
+
+    view.projectionMatrix[2] = 0.0;
+    view.projectionMatrix[6] = 0.0;
+    view.projectionMatrix[10] = -(z_far + z_near) / depth;
+    view.projectionMatrix[14] = -2.0 * z_far * z_near / depth;
+
+    view.projectionMatrix[3] = 0.0;
+    view.projectionMatrix[7] = 0.0;
+    view.projectionMatrix[11] = -1.0;
+    view.projectionMatrix[15] = 0.0;
+}
+
+/// Raven `CUTOFF` — `qsortFast`'s small-array-switches-to-`shortsort`
+/// threshold.
+///
+/// Raven: testing shows that this is good value.
+///
+/// Source: `oracle/codemp/renderer/tr_main.cpp:1074`
+const CUTOFF: usize = 8;
+
+/// Raven `qsortFast` — iterative quicksort (explicit `lostk`/`histk` stack in
+/// place of the C `goto recurse` pseudo-recursion) over `drawSurf_t`,
+/// falling back to `shortsort` under `CUTOFF` elements. Operates on the whole
+/// slice (Raven's `void *base, unsigned num, unsigned width` triple collapses
+/// to a slice per the out-param/pointer-walk dictionary entries); `lo`/`hi`/
+/// `loguy`/`higuy` become `isize` slice-index cursors instead of `char*`
+/// addresses (the C code transiently holds `higuy` one-past-`hi` and
+/// decrements before every dereference, so the loop invariant that keeps
+/// every actual index access in bounds is preserved exactly).
+///
+/// PORT-NOTE: the oracle's leading `if (sizeof(drawSurf_t) != 8) Com_Error(
+/// ERR_DROP, "change SWAP_DRAW_SURF macro")` guards the C `SWAP_DRAW_SURF`
+/// macro's 2-word (sort + pointer) block-swap trick — a packed-layout
+/// precondition for that specific 8-byte pointer-swap optimization, not a
+/// bounds/overflow guard on the sort itself. The owned generic `DrawSurf<S>`
+/// this port swaps via `[T]::swap` has no fixed size and no equivalent
+/// macro, so the check has no Rust counterpart; dropped rather than ported.
+///
+/// Source: `oracle/codemp/renderer/tr_main.cpp:1097-1252`
+pub fn qsortFast<S>(surfs: &mut [DrawSurf<S>]) {
+    let num = surfs.len();
+    if num < 2 {
+        return; // nothing to do
+    }
+
+    // Note: the number of stack entries required is no more than
+    // 1 + log2(size), so 30 is sufficient for any array
+    let mut lostk: [isize; 30] = [0; 30];
+    let mut histk: [isize; 30] = [0; 30];
+    let mut stkptr: usize = 0; // initialize stack
+
+    let mut lo: isize = 0;
+    let mut hi: isize = num as isize - 1; // initialize limits
+
+    // this entry point is for pseudo-recursion calling: setting
+    // lo and hi and jumping to here is like recursion, but stkptr is
+    // prserved, locals aren't, so we preserve stuff on the stack
+    'recurse: loop {
+        let size = hi - lo + 1; // number of el's to sort
+
+        // below a certain size, it is faster to use a O(n^2) sorting method
+        if size as usize <= CUTOFF {
+            shortsort(&mut surfs[lo as usize..=hi as usize]);
+        } else {
+            // First we pick a partititioning element. The efficiency of the
+            // algorithm demands that we find one that is approximately the
+            // median of the values, but also that we select one fast. Using
+            // the first one produces bad performace if the array is already
+            // sorted, so we use the middle one, which would require a very
+            // wierdly arranged array for worst case performance. Testing
+            // shows that a median-of-three algorithm does not, in general,
+            // increase performance.
+
+            let mid = lo + size / 2; // find middle element
+            surfs.swap(mid as usize, lo as usize); // swap it to beginning of array
+
+            // We now wish to partition the array into three pieces, one
+            // consisiting of elements <= partition element, one of elements
+            // equal to the parition element, and one of element >= to it.
+            // This is done below; comments indicate conditions established
+            // at every step.
+
+            let mut loguy = lo;
+            let mut higuy = hi + 1;
+
+            // Note that higuy decreases and loguy increases on every
+            // iteration, so loop must terminate.
+            loop {
+                // lo <= loguy < hi, lo < higuy <= hi + 1,
+                // A[i] <= A[lo] for lo <= i <= loguy,
+                // A[i] >= A[lo] for higuy <= i <= hi
+                loop {
+                    loguy += 1;
+                    if !(loguy <= hi && surfs[loguy as usize].sort <= surfs[lo as usize].sort) {
+                        break;
+                    }
+                }
+                // lo < loguy <= hi+1, A[i] <= A[lo] for lo <= i < loguy,
+                // either loguy > hi or A[loguy] > A[lo]
+
+                loop {
+                    higuy -= 1;
+                    if !(higuy > lo && surfs[higuy as usize].sort >= surfs[lo as usize].sort) {
+                        break;
+                    }
+                }
+                // lo-1 <= higuy <= hi, A[i] >= A[lo] for higuy < i <= hi,
+                // either higuy <= lo or A[higuy] < A[lo]
+
+                if higuy < loguy {
+                    break;
+                }
+                // if loguy > hi or higuy <= lo, then we would have exited, so
+                // A[loguy] > A[lo], A[higuy] < A[lo],
+                // loguy < hi, highy > lo
+
+                surfs.swap(loguy as usize, higuy as usize);
+                // A[loguy] < A[lo], A[higuy] > A[lo]; so condition at top
+                // of loop is re-established
+            }
+
+            //     A[i] >= A[lo] for higuy < i <= hi,
+            //     A[i] <= A[lo] for lo <= i < loguy,
+            //     higuy < loguy, lo <= higuy <= hi
+            // implying:
+            //     A[i] >= A[lo] for loguy <= i <= hi,
+            //     A[i] <= A[lo] for lo <= i <= higuy,
+            //     A[i] = A[lo] for higuy < i < loguy
+
+            surfs.swap(lo as usize, higuy as usize); // put partition element in place
+
+            // OK, now we have the following:
+            //    A[i] >= A[higuy] for loguy <= i <= hi,
+            //    A[i] <= A[higuy] for lo <= i < higuy
+            //    A[i] = A[lo] for higuy <= i < loguy
+
+            // We've finished the partition, now we want to sort the
+            // subarrays [lo, higuy-1] and [loguy, hi].
+            // We do the smaller one first to minimize stack usage.
+            // We only sort arrays of length 2 or more.
+            if higuy - 1 - lo >= hi - loguy {
+                if lo + 1 < higuy {
+                    lostk[stkptr] = lo;
+                    histk[stkptr] = higuy - 1;
+                    stkptr += 1; // save big recursion for later
+                }
+
+                if loguy < hi {
+                    lo = loguy;
+                    continue 'recurse; // do small recursion
+                }
+            } else {
+                if loguy < hi {
+                    lostk[stkptr] = loguy;
+                    histk[stkptr] = hi;
+                    stkptr += 1; // save big recursion for later
+                }
+
+                if lo + 1 < higuy {
+                    hi = higuy - 1;
+                    continue 'recurse; // do small recursion
+                }
+            }
+        }
+
+        // We have sorted the array, except for any pending sorts on the
+        // stack. Check if there are any, and do them.
+        if stkptr == 0 {
+            return; // all subarrays done
+        }
+        stkptr -= 1;
+        lo = lostk[stkptr];
+        hi = histk[stkptr];
+        // pop subarray from stack, continue 'recurse
+    }
+}
+
+/// Raven `R_DebugPolygon`.
+///
+/// DEFERRED: R4 — the entire body is fixed-function GL calls
+/// (`qglColor3f`/`qglBegin`/`qglVertex3fv`/`qglEnd`/`qglDepthRange`) plus
+/// `GL_State` (already-ported wave-0, but purely a GL binding-state write —
+/// no CPU-only remainder to extract here). DEC-01/DEC-37 rule the R4 backend
+/// an idiomatic wgpu rewrite, not a GL transcription, and R2 leaves these
+/// entry points unhomed (`GpuResources::gl_state` a named placeholder until
+/// R4). No CPU logic survives the deferral: `color`/`points` only exist to
+/// feed the deferred draw calls (the bit-unpack `color&1`/`(color>>1)&1`/
+/// `(color>>2)&1` is itself only a GL color-component argument).
+///
+/// Source: `oracle/codemp/renderer/tr_main.cpp:1540-1564`
+pub fn R_DebugPolygon(_color: i32, _num_points: i32, _points: &[f32]) {
+    // DEFERRED: R4 — R_DebugPolygon (see doc comment above) (DEC-37 A13.2 / DEC-01)
+    // Source: oracle/codemp/renderer/tr_main.cpp:1540-1564
 }

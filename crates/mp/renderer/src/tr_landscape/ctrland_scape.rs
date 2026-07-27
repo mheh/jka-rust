@@ -136,6 +136,22 @@ impl CTRLandScape {
         let patch = self.patch_mut(patchX, patchY, blockWidth);
         patch.mRenderMap = render_map.wrapping_add((x + (y * realWidth)) as usize);
     }
+
+    /// Raven `CTRLandScape::GetShader()->sortedIndex` — the terrain surface's
+    /// sort key (`R_AddTerrainSurfaces`, `tr_terrain.cpp:1004`).
+    ///
+    /// # Safety invariant
+    /// `mShader` is the shader `CTRLandScape`'s ctor resolves through
+    /// `R_FindShader` (`tr_terrain.cpp:891`) and holds for the landscape's
+    /// lifetime; the shader table it points into outlives the landscape (both
+    /// die with the world asset).
+    ///
+    /// This accessor retires with the type at the #41 type pass.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_landscape.h:170`
+    pub fn shader_sorted_index(&self) -> c_int {
+        unsafe { (*self.mShader).sortedIndex }
+    }
 }
 
 const _: () = assert!(core::mem::offset_of!(CTRLandScape, common) == 0);

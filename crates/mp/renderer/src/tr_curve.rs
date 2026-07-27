@@ -386,3 +386,171 @@ pub fn R_CreateSurfaceGridMesh(
 pub fn R_FreeSurfaceGridMesh(grid: GridMesh) {
     drop(grid);
 }
+
+/// Raven `PutPointsOnCurve`.
+///
+/// Source: `oracle/codemp/renderer/tr_curve.cpp:251-272`
+pub fn PutPointsOnCurve(ctrl: &mut ControlGrid, width: usize, height: usize) {
+    for i in 0..width {
+        let mut j = 1usize;
+        while j < height {
+            let prev = LerpDrawVert(&ctrl[j][i], &ctrl[j + 1][i]);
+            let next = LerpDrawVert(&ctrl[j][i], &ctrl[j - 1][i]);
+            ctrl[j][i] = LerpDrawVert(&prev, &next);
+            j += 2;
+        }
+    }
+
+    for j in 0..height {
+        let mut i = 1usize;
+        while i < width {
+            let prev = LerpDrawVert(&ctrl[j][i], &ctrl[j][i + 1]);
+            let next = LerpDrawVert(&ctrl[j][i], &ctrl[j][i - 1]);
+            ctrl[j][i] = LerpDrawVert(&prev, &next);
+            i += 2;
+        }
+    }
+}
+
+/// A fresh, zero-filled `ControlGrid` — `drawVert_t` has no `Copy`/`Clone`
+/// derive (see `copy_draw_vert`), so the fixed `[[T; 65]; 65]` cannot be
+/// built with array-repeat syntax; `array::from_fn` fills it element-wise
+/// instead. Stands in for the oracle's uninitialized `MAC_STATIC drawVert_t
+/// ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE]` stack buffer.
+fn zero_control_grid() -> ControlGrid {
+    std::array::from_fn(|_| std::array::from_fn(|_| zero_draw_vert()))
+}
+
+/// Raven `R_GridInsertColumn`.
+///
+/// Source: `oracle/codemp/renderer/tr_curve.cpp:511-558`
+pub fn R_GridInsertColumn(
+    grid: GridMesh,
+    column: usize,
+    row: usize,
+    point: vec3_t,
+    loderror: f32,
+) -> Option<GridMesh> {
+    let old_width = grid.width as usize;
+    let height = grid.height as usize;
+    let width = old_width + 1;
+    if width > MAX_GRID_SIZE {
+        return None;
+    }
+
+    let mut ctrl = zero_control_grid();
+    let mut error_table: ErrorTable = [[0.0; MAX_GRID_SIZE]; 2];
+
+    let mut old_column = 0usize;
+    for i in 0..width {
+        if i == column {
+            // insert new column
+            for j in 0..height {
+                // PORT-NOTE (porting-rules §19): Raven's straddle read
+                // `grid->verts[j*grid->width + i-1]`/`[...+i]` can index
+                // outside the old array when inserting at a boundary
+                // (column == 0 or == old width) — C UB (stack over-read).
+                // Rust's `Vec` bounds check turns that into a panic instead,
+                // the defined-behavior pick for this UB site.
+                let mut v = LerpDrawVert(
+                    &grid.verts[j * old_width + i - 1],
+                    &grid.verts[j * old_width + i],
+                );
+                if j == row {
+                    v.xyz = point;
+                }
+                ctrl[j][i] = v;
+            }
+            error_table[0][i] = loderror;
+            continue;
+        }
+        error_table[0][i] = grid.width_lod_error[old_column];
+        for j in 0..height {
+            ctrl[j][i] = copy_draw_vert(&grid.verts[j * old_width + old_column]);
+        }
+        old_column += 1;
+    }
+    for j in 0..height {
+        error_table[1][j] = grid.height_lod_error[j];
+    }
+    // put all the aproximating points on the curve
+    //PutPointsOnCurve( ctrl, width, height );
+    // calculate normals
+    MakeMeshNormals(width, height, &mut ctrl);
+
+    let lod_origin = grid.lod_origin;
+    let lod_radius = grid.lod_radius;
+    // free the old grid
+    R_FreeSurfaceGridMesh(grid);
+    // create a new grid
+    let mut new_grid = R_CreateSurfaceGridMesh(width, height, &ctrl, &error_table);
+    new_grid.lod_radius = lod_radius;
+    new_grid.lod_origin = lod_origin;
+    Some(new_grid)
+}
+
+/// Raven `R_GridInsertRow`.
+///
+/// Source: `oracle/codemp/renderer/tr_curve.cpp:565-612`
+pub fn R_GridInsertRow(
+    grid: GridMesh,
+    row: usize,
+    column: usize,
+    point: vec3_t,
+    loderror: f32,
+) -> Option<GridMesh> {
+    let width = grid.width as usize;
+    let old_height = grid.height as usize;
+    let height = old_height + 1;
+    if height > MAX_GRID_SIZE {
+        return None;
+    }
+
+    let mut ctrl = zero_control_grid();
+    let mut error_table: ErrorTable = [[0.0; MAX_GRID_SIZE]; 2];
+
+    let mut old_row = 0usize;
+    for i in 0..height {
+        if i == row {
+            // insert new row
+            for j in 0..width {
+                // PORT-NOTE (porting-rules §19): Raven's straddle read
+                // `grid->verts[(i-1)*grid->width + j]`/`[i*grid->width+j]`
+                // can index outside the old array when inserting at a
+                // boundary (row == 0 or == old height) — C UB (stack
+                // over-read). Rust's `Vec` bounds check turns that into a
+                // panic instead, the defined-behavior pick for this UB site.
+                let mut v =
+                    LerpDrawVert(&grid.verts[(i - 1) * width + j], &grid.verts[i * width + j]);
+                if j == column {
+                    v.xyz = point;
+                }
+                ctrl[i][j] = v;
+            }
+            error_table[1][i] = loderror;
+            continue;
+        }
+        error_table[1][i] = grid.height_lod_error[old_row];
+        for j in 0..width {
+            ctrl[i][j] = copy_draw_vert(&grid.verts[old_row * width + j]);
+        }
+        old_row += 1;
+    }
+    for j in 0..width {
+        error_table[0][j] = grid.width_lod_error[j];
+    }
+    // put all the aproximating points on the curve
+    //PutPointsOnCurve( ctrl, width, height );
+    // calculate normals
+    MakeMeshNormals(width, height, &mut ctrl);
+
+    let lod_origin = grid.lod_origin;
+    let lod_radius = grid.lod_radius;
+    // free the old grid
+    R_FreeSurfaceGridMesh(grid);
+    // create a new grid
+    let mut new_grid = R_CreateSurfaceGridMesh(width, height, &ctrl, &error_table);
+    new_grid.lod_radius = lod_radius;
+    new_grid.lod_origin = lod_origin;
+    Some(new_grid)
+}

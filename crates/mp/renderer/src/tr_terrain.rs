@@ -63,6 +63,7 @@ use crate::tr_local::srf_terrain_s::srfTerrain_t;
 use crate::tr_local::surface_type_t::surfaceType_t;
 use crate::tr_local::tr_refdef_t::trRefdef_t;
 use crate::tr_local::view_parms_t::viewParms_t;
+use crate::tr_main::{DrawSurf, R_AddDrawSurf, SurfaceGeometry};
 
 /// Raven `HEIGHT_RESOLUTION` — the size of `CTRLandScape::mHeightDetails[]`.
 /// Already defined (module-private) in
@@ -533,4 +534,86 @@ pub fn R_TerrainShutdown(cm: &mut CollisionWorld, land_scape: &mut srfTerrain_t)
         // Source: `oracle/codemp/renderer/tr_terrain.cpp:1046-1053`
         todo!("Port R_TerrainShutdown teardown — oracle/codemp/renderer/tr_terrain.cpp:1046-1053")
     }
+}
+
+// ---------------------------------------------------------------------
+// wave 1
+// ---------------------------------------------------------------------
+
+/// Raven `RDF_NOWORLDMODEL` — restated from `tr_main.rs`'s own local `const`
+/// (not `pub` there, so not reachable from this file); same confirmed value
+/// (`tr_light.rs`'s own restatement of the same literal).
+///
+/// Source: `oracle/codemp/cgame/tr_types.h`
+const RDF_NOWORLDMODEL: i32 = 1;
+
+/// Raven `RDF_NOFOG` — restated from `tr_main.rs`'s own local `const` (not
+/// `pub` there).
+///
+/// Raven: no global fog in this scene (but still brush fog) -rww.
+///
+/// Source: `oracle/codemp/cgame/tr_types.h:64`
+const RDF_NOFOG: i32 = 64;
+
+/// Raven `R_AddTerrainSurfaces`.
+///
+/// `r_drawTerrain`/`tr.refdef` are threaded (`cvars`/`engine`/`refdef`, §B4).
+/// `tr.landScape` (the `srfTerrain_t`) and `landscape->GetCommon()`'s
+/// `CmLandScape` are threaded separately per this file's own header PORT-NOTE
+/// ("the renderer reaches [`common`] through ... back-pointers ... the
+/// carriers are threaded in as `&CmLandScape` ... parameters") — matching
+/// [`R_CalcTerrainVisBounds`]'s own established shape below, which this fn
+/// calls.
+///
+/// `shader_sorted_index` (`landscape->GetShader()->sortedIndex`) is read
+/// through the tier-2 accessors `srfTerrain_t::landscape` and
+/// `CTRLandScape::shader_sorted_index`, which quarantine the two raw-pointer
+/// derefs in the owning types' own files (§D11) alongside this file's
+/// `mTRPatches`/`mRenderMap` accessors.
+///
+/// `shifted_entity_num` is `tr.shiftedEntityNum`: unlike `R_AddPolygonSurfaces`
+/// (`tr_scene.rs`), which assigns it inline in its own oracle body, this fn's
+/// oracle body never writes it — it is read as ambient state set by whichever
+/// caller precedes this call (`R_AddWorldSurfaces`, not in this wave's
+/// packet). Threaded explicitly rather than guessed at a fixed value (no
+/// speculative behavior, porting-rules §A2); the caller supplies the current
+/// `tr.shiftedEntityNum`.
+///
+/// The surface payload has no dedicated `SurfaceGeometry` variant yet (world/
+/// terrain surface arenas land with `tr_bsp`/`tr_world`, tier-2 transition
+/// audit) — `SurfaceGeometry::Other` is the file's own established catch-all
+/// for not-yet-modeled surface kinds (`tr_main.rs`'s `R_CullPointAndRadius`
+/// family default-plane arm).
+///
+/// Source: `oracle/codemp/renderer/tr_terrain.cpp:993-1008`
+pub fn R_AddTerrainSurfaces<'a>(
+    engine: &Common,
+    cvars: &RendererCvars,
+    refdef: &trRefdef_t,
+    land_scape: &srfTerrain_t,
+    land: &CmLandScape,
+    view: &mut viewParms_t,
+    shifted_entity_num: i32,
+    draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
+) {
+    if engine.cvar(cvars.r_drawTerrain).integer == 0 || (refdef.rdflags & RDF_NOWORLDMODEL) != 0 {
+        return;
+    }
+
+    if land_scape.landscape.is_null() {
+        return;
+    }
+    let shader_sorted_index = land_scape.landscape().shader_sorted_index();
+    let rdf_nofog = (refdef.rdflags & RDF_NOFOG) != 0;
+
+    R_AddDrawSurf(
+        SurfaceGeometry::Other,
+        shader_sorted_index,
+        shifted_entity_num,
+        rdf_nofog,
+        0,
+        0,
+        draw_surfs,
+    );
+    R_CalcTerrainVisBounds(land, view);
 }

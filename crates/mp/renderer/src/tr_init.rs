@@ -4,12 +4,18 @@
 
 #![allow(non_snake_case)]
 
+use core::ffi::c_int;
+
 use mp_engine_qcommon::common::common::{com_printf, Common};
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::cvar_fns::{Cvar_Get, Cvar_Set, Cvar_VariableString};
+use mp_engine_qcommon::files_common::FS_WriteFile;
 use mp_qshared::common::mp::cgame::texture_compression_t::textureCompression_t;
-use mp_qshared::shared::cvar::{CvarHandle, CVAR_ROM};
+use mp_qshared::shared::cvar::{
+    CvarHandle, CVAR_ARCHIVE, CVAR_CHEAT, CVAR_LATCH, CVAR_ROM, CVAR_TEMP,
+};
 use mp_qshared::shared::q_color::S_COLOR_YELLOW;
+use native_platform::Sys_LowPhysicalMemory;
 
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
@@ -437,3 +443,467 @@ pub fn RE_SetLightStyle(sim: &mut RenderAssetsSim, style: usize, color: [u8; 4])
 // fn-scope `static refexport_t re` dissolves with the type it held (the
 // three-kind-rule classification is moot once the carrier is gone).
 // Source: oracle/codemp/renderer/tr_init.cpp:1459-1531
+
+/// Raven `R_TakeScreenshot`.
+///
+/// `Hunk_AllocateTempMemory`/`Hunk_FreeTempMemory` collapse to an owned local
+/// `Vec<u8>` (porting-rules §C9 — the established `R_MipMap2` precedent,
+/// `tr_image.rs:180-187`), never a raw-pointer alloc/free pair; the "swap rgb
+/// to bgr" pointer walk becomes `Vec::swap` (same behavior, idiomatic shape,
+/// porting-rules §C10).
+///
+/// Source: `oracle/codemp/renderer/tr_init.cpp:537-571`
+// `x`/`y` are read only by the R4-deferred `qglReadPixels` call below.
+#[allow(unused_variables)]
+pub fn R_TakeScreenshot(
+    common: &mut Common,
+    assets: &RenderAssets,
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+    file_name: &str,
+) {
+    let vid_width = assets.glconfig.vid_width;
+    let vid_height = assets.glconfig.vid_height;
+
+    // `Com_Memset(buffer, 0, 18)` — `vec![0u8; N]` is already zero-filled.
+    let mut buffer = vec![0u8; (vid_width * vid_height * 3 + 18).max(0) as usize];
+    buffer[2] = 2; // uncompressed type
+    buffer[12] = (width & 255) as u8;
+    buffer[13] = (width >> 8) as u8;
+    buffer[14] = (height & 255) as u8;
+    buffer[15] = (height >> 8) as u8;
+    buffer[16] = 24; // pixel size
+
+    // DEFERRED: R4 — `qglReadPixels(x, y, width, height, GL_RGB,
+    // GL_UNSIGNED_BYTE, buffer+18)`: the fixed-function GL surface has no R3
+    // home (DEC-01/DEC-37 A13.2 — `GpuResources::gl_state` is a named
+    // placeholder until the wgpu rewrite). `buffer[18..]` stays zero-filled
+    // until R4 fills it; the surrounding CPU logic (header, channel swap,
+    // gamma, file write) is still ported per this wave's threading digest
+    // ("port the CPU logic").
+    // Source: oracle/codemp/renderer/tr_init.cpp:552
+
+    // swap rgb to bgr
+    let c = (18 + width * height * 3) as usize;
+    let mut i = 18usize;
+    while i < c {
+        buffer.swap(i, i + 2);
+        i += 3;
+    }
+
+    // DEFERRED: `tr.overbrightBits > 0` — `trGlobals_t` frontend scratch ->
+    // `RenderWorld::frame: FrameState` (`## State ownership` "tr frontend
+    // scratch/counters" row); the field is not yet landed on `FrameState`
+    // (same gap `GfxInfo_f`'s GAMMA-line note above already flags), so the
+    // gamma-correct gate can't be evaluated and the whole conditional is
+    // skipped rather than guessed (porting-rules §A2).
+    // Source: oracle/codemp/renderer/tr_init.cpp:562-565
+
+    FS_WriteFile(common, file_name, buffer.as_ptr() as *const (), c as c_int);
+
+    // `Hunk_FreeTempMemory(buffer)` — no-op: `buffer` (owned `Vec<u8>`) drops
+    // here (porting-rules §C9).
+}
+
+// DEFERRED: `R_LevelShot` — two state-home gaps stack on this fn, neither
+// licensed to invent:
+// (1) `tr.world->baseName` — the `world_t` tier-2 transition audit's `world_t`
+//     row promises "String x2 for the names" once `tr_bsp`/`tr_world` land,
+//     but the currently-landed `WorldAsset` (`render_state/placeholders.rs`)
+//     carries only `name`, no `base_name` field — no state home exists yet
+//     (preamble: "leave a cited // DEFERRED: and raise it — do NOT create a
+//     field"). It names the output file, so it blocks the very first
+//     statement every other one depends on; no partial CPU-logic body is
+//     written (unlike `R_TakeScreenshot` above).
+// (2) `qglReadPixels` — same GL-surface gap as `R_TakeScreenshot` above
+//     (DEC-01/DEC-37 A13.2).
+// `LEVELSHOTSIZE` is `256` (oracle/codemp/renderer/tr_init.cpp:631) — no
+// longer a gap; the constant lands with the body.
+// Source: oracle/codemp/renderer/tr_init.cpp:632-691
+
+/// Raven `R_Register`.
+///
+/// One `Cvar_Get` per `RendererCvars` field (DEC-37 A13.1); flag/default
+/// values transcribed verbatim, including the oracle's own-looking quirks
+/// (`"0.8f"`/`"1.13f"` default strings, the `"r_roofCeilFloorDist"` cvar name
+/// under the `r_roofCullFloorDist` field — both already noted in
+/// `renderer_cvars.rs`'s per-field doc comments, not re-derived here).
+///
+/// Platform `#ifdef` resolution follows the established MP-retail-build
+/// precedent (non-`_XBOX`, non-`__linux__`, non-`__MACOS__`, non-`_DEBUG` —
+/// `tr_shade_calc.rs:263-264`, `tr_shadows.rs:76`): the `_XBOX`-only cvars
+/// (`r_hdreffect`/`r_sundir_*`/`r_hdrbloom`) and the `_DEBUG`-only
+/// `r_noPrecacheGLA` are dropped, not registered.
+///
+/// The `#ifndef DEDICATED` command-registration block (`imagelist`/
+/// `shaderlist`/`skinlist`/`screenshot`/`screenshot_tga`/`gfxinfo`/
+/// `r_atihack`/`r_we`/`imagecacheinfo`) is dropped whole — DEDICATED is this
+/// build's live configuration (`Hunk_Clear` precedent,
+/// `crates/mp/engine/qcommon/src/z_memman_pc.rs:808-811`, porting-rules
+/// §20/§C10).
+///
+/// Source: `oracle/codemp/renderer/tr_init.cpp:985-1205`
+pub fn R_Register(view: &mut EngineHostView, cvars: &mut RendererCvars) {
+    //
+    // latched and archived variables
+    //
+    cvars.r_allowExtensions = Some(Cvar_Get(
+        view,
+        "r_allowExtensions",
+        "1",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
+    cvars.r_ext_compressed_textures = Some(Cvar_Get(
+        view,
+        "r_ext_compress_textures",
+        "1",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
+    cvars.r_ext_compressed_lightmaps = Some(Cvar_Get(
+        view,
+        "r_ext_compress_lightmaps",
+        "0",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
+    cvars.r_ext_preferred_tc_method = Some(Cvar_Get(
+        view,
+        "r_ext_preferred_tc_method",
+        "0",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
+    cvars.r_ext_gamma_control = Some(Cvar_Get(
+        view,
+        "r_ext_gamma_control",
+        "1",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
+    cvars.r_ext_multitexture = Some(Cvar_Get(
+        view,
+        "r_ext_multitexture",
+        "1",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
+    cvars.r_ext_compiled_vertex_array = Some(Cvar_Get(
+        view,
+        "r_ext_compiled_vertex_array",
+        "1",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
+    // MP retail builds the non-`__linux__` branch (established precedent —
+    // see doc comment above).
+    cvars.r_ext_texture_env_add = Some(Cvar_Get(
+        view,
+        "r_ext_texture_env_add",
+        "1",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
+    cvars.r_ext_texture_filter_anisotropic = Some(Cvar_Get(
+        view,
+        "r_ext_texture_filter_anisotropic",
+        "16",
+        CVAR_ARCHIVE,
+    ));
+
+    cvars.r_DynamicGlow = Some(Cvar_Get(view, "r_DynamicGlow", "0", CVAR_ARCHIVE));
+    cvars.r_DynamicGlowPasses = Some(Cvar_Get(view, "r_DynamicGlowPasses", "5", CVAR_CHEAT));
+    cvars.r_DynamicGlowDelta = Some(Cvar_Get(view, "r_DynamicGlowDelta", "0.8f", CVAR_CHEAT));
+    cvars.r_DynamicGlowIntensity = Some(Cvar_Get(
+        view,
+        "r_DynamicGlowIntensity",
+        "1.13f",
+        CVAR_CHEAT,
+    ));
+    cvars.r_DynamicGlowSoft = Some(Cvar_Get(view, "r_DynamicGlowSoft", "1", CVAR_CHEAT));
+    cvars.r_DynamicGlowWidth = Some(Cvar_Get(
+        view,
+        "r_DynamicGlowWidth",
+        "320",
+        CVAR_CHEAT | CVAR_LATCH,
+    ));
+    cvars.r_DynamicGlowHeight = Some(Cvar_Get(
+        view,
+        "r_DynamicGlowHeight",
+        "240",
+        CVAR_CHEAT | CVAR_LATCH,
+    ));
+
+    cvars.r_picmip = Some(Cvar_Get(view, "r_picmip", "1", CVAR_ARCHIVE | CVAR_LATCH));
+    cvars.r_colorMipLevels = Some(Cvar_Get(view, "r_colorMipLevels", "0", CVAR_LATCH));
+    AssertCvarRange(view, cvars.r_picmip.unwrap(), 0.0, 16.0, true);
+    cvars.r_detailTextures = Some(Cvar_Get(
+        view,
+        "r_detailtextures",
+        "1",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
+    cvars.r_texturebits = Some(Cvar_Get(
+        view,
+        "r_texturebits",
+        "0",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
+    cvars.r_texturebitslm = Some(Cvar_Get(
+        view,
+        "r_texturebitslm",
+        "0",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
+    cvars.r_colorbits = Some(Cvar_Get(
+        view,
+        "r_colorbits",
+        "0",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
+    cvars.r_stereo = Some(Cvar_Get(view, "r_stereo", "0", CVAR_ARCHIVE | CVAR_LATCH));
+    // MP retail builds the non-`__linux__` branch (established precedent —
+    // see doc comment above).
+    cvars.r_stencilbits = Some(Cvar_Get(
+        view,
+        "r_stencilbits",
+        "8",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
+    cvars.r_depthbits = Some(Cvar_Get(
+        view,
+        "r_depthbits",
+        "0",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
+    cvars.r_overBrightBits = Some(Cvar_Get(
+        view,
+        "r_overBrightBits",
+        "0",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
+    cvars.r_ignorehwgamma = Some(Cvar_Get(
+        view,
+        "r_ignorehwgamma",
+        "0",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
+    cvars.r_mode = Some(Cvar_Get(view, "r_mode", "4", CVAR_ARCHIVE | CVAR_LATCH));
+    cvars.r_fullscreen = Some(Cvar_Get(
+        view,
+        "r_fullscreen",
+        "1",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
+    cvars.r_customwidth = Some(Cvar_Get(
+        view,
+        "r_customwidth",
+        "1600",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
+    cvars.r_customheight = Some(Cvar_Get(
+        view,
+        "r_customheight",
+        "1024",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
+    cvars.r_simpleMipMaps = Some(Cvar_Get(
+        view,
+        "r_simpleMipMaps",
+        "1",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
+    cvars.r_vertexLight = Some(Cvar_Get(
+        view,
+        "r_vertexLight",
+        "0",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
+    cvars.r_uiFullScreen = Some(Cvar_Get(view, "r_uifullscreen", "0", 0));
+    cvars.r_subdivisions = Some(Cvar_Get(
+        view,
+        "r_subdivisions",
+        "4",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
+
+    //
+    // temporary latched variables that can only change over a restart
+    //
+    cvars.r_displayRefresh = Some(Cvar_Get(view, "r_displayRefresh", "0", CVAR_LATCH));
+    AssertCvarRange(view, cvars.r_displayRefresh.unwrap(), 0.0, 200.0, true);
+    cvars.r_fullbright = Some(Cvar_Get(view, "r_fullbright", "0", CVAR_CHEAT));
+    cvars.r_intensity = Some(Cvar_Get(view, "r_intensity", "1", CVAR_LATCH));
+    cvars.r_singleShader = Some(Cvar_Get(
+        view,
+        "r_singleShader",
+        "0",
+        CVAR_CHEAT | CVAR_LATCH,
+    ));
+
+    //
+    // archived variables that can change at any time
+    //
+    cvars.r_lodCurveError = Some(Cvar_Get(view, "r_lodCurveError", "250", CVAR_ARCHIVE));
+    cvars.r_lodbias = Some(Cvar_Get(view, "r_lodbias", "0", CVAR_ARCHIVE));
+    cvars.r_autolodscalevalue = Some(Cvar_Get(view, "r_autolodscalevalue", "0", CVAR_ROM));
+
+    cvars.r_flares = Some(Cvar_Get(view, "r_flares", "1", CVAR_ARCHIVE));
+    // MP retail builds the non-`_XBOX` branch (established precedent — see
+    // doc comment above).
+    cvars.r_znear = Some(Cvar_Get(view, "r_znear", "4", CVAR_CHEAT));
+    AssertCvarRange(view, cvars.r_znear.unwrap(), 0.001, 200.0, true);
+    cvars.r_ignoreGLErrors = Some(Cvar_Get(view, "r_ignoreGLErrors", "1", CVAR_ARCHIVE));
+    cvars.r_fastsky = Some(Cvar_Get(view, "r_fastsky", "0", CVAR_ARCHIVE));
+    cvars.r_inGameVideo = Some(Cvar_Get(view, "r_inGameVideo", "1", CVAR_ARCHIVE));
+    cvars.r_drawSun = Some(Cvar_Get(view, "r_drawSun", "0", CVAR_ARCHIVE));
+    cvars.r_dynamiclight = Some(Cvar_Get(view, "r_dynamiclight", "1", CVAR_ARCHIVE));
+    // rjr - removed for hacking r_dlightBacks = Cvar_Get( "r_dlightBacks", "1", CVAR_CHEAT );
+    cvars.r_finish = Some(Cvar_Get(view, "r_finish", "0", CVAR_ARCHIVE));
+    cvars.r_textureMode = Some(Cvar_Get(
+        view,
+        "r_textureMode",
+        "GL_LINEAR_MIPMAP_NEAREST",
+        CVAR_ARCHIVE,
+    ));
+    cvars.r_swapInterval = Some(Cvar_Get(view, "r_swapInterval", "0", CVAR_ARCHIVE));
+    cvars.r_markcount = Some(Cvar_Get(view, "r_markcount", "100", CVAR_ARCHIVE));
+    // MP retail builds the non-`__MACOS__` branch (established precedent —
+    // see doc comment above).
+    cvars.r_gamma = Some(Cvar_Get(view, "r_gamma", "1", CVAR_ARCHIVE));
+    cvars.r_facePlaneCull = Some(Cvar_Get(view, "r_facePlaneCull", "1", CVAR_ARCHIVE));
+
+    // attempted smart method of culling out upwards facing surfaces on
+    // roofs for automap shots -rww
+    cvars.r_cullRoofFaces = Some(Cvar_Get(view, "r_cullRoofFaces", "0", CVAR_CHEAT));
+    cvars.r_roofCullCeilDist = Some(Cvar_Get(view, "r_roofCullCeilDist", "256", CVAR_CHEAT));
+    cvars.r_roofCullFloorDist = Some(Cvar_Get(view, "r_roofCeilFloorDist", "128", CVAR_CHEAT));
+
+    cvars.r_primitives = Some(Cvar_Get(view, "r_primitives", "0", CVAR_ARCHIVE));
+
+    cvars.r_ambientScale = Some(Cvar_Get(view, "r_ambientScale", "0.6", CVAR_CHEAT));
+    cvars.r_directedScale = Some(Cvar_Get(view, "r_directedScale", "1", CVAR_CHEAT));
+
+    // automap renderside toggle for debugging -rww
+    cvars.r_autoMap = Some(Cvar_Get(view, "r_autoMap", "0", CVAR_ARCHIVE));
+    // alpha of automap bg -rww
+    cvars.r_autoMapBackAlpha = Some(Cvar_Get(view, "r_autoMapBackAlpha", "0", 0));
+    cvars.r_autoMapDisable = Some(Cvar_Get(view, "r_autoMapDisable", "1", 0));
+
+    //
+    // temporary variables that can change at any time
+    //
+    cvars.r_showImages = Some(Cvar_Get(view, "r_showImages", "0", CVAR_CHEAT));
+
+    cvars.r_debugLight = Some(Cvar_Get(view, "r_debuglight", "0", CVAR_TEMP));
+    cvars.r_debugSort = Some(Cvar_Get(view, "r_debugSort", "0", CVAR_CHEAT));
+
+    cvars.r_dlightStyle = Some(Cvar_Get(view, "r_dlightStyle", "1", CVAR_TEMP));
+    cvars.r_surfaceSprites = Some(Cvar_Get(view, "r_surfaceSprites", "1", CVAR_TEMP));
+    cvars.r_surfaceWeather = Some(Cvar_Get(view, "r_surfaceWeather", "0", CVAR_TEMP));
+
+    cvars.r_windSpeed = Some(Cvar_Get(view, "r_windSpeed", "0", 0));
+    cvars.r_windAngle = Some(Cvar_Get(view, "r_windAngle", "0", 0));
+    cvars.r_windGust = Some(Cvar_Get(view, "r_windGust", "0", 0));
+    cvars.r_windDampFactor = Some(Cvar_Get(view, "r_windDampFactor", "0.1", 0));
+    cvars.r_windPointForce = Some(Cvar_Get(view, "r_windPointForce", "0", 0));
+    cvars.r_windPointX = Some(Cvar_Get(view, "r_windPointX", "0", 0));
+    cvars.r_windPointY = Some(Cvar_Get(view, "r_windPointY", "0", 0));
+
+    cvars.r_nocurves = Some(Cvar_Get(view, "r_nocurves", "0", CVAR_CHEAT));
+    cvars.r_drawworld = Some(Cvar_Get(view, "r_drawworld", "1", CVAR_CHEAT));
+    cvars.r_drawfog = Some(Cvar_Get(view, "r_drawfog", "2", CVAR_CHEAT));
+    cvars.r_lightmap = Some(Cvar_Get(view, "r_lightmap", "0", CVAR_CHEAT));
+    cvars.r_portalOnly = Some(Cvar_Get(view, "r_portalOnly", "0", CVAR_CHEAT));
+
+    cvars.r_skipBackEnd = Some(Cvar_Get(view, "r_skipBackEnd", "0", CVAR_CHEAT));
+
+    cvars.r_measureOverdraw = Some(Cvar_Get(view, "r_measureOverdraw", "0", CVAR_CHEAT));
+    cvars.r_lodscale = Some(Cvar_Get(view, "r_lodscale", "5", 0));
+    cvars.r_norefresh = Some(Cvar_Get(view, "r_norefresh", "0", CVAR_CHEAT));
+    cvars.r_drawentities = Some(Cvar_Get(view, "r_drawentities", "1", CVAR_CHEAT));
+    cvars.r_ignore = Some(Cvar_Get(view, "r_ignore", "1", CVAR_CHEAT));
+    cvars.r_nocull = Some(Cvar_Get(view, "r_nocull", "0", CVAR_CHEAT));
+    cvars.r_novis = Some(Cvar_Get(view, "r_novis", "0", CVAR_CHEAT));
+    cvars.r_showcluster = Some(Cvar_Get(view, "r_showcluster", "0", CVAR_CHEAT));
+    cvars.r_speeds = Some(Cvar_Get(view, "r_speeds", "0", CVAR_CHEAT));
+    cvars.r_verbose = Some(Cvar_Get(view, "r_verbose", "0", CVAR_CHEAT));
+    cvars.r_logFile = Some(Cvar_Get(view, "r_logFile", "0", CVAR_CHEAT));
+    cvars.r_debugSurface = Some(Cvar_Get(view, "r_debugSurface", "0", CVAR_CHEAT));
+    cvars.r_nobind = Some(Cvar_Get(view, "r_nobind", "0", CVAR_CHEAT));
+    cvars.r_showtris = Some(Cvar_Get(view, "r_showtris", "0", CVAR_CHEAT));
+    cvars.r_showsky = Some(Cvar_Get(view, "r_showsky", "0", CVAR_CHEAT));
+    cvars.r_shownormals = Some(Cvar_Get(view, "r_shownormals", "0", CVAR_CHEAT));
+    cvars.r_clear = Some(Cvar_Get(view, "r_clear", "0", CVAR_CHEAT));
+    cvars.r_offsetFactor = Some(Cvar_Get(view, "r_offsetfactor", "-1", CVAR_CHEAT));
+    cvars.r_offsetUnits = Some(Cvar_Get(view, "r_offsetunits", "-2", CVAR_CHEAT));
+    cvars.r_lockpvs = Some(Cvar_Get(view, "r_lockpvs", "0", CVAR_CHEAT));
+    cvars.r_noportals = Some(Cvar_Get(view, "r_noportals", "0", CVAR_CHEAT));
+    cvars.r_shadows = Some(Cvar_Get(view, "cg_shadows", "1", 0));
+    cvars.r_shadowRange = Some(Cvar_Get(view, "r_shadowRange", "1000", 0));
+
+    // _XBOX-only cvars (r_hdreffect/r_sundir_x/r_sundir_y/r_sundir_z/
+    // r_hdrbloom) dropped — MP retail builds the non-`_XBOX` branch.
+    // Source: oracle/codemp/renderer/tr_init.cpp:1142-1148
+
+    // PORT-NOTE: `va("%d", MAX_POLYS)`/`va("%d", MAX_POLYVERTS)` -> literal
+    // decimal strings; values corroborated by `RenderAssets::max_polys`/
+    // `max_polyverts`'s own doc comments (`render_state/render_assets.rs:
+    // 121-133`: "default MAX_POLYS = 600" / "default MAX_POLYVERTS = 3000"),
+    // not guessed.
+    cvars.r_maxpolys = Some(Cvar_Get(view, "r_maxpolys", "600", 0));
+    cvars.r_maxpolyverts = Some(Cvar_Get(view, "r_maxpolyverts", "3000", 0));
+    /*
+    Ghoul2 Insert Start
+    */
+    // `r_noPrecacheGLA` (`_DEBUG`-only) dropped — MP retail builds the
+    // non-`_DEBUG` branch.
+    // Source: oracle/codemp/renderer/tr_init.cpp:1155-1157
+
+    cvars.r_noServerGhoul2 = Some(Cvar_Get(view, "r_noserverghoul2", "0", CVAR_CHEAT));
+
+    cvars.r_Ghoul2AnimSmooth = Some(Cvar_Get(view, "r_ghoul2animsmooth", "0.3", 0));
+    cvars.r_Ghoul2UnSqashAfterSmooth = Some(Cvar_Get(view, "r_ghoul2unsqashaftersmooth", "1", 0));
+
+    cvars.broadsword = Some(Cvar_Get(view, "broadsword", "0", 0));
+    cvars.broadsword_kickbones = Some(Cvar_Get(view, "broadsword_kickbones", "1", 0));
+    cvars.broadsword_kickorigin = Some(Cvar_Get(view, "broadsword_kickorigin", "1", 0));
+    cvars.broadsword_dontstopanim = Some(Cvar_Get(view, "broadsword_dontstopanim", "0", 0));
+    cvars.broadsword_waitforshot = Some(Cvar_Get(view, "broadsword_waitforshot", "0", 0));
+    cvars.broadsword_playflop = Some(Cvar_Get(view, "broadsword_playflop", "1", 0));
+    cvars.broadsword_smallbbox = Some(Cvar_Get(view, "broadsword_smallbbox", "0", 0));
+    cvars.broadsword_extra1 = Some(Cvar_Get(view, "broadsword_extra1", "0", 0));
+    cvars.broadsword_extra2 = Some(Cvar_Get(view, "broadsword_extra2", "0", 0));
+    cvars.broadsword_effcorr = Some(Cvar_Get(view, "broadsword_effcorr", "1", 0));
+    cvars.broadsword_ragtobase = Some(Cvar_Get(view, "broadsword_ragtobase", "2", 0));
+    cvars.broadsword_dircap = Some(Cvar_Get(view, "broadsword_dircap", "64", 0));
+    /*
+    Ghoul2 Insert End
+    */
+
+    cvars.r_modelpoolmegs = Some(Cvar_Get(view, "r_modelpoolmegs", "20", CVAR_ARCHIVE));
+    if Sys_LowPhysicalMemory() != 0 {
+        Cvar_Set(view, "r_modelpoolmegs", "0");
+    }
+
+    // make sure all the commands added here are also removed in R_Shutdown
+
+    // PORT-NOTE: the `#ifndef DEDICATED` command-registration block
+    // (imagelist/shaderlist/skinlist/screenshot/screenshot_tga/gfxinfo/
+    // r_atihack/r_we/imagecacheinfo) is dropped whole — DEDICATED is this
+    // build's live configuration (see doc comment above).
+    // Source: oracle/codemp/renderer/tr_init.cpp:1188-1197
+
+    // TODO: Port R_Modellist_f
+    // Source: oracle/codemp/renderer/tr_init.cpp:1199
+    // Registered unconditionally (outside `#ifndef DEDICATED`) as
+    // "modellist" — not yet ported anywhere in this crate.
+
+    // TODO: Port R_ModeList_f Cmd_AddCommand wiring
+    // Source: oracle/codemp/renderer/tr_init.cpp:1201
+    // `R_ModeList_f` (this file — `common: &mut Common, vidmodes:
+    // &VidModeTable`) is already ported but does not fit `CmdFunction =
+    // fn(&mut EngineHostView)` (`crates/mp/engine/qcommon/src/cmd/
+    // cmd_function_t.rs:12`) — no renderer-state-carrying adapter is
+    // licensed by this packet's resolved call surface.
+
+    // TODO: Port RE_RegisterModels_Info_f
+    // Source: oracle/codemp/renderer/tr_init.cpp:1203
+    // Registered unconditionally (outside `#ifndef DEDICATED`) as
+    // "modelcacheinfo" — not yet ported anywhere in this crate.
+}

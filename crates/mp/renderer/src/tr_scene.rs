@@ -7,6 +7,7 @@
 #![allow(non_snake_case)]
 
 use mp_engine_qcommon::common::{com_error, com_printf, Common};
+use mp_qshared::common::mp::cgame::mini_ref_entity_s::miniRefEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::shared::error_parm::errorParm_t;
@@ -16,8 +17,11 @@ use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_event::FrameEvent;
 use crate::render_state::placeholders::{PolyVert, RefEntity, Vec3};
 use crate::render_state::render_assets::RenderAssets;
+use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::tr_local::decal_poly_s::decalPoly_t;
+use crate::tr_main::{DrawSurf, R_AddDrawSurf, SurfaceGeometry};
+use crate::tr_shader::R_GetShaderByHandle;
 
 // This wave threads `RenderAssets`, `FrameData`/`FrameEvent` and `Common`
 // (for `com_printf`) as the fns below expect them, per this packet's STATE
@@ -70,19 +74,23 @@ pub struct SceneState {
     /// `/* … */` comment in `RE_AddRefEntityToScene` (DEC-37 ruling 13) —
     /// only the unconditional `refEntParent = -1;` survives as live code.
     pub ref_ent_parent: Option<u32>,
-    /// Raven `re_decalPolys[MAX_DECAL_POLYS]` — the decal-polygon pool.
+    /// Raven `re_decalPolys[NUM_DECAL_POLY_TYPES][MAX_DECAL_POLYS]` — the
+    /// decal-polygon pool. Outer index = decal type (`DECALPOLY_TYPE_NORMAL`/
+    /// `DECALPOLY_TYPE_FADE`), inner index = per-type slot (wave-1 resolves
+    /// the shape the wave-0 PORT-NOTE left open).
     ///
-    /// PORT-NOTE: exact capacity (`MAX_DECAL_POLYS`) is not in this packet's
-    /// resolved call surface; `Vec<decalPoly_t>` replaces the fixed C array
-    /// under the owned-collection translation, `RE_ClearDecals`'s
-    /// memset-to-zero becoming `Vec::clear()` (consumers reindex against
-    /// `.len()` once the decal-add path lands in a later wave).
-    pub decal_polys: Vec<decalPoly_t>,
-    /// Raven `re_decalPolyHead[...]` — decal hash-bucket head list. Same
-    /// PORT-NOTE as `decal_polys`; exact element type/size unresolved here.
+    /// PORT-NOTE: `MAX_DECAL_POLYS` (the C array's fixed capacity) is not in
+    /// this packet's resolved call surface either; each per-type pool grows
+    /// lazily to the highest index `RE_AllocDecal`/`RE_FreeDecal` touch
+    /// (`ensure_decal_pool`), bounded at runtime by `r_markcount->integer` —
+    /// the same bound Raven's own head/wraparound logic uses — rather than
+    /// being pre-sized. `RE_ClearDecals`'s memset-to-zero is `Vec::clear()`.
+    pub decal_polys: Vec<Vec<decalPoly_t>>,
+    /// Raven `re_decalPolyHead[NUM_DECAL_POLY_TYPES]` — decal ring-buffer
+    /// head, one slot per decal type. Same PORT-NOTE as `decal_polys`.
     pub decal_poly_head: Vec<i32>,
-    /// Raven `re_decalPolyTotal[...]` — decal per-bucket running total.
-    /// Same PORT-NOTE as `decal_polys`.
+    /// Raven `re_decalPolyTotal[NUM_DECAL_POLY_TYPES]` — decal per-type
+    /// running total. Same PORT-NOTE as `decal_polys`.
     pub decal_poly_total: Vec<i32>,
 }
 
@@ -292,13 +300,15 @@ pub fn RE_AddRefEntityToScene(
     // Raven's `backEndData->entities[r_numentities].e = *ent;` is a whole-struct
     // copy: every `RefEntity` field that flattens a `refEntity_t` member comes
     // from `ent`. The three `trRefEntity_t` lighting outputs
-    // (`light_dir`/`ambient_light`/`directed_light`) have no `.e` counterpart —
-    // Raven leaves last frame's values in place and `lightingCalculated =
-    // qfalse` forces `R_SetupEntityLighting` to overwrite them before any read.
+    // (`light_dir`/`ambient_light`/`ambient_light_int`/`directed_light`, plus
+    // `need_dlights`/`dlight_bits`) have no `.e` counterpart — Raven leaves
+    // last frame's values in place and `lightingCalculated = qfalse` forces
+    // `R_SetupEntityLighting` to overwrite them before any read.
     let re = RefEntity {
         re_type: ent.reType,
         renderfx: ent.renderfx,
         h_model: ent.hModel,
+        axis: ent.axis,
         origin: ent.origin,
         old_origin: ent.oldorigin,
         custom_shader: ent.customShader,
@@ -306,10 +316,13 @@ pub fn RE_AddRefEntityToScene(
         lighting_origin: ent.lightingOrigin,
         end_time: ent.endTime,
         has_ghoul2: !ent.ghoul2.is_null(),
+        need_dlights: false,
         lighting_calculated: false,
         light_dir: [0.0; 3],
         ambient_light: [0.0; 3],
+        ambient_light_int: [0; 4],
         directed_light: [0.0; 3],
+        dlight_bits: 0,
     };
 
     // PORT-NOTE: Raven dereferences `ent->ghoul2` here (`CGhoul2Info_v
@@ -392,4 +405,376 @@ pub fn RE_ClearDecals(scene: &mut SceneState) {
     scene.decal_polys.clear();
     scene.decal_poly_head.clear();
     scene.decal_poly_total.clear();
+}
+
+// ---------------------------------------------------------------------
+// wave 1
+// ---------------------------------------------------------------------
+
+/// Raven `QSORT_ENTITYNUM_SHIFT` — restated from `tr_main.rs`'s own local
+/// `const` (not `pub` there, so not reachable from this file). Same value,
+/// same bit-packing rationale as `tr_main.rs`'s `R_AddDrawSurf`/
+/// `R_DecomposeSort` PORT-NOTE (dlight 2 bits + fog 5 bits => entity's
+/// bit-7 start; DEC-37 ruling 1: the sort key is pure renderer interior, only
+/// its resulting relative order is observable) — not re-derived here.
+///
+/// Source: `oracle/codemp/renderer/tr_local.h:130` (field comment:
+/// `currentEntityNum << QSORT_ENTITYNUM_SHIFT`)
+const QSORT_ENTITYNUM_SHIFT: u32 = 7;
+
+/// Raven `R_AddPolygonSurfaces`.
+///
+/// `tr.currentEntityNum`/`tr.shiftedEntityNum` are recomputed to the same
+/// value (`TR_WORLDENT`/`TR_WORLDENT << QSORT_ENTITYNUM_SHIFT`) on every call
+/// and consumed immediately by `R_AddDrawSurf` below. This packet's STATE
+/// HOMES row assigns the persistent write to `RenderWorld::frame: FrameState`,
+/// but this wave is scoped to `tr_scene.rs` only (cannot add a field to
+/// `render_state/frame_state.rs`), so the write stays a local computation —
+/// escalate a `FrameState` field-merge if a later wave needs to read either
+/// value back outside this call.
+///
+/// `tr.refdef.polys` is this frame's already-appended
+/// `FrameEvent::AddPolyToScene` events — matching this file's own
+/// `frame_poly_counts`/`frame_entity_count` precedent of treating `FrameData`
+/// itself as the render-thread's "current refdef" carrier until `TrRefdef`
+/// grows a dedicated `polys` field.
+///
+/// Source: `oracle/codemp/renderer/tr_scene.cpp:97-109`
+pub fn R_AddPolygonSurfaces<'a>(
+    frame: &'a FrameData,
+    assets: &RenderAssets,
+    common: &mut Common,
+    draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
+) {
+    let current_entity_num = TR_WORLDENT as i32;
+    let shifted_entity_num = current_entity_num << QSORT_ENTITYNUM_SHIFT;
+
+    for event in &frame.events {
+        if let FrameEvent::AddPolyToScene {
+            shader,
+            verts,
+            fog_index,
+        } = event
+        {
+            let sh = R_GetShaderByHandle(assets, common, shader.index() as i32);
+            let shader_sorted_index = assets.shaders.get(sh).map(|s| s.sorted_index).unwrap_or(0);
+
+            // DEFERRED: rdf_nofog (`tr.refdef.rdflags & RDF_NOFOG`) — `TrRefdef`
+            // has no `rdflags` field yet (lands with whichever wave gives it
+            // its full shape). `fog_index` is already forced to 0 by
+            // `RE_AddPolyToScene`'s own DEFERRED fog-search note (above), so
+            // `rdf_nofog`'s value is a no-op either way until both land.
+            // Source: oracle/codemp/renderer/tr_main.cpp:1266
+            R_AddDrawSurf(
+                SurfaceGeometry::Poly {
+                    verts: verts.as_slice(),
+                },
+                shader_sorted_index,
+                shifted_entity_num,
+                false,
+                *fog_index,
+                0,
+                draw_surfs,
+            );
+        }
+    }
+}
+
+/// Raven `RE_AddMiniRefEntityToScene`.
+///
+/// Only the oracle's live `#if 1` branch is transcribed — the `#else` branch
+/// (chain-parent bookkeeping against `backEndData->miniEntities`) is dead
+/// source, guarded out at compile time in the oracle itself (DEC-37 ruling
+/// 13: the real mini-refentity chain is `#if 0`) and dropped per §19's
+/// dead-surface rule rather than ported.
+///
+/// `ent` is `Option<&miniRefEntity_t>` — unlike `RE_AddRefEntityToScene`'s
+/// moot `!ent` check, this fn's null branch is genuinely live (sets
+/// `refEntParent = -1` and returns before touching `ent`).
+///
+/// The C body's `memcpy(&tempEnt, ent, sizeof(*ent));
+/// memset(...+sizeof(*ent), 0, ...)` becomes an explicit field-by-field copy
+/// from `miniRefEntity_t` onto a zeroed `refEntity_t` — the two types share
+/// an identical field-for-field prefix layout (both structs' own doc
+/// comments: "this structure must remain identical as the miniRefEntity_t"),
+/// so copying exactly `miniRefEntity_t`'s 14 named fields onto a
+/// `refEntity_t::zeroed()` reproduces the memcpy+memset pair without a raw
+/// byte copy (interior-safety law).
+///
+/// Source: `oracle/codemp/renderer/tr_scene.cpp:271-317`
+pub fn RE_AddMiniRefEntityToScene(
+    frame: &mut FrameData,
+    assets: &RenderAssets,
+    scene: &mut SceneState,
+    ent: Option<&miniRefEntity_t>,
+) {
+    if !assets.registered {
+        return;
+    }
+
+    let ent = match ent {
+        Some(ent) => ent,
+        None => {
+            scene.ref_ent_parent = None;
+            return;
+        }
+    };
+
+    let mut temp_ent = refEntity_t::zeroed();
+    temp_ent.reType = ent.reType;
+    temp_ent.renderfx = ent.renderfx;
+    temp_ent.hModel = ent.hModel;
+    temp_ent.axis = ent.axis;
+    temp_ent.nonNormalizedAxes = ent.nonNormalizedAxes;
+    temp_ent.origin = ent.origin;
+    temp_ent.oldorigin = ent.oldorigin;
+    temp_ent.customShader = ent.customShader;
+    temp_ent.shaderRGBA = ent.shaderRGBA;
+    temp_ent.shaderTexCoord = ent.shaderTexCoord;
+    temp_ent.radius = ent.radius;
+    temp_ent.rotation = ent.rotation;
+    temp_ent.shaderTime = ent.shaderTime;
+    temp_ent.frame = ent.frame;
+
+    RE_AddRefEntityToScene(frame, assets, scene, &temp_ent);
+}
+
+/// Raven `RE_AddLightToScene`.
+///
+/// Source: `oracle/codemp/renderer/tr_scene.cpp:355-357`
+pub fn RE_AddLightToScene(
+    frame: &mut FrameData,
+    assets: &RenderAssets,
+    org: Vec3,
+    intensity: f32,
+    r: f32,
+    g: f32,
+    b: f32,
+) {
+    RE_AddDynamicLightToScene(frame, assets, org, intensity, r, g, b, false);
+}
+
+/// Raven `RE_AddAdditiveLightToScene`.
+///
+/// Source: `oracle/codemp/renderer/tr_scene.cpp:367-369`
+pub fn RE_AddAdditiveLightToScene(
+    frame: &mut FrameData,
+    assets: &RenderAssets,
+    org: Vec3,
+    intensity: f32,
+    r: f32,
+    g: f32,
+    b: f32,
+) {
+    RE_AddDynamicLightToScene(frame, assets, org, intensity, r, g, b, true);
+}
+
+/// Raven `R_InitDecals`.
+///
+/// Source: `oracle/codemp/renderer/tr_scene.cpp:404-407`
+pub fn R_InitDecals(scene: &mut SceneState) {
+    RE_ClearDecals(scene);
+}
+
+/// Raven `DECALPOLY_TYPE_NORMAL` — first member of the file-local decal-type
+/// enum.
+///
+/// Source: `oracle/codemp/renderer/tr_scene.cpp:375`
+const DECALPOLY_TYPE_NORMAL: i32 = 0;
+
+/// Raven `DECALPOLY_TYPE_FADE` — second member of the file-local decal-type
+/// enum.
+///
+/// Source: `oracle/codemp/renderer/tr_scene.cpp:376`
+const DECALPOLY_TYPE_FADE: i32 = 1;
+
+/// Raven `DECAL_FADE_TIME`.
+///
+/// Source: `oracle/codemp/renderer/tr_scene.cpp:380`
+const DECAL_FADE_TIME: i32 = 1000;
+
+/// Ensures `scene.decal_polys[type_]` exists and has at least `len` slots,
+/// growing with `decalPoly_t::zeroed()` entries — the owned-`Vec` replacement
+/// for Raven's fixed `re_decalPolys[NUM_DECAL_POLY_TYPES][MAX_DECAL_POLYS]`
+/// (`decal_polys`'s own doc comment: `MAX_DECAL_POLYS`'s value is not in
+/// this packet, so the pool grows to whatever index is touched instead of
+/// being pre-sized).
+fn ensure_decal_pool(scene: &mut SceneState, type_: usize, len: usize) {
+    while scene.decal_polys.len() <= type_ {
+        scene.decal_polys.push(Vec::new());
+    }
+    while scene.decal_polys[type_].len() < len {
+        scene.decal_polys[type_].push(decalPoly_t::zeroed());
+    }
+}
+
+/// Reads `scene.decal_poly_head[type_]`, growing the per-type head list on
+/// demand (same lazy-growth shape as `ensure_decal_pool`).
+fn decal_head(scene: &mut SceneState, type_: usize) -> i32 {
+    while scene.decal_poly_head.len() <= type_ {
+        scene.decal_poly_head.push(0);
+    }
+    scene.decal_poly_head[type_]
+}
+
+/// Writes `scene.decal_poly_head[type_]`, growing on demand.
+fn set_decal_head(scene: &mut SceneState, type_: usize, value: i32) {
+    while scene.decal_poly_head.len() <= type_ {
+        scene.decal_poly_head.push(0);
+    }
+    scene.decal_poly_head[type_] = value;
+}
+
+/// Reads `scene.decal_poly_total[type_]`, growing the per-type total list on
+/// demand.
+fn decal_total(scene: &mut SceneState, type_: usize) -> i32 {
+    while scene.decal_poly_total.len() <= type_ {
+        scene.decal_poly_total.push(0);
+    }
+    scene.decal_poly_total[type_]
+}
+
+/// Writes `scene.decal_poly_total[type_]`, growing on demand.
+fn set_decal_total(scene: &mut SceneState, type_: usize, value: i32) {
+    while scene.decal_poly_total.len() <= type_ {
+        scene.decal_poly_total.push(0);
+    }
+    scene.decal_poly_total[type_] = value;
+}
+
+/// Raven `RE_FreeDecal`.
+///
+/// `type_`/`index` mirror the oracle's `type`/`index` params (`type` is a
+/// Rust keyword, so `type_`). `refdef_time` stands in for `tr.refdef.time` —
+/// `TrRefdef` (this packet's STATE HOMES carrier for `tr`'s frontend scratch)
+/// has no `time` field yet and this wave is scoped to `tr_scene.rs` only, so
+/// the value is threaded as an explicit parameter instead of extending that
+/// struct (escalate a `TrRefdef` field-merge if a later wave needs to read
+/// it back from `FrameState` directly). `cvars`/`common` forward to the
+/// `RE_AllocDecal` recursive call below (SCC 506).
+///
+/// Source: `oracle/codemp/renderer/tr_scene.cpp:409-431`
+pub fn RE_FreeDecal(
+    scene: &mut SceneState,
+    cvars: &RendererCvars,
+    common: &Common,
+    refdef_time: i32,
+    type_: i32,
+    index: i32,
+) {
+    ensure_decal_pool(scene, type_ as usize, index as usize + 1);
+    if scene.decal_polys[type_ as usize][index as usize].time == 0 {
+        return;
+    }
+
+    if type_ == DECALPOLY_TYPE_NORMAL {
+        // `fade = RE_AllocDecal( DECALPOLY_TYPE_FADE );` — see this fn's
+        // return-shape PORT-NOTE on `RE_AllocDecal` for why this is a
+        // `(type, index)` location rather than a `decalPoly_t *`.
+        let fade = RE_AllocDecal(scene, cvars, common, refdef_time, DECALPOLY_TYPE_FADE);
+
+        // `memcpy ( fade, &re_decalPolys[type][index], sizeof(decalPoly_t) );`
+        // — `decalPoly_t` is `Copy`, so an owned read-then-write reproduces
+        // the whole-struct copy without a raw byte copy.
+        let normal_poly = scene.decal_polys[type_ as usize][index as usize];
+        ensure_decal_pool(scene, fade.0, fade.1 + 1);
+        scene.decal_polys[fade.0][fade.1] = normal_poly;
+        scene.decal_polys[fade.0][fade.1].time = refdef_time;
+        scene.decal_polys[fade.0][fade.1].fadetime = refdef_time + DECAL_FADE_TIME;
+    }
+
+    ensure_decal_pool(scene, type_ as usize, index as usize + 1);
+    scene.decal_polys[type_ as usize][index as usize].time = 0;
+
+    let new_total = decal_total(scene, type_ as usize) - 1;
+    set_decal_total(scene, type_ as usize, new_total);
+}
+
+/// Raven `RE_AllocDecal`.
+///
+/// `refdef_time` stands in for `tr.refdef.time` — same STATE HOMES caveat as
+/// `RE_FreeDecal`. Returns `(type, index)` into `SceneState::decal_polys`
+/// rather than the oracle's `decalPoly_t *`: holding a live `&mut
+/// decalPoly_t` across this fn's own `RE_FreeDecal` recursion would alias
+/// `scene` twice at once (forbidden in safe Rust) — the interior-safety law's
+/// "need to reference another asset -> store its `Handle`" rule applies the
+/// same way here, so callers re-index through the returned location instead
+/// of holding a live reference.
+///
+/// Source: `oracle/codemp/renderer/tr_scene.cpp:440-500`
+pub fn RE_AllocDecal(
+    scene: &mut SceneState,
+    cvars: &RendererCvars,
+    common: &Common,
+    refdef_time: i32,
+    type_: i32,
+) -> (usize, usize) {
+    let r_markcount = common.cvar(cvars.r_markcount).integer;
+
+    // See if the cvar changed
+    if decal_total(scene, type_ as usize) > r_markcount {
+        RE_ClearDecals(scene);
+    }
+
+    let head = decal_head(scene, type_ as usize) as usize;
+    ensure_decal_pool(scene, type_ as usize, head + 1);
+
+    // If it has no time its the first occasion its been used
+    if scene.decal_polys[type_ as usize][head].time != 0 {
+        if scene.decal_polys[type_ as usize][head].time != refdef_time {
+            let mut i = head as i32;
+
+            // since we are killing one that existed before, make sure we
+            // kill all the other marks that belong to the group
+            loop {
+                i += 1;
+                if i >= r_markcount {
+                    i = 0;
+                }
+                ensure_decal_pool(scene, type_ as usize, i as usize + 1);
+                ensure_decal_pool(scene, type_ as usize, head + 1);
+
+                // Break out on the first one thats not part of the group
+                // PORT-NOTE: `le->time` and `re_decalPolyHead[type]` are live
+                // pointer/array reads in the oracle, not values snapshotted
+                // before the loop — `RE_FreeDecal` below re-enters
+                // `RE_AllocDecal`, which can run `RE_ClearDecals` and reset
+                // both. Each is re-read at its own oracle read point.
+                let le_time = scene.decal_polys[type_ as usize][head].time;
+                if scene.decal_polys[type_ as usize][i as usize].time != le_time {
+                    break;
+                }
+
+                RE_FreeDecal(scene, cvars, common, refdef_time, type_, i);
+
+                if i == decal_head(scene, type_ as usize) {
+                    break;
+                }
+            }
+
+            let live_head = decal_head(scene, type_ as usize);
+            RE_FreeDecal(scene, cvars, common, refdef_time, type_, live_head);
+        } else {
+            let live_head = decal_head(scene, type_ as usize);
+            RE_FreeDecal(scene, cvars, common, refdef_time, type_, live_head);
+        }
+    }
+
+    ensure_decal_pool(scene, type_ as usize, head + 1);
+    scene.decal_polys[type_ as usize][head] = decalPoly_t::zeroed();
+    scene.decal_polys[type_ as usize][head].time = refdef_time;
+
+    let new_total = decal_total(scene, type_ as usize) + 1;
+    set_decal_total(scene, type_ as usize, new_total);
+
+    // Move on to the next decal poly and wrap around if need be
+    // PORT-NOTE: the increment reads `re_decalPolyHead[type]` live, not the
+    // entry snapshot `head` — same reset-by-`RE_ClearDecals` reason as above.
+    let mut new_head = decal_head(scene, type_ as usize) + 1;
+    if new_head >= r_markcount {
+        new_head = 0;
+    }
+    set_decal_head(scene, type_ as usize, new_head);
+
+    (type_ as usize, head)
 }

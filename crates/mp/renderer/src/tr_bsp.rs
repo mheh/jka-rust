@@ -12,8 +12,10 @@
 use core::mem::size_of;
 
 use mp_engine_qcommon::common::{com_error, com_printf, Common};
+use mp_engine_qcommon::qfiles::dleaf_t::dleaf_t;
+use mp_engine_qcommon::qfiles::dnode_t::dnode_t;
 use mp_engine_qcommon::qfiles::dplane_t::dplane_t;
-use mp_engine_qcommon::qfiles::draw_vert_t::drawVert_t;
+use mp_engine_qcommon::qfiles::draw_vert_t::{drawVert_t, MAXLIGHTMAPS};
 use mp_engine_qcommon::qfiles::dshader_t::dshader_t;
 use mp_engine_qcommon::qfiles::lump_t::lump_t;
 use mp_qshared::shared::q_math::PlaneTypeForNormal;
@@ -22,7 +24,9 @@ use mp_qshared::shared::swap::{LittleFloat, LittleLong};
 use mp_qshared::shared::{cplane_t, errorParm_t, MAX_QPATH};
 
 use crate::render_state::frame_state::FrameState;
-use crate::render_state::placeholders::WorldAsset;
+use crate::render_state::placeholders::{Vec3, WorldAsset};
+use crate::tr_local::mgrid_t::mgrid_t;
+use crate::tr_local::surface_type_t::surfaceType_t;
 
 // This wave threads `WorldAsset` (`crate::render_state::placeholders`) and
 // `FrameState` (`crate::render_state::frame_state`) as the fns below expect
@@ -39,6 +43,21 @@ use crate::render_state::placeholders::WorldAsset;
 // (`light_grid_data` merged to `tr_light.rs`'s typed `Vec<mgrid_t>` shape,
 // not this note's original `Vec<u8>` guess — this file only ever writes
 // `None` through it.)
+//
+// WAVE 1 ADDITIONS, landed by the same field-merge step: `WorldAsset::nodes:
+// Vec<Node>` / `num_decision_nodes: i32` (`R_LoadNodesAndLeafs`, tier-2
+// transition audit Group 1 `mnode_t`/`world_t` rows), `WorldAsset::bmodels:
+// Vec<BModel>` (`R_LoadLightGrid` reads `bmodels[0].bounds`; populated by
+// the not-yet-ported `R_LoadSubmodels`, out of this wave's packet), and
+// `WorldAsset::light_grid_size: Vec3` (`R_LoadLightGrid` reads it; populated
+// by the not-yet-ported `R_LoadEntities`'s `gridsize` worldspawn key,
+// `oracle/codemp/renderer/tr_bsp.cpp:1887-1889,1956`, out of this wave's
+// packet). `R_FixSharedVertexLodError_r`/`R_MovePatchSurfacesToHunk`
+// deliberately do NOT thread `WorldAsset` — the packet's threading digest
+// marks both "no state channel"/"engine seam" only, and neither has a
+// licensed `WorldAsset::surfaces`-style carrier yet (no `Surface` tagged-
+// union home exists in R2 for `msurface_t.data`); they take a grid-mesh
+// collection as a plain parameter instead (see each fn's doc comment).
 
 /// `fileBase` — the file-scope byte pointer the oracle's BSP loaders index
 /// by lump offset (`fileBase + l->fileofs`). Not part of R2's frozen state
@@ -66,30 +85,83 @@ pub struct DShader {
 
 /// Owned replacement for Raven `mnode_t`'s parent/children pointer graph —
 /// index-linked into a shared node arena instead of raw pointers (tier-2
-/// transition audit, Group 1: `mnode_t` row). This wave only needs the
-/// fields `R_SetParent` touches; `plane`, `firstmarksurface`/
-/// `nummarksurfaces`, and the leaf fields land with the `tr_world` waves
-/// that build the rest of the node arena.
+/// transition audit, Group 1: `mnode_t` row). Wave 0 only needed the fields
+/// `R_SetParent` touches; this wave (`R_LoadNodesAndLeafs`, the node/leaf
+/// loader) adds the remaining fields it fills — `plane` becomes an index
+/// into `WorldAsset::planes` and `firstmarksurface` an index into
+/// `WorldAsset::mark_surfaces`, per the licensed replacement shape.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:917-934`
+#[derive(Clone)]
 pub struct Node {
     pub parent: Option<usize>,
     pub children: [Option<usize>; 2],
-    /// -1 for nodes, to differentiate from leafs
+    /// `CONTENTS_NODE` (`-1`, `oracle/codemp/renderer/tr_local.h:882`) for
+    /// decision nodes, to differentiate from leafs. Raven's
+    /// `R_LoadNodesAndLeafs` never assigns `contents` for leaf entries (only
+    /// `mins`/`maxs`/`cluster`/`area`/`firstmarksurface`/`nummarksurfaces`
+    /// are set in that loop) — leafs keep the zero-initialized value here,
+    /// same as the oracle's zeroed `Hunk_Alloc` block.
     pub contents: i32,
+    /// `mins`/`maxs` — frustum-culling bounds (decision nodes and leafs
+    /// alike).
+    pub mins: [i32; 3],
+    pub maxs: [i32; 3],
+    /// `plane` — index into `WorldAsset::planes` (decision nodes only; not
+    /// meaningful for leafs).
+    pub plane: Option<usize>,
+    /// `cluster` (leafs only).
+    pub cluster: i32,
+    /// `area` (leafs only).
+    pub area: i32,
+    /// `firstmarksurface` — start index into `WorldAsset::mark_surfaces`
+    /// (leafs only).
+    pub firstmarksurface: usize,
+    /// `nummarksurfaces` (leafs only).
+    pub nummarksurfaces: i32,
+}
+
+/// Owned replacement for Raven `bmodel_t`'s culling bounds — this wave
+/// (`R_LoadLightGrid`) only reads `bounds`; `firstSurface`/`numSurfaces`
+/// land with the wave that ports `R_LoadSubmodels` (tier-2 transition
+/// audit, Group 1: `bmodel_t` row).
+///
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:938-942`
+#[derive(Clone)]
+pub struct BModel {
+    pub bounds: [Vec3; 2],
 }
 
 /// Owned replacement for Raven `srfGridMesh_t`'s vertex data — `verts`
 /// becomes an owned `Vec<drawVert_t>` sized by `(width, height)`, replacing
 /// the C flexible-array trick (tier-2 transition audit, Group 1:
-/// `srfGridMesh_t` row). `widthLodError`/`heightLodError` land with
-/// whichever wave ports the LOD-stitching functions that read them.
+/// `srfGridMesh_t` row). This wave (the LOD-stitching functions,
+/// `R_FixSharedVertexLodError_r`) adds `surface_type`/`lod_radius`/
+/// `lod_origin`/`lod_fixed`/`width_lod_error`/`height_lod_error` — the
+/// fields those functions read/write. `tr_curve.rs` independently owns a
+/// full `srfGridMesh_t` stand-in of its own (`R_CreateSurfaceGridMesh`'s
+/// return shape) — this file's `GridMesh` stays a separate, narrower
+/// scoped-local type (same pattern as `tr_main::SurfaceGeometry`/
+/// `tr_marks::MarkSurfaceData`), because `R_MergedWidthPoints`/
+/// `R_MergedHeightPoints` (already ported, wave 0) are typed against it.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:750-774`
 pub struct GridMesh {
+    pub surface_type: surfaceType_t,
     pub width: i32,
     pub height: i32,
     pub verts: Vec<drawVert_t>,
+    /// `lodRadius`.
+    pub lod_radius: f32,
+    /// `lodOrigin`.
+    pub lod_origin: Vec3,
+    /// `lodFixed` — `2` once `R_FixSharedVertexLodError_r` has stitched
+    /// this patch's LOD errors against a matching group.
+    pub lod_fixed: i32,
+    /// `widthLodError`.
+    pub width_lod_error: Vec<f32>,
+    /// `heightLodError`.
+    pub height_lod_error: Vec<f32>,
 }
 
 /// Decodes a Latin-1, NUL-terminated fixed-size name buffer (the on-disk BSP
@@ -244,13 +316,15 @@ pub fn R_MergedWidthPoints(grid: &GridMesh, offset: i32) -> bool {
         for j in i + 1..grid.width - 1 {
             let a = grid.verts[(i + offset) as usize].xyz;
             let b = grid.verts[(j + offset) as usize].xyz;
-            if (a[0] - b[0]).abs() > 0.1 {
+            // `fabs()` takes a double: the f32 difference promotes and the `.1`
+            // comparand is a double literal (ruling 12).
+            if ((a[0] - b[0]) as f64).abs() > 0.1 {
                 continue;
             }
-            if (a[1] - b[1]).abs() > 0.1 {
+            if ((a[1] - b[1]) as f64).abs() > 0.1 {
                 continue;
             }
-            if (a[2] - b[2]).abs() > 0.1 {
+            if ((a[2] - b[2]) as f64).abs() > 0.1 {
                 continue;
             }
             return true;
@@ -267,13 +341,15 @@ pub fn R_MergedHeightPoints(grid: &GridMesh, offset: i32) -> bool {
         for j in i + 1..grid.height - 1 {
             let a = grid.verts[(grid.width * i + offset) as usize].xyz;
             let b = grid.verts[(grid.width * j + offset) as usize].xyz;
-            if (a[0] - b[0]).abs() > 0.1 {
+            // `fabs()` takes a double: the f32 difference promotes and the `.1`
+            // comparand is a double literal (ruling 12).
+            if ((a[0] - b[0]) as f64).abs() > 0.1 {
                 continue;
             }
-            if (a[1] - b[1]).abs() > 0.1 {
+            if ((a[1] - b[1]) as f64).abs() > 0.1 {
                 continue;
             }
-            if (a[2] - b[2]).abs() > 0.1 {
+            if ((a[2] - b[2]) as f64).abs() > 0.1 {
                 continue;
             }
             return true;
@@ -476,4 +552,466 @@ pub fn R_GetEntityToken(world: &mut WorldAsset, size: i32) -> (bool, String) {
     } else {
         (true, buffer)
     }
+}
+
+// --- R3 wave 1 ---------------------------------------------------------
+
+/// Borrows `world_data[a]` immutably and `world_data[b]` mutably from the
+/// same slice — the split-borrow helper `R_FixSharedVertexLodError_r`'s
+/// recursion needs (its `grid1`/`grid2` alias one array in the oracle,
+/// interior-safety law: pointer aliasing becomes an index pair over one
+/// owned slice instead of two independent raw pointers). `a == b` is not a
+/// case the oracle's recursion produces (the caller always resumes the
+/// search at `start`, and `grid1` is always positioned before `start` in
+/// every real call chain); panics rather than silently aliasing if it ever
+/// does (porting-rules §19 — pick one defined behavior for what is
+/// otherwise nonsensical input).
+fn split_grid_pair(world_data: &mut [GridMesh], a: usize, b: usize) -> (&GridMesh, &mut GridMesh) {
+    if a < b {
+        let (left, right) = world_data.split_at_mut(b);
+        (&left[a], &mut right[0])
+    } else {
+        let (left, right) = world_data.split_at_mut(a);
+        (&right[0], &mut left[b])
+    }
+}
+
+/// Raven `R_FixSharedVertexLodError_r`.
+///
+/// PORT-NOTE: the packet's threading digest marks this "pure fn — no state
+/// channel"; it operates on a plain `world_data: &mut [GridMesh]` rather
+/// than `WorldAsset` (no licensed `WorldAsset::surfaces` carrier exists yet
+/// — see the top-of-file wave-1 note). `grid1` crosses as an index into that
+/// same slice (`grid1_idx`) instead of a raw pointer: the oracle's recursive
+/// call re-enters with `grid2` (an element of `worldData.surfaces`) as the
+/// new `grid1`, aliasing the very array the loop mutates, which Rust's
+/// aliasing rules forbid via two independent references — `split_grid_pair`
+/// derives both from one `&mut` borrow per iteration instead
+/// (interior-safety law: pointer → index). The `grid2->surfaceType != SF_GRID`
+/// guard is transcribed verbatim even though every element of `world_data`
+/// is already a `GridMesh` (always `SF_GRID` by construction here) — it is
+/// the oracle's own invariant check on the general `worldData.surfaces`
+/// array, harmless to keep as a literal transcription (porting-rules §2).
+///
+/// Source: `oracle/codemp/renderer/tr_bsp.cpp:681-783`
+pub fn R_FixSharedVertexLodError_r(start: usize, grid1_idx: usize, world_data: &mut [GridMesh]) {
+    let mut j = start;
+    while j < world_data.len() {
+        let mut recurse = false;
+        {
+            let (grid1, grid2) = split_grid_pair(world_data, grid1_idx, j);
+
+            // if this surface is not a grid
+            if !matches!(grid2.surface_type, surfaceType_t::SF_GRID) {
+                j += 1;
+                continue;
+            }
+            // if the LOD errors are already fixed for this patch
+            if grid2.lod_fixed == 2 {
+                j += 1;
+                continue;
+            }
+            // grids in the same LOD group should have the exact same lod radius
+            if grid1.lod_radius != grid2.lod_radius {
+                j += 1;
+                continue;
+            }
+            // grids in the same LOD group should have the exact same lod origin
+            if grid1.lod_origin[0] != grid2.lod_origin[0]
+                || grid1.lod_origin[1] != grid2.lod_origin[1]
+                || grid1.lod_origin[2] != grid2.lod_origin[2]
+            {
+                j += 1;
+                continue;
+            }
+
+            //
+            let mut touch = false;
+            for n in 0..2i32 {
+                //
+                let offset1 = if n != 0 {
+                    (grid1.height - 1) * grid1.width
+                } else {
+                    0
+                };
+                if R_MergedWidthPoints(grid1, offset1) {
+                    continue;
+                }
+                for k in 1..(grid1.width - 1) {
+                    for m in 0..2i32 {
+                        let offset2 = if m != 0 {
+                            (grid2.height - 1) * grid2.width
+                        } else {
+                            0
+                        };
+                        if R_MergedWidthPoints(grid2, offset2) {
+                            continue;
+                        }
+                        for l in 1..(grid2.width - 1) {
+                            //
+                            let a = grid1.verts[(k + offset1) as usize].xyz;
+                            let b = grid2.verts[(l + offset2) as usize].xyz;
+                            // `fabs()` takes a double: the f32 difference promotes and the `.1`
+                            // comparand is a double literal (ruling 12).
+                            if ((a[0] - b[0]) as f64).abs() > 0.1 {
+                                continue;
+                            }
+                            if ((a[1] - b[1]) as f64).abs() > 0.1 {
+                                continue;
+                            }
+                            if ((a[2] - b[2]) as f64).abs() > 0.1 {
+                                continue;
+                            }
+                            // ok the points are equal and should have the same lod error
+                            grid2.width_lod_error[l as usize] = grid1.width_lod_error[k as usize];
+                            touch = true;
+                        }
+                    }
+                    for m in 0..2i32 {
+                        let offset2 = if m != 0 { grid2.width - 1 } else { 0 };
+                        if R_MergedHeightPoints(grid2, offset2) {
+                            continue;
+                        }
+                        for l in 1..(grid2.height - 1) {
+                            //
+                            let a = grid1.verts[(k + offset1) as usize].xyz;
+                            let b = grid2.verts[(grid2.width * l + offset2) as usize].xyz;
+                            // `fabs()` takes a double: the f32 difference promotes and the `.1`
+                            // comparand is a double literal (ruling 12).
+                            if ((a[0] - b[0]) as f64).abs() > 0.1 {
+                                continue;
+                            }
+                            if ((a[1] - b[1]) as f64).abs() > 0.1 {
+                                continue;
+                            }
+                            if ((a[2] - b[2]) as f64).abs() > 0.1 {
+                                continue;
+                            }
+                            // ok the points are equal and should have the same lod error
+                            grid2.height_lod_error[l as usize] = grid1.width_lod_error[k as usize];
+                            touch = true;
+                        }
+                    }
+                }
+            }
+            for n in 0..2i32 {
+                //
+                let offset1 = if n != 0 { grid1.width - 1 } else { 0 };
+                if R_MergedHeightPoints(grid1, offset1) {
+                    continue;
+                }
+                for k in 1..(grid1.height - 1) {
+                    for m in 0..2i32 {
+                        let offset2 = if m != 0 {
+                            (grid2.height - 1) * grid2.width
+                        } else {
+                            0
+                        };
+                        if R_MergedWidthPoints(grid2, offset2) {
+                            continue;
+                        }
+                        for l in 1..(grid2.width - 1) {
+                            //
+                            let a = grid1.verts[(grid1.width * k + offset1) as usize].xyz;
+                            let b = grid2.verts[(l + offset2) as usize].xyz;
+                            // `fabs()` takes a double: the f32 difference promotes and the `.1`
+                            // comparand is a double literal (ruling 12).
+                            if ((a[0] - b[0]) as f64).abs() > 0.1 {
+                                continue;
+                            }
+                            if ((a[1] - b[1]) as f64).abs() > 0.1 {
+                                continue;
+                            }
+                            if ((a[2] - b[2]) as f64).abs() > 0.1 {
+                                continue;
+                            }
+                            // ok the points are equal and should have the same lod error
+                            grid2.width_lod_error[l as usize] = grid1.height_lod_error[k as usize];
+                            touch = true;
+                        }
+                    }
+                    for m in 0..2i32 {
+                        let offset2 = if m != 0 { grid2.width - 1 } else { 0 };
+                        if R_MergedHeightPoints(grid2, offset2) {
+                            continue;
+                        }
+                        for l in 1..(grid2.height - 1) {
+                            //
+                            let a = grid1.verts[(grid1.width * k + offset1) as usize].xyz;
+                            let b = grid2.verts[(grid2.width * l + offset2) as usize].xyz;
+                            // `fabs()` takes a double: the f32 difference promotes and the `.1`
+                            // comparand is a double literal (ruling 12).
+                            if ((a[0] - b[0]) as f64).abs() > 0.1 {
+                                continue;
+                            }
+                            if ((a[1] - b[1]) as f64).abs() > 0.1 {
+                                continue;
+                            }
+                            if ((a[2] - b[2]) as f64).abs() > 0.1 {
+                                continue;
+                            }
+                            // ok the points are equal and should have the same lod error
+                            grid2.height_lod_error[l as usize] = grid1.height_lod_error[k as usize];
+                            touch = true;
+                        }
+                    }
+                }
+            }
+            if touch {
+                grid2.lod_fixed = 2;
+                //NOTE: this would be correct but makes things really slow
+                //grid2->lodFixed = 1;
+                recurse = true;
+            }
+        }
+        if recurse {
+            R_FixSharedVertexLodError_r(start, j, world_data);
+        }
+        j += 1;
+    }
+}
+
+/// Raven `R_MovePatchSurfacesToHunk`.
+///
+/// PORT-NOTE: the oracle deep-copies each grid surface out of its original
+/// (zone-scratch) allocation into a permanent hunk allocation — trimming
+/// `widthLodError`/`heightLodError` to their exact size — then frees the
+/// original via `R_FreeSurfaceGridMesh` and repoints `worldData.surfaces[i]
+/// .data` at the hunk copy. Under the owned-`Vec` model every `GridMesh` is
+/// already exactly-sized, permanently-owned storage (same collapse as
+/// `R_LoadVisibility`'s Hunk_Alloc/Com_Mem* note above): there is no
+/// separate hunk to move data into, so this reduces to the identity and
+/// `R_FreeSurfaceGridMesh` (already ported, `tr_curve.rs`) is not called —
+/// there is no separate original allocation for it to free. Also noted: the
+/// oracle's `heightLodError` copy at `tr_bsp.cpp:1333` copies
+/// `grid->heightLodError` onto itself (`grid->heightLodError,
+/// grid->heightLodError`, not `hunkgrid->heightLodError`) — an oracle bug
+/// that leaves `hunkgrid->heightLodError` as uninitialized hunk memory in
+/// the original. Porting-rules §19: picking the defined behavior of
+/// preserving the real `heightLodError` values (there is no "uninitialized
+/// hunk memory" concept to reproduce under owned `Vec`s) rather than
+/// modeling that corruption.
+///
+/// Source: `oracle/codemp/renderer/tr_bsp.cpp:1314-1339`
+pub fn R_MovePatchSurfacesToHunk(_world_data: &mut [crate::tr_curve::GridMesh]) {
+    // No-op under the owned-Vec ownership model — see PORT-NOTE above.
+}
+
+/// Raven `R_LoadNodesAndLeafs`.
+///
+/// PORT-NOTE: `worldData.nodes`'s parent/children pointer graph becomes the
+/// index-linked `Node` arena (tier-2 transition audit, Group 1: `mnode_t`
+/// row); the oracle's single `Hunk_Alloc`'d `(numNodes + numLeafs)`-element
+/// array collapses to one `Vec<Node>` built directly from the parsed file
+/// bytes (same Hunk_Alloc/Com_Mem* collapse as `R_LoadVisibility` above —
+/// no idiomatic-interior counterpart for the hunk allocator). `plane`
+/// crosses as an index into `world.planes`; `firstmarksurface` as an index
+/// into `world.mark_surfaces` (both already-populated by
+/// `R_LoadPlanes`/`R_LoadMarksurfaces`, lower-wave siblings in this file).
+///
+/// Source: `oracle/codemp/renderer/tr_bsp.cpp:1492-1561`
+fn R_LoadNodesAndLeafs(
+    ctx: &BspLoadContext,
+    node_lump: &lump_t,
+    leaf_lump: &lump_t,
+    world: &mut WorldAsset,
+) {
+    let node_entry_size = size_of::<dnode_t>();
+    let leaf_entry_size = size_of::<dleaf_t>();
+    if (node_lump.filelen as usize) % node_entry_size != 0
+        || (leaf_lump.filelen as usize) % leaf_entry_size != 0
+    {
+        com_error(
+            errorParm_t::ERR_DROP,
+            format!("LoadMap: funny lump size in {}", world.name),
+        );
+    }
+
+    let num_nodes = node_lump.filelen as usize / node_entry_size;
+    let num_leafs = leaf_lump.filelen as usize / leaf_entry_size;
+
+    let mut nodes: Vec<Node> = Vec::with_capacity(num_nodes + num_leafs);
+
+    // load nodes
+    let node_base = node_lump.fileofs as usize;
+    for i in 0..num_nodes {
+        let rec =
+            &ctx.file_base[node_base + i * node_entry_size..node_base + (i + 1) * node_entry_size];
+
+        let mut mins = [0i32; 3];
+        let mut maxs = [0i32; 3];
+        for j in 0..3 {
+            mins[j] = LittleLong(i32::from_le_bytes(
+                rec[12 + j * 4..16 + j * 4].try_into().unwrap(),
+            ));
+            maxs[j] = LittleLong(i32::from_le_bytes(
+                rec[24 + j * 4..28 + j * 4].try_into().unwrap(),
+            ));
+        }
+
+        let plane_num = LittleLong(i32::from_le_bytes(rec[0..4].try_into().unwrap()));
+
+        let mut children = [None, None];
+        for j in 0..2 {
+            let p = LittleLong(i32::from_le_bytes(
+                rec[4 + j * 4..8 + j * 4].try_into().unwrap(),
+            ));
+            children[j] = if p >= 0 {
+                Some(p as usize)
+            } else {
+                Some(num_nodes + (-1 - p) as usize)
+            };
+        }
+
+        nodes.push(Node {
+            parent: None,
+            children,
+            contents: -1, // CONTENTS_NODE — differentiate from leafs
+            mins,
+            maxs,
+            plane: Some(plane_num as usize),
+            cluster: 0,
+            area: 0,
+            firstmarksurface: 0,
+            nummarksurfaces: 0,
+        });
+    }
+
+    // load leafs
+    let leaf_base = leaf_lump.fileofs as usize;
+    for i in 0..num_leafs {
+        let rec =
+            &ctx.file_base[leaf_base + i * leaf_entry_size..leaf_base + (i + 1) * leaf_entry_size];
+
+        let mut mins = [0i32; 3];
+        let mut maxs = [0i32; 3];
+        for j in 0..3 {
+            mins[j] = LittleLong(i32::from_le_bytes(
+                rec[8 + j * 4..12 + j * 4].try_into().unwrap(),
+            ));
+            maxs[j] = LittleLong(i32::from_le_bytes(
+                rec[20 + j * 4..24 + j * 4].try_into().unwrap(),
+            ));
+        }
+
+        let cluster = LittleLong(i32::from_le_bytes(rec[0..4].try_into().unwrap()));
+        let area = LittleLong(i32::from_le_bytes(rec[4..8].try_into().unwrap()));
+
+        if cluster >= world.num_clusters {
+            world.num_clusters = cluster + 1;
+        }
+
+        let first_leaf_surface = LittleLong(i32::from_le_bytes(rec[32..36].try_into().unwrap()));
+        let num_leaf_surfaces = LittleLong(i32::from_le_bytes(rec[36..40].try_into().unwrap()));
+
+        nodes.push(Node {
+            parent: None,
+            children: [None, None],
+            // Raven never assigns `out->contents` in this leaf loop; leafs
+            // keep the zero-initialized default (see the `Node::contents`
+            // doc comment).
+            contents: 0,
+            mins,
+            maxs,
+            plane: None,
+            cluster,
+            area,
+            firstmarksurface: first_leaf_surface as usize,
+            nummarksurfaces: num_leaf_surfaces,
+        });
+    }
+
+    // chain decendants
+    R_SetParent(&mut nodes, 0, None);
+
+    world.num_decision_nodes = num_nodes as i32;
+    world.nodes = nodes;
+}
+
+/// Raven `R_LoadLightGrid`.
+///
+/// PORT-NOTE: `wave-0 ruling 12` — `1.0 / w->lightGridSize[i]` (a C `double`
+/// literal divided by `float`) and the `ceil`/`floor` calls (which promote
+/// their `float` argument to `double`, the standard-library signature)
+/// evaluate in `f64` here, rounded to `f32` once at the C assignment point.
+/// The `lightGridBounds[i]` line has no double literal or `ceil`/`floor`
+/// call — every operand is `float` — so it stays plain `f32` arithmetic.
+/// `w->lightGridData`'s `Hunk_Alloc` + `memcpy` collapses to direct
+/// `Vec<mgrid_t>` construction (same collapse as `R_LoadVisibility` above);
+/// `mgrid_t`'s fields are all byte arrays, so no `LittleLong`/`LittleFloat`
+/// endian conversion applies. The 3-byte-in-place
+/// `R_ColorShiftLightingBytes` overload is `R_ColorShiftLightingBytesRGB`
+/// (this file, wave 0) — its Rust shape returns the shifted bytes instead of
+/// mutating in place.
+///
+/// Source: `oracle/codemp/renderer/tr_bsp.cpp:1813-1848`
+pub fn R_LoadLightGrid(
+    ctx: &BspLoadContext,
+    frame: &FrameState,
+    l: &lump_t,
+    world: &mut WorldAsset,
+) {
+    for i in 0..3usize {
+        world.light_grid_inverse_size[i] = (1.0f64 / world.light_grid_size[i] as f64) as f32;
+    }
+
+    let w_mins = world.bmodels[0].bounds[0];
+    let w_maxs = world.bmodels[0].bounds[1];
+
+    let mut maxs = [0.0f32; 3];
+    for i in 0..3usize {
+        world.light_grid_origin[i] = (world.light_grid_size[i] as f64
+            * (w_mins[i] as f64 / world.light_grid_size[i] as f64).ceil())
+            as f32;
+        maxs[i] = (world.light_grid_size[i] as f64
+            * (w_maxs[i] as f64 / world.light_grid_size[i] as f64).floor())
+            as f32;
+        world.light_grid_bounds[i] =
+            ((maxs[i] - world.light_grid_origin[i]) / world.light_grid_size[i] + 1.0) as i32;
+    }
+
+    let entry_size = size_of::<mgrid_t>();
+    let num_grid_data_elements = l.filelen as usize / entry_size;
+
+    let base = l.fileofs as usize;
+    let mut light_grid_data = Vec::with_capacity(num_grid_data_elements);
+    for i in 0..num_grid_data_elements {
+        let rec = &ctx.file_base[base + i * entry_size..base + (i + 1) * entry_size];
+
+        let mut ambient_light = [[0u8; 3]; MAXLIGHTMAPS];
+        for k in 0..MAXLIGHTMAPS {
+            ambient_light[k] = [rec[k * 3], rec[k * 3 + 1], rec[k * 3 + 2]];
+        }
+        let direct_base = MAXLIGHTMAPS * 3;
+        let mut direct_light = [[0u8; 3]; MAXLIGHTMAPS];
+        for k in 0..MAXLIGHTMAPS {
+            direct_light[k] = [
+                rec[direct_base + k * 3],
+                rec[direct_base + k * 3 + 1],
+                rec[direct_base + k * 3 + 2],
+            ];
+        }
+        let styles_base = direct_base + MAXLIGHTMAPS * 3;
+        let mut styles = [0u8; MAXLIGHTMAPS];
+        styles.copy_from_slice(&rec[styles_base..styles_base + MAXLIGHTMAPS]);
+        let lat_long_base = styles_base + MAXLIGHTMAPS;
+        let lat_long = [rec[lat_long_base], rec[lat_long_base + 1]];
+
+        let mut grid = mgrid_t {
+            ambientLight: ambient_light,
+            directLight: direct_light,
+            styles,
+            latLong: lat_long,
+        };
+
+        // deal with overbright bits
+        for j in 0..MAXLIGHTMAPS {
+            grid.ambientLight[j] = R_ColorShiftLightingBytesRGB(frame, grid.ambientLight[j]);
+            grid.directLight[j] = R_ColorShiftLightingBytesRGB(frame, grid.directLight[j]);
+        }
+
+        light_grid_data.push(grid);
+    }
+
+    world.light_grid_data = Some(light_grid_data);
 }

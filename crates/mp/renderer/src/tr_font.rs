@@ -1169,6 +1169,19 @@ pub fn Korean_ValidKSC5601Hangul(_iHi: u8, _iLo: u8) -> bool {
         && _iLo < KSC5601_HANGUL_LOBYTE_HIBOUND
 }
 
+/// Raven `Korean_ValidKSC5601Hangul` (the single-`uiCode` overload).
+///
+/// PORT-NOTE: Raven overloads this name for both the `(hi, lo)` byte-pair
+/// form above and this packed-code form; Rust has no overloading, so this
+/// overload is disambiguated with the `_uiCode` suffix, taken from its own
+/// oracle parameter name. The C narrowing conversion of `uiCode >> 8` into
+/// the `byte _iHi` parameter is spelled out as an explicit `as u8` truncation.
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:273-276`
+pub fn Korean_ValidKSC5601Hangul_uiCode(uiCode: u32) -> bool {
+    Korean_ValidKSC5601Hangul((uiCode >> 8) as u8, (uiCode & 0xFF) as u8)
+}
+
 /// Per-subsystem owned state for the Asian-glyph + font-registry code
 /// (DEC-37 A13.3) — homes `g_iNonScaledCharRange` (write sites `:299,381`,
 /// and this shard's `:476,544,646`), the font registry
@@ -1254,6 +1267,32 @@ pub fn Taiwanese_IsTrailingPunctuation(uiCode: u32) -> bool {
     false
 }
 
+/// Raven `Taiwanese_CollapseBig5Code`.
+///
+/// Raven: sneaky maths on both bytes, reduce to 0x0000 onwards.
+///
+/// PORT-NOTE: every constant this body needs except `BIG5_CODES_PER_ROW` is
+/// already defined in this file; `BIG5_CODES_PER_ROW`'s value is not in this
+/// packet's slice, so the final collapse step (the only line that needs it)
+/// is left as a cited `todo!()` rather than guessed (wave-0 ruling: never
+/// guess a `#define` value) — everything computable above it is transcribed
+/// faithfully, including both bounds guards.
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:362-375`
+pub fn Taiwanese_CollapseBig5Code(mut uiCode: u32) -> i32 {
+    if Taiwanese_ValidBig5Code(uiCode) {
+        uiCode -= (BIG5_HIBYTE_START0 as u32 * 256) + BIG5_LOBYTE_LOBOUND0 as u32;
+        if (uiCode & 0xFF) >= (BIG5_LOBYTE_LOBOUND1 as u32 - 1) - BIG5_LOBYTE_LOBOUND0 as u32 {
+            uiCode -= ((BIG5_LOBYTE_LOBOUND1 as u32 - 1) - (BIG5_LOBYTE_HIBOUND0 as u32 + 1)) - 1;
+        }
+        //TODO: Port BIG5_CODES_PER_ROW
+        // Source: oracle/codemp/renderer/tr_font.cpp:371 (#define, value not in packet)
+        let _ = uiCode;
+        todo!("Port BIG5_CODES_PER_ROW — oracle/codemp/renderer/tr_font.cpp:371");
+    }
+    0
+}
+
 /// Raven `Taiwanese_InitFields`.
 /// Source: `oracle/codemp/renderer/tr_font.cpp:377-383`
 pub fn Taiwanese_InitFields(font: &mut FontState) -> LanguageFontFields {
@@ -1279,6 +1318,17 @@ pub fn Japanese_ValidShiftJISCode(_iHi: u8, _iLo: u8) -> bool {
     }
 
     false
+}
+
+/// Raven `Japanese_ValidShiftJISCode` (the single-`uiCode` overload).
+///
+/// PORT-NOTE: same overload-disambiguation as
+/// [`Korean_ValidKSC5601Hangul_uiCode`] — Rust has no overloading, so the
+/// packed-code overload gets the `_uiCode` suffix.
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:421-424`
+pub fn Japanese_ValidShiftJISCode_uiCode(uiCode: u32) -> bool {
+    Japanese_ValidShiftJISCode((uiCode >> 8) as u8, (uiCode & 0xFF) as u8)
 }
 
 /// Raven `Japanese_IsTrailingPunctuation`.
@@ -1315,6 +1365,17 @@ pub fn Chinese_ValidGBCode(_iHi: u8, _iLo: u8) -> bool {
         && _iHi <= GB_HIBYTE_STOP
         && _iLo > GB_LOBYTE_LOBOUND
         && _iLo < GB_LOBYTE_HIBOUND
+}
+
+/// Raven `Chinese_ValidGBCode` (the single-`uiCode` overload).
+///
+/// PORT-NOTE: same overload-disambiguation as
+/// [`Korean_ValidKSC5601Hangul_uiCode`] — Rust has no overloading, so the
+/// packed-code overload gets the `_uiCode` suffix.
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:499-502`
+pub fn Chinese_ValidGBCode_uiCode(uiCode: u32) -> bool {
+    Chinese_ValidGBCode((uiCode >> 8) as u8, (uiCode & 0xFF) as u8)
 }
 
 /// Raven `Chinese_IsTrailingPunctuation`.
@@ -1421,6 +1482,103 @@ pub fn Thai_InitFields(font: &mut FontState) -> LanguageFontFields {
     }
 }
 
+/// Raven `Language_IsAsian`.
+///
+/// PORT-NOTE: `GetLanguageEnum()` is unported (file-head DEFERRED,
+/// `:31-53`); threaded in as the `eLanguage` parameter per that note's
+/// established pattern (porting-rules §B4) — every other caller in this
+/// file already does the same.
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:785-798`
+pub fn Language_IsAsian(eLanguage: Language_e) -> bool {
+    matches!(
+        eLanguage,
+        Language_e::eKorean
+            | Language_e::eTaiwanese
+            | Language_e::eJapanese
+            | Language_e::eChinese
+            // this is asian, but the query is normally used for scaling
+            | Language_e::eThai
+    )
+}
+
+/// Raven `Language_UsesSpaces`.
+///
+/// Raven: ( korean uses spaces ).
+///
+/// PORT-NOTE: `GetLanguageEnum()` is unported (file-head DEFERRED,
+/// `:31-53`); threaded in as the `eLanguage` parameter, same as
+/// [`Language_IsAsian`].
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:800-813`
+pub fn Language_UsesSpaces(eLanguage: Language_e) -> bool {
+    !matches!(
+        eLanguage,
+        Language_e::eTaiwanese | Language_e::eJapanese | Language_e::eChinese | Language_e::eThai
+    )
+}
+
+/// Raven `GetFont_SBCSOverride`.
+///
+/// Raven: work out the scaling factor for this font's glyphs, then override
+/// with the main properties of the original font.
+///
+/// PORT-NOTE: `GetLanguageEnum()` is unported (file-head DEFERRED,
+/// `:31-53`); threaded in as the `eLanguage` parameter. `pFont`/the returned
+/// `CFontInfo *` are `FontState::g_vFontArray` indices per the arena+id
+/// pattern (porting-rules §B5) the rest of this file already uses.
+///
+/// PORT-NOTE: this packet's RESOLVED CALL SURFACE lists `RE_RegisterFont`
+/// and `GetFont_Actual` as already ported in a lower wave; grepping this
+/// crate shows neither exists yet (a wave-planning defect, not a genuine
+/// call surface). Every guard this function can evaluate without them is
+/// transcribed faithfully; only the two branches that actually need them are
+/// left as cited `todo!()`s.
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:1251-1295`
+pub fn GetFont_SBCSOverride(
+    font: &mut FontState,
+    eLanguage: Language_e,
+    iFont: i32,
+    eLanguageSBCS: Language_e,
+    psLanguageNameSBCS: &str,
+) -> Option<i32> {
+    let (m_bIsFakeAlienLanguage, m_iAltSBCSFont) = match font
+        .g_vFontArray
+        .get(iFont as usize)
+        .and_then(|f| f.as_deref())
+    {
+        Some(f) => (f.m_bIsFakeAlienLanguage, f.m_iAltSBCSFont),
+        None => return None,
+    };
+
+    if !m_bIsFakeAlienLanguage && eLanguage == eLanguageSBCS {
+        if m_iAltSBCSFont == -1 {
+            // no reg attempted yet?
+            // need to register this alternative SBCS font...
+            //
+            //TODO: Port RE_RegisterFont
+            // Source: oracle/codemp/renderer/tr_font.cpp:1261
+            //TODO: Port GetFont_Actual
+            // Source: oracle/codemp/renderer/tr_font.cpp:1262
+            let _ = psLanguageNameSBCS;
+            todo!(
+                "Port GetFont_SBCSOverride's alt-font registration — depends on unported RE_RegisterFont/GetFont_Actual — oracle/codemp/renderer/tr_font.cpp:1259-1284"
+            );
+        }
+
+        if m_iAltSBCSFont > 0 {
+            //TODO: Port GetFont_Actual
+            // Source: oracle/codemp/renderer/tr_font.cpp:1289
+            todo!(
+                "Port GetFont_SBCSOverride's alt-font lookup — depends on unported GetFont_Actual — oracle/codemp/renderer/tr_font.cpp:1287-1290"
+            );
+        }
+    }
+
+    None
+}
+
 /// Raven `R_InitFonts`.
 /// Source: `oracle/codemp/renderer/tr_font.cpp:1645-1649`
 pub fn R_InitFonts(font: &mut FontState) {
@@ -1446,4 +1604,73 @@ pub fn R_ShutdownFonts(font: &mut FontState) {
     font.g_iCurrentFontIndex = 1;
 
     font.g_ThaiCodes.Clear();
+}
+
+/// Raven `R_ReloadFonts_f`.
+///
+/// PORT-NOTE: Raven's inner `for` loop leaks its `it` iterator past the loop
+/// (the pre-C++11 MSVC for-scope-leak idiom this codebase relies on
+/// elsewhere) to learn afterward whether the search broke early or ran to
+/// completion; a `found` flag threaded out of the loop carries the same
+/// information explicitly. `g_mapFontIndexes`' Rust `HashMap` has no
+/// iteration order, but the search is a reverse (index -> name) lookup by
+/// value, not an order-dependent scan, so this is behavior-preserving
+/// (porting-rules §10 — control flow preserved, shape is not).
+///
+/// PORT-NOTE: this packet's RESOLVED CALL SURFACE lists `RE_RegisterFont` as
+/// already ported in a lower wave; grepping this crate shows it does not
+/// exist yet (a wave-planning defect). Every step that does not need it —
+/// the ordered-name collection, the shutdown/restart, both `Com_Printf`
+/// paths — is transcribed faithfully; only the re-registration loop's actual
+/// `RE_RegisterFont` call is left as a cited `todo!()`. The `#ifdef _DEBUG`
+/// `assert(iNewFontHandle == iFont+1)` twin of the release-build call is the
+/// same blocked call either way, so both arms collapse to the one `todo!()`.
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:1666-1711`
+pub fn R_ReloadFonts_f(view: &mut EngineHostView, font: &mut FontState) {
+    // first, grab all the currently-registered fonts IN THE ORDER THEY WERE
+    // REGISTERED...
+    //
+    let mut vstrFonts: Vec<String> = Vec::new();
+    let mut found_all = true;
+
+    for iFontToFind in 1..font.g_iCurrentFontIndex {
+        let found = font
+            .g_mapFontIndexes
+            .iter()
+            .find(|&(_, &idx)| idx == iFontToFind)
+            .map(|(name, _)| name.clone());
+        match found {
+            Some(name) => vstrFonts.push(name),
+            None => {
+                // couldn't find this font
+                found_all = false;
+                break;
+            }
+        }
+    }
+
+    if found_all {
+        // found all of them? now restart the font system...
+        //
+        R_ShutdownFonts(font);
+        R_InitFonts(font);
+        //
+        // and re-register our fonts in the same order as before (note that
+        // some menu items etc cache the string lengths so really a
+        // vid_restart is better, but this is just for my testing)
+        //
+        for _name in &vstrFonts {
+            //TODO: Port RE_RegisterFont
+            // Source: oracle/codemp/renderer/tr_font.cpp:1699,1702
+            todo!("Port RE_RegisterFont — oracle/codemp/renderer/tr_font.cpp:1699,1702");
+        }
+        com_printf(view.common, "Done.\n");
+    } else {
+        // poo. Oh well, forget it.
+        com_printf(
+            view.common,
+            "Problem encountered finding current fonts, ignoring.\n",
+        );
+    }
 }

@@ -16,6 +16,26 @@ pub struct srfTerrain_t {
 /// Raven manifest tag name; the typedef is `srfTerrain_t`.
 pub type srfTerrain_s = srfTerrain_t;
 
+impl srfTerrain_t {
+    /// Raven's `((srfTerrain_t *)surface)->landscape` deref — the terrain
+    /// surface's `CTRLandScape` (`R_AddTerrainSurfaces`,
+    /// `tr_terrain.cpp:998-1004`).
+    ///
+    /// # Safety invariant
+    /// `landscape` is set by the terrain loader to the live
+    /// `CTRLandScape` for the current world and stays valid while that world
+    /// asset lives; callers first test `landscape.is_null()`, the oracle's own
+    /// guard (`tr_terrain.cpp:999`).
+    ///
+    /// This accessor retires with the type at the #41 type pass.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:744-748`
+    pub fn landscape(&self) -> &CTRLandScape {
+        debug_assert!(!self.landscape.is_null());
+        unsafe { &*self.landscape }
+    }
+}
+
 const _: () = assert!(core::mem::offset_of!(srfTerrain_t, surfaceType) == 0);
 #[cfg(target_pointer_width = "64")]
 const _: () = {

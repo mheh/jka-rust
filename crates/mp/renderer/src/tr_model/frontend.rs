@@ -5,10 +5,15 @@
 
 use core::ffi::c_void;
 
+use mp_engine_qcommon::qfiles::md3_frame_s::md3Frame_t;
 use mp_engine_qcommon::qfiles::md3_header_t::md3Header_t;
 use mp_engine_qcommon::qfiles::md3_tag_s::md3Tag_t;
 use mp_host_interface::mdx::mdxm::MdxmView;
+use mp_qshared::shared::q_math::VectorClear;
+use mp_qshared::shared::{orientation_t, qhandle_t, vec3_t};
+use native_math::qmath::{AxisClear, VectorNormalize};
 
+use super::render_models::RenderModels;
 use super::server_load::read_qpath;
 use crate::tr_local::model_s::model_t;
 
@@ -37,6 +42,23 @@ use crate::tr_local::model_s::model_t;
 // - `R_Modellist_f` -> `RenderModels::modellist_f` (`render_models.rs`).
 //
 // The 13th, `R_GetTag`, has no existing port — transcribed below.
+//
+// PORT-NOTE: R3 wave-1 packet `tr_model.wave1.md` lists 8 fns; 6 of them are
+// already live in this subsystem (`_PREAMBLE.md` "Never re-port an
+// already-ported fn" — same wave-planning gap as above). Reconciled here
+// rather than re-transcribed:
+// - `RE_RegisterServerModels_Malloc` ->
+//   `RenderModels::re_register_server_models_malloc` (`cached_model_binary.rs`).
+// - `RE_RegisterModels_LevelLoadEnd` ->
+//   `RenderModels::models_level_load_end` (`cached_model_binary.rs`).
+// - `RE_InsertModelIntoHash` ->
+//   `RenderModels::re_insert_model_into_hash` (`render_models.rs`).
+// - `R_ModelInit` -> `RenderModels::model_init` (`render_models.rs`).
+// - `R_HunkClearCrap` -> `RenderModels::hunk_clear` (`render_models.rs`).
+// - `R_ModelFree` -> `RenderModels::model_free` (`render_models.rs`).
+//
+// The remaining 2, `R_LerpTag` and `R_ModelBounds`, have no existing port —
+// transcribed below.
 
 /// The crate's single [`MdxmView`] handout over a `model_t`'s `.glm` block.
 ///
@@ -96,4 +118,88 @@ pub unsafe fn r_get_tag(
     }
 
     None
+}
+
+/// Raven `R_LerpTag` — looks up `tag_name` in an MD3 model's `start_frame`
+/// and `end_frame` tag tables and linearly interpolates the origin/axis by
+/// `frac`, writing the result into `tag`. Returns `false` (Raven `qfalse`)
+/// if the model has no MD3 LOD 0, or `tag_name` isn't found in either frame
+/// — both leave `tag` axis-cleared/origin-cleared, matching Raven.
+///
+/// Raven: it is possible to have a bad frame while changing models, so don't error
+///
+/// # Safety
+/// `handle` must resolve (through [`RenderModels::get_model`]) to a
+/// `model_t` whose `md3[0]`, if non-null, satisfies [`r_get_tag`]'s pointer
+/// contract (tier-2 raw-pointer read, `_PREAMBLE.md` Group 6: on-disk MD3
+/// layout is a frozen file format, not new interior state).
+///
+/// Source: `oracle/codemp/renderer/tr_model.cpp:1768-1803`
+pub unsafe fn r_lerp_tag(
+    rm: &RenderModels,
+    tag: &mut orientation_t,
+    handle: qhandle_t,
+    start_frame: i32,
+    end_frame: i32,
+    frac: f32,
+    tag_name: &str,
+) -> bool {
+    let model = rm.get_model(handle);
+    if model.md3[0].is_null() {
+        AxisClear(tag.axis.as_mut_ptr());
+        VectorClear(&mut tag.origin);
+        return false;
+    }
+
+    let start = r_get_tag(model.md3[0], start_frame, tag_name);
+    let end = r_get_tag(model.md3[0], end_frame, tag_name);
+    let (Some(start), Some(end)) = (start, end) else {
+        AxisClear(tag.axis.as_mut_ptr());
+        VectorClear(&mut tag.origin);
+        return false;
+    };
+
+    let front_lerp = frac;
+    let back_lerp = 1.0 - frac;
+
+    for i in 0..3 {
+        tag.origin[i] = (*start).origin[i] * back_lerp + (*end).origin[i] * front_lerp;
+        tag.axis[0][i] = (*start).axis[0][i] * back_lerp + (*end).axis[0][i] * front_lerp;
+        tag.axis[1][i] = (*start).axis[1][i] * back_lerp + (*end).axis[1][i] * front_lerp;
+        tag.axis[2][i] = (*start).axis[2][i] * back_lerp + (*end).axis[2][i] * front_lerp;
+    }
+    VectorNormalize(&mut tag.axis[0]);
+    VectorNormalize(&mut tag.axis[1]);
+    VectorNormalize(&mut tag.axis[2]);
+
+    true
+}
+
+/// Raven `R_ModelBounds` — a model's bounding box: an inline (brush)
+/// model's own `bmodel_t::bounds`, else its MD3 LOD-0 first frame's bounds,
+/// else a cleared box if the model has no MD3 LOD 0. Out-params `mins`/
+/// `maxs` become the return tuple (porting-rules §C7).
+///
+/// # Safety
+/// `handle` must resolve (through [`RenderModels::get_model`]) to a
+/// `model_t` whose `bmodel`/`md3[0]`, if non-null, satisfy the tier-2
+/// raw-pointer read contract those fields already carry (`_PREAMBLE.md`
+/// Group 1/6).
+///
+/// Source: `oracle/codemp/renderer/tr_model.cpp:1811-1836`
+pub unsafe fn r_model_bounds(rm: &RenderModels, handle: qhandle_t) -> (vec3_t, vec3_t) {
+    let model = rm.get_model(handle);
+
+    if !model.bmodel.is_null() {
+        return ((*model.bmodel).bounds[0], (*model.bmodel).bounds[1]);
+    }
+
+    if model.md3[0].is_null() {
+        return ([0.0; 3], [0.0; 3]);
+    }
+
+    let header = model.md3[0];
+    let frame = (header as *const u8).add((*header).ofsFrames as usize) as *const md3Frame_t;
+
+    ((*frame).bounds[0], (*frame).bounds[1])
 }

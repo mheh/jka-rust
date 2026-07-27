@@ -6,6 +6,8 @@
 // transcription, matching the rest of the renderer/engine crates.
 #![allow(non_snake_case)]
 
+use crate::render_state::placeholders::GlConfig;
+
 /// Raven `edgeDef_t` — one shadow-silhouette edge record `R_AddEdgeDef`
 /// appends and `R_RenderShadowEdges` walks.
 ///
@@ -97,4 +99,93 @@ pub fn R_RenderShadowEdges(_state: &TrShadowsState) {
 pub fn RB_ProjectionShadowDeform() {
     // DEFERRED: R4 — RB_ProjectionShadowDeform (see doc comment above)
     // Source: oracle/codemp/renderer/tr_shadows.cpp:470-508
+}
+
+/// Raven `RB_DoShadowTessEnd` — casts tessellated shadow-volume vertices
+/// away from the light direction and records each triangle's front/back
+/// facing edges for the stencil-shadow silhouette pass, then draws the
+/// silhouette side walls into the stencil buffer.
+///
+/// DEFERRED: R4 — every touched value lives on `tess` (dissolved into R4's
+/// tessellation/vertex-building pipeline, R2 `## State ownership` row `tess`;
+/// no R3 carrier holds `tess.numVertexes`/`tess.xyz`/`tess.indexes`/
+/// `tess.numIndexes` to bound or drive either loop) or is itself GL-call
+/// choreography (`GL_Bind`/`GL_Cull`/`GL_State`/`qglColor3f`/`qglColorMask`/
+/// `qglEnable`/`qglDepthFunc`/`qglStencilFunc`/`qglStencilOp` — the
+/// fixed-function GL surface, unhomed until R4, DEC-01/DEC-37;
+/// `GpuResources::gl_state` is a named placeholder). `numEdgeDefs`/
+/// `edgeDefs` (`TrShadowsState`/`R_AddEdgeDef`/`R_RenderShadowEdges`, A13.3)
+/// and `glConfig.stencilBits`/`backEnd.ori`/`backEnd.currentEntity` are real
+/// R3 carriers but have nothing to drive without the tess vertex/index
+/// buffers, so no partial signature is invented ahead of the R4
+/// tessellation pipeline landing (matches this file's
+/// `RB_ProjectionShadowDeform` precedent).
+///
+/// PORT-NOTE: the retail `#if 1` block (the only compiled path — its `#else`
+/// alternate light-position-based projection is `#if 0`'d dead code) is the
+/// branch this digest reflects; the `#ifdef _STENCIL_REVERSE` Carmack-Reverse
+/// capping pass and the `_DEBUG_STENCIL_SHADOWS` wireframe branch are also
+/// dropped as dead code (neither macro is defined in the retail build).
+///
+/// Source: `oracle/codemp/renderer/tr_shadows.cpp:202-393`
+pub fn RB_DoShadowTessEnd() {
+    // DEFERRED: R4 — RB_DoShadowTessEnd (see doc comment above)
+    // Source: oracle/codemp/renderer/tr_shadows.cpp:202-393
+}
+
+/// Raven `RB_ShadowFinish` — draws the stencil-shadow blend quad that
+/// darkens the ground under the accumulated shadow-volume stencil counts.
+///
+/// `r_shadows_integer` is `r_shadows->integer` (`RendererCvars::r_shadows`,
+/// DEC-37 A13.1 — read through the live engine cvar table by the caller,
+/// threaded in here rather than reached for, matching this crate's
+/// `R_CullLocalBox`/`r_nocull_integer` precedent); `glconfig` is
+/// `RenderAssets::glconfig` (STATE HOMES row, sim-readable — B11).
+///
+/// DEFERRED: R4 — past the two guards below, the entire remaining body is
+/// the fixed-function GL stencil/blend-quad sequence
+/// (`qglEnable`/`qglStencilFunc`/`qglStencilOp`/`qglIsEnabled`/`GL_Cull`/
+/// `GL_Bind(tr.whiteImage)`/`qglPushMatrix`/`qglLoadIdentity`/`qglColor4f`/
+/// `GL_State`/`qglBegin`..`qglEnd`/`qglDisable`/`qglPopMatrix`) — unhomed
+/// until R4 (DEC-01/DEC-37; `GpuResources::gl_state` is a named
+/// placeholder), matching this file's `GL_Cull`-guard-then-defer precedent
+/// (`tr_backend.rs`). `tr.whiteImage` also has no R3 carrier yet (STATE
+/// HOMES `tr` SPLIT row names only the registries/`FrameState` scratch, not
+/// this frontend singleton handle).
+///
+/// Source: `oracle/codemp/renderer/tr_shadows.cpp:406-461`
+pub fn RB_ShadowFinish(r_shadows_integer: i32, glconfig: &GlConfig) {
+    if r_shadows_integer != 2 {
+        return;
+    }
+    if glconfig.stencil_bits < 4 {
+        return;
+    }
+
+    // DEFERRED: R4 — RB_ShadowFinish stencil/blend-quad GL sequence (see doc
+    // comment above).
+    // Source: oracle/codemp/renderer/tr_shadows.cpp:418-461
+}
+
+/// Raven `RB_CaptureScreenImage` — copies a centered screen region into
+/// `tr.screenImage`, clamped to the GL implementation's max texture size and
+/// the current viewport.
+///
+/// DEFERRED: R4 — the capture-rect arithmetic (`radX`/`radY`/`cX`/`cY`)
+/// exists solely to parameterize `qglCopyTexImage2D`, the fixed-function GL
+/// call itself (unhomed until R4, DEC-01/DEC-37; `GpuResources::gl_state` is
+/// a named placeholder) — matches this crate's `RB_Hyperspace`
+/// (`tr_backend.rs`) precedent of deferring GL-only-consumed arithmetic
+/// alongside its GL call rather than stranding an orphan return value.
+/// `GL_Bind(tr.screenImage)` is also unhomed: `tr.screenImage`/
+/// `tr.whiteImage` are frontend singleton image handles with no R3 carrier
+/// (STATE HOMES `tr` SPLIT row names only the registries and `FrameState`
+/// scratch, not these). `glConfig.vidWidth`/`vidHeight`/`maxTextureSize`
+/// (`RenderAssets::glconfig`) are real R3 carriers and would drive this
+/// arithmetic once `GL_Bind`/`qglCopyTexImage2D` land.
+///
+/// Source: `oracle/codemp/renderer/tr_shadows.cpp:511-572`
+pub fn RB_CaptureScreenImage() {
+    // DEFERRED: R4 — RB_CaptureScreenImage (see doc comment above)
+    // Source: oracle/codemp/renderer/tr_shadows.cpp:511-572
 }

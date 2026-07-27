@@ -93,3 +93,55 @@ pub fn R_NoiseInit(noise: &mut NoiseState, rng: &mut Rng) {
         noise.perm[i] = ((rng.rand() as f32 / RAND_MAX as f32 * 255.0) as u8) as i32;
     }
 }
+
+/// Raven `LERP(a,b,c)` macro: `(a) + (c) * ((b) - (a))`.
+///
+// PORT-NOTE: not a named oracle function — the shared `LERP` macro (standard
+// id/Raven linear-interpolation `#define`, `oracle/codemp/game/q_shared.h`),
+// factored into a helper since `R_NoiseGet4f` applies it seven times.
+fn lerp(a: f32, b: f32, c: f32) -> f32 {
+    a + c * (b - a)
+}
+
+/// Raven `R_NoiseGet4f`.
+///
+/// Source: `oracle/codemp/renderer/tr_noise.cpp:45-84`
+pub fn R_NoiseGet4f(noise: &NoiseState, x: f32, y: f32, z: f32, t: f32) -> f32 {
+    let ix = x.floor() as i32;
+    let fx = x - ix as f32;
+    let iy = y.floor() as i32;
+    let fy = y - iy as f32;
+    let iz = z.floor() as i32;
+    let fz = z - iz as f32;
+    let it = t.floor() as i32;
+    let ft = t - it as f32;
+
+    let mut value = [0.0f32; 2];
+    for i in 0..2i32 {
+        let it_i = it + i;
+
+        let front = [
+            get_noise_value(noise, ix, iy, iz, it_i),
+            get_noise_value(noise, ix + 1, iy, iz, it_i),
+            get_noise_value(noise, ix, iy + 1, iz, it_i),
+            get_noise_value(noise, ix + 1, iy + 1, iz, it_i),
+        ];
+        let back = [
+            get_noise_value(noise, ix, iy, iz + 1, it_i),
+            get_noise_value(noise, ix + 1, iy, iz + 1, it_i),
+            get_noise_value(noise, ix, iy + 1, iz + 1, it_i),
+            get_noise_value(noise, ix + 1, iy + 1, iz + 1, it_i),
+        ];
+
+        let fvalue = lerp(
+            lerp(front[0], front[1], fx),
+            lerp(front[2], front[3], fx),
+            fy,
+        );
+        let bvalue = lerp(lerp(back[0], back[1], fx), lerp(back[2], back[3], fx), fy);
+
+        value[i as usize] = lerp(fvalue, bvalue, fz);
+    }
+
+    lerp(value[0], value[1], ft)
+}

@@ -42,6 +42,29 @@ pub struct model_t {
 
 pub type model_s = model_t;
 
+impl model_t {
+    /// Raven's `model->bmodel` deref (`RE_GetBModelVerts`,
+    /// `tr_world.cpp:663`) — the inline (brush) model's surface range. The
+    /// raw deref is quarantined here (§D11) so the `tr_world.cpp` logic port
+    /// stays entirely safe; it mirrors `tr_model::frontend::mdxm_view_of`'s
+    /// established quarantine for the sibling `mdxm` pointer.
+    ///
+    /// # Safety invariant
+    /// `bmodel` is set by `R_LoadBrushModel` (`tr_bsp.cpp`) for
+    /// `MOD_BRUSH` models and points into the world's `Hunk_Alloc`'d block,
+    /// valid while the world asset lives; the oracle dereferences it
+    /// unchecked on the same path, so callers must only reach here for brush
+    /// models.
+    ///
+    /// This accessor retires with the type at the #41 type pass.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1128`
+    pub fn bmodel(&self) -> &bmodel_t {
+        debug_assert!(!self.bmodel.is_null());
+        unsafe { &*self.bmodel }
+    }
+}
+
 const _: () = assert!(core::mem::offset_of!(model_t, name) == 0);
 #[cfg(target_pointer_width = "64")]
 const _: () = {

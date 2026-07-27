@@ -337,3 +337,168 @@ pub fn EndPixelShader(pixel_shader: &PixelShaderState) {
     // Source: oracle/codemp/renderer/tr_backend.cpp:2008
     let _ = current_type;
 }
+
+/// Raven `RB_BeginDrawingView` — clears the draw buffers for a new view and
+/// sets up the portal clip plane.
+///
+/// DEFERRED: R4 — every dependency past the one field write below is
+/// unhomed:
+/// - the renderer's cvar-value-read seam isn't wired yet (`RendererCvars`
+///   holds only `Option<CvarHandle>`, A13.1) — `r_finish`/`r_measureOverdraw`/
+///   `r_shadows`/`r_fastsky`/`r_DynamicGlow`'s live values can't be read;
+/// - `TrRefdef` (`FrameState::refdef`) only carries the `tr_backend` wave-0
+///   fields (`fov_x`/`fov_y`/`view_origin`/`view_axis`) — `rdflags` lands
+///   with the `tr_scene` wave (R2 `## State ownership`, `trRefdef_t` row),
+///   so the `RDF_SKYBOXPORTAL`/`RDF_NOWORLDMODEL`/`RDF_AUTOMAP`/
+///   `RDF_HYPERSPACE` bit tests this fn guards on are left undecoded rather
+///   than guessed at (same treatment as `GL_State`'s `GLS_*` bits, DEC-37
+///   A13.2);
+/// - `ViewParms`/`OrientationR` (`FrameState::view`/`ori`) are still empty
+///   stubs — `isPortal`/`portalPlane`/`ori.axis` land with the `tr_main`
+///   wave;
+/// - `tr.world`'s `globalFog`/`fogs` land with the `tr_bsp`/`tr_world` wave;
+/// - `g_bRenderGlowingObjects`/`skyboxportal`/`tr_stencilled` are file-scope
+///   statics with no R2-assigned carrier yet (DEC-37 A13.3 — a per-subsystem
+///   state struct is named by whichever fn's wave actually reads/writes
+///   them; none of that state is reached by the portable slice below);
+/// - every `qgl*` call (`qglFinish`/`qglClearColor`/`qglClear`/
+///   `qglLoadMatrixf`/`qglClipPlane`/`qglEnable`/`qglDisable`) is GL-only —
+///   `GpuResources::gl_state` stays a named placeholder until R4 (DEC-37
+///   A13.2).
+///
+/// Only the one unconditional field write lands here: `backEnd.projection2D
+/// = qfalse;`. `SetViewportAndScissor`/`GL_State`/`RB_Hyperspace` (the
+/// wave-0 in-module callees) are not invoked — every call site downstream of
+/// them is gated by the unresolved state above.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:477-593`
+pub fn RB_BeginDrawingView(
+    frame: &mut FrameState,
+    _gpu: &mut GpuResources,
+    _assets: &RenderAssets,
+    _cvars: &RendererCvars,
+) {
+    // we will need to change the projection matrix before drawing
+    // 2D images again
+    frame.projection_2d = false;
+
+    // DEFERRED: R4 — the rest of RB_BeginDrawingView (see doc comment above)
+    // (DEC-37 A13.1, A13.2, A13.3; R2 `## State ownership` trRefdef_t /
+    // viewParms_t / orientationr_t rows)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:480-593
+}
+
+/// Raven `R_WorldCoordToScreenCoord` — the `int`-out-param wrapper around
+/// `R_WorldCoordToScreenCoordFloat`; returns `None` where the oracle's
+/// `bool retVal == false` left `*x`/`*y` holding whatever `xF`/`yF` happened
+/// to be (an unwritten-on-failure read, porting-rules §19: the one defined
+/// behavior kept here is "no coordinate" rather than a garbage cast).
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:638-645`
+pub fn R_WorldCoordToScreenCoord(
+    assets: &RenderAssets,
+    frame: &FrameState,
+    world_coord: Vec3,
+) -> Option<(i32, i32)> {
+    let (x_f, y_f) = R_WorldCoordToScreenCoordFloat(assets, frame, world_coord)?;
+    Some((x_f as i32, y_f as i32))
+}
+
+/// Raven `RB_SetGL2D` — switches the backend into 2D orthographic drawing
+/// mode: sets `backEnd.projection2D`, the 2D viewport/scissor/projection
+/// matrix, blend state, and stamps `backEnd.refdef.time`/`floatTime` for 2D
+/// shaders.
+///
+/// DEFERRED: R4 — every `qgl*` call (`qglViewport`/`qglScissor`/
+/// `qglMatrixMode`/`qglLoadIdentity`/`qglOrtho`/`qglDisable`) and the
+/// `GL_State` call (its `GLS_DEPTHTEST_DISABLE | GLS_SRCBLEND_SRC_ALPHA |
+/// GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA` bits are left undecoded rather than
+/// guessed at, same treatment as `GL_State`'s own body) are GL-only (DEC-37
+/// A13.2). The `backEnd.refdef.time`/`floatTime` stamp also has no home yet
+/// — `TrRefdef` (`FrameState::refdef`) only carries the `tr_backend` wave-0
+/// fields (`fov_x`/`fov_y`/`view_origin`/`view_axis`); `time`/`floatTime`
+/// land with the `tr_scene` wave (R2 `## State ownership`, `trRefdef_t`
+/// row) — and reading it needs `Sys_Milliseconds`'s `Engine` param plus
+/// `com_timescale`'s live cvar value, neither threaded to this fn.
+///
+/// Only the one unconditional field write lands here: `backEnd.projection2D
+/// = qtrue;`.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1266-1292`
+pub fn RB_SetGL2D(frame: &mut FrameState, _gpu: &mut GpuResources, _assets: &RenderAssets) {
+    frame.projection_2d = true;
+
+    // DEFERRED: R4 — the rest of RB_SetGL2D (see doc comment above) (DEC-37
+    // A13.2; R2 `## State ownership` trRefdef_t row)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:1269-1291
+}
+
+/// Raven `RE_UploadCinematic` — (re)uploads a cinematic video frame into the
+/// per-client scratch texture `tr.scratchImage[client]`, either as a fresh
+/// `qglTexImage2D` when the frame size changed or a `qglTexSubImage2D` when
+/// `dirty`.
+///
+/// DEFERRED: R4 — `tr.scratchImage[MAX_VIDEO_CLIENTS]` has no R2-assigned
+/// carrier (not one of the named `## State ownership` `tr` sub-fields, and
+/// not a `RenderAssets::images` registry entry — a fixed per-client scratch
+/// slot, not a registered/named image); `GL_Bind`'s own body is itself
+/// deferred pending that same registry wiring. Every `qgl*` call
+/// (`qglTexImage2D`/`qglTexSubImage2D`/`qglTexParameterf`) is GL-only
+/// (DEC-37 A13.2).
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1367-1395`
+pub fn RE_UploadCinematic(
+    _gpu: &mut GpuResources,
+    _assets: &mut RenderAssets,
+    _cols: i32,
+    _rows: i32,
+    _data: &[u8],
+    _client: i32,
+    _dirty: bool,
+) {
+    // DEFERRED: R4 — RE_UploadCinematic (see doc comment above) (DEC-37 A13.2)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:1367-1395
+}
+
+/// Raven `RB_BlurGlowTexture` — the dynamic-glow blur pass: N iterations
+/// (`r_DynamicGlowPasses`) of a fullscreen-quad vertex/pixel-shader blur over
+/// `tr.screenGlow`/`tr.blurImage`, widening the texel offset by
+/// `r_DynamicGlowDelta` each pass.
+///
+/// DEFERRED: R4 — entirely GL/cvar-value/GPU-texture-handle driven: the
+/// cvar-value-read seam isn't wired yet (`r_DynamicGlowIntensity`/
+/// `r_DynamicGlowPasses`/`r_DynamicGlowDelta`'s live values, A13.1);
+/// `tr.glowVShader`/`glowPShader`/`screenGlow`/`blurImage` are GL program/
+/// texture handles with no R2-assigned carrier (GPU-facing state, an R4
+/// concern per `GpuResources`'s own doc comment); `g_bTextureRectangleHack`
+/// is homed outside this TU with no confirmed receiver; every `qgl*` call is
+/// GL-only and the `glState.currenttmu` write is a named placeholder until
+/// R4 (DEC-37 A13.2).
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:2015-2189`
+pub fn RB_BlurGlowTexture(
+    _frame: &FrameState,
+    _gpu: &mut GpuResources,
+    _assets: &RenderAssets,
+    _cvars: &RendererCvars,
+) {
+    // DEFERRED: R4 — RB_BlurGlowTexture (see doc comment above) (DEC-37 A13.2)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:2015-2189
+}
+
+/// Raven `RB_DrawGlowOverlay` — composites the blurred glow texture
+/// (`tr.blurImage`) additively over the scene texture (`tr.sceneImage`) in
+/// 2D orthographic mode.
+///
+/// DEFERRED: R4 — entirely GL/cvar-value/GPU-texture-handle driven: the
+/// cvar-value-read seam isn't wired yet (`r_DynamicGlow`/
+/// `r_DynamicGlowHeight`/`r_DynamicGlowSoft`/`r_DynamicGlowWidth`'s live
+/// values, A13.1); `tr.sceneImage`/`blurImage` are GL texture handles with
+/// no R2-assigned carrier (GPU-facing state, an R4 concern); every `qgl*`
+/// call is GL-only (DEC-37 A13.2).
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:2192-2325`
+pub fn RB_DrawGlowOverlay(_gpu: &mut GpuResources, _assets: &RenderAssets, _cvars: &RendererCvars) {
+    // DEFERRED: R4 — RB_DrawGlowOverlay (see doc comment above) (DEC-37 A13.2)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:2192-2325
+}

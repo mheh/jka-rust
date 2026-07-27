@@ -9,19 +9,27 @@
 use std::f32::consts::PI;
 use std::sync::Arc;
 
+use mp_engine_qcommon::common::common::com_printf;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::error::com_error;
+use mp_engine_qcommon::common_fns::Com_DPrintf;
 use mp_engine_qcommon::cvar_fns::Cvar_Set;
 use mp_engine_qcommon::files_common::{FS_FCloseFile, FS_FOpenFileRead, FS_Read, FS_ReadFileVec};
 use mp_qshared::shared::error_parm::errorParm_t;
+use mp_qshared::shared::q_color::{S_COLOR_RED, S_COLOR_YELLOW};
+use mp_qshared::shared::q_string::COM_StripExtension;
 use mp_qshared::shared::{fileHandle_t, MAX_QPATH};
+use native_math::qmath::Com_Clamp;
 
+use crate::render_state::frame_state::FrameState;
+use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::placeholders::GlConfig;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_local::tr_globals_t::FOG_TABLE_SIZE;
+use crate::tr_model::render_models::RenderModels;
 
 // PORT-NOTE: several functions below read/write fields on two root types
 // this crate owns elsewhere (`render_state::placeholders::{GlConfig,
@@ -43,6 +51,42 @@ use crate::tr_local::tr_globals_t::FOG_TABLE_SIZE;
 // than inventing the field (porting-rules §A2, no speculative behavior) —
 // see `R_SetColorMappings` below.
 
+// PORT-NOTE (wave 1): this wave's fns (`R_SumOfUsedImages`, `R_ImageList_f`,
+// `R_Images_DeleteImage`, `R_Images_Clear`, `RE_RegisterImages_Info_f`,
+// `R_FindImageFile_NoLoad`) read/write per-image fields on
+// `crate::render_state::image_asset::ImageAsset` and a frame counter on
+// `crate::render_state::frame_state::FrameState` that do not exist yet —
+// `ImageAsset` is still `pub struct ImageAsset {}` (its own doc comment:
+// "fields land with the tr_image R3 wave", which is this wave, but this
+// packet's scope restricts every transcriber to their one target file, so
+// `image_asset.rs`/`frame_state.rs` cannot be touched from here). This
+// extends the exact multi-wave-fills-one-struct pattern the file-top
+// PORT-NOTE above already established for `GlConfig`/`FunctionTables`:
+// fields are referenced under their expected names/types below, and the
+// wave/integrator that can edit those files adds them verbatim. Required
+// additions, snake-case of the Raven `image_t`
+// (`oracle/codemp/renderer/tr_local.h:136-151`) / `trGlobals_t` names:
+//
+// `ImageAsset`:
+//   - `img_name: String`        (`imgName[64]`)
+//   - `width: i32`
+//   - `height: i32`
+//   - `mipmap: bool`
+//   - `allow_picmip: bool`
+//   - `wrap_clamp_mode: i32`    (`wrapClampMode`, a stored GLenum)
+//   - `internal_format: i32`   (`internalFormat`, a stored GLenum)
+//   - `frame_used: i32`         (`frameUsed`)
+//   - `last_level_used_on: i32` (`iLastLevelUsedOn`)
+//
+// `FrameState`:
+//   - `frame_count: i32` (`tr.frameCount` — this wave's packet explicitly
+//     SPLITs `R_SumOfUsedImages`'s `tr` read across `RenderAssets` +
+//     `FrameState`, matching R2's frontend-scratch-counter row)
+//
+// Flagged as an escalation per the preamble ("A state home this packet
+// marks UNMAPPED is an ESCALATION, never an invention") rather than
+// silently invented past this file's boundary.
+
 /// Per-subsystem state for `tr_image.cpp`'s two 256-entry gamma/intensity
 /// lookup tables — Raven file-scope statics `s_gammatable`/`s_intensitytable`
 /// with no R2 carrier of their own (kind-3, genuine cross-frame state);
@@ -51,14 +95,26 @@ use crate::tr_local::tr_globals_t::FOG_TABLE_SIZE;
 /// the oracle's zero-filled `static` arrays before the first
 /// `R_SetColorMappings` call.
 ///
+/// Extended by wave 1 with three more `tr_image.cpp` file-scope statics
+/// (kind-3, A13.3): `gl_filter_min`/`gl_filter_max` (`GL_TextureMode`'s
+/// selected minify/magnify GL filter enum) and `giTextureBindNum` (the next
+/// GL texture name to hand out, reset by `R_Images_Clear`).
+///
 /// Source: `oracle/codemp/renderer/tr_image.cpp` (file-scope statics near
-/// `R_SetColorMappings`, `:2847-2919`)
+/// `R_SetColorMappings`, `:2847-2919`; `gl_filter_min`/`gl_filter_max`
+/// near `:90-97`; `giTextureBindNum` near `:1030`)
 #[derive(Clone)]
 pub struct TrImageState {
     /// Raven `byte s_gammatable[256]`.
     pub gamma_table: [u8; 256],
     /// Raven `byte s_intensitytable[256]`.
     pub intensity_table: [u8; 256],
+    /// Raven file-scope `int gl_filter_min`.
+    pub gl_filter_min: i32,
+    /// Raven file-scope `int gl_filter_max`.
+    pub gl_filter_max: i32,
+    /// Raven file-scope `int giTextureBindNum`.
+    pub gi_texture_bind_num: i32,
 }
 
 impl Default for TrImageState {
@@ -66,6 +122,9 @@ impl Default for TrImageState {
         TrImageState {
             gamma_table: [0; 256],
             intensity_table: [0; 256],
+            gl_filter_min: 0,
+            gl_filter_max: 0,
+            gi_texture_bind_num: 0,
         }
     }
 }
@@ -82,6 +141,14 @@ const GL_RGB8: i32 = 0x8051;
 const GL_RGB4_S3TC: i32 = 0x83A1;
 const GL_COMPRESSED_RGB_S3TC_DXT1_EXT: i32 = 0x83F0;
 const GL_COMPRESSED_RGBA_S3TC_DXT5_EXT: i32 = 0x83F3;
+
+/// Raven `#define LANCZOS3 3.0` — `R_Resample`'s filter-window radius. Not
+/// guessed: this exact value is already load-bearing in this same file as
+/// `Lanczos3`'s own cutoff (`if t < 3.0`, wave 0, `tr_image.cpp:2352-2364`),
+/// so naming it here reuses a value already present in the target file
+/// rather than inventing one (wave law: never guess a `#define` not in the
+/// packet/target file).
+const LANCZOS3: f32 = 3.0;
 
 /// Raven `R_GammaCorrect`.
 ///
@@ -831,3 +898,658 @@ pub fn R_SetColorMappings(
 // around — porting-rules §A2/preamble: "A state home this packet marks
 // UNMAPPED is an ESCALATION, never an invention."
 // Source: oracle/codemp/renderer/tr_image.cpp:3355-3371
+
+// ============================================================================
+// wave 1
+// ============================================================================
+
+/// Raven `GL_TextureMode`.
+///
+/// ESCALATION: `modes[6]` (name + `GL_TEXTURE_MIN_FILTER`/`MAG_FILTER` enum
+/// pair) is declared immediately above `tr_image.cpp:99`, outside this
+/// packet's verbatim oracle slice — its GL enum values are not guessable per
+/// wave law ("never guess a numeric constant… the RF_* bit-value guesses
+/// were wave-0 BLOCKERs"). The function's very first statement depends on
+/// it (`modes[i].name` compared against the console arg), so nothing above
+/// the lookup is separable from it — left as a cited `todo!()` rather than
+/// fabricated, matching the `Taiwanese_CollapseBig5Code` precedent
+/// (`tr_font.rs`: transcribe everything computable, `todo!()` at the exact
+/// blocking point). `gl_filter_min`/`gl_filter_max` land on `TrImageState`
+/// (A13.3, named by this wave) once the table is available; the
+/// `qglTexParameterf` mipmap-refresh loop past it is DEFERRED: R4 regardless
+/// (fixed-function GL surface, DEC-37 A13.2).
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:99-143
+pub fn GL_TextureMode(
+    _view: &mut EngineHostView,
+    _cvars: &RendererCvars,
+    _assets: &RenderAssets,
+    _state: &mut TrImageState,
+    _gpu: &mut GpuResources,
+    _string: &str,
+) {
+    //TODO: Port modes
+    // Source: oracle/codemp/renderer/tr_image.cpp (modes[6] filter-mode
+    // table, declared immediately above :99 — not included in this packet's
+    // verbatim slice)
+    todo!(
+        "Port GL_TextureMode's modes[6] table — oracle/codemp/renderer/tr_image.cpp:99-143 (modes[] declared above :99, not in this packet)"
+    )
+}
+
+/// Raven `R_SumOfUsedImages`.
+///
+/// Out-param-free already; `tr.frameCount` reads `FrameState::frame_count`
+/// per this packet's explicit SPLIT digest (registries stay `RenderAssets`,
+/// the frame counter is render-thread scratch) — see the wave-1 PORT-NOTE
+/// above `TrImageState` for the not-yet-landed field. `int total` truncates
+/// on every `+=` in the `bUseFormat` branch in the oracle (int lvalue, float
+/// rvalue); reproduced by casting back to `i32` each iteration rather than
+/// accumulating in `f32` and casting once at the end.
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:206-228
+pub fn R_SumOfUsedImages(assets: &RenderAssets, frame: &FrameState, use_format: bool) -> f32 {
+    let mut total: i32 = 0;
+
+    let _ = R_Images_StartIteration(assets);
+    let mut cursor = 0usize;
+    while let Some(handle) = R_Images_GetNextIteration(assets, &mut cursor) {
+        let image = match assets.images.get(handle) {
+            Some(image) => image,
+            None => continue,
+        };
+        // it has already been advanced for the next frame, so...
+        if image.frame_used == frame.frame_count - 1 {
+            if use_format {
+                let byte_per_tex = R_BytesPerTex(&assets.glconfig, image.internal_format);
+                total = (total as f32 + byte_per_tex * (image.width * image.height) as f32) as i32;
+            } else {
+                total += image.width * image.height;
+            }
+        }
+    }
+
+    total as f32
+}
+
+/// Raven `R_ImageList_f`.
+///
+/// ESCALATION (partial): `image->wrapClampMode`'s `GL_REPEAT`/`GL_CLAMP`/
+/// `GL_CLAMP_TO_EDGE` named branches are not resolvable — their values are
+/// not in this packet or the target file (the `internalFormat` switch just
+/// above reuses `GL_RGBA4`/`GL_RGB5`/`GL_RGBA8`/`GL_RGB8`/`GL_RGB4_S3TC`/
+/// `GL_COMPRESSED_RGB_S3TC_DXT1_EXT`/`GL_COMPRESSED_RGBA_S3TC_DXT5_EXT`,
+/// already landed in this file by wave 0, so those ARE reused here — but no
+/// wrap-mode constant is present anywhere this wave can read). The wrap
+/// column falls through to the oracle's own numeric default-case format
+/// (`"%4i ", image->wrapClampMode`) for every mode, not just unrecognized
+/// ones, until the three named constants land.
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:235-312
+pub fn R_ImageList_f(view: &mut EngineHostView, assets: &RenderAssets) {
+    const YESNO: [&str; 2] = ["no ", "yes"];
+
+    com_printf(
+        view.common,
+        "\n      -w-- -h-- -mm- -if-- wrap --name-------\n",
+    );
+
+    let mut texels: i32 = 0;
+    let mut tex_bytes: f32 = 0.0;
+    let mut i: i32 = 0;
+
+    let num_images = R_Images_StartIteration(assets);
+    let mut cursor = 0usize;
+    while let Some(handle) = R_Images_GetNextIteration(assets, &mut cursor) {
+        let image = match assets.images.get(handle) {
+            Some(image) => image,
+            None => continue,
+        };
+        texels += image.width * image.height;
+        tex_bytes += (image.width * image.height) as f32
+            * R_BytesPerTex(&assets.glconfig, image.internal_format);
+        com_printf(
+            view.common,
+            &format!(
+                "{:4}: {:4} {:4}  {} ",
+                i, image.width, image.height, YESNO[image.mipmap as usize]
+            ),
+        );
+        match image.internal_format {
+            1 => com_printf(view.common, "I    "),
+            2 => com_printf(view.common, "IA   "),
+            3 => com_printf(view.common, "RGB  "),
+            4 => com_printf(view.common, "RGBA "),
+            GL_RGBA8 => com_printf(view.common, "RGBA8"),
+            GL_RGB8 => com_printf(view.common, "RGB8"),
+            GL_RGB4_S3TC => com_printf(view.common, "S3TC "),
+            GL_COMPRESSED_RGB_S3TC_DXT1_EXT => com_printf(view.common, "DXT1 "),
+            GL_COMPRESSED_RGBA_S3TC_DXT5_EXT => com_printf(view.common, "DXT5 "),
+            GL_RGBA4 => com_printf(view.common, "RGBA4"),
+            GL_RGB5 => com_printf(view.common, "RGB5 "),
+            _ => com_printf(view.common, "???? "),
+        }
+
+        //TODO: Port GL_REPEAT
+        //TODO: Port GL_CLAMP
+        //TODO: Port GL_CLAMP_TO_EDGE
+        // Source: oracle/codemp/renderer/tr_image.cpp:289-302 (wrap-mode GL
+        // enum values not resolvable without oracle access; wave law forbids
+        // guessing numeric constants — falls through to the default-case
+        // numeric format for every mode)
+        com_printf(view.common, &format!("{:4} ", image.wrap_clamp_mode));
+
+        com_printf(view.common, &format!("{}\n", image.img_name));
+        i += 1;
+    }
+    com_printf(view.common, " ---------\n");
+    com_printf(
+        view.common,
+        "      -w-- -h-- -mm- -if- wrap --name-------\n",
+    );
+    com_printf(
+        view.common,
+        &format!(" {} total texels (not including mipmaps)\n", texels),
+    );
+    com_printf(
+        view.common,
+        &format!(
+            " {:.2}MB total texture mem (not including mipmaps)\n",
+            tex_bytes / 1048576.0
+        ),
+    );
+    com_printf(view.common, &format!(" {} total images\n\n", num_images));
+}
+
+/// Raven `R_MipMap`.
+///
+/// `in`/`out` alias the same buffer in the oracle — `out` always trails `in`
+/// (it advances 4 bytes per source-pixel-pair `in` advances 8, starting
+/// equal), so it never overtakes an unread source pixel; represented here as
+/// two index cursors over one mutable slice rather than two raw pointers
+/// (interior-safety law). The `(unsigned *)in` reinterpret-cast on the
+/// `!r_simpleMipMaps` fast path becomes an explicit little-endian
+/// byte<->u32 round-trip around the already-ported `R_MipMap2` (matching
+/// `R_MipMap2`'s own `to_le_bytes`/`from_le_bytes` precedent), since Rust has
+/// no safe reinterpret between differently-typed slices.
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:439-477
+pub fn R_MipMap(
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    data: &mut [u8],
+    width: i32,
+    height: i32,
+) {
+    if view.common.cvar(cvars.r_simpleMipMaps).integer == 0 {
+        let pixel_count = (width * height).max(0) as usize;
+        let mut px: Vec<u32> = data[..pixel_count * 4]
+            .chunks_exact(4)
+            .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+            .collect();
+        R_MipMap2(&mut px, width, height);
+        let out_count = (((width >> 1).max(0)) * ((height >> 1).max(0))) as usize;
+        for (i, value) in px[..out_count].iter().enumerate() {
+            data[i * 4..i * 4 + 4].copy_from_slice(&value.to_le_bytes());
+        }
+        return;
+    }
+
+    if width == 1 && height == 1 {
+        return;
+    }
+
+    let row = (width * 4) as usize;
+    let mut out_pos = 0usize;
+    let mut in_pos = 0usize;
+    let out_width = width >> 1;
+    let out_height = height >> 1;
+
+    if out_width == 0 || out_height == 0 {
+        let n = out_width + out_height; // get largest
+        for _ in 0..n {
+            let mut out_pixel = [0u8; 4];
+            for k in 0..4usize {
+                out_pixel[k] = ((data[in_pos + k] as u16 + data[in_pos + 4 + k] as u16) >> 1) as u8;
+            }
+            data[out_pos..out_pos + 4].copy_from_slice(&out_pixel);
+            out_pos += 4;
+            in_pos += 8;
+        }
+        return;
+    }
+
+    for _ in 0..out_height {
+        for _ in 0..out_width {
+            let mut out_pixel = [0u8; 4];
+            for k in 0..4usize {
+                let sum = data[in_pos + k] as u16
+                    + data[in_pos + 4 + k] as u16
+                    + data[in_pos + row + k] as u16
+                    + data[in_pos + row + 4 + k] as u16;
+                out_pixel[k] = (sum >> 2) as u8;
+            }
+            data[out_pos..out_pos + 4].copy_from_slice(&out_pixel);
+            out_pos += 4;
+            in_pos += 8;
+        }
+        in_pos += row;
+    }
+}
+
+/// Raven `GL_ResetBinds`.
+///
+/// DEFERRED: R4 — entirely fixed-function GL: `memset(glState
+/// .currenttextures, …)` plus `qglBindTexture`/`qglActiveTextureARB`-gated
+/// calls through `GL_SelectTexture` (`tr_backend.rs`, already DEFERRED: R4).
+/// No CPU-only logic survives the GL binding cache (DEC-37 A13.2), matching
+/// `GL_Bind`'s identical empty-body precedent in the same crate.
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:982-999
+pub fn GL_ResetBinds(_gpu: &mut GpuResources) {
+    // DEFERRED: R4 — GL_ResetBinds body (see doc comment above) (DEC-37 A13.2)
+    // Source: oracle/codemp/renderer/tr_image.cpp:982-999
+}
+
+/// Raven `R_Images_DeleteImage`.
+///
+/// `image_t *pImage`'s std::map find-by-name-then-erase collapses to a
+/// direct arena lookup by handle (§B5 index-not-pointer) — the name is read
+/// back off the found `ImageAsset` (`img_name`, wave-1 PORT-NOTE field) so
+/// `image_names`' matching entry can be erased alongside the arena slot, the
+/// two registries the oracle's single `AllocatedImages` map served at once
+/// (`R2-D3`/`R2-D4`). `assert(0)` (not-found path) becomes `debug_assert!`
+/// (§19 — no defined oracle behavior past an assert in a release build).
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:1035-1049
+pub fn R_Images_DeleteImage(sim: &mut RenderAssetsSim, handle: ImageHandle) {
+    let name = sim
+        .published
+        .images
+        .get(handle)
+        .map(|image| image.img_name.clone());
+
+    match name {
+        Some(name) => {
+            R_Images_DeleteImageContents(sim, handle);
+            Arc::make_mut(&mut sim.published).image_names.remove(&name);
+        }
+        None => {
+            debug_assert!(false, "R_Images_DeleteImage: handle not found in registry");
+        }
+    }
+}
+
+/// Raven `R_Images_Clear`.
+///
+/// The std::map iteration is collected into an owned `Vec<ImageHandle>`
+/// first, then walked to call the already-ported `R_Images_DeleteImageContents`
+/// (which itself empties the arena slot, wave 0) — avoids mutating
+/// `RenderAssets::images` while a live borrow of it is mid-iteration.
+/// `giTextureBindNum` lands on `TrImageState` (A13.3, named by this wave).
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:1053-1066
+pub fn R_Images_Clear(sim: &mut RenderAssetsSim, state: &mut TrImageState) {
+    let _ = R_Images_StartIteration(&sim.published);
+    let mut cursor = 0usize;
+    let mut handles = Vec::new();
+    while let Some(handle) = R_Images_GetNextIteration(&sim.published, &mut cursor) {
+        handles.push(handle);
+    }
+    for handle in handles {
+        R_Images_DeleteImageContents(sim, handle);
+    }
+
+    Arc::make_mut(&mut sim.published).image_names.clear();
+
+    state.gi_texture_bind_num = 1024;
+}
+
+/// Raven `RE_RegisterImages_Info_f`.
+///
+/// `RE_RegisterMedia_GetLevel()` reconciles to the already-live
+/// `RenderModels::media_get_level` (`tr_model/cached_model_binary.rs`,
+/// per the crate's `tr_model` PORT-NOTE above — reconciled, not re-ported).
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:1069-1087
+pub fn RE_RegisterImages_Info_f(
+    view: &mut EngineHostView,
+    assets: &RenderAssets,
+    models: &RenderModels,
+) {
+    let mut i_image: i32 = 0;
+    let mut i_texels: i32 = 0;
+
+    let num_images = R_Images_StartIteration(assets);
+    let mut cursor = 0usize;
+    while let Some(handle) = R_Images_GetNextIteration(assets, &mut cursor) {
+        let image = match assets.images.get(handle) {
+            Some(image) => image,
+            None => continue,
+        };
+        com_printf(
+            view.common,
+            &format!(
+                "{}: ({:4}x{:4}y) \"{}\"",
+                i_image, image.width, image.height, image.img_name
+            ),
+        );
+        Com_DPrintf(
+            view.common,
+            &format!(
+                "{}, levused {}",
+                S_COLOR_RED.to_str().expect("S_COLOR_RED is ASCII"),
+                image.last_level_used_on
+            ),
+        );
+        com_printf(view.common, "\n");
+
+        i_texels += image.width * image.height;
+        i_image += 1;
+    }
+    com_printf(
+        view.common,
+        &format!(
+            "{} Images. {} ({:.2}MB) texels total, (not including mipmaps)\n",
+            num_images,
+            i_texels,
+            i_texels as f32 / 1024.0 / 1024.0
+        ),
+    );
+    Com_DPrintf(
+        view.common,
+        &format!(
+            "{}RE_RegisterMedia_GetLevel(): {}",
+            S_COLOR_RED.to_str().expect("S_COLOR_RED is ASCII"),
+            models.media_get_level()
+        ),
+    );
+}
+
+/// Raven `R_FindImageFile_NoLoad`.
+///
+/// `const char *name`'s NULL check becomes `Option<&str>` (idiomatic
+/// nullable-pointer translation, no Rust `&str` can be null); the std::map
+/// `find` collapses to `RenderAssets::image_names`' `HashMap` lookup
+/// (`R2-D3`/`R2-D4`); the `iLastLevelUsedOn` write goes through
+/// `Arc::make_mut` (A9), matching every other `RenderAssets` mutation.
+/// `allowTC` is read nowhere in the oracle body (dead parameter even in
+/// retail) — dropped rather than threaded through unused (porting-rules
+/// data-flow principle; the oracle itself never reads it).
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:1157-1193
+pub fn R_FindImageFile_NoLoad(
+    sim: &mut RenderAssetsSim,
+    view: &mut EngineHostView,
+    models: &RenderModels,
+    name: Option<&str>,
+    mipmap: bool,
+    allow_picmip: bool,
+    gl_wrap_clamp_mode: i32,
+) -> Option<ImageHandle> {
+    let name = name?;
+    let p_name = GenerateImageMappingName(name);
+
+    let handle = *sim.published.image_names.get(&p_name)?;
+
+    if p_name != "*white" {
+        if let Some(image) = sim.published.images.get(handle) {
+            if image.mipmap != mipmap {
+                com_printf(
+                    view.common,
+                    &format!(
+                        "{}WARNING: reused image {} with mixed mipmap parm\n",
+                        S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII"),
+                        p_name
+                    ),
+                );
+            }
+            if image.allow_picmip != allow_picmip {
+                com_printf(
+                    view.common,
+                    &format!(
+                        "{}WARNING: reused image {} with mixed allowPicmip parm\n",
+                        S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII"),
+                        p_name
+                    ),
+                );
+            }
+            if image.wrap_clamp_mode != gl_wrap_clamp_mode {
+                com_printf(
+                    view.common,
+                    &format!(
+                        "{}WARNING: reused image {} with mixed glWrapClampMode parm\n",
+                        S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII"),
+                        p_name
+                    ),
+                );
+            }
+        }
+    }
+
+    Arc::make_mut(&mut sim.published)
+        .images
+        .get_mut(handle)?
+        .last_level_used_on = models.media_get_level();
+
+    Some(handle)
+}
+
+// DEFERRED-WHOLE: `SaveJPG` — entirely a vendored-libjpeg compression
+// pipeline (`jpeg_std_error`/`jpeg_create_compress`/`jpeg_set_defaults`/
+// `jpeg_set_quality`/`jpeg_finish_compress`/`jpeg_destroy_compress`, plus the
+// already-deferred `jpegDest`/`jpeg_start_compress`/`jpeg_write_scanlines`
+// glue directly above) with no Rust-crate jpeg-encode seam wired in this
+// workspace (`Cargo.toml` carries no image/jpeg dependency) — this packet's
+// own threading digest for `SaveJPG` says exactly this: "vendored
+// libjpeg/png; a Rust-crate seam, never byte-ported (escalate if the seam
+// lacks a wrapper)", extending wave 0's jpegDest-family precedent (no stub
+// body written, this comment block only) to the caller. `hackSize`
+// (`term_destination`'s write target, the `FS_WriteFile` size argument) has
+// no consumer elsewhere in this packet and stays unhomed alongside this
+// glue.
+//
+// Source: oracle/codemp/renderer/tr_image.cpp:2113-2216
+
+/// Raven `COM_DefaultExtension` on owned strings: append `extension` unless
+/// the basename (scan back to the last `/`) already carries a `.`; result is
+/// bounded at `MAX_QPATH - 1` like the original's `Com_sprintf( path,
+/// maxSize, … )`.
+/// Source: `oracle/codemp/game/q_shared.c:112-131`
+fn com_default_extension(path: &str, extension: &str) -> String {
+    // `while (*src != '/' && src != path)` tests the loop condition *before*
+    // the body, so index 0 is never examined for `.` or `/`: a leading-dot
+    // path still gets the extension appended. Scanning `[1..]` reproduces
+    // that; an empty or 1-byte path scans nothing, as in C.
+    if path.len() > 1 {
+        for &b in path.as_bytes()[1..].iter().rev() {
+            if b == b'/' {
+                break;
+            }
+            if b == b'.' {
+                return path.to_string();
+            }
+        }
+    }
+    let mut out = format!("{path}{extension}");
+    let bound = MAX_QPATH as usize - 1;
+    if out.len() > bound {
+        let mut cut = bound;
+        while !out.is_char_boundary(cut) {
+            cut -= 1;
+        }
+        out.truncate(cut);
+    }
+    out
+}
+
+/// Raven `R_LoadImage`.
+///
+/// Out-params (`pic`/`width`/`height`) collapse to a return value (§C7).
+/// `*format` is unconditionally `GL_RGBA` on every reachable path (assigned
+/// once at entry, never reassigned) — its numeric value is not in this
+/// packet or the target file and is left out of the return rather than
+/// guessed (wave law: never guess a numeric constant); a reviewer restoring
+/// it needs only the one always-true assignment, not new control flow.
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:2228-2256
+pub fn R_LoadImage(view: &mut EngineHostView, shortname: &str) -> Option<(Vec<u8>, i32, i32)> {
+    //TODO: Port GL_RGBA
+    // Source: oracle/codemp/renderer/tr_image.cpp:2235 (`*format = GL_RGBA;`
+    // — value not in packet/target file, dropped from the return per the
+    // doc comment above)
+
+    let name = com_default_extension(&COM_StripExtension(shortname), ".jpg");
+    if let Some(result) = LoadJPG(view, &name) {
+        return Some(result);
+    }
+
+    // DEFERRED: `LoadPNG32` — vendored libpng, no Rust-crate seam wired in
+    // this workspace (`Cargo.toml` carries no png/image dependency);
+    // escalate rather than byte-port, matching `LoadJPG`'s identical
+    // codec-seam precedent above in this same file. The default-extension
+    // computation is still performed for parity of the attempted-path
+    // sequence; the decode itself is a no-op (always "no pic").
+    // Source: oracle/codemp/renderer/tr_image.cpp:2243-2248
+    let _name_png = com_default_extension(&COM_StripExtension(shortname), ".png");
+
+    let name = com_default_extension(&COM_StripExtension(shortname), ".tga");
+    if let Some(result) = LoadTGA(view, &name) {
+        return Some(result);
+    }
+
+    None
+}
+
+/// Raven `R_LoadDataImage`.
+///
+/// Out-params collapse to a return value (§C7); both length guards
+/// (`len >= MAX_QPATH`, `len < 5`) transcribed faithfully. `LoadPNG8` is the
+/// same unresolved vendored-libpng codec seam as `R_LoadImage`'s `LoadPNG32`
+/// — DEFERRED, matching precedent.
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:2259-2306
+pub fn R_LoadDataImage(view: &mut EngineHostView, name: &str) -> Option<(Vec<u8>, i32, i32)> {
+    let len = name.len();
+    if len >= MAX_QPATH as usize {
+        return None;
+    }
+    if len < 5 {
+        return None;
+    }
+
+    // DEFERRED: `LoadPNG8` — vendored libpng, no Rust-crate seam wired (see
+    // `R_LoadImage`'s identical PNG note above).
+    // Source: oracle/codemp/renderer/tr_image.cpp:2281-2282
+    let _work_png = com_default_extension(name, ".png");
+
+    let work = com_default_extension(name, ".jpg");
+    if let Some(result) = LoadJPG(view, &work) {
+        return Some(result);
+    }
+
+    let work = com_default_extension(name, ".tga");
+    if let Some(result) = LoadTGA(view, &work) {
+        return Some(result);
+    }
+
+    com_printf(
+        view.common,
+        &format!("Couldn't read {} -- dataimage load failed\n", name),
+    );
+    None
+}
+
+/// Raven `R_Resample`.
+///
+/// `contrib_list_t`/`contrib_t`'s `Z_Malloc`/`Z_Free` scratch pairs become
+/// owned local `Vec<Vec<Contrib>>` (porting-rules §C9: manual alloc/free ->
+/// ownership) — one inner `Vec` per output row/column index, replacing the
+/// oracle's fixed `num`-sized `Z_Malloc` block per index. `LANCZOS3` reuses
+/// the value already present in this file (see the `const` above).
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:2366-2520
+pub fn R_Resample(
+    source: &[u8],
+    swidth: i32,
+    sheight: i32,
+    dest: &mut [u8],
+    dwidth: i32,
+    dheight: i32,
+    components: i32,
+) {
+    struct Contrib {
+        pixel: i32,
+        weight: f32,
+    }
+
+    fn build_contributors(dcount: i32, scount: i32) -> Vec<Vec<Contrib>> {
+        let scale_axis = dcount as f32 / scount as f32;
+        let (window, scale) = if scale_axis < 1.0 {
+            ((LANCZOS3 / scale_axis).ceil(), scale_axis)
+        } else {
+            (LANCZOS3, 1.0)
+        };
+
+        let mut contributors = Vec::with_capacity(dcount.max(0) as usize);
+        for i in 0..dcount {
+            let center = i as f32 / scale_axis;
+            let left = (center - window).ceil() as i32;
+            let right = (center + window).floor() as i32;
+
+            let mut contrib = Vec::new();
+            for j in left..=right {
+                let weight = Lanczos3((center - j as f32) * scale) * scale;
+                let pixel = if j < 0 {
+                    -j
+                } else if j >= scount {
+                    (scount - j) + scount - 1
+                } else {
+                    j
+                };
+                contrib.push(Contrib { pixel, weight });
+            }
+            contributors.push(contrib);
+        }
+        contributors
+    }
+
+    // Pre-calculate filter contributions for rows, apply horizontally
+    // (source -> work).
+    let mut work = vec![0u8; (dwidth * sheight * components).max(0) as usize];
+    let row_contributors = build_contributors(dwidth, swidth);
+
+    for k in 0..sheight {
+        let raster = &source[(k * swidth * components).max(0) as usize..];
+        for i in 0..dwidth {
+            for l in 0..components {
+                let mut weight = 0.0f32;
+                for c in &row_contributors[i as usize] {
+                    weight += raster[((c.pixel * components) + l) as usize] as f32 * c.weight;
+                }
+                let pixel = Com_Clamp(0.0, 255.0, weight) as u8;
+                work[((k * dwidth * components) + (i * components) + l) as usize] = pixel;
+            }
+        }
+    }
+
+    // Columns: pre-calculate filter contributions, apply vertically
+    // (work -> dest).
+    let col_contributors = build_contributors(dheight, sheight);
+
+    for k in 0..dwidth {
+        for l in 0..components {
+            for i in 0..dheight {
+                let mut weight = 0.0f32;
+                for c in &col_contributors[i as usize] {
+                    weight += work
+                        [((c.pixel * dwidth * components) + (k * components) + l) as usize]
+                        as f32
+                        * c.weight;
+                }
+                let pixel = Com_Clamp(0.0, 255.0, weight) as u8;
+                dest[((i * dwidth * components) + (k * components) + l) as usize] = pixel;
+            }
+        }
+    }
+}

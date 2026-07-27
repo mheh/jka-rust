@@ -1,6 +1,7 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
 use core::ffi::c_int;
+use core::ptr::null_mut;
 
 use mp_qshared::common::mp::cgame::poly_s::poly_t;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
@@ -26,6 +27,36 @@ pub struct decalPoly_t {
 }
 
 pub type decalPoly_s = decalPoly_t;
+
+impl decalPoly_t {
+    /// All-zero constructor matching Raven's zero-initialized
+    /// `re_decalPolys[][]` global array element — the same memset parity
+    /// `refEntity_t::zeroed()` provides, written field-by-field (a struct
+    /// holding a raw pointer is safe to build; `verts` is a valid null).
+    ///
+    /// This accessor retires with the type at the #41 type pass.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_scene.cpp` (`re_decalPolys`)
+    #[must_use]
+    pub fn zeroed() -> Self {
+        Self {
+            time: 0,
+            fadetime: 0,
+            shader: 0,
+            color: [0.0; 4],
+            poly: poly_t {
+                hShader: 0,
+                numVerts: 0,
+                verts: null_mut(),
+            },
+            verts: [polyVert_t {
+                xyz: [0.0; 3],
+                st: [0.0; 2],
+                modulate: [0; 4],
+            }; MAX_VERTS_ON_DECAL_POLY],
+        }
+    }
+}
 
 const _: () = assert!(core::mem::offset_of!(decalPoly_t, time) == 0);
 #[cfg(target_pointer_width = "64")]

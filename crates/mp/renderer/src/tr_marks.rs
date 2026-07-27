@@ -8,7 +8,7 @@
 
 use mp_qshared::shared::q_math::BoxOnPlaneSideRef;
 use mp_qshared::shared::surface_flags::{CONTENTS_FOG, SURF_NOIMPACT, SURF_NOMARKS};
-use mp_qshared::shared::{cplane_t, vec3_t};
+use mp_qshared::shared::{cplane_t, markFragment_t, vec3_t};
 
 use crate::render_state::frame_state::FrameState;
 
@@ -246,4 +246,60 @@ pub fn R_BoxSurfaces_r(
             list.push(surf.data.clone());
         }
     }
+}
+
+/// Raven `R_AddMarkFragments` — clips a candidate polygon (typically a
+/// `srfSurfaceFace_t`/`srfGridMesh_t` fragment collected by `R_BoxSurfaces_r`)
+/// against `normals`/`dists`, then appends the surviving points/fragment to
+/// the caller's accumulator buffers.
+///
+/// PORT-NOTE: Raven's `pointBuffer`/`fragmentBuffer` are caller-owned raw
+/// arrays with `returnedPoints`/`returnedFragments` as running write-offset
+/// out-params; per the interior-safety law and the out-params→returns
+/// dictionary entry, both become `&mut Vec<T>` and the running counts fold
+/// into `.len()` — no separate offset out-param needed. Likewise `Com_Memcpy`
+/// (the only listed engine callee) copied the final ping-pong buffer into
+/// `pointBuffer`; with owned `Vec<vec3_t>` throughout, `extend_from_slice` is
+/// the direct idiomatic equivalent — no raw-pointer copy exists to call
+/// through.
+///
+/// PORT-NOTE: Raven's `maxFragments`/`mins`/`maxs` params are dropped — the
+/// oracle body (`tr_marks.cpp:186-237`) never reads `maxFragments` (a dead
+/// signature param, no guard to preserve), and `mins`/`maxs` are read only by
+/// the bounding-box sanity check Raven itself left commented out
+/// (`tr_marks.cpp:217-228`, dead code, not transcribed).
+///
+/// Source: `oracle/codemp/renderer/tr_marks.cpp:186-237`
+pub fn R_AddMarkFragments(
+    clip_points: &[vec3_t],
+    normals: &[vec3_t],
+    dists: &[f32],
+    max_points: usize,
+    point_buffer: &mut Vec<vec3_t>,
+    fragment_buffer: &mut Vec<markFragment_t>,
+) {
+    // chop the surface by all the bounding planes of the to be projected polygon
+    let mut points: Vec<vec3_t> = clip_points.to_vec();
+
+    for i in 0..normals.len() {
+        points = R_ChopPolyBehindPlane(&points, normals[i], dists[i], 0.5);
+        if points.is_empty() {
+            break;
+        }
+    }
+    // completely clipped away?
+    if points.is_empty() {
+        return;
+    }
+
+    // add this fragment to the returned list
+    if points.len() + point_buffer.len() > max_points {
+        return; // not enough space for this polygon
+    }
+
+    fragment_buffer.push(markFragment_t {
+        firstPoint: point_buffer.len() as i32,
+        numPoints: points.len() as i32,
+    });
+    point_buffer.extend_from_slice(&points);
 }

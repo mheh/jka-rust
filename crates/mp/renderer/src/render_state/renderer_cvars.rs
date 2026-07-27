@@ -5,7 +5,7 @@
 
 use mp_qshared::shared::cvar::CvarHandle;
 
-/// The 125 `cvar_t *` handles the renderer holds as file-scope globals, one
+/// The 128 `cvar_t *` handles the renderer holds as file-scope globals, one
 /// field per cvar, registered in `R_Register` and threaded as a carrier — the
 /// engine-island `EngineCvars` precedent (`Common`'s `sv_*` handle block).
 /// Reads go through the engine cvar table live; an R4 render-thread snapshot
@@ -17,7 +17,7 @@ use mp_qshared::shared::cvar::CvarHandle;
 ///
 /// Four of them (`r_drawTerrain`, `r_showFrameVariance`,
 /// `r_terrainTessellate`, `r_terrainWaterOffset`) are declared and
-/// registered in `tr_terrain.cpp`; the other 121 in `tr_init.cpp`.
+/// registered in `tr_terrain.cpp`; the other 124 in `tr_init.cpp`.
 ///
 /// Source: `oracle/codemp/renderer/tr_init.cpp:40-216` (declarations),
 /// `:985-1205` (`R_Register`);
@@ -144,6 +144,10 @@ pub struct RendererCvars {
     pub r_fullscreen: Option<CvarHandle>,
     /// `"r_gamma"` — default `"1.2"`, `CVAR_ARCHIVE`.
     pub r_gamma: Option<CvarHandle>,
+    /// `"r_ghoul2animsmooth"` — default `"0.3"`, `0`.
+    pub r_Ghoul2AnimSmooth: Option<CvarHandle>,
+    /// `"r_ghoul2unsqashaftersmooth"` — default `"1"`, `0`.
+    pub r_Ghoul2UnSqashAfterSmooth: Option<CvarHandle>,
     /// `"r_ignore"` — default `"1"`, `CVAR_CHEAT`.
     pub r_ignore: Option<CvarHandle>,
     /// `"r_ignoreGLErrors"` — default `"1"`, `CVAR_ARCHIVE`.
@@ -208,6 +212,8 @@ pub struct RendererCvars {
     pub r_roofCullCeilDist: Option<CvarHandle>,
     /// `"r_roofCeilFloorDist"` — default `"128"`, `CVAR_CHEAT`.
     pub r_roofCullFloorDist: Option<CvarHandle>,
+    /// `"r_shadowRange"` — default `"1000"`, `0`.
+    pub r_shadowRange: Option<CvarHandle>,
     /// `"cg_shadows"` — default `"1"`, `0`.
     pub r_shadows: Option<CvarHandle>,
     /// `"r_showFrameVariance"` — default `"0"`, `0`.

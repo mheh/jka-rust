@@ -26,7 +26,7 @@ use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::texture_compression_t::textureCompression_t;
 use mp_qshared::shared::{cplane_t, qhandle_t, vec3_t};
 
-use crate::tr_bsp::DShader;
+use crate::tr_bsp::{BModel, DShader, Node};
 use crate::tr_local::mgrid_t::mgrid_t;
 use crate::tr_local::tr_globals_t::{FOG_TABLE_SIZE, FUNCTABLE_SIZE};
 
@@ -73,6 +73,8 @@ pub struct RefEntity {
     /// zero means "unset" here, where `Handle{0,0}` means the registry's live
     /// default entry (A12).
     pub h_model: qhandle_t,
+    /// `e.axis[3]` — rotation vectors.
+    pub axis: [Vec3; 3],
     /// `e.origin`.
     pub origin: Vec3,
     /// `e.oldorigin`.
@@ -88,14 +90,23 @@ pub struct RefEntity {
     /// `e.ghoul2 != NULL` — a presence flag, not the pointer: the tier-1
     /// `*mut c_void` tail is forbidden interior.
     pub has_ghoul2: bool,
+    /// `needDlights` — Raven: true for bmodels that touch a dlight.
+    pub need_dlights: bool,
     /// `lightingCalculated`.
     pub lighting_calculated: bool,
     /// `lightDir` — normalized direction towards light.
     pub light_dir: Vec3,
     /// `ambientLight` — color normalized to 0-255.
     pub ambient_light: Vec3,
+    /// `ambientLightInt` — Raven: 32 bit rgba packed. Retail writes it
+    /// through `((byte *)&ent->ambientLightInt)[N]`, a reinterpret-cast the
+    /// interior-safety law forbids; carried as the unpacked `color4ub_t` the
+    /// byte writes address instead.
+    pub ambient_light_int: [u8; 4],
     /// `directedLight`.
     pub directed_light: Vec3,
+    /// `dlightBits`.
+    pub dlight_bits: i32,
 }
 
 // `refEntityType_t` has no `Default`, so `RefEntity`'s cannot be derived;
@@ -106,6 +117,7 @@ impl Default for RefEntity {
             re_type: refEntityType_t::RT_MODEL,
             renderfx: 0,
             h_model: 0,
+            axis: [[0.0; 3]; 3],
             origin: [0.0; 3],
             old_origin: [0.0; 3],
             custom_shader: 0,
@@ -113,10 +125,13 @@ impl Default for RefEntity {
             lighting_origin: [0.0; 3],
             end_time: 0.0,
             has_ghoul2: false,
+            need_dlights: false,
             lighting_calculated: false,
             light_dir: [0.0; 3],
             ambient_light: [0.0; 3],
+            ambient_light_int: [0; 4],
             directed_light: [0.0; 3],
+            dlight_bits: 0,
         }
     }
 }
@@ -179,13 +194,22 @@ pub struct WorldAsset {
     pub name: String,
     /// `shaders` (`dshader_t *`) — the on-disk shader-reference lump.
     pub shaders: Vec<DShader>,
+    /// `bmodels` (`bmodel_t *`).
+    pub bmodels: Vec<BModel>,
     /// `planes` (`cplane_t *`).
     pub planes: Vec<cplane_t>,
+    /// `numDecisionNodes`.
+    pub num_decision_nodes: i32,
+    /// `nodes` (`mnode_t *`) — the node/leaf arena `Node`'s `parent`/
+    /// `children` indices point into (`numnodes` is `nodes.len()`).
+    pub nodes: Vec<Node>,
     /// `marksurfaces` (`msurface_t **`) — surface **indices**, per the tier-2
     /// transition audit's pointer-array replacement.
     pub mark_surfaces: Vec<u32>,
     /// `lightGridOrigin`.
     pub light_grid_origin: Vec3,
+    /// `lightGridSize`.
+    pub light_grid_size: Vec3,
     /// `lightGridInverseSize`.
     pub light_grid_inverse_size: Vec3,
     /// `lightGridBounds[3]`.

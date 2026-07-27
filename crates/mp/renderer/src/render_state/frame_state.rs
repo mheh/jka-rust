@@ -38,12 +38,25 @@ pub struct FrameState {
     /// `oracle/codemp/renderer/tr_light.cpp:234-274`). A per-frame copy, not
     /// sim-owned `LightStyleTable` itself (`R2-D5`).
     pub scene_light_styles: [[u8; 4]; MAX_LIGHT_STYLES],
+    /// `tr.frameCount` — Raven: incremented every frame.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1313`
+    pub frame_count: i32,
     /// `tr.viewCount` — the frontend scratch counter `R_BoxSurfaces_r` stamps
     /// surfaces with to avoid revisiting them (`## State ownership`'s "tr
     /// frontend scratch/counters" row).
     ///
     /// Source: `oracle/codemp/renderer/tr_local.h:1315`
     pub view_count: i32,
+    /// `tr.identityLight` — `1.0 / ( 1 << overbrightBits )`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1374`
+    pub identity_light: f32,
+    /// `tr.identityLightByte` — `identityLight * 255`, truncated to `int` by
+    /// the oracle's assignment.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1375`
+    pub identity_light_byte: i32,
     /// `tr.overbrightBits` — the lightmap/vertex-color shift
     /// `R_ColorShiftLightingBytes` applies at BSP load.
     ///
