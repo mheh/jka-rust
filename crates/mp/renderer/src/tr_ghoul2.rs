@@ -1519,3 +1519,62 @@ pub fn r_g_cull_model(
 // `ConstructGhoulSkeleton`/`EvalLow`), so no re-export was needed to keep
 // this wave's live call graph closed.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// R3 wave 5 (`tr_ghoul2.wave5.md`).
+// ---------------------------------------------------------------------------
+
+/// Raven `RB_SurfaceGhoul` — the `SF_MDX` dispatch-table entry: deforms a
+/// Ghoul2 render surface's vertexes/normals by its lerped bone matrices and
+/// appends them to the tessellation buffer (the `_G2_GORE` branch instead
+/// fast-paths a pre-deformed gore overlay's vertex/normal/texcoord/fade data
+/// straight out of `surf->alternateTex`, walking `surf->goreChain` for every
+/// gore layer stacked on this surface), then frees `surf` — except when
+/// `_G2_GORE` is compiled in (unconditionally true for MP, `_G2_GORE`
+/// `oracle/codemp/game/q_shared.h:3110`), where ownership instead passes to
+/// `storeSurf`/the glow-pass free gate below.
+///
+/// DEFERRED: R4/escalation — whole-fn, no partial body survives:
+/// - Every write target is `tess` (`shaderCommands_t`: `.xyz`/`.normal`/
+///   `.texCoords`/`.svars.colors`/`.indexes`/`.numVertexes`/`.numIndexes`/
+///   `.fading`), which dissolves entirely into R4's tessellation/
+///   vertex-building pipeline with no replacement scratch carrier at R3
+///   (packet STATE HOMES row `RB_SurfaceGhoul` / `tess`; R2 `## State
+///   ownership` row `tess`).
+/// - The read side is independently blocked: `surf.surfaceData`
+///   (`*mut mdxmSurface_t`), `surf.boneCache` (`*mut c_void`, the packed
+///   `CBoneCache*`), and `surf.alternateTex`/`surf.goreChain` are raw-pointer
+///   fields on the tier-2 `CRenderableSurface`
+///   (`tr_local/crenderable_surface.rs`) with no quarantine accessor
+///   licensed for this wave — dereferencing them here would be new unsafe,
+///   banned by this wave's law. R2's own Group-4 table marks
+///   `CRenderableSurface`'s replacement shape "re-verify when the ghoul2
+///   render-side integration wave lands", not this one; this file's own
+///   `render_surfaces`/`alloc_rs` (wave 2/earlier) already reached the same
+///   conclusion for the same struct.
+/// - `RB_CheckOverflow`, the one in-module callee this fn leans on before
+///   writing `tess`, is itself already `todo!()` for the identical `tess`
+///   reason (`tr_surface.rs:394-421`) — no gap closes by calling it.
+/// - The dynamic-glow gate (`g_bDynamicGlowSupported`/
+///   `g_bRenderGlowingObjects`) has no R3 carrier: DEC-37 A13.3 assigns it a
+///   per-subsystem owned state struct "NAMED BY THIS WAVE if this file's
+///   wave is where the subsystem lands" — the dynamic-glow subsystem does
+///   not land in this wave (its only other touch anywhere in this file's
+///   packets is this one read), so naming a struct for it here would be an
+///   invented carrier, not a licensed one; left unresolved rather than
+///   guessed. `r_DynamicGlow` itself does have a home (`RendererCvars`,
+///   DEC-37 A13.1) but gates nothing reachable without the other two.
+/// - `G2PerformanceTimer_RB_SurfaceGhoul` (read)/`G2Time_RB_SurfaceGhoul`
+///   (write) are dropped per DEC-37 A13.5 (dead `#ifndef FINAL_BUILD`
+///   surface, this file's module-doc note) — not transcribed even as a
+///   comment inside the body.
+///
+/// Loud `todo!()` per the whole-fn-deferral convention (partial-body fns
+/// keep `DEFERRED:` comments instead of panicking).
+///
+/// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:4060-4451`
+#[doc(alias = "RB_SurfaceGhoul")]
+pub fn rb_surface_ghoul(surf: CRenderableSurface, frame: &mut FrameState) {
+    let _ = (surf, frame);
+    todo!("Port RB_SurfaceGhoul — oracle/codemp/renderer/tr_ghoul2.cpp:4060-4451")
+}

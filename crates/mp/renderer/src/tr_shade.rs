@@ -11,6 +11,7 @@
 
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::gpu_resources::GpuResources;
+use crate::render_state::light_style_table::LightStyleTable;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
@@ -495,4 +496,147 @@ pub fn RB_EndSurface(_gpu: &mut GpuResources) {
 /// Source: `oracle/codemp/renderer/tr_shade.cpp:1809-1927`
 pub fn ComputeTexCoords(_stage: &ShaderStage) {
     todo!("Port ComputeTexCoords — oracle/codemp/renderer/tr_shade.cpp:1809-1927")
+}
+
+/// Raven `ComputeColors` — for one shader stage, generates the tessellated
+/// vertex colors (dispatching on `rgbGen`/`forceRGBGen`: identity,
+/// identity-lighting, diffuse, diffuse-entity, exact-vertex, const, vertex,
+/// one-minus-vertex, fog, waveform, entity, one-minus-entity, lightmap-style)
+/// and then the alpha channel (dispatching on `alphaGen`: skip, identity,
+/// const, waveform, lighting-specular, entity, one-minus-entity, vertex,
+/// one-minus-vertex, portal, blend), with a `RF_DISINTEGRATE1`/
+/// `RF_DISINTEGRATE2`/`RF_VOLUMETRIC` special-case short-circuit ahead of
+/// both switches and a fog-fade adjustment (`adjustColorsForFog`) after.
+///
+/// DEFERRED: R4 — whole-body deferral, both switches' *dispatch keys* are
+/// unavailable, not just their arms: `pStage->rgbGen`/`alphaGen`/
+/// `constantColor`/`rgbWave`/`alphaWave`/`adjustColorsForFog`/
+/// `lightmapStyle`/`index` are exactly the `shaderStage_t` fields
+/// `ShaderStage` (`render_state/shader_stage.rs`'s own doc comment) lists as
+/// having "no reader yet" — this fn is oracle's one real reader of all of
+/// them, but the wave contract restricts this packet to `tr_shade.rs` only
+/// (same restriction `R_BindAnimatedImage`'s doc comment above cites for
+/// `skin_num`), so they cannot be added here. Every write target and most
+/// read sources are the dissolved `tess` (R2 `## State ownership` row
+/// `tess`, no R3 carrier ever): `tess.svars.colors` (the sole output
+/// buffer), `tess.numVertexes` (every loop bound, including the disintegrate/
+/// volumetric short-circuit's), `tess.vertexColors`, `tess.xyz`,
+/// `tess.vertexAlphas`, `tess.fogNum`, `tess.shader` (both the
+/// `!= tr.projectionShadowShader/shadowShader` guard and `->portalRange` in
+/// `AGEN_PORTAL`). `tr.world->fogs` needs a `WorldAsset::fogs` field not
+/// landed by any prior wave (`RB_FogPass`'s doc comment above: only `name`/
+/// `shaders`/`bmodels`/`planes`/`nodes`/`mark_surfaces`/light-grid/`vis`/
+/// `novis`/entity-string are real). `tr.shadowShader`/`projectionShadowShader`
+/// have no `RenderAssets` field landed (`RB_EndSurface`'s doc comment above:
+/// only the tier-2 `tr_globals_t::shadowShader` raw pointer exists,
+/// scaffolding this wave may not extend). `tr.identityLight`/
+/// `identityLightByte` and `styleColors` (`LightStyleTable::colors`) *are*
+/// real (`FrameState::identity_light`/`identity_light_byte`,
+/// `LightStyleTable` — landed, threaded as parameters below), and
+/// `backEnd.currentEntity->e.renderfx`/`.shaderRGBA` are real
+/// (`RefEntity::renderfx`/`shader_rgba`), but every branch that would read
+/// them writes into the same missing `tess.svars.colors`/`tess.numVertexes`,
+/// so nothing downstream of them is reachable either. The already-ported
+/// wave-0..4 in-module callees this fn would otherwise call
+/// (`RB_CalcDiffuseColor`/`RB_CalcDiffuseEntityColor`/`RB_CalcWaveColor`/
+/// `RB_CalcWaveAlpha`/`RB_CalcSpecularAlpha`/`RB_CalcColorFromEntity`/
+/// `RB_CalcColorFromOneMinusEntity`/`RB_CalcAlphaFromEntity`/
+/// `RB_CalcAlphaFromOneMinusEntity`/`RB_CalcDisintegrateColors`/
+/// `RB_CalcDisintegrateVertDeform`/`RB_CalcModulateColorsByFog`/
+/// `RB_CalcModulateAlphasByFog`/`RB_CalcModulateRGBAsByFog`) all take the
+/// same dissolved `tess.svars.colors`/`.xyz`/`.vertexColors` buffers (and, for
+/// the fog trio, a `fog_t`/`orientationr_t` this fn has no way to select —
+/// `tr.world->fogs + tess.fogNum`) as their arguments, so none has a value to
+/// call with here. No computation survives once every input above is
+/// removed — this includes both switch statements in full, since their
+/// dispatch keys are the unlanded `pStage` fields themselves.
+///
+/// Whole-body deferral: no partial body survives, so this lands as a loud
+/// `todo!()` rather than a silent no-op (whole-fn-deferral convention —
+/// partial-body fns keep DEFERRED comments instead).
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:1529-1801`
+pub fn ComputeColors(
+    _frame: &FrameState,
+    _assets: &RenderAssets,
+    _styles: &LightStyleTable,
+    _stage: &ShaderStage,
+    _force_rgb_gen: i32,
+) {
+    todo!("Port ComputeColors — oracle/codemp/renderer/tr_shade.cpp:1529-1801")
+}
+
+/// Raven `RB_IterateStagesGeneric` — the fixed-function per-stage draw loop:
+/// sets up global fog for the surface's fog volume, then for each of the
+/// shader's unfogged passes computes colors/texcoords, resolves the correct
+/// GL state/blend/texture-binding path (distortion, vertex-lit, stencil-mask,
+/// forced-entity-alpha, or the plain path), and draws.
+///
+/// DEFERRED: R4 — whole-body deferral, both the outer guard and the loop
+/// bound are unavailable, not just individual branches: `tess.fogNum`/
+/// `.shader` and the `shaderCommands_t *input` parameter itself are the
+/// dissolved `tess` type (R2 `## State ownership` row `tess`: "dissolved
+/// into R4's tessellation/vertex-building pipeline ... no single global
+/// scratch buffer survives the new topology"; same treatment this packet's
+/// sibling fns give a `shaderCommands_t *input` parameter — `DrawTris`'s doc
+/// comment above: "no R3 carrier holds `input->xyz`/`numVertexes`/
+/// `numIndexes`/`indexes` to read from") — so `input->shader->
+/// numUnfoggedPasses`, the `for` loop's own bound, has no value to iterate
+/// even though `ShaderAsset::num_unfogged_passes` itself has landed, because
+/// there is no way to reach a `ShaderAsset` through the unavailable `input`.
+/// `tess.xstages[stage]` (`pStage`) is the same dissolved receiver, and even
+/// were it reachable, `ShaderStage` (`render_state::shader_stage`'s own doc
+/// comment) lists only `image`/`state_bits`/`active` as landed — `ss`/
+/// `mGLFogColorOverride`/`glow`/`bundle[0].isLightmap`/`bundle[0]
+/// .vertexLightmap`/`bundle[1].isLightmap`/`bundle[1].image` all have no
+/// reader yet. `tr.world->fogs`/`globalFog`/`numfogs` need a
+/// `WorldAsset::fogs` field not landed by any prior wave (`RB_FogPass`'s doc
+/// comment above: only `name`/`shaders`/`bmodels`/`planes`/`nodes`/
+/// `mark_surfaces`/light-grid/`vis`/`novis`/entity-string are real).
+/// `tr.rangedFog`/`tr.distanceCull` — `RenderAssets` carries
+/// `distance_cull`/`distance_cull_squared` but no `ranged_fog` field.
+/// `tr.distortionShader`/`tr.screenImage` have no `RenderAssets` field landed
+/// (the registry survey lists `default_image`/`fog_image`/`dlight_image`/
+/// `white_image` only). `r_drawfog`/`r_lightmap`/`r_uiFullScreen`/
+/// `r_vertexLight` need a live cvar-value read — `RendererCvars` holds only
+/// `Option<CvarHandle>`, the value-read seam is unwired (same DEFERRED
+/// reason as `RB_DrawBuffer`'s `r_clear` dependency, DEC-37 A13.1).
+/// `GLFogOverrideColors`/`g_bRenderGlowingObjects`/`logtestExp2`/
+/// `setArraysOnce` are this packet's `STATE HOMES` "per-subsystem owned
+/// state struct, NAMED BY THIS WAVE if this file's wave is where the
+/// subsystem lands" rows — this fn's every touch of them is a read that only
+/// ever gates GL calls or feeds the unreachable `tess`/`pStage` logic above,
+/// so no write site here would justify naming a carrier (same treatment
+/// `RB_EndSurface`'s doc comment above gives `skyboxportal`/
+/// `drawskyboxportal`); `tr_stencilled` (write) is the fn-scope-adjacent
+/// `lStencilled: bool` static's cross-frame twin — a kind-3 escalation per
+/// the three-kind rule, but with no reachable write site here either, so it
+/// stays unmapped rather than invented. `backEnd.currentEntity` itself is
+/// landed (`FrameState::current_entity: Option<RefEntity>`, and
+/// `RefEntity::renderfx`/`shader_rgba` are real per `ComputeColors`'s doc
+/// comment above), but every branch that reads it
+/// (`RF_DISINTEGRATE1`/`RF_RGB_TINT`/`RF_DISTORTION`/`RF_FORCE_ENT_ALPHA`)
+/// only ever feeds `stateBits`/`forceRGBGen` into the unreachable
+/// `ComputeColors`/`GL_State` calls below, so it has no independent
+/// observable effect. Every in-module callee this fn would otherwise call is
+/// itself unavailable: `ComputeColors`/`ComputeTexCoords` are whole-fn
+/// `todo!()` stubs on this same file (their doc comments above: no
+/// computation survives once `tess`/`pStage` are removed); `DrawMultitextured`/
+/// `R_DrawElements`/`ForceAlpha` are DEFERRED-R4 no-ops for the identical
+/// dissolved-`tess`/unwired-cvar reasons; `R_BindAnimatedImage` is live only
+/// for its video-map branch, unreachable here since `pStage->bundle[0]` is
+/// itself unavailable; `GL_Bind`/`GL_Cull`/`GL_State` are GL entry points
+/// (DEC-37 A13.2). No computation survives once every input above is
+/// removed — this includes the entire per-stage dispatch (distortion /
+/// vertex-lit-lightmap / stencil-mask / forced-entity-alpha / plain paths),
+/// since its sole inputs are the dissolved `tess`/`input` and the un-landed
+/// `pStage`/cvar/registry fields.
+///
+/// Whole-body deferral: no partial body survives, so this lands as a loud
+/// `todo!()` rather than a silent no-op (whole-fn-deferral convention —
+/// partial-body fns keep DEFERRED comments instead).
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:1953-2231`
+pub fn RB_IterateStagesGeneric(_gpu: &mut GpuResources) {
+    todo!("Port RB_IterateStagesGeneric — oracle/codemp/renderer/tr_shade.cpp:1953-2231")
 }

@@ -18,13 +18,17 @@ use mp_qshared::shared::cvar::{
 use mp_qshared::shared::q_color::S_COLOR_YELLOW;
 use native_platform::Sys_LowPhysicalMemory;
 
+use crate::gl_constants::GL_CLAMP;
+use crate::render_state::frame_state::FrameState;
 use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
-use crate::tr_backend::GL_TexEnv;
-use crate::tr_image::{GL_TextureMode, TrImageState};
-use crate::tr_shader::GL_MODULATE;
+use crate::tr_backend::{GL_Bind, GL_State, GL_TexEnv, RB_SetGL2D};
+use crate::tr_cmds::r_init_command_buffers;
+use crate::tr_image::{GL_TextureMode, R_FindImageFile, TrImageState};
+use crate::tr_model::render_models::RenderModels;
+use crate::tr_shader::{GLS_DSTBLEND_ZERO, GLS_SRCBLEND_ONE, GL_MODULATE};
 
 /// `VidModeTable` — the built-in video-mode list `R_GetModeInfo`/
 /// `R_ModeList_f` index by small integer (DEC-37 A13.3 — NAMED BY THIS WAVE:
@@ -1158,4 +1162,114 @@ pub fn GL_SetDefaultState(
     // builds the non-`_XBOX` branch (established precedent, `R_Register`
     // doc comment above).
     // Source: oracle/codemp/renderer/tr_init.cpp:862-864
+}
+
+/// Raven `R_Splash`.
+///
+/// `#ifndef _XBOX` resolves to the always-taken branch — MP retail builds
+/// the non-`_XBOX` configuration (established precedent, `R_Register` doc
+/// comment above). The CPU-side setup (image lookup, the `GL_Bind`/
+/// `GL_State`/`RB_SetGL2D` calls, the `if (pImage)` guard) is ported per
+/// this wave's threading digest ("port the CPU logic"); two gaps are left
+/// cited rather than guessed:
+/// - The `qglBegin(GL_TRIANGLE_STRIP)`/`qglTexCoord2f`/`qglVertex2f`×4/
+///   `qglEnd()` quad draw is the fixed-function GL surface DEC-01/DEC-37
+///   leave unhomed until the R4 wgpu rewrite (A13.2) — the `width`/`height`/
+///   `x1`/`x2`/`y1`/`y2` geometry feeds only this deferred draw call, so it
+///   is described here rather than materialized as dead locals (the
+///   `RB_Hyperspace`/`GL_SetDefaultState` precedent, `tr_backend.rs`/this
+///   file above): `width=640, height=480, x1=320-width/2, x2=320+width/2,
+///   y1=240-height/2, y2=240+height/2`, drawn as a texcoord-mapped
+///   triangle strip covering that quad.
+/// - `GLimp_EndFrame` — this packet's RESOLVED CALL SURFACE lists it as
+///   already-ported LAW, but `crates/mp/renderer/Cargo.toml` has no
+///   `mp_engine_client` dependency: the same "no reachable path from this
+///   crate" gap `RB_SwapBuffers` already escalated
+///   (`tr_backend.rs:812-816`) — a wave-planning discrepancy, raised here
+///   rather than silently adding an undeclared cross-crate edge out of this
+///   packet's scope.
+///
+/// Source: `oracle/codemp/renderer/tr_init.cpp:325-369`
+pub fn R_Splash(
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    frame: &mut FrameState,
+    assets: &RenderAssets,
+) {
+    let p_image = R_FindImageFile(
+        view,
+        cvars,
+        sim,
+        models,
+        state,
+        gpu,
+        Some("menu/splash"),
+        false,
+        false,
+        false,
+        GL_CLAMP,
+    );
+
+    RB_SetGL2D(frame, gpu, assets);
+    if p_image.is_some() {
+        // invalid paths?
+        GL_Bind(gpu, p_image);
+    }
+    GL_State(gpu, GLS_SRCBLEND_ONE as u32 | GLS_DSTBLEND_ZERO as u32);
+
+    // DEFERRED: R4 — qglBegin(GL_TRIANGLE_STRIP) / qglTexCoord2f /
+    // qglVertex2f x4 / qglEnd() (see doc comment above). Fixed-function GL
+    // surface, no R3 home (DEC-01/DEC-37 A13.2).
+    // Source: oracle/codemp/renderer/tr_init.cpp:356-365
+
+    // DEFERRED: GLimp_EndFrame — no reachable path from this crate (see doc
+    // comment above).
+    // Source: oracle/codemp/renderer/tr_init.cpp:367
+}
+
+/// Raven `InitOpenGL`.
+///
+/// `glConfig.vidWidth == 0` (STATE HOMES: `RenderAssets::glconfig`, R2
+/// `## State ownership` `glConfig` row, `R2-D1`/B11 — sim-readable, not
+/// render-thread-local) selects the first-init branch. `GLimp_Init` has no
+/// reachable path from this crate today: it lives in `mp_engine_client::
+/// null::null_glimp`, but `crates/mp/renderer/Cargo.toml` has no
+/// `mp_engine_client` dependency — the same gap `GLimp_EndFrame`/
+/// `GLimp_LogComment` already escalated (`tr_backend.rs:812-816`, `R_Splash`
+/// doc comment above); escalated here rather than adding an undeclared
+/// cross-crate edge out of this packet's scope. The rest of the branch (
+/// `GL_SetDefaultState`/`R_Splash`/`GfxInfo_f`) is real CPU logic with a
+/// resolved call surface and runs unconditionally either way.
+///
+/// Source: `oracle/codemp/renderer/tr_init.cpp:379-407`
+#[allow(clippy::too_many_arguments)]
+pub fn InitOpenGL(
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    assets: &RenderAssets,
+    state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    frame: &mut FrameState,
+) {
+    if assets.glconfig.vid_width == 0 {
+        // DEFERRED: GLimp_Init — no reachable path from this crate (see doc
+        // comment above).
+        // Source: oracle/codemp/renderer/tr_init.cpp:394
+
+        // print info the first time only
+        GL_SetDefaultState(view, cvars, assets, state, gpu);
+        R_Splash(view, cvars, sim, models, state, gpu, frame, assets); // get something on screen asap
+        GfxInfo_f(view, cvars, assets);
+    } else {
+        // set default state
+        GL_SetDefaultState(view, cvars, assets, state, gpu);
+    }
+    // init command buffers and SMP
+    r_init_command_buffers();
 }

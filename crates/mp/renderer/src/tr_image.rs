@@ -2295,3 +2295,214 @@ pub fn R_CreateDefaultImage(
     );
     Arc::make_mut(&mut sim.published).default_image = Some(handle);
 }
+
+// ============================================================================
+// wave 5
+// ============================================================================
+
+/// Raven `NUM_SCRATCH_IMAGES` (non-`_XBOX` branch) — declared in
+/// `tr_local.h`, outside this file's own `#define` set, so it is not this
+/// packet's FILE-SCOPE CONSTANTS section; not guessed — reused verbatim from
+/// the value already landed (with the same oracle citation) at
+/// `crates/mp/renderer/src/tr_local/tr_globals_t.rs:22`.
+///
+/// Source: oracle/codemp/renderer/tr_local.h:1300-1307
+const NUM_SCRATCH_IMAGES: usize = 16;
+
+/// Raven `R_CreateBuiltinImages`.
+///
+/// ESCALATION: `tr.screenImage`/`tr.identityLightImage`/
+/// `tr.scratchImage[NUM_SCRATCH_IMAGES]` have no `RenderAssets` field of
+/// their own — this packet's STATE HOMES table's "tr" write row names only
+/// `RenderAssets::white_image` as a landed sub-field. Adding the missing
+/// fields means editing `render_state::render_assets::RenderAssets`, outside
+/// this wave's file scope (`tr_image.rs` only), so per the preamble ("A state
+/// home this packet marks UNMAPPED is an ESCALATION, never an invention")
+/// they stay unhomed. The `R_CreateImage` calls that build them are still
+/// made — their registry side effects (`images`/`image_names` under the
+/// mapped name) and `state.gi_texture_bind_num`'s advance (`R_CreateImage`'s
+/// own doc comment: "the ++ is of course staggeringly important... later
+/// images depend on it having advanced") are real and preserved; only the
+/// returned `ImageHandle` has nowhere typed to land and is dropped. A later
+/// caller can still reach these images by name through
+/// `RenderAssets::image_names`.
+///
+/// `tr.screenGlow`/`tr.sceneImage`/`tr.blurImage` are raw GL texture names
+/// (`1024 + giTextureBindNum++` handed straight to `qglBindTexture`, never
+/// routed through `R_CreateImage`/the image arena) — DEFERRED: R4 for the GL
+/// calls themselves (DEC-37 A13.2, `GpuResources::gl_state` unhomed), but
+/// each block's `giTextureBindNum++` is pure CPU counter state
+/// (`TrImageState::gi_texture_bind_num`, A13.3, named by wave 1) and is
+/// preserved so later `R_CreateImage`-issued texture names keep sequencing
+/// correctly. The `r_DynamicGlowWidth`/`r_DynamicGlowHeight` clamp
+/// (`->integer = glConfig.vidWidth/vidHeight`) is a direct write to the
+/// cvar's `.integer` field, bypassing `Cvar_Set` entirely — deliberate in the
+/// oracle, since both cvars are `CVAR_LATCH` and a normal `Cvar_Set` would
+/// defer the clamp to the next `vid_restart` instead of applying it
+/// immediately. No ported accessor mutates a cvar's integer field directly
+/// (`cvar_fns.rs` exposes only the latch-respecting `Cvar_Set`/
+/// `Cvar_SetValue`/`Cvar_SetLatched` family); using one of those would
+/// silently change this clamp's observable timing (porting-rules §A2, no
+/// speculative behavior) — DEFERRED rather than approximated.
+///
+/// `tr.identityLightByte` is `FrameState` frontend scratch (R2
+/// `## State ownership`, "tr frontend scratch/counters" row); threaded in as
+/// `frame` per this fn's own threading digest ("channel: ... SPLIT
+/// (RenderAssets + FrameState)").
+///
+/// `data[DEFAULT_SIZE][DEFAULT_SIZE][4]` is reused across the white/screen,
+/// identityLight, and scratch-image blocks exactly as the oracle reuses one
+/// stack buffer — the scratch-image loop at the end inherits whatever the
+/// identityLight loop last wrote (Raven never re-fills `data` between them),
+/// transcribed faithfully rather than "corrected". `(byte *)data` reinterpret
+/// casts become owned flattens (interior-safety law), matching
+/// `R_CreateDefaultImage`'s identical precedent in this same file.
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:2766-2839
+pub fn R_CreateBuiltinImages(
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    frame: &FrameState,
+) {
+    R_CreateDefaultImage(view, cvars, sim, models, state, gpu);
+
+    // we use a solid white image instead of disabling texturing
+    let mut data = [[[0u8; 4]; DEFAULT_SIZE]; DEFAULT_SIZE];
+    for row in data.iter_mut() {
+        for px in row.iter_mut() {
+            *px = [255; 4];
+        }
+    }
+    let flat: Vec<u8> = data.iter().flatten().flatten().copied().collect();
+    let white = R_CreateImage(
+        view, cvars, sim, models, state, gpu, "*white", &flat, 8, 8, GL_RGBA, false, false, false,
+        GL_REPEAT, false,
+    );
+    Arc::make_mut(&mut sim.published).white_image = Some(white);
+
+    // ESCALATION: `tr.screenImage` — see the doc comment above. Call
+    // preserved for its registry/counter side effects.
+    let _ = R_CreateImage(
+        view, cvars, sim, models, state, gpu, "*screen", &flat, 8, 8, GL_RGBA, false, false, false,
+        GL_REPEAT, false,
+    );
+
+    // Create the scene glow image. - AReis
+    //
+    // DEFERRED: R4 — qglDisable(GL_TEXTURE_2D)/qglEnable(
+    // GL_TEXTURE_RECTANGLE_EXT)/qglBindTexture/qglTexImage2D/
+    // qglTexParameteri x4: fixed-function GL surface, no R3 home (DEC-37
+    // A13.2). `tr.screenGlow`'s bind-number value itself has no R3 home
+    // either (a raw GL texture name, not an `ImageAsset`); the counter
+    // advance that produces it is preserved below.
+    // Source: oracle/codemp/renderer/tr_image.cpp:2778-2787
+    state.gi_texture_bind_num += 1;
+
+    // Create the scene image. - AReis
+    //
+    // DEFERRED: R4 — qglBindTexture/qglTexImage2D/qglTexParameteri x4; see
+    // the scene-glow block above.
+    // Source: oracle/codemp/renderer/tr_image.cpp:2789-2796
+    state.gi_texture_bind_num += 1;
+
+    // Create the minimized scene blur image.
+    //
+    // DEFERRED: the `r_DynamicGlowWidth`/`r_DynamicGlowHeight` direct-field
+    // clamp, and R4 — qglBindTexture/qglTexImage2D/qglTexParameteri x4/
+    // qglDisable(GL_TEXTURE_RECTANGLE_EXT)/qglEnable(GL_TEXTURE_2D); see the
+    // doc comment above.
+    // Source: oracle/codemp/renderer/tr_image.cpp:2798-2815
+    state.gi_texture_bind_num += 1;
+
+    // with overbright bits active, we need an image which is some fraction of
+    // full color, for default lightmaps, etc
+    let identity_byte = frame.identity_light_byte as u8;
+    for row in data.iter_mut() {
+        for px in row.iter_mut() {
+            *px = [identity_byte, identity_byte, identity_byte, 255];
+        }
+    }
+    let flat: Vec<u8> = data.iter().flatten().flatten().copied().collect();
+
+    // ESCALATION: `tr.identityLightImage` — see the doc comment above.
+    let _ = R_CreateImage(
+        view,
+        cvars,
+        sim,
+        models,
+        state,
+        gpu,
+        "*identityLight",
+        &flat,
+        8,
+        8,
+        GL_RGBA,
+        false,
+        false,
+        false,
+        GL_REPEAT,
+        false,
+    );
+
+    // ESCALATION: `tr.scratchImage[NUM_SCRATCH_IMAGES]` — see the doc comment
+    // above. `data` still holds the identityLight fill from just above, per
+    // the oracle's own buffer reuse.
+    for x in 0..NUM_SCRATCH_IMAGES {
+        // scratchimage is usually used for cinematic drawing
+        let _ = R_CreateImage(
+            view,
+            cvars,
+            sim,
+            models,
+            state,
+            gpu,
+            &format!("*scratch{}", x),
+            &flat,
+            DEFAULT_SIZE as i32,
+            DEFAULT_SIZE as i32,
+            GL_RGBA,
+            false,
+            true,
+            false,
+            GL_CLAMP,
+            false,
+        );
+    }
+
+    R_CreateDlightImage(view, cvars, sim, models, state, gpu);
+    R_CreateFogImage(view, cvars, sim, models, state, gpu);
+}
+
+// ============================================================================
+// wave 6
+// ============================================================================
+
+/// Raven `R_InitImages`.
+///
+/// Raven: "// memset(hashTable, 0, sizeof(hashTable)); // DO NOT DO THIS NOW
+/// (because of image cacheing) -ste." — dead comment for a hash table with no
+/// R2 carrier of its own (the arena + `image_names` map already replaced the
+/// C hash table, `R2-D3`/`R2-D4`); nothing to preserve or defer, matching
+/// `porting-rules` §20 (dead surface, not ported speculatively).
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:2926-2933
+pub fn R_InitImages(
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    glconfig: &GlConfig,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    frame: &FrameState,
+) {
+    // build brightness translation tables
+    R_SetColorMappings(view, cvars, glconfig, state);
+
+    // create default texture and white texture
+    R_CreateBuiltinImages(view, cvars, sim, models, state, gpu, frame);
+}

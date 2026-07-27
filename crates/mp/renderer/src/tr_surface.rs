@@ -7,6 +7,8 @@
 #![allow(non_snake_case)]
 
 use mp_engine_qcommon::common::{com_printf, Common};
+use mp_engine_qcommon::qfiles::md3_surface_t::md3Surface_t;
+use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::shared::{vec3_t, vec4_t};
 // PORT-NOTE: `native_math` is not yet a direct `mp_renderer` dependency
 // (Cargo.toml wiring gap, same finding as `tr_curve.rs`) — `Q_rsqrt` is
@@ -14,8 +16,9 @@ use mp_qshared::shared::{vec3_t, vec4_t};
 // reachable from this crate today. Flagged for the integrate phase to add
 // the dependency edge; the call site below is otherwise final.
 use native_math::qmath::{
-    _VectorAdd as VectorAdd, _VectorScale as VectorScale, PerpendicularVectorMP, Q_rsqrt,
-    RotatePointAroundVector, VectorNormalize,
+    _VectorAdd as VectorAdd, _VectorMA as VectorMA, _VectorScale as VectorScale,
+    _VectorSubtract as VectorSubtract, CrossProduct, MakeNormalVectors, PerpendicularVectorMP,
+    Q_rsqrt, RotatePointAroundVector, VectorNormalize,
 };
 
 use crate::render_state::frame_state::FrameState;
@@ -25,6 +28,9 @@ use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_local::orientationr_t::orientationr_t;
 use crate::tr_local::srf_display_list_s::srfDisplayList_t;
 use crate::tr_local::srf_grid_mesh_s::srfGridMesh_t;
+use crate::tr_local::srf_poly_s::srfPoly_t;
+use crate::tr_local::srf_surface_face_t::srfSurfaceFace_t;
+use crate::tr_local::srf_triangles_t::srfTriangles_t;
 use crate::tr_local::surface_type_t::surfaceType_t;
 use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_main::{R_TransformClipToWindow, R_TransformModelToClip};
@@ -455,4 +461,489 @@ pub fn RB_CheckOverflow(verts: i32, indexes: i32, frame: &mut FrameState) {
 pub fn RB_SurfaceGrid(cv: &srfGridMesh_t, frame: &mut FrameState) {
     let _ = (cv, frame);
     todo!("Port RB_SurfaceGrid — oracle/codemp/renderer/tr_surface.cpp:1572-1764")
+}
+
+/// Raven `RB_AddQuadStampExt` — appends a screen-facing quad (4 verts / 6
+/// indices) to the tessellation buffer: `origin`±`left`±`up` for the four
+/// corners, a constant normal (`vec3_origin - backEnd.viewParms.ori.axis[0]`),
+/// standard `s1`/`t1`..`s2`/`t2` UVs, and `color` broadcast to all four
+/// verts.
+///
+/// DEFERRED: R4/escalation — every write target is `tess`
+/// (`shaderCommands_t`: `.indexes`, `.xyz`, `.normal`, `.texCoords`,
+/// `.vertexColors`, `.numVertexes`, `.numIndexes`), which dissolves entirely
+/// into R4's tessellation/vertex-building pipeline with no replacement
+/// scratch carrier at R3 (packet STATE HOMES row `RB_AddQuadStampExt` /
+/// `tess`; R2 `## State ownership` row `tess`). The one non-tess computation
+/// (the constant normal) is itself blocked: `backEnd.viewParms.ori.axis[0]`
+/// has no R3 field (`FrameState::ori` is still the empty `OrientationR`
+/// landing placeholder, `render_state/placeholders.rs`), and `vec3_origin` is
+/// engine-owned with no confirmed renderer-side receiver yet (packet STATE
+/// HOMES row `RB_AddQuadStampExt` / `vec3_origin`: "confirm the exact
+/// receiver at port time" — an unresolved escalation, not an invention). The
+/// in-module callee this fn guards with (`RB_CheckOverflow`) is itself a
+/// `todo!()` tess-dependent stub above. No partial CPU logic survives
+/// dropping all three.
+///
+/// Whole-body deferral: no partial body survives, so this lands as a loud
+/// `todo!()` rather than a silent no-op (whole-fn-deferral convention —
+/// partial-body fns keep DEFERRED comments instead).
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:60-125`
+pub fn RB_AddQuadStampExt(
+    origin: vec3_t,
+    left: vec3_t,
+    up: vec3_t,
+    color: [u8; 4],
+    s1: f32,
+    t1: f32,
+    s2: f32,
+    t2: f32,
+    frame: &mut FrameState,
+) {
+    let _ = (origin, left, up, color, s1, t1, s2, t2, frame);
+    todo!("Port RB_AddQuadStampExt — oracle/codemp/renderer/tr_surface.cpp:60-125")
+}
+
+/// Raven `RB_SurfacePolychain` — fans a `srfPoly_t`'s `numVerts` verts into
+/// the tessellation buffer as a triangle fan (copying `xyz`/`st`/`modulate`
+/// per vert, then emitting `numVerts - 2` fan-index triples).
+///
+/// DEFERRED: R4/escalation — every write target is `tess`
+/// (`shaderCommands_t`: `.xyz`, `.texCoords`, `.vertexColors`, `.indexes`,
+/// `.numVertexes`, `.numIndexes`), which dissolves entirely into R4's
+/// tessellation/vertex-building pipeline with no replacement scratch carrier
+/// at R3 (packet STATE HOMES row `RB_SurfacePolychain` / `tess`; R2 `##
+/// State ownership` row `tess`). The read side is blocked independently too:
+/// `p->verts` is `srfPoly_t::verts: *mut polyVert_t`
+/// (`tr_local/srf_poly_s.rs`), a tier-2 raw pointer with no quarantine
+/// accessor — walking it here would be new unsafe, banned by this wave's
+/// law (`UNSAFE IS BANNED`). The in-module callee this fn guards with
+/// (`RB_CheckOverflow`) is itself a `todo!()` tess-dependent stub above. No
+/// partial CPU logic survives dropping both the write target and the read
+/// source.
+///
+/// Whole-body deferral: no partial body survives, so this lands as a loud
+/// `todo!()` rather than a silent no-op (whole-fn-deferral convention —
+/// partial-body fns keep DEFERRED comments instead).
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:227-253`
+pub fn RB_SurfacePolychain(p: &srfPoly_t, frame: &mut FrameState) {
+    let _ = (p, frame);
+    todo!("Port RB_SurfacePolychain — oracle/codemp/renderer/tr_surface.cpp:227-253")
+}
+
+/// Raven `RB_SurfaceTriangles` — appends a `srfTriangles_t`'s full index +
+/// vertex soup (xyz/normal/texCoords/lightmap-STs/color via
+/// `ComputeFinalVertexColor`/per-vertex `vertexDlightBits`) to the
+/// tessellation buffer, offsetting indices by the buffer's current
+/// `numVertexes`. The `_XBOX`/`VV_LIGHTING` branches are dead on every
+/// target this port ships; only the retail (non-`_XBOX`) body is in scope.
+///
+/// DEFERRED: R4/escalation — every write target is `tess`
+/// (`shaderCommands_t`: `.dlightBits`, `.indexes`, `.xyz`, `.normal`,
+/// `.texCoords`, `.vertexColors`, `.vertexDlightBits`, `.numIndexes`,
+/// `.numVertexes`), which dissolves entirely into R4's tessellation/
+/// vertex-building pipeline with no replacement scratch carrier at R3
+/// (packet STATE HOMES row `RB_SurfaceTriangles` / `tess`; R2 `## State
+/// ownership` row `tess`). The read side is blocked independently too:
+/// `srf->indexes`/`srf->verts` are `srfTriangles_t::indexes: *mut i32`/
+/// `::verts: *mut drawVert_t` (`tr_local/srf_triangles_t.rs`), tier-2 raw
+/// pointers with no quarantine accessor — walking them here would be new
+/// unsafe, banned by this wave's law. The two in-module callees this fn uses
+/// (`ComputeFinalVertexColor`, `RB_CheckOverflow`) are themselves `todo!()`
+/// stubs in this same file, the former for the same `tess` gap
+/// (`tess.shader` has no R3 carrier). No partial CPU logic survives dropping
+/// both the write target and the read source.
+///
+/// Whole-body deferral: no partial body survives, so this lands as a loud
+/// `todo!()` rather than a silent no-op (whole-fn-deferral convention —
+/// partial-body fns keep DEFERRED comments instead).
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:353-469`
+pub fn RB_SurfaceTriangles(srf: &srfTriangles_t, frame: &mut FrameState) {
+    let _ = (srf, frame);
+    todo!("Port RB_SurfaceTriangles — oracle/codemp/renderer/tr_surface.cpp:353-469")
+}
+
+/// Raven `DoLine` — appends a screen-oriented quad (two triangles) for the
+/// line segment `start`..`end` of half-width `spanWidth`, colored from the
+/// current entity's `shaderRGBA`. (Distinct from the already-ported
+/// `DoLine_Oriented`: this variant writes UVs `0/0`,`1/0`,`0/1`,`1/1`
+/// directly rather than from the entity's `data.line.stscale`.)
+///
+/// DEFERRED: R4/escalation — every write target is `tess`
+/// (`shaderCommands_t`: `.xyz`, `.texCoords`, `.vertexColors`, `.indexes`,
+/// `.numVertexes`, `.numIndexes`), which dissolves entirely into R4's
+/// tessellation/vertex-building pipeline with no replacement scratch carrier
+/// at R3 (packet STATE HOMES row `DoLine` / `tess`; R2 `## State ownership`
+/// row `tess`). Unlike `DoLine_Oriented`, the read side
+/// (`backEnd.currentEntity->e.shaderRGBA`) IS available — `FrameState::
+/// current_entity`'s `RefEntity::shader_rgba` landed at wave 0 — but every
+/// statement in the oracle body writes its computed value straight into a
+/// `tess.*` array slot (`VectorMA(..., tess.xyz[tess.numVertexes])`,
+/// `tess.vertexColors[tess.numVertexes][k] = ...`); there is no independent
+/// scratch computation to salvage once the write target is gone. The
+/// in-module callee this fn guards with (`RB_CheckOverflow`) is itself a
+/// `todo!()` tess-dependent stub above.
+///
+/// Whole-body deferral: no partial body survives, so this lands as a loud
+/// `todo!()` rather than a silent no-op (whole-fn-deferral convention —
+/// partial-body fns keep DEFERRED comments instead).
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:601-656`
+pub fn DoLine(start: vec3_t, end: vec3_t, up: vec3_t, span_width: f32, frame: &mut FrameState) {
+    let _ = (start, end, up, span_width, frame);
+    todo!("Port DoLine — oracle/codemp/renderer/tr_surface.cpp:601-656")
+}
+
+/// Raven `DoLine2` — `DoLine`'s twin with independent half-widths at each
+/// end (`spanWidth` at `start`, `spanWidth2` at `end`), otherwise identical
+/// shape/coloring.
+///
+/// DEFERRED: R4/escalation — identical reasoning to `DoLine` immediately
+/// above: every write target is `tess` (`.xyz`, `.texCoords`,
+/// `.vertexColors`, `.indexes`, `.numVertexes`, `.numIndexes`), dissolved
+/// into R4 with no R3 carrier (packet STATE HOMES row `DoLine2` / `tess`; R2
+/// `## State ownership` row `tess`); the readable
+/// `backEnd.currentEntity->e.shaderRGBA` input has no independent
+/// computation to salvage once every write target is gone. The in-module
+/// callee this fn guards with (`RB_CheckOverflow`) is itself a `todo!()`
+/// tess-dependent stub above.
+///
+/// Whole-body deferral: no partial body survives, so this lands as a loud
+/// `todo!()` rather than a silent no-op (whole-fn-deferral convention —
+/// partial-body fns keep DEFERRED comments instead).
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:658-710`
+pub fn DoLine2(
+    start: vec3_t,
+    end: vec3_t,
+    up: vec3_t,
+    span_width: f32,
+    span_width2: f32,
+    frame: &mut FrameState,
+) {
+    let _ = (start, end, up, span_width, span_width2, frame);
+    todo!("Port DoLine2 — oracle/codemp/renderer/tr_surface.cpp:658-710")
+}
+
+/// Raven `DoCylinderPart` — appends one quad segment (4 verts / 6 indices,
+/// a triangle-strip-style quad rather than a fan) of a `NUM_CYLINDER_SEGMENTS`
+/// -sided cylinder from 4 caller-supplied `polyVert_t`s, copied verbatim
+/// (`xyz`/`st`/`modulate`) into the tessellation buffer.
+///
+/// DEFERRED: R4/escalation — every write target is `tess`
+/// (`shaderCommands_t`: `.xyz`, `.texCoords`, `.vertexColors`, `.indexes`,
+/// `.numVertexes`, `.numIndexes`), which dissolves entirely into R4's
+/// tessellation/vertex-building pipeline with no replacement scratch carrier
+/// at R3 (packet STATE HOMES row `DoCylinderPart` / `tess`; R2 `## State
+/// ownership` row `tess`). The read side (`verts[0..4]`) is the tier-1
+/// `polyVert_t` — already ported and safe to read — but nothing survives the
+/// write side's loss: every read is copied straight into a `tess.*` slot
+/// with no independent computation. The in-module callee this fn guards
+/// with (`RB_CheckOverflow`) is itself a `todo!()` tess-dependent stub
+/// above. `NUM_CYLINDER_SEGMENTS` (`#define NUM_CYLINDER_SEGMENTS 32`,
+/// packet FILE-SCOPE CONSTANTS, `tr_surface.cpp:815`) is not read by this
+/// fn's own body (it walks a fixed 4 verts per call) — the caller that loops
+/// `NUM_CYLINDER_SEGMENTS` times to build a full cylinder lands in a higher
+/// wave.
+///
+/// Whole-body deferral: no partial body survives, so this lands as a loud
+/// `todo!()` rather than a silent no-op (whole-fn-deferral convention —
+/// partial-body fns keep DEFERRED comments instead).
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:818-847`
+pub fn DoCylinderPart(verts: &[polyVert_t; 4], frame: &mut FrameState) {
+    let _ = (verts, frame);
+    todo!("Port DoCylinderPart — oracle/codemp/renderer/tr_surface.cpp:818-847")
+}
+
+/// Raven `RB_SurfaceMesh` — the `SF_MD3` dispatch-table entry: lerps the
+/// current entity's MD3 keyframe (`LerpMeshVertexes`) then appends the
+/// surface's triangle indices (offset by the buffer's current
+/// `numVertexes`/`numIndexes`) and per-vertex UVs to the tessellation
+/// buffer.
+///
+/// DEFERRED: R4/escalation — every write target is `tess`
+/// (`shaderCommands_t`: `.indexes`, `.texCoords`, `.numIndexes`,
+/// `.numVertexes`), which dissolves entirely into R4's tessellation/
+/// vertex-building pipeline with no replacement scratch carrier at R3
+/// (packet STATE HOMES row `RB_SurfaceMesh` / `tess`; R2 `## State
+/// ownership` row `tess`). The read side is blocked independently too:
+/// `surface->ofsTriangles`/`::ofsSt` are byte offsets the oracle walks via
+/// raw pointer arithmetic off `surface` itself (`(int *)((byte *)surface +
+/// surface->ofsTriangles)`) — `md3Surface_t`
+/// (`mp_engine_qcommon::qfiles::md3_surface_t`) is an on-disk header with no
+/// quarantine accessor for that trailing-data walk; performing it here
+/// would be new unsafe, banned by this wave's law. `backEnd.currentEntity->
+/// e.oldframe`/`.frame`/`.backlerp` (the `backlerp` computation) are also
+/// not among the fields wave 0 landed on `RefEntity`
+/// (`render_state/placeholders.rs`). The sole in-module callees
+/// (`LerpMeshVertexes`, `RB_CheckOverflow`) are both `todo!()`/DEFERRED
+/// stubs in this same file already. No partial CPU logic survives dropping
+/// the write target, the read source, and the entity fields.
+///
+/// Whole-body deferral: no partial body survives, so this lands as a loud
+/// `todo!()` rather than a silent no-op (whole-fn-deferral convention —
+/// partial-body fns keep DEFERRED comments instead).
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:1353-1397`
+pub fn RB_SurfaceMesh(surface: &md3Surface_t, frame: &mut FrameState) {
+    let _ = (surface, frame);
+    todo!("Port RB_SurfaceMesh — oracle/codemp/renderer/tr_surface.cpp:1353-1397")
+}
+
+/// Raven `RB_SurfaceFace` — the `SF_FACE` dispatch-table entry: appends a
+/// planar BSP face's index list (offset by the buffer's current
+/// `numVertexes`) and per-point xyz/normal/UVs/color to the tessellation
+/// buffer. The `_XBOX` branch (16-bit indices, packed `srfPoints`, tangent
+/// unpacking) is dead on every target this port ships; only the retail
+/// (non-`_XBOX`) body is in scope.
+///
+/// DEFERRED: R4/escalation — every write target is `tess`
+/// (`shaderCommands_t`: `.dlightBits`, `.indexes`, `.normal`, `.xyz`,
+/// `.texCoords`, `.vertexColors`, `.vertexDlightBits`, `.numIndexes`), which
+/// dissolves entirely into R4's tessellation/vertex-building pipeline with
+/// no replacement scratch carrier at R3 (packet STATE HOMES row
+/// `RB_SurfaceFace` / `tess`; R2 `## State ownership` row `tess`). Unlike
+/// the other fns in this packet, the read side here IS reachable —
+/// `srfSurfaceFace_t::point`/`::indices` (`tr_local/srf_surface_face_t.rs`)
+/// are already-licensed quarantine accessors for the trailing-array walk —
+/// but every one of those reads is copied straight into a `tess.*` slot with
+/// no independent computation (`ComputeFinalVertexColor`, the other
+/// in-module callee, is itself a `todo!()` stub in this same file for the
+/// same `tess.shader` gap). No partial CPU logic survives dropping the
+/// write target.
+///
+/// Whole-body deferral: no partial body survives, so this lands as a loud
+/// `todo!()` rather than a silent no-op (whole-fn-deferral convention —
+/// partial-body fns keep DEFERRED comments instead).
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:1405-1532`
+pub fn RB_SurfaceFace(surf: &srfSurfaceFace_t, frame: &mut FrameState) {
+    let _ = (surf, frame);
+    todo!("Port RB_SurfaceFace — oracle/codemp/renderer/tr_surface.cpp:1405-1532")
+}
+
+/// Raven `RB_AddQuadStamp` — the default-UV wrapper around
+/// `RB_AddQuadStampExt` (`s1`/`t1`/`s2`/`t2` fixed at `0,0,1,1`).
+///
+/// Panics via `RB_AddQuadStampExt`'s loud stub until its owning wave lands —
+/// that callee is still a `todo!()` in this same file for the `tess` gap its
+/// own doc names. The wrapper's one line of behavior (the fixed UVs) is
+/// transcribed regardless: a faithfully-transcribed body whose callee is a
+/// loud stub is landed code, not a deferral.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:132-134`
+pub fn RB_AddQuadStamp(
+    origin: vec3_t,
+    left: vec3_t,
+    up: vec3_t,
+    color: [u8; 4],
+    frame: &mut FrameState,
+) {
+    RB_AddQuadStampExt(origin, left, up, color, 0.0, 0.0, 1.0, 1.0, frame);
+}
+
+/// Raven `RB_SurfaceLine` — the `SF_ENTITY` "line" surface: builds a
+/// screen-oriented quad from the current entity's `origin`/`oldorigin`,
+/// computing the quad's "up" (side) vector as the normalized cross product of
+/// the two endpoints' view-relative direction vectors, via `DoLine`.
+///
+/// `backEnd.currentEntity` becomes `Option<&RefEntity>` (the `RB_SurfaceBeam`
+/// precedent, this file, wave 0). `backEnd.viewParms.ori.origin` is threaded
+/// as the already-ported tier-2 `viewParms_t` directly rather than through
+/// `FrameState::view` — that field is still the empty `ViewParms` landing
+/// placeholder (`render_state/placeholders.rs`), the `RB_TestZFlare`
+/// precedent (this file).
+///
+/// DEFERRED: escalation — the final `DoLine(start, end, right, e->radius)`
+/// call is unreachable: `refEntity_t::radius`
+/// (`oracle/codemp/cgame/tr_types.h:158`) is not among the fields wave 0
+/// landed on `RefEntity` (`render_state/placeholders.rs`) — a state home this
+/// packet marks mapped-but-not-yet-populated is an escalation, not an
+/// invention (preamble). `DoLine` is itself still a `todo!()` tess-dependent
+/// stub in this same file regardless. The `right` vector computation above it
+/// is real CPU logic and is transcribed.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:771-790`
+pub fn RB_SurfaceLine(current_entity: Option<&RefEntity>, view: &viewParms_t) {
+    let Some(e) = current_entity else {
+        return;
+    };
+
+    let end = e.old_origin;
+    let start = e.origin;
+
+    // compute side vector
+    let mut v1: vec3_t = [0.0; 3];
+    let mut v2: vec3_t = [0.0; 3];
+    VectorSubtract(start, view.ori.origin, &mut v1);
+    VectorSubtract(end, view.ori.origin, &mut v2);
+    let mut right: vec3_t = [0.0; 3];
+    CrossProduct(v1, v2, &mut right);
+    VectorNormalize(&mut right);
+
+    // DEFERRED: escalation — DoLine(start, end, right, e.radius) (see doc
+    // comment above): `RefEntity::radius` not landed; `DoLine` itself a
+    // todo!() tess-dependent stub.
+    // Source: oracle/codemp/renderer/tr_surface.cpp:789
+    let _ = right;
+}
+
+/// Raven `RB_SurfaceCylinder` — the `SF_ENTITY` "cylinder" surface: builds a
+/// LOD-scaled ring of quads (`DoCylinderPart` per segment) around the
+/// current entity's `origin`..`oldorigin` axis.
+///
+/// `backEnd.currentEntity` becomes `Option<&RefEntity>` (the `RB_SurfaceBeam`
+/// precedent, this file, wave 0); `backEnd.viewParms` is threaded as the
+/// already-ported tier-2 `viewParms_t` directly (the `RB_TestZFlare`
+/// precedent, this file) — `FrameState::view` is still the empty `ViewParms`
+/// landing placeholder.
+///
+/// The LOD `detail`/`segments` computation (needs only `origin`/`oldorigin`/
+/// `axis[0]`, all landed on `RefEntity`, plus `view.ori.origin`/`view.fovX`)
+/// is real CPU logic and is transcribed.
+///
+/// DEFERRED: escalation — everything past `MakeNormalVectors` is
+/// unreachable: `VectorScale( vu, e->radius, v1 )`/`VectorScale( vu,
+/// e->rotation, vu )` need `refEntity_t::radius`/`::rotation`
+/// (`oracle/codemp/cgame/tr_types.h:158-159`), neither among the fields wave
+/// 0 landed on `RefEntity` (`render_state/placeholders.rs`) — a state home
+/// this packet marks mapped-but-not-yet-populated is an escalation, not an
+/// invention (preamble). The subsequent ring-building loops write into the
+/// file-scope `static polyVert_t lower_points[NUM_CYLINDER_SEGMENTS]`/
+/// `upper_points[...]`/`verts[4]` — classified per the three-kind rule as
+/// kind-2 rotating per-call scratch (every element is written before it is
+/// read, once per call; would become owned local
+/// `[PolyVert; NUM_CYLINDER_SEGMENTS]`/`[PolyVert; 4]` arrays, never a field)
+/// — but are not materialized here since the values they would hold
+/// (`v1`/`vu`-derived) are themselves blocked, and their sole consumer
+/// `DoCylinderPart` is itself still a `todo!()` tess-dependent stub in this
+/// same file.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:853-953`
+pub fn RB_SurfaceCylinder(current_entity: Option<&RefEntity>, view: &viewParms_t) {
+    // `#define NUM_CYLINDER_SEGMENTS 32` — packet FILE-SCOPE CONSTANTS,
+    // `tr_surface.cpp:815`.
+    const NUM_CYLINDER_SEGMENTS: i32 = 32;
+
+    let Some(e) = current_entity else {
+        return;
+    };
+
+    // Work out the detail level of this cylinder
+    let mut midpoint: vec3_t = [0.0; 3];
+    VectorAdd(e.origin, e.old_origin, &mut midpoint);
+    VectorScale(midpoint, 0.5, &mut midpoint); // Average start and end
+
+    VectorSubtract(midpoint, view.ori.origin, &mut midpoint);
+    let mut length = VectorNormalize(&mut midpoint);
+
+    // this doesn't need to be perfect....just a rough compensation for zoom level is enough
+    length *= view.fovX / 90.0;
+
+    let detail = 1.0 - (length / 1024.0);
+    let mut segments = (NUM_CYLINDER_SEGMENTS as f32 * detail) as i32;
+
+    // 3 is the absolute minimum, but the pop between 3-8 is too noticeable
+    if segments < 8 {
+        segments = 8;
+    }
+
+    if segments > NUM_CYLINDER_SEGMENTS {
+        segments = NUM_CYLINDER_SEGMENTS;
+    }
+
+    // Get the direction vector
+    let mut vr: vec3_t = [0.0; 3];
+    let mut vu: vec3_t = [0.0; 3];
+    MakeNormalVectors(e.axis[0], &mut vr, &mut vu);
+    let _ = vr;
+
+    // DEFERRED: escalation — VectorScale(vu, e.radius, v1) onward, and the
+    // ring-building loops below it (see doc comment above): `RefEntity::
+    // radius`/`::rotation` not landed; `DoCylinderPart` itself a todo!()
+    // tess-dependent stub.
+    // Source: oracle/codemp/renderer/tr_surface.cpp:892-952
+    let _ = (vu, segments);
+}
+
+/// Raven `ApplyShape` — recursively subdivides a straight radius-tapered
+/// segment into a jittered "lightning bolt" shape (jitter driven by the
+/// per-call random `sh1`/`sh2` vectors, `CreateShape`), bottoming out at
+/// `DoLine2` once `count` reaches 0.
+///
+/// `sh1`/`sh2` are threaded via `TrSurfaceShapeState`, the carrier this
+/// file's wave 0 already named for them (`CreateShape`'s doc comment, DEC-37
+/// A13.3).
+///
+/// Panics via `DoLine2`'s loud stub until its owning wave lands — the
+/// `count < 1` recursion base case calls it, and it is still a `todo!()`
+/// `tess`-dependent stub in this same file. Every other line here is pure
+/// vector math with no `tess` dependency, so the body is transcribed in
+/// full.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:990-1036`
+pub fn ApplyShape(
+    start: vec3_t,
+    end: vec3_t,
+    right: vec3_t,
+    sradius: f32,
+    eradius: f32,
+    count: i32,
+    state: &mut TrSurfaceShapeState,
+    frame: &mut FrameState,
+) {
+    if count < 1 {
+        // done recursing
+        DoLine2(start, end, right, sradius, eradius, frame);
+        return;
+    }
+
+    CreateShape(state);
+
+    let mut fwd: vec3_t = [0.0; 3];
+    VectorSubtract(end, start, &mut fwd);
+    let dis = VectorNormalize(&mut fwd) * 0.7;
+    let mut rt: vec3_t = [0.0; 3];
+    let mut up: vec3_t = [0.0; 3];
+    MakeNormalVectors(fwd, &mut rt, &mut up);
+
+    let mut perc = state.sh1[0];
+
+    let mut point1: vec3_t = [0.0; 3];
+    VectorScale(start, perc, &mut point1);
+    VectorMA(point1, 1.0 - perc, end, &mut point1);
+    VectorMA(point1, dis * state.sh1[1], rt, &mut point1);
+    VectorMA(point1, dis * state.sh1[2], up, &mut point1);
+
+    // do a quick and dirty interpolation of the radius at that point
+    let rads1 = sradius * 0.666 + eradius * 0.333;
+    let rads2 = sradius * 0.333 + eradius * 0.666;
+
+    // recursion
+    ApplyShape(
+        start,
+        point1,
+        right,
+        sradius,
+        rads1,
+        count - 1,
+        state,
+        frame,
+    );
+
+    perc = state.sh2[0];
+
+    let mut point2: vec3_t = [0.0; 3];
+    VectorScale(start, perc, &mut point2);
+    VectorMA(point2, 1.0 - perc, end, &mut point2);
+    VectorMA(point2, dis * state.sh2[1], rt, &mut point2);
+    VectorMA(point2, dis * state.sh2[2], up, &mut point2);
+
+    // recursion
+    ApplyShape(point2, point1, right, rads1, rads2, count - 1, state, frame);
+    ApplyShape(point2, end, right, rads2, eradius, count - 1, state, frame);
 }

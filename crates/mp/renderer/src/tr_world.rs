@@ -10,7 +10,7 @@ use mp_engine_qcommon::cm_load::{CM_LeafArea, CM_LeafCluster};
 use mp_engine_qcommon::cm_test::{CM_ClusterPVSBits, CM_PointLeafnum};
 use mp_engine_qcommon::cm_trace::CM_BoxTrace;
 use mp_engine_qcommon::collision_world::CollisionWorld;
-use mp_engine_qcommon::common::EngineHostView;
+use mp_engine_qcommon::common::{Common, EngineHostView};
 use mp_engine_qcommon::files_common::{
     FS_FCloseFile, FS_FOpenFileRead, FS_FOpenFileWrite, FS_Read, FS_Write,
 };
@@ -27,8 +27,12 @@ use native_types::fileHandle_t;
 use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_event::FrameEvent;
 use crate::render_state::frame_state::FrameState;
+use crate::render_state::placeholders::RefEntity;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
+use crate::tr_light::{
+    DlightBmodel, DlightSurface, DlightSurfaceData, R_DlightBmodel, R_SetupEntityLighting,
+};
 use crate::tr_local::cull_type_t::cullType_t;
 use crate::tr_local::dlight_s::dlight_t;
 use crate::tr_local::msurface_s::{msurface_t, SurfaceRef, SurfaceRefMut};
@@ -1415,4 +1419,274 @@ pub fn R_InitializeWireframeAutomap(
     }
 
     automap.valid
+}
+
+// ===== wave 5 =====
+
+/// Raven `R_AddBrushModelSurfaces` — cull an inline (brush) model against the
+/// view frustum, dlight it, and hand its surfaces to the world's draw-surf
+/// list.
+///
+/// PORT-NOTE: both `#ifdef VV_LIGHTING` branches (`R_SetupEntityLighting`/
+/// `R_DlightBmodel` calls) are dead — no `#define VV_LIGHTING` exists
+/// anywhere in the tree — matching this file's established treatment of
+/// `_ALT_AUTOMAP_METHOD`; only the compiled `#else` calls are transcribed.
+/// The `//rww` commented-out `com_RMG` branch below the `R_DlightBmodel`
+/// call is plain dead prose in the oracle (not `#if 0`), nothing to port.
+///
+/// PORT-NOTE: `pModel`/`bmodel` are read through the already-established
+/// tier-2 quarantine accessors `RenderModels::get_model`/`model_t::bmodel`
+/// (§D11, `RE_GetBModelVerts` precedent, this file). `R_DlightBmodel`'s own
+/// already-ported signature (wave 1) takes an owned `DlightBmodel` snapshot,
+/// not `bmodel_t` directly; the snapshot is built here from `bmodel.bounds`
+/// and a safe read of each surface's `surface_kind()` (no `unsafe` written
+/// in this file — the interior-safety law).
+///
+/// DEFERRED: the closing `for (i = 0; i < bmodel->numSurfaces; i++)
+/// R_AddWorldSurface(bmodel->firstSurface + i, tr.currentEntity->dlightBits,
+/// qtrue)` loop — `R_AddWorldSurface`'s own already-ported signature (wave
+/// 4) needs `shader: &shader_t` per surface, but `msurface_t::shader` is a
+/// tier-2 `*mut shader_s` with no quarantine accessor anywhere in the crate
+/// (only `.data` has `surface_kind`/`surface_kind_mut`/`.face()`); adding
+/// one would extend the tier-2 pattern with a new accessor this wave may not
+/// write, and dereferencing it inline here would be new `unsafe` (banned).
+/// A wave-planning defect in `R_AddWorldSurface`'s own shader-threading
+/// design fed back to the manifest, not something this wave can invent
+/// around. `R_DlightBmodel`'s snapshot write-back (`bmodel.surfaces` on the
+/// throwaway `DlightBmodel`, not the live `msurface_t`s) is therefore also
+/// unobserved by this call — a narrow fidelity gap only visible for a
+/// surface this loop never reaches anyway.
+///
+/// Source: `oracle/codemp/renderer/tr_world.cpp:570-611`
+pub fn R_AddBrushModelSurfaces(
+    ent: &mut RefEntity,
+    models: &RenderModels,
+    r_nocull_integer: i32,
+    ori: &orientationr_t,
+    frustum: &[cplane_t; 4],
+    view: &mut EngineHostView<'_>,
+    cvars: &RendererCvars,
+    assets: &RenderAssets,
+    frame: &mut FrameState,
+    refdef_rdflags: i32,
+    dlights: &mut [dlight_t],
+) {
+    let p_model = models.get_model(ent.h_model);
+    let bmodel = p_model.bmodel();
+
+    let clip = R_CullLocalBox(bmodel.bounds, r_nocull_integer, ori, frustum);
+    if clip == CULL_OUT {
+        return;
+    }
+
+    if p_model.bspInstance != 0 {
+        // rwwRMG - added
+        R_SetupEntityLighting(
+            view.common,
+            cvars,
+            assets,
+            frame,
+            refdef_rdflags,
+            dlights,
+            ent,
+        );
+    }
+
+    // rww - Take this into account later?
+    let mut dlight_bmodel = DlightBmodel {
+        bounds: bmodel.bounds,
+        surfaces: bmodel
+            .surfaces()
+            .iter()
+            .map(|s| DlightSurface {
+                data: match s.surface_kind() {
+                    SurfaceRef::Face(f) => DlightSurfaceData::Face {
+                        dlightBits: f.dlightBits,
+                    },
+                    SurfaceRef::Grid(g) => DlightSurfaceData::Grid {
+                        dlightBits: g.dlightBits,
+                    },
+                    SurfaceRef::Triangles(t) => DlightSurfaceData::Triangles {
+                        dlightBits: t.dlightBits,
+                    },
+                    SurfaceRef::Other => DlightSurfaceData::Other,
+                },
+            })
+            .collect(),
+    };
+    R_DlightBmodel(&mut dlight_bmodel, false, dlights, ori, frame);
+
+    // DEFERRED: bmodel->numSurfaces R_AddWorldSurface loop — see this fn's
+    // own doc comment above.
+    // Source: oracle/codemp/renderer/tr_world.cpp:608-610
+}
+
+/// Raven `R_RecursiveWorldNode`.
+///
+/// DEFERRED: R_RecursiveWorldNode (whole fn) — the very first real check the oracle body makes —
+/// `node->visframe != tr.visCount` (return early otherwise) — has no carrier
+/// to read: the tier-3 `Node` replacement (`crate::tr_bsp::Node`, landed by
+/// the tr_bsp wave-1 node/leaf loader) carries only the fields
+/// `R_LoadNodesAndLeafs` parses from the BSP file (`parent`/`children`/
+/// `contents`/`mins`/`maxs`/`plane`/`cluster`/`area`/`firstmarksurface`/
+/// `nummarksurfaces`) and has no per-node runtime visited-scratch field, and
+/// `FrameState` has no parallel per-node array either — the identical gap
+/// this file's own `R_RecursiveWireframeSurf` note (above) already names for
+/// a sibling fn. Every other branch (frustum planeBits culling against
+/// `node->plane`, the front/back recursive descent, and the leaf branch's
+/// `firstmarksurface`/`nummarksurfaces` walk) sits behind that gate in the
+/// oracle, so skipping the check would invent which nodes get processed
+/// (porting-rules §A2 — no speculative behavior), not faithfully transcribe
+/// it. The leaf branch is separately blocked regardless:
+/// `WorldAsset::mark_surfaces: Vec<u32>` is a set of surface *indices* with
+/// no backing `Vec<msurface_t>`/surface arena to resolve them against yet
+/// (tier-2 transition audit Group 1; same gap `R_RecursiveWireframeSurf`'s
+/// own note and `R_StitchPatches`'s escalation both name). Both are
+/// state-home omissions per the preamble ("a state home this packet marks
+/// UNMAPPED is an ESCALATION, never an invention"), not something this wave
+/// can invent a carrier for.
+///
+/// STATE HOMES (for whichever wave lands the body): `r_nocull` ->
+/// `RendererCvars` (DEC-37 A13.1); `tr` reads/writes SPLIT across
+/// `RenderAssets` (`world.nodes`/`.planes`, registries) and `FrameState`
+/// (`visCount`, `viewParms.frustum`/`.visBounds`, `pc.c_leafs`,
+/// `refdef.dlights`/`.num_dlights`) per R2 `## State ownership`.
+///
+/// Source: `oracle/codemp/renderer/tr_world.cpp:1503-1663`
+pub fn R_RecursiveWorldNode(
+    _node_index: usize,
+    _plane_bits: i32,
+    _dlight_bits: i32,
+    _r_nocull_integer: i32,
+    _assets: &RenderAssets,
+    _frame: &mut FrameState,
+    _dlights: &[dlight_t],
+) {
+    todo!("Port R_RecursiveWorldNode — oracle/codemp/renderer/tr_world.cpp:1503-1663")
+}
+
+// ===== wave 6 =====
+
+/// Raven `RDF_NOWORLDMODEL` — restated from `tr_main.rs`'s own local `const`
+/// (not `pub` there, so not reachable from this file); same confirmed value
+/// as `tr_light.rs`/`tr_terrain.rs`'s own restatements of the same literal.
+///
+/// Source: `oracle/codemp/cgame/tr_types.h:57`
+const RDF_NOWORLDMODEL: i32 = 1;
+
+/// Raven `R_AddWorldSurfaces` — entry point for adding the world's
+/// potentially-visible surfaces to this frame's draw-surf list: mark this
+/// frame's visible leaves, clear the view's visibility bounds, clamp the
+/// active dlight count, and recurse the BSP tree.
+///
+/// STATE HOMES: `r_drawworld` -> `RendererCvars` (DEC-37 A13.1), read
+/// through the live engine cvar table via `common.cvar(cvars.r_drawworld)`
+/// (this packet's STATE HOMES row). `tr.refdef.rdflags` is threaded in as
+/// `refdef_rdflags: i32` — `TrRefdef` (`FrameState::refdef`) has no
+/// `rdflags` field yet, the same gap `tr_scene.rs`/`tr_main.rs`/
+/// `tr_terrain.rs`'s own `RDF_NOWORLDMODEL`/`RDF_NOFOG` PORT-NOTEs already
+/// name; mirrors `tr_terrain.rs::R_AddTerrainSurfaces`'s identical
+/// `refdef.rdflags & RDF_NOWORLDMODEL` guard threading. `tr.refdef.
+/// num_dlights` is threaded in as `refdef_num_dlights: i32` for the same
+/// reason (no `TrRefdef::num_dlights` field yet). `r_lockpvs`/`r_novis`/
+/// `r_nocull` are resolved through `common.cvar(...)` immediately before
+/// each already-ported callee that needs them (`R_MarkLeaves`/
+/// `R_RecursiveWorldNode`'s own established "cvar ints threaded in
+/// resolved, not reached for" signatures, this file).
+///
+/// PORT-NOTE: `tr.currentEntityNum = TR_WORLDENT; tr.shiftedEntityNum =
+/// tr.currentEntityNum << QSORT_ENTITYNUM_SHIFT` has no carrier —
+/// `FrameState` has no `current_entity_num`/`shifted_entity_num` fields yet
+/// (the same gap `tr_scene.rs::R_AddPolygonSurfaces`'s own PORT-NOTE names)
+/// — and unlike that fn, neither value is consumed anywhere else in this
+/// body: `R_MarkLeaves`/`R_RecursiveWorldNode`'s own already-ported
+/// signatures (this file, waves 0/5) take no `current_entity_num`/
+/// `shifted_entity_num` parameter. Escalate a `FrameState` field-merge if a
+/// later wave needs either value read back outside this call — nothing is
+/// dropped here, the write is simply inert under the current call graph.
+///
+/// DEFERRED: `ClearBounds( tr.viewParms.visBounds[0], tr.viewParms.
+/// visBounds[1] )` — `ViewParms` (`FrameState::view`) is still the empty
+/// placeholder struct pending the `tr_main` wave
+/// (`render_state/placeholders.rs`); `visBounds` has no landing field to
+/// clear yet, so there is nothing to pass `ClearBounds` even if it were
+/// called. `ClearBoundsMP` (`native_math::qmath`) is the confirmed MP-fork
+/// pick for this packet's unresolved `ClearBounds` — mirroring the
+/// established `ClearBoundsMP as ClearBounds` use already landed in
+/// `tr_curve.rs`/`tr_marks.rs` — named here for whichever wave adds the
+/// field.
+/// Source: `oracle/codemp/renderer/tr_world.cpp:1950`
+///
+/// PORT-NOTE (ruling 19 — UB pick): `( 1 << tr.refdef.num_dlights ) - 1`
+/// after the `> 32` clamp can leave `num_dlights == 32` (`MAX_DLIGHTS` is
+/// 32 and the count is reachable, `oracle/codemp/cgame/tr_types.h:7`), and
+/// `1 << 32` is undefined behavior for a 32-bit `int` in C. The defined
+/// behavior picked here is the x86 one the retail binary actually produces:
+/// `shl` masks its count modulo 32, so a width of 32 shifts by 0 and the
+/// mask comes out `1 - 1 == 0` (no dlight bits), not "all bits set".
+/// `wrapping_shl` applies exactly that mod-32 count masking, and
+/// `wrapping_sub` keeps the `- 1` from panicking on the debug overflow
+/// check. `tr.refdef.num_dlights = 32` itself (the write-back after the
+/// clamp) has no carrier — `TrRefdef` has no `num_dlights` field yet (same
+/// gap as `refdef_rdflags` above) — and is never re-read within this body,
+/// so only the local clamped value is threaded into the mask below.
+/// Source: `oracle/codemp/renderer/tr_world.cpp:1953-1957`
+///
+/// Panics via `R_RecursiveWorldNode`'s loud stub until its owning wave lands.
+///
+/// `tr.world->nodes` is the root of the node/leaf tree — index 0 into
+/// `WorldAsset::nodes` (tier-2 transition audit, Group 1); `15` is Raven's
+/// own literal `planeBits` (all 4 `FRUSTUM_PLANES` bits set, `R2-D7`(a)).
+///
+/// Source: `oracle/codemp/renderer/tr_world.cpp:1934-1958`
+pub fn R_AddWorldSurfaces(
+    common: &Common,
+    cvars: &mut RendererCvars,
+    assets: &mut RenderAssets,
+    frame: &mut FrameState,
+    dlights: &[dlight_t],
+    refdef_rdflags: i32,
+    refdef_num_dlights: i32,
+) {
+    if common.cvar(cvars.r_drawworld).integer == 0 {
+        return;
+    }
+
+    if refdef_rdflags & RDF_NOWORLDMODEL != 0 {
+        return;
+    }
+
+    // PORT-NOTE: tr.currentEntityNum/tr.shiftedEntityNum — see this fn's own
+    // doc comment above.
+    // Source: oracle/codemp/renderer/tr_world.cpp:1943-1944
+
+    // determine which leaves are in the PVS / areamask
+    let r_lockpvs_integer = common.cvar(cvars.r_lockpvs).integer;
+    let r_novis_integer = common.cvar(cvars.r_novis).integer;
+    R_MarkLeaves(r_lockpvs_integer, r_novis_integer, cvars, assets);
+
+    // DEFERRED: clear out the visible min/max (ClearBounds) — see this fn's
+    // own doc comment above.
+    // Source: oracle/codemp/renderer/tr_world.cpp:1950
+
+    // perform frustum culling and add all the potentially visible surfaces
+    let clamped_num_dlights = refdef_num_dlights.min(32);
+    // DEFERRED: tr.refdef.num_dlights = 32 write-back — see this fn's own
+    // doc comment above (ruling 19 — UB pick).
+    // Source: oracle/codemp/renderer/tr_world.cpp:1953-1955
+    let dlight_bits = 1i32
+        .wrapping_shl(clamped_num_dlights as u32)
+        .wrapping_sub(1);
+
+    let r_nocull_integer = common.cvar(cvars.r_nocull).integer;
+    let node_index = 0usize; // tr.world->nodes (the tree root)
+    R_RecursiveWorldNode(
+        node_index,
+        15,
+        dlight_bits,
+        r_nocull_integer,
+        assets,
+        frame,
+        dlights,
+    );
 }

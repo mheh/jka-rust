@@ -874,3 +874,179 @@ pub fn RB_WorldEffects(
     // tess.fogNum) reopen (see doc comment above)
     // Source: oracle/codemp/renderer/tr_backend.cpp:1899-1902
 }
+
+/// Raven `RB_StretchPic` — the `RC_STRETCH_PIC` backend command: draws a
+/// screen-space stretched quad into the current tess batch. The oracle's
+/// `data`/`cmd + 1` command-buffer walk dissolves — the caller supplies the
+/// already-decoded `FrameEvent::DrawStretchPic` payload directly
+/// (`R2-D2`/A1); `cmd->shader` becomes the `shader: ShaderHandle` payload
+/// field per the tier-2 transition audit's `stretchPicCommand_t`/`shader_t`
+/// rows.
+///
+/// One landable guard: `if (!backEnd.projection2D) RB_SetGL2D();`.
+///
+/// DEFERRED: R4 — every remaining line operates on `tess`
+/// (`shaderCommands_s`), which dissolves entirely into R4's tessellation/
+/// vertex-building pipeline (R2 `## State ownership` row `tess`; no R3
+/// carrier holds `tess.shader`/`numIndexes`/`numVertexes`/`indexes`/
+/// `vertexColors`/`xyz`/`texCoords`): the `shader != tess.shader`
+/// batch-break test, the `RB_EndSurface`/`RB_BeginSurface` batch-open pair it
+/// guards, the `backEnd.currentEntity = &backEnd.entity2D;` write nested
+/// inside that same guard, `RB_CHECKOVERFLOW`'s bounds check (`RB_CheckOverflow`
+/// is itself a `todo!()` stub for the same `tess` gap,
+/// `crates/mp/renderer/src/tr_surface.rs:424`), and the six vertex/index/color/texcoord
+/// writes that build the quad (`backEnd.color2D` also has no read site left
+/// once its consumer, the vertex-color write, is unreachable) all stay
+/// unreachable behind that missing carrier (DEC-37 A13.2).
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1422-1490`
+pub fn RB_StretchPic(
+    frame: &mut FrameState,
+    gpu: &mut GpuResources,
+    assets: &RenderAssets,
+    _x: f32,
+    _y: f32,
+    _w: f32,
+    _h: f32,
+    _s1: f32,
+    _t1: f32,
+    _s2: f32,
+    _t2: f32,
+    _shader: ShaderHandle,
+) {
+    if !frame.projection_2d {
+        RB_SetGL2D(frame, gpu, assets);
+    }
+
+    // DEFERRED: R4 — the rest of RB_StretchPic (see doc comment above)
+    // (DEC-37 A13.2; R2 `## State ownership` row `tess`)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:1433-1487
+}
+
+/// Raven `RDF_NOWORLDMODEL` — restated from `tr_main.rs`'s own local `const`
+/// (not `pub` there, so not reachable from this file); same confirmed value
+/// as `tr_light.rs`/`tr_world.rs`'s own restatements of the same literal.
+///
+/// Source: `oracle/codemp/cgame/tr_types.h:57`
+const RDF_NOWORLDMODEL: i32 = 1;
+
+/// Raven `RB_DrawSurfs` — the `RC_DRAW_SURFS` backend command: draws the
+/// sorted surface list for a view, then (retail, non-`_XBOX`) runs the
+/// dynamic-glow pass when the world model is present and both the runtime
+/// capability flag and the `r_DynamicGlow` cvar allow it. The oracle's
+/// `data`/`cmd + 1` command-buffer walk dissolves — `drawSurfs` crosses as
+/// the already-computed cull/sort output this fn receives directly
+/// (`R2-D2`/A1).
+///
+/// PORT-NOTE: `backEnd.refdef = cmd->refdef; backEnd.viewParms =
+/// cmd->viewParms;` do not land as field copies here. Per the A1 disposition
+/// table's `RC_DRAW_SURFS` row and `tr_cmds.rs`'s `R_AddDrawSurfCmd` DEFERRED
+/// note (same reasoning, cited there): `drawSurfsCommand_t` dissolves, and
+/// `refdef`/`viewParms` already cross into `FrameState::refdef`/`view` via
+/// `FrameEvent::RenderScene` at scene-seal time (`RE_RenderScene`, a
+/// different, not-yet-ported fn) — "the render-thread-local hand-off from
+/// cull/sort output to the backend's draw step is the owning
+/// `tr_main`/`tr_backend` wave's concern, not a `FrameData` push". This fn is
+/// that hand-off: it consumes the already-current `frame.refdef`/`view`
+/// rather than re-copying them from a dissolved command struct.
+///
+/// DEFERRED: R4 — the leading "finish any 2D drawing if needed"
+/// `tess.numIndexes` flush guard + `RB_EndSurface()` call: `tess` dissolves
+/// into R4's tessellation/vertex-building pipeline (R2 `## State ownership`
+/// row `tess`); no R3 carrier holds `tess.numIndexes`.
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1620-1622`
+///
+/// The dynamic-glow block's outer `!(backEnd.refdef.rdflags &
+/// RDF_NOWORLDMODEL)` term IS landed: `tr.refdef.rdflags` is threaded in as
+/// `refdef_rdflags: i32` — `TrRefdef` (`FrameState::refdef`) has no `rdflags`
+/// field yet (it lands with the `tr_scene` wave, R2 `## State ownership`,
+/// `trRefdef_t` row) — mirroring `tr_world.rs::R_AddWorldSurfaces`'s
+/// identical threading of the same guard in this same batch.
+///
+/// DEFERRED: R4/DEC-37 A13.1-A13.3 — everything inside the dynamic-glow
+/// block. The guard's remaining two terms are the blocker:
+/// `g_bDynamicGlowSupported` (a GL runtime-capability flag) and
+/// `r_DynamicGlow->integer` (a live cvar read, which needs `Common::cvar`,
+/// not threaded to this fn) have no carrier — the same "stay unmapped rather
+/// than invented" call `RB_RenderDrawSurfList`'s port made just above for
+/// `g_bRenderGlowingObjects`/`g_postRenders`/`rb_surfaceTable`, and the
+/// reason this fn takes no `RendererCvars` (a cvar handle table with no
+/// `Common` to resolve it against buys nothing). The block's body is GL
+/// surface throughout: `qglDisable`/`qglEnable`/`qglBindTexture`/
+/// `qglCopyTexSubImage2D`/`qglClearColor`/`qglClear`/`qglFinish` against
+/// `tr.sceneImage`/`tr.screenGlow`/`tr.blurImage`, `SetViewportAndScissor`'s
+/// viewport-swap dance over `r_DynamicGlowWidth`/`r_DynamicGlowHeight`, and
+/// `RB_BlurGlowTexture`/`RB_DrawGlowOverlay`'s own already-deferred bodies.
+/// The one non-GL effect, the second `RB_RenderDrawSurfList` call bracketed
+/// by the `g_bRenderGlowingObjects` write, is inseparable from that flag's
+/// missing carrier: without it the second pass would draw the same surfaces
+/// again rather than the glow subset (DEC-37 A13.1, A13.3).
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1641-1697`
+///
+/// Panics via `RB_RenderDrawSurfList`'s loud stub until its owning wave lands.
+pub fn RB_DrawSurfs(
+    frame: &mut FrameState,
+    gpu: &mut GpuResources,
+    assets: &RenderAssets,
+    refdef_rdflags: i32,
+    draw_surfs: &[DrawSurf<SurfaceGeometry<'_>>],
+) {
+    RB_RenderDrawSurfList(frame, gpu, assets, draw_surfs);
+
+    // Render dynamic glowing/flaring objects.
+    if refdef_rdflags & RDF_NOWORLDMODEL == 0 {
+        // DEFERRED: R4/DEC-37 A13.1-A13.3 — the rest of the guard
+        // (`g_bDynamicGlowSupported && r_DynamicGlow->integer`) and the whole
+        // glow block behind it (see doc comment above).
+        // Source: oracle/codemp/renderer/tr_backend.cpp:1641-1697
+    }
+}
+
+/// Raven `RB_ExecuteRenderCommands` — the backend command-list dispatch
+/// loop: walks the render-thread command buffer (`data`), switching on each
+/// entry's `RC_*` tag to `RB_SetColor`/`RB_StretchPic`/`RB_RotatePic`/
+/// `RB_RotatePic2`/`RB_DrawSurfs`/`RB_DrawBuffer`/`RB_SwapBuffers`/
+/// `RB_WorldEffects`/`R_DrawWireframeAutomap` in order, then stamps
+/// `backEnd.pc.msec` from a `com_timescale`-scaled `Sys_Milliseconds` delta
+/// once it hits `RC_END_OF_LIST`.
+///
+/// Whole-body deferral — every input the loop needs is unhomed at this wave:
+/// - The walk itself has no carrier. `data`'s ordered `RC_*` command buffer
+///   is the oracle's `renderCommandList_t` (`### A1 disposition table` —
+///   "dissolved"); its R3 successor, `FrameData::events: Vec<FrameEvent>`,
+///   carries only the trap-sourced event kinds (`SetColor`/`DrawStretchPic`/
+///   `DrawRotatePic`/`DrawRotatePic2`/`RenderScene`/...). `RC_DRAW_SURFS`/
+///   `RC_DRAW_BUFFER`/`RC_SWAP_BUFFERS`/`RC_WORLD_EFFECTS`/`RC_AUTO_MAP` are
+///   deliberately absent from `FrameEvent` (`tr_cmds.rs`'s
+///   `R_AddDrawSurfCmd`/`RE_RenderWorldEffects`/`RE_RenderAutoMap` DEFERRED
+///   notes) — those five are frame-orchestration commands
+///   `R_IssueRenderCommands` (not yet ported) issues directly, not
+///   trap-pushed events, so there is no single Rust value this fn could
+///   accept as "the command list to execute" without inventing one
+///   (interior-safety law: no new carrier outside R2's licensed vocabulary).
+/// - Even if the walk existed, the callees it would dispatch to take
+///   mutually incompatible argument shapes (`RB_DrawSurfs` needs a
+///   `&[DrawSurf<SurfaceGeometry>]` cull/sort slice, `RB_WorldEffects` needs
+///   `WorldEffectsState`/`WindZoneState`/`EngineHostView`/`Rng`,
+///   `RB_SwapBuffers` needs `Common`, `R_DrawWireframeAutomap` needs
+///   `WireframeAutomap`/`player_height`/`r_auto_map_integer`) — no uniform
+///   `data = handler(data)` shape survives the translation regardless of the
+///   carrier question above.
+/// - `com_timescale`'s live value has no resolved receiver at this fn: this
+///   packet's STATE HOMES row marks it "outside R2's scope (not a
+///   renderer-owned global)... confirm the exact receiver at port time", and
+///   the resolved call surface gives no accessor for it — only
+///   `sys_milliseconds` itself is LAW.
+/// - The terminal `backEnd.pc.msec = t2 - t1;` write has no home either:
+///   `BackEndCounters` is `tr_cmds.rs`'s established empty tier-3
+///   placeholder, `msec` explicitly owned by "the R4 backend wave" (same
+///   precedent `R_PerformanceCounters`'s DEFERRED note cites).
+///
+/// No computation survives once every input above is removed, so this lands
+/// as a loud `todo!()` rather than a partial-body DEFERRED
+/// (`RB_RenderDrawSurfList`'s whole-body-deferral precedent, same file).
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1916-1959`
+pub fn RB_ExecuteRenderCommands() {
+    todo!("Port RB_ExecuteRenderCommands — oracle/codemp/renderer/tr_backend.cpp:1916-1959")
+}

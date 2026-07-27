@@ -8,6 +8,9 @@
 // transcription, matching the rest of the renderer/engine crates.
 #![allow(non_snake_case)]
 
+use core::f64::consts::PI;
+use core::mem;
+
 use mp_engine_qcommon::cm::cm_shader_consts::MAX_SHADER_FILES;
 use mp_engine_qcommon::cmd_common::Cmd_Argc;
 use mp_engine_qcommon::common::common::{com_printf, Common};
@@ -16,9 +19,11 @@ use mp_engine_qcommon::common::error::com_error;
 use mp_engine_qcommon::files_common::{FS_ListFiles, FS_ReadFileVec};
 use mp_engine_qcommon::qfiles::draw_vert_t::MAXLIGHTMAPS;
 use mp_engine_qcommon::qfiles::light_style_limits::LS_UNUSED;
-use mp_qshared::shared::com_parse::{COM_ParseExt, QSharedScratch, SkipBracedSection};
+use mp_qshared::shared::com_parse::{
+    COM_ParseExt, QSharedScratch, SkipBracedSection, SkipRestOfLine,
+};
 use mp_qshared::shared::error_parm::errorParm_t;
-use mp_qshared::shared::q_color::S_COLOR_YELLOW;
+use mp_qshared::shared::q_color::{S_COLOR_RED, S_COLOR_YELLOW};
 use mp_qshared::shared::q_string::COM_StripExtension;
 use mp_qshared::shared::surface_flags::{
     CONTENTS_ABSEIL, CONTENTS_BOTCLIP, CONTENTS_DETAIL, CONTENTS_FOG, CONTENTS_INSIDE,
@@ -31,13 +36,21 @@ use mp_qshared::shared::surface_flags::{
 use native_string::atof::atof;
 use native_string::Q_stricmpn;
 
+use crate::gl_constants::{GL_CLAMP, GL_REPEAT};
+use crate::render_state::frame_state::FrameState;
+use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::placeholders::SkyParms;
 use crate::render_state::render_assets::RenderAssets;
+use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::{ShaderAsset, ShaderHandle};
+use crate::tr_image::{R_FindImageFile, TrImageState};
 use crate::tr_local::shader_sort_t::shaderSort_t;
 use crate::tr_local::tex_mod_t::texMod_t;
+use crate::tr_local::view_parms_t::viewParms_t;
+use crate::tr_model::render_models::RenderModels;
+use crate::tr_sky::{R_InitSkyTexCoords, SkyState};
 
 // PORT-NOTE: this wave is `tr_shader`'s first (wave 0) — the R3 wave the
 // tier-2 transition audit assigns `ShaderAsset`'s fields to
@@ -67,6 +80,12 @@ pub const MAX_SHADER_STAGES: usize = 8;
 ///
 /// Source: `oracle/codemp/renderer/tr_local.h:107`
 pub const NUM_TEXTURE_BUNDLES: usize = 2;
+
+/// Raven `MAX_IMAGE_ANIMATIONS` — a fn-scope `#define` inside `ParseStage`'s
+/// `animMap` branch (in-packet, `## FILE-SCOPE CONSTANTS`).
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:1402`
+pub const MAX_IMAGE_ANIMATIONS: usize = 32;
 
 /// Raven `MAX_SHADER_DEFORMS`. Not itself in this wave's packet, but already
 /// ported (privately) as `tr_local::shader_s::MAX_SHADER_DEFORMS` — the value
@@ -106,6 +125,12 @@ pub const GLS_DSTBLEND_BITS: i32 = 0x0000_00f0;
 /// Raven `GLS_DEPTHMASK_TRUE`.
 /// Source: `oracle/codemp/renderer/tr_local.h:1669`
 pub const GLS_DEPTHMASK_TRUE: i32 = 0x0000_0100;
+/// Raven `GLS_DEPTHTEST_DISABLE`.
+/// Source: `oracle/codemp/renderer/tr_local.h:1673`
+pub const GLS_DEPTHTEST_DISABLE: i32 = 0x0001_0000;
+/// Raven `GLS_DEPTHFUNC_EQUAL`.
+/// Source: `oracle/codemp/renderer/tr_local.h:1674`
+pub const GLS_DEPTHFUNC_EQUAL: i32 = 0x0002_0000;
 /// Raven `GLS_DEFAULT` — `#define GLS_DEFAULT GLS_DEPTHMASK_TRUE`.
 /// Source: `oracle/codemp/renderer/tr_local.h:1682`
 pub const GLS_DEFAULT: i32 = GLS_DEPTHMASK_TRUE;
@@ -366,6 +391,17 @@ pub struct TextureBundleParse {
     pub vertex_lightmap: bool,
     pub is_video_map: bool,
     pub video_map_handle: i32,
+    /// `image[MAX_IMAGE_ANIMATIONS]` — added by wave 5 (`ParseStage`'s
+    /// `animMap`/`clampanimMap`/`oneshotanimMap` frame list). The oracle
+    /// builds a local `image_t *images[MAX_IMAGE_ANIMATIONS]` array and
+    /// copies it into `bundle[0].image` via `Hunk_Alloc`+`memcpy`; the owned
+    /// `Vec` here IS that copy, no allocation step needed (§C9). `image`
+    /// above stays the single-frame ("map"/"clampmap") slot — the two never
+    /// populate simultaneously in the oracle either (`bundle[0].image` is
+    /// reused/overloaded between the single-image and animated-array cases).
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shader.cpp:1400-1443`
+    pub image_animations: Vec<ImageHandle>,
 }
 
 /// Owned form of Raven `surfaceSprite_t`.
@@ -421,6 +457,71 @@ pub struct ShaderStageParse {
     /// `adjustColorsForFog` — added by wave 2; computed by `FinishShader`'s
     /// "determine sort order and fog color adjustment" block.
     pub adjust_colors_for_fog: AdjustColorsForFog,
+    /// `constantColor[4]` — added by wave 5 (`ParseStage`'s `rgbGen const`/
+    /// `alphaGen const`). Field declaration is on `shaderStage_t`
+    /// (`oracle/codemp/renderer/tr_local.h`, exact line outside this
+    /// packet's slice — not guessed, per porting-rules §A2); the write
+    /// sites this wave transcribes are `oracle/codemp/renderer/
+    /// tr_shader.cpp:1605-1607,1688`.
+    pub constant_color: [u8; 4],
+    /// `glow` — added by wave 5 (`ParseStage`'s `glow` keyword). Raven-added
+    /// JKA field (not itself in the `shaderStage_t` line range this file's
+    /// other fields cite), read only by the DEFERRED-R4 glow backend.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shader.cpp:1813-1819`
+    pub glow: bool,
+}
+
+/// Raven `cullType_t`, reproduced locally — same rationale as `ColorGen`/
+/// `GenFunc` above (`ShaderParseState` needs `Clone`/`Copy`/`Default`, out of
+/// scope for the tier-2 `cullType_t` file this wave may not touch).
+///
+/// Type definition source: `oracle/codemp/renderer/tr_local.h` (`cullType_t`,
+/// exact line outside this packet's slice — not guessed, per porting-rules
+/// §A2; write site `oracle/codemp/renderer/tr_shader.cpp:2507-2530`)
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum CullType {
+    FrontSided,
+    BackSided,
+    TwoSided,
+}
+impl Default for CullType {
+    fn default() -> CullType {
+        CullType::FrontSided
+    }
+}
+
+/// Raven `fogPass_t`, reproduced locally — same rationale as `CullType`
+/// above (`shader.fogPass` write site has no `ShaderAsset` carrier yet either
+/// — `GeneratePermanentShader`'s existing `DEFERRED` note — but the scratch
+/// value is still captured here, matching every other `ShaderParseState`
+/// field this file adds ahead of its `ShaderAsset` sync).
+///
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:442-447`
+/// (write site `oracle/codemp/renderer/tr_shader.cpp:2444-2448`)
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum FogPass {
+    None,
+    Equal,
+    Le,
+    GlFog,
+}
+impl Default for FogPass {
+    fn default() -> FogPass {
+        FogPass::None
+    }
+}
+
+/// Owned form of Raven `fogParms_t` — only the two members this wave's
+/// `ParseShader` touches (`color`, `depthForOpaque`); the type's full field
+/// list sits outside this packet's slice (not guessed, per porting-rules
+/// §A2).
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:2469-2488` (write sites)
+#[derive(Clone, Copy, Default)]
+pub struct FogParms {
+    pub color: [f32; 3],
+    pub depth_for_opaque: f32,
 }
 
 /// Per-`ParseShader`-call scratch — the oracle file-scope globals `shader`
@@ -464,6 +565,51 @@ pub struct ShaderParseState {
     /// `numDeforms` field is needed (§C9-style out-param -> the collection's
     /// own length).
     pub deforms: Vec<DeformStage>,
+    /// `shader.noMipMaps` — added by wave 5 (`ParseStage`'s `map`/`clampmap`/
+    /// `animMap`/sky-box image-load flag reads). Field declaration is on
+    /// `shader_t` (`oracle/codemp/renderer/tr_local.h`, exact line outside
+    /// this packet's slice — not guessed, per porting-rules §A2); the read
+    /// sites this wave transcribes are `oracle/codemp/renderer/
+    /// tr_shader.cpp:1339,1361,1389,1430,2106`.
+    pub no_mip_maps: bool,
+    /// `shader.noPicMip` — added by wave 5, same callers as `no_mip_maps`.
+    pub no_pic_mip: bool,
+    /// `shader.noTC` — added by wave 5, same callers as `no_mip_maps`.
+    pub no_tc: bool,
+    /// `shader.portalRange` — added by wave 5 (`ParseStage`'s `alphaGen
+    /// portal`, `oracle/codemp/renderer/tr_shader.cpp:1729,1734`).
+    pub portal_range: f32,
+    /// `shader.hasGlow` — added by wave 6 (`ParseShader`'s per-stage `glow`
+    /// aggregation, `#ifndef _XBOX` leg).
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shader.cpp:2341-2346`
+    pub has_glow: bool,
+    /// `shader.clampTime` — added by wave 6 (`ParseShader`'s `clampTime`
+    /// keyword).
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shader.cpp:2415-2420`
+    pub clamp_time: f32,
+    /// `shader.entityMergable` — added by wave 6 (`ParseShader`'s
+    /// `entityMergable` keyword).
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shader.cpp:2460-2468`
+    pub entity_mergable: bool,
+    /// `shader.fogParms` — added by wave 6 (`ParseShader`'s `fogParms`
+    /// keyword). `Hunk_Alloc`'d in the oracle; owned inline here (§C9), same
+    /// pattern as `sky: Option<SkyParms>` above.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shader.cpp:2469-2488`
+    pub fog_parms: Option<FogParms>,
+    /// `shader.cullType` — added by wave 6 (`ParseShader`'s `cull` keyword).
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shader.cpp:2507-2530`
+    pub cull_type: CullType,
+    /// `shader.fogPass` — added by wave 6 (`ParseShader`'s `noglfog`
+    /// keyword). See `FogPass`'s doc comment for the `ShaderAsset`-sync
+    /// caveat.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shader.cpp:2444-2448`
+    pub fog_pass: FogPass,
 }
 
 /// Mechanical replacement for the oracle's `lightmapIndex ==
@@ -3375,13 +3521,9 @@ pub fn RE_RegisterShaderFromImage(
         state.stages[0].active = true;
         state.stages[0].rgb_gen = ColorGen::Vertex;
         state.stages[0].alpha_gen = AlphaGen::Vertex;
-        state.stages[0].state_bits =
-            // DEFERRED: `GLS_DEPTHTEST_DISABLE` — not present in this
-            // packet's FILE-SCOPE CONSTANTS section nor in this fn's own
-            // oracle slice; never-guess rule (porting-rules §A2, packet
-            // preamble rule 12). ORed in as 0 until a later wave ports it.
-            // Source: oracle/codemp/renderer/tr_local.h (GLS_DEPTHTEST_DISABLE)
-            (GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA) as u32;
+        state.stages[0].state_bits = (GLS_DEPTHTEST_DISABLE
+            | GLS_SRCBLEND_SRC_ALPHA
+            | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA) as u32;
     } else if state.lightmap_index[0] == LIGHTMAP_WHITEIMAGE {
         // fullbright level
         state.stages[0].bundle[0].image = assets.white_image;
@@ -3512,4 +3654,1126 @@ pub fn CreateInternalShaders(
     // in FILE-SCOPE CONSTANTS, not in this fn's own oracle slice) —
     // never-guess rule.
     // Source: oracle/codemp/renderer/tr_shader.cpp:4170-4250
+}
+
+/// Raven `ParseStage`.
+///
+/// `#ifdef DEDICATED`/`#else` splits throughout this fn take the `#else`
+/// (real-load) leg — `R_FindImageFile` is already a full, already-ported
+/// implementation that itself short-circuits at runtime on the
+/// `com_dedicated` cvar (`tr_image.rs`), not a compile-time stub, so the
+/// non-`DEDICATED` branch is the one that actually reaches live code (same
+/// precedent as `R_Splash`, `tr_init.rs`). `#ifdef VV_LIGHTING`
+/// (`specularmap`) and `#ifdef _XBOX` (`bumpmap`, and the `_XBOX`-only
+/// `needsNormal`/`needsTangent` set-asides inside `lightingDiffuse`/
+/// `tcGen environment`) are dropped — MP retail builds neither
+/// (established file precedent, e.g. `CollapseMultitexture`/`R_Splash`).
+///
+/// `continue;` in the oracle's `while(1)` body is, with one exception,
+/// behaviorally identical to just letting the enclosing `if`/`else if` arm
+/// finish (nothing follows the dispatch chain inside the loop) — transcribed
+/// as plain if/else-if fall-through, not literal `continue`. The exception
+/// is `blendfunc`: its two early "missing parm" exits skip a trailing
+/// `depthMaskBits` clear that sits *after* the token-dispatch chain but
+/// still inside the `blendfunc` arm, so those two use a real Rust `continue`
+/// to match.
+///
+/// `Hunk_Alloc`+`memcpy` (`animMap`'s frame-array copy, `tcGen vector`'s
+/// `tcGenVectors`) dissolve — `TextureBundleParse::image_animations`/
+/// `tc_gen_vectors` are already owned storage, nothing to allocate into
+/// (§C9).
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:1279-1920`
+pub fn ParseStage<'a>(
+    stage: &mut ShaderStageParse,
+    text: &mut Option<&'a [u8]>,
+    qs: &mut QSharedScratch,
+    state: &mut ShaderParseState,
+    assets: &RenderAssets,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+) -> bool {
+    let warn = S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII");
+
+    let mut depth_mask_bits: i32 = GLS_DEPTHMASK_TRUE;
+    let mut blend_src_bits: i32 = 0;
+    let mut blend_dst_bits: i32 = 0;
+    let mut atest_bits: u32 = 0;
+    let mut depth_func_bits: i32 = 0;
+    let mut depth_mask_explicit = false;
+
+    stage.active = true;
+
+    loop {
+        let (token, rest) = COM_ParseExt(qs, *text, true);
+        *text = rest;
+        if token.is_empty() {
+            com_printf(
+                view.common,
+                &format!("{}WARNING: no matching '}}' found\n", warn),
+            );
+            return false;
+        }
+
+        // Faithful: the oracle tests `token[0]`, the first byte only — an
+        // empty token reads its NUL terminator, which matches no brace.
+        // Source: oracle/codemp/renderer/tr_shader.cpp:1296
+        if token.as_bytes().first() == Some(&b'}') {
+            break;
+        } else if token.eq_ignore_ascii_case("map") {
+            //
+            // map <name>
+            //
+            let (t, rest) = COM_ParseExt(qs, *text, false);
+            *text = rest;
+            if t.is_empty() {
+                com_printf(
+                    view.common,
+                    &format!(
+                        "{}WARNING: missing parameter for 'map' keyword in shader '{}'\n",
+                        warn, state.name
+                    ),
+                );
+                return false;
+            }
+
+            if t.eq_ignore_ascii_case("$whiteimage") {
+                stage.bundle[0].image = assets.white_image;
+            } else if t.eq_ignore_ascii_case("$lightmap") {
+                stage.bundle[0].is_lightmap = true;
+                if state.lightmap_index[0] < 0
+                    || state.lightmap_index[0] as usize >= assets.lightmaps.len()
+                {
+                    // `#ifndef FINAL_BUILD` diagnostic dropped — retail
+                    // compiles it out entirely (DEC-37 A13.5, `tr_scene.rs`'s
+                    // precedent).
+                    // Source: oracle/codemp/renderer/tr_shader.cpp:1322-1324
+                    stage.bundle[0].image = assets.white_image;
+                } else {
+                    stage.bundle[0].image = assets
+                        .lightmaps
+                        .get(state.lightmap_index[0] as usize)
+                        .copied();
+                }
+            } else {
+                let handle = R_FindImageFile(
+                    view,
+                    cvars,
+                    sim,
+                    models,
+                    img_state,
+                    gpu,
+                    Some(t.as_str()),
+                    !state.no_mip_maps,
+                    !state.no_pic_mip,
+                    !state.no_tc,
+                    GL_REPEAT,
+                );
+                match handle {
+                    Some(h) => stage.bundle[0].image = Some(h),
+                    None => {
+                        com_printf(
+                            view.common,
+                            &format!(
+                                "{}WARNING: R_FindImageFile could not find '{}' in shader '{}'\n",
+                                warn, t, state.name
+                            ),
+                        );
+                        return false;
+                    }
+                }
+            }
+        } else if token.eq_ignore_ascii_case("clampmap") {
+            //
+            // clampmap <name>
+            //
+            let (t, rest) = COM_ParseExt(qs, *text, false);
+            *text = rest;
+            if t.is_empty() {
+                com_printf(
+                    view.common,
+                    &format!(
+                        "{}WARNING: missing parameter for 'clampmap' keyword in shader '{}'\n",
+                        warn, state.name
+                    ),
+                );
+                return false;
+            }
+
+            let handle = R_FindImageFile(
+                view,
+                cvars,
+                sim,
+                models,
+                img_state,
+                gpu,
+                Some(t.as_str()),
+                !state.no_mip_maps,
+                !state.no_pic_mip,
+                !state.no_tc,
+                GL_CLAMP,
+            );
+            match handle {
+                Some(h) => stage.bundle[0].image = Some(h),
+                None => {
+                    com_printf(
+                        view.common,
+                        &format!(
+                            "{}WARNING: R_FindImageFile could not find '{}' in shader '{}'\n",
+                            warn, t, state.name
+                        ),
+                    );
+                    return false;
+                }
+            }
+        } else if token.eq_ignore_ascii_case("animMap")
+            || token.eq_ignore_ascii_case("clampanimMap")
+            || token.eq_ignore_ascii_case("oneshotanimMap")
+        {
+            //
+            // animMap <frequency> <image1> .... <imageN>
+            //
+            let b_clamp = token.eq_ignore_ascii_case("clampanimMap");
+            let one_shot = token.eq_ignore_ascii_case("oneshotanimMap");
+
+            let (freq, rest) = COM_ParseExt(qs, *text, false);
+            *text = rest;
+            if freq.is_empty() {
+                // PORT-NOTE: the oracle's own warning names are swapped —
+                // `(bClamp ? "animMap" : "clampanimMap")` prints "animMap"
+                // when `bClamp` is true (i.e. the keyword actually parsed
+                // WAS "clampanimMap") and vice versa. Transcribed verbatim
+                // (porting-rules §A2: port faithfully, even if buggy).
+                com_printf(
+                    view.common,
+                    &format!(
+                        "{}WARNING: missing parameter for '{}' keyword in shader '{}'\n",
+                        warn,
+                        if b_clamp { "animMap" } else { "clampanimMap" },
+                        state.name
+                    ),
+                );
+                return false;
+            }
+            stage.bundle[0].image_animation_speed = atof(&freq) as f32;
+            stage.bundle[0].one_shot_anim_map = one_shot;
+
+            // parse up to MAX_IMAGE_ANIMATIONS animations
+            let mut images: Vec<ImageHandle> = Vec::new();
+            loop {
+                let (img_token, rest) = COM_ParseExt(qs, *text, false);
+                *text = rest;
+                if img_token.is_empty() {
+                    break;
+                }
+                if images.len() < MAX_IMAGE_ANIMATIONS {
+                    let handle = R_FindImageFile(
+                        view,
+                        cvars,
+                        sim,
+                        models,
+                        img_state,
+                        gpu,
+                        Some(img_token.as_str()),
+                        !state.no_mip_maps,
+                        !state.no_pic_mip,
+                        !state.no_tc,
+                        if b_clamp { GL_CLAMP } else { GL_REPEAT },
+                    );
+                    match handle {
+                        Some(h) => images.push(h),
+                        None => {
+                            com_printf(
+                                view.common,
+                                &format!(
+                                    "{}WARNING: R_FindImageFile could not find '{}' in shader '{}'\n",
+                                    warn, img_token, state.name
+                                ),
+                            );
+                            return false;
+                        }
+                    }
+                }
+            }
+            // Copy image ptrs into an array of ptrs — collapses to owning
+            // the Vec directly; Hunk_Alloc+memcpy has no owned-Vec
+            // counterpart (§C9).
+            stage.bundle[0].num_image_animations = images.len() as i16;
+            stage.bundle[0].image_animations = images;
+        } else if token.eq_ignore_ascii_case("videoMap") {
+            let (t, rest) = COM_ParseExt(qs, *text, false);
+            *text = rest;
+            if t.is_empty() {
+                com_printf(
+                    view.common,
+                    &format!(
+                        "{}WARNING: missing parameter for 'videoMap' keyword in shader '{}'\n",
+                        warn, state.name
+                    ),
+                );
+                return false;
+            }
+            // DEFERRED: `CIN_PlayCinematic`/`tr.scratchImage[client]` —
+            // `CIN_PlayCinematic` is genuinely unresolved client-side
+            // cinematic-playback surface (packet RESOLVED CALL SURFACE:
+            // "escalate, never stub"), and `tr.scratchImage` carries no R2
+            // carrier (same class as `RE_UploadCinematic`'s own
+            // DEFERRED: R4, `tr_backend.rs:444-455`, DEC-37 A13.2).
+            // `videoMapHandle` stays `-1` — the oracle's own DEDICATED-build
+            // default — so the `if (videoMapHandle != -1)` guard below is
+            // faithfully never entered and `isVideoMap`/`image` stay unset.
+            // Source: oracle/codemp/renderer/tr_shader.cpp:1444-1461
+            stage.bundle[0].video_map_handle = -1;
+        } else if token.eq_ignore_ascii_case("alphaFunc") {
+            //
+            // alphafunc <func>
+            //
+            let (t, rest) = COM_ParseExt(qs, *text, false);
+            *text = rest;
+            if t.is_empty() {
+                com_printf(
+                    view.common,
+                    &format!(
+                        "{}WARNING: missing parameter for 'alphaFunc' keyword in shader '{}'\n",
+                        warn, state.name
+                    ),
+                );
+                return false;
+            }
+            atest_bits = NameToAFunc(state, view.common, &t);
+        } else if token.eq_ignore_ascii_case("depthfunc") {
+            //
+            // depthFunc <func>
+            //
+            let (t, rest) = COM_ParseExt(qs, *text, false);
+            *text = rest;
+            if t.is_empty() {
+                com_printf(
+                    view.common,
+                    &format!(
+                        "{}WARNING: missing parameter for 'depthfunc' keyword in shader '{}'\n",
+                        warn, state.name
+                    ),
+                );
+                return false;
+            }
+
+            if t.eq_ignore_ascii_case("lequal") {
+                depth_func_bits = 0;
+            } else if t.eq_ignore_ascii_case("equal") {
+                depth_func_bits = GLS_DEPTHFUNC_EQUAL;
+            } else if t.eq_ignore_ascii_case("disable") {
+                depth_func_bits = GLS_DEPTHTEST_DISABLE;
+            } else {
+                com_printf(
+                    view.common,
+                    &format!(
+                        "{}WARNING: unknown depthfunc '{}' in shader '{}'\n",
+                        warn, t, state.name
+                    ),
+                );
+            }
+        } else if token.eq_ignore_ascii_case("detail") {
+            stage.is_detail = true;
+        } else if token.eq_ignore_ascii_case("blendfunc") {
+            //
+            // blendfunc <srcFactor> <dstFactor>
+            // or blendfunc <add|filter|blend>
+            //
+            let (t, rest) = COM_ParseExt(qs, *text, false);
+            *text = rest;
+            if t.is_empty() {
+                com_printf(
+                    view.common,
+                    &format!(
+                        "{}WARNING: missing parm for blendFunc in shader '{}'\n",
+                        warn, state.name
+                    ),
+                );
+                continue;
+            }
+            // check for "simple" blends first
+            if t.eq_ignore_ascii_case("add") {
+                blend_src_bits = GLS_SRCBLEND_ONE;
+                blend_dst_bits = GLS_DSTBLEND_ONE;
+            } else if t.eq_ignore_ascii_case("filter") {
+                blend_src_bits = GLS_SRCBLEND_DST_COLOR;
+                blend_dst_bits = GLS_DSTBLEND_ZERO;
+            } else if t.eq_ignore_ascii_case("blend") {
+                blend_src_bits = GLS_SRCBLEND_SRC_ALPHA;
+                blend_dst_bits = GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA;
+            } else {
+                // complex double blends
+                blend_src_bits = NameToSrcBlendMode(state, view.common, &t);
+
+                let (t2, rest2) = COM_ParseExt(qs, *text, false);
+                *text = rest2;
+                if t2.is_empty() {
+                    com_printf(
+                        view.common,
+                        &format!(
+                            "{}WARNING: missing parm for blendFunc in shader '{}'\n",
+                            warn, state.name
+                        ),
+                    );
+                    continue;
+                }
+                blend_dst_bits = NameToDstBlendMode(state, view.common, &t2);
+            }
+
+            // clear depth mask for blended surfaces
+            if !depth_mask_explicit {
+                depth_mask_bits = 0;
+            }
+        } else if token.eq_ignore_ascii_case("rgbGen") {
+            //
+            // rgbGen
+            //
+            let (t, rest) = COM_ParseExt(qs, *text, false);
+            *text = rest;
+            if t.is_empty() {
+                com_printf(
+                    view.common,
+                    &format!(
+                        "{}WARNING: missing parameters for rgbGen in shader '{}'\n",
+                        warn, state.name
+                    ),
+                );
+            } else if t.eq_ignore_ascii_case("wave") {
+                ParseWaveForm(qs, text, view.common, state, &mut stage.rgb_wave);
+                stage.rgb_gen = ColorGen::Waveform;
+            } else if t.eq_ignore_ascii_case("const") {
+                let mut color: [f32; 3] = [0.0; 3];
+                ParseVector(qs, text, view.common, &state.name, 3, &mut color);
+                stage.constant_color[0] = (255.0 * color[0]) as u8;
+                stage.constant_color[1] = (255.0 * color[1]) as u8;
+                stage.constant_color[2] = (255.0 * color[2]) as u8;
+                stage.rgb_gen = ColorGen::Const;
+            } else if t.eq_ignore_ascii_case("identity") {
+                stage.rgb_gen = ColorGen::Identity;
+            } else if t.eq_ignore_ascii_case("identityLighting") {
+                stage.rgb_gen = ColorGen::IdentityLighting;
+            } else if t.eq_ignore_ascii_case("entity") {
+                stage.rgb_gen = ColorGen::Entity;
+            } else if t.eq_ignore_ascii_case("oneMinusEntity") {
+                stage.rgb_gen = ColorGen::OneMinusEntity;
+            } else if t.eq_ignore_ascii_case("vertex") {
+                stage.rgb_gen = ColorGen::Vertex;
+                if stage.alpha_gen == AlphaGen::Identity {
+                    stage.alpha_gen = AlphaGen::Vertex;
+                }
+            } else if t.eq_ignore_ascii_case("exactVertex") {
+                stage.rgb_gen = ColorGen::ExactVertex;
+            } else if t.eq_ignore_ascii_case("lightingDiffuse") {
+                stage.rgb_gen = ColorGen::LightingDiffuse;
+                // `#ifdef _XBOX shader.needsNormal = true;` dropped — MP
+                // retail builds the non-`_XBOX` configuration (established
+                // file precedent).
+            } else if t.eq_ignore_ascii_case("lightingDiffuseEntity") {
+                if state.lightmap_index[0] != LIGHTMAP_NONE {
+                    let err = S_COLOR_RED.to_str().expect("S_COLOR_RED is ASCII");
+                    com_printf(
+                        view.common,
+                        &format!(
+                            "{}ERROR: rgbGen lightingDiffuseEntity used on a misc_model! in shader '{}'\n",
+                            err, state.name
+                        ),
+                    );
+                }
+                stage.rgb_gen = ColorGen::LightingDiffuseEntity;
+                // `#ifdef _XBOX shader.needsNormal = true;` dropped, as above.
+            } else if t.eq_ignore_ascii_case("oneMinusVertex") {
+                stage.rgb_gen = ColorGen::OneMinusVertex;
+            } else {
+                com_printf(
+                    view.common,
+                    &format!(
+                        "{}WARNING: unknown rgbGen parameter '{}' in shader '{}'\n",
+                        warn, t, state.name
+                    ),
+                );
+            }
+        } else if token.eq_ignore_ascii_case("alphaGen") {
+            //
+            // alphaGen
+            //
+            let (t, rest) = COM_ParseExt(qs, *text, false);
+            *text = rest;
+            if t.is_empty() {
+                com_printf(
+                    view.common,
+                    &format!(
+                        "{}WARNING: missing parameters for alphaGen in shader '{}'\n",
+                        warn, state.name
+                    ),
+                );
+            } else if t.eq_ignore_ascii_case("wave") {
+                ParseWaveForm(qs, text, view.common, state, &mut stage.alpha_wave);
+                stage.alpha_gen = AlphaGen::Waveform;
+            } else if t.eq_ignore_ascii_case("const") {
+                // Faithful: the oracle does not check this token for
+                // emptiness before `atof`-ing it.
+                let (t2, rest2) = COM_ParseExt(qs, *text, false);
+                *text = rest2;
+                // `255 * atof(token)` is `int * double` -> `double` in C; the
+                // multiply happens at `f64` width, not `f32`.
+                stage.constant_color[3] = (255.0f64 * atof(&t2)) as u8;
+                stage.alpha_gen = AlphaGen::Const;
+            } else if t.eq_ignore_ascii_case("identity") {
+                stage.alpha_gen = AlphaGen::Identity;
+            } else if t.eq_ignore_ascii_case("entity") {
+                stage.alpha_gen = AlphaGen::Entity;
+            } else if t.eq_ignore_ascii_case("oneMinusEntity") {
+                stage.alpha_gen = AlphaGen::OneMinusEntity;
+            } else if t.eq_ignore_ascii_case("vertex") {
+                stage.alpha_gen = AlphaGen::Vertex;
+            } else if t.eq_ignore_ascii_case("lightingSpecular") {
+                stage.alpha_gen = AlphaGen::LightingSpecular;
+            } else if t.eq_ignore_ascii_case("oneMinusVertex") {
+                stage.alpha_gen = AlphaGen::OneMinusVertex;
+            } else if t.eq_ignore_ascii_case("dot") {
+                stage.alpha_gen = AlphaGen::Dot;
+            } else if t.eq_ignore_ascii_case("oneMinusDot") {
+                stage.alpha_gen = AlphaGen::OneMinusDot;
+            } else if t.eq_ignore_ascii_case("portal") {
+                stage.alpha_gen = AlphaGen::Portal;
+                let (t2, rest2) = COM_ParseExt(qs, *text, false);
+                *text = rest2;
+                if t2.is_empty() {
+                    state.portal_range = 256.0;
+                    com_printf(
+                        view.common,
+                        &format!(
+                            "{}WARNING: missing range parameter for alphaGen portal in shader '{}', defaulting to 256\n",
+                            warn, state.name
+                        ),
+                    );
+                } else {
+                    state.portal_range = atof(&t2) as f32;
+                }
+            } else {
+                com_printf(
+                    view.common,
+                    &format!(
+                        "{}WARNING: unknown alphaGen parameter '{}' in shader '{}'\n",
+                        warn, t, state.name
+                    ),
+                );
+            }
+        } else if token.eq_ignore_ascii_case("texgen") || token.eq_ignore_ascii_case("tcGen") {
+            //
+            // tcGen <function>
+            //
+            let (t, rest) = COM_ParseExt(qs, *text, false);
+            *text = rest;
+            if t.is_empty() {
+                com_printf(
+                    view.common,
+                    &format!(
+                        "{}WARNING: missing texgen parm in shader '{}'\n",
+                        warn, state.name
+                    ),
+                );
+            } else if t.eq_ignore_ascii_case("environment") {
+                stage.bundle[0].tc_gen = TexCoordGen::EnvironmentMapped;
+                // `#ifdef _XBOX shader.needsNormal = true;` dropped, as above.
+            } else if t.eq_ignore_ascii_case("lightmap") {
+                stage.bundle[0].tc_gen = TexCoordGen::Lightmap;
+            } else if t.eq_ignore_ascii_case("texture") || t.eq_ignore_ascii_case("base") {
+                stage.bundle[0].tc_gen = TexCoordGen::Texture;
+            } else if t.eq_ignore_ascii_case("vector") {
+                ParseVector(
+                    qs,
+                    text,
+                    view.common,
+                    &state.name,
+                    3,
+                    &mut stage.bundle[0].tc_gen_vectors[0],
+                );
+                ParseVector(
+                    qs,
+                    text,
+                    view.common,
+                    &state.name,
+                    3,
+                    &mut stage.bundle[0].tc_gen_vectors[1],
+                );
+                stage.bundle[0].tc_gen = TexCoordGen::Vector;
+            } else {
+                com_printf(
+                    view.common,
+                    &format!(
+                        "{}WARNING: unknown texgen parm in shader '{}'\n",
+                        warn, state.name
+                    ),
+                );
+            }
+        } else if token.eq_ignore_ascii_case("tcMod") {
+            //
+            // tcMod <type> <...>
+            //
+            let mut buffer = String::new();
+            loop {
+                let (t, rest) = COM_ParseExt(qs, *text, false);
+                *text = rest;
+                if t.is_empty() {
+                    break;
+                }
+                buffer.push_str(&t);
+                buffer.push(' ');
+            }
+            ParseTexMod(buffer.as_bytes(), stage, qs, state, view.common);
+        } else if token.eq_ignore_ascii_case("depthwrite") {
+            depth_mask_bits = GLS_DEPTHMASK_TRUE;
+            depth_mask_explicit = true;
+        } else if token.eq_ignore_ascii_case("glow") {
+            // If this stage has glow...	GLOWXXX
+            stage.glow = true;
+        } else if token.eq_ignore_ascii_case("surfaceSprites") {
+            //
+            // surfaceSprites <type> ...
+            //
+            let mut buffer = String::new();
+            loop {
+                let (t, rest) = COM_ParseExt(qs, *text, false);
+                *text = rest;
+                if t.is_empty() {
+                    break;
+                }
+                buffer.push_str(&t);
+                buffer.push(' ');
+            }
+            ParseSurfaceSprites(buffer.as_bytes(), stage, qs, state, view.common);
+        } else if Q_stricmpn(&token, "ss", 2) == 0 {
+            // <--- NOTE ONLY COMPARING FIRST TWO LETTERS
+            //
+            // ssFademax <fademax>
+            // ssFadescale <fadescale>
+            // ssVariance <varwidth> <varheight>
+            // ssHangdown
+            // ssAnyangle
+            // ssFaceup
+            // ssWind <wind>
+            // ssWindIdle <windidle>
+            // ssDuration <duration>
+            // ssGrow <growwidth> <growheight>
+            // ssWeather
+            //
+            let param = token.clone();
+            let mut buffer = String::new();
+            loop {
+                let (t, rest) = COM_ParseExt(qs, *text, false);
+                *text = rest;
+                if t.is_empty() {
+                    break;
+                }
+                buffer.push_str(&t);
+                buffer.push(' ');
+            }
+            ParseSurfaceSpritesOptional(&param, buffer.as_bytes(), stage, qs, state, view.common);
+        } else {
+            com_printf(
+                view.common,
+                &format!(
+                    "{}WARNING: unknown parameter '{}' in shader '{}'\n",
+                    warn, token, state.name
+                ),
+            );
+            return false;
+        }
+    }
+
+    //
+    // if cgen isn't explicitly specified, use either identity or identitylighting
+    //
+    if stage.rgb_gen == ColorGen::Bad {
+        if blend_src_bits == GLS_SRCBLEND_ONE || blend_src_bits == GLS_SRCBLEND_SRC_ALPHA {
+            stage.rgb_gen = ColorGen::IdentityLighting;
+        } else {
+            stage.rgb_gen = ColorGen::Identity;
+        }
+    }
+
+    //
+    // implicitly assume that a GL_ONE GL_ZERO blend mask disables blending
+    //
+    if blend_src_bits == GLS_SRCBLEND_ONE && blend_dst_bits == GLS_DSTBLEND_ZERO {
+        blend_dst_bits = 0;
+        blend_src_bits = 0;
+        depth_mask_bits = GLS_DEPTHMASK_TRUE;
+    }
+
+    // decide which agens we can skip
+    if stage.alpha_gen == AlphaGen::Identity
+        && (stage.rgb_gen == ColorGen::Identity || stage.rgb_gen == ColorGen::LightingDiffuse)
+    {
+        stage.alpha_gen = AlphaGen::Skip;
+    }
+
+    //
+    // compute state bits
+    //
+    stage.state_bits =
+        (depth_mask_bits | blend_src_bits | blend_dst_bits | depth_func_bits) as u32 | atest_bits;
+
+    true
+}
+
+/// Raven `ParseSkyParms`.
+///
+/// `shader.sky = Hunk_Alloc(...)` collapses to constructing an owned
+/// `SkyParms` value — `SkyParms` is still the zero-field placeholder
+/// (`render_state/placeholders.rs`: "fields land with the `tr_sky` R3 wave,
+/// the first that reads one — wave-0 `tr_shader` only tests the option for
+/// presence"), so this (later) `tr_shader` wave still has nowhere to store
+/// `outerbox`/`cloudHeight`. The 6 `R_FindImageFile` calls are still issued
+/// — they carry a real, observable side effect (loading/registering the
+/// actual assets, exactly matching the oracle) — but their returned handles
+/// are discarded, and the oracle's `outerbox[i-1]`/`tr.defaultImage`
+/// fallback chain isn't reproduced (nothing to chain into). `Com_sprintf`
+/// into a `pathname[MAX_QPATH]` buffer collapses to `format!` (established
+/// `char[N]` -> `String` translation, no truncation modeled, same as
+/// `R_CreateExtendedName` elsewhere in this file) rather than calling the
+/// LAW `Com_sprintf(dest: *mut c_char, ...)` — that signature is raw-pointer
+/// C ABI and would require `unsafe`, banned by the interior-safety law.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:2086-2137`
+pub fn ParseSkyParms<'a>(
+    text: &mut Option<&'a [u8]>,
+    qs: &mut QSharedScratch,
+    state: &mut ShaderParseState,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
+) {
+    let warn = S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII");
+    const SUF: [&str; 6] = ["rt", "lf", "bk", "ft", "up", "dn"];
+
+    state.sky = Some(SkyParms {});
+
+    // outerbox
+    let (token, rest) = COM_ParseExt(qs, *text, false);
+    *text = rest;
+    if token.is_empty() {
+        com_printf(
+            view.common,
+            &format!(
+                "{}WARNING: 'skyParms' missing parameter in shader '{}'\n",
+                warn, state.name
+            ),
+        );
+        return;
+    }
+    if token != "-" {
+        // DEFERRED: `skyParms_t::outerbox[6]` storage — see doc comment
+        // above (`SkyParms` has no fields until the `tr_sky` wave).
+        // Source: oracle/codemp/renderer/tr_shader.cpp:2100-2116
+        for suf in SUF.iter() {
+            let pathname = format!("{}_{}", token, suf);
+            let _ = R_FindImageFile(
+                view,
+                cvars,
+                sim,
+                models,
+                img_state,
+                gpu,
+                Some(pathname.as_str()),
+                true,
+                true,
+                !state.no_tc,
+                GL_CLAMP,
+            );
+        }
+    }
+
+    // cloudheight
+    let (token, rest) = COM_ParseExt(qs, *text, false);
+    *text = rest;
+    if token.is_empty() {
+        com_printf(
+            view.common,
+            &format!(
+                "{}WARNING: 'skyParms' missing cloudheight in shader '{}'\n",
+                warn, state.name
+            ),
+        );
+        return;
+    }
+    let mut cloud_height = atof(&token) as f32;
+    if cloud_height == 0.0 {
+        cloud_height = 512.0;
+    }
+    R_InitSkyTexCoords(cloud_height, sky_view, sky);
+
+    // innerbox
+    let (token, rest) = COM_ParseExt(qs, *text, false);
+    *text = rest;
+    if token != "-" {
+        com_printf(
+            view.common,
+            &format!(
+                "{}WARNING: in shader '{}' 'skyParms', innerbox is not supported!",
+                warn, state.name
+            ),
+        );
+    }
+}
+
+/// Raven `ParseShader` — wave 6.
+///
+/// `#ifdef _XBOX shader.needsNormal = false; shader.needsTangent = false;`
+/// dropped — MP retail builds the non-`_XBOX` configuration (established
+/// file precedent).
+///
+/// The stage branch (`token[0] == '{'`) takes `&mut state.stages[s]` out of
+/// `state` via `mem::take` before calling `ParseStage`, which also wants the
+/// whole `state: &mut ShaderParseState` for its own reads/writes — the
+/// disjoint-borrow workaround any caller owning the stage inside the same
+/// `ShaderParseState` it passes alongside needs; the taken value is put back
+/// immediately after the call, `ShaderStageParse::default()` never observed
+/// outside that window.
+///
+/// DIVERGE (porting-rules §19): the oracle's `stages[MAX_SHADER_STAGES]` is
+/// a fixed array with no bounds check on `s` here — a 9th stage block is a
+/// silent OOB write (UB). `state.stages` is an owned `Vec`; the defined
+/// behavior picked is a warning + shader rejection, mirroring `ParseDeform`'s
+/// `MAX_SHADER_DEFORMS` guard already in this file.
+///
+/// `tr.sunLight[3]` and `tr.sunSurfaceLight` have no R2 carrier (`##
+/// State ownership` names `tr.sunDirection`'s home on `FrameState` but not
+/// these two) — their tokens are still consumed, in order, so the shared
+/// parser cursor stays correct; the parsed values themselves go nowhere
+/// (`sun`/`q3map_sun` and `surfacelight`/`q3map_surfacelight` arms below).
+/// `a`/`b` (the two angle tokens `sunDirection` is actually built from) are
+/// real locals: ruling 12 — `a = a/180*M_PI` and `b = b/180*M_PI` promote to
+/// `f64` for the divide/multiply (an unsuffixed `M_PI` double operand),
+/// truncating back to `f32` at the assignment (`a`/`b` are C `float`s); the
+/// `cos`/`sin` calls likewise promote their `float` argument to `double`.
+///
+/// `SkipRestOfLine` here resolves to the byte-cursor overload
+/// (`mp_qshared::shared::com_parse::SkipRestOfLine(qs, Option<&[u8]>) ->
+/// Option<&[u8]>`), not the `&str` overload the packet's call-surface table
+/// names (`q_string.rs`) — this file's `text` cursor is `Option<&[u8]>`
+/// throughout, and `com_parse`'s twin is the exact-signature match already
+/// established by `COM_ParseExt`/`SkipBracedSection` in this same module.
+///
+/// `continue` in the oracle's `while(1)` body is, with one exception,
+/// behaviorally identical to letting the enclosing `if`/`else if` arm finish
+/// (nothing follows the dispatch chain inside the loop) — transcribed as
+/// plain if/else-if fall-through, matching this file's `ParseStage`
+/// precedent. The exception is `fogParms`: its "missing parm" warning exits
+/// via `continue` *before* the trailing `depthForOpaque` assignment and
+/// `SkipRestOfLine` call still inside that arm, so that leg uses a real Rust
+/// `continue` to match.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:2300-2554`
+#[allow(clippy::too_many_arguments)]
+pub fn ParseShader<'a>(
+    text: &mut Option<&'a [u8]>,
+    qs: &mut QSharedScratch,
+    state: &mut ShaderParseState,
+    frame: &mut FrameState,
+    assets: &RenderAssets,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
+) -> bool {
+    let warn = S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII");
+    let mut s: usize = 0;
+
+    let (token, rest) = COM_ParseExt(qs, *text, true);
+    *text = rest;
+    // Faithful: the oracle tests `token[0]`, the first byte only — an empty
+    // token reads its NUL terminator, which is not `{`.
+    // Source: oracle/codemp/renderer/tr_shader.cpp:2313
+    if token.as_bytes().first() != Some(&b'{') {
+        com_printf(
+            view.common,
+            &format!(
+                "{}WARNING: expecting '{{', found '{}' instead in shader '{}'\n",
+                warn, token, state.name
+            ),
+        );
+        return false;
+    }
+
+    loop {
+        let (token, rest) = COM_ParseExt(qs, *text, true);
+        *text = rest;
+        if token.is_empty() {
+            com_printf(
+                view.common,
+                &format!(
+                    "{}WARNING: no concluding '}}' in shader {}\n",
+                    warn, state.name
+                ),
+            );
+            return false;
+        }
+
+        // end of shader definition
+        // Faithful: the oracle tests `token[0]`, the first byte only — an
+        // empty token reads its NUL terminator, which matches no brace.
+        // Source: oracle/codemp/renderer/tr_shader.cpp:2329
+        if token.as_bytes().first() == Some(&b'}') {
+            break;
+        }
+        // stage definition
+        // Source: oracle/codemp/renderer/tr_shader.cpp:2333
+        else if token.as_bytes().first() == Some(&b'{') {
+            if s >= MAX_SHADER_STAGES {
+                // DIVERGE (porting-rules §19) — see fn doc above.
+                com_printf(
+                    view.common,
+                    &format!(
+                        "{}WARNING: too many stages in shader '{}'\n",
+                        warn, state.name
+                    ),
+                );
+                return false;
+            }
+            let mut current_stage = mem::take(&mut state.stages[s]);
+            let ok = ParseStage(
+                &mut current_stage,
+                text,
+                qs,
+                state,
+                assets,
+                view,
+                cvars,
+                sim,
+                models,
+                img_state,
+                gpu,
+            );
+            state.stages[s] = current_stage;
+            if !ok {
+                return false;
+            }
+            state.stages[s].active = true;
+            // #ifndef _XBOX // GLOWXXX
+            if state.stages[s].glow {
+                state.has_glow = true;
+            }
+            s += 1;
+        }
+        // skip stuff that only the QuakeEdRadient needs
+        else if Q_stricmpn(&token, "qer", 3) == 0 {
+            *text = SkipRestOfLine(qs, *text);
+        }
+        // material deprecated as of 11 Jan 01
+        // material undeprecated as of 7 May 01 - q3map_material deprecated
+        else if token.eq_ignore_ascii_case("material")
+            || token.eq_ignore_ascii_case("q3map_material")
+        {
+            ParseMaterial(state, qs, text, view.common);
+        }
+        // sun parms
+        else if token.eq_ignore_ascii_case("sun") || token.eq_ignore_ascii_case("q3map_sun") {
+            // DEFERRED: `tr.sunLight[3]` — see fn doc above. Tokens still
+            // consumed to keep the cursor correct; values go nowhere.
+            let (_, rest) = COM_ParseExt(qs, *text, false); // sunLight[0]
+            *text = rest;
+            let (_, rest) = COM_ParseExt(qs, *text, false); // sunLight[1]
+            *text = rest;
+            let (_, rest) = COM_ParseExt(qs, *text, false); // sunLight[2]
+            *text = rest;
+            let (_, rest) = COM_ParseExt(qs, *text, false); // intensity
+            *text = rest;
+
+            let (token, rest) = COM_ParseExt(qs, *text, false);
+            *text = rest;
+            // ruling 12: `a/180*M_PI` promotes to `f64`, truncating back to
+            // `f32` at the assignment.
+            let mut a: f32 = atof(&token) as f32;
+            a = (a as f64 / 180.0 * PI) as f32;
+
+            let (token, rest) = COM_ParseExt(qs, *text, false);
+            *text = rest;
+            let mut b: f32 = atof(&token) as f32;
+            b = (b as f64 / 180.0 * PI) as f32;
+
+            frame.sun_direction[0] = ((a as f64).cos() * (b as f64).cos()) as f32;
+            frame.sun_direction[1] = ((a as f64).sin() * (b as f64).cos()) as f32;
+            frame.sun_direction[2] = (b as f64).sin() as f32;
+        }
+        // q3map_surfacelight deprecated as of 16 Jul 01
+        else if token.eq_ignore_ascii_case("surfacelight")
+            || token.eq_ignore_ascii_case("q3map_surfacelight")
+        {
+            // DEFERRED: `tr.sunSurfaceLight` — see fn doc above.
+            let (_, rest) = COM_ParseExt(qs, *text, false);
+            *text = rest;
+        } else if token.eq_ignore_ascii_case("lightColor") {
+            // SP skips this so I'm skipping it here too.
+            *text = SkipRestOfLine(qs, *text);
+        } else if token.eq_ignore_ascii_case("deformvertexes")
+            || token.eq_ignore_ascii_case("deform")
+        {
+            ParseDeform(state, qs, text, view.common);
+        } else if token.eq_ignore_ascii_case("tesssize") {
+            *text = SkipRestOfLine(qs, *text);
+        } else if token.eq_ignore_ascii_case("clampTime") {
+            let (token, rest) = COM_ParseExt(qs, *text, false);
+            *text = rest;
+            if !token.is_empty() {
+                state.clamp_time = atof(&token) as f32;
+            }
+        }
+        // skip stuff that only the q3map needs
+        else if Q_stricmpn(&token, "q3map", 5) == 0 {
+            *text = SkipRestOfLine(qs, *text);
+        }
+        // skip stuff that only q3map or the server needs
+        else if token.eq_ignore_ascii_case("surfaceParm") {
+            ParseSurfaceParm(state, qs, text);
+        }
+        // no mip maps
+        else if token.eq_ignore_ascii_case("nomipmaps") {
+            state.no_mip_maps = true;
+            state.no_pic_mip = true;
+        }
+        // no picmip adjustment
+        else if token.eq_ignore_ascii_case("nopicmip") {
+            state.no_pic_mip = true;
+        } else if token.eq_ignore_ascii_case("noglfog") {
+            state.fog_pass = FogPass::None;
+        }
+        // polygonOffset
+        else if token.eq_ignore_ascii_case("polygonOffset") {
+            state.polygon_offset = true;
+        } else if token.eq_ignore_ascii_case("noTC") {
+            state.no_tc = true;
+        }
+        // entityMergable, allowing sprite surfaces from multiple entities
+        // to be merged into one batch.  This is a savings for smoke
+        // puffs and blood, but can't be used for anything where the
+        // shader calcs (not the surface function) reference the entity color or scroll
+        else if token.eq_ignore_ascii_case("entityMergable") {
+            state.entity_mergable = true;
+        }
+        // fogParms
+        else if token.eq_ignore_ascii_case("fogParms") {
+            // `Hunk_Alloc(sizeof(fogParms_t), h_low)` dissolves — constructs
+            // the owned value directly instead (§C9, `ParseDeform`/
+            // `ParseStage` precedent elsewhere in this file).
+            state.fog_parms = Some(FogParms::default());
+            if !ParseVector(
+                qs,
+                text,
+                view.common,
+                &state.name,
+                3,
+                &mut state.fog_parms.as_mut().expect("just set above").color,
+            ) {
+                return false;
+            }
+
+            let (token, rest) = COM_ParseExt(qs, *text, false);
+            *text = rest;
+            if token.is_empty() {
+                com_printf(
+                    view.common,
+                    &format!(
+                        "{}WARNING: missing parm for 'fogParms' keyword in shader '{}'\n",
+                        warn, state.name
+                    ),
+                );
+                continue;
+            }
+            state
+                .fog_parms
+                .as_mut()
+                .expect("just set above")
+                .depth_for_opaque = atof(&token) as f32;
+
+            // skip any old gradient directions
+            *text = SkipRestOfLine(qs, *text);
+        }
+        // portal
+        else if token.eq_ignore_ascii_case("portal") {
+            state.sort = shaderSort_t::SS_PORTAL as i32 as f32;
+        }
+        // skyparms <cloudheight> <outerbox> <innerbox>
+        else if token.eq_ignore_ascii_case("skyparms") {
+            ParseSkyParms(
+                text, qs, state, view, cvars, sim, models, img_state, gpu, sky_view, sky,
+            );
+        }
+        // light <value> determines flaring in q3map, not needed here
+        else if token.eq_ignore_ascii_case("light") {
+            let (_, rest) = COM_ParseExt(qs, *text, false);
+            *text = rest;
+        }
+        // cull <face>
+        else if token.eq_ignore_ascii_case("cull") {
+            let (token, rest) = COM_ParseExt(qs, *text, false);
+            *text = rest;
+            if token.is_empty() {
+                com_printf(
+                    view.common,
+                    &format!(
+                        "{}WARNING: missing cull parms in shader '{}'\n",
+                        warn, state.name
+                    ),
+                );
+            } else if token.eq_ignore_ascii_case("none")
+                || token.eq_ignore_ascii_case("twosided")
+                || token.eq_ignore_ascii_case("disable")
+            {
+                state.cull_type = CullType::TwoSided;
+            } else if token.eq_ignore_ascii_case("back")
+                || token.eq_ignore_ascii_case("backside")
+                || token.eq_ignore_ascii_case("backsided")
+            {
+                state.cull_type = CullType::BackSided;
+            } else {
+                com_printf(
+                    view.common,
+                    &format!(
+                        "{}WARNING: invalid cull parm '{}' in shader '{}'\n",
+                        warn, token, state.name
+                    ),
+                );
+            }
+        }
+        // sort
+        else if token.eq_ignore_ascii_case("sort") {
+            ParseSort(state, qs, text, view.common);
+        } else {
+            com_printf(
+                view.common,
+                &format!(
+                    "{}WARNING: unknown general shader parameter '{}' in '{}'\n",
+                    warn, token, state.name
+                ),
+            );
+            return false;
+        }
+    }
+
+    //
+    // ignore shaders that don't have any stages, unless it is a sky or fog
+    //
+    if s == 0 && state.sky.is_none() && (state.content_flags & CONTENTS_FOG) == 0 {
+        return false;
+    }
+
+    state.explicitly_defined = true;
+
+    true
 }

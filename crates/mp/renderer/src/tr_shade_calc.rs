@@ -15,12 +15,13 @@ use mp_engine_qcommon::common::{com_error, com_printf, Common};
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::q_color::S_COLOR_YELLOW;
 use mp_qshared::shared::q_math::{
-    _DotProduct, _VectorMA, _VectorScale, _VectorSubtract, CrossProduct, VectorLengthSquared,
-    VectorNormalize,
+    _DotProduct, _VectorAdd, _VectorMA, _VectorScale, _VectorSubtract, CrossProduct, VectorClear,
+    VectorLengthSquared, VectorNormalize,
 };
 use mp_qshared::shared::vec3_t;
 use native_math::qmath::Q_rsqrt;
 
+use crate::render_state::frame_state::FrameState;
 use crate::render_state::placeholders::RefEntity;
 use crate::render_state::render_assets::RenderAssets;
 use crate::tr_image::R_FogFactor;
@@ -32,6 +33,7 @@ use crate::tr_local::tex_mod_info_t::texModInfo_t;
 use crate::tr_local::tex_mod_t::texMod_t;
 use crate::tr_local::wave_form_t::waveForm_t;
 use crate::tr_noise::{get_noise_time, NoiseState, R_NoiseGet4f};
+use crate::tr_surface::RB_AddQuadStampExt;
 
 // This wave threads `RenderAssets` (`## State ownership` row `tr` registries
 // SPLIT) and `RefEntity` (`crate::render_state::placeholders`, owned by the
@@ -1498,5 +1500,99 @@ pub fn RB_CalcWaveAlpha(
 
     for c in dst_colors.iter_mut() {
         c[3] = v as u8;
+    }
+}
+
+/// Raven `void DeformText( const char *text )`.
+///
+/// `tess.normal[0]` collapses to the single `normal0` vec3 param (only index
+/// 0 is ever read); `tess.xyz` collapses to the fixed `xyz` array — the
+/// oracle always reads exactly indices 0-3 (`for ( i = 0 ; i < 4 ; i++ )`),
+/// so a `[[f32; 4]; 4]`-shaped param carries the same invariant a
+/// bounds-check on a slice would, without needing one. `strlen` is `text.len()` (Latin-1
+/// byte-seam discipline, translation dictionary); the character loop walks
+/// `text.bytes()` directly — `ch &= 255` is a no-op once each element is
+/// already a `u8`.
+///
+/// DEFERRED: R4 — `tess.numIndexes = 0; tess.numVertexes = 0;` ("clear the
+/// shader indexes") has no R3 target: no `tess` carrier exists. `tess` is
+/// DISSOLVED into R4's tessellation/vertex-building pipeline with no
+/// replacement scratch carrier (R2 `## State ownership` row `tess`; packet
+/// STATE HOMES row `DeformText`), so there are no counters to zero here.
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:335-337`
+///
+/// Panics via `RB_AddQuadStampExt`'s loud stub until its owning wave lands.
+///
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:295-361`
+pub fn DeformText(text: &str, normal0: vec3_t, xyz: [[f32; 4]; 4], frame: &mut FrameState) {
+    let mut height: vec3_t = [0.0, 0.0, -1.0];
+    let mut width: vec3_t = [0.0; 3];
+    CrossProduct(normal0, height, &mut width);
+
+    // find the midpoint of the box
+    let mut mid: vec3_t = [0.0; 3];
+    VectorClear(&mut mid);
+    let mut bottom = 999999.0f32;
+    let mut top = -999999.0f32;
+    for vert in xyz.iter() {
+        let v3 = [vert[0], vert[1], vert[2]];
+        let mut next_mid = [0.0; 3];
+        _VectorAdd(v3, mid, &mut next_mid);
+        mid = next_mid;
+        if vert[2] < bottom {
+            bottom = vert[2];
+        }
+        if vert[2] > top {
+            top = vert[2];
+        }
+    }
+    let mut origin: vec3_t = [0.0; 3];
+    _VectorScale(mid, 0.25, &mut origin);
+
+    // determine the individual character size
+    height[0] = 0.0;
+    height[1] = 0.0;
+    height[2] = (top - bottom) * 0.5;
+
+    let mut scaled_width: vec3_t = [0.0; 3];
+    _VectorScale(width, height[2] * -0.75, &mut scaled_width);
+    width = scaled_width;
+
+    // determine the starting position
+    let len = text.len() as i32;
+    let mut ma_origin: vec3_t = [0.0; 3];
+    _VectorMA(origin, (len - 1) as f32, width, &mut ma_origin);
+    origin = ma_origin;
+
+    // clear the shader indexes
+    // PORT-NOTE: dropped — see fn doc comment (`tess` dissolution).
+
+    let color: [u8; 4] = [255, 255, 255, 255];
+
+    // draw each character
+    for ch in text.bytes() {
+        if ch != b' ' {
+            let row = ch >> 4;
+            let col = ch & 15;
+
+            let frow = row as f32 * 0.0625;
+            let fcol = col as f32 * 0.0625;
+            let size = 0.0625;
+
+            RB_AddQuadStampExt(
+                origin,
+                width,
+                height,
+                color,
+                fcol,
+                frow,
+                fcol + size,
+                frow + size,
+                frame,
+            );
+        }
+        let mut next_origin: vec3_t = [0.0; 3];
+        _VectorMA(origin, -2.0, width, &mut next_origin);
+        origin = next_origin;
     }
 }

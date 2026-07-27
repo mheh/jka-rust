@@ -22,10 +22,16 @@ use native_math::qmath::{MakeNormalVectors, VectorNormalize};
 use native_math::rng::{Rng, RAND_MAX};
 use native_string::atoi;
 
+use crate::gl_constants::GL_CLAMP;
 use crate::render_state::frame_state::FrameState;
+use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::render_assets::RenderAssets;
-use crate::tr_backend::SetViewportAndScissor;
+use crate::render_state::render_assets_sim::RenderAssetsSim;
+use crate::render_state::renderer_cvars::RendererCvars;
+use crate::tr_backend::{GL_Bind, SetViewportAndScissor};
+use crate::tr_image::{R_FindImageFile, TrImageState};
+use crate::tr_model::render_models::RenderModels;
 use crate::tr_shader::ParseVector;
 
 /// Raven `POINTCACHE_CELL_SIZE` — the weather point-cache cell edge length.
@@ -980,24 +986,51 @@ impl CWeatherParticleCloud {
     /// Raven declares `int VertexCount=4`; Rust has no default arguments, so
     /// every call site passes it explicitly. `rng` carries `mMass.Pick`'s
     /// msvcrt `rand()` stream, threaded rather than reached (porting-rules
-    /// §B4).
+    /// §B4). `view`/`cvars`/`sim`/`models`/`image_state`/`gpu` thread
+    /// `R_FindImageFile`/`GL_Bind`'s carriers (wave 4 / wave 0, resolved call
+    /// surface LAW) rather than reaching them.
     /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:902-945`
-    pub fn Initialize(&mut self, rng: &mut Rng, count: i32, texture_path: &str, vertex_count: i32) {
+    #[allow(clippy::too_many_arguments)]
+    pub fn Initialize(
+        &mut self,
+        rng: &mut Rng,
+        view: &mut EngineHostView,
+        cvars: &RendererCvars,
+        sim: &mut RenderAssetsSim,
+        models: &RenderModels,
+        image_state: &mut TrImageState,
+        gpu: &mut GpuResources,
+        count: i32,
+        texture_path: &str,
+        vertex_count: i32,
+    ) {
         self.Reset();
         debug_assert!(self.mParticleCount == 0 && self.mParticles.is_empty());
         debug_assert!(self.mImage.is_none());
 
         // Create The Image
         //------------------
-        // DEFERRED: `mImage = R_FindImageFile(texturePath, qfalse, qfalse,
-        // qfalse, GL_CLAMP)`, its `Com_Error(ERR_DROP, "CWeatherParticleCloud:
-        // Could not texture %s")` miss path, and the `GL_Bind(mImage)` that
-        // follows. The loading `R_FindImageFile` has no home in this crate yet
-        // (only `R_FindImageFile_NoLoad` landed, `tr_image.rs`), and `GL_Bind`
-        // is itself an already-DEFERRED R4 no-op (`tr_backend.rs`, DEC-37
-        // A13.2). `mImage` stays `None`; nothing below reads it.
-        // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:908-916
-        let _ = texture_path;
+        self.mImage = R_FindImageFile(
+            view,
+            cvars,
+            sim,
+            models,
+            image_state,
+            gpu,
+            Some(texture_path),
+            false,
+            false,
+            false,
+            GL_CLAMP,
+        );
+        if self.mImage.is_none() {
+            com_error(
+                errorParm_t::ERR_DROP,
+                format!("CWeatherParticleCloud: Could not texture {}", texture_path),
+            );
+        }
+
+        GL_Bind(gpu, self.mImage);
 
         // Create The Particles
         //----------------------
@@ -1522,11 +1555,20 @@ impl WorldEffectsState {
     /// default-constructs in place, then is filled through the returned
     /// reference) becomes a `CWeatherParticleCloud::new()` local pushed once
     /// its fields are written.
+    /// `cvars`/`sim`/`models`/`image_state`/`gpu` thread the carriers each
+    /// `CWeatherParticleCloud::Initialize` call needs (wave 5 reconciliation:
+    /// `R_FindImageFile`/`GL_Bind` are now real calls, not deferrals).
     /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1593-1986`
+    #[allow(clippy::too_many_arguments)]
     pub fn R_WorldEffectCommand(
         &mut self,
         qs: &mut QSharedScratch,
         host: &mut EngineHostView,
+        cvars: &RendererCvars,
+        sim: &mut RenderAssetsSim,
+        models: &RenderModels,
+        image_state: &mut TrImageState,
+        gpu: &mut GpuResources,
         command: Option<&[u8]>,
     ) {
         if command.is_none() {
@@ -1633,7 +1675,18 @@ impl WorldEffectsState {
                 return;
             }
             let mut n_cloud = CWeatherParticleCloud::new();
-            n_cloud.Initialize(&mut self.rng, 500, "gfx/world/rain.jpg", 3);
+            n_cloud.Initialize(
+                &mut self.rng,
+                host,
+                cvars,
+                sim,
+                models,
+                image_state,
+                gpu,
+                500,
+                "gfx/world/rain.jpg",
+                3,
+            );
             n_cloud.mHeight = 80.0;
             n_cloud.mWidth = 1.2;
             n_cloud.mGravity = 2000.0;
@@ -1652,7 +1705,18 @@ impl WorldEffectsState {
                 return;
             }
             let mut n_cloud = CWeatherParticleCloud::new();
-            n_cloud.Initialize(&mut self.rng, 1000, "gfx/world/rain.jpg", 3);
+            n_cloud.Initialize(
+                &mut self.rng,
+                host,
+                cvars,
+                sim,
+                models,
+                image_state,
+                gpu,
+                1000,
+                "gfx/world/rain.jpg",
+                3,
+            );
             n_cloud.mHeight = 80.0;
             n_cloud.mWidth = 1.2;
             n_cloud.mGravity = 2000.0;
@@ -1671,7 +1735,18 @@ impl WorldEffectsState {
                 return;
             }
             let mut n_cloud = CWeatherParticleCloud::new();
-            n_cloud.Initialize(&mut self.rng, 1000, "gfx/world/rain.jpg", 3);
+            n_cloud.Initialize(
+                &mut self.rng,
+                host,
+                cvars,
+                sim,
+                models,
+                image_state,
+                gpu,
+                1000,
+                "gfx/world/rain.jpg",
+                3,
+            );
             n_cloud.mHeight = 80.0;
             n_cloud.mWidth = 2.0;
             n_cloud.mGravity = 2000.0;
@@ -1697,7 +1772,18 @@ impl WorldEffectsState {
                 return;
             }
             let mut n_cloud = CWeatherParticleCloud::new();
-            n_cloud.Initialize(&mut self.rng, 1000, "gfx/world/rain.jpg", 3);
+            n_cloud.Initialize(
+                &mut self.rng,
+                host,
+                cvars,
+                sim,
+                models,
+                image_state,
+                gpu,
+                1000,
+                "gfx/world/rain.jpg",
+                3,
+            );
             n_cloud.mHeight = 80.0;
             n_cloud.mWidth = 1.2;
             n_cloud.mGravity = 2800.0;
@@ -1719,7 +1805,18 @@ impl WorldEffectsState {
             // The PC `#else` arm: `Initialize(1000, …)` takes Raven's default
             // `VertexCount=4` (the `_XBOX` arm's `1` and its `mWidth = 0.05f`
             // are not this build).
-            n_cloud.Initialize(&mut self.rng, 1000, "gfx/effects/snowflake1.bmp", 4);
+            n_cloud.Initialize(
+                &mut self.rng,
+                host,
+                cvars,
+                sim,
+                models,
+                image_state,
+                gpu,
+                1000,
+                "gfx/effects/snowflake1.bmp",
+                4,
+            );
             n_cloud.mBlendMode = 1;
             n_cloud.mRotationChangeNext = 0;
             n_cloud.mColor = [0.75; 4];
@@ -1738,7 +1835,18 @@ impl WorldEffectsState {
             let count = atoi(&count_token);
 
             let mut n_cloud = CWeatherParticleCloud::new();
-            n_cloud.Initialize(&mut self.rng, count, "gfx/effects/snowpuff1.tga", 4);
+            n_cloud.Initialize(
+                &mut self.rng,
+                host,
+                cvars,
+                sim,
+                models,
+                image_state,
+                gpu,
+                count,
+                "gfx/effects/snowpuff1.tga",
+                4,
+            );
             n_cloud.mHeight = 1.2;
             n_cloud.mWidth = 1.2;
             n_cloud.mGravity = 0.0;
@@ -1763,7 +1871,18 @@ impl WorldEffectsState {
                 return;
             }
             let mut n_cloud = CWeatherParticleCloud::new();
-            n_cloud.Initialize(&mut self.rng, 400, "gfx/effects/alpha_smoke2b.tga", 4);
+            n_cloud.Initialize(
+                &mut self.rng,
+                host,
+                cvars,
+                sim,
+                models,
+                image_state,
+                gpu,
+                400,
+                "gfx/effects/alpha_smoke2b.tga",
+                4,
+            );
 
             n_cloud.mGravity = 0.0;
             n_cloud.mWidth = 70.0;
@@ -1788,7 +1907,18 @@ impl WorldEffectsState {
                 return;
             }
             let mut n_cloud = CWeatherParticleCloud::new();
-            n_cloud.Initialize(&mut self.rng, 60, "gfx/effects/alpha_smoke2b.tga", 4);
+            n_cloud.Initialize(
+                &mut self.rng,
+                host,
+                cvars,
+                sim,
+                models,
+                image_state,
+                gpu,
+                60,
+                "gfx/effects/alpha_smoke2b.tga",
+                4,
+            );
             n_cloud.mBlendMode = 1;
             n_cloud.mGravity = 0.0;
             n_cloud.mWidth = 70.0;
@@ -1810,7 +1940,18 @@ impl WorldEffectsState {
                 return;
             }
             let mut n_cloud = CWeatherParticleCloud::new();
-            n_cloud.Initialize(&mut self.rng, 70, "gfx/effects/alpha_smoke2b.tga", 4);
+            n_cloud.Initialize(
+                &mut self.rng,
+                host,
+                cvars,
+                sim,
+                models,
+                image_state,
+                gpu,
+                70,
+                "gfx/effects/alpha_smoke2b.tga",
+                4,
+            );
             n_cloud.mBlendMode = 1;
             n_cloud.mGravity = 0.0;
             n_cloud.mWidth = 100.0;
@@ -1835,7 +1976,18 @@ impl WorldEffectsState {
                 return;
             }
             let mut n_cloud = CWeatherParticleCloud::new();
-            n_cloud.Initialize(&mut self.rng, 40, "gfx/effects/alpha_smoke2b.tga", 4);
+            n_cloud.Initialize(
+                &mut self.rng,
+                host,
+                cvars,
+                sim,
+                models,
+                image_state,
+                gpu,
+                40,
+                "gfx/effects/alpha_smoke2b.tga",
+                4,
+            );
             n_cloud.mBlendMode = 1;
             n_cloud.mGravity = 0.0;
             n_cloud.mWidth = 100.0;
@@ -1915,15 +2067,32 @@ pub fn R_ShutdownWorldEffects(state: &mut WorldEffectsState, host: &mut EngineHo
 /// (`host.common` supplies `Cvar_VariableIntegerValue`'s `Common`).
 ///
 /// Raven's `char temp[2048]` scratch is [`Cmd_ArgsBuffer`]'s owned return; its
-/// `sizeof(temp)` becomes the `buffer_length` cap.
+/// `sizeof(temp)` becomes the `buffer_length` cap. `cvars`/`sim`/`models`/
+/// `image_state`/`gpu` thread `R_WorldEffectCommand`'s own added carriers
+/// through (wave 5 reconciliation), matching its signature.
 /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1583-1591`
+#[allow(clippy::too_many_arguments)]
 pub fn R_WorldEffect_f(
     state: &mut WorldEffectsState,
     qs: &mut QSharedScratch,
     host: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    image_state: &mut TrImageState,
+    gpu: &mut GpuResources,
 ) {
     if Cvar_VariableIntegerValue(host.common, "sv_cheats") != 0 {
         let temp = Cmd_ArgsBuffer(host.common, 2048);
-        state.R_WorldEffectCommand(qs, host, Some(temp.as_bytes()));
+        state.R_WorldEffectCommand(
+            qs,
+            host,
+            cvars,
+            sim,
+            models,
+            image_state,
+            gpu,
+            Some(temp.as_bytes()),
+        );
     }
 }

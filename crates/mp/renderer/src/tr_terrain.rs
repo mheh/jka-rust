@@ -69,6 +69,7 @@ use crate::tr_local::surface_type_t::surfaceType_t;
 use crate::tr_local::tr_refdef_t::trRefdef_t;
 use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_main::{DrawSurf, R_AddDrawSurf, SurfaceGeometry};
+use crate::tr_surface::RB_CheckOverflow;
 
 /// Raven `HEIGHT_RESOLUTION` — the size of `CTRLandScape::mHeightDetails[]`.
 /// Already defined (module-private) in
@@ -166,6 +167,110 @@ impl CTRPatch {
         } else {
             self.misVisible = true;
         }
+    }
+
+    /// Raven `CTRPatch::RecurseRender` — recursively subdivides a
+    /// right-triangle span of the patch (`left`/`right`/`apex`) down to leaf
+    /// triangles, emitting one leaf triangle per bottomed-out recursion.
+    ///
+    /// `ivec5_t` (`int[5]`: xy grid indices in `[0]`/`[1]`, four packed alpha
+    /// bytes reinterpreted through `[2]`, the vert index in `[3]`, the
+    /// tessellation-registration flag in `[4]`) has no existing alias in this
+    /// crate — represented inline as `[i32; 5]`, matching this file's own
+    /// `vec3_t = [f32; 3]` treatment of other oracle fixed-size arrays.
+    ///
+    /// Raven reinterprets `&left[2]`/`&right[2]`/`&center[2]` as `byte*` to
+    /// average the four packed alpha bytes in place; transcribed via
+    /// `to_ne_bytes`/`from_ne_bytes` (native-endian, matching the host-order
+    /// pointer aliasing Raven relies on) rather than a raw pointer
+    /// reinterpret cast, which the interior-safety law forbids.
+    ///
+    /// `RB_CheckOverflow`'s ported signature threads `&mut FrameState`
+    /// (§B4) in place of the `tess`-adjacent globals it reads.
+    ///
+    /// Panics via `RB_CheckOverflow`'s loud stub until its owning wave lands
+    /// — that callee is still a `todo!()` in `tr_surface.rs` for the `tess`
+    /// gap its own doc names. The subdivision/alpha-averaging logic above it
+    /// has no `tess` dependency and is transcribed in full.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_terrain.cpp:58-114`
+    pub fn RecurseRender(
+        &self,
+        mut depth: i32,
+        left: [i32; 5],
+        right: [i32; 5],
+        apex: [i32; 5],
+        frame: &mut FrameState,
+    ) {
+        // All non-leaf nodes have both children, so just check for one
+        if depth >= 0 {
+            let mut center: [i32; 5] = [0; 5];
+
+            // Work out the centre of the hypoteneuse
+            center[0] = (left[0] + right[0]) >> 1;
+            center[1] = (left[1] + right[1]) >> 1;
+
+            // Work out the relevant texture coefficients at that point
+            let left_alphas = left[2].to_ne_bytes();
+            let right_alphas = right[2].to_ne_bytes();
+            let mut center_alphas = [0u8; 4];
+
+            center_alphas[0] = ((left_alphas[0] as i32 + right_alphas[0] as i32) >> 1) as u8;
+            center_alphas[1] = ((left_alphas[1] as i32 + right_alphas[1] as i32) >> 1) as u8;
+            center_alphas[2] = ((left_alphas[2] as i32 + right_alphas[2] as i32) >> 1) as u8;
+            center_alphas[3] = ((left_alphas[3] as i32 + right_alphas[3] as i32) >> 1) as u8;
+            center[2] = i32::from_ne_bytes(center_alphas);
+
+            // Make sure the vert index and tesselation registration are not set
+            center[3] = -1;
+            center[4] = 0;
+
+            if apex[0] == left[0] && apex[0] == center[0] {
+                depth = 0;
+            }
+
+            self.RecurseRender(depth - 1, apex, left, center, frame);
+            self.RecurseRender(depth - 1, right, apex, center, frame);
+        } else {
+            if left[0] == right[0] && left[0] == apex[0] {
+                return;
+            }
+            if left[1] == right[1] && left[1] == apex[1] {
+                return;
+            }
+            // A leaf node!  Output a triangle to be rendered.
+            RB_CheckOverflow(4, 4, frame);
+
+            // assert(left[0] != right[0] || left[1] != right[1]);
+            // assert(left[0] != apex[0] || left[1] != apex[1]);
+
+            // DEFERRED: R4 — `RenderCorner` writes only into the DISSOLVED
+            // `tess` global (R2 `## State ownership` row `tess`); its
+            // Rust body is deliberately unwritten (this file's `RenderCorner`
+            // note above), so these three calls have no target to invoke.
+            // The `RB_CheckOverflow(4, 4)` call above is transcribed as-is;
+            // it panics through that fn's own loud `todo!()` stub
+            // (`tr_surface.rs`) until the `tess` wave lands it.
+            // Source: oracle/codemp/renderer/tr_terrain.cpp:110-112
+            let _ = (left, right, apex);
+        }
+    }
+
+    /// Raven `CTRPatch::RenderWater` — emits the two triangles covering this
+    /// patch's water surface.
+    // DEFERRED: R4 — `RenderWaterVert` (this file's `RenderWaterVert`
+    // DEFERRED note above) has no Rust body to call, and the four
+    // TL/TR/BL/BR indexes it would return feed directly into the
+    // `tess.indexes` writes, DISSOLVED (R2 `## State ownership` row `tess`).
+    // No CPU logic survives independent of either blocker, so this lands as
+    // a whole-fn loud `todo!()`. The leading `RB_CheckOverflow(4, 6)`
+    // (`oracle/codemp/renderer/tr_terrain.cpp:186`) is NOT transcribed ahead
+    // of it: a call whose only successor is an unconditional panic is dead,
+    // and it re-lands with the real body when this fn's wave writes it.
+    // Source: `oracle/codemp/renderer/tr_terrain.cpp:184-203`
+    pub fn RenderWater(&self, frame: &mut FrameState) {
+        let _ = frame;
+        todo!("Port CTRPatch::RenderWater — oracle/codemp/renderer/tr_terrain.cpp:189-202")
     }
 }
 
