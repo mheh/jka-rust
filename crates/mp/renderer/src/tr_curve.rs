@@ -1,3 +1,388 @@
 //! Raven `tr_curve.cpp` logic (R3 frontend port).
 //!
 //! Source: `oracle/codemp/renderer/tr_curve.cpp`
+
+// Raven-named functions/types keep their original casing across this
+// transcription, matching the rest of the renderer/engine crates.
+#![allow(non_snake_case)]
+
+use mp_engine_qcommon::qfiles::draw_vert_t::{drawVert_t, MAXLIGHTMAPS};
+use mp_qshared::shared::q_math::{
+    _VectorAdd, _VectorScale, _VectorSubtract, CrossProduct, VectorClear, VectorLength,
+    VectorLengthSquared, VectorNormalize2,
+};
+use mp_qshared::shared::vec3_t;
+// PORT-NOTE: `native_math` is not yet a direct `mp_renderer` dependency
+// (Cargo.toml wiring gap) — `AddPointToBounds`/`ClearBoundsMP` are LAW-cited
+// at `crates/native/math/src/qmath.rs` and have no re-export reachable from
+// this crate today. Flagged for the integrate phase to add the dependency
+// edge; the call sites below are otherwise final.
+use native_math::qmath::{AddPointToBounds, ClearBoundsMP};
+
+use crate::tr_local::surface_type_t::surfaceType_t;
+
+/// Raven `MAX_GRID_SIZE` — the bezier-patch control-grid bound.
+///
+/// Source: `oracle/codemp/renderer/tr_local.h` (`#define MAX_GRID_SIZE 65`,
+/// cited by this packet's `R_CreateSurfaceGridMesh`/`InvertErrorTable`
+/// oracle signatures, `ctrl[65][65]`/`errorTable[2][65]`).
+pub const MAX_GRID_SIZE: usize = 65;
+
+/// A fixed `MAX_GRID_SIZE`x`MAX_GRID_SIZE` bezier control-point buffer —
+/// Raven's `drawVert_t ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE]` out-param shape,
+/// kept as a fixed array (not `Vec`) since every caller in this file passes
+/// the same full-size stack buffer and only `width`/`height` bound the
+/// active region.
+pub type ControlGrid = [[drawVert_t; MAX_GRID_SIZE]; MAX_GRID_SIZE];
+
+/// Raven's `float errorTable[2][MAX_GRID_SIZE]`.
+pub type ErrorTable = [[f32; MAX_GRID_SIZE]; 2];
+
+/// Owned replacement for the tier-2 `srfGridMesh_t`
+/// (`crates/mp/renderer/src/tr_local/srf_grid_mesh_s.rs`) — a bezier-patch
+/// tessellated surface. Named by this wave (DEC-37 A13.3): the R2 tier-2
+/// transition audit assigns `srfGridMesh_t`'s pointer fields
+/// (`widthLodError`/`heightLodError: *mut f32`, `verts: [drawVert_t; 1]`
+/// C flexible-array) to owned `Vec` forms "as each subsystem's logic
+/// lands" — `tr_curve.cpp` (this file) is the bezier-patch tessellation
+/// subsystem that owns that transition.
+///
+/// Source: `oracle/codemp/renderer/tr_local.h:750-774`
+/// (`renderer-r2-design.md` `### Tier-2 transition audit`, Group 1 —
+/// `srfGridMesh_t` row)
+pub struct GridMesh {
+    pub surface_type: surfaceType_t,
+    pub dlight_bits: i32,
+    pub mesh_bounds: [vec3_t; 2],
+    pub local_origin: vec3_t,
+    pub mesh_radius: f32,
+    pub lod_origin: vec3_t,
+    pub lod_radius: f32,
+    pub lod_fixed: i32,
+    pub lod_stitched: i32,
+    pub width: i32,
+    pub height: i32,
+    pub width_lod_error: Vec<f32>,
+    pub height_lod_error: Vec<f32>,
+    pub verts: Vec<drawVert_t>,
+}
+
+/// `drawVert_t` (`crates/mp/engine/qcommon/src/qfiles/draw_vert_t.rs`) is
+/// `#[repr(C)]` without a `Copy`/`Clone` derive (out of this wave's scope —
+/// a tier-1 ABI-adjacent file). Every field is itself `Copy`, so a
+/// field-wise read stands in for Raven's `temp = ctrl[j][i];` whole-struct
+/// value copies used throughout this file.
+fn copy_draw_vert(v: &drawVert_t) -> drawVert_t {
+    drawVert_t {
+        xyz: v.xyz,
+        st: v.st,
+        lightmap: v.lightmap,
+        normal: v.normal,
+        color: v.color,
+    }
+}
+
+/// A zero-valued `drawVert_t` — see `copy_draw_vert` for why this file
+/// cannot derive `Default`.
+fn zero_draw_vert() -> drawVert_t {
+    drawVert_t {
+        xyz: [0.0; 3],
+        st: [0.0; 2],
+        lightmap: [[0.0; 2]; MAXLIGHTMAPS],
+        normal: [0.0; 3],
+        color: [[0; 4]; MAXLIGHTMAPS],
+    }
+}
+
+/// Raven `LerpDrawVert`.
+///
+/// Source: `oracle/codemp/renderer/tr_curve.cpp:27-52`
+pub fn LerpDrawVert(a: &drawVert_t, b: &drawVert_t) -> drawVert_t {
+    let mut out = zero_draw_vert();
+
+    out.xyz[0] = 0.5 * (a.xyz[0] + b.xyz[0]);
+    out.xyz[1] = 0.5 * (a.xyz[1] + b.xyz[1]);
+    out.xyz[2] = 0.5 * (a.xyz[2] + b.xyz[2]);
+
+    out.st[0] = 0.5 * (a.st[0] + b.st[0]);
+    out.st[1] = 0.5 * (a.st[1] + b.st[1]);
+
+    out.normal[0] = 0.5 * (a.normal[0] + b.normal[0]);
+    out.normal[1] = 0.5 * (a.normal[1] + b.normal[1]);
+    out.normal[2] = 0.5 * (a.normal[2] + b.normal[2]);
+
+    for k in 0..MAXLIGHTMAPS {
+        out.lightmap[k][0] = 0.5 * (a.lightmap[k][0] + b.lightmap[k][0]);
+        out.lightmap[k][1] = 0.5 * (a.lightmap[k][1] + b.lightmap[k][1]);
+
+        // Raven's `>>` operates on ints after C integer promotion of the
+        // `u8` operands; widen to u16 before the add so the shift matches.
+        out.color[k][0] = ((a.color[k][0] as u16 + b.color[k][0] as u16) >> 1) as u8;
+        out.color[k][1] = ((a.color[k][1] as u16 + b.color[k][1] as u16) >> 1) as u8;
+        out.color[k][2] = ((a.color[k][2] as u16 + b.color[k][2] as u16) >> 1) as u8;
+        out.color[k][3] = ((a.color[k][3] as u16 + b.color[k][3] as u16) >> 1) as u8;
+    }
+
+    out
+}
+
+/// Raven `Transpose`.
+///
+/// Source: `oracle/codemp/renderer/tr_curve.cpp:59-93`
+pub fn Transpose(width: usize, height: usize, ctrl: &mut ControlGrid) {
+    if width > height {
+        for i in 0..height {
+            for j in (i + 1)..width {
+                if j < height {
+                    // swap the value
+                    let temp = copy_draw_vert(&ctrl[j][i]);
+                    ctrl[j][i] = copy_draw_vert(&ctrl[i][j]);
+                    ctrl[i][j] = temp;
+                } else {
+                    // just copy
+                    ctrl[j][i] = copy_draw_vert(&ctrl[i][j]);
+                }
+            }
+        }
+    } else {
+        for i in 0..width {
+            for j in (i + 1)..height {
+                if j < width {
+                    // swap the value
+                    let temp = copy_draw_vert(&ctrl[i][j]);
+                    ctrl[i][j] = copy_draw_vert(&ctrl[j][i]);
+                    ctrl[j][i] = temp;
+                } else {
+                    // just copy
+                    ctrl[i][j] = copy_draw_vert(&ctrl[j][i]);
+                }
+            }
+        }
+    }
+}
+
+/// Raven `neighbors[8][2]` — the bezier-mesh normal-averaging offset table
+/// (fn-scope `static` in the oracle; const-table kind per the three-kind
+/// rule, so it becomes a plain `const`, no carrier).
+///
+/// Source: `oracle/codemp/renderer/tr_curve.cpp:116-118`
+const NEIGHBORS: [[i32; 2]; 8] = [
+    [0, 1],
+    [1, 1],
+    [1, 0],
+    [1, -1],
+    [0, -1],
+    [-1, -1],
+    [-1, 0],
+    [-1, 1],
+];
+
+/// Raven `MakeMeshNormals`.
+///
+/// Source: `oracle/codemp/renderer/tr_curve.cpp:103-205`
+#[allow(unused_assignments)]
+pub fn MakeMeshNormals(width: usize, height: usize, ctrl: &mut ControlGrid) {
+    // Raven's `for (i=0;i<height;i++){...break;} if (i==height) wrapWidth=qtrue;`
+    // reads the loop counter after the loop to detect "ran to completion
+    // without breaking"; tracked directly here instead (porting-rules C10).
+    let mut wrap_width = false;
+    let mut broke = false;
+    for i in 0..height {
+        let mut delta: vec3_t = [0.0; 3];
+        _VectorSubtract(ctrl[i][0].xyz, ctrl[i][width - 1].xyz, &mut delta);
+        let len = VectorLengthSquared(delta);
+        if len > 1.0 {
+            broke = true;
+            break;
+        }
+    }
+    if !broke {
+        wrap_width = true;
+    }
+
+    let mut wrap_height = false;
+    let mut broke = false;
+    for i in 0..width {
+        let mut delta: vec3_t = [0.0; 3];
+        _VectorSubtract(ctrl[0][i].xyz, ctrl[height - 1][i].xyz, &mut delta);
+        let len = VectorLengthSquared(delta);
+        if len > 1.0 {
+            broke = true;
+            break;
+        }
+    }
+    if !broke {
+        wrap_height = true;
+    }
+
+    for i in 0..width {
+        for j in 0..height {
+            let mut count = 0i32;
+            let base: vec3_t = ctrl[j][i].xyz;
+            let mut around = [[0.0f32; 3]; 8];
+            let mut good = [false; 8];
+
+            for k in 0..8usize {
+                VectorClear(&mut around[k]);
+                good[k] = false;
+
+                for dist in 1..=3i32 {
+                    let mut x = i as i32 + NEIGHBORS[k][0] * dist;
+                    let mut y = j as i32 + NEIGHBORS[k][1] * dist;
+                    if wrap_width {
+                        if x < 0 {
+                            x = width as i32 - 1 + x;
+                        } else if x >= width as i32 {
+                            x = 1 + x - width as i32;
+                        }
+                    }
+                    if wrap_height {
+                        if y < 0 {
+                            y = height as i32 - 1 + y;
+                        } else if y >= height as i32 {
+                            y = 1 + y - height as i32;
+                        }
+                    }
+
+                    if x < 0 || x >= width as i32 || y < 0 || y >= height as i32 {
+                        break; // edge of patch
+                    }
+                    let mut temp: vec3_t = [0.0; 3];
+                    _VectorSubtract(ctrl[y as usize][x as usize].xyz, base, &mut temp);
+                    if VectorNormalize2(temp, &mut temp) == 0.0 {
+                        continue; // degenerate edge, get more dist
+                    } else {
+                        good[k] = true;
+                        around[k] = temp;
+                        break; // good edge
+                    }
+                }
+            }
+
+            let mut sum: vec3_t = [0.0; 3];
+            VectorClear(&mut sum);
+            for k in 0..8usize {
+                if !good[k] || !good[(k + 1) & 7] {
+                    continue; // didn't get two points
+                }
+                let mut normal: vec3_t = [0.0; 3];
+                CrossProduct(around[(k + 1) & 7], around[k], &mut normal);
+                if VectorNormalize2(normal, &mut normal) == 0.0 {
+                    continue;
+                }
+                _VectorAdd(normal, sum, &mut sum);
+                count += 1;
+            }
+            if count == 0 {
+                // Raven: //printf("bad normal\n");
+                count = 1;
+            }
+            VectorNormalize2(sum, &mut ctrl[j][i].normal);
+        }
+    }
+}
+
+/// Raven `InvertCtrl`.
+///
+/// Source: `oracle/codemp/renderer/tr_curve.cpp:212-223`
+pub fn InvertCtrl(width: usize, height: usize, ctrl: &mut ControlGrid) {
+    for i in 0..height {
+        for j in 0..(width / 2) {
+            let temp = copy_draw_vert(&ctrl[i][j]);
+            ctrl[i][j] = copy_draw_vert(&ctrl[i][width - 1 - j]);
+            ctrl[i][width - 1 - j] = temp;
+        }
+    }
+}
+
+/// Raven `InvertErrorTable`.
+///
+/// Source: `oracle/codemp/renderer/tr_curve.cpp:230-244`
+pub fn InvertErrorTable(error_table: &mut ErrorTable, width: usize, height: usize) {
+    // Raven: `Com_Memcpy(copy, errorTable, sizeof(copy));` — a fixed-size
+    // `f32` array is `Copy`, so the stack-buffer duplication is a plain
+    // value copy (porting-rules C9: manual copy collapses into ownership).
+    let copy = *error_table;
+
+    for i in 0..width {
+        error_table[1][i] = copy[0][i]; //[width-1-i];
+    }
+
+    for i in 0..height {
+        error_table[0][i] = copy[1][height - 1 - i];
+    }
+}
+
+/// Raven `R_CreateSurfaceGridMesh`.
+///
+/// Source: `oracle/codemp/renderer/tr_curve.cpp:279-331`
+// PORT-NOTE: the oracle's `#ifdef PATCH_STITCHING`/`#else` branches both
+// size one heap block (`Z_Malloc`/`Hunk_Alloc`), `Com_Memset` it, then fill
+// `widthLodError`/`heightLodError` with a second/third allocation each.
+// `GridMesh`'s owned `Vec` fields replace all of that manual sizing/zeroing
+// (porting-rules C9) — no `Z_Malloc`/`Hunk_Alloc`/`Com_Memset`/`memtag_t`
+// call is needed; the struct is built directly from Rust values.
+pub fn R_CreateSurfaceGridMesh(
+    width: usize,
+    height: usize,
+    ctrl: &ControlGrid,
+    error_table: &ErrorTable,
+) -> GridMesh {
+    let width_lod_error = error_table[0][..width].to_vec();
+    let height_lod_error = error_table[1][..height].to_vec();
+
+    let mut mins: vec3_t = [0.0; 3];
+    let mut maxs: vec3_t = [0.0; 3];
+    // PORT-NOTE: the packet flags `ClearBounds` as unresolved (MP/SP fork
+    // ambiguity) — `crates/mp/renderer` is the MP crate, so the MP fork
+    // (`ClearBoundsMP`, `crates/native/math/src/qmath.rs`) is the matching
+    // pick, mirroring the established `ClearBoundsMP as ClearBounds`
+    // pattern already used by `mp_game`'s `q_math` module.
+    ClearBoundsMP(&mut mins, &mut maxs);
+
+    let mut verts: Vec<drawVert_t> = (0..width * height).map(|_| zero_draw_vert()).collect();
+    for i in 0..width {
+        for j in 0..height {
+            let vert = copy_draw_vert(&ctrl[j][i]);
+            AddPointToBounds(vert.xyz, &mut mins, &mut maxs);
+            verts[j * width + i] = vert;
+        }
+    }
+
+    // compute local origin and bounds
+    let mut local_origin: vec3_t = [0.0; 3];
+    _VectorAdd(mins, maxs, &mut local_origin);
+    _VectorScale(local_origin, 0.5, &mut local_origin);
+    let mut tmp_vec: vec3_t = [0.0; 3];
+    _VectorSubtract(mins, local_origin, &mut tmp_vec);
+    let mesh_radius = VectorLength(tmp_vec);
+
+    GridMesh {
+        surface_type: surfaceType_t::SF_GRID,
+        dlight_bits: 0,
+        mesh_bounds: [mins, maxs],
+        local_origin,
+        mesh_radius,
+        lod_origin: local_origin,
+        lod_radius: mesh_radius,
+        lod_fixed: 0,
+        lod_stitched: 0,
+        width: width as i32,
+        height: height as i32,
+        width_lod_error,
+        height_lod_error,
+        verts,
+    }
+}
+
+/// Raven `R_FreeSurfaceGridMesh`.
+///
+/// Source: `oracle/codemp/renderer/tr_curve.cpp:338-342`
+// PORT-NOTE: Raven explicitly `Z_Free`s `widthLodError`, `heightLodError`,
+// and `grid` itself — three heap blocks under the old Hunk/Zone model.
+// `GridMesh`'s `Vec`/owned fields hold that storage (porting-rules C9);
+// dropping the value frees it, so consuming `grid` by value replaces the
+// three explicit frees.
+pub fn R_FreeSurfaceGridMesh(grid: GridMesh) {
+    drop(grid);
+}

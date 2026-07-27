@@ -11,6 +11,7 @@ use mp_engine_qcommon::qfiles::draw_vert_t::MAXLIGHTMAPS;
 // in the original source.
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:970-977`
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct mgrid_t {
     pub ambientLight: [[u8; 3]; MAXLIGHTMAPS],
     pub directLight: [[u8; 3]; MAXLIGHTMAPS],

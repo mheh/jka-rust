@@ -10,11 +10,27 @@ name = "mp_renderer"
 mp_qshared = { path = "../qshared" }
 mp_engine_qcommon = { path = "../engine/qcommon" }
 native_platform = { path = "../../native/platform" }
+# `tr_shade_calc`'s resolved call surface LAWs `Q_rsqrt` directly
+# (`crates/native/math/src/qmath.rs`); mp_qshared re-exports the vec3
+# primitives from this same crate but not `Q_rsqrt` itself.
+native_math = { path = "../../native/math" }
+# `tr_terrain`'s `RE_*Terrain` seam takes Raven `thandle_t`, whose canonical
+# home is `native_types` (`mp_engine_qcommon` consumes it from there too).
+native_types = { path = "../../native/types" }
+# `tr_shader`'s numeric shader-token parsing is Raven `atof`; the canonical
+# native-libc `atof` lives in `native_string` (DEC-32 one-home).
+native_string = { path = "../../native/string" }
 # tr_model's server_load/cached_model_binary methods take `host: &mut impl
 # EngineHost`; EngineHost is frozen in mp_host_interface. Edge authorized by the
 # ruling-56c blanket §F-consumer authorization (TRM-D1(c)) — acyclic since
 # mp_host_interface deps only mp_qshared.
 mp_host_interface = { path = "../host-interface" }
+# USER RULING (DEC-32 one-home): `tr_ghoul2`'s bone-evaluation surface
+# (`CBoneCache`/`SBoneCalc`/`CTransformBone`/`CGhoul2Info`/`Multiply_3x4Matrix`
+# and friends) is canonically ported in `mp_engine_ghoul2`'s `render/` module
+# (DEC-35); this crate consumes it instead of re-porting it. Acyclic:
+# mp_engine_ghoul2 deps only mp_qshared + mp_host_interface.
+mp_engine_ghoul2 = { path = "../engine/ghoul2" }
 
 [dev-dependencies]
 testkit = { path = "../../testkit" }

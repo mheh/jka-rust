@@ -316,10 +316,14 @@ dependencies = [
 name = "mp_renderer"
 version = "0.1.0"
 dependencies = [
+ "mp_engine_ghoul2",
  "mp_engine_qcommon",
  "mp_host_interface",
  "mp_qshared",
+ "native_math",
  "native_platform",
+ "native_string",
+ "native_types",
  "testkit",
 ]
 

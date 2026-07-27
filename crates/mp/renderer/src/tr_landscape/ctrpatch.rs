@@ -1,6 +1,7 @@
 #![allow(non_camel_case_types, non_snake_case)]
 use core::ffi::c_void;
 
+use mp_engine_qcommon::cm_patch::CmPatch;
 use mp_qshared::shared::vec3_t;
 
 use crate::tr_local::shader_s::shader_t;
@@ -31,6 +32,38 @@ pub struct CTRPatch {
     pub mBRShader: *mut shader_t,
     /// Is this patch visible in the current frame?
     pub misVisible: bool,
+}
+
+impl CTRPatch {
+    /// Raven `CTRPatch::Clear` — `memset(this, 0, sizeof(*this))`, written out
+    /// per field so no `unsafe` is needed.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_landscape.h:88`
+    pub fn clear(&mut self) {
+        self.owner = core::ptr::null_mut();
+        self.localowner = core::ptr::null_mut();
+        self.common = core::ptr::null_mut();
+        self.mCenter = [0.0; 3];
+        self.mRenderMap = core::ptr::null_mut();
+        self.mTLShader = core::ptr::null_mut();
+        self.mBRShader = core::ptr::null_mut();
+        self.misVisible = false;
+    }
+
+    /// Raven `CTRPatch::SetCenter` — `VectorAverage(common->GetMins(),
+    /// common->GetMaxs(), mCenter)`. The `CCMPatch` is threaded in as
+    /// `&CmPatch` (§B4) rather than read through the ABI-layout `common` field.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_landscape.h:89`
+    pub fn set_center(&mut self, common: &CmPatch) {
+        let mins = common.bounds[0];
+        let maxs = common.bounds[1];
+        self.mCenter = [
+            (mins[0] + maxs[0]) * 0.5,
+            (mins[1] + maxs[1]) * 0.5,
+            (mins[2] + maxs[2]) * 0.5,
+        ];
+    }
 }
 
 const _: () = assert!(core::mem::offset_of!(CTRPatch, owner) == 0);

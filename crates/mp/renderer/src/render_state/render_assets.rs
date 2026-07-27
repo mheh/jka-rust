@@ -47,6 +47,12 @@ pub struct RenderAssets {
     /// short-circuit (`:3382`) — a plain name→handle map cannot represent it
     /// (`R2-D4`).
     pub shader_lookup: HashMap<String, Vec<ShaderHandle>>,
+    /// `tr.sortedShaders[MAX_SHADERS]` — shaders in draw order, maintained by
+    /// `SortNewShader` and walked by `R_ShaderList_f`'s `Cmd_Argc() > 1`
+    /// branch. Owned handles, not the oracle's `shader_t *` array.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1407`
+    pub sorted_shaders: Vec<ShaderHandle>,
     /// `s_shaderText` — the concatenated `.shader` file text, parsed on demand
     /// by `FindShaderInShaderText` (A13.4).
     ///

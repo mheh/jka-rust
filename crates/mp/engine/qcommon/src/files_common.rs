@@ -1149,6 +1149,29 @@ pub fn FS_ReadFile(view: &mut EngineHostView, qpath: &str, buffer: *mut *mut ())
     }
 }
 
+/// Raven `FS_ReadFile` with its `byte **buffer` out-param collapsed to an
+/// owned return value (porting-rules §C7), so callers never hold the engine's
+/// raw allocation: the `Z_Malloc`'d block is copied out and `FS_FreeFile`d
+/// here. `None` is Raven's `len == -1` / null-buffer miss.
+///
+/// Source: `oracle/codemp/qcommon/files_pc.cpp:1259-1372`
+pub fn FS_ReadFileVec(view: &mut EngineHostView, qpath: &str) -> Option<Vec<u8>> {
+    let mut raw: *mut () = core::ptr::null_mut();
+    let len = FS_ReadFile(view, qpath, &mut raw as *mut *mut ());
+    if raw.is_null() {
+        return None;
+    }
+    // SAFETY: `FS_ReadFile` returned a non-null buffer, so it wrote a
+    // `Z_Malloc`'d block of `len` bytes (plus the trailing NUL it appends) into
+    // `raw` and returned that `len`; nothing else aliases the block between
+    // here and the `FS_FreeFile` below, which is this function's own sole
+    // release of it. `len.max(0)` covers the journal path's `len == 0`.
+    let bytes = unsafe { core::slice::from_raw_parts(raw as *const u8, len.max(0) as usize) };
+    let owned = bytes.to_vec();
+    FS_FreeFile(view.common, raw);
+    Some(owned)
+}
+
 /// Raven `FS_FreeFile`.
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:1379-1405`

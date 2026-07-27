@@ -171,6 +171,25 @@ pub fn CM_ClusterPVS(cm: &mut CollisionWorld, cluster: c_int) -> *mut byte {
     }
 }
 
+/// [`CM_ClusterPVS`] with its `byte *` return collapsed to the borrowed
+/// `clusterBytes`-long PVS row, so callers read the bitmask without `unsafe`
+/// (porting-rules §D11). `None` is the never-loaded map (`visibility` null).
+///
+/// Source: `oracle/codemp/qcommon/cm_test.cpp:351-357`
+pub fn CM_ClusterPVSBits(cm: &mut CollisionWorld, cluster: c_int) -> Option<&[u8]> {
+    let row = CM_ClusterPVS(cm, cluster);
+    if row.is_null() {
+        return None;
+    }
+    // SAFETY: `CM_ClusterPVS` returns either `cmg.visibility` itself or the
+    // `cluster`-th `clusterBytes`-sized row inside it — `CM_LoadMap` allocates
+    // `numClusters * clusterBytes` (or a single `clusterBytes` row when the map
+    // carries no vis data), so `clusterBytes` bytes from `row` are always in
+    // bounds. The `&mut cm` borrow is held for the returned lifetime, so the
+    // hunk block cannot be reallocated while the slice lives.
+    Some(unsafe { core::slice::from_raw_parts(row, cm.cmg.clusterBytes.max(0) as usize) })
+}
+
 /// Raven `CM_PointLeafnum`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_test.cpp:46-51`

@@ -32,6 +32,11 @@ pub enum FrameEvent {
     AddPolyToScene {
         shader: ShaderHandle,
         verts: Vec<PolyVert>,
+        /// `poly_t::fogIndex` — the fog volume the poly falls in, resolved at
+        /// trap time by `RE_AddPolyToScene`.
+        ///
+        /// Source: `oracle/codemp/renderer/tr_scene.cpp:151-179`
+        fog_index: i32,
     },
     /// `CG_R_ADDPOLYSTOSCENE` — cgame-only.
     AddPolysToScene {

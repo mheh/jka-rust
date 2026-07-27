@@ -1,3 +1,339 @@
 //! Raven `tr_backend.cpp` logic (R3 frontend port).
 //!
 //! Source: `oracle/codemp/renderer/tr_backend.cpp`
+
+// Raven-named functions/types keep their original casing across this
+// transcription, matching the rest of the renderer/engine crates.
+#![allow(non_snake_case)]
+
+use mp_engine_qcommon::common::com_error;
+use mp_qshared::shared::error_parm::errorParm_t;
+
+use crate::render_state::frame_state::FrameState;
+use crate::render_state::gpu_resources::GpuResources;
+use crate::render_state::image_asset::ImageHandle;
+use crate::render_state::placeholders::Vec3;
+use crate::render_state::render_assets::RenderAssets;
+use crate::render_state::renderer_cvars::RendererCvars;
+use crate::tr_local::cull_type_t::cullType_t;
+
+// `R_WorldCoordToScreenCoordFloat` threads `RenderAssets::glconfig`
+// (`crate::render_state::placeholders::GlConfig`) and `FrameState::refdef`
+// (`crate::render_state::placeholders::TrRefdef`) per the R2 `## State
+// ownership` rows for `glConfig`/`tr` frontend scratch. Both are still
+// skeleton stubs owned by other waves this wave may not touch (porting-rules
+// process); the fields it reads — `GlConfig`: `vid_width`/`vid_height: i32`;
+// `TrRefdef`: `view_axis: [Vec3; 3]`, `view_origin: Vec3`,
+// `fov_x`/`fov_y: f32` — are `glconfig_t`/`trRefdef_t`'s licensed shapes and
+// land on those structs with the field-merge step of this wave's
+// integration (tr_bsp.rs precedent).
+
+// Official OpenGL 1.0/1.1 registry enum values (not a Raven `#define` — these
+// are the fixed spec constants `GL_TexEnv`'s switch compares `env` against).
+const GL_MODULATE: u32 = 0x2100;
+const GL_DECAL: u32 = 0x2101;
+const GL_ADD: u32 = 0x0104;
+const GL_REPLACE: u32 = 0x1E01;
+
+// Official ARB/NV extension-registry enum values (not a Raven `#define`) —
+// the two pixel-shader path selectors `BeginPixelShader`/`EndPixelShader`
+// switch on.
+const GL_REGISTER_COMBINERS_NV: u32 = 0x8523;
+const GL_FRAGMENT_PROGRAM_ARB: u32 = 0x8804;
+
+/// Per-subsystem render-thread state for the pixel-shader (register-combiner
+/// / ARB fragment-program) path `BeginPixelShader`/`EndPixelShader` track
+/// between calls.
+///
+/// Raven `GLuint g_uiCurrentPixelShaderType` — a file-scope static crossing
+/// between the two fns; both consumers land in this file at this wave, so it
+/// is named here per DEC-37 A13.3.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp` (`g_uiCurrentPixelShaderType`)
+#[derive(Default)]
+pub struct PixelShaderState {
+    /// `0x0` (unset) in the oracle; `None` here.
+    pub current_type: Option<u32>,
+}
+
+/// Raven `GL_Bind` — binds a 2D image as the active texture on the current
+/// TMU: resolves the `NULL image` fallback to `tr.defaultImage`, the
+/// `r_nobind` performance-evaluation override to `tr.dlightImage`, then
+/// compares against `glState.currenttextures[glState.currenttmu]` before
+/// issuing `qglBindTexture` and stamping `image->frameUsed = tr.frameCount`.
+///
+/// DEFERRED: R4 — every touched field lives on a placeholder still owned by
+/// a later wave: `RenderAssets`' `default_image`/`dlight_image`/`frame_count`
+/// registry state and `ImageAsset::texnum`/`frame_used` (tr_image wave), and
+/// `GpuResources::gl_state`'s `currenttextures`/`currenttmu` cache (a named
+/// placeholder until R4 defines the real pipeline/bind-group cache). The
+/// bind decision and the `qglBindTexture` call are GL-only regardless
+/// (DEC-37 A13.2).
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:61-82`
+pub fn GL_Bind(_gpu: &mut GpuResources, _image: Option<ImageHandle>) {
+    // DEFERRED: R4 — GL_Bind (see doc comment above) (DEC-37 A13.2)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:61-82
+}
+
+/// Raven `GL_Bind3D` — `GL_Bind`'s `GL_TEXTURE_3D` twin; identical texnum
+/// resolution, same `glState.currenttextures[currenttmu]` cache compare.
+///
+/// DEFERRED: R4 — same dependency set as `GL_Bind` (DEC-37 A13.2).
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:85-107`
+pub fn GL_Bind3D(_gpu: &mut GpuResources, _image: Option<ImageHandle>) {
+    // DEFERRED: R4 — GL_Bind3D (see doc comment above) (DEC-37 A13.2)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:85-107
+}
+
+/// Raven `GL_SelectTexture` — selects a texture unit (TMU) for subsequent
+/// texture state changes; `unit` must be `0..=3`.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:112-152`
+pub fn GL_SelectTexture(_gpu: &mut GpuResources, unit: i32) {
+    match unit {
+        0..=3 => {
+            // DEFERRED: R4 — GL_SelectTexture glState.currenttmu
+            // cache-compare, qglActiveTextureARB/qglClientActiveTextureARB
+            // per unit, and the GLimp_LogComment trace calls
+            // (GpuResources::gl_state is a named placeholder until R4)
+            // (DEC-37 A13.2)
+            // Source: oracle/codemp/renderer/tr_backend.cpp:114-151
+        }
+        _ => com_error(
+            errorParm_t::ERR_DROP,
+            format!("GL_SelectTexture: unit = {unit}"),
+        ),
+    }
+}
+
+/// Raven `GL_Cull` — selects the fixed-function face-culling mode for the
+/// current draw call; a no-op while `backEnd.projection2D` (2D drawing
+/// always disables culling).
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:158-198`
+pub fn GL_Cull(frame: &FrameState, _gpu: &mut GpuResources, cull_type: cullType_t) {
+    // DEFERRED: R4 — GL_Cull glState.faceCulling cache-compare + write
+    // (GpuResources::gl_state is a named placeholder until R4 defines the
+    // real pipeline/bind-group cache) (DEC-37 A13.2)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:159-162
+
+    if frame.projection_2d {
+        //don't care, we're in 2d when it's always disabled
+        return;
+    }
+
+    // DEFERRED: R4 — GL_Cull qglEnable/qglDisable(GL_CULL_FACE) and
+    // qglCullFace(GL_FRONT/GL_BACK) selection (needs FrameState::view
+    // .is_mirror, landed by the tr_main wave) (DEC-37 A13.2)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:167-197
+    let _ = cull_type;
+}
+
+/// Raven `GL_TexEnv` — sets the fixed-function texture-environment mode for
+/// the current TMU.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:203-236`
+pub fn GL_TexEnv(_gpu: &mut GpuResources, env: u32) {
+    match env {
+        GL_MODULATE | GL_REPLACE | GL_DECAL | GL_ADD => {
+            // DEFERRED: R4 — GL_TexEnv glState.texEnv[currenttmu]
+            // cache-compare + qglTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE,
+            // env) (GpuResources::gl_state is a named placeholder until R4)
+            // (DEC-37 A13.2)
+            // Source: oracle/codemp/renderer/tr_backend.cpp:210-226
+        }
+        _ => com_error(
+            errorParm_t::ERR_DROP,
+            format!("GL_TexEnv: invalid env '{env}' passed\n"),
+        ),
+    }
+}
+
+/// Raven `GL_State` — diffs `stateBits` against the cached
+/// `glState.glStateBits` and issues the fixed-function GL depth-func/
+/// blend/depth-mask/polygon-mode/depth-test/alpha-test calls for whatever
+/// changed.
+///
+/// DEFERRED: R4 — pure fixed-function GL state translation; every branch
+/// both reads and writes `GpuResources::gl_state`, a named placeholder until
+/// R4 defines the real pipeline/bind-group cache. The `GLS_*` bit-flag
+/// `#define`s this decodes are not yet ported to Rust consts — left
+/// undecoded rather than guessed at (DEC-37 A13.2).
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:244-431`
+pub fn GL_State(_gpu: &mut GpuResources, _state_bits: u32) {
+    // DEFERRED: R4 — GL_State (see doc comment above) (DEC-37 A13.2)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:244-431
+}
+
+/// Raven `RB_Hyperspace` — the hyperspace/warp screen-flash effect: a
+/// flat-grey clear whose brightness cycles with `backEnd.refdef.time`.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:442-454`
+pub fn RB_Hyperspace(frame: &mut FrameState) {
+    if !frame.is_hyperspace {
+        // do initialization shit
+    }
+
+    // DEFERRED: R4 — RB_Hyperspace c = (backEnd.refdef.time & 255) / 255.0;
+    // qglClearColor(c, c, c, 1); qglClear(GL_COLOR_BUFFER_BIT) (needs
+    // FrameState::refdef.time, landed by the tr_scene wave) (DEC-37 A13.2)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:449-451
+
+    frame.is_hyperspace = true;
+}
+
+/// Raven `SetViewportAndScissor` — loads the view's projection matrix and
+/// sets the GL viewport/scissor rect from `backEnd.viewParms`.
+///
+/// DEFERRED: R4 — pure GL (qglMatrixMode/qglLoadMatrixf/qglViewport/
+/// qglScissor); every value it reads (`viewParms.projectionMatrix`/
+/// `viewportX`/`viewportY`/`viewportWidth`/`viewportHeight`) lives on
+/// `FrameState::view`, a placeholder landed by the tr_main wave (DEC-37
+/// A13.2).
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:457-467`
+pub fn SetViewportAndScissor(_frame: &FrameState) {
+    // DEFERRED: R4 — SetViewportAndScissor (see doc comment above) (DEC-37 A13.2)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:457-467
+}
+
+/// Raven `R_WorldCoordToScreenCoordFloat` — projects a world-space point
+/// through the current refdef's view axes and FOV onto screen coordinates;
+/// `None` when the point is behind (or too close to) the view plane.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:598-635`
+pub fn R_WorldCoordToScreenCoordFloat(
+    assets: &RenderAssets,
+    frame: &FrameState,
+    world_coord: Vec3,
+) -> Option<(f32, f32)> {
+    let xcenter = (assets.glconfig.vid_width / 2) as f32;
+    let ycenter = (assets.glconfig.vid_height / 2) as f32;
+
+    //AngleVectors (tr.refdef.viewangles, vfwd, vright, vup);
+    let vfwd = frame.refdef.view_axis[0];
+    let vright = frame.refdef.view_axis[1];
+    let vup = frame.refdef.view_axis[2];
+
+    let local = [
+        world_coord[0] - frame.refdef.view_origin[0],
+        world_coord[1] - frame.refdef.view_origin[1],
+        world_coord[2] - frame.refdef.view_origin[2],
+    ];
+
+    let transformed = [dot(local, vright), dot(local, vup), dot(local, vfwd)];
+
+    // Make sure Z is not negative.
+    if transformed[2] < 0.01 {
+        return None;
+    }
+
+    // C promotes to double; f64 intermediate per wave-0 ruling 12 (the `90.0`
+    // literals are doubles, so each `90.0/fov` quotient and its product are).
+    let xzi = ((xcenter / transformed[2]) as f64 * (90.0 / frame.refdef.fov_x as f64)) as f32;
+    let yzi = ((ycenter / transformed[2]) as f64 * (90.0 / frame.refdef.fov_y as f64)) as f32;
+
+    let x = xcenter + xzi * transformed[0];
+    let y = ycenter - yzi * transformed[1];
+
+    Some((x, y))
+}
+
+/// `DotProduct` inlined (a `q_math.h` inline helper, not a module fn).
+fn dot(a: Vec3, b: Vec3) -> f32 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+
+/// Raven `R_AverageTessXYZ` — averages the two nearest tessellated vertices
+/// for register-combiner texgen support.
+///
+/// DEFERRED: R4 — `tess` dissolves into R4's tessellation/vertex-building
+/// pipeline (R2 `## State ownership` row `tess`); no R3 carrier holds
+/// `tess.xyz`/`tess.numVertexes` to read from.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:673-703`
+pub fn R_AverageTessXYZ() -> Option<Vec3> {
+    // DEFERRED: R4 — R_AverageTessXYZ (see doc comment above)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:673-703
+    None
+}
+
+/// Raven `RB_SetColor` — the `RC_SET_COLOR` backend command: converts the
+/// float `[0,1]` color to the byte `backEnd.color2D` the 2D draw commands
+/// use. The oracle's `data`/`cmd + 1` command-buffer walk dissolves — the
+/// caller supplies the already-decoded `FrameEvent::SetColor` payload
+/// directly (`R2-D2`/A1).
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1404-1415`
+pub fn RB_SetColor(frame: &mut FrameState, color: [f32; 4]) {
+    frame.color_2d = [
+        (color[0] * 255.0) as u8,
+        (color[1] * 255.0) as u8,
+        (color[2] * 255.0) as u8,
+        (color[3] * 255.0) as u8,
+    ];
+}
+
+/// Raven `RB_DrawBuffer` — selects the GL draw buffer, then clears the
+/// screen: the world's global-fog color if the loaded BSP has one,
+/// otherwise `r_clear`'s debug color cycle (or a random one at `r_clear 42`).
+///
+/// DEFERRED: R4 — GL-only (qglDrawBuffer/qglClear/qglClearColor) plus three
+/// not-yet-landed dependencies: `RenderAssets::world`'s `WorldAsset` fog
+/// fields (`global_fog`/`fogs`, tr_bsp/tr_world wave), the `r_clear` cvar's
+/// live integer value (the renderer's cvar-value-read seam isn't wired yet —
+/// `RendererCvars` holds only the `Option<CvarHandle>`, A13.1), and
+/// `Q_irand`'s receiver (R2 assigns the renderer none — digest note). The
+/// oracle's `data`/`cmd + 1` command-buffer walk also dissolves per A1.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1710-1764`
+pub fn RB_DrawBuffer(_assets: &RenderAssets, _cvars: &RendererCvars, _buffer: u32) {
+    // DEFERRED: R4 — RB_DrawBuffer (see doc comment above) (DEC-37 A13.2)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:1710-1764
+}
+
+/// Raven `BeginPixelShader` — selects a register-combiner or ARB
+/// fragment-program pixel shader.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1967-2000`
+pub fn BeginPixelShader(pixel_shader: &mut PixelShaderState, ui_type: u32, _ui_id: u32) {
+    match ui_type {
+        // Using Register Combiners, so call the Display List that stores it.
+        GL_REGISTER_COMBINERS_NV => {
+            // PORT-NOTE: the oracle's `if (!qglCombinerParameterfvNV) return;`
+            // extension-availability guard is folded into the deferred GL
+            // call below — extension-pointer availability has no R3 home.
+            // DEFERRED: R4 — BeginPixelShader qglEnable(GL_REGISTER_COMBINERS_NV)
+            // + qglCallList(uiID) (DEC-37 A13.2)
+            // Source: oracle/codemp/renderer/tr_backend.cpp:1975-1981
+            pixel_shader.current_type = Some(GL_REGISTER_COMBINERS_NV);
+        }
+        // Using Fragment Programs, so call the program.
+        GL_FRAGMENT_PROGRAM_ARB => {
+            // PORT-NOTE: the oracle's `if (!qglGenProgramsARB) return;`
+            // extension-availability guard is folded into the deferred GL
+            // call below.
+            // DEFERRED: R4 — BeginPixelShader qglEnable(GL_FRAGMENT_PROGRAM_ARB)
+            // + qglBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, uiID) (DEC-37 A13.2)
+            // Source: oracle/codemp/renderer/tr_backend.cpp:1989-1996
+            pixel_shader.current_type = Some(GL_FRAGMENT_PROGRAM_ARB);
+        }
+        _ => {}
+    }
+}
+
+/// Raven `EndPixelShader` — disables whichever pixel-shader path
+/// `BeginPixelShader` last selected.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:2003-2009`
+pub fn EndPixelShader(pixel_shader: &PixelShaderState) {
+    let Some(current_type) = pixel_shader.current_type else {
+        return;
+    };
+    // DEFERRED: R4 — EndPixelShader qglDisable(current_type) (DEC-37 A13.2)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:2008
+    let _ = current_type;
+}

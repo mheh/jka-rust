@@ -44,11 +44,11 @@ pub(crate) const MAX_SKINS: usize = 1024;
 
 /// `FUNCTABLE_SIZE`.
 /// Source: `oracle/codemp/renderer/tr_local.h:1247`
-const FUNCTABLE_SIZE: usize = 1024;
+pub const FUNCTABLE_SIZE: usize = 1024;
 
 /// `FOG_TABLE_SIZE`.
 /// Source: `oracle/codemp/renderer/tr_local.h:1246`
-const FOG_TABLE_SIZE: usize = 256;
+pub const FOG_TABLE_SIZE: usize = 256;
 
 /// Raven `trGlobals_t` — the renderer's single big global state struct: current
 /// scene/view/world, image/shader/model/skin registries, and lookup tables.

@@ -931,6 +931,129 @@ impl CmLandScape {
     pub fn get_rand_seed(&self) -> c_ulong {
         self.holdrand as c_ulong
     }
+
+    // --- Renderer-side landscape read (`tr_terrain.cpp` / `tr_landscape.h`).
+    //     Raven's renderer reaches these trivial `cm_landscape.h` inline
+    //     getters through `CTRLandScape::common`/`CTRPatch::owner`; the port
+    //     threads `&CmLandScape` in as a parameter instead (§B4), so the
+    //     getters are `pub` here. Raven returns `const vec3_t &`; `vec3_t` is
+    //     `Copy`, so these return by value. ---
+
+    /// `CCMLandScape::GetMins` — `mBounds[0]`.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:200`
+    pub fn mins(&self) -> vec3_t {
+        self.bounds[0]
+    }
+
+    /// `CCMLandScape::GetMaxs` — `mBounds[1]`.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:201`
+    pub fn maxs(&self) -> vec3_t {
+        self.bounds[1]
+    }
+
+    /// `CCMLandScape::GetTerxelSize`.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:203`
+    pub fn terxel_size(&self) -> vec3_t {
+        self.terxel_size
+    }
+
+    /// `CCMLandScape::GetPatchSize`.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:204`
+    pub fn patch_size(&self) -> vec3_t {
+        self.patch_size
+    }
+
+    /// `CCMLandScape::GetTerxels`.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:208`
+    pub fn terxels(&self) -> i32 {
+        self.terxels
+    }
+
+    /// `CCMLandScape::GetRealWidth` — `mWidth + 1`.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:209`
+    pub fn real_width(&self) -> i32 {
+        self.width + 1
+    }
+
+    /// `CCMLandScape::GetRealHeight` — `mHeight + 1`.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:210`
+    pub fn real_height(&self) -> i32 {
+        self.height + 1
+    }
+
+    /// `CCMLandScape::GetWidth`.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:212`
+    pub fn width(&self) -> i32 {
+        self.width
+    }
+
+    /// `CCMLandScape::GetHeight`.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:213`
+    pub fn height(&self) -> i32 {
+        self.height
+    }
+
+    /// `CCMLandScape::GetBlockWidth`.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:215`
+    pub fn block_width(&self) -> i32 {
+        self.block_width
+    }
+
+    /// `CCMLandScape::GetBlockHeight`.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:216`
+    pub fn block_height(&self) -> i32 {
+        self.block_height
+    }
+
+    /// `CCMLandScape::GetBlockCount` — `mBlockWidth * mBlockHeight`.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:217`
+    pub fn block_count(&self) -> i32 {
+        self.block_width * self.block_height
+    }
+
+    /// `CCMLandScape::GetBaseWaterHeight` — base water height in terxels.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:230`
+    pub fn base_water_height(&self) -> i32 {
+        self.base_water_height
+    }
+
+    /// `CCMLandScape::SetRealWaterHeight` — `mWaterHeight = height *
+    /// mTerxelSize[2]`.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:231`
+    pub fn set_real_water_height(&mut self, height: i32) {
+        self.water_height = height as f32 * self.terxel_size[2];
+    }
+
+    /// `CCMLandScape::GetWaterHeight` — the real-world water height.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:232`
+    pub fn water_height(&self) -> f32 {
+        self.water_height
+    }
+
+    /// `CCMLandScape::GetPatch` — `mPatches + ((y * mBlockWidth) + x)`.
+    /// Immutable twin of the `pub(crate)` [`CmLandScape::get_patch`]: the
+    /// renderer's patch walk (`tr_terrain.cpp:280,325,828`) only reads.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_terrain.cpp:593-596`
+    pub fn patch(&self, x: i32, y: i32) -> &CmPatch {
+        let index = ((y * self.block_width) + x) as usize;
+        &self.patches[index]
+    }
 }
 
 // --- Per-frame terrain collision (Seam §C item 2). RULING 38: these are

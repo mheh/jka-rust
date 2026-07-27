@@ -1,5 +1,6 @@
 #![allow(non_camel_case_types, non_snake_case)]
 use core::ffi::{c_float, c_int, c_void};
+use core::slice;
 
 use mp_qshared::shared::qhandle_t;
 
@@ -57,6 +58,84 @@ pub struct CTRLandScape {
 
     /// Array of info specific to height
     pub mHeightDetails: [CTRHeightDetails; HEIGHT_RESOLUTION],
+}
+
+// The two `Z_Malloc`'d arrays this class owns (`mRenderMap`, `mTRPatches`) are
+// ABI-layout raw pointers. Their raw walks are quarantined here (§D11) so the
+// `tr_terrain.cpp` logic port stays entirely safe.
+impl CTRLandScape {
+    /// Raven's `mRenderMap` array — one `CTerVert` per heightmap sample.
+    ///
+    /// # Safety invariant
+    /// `mRenderMap` is the `Z_Malloc(sizeof(CTerVert) * common->GetRealArea())`
+    /// block the `CTRLandScape(const char *)` ctor allocates
+    /// (`tr_terrain.cpp:899`) and `~CTRLandScape` frees (`:866-870`); it stays
+    /// live for the whole landscape's lifetime. `len` must be at most that
+    /// landscape's `CCMLandScape::GetRealArea()` — callers pass
+    /// `CmLandScape::real_area()`, the value the allocation was sized from.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_landscape.h:135`
+    pub fn render_map(&self, len: usize) -> &[CTerVert] {
+        unsafe { slice::from_raw_parts(self.mRenderMap, len) }
+    }
+
+    /// Mutable twin of [`CTRLandScape::render_map`] — same safety invariant.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_landscape.h:135`
+    pub fn render_map_mut(&mut self, len: usize) -> &mut [CTerVert] {
+        unsafe { slice::from_raw_parts_mut(self.mRenderMap, len) }
+    }
+
+    /// Raven `CTRLandScape::GetPatch` — `mTRPatches + (blockWidth * y) + x`.
+    /// Raven reads `blockWidth` through the `common` back-pointer; it is
+    /// threaded in here (§B4).
+    ///
+    /// # Safety invariant
+    /// `mTRPatches` is the `Z_Malloc(sizeof(CTRPatch) * common->GetBlockCount())`
+    /// block the ctor allocates (`tr_terrain.cpp:918`) and `~CTRLandScape`
+    /// frees (`:856-860`). `x` must be in `[0, blockWidth)` and `y` in
+    /// `[0, GetBlockHeight())`, so the index stays inside `GetBlockCount()`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_landscape.h:168`
+    pub fn patch_mut(&mut self, x: c_int, y: c_int, blockWidth: c_int) -> &mut CTRPatch {
+        unsafe { &mut *self.mTRPatches.add(((blockWidth * y) + x) as usize) }
+    }
+
+    /// Raven `CTRPatch::SetRenderMap` (`tr_terrain.cpp:806-809`) fused with the
+    /// `CTRLandScape::GetRenderMap` accessor it calls through its `localowner`
+    /// back-pointer — `mRenderMap + x + (y * common->GetRealWidth())`. Owning
+    /// the pair here keeps `CTRPatch::mRenderMap`, an ABI-layout `CTerVert *`,
+    /// the only raw pointer the terrain logic port ever produces, and keeps
+    /// producing it inside this quarantine (§D11). Raven's two back-pointers
+    /// are threaded in as the patch's block coordinates plus `blockWidth`/
+    /// `realWidth` (§B4).
+    ///
+    /// # Safety invariant
+    /// `patchX`/`patchY`/`blockWidth` carry [`CTRLandScape::patch_mut`]'s
+    /// invariant. The offset itself is a `wrapping_add`, so forming the
+    /// pointer is safe; every later *read* through `CTRPatch::mRenderMap`
+    /// requires `x + (y * realWidth)` to land inside the
+    /// `Z_Malloc(sizeof(CTerVert) * common->GetRealArea())` block described on
+    /// [`CTRLandScape::render_map`], which holds for the heightmap coordinates
+    /// `InitRendererPatches` passes (`x < realWidth`, `y < GetRealHeight()`)
+    /// with `realWidth` the same `CCMLandScape::GetRealWidth()` the allocation
+    /// was sized from.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_landscape.h:167`;
+    /// `oracle/codemp/renderer/tr_terrain.cpp:806-809`
+    pub fn set_patch_render_map(
+        &mut self,
+        patchX: c_int,
+        patchY: c_int,
+        blockWidth: c_int,
+        x: c_int,
+        y: c_int,
+        realWidth: c_int,
+    ) {
+        let render_map = self.mRenderMap;
+        let patch = self.patch_mut(patchX, patchY, blockWidth);
+        patch.mRenderMap = render_map.wrapping_add((x + (y * realWidth)) as usize);
+    }
 }
 
 const _: () = assert!(core::mem::offset_of!(CTRLandScape, common) == 0);

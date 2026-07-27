@@ -114,6 +114,16 @@ pub fn BoxOnPlaneSide(emins: vec3_t, emaxs: vec3_t, p: *mut cplane_t) -> c_int {
     sides
 }
 
+/// Safe twin of [`BoxOnPlaneSide`] for callers that hold the plane by
+/// reference. `&mut` mirrors Raven's non-const `struct cplane_s *p`, so a
+/// caller passes the plane it stores — keeping that plane's `signbits` cache —
+/// rather than a copy.
+///
+/// Source: `oracle/codemp/game/q_math.c:809-871`
+pub fn BoxOnPlaneSideRef(emins: vec3_t, emaxs: vec3_t, p: &mut cplane_t) -> c_int {
+    BoxOnPlaneSide(emins, emaxs, p as *mut cplane_t)
+}
+
 /// Raven `PlaneTypeForNormal`. The `q_math.c` function is `#if 0`'d out; the
 /// live definition is the `q_shared.h` macro (`PLANE_NON_AXIAL` = 3).
 ///
