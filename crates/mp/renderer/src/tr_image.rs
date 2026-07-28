@@ -6,7 +6,7 @@
 // transcription, matching the rest of the renderer/engine crates.
 #![allow(non_snake_case)]
 
-use std::f32::consts::PI;
+use std::f64::consts::PI;
 use std::sync::Arc;
 
 use mp_engine_qcommon::common::common::com_printf;
@@ -744,8 +744,14 @@ pub fn Lanczos3(t: f32) -> f32 {
     }
     let t = t.abs();
     if t < 3.0 {
-        const M_PI_OVER_3: f32 = PI / 3.0;
-        return (t * PI).sin() * (t * M_PI_OVER_3).sin() / (t * PI * t * M_PI_OVER_3);
+        // DEC-41: `M_PI` is the math.h f64; `M_PI_OVER_3` (`M_PI / 3.0f`,
+        // tr_image.cpp:2336) promotes to f64 too. Each `sinf` argument
+        // rounds to f32 at the call; the denominator stays f64 and the
+        // division result rounds to f32 once at C's return.
+        const M_PI_OVER_3: f64 = PI / 3.0;
+        let num = ((t as f64 * PI) as f32).sin() * ((t as f64 * M_PI_OVER_3) as f32).sin();
+        let den = t as f64 * PI * t as f64 * M_PI_OVER_3;
+        return (num as f64 / den) as f32;
     }
     0.0
 }

@@ -1036,3 +1036,29 @@ headless subset, so all new renderer/client logic is jamp.exe-based.
 
 Applied in the waves 7-13 fix round (commit 255ec091); review survey: 17 of
 19 guarded sites in that diff already took the client leg.
+
+## DEC-41 — `M_PI` expands as the math.h f64 (user-ratified 2026-07-27)
+
+**Ruling:** wherever Raven's `M_PI` macro appears, the port treats it as the
+**math.h double** and keeps C's double-promotion trajectory for that
+expression, rounding to f32 exactly where C rounds (ruling-12 discipline).
+
+Background: `q_shared.h:547-549` guards a *float*-suffixed fallback
+(`3.14159265358979323846f`) behind `#ifndef M_PI`; MSVC's math.h defines
+nothing (no `_USE_MATH_DEFINES` anywhere in the oracle), so retail Windows
+binaries computed with the f32 literal, while clang/glibc builds — every
+differential oracle we can build, and OpenJK on macOS/Linux (OpenJK keeps
+the identical guard, `shared/qcommon/q_math.h:40`) — get the double.
+
+1. **Scope is the literal's width only.** Storage stays f32 everywhere
+   (`vec_t`, `vec3_t`, `tr.sinTable`, all `#[repr(C)]` fields); nothing
+   crosses the wire wider; simulation code already referee-gated under
+   ruling 12 is untouched.
+2. **Known, unmeasurable divergence from retail Windows** (~1 ulp in the
+   final f32 at `M_PI` sites — sin-table entries, deform/wave/turb angles,
+   Lanczos3 weights). Recorded here instead of per-site notes.
+3. Normalized at ratification: `tr_shade_calc.rs` bulge offset,
+   `tr_image.rs` `Lanczos3` (+ `M_PI_OVER_3 = M_PI / 3.0f`, itself f64 by
+   promotion). The canonical `native_math::qmath` note already calibrated
+   to the math.h double; this DEC makes it citable. Applies as-is to the
+   coming cgame/`cl_*` waves.

@@ -9,7 +9,7 @@
 // callers landing in later R3 waves.
 #![allow(dead_code)]
 
-use core::f32::consts::PI;
+use core::f64::consts::PI;
 
 use mp_engine_qcommon::common::{com_error, com_printf, Common};
 use mp_qshared::shared::error_parm::errorParm_t;
@@ -190,7 +190,10 @@ pub fn RB_CalcBulgeVertexes(
         let sin_table = &assets.function_tables.sin_table;
 
         for ((v, n), st) in xyz.iter_mut().zip(normal.iter()).zip(tex_coords0.iter()) {
-            let off = ((FUNCTABLE_SIZE as f32 / (PI * 2.0)) * (st[0] * ds.bulgeWidth + now)) as i32;
+            // DEC-41: `FUNCTABLE_SIZE / (M_PI*2)` is f64 (math.h `M_PI`),
+            // rounded to f32 once at C's `(float)` cast before the multiply.
+            let off = (((FUNCTABLE_SIZE as f64 / (PI * 2.0)) as f32)
+                * (st[0] * ds.bulgeWidth + now)) as i32;
             let scale = sin_table[functable_index(off)] * ds.bulgeHeight;
 
             v[0] += n[0] * scale;
