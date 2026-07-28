@@ -129,6 +129,17 @@ pub struct CgViewState {
     /// its one writer.
     /// Source: `oracle/codemp/cgame/cg_view.c:2435`
     pub cg_linearFogOverride: f32,
+
+    /// Raven `vec3_t cg_actionCamLastPos` — the third-person action camera's
+    /// last damped position, walked toward the desired position a frame at a
+    /// time.
+    /// Source: `oracle/codemp/cgame/cg_view.c:1396`
+    pub cg_actionCamLastPos: vec3_t,
+
+    /// Raven `int cg_actionCamLastTime` — `cg.time` the action camera last
+    /// ran; a 300ms gap re-seeds it from a fresh third-person offset.
+    /// Source: `oracle/codemp/cgame/cg_view.c:1397`
+    pub cg_actionCamLastTime: c_int,
 }
 
 impl Default for CgViewState {
@@ -171,6 +182,8 @@ impl Default for CgViewState {
             zoomFov: 0.0,
             zoomSoundTime: 0,
             cg_linearFogOverride: 0.0,
+            cg_actionCamLastPos: [0.0; 3],
+            cg_actionCamLastTime: 0,
         }
     }
 }

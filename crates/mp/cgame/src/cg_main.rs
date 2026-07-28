@@ -4,9 +4,13 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 
-use core::ffi::{c_char, c_int};
+use core::ffi::{c_char, c_int, c_uint};
 use core::ptr::null_mut;
 
+use mp_abi::cgame::public::rag_callback_bone_snap_t::ragCallbackBoneSnap_t;
+use mp_abi::cgame::public::rag_callback_debug_box_t::ragCallbackDebugBox_t;
+use mp_abi::cgame::public::rag_callback_debug_line_t::ragCallbackDebugLine_t;
+use mp_abi::cgame::public::rag_callback_trace_line_t::ragCallbackTraceLine_t;
 use mp_abi::cgame::shared_buffer::{
     TCGG2Mark, TCGGetBoltData, TCGImpactMark, TCGMiscEnt, TCGPointContents, TCGTrace, TCGVectorData,
 };
@@ -59,6 +63,7 @@ use mp_qshared::shared::q_math::{
     PITCH, ROLL, YAW,
 };
 use mp_qshared::shared::q_string::COM_Parse;
+use mp_qshared::shared::sound_channel::CHAN_AUTO;
 use mp_qshared::shared::{
     fileHandle_t, pc_token_t, qfalse, qhandle_t, qtrue, vec3_t, vec4_t, CIN_LOOP, FS_READ,
     MASK_PLAYERSOLID, MAX_CONFIGSTRINGS, MAX_GENTITIES, MAX_QPATH, MAX_TOKENLENGTH,
@@ -4853,4 +4858,142 @@ pub fn CG_SpawnCGameOnlyEnts(ctx: &mut CgContext) {
     while CG_ParseSpawnVars(ctx) {
         CG_SpawnCGameEntFromVars(ctx);
     }
+}
+
+/// Raven `#define RAG_CALLBACK_DEBUGBOX 1` — [`CG_RagCallback`]'s ragdoll
+/// debug-box case selector.
+/// Source: `oracle/codemp/cgame/cg_public.h:541`
+const RAG_CALLBACK_DEBUGBOX: c_int = 1;
+
+/// Raven `#define RAG_CALLBACK_DEBUGLINE 2`.
+/// Source: `oracle/codemp/cgame/cg_public.h:550`
+const RAG_CALLBACK_DEBUGLINE: c_int = 2;
+
+/// Raven `#define RAG_CALLBACK_BONESNAP 3`.
+/// Source: `oracle/codemp/cgame/cg_public.h:560`
+const RAG_CALLBACK_BONESNAP: c_int = 3;
+
+/// Raven `#define RAG_CALLBACK_BONEIMPACT 4`.
+/// Source: `oracle/codemp/cgame/cg_public.h:571`
+const RAG_CALLBACK_BONEIMPACT: c_int = 4;
+
+/// Raven `#define RAG_CALLBACK_BONEINSOLID 5`.
+/// Source: `oracle/codemp/cgame/cg_public.h:576`
+const RAG_CALLBACK_BONEINSOLID: c_int = 5;
+
+/// Raven `#define RAG_CALLBACK_TRACELINE 6`.
+/// Source: `oracle/codemp/cgame/cg_public.h:582`
+const RAG_CALLBACK_TRACELINE: c_int = 6;
+
+/// Raven `CG_RagCallback` — the `CG_RAG_CALLBACK` vmcall body ghoul2's ragdoll
+/// solver invokes for debug draws and ragdoll-triggered gameplay events (bone
+/// snap sound, trace queries for the solver).
+///
+/// `callType` is the only vmMain argument (see `CgRagCallbackArgs`); the
+/// per-case payload rides `cg.sharedBuffer` itself, cast to a different struct
+/// per `callType` - unlike the single-shape `C_*` vmcalls this module already
+/// ports, the shape here is only known once we're inside the switch, so the
+/// decode happens at this fn (this call *is* the DEC-46.6 boundary for this
+/// vmcall) rather than at a shared dispatch site.
+///
+/// `RAG_CALLBACK_BONESNAP` falls through into `RAG_CALLBACK_BONEIMPACT` in
+/// Raven (no `break`); the impact arm is empty so the fallthrough has no
+/// observable effect beyond what the snap arm already does.
+/// `RAG_CALLBACK_BONEINSOLID`'s body is `#if 0`'d out in Raven - dead code,
+/// so the port does nothing there too.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:508-568`
+pub fn CG_RagCallback(ctx: &mut CgContext, callType: c_int) -> c_int {
+    match callType {
+        RAG_CALLBACK_DEBUGBOX => {
+            // SAFETY: the engine writes a `ragCallbackDebugBox_t` into
+            // `cg.sharedBuffer` before invoking this callback with
+            // callType == RAG_CALLBACK_DEBUGBOX; `read_unaligned` copies it
+            // out without forming a reference into the byte buffer (whose
+            // alignment is 1).
+            let callData = unsafe {
+                (ctx.world.shared_buffer.as_ptr() as *const ragCallbackDebugBox_t).read_unaligned()
+            };
+            let (mins, maxs, duration) = (callData.mins, callData.maxs, callData.duration);
+
+            CG_DebugBoxLines(ctx.world, mins, maxs, duration);
+        }
+        RAG_CALLBACK_DEBUGLINE => {
+            // SAFETY: same shared-buffer contract as the debug-box arm above,
+            // typed `ragCallbackDebugLine_t` for this callType; unaligned copy,
+            // no reference formed.
+            let callData = unsafe {
+                (ctx.world.shared_buffer.as_ptr() as *const ragCallbackDebugLine_t).read_unaligned()
+            };
+            let (start, end, time, color, radius) = (
+                callData.start,
+                callData.end,
+                callData.time,
+                callData.color as c_uint,
+                callData.radius,
+            );
+
+            CG_TestLine(ctx.world, &start, &end, time, color, radius);
+        }
+        RAG_CALLBACK_BONESNAP => {
+            // SAFETY: same shared-buffer contract, typed `ragCallbackBoneSnap_t`
+            // for this callType; unaligned copy, no reference formed.
+            let callData = unsafe {
+                (ctx.world.shared_buffer.as_ptr() as *const ragCallbackBoneSnap_t).read_unaligned()
+            };
+            let entNum = callData.entNum;
+            let lerpOrigin = ctx.world.entity(entNum as usize).lerpOrigin;
+            let roll = ctx.world.bg_state.rng.Q_irand(1, 3);
+            let sample = format!("sound/player/bodyfall_human{roll}.wav");
+            let snapSound = trap::S_RegisterSound(ctx.engine, &sample);
+
+            trap::S_StartSound(ctx.engine, Some(&lerpOrigin), entNum, CHAN_AUTO, snapSound);
+            // falls through to RAG_CALLBACK_BONEIMPACT in Raven, which is a
+            // no-op arm - nothing further to do
+        }
+        RAG_CALLBACK_BONEIMPACT => {}
+        RAG_CALLBACK_BONEINSOLID => {
+            // Raven's body here is `#if 0`'d out - dead code, no-op.
+        }
+        RAG_CALLBACK_TRACELINE => {
+            // SAFETY: same shared-buffer contract, typed
+            // `ragCallbackTraceLine_t` for this callType; unaligned copy, no
+            // reference formed.
+            let callData = unsafe {
+                (ctx.world.shared_buffer.as_ptr() as *const ragCallbackTraceLine_t).read_unaligned()
+            };
+            let (start, end, mins, maxs, ignore, mask) = (
+                callData.start,
+                callData.end,
+                callData.mins,
+                callData.maxs,
+                callData.ignore,
+                callData.mask,
+            );
+            let mut tr = callData.tr;
+
+            CG_Trace(ctx, &mut tr, &start, &mins, &maxs, &end, ignore, mask);
+
+            // Raven traces straight into `callData->tr` and the engine reads
+            // the result back out of shared memory (G2_bones.cpp:2690-2701) -
+            // write the filled trace back where it looks.
+            // SAFETY: same buffer contract; `addr_of_mut!` projects the field
+            // without a reference, `write_unaligned` tolerates the byte
+            // buffer's alignment.
+            unsafe {
+                let base = ctx.world.shared_buffer.as_mut_ptr() as *mut ragCallbackTraceLine_t;
+                core::ptr::addr_of_mut!((*base).tr).write_unaligned(tr);
+            }
+        }
+        _ => {
+            Com_Error(
+                ctx,
+                errorParm_t::ERR_DROP as c_int,
+                "Invalid callType in CG_RagCallback",
+            );
+            return 0;
+        }
+    }
+
+    0
 }

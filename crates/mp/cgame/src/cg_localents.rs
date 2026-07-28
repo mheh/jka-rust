@@ -10,16 +10,20 @@ use mp_bg::bg_misc::{BG_EvaluateTrajectory, BG_EvaluateTrajectoryDelta};
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::q_math::{
-    _DotProduct, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin, CrossProduct,
-    VectorLength, VectorNormalize,
+    _DotProduct, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin, AnglesToAxis,
+    CrossProduct, VectorLength, VectorNormalize,
 };
+use mp_qshared::shared::surface_flags::{CONTENTS_NODROP, CONTENTS_SOLID};
 use mp_qshared::shared::{
     qtrue, sfxHandle_t, trType_t, trajectory_t, vec3_t, CHAN_AUTO, ENTITYNUM_WORLD,
 };
 
 use crate::cg_effects::CG_SmokePuff;
+use crate::cg_ents::ScaleModelAxis;
 use crate::cg_main::CG_Error;
+use crate::cg_predict::CG_Trace;
 use crate::local::le_bounce_sound_type_t::leBounceSoundType_t;
+use crate::local::le_flag_t::leFlag_t;
 use crate::local::le_mark_type_t::leMarkType_t;
 use crate::local::le_type_t::leType_t;
 use crate::local::local_entity_s::localEntity_t;
@@ -48,6 +52,19 @@ pub const NUMBER_SIZE: usize = 8;
 /// `leFlags`, so it's pulled in here rather than guessed.
 /// Source: `oracle/codemp/cgame/cg_local.h:499`
 pub const LEF_PUFF_DONT_SCALE: c_int = 0x0001;
+
+/// Raven `SINK_TIME` — time for fragments to sink into the ground before
+/// going away, in ms. Lives in `cg_local.h`, not `cg_localents.c` itself, but
+/// `CG_AddFragment` reads it straight out, so it's pulled in here rather than
+/// guessed.
+/// Source: `oracle/codemp/cgame/cg_local.h:48`
+const SINK_TIME: c_int = 1000;
+
+/// Raven `RF_FORCE_ENT_ALPHA` — override shader alpha settings. Same
+/// no-ported-home story as `cg_players.rs`'s own private copy — redeclared
+/// here rather than made `pub` and imported cross-TU.
+/// Source: `oracle/codemp/cgame/tr_types.h:36`
+const RF_FORCE_ENT_ALPHA: c_int = 0x00400;
 
 /// Raven `CG_InitLocalEntities` — resets the local-entity pool to all-free.
 ///
@@ -721,4 +738,154 @@ pub fn CG_BloodTrail(world: &mut CgWorld, le: &localEntity_t) {
 
         t += step;
     }
+}
+
+/// Raven `CG_AddFragment` — the per-frame think for a bouncing gib/fragment:
+/// sinks stationary fragments into the ground near removal time, otherwise
+/// traces its trajectory and either keeps falling, gets discarded in a nodrop
+/// volume, or bounces (leaving a mark, playing a sound, reflecting velocity).
+///
+/// Takes the pool handle rather than a resolved `localEntity_t` like the
+/// other Add fns in this file: several callees below
+/// ([`CG_FragmentBounceMark`], [`CG_FragmentBounceSound`],
+/// [`CG_ReflectVelocity`], [`CG_BloodTrail`]) take `world`/`ctx` *and*
+/// `le: &mut localEntity_t` as separate params, which would fight the pool's
+/// mutable borrow — so the entity is taken out of the slab up front
+/// (`localEntity_t::zeroed()` left in its place) and put back before every
+/// return that doesn't free it.
+/// Source: `oracle/codemp/cgame/cg_localents.c:234-332`
+pub fn CG_AddFragment(ctx: &mut CgContext, handle: EffectHandle) {
+    let mut le = core::mem::replace(
+        ctx.world
+            .cg_localEntities
+            .get_mut(handle)
+            .expect("CG_AddFragment: not active"),
+        localEntity_t::zeroed(),
+    );
+
+    if le.forceAlpha != 0 {
+        le.refEntity.renderfx |= RF_FORCE_ENT_ALPHA;
+        le.refEntity.shaderRGBA[3] = le.forceAlpha as u8;
+    }
+
+    if le.pos.trType == trType_t::TR_STATIONARY {
+        // sink into the ground if near the removal time
+        let t = le.endTime - ctx.world.cg.time;
+        if t < SINK_TIME * 2 {
+            le.refEntity.renderfx |= RF_FORCE_ENT_ALPHA;
+            // narrows through `int` before landing back in `float t_e` — see CG_AddFadeRGB
+            // for the same C truncate-through-i32 shape, mirrored here going the other way.
+            let mut t_e = ((le.endTime - ctx.world.cg.time) as f32 / (SINK_TIME * 2) as f32 * 255.0)
+                as i32 as f32;
+
+            if t_e > 255.0 {
+                t_e = 255.0;
+            }
+            if t_e < 1.0 {
+                t_e = 1.0;
+            }
+
+            if le.refEntity.shaderRGBA[3] != 0 && t_e > le.refEntity.shaderRGBA[3] as f32 {
+                t_e = le.refEntity.shaderRGBA[3] as f32;
+            }
+
+            le.refEntity.shaderRGBA[3] = t_e as i32 as u8;
+
+            trap::R_AddRefEntityToScene(ctx.engine, &le.refEntity);
+        } else {
+            trap::R_AddRefEntityToScene(ctx.engine, &le.refEntity);
+        }
+
+        *ctx.world
+            .cg_localEntities
+            .get_mut(handle)
+            .expect("CG_AddFragment: not active") = le;
+        return;
+    }
+
+    // calculate new position
+    let mut newOrigin: vec3_t = [0.0; 3];
+    BG_EvaluateTrajectory(
+        &le.pos as *const trajectory_t,
+        ctx.world.cg.time,
+        &mut newOrigin,
+    );
+
+    // trace a line from previous position to new position
+    let mut trace = trace_t::zeroed();
+    CG_Trace(
+        ctx,
+        &mut trace,
+        &le.refEntity.origin,
+        &vec3_origin,
+        &vec3_origin,
+        &newOrigin,
+        -1,
+        CONTENTS_SOLID,
+    );
+    if trace.fraction == 1.0 {
+        // still in free fall
+        _VectorCopy(newOrigin, &mut le.refEntity.origin);
+
+        if le.leFlags & leFlag_t::LEF_TUMBLE as c_int != 0 {
+            let mut angles: vec3_t = [0.0; 3];
+            BG_EvaluateTrajectory(
+                &le.angles as *const trajectory_t,
+                ctx.world.cg.time,
+                &mut angles,
+            );
+            AnglesToAxis(angles, le.refEntity.axis.as_mut_ptr());
+            ScaleModelAxis(&mut le.refEntity);
+        }
+
+        trap::R_AddRefEntityToScene(ctx.engine, &le.refEntity);
+
+        // add a blood trail
+        if le.leBounceSoundType == leBounceSoundType_t::LEBS_BLOOD {
+            CG_BloodTrail(ctx.world, &le);
+        }
+
+        *ctx.world
+            .cg_localEntities
+            .get_mut(handle)
+            .expect("CG_AddFragment: not active") = le;
+        return;
+    }
+
+    // if it is in a nodrop zone, remove it
+    // this keeps gibs from waiting at the bottom of pits of death
+    // and floating levels
+    if trap::CM_PointContents(ctx.engine, &trace.endpos, 0) & CONTENTS_NODROP != 0 {
+        CG_FreeLocalEntity(ctx, handle);
+        return;
+    }
+
+    if trace.startsolid == 0 {
+        // leave a mark
+        CG_FragmentBounceMark(ctx.world, &mut le, &trace);
+
+        // do a bouncy sound
+        CG_FragmentBounceSound(ctx, &mut le, &trace);
+
+        if le.bounceSound != 0 {
+            // specified bounce sound (debris)
+            trap::S_StartSound(
+                ctx.engine,
+                Some(&le.pos.trBase),
+                ENTITYNUM_WORLD,
+                CHAN_AUTO,
+                le.bounceSound as sfxHandle_t,
+            );
+        }
+
+        // reflect the velocity on the trace plane
+        CG_ReflectVelocity(ctx.world, &mut le, &trace);
+
+        trap::R_AddRefEntityToScene(ctx.engine, &le.refEntity);
+    }
+
+    *ctx.world
+        .cg_localEntities
+        .get_mut(handle)
+        .expect("CG_AddFragment: not active") = le;
 }

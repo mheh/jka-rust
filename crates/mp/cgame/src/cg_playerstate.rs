@@ -8,15 +8,19 @@ use core::ffi::c_int;
 use mp_bg::public::gametype::{GT_CTF, GT_DUEL, GT_POWERDUEL, GT_SIEGE};
 use mp_bg::public::pers_enum::persEnum_t::{PERS_HITS, PERS_TEAM};
 use mp_bg::public::stat_index::statIndex_t::STAT_HEALTH;
-use mp_qshared::common::mp::qcommon::player_state::playerState_t;
+use mp_qshared::common::mp::qcommon::player_state::{playerState_t, MAX_PS_EVENTS};
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorSubtract, vec3_origin, AngleVectors, VectorLength, PITCH, ROLL, YAW,
 };
 use mp_qshared::shared::sound_channel::CHAN_ANNOUNCER;
 use mp_qshared::shared::{qtrue, vec3_t};
+use mp_uishared::shared::display_state::DisplayState;
 
-use crate::cg_event::CG_PainEvent;
+use crate::cg_event::{CG_EntityEvent, CG_PainEvent};
+use crate::cg_main::CG_Printf;
 use crate::cg_view::{CG_AddBufferedSound, DAMAGE_TIME};
+use crate::local::cg_t::MAX_PREDICTED_EVENTS;
+use crate::local::player_state_ref::PlayerStateRef;
 use crate::trap;
 use crate::world::cg_context::CgContext;
 use crate::world::cg_world::CgWorld;
@@ -262,6 +266,107 @@ pub fn CG_CheckLocalSounds(ctx: &mut CgContext, ps: &playerState_t, ops: &player
             let sfx = ctx.world.cgs.media.threeFragSound;
             CG_AddBufferedSound(ctx.world, sfx);
             ctx.world.playerstate.cgAnnouncerTime = ctx.world.cg.time + 3000;
+        }
+    }
+}
+
+/// Raven `CG_CheckPlayerstateEvents` — replays the server-authoritative
+/// `externalEvent` plus the local client's predictable-event ring buffer into
+/// `CG_EntityEvent`, keeping `cg.predictableEvents`/`cg.eventSequence` in step.
+///
+/// Source: `oracle/codemp/cgame/cg_playerstate.c:217-250`
+pub fn CG_CheckPlayerstateEvents(
+    ctx: &mut CgContext,
+    ds: &DisplayState,
+    ps: &playerState_t,
+    ops: &playerState_t,
+    psRef: PlayerStateRef,
+) {
+    let centNum = ps.clientNum as usize;
+
+    if ps.externalEvent != 0 && ps.externalEvent != ops.externalEvent {
+        {
+            let cent = ctx.world.entity_mut(centNum);
+            cent.currentState.event = ps.externalEvent;
+            cent.currentState.eventParm = ps.externalEventParm;
+        }
+        let position = ctx.world.entity(centNum).lerpOrigin;
+        CG_EntityEvent(ctx, ds, centNum, &position);
+    }
+
+    // go through the predictable events buffer
+    for i in (ps.eventSequence - MAX_PS_EVENTS as c_int)..ps.eventSequence {
+        let idx = (i & (MAX_PS_EVENTS as c_int - 1)) as usize;
+        // if we have a new predictable event
+        // or the server told us to play another event instead of a predicted event we already issued
+        // or something the server told us changed our prediction causing a different event
+        if i >= ops.eventSequence
+            || (i > ops.eventSequence - MAX_PS_EVENTS as c_int && ps.events[idx] != ops.events[idx])
+        {
+            let event = ps.events[idx];
+            {
+                let cent = ctx.world.entity_mut(centNum);
+                cent.currentState.event = event;
+                cent.currentState.eventParm = ps.eventParms[idx];
+                // JLF ADDED to hopefully mark events as player event
+                //
+                // Raven stores the caller's `ps` pointer verbatim here
+                // (`cg.predictedPlayerState` on the predict path,
+                // `cg.snap->ps` on the cg_snapshot.c one) - and cg_view.c /
+                // cg_players.c DO read it back. The caller says which target
+                // it handed us (DEC-46.2 resolution enum).
+                cent.playerState = psRef;
+            }
+            let position = ctx.world.entity(centNum).lerpOrigin;
+            CG_EntityEvent(ctx, ds, centNum, &position);
+
+            let predIdx = (i & (MAX_PREDICTED_EVENTS as c_int - 1)) as usize;
+            ctx.world.cg.predictableEvents[predIdx] = event;
+
+            ctx.world.cg.eventSequence += 1;
+        }
+    }
+}
+
+/// Raven `CG_CheckChangedPredictableEvents` — re-checks the server's replayed
+/// `playerState_t.events` ring against what the client already predicted
+/// (`cg.predictableEvents`), replaying `CG_EntityEvent` only where the server's
+/// account diverged from the local prediction.
+///
+/// Source: `oracle/codemp/cgame/cg_playerstate.c:257-286`
+pub fn CG_CheckChangedPredictableEvents(
+    ctx: &mut CgContext,
+    ds: &DisplayState,
+    ps: &playerState_t,
+) {
+    let centNum = ps.clientNum as usize;
+
+    for i in (ps.eventSequence - MAX_PS_EVENTS as c_int)..ps.eventSequence {
+        if i >= ctx.world.cg.eventSequence {
+            continue;
+        }
+        // if this event is not further back in than the maximum predictable events we remember
+        if i > ctx.world.cg.eventSequence - MAX_PREDICTED_EVENTS as c_int {
+            let idx = (i & (MAX_PS_EVENTS as c_int - 1)) as usize;
+            let predIdx = (i & (MAX_PREDICTED_EVENTS as c_int - 1)) as usize;
+
+            // if the new playerstate event is different from a previously predicted one
+            if ps.events[idx] != ctx.world.cg.predictableEvents[predIdx] {
+                let event = ps.events[idx];
+                {
+                    let cent = ctx.world.entity_mut(centNum);
+                    cent.currentState.event = event;
+                    cent.currentState.eventParm = ps.eventParms[idx];
+                }
+                let position = ctx.world.entity(centNum).lerpOrigin;
+                CG_EntityEvent(ctx, ds, centNum, &position);
+
+                ctx.world.cg.predictableEvents[predIdx] = event;
+
+                if ctx.world.cvars.cg_showmiss.integer != 0 {
+                    CG_Printf(ctx, "WARNING: changed predicted event\n");
+                }
+            }
         }
     }
 }

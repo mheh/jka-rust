@@ -19,6 +19,7 @@ use mp_bg::public::pmtype::pmtype_t;
 use mp_bg::public::stat_index::statIndex_t::{STAT_DEAD_YAW, STAT_HEALTH};
 use mp_bg::public::team::TEAM_SPECTATOR;
 use mp_bg::public::viewheight::{DEFAULT_MAXS_2, DEFAULT_MINS_2};
+use mp_bg::weapons::weapon_t::WP_SABER;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::refdef_t::{
@@ -29,9 +30,9 @@ use mp_qshared::common::mp::qcommon::player_state::{playerState_t, MAX_POWERUPS}
 use mp_qshared::common::mp::qcommon::pm_flags::{PMF_DUCKED, PMF_FOLLOW};
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::q_math::{
-    _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vectoangles,
-    AngleNormalize180, AngleVectors, AnglesToAxis, Q_fabs, VectorNormalize, VectorSet, PITCH, ROLL,
-    YAW,
+    _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin,
+    vectoangles, AngleNormalize180, AngleVectors, AnglesToAxis, Q_fabs, VectorLength,
+    VectorNormalize, VectorSet, PITCH, ROLL, YAW,
 };
 use mp_qshared::shared::sound_channel::{CHAN_ANNOUNCER, CHAN_LOCAL};
 use mp_qshared::shared::surface_flags::{
@@ -2210,4 +2211,110 @@ pub fn CG_OffsetThirdPersonView(ctx: &mut CgContext) {
     _VectorCopy(cameraCurLoc, &mut ctx.world.cg.refdef.vieworg);
 
     ctx.world.view.cameraLastFrame = ctx.world.cg.time;
+}
+
+/// Raven `CG_ThirdPersonActionCam` — sabers-only camera that rides the
+/// blade's trail position, lerping toward it and re-tracing so it never
+/// clips through geometry.
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:1400-1474`
+pub fn CG_ThirdPersonActionCam(ctx: &mut CgContext) -> bool {
+    // §F19: Raven derefs `cg.snap` unguarded; with no snapshot there is no
+    // one to aim the action cam at, so report "didn't run".
+    let Some(snap) = ctx.world.cg.snap_ref() else {
+        return false;
+    };
+    let clientNum = snap.ps.clientNum as usize;
+    let cent = ctx.world.entity(clientNum);
+
+    // if we don't have a g2 instance this frame for whatever reason then do nothing
+    if cent.ghoul2.is_null() {
+        return false;
+    }
+
+    // just being safe, should not ever happen
+    if cent.currentState.weapon != WP_SABER {
+        return false;
+    }
+
+    let ci = &ctx.world.cgs.clientinfo[clientNum];
+    // too long since we last got the blade position
+    if ctx.world.cg.time - ci.saber[0].blade[0].trail.lastTime > 300 {
+        return false;
+    }
+
+    let base = ci.saber[0].blade[0].trail.base;
+    let lerpOrigin = cent.lerpOrigin;
+    let entNumber = cent.currentState.number;
+    let smoothFactor = 0.1_f32 * ctx.world.cvars.cg_timescale.value;
+    let range = ctx.world.cvars.cg_thirdPersonRange.value;
+
+    // get direction from base to ent origin
+    let mut positionDir: vec3_t = [0.0; 3];
+    _VectorSubtract(base, lerpOrigin, &mut positionDir);
+    VectorNormalize(&mut positionDir);
+
+    // position the cam based on the direction and saber position
+    let mut desiredPos: vec3_t = [0.0; 3];
+    _VectorMA(lerpOrigin, range * 2.0, positionDir, &mut desiredPos);
+
+    // trace to the desired pos to see how far that way we can actually go before we hit something
+    // the endpos will be valid for our desiredpos no matter what
+    let mut tr = trace_t::zeroed();
+    CG_Trace(
+        ctx,
+        &mut tr,
+        &lerpOrigin,
+        &vec3_origin,
+        &vec3_origin,
+        &desiredPos,
+        entNumber,
+        MASK_SOLID,
+    );
+    desiredPos = tr.endpos;
+
+    if ctx.world.cg.time - ctx.world.view.cg_actionCamLastTime > 300 {
+        // do a third person offset first and grab the initial point from that
+        CG_OffsetThirdPersonView(ctx);
+        ctx.world.view.cg_actionCamLastPos = ctx.world.cg.refdef.vieworg;
+    }
+
+    ctx.world.view.cg_actionCamLastTime = ctx.world.cg.time;
+
+    // lerp the vieworg to the desired pos from the last valid
+    let mut v: vec3_t = [0.0; 3];
+    _VectorSubtract(desiredPos, ctx.world.view.cg_actionCamLastPos, &mut v);
+
+    if VectorLength(v) > 64.0 {
+        // don't bother moving yet if not far from the last pos
+        for i in 0..3 {
+            ctx.world.view.cg_actionCamLastPos[i] += v[i] * smoothFactor;
+            ctx.world.cg.refdef.vieworg[i] = ctx.world.view.cg_actionCamLastPos[i];
+        }
+    } else {
+        ctx.world.cg.refdef.vieworg = ctx.world.view.cg_actionCamLastPos;
+    }
+
+    // Make sure the point is alright
+    let vieworg = ctx.world.cg.refdef.vieworg;
+    CG_Trace(
+        ctx,
+        &mut tr,
+        &lerpOrigin,
+        &vec3_origin,
+        &vec3_origin,
+        &vieworg,
+        entNumber,
+        MASK_SOLID,
+    );
+    ctx.world.cg.refdef.vieworg = tr.endpos;
+
+    let mut positionDir: vec3_t = [0.0; 3];
+    _VectorSubtract(lerpOrigin, ctx.world.cg.refdef.vieworg, &mut positionDir);
+    let mut desiredAngles: vec3_t = [0.0; 3];
+    vectoangles(positionDir, &mut desiredAngles);
+
+    // just set the angles for now
+    ctx.world.cg.refdef.viewangles = desiredAngles;
+    true
 }

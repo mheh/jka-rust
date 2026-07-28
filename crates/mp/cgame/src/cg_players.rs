@@ -8183,3 +8183,204 @@ pub fn CG_AddSaberBlade(
         ctx.world.cgs.clientinfo[number] = *client;
     }
 }
+
+/// Raven `CG_SetDeferredClientInfo` — a new client wants a model/skin that isn't
+/// registered yet; hunts the client table for one that's close enough to reuse
+/// (exact match loads for real, a same-skin teammate donates its handles),
+/// falling back to a real load when nobody matches.
+///
+/// ESCALATION (queued for the CG_NewClientInfo wave, same family as
+/// `CG_LoadClientInfo`'s note): Raven's ONLY caller passes a STACK LOCAL
+/// (`CG_SetDeferredClientInfo(&newInfo)`, cg_players.c:1807) while
+/// `cgs.clientinfo[clientNum]` still holds the OLD occupant - so in Raven the
+/// scan loops can match the old slot, and the old ghoul2 handle gets cleaned
+/// before `*ci = newInfo` lands (:1814-1819). This clientNum shape takes the
+/// slot out (it can't match itself, and writes land uncleaned) - that wave
+/// must reconcile before wiring the caller.
+/// Source: `oracle/codemp/cgame/cg_players.c:1397-1492`
+pub fn CG_SetDeferredClientInfo(ctx: &mut CgContext, clientNum: c_int) {
+    let maxclients = ctx.world.cgs.maxclients;
+    let gametype = ctx.world.cgs.gametype;
+
+    // Take ci out up front so the scan below never aliases its own slot - a
+    // self-match in Raven is a same-value no-op copy anyway.
+    let mut ci = core::mem::replace(
+        &mut ctx.world.cgs.clientinfo[clientNum as usize],
+        zeroed_client_info(),
+    );
+    let ciSkinName = buf_to_string(&ci.skinName.map(|c| c as u8));
+    let ciModelName = buf_to_string(&ci.modelName.map(|c| c as u8));
+
+    // if someone else is already the same models and skins we
+    // can just load the client info
+    for i in 0..maxclients {
+        let m = &ctx.world.cgs.clientinfo[i as usize];
+        if m.infoValid == qfalse || m.deferred != qfalse {
+            continue;
+        }
+        let mSkinName = buf_to_string(&m.skinName.map(|c| c as u8));
+        let mModelName = buf_to_string(&m.modelName.map(|c| c as u8));
+        if Q_stricmp(&ciSkinName, &mSkinName) != 0
+            || Q_stricmp(&ciModelName, &mModelName) != 0
+            || (gametype >= GT_TEAM && ci.team != m.team && ci.team != TEAM_SPECTATOR)
+        {
+            continue;
+        }
+
+        // just load the real info cause it uses the same models and skins
+        ctx.world.cgs.clientinfo[clientNum as usize] = ci;
+        CG_LoadClientInfo(ctx, clientNum);
+        return;
+    }
+
+    // if we are in teamplay, only grab a model if the skin is correct
+    if gametype >= GT_TEAM {
+        for i in 0..maxclients {
+            let iu = i as usize;
+            let isMatch = {
+                let m = &ctx.world.cgs.clientinfo[iu];
+                if m.infoValid == qfalse || m.deferred != qfalse {
+                    false
+                } else {
+                    let mSkinName = buf_to_string(&m.skinName.map(|c| c as u8));
+                    !(ci.team != TEAM_SPECTATOR
+                        && (Q_stricmp(&ciSkinName, &mSkinName) != 0
+                            || (gametype >= GT_TEAM && ci.team != m.team)))
+                }
+            };
+            if !isMatch {
+                continue;
+            }
+
+            ci.deferred = qtrue;
+            let matchCi =
+                core::mem::replace(&mut ctx.world.cgs.clientinfo[iu], zeroed_client_info());
+            CG_CopyClientInfoModel(ctx, &matchCi, &mut ci);
+            ctx.world.cgs.clientinfo[iu] = matchCi;
+            ctx.world.cgs.clientinfo[clientNum as usize] = ci;
+            return;
+        }
+        // load the full model, because we don't ever want to show
+        // an improper team skin.  This will cause a hitch for the first
+        // player, when the second enters.  Combat shouldn't be going on
+        // yet, so it shouldn't matter
+        ctx.world.cgs.clientinfo[clientNum as usize] = ci;
+        CG_LoadClientInfo(ctx, clientNum);
+        return;
+    }
+
+    // find the first valid clientinfo and grab its stuff
+    for i in 0..maxclients {
+        let iu = i as usize;
+        // no deferring off of deferred info. Because I said so.
+        let isMatch = {
+            let m = &ctx.world.cgs.clientinfo[iu];
+            m.infoValid != qfalse && m.deferred == qfalse
+        };
+        if !isMatch {
+            continue;
+        }
+
+        ci.deferred = qtrue;
+        let matchCi = core::mem::replace(&mut ctx.world.cgs.clientinfo[iu], zeroed_client_info());
+        CG_CopyClientInfoModel(ctx, &matchCi, &mut ci);
+        ctx.world.cgs.clientinfo[iu] = matchCi;
+        ctx.world.cgs.clientinfo[clientNum as usize] = ci;
+        return;
+    }
+
+    // we should never get here...
+    // Actually it is possible now because of the unique sabers.
+    ctx.world.cgs.clientinfo[clientNum as usize] = ci;
+    CG_LoadClientInfo(ctx, clientNum);
+}
+
+/// Raven `CG_ActualLoadDeferredPlayers` — scans every client slot for one still
+/// waiting on a deferred model load and loads it for real.
+/// Source: `oracle/codemp/cgame/cg_players.c:1953-1965`
+pub fn CG_ActualLoadDeferredPlayers(ctx: &mut CgContext) {
+    // scan for a deferred player to load
+    for i in 0..ctx.world.cgs.maxclients {
+        let shouldLoad = {
+            let ci = &ctx.world.cgs.clientinfo[i as usize];
+            ci.infoValid != qfalse && ci.deferred != qfalse
+        };
+        if shouldLoad {
+            CG_LoadClientInfo(ctx, i);
+            // break; - Raven leaves the early-out commented, so every deferred
+            // slot gets picked up in one pass
+        }
+    }
+}
+
+/// Raven `CG_PlayerFootsteps` — bolts a matrix at the stepping foot and hands
+/// off to `_PlayerFootStep` for the ground trace, sound, and decal work.
+/// Source: `oracle/codemp/cgame/cg_players.c:2183-2235`
+pub fn CG_PlayerFootsteps(ctx: &mut CgContext, centNum: usize, footStepType: footstepType_t) {
+    if ctx.world.cvars.cg_footsteps.integer == 0 {
+        return;
+    }
+
+    let cent = ctx.world.entity(centNum);
+    let npcClass = cent.currentState.NPC_class;
+
+    // FIXME: make this a feature of NPCs in the NPCs.cfg? Specify a footstep shader, if any?
+    if npcClass == class_t::CLASS_ATST as c_int
+        || npcClass == class_t::CLASS_CLAW as c_int
+        || npcClass == class_t::CLASS_FISH as c_int
+        || npcClass == class_t::CLASS_FLIER2 as c_int
+        || npcClass == class_t::CLASS_GLIDER as c_int
+        || npcClass == class_t::CLASS_INTERROGATOR as c_int
+        || npcClass == class_t::CLASS_MURJJ as c_int
+        || npcClass == class_t::CLASS_PROBE as c_int
+        || npcClass == class_t::CLASS_R2D2 as c_int
+        || npcClass == class_t::CLASS_R5D2 as c_int
+        || npcClass == class_t::CLASS_REMOTE as c_int
+        || npcClass == class_t::CLASS_SEEKER as c_int
+        || npcClass == class_t::CLASS_SENTRY as c_int
+        || npcClass == class_t::CLASS_SWAMP as c_int
+    {
+        return;
+    }
+
+    let yawAngle = cent.pe.legs.yawAngle;
+    let ghoul2 = cent.ghoul2;
+    let lerpOrigin = cent.lerpOrigin;
+    let modelScale = cent.modelScale;
+
+    let engine = ctx.engine;
+    let mut boltMatrix = mdxaBone_t {
+        matrix: [[0.0; 4]; 3],
+    };
+    let mut tempAngles: vec3_t = [0.0; 3];
+    let mut sideOrigin: vec3_t = [0.0; 3];
+
+    tempAngles[PITCH] = 0.0;
+    tempAngles[YAW] = yawAngle;
+    tempAngles[ROLL] = 0.0;
+
+    let footBolt = match footStepType {
+        footstepType_t::FOOTSTEP_R | footstepType_t::FOOTSTEP_HEAVY_R => {
+            trap::G2API_AddBolt(engine, ghoul2, 0, "*r_leg_foot") //cent->gent->footRBolt;
+        }
+        _ => trap::G2API_AddBolt(engine, ghoul2, 0, "*l_leg_foot"), //cent->gent->footLBolt;
+    };
+
+    // FIXME: get yaw orientation of the foot and use on decal
+    let time = ctx.world.cg.time;
+    trap::G2API_GetBoltMatrix(
+        engine,
+        ghoul2,
+        0,
+        footBolt,
+        &mut boltMatrix,
+        &tempAngles,
+        &lerpOrigin,
+        time,
+        Some(&mut ctx.world.cgs.gameModels[0]),
+        &modelScale,
+    );
+    BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut sideOrigin);
+    sideOrigin[2] += 15.0; // fudge up a bit for coplanar
+    _PlayerFootStep(ctx, &sideOrigin, yawAngle, 6.0, centNum, footStepType);
+}

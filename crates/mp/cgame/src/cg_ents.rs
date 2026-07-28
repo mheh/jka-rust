@@ -3969,3 +3969,23 @@ pub fn CG_General(ctx: &mut CgContext, centNum: usize) {
     Ghoul2 Insert End
     */
 }
+
+/// Raven `CG_Special` - draws entities with `ET_SPECIAL` (currently just the
+/// portable shield wall).
+///
+/// Raven's `if (!s1)` null check is dead - `s1` is `&cent->currentState`, never null.
+/// Source: `oracle/codemp/cgame/cg_ents.c:463-483`
+pub fn CG_Special(ctx: &mut CgContext, centNum: usize) {
+    let modelindex = ctx.world.entity(centNum).currentState.modelindex;
+
+    // if set to invisible, skip
+    if modelindex == 0 {
+        return;
+    }
+
+    if modelindex == HI_SHIELD as c_int {
+        // The portable shield should go through a different rendering function.
+        FX_DrawPortableShield(ctx, centNum);
+        return;
+    }
+}

@@ -7,7 +7,9 @@ use core::ptr::null_mut;
 
 use mp_abi::ui::public::ui_menu_command_t::UIMENU_PLAYERCONFIG;
 
-use mp_bg::bg_misc::{BG_CycleInven, BG_FindItemForHoldable, BG_GiveMeVectorFromMatrix};
+use mp_bg::bg_misc::{
+    BG_CycleInven, BG_EvaluateTrajectory, BG_FindItemForHoldable, BG_GiveMeVectorFromMatrix,
+};
 use mp_bg::bg_panimate::BG_InKnockDownOnly;
 use mp_bg::bg_saber::SFL2_NO_CLASH_FLARE;
 use mp_bg::bg_saberLoad::WP_SaberBladeUseSecondBladeStyle;
@@ -19,7 +21,9 @@ use mp_bg::public::ctf_msg::ctfMsg_t;
 use mp_bg::public::effect_types::effectTypes_t;
 use mp_bg::public::entity_event::entity_event_t;
 use mp_bg::public::entity_event::entity_event_t::EV_USE_ITEM0;
-use mp_bg::public::entity_flags::{EF_ALT_FIRING, EF_DEAD, EF_JETPACK_ACTIVE, EF_SOUNDTRACKER};
+use mp_bg::public::entity_flags::{
+    EF_ALT_FIRING, EF_DEAD, EF_JETPACK_ACTIVE, EF_PLAYER_EVENT, EF_SOUNDTRACKER,
+};
 use mp_bg::public::entity_type::entityType_t;
 use mp_bg::public::gametype::{GT_CTY, GT_DUEL, GT_JEDIMASTER, GT_POWERDUEL, GT_TEAM};
 use mp_bg::public::gender::gender_t;
@@ -86,7 +90,7 @@ use crate::cg_effects::{
 };
 use crate::cg_ents::{
     CG_Beam, CG_PlayDoorLoopSound, CG_PlayDoorSound, CG_S_AddRealLoopingSound,
-    CG_S_StopLoopingSound,
+    CG_S_StopLoopingSound, CG_SetEntitySoundPosition,
 };
 use crate::cg_main::{
     CG_ConfigString, CG_Error, CG_GetStringEdString, CG_Printf, CG_StartMusic, Com_Printf,
@@ -4311,4 +4315,53 @@ pub fn CG_EntityEvent(ctx: &mut CgContext, ds: &DisplayState, centNum: usize, po
             CG_Error(ctx, &format!("Unknown event: {event}"));
         }
     }
+}
+
+/// Raven `CG_CheckEvents` - fires the entity's event (event-only entity or a
+/// riding `event` change) exactly once per event, then evaluates its position
+/// at the current snapshot time before handing off to `CG_EntityEvent`.
+///
+/// Source: `oracle/codemp/cgame/cg_event.c:3700-3730`
+pub fn CG_CheckEvents(ctx: &mut CgContext, ds: &DisplayState, centNum: usize) {
+    // check for event-only entities
+    {
+        let cent = ctx.world.entity_mut(centNum);
+        if cent.currentState.eType > entityType_t::ET_EVENTS as c_int {
+            if cent.previousEvent != 0 {
+                return; // already fired
+            }
+            // if this is a player event set the entity number of the client entity number
+            if cent.currentState.eFlags & EF_PLAYER_EVENT != 0 {
+                cent.currentState.number = cent.currentState.otherEntityNum;
+            }
+
+            cent.previousEvent = 1;
+
+            cent.currentState.event = cent.currentState.eType - entityType_t::ET_EVENTS as c_int;
+        } else {
+            // check for events riding with another entity
+            if cent.currentState.event == cent.previousEvent {
+                return;
+            }
+            cent.previousEvent = cent.currentState.event;
+            if (cent.currentState.event & !EV_EVENT_BITS) == 0 {
+                return;
+            }
+        }
+    }
+
+    // calculate the position at exactly the frame time
+    let serverTime = match ctx.world.cg.snap_ref() {
+        Some(snap) => snap.serverTime,
+        // §F19: no snapshot to evaluate the trajectory against yet - nothing
+        // to fire the event's position off of, so skip this frame.
+        None => return,
+    };
+    let cent = ctx.world.entity_mut(centNum);
+    BG_EvaluateTrajectory(&cent.currentState.pos, serverTime, &mut cent.lerpOrigin);
+
+    CG_SetEntitySoundPosition(ctx, centNum);
+
+    let position = ctx.world.entity(centNum).lerpOrigin;
+    CG_EntityEvent(ctx, ds, centNum, &position);
 }

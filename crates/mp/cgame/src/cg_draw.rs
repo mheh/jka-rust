@@ -63,7 +63,7 @@ use mp_qshared::shared::force_powers::{
     FP_SABERTHROW, FP_SABER_DEFENSE, FP_SABER_OFFENSE, FP_SEE, FP_SPEED, FP_TELEPATHY,
     NUM_FORCE_POWERS,
 };
-use mp_qshared::shared::limits::MAX_SAY_TEXT;
+use mp_qshared::shared::limits::{MAX_SAY_TEXT, SNAPFLAG_RATE_DELAYED};
 use mp_qshared::shared::q_color::{colorWhite, g_color_table};
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorCopy, _VectorMA, _VectorSubtract, vec3_origin, AngleVectors, AnglesToAxis,
@@ -101,6 +101,7 @@ use crate::cg_main::{CG_ConfigString, CG_Error, CG_GetLocationString, CG_GetStri
 use crate::cg_new_draw::{CG_OtherTeamHasFlag, CG_YourTeamHasFlag};
 use crate::cg_players::{CG_IsMindTricked, CG_RadiusForCent};
 use crate::cg_predict::{CG_G2Trace, CG_Trace};
+use crate::cg_scoreboard::CG_DrawOldScoreboard;
 use crate::cg_view::WAVE_FREQUENCY;
 use crate::cg_weapons::{CG_CalcMuzzlePoint, CG_RegisterItemVisuals, WEAPON_SELECT_TIME};
 use crate::local::cg_t::MAX_CHATBOX_ITEMS;
@@ -485,6 +486,10 @@ pub const vehDamageData: [veh_damage_t; 4] = [
 const COLOR_RED_INDEX: usize = 1;
 /// Source: `oracle/codemp/game/q_shared.h:1152,1158`
 const COLOR_GREEN_INDEX: usize = 2;
+/// Source: `oracle/codemp/game/q_shared.h:1153,1158`
+const COLOR_YELLOW_INDEX: usize = 3;
+/// Source: `oracle/codemp/game/q_shared.h:1154,1158`
+const COLOR_BLUE_INDEX: usize = 4;
 
 /// Raven `vec4_t colorTable[CT_MAX]` — the named HUD palette every cgame `.c`
 /// indexes with a `ct_table_t`. Never written, so a `const`, not state.
@@ -8034,4 +8039,345 @@ pub fn CG_DrawWarmup(ctx: &mut CgContext, ds: &DisplayState) {
         ITEM_TEXTSTYLE_SHADOWEDMORE,
         FONT_MEDIUM,
     );
+}
+
+/// Raven `CG_DrawStats` — draws the vehicle HUD if we're piloting, then the
+/// player HUD. Most of the body is commented out in Raven; only the HUD dispatch
+/// survives.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:2699-2745`
+pub fn CG_DrawStats(ctx: &mut CgContext, menus: &MenuSystem, ds: &DisplayState) {
+    let mut drawHUD = true;
+
+    // Raven: `cent = &cg_entities[cg.snap->ps.clientNum]` then treats it as
+    // non-null, so the whole body runs.
+    let centNum = match ctx.world.cg.snap_ref() {
+        Some(snap) => snap.ps.clientNum as usize,
+        // §F19: `cg.snap` is server-supplied and Raven derefs it unguarded; with
+        // no snapshot yet there's nothing to draw.
+        None => return,
+    };
+
+    // ps = &cg.predictedPlayerState
+    if ctx.world.cg.predictedPlayerState.m_iVehicleNum != 0 {
+        // In a vehicle???
+        drawHUD = CG_DrawVehicleHud(ctx, menus, centNum);
+    }
+
+    if drawHUD {
+        CG_DrawHUD(ctx, menus, ds, centNum);
+    }
+}
+
+/// Raven `CG_DrawUpperRight` — the stacked upper-right readouts (team overlay,
+/// snapshot/fps/timer, radar, enemy info, mini scoreboard, powerup icons).
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:4020-4056`
+pub fn CG_DrawUpperRight(ctx: &mut CgContext, ds: &DisplayState) {
+    // Raven's `#ifdef _XBOX` starts `y` at 50; the PC build starts at 0.
+    let mut y: f32 = 0.0;
+
+    trap::R_SetColor(ctx.engine, Some(&colorTable[ct_table_t::CT_WHITE as usize]));
+
+    if ctx.world.cgs.gametype >= GT_TEAM && ctx.world.cvars.cg_drawTeamOverlay.integer == 1 {
+        y = CG_DrawTeamOverlay(ctx, ds, y, true, true);
+    }
+    if ctx.world.cvars.cg_drawSnapshot.integer != 0 {
+        y = CG_DrawSnapshot(ctx, ds, y);
+    }
+
+    if ctx.world.cvars.cg_drawFPS.integer != 0 {
+        y = CG_DrawFPS(ctx, ds, y);
+    }
+    if ctx.world.cvars.cg_drawTimer.integer != 0 {
+        y = CG_DrawTimer(ctx, ds, y);
+    }
+
+    if (ctx.world.cgs.gametype >= GT_TEAM || ctx.world.cg.predictedPlayerState.m_iVehicleNum != 0)
+        && ctx.world.cvars.cg_drawRadar.integer != 0
+    {
+        //draw Radar in Siege mode or when in a vehicle of any kind
+        y = CG_DrawRadar(ctx, y);
+    }
+
+    y = CG_DrawEnemyInfo(ctx, ds, y);
+
+    y = CG_DrawMiniScoreboard(ctx, ds, y);
+
+    CG_DrawPowerupIcons(ctx, ds, y as c_int);
+}
+
+/// Raven `CG_DrawLagometer` — the two-row interpolate/snapshot graph in the
+/// lower-right, or the disconnect icon in its place.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:4252-4351`
+pub fn CG_DrawLagometer(ctx: &mut CgContext, ds: &DisplayState) {
+    if ctx.world.cvars.cg_lagometer.integer == 0 || ctx.world.cgs.localServer != qfalse {
+        CG_DrawDisconnect(ctx, ds);
+        return;
+    }
+
+    //
+    // draw the graph
+    //
+    let x: c_int = 640 - 48;
+    let y: c_int = 480 - 144;
+
+    let lagometerShader = ctx.world.cgs.media.lagometerShader;
+    let whiteShader = ctx.world.cgs.media.whiteShader;
+
+    trap::R_SetColor(ctx.engine, None);
+    CG_DrawPic(ctx, x as f32, y as f32, 48.0, 48.0, lagometerShader);
+
+    let ax: f32 = x as f32;
+    let ay: f32 = y as f32;
+    let aw: f32 = 48.0;
+    let ah: f32 = 48.0;
+
+    let mut color: c_int = -1;
+    let mut range: f32 = ah / 3.0;
+    let mid: f32 = ay + range;
+
+    let mut vscale: f32 = range / MAX_LAGOMETER_RANGE as f32;
+
+    // draw the frame interpoalte / extrapolate graph
+    let frameCount = ctx.world.draw.lagometer.frameCount;
+    for a in 0..(aw as c_int) {
+        let i = ((frameCount - 1 - a) & (LAG_SAMPLES as c_int - 1)) as usize;
+        let mut v = ctx.world.draw.lagometer.frameSamples[i] as f32;
+        v *= vscale;
+        if v > 0.0 {
+            if color != 1 {
+                color = 1;
+                trap::R_SetColor(ctx.engine, Some(&g_color_table[COLOR_YELLOW_INDEX]));
+            }
+            if v > range {
+                v = range;
+            }
+            trap::R_DrawStretchPic(
+                ctx.engine,
+                ax + aw - a as f32,
+                mid - v,
+                1.0,
+                v,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                whiteShader,
+            );
+        } else if v < 0.0 {
+            if color != 2 {
+                color = 2;
+                trap::R_SetColor(ctx.engine, Some(&g_color_table[COLOR_BLUE_INDEX]));
+            }
+            v = -v;
+            if v > range {
+                v = range;
+            }
+            trap::R_DrawStretchPic(
+                ctx.engine,
+                ax + aw - a as f32,
+                mid,
+                1.0,
+                v,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                whiteShader,
+            );
+        }
+    }
+
+    // draw the snapshot latency / drop graph
+    range = ah / 2.0;
+    vscale = range / MAX_LAGOMETER_PING as f32;
+
+    let snapshotCount = ctx.world.draw.lagometer.snapshotCount;
+    for a in 0..(aw as c_int) {
+        let i = ((snapshotCount - 1 - a) & (LAG_SAMPLES as c_int - 1)) as usize;
+        let mut v = ctx.world.draw.lagometer.snapshotSamples[i] as f32;
+        if v > 0.0 {
+            if ctx.world.draw.lagometer.snapshotFlags[i] & SNAPFLAG_RATE_DELAYED != 0 {
+                if color != 5 {
+                    color = 5; // YELLOW for rate delay
+                    trap::R_SetColor(ctx.engine, Some(&g_color_table[COLOR_YELLOW_INDEX]));
+                }
+            } else if color != 3 {
+                color = 3;
+                trap::R_SetColor(ctx.engine, Some(&g_color_table[COLOR_GREEN_INDEX]));
+            }
+            v *= vscale;
+            if v > range {
+                v = range;
+            }
+            trap::R_DrawStretchPic(
+                ctx.engine,
+                ax + aw - a as f32,
+                ay + ah - v,
+                1.0,
+                v,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                whiteShader,
+            );
+        } else if v < 0.0 {
+            if color != 4 {
+                color = 4; // RED for dropped snapshots
+                trap::R_SetColor(ctx.engine, Some(&g_color_table[COLOR_RED_INDEX]));
+            }
+            trap::R_DrawStretchPic(
+                ctx.engine,
+                ax + aw - a as f32,
+                ay + ah - range,
+                1.0,
+                range,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                whiteShader,
+            );
+        }
+    }
+
+    trap::R_SetColor(ctx.engine, None);
+
+    if ctx.world.cvars.cg_nopredict.integer != 0
+        || ctx.world.cvars.cg_synchronousClients.integer != 0
+    {
+        CG_DrawBigString(ctx, ds, ax as c_int, ay as c_int, "snc", 1.0);
+    }
+
+    CG_DrawDisconnect(ctx, ds);
+}
+
+/// Raven `CG_DrawCrosshairNames` — the name of whoever the crosshair is on,
+/// tinted by team/duel relationship and faded on the crosshair timer.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:6333-6460`
+pub fn CG_DrawCrosshairNames(ctx: &mut CgContext, ds: &DisplayState) {
+    if ctx.world.cvars.cg_drawCrosshair.integer == 0 {
+        return;
+    }
+
+    // scan the known entities to see if the crosshair is sighted on one
+    CG_ScanForCrosshairEntity(ctx);
+
+    if ctx.world.cvars.cg_drawCrosshairNames.integer == 0 {
+        return;
+    }
+    //rww - still do the trace, our dynamic crosshair depends on it
+
+    let mut isVeh = false;
+    if ctx.world.cg.crosshairClientNum < ENTITYNUM_WORLD {
+        // copy the vehicle's state out so the borrow ends before we write cg
+        let ves = &ctx
+            .world
+            .entity(ctx.world.cg.crosshairClientNum as usize)
+            .currentState;
+        let (eType, npcClass, owner, number) = (ves.eType, ves.NPC_class, ves.owner, ves.number);
+
+        if eType == entityType_t::ET_NPC as c_int
+            && npcClass == class_t::CLASS_VEHICLE as c_int
+            && owner < MAX_CLIENTS_I32
+        {
+            //draw the name of the pilot then
+            ctx.world.cg.crosshairClientNum = owner;
+            ctx.world.cg.crosshairVehNum = number;
+            ctx.world.cg.crosshairVehTime = ctx.world.cg.time;
+            isVeh = true; //so we know we're drawing the pilot's name
+        }
+    }
+
+    if ctx.world.cg.crosshairClientNum >= MAX_CLIENTS_I32 {
+        return;
+    }
+
+    let cn = ctx.world.cg.crosshairClientNum as usize;
+
+    if ctx.world.entity(cn).currentState.powerups & (1 << PW_CLOAKED) != 0 {
+        return;
+    }
+
+    // draw the name of the player being looked at
+    let crosshairClientTime = ctx.world.cg.crosshairClientTime;
+    let Some(color) = CG_FadeColor(ctx.world, crosshairClientTime, 1000) else {
+        trap::R_SetColor(ctx.engine, None);
+        return;
+    };
+
+    // Raven derefs `cg.snap` unguarded below (duel state); a null there is UB.
+    let (snapPsClientNum, snapPsDuelInProgress, snapPsDuelIndex) = match ctx.world.cg.snap_ref() {
+        Some(snap) => (
+            snap.ps.clientNum as usize,
+            snap.ps.duelInProgress,
+            snap.ps.duelIndex,
+        ),
+        // §F19: no snapshot yet means nothing to draw.
+        None => return,
+    };
+    let predClientNum = ctx.world.cg.predictedPlayerState.clientNum as usize;
+
+    let name = buf_to_string(&ctx.world.cgs.clientinfo[cn].name.map(|c| c as u8));
+
+    let mut baseColor: usize;
+    if ctx.world.cgs.gametype >= GT_TEAM {
+        // Raven's `if (1)`: instead of team-based we orient by which team we're
+        // on. The `else` arm (TEAM_RED/TEAM_BLUE coloring) is dead behind it.
+        if ctx.world.cgs.clientinfo[cn].team
+            == ctx.world.cg.predictedPlayerState.persistant[PERS_TEAM as usize]
+        {
+            baseColor = ct_table_t::CT_GREEN as usize;
+        } else {
+            baseColor = ct_table_t::CT_RED as usize;
+        }
+    } else if ctx.world.cgs.gametype == GT_POWERDUEL
+        && ctx.world.cgs.clientinfo[snapPsClientNum].team != TEAM_SPECTATOR
+        && ctx.world.cgs.clientinfo[cn].duelTeam == ctx.world.cgs.clientinfo[predClientNum].duelTeam
+    {
+        //on the same duel team in powerduel, so he's a friend
+        baseColor = ct_table_t::CT_GREEN as usize;
+    } else {
+        baseColor = ct_table_t::CT_RED as usize; //just make it red in nonteam modes since everyone is hostile and crosshair will be red on them too
+    }
+
+    if snapPsDuelInProgress != qfalse {
+        if cn as c_int != snapPsDuelIndex {
+            //grey out crosshair for everyone but your foe if you're in a duel
+            baseColor = ct_table_t::CT_BLACK as usize;
+        }
+    } else if ctx.world.entity(cn).currentState.bolt1 != 0 {
+        //this fellow is in a duel. We just checked if we were in a duel above, so
+        //this means we aren't and he is. Which of course means our crosshair greys out over him.
+        baseColor = ct_table_t::CT_BLACK as usize;
+    }
+
+    let mut tcolor: vec4_t = [0.0; 4];
+    tcolor[0] = colorTable[baseColor][0];
+    tcolor[1] = colorTable[baseColor][1];
+    tcolor[2] = colorTable[baseColor][2];
+    tcolor[3] = color[3] * 0.5;
+
+    let sanitized = CG_SanitizeString(&name);
+
+    if isVeh {
+        let str = format!("{sanitized} (pilot)");
+        UI_DrawProportionalString(ctx, ds, 320, 170, &str, UI_CENTER, tcolor);
+    } else {
+        UI_DrawProportionalString(ctx, ds, 320, 170, &sanitized, UI_CENTER, tcolor);
+    }
+
+    trap::R_SetColor(ctx.engine, None);
+}
+
+/// Raven `CG_DrawScoreboard` — the new (menu-driven) scoreboard is compiled out
+/// (`#if 0`), so this just forwards to the old scoreboard.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:6727-6793`
+pub fn CG_DrawScoreboard(ctx: &mut CgContext, ds: &DisplayState) -> bool {
+    CG_DrawOldScoreboard(ctx, ds)
 }
