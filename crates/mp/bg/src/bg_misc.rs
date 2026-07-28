@@ -1896,13 +1896,16 @@ pub const MAX_POOL_SIZE_CGAME: c_int = 2048000;
 ///
 /// Source: `oracle/codemp/game/bg_misc.c:3371-3381`
 pub fn BG_TempFree(size: c_int, bg: &mut BgState) {
+    // Raven's MAX_POOL_SIZE here is the compiling module's own arm, so the
+    // ceiling is this host's pool size — not the QAGAME const.
+    let pool_size = bg.bg_pool.len() as c_int;
     let mut sz = size;
     sz = (sz + 0x00000003) & !3;
-    if bg.bg_poolTail + sz > MAX_POOL_SIZE {
+    if bg.bg_poolTail + sz > pool_size {
         panic!(
             "BG_TempFree: tail greater than size ({} > {})",
             bg.bg_poolTail + sz,
-            MAX_POOL_SIZE
+            pool_size
         );
     }
     bg.bg_poolTail += sz;
@@ -1927,7 +1930,8 @@ pub fn BG_StringAlloc(source: *const c_char, bg: &mut BgState) -> *mut c_char {
 ///
 /// Source: `oracle/codemp/game/bg_misc.c:3392-3395`
 pub fn BG_OutOfMemory(bg: &BgState) -> qboolean {
-    if bg.bg_poolSize >= MAX_POOL_SIZE {
+    // same per-host arm story as BG_TempFree above
+    if bg.bg_poolSize >= bg.bg_pool.len() as c_int {
         qtrue
     } else {
         qfalse
