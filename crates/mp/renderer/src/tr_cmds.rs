@@ -65,8 +65,9 @@ pub fn R_IssueRenderCommands(
     // to look at it's performance counters
     if run_performance_counters {
         // DEFERRED: R_PerformanceCounters — no R2 carrier exists for this
-        // callee's own state (`tr.pc`/`backEnd.pc`/`tr.viewParms.zFar`/
-        // `tr.viewCluster` all UNMAPPED — see this file's own
+        // callee's own state (`tr.pc`/`backEnd.pc`/`tr.viewParms.zFar` all
+        // UNMAPPED; `tr.viewCluster` is homed now as
+        // `FrameState::view_cluster` — see this file's own
         // `R_PerformanceCounters` DEFERRED note below), so no fn exists in
         // this crate to call. This wave's packet lists `R_PerformanceCounters`
         // as already ported in wave 2 under `tr_cmds.cpp`; that claim is
@@ -271,8 +272,9 @@ pub fn RE_RotatePic2(
 //   - `tr.viewParms.zFar` is explicitly owned by "the tr_main R3 wave", per
 //     `ViewParms`'s own doc comment (`render_state/placeholders.rs:159-166`)
 //     — also not this wave.
-//   - `tr.viewCluster` (same frontend-scratch bucket as `tr.pc`) has no
-//     field home either.
+//   - `tr.viewCluster` is no longer a blocker: campaign #41 batch 1 homed it
+//     as `FrameState::view_cluster`. The three rows above still stand, and
+//     every path shares them, so the fn stays deferred.
 // No branch — including the `r_speeds->integer == 7` texture/buffer-size
 // print, whose own inputs (`glConfig`, `RendererCvars::r_texturebits`) are
 // otherwise available — can be transcribed standalone, because every path

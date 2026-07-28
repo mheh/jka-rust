@@ -3,6 +3,7 @@
 /// Raven `alphaGen_t` — alpha generation modes.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:226-240`
+#[derive(Clone, Copy)]
 #[repr(i32)]
 pub enum alphaGen_t {
     AGEN_IDENTITY,

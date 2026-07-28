@@ -25,6 +25,7 @@ use crate::tr_cmds::R_SyncRenderThread;
 use crate::tr_image::{R_Images_GetNextIteration, R_Images_StartIteration};
 use crate::tr_local::cull_type_t::cullType_t;
 use crate::tr_main::{DrawSurf, SurfaceGeometry};
+use crate::tr_public::ref_flags::RDF_NOWORLDMODEL;
 use crate::tr_worldeffects::world_effects::{WindZoneState, WorldEffectsState};
 
 // `R_WorldCoordToScreenCoordFloat` threads `RenderAssets::glconfig`
@@ -361,17 +362,20 @@ pub fn EndPixelShader(pixel_shader: &PixelShaderState) {
 ///   fields (`fov_x`/`fov_y`/`view_origin`/`view_axis`) — `rdflags` lands
 ///   with the `tr_scene` wave (R2 `## State ownership`, `trRefdef_t` row),
 ///   so the `RDF_SKYBOXPORTAL`/`RDF_NOWORLDMODEL`/`RDF_AUTOMAP`/
-///   `RDF_HYPERSPACE` bit tests this fn guards on are left undecoded rather
-///   than guessed at (same treatment as `GL_State`'s `GLS_*` bits, DEC-37
-///   A13.2);
+///   `RDF_HYPERSPACE` bit tests this fn guards on are left undecoded — the
+///   masks themselves are no longer the gap (`tr_public::ref_flags` is the
+///   crate's canonical flag home), the `rdflags` operand is;
 /// - `ViewParms`/`OrientationR` (`FrameState::view`/`ori`) are still empty
 ///   stubs — `isPortal`/`portalPlane`/`ori.axis` land with the `tr_main`
 ///   wave;
 /// - `tr.world`'s `globalFog`/`fogs` land with the `tr_bsp`/`tr_world` wave;
-/// - `g_bRenderGlowingObjects`/`skyboxportal`/`tr_stencilled` are file-scope
-///   statics with no R2-assigned carrier yet (DEC-37 A13.3 — a per-subsystem
-///   state struct is named by whichever fn's wave actually reads/writes
-///   them; none of that state is reached by the portable slice below);
+/// - `g_bRenderGlowingObjects`/`skyboxportal` are homed now
+///   (`FrameState::render_glowing_objects`/`skyboxportal`, campaign #41
+///   batch 1, DEC-37 A13.3), but every read of them here sits behind the
+///   blocked cvar/`TrRefdef`/`ViewParms` state above; `tr_stencilled` still
+///   has no carrier (DEC-37 A13.3 — a per-subsystem state struct is named by
+///   whichever fn's wave actually reads/writes it, and none of that state is
+///   reached by the portable slice below);
 /// - every `qgl*` call (`qglFinish`/`qglClearColor`/`qglClear`/
 ///   `qglLoadMatrixf`/`qglClipPlane`/`qglEnable`/`qglDisable`) is GL-only —
 ///   `GpuResources::gl_state` stays a named placeholder until R4 (DEC-37
@@ -747,15 +751,15 @@ pub fn RB_ShowImages(
 ///   ported callees in this wave's resolved call surface (`RB_SurfaceFace`/
 ///   `RB_SurfaceGrid`/... are a later wave) — `DrawSurf<S>::surface`'s tagged
 ///   dispatch stays unresolved regardless of the state above.
-/// - `g_bRenderGlowingObjects`/`g_postRenders`/`g_numPostRenders`/
-///   `rb_surfaceTable`/`tr_stencilled` are this packet's STATE HOMES rows
-///   marked "NAMED BY THIS WAVE if this file's wave is where the subsystem
-///   lands" (DEC-37 A13.3); every real read/write site of them sits behind
-///   the blocked state above (the postRender decision itself needs
+/// - `g_bRenderGlowingObjects` is homed now
+///   (`FrameState::render_glowing_objects`, campaign #41 batch 1, DEC-37
+///   A13.3); `g_postRenders`/`g_numPostRenders`/`rb_surfaceTable`/
+///   `tr_stencilled` are still this packet's STATE HOMES rows marked "NAMED
+///   BY THIS WAVE if this file's wave is where the subsystem lands". Either
+///   way every real read/write site sits behind the blocked state above (the
+///   postRender decision itself needs
 ///   `backEnd.refdef.entities[entityNum].e.renderfx`), so there is no
-///   landable use site that would justify inventing the carrier struct now —
-///   same "stay unmapped rather than invented" call `RB_EndSurface`'s port
-///   made for `skyboxportal`/`drawskyboxportal` (`tr_shade.rs`).
+///   landable use site here.
 /// - `qglLoadMatrixf`/`qglDepthRange`/`qglCopyTexImage2D` are GL-only
 ///   (DEC-37 A13.2).
 /// - `RB_CaptureScreenImage`/`RB_DistortionFill`/`RB_ShadowFinish`/
@@ -926,13 +930,6 @@ pub fn RB_StretchPic(
     // Source: oracle/codemp/renderer/tr_backend.cpp:1433-1487
 }
 
-/// Raven `RDF_NOWORLDMODEL` — restated from `tr_main.rs`'s own local `const`
-/// (not `pub` there, so not reachable from this file); same confirmed value
-/// as `tr_light.rs`/`tr_world.rs`'s own restatements of the same literal.
-///
-/// Source: `oracle/codemp/cgame/tr_types.h:57`
-const RDF_NOWORLDMODEL: i32 = 1;
-
 /// Raven `RB_DrawSurfs` — the `RC_DRAW_SURFS` backend command: draws the
 /// sorted surface list for a view, then (retail, non-`_XBOX`) runs the
 /// dynamic-glow pass when the world model is present and both the runtime
@@ -972,7 +969,7 @@ const RDF_NOWORLDMODEL: i32 = 1;
 /// `r_DynamicGlow->integer` (a live cvar read, which needs `Common::cvar`,
 /// not threaded to this fn) have no carrier — the same "stay unmapped rather
 /// than invented" call `RB_RenderDrawSurfList`'s port made just above for
-/// `g_bRenderGlowingObjects`/`g_postRenders`/`rb_surfaceTable`, and the
+/// `g_postRenders`/`rb_surfaceTable`, and the
 /// reason this fn takes no `RendererCvars` (a cvar handle table with no
 /// `Common` to resolve it against buys nothing). The block's body is GL
 /// surface throughout: `qglDisable`/`qglEnable`/`qglBindTexture`/
@@ -981,9 +978,10 @@ const RDF_NOWORLDMODEL: i32 = 1;
 /// viewport-swap dance over `r_DynamicGlowWidth`/`r_DynamicGlowHeight`, and
 /// `RB_BlurGlowTexture`/`RB_DrawGlowOverlay`'s own already-deferred bodies.
 /// The one non-GL effect, the second `RB_RenderDrawSurfList` call bracketed
-/// by the `g_bRenderGlowingObjects` write, is inseparable from that flag's
-/// missing carrier: without it the second pass would draw the same surfaces
-/// again rather than the glow subset (DEC-37 A13.1, A13.3).
+/// by the `g_bRenderGlowingObjects` write, now has its flag homed
+/// (`FrameState::render_glowing_objects`, campaign #41 batch 1) — but it is
+/// still unreachable, because the guard above it needs
+/// `g_bDynamicGlowSupported`/`r_DynamicGlow` (DEC-37 A13.1, A13.3).
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:1641-1697`
 ///
 /// Panics via `RB_RenderDrawSurfList`'s loud stub until its owning wave lands.

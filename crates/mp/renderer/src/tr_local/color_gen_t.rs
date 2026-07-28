@@ -3,6 +3,7 @@
 /// Raven `colorGen_t` — color generation modes.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:242-257`
+#[derive(Clone, Copy)]
 #[repr(i32)]
 pub enum colorGen_t {
     CGEN_BAD,

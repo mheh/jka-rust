@@ -12,8 +12,9 @@
 //! Quarantine still holds, but several are no longer empty: the R3 wave-0
 //! transcription landed the fields it reads on `RefEntity`, `TrRefdef`,
 //! `WorldAsset`, `FunctionTables` and `GlConfig` (each type's doc comment says
-//! which set is real and which wave lands the rest). `Poly`, `ViewParms`,
-//! `OrientationR`, `BackEndCounters`, `SkyParms`, `AutomapWireframe` and
+//! which set is real and which wave lands the rest), and campaign #41 batch 1
+//! filled `OrientationR` outright (all four oracle fields are value arrays).
+//! `Poly`, `ViewParms`, `BackEndCounters`, `SkyParms`, `AutomapWireframe` and
 //! `GlStatePlaceholder` are untouched by wave-0 and stay empty.
 //!
 //! Two exceptions carry a real shape already, because the oracle payload they
@@ -92,10 +93,35 @@ pub struct RefEntity {
     pub custom_shader: qhandle_t,
     /// `e.shaderRGBA`.
     pub shader_rgba: [u8; 4],
+    /// `e.radius` — extra sprite information.
+    ///
+    /// Source: `oracle/codemp/cgame/tr_types.h:158`
+    pub radius: f32,
+    /// `e.rotation` — extra sprite information.
+    ///
+    /// Source: `oracle/codemp/cgame/tr_types.h:159`
+    pub rotation: f32,
+    /// `e.frame` — Raven: also used as `MODEL_BEAM`'s diameter, and as the
+    /// `Q_random`/`Q_crandom` seed the lightning surfaces step through.
+    ///
+    /// Source: `oracle/codemp/cgame/tr_types.h:163`
+    pub frame: i32,
     /// `e.lightingOrigin`.
     pub lighting_origin: Vec3,
     /// `e.endTime`.
     pub end_time: f32,
+    /// `e.saberLength`.
+    ///
+    /// Source: `oracle/codemp/cgame/tr_types.h:238`
+    pub saber_length: f32,
+    /// `e.angles` — Raven: rotation angles - used for Ghoul2.
+    ///
+    /// Source: `oracle/codemp/cgame/tr_types.h:243`
+    pub angles: Vec3,
+    /// `e.modelScale` — Raven: axis scale for models.
+    ///
+    /// Source: `oracle/codemp/cgame/tr_types.h:245`
+    pub model_scale: Vec3,
     /// `e.ghoul2 != NULL` — a presence flag, not the pointer: the tier-1
     /// `*mut c_void` tail is forbidden interior.
     pub has_ghoul2: bool,
@@ -131,8 +157,14 @@ impl Default for RefEntity {
             old_origin: [0.0; 3],
             custom_shader: 0,
             shader_rgba: [0; 4],
+            radius: 0.0,
+            rotation: 0.0,
+            frame: 0,
             lighting_origin: [0.0; 3],
             end_time: 0.0,
+            saber_length: 0.0,
+            angles: [0.0; 3],
+            model_scale: [0.0; 3],
             has_ghoul2: false,
             need_dlights: false,
             lighting_calculated: false,
@@ -175,12 +207,29 @@ pub struct TrRefdef {
 pub struct ViewParms {}
 
 /// The owned form of Raven `orientationr_t` — `FrameState::ori` (`R2-D7`(b):
-/// Rust spells it `ori` on both modes). Fields land with the `tr_main` R3
-/// wave.
+/// Rust spells it `ori` on both modes). All four oracle fields are plain
+/// value arrays, so the whole struct lands owned.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:109-114`
-#[derive(Clone)]
-pub struct OrientationR {}
+#[derive(Clone, Default)]
+pub struct OrientationR {
+    /// `origin` — Raven: in world coordinates.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:110`
+    pub origin: Vec3,
+    /// `axis[3]` — Raven: orientation in world.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:111`
+    pub axis: [Vec3; 3],
+    /// `viewOrigin` — Raven: `viewParms->or.origin` in local coordinates.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:112`
+    pub view_origin: Vec3,
+    /// `modelMatrix[16]`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:113`
+    pub model_matrix: [f32; 16],
+}
 
 /// The owned form of Raven `backEndCounters_t` — `FrameState::counters`
 /// (`backEnd.pc`). Fields land with the R4 backend wave.

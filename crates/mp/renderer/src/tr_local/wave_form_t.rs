@@ -7,6 +7,7 @@ use super::gen_func_t::genFunc_t;
 /// Raven `waveForm_t`.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:287-294`
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct waveForm_t {
     pub func: genFunc_t,

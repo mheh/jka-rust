@@ -46,6 +46,7 @@ use crate::tr_main::{
     CULL_CLIP, CULL_IN, CULL_OUT,
 };
 use crate::tr_model::render_models::RenderModels;
+use crate::tr_public::ref_flags::RDF_NOWORLDMODEL;
 
 /// Raven `Q_CastShort2Float` — widen a packed lightgrid short to a float.
 /// Out-param `float *f` becomes a return value (§C7).
@@ -1566,13 +1567,6 @@ pub fn R_RecursiveWorldNode(
 }
 
 // ===== wave 6 =====
-
-/// Raven `RDF_NOWORLDMODEL` — restated from `tr_main.rs`'s own local `const`
-/// (not `pub` there, so not reachable from this file); same confirmed value
-/// as `tr_light.rs`/`tr_terrain.rs`'s own restatements of the same literal.
-///
-/// Source: `oracle/codemp/cgame/tr_types.h:57`
-const RDF_NOWORLDMODEL: i32 = 1;
 
 /// Raven `R_AddWorldSurfaces` — entry point for adding the world's
 /// potentially-visible surfaces to this frame's draw-surf list: mark this

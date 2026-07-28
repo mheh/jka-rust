@@ -1077,13 +1077,15 @@ pub fn DoSprite(
 /// `Q_random(&e->frame)` (`tr_surface.cpp:1075-1077,1100,1113`): both seed
 /// from **the current entity's own `frame` field**, not an ambient/global
 /// LCG (`Q_crandom`/`Q_random` are already ported, `native_math::qmath
-/// ::{Q_crandom, Q_random}`, `*mut c_int` seed param). The real blockers are
-/// (1) `RefEntity` (`render_state/placeholders.rs:67-110`) carries no
-/// `frame` field to seed from, and (2) each call also *writes* the seed
-/// in-place through that pointer — this fn's `Option<&RefEntity>` dispatch
-/// shape (the `RB_SurfaceElectricity`/`RB_SurfaceFlare` precedent, this
-/// file) is immutable, so even with a `frame` field there is nowhere to
-/// commit the mutation across the loop's repeated calls. The `RF_FORKED`
+/// ::{Q_crandom, Q_random}`, `*mut c_int` seed param). Blocker (1) — no
+/// `frame` field to seed from — is now closed: `RefEntity::frame` exists
+/// (campaign #41 batch 1,
+/// `render_state/placeholders.rs`) — but (2) stands: each call also *writes*
+/// the seed in-place through that pointer, and this fn's `Option<&RefEntity>`
+/// dispatch shape (the `RB_SurfaceElectricity`/`RB_SurfaceFlare` precedent,
+/// this file) is immutable, so there is still nowhere to commit the mutation
+/// across the loop's repeated calls. Switching the dispatch shape to
+/// `Option<&mut RefEntity>` is the follow-up rewire. The `RF_FORKED`
 /// branch's `f_count--` write is this packet's STATE HOMES row
 /// `DoBoltSeg`/`f_count`: "per-subsystem owned state struct, NAMED BY THIS
 /// WAVE if this file's wave is where the subsystem lands" — this file
@@ -1093,13 +1095,11 @@ pub fn DoSprite(
 /// oracle's `f_count` is **file-scope** (`static float f_count;`,
 /// `tr_surface.cpp:956`, alongside `sh1`/`sh2`), not fn-scope, and is a
 /// `float`, not an `int`. The loop also reads `e->renderfx & RF_TAPERED`
-/// (`:1088`) — `RF_TAPERED` (`0x08000`) has no const anywhere in this crate
-/// yet, unlike its `oracle/codemp/cgame/tr_types.h:43-45` block-mates
-/// `RF_FORKED`/`RF_GROW` (still also unported themselves) and the same
-/// block's `RF_DISINTEGRATE1`/`RF_DISINTEGRATE2` (`:47-48`, already
-/// transcribed, `tr_shade_calc.rs:126,132`) — and the
-/// `LIGHTNING_RECURSION_LEVEL` constant it passes to `ApplyShape`
-/// (`:958`, `#define LIGHTNING_RECURSION_LEVEL 1`, also unported). The
+/// (`:1088`) — `RF_TAPERED`/`RF_FORKED`/`RF_GROW` are now ported in the
+/// crate's canonical flag home (`tr_public::ref_flags`), so the masks are no
+/// longer a blocker. Still unported is the `LIGHTNING_RECURSION_LEVEL`
+/// constant it passes to `ApplyShape`
+/// (`:958`, `#define LIGHTNING_RECURSION_LEVEL 1`). The
 /// loop's two in-module callees (`ApplyShape`, the self-recursive
 /// `DoBoltSeg`) are both blocked by the same gaps.
 ///
@@ -1215,13 +1215,12 @@ pub fn RB_SurfaceFlare(
 /// (`e->saberLength`..`0`, `DoSprite` per step) then a single larger,
 /// slightly randomized "hilt glow" sprite at the entity's origin.
 ///
-/// DEFERRED: escalation — every statement needs an input `RefEntity` does not
-/// carry: the stepping loop reads `e->saberLength`/`e->radius`
-/// (`oracle/codemp/cgame/tr_types.h:158`), neither among the fields wave 0
-/// landed (`render_state/placeholders.rs`) — a state home this packet marks
-/// mapped-but-not-yet-populated is an escalation, not an invention (preamble)
-/// — and the trailing hilt-glow call's radius argument
-/// (`5.5f + random() * 0.25f`) needs `random()` — **not** the engine's own
+/// DEFERRED: escalation — the stepping loop's `e->saberLength`/`e->radius`
+/// inputs are now real (`RefEntity::saber_length`/`radius`, campaign #41
+/// batch 1; `oracle/codemp/cgame/tr_types.h:238,158`), so transcribing the
+/// loop is a follow-up rewire. What still blocks the fn as a whole is the
+/// trailing hilt-glow call's radius argument
+/// (`5.5f + random() * 0.25f`), which needs `random()` — **not** the engine's own
 /// `Q_random` LCG: `random()`/`crandom()` are a `#define` over libc `rand()`
 /// (`oracle/codemp/game/q_shared.h:1591-1592`), a distinct generator this
 /// crate's port convention places on the game tier's `bg_channel::rng::Rng`
@@ -1232,8 +1231,8 @@ pub fn RB_SurfaceFlare(
 /// `DoSprite`, the sole callee, is itself already ported and not the
 /// blocker.
 ///
-/// Whole-body deferral: no statement is independent of `saberLength`/
-/// `radius`/`random()`, so this lands as a loud `todo!()` rather than a
+/// Whole-body deferral: the trailing hilt-glow sprite is unconditional and
+/// depends on `random()`, so this stays a loud `todo!()` rather than a
 /// silent no-op (whole-fn-deferral convention — partial-body fns keep
 /// DEFERRED comments instead).
 ///
@@ -1264,18 +1263,12 @@ pub fn RB_SurfaceSaberGlow(
 /// landed on `RefEntity`) is real CPU logic and is transcribed.
 ///
 /// DEFERRED: escalation — everything past that setup (see doc comment
-/// above): `radius = e->radius` needs `RefEntity::radius`
-/// (`oracle/codemp/cgame/tr_types.h:158`), not among the fields wave 0
-/// landed — a state home this packet marks mapped-but-not-yet-populated is
-/// an escalation, not an invention (preamble). The `RF_GROW` growth branch
-/// additionally needs `tr.refdef.time` (`FrameState::refdef`'s `TrRefdef` has
+/// above). `radius = e->radius` and the `RF_GROW` mask are both closed now
+/// (`RefEntity::radius`, campaign #41 batch 1; `tr_public::ref_flags
+/// ::RF_GROW`), so those two are a follow-up rewire. What still blocks the
+/// growth branch is `tr.refdef.time` (`FrameState::refdef`'s `TrRefdef` has
 /// no `time` field yet, packet STATE HOMES row `RB_SurfaceElectricity`/`tr`).
-/// (`RF_GROW`'s bit value itself is not the blocker — `0x10000`, verifiable
-/// at `oracle/codemp/cgame/tr_types.h:43-45` alongside `RF_FORKED`/
-/// `RF_TAPERED`, the same block this crate already transcribes part of,
-/// `tr_shade_calc.rs:126,132`'s `RF_DISINTEGRATE1`/`RF_DISINTEGRATE2` — it is
-/// simply not yet ported as a const anywhere in this crate, an omission, not
-/// an unknowable value.) The subsequent `VectorMA(..., e->oldorigin)` writes
+/// The subsequent `VectorMA(..., e->oldorigin)` writes
 /// the entity's `oldorigin`
 /// in place — a mutation this file's `Option<&RefEntity>` shape cannot
 /// express (the same shape as every other dispatch entry in this file). The

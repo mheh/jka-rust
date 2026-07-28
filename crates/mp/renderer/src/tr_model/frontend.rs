@@ -730,12 +730,8 @@ pub(crate) fn r_load_md3(
 /// type is the owned `GlConfig`, cloned at the same point Raven copies the
 /// struct by value.
 ///
-/// `tr.viewCluster = -1;` — DEFERRED, not written: `tr.viewCluster` has no
-/// R2 field home. This is the same frontend-scratch-bucket gap this crate's
-/// `R_PerformanceCounters` PORT-NOTE already escalates for the identical
-/// global (`tr_cmds.rs`: "`tr.viewCluster` (same frontend-scratch bucket as
-/// `tr.pc`) has no field home either") — `FrameState` carries no
-/// `view_cluster` field to write.
+/// `tr.viewCluster = -1;` — landed: `FrameState::view_cluster` is the field
+/// home (campaign #41 batch 1).
 /// Source: `oracle/codemp/renderer/tr_model.cpp:1637`
 ///
 /// `// rww - 9-13-01 [1-26-01-sof2]` / `//R_ClearFlares();` — already
@@ -787,7 +783,8 @@ pub fn RE_BeginRegistration(
 
     R_SyncRenderThread(assets, common, cvars);
 
-    // `tr.viewCluster = -1;` — DEFERRED, see doc comment above.
+    // tr.viewCluster = -1;
+    frame.view_cluster = -1;
 
     RE_ClearScene(frame_data, scene);
 

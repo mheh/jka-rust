@@ -79,6 +79,7 @@ use crate::tr_local::tr_refdef_t::trRefdef_t;
 use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_main::{DrawSurf, R_AddDrawSurf, SurfaceGeometry};
 use crate::tr_model::render_models::RenderModels;
+use crate::tr_public::ref_flags::RDF_NOWORLDMODEL;
 use crate::tr_shader::{RE_RegisterShader, R_CreateBlendedShader, R_GetShaderByHandle};
 use crate::tr_sky::SkyState;
 use crate::tr_surface::RB_CheckOverflow;
@@ -1071,13 +1072,6 @@ pub fn R_TerrainShutdown(cm: &mut CollisionWorld, land_scape: &mut srfTerrain_t)
 // ---------------------------------------------------------------------
 // wave 1
 // ---------------------------------------------------------------------
-
-/// Raven `RDF_NOWORLDMODEL` — restated from `tr_main.rs`'s own local `const`
-/// (not `pub` there, so not reachable from this file); same confirmed value
-/// (`tr_light.rs`'s own restatement of the same literal).
-///
-/// Source: `oracle/codemp/cgame/tr_types.h`
-const RDF_NOWORLDMODEL: i32 = 1;
 
 /// Raven `RDF_NOFOG` — restated from `tr_main.rs`'s own local `const` (not
 /// `pub` there).

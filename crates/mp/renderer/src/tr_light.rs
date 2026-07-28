@@ -25,6 +25,7 @@ use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_local::dlight_s::dlight_t;
 use crate::tr_local::mgrid_t::mgrid_t;
 use crate::tr_local::orientationr_t::orientationr_t;
+use crate::tr_public::ref_flags::RDF_NOWORLDMODEL;
 use crate::tr_shade_calc::myftol;
 
 // This wave threads `RenderAssets`, `FrameState`, `RendererCvars` (the R2
@@ -73,13 +74,6 @@ const RF_FIRST_PERSON: i32 = 0x00004;
 ///
 /// Source: `oracle/codemp/cgame/tr_types.h:28`
 const RF_LIGHTING_ORIGIN: i32 = 0x00080;
-
-/// Raven `RDF_NOWORLDMODEL`. Value confirmed against the already-ported
-/// `crates/mp/renderer/src/tr_main.rs`'s `RDF_NOWORLDMODEL` (same literal,
-/// same `refdef_rdflags`-parameter threading pattern used below).
-///
-/// Source: `oracle/codemp/cgame/tr_types.h`
-const RDF_NOWORLDMODEL: i32 = 1;
 
 /// `FUNCTABLE_MASK` (`FUNCTABLE_SIZE - 1`).
 ///

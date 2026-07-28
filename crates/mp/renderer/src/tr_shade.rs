@@ -425,11 +425,10 @@ pub fn RB_FogPass(_gpu: &mut GpuResources) {
 /// downstream line is even reachable without it; `tr.shadowShader` has no
 /// `RenderAssets` field landed by any prior wave (only the tier-2
 /// `tr_globals_t::shadowShader` raw pointer exists, scaffolding this wave may
-/// not extend); `skyboxportal`/`drawskyboxportal`
-/// are per-subsystem owned state this packet's `STATE HOMES` marks "NAMED BY
-/// THIS WAVE if this file's wave is where the subsystem lands" — this wave's
-/// one fn only reads them, never a write site that would justify naming the
-/// carrier, so they stay unmapped rather than invented (DEC-37 A13.3);
+/// not extend); `skyboxportal`/`drawskyboxportal` are homed now
+/// (`FrameState::skyboxportal`/`drawskyboxportal`, campaign #41 batch 1,
+/// DEC-37 A13.3) but this wave's one fn only reads them, behind the
+/// dissolved `tess`, so nothing lands from them;
 /// `backEnd.refdef.rdflags` needs a `TrRefdef` field not landed (only
 /// `fov_x`/`fov_y`/`view_origin`/`view_axis` are real —
 /// `render_state::placeholders`); `backEnd.pc.c_shaders`/`c_vertexes`/
@@ -601,14 +600,14 @@ pub fn ComputeColors(
 /// `r_vertexLight` need a live cvar-value read — `RendererCvars` holds only
 /// `Option<CvarHandle>`, the value-read seam is unwired (same DEFERRED
 /// reason as `RB_DrawBuffer`'s `r_clear` dependency, DEC-37 A13.1).
-/// `GLFogOverrideColors`/`g_bRenderGlowingObjects`/`logtestExp2`/
-/// `setArraysOnce` are this packet's `STATE HOMES` "per-subsystem owned
-/// state struct, NAMED BY THIS WAVE if this file's wave is where the
-/// subsystem lands" rows — this fn's every touch of them is a read that only
-/// ever gates GL calls or feeds the unreachable `tess`/`pStage` logic above,
-/// so no write site here would justify naming a carrier (same treatment
-/// `RB_EndSurface`'s doc comment above gives `skyboxportal`/
-/// `drawskyboxportal`); `tr_stencilled` (write) is the fn-scope-adjacent
+/// `g_bRenderGlowingObjects` is homed now
+/// (`FrameState::render_glowing_objects`, campaign #41 batch 1, DEC-37
+/// A13.3), but every touch of it here is a read that only gates GL calls or
+/// feeds the unreachable `tess`/`pStage` logic above, so nothing lands from
+/// it. `GLFogOverrideColors`/`logtestExp2`/`setArraysOnce` are this packet's
+/// `STATE HOMES` "per-subsystem owned state struct, NAMED BY THIS WAVE if
+/// this file's wave is where the subsystem lands" rows — same read-only
+/// situation, so they stay unmapped rather than invented; `tr_stencilled` (write) is the fn-scope-adjacent
 /// `lStencilled: bool` static's cross-frame twin — a kind-3 escalation per
 /// the three-kind rule, but with no reachable write site here either, so it
 /// stays unmapped rather than invented. `backEnd.currentEntity` itself is

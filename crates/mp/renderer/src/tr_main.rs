@@ -46,6 +46,7 @@ use crate::tr_local::tr_refdef_t::trRefdef_t;
 use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_mesh::r_add_md3_surfaces;
 use crate::tr_model::render_models::RenderModels;
+use crate::tr_public::ref_flags::RDF_NOWORLDMODEL;
 use crate::tr_scene::R_AddPolygonSurfaces;
 use crate::tr_shader::R_GetShaderByHandle;
 use crate::tr_terrain::R_AddTerrainSurfaces;
@@ -95,13 +96,6 @@ pub const CULL_OUT: i32 = 2;
 ///
 /// Source: `oracle/codemp/game/q_shared.h`
 const PLANE_NON_AXIAL: u8 = 3;
-
-/// Raven `RDF_NOWORLDMODEL`.
-///
-/// Raven: used for player configuration screen.
-///
-/// Source: `oracle/codemp/cgame/tr_types.h:57`
-const RDF_NOWORLDMODEL: i32 = 1;
 
 /// Raven `RDF_AUTOMAP`.
 ///
@@ -1579,8 +1573,14 @@ fn ref_entity_from_tr(ent: &trRefEntity_t) -> RefEntity {
         old_origin: ent.e.oldorigin,
         custom_shader: ent.e.customShader,
         shader_rgba: ent.e.shaderRGBA,
+        radius: ent.e.radius,
+        rotation: ent.e.rotation,
+        frame: ent.e.frame,
         lighting_origin: ent.e.lightingOrigin,
         end_time: ent.e.endTime,
+        saber_length: ent.e.saberLength,
+        angles: ent.e.angles,
+        model_scale: ent.e.modelScale,
         has_ghoul2: !ent.e.ghoul2.is_null(),
         need_dlights: ent.needDlights != 0,
         lighting_calculated: ent.lightingCalculated != 0,

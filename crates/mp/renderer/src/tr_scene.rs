@@ -30,6 +30,7 @@ use crate::render_state::shader_asset::ShaderHandle;
 use crate::tr_local::decal_poly_s::{decalPoly_t, MAX_VERTS_ON_DECAL_POLY};
 use crate::tr_main::{DrawSurf, R_AddDrawSurf, SurfaceGeometry};
 use crate::tr_marks::{MarkNode, R_MarkFragments};
+use crate::tr_public::ref_flags::RDF_NOWORLDMODEL;
 use crate::tr_shader::R_GetShaderByHandle;
 
 // This wave threads `RenderAssets`, `FrameData`/`FrameEvent` and `Common`
@@ -338,8 +339,14 @@ pub fn RE_AddRefEntityToScene(
         old_origin: ent.oldorigin,
         custom_shader: ent.customShader,
         shader_rgba: ent.shaderRGBA,
+        radius: ent.radius,
+        rotation: ent.rotation,
+        frame: ent.frame,
         lighting_origin: ent.lightingOrigin,
         end_time: ent.endTime,
+        saber_length: ent.saberLength,
+        angles: ent.angles,
+        model_scale: ent.modelScale,
         has_ghoul2: !ent.ghoul2.is_null(),
         need_dlights: false,
         lighting_calculated: false,
@@ -1101,13 +1108,6 @@ pub fn RE_AddDecalToScene(
 // wave 13
 // ---------------------------------------------------------------------
 
-/// Raven `RDF_NOWORLDMODEL` — restated from `tr_main.rs`'s own local
-/// `const` (not `pub` there, so not reachable from here); same value, same
-/// oracle line.
-///
-/// Source: `oracle/codemp/cgame/tr_types.h:57`
-const RDF_NOWORLDMODEL: i32 = 1;
-
 /// Raven `RE_RenderScene` — commits a scene's `refdef_t` and, in the
 /// oracle, immediately renders it (`R_RenderView`) before returning.
 ///
@@ -1214,13 +1214,16 @@ pub fn RE_RenderScene(
     // Source: oracle/codemp/renderer/tr_scene.cpp:709,741-742
     scene.last_time = fd.time;
 
-    // DEFERRED: `skyboxportal`/`drawskyboxportal` writes — `RDF_SKYBOXPORTAL`/
-    // `RDF_DRAWSKYBOX`'s bit values are neither in this packet's FILE-SCOPE
-    // CONSTANTS section nor this fn's own oracle slice (only
-    // `RDF_NOWORLDMODEL`/`RDF_AUTOMAP` are independently confirmed, via
-    // `tr_main.rs`'s already-ported locals) — never-guess rule. Destination
-    // is `SceneState` (DEC-37 A13.3, this file's own carrier) once the
-    // values are confirmed.
+    // DEFERRED: `skyboxportal`/`drawskyboxportal` writes. Both blockers the
+    // wave-13 note listed are closed: the masks are ported
+    // (`tr_public::ref_flags::{RDF_SKYBOXPORTAL, RDF_DRAWSKYBOX}`) and the
+    // destination is named (`FrameState::skyboxportal`/`drawskyboxportal`,
+    // campaign #41 batch 1, DEC-37 A13.3). What remains is reach: this fn is
+    // a trap-time sim-side handler and takes `FrameData`, not the
+    // render-thread-local `FrameState` (ruling 3), so the two writes have to
+    // ride the `FrameEvent::RenderScene` payload — the same field-merge this
+    // fn's `tr.refdef` commit above already escalates for the wave that lands
+    // `R_IssueRenderCommands`'s render-thread orchestrator.
     // Source: oracle/codemp/renderer/tr_scene.cpp:744-756
 
     if fd.rdflags & RDF_NOWORLDMODEL == 0 {

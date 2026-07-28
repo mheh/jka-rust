@@ -999,12 +999,17 @@ pub fn RB_DrawSurfaceSprites(
     }
 
     //TODO: Port shaderStage_t::ss
-    // `*mut surfaceSprite_t` has no safe quarantine accessor and unsafe is
-    // banned in this file — escalated rather than read raw.
+    // The owned form now carries the block
+    // (`render_state::shader_stage::ShaderStage::ss`,
+    // `Option<Box<surfaceSprite_t>>`, campaign #41 batch 1), but this fn's
+    // `stage` parameter is still the tier-2 `shaderStage_t`, whose `ss` is a
+    // `*mut surfaceSprite_t` with no safe quarantine accessor (unsafe is
+    // banned in this file). Migrating the parameter to `&ShaderStage` is the
+    // rewire that closes this; reading the raw pointer is not.
     // Source: oracle/codemp/renderer/tr_local.h:394-427 (shaderStage_t::ss);
     // oracle/codemp/renderer/tr_surfacesprites.cpp:1445
     let surface_sprite_type: i32 = todo!(
-        "Port shaderStage_t::ss — needs tier-2 quarantine accessor, oracle/codemp/renderer/tr_local.h:420"
+        "Port shaderStage_t::ss — needs the &ShaderStage parameter migration, oracle/codemp/renderer/tr_local.h:423"
     );
     match surface_sprite_type {
         SURFSPRITE_VERTICAL => RB_DrawVerticalSurfaceSprites(stage, state, quick_sprite),

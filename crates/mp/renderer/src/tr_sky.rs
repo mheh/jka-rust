@@ -925,31 +925,18 @@ pub fn RB_DrawSun(frame: &FrameState, common: &Common, cvars: &RendererCvars, vi
 /// Whole-fn deferral, not a partial body: the function's very first
 /// statement, `if ( g_bRenderGlowingObjects ) return;`, gates every single
 /// statement that follows it — including the trailing unconditional
-/// `backEnd.skyRenderedThisView = qtrue;` write. `g_bRenderGlowingObjects` is
-/// a file-scope static with no R2/R3-assigned carrier (DEC-37 A13.3 — same
-/// unresolved conclusion this crate already reached at
-/// `tr_backend.rs:371`/`tr_ghoul2.rs:1565`, and this wave is not where the
-/// dynamic-glow subsystem lands, so naming a struct for it here would be an
-/// invented carrier, not a licensed one). Without that value there is no
-/// sound way to decide whether *any* downstream statement — real or
-/// deferred — is ever reached, so nothing can be transcribed unconditionally
-/// without guessing (porting-rules §A2 never-guess).
+/// `backEnd.skyRenderedThisView = qtrue;` write. That gate is no longer the
+/// blocker: campaign #41 batch 1 homed `g_bRenderGlowingObjects` and
+/// `skyboxportal` on `FrameState` (`render_glowing_objects`/`skyboxportal`,
+/// DEC-37 A13.3) and landed `RDF_SKYBOXPORTAL` in the crate's canonical flag
+/// home (`tr_public::ref_flags`), so the two early-out guards
+/// (`if (g_bRenderGlowingObjects) return;` and
+/// `if (skyboxportal && !(backEnd.refdef.rdflags & RDF_SKYBOXPORTAL))
+/// return;`) are a follow-up rewire once this fn takes `FrameState` and the
+/// `refdef_rdflags: i32` parameter this crate threads elsewhere
+/// (`tr_backend.rs`, `tr_light.rs`, `tr_world.rs`).
 ///
-/// Even granting that gate, the reachable body is blocked twice more:
-/// - `if (skyboxportal && !(backEnd.refdef.rdflags & RDF_SKYBOXPORTAL))
-///   return;` — `skyboxportal` has the same no-carrier status as
-///   `g_bRenderGlowingObjects`. The `backEnd.refdef.rdflags` half of the test
-///   is not itself the blocker: `TrRefdef`/`FrameState::refdef` doesn't carry
-///   an `rdflags` field, but this crate's established pattern is to thread
-///   `backEnd.refdef.rdflags` in as a `refdef_rdflags: i32` parameter and
-///   decode bit tests against it directly (`tr_backend.rs:994`,
-///   `tr_light.rs:473`, `tr_world.rs:1471,1648`; the decode itself at
-///   `tr_backend.rs:1000`). What is genuinely missing is the mask:
-///   `RDF_SKYBOXPORTAL` (`8`, `oracle/codemp/cgame/tr_types.h:60`) has no
-///   ported const anywhere in this crate (only `RDF_NOWORLDMODEL`/
-///   `RDF_AUTOMAP`/`RDF_NOFOG` are) — so even with `refdef_rdflags` threaded
-///   in, the bit test has no mask to test against, and `skyboxportal` still
-///   has no carrier regardless.
+/// What still forces the whole-fn deferral is the body itself:
 /// - `RB_ClipSkyPolygons( &tess )`, `tess.shader->sky->outerbox[...]`,
 ///   `DrawSkyBox( tess.shader )`, `R_BuildCloudData( &tess )`, and
 ///   `if (tess.numIndexes && tess.numVertexes) RB_StageIteratorGeneric()`

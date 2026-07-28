@@ -643,15 +643,12 @@ pub fn g2_get_vert_bone_weight_not_slow(p_vert: &mdxmVertex_t, i_weight_num: i32
 /// *currentModel, int lodBias)`.
 ///
 /// `ent->e.modelScale`/`ent->e.radius` are threaded as explicit
-/// `model_scale`/`radius` parameters rather than read off `RefEntity`: that
-/// placeholder (`render_state::placeholders`, out of this file's edit scope)
-/// carries only the subset of fields the `tr_light`/`tr_scene` wave-0 slices
-/// needed (`origin`, `renderfx`, the lighting fields, ...) and does not yet
-/// have `modelScale`/`radius`. A state home this packet marks
-/// mapped-but-not-yet-populated is an escalation, not an invention (preamble
-/// "state home ... ESCALATION"); threading the two missing scalars in
-/// directly avoids inventing a field on a struct outside this file. `ent`
-/// itself is still threaded for `.origin`, which the placeholder does carry.
+/// `model_scale`/`radius` parameters rather than read off `RefEntity`,
+/// because that placeholder carried neither field when this wave landed.
+/// Campaign #41 batch 1 added both (`RefEntity::model_scale`/`radius`,
+/// `render_state/placeholders.rs`), so dropping the two extra parameters and
+/// reading them off `ent` is the follow-up rewire. `ent` itself is already
+/// threaded for `.origin`.
 ///
 /// `r_lodbias`/`r_lodscale`/`r_autolodscalevalue` read through
 /// `Common::cvar` (the `RendererCvars`-handle + live-engine-table pattern
@@ -1462,8 +1459,8 @@ pub fn g2_rag_get_anim_matrix(
 ///
 /// `ent->e.modelScale`/`ent->e.radius` are threaded as explicit
 /// `model_scale`/`radius` parameters rather than read off `RefEntity` — same
-/// rationale [`g2_compute_lod`] (this file, wave 1) already documents for the
-/// same two fields, and `ent->e.origin` is unread here (oracle culls around
+/// rationale (and same now-available follow-up rewire) [`g2_compute_lod`]
+/// (this file, wave 1) already documents for the same two fields, and `ent->e.origin` is unread here (oracle culls around
 /// `vec3_origin`, not the entity's world position). The three `tr.pc.*`
 /// counters have no state carrier yet (`FrameState::counters: BackEndCounters`
 /// is still the R4-backend-wave empty placeholder, `render_state::
@@ -2276,14 +2273,13 @@ impl RenderModels {
 /// - `RenderSurfaces`'s surface-visible body is itself already `todo!()` in
 ///   this file for independent reasons (see [`render_surfaces`]'s doc
 ///   comment).
-/// - `ent->e.modelScale`/`radius`/`angles`/`customSkin` are read by this
-///   body but are not fields [`RefEntity`] carries (it has `custom_shader`,
-///   not `customSkin`; no `modelScale`/`radius`/`angles` at all — the same
-///   gap [`g2_compute_lod`]/[`r_g_cull_model`] (this file, earlier waves)
-///   already worked around by threading `model_scale`/`radius` as explicit
-///   parameters instead of reading them off `RefEntity`, a workaround this
-///   fn cannot use because it also needs the blocked `ghoul2`/`angles`
-///   fields those two callees don't).
+/// - `ent->e.customSkin` is read by this body but is not a field
+///   [`RefEntity`] carries (it has `custom_shader`, not `customSkin`).
+///   `modelScale`/`radius`/`angles` were part of the same gap until campaign
+///   #41 batch 1 added all three to [`RefEntity`]; they are no longer
+///   blockers, and reading them off `ent` (instead of the explicit
+///   `model_scale`/`radius` parameters [`g2_compute_lod`]/[`r_g_cull_model`]
+///   thread) is the follow-up rewire.
 ///
 /// Loud `todo!()` per the whole-fn-deferral convention.
 ///

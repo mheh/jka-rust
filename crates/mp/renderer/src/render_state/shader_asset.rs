@@ -13,8 +13,9 @@ use crate::tr_shader::FogParms;
 /// `Handle<ShaderAsset>`, the intrusive `next` chain dissolved). The fields
 /// below are real (landed with the `tr_shader` R3 wave-0, `stages` added by
 /// the `RB_RotatePic`/`RB_RotatePic2` wave, `fog_parms` by the waves-7-13 fix
-/// round); `deforms` and the remaining scalars land with the later
-/// `tr_shader` waves that read them.
+/// round, `time_offset`/`remapped_shader` by campaign #41 batch 1);
+/// `deforms` and the remaining scalars land with the later `tr_shader` waves
+/// that read them.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:459-530`
 #[derive(Clone)]
@@ -57,6 +58,19 @@ pub struct ShaderAsset {
     /// `stages[MAX_SHADER_STAGES]` (`shaderStage_t *`, `Hunk_Alloc`ed to
     /// `numUnfoggedPasses` entries) — owned inline as `Vec<ShaderStage>`.
     pub stages: Vec<ShaderStage>,
+    /// `timeOffset` — Raven: current time offset for this shader
+    /// (`R_RemapShader`'s third argument, parsed with `atof`).
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:511`
+    pub time_offset: f32,
+    /// `remappedShader` (`struct shader_s *`) — Raven: current shader this
+    /// one is remapped too. The oracle's self-pointer becomes a handle into
+    /// the same registry (tier-2 transition audit); `None` for the
+    /// overwhelmingly common not-remapped case, where the oracle stores a
+    /// self-pointer.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:528`
+    pub remapped_shader: Option<ShaderHandle>,
 }
 
 /// A generation-counted handle into `RenderAssets::shaders` (A2).

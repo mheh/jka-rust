@@ -48,6 +48,30 @@ pub struct FrameState {
     ///
     /// Source: `oracle/codemp/renderer/tr_local.h:1315`
     pub view_count: i32,
+    /// `tr.viewCluster` — the PVS cluster the current view origin sits in,
+    /// reset to `-1` by `RE_BeginRegistration` and by `R_MarkLeaves`'s
+    /// novis path.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1382`
+    pub view_cluster: i32,
+    /// `skyboxportal` — cross-TU scene/backend state, DEC-37 A13.3 home:
+    /// written sim-side by `RE_RenderScene`/`RE_LoadWorldMap`, read
+    /// render-side by `tr_sky`/`tr_shade`/`tr_backend`. Raven's `int`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_scene.cpp:35`
+    pub skyboxportal: i32,
+    /// `drawskyboxportal` — cross-TU scene/backend state, DEC-37 A13.3 home;
+    /// same write/read split as `skyboxportal`. Raven's `int`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_scene.cpp:36`
+    pub drawskyboxportal: i32,
+    /// `g_bRenderGlowingObjects` — cross-TU scene/backend state, DEC-37
+    /// A13.3 home: Raven: "Whether we are currently rendering only glowing
+    /// objects or not." Written by `RB_DrawSurfs`'s dynamic-glow pass, read
+    /// by `tr_sky`/`tr_shade`/`tr_backend`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_backend.cpp:32`
+    pub render_glowing_objects: bool,
     /// `tr.identityLight` — `1.0 / ( 1 << overbrightBits )`.
     ///
     /// Source: `oracle/codemp/renderer/tr_local.h:1374`

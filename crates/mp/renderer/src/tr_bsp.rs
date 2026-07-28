@@ -3499,12 +3499,10 @@ pub fn R_LoadEntities(
 /// doc comment — "owned by whichever caller drives `R_LoadWorld`'s call
 /// tree"; this fn *is* that caller).
 ///
-/// Four deliberate departures from a literal transcription, each cited at
-/// its own site below:
-/// - `skyboxportal = 0` — DEFERRED, no R2 carrier (DEC-37 A13.3); a static
-///   crossing the sim/render boundary per this packet's STATE HOMES row, and
-///   every read site (`tr_shade.rs`/`tr_backend.rs`/`tr_sky.rs`) already
-///   independently reached the same conclusion.
+/// Three deliberate departures from a literal transcription, each cited at
+/// its own site below (`skyboxportal = 0` was a fourth until campaign #41
+/// batch 1 gave it a home on `FrameState::skyboxportal`; it is now written
+/// literally):
 /// - `c_gridVerts = 0` — DEFERRED, no R2 carrier and zero consumers found
 ///   anywhere in the ported crate (grep-verified).
 /// - the cached-disk-image read (`gpvCachedMapDiskImage`) — a loud
@@ -3562,17 +3560,12 @@ pub fn RE_LoadWorldMap_Actual(
     }
 
     if index == 0 {
-        // DEFERRED: skyboxportal = 0 — file-scope static with no R2-assigned
-        // carrier (DEC-37 A13.3). This write happens sim-side (this fn is an
-        // engine-seam load call, `## State ownership`'s "engine seam (direct
-        // calls...)" channel) while every read site is render-side
-        // (`tr_shade.rs`, `tr_backend.rs`, `tr_sky.rs`) — all three already
-        // independently reached "no carrier, DEC-37 A13.3" at their own read
-        // sites (this file's sibling waves). A static crossing the sim/
-        // render boundary ESCALATES per this packet's STATE HOMES row;
-        // naming a carrier unilaterally here, when three other waves already
-        // declined to, would invent state rather than license it.
+        // skyboxportal = 0;
+        // Landed: `FrameState::skyboxportal` is the DEC-37 A13.3 home
+        // campaign #41 batch 1 gave this cross-TU static, and this fn already
+        // receives `frame`.
         // Source: oracle/codemp/renderer/tr_bsp.cpp:2016
+        frame.skyboxportal = 0;
 
         // set default sun direction to be used if it isn't
         // overridden by a shader

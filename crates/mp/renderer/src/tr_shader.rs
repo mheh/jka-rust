@@ -2776,6 +2776,13 @@ pub fn GeneratePermanentShader(
         // this wave's scope) — an empty `Vec` is the faithful stand-in for
         // the oracle's not-yet-populated `newShader->stages`.
         stages: Vec::new(),
+        // `shader.timeOffset`/`shader.remappedShader` are never written by
+        // the parser — the file-scope `shader` scratch is memset before
+        // `ParseShader`, and only `R_RemapShader` ever writes them, on the
+        // *registered* shader — so the whole-struct copy lands the zeroed
+        // values here.
+        time_offset: 0.0,
+        remapped_shader: None,
     };
 
     // if ( shader.sort <= SS_SEE_THROUGH ) newShader->fogPass = FP_EQUAL;
@@ -2837,11 +2844,11 @@ pub fn R_CreateBlendedStage(
     // registered shader's first pass, the payload `R_CopyStage` copies into
     // `stages[idx]`) has no live payload yet: `GeneratePermanentShader`'s
     // per-stage copy loop that would populate a registered shader's `stages`
-    // is still deferred (see that fn's doc comment). `ShaderStage` also
-    // doesn't carry `rgbGen`/`alphaGen`/`ss` yet, which this fn's body needs
-    // to write.
+    // is still deferred (see that fn's doc comment). `ShaderStage` now does
+    // carry `rgb_gen`/`alpha_gen`/`ss` (campaign #41 batch 1), so the
+    // stage-copy loop is the only remaining blocker.
     todo!(
-        "Port R_CreateBlendedStage — oracle/codemp/renderer/tr_shader.cpp:4012-4026 (blocked on GeneratePermanentShader's stage-copy loop + ShaderStage::rgb_gen/alpha_gen/ss)"
+        "Port R_CreateBlendedStage — oracle/codemp/renderer/tr_shader.cpp:4012-4026 (blocked on GeneratePermanentShader's stage-copy loop)"
     )
 }
 
@@ -5253,23 +5260,23 @@ pub fn CreateExternalShaders(
 
 /// Raven `R_RemapShader` — wave 9.
 ///
-/// DEFERRED, whole-fn loud stub. The `lightmapsNone`/`stylesDefault`
-/// arguments to `RE_RegisterShaderLightMap` (`:281`, `:291`) are now real
-/// (landed as file-scope consts above), but the writes this fn exists to
-/// perform still have nowhere to go: `ShaderAsset`
-/// (`render_state/shader_asset.rs`) carries neither
-/// - `remapped_shader` — `sh->remappedShader = sh2;`/`= NULL;` (`:307,309`),
-///   Raven `struct shader_s *remappedShader`
-///   (`oracle/codemp/renderer/tr_local.h:528`); nor
-/// - `time_offset` — `sh2->timeOffset = atof(timeOffset);` (`:314`), Raven
-///   `float timeOffset` (`oracle/codemp/renderer/tr_local.h:511`).
+/// DEFERRED, whole-fn loud stub — but no longer field-blocked. The
+/// `lightmapsNone`/`stylesDefault` arguments to `RE_RegisterShaderLightMap`
+/// (`:281`, `:291`) landed as file-scope consts above, and campaign #41
+/// batch 1 landed both destination fields on `ShaderAsset`
+/// (`render_state/shader_asset.rs`):
+/// - `remapped_shader: Option<ShaderHandle>` — `sh->remappedShader = sh2;`/
+///   `= NULL;` (`:307,309`), Raven `struct shader_s *remappedShader`
+///   (`oracle/codemp/renderer/tr_local.h:528`), under the tier-2 transition
+///   audit's Group 2 self-pointer -> handle row; and
+/// - `time_offset: f32` — `sh2->timeOffset = atof(timeOffset);` (`:314`),
+///   Raven `float timeOffset` (`oracle/codemp/renderer/tr_local.h:511`).
 ///
-/// The tier-2 transition audit's Group 2 row licenses `remappedShader` ->
-/// `Handle<ShaderAsset>` eventually, but neither field has landed on the real
-/// type. The `hashTable[hash]` chain walk (`:304-312`) is representable via
-/// `RenderAssets::shader_lookup`'s stripped-name bucket per this packet's
-/// STATE HOMES row, but that walk exists only to reach these unhomed writes,
-/// so nothing observable survives without them.
+/// What is left is the transcription itself — the two `R_FindShaderByName`/
+/// `RE_RegisterShaderLightMap` lookups plus the `hashTable[hash]` chain walk
+/// (`:304-312`), representable via `RenderAssets::shader_lookup`'s
+/// stripped-name bucket per this packet's STATE HOMES row — which is a
+/// follow-up port, not a field gap.
 ///
 /// `sh == NULL || sh == tr.defaultShader` collapses to
 /// `sh == ShaderHandle::slot_zero()` once implemented (`R_FindShaderByName`'s
@@ -5310,10 +5317,10 @@ pub fn R_RemapShader(
         sky_view,
         sky,
     );
-    // DEFERRED: `ShaderAsset::remapped_shader`/`time_offset` unhomed — see
-    // doc comment above.
+    // DEFERRED: body not transcribed — the destination fields exist now, the
+    // lookup/hash-chain walk does not. See doc comment above.
     todo!(
-        "Port R_RemapShader — oracle/codemp/renderer/tr_shader.cpp:273-316 (ShaderAsset::remapped_shader/time_offset unhomed)"
+        "Port R_RemapShader — oracle/codemp/renderer/tr_shader.cpp:273-316 (lookup + hashTable chain walk not transcribed)"
     );
 }
 
@@ -5332,10 +5339,10 @@ pub fn R_RemapShader(
 ///   already-landed loud stub names (`GeneratePermanentShader`'s per-stage
 ///   copy loop, the thing that would populate a registered shader's
 ///   `stages` with `rgbGen`/`alphaGen`/`ss`, is itself unported) — this fn
-///   calls that same blocked `R_CreateBlendedStage` twice more (`:4053-4054`)
-///   and, when `surfaceSprites` is set, reads `work->stages[i].ss`
-///   (`:4062,4074,4086`) directly, a field `ShaderStage` does not carry at
-///   all.
+///   calls that same blocked `R_CreateBlendedStage` twice more
+///   (`:4053-4054`). The `work->stages[i].ss` reads (`:4062,4074,4086`) are
+///   no longer a field gap (`ShaderStage::ss`, campaign #41 batch 1); they
+///   are blocked only by that empty `stages` payload.
 ///
 /// Two further calls in this body are omitted rather than gap-blocked, and
 /// are recorded here so the finishing wave restores them:
