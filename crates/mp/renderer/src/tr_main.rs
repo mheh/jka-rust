@@ -32,6 +32,7 @@ use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::tr_backend::{GL_Bind, GL_Cull};
+use crate::tr_bsp::{Surface, SurfaceData};
 use crate::tr_cmds::R_SyncRenderThread;
 use crate::tr_ghoul2::r_add_ghoul_surfaces;
 use crate::tr_local::cull_type_t::cullType_t;
@@ -204,13 +205,56 @@ pub enum SurfaceGeometry<'a> {
     Other,
 }
 
+/// The `drawSurf_t::surface` payload for a **world** surface (DEC-43.3): a
+/// `Copy` index handle into `WorldAsset::surfaces`, carrying a cached copy
+/// of that surface's kind tag. The `u32` is the flat surface index — the
+/// oracle's own `worldData.surfaces` subscript, which under the owned world
+/// replaces its `msurface_t.data` pointer (porting-rules §B5) — so the
+/// backend re-fetches the surface from the world instead of the draw list
+/// holding a borrow of it across the world walk (the borrow
+/// `R_RecursiveWorldNode` cannot hand out while it is mutating the same
+/// array).
+///
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:656-678`
+/// (`surfaceType_t`)
+#[derive(Clone, Copy)]
+pub enum WorldSurfaceRef {
+    /// `&skipData` (`SF_SKIP`).
+    Skip(u32),
+    /// `srfSurfaceFace_t` (`SF_FACE`).
+    Face(u32),
+    /// `srfGridMesh_t` (`SF_GRID`).
+    Grid(u32),
+    /// `srfTriangles_t` (`SF_TRIANGLES`).
+    Triangles(u32),
+    /// `srfFlare_t` (`SF_FLARE`).
+    Flare(u32),
+}
+
+impl WorldSurfaceRef {
+    /// The handle for `WorldAsset::surfaces[index]`, tagged with that
+    /// surface's current kind — the owned analogue of Raven passing
+    /// `surf->data` (the tagged-union pointer) straight to `R_AddDrawSurf`.
+    pub fn of(surf: &Surface, index: u32) -> Self {
+        match &surf.data {
+            SurfaceData::Skip => WorldSurfaceRef::Skip(index),
+            SurfaceData::Face(_) => WorldSurfaceRef::Face(index),
+            SurfaceData::Grid(_) => WorldSurfaceRef::Grid(index),
+            SurfaceData::Triangles(_) => WorldSurfaceRef::Triangles(index),
+            SurfaceData::Flare(_) => WorldSurfaceRef::Flare(index),
+        }
+    }
+}
+
 /// The owned replacement for Raven `drawSurf_t` (`tr_local::draw_surf_s`,
-/// `sort: u32, surface: *mut surfaceType_t`) — `surface` becomes an owned/
-/// borrowed value instead of a raw tagged-union pointer (interior-safety
-/// law). Generic over the concrete surface representation because the real
-/// arena/handle shape lands with `tr_bsp`/`tr_world` (tier-2 transition
-/// audit, `drawSurf_t` row: "`surface` -> a `Handle`/index into the surface
-/// arena").
+/// `sort: u32, surface: *mut surfaceType_t`) — `surface` becomes an owned
+/// value or handle instead of a raw tagged-union pointer (interior-safety
+/// law). Still generic over the concrete surface representation: world
+/// surfaces instantiate it at [`WorldSurfaceRef`] (DEC-43.3, the tier-2
+/// transition audit's `drawSurf_t` row: "`surface` -> a `Handle`/index into
+/// the surface arena"), while the non-world payloads `SurfaceGeometry`
+/// stands in for (`Poly`, entity md3/ghoul2, `tr.landScape`) still need a
+/// carrier of their own before one unified payload enum can replace `S`.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:680-683`
 // `Clone`/`Copy` added wave 12 — see `SurfaceGeometry`'s own derive note

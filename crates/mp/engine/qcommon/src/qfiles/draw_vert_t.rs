@@ -10,6 +10,12 @@ pub const MAXLIGHTMAPS: usize = 4;
 /// Raven `drawVert_t` — BSP surface vertex.
 ///
 /// Type definition source: `oracle/codemp/qcommon/../qcommon/qfiles.h:514-520`
+// `Clone, Copy` added by DEC-43.4 (the `WorldAsset::surfaces` carrier): every
+// field is already a plain value array, so the derives are layout-neutral (the
+// asserts below are unchanged) and let the owned surface payloads that hold
+// `Vec<drawVert_t>` — `GridMesh`, `SurfaceTriangles`, hence `Surface` and
+// `WorldAsset` — satisfy `RenderAssets`' `Clone` bound (`Arc::make_mut`).
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct drawVert_t {
     pub xyz: vec3_t,

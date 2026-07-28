@@ -3,6 +3,10 @@
 /// Raven `surfaceType_t` — surface type enumeration.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:656-678`
+// `Clone, Copy` added by DEC-43.4 — a fieldless `#[repr(i32)]` enum, so the
+// derives are layout-neutral; `GridMesh`/`srfFlare_t` carry one as their
+// leading tag and need it to be `Clone` for the surface carrier.
+#[derive(Clone, Copy)]
 #[repr(i32)]
 pub enum surfaceType_t {
     SF_BAD = 0,

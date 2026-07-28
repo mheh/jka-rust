@@ -7,6 +7,10 @@ use super::surface_type_t::surfaceType_t;
 /// Raven `srfFlare_t`.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:715-720`
+// `Clone, Copy` added by DEC-43.4 — every field is a plain value, so the
+// derives are layout-neutral (asserts below unchanged); `SurfaceData::Flare`
+// stores one by value in `WorldAsset::surfaces`.
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct srfFlare_t {
     pub surfaceType: surfaceType_t,

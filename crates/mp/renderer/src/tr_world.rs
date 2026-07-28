@@ -30,20 +30,19 @@ use crate::render_state::frame_state::FrameState;
 use crate::render_state::placeholders::RefEntity;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
+use crate::tr_bsp::{Surface, SurfaceData, SurfaceFace, SurfaceTriangles};
+use crate::tr_curve::GridMesh;
 use crate::tr_light::{
     DlightBmodel, DlightSurface, DlightSurfaceData, R_DlightBmodel, R_SetupEntityLighting,
 };
 use crate::tr_local::cull_type_t::cullType_t;
 use crate::tr_local::dlight_s::dlight_t;
-use crate::tr_local::msurface_s::{msurface_t, SurfaceRef, SurfaceRefMut};
+use crate::tr_local::msurface_s::SurfaceRef;
 use crate::tr_local::orientationr_t::orientationr_t;
 use crate::tr_local::shader_s::shader_t;
-use crate::tr_local::srf_grid_mesh_s::srfGridMesh_t;
-use crate::tr_local::srf_surface_face_t::srfSurfaceFace_t;
-use crate::tr_local::srf_triangles_t::srfTriangles_t;
 use crate::tr_main::{
     DrawSurf, R_AddDrawSurf, R_CullLocalBox, R_CullLocalPointAndRadius, R_CullPointAndRadius,
-    CULL_CLIP, CULL_IN, CULL_OUT,
+    WorldSurfaceRef, CULL_CLIP, CULL_IN, CULL_OUT,
 };
 use crate::tr_model::render_models::RenderModels;
 use crate::tr_public::ref_flags::RDF_NOWORLDMODEL;
@@ -70,7 +69,7 @@ pub fn Q_CastShort2Float(s: i16) -> f32 {
 ///
 /// Source: `oracle/codemp/renderer/tr_world.cpp:278-301`
 pub fn R_DlightFace(
-    face: &mut srfSurfaceFace_t,
+    face: &mut SurfaceFace,
     mut dlight_bits: i32,
     dlights: &[dlight_t],
     dlight_surfaces_culled: &mut u32,
@@ -90,7 +89,7 @@ pub fn R_DlightFace(
         *dlight_surfaces_culled += 1;
     }
 
-    face.dlightBits = dlight_bits;
+    face.dlight_bits = dlight_bits;
     dlight_bits
 }
 
@@ -101,7 +100,7 @@ pub fn R_DlightFace(
 ///
 /// Source: `oracle/codemp/renderer/tr_world.cpp:303-329`
 pub fn R_DlightGrid(
-    grid: &mut srfGridMesh_t,
+    grid: &mut GridMesh,
     mut dlight_bits: i32,
     dlights: &[dlight_t],
     dlight_surfaces_culled: &mut u32,
@@ -110,12 +109,12 @@ pub fn R_DlightGrid(
         if dlight_bits & (1 << i) == 0 {
             continue;
         }
-        if dl.origin[0] - dl.radius > grid.meshBounds[1][0]
-            || dl.origin[0] + dl.radius < grid.meshBounds[0][0]
-            || dl.origin[1] - dl.radius > grid.meshBounds[1][1]
-            || dl.origin[1] + dl.radius < grid.meshBounds[0][1]
-            || dl.origin[2] - dl.radius > grid.meshBounds[1][2]
-            || dl.origin[2] + dl.radius < grid.meshBounds[0][2]
+        if dl.origin[0] - dl.radius > grid.mesh_bounds[1][0]
+            || dl.origin[0] + dl.radius < grid.mesh_bounds[0][0]
+            || dl.origin[1] - dl.radius > grid.mesh_bounds[1][1]
+            || dl.origin[1] + dl.radius < grid.mesh_bounds[0][1]
+            || dl.origin[2] - dl.radius > grid.mesh_bounds[1][2]
+            || dl.origin[2] + dl.radius < grid.mesh_bounds[0][2]
         {
             // dlight doesn't reach the bounds
             dlight_bits &= !(1 << i);
@@ -126,7 +125,7 @@ pub fn R_DlightGrid(
         *dlight_surfaces_culled += 1;
     }
 
-    grid.dlightBits = dlight_bits;
+    grid.dlight_bits = dlight_bits;
     dlight_bits
 }
 
@@ -137,8 +136,8 @@ pub fn R_DlightGrid(
 /// Raven: FIXME: more dlight culling to trisurfs...
 ///
 /// Source: `oracle/codemp/renderer/tr_world.cpp:332-363`
-pub fn R_DlightTrisurf(surf: &mut srfTriangles_t, dlight_bits: i32) -> i32 {
-    surf.dlightBits = dlight_bits;
+pub fn R_DlightTrisurf(surf: &mut SurfaceTriangles, dlight_bits: i32) -> i32 {
+    surf.dlight_bits = dlight_bits;
     dlight_bits
 }
 
@@ -313,13 +312,13 @@ pub fn R_GetNewWireframeMapSurf(automap: &mut WireframeAutomap) -> usize {
     index
 }
 
-// DEFERRED: R_NodeHasOppositeFaces — needs the owned node/mark-surface arena
-// (mnode_t.firstmarksurface, msurface_t.data union) that WorldAsset lands
-// with at the tr_bsp wave; RenderAssets::world is still an empty placeholder
-// here (tier-2 transition audit, Group 1) and walking the raw pointers today
-// would adopt exactly the pattern the interior-safety law forbids for new
-// code.
+//TODO: Port R_NodeHasOppositeFaces
 // Source: oracle/codemp/renderer/tr_world.cpp:927-986
+// Both carriers it waited on are landed now — `Node::firstmarksurface`/
+// `nummarksurfaces` and `WorldAsset::mark_surfaces` (tr_bsp wave 1) and
+// `WorldAsset::surfaces`' owned `SurfaceData::Face` payload (DEC-43) — so
+// this fn is unblocked; it simply has no body yet. Its sole caller is
+// `R_RecursiveWorldNode`, itself unported (see its own note below).
 
 /// Raven `R_DestroyWireframeMap` — invalidate and free the wireframe
 /// automap. Owned `Vec`/`Vec<u8>` drops replace the oracle's manual `Z_Free`
@@ -468,7 +467,7 @@ pub fn R_inPVS(cm: &mut CollisionWorld, p1: vec3_t, p2: vec3_t) -> bool {
 ///
 /// Source: `oracle/codemp/renderer/tr_world.cpp:58-67`
 pub fn R_CullTriSurf(
-    cv: &srfTriangles_t,
+    cv: &SurfaceTriangles,
     r_nocull_integer: i32,
     ori: &orientationr_t,
     frustum: &[cplane_t; 4],
@@ -489,28 +488,25 @@ pub fn R_CullTriSurf(
 /// wave, so the counter is threaded in directly rather than via a whole
 /// `FrameState` reference (porting-rules §4).
 ///
-/// PORT-NOTE: the tagged-union dispatch over `msurface_t.data` goes through
-/// `msurface_t::surface_kind_mut` (tier-2 quarantine, §D11); each arm mutates
-/// its concrete surface exactly as the oracle does, so `surf` is `&mut`,
-/// matching the oracle's own non-const `msurface_t *`.
+/// PORT-NOTE: the tagged-union dispatch over `msurface_t.data` is a match on
+/// the owned [`SurfaceData`] (DEC-43.1); each arm mutates its concrete
+/// surface exactly as the oracle does, so `surf` is `&mut`, matching the
+/// oracle's own non-const `msurface_t *`. The `Skip`/`Flare` arms are the
+/// oracle's `default:` (no dlight handler).
 ///
 /// Source: `oracle/codemp/renderer/tr_world.cpp:374-390`
 pub fn R_DlightSurface(
-    surf: &mut msurface_t,
+    surf: &mut Surface,
     dlight_bits: i32,
     dlights: &[dlight_t],
     dlight_surfaces_culled: &mut u32,
     dlight_surfaces: &mut u32,
 ) -> i32 {
-    let dlight_bits = match surf.surface_kind_mut() {
-        SurfaceRefMut::Face(face) => {
-            R_DlightFace(face, dlight_bits, dlights, dlight_surfaces_culled)
-        }
-        SurfaceRefMut::Grid(grid) => {
-            R_DlightGrid(grid, dlight_bits, dlights, dlight_surfaces_culled)
-        }
-        SurfaceRefMut::Triangles(tris) => R_DlightTrisurf(tris, dlight_bits),
-        SurfaceRefMut::Other => 0,
+    let dlight_bits = match &mut surf.data {
+        SurfaceData::Face(face) => R_DlightFace(face, dlight_bits, dlights, dlight_surfaces_culled),
+        SurfaceData::Grid(grid) => R_DlightGrid(grid, dlight_bits, dlights, dlight_surfaces_culled),
+        SurfaceData::Triangles(tris) => R_DlightTrisurf(tris, dlight_bits),
+        SurfaceData::Skip | SurfaceData::Flare(_) => 0,
     };
 
     if dlight_bits != 0 {
@@ -544,7 +540,10 @@ pub fn R_DlightSurface(
 /// really an `SF_FACE` mirrors the oracle's own unchecked dereference — not a
 /// divergence, Raven has no guard here either (porting-rules §19: this is
 /// oracle UB, not a case this port need reproduce more safely, but neither
-/// does it invent a defined-behavior guard the oracle lacks).
+/// does it invent a defined-behavior guard the oracle lacks). This walk is
+/// the reason `msurface_t`'s quarantine survives DEC-43: the world's own
+/// surfaces are owned now, but a brush model still reaches its range through
+/// `model_t::bmodel`, whose registration `R_LoadSubmodels` has not ported.
 ///
 /// Source: `oracle/codemp/renderer/tr_world.cpp:653-744`
 pub fn RE_GetBModelVerts(
@@ -609,26 +608,27 @@ pub fn RE_GetBModelVerts(
 /// handled (dead `return;` arms in the oracle, dropped surface per
 /// porting-rules §20).
 ///
-/// PORT-NOTE: `face->ofsIndices` is a byte offset from `face` to its
-/// trailing index array (another flexible-array-member layout, read through
-/// the tier-2 `srfSurfaceFace_t::indices` accessor); `points && numPoints
-/// > 0` collapses to `numPoints > 0` — `points` is `&face->points[0][0]`,
-/// the address of a field embedded in `face` itself, never null.
+/// PORT-NOTE: `face->numIndices` and the trailing index array Raven reaches
+/// at the byte offset `face->ofsIndices` are the owned
+/// `SurfaceFace::indices` `Vec` (DEC-43.1), so the count is its length;
+/// `points && numPoints > 0` collapses to `numPoints > 0` — `points` is
+/// `&face->points[0][0]`, the address of a field embedded in `face` itself,
+/// never null.
 ///
 /// Source: `oracle/codemp/renderer/tr_world.cpp:856-921`
-pub fn R_EvaluateWireframeSurf(surf: &msurface_t, automap: &mut WireframeAutomap) {
-    match surf.surface_kind() {
-        SurfaceRef::Face(face) => {
-            let num_points = face.numIndices;
+pub fn R_EvaluateWireframeSurf(surf: &Surface, automap: &mut WireframeAutomap) {
+    match &surf.data {
+        SurfaceData::Face(face) => {
+            let num_points = face.indices.len() as i32;
 
             if num_points > 0 {
                 // we can add it, now go through the indices and add a point
                 // for each
                 let next_idx = R_GetNewWireframeMapSurf(automap);
                 let mut points = Vec::with_capacity(num_points as usize);
-                for &index in face.indices() {
+                for &index in &face.indices {
                     points.push(WireframeSurfPoint {
-                        xyz: face.point(index as usize),
+                        xyz: face.points[index as usize].xyz,
                         ..Default::default()
                     });
                 }
@@ -637,9 +637,9 @@ pub fn R_EvaluateWireframeSurf(surf: &msurface_t, automap: &mut WireframeAutomap
             }
         }
         // srfTriangles_t / srfGridMesh_t: not handled
-        SurfaceRef::Triangles(_) | SurfaceRef::Grid(_) => {}
+        SurfaceData::Triangles(_) | SurfaceData::Grid(_) => {}
         // ...unknown type?
-        SurfaceRef::Other => {}
+        SurfaceData::Skip | SurfaceData::Flare(_) => {}
     }
 }
 
@@ -912,7 +912,7 @@ const TR_WORLDENT: i32 = MAX_ENTITIES - 1;
 /// Source: `oracle/codemp/renderer/tr_world.cpp:77-125`
 #[allow(clippy::too_many_arguments)]
 pub fn R_CullGrid(
-    cv: &srfGridMesh_t,
+    cv: &GridMesh,
     current_entity_num: i32,
     r_nocurves_integer: i32,
     r_nocull_integer: i32,
@@ -931,14 +931,14 @@ pub fn R_CullGrid(
 
     let sphere_cull = if current_entity_num != TR_WORLDENT {
         R_CullLocalPointAndRadius(
-            cv.localOrigin,
-            cv.meshRadius,
+            cv.local_origin,
+            cv.mesh_radius,
             ori,
             r_nocull_integer,
             frustum,
         )
     } else {
-        R_CullPointAndRadius(cv.localOrigin, cv.meshRadius, r_nocull_integer, frustum)
+        R_CullPointAndRadius(cv.local_origin, cv.mesh_radius, r_nocull_integer, frustum)
     };
 
     // check for trivial reject
@@ -949,7 +949,7 @@ pub fn R_CullGrid(
         // check bounding box if necessary
         *c_sphere_cull_patch_clip += 1;
 
-        let box_cull = R_CullLocalBox(cv.meshBounds, r_nocull_integer, ori, frustum);
+        let box_cull = R_CullLocalBox(cv.mesh_bounds, r_nocull_integer, ori, frustum);
 
         if box_cull == CULL_OUT {
             *c_box_cull_patch_out += 1;
@@ -966,21 +966,18 @@ pub fn R_CullGrid(
     false
 }
 
-// DEFERRED: R_RecursiveWireframeSurf — needs two carriers R2 has not
-// licensed yet: (1) a per-node runtime visibility-frame field
-// (`node->visframe`) to compare against `tr.visCount` — the tier-3 `Node`
-// replacement (`tr_bsp::Node`, landed by the tr_bsp wave-1 node/leaf loader)
-// carries only the fields `R_LoadNodesAndLeafs` parses from the BSP file and
-// has no scratch field for this, and `FrameState` has no parallel per-node
-// array either; (2) `WorldAsset::mark_surfaces: Vec<u32>` is a set of
-// surface *indices* with no backing `Vec` of surfaces to resolve them
-// against yet (no `Surface` tagged-union home exists in R2 for
-// `msurface_t.data` — the same gap `tr_bsp.rs`'s wave-1 top-of-file note and
-// `R_StitchPatches`'s escalation both name), so even a resolved index has no
-// `R_EvaluateWireframeSurf`-callable surface to hand it. Both gaps are
-// state-home omissions per the preamble ("a state home this packet marks
-// UNMAPPED is an ESCALATION, never an invention"), not something this wave
-// can invent a carrier for.
+// DEFERRED: R_RecursiveWireframeSurf — one carrier gap left: a per-node
+// runtime visibility-frame field (`node->visframe`) to compare against
+// `tr.visCount`. The tier-3 `Node` replacement (`tr_bsp::Node`, landed by the
+// tr_bsp wave-1 node/leaf loader) carries only the fields
+// `R_LoadNodesAndLeafs` parses from the BSP file and has no scratch field for
+// this, and `FrameState` has no parallel per-node array either — a state-home
+// omission per the preamble ("a state home this packet marks UNMAPPED is an
+// ESCALATION, never an invention"), not something a wave can invent. The
+// second gap this note used to name is CLOSED by DEC-43:
+// `WorldAsset::mark_surfaces`' surface indices now resolve into
+// `WorldAsset::surfaces`, and `R_EvaluateWireframeSurf` takes the resulting
+// `&Surface` directly.
 // Source: oracle/codemp/renderer/tr_world.cpp:990-1036
 
 /// Raven `R_CullSurface` — decide whether a world surface is entirely
@@ -990,10 +987,10 @@ pub fn R_CullGrid(
 /// front/back plane test. `qboolean` collapsed to `bool` (§C7).
 ///
 /// PORT-NOTE: the oracle's `surfaceType_t *surface` parameter is the tagged
-/// pointer `msurface_t::data` addresses; taking `surf: &msurface_t` and
-/// dispatching through `msurface_t::surface_kind` (tier-2 quarantine, §D11)
-/// mirrors `R_DlightSurface`'s established treatment of the same tagged
-/// union in this file, rather than threading a bare `surfaceType_t` pointer.
+/// pointer `msurface_t::data` addresses; taking `surf: &Surface` and matching
+/// on its owned [`SurfaceData`] (DEC-43.1) mirrors `R_DlightSurface`'s
+/// treatment of the same tagged union in this file, rather than threading a
+/// bare tag.
 ///
 /// PORT-NOTE: `R_CullGrid`/`R_CullTriSurf` (this file, already ported)
 /// needed their own globals threaded in as plain parameters once their
@@ -1020,7 +1017,7 @@ pub fn R_CullGrid(
 /// Source: `oracle/codemp/renderer/tr_world.cpp:138-275`
 #[allow(clippy::too_many_arguments)]
 pub fn R_CullSurface(
-    surf: &msurface_t,
+    surf: &Surface,
     shader: &shader_t,
     view: &mut EngineHostView<'_>,
     ori: &orientationr_t,
@@ -1042,8 +1039,8 @@ pub fn R_CullSurface(
         return false;
     }
 
-    let face = match surf.surface_kind() {
-        SurfaceRef::Grid(grid) => {
+    let face = match &surf.data {
+        SurfaceData::Grid(grid) => {
             return R_CullGrid(
                 grid,
                 current_entity_num,
@@ -1059,11 +1056,11 @@ pub fn R_CullSurface(
                 c_box_cull_patch_clip,
             );
         }
-        SurfaceRef::Triangles(tris) => {
+        SurfaceData::Triangles(tris) => {
             return R_CullTriSurf(tris, r_nocull_integer, ori, frustum);
         }
-        SurfaceRef::Face(face) => face,
-        SurfaceRef::Other => return false,
+        SurfaceData::Face(face) => face,
+        SurfaceData::Skip | SurfaceData::Flare(_) => return false,
     };
 
     if matches!(shader.cullType, cullType_t::CT_TWO_SIDED) {
@@ -1077,12 +1074,12 @@ pub fn R_CullSurface(
 
     if r_cull_roof_faces_integer != 0 {
         // Very slow, but this is only intended for taking shots for automap images.
-        if face.plane.normal[2] > 0.0 && face.numPoints > 0 {
+        if face.plane.normal[2] > 0.0 && !face.points.is_empty() {
             // it's facing up I guess
 
             // The fact that this point is in the middle of the array has no
             // relation to the orientation in the surface outline.
-            let mut base_point = face.point((face.numPoints / 2) as usize);
+            let mut base_point = face.points[face.points.len() / 2].xyz;
             base_point[2] += 2.0;
 
             // the endpoint will be 8192 units from the chosen point in the
@@ -1270,18 +1267,20 @@ const QSORT_ENTITYNUM_SHIFT: u32 = 7;
 /// the tree, and every other automap fn in this file
 /// (`R_DrawWireframeAutomap`, `R_EvaluateWireframeSurf`) already lives under
 /// the matching `#ifndef` arm. Only the compiled `#else` path (the plain
-/// `R_AddDrawSurf` call) is transcribed. `surf.data`'s tagged-union pointer
-/// is read through the existing `msurface_t::surface_kind`/`surface_kind_mut`
-/// quarantine accessors (§D11) and passed straight through as the
-/// `R_AddDrawSurf` generic's `SurfaceRef<'a>` payload — `SurfaceGeometry`
-/// (this file's siblings' `S` choice) has no `Grid` variant, so `SurfaceRef`
-/// (already covering Face/Grid/Triangles/Other) is the correct instantiation
-/// for a world surface.
+/// `R_AddDrawSurf` call) is transcribed. Raven hands `surf->data` — the
+/// tagged-union pointer — straight to `R_AddDrawSurf`; under the owned world
+/// that pointer is [`WorldSurfaceRef`], a `Copy` handle pairing the surface's
+/// kind tag with its flat index into `WorldAsset::surfaces` (DEC-43.3). Hence
+/// the extra `surf_index` parameter: it is the oracle's own
+/// `worldData.surfaces` subscript, standing in for the pointer identity the
+/// draw list cannot keep while the world walk mutates the same array
+/// (porting-rules §B5).
 ///
 /// Source: `oracle/codemp/renderer/tr_world.cpp:408-555`
 #[allow(clippy::too_many_arguments)]
-pub fn R_AddWorldSurface<'a>(
-    surf: &'a mut msurface_t,
+pub fn R_AddWorldSurface(
+    surf: &mut Surface,
+    surf_index: u32,
     mut dlight_bits: i32,
     no_view_count: bool,
     view_count: i32,
@@ -1305,20 +1304,20 @@ pub fn R_AddWorldSurface<'a>(
     dlights: &[dlight_t],
     dlight_surfaces_culled: &mut u32,
     dlight_surfaces: &mut u32,
-    draw_surfs: &mut Vec<DrawSurf<SurfaceRef<'a>>>,
+    draw_surfs: &mut Vec<DrawSurf<WorldSurfaceRef>>,
 ) {
     if !no_view_count {
-        if surf.viewCount == view_count {
+        if surf.view_count == view_count {
             // already in this view, but lets make sure all the dlight bits are set
-            match surf.surface_kind_mut() {
-                SurfaceRefMut::Face(face) => face.dlightBits |= dlight_bits,
-                SurfaceRefMut::Grid(grid) => grid.dlightBits |= dlight_bits,
-                SurfaceRefMut::Triangles(tris) => tris.dlightBits |= dlight_bits,
-                SurfaceRefMut::Other => {}
+            match &mut surf.data {
+                SurfaceData::Face(face) => face.dlight_bits |= dlight_bits,
+                SurfaceData::Grid(grid) => grid.dlight_bits |= dlight_bits,
+                SurfaceData::Triangles(tris) => tris.dlight_bits |= dlight_bits,
+                SurfaceData::Skip | SurfaceData::Flare(_) => {}
             }
             return;
         }
-        surf.viewCount = view_count;
+        surf.view_count = view_count;
         // FIXME: bmodel fog?
     }
 
@@ -1357,10 +1356,10 @@ pub fn R_AddWorldSurface<'a>(
         dlight_bits = (dlight_bits != 0) as i32;
     }
 
-    let fog_index = surf.fogIndex;
+    let fog_index = surf.fog_index;
     let shifted_entity_num = current_entity_num << QSORT_ENTITYNUM_SHIFT;
     R_AddDrawSurf(
-        surf.surface_kind(),
+        WorldSurfaceRef::of(surf, surf_index),
         shader.sortedIndex,
         shifted_entity_num,
         rdf_nofog,
@@ -1445,18 +1444,21 @@ pub fn R_InitializeWireframeAutomap(
 ///
 /// DEFERRED: the closing `for (i = 0; i < bmodel->numSurfaces; i++)
 /// R_AddWorldSurface(bmodel->firstSurface + i, tr.currentEntity->dlightBits,
-/// qtrue)` loop — `R_AddWorldSurface`'s own already-ported signature (wave
-/// 4) needs `shader: &shader_t` per surface, but `msurface_t::shader` is a
-/// tier-2 `*mut shader_s` with no quarantine accessor anywhere in the crate
-/// (only `.data` has `surface_kind`/`surface_kind_mut`/`.face()`); adding
-/// one would extend the tier-2 pattern with a new accessor this wave may not
-/// write, and dereferencing it inline here would be new `unsafe` (banned).
-/// A wave-planning defect in `R_AddWorldSurface`'s own shader-threading
-/// design fed back to the manifest, not something this wave can invent
-/// around. `R_DlightBmodel`'s snapshot write-back (`bmodel.surfaces` on the
-/// throwaway `DlightBmodel`, not the live `msurface_t`s) is therefore also
-/// unobserved by this call — a narrow fidelity gap only visible for a
-/// surface this loop never reaches anyway.
+/// qtrue)` loop — `R_AddWorldSurface` now takes `(&mut Surface, surf_index)`
+/// into `WorldAsset::surfaces` (DEC-43.3), which is exactly the range
+/// `BModel::first_surface`/`num_surfaces` describes; but this fn reaches its
+/// brush model through the tier-2 `model_t::bmodel` raw pointer, and the
+/// `R_LoadSubmodels` half that would register a `model_t` against a `BModel`
+/// (and so let this walk address the owned array) is itself unported
+/// (`tr_bsp.rs`, `//TODO: Port R_LoadSubmodels model_t registration`).
+/// `R_AddWorldSurface` also needs `shader: &shader_t` per surface, resolved
+/// from `Surface::shader`'s `ShaderHandle` — available once the walk is on
+/// the owned array, unavailable through `msurface_t::shader` (a `*mut
+/// shader_s` with no quarantine accessor; dereferencing it inline would be
+/// new `unsafe`, banned here). `R_DlightBmodel`'s snapshot write-back
+/// (`bmodel.surfaces` on the throwaway `DlightBmodel`, not the live
+/// `msurface_t`s) is therefore also unobserved by this call — a narrow
+/// fidelity gap only visible for a surface this loop never reaches anyway.
 ///
 /// Source: `oracle/codemp/renderer/tr_world.cpp:570-611`
 pub fn R_AddBrushModelSurfaces(
@@ -1538,14 +1540,13 @@ pub fn R_AddBrushModelSurfaces(
 /// `firstmarksurface`/`nummarksurfaces` walk) sits behind that gate in the
 /// oracle, so skipping the check would invent which nodes get processed
 /// (porting-rules §A2 — no speculative behavior), not faithfully transcribe
-/// it. The leaf branch is separately blocked regardless:
-/// `WorldAsset::mark_surfaces: Vec<u32>` is a set of surface *indices* with
-/// no backing `Vec<msurface_t>`/surface arena to resolve them against yet
-/// (tier-2 transition audit Group 1; same gap `R_RecursiveWireframeSurf`'s
-/// own note and `R_StitchPatches`'s escalation both name). Both are
-/// state-home omissions per the preamble ("a state home this packet marks
-/// UNMAPPED is an ESCALATION, never an invention"), not something this wave
-/// can invent a carrier for.
+/// it. That gap is a state-home omission per the preamble ("a state home this
+/// packet marks UNMAPPED is an ESCALATION, never an invention"), not
+/// something a wave can invent a carrier for. The leaf branch's separate
+/// blocker is CLOSED by DEC-43: `WorldAsset::mark_surfaces`' surface indices
+/// now address `WorldAsset::surfaces`, and `R_AddWorldSurface` takes
+/// `(&mut Surface, surf_index)` — destructuring `WorldAsset` once yields
+/// `&nodes`/`&planes` alongside `&mut surfaces` for the whole walk.
 ///
 /// STATE HOMES (for whichever wave lands the body): `r_nocull` ->
 /// `RendererCvars` (DEC-37 A13.1); `tr` reads/writes SPLIT across

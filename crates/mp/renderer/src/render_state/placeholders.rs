@@ -27,7 +27,7 @@ use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::texture_compression_t::textureCompression_t;
 use mp_qshared::shared::{cplane_t, qhandle_t, vec3_t};
 
-use crate::tr_bsp::{BModel, DShader, Fog, Node};
+use crate::tr_bsp::{BModel, DShader, Fog, Node, Surface};
 use crate::tr_local::mgrid_t::mgrid_t;
 
 /// `FUNCTABLE_SIZE`.
@@ -261,8 +261,14 @@ pub struct WorldAsset {
     /// `nodes` (`mnode_t *`) — the node/leaf arena `Node`'s `parent`/
     /// `children` indices point into (`numnodes` is `nodes.len()`).
     pub nodes: Vec<Node>,
-    /// `marksurfaces` (`msurface_t **`) — surface **indices**, per the tier-2
-    /// transition audit's pointer-array replacement.
+    /// `surfaces` (`msurface_t *`) — the world's renderable surfaces in BSP
+    /// lump order (`numsurfaces` is `surfaces.len()`). DEC-43.1: one flat
+    /// index space, so `mark_surfaces` and `BModel`'s
+    /// `first_surface`/`num_surfaces` range address it directly.
+    pub surfaces: Vec<Surface>,
+    /// `marksurfaces` (`msurface_t **`) — surface **indices** into
+    /// [`Self::surfaces`], per the tier-2 transition audit's pointer-array
+    /// replacement.
     pub mark_surfaces: Vec<u32>,
     /// `lightGridOrigin`.
     pub light_grid_origin: Vec3,

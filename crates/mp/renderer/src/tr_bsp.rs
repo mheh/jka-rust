@@ -101,10 +101,9 @@ use crate::tr_worldeffects::world_effects::WorldEffectsState;
 // `oracle/codemp/renderer/tr_bsp.cpp:1887-1889,1956`, out of this wave's
 // packet). `R_FixSharedVertexLodError_r`/`R_MovePatchSurfacesToHunk`
 // deliberately do NOT thread `WorldAsset` — the packet's threading digest
-// marks both "no state channel"/"engine seam" only, and neither has a
-// licensed `WorldAsset::surfaces`-style carrier yet (no `Surface` tagged-
-// union home exists in R2 for `msurface_t.data`); they take a grid-mesh
-// collection as a plain parameter instead (see each fn's doc comment).
+// marks both "no state channel"/"engine seam" only; they take
+// `worldData.surfaces` as a plain `&mut [Surface]` parameter instead (see
+// each fn's doc comment).
 //
 // WAVE 8 ADDITIONS, landed by the same field-merge step: `WorldAsset::fogs:
 // Vec<Fog>` and `WorldAsset::global_fog: i32` (`R_LoadFogs`, tier-2
@@ -116,19 +115,17 @@ use crate::tr_worldeffects::world_effects::WorldEffectsState;
 // WAVE 10 ADDITIONS, landed by the same field-merge step: `FrameState::
 // sun_ambient: Vec3` (`R_LoadEntities`, R2 `## State ownership`'s `tr`
 // frontend-scratch row — "sun/fog fields" — `FrameState` carries
-// `sun_direction` already but not `sunAmbient`). `R_LoadSurfaces` adds no
-// field: `WorldAsset` still has no `surfaces`/`numsurfaces` carrier (no
-// `Surface` tagged-union home exists in R2 for `msurface_t.data` — the same
-// gap `tr_world.rs`'s `R_NodeHasOppositeFaces`/`R_RecursiveWireframeSurf`/
-// `R_RecursiveWorldNode` DEFERRED notes and this file's own wave-1 note all
-// name), so `R_LoadSurfaces` follows this file's own established
-// `R_FixSharedVertexLodError`/`R_StitchAllPatches`/
-// `R_MovePatchSurfacesToHunk` precedent (waves 1/2/4): it builds a local
-// `Vec<GridMesh>` from the grid patches `ParseMesh` produces and threads it
-// through those three already-ported siblings, exercising
-// `ParseFace`/`ParseMesh`/`ParseTriSurf`/`ParseFlare` for their real side
-// effects (shader/image registration, which do have R2 homes) and dropping
-// their non-grid geometry afterward.
+// `sun_direction` already but not `sunAmbient`).
+//
+// DEC-43 ADDITIONS: `WorldAsset::surfaces: Vec<Surface>` — the owned
+// `worldData.surfaces` carrier (`Surface`/`SurfaceData`, defined beside the
+// `Parse*` payload types below). `R_LoadSurfaces` fills it in lump order and
+// the five patch-stitching walks
+// (`R_FixSharedVertexLodError`/`_r`/`R_StitchPatches`/`R_TryStitchingPatch`/
+// `R_StitchAllPatches`) iterate it over the oracle's own `0..numsurfaces`
+// index domain, so their transcribed `surfaceType != SF_GRID` guards are
+// live `SurfaceData::Grid` matches rather than always-true checks over a
+// grids-only stand-in collection.
 
 // The two dependencies `R_LoadFogs`'s shader/fog-parameter step needs are
 // both landed now (waves-7-13 fix round): `stylesDefault` (the `const byte
@@ -208,17 +205,15 @@ pub struct Node {
 /// Owned replacement for Raven `bmodel_t`'s culling bounds — wave 1
 /// (`R_LoadLightGrid`) only reads `bounds`; this wave (`R_LoadSubmodels`)
 /// adds `first_surface`/`num_surfaces` (tier-2 transition audit, Group 1:
-/// `bmodel_t` row). `first_surface` is the parsed lump index — same
-/// index-not-pointer treatment as `R_LoadMarksurfaces`'s `mark_surfaces`
-/// above — since no `WorldAsset::surfaces` (`msurface_t` array) carrier
-/// exists yet for it to address into (see `R_LoadSubmodels`'s doc comment).
+/// `bmodel_t` row). `first_surface` is an index, not a pointer — same
+/// treatment as `R_LoadMarksurfaces`'s `mark_surfaces` above.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:938-942`
 #[derive(Clone)]
 pub struct BModel {
     pub bounds: [Vec3; 2],
-    /// `firstSurface` — parsed lump index, not yet a live range into an
-    /// owned surface array (no `WorldAsset::surfaces` carrier exists).
+    /// `firstSurface` — start of this submodel's `[first, first + num)` range
+    /// into [`WorldAsset::surfaces`] (DEC-43.1).
     pub first_surface: usize,
     /// `numSurfaces`.
     pub num_surfaces: i32,
@@ -653,12 +648,12 @@ pub fn R_GetEntityToken(world: &mut WorldAsset, size: i32) -> (bool, String) {
 
 // --- R3 wave 1 ---------------------------------------------------------
 
-/// Borrows `world_data[a]` immutably and `world_data[b]` mutably from the
-/// same slice — the split-borrow helper `R_FixSharedVertexLodError_r`'s
-/// recursion needs (its `grid1`/`grid2` alias one array in the oracle,
-/// interior-safety law: pointer aliasing becomes an index pair over one
-/// owned slice instead of two independent raw pointers). `a == b` is
-/// unreachable here because the caller applies the oracle's own
+/// Borrows the grid at `world_data[a]` immutably and the one at
+/// `world_data[b]` mutably from the same slice — the split-borrow helper
+/// `R_FixSharedVertexLodError_r`'s recursion needs (its `grid1`/`grid2` alias
+/// one array in the oracle, interior-safety law: pointer aliasing becomes an
+/// index pair over one owned slice instead of two independent raw pointers).
+/// `a == b` is unreachable here because the caller applies the oracle's own
 /// `lodFixed == 2` guard (`tr_bsp.cpp:689-692`) before splitting: the parent
 /// frame sets `grid2->lodFixed = 2` at `tr_bsp.cpp:777` *before* recursing
 /// with that same grid as `grid1` at `:778`, so the recursive frame's loop
@@ -666,35 +661,37 @@ pub fn R_GetEntityToken(world: &mut WorldAsset, size: i32) -> (bool, String) {
 /// `a == b`. It panics rather than silently aliasing if that ordering is ever
 /// broken (porting-rules §19 — pick one defined behavior for what is
 /// otherwise nonsensical input).
-fn split_grid_pair(world_data: &mut [GridMesh], a: usize, b: usize) -> (&GridMesh, &mut GridMesh) {
-    if a < b {
+fn split_grid_pair(world_data: &mut [Surface], a: usize, b: usize) -> (&GridMesh, &mut GridMesh) {
+    let (s1, s2) = if a < b {
         let (left, right) = world_data.split_at_mut(b);
-        (&left[a], &mut right[0])
+        (&left[a].data, &mut right[0].data)
     } else {
         let (left, right) = world_data.split_at_mut(a);
-        (&right[0], &mut left[b])
+        (&right[0].data, &mut left[b].data)
+    };
+    match (s1, s2) {
+        (SurfaceData::Grid(grid1), SurfaceData::Grid(grid2)) => (grid1, grid2),
+        // Unreachable: both callers apply the oracle's own `surfaceType !=
+        // SF_GRID` guard to each index before splitting (porting-rules §19).
+        _ => unreachable!("split_grid_pair on a non-grid surface"),
     }
 }
 
 /// Raven `R_FixSharedVertexLodError_r`.
 ///
 /// PORT-NOTE: the packet's threading digest marks this "pure fn — no state
-/// channel"; it operates on a plain `world_data: &mut [GridMesh]` rather
-/// than `WorldAsset` (no licensed `WorldAsset::surfaces` carrier exists yet
-/// — see the top-of-file wave-1 note). `grid1` crosses as an index into that
-/// same slice (`grid1_idx`) instead of a raw pointer: the oracle's recursive
-/// call re-enters with `grid2` (an element of `worldData.surfaces`) as the
-/// new `grid1`, aliasing the very array the loop mutates, which Rust's
-/// aliasing rules forbid via two independent references — `split_grid_pair`
-/// derives both from one `&mut` borrow per iteration instead
-/// (interior-safety law: pointer → index). The `grid2->surfaceType != SF_GRID`
-/// guard is transcribed verbatim even though every element of `world_data`
-/// is already a `GridMesh` (always `SF_GRID` by construction here) — it is
-/// the oracle's own invariant check on the general `worldData.surfaces`
-/// array, harmless to keep as a literal transcription (porting-rules §2).
+/// channel"; it walks `worldData.surfaces` as a plain `world_data: &mut
+/// [Surface]` slice rather than the whole `WorldAsset` (DEC-43.1 gives the
+/// carrier; this fn still needs nothing else off the world). `grid1` crosses
+/// as an index into that same slice (`grid1_idx`) instead of a raw pointer:
+/// the oracle's recursive call re-enters with `grid2` (an element of
+/// `worldData.surfaces`) as the new `grid1`, aliasing the very array the loop
+/// mutates, which Rust's aliasing rules forbid via two independent references
+/// — `split_grid_pair` derives both from one `&mut` borrow per iteration
+/// instead (interior-safety law: pointer → index).
 ///
 /// Source: `oracle/codemp/renderer/tr_bsp.cpp:681-783`
-pub fn R_FixSharedVertexLodError_r(start: usize, grid1_idx: usize, world_data: &mut [GridMesh]) {
+pub fn R_FixSharedVertexLodError_r(start: usize, grid1_idx: usize, world_data: &mut [Surface]) {
     let mut j = start;
     while j < world_data.len() {
         let mut recurse = false;
@@ -703,12 +700,12 @@ pub fn R_FixSharedVertexLodError_r(start: usize, grid1_idx: usize, world_data: &
             // *before* the split borrow: the `lodFixed == 2` guard is what makes
             // `j == grid1_idx` unreachable at `split_grid_pair` (see its doc).
             // if this surface is not a grid
-            if !matches!(world_data[j].surface_type, surfaceType_t::SF_GRID) {
+            let Some(grid2) = surface_grid(&world_data[j]) else {
                 j += 1;
                 continue;
-            }
+            };
             // if the LOD errors are already fixed for this patch
-            if world_data[j].lod_fixed == 2 {
+            if grid2.lod_fixed == 2 {
                 j += 1;
                 continue;
             }
@@ -897,7 +894,7 @@ pub fn R_FixSharedVertexLodError_r(start: usize, grid1_idx: usize, world_data: &
 /// modeling that corruption.
 ///
 /// Source: `oracle/codemp/renderer/tr_bsp.cpp:1314-1339`
-pub fn R_MovePatchSurfacesToHunk(_world_data: &mut [GridMesh]) {
+pub fn R_MovePatchSurfacesToHunk(_world_data: &mut [Surface]) {
     // No-op under the owned-Vec ownership model — see PORT-NOTE above.
 }
 
@@ -1125,25 +1122,24 @@ pub fn R_LoadLightGrid(
 /// Raven `R_FixSharedVertexLodError`.
 ///
 /// PORT-NOTE: same "no state channel" / plain-`world_data` shape as the
-/// wave-1 sibling `R_FixSharedVertexLodError_r` it drives (see the top-of-
-/// file wave-1 note) — no licensed `WorldAsset::surfaces` carrier exists yet
-/// for `worldData.surfaces`, so this walks a plain `world_data: &mut
-/// [GridMesh]` slice instead.
+/// wave-1 sibling `R_FixSharedVertexLodError_r` it drives — it walks
+/// `worldData.surfaces` as a `&mut [Surface]` slice (DEC-43.1) and needs
+/// nothing else off `WorldAsset`.
 ///
 /// Source: `oracle/codemp/renderer/tr_bsp.cpp:793-811`
-pub fn R_FixSharedVertexLodError(world_data: &mut [GridMesh]) {
+pub fn R_FixSharedVertexLodError(world_data: &mut [Surface]) {
     for i in 0..world_data.len() {
         //
         // if this surface is not a grid
-        if !matches!(world_data[i].surface_type, surfaceType_t::SF_GRID) {
+        let Some(grid) = surface_grid_mut(&mut world_data[i]) else {
+            continue;
+        };
+        //
+        if grid.lod_fixed != 0 {
             continue;
         }
         //
-        if world_data[i].lod_fixed != 0 {
-            continue;
-        }
-        //
-        world_data[i].lod_fixed = 2;
+        grid.lod_fixed = 2;
         // recursively fix other patches in the same LOD group
         R_FixSharedVertexLodError_r(i + 1, i, world_data);
     }
@@ -1594,17 +1590,28 @@ fn stitch_scan(grid1: &GridMesh, grid2: &GridMesh) -> Option<StitchInsert> {
 /// in the same LOD group, returning whether it changed anything.
 ///
 /// `R_GridInsertColumn`/`R_GridInsertRow` (`tr_curve.rs`) take the grid by
-/// value, so `grid2` is moved out of its slot with `core::mem::replace` and
-/// the returned grid moved back — the owned-slice form of the oracle's
-/// `worldData.surfaces[grid2num].data = (surfaceType_t *) grid2;` repoint.
+/// value, so `grid2` is moved out of its `SurfaceData::Grid` slot with
+/// `core::mem::replace` and the returned grid moved back — the owned form of
+/// the oracle's `worldData.surfaces[grid2num].data = (surfaceType_t *) grid2;`
+/// repoint. The transient placeholder left in the slot is
+/// `empty_grid_mesh()` (tag `SF_BAD`), not `SurfaceData::Skip`: `SF_SKIP` is
+/// a meaningful nodraw surface, while `SF_BAD` is self-evidently a hole.
 ///
 /// PORT-NOTE: same "no state channel" / plain-`world_data` shape as its
-/// `R_FixSharedVertexLodError` siblings above — no licensed
-/// `WorldAsset::surfaces` carrier exists yet for `worldData.surfaces`.
+/// `R_FixSharedVertexLodError` siblings above — it walks `worldData.surfaces`
+/// as a `&mut [Surface]` slice (DEC-43.1).
 ///
 /// Source: `oracle/codemp/renderer/tr_bsp.cpp:819-1235`
-pub fn R_StitchPatches(grid1num: usize, grid2num: usize, world_data: &mut [GridMesh]) -> bool {
-    let insert = stitch_scan(&world_data[grid1num], &world_data[grid2num]);
+pub fn R_StitchPatches(grid1num: usize, grid2num: usize, world_data: &mut [Surface]) -> bool {
+    let (Some(grid1), Some(grid2)) = (
+        surface_grid(&world_data[grid1num]),
+        surface_grid(&world_data[grid2num]),
+    ) else {
+        // Unreachable: `R_StitchAllPatches`/`R_TryStitchingPatch` apply the
+        // oracle's `surfaceType != SF_GRID` guard to both indices first.
+        unreachable!("R_StitchPatches on a non-grid surface")
+    };
+    let insert = stitch_scan(grid1, grid2);
     let Some(insert) = insert else {
         return false;
     };
@@ -1614,14 +1621,19 @@ pub fn R_StitchPatches(grid1num: usize, grid2num: usize, world_data: &mut [GridM
     // guards already exclude; re-checked before the move so a bail can never
     // consume the grid out of its slot.
     let fits = match insert {
-        StitchInsert::Column { .. } => world_data[grid2num].width < MAX_GRID_SIZE as i32,
-        StitchInsert::Row { .. } => world_data[grid2num].height < MAX_GRID_SIZE as i32,
+        StitchInsert::Column { .. } => grid2.width < MAX_GRID_SIZE as i32,
+        StitchInsert::Row { .. } => grid2.height < MAX_GRID_SIZE as i32,
     };
     if !fits {
         return false;
     }
 
-    let grid2 = replace(&mut world_data[grid2num], empty_grid_mesh());
+    let SurfaceData::Grid(grid2) = replace(
+        &mut world_data[grid2num].data,
+        SurfaceData::Grid(empty_grid_mesh()),
+    ) else {
+        unreachable!("R_StitchPatches on a non-grid surface")
+    };
     let stitched = match insert {
         StitchInsert::Column {
             column,
@@ -1640,10 +1652,11 @@ pub fn R_StitchPatches(grid1num: usize, grid2num: usize, world_data: &mut [GridM
     match stitched {
         Some(mut grid2) => {
             grid2.lod_stitched = 0;
-            world_data[grid2num] = grid2;
+            world_data[grid2num].data = SurfaceData::Grid(grid2);
             true
         }
-        // Unreachable — see the `fits` check above.
+        // Unreachable — see the `fits` check above. The callee consumed the
+        // grid on this path, so the slot keeps its `SF_BAD` placeholder.
         None => false,
     }
 }
@@ -1738,42 +1751,41 @@ fn R_LoadSubmodels(ctx: &BspLoadContext, l: &lump_t, world: &mut WorldAsset, ind
 /// Raven `R_TryStitchingPatch`.
 ///
 /// PORT-NOTE: same "no state channel" / plain-`world_data` shape as its
-/// `R_StitchPatches`/`R_FixSharedVertexLodError` siblings above — no
-/// licensed `WorldAsset::surfaces` carrier exists yet for `worldData.surfaces`
-/// (see the top-of-file wave-1 note), so this walks a plain `world_data: &mut
-/// [GridMesh]` slice instead; `worldData.numsurfaces` is `world_data.len()`.
-/// The oracle caches `grid1 = worldData.surfaces[grid1num].data` once before
-/// the loop and never re-fetches it, but `lodRadius`/`lodOrigin` (the only
-/// fields read off `grid1` here) are never mutated by `R_StitchPatches`, so
-/// re-indexing `world_data[grid1num]` fresh each iteration is behaviorally
-/// identical and avoids holding a stale reference across the mutating call
+/// `R_StitchPatches`/`R_FixSharedVertexLodError` siblings above — it walks
+/// `worldData.surfaces` as a `&mut [Surface]` slice (DEC-43.1);
+/// `worldData.numsurfaces` is `world_data.len()`. The oracle caches
+/// `grid1 = worldData.surfaces[grid1num].data` once before the loop and never
+/// re-fetches it, but `lodRadius`/`lodOrigin` (the only fields read off
+/// `grid1` here) are never mutated by `R_StitchPatches`, so re-indexing
+/// `world_data[grid1num]` fresh each iteration is behaviorally identical and
+/// avoids holding a stale reference across the mutating call
 /// (interior-safety law: no raw pointers to alias here in the first place).
-/// The oracle's `grid2->surfaceType != SF_GRID` guard is transcribed
-/// verbatim, same as `R_FixSharedVertexLodError_r`'s identical guard, even
-/// though every element of `world_data` is already a `GridMesh` here
-/// (porting-rules §2).
 ///
 /// Source: `oracle/codemp/renderer/tr_bsp.cpp:1250-1274`
-pub fn R_TryStitchingPatch(grid1num: usize, world_data: &mut [GridMesh]) -> i32 {
+pub fn R_TryStitchingPatch(grid1num: usize, world_data: &mut [Surface]) -> i32 {
     let mut numstitches = 0i32;
     for j in 0..world_data.len() {
         //
         // if this surface is not a grid
-        if !matches!(world_data[j].surface_type, surfaceType_t::SF_GRID) {
+        let Some(grid2) = surface_grid(&world_data[j]) else {
             continue;
-        }
+        };
+        let Some(grid1) = surface_grid(&world_data[grid1num]) else {
+            // Unreachable: `R_StitchAllPatches` only calls in with a grid.
+            unreachable!("R_TryStitchingPatch on a non-grid surface")
+        };
         // grids in the same LOD group should have the exact same lod radius
-        if world_data[grid1num].lod_radius != world_data[j].lod_radius {
+        if grid1.lod_radius != grid2.lod_radius {
             continue;
         }
         // grids in the same LOD group should have the exact same lod origin
-        if world_data[grid1num].lod_origin[0] != world_data[j].lod_origin[0] {
+        if grid1.lod_origin[0] != grid2.lod_origin[0] {
             continue;
         }
-        if world_data[grid1num].lod_origin[1] != world_data[j].lod_origin[1] {
+        if grid1.lod_origin[1] != grid2.lod_origin[1] {
             continue;
         }
-        if world_data[grid1num].lod_origin[2] != world_data[j].lod_origin[2] {
+        if grid1.lod_origin[2] != grid2.lod_origin[2] {
             continue;
         }
         //
@@ -1789,32 +1801,30 @@ pub fn R_TryStitchingPatch(grid1num: usize, world_data: &mut [GridMesh]) -> i32 
 /// Raven `R_StitchAllPatches`.
 ///
 /// PORT-NOTE: same "no state channel" / plain-`world_data` shape as its
-/// `R_TryStitchingPatch`/`R_StitchPatches` siblings above — no licensed
-/// `WorldAsset::surfaces` carrier exists yet for `worldData.surfaces` (see
-/// the top-of-file wave-1 note), so this walks a plain `world_data: &mut
-/// [GridMesh]` slice instead; `worldData.numsurfaces` is `world_data.len()`.
-/// `numstitches` is transcribed as a local accumulator even though its only
-/// oracle consumer, the trailing `Com_Printf`, is commented out in the
-/// oracle itself — dead by construction, not a Rust-side drop
-/// (porting-rules §2).
+/// `R_TryStitchingPatch`/`R_StitchPatches` siblings above — it walks
+/// `worldData.surfaces` as a `&mut [Surface]` slice (DEC-43.1);
+/// `worldData.numsurfaces` is `world_data.len()`. `numstitches` is
+/// transcribed as a local accumulator even though its only oracle consumer,
+/// the trailing `Com_Printf`, is commented out in the oracle itself — dead by
+/// construction, not a Rust-side drop (porting-rules §2).
 ///
 /// Source: `oracle/codemp/renderer/tr_bsp.cpp:1281-1307`
-pub fn R_StitchAllPatches(world_data: &mut [GridMesh]) {
+pub fn R_StitchAllPatches(world_data: &mut [Surface]) {
     let mut numstitches = 0i32;
     loop {
         let mut stitched = false;
         for i in 0..world_data.len() {
             //
             // if this surface is not a grid
-            if !matches!(world_data[i].surface_type, surfaceType_t::SF_GRID) {
+            let Some(grid) = surface_grid_mut(&mut world_data[i]) else {
+                continue;
+            };
+            //
+            if grid.lod_stitched != 0 {
                 continue;
             }
             //
-            if world_data[i].lod_stitched != 0 {
-                continue;
-            }
-            //
-            world_data[i].lod_stitched = 1;
+            grid.lod_stitched = 1;
             stitched = true;
             //
             numstitches += R_TryStitchingPatch(i, world_data);
@@ -2147,28 +2157,18 @@ fn R_LoadFogs(
 // --- R3 wave 9 -----------------------------------------------------------
 //
 // The four `Parse*` fns below (`ParseFace`/`ParseMesh`/`ParseTriSurf`/
-// `ParseFlare`) each fill in Raven's `msurface_t *surf` out-parameter — but
-// the tier-2 `msurface_t` (`tr_local/msurface_s.rs`) carries `shader: *mut
-// shader_s`/`data: *mut surfaceType_t` raw pointers, and `WorldAsset` has no
-// `surfaces`-style carrier for `msurface_t` records to live in yet (this
-// file's top-of-file wave-1 note: "no `WorldAsset::surfaces` carrier exists
-// yet ... no `Surface` tagged-union home exists in R2 for `msurface_t.data`").
-// Building a tier-2 `msurface_t`/`srfSurfaceFace_t`/`srfTriangles_t` needs
-// `Hunk_Alloc` plus raw-pointer repointing — forbidden by this file's
-// interior-safety law (UNSAFE IS BANNED; only the *read-side*
-// `surface_kind`/`face` quarantine accessors exist, no write-side
-// constructor). Per the out-params→returns dictionary entry, each fn below
-// instead returns an owned `Parsed*` triple (`fog_index`, `shader`, and the
-// fn's own owned surface payload) — `ParseFace`/`ParseTriSurf` realize the
-// tier-2 transition audit's Group 1 `srfSurfaceFace_t`/`srfTriangles_t` rows
-// as new owned types (`SurfaceFace`/`SurfaceTriangles`) since this wave is
-// their owning construction site; `ParseMesh` reuses the already-owned
-// `GridMesh` (`tr_curve.rs`, wave 2); `ParseFlare` reuses the existing
-// tier-2 `srfFlare_t` as-is, since it carries zero raw-pointer/`c_char`/
-// `qboolean` fields (no audit row — genuinely pointer-free already). A later
-// wave (`R_LoadSurfaces`, not in this packet — it is the caller these fns
-// serve) reconciles the returned owned data with wherever
-// `WorldAsset::surfaces` eventually lands.
+// `ParseFlare`) each fill in Raven's `msurface_t *surf` out-parameter. Per
+// the out-params→returns dictionary entry, each returns an owned `Parsed*`
+// triple (`fog_index`, `shader`, and the fn's own owned surface payload)
+// instead — `ParseFace`/`ParseTriSurf` realize the tier-2 transition audit's
+// Group 1 `srfSurfaceFace_t`/`srfTriangles_t` rows as new owned types
+// (`SurfaceFace`/`SurfaceTriangles`) since this wave is their owning
+// construction site; `ParseMesh` reuses the already-owned `GridMesh`
+// (`tr_curve.rs`, wave 2); `ParseFlare` reuses the existing tier-2
+// `srfFlare_t` as-is, since it carries zero raw-pointer/`c_char`/`qboolean`
+// fields (no audit row — genuinely pointer-free already). `R_LoadSurfaces`
+// (the caller these fns serve) assembles each triple into one `Surface` on
+// `WorldAsset::surfaces` — the DEC-43 carrier, defined below.
 //
 // CROSS-FILE ESCALATION (found by grepping the workspace, not assumed):
 // `tr_surface.rs`'s already-declared `RB_SurfaceFace(surf: &srfSurfaceFace_t,
@@ -2227,11 +2227,9 @@ pub struct SurfaceFace {
 /// `numIndexes`/`indexes` naming for this specific type (Raven itself is
 /// inconsistent between `srfSurfaceFace_t` and `srfTriangles_t`).
 ///
-/// Not `#[derive(Clone)]`: `verts: Vec<drawVert_t>` and `drawVert_t`
-/// (`mp_engine_qcommon::qfiles::draw_vert_t`) derives neither `Default` nor
-/// `Clone` (`tr_curve.rs`'s `zero_draw_vert`/`copy_draw_vert` precedent).
-///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:818-836`
+// `Clone` added by DEC-43.4, once `drawVert_t` gained its own derive.
+#[derive(Clone)]
 pub struct SurfaceTriangles {
     /// `dlightBits` — zero-initialized here; only a later dlight wave writes
     /// it.
@@ -2240,6 +2238,72 @@ pub struct SurfaceTriangles {
     pub bounds: [Vec3; 2],
     pub verts: Vec<drawVert_t>,
     pub indexes: Vec<i32>,
+}
+
+/// The owned form of Raven's `msurface_t.data` tagged union — the
+/// `surfaceType_t *` whose leading discriminant selects one of the `srf*_t`
+/// structs behind it. One variant per arm of `R_LoadSurfaces`' `switch`
+/// (`MST_PLANAR`/`MST_PATCH`/`MST_TRIANGLE_SOUP`/`MST_FLARE`), plus `Skip`
+/// for `ParseMesh`'s nodraw early return (`surf->data = &skipData`).
+///
+/// DEC-43.2: there is deliberately **no** `Terrain` variant. `SF_TERRAIN`
+/// appears nowhere in `tr_bsp.cpp`/`tr_world.cpp` — terrain enters the draw
+/// list as the engine-global `&tr.landScape`
+/// (`oracle/codemp/renderer/tr_terrain.cpp:1005`), never as a BSP surface —
+/// so a variant here would invent state the oracle lacks (porting-rules §A2).
+///
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:656-678`
+#[derive(Clone)]
+pub enum SurfaceData {
+    /// `&skipData` — Raven's shared `static surfaceType_t skipData = SF_SKIP`
+    /// nodraw tag (three-kind rule kind 1: a const, not cross-frame state).
+    Skip,
+    /// `srfSurfaceFace_t` (`SF_FACE`).
+    Face(SurfaceFace),
+    /// `srfGridMesh_t` (`SF_GRID`).
+    Grid(GridMesh),
+    /// `srfTriangles_t` (`SF_TRIANGLES`).
+    Triangles(SurfaceTriangles),
+    /// `srfFlare_t` (`SF_FLARE`).
+    Flare(srfFlare_t),
+}
+
+/// Owned replacement for Raven `msurface_t` — one renderable BSP surface,
+/// element of [`WorldAsset::surfaces`] (DEC-43.1). `shader: shader_s *`
+/// becomes a `ShaderHandle` and the `data: surfaceType_t *` tagged-union
+/// pointer becomes the owned [`SurfaceData`]; the array stays flat and in
+/// lump order, so `WorldAsset::mark_surfaces` and `BModel`'s
+/// `first_surface`/`num_surfaces` range address it with the oracle's own
+/// surface indices (`worldData.numsurfaces` is `surfaces.len()`).
+///
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:872-878`
+#[derive(Clone)]
+pub struct Surface {
+    /// `viewCount` — Raven: if == tr.viewCount, already added.
+    pub view_count: i32,
+    /// `shader`.
+    pub shader: ShaderHandle,
+    /// `fogIndex`.
+    pub fog_index: i32,
+    /// `data` — Raven: any of `srf*_t`.
+    pub data: SurfaceData,
+}
+
+/// `(srfGridMesh_t *)worldData.surfaces[i].data` behind the oracle's own
+/// `surfaceType != SF_GRID` guard — `None` is that guard's `continue`.
+fn surface_grid(surf: &Surface) -> Option<&GridMesh> {
+    match &surf.data {
+        SurfaceData::Grid(grid) => Some(grid),
+        _ => None,
+    }
+}
+
+/// Mutable twin of [`surface_grid`].
+fn surface_grid_mut(surf: &mut Surface) -> Option<&mut GridMesh> {
+    match &mut surf.data {
+        SurfaceData::Grid(grid) => Some(grid),
+        _ => None,
+    }
 }
 
 /// The owned triple `ParseFace` computes in place of writing through Raven's
@@ -3160,23 +3224,17 @@ fn decode_map_vert(rec: &[u8]) -> mapVert_t {
 
 /// Raven `R_LoadSurfaces`.
 ///
-/// PORT-NOTE: see this file's "WAVE 10 ADDITIONS" top-of-file note for why
-/// this fn stores no per-surface data on `world` — it follows the same
-/// `world_data: &mut [GridMesh]` plain-collection precedent this file's
-/// `R_FixSharedVertexLodError`/`R_StitchAllPatches`/
-/// `R_MovePatchSurfacesToHunk` (waves 1/2/4) already established for the
-/// identical "no `WorldAsset::surfaces` carrier yet" gap. `dsurface_t`/
-/// `mapVert_t`/the index array are decoded from `fileBase` bytes up front
-/// (`decode_dsurface`/`decode_map_vert`, same pattern as
-/// `R_LoadNodesAndLeafs`/`R_LoadPlanes` above); each surface record is then
-/// dispatched by `surfaceType` exactly like the oracle `switch`, calling
-/// this file's already-ported `ParseMesh`/`ParseTriSurf`/`ParseFace`/
-/// `ParseFlare` (wave 9) for their real side effects (shader/image
-/// registration). `ParseMesh`'s grid patches are collected into `grids` and
-/// threaded through the three post-loop calls exactly as those callees'
-/// existing signatures require; the other three callees' returned
-/// `Parsed*` payloads are dropped (no home to store them in — see the
-/// `worldData.surfaces` marker in the body).
+/// PORT-NOTE: `dsurface_t`/`mapVert_t`/the index array are decoded from
+/// `fileBase` bytes up front (`decode_dsurface`/`decode_map_vert`, same
+/// pattern as `R_LoadNodesAndLeafs`/`R_LoadPlanes` above); each surface
+/// record is then dispatched by `surfaceType` exactly like the oracle
+/// `switch`, and the `Parsed*` triple its `Parse*` callee returns (the
+/// out-param → return-value translation of Raven's `msurface_t *surf`, wave
+/// 9) is assembled into one `Surface` and pushed onto `world.surfaces` —
+/// so surface order is lump order and the flat index space is the oracle's
+/// (DEC-43.1). `viewCount` is `0` for every fresh surface, matching the
+/// oracle's zeroed `Hunk_Alloc(count * sizeof(msurface_t), h_low)`;
+/// `worldData.numsurfaces = count` is `world.surfaces.len()`.
 ///
 /// Source: `oracle/codemp/renderer/tr_bsp.cpp:1346-1412`
 #[allow(clippy::too_many_arguments)]
@@ -3196,7 +3254,7 @@ pub fn R_LoadSurfaces(
     surfs: &lump_t,
     verts_lump: &lump_t,
     index_lump: &lump_t,
-    world: &WorldAsset,
+    world: &mut WorldAsset,
     index: i32,
 ) {
     let surf_entry_size = size_of::<dsurface_t>();
@@ -3248,14 +3306,11 @@ pub fn R_LoadSurfaces(
         ));
     }
 
-    //TODO: Port worldData.surfaces carrier
-    // Source: oracle/codemp/renderer/tr_bsp.cpp:1373-1376
     // `out = Hunk_Alloc(count * sizeof(msurface_t)); worldData.surfaces =
-    // out; worldData.numsurfaces = count;` — no `WorldAsset::surfaces`
-    // carrier exists yet, so the `Parsed*` payloads below are dropped (see
-    // this fn's doc comment).
-
-    let mut grids: Vec<GridMesh> = Vec::new();
+    // out; worldData.numsurfaces = count;` — the owned flat `Vec` grown one
+    // `Surface` per lump record below (DEC-43.1).
+    // Source: oracle/codemp/renderer/tr_bsp.cpp:1373-1376
+    let mut surfaces: Vec<Surface> = Vec::with_capacity(count);
 
     for i in 0..count {
         let rec =
@@ -3268,32 +3323,58 @@ pub fn R_LoadSurfaces(
                 qs, frame, assets, view, cvars, sim, models, img_state, gpu, sky_view, sky, &ds,
                 &dv, world, index,
             );
-            if let MeshSurfaceData::Grid(grid) = parsed.data {
-                grids.push(grid);
-            }
+            surfaces.push(Surface {
+                view_count: 0,
+                shader: parsed.shader,
+                fog_index: parsed.fog_index,
+                data: match parsed.data {
+                    MeshSurfaceData::Skip => SurfaceData::Skip,
+                    MeshSurfaceData::Grid(grid) => SurfaceData::Grid(grid),
+                },
+            });
         } else if surface_type == mapSurfaceType_t::MST_TRIANGLE_SOUP as i32 {
-            let _ = ParseTriSurf(
+            let parsed = ParseTriSurf(
                 qs, frame, assets, view, cvars, sim, models, img_state, gpu, sky_view, sky, &ds,
                 &dv, &indexes, world, index,
             );
+            surfaces.push(Surface {
+                view_count: 0,
+                shader: parsed.shader,
+                fog_index: parsed.fog_index,
+                data: SurfaceData::Triangles(parsed.tri),
+            });
         } else if surface_type == mapSurfaceType_t::MST_PLANAR as i32 {
-            let _ = ParseFace(
+            let parsed = ParseFace(
                 qs, frame, assets, view, cvars, sim, models, img_state, gpu, sky_view, sky, &ds,
                 &dv, &indexes, world, index,
             );
+            surfaces.push(Surface {
+                view_count: 0,
+                shader: parsed.shader,
+                fog_index: parsed.fog_index,
+                data: SurfaceData::Face(parsed.face),
+            });
         } else if surface_type == mapSurfaceType_t::MST_FLARE as i32 {
-            let _ = ParseFlare(
+            let parsed = ParseFlare(
                 qs, frame, assets, view, cvars, sim, models, img_state, gpu, sky_view, sky, &ds,
                 world, index,
             );
+            surfaces.push(Surface {
+                view_count: 0,
+                shader: parsed.shader,
+                fog_index: parsed.fog_index,
+                data: SurfaceData::Flare(parsed.flare),
+            });
         } else {
             com_error(errorParm_t::ERR_DROP, "Bad surfaceType".to_string());
         }
     }
 
-    R_StitchAllPatches(&mut grids);
-    R_FixSharedVertexLodError(&mut grids);
-    R_MovePatchSurfacesToHunk(&mut grids);
+    world.surfaces = surfaces;
+
+    R_StitchAllPatches(&mut world.surfaces);
+    R_FixSharedVertexLodError(&mut world.surfaces);
+    R_MovePatchSurfacesToHunk(&mut world.surfaces);
 
     // Com_Printf("...loaded %d faces, %i meshes, %i trisurfs, %i
     // flares\n", ...) — commented out in the oracle; nothing to port.

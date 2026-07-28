@@ -54,6 +54,10 @@ pub type ErrorTable = [[f32; MAX_GRID_SIZE]; 2];
 /// Source: `oracle/codemp/renderer/tr_local.h:750-774`
 /// (`renderer-r2-design.md` `### Tier-2 transition audit`, Group 1 —
 /// `srfGridMesh_t` row)
+// `Clone` added by DEC-43.4: `SurfaceData::Grid` stores a `GridMesh` by value
+// in `WorldAsset::surfaces`, which `RenderAssets` clones through
+// `Arc::make_mut`.
+#[derive(Clone)]
 pub struct GridMesh {
     pub surface_type: surfaceType_t,
     pub dlight_bits: i32,
@@ -80,11 +84,12 @@ pub struct GridMesh {
 }
 
 /// An empty `GridMesh` placeholder — stands in for a grid that has been moved
-/// out of an owned `[GridMesh]` slot to be handed to
+/// out of its `Surface` slot to be handed to
 /// `R_GridInsertColumn`/`R_GridInsertRow` by value (`tr_bsp::R_StitchPatches`,
 /// which repoints `worldData.surfaces[grid2num].data` at the returned grid).
-/// A helper rather than a `Default` impl for the same reason as
-/// `zero_draw_vert`: `drawVert_t` derives neither `Default` nor `Clone`.
+/// Its `SF_BAD` tag makes the transient hole self-evident. A helper rather
+/// than a `Default` impl for the same reason as `zero_draw_vert`: `drawVert_t`
+/// derives no `Default`.
 pub fn empty_grid_mesh() -> GridMesh {
     GridMesh {
         surface_type: surfaceType_t::SF_BAD,
@@ -104,11 +109,9 @@ pub fn empty_grid_mesh() -> GridMesh {
     }
 }
 
-/// `drawVert_t` (`crates/mp/engine/qcommon/src/qfiles/draw_vert_t.rs`) is
-/// `#[repr(C)]` without a `Copy`/`Clone` derive (out of this wave's scope —
-/// a tier-1 ABI-adjacent file). Every field is itself `Copy`, so a
-/// field-wise read stands in for Raven's `temp = ctrl[j][i];` whole-struct
-/// value copies used throughout this file.
+/// The single spelling this file uses for Raven's `temp = ctrl[j][i];`
+/// whole-struct `drawVert_t` value copies — a field-wise read, kept as one
+/// named helper rather than spread across ~20 call sites.
 fn copy_draw_vert(v: &drawVert_t) -> drawVert_t {
     drawVert_t {
         xyz: v.xyz,
@@ -119,8 +122,8 @@ fn copy_draw_vert(v: &drawVert_t) -> drawVert_t {
     }
 }
 
-/// A zero-valued `drawVert_t` — see `copy_draw_vert` for why this file
-/// cannot derive `Default`.
+/// A zero-valued `drawVert_t` — `drawVert_t` derives no `Default` (it is a
+/// tier-1 ABI-adjacent file), so this file spells the zero value once here.
 fn zero_draw_vert() -> drawVert_t {
     drawVert_t {
         xyz: [0.0; 3],

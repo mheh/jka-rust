@@ -30,24 +30,22 @@ pub type msurface_s = msurface_t;
 /// have variants; every other tag (and `SF_BAD`) is `Other`, matching the
 /// oracle's `default:` arms.
 ///
-/// Both this enum and the accessors below retire with `msurface_t` at the
-/// #41 type pass, when the world owns a real surface arena.
+/// The **world's** surfaces no longer come through here: DEC-43 gave
+/// `WorldAsset::surfaces` an owned `Surface`/`SurfaceData` carrier
+/// (`tr_bsp.rs`) and the whole `tr_world.cpp` world walk matches on that.
+/// What is left is the inline **brush-model** walk — `RE_GetBModelVerts` and
+/// `R_AddBrushModelSurfaces` reach their surfaces through
+/// `model_t::bmodel` -> `bmodel_t::firstSurface`, still a raw
+/// `*mut msurface_t` because `R_LoadSubmodels`' `model_t` registration is
+/// itself unported (`tr_bsp.rs`). This enum and the two accessors below
+/// retire when that registration lands and brush models address
+/// `WorldAsset::surfaces` by their `BModel` range.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:656-678`
 pub enum SurfaceRef<'a> {
     Face(&'a srfSurfaceFace_t),
     Grid(&'a srfGridMesh_t),
     Triangles(&'a srfTriangles_t),
-    Other,
-}
-
-/// Mutable twin of [`SurfaceRef`] — the oracle's dispatch arms mutate the
-/// concrete surface (`R_DlightFace`/`R_DlightGrid`/`R_DlightTrisurf` each
-/// stash the surviving `dlightBits` on it).
-pub enum SurfaceRefMut<'a> {
-    Face(&'a mut srfSurfaceFace_t),
-    Grid(&'a mut srfGridMesh_t),
-    Triangles(&'a mut srfTriangles_t),
     Other,
 }
 
@@ -82,25 +80,10 @@ impl msurface_t {
         }
     }
 
-    /// Mutable twin of [`msurface_t::surface_kind`] — same safety invariant.
-    ///
-    /// Source: `oracle/codemp/renderer/tr_local.h:877`
-    pub fn surface_kind_mut(&mut self) -> SurfaceRefMut<'_> {
-        unsafe {
-            match *self.data {
-                surfaceType_t::SF_FACE => {
-                    SurfaceRefMut::Face(&mut *(self.data as *mut srfSurfaceFace_t))
-                }
-                surfaceType_t::SF_GRID => {
-                    SurfaceRefMut::Grid(&mut *(self.data as *mut srfGridMesh_t))
-                }
-                surfaceType_t::SF_TRIANGLES => {
-                    SurfaceRefMut::Triangles(&mut *(self.data as *mut srfTriangles_t))
-                }
-                _ => SurfaceRefMut::Other,
-            }
-        }
-    }
+    // The mutable twin `surface_kind_mut`/`SurfaceRefMut` was dropped by
+    // DEC-43: its only consumers were `R_DlightSurface`/`R_AddWorldSurface`,
+    // which now mutate the owned `SurfaceData`, and the surviving brush-model
+    // walks read only (porting-rules §20 — dead surface, and dead `unsafe`).
 
     /// Unchecked `(srfSurfaceFace_t *)surf->data` cast — Raven's brush-model
     /// walk (`RE_GetBModelVerts`, `tr_world.cpp:672`) casts without testing
