@@ -494,7 +494,8 @@ pub fn BG_LegalizedForcePowers(
                                         && (c != FP_SABER_OFFENSE as usize || freeSaber == 0)
                                         && (c != FP_SABER_DEFENSE as usize || freeSaber == 0))
                                 {
-                                    used_points -= force_power_cost(bg, c as c_int, final_powers[c]);
+                                    used_points -=
+                                        force_power_cost(bg, c as c_int, final_powers[c]);
                                     final_powers[c] -= 1;
                                 } else {
                                     break;
@@ -1885,6 +1886,11 @@ pub const MAX_POOL_SIZE: c_int = 3000000;
 /// Raven `MAX_POOL_SIZE` — `UI_EXPORT` (ui module) arm (DEC-36 addendum 11).
 /// Source: `oracle/codemp/game/bg_misc.c:3311-3316`
 pub const MAX_POOL_SIZE_UI: c_int = 512000;
+
+/// Raven `MAX_POOL_SIZE` — `CGAME` (cgame module) arm. Raven: "don't need as
+/// much for cgame stuff. 2mb will be fine."
+/// Source: `oracle/codemp/game/bg_misc.c:3311-3316`
+pub const MAX_POOL_SIZE_CGAME: c_int = 2048000;
 
 /// Raven `BG_TempFree`.
 ///

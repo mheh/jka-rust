@@ -2,14 +2,14 @@
 
 use core::ffi::c_void;
 
-use mp_bg::vehicles::vehicle_s::Vehicle_t;
 use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
-use mp_qshared::common::mp::qcommon::player_state::playerState_t;
 use mp_qshared::shared::{qboolean, vec3_t};
 
 use super::cg_loop_sound_s::cgLoopSound_t;
 use super::client_info_t::clientInfo_t;
 use super::player_entity_t::playerEntity_t;
+use super::player_state_ref::PlayerStateRef;
+use super::vehicle_id::VehicleId;
 
 /// Raven `MAX_CG_LOOPSOUNDS`.
 ///
@@ -28,10 +28,12 @@ pub const MAX_CG_LOOPSOUNDS: usize = 8;
 pub struct centity_t {
     /// Raven: from cg.frame
     pub currentState: entityState_t,
-    /// Raven: ptr to playerstate if applicable (for bg ents)
-    pub playerState: *mut playerState_t,
-    /// Raven: vehicle data
-    pub m_pVehicle: *mut Vehicle_t,
+    /// Raven: ptr to playerstate if applicable (for bg ents).
+    /// DEC-46.2: resolution enum, resolved via `CgWorld` at use sites.
+    pub playerState: PlayerStateRef,
+    /// Raven: vehicle data.
+    /// DEC-46.2: the vehicle cent's entity number, not a pointer.
+    pub m_pVehicle: Option<VehicleId>,
     /// Raven: g2 instance
     pub ghoul2: *mut c_void,
     /// Raven: index locally (game/cgame) to anim data for this skel
@@ -88,7 +90,9 @@ pub struct centity_t {
     pub eventAnimIndex: i32,
 
     /// Raven: dynamically allocated - always free it, and never stomp over it.
-    pub npcClient: *mut clientInfo_t,
+    /// DEC-46.2: owned, so the always-free/never-stomp discipline is the
+    /// borrow checker's problem now.
+    pub npcClient: Option<Box<clientInfo_t>>,
 
     pub weapon: i32,
 
@@ -160,143 +164,9 @@ pub struct centity_t {
     pub vChatTime: i32,
 }
 
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::size_of::<centity_t>() == 1984);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, currentState) == 0);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, playerState) == 536);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, m_pVehicle) == 544);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, ghoul2) == 552);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, localAnimIndex) == 560);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, modelScale) == 564);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, nextState) == 576);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, interpolate) == 1108);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, currentValid) == 1112);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, muzzleFlashTime) == 1116);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, previousEvent) == 1120);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, trailTime) == 1124);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, dustTrailTime) == 1128);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, miscTime) == 1132);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, damageAngles) == 1136);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, damageTime) == 1148);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, snapShotTime) == 1152);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, pe) == 1160);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, rawAngles) == 1424);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, beamEnd) == 1436);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, lerpOrigin) == 1448);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, lerpAngles) == 1460);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, ragLastOrigin) == 1472);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, ragLastOriginTime) == 1484);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, noLumbar) == 1488);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, noFace) == 1492);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, npcLocalSurfOn) == 1496);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, npcLocalSurfOff) == 1500);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, eventAnimIndex) == 1504);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, npcClient) == 1512);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, weapon) == 1520);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, ghoul2weapon) == 1528);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, radius) == 1536);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, boltInfo) == 1540);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, bolt1) == 1544);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, bolt2) == 1548);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, bolt3) == 1552);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, bolt4) == 1556);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, bodyHeight) == 1560);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, torsoBolt) == 1564);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, turAngles) == 1568);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, frame_minus1) == 1580);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, frame_minus2) == 1592);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, frame_minus1_refreshed) == 1604);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, frame_minus2_refreshed) == 1608);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, frame_hold) == 1616);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, frame_hold_time) == 1624);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, frame_hold_refreshed) == 1628);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, grip_arm) == 1632);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, trickAlpha) == 1640);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, trickAlphaTime) == 1644);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, teamPowerEffectTime) == 1648);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, teamPowerType) == 1652);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, isRagging) == 1656);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, ownerRagging) == 1660);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, overridingBones) == 1664);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, bodyFadeTime) == 1668);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, pushEffectOrigin) == 1672);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, loopingSound) == 1684);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, numLoopingSounds) == 1940);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, serverSaberHitIndex) == 1944);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, serverSaberHitTime) == 1948);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, serverSaberFleshImpact) == 1952);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, ikStatus) == 1956);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, saberWasInFlight) == 1960);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, smoothYaw) == 1964);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, uncloaking) == 1968);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, cloaked) == 1972);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(centity_t, vChatTime) == 1976);
+// Layout asserts retired with the DEC-46.2 reshape (playerState/m_pVehicle/
+// npcClient are owned/resolution types now, so C layout parity is gone by
+// design). `centity_t` is `cg_local.h` module-private and never crosses the
+// seam — bg reaches entity data through the accessor seam, never the
+// `bgEntity_t` pointer pun. Same DEC-31 treatment `weaponInfo_t`,
+// `localEntity_t` and `markPoly_t` carry.

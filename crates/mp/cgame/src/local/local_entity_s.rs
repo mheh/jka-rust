@@ -154,12 +154,17 @@ pub union localEntity_t_data {
 /// Raven: `lifeRate` is `1.0 / (endTime - startTime)`; `bounceFactor` is 0.0 = no bounce,
 /// 1.0 = perfect; `bounceSound` is an optional sound index to play upon bounce; `leMarkType`
 /// is the mark to leave on fragment impact.
+///
+/// Raven's intrusive `prev`/`next` links are gone — DEC-46.3 moves the free
+/// list, the live flag and the allocation order into
+/// [`EffectPool`](crate::world::effect_pool::EffectPool). The type is
+/// module-private (`cg_local.h`), never crosses the engine seam, so the layout
+/// is free and the transcription-era size/offset asserts retire with the links
+/// (the DEC-31 treatment `weaponInfo_t` already got).
 /// Type definition source: `oracle/codemp/cgame/cg_local.h:519-625`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct localEntity_t {
-    pub prev: *mut localEntity_t,
-    pub next: *mut localEntity_t,
     pub leType: leType_t,
     pub leFlags: c_int,
 
@@ -195,27 +200,15 @@ pub struct localEntity_t {
     pub refEntity: refEntity_t,
 }
 
-const _: () = assert!(core::mem::size_of::<localEntity_t>() == 472);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, prev) == 0);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, next) == 8);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, leType) == 16);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, leFlags) == 20);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, startTime) == 24);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, endTime) == 28);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, fadeInTime) == 32);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, lifeRate) == 36);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, pos) == 40);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, angles) == 76);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, bounceFactor) == 112);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, bounceSound) == 116);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, alpha) == 120);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, dalpha) == 124);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, forceAlpha) == 128);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, color) == 132);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, radius) == 148);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, light) == 152);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, lightColor) == 156);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, leMarkType) == 168);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, leBounceSoundType) == 172);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, data) == 176);
-const _: () = assert!(core::mem::offset_of!(localEntity_t, refEntity) == 256);
+impl localEntity_t {
+    /// Raven `memset( le, 0, sizeof( *le ) )` on every alloc — the seed
+    /// [`EffectPool`](crate::world::effect_pool::EffectPool) hands each slot.
+    ///
+    /// Source: `oracle/codemp/cgame/cg_localents.c:70`
+    pub fn zeroed() -> Self {
+        // SAFETY: every field is a POD scalar/array/union of scalars, and each
+        // enum field (`leType_t`, `leMarkType_t`, `leBounceSoundType_t`, the
+        // `trType_t` inside `trajectory_t`) has a 0 discriminant.
+        unsafe { core::mem::zeroed() }
+    }
+}

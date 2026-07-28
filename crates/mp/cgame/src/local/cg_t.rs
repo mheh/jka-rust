@@ -306,8 +306,6 @@ pub struct cg_t {
     /// had to be moved so we wouldn't wipe these out with the memset - these have STL in them and shouldn't be cleared that way
     pub activeSnapshots: [snapshot_t; 2],
     // Ghoul2 Insert End
-    pub sharedBuffer: [c_char; MAX_CG_SHARED_BUFFER_SIZE],
-
     pub radarEntityCount: i16,
     pub radarEntities: [i16; MAX_CLIENTS + 16],
 
@@ -320,7 +318,6 @@ pub struct cg_t {
     pub chatItemActive: i32,
 }
 
-const _: () = assert!(core::mem::size_of::<cg_t>() == 295424);
 const _: () = assert!(core::mem::offset_of!(cg_t, clientFrame) == 0);
 const _: () = assert!(core::mem::offset_of!(cg_t, clientNum) == 4);
 const _: () = assert!(core::mem::offset_of!(cg_t, demoPlayback) == 8);
@@ -602,19 +599,8 @@ const _: () = assert!(core::mem::offset_of!(cg_t, lastFPFlashPoint) == 13652);
 const _: () = assert!(core::mem::offset_of!(cg_t, testModel) == 13664);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(cg_t, activeSnapshots) == 13668);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, sharedBuffer) == 292372);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, radarEntityCount) == 294420);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, radarEntities) == 294422);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, bracketedEntityCount) == 294518);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, bracketedEntities) == 294520);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, distanceCull) == 294616);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, chatItems) == 294620);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, chatItemActive) == 295420);
+// Asserts from `sharedBuffer` onward (and the total-size assert) retired:
+// DEC-46.6 hoisted the engine-registered buffer to `CgWorld::shared_buffer`
+// (pinned Box, copy-out decode), so the field left `cg_t` and every later
+// offset shifted. `cg_t` is `cg_local.h` module-private; parity of the
+// preceding fields is still asserted above for transcription fidelity.

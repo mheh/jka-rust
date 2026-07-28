@@ -40,6 +40,7 @@ pub mod item_id;
 pub mod item_kind;
 pub mod item_type;
 pub mod jump_velocity;
+pub mod max_items;
 pub mod means_of_death;
 pub mod parry_debounce_table;
 pub mod pd_sounds;

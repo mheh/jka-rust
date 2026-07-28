@@ -155,9 +155,9 @@ impl core::ops::IndexMut<usize> for IpFilters {
     }
 }
 
-// Raven `#define MAX_ITEMS 256`.
-// Source: `oracle/codemp/game/bg_public.h:31`
-pub const MAX_ITEMS: usize = 256;
+// Canonical home moved to `mp_bg` (DEC-32) — cgame needs it too and cannot
+// reach this crate.
+pub use mp_bg::public::max_items::MAX_ITEMS;
 
 // Raven `ai_wpnav.c` / `q_shared.h` waypoint-arena sizes. `MAX_WPARRAY_SIZE`
 // canonical in `mp_qshared::shared::limits` (`c_int`, cast here);
@@ -353,8 +353,9 @@ pub struct TempWaypointList(pub Box<[waypointData_t; MAX_STORED_WAYPOINTS]>);
 
 impl Default for TempWaypointList {
     fn default() -> Self {
-        let items: Vec<waypointData_t> =
-            (0..MAX_STORED_WAYPOINTS).map(|_| waypointData_t::default()).collect();
+        let items: Vec<waypointData_t> = (0..MAX_STORED_WAYPOINTS)
+            .map(|_| waypointData_t::default())
+            .collect();
         let boxed: Box<[waypointData_t; MAX_STORED_WAYPOINTS]> =
             items.into_boxed_slice().try_into().ok().unwrap();
         TempWaypointList(boxed)

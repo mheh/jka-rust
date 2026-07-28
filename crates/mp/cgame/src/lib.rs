@@ -19,10 +19,46 @@
 //! - **C4** the `CgGameCallbacks` implementor, **C5** transcription waves,
 //!   **C6** gates (live rounds under `openjk.app` + the demo referee)
 //!
-//! The cgame root types [`local`] and [`lights`] landed under C1/C2; `CgWorld`
-//! itself arrives with C4/C5.
+//! The cgame root types [`local`] and [`lights`] landed under C1/C2; [`world`]
+//! is the C5 skeleton — [`world::CgWorld`], the effect pools, the cvar mirrors
+//! and one state sub-struct per `.c` file with statics to fold. The per-TU
+//! function modules below are empty until the waves fill them.
 
 pub mod bg_channel;
+pub mod cg_consolecmds;
+pub mod cg_draw;
+pub mod cg_drawtools;
+pub mod cg_effects;
+pub mod cg_ents;
+pub mod cg_event;
+pub mod cg_info;
+pub mod cg_light;
+pub mod cg_localents;
+pub mod cg_main;
+pub mod cg_marks;
+pub mod cg_new_draw;
+pub mod cg_players;
+pub mod cg_playerstate;
+pub mod cg_predict;
+pub mod cg_saga;
+pub mod cg_scoreboard;
+pub mod cg_servercmds;
+pub mod cg_snapshot;
+pub mod cg_strap;
+pub mod cg_turret;
+pub mod cg_view;
+pub mod cg_weaponinit;
+pub mod cg_weapons;
+pub mod fx_blaster;
+pub mod fx_bowcaster;
+pub mod fx_bryarpistol;
+pub mod fx_demp2;
+pub mod fx_disruptor;
+pub mod fx_flechette;
+pub mod fx_force;
+pub mod fx_heavyrepeater;
+pub mod fx_rocketlauncher;
 pub mod lights;
 pub mod local;
 pub mod trap;
+pub mod world;
