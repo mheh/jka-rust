@@ -52,6 +52,7 @@ pub mod frame_exec;
 mod gpu;
 pub mod gpu_images;
 pub mod pipeline2d;
+pub mod ui_host;
 
 pub use blend::{blend_state_from_gls, ALPHA_BLEND, GLS_2D_DEFAULT};
 pub use frame_exec::{FrameExecutor, FrameStats};

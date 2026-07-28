@@ -13,3 +13,18 @@ mp_renderer = { path = "../renderer" }
 pollster = "1.0.1"
 wgpu = "30.0.0"
 winit = "0.30.13"
+
+# R4a wave 3 (`ui_host`, the `ui_harness` bin only): the harness boots the
+# engine's FS/cvar/cmd subset, drives the ported `ui` menu framework, and
+# tokenizes menu files with the same botlib precompiler the live engine uses.
+# `mp_renderer`'s own dedicated-server link is unaffected — these edges are
+# this crate's, not the renderer's.
+mp_bg = { path = "../bg" }
+mp_engine_botlib = { path = "../engine/botlib" }
+mp_engine_core = { path = "../engine/core" }
+mp_engine_server = { path = "../engine/server" }
+mp_qshared = { path = "../qshared" }
+mp_ui = { path = "../ui" }
+mp_uishared = { path = "../uishared" }
+native_math = { path = "../../native/math" }
+native_string = { path = "../../native/string" }

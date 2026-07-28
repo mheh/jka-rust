@@ -1047,8 +1047,17 @@ name = "mp_renderer_gpu"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
+ "mp_bg",
+ "mp_engine_botlib",
+ "mp_engine_core",
  "mp_engine_qcommon",
+ "mp_engine_server",
+ "mp_qshared",
  "mp_renderer",
+ "mp_ui",
+ "mp_uishared",
+ "native_math",
+ "native_string",
  "pollster",
  "wgpu",
  "winit",

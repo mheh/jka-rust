@@ -1,0 +1,479 @@
+//! Boot: the engine subset, the renderer CPU frontend, and `_UI_Init`'s
+//! equivalent prefix.
+//!
+//! The engine sequence is the ordered FS/cvar/cmd head of `Com_Init`
+//! (`mp_engine_qcommon::common_fns::Com_Init`) and nothing after it:
+//! `Cvar_Init` → `Cbuf_Init` → `Com_InitZoneMemory` (FS pack loads
+//! `Z_Malloc`) → `Cmd_Init` (`FS_Startup` registers commands) → the
+//! `fs_basepath`/`fs_game` seed → `FS_InitFilesystem` → `Com_InitHunkMemory`.
+//! `Com_Init`'s tail (`SE_Init`, `Netchan_Init`, `VM_Init`, the mandatory
+//! `SV_Init` hook, the `CL_*` hooks) is skipped: the menus need a filesystem,
+//! a cvar table and a command buffer, and nothing else the engine provides.
+
+use core::ffi::c_int;
+use core::ptr::null_mut;
+
+use mp_engine_botlib::l_precomp_fns::PC_SetBaseFolder;
+use mp_engine_core::Engine;
+use mp_engine_qcommon::cmd_common::{Cbuf_Init, Cmd_Init};
+use mp_engine_qcommon::collision_world::CollisionWorld;
+use mp_engine_qcommon::common::common::Common;
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
+use mp_engine_qcommon::common::opaque_slots::{
+    BotLib as SlotBotLib, Client as SlotClient, Ghoul2System as SlotGhoul2,
+    RenderModels as SlotRenderModels, RmManager as SlotRmManager, Server as SlotServer,
+};
+use mp_engine_qcommon::cvar_fns::{Cvar_Get, Cvar_Init};
+use mp_engine_qcommon::files_common::FS_InitFilesystem;
+use mp_engine_qcommon::z_memman_pc::{Com_InitHunkMemory, Com_InitZoneMemory};
+use mp_engine_server::Server;
+use mp_qshared::shared::com_parse::QSharedScratch;
+use mp_qshared::shared::cvar::CVAR_INIT;
+use mp_qshared::shared::qfalse;
+use mp_renderer::render_state::arena::Arena;
+use mp_renderer::render_state::frame_data::FrameData;
+use mp_renderer::render_state::frame_state::FrameState;
+use mp_renderer::render_state::gpu_resources::GpuResources;
+use mp_renderer::render_state::light_style_table::LightStyleTable;
+use mp_renderer::render_state::placeholders::{
+    AutomapWireframe, BackEndCounters, FunctionTables, GlConfig, GlStatePlaceholder, OrientationR,
+    RefEntity, TrRefdef, Vec3, ViewParms,
+};
+use mp_renderer::render_state::render_assets::RenderAssets;
+use mp_renderer::render_state::render_assets_sim::RenderAssetsSim;
+use mp_renderer::render_state::renderer_cvars::RendererCvars;
+use mp_renderer::tr_font::FontState;
+use mp_renderer::tr_image::TrImageState;
+use mp_renderer::tr_init::R_Init;
+use mp_renderer::tr_local::view_parms_t::viewParms_t;
+use mp_renderer::tr_model::render_models::RenderModels;
+use mp_renderer::tr_noise::NoiseState;
+use mp_renderer::tr_scene::SceneState;
+use mp_renderer::tr_sky::SkyState;
+use mp_renderer::tr_worldeffects::world_effects::WorldEffectsState;
+use mp_ui::world::ui_state::UiState;
+use mp_uishared::shared::display_context::DisplayContext;
+use mp_uishared::ui_shared::{Menu_Count, Menus_ActivateByName, String_Init};
+use native_math::rng::Rng;
+
+use crate::pipeline2d::{SCREEN_HEIGHT, SCREEN_WIDTH};
+use crate::ui_host::display::HarnessDc;
+use crate::ui_host::state::{InputState, StubLog, UiHost};
+
+/// Where the retail assets live and which menu set to open.
+pub struct BootConfig {
+    /// `fs_basepath` — the directory holding `base/assets*.pk3`.
+    pub basepath: String,
+    /// `fs_game` — "" for stock `base`.
+    pub fs_game: String,
+    /// The menu-set file (`ui_menuFilesMP`'s default).
+    pub menu_file: String,
+    /// The menu opened after load (`UIMENU_MAIN`'s target).
+    pub start_menu: String,
+}
+
+impl Default for BootConfig {
+    fn default() -> Self {
+        BootConfig {
+            basepath: String::from("/Users/milohehmsoth/Developer/jka/jka_server"),
+            fs_game: String::new(),
+            menu_file: String::from("ui/jampmenus.txt"),
+            start_menu: String::from("main"),
+        }
+    }
+}
+
+/// Boots the engine subset, the renderer, and the menus; returns a host ready
+/// to be painted every frame.
+pub fn boot(cfg: &BootConfig) -> UiHost {
+    let mut engine = Engine::new();
+
+    // The hook tables `Com_Init` would have installed — Raven's link-time
+    // symbol resolution (DEC-23). Installing the server table is NOT booting a
+    // server: `Hunk_Clear` calls the `SV_ShutdownGameProgs` hook
+    // unconditionally (`z_memman_pc.rs:816`), and with no `SV_Init` ever run
+    // that hook finds a null game VM and returns. `SV_Init` itself — the step
+    // that would actually start a server — is never called.
+    mp_engine_server::hook_install::install_engine_hooks(&mut engine.common.hooks);
+    mp_renderer::hook_install::install_engine_hooks(&mut engine.common.hooks);
+
+    // The renderer's model pool, built before the engine subset because
+    // `Com_InitHunkMemory` -> `Hunk_Clear` calls the `R_HunkClearCrap` hook,
+    // which casts the view's `rm` slot before doing anything else.
+    let mut models = RenderModels::default();
+
+    // ---- engine subset -------------------------------------------------
+    {
+        let models_ptr: *mut RenderModels = &mut models;
+        let Engine { common, cm, sv, .. } = &mut *engine;
+        let sv_ptr: *mut () = sv as *mut Server as *mut ();
+        let mut view = host_view(common, cm, sv_ptr, models_ptr);
+        Cvar_Init(&mut view);
+        Cbuf_Init(view.common);
+        Com_InitZoneMemory(&mut view);
+        Cmd_Init(&mut view);
+
+        // Seed before `FS_Startup` re-registers them with platform defaults:
+        // `Cvar_Get` keeps an already-registered value (`cvar_fns.rs`).
+        Cvar_Get(&mut view, "fs_basepath", &cfg.basepath, CVAR_INIT);
+        Cvar_Get(&mut view, "fs_game", &cfg.fs_game, CVAR_INIT);
+        let ded = Cvar_Get(&mut view, "dedicated", "0", 0);
+        view.common.com_dedicated = Some(ded);
+
+        FS_InitFilesystem(&mut view);
+        Com_InitHunkMemory(&mut view);
+        println!(
+            "ui_harness: FS up — {} files in pk3 files under {}",
+            view.common.fs_packFiles, cfg.basepath
+        );
+    }
+
+    // The precompiler's `#include` search root, as `SV_BotInitBotLib` sets it.
+    PC_SetBaseFolder(&mut engine.bot, "base");
+
+    // ---- renderer carrier bundle ---------------------------------------
+    let mut host = UiHost {
+        engine,
+        models,
+        cvars: RendererCvars::default(),
+        assets: empty_assets(),
+        sim: RenderAssetsSim {
+            published: std::sync::Arc::new(empty_assets()),
+            light_styles: LightStyleTable {
+                colors: [[0u8; 4]; mp_engine_qcommon::qfiles::light_style_limits::MAX_LIGHT_STYLES],
+            },
+        },
+        img_state: TrImageState::default(),
+        gpu_res: GpuResources {
+            gl_state: GlStatePlaceholder {},
+        },
+        frame: zeroed_frame_state(),
+        scene: SceneState::default(),
+        noise: NoiseState::default(),
+        rng: Rng::new(),
+        font: FontState::default(),
+        world_effects: WorldEffectsState::default(),
+        qs: QSharedScratch::zeroed(),
+        sky_view: zeroed_view_parms(),
+        sky: empty_sky(),
+        ui: UiState::default(),
+        input: InputState::default(),
+        stubs: StubLog::default(),
+        start: std::time::Instant::now(),
+    };
+
+    // ---- R_Init (the real one) -----------------------------------------
+    {
+        let UiHost {
+            engine,
+            models,
+            cvars,
+            assets,
+            sim,
+            img_state,
+            gpu_res,
+            frame,
+            scene,
+            noise,
+            rng,
+            font,
+            world_effects,
+            qs,
+            sky_view,
+            sky,
+            ..
+        } = &mut host;
+        let mut frame_data = FrameData { events: Vec::new() };
+        let models_ptr: *mut RenderModels = &mut *models;
+        let Engine { common, cm, sv, .. } = &mut **engine;
+        let sv_ptr: *mut () = sv as *mut Server as *mut ();
+        let mut view = host_view(common, cm, sv_ptr, models_ptr);
+        R_Init(
+            &mut view,
+            cvars,
+            assets,
+            sim,
+            img_state,
+            gpu_res,
+            models,
+            frame,
+            scene,
+            &mut frame_data,
+            noise,
+            rng,
+            font,
+            world_effects,
+            qs,
+            sky_view,
+            sky,
+        );
+    }
+    println!(
+        "ui_harness: R_Init done — {} shaders, {} images registered",
+        host.assets.shaders.iter().count(),
+        host.assets.images.iter().count()
+    );
+
+    ui_init_equivalent(&mut host, cfg);
+    host
+}
+
+/// `_UI_Init`'s prefix, restricted to what the framework half needs: the
+/// virtual-screen scale, the menu fonts, the cursor/white shaders, the menu
+/// set, and the opening menu.
+///
+/// Raven order (`ui_main.c:_UI_Init`): `GetGlconfig` → `String_Init` →
+/// cursor/white shader registration → `AssetCache` → menu load →
+/// `Menus_CloseAll`. The module-owned steps in between (siege class load,
+/// player-model list, force config, bot list, cached servers) are `mp_ui`'s
+/// and need `UiContext`; they are not reachable here and are not needed to
+/// paint a menu.
+fn ui_init_equivalent(host: &mut UiHost, cfg: &BootConfig) {
+    // `trap_GetGlconfig` — the harness IS the renderer, so the virtual screen
+    // is the one `pipeline2d` rasterises into.
+    host.ui.uiDC.glconfig.vidWidth = SCREEN_WIDTH as c_int;
+    host.ui.uiDC.glconfig.vidHeight = SCREEN_HEIGHT as c_int;
+    host.ui.uiDC.glconfig.isFullscreen = qfalse;
+    // `_UI_Init`'s scale computation (`ui_main.c`): 640x480 reference.
+    host.ui.uiDC.xscale = 1.0;
+    host.ui.uiDC.yscale = 1.0;
+    host.ui.uiDC.bias = 0.0;
+    host.ui.uiDC.cursorx = SCREEN_WIDTH as c_int / 2;
+    host.ui.uiDC.cursory = SCREEN_HEIGHT as c_int / 2;
+
+    with_dc(host, |dc, ui| {
+        // The four menu fonts `MenuFontToHandle` selects between, plus the
+        // cursor/white/gradient shaders. Retail `ui/jamp/main.menu`'s
+        // `assetGlobalDef` block names exactly these; the harness's menu
+        // loader skips that block (`Asset_Parse` is `mp_ui`-owned and
+        // `UiContext`-bound), so the same names are registered here.
+        String_Init(&mut ui.menus, dc);
+        ui.uiDC.Assets.qhMediumFont = dc.RegisterFont("ergoec");
+        ui.uiDC.Assets.qhSmallFont = dc.RegisterFont("aurabesh");
+        ui.uiDC.Assets.qhBigFont = dc.RegisterFont("anewhope");
+        ui.uiDC.Assets.qhSmall2Font = dc.RegisterFont("arialnb");
+        ui.uiDC.cursor = dc.registerShaderNoMip("cursor");
+        ui.uiDC.whiteShader = dc.registerShaderNoMip("white");
+        ui.uiDC.gradientImage = dc.registerShaderNoMip("ui/assets/gradientbar2.tga");
+        ui.uiDC.Assets.gradientBar = ui.uiDC.gradientImage;
+        ui.uiDC.Assets.cursor = ui.uiDC.cursor;
+        // `assetGlobalDef`'s fade block, same source, same values.
+        ui.uiDC.Assets.fadeClamp = 1.0;
+        ui.uiDC.Assets.fadeCycle = 1;
+        ui.uiDC.Assets.fadeAmount = 0.1;
+        ui.uiDC.Assets.shadowColor = [0.1, 0.1, 0.1, 0.25];
+        ui.uiDC.Assets.fontRegistered = true;
+    });
+    println!(
+        "ui_harness: fonts registered — small={} medium={} big={}, cursor shader={}",
+        host.ui.uiDC.Assets.qhSmallFont,
+        host.ui.uiDC.Assets.qhMediumFont,
+        host.ui.uiDC.Assets.qhBigFont,
+        host.ui.uiDC.cursor
+    );
+
+    let menu_file = cfg.menu_file.clone();
+    let start_menu = cfg.start_menu.clone();
+    with_dc(host, |dc, ui| {
+        dc.load_menus(&mut ui.menus, &mut ui.uiDC, &menu_file);
+        println!("ui_harness: {} menus parsed", Menu_Count(&ui.menus));
+        let ds = &ui.uiDC;
+        let opened = Menus_ActivateByName(&mut ui.menus, ds, dc, &start_menu);
+        println!(
+            "ui_harness: Menus_ActivateByName(\"{start_menu}\") -> {}",
+            if opened.is_some() {
+                "open"
+            } else {
+                "NOT FOUND"
+            }
+        );
+    });
+}
+
+/// Runs `body` with a live [`HarnessDc`] borrowed out of `host`, plus the ui
+/// state it paints. The two are split-borrowed disjointly: the `dc` owns the
+/// engine/renderer carriers, `ui` owns `menus`/`uiDC`.
+pub fn with_dc<R>(host: &mut UiHost, body: impl FnOnce(&mut HarnessDc, &mut UiState) -> R) -> R {
+    let UiHost {
+        engine,
+        models,
+        cvars,
+        assets,
+        sim,
+        img_state,
+        gpu_res,
+        frame,
+        font,
+        qs,
+        sky_view,
+        sky,
+        ui,
+        input,
+        stubs,
+        start,
+        ..
+    } = host;
+    let millis = start.elapsed().as_millis() as c_int;
+    // Split-borrowed disjointly: the view takes `common`/`cm`, the tokenizer
+    // takes `bot`. The view's own `bot` slot stays null (see `host_view`).
+    let models_ptr: *mut RenderModels = &mut *models;
+    let Engine {
+        common,
+        cm,
+        bot,
+        sv,
+        ..
+    } = &mut **engine;
+    let sv_ptr: *mut () = sv as *mut Server as *mut ();
+    let view = host_view(common, cm, sv_ptr, models_ptr);
+    let mut dc = HarnessDc {
+        view,
+        bot,
+        cvars,
+        assets,
+        sim,
+        models,
+        img_state,
+        gpu: gpu_res,
+        frame,
+        qs,
+        sky_view,
+        sky,
+        font,
+        frame_data: FrameData { events: Vec::new() },
+        input,
+        stubs,
+        millis,
+    };
+    body(&mut dc, ui)
+}
+
+/// Builds an [`EngineHostView`] over the harness's islands.
+///
+/// Takes `common`/`cm` as already-split field borrows rather than the whole
+/// `Engine`, so a caller can hold `engine.bot` (the precompiler) at the same
+/// time without aliasing.
+///
+/// `sv` points at the engine's own (never-initialised) `Server`: `Hunk_Clear`
+/// calls the `SV_ShutdownGameProgs` hook unconditionally, and that hook casts
+/// this slot before testing the game VM, so a null slot is a hard crash rather
+/// than a no-op.
+///
+/// `rm` points at the harness's own [`RenderModels`] (the renderer's model
+/// pool), not `engine.render_models` — the engine's copy belongs to the
+/// headless server subset and is not what `R_Init` initialised. Every other
+/// opaque slot is null: no path this harness runs reads them, and a null slot
+/// makes that a loud crash rather than a silent wrong-island read.
+fn host_view<'a>(
+    common: &'a mut Common,
+    cm: &'a mut CollisionWorld,
+    sv: *mut (),
+    rm: *mut RenderModels,
+) -> EngineHostView<'a> {
+    EngineHostView {
+        common,
+        cm,
+        sv: SlotServer::from_raw(sv),
+        cl: SlotClient::from_raw(null_mut()),
+        bot: SlotBotLib::from_raw(null_mut()),
+        rm: SlotRenderModels::from_raw(rm as *mut ()),
+        rmg: SlotRmManager::from_raw(null_mut()),
+        g2: SlotGhoul2::from_raw(null_mut()),
+    }
+}
+
+/// A `RenderAssets` at the state `R_Init`'s partial clear leaves it — the
+/// arenas empty, the tables empty. `R_InitImages`/`R_InitShaders` fill it.
+fn empty_assets() -> RenderAssets {
+    RenderAssets {
+        images: Arena::new_unbounded(),
+        image_names: Default::default(),
+        default_image: None,
+        fog_image: None,
+        dlight_image: None,
+        white_image: None,
+        lightmaps: Vec::new(),
+        shaders: Arena::new_unbounded(),
+        shader_lookup: Default::default(),
+        sorted_shaders: Vec::new(),
+        shader_text: String::new(),
+        shader_text_hash_table: Vec::new(),
+        defer_load: false,
+        skins: Arena::new_unbounded(),
+        skin_lookup: Default::default(),
+        world: None,
+        bsp_models: Vec::new(),
+        function_tables: FunctionTables::default(),
+        distance_cull: 0.0,
+        distance_cull_squared: 0.0,
+        glconfig: GlConfig::default(),
+        registered: false,
+        world_map_loaded: false,
+        max_polys: 0,
+        max_polyverts: 0,
+        automap_wireframe: AutomapWireframe {},
+    }
+}
+
+/// A zeroed `FrameState` for `R_Init` to overwrite wholesale (its first act is
+/// `*frame = FrameState { .. }`).
+fn zeroed_frame_state() -> FrameState {
+    FrameState {
+        refdef: TrRefdef {
+            fov_x: 0.0,
+            fov_y: 0.0,
+            view_origin: Vec3::default(),
+            view_axis: [Vec3::default(); 3],
+        },
+        view: ViewParms {},
+        ori: OrientationR::default(),
+        counters: BackEndCounters {},
+        is_hyperspace: false,
+        current_entity: None,
+        sky_rendered_this_view: false,
+        projection_2d: false,
+        color_2d: [0; 4],
+        vertexes_2d: false,
+        entity_2d: RefEntity::default(),
+        scene_light_styles: [[0u8; 4];
+            mp_engine_qcommon::qfiles::light_style_limits::MAX_LIGHT_STYLES],
+        frame_count: 0,
+        view_count: 0,
+        view_cluster: 0,
+        skyboxportal: 0,
+        drawskyboxportal: 0,
+        render_glowing_objects: false,
+        identity_light: 1.0,
+        identity_light_byte: 255,
+        overbright_bits: 0,
+        sun_direction: Vec3::default(),
+        sun_ambient: Vec3::default(),
+        external_vis_data: None,
+    }
+}
+
+/// A zeroed `viewParms_t` for the sky-shader parse carrier.
+///
+/// `viewParms_t` is a frozen `#[repr(C)]` ABI struct of scalars, fixed arrays
+/// and `#[repr(C)]` sub-structs — no pointers with validity invariants, no
+/// owning types — so an all-zero bit pattern is a valid value, and it is the
+/// value `Com_Memset(&tr.viewParms, 0, ...)` gives it in the oracle.
+fn zeroed_view_parms() -> viewParms_t {
+    // SAFETY: POD `#[repr(C)]`; see the doc comment.
+    unsafe { core::mem::zeroed() }
+}
+
+/// A `SkyState` at rest (`tr_sky`'s file-scope statics, zeroed).
+fn empty_sky() -> SkyState {
+    SkyState {
+        sky_mins: [[0.0; 6]; 2],
+        sky_maxs: [[0.0; 6]; 2],
+        sky_min: 0.0,
+        sky_max: 0.0,
+        sky_clip: [[0.0; 3]; 6],
+        sky_points: Vec::new(),
+        sky_tex_coords: Vec::new(),
+        cloud_tex_coords: Vec::new(),
+        cloud_tex_p: Vec::new(),
+    }
+}
