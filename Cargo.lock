@@ -1046,6 +1046,7 @@ dependencies = [
 name = "mp_renderer_gpu"
 version = "0.1.0"
 dependencies = [
+ "bytemuck",
  "mp_renderer",
  "pollster",
  "wgpu",

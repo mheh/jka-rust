@@ -27,6 +27,29 @@
 //! CPU-registry-to-GPU-resource bridge — against this crate's device/queue
 //! is an R4a design item, not scaffold scope: this file only stands up the
 //! device/surface plumbing every later slice needs.
-mod gpu;
+//! ## R4a wave 1 — 2D first light (this crate's current state)
+//!
+//! Landed: [`frame_exec`] walks a `FrameData` event stream in trap-call order,
+//! [`pipeline2d`] rasterises `DrawStretchPic` quads through Raven's 640x480
+//! virtual screen, and [`blend`] decodes `mp_renderer`'s `GLS_*` state bits
+//! into pipeline blend states.
+//!
+//! **Staging: single-threaded first light.** DEC-37 ruling 2's sim/render
+//! thread split is a later R4 slice — today the dev harness builds a
+//! `FrameData` and executes it inline the same frame. The executor's signature
+//! is already split-shaped (borrowed frame stream in, render-thread state
+//! only), so that slice moves the caller, not this crate's API.
+//!
+//! Not yet rendered (counted and skipped, never panicked): `DrawString`, the
+//! rotate-pic pair, and every scene-composition event. Textures are one
+//! built-in white texel until `mp_renderer` retains decoded image pixels.
 
+pub mod blend;
+pub mod frame_exec;
+mod gpu;
+pub mod pipeline2d;
+
+pub use blend::{blend_state_from_gls, ALPHA_BLEND, GLS_2D_DEFAULT};
+pub use frame_exec::{FrameExecutor, FrameStats};
 pub use gpu::{FrameError, Gpu};
+pub use pipeline2d::{Pipeline2d, QuadBatch, Rect, UvRect, SCREEN_HEIGHT, SCREEN_WIDTH};

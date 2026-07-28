@@ -83,6 +83,29 @@ impl Gpu {
         }
     }
 
+    /// The device every render-thread resource is created against.
+    pub fn device(&self) -> &wgpu::Device {
+        &self.device
+    }
+
+    /// The queue buffer writes and command submissions go through.
+    pub fn queue(&self) -> &wgpu::Queue {
+        &self.queue
+    }
+
+    /// The surface's colour format — what every render pipeline's colour
+    /// target must be built for.
+    pub fn surface_format(&self) -> wgpu::TextureFormat {
+        self.config.format
+    }
+
+    /// The surface's current size in physical pixels. Raven's 2D commands are
+    /// authored in a 640x480 virtual space and scaled by the viewport, so this
+    /// is a readout, not a coordinate system (see `pipeline2d`).
+    pub fn surface_size(&self) -> (u32, u32) {
+        (self.config.width, self.config.height)
+    }
+
     /// Reconfigures the surface for a new window size. A no-op for a
     /// degenerate (minimized) size; wgpu requires both dimensions nonzero.
     pub fn resize(&mut self, width: u32, height: u32) {
