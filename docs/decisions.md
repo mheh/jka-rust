@@ -1096,3 +1096,37 @@ Three user-settled design points closing the waves 7-13 review's open tail:
    the cgame scoping sit-down revisits the whole client engine-carrier
    story (cl_* island, cgame vmcalls) and confirms or amends this
    convention before cgame waves start.
+
+## DEC-43 — WorldAsset::surfaces carrier: owned enum, flat Vec (2026-07-27)
+
+The `world_t::surfaces` replacement (the #41 tier-2 campaign's one design
+centerpiece), ruled after an evidence sketch round
+(both shapes drafted against the live `R_LoadSurfaces`, the wave-2 grid
+stitching, and tr_world's dispatch sites):
+
+1. **Shape.** `WorldAsset::surfaces: Vec<Surface>`; `Surface` keeps the
+   oracle's `msurface_t` header (`view_count`, `shader: ShaderHandle`,
+   `fog_index` — `oracle/codemp/renderer/tr_local.h:872-878`) with `data:
+   SurfaceData`, the owned form of the `surfaceType_t*` tagged union.
+   Flat-index addressing preserves the oracle's one surface-index space
+   (`mark_surfaces: Vec<u32>`, `BModel` start/len ranges resolve verbatim);
+   matches the landed, referee-covered `tr_marks::MarkSurface` precedent.
+2. **No `Terrain` variant.** `SF_TERRAIN` never appears in
+   tr_bsp.cpp/tr_world.cpp — terrain enters the draw list as the engine
+   global `&tr.landScape` (`oracle/codemp/renderer/tr_terrain.cpp:1005`),
+   never a BSP surface; a variant would invent state the oracle lacks
+   (§A2). Variants follow the real `R_LoadSurfaces` arms:
+   `Face`/`Grid`/`Triangles`/`Flare`/`Skip`.
+3. **`DrawSurf` payload becomes a `Copy` index-handle enum** over the flat
+   surface index (`WorldSurfaceRef::{Face,Grid,Triangles,..}(u32)`),
+   retiring the `SurfaceRef<'a>` borrow that would deadlock the owned
+   world walk (predicted by the audit's `drawSurf_t` row).
+4. **Prerequisite:** `#[derive(Clone, Copy)]` on `drawVert_t`
+   (layout-neutral; asserts untouched) so `GridMesh`/`Surface` satisfy
+   `WorldAsset`'s `Clone` bound (`Arc::make_mut`, A9/NB-1).
+5. Stitching keeps its landed `split_at_mut` + `mem::replace` mechanics on
+   the flat Vec (~40 lines of wrapper re-signature; tr_curve logic
+   untouched). If the world walk ever profiles header-bound, box the large
+   variants — no call-site changes — rather than re-opening per-kind pools.
+
+Sketch record: session scratchpad `surfaces-carrier-sketch.md` (2026-07-27).
