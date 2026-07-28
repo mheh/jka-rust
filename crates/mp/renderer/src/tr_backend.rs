@@ -529,13 +529,12 @@ pub fn RB_DrawGlowOverlay(_gpu: &mut GpuResources, _assets: &RenderAssets, _cvar
 /// The oracle's `image = &shader->stages[0].bundle[0].image[0]` is a plain
 /// re-fetch of `bundle[0].image` (indexing a pointer field with `[0]` is
 /// `*image`, so `&image[0]` is `image` itself) — a real nullable pointer,
-/// not a structurally-non-null address-of; landed here as
-/// `ShaderStage::image` and the `if (image)` guard as an `Option` check. A
-/// stale/invalid `shader` handle or a shader with no stages yet (`stages` is
-/// still populated empty by every current `GeneratePermanentShader` call —
-/// its per-stage copy loop is a separate, later wave) both fall through the
-/// same `None` path as a genuinely unset image, matching the oracle's
-/// "skip drawing" outcome (porting-rules §19).
+/// not a structurally-non-null address-of; read here as
+/// `stages[0].bundle[0].image`, with the `if (image)` guard as an `Option`
+/// check. A stale/invalid `shader` handle, or one whose `stages` came out
+/// empty (`GeneratePermanentShader`'s copy loop `break`s on the first
+/// inactive stage), falls through the same `None` path as a genuinely unset
+/// image, matching the oracle's "skip drawing" outcome (porting-rules §19).
 ///
 /// DEFERRED: R4 — past that guard, every effect (`qglColor4ubv`/
 /// `qglPushMatrix`/`qglTranslatef`/`qglRotatef`, `GL_Bind`'s own innards, the
@@ -562,7 +561,7 @@ pub fn RB_RotatePic(
         .shaders
         .get(shader)
         .and_then(|s| s.stages.first())
-        .and_then(|stage| stage.image);
+        .and_then(|stage| stage.bundle[0].image);
 
     if let Some(image) = image {
         if !frame.projection_2d {
@@ -592,10 +591,10 @@ pub fn RB_RotatePic(
 /// Two landable guards: `shader->numUnfoggedPasses` is a real
 /// `ShaderAsset::num_unfogged_passes` field, and `image = &shader->stages[0]
 /// .bundle[0].image[0]` is a plain re-fetch of `bundle[0].image` (a real
-/// nullable pointer — see `RB_RotatePic`'s doc comment), now
-/// `ShaderStage::image`. An invalid/stale `shader` handle, or one whose
-/// `stages` is still populated empty (`GeneratePermanentShader`'s per-stage
-/// copy loop is a separate, later wave), both fall back to "no passes"/"no
+/// nullable pointer — see `RB_RotatePic`'s doc comment), read here as
+/// `stages[0].bundle[0].image`. An invalid/stale `shader` handle, or one
+/// whose `stages` came out empty (`GeneratePermanentShader`'s copy loop
+/// `break`s on the first inactive stage), both fall back to "no passes"/"no
 /// image" (skip drawing) rather than the oracle's implicit
 /// always-valid-pointer assumption (porting-rules §19).
 ///
@@ -636,7 +635,7 @@ pub fn RB_RotatePic2(
     }
 
     let first_stage = shader_asset.and_then(|s| s.stages.first());
-    let image = first_stage.and_then(|stage| stage.image);
+    let image = first_stage.and_then(|stage| stage.bundle[0].image);
 
     if let Some(image) = image {
         if !frame.projection_2d {

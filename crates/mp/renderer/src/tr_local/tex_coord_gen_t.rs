@@ -3,6 +3,9 @@
 /// Raven `texCoordGen_t` — texture coordinate generation type.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:259-270`
+// Fieldless C enum stored by value in `TextureBundle::tc_gen`; the derives
+// are layout-neutral.
+#[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum texCoordGen_t {
     TCGEN_BAD = 0,

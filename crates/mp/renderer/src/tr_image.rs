@@ -6,6 +6,7 @@
 // transcription, matching the rest of the renderer/engine crates.
 #![allow(non_snake_case)]
 
+use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::sync::Arc;
 
@@ -135,6 +136,22 @@ pub struct TrImageState {
     pub gl_filter_max: i32,
     /// Raven file-scope `int giTextureBindNum`.
     pub gi_texture_bind_num: i32,
+    /// R4a bridge — new Rust-side infrastructure, no single oracle statics
+    /// counterpart (see [`PendingUpload`]'s doc comment for the full
+    /// rationale). Keyed by [`ImageHandle`] rather than folded onto
+    /// [`ImageAsset`] (`crate::render_state::image_asset`): `ImageAsset`
+    /// lives inside `RenderAssets`, which is `Arc`-shared and mutated only
+    /// through `Arc::make_mut`'s copy-on-write clone
+    /// (`RenderAssets::images` — see `R_CreateImage`'s `Arc::make_mut` call
+    /// below) — a fat `Vec<u8>` riding on every arena slot would deep-copy
+    /// every already-registered image's pixels on any unrelated
+    /// `RenderAssets` mutation while the render thread still holds a
+    /// reference. `TrImageState` is sim-owned and threaded by `&mut`, never
+    /// `Arc`-shared, so inserting here costs exactly the new image's bytes.
+    /// Entries are removed by `R_Images_DeleteImageContents` (wave 0,
+    /// extended this wave) alongside the arena slot it empties, so nothing
+    /// outlives its `ImageAsset`.
+    pub pending_uploads: HashMap<ImageHandle, PendingUpload>,
 }
 
 impl Default for TrImageState {
@@ -151,8 +168,42 @@ impl Default for TrImageState {
             // Raven: `int giTextureBindNum = 1024;`
             // Source: oracle/codemp/renderer/tr_image.cpp:536
             gi_texture_bind_num: 1024,
+            pending_uploads: HashMap::new(),
         }
     }
+}
+
+/// R4a bridge — the renderer-gpu upload (a separate crate this CPU-only
+/// crate cannot depend on at R3; see `GpuResources`' own doc comment) reads
+/// this to call `wgpu`'s texture-upload path; the oracle frees the sys-RAM
+/// copy after `qglTexImage2D` (the `R_FindImageFile` caller's
+/// `Z_Free(pic)` immediately after its `R_CreateImage` call returns,
+/// `oracle/codemp/renderer/tr_image.cpp:2574-2575`), we deliberately retain
+/// (documented deviation, presentation-side only).
+///
+/// `pixels`/`width`/`height` are the exact RGBA8 buffer and dimensions
+/// `Upload32` receives as its `data`/`*pUploadWidth`/`*pUploadHeight`
+/// arguments — i.e. `R_CreateImage`'s own `pic`/`width`/`height` — captured
+/// *before* any of `Upload32`'s internal `R_MipMap` (picmip/max-size
+/// clamping), `R_LightScaleTexture`, or per-miplevel work, all of which read
+/// and rewrite through that same buffer in place
+/// (`oracle/codemp/renderer/tr_image.cpp:599-762`). `width`/`height` are
+/// stored alongside the bytes because `ImageAsset::width`/`height` hold the
+/// *post*-transform values Upload32 eventually reports back
+/// (`ImageAsset`'s own doc comment: "after power of two and picmip") — a
+/// size a still-unimplemented `Upload32` never actually sets, so this
+/// struct's own copy is the only faithful pairing available while that gap
+/// stands.
+///
+/// Source: `oracle/codemp/renderer/tr_image.cpp:584-606,1272-1279`
+#[derive(Clone)]
+pub struct PendingUpload {
+    /// RGBA8, `width * height * 4` bytes — Raven's `(unsigned *)pic`.
+    pub pixels: Vec<u8>,
+    /// Raven `*pUploadWidth` at entry (== `R_CreateImage`'s `width`).
+    pub width: i32,
+    /// Raven `*pUploadHeight` at entry (== `R_CreateImage`'s `height`).
+    pub height: i32,
 }
 
 /// Raven `#define LANCZOS3 3.0` — `R_Resample`'s filter-window radius. Not
@@ -369,14 +420,24 @@ pub fn R_Images_GetNextIteration(assets: &RenderAssets, cursor: &mut usize) -> O
 /// rules §C9). Registry mutation goes through `Arc::make_mut` (A9), matching
 /// every other `RenderAssets` registry write.
 ///
+/// `state: &mut TrImageState` is this wave's addition (not an oracle
+/// parameter): the R4a `pending_uploads` staging table
+/// ([`TrImageState::pending_uploads`]) is keyed by the same `ImageHandle`
+/// this fn frees, and must not outlive the `ImageAsset` it was staged for.
+///
 /// Source: oracle/codemp/renderer/tr_image.cpp:561-571
-pub fn R_Images_DeleteImageContents(sim: &mut RenderAssetsSim, handle: ImageHandle) {
+pub fn R_Images_DeleteImageContents(
+    sim: &mut RenderAssetsSim,
+    state: &mut TrImageState,
+    handle: ImageHandle,
+) {
     // DEFERRED: R4 — qglDeleteTextures(1, &pImage->texnum): the fixed-
     // function GL surface; R2 leaves GL entry points unhomed until the R4
     // wgpu rewrite (DEC-01/DEC-37 A13.2; `GpuResources::gl_state` named
     // placeholder).
     // Source: oracle/codemp/renderer/tr_image.cpp:566-567
     Arc::make_mut(&mut sim.published).images.remove(handle);
+    state.pending_uploads.remove(&handle);
 }
 
 /// Raven's `switch (pHeader->byImagePlanes)` RGB/greyscale pixel reader
@@ -1221,7 +1282,11 @@ pub fn GL_ResetBinds(_gpu: &mut GpuResources) {
 /// (§19 — no defined oracle behavior past an assert in a release build).
 ///
 /// Source: oracle/codemp/renderer/tr_image.cpp:1035-1049
-pub fn R_Images_DeleteImage(sim: &mut RenderAssetsSim, handle: ImageHandle) {
+pub fn R_Images_DeleteImage(
+    sim: &mut RenderAssetsSim,
+    state: &mut TrImageState,
+    handle: ImageHandle,
+) {
     let name = sim
         .published
         .images
@@ -1230,7 +1295,7 @@ pub fn R_Images_DeleteImage(sim: &mut RenderAssetsSim, handle: ImageHandle) {
 
     match name {
         Some(name) => {
-            R_Images_DeleteImageContents(sim, handle);
+            R_Images_DeleteImageContents(sim, state, handle);
             Arc::make_mut(&mut sim.published).image_names.remove(&name);
         }
         None => {
@@ -1256,7 +1321,7 @@ pub fn R_Images_Clear(sim: &mut RenderAssetsSim, state: &mut TrImageState) {
         handles.push(handle);
     }
     for handle in handles {
-        R_Images_DeleteImageContents(sim, handle);
+        R_Images_DeleteImageContents(sim, state, handle);
     }
 
     Arc::make_mut(&mut sim.published).image_names.clear();
@@ -1624,7 +1689,13 @@ pub fn R_Resample(
 /// porting-rules §A2 no speculative behavior) and the R4
 /// `qglTexImage2D`/`qglTexParameterf` GL entry points (DEC-37 A13.2, unhomed)
 /// for the upload/mipmap-refresh calls this fn's own threading digest already
-/// flags DEFERRED.
+/// flags DEFERRED. What's blocked is strictly that GL-side math and the
+/// mip/picmip/light-scale transforms it drives (`R_MipMap`,
+/// `R_LightScaleTexture`, `R_BlendOverTexture` against `mipBlendColors`) —
+/// **not** the pixel data itself: `R_CreateImage` already stages the exact
+/// `data` buffer this fn would scale/mip in place onto
+/// `TrImageState::pending_uploads` (keyed by the `ImageHandle` it returns),
+/// for R4a's renderer-gpu upload to read once that crate exists.
 ///
 /// Source: oracle/codemp/renderer/tr_image.cpp:584-786
 pub fn Upload32(
@@ -1647,7 +1718,9 @@ pub fn Upload32(
     //TODO: Port Upload32
     // Source: oracle/codemp/renderer/tr_image.cpp:584-786 (blocked on the
     // `mipBlendColors[16][4]` table's state home and the R4 GL upload
-    // surface; see the doc comment above)
+    // surface; see the doc comment above — the pixel data itself is already
+    // staged by `R_CreateImage` via `TrImageState::pending_uploads`, so this
+    // gap is GL-math-only)
     todo!("Port Upload32 — oracle/codemp/renderer/tr_image.cpp:584-786")
 }
 
@@ -1667,7 +1740,11 @@ pub fn Upload32(
 /// collect-first shape sidesteps it entirely.
 ///
 /// Source: oracle/codemp/renderer/tr_image.cpp:1006-1031
-pub fn R_Images_DeleteLightMaps(sim: &mut RenderAssetsSim, gpu: &mut GpuResources) {
+pub fn R_Images_DeleteLightMaps(
+    sim: &mut RenderAssetsSim,
+    state: &mut TrImageState,
+    gpu: &mut GpuResources,
+) {
     let _ = R_Images_StartIteration(&sim.published);
     let mut cursor = 0usize;
     let mut targets = Vec::new();
@@ -1681,7 +1758,7 @@ pub fn R_Images_DeleteLightMaps(sim: &mut RenderAssetsSim, gpu: &mut GpuResource
     }
 
     for (handle, name) in targets {
-        R_Images_DeleteImageContents(sim, handle);
+        R_Images_DeleteImageContents(sim, state, handle);
         Arc::make_mut(&mut sim.published).image_names.remove(&name);
     }
 
@@ -1704,6 +1781,7 @@ pub fn R_Images_DeleteLightMaps(sim: &mut RenderAssetsSim, gpu: &mut GpuResource
 /// Source: oracle/codemp/renderer/tr_image.cpp:1097-1148
 pub fn RE_RegisterImages_LevelLoadEnd(
     sim: &mut RenderAssetsSim,
+    state: &mut TrImageState,
     gpu: &mut GpuResources,
     view: &mut EngineHostView,
     models: &RenderModels,
@@ -1745,7 +1823,7 @@ pub fn RE_RegisterImages_LevelLoadEnd(
     }
 
     for (handle, name) in targets {
-        R_Images_DeleteImageContents(sim, handle);
+        R_Images_DeleteImageContents(sim, state, handle);
         Arc::make_mut(&mut sim.published).image_names.remove(&name);
         erase_occured = true;
     }
@@ -1905,7 +1983,10 @@ pub fn R_CreateImage(
     // PORT-NOTE: the owned copy also drops Raven's in-place write-back —
     // `Upload32` scales/mips through the caller's `pic` buffer — but no
     // oracle caller reads `pic` after the call, so the divergence is
-    // unobservable.
+    // unobservable. `data` is separate, scratch-only working state for
+    // `Upload32`'s still-todo `R_MipMap`/`R_LightScaleTexture` math; the
+    // R4a-consumable copy is staged straight off `pic` below (this fn's own
+    // `state.pending_uploads.insert(...)` call, past the `Upload32` call).
     let pixel_count = (width * height).max(0) as usize;
     let mut data: Vec<u32> = pic[..pixel_count * 4]
         .chunks_exact(4)
@@ -1953,6 +2034,25 @@ pub fn R_CreateImage(
         last_level_used_on,
     });
     assets.image_names.insert(p_name, handle);
+
+    // R4a bridge (see `TrImageState::pending_uploads`'s doc comment): stage
+    // the exact RGBA8 buffer `Upload32` receives — pre-`R_MipMap`/pre-
+    // `R_LightScaleTexture`, at `pic`'s own `width`x`height` — for the
+    // renderer-gpu upload this CPU-only crate cannot itself perform. Gated
+    // the same `format == GL_RGBA` way Upload32's own body is
+    // (`oracle/codemp/renderer/tr_image.cpp:599`); the `else` arm
+    // (`:764-766`) is empty, so a non-`GL_RGBA` format uploads nothing in
+    // the oracle and stages nothing here either.
+    if format == GL_RGBA {
+        state.pending_uploads.insert(
+            handle,
+            PendingUpload {
+                pixels: pic[..pixel_count * 4].to_vec(),
+                width,
+                height,
+            },
+        );
+    }
 
     // DEFERRED: R4 — `if (bRectangle) { qglDisable(uiTarget);
     // qglEnable(GL_TEXTURE_2D); }` restore.

@@ -6,6 +6,10 @@ use super::wave_form_t::waveForm_t;
 /// Raven `texModInfo_t` — one texture-coordinate modifier stage.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:323-348`
+// `Clone`/`Copy` so `TextureBundle::tex_mods: Vec<texModInfo_t>` (the owned
+// form of Raven's `Hunk_Alloc`+`Com_Memcpy`'d `texMods` block) can be cloned;
+// layout-neutral.
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct texModInfo_t {
     pub r#type: texMod_t,

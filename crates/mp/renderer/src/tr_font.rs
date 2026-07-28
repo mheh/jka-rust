@@ -15,18 +15,30 @@ use mp_engine_qcommon::common::common::com_printf;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::error::com_error;
 use mp_engine_qcommon::common::Common;
-use mp_engine_qcommon::cvar_fns::Cvar_Set;
+use mp_engine_qcommon::cvar_fns::{Cvar_FindVar, Cvar_Set};
 use mp_engine_qcommon::files_common::{FS_FCloseFile, FS_FOpenFileRead, FS_ReadFileVec};
 use mp_engine_qcommon::qfiles::dfontdat_s::{dfontdat_t, GLYPH_COUNT};
 use mp_engine_qcommon::qfiles::font_style::{SET_MASK, STYLE_BLINK, STYLE_DROPSHADOW};
 use mp_engine_qcommon::qfiles::glyph_info_t::glyphInfo_t;
+use mp_qshared::shared::com_parse::QSharedScratch;
+use mp_qshared::shared::cvar::CvarHandle;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::q_string::COM_StripExtension;
 use mp_qshared::shared::{fileHandle_t, g_color_table, MAX_QPATH};
+use native_string::q_string::Q_stricmp;
 
 use crate::render_state::frame_data::FrameData;
+use crate::render_state::frame_state::FrameState;
+use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::render_assets::RenderAssets;
+use crate::render_state::render_assets_sim::RenderAssetsSim;
+use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_cmds::{RE_SetColor, RE_StretchPic};
+use crate::tr_image::TrImageState;
+use crate::tr_local::view_parms_t::viewParms_t;
+use crate::tr_model::render_models::RenderModels;
+use crate::tr_shader::RE_RegisterShaderNoMip;
+use crate::tr_sky::SkyState;
 
 /// Raven `sFILENAME_THAI_WIDTHS`.
 /// Source: `oracle/codemp/renderer/tr_font.cpp:75`
@@ -125,6 +137,10 @@ const BIG5_LOBYTE_LOBOUND1: u8 = 0xA1;
 /// Source: `oracle/codemp/renderer/tr_font.cpp:314`
 const BIG5_LOBYTE_HIBOUND1: u8 = 0xFE;
 
+/// Raven `BIG5_CODES_PER_ROW` — Raven: 3 more than the number of glyphs.
+/// Source: `oracle/codemp/renderer/tr_font.cpp:315`
+const BIG5_CODES_PER_ROW: u32 = 160;
+
 /// Raven `SHIFTJIS_HIBYTE_START0` (all Shift-JIS ranges inclusive).
 /// Source: `oracle/codemp/renderer/tr_font.cpp:390`
 const SHIFTJIS_HIBYTE_START0: u8 = 0x81;
@@ -188,21 +204,13 @@ const GB_CODES_PER_ROW: u32 = 95;
 /// Source: `oracle/codemp/renderer/tr_font.cpp:551`
 const TIS_GLYPHS_START: u32 = 160;
 
-// DEFERRED: GetLanguageEnum — `se_language` (STATE HOMES row: "NOT renderer
-// state — declared outside the renderer TU set... already homed by the
-// engine port... confirm the exact receiver at port time") has no resolvable
-// receiver from this packet's scope (engine crate not in the allowed read
-// set), and its 7 callees (`Language_IsChinese`/`IsJapanese`/`IsKorean`/
-// `IsPolish`/`IsRussian`/`IsTaiwanese`/`IsThai`) are inline header helpers
-// with no ported equivalent and no body in this packet — porting either the
-// engine-cvar-modificationCount cache (a kind-3 fn-scope-static escalation,
-// R2 assigns it no carrier) or the language-string dispatch would be
-// speculative behavior (porting-rules §A2). Left untranscribed; raised as a
-// wave-planning gap. Its *result* is threaded in as a `Language_e` parameter
-// by every method that needs it (`CFontInfo::{new, UpdateAsianIfNeeded,
-// GetLetter, GetCollapsedAsianCode, GetLetterWidth, GetLetterHorizAdvance}`),
-// per porting-rules §B4 — reached-for ambient language state is what stays
-// unported, not the language itself.
+// `GetLanguageEnum` and its 7 `Language_Is*` callees are ported below
+// (`:1690`ff), landed by task #52 now that the cvar chain they need is
+// reachable. The wave-0 DEFERRED that stood here is closed; its *result*
+// stays threaded in as a `Language_e` parameter by every method that needs it
+// (`CFontInfo::{new, UpdateAsianIfNeeded, GetLetter, GetCollapsedAsianCode,
+// GetLetterWidth, GetLetterHorizAdvance}`, `GetFont*`, `RE_Font_*`), per
+// porting-rules §B4 — the file's established convention, unchanged.
 // Source: `oracle/codemp/renderer/tr_font.cpp:31-53`
 
 /// Raven `Language_e`.
@@ -485,9 +493,25 @@ impl CFontInfo {
     /// are unported (file-head DEFERRED, `:31-53`), so both are threaded in
     /// as parameters (porting-rules §B4).
     ///
+    /// PORT-NOTE: the `qs`..`sky` prefix is [`RE_RegisterShaderNoMip`]'s
+    /// carrier list (DEC-42.3, the client track's engine-carrier convention —
+    /// `RE_RegisterSkin` is the model), threaded here so the glyph-shader
+    /// registration at `:877` can actually run.
+    ///
     /// Source: `oracle/codemp/renderer/tr_font.cpp:815-956`
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
+        qs: &mut QSharedScratch,
+        frame_state: &mut FrameState,
+        assets: &mut RenderAssets,
         view: &mut EngineHostView,
+        cvars: &RendererCvars,
+        sim: &mut RenderAssetsSim,
+        models: &RenderModels,
+        img_state: &mut TrImageState,
+        gpu: &mut GpuResources,
+        sky_view: &mut viewParms_t,
+        sky: &mut SkyState,
         font: &mut FontState,
         eLanguage: Language_e,
         iSE_Language_ModificationCount: i32,
@@ -575,22 +599,39 @@ impl CFontInfo {
         truncate_to_qpath(&mut me.m_sFontName);
         // so we get better error printing if failed to load shader (ie lose ".fontdat")
         me.m_sFontName = COM_StripExtension(&me.m_sFontName);
-        // DEFERRED: RE_RegisterShaderNoMip — landed (wave 8,
-        // `tr_shader.rs:5099`), but its Rust signature threads a dozen
-        // renderer/engine carriers (`QSharedScratch`, `FrameState`,
-        // `RenderAssets`, `RendererCvars`, `RenderAssetsSim`, `RenderModels`,
-        // `TrImageState`, `GpuResources`, `viewParms_t`, `SkyState`) that
-        // `CFontInfo::new` does not have and is out of this wave's scope to
-        // add; its body is also still an unlanded loud stub
-        // (`todo!("Port RE_RegisterShader...")`, `tr_shader.rs:5085-5087`)
-        // pending its own `lightmaps2d`/`stylesDefault` gap, so wiring it here
-        // would only trade this cited gap for an unconditional panic. The
-        // handle stays 0, Raven's own "no shader" value, until both land.
-        // Source: `oracle/codemp/renderer/tr_font.cpp:877`
-        me.mShader = 0;
+        me.mShader = RE_RegisterShaderNoMip(
+            &me.m_sFontName,
+            qs,
+            frame_state,
+            assets,
+            view,
+            cvars,
+            sim,
+            models,
+            img_state,
+            gpu,
+            sky_view,
+            sky,
+        );
 
         me.FlagNoAsianGlyphs();
-        me.UpdateAsianIfNeeded(view, font, eLanguage, iSE_Language_ModificationCount, true);
+        me.UpdateAsianIfNeeded(
+            qs,
+            frame_state,
+            assets,
+            view,
+            cvars,
+            sim,
+            models,
+            img_state,
+            gpu,
+            sky_view,
+            sky,
+            font,
+            eLanguage,
+            iSE_Language_ModificationCount,
+            true,
+        );
 
         if view.common.com_buildScript.is_some()
             && view.common.cvar(view.common.com_buildScript).integer == 2
@@ -734,10 +775,25 @@ impl CFontInfo {
     /// `eLanguage`/`iSE_Language_ModificationCount` params — see the
     /// file-head DEFERRED (`:31-53`).
     ///
+    /// PORT-NOTE: the `qs`..`sky` prefix is [`RE_RegisterShaderNoMip`]'s
+    /// carrier list (DEC-42.3), threaded here so the Asian glyph-page
+    /// registration at `:1023` can actually run.
+    ///
     /// Source: `oracle/codemp/renderer/tr_font.cpp:958-1069`
+    #[allow(clippy::too_many_arguments)]
     pub fn UpdateAsianIfNeeded(
         &mut self,
+        qs: &mut QSharedScratch,
+        frame_state: &mut FrameState,
+        assets: &mut RenderAssets,
         view: &mut EngineHostView,
+        cvars: &RendererCvars,
+        sim: &mut RenderAssetsSim,
+        models: &RenderModels,
+        img_state: &mut TrImageState,
+        gpu: &mut GpuResources,
+        sky_view: &mut viewParms_t,
+        sky: &mut SkyState,
         font: &mut FontState,
         eLanguage: Language_e,
         iSE_Language_ModificationCount: i32,
@@ -810,25 +866,32 @@ impl CFontInfo {
                     for i in 0..fields.iGlyphTPs as usize {
                         // (Note!!  assumption for S,T calculations: all Asian glyph textures pages are square except for last one)
                         //
-                        // DEFERRED: RE_RegisterShaderNoMip, together with the
-                        // `Com_sprintf(sTemp, "fonts/%s_%d_1024_%d", psLang,
-                        // 1024/m_iAsianGlyphsAcross, i)` name build that feeds
-                        // it — landed (wave 8, `tr_shader.rs:5099`) but not
-                        // callable from `UpdateAsianIfNeeded`'s own parameter
-                        // list without threading a dozen renderer/engine
-                        // carriers this fn doesn't carry, and its body is
-                        // still an unlanded loud stub
-                        // (`todo!("Port RE_RegisterShader...")`,
-                        // `tr_shader.rs:5085-5087`) pending its own
-                        // `lightmaps2d`/`stylesDefault` gap — see the matching
-                        // note on `CFontInfo::new`'s `mShader` assignment.
-                        // Raven's own comment below states what the 0 left
-                        // here then means.
-                        // Source: `oracle/codemp/renderer/tr_font.cpp:1013-1017`
+                        // Raven's `Com_sprintf` into `char sTemp[MAX_QPATH]`
+                        // can overrun (UB); the owned `String` cannot
+                        // (porting-rules §19).
+                        let sTemp = format!(
+                            "fonts/{}_{}_1024_{}",
+                            fields.psLang,
+                            1024 / self.m_iAsianGlyphsAcross,
+                            i
+                        );
                         //
                         // returning 0 here will automatically inhibit Asian glyph calculations at runtime...
                         //
-                        self.m_hAsianShaders[i] = 0;
+                        self.m_hAsianShaders[i] = RE_RegisterShaderNoMip(
+                            &sTemp,
+                            qs,
+                            frame_state,
+                            assets,
+                            view,
+                            cvars,
+                            sim,
+                            models,
+                            img_state,
+                            gpu,
+                            sky_view,
+                            sky,
+                        );
                     }
 
                     // for now I'm hardwiring these, but if we ever have more than one glyph set per language then they'll be changed...
@@ -1258,6 +1321,13 @@ pub struct FontState {
     /// speed)". A fn-scope static is a hidden global (porting-rules §B3), so
     /// it is homed here with the file's other statics.
     pub bDone_ForeignFontsRegistered: bool,
+    /// Raven's fn-scope `static int iSE_Language_ModificationCount` inside
+    /// [`GetLanguageEnum`] (`:33`) — `None` is its `-1234` never-matched
+    /// seed. Hidden global, homed here (porting-rules §B3).
+    pub iSE_Language_ModificationCount: Option<i32>,
+    /// Raven's fn-scope `static Language_e eLanguage = eWestern` inside
+    /// [`GetLanguageEnum`] (`:34`) — same §B3 rehoming.
+    pub eLanguage: Language_e,
 }
 
 /// Raven's `int &iGlyphTPs, LPCSTR &psLang` out-params plus the `int` return
@@ -1320,13 +1390,6 @@ pub fn Taiwanese_IsTrailingPunctuation(uiCode: u32) -> bool {
 ///
 /// Raven: sneaky maths on both bytes, reduce to 0x0000 onwards.
 ///
-/// PORT-NOTE: every constant this body needs except `BIG5_CODES_PER_ROW` is
-/// already defined in this file; `BIG5_CODES_PER_ROW`'s value is not in this
-/// packet's slice, so the final collapse step (the only line that needs it)
-/// is left as a cited `todo!()` rather than guessed (wave-0 ruling: never
-/// guess a `#define` value) — everything computable above it is transcribed
-/// faithfully, including both bounds guards.
-///
 /// Source: `oracle/codemp/renderer/tr_font.cpp:362-375`
 pub fn Taiwanese_CollapseBig5Code(mut uiCode: u32) -> i32 {
     if Taiwanese_ValidBig5Code(uiCode) {
@@ -1334,10 +1397,8 @@ pub fn Taiwanese_CollapseBig5Code(mut uiCode: u32) -> i32 {
         if (uiCode & 0xFF) >= (BIG5_LOBYTE_LOBOUND1 as u32 - 1) - BIG5_LOBYTE_LOBOUND0 as u32 {
             uiCode -= ((BIG5_LOBYTE_LOBOUND1 as u32 - 1) - (BIG5_LOBYTE_HIBOUND0 as u32 + 1)) - 1;
         }
-        //TODO: Port BIG5_CODES_PER_ROW
-        // Source: oracle/codemp/renderer/tr_font.cpp:371 (#define, value not in packet)
-        let _ = uiCode;
-        todo!("Port BIG5_CODES_PER_ROW — oracle/codemp/renderer/tr_font.cpp:371");
+        uiCode = ((uiCode >> 8) * BIG5_CODES_PER_ROW) + (uiCode & 0xFF);
+        return uiCode as i32;
     }
     0
 }
@@ -1685,12 +1746,97 @@ pub fn AnyLanguage_ReadCharFromString(
     (uiLetter, piAdvanceCount, pbIsTrailingPunctuation)
 }
 
+/// Raven's `se_language` cvar handle, resolved by name.
+///
+/// Raven caches the `cvar_t *` in an engine-registered file-scope global; the
+/// renderer has no such cached handle here, so the nullable pointer every
+/// `Language_Is*` helper tests (`se_language && ...`) is
+/// [`Cvar_FindVar`]'s `Option<CvarHandle>` instead — `None` is Raven's NULL.
+///
+/// Source: `oracle/codemp/qcommon/stringed_ingame.h:71-104`
+fn se_language(common: &Common) -> Option<CvarHandle> {
+    Cvar_FindVar(common, "se_language")
+}
+
+/// Raven's `se_language->modificationCount` read — the value
+/// [`CFontInfo::UpdateAsianIfNeeded`] (`:970-972`) and [`GetLanguageEnum`]
+/// compare against, exposed on its own because this file's fns take it as a
+/// threaded parameter (the file-head note). `0` when the cvar was never
+/// registered, where Raven would null-deref (porting-rules §19).
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:36`
+pub fn se_language_modification_count(common: &Common) -> i32 {
+    se_language(common).map_or(0, |h| common.cvar(h).modificationCount)
+}
+
+/// Raven `Language_IsRussian`/`IsPolish`/`IsKorean`/`IsTaiwanese`/
+/// `IsJapanese`/`IsChinese`/`IsThai` — the seven identical inline helpers,
+/// collapsed to one parameterised body because they differ only in the
+/// compared literal (porting-rules §10: behavior preserved, shape is not).
+/// [`GetLanguageEnum`] is the only caller in either tree.
+///
+/// Source: `oracle/codemp/qcommon/stringed_ingame.h:71-104`
+fn Language_Is(common: &Common, psLanguage: &str) -> bool {
+    match se_language(common) {
+        Some(h) => Q_stricmp(&common.cvar(h).string, psLanguage) == 0,
+        None => false,
+    }
+}
+
+/// Raven `GetLanguageEnum`.
+///
+/// Raven: this is to cut down on all the stupid string compares I've been
+/// doing, and convert asian stuff to switch-case.
+///
+/// PORT-NOTE: Raven's two fn-scope statics are hidden globals
+/// (porting-rules §B3), so both are homed on [`FontState`]. The
+/// `iSE_Language_ModificationCount = -1234` seed ("any old silly value that
+/// won't match the cvar mod count") is an `Option`'s `None` here — the same
+/// never-matched sentinel without a magic number.
+///
+/// PORT-NOTE: Raven dereferences `se_language` unconditionally at `:36`,
+/// which is a null deref when the cvar was never registered (porting-rules
+/// §19); the defined behavior chosen is "count unchanged", which leaves the
+/// cached `eWestern` in place — the same answer the seven string compares
+/// would give against a NULL `se_language`.
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:29-53`
+pub fn GetLanguageEnum(common: &Common, font: &mut FontState) -> Language_e {
+    let iSE_Language_ModificationCount =
+        se_language(common).map(|h| common.cvar(h).modificationCount);
+
+    // only re-strcmp() when language string has changed from what we knew it as...
+    //
+    if font.iSE_Language_ModificationCount != iSE_Language_ModificationCount {
+        font.iSE_Language_ModificationCount = iSE_Language_ModificationCount;
+
+        font.eLanguage = if Language_Is(common, "russian") {
+            Language_e::eRussian
+        } else if Language_Is(common, "polish") {
+            Language_e::ePolish
+        } else if Language_Is(common, "korean") {
+            Language_e::eKorean
+        } else if Language_Is(common, "taiwanese") {
+            Language_e::eTaiwanese
+        } else if Language_Is(common, "japanese") {
+            Language_e::eJapanese
+        } else if Language_Is(common, "chinese") {
+            Language_e::eChinese
+        } else if Language_Is(common, "thai") {
+            Language_e::eThai
+        } else {
+            Language_e::eWestern
+        };
+    }
+
+    font.eLanguage
+}
+
 /// Raven `Language_IsAsian`.
 ///
-/// PORT-NOTE: `GetLanguageEnum()` is unported (file-head DEFERRED,
-/// `:31-53`); threaded in as the `eLanguage` parameter per that note's
-/// established pattern (porting-rules §B4) — every other caller in this
-/// file already does the same.
+/// PORT-NOTE: [`GetLanguageEnum`]'s result is threaded in as the `eLanguage`
+/// parameter (porting-rules §B4, the file-head note's established pattern) —
+/// every other caller in this file already does the same.
 ///
 /// Source: `oracle/codemp/renderer/tr_font.cpp:785-798`
 pub fn Language_IsAsian(eLanguage: Language_e) -> bool {
@@ -1721,6 +1867,157 @@ pub fn Language_UsesSpaces(eLanguage: Language_e) -> bool {
     )
 }
 
+// ---------------------------------------------------------------------------
+// R4a prep (task #52): `GetFont_Actual`/`RE_RegisterFont`, the two fns
+// `GetFont`, `GetFont_SBCSOverride` and `R_ReloadFonts_f` were each parked on.
+// `RE_RegisterFont` is the `ui` module's `R_RegisterFont` trap target.
+//
+// Both carry [`RE_RegisterShaderNoMip`]'s `qs`..`sky` carrier prefix
+// (DEC-42.3, `RE_RegisterSkin` is the model) because the load path they reach
+// — `CFontInfo::new` -> `RE_RegisterShaderNoMip` for the glyph texture page,
+// `UpdateAsianIfNeeded` -> the same for Asian glyph pages — needs it.
+// ---------------------------------------------------------------------------
+
+/// Raven `GetFont_Actual`.
+///
+/// PORT-NOTE: Raven's `CFontInfo *` return is a `FontState::g_vFontArray`
+/// index (arena+id, porting-rules §B5), `NULL` -> `None`; an in-range index
+/// whose slot is empty is Raven's in-range `pFont == NULL`, which returns
+/// `NULL` *without* running the Asian update, so it maps to `None` too. The
+/// `pFont->UpdateAsianIfNeeded()` call needs `&mut CFontInfo` while that
+/// method itself reads and writes `FontState`, so the entry is lifted out
+/// with [`take_font`]/[`put_font_back`] rather than held as an aliasing
+/// `&mut`/`&` pair.
+///
+/// PORT-NOTE: `GetLanguageEnum()`/`se_language->modificationCount` are
+/// unported (file-head DEFERRED, `:31-53`); threaded in as parameters, same
+/// as every other caller in this file.
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:1071-1085`
+#[allow(clippy::too_many_arguments)]
+pub fn GetFont_Actual(
+    qs: &mut QSharedScratch,
+    frame_state: &mut FrameState,
+    assets: &mut RenderAssets,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
+    font: &mut FontState,
+    eLanguage: Language_e,
+    iSE_Language_ModificationCount: i32,
+    index: i32,
+) -> Option<i32> {
+    let index = index & (SET_MASK as i32);
+    if index >= 1 && index < font.g_iCurrentFontIndex {
+        // CFontInfo *pFont = g_vFontArray[index]; if (pFont) ...
+        let mut pFont = take_font(font, index)?;
+
+        pFont.UpdateAsianIfNeeded(
+            qs,
+            frame_state,
+            assets,
+            view,
+            cvars,
+            sim,
+            models,
+            img_state,
+            gpu,
+            sky_view,
+            sky,
+            font,
+            eLanguage,
+            iSE_Language_ModificationCount,
+            false,
+        );
+
+        put_font_back(font, index, pFont);
+        return Some(index);
+    }
+    None
+}
+
+/// Raven `RE_RegisterFont` — the font registry's public entry point (the
+/// `ui`/`cgame` modules' `R_RegisterFont` trap target).
+///
+/// PORT-NOTE: Raven's `new CFontInfo(psName)` files itself into
+/// `g_vFontArray` and Raven then re-derives its slot as `g_iCurrentFontIndex
+/// - 1` (`:1629`); [`CFontInfo::new`] returns that same number directly (its
+/// own PORT-NOTE), so `iFontIndex` is that return value. The `else` arm's
+/// dangling `pFont` is not a leak in either tree — the constructor already
+/// parked the object in `g_vFontArray`, and Raven never deletes it before
+/// `R_ShutdownFonts`.
+///
+/// PORT-NOTE: `GetLanguageEnum()`/`se_language->modificationCount` are
+/// unported (file-head DEFERRED, `:31-53`); threaded in as parameters.
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:1616-1642`
+#[allow(clippy::too_many_arguments)]
+pub fn RE_RegisterFont(
+    qs: &mut QSharedScratch,
+    frame_state: &mut FrameState,
+    assets: &mut RenderAssets,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
+    font: &mut FontState,
+    eLanguage: Language_e,
+    iSE_Language_ModificationCount: i32,
+    psName: &str,
+) -> i32 {
+    if let Some(&iFontIndex) = font.g_mapFontIndexes.get(psName) {
+        return iFontIndex;
+    }
+
+    // not registered, so...
+    //
+    let iFontIndex = CFontInfo::new(
+        qs,
+        frame_state,
+        assets,
+        view,
+        cvars,
+        sim,
+        models,
+        img_state,
+        gpu,
+        sky_view,
+        sky,
+        font,
+        eLanguage,
+        iSE_Language_ModificationCount,
+        psName,
+    );
+
+    let iPointSize = font
+        .g_vFontArray
+        .get(iFontIndex as usize)
+        .and_then(|f| f.as_deref())
+        .map_or(0, |f| f.GetPointSize());
+
+    if iPointSize > 0 {
+        font.g_mapFontIndexes.insert(psName.to_owned(), iFontIndex);
+        if let Some(Some(pFont)) = font.g_vFontArray.get_mut(iFontIndex as usize) {
+            pFont.m_iThisFont = iFontIndex;
+        }
+        return iFontIndex;
+    }
+
+    // missing/invalid
+    font.g_mapFontIndexes.insert(psName.to_owned(), 0);
+
+    0
+}
+
 /// Raven `GetFont_SBCSOverride`.
 ///
 /// Raven: work out the scaling factor for this font's glyphs, then override
@@ -1731,27 +2028,45 @@ pub fn Language_UsesSpaces(eLanguage: Language_e) -> bool {
 /// `CFontInfo *` are `FontState::g_vFontArray` indices per the arena+id
 /// pattern (porting-rules §B5) the rest of this file already uses.
 ///
-/// PORT-NOTE: this packet's RESOLVED CALL SURFACE lists `RE_RegisterFont`
-/// and `GetFont_Actual` as already ported in a lower wave; grepping this
-/// crate shows neither exists yet (a wave-planning defect, not a genuine
-/// call surface). Every guard this function can evaluate without them is
-/// transcribed faithfully; only the two branches that actually need them are
-/// left as cited `todo!()`s.
+/// PORT-NOTE: Raven reads `pFont->m_iAltSBCSFont` a second time at `:1286`,
+/// *after* the registration branch has written it, so the second test
+/// re-reads the arena rather than reusing the value snapshotted at entry.
+/// The `pAltFont` field writes snapshot the original font's four metrics
+/// first; that is behavior-identical to Raven's interleaved read/write even
+/// in the degenerate `pAltFont == pFont` case (each write stores the value
+/// the following read would have returned).
 ///
 /// Source: `oracle/codemp/renderer/tr_font.cpp:1251-1295`
+#[allow(clippy::too_many_arguments)]
 pub fn GetFont_SBCSOverride(
+    qs: &mut QSharedScratch,
+    frame_state: &mut FrameState,
+    assets: &mut RenderAssets,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
     font: &mut FontState,
     eLanguage: Language_e,
+    iSE_Language_ModificationCount: i32,
     iFont: i32,
     eLanguageSBCS: Language_e,
     psLanguageNameSBCS: &str,
 ) -> Option<i32> {
-    let (m_bIsFakeAlienLanguage, m_iAltSBCSFont) = match font
+    let (m_bIsFakeAlienLanguage, m_iAltSBCSFont, m_sFontName) = match font
         .g_vFontArray
         .get(iFont as usize)
         .and_then(|f| f.as_deref())
     {
-        Some(f) => (f.m_bIsFakeAlienLanguage, f.m_iAltSBCSFont),
+        Some(f) => (
+            f.m_bIsFakeAlienLanguage,
+            f.m_iAltSBCSFont,
+            f.m_sFontName.clone(),
+        ),
         None => return None,
     };
 
@@ -1760,21 +2075,110 @@ pub fn GetFont_SBCSOverride(
             // no reg attempted yet?
             // need to register this alternative SBCS font...
             //
-            //TODO: Port RE_RegisterFont
-            // Source: oracle/codemp/renderer/tr_font.cpp:1261
-            //TODO: Port GetFont_Actual
-            // Source: oracle/codemp/renderer/tr_font.cpp:1262
-            let _ = psLanguageNameSBCS;
-            todo!(
-                "Port GetFont_SBCSOverride's alt-font registration — depends on unported RE_RegisterFont/GetFont_Actual — oracle/codemp/renderer/tr_font.cpp:1259-1284"
+            // ensure unique name (eg: "lcd/russian"). `COM_SkipPath` is the
+            // same two-line `&str` scan `CFontInfo::new` spells out, and
+            // Raven's `va()` scratch buffer becomes an owned `String`.
+            let psSkipPath = match m_sFontName.rsplit_once('/') {
+                Some((_, tail)) => tail,
+                None => m_sFontName.as_str(),
+            };
+            let iAltFontIndex = RE_RegisterFont(
+                qs,
+                frame_state,
+                assets,
+                view,
+                cvars,
+                sim,
+                models,
+                img_state,
+                gpu,
+                sky_view,
+                sky,
+                font,
+                eLanguage,
+                iSE_Language_ModificationCount,
+                &format!("{psSkipPath}/{psLanguageNameSBCS}"),
             );
+            let pAltFont = GetFont_Actual(
+                qs,
+                frame_state,
+                assets,
+                view,
+                cvars,
+                sim,
+                models,
+                img_state,
+                gpu,
+                sky_view,
+                sky,
+                font,
+                eLanguage,
+                iSE_Language_ModificationCount,
+                iAltFontIndex,
+            );
+            if let Some(iAltFont) = pAltFont {
+                let (iPointSize, iHeight, iAscender, iDescender, m_iThisFont) = match font
+                    .g_vFontArray
+                    .get(iFont as usize)
+                    .and_then(|f| f.as_deref())
+                {
+                    Some(f) => (
+                        f.GetPointSize(),
+                        f.GetHeight(),
+                        f.GetAscender(),
+                        f.GetDescender(),
+                        f.m_iThisFont,
+                    ),
+                    None => return None,
+                };
+
+                if let Some(Some(pAltFont)) = font.g_vFontArray.get_mut(iAltFont as usize) {
+                    // work out the scaling factor for this font's glyphs...
+                    // ( round it to 1 decimal place to cut down on silly
+                    // scale factors like 0.53125 )
+                    //
+                    pAltFont.m_fAltSBCSFontScaleFactor =
+                        RoundTenth(iPointSize as f32 / pAltFont.GetPointSize() as f32);
+                    //
+                    // then override with the main properties of the original font...
+                    //
+                    pAltFont.mPointSize = iPointSize;
+                    pAltFont.mHeight = iHeight;
+                    pAltFont.mAscender = iAscender;
+                    pAltFont.mDescender = iDescender;
+
+                    pAltFont.mbRoundCalcs = true;
+                    pAltFont.m_iOriginalFontWhenSBCSOverriden = m_iThisFont;
+                }
+            }
+            if let Some(Some(pFont)) = font.g_vFontArray.get_mut(iFont as usize) {
+                pFont.m_iAltSBCSFont = iAltFontIndex;
+            }
         }
 
+        // re-read: the branch above may just have written it
+        let m_iAltSBCSFont = font
+            .g_vFontArray
+            .get(iFont as usize)
+            .and_then(|f| f.as_deref())
+            .map_or(-1, |f| f.m_iAltSBCSFont);
         if m_iAltSBCSFont > 0 {
-            //TODO: Port GetFont_Actual
-            // Source: oracle/codemp/renderer/tr_font.cpp:1289
-            todo!(
-                "Port GetFont_SBCSOverride's alt-font lookup — depends on unported GetFont_Actual — oracle/codemp/renderer/tr_font.cpp:1287-1290"
+            return GetFont_Actual(
+                qs,
+                frame_state,
+                assets,
+                view,
+                cvars,
+                sim,
+                models,
+                img_state,
+                gpu,
+                sky_view,
+                sky,
+                font,
+                eLanguage,
+                iSE_Language_ModificationCount,
+                m_iAltSBCSFont,
             );
         }
     }
@@ -1786,32 +2190,70 @@ pub fn GetFont_SBCSOverride(
 ///
 /// PORT-NOTE: `GetLanguageEnum()` is unported (file-head DEFERRED,
 /// `:31-53`); threaded in as `eLanguage`, forwarded to
-/// [`GetFont_SBCSOverride`] exactly as its own PORT-NOTE requires.
-///
-/// PORT-NOTE: this packet's RESOLVED CALL SURFACE lists `GetFont_Actual` as
-/// already ported in a lower wave; grepping this crate shows it does not
-/// exist yet — the same wave-planning defect [`GetFont_SBCSOverride`]'s
-/// PORT-NOTE already raised for the identical fn. `pFont`/the returned
-/// `CFontInfo *` are `FontState::g_vFontArray` indices per the arena+id
-/// pattern this file already uses; every step this fn can perform without
-/// `GetFont_Actual` is transcribed faithfully, only the initial lookup is
-/// left as a cited `todo!()`.
+/// [`GetFont_SBCSOverride`] exactly as its own PORT-NOTE requires. `pFont`/
+/// the returned `CFontInfo *` are `FontState::g_vFontArray` indices per the
+/// arena+id pattern this file already uses.
 ///
 /// Source: `oracle/codemp/renderer/tr_font.cpp:1299-1318`
-#[allow(unreachable_code, unused_variables)]
-pub fn GetFont(font: &mut FontState, eLanguage: Language_e, index: i32) -> Option<i32> {
-    let _ = index;
-    //TODO: Port GetFont_Actual
-    // Source: oracle/codemp/renderer/tr_font.cpp:1301
-    let pFont: Option<i32> =
-        todo!("Port GetFont's GetFont_Actual call — oracle/codemp/renderer/tr_font.cpp:1301");
+#[allow(clippy::too_many_arguments)]
+pub fn GetFont(
+    qs: &mut QSharedScratch,
+    frame_state: &mut FrameState,
+    assets: &mut RenderAssets,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
+    font: &mut FontState,
+    eLanguage: Language_e,
+    iSE_Language_ModificationCount: i32,
+    index: i32,
+) -> Option<i32> {
+    let pFont = GetFont_Actual(
+        qs,
+        frame_state,
+        assets,
+        view,
+        cvars,
+        sim,
+        models,
+        img_state,
+        gpu,
+        sky_view,
+        sky,
+        font,
+        eLanguage,
+        iSE_Language_ModificationCount,
+        index,
+    );
 
     if let Some(iFont) = pFont {
         // any SBCS overrides? (this has to be pretty quick, and is (sort of))...
         //
         for entry in g_SBCSOverrideLanguages.iter() {
-            let pAltFont =
-                GetFont_SBCSOverride(font, eLanguage, iFont, entry.m_eLanguage, entry.m_psName);
+            let pAltFont = GetFont_SBCSOverride(
+                qs,
+                frame_state,
+                assets,
+                view,
+                cvars,
+                sim,
+                models,
+                img_state,
+                gpu,
+                sky_view,
+                sky,
+                font,
+                eLanguage,
+                iSE_Language_ModificationCount,
+                iFont,
+                entry.m_eLanguage,
+                entry.m_psName,
+            );
             if pAltFont.is_some() {
                 return pAltFont;
             }
@@ -1859,17 +2301,28 @@ pub fn R_ShutdownFonts(font: &mut FontState) {
 /// value, not an order-dependent scan, so this is behavior-preserving
 /// (porting-rules §10 — control flow preserved, shape is not).
 ///
-/// PORT-NOTE: this packet's RESOLVED CALL SURFACE lists `RE_RegisterFont` as
-/// already ported in a lower wave; grepping this crate shows it does not
-/// exist yet (a wave-planning defect). Every step that does not need it —
-/// the ordered-name collection, the shutdown/restart, both `Com_Printf`
-/// paths — is transcribed faithfully; only the re-registration loop's actual
-/// `RE_RegisterFont` call is left as a cited `todo!()`. The `#ifdef _DEBUG`
-/// `assert(iNewFontHandle == iFont+1)` twin of the release-build call is the
-/// same blocked call either way, so both arms collapse to the one `todo!()`.
+/// PORT-NOTE: Raven's `#ifdef _DEBUG` arm differs from the release arm only
+/// by `assert( iNewFontHandle == iFont+1 )`, which is exactly Rust's
+/// `debug_assert_eq!` — one call site covers both arms.
 ///
 /// Source: `oracle/codemp/renderer/tr_font.cpp:1666-1711`
-pub fn R_ReloadFonts_f(view: &mut EngineHostView, font: &mut FontState) {
+#[allow(clippy::too_many_arguments)]
+pub fn R_ReloadFonts_f(
+    qs: &mut QSharedScratch,
+    frame_state: &mut FrameState,
+    assets: &mut RenderAssets,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
+    font: &mut FontState,
+    eLanguage: Language_e,
+    iSE_Language_ModificationCount: i32,
+) {
     // first, grab all the currently-registered fonts IN THE ORDER THEY WERE
     // REGISTERED...
     //
@@ -1902,10 +2355,25 @@ pub fn R_ReloadFonts_f(view: &mut EngineHostView, font: &mut FontState) {
         // some menu items etc cache the string lengths so really a
         // vid_restart is better, but this is just for my testing)
         //
-        for _name in &vstrFonts {
-            //TODO: Port RE_RegisterFont
-            // Source: oracle/codemp/renderer/tr_font.cpp:1699,1702
-            todo!("Port RE_RegisterFont — oracle/codemp/renderer/tr_font.cpp:1699,1702");
+        for (iFont, name) in vstrFonts.iter().enumerate() {
+            let iNewFontHandle = RE_RegisterFont(
+                qs,
+                frame_state,
+                assets,
+                view,
+                cvars,
+                sim,
+                models,
+                img_state,
+                gpu,
+                sky_view,
+                sky,
+                font,
+                eLanguage,
+                iSE_Language_ModificationCount,
+                name,
+            );
+            debug_assert_eq!(iNewFontHandle, iFont as i32 + 1);
         }
         com_printf(view.common, "Done.\n");
     } else {
@@ -1979,15 +2447,48 @@ fn ColorIndex(c: u8) -> i32 {
 /// PORT-NOTE: `GetLanguageEnum()` is unported (file-head DEFERRED, `:31-53`);
 /// threaded in as `eLanguage`, same as every other caller in this file.
 ///
+/// PORT-NOTE: the `qs`..`sky` prefix is [`GetFont`]'s carrier list (DEC-42.3)
+/// — `GetFont` reaches `RE_RegisterShaderNoMip` through the SBCS-override and
+/// Asian-glyph paths.
+///
 /// Source: `oracle/codemp/renderer/tr_font.cpp:1321-1374`
+#[allow(clippy::too_many_arguments)]
 pub fn RE_Font_StrLenPixels(
+    qs: &mut QSharedScratch,
+    frame_state: &mut FrameState,
+    assets: &mut RenderAssets,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
     font: &mut FontState,
     eLanguage: Language_e,
+    iSE_Language_ModificationCount: i32,
     psText: &[u8],
     iFontHandle: i32,
     fScale: f32,
 ) -> i32 {
-    let iFont = match GetFont(font, eLanguage, iFontHandle) {
+    let iFont = match GetFont(
+        qs,
+        frame_state,
+        assets,
+        view,
+        cvars,
+        sim,
+        models,
+        img_state,
+        gpu,
+        sky_view,
+        sky,
+        font,
+        eLanguage,
+        iSE_Language_ModificationCount,
+        iFontHandle,
+    ) {
         Some(i) => i,
         None => return 0,
     };
@@ -2099,14 +2600,45 @@ pub fn RE_Font_StrLenChars(font: &FontState, eLanguage: Language_e, psText: &[u8
 /// PORT-NOTE: `GetLanguageEnum()` is unported (file-head DEFERRED, `:31-53`);
 /// threaded in as `eLanguage`.
 ///
+/// PORT-NOTE: the `qs`..`sky` prefix is [`GetFont`]'s carrier list (DEC-42.3).
+///
 /// Source: `oracle/codemp/renderer/tr_font.cpp:1415-1426`
+#[allow(clippy::too_many_arguments)]
 pub fn RE_Font_HeightPixels(
+    qs: &mut QSharedScratch,
+    frame_state: &mut FrameState,
+    assets: &mut RenderAssets,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
     font: &mut FontState,
     eLanguage: Language_e,
+    iSE_Language_ModificationCount: i32,
     iFontHandle: i32,
     fScale: f32,
 ) -> i32 {
-    let iFont = match GetFont(font, eLanguage, iFontHandle) {
+    let iFont = match GetFont(
+        qs,
+        frame_state,
+        assets,
+        view,
+        cvars,
+        sim,
+        models,
+        img_state,
+        gpu,
+        sky_view,
+        sky,
+        font,
+        eLanguage,
+        iSE_Language_ModificationCount,
+        iFontHandle,
+    ) {
         Some(i) => i,
         None => return 0,
     };
@@ -2450,14 +2982,30 @@ fn RE_Font_DrawString_body(
 /// this entry forwards the parameter unchanged rather than fabricating a
 /// color here.
 ///
+/// PORT-NOTE: the `qs`..`sky` prefix is [`GetFont`]'s carrier list (DEC-42.3);
+/// `common` is no longer a separate parameter because `view.common` is the
+/// same `Common` (two `&mut` borrows of it could not coexist). `frame` stays
+/// the `FrameData` draw-command buffer, distinct from the carrier list's
+/// `frame_state`.
+///
 /// Source: `oracle/codemp/renderer/tr_font.cpp:1430-1614`
 #[allow(clippy::too_many_arguments)]
 pub fn RE_Font_DrawString(
+    qs: &mut QSharedScratch,
+    frame_state: &mut FrameState,
+    assets: &mut RenderAssets,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
     font: &mut FontState,
     eLanguage: Language_e,
+    iSE_Language_ModificationCount: i32,
     frame: &mut FrameData,
-    assets: &RenderAssets,
-    common: &mut Common,
     ox: i32,
     oy: i32,
     psText: &[u8],
@@ -2473,7 +3021,23 @@ pub fn RE_Font_DrawString(
         }
     }
 
-    let iFont = match GetFont(font, eLanguage, iFontHandle) {
+    let iFont = match GetFont(
+        qs,
+        frame_state,
+        assets,
+        view,
+        cvars,
+        sim,
+        models,
+        img_state,
+        gpu,
+        sky_view,
+        sky,
+        font,
+        eLanguage,
+        iSE_Language_ModificationCount,
+        iFontHandle,
+    ) {
         Some(i) => i,
         None => return,
     };
@@ -2487,8 +3051,8 @@ pub fn RE_Font_DrawString(
         font,
         eLanguage,
         frame,
-        assets,
-        common,
+        &*assets,
+        view.common,
         ox,
         oy,
         psText,

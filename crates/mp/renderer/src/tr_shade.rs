@@ -465,12 +465,9 @@ pub fn RB_EndSurface(_gpu: &mut GpuResources) {
 /// State ownership` row `tess`, no R3 carrier ever — including the loop
 /// bound, so no `TCGEN_*`/`TMOD_*` case is even reachable without it); the
 /// error-path read `tess.shader->name` is the same dissolved receiver.
-/// `pStage->bundle[b]` (`tcGen`/`tcGenVectors`/`numTexMods`/`texMods`) needs
-/// per-bundle fields `ShaderStage` doesn't carry — only `image`/`state_bits`/
-/// `active` are real (`render_state::shader_stage`'s own doc comment: "The
-/// remaining `shaderStage_t` fields (`bundle[1]`, ... `index`,
-/// `lightmapStyle`, `isDetail`) have no reader yet"; `bundle[0]`'s own
-/// `tcGen`/`tcGenVectors`/`texMods` aren't among the landed fields either).
+/// `pStage->bundle[b]` (`tcGen`/`tcGenVectors`/`numTexMods`/`texMods`) is no
+/// longer a field gap — `ShaderStage::bundle` landed complete with the
+/// R4a-prep wave — but has nothing to write into while `tess` is dissolved.
 /// The `TMOD_ENTITY_TRANSLATE` leg additionally needs
 /// `backEnd.currentEntity->e.shaderTexCoord`, a `RefEntity` field no prior
 /// wave landed (`render_state::placeholders::RefEntity`'s doc comment: real
@@ -507,17 +504,13 @@ pub fn ComputeTexCoords(_stage: &ShaderStage) {
 /// `RF_DISINTEGRATE2`/`RF_VOLUMETRIC` special-case short-circuit ahead of
 /// both switches and a fog-fade adjustment (`adjustColorsForFog`) after.
 ///
-/// DEFERRED: R4 — whole-body deferral, both switches' *dispatch keys* are
-/// unavailable, not just their arms: `pStage->rgbGen`/`alphaGen`/
-/// `constantColor`/`rgbWave`/`alphaWave`/`adjustColorsForFog`/
-/// `lightmapStyle`/`index` are exactly the `shaderStage_t` fields
-/// `ShaderStage` (`render_state/shader_stage.rs`'s own doc comment) lists as
-/// having "no reader yet" — this fn is oracle's one real reader of all of
-/// them, but the wave contract restricts this packet to `tr_shade.rs` only
-/// (same restriction `R_BindAnimatedImage`'s doc comment above cites for
-/// `skin_num`), so they cannot be added here. Every write target and most
-/// read sources are the dissolved `tess` (R2 `## State ownership` row
-/// `tess`, no R3 carrier ever): `tess.svars.colors` (the sole output
+/// DEFERRED: R4 — whole-body deferral. Both switches' dispatch keys
+/// (`pStage->rgbGen`/`alphaGen`/`constantColor`/`rgbWave`/`alphaWave`/
+/// `adjustColorsForFog`/`lightmapStyle`/`index`) are real fields now — the
+/// R4a-prep wave completed `ShaderStage` against `shaderStage_t` — but every
+/// write target and most read sources are the dissolved `tess` (R2 `## State
+/// ownership` row `tess`, no R3 carrier ever): `tess.svars.colors` (the sole
+/// output
 /// buffer), `tess.numVertexes` (every loop bound, including the disintegrate/
 /// volumetric short-circuit's), `tess.vertexColors`, `tess.xyz`,
 /// `tess.vertexAlphas`, `tess.fogNum`, `tess.shader` (both the
@@ -583,12 +576,12 @@ pub fn ComputeColors(
 /// numUnfoggedPasses`, the `for` loop's own bound, has no value to iterate
 /// even though `ShaderAsset::num_unfogged_passes` itself has landed, because
 /// there is no way to reach a `ShaderAsset` through the unavailable `input`.
-/// `tess.xstages[stage]` (`pStage`) is the same dissolved receiver, and even
-/// were it reachable, `ShaderStage` (`render_state::shader_stage`'s own doc
-/// comment) lists only `image`/`state_bits`/`active` as landed — `ss`/
-/// `mGLFogColorOverride`/`glow`/`bundle[0].isLightmap`/`bundle[0]
-/// .vertexLightmap`/`bundle[1].isLightmap`/`bundle[1].image` all have no
-/// reader yet. `tr.world->fogs`/`globalFog`/`numfogs` need a
+/// `tess.xstages[stage]` (`pStage`) is the same dissolved receiver; the
+/// fields it would read (`ss`/`mGLFogColorOverride`/`glow`/
+/// `bundle[0].isLightmap`/`bundle[0].vertexLightmap`/`bundle[1].isLightmap`/
+/// `bundle[1].image`) are all real since the R4a-prep wave completed
+/// `ShaderStage`, but remain unreachable through it. `tr.world->fogs`/
+/// `globalFog`/`numfogs` need a
 /// `WorldAsset::fogs` field not landed by any prior wave (`RB_FogPass`'s doc
 /// comment above: only `name`/`shaders`/`bmodels`/`planes`/`nodes`/
 /// `mark_surfaces`/light-grid/`vis`/`novis`/entity-string are real).

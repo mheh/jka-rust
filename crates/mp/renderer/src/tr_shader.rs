@@ -8,6 +8,7 @@
 // transcription, matching the rest of the renderer/engine crates.
 #![allow(non_snake_case)]
 
+use core::array;
 use core::f64::consts::PI;
 use core::mem;
 
@@ -47,10 +48,21 @@ use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::{ShaderAsset, ShaderHandle};
+use crate::render_state::shader_stage::ShaderStage;
+use crate::render_state::texture_bundle::TextureBundle;
 use crate::tr_image::{R_FindImageFile, TrImageState};
+use crate::tr_local::acff_t::acff_t;
+use crate::tr_local::alpha_gen_t::alphaGen_t;
+use crate::tr_local::color_gen_t::colorGen_t;
+use crate::tr_local::eglfog_override::EGLFogOverride;
+use crate::tr_local::gen_func_t::genFunc_t;
 use crate::tr_local::shader_sort_t::shaderSort_t;
+use crate::tr_local::surface_sprite_s::surfaceSprite_t;
+use crate::tr_local::tex_coord_gen_t::texCoordGen_t;
+use crate::tr_local::tex_mod_info_t::texModInfo_t;
 use crate::tr_local::tex_mod_t::texMod_t;
 use crate::tr_local::view_parms_t::viewParms_t;
+use crate::tr_local::wave_form_t::waveForm_t;
 use crate::tr_model::render_models::RenderModels;
 use crate::tr_sky::{R_InitSkyTexCoords, SkyState};
 
@@ -499,18 +511,452 @@ pub struct ShaderStageParse {
     /// "determine sort order and fog color adjustment" block.
     pub adjust_colors_for_fog: AdjustColorsForFog,
     /// `constantColor[4]` — added by wave 5 (`ParseStage`'s `rgbGen const`/
-    /// `alphaGen const`). Field declaration is on `shaderStage_t`
-    /// (`oracle/codemp/renderer/tr_local.h`, exact line outside this
-    /// packet's slice — not guessed, per porting-rules §A2); the write
-    /// sites this wave transcribes are `oracle/codemp/renderer/
+    /// `alphaGen const`); write sites `oracle/codemp/renderer/
     /// tr_shader.cpp:1605-1607,1688`.
-    pub constant_color: [u8; 4],
-    /// `glow` — added by wave 5 (`ParseStage`'s `glow` keyword). Raven-added
-    /// JKA field (not itself in the `shaderStage_t` line range this file's
-    /// other fields cite), read only by the DEFERRED-R4 glow backend.
     ///
-    /// Source: `oracle/codemp/renderer/tr_shader.cpp:1813-1819`
+    /// Source: `oracle/codemp/renderer/tr_local.h:415`
+    pub constant_color: [u8; 4],
+    /// `glow` — added by wave 5 (`ParseStage`'s `glow` keyword,
+    /// `oracle/codemp/renderer/tr_shader.cpp:1813-1819`).
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:426`
     pub glow: bool,
+}
+
+// ---------------------------------------------------------------------------
+// Parse-scratch <-> registered stage conversions.
+//
+// The oracle's `newShader->stages[i] = stages[i]`
+// (`oracle/codemp/renderer/tr_shader.cpp:2789`) and
+// `R_CopyStage(work->stages, stages + idx)` (`:4017`) are plain
+// `shaderStage_t` struct assignments in both directions. This port splits
+// that one C type in two — the parse-scratch `ShaderStageParse` (file-local
+// `Clone`/`Copy` enum copies, so `ShaderParseState` can derive `Clone`) and
+// the registered `ShaderStage` (tier-2 `tr_local` enums) — so each assignment
+// becomes the field-for-field `From` impls below. They carry no behavior of
+// their own: every arm is the identity mapping between two transcriptions of
+// the same Raven enumerator list.
+// ---------------------------------------------------------------------------
+
+/// `ColorGen` -> `colorGen_t` (`oracle/codemp/renderer/tr_local.h:242-257`).
+impl From<ColorGen> for colorGen_t {
+    fn from(v: ColorGen) -> colorGen_t {
+        match v {
+            ColorGen::Bad => colorGen_t::CGEN_BAD,
+            ColorGen::IdentityLighting => colorGen_t::CGEN_IDENTITY_LIGHTING,
+            ColorGen::Identity => colorGen_t::CGEN_IDENTITY,
+            ColorGen::Entity => colorGen_t::CGEN_ENTITY,
+            ColorGen::OneMinusEntity => colorGen_t::CGEN_ONE_MINUS_ENTITY,
+            ColorGen::ExactVertex => colorGen_t::CGEN_EXACT_VERTEX,
+            ColorGen::Vertex => colorGen_t::CGEN_VERTEX,
+            ColorGen::OneMinusVertex => colorGen_t::CGEN_ONE_MINUS_VERTEX,
+            ColorGen::Waveform => colorGen_t::CGEN_WAVEFORM,
+            ColorGen::LightingDiffuse => colorGen_t::CGEN_LIGHTING_DIFFUSE,
+            ColorGen::LightingDiffuseEntity => colorGen_t::CGEN_LIGHTING_DIFFUSE_ENTITY,
+            ColorGen::Fog => colorGen_t::CGEN_FOG,
+            ColorGen::Const => colorGen_t::CGEN_CONST,
+            ColorGen::LightmapStyle => colorGen_t::CGEN_LIGHTMAPSTYLE,
+        }
+    }
+}
+
+/// `colorGen_t` -> `ColorGen` (`oracle/codemp/renderer/tr_local.h:242-257`).
+impl From<colorGen_t> for ColorGen {
+    fn from(v: colorGen_t) -> ColorGen {
+        match v {
+            colorGen_t::CGEN_BAD => ColorGen::Bad,
+            colorGen_t::CGEN_IDENTITY_LIGHTING => ColorGen::IdentityLighting,
+            colorGen_t::CGEN_IDENTITY => ColorGen::Identity,
+            colorGen_t::CGEN_ENTITY => ColorGen::Entity,
+            colorGen_t::CGEN_ONE_MINUS_ENTITY => ColorGen::OneMinusEntity,
+            colorGen_t::CGEN_EXACT_VERTEX => ColorGen::ExactVertex,
+            colorGen_t::CGEN_VERTEX => ColorGen::Vertex,
+            colorGen_t::CGEN_ONE_MINUS_VERTEX => ColorGen::OneMinusVertex,
+            colorGen_t::CGEN_WAVEFORM => ColorGen::Waveform,
+            colorGen_t::CGEN_LIGHTING_DIFFUSE => ColorGen::LightingDiffuse,
+            colorGen_t::CGEN_LIGHTING_DIFFUSE_ENTITY => ColorGen::LightingDiffuseEntity,
+            colorGen_t::CGEN_FOG => ColorGen::Fog,
+            colorGen_t::CGEN_CONST => ColorGen::Const,
+            colorGen_t::CGEN_LIGHTMAPSTYLE => ColorGen::LightmapStyle,
+        }
+    }
+}
+
+/// `AlphaGen` -> `alphaGen_t` (`oracle/codemp/renderer/tr_local.h:226-240`).
+impl From<AlphaGen> for alphaGen_t {
+    fn from(v: AlphaGen) -> alphaGen_t {
+        match v {
+            AlphaGen::Identity => alphaGen_t::AGEN_IDENTITY,
+            AlphaGen::Skip => alphaGen_t::AGEN_SKIP,
+            AlphaGen::Entity => alphaGen_t::AGEN_ENTITY,
+            AlphaGen::OneMinusEntity => alphaGen_t::AGEN_ONE_MINUS_ENTITY,
+            AlphaGen::Vertex => alphaGen_t::AGEN_VERTEX,
+            AlphaGen::OneMinusVertex => alphaGen_t::AGEN_ONE_MINUS_VERTEX,
+            AlphaGen::LightingSpecular => alphaGen_t::AGEN_LIGHTING_SPECULAR,
+            AlphaGen::Waveform => alphaGen_t::AGEN_WAVEFORM,
+            AlphaGen::Portal => alphaGen_t::AGEN_PORTAL,
+            AlphaGen::Blend => alphaGen_t::AGEN_BLEND,
+            AlphaGen::Const => alphaGen_t::AGEN_CONST,
+            AlphaGen::Dot => alphaGen_t::AGEN_DOT,
+            AlphaGen::OneMinusDot => alphaGen_t::AGEN_ONE_MINUS_DOT,
+        }
+    }
+}
+
+/// `alphaGen_t` -> `AlphaGen` (`oracle/codemp/renderer/tr_local.h:226-240`).
+impl From<alphaGen_t> for AlphaGen {
+    fn from(v: alphaGen_t) -> AlphaGen {
+        match v {
+            alphaGen_t::AGEN_IDENTITY => AlphaGen::Identity,
+            alphaGen_t::AGEN_SKIP => AlphaGen::Skip,
+            alphaGen_t::AGEN_ENTITY => AlphaGen::Entity,
+            alphaGen_t::AGEN_ONE_MINUS_ENTITY => AlphaGen::OneMinusEntity,
+            alphaGen_t::AGEN_VERTEX => AlphaGen::Vertex,
+            alphaGen_t::AGEN_ONE_MINUS_VERTEX => AlphaGen::OneMinusVertex,
+            alphaGen_t::AGEN_LIGHTING_SPECULAR => AlphaGen::LightingSpecular,
+            alphaGen_t::AGEN_WAVEFORM => AlphaGen::Waveform,
+            alphaGen_t::AGEN_PORTAL => AlphaGen::Portal,
+            alphaGen_t::AGEN_BLEND => AlphaGen::Blend,
+            alphaGen_t::AGEN_CONST => AlphaGen::Const,
+            alphaGen_t::AGEN_DOT => AlphaGen::Dot,
+            alphaGen_t::AGEN_ONE_MINUS_DOT => AlphaGen::OneMinusDot,
+        }
+    }
+}
+
+/// `GenFunc` -> `genFunc_t` (`oracle/codemp/renderer/tr_local.h:192-204`).
+impl From<GenFunc> for genFunc_t {
+    fn from(v: GenFunc) -> genFunc_t {
+        match v {
+            GenFunc::None => genFunc_t::GF_NONE,
+            GenFunc::Sin => genFunc_t::GF_SIN,
+            GenFunc::Square => genFunc_t::GF_SQUARE,
+            GenFunc::Triangle => genFunc_t::GF_TRIANGLE,
+            GenFunc::Sawtooth => genFunc_t::GF_SAWTOOTH,
+            GenFunc::InverseSawtooth => genFunc_t::GF_INVERSE_SAWTOOTH,
+            GenFunc::Noise => genFunc_t::GF_NOISE,
+            GenFunc::Rand => genFunc_t::GF_RAND,
+        }
+    }
+}
+
+/// `genFunc_t` -> `GenFunc` (`oracle/codemp/renderer/tr_local.h:192-204`).
+impl From<genFunc_t> for GenFunc {
+    fn from(v: genFunc_t) -> GenFunc {
+        match v {
+            genFunc_t::GF_NONE => GenFunc::None,
+            genFunc_t::GF_SIN => GenFunc::Sin,
+            genFunc_t::GF_SQUARE => GenFunc::Square,
+            genFunc_t::GF_TRIANGLE => GenFunc::Triangle,
+            genFunc_t::GF_SAWTOOTH => GenFunc::Sawtooth,
+            genFunc_t::GF_INVERSE_SAWTOOTH => GenFunc::InverseSawtooth,
+            genFunc_t::GF_NOISE => GenFunc::Noise,
+            genFunc_t::GF_RAND => GenFunc::Rand,
+        }
+    }
+}
+
+/// `TexCoordGen` -> `texCoordGen_t` (`oracle/codemp/renderer/tr_local.h:259-270`).
+impl From<TexCoordGen> for texCoordGen_t {
+    fn from(v: TexCoordGen) -> texCoordGen_t {
+        match v {
+            TexCoordGen::Bad => texCoordGen_t::TCGEN_BAD,
+            TexCoordGen::Identity => texCoordGen_t::TCGEN_IDENTITY,
+            TexCoordGen::Lightmap => texCoordGen_t::TCGEN_LIGHTMAP,
+            TexCoordGen::Lightmap1 => texCoordGen_t::TCGEN_LIGHTMAP1,
+            TexCoordGen::Lightmap2 => texCoordGen_t::TCGEN_LIGHTMAP2,
+            TexCoordGen::Lightmap3 => texCoordGen_t::TCGEN_LIGHTMAP3,
+            TexCoordGen::Texture => texCoordGen_t::TCGEN_TEXTURE,
+            TexCoordGen::EnvironmentMapped => texCoordGen_t::TCGEN_ENVIRONMENT_MAPPED,
+            TexCoordGen::Fog => texCoordGen_t::TCGEN_FOG,
+            TexCoordGen::Vector => texCoordGen_t::TCGEN_VECTOR,
+        }
+    }
+}
+
+/// `texCoordGen_t` -> `TexCoordGen` (`oracle/codemp/renderer/tr_local.h:259-270`).
+impl From<texCoordGen_t> for TexCoordGen {
+    fn from(v: texCoordGen_t) -> TexCoordGen {
+        match v {
+            texCoordGen_t::TCGEN_BAD => TexCoordGen::Bad,
+            texCoordGen_t::TCGEN_IDENTITY => TexCoordGen::Identity,
+            texCoordGen_t::TCGEN_LIGHTMAP => TexCoordGen::Lightmap,
+            texCoordGen_t::TCGEN_LIGHTMAP1 => TexCoordGen::Lightmap1,
+            texCoordGen_t::TCGEN_LIGHTMAP2 => TexCoordGen::Lightmap2,
+            texCoordGen_t::TCGEN_LIGHTMAP3 => TexCoordGen::Lightmap3,
+            texCoordGen_t::TCGEN_TEXTURE => TexCoordGen::Texture,
+            texCoordGen_t::TCGEN_ENVIRONMENT_MAPPED => TexCoordGen::EnvironmentMapped,
+            texCoordGen_t::TCGEN_FOG => TexCoordGen::Fog,
+            texCoordGen_t::TCGEN_VECTOR => TexCoordGen::Vector,
+        }
+    }
+}
+
+/// `AdjustColorsForFog` -> `acff_t` (`oracle/codemp/renderer/tr_local.h:272-277`).
+impl From<AdjustColorsForFog> for acff_t {
+    fn from(v: AdjustColorsForFog) -> acff_t {
+        match v {
+            AdjustColorsForFog::None => acff_t::ACFF_NONE,
+            AdjustColorsForFog::ModulateRgb => acff_t::ACFF_MODULATE_RGB,
+            AdjustColorsForFog::ModulateRgba => acff_t::ACFF_MODULATE_RGBA,
+            AdjustColorsForFog::ModulateAlpha => acff_t::ACFF_MODULATE_ALPHA,
+        }
+    }
+}
+
+/// `acff_t` -> `AdjustColorsForFog` (`oracle/codemp/renderer/tr_local.h:272-277`).
+impl From<acff_t> for AdjustColorsForFog {
+    fn from(v: acff_t) -> AdjustColorsForFog {
+        match v {
+            acff_t::ACFF_NONE => AdjustColorsForFog::None,
+            acff_t::ACFF_MODULATE_RGB => AdjustColorsForFog::ModulateRgb,
+            acff_t::ACFF_MODULATE_RGBA => AdjustColorsForFog::ModulateRgba,
+            acff_t::ACFF_MODULATE_ALPHA => AdjustColorsForFog::ModulateAlpha,
+        }
+    }
+}
+
+/// `FogColorOverride` -> `EGLFogOverride` (`oracle/codemp/renderer/tr_local.h:279-285`).
+impl From<FogColorOverride> for EGLFogOverride {
+    fn from(v: FogColorOverride) -> EGLFogOverride {
+        match v {
+            FogColorOverride::None => EGLFogOverride::GLFOGOVERRIDE_NONE,
+            FogColorOverride::Black => EGLFogOverride::GLFOGOVERRIDE_BLACK,
+            FogColorOverride::White => EGLFogOverride::GLFOGOVERRIDE_WHITE,
+            FogColorOverride::Max => EGLFogOverride::GLFOGOVERRIDE_MAX,
+        }
+    }
+}
+
+/// `EGLFogOverride` -> `FogColorOverride` (`oracle/codemp/renderer/tr_local.h:279-285`).
+impl From<EGLFogOverride> for FogColorOverride {
+    fn from(v: EGLFogOverride) -> FogColorOverride {
+        match v {
+            EGLFogOverride::GLFOGOVERRIDE_NONE => FogColorOverride::None,
+            EGLFogOverride::GLFOGOVERRIDE_BLACK => FogColorOverride::Black,
+            EGLFogOverride::GLFOGOVERRIDE_WHITE => FogColorOverride::White,
+            EGLFogOverride::GLFOGOVERRIDE_MAX => FogColorOverride::Max,
+        }
+    }
+}
+
+/// `WaveForm` -> `waveForm_t` (`oracle/codemp/renderer/tr_local.h:287-294`).
+impl From<WaveForm> for waveForm_t {
+    fn from(v: WaveForm) -> waveForm_t {
+        waveForm_t {
+            func: v.func.into(),
+            base: v.base,
+            amplitude: v.amplitude,
+            phase: v.phase,
+            frequency: v.frequency,
+        }
+    }
+}
+
+/// `waveForm_t` -> `WaveForm` (`oracle/codemp/renderer/tr_local.h:287-294`).
+impl From<waveForm_t> for WaveForm {
+    fn from(v: waveForm_t) -> WaveForm {
+        WaveForm {
+            func: v.func.into(),
+            base: v.base,
+            amplitude: v.amplitude,
+            phase: v.phase,
+            frequency: v.frequency,
+        }
+    }
+}
+
+/// `TexModInfo` -> `texModInfo_t` (`oracle/codemp/renderer/tr_local.h:323-348`).
+///
+/// The parse mirror keeps `kind` as a plain `i32` tag; every writer in this
+/// file stores a `texMod_t::TMOD_* as i32`, so the `_` arm below is
+/// unreachable and folds to Raven's own zero enumerator.
+impl From<TexModInfo> for texModInfo_t {
+    fn from(v: TexModInfo) -> texModInfo_t {
+        let r#type = match v.kind {
+            x if x == texMod_t::TMOD_TRANSFORM as i32 => texMod_t::TMOD_TRANSFORM,
+            x if x == texMod_t::TMOD_TURBULENT as i32 => texMod_t::TMOD_TURBULENT,
+            x if x == texMod_t::TMOD_SCROLL as i32 => texMod_t::TMOD_SCROLL,
+            x if x == texMod_t::TMOD_SCALE as i32 => texMod_t::TMOD_SCALE,
+            x if x == texMod_t::TMOD_STRETCH as i32 => texMod_t::TMOD_STRETCH,
+            x if x == texMod_t::TMOD_ROTATE as i32 => texMod_t::TMOD_ROTATE,
+            x if x == texMod_t::TMOD_ENTITY_TRANSLATE as i32 => texMod_t::TMOD_ENTITY_TRANSLATE,
+            _ => texMod_t::TMOD_NONE,
+        };
+        texModInfo_t {
+            r#type,
+            wave: v.wave.into(),
+            matrix: v.matrix,
+            translate: v.translate,
+        }
+    }
+}
+
+/// `texModInfo_t` -> `TexModInfo` (`oracle/codemp/renderer/tr_local.h:323-348`).
+impl From<texModInfo_t> for TexModInfo {
+    fn from(v: texModInfo_t) -> TexModInfo {
+        TexModInfo {
+            kind: v.r#type as i32,
+            wave: v.wave.into(),
+            matrix: v.matrix,
+            translate: v.translate,
+        }
+    }
+}
+
+/// `SurfaceSpriteParse` -> `surfaceSprite_t` (`oracle/codemp/renderer/tr_local.h:363-370`).
+impl From<&SurfaceSpriteParse> for surfaceSprite_t {
+    fn from(v: &SurfaceSpriteParse) -> surfaceSprite_t {
+        surfaceSprite_t {
+            surfaceSpriteType: v.surface_sprite_type,
+            width: v.width,
+            height: v.height,
+            density: v.density,
+            wind: v.wind,
+            windIdle: v.wind_idle,
+            fadeDist: v.fade_dist,
+            fadeMax: v.fade_max,
+            fadeScale: v.fade_scale,
+            fxAlphaStart: v.fx_alpha_start,
+            fxAlphaEnd: v.fx_alpha_end,
+            fxDuration: v.fx_duration,
+            vertSkew: v.vert_skew,
+            variance: v.variance,
+            fxGrow: v.fx_grow,
+            facing: v.facing,
+        }
+    }
+}
+
+/// `surfaceSprite_t` -> `SurfaceSpriteParse` (`oracle/codemp/renderer/tr_local.h:363-370`).
+impl From<&surfaceSprite_t> for SurfaceSpriteParse {
+    fn from(v: &surfaceSprite_t) -> SurfaceSpriteParse {
+        SurfaceSpriteParse {
+            surface_sprite_type: v.surfaceSpriteType,
+            width: v.width,
+            height: v.height,
+            density: v.density,
+            wind: v.wind,
+            wind_idle: v.windIdle,
+            fade_dist: v.fadeDist,
+            fade_max: v.fadeMax,
+            fade_scale: v.fadeScale,
+            fx_alpha_start: v.fxAlphaStart,
+            fx_alpha_end: v.fxAlphaEnd,
+            fx_duration: v.fxDuration,
+            vert_skew: v.vertSkew,
+            variance: v.variance,
+            fx_grow: v.fxGrow,
+            facing: v.facing,
+        }
+    }
+}
+
+/// `TextureBundleParse` -> `TextureBundle` (`oracle/codemp/renderer/tr_local.h:372-389`).
+///
+/// The `tex_mods` collect IS `GeneratePermanentShader`'s per-bundle
+/// `Hunk_Alloc` + `Com_Memcpy` of the `numTexMods` block (§C9); the oracle's
+/// `else { texMods = 0; }` leg is the empty-`Vec` case, needing no separate
+/// arm.
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:2791-2802`
+impl From<&TextureBundleParse> for TextureBundle {
+    fn from(v: &TextureBundleParse) -> TextureBundle {
+        TextureBundle {
+            image: v.image,
+            tc_gen: v.tc_gen.into(),
+            tc_gen_vectors: v.tc_gen_vectors,
+            tex_mods: v.tex_mods.iter().map(|m| (*m).into()).collect(),
+            num_image_animations: v.num_image_animations,
+            image_animation_speed: v.image_animation_speed,
+            is_lightmap: v.is_lightmap,
+            one_shot_anim_map: v.one_shot_anim_map,
+            vertex_lightmap: v.vertex_lightmap,
+            is_video_map: v.is_video_map,
+            video_map_handle: v.video_map_handle,
+            image_animations: v.image_animations.clone(),
+        }
+    }
+}
+
+/// `TextureBundle` -> `TextureBundleParse` (`oracle/codemp/renderer/tr_local.h:372-389`).
+impl From<&TextureBundle> for TextureBundleParse {
+    fn from(v: &TextureBundle) -> TextureBundleParse {
+        TextureBundleParse {
+            image: v.image,
+            tc_gen: v.tc_gen.into(),
+            tc_gen_vectors: v.tc_gen_vectors,
+            tex_mods: v.tex_mods.iter().map(|m| (*m).into()).collect(),
+            num_image_animations: v.num_image_animations,
+            image_animation_speed: v.image_animation_speed,
+            is_lightmap: v.is_lightmap,
+            one_shot_anim_map: v.one_shot_anim_map,
+            vertex_lightmap: v.vertex_lightmap,
+            is_video_map: v.is_video_map,
+            video_map_handle: v.video_map_handle,
+            image_animations: v.image_animations.clone(),
+        }
+    }
+}
+
+/// `ShaderStageParse` -> `ShaderStage` — the field-for-field form of the
+/// oracle's `newShader->stages[i] = stages[i]`.
+///
+/// Source: `oracle/codemp/renderer/tr_local.h:394-427`
+/// (assignment site `oracle/codemp/renderer/tr_shader.cpp:2789-2802`)
+impl From<&ShaderStageParse> for ShaderStage {
+    fn from(v: &ShaderStageParse) -> ShaderStage {
+        ShaderStage {
+            active: v.active,
+            is_detail: v.is_detail,
+            index: v.index,
+            lightmap_style: v.lightmap_style,
+            bundle: array::from_fn(|b| TextureBundle::from(&v.bundle[b])),
+            rgb_wave: v.rgb_wave.into(),
+            rgb_gen: v.rgb_gen.into(),
+            alpha_wave: v.alpha_wave.into(),
+            alpha_gen: v.alpha_gen.into(),
+            constant_color: v.constant_color,
+            state_bits: v.state_bits,
+            adjust_colors_for_fog: v.adjust_colors_for_fog.into(),
+            gl_fog_color_override: v.gl_fog_color_override.into(),
+            ss: v
+                .ss
+                .as_ref()
+                .map(|s| Box::new(surfaceSprite_t::from(s.as_ref()))),
+            glow: v.glow,
+        }
+    }
+}
+
+/// `ShaderStage` -> `ShaderStageParse` — the field-for-field form of
+/// `R_CopyStage`'s registered-to-scratch direction (`work->stages` into
+/// `stages + idx`).
+///
+/// Source: `oracle/codemp/renderer/tr_local.h:394-427`
+/// (assignment site `oracle/codemp/renderer/tr_shader.cpp:4017`)
+impl From<&ShaderStage> for ShaderStageParse {
+    fn from(v: &ShaderStage) -> ShaderStageParse {
+        ShaderStageParse {
+            active: v.active,
+            state_bits: v.state_bits,
+            rgb_gen: v.rgb_gen.into(),
+            rgb_wave: v.rgb_wave.into(),
+            alpha_gen: v.alpha_gen.into(),
+            alpha_wave: v.alpha_wave.into(),
+            bundle: array::from_fn(|b| TextureBundleParse::from(&v.bundle[b])),
+            gl_fog_color_override: v.gl_fog_color_override.into(),
+            ss: v
+                .ss
+                .as_ref()
+                .map(|s| Box::new(SurfaceSpriteParse::from(s.as_ref()))),
+            is_detail: v.is_detail,
+            index: v.index,
+            lightmap_style: v.lightmap_style,
+            adjust_colors_for_fog: v.adjust_colors_for_fog.into(),
+            constant_color: v.constant_color,
+            glow: v.glow,
+        }
+    }
 }
 
 /// Raven `cullType_t`, reproduced locally — same rationale as `ColorGen`/
@@ -2735,11 +3181,19 @@ pub fn ParseTexMod(
 
 /// Raven `GeneratePermanentShader`.
 ///
-/// DEFERRED: the per-stage copy loop (`:2782-2803`, `newShader->stages[i] =
-/// stages[i]` plus its per-bundle `texMods` copy) needs a full
-/// `ShaderStageParse` -> `ShaderStage` per-field transcription (not this
-/// wave's scope — `ShaderAsset::stages` itself is real, landed field-empty
-/// below); the `fogPass` assignment (`:2768-2772`) needs
+/// The per-stage copy loop (`:2782-2803`) is transcribed below: the
+/// `Hunk_Alloc` sizing (`:2782-2783`) and the per-bundle `texMods`
+/// `Hunk_Alloc`+`Com_Memcpy`/`= 0` split (`:2791-2802`) both dissolve into
+/// the owned `Vec`s the `From` impls build (§C9), and the loop's `break` on
+/// the first inactive stage is kept, so a registered shader's `stages` may be
+/// shorter than its `num_unfogged_passes`.
+///
+/// Order: the Rust shape fills `stages` before `assets.shaders.insert(...)`,
+/// where the oracle writes through the already-`Hunk_Alloc`'d `newShader`
+/// after registering it. Unobservable — nothing between the two reads the
+/// registry, and `SortNewShader` (which does) still runs after both.
+///
+/// DEFERRED: the `fogPass` assignment (`:2768-2772`) needs
 /// `ShaderAsset::fog_pass`, which doesn't exist yet (`shader_asset.rs`'s own
 /// doc comment: lands "with the later tr_shader waves that read
 /// them"). Every other field of the whole-struct copy (`:2766`), the arena
@@ -2754,6 +3208,26 @@ pub fn GeneratePermanentShader(
     common: &mut Common,
     state: &ShaderParseState,
 ) -> ShaderHandle {
+    // size = newShader->numUnfoggedPasses ? ... : sizeof( stages[0] );
+    // newShader->stages = Hunk_Alloc( size, h_low );
+    // for ( i = 0 ; i < newShader->numUnfoggedPasses ; i++ ) {
+    //     if ( !stages[i].active ) break;
+    //     newShader->stages[i] = stages[i];
+    //     for ( b = 0 ; b < NUM_TEXTURE_BUNDLES ; b++ ) { ...texMods... }
+    // }
+    // The `Hunk_Alloc` sizing has no owned-`Vec` counterpart, and the inner
+    // per-bundle `texMods` copy is `TextureBundle`'s own `tex_mods` collect.
+    let mut stages: Vec<ShaderStage> = Vec::new();
+    for i in 0..state.num_unfogged_passes.max(0) as usize {
+        let Some(src) = state.stages.get(i) else {
+            break;
+        };
+        if !src.active {
+            break;
+        }
+        stages.push(ShaderStage::from(src));
+    }
+
     // *newShader = shader; — whole-struct copy of every field `ShaderAsset`
     // currently declares (interior-safety law: no `..Default::default()`
     // masking payload).
@@ -2771,11 +3245,8 @@ pub fn GeneratePermanentShader(
         num_unfogged_passes: state.num_unfogged_passes,
         sky: state.sky.clone(),
         fog_parms: state.fog_parms,
-        // `stages[i] = ...` per-stage copy loop below is still DEFERRED
-        // (needs the `ShaderStageParse` -> `ShaderStage` per-field copy, not
-        // this wave's scope) — an empty `Vec` is the faithful stand-in for
-        // the oracle's not-yet-populated `newShader->stages`.
-        stages: Vec::new(),
+        // `newShader->stages` — filled by the per-stage copy loop above.
+        stages,
         // `shader.timeOffset`/`shader.remappedShader` are never written by
         // the parser — the file-scope `shader` scratch is memset before
         // `ParseShader`, and only `R_RemapShader` ever writes them, on the
@@ -2806,10 +3277,6 @@ pub fn GeneratePermanentShader(
         return new_shader_handle;
     }
 
-    // size = ...; newShader->stages = Hunk_Alloc(...); for (...) { ... }
-    // DEFERRED: the per-stage copy loop — see fn doc above (`ShaderAsset::stages`
-    // itself is real, populated empty above; the loop body is out of scope).
-
     SortNewShader(assets, new_shader_handle);
 
     // const int hash = generateHashValue(newShader->name, FILE_HASH_SIZE);
@@ -2830,26 +3297,48 @@ pub fn GeneratePermanentShader(
 
 /// Raven `R_CreateBlendedStage`.
 ///
+/// `R_CopyStage(work->stages, stages + idx)` crosses the parse/registered
+/// split this port introduced, so the whole-struct copy goes through
+/// `ShaderStageParse::from(&ShaderStage)` (declared at this file's scope)
+/// before the already-ported `R_CopyStage` performs the assignment.
+///
+/// `work->stages[0]` on a shader whose stage list came out short (the
+/// `GeneratePermanentShader` loop `break`s on the first inactive stage) reads
+/// the zeroed tail of the `Hunk_Alloc`'d block in the oracle — `Hunk_Alloc`
+/// zeroes — which is exactly `ShaderStageParse::default()`, every scratch
+/// enum's `Default` being its own zero enumerator.
+///
 /// Source: `oracle/codemp/renderer/tr_shader.cpp:4012-4026`
 pub fn R_CreateBlendedStage(
-    _assets: &RenderAssets,
-    _common: &mut Common,
-    _state: &mut ShaderParseState,
-    _handle: i32,
-    _idx: usize,
+    assets: &RenderAssets,
+    common: &mut Common,
+    state: &mut ShaderParseState,
+    handle: i32,
+    idx: usize,
 ) {
-    //TODO: Port R_CreateBlendedStage
-    // Source: oracle/codemp/renderer/tr_shader.cpp:4012-4026
-    // `ShaderAsset::stages` is now real, but `work->stages[0]` (the
-    // registered shader's first pass, the payload `R_CopyStage` copies into
-    // `stages[idx]`) has no live payload yet: `GeneratePermanentShader`'s
-    // per-stage copy loop that would populate a registered shader's `stages`
-    // is still deferred (see that fn's doc comment). `ShaderStage` now does
-    // carry `rgb_gen`/`alpha_gen`/`ss` (campaign #41 batch 1), so the
-    // stage-copy loop is the only remaining blocker.
-    todo!(
-        "Port R_CreateBlendedStage — oracle/codemp/renderer/tr_shader.cpp:4012-4026 (blocked on GeneratePermanentShader's stage-copy loop)"
-    )
+    // work = R_GetShaderByHandle(handle);
+    let work = R_GetShaderByHandle(assets, common, handle);
+
+    // R_CopyStage(work->stages, stages + idx);
+    let orig = assets
+        .shaders
+        .get(work)
+        .and_then(|s| s.stages.first())
+        .map(ShaderStageParse::from)
+        .unwrap_or_default();
+    R_CopyStage(&orig, &mut state.stages[idx]);
+
+    // stages[idx].rgbGen = CGEN_EXACT_VERTEX;
+    state.stages[idx].rgb_gen = ColorGen::ExactVertex;
+    // stages[idx].alphaGen = AGEN_BLEND;
+    state.stages[idx].alpha_gen = AlphaGen::Blend;
+    // stages[idx].stateBits = GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE | GLS_DEPTHMASK_TRUE;
+    state.stages[idx].state_bits =
+        (GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE | GLS_DEPTHMASK_TRUE) as u32;
+
+    if let Some(ss) = state.stages[idx].ss.as_mut() {
+        ss.density *= 0.33;
+    }
 }
 
 /// Raven `ParseDeform`.
@@ -5326,32 +5815,24 @@ pub fn R_RemapShader(
 
 /// Raven `R_MergeShaders` — wave 9.
 ///
-/// DEFERRED, whole-fn loud stub. The `lightmapsVertex`/`stylesDefault`
-/// `memcpy` sources (`:4039-4040`) are now real (landed as file-scope consts
-/// above); the blocker that stands is the stage shape:
-/// - `R_CopyStage(work->stages, stages)` (`:4046`) — `work` is the
-///   *registered* shader `R_GetShaderByHandle(c)` returns, whose
-///   `ShaderAsset::stages: Vec<ShaderStage>` (`render_state/shader_stage.rs`)
-///   carries only `image`/`state_bits`/`active`; the already-ported
-///   `R_CopyStage(orig: &ShaderStageParse, stage: &mut ShaderStageParse)`
-///   (this file) needs the parse-scratch `ShaderStageParse` shape on both
-///   sides. This is the exact type gap `R_CreateBlendedStage`'s own
-///   already-landed loud stub names (`GeneratePermanentShader`'s per-stage
-///   copy loop, the thing that would populate a registered shader's
-///   `stages` with `rgbGen`/`alphaGen`/`ss`, is itself unported) — this fn
-///   calls that same blocked `R_CreateBlendedStage` twice more
-///   (`:4053-4054`). The `work->stages[i].ss` reads (`:4062,4074,4086`) are
-///   no longer a field gap (`ShaderStage::ss`, campaign #41 batch 1); they
-///   are blocked only by that empty `stages` payload.
+/// DEFERRED, whole-fn loud stub — but no longer stage-shape-blocked. The
+/// `lightmapsVertex`/`stylesDefault` `memcpy` sources (`:4039-4040`) are real
+/// file-scope consts above; `ShaderStage` is complete and
+/// `GeneratePermanentShader` now populates a registered shader's `stages`, so
+/// `R_CopyStage(work->stages, stages)` (`:4046`), the `work->stages[i].ss`
+/// reads (`:4062,4074,4086`) and the two further `R_CreateBlendedStage` calls
+/// (`:4053-4054`, itself ported) all have live payloads.
 ///
-/// Two further calls in this body are omitted rather than gap-blocked, and
-/// are recorded here so the finishing wave restores them:
+/// What stands is this fn's own body, which was never transcribed: the
+/// `shader`/`stages` file-scope scratch reset the oracle performs inline
+/// before each `RE_RegisterShaderLightMap` pass, the `current`/`i` pass
+/// bookkeeping, and:
 /// - `R_SyncRenderThread();` (`:4034`) — no renderer-thread sync exists in
-///   this single-threaded port (threading is out of scope for this repo).
+///   this single-threaded port (threading is out of scope for this repo), so
+///   it is dropped rather than transcribed.
 /// - `shader.multitextureEnv = work->multitextureEnv;` (`:4050`, Raven's
-///   "jic") — a plain `ShaderParseState`/`ShaderAsset` field copy, but it
-///   sits inside the `R_CopyStage` block above and cannot be landed on its
-///   own without the surrounding pass-0 setup.
+///   "jic") — a plain `ShaderParseState`/`ShaderAsset` field copy that lands
+///   with the surrounding pass-0 setup.
 ///
 /// Source: `oracle/codemp/renderer/tr_shader.cpp:4028-4098`
 #[allow(clippy::too_many_arguments)]
@@ -5375,13 +5856,11 @@ pub fn R_MergeShaders(
         common,
         cvars,
     );
-    // DEFERRED: `ShaderAsset::stages`'s registered `ShaderStage` shape (no
-    // `rgbGen`/`alphaGen`/`ss`) can't feed the already-ported `R_CopyStage`
-    // or the `work->stages[i].ss` reads; `R_SyncRenderThread()` (`:4034`) and
-    // the `shader.multitextureEnv` copy (`:4050`) are likewise unlanded — see
-    // doc comment above.
+    // DEFERRED: body not transcribed — the multi-pass `shader`/`stages`
+    // scratch reset and pass bookkeeping; `R_SyncRenderThread()` (`:4034`)
+    // is dropped outright. See doc comment above.
     todo!(
-        "Port R_MergeShaders — oracle/codemp/renderer/tr_shader.cpp:4028-4098 (ShaderAsset::stages registered shape lacks rgbGen/alphaGen/ss for R_CopyStage/surfaceSprites; R_SyncRenderThread + multitextureEnv copy omitted)"
+        "Port R_MergeShaders — oracle/codemp/renderer/tr_shader.cpp:4028-4098 (multi-pass shader/stages scratch reset + pass bookkeeping not transcribed; R_SyncRenderThread dropped)"
     );
 }
 
