@@ -37,7 +37,8 @@ use crate::tr_backend::{GL_Bind, GL_State, GL_TexEnv, RB_SetGL2D, RB_ShowImages}
 use crate::tr_cmds::{r_init_command_buffers, r_shutdown_command_buffers, R_SyncRenderThread};
 use crate::tr_font::{FontState, R_InitFonts, R_ShutdownFonts};
 use crate::tr_image::{
-    GL_TextureMode, R_DeleteTextures, R_FindImageFile, R_InitFogTable, R_InitImages, TrImageState,
+    GL_TextureMode, R_DeleteTextures, R_FindImageFile, R_InitFogTable, R_InitImages, R_InitSkins,
+    TrImageState,
 };
 use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_model::render_models::RenderModels;
@@ -926,17 +927,25 @@ pub fn R_Register(view: &mut EngineHostView, cvars: &mut RendererCvars) {
     //
     // Blocker: `CmdFunction = fn(&mut EngineHostView)`
     // (`crates/mp/engine/qcommon/src/cmd/cmd_function_t.rs:12`) carries no
-    // renderer state, and every one of the seven ported handlers needs some
-    // (`R_ImageList_f`/`R_ShaderList_f`/`R_ScreenShot_f`/`R_ScreenShotTGA_f`:
-    // `&RenderAssets`; `GfxInfo_f`: `&RendererCvars` + `&RenderAssets`;
-    // `RE_RegisterImages_Info_f`: `&RenderAssets` + `&RenderModels`;
-    // `R_WorldEffect_f`: `&mut WorldEffectsState` + five more). The remaining
-    // two, `R_SkinList_f` and `R_AtiHackToggle_f`, are not ported anywhere in
-    // this crate at all (this file's own `R_AtiHackToggle_f` DEFERRED note
-    // above; `tr_image.rs`'s `R_SkinList_f` ESCALATION). This is the same
-    // missing renderer-state-carrying adapter the `R_ModeList_f` marker below
-    // already records; registering them needs that adapter, which no packet
-    // has licensed.
+    // renderer state, and every one of the eight ported handlers needs some
+    // (`R_ImageList_f`/`R_ShaderList_f`/`R_SkinList_f`/`R_ScreenShot_f`/
+    // `R_ScreenShotTGA_f`: `&RenderAssets`; `GfxInfo_f`: `&RendererCvars` +
+    // `&RenderAssets`; `RE_RegisterImages_Info_f`: `&RenderAssets` +
+    // `&RenderModels`; `R_WorldEffect_f`: `&mut WorldEffectsState` + five
+    // more). This is the same missing renderer-state-carrying adapter the
+    // `R_ModeList_f` marker below already records.
+    //
+    // (i) The ninth handler, `R_AtiHackToggle_f`, is R4-deferred: its only
+    // state is the GL-upload flag `g_bTextureRectangleHack`
+    // (oracle/codemp/renderer/tr_init.cpp:974-977), read by the R4 upload
+    // path and carried by no R2/R3 struct, so there is nothing for a ported
+    // handler to toggle yet.
+    //
+    // (ii) The registration wiring itself is blocked on the client boot seam
+    // owning a renderer instance reachable from `EngineHostView` (#46): every
+    // handler above takes the DEC-42.3 client bundle (`&mut EngineHostView`
+    // plus the renderer state), and nothing hands a `Cmd_AddCommand` callback
+    // that state today.
 
     //TODO: Port R_Modellist_f
     // Source: oracle/codemp/renderer/tr_init.cpp:1199
@@ -1507,13 +1516,18 @@ const MAX_POLYVERTS: i32 = 3000;
 ///   `CreateInternalShaders`' `Arena::reset` (DEC-42.1: every pre-reset
 ///   handle stales, the `<default>` shader is re-created at index 0), so a
 ///   pre-clear here would be redundant.
-/// - `skins` (`:1409-1410`), `models` (`:1396-1397`) — not rebuilt by any
-///   later statement in this fn: `RenderModels::init_skins`/`model_init`
-///   reset that struct's own `Vec` fields, never `RenderAssets::{skins,
-///   models}`. Both arenas are still producer-less in this crate — see the
-///   `//TODO: Port R_Init registry reset` marker in the rebuild region below.
+/// - `skins` (`:1409-1410`) — rebuilt by `R_InitSkins` below, which hands the
+///   arena purge to `Arena::reset` (DEC-42.1: every pre-reset handle stales,
+///   the `"<default skin>"` entry is re-created at index 0), so a pre-clear
+///   here would be redundant.
+/// - `models` (`:1396-1397`) — not rebuilt by any later statement in this fn:
+///   `RenderModels::model_init` resets that struct's own `Vec` field, never
+///   `RenderAssets::models`, and the arena is still producer-less in this
+///   crate — see the `//TODO: Port R_Init registry reset (models)` marker in
+///   the rebuild region below.
 /// - `skin_lookup`/`model_lookup` — plain name->handle maps with no reserved
-///   -slot semantics and no later re-establishment; zeroed here.
+///   -slot semantics; zeroed here (`R_InitSkins` clears `skin_lookup` again
+///   as the map half of its own purge).
 /// - `images`/`image_names` (`AllocatedImages`, a separate `tr_image.cpp`
 ///   global, not a `trGlobals_t` field), `shader_text`/
 ///   `shader_text_hash_table`/`defer_load`'s own storage (`s_shaderText`/
@@ -1611,21 +1625,23 @@ pub fn R_Init(
     // `CreateInternalShaders`' `Arena::reset` below (DEC-42.1), so it is not
     // touched here.
 
-    //TODO: Port R_Init registry reset
+    // `RenderAssets::skins` is purged by `R_InitSkins`' `Arena::reset` below
+    // (DEC-42.1), so it is not touched here either.
+
+    //TODO: Port R_Init registry reset (models)
     // Source: oracle/codemp/renderer/tr_init.cpp:1232
-    // (`oracle/codemp/renderer/tr_local.h:1396-1397,1409-1410` for the
-    // `models`/`skins` fields that memset zeroes)
-    // `RenderAssets::{skins, models}` still have no producer anywhere in this
-    // crate — the landed skin/model registries are `RenderModels`' own `Vec`s
-    // (`tr_model/server_skins.rs`, `tr_model/render_models.rs`), and nothing
-    // inserts into either arena. `Arena::reset(slot0)` (DEC-42.1) needs the
-    // registry's slot-0 default entry, which only the client-side registration
-    // code that populates these arenas can build (`"<default skin>"`,
-    // `R_InitSkins`, `oracle/codemp/renderer/tr_image.cpp:3324-3332`;
-    // `MOD_BAD`, `R_ModelInit`, `oracle/codemp/renderer/
+    // (`oracle/codemp/renderer/tr_local.h:1396-1397` for the `models` field
+    // that memset zeroes)
+    // `RenderAssets::models` still has no producer anywhere in this crate —
+    // the landed model registry is `RenderModels`' own `Vec`
+    // (`tr_model/render_models.rs`), and nothing inserts into the arena.
+    // `Arena::reset(slot0)` (DEC-42.1) needs the registry's slot-0 default
+    // entry (`MOD_BAD`, `R_ModelInit`, `oracle/codemp/renderer/
     // tr_model.cpp:1665-1680`); inventing one here would fabricate a live
-    // default for a registry that has no entries at all. Wires up with those
-    // registration paths, not before (porting-rules §A2).
+    // default for a registry that has no entries at all. The tier-2 pass that
+    // migrates `RenderModels`' tier-2 `models` Vec into the `ModelAsset` arena
+    // (#41) is that producer — this wires up with it, not before
+    // (porting-rules §A2).
 
     // Com_Memset(&backEnd, 0, sizeof(backEnd)) — full rebuild; see doc
     // comment above (nothing else in this fn writes into `frame`).
@@ -1733,6 +1749,10 @@ pub fn R_Init(
     R_InitShaders(
         false, qs, frame, assets, view, cvars, sim, &*models, state, gpu, sky_view, sky,
     );
+    // R_InitSkins(): the client registry (`RenderAssets::skins`) and, for the
+    // dedicated link set's own `RenderModels.skins` pool, its twin — one
+    // oracle fn per registry (`tr_image.rs`'s skin PORT-NOTE).
+    R_InitSkins(assets);
     models.init_skins();
 
     // DEFERRED: `R_TerrainInit()` — its already-ported signature needs

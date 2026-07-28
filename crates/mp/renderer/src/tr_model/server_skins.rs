@@ -8,13 +8,16 @@
 //! Server skins exist so ghoul2 server-side surface state works: a `.skin`
 //! file's `"*off"` shader rows mark surfaces off
 //! (`G2_SetSurfaceOnOffFromSkin`, `G2_surfaces.cpp:201-226`), which affects
-//! server collision. On this slice `gServerSkinHack` (`tr_image.cpp:2967`) is
-//! const-true: `RE_RegisterServerSkin`'s `com_cl_running` fast-path and
-//! `RE_RegisterIndividualSkin`'s `R_FindShader` arm both need the §20-dropped
-//! client shader table (`tr_shader.cpp`), so the `R_FindServerShader` arm is
-//! the only live shader resolver — flattened to [`find_server_shader`]'s name
-//! pool, since the name is the sole shader field the dedicated path reads
-//! (`G2_surfaces.cpp:212`).
+//! server collision. Within this module `gServerSkinHack`
+//! (`tr_image.cpp:2967`) is const-true: the `R_FindServerShader` arm is its
+//! only shader resolver — flattened to [`find_server_shader`]'s name pool,
+//! since the name is the sole shader field the dedicated path reads
+//! (`G2_surfaces.cpp:212`). The `gServerSkinHack == false` arms —
+//! `RE_RegisterIndividualSkin`'s `R_FindShader` leg and
+//! `RE_RegisterServerSkin`'s `com_cl_running` fast path — are the CLIENT
+//! renderer's, ported against `RenderAssets::skins` in `tr_image.rs` (DEC-40);
+//! the one seam still open between them is
+//! `RenderModels::register_server_skin`'s marked fast path.
 //!
 //! Source: `oracle/codemp/renderer/tr_image.cpp:2956-3346`
 //!
@@ -35,7 +38,7 @@ use super::server_skin_surface::ServerSkinSurface;
 /// (`sizeof(skin->surfaces) / sizeof(skin->surfaces[0])`).
 ///
 /// Source: `oracle/codemp/renderer/tr_local.h:612`
-const MAX_SKIN_SURFACES: usize = 128;
+pub(crate) const MAX_SKIN_SURFACES: usize = 128;
 
 /// The seeded name of pool slot 0 — Raven `tr.defaultShader`. On the oracle
 /// DEDICATED build `tr.defaultShader` is never created (`CreateInternalShaders`
@@ -72,17 +75,33 @@ impl RenderModels {
     }
 
     /// Raven `RE_RegisterServerSkin` — "Mangled version of the above function
-    /// to load .skin files on the server." The `com_cl_running &&
-    /// Com_TheHunkMarkHasBeenMade() && ShaderHashTableExists()` fast-path
-    /// re-enters `RE_RegisterSkin` against the client shader table —
-    /// §20-dropped here, so the `gServerSkinHack = true` arm is the only live
-    /// one (both arms record the same shader NAME, the sole field the
-    /// dedicated consumer reads, so the `"*off"` sentinel is arm-invariant).
+    /// to load .skin files on the server." Its `com_cl_running &&
+    /// com_cl_running->integer && Com_TheHunkMarkHasBeenMade() &&
+    /// ShaderHashTableExists()` test is a RUNTIME switch (DEC-40 rule 2): with
+    /// a client running it re-enters the CLIENT `RE_RegisterSkin`
+    /// (`tr_image.rs`) against the client shader table; otherwise it takes the
+    /// `gServerSkinHack = true` arm below, which is this fn's only live path
+    /// on the dedicated build.
     ///
     /// Source: `oracle/codemp/renderer/tr_image.cpp:3301-3318`
     pub fn register_server_skin(&mut self, host: &mut impl EngineHost, name: &str) -> qhandle_t {
+        //TODO: Port RE_RegisterServerSkin client fast path
+        // Source: oracle/codemp/renderer/tr_image.cpp:3304-3310
+        // The `com_cl_running` arm returns the CLIENT `RE_RegisterSkin`
+        // (`crates/mp/renderer/src/tr_image.rs`), which needs the `qs`/`frame`/
+        // `assets`/`view`/`cvars`/`sim`/`models`/`img_state`/`gpu`/`sky_view`/
+        // `sky` bundle every client renderer fn takes (DEC-42.3). This fn
+        // receives only `&mut self` (a `RenderModels`, which `models: &Render
+        // Models` would alias) and `&mut impl EngineHost`, reaching neither
+        // `RenderAssets` nor `EngineHostView`; `EngineHost` also exposes no
+        // `Com_TheHunkMarkHasBeenMade`/`ShaderHashTableExists`. Restructuring
+        // this signature is out of scope — the dedicated path it serves is
+        // byte-gated by the lockstep referee. Wires up with the client boot
+        // seam that owns a renderer instance reachable from `EngineHostView`
+        // (#46).
+
         // gServerSkinHack = true; r = RE_RegisterSkin(name); gServerSkinHack
-        // = false — const-true on this slice (module doc-comment).
+        // = false — the dedicated arm, const-true here (module doc-comment).
         self.register_skin(host, name)
     }
 
@@ -313,7 +332,9 @@ impl RenderModels {
 /// UB; owned `String`s keep the full text, §19.)
 ///
 /// Source: `oracle/codemp/renderer/tr_image.cpp:2980-3024`
-fn re_split_skins(name: &str) -> Option<(String, String, String)> {
+// `pub(crate)`: one oracle body, shared by both skin arms — `tr_image.rs`'s
+// client arm calls this rather than forking a second copy (DEC-32).
+pub(crate) fn re_split_skins(name: &str) -> Option<(String, String, String)> {
     // INname = "models/players/jedi_tf/|head01_skin1|torso01|lower01";
     let p = name.find('|')?;
     // fill in the base path
@@ -347,7 +368,9 @@ fn re_split_skins(name: &str) -> Option<(String, String, String)> {
 /// (Raven's `len = 0`), exactly as the oracle's final length check does.
 ///
 /// Source: `oracle/codemp/renderer/tr_image.cpp:3193-3292`
-fn comma_parse(data: &[u8], pos: &mut usize) -> Vec<u8> {
+// `pub(crate)`: one oracle body, shared by both skin arms — `tr_image.rs`'s
+// client arm calls this rather than forking a second copy (DEC-32).
+pub(crate) fn comma_parse(data: &[u8], pos: &mut usize) -> Vec<u8> {
     let at = |i: usize| -> u8 {
         if i < data.len() {
             data[i]

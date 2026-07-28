@@ -15,10 +15,11 @@ use mp_engine_qcommon::common::error::com_error;
 use mp_engine_qcommon::common_fns::Com_DPrintf;
 use mp_engine_qcommon::cvar_fns::Cvar_Set;
 use mp_engine_qcommon::files_common::{FS_FCloseFile, FS_FOpenFileRead, FS_Read, FS_ReadFileVec};
+use mp_qshared::shared::com_parse::QSharedScratch;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::q_color::{S_COLOR_RED, S_COLOR_YELLOW};
 use mp_qshared::shared::q_string::COM_StripExtension;
-use mp_qshared::shared::{fileHandle_t, MAX_QPATH};
+use mp_qshared::shared::{fileHandle_t, qhandle_t, MAX_QPATH};
 use native_math::qmath::Com_Clamp;
 use native_string::q_string::Q_stricmp;
 
@@ -35,8 +36,21 @@ use crate::render_state::placeholders::GlConfig;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
+use crate::render_state::shader_asset::ShaderHandle;
+use crate::render_state::skin_asset::{SkinAsset, SkinHandle, SkinSurface};
+use crate::tr_cmds::R_SyncRenderThread;
 use crate::tr_local::tr_globals_t::FOG_TABLE_SIZE;
+use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_model::render_models::RenderModels;
+// `CommaParse`/`RE_SplitSkins`/`skin->surfaces[128]`'s cap are ONE oracle body
+// each, shared by this file's client skin arm and the dedicated-server arm;
+// they live in `tr_model/server_skins.rs` because that arm landed first, and
+// are reused from here rather than forked into a second copy (DEC-32, one
+// canonical home). Relocating them to this file — their oracle home — is left
+// to the pass that may restructure `server_skins.rs`.
+use crate::tr_model::server_skins::{comma_parse, re_split_skins, MAX_SKIN_SURFACES};
+use crate::tr_shader::{lightmapsNone, stylesDefault, R_FindShader};
+use crate::tr_sky::SkyState;
 
 // PORT-NOTE: several functions below read/write fields on two root types
 // this crate owns elsewhere (`render_state::placeholders::{GlConfig,
@@ -890,29 +904,18 @@ pub fn R_SetColorMappings(
     }
 }
 
-// PORT-NOTE: `RE_SplitSkins`/`CommaParse`/`R_InitSkins`/`R_GetSkinByHandle`
-// (oracle/codemp/renderer/tr_image.cpp:2980-3027, 3193-3290, 3324-3335,
-// 3342-3347) are already ported — `crates/mp/renderer/src/tr_model/
-// server_skins.rs`'s `re_split_skins`/`comma_parse`/
-// `RenderModels::init_skins`/`RenderModels::skin_surfaces`, under the live
-// `RenderModels.skins: Vec<ServerSkin>` skin registry (user ruling
-// 2026-07-12 "server skins name-pool", amending the FROZEN `tr-model.md`).
-// Reconciled, not re-transcribed here (preamble: "Never re-port an
-// already-ported fn … reconcile, never fork a second port").
-
-// ESCALATION: `R_SkinList_f` (oracle/codemp/renderer/tr_image.cpp:3355-3371)
-// walks `tr.skins[0..tr.numSkins]` — this packet's STATE HOMES table routes
-// that to `RenderAssets::skins: Arena<SkinAsset>` (the "SPLIT" row), but per
-// the PORT-NOTE above the skin registry's LIVE implementation is
-// `RenderModels.skins: Vec<ServerSkin>` (`tr_model/server_skins.rs`).
-// Writing `R_SkinList_f` against `RenderAssets::skins` would fork a second,
-// dead skin registry contradicting the live one; `RenderModels` has no
-// public enumerate-all accessor today (only the per-handle
-// `skin_surfaces`). Flagged as a wave-planning defect (this packet's STATE
-// HOMES row is stale relative to the 2026-07-12 ruling) rather than invented
-// around — porting-rules §A2/preamble: "A state home this packet marks
-// UNMAPPED is an ESCALATION, never an invention."
-// Source: oracle/codemp/renderer/tr_image.cpp:3355-3371
+// PORT-NOTE: `RE_SplitSkins`/`CommaParse` (oracle/codemp/renderer/
+// tr_image.cpp:2980-3027, 3193-3290) are pure parsers shared by both skin
+// arms, ported once as `re_split_skins`/`comma_parse` in
+// `crates/mp/renderer/src/tr_model/server_skins.rs` (the dedicated arm landed
+// first) and imported from there by this file's client arm — see the file-top
+// import note. `R_InitSkins`/`R_GetSkinByHandle` (`:3324-3335`, `:3342-3347`)
+// are per-registry, so each registry has its own: the client's
+// [`R_InitSkins`] below drives `RenderAssets::skins`, and
+// `RenderModels::init_skins`/`skin_surfaces` drive the dedicated
+// `RenderModels.skins: Vec<ServerSkin>` registry (user ruling 2026-07-12
+// "server skins name-pool", amending the FROZEN `tr-model.md`). The client
+// `R_GetSkinByHandle` has no consumer in this crate yet and is not ported.
 
 // ============================================================================
 // wave 1
@@ -2526,132 +2529,348 @@ pub fn R_InitImages(
 // wave 8
 // ============================================================================
 
-//TODO: Port RE_RegisterIndividualSkin client arm
-// Source: oracle/codemp/renderer/tr_image.cpp:3091-3097
-// The `R_FindShader( name, lightmapsNone, stylesDefault, qtrue )` arm — the
-// `else` leg of the `gServerSkinHack` test — is live on the client
-// (R3 client-leg ruling: the R3 renderer track is the CLIENT port; the
-// jampDed disposition below is scoped to the dedicated-server link set).
-// The reconciled body (`RenderModels::register_individual_skin`) only ever
-// takes the `R_FindServerShader` arm, because `server_skins.rs` treats
-// `gServerSkinHack` as const-true. The wave-8 note below records that
-// reconciliation and stays accurate for the server link set.
-//
-// PORT-NOTE (wave 8): `RE_RegisterIndividualSkin`
-// (oracle/codemp/renderer/tr_image.cpp:3030-3111) is already ported —
-// `RenderModels::register_individual_skin`
-// (`crates/mp/renderer/src/tr_model/server_skins.rs:165-241`), under the
-// live `RenderModels.skins: Vec<ServerSkin>` skin registry (user ruling
-// 2026-07-12 "server skins name-pool", amending the FROZEN `tr-model.md` —
-// the same registry the wave-1 PORT-NOTE above already reconciled
-// `RE_SplitSkins`/`CommaParse`/`R_InitSkins`/`R_GetSkinByHandle` against).
-// Reconciled, not re-transcribed here (preamble: "Never re-port an
-// already-ported fn … reconcile, never fork a second port").
-//
-// This packet's STATE HOMES table SPLIT-routes the fn's `tr` read to
-// `RenderAssets::skins: Arena<SkinAsset>` and its RESOLVED CALL SURFACE
-// names `R_FindServerShader`/`R_FindShader` (tr_shader.cpp waves 3/7) as
-// callees — both stale relative to the same 2026-07-12 ruling the file's
-// existing `R_SkinList_f` ESCALATION above already flags for this same skin
-// subsystem: the live implementation resolves shader names through its own
-// flattened `RenderModels::find_server_shader` pool instead (pool entries
-// carry only the shader name, the sole field the dedicated
-// `G2_SetSurfaceOnOffFromSkin` consumer ever reads — that file's own
-// module/fn doc comments). Writing a second `RE_RegisterIndividualSkin`
-// against `RenderAssets::skins`/`R_FindShader` would fork a dead second skin
-// registry contradicting the live one; flagged as the same wave-planning
-// defect (this packet's tables are stale) rather than invented around
-// (preamble: "A state home this packet marks UNMAPPED is an ESCALATION,
-// never an invention").
-// Source: oracle/codemp/renderer/tr_image.cpp:3030-3111
+/// Raven `RE_RegisterIndividualSkin` — "given a name, go get the skin we want
+/// and return": load and parse one `.skin` file, appending each
+/// `surface,shader` row onto `RenderAssets::skins[h_skin]` (an append, since
+/// [`RE_RegisterSkin`]'s three-part form calls this thrice on one skin).
+/// Surface names are `MAX_QPATH`-truncated and lowercased; `tag_` rows and
+/// redundant `_off`/`*off` doubles are skipped; a skin left with zero surfaces
+/// reads as the default skin (`SkinHandle::slot_zero()` — Raven's `0`, A12).
+///
+/// This is the CLIENT arm (DEC-40): `gServerSkinHack` is false on the client
+/// leg, so shaders resolve through `R_FindShader` (`:3097`). The
+/// `R_FindServerShader` arm (`:3093`) is the dedicated twin, live in
+/// `RenderModels::register_individual_skin` (`tr_model/server_skins.rs`) —
+/// two arms of one oracle fn, one Rust fn each; the shared `CommaParse` body
+/// is imported from there rather than forked (file-top import note).
+///
+/// The `#ifndef FINAL_BUILD` load-failure warning is live (`FINAL_BUILD`
+/// undefined, porting-rules precedent); `assert(tr.skins[hSkin])` is
+/// debug-only — a handle the arena cannot resolve returns the default skin
+/// rather than dereferencing NULL (§19).
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:3030-3111
+#[allow(clippy::too_many_arguments)]
+pub fn RE_RegisterIndividualSkin(
+    qs: &mut QSharedScratch,
+    frame: &mut FrameState,
+    assets: &mut RenderAssets,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
+    name: &str,
+    h_skin: SkinHandle,
+) -> SkinHandle {
+    // load and parse the skin file
+    let Some(text) = FS_ReadFileVec(view, name) else {
+        com_printf(
+            view.common,
+            &format!("WARNING: RE_RegisterSkin( '{name}' ) failed to load!\n"),
+        );
+        return SkinHandle::slot_zero();
+    };
+
+    // assert (tr.skins[hSkin]); — should already be setup, but might be an
+    // 3part append.
+    if assets.skins.get(h_skin).is_none() {
+        return SkinHandle::slot_zero();
+    }
+
+    let mut pos = 0usize;
+    while pos < text.len() && text[pos] != 0 {
+        // get surface name
+        let token = comma_parse(&text, &mut pos);
+        // Q_strncpyz( surfName, token, sizeof( surfName ) )
+        let mut surf_name: Vec<u8> = token.iter().copied().take(MAX_QPATH - 1).collect();
+
+        if token.is_empty() {
+            break;
+        }
+        // lowercase the surface name so skin compares are faster
+        surf_name.make_ascii_lowercase();
+
+        if pos < text.len() && text[pos] == b',' {
+            pos += 1;
+        }
+
+        // these aren't in there, but just in case you load an id style one...
+        if token.starts_with(b"tag_") {
+            continue;
+        }
+
+        // parse the shader name
+        let token = comma_parse(&text, &mut pos);
+
+        // Raven indexes `&surfName[strlen(surfName)-4]` unchecked — a
+        // <4-byte name underruns the buffer (UB); guarded to len >= 4 (§19).
+        if surf_name.len() >= 4 && surf_name.ends_with(b"_off") {
+            if token == b"*off" {
+                continue; // don't need these double offs
+            }
+            let stripped_len = surf_name.len() - 4;
+            surf_name.truncate(stripped_len); // remove the "_off"
+        }
+
+        let num_surfaces = assets
+            .skins
+            .get(h_skin)
+            .expect("checked above; nothing below vacates the skin arena")
+            .surfaces
+            .len();
+        if num_surfaces >= MAX_SKIN_SURFACES {
+            com_printf(
+                view.common,
+                &format!(
+                    "WARNING: RE_RegisterSkin( '{name}' ) more than {MAX_SKIN_SURFACES} surfaces!\n"
+                ),
+            );
+            break;
+        }
+
+        let shader = R_FindShader(
+            &String::from_utf8_lossy(&token),
+            &lightmapsNone,
+            &stylesDefault,
+            true,
+            qs,
+            frame,
+            assets,
+            view,
+            cvars,
+            sim,
+            models,
+            img_state,
+            gpu,
+            sky_view,
+            sky,
+        );
+        assets
+            .skins
+            .get_mut(h_skin)
+            .expect("checked above; nothing below vacates the skin arena")
+            .surfaces
+            .push(SkinSurface {
+                name: String::from_utf8_lossy(&surf_name).into_owned(),
+                shader,
+            });
+    }
+
+    // FS_FreeFile( text ) — `FS_ReadFileVec` already released the engine
+    // buffer; `text`'s own drop ends the owned copy.
+
+    // never let a skin have 0 shaders
+    if assets
+        .skins
+        .get(h_skin)
+        .is_none_or(|skin| skin.surfaces.is_empty())
+    {
+        return SkinHandle::slot_zero(); // use default skin
+    }
+
+    h_skin
+}
 
 // ============================================================================
 // wave 9
 // ============================================================================
 
-//TODO: Port RE_RegisterSkin client arm
-// Source: oracle/codemp/renderer/tr_image.cpp:3113-3181 (`R_SyncRenderThread`
-// at :3150)
-// Two things the reconciled body (`RenderModels::register_skin`) drops as
-// dedicated-only are live on the client (R3 client-leg ruling: the R3
-// renderer track is the CLIENT port; the jampDed disposition below is scoped
-// to the dedicated-server link set): the `R_SyncRenderThread()` call at
-// :3150 (ported, `tr_cmds.rs`), and the `RenderAssets::skins`/`R_FindShader`
-// -backed registry the wave-9 note below declines to fork a second port
-// against. The note stays accurate for the server link set.
-//
-// PORT-NOTE (wave 9): `RE_RegisterSkin`
-// (oracle/codemp/renderer/tr_image.cpp:3113-3181) is already ported —
-// `RenderModels::register_skin` (private, `crates/mp/renderer/src/tr_model/
-// server_skins.rs:97-152`), under the live `RenderModels.skins:
-// Vec<ServerSkin>` skin registry (user ruling 2026-07-12 "server skins
-// name-pool"), the same registry the wave-1 and wave-8 PORT-NOTEs above
-// already reconciled `RE_SplitSkins`/`CommaParse`/`R_InitSkins`/
-// `R_GetSkinByHandle`/`RE_RegisterIndividualSkin` against. Reconciled, not
-// re-transcribed here (preamble: "Never re-port an already-ported fn …
-// reconcile, never fork a second port").
-//
-// This packet's STATE HOMES table SPLIT-routes the fn's `tr` write to
-// `RenderAssets::skins`/`RenderWorld::frame: FrameState` and its RESOLVED
-// CALL SURFACE names `RE_RegisterIndividualSkin`, `RE_SplitSkins`,
-// `R_SyncRenderThread` (wave 8/0/8) as in-module callees — all three are
-// stale relative to the same 2026-07-12 ruling the file's existing
-// `R_SkinList_f` ESCALATION and wave-8 PORT-NOTE already flag for this same
-// skin subsystem: `register_skin`'s live body calls
-// `RenderModels::register_individual_skin` and the file-private
-// `re_split_skins` instead, and documents `R_SyncRenderThread` as "client
-// render-thread sync, dead on the dedicated slice (§C10)" rather than a
-// callee with nowhere to land. Writing a second `RE_RegisterSkin` against
-// `RenderAssets::skins` would fork a dead second skin registry contradicting
-// the live one; flagged as the same wave-planning defect (this packet's
-// tables are stale) rather than invented around (preamble: "A state home
-// this packet marks UNMAPPED is an ESCALATION, never an invention").
-// Source: oracle/codemp/renderer/tr_image.cpp:3113-3181
+/// Raven `RE_RegisterSkin` — the client `.skin` registration entry point:
+/// dedup an already-registered skin by case-insensitive name (a known
+/// zero-surface skin reads as the default skin `0`), allocate the arena entry,
+/// then parse either the three-part `|`-macro form (`RE_SplitSkins`) or the
+/// single `.skin` file into it through [`RE_RegisterIndividualSkin`]. A
+/// parse-failed skin stays in the arena with zero surfaces, exactly as Raven
+/// leaves the `Hunk_Alloc`'d entry behind. (MP has no `@`-prefixed skin form —
+/// the `|` three-part split, `:2980-3024`, is the only macro form.)
+///
+/// Raven's `for (hSkin = 1; hSkin < tr.numSkins; hSkin++) Q_stricmp` walk is
+/// `RenderAssets::skin_lookup`, keyed by the lower-cased name (`R2-D4`); slot
+/// 0 (`"<default skin>"`) is never a key, matching the walk's `hSkin = 1`
+/// start. The `MAX_SKINS` test is the arena's own soft cap: `Arena::insert`
+/// returns `Handle{0,0}` on overflow (A12) — impossible for a real insert,
+/// since slot 0 is reserved — so the warning hangs off that return instead of
+/// a pre-test, with the same print-and-return-0 behavior.
+///
+/// The commented-out "If not a .skin file, load as a single shader" block
+/// (`:3153-3159`) is dead in the oracle and not ported.
+///
+/// Returned as a bare `qhandle_t` slot index (DEC-42.2) — the seam type every
+/// consumer (`refEntity_t::customSkin`, `R_GetSkinByHandle`) stores.
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:3113-3181
+#[allow(clippy::too_many_arguments)]
+pub fn RE_RegisterSkin(
+    qs: &mut QSharedScratch,
+    frame: &mut FrameState,
+    assets: &mut RenderAssets,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
+    name: &str,
+) -> qhandle_t {
+    if name.is_empty() {
+        com_printf(view.common, "Empty name passed to RE_RegisterSkin\n");
+        return 0;
+    }
+
+    if name.len() >= MAX_QPATH {
+        com_printf(view.common, "Skin name exceeds MAX_QPATH\n");
+        return 0;
+    }
+
+    // see if the skin is already loaded
+    if let Some(&handle) = assets.skin_lookup.get(&name.to_ascii_lowercase()) {
+        if assets
+            .skins
+            .get(handle)
+            .is_none_or(|skin| skin.surfaces.is_empty())
+        {
+            return 0; // default skin
+        }
+        return handle.index() as qhandle_t;
+    }
+
+    // allocate a new skin
+    let h_skin = assets.skins.insert(SkinAsset {
+        name: name.to_owned(),
+        surfaces: Vec::new(),
+    });
+    if h_skin == SkinHandle::slot_zero() {
+        com_printf(
+            view.common,
+            &format!("WARNING: RE_RegisterSkin( '{name}' ) MAX_SKINS hit\n"),
+        );
+        return 0;
+    }
+    assets.skin_lookup.insert(name.to_ascii_lowercase(), h_skin);
+
+    // make sure the render thread is stopped
+    R_SyncRenderThread(&*assets, view.common, cvars);
+
+    let h_skin = if let Some((skinhead, skintorso, skinlower)) = re_split_skins(name) {
+        // three part
+        let mut h_skin = RE_RegisterIndividualSkin(
+            qs, frame, assets, view, cvars, sim, models, img_state, gpu, sky_view, sky, &skinhead,
+            h_skin,
+        );
+        if h_skin != SkinHandle::slot_zero() {
+            h_skin = RE_RegisterIndividualSkin(
+                qs, frame, assets, view, cvars, sim, models, img_state, gpu, sky_view, sky,
+                &skintorso, h_skin,
+            );
+            if h_skin != SkinHandle::slot_zero() {
+                h_skin = RE_RegisterIndividualSkin(
+                    qs, frame, assets, view, cvars, sim, models, img_state, gpu, sky_view, sky,
+                    &skinlower, h_skin,
+                );
+            }
+        }
+        h_skin
+    } else {
+        // single skin
+        RE_RegisterIndividualSkin(
+            qs, frame, assets, view, cvars, sim, models, img_state, gpu, sky_view, sky, name,
+            h_skin,
+        )
+    };
+
+    h_skin.index() as qhandle_t
+}
 
 // ============================================================================
 // wave 10
 // ============================================================================
 
-//TODO: Port RE_RegisterServerSkin client arm
-// Source: oracle/codemp/renderer/tr_image.cpp:3304-3310
-// On the client `com_cl_running->integer` is 1, so the `com_cl_running &&
-// Com_TheHunkMarkHasBeenMade() && ShaderHashTableExists()` fast path is the
-// live one and this fn is `return RE_RegisterSkin(name)` with
-// `gServerSkinHack` never set (R3 client-leg ruling: the R3 renderer track is
-// the CLIENT port; the jampDed disposition below is scoped to the
-// dedicated-server link set). The reconciled body
-// (`RenderModels::register_server_skin`) takes only the `gServerSkinHack =
-// true` arm; the note below stays accurate for the server link set.
-//
 // PORT-NOTE (wave 10): `RE_RegisterServerSkin`
-// (oracle/codemp/renderer/tr_image.cpp:3301-3317) is already ported —
+// (oracle/codemp/renderer/tr_image.cpp:3301-3317) has ONE port —
 // `RenderModels::register_server_skin` (`crates/mp/renderer/src/tr_model/
-// server_skins.rs:83-87`), under the live `RenderModels.skins:
-// Vec<ServerSkin>` skin registry (user ruling 2026-07-12 "server skins
-// name-pool"), the same registry the wave-1/wave-8/wave-9 PORT-NOTEs above
-// already reconciled `RE_SplitSkins`/`CommaParse`/`R_InitSkins`/
-// `R_GetSkinByHandle`/`RE_RegisterIndividualSkin`/`RE_RegisterSkin` against.
-// Reconciled, not re-transcribed here (preamble: "Never re-port an
-// already-ported fn … reconcile, never fork a second port").
-//
-// This packet's STATE HOMES table routes the fn's `com_cl_running` read to
-// the engine-owned `Common` (outside R2's scope) and its `gServerSkinHack`
-// write to a per-subsystem state struct this wave would name (A13.3) — both
-// stale relative to the same 2026-07-12 ruling the file's existing
-// `R_SkinList_f`/wave-8/wave-9 notes already flag for this same skin
-// subsystem. The live `register_server_skin` treats `gServerSkinHack` as
-// **const-true** rather than a mutable flag (`server_skins.rs`'s module doc
-// comment, `:11-17`): the oracle's `com_cl_running && ... &&
-// ShaderHashTableExists()` fast-path re-enters `RE_RegisterSkin` against the
-// §20-dropped client shader table, so on this dedicated-server slice that
-// fast-path is dead code and only the `gServerSkinHack = true` arm — which
-// resolves shaders through the same `find_server_shader` name pool the
-// always-taken arm resolves through — is live. `com_cl_running`,
-// `Com_TheHunkMarkHasBeenMade`, and `ShaderHashTableExists` are therefore
-// never read by the live body: writing a second `RE_RegisterServerSkin`
-// against them (and a new `gServerSkinHack` field) would fork a dead second
-// skin-registration path contradicting the live one; flagged as the same
-// wave-planning defect (this packet's tables are stale) rather than invented
-// around (preamble: "A state home this packet marks UNMAPPED is an
-// ESCALATION, never an invention").
+// server_skins.rs`) — not a client twin here: the fn's client leg is
+// `return RE_RegisterSkin(name)`, i.e. a call into this file, not a second
+// body. Per DEC-40 rule 2 that `com_cl_running` test is a RUNTIME switch with
+// both arms live; the open half of the wiring is marked at the call site it
+// belongs to, `//TODO: Port RE_RegisterServerSkin client fast path` in
+// `server_skins.rs`, which names the exact blocker (that fn's `&mut self,
+// host: &mut impl EngineHost` receiver cannot reach the `RenderAssets` +
+// `EngineHostView` bundle [`RE_RegisterSkin`] above requires — DEC-42.3).
 // Source: oracle/codemp/renderer/tr_image.cpp:3301-3317
+
+// ============================================================================
+// client skin registry init/list (the wave-0/1 `R_InitSkins`/`R_SkinList_f`
+// notes' client half — see the skin PORT-NOTE above)
+// ============================================================================
+
+/// Raven `R_InitSkins` — seed the skin registry with the single default skin
+/// whose one surface wears `tr.defaultShader` (`Hunk_Alloc`'s zero-fill leaves
+/// that surface's name empty).
+///
+/// `tr.numSkins = 1` is the whole-registry purge: every previously registered
+/// skin becomes unreachable at once. On the arena that is `Arena::reset`
+/// (DEC-42.1) — every pre-reset `SkinHandle` goes stale and the default skin
+/// is re-seated at slot 0, "re-created, never re-numbered" (A12) — plus the
+/// `skin_lookup` clear that is the map half of the same invalidation. No
+/// lift-out choreography is needed (unlike `CreateInternalShaders`): the
+/// default skin is built here directly, never through a registering call.
+///
+/// `tr.defaultShader` is `ShaderHandle::slot_zero()` by construction (A12),
+/// the convention `tr_shader.rs` uses throughout.
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:3324-3335
+pub fn R_InitSkins(assets: &mut RenderAssets) {
+    // tr.numSkins = 1; — see doc comment: the arena purge + lookup clear.
+    //
+    // make the default skin have all default shaders
+    assets.skins.reset(SkinAsset {
+        name: "<default skin>".to_owned(),
+        surfaces: vec![SkinSurface {
+            name: String::new(),
+            shader: ShaderHandle::slot_zero(),
+        }],
+    });
+    assets.skin_lookup.clear();
+}
+
+/// Raven `R_SkinList_f` — the `skinlist` console command's handler.
+///
+/// Raven's `for (i = 0; i < tr.numSkins; i++)` walk is `Arena::iter`, which
+/// yields occupied slots in index order; the two differ only for slots vacated
+/// by [`R_InitSkins`]' reset, which Raven's high-water-mark counter cannot
+/// produce and which hold no skin to print.
+///
+/// Registration is not wired — see `tr_init.rs`'s `//TODO: Port R_Register
+/// console commands`.
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:3355-3371
+pub fn R_SkinList_f(view: &mut EngineHostView, assets: &RenderAssets) {
+    com_printf(view.common, "------------------\n");
+
+    for (handle, skin) in assets.skins.iter() {
+        com_printf(
+            view.common,
+            &format!("{:3}:{}\n", handle.index(), skin.name),
+        );
+        for surf in &skin.surfaces {
+            // `skin->surfaces[j]->shader->name` — a shader handle the arena
+            // cannot resolve (stale after a shader-registry purge) prints
+            // empty rather than dereferencing NULL (§19).
+            let shader_name = assets
+                .shaders
+                .get(surf.shader)
+                .map_or("", |shader| shader.name.as_str());
+            com_printf(
+                view.common,
+                &format!("       {} = {}\n", surf.name, shader_name),
+            );
+        }
+    }
+    com_printf(view.common, "------------------\n");
+}
