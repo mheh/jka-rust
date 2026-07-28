@@ -1156,3 +1156,35 @@ User-settled at the R4 kickoff sit-down, on the standing DEC-37 architecture
 4. The #51 models-pool ruling (arena mechanics in place inside
    `RenderModels`) is recorded in `docs/subsystems/tr-model.md`'s
    2026-07-27 amendment.
+
+## DEC-45 — cgame track opened (#46 scoping sit-down, 2026-07-27)
+
+Three user rulings on the 2026-07-24 scoping's foundation (four-class
+census, CgWorld sketch, GameCallbacks reuse — already ratified there):
+
+1. **Parallel from now.** C0 (cgpackets tooling) + C1 (crate/abi audit)
+   launch immediately in R4's shadow; the C2 root-type sit-down schedules
+   after the R4a menus milestone; transcription waves start only after C2
+   is user-ratified. Amends DEC-44.1's park.
+2. **Validation = live gate + demo referee.** C6a: U6-style in-person
+   rounds under openjk.app (dual UI/cgame ABI, jampgame-precedent legacy
+   arm). C6b: fixture `.dm_26` demos played through stock vs ported cgame
+   under a trap-stream logger shim, streams byte-diffed, RNG matched
+   call-for-call (crandom/replica-fidelity precedent). The shim is its own
+   C-stage, built mid-track; waves may start under C6a alone.
+3. **Carrier split confirmed (DEC-42.3 revisit closed).** The module track
+   uses a syscall-shaped trap layer on ui's `trap.rs` pattern (forced by
+   the OpenJK ABI); `EngineHostView` remains the in-engine convention,
+   unamended. Reconciliation is owned by the future cl_* island plan —
+   working hypothesis: the engine's cgame-import implementations are the
+   bridge (traps terminate in carrier-holding engine fns); neither module
+   nor renderer reshapes.
+
+Stage skeleton (mirrors U0-U6): C0 packets tooling (cgpackets sibling —
+uipackets.py is not module-parameterized; mp-cgame closure profile
+exists) → C1 crate/abi reconciliation audit → C2 root-type sit-down
+(CgWorld, centity arena, Class-D bgEntity_t prefix seam, pools→arenas) →
+C3 trap layer (218 wrappers) → C4 CgGameCallbacks implementor (51-method
+trait, ui-implementor precedent) → C5 transcription waves → C6 gates.
+Sound stays engine-hosted under the module track (no cgame-track sound
+work); the cl_* island remains a separate later plan.
