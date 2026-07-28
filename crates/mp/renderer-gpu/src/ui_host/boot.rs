@@ -57,7 +57,7 @@ use mp_renderer::tr_sky::SkyState;
 use mp_renderer::tr_worldeffects::world_effects::WorldEffectsState;
 use mp_ui::world::ui_state::UiState;
 use mp_uishared::shared::display_context::DisplayContext;
-use mp_uishared::ui_shared::{Menu_Count, Menus_ActivateByName, String_Init};
+use mp_uishared::ui_shared::{Menu_Count, Menus_ActivateByName, Menus_CloseAll, String_Init};
 use native_math::rng::Rng;
 
 use crate::pipeline2d::{SCREEN_HEIGHT, SCREEN_WIDTH};
@@ -304,6 +304,10 @@ fn ui_init_equivalent(host: &mut UiHost, cfg: &BootConfig) {
         dc.load_menus(&mut ui.menus, &mut ui.uiDC, &menu_file);
         println!("ui_harness: {} menus parsed", Menu_Count(&ui.menus));
         let ds = &ui.uiDC;
+        // `UI_SetActiveMenu(UIMENU_MAIN)` closes everything BEFORE activating
+        // (`oracle/codemp/ui/ui_main.c:1890-1891`) — without this, every menu
+        // whose file declares `visible 1` paints stacked over main.
+        Menus_CloseAll(&mut ui.menus, ds, dc);
         let opened = Menus_ActivateByName(&mut ui.menus, ds, dc, &start_menu);
         println!(
             "ui_harness: Menus_ActivateByName(\"{start_menu}\") -> {}",
