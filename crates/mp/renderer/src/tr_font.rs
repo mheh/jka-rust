@@ -2665,19 +2665,52 @@ pub fn RE_Font_HeightPixels(
 /// Source: `oracle/codemp/renderer/tr_font.cpp:1511`
 const V4_DK_GREY2: [f32; 4] = [0.15, 0.15, 0.15, 1.0];
 
+/// R4a bridge — one glyph's `RE_StretchPic` arguments, produced by
+/// [`layout_font_glyph`] instead of being pushed straight into a
+/// [`FrameData`]. Same numbers, in the same order, that
+/// `oracle/codemp/renderer/tr_font.cpp:1588-1601`'s call passes; splitting
+/// them out lets the GPU backend re-run the oracle's glyph layout for a
+/// `FrameEvent::DrawString` it received whole (the trap records the string,
+/// not the per-glyph pics).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FontGlyphQuad {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+    pub s1: f32,
+    pub t1: f32,
+    pub s2: f32,
+    pub t2: f32,
+    /// The glyph page's shader, a raw Raven `qhandle_t` — `CFontInfo::mShader`
+    /// / `m_hAsianShaders[]`' own storage form (see `CFontInfo::mShader`).
+    pub h_shader: i32,
+}
+
+/// R4a bridge — one entry of [`layout_font_string`]'s output: the exact
+/// sequence of `RE_SetColor`/`RE_StretchPic` calls
+/// `RE_Font_DrawString_body` makes, recorded rather than issued.
+/// `Color`'s `Option` is [`RE_SetColor`]'s own nullable-`rgba` model.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum FontDrawItem {
+    Color(Option<[f32; 4]>),
+    Glyph(FontGlyphQuad),
+}
+
 /// The shared "draw one glyph" tail `RE_Font_DrawString`'s per-letter switch
 /// falls into once its `case '_'`/`case '^'` special checks don't apply (the
-/// `default:` arm, plus both of those cases' fallthroughs into it).
+/// `default:` arm, plus both of those cases' fallthroughs into it) — the
+/// layout half, returning the `RE_StretchPic` call's arguments instead of
+/// making the call (see [`FontGlyphQuad`]); `None` is the
+/// `bNextTextWouldOverflow` early-out, which skips the draw in the oracle
+/// too.
 ///
 /// Source: `oracle/codemp/renderer/tr_font.cpp:1568-1610`
 #[allow(clippy::too_many_arguments)]
-fn draw_font_glyph(
+fn layout_font_glyph(
     curfont: &mut CFontInfo,
     font: &FontState,
     eLanguage: Language_e,
-    frame: &mut FrameData,
-    assets: &RenderAssets,
-    common: &mut Common,
     x: i32,
     ox: i32,
     oy: i32,
@@ -2686,7 +2719,7 @@ fn draw_font_glyph(
     fScaleA: f32,
     iMaxPixelWidth: i32,
     uiLetter: u32,
-) -> (i32, bool) {
+) -> (i32, bool, Option<FontGlyphQuad>) {
     // Description of pLetter
     let (mut pLetter, hShader) = curfont.GetLetter(font, eLanguage, uiLetter, true);
     if pLetter.width == 0 {
@@ -2712,6 +2745,7 @@ fn draw_font_glyph(
     let bNextTextWouldOverflow =
         iMaxPixelWidth != -1 && ((x + iAdvancePixels) - ox) > iMaxPixelWidth;
 
+    let mut quad = None;
     if !bNextTextWouldOverflow {
         // this 'mbRoundCalcs' stuff is crap, but the only way to make the
         // font code work. Sigh...
@@ -2741,35 +2775,36 @@ fn draw_font_glyph(
             pLetter.height as f32 * fThisScale
         };
 
-        RE_StretchPic(
-            frame,
-            assets,
-            common,
-            (x + Round(pLetter.horizOffset as f32 * fScale)) as f32, // float x
-            (if uiLetter > font.g_iNonScaledCharRange as u32 {
+        quad = Some(FontGlyphQuad {
+            x: (x + Round(pLetter.horizOffset as f32 * fScale)) as f32, // float x
+            y: (if uiLetter > font.g_iNonScaledCharRange as u32 {
                 y - iAsianYAdjust
             } else {
                 y
             }) as f32, // float y
-            w,                                                       // float w
-            h,                                                       // float h
-            pLetter.s,                                               // float s1
-            pLetter.t,                                               // float t1
-            pLetter.s2,                                              // float s2
-            pLetter.t2,                                              // float t2
-            hShader,                                                 // qhandle_t hShader
-        );
+            w,                                                          // float w
+            h,                                                          // float h
+            s1: pLetter.s,                                              // float s1
+            t1: pLetter.t,                                              // float t1
+            s2: pLetter.s2,                                             // float s2
+            t2: pLetter.t2,                                             // float t2
+            h_shader: hShader,                                          // qhandle_t hShader
+        });
 
         x += iAdvancePixels;
     }
 
-    (x, bNextTextWouldOverflow)
+    (x, bNextTextWouldOverflow, quad)
 }
 
 /// Raven `RE_Font_DrawString`'s body, once `curfont` is already resolved —
 /// see the public [`RE_Font_DrawString`]'s PORT-NOTEs for why this split
 /// exists (the recursive dropshadow call, `gbInShadow`, and the `curfont`
 /// arena take/put-back all interact here).
+///
+/// The body itself is the layout half ([`layout_font_string_body`]); this fn
+/// issues the recorded `RE_SetColor`/`RE_StretchPic` calls in order, which is
+/// exactly what the oracle's loop emitted inline.
 ///
 /// Source: `oracle/codemp/renderer/tr_font.cpp:1491-1613`
 #[allow(clippy::too_many_arguments)]
@@ -2789,6 +2824,55 @@ fn RE_Font_DrawString_body(
     fScale: f32,
     bInShadow: bool,
 ) {
+    let mut items = Vec::new();
+    layout_font_string_body(
+        curfont,
+        font,
+        eLanguage,
+        ox,
+        oy,
+        psText,
+        rgba,
+        iFontHandle,
+        iMaxPixelWidth,
+        fScale,
+        bInShadow,
+        &mut items,
+    );
+
+    for item in &items {
+        match *item {
+            FontDrawItem::Color(rgba) => RE_SetColor(frame, rgba),
+            FontDrawItem::Glyph(g) => RE_StretchPic(
+                frame, assets, common, g.x, g.y, g.w, g.h, g.s1, g.t1, g.s2, g.t2, g.h_shader,
+            ),
+        }
+    }
+}
+
+/// [`RE_Font_DrawString_body`]'s layout half: the per-letter walk, recording
+/// each `RE_SetColor`/`RE_StretchPic` it would issue into `out` (see
+/// [`FontDrawItem`]) rather than pushing it into a [`FrameData`]. Extracted so
+/// the GPU backend can re-run the oracle's glyph layout for a whole-string
+/// `FrameEvent::DrawString`; behaviour, including the dropshadow recursion's
+/// shadow-before-text ordering, is unchanged.
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:1491-1613`
+#[allow(clippy::too_many_arguments)]
+fn layout_font_string_body(
+    curfont: &mut CFontInfo,
+    font: &FontState,
+    eLanguage: Language_e,
+    ox: i32,
+    oy: i32,
+    psText: &[u8],
+    rgba: Option<[f32; 4]>,
+    iFontHandle: i32,
+    iMaxPixelWidth: i32,
+    fScale: f32,
+    bInShadow: bool,
+    out: &mut Vec<FontDrawItem>,
+) {
     let mut fScaleA = fScale;
     let mut iAsianYAdjust = 0i32;
     if Language_IsAsian(eLanguage) && fScale > 0.7f32 {
@@ -2805,13 +2889,10 @@ fn RE_Font_DrawString_body(
     if (iFontHandle as u32) & STYLE_DROPSHADOW != 0 {
         let offset = Round(curfont.GetPointSize() as f32 * fScale * 0.075f32);
 
-        RE_Font_DrawString_body(
+        layout_font_string_body(
             curfont,
             font,
             eLanguage,
-            frame,
-            assets,
-            common,
             ox + offset,
             oy + offset,
             psText,
@@ -2820,10 +2901,11 @@ fn RE_Font_DrawString_body(
             iMaxPixelWidth,
             fScale,
             true,
+            out,
         );
     }
 
-    RE_SetColor(frame, rgba);
+    out.push(FontDrawItem::Color(rgba));
 
     let mut x = ox;
     let mut oy = oy + Round((curfont.GetHeight() - (curfont.GetDescender() >> 1)) as f32 * fScale);
@@ -2859,13 +2941,10 @@ fn RE_Font_DrawString_body(
             let next = psText.get(pos).copied().unwrap_or(0);
             if !(eLanguage == Language_e::eThai && next as u32 >= TIS_GLYPHS_START) {
                 // else drop through and display as normal...
-                let (new_x, overflow) = draw_font_glyph(
+                let (new_x, overflow, quad) = layout_font_glyph(
                     curfont,
                     font,
                     eLanguage,
-                    frame,
-                    assets,
-                    common,
                     x,
                     ox,
                     oy,
@@ -2877,6 +2956,7 @@ fn RE_Font_DrawString_body(
                 );
                 x = new_x;
                 bNextTextWouldOverflow = overflow;
+                out.extend(quad.map(FontDrawItem::Glyph));
             }
         } else if uiLetter == '^' as u32 {
             if let Some(&next) = psText.get(pos).filter(|&&b| (b'0'..=b'9').contains(&b)) {
@@ -2884,17 +2964,14 @@ fn RE_Font_DrawString_body(
                 // *psText++
                 pos += 1;
                 if !bInShadow {
-                    RE_SetColor(frame, Some(g_color_table[colour as usize]));
+                    out.push(FontDrawItem::Color(Some(g_color_table[colour as usize])));
                 }
             } else {
                 // purposely falls through (to the default glyph draw)
-                let (new_x, overflow) = draw_font_glyph(
+                let (new_x, overflow, quad) = layout_font_glyph(
                     curfont,
                     font,
                     eLanguage,
-                    frame,
-                    assets,
-                    common,
                     x,
                     ox,
                     oy,
@@ -2906,15 +2983,13 @@ fn RE_Font_DrawString_body(
                 );
                 x = new_x;
                 bNextTextWouldOverflow = overflow;
+                out.extend(quad.map(FontDrawItem::Glyph));
             }
         } else {
-            let (new_x, overflow) = draw_font_glyph(
+            let (new_x, overflow, quad) = layout_font_glyph(
                 curfont,
                 font,
                 eLanguage,
-                frame,
-                assets,
-                common,
                 x,
                 ox,
                 oy,
@@ -2926,8 +3001,59 @@ fn RE_Font_DrawString_body(
             );
             x = new_x;
             bNextTextWouldOverflow = overflow;
+            out.extend(quad.map(FontDrawItem::Glyph));
         }
     }
+}
+
+/// R4a bridge — [`RE_Font_DrawString`]'s tail for a caller that already knows
+/// which font index to use: takes `iFont` out of the arena, runs
+/// [`layout_font_string_body`], puts it back, and returns the recorded
+/// `RE_SetColor`/`RE_StretchPic` sequence.
+///
+/// No `GetFont` call: that resolution needs the whole engine carrier list
+/// (SBCS override, `UpdateAsianIfNeeded`'s glyph-page registration), which a
+/// backend replaying an already-recorded frame does not have. The caller
+/// passes the index it wants; an out-of-range one yields an empty layout, the
+/// same nothing-drawn outcome as `GetFont` returning `None`.
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:1430-1614`
+#[allow(clippy::too_many_arguments)]
+pub fn layout_font_string(
+    font: &mut FontState,
+    eLanguage: Language_e,
+    iFont: i32,
+    ox: i32,
+    oy: i32,
+    psText: &[u8],
+    rgba: Option<[f32; 4]>,
+    iFontHandle: i32,
+    iMaxPixelWidth: i32,
+    fScale: f32,
+) -> Vec<FontDrawItem> {
+    let mut curfont = match take_font(font, iFont) {
+        Some(c) => c,
+        None => return Vec::new(),
+    };
+
+    let mut items = Vec::new();
+    layout_font_string_body(
+        &mut curfont,
+        font,
+        eLanguage,
+        ox,
+        oy,
+        psText,
+        rgba,
+        iFontHandle,
+        iMaxPixelWidth,
+        fScale,
+        false,
+        &mut items,
+    );
+
+    put_font_back(font, iFont, curfont);
+    items
 }
 
 /// Raven `RE_Font_DrawString`.

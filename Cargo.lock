@@ -1047,6 +1047,7 @@ name = "mp_renderer_gpu"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
+ "mp_engine_qcommon",
  "mp_renderer",
  "pollster",
  "wgpu",

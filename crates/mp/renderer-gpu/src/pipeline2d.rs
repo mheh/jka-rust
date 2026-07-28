@@ -1,5 +1,5 @@
 //! `pipeline2d` — the textured-quad pipeline for Raven's 640x480 virtual 2D
-//! screen (R4a backend #1, v0).
+//! screen (R4a backend #1, wave 2).
 //!
 //! The oracle's 2D path is fixed-function: `RB_SetGL2D` sets a full-window
 //! viewport, loads `qglOrtho(0, 640, 480, 0, 0, 1)` as the projection, and
@@ -12,24 +12,27 @@
 //! Source: `oracle/codemp/renderer/tr_backend.cpp:1266-1292` (`RB_SetGL2D`);
 //! `oracle/codemp/game/q_shared.h:1029-1030` (`SCREEN_WIDTH`/`SCREEN_HEIGHT`)
 //!
-//! v0 scope: one built-in 1x1 white texture and one bind group. Real image
-//! upload — resolving a [`ShaderHandle`] to an uploaded `ImageAsset` — lands
-//! next wave, once `mp_renderer` retains decoded pixels. Until then a
-//! `DrawStretchPic` renders as its flat vertex colour, which is enough to
-//! prove the event -> execution -> pixels path.
+//! Wave 2 scope: real textures. A quad carries the [`ImageHandle`] its shader
+//! stage resolved to, [`crate::gpu_images`] owns the uploaded texture and its
+//! bind group, and a run breaks whenever either the blend state or the image
+//! changes. A quad with no image binds the white texel, which reduces
+//! `texture * vertex_color` to the flat vertex colour — the wave-1 behaviour,
+//! now the explicit fallback rather than the only mode.
 //!
 //! Colour space: the surface is typically an sRGB format, so wgpu encodes the
 //! shader's linear output on write while the oracle wrote colour bytes
 //! straight through. Matching Raven's exact ramp is a later fidelity item, not
-//! a v0 blocker.
+//! a wave-2 blocker.
 
 use std::collections::HashMap;
 use std::mem::size_of;
 
 use bytemuck::{Pod, Zeroable};
+use mp_renderer::render_state::image_asset::ImageHandle;
 use wgpu::{BlendState, RenderPipeline, TextureView};
 
 use crate::gpu::Gpu;
+use crate::gpu_images::GpuImages;
 
 /// Raven `SCREEN_WIDTH` — the virtual 2D screen width every UI/HUD draw is
 /// authored against.
@@ -85,12 +88,22 @@ pub struct Vertex2d {
 const VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 3] =
     wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Float32x4];
 
-/// A contiguous span of the batch's vertices sharing one blend state — the
-/// unit of one `draw` call. Consecutive quads with the same blend state merge
-/// into one run, so a typical UI frame is a single draw.
-#[derive(Clone, Copy, Debug)]
+/// A contiguous span of the batch's vertices sharing one blend state *and*
+/// one texture — the unit of one `draw` call. Consecutive quads matching on
+/// both merge, so a UI frame drawn from one atlas (a font page, a menu sheet)
+/// is still a single draw; a texture change breaks the run exactly as the
+/// oracle's `GL_Bind` did.
+///
+/// `image: None` is the white-texel fallback, shared by every handle-less
+/// draw — so consecutive untextured quads merge with each other, and with
+/// nothing else.
+///
+/// No `Debug`: `Handle<K>` deliberately derives nothing that would bound `K`
+/// (see `mp_renderer`'s `render_state::handle`).
+#[derive(Clone, Copy)]
 struct DrawRun {
     blend: BlendState,
+    image: Option<ImageHandle>,
     first_vertex: u32,
     vertex_count: u32,
 }
@@ -123,9 +136,16 @@ impl QuadBatch {
         self.runs.len() as u32
     }
 
-    /// Appends one screen-space quad, extending the tail run when `blend`
-    /// matches it and opening a new run otherwise.
-    pub fn push_quad(&mut self, rect: Rect, uv: UvRect, color: [f32; 4], blend: BlendState) {
+    /// Appends one screen-space quad, extending the tail run when both
+    /// `blend` and `image` match it and opening a new run otherwise.
+    pub fn push_quad(
+        &mut self,
+        rect: Rect,
+        uv: UvRect,
+        color: [f32; 4],
+        blend: BlendState,
+        image: Option<ImageHandle>,
+    ) {
         let (x0, y0) = (rect.x, rect.y);
         let (x1, y1) = (rect.x + rect.w, rect.y + rect.h);
 
@@ -161,9 +181,12 @@ impl QuadBatch {
         ]);
 
         match self.runs.last_mut() {
-            Some(run) if run.blend == blend => run.vertex_count += VERTICES_PER_QUAD as u32,
+            Some(run) if run.blend == blend && run.image == image => {
+                run.vertex_count += VERTICES_PER_QUAD as u32
+            }
             _ => self.runs.push(DrawRun {
                 blend,
+                image,
                 first_vertex,
                 vertex_count: VERTICES_PER_QUAD as u32,
             }),
@@ -172,8 +195,9 @@ impl QuadBatch {
 }
 
 /// The 2D pipeline's GPU-side resources: shader module, layouts, the ortho
-/// uniform, the placeholder white texture, the growable vertex buffer, and the
-/// per-blend-state pipeline cache.
+/// uniform, the growable vertex buffer, and the per-blend-state pipeline
+/// cache. Textures are not owned here — [`GpuImages`] owns them, and `draw`
+/// borrows it to bind each run's.
 ///
 /// DEC-37 ruling 2/3: this is render-thread-owned state. Nothing here is
 /// reachable from a trap query.
@@ -187,14 +211,15 @@ pub struct Pipeline2d {
     pipelines: HashMap<BlendState, RenderPipeline>,
     surface_format: wgpu::TextureFormat,
     transform_bind_group: wgpu::BindGroup,
-    texture_bind_group: wgpu::BindGroup,
     vertex_buffer: wgpu::Buffer,
     vertex_capacity: usize,
 }
 
 impl Pipeline2d {
     /// Builds the pipeline's fixed resources against `gpu`'s device.
-    pub fn new(gpu: &Gpu) -> Pipeline2d {
+    /// `images` supplies the texture bind-group layout, so the pipeline
+    /// layout and every image's bind group agree by construction.
+    pub fn new(gpu: &Gpu, images: &GpuImages) -> Pipeline2d {
         let device = gpu.device();
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -216,31 +241,9 @@ impl Pipeline2d {
             }],
         });
 
-        let texture_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("mp_renderer_gpu 2d texture layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-        });
-
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("mp_renderer_gpu 2d pipeline layout"),
-            bind_group_layouts: &[Some(&transform_layout), Some(&texture_layout)],
+            bind_group_layouts: &[Some(&transform_layout), Some(images.layout())],
             immediate_size: 0,
         });
 
@@ -265,9 +268,6 @@ impl Pipeline2d {
             }],
         });
 
-        let texture_bind_group =
-            create_white_texture_bind_group(device, gpu.queue(), &texture_layout);
-
         let vertex_buffer = create_vertex_buffer(device, INITIAL_VERTEX_CAPACITY);
 
         Pipeline2d {
@@ -276,7 +276,6 @@ impl Pipeline2d {
             pipelines: HashMap::new(),
             surface_format: gpu.surface_format(),
             transform_bind_group,
-            texture_bind_group,
             vertex_buffer,
             vertex_capacity: INITIAL_VERTEX_CAPACITY,
         }
@@ -286,7 +285,13 @@ impl Pipeline2d {
     /// blend run. The pass loads (never clears) so it composites on top of
     /// whatever the frame's earlier passes left — `Gpu::begin_frame`'s clear
     /// today, the 3D scene pass once R4b lands. Returns the draw-call count.
-    pub fn draw(&mut self, gpu: &Gpu, target: &TextureView, batch: &QuadBatch) -> u32 {
+    pub fn draw(
+        &mut self,
+        gpu: &Gpu,
+        target: &TextureView,
+        batch: &QuadBatch,
+        images: &GpuImages,
+    ) -> u32 {
         if batch.is_empty() {
             return 0;
         }
@@ -328,7 +333,6 @@ impl Pipeline2d {
             });
 
             pass.set_bind_group(0, &self.transform_bind_group, &[]);
-            pass.set_bind_group(1, &self.texture_bind_group, &[]);
             pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
 
             for run in &batch.runs {
@@ -337,6 +341,7 @@ impl Pipeline2d {
                     .get(&run.blend)
                     .expect("2d pipeline was created for every run's blend state above");
                 pass.set_pipeline(pipeline);
+                pass.set_bind_group(1, images.bind_group(run.image), &[]);
                 pass.draw(run.first_vertex..run.first_vertex + run.vertex_count, 0..1);
             }
         }
@@ -444,73 +449,6 @@ fn create_vertex_buffer(device: &wgpu::Device, capacity: usize) -> wgpu::Buffer 
     })
 }
 
-/// The v0 stand-in for a registered image: one opaque white texel, so
-/// `texture * vertex_color` reduces to the vertex colour. Sampling is
-/// linear/clamp, matching `R_RegisterShaderNoMip`'s `GL_LINEAR` + `GL_CLAMP`
-/// 2D images.
-fn create_white_texture_bind_group(
-    device: &wgpu::Device,
-    queue: &wgpu::Queue,
-    layout: &wgpu::BindGroupLayout,
-) -> wgpu::BindGroup {
-    let size = wgpu::Extent3d {
-        width: 1,
-        height: 1,
-        depth_or_array_layers: 1,
-    };
-    let texture = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("mp_renderer_gpu 2d white texture"),
-        size,
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Rgba8Unorm,
-        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-        view_formats: &[],
-    });
-    queue.write_texture(
-        wgpu::TexelCopyTextureInfo {
-            texture: &texture,
-            mip_level: 0,
-            origin: wgpu::Origin3d::ZERO,
-            aspect: wgpu::TextureAspect::All,
-        },
-        &[0xff, 0xff, 0xff, 0xff],
-        wgpu::TexelCopyBufferLayout {
-            offset: 0,
-            bytes_per_row: Some(4),
-            rows_per_image: Some(1),
-        },
-        size,
-    );
-
-    let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-    let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-        label: Some("mp_renderer_gpu 2d sampler"),
-        address_mode_u: wgpu::AddressMode::ClampToEdge,
-        address_mode_v: wgpu::AddressMode::ClampToEdge,
-        address_mode_w: wgpu::AddressMode::ClampToEdge,
-        mag_filter: wgpu::FilterMode::Linear,
-        min_filter: wgpu::FilterMode::Linear,
-        ..Default::default()
-    });
-
-    device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some("mp_renderer_gpu 2d texture bind group"),
-        layout,
-        entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::TextureView(&view),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: wgpu::BindingResource::Sampler(&sampler),
-            },
-        ],
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -522,6 +460,15 @@ mod tests {
             t1: 0.0,
             s2: 1.0,
             t2: 1.0,
+        }
+    }
+
+    fn unit_rect() -> Rect {
+        Rect {
+            x: 0.0,
+            y: 0.0,
+            w: 10.0,
+            h: 10.0,
         }
     }
 
@@ -541,20 +488,15 @@ mod tests {
     }
 
     #[test]
-    fn same_blend_quads_merge_into_one_run() {
+    fn same_blend_and_texture_quads_merge_into_one_run() {
         let mut batch = QuadBatch::new();
-        let rect = Rect {
-            x: 0.0,
-            y: 0.0,
-            w: 10.0,
-            h: 10.0,
-        };
-        batch.push_quad(rect, unit_uv(), [1.0; 4], ALPHA_BLEND);
+        batch.push_quad(unit_rect(), unit_uv(), [1.0; 4], ALPHA_BLEND, None);
         batch.push_quad(
-            rect,
+            unit_rect(),
             unit_uv(),
             [1.0; 4],
             blend_state_from_gls(GLS_2D_DEFAULT),
+            None,
         );
         assert_eq!(batch.run_count(), 1);
         assert_eq!(batch.vertices.len(), 2 * VERTICES_PER_QUAD);
@@ -563,18 +505,61 @@ mod tests {
     #[test]
     fn differing_blend_states_open_new_runs() {
         let mut batch = QuadBatch::new();
-        let rect = Rect {
-            x: 0.0,
-            y: 0.0,
-            w: 10.0,
-            h: 10.0,
-        };
-        batch.push_quad(rect, unit_uv(), [1.0; 4], ALPHA_BLEND);
-        batch.push_quad(rect, unit_uv(), [1.0; 4], blend_state_from_gls(0));
+        batch.push_quad(unit_rect(), unit_uv(), [1.0; 4], ALPHA_BLEND, None);
+        batch.push_quad(
+            unit_rect(),
+            unit_uv(),
+            [1.0; 4],
+            blend_state_from_gls(0),
+            None,
+        );
         assert_eq!(batch.run_count(), 2);
         assert_eq!(batch.runs[1].first_vertex, VERTICES_PER_QUAD as u32);
 
         batch.clear();
         assert!(batch.is_empty());
+    }
+
+    #[test]
+    fn a_texture_change_breaks_the_run() {
+        let first = ImageHandle::new(3, 0);
+        let second = ImageHandle::new(4, 0);
+
+        let mut batch = QuadBatch::new();
+        batch.push_quad(unit_rect(), unit_uv(), [1.0; 4], ALPHA_BLEND, Some(first));
+        batch.push_quad(unit_rect(), unit_uv(), [1.0; 4], ALPHA_BLEND, Some(first));
+        assert_eq!(batch.run_count(), 1);
+
+        // Same blend, different image.
+        batch.push_quad(unit_rect(), unit_uv(), [1.0; 4], ALPHA_BLEND, Some(second));
+        assert_eq!(batch.run_count(), 2);
+
+        // Back to the white fallback — a third run, not a merge with either.
+        batch.push_quad(unit_rect(), unit_uv(), [1.0; 4], ALPHA_BLEND, None);
+        assert_eq!(batch.run_count(), 3);
+        assert!(batch.runs[2].image.is_none());
+        assert_eq!(batch.runs[2].first_vertex, 3 * VERTICES_PER_QUAD as u32);
+    }
+
+    #[test]
+    fn a_stale_generation_is_a_different_texture() {
+        // Handles compare on index *and* generation, so a reused image slot
+        // never silently merges with its predecessor's run.
+        let mut batch = QuadBatch::new();
+        batch.push_quad(
+            unit_rect(),
+            unit_uv(),
+            [1.0; 4],
+            ALPHA_BLEND,
+            Some(ImageHandle::new(7, 0)),
+        );
+        batch.push_quad(
+            unit_rect(),
+            unit_uv(),
+            [1.0; 4],
+            ALPHA_BLEND,
+            Some(ImageHandle::new(7, 1)),
+        );
+        assert_eq!(batch.run_count(), 2);
     }
 }

@@ -27,12 +27,15 @@
 //! CPU-registry-to-GPU-resource bridge — against this crate's device/queue
 //! is an R4a design item, not scaffold scope: this file only stands up the
 //! device/surface plumbing every later slice needs.
-//! ## R4a wave 1 — 2D first light (this crate's current state)
+//! ## R4a wave 2 — real textures and text (this crate's current state)
 //!
 //! Landed: [`frame_exec`] walks a `FrameData` event stream in trap-call order,
-//! [`pipeline2d`] rasterises `DrawStretchPic` quads through Raven's 640x480
-//! virtual screen, and [`blend`] decodes `mp_renderer`'s `GLS_*` state bits
-//! into pipeline blend states.
+//! [`pipeline2d`] rasterises quads through Raven's 640x480 virtual screen,
+//! [`blend`] decodes `mp_renderer`'s `GLS_*` state bits into pipeline blend
+//! states, and [`gpu_images`] uploads `R_CreateImage`'s staged pixels into
+//! textures. A `DrawStretchPic` now resolves its shader to a real texture and
+//! its stage's blend mode; a `DrawString` is laid out into glyph quads by
+//! `tr_font`'s own per-glyph walk.
 //!
 //! **Staging: single-threaded first light.** DEC-37 ruling 2's sim/render
 //! thread split is a later R4 slice — today the dev harness builds a
@@ -40,16 +43,18 @@
 //! is already split-shaped (borrowed frame stream in, render-thread state
 //! only), so that slice moves the caller, not this crate's API.
 //!
-//! Not yet rendered (counted and skipped, never panicked): `DrawString`, the
-//! rotate-pic pair, and every scene-composition event. Textures are one
-//! built-in white texel until `mp_renderer` retains decoded image pixels.
+//! Not yet rendered (counted and skipped, never panicked): the rotate-pic pair
+//! and every scene-composition event. Uploads are level-0 only — `Upload32`'s
+//! mipmap chain is still ahead.
 
 pub mod blend;
 pub mod frame_exec;
 mod gpu;
+pub mod gpu_images;
 pub mod pipeline2d;
 
 pub use blend::{blend_state_from_gls, ALPHA_BLEND, GLS_2D_DEFAULT};
 pub use frame_exec::{FrameExecutor, FrameStats};
 pub use gpu::{FrameError, Gpu};
+pub use gpu_images::{GpuImage, GpuImages};
 pub use pipeline2d::{Pipeline2d, QuadBatch, Rect, UvRect, SCREEN_HEIGHT, SCREEN_WIDTH};

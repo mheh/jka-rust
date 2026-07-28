@@ -337,6 +337,23 @@ pub struct FunctionTables {
     pub fog_table: [f32; FOG_TABLE_SIZE],
 }
 
+// The tables are zero until `R_InitFuncTables` fills them, matching `tr`'s
+// `Com_Memset(&tr, 0, sizeof(tr))` in `R_Init` (DEC-42.1). `#[derive(Default)]`
+// cannot produce this — `[T; N]: Default` stops at N = 32.
+// Source: `oracle/codemp/renderer/tr_init.cpp` (`R_Init`, `R_InitFuncTables`)
+impl Default for FunctionTables {
+    fn default() -> FunctionTables {
+        FunctionTables {
+            sin_table: [0.0; FUNCTABLE_SIZE],
+            square_table: [0.0; FUNCTABLE_SIZE],
+            triangle_table: [0.0; FUNCTABLE_SIZE],
+            saw_tooth_table: [0.0; FUNCTABLE_SIZE],
+            inverse_saw_tooth_table: [0.0; FUNCTABLE_SIZE],
+            fog_table: [0.0; FOG_TABLE_SIZE],
+        }
+    }
+}
+
 /// The owned form of Raven `glconfig_t` — `RenderAssets::glconfig`,
 /// sim-readable because `CG_R_GETREALRES` reads `vidWidth`/`vidHeight`
 /// synchronously (B11). Not the tier-1 `glconfig_t` (its `c_char` renderer/
