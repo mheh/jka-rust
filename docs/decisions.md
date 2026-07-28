@@ -838,7 +838,12 @@ itself stays out of repo docs per the external-reference rule):
   (lean: fixed 2-3 buffer pool + return channel; R2 freezes only the
   event-stream shape); `RC_AUTO_MAP`'s full command shape gets its targeted
   oracle read at the first automap wave; `subImageCommand_t` dead-vs-internal
-  gets its grep before R3 scope-freezes; the generic `Handle<K>`/`Arena<T>`
+  gets its grep before R3 scope-freezes — **CLOSED 2026-07-27: dead.** The
+  grep found `subImageCommand_t` defined once (`tr_local.h:2201`) with zero
+  references in any oracle `.cpp` (no issuer, no `RC_` id, no backend
+  dispatch arm) and no `RE_SubImage` anywhere; the type is already ported
+  with layout asserts (`tr_local/sub_image_command_t.rs`), nothing further
+  owed; the generic `Handle<K>`/`Arena<T>`
   infra carries a doc-comment citing the `AlignedBytes` justified-exception
   precedent (no `Source:` line — new Rust infra implementing ruling 11).
 - **A8. The R2 design doc is RATIFIED** and lands as
