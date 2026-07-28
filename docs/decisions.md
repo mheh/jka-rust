@@ -1188,3 +1188,43 @@ C3 trap layer (218 wrappers) → C4 CgGameCallbacks implementor (51-method
 trait, ui-implementor precedent) → C5 transcription waves → C6 gates.
 Sound stays engine-hosted under the module track (no cgame-track sound
 work); the cl_* island remains a separate later plan.
+
+## DEC-46 — cgame root types (C2 sit-down, 2026-07-28)
+
+Six user rulings; packets regenerate with these as ratified ROOT-TYPE
+BINDINGS (CONFIG_FINALIZED) before C5 waves:
+
+1. **CgWorld = three-way spine, Raven names**: `cg: CgState` (`cg_t`,
+   `cg_local.h:755-1014`), `cgs: CgsState` (`cgs_t`, `:1516-1609`),
+   `entities: Box<[CEntity; MAX_GENTITIES]>` (`cg_entities` — fixed,
+   entity-number-indexed, no arena). Transcription reads line-for-line
+   (`cg.time` → `world.cg.time`); media/weapon/item registries hang off
+   the spine.
+2. **CEntity owned + resolution enums** (the Class-D accessor design the
+   2026-07-24 census deferred): `playerState: *mut` →
+   `PlayerStateRef { None | Predicted | Snap }` resolved via `CgWorld` at
+   use sites; `m_pVehicle` → `Option<VehicleId>` into an owned vehicle
+   store; `npcClient` → owned `Option<Box>`; `ghoul2`/`ghoul2weapon`
+   stay opaque engine tokens (never dereferenced module-side, ui
+   precedent). The `bgEntity_t` prefix layout carries no obligation —
+   bg reaches entity data through the accessor seam only.
+3. **Effect pools = gen-counted slab + explicit LRU queue**
+   (`localEntity_t` 512, `markPoly_t` 256): `active: VecDeque<Handle>`
+   in age order; alloc at capacity frees the oldest — Raven's steal
+   behavior (`CG_AllocLocalEntity`) preserved verbatim; intrusive
+   `prev/next` dissolves.
+4. **Fn-ptr tables → closed enums + match** (§C8): `thinkFn`/leType
+   dispatch and `weaponInfo_t`'s trail/charge fns; each variant's arm
+   cites its Raven fn; exhaustive, no `unsafe extern` fields.
+5. **CgGameCallbacks law: inert per the ifdef.** The ~30 QAGAME-gated
+   trait methods return the neutral value that keeps every gated block
+   unreachable (accessors → false/0/None; mutators → no-op), each citing
+   the oracle `#ifdef QAGAME` proving Raven's cgame build compiled the
+   block out — live `cg_entities` reads would execute logic the oracle
+   cgame never ran (demo-referee divergence). The 16 DEC-36-D5
+   registration arms are real implementations (sound/model/effect/vehicle/
+   siege traps).
+6. **sharedBuffer (the census's one Class-A) = pinned `Box<[u8; 2048]>`
+   on CgWorld**, registered once via `CG_SET_SHARED_BUFFER`; consuming
+   vmcalls copy-out and decode through the existing abi `TCG*` types at
+   entry — no Rust reference outlives a call into engine-mutated memory.
