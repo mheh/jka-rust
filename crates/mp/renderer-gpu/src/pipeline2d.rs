@@ -74,6 +74,22 @@ pub struct UvRect {
     pub t2: f32,
 }
 
+impl UvRect {
+    /// The rectangle's four corners in `RB_StretchPic`'s vertex order —
+    /// top-left, top-right, bottom-right, bottom-left — which is the array
+    /// `ComputeTexCoords`' `tcMod` list rewrites.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_backend.cpp:1465-1490`
+    pub fn corners(self) -> [[f32; 2]; 4] {
+        [
+            [self.s1, self.t1],
+            [self.s2, self.t1],
+            [self.s2, self.t2],
+            [self.s1, self.t2],
+        ]
+    }
+}
+
 /// One vertex of the 2D pipeline. `#[repr(C)]` here is a GPU-layout
 /// requirement (it must match the `VertexBufferLayout` below), not an ABI
 /// seam.
@@ -136,12 +152,34 @@ impl QuadBatch {
         self.runs.len() as u32
     }
 
-    /// Appends one screen-space quad, extending the tail run when both
-    /// `blend` and `image` match it and opening a new run otherwise.
+    /// Appends one screen-space quad whose texture coordinates are an
+    /// axis-aligned rectangle — the common case, and the only shape a
+    /// `DrawStretchPic` carries before its stage's `tcMod` list runs.
     pub fn push_quad(
         &mut self,
         rect: Rect,
         uv: UvRect,
+        color: [f32; 4],
+        blend: BlendState,
+        image: Option<ImageHandle>,
+    ) {
+        self.push_quad_st(rect, uv.corners(), color, blend, image);
+    }
+
+    /// Appends one screen-space quad with independent per-corner texture
+    /// coordinates, extending the tail run when both `blend` and `image` match
+    /// it and opening a new run otherwise.
+    ///
+    /// `st` is in `RB_StretchPic`'s own vertex order — top-left, top-right,
+    /// bottom-right, bottom-left — which is the order `ComputeTexCoords`' mods
+    /// rewrite in place. A `tcMod rotate` turns the corners off the axes, so
+    /// the four are carried separately rather than as a [`UvRect`].
+    ///
+    /// Source: `oracle/codemp/renderer/tr_backend.cpp:1461-1490`
+    pub fn push_quad_st(
+        &mut self,
+        rect: Rect,
+        st: [[f32; 2]; 4],
         color: [f32; 4],
         blend: BlendState,
         image: Option<ImageHandle>,
@@ -151,22 +189,22 @@ impl QuadBatch {
 
         let top_left = Vertex2d {
             position: [x0, y0],
-            uv: [uv.s1, uv.t1],
+            uv: st[0],
             color,
         };
         let top_right = Vertex2d {
             position: [x1, y0],
-            uv: [uv.s2, uv.t1],
+            uv: st[1],
             color,
         };
         let bottom_right = Vertex2d {
             position: [x1, y1],
-            uv: [uv.s2, uv.t2],
+            uv: st[2],
             color,
         };
         let bottom_left = Vertex2d {
             position: [x0, y1],
-            uv: [uv.s1, uv.t2],
+            uv: st[3],
             color,
         };
 

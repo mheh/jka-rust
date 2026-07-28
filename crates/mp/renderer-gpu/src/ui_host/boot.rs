@@ -432,7 +432,7 @@ const MAX_SKINS: u32 = 1024;
 /// `R_InitSkins`' `Arena::reset` re-seat the real defaults during `R_Init`);
 /// `images` stays unbounded (A5 — its purge is `R_DeleteTextures`, never
 /// `reset`).
-fn empty_assets() -> RenderAssets {
+pub(crate) fn empty_assets() -> RenderAssets {
     RenderAssets {
         images: Arena::new_unbounded(),
         image_names: Default::default(),

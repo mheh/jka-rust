@@ -25,13 +25,20 @@
 //! bisectable.
 //!
 //! **Resolving a draw.** A `DrawStretchPic` carries the `ShaderHandle` the
-//! trap layer resolved; this side walks it the rest of the way — shader ->
-//! first active stage -> `bundle[0].image` -> uploaded texture — and takes
-//! that stage's `stateBits` as the blend mode, which is exactly what
-//! `RB_StageIteratorGeneric`'s `GL_State(pStage->stateBits)` did. Every link
-//! is fallible (an unregistered shader, a stage-less default shader, an image
-//! whose upload has not run) and every failure degrades to the white texel
-//! with a once-per-kind log rather than dropping the quad.
+//! trap layer resolved; this side walks it the rest of the way, one layered
+//! quad per active stage, exactly as `RB_StageIteratorGeneric` issues one pass
+//! per active stage: [`crate::stage2d`] computes that stage's colour
+//! (`ComputeColors`), its texture coordinates (`ComputeTexCoords`) and its
+//! bound image (`R_BindAnimatedImage`), and the stage's own `stateBits` become
+//! the blend mode — `GL_State(pStage->stateBits)`. A shader whose stages all
+//! died in `FinishShader` (a `videoMap` with no cinematic behind it, a stage
+//! whose image failed to load) draws nothing, which is what the oracle's
+//! zero-iteration loop does.
+//!
+//! The white texel remains the fallback for the one case that is *not* a
+//! zero-pass shader — an unregistered handle — and for an active stage whose
+//! image has not been uploaded. Both log once per process rather than dropping
+//! the quad.
 
 use mp_engine_qcommon::qfiles::font_style::SET_MASK;
 use mp_renderer::render_state::frame_data::FrameData;
@@ -41,12 +48,14 @@ use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::shader_asset::ShaderHandle;
 use mp_renderer::tr_font::{layout_font_string, FontDrawItem, FontState, Language_e};
 use mp_renderer::tr_image::TrImageState;
-use wgpu::{BlendState, TextureView};
+use mp_renderer::tr_noise::NoiseState;
+use wgpu::TextureView;
 
 use crate::blend::{blend_state_from_gls, GLS_2D_DEFAULT};
 use crate::gpu::Gpu;
 use crate::gpu_images::GpuImages;
 use crate::pipeline2d::{Pipeline2d, QuadBatch, Rect, UvRect};
+use crate::stage2d::{stage_color, stage_image, stage_texcoords, Stage2dWarnings, StageTime};
 
 /// `tr.identityLight` at its default (no overbright) — the colour a frame
 /// starts at before any `SetColor`, matching the oracle's white default.
@@ -59,9 +68,12 @@ const DEFAULT_COLOR: [f32; 4] = [1.0, 1.0, 1.0, 1.0];
 /// reports.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FrameStats {
-    /// Quads batched — `DrawStretchPic` events plus every glyph a
-    /// `DrawString` laid out.
+    /// Quads batched — one per active stage of every `DrawStretchPic`'s
+    /// shader, plus every glyph a `DrawString` laid out.
     pub quads: u32,
+    /// `DrawStretchPic` events whose shader had stages but none active, so no
+    /// pass was drawn (the oracle's zero-iteration `RB_StageIteratorGeneric`).
+    pub zero_pass_pics: u32,
     /// `SetColor` events applied.
     pub color_changes: u32,
     /// `draw` calls the batch collapsed to (one per blend+texture run).
@@ -104,7 +116,7 @@ enum Warned {
     Other,
     /// A `DrawStretchPic`'s shader handle addressed no registered shader.
     UnknownShader,
-    /// A shader resolved, but no active stage named an uploaded image.
+    /// An active stage's image is missing or not uploaded yet.
     NoStageImage,
     /// A `DrawString`'s font index addressed no loaded font.
     UnknownFont,
@@ -135,7 +147,7 @@ impl Warned {
             }
             Warned::Other => "skips world-effect / automap commands — not rendered yet",
             Warned::UnknownShader => "drew a pic whose shader handle is not registered — white",
-            Warned::NoStageImage => "drew a pic whose shader has no uploaded stage image — white",
+            Warned::NoStageImage => "drew a stage whose image is not uploaded — white",
             Warned::UnknownFont => "drew a string with an unloaded font handle — nothing drawn",
             Warned::NoGlyphImage => "drew a glyph whose page shader has no image — white",
         }
@@ -148,6 +160,7 @@ pub struct FrameExecutor {
     pipeline: Pipeline2d,
     batch: QuadBatch,
     warned: [bool; Warned::COUNT],
+    stage_warnings: Stage2dWarnings,
 }
 
 impl FrameExecutor {
@@ -159,6 +172,7 @@ impl FrameExecutor {
             pipeline: Pipeline2d::new(gpu, images),
             batch: QuadBatch::new(),
             warned: [false; Warned::COUNT],
+            stage_warnings: Stage2dWarnings::default(),
         }
     }
 
@@ -168,6 +182,13 @@ impl FrameExecutor {
     /// `RB_SetGL2D` path re-establishes white at the top of every 2D pass, and
     /// `FrameData` is a complete frame, so starting from [`DEFAULT_COLOR`]
     /// keeps a dropped frame from tinting the next one.
+    ///
+    /// `float_time` is the 2D pass's shader clock in seconds —
+    /// `backEnd.refdef.floatTime`, which `RB_SetGL2D` sets from
+    /// `ri.Milliseconds()` at the top of every 2D pass. Every animated stage
+    /// (`rgbGen wave`, `tcMod scroll`/`rotate`, `animMap`) is driven from it.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_backend.cpp:1289-1291`
     #[allow(clippy::too_many_arguments)]
     pub fn execute_frame(
         &mut self,
@@ -179,6 +200,8 @@ impl FrameExecutor {
         img_state: &mut TrImageState,
         gpu_images: &mut GpuImages,
         fonts: &mut FontState,
+        noise: &NoiseState,
+        float_time: f32,
     ) -> FrameStats {
         // Two registries by design (A9): shader registration writes the direct
         // `assets` instance, image registration writes the sim-published Arc
@@ -212,8 +235,8 @@ impl FrameExecutor {
                     t2,
                     shader,
                 } => {
-                    let (image, blend) = self.resolve_shader(*shader, assets, gpu_images);
-                    self.batch.push_quad(
+                    let drawn = self.draw_stretch_pic(
+                        *shader,
                         Rect {
                             x: *x,
                             y: *y,
@@ -227,10 +250,15 @@ impl FrameExecutor {
                             t2: *t2,
                         },
                         color,
-                        blend,
-                        image,
+                        assets,
+                        gpu_images,
+                        noise,
+                        float_time,
                     );
-                    stats.quads += 1;
+                    stats.quads += drawn;
+                    if drawn == 0 {
+                        stats.zero_pass_pics += 1;
+                    }
                 }
 
                 FrameEvent::DrawString {
@@ -294,51 +322,99 @@ impl FrameExecutor {
         stats
     }
 
-    /// Walks a draw's `ShaderHandle` to the texture it binds and the blend
-    /// state it draws with: shader -> first active stage -> `bundle[0].image`
-    /// -> uploaded texture, with the stage's `stateBits` decoded as the blend
-    /// mode.
+    /// Draws one `DrawStretchPic` as `RB_StageIteratorGeneric` does: one
+    /// layered quad per active stage, in stage order, each with its own image,
+    /// its own `GL_State(pStage->stateBits)` blend and its own
+    /// `ComputeColors`/`ComputeTexCoords` result. Returns the number of quads
+    /// batched.
     ///
-    /// "First active stage" is the single-pass reduction of
-    /// `RB_StageIteratorGeneric`'s loop, which walks every active stage and
-    /// re-issues `GL_State(pStage->stateBits)` per pass. 2D pics are
-    /// overwhelmingly one-stage, so wave 2 renders stage 0 and leaves
-    /// multi-pass 2D shaders (`animMap` frames, multi-stage menu art) to the
-    /// wave that brings `tess`-equivalent multi-pass iteration.
+    /// Every stage draws the same screen rectangle — the oracle re-tessellates
+    /// nothing between passes, it only re-binds and re-issues `tess`'s
+    /// geometry — so the layering is pure blend order, which the batch already
+    /// preserves (2D has no depth test; later wins).
     ///
-    /// A missing link degrades to `(white, RB_SetGL2D's blend)` — the state
-    /// the oracle's 2D pass is already in — never a dropped quad.
+    /// Zero active stages means zero passes, which is a shader whose stages all
+    /// died in `FinishShader` — a `videoMap` with no cinematic behind it, or a
+    /// stage whose image failed to load. `RB_IterateStagesGeneric` breaks on
+    /// the first inactive stage, so the oracle draws nothing there and so does
+    /// this; the white texel is reserved for a handle that names no shader at
+    /// all.
     ///
-    /// Source: `oracle/codemp/renderer/tr_shade.cpp` (`RB_StageIteratorGeneric`);
-    /// `oracle/codemp/renderer/tr_backend.cpp:1282-1284` (`RB_SetGL2D`)
-    //TODO: Port RB_StageIteratorGeneric's multi-stage 2D pass
-    // Source: oracle/codemp/renderer/tr_shade.cpp
-    fn resolve_shader(
+    /// Source: `oracle/codemp/renderer/tr_shade.cpp:1953-2231`
+    /// (`RB_IterateStagesGeneric`); `oracle/codemp/renderer/tr_backend.cpp:1282-1284`
+    /// (`RB_SetGL2D`)
+    #[allow(clippy::too_many_arguments)]
+    fn draw_stretch_pic(
         &mut self,
         shader: ShaderHandle,
+        rect: Rect,
+        uv: UvRect,
+        color: [f32; 4],
         assets: &RenderAssets,
         gpu_images: &GpuImages,
-    ) -> (Option<ImageHandle>, BlendState) {
-        let default = (None, blend_state_from_gls(GLS_2D_DEFAULT));
-
+        noise: &NoiseState,
+        float_time: f32,
+    ) -> u32 {
         let Some(asset) = assets.shaders.get(shader) else {
             self.warn_once(Warned::UnknownShader);
-            return default;
+            self.push_white(rect, uv, color);
+            return 1;
         };
-        let Some(stage) = asset.stages.iter().find(|stage| stage.active) else {
-            // The default shader and every not-yet-parsed shader are
-            // stage-less; that is ordinary, not an error worth a log.
-            return default;
-        };
+        let time = StageTime::new(float_time, asset.time_offset);
+        let mut drawn = 0;
+        for stage in asset.stages.iter().filter(|stage| stage.active) {
+            let bundle = &stage.bundle[0];
+            let image = stage_image(bundle, time.shader_time).filter(|image| {
+                let uploaded = gpu_images.contains(*image);
+                if !uploaded {
+                    self.warn_once(Warned::NoStageImage);
+                }
+                uploaded
+            });
 
-        let blend = blend_state_from_gls(stage.state_bits);
-        match stage.bundle[0].image {
-            Some(image) if gpu_images.contains(image) => (Some(image), blend),
-            _ => {
-                self.warn_once(Warned::NoStageImage);
-                (None, blend)
-            }
+            let mut st = uv.corners();
+            stage_texcoords(
+                bundle,
+                &mut st,
+                time,
+                noise,
+                assets,
+                &asset.name,
+                &mut self.stage_warnings,
+            );
+
+            self.batch.push_quad_st(
+                rect,
+                st,
+                stage_color(
+                    stage,
+                    color,
+                    time,
+                    noise,
+                    assets,
+                    &asset.name,
+                    &mut self.stage_warnings,
+                ),
+                blend_state_from_gls(stage.state_bits),
+                image,
+            );
+            drawn += 1;
         }
+        drawn
+    }
+
+    /// The white-texel fallback quad, drawn in the state `RB_SetGL2D` leaves
+    /// the pass in.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_backend.cpp:1282-1284`
+    fn push_white(&mut self, rect: Rect, uv: UvRect, color: [f32; 4]) {
+        self.batch.push_quad(
+            rect,
+            uv,
+            color,
+            blend_state_from_gls(GLS_2D_DEFAULT),
+            None::<ImageHandle>,
+        );
     }
 
     /// Lays a `DrawString` out into glyph quads and pushes them into the

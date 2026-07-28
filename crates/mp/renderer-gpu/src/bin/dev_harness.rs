@@ -41,6 +41,7 @@ use mp_renderer::render_state::shader_asset::{ShaderAsset, ShaderHandle};
 use mp_renderer::render_state::shader_stage::ShaderStage;
 use mp_renderer::tr_font::FontState;
 use mp_renderer::tr_image::{PendingUpload, TrImageState};
+use mp_renderer::tr_noise::NoiseState;
 use mp_renderer::tr_shader::ShaderStageParse;
 use mp_renderer_gpu::{FrameExecutor, FrameStats, Gpu, GpuImages, GLS_2D_DEFAULT};
 use winit::application::ApplicationHandler;
@@ -72,6 +73,9 @@ struct App {
     executor: Option<FrameExecutor>,
     registries: DevRegistries,
     fonts: FontState,
+    /// Wall clock since boot, standing in for `ri.Milliseconds()` — the 2D
+    /// shader clock `RB_SetGL2D` installs.
+    start: std::time::Instant,
     /// The first frame's stats, printed once so a headless run leaves proof in
     /// the log that the events reached the GPU.
     reported: bool,
@@ -86,6 +90,7 @@ impl App {
             executor: None,
             registries: dev_registries(),
             fonts: FontState::default(),
+            start: std::time::Instant::now(),
             reported: false,
         }
     }
@@ -154,6 +159,8 @@ impl ApplicationHandler for App {
                             &mut self.registries.img_state,
                             images,
                             &mut self.fonts,
+                            &NoiseState::default(),
+                            self.start.elapsed().as_secs_f32(),
                         );
                         if !self.reported {
                             self.reported = true;
@@ -302,10 +309,17 @@ fn dev_registries() -> DevRegistries {
         },
     );
 
-    // Slot 0 is the registries' default entry (A12) — stage-less, so it
-    // resolves to the white texel.
+    // Slot 0 is the registries' default entry (A12), shaped like
+    // `CreateInternalShaders`' `<default>`: one active stage whose image is
+    // `tr.defaultImage`. This harness has no builtin images, so that stage
+    // binds nothing and resolves to the white texel.
     let mut shaders = Arena::new_unbounded();
-    shaders.insert(shader_asset("<default>", Vec::new()));
+    let default_stage = ShaderStage::from(&ShaderStageParse {
+        active: true,
+        state_bits: GLS_2D_DEFAULT,
+        ..Default::default()
+    });
+    shaders.insert(shader_asset("<default>", vec![default_stage]));
 
     let mut stage = ShaderStage::from(&ShaderStageParse {
         active: true,

@@ -52,6 +52,7 @@ pub mod frame_exec;
 mod gpu;
 pub mod gpu_images;
 pub mod pipeline2d;
+pub mod stage2d;
 pub mod ui_host;
 
 pub use blend::{blend_state_from_gls, ALPHA_BLEND, GLS_2D_DEFAULT};
@@ -59,3 +60,4 @@ pub use frame_exec::{FrameExecutor, FrameStats};
 pub use gpu::{FrameError, Gpu};
 pub use gpu_images::{GpuImage, GpuImages};
 pub use pipeline2d::{Pipeline2d, QuadBatch, Rect, UvRect, SCREEN_HEIGHT, SCREEN_WIDTH};
+pub use stage2d::{stage_color, stage_image, stage_texcoords, Stage2dWarnings, StageTime};

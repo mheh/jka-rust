@@ -33,7 +33,13 @@ use crate::tr_local::mgrid_t::mgrid_t;
 /// `FUNCTABLE_SIZE`.
 ///
 /// Source: `oracle/codemp/renderer/tr_local.h:1247`
-pub(crate) const FUNCTABLE_SIZE: usize = 1024;
+pub const FUNCTABLE_SIZE: usize = 1024;
+
+/// `FUNCTABLE_SIZE2` — Raven: `log2(FUNCTABLE_SIZE)`, the shift
+/// `R_BindAnimatedImage` applies to an `animMap` frame index.
+///
+/// Source: `oracle/codemp/renderer/tr_local.h:1248`
+pub const FUNCTABLE_SIZE2: i32 = 10;
 
 /// `FOG_TABLE_SIZE`.
 ///

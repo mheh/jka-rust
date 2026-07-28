@@ -24,6 +24,10 @@ use mp_qshared::shared::q_string::COM_StripExtension;
 use mp_qshared::shared::{fileHandle_t, qhandle_t, MAX_QPATH};
 use native_math::qmath::Com_Clamp;
 use native_string::q_string::Q_stricmp;
+use zune_jpeg::zune_core::bytestream::ZCursor;
+use zune_jpeg::zune_core::colorspace::ColorSpace;
+use zune_jpeg::zune_core::options::DecoderOptions;
+use zune_jpeg::JpegDecoder;
 
 use crate::gl_constants::{
     GL_CLAMP, GL_CLAMP_TO_EDGE, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, GL_COMPRESSED_RGB_S3TC_DXT1_EXT,
@@ -764,9 +768,20 @@ pub fn LoadTGA(view: &mut EngineHostView, name: &str) -> Option<(Vec<u8>, i32, i
 
 /// Raven `LoadJPG`.
 ///
-/// The file-read CPU logic (`FS_FOpenFileRead`/`FS_Read`/`FS_FCloseFile`) is
-/// ported; the libjpeg decompression pipeline itself is escalated — see the
-/// `DEFERRED` block in the body.
+/// Raven's steps 1-5 and 7-8 are libjpeg-6b lifecycle calls against vendored
+/// third-party C (`oracle/codemp/jpeg-6`), not Raven logic; `zune-jpeg` fills
+/// that codec seam, which is what the earlier DEFERRED note here asked for
+/// ("escalate if the seam lacks a wrapper, never byte-port"). Raven's
+/// libjpeg is patched to `RGB_PIXELSIZE 4`, so its `output_components` is 4
+/// for colour and 1 for greyscale; asking the crate for `ColorSpace::RGBA`
+/// produces the same 4-byte-per-pixel buffer for both, and the oracle's own
+/// greyscale-expansion / alpha-clear passes (`:1862-1890`) run below over it
+/// regardless — the alpha clear is a no-op on a converter that already wrote
+/// 255, and the expansion is the identity once the crate has replicated luma.
+///
+/// A decode failure is Raven's `jpeg_std_error` path, which longjmps out and
+/// leaves `*pic` NULL — `None` here, i.e. the caller falls through to the
+/// next extension.
 ///
 /// Source: oracle/codemp/renderer/tr_image.cpp:1746-1915
 pub fn LoadJPG(view: &mut EngineHostView, filename: &str) -> Option<(Vec<u8>, i32, i32)> {
@@ -780,19 +795,44 @@ pub fn LoadJPG(view: &mut EngineHostView, filename: &str) -> Option<(Vec<u8>, i3
     FS_Read(view.common, fbuffer.as_mut_ptr() as *mut (), len, handle);
     FS_FCloseFile(view.common, handle);
 
-    // DEFERRED: escalate — the libjpeg decompression pipeline
-    // (jpeg_create_decompress/jpeg_stdio_src/jpeg_read_header/
-    // jpeg_start_decompress/jpeg_read_scanlines/jpeg_finish_decompress/
-    // jpeg_destroy_decompress) is vendored libjpeg with no Rust-crate seam
-    // confirmed wired in this workspace (packet tr_image.wave0 "image-codec
-    // seam" note: "escalate if the seam lacks a wrapper", never byte-port).
-    // The file read above is the CPU logic ported around it; the
-    // grayscale-expansion and alpha-channel-clear post-processing
-    // (`:1862-1890`) would run once `out` is decoded, once the codec seam
-    // lands.
-    // Source: oracle/codemp/renderer/tr_image.cpp:1788-1899
-    let _ = fbuffer;
-    None
+    let options = DecoderOptions::default().jpeg_set_out_colorspace(ColorSpace::RGBA);
+    let mut decoder =
+        JpegDecoder::new_with_options(ZCursor::new(&fbuffer[..len.max(0) as usize]), options);
+    let mut out = match decoder.decode() {
+        Ok(out) => out,
+        Err(err) => {
+            com_printf(
+                view.common,
+                &format!(
+                    "{}JPG {filename} failed to decode ({err})\n",
+                    S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII"),
+                ),
+            );
+            return None;
+        }
+    };
+    let info = decoder.info()?;
+    let output_width = i32::from(info.width);
+    let output_height = i32::from(info.height);
+
+    // rww - 9-13-01 [1-26-01-sof2] — Raven's unsupported-depth warning. The
+    // crate is asked for 4 components, so this only fires on a truncated
+    // buffer.
+    let output_components = out.len() / (output_width * output_height).max(1) as usize;
+    if output_components != 4 && output_components != 1 {
+        com_printf(
+            view.common,
+            &format!("JPG {filename} is unsupported color depth ({output_components})\n"),
+        );
+    }
+    out.resize((output_width * output_height * 4) as usize, 0);
+
+    // clear all the alphas to 255
+    for i in (3..out.len()).step_by(4) {
+        out[i] = 255;
+    }
+
+    Some((out, output_width, output_height))
 }
 
 // DEFERRED-WHOLE: vendored libjpeg destination-manager glue — Raven's

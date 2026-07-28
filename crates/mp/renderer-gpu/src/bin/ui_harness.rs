@@ -220,6 +220,10 @@ impl ApplicationHandler for App {
 impl App {
     fn redraw(&mut self, event_loop: &ActiveEventLoop) {
         let frame_data = self.ui_frame();
+        // `RB_SetGL2D`'s shader clock: `backEnd.refdef.floatTime =
+        // ri.Milliseconds() * 0.001f`.
+        // Source: `oracle/codemp/renderer/tr_backend.cpp:1289-1291`
+        let float_time = self.host.ui.uiDC.realTime as f32 * 0.001;
         let (Some(window), Some(gpu), Some(images), Some(executor)) = (
             self.window.as_ref(),
             self.gpu.as_mut(),
@@ -246,6 +250,8 @@ impl App {
                     &mut self.host.img_state,
                     images,
                     &mut self.host.font,
+                    &self.host.noise,
+                    float_time,
                 );
                 if !self.reported {
                     self.reported = true;
@@ -290,14 +296,15 @@ impl App {
 fn report(label: &str, stats: &FrameStats) {
     println!(
         "ui_harness: {label} — {} images uploaded, {} quads ({} glyphs across {} strings), \
-         {} color changes, {} draw calls, {} events skipped",
+         {} color changes, {} draw calls, {} events skipped, {} zero-pass pics",
         stats.images_uploaded,
         stats.quads,
         stats.glyphs,
         stats.strings,
         stats.color_changes,
         stats.draw_calls,
-        stats.skipped_events()
+        stats.skipped_events(),
+        stats.zero_pass_pics
     );
 }
 

@@ -31,6 +31,7 @@ mp_host_interface = { path = "../host-interface" }
 # (DEC-35); this crate consumes it instead of re-porting it. Acyclic:
 # mp_engine_ghoul2 deps only mp_qshared + mp_host_interface.
 mp_engine_ghoul2 = { path = "../engine/ghoul2" }
+zune-jpeg = "0.5"
 
 [dev-dependencies]
 testkit = { path = "../../testkit" }

@@ -1737,6 +1737,20 @@ pub fn R_Init(
         gpu,
         &*frame,
     );
+    // PORT-NOTE: Raven has one `tr`, so `R_InitImages`' internal-image handles
+    // (`tr.defaultImage`/`whiteImage`/`fogImage`/`dlightImage`) are already
+    // visible to `R_InitShaders` when it builds `<default>`/`white`/`fog`.
+    // Here the image registry is the sim-published master (A9) and the shader
+    // registry is `assets`, so the four handles are mirrored across before the
+    // shader init reads them — without this `CreateInternalShaders` binds
+    // `tr.defaultImage == NULL` and every internal shader loses its only stage.
+    // The handles stay valid on either side: both name slots in the one image
+    // arena `R_CreateImage` writes.
+    assets.default_image = sim.published.default_image;
+    assets.fog_image = sim.published.fog_image;
+    assets.dlight_image = sim.published.dlight_image;
+    assets.white_image = sim.published.white_image;
+
     R_InitShaders(
         false, qs, frame, assets, view, cvars, sim, &*models, state, gpu, sky_view, sky,
     );
