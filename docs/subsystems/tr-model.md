@@ -1051,3 +1051,17 @@ The FROZEN content above is unchanged. This records the closure-campaign ruling
   This doc **backs** it (owns `RenderModels.skins`); the frozen bone/surface subset in
   `ghoul2-server.md` **consumes** it (that doc's matching amendment closes its model-
   memory gap #2).
+
+## Amendment 2026-07-27 — models pool: arena mechanics (#51, user-approved unfreeze)
+
+User ruling 2026-07-27 (the #51 tier-2 sit-down): `RenderModels.models`
+(`Vec<Box<ModelData>>` + `hash`) adopts the R2 arena mechanics **in place** —
+slot 0 seeded `MOD_BAD` per `R_ModelInit`
+(`oracle/codemp/renderer/tr_model.cpp:1665-1680`, A12), slot = Raven's bare
+`mod->index`/`qhandle_t` (DEC-42.2 — G2/server code stores plain ints),
+generation counting per ruling 11. The DEC-35 mdx-view seams
+(`mp_host_interface`, `EngineHost` block reads) and the TRM-D4 cast
+discipline are untouched; the lockstep referee gates byte-identity. The
+unused `RenderAssets::models: Arena<ModelAsset>` R2 scaffold retires with a
+note — full server/client registry unification is deferred to the
+client-engine island.
