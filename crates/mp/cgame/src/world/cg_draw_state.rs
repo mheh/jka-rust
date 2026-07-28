@@ -6,7 +6,7 @@
 use core::ffi::c_int;
 
 use mp_bg::public::team_maxoverlay::TEAM_MAXOVERLAY;
-use mp_qshared::shared::{vec4_t, ENTITYNUM_NONE};
+use mp_qshared::shared::{vec3_t, vec4_t, ENTITYNUM_NONE};
 
 use crate::cg_draw::LAG_SAMPLES;
 
@@ -47,7 +47,7 @@ impl Default for lagometer_t {
 /// tables beside them are compiled-in data, not state; they land as `const`s
 /// beside the functions that read them (§C8).
 ///
-/// Source: `oracle/codemp/cgame/cg_draw.c:23-40,1791-1792,1940-1941,2196,2425,3167,3172-3174,4152,4738-4740,4799-4803,4847,5325-5326,7317-7338,7351-7354,7481`
+/// Source: `oracle/codemp/cgame/cg_draw.c:23-40,1791-1792,1940-1941,2196,2425,3167,3172-3174,4152,4738-4740,4799-4803,4847,5325-5326,7317-7335,7351-7354,7481`
 #[derive(Debug, Clone)]
 pub struct CgDrawState {
     /// Raven `int cg_targVeh` — the vehicle the targeting HUD is locked onto.
@@ -153,10 +153,89 @@ pub struct CgDrawState {
     /// Source: `oracle/codemp/cgame/cg_draw.c:224`
     pub flip: bool,
 
+    /// Raven `int cg_beatingSiegeTime` — the "beat this time" siege target in
+    /// msec, off `CS_SIEGE_TIMEOVERRIDE`; `cg_main.c`/`cg_servercmds.c` write it.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:7351`
+    pub cg_beatingSiegeTime: c_int,
+
     /// Raven's `static int oldDif = 0` inside `CG_DrawRocketLocking` — last
     /// frame's wedge count; a change fires the tick/lock sound.
     /// Source: `oracle/codemp/cgame/cg_draw.c:5752`
     pub oldDif: c_int,
+
+    /// Raven `vec3_t cg_crosshairPos` — the world point the crosshair was last
+    /// painted at, latched by `CG_DrawCrosshair` for the zoom/lock overlays.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:4847`
+    pub cg_crosshairPos: vec3_t,
+
+    /// Raven `int cg_saberFlashTime` — `cg.time` of the last saber clash; the
+    /// flare lives for 150ms after it.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:5325`
+    pub cg_saberFlashTime: c_int,
+
+    /// Raven `vec3_t cg_saberFlashPos` — where that clash happened.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:5326`
+    pub cg_saberFlashPos: vec3_t,
+
+    /// Raven `int cgRageTime` — `cg.time` the rage screen tint started.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:7317`
+    pub cgRageTime: c_int,
+
+    /// Raven `int cgRageFadeTime`.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:7318`
+    pub cgRageFadeTime: c_int,
+
+    /// Raven `float cgRageFadeVal`.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:7319`
+    pub cgRageFadeVal: f32,
+
+    /// Raven `int cgRageRecTime` — same clock for the rage-recovery grey.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:7321`
+    pub cgRageRecTime: c_int,
+
+    /// Raven `int cgRageRecFadeTime`.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:7322`
+    pub cgRageRecFadeTime: c_int,
+
+    /// Raven `float cgRageRecFadeVal`.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:7323`
+    pub cgRageRecFadeVal: f32,
+
+    /// Raven `int cgAbsorbTime` — `cg.time` the absorb tint started.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:7325`
+    pub cgAbsorbTime: c_int,
+
+    /// Raven `int cgAbsorbFadeTime`.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:7326`
+    pub cgAbsorbFadeTime: c_int,
+
+    /// Raven `float cgAbsorbFadeVal`.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:7327`
+    pub cgAbsorbFadeVal: f32,
+
+    /// Raven `int cgProtectTime` — `cg.time` the protect tint started.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:7329`
+    pub cgProtectTime: c_int,
+
+    /// Raven `int cgProtectFadeTime`.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:7330`
+    pub cgProtectFadeTime: c_int,
+
+    /// Raven `float cgProtectFadeVal`.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:7331`
+    pub cgProtectFadeVal: f32,
+
+    /// Raven `int cgYsalTime` — `cg.time` the ysalamiri tint started.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:7333`
+    pub cgYsalTime: c_int,
+
+    /// Raven `int cgYsalFadeTime`.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:7334`
+    pub cgYsalFadeTime: c_int,
+
+    /// Raven `float cgYsalFadeVal`.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:7335`
+    pub cgYsalFadeVal: f32,
 }
 
 impl Default for CgDrawState {
@@ -186,6 +265,25 @@ impl Default for CgDrawState {
             lastvalidlockdif: 0,
             flip: true,
             oldDif: 0,
+            cg_crosshairPos: [0.0; 3],
+            cg_saberFlashTime: 0,
+            cg_saberFlashPos: [0.0; 3],
+            cgRageTime: 0,
+            cgRageFadeTime: 0,
+            cgRageFadeVal: 0.0,
+            cgRageRecTime: 0,
+            cgRageRecFadeTime: 0,
+            cgRageRecFadeVal: 0.0,
+            cgAbsorbTime: 0,
+            cgAbsorbFadeTime: 0,
+            cgAbsorbFadeVal: 0.0,
+            cgProtectTime: 0,
+            cgProtectFadeTime: 0,
+            cgProtectFadeVal: 0.0,
+            cgYsalTime: 0,
+            cgYsalFadeTime: 0,
+            cgYsalFadeVal: 0.0,
+            cg_beatingSiegeTime: 0,
         }
     }
 }

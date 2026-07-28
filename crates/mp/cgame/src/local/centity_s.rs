@@ -16,6 +16,18 @@ use super::vehicle_id::VehicleId;
 /// Source: `oracle/codemp/cgame/cg_local.h:321`
 pub const MAX_CG_LOOPSOUNDS: usize = 8;
 
+impl centity_t {
+    /// All-zero value for take/put-back swaps at borrow-conflicted call sites
+    /// (the `refEntity_t::zeroed` pattern). Every POD field is zero-valid, and
+    /// the three resolution fields are too: `PlayerStateRef` (0 = None),
+    /// `Option<VehicleId>` and `npcClient` (null-niche `Option`s).
+    #[must_use]
+    pub fn zeroed() -> Self {
+        // SAFETY: all-zero is a valid bit pattern for every field, per above.
+        unsafe { core::mem::zeroed() }
+    }
+}
+
 /// Raven `centity_t` — client-side representation of an entity, tracking
 /// interpolation, animation, and effects state between snapshots.
 ///

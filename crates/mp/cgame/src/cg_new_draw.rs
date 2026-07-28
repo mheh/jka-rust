@@ -6,13 +6,15 @@
 use core::ffi::c_int;
 use core::ptr::null_mut;
 
+use mp_bg::bg_misc::BG_FindItemForPowerup;
+use mp_bg::public::configstring::CS_LOCATIONS;
 use mp_bg::public::gametype::{
     GT_CTF, GT_CTY, GT_DUEL, GT_FFA, GT_HOLOCRON, GT_JEDIMASTER, GT_POWERDUEL, GT_SIEGE,
     GT_SINGLE_PLAYER, GT_TEAM,
 };
 use mp_bg::public::pers_enum::persEnum_t::{PERS_RANK, PERS_SCORE, PERS_TEAM};
 use mp_bg::public::pmtype::pmtype_t;
-use mp_bg::public::powerup::{PW_BLUEFLAG, PW_NEUTRALFLAG, PW_REDFLAG};
+use mp_bg::public::powerup::{PW_BLUEFLAG, PW_NEUTRALFLAG, PW_NUM_POWERUPS, PW_REDFLAG};
 use mp_bg::public::stat_index::statIndex_t;
 use mp_bg::public::team::{TEAM_BLUE, TEAM_RED, TEAM_SPECTATOR};
 use mp_bg::public::teamtask::teamtask_t;
@@ -41,9 +43,9 @@ use mp_uishared::ui_shared::{
 use native_string::{latin1_to_string, string_to_latin1, Q_stricmpBytes};
 
 use crate::cg_draw::{CG_Text_Paint, CG_Text_Width, MenuFontToHandle};
-use crate::cg_drawtools::CG_DrawPic;
+use crate::cg_drawtools::{CG_DrawPic, CG_GetColorForHealth};
 use crate::cg_event::CG_PlaceString;
-use crate::cg_main::CG_GetStringEdString;
+use crate::cg_main::{CG_ConfigString, CG_GetLocationString, CG_GetStringEdString};
 use crate::trap;
 use crate::world::cg_context::CgContext;
 use crate::world::cg_world::CgWorld;
@@ -52,6 +54,10 @@ use crate::world::cg_world::CgWorld;
 ///
 /// Source: `oracle/codemp/cgame/cg_newDraw.c:324`
 pub const PIC_WIDTH: c_int = 12;
+
+// PORT-NOTE: file-local copy per cg_draw.rs's own (that one is private).
+/// Source: `oracle/codemp/game/q_shared.h:1989`
+const MAX_LOCATIONS: c_int = 64;
 
 // PORT-NOTE: `q_shared.h`'s font enum is anonymous, so per the
 // anonymous-enum convention this is a file-local `const`, mirroring
@@ -814,5 +820,321 @@ pub fn CG_KeyEvent(
     } else if key == A_MOUSE2 && down {
         // DEFERRED: see the fn doc above.
         // Source: oracle/codemp/cgame/cg_newDraw.c:854-855
+    }
+}
+
+/// Raven `CG_DrawNewTeamInfo` — the scoreboard team-overlay row: each
+/// teammate's powerup icons, health/armor tint, current task icon, name, and
+/// location, painted top to bottom until the rect runs out of room.
+///
+/// PORT-NOTE: Raven computes `pwidth` (max player-name width) and `lwidth`
+/// (max location-name width) up front but never reads either afterward - the
+/// draw loop below hardcodes its column split instead. The dead stores go,
+/// but the measuring loops still run: each `CG_Text_Width` is a live
+/// `R_Font_StrLenPixels` engine query Raven issues every frame.
+/// Source: `oracle/codemp/cgame/cg_newDraw.c:338-359`
+#[allow(clippy::too_many_arguments)]
+pub fn CG_DrawNewTeamInfo(
+    ctx: &mut CgContext,
+    cgDC: &DisplayState,
+    rect: &RectDef,
+    _text_x: f32,
+    text_y: f32,
+    scale: f32,
+    color: vec4_t,
+    _shader: qhandle_t,
+) {
+    let count = if ctx.world.draw.numSortedTeamPlayers > 8 {
+        8
+    } else {
+        ctx.world.draw.numSortedTeamPlayers
+    };
+
+    // §F19: Raven derefs `cg.snap` unguarded for every row's team check; the
+    // port resolves it once up front and does nothing with no snapshot,
+    // rather than crashing partway through the first row.
+    let Some(snap) = ctx.world.cg.snap_ref() else {
+        return;
+    };
+    let myTeam = snap.ps.persistant[PERS_TEAM as usize];
+
+    // max player name width (dead store dropped, live engine queries kept -
+    // see the PORT-NOTE above)
+    for i in 0..count as usize {
+        let idx = ctx.world.draw.sortedTeamPlayers[i] as usize;
+        let (infoValid, ciTeam, nameBuf) = {
+            let ci = &ctx.world.cgs.clientinfo[idx];
+            (ci.infoValid, ci.team, ci.name)
+        };
+        if infoValid != qfalse && ciTeam == myTeam {
+            let nameBytes: Vec<u8> = nameBuf
+                .iter()
+                .take_while(|&&c| c != 0)
+                .map(|&c| c as u8)
+                .collect();
+            let name = latin1_to_string(&nameBytes);
+            CG_Text_Width(ctx, cgDC, &name, scale, 0);
+        }
+    }
+
+    // max location name width
+    for i in 1..MAX_LOCATIONS {
+        let cs = CG_ConfigString(ctx, CS_LOCATIONS + i);
+        let p = CG_GetLocationString(ctx, &cs);
+        if !p.is_empty() {
+            CG_Text_Width(ctx, cgDC, &p, scale, 0);
+        }
+    }
+
+    let mut y = rect.y;
+
+    for i in 0..count as usize {
+        let idx = ctx.world.draw.sortedTeamPlayers[i] as usize;
+        let (infoValid, ciTeam, powerups, health, armor, teamTask, location, nameBuf) = {
+            let ci = &ctx.world.cgs.clientinfo[idx];
+            (
+                ci.infoValid,
+                ci.team,
+                ci.powerups,
+                ci.health,
+                ci.armor,
+                ci.teamTask,
+                ci.location,
+                ci.name,
+            )
+        };
+
+        if infoValid == qfalse || ciTeam != myTeam {
+            continue;
+        }
+
+        let mut xx = (rect.x + 1.0) as i32;
+        for j in 0..=PW_NUM_POWERUPS {
+            if powerups & (1 << j) != 0 {
+                if let Some(item) = BG_FindItemForPowerup(j) {
+                    // §F19: Raven hands `item->icon` straight to the trap; the
+                    // ported icon is optional, and an item without one
+                    // registers the empty name rather than dereferencing NULL.
+                    let icon = item.item().icon.unwrap_or("");
+                    let shader = trap::R_RegisterShader(ctx.engine, icon);
+                    CG_DrawPic(
+                        ctx,
+                        xx as f32,
+                        y,
+                        PIC_WIDTH as f32,
+                        PIC_WIDTH as f32,
+                        shader,
+                    );
+                    xx += PIC_WIDTH;
+                }
+            }
+        }
+
+        // FIXME: max of 3 powerups shown properly
+        xx = (rect.x + (PIC_WIDTH * 3) as f32 + 2.0) as i32;
+
+        let hcolor = CG_GetColorForHealth(health, armor);
+        trap::R_SetColor(ctx.engine, Some(&hcolor));
+        let heartShader = ctx.world.cgs.media.heartShader;
+        CG_DrawPic(
+            ctx,
+            xx as f32,
+            y + 1.0,
+            (PIC_WIDTH - 2) as f32,
+            (PIC_WIDTH - 2) as f32,
+            heartShader,
+        );
+
+        // Raven's `//Com_sprintf(st, ...)` / `//CG_Text_Paint(...)` health
+        // caption is commented out in the C - dead, carried as no-op.
+
+        // draw weapon icon
+        xx += PIC_WIDTH + 1;
+
+        // Raven's `#if 0` weapon-icon block ("weapon used is not that
+        // useful, use the space for task") never compiled into retail -
+        // dropped, not ported.
+
+        trap::R_SetColor(ctx.engine, None);
+        let h = CG_StatusHandle(ctx.world, teamTask);
+
+        if h != 0 {
+            CG_DrawPic(ctx, xx as f32, y, PIC_WIDTH as f32, PIC_WIDTH as f32, h);
+        }
+
+        xx += PIC_WIDTH + 1;
+
+        let leftOver = rect.w - xx as f32;
+        let mut maxx = xx as f32 + leftOver / 3.0;
+
+        let nameBytes: Vec<u8> = nameBuf
+            .iter()
+            .take_while(|&&c| c != 0)
+            .map(|&c| c as u8)
+            .collect();
+        let name = latin1_to_string(&nameBytes);
+        CG_Text_Paint_Limit(
+            ctx,
+            cgDC,
+            &mut maxx,
+            xx as f32,
+            y + text_y,
+            scale,
+            color,
+            &name,
+            0.0,
+            0,
+            FONT_MEDIUM,
+        );
+
+        let csStr = CG_ConfigString(ctx, CS_LOCATIONS + location);
+        let mut p = CG_GetLocationString(ctx, &csStr);
+        if p.is_empty() {
+            p = "unknown".to_string();
+        }
+
+        xx = (xx as f32 + (leftOver / 3.0 + 2.0)) as i32;
+        maxx = rect.w - 4.0;
+
+        CG_Text_Paint_Limit(
+            ctx,
+            cgDC,
+            &mut maxx,
+            xx as f32,
+            y + text_y,
+            scale,
+            color,
+            &p,
+            0.0,
+            0,
+            FONT_MEDIUM,
+        );
+        y += text_y + 2.0;
+        if y + text_y + 2.0 > rect.y + rect.h {
+            break;
+        }
+    }
+}
+
+/// Raven `CG_DrawTeamSpectators` — the scrolling spectator-name ticker along
+/// the scoreboard's bottom edge; two overlapping paints (`spectatorPaintX`/
+/// `spectatorPaintX2`) let the tail of one lap keep sliding while the next
+/// lap's head enters from the right.
+///
+/// Source: `oracle/codemp/cgame/cg_newDraw.c:437-492`
+pub fn CG_DrawTeamSpectators(
+    ctx: &mut CgContext,
+    cgDC: &DisplayState,
+    rect: &RectDef,
+    scale: f32,
+    color: vec4_t,
+    _shader: qhandle_t,
+) {
+    if ctx.world.cg.spectatorLen == 0 {
+        return;
+    }
+
+    if ctx.world.cg.spectatorWidth == -1.0 {
+        ctx.world.cg.spectatorWidth = 0.0;
+        ctx.world.cg.spectatorPaintX = (rect.x + 1.0) as i32;
+        ctx.world.cg.spectatorPaintX2 = -1;
+    }
+
+    if ctx.world.cg.spectatorOffset > ctx.world.cg.spectatorLen {
+        ctx.world.cg.spectatorOffset = 0;
+        ctx.world.cg.spectatorPaintX = (rect.x + 1.0) as i32;
+        ctx.world.cg.spectatorPaintX2 = -1;
+    }
+
+    if ctx.world.cg.time > ctx.world.cg.spectatorTime {
+        ctx.world.cg.spectatorTime = ctx.world.cg.time + 10;
+        if (ctx.world.cg.spectatorPaintX as f32) <= rect.x + 2.0 {
+            if ctx.world.cg.spectatorOffset < ctx.world.cg.spectatorLen {
+                let offset = ctx.world.cg.spectatorOffset as usize;
+                let tailBytes: Vec<u8> = ctx.world.cg.spectatorList[offset..]
+                    .iter()
+                    .take_while(|&&c| c != 0)
+                    .map(|&c| c as u8)
+                    .collect();
+                let tail = latin1_to_string(&tailBytes);
+                let width = CG_Text_Width(ctx, cgDC, &tail, scale, 1);
+                ctx.world.cg.spectatorPaintX += width - 1;
+                ctx.world.cg.spectatorOffset += 1;
+            } else {
+                ctx.world.cg.spectatorOffset = 0;
+                if ctx.world.cg.spectatorPaintX2 >= 0 {
+                    ctx.world.cg.spectatorPaintX = ctx.world.cg.spectatorPaintX2;
+                } else {
+                    ctx.world.cg.spectatorPaintX = (rect.x + rect.w - 2.0) as i32;
+                }
+                ctx.world.cg.spectatorPaintX2 = -1;
+            }
+        } else {
+            ctx.world.cg.spectatorPaintX -= 1;
+            if ctx.world.cg.spectatorPaintX2 >= 0 {
+                ctx.world.cg.spectatorPaintX2 -= 1;
+            }
+        }
+    }
+
+    let mut maxX = rect.x + rect.w - 2.0;
+    let offset = ctx.world.cg.spectatorOffset as usize;
+    let tailBytes: Vec<u8> = ctx.world.cg.spectatorList[offset..]
+        .iter()
+        .take_while(|&&c| c != 0)
+        .map(|&c| c as u8)
+        .collect();
+    let tail = latin1_to_string(&tailBytes);
+    let spectatorPaintX = ctx.world.cg.spectatorPaintX as f32;
+    CG_Text_Paint_Limit(
+        ctx,
+        cgDC,
+        &mut maxX,
+        spectatorPaintX,
+        rect.y + rect.h - 3.0,
+        scale,
+        color,
+        &tail,
+        0.0,
+        0,
+        FONT_MEDIUM,
+    );
+
+    if ctx.world.cg.spectatorPaintX2 >= 0 {
+        let mut maxX2 = rect.x + rect.w - 2.0;
+        let fullBytes: Vec<u8> = ctx
+            .world
+            .cg
+            .spectatorList
+            .iter()
+            .take_while(|&&c| c != 0)
+            .map(|&c| c as u8)
+            .collect();
+        let full = latin1_to_string(&fullBytes);
+        let spectatorPaintX2 = ctx.world.cg.spectatorPaintX2 as f32;
+        let limit = ctx.world.cg.spectatorOffset;
+        CG_Text_Paint_Limit(
+            ctx,
+            cgDC,
+            &mut maxX2,
+            spectatorPaintX2,
+            rect.y + rect.h - 3.0,
+            scale,
+            color,
+            &full,
+            0.0,
+            limit,
+            FONT_MEDIUM,
+        );
+    }
+
+    // if we have an offset ( we are skipping the first part of the string )
+    // and we fit the string
+    if ctx.world.cg.spectatorOffset != 0 && maxX > 0.0 {
+        if ctx.world.cg.spectatorPaintX2 == -1 {
+            ctx.world.cg.spectatorPaintX2 = (rect.x + rect.w - 2.0) as i32;
+        }
+    } else {
+        ctx.world.cg.spectatorPaintX2 = -1;
     }
 }

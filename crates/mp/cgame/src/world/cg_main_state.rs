@@ -103,6 +103,15 @@ pub struct CgMainState {
     /// Raven `float cg_skyOriScale`.
     /// Source: `oracle/codemp/cgame/cg_main.c:3431`
     pub cg_skyOriScale: f32,
+
+    /// Raven `int cgWeatherOverride` — the contents mask the RMG handed the
+    /// renderer, so `CG_Shutdown` knows whether to reset it.
+    ///
+    /// Its only writer, `CG_SetWeatherOverride`, sits inside an `#if 0` in the
+    /// oracle, so this never leaves 0 and `CG_Shutdown`'s test never fires.
+    /// Transcribed anyway - the test is Raven's.
+    /// Source: `oracle/codemp/cgame/cg_main.c:113,1117-1127`
+    pub cgWeatherOverride: c_int,
 }
 
 impl Default for CgMainState {
@@ -122,6 +131,7 @@ impl Default for CgMainState {
             cg_skyOri: false,
             cg_skyOriPos: [0.0; 3],
             cg_skyOriScale: 0.0,
+            cgWeatherOverride: 0,
         }
     }
 }

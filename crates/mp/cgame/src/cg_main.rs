@@ -7,19 +7,25 @@
 use core::ffi::{c_char, c_int};
 use core::ptr::null_mut;
 
-use mp_abi::cgame::shared_buffer::{TCGGetBoltData, TCGMiscEnt, TCGPointContents, TCGVectorData};
+use mp_abi::cgame::shared_buffer::{
+    TCGG2Mark, TCGGetBoltData, TCGMiscEnt, TCGPointContents, TCGTrace, TCGVectorData,
+};
 use mp_bg::bg_misc::{
     selected_holdable_tag, BG_CycleForce, BG_CycleInven, BG_FindItemForPowerup,
     BG_GetItemIndexByTag,
 };
+use mp_bg::bg_panimate::BG_ClearAnimsets;
 use mp_bg::public::bg_itemlist::{bg_itemlist, bg_numItems};
 use mp_bg::public::configstring::{
-    CS_AMBIENT_SET, CS_BSP_MODELS, CS_GLOBAL_AMBIENT_SET, CS_ITEMS, CS_MODELS, CS_MUSIC,
-    CS_TERRAINS,
+    CS_AMBIENT_SET, CS_BSP_MODELS, CS_EFFECTS, CS_GLOBAL_AMBIENT_SET, CS_ICONS, CS_ITEMS,
+    CS_MODELS, CS_MUSIC, CS_SIEGE_OBJECTIVES, CS_SIEGE_STATE, CS_SIEGE_TIMEOVERRIDE,
+    CS_SIEGE_WINTEAM, CS_SOUNDS, CS_TERRAINS,
 };
 use mp_bg::public::entity_type::entityType_t;
 use mp_bg::public::g_item::MAX_ITEM_MODELS;
-use mp_bg::public::gametype::{GT_CTF, GT_CTY, GT_DUEL, GT_JEDIMASTER, GT_POWERDUEL, GT_TEAM};
+use mp_bg::public::gametype::{
+    GT_CTF, GT_CTY, GT_DUEL, GT_JEDIMASTER, GT_POWERDUEL, GT_SIEGE, GT_TEAM,
+};
 use mp_bg::public::item_type::IT_HOLDABLE;
 use mp_bg::public::max_items::MAX_ITEMS;
 use mp_bg::public::pers_enum::persEnum_t::PERS_ATTACKER;
@@ -35,6 +41,7 @@ use mp_qshared::common::mp::cgame::refdef_t::{
 };
 use mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_USE;
 use mp_qshared::common::mp::qcommon::{usercmd_t, PMF_FOLLOW};
+use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::cvar::{
     CVAR_ARCHIVE, CVAR_CHEAT, CVAR_INTERNAL, CVAR_ROM, CVAR_SERVERINFO, CVAR_USERINFO,
 };
@@ -43,34 +50,36 @@ use mp_qshared::shared::force_powers::{
     FP_HEAL, FP_LEVITATION, FP_SABERTHROW, FP_SABER_DEFENSE, FP_SABER_OFFENSE, NUM_FORCE_POWERS,
 };
 use mp_qshared::shared::limits::{
-    MAX_CLIENTS, MAX_CLIENTS_I32, MAX_MODELS, MAX_STRING_CHARS, MAX_SUB_BSP, MAX_TOKEN_CHARS,
+    ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_CLIENTS, MAX_CLIENTS_I32, MAX_FX, MAX_ICONS, MAX_MODELS,
+    MAX_SOUNDS, MAX_STRING_CHARS, MAX_SUB_BSP, MAX_TOKEN_CHARS,
 };
 use mp_qshared::shared::q_color::S_COLOR_RED;
 use mp_qshared::shared::q_math::{
-    _VectorCopy, _VectorSubtract, AnglesToAxis, Distance, VectorLength, PITCH, ROLL, YAW,
+    _VectorCopy, _VectorMA, _VectorSubtract, vec3_origin, AnglesToAxis, Distance, VectorLength,
+    PITCH, ROLL, YAW,
 };
 use mp_qshared::shared::q_string::COM_Parse;
 use mp_qshared::shared::{
     fileHandle_t, pc_token_t, qfalse, qhandle_t, qtrue, vec3_t, vec4_t, CIN_LOOP, FS_READ,
-    MAX_CONFIGSTRINGS, MAX_GENTITIES, MAX_QPATH, MAX_TOKENLENGTH,
+    MASK_PLAYERSOLID, MAX_CONFIGSTRINGS, MAX_GENTITIES, MAX_QPATH, MAX_TOKENLENGTH,
 };
 use mp_uishared::shared::cached_assets_t::NUM_CROSSHAIRS;
 use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::display_state::DisplayState;
 use mp_uishared::shared::item_id::ItemId;
 use mp_uishared::shared::menu_id::MenuId;
-use mp_uishared::shared::menu_system::{MenuSystem, MAX_MENUFILE};
+use mp_uishared::shared::menu_system::{MenuSystem, MAX_MENUDEFFILE, MAX_MENUFILE};
 use mp_uishared::shared::menudef::{
     CG_BLUE_NAME, CG_GAME_STATUS, CG_GAME_TYPE, CG_KILLER, CG_RED_NAME, FEEDER_BLUETEAM_LIST,
     FEEDER_REDTEAM_LIST, FEEDER_SCOREBOARD,
 };
 use mp_uishared::ui_shared::{
     Menu_New, Menu_SetFeederSelection, PC_Color_Parse, PC_Float_Parse, PC_Int_Parse,
-    PC_String_Parse,
+    PC_String_Parse, UI_CleanupGhoul2,
 };
 use native_string::{
-    atof, atoi, buf_to_string, latin1_to_string, string_to_latin1, strncpyz_string, Q_strcat,
-    Q_stricmp,
+    atof, atoi, buf_to_string, latin1_to_string, sscanf_f32s, string_to_latin1, strncpyz_string,
+    Q_strcat, Q_stricmp,
 };
 
 use crate::cg_draw::{CG_Text_Paint, CG_Text_Width};
@@ -81,12 +90,17 @@ use crate::cg_marks::CG_ClearParticles;
 use crate::cg_new_draw::{
     CG_GameTypeString, CG_GetGameStatusText, CG_GetKillerText, CG_StatusHandle,
 };
-use crate::cg_players::{CG_CacheG2AnimInfo, CG_CleanJetpackGhoul2, CG_HandleAppendedSkin};
-use crate::cg_predict::CG_PointContents;
+use crate::cg_players::{
+    CG_AddGhoul2Mark, CG_CacheG2AnimInfo, CG_CleanJetpackGhoul2, CG_HandleAppendedSkin,
+};
+use crate::cg_predict::{CG_G2Trace, CG_PointContents, CG_Trace};
+use crate::cg_saga::{CG_ParseSiegeObjectiveStatus, CG_SetSiegeTimerCvar};
 use crate::cg_scoreboard::{CG_GetClassCount, CG_GetTeamNonScoreCount};
-use crate::cg_servercmds::CG_KillCEntityG2;
+use crate::cg_servercmds::{CG_KillCEntityG2, CG_PrecacheNPCSounds};
 use crate::cg_weapons::{CG_InitG2Weapons, CG_RegisterItemVisuals, CG_ShutDownG2Weapons};
+use crate::local::centity_s::centity_t;
 use crate::local::client_info_t::clientInfo_t;
+use crate::local::footstep_t::footstep_t;
 use crate::local::item_info_t::itemInfo_t;
 use crate::local::weapon_info_s::weaponInfo_t;
 use crate::trap;
@@ -2076,19 +2090,12 @@ pub fn CG_Init_CG(world: &mut CgWorld) {
 
 /// Raven `CG_Init_CGents` — wipes the entity array between map loads.
 ///
-/// ESCALATION: blocked on a safe zero-fill for `centity_t`, the same gap
-/// [`CG_Init_CG`] hit — `memset(&cg_entities, 0, sizeof(cg_entities))` needs
-/// `centity_t::zeroed()` (`local/centity_s.rs`, outside this wave's two files)
-/// or an `unsafe` fill this wave may not write.
-///
 /// Source: `oracle/codemp/cgame/cg_main.c:3274-3278`
 pub fn CG_Init_CGents(world: &mut CgWorld) {
-    let _ = world;
-    //TODO: Port CG_Init_CGents
-    // Source: oracle/codemp/cgame/cg_main.c:3274-3278
-    todo!(
-        "CG_Init_CGents — blocked on a safe centity_t zero-fill, oracle/codemp/cgame/cg_main.c:3274-3278"
-    )
+    // Raven: memset(&cg_entities, 0, sizeof(cg_entities));
+    for cent in world.entities.iter_mut() {
+        *cent = centity_t::zeroed();
+    }
 }
 
 /// Raven `CG_InitItems` — drops every item's registered models/icons.
@@ -3887,4 +3894,812 @@ pub fn CG_DestroyAllGhoul2(ctx: &mut CgContext) {
 
     // Clean the global jetpack instance
     CG_CleanJetpackGhoul2(ctx);
+}
+
+/// Raven `C_Trace` — the `CG_TRACE` vmcall body.
+///
+/// Same DEC-46.6 shape as [`C_PointContents`]: Raven casts `cg.sharedBuffer` to
+/// `TCGTrace *` right here, the port takes the already-decoded payload from the
+/// vmMain dispatch boundary and writes the result back into `mResult`.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:408-413`
+pub fn C_Trace(ctx: &mut CgContext, td: &mut TCGTrace) {
+    CG_Trace(
+        ctx,
+        &mut td.mResult,
+        &td.mStart,
+        &td.mMins,
+        &td.mMaxs,
+        &td.mEnd,
+        td.mSkipNumber,
+        td.mMask,
+    );
+}
+
+/// Raven `C_G2Trace` — [`C_Trace`]'s twin on the `CG_G2TRACE` vmcall, so the
+/// sweep also probes ghoul2 sub-models.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:415-420`
+pub fn C_G2Trace(ctx: &mut CgContext, td: &mut TCGTrace) {
+    CG_G2Trace(
+        ctx,
+        &mut td.mResult,
+        &td.mStart,
+        &td.mMins,
+        &td.mMaxs,
+        &td.mEnd,
+        td.mSkipNumber,
+        td.mMask,
+    );
+}
+
+/// Raven `C_G2Mark` — the `CG_G2MARK` vmcall body: fire a 64-unit probe along
+/// `dir` and project a gore decal onto whoever it hits.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:422-443`
+pub fn C_G2Mark(ctx: &mut CgContext, td: &TCGG2Mark) {
+    let mut tr = trace_t::zeroed();
+    let mut end: vec3_t = [0.0; 3];
+
+    _VectorMA(td.start, 64.0, td.dir, &mut end);
+    // Raven passes NULL mins/maxs; `CM_BoxTrace` substitutes `vec3_origin` for a
+    // NULL box (`oracle/codemp/qcommon/cm_trace.cpp:1603-1606`) and
+    // `CG_ClipMoveToEntities` only forwards them, so the zero vector is the same
+    // trace.
+    CG_G2Trace(
+        ctx,
+        &mut tr,
+        &td.start,
+        &vec3_origin,
+        &vec3_origin,
+        &end,
+        ENTITYNUM_NONE,
+        MASK_PLAYERSOLID,
+    );
+
+    if (tr.entityNum as c_int) < ENTITYNUM_WORLD
+        && !ctx.world.entities[tr.entityNum as usize].ghoul2.is_null()
+    {
+        //hit someone with a ghoul2 instance, let's project the decal on them then.
+        let cent = tr.entityNum as usize;
+
+        //CG_TestLine(tr.endpos, end, 2000, 0x0000ff, 1);
+
+        let lerpOrigin = ctx.world.entities[cent].lerpOrigin;
+        let entangle = ctx.world.entities[cent].lerpAngles[YAW];
+        let ghoul2 = ctx.world.entities[cent].ghoul2;
+        // `modelScale` goes in by pointer in Raven and `CG_AddGhoul2Mark` really
+        // does stomp it (its argument-swapped `VectorCopy`), so copy it back out.
+        let mut modelScale = ctx.world.entities[cent].modelScale;
+        let lifeTime = ctx.world.bg_state.rng.Q_irand(2000, 4000);
+
+        CG_AddGhoul2Mark(
+            ctx,
+            td.shader,
+            td.size,
+            &tr.endpos,
+            &end,
+            tr.entityNum as c_int,
+            &lerpOrigin,
+            entangle,
+            ghoul2,
+            &mut modelScale,
+            lifeTime,
+        );
+        ctx.world.entities[cent].modelScale = modelScale;
+        //I'm making fx system decals have a very short lifetime.
+    }
+}
+
+/// Raven `CG_RegisterSounds` — the map-load sound/effect precache: the fixed
+/// list Raven spells out inline, then everything the server asked for through
+/// `CS_SOUNDS`/`CS_EFFECTS`/`CS_ICONS`.
+///
+/// Most of the calls throw their handle away — registering is the point, the
+/// engine hands the same handle back when the sound is played by name.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:1456-1857`
+pub fn CG_RegisterSounds(ctx: &mut CgContext) {
+    let engine = ctx.engine;
+
+    CG_AS_Register(ctx);
+
+    // CG_LoadingString( "sounds" );
+
+    trap::S_RegisterSound(engine, "sound/weapons/melee/punch1.mp3");
+    trap::S_RegisterSound(engine, "sound/weapons/melee/punch2.mp3");
+    trap::S_RegisterSound(engine, "sound/weapons/melee/punch3.mp3");
+    trap::S_RegisterSound(engine, "sound/weapons/melee/punch4.mp3");
+    trap::S_RegisterSound(engine, "sound/movers/objects/saber_slam");
+
+    trap::S_RegisterSound(engine, "sound/player/bodyfall_human1.wav");
+    trap::S_RegisterSound(engine, "sound/player/bodyfall_human2.wav");
+    trap::S_RegisterSound(engine, "sound/player/bodyfall_human3.wav");
+
+    //test effects
+    trap::FX_RegisterEffect(engine, "effects/mp/test_sparks.efx");
+    trap::FX_RegisterEffect(engine, "effects/mp/test_wall_impact.efx");
+
+    ctx.world.cgs.media.oneMinuteSound =
+        trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM004");
+    ctx.world.cgs.media.fiveMinuteSound =
+        trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM005");
+    ctx.world.cgs.media.oneFragSound =
+        trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM001");
+    ctx.world.cgs.media.twoFragSound =
+        trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM002");
+    ctx.world.cgs.media.threeFragSound =
+        trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM003");
+    ctx.world.cgs.media.count3Sound =
+        trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM035");
+    ctx.world.cgs.media.count2Sound =
+        trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM036");
+    ctx.world.cgs.media.count1Sound =
+        trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM037");
+    ctx.world.cgs.media.countFightSound =
+        trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM038");
+
+    ctx.world.cgs.media.hackerIconShader =
+        trap::R_RegisterShaderNoMip(engine, "gfx/mp/c_icon_tech");
+
+    ctx.world.cgs.media.redSaberGlowShader =
+        trap::R_RegisterShader(engine, "gfx/effects/sabers/red_glow");
+    ctx.world.cgs.media.redSaberCoreShader =
+        trap::R_RegisterShader(engine, "gfx/effects/sabers/red_line");
+    ctx.world.cgs.media.orangeSaberGlowShader =
+        trap::R_RegisterShader(engine, "gfx/effects/sabers/orange_glow");
+    ctx.world.cgs.media.orangeSaberCoreShader =
+        trap::R_RegisterShader(engine, "gfx/effects/sabers/orange_line");
+    ctx.world.cgs.media.yellowSaberGlowShader =
+        trap::R_RegisterShader(engine, "gfx/effects/sabers/yellow_glow");
+    ctx.world.cgs.media.yellowSaberCoreShader =
+        trap::R_RegisterShader(engine, "gfx/effects/sabers/yellow_line");
+    ctx.world.cgs.media.greenSaberGlowShader =
+        trap::R_RegisterShader(engine, "gfx/effects/sabers/green_glow");
+    ctx.world.cgs.media.greenSaberCoreShader =
+        trap::R_RegisterShader(engine, "gfx/effects/sabers/green_line");
+    ctx.world.cgs.media.blueSaberGlowShader =
+        trap::R_RegisterShader(engine, "gfx/effects/sabers/blue_glow");
+    ctx.world.cgs.media.blueSaberCoreShader =
+        trap::R_RegisterShader(engine, "gfx/effects/sabers/blue_line");
+    ctx.world.cgs.media.purpleSaberGlowShader =
+        trap::R_RegisterShader(engine, "gfx/effects/sabers/purple_glow");
+    ctx.world.cgs.media.purpleSaberCoreShader =
+        trap::R_RegisterShader(engine, "gfx/effects/sabers/purple_line");
+    ctx.world.cgs.media.saberBlurShader =
+        trap::R_RegisterShader(engine, "gfx/effects/sabers/saberBlur");
+    ctx.world.cgs.media.swordTrailShader =
+        trap::R_RegisterShader(engine, "gfx/effects/sabers/swordTrail");
+
+    ctx.world.cgs.media.forceCoronaShader =
+        trap::R_RegisterShaderNoMip(engine, "gfx/hud/force_swirl");
+
+    ctx.world.cgs.media.yellowDroppedSaberShader =
+        trap::R_RegisterShader(engine, "gfx/effects/yellow_glow");
+
+    ctx.world.cgs.media.rivetMarkShader = trap::R_RegisterShader(engine, "gfx/damage/rivetmark");
+
+    trap::R_RegisterShader(engine, "gfx/effects/saberFlare");
+
+    trap::R_RegisterShader(engine, "powerups/ysalimarishell");
+
+    trap::R_RegisterShader(engine, "gfx/effects/forcePush");
+
+    trap::R_RegisterShader(engine, "gfx/misc/red_dmgshield");
+    trap::R_RegisterShader(engine, "gfx/misc/red_portashield");
+    trap::R_RegisterShader(engine, "gfx/misc/blue_dmgshield");
+    trap::R_RegisterShader(engine, "gfx/misc/blue_portashield");
+
+    trap::R_RegisterShader(engine, "models/map_objects/imp_mine/turret_chair_dmg.tga");
+
+    for i in 1..9 {
+        trap::S_RegisterSound(engine, &format!("sound/weapons/saber/saberhup{i}.wav"));
+    }
+
+    for i in 1..10 {
+        trap::S_RegisterSound(engine, &format!("sound/weapons/saber/saberblock{i}.wav"));
+    }
+
+    for i in 1..4 {
+        trap::S_RegisterSound(engine, &format!("sound/weapons/saber/bounce{i}.wav"));
+    }
+
+    trap::S_RegisterSound(engine, "sound/weapons/saber/enemy_saber_on.wav");
+    trap::S_RegisterSound(engine, "sound/weapons/saber/enemy_saber_off.wav");
+
+    trap::S_RegisterSound(engine, "sound/weapons/saber/saberhum1.wav");
+    trap::S_RegisterSound(engine, "sound/weapons/saber/saberon.wav");
+    trap::S_RegisterSound(engine, "sound/weapons/saber/saberoffquick.wav");
+    trap::S_RegisterSound(engine, "sound/weapons/saber/saberhitwall1");
+    trap::S_RegisterSound(engine, "sound/weapons/saber/saberhitwall2");
+    trap::S_RegisterSound(engine, "sound/weapons/saber/saberhitwall3");
+    trap::S_RegisterSound(engine, "sound/weapons/saber/saberhit.wav");
+    trap::S_RegisterSound(engine, "sound/weapons/saber/saberhit1.wav");
+    trap::S_RegisterSound(engine, "sound/weapons/saber/saberhit2.wav");
+    trap::S_RegisterSound(engine, "sound/weapons/saber/saberhit3.wav");
+
+    trap::S_RegisterSound(engine, "sound/weapons/saber/saber_catch.wav");
+
+    ctx.world.cgs.media.teamHealSound =
+        trap::S_RegisterSound(engine, "sound/weapons/force/teamheal.wav");
+    ctx.world.cgs.media.teamRegenSound =
+        trap::S_RegisterSound(engine, "sound/weapons/force/teamforce.wav");
+
+    trap::S_RegisterSound(engine, "sound/weapons/force/heal.wav");
+    trap::S_RegisterSound(engine, "sound/weapons/force/speed.wav");
+    trap::S_RegisterSound(engine, "sound/weapons/force/see.wav");
+    trap::S_RegisterSound(engine, "sound/weapons/force/rage.wav");
+    trap::S_RegisterSound(engine, "sound/weapons/force/lightning");
+    trap::S_RegisterSound(engine, "sound/weapons/force/lightninghit1");
+    trap::S_RegisterSound(engine, "sound/weapons/force/lightninghit2");
+    trap::S_RegisterSound(engine, "sound/weapons/force/lightninghit3");
+    trap::S_RegisterSound(engine, "sound/weapons/force/drain.wav");
+    trap::S_RegisterSound(engine, "sound/weapons/force/jumpbuild.wav");
+    trap::S_RegisterSound(engine, "sound/weapons/force/distract.wav");
+    trap::S_RegisterSound(engine, "sound/weapons/force/distractstop.wav");
+    trap::S_RegisterSound(engine, "sound/weapons/force/pull.wav");
+    trap::S_RegisterSound(engine, "sound/weapons/force/push.wav");
+
+    for i in 1..3 {
+        trap::S_RegisterSound(engine, &format!("sound/weapons/thermal/bounce{i}.wav"));
+    }
+
+    trap::S_RegisterSound(engine, "sound/movers/switches/switch2.wav");
+    trap::S_RegisterSound(engine, "sound/movers/switches/switch3.wav");
+    trap::S_RegisterSound(engine, "sound/ambience/spark5.wav");
+    trap::S_RegisterSound(engine, "sound/chars/turret/ping.wav");
+    trap::S_RegisterSound(engine, "sound/chars/turret/startup.wav");
+    trap::S_RegisterSound(engine, "sound/chars/turret/shutdown.wav");
+    trap::S_RegisterSound(engine, "sound/chars/turret/move.wav");
+    trap::S_RegisterSound(engine, "sound/player/pickuphealth.wav");
+    trap::S_RegisterSound(engine, "sound/player/pickupshield.wav");
+
+    trap::S_RegisterSound(engine, "sound/effects/glassbreak1.wav");
+
+    trap::S_RegisterSound(engine, "sound/weapons/rocket/tick.wav");
+    trap::S_RegisterSound(engine, "sound/weapons/rocket/lock.wav");
+
+    trap::S_RegisterSound(engine, "sound/weapons/force/speedloop.wav");
+
+    trap::S_RegisterSound(engine, "sound/weapons/force/protecthit.mp3"); //PDSOUND_PROTECTHIT
+    trap::S_RegisterSound(engine, "sound/weapons/force/protect.mp3"); //PDSOUND_PROTECT
+    trap::S_RegisterSound(engine, "sound/weapons/force/absorbhit.mp3"); //PDSOUND_ABSORBHIT
+    trap::S_RegisterSound(engine, "sound/weapons/force/absorb.mp3"); //PDSOUND_ABSORB
+    trap::S_RegisterSound(engine, "sound/weapons/force/jump.mp3"); //PDSOUND_FORCEJUMP
+    trap::S_RegisterSound(engine, "sound/weapons/force/grip.mp3"); //PDSOUND_FORCEGRIP
+
+    if ctx.world.cgs.gametype >= GT_TEAM || ctx.world.cvars.cg_buildScript.integer != 0 {
+        // #ifdef JK2AWARDS: cgs.media.captureAwardSound — not defined in the MP
+        // build, so the retail module never registers it.
+
+        ctx.world.cgs.media.redLeadsSound =
+            trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM046");
+        ctx.world.cgs.media.blueLeadsSound =
+            trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM045");
+        ctx.world.cgs.media.teamsTiedSound =
+            trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM032");
+
+        ctx.world.cgs.media.redScoredSound =
+            trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM044");
+        ctx.world.cgs.media.blueScoredSound =
+            trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM043");
+
+        if ctx.world.cgs.gametype == GT_CTF || ctx.world.cvars.cg_buildScript.integer != 0 {
+            ctx.world.cgs.media.redFlagReturnedSound =
+                trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM042");
+            ctx.world.cgs.media.blueFlagReturnedSound =
+                trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM041");
+            ctx.world.cgs.media.redTookFlagSound =
+                trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM040");
+            ctx.world.cgs.media.blueTookFlagSound =
+                trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM039");
+        }
+        if ctx.world.cgs.gametype == GT_CTY
+        /*|| cg_buildScript.integer*/
+        {
+            ctx.world.cgs.media.redYsalReturnedSound =
+                trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM050");
+            ctx.world.cgs.media.blueYsalReturnedSound =
+                trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM049");
+            ctx.world.cgs.media.redTookYsalSound =
+                trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM048");
+            ctx.world.cgs.media.blueTookYsalSound =
+                trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM047");
+        }
+    }
+
+    ctx.world.cgs.media.drainSound =
+        trap::S_RegisterSound(engine, "sound/weapons/force/drained.mp3");
+
+    ctx.world.cgs.media.happyMusic = trap::S_RegisterSound(engine, "music/goodsmall.mp3");
+    ctx.world.cgs.media.dramaticFailure = trap::S_RegisterSound(engine, "music/badsmall.mp3");
+
+    //PRECACHE ALL MUSIC HERE (don't need to precache normally because it's streamed off the disk)
+    if ctx.world.cvars.cg_buildScript.integer != 0 {
+        trap::S_StartBackgroundTrack(engine, "music/mp/duel.mp3", "music/mp/duel.mp3", false);
+    }
+
+    ctx.world.cg.loadLCARSStage = 1;
+
+    ctx.world.cgs.media.selectSound = trap::S_RegisterSound(engine, "sound/weapons/change.wav");
+
+    ctx.world.cgs.media.teleInSound = trap::S_RegisterSound(engine, "sound/player/telein.wav");
+    ctx.world.cgs.media.teleOutSound = trap::S_RegisterSound(engine, "sound/player/teleout.wav");
+    ctx.world.cgs.media.respawnSound = trap::S_RegisterSound(engine, "sound/items/respawn1.wav");
+
+    trap::S_RegisterSound(engine, "sound/movers/objects/objectHit.wav");
+
+    ctx.world.cgs.media.talkSound = trap::S_RegisterSound(engine, "sound/player/talk.wav");
+    ctx.world.cgs.media.landSound = trap::S_RegisterSound(engine, "sound/player/land1.wav");
+    ctx.world.cgs.media.fallSound = trap::S_RegisterSound(engine, "sound/player/fallsplat.wav");
+
+    ctx.world.cgs.media.crackleSound =
+        trap::S_RegisterSound(engine, "sound/effects/energy_crackle.wav");
+    // #ifdef JK2AWARDS: impressiveSound/excellentSound/deniedSound/
+    // humiliationSound/defendSound — not defined in the MP build.
+
+    /*
+    cgs.media.takenLeadSound = trap_S_RegisterSound( "sound/chars/protocol/misc/40MOM051");
+    cgs.media.tiedLeadSound = trap_S_RegisterSound( "sound/chars/protocol/misc/40MOM032");
+    cgs.media.lostLeadSound = trap_S_RegisterSound( "sound/chars/protocol/misc/40MOM052");
+    */
+
+    ctx.world.cgs.media.rollSound = trap::S_RegisterSound(engine, "sound/player/roll1.wav");
+
+    ctx.world.cgs.media.noforceSound = trap::S_RegisterSound(engine, "sound/weapons/force/noforce");
+
+    ctx.world.cgs.media.watrInSound = trap::S_RegisterSound(engine, "sound/player/watr_in.wav");
+    ctx.world.cgs.media.watrOutSound = trap::S_RegisterSound(engine, "sound/player/watr_out.wav");
+    ctx.world.cgs.media.watrUnSound = trap::S_RegisterSound(engine, "sound/player/watr_un.wav");
+
+    ctx.world.cgs.media.explosionModel =
+        trap::R_RegisterModel(engine, "models/map_objects/mp/sphere.md3");
+    ctx.world.cgs.media.surfaceExplosionShader = trap::R_RegisterShader(engine, "surfaceExplosion");
+
+    ctx.world.cgs.media.disruptorShader = trap::R_RegisterShader(engine, "gfx/effects/burn");
+
+    if ctx.world.cvars.cg_buildScript.integer != 0 {
+        trap::R_RegisterShader(engine, "gfx/effects/turretflashdie");
+    }
+
+    ctx.world.cgs.media.solidWhite = trap::R_RegisterShader(engine, "gfx/effects/solidWhite_cull");
+
+    trap::R_RegisterShader(engine, "gfx/misc/mp_light_enlight_disable");
+    trap::R_RegisterShader(engine, "gfx/misc/mp_dark_enlight_disable");
+
+    trap::R_RegisterModel(engine, "models/map_objects/mp/sphere.md3");
+    trap::R_RegisterModel(engine, "models/items/remote.md3");
+
+    ctx.world.cgs.media.holocronPickup = trap::S_RegisterSound(engine, "sound/player/holocron.wav");
+
+    // Zoom
+    ctx.world.cgs.media.zoomStart = trap::S_RegisterSound(engine, "sound/interface/zoomstart.wav");
+    ctx.world.cgs.media.zoomLoop = trap::S_RegisterSound(engine, "sound/interface/zoomloop.wav");
+    ctx.world.cgs.media.zoomEnd = trap::S_RegisterSound(engine, "sound/interface/zoomend.wav");
+
+    for i in 0..4 {
+        // Raven builds each name with `Com_sprintf` into a `char[MAX_QPATH]`;
+        // every one of these is far shorter than the cap.
+        let footsteps = &mut ctx.world.cgs.media.footsteps;
+
+        let name = format!("sound/player/footsteps/stone_step{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_STONEWALK as usize][i] =
+            trap::S_RegisterSound(engine, &name);
+        let name = format!("sound/player/footsteps/stone_run{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_STONERUN as usize][i] = trap::S_RegisterSound(engine, &name);
+
+        let name = format!("sound/player/footsteps/metal_step{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_METALWALK as usize][i] =
+            trap::S_RegisterSound(engine, &name);
+        let name = format!("sound/player/footsteps/metal_run{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_METALRUN as usize][i] = trap::S_RegisterSound(engine, &name);
+
+        let name = format!("sound/player/footsteps/pipe_step{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_PIPEWALK as usize][i] = trap::S_RegisterSound(engine, &name);
+        let name = format!("sound/player/footsteps/pipe_run{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_PIPERUN as usize][i] = trap::S_RegisterSound(engine, &name);
+
+        let name = format!("sound/player/footsteps/water_run{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_SPLASH as usize][i] = trap::S_RegisterSound(engine, &name);
+
+        let name = format!("sound/player/footsteps/water_walk{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_WADE as usize][i] = trap::S_RegisterSound(engine, &name);
+
+        let name = format!("sound/player/footsteps/water_wade_0{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_SWIM as usize][i] = trap::S_RegisterSound(engine, &name);
+
+        let name = format!("sound/player/footsteps/snow_step{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_SNOWWALK as usize][i] = trap::S_RegisterSound(engine, &name);
+        let name = format!("sound/player/footsteps/snow_run{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_SNOWRUN as usize][i] = trap::S_RegisterSound(engine, &name);
+
+        let name = format!("sound/player/footsteps/sand_walk{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_SANDWALK as usize][i] = trap::S_RegisterSound(engine, &name);
+        let name = format!("sound/player/footsteps/sand_run{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_SANDRUN as usize][i] = trap::S_RegisterSound(engine, &name);
+
+        let name = format!("sound/player/footsteps/grass_step{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_GRASSWALK as usize][i] =
+            trap::S_RegisterSound(engine, &name);
+        let name = format!("sound/player/footsteps/grass_run{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_GRASSRUN as usize][i] = trap::S_RegisterSound(engine, &name);
+
+        let name = format!("sound/player/footsteps/dirt_step{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_DIRTWALK as usize][i] = trap::S_RegisterSound(engine, &name);
+        let name = format!("sound/player/footsteps/dirt_run{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_DIRTRUN as usize][i] = trap::S_RegisterSound(engine, &name);
+
+        let name = format!("sound/player/footsteps/mud_walk{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_MUDWALK as usize][i] = trap::S_RegisterSound(engine, &name);
+        let name = format!("sound/player/footsteps/mud_run{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_MUDRUN as usize][i] = trap::S_RegisterSound(engine, &name);
+
+        let name = format!("sound/player/footsteps/gravel_walk{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_GRAVELWALK as usize][i] =
+            trap::S_RegisterSound(engine, &name);
+        let name = format!("sound/player/footsteps/gravel_run{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_GRAVELRUN as usize][i] =
+            trap::S_RegisterSound(engine, &name);
+
+        let name = format!("sound/player/footsteps/rug_step{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_RUGWALK as usize][i] = trap::S_RegisterSound(engine, &name);
+        let name = format!("sound/player/footsteps/rug_run{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_RUGRUN as usize][i] = trap::S_RegisterSound(engine, &name);
+
+        let name = format!("sound/player/footsteps/wood_walk{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_WOODWALK as usize][i] = trap::S_RegisterSound(engine, &name);
+        let name = format!("sound/player/footsteps/wood_run{}.wav", i + 1);
+        footsteps[footstep_t::FOOTSTEP_WOODRUN as usize][i] = trap::S_RegisterSound(engine, &name);
+    }
+
+    // only register the items that the server says we need
+    let items = CG_ConfigString(ctx, CS_ITEMS);
+    let itemBytes = items.as_bytes();
+
+    for i in 1..bg_numItems {
+        // §F19: Raven reads `char items[MAX_ITEMS+1]` past the copied string's
+        // terminator when the configstring is short; a byte that isn't there is
+        // "not requested" here (same read [`CG_RegisterGraphics`] takes).
+        if itemBytes.get(i as usize) == Some(&b'1') || ctx.world.cvars.cg_buildScript.integer != 0 {
+            CG_RegisterItemSounds(ctx, i);
+        }
+    }
+
+    for i in 1..MAX_SOUNDS {
+        let soundName = CG_ConfigString(ctx, CS_SOUNDS + i);
+        if soundName.is_empty() {
+            break;
+        }
+        if soundName.as_bytes()[0] == b'*' {
+            if soundName.as_bytes().get(1) == Some(&b'$') {
+                //an NPC soundset
+                CG_PrecacheNPCSounds(ctx, &soundName);
+            }
+            continue; // custom sound
+        }
+        ctx.world.cgs.gameSounds[i as usize] = trap::S_RegisterSound(engine, &soundName);
+    }
+
+    for i in 1..MAX_FX {
+        let soundName = CG_ConfigString(ctx, CS_EFFECTS + i);
+        if soundName.is_empty() {
+            break;
+        }
+
+        if soundName.as_bytes()[0] == b'*' {
+            //it's a special global weather effect
+            CG_ParseWeatherEffect(ctx, &soundName);
+            ctx.world.cgs.gameEffects[i as usize] = 0;
+        } else {
+            ctx.world.cgs.gameEffects[i as usize] = trap::FX_RegisterEffect(engine, &soundName);
+        }
+    }
+
+    // register all the server specified icons
+    for i in 1..MAX_ICONS {
+        let iconName = CG_ConfigString(ctx, CS_ICONS + i);
+        if iconName.is_empty() {
+            break;
+        }
+
+        ctx.world.cgs.gameIcons[i as usize] = trap::R_RegisterShaderNoMip(engine, &iconName);
+    }
+
+    let soundName = CG_ConfigString(ctx, CS_SIEGE_STATE);
+
+    if !soundName.is_empty() {
+        CG_ParseSiegeState(ctx.world, &soundName);
+    }
+
+    let soundName = CG_ConfigString(ctx, CS_SIEGE_WINTEAM);
+
+    if !soundName.is_empty() {
+        ctx.world.scoreboard.cg_siegeWinTeam = atoi(&soundName);
+    }
+
+    if ctx.world.cgs.gametype == GT_SIEGE {
+        let objectives = CG_ConfigString(ctx, CS_SIEGE_OBJECTIVES);
+        CG_ParseSiegeObjectiveStatus(ctx, &objectives);
+        let timeOverride = CG_ConfigString(ctx, CS_SIEGE_TIMEOVERRIDE);
+        ctx.world.draw.cg_beatingSiegeTime = atoi(&timeOverride);
+        if ctx.world.draw.cg_beatingSiegeTime != 0 {
+            let msec = ctx.world.draw.cg_beatingSiegeTime;
+            CG_SetSiegeTimerCvar(ctx, msec);
+        }
+    }
+
+    ctx.world.cg.loadLCARSStage = 2;
+
+    // FIXME: only needed with item
+    ctx.world.cgs.media.deploySeeker =
+        trap::S_RegisterSound(engine, "sound/chars/seeker/misc/hiss");
+    ctx.world.cgs.media.medkitSound = trap::S_RegisterSound(engine, "sound/items/use_bacta.wav");
+
+    ctx.world.cgs.media.winnerSound =
+        trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM006");
+    ctx.world.cgs.media.loserSound =
+        trap::S_RegisterSound(engine, "sound/chars/protocol/misc/40MOM010");
+}
+
+/// Raven `CG_LoadMenus` — reads the hud-menu list file and hands every
+/// `loadmenu { … }` block to [`CG_Load_Menu`].
+///
+/// A missing list file falls back to `ui/jahud.txt`; if that is missing too
+/// Raven prints and reads on with the handle still 0, which is kept below.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:3076-3137`
+pub fn CG_LoadMenus(
+    ctx: &mut CgContext,
+    menus: &mut MenuSystem,
+    ds: &mut DisplayState,
+    dc: &mut dyn DisplayContext,
+    menuFile: &str,
+) {
+    // Raven's `static char buf[MAX_MENUDEFFILE]` is read-then-parse scratch that
+    // never outlives the call, so it stays a local (the cap survives as the
+    // length guard below).
+    let mut f: fileHandle_t = 0;
+    let mut len = trap::FS_FOpenFile(ctx.engine, menuFile, &mut f, FS_READ);
+
+    if f == 0 {
+        trap::Print(
+            ctx.engine,
+            &format!(
+                "{}menu file not found: {}, using default\n",
+                S_COLOR_RED.to_str().unwrap(),
+                menuFile
+            ),
+        );
+
+        len = trap::FS_FOpenFile(ctx.engine, "ui/jahud.txt", &mut f, FS_READ);
+        if f == 0 {
+            // Raven hands `menuFile` to a `va()` format with no conversion in
+            // it, so the name never reaches the output - kept as it prints.
+            trap::Print(
+                ctx.engine,
+                &format!(
+                    "{}default menu file not found: ui/hud.txt, unable to continue!\n",
+                    S_COLOR_RED.to_str().unwrap()
+                ),
+            );
+        }
+    }
+
+    if len >= MAX_MENUDEFFILE as c_int {
+        trap::Print(
+            ctx.engine,
+            &format!(
+                "{}menu file too large: {} is {}, max allowed is {}",
+                S_COLOR_RED.to_str().unwrap(),
+                menuFile,
+                len,
+                MAX_MENUDEFFILE
+            ),
+        );
+        trap::FS_FCloseFile(ctx.engine, f);
+        return;
+    }
+
+    // §F19: a failed second open leaves `len` at the trap's error value and
+    // Raven still reads with it and writes `buf[len]`; a negative length reads
+    // nothing here. `buf[len] = 0` is the slice end.
+    let mut buf = vec![0u8; len.max(0) as usize];
+    trap::FS_Read(ctx.engine, &mut buf, f);
+    trap::FS_FCloseFile(ctx.engine, f);
+
+    let text = latin1_to_string(&buf);
+    let mut p: &str = &text;
+
+    loop {
+        // Raven's `COM_ParseExt(&p, qtrue)`; the ported `COM_Parse` already
+        // carries the `allowLineBreaks` flag.
+        let (token, rest) = COM_Parse(p, true);
+        p = rest;
+        if token.is_empty() || token.starts_with('}') {
+            break;
+        }
+
+        if Q_stricmp(&token, "}") == 0 {
+            break;
+        }
+
+        if Q_stricmp(&token, "loadmenu") == 0 {
+            if CG_Load_Menu(ctx, menus, ds, dc, &mut p) {
+                continue;
+            } else {
+                break;
+            }
+        }
+    }
+
+    //Com_Printf("UI menu load time = %d milli seconds\n", cgi_Milliseconds() - start);
+}
+
+/// Raven `CG_NewString` — interns a spawn-var value in the cgame string pool,
+/// turning `\n` into a real linefeed on the way.
+///
+/// A backslash in front of anything else eats the escaped character and leaves
+/// the backslash - Raven's quirk, kept. The pool buffer is gone (see
+/// [`CG_StrPool_Alloc`]), so this hands back the owned string.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:3344-3370`
+pub fn CG_NewString(ctx: &mut CgContext, string: &str) -> String {
+    let mut src = string_to_latin1(string);
+    // `l = strlen(string) + 1` - the copy loop walks the terminator too.
+    src.push(0);
+    let l = src.len();
+
+    let mut newb = CG_StrPool_Alloc(ctx, l as c_int);
+
+    let mut new_p = 0;
+
+    // turn \n into a real linefeed
+    let mut i = 0;
+    while i < l {
+        if src[i] == b'\\' && i < l - 1 {
+            i += 1;
+            if src[i] == b'n' {
+                newb[new_p] = b'\n';
+            } else {
+                newb[new_p] = b'\\';
+            }
+            new_p += 1;
+        } else {
+            newb[new_p] = src[i];
+            new_p += 1;
+        }
+        i += 1;
+    }
+
+    // Raven returns the pool pointer and the reader stops at the NUL the loop
+    // copied (or at the zeroed tail when a trailing backslash ate it).
+    let end = newb.iter().position(|&c| c == 0).unwrap_or(newb.len());
+    latin1_to_string(&newb[..end])
+}
+
+/// Raven `cg_spawnFields[]` + `BG_ParseField`, collapsed to one key dispatch
+/// over [`CgSpawnEnt`].
+///
+/// The table's rows are `CGFOFS` byte offsets into a `cgSpawnEnt_t`, and the
+/// port's record is idiomatic (`char *` → `String`, no `#[repr(C)]`), so there
+/// is no offset to hand `BG_ParseField`. The 13 rows land as the arms below in
+/// table order, each decoding exactly what its `fieldtype_t` decodes; a key
+/// that matches nothing is dropped, same as falling off the table scan.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:3392-3408`;
+/// `oracle/codemp/game/bg_misc.c:358-423`
+fn CG_ParseSpawnField(ctx: &mut CgContext, ent: &mut CgSpawnEnt, key: &str, value: &str) {
+    if Q_stricmp(key, "classname") == 0 {
+        ent.classname = CG_NewString(ctx, value);
+    } else if Q_stricmp(key, "origin") == 0 {
+        spawn_vector(value, &mut ent.origin);
+    } else if Q_stricmp(key, "angles") == 0 {
+        spawn_vector(value, &mut ent.angles);
+    } else if Q_stricmp(key, "angle") == 0 {
+        ent.angle = atof(value) as f32;
+    } else if Q_stricmp(key, "modelscale") == 0 {
+        ent.fScale = atof(value) as f32;
+    } else if Q_stricmp(key, "modelscale_vec") == 0 {
+        spawn_vector(value, &mut ent.scale);
+    } else if Q_stricmp(key, "model") == 0 {
+        ent.model = CG_NewString(ctx, value);
+    } else if Q_stricmp(key, "mins") == 0 {
+        spawn_vector(value, &mut ent.mins);
+    } else if Q_stricmp(key, "maxs") == 0 {
+        spawn_vector(value, &mut ent.maxs);
+    } else if Q_stricmp(key, "zoffset") == 0 {
+        ent.zoffset = atof(value) as f32;
+    } else if Q_stricmp(key, "onlyfoghere") == 0 {
+        ent.onlyFogHere = atoi(value);
+    } else if Q_stricmp(key, "fogstart") == 0 {
+        ent.fogstart = atof(value) as f32;
+    } else if Q_stricmp(key, "radarrange") == 0 {
+        ent.radarrange = atof(value) as f32;
+    }
+}
+
+/// `BG_ParseField`'s `F_VECTOR` case.
+///
+/// `sscanf(value, "%f %f %f", …)` has no count check, so an unmatched component
+/// keeps the 0.0 seed (§F19, the same read `BG_ParseField` itself took).
+///
+/// Source: `oracle/codemp/game/bg_misc.c:378-384`
+fn spawn_vector(value: &str, out: &mut vec3_t) {
+    *out = [0.0; 3];
+    sscanf_f32s(value, out);
+}
+
+/// Raven `CG_SpawnCGameEntFromVars` — turns one parsed map entity into whatever
+/// cgame keeps of it: worldspawn fog/radar overrides, static models, sky-portal
+/// points and weather zones. Everything else on the map is the game's problem.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:3608-3654`
+pub fn CG_SpawnCGameEntFromVars(ctx: &mut CgContext) {
+    let mut ent = CgSpawnEnt::default();
+
+    for i in 0..ctx.world.main.cg_spawnVars.len() {
+        //shove all this stuff into our data structure used specifically for getting spawn info
+        let [key, value] = ctx.world.main.cg_spawnVars[i].clone();
+        CG_ParseSpawnField(ctx, &mut ent, &key, &value);
+    }
+
+    // Raven's `ent.classname && ent.classname[0]` — the owned `String` folds the
+    // null test and the empty test into one.
+    if !ent.classname.is_empty() {
+        //we'll just stricmp this bastard, since there aren't all that many cgame-only things, and they all have special handling
+        if Q_stricmp(&ent.classname, "worldspawn") == 0 {
+            //I'd like some info off this guy
+            if ent.fogstart != 0.0 {
+                //linear fog method
+                ctx.world.view.cg_linearFogOverride = ent.fogstart;
+            }
+            //get radarRange off of worldspawn
+            if ent.radarrange != 0.0 {
+                //linear fog method
+                ctx.world.draw.cg_radarRange = ent.radarrange;
+            }
+        } else if Q_stricmp(&ent.classname, "misc_model_static") == 0 {
+            //we've got us a static model
+            CG_CreateModelFromSpawnEnt(ctx, &mut ent);
+        } else if Q_stricmp(&ent.classname, "misc_skyportal_orient") == 0 {
+            //a sky portal orientation point
+            CG_CreateSkyOriFromSpawnEnt(ctx.world, &ent);
+        } else if Q_stricmp(&ent.classname, "misc_skyportal") == 0 {
+            //might as well parse this thing cgame side for the extra info I want out of it
+            CG_CreateSkyPortalFromSpawnEnt(ctx.world, &ent);
+        } else if Q_stricmp(&ent.classname, "misc_weather_zone") == 0 {
+            //might as well parse this thing cgame side for the extra info I want out of it
+            CG_CreateWeatherZoneFromSpawnEnt(ctx, &mut ent);
+        }
+    }
+
+    //reset the string pool for the next entity, if there is one
+    CG_StrPool_Reset(ctx.world);
+}
+
+/// Raven `CG_Shutdown` — the `CG_SHUTDOWN` vmMain arm: drop every ghoul2
+/// instance, tear the FX/ROFF systems down and put the weather back.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:3993-4016`
+pub fn CG_Shutdown(ctx: &mut CgContext, menus: &mut MenuSystem, dc: &mut dyn DisplayContext) {
+    BG_ClearAnimsets(); //free all dynamic allocations made through the engine
+
+    CG_DestroyAllGhoul2(ctx);
+
+    //	Com_Printf("... FX System Cleanup\n");
+    trap::FX_FreeSystem(ctx.engine);
+    trap::ROFF_Clean(ctx.engine);
+
+    if ctx.world.main.cgWeatherOverride != 0 {
+        trap::R_WeatherContentsOverride(ctx.engine, 0); //rwwRMG - reset it engine-side
+    }
+
+    //reset weather
+    trap::R_WorldEffectCommand(ctx.engine, "die");
+
+    UI_CleanupGhoul2(menus, dc);
+    //If there was any ghoul2 stuff in our side of the shared ui code, then remove it now.
+
+    // some mods may need to do cleanup work here,
+    // like closing files or archiving session data
 }

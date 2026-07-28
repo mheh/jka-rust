@@ -495,3 +495,75 @@ pub fn CG_DrawClientScore(
         }
     }
 }
+
+/// Raven `CG_TeamScoreboard` — draws (or, with `countOnly`, just tallies) the
+/// rows of `cg.scores` whose client is on `team`, stopping once `maxClients`
+/// rows have been counted.
+///
+/// Source: `oracle/codemp/cgame/cg_scoreboard.c:232-261`
+#[allow(clippy::too_many_arguments)]
+pub fn CG_TeamScoreboard(
+    ctx: &mut CgContext,
+    ds: &DisplayState,
+    y: c_int,
+    team: team_t,
+    fade: f32,
+    maxClients: c_int,
+    lineHeight: c_int,
+    countOnly: bool,
+) -> c_int {
+    let color: vec4_t = [1.0, 1.0, 1.0, fade];
+
+    let mut count: c_int = 0;
+    let mut i: c_int = 0;
+
+    while i < ctx.world.cg.numScores && count < maxClients {
+        let score_ref = &ctx.world.cg.scores[i as usize];
+        let ci = &ctx.world.cgs.clientinfo[score_ref.client as usize];
+
+        if team != ci.team {
+            i += 1;
+            continue;
+        }
+
+        if !countOnly {
+            // `CG_DrawClientScore` takes `ctx: &mut CgContext`, which would
+            // alias the `&score_t` borrowed straight out of `ctx.world.cg.scores`
+            // above - copy the row out first (same fix `zeroed_score`'s sibling
+            // fn in `cg_servercmds.rs` uses; `score_t` has no `Clone`).
+            let score_ref = &ctx.world.cg.scores[i as usize];
+            let score = score_t {
+                client: score_ref.client,
+                score: score_ref.score,
+                ping: score_ref.ping,
+                time: score_ref.time,
+                scoreFlags: score_ref.scoreFlags,
+                powerUps: score_ref.powerUps,
+                accuracy: score_ref.accuracy,
+                impressiveCount: score_ref.impressiveCount,
+                excellentCount: score_ref.excellentCount,
+                guantletCount: score_ref.guantletCount,
+                defendCount: score_ref.defendCount,
+                assistCount: score_ref.assistCount,
+                captures: score_ref.captures,
+                perfect: score_ref.perfect,
+                team: score_ref.team,
+            };
+
+            CG_DrawClientScore(
+                ctx,
+                ds,
+                y + lineHeight * count,
+                &score,
+                &color,
+                fade,
+                lineHeight == SB_NORMAL_HEIGHT,
+            );
+        }
+
+        count += 1;
+        i += 1;
+    }
+
+    count
+}

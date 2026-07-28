@@ -179,6 +179,13 @@ pub struct CgMarksState {
     /// registered; zero in the shipped build, same reason.
     /// Source: `oracle/codemp/cgame/cg_marks.c:374`
     pub numShaderAnims: c_int,
+
+    /// Raven `static int markTotal` — a running count of persistent mark polys
+    /// `CG_ImpactMark` has ever allocated. Its only read (`markTotal >=
+    /// MAX_MARK_POLYS`) is commented out in the shipped source, so this only
+    /// ever grows.
+    /// Source: `oracle/codemp/cgame/cg_marks.c:19`
+    pub markTotal: c_int,
 }
 
 impl Default for CgMarksState {
@@ -203,6 +210,7 @@ impl Default for CgMarksState {
             roll: 0.0,
             shaderAnims: [[0; MAX_SHADER_ANIM_FRAMES]; MAX_SHADER_ANIMS],
             numShaderAnims: 0,
+            markTotal: 0,
         }
     }
 }

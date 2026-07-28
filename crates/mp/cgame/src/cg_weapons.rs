@@ -38,11 +38,14 @@ use mp_qshared::shared::q_math::{
     ROLL, YAW,
 };
 use mp_qshared::shared::{
-    addspriteArgStruct_t, mdxaBone_t, qfalse, qtrue, vec3_t, Eorientations, CHAN_AUTO, CHAN_WEAPON,
-    MAX_CLIENTS_I32,
+    addspriteArgStruct_t, ct_table_t, mdxaBone_t, qfalse, qtrue, vec3_t, vec4_t, Eorientations,
+    CHAN_AUTO, CHAN_WEAPON, MAX_CLIENTS_I32,
 };
+use mp_uishared::shared::display_state::DisplayState;
 use native_string::{atoi, Q_stricmp};
 
+use crate::cg_draw::colorTable;
+use crate::cg_drawtools::{CG_DrawPic, UI_DrawProportionalString};
 use crate::cg_ents::{CG_PositionEntityOnTag, CG_PositionRotatedEntityOnTag};
 use crate::cg_main::{CG_Argv, CG_Error};
 use crate::cg_players::CG_IsMindTricked;
@@ -112,6 +115,27 @@ pub const WEAPON_SELECT_TIME: c_int = 1400;
 /// may cycle to. Same beside-the-reader treatment `g_cmds.rs` gave it.
 /// Source: `oracle/codemp/game/bg_weapons.h:43`
 pub const LAST_USEABLE_WEAPON: c_int = WP_BRYAR_OLD;
+
+// `tr_types.h`'s renderfx bits and `q_shared.h`'s `UI_*` text flags have no
+// ported cross-crate home, so the two this file reads land beside their reader —
+// the same file-local-copy story `cg_players.rs`/`cg_drawtools.rs` carry.
+
+/// Raven `RF_FIRST_PERSON` — only draw through eyes (view weapon, damage blood
+/// blob).
+/// Source: `oracle/codemp/cgame/tr_types.h:20`
+const RF_FIRST_PERSON: c_int = 0x00004;
+
+/// Raven `RF_DEPTHHACK` — for view weapon Z crunching.
+/// Source: `oracle/codemp/cgame/tr_types.h:21`
+const RF_DEPTHHACK: c_int = 0x00008;
+
+/// Raven `UI_CENTER`.
+/// Source: `oracle/codemp/game/q_shared.h:488`
+const UI_CENTER: c_int = 0x00000001;
+
+/// Raven `UI_SMALLFONT`.
+/// Source: `oracle/codemp/game/q_shared.h:491`
+const UI_SMALLFONT: c_int = 0x00000010;
 
 // ---------------------------------------------------------------------------
 // Functions
@@ -241,17 +265,18 @@ pub fn CG_RegisterItemVisuals(ctx: &mut CgContext, itemNum: c_int) {
 /// Raven `CG_MapTorsoToWeaponFrame` — which viewmodel frame goes with the
 /// torso animation we're on. `-1` means "no matching frame".
 ///
-/// `ci` is Raven's unused parameter; the busy-holster block is gated on
-/// `#define WEAPON_FORCE_BUSY_HOLSTER` (`cg_weapons.c:126`), which this file
-/// always defines, so it is unconditional here.
+/// The busy-holster block is gated on `#define WEAPON_FORCE_BUSY_HOLSTER`
+/// (`cg_weapons.c:126`), which this file always defines, so it is unconditional
+/// here.
+///
+/// PORT-NOTE: Raven's `clientInfo_t *ci` parameter is never read in the body,
+/// and its only caller ([`CG_AddViewWeapon`], the sole one - Raven's fn is
+/// `static`) sources it from the same `CgWorld` this fn takes by `&mut`. The
+/// dead parameter is dropped rather than fought for; the caller keeps Raven's
+/// "no npcClient means bail" early return.
 ///
 /// Source: `oracle/codemp/cgame/cg_weapons.c:140-202`
-pub fn CG_MapTorsoToWeaponFrame(
-    world: &mut CgWorld,
-    _ci: &clientInfo_t,
-    frame: c_int,
-    animNum: c_int,
-) -> c_int {
+fn CG_MapTorsoToWeaponFrame(world: &mut CgWorld, frame: c_int, animNum: c_int) -> c_int {
     // no snapshot means no hand extension, which is the reset arm below
     let forceHandExtend = world
         .cg
@@ -908,6 +933,146 @@ pub fn CG_AddPlayerWeapon(
     }
 }
 
+/// Raven `CG_AddViewWeapon` — the first-person gun: fov-clamped drop, the bob
+/// and landing dip out of [`CG_CalculateWeaponPosition`], the torso-to-weapon
+/// frame map, then everything else hung off it by [`CG_AddPlayerWeapon`].
+///
+/// `ps` never aliases `ctx`, so a caller handing us `cg.predictedPlayerState`
+/// copies it out first.
+///
+/// Source: `oracle/codemp/cgame/cg_weapons.c:766-881`
+pub fn CG_AddViewWeapon(ctx: &mut CgContext, ps: &playerState_t) {
+    let mut angles: vec3_t = [0.0; 3];
+    let mut cgFov = ctx.world.cvars.cg_fov.value;
+
+    if cgFov < 1.0 {
+        cgFov = 1.0;
+    }
+    if cgFov > 97.0 {
+        cgFov = 97.0;
+    }
+
+    if ps.persistant[PERS_TEAM as usize] == TEAM_SPECTATOR {
+        return;
+    }
+
+    if ps.pm_type == pmtype_t::PM_INTERMISSION as c_int {
+        return;
+    }
+
+    // no gun if in third person view or a camera is active
+    //if ( cg.renderingThirdPerson || cg.cameraMode) {
+    if ctx.world.cg.renderingThirdPerson != qfalse {
+        return;
+    }
+
+    // allow the gun to be completely removed
+    if ctx.world.cvars.cg_drawGun.integer == 0 || ctx.world.cg.predictedPlayerState.zoomMode != 0 {
+        if (ctx.world.cg.predictedPlayerState.eFlags & EF_FIRING) != 0 {
+            // special hack for lightning gun...
+            let mut origin: vec3_t = [0.0; 3];
+            _VectorCopy(ctx.world.cg.refdef.vieworg, &mut origin);
+            let viewaxis2 = ctx.world.cg.refdef.viewaxis[2];
+            _VectorMA(origin, -8.0, viewaxis2, &mut origin);
+            CG_LightningBolt(ctx.world.entity(ps.clientNum as usize), &origin);
+        }
+        return;
+    }
+
+    // don't draw if testing a gun model
+    if ctx.world.cg.testGun != qfalse {
+        return;
+    }
+
+    // drop gun lower at higher fov
+    // Raven's `-0.2` is a double, so the whole product widens before it lands
+    // back in the float
+    let fovOffset: f32 = if cgFov > 90.0 {
+        (-0.2 * (cgFov - 90.0) as f64) as f32
+    } else {
+        0.0
+    };
+
+    let centNum = ctx.world.cg.predictedPlayerState.clientNum as usize;
+    CG_RegisterWeapon(ctx, ps.weapon);
+    let weapSlot = ps.weapon as usize;
+
+    let mut hand = refEntity_t::zeroed();
+
+    // set up gun position
+    CG_CalculateWeaponPosition(ctx.world, &mut hand.origin, &mut angles);
+
+    let viewaxis = ctx.world.cg.refdef.viewaxis;
+    _VectorMA(
+        hand.origin,
+        ctx.world.cvars.cg_gun_x.value,
+        viewaxis[0],
+        &mut hand.origin,
+    );
+    _VectorMA(
+        hand.origin,
+        ctx.world.cvars.cg_gun_y.value,
+        viewaxis[1],
+        &mut hand.origin,
+    );
+    _VectorMA(
+        hand.origin,
+        ctx.world.cvars.cg_gun_z.value + fovOffset,
+        viewaxis[2],
+        &mut hand.origin,
+    );
+
+    AnglesToAxis(angles, hand.axis.as_mut_ptr());
+
+    // map torso animations to weapon animations
+    if ctx.world.cvars.cg_gun_frame.integer != 0 {
+        // development tool
+        hand.frame = ctx.world.cvars.cg_gun_frame.integer;
+        hand.oldframe = hand.frame;
+        hand.backlerp = 0.0;
+    } else {
+        // get clientinfo for animation map
+        // Raven picks `ci` here and hands it to `CG_MapTorsoToWeaponFrame`, which
+        // never reads it; all that survives is the NPC-without-clientinfo bail.
+        if ctx.world.entity(centNum).currentState.eType == ET_NPC as c_int
+            && ctx.world.entity(centNum).npcClient.is_none()
+        {
+            return;
+        }
+
+        let (torsoFrame, torsoOldFrame, torsoBacklerp, torsoAnim) = {
+            let cent = ctx.world.entity(centNum);
+            (
+                cent.pe.torso.frame,
+                cent.pe.torso.oldFrame,
+                cent.pe.torso.backlerp,
+                cent.currentState.torsoAnim,
+            )
+        };
+
+        hand.frame = CG_MapTorsoToWeaponFrame(ctx.world, torsoFrame, torsoAnim);
+        hand.oldframe = CG_MapTorsoToWeaponFrame(ctx.world, torsoOldFrame, torsoAnim);
+        hand.backlerp = torsoBacklerp;
+
+        // Handle the fringe situation where oldframe is invalid
+        if hand.frame == -1 {
+            hand.frame = 0;
+            hand.oldframe = 0;
+            hand.backlerp = 0.0;
+        } else if hand.oldframe == -1 {
+            hand.oldframe = hand.frame;
+            hand.backlerp = 0.0;
+        }
+    }
+
+    hand.hModel = ctx.world.cg_weapons[weapSlot].handsModel;
+    hand.renderfx = RF_DEPTHHACK | RF_FIRST_PERSON; // | RF_MINLIGHT;
+
+    // add everything onto the hand
+    let team = ps.persistant[PERS_TEAM as usize];
+    CG_AddPlayerWeapon(ctx, &hand, Some(ps), centNum, team, &angles, false);
+}
+
 /// Raven `CG_DrawIconBackground` — drives the icon HUD's open/close animation.
 ///
 /// Every `CG_DrawPic` in Raven's body is commented out, so what is left is the
@@ -1033,6 +1198,300 @@ pub fn CG_WeaponSelectable(world: &CgWorld, i: c_int) -> bool {
     }
 
     true
+}
+
+/// Raven `CG_DrawWeaponSelect` — the weapon-select HUD: up to three small icons
+/// either side of the big current one, then the selected weapon's name.
+///
+/// The concussion rifle is walked out of numeric order on both sides (Raven's
+/// "*SIGH*" hack), and `drewConc` is what stops it being drawn twice.
+///
+/// Source: `oracle/codemp/cgame/cg_weapons.c:1076-1371`
+pub fn CG_DrawWeaponSelect(ctx: &mut CgContext, ds: &DisplayState) {
+    // Raven's `_XBOX` block (CL_ExtendSelectTime plus a -50 yOffset) is compiled
+    // out of the PC build, so the offset stays 0.
+    let yOffset: c_int = 0;
+
+    if ctx.world.cg.predictedPlayerState.emplacedIndex != 0 {
+        //can't cycle when on a weapon
+        ctx.world.cg.weaponSelectTime = 0;
+    }
+
+    // Time is up for the HUD to display
+    if (ctx.world.cg.weaponSelectTime + WEAPON_SELECT_TIME) < ctx.world.cg.time {
+        return;
+    }
+
+    // don't display if dead
+    if ctx.world.cg.predictedPlayerState.stats[STAT_HEALTH as usize] <= 0 {
+        return;
+    }
+
+    // showing weapon select clears pickup item display, but not the blend blob
+    ctx.world.cg.itemPickupTime = 0;
+
+    let bits = ctx.world.cg.predictedPlayerState.stats[STAT_WEAPONS as usize];
+
+    // count the number of weapons owned
+    let mut count: c_int = 0;
+
+    let selected = ctx.world.cg.weaponSelect;
+    if !CG_WeaponSelectable(ctx.world, selected)
+        && (selected == WP_THERMAL || selected == WP_TRIP_MINE)
+    {
+        //display this weapon that we don't actually "have" as unhighlighted until it's deselected
+        //since it's selected we must increase the count to display the proper number of valid selectable weapons
+        count += 1;
+    }
+
+    for i in 1..WP_NUM_WEAPONS {
+        if bits & (1 << i) != 0
+            && (CG_WeaponSelectable(ctx.world, i) || (i != WP_THERMAL && i != WP_TRIP_MINE))
+        {
+            count += 1;
+        }
+    }
+
+    if count == 0 {
+        // If no weapons, don't display
+        return;
+    }
+
+    let sideMax: c_int = 3; // Max number of icons on the side
+
+    // Calculate how many icons will appear to either side of the center one
+    let holdCount = count - 1; // -1 for the center icon
+    let (sideLeftIconCnt, sideRightIconCnt) = if holdCount == 0 {
+        // No icons to either side
+        (0, 0)
+    } else if count > (2 * sideMax) {
+        // Go to the max on each side
+        (sideMax, sideMax)
+    } else {
+        // Less than max, so do the calc
+        let left = holdCount / 2;
+        (left, holdCount - left)
+    };
+
+    let mut i = if ctx.world.cg.weaponSelect == WP_CONCUSSION {
+        WP_FLECHETTE
+    } else {
+        ctx.world.cg.weaponSelect - 1
+    };
+    if i < 1 {
+        i = LAST_USEABLE_WEAPON;
+    }
+
+    let smallIconSize: c_int = 40;
+    let bigIconSize: c_int = 80;
+    let pad: c_int = 12;
+
+    let x: c_int = 320;
+    let y: c_int = 410;
+
+    // Raven's background pass (a `.35f`-alpha white `trap_R_SetColor`) is
+    // commented out right here.
+
+    // Left side ICONS
+    trap::R_SetColor(ctx.engine, Some(&colorTable[ct_table_t::CT_WHITE as usize]));
+    // Work backwards from current icon
+    let mut holdX = x - ((bigIconSize / 2) + pad + smallIconSize);
+    // Raven's `height` is written three times across this fn and never read -
+    // dead store, dropped with its `cg.iconHUDPercent` reads.
+    let mut drewConc = false;
+
+    let mut iconCnt: c_int = 1;
+    while iconCnt < (sideLeftIconCnt + 1) {
+        // the labelled block is Raven's `continue`, which still runs the `i--`
+        'iter: {
+            if i == WP_CONCUSSION {
+                i -= 1;
+            } else if i == WP_FLECHETTE && !drewConc && ctx.world.cg.weaponSelect != WP_CONCUSSION {
+                i = WP_CONCUSSION;
+            }
+            if i < 1 {
+                //i = 13;
+                //...don't ever do this.
+                i = LAST_USEABLE_WEAPON;
+            }
+
+            if bits & (1 << i) == 0 {
+                // Does he have this weapon?
+                if i == WP_CONCUSSION {
+                    drewConc = true;
+                    i = WP_ROCKET_LAUNCHER;
+                }
+                break 'iter;
+            }
+
+            if !CG_WeaponSelectable(ctx.world, i) && (i == WP_THERMAL || i == WP_TRIP_MINE) {
+                //Don't show thermal and tripmine when out of them
+                break 'iter;
+            }
+
+            iconCnt += 1; // Good icon
+
+            if ctx.world.cgs.media.weaponIcons[i as usize] != 0 {
+                CG_RegisterWeapon(ctx, i);
+                // Raven's `weaponInfo` local goes unread - the icon handles it
+                // would have supplied are commented out in favour of
+                // `cgs.media.weaponIcons*`.
+
+                trap::R_SetColor(ctx.engine, Some(&colorTable[ct_table_t::CT_WHITE as usize]));
+                let icon = if !CG_WeaponCheck(ctx.world, i) {
+                    ctx.world.cgs.media.weaponIcons_NA[i as usize]
+                } else {
+                    ctx.world.cgs.media.weaponIcons[i as usize]
+                };
+                CG_DrawPic(
+                    ctx,
+                    holdX as f32,
+                    (y + 10 + yOffset) as f32,
+                    smallIconSize as f32,
+                    smallIconSize as f32,
+                    icon,
+                );
+
+                holdX -= smallIconSize + pad;
+            }
+            if i == WP_CONCUSSION {
+                drewConc = true;
+                i = WP_ROCKET_LAUNCHER;
+            }
+        }
+        i -= 1;
+    }
+
+    // Current Center Icon
+    let center = ctx.world.cg.weaponSelect;
+    if ctx.world.cgs.media.weaponIcons[center as usize] != 0 {
+        CG_RegisterWeapon(ctx, center);
+
+        trap::R_SetColor(ctx.engine, Some(&colorTable[ct_table_t::CT_WHITE as usize]));
+        let icon = if !CG_WeaponCheck(ctx.world, center) {
+            ctx.world.cgs.media.weaponIcons_NA[center as usize]
+        } else {
+            ctx.world.cgs.media.weaponIcons[center as usize]
+        };
+        CG_DrawPic(
+            ctx,
+            (x - (bigIconSize / 2)) as f32,
+            ((y - ((bigIconSize - smallIconSize) / 2)) + 10 + yOffset) as f32,
+            bigIconSize as f32,
+            bigIconSize as f32,
+            icon,
+        );
+    }
+
+    i = if ctx.world.cg.weaponSelect == WP_CONCUSSION {
+        WP_ROCKET_LAUNCHER
+    } else {
+        ctx.world.cg.weaponSelect + 1
+    };
+    if i > LAST_USEABLE_WEAPON {
+        i = 1;
+    }
+
+    // Right side ICONS
+    // Work forwards from current icon
+    holdX = x + (bigIconSize / 2) + pad;
+    iconCnt = 1;
+    while iconCnt < (sideRightIconCnt + 1) {
+        // the labelled block is Raven's `continue`, which still runs the `i++`
+        'iter: {
+            if i == WP_CONCUSSION {
+                i += 1;
+            } else if i == WP_ROCKET_LAUNCHER
+                && !drewConc
+                && ctx.world.cg.weaponSelect != WP_CONCUSSION
+            {
+                i = WP_CONCUSSION;
+            }
+            if i > LAST_USEABLE_WEAPON {
+                i = 1;
+            }
+
+            if bits & (1 << i) == 0 {
+                // Does he have this weapon?
+                if i == WP_CONCUSSION {
+                    drewConc = true;
+                    i = WP_FLECHETTE;
+                }
+                break 'iter;
+            }
+
+            if !CG_WeaponSelectable(ctx.world, i) && (i == WP_THERMAL || i == WP_TRIP_MINE) {
+                //Don't show thermal and tripmine when out of them
+                break 'iter;
+            }
+
+            iconCnt += 1; // Good icon
+
+            // Raven's `weaponData[i].weaponIcon[0]` test is commented out in
+            // favour of the media handle
+            if ctx.world.cgs.media.weaponIcons[i as usize] != 0 {
+                CG_RegisterWeapon(ctx, i);
+
+                // No ammo for this weapon?
+                trap::R_SetColor(ctx.engine, Some(&colorTable[ct_table_t::CT_WHITE as usize]));
+                let icon = if !CG_WeaponCheck(ctx.world, i) {
+                    ctx.world.cgs.media.weaponIcons_NA[i as usize]
+                } else {
+                    ctx.world.cgs.media.weaponIcons[i as usize]
+                };
+                CG_DrawPic(
+                    ctx,
+                    holdX as f32,
+                    (y + 10 + yOffset) as f32,
+                    smallIconSize as f32,
+                    smallIconSize as f32,
+                    icon,
+                );
+
+                holdX += smallIconSize + pad;
+            }
+            if i == WP_CONCUSSION {
+                drewConc = true;
+                i = WP_FLECHETTE;
+            }
+        }
+        i += 1;
+    }
+
+    // draw the selected name
+    let selectedItem = ctx.world.cg_weapons[ctx.world.cg.weaponSelect as usize].item;
+    if let Some(item) = selectedItem {
+        let textColor: vec4_t = [0.875, 0.718, 0.121, 1.0];
+        let classname = item.item().classname;
+
+        // Raven upper-cases a scratch copy, so the fall-back below still prints
+        // the classname as it sits in the item table
+        let upperKey = classname.to_ascii_uppercase();
+
+        let key = format!("SP_INGAME_{}", upperKey);
+        match trap::SP_GetStringTextString(ctx.engine, &key, 1024) {
+            Some(text) => UI_DrawProportionalString(
+                ctx,
+                ds,
+                320,
+                y + 45 + yOffset,
+                &text,
+                UI_CENTER | UI_SMALLFONT,
+                textColor,
+            ),
+            None => UI_DrawProportionalString(
+                ctx,
+                ds,
+                320,
+                y + 45 + yOffset,
+                classname,
+                UI_CENTER | UI_SMALLFONT,
+                textColor,
+            ),
+        }
+    }
+
+    trap::R_SetColor(ctx.engine, None);
 }
 
 /// Raven `CG_NextWeapon_f` — the `+weapnext` console command: step forward to

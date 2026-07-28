@@ -15,22 +15,29 @@ use mp_bg::public::configstring::{
     CS_LEVEL_START_TIME, CS_SCORES1, CS_SCORES2, CS_SERVERINFO, CS_SHADERSTATE, CS_SOUNDS,
     CS_TERRAINS, CS_WARMUP,
 };
-use mp_bg::public::gametype::{GT_CTF, GT_CTY};
+use mp_bg::public::gametype::{GT_CTF, GT_CTY, GT_POWERDUEL, GT_SIEGE};
 use mp_bg::weapons::weapon_t::WP_BRYAR_PISTOL;
 use mp_engine_select::Engine;
 use mp_qshared::common::mp::ghoul2::bone_flags::BONE_ANIM_OVERRIDE_FREEZE;
 use mp_qshared::common::mp::qcommon::saber::saber_info::MAX_SABERS;
 use mp_qshared::shared::q_math::VectorClear;
+use mp_qshared::shared::sound_channel::CHAN_ANNOUNCER;
 use mp_qshared::shared::{
-    qfalse, qtrue, sfxHandle_t, MAX_CLIENTS, MAX_CLIENTS_I32, MAX_GENTITIES, MAX_QPATH,
+    qfalse, qtrue, sfxHandle_t, GIANTCHAR_WIDTH, MAX_CLIENTS, MAX_CLIENTS_I32, MAX_GENTITIES,
+    MAX_QPATH,
 };
 use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::display_state::DisplayState;
 use mp_uishared::shared::menu_system::MenuSystem;
 use native_string::{atoi, strcat_string, Info_ValueForKey, Q_strncpyz};
 
+use crate::cg_draw::CG_CenterPrint;
 use crate::cg_event::CG_ReattachLimb;
-use crate::cg_main::{CG_Argv, CG_ConfigString, CG_GetStringEdString, CG_SetScoreSelection};
+use crate::cg_localents::CG_InitLocalEntities;
+use crate::cg_main::{
+    CG_Argv, CG_ConfigString, CG_GetStringEdString, CG_Printf, CG_SetScoreSelection, CG_StartMusic,
+};
+use crate::cg_marks::{CG_ClearParticles, CG_InitMarkPolys};
 use crate::cg_players::{
     cg_customCombatSoundNames, cg_customDuelSoundNames, cg_customExtraSoundNames,
     cg_customJediSoundNames, cg_customSoundNames, CG_DestroyNPCClient,
@@ -1113,4 +1120,66 @@ pub fn CG_KillCEntityInstances(ctx: &mut CgContext) {
 
         i += 1;
     }
+}
+
+/// Raven `CG_MapRestart` - clears the local-entity/mark/particle pools and
+/// per-entity ghoul2 latches on a mid-match map restart, resets the frag/time
+/// limit warning latches so they play again, and (skipping siege/powerduel)
+/// plays the "fight" announcer sound + centerprint when the restart isn't
+/// coming out of warmup.
+///
+/// Source: `oracle/codemp/cgame/cg_servercmds.c:994-1038`
+pub fn CG_MapRestart(ctx: &mut CgContext) {
+    if ctx.world.cvars.cg_showmiss.integer != 0 {
+        CG_Printf(ctx, "CG_MapRestart\n");
+    }
+
+    trap::R_ClearDecals(ctx.engine);
+    //FIXME: trap_FX_Reset?
+
+    CG_InitLocalEntities(ctx.world);
+    CG_InitMarkPolys(ctx.world);
+    CG_ClearParticles(ctx.world);
+    CG_KillCEntityInstances(ctx);
+
+    // make sure the "3 frags left" warnings play again
+    ctx.world.cg.fraglimitWarnings = 0;
+
+    ctx.world.cg.timelimitWarnings = 0;
+
+    ctx.world.cg.intermissionStarted = qfalse;
+
+    ctx.world.cgs.voteTime = 0;
+
+    ctx.world.cg.mapRestart = qtrue;
+
+    CG_StartMusic(ctx, true);
+
+    trap::S_ClearLoopingSounds(ctx.engine);
+
+    // we really should clear more parts of cg here and stop sounds
+
+    // play the "fight" sound if this is a restart without warmup
+    if ctx.world.cg.warmup == 0
+        && ctx.world.cgs.gametype != GT_SIEGE
+        && ctx.world.cgs.gametype != GT_POWERDUEL
+    /* && cgs.gametype == GT_DUEL */
+    {
+        trap::S_StartLocalSound(
+            ctx.engine,
+            ctx.world.cgs.media.countFightSound,
+            CHAN_ANNOUNCER,
+        );
+        let s = CG_GetStringEdString(ctx, "MP_SVGAME", "BEGIN_DUEL");
+        CG_CenterPrint(ctx.world, &s, 120, GIANTCHAR_WIDTH * 2);
+    }
+    /*
+    if (cg_singlePlayerActive.integer) {
+        trap_Cvar_Set("ui_matchStartTime", va("%i", cg.time));
+        if (cg_recordSPDemo.integer && cg_recordSPDemoName.string && *cg_recordSPDemoName.string) {
+            trap_SendConsoleCommand(va("set g_synchronousclients 1 ; record %s \n", cg_recordSPDemoName.string));
+        }
+    }
+    */
+    trap::Cvar_Set(ctx.engine, "cg_thirdPerson", "0");
 }

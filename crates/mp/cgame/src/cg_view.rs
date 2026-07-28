@@ -11,29 +11,39 @@ use mp_bg::public::dm_flags::DF_FIXED_FOV;
 use mp_bg::public::entity_effects::EF2_HELD_BY_MONSTER;
 use mp_bg::public::entity_flags::{EF_NODRAW, EF_SOUNDTRACKER};
 use mp_bg::public::entity_type::entityType_t;
+use mp_bg::public::gametype::GT_TEAM;
+use mp_bg::public::hyperspace::HYPERSPACE_TIME;
+use mp_bg::public::pers_enum::persEnum_t::PERS_TEAM;
 use mp_bg::public::pmtype::pmtype_t;
 use mp_bg::public::stat_index::statIndex_t::{STAT_DEAD_YAW, STAT_HEALTH};
+use mp_bg::public::team::TEAM_SPECTATOR;
+use mp_bg::public::viewheight::{DEFAULT_MAXS_2, DEFAULT_MINS_2};
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
+use mp_qshared::common::mp::cgame::refdef_t::{
+    refdef_t, MAX_MAP_AREA_BYTES, MAX_RENDER_STRINGS, MAX_RENDER_STRING_LENGTH,
+};
 use mp_qshared::common::mp::game::class_t::class_t;
 use mp_qshared::common::mp::qcommon::player_state::MAX_POWERUPS;
-use mp_qshared::common::mp::qcommon::pm_flags::PMF_DUCKED;
+use mp_qshared::common::mp::qcommon::pm_flags::{PMF_DUCKED, PMF_FOLLOW};
+use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::q_math::{
-    _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorSubtract, AnglesToAxis,
-    VectorNormalize, PITCH, ROLL, YAW,
+    _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, AngleVectors,
+    AnglesToAxis, Q_fabs, VectorNormalize, VectorSet, PITCH, ROLL, YAW,
 };
 use mp_qshared::shared::sound_channel::{CHAN_ANNOUNCER, CHAN_LOCAL};
 use mp_qshared::shared::surface_flags::{
-    CONTENTS_LAVA, CONTENTS_PLAYERCLIP, CONTENTS_SLIME, CONTENTS_WATER, MASK_SOLID,
+    CONTENTS_LAVA, CONTENTS_PLAYERCLIP, CONTENTS_SLIME, CONTENTS_WATER, MASK_SOLID, SOLID_BMODEL,
 };
 use mp_qshared::shared::{
-    qfalse, qtrue, sfxHandle_t, vec3_t, ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_QPATH,
+    qfalse, qtrue, sfxHandle_t, trType_t, vec3_t, ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_QPATH,
 };
 use native_string::{atof, buf_to_string, Q_strncpyz};
 
-use crate::cg_ents::CG_S_UpdateLoopingSounds;
+use crate::cg_drawtools::CG_DrawPic;
+use crate::cg_ents::{CG_CalcEntityLerpPositions, CG_S_UpdateLoopingSounds};
 use crate::cg_main::{CG_Argv, CG_Printf};
-use crate::cg_predict::CG_PointContents;
+use crate::cg_predict::{CG_PointContents, CG_Trace};
 use crate::cg_weapons::{LAND_DEFLECT_TIME, LAND_RETURN_TIME};
 use crate::local::cg_t::MAX_SOUNDBUFFER;
 use crate::trap;
@@ -1342,4 +1352,654 @@ pub fn CG_TestGun_f(ctx: &mut CgContext) {
 
     // rww - 9-13-01 [1-26-01-sof2]
     ctx.world.cg.testModelEntity.renderfx = RF_DEPTHHACK | RF_FIRST_PERSON;
+}
+
+/// Raven `CG_ResetThirdPersonViewDamp` — snaps the third-person camera straight
+/// onto its ideal target and location with no damping at all, then clips both
+/// against the world.
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:367-410`
+pub fn CG_ResetThirdPersonViewDamp(ctx: &mut CgContext) {
+    let mut trace = trace_t::zeroed();
+
+    // Cap the pitch within reasonable limits
+    if ctx.world.view.cameraFocusAngles[PITCH] > 89.0 {
+        ctx.world.view.cameraFocusAngles[PITCH] = 89.0;
+    } else if ctx.world.view.cameraFocusAngles[PITCH] < -89.0 {
+        ctx.world.view.cameraFocusAngles[PITCH] = -89.0;
+    }
+
+    let cameraFocusAngles = ctx.world.view.cameraFocusAngles;
+    let mut camerafwd: vec3_t = [0.0; 3];
+    let mut cameraup: vec3_t = [0.0; 3];
+    AngleVectors(
+        cameraFocusAngles,
+        Some(&mut camerafwd),
+        None,
+        Some(&mut cameraup),
+    );
+    ctx.world.view.camerafwd = camerafwd;
+    ctx.world.view.cameraup = cameraup;
+
+    // Set the cameraIdealTarget
+    CG_CalcIdealThirdPersonViewTarget(ctx.world);
+
+    // Set the cameraIdealLoc
+    CG_CalcIdealThirdPersonViewLocation(ctx.world);
+
+    // Now, we just set everything to the new positions.
+    ctx.world.view.cameraCurLoc = ctx.world.view.cameraIdealLoc;
+    ctx.world.view.cameraCurTarget = ctx.world.view.cameraIdealTarget;
+
+    // Raven derefs `cg.snap` for the traces' skip entity; a null there is UB, so
+    // the port skips client 0 (§F19).
+    let clientNum = ctx
+        .world
+        .cg
+        .snap_ref()
+        .map(|snap| snap.ps.clientNum)
+        .unwrap_or(0);
+
+    // First thing we do is trace from the first person viewpoint out to the new target location.
+    let cameraFocusLoc = ctx.world.view.cameraFocusLoc;
+    let cameraCurTarget = ctx.world.view.cameraCurTarget;
+    CG_Trace(
+        ctx,
+        &mut trace,
+        &cameraFocusLoc,
+        &cameramins,
+        &cameramaxs,
+        &cameraCurTarget,
+        clientNum,
+        MASK_CAMERACLIP,
+    );
+    if trace.fraction <= 1.0 {
+        ctx.world.view.cameraCurTarget = trace.endpos;
+    }
+
+    // Now we trace from the new target location to the new view location, to make sure there is nothing in the way.
+    let cameraCurTarget = ctx.world.view.cameraCurTarget;
+    let cameraCurLoc = ctx.world.view.cameraCurLoc;
+    CG_Trace(
+        ctx,
+        &mut trace,
+        &cameraCurTarget,
+        &cameramins,
+        &cameramaxs,
+        &cameraCurLoc,
+        clientNum,
+        MASK_CAMERACLIP,
+    );
+    if trace.fraction <= 1.0 {
+        ctx.world.view.cameraCurLoc = trace.endpos;
+    }
+
+    ctx.world.view.cameraLastFrame = ctx.world.cg.time;
+    ctx.world.view.cameraLastYaw = ctx.world.view.cameraFocusAngles[YAW];
+    ctx.world.view.cameraStiffFactor = 0.0;
+}
+
+/// Raven `CG_UpdateThirdPersonTargetDamp` — walks the camera's look-at point
+/// toward the ideal target by `(damp)^(time)` of the distance left, then clips
+/// it against the world.
+///
+/// Raven: "Note that previously there was an upper limit to the number of
+/// physics traces that are done through the world for the sake of camera
+/// collision, since it wasn't calced per frame. Now it is calculated every
+/// frame. This has the benefit that the camera is a lot smoother now (before it
+/// lerped between tested points), however two full volume traces each frame is
+/// a bit scary to think about."
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:413-464`
+pub fn CG_UpdateThirdPersonTargetDamp(ctx: &mut CgContext) {
+    let mut trace = trace_t::zeroed();
+    let mut targetdiff: vec3_t = [0.0; 3];
+
+    // Set the cameraIdealTarget
+    // Automatically get the ideal target, to avoid jittering.
+    CG_CalcIdealThirdPersonViewTarget(ctx.world);
+
+    let hyperSpaceTime = ctx.world.cg.predictedVehicleState.hyperSpaceTime;
+    let targetDamp = ctx.world.cvars.cg_thirdPersonTargetDamp.value;
+
+    if hyperSpaceTime != 0 && (ctx.world.cg.time - hyperSpaceTime) < HYPERSPACE_TIME {
+        //hyperspacing, no damp
+        ctx.world.view.cameraCurTarget = ctx.world.view.cameraIdealTarget;
+    } else if targetDamp >= 1.0
+        || ctx.world.cg.thisFrameTeleport != qfalse
+        || ctx.world.cg.predictedPlayerState.m_iVehicleNum != 0
+    {
+        // No damping.
+        ctx.world.view.cameraCurTarget = ctx.world.view.cameraIdealTarget;
+    } else if targetDamp >= 0.0 {
+        // Calculate the difference from the current position to the new one.
+        let cameraIdealTarget = ctx.world.view.cameraIdealTarget;
+        let cameraCurTarget = ctx.world.view.cameraCurTarget;
+        _VectorSubtract(cameraIdealTarget, cameraCurTarget, &mut targetdiff);
+
+        // Now we calculate how much of the difference we cover in the time allotted.
+        // The equation is (Damp)^(time)
+        // Raven's `1.0` and `1.0/(float)CAMERA_DAMP_INTERVAL` are math.h doubles,
+        // so both expressions evaluate in f64 and round back into the floats.
+        // We must exponent the amount LEFT rather than the amount bled off
+        let dampfactor = (1.0f64 - targetDamp as f64) as f32;
+        // Our dampfactor is geared towards a time interval equal to "1".
+        let dtime = ((ctx.world.cg.time - ctx.world.view.cameraLastFrame) as f32 as f64
+            * (1.0f64 / CAMERA_DAMP_INTERVAL as f64)) as f32;
+
+        // Note that since there are a finite number of "practical" delta millisecond values possible,
+        // the ratio should be initialized into a chart ultimately.
+        let ratio = dampfactor.powf(dtime);
+
+        // This value is how much distance is "left" from the ideal.
+        _VectorMA(
+            cameraIdealTarget,
+            -ratio,
+            targetdiff,
+            &mut ctx.world.view.cameraCurTarget,
+        );
+    }
+
+    // Now we trace to see if the new location is cool or not.
+
+    // Raven derefs `cg.snap` for the trace's skip entity; a null there is UB, so
+    // the port skips client 0 (§F19).
+    let clientNum = ctx
+        .world
+        .cg
+        .snap_ref()
+        .map(|snap| snap.ps.clientNum)
+        .unwrap_or(0);
+
+    // First thing we do is trace from the first person viewpoint out to the new target location.
+    let cameraFocusLoc = ctx.world.view.cameraFocusLoc;
+    let cameraCurTarget = ctx.world.view.cameraCurTarget;
+    CG_Trace(
+        ctx,
+        &mut trace,
+        &cameraFocusLoc,
+        &cameramins,
+        &cameramaxs,
+        &cameraCurTarget,
+        clientNum,
+        MASK_CAMERACLIP,
+    );
+    if trace.fraction < 1.0 {
+        ctx.world.view.cameraCurTarget = trace.endpos;
+    }
+}
+
+/// Raven `CG_UpdateThirdPersonCameraDamp` — same damped walk for where the
+/// camera itself sits, with the pitch and the yaw-change stiffness folded into
+/// the damp factor, then clipped against the world.
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:468-590`
+pub fn CG_UpdateThirdPersonCameraDamp(ctx: &mut CgContext) {
+    let mut trace = trace_t::zeroed();
+    let mut locdiff: vec3_t = [0.0; 3];
+
+    // Set the cameraIdealLoc
+    CG_CalcIdealThirdPersonViewLocation(ctx.world);
+
+    // First thing we do is calculate the appropriate damping factor for the camera.
+    let mut dampfactor: f32 = 0.0;
+    let hyperSpaceTime = ctx.world.cg.predictedVehicleState.hyperSpaceTime;
+    if hyperSpaceTime != 0 && (ctx.world.cg.time - hyperSpaceTime) < HYPERSPACE_TIME {
+        //hyperspacing - don't damp camera
+        dampfactor = 1.0;
+    } else if ctx.world.cvars.cg_thirdPersonCameraDamp.value != 0.0 {
+        let dFactor = if ctx.world.cg.predictedPlayerState.m_iVehicleNum == 0 {
+            ctx.world.cvars.cg_thirdPersonCameraDamp.value
+        } else {
+            1.0
+        };
+
+        // Note that the camera pitch has already been capped off to 89.
+        let mut pitch = Q_fabs(ctx.world.view.cameraFocusAngles[PITCH]);
+
+        // The higher the pitch, the larger the factor, so as you look up, it damps a lot less.
+        // Raven's `115.0` and `1.0` are math.h doubles, so each of these lands in
+        // f64 before rounding back into the float.
+        pitch = (pitch as f64 / 115.0) as f32;
+        dampfactor = ((1.0f64 - dFactor as f64) * (pitch * pitch) as f64) as f32;
+
+        dampfactor += dFactor;
+
+        // Now we also multiply in the stiff factor, so that faster yaw changes are stiffer.
+        if ctx.world.view.cameraStiffFactor > 0.0 {
+            // The cameraStiffFactor is how much of the remaining damp below 1 should be shaved off, i.e. approach 1 as stiffening increases.
+            dampfactor = (dampfactor as f64
+                + (1.0f64 - dampfactor as f64) * ctx.world.view.cameraStiffFactor as f64)
+                as f32;
+        }
+    }
+
+    if dampfactor >= 1.0 || ctx.world.cg.thisFrameTeleport != qfalse {
+        // No damping.
+        ctx.world.view.cameraCurLoc = ctx.world.view.cameraIdealLoc;
+    } else if dampfactor >= 0.0 {
+        // Calculate the difference from the current position to the new one.
+        let cameraIdealLoc = ctx.world.view.cameraIdealLoc;
+        let cameraCurLoc = ctx.world.view.cameraCurLoc;
+        _VectorSubtract(cameraIdealLoc, cameraCurLoc, &mut locdiff);
+
+        // Now we calculate how much of the difference we cover in the time allotted.
+        // The equation is (Damp)^(time)
+        // We must exponent the amount LEFT rather than the amount bled off
+        dampfactor = (1.0f64 - dampfactor as f64) as f32;
+        // Our dampfactor is geared towards a time interval equal to "1".
+        let dtime = ((ctx.world.cg.time - ctx.world.view.cameraLastFrame) as f32 as f64
+            * (1.0f64 / CAMERA_DAMP_INTERVAL as f64)) as f32;
+
+        // Note that since there are a finite number of "practical" delta millisecond values possible,
+        // the ratio should be initialized into a chart ultimately.
+        let ratio = dampfactor.powf(dtime);
+
+        // This value is how much distance is "left" from the ideal.
+        _VectorMA(
+            cameraIdealLoc,
+            -ratio,
+            locdiff,
+            &mut ctx.world.view.cameraCurLoc,
+        );
+    }
+
+    // Raven derefs `cg.snap` for the traces' skip entity; a null there is UB, so
+    // the port skips client 0 (§F19).
+    let clientNum = ctx
+        .world
+        .cg
+        .snap_ref()
+        .map(|snap| snap.ps.clientNum)
+        .unwrap_or(0);
+
+    // Now we trace from the new target location to the new view location, to make sure there is nothing in the way.
+    let cameraCurTarget = ctx.world.view.cameraCurTarget;
+    let cameraCurLoc = ctx.world.view.cameraCurLoc;
+    CG_Trace(
+        ctx,
+        &mut trace,
+        &cameraCurTarget,
+        &cameramins,
+        &cameramaxs,
+        &cameraCurLoc,
+        clientNum,
+        MASK_CAMERACLIP,
+    );
+
+    if trace.fraction < 1.0 {
+        // `trace_t.entityNum` is Raven's `short`; widen for the world test.
+        let hitNum = trace.entityNum as c_int;
+        let isMover = hitNum < ENTITYNUM_WORLD
+            && ctx.world.entity(hitNum as usize).currentState.solid == SOLID_BMODEL
+            && ctx.world.entity(hitNum as usize).currentState.eType
+                == entityType_t::ET_MOVER as c_int;
+
+        if isMover {
+            //get a different position for movers -rww
+            let mover = hitNum as usize;
+
+            //this is absolutely hackiful, since we calc view values before we add packet ents and lerp,
+            //if we hit a mover we want to update its lerp pos and force it when we do the trace against
+            //it.
+            let curTr = ctx.world.entity(mover).currentState.pos.trType;
+            if curTr != trType_t::TR_STATIONARY && curTr != trType_t::TR_LINEAR {
+                let curTrB = ctx.world.entity(mover).currentState.pos.trBase;
+
+                //calc lerporigin for this client frame
+                CG_CalcEntityLerpPositions(ctx, mover);
+
+                //force the calc'd lerp to be the base and say we are stationary so we don't try to extrapolate
+                //out further.
+                ctx.world.entity_mut(mover).currentState.pos.trType = trType_t::TR_STATIONARY;
+                let lerpOrigin = ctx.world.entity(mover).lerpOrigin;
+                ctx.world.entity_mut(mover).currentState.pos.trBase = lerpOrigin;
+
+                //retrace
+                let cameraCurTarget = ctx.world.view.cameraCurTarget;
+                let cameraCurLoc = ctx.world.view.cameraCurLoc;
+                CG_Trace(
+                    ctx,
+                    &mut trace,
+                    &cameraCurTarget,
+                    &cameramins,
+                    &cameramaxs,
+                    &cameraCurLoc,
+                    clientNum,
+                    MASK_CAMERACLIP,
+                );
+
+                //copy old data back in
+                ctx.world.entity_mut(mover).currentState.pos.trType = curTr;
+                ctx.world.entity_mut(mover).currentState.pos.trBase = curTrB;
+            }
+            if trace.fraction < 1.0 {
+                //still hit it, so take the proper trace endpos and use that.
+                ctx.world.view.cameraCurLoc = trace.endpos;
+            }
+        } else {
+            ctx.world.view.cameraCurLoc = trace.endpos;
+        }
+    }
+}
+
+/// Raven `CG_OffsetFighterView` — pushes the view out sideways/up off the
+/// fighter, then pulls it back along the (offset) view angles at range, clipping
+/// both hops.
+///
+/// Raven: "FIXME: do we need to smooth the org?"
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:1045-1102`
+pub fn CG_OffsetFighterView(ctx: &mut CgContext) {
+    let mut vehRight: vec3_t = [0.0; 3];
+    let mut vehUp: vec3_t = [0.0; 3];
+    let mut backDir: vec3_t = [0.0; 3];
+    let mut camOrg: vec3_t = [0.0; 3];
+    let mut camBackOrg: vec3_t = [0.0; 3];
+    // none of these are `mut`: the only arm that would reassign them is the
+    // deferred vehicle override below.
+    let horzOffset = ctx.world.cvars.cg_thirdPersonHorzOffset.value;
+    let vertOffset = ctx.world.cvars.cg_thirdPersonVertOffset.value;
+    let pitchOffset = ctx.world.cvars.cg_thirdPersonPitchOffset.value;
+    let yawOffset = ctx.world.cvars.cg_thirdPersonAngle.value;
+    let range = ctx.world.cvars.cg_thirdPersonRange.value;
+    let mut trace = trace_t::zeroed();
+    let veh = ctx.world.cg.predictedPlayerState.m_iVehicleNum as usize;
+
+    // Raven fills a `vehFwd` here that nothing in the fn ever reads, so the port
+    // asks for no forward vector.
+    let viewangles = ctx.world.cg.refdef.viewangles;
+    AngleVectors(viewangles, None, Some(&mut vehRight), Some(&mut vehUp));
+
+    if ctx.world.entity(veh).m_pVehicle.is_some() {
+        // DEFERRED: `Vehicle_t::m_pVehicleInfo` — `cameraOverride` and the four
+        // `camera*Offset`/`cameraRange` values it gates, plus
+        // `veh->playerState->hackingTime`, all hang off the `Vehicle_t` referent
+        // pool behind `centity_t.m_pVehicle`, which lands with
+        // `oracle/codemp/cgame/cg_players.c:7014-7042` (DEC-46.2). Only the
+        // presence test is reachable, so the five values keep their cvars — what
+        // Raven does for any vehicle that isn't `cameraOverride`.
+        // Source: `oracle/codemp/cgame/cg_view.c:1059-1072`
+    }
+
+    //Set camera viewing position
+    let vieworg = ctx.world.cg.refdef.vieworg;
+    _VectorMA(vieworg, horzOffset, vehRight, &mut camOrg);
+    let out = camOrg;
+    _VectorMA(out, vertOffset, vehUp, &mut camOrg);
+
+    // Raven derefs `cg.snap` for the traces' skip entity; a null there is UB, so
+    // the port skips client 0 (§F19).
+    let clientNum = ctx
+        .world
+        .cg
+        .snap_ref()
+        .map(|snap| snap.ps.clientNum)
+        .unwrap_or(0);
+
+    //trace to that pos
+    CG_Trace(
+        ctx,
+        &mut trace,
+        &vieworg,
+        &cameramins,
+        &cameramaxs,
+        &camOrg,
+        clientNum,
+        MASK_CAMERACLIP,
+    );
+    if trace.fraction < 1.0 {
+        camOrg = trace.endpos;
+    }
+
+    // Set camera viewing direction.
+    ctx.world.cg.refdef.viewangles[YAW] += yawOffset;
+    ctx.world.cg.refdef.viewangles[PITCH] += pitchOffset;
+
+    //Now bring the cam back from that pos and angles at range
+    let viewangles = ctx.world.cg.refdef.viewangles;
+    AngleVectors(viewangles, Some(&mut backDir), None, None);
+    let out = backDir;
+    _VectorScale(out, -1.0, &mut backDir);
+
+    _VectorMA(camOrg, range, backDir, &mut camBackOrg);
+
+    //trace to that pos
+    CG_Trace(
+        ctx,
+        &mut trace,
+        &camOrg,
+        &cameramins,
+        &cameramaxs,
+        &camBackOrg,
+        clientNum,
+        MASK_CAMERACLIP,
+    );
+    camOrg = trace.endpos;
+
+    //FIXME: do we need to smooth the org?
+    // ...and of course we should copy the new view location to the proper spot too.
+    ctx.world.cg.refdef.vieworg = camOrg;
+}
+
+/// Raven `RDF_NOWORLDMODEL` — used for player configuration screen. `cg_draw.rs`
+/// has its own private copy beside its own reader; this TU gets its own per §C8.
+/// Source: `oracle/codemp/cgame/tr_types.h:57`
+const RDF_NOWORLDMODEL: c_int = 1;
+
+/// Raven `RDF_AUTOMAP` — Raven: "means this scene is to draw the automap -rww".
+/// Source: `oracle/codemp/cgame/tr_types.h:63`
+const RDF_AUTOMAP: c_int = 32;
+
+/// Raven `CG_DrawAutoMap` — draws the automap scene. -rww
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:2284-2425`
+pub fn CG_DrawAutoMap(ctx: &mut CgContext) {
+    let mut tr = trace_t::zeroed();
+    let mut fwd: vec3_t = [0.0; 3];
+
+    if ctx.world.cvars.cg_autoMap.integer == 0 {
+        //don't do anything then
+        return;
+    }
+
+    // Raven derefs `cg.snap` for the dead test; a null there is UB, so the port
+    // draws no automap at all (§F19).
+    let Some(health) = ctx
+        .world
+        .cg
+        .snap_ref()
+        .map(|snap| snap.ps.stats[STAT_HEALTH as usize])
+    else {
+        return;
+    };
+    if health <= 0 {
+        //don't show when dead
+        return;
+    }
+
+    if (ctx.world.cg.predictedPlayerState.pm_flags & PMF_FOLLOW) != 0
+        || ctx.world.cg.predictedPlayerState.persistant[PERS_TEAM as usize] == TEAM_SPECTATOR
+    {
+        //don't show when spec
+        return;
+    }
+
+    let localNum = ctx.world.cg.predictedPlayerState.clientNum as usize;
+    if ctx.world.cgs.clientinfo[localNum].infoValid == qfalse {
+        //don't show if bad ci
+        return;
+    }
+
+    if ctx.world.cgs.gametype < GT_TEAM {
+        //don't show in non-team gametypes
+        return;
+    }
+
+    if ctx.world.view.cg_autoMapInputTime >= ctx.world.cg.time {
+        if ctx.world.view.cg_autoMapInput.up != 0.0 {
+            ctx.world.view.cg_autoMapZoom -= ctx.world.view.cg_autoMapInput.up;
+            if ctx.world.view.cg_autoMapZoom < ctx.world.view.cg_autoMapZoomMainOffset + 64.0 {
+                ctx.world.view.cg_autoMapZoom = ctx.world.view.cg_autoMapZoomMainOffset + 64.0;
+            }
+        }
+
+        if ctx.world.view.cg_autoMapInput.down != 0.0 {
+            ctx.world.view.cg_autoMapZoom += ctx.world.view.cg_autoMapInput.down;
+            if ctx.world.view.cg_autoMapZoom > ctx.world.view.cg_autoMapZoomMainOffset + 4096.0 {
+                ctx.world.view.cg_autoMapZoom = ctx.world.view.cg_autoMapZoomMainOffset + 4096.0;
+            }
+        }
+
+        if ctx.world.view.cg_autoMapInput.yaw != 0.0 {
+            ctx.world.view.cg_autoMapAngle[YAW] += ctx.world.view.cg_autoMapInput.yaw;
+        }
+
+        if ctx.world.view.cg_autoMapInput.pitch != 0.0 {
+            ctx.world.view.cg_autoMapAngle[PITCH] += ctx.world.view.cg_autoMapInput.pitch;
+        }
+
+        if ctx.world.view.cg_autoMapInput.goToDefaults != qfalse {
+            ctx.world.view.cg_autoMapZoom = 512.0;
+            VectorSet(&mut ctx.world.view.cg_autoMapAngle, 90.0, 0.0, 0.0);
+        }
+    }
+
+    // Raven's `memset( &refdef, 0, sizeof( refdef ) )` — `refdef_t` is scalars
+    // and arrays with no padding, so the zeroed literal is the memset.
+    let mut refdef = refdef_t {
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        fov_x: 0.0,
+        fov_y: 0.0,
+        vieworg: [0.0; 3],
+        viewangles: [0.0; 3],
+        viewaxis: [[0.0; 3]; 3],
+        viewContents: 0,
+        time: 0,
+        rdflags: 0,
+        areamask: [0; MAX_MAP_AREA_BYTES],
+        text: [[0; MAX_RENDER_STRING_LENGTH]; MAX_RENDER_STRINGS],
+    };
+
+    refdef.rdflags = RDF_NOWORLDMODEL | RDF_AUTOMAP;
+
+    let origin = ctx.world.cg.predictedPlayerState.origin;
+    _VectorCopy(origin, &mut refdef.vieworg);
+    let cg_autoMapAngle = ctx.world.view.cg_autoMapAngle;
+    _VectorCopy(cg_autoMapAngle, &mut refdef.viewangles);
+
+    //scale out in the direction of the view angles base on the zoom factor
+    AngleVectors(refdef.viewangles, Some(&mut fwd), None, None);
+    let vieworg = refdef.vieworg;
+    _VectorMA(
+        vieworg,
+        -ctx.world.view.cg_autoMapZoom,
+        fwd,
+        &mut refdef.vieworg,
+    );
+
+    AnglesToAxis(refdef.viewangles, refdef.viewaxis.as_mut_ptr());
+
+    refdef.fov_x = 50.0;
+    refdef.fov_y = 50.0;
+
+    //guess this doesn't need to be done every frame, but eh
+    let (vWidth, vHeight) = trap::R_GetRealRes(ctx.engine);
+
+    //set scaling values so that the 640x480 will result at 1.0/1.0
+    let hScale = vWidth as f32 / 640.0;
+    let vScale = vHeight as f32 / 480.0;
+
+    let x = ctx.world.cvars.cg_autoMapX.value;
+    let y = ctx.world.cvars.cg_autoMapY.value;
+    let w = ctx.world.cvars.cg_autoMapW.value;
+    let h = ctx.world.cvars.cg_autoMapH.value;
+
+    refdef.x = (x * hScale) as c_int;
+    refdef.y = (y * vScale) as c_int;
+    refdef.width = (w * hScale) as c_int;
+    refdef.height = (h * vScale) as c_int;
+
+    let frameLeft = ctx.world.cgs.media.wireframeAutomapFrame_left;
+    let frameRight = ctx.world.cgs.media.wireframeAutomapFrame_right;
+    let frameTop = ctx.world.cgs.media.wireframeAutomapFrame_top;
+    let frameBottom = ctx.world.cgs.media.wireframeAutomapFrame_bottom;
+    CG_DrawPic(
+        ctx,
+        x - SIDEFRAME_WIDTH as f32,
+        y,
+        SIDEFRAME_WIDTH as f32,
+        h,
+        frameLeft,
+    );
+    CG_DrawPic(ctx, x + w, y, SIDEFRAME_WIDTH as f32, h, frameRight);
+    CG_DrawPic(
+        ctx,
+        x - SIDEFRAME_WIDTH as f32,
+        y - SIDEFRAME_HEIGHT as f32,
+        w + (SIDEFRAME_WIDTH * 2) as f32,
+        SIDEFRAME_HEIGHT as f32,
+        frameTop,
+    );
+    CG_DrawPic(
+        ctx,
+        x - SIDEFRAME_WIDTH as f32,
+        y + h,
+        w + (SIDEFRAME_WIDTH * 2) as f32,
+        SIDEFRAME_HEIGHT as f32,
+        frameBottom,
+    );
+
+    refdef.time = ctx.world.cg.time;
+
+    trap::R_ClearScene(ctx.engine);
+    CG_AddRadarAutomapEnts(ctx);
+
+    // DEFERRED: `Vehicle_t::m_pVehicleInfo->type == VH_FIGHTER` — the last term
+    // of Raven's chain hangs off the `Vehicle_t` referent pool behind
+    // `centity_t.m_pVehicle` (`oracle/codemp/cgame/cg_players.c:7014-7042`,
+    // DEC-46.2), so DEC-46.2's `Option<VehicleId>` can only answer the presence
+    // half and this accepts every vehicle class — the same disposition
+    // `cg_draw.rs`'s `CG_DrawVehicleHUD` fighter test took.
+    // Source: `oracle/codemp/cgame/cg_view.c:2401-2405`
+    let vehNum = ctx.world.cg.predictedPlayerState.m_iVehicleNum as usize;
+    let inFighter = ctx.world.cg.predictedPlayerState.m_iVehicleNum != 0
+        && ctx.world.entity(vehNum).currentState.eType == entityType_t::ET_NPC as c_int
+        && ctx.world.entity(vehNum).currentState.NPC_class == class_t::CLASS_VEHICLE as c_int
+        && ctx.world.entity(vehNum).m_pVehicle.is_some();
+
+    if inFighter {
+        //constantly adjust to current height
+        let height = ctx.world.cg.predictedPlayerState.origin[2];
+        trap::R_AutomapElevAdj(ctx.engine, height);
+    } else {
+        //Trace down and set the ground elevation as the main automap elevation point
+        let mut playerMins: vec3_t = [0.0; 3];
+        let mut playerMaxs: vec3_t = [0.0; 3];
+        VectorSet(&mut playerMins, -15.0, -15.0, DEFAULT_MINS_2 as f32);
+        VectorSet(&mut playerMaxs, 15.0, 15.0, DEFAULT_MAXS_2 as f32);
+
+        let origin = ctx.world.cg.predictedPlayerState.origin;
+        _VectorCopy(origin, &mut fwd);
+        fwd[2] -= 4096.0;
+        let psClientNum = ctx.world.cg.predictedPlayerState.clientNum;
+        CG_Trace(
+            ctx,
+            &mut tr,
+            &origin,
+            &playerMins,
+            &playerMaxs,
+            &fwd,
+            psClientNum,
+            MASK_SOLID,
+        );
+
+        if tr.startsolid == 0 && tr.allsolid == 0 {
+            trap::R_AutomapElevAdj(ctx.engine, tr.endpos[2]);
+        }
+    }
+    trap::R_RenderScene(ctx.engine, &refdef);
 }

@@ -5,16 +5,22 @@
 
 use core::ffi::c_int;
 
+use mp_abi::cgame::syscalls::CG_CM_MARKFRAGMENTS::markFragment_t;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
+use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::q_math::{
-    _VectorCopy, _VectorMA, vectoangles, AngleVectors, Distance, VectorClear, VectorLength,
-    VectorSet, ROLL,
+    _DotProduct, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin, vectoangles,
+    AngleVectors, CrossProduct, Distance, PerpendicularVector, RotatePointAroundVector,
+    VectorClear, VectorLength, VectorNormalize2, VectorSet, ROLL,
 };
 use mp_qshared::shared::q_string::COM_Parse;
-use mp_qshared::shared::{qhandle_t, vec3_t};
+use mp_qshared::shared::surface_flags::CONTENTS_SOLID;
+use mp_qshared::shared::{qhandle_t, vec3_t, ENTITYNUM_WORLD};
 use native_string::{atof, atoi, Q_stricmp};
 
 use crate::cg_main::{CG_ConfigString, CG_Error, CG_Printf};
+use crate::cg_predict::CG_Trace;
+use crate::local::mark_poly_s::MAX_VERTS_ON_POLY;
 use crate::trap;
 use crate::world::cg_context::CgContext;
 use crate::world::cg_marks_state::particle_type_t::{
@@ -2263,4 +2269,220 @@ pub fn CG_NewParticleArea(ctx: &mut CgContext, num: c_int) -> c_int {
     */
 
     1
+}
+
+/// Raven `CG_ImpactMark` — clips a shader quad against the world and either
+/// hands it straight to the renderer (`temporary`) or stores it as a
+/// persistent mark poly that fades out over [`MARK_TOTAL_TIME`].
+///
+/// `cg_addMarks == 2` skips the `CM_MarkFragments` clip entirely and hands the
+/// whole quad to the renderer's own decal path instead.
+///
+/// Source: `oracle/codemp/cgame/cg_marks.c:110-210`
+#[allow(clippy::too_many_arguments)]
+pub fn CG_ImpactMark(
+    ctx: &mut CgContext,
+    markShader: qhandle_t,
+    origin: vec3_t,
+    dir: vec3_t,
+    orientation: f32,
+    red: f32,
+    green: f32,
+    blue: f32,
+    alpha: f32,
+    alphaFade: bool,
+    radius: f32,
+    temporary: bool,
+) {
+    debug_assert!(markShader != 0);
+
+    if ctx.world.cvars.cg_addMarks.integer == 0 {
+        return;
+    } else if ctx.world.cvars.cg_addMarks.integer == 2 {
+        trap::R_AddDecalToScene(
+            ctx.engine,
+            markShader,
+            &origin,
+            &dir,
+            orientation,
+            red,
+            green,
+            blue,
+            alpha,
+            alphaFade,
+            radius,
+            temporary,
+        );
+        return;
+    }
+
+    if radius <= 0.0 {
+        CG_Error(ctx, "CG_ImpactMark called with <= 0 radius");
+        return;
+    }
+
+    //if ( markTotal >= MAX_MARK_POLYS ) {
+    //	return;
+    //}
+
+    // create the texture axis
+    let mut axis0: vec3_t = [0.0; 3];
+    VectorNormalize2(dir, &mut axis0);
+
+    let mut axisPerp: vec3_t = [0.0; 3];
+    PerpendicularVector(&mut axisPerp, axis0);
+
+    let mut axis2: vec3_t = [0.0; 3];
+    RotatePointAroundVector(&mut axis2, axis0, axisPerp, orientation);
+
+    let mut axis1: vec3_t = [0.0; 3];
+    CrossProduct(axis0, axis2, &mut axis1);
+
+    let texCoordScale = (0.5_f64 * 1.0 / radius as f64) as f32;
+
+    // create the full polygon
+    let mut originalPoints: [vec3_t; 4] = [[0.0; 3]; 4];
+    for i in 0..3 {
+        originalPoints[0][i] = origin[i] - radius * axis1[i] - radius * axis2[i];
+        originalPoints[1][i] = origin[i] + radius * axis1[i] - radius * axis2[i];
+        originalPoints[2][i] = origin[i] + radius * axis1[i] + radius * axis2[i];
+        originalPoints[3][i] = origin[i] - radius * axis1[i] + radius * axis2[i];
+    }
+
+    // get the fragments
+    let mut projection: vec3_t = [0.0; 3];
+    _VectorScale(dir, -20.0, &mut projection);
+
+    let mut markPoints: [vec3_t; MAX_MARK_POINTS] = [[0.0; 3]; MAX_MARK_POINTS];
+    let mut markFragments = [markFragment_t::default(); MAX_MARK_FRAGMENTS];
+    let numFragments = trap::CM_MarkFragments(
+        ctx.engine,
+        &originalPoints,
+        &projection,
+        &mut markPoints,
+        &mut markFragments,
+    );
+
+    let colors: [u8; 4] = [
+        (red * 255.0) as i32 as u8,
+        (green * 255.0) as i32 as u8,
+        (blue * 255.0) as i32 as u8,
+        (alpha * 255.0) as i32 as u8,
+    ];
+
+    let mut i: usize = 0;
+    while (i as c_int) < numFragments {
+        let mf = &mut markFragments[i];
+
+        // we have an upper limit on the complexity of polygons
+        // that we store persistantly
+        if mf.numPoints > MAX_VERTS_ON_POLY as c_int {
+            mf.numPoints = MAX_VERTS_ON_POLY as c_int;
+        }
+        let numPoints = mf.numPoints as usize;
+        let firstPoint = mf.firstPoint as usize;
+
+        let mut verts = [polyVert_t {
+            xyz: [0.0; 3],
+            st: [0.0; 2],
+            modulate: [0; 4],
+        }; MAX_VERTS_ON_POLY];
+
+        for j in 0..numPoints {
+            let xyz = markPoints[firstPoint + j];
+            verts[j].xyz = xyz;
+
+            let mut delta: vec3_t = [0.0; 3];
+            _VectorSubtract(xyz, origin, &mut delta);
+            verts[j].st[0] = (0.5_f64 + (_DotProduct(delta, axis1) * texCoordScale) as f64) as f32;
+            verts[j].st[1] = (0.5_f64 + (_DotProduct(delta, axis2) * texCoordScale) as f64) as f32;
+            verts[j].modulate = colors;
+        }
+
+        // if it is a temporary (shadow) mark, add it immediately and forget about it
+        if temporary {
+            trap::R_AddPolyToScene(ctx.engine, markShader, &verts[..numPoints]);
+        } else {
+            // otherwise save it persistantly
+            let mark = CG_AllocMark(ctx.world);
+            let cgTime = ctx.world.cg.time;
+            if let Some(m) = ctx.world.cg_markPolys.get_mut(mark) {
+                m.time = cgTime;
+                m.alphaFade = alphaFade as c_int;
+                m.markShader = markShader;
+                m.poly.numVerts = numPoints as c_int;
+                m.color = [red, green, blue, alpha];
+                m.verts[..numPoints].copy_from_slice(&verts[..numPoints]);
+            }
+            ctx.world.marks.markTotal += 1;
+        }
+
+        i += 1;
+    }
+}
+
+/// Raven `ValidBloodPool` — samples a 2x2 grid of short downward traces above
+/// `start` and only accepts the spot if every sample lands flush on the world
+/// (no entities, no embedded start point).
+///
+/// Source: `oracle/codemp/cgame/cg_marks.c:1902-1946`
+pub fn ValidBloodPool(ctx: &mut CgContext, start: vec3_t) -> bool {
+    let fwidth: f32 = 16.0;
+    let fheight: f32 = 16.0;
+
+    let mut normal: vec3_t = [0.0; 3];
+    VectorSet(&mut normal, 0.0, 0.0, 1.0);
+
+    let mut angles: vec3_t = [0.0; 3];
+    vectoangles(normal, &mut angles);
+    let mut right: vec3_t = [0.0; 3];
+    let mut up: vec3_t = [0.0; 3];
+    AngleVectors(angles, None, Some(&mut right), Some(&mut up));
+
+    let mut center_pos: vec3_t = [0.0; 3];
+    _VectorMA(start, EXTRUDE_DIST, normal, &mut center_pos);
+
+    let mut x = -fwidth / 2.0;
+    while x < fwidth {
+        let mut x_pos: vec3_t = [0.0; 3];
+        _VectorMA(center_pos, x, right, &mut x_pos);
+
+        let mut y = -fheight / 2.0;
+        while y < fheight {
+            let mut this_pos: vec3_t = [0.0; 3];
+            _VectorMA(x_pos, y, up, &mut this_pos);
+            let mut end_pos: vec3_t = [0.0; 3];
+            _VectorMA(this_pos, -EXTRUDE_DIST * 2.0, normal, &mut end_pos);
+
+            let mut trace = trace_t::zeroed();
+            // PORT-NOTE: Raven passes NULL mins/maxs; `CM_Trace` substitutes
+            // `vec3_origin` for a NULL bound (`cm_trace.cpp:1603-1610`), so the
+            // zero vector below is the same point trace.
+            CG_Trace(
+                ctx,
+                &mut trace,
+                &this_pos,
+                &vec3_origin,
+                &vec3_origin,
+                &end_pos,
+                -1,
+                CONTENTS_SOLID,
+            );
+
+            if trace.entityNum != ENTITYNUM_WORLD as i16 {
+                // may only land on world
+                return false;
+            }
+
+            if trace.startsolid != 0 || trace.fraction >= 1.0 {
+                return false;
+            }
+
+            y += fheight;
+        }
+
+        x += fwidth;
+    }
+
+    true
 }

@@ -3,6 +3,8 @@
 
 #![allow(non_snake_case)]
 
+use core::ffi::c_int;
+
 /// `cg_scoreboard.c`'s mutable file-scope globals, grouped by owning `.c` file
 /// (§B3: file-scope globals become owned state, they never become Rust
 /// globals).
@@ -21,4 +23,9 @@ pub struct CgScoreboardState {
     ///
     /// Source: `oracle/codemp/cgame/cg_scoreboard.c:54`
     pub localClient: bool,
+
+    /// Raven `int cg_siegeWinTeam` — which side won the siege round, off
+    /// `CS_SIEGE_WINTEAM` (1 or 2); `cg_main.c` writes it.
+    /// Source: `oracle/codemp/cgame/cg_scoreboard.c:344`
+    pub cg_siegeWinTeam: c_int,
 }

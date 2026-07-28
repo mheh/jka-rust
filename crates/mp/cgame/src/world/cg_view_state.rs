@@ -5,6 +5,7 @@
 
 use core::ffi::c_int;
 
+use mp_abi::cgame::shared_buffer::autoMapInput_t;
 use mp_qshared::shared::{qfalse, vec3_t};
 
 use crate::local::cgscreffects_s::cgscreffects_t;
@@ -46,6 +47,66 @@ pub struct CgViewState {
     /// Source: `oracle/codemp/cgame/cg_view.c:226`
     pub cameraIdealLoc: vec3_t,
 
+    /// Raven `vec3_t cameraup` — the third-person camera's up axis, filled
+    /// beside `camerafwd` from `cameraFocusAngles`.
+    /// Source: `oracle/codemp/cgame/cg_view.c:223`
+    pub cameraup: vec3_t,
+
+    /// Raven `vec3_t cameraFocusAngles` — the angles the third-person camera
+    /// looks along, pitch-capped to +-89.
+    /// Source: `oracle/codemp/cgame/cg_view.c:225`
+    pub cameraFocusAngles: vec3_t,
+
+    /// Raven `vec3_t cameraCurTarget` — the damped target the camera is
+    /// actually looking at this frame.
+    /// Source: `oracle/codemp/cgame/cg_view.c:227`
+    pub cameraCurTarget: vec3_t,
+
+    /// Raven `vec3_t cameraCurLoc` — the damped, trace-clipped spot the camera
+    /// is actually sitting at this frame.
+    /// Source: `oracle/codemp/cgame/cg_view.c:227`
+    pub cameraCurLoc: vec3_t,
+
+    /// Raven `int cameraLastFrame` — `cg.time` the last time the camera damp
+    /// ran; the damp exponent's time base.
+    /// Source: `oracle/codemp/cgame/cg_view.c:229`
+    pub cameraLastFrame: c_int,
+
+    /// Raven `float cameraLastYaw` — last frame's focus yaw, so a fast yaw
+    /// change can stiffen the camera.
+    /// Source: `oracle/codemp/cgame/cg_view.c:231`
+    pub cameraLastYaw: f32,
+
+    /// Raven `float cameraStiffFactor` — how much of the remaining damp gets
+    /// shaved off; approaches 1 as the yaw change speeds up.
+    /// Source: `oracle/codemp/cgame/cg_view.c:232`
+    pub cameraStiffFactor: f32,
+
+    /// Raven `float cg_autoMapZoom` — how far back the automap camera pulls,
+    /// walked by the automap input.
+    /// Source: `oracle/codemp/cgame/cg_view.c:2277`
+    pub cg_autoMapZoom: f32,
+
+    /// Raven `float cg_autoMapZoomMainOffset` — the floor the automap zoom
+    /// clamps against, so the zoom range slides with it.
+    /// Source: `oracle/codemp/cgame/cg_view.c:2278`
+    pub cg_autoMapZoomMainOffset: f32,
+
+    /// Raven `vec3_t cg_autoMapAngle` — the automap camera's angles; starts
+    /// straight down.
+    /// Source: `oracle/codemp/cgame/cg_view.c:2279`
+    pub cg_autoMapAngle: vec3_t,
+
+    /// Raven `autoMapInput_t cg_autoMapInput` — the last automap input the
+    /// engine handed over through the shared buffer.
+    /// Source: `oracle/codemp/cgame/cg_view.c:2280`
+    pub cg_autoMapInput: autoMapInput_t,
+
+    /// Raven `int cg_autoMapInputTime` — until when that input keeps driving
+    /// the automap camera.
+    /// Source: `oracle/codemp/cgame/cg_view.c:2281`
+    pub cg_autoMapInputTime: c_int,
+
     /// Raven `cgscreffects_t cgScreenEffects` — the screen-shake and
     /// music-ducking state the `CG_SE_*` / `CGCam_*` fns drive.
     /// Source: `oracle/codemp/cgame/cg_view.c:2009`
@@ -62,17 +123,41 @@ pub struct CgViewState {
     /// disruptor zoom loop is next allowed to fire.
     /// Source: `oracle/codemp/cgame/cg_view.c:1264`
     pub zoomSoundTime: c_int,
+
+    /// Raven `float cg_linearFogOverride` — designer-specified override for
+    /// linear fogging style, off the worldspawn's `fogstart`; `cg_main.c` is
+    /// its one writer.
+    /// Source: `oracle/codemp/cgame/cg_view.c:2435`
+    pub cg_linearFogOverride: f32,
 }
 
 impl Default for CgViewState {
-    /// Raven's zeroed BSS — every one of these is an uninitialized file-scope
-    /// global.
+    /// Raven's zeroed BSS, except the four automap globals he gave loaded
+    /// initializers — those keep Raven's values.
     fn default() -> Self {
         CgViewState {
             camerafwd: [0.0; 3],
             cameraFocusLoc: [0.0; 3],
             cameraIdealTarget: [0.0; 3],
             cameraIdealLoc: [0.0; 3],
+            cameraup: [0.0; 3],
+            cameraFocusAngles: [0.0; 3],
+            cameraCurTarget: [0.0; 3],
+            cameraCurLoc: [0.0; 3],
+            cameraLastFrame: 0,
+            cameraLastYaw: 0.0,
+            cameraStiffFactor: 0.0,
+            cg_autoMapZoom: 512.0,
+            cg_autoMapZoomMainOffset: 0.0,
+            cg_autoMapAngle: [90.0, 0.0, 0.0],
+            cg_autoMapInput: autoMapInput_t {
+                up: 0.0,
+                down: 0.0,
+                yaw: 0.0,
+                pitch: 0.0,
+                goToDefaults: qfalse,
+            },
+            cg_autoMapInputTime: 0,
             cgScreenEffects: cgscreffects_t {
                 FOV: 0.0,
                 FOV2: 0.0,
@@ -85,6 +170,7 @@ impl Default for CgViewState {
             },
             zoomFov: 0.0,
             zoomSoundTime: 0,
+            cg_linearFogOverride: 0.0,
         }
     }
 }

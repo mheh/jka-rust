@@ -7,7 +7,9 @@ use core::ffi::c_int;
 
 use mp_bg::public::stat_index::statIndex_t::{STAT_ARMOR, STAT_HEALTH};
 use mp_qshared::shared::q_color::{g_color_table, Q_IsColorString};
-use mp_qshared::shared::{qhandle_t, vec4_t};
+use mp_qshared::shared::{
+    qhandle_t, vec4_t, BIGCHAR_HEIGHT, BIGCHAR_WIDTH, SMALLCHAR_HEIGHT, SMALLCHAR_WIDTH,
+};
 use mp_uishared::shared::display_state::DisplayState;
 use mp_uishared::shared::menudef::{ITEM_TEXTSTYLE_BLINK, ITEM_TEXTSTYLE_SHADOWED};
 
@@ -788,5 +790,119 @@ pub fn UI_DrawScaledProportionalString(
         0,
         iStyle,
         FONT_MEDIUM,
+    );
+}
+
+/// Raven `CG_DrawBigString` — the big console font, white with a caller-given alpha.
+///
+/// Source: `oracle/codemp/cgame/cg_drawtools.c:276-282`
+pub fn CG_DrawBigString(
+    ctx: &mut CgContext,
+    ds: &DisplayState,
+    x: c_int,
+    y: c_int,
+    s: &str,
+    alpha: f32,
+) {
+    let mut color: vec4_t = [0.0, 0.0, 0.0, 0.0];
+    color[0] = 1.0;
+    color[1] = 1.0;
+    color[2] = 1.0;
+    color[3] = alpha;
+    CG_DrawStringExt(
+        ctx,
+        ds,
+        x,
+        y,
+        s,
+        &color,
+        false,
+        true,
+        BIGCHAR_WIDTH,
+        BIGCHAR_HEIGHT,
+        0,
+    );
+}
+
+/// Raven `CG_DrawBigStringColor` — the big console font, caller-supplied color.
+///
+/// Source: `oracle/codemp/cgame/cg_drawtools.c:284-286`
+pub fn CG_DrawBigStringColor(
+    ctx: &mut CgContext,
+    ds: &DisplayState,
+    x: c_int,
+    y: c_int,
+    s: &str,
+    color: &vec4_t,
+) {
+    CG_DrawStringExt(
+        ctx,
+        ds,
+        x,
+        y,
+        s,
+        color,
+        true,
+        true,
+        BIGCHAR_WIDTH,
+        BIGCHAR_HEIGHT,
+        0,
+    );
+}
+
+/// Raven `CG_DrawSmallString` — the small console font, white with a caller-given alpha.
+///
+/// Source: `oracle/codemp/cgame/cg_drawtools.c:288-294`
+pub fn CG_DrawSmallString(
+    ctx: &mut CgContext,
+    ds: &DisplayState,
+    x: c_int,
+    y: c_int,
+    s: &str,
+    alpha: f32,
+) {
+    let mut color: vec4_t = [0.0, 0.0, 0.0, 0.0];
+    color[0] = 1.0;
+    color[1] = 1.0;
+    color[2] = 1.0;
+    color[3] = alpha;
+    CG_DrawStringExt(
+        ctx,
+        ds,
+        x,
+        y,
+        s,
+        &color,
+        false,
+        false,
+        SMALLCHAR_WIDTH,
+        SMALLCHAR_HEIGHT,
+        0,
+    );
+}
+
+/// Raven `CG_DrawSmallStringColor` — the small console font, caller-supplied color.
+///
+/// Source: `oracle/codemp/cgame/cg_drawtools.c:296-298`
+pub fn CG_DrawSmallStringColor(
+    ctx: &mut CgContext,
+    ds: &DisplayState,
+    x: c_int,
+    y: c_int,
+    s: &str,
+    color: &vec4_t,
+) {
+    CG_DrawStringExt(
+        ctx,
+        ds,
+        x,
+        y,
+        s,
+        color,
+        true,
+        false,
+        SMALLCHAR_WIDTH,
+        SMALLCHAR_HEIGHT,
+        0,
     );
 }

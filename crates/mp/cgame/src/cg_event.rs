@@ -6,12 +6,14 @@ use core::ffi::c_int;
 use core::ptr::null_mut;
 
 use mp_bg::bg_misc::{BG_CycleInven, BG_FindItemForHoldable, BG_GiveMeVectorFromMatrix};
+use mp_bg::bg_panimate::BG_InKnockDownOnly;
 use mp_bg::cstr_util::cstr_to_str;
 use mp_bg::local::bg_customSiegeSoundNames;
 use mp_bg::public::bg_itemlist::bg_itemlist;
 use mp_bg::public::configstring::CS_PLAYERS;
 use mp_bg::public::ctf_msg::ctfMsg_t;
 use mp_bg::public::entity_event::entity_event_t::EV_USE_ITEM0;
+use mp_bg::public::entity_flags::{EF_DEAD, EF_JETPACK_ACTIVE};
 use mp_bg::public::gametype::{GT_DUEL, GT_JEDIMASTER, GT_POWERDUEL, GT_TEAM};
 use mp_bg::public::gender::gender_t;
 use mp_bg::public::holdable::{
@@ -26,21 +28,24 @@ use mp_bg::public::weaponstate::weaponstate_t;
 use mp_bg::public::{team_t, RANK_TIED_FLAG, TEAM_BLUE, TEAM_RED, TEAM_SPECTATOR};
 use mp_bg::vehicles::vehicle_s::{Vehicle_t, MAX_VEHICLES, VEHICLE_BASE};
 use mp_bg::weapons::weapon_t::{
-    WP_BLASTER, WP_DEMP2, WP_DET_PACK, WP_ROCKET_LAUNCHER, WP_SABER, WP_THERMAL, WP_TRIP_MINE,
-    WP_TURRET,
+    WP_BLASTER, WP_BOWCASTER, WP_BRYAR_OLD, WP_BRYAR_PISTOL, WP_CONCUSSION, WP_DEMP2, WP_DET_PACK,
+    WP_DISRUPTOR, WP_REPEATER, WP_ROCKET_LAUNCHER, WP_SABER, WP_THERMAL, WP_TRIP_MINE, WP_TURRET,
 };
 use mp_qshared::common::mp::qcommon::entityState_t;
+use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::limits::MAX_VEH_WEAPONS;
 use mp_qshared::shared::q_color::S_COLOR_WHITE;
+use mp_qshared::shared::q_math::{vec3_origin, YAW};
 use mp_qshared::shared::{
-    mdxaBone_t, qfalse, vec3_t, Eorientations, BIGCHAR_WIDTH, CHAN_AUTO, ENTITYNUM_WORLD,
-    MAX_CLIENTS_I32, SCREEN_HEIGHT,
+    mdxaBone_t, qfalse, vec3_t, Eorientations, BIGCHAR_WIDTH, CHAN_AUTO, CHAN_VOICE,
+    ENTITYNUM_NONE, ENTITYNUM_WORLD, MASK_PLAYERSOLID, MAX_CLIENTS_I32, SCREEN_HEIGHT,
 };
 use native_string::{buf_to_string, string_to_latin1, Info_ValueForKey, Q_strncpyzBytes};
 
 use crate::cg_draw::CG_CenterPrint;
 use crate::cg_main::{CG_ConfigString, CG_Error, CG_GetStringEdString, CG_Printf, Com_Printf};
-use crate::cg_players::CG_ThereIsAMaster;
+use crate::cg_players::{CG_AddGhoul2Mark, CG_CustomSound, CG_ThereIsAMaster};
+use crate::cg_predict::CG_G2Trace;
 use crate::local::centity_s::centity_t;
 use crate::local::client_info_t::MAX_CUSTOM_SIEGE_SOUNDS;
 use crate::trap;
@@ -1245,4 +1250,320 @@ pub fn CG_PrintCTFMessage(
     let printMsg: String = printMsg.chars().take(1023).collect();
 
     Com_Printf(ctx, &format!("{printMsg}\n"));
+}
+
+/// Raven `CG_PainEvent` — plays a health-banded pain grunt for an entity
+/// (throttled to two a second) and flips its programmatic twitch direction.
+///
+/// Source: `oracle/codemp/cgame/cg_event.c:842-865`
+pub fn CG_PainEvent(ctx: &mut CgContext, centNum: usize, health: c_int) {
+    let time = ctx.world.cg.time;
+    let painTime = ctx.world.entity(centNum).pe.painTime;
+
+    // don't do more than two pain sounds a second
+    if time - painTime < 500 {
+        return;
+    }
+
+    let snd = if health < 25 {
+        "*pain25.wav"
+    } else if health < 50 {
+        "*pain50.wav"
+    } else if health < 75 {
+        "*pain75.wav"
+    } else {
+        "*pain100.wav"
+    };
+
+    let number = ctx.world.entity(centNum).currentState.number;
+    let custom = CG_CustomSound(ctx, number, snd);
+    trap::S_StartSound(ctx.engine, None, number, CHAN_VOICE, custom);
+
+    // save pain time for programitic twitch animation
+    let cent = ctx.world.entity_mut(centNum);
+    cent.pe.painTime = time;
+    cent.pe.painDirection ^= 1;
+}
+
+/// Raven `CG_GetCTFMessageEvent` — resolves the flag-event's client/team
+/// indices into a `clientinfo_t` slot and a team label, then hands off to
+/// [`CG_PrintCTFMessage`].
+///
+/// §F19: Raven's `clIndex < MAX_CLIENTS` guards only the upper bound; a
+/// negative `trickedentindex` would index `cgs.clientinfo` out of bounds (UB)
+/// in C. The port adds a `clIndex >= 0` check and treats a miss as "no
+/// client", matching the fn's own `if (!ci) return;` early-out.
+///
+/// Source: `oracle/codemp/cgame/cg_event.c:1044-1067`
+pub fn CG_GetCTFMessageEvent(ctx: &mut CgContext, es: &entityState_t) {
+    let clIndex = es.trickedentindex;
+    let teamIndex = es.trickedentindex2;
+
+    let ci = if clIndex >= 0 && clIndex < MAX_CLIENTS_I32 {
+        Some(clIndex as usize)
+    } else {
+        None
+    };
+
+    let teamName = if teamIndex < 50 {
+        Some(CG_TeamName(teamIndex))
+    } else {
+        None
+    };
+
+    let Some(ci) = ci else {
+        return;
+    };
+
+    CG_PrintCTFMessage(ctx, Some(ci), teamName, es.eventParm);
+}
+
+/// Raven `DoFall` — picks the landing sound (corpse crack, knockdown thud, or
+/// footfall) from the fall delta and, for the local player, smooths the
+/// screen's landing-Z bob.
+///
+/// The `_XBOX`-gated rumble tail (`FF_XboxDamage`) never compiled into the MP
+/// build and is dropped, not transcribed.
+///
+/// Source: `oracle/codemp/cgame/cg_event.c:1078-1168`
+pub fn DoFall(ctx: &mut CgContext, centNum: usize, es: &entityState_t, clientNum: c_int) {
+    let delta = es.eventParm;
+
+    let eFlags = ctx.world.entity(centNum).currentState.eFlags;
+    let currentNumber = ctx.world.entity(centNum).currentState.number;
+
+    if eFlags & EF_DEAD != 0 {
+        //corpses crack into the ground ^_^
+        if delta > 25 {
+            let sfx = ctx.world.cgs.media.fallSound;
+            trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, sfx);
+        } else {
+            let sfx = trap::S_RegisterSound(ctx.engine, "sound/movers/objects/objectHit.wav");
+            trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, sfx);
+        }
+    } else if BG_InKnockDownOnly(es.legsAnim) != qfalse {
+        if delta > 14 {
+            let sfx = ctx.world.cgs.media.fallSound;
+            trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, sfx);
+        } else {
+            let sfx = trap::S_RegisterSound(ctx.engine, "sound/movers/objects/objectHit.wav");
+            trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, sfx);
+        }
+    } else if delta > 50 {
+        let sfx = ctx.world.cgs.media.fallSound;
+        trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, sfx);
+        let custom = CG_CustomSound(ctx, currentNumber, "*land1.wav");
+        trap::S_StartSound(ctx.engine, None, currentNumber, CHAN_VOICE, custom);
+        let time = ctx.world.cg.time;
+        // don't play a pain sound right after this
+        ctx.world.entity_mut(centNum).pe.painTime = time;
+    } else if delta > 44 {
+        let sfx = ctx.world.cgs.media.fallSound;
+        trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, sfx);
+        let custom = CG_CustomSound(ctx, currentNumber, "*land1.wav");
+        trap::S_StartSound(ctx.engine, None, currentNumber, CHAN_VOICE, custom);
+        let time = ctx.world.cg.time;
+        // don't play a pain sound right after this
+        ctx.world.entity_mut(centNum).pe.painTime = time;
+    } else {
+        let sfx = ctx.world.cgs.media.landSound;
+        trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, sfx);
+    }
+
+    if clientNum == ctx.world.cg.predictedPlayerState.clientNum {
+        // smooth landing z changes
+        ctx.world.cg.landChange = -delta as f32;
+        if ctx.world.cg.landChange > 32.0 {
+            ctx.world.cg.landChange = 32.0;
+        }
+        if ctx.world.cg.landChange < -32.0 {
+            ctx.world.cg.landChange = -32.0;
+        }
+        ctx.world.cg.landTime = ctx.world.cg.time;
+    }
+}
+
+/// Raven `CG_TryPlayCustomSound` — plays a per-model custom sound at
+/// `origin`, silently doing nothing when the entity has no override for it.
+///
+/// Source: `oracle/codemp/cgame/cg_event.c:1206-1216`
+pub fn CG_TryPlayCustomSound(
+    ctx: &mut CgContext,
+    origin: Option<&vec3_t>,
+    entityNum: c_int,
+    channel: c_int,
+    soundName: &str,
+) {
+    let cSound = CG_CustomSound(ctx, entityNum, soundName);
+
+    if cSound <= 0 {
+        return;
+    }
+
+    trap::S_StartSound(ctx.engine, origin, entityNum, channel, cSound);
+}
+
+/// Raven `CG_G2MarkEvent` — projects a ghoul2 scorch/burn decal at a
+/// projectile's impact point, re-tracing to the surface first when the
+/// server flagged a radius-explosion source.
+///
+/// Source: `oracle/codemp/cgame/cg_event.c:1218-1348`
+pub fn CG_G2MarkEvent(ctx: &mut CgContext, es: &entityState_t) {
+    // es->origin should be the hit location of the projectile,
+    // whereas es->origin2 is the predicted position of the
+    // projectile. (based on the trajectory upon impact) -rww
+    let ownerNum = es.otherEntityNum as usize;
+
+    if ctx.world.entity(ownerNum).ghoul2.is_null() {
+        //can't do anything then...
+        return;
+    }
+
+    // es->eventParm being non-0 means to do a special trace check
+    // first. This will give us an impact right at the surface to
+    // project the mark on. Typically this is used for radius
+    // explosions and such, where the source position could be
+    // way outside of model space.
+    let startPoint: vec3_t = if es.eventParm != 0 {
+        let mut tr = trace_t::zeroed();
+        let mut ignore = ENTITYNUM_NONE;
+
+        CG_G2Trace(
+            ctx,
+            &mut tr,
+            &es.origin,
+            &vec3_origin,
+            &vec3_origin,
+            &es.origin2,
+            ignore,
+            MASK_PLAYERSOLID,
+        );
+
+        if tr.entityNum as c_int != es.otherEntityNum {
+            //try again if we hit an ent but not the one we wanted.
+            if (tr.entityNum as c_int) < ENTITYNUM_WORLD {
+                ignore = tr.entityNum as c_int;
+                CG_G2Trace(
+                    ctx,
+                    &mut tr,
+                    &es.origin,
+                    &vec3_origin,
+                    &vec3_origin,
+                    &es.origin2,
+                    ignore,
+                    MASK_PLAYERSOLID,
+                );
+                if tr.entityNum as c_int != es.otherEntityNum {
+                    //try extending the trace a bit.. or not
+                    //didn't manage to collide with the desired person. No mark will be placed then.
+                    return;
+                }
+            }
+        }
+
+        //otherwise we now have a valid starting point.
+        tr.endpos
+    } else {
+        es.origin
+    };
+
+    let mut size: f32 = 0.0;
+    let mut shader: c_int = 0;
+
+    if es.eFlags & EF_JETPACK_ACTIVE != 0 {
+        // a vehicle weapon, make it a larger size mark
+        //OR base this on the size of the thing you hit?
+        // §F19: Raven indexes `g_vehWeaponInfo[otherEntityNum2]` unchecked; an
+        // out-of-range index reads as the zeroed entry here rather than OOB
+        // memory.
+        let vw = ctx
+            .world
+            .bg_state
+            .g_vehWeaponInfo
+            .get(es.otherEntityNum2 as usize);
+        let (markSize, markShader) =
+            vw.map_or((0.0, 0), |w| (w.fG2MarkSize, w.iG2MarkShaderHandle));
+
+        if markSize != 0.0 {
+            size = ctx.world.bg_state.rng.flrand(0.6, 1.4) * markSize;
+        } else {
+            size = ctx.world.bg_state.rng.flrand(32.0, 72.0);
+        }
+        //specify mark shader in vehWeapon file
+        if markShader != 0 {
+            //have one we want to use instead of defaults
+            shader = markShader;
+        }
+    }
+
+    match es.weapon {
+        WP_BRYAR_PISTOL | WP_CONCUSSION | WP_BRYAR_OLD | WP_BLASTER | WP_DISRUPTOR
+        | WP_BOWCASTER | WP_REPEATER | WP_TURRET => {
+            if size == 0.0 {
+                size = 4.0;
+            }
+            if shader == 0 {
+                shader = ctx.world.cgs.media.bdecal_bodyburn1;
+            }
+
+            let owner = ctx.world.entity(ownerNum);
+            let ownerGhoul2 = owner.ghoul2;
+            let ownerLerpOrigin = owner.lerpOrigin;
+            let ownerLerpYaw = owner.lerpAngles[YAW];
+            let mut ownerScale = owner.modelScale;
+            let lifeTime = ctx.world.bg_state.rng.Q_irand(10000, 20000);
+
+            CG_AddGhoul2Mark(
+                ctx,
+                shader,
+                size,
+                &startPoint,
+                &es.origin2,
+                es.owner,
+                &ownerLerpOrigin,
+                ownerLerpYaw,
+                ownerGhoul2,
+                &mut ownerScale,
+                lifeTime,
+            );
+            // the callee mutates the caller's scale vector in place (see the
+            // PORT-NOTE on `CG_AddGhoul2Mark`'s swapped-argument bug) - write
+            // the (possibly stomped) result back same as Raven's pointer would.
+            ctx.world.entity_mut(ownerNum).modelScale = ownerScale;
+        }
+
+        WP_ROCKET_LAUNCHER | WP_THERMAL => {
+            if size == 0.0 {
+                size = 24.0;
+            }
+            if shader == 0 {
+                shader = ctx.world.cgs.media.bdecal_burn1;
+            }
+
+            let owner = ctx.world.entity(ownerNum);
+            let ownerGhoul2 = owner.ghoul2;
+            let ownerLerpOrigin = owner.lerpOrigin;
+            let ownerLerpYaw = owner.lerpAngles[YAW];
+            let mut ownerScale = owner.modelScale;
+            let lifeTime = ctx.world.bg_state.rng.Q_irand(10000, 20000);
+
+            CG_AddGhoul2Mark(
+                ctx,
+                shader,
+                size,
+                &startPoint,
+                &es.origin2,
+                es.owner,
+                &ownerLerpOrigin,
+                ownerLerpYaw,
+                ownerGhoul2,
+                &mut ownerScale,
+                lifeTime,
+            );
+            ctx.world.entity_mut(ownerNum).modelScale = ownerScale;
+        }
+
+        //Issues with small scale?
+        _ => {}
+    }
 }

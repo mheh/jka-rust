@@ -47,6 +47,12 @@ pub struct CgPlayersState {
     /// hyperspace-stars effect, so a second jump doesn't replay it.
     /// Source: `oracle/codemp/cgame/cg_players.c:7980`
     pub cg_lastHyperSpaceEffectTime: c_int,
+
+    /// Raven `static float cg_vehThirdPersonAlpha` — how see-through the ship
+    /// you are flying is right now, eased toward its target by
+    /// `CG_CheckThirdPersonAlpha`. Starts fully opaque.
+    /// Source: `oracle/codemp/cgame/cg_players.c:8338`
+    pub cg_vehThirdPersonAlpha: f32,
 }
 
 impl Default for CgPlayersState {
@@ -58,6 +64,7 @@ impl Default for CgPlayersState {
             cg_g2JetpackInstance: null_mut(),
             lastFlyBySound: [0; MAX_GENTITIES],
             cg_lastHyperSpaceEffectTime: 0,
+            cg_vehThirdPersonAlpha: 1.0,
         }
     }
 }

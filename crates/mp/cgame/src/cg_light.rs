@@ -11,6 +11,7 @@ use mp_qshared::shared::MAX_QPATH;
 use native_string::string_to_latin1;
 
 use crate::cg_main::{CG_ConfigString, Com_Error};
+use crate::lights::clightstyle_t::clightstyle_t;
 use crate::trap;
 use crate::world::CgContext;
 
@@ -62,6 +63,23 @@ pub fn CG_RunLightStyles(ctx: &mut CgContext) {
 
         let color = i32::from_ne_bytes(ls.value);
         trap::R_SetLightStyle(ctx.engine, i as c_int, color);
+    }
+}
+
+/// Raven `CG_ClearLightStyles` — zeroes the lightstyle table and recompiles
+/// every entry from its configstring (mirrors what a fresh connect sees).
+///
+/// Source: `oracle/codemp/cgame/cg_light.c:15-26`
+pub fn CG_ClearLightStyles(ctx: &mut CgContext) {
+    ctx.world.light.cl_lightstyle = core::array::from_fn(|_| clightstyle_t {
+        length: 0,
+        value: [0, 0, 0, 0],
+        map: [[0, 0, 0, 0]; MAX_QPATH],
+    });
+    ctx.world.light.lastofs = -1;
+
+    for i in 0..(MAX_LIGHT_STYLES * 3) as c_int {
+        CG_SetLightstyle(ctx, i);
     }
 }
 

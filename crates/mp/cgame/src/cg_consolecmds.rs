@@ -13,8 +13,8 @@ use mp_bg::saga::siege_team_t::{SIEGETEAM_TEAM1, SIEGETEAM_TEAM2};
 
 use mp_qshared::shared::limits::MAX_TOKEN_CHARS;
 use mp_qshared::shared::q_math::YAW;
-use mp_qshared::shared::qfalse;
 use mp_qshared::shared::SCREEN_HEIGHT;
+use mp_qshared::shared::{qfalse, qtrue};
 
 use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::display_state::DisplayState;
@@ -25,8 +25,8 @@ use mp_uishared::ui_shared::Menu_ScrollFeeder;
 
 use crate::cg_draw::CG_CenterPrint;
 use crate::cg_main::{
-    CG_Argv, CG_CrosshairPlayer, CG_GetStringEdString, CG_LastAttacker, CG_NextForcePower_f,
-    CG_NextInventory_f, CG_PrevForcePower_f, CG_PrevInventory_f, CG_Printf,
+    CG_Argv, CG_BuildSpectatorString, CG_CrosshairPlayer, CG_GetStringEdString, CG_LastAttacker,
+    CG_NextForcePower_f, CG_NextInventory_f, CG_PrevForcePower_f, CG_PrevInventory_f, CG_Printf,
 };
 use crate::cg_players::CG_LoadDeferredPlayers;
 use crate::cg_saga::CG_SiegeBriefingDisplay;
@@ -128,6 +128,32 @@ pub fn CG_Viewpos_f(ctx: &mut CgContext) {
         viewangles[YAW] as c_int,
     );
     CG_Printf(ctx, &msg);
+}
+
+/// Raven `CG_ScoresDown_f` — requests a fresh scoreboard from the server if
+/// the cached one is more than two seconds stale, else just shows the cached
+/// contents.
+///
+/// Source: `oracle/codemp/cgame/cg_consolecmds.c:66-86`
+pub fn CG_ScoresDown_f(ctx: &mut CgContext) {
+    CG_BuildSpectatorString(ctx);
+    if ctx.world.cg.scoresRequestTime + 2000 < ctx.world.cg.time {
+        // the scores are more than two seconds out of data,
+        // so request new ones
+        ctx.world.cg.scoresRequestTime = ctx.world.cg.time;
+        trap::SendClientCommand(ctx.engine, "score");
+
+        // leave the current scores up if they were already
+        // displayed, but if this is the first hit, clear them out
+        if ctx.world.cg.showScores == qfalse {
+            ctx.world.cg.showScores = qtrue;
+            ctx.world.cg.numScores = 0;
+        }
+    } else {
+        // show the cached contents even if they just pressed if it
+        // is within two seconds
+        ctx.world.cg.showScores = qtrue;
+    }
 }
 
 /// Raven `CG_ScoresUp_f` — dismisses the scoreboard if it's showing, latching
@@ -359,12 +385,6 @@ pub fn CG_SiegeCompleteCvarUpdate_f(ctx: &mut CgContext) {
 /// [`CG_scrollScoresUp_f`], which need the shared menu framework the same way
 /// their own doc comments explain.
 ///
-/// One arm (`+scores`) still dispatches to `CG_ScoresDown_f`, which doesn't
-/// exist in the tree yet (verified by grep) - it lands in a later wave. A
-/// genuine executable stub: reachable only if a player actually types that
-/// console command, so it panics loudly naming the still-unported Raven fn
-/// rather than silently swallowing the command.
-///
 /// Source: `oracle/codemp/cgame/cg_consolecmds.c:309-323`
 pub fn CG_ConsoleCommand(
     ctx: &mut CgContext,
@@ -388,11 +408,7 @@ pub fn CG_ConsoleCommand(
             "nextskin" => CG_TestModelNextSkin_f(ctx),
             "prevskin" => CG_TestModelPrevSkin_f(ctx),
             "viewpos" => CG_Viewpos_f(ctx),
-            "+scores" => {
-                //TODO: Port CG_ScoresDown_f
-                // Source: oracle/codemp/cgame/cg_consolecmds.c:66 (cgame module wave 3 - not yet in tree)
-                todo!("CG_ScoresDown_f - oracle/codemp/cgame/cg_consolecmds.c:66")
-            }
+            "+scores" => CG_ScoresDown_f(ctx),
             "-scores" => CG_ScoresUp_f(ctx.world),
             "sizeup" => CG_SizeUp_f(ctx),
             "sizedown" => CG_SizeDown_f(ctx),

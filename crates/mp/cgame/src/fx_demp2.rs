@@ -3,10 +3,15 @@
 
 #![allow(non_snake_case)]
 
-use mp_qshared::shared::q_math::VectorNormalize2;
+use core::ffi::c_int;
+
+use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
+use mp_qshared::shared::q_math::{_VectorCopy, VectorNormalize2};
 use mp_qshared::shared::vec3_t;
 
+use crate::cg_localents::CG_AllocLocalEntity;
 use crate::local::centity_s::centity_t;
+use crate::local::le_type_t::leType_t;
 use crate::local::weapon_info_s::weaponInfo_t;
 use crate::trap;
 use crate::world::cg_context::CgContext;
@@ -65,6 +70,43 @@ pub fn FX_DEMP2_HitPlayer(ctx: &mut CgContext, origin: &vec3_t, normal: &vec3_t,
         -1,
         -1,
     );
+}
+
+/// Raven `RF_VOLUMETRIC` — fake volumetric shading.
+/// Source: `oracle/codemp/cgame/tr_types.h:24`
+const RF_VOLUMETRIC: c_int = 0x00020;
+
+/// Raven `FX_DEMP2_AltDetonate` — spawns a fading shell-model local entity
+/// at the alt-fire detonation point.
+/// Source: `oracle/codemp/cgame/fx_demp2.c:240-259`
+pub fn FX_DEMP2_AltDetonate(ctx: &mut CgContext, org: &vec3_t, size: f32) {
+    let handle = CG_AllocLocalEntity(ctx.world);
+    let now = ctx.world.cg.time;
+    let demp2ShellShader = ctx.world.cgs.media.demp2ShellShader;
+    let demp2Shell = ctx.world.cgs.media.demp2Shell;
+
+    let ex = ctx
+        .world
+        .cg_localEntities
+        .get_mut(handle)
+        .expect("FX_DEMP2_AltDetonate: fresh slot");
+
+    ex.leType = leType_t::LE_FADE_SCALE_MODEL;
+    ex.refEntity = refEntity_t::zeroed();
+
+    ex.refEntity.renderfx |= RF_VOLUMETRIC;
+
+    ex.startTime = now;
+    ex.endTime = ex.startTime + 800; //1600;
+
+    ex.radius = size;
+    ex.refEntity.customShader = demp2ShellShader;
+    ex.refEntity.hModel = demp2Shell;
+    _VectorCopy(*org, &mut ex.refEntity.origin);
+
+    ex.color[0] = 255.0;
+    ex.color[1] = 255.0;
+    ex.color[2] = 255.0;
 }
 
 /// Raven `FX_DEMP2_AltBeam` — dead: the entire body is commented out in the
