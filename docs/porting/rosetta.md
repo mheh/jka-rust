@@ -143,3 +143,13 @@ if (*client_ptr).hook == Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), ent))
 if (*ent).enemy.is_none() { /* … */ }
 // ent_id_opt(base, maybe_null_ptr) folds a nullable pointer straight to Option<EntityId>.
 ```
+
+### multi-RNG-draw expressions — transcribe in SOURCE order (ruling 2026-07-28)
+```rust
+// Raven: f(..., 300 + (rand() & 99), ..., radius*0.05f + (crandom()*0.3f), ...);
+// C leaves argument/operand evaluation order unspecified (MSVC ran right-to-left);
+// ruled: the port draws in SOURCE order, left-to-right, everywhere.
+let rockRand = world.bg_state.rng.rand() & 99;                     // first in source
+let sizeRand = radius * 0.05 + (world.bg_state.rng.crandom() * 0.3) as f32; // second
+f(..., 300 + rockRand, ..., sizeRand, ...);
+```
