@@ -28,7 +28,7 @@ use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::placeholders::{
-    BackEndCounters, OrientationR, RefEntity, TrRefdef, ViewParms,
+    BackEndCounters, OrientationR, RefEntity, TrRefdef, ViewParms, FUNCTABLE_SIZE,
 };
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
@@ -1456,14 +1456,6 @@ pub fn RE_EndRegistration(
         RB_ShowImages(frame, gpu, assets, cvars);
     }
 }
-
-/// `FUNCTABLE_SIZE` — restated per the established `tr_light.rs`/
-/// `tr_shade_calc.rs` precedent (private consts not `pub` there, so not
-/// reachable from this file); corroborated against
-/// `tr_local/tr_globals_t.rs:47`.
-///
-/// Source: `oracle/codemp/renderer/tr_local.h:1247` (`FUNCTABLE_SIZE`)
-const FUNCTABLE_SIZE: usize = 1024;
 
 /// Raven `#define MAX_POLYS 600` — corroborated by `RenderAssets::max_polys`'s
 /// own doc comment ("default MAX_POLYS = 600").

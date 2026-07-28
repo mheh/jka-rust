@@ -32,14 +32,13 @@ use crate::gl_constants::{
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::image_asset::{ImageAsset, ImageHandle};
-use crate::render_state::placeholders::GlConfig;
+use crate::render_state::placeholders::{GlConfig, FOG_TABLE_SIZE};
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::render_state::skin_asset::{SkinAsset, SkinHandle, SkinSurface};
 use crate::tr_cmds::R_SyncRenderThread;
-use crate::tr_local::tr_globals_t::FOG_TABLE_SIZE;
 use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_model::render_models::RenderModels;
 // `CommaParse`/`RE_SplitSkins`/`skin->surfaces[128]`'s cap are ONE oracle body
@@ -2321,8 +2320,7 @@ pub fn R_CreateDefaultImage(
 /// Raven `NUM_SCRATCH_IMAGES` (non-`_XBOX` branch) — declared in
 /// `tr_local.h`, outside this file's own `#define` set, so it is not this
 /// packet's FILE-SCOPE CONSTANTS section; not guessed — reused verbatim from
-/// the value already landed (with the same oracle citation) at
-/// `crates/mp/renderer/src/tr_local/tr_globals_t.rs:22`.
+/// the same oracle citation.
 ///
 /// Source: oracle/codemp/renderer/tr_local.h:1300-1307
 const NUM_SCRATCH_IMAGES: usize = 16;

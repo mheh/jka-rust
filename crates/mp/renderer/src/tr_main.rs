@@ -125,9 +125,7 @@ const RDF_NOFOG: i32 = 64;
 /// Source: `oracle/codemp/cgame/tr_types.h:20`
 const RF_FIRST_PERSON: i32 = 0x00004;
 
-/// Raven `MAX_SHADERS` (non-`_XBOX` branch) — local copy of the private
-/// const already ported at `tr_local::tr_globals_t` (not `pub`, so not
-/// reachable from here).
+/// Raven `MAX_SHADERS` (non-`_XBOX` branch).
 ///
 /// Source: `oracle/codemp/renderer/tr_local.h:40-46`
 const MAX_SHADERS: usize = 16384;

@@ -28,6 +28,7 @@
 
 use core::ffi::c_char;
 
+use mp_engine_qcommon::qfiles::shader_limits::{SHADER_MAX_INDEXES, SHADER_MAX_VERTEXES};
 use mp_host_interface::EngineHost;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::{qhandle_t, MAX_QPATH};
@@ -39,8 +40,6 @@ use crate::mdx_format::mdxm_lodsurf_offset_t::mdxmLODSurfOffset_t;
 use crate::mdx_format::mdxm_surf_hierarchy_t::mdxmSurfHierarchy_t;
 use crate::mdx_format::mdxm_surface_t::mdxmSurface_t;
 use crate::tr_local::modtype_t::modtype_t;
-use crate::tr_local::shader_commands_s::SHADER_MAX_INDEXES;
-use crate::tr_local::stage_vars::SHADER_MAX_VERTEXES;
 use crate::tr_local::surface_type_t::surfaceType_t;
 
 use super::render_models::RenderModels;

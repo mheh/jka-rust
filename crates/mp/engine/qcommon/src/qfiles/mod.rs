@@ -33,5 +33,6 @@ pub mod md3_tag_s;
 pub mod md3_triangle_t;
 pub mod md3_xyz_normal_t;
 pub mod pcx_t;
+pub mod shader_limits;
 pub mod vm_header_t;
 pub mod vm_magic;

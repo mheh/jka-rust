@@ -22,7 +22,7 @@ use mp_qshared::shared::vec3_t;
 use native_math::qmath::Q_rsqrt;
 
 use crate::render_state::frame_state::FrameState;
-use crate::render_state::placeholders::RefEntity;
+use crate::render_state::placeholders::{RefEntity, FUNCTABLE_SIZE};
 use crate::render_state::render_assets::RenderAssets;
 use crate::tr_image::R_FogFactor;
 use crate::tr_local::deform_stage_t::deformStage_t;
@@ -86,11 +86,6 @@ pub struct ShadeCalcState {
     /// Source: `oracle/codemp/renderer/tr_shade_calc.cpp` (extern `lightOrigin`)
     pub light_origin: vec3_t,
 }
-
-/// `FUNCTABLE_SIZE`.
-///
-/// Source: `oracle/codemp/renderer/tr_local.h:1247`
-const FUNCTABLE_SIZE: usize = 1024;
 
 /// `FUNCTABLE_MASK` (`FUNCTABLE_SIZE - 1`).
 ///

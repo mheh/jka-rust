@@ -28,11 +28,14 @@ use mp_qshared::shared::limits::MAX_TOKEN_CHARS;
 use mp_qshared::shared::q_string::COM_StripExtension;
 use mp_qshared::shared::{qhandle_t, MAX_QPATH};
 
-use crate::tr_local::tr_globals_t::MAX_SKINS;
-
 use super::render_models::RenderModels;
 use super::server_skin::ServerSkin;
 use super::server_skin_surface::ServerSkinSurface;
+
+/// `MAX_SKINS`.
+///
+/// Source: `oracle/codemp/renderer/tr_local.h:1204`
+const MAX_SKINS: usize = 1024;
 
 /// Raven `skin_t.surfaces[128]` — the per-skin surface cap
 /// (`sizeof(skin->surfaces) / sizeof(skin->surfaces[0])`).

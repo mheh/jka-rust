@@ -19,7 +19,7 @@ use mp_qshared::shared::q_math::{
 use mp_qshared::shared::vec3_t;
 
 use crate::render_state::frame_state::FrameState;
-use crate::render_state::placeholders::RefEntity;
+use crate::render_state::placeholders::{RefEntity, FUNCTABLE_SIZE};
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_local::dlight_s::dlight_t;
@@ -80,11 +80,6 @@ const RF_LIGHTING_ORIGIN: i32 = 0x00080;
 ///
 /// Source: `oracle/codemp/cgame/tr_types.h`
 const RDF_NOWORLDMODEL: i32 = 1;
-
-/// `FUNCTABLE_SIZE`.
-///
-/// Source: `oracle/codemp/renderer/tr_local.h:1247`
-const FUNCTABLE_SIZE: usize = 1024;
 
 /// `FUNCTABLE_MASK` (`FUNCTABLE_SIZE - 1`).
 ///

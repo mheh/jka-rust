@@ -33,6 +33,7 @@ use mp_engine_qcommon::qfiles::lump_indices::{
 use mp_engine_qcommon::qfiles::lump_t::lump_t;
 use mp_engine_qcommon::qfiles::map_surface_type_t::mapSurfaceType_t;
 use mp_engine_qcommon::qfiles::map_vert_t::mapVert_t;
+use mp_engine_qcommon::qfiles::shader_limits::{SHADER_MAX_INDEXES, SHADER_MAX_VERTEXES};
 use mp_qshared::shared::com_parse::QSharedScratch;
 use mp_qshared::shared::q_math::PlaneTypeForNormal;
 use mp_qshared::shared::q_string::{COM_Parse, COM_StripExtension};
@@ -63,9 +64,7 @@ use crate::tr_curve::{
 };
 use crate::tr_image::{R_CreateImage, TrImageState};
 use crate::tr_local::mgrid_t::mgrid_t;
-use crate::tr_local::shader_commands_s::SHADER_MAX_INDEXES;
 use crate::tr_local::srf_flare_s::srfFlare_t;
-use crate::tr_local::stage_vars::SHADER_MAX_VERTEXES;
 use crate::tr_local::surface_type_t::surfaceType_t;
 use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_model::render_models::RenderModels;

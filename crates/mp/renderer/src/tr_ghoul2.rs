@@ -43,6 +43,7 @@ use mp_engine_ghoul2::shared::surface_info_t::surfaceInfo_t;
 use mp_engine_ghoul2::surfaces::g2_find_override_surface;
 
 use mp_engine_qcommon::common::{com_error, com_printf, Common, EngineHostView};
+use mp_engine_qcommon::qfiles::shader_limits::{SHADER_MAX_INDEXES, SHADER_MAX_VERTEXES};
 use native_string::q_string::Q_strlwr;
 
 use crate::mdx_format::mdxa_header_t::mdxaHeader_t;
@@ -66,8 +67,6 @@ use crate::tr_local::crenderable_surface::CRenderableSurface;
 use crate::tr_local::model_s::model_t;
 use crate::tr_local::modtype_t::modtype_t;
 use crate::tr_local::orientationr_t::orientationr_t;
-use crate::tr_local::shader_commands_s::SHADER_MAX_INDEXES;
-use crate::tr_local::stage_vars::SHADER_MAX_VERTEXES;
 use crate::tr_local::surface_type_t::surfaceType_t;
 use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_main::{R_CullLocalPointAndRadius, CULL_CLIP, CULL_IN, CULL_OUT};

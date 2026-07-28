@@ -19,11 +19,15 @@ use mp_qshared::shared::qhandle_t;
 
 use crate::tr_local::model_s::model_t;
 use crate::tr_local::modtype_t::modtype_t;
-use crate::tr_local::tr_globals_t::MAX_MOD_KNOWN;
 
 use super::cached_model_binary::CachedEndianedModelBinary;
 use super::server_load::read_qpath;
 use super::server_skin::ServerSkin;
+
+/// `MAX_MOD_KNOWN`.
+///
+/// Source: `oracle/codemp/renderer/tr_local.h:1138`
+const MAX_MOD_KNOWN: usize = 1024;
 
 /// `ModelData` — the `tr.models[]` pool entry (ruling 40 reuse: the already-
 /// ported `model_t`, imported never re-declared; a thin wrapper vs the bare

@@ -28,7 +28,16 @@ use mp_qshared::shared::{cplane_t, qhandle_t, vec3_t};
 
 use crate::tr_bsp::{BModel, DShader, Fog, Node};
 use crate::tr_local::mgrid_t::mgrid_t;
-use crate::tr_local::tr_globals_t::{FOG_TABLE_SIZE, FUNCTABLE_SIZE};
+
+/// `FUNCTABLE_SIZE`.
+///
+/// Source: `oracle/codemp/renderer/tr_local.h:1247`
+pub(crate) const FUNCTABLE_SIZE: usize = 1024;
+
+/// `FOG_TABLE_SIZE`.
+///
+/// Source: `oracle/codemp/renderer/tr_local.h:1246`
+pub(crate) const FOG_TABLE_SIZE: usize = 256;
 
 /// Raven `vec3_t` under the design's `Vec3` spelling — the vector payload
 /// `FrameEvent`'s light/decal variants carry.

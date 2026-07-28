@@ -3,6 +3,7 @@
 //! Source: `oracle/codemp/renderer/tr_quicksprite.cpp`
 
 use mp_engine_qcommon::common::Common;
+use mp_engine_qcommon::qfiles::shader_limits::SHADER_MAX_VERTEXES;
 use mp_qshared::common::mp::cgame::color4ub_t::color4ub_t;
 use mp_qshared::shared::{vec2_t, vec4_t};
 
@@ -11,7 +12,6 @@ use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_backend::GL_State;
-use crate::tr_local::stage_vars::SHADER_MAX_VERTEXES;
 use crate::tr_local::texture_bundle_t::textureBundle_t;
 
 /// Raven `CQuickSpriteSystem` — the quad-batching helper the backend fills
