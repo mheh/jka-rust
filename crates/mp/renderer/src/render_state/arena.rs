@@ -115,6 +115,47 @@ impl<T> Arena<T> {
         Some(value)
     }
 
+    /// Whole-registry purge for `R_Init`'s `Com_Memset(&tr, 0, ...)` rebuild
+    /// (DEC-42.1) — capped arenas only. Every slot above 0 is vacated into
+    /// the free list with its generation bumped, exactly as [`Self::remove`]
+    /// does, so every pre-reset handle goes stale (ruling 11); slot 0's value
+    /// is replaced in place with `slot0` at generation 0, keeping
+    /// `Handle::slot_zero()` the persistent default identity across lives
+    /// (A12 — oracle index 0 is re-created, never re-numbered).
+    ///
+    /// Panics on an unbounded arena — the image arena has no reserved slot 0
+    /// and no memset-and-recreate lifecycle (its purge is `R_DeleteTextures`).
+    pub fn reset(&mut self, slot0: T) {
+        assert!(
+            self.soft_cap.is_some(),
+            "Arena::reset is defined only for capped (slot-0-reserved) arenas"
+        );
+        for index in 1..self.slots.len() {
+            if let Some((generation, _)) = self.slots[index].take() {
+                self.free_list
+                    .push((index as u32, generation.wrapping_add(1)));
+            }
+        }
+        if self.slots.is_empty() {
+            self.slots.push(Some((0, slot0)));
+        } else {
+            self.slots[0] = Some((0, slot0));
+        }
+    }
+
+    /// The CURRENT handle occupying `slot`, if any — the bare-int → handle
+    /// resolution for oracle code that stores plain `int` indices
+    /// (`shader_t::index` disk-image pokes, cross-module `tr.shaders[]`
+    /// lookups; DEC-42.2 "slot = index"). A stale int after a registry
+    /// purge resolves to the slot's new occupant, exactly as the oracle's
+    /// raw `tr.shaders[idx]` read does.
+    pub fn handle_at_slot(&self, slot: u32) -> Option<Handle<T>> {
+        match self.slots.get(slot as usize) {
+            Some(Some((generation, _))) => Some(Handle::new(slot, *generation)),
+            _ => None,
+        }
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = (Handle<T>, &T)> + '_ {
         self.slots
             .iter()

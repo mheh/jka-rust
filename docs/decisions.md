@@ -1062,3 +1062,32 @@ the identical guard, `shared/qcommon/q_math.h:40`) — get the double.
    promotion). The canonical `native_math::qmath` note already calibrated
    to the math.h double; this DEC makes it citable. Applies as-is to the
    coming cgame/`cl_*` waves.
+
+## DEC-42 — R3 registry/carrier design triplet (sit-downs, 2026-07-27)
+
+Three user-settled design points closing the waves 7-13 review's open tail:
+
+1. **`Arena::reset(slot0)`** is the registry teardown for `R_Init`'s
+   memset-rebuild: every slot > 0 vacates into the free list with its
+   generation bumped (all pre-reset handles go stale, ruling 11); slot 0's
+   value is replaced in place at generation 0, keeping `Handle::slot_zero()`
+   the persistent default identity across lives (A12). Capped arenas only —
+   the image arena's purge stays `R_DeleteTextures`.
+2. **Slot = index.** The arena slot number IS Raven's `shader_t::index` /
+   `tr.shaders[]` int: disk-image pokes write `handle.index() as i32`, and
+   bare-int consumers resolve through `Arena::handle_at_slot(u32)` (the
+   slot's current generation). Sound because shaders are append-only in the
+   oracle (no individual removal; whole-registry purge = reset, which
+   preserves slot 0 and never renumbers). Overflow semantics align free:
+   slot 0 = index 0 = `tr.defaultShader`.
+3. **`EngineHostView` is the client track's engine carrier.** The
+   client-only model family (`RE_RegisterModel`/`_Actual`,
+   `r_load_mdxa`/`mdxm`/`md3`, `re_register_models_malloc`) re-signs onto
+   `view: &mut EngineHostView` — `common` reached as `view.common` by
+   sequential reborrow, server-shared helpers still callable (the view
+   implements `EngineHost`), `RenderModels` via the ruled scoped slot-cast.
+   The dedicated subset (`server_load`/`server_skins`, generic
+   `impl EngineHost`) is untouched. **Follow-up recorded on #46 (user):**
+   the cgame scoping sit-down revisits the whole client engine-carrier
+   story (cl_* island, cgame vmcalls) and confirms or amends this
+   convention before cgame waves start.
