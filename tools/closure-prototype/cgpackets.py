@@ -15,12 +15,11 @@ Each packet carries, per the U0/C0 packet-generator agenda:
      wave-1 gap fix, ported here — see `file_scope_constants` below: R3 lost
      ~10 fns to "constant not in my slice" guesses before this section
      existed; baking it in from cgame's first wave closes that gap here);
- (b) a THREADING DIGEST PER FN naming the state channel in PLACEHOLDER terms
-     (CgWorld / CgContext / DisplayContext / MenuSystem — see the CONFIG
-     block; ratified at the C2 root-type sit-down, NOT yet — this differs
-     from uipackets.py, which regenerated post-ratification with DEC-36
-     bindings baked in as fact. cgpackets keeps the placeholder framing
-     uipackets used pre-U2 until C2 lands);
+ (b) a THREADING DIGEST PER FN naming the state channel against the RATIFIED
+     root-type bindings (CgWorld / CgContext / DisplayContext / MenuSystem —
+     see the CONFIG block; ratified at the C2 root-type sit-down as DEC-46,
+     2026-07-28) — cgpackets now matches uipackets.py, which regenerated
+     post-ratification with DEC-36 bindings baked in as fact;
  (c) the cited verbatim oracle source slice of each fn + its oracle C signature;
  (d) resolved signatures of out-of-module callees — bg fns from crates/mp/bg
      (LAW, ported), ui_shared.c fns from crates/mp/uishared (LAW, ported — the
@@ -69,18 +68,18 @@ SHARD_MAX_FNS = 35
 SHARD_MAX_LOC = 3000
 
 # =============================================================================
-# CONFIG — placeholder root-type bindings (NOT yet ratified — C2 sit-down is
-# still to come per DEC-45's stage skeleton; C0 runs in parallel with C1,
-# ahead of C2). Unlike uipackets.py (regenerated post-U2 with DEC-36 fact
-# baked in), these four names are PLACEHOLDER, drawn only from the 2026-07-24
-# scoping doc's "Owned-state designs" section — a shape question a packet
-# cannot answer from that doc is an escalation at C2, never an invention here.
+# CONFIG — root-type bindings, RATIFIED at the C2 sit-down as DEC-46
+# (docs/decisions.md, 2026-07-28). Unlike the pre-C2 draft this replaces,
+# these names are FINALIZED law transcribers must follow; a shape question
+# DEC-46 doesn't cover is a real escalation, never an invention here.
 #
-#   CgWorld        — the owned cgame state spine (cg_t + cgs_t + cg_entities +
-#                    per-file statics folded in). Analog of GameWorld/UiWorld.
+#   CgWorld        — the owned cgame state spine: cg: CgState (cg_t) +
+#                    cgs: CgsState (cgs_t) + entities: Box<[CEntity;
+#                    MAX_GENTITIES]> (DEC-46.1), Raven field names preserved
+#                    line-for-line (cg.time -> world.cg.time).
 #   CgContext      — the threaded handle the vmMain entrypoints own and pass
 #                    inward ({ world: &mut CgWorld, engine, … }). Analog of
-#                    GameContext/UiContext.
+#                    GameContext/UiContext; DEC-46 did not revisit this name.
 #   DisplayContext — the ui-plan's same ~50-fn-pointer render/text/cvar/
 #                    feeder/ownerDraw/sound vtable (Raven displayContextDef_t)
 #                    cgame implements too (scoping.md: MenuSystem is generic
@@ -93,7 +92,7 @@ CG_WORLD = "CgWorld"
 CG_CONTEXT = "CgContext"
 DISPLAY_CONTEXT = "DisplayContext"
 MENU_SYSTEM = "MenuSystem"
-CONFIG_FINALIZED = False  # C2 root-type sit-down has not run yet
+CONFIG_FINALIZED = True  # DEC-46 ratified the C2 root-type sit-down 2026-07-28
 # =============================================================================
 
 # bg_lib.c-origin callees that are NOT mp_bg fns — Raven's own libc shims. They
@@ -364,47 +363,62 @@ def render_packet(cfile, wave, chunk, shard, n_shards, law, bg_sigs,
              f"file: `{cfile}`")
     o.append("")
 
-    # ---- CONFIG / root-type bindings (PLACEHOLDER — C2 sit-down pending)
-    o.append("## ROOT-TYPE BINDINGS (PLACEHOLDER — C2 root-type sit-down "
-             "has NOT run; DEC-45 stage skeleton)")
+    # ---- CONFIG / root-type bindings (RATIFIED — DEC-46)
+    o.append("## ROOT-TYPE BINDINGS (RATIFIED — DEC-46, C2 root-type "
+             "sit-down 2026-07-28)")
     o.append("")
-    o.append("The cgame root types are **NOT ratified**. These packets thread "
-             "state in PLACEHOLDER terms only, drawn from the 2026-07-24 "
-             "scoping doc's \"Owned-state designs\" section quoted below — a "
-             "shape question this packet cannot answer is a **C2 escalation**, "
-             "never an invention:")
-    o.append(f"- **`{CG_CONTEXT}`** — `{{ world: &mut {CG_WORLD}, engine }}`, "
-             "owned by the vmMain entrypoints and passed inward; analog of "
-             "`GameContext`/`UiContext`. State is THREADED, not reached — no "
-             "`static mut`, no ambient cells (the G_SoundIndex lesson is "
-             "day-one law).")
-    o.append(f"- **`{CG_WORLD}`** — owned cgame spine: `cg_t` + `cgs_t` + "
-             "`cg_entities`/`cg_weapons`/`cg_items` + the per-file statics "
-             "listed under each fn below, folded into fields. Two idiom-"
-             "mismatch pockets are called out in scoping.md: `localEntity_t` "
-             "and `markPoly_t` pools redesign to arena/slab + index handles "
-             "(NOT a verbatim intrusive-list transcription).")
-    o.append(f"- **`{MENU_SYSTEM}`** — ui_shared.c's menu framework is "
-             "ALREADY PORTED as `mp_uishared` (crates/mp/uishared), shared "
-             "by ui and cgame; owned by composition `{0}.menus`."
-             .format(CG_WORLD))
-    o.append(f"- **`{DISPLAY_CONTEXT}`** — the same idiomatic trait ui's "
-             "packets use, REPLACING Raven's `displayContextDef_t` fn-pointer "
-             "struct; cgame supplies its own host impl.")
-    o.append("- **bg arms (`#elif defined CGAME`)** — the `GameCallbacks` "
-             "surface (task #19's own-state impl pattern): cgame implements "
-             "the same trait game does, supplying "
-             "`trap_S_RegisterSound`/`trap_R_RegisterShaderNoMip` where game "
-             "supplies `G_SoundIndex`/noop.")
-    o.append("- **bg_pmove seam** — `cg_pmove.baseEnt = (bgEntity_t*)"
-             "cg_entities; entSize = sizeof(centity_t)` is pointer-stride "
-             "aliasing Rust cannot pun; feed pmove via the same entity-"
-             "accessor abstraction mp_bg gave the game side (PORT-NOTE at "
-             "the site, do not invent the accessor here).")
-    o.append("- **Class A (engine-retained) surface** — `cg.sharedBuffer` "
-             "and the trajectory-pointer RPCs are byte-frozen per the "
-             "scoping doc's census; do not add owned-String/bool fields to "
-             "anything in that class.")
+    o.append("The cgame root types are **ratified** — `docs/decisions.md` "
+             "DEC-46. Transcribe against these six dispositions; a shape "
+             "question DEC-46 doesn't cover is a real **escalation**, never "
+             "an invention:")
+    o.append(f"- **DEC-46.1 — `{CG_WORLD}` spine, Raven names.** "
+             "`cg_t`/`cgs_t`/`cg_entities` → `CgWorld { cg: CgState, cgs: "
+             "CgsState, entities: Box<[CEntity; MAX_GENTITIES]> }`. "
+             "Transcribe line-for-line with Raven field names (`cg.time` → "
+             "`world.cg.time`); media/weapon/item registries hang off the "
+             "spine.")
+    o.append("- **DEC-46.2 — `CEntity` owned + resolution enums.** "
+             "`centity_t` pointer fields become owned/resolution types: "
+             "`playerState: *mut` → `PlayerStateRef { None | Predicted | "
+             "Snap }` resolved via `CgWorld` at use sites; `m_pVehicle` → "
+             "`Option<VehicleId>`; `npcClient` → owned `Option<Box<..>>`; "
+             "`ghoul2`/`ghoul2weapon` stay opaque engine tokens (never "
+             "dereferenced module-side). The `bgEntity_t` prefix carries "
+             "**no layout obligation** — bg reaches entity data through the "
+             "accessor seam only, never a pointer pun.")
+    o.append("- **DEC-46.3 — pools → gen-counted slab + LRU queue.** "
+             "`localEntity_t` (512) / `markPoly_t` (256) intrusive pools "
+             "become a gen-counted slab with `active: VecDeque<Handle>` in "
+             "age order; alloc at capacity frees the oldest (Raven's "
+             "`CG_AllocLocalEntity` steal behavior preserved verbatim). "
+             "Intrusive `prev`/`next` dissolves.")
+    o.append("- **DEC-46.4 — fn-ptr tables → closed enums + `match`.** "
+             "`thinkFn`/leType dispatch and `weaponInfo_t`'s trail/charge "
+             "fn-ptrs become closed enums; each arm cites its Raven fn; "
+             "exhaustive, no `unsafe extern` fields.")
+    o.append("- **DEC-46.5 — `CgGameCallbacks` INERT-PER-IFDEF law.** The "
+             "~30 QAGAME-gated trait methods return the neutral value that "
+             "keeps the gated block unreachable (accessors → false/0/None; "
+             "mutators → no-op) — cite the oracle `#ifdef QAGAME` proving "
+             "Raven's cgame build compiled the block out. These methods "
+             "must NEVER perform a live `cg_entities` read. The 16 "
+             "DEC-36-D5 registration arms (sound/model/effect/vehicle/"
+             "siege traps) are real implementations, not gated.")
+    o.append("- **DEC-46.6 — `cg.sharedBuffer` = pinned buffer + copy-out "
+             "decode.** `Box<[u8; 2048]>` pinned on `CgWorld`, registered "
+             "once via `CG_SET_SHARED_BUFFER`; consuming vmcalls copy out "
+             "and decode through the existing abi `TCG*` types at the call "
+             "boundary — no Rust reference outlives a call into engine-"
+             "mutated memory.")
+    o.append(f"- **`{CG_CONTEXT}`/`{MENU_SYSTEM}`/`{DISPLAY_CONTEXT}`** "
+             "carry over unamended from C0/scoping.md — DEC-46 did not "
+             f"revisit them: `{CG_CONTEXT} = {{ world: &mut {CG_WORLD}, "
+             f"engine }}` owned by the vmMain entrypoints; `{MENU_SYSTEM}` "
+             "is ui_shared.c's ALREADY-PORTED menu framework "
+             f"(`mp_uishared`), owned by composition `{CG_WORLD}.menus`; "
+             f"`{DISPLAY_CONTEXT}` is the same idiomatic render/text/cvar/"
+             "feeder/ownerDraw/sound trait ui's packets use, replacing "
+             "`displayContextDef_t`.")
     o.append("")
 
     # ---- law + dictionary
@@ -468,8 +482,8 @@ def render_packet(cfile, wave, chunk, shard, n_shards, law, bg_sigs,
             fold.append("file globals WRITTEN: "
                         + ", ".join(f"`{g}`" for g in gwrites))
         if fold:
-            o.append(f"- **statics-to-fold (→ `{CG_WORLD}` fields at C2):** "
-                     + "  ·  ".join(fold))
+            o.append(f"- **statics-to-fold (→ `{CG_WORLD}` fields per "
+                     "DEC-46):** " + "  ·  ".join(fold))
         if fnptr:
             fps = ", ".join(f"`{w['field']}={w['target']}`" for w in fnptr)
             o.append(f"- **fn-ptr dispatch writes:** {fps} — a "
@@ -638,6 +652,8 @@ def main():
           f"-> out/cgame/packets/")
     if CONFIG_FINALIZED is False:
         print("[cgpackets] NOTE: root-type bindings are PLACEHOLDER (C2 pending)")
+    else:
+        print("[cgpackets] root-type bindings are RATIFIED (DEC-46)")
 
 
 if __name__ == "__main__":
