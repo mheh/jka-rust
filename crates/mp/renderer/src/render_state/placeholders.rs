@@ -26,7 +26,7 @@ use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::texture_compression_t::textureCompression_t;
 use mp_qshared::shared::{cplane_t, qhandle_t, vec3_t};
 
-use crate::tr_bsp::{BModel, DShader, Node};
+use crate::tr_bsp::{BModel, DShader, Fog, Node};
 use crate::tr_local::mgrid_t::mgrid_t;
 use crate::tr_local::tr_globals_t::{FOG_TABLE_SIZE, FUNCTABLE_SIZE};
 
@@ -235,6 +235,19 @@ pub struct WorldAsset {
     /// `entityParsePoint` (`char *`) — a byte offset into `entity_string`,
     /// not a pointer into it (interior-safety law).
     pub entity_parse_point: usize,
+    /// `baseName` — ie: `tim_dm2`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:987`
+    pub base_name: String,
+    /// `globalFog` — index into [`Self::fogs`], `-1` when the map has none.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1012`
+    pub global_fog: i32,
+    /// `fogs` (`fog_t *`) — `numfogs` collapses to `fogs.len()` (wave-8
+    /// field merge; see `tr_bsp.rs`'s WAVE 8 ADDITIONS note).
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1010-1013`
+    pub fogs: Vec<Fog>,
 }
 
 /// `tr`'s precomputed wave-function tables (`sinTable`, `squareTable`,

@@ -4,31 +4,48 @@
 
 #![allow(non_snake_case)]
 
+use core::f64::consts::PI;
 use core::ffi::c_int;
 
 use mp_engine_qcommon::cmd_common::{Cmd_Argc, Cmd_Argv};
+use mp_engine_qcommon::cmd_pc::Cmd_RemoveCommand;
 use mp_engine_qcommon::common::common::{com_printf, Common};
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::cvar_fns::{Cvar_Get, Cvar_Set, Cvar_VariableString};
 use mp_engine_qcommon::files_common::FS_WriteFile;
+use mp_engine_qcommon::qfiles::light_style_limits::MAX_LIGHT_STYLES;
 use mp_qshared::common::mp::cgame::texture_compression_t::textureCompression_t;
+use mp_qshared::shared::com_parse::QSharedScratch;
 use mp_qshared::shared::cvar::{
     CvarHandle, CVAR_ARCHIVE, CVAR_CHEAT, CVAR_LATCH, CVAR_ROM, CVAR_TEMP,
 };
 use mp_qshared::shared::q_color::S_COLOR_YELLOW;
+use native_math::rng::Rng;
 use native_platform::Sys_LowPhysicalMemory;
 
 use crate::gl_constants::GL_CLAMP;
+use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::gpu_resources::GpuResources;
+use crate::render_state::placeholders::{
+    BackEndCounters, OrientationR, RefEntity, TrRefdef, ViewParms,
+};
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
-use crate::tr_backend::{GL_Bind, GL_State, GL_TexEnv, RB_SetGL2D};
-use crate::tr_cmds::r_init_command_buffers;
-use crate::tr_image::{GL_TextureMode, R_FindImageFile, TrImageState};
+use crate::tr_backend::{GL_Bind, GL_State, GL_TexEnv, RB_SetGL2D, RB_ShowImages};
+use crate::tr_cmds::{r_init_command_buffers, r_shutdown_command_buffers, R_SyncRenderThread};
+use crate::tr_font::{FontState, R_InitFonts, R_ShutdownFonts};
+use crate::tr_image::{
+    GL_TextureMode, R_DeleteTextures, R_FindImageFile, R_InitFogTable, R_InitImages, TrImageState,
+};
+use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_model::render_models::RenderModels;
-use crate::tr_shader::{GLS_DSTBLEND_ZERO, GLS_SRCBLEND_ONE, GL_MODULATE};
+use crate::tr_noise::{NoiseState, R_NoiseInit};
+use crate::tr_scene::{R_InitDecals, R_ToggleSmpFrame, SceneState};
+use crate::tr_shader::{R_InitShaders, GLS_DSTBLEND_ZERO, GLS_SRCBLEND_ONE, GL_MODULATE};
+use crate::tr_sky::SkyState;
+use crate::tr_worldeffects::world_effects::WorldEffectsState;
 
 /// `VidModeTable` — the built-in video-mode list `R_GetModeInfo`/
 /// `R_ModeList_f` index by small integer (DEC-37 A13.3 — NAMED BY THIS WAVE:
@@ -548,10 +565,14 @@ pub fn R_TakeScreenshot(
 ///
 /// The `#ifndef DEDICATED` command-registration block (`imagelist`/
 /// `shaderlist`/`skinlist`/`screenshot`/`screenshot_tga`/`gfxinfo`/
-/// `r_atihack`/`r_we`/`imagecacheinfo`) is dropped whole — DEDICATED is this
-/// build's live configuration (`Hunk_Clear` precedent,
-/// `crates/mp/engine/qcommon/src/z_memman_pc.rs:808-811`, porting-rules
-/// §20/§C10).
+/// `r_atihack`/`r_we`/`imagecacheinfo`) is the client leg and belongs here
+/// (R3 client-leg ruling: the R3 renderer track is the CLIENT port; the
+/// jampDed disposition is scoped to the dedicated-server link set). It is
+/// **not** registered yet — see the `//TODO: Port R_Register console
+/// commands` marker at the block's own position in the body below for the
+/// blocker, which is the same `CmdFunction` signature mismatch the
+/// unconditionally-registered `R_ModeList_f` marker beside it already
+/// records.
 ///
 /// Source: `oracle/codemp/renderer/tr_init.cpp:985-1205`
 pub fn R_Register(view: &mut EngineHostView, cvars: &mut RendererCvars) {
@@ -892,11 +913,30 @@ pub fn R_Register(view: &mut EngineHostView, cvars: &mut RendererCvars) {
 
     // make sure all the commands added here are also removed in R_Shutdown
 
-    // PORT-NOTE: the `#ifndef DEDICATED` command-registration block
-    // (imagelist/shaderlist/skinlist/screenshot/screenshot_tga/gfxinfo/
-    // r_atihack/r_we/imagecacheinfo) is dropped whole — DEDICATED is this
-    // build's live configuration (see doc comment above).
+    //TODO: Port R_Register console commands
     // Source: oracle/codemp/renderer/tr_init.cpp:1188-1197
+    // The nine `#ifndef DEDICATED` registrations (imagelist/shaderlist/
+    // skinlist/screenshot/screenshot_tga/gfxinfo/r_atihack/r_we/
+    // imagecacheinfo) are the client leg and belong here (R3 client-leg
+    // ruling), superseding this file's earlier "DEDICATED is this build's
+    // live configuration" rationale. `RE_Shutdown` below already removes all
+    // nine, matching Raven's own comment above ("make sure all the commands
+    // added here are also removed in R_Shutdown"), so leaving them
+    // unregistered is the inconsistency this marker names.
+    //
+    // Blocker: `CmdFunction = fn(&mut EngineHostView)`
+    // (`crates/mp/engine/qcommon/src/cmd/cmd_function_t.rs:12`) carries no
+    // renderer state, and every one of the seven ported handlers needs some
+    // (`R_ImageList_f`/`R_ShaderList_f`/`R_ScreenShot_f`/`R_ScreenShotTGA_f`:
+    // `&RenderAssets`; `GfxInfo_f`: `&RendererCvars` + `&RenderAssets`;
+    // `RE_RegisterImages_Info_f`: `&RenderAssets` + `&RenderModels`;
+    // `R_WorldEffect_f`: `&mut WorldEffectsState` + five more). The remaining
+    // two, `R_SkinList_f` and `R_AtiHackToggle_f`, are not ported anywhere in
+    // this crate at all (this file's own `R_AtiHackToggle_f` DEFERRED note
+    // above; `tr_image.rs`'s `R_SkinList_f` ESCALATION). This is the same
+    // missing renderer-state-carrying adapter the `R_ModeList_f` marker below
+    // already records; registering them needs that adapter, which no packet
+    // has licensed.
 
     //TODO: Port R_Modellist_f
     // Source: oracle/codemp/renderer/tr_init.cpp:1199
@@ -1272,4 +1312,442 @@ pub fn InitOpenGL(
     }
     // init command buffers and SMP
     r_init_command_buffers();
+}
+
+/// Raven `RE_Shutdown`.
+///
+/// The glow-teardown block (`r_DynamicGlow->integer` gate,
+/// `qglDeleteProgramsARB`/`qglDeleteLists`/`qglCombinerParameteriNV`/
+/// `qglDeleteTextures` x3 against `tr.glowVShader`/`glowPShader`/
+/// `screenGlow`/`sceneImage`/`blurImage`) is entirely the fixed-function GL
+/// surface DEC-01/DEC-37 leave unhomed until the R4 wgpu rewrite (A13.2) —
+/// the glow handle fields themselves have no `RenderAssets`/`FrameState`
+/// carrier either (STATE HOMES only assigns this wave `r_DynamicGlow`/`tr`),
+/// so the whole guarded block is left as a single cited `// DEFERRED: R4`
+/// rather than a partial stub, matching `GL_SetDefaultState`'s treatment of
+/// its own `qgl*`-gated blocks above.
+///
+/// `R_TerrainShutdown`'s already-ported (wave 0) signature is `fn(cm: &mut
+/// CollisionWorld, land_scape: &mut srfTerrain_t)`: `CollisionWorld` is
+/// reachable (`view.cm`), but `tr.landScape` (`srfTerrain_t`) is
+/// design-assigned to `RenderWorld::frame: FrameState`'s frontend-scratch
+/// bucket (`renderer-r2-design.md` `## Seam definition`: "...sun/fog
+/// fields, `landScape`, `distanceCull`...") and is not yet a landed
+/// `FrameState` field — the same class of gap this file's
+/// `tr.overbrightBits` notes already flag (`GfxInfo_f`/`R_TakeScreenshot`/
+/// `R_TakeScreenshotJPEG` above). The call is deferred rather than the
+/// carrier invented (preamble: "do NOT create a field").
+///
+/// `GLimp_Shutdown` has no reachable path from this crate:
+/// `crates/mp/renderer/Cargo.toml` has no `mp_engine_client` dependency,
+/// the same gap `GLimp_Init`/`GLimp_EndFrame` already escalated
+/// (`R_Splash`/`InitOpenGL` doc comments above, `tr_backend.rs:812-816`) —
+/// not added as an undeclared cross-crate edge out of this packet's scope.
+///
+/// Every other statement is real CPU logic with a resolved call surface and
+/// lands here: the unconditional command removals, `R_ShutdownFonts`, the
+/// `tr.registered`-gated `R_SyncRenderThread`/`R_ShutdownCommandBuffers`/
+/// `R_DeleteTextures` sequence, and the final `tr.registered = qfalse`.
+/// `qboolean destroyWindow` -> `bool` (translation dictionary).
+///
+/// Everything from the glow teardown through `tr.registered = qfalse` sits
+/// inside one `#ifndef DEDICATED` (`:1349-1404`); the non-DEDICATED (client)
+/// leg is transcribed per the R3 client-leg ruling — the R3 renderer track is
+/// the CLIENT port, and the jampDed disposition is scoped to the
+/// dedicated-server link set.
+///
+/// Source: `oracle/codemp/renderer/tr_init.cpp:1333-1407`
+#[allow(clippy::too_many_arguments)]
+pub fn RE_Shutdown(
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    assets: &mut RenderAssets,
+    sim: &mut RenderAssetsSim,
+    state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    font: &mut FontState,
+    destroy_window: bool,
+) {
+    Cmd_RemoveCommand(view.common, "imagelist");
+    Cmd_RemoveCommand(view.common, "shaderlist");
+    Cmd_RemoveCommand(view.common, "skinlist");
+    Cmd_RemoveCommand(view.common, "screenshot");
+    Cmd_RemoveCommand(view.common, "screenshot_tga");
+    Cmd_RemoveCommand(view.common, "gfxinfo");
+    Cmd_RemoveCommand(view.common, "r_atihack");
+    Cmd_RemoveCommand(view.common, "r_we");
+    Cmd_RemoveCommand(view.common, "imagecacheinfo");
+    Cmd_RemoveCommand(view.common, "modellist");
+    Cmd_RemoveCommand(view.common, "modelist");
+    Cmd_RemoveCommand(view.common, "modelcacheinfo");
+
+    let r_dynamic_glow = view.common.cvar(cvars.r_DynamicGlow).integer;
+    if r_dynamic_glow != 0 {
+        // Release the Glow Vertex Shader.
+        // Release Pixel Shader.
+        // Release the scene glow texture / scene texture / blur texture.
+        //
+        // DEFERRED: R4 — qglDeleteProgramsARB / qglDeleteLists /
+        // qglCombinerParameteriNV / qglDeleteTextures x3 against
+        // tr.glowVShader/glowPShader/screenGlow/sceneImage/blurImage (see
+        // doc comment above). Fixed-function GL surface, no R3 home
+        // (DEC-01/DEC-37 A13.2); the glow handle fields themselves have no
+        // carrier either.
+        // Source: oracle/codemp/renderer/tr_init.cpp:1354-1383
+    }
+
+    // DEFERRED: R_TerrainShutdown(&mut *view.cm, &mut tr.landScape) —
+    // `tr.landScape` (`srfTerrain_t`) has no landed `FrameState` field yet
+    // (see doc comment above); `CollisionWorld` alone (`view.cm`) is not
+    // enough to make the call.
+    // Source: oracle/codemp/renderer/tr_init.cpp:1386
+
+    R_ShutdownFonts(font);
+
+    if assets.registered {
+        R_SyncRenderThread(assets, view.common, cvars);
+        r_shutdown_command_buffers();
+        if destroy_window {
+            // only do this for vid_restart now, not during things like map
+            // load
+            R_DeleteTextures(sim, state, gpu);
+        }
+    }
+
+    // shut down platform specific OpenGL stuff
+    //
+    // DEFERRED: GLimp_Shutdown() — no reachable path from this crate (see
+    // doc comment above).
+    // Source: oracle/codemp/renderer/tr_init.cpp:1400-1403
+
+    assets.registered = false;
+}
+
+/// Raven `RE_EndRegistration`.
+///
+/// `#ifndef _XBOX` resolves to the always-taken branch — MP retail builds
+/// the non-`_XBOX` configuration (established precedent, `R_Register`/
+/// `R_Splash` doc comments above).
+///
+/// The whole fn sits inside one `#ifndef DEDICATED` (`:1409-1452`); it is
+/// ported per the R3 client-leg ruling — the R3 renderer track is the CLIENT
+/// port, and the jampDed disposition is scoped to the dedicated-server link
+/// set.
+///
+/// Source: `oracle/codemp/renderer/tr_init.cpp:1418-1425`
+pub fn RE_EndRegistration(
+    common: &Common,
+    cvars: &RendererCvars,
+    assets: &RenderAssets,
+    frame: &mut FrameState,
+    gpu: &mut GpuResources,
+) {
+    R_SyncRenderThread(assets, common, cvars);
+    if Sys_LowPhysicalMemory() == 0 {
+        RB_ShowImages(frame, gpu, assets, cvars);
+    }
+}
+
+/// `FUNCTABLE_SIZE` — restated per the established `tr_light.rs`/
+/// `tr_shade_calc.rs` precedent (private consts not `pub` there, so not
+/// reachable from this file); corroborated against
+/// `tr_local/tr_globals_t.rs:47`.
+///
+/// Source: `oracle/codemp/renderer/tr_local.h:1247` (`FUNCTABLE_SIZE`)
+const FUNCTABLE_SIZE: usize = 1024;
+
+/// Raven `#define MAX_POLYS 600` — corroborated by `RenderAssets::max_polys`'s
+/// own doc comment ("default MAX_POLYS = 600").
+///
+/// Source: `oracle/codemp/renderer/tr_local.h:2256`
+const MAX_POLYS: i32 = 600;
+
+/// Raven `#define MAX_POLYVERTS 3000` — corroborated by
+/// `RenderAssets::max_polyverts`'s own doc comment ("default MAX_POLYVERTS =
+/// 3000").
+///
+/// Source: `oracle/codemp/renderer/tr_local.h:2257`
+const MAX_POLYVERTS: i32 = 3000;
+
+/// Raven `R_Init`.
+///
+/// `#ifdef _XBOX` blocks (the `externalVisData` save/restore straddling the
+/// `tr`/`backEnd` memsets) drop — MP retail builds the non-`_XBOX` branch
+/// (established precedent, `R_Register`/`R_Splash` doc comments above).
+///
+/// The three `#ifndef DEDICATED` legs — `R_InitFogTable`/`R_NoiseInit`
+/// (`:1278-1282`), `R_ToggleSmpFrame` through `R_InitFonts` (`:1297-1313`),
+/// and `R_InitDecals`/`R_InitWorldEffects`/`qglGetError` (`:1316-1324`) —
+/// are all transcribed as the non-DEDICATED (client) leg per the R3
+/// client-leg ruling: the R3 renderer track is the CLIENT port, and the
+/// jampDed disposition is scoped to the dedicated-server link set.
+///
+/// `Com_Memset(&tr, 0, sizeof(tr))` / `Com_Memset(&backEnd, 0,
+/// sizeof(backEnd))` — SPLIT per the STATE HOMES table. `backEnd`'s R2 home,
+/// `FrameState`, also carries the `tr` frontend-scratch fields R2 folds into
+/// it (`## Seam definition`), so both memsets land as one full-struct
+/// rebuild below (nothing else in this fn's body writes into `frame`, so a
+/// wholesale zero is exact, not approximate). `tr`'s registries land on
+/// `RenderAssets` instead, and only get a **partial** reset here — the
+/// residual fields this fn's own later statements don't already
+/// re-establish:
+/// - `defaultImage`/`fogImage`/`dlightImage`/`whiteImage`/`lightmaps`
+///   (`tr_local.h:1329-1364`), `world`/`bspModels` (`:1039,1399`),
+///   `distanceCull`/`distanceCullSquared` (`:1420`), `registered` (`:1310`),
+///   `worldMapLoaded` (`:1320`) — no later statement in this fn touches
+///   these, so they are zeroed here. `worldMapLoaded` in particular has to
+///   be cleared: `RE_LoadWorldMap_Actual` (`tr_bsp.rs`) raises a redundant
+///   -load `Com_Error` off it, so a `vid_restart` that left it set would fire
+///   on the next map load.
+/// - `sortedShaders` (`:1407`) — `CreateInternalShaders`
+///   (`tr_shader.rs`, reached through `R_InitShaders` below) clears it, so a
+///   redundant pre-clear here is skipped.
+/// - `shaders` (`:1405-1406`), `skins` (`:1409-1410`), `models`
+///   (`:1396-1397`) — the three `Arena`-backed
+///   registries are NOT rebuilt by any later statement in this fn:
+///   `R_InitShaders` resets only `shader_lookup`/`defer_load`, and
+///   `RenderModels::init_skins`/`model_init` reset that struct's own
+///   `Vec` fields, never `RenderAssets::{skins, models}`. Clearing them is
+///   blocked on a missing `Arena` teardown entry point — see the
+///   `//TODO: Port R_Init registry reset` marker in the rebuild region below.
+/// - `skin_lookup`/`model_lookup` — plain name->handle maps with no reserved
+///   -slot semantics and no later re-establishment; zeroed here.
+/// - `images`/`image_names` (`AllocatedImages`, a separate `tr_image.cpp`
+///   global, not a `trGlobals_t` field), `shader_text`/
+///   `shader_text_hash_table`/`defer_load`'s own storage (`s_shaderText`/
+///   `shaderTextHashTable`, separate `tr_shader.cpp` file-scope statics,
+///   A13.4), and `glConfig` ("outside of TR… shouldn't be cleared during ref
+///   re-init", `## Seam definition`) are never part of `tr` at all — left
+///   untouched, matching Raven.
+/// - `function_tables`/`max_polys`/`max_polyverts` are unconditionally
+///   overwritten by this same fn's own next statements (the function-table
+///   loop, `R_InitFogTable`, the `max_polys`/`max_polyverts` clamp below) —
+///   a pre-zero would be immediately discarded, so it is skipped.
+///
+/// `#ifndef DEDICATED Com_Memset(&tess, 0, sizeof(tess)) #endif` and the
+/// `#ifndef FINAL_BUILD` `tess.xyz` 16-byte-alignment warning both need
+/// `tess` (`shaderCommands_t`) — DISSOLVED into R4's tessellation pipeline,
+/// no R3 carrier (`## State ownership` `tess` row); both are dropped rather
+/// than guessed at.
+///
+/// `Hunk_Alloc(sizeof(*backEndData) + …)` / `backEndData = …` /
+/// `backEndData->polys = …` / `backEndData->polyVerts = …` — `backEndData_t`
+/// is DISSOLVED (`## Seam definition` A1 disposition table: "its field list
+/// is the reference vocabulary for `FrameData`'s event payloads, not a
+/// struct that survives"); the one durable value this block produces,
+/// `max_polys`/`max_polyverts` as append-time capacity bounds, is already
+/// captured on `RenderAssets` by the clamp logic immediately above it.
+///
+/// `RE_SetLightStyle(i, -1)` — packed `int color = -1` reinterpreted as
+/// `color4ub_t` is `[0xFF; 4]` regardless of host byte order (all bits set).
+///
+/// `G2VertSpaceServer = &CMiniHeap_singleton;` — dropped, not given a state
+/// home: `CMiniHeap` is deleted per the ghoul2-server design ruling already
+/// applied to this exact assignment's server-side counterpart
+/// (`SV_SpawnServer`'s `G2VertSpaceServer = new CMiniHeap(...)`,
+/// `crates/mp/engine/server/src/sv_init.rs:1172-1175`: "`CMiniHeap` is
+/// deleted per the ghoul2-server design (the collision path threads no
+/// scratch heap), so this allocation drops"); the client-side singleton
+/// assignment is the same dead surface (porting-rules §20).
+///
+/// `R_TerrainInit()` — its already-ported (wave 0) signature needs
+/// `land_scape: &mut srfTerrain_t` (`tr.landScape`), which is
+/// design-assigned to `FrameState`'s frontend-scratch bucket but not yet a
+/// landed field (the same gap `RE_Shutdown`'s `R_TerrainShutdown` doc
+/// comment above already escalates for the same global) — deferred rather
+/// than inventing the field.
+///
+/// `int err = qglGetError(); if (err != GL_NO_ERROR) Com_Printf(...)` — the
+/// fixed-function GL surface DEC-01/DEC-37 leave unhomed until the R4 wgpu
+/// rewrite (A13.2), same treatment as every other `qgl*` call in this file.
+///
+/// `assets: &mut RenderAssets` and `sim: &mut RenderAssetsSim` (whose own
+/// `published: Arc<RenderAssets>` is a *separate* instance) are threaded as
+/// independent sibling parameters, mirroring `R_InitShaders`'s own
+/// already-ported (wave 9) signature, which carries the same duality.
+/// Reconciling them into one Arc-published instance across a frame boundary
+/// (A9) is engine call-site wiring outside this single-fn packet's scope.
+///
+/// Source: `oracle/codemp/renderer/tr_init.cpp:1214-1326`
+#[allow(clippy::too_many_arguments)]
+pub fn R_Init(
+    view: &mut EngineHostView,
+    cvars: &mut RendererCvars,
+    assets: &mut RenderAssets,
+    sim: &mut RenderAssetsSim,
+    state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    models: &mut RenderModels,
+    frame: &mut FrameState,
+    scene: &mut SceneState,
+    frame_data: &mut FrameData,
+    noise: &mut NoiseState,
+    rng: &mut Rng,
+    font: &mut FontState,
+    world_effects: &mut WorldEffectsState,
+    qs: &mut QSharedScratch,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
+) {
+    // Com_Memset(&tr, 0, sizeof(tr)) — partial reset; see doc comment above
+    // for the residual-field reasoning.
+    assets.default_image = None;
+    assets.fog_image = None;
+    assets.dlight_image = None;
+    assets.white_image = None;
+    assets.lightmaps.clear();
+    assets.world = None;
+    assets.bsp_models.clear();
+    assets.distance_cull = 0.0;
+    assets.distance_cull_squared = 0.0;
+    assets.registered = false;
+    assets.world_map_loaded = false;
+    assets.skin_lookup.clear();
+    assets.model_lookup.clear();
+
+    //TODO: Port R_Init registry reset
+    // Source: oracle/codemp/renderer/tr_init.cpp:1232
+    // (`oracle/codemp/renderer/tr_local.h:1396-1397,1405-1406,1409-1410` for
+    // the `models`/`shaders`/`skins` fields that memset zeroes)
+    // `RenderAssets::{shaders, skins, models}` are `Arena`-backed and survive
+    // this memset: `Arena` (`render_state/arena.rs`) exposes only
+    // `insert`/`get`/`get_mut`/`remove`/`iter`, no teardown entry point, and
+    // a `remove`-every-handle sweep would vacate the A12 reserved slot 0
+    // permanently (`remove`'s own rule: slot 0 of a capped arena never
+    // re-enters the free list), breaking every overflow path that returns
+    // `Handle::slot_zero()`. Reconstructing them instead needs
+    // `Arena::new_with_slot0(cap, default_entry)` — and which value each
+    // registry's default entry takes is the open A12 wiring question
+    // `CreateInternalShaders`'s own PORT-NOTE (`tr_shader.rs`) already
+    // escalates ("no `RenderAssets` constructor has landed in this crate
+    // yet"). Escalated, not invented (porting-rules §A2).
+    // Com_Memset(&backEnd, 0, sizeof(backEnd)) — full rebuild; see doc
+    // comment above (nothing else in this fn writes into `frame`).
+    *frame = FrameState {
+        refdef: TrRefdef {
+            fov_x: 0.0,
+            fov_y: 0.0,
+            view_origin: [0.0; 3],
+            view_axis: [[0.0; 3]; 3],
+        },
+        view: ViewParms {},
+        ori: OrientationR {},
+        counters: BackEndCounters {},
+        is_hyperspace: false,
+        current_entity: None,
+        sky_rendered_this_view: false,
+        projection_2d: false,
+        color_2d: [0; 4],
+        vertexes_2d: false,
+        entity_2d: RefEntity::default(),
+        scene_light_styles: [[0; 4]; MAX_LIGHT_STYLES],
+        frame_count: 0,
+        view_count: 0,
+        identity_light: 0.0,
+        identity_light_byte: 0,
+        overbright_bits: 0,
+        sun_direction: [0.0; 3],
+        sun_ambient: [0.0; 3],
+        external_vis_data: None,
+    };
+
+    // DEFERRED: `tess` (`shaderCommands_t`) memset + the `tess.xyz` 16-byte
+    // alignment warning — `tess` is DISSOLVED into R4's tessellation
+    // pipeline, no R3 carrier (see doc comment above).
+    // Source: oracle/codemp/renderer/tr_init.cpp:1235,1246-1250
+
+    //
+    // init function tables
+    //
+    for i in 0..FUNCTABLE_SIZE {
+        let deg = i as f32 * 360.0 / (FUNCTABLE_SIZE - 1) as f32;
+        // DEG2RAD's `a * M_PI` promotes through `M_PI` (double); ruling 12.
+        let rad = deg as f64 * PI / 180.0;
+        assets.function_tables.sin_table[i] = rad.sin() as f32;
+        assets.function_tables.square_table[i] = if i < FUNCTABLE_SIZE / 2 { 1.0 } else { -1.0 };
+        assets.function_tables.saw_tooth_table[i] = i as f32 / FUNCTABLE_SIZE as f32;
+        assets.function_tables.inverse_saw_tooth_table[i] =
+            1.0 - assets.function_tables.saw_tooth_table[i];
+
+        if i < FUNCTABLE_SIZE / 2 {
+            if i < FUNCTABLE_SIZE / 4 {
+                assets.function_tables.triangle_table[i] = i as f32 / (FUNCTABLE_SIZE / 4) as f32;
+            } else {
+                assets.function_tables.triangle_table[i] =
+                    1.0 - assets.function_tables.triangle_table[i - FUNCTABLE_SIZE / 4];
+            }
+        } else {
+            assets.function_tables.triangle_table[i] =
+                -assets.function_tables.triangle_table[i - FUNCTABLE_SIZE / 2];
+        }
+    }
+
+    R_InitFogTable(assets);
+
+    R_NoiseInit(noise, rng);
+
+    R_Register(view, cvars);
+
+    let mut max_polys = view.common.cvar(cvars.r_maxpolys).integer;
+    if max_polys < MAX_POLYS {
+        max_polys = MAX_POLYS;
+    }
+    assets.max_polys = max_polys as usize;
+
+    let mut max_polyverts = view.common.cvar(cvars.r_maxpolyverts).integer;
+    if max_polyverts < MAX_POLYVERTS {
+        max_polyverts = MAX_POLYVERTS;
+    }
+    assets.max_polyverts = max_polyverts as usize;
+
+    // DEFERRED: `ptr = Hunk_Alloc(sizeof(*backEndData) + …); backEndData =
+    // …; backEndData->polys = …; backEndData->polyVerts = …;` —
+    // `backEndData_t` is DISSOLVED (see doc comment above); the durable
+    // `max_polys`/`max_polyverts` capacity bounds are already set above.
+    // Source: oracle/codemp/renderer/tr_init.cpp:1293-1296
+
+    R_ToggleSmpFrame(frame_data, scene);
+
+    for i in 0..MAX_LIGHT_STYLES {
+        RE_SetLightStyle(sim, i, [0xFF; 4]);
+    }
+
+    InitOpenGL(view, cvars, &*assets, state, gpu, sim, &*models, frame);
+
+    R_InitImages(
+        view,
+        cvars,
+        &assets.glconfig,
+        sim,
+        &*models,
+        state,
+        gpu,
+        &*frame,
+    );
+    R_InitShaders(
+        false, qs, frame, assets, view, cvars, sim, &*models, state, gpu, sky_view, sky,
+    );
+    models.init_skins();
+
+    // DEFERRED: `R_TerrainInit()` — its already-ported signature needs
+    // `land_scape: &mut srfTerrain_t` (`tr.landScape`), not yet a landed
+    // `FrameState` field (see doc comment above).
+    // Source: oracle/codemp/renderer/tr_init.cpp:1310
+
+    R_InitFonts(font);
+
+    models.model_init();
+
+    // PORT-NOTE: `G2VertSpaceServer = &CMiniHeap_singleton;` dropped — see
+    // doc comment above (established `sv_init.rs` ghoul2-server precedent).
+    // Source: oracle/codemp/renderer/tr_init.cpp:1315
+
+    R_InitDecals(scene);
+
+    world_effects.R_InitWorldEffects(view);
+
+    // DEFERRED: R4 — `int err = qglGetError(); if (err != GL_NO_ERROR)
+    // Com_Printf(...)`. Fixed-function GL surface, no R3 home (DEC-01/
+    // DEC-37 A13.2).
+    // Source: oracle/codemp/renderer/tr_init.cpp:1321-1323
 }

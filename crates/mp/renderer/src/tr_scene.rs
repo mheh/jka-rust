@@ -16,6 +16,7 @@ use mp_qshared::common::mp::cgame::mini_ref_entity_s::miniRefEntity_t;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
+use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::qhandle_t;
 
@@ -107,6 +108,13 @@ pub struct SceneState {
     ///
     /// Source: `oracle/codemp/renderer/tr_scene.cpp:624`
     pub last_mark_count: i32,
+    /// Raven `RE_RenderScene`'s `static int lastTime` — the previous call's
+    /// `fd->time`, differenced against the new one to derive `frametime`
+    /// (kind-3 fn-scope state, this file's own carrier per the three-kind
+    /// rule; DEC-37 A13.3).
+    ///
+    /// Source: `oracle/codemp/renderer/tr_scene.cpp:709`
+    pub last_time: i32,
 }
 
 impl Default for SceneState {
@@ -117,6 +125,7 @@ impl Default for SceneState {
             decal_poly_head: Vec::new(),
             decal_poly_total: Vec::new(),
             last_mark_count: -1,
+            last_time: 0,
         }
     }
 }
@@ -1086,4 +1095,177 @@ pub fn RE_AddDecalToScene(
         // the byte-count-bounded memcpy without a raw pointer.
         decal.verts[..num_points as usize].copy_from_slice(&verts[..num_points as usize]);
     }
+}
+
+// ---------------------------------------------------------------------
+// wave 13
+// ---------------------------------------------------------------------
+
+/// Raven `RDF_NOWORLDMODEL` — restated from `tr_main.rs`'s own local
+/// `const` (not `pub` there, so not reachable from here); same value, same
+/// oracle line.
+///
+/// Source: `oracle/codemp/cgame/tr_types.h:57`
+const RDF_NOWORLDMODEL: i32 = 1;
+
+/// Raven `RE_RenderScene` — commits a scene's `refdef_t` and, in the
+/// oracle, immediately renders it (`R_RenderView`) before returning.
+///
+/// Landed here: the `tr.registered` guard, the `r_norefresh` early-out, the
+/// `tr.world`/`RDF_NOWORLDMODEL` validation, the `lastTime` static update,
+/// the `R_AddDecals` call, and the `refEntParent` reset. Everything past
+/// those is DEFERRED at its own site below, for reasons that don't dissolve
+/// with more threading:
+///
+/// - `R_RenderView`'s already-landed (wave 12, `tr_main.rs`) signature takes
+///   `gpu: &mut GpuResources`, which `## Seam definition`'s own doc comment
+///   marks "Render-thread-only. Never touched by a trap query (ruling 3
+///   invariant)." `RE_RenderScene` is exactly a trap-time handler
+///   (`CG_R_/UI_R_RENDERSCENE`) — calling `R_RenderView` from here would
+///   violate that frozen invariant regardless of how much additional
+///   context this fn threads in. `FrameEvent::RenderScene`'s existing
+///   "seals the accumulated scene" shape (`render_state/frame_event.rs`)
+///   confirms the intended split: a future render-thread orchestrator
+///   consumes that event and calls `R_RenderView` itself, not this
+///   trap-time fn.
+/// - Pushing `FrameEvent::RenderScene` here anyway is not done either:
+///   `TrRefdef` (its payload type, `render_state/placeholders.rs`) carries
+///   only 4 of the oracle `trRefdef_t`'s ~15 fields (`fov_x`/`fov_y`/
+///   `view_origin`/`view_axis`) — `x`/`y`/`width`/`height`/`time`/
+///   `frametime`/`rdflags`/`areamask`/`areamaskModified`/`floatTime`/`text`/
+///   the four count+pointer pairs are absent. `TrRefdef`'s own doc comment
+///   says the rest "lands with the `tr_scene` R3 wave" (this wave), but
+///   extending it means editing `render_state/placeholders.rs`, outside
+///   this wave's scoped file. Pushing a silently-incomplete `TrRefdef` for a
+///   future consumer to read would be exactly the invented partial state
+///   the never-guess rule guards against, so the whole event push waits for
+///   that field-merge.
+/// - `tr.frameSceneNum`/`tr.sceneCount` have no `FrameState` field
+///   (`FrameState` carries `frame_count`/`view_count` only) — UNMAPPED, not
+///   invented.
+/// - `RE_RenderWorldEffects`/`RE_RenderAutoMap` are themselves unported —
+///   `tr_cmds.rs` carries its own `DEFERRED: RE_RenderWorldEffects`/
+///   `DEFERRED: RE_RenderAutoMap` markers, no callable fn under either name
+///   exists anywhere in the crate (verified by grep, not assumed).
+///
+/// Source: `oracle/codemp/renderer/tr_scene.cpp:706-874`
+pub fn RE_RenderScene(
+    fd: &refdef_t,
+    frame: &mut FrameData,
+    assets: &RenderAssets,
+    cvars: &RendererCvars,
+    scene: &mut SceneState,
+    common: &mut Common,
+) {
+    if !assets.registered {
+        return;
+    }
+
+    // DEFERRED: GLimp_LogComment("====== RE_RenderScene =====\n") —
+    // unreachable from this crate: `crates/mp/renderer/Cargo.toml` doesn't
+    // depend on `mp_engine_client` (where `GLimp_LogComment`/`GLimp_EndFrame`
+    // live), and its raw `*mut c_char` signature would need the unsafe
+    // pointer construction the interior-safety law forbids even if it did —
+    // the same ruling `tr_backend.rs`'s `RB_EndSurface`/
+    // `R_IssuePendingRenderCommands` ports already made for this exact call
+    // (DEC-37 A13.2).
+    // Source: oracle/codemp/renderer/tr_scene.cpp:714
+
+    if common.cvar(cvars.r_norefresh).integer != 0 {
+        return;
+    }
+
+    // DEFERRED: `startTime = Sys_Milliseconds()*com_timescale->value;` —
+    // paired with `tr.frontEndMsec += ... - startTime` at the end of this
+    // fn (oracle line 866); computing `startTime` alone has nowhere to feed
+    // since `tr.frontEndMsec` has no `FrameState`/`BackEndCounters` field
+    // (`BackEndCounters` is the established empty tier-3 placeholder, owned
+    // by "the R4 backend wave" per `tr_cmds.rs`'s `R_PerformanceCounters`
+    // DEFERRED note) — deferring both together rather than landing a
+    // computation with no observable effect.
+    // Source: oracle/codemp/renderer/tr_scene.cpp:720,866
+
+    if assets.world.is_none() && (fd.rdflags & RDF_NOWORLDMODEL) == 0 {
+        com_error(
+            errorParm_t::ERR_DROP,
+            "R_RenderScene: NULL worldmodel".to_string(),
+        );
+    }
+
+    // DEFERRED: the rest of `tr.refdef`'s field-by-field commit
+    // (`text`/`x`/`y`/`width`/`height`/`fov_x`/`fov_y`/`vieworg`/`viewaxis`/
+    // `time`/`frametime`/`rdflags`/`areamask`/`areamaskModified`/
+    // `floatTime`/the four count+pointer pairs) — see this fn's own doc
+    // comment for why committing only `TrRefdef`'s 4 already-landed fields
+    // into a `FrameEvent::RenderScene` push is not done either. Escalate a
+    // `TrRefdef`/`FrameState` field-merge for the wave that lands
+    // `R_IssueRenderCommands`'s render-thread orchestrator.
+    // Source: oracle/codemp/renderer/tr_scene.cpp:726-743,758-803,811-814
+    // (narrowed from the field-commit block's full :726-822 span — :744-756
+    // is the skyboxportal/drawskyboxportal write, marked separately below;
+    // :807-810 is `R_AddDecals`, landed a few lines below this comment;
+    // :815-822 is the dynamic-lighting-disable block, also marked
+    // separately below — none of those three sub-ranges belong to this
+    // deferral).
+
+    // `static int lastTime` (kind-3 fn-scope state, this file's own
+    // `SceneState` carrier) — landed independent of `frametime`'s own
+    // (deferred, see above) destination field.
+    // Source: oracle/codemp/renderer/tr_scene.cpp:709,741-742
+    scene.last_time = fd.time;
+
+    // DEFERRED: `skyboxportal`/`drawskyboxportal` writes — `RDF_SKYBOXPORTAL`/
+    // `RDF_DRAWSKYBOX`'s bit values are neither in this packet's FILE-SCOPE
+    // CONSTANTS section nor this fn's own oracle slice (only
+    // `RDF_NOWORLDMODEL`/`RDF_AUTOMAP` are independently confirmed, via
+    // `tr_main.rs`'s already-ported locals) — never-guess rule. Destination
+    // is `SceneState` (DEC-37 A13.3, this file's own carrier) once the
+    // values are confirmed.
+    // Source: oracle/codemp/renderer/tr_scene.cpp:744-756
+
+    if fd.rdflags & RDF_NOWORLDMODEL == 0 {
+        R_AddDecals(frame, assets, scene, cvars, common, fd.time);
+    }
+
+    // DEFERRED: the dynamic-lighting-disable block (`r_dynamiclight->integer
+    // == 0 || r_vertexLight->integer == 1` clearing `tr.refdef.num_dlights`)
+    // — `num_dlights` has no `TrRefdef` field (see above).
+    // Source: oracle/codemp/renderer/tr_scene.cpp:815-822
+
+    // DEFERRED: `tr.frameSceneNum++; tr.sceneCount++;` — `FrameState`
+    // carries `frame_count`/`view_count` only; `frameSceneNum`/`sceneCount`
+    // are UNMAPPED (no field), not invented.
+    // Source: oracle/codemp/renderer/tr_scene.cpp:829-830
+
+    // DEFERRED: the local `viewParms_t parms` setup and the `R_RenderView`
+    // call itself — see this fn's own doc comment (ruling-3 invariant:
+    // `R_RenderView` touches render-thread-only `GpuResources`, unreachable
+    // from this trap-time handler).
+    // Source: oracle/codemp/renderer/tr_scene.cpp:832-855
+
+    // The `r_firstSceneDrawSurf`/`Entity`/`Dlight`/`Poly` per-scene-offset
+    // bookkeeping (oracle lines 857-862) is not a Rust write at all: same
+    // "no dedicated field, a property of the `FrameData` under
+    // construction" disposition `R_ToggleSmpFrame`/`RE_ClearScene` (this
+    // file, above) already establish for these counters — nothing to port.
+    // Source: oracle/codemp/renderer/tr_scene.cpp:857-862
+
+    scene.ref_ent_parent = None;
+
+    // DEFERRED: `tr.frontEndMsec += Sys_Milliseconds()*com_timescale->value
+    // - startTime;` — paired with `startTime` above.
+    // Source: oracle/codemp/renderer/tr_scene.cpp:866
+
+    // DEFERRED: `RE_RenderWorldEffects()` — unported: `tr_cmds.rs` carries
+    // its own `DEFERRED: RE_RenderWorldEffects` marker (no callable fn under
+    // this name exists anywhere in the crate; verified by grep, not
+    // assumed).
+    // Source: oracle/codemp/renderer/tr_scene.cpp:868
+
+    // DEFERRED: `if (tr.refdef.rdflags & RDF_AUTOMAP) RE_RenderAutoMap();` —
+    // `RDF_AUTOMAP`'s value (32) is independently confirmed (`tr_main.rs`),
+    // but `RE_RenderAutoMap` itself is unported — same as
+    // `RE_RenderWorldEffects` above, `tr_cmds.rs` carries its own
+    // `DEFERRED: RE_RenderAutoMap` marker.
+    // Source: oracle/codemp/renderer/tr_scene.cpp:870-873
 }

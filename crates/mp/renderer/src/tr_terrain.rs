@@ -28,17 +28,20 @@
 // what that threading replaces, so they are not re-created as pointer stores.
 //
 // Still genuinely deferred (nothing in this crate provides them yet):
-// `CTRLandScape::GetBlendedShader` → `R_CreateBlendedShader` (unported), and
-// with it `CalculateShaders`; `WorldAsset::globalFog` (tr_bsp/tr_world R3
-// wave) and the zero-arg `CTRLandScape::Render()`, and with them
-// `RB_SurfaceTerrain`; the `CTRLandScape(const char *)` ctor, and with it
-// `RE_InitRendererTerrain` and `R_TerrainShutdown`'s teardown arm. `tess`
-// writes (`RenderCorner`/`Render`/`RenderWaterVert`) are DISSOLVED per R2
-// `## State ownership` (an R4 concern) and carry no body at all.
+// `CalculateShaders` (`CTRLandScape::GetBlendedShader`, wave 11, no longer
+// blocks it — see that fn's own doc; the remaining blocker is the
+// `mSortedPatches`/`mSortedCount` fill + closing `qsort`); `WorldAsset
+// ::globalFog` (tr_bsp/tr_world R3 wave) and the zero-arg `CTRLandScape
+// ::Render()`, and with them `RB_SurfaceTerrain`; the `CTRLandScape(const
+// char *)` ctor, and with it `RE_InitRendererTerrain` and
+// `R_TerrainShutdown`'s teardown arm. `tess` writes (`RenderCorner`/`Render`/
+// `RenderWaterVert`) are DISSOLVED per R2 `## State ownership` (an R4
+// concern) and carry no body at all.
 
 use core::ffi::c_int;
 
 use native_math::qmath::Com_Clampi;
+use native_string::atoi::atoi;
 use native_types::thandle_t;
 
 use mp_engine_qcommon::cm_load::CM_ShutdownTerrain;
@@ -48,8 +51,11 @@ use mp_engine_qcommon::cm_trace::CM_CullWorldBox;
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::{com_printf, Common};
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
+use mp_engine_qcommon::common_fns::{Com_ParseTextFile, Com_ParseTextFileDestroy};
 use mp_engine_qcommon::cvar_fns::Cvar_Get;
+use mp_engine_qcommon::gp2::generic_parser2::GenericParser2;
 use mp_engine_qcommon::z_memman_pc::Z_Free;
+use mp_qshared::shared::com_parse::QSharedScratch;
 use mp_qshared::shared::cvar::CVAR_CHEAT;
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorAdd, _VectorMA, _VectorScale, _VectorSubtract, CrossProduct,
@@ -58,8 +64,11 @@ use mp_qshared::shared::q_math::{
 use mp_qshared::shared::{qhandle_t, vec3_t};
 
 use crate::render_state::frame_state::FrameState;
+use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::render_assets::RenderAssets;
+use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
+use crate::tr_image::TrImageState;
 use crate::tr_landscape::ctrland_scape::CTRLandScape;
 use crate::tr_landscape::ctrpatch::CTRPatch;
 use crate::tr_landscape::spatch_info::TPatchInfo;
@@ -69,6 +78,9 @@ use crate::tr_local::surface_type_t::surfaceType_t;
 use crate::tr_local::tr_refdef_t::trRefdef_t;
 use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_main::{DrawSurf, R_AddDrawSurf, SurfaceGeometry};
+use crate::tr_model::render_models::RenderModels;
+use crate::tr_shader::{RE_RegisterShader, R_CreateBlendedShader, R_GetShaderByHandle};
+use crate::tr_sky::SkyState;
 use crate::tr_surface::RB_CheckOverflow;
 
 /// Raven `HEIGHT_RESOLUTION` — the size of `CTRLandScape::mHeightDetails[]`.
@@ -275,6 +287,70 @@ impl CTRPatch {
 }
 
 impl CTRLandScape {
+    /// Raven `CTRLandScape::CTRLandScape` — constructs the renderer-side
+    /// landscape from a `.terrain`/RMG config string: registers the
+    /// collision-side `CCMLandScape`, links the two back-pointers, allocates
+    /// and fills `mRenderMap`/`mTRPatches`/`mSortedPatches`, walks the
+    /// collision patches to build the matching renderer patches, and
+    /// resolves the terrain's contents shader.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_terrain.cpp:875-938`
+    // DEFERRED: whole-fn — the ctor has no meaningful partial transcription;
+    // five independent, individually-verified blockers (wave-10 grep, not
+    // assumed) close it end-to-end between them. Blocker 1 denies `common`
+    // itself (needed from `:889` on); blocker 5 denies `this` — needed even
+    // by the *leading* `memset(this, 0, sizeof(*this))`/
+    // `tr.landScape.landscape = this` writes (`:881,887`, neither of which
+    // reads `common`) and by the already-landed `LoadTerrainDef`'s `&mut
+    // self` method call (`:890`, likewise no `common` read). No step in the
+    // body has both an available receiver and an available `common`.
+    //   1. `CM_RegisterTerrain(configstring, false)` (`:884`) returns
+    //      `const CCMLandScape *` in oracle. The workspace's
+    //      `mp_engine_qcommon::cm_terrain::register_terrain` folds Raven's
+    //      ctor+`CM_InitTerrain` into one get-or-create call, but returns a
+    //      `TerrainHandle` (always `0`) and needs `&mut CollisionWorld` +
+    //      `&mut impl EngineHost` threaded in — neither of which this ctor's
+    //      only call site, `RE_InitRendererTerrain` (below), carries today.
+    //      Retrieving the `&CmLandScape` back from the handle is possible in
+    //      principle (`CollisionWorld::land_scape` is the single global slot
+    //      the always-`0` handle names) but widening
+    //      `RE_InitRendererTerrain`'s signature reaches every one of its
+    //      external callers, out of this single-file wave's scope.
+    //   2. `common->GetSize()` (`:893`, `CCMLandScape::GetSize`/`mSize`) has
+    //      no live Rust accessor: `cm_terrain.rs`'s `CmLandScape::size` field
+    //      is `#[allow(dead_code)]` with its own doc note that "its live
+    //      reader ... lands with a later terrain-consuming slice"
+    //      (`crates/mp/engine/qcommon/src/cm_terrain.rs`).
+    //   3. `CM_TerrainPatchIterate(common, InitRendererPatches, this)`
+    //      (`:923`) — the iterator that drives this file's own
+    //      already-ported [`InitRendererPatches`] callback — has no Rust
+    //      definition anywhere in the workspace.
+    //      `crates/mp/engine/qcommon/src/cm_terrain.rs`'s own module doc
+    //      lists `CM_TerrainPatchIterate`/`TerrainPatchIterate` under
+    //      "§20-dropped ... renderer + dead generation-path callers only":
+    //      judged to have no live caller and intentionally not ported. This
+    //      ctor is in fact that live renderer caller, so that ruling is
+    //      stale — reconciling it is an escalation for the state-ownership
+    //      docs, not an invention at this call site.
+    //   4. `CalculateShaders()` (`:926`) is this file's own whole-fn
+    //      `todo!()` below (`GetBlendedShader` itself landed wave 11, but
+    //      the `mSortedPatches`/`mSortedCount` fill + closing `qsort` are
+    //      still unwritten). `mShader = R_GetShaderByHandle(R_GetShaderByNum(
+    //      shaderNum, *tr.world))` (`:930`) needs the world registry this
+    //      file's header PORT-NOTE already flags as "still empty landing
+    //      placeholders" pending the `tr_bsp`/`tr_world` R3 wave.
+    //   5. `this` is heap-constructed at the `new CCMLandScape(...)` call
+    //      site (`RE_InitRendererTerrain`, not this ctor), not
+    //      stack-returned — this file's `R_TerrainShutdown` DEFERRED note
+    //      above already records that "`CTRLandScape`'s owning-allocation
+    //      strategy is unsettled while its ctor ... is deferred".
+    // `configstring` is threaded to match the oracle signature; unused since
+    // the body never runs.
+    pub fn new(configstring: &str) -> Self {
+        let _ = configstring;
+        todo!("Port CTRLandScape::CTRLandScape — oracle/codemp/renderer/tr_terrain.cpp:875-938")
+    }
+
     /// Raven `CTRLandScape::Reset` — resets all patches, recomputing variance
     /// if needed.
     ///
@@ -600,14 +676,201 @@ impl CTRLandScape {
         }
     }
 
+    /// Raven `CTRLandScape::LoadTerrainDef` — wave 9 (`snake_case`, matching
+    /// every other landed `CTRLandScape` method in this file). GP2-parses
+    /// `ext_data/RMG/<td>.terrain` (falling back to `ext_data/arioche/<td>
+    /// .terrain` on a first miss, printing `Could not open %s` and returning
+    /// non-fatally on a double miss), then walks the root group's subgroups'
+    /// subgroups for `altitudetexture`/`water`/`flattexture` blocks.
+    ///
+    /// `Com_sprintf`/`stricmp` -> `format!`/`eq_ignore_ascii_case` per the
+    /// translation dictionary (mirrors this crate's `ParseSkyParms`
+    /// treatment, `tr_shader.rs`, of the same raw-pointer-`Com_sprintf`
+    /// substitution). `atol` -> `native_string::atoi::atoi` (identical on
+    /// the 32-bit retail target — same one-line ruling `cm_terrain.rs`'s
+    /// `CmLandScape::load_terrain_def` states for its own `atol` call).
+    ///
+    /// `#ifndef PRE_RELEASE_DEMO` wraps the whole retail body; the demo-only
+    /// empty-fn arm is dead surface, dropped (§C10).
+    ///
+    /// The `water`/`flattexture` cases' `RE_RegisterShader` calls thread
+    /// through the whole shader-registration surface (`QSharedScratch`,
+    /// `FrameState`, `RenderAssets`, `EngineHostView`, `RendererCvars`,
+    /// `RenderAssetsSim`, `RenderModels`, `TrImageState`, `GpuResources`,
+    /// `viewParms_t`, `SkyState`) per its own wave-8 LAW signature. That
+    /// callee is itself still a whole-fn loud `todo!()` stub pending its
+    /// `lightmaps2d`/`stylesDefault` gap (`tr_shader.rs`); any non-empty
+    /// `shader` name reaching this fn panics through it until that wave
+    /// lands (marker law: "Panics via `<callee>`'s loud stub").
+    ///
+    /// `mFlatShader` (a plain `qhandle_t`) takes `RE_RegisterShader`'s
+    /// return directly. `mWaterShader` (`*mut shader_t`, tier-2 raw
+    /// pointer — `renderer-r2-design.md`'s tier-2 transition audit lists it
+    /// "Coordinate (soft)" alongside `mTLShader`/`mBRShader`) cannot receive
+    /// `R_GetShaderByHandle`'s idiomatic `ShaderHandle` return without
+    /// unsafe pointer synthesis, banned by the interior-safety law; the
+    /// registration + lookup calls are still issued for their real
+    /// side effects (mirrors this crate's `ParseSkyParms` "calls issued,
+    /// handle discarded" treatment), but the store into `mWaterShader`
+    /// itself is DEFERRED to that coordinated slice.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_terrain.cpp:508-578`
+    #[allow(clippy::too_many_arguments)]
+    pub fn load_terrain_def(
+        &mut self,
+        td: &str,
+        view: &mut EngineHostView,
+        qs: &mut QSharedScratch,
+        frame: &mut FrameState,
+        assets: &mut RenderAssets,
+        cvars: &RendererCvars,
+        sim: &mut RenderAssetsSim,
+        models: &RenderModels,
+        img_state: &mut TrImageState,
+        gpu: &mut GpuResources,
+        sky_view: &mut viewParms_t,
+        sky: &mut SkyState,
+    ) {
+        let mut path = format!("ext_data/RMG/{td}.terrain");
+        com_printf(
+            view.common,
+            &format!("R_Terrain: Loading and parsing terrainDef {td}.....\n"),
+        );
+
+        self.mWaterShader = core::ptr::null_mut();
+        self.mFlatShader = 0;
+
+        let mut parse = GenericParser2::new();
+        if !Com_ParseTextFile(view, &path, &mut parse, true) {
+            path = format!("ext_data/arioche/{td}.terrain");
+            if !Com_ParseTextFile(view, &path, &mut parse, true) {
+                com_printf(view.common, &format!("Could not open {path}\n"));
+                return;
+            }
+        }
+
+        // The whole file → the root `{ }` struct → its subgroups.
+        let basegroup = parse.top_level();
+        for classes in basegroup.subgroups() {
+            for items in classes.subgroups() {
+                let type_name = items.name();
+                if type_name.eq_ignore_ascii_case("altitudetexture") {
+                    // Height must exist - the rest are optional
+                    let height = atoi(items.find_pair_value("height").unwrap_or("0"));
+
+                    // Shader for this height
+                    let shader_name = items.find_pair_value("shader").unwrap_or("");
+                    if !shader_name.is_empty() {
+                        let shader = RE_RegisterShader(
+                            shader_name,
+                            qs,
+                            frame,
+                            assets,
+                            view,
+                            cvars,
+                            sim,
+                            models,
+                            img_state,
+                            gpu,
+                            sky_view,
+                            sky,
+                        );
+                        if shader != 0 {
+                            self.set_shaders(height, shader);
+                        }
+                    }
+                } else if type_name.eq_ignore_ascii_case("water") {
+                    let shader_name = items.find_pair_value("shader").unwrap_or("");
+                    let shader = RE_RegisterShader(
+                        shader_name,
+                        qs,
+                        frame,
+                        assets,
+                        view,
+                        cvars,
+                        sim,
+                        models,
+                        img_state,
+                        gpu,
+                        sky_view,
+                        sky,
+                    );
+                    // DEFERRED: mWaterShader store — raw-pointer tier-2
+                    // field, no Handle<Shader> replacement landed yet
+                    // (renderer-r2-design.md tier-2 transition audit, Group
+                    // 2 `shader_t` row, "Coordinate (soft)").
+                    // Source: oracle/codemp/renderer/tr_terrain.cpp:564
+                    let _ = R_GetShaderByHandle(assets, view.common, shader);
+                } else if type_name.eq_ignore_ascii_case("flattexture") {
+                    let shader_name = items.find_pair_value("shader").unwrap_or("");
+                    self.mFlatShader = RE_RegisterShader(
+                        shader_name,
+                        qs,
+                        frame,
+                        assets,
+                        view,
+                        cvars,
+                        sim,
+                        models,
+                        img_state,
+                        gpu,
+                        sky_view,
+                        sky,
+                    );
+                }
+            }
+        }
+
+        Com_ParseTextFileDestroy(&mut parse);
+    }
+
+    /// Raven `CTRLandScape::GetBlendedShader` — wave 11. Body doesn't touch
+    /// `self`; kept as an impl method (not a free fn) to mirror `CTRLandScape
+    /// ::` class membership, matching this file's `has_water`/`set_visibility`
+    /// precedent for member fns whose bodies happen not to read `self`.
+    ///
+    /// `R_CreateBlendedShader`'s already-ported wave-10 signature returns a
+    /// `ShaderHandle` where the oracle returns `qhandle_t` directly; the
+    /// round-trip is `.index() as i32`, the established seam convention for
+    /// this exact conversion (`tr_scene.rs:483`'s `R_GetShaderByHandle` call,
+    /// `tr_shader.rs:5073`'s `RE_RegisterShaderLightMap` return arm).
+    /// `assets`/`common`/`cvars` are threaded (§B4) to satisfy that callee's
+    /// own signature.
+    ///
+    /// Panics via `R_MergeShaders`'s loud stub (`tr_shader.rs:5354`) until
+    /// its owning wave lands — reached through `R_CreateBlendedShader`, whose
+    /// own doc comment names the same transitive path, whenever no existing
+    /// blended shader is found.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_terrain.cpp:580-592`
+    pub fn get_blended_shader(
+        &self,
+        a: qhandle_t,
+        b: qhandle_t,
+        c: qhandle_t,
+        surface_sprites: bool,
+        assets: &mut RenderAssets,
+        common: &mut Common,
+        cvars: &RendererCvars,
+    ) -> qhandle_t {
+        // Special case single pass shader
+        if a == b && a == c {
+            return a;
+        }
+
+        let blended = R_CreateBlendedShader(a, b, c, surface_sprites, assets, common, cvars);
+        blended.index() as i32
+    }
+
     /// Raven `CTRLandScape::CalculateShaders`.
-    // DEFERRED: `CTRLandScape::GetBlendedShader` (`tr_terrain.cpp:580-592`)
-    // forwards to `R_CreateBlendedShader`, which has no Rust definition in
-    // this crate — the whole retail-compiled body (`#ifndef
-    // PRE_RELEASE_DEMO`) exists to feed it, and its `mSortedPatches`/
-    // `mSortedCount` fill plus the closing `qsort(… ComparePatchInfo)` are
-    // blocked behind it. Lands with the blended-shader slice of the R3
-    // `tr_shader` wave.
+    // DEFERRED: `GetBlendedShader` itself landed this wave
+    // (`get_blended_shader` above), but `CalculateShaders`'s own body is
+    // still blocked on independent gaps: the whole retail-compiled body
+    // (`#ifndef PRE_RELEASE_DEMO`) walks `mTRPatches` to fill
+    // `mSortedPatches`/`mSortedCount`, then closes with `qsort(…,
+    // ComparePatchInfo)` — neither the sorted-patch buffer's fill loop nor a
+    // `qsort` call site exist yet in this file, out of this single-fn wave's
+    // scope. Lands with a future `tr_terrain` slice.
     // Source: `oracle/codemp/renderer/tr_terrain.cpp:628-804`
     pub fn calculate_shaders(&mut self) {
         todo!("Port CTRLandScape::CalculateShaders — oracle/codemp/renderer/tr_terrain.cpp:628-804")
@@ -744,11 +1007,13 @@ pub fn R_CalcTerrainVisBounds(land: &CmLandScape, view: &mut viewParms_t) {
 }
 
 /// Raven `RE_InitRendererTerrain`.
-// DEFERRED: `CTRLandScape::CTRLandScape(const char *)` (`tr_terrain.cpp:
-// 875-938`) — the ctor is not among this wave's 22 packet functions, and it
-// is itself blocked on `CalculateShaders`/`LoadTerrainDef` and the
-// `R_GetShaderByNum` world read. `R_TerrainShutdown` below is blocked on the
-// same allocation strategy.
+// DEFERRED: `CTRLandScape::CTRLandScape(const char *)` — wave-10 ported
+// as [`CTRLandScape::new`] above, itself a whole-fn `todo!()` (see that
+// method's own doc for the five verified blockers: the `CM_RegisterTerrain`
+// shape/threading mismatch, the missing `GetSize` accessor, the dropped
+// `CM_TerrainPatchIterate`, `CalculateShaders`'s existing block, and the
+// unsettled `CTRLandScape` heap-ownership strategy). `R_TerrainShutdown`
+// below is blocked on that same allocation strategy.
 // Source: `oracle/codemp/renderer/tr_terrain.cpp:1010-1024`
 pub fn RE_InitRendererTerrain(common: &mut Common, info: &str) {
     if info.is_empty() {
@@ -759,7 +1024,7 @@ pub fn RE_InitRendererTerrain(common: &mut Common, info: &str) {
     com_printf(common, "R_Terrain: Creating RENDERER data.....\n");
 
     // Create and register a new landscape structure
-    todo!("Port CTRLandScape::CTRLandScape — oracle/codemp/renderer/tr_terrain.cpp:875-938")
+    let _landscape = CTRLandScape::new(info);
 }
 
 /// Raven `R_TerrainInit`.

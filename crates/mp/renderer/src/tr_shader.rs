@@ -16,9 +16,10 @@ use mp_engine_qcommon::cmd_common::Cmd_Argc;
 use mp_engine_qcommon::common::common::{com_printf, Common};
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::error::com_error;
+use mp_engine_qcommon::common_fns::Com_DPrintf;
 use mp_engine_qcommon::files_common::{FS_ListFiles, FS_ReadFileVec};
 use mp_engine_qcommon::qfiles::draw_vert_t::MAXLIGHTMAPS;
-use mp_engine_qcommon::qfiles::light_style_limits::LS_UNUSED;
+use mp_engine_qcommon::qfiles::light_style_limits::{LS_LSNONE, LS_NORMAL, LS_UNUSED};
 use mp_qshared::shared::com_parse::{
     COM_ParseExt, QSharedScratch, SkipBracedSection, SkipRestOfLine,
 };
@@ -33,6 +34,7 @@ use mp_qshared::shared::surface_flags::{
     SURF_FORCEFIELD, SURF_METALSTEPS, SURF_NODAMAGE, SURF_NODLIGHT, SURF_NODRAW, SURF_NOIMPACT,
     SURF_NOMARKS, SURF_NOMISCENTS, SURF_NOSTEPS, SURF_SKY, SURF_SLICK,
 };
+use mp_qshared::shared::MAX_QPATH;
 use native_string::atof::atof;
 use native_string::Q_stricmpn;
 
@@ -153,6 +155,45 @@ pub const LIGHTMAP_2D: i32 = -4;
 pub const LIGHTMAP_BY_VERTEX: i32 = -3;
 pub const LIGHTMAP_WHITEIMAGE: i32 = -2;
 pub const LIGHTMAP_NONE: i32 = -1;
+
+// Raven's four file-scope lightmap-index tables and the default style table.
+// They are compared by *address* in `R_CreateExtendedName` (`:187-202`) and
+// passed by pointer everywhere else; the address-identity role is carried by
+// `LightmapNameMode` instead (see that enum), so these keep only their value
+// role. Raven's lowerCamelCase names are preserved, hence the per-item
+// `non_upper_case_globals` allow — the same casing-fidelity choice the
+// file-level `non_snake_case` allow makes for functions.
+// Source: `oracle/codemp/renderer/tr_shader.cpp:125-163`
+
+/// Raven `const int lightmapsNone[MAXLIGHTMAPS]`.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:125-131`
+#[allow(non_upper_case_globals)]
+pub const lightmapsNone: [i32; MAXLIGHTMAPS] = [LIGHTMAP_NONE; MAXLIGHTMAPS];
+
+/// Raven `const int lightmaps2d[MAXLIGHTMAPS]`.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:133-139`
+#[allow(non_upper_case_globals)]
+pub const lightmaps2d: [i32; MAXLIGHTMAPS] = [LIGHTMAP_2D; MAXLIGHTMAPS];
+
+/// Raven `const int lightmapsVertex[MAXLIGHTMAPS]`.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:141-147`
+#[allow(non_upper_case_globals)]
+pub const lightmapsVertex: [i32; MAXLIGHTMAPS] = [LIGHTMAP_BY_VERTEX; MAXLIGHTMAPS];
+
+/// Raven `const int lightmapsFullBright[MAXLIGHTMAPS]`.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:149-155`
+#[allow(non_upper_case_globals)]
+pub const lightmapsFullBright: [i32; MAXLIGHTMAPS] = [LIGHTMAP_WHITEIMAGE; MAXLIGHTMAPS];
+
+/// Raven `const byte stylesDefault[MAXLIGHTMAPS]`.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:157-163`
+#[allow(non_upper_case_globals)]
+pub const stylesDefault: [u8; MAXLIGHTMAPS] = [LS_NORMAL, LS_LSNONE, LS_LSNONE, LS_LSNONE];
 
 // Raven's surface-sprite type/facing tags.
 // Source: `oracle/codemp/renderer/tr_local.h:351-360`
@@ -2729,6 +2770,7 @@ pub fn GeneratePermanentShader(
         explicitly_defined: state.explicitly_defined,
         num_unfogged_passes: state.num_unfogged_passes,
         sky: state.sky.clone(),
+        fog_parms: state.fog_parms,
         // `stages[i] = ...` per-stage copy loop below is still DEFERRED
         // (needs the `ShaderStageParse` -> `ShaderStage` per-field copy, not
         // this wave's scope) — an empty `Vec` is the faithful stand-in for
@@ -3042,13 +3084,6 @@ pub fn ParseDeform(
 
 /// Raven `FinishShader`.
 ///
-/// DEFERRED (never-guess rule, porting-rules §A2 / packet marker law): a
-/// handful of oracle globals/macros this fn reads have no value anywhere in
-/// this packet — each site below carries its own cited `// DEFERRED:` marker
-/// rather than one blanket note:
-/// - `lightmapsNone`/`stylesDefault` (`:3244-3245`) — file-scope default
-///   tables; their contents aren't given anywhere in this packet.
-///
 /// Source: `oracle/codemp/renderer/tr_shader.cpp:2941-3275`
 pub fn FinishShader(
     assets: &mut RenderAssets,
@@ -3359,8 +3394,9 @@ pub fn FinishShader(
                     state.name
                 ),
             );
-            // DEFERRED: `lightmapsNone`/`stylesDefault` — see fn doc above.
             // Source: oracle/codemp/renderer/tr_shader.cpp:3244-3245
+            state.lightmap_index = lightmapsNone;
+            state.styles = stylesDefault;
         }
     }
 
@@ -3603,14 +3639,9 @@ pub fn CreateInternalShaders(
     let mut state = reset_global_shader_bare();
     state.name = "<default>".to_string();
 
-    // memcpy(shader.lightmapIndex, lightmapsNone, sizeof(shader.lightmapIndex));
-    // memcpy(shader.styles, stylesDefault, sizeof(shader.styles));
-    // DEFERRED: `lightmapsNone`/`stylesDefault` — these file-scope static
-    // const tables are neither in this packet's FILE-SCOPE CONSTANTS section
-    // nor visible in this fn's own oracle slice; never-guess rule
-    // (porting-rules §A2, packet preamble rule 12). `state.lightmap_index`/
-    // `state.styles` stay at `ClearGlobalShader`'s zero-initialized default.
     // Source: oracle/codemp/renderer/tr_shader.cpp:4146-4147
+    state.lightmap_index = lightmapsNone;
+    state.styles = stylesDefault;
 
     // PORT-NOTE: the texMods-copy loop dissolves — see
     // `RE_RegisterShaderFromImage`'s identical note above.
@@ -4454,10 +4485,15 @@ pub fn ParseSkyParms<'a>(
 /// parser cursor stays correct; the parsed values themselves go nowhere
 /// (`sun`/`q3map_sun` and `surfacelight`/`q3map_surfacelight` arms below).
 /// `a`/`b` (the two angle tokens `sunDirection` is actually built from) are
-/// real locals: ruling 12 — `a = a/180*M_PI` and `b = b/180*M_PI` promote to
-/// `f64` for the divide/multiply (an unsuffixed `M_PI` double operand),
-/// truncating back to `f32` at the assignment (`a`/`b` are C `float`s); the
-/// `cos`/`sin` calls likewise promote their `float` argument to `double`.
+/// real locals: ruling 12 — `a = a/180*M_PI` and `b = b/180*M_PI` are
+/// evaluated in `f64` and truncated back to `f32` at the assignment (`a`/`b`
+/// are C `float`s); the `cos`/`sin` calls likewise promote their `float`
+/// argument to `double`. (Note on the operand's own width: Raven's fallback
+/// `#define M_PI 3.14159265358979323846f` is `float`-suffixed
+/// (`oracle/codemp/game/q_shared.h:547-549`) and only takes effect when
+/// `math.h` did not already define `M_PI`; which of the two definitions is in
+/// scope here — and therefore the promotion's exact width — is a deferred
+/// user ruling, so the computation below is left as landed.)
 ///
 /// `SkipRestOfLine` here resolves to the byte-cursor overload
 /// (`mp_qshared::shared::com_parse::SkipRestOfLine(qs, Option<&[u8]>) ->
@@ -4776,4 +4812,677 @@ pub fn ParseShader<'a>(
     state.explicitly_defined = true;
 
     true
+}
+
+/// Raven `R_FindShader` — wave 7 (topological leaf: every in-module callee
+/// below landed in a lower wave).
+///
+/// `#ifdef DEDICATED`/`#else` split (`:3491-3501`): takes the `#else`
+/// (real-load) leg unconditionally, same precedent as `ParseStage`/
+/// `R_Splash` in this file — `R_FindImageFile` is already a full,
+/// already-ported implementation that itself short-circuits at runtime on
+/// the `com_dedicated` cvar, not a compile-time stub, so calling it
+/// uniformly reproduces both builds' observable behavior (dedicated: `image`
+/// comes back `None`, falls into the "couldn't find image" branch below,
+/// same net `default_shader = true` result as the oracle's compiled-out
+/// `#ifdef DEDICATED` early return — the one difference is this leg also
+/// emits the `Com_DPrintf` the `DEDICATED` build never compiles, a
+/// diagnostic-only divergence).
+///
+/// `COM_StripExtension(name, fileName)` (`:3490`) is not re-run as a second
+/// call: it is the same pure function applied to the same `name` already
+/// captured in `stripped_name` above (porting-rules §C10, preserve behavior
+/// not shape).
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:3428-3557`
+#[allow(clippy::too_many_arguments)]
+pub fn R_FindShader(
+    name: &str,
+    lightmap_index: &[i32],
+    styles: &[u8],
+    mip_raw_image: bool,
+    qs: &mut QSharedScratch,
+    frame: &mut FrameState,
+    assets: &mut RenderAssets,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
+) -> ShaderHandle {
+    if name.is_empty() {
+        return ShaderHandle::slot_zero(); // tr.defaultShader
+    }
+
+    // use (fullbright) vertex lighting if the bsp file doesn't have
+    // lightmaps
+    //
+    // `tr.numLightmaps` is `RenderAssets::lightmaps.len()` (that Vec is the
+    // owned form of `tr.lightmaps[MAX_LIGHTMAPS]` + its count).
+    // Source: oracle/codemp/renderer/tr_shader.cpp:3441-3446
+    let lightmap_index: &[i32] =
+        if lightmap_index[0] >= 0 && lightmap_index[0] >= assets.lightmaps.len() as i32 {
+            &lightmapsVertex
+        } else {
+            lightmap_index
+        };
+
+    let stripped_name = COM_StripExtension(name);
+
+    // see if the shader is already loaded
+    //
+    // NOTE: if there was no shader or image available with the name strippedName
+    // then a default shader is created with lightmapIndex == LIGHTMAP_NONE, so we
+    // have to check all default shaders otherwise for every call to R_FindShader
+    // with that same strippedName a new default shader is created.
+    if let Some(candidates) = assets.shader_lookup.get(&stripped_name) {
+        for &candidate in candidates {
+            if let Some(sh) = assets.shaders.get(candidate) {
+                if IsShader(sh, &stripped_name, lightmap_index, styles) {
+                    return candidate;
+                }
+            }
+        }
+    }
+
+    // clear the global shader
+    let mut state = ClearGlobalShader();
+    state.name = stripped_name.clone();
+    state
+        .lightmap_index
+        .copy_from_slice(&lightmap_index[..MAXLIGHTMAPS]);
+    state.styles.copy_from_slice(&styles[..MAXLIGHTMAPS]);
+
+    //
+    // attempt to define shader from an explicit parameter file
+    //
+    if let Some(shader_text) = FindShaderInShaderText(assets, qs, &stripped_name) {
+        let text_bytes = latin1_encode(&shader_text);
+        let mut cursor: Option<&[u8]> = Some(text_bytes.as_slice());
+        if !ParseShader(
+            &mut cursor,
+            qs,
+            &mut state,
+            frame,
+            &*assets,
+            view,
+            cvars,
+            sim,
+            models,
+            img_state,
+            gpu,
+            sky_view,
+            sky,
+        ) {
+            // had errors, so use default shader
+            state.default_shader = true;
+        }
+        let sh = FinishShader(assets, view.common, cvars, &mut state);
+        return sh;
+    }
+
+    //
+    // if not defined in the in-memory shader descriptions,
+    // look for a single TGA, BMP, or PCX
+    //
+    // (`fileName` collapses to `stripped_name` — see fn doc above)
+    let gl_wrap_clamp_mode = if mip_raw_image { GL_REPEAT } else { GL_CLAMP };
+    let image = R_FindImageFile(
+        view,
+        cvars,
+        sim,
+        models,
+        img_state,
+        gpu,
+        Some(stripped_name.as_str()),
+        mip_raw_image,
+        mip_raw_image,
+        true,
+        gl_wrap_clamp_mode,
+    );
+    let image = match image {
+        Some(image) => image,
+        None => {
+            Com_DPrintf(
+                view.common,
+                &format!(
+                    "{}Couldn't find image for shader {}\n",
+                    S_COLOR_RED.to_str().expect("S_COLOR_RED is ASCII"),
+                    name
+                ),
+            );
+            state.default_shader = true;
+            return FinishShader(assets, view.common, cvars, &mut state);
+        }
+    };
+
+    //
+    // create the default shading commands
+    //
+    if state.lightmap_index[0] == LIGHTMAP_NONE {
+        // dynamic colors at vertexes
+        state.stages[0].bundle[0].image = Some(image);
+        state.stages[0].active = true;
+        state.stages[0].rgb_gen = ColorGen::LightingDiffuse;
+        state.stages[0].state_bits = GLS_DEFAULT as u32;
+        // `#ifdef _XBOX shader.needsNormal = true;` (`:3511-3513`) — Xbox-only
+        // dead surface on the PC build this port targets (porting-rules §20).
+    } else if state.lightmap_index[0] == LIGHTMAP_BY_VERTEX {
+        // explicit colors at vertexes
+        state.stages[0].bundle[0].image = Some(image);
+        state.stages[0].active = true;
+        state.stages[0].rgb_gen = ColorGen::ExactVertex;
+        state.stages[0].alpha_gen = AlphaGen::Skip;
+        state.stages[0].state_bits = GLS_DEFAULT as u32;
+    } else if state.lightmap_index[0] == LIGHTMAP_2D {
+        // GUI elements
+        state.stages[0].bundle[0].image = Some(image);
+        state.stages[0].active = true;
+        state.stages[0].rgb_gen = ColorGen::Vertex;
+        state.stages[0].alpha_gen = AlphaGen::Vertex;
+        state.stages[0].state_bits = (GLS_DEPTHTEST_DISABLE
+            | GLS_SRCBLEND_SRC_ALPHA
+            | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA) as u32;
+    } else if state.lightmap_index[0] == LIGHTMAP_WHITEIMAGE {
+        // fullbright level
+        state.stages[0].bundle[0].image = assets.white_image;
+        state.stages[0].active = true;
+        state.stages[0].rgb_gen = ColorGen::IdentityLighting;
+        state.stages[0].state_bits = GLS_DEFAULT as u32;
+
+        state.stages[1].bundle[0].image = Some(image);
+        state.stages[1].active = true;
+        state.stages[1].rgb_gen = ColorGen::Identity;
+        state.stages[1].state_bits |= (GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO) as u32;
+    } else {
+        // two pass lightmap
+        let lm_idx = state.lightmap_index[0] as usize;
+        state.stages[0].bundle[0].image = Some(assets.lightmaps[lm_idx]);
+        state.stages[0].bundle[0].is_lightmap = true;
+        state.stages[0].active = true;
+        // lightmaps are scaled on creation for identitylight
+        state.stages[0].rgb_gen = ColorGen::Identity;
+        state.stages[0].state_bits = GLS_DEFAULT as u32;
+
+        state.stages[1].bundle[0].image = Some(image);
+        state.stages[1].active = true;
+        state.stages[1].rgb_gen = ColorGen::Identity;
+        state.stages[1].state_bits |= (GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO) as u32;
+    }
+
+    FinishShader(assets, view.common, cvars, &mut state)
+}
+
+/// Raven `RE_RegisterShaderLightMap`.
+///
+/// `lightmapIndex`/`styles` are caller-supplied parameters here, where
+/// `RE_RegisterShader`/`RE_RegisterShaderNoMip` below pass the fixed
+/// file-scope `lightmaps2d`/`stylesDefault` tables; the three bodies are
+/// otherwise identical.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:3696-3717`
+#[allow(clippy::too_many_arguments)]
+pub fn RE_RegisterShaderLightMap(
+    name: &str,
+    lightmap_index: &[i32],
+    styles: &[u8],
+    qs: &mut QSharedScratch,
+    frame: &mut FrameState,
+    assets: &mut RenderAssets,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
+) -> i32 {
+    if name.len() >= MAX_QPATH as usize {
+        com_printf(view.common, "Shader name exceeds MAX_QPATH\n");
+        return 0;
+    }
+
+    let sh = R_FindShader(
+        name,
+        lightmap_index,
+        styles,
+        true,
+        qs,
+        frame,
+        assets,
+        view,
+        cvars,
+        sim,
+        models,
+        img_state,
+        gpu,
+        sky_view,
+        sky,
+    );
+
+    // we want to return 0 if the shader failed to
+    // load for some reason, but R_FindShader should
+    // still keep a name allocated for it, so if
+    // something calls RE_RegisterShader again with
+    // the same name, we don't try looking for it again
+    match assets.shaders.get(sh) {
+        Some(shader) if !shader.default_shader => sh.index() as i32,
+        _ => 0,
+    }
+}
+
+/// Raven `RE_RegisterShader`.
+///
+/// Raven: This is the exported shader entry point for the rest of the system.
+/// It will always return an index that will be valid.
+///
+/// Raven: This should really only be used for explicit shaders, because there
+/// is no way to ask for different implicit lighting modes (vertex, lightmap,
+/// etc).
+///
+/// Structurally identical to `RE_RegisterShaderLightMap` above; the only
+/// differences are the fixed `lightmaps2d`/`stylesDefault` arguments.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:3731-3751`
+#[allow(clippy::too_many_arguments)]
+pub fn RE_RegisterShader(
+    name: &str,
+    qs: &mut QSharedScratch,
+    frame: &mut FrameState,
+    assets: &mut RenderAssets,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
+) -> i32 {
+    if name.len() >= MAX_QPATH as usize {
+        com_printf(view.common, "Shader name exceeds MAX_QPATH\n");
+        return 0;
+    }
+
+    let sh = R_FindShader(
+        name,
+        &lightmaps2d,
+        &stylesDefault,
+        true,
+        qs,
+        frame,
+        assets,
+        view,
+        cvars,
+        sim,
+        models,
+        img_state,
+        gpu,
+        sky_view,
+        sky,
+    );
+
+    // we want to return 0 if the shader failed to
+    // load for some reason, but R_FindShader should
+    // still keep a name allocated for it, so if
+    // something calls RE_RegisterShader again with
+    // the same name, we don't try looking for it again
+    match assets.shaders.get(sh) {
+        Some(shader) if !shader.default_shader => sh.index() as i32,
+        _ => 0,
+    }
+}
+
+/// Raven `RE_RegisterShaderNoMip`.
+///
+/// Raven: For menu graphics that should never be picmiped.
+///
+/// Identical to `RE_RegisterShader` above except for the `mipRawImage`
+/// argument to `R_FindShader` (`qfalse` here vs `qtrue` there).
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:3761-3781`
+#[allow(clippy::too_many_arguments)]
+pub fn RE_RegisterShaderNoMip(
+    name: &str,
+    qs: &mut QSharedScratch,
+    frame: &mut FrameState,
+    assets: &mut RenderAssets,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
+) -> i32 {
+    if name.len() >= MAX_QPATH as usize {
+        com_printf(view.common, "Shader name exceeds MAX_QPATH\n");
+        return 0;
+    }
+
+    let sh = R_FindShader(
+        name,
+        &lightmaps2d,
+        &stylesDefault,
+        false,
+        qs,
+        frame,
+        assets,
+        view,
+        cvars,
+        sim,
+        models,
+        img_state,
+        gpu,
+        sky_view,
+        sky,
+    );
+
+    // we want to return 0 if the shader failed to
+    // load for some reason, but R_FindShader should
+    // still keep a name allocated for it, so if
+    // something calls RE_RegisterShader again with
+    // the same name, we don't try looking for it again
+    match assets.shaders.get(sh) {
+        Some(shader) if !shader.default_shader => sh.index() as i32,
+        _ => 0,
+    }
+}
+
+/// Raven `CreateExternalShaders` — wave 8.
+///
+/// DEFERRED, whole-fn loud stub. The `lightmapsNone`/`stylesDefault`
+/// arguments are now real (landed as file-scope consts above); what stands is
+/// that both handles this fn computes are unhomed:
+/// `tr.projectionShadowShader`/`tr.sunShader` have no `RenderAssets`/
+/// `FrameState` carrier — `## State ownership` names none for either, and
+/// `RB_DrawSun`'s doc comment (`tr_sky.rs`) already escalates the identical
+/// `tr.sunShader` gap. `tr.projectionShadowShader->sort = SS_STENCIL_SHADOW`
+/// (`:4255`) has nothing to write through either, so the whole 3-line body
+/// stays a loud stub.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:4253-4257`
+#[allow(clippy::too_many_arguments)]
+pub fn CreateExternalShaders(
+    qs: &mut QSharedScratch,
+    frame: &mut FrameState,
+    assets: &mut RenderAssets,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
+) {
+    let _ = (
+        qs, frame, assets, view, cvars, sim, models, img_state, gpu, sky_view, sky,
+    );
+    todo!(
+        "Port CreateExternalShaders — oracle/codemp/renderer/tr_shader.cpp:4253-4257 (tr.projectionShadowShader/sunShader unhomed)"
+    );
+}
+
+/// Raven `R_RemapShader` — wave 9.
+///
+/// DEFERRED, whole-fn loud stub. The `lightmapsNone`/`stylesDefault`
+/// arguments to `RE_RegisterShaderLightMap` (`:281`, `:291`) are now real
+/// (landed as file-scope consts above), but the writes this fn exists to
+/// perform still have nowhere to go: `ShaderAsset`
+/// (`render_state/shader_asset.rs`) carries neither
+/// - `remapped_shader` — `sh->remappedShader = sh2;`/`= NULL;` (`:307,309`),
+///   Raven `struct shader_s *remappedShader`
+///   (`oracle/codemp/renderer/tr_local.h:528`); nor
+/// - `time_offset` — `sh2->timeOffset = atof(timeOffset);` (`:314`), Raven
+///   `float timeOffset` (`oracle/codemp/renderer/tr_local.h:511`).
+///
+/// The tier-2 transition audit's Group 2 row licenses `remappedShader` ->
+/// `Handle<ShaderAsset>` eventually, but neither field has landed on the real
+/// type. The `hashTable[hash]` chain walk (`:304-312`) is representable via
+/// `RenderAssets::shader_lookup`'s stripped-name bucket per this packet's
+/// STATE HOMES row, but that walk exists only to reach these unhomed writes,
+/// so nothing observable survives without them.
+///
+/// `sh == NULL || sh == tr.defaultShader` collapses to
+/// `sh == ShaderHandle::slot_zero()` once implemented (`R_FindShaderByName`'s
+/// existing doc comment: slot zero already IS the live default shader by
+/// construction, A12) — noted here for whichever wave finishes this stub.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:273-316`
+#[allow(clippy::too_many_arguments)]
+pub fn R_RemapShader(
+    shader_name: &str,
+    new_shader_name: &str,
+    time_offset: Option<&str>,
+    qs: &mut QSharedScratch,
+    frame: &mut FrameState,
+    assets: &mut RenderAssets,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
+) {
+    let _ = (
+        shader_name,
+        new_shader_name,
+        time_offset,
+        qs,
+        frame,
+        assets,
+        view,
+        cvars,
+        sim,
+        models,
+        img_state,
+        gpu,
+        sky_view,
+        sky,
+    );
+    // DEFERRED: `ShaderAsset::remapped_shader`/`time_offset` unhomed — see
+    // doc comment above.
+    todo!(
+        "Port R_RemapShader — oracle/codemp/renderer/tr_shader.cpp:273-316 (ShaderAsset::remapped_shader/time_offset unhomed)"
+    );
+}
+
+/// Raven `R_MergeShaders` — wave 9.
+///
+/// DEFERRED, whole-fn loud stub. The `lightmapsVertex`/`stylesDefault`
+/// `memcpy` sources (`:4039-4040`) are now real (landed as file-scope consts
+/// above); the blocker that stands is the stage shape:
+/// - `R_CopyStage(work->stages, stages)` (`:4046`) — `work` is the
+///   *registered* shader `R_GetShaderByHandle(c)` returns, whose
+///   `ShaderAsset::stages: Vec<ShaderStage>` (`render_state/shader_stage.rs`)
+///   carries only `image`/`state_bits`/`active`; the already-ported
+///   `R_CopyStage(orig: &ShaderStageParse, stage: &mut ShaderStageParse)`
+///   (this file) needs the parse-scratch `ShaderStageParse` shape on both
+///   sides. This is the exact type gap `R_CreateBlendedStage`'s own
+///   already-landed loud stub names (`GeneratePermanentShader`'s per-stage
+///   copy loop, the thing that would populate a registered shader's
+///   `stages` with `rgbGen`/`alphaGen`/`ss`, is itself unported) — this fn
+///   calls that same blocked `R_CreateBlendedStage` twice more (`:4053-4054`)
+///   and, when `surfaceSprites` is set, reads `work->stages[i].ss`
+///   (`:4062,4074,4086`) directly, a field `ShaderStage` does not carry at
+///   all.
+///
+/// Two further calls in this body are omitted rather than gap-blocked, and
+/// are recorded here so the finishing wave restores them:
+/// - `R_SyncRenderThread();` (`:4034`) — no renderer-thread sync exists in
+///   this single-threaded port (threading is out of scope for this repo).
+/// - `shader.multitextureEnv = work->multitextureEnv;` (`:4050`, Raven's
+///   "jic") — a plain `ShaderParseState`/`ShaderAsset` field copy, but it
+///   sits inside the `R_CopyStage` block above and cannot be landed on its
+///   own without the surrounding pass-0 setup.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:4028-4098`
+#[allow(clippy::too_many_arguments)]
+pub fn R_MergeShaders(
+    blended_name: &str,
+    a: i32,
+    b: i32,
+    c: i32,
+    surface_sprites: bool,
+    assets: &mut RenderAssets,
+    common: &mut Common,
+    cvars: &RendererCvars,
+) -> ShaderHandle {
+    let _ = (
+        blended_name,
+        a,
+        b,
+        c,
+        surface_sprites,
+        assets,
+        common,
+        cvars,
+    );
+    // DEFERRED: `ShaderAsset::stages`'s registered `ShaderStage` shape (no
+    // `rgbGen`/`alphaGen`/`ss`) can't feed the already-ported `R_CopyStage`
+    // or the `work->stages[i].ss` reads; `R_SyncRenderThread()` (`:4034`) and
+    // the `shader.multitextureEnv` copy (`:4050`) are likewise unlanded — see
+    // doc comment above.
+    todo!(
+        "Port R_MergeShaders — oracle/codemp/renderer/tr_shader.cpp:4028-4098 (ShaderAsset::stages registered shape lacks rgbGen/alphaGen/ss for R_CopyStage/surfaceSprites; R_SyncRenderThread + multitextureEnv copy omitted)"
+    );
+}
+
+/// Raven `R_InitShaders` — wave 9.
+///
+/// `#ifndef DEDICATED` wraps the `if (!server)` block, but this packet's own
+/// wave-partition call graph places `CreateInternalShaders`/
+/// `ScanAndLoadShaderFiles`/`CreateExternalShaders` as real dependency edges
+/// of this fn (THREADING DIGEST "in-module callees (wave < 9)") — the three
+/// have no other caller anywhere in this crate. Taken as settled: unlike the
+/// `Hunk_Clear`/`R_Register` precedent (`crates/mp/engine/qcommon/src/
+/// z_memman_pc.rs:808-811`, `tr_init.rs:551-556`, files genuinely shared
+/// between the dedicated and client builds), `tr_shader.cpp` is client-only
+/// source the dedicated server never compiles in the first place, so the
+/// guard is vestigial here; `server` (Raven `qboolean server`) is
+/// transcribed as a real runtime `bool` gate, matching the oracle's own
+/// `if (!server)` check.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:4265-4283`
+#[allow(clippy::too_many_arguments)]
+pub fn R_InitShaders(
+    server: bool,
+    qs: &mut QSharedScratch,
+    frame: &mut FrameState,
+    assets: &mut RenderAssets,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
+    models: &RenderModels,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
+) {
+    //Com_Printf ("Initializing Shaders\n" );
+
+    // Com_Memset(hashTable, 0, sizeof(hashTable));
+    //
+    // PORT-NOTE: the threading digest classifies `hashTable` as
+    // read-only for this fn (a tooling artifact of the `Com_Memset(hashTable,
+    // …)` address-of-array pattern) but the oracle body clearly zeroes it;
+    // transcribed as the write it observably is (porting-rules §A1
+    // behavioral parity) — `shader_lookup` is the STATE HOMES-assigned
+    // carrier for `hashTable` (this packet, `R_RemapShader`/`R_InitShaders`
+    // rows).
+    assets.shader_lookup.clear();
+
+    // deferLoad = qfalse;
+    assets.defer_load = false;
+
+    // #ifndef DEDICATED
+    if !server {
+        CreateInternalShaders(assets, view.common, cvars);
+
+        ScanAndLoadShaderFiles(assets, qs, view, "shaders");
+
+        CreateExternalShaders(
+            qs, frame, assets, view, cvars, sim, models, img_state, gpu, sky_view, sky,
+        );
+    }
+    // #endif
+}
+
+/// Raven `R_CreateBlendedShader` — wave 10.
+///
+/// `Com_sprintf(blendedName, MAX_QPATH, "blend(%d,%d,%d)", a, b, c)` collapses
+/// to `format!` (established `char[N]` -> `String` translation, no truncation
+/// modeled — same precedent as `ParseSkyParms`/`R_CreateExtendedName` above:
+/// the LAW raw-pointer `Com_sprintf(dest: *mut c_char, ...)` signature would
+/// require `unsafe`, banned by the interior-safety law); `strcat` ->
+/// `String::push_str`.
+///
+/// The `hashTable[generateHashValue(extendedName, FILE_HASH_SIZE)]` bucket
+/// walk + `Q_stricmp(work->name, extendedName) == 0` compare is the same
+/// `RenderAssets::shader_lookup` name-keyed lookup `R_FindShader`/
+/// `RE_RegisterShaderFromImage` above use (`generateHashValue` deliberately
+/// not reproduced, same precedent as `GeneratePermanentShader`); the lookup
+/// key is `COM_StripExtension`'d (`GeneratePermanentShader`'s own insertion
+/// key, `:2774`), candidates compared against the full, unstripped
+/// `extendedName` via `eq_ignore_ascii_case` — identical asymmetry to
+/// `RE_RegisterShaderFromImage`'s doc comment above (the stripped-key bucket
+/// is a superset of the exact-key bucket; the full-name compare rejects the
+/// extras).
+///
+/// `R_CreateExtendedName(extendedName, blendedName, lightmapsVertex,
+/// stylesDefault)` (`:4117`) hits the `lightmapIndex == lightmapsVertex`
+/// address-identity arm (`:195-198`), which appends `"_vertex"` — so the
+/// mode passed here is `LightmapNameMode::Vertex` and the extended name is
+/// `blend(a,b,c)[noSS]_vertex`.
+///
+/// Panics via `R_MergeShaders`'s loud stub until its owning wave lands (see
+/// that fn's doc comment) whenever no existing blended shader is found.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:4103-4130`
+pub fn R_CreateBlendedShader(
+    a: i32,
+    b: i32,
+    c: i32,
+    surface_sprites: bool,
+    assets: &mut RenderAssets,
+    common: &mut Common,
+    cvars: &RendererCvars,
+) -> ShaderHandle {
+    let mut blended_name = format!("blend({},{},{})", a, b, c);
+    if !surface_sprites {
+        blended_name.push_str("noSS");
+    }
+
+    // Find if this shader has already been created
+    let extended_name = R_CreateExtendedName(&blended_name, Some(LightmapNameMode::Vertex));
+    let lookup_key = COM_StripExtension(&extended_name);
+    if let Some(candidates) = assets.shader_lookup.get(&lookup_key) {
+        for &candidate in candidates {
+            if let Some(work) = assets.shaders.get(candidate) {
+                if work.name.eq_ignore_ascii_case(&extended_name) {
+                    return candidate;
+                }
+            }
+        }
+    }
+
+    // Create new shader if it doesn't already exist
+    R_MergeShaders(
+        &extended_name,
+        a,
+        b,
+        c,
+        surface_sprites,
+        assets,
+        common,
+        cvars,
+    )
 }

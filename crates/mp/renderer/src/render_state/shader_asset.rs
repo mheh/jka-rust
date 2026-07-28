@@ -5,14 +5,16 @@ use mp_engine_qcommon::qfiles::draw_vert_t::MAXLIGHTMAPS;
 use crate::render_state::handle::Handle;
 use crate::render_state::placeholders::SkyParms;
 use crate::render_state::shader_stage::ShaderStage;
+use crate::tr_shader::FogParms;
 
 /// The owned form of Raven `shader_t` — `RenderAssets::shaders`' element
 /// (`R2-D3`), in the shape the tier-2 transition audit assigns (`name` →
 /// `String`, `stages`/`deforms` → owned `Vec`s, `remappedShader` →
 /// `Handle<ShaderAsset>`, the intrusive `next` chain dissolved). The fields
 /// below are real (landed with the `tr_shader` R3 wave-0, `stages` added by
-/// the `RB_RotatePic`/`RB_RotatePic2` wave); `deforms`, `fogParms` and the
-/// remaining scalars land with the later `tr_shader` waves that read them.
+/// the `RB_RotatePic`/`RB_RotatePic2` wave, `fog_parms` by the waves-7-13 fix
+/// round); `deforms` and the remaining scalars land with the later
+/// `tr_shader` waves that read them.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:459-530`
 #[derive(Clone)]
@@ -46,6 +48,12 @@ pub struct ShaderAsset {
     /// `sky` (`skyParms_t *`) — owned inline, `None` when the shader has no
     /// sky parms.
     pub sky: Option<SkyParms>,
+    /// `fogParms` (`fogParms_t *`, `Hunk_Alloc`'d in the oracle) — owned
+    /// inline, `None` when the shader declared no `fogParms` keyword. Read by
+    /// `tr_bsp`'s `R_LoadFogs`.
+    ///
+    /// Type definition source: `oracle/codemp/renderer/tr_local.h:488`
+    pub fog_parms: Option<FogParms>,
     /// `stages[MAX_SHADER_STAGES]` (`shaderStage_t *`, `Hunk_Alloc`ed to
     /// `numUnfoggedPasses` entries) — owned inline as `Vec<ShaderStage>`.
     pub stages: Vec<ShaderStage>,

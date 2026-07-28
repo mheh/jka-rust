@@ -750,14 +750,23 @@ pub fn Lanczos3(t: f32) -> f32 {
     0.0
 }
 
-/// Raven `R_InitFogTable`. Registry-adjacent mutation of
-/// `RenderAssets::function_tables` — goes through `Arc::make_mut` (A9),
-/// matching every other `RenderAssets` write.
+/// Raven `R_InitFogTable`. Writes `RenderAssets::function_tables` on the
+/// frontend `RenderAssets` its sole reader [`R_FogFactor`] takes, not on
+/// `RenderAssetsSim::published` — the oracle has one `tr` holding all six
+/// function tables, written together by `R_Init`
+/// (`oracle/codemp/renderer/tr_init.cpp:1255-1279`), and `R_Init`'s own five
+/// -table loop already writes the frontend instance. Taking `sim` here left
+/// `R_FogFactor` reading an all-zero table
+/// (`tr_shade_calc.rs`'s three `RB_CalcFogTexCoords` call sites).
+///
+/// The one remaining sim-side reader, `R_CreateFogImage` below, still reads
+/// `sim.published` — the pre-existing A9 duality (`R_Init`'s own doc comment:
+/// `assets` and `sim.published` are separate instances), not this fn's to
+/// reconcile.
 ///
 /// Source: oracle/codemp/renderer/tr_image.cpp:2633-2645
-pub fn R_InitFogTable(sim: &mut RenderAssetsSim) {
+pub fn R_InitFogTable(assets: &mut RenderAssets) {
     let exp = 0.5f32;
-    let assets = Arc::make_mut(&mut sim.published);
     for i in 0..FOG_TABLE_SIZE {
         // C `pow` is `double pow(double, double)`; f64 intermediate per wave-0
         // ruling 12.
@@ -2506,3 +2515,137 @@ pub fn R_InitImages(
     // create default texture and white texture
     R_CreateBuiltinImages(view, cvars, sim, models, state, gpu, frame);
 }
+
+// ============================================================================
+// wave 8
+// ============================================================================
+
+//TODO: Port RE_RegisterIndividualSkin client arm
+// Source: oracle/codemp/renderer/tr_image.cpp:3091-3097
+// The `R_FindShader( name, lightmapsNone, stylesDefault, qtrue )` arm — the
+// `else` leg of the `gServerSkinHack` test — is live on the client
+// (R3 client-leg ruling: the R3 renderer track is the CLIENT port; the
+// jampDed disposition below is scoped to the dedicated-server link set).
+// The reconciled body (`RenderModels::register_individual_skin`) only ever
+// takes the `R_FindServerShader` arm, because `server_skins.rs` treats
+// `gServerSkinHack` as const-true. The wave-8 note below records that
+// reconciliation and stays accurate for the server link set.
+//
+// PORT-NOTE (wave 8): `RE_RegisterIndividualSkin`
+// (oracle/codemp/renderer/tr_image.cpp:3030-3111) is already ported —
+// `RenderModels::register_individual_skin`
+// (`crates/mp/renderer/src/tr_model/server_skins.rs:165-241`), under the
+// live `RenderModels.skins: Vec<ServerSkin>` skin registry (user ruling
+// 2026-07-12 "server skins name-pool", amending the FROZEN `tr-model.md` —
+// the same registry the wave-1 PORT-NOTE above already reconciled
+// `RE_SplitSkins`/`CommaParse`/`R_InitSkins`/`R_GetSkinByHandle` against).
+// Reconciled, not re-transcribed here (preamble: "Never re-port an
+// already-ported fn … reconcile, never fork a second port").
+//
+// This packet's STATE HOMES table SPLIT-routes the fn's `tr` read to
+// `RenderAssets::skins: Arena<SkinAsset>` and its RESOLVED CALL SURFACE
+// names `R_FindServerShader`/`R_FindShader` (tr_shader.cpp waves 3/7) as
+// callees — both stale relative to the same 2026-07-12 ruling the file's
+// existing `R_SkinList_f` ESCALATION above already flags for this same skin
+// subsystem: the live implementation resolves shader names through its own
+// flattened `RenderModels::find_server_shader` pool instead (pool entries
+// carry only the shader name, the sole field the dedicated
+// `G2_SetSurfaceOnOffFromSkin` consumer ever reads — that file's own
+// module/fn doc comments). Writing a second `RE_RegisterIndividualSkin`
+// against `RenderAssets::skins`/`R_FindShader` would fork a dead second skin
+// registry contradicting the live one; flagged as the same wave-planning
+// defect (this packet's tables are stale) rather than invented around
+// (preamble: "A state home this packet marks UNMAPPED is an ESCALATION,
+// never an invention").
+// Source: oracle/codemp/renderer/tr_image.cpp:3030-3111
+
+// ============================================================================
+// wave 9
+// ============================================================================
+
+//TODO: Port RE_RegisterSkin client arm
+// Source: oracle/codemp/renderer/tr_image.cpp:3113-3181 (`R_SyncRenderThread`
+// at :3150)
+// Two things the reconciled body (`RenderModels::register_skin`) drops as
+// dedicated-only are live on the client (R3 client-leg ruling: the R3
+// renderer track is the CLIENT port; the jampDed disposition below is scoped
+// to the dedicated-server link set): the `R_SyncRenderThread()` call at
+// :3150 (ported, `tr_cmds.rs`), and the `RenderAssets::skins`/`R_FindShader`
+// -backed registry the wave-9 note below declines to fork a second port
+// against. The note stays accurate for the server link set.
+//
+// PORT-NOTE (wave 9): `RE_RegisterSkin`
+// (oracle/codemp/renderer/tr_image.cpp:3113-3181) is already ported —
+// `RenderModels::register_skin` (private, `crates/mp/renderer/src/tr_model/
+// server_skins.rs:97-152`), under the live `RenderModels.skins:
+// Vec<ServerSkin>` skin registry (user ruling 2026-07-12 "server skins
+// name-pool"), the same registry the wave-1 and wave-8 PORT-NOTEs above
+// already reconciled `RE_SplitSkins`/`CommaParse`/`R_InitSkins`/
+// `R_GetSkinByHandle`/`RE_RegisterIndividualSkin` against. Reconciled, not
+// re-transcribed here (preamble: "Never re-port an already-ported fn …
+// reconcile, never fork a second port").
+//
+// This packet's STATE HOMES table SPLIT-routes the fn's `tr` write to
+// `RenderAssets::skins`/`RenderWorld::frame: FrameState` and its RESOLVED
+// CALL SURFACE names `RE_RegisterIndividualSkin`, `RE_SplitSkins`,
+// `R_SyncRenderThread` (wave 8/0/8) as in-module callees — all three are
+// stale relative to the same 2026-07-12 ruling the file's existing
+// `R_SkinList_f` ESCALATION and wave-8 PORT-NOTE already flag for this same
+// skin subsystem: `register_skin`'s live body calls
+// `RenderModels::register_individual_skin` and the file-private
+// `re_split_skins` instead, and documents `R_SyncRenderThread` as "client
+// render-thread sync, dead on the dedicated slice (§C10)" rather than a
+// callee with nowhere to land. Writing a second `RE_RegisterSkin` against
+// `RenderAssets::skins` would fork a dead second skin registry contradicting
+// the live one; flagged as the same wave-planning defect (this packet's
+// tables are stale) rather than invented around (preamble: "A state home
+// this packet marks UNMAPPED is an ESCALATION, never an invention").
+// Source: oracle/codemp/renderer/tr_image.cpp:3113-3181
+
+// ============================================================================
+// wave 10
+// ============================================================================
+
+//TODO: Port RE_RegisterServerSkin client arm
+// Source: oracle/codemp/renderer/tr_image.cpp:3304-3310
+// On the client `com_cl_running->integer` is 1, so the `com_cl_running &&
+// Com_TheHunkMarkHasBeenMade() && ShaderHashTableExists()` fast path is the
+// live one and this fn is `return RE_RegisterSkin(name)` with
+// `gServerSkinHack` never set (R3 client-leg ruling: the R3 renderer track is
+// the CLIENT port; the jampDed disposition below is scoped to the
+// dedicated-server link set). The reconciled body
+// (`RenderModels::register_server_skin`) takes only the `gServerSkinHack =
+// true` arm; the note below stays accurate for the server link set.
+//
+// PORT-NOTE (wave 10): `RE_RegisterServerSkin`
+// (oracle/codemp/renderer/tr_image.cpp:3301-3317) is already ported —
+// `RenderModels::register_server_skin` (`crates/mp/renderer/src/tr_model/
+// server_skins.rs:83-87`), under the live `RenderModels.skins:
+// Vec<ServerSkin>` skin registry (user ruling 2026-07-12 "server skins
+// name-pool"), the same registry the wave-1/wave-8/wave-9 PORT-NOTEs above
+// already reconciled `RE_SplitSkins`/`CommaParse`/`R_InitSkins`/
+// `R_GetSkinByHandle`/`RE_RegisterIndividualSkin`/`RE_RegisterSkin` against.
+// Reconciled, not re-transcribed here (preamble: "Never re-port an
+// already-ported fn … reconcile, never fork a second port").
+//
+// This packet's STATE HOMES table routes the fn's `com_cl_running` read to
+// the engine-owned `Common` (outside R2's scope) and its `gServerSkinHack`
+// write to a per-subsystem state struct this wave would name (A13.3) — both
+// stale relative to the same 2026-07-12 ruling the file's existing
+// `R_SkinList_f`/wave-8/wave-9 notes already flag for this same skin
+// subsystem. The live `register_server_skin` treats `gServerSkinHack` as
+// **const-true** rather than a mutable flag (`server_skins.rs`'s module doc
+// comment, `:11-17`): the oracle's `com_cl_running && ... &&
+// ShaderHashTableExists()` fast-path re-enters `RE_RegisterSkin` against the
+// §20-dropped client shader table, so on this dedicated-server slice that
+// fast-path is dead code and only the `gServerSkinHack = true` arm — which
+// resolves shaders through the same `find_server_shader` name pool the
+// always-taken arm resolves through — is live. `com_cl_running`,
+// `Com_TheHunkMarkHasBeenMade`, and `ShaderHashTableExists` are therefore
+// never read by the live body: writing a second `RE_RegisterServerSkin`
+// against them (and a new `gServerSkinHack` field) would fork a dead second
+// skin-registration path contradicting the live one; flagged as the same
+// wave-planning defect (this packet's tables are stale) rather than invented
+// around (preamble: "A state home this packet marks UNMAPPED is an
+// ESCALATION, never an invention").
+// Source: oracle/codemp/renderer/tr_image.cpp:3301-3317

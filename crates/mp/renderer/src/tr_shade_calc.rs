@@ -15,8 +15,8 @@ use mp_engine_qcommon::common::{com_error, com_printf, Common};
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::q_color::S_COLOR_YELLOW;
 use mp_qshared::shared::q_math::{
-    _DotProduct, _VectorAdd, _VectorMA, _VectorScale, _VectorSubtract, CrossProduct, VectorClear,
-    VectorLengthSquared, VectorNormalize,
+    _DotProduct, _VectorAdd, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin, CrossProduct,
+    VectorClear, VectorLength, VectorLengthSquared, VectorNormalize,
 };
 use mp_qshared::shared::vec3_t;
 use native_math::qmath::Q_rsqrt;
@@ -26,6 +26,7 @@ use crate::render_state::placeholders::RefEntity;
 use crate::render_state::render_assets::RenderAssets;
 use crate::tr_image::R_FogFactor;
 use crate::tr_local::deform_stage_t::deformStage_t;
+use crate::tr_local::deform_t::deform_t;
 use crate::tr_local::fog_t::fog_t;
 use crate::tr_local::gen_func_t::genFunc_t;
 use crate::tr_local::orientationr_t::orientationr_t;
@@ -33,7 +34,8 @@ use crate::tr_local::tex_mod_info_t::texModInfo_t;
 use crate::tr_local::tex_mod_t::texMod_t;
 use crate::tr_local::wave_form_t::waveForm_t;
 use crate::tr_noise::{get_noise_time, NoiseState, R_NoiseGet4f};
-use crate::tr_surface::RB_AddQuadStampExt;
+use crate::tr_shadows::RB_ProjectionShadowDeform;
+use crate::tr_surface::{RB_AddQuadStamp, RB_AddQuadStampExt};
 
 // This wave threads `RenderAssets` (`## State ownership` row `tr` registries
 // SPLIT) and `RefEntity` (`crate::render_state::placeholders`, owned by the
@@ -1594,5 +1596,327 @@ pub fn DeformText(text: &str, normal0: vec3_t, xyz: [[f32; 4]; 4], frame: &mut F
         let mut next_origin: vec3_t = [0.0; 3];
         _VectorMA(origin, -2.0, width, &mut next_origin);
         origin = next_origin;
+    }
+}
+
+/// Raven `static void AutospriteDeform( void )`.
+///
+/// `tess.numVertexes`/`tess.numIndexes`/`tess.xyz`/`tess.vertexColors` are
+/// `tess`-dissolved (R2 `## State ownership` row `tess`) — `xyz`/
+/// `vertex_colors` thread as slices sized to the oracle's `oldVerts` snapshot
+/// (the old vertex count the loop walks before rebuilding via
+/// `RB_AddQuadStamp`); `tess.numIndexes` collapses to the explicit
+/// `num_indexes` scalar, same scalar-collapse pattern this file already
+/// applies to every other single dissolved-field diagnostic read (compare
+/// `shader_time`/`refdef_time`); `tess.shader->name` collapses to
+/// `shader_name`, same as `RB_CalcBulgeVertexes`/`RB_CalcMoveVertexes`.
+///
+/// `backEnd.currentEntity != &tr.worldEntity` has no home on the owned
+/// `RefEntity`/`FrameState` yet (the world-entity sentinel isn't modeled), so
+/// the caller resolves the comparison and threads `is_world_entity` — same
+/// collapse `Autosprite2Deform` (this file) already applies. `backEnd.ori`/
+/// `backEnd.viewParms.ori` thread as the already-real `orientationr_t`,
+/// matching `Autosprite2Deform`'s `ori`/`view_ori` split;
+/// `backEnd.viewParms.isMirror` collapses to the `is_mirror` bool (`ViewParms`
+/// is still an empty placeholder — same reasoning this file's header comment
+/// gives for threading `ori` directly instead of the empty `OrientationR`).
+/// `backEnd.currentEntity->e.nonNormalizedAxes` has no home on `RefEntity`
+/// yet (not among the fields an earlier wave landed, and this wave may not
+/// extend `placeholders.rs`) — threaded as the explicit `non_normalized_axes`
+/// bool, same "field not yet landed" pattern this file already uses for
+/// `ent->ambientLightInt` (`RB_CalcDiffuseColor`); `.e.axis[0]` IS already on
+/// `RefEntity`, so `current_entity` threads through for that read.
+///
+/// DEFERRED: R4 — `tess.numVertexes = 0; tess.numIndexes = 0;` (the reset
+/// before rebuilding via `RB_AddQuadStamp`) has no R3 target: no `tess`
+/// carrier exists, same finding as `DeformText`'s identical reset (this
+/// file, `oracle/codemp/renderer/tr_shade_calc.cpp:335-337`).
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:398-400`
+///
+/// Panics via `RB_AddQuadStamp`'s callee `RB_AddQuadStampExt`'s loud stub
+/// until its owning wave lands.
+///
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:382-443`
+pub fn AutospriteDeform(
+    xyz: &[[f32; 4]],
+    vertex_colors: &[[u8; 4]],
+    num_indexes: i32,
+    shader_name: &str,
+    is_world_entity: bool,
+    current_entity: &RefEntity,
+    non_normalized_axes: bool,
+    is_mirror: bool,
+    ori: &orientationr_t,
+    view_ori: &orientationr_t,
+    common: &mut Common,
+    frame: &mut FrameState,
+) {
+    let old_verts = xyz.len();
+
+    if old_verts & 3 != 0 {
+        com_printf(
+            common,
+            &format!(
+                "{}Autosprite shader {} had odd vertex count",
+                S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII"),
+                shader_name
+            ),
+        );
+    }
+    if num_indexes != (old_verts as i32 >> 2) * 6 {
+        com_printf(
+            common,
+            &format!(
+                "{}Autosprite shader {} had odd index count",
+                S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII"),
+                shader_name
+            ),
+        );
+    }
+
+    // PORT-NOTE: `oldVerts = tess.numVertexes; tess.numVertexes = 0;
+    // tess.numIndexes = 0;` dropped — see fn doc comment (`tess` dissolution,
+    // same finding as `DeformText`'s reset).
+
+    let (left_dir, up_dir) = if is_world_entity {
+        (view_ori.axis[1], view_ori.axis[2])
+    } else {
+        (
+            GlobalVectorToLocal(view_ori.axis[1], ori),
+            GlobalVectorToLocal(view_ori.axis[2], ori),
+        )
+    };
+
+    let mut i = 0usize;
+    while i < old_verts {
+        // find the midpoint
+        let mut mid: vec3_t = [0.0; 3];
+        mid[0] = 0.25 * (xyz[i][0] + xyz[i + 1][0] + xyz[i + 2][0] + xyz[i + 3][0]);
+        mid[1] = 0.25 * (xyz[i][1] + xyz[i + 1][1] + xyz[i + 2][1] + xyz[i + 3][1]);
+        mid[2] = 0.25 * (xyz[i][2] + xyz[i + 1][2] + xyz[i + 2][2] + xyz[i + 3][2]);
+
+        let mut delta: vec3_t = [0.0; 3];
+        _VectorSubtract([xyz[i][0], xyz[i][1], xyz[i][2]], mid, &mut delta);
+        // / sqrt(2)
+        let radius = VectorLength(delta) * 0.707f32;
+
+        let mut left: vec3_t = [0.0; 3];
+        _VectorScale(left_dir, radius, &mut left);
+        let mut up: vec3_t = [0.0; 3];
+        _VectorScale(up_dir, radius, &mut up);
+
+        if is_mirror {
+            let mut mirrored_left: vec3_t = [0.0; 3];
+            _VectorSubtract(vec3_origin, left, &mut mirrored_left);
+            left = mirrored_left;
+        }
+
+        // compensate for scale in the axes if necessary
+        if non_normalized_axes {
+            let axis_length = VectorLength(current_entity.axis[0]);
+            let axis_length = if axis_length == 0.0 {
+                0.0
+            } else {
+                1.0f32 / axis_length
+            };
+
+            let mut scaled_left: vec3_t = [0.0; 3];
+            _VectorScale(left, axis_length, &mut scaled_left);
+            left = scaled_left;
+
+            let mut scaled_up: vec3_t = [0.0; 3];
+            _VectorScale(up, axis_length, &mut scaled_up);
+            up = scaled_up;
+        }
+
+        RB_AddQuadStamp(mid, left, up, vertex_colors[i], frame);
+
+        i += 4;
+    }
+}
+
+/// Raven `void RB_DeformTessGeometry( void )` — walks the current shader's
+/// deform-stage list, dispatching each stage to its calc/deform fn.
+///
+/// `tess.shader->numDeforms`/`tess.shader->deforms` are `tess`-dissolved
+/// (R2 `## State ownership` row `tess`) — the caller passes the stage list
+/// directly as `deforms` (`numDeforms` collapses to `deforms.len()`, i.e. the
+/// loop bound), the same tess-dissolved-into-slice-parameter pattern this
+/// file already applies everywhere else. `tess.xyz`/`tess.normal` collapse to
+/// the `xyz`/`normal` slices every branch below shares (mutability per branch
+/// matches each already-ported callee's own settled signature — read-only
+/// borrows are taken via `&*xyz`/`&*normal` reborrows, matched to the four
+/// callees that don't mutate them).
+///
+/// `backEnd.refdef.text[ds->deformation - DEFORM_TEXT0]` — `TrRefdef::text`
+/// hasn't landed yet (its doc comment: "lands with the `tr_scene` R3 wave"),
+/// so the 8 render strings thread as the explicit `refdef_text` slice, same
+/// "field not yet landed → explicit parameter" pattern this file already uses
+/// for `ambientLightInt`/`nonNormalizedAxes`. `deform_t` derives no `Copy`
+/// (out of scope — this packet may touch only this file), so the switch on
+/// `ds->deformation` matches on `&ds.deformation` via match ergonomics
+/// (avoids moving out of the borrow) and the oracle's
+/// `ds->deformation - DEFORM_TEXT0` index arithmetic on the enum becomes 8
+/// explicit `DEFORM_TEXT0..=DEFORM_TEXT7` arms with a literal index each,
+/// rather than an enum-to-int cast.
+///
+/// `current_entity`/`is_world_entity`/`non_normalized_axes`/`is_mirror`/
+/// `ori`/`view_ori` thread straight through to `AutospriteDeform`/
+/// `Autosprite2Deform`, matching those fns' own already-settled parameter
+/// lists (this file, above); `common`/`frame`/`assets`/`noise`/`shader_name`/
+/// `refdef_time`/`refdef_float_time`/`shader_time`/`tex_coords0`/`indexes`/
+/// `vertex_colors`/`num_indexes` are the same dissolved-field collapses each
+/// individual callee already established.
+///
+/// Panics via `RB_AddQuadStampExt`'s loud stub (through `AutospriteDeform`/
+/// `DeformText`) until its owning wave lands, for any shader whose deform
+/// list reaches `DEFORM_AUTOSPRITE`/`DEFORM_TEXT0..7`.
+///
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:571-614`
+#[allow(clippy::too_many_arguments)]
+pub fn RB_DeformTessGeometry(
+    deforms: &[deformStage_t],
+    xyz: &mut [[f32; 4]],
+    normal: &mut [[f32; 4]],
+    tex_coords0: &[[f32; 2]],
+    indexes: &[i32],
+    vertex_colors: &[[u8; 4]],
+    num_indexes: i32,
+    shader_name: &str,
+    refdef_text: &[String],
+    refdef_time: i32,
+    refdef_float_time: f32,
+    shader_time: f32,
+    noise: &NoiseState,
+    assets: &RenderAssets,
+    is_world_entity: bool,
+    current_entity: &RefEntity,
+    non_normalized_axes: bool,
+    is_mirror: bool,
+    ori: &orientationr_t,
+    view_ori: &orientationr_t,
+    common: &mut Common,
+    frame: &mut FrameState,
+) {
+    for ds in deforms {
+        match &ds.deformation {
+            deform_t::DEFORM_NONE => {}
+            deform_t::DEFORM_NORMALS => {
+                RB_CalcDeformNormals(ds, &*xyz, normal, shader_time, noise);
+            }
+            deform_t::DEFORM_WAVE => {
+                RB_CalcDeformVertexes(
+                    ds,
+                    xyz,
+                    &*normal,
+                    noise,
+                    refdef_time,
+                    refdef_float_time,
+                    shader_time,
+                    assets,
+                    shader_name,
+                );
+            }
+            deform_t::DEFORM_BULGE => {
+                RB_CalcBulgeVertexes(ds, xyz, &*normal, tex_coords0, refdef_time, assets);
+            }
+            deform_t::DEFORM_MOVE => {
+                RB_CalcMoveVertexes(ds, xyz, shader_time, assets, shader_name);
+            }
+            deform_t::DEFORM_PROJECTION_SHADOW => {
+                RB_ProjectionShadowDeform();
+            }
+            deform_t::DEFORM_AUTOSPRITE => {
+                AutospriteDeform(
+                    &*xyz,
+                    vertex_colors,
+                    num_indexes,
+                    shader_name,
+                    is_world_entity,
+                    current_entity,
+                    non_normalized_axes,
+                    is_mirror,
+                    ori,
+                    view_ori,
+                    common,
+                    frame,
+                );
+            }
+            deform_t::DEFORM_AUTOSPRITE2 => {
+                Autosprite2Deform(
+                    xyz,
+                    indexes,
+                    shader_name,
+                    is_world_entity,
+                    ori,
+                    view_ori,
+                    common,
+                );
+            }
+            deform_t::DEFORM_TEXT0 => {
+                DeformText(
+                    &refdef_text[0],
+                    [normal[0][0], normal[0][1], normal[0][2]],
+                    [xyz[0], xyz[1], xyz[2], xyz[3]],
+                    frame,
+                );
+            }
+            deform_t::DEFORM_TEXT1 => {
+                DeformText(
+                    &refdef_text[1],
+                    [normal[0][0], normal[0][1], normal[0][2]],
+                    [xyz[0], xyz[1], xyz[2], xyz[3]],
+                    frame,
+                );
+            }
+            deform_t::DEFORM_TEXT2 => {
+                DeformText(
+                    &refdef_text[2],
+                    [normal[0][0], normal[0][1], normal[0][2]],
+                    [xyz[0], xyz[1], xyz[2], xyz[3]],
+                    frame,
+                );
+            }
+            deform_t::DEFORM_TEXT3 => {
+                DeformText(
+                    &refdef_text[3],
+                    [normal[0][0], normal[0][1], normal[0][2]],
+                    [xyz[0], xyz[1], xyz[2], xyz[3]],
+                    frame,
+                );
+            }
+            deform_t::DEFORM_TEXT4 => {
+                DeformText(
+                    &refdef_text[4],
+                    [normal[0][0], normal[0][1], normal[0][2]],
+                    [xyz[0], xyz[1], xyz[2], xyz[3]],
+                    frame,
+                );
+            }
+            deform_t::DEFORM_TEXT5 => {
+                DeformText(
+                    &refdef_text[5],
+                    [normal[0][0], normal[0][1], normal[0][2]],
+                    [xyz[0], xyz[1], xyz[2], xyz[3]],
+                    frame,
+                );
+            }
+            deform_t::DEFORM_TEXT6 => {
+                DeformText(
+                    &refdef_text[6],
+                    [normal[0][0], normal[0][1], normal[0][2]],
+                    [xyz[0], xyz[1], xyz[2], xyz[3]],
+                    frame,
+                );
+            }
+            deform_t::DEFORM_TEXT7 => {
+                DeformText(
+                    &refdef_text[7],
+                    [normal[0][0], normal[0][1], normal[0][2]],
+                    [xyz[0], xyz[1], xyz[2], xyz[3]],
+                    frame,
+                );
+            }
+        }
     }
 }

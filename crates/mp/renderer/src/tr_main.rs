@@ -23,27 +23,51 @@
 // `view`/`ori`/`refdef` fields land with real shapes, call sites here take
 // `&frame.view`/`&frame.ori` slices instead of the tier-2 types directly.
 
+use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_state::FrameState;
+use crate::render_state::gpu_resources::GpuResources;
+use crate::render_state::image_asset::ImageHandle;
+use crate::render_state::placeholders::RefEntity;
+use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
+use crate::tr_backend::{GL_Bind, GL_Cull};
+use crate::tr_cmds::R_SyncRenderThread;
+use crate::tr_ghoul2::r_add_ghoul_surfaces;
+use crate::tr_local::cull_type_t::cullType_t;
+use crate::tr_local::dlight_s::dlight_t;
 use crate::tr_local::fog_t::fog_t;
+use crate::tr_local::modtype_t::modtype_t;
 use crate::tr_local::orientationr_t::orientationr_t;
+use crate::tr_local::shader_sort_t::shaderSort_t;
+use crate::tr_local::srf_terrain_s::srfTerrain_t;
 use crate::tr_local::tr_ref_entity_t::trRefEntity_t;
+use crate::tr_local::tr_refdef_t::trRefdef_t;
 use crate::tr_local::view_parms_t::viewParms_t;
+use crate::tr_mesh::r_add_md3_surfaces;
+use crate::tr_model::render_models::RenderModels;
+use crate::tr_scene::R_AddPolygonSurfaces;
+use crate::tr_shader::R_GetShaderByHandle;
+use crate::tr_terrain::R_AddTerrainSurfaces;
+use crate::tr_world::{R_AddBrushModelSurfaces, R_AddWorldSurfaces};
 
 use core::f64::consts::PI;
 
-use mp_engine_qcommon::common::Common;
+use mp_engine_qcommon::cm_terrain::CmLandScape;
+use mp_engine_qcommon::common::{com_error, Common, EngineHostView};
+use mp_engine_qcommon::common_fns::Com_DPrintf;
 use mp_engine_qcommon::qfiles::draw_vert_t::drawVert_t;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
+use mp_qshared::shared::error_parm::errorParm_t;
+use mp_qshared::shared::q_color::S_COLOR_RED;
 use mp_qshared::shared::q_math::{
     _DotProduct as DotProduct, _VectorAdd as VectorAdd, _VectorCopy as VectorCopy,
     _VectorMA as VectorMA, _VectorScale as VectorScale, _VectorSubtract as VectorSubtract,
     vec3_origin, CrossProduct, DistanceSquared, PerpendicularVector, SetPlaneSignbits, VectorClear,
     VectorLength,
 };
-use mp_qshared::shared::{cplane_t, orientation_t, vec3_t, vec4_t};
+use mp_qshared::shared::{cplane_t, orientation_t, qfalse, qtrue, vec3_t, vec4_t};
 // `PlaneFromPoints`/`RotatePointAroundVector` have no `mp_qshared::shared::
 // q_math` re-export (unlike the other `q_math` helpers above); taken from
 // their canonical `native_math` home, the same edge `tr_shade_calc` uses for
@@ -92,6 +116,14 @@ const RDF_AUTOMAP: i32 = 32;
 ///
 /// Source: `oracle/codemp/cgame/tr_types.h:64`
 const RDF_NOFOG: i32 = 64;
+
+/// Raven `RF_FIRST_PERSON` — only draw through eyes (view weapon, damage
+/// blood blob). Local copy of the private const already ported at
+/// `tr_light.rs` (not `pub` there, so not reachable from here); same value,
+/// same oracle line.
+///
+/// Source: `oracle/codemp/cgame/tr_types.h:20`
+const RF_FIRST_PERSON: i32 = 0x00004;
 
 /// Raven `MAX_SHADERS` (non-`_XBOX` branch) — local copy of the private
 /// const already ported at `tr_local::tr_globals_t` (not `pub`, so not
@@ -158,6 +190,16 @@ pub struct TrMainScratch {
 /// the one pure function below.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:656-678`
+// `Clone`/`Copy` added wave 12: `R_SortDrawSurfs`'s recursion through
+// `R_MirrorViewBySurface` -> `R_RenderView` -> `R_GenerateDrawSurfs` pushes
+// new entries onto the very `Vec<DrawSurf<SurfaceGeometry>>` a live borrowed
+// slice/reference into it would alias across that call (Rust has no
+// equivalent to Raven's fixed `drawSurfs[MAX_DRAWSURFS]` array, which never
+// reallocates under the C ring-buffer scheme). Every field here is already
+// `Copy` (`cplane_t`, or a borrowed slice); deriving it lets the sort loop
+// copy one element out by value before recursing instead of holding a
+// borrow across it.
+#[derive(Clone, Copy)]
 pub enum SurfaceGeometry<'a> {
     Face(cplane_t),
     Triangles {
@@ -179,6 +221,10 @@ pub enum SurfaceGeometry<'a> {
 /// arena").
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:680-683`
+// `Clone`/`Copy` added wave 12 — see `SurfaceGeometry`'s own derive note
+// just above; `DrawSurf<S>`'s derive requires `S: Copy`, which
+// `SurfaceGeometry<'a>` now satisfies.
+#[derive(Clone, Copy)]
 pub struct DrawSurf<S> {
     pub sort: u32,
     pub surface: S,
@@ -1459,4 +1505,1018 @@ pub fn SurfIsOffscreen<S>(
     _frame: &mut FrameState,
 ) -> bool {
     todo!("Port SurfIsOffscreen — oracle/codemp/renderer/tr_main.cpp:871-961 (R4: tess tessellation pipeline, R2 `## State ownership` row `tess`)")
+}
+
+// ===== wave 9 =====
+
+/// Raven `R_DebugGraphics`.
+///
+/// `r_debug_surface_integer` is `r_debugSurface->integer`
+/// (`RendererCvars::r_debugSurface`, DEC-37 A13.1, `common.cvar(handle)`
+/// read through the live engine cvar table — the `R_SetupProjection`/
+/// `tr_world.rs::R_AddWorldSurfaces` precedent for cvar threading).
+/// `white_image` is `tr.whiteImage` (`RenderAssets::white_image`, STATE
+/// HOMES SPLIT row — a registry field, `R2-D3`/`R2-D4`). `assets`/`common`/
+/// `cvars` thread straight through to `R_SyncRenderThread`'s own landed
+/// signature (`tr_cmds.rs`); `frame`/`gpu` thread `GL_Cull`/`GL_Bind`'s own
+/// parameters straight through (both already-landed DEFERRED-R4 stubs,
+/// `tr_backend.rs`).
+///
+/// DEFERRED: `CM_DrawDebugSurface( R_DebugPolygon )` — the collision-debug
+/// surface walk `cm_patch_fns.rs` explicitly dropped as dead surface (§20):
+/// "Renderer-debug surface dropped ... `CM_DrawDebugSurface` itself is not
+/// ported (it has no callers here)" (that file's module doc comment). Its
+/// sole payload, `R_DebugPolygon`, is itself an already-landed DEFERRED-R4
+/// stub in this file (every argument it would receive only feeds fixed-
+/// function GL calls). No CPU logic is lost: the walk exists purely to feed
+/// GL debug-draw calls on both ends.
+/// (cm_patch_fns.rs module doc comment §20; DEC-37 A13.2 / DEC-01)
+///
+/// Source: `oracle/codemp/renderer/tr_main.cpp:1573-1584`
+pub fn R_DebugGraphics(
+    r_debug_surface_integer: i32,
+    white_image: Option<ImageHandle>,
+    assets: &RenderAssets,
+    common: &Common,
+    cvars: &RendererCvars,
+    frame: &FrameState,
+    gpu: &mut GpuResources,
+) {
+    if r_debug_surface_integer == 0 {
+        return;
+    }
+
+    // the render thread can't make callbacks to the main thread
+    R_SyncRenderThread(assets, common, cvars);
+
+    GL_Bind(gpu, white_image);
+    GL_Cull(frame, gpu, cullType_t::CT_FRONT_SIDED);
+
+    // DEFERRED: CM_DrawDebugSurface( R_DebugPolygon ) — see doc comment above.
+    // Source: oracle/codemp/renderer/tr_main.cpp:1583
+}
+
+// ===== wave 10 =====
+
+/// Builds the `RefEntity` (R2 placeholder, `render_state::placeholders`) view
+/// of a `trRefEntity_t` that `R_AddBrushModelSurfaces`/`r_add_ghoul_surfaces`
+/// (their own already-ported signatures, waves 5/9) take. Extends the
+/// whole-struct `refEntity_t` -> `RefEntity` mapping `RE_AddRefEntityToScene`
+/// (`tr_scene.rs`) established with `trRefEntity_t`'s own five lighting
+/// -output fields, read as their *live* values here (that call site zeroes
+/// them instead, because there the entity is freshly submitted and
+/// `lighting_calculated: false` forces a recompute before any read).
+///
+/// `ambient_light_int` unpacks `ambientLightInt`'s packed 32-bit value the
+/// same way Raven's own byte writes do (`((byte *)&ent->ambientLightInt)[N]`,
+/// cited on [`RefEntity::ambient_light_int`]'s own doc comment) — a
+/// little-endian byte reinterpretation, matching x86.
+fn ref_entity_from_tr(ent: &trRefEntity_t) -> RefEntity {
+    RefEntity {
+        re_type: ent.e.reType,
+        renderfx: ent.e.renderfx,
+        h_model: ent.e.hModel,
+        axis: ent.e.axis,
+        origin: ent.e.origin,
+        old_origin: ent.e.oldorigin,
+        custom_shader: ent.e.customShader,
+        shader_rgba: ent.e.shaderRGBA,
+        lighting_origin: ent.e.lightingOrigin,
+        end_time: ent.e.endTime,
+        has_ghoul2: !ent.e.ghoul2.is_null(),
+        need_dlights: ent.needDlights != 0,
+        lighting_calculated: ent.lightingCalculated != 0,
+        light_dir: ent.lightDir,
+        ambient_light: ent.ambientLight,
+        ambient_light_int: ent.ambientLightInt.to_le_bytes(),
+        directed_light: ent.directedLight,
+        dlight_bits: ent.dlightBits,
+    }
+}
+
+/// Writes back the seven of `trRefEntity_t`'s eight non-`e` fields a
+/// `RefEntity` carries (all but `axisLength`, which no `R_AddEntitySurfaces`
+/// callee touches) from a `RefEntity` that `R_AddBrushModelSurfaces` may have
+/// mutated through its own `R_SetupEntityLighting` call
+/// (`lighting_calculated`/`ambient_light`/`ambient_light_int`/
+/// `directed_light`/`light_dir` writes, `tr_light.rs`) and its own
+/// `R_DlightBmodel` call (`need_dlights`/`dlight_bits`, `tr_light.rs`).
+/// Raven mutates `*ent` in place, so a later per-frame stage reading
+/// `tr.refdef.entities[n]`'s lighting fields must observe them; the reverse
+/// of [`ref_entity_from_tr`] above.
+fn write_back_lighting(ent: &mut trRefEntity_t, re: &RefEntity) {
+    ent.needDlights = re.need_dlights as i32;
+    ent.lightingCalculated = re.lighting_calculated as i32;
+    ent.lightDir = re.light_dir;
+    ent.ambientLight = re.ambient_light;
+    ent.ambientLightInt = i32::from_le_bytes(re.ambient_light_int);
+    ent.directedLight = re.directed_light;
+    ent.dlightBits = re.dlight_bits;
+}
+
+/// Raven `R_AddEntitySurfaces`.
+///
+/// `entities` is `tr.refdef.entities` (length = `tr.refdef.num_entities`,
+/// this file's established `R_SpriteFogNum`/`R_GetPortalOrientations` slice
+/// -threading precedent); `view` is `tr.viewParms` (`.isPortal`/`.frustum`
+/// read, threaded through to `R_RotateForEntity`); `scratch` carries
+/// `preTransEntMatrix` (`TrMainScratch`, threaded through to
+/// `R_RotateForEntity`); `models` is the live `RenderModels` registry
+/// (`R_GetModelByHandle` -> `models.get_model`/`models.num_models`);
+/// `engine_view` is the host bundle `R_AddBrushModelSurfaces`'s own already
+/// -ported signature demands (`view` there — renamed here to avoid colliding
+/// with this fn's own `view: &viewParms_t`); `fogs` is `tr.world->fogs`
+/// (`R_SpriteFogNum`'s own established parameter); `refdef_rdflags` is
+/// `tr.refdef.rdflags` (`R_SpriteFogNum`'s `rdflags` +
+/// `R_AddBrushModelSurfaces`'s `refdef_rdflags`); `dlights`/`draw_surfs` are
+/// `tr.refdef.dlights`/`.drawSurfs` (STATE HOMES SPLIT, `FrameData`'s append
+/// -validation carriers — threaded as a slice/`Vec` per this file's
+/// established `R_AddDrawSurf` precedent, `tr_scene.rs`'s
+/// `R_AddPolygonSurfaces` twin).
+///
+/// `r_drawentities`/`r_nocull`/`r_shadows` (`RendererCvars`, DEC-37 A13.1)
+/// are read through the live cvar table (`engine_view.common.cvar`) at the
+/// point they are needed rather than threaded as pre-resolved integers —
+/// this fn already carries `engine_view`/`cvars` for the shader/model
+/// -lookup calls below, so there is no leaf-function reason to split the
+/// cvar reads out as separate parameters the way `R_CullLocalBox`'s
+/// `r_nocull_integer` does.
+///
+/// `entitySurface` (file-scope `static surfaceType_t entitySurface =
+/// SF_ENTITY;`, a kind-1 const per the fn-scope-statics three-kind rule,
+/// DEC-37 A13.3) has no dedicated `SurfaceGeometry` payload — it carries no
+/// data of its own (`SF_ENTITY`'s whole purpose is "this draw surf's shape
+/// comes from the entity itself", `tr_surface.rs`'s `RB_SurfaceEntity`
+/// dispatch family) — mapped to `SurfaceGeometry::Other`, this file's
+/// established catch-all for not-yet-modeled surface kinds
+/// (`R_AddTerrainSurfaces`, `tr_terrain.rs`, and `R_AddPolygonSurfaces`,
+/// `tr_scene.rs`, both already use it the same way).
+///
+/// PORT-NOTE: `tr.currentEntityNum`/`tr.shiftedEntityNum`/`tr.currentModel`
+/// (STATE HOMES SPLIT row's `RenderWorld::frame: FrameState` bucket) stay
+/// local loop computations, not persisted to `FrameState` — same wave-scope
+/// precedent as `R_GetPortalOrientations`/`IsMirror` (this file) and
+/// `R_AddPolygonSurfaces` (`tr_scene.rs`). `tr.currentEntity` is the one
+/// exception: `FrameState::current_entity` is a landed field and
+/// `R_DlightBmodel` (`tr_light.cpp:78-79`, reached through
+/// `R_AddBrushModelSurfaces`) writes `needDlights`/`dlightBits` through it,
+/// so the oracle's `ent = tr.currentEntity = &tr.refdef.entities[n]`
+/// (`:1380`) is transcribed as a per-iteration `frame.current_entity` write.
+///
+/// PORT-NOTE: `R_GetModelByHandle` never returns a null-equivalent — its
+/// oracle body returns `tr.models[0]`, the reserved `MOD_BAD` NULL model,
+/// for any out-of-range handle (`oracle/codemp/renderer/tr_model.cpp:
+/// 593-604`), which the already-ported `RenderModels::get_model` reproduces.
+/// The oracle's `if (!tr.currentModel)` arm (`:1425-1426`) is therefore
+/// unreachable in either tree and is not transcribed: an out-of-range or
+/// zero `hModel` falls into the switch's own `MOD_BAD` arm below, exactly as
+/// it does in the oracle.
+///
+/// Source: `oracle/codemp/renderer/tr_main.cpp:1369-1482`
+pub fn R_AddEntitySurfaces<'a>(
+    entities: &mut [trRefEntity_t],
+    view: &viewParms_t,
+    scratch: &mut TrMainScratch,
+    engine_view: &mut EngineHostView<'_>,
+    assets: &RenderAssets,
+    models: &RenderModels,
+    cvars: &RendererCvars,
+    frame: &mut FrameState,
+    refdef_rdflags: i32,
+    fogs: &[fog_t],
+    dlights: &mut [dlight_t],
+    draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
+) {
+    if engine_view.common.cvar(cvars.r_drawentities).integer == 0 {
+        return;
+    }
+
+    let rdf_nofog = refdef_rdflags & RDF_NOFOG != 0;
+
+    for current_entity_num in 0..entities.len() {
+        // preshift the value we are going to OR into the drawsurf sort
+        let shifted_entity_num = (current_entity_num as i32) << QSORT_ENTITYNUM_SHIFT;
+        let ent = &mut entities[current_entity_num];
+
+        debug_assert!(ent.e.renderfx >= 0);
+
+        ent.needDlights = qfalse;
+
+        // `ent = tr.currentEntity = &tr.refdef.entities[tr.currentEntityNum]`
+        // — one object in the oracle, two carriers here (`entities[n]` and
+        // `FrameState::current_entity`, which holds a `RefEntity` by value
+        // per R2 ruling 1). Snapshotted after the `needDlights` clear above
+        // so both carriers start the iteration equal.
+        frame.current_entity = Some(ref_entity_from_tr(ent));
+
+        // the weapon model must be handled special --
+        // we don't want the hacked weapon position showing in
+        // mirrors, because the true body position will already be drawn
+        if (ent.e.renderfx & RF_FIRST_PERSON) != 0 && view.isPortal != 0 {
+            continue;
+        }
+
+        // simple generated models, like sprites and beams, are not culled
+        match ent.e.reType {
+            refEntityType_t::RT_PORTALSURFACE => {
+                // don't draw anything
+            }
+
+            refEntityType_t::RT_SPRITE
+            | refEntityType_t::RT_BEAM
+            | refEntityType_t::RT_ORIENTED_QUAD
+            | refEntityType_t::RT_ELECTRICITY
+            | refEntityType_t::RT_LINE
+            | refEntityType_t::RT_ORIENTEDLINE
+            | refEntityType_t::RT_CYLINDER
+            | refEntityType_t::RT_SABER_GLOW => {
+                // self blood sprites, talk balloons, etc should not be drawn
+                // in the primary view. We can't just do this check for all
+                // entities, because md3 entities may still want to cast
+                // shadows from them
+                //
+                // DEFERRED: RF_THIRD_PERSON — never-guess-a-constant: not in
+                // this packet's FILE-SCOPE CONSTANTS section and not ported
+                // anywhere else in the crate (the identical absence
+                // `tr_mesh.rs::r_add_md3_surfaces`'s own DEFERRED note
+                // already records for this same flag). The oracle's very
+                // first statement in this arm reads it, so nothing past it
+                // is reachable without guessing the bitmask.
+                // Source: oracle/codemp/renderer/tr_main.cpp:1410-1417
+                todo!(
+                    "Port R_AddEntitySurfaces RT_SPRITE-family arm — RF_THIRD_PERSON unported, oracle/codemp/renderer/tr_main.cpp:1399-1418"
+                )
+            }
+
+            refEntityType_t::RT_MODEL => {
+                // we must set up parts of tr.ori for model culling
+                let ori = R_RotateForEntity(ent, view, scratch);
+
+                // DEFERRED: `tr.ori` — the oracle writes `R_RotateForEntity`'s
+                // orientation into the `tr.ori` global (Raven's own comment
+                // above: "we must set up parts of tr.ori for model culling"),
+                // which `R_AddMD3Surfaces` and `R_AddGhoulSurfaces` then read
+                // back for culling. Here it is only handed to
+                // `R_AddBrushModelSurfaces` (whose already-ported signature
+                // takes it as a parameter); `FrameState::ori` is the
+                // field-less `OrientationR` placeholder
+                // (`render_state/placeholders.rs`), so there is no carrier to
+                // publish it through for the other two callees.
+                // Source: oracle/codemp/renderer/tr_main.cpp:1421-1442
+                let current_model = models.get_model(ent.e.hModel);
+                match current_model.r#type {
+                    modtype_t::MOD_MESH => {
+                        let r_shadows_integer = engine_view.common.cvar(cvars.r_shadows).integer;
+                        r_add_md3_surfaces(
+                            engine_view.common,
+                            cvars,
+                            r_shadows_integer,
+                            assets,
+                            &*frame,
+                            ent,
+                        );
+                    }
+
+                    modtype_t::MOD_BRUSH => {
+                        let r_nocull_integer = engine_view.common.cvar(cvars.r_nocull).integer;
+                        // `R_AddBrushModelSurfaces`'s two mutators both
+                        // target `*tr.currentEntity` in the oracle — one
+                        // object — but land in different carriers here:
+                        // `R_SetupEntityLighting` writes the `&mut
+                        // RefEntity` this call passes, `R_DlightBmodel`
+                        // writes `frame.current_entity`
+                        // (`oracle/codemp/renderer/tr_light.cpp:78-79`).
+                        // The lighting writes are folded back onto
+                        // `frame.current_entity` so the single reconciled
+                        // entity is the one written back to
+                        // `entities[n]`.
+                        let mut re = ref_entity_from_tr(ent);
+                        R_AddBrushModelSurfaces(
+                            &mut re,
+                            models,
+                            r_nocull_integer,
+                            &ori,
+                            &view.frustum,
+                            engine_view,
+                            cvars,
+                            assets,
+                            frame,
+                            refdef_rdflags,
+                            dlights,
+                        );
+                        let current_entity = frame
+                            .current_entity
+                            .as_mut()
+                            .expect("R_AddEntitySurfaces: current_entity set above");
+                        current_entity.lighting_calculated = re.lighting_calculated;
+                        current_entity.light_dir = re.light_dir;
+                        current_entity.ambient_light = re.ambient_light;
+                        current_entity.ambient_light_int = re.ambient_light_int;
+                        current_entity.directed_light = re.directed_light;
+                        write_back_lighting(ent, current_entity);
+                    }
+
+                    // g2r
+                    modtype_t::MOD_MDXM => {
+                        if !ent.e.ghoul2.is_null() {
+                            let re = ref_entity_from_tr(ent);
+                            r_add_ghoul_surfaces(&re, assets, frame, cvars, &*engine_view.common);
+                        }
+                    }
+
+                    // null model axis
+                    modtype_t::MOD_BAD => {
+                        // DEFERRED: RF_THIRD_PERSON/RF_SHADOW_ONLY — same
+                        // never-guess-a-constant absence as the
+                        // RT_SPRITE-family arm above; this arm's own
+                        // first statement reads RF_THIRD_PERSON before
+                        // anything else. The trailing
+                        // `G2API_HaveWeGhoul2Models` check (once
+                        // reachable) resolves to
+                        // `mp_engine_ghoul2::api_models::
+                        // g2api_have_we_ghoul2_models` (contra this
+                        // packet's resolved-call-surface note marking it
+                        // "NOT RESOLVED" — it exists, ported at wave-9
+                        // adjacent work) but reaching it still needs a
+                        // `&CGhoul2Info_v` for this entity, the same
+                        // per-entity Ghoul2System threading gap
+                        // `r_add_ghoul_surfaces`'s own doc comment
+                        // (`tr_ghoul2.rs`) already blocks on.
+                        // Source: oracle/codemp/renderer/tr_main.cpp:1445-1461
+                        todo!(
+                            "Port R_AddEntitySurfaces MOD_BAD arm — RF_THIRD_PERSON/RF_SHADOW_ONLY unported, oracle/codemp/renderer/tr_main.cpp:1445-1461"
+                        )
+                    }
+
+                    modtype_t::MOD_MDXA => {
+                        com_error(
+                            errorParm_t::ERR_DROP,
+                            "R_AddEntitySurfaces: Bad modeltype".to_string(),
+                        );
+                    }
+                }
+            }
+
+            refEntityType_t::RT_ENT_CHAIN => {
+                let shader = R_GetShaderByHandle(assets, engine_view.common, ent.e.customShader);
+                let shader_sorted_index = assets
+                    .shaders
+                    .get(shader)
+                    .map(|s| s.sorted_index)
+                    .unwrap_or(0);
+                let fog_index = R_SpriteFogNum(refdef_rdflags, fogs, ent.e.origin, ent.e.radius);
+                R_AddDrawSurf(
+                    SurfaceGeometry::Other,
+                    shader_sorted_index,
+                    shifted_entity_num,
+                    rdf_nofog,
+                    fog_index,
+                    0,
+                    draw_surfs,
+                );
+            }
+
+            refEntityType_t::RT_POLY | refEntityType_t::RT_MAX_REF_ENTITY_TYPE => {
+                com_error(
+                    errorParm_t::ERR_DROP,
+                    "R_AddEntitySurfaces: Bad reType".to_string(),
+                );
+            }
+        }
+    }
+}
+
+/// Raven `R_GenerateDrawSurfs` — appends this view's world, polygon, terrain,
+/// and entity draw surfaces, setting up the projection matrix in between
+/// (entities need it for LOD, so it must run after the world is bounded but
+/// before entities are added, per the oracle's own ordering comment).
+///
+/// This fn has no globals of its own (`void R_GenerateDrawSurfs(void)`); its
+/// signature is the union of its five already-ported callees' own threaded
+/// parameters (wave 1/2/6/10, all below wave 11 — signatures are LAW, not
+/// reshaped here). `frame` is `RenderWorld::frame: FrameState`
+/// (`R_AddWorldSurfaces`/`R_AddEntitySurfaces`'s own parameter, this file's
+/// established name); `frame_data` is this frame's `FrameData` event stream
+/// (`R_AddPolygonSurfaces`'s own `frame: &'a FrameData` — renamed here only
+/// to avoid colliding with the `FrameState` parameter, ties this fn's own
+/// `'a` to the `DrawSurf<SurfaceGeometry<'a>>` payload). `refdef_rdflags`/
+/// `refdef_fov_x`/`refdef_fov_y`/`refdef_num_dlights` are `tr.refdef`'s
+/// bare-scalar fields, threaded exactly as `R_AddWorldSurfaces`/
+/// `R_SetupProjection`/`R_AddEntitySurfaces` already require them (no
+/// `TrRefdef` field yet — the same gap those fns' own PORT-NOTEs name).
+/// `refdef` (the `trRefdef_t` tier-2 value) and `land_scape`/`land` are
+/// `R_AddTerrainSurfaces`'s own already-ported parameters, passed straight
+/// through. `dlights` is `tr.refdef.dlights`, threaded as `&mut [dlight_t]`
+/// to match `R_AddEntitySurfaces`'s own signature; downgraded to `&[dlight_t]`
+/// for `R_AddWorldSurfaces`'s read-only use via the standard `&mut T -> &T`
+/// coercion. `fogs` is `tr.world->fogs`, `R_AddEntitySurfaces`'s own
+/// established parameter (no `WorldAsset::fogs` field yet — the tier-2
+/// transition audit's Group 1 `world_t` row names this as still pending the
+/// `tr_bsp`/`tr_world` fog-array wave). `distance_cull` is
+/// `tr.distanceCull` (`RenderAssets::distance_cull`, B11), `R_SetupProjection`'s
+/// own parameter. `shifted_entity_num` is `tr.shiftedEntityNum` as
+/// `R_AddTerrainSurfaces`'s own PORT-NOTE already documents (ambient state
+/// set by this fn's caller, `R_RenderView`, not yet in this wave's packet —
+/// threaded in rather than guessed at a fixed value, porting-rules §A2).
+/// `engine_view`/`assets`/`cvars`/`models`/`entities`/`scratch`/`view`/
+/// `draw_surfs` are `R_AddEntitySurfaces`/`R_AddTerrainSurfaces`/
+/// `R_SetupProjection`'s own already-ported parameters, threaded straight
+/// through; `common` for the calls that don't take the full `engine_view`
+/// bundle is `engine_view.common`, reborrowed per call (this file's
+/// established `engine_view.common` pattern, e.g. `R_AddEntitySurfaces`'s
+/// `MOD_MESH`/`RT_ENT_CHAIN` arms above) rather than threaded as a second
+/// top-level parameter.
+///
+/// Source: `oracle/codemp/renderer/tr_main.cpp:1516-1531`
+pub fn R_GenerateDrawSurfs<'a>(
+    engine_view: &mut EngineHostView<'_>,
+    assets: &mut RenderAssets,
+    cvars: &mut RendererCvars,
+    frame: &mut FrameState,
+    frame_data: &'a FrameData,
+    view: &mut viewParms_t,
+    refdef: &trRefdef_t,
+    refdef_rdflags: i32,
+    refdef_fov_x: f32,
+    refdef_fov_y: f32,
+    refdef_num_dlights: i32,
+    dlights: &mut [dlight_t],
+    fogs: &[fog_t],
+    distance_cull: f32,
+    land_scape: &srfTerrain_t,
+    land: &CmLandScape,
+    shifted_entity_num: i32,
+    entities: &mut [trRefEntity_t],
+    scratch: &mut TrMainScratch,
+    models: &RenderModels,
+    draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
+) {
+    R_AddWorldSurfaces(
+        engine_view.common,
+        cvars,
+        assets,
+        frame,
+        dlights,
+        refdef_rdflags,
+        refdef_num_dlights,
+    );
+
+    R_AddPolygonSurfaces(frame_data, assets, engine_view.common, draw_surfs);
+
+    R_AddTerrainSurfaces(
+        engine_view.common,
+        cvars,
+        refdef,
+        land_scape,
+        land,
+        view,
+        shifted_entity_num,
+        draw_surfs,
+    );
+
+    // set the projection matrix with the minimum zfar and now that we have
+    // the world bounded this needs to be done before entities are added,
+    // because they use the projection matrix for lod calculation
+    R_SetupProjection(
+        view,
+        refdef_rdflags,
+        refdef_fov_x,
+        refdef_fov_y,
+        distance_cull,
+        engine_view.common,
+        cvars,
+    );
+
+    R_AddEntitySurfaces(
+        entities,
+        view,
+        scratch,
+        engine_view,
+        assets,
+        models,
+        cvars,
+        frame,
+        refdef_rdflags,
+        fogs,
+        dlights,
+        draw_surfs,
+    );
+}
+
+// ===== wave 12 =====
+//
+// `R_MirrorViewBySurface`/`R_SortDrawSurfs`/`R_RenderView` are mutually
+// recursive (packet SCC 462): `R_RenderView` calls `R_SortDrawSurfs`, which
+// calls `R_MirrorViewBySurface`, which calls `R_RenderView` again for the
+// mirrored/portal sub-scene. All three thread the same giant parameter
+// bundle this file's `R_GenerateDrawSurfs` (wave 11, LAW) already
+// established — `R_RenderView` calls it directly, so its own signature is
+// that bundle plus this fn's own inputs (`parms`, `frame_scene_num`,
+// `refdef_time`, `gpu`); `R_SortDrawSurfs`/`R_MirrorViewBySurface` need the
+// same bundle purely to forward it through the recursion.
+
+/// Raven `MAX_DRAWSURFS` — `backEndData_t::drawSurfs` capacity, cited
+/// directly from this wave's packet preamble (`_PREAMBLE.md`'s `## Seam
+/// definition`: "`drawSurfs[MAX_DRAWSURFS=0x10000]`"); not itself in this
+/// packet's own FILE-SCOPE CONSTANTS section, but given verbatim there
+/// rather than guessed (never-guess-a-constant, porting-rules §A2).
+///
+/// The `#define` has an `_XBOX` twin (`0x4000`); MP retail builds the
+/// non-`_XBOX` `0x10000`, this file's established platform-guard precedent.
+///
+/// Source: `oracle/codemp/renderer/tr_local.h:1207-1211` (use site:
+/// `:2264`)
+const MAX_DRAWSURFS: usize = 0x10000;
+
+/// Whole-struct copy of a `viewParms_t` — every field the Rust struct has,
+/// per the whole-struct-copy rule (`oldParms = tr.viewParms;`/`newParms =
+/// tr.viewParms;` in `R_MirrorViewBySurface`, `tr.viewParms = *parms;` in
+/// `R_RenderView`). `viewParms_t` (`tr_local::view_parms_t`) has no
+/// `Clone`/`Copy` derive and this wave is scoped to `tr_main.rs` only, so a
+/// manual memberwise copy stands in for one rather than editing that file.
+fn clone_view_parms(v: &viewParms_t) -> viewParms_t {
+    viewParms_t {
+        ori: orientationr_t {
+            origin: v.ori.origin,
+            axis: v.ori.axis,
+            viewOrigin: v.ori.viewOrigin,
+            modelMatrix: v.ori.modelMatrix,
+        },
+        world: orientationr_t {
+            origin: v.world.origin,
+            axis: v.world.axis,
+            viewOrigin: v.world.viewOrigin,
+            modelMatrix: v.world.modelMatrix,
+        },
+        pvsOrigin: v.pvsOrigin,
+        isPortal: v.isPortal,
+        isMirror: v.isMirror,
+        frameSceneNum: v.frameSceneNum,
+        frameCount: v.frameCount,
+        portalPlane: v.portalPlane,
+        viewportX: v.viewportX,
+        viewportY: v.viewportY,
+        viewportWidth: v.viewportWidth,
+        viewportHeight: v.viewportHeight,
+        fovX: v.fovX,
+        fovY: v.fovY,
+        projectionMatrix: v.projectionMatrix,
+        frustum: v.frustum,
+        visBounds: v.visBounds,
+        zFar: v.zFar,
+    }
+}
+
+/// Raven `R_MirrorViewBySurface`. Out-param (`qboolean` return) -> `bool`.
+///
+/// Panics via `SurfIsOffscreen`'s loud stub (this file) until its owning R4
+/// wave lands — the trivial-reject call below is this fn's third statement.
+///
+/// `draw_surf` is taken **by value** (not `&DrawSurf<..>`) — see this file's
+/// `SurfaceGeometry`/`DrawSurf` `Copy`-derive note above: the caller
+/// (`R_SortDrawSurfs`) copies the element out of `draw_surfs` before calling
+/// this fn, so this fn can hold `draw_surfs: &mut Vec<..>` (needed for the
+/// `R_RenderView` recursion below, which appends to it) without aliasing a
+/// borrow into the same `Vec`.
+///
+/// `view` is `tr.viewParms` (read/written — this file's established tier-2
+/// stand-in, top-of-file PORT-NOTE). `frame_scene_num` is `tr.frameSceneNum`
+/// (STATE HOMES: no `FrameState` field exists yet for it — same gap
+/// `tr_cmds.rs`'s own `R_ToggleSmpFrame`-family DEFERRED note records for
+/// this exact global; threaded as a bare scalar here instead, this file's
+/// established `refdef_rdflags`-style precedent for "no landed carrier field
+/// yet", forwarded straight through to the `R_RenderView` call).
+/// `refdef_time` is `tr.refdef.time`, `R_GetPortalOrientations`'s own
+/// already-ported parameter. `gpu` is `RenderWorld::frame`-adjacent render
+/// -thread-local `GpuResources` (R2 `glState` row) — not part of
+/// `R_GenerateDrawSurfs`'s own parameter list, but required to forward
+/// through to `R_RenderView`'s own `R_DebugGraphics` call. Every other
+/// parameter is `R_GenerateDrawSurfs`'s own already-ported bundle (wave 11),
+/// forwarded straight through the recursion.
+///
+/// Source: `oracle/codemp/renderer/tr_main.cpp:971-1019`
+#[allow(clippy::too_many_arguments)]
+pub fn R_MirrorViewBySurface<'a>(
+    draw_surf: DrawSurf<SurfaceGeometry<'a>>,
+    entity_num: i32,
+    frame_scene_num: i32,
+    refdef_time: i32,
+    engine_view: &mut EngineHostView<'_>,
+    assets: &mut RenderAssets,
+    cvars: &mut RendererCvars,
+    frame: &mut FrameState,
+    gpu: &mut GpuResources,
+    frame_data: &'a FrameData,
+    view: &mut viewParms_t,
+    refdef: &trRefdef_t,
+    refdef_rdflags: i32,
+    refdef_fov_x: f32,
+    refdef_fov_y: f32,
+    refdef_num_dlights: i32,
+    dlights: &mut [dlight_t],
+    fogs: &[fog_t],
+    distance_cull: f32,
+    land_scape: &srfTerrain_t,
+    land: &CmLandScape,
+    shifted_entity_num: i32,
+    entities: &mut [trRefEntity_t],
+    scratch: &mut TrMainScratch,
+    models: &RenderModels,
+    draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
+) -> bool {
+    // don't recursively mirror
+    if view.isPortal != 0 {
+        Com_DPrintf(
+            engine_view.common,
+            &format!(
+                "{}WARNING: recursive mirror/portal found\n",
+                S_COLOR_RED.to_str().expect("S_COLOR_RED is ASCII")
+            ),
+        );
+        return false;
+    }
+
+    if engine_view.common.cvar(cvars.r_noportals).integer != 0
+        || engine_view.common.cvar(cvars.r_fastsky).integer == 1
+    {
+        return false;
+    }
+
+    // trivially reject portal/mirror
+    if SurfIsOffscreen(
+        &draw_surf,
+        &assets.sorted_shaders,
+        entities,
+        view,
+        scratch,
+        frame,
+    ) {
+        return false;
+    }
+
+    // save old viewParms so we can return to it after the mirror view
+    let old_parms = clone_view_parms(view);
+
+    let mut new_parms = clone_view_parms(view);
+    new_parms.isPortal = qtrue;
+
+    let (surface, camera, pvs_origin, mirror) = match R_GetPortalOrientations(
+        Some(&draw_surf.surface),
+        entity_num,
+        entities,
+        refdef_time,
+        view,
+        scratch,
+    ) {
+        Some(v) => v,
+        None => return false, // bad portal, no portalentity
+    };
+
+    new_parms.ori.origin = R_MirrorPoint(old_parms.ori.origin, &surface, &camera);
+
+    VectorSubtract(
+        vec3_origin,
+        camera.axis[0],
+        &mut new_parms.portalPlane.normal,
+    );
+    new_parms.portalPlane.dist = DotProduct(camera.origin, new_parms.portalPlane.normal);
+
+    new_parms.ori.axis[0] = R_MirrorVector(old_parms.ori.axis[0], &surface, &camera);
+    new_parms.ori.axis[1] = R_MirrorVector(old_parms.ori.axis[1], &surface, &camera);
+    new_parms.ori.axis[2] = R_MirrorVector(old_parms.ori.axis[2], &surface, &camera);
+
+    new_parms.pvsOrigin = pvs_origin;
+    // bool -> qboolean (dictionary): `mirror` already came back through
+    // `R_GetPortalOrientations`'s own `bool` out-param translation.
+    new_parms.isMirror = mirror as i32;
+
+    // OPTIMIZE: restrict the viewport on the mirrored view
+
+    // render the mirror view
+    R_RenderView(
+        &new_parms,
+        frame_scene_num,
+        refdef_time,
+        view,
+        engine_view,
+        assets,
+        cvars,
+        frame,
+        gpu,
+        frame_data,
+        refdef,
+        refdef_rdflags,
+        refdef_fov_x,
+        refdef_fov_y,
+        refdef_num_dlights,
+        dlights,
+        fogs,
+        distance_cull,
+        land_scape,
+        land,
+        shifted_entity_num,
+        entities,
+        scratch,
+        models,
+        draw_surfs,
+    );
+
+    *view = old_parms;
+
+    true
+}
+
+/// Raven `R_SortDrawSurfs`.
+///
+/// `draw_surfs`/`first_draw_surf` replace the oracle's `drawSurf_t
+/// *drawSurfs, int numDrawSurfs` pointer+length pair: `draw_surfs` is the
+/// file's owned, growing `Vec` standing in for `tr.refdef.drawSurfs`
+/// (established by `R_AddDrawSurf`'s own PORT-NOTE — "the fixed-size ring
+/// buffer is replaced by a plain `Vec` append"), and `first_draw_surf` is
+/// the oracle's pointer offset into it. A borrowed slice of the range being
+/// sorted was rejected: `R_MirrorViewBySurface`'s recursion through
+/// `R_RenderView` -> `R_GenerateDrawSurfs` appends new entries onto this
+/// same `Vec` mid-loop (exactly as Raven's own fixed
+/// `drawSurfs[MAX_DRAWSURFS]` array does — new entries land past the range
+/// being sorted, never observed by this fn's own bounded loop), which would
+/// alias a live slice/reallocate out from under it; indexing `draw_surfs`
+/// fresh each iteration instead avoids that without any `unsafe`.
+///
+/// `sorted_shaders`/shader lookups read `assets.sorted_shaders`/
+/// `assets.shaders` (`RenderAssets`, `R2-D3`/`R2-D4`). `r_portalOnly` reads
+/// through the live cvar table (`RendererCvars::r_portalOnly`, DEC-37
+/// A13.1). Every other parameter is `R_MirrorViewBySurface`'s own bundle
+/// above, forwarded straight through.
+///
+/// PORT-NOTE: `R_AddDrawSurfCmd`'s two call sites (the early-return "we
+/// still need to add it for hyperspace cases" branch, and the fall-through
+/// at the end) are both dropped, not merely deferred — `tr_cmds.rs`'s own
+/// `R_AddDrawSurfCmd` DEFERRED note (`:96-107`) already establishes there is
+/// "no remaining R2-carrier behavior for this fn to perform": `drawSurfs` is
+/// already this file's owned `Vec` (no ring-buffer command needed to expose
+/// it), and `viewParms`/`refdef` already cross via `FrameEvent::RenderScene`
+/// pushed by the not-yet-ported `RE_RenderScene`.
+/// (R2 `### A1 disposition table` row `RC_DRAW_SURFS`)
+/// Source: `oracle/codemp/renderer/tr_cmds.cpp:169-183`
+///
+/// Only the non-`_XBOX` `qsortFast` call site is transcribed (the `_XBOX`
+/// build calls it a second time, post-loop, instead of pre-loop) — MP never
+/// builds `_XBOX`, the same `R_SetupProjection`-established precedent for
+/// dropping `_XBOX`-only branches in this file.
+///
+/// Source: `oracle/codemp/renderer/tr_main.cpp:1304-1362`
+#[allow(clippy::too_many_arguments)]
+pub fn R_SortDrawSurfs<'a>(
+    draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
+    first_draw_surf: usize,
+    frame_scene_num: i32,
+    refdef_time: i32,
+    engine_view: &mut EngineHostView<'_>,
+    assets: &mut RenderAssets,
+    cvars: &mut RendererCvars,
+    frame: &mut FrameState,
+    gpu: &mut GpuResources,
+    frame_data: &'a FrameData,
+    view: &mut viewParms_t,
+    refdef: &trRefdef_t,
+    refdef_rdflags: i32,
+    refdef_fov_x: f32,
+    refdef_fov_y: f32,
+    refdef_num_dlights: i32,
+    dlights: &mut [dlight_t],
+    fogs: &[fog_t],
+    distance_cull: f32,
+    land_scape: &srfTerrain_t,
+    land: &CmLandScape,
+    shifted_entity_num: i32,
+    entities: &mut [trRefEntity_t],
+    scratch: &mut TrMainScratch,
+    models: &RenderModels,
+) {
+    // it is possible for some views to not have any surfaces
+    if draw_surfs.len() <= first_draw_surf {
+        // R_AddDrawSurfCmd( drawSurfs, numDrawSurfs ) — PORT-NOTE above:
+        // dropped, no remaining behavior.
+        return;
+    }
+
+    // if we overflowed MAX_DRAWSURFS, the drawsurfs wrapped around in the
+    // buffer and we will be missing the first surfaces, not the last ones
+    let mut num_draw_surfs = draw_surfs.len() - first_draw_surf;
+    if num_draw_surfs > MAX_DRAWSURFS {
+        num_draw_surfs = MAX_DRAWSURFS;
+    }
+
+    // sort the drawsurfs by sort type, then orientation, then shader
+    qsortFast(&mut draw_surfs[first_draw_surf..first_draw_surf + num_draw_surfs]);
+
+    // check for any pass through drawing, which may cause another view to
+    // be rendered first
+    for i in 0..num_draw_surfs {
+        let sort = draw_surfs[first_draw_surf + i].sort;
+        let (entity_num, shader_handle, _fog_num, _dlighted) =
+            R_DecomposeSort(sort, &assets.sorted_shaders);
+
+        let shader_entry = assets.shaders.get(shader_handle);
+        let shader_sort = shader_entry.map(|s| s.sort).unwrap_or(0.0);
+
+        if shader_sort > shaderSort_t::SS_PORTAL as i32 as f32 {
+            break;
+        }
+
+        // no shader should ever have this sort type
+        if shader_sort == shaderSort_t::SS_BAD as i32 as f32 {
+            let shader_name = shader_entry.map(|s| s.name.as_str()).unwrap_or("");
+            com_error(
+                errorParm_t::ERR_DROP,
+                format!("Shader '{}'with sort == SS_BAD", shader_name),
+            );
+        }
+
+        // owned copy — see `R_MirrorViewBySurface`'s own doc comment for why
+        // this can't be a borrow into `draw_surfs`.
+        let draw_surf = draw_surfs[first_draw_surf + i];
+
+        // if the mirror was completely clipped away, we may need to check
+        // another surface
+        if R_MirrorViewBySurface(
+            draw_surf,
+            entity_num,
+            frame_scene_num,
+            refdef_time,
+            engine_view,
+            assets,
+            cvars,
+            frame,
+            gpu,
+            frame_data,
+            view,
+            refdef,
+            refdef_rdflags,
+            refdef_fov_x,
+            refdef_fov_y,
+            refdef_num_dlights,
+            dlights,
+            fogs,
+            distance_cull,
+            land_scape,
+            land,
+            shifted_entity_num,
+            entities,
+            scratch,
+            models,
+            draw_surfs,
+        ) {
+            // this is a debug option to see exactly what is being mirrored
+            if engine_view.common.cvar(cvars.r_portalOnly).integer != 0 {
+                return;
+            }
+            break; // only one mirror view at a time
+        }
+    }
+
+    // R_AddDrawSurfCmd( drawSurfs, numDrawSurfs ) — PORT-NOTE above: dropped,
+    // no remaining behavior.
+}
+
+/// Raven `R_RenderView`.
+///
+/// `parms` is the oracle's `viewParms_t *parms` in-param (the new view to
+/// install); `view` is `tr.viewParms` itself (written wholesale from
+/// `parms`, then read/written by every callee below — this file's
+/// established tier-2 stand-in). `frame` is `RenderWorld::frame: FrameState`
+/// — `tr.viewCount` (incremented twice, faithfully kept as two separate
+/// `+= 1`s rather than folded into `+= 2`) and `tr.frameCount` (`view
+/// .frameCount = frame.frame_count`, `FrameState::frame_count`, the same
+/// carrier `tr_cmds.rs`/`tr_image.rs` already use for `tr.frameCount`).
+/// `frame_scene_num` is `tr.frameSceneNum` — see `R_MirrorViewBySurface`'s
+/// own doc comment for why it's threaded as a bare scalar rather than a
+/// `FrameState` field. `gpu` is `RenderWorld`'s render-thread-local
+/// `GpuResources`, needed only for the trailing `R_DebugGraphics` call
+/// (`R_GenerateDrawSurfs` itself doesn't touch GL state). Every other
+/// parameter is `R_GenerateDrawSurfs`'s own already-ported bundle (wave 11),
+/// forwarded straight through; `tr.refdef.numDrawSurfs`/the oracle's
+/// `firstDrawSurf` local are `draw_surfs.len()` snapshots (see
+/// `R_SortDrawSurfs`'s own doc comment for the `Vec`-append equivalence).
+///
+/// Source: `oracle/codemp/renderer/tr_main.cpp:1595-1627`
+#[allow(clippy::too_many_arguments)]
+pub fn R_RenderView<'a>(
+    parms: &viewParms_t,
+    frame_scene_num: i32,
+    refdef_time: i32,
+    view: &mut viewParms_t,
+    engine_view: &mut EngineHostView<'_>,
+    assets: &mut RenderAssets,
+    cvars: &mut RendererCvars,
+    frame: &mut FrameState,
+    gpu: &mut GpuResources,
+    frame_data: &'a FrameData,
+    refdef: &trRefdef_t,
+    refdef_rdflags: i32,
+    refdef_fov_x: f32,
+    refdef_fov_y: f32,
+    refdef_num_dlights: i32,
+    dlights: &mut [dlight_t],
+    fogs: &[fog_t],
+    distance_cull: f32,
+    land_scape: &srfTerrain_t,
+    land: &CmLandScape,
+    shifted_entity_num: i32,
+    entities: &mut [trRefEntity_t],
+    scratch: &mut TrMainScratch,
+    models: &RenderModels,
+    draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
+) {
+    if parms.viewportWidth <= 0 || parms.viewportHeight <= 0 {
+        return;
+    }
+
+    frame.view_count += 1;
+
+    *view = clone_view_parms(parms);
+    view.frameSceneNum = frame_scene_num;
+    view.frameCount = frame.frame_count;
+
+    let first_draw_surf = draw_surfs.len();
+
+    // Raven increments `tr.viewCount` a second time here.
+    frame.view_count += 1;
+
+    // set viewParms.world
+    //
+    // DEFERRED: `tr.ori` — `R_RotateForViewer`'s return value IS the oracle's
+    // `tr.ori` write (its own doc comment: "Out-param (via `tr.ori`) ->
+    // return value"), read for the rest of this view by the whole
+    // `R_GenerateDrawSurfs` subtree. It is discarded here because
+    // `FrameState::ori` is the field-less `OrientationR` placeholder
+    // (`render_state/placeholders.rs`) — no carrier to store it in, and this
+    // fn may not add one.
+    // Source: oracle/codemp/renderer/tr_main.cpp:1612-1613
+    R_RotateForViewer(view);
+
+    R_SetupFrustum(view);
+
+    R_GenerateDrawSurfs(
+        engine_view,
+        assets,
+        cvars,
+        frame,
+        frame_data,
+        view,
+        refdef,
+        refdef_rdflags,
+        refdef_fov_x,
+        refdef_fov_y,
+        refdef_num_dlights,
+        dlights,
+        fogs,
+        distance_cull,
+        land_scape,
+        land,
+        shifted_entity_num,
+        entities,
+        scratch,
+        models,
+        draw_surfs,
+    );
+
+    R_SortDrawSurfs(
+        draw_surfs,
+        first_draw_surf,
+        frame_scene_num,
+        refdef_time,
+        engine_view,
+        assets,
+        cvars,
+        frame,
+        gpu,
+        frame_data,
+        view,
+        refdef,
+        refdef_rdflags,
+        refdef_fov_x,
+        refdef_fov_y,
+        refdef_num_dlights,
+        dlights,
+        fogs,
+        distance_cull,
+        land_scape,
+        land,
+        shifted_entity_num,
+        entities,
+        scratch,
+        models,
+    );
+
+    // draw main system development information (surface outlines, etc)
+    R_DebugGraphics(
+        engine_view.common.cvar(cvars.r_debugSurface).integer,
+        assets.white_image,
+        assets,
+        engine_view.common,
+        cvars,
+        frame,
+        gpu,
+    );
 }

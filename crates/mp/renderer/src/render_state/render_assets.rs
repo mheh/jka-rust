@@ -145,6 +145,12 @@ pub struct RenderAssets {
     ///
     /// Source: `oracle/codemp/renderer/tr_local.h:1310`
     pub registered: bool,
+    /// `tr.worldMapLoaded` — same "session flag, not per-frame scratch"
+    /// disposition as [`Self::registered`] (wave-11 field merge; see
+    /// `tr_bsp.rs`'s WAVE 11 ADDITIONS note).
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1320`
+    pub world_map_loaded: bool,
     /// `max_polys` — the per-frame poly append bound, `r_maxpolys`' value
     /// (default `MAX_POLYS = 600`). Session/capacity state, sim-side
     /// (`### FrameData`'s append-validation principle).

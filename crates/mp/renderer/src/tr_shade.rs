@@ -640,3 +640,70 @@ pub fn ComputeColors(
 pub fn RB_IterateStagesGeneric(_gpu: &mut GpuResources) {
     todo!("Port RB_IterateStagesGeneric — oracle/codemp/renderer/tr_shade.cpp:1953-2231")
 }
+
+/// Raven `RB_StageIteratorGeneric` — the fixed-function stage-iterator entry
+/// point for one tessellated surface: deforms the geometry, logs the call,
+/// sets face culling and polygon offset, decides (and records into
+/// `setArraysOnce`) whether the color/texcoord client arrays can be enabled
+/// once for the whole surface or must be re-enabled per pass, locks the
+/// vertex array, dispatches to `RB_IterateStagesGeneric`, projects dynamic
+/// lights, draws a fog pass, draws surface sprites, then tears the GL state
+/// back down.
+///
+/// DEFERRED: R4 — whole-body deferral, every input is unavailable at this R3
+/// wave: `input = &tess` and every subsequent `input->shader->*`/
+/// `tess.*` read (`shader->cullType`/`polygonOffset`/`multitextureEnv`/
+/// `fogPass`, `tess.numPasses`/`svars.colors`/`svars.texcoords`/`xyz`/
+/// `numVertexes`/`dlightBits`/`fogNum`/`shader->sort`/`shader->surfaceFlags`)
+/// are the dissolved `tess`/`shaderCommands_t` (R2 `## State ownership` row
+/// `tess`: "dissolved into R4's tessellation/vertex-building pipeline ... no
+/// single global scratch buffer survives the new topology"; same treatment
+/// this file's sibling fns give a `shaderCommands_t *input` parameter —
+/// `DrawTris`'s doc comment above) — so even the function's very first
+/// statement has no value to read, and every downstream branch condition
+/// depends on it. `r_logFile`/`r_dlightStyle`/`r_drawfog`/`r_offsetFactor`/
+/// `r_offsetUnits`/`r_surfaceSprites` do have real carriers —
+/// `common.cvar(cvars.r_x).integer`/`.value` is this crate's established
+/// idiom (~100 call sites) and all six handles are live fields on
+/// `RendererCvars` (`render_state/renderer_cvars.rs:104,112,172,200,228,246`)
+/// — and `tr.world->globalFog`/`.numfogs` likewise have real carriers now
+/// (`WorldAsset::global_fog`/`::fogs`, `render_state/placeholders.rs:242-250`).
+/// Neither shortens the deferral: every one of those reads is reached only
+/// downstream of `input = &tess`, this fn's very first statement, so the fn
+/// can still never get past its own opening line before any of them would be
+/// consulted. `setArraysOnce` is this packet's `STATE
+/// HOMES` row "per-subsystem owned state struct, NAMED BY THIS WAVE if this
+/// file's wave is where the subsystem lands" (DEC-37 A13.3) — this fn is that
+/// write site, but the value written is `tess.numPasses > 1 ||
+/// input->shader->multitextureEnv`, itself unavailable via the dissolved
+/// `input`, so naming a carrier here still couldn't be assigned a correct
+/// value; it stays unmapped rather than invented with a placeholder. Every
+/// in-module callee is itself unreachable with real arguments: the wave-8
+/// `RB_DeformTessGeometry` port takes explicit `xyz`/`normal`/`tex_coords0`/
+/// `indexes`/`vertex_colors`/... parameters sourced from `tess` fields this
+/// fn has no carrier for and no parameter list to receive them through;
+/// `RB_IterateStagesGeneric` is itself a whole-fn `todo!()` stub on this same
+/// file; `ProjectDlightTexture`/`ProjectDlightTexture2`/`RB_FogPass` are
+/// DEFERRED-R4 no-ops needing the same unavailable `tess`/cvar inputs to even
+/// select which one to call; `RB_DrawSurfaceSprites`'s wave-2 port takes
+/// `&shaderStage_t`/`&mut CQuickSpriteSystem`/`&mut SurfaceSpriteState`/...
+/// sourced from `tess.xstages[stage]`, the same dissolved receiver;
+/// `GL_Cull`'s wave-0 port takes a `cullType_t` sourced from
+/// `input->shader->cullType`, unavailable for the same reason. Every terminal
+/// action past the unavailable inputs is a GL call
+/// (`qglColorPointer`/`qglDisable`/`qglDisableClientState`/`qglEnable`/
+/// `qglEnableClientState`/`qglLockArraysEXT`/`qglPolygonOffset`/
+/// `qglTexCoordPointer`/`qglUnlockArraysEXT`/`qglVertexPointer`, DEC-37
+/// A13.2). No computation survives once every input above is removed — this
+/// includes the entire face-culling/polygon-offset/array-mode/dlight/fog/
+/// surface-sprite orchestration, since its sole inputs are the dissolved
+/// `tess`/`input` and the un-landed cvar-value/`WorldAsset` fields.
+///
+/// Whole-body deferral: no partial body survives, so this lands as a loud
+/// `todo!()` rather than a silent no-op (whole-fn-deferral convention —
+/// partial-body fns keep DEFERRED comments instead).
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:2237-2385`
+pub fn RB_StageIteratorGeneric(_gpu: &mut GpuResources) {
+    todo!("Port RB_StageIteratorGeneric — oracle/codemp/renderer/tr_shade.cpp:2237-2385")
+}

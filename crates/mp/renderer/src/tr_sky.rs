@@ -913,3 +913,78 @@ pub fn RB_DrawSun(frame: &FrameState, common: &Common, cvars: &RendererCvars, vi
     // DEFERRED: R4 — qglDepthRange(0.0, 1.0);
     // Source: oracle/codemp/renderer/tr_sky.cpp:771
 }
+
+/// Raven `RB_StageIteratorSky` — wave 10, final tail wave for this file.
+///
+/// Raven: go through all the polygons and project them onto the sky box to
+/// see which blocks on each side need to be drawn; `r_showsky` will let all
+/// the sky blocks be drawn in front of everything to allow developers to see
+/// how much sky is getting sucked in; note that sky was drawn so we will
+/// draw a sun later.
+///
+/// Whole-fn deferral, not a partial body: the function's very first
+/// statement, `if ( g_bRenderGlowingObjects ) return;`, gates every single
+/// statement that follows it — including the trailing unconditional
+/// `backEnd.skyRenderedThisView = qtrue;` write. `g_bRenderGlowingObjects` is
+/// a file-scope static with no R2/R3-assigned carrier (DEC-37 A13.3 — same
+/// unresolved conclusion this crate already reached at
+/// `tr_backend.rs:371`/`tr_ghoul2.rs:1565`, and this wave is not where the
+/// dynamic-glow subsystem lands, so naming a struct for it here would be an
+/// invented carrier, not a licensed one). Without that value there is no
+/// sound way to decide whether *any* downstream statement — real or
+/// deferred — is ever reached, so nothing can be transcribed unconditionally
+/// without guessing (porting-rules §A2 never-guess).
+///
+/// Even granting that gate, the reachable body is blocked twice more:
+/// - `if (skyboxportal && !(backEnd.refdef.rdflags & RDF_SKYBOXPORTAL))
+///   return;` — `skyboxportal` has the same no-carrier status as
+///   `g_bRenderGlowingObjects`. The `backEnd.refdef.rdflags` half of the test
+///   is not itself the blocker: `TrRefdef`/`FrameState::refdef` doesn't carry
+///   an `rdflags` field, but this crate's established pattern is to thread
+///   `backEnd.refdef.rdflags` in as a `refdef_rdflags: i32` parameter and
+///   decode bit tests against it directly (`tr_backend.rs:994`,
+///   `tr_light.rs:473`, `tr_world.rs:1471,1648`; the decode itself at
+///   `tr_backend.rs:1000`). What is genuinely missing is the mask:
+///   `RDF_SKYBOXPORTAL` (`8`, `oracle/codemp/cgame/tr_types.h:60`) has no
+///   ported const anywhere in this crate (only `RDF_NOWORLDMODEL`/
+///   `RDF_AUTOMAP`/`RDF_NOFOG` are) — so even with `refdef_rdflags` threaded
+///   in, the bit test has no mask to test against, and `skyboxportal` still
+///   has no carrier regardless.
+/// - `RB_ClipSkyPolygons( &tess )`, `tess.shader->sky->outerbox[...]`,
+///   `DrawSkyBox( tess.shader )`, `R_BuildCloudData( &tess )`, and
+///   `if (tess.numIndexes && tess.numVertexes) RB_StageIteratorGeneric()`
+///   all key off the dissolved `tess`/`shaderCommands_t` global (R2
+///   `## State ownership` row `tess`: "no single global scratch buffer
+///   survives the new topology") — there is no R3 carrier from which to read
+///   `tess.shader` (the `ShaderHandle` every one of those already-ported
+///   in-module callees needs) or `tess.numIndexes`/`numVertexes`.
+///
+/// `r_fastsky`/`r_showsky` genuinely do have real carriers (`RendererCvars`,
+/// DEC-37 A13.1 — see `RB_ClipSkyPolygons`'s sibling wave-9 fn
+/// `RB_StageIteratorGeneric` for the established `common.cvar(cvars.r_x)
+/// .integer` idiom) but sit behind the first unresolved gate above, so
+/// reading them here would not shorten the deferral — the fn can still
+/// return before ever reaching them.
+///
+/// Every `qgl*` call (`qglDepthRange`/`qglColor3f`/`qglPushMatrix`/
+/// `qglPopMatrix`/`qglTranslatef`) is additionally unhomed GL/WGL surface
+/// (DEC-01/DEC-37, `GpuResources::gl_state` a named placeholder until R4).
+///
+/// Loud `todo!()` per the whole-fn-deferral convention (partial-body fns
+/// keep `DEFERRED:` comments instead of panicking) — same convention this
+/// crate already applied at `tr_ghoul2.rs`'s `rb_surface_ghoul`
+/// (`RB_SurfaceGhoul`).
+///
+/// Source: `oracle/codemp/renderer/tr_sky.cpp:786-848`
+pub fn RB_StageIteratorSky(
+    frame: &mut FrameState,
+    common: &Common,
+    cvars: &RendererCvars,
+    gpu: &mut GpuResources,
+    assets: &RenderAssets,
+    sky: &mut SkyState,
+    view: &viewParms_t,
+) {
+    let _ = (frame, common, cvars, gpu, assets, sky, view);
+    todo!("Port RB_StageIteratorSky — oracle/codemp/renderer/tr_sky.cpp:786-848")
+}

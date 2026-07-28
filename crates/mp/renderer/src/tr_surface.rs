@@ -6,9 +6,12 @@
 // transcription, matching the rest of the renderer/engine crates.
 #![allow(non_snake_case)]
 
+use core::f64::consts::PI;
+
 use mp_engine_qcommon::common::{com_printf, Common};
 use mp_engine_qcommon::qfiles::md3_surface_t::md3Surface_t;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
+use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::shared::{vec3_t, vec4_t};
 // PORT-NOTE: `native_math` is not yet a direct `mp_renderer` dependency
 // (Cargo.toml wiring gap, same finding as `tr_curve.rs`) — `Q_rsqrt` is
@@ -16,9 +19,9 @@ use mp_qshared::shared::{vec3_t, vec4_t};
 // reachable from this crate today. Flagged for the integrate phase to add
 // the dependency edge; the call site below is otherwise final.
 use native_math::qmath::{
-    _VectorAdd as VectorAdd, _VectorMA as VectorMA, _VectorScale as VectorScale,
-    _VectorSubtract as VectorSubtract, CrossProduct, MakeNormalVectors, PerpendicularVectorMP,
-    Q_rsqrt, RotatePointAroundVector, VectorNormalize,
+    _DotProduct as DotProduct, _VectorAdd as VectorAdd, _VectorMA as VectorMA,
+    _VectorScale as VectorScale, _VectorSubtract as VectorSubtract, vec3_origin, CrossProduct,
+    MakeNormalVectors, PerpendicularVectorMP, Q_rsqrt, RotatePointAroundVector, VectorNormalize,
 };
 
 use crate::render_state::frame_state::FrameState;
@@ -27,6 +30,7 @@ use crate::render_state::placeholders::RefEntity;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_local::orientationr_t::orientationr_t;
 use crate::tr_local::srf_display_list_s::srfDisplayList_t;
+use crate::tr_local::srf_flare_s::srfFlare_t;
 use crate::tr_local::srf_grid_mesh_s::srfGridMesh_t;
 use crate::tr_local::srf_poly_s::srfPoly_t;
 use crate::tr_local::srf_surface_face_t::srfSurfaceFace_t;
@@ -946,4 +950,433 @@ pub fn ApplyShape(
     // recursion
     ApplyShape(point2, point1, right, rads1, rads2, count - 1, state, frame);
     ApplyShape(point2, end, right, rads2, eradius, count - 1, state, frame);
+}
+
+/// Raven `RB_SurfaceSprite` — the `SF_ENTITY` "sprite" surface: builds a
+/// screen-oriented quad, optionally rotated by the current entity's
+/// `rotation` around the view axis, scaled to its `radius`.
+///
+/// DEFERRED: escalation — every statement reads `refEntity_t::radius`/
+/// `::rotation` (`oracle/codemp/cgame/tr_types.h:158-159`) directly or via a
+/// value (`left`/`up`) derived from them; neither field is among the ones
+/// wave 0 landed on `RefEntity` (`render_state/placeholders.rs`). No
+/// statement in this body is independent of them — unlike
+/// `RB_SurfaceOrientedQuad` below, there is no unscaled-vector prefix to
+/// salvage — so nothing survives dropping both inputs. A state home this
+/// packet marks mapped-but-not-yet-populated is an escalation, not an
+/// invention (preamble).
+///
+/// Whole-body deferral: no partial body survives, so this lands as a loud
+/// `todo!()` rather than a silent no-op (whole-fn-deferral convention —
+/// partial-body fns keep DEFERRED comments instead).
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:141-169`
+pub fn RB_SurfaceSprite(
+    current_entity: Option<&RefEntity>,
+    view: &viewParms_t,
+    frame: &mut FrameState,
+) {
+    let _ = (current_entity, view, frame);
+    todo!("Port RB_SurfaceSprite — oracle/codemp/renderer/tr_surface.cpp:141-169")
+}
+
+/// Raven `RB_SurfaceOrientedQuad` — the `SF_ENTITY` "oriented quad" surface:
+/// builds a quad from the current entity's `axis[1]`/`axis[2]`, optionally
+/// rotated by `rotation`, scaled to `radius`.
+///
+/// The unscaled `left`/`up` copy (`axis[1]`/`axis[2]`) needs neither
+/// `radius` nor `rotation` and is real CPU logic, so it is transcribed.
+///
+/// DEFERRED: escalation — everything past the copy (see doc comment above):
+/// `refEntity_t::radius`/`::rotation` (`oracle/codemp/cgame/tr_types.h:
+/// 158-159`) are not among the fields wave 0 landed on `RefEntity`
+/// (`render_state/placeholders.rs`) — a state home this packet marks
+/// mapped-but-not-yet-populated is an escalation, not an invention
+/// (preamble). `RB_AddQuadStamp` is not called.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:177-220`
+pub fn RB_SurfaceOrientedQuad(
+    current_entity: Option<&RefEntity>,
+    view: &viewParms_t,
+    frame: &mut FrameState,
+) {
+    let Some(e) = current_entity else {
+        return;
+    };
+
+    //	MakeNormalVectors( backEnd.currentEntity->e.axis[0], left, up ); --
+    // commented out in the oracle itself; preserved as a Raven comment, not
+    // reactivated (porting-rules: preserve comments, not dead code).
+    let left = e.axis[1];
+    let up = e.axis[2];
+
+    // DEFERRED: escalation — the `rotation == 0` scale branch onward, the
+    // `isMirror` flip, and the final `RB_AddQuadStamp` call (see doc comment
+    // above): `RefEntity::radius`/`::rotation` not landed.
+    // Source: oracle/codemp/renderer/tr_surface.cpp:188-220
+    let _ = (left, up, view, frame);
+}
+
+/// Raven `DoSprite` — builds a screen-oriented quad of half-size `radius`,
+/// rotated by `rotation` around the view axis, at `origin`, colored from the
+/// current entity's `shaderRGBA`. (Called with `radius`/`rotation` already
+/// resolved by its higher-wave caller, unlike `RB_SurfaceSprite` above which
+/// reads them straight off the entity.)
+///
+/// Panics via `RB_AddQuadStampExt`'s loud stub (`tr_surface.rs:508`) until
+/// its owning wave lands — reached through `RB_AddQuadStamp`, the real
+/// one-line wrapper this fn calls (the same transitive path
+/// `RB_AddQuadStamp`'s own doc comment above names).
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:533-555`
+pub fn DoSprite(
+    origin: vec3_t,
+    radius: f32,
+    rotation: f32,
+    current_entity: Option<&RefEntity>,
+    view: &viewParms_t,
+    frame: &mut FrameState,
+) {
+    let Some(e) = current_entity else {
+        return;
+    };
+
+    // ruling 12: `M_PI * rotation / 180.0f` promotes to `f64` (the
+    // unsuffixed `M_PI` double constant), truncating back to `f32` at the
+    // `ang` assignment.
+    let ang = (PI * rotation as f64 / 180.0) as f32;
+    let s = ang.sin();
+    let c = ang.cos();
+
+    let mut left: vec3_t = [0.0; 3];
+    VectorScale(view.ori.axis[1], c * radius, &mut left);
+    VectorMA(left, -s * radius, view.ori.axis[2], &mut left);
+
+    let mut up: vec3_t = [0.0; 3];
+    VectorScale(view.ori.axis[2], c * radius, &mut up);
+    VectorMA(up, s * radius, view.ori.axis[1], &mut up);
+
+    if view.isMirror != 0 {
+        VectorSubtract(vec3_origin, left, &mut left);
+    }
+
+    RB_AddQuadStamp(origin, left, up, e.shader_rgba, frame);
+}
+
+/// Raven `DoBoltSeg` — recursively steps `start`..`end` in ~20-unit chunks,
+/// jittering each point (`Q_crandom`) and passing the resulting segment to
+/// `ApplyShape`, occasionally forking a tendril via a self-recursive call
+/// when `RF_FORKED` is set.
+///
+/// The pre-loop setup (direction/normal vectors, the `old` running point,
+/// the initial radii) needs none of the blocked inputs below and is real CPU
+/// logic, so it is transcribed.
+///
+/// DEFERRED: engine seam — every statement inside the `for ( i = 20; i <=
+/// dis; i += 20 )` stepping loop reads `Q_crandom(&e->frame)`/
+/// `Q_random(&e->frame)` (`tr_surface.cpp:1075-1077,1100,1113`): both seed
+/// from **the current entity's own `frame` field**, not an ambient/global
+/// LCG (`Q_crandom`/`Q_random` are already ported, `native_math::qmath
+/// ::{Q_crandom, Q_random}`, `*mut c_int` seed param). The real blockers are
+/// (1) `RefEntity` (`render_state/placeholders.rs:67-110`) carries no
+/// `frame` field to seed from, and (2) each call also *writes* the seed
+/// in-place through that pointer — this fn's `Option<&RefEntity>` dispatch
+/// shape (the `RB_SurfaceElectricity`/`RB_SurfaceFlare` precedent, this
+/// file) is immutable, so even with a `frame` field there is nowhere to
+/// commit the mutation across the loop's repeated calls. The `RF_FORKED`
+/// branch's `f_count--` write is this packet's STATE HOMES row
+/// `DoBoltSeg`/`f_count`: "per-subsystem owned state struct, NAMED BY THIS
+/// WAVE if this file's wave is where the subsystem lands" — this file
+/// already names that carrier (`TrSurfaceShapeState`, `CreateShape`'s doc
+/// comment) but `f_count` is not added to it here since the loop that would
+/// read/write it never executes; note for whichever wave does add it that
+/// oracle's `f_count` is **file-scope** (`static float f_count;`,
+/// `tr_surface.cpp:956`, alongside `sh1`/`sh2`), not fn-scope, and is a
+/// `float`, not an `int`. The loop also reads `e->renderfx & RF_TAPERED`
+/// (`:1088`) — `RF_TAPERED` (`0x08000`) has no const anywhere in this crate
+/// yet, unlike its `oracle/codemp/cgame/tr_types.h:43-45` block-mates
+/// `RF_FORKED`/`RF_GROW` (still also unported themselves) and the same
+/// block's `RF_DISINTEGRATE1`/`RF_DISINTEGRATE2` (`:47-48`, already
+/// transcribed, `tr_shade_calc.rs:126,132`) — and the
+/// `LIGHTNING_RECURSION_LEVEL` constant it passes to `ApplyShape`
+/// (`:958`, `#define LIGHTNING_RECURSION_LEVEL 1`, also unported). The
+/// loop's two in-module callees (`ApplyShape`, the self-recursive
+/// `DoBoltSeg`) are both blocked by the same gaps.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:1039-1124`
+pub fn DoBoltSeg(
+    start: vec3_t,
+    end: vec3_t,
+    right: vec3_t,
+    radius: f32,
+    current_entity: Option<&RefEntity>,
+) {
+    let mut fwd: vec3_t = [0.0; 3];
+    VectorSubtract(end, start, &mut fwd);
+    let dis = VectorNormalize(&mut fwd);
+
+    let mut rt: vec3_t = [0.0; 3];
+    let mut up: vec3_t = [0.0; 3];
+    MakeNormalVectors(fwd, &mut rt, &mut up);
+
+    let old = start;
+    let old_radius = radius;
+    let new_radius = radius;
+
+    // DEFERRED: `RefEntity::frame` + the stepping loop (see doc comment
+    // above), which is where `e = &backEnd.currentEntity->e` is actually
+    // read.
+    // Source: oracle/codemp/renderer/tr_surface.cpp:1061-1123
+    let _ = (
+        dis,
+        rt,
+        up,
+        old,
+        old_radius,
+        new_radius,
+        right,
+        current_entity,
+    );
+}
+
+/// Raven `RB_SurfaceFlare` — the `SF_FLARE` dispatch-table entry: occlusion-
+/// tests a flare surface (`RB_TestZFlare`), fades its color by the angle
+/// between its normal and the view direction, then stamps a screen-oriented
+/// quad scaled to the current shader's `portalRange` (falling back to `30`,
+/// distance-attenuated, clamped to a `5.0` minimum). The `_XBOX` branch
+/// (short-packed origin/normal) is dead on every target this port ships;
+/// only the retail (non-`_XBOX`) body is in scope.
+///
+/// The `r_flares` early-out, the occlusion test, and the color-fade
+/// computation need none of the blocked state below and are real CPU logic,
+/// so they are transcribed.
+///
+/// DEFERRED: R4 — `tess.shader->portalRange` (`shaderCommands_t`) dissolves
+/// entirely into R4's tessellation/vertex-building pipeline with no
+/// "current shader being tessellated" carrier surviving at R3 (R2 `##
+/// State ownership` row `tess`). Every statement past this point —
+/// `radius`'s distance falloff/clamp, `left`/`up`, the `isMirror` flip, and
+/// the final `RB_AddQuadStamp` call — depends on this unresolved value, so
+/// none of it is transcribed.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:1929-2001`
+pub fn RB_SurfaceFlare(
+    surf: &srfFlare_t,
+    ori: &orientationr_t,
+    view: &viewParms_t,
+    cvars: &RendererCvars,
+    common: &Common,
+    gpu: &mut GpuResources,
+    frame: &mut FrameState,
+) {
+    if common.cvar(cvars.r_flares).integer == 0 {
+        return;
+    }
+
+    if !RB_TestZFlare(surf.origin, ori, view, cvars, common, gpu) {
+        return;
+    }
+
+    // calculate the xyz locations for the four corners
+    let mut origin: vec3_t = [0.0; 3];
+    VectorMA(surf.origin, 3.0, surf.normal, &mut origin);
+    let snormal = surf.normal;
+
+    let mut dir: vec3_t = [0.0; 3];
+    VectorSubtract(origin, view.ori.origin, &mut dir);
+    VectorNormalize(&mut dir);
+
+    let mut d = -DotProduct(dir, snormal);
+    if d < 0.0 {
+        d = -d;
+    }
+
+    // fade the intensity of the flare down as the
+    // light surface turns away from the viewer
+    //
+    // `byte color[4]` truncating float->u8 cast (Raven's own C conversion);
+    // `d` is `abs(dot of two unit vectors)`, bounded to `[0, 1]`, so the
+    // truncation never overflows.
+    let color: [u8; 4] = [
+        (d * 255.0) as u8,
+        (d * 255.0) as u8,
+        (d * 255.0) as u8,
+        255, // only gets used if the shader has cgen exact_vertex!
+    ];
+
+    // DEFERRED: R4 — `radius = tess.shader->portalRange ? ... : 30` onward
+    // (see doc comment above).
+    // Source: oracle/codemp/renderer/tr_surface.cpp:1985-2000
+    let _ = (color, frame);
+}
+
+/// Raven `RB_SurfaceSaberGlow` — the `SF_SABER_GLOW` dispatch-table entry:
+/// stamps a shrinking trail of glow sprites down the saber blade
+/// (`e->saberLength`..`0`, `DoSprite` per step) then a single larger,
+/// slightly randomized "hilt glow" sprite at the entity's origin.
+///
+/// DEFERRED: escalation — every statement needs an input `RefEntity` does not
+/// carry: the stepping loop reads `e->saberLength`/`e->radius`
+/// (`oracle/codemp/cgame/tr_types.h:158`), neither among the fields wave 0
+/// landed (`render_state/placeholders.rs`) — a state home this packet marks
+/// mapped-but-not-yet-populated is an escalation, not an invention (preamble)
+/// — and the trailing hilt-glow call's radius argument
+/// (`5.5f + random() * 0.25f`) needs `random()` — **not** the engine's own
+/// `Q_random` LCG: `random()`/`crandom()` are a `#define` over libc `rand()`
+/// (`oracle/codemp/game/q_shared.h:1591-1592`), a distinct generator this
+/// crate's port convention places on the game tier's `bg_channel::rng::Rng`
+/// (`Rng::random`/`Rng::crandom`, `native_math::qmath`'s module doc), not
+/// reachable from the renderer — for which R2 assigns the renderer no
+/// receiver (packet threading digest: "cite a `// DEFERRED:` if the wave
+/// needs one" — the `CreateShape`/`DoBoltSeg` precedent, this file).
+/// `DoSprite`, the sole callee, is itself already ported and not the
+/// blocker.
+///
+/// Whole-body deferral: no statement is independent of `saberLength`/
+/// `radius`/`random()`, so this lands as a loud `todo!()` rather than a
+/// silent no-op (whole-fn-deferral convention — partial-body fns keep
+/// DEFERRED comments instead).
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:560-580`
+pub fn RB_SurfaceSaberGlow(
+    current_entity: Option<&RefEntity>,
+    view: &viewParms_t,
+    frame: &mut FrameState,
+) {
+    let _ = (current_entity, view, frame);
+    todo!("Port RB_SurfaceSaberGlow — oracle/codemp/renderer/tr_surface.cpp:560-580")
+}
+
+/// Raven `RB_SurfaceElectricity` — the `SF_ENTITY` "electricity" surface:
+/// grows/anchors a lightning bolt from the current entity's `origin` to
+/// `oldorigin` (optionally animating the endpoint under `RF_GROW`), then
+/// hands the resulting segment plus a view-relative "right" vector to
+/// `DoBoltSeg`.
+///
+/// `backEnd.currentEntity` becomes `Option<&RefEntity>` (the `RB_SurfaceBeam`
+/// precedent, this file, wave 0); `backEnd.viewParms` is threaded as the
+/// already-ported tier-2 `viewParms_t` directly (the `RB_TestZFlare`
+/// precedent, this file) — `FrameState::view` is still the empty `ViewParms`
+/// landing placeholder. `tr` is threaded via `frame: &FrameState` per the
+/// packet's SPLIT `tr` row.
+///
+/// The `start`/`fwd`/`dis` setup (needs only `origin`/`oldorigin`, both
+/// landed on `RefEntity`) is real CPU logic and is transcribed.
+///
+/// DEFERRED: escalation — everything past that setup (see doc comment
+/// above): `radius = e->radius` needs `RefEntity::radius`
+/// (`oracle/codemp/cgame/tr_types.h:158`), not among the fields wave 0
+/// landed — a state home this packet marks mapped-but-not-yet-populated is
+/// an escalation, not an invention (preamble). The `RF_GROW` growth branch
+/// additionally needs `tr.refdef.time` (`FrameState::refdef`'s `TrRefdef` has
+/// no `time` field yet, packet STATE HOMES row `RB_SurfaceElectricity`/`tr`).
+/// (`RF_GROW`'s bit value itself is not the blocker — `0x10000`, verifiable
+/// at `oracle/codemp/cgame/tr_types.h:43-45` alongside `RF_FORKED`/
+/// `RF_TAPERED`, the same block this crate already transcribes part of,
+/// `tr_shade_calc.rs:126,132`'s `RF_DISINTEGRATE1`/`RF_DISINTEGRATE2` — it is
+/// simply not yet ported as a const anywhere in this crate, an omission, not
+/// an unknowable value.) The subsequent `VectorMA(..., e->oldorigin)` writes
+/// the entity's `oldorigin`
+/// in place — a mutation this file's `Option<&RefEntity>` shape cannot
+/// express (the same shape as every other dispatch entry in this file). The
+/// final `right`-vector computation and `DoBoltSeg` call are unreachable
+/// without that write's output (`end`) and `radius`.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:1127-1169`
+pub fn RB_SurfaceElectricity(
+    current_entity: Option<&RefEntity>,
+    view: &viewParms_t,
+    frame: &FrameState,
+) {
+    let Some(e) = current_entity else {
+        return;
+    };
+
+    let start = e.origin;
+
+    let mut fwd: vec3_t = [0.0; 3];
+    VectorSubtract(e.old_origin, start, &mut fwd);
+    let dis = VectorNormalize(&mut fwd);
+
+    // DEFERRED: escalation — `radius = e->radius` onward (see doc comment
+    // above).
+    // Source: oracle/codemp/renderer/tr_surface.cpp:1137,1145-1169
+    let _ = (dis, view, frame);
+}
+
+/// Raven `RB_SurfaceEntity` — the `SF_ENTITY` dispatch table: routes to the
+/// per-`reType` surface fn for the current entity (sprite/oriented-quad/beam/
+/// electricity/line/oriented-line/saber-glow/cylinder), falling back to
+/// `RB_SurfaceAxis` for every other type (`RT_MODEL`, `RT_POLY`,
+/// `RT_PORTALSURFACE`, `RT_CLOUDS`, ...).
+///
+/// `backEnd.currentEntity` becomes `frame.current_entity: Option<RefEntity>`
+/// (the `RB_SurfaceBeam` precedent, this file, wave 0), cloned once up front
+/// so the dispatch arms below can pass `Option<&RefEntity>` downward while
+/// still holding `frame: &mut FrameState` for the arms that need it mutably
+/// (`RB_SurfaceSprite`/`RB_SurfaceOrientedQuad`/`RB_SurfaceSaberGlow`).
+/// `backEnd.viewParms` is threaded as the already-ported tier-2
+/// `viewParms_t` directly (the `RB_TestZFlare` precedent, this file) —
+/// `FrameState::view` is still the empty `ViewParms` landing placeholder.
+///
+/// DEFERRED: escalation — the `RT_ENT_CHAIN` case's body
+/// (`tr_surface.cpp:1840-1861`) is unreachable: its `static trRefEntity_t
+/// tempEnt = *backEnd.currentEntity;` is this packet's own STATE HOMES/
+/// THREADING DIGEST fn-scope static (`tempEnt`), a genuine cross-frame kind-3
+/// static per the three-kind rule (it survives across calls, initialized only
+/// once at first execution per the oracle's own `//rww` comment) — R2 assigns
+/// the renderer no carrier for any kind-3 fn-scope static, so it is an
+/// escalation, never an invented field (preamble). Independently blocked
+/// too: `e->e.uRefEnt.uMini.miniStart`/`::miniCount` are fields of
+/// `refEntity_t`'s `uRefEnt` union (`oracle/codemp/cgame/tr_types.h:135-231`)
+/// not among the ones wave 0 landed on `RefEntity`
+/// (`render_state/placeholders.rs`), and `backEnd.refdef.miniEntities` has no
+/// `TrRefdef` field either — only `fov_x`/`fov_y`/`view_origin`/`view_axis`
+/// are landed there. A state home this packet marks mapped-but-not-yet-
+/// populated is an escalation, not an invention (preamble).
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:1812-1868`
+pub fn RB_SurfaceEntity(surf_type: &surfaceType_t, frame: &mut FrameState, view: &viewParms_t) {
+    let current_entity = frame.current_entity.clone();
+    let Some(e) = &current_entity else {
+        return;
+    };
+
+    match e.re_type {
+        refEntityType_t::RT_SPRITE => {
+            RB_SurfaceSprite(current_entity.as_ref(), view, frame);
+        }
+        refEntityType_t::RT_ORIENTED_QUAD => {
+            RB_SurfaceOrientedQuad(current_entity.as_ref(), view, frame);
+        }
+        refEntityType_t::RT_BEAM => {
+            RB_SurfaceBeam(current_entity.as_ref());
+        }
+        refEntityType_t::RT_ELECTRICITY => {
+            RB_SurfaceElectricity(current_entity.as_ref(), view, &*frame);
+        }
+        refEntityType_t::RT_LINE => {
+            RB_SurfaceLine(current_entity.as_ref(), view);
+        }
+        refEntityType_t::RT_ORIENTEDLINE => {
+            RB_SurfaceOrientedLine(current_entity.as_ref());
+        }
+        refEntityType_t::RT_SABER_GLOW => {
+            RB_SurfaceSaberGlow(current_entity.as_ref(), view, frame);
+        }
+        refEntityType_t::RT_CYLINDER => {
+            RB_SurfaceCylinder(current_entity.as_ref(), view);
+        }
+        refEntityType_t::RT_ENT_CHAIN => {
+            // DEFERRED: escalation — RT_ENT_CHAIN's miniEntities-chain fanout
+            // (see doc comment above): `tempEnt` fn-scope static is an
+            // unhomed kind-3 escalation; `RefEntity::uRefEnt`/`TrRefdef::
+            // miniEntities` not landed.
+            // Source: oracle/codemp/renderer/tr_surface.cpp:1839-1861
+            let _ = surf_type;
+        }
+        _ => {
+            RB_SurfaceAxis();
+        }
+    }
 }

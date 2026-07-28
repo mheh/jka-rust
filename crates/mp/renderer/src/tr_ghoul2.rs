@@ -12,11 +12,14 @@
 //! function below likewise drops its own `#ifdef G2_PERFORMANCE_ANALYSIS`
 //! timer touches per the same ruling (DEC-37 A13.5) without a per-site note.
 
+use mp_qshared::common::mp::qcommon::tags::memtag_t;
+use mp_qshared::shared::q_color::S_COLOR_YELLOW;
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorMA, _VectorSubtract, vec3_origin, CrossProduct, DotProductRow,
     VectorNormalize2,
 };
-use mp_qshared::shared::{cplane_t, mdxaBone_t, vec3_t, VectorNormalize};
+use mp_qshared::shared::swap::LittleLong;
+use mp_qshared::shared::{cplane_t, errorParm_t, mdxaBone_t, qhandle_t, vec3_t, VectorNormalize};
 
 use mp_host_interface::mdx::mdxa::{MdxaRef, MdxaView};
 use mp_host_interface::mdx::mdxm::{MdxmSurfaceView, MdxmVertView, MdxmView};
@@ -38,8 +41,15 @@ use mp_engine_ghoul2::shared::cghoul2_info::CGhoul2Info;
 use mp_engine_ghoul2::shared::surface_info_t::surfaceInfo_t;
 use mp_engine_ghoul2::surfaces::g2_find_override_surface;
 
-use mp_engine_qcommon::common::Common;
+use mp_engine_qcommon::common::{com_error, com_printf, Common};
+use native_string::q_string::Q_strlwr;
 
+use crate::mdx_format::mdxa_header_t::mdxaHeader_t;
+use crate::mdx_format::mdxm_header_t::mdxmHeader_t;
+use crate::mdx_format::mdxm_lod_t::mdxmLOD_t;
+use crate::mdx_format::mdxm_lodsurf_offset_t::mdxmLODSurfOffset_t;
+use crate::mdx_format::mdxm_surf_hierarchy_t::mdxmSurfHierarchy_t;
+use crate::mdx_format::mdxm_surface_t::mdxmSurface_t;
 use crate::mdx_format::mdxm_vertex_t::mdxmVertex_t;
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::model_asset::ModelHandle;
@@ -50,10 +60,16 @@ use crate::render_state::shader_asset::ShaderHandle;
 use crate::render_state::skin_asset::SkinHandle;
 use crate::tr_local::crenderable_surface::CRenderableSurface;
 use crate::tr_local::model_s::model_t;
+use crate::tr_local::modtype_t::modtype_t;
 use crate::tr_local::orientationr_t::orientationr_t;
+use crate::tr_local::shader_commands_s::SHADER_MAX_INDEXES;
+use crate::tr_local::stage_vars::SHADER_MAX_VERTEXES;
+use crate::tr_local::surface_type_t::surfaceType_t;
 use crate::tr_main::{R_CullLocalPointAndRadius, CULL_CLIP, CULL_IN, CULL_OUT};
 use crate::tr_mesh::project_radius;
-use crate::tr_model::frontend::mdxm_view_of;
+use crate::tr_model::frontend::{mdxm_view_of, re_register_models_malloc, RE_RegisterModel};
+use crate::tr_model::render_models::RenderModels;
+use crate::tr_model::server_load::read_qpath;
 use crate::tr_shade_calc::myftol;
 
 // ---------------------------------------------------------------------------
@@ -98,6 +114,24 @@ const FG2_BONEWEIGHT_RECIPROCAL_MULT: f32 = 1.0 / 1023.0;
 // Its one reader, `alloc_rs`, is still deferred on the ring's state carrier.
 #[allow(dead_code)]
 const MAX_RENDER_SURFACES: usize = 2048;
+
+/// Raven `int OldToNewRemapTable[72]` — the JK2->JKA bone remap table
+/// [`RenderModels::r_load_mdxm`] runs over an old (`numBones == 72`,
+/// `_humanoid`) `.glm`'s bone references. File-scope in this very TU, right
+/// above the `_humanoid` skeleton commentary that documents each entry's
+/// source bone; Raven's mixed-case name is preserved (same
+/// `non_upper_case_globals` allowance `tr_shader.rs`'s `lightmapsNone` uses).
+///
+/// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:4469-4542`
+#[allow(non_upper_case_globals)]
+const OldToNewRemapTable: [i32; 72] = [
+    0, 1, 2, 3, 4, 5, 6, 6, 7, 8, 9, 10, //
+    10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, //
+    22, 23, 24, 25, 26, 27, 28, 29, 29, 34, 35, 35, //
+    30, 31, 31, 32, 33, 33, 32, 33, 33, 34, 35, 35, //
+    36, 37, 38, 39, 40, 41, 42, 42, 43, 44, 44, 43, //
+    44, 44, 45, 46, 46, 45, 46, 46, 47, 48, 48, 52,
+];
 
 // ---------------------------------------------------------------------------
 // USER RULING (DEC-32 one home per item): the bone-evaluation surface this
@@ -1577,4 +1611,635 @@ pub fn r_g_cull_model(
 pub fn rb_surface_ghoul(surf: CRenderableSurface, frame: &mut FrameState) {
     let _ = (surf, frame);
     todo!("Port RB_SurfaceGhoul — oracle/codemp/renderer/tr_ghoul2.cpp:4060-4451")
+}
+
+// ---------------------------------------------------------------------------
+// R3 wave 9 (`tr_ghoul2.wave9.md`) — final tail wave.
+// ---------------------------------------------------------------------------
+
+/// Raven `MDXA_VERSION` — cross-verified (never guessed, porting-rules §A2)
+/// against the already-ported copy `tr_model::server_load` carries for the
+/// exact same oracle `#define` (this wave's packet does not list it in its
+/// own `## FILE-SCOPE CONSTANTS` section — it lives in `mdx_format.h`, not
+/// `tr_ghoul2.cpp` — but the never-guess rule permits reuse of an
+/// already-verified copy).
+///
+/// Source: `oracle/codemp/renderer/mdx_format.h:29`
+const MDXA_VERSION: i32 = 6;
+
+impl RenderModels {
+    /// Raven `qboolean R_LoadMDXA(model_t *mod, void *buffer, const char
+    /// *mod_name, qboolean &bAlreadyCached)` — the CLIENT model-registration
+    /// path's Ghoul 2 animation-file (`.gla`) loader. Distinct oracle
+    /// function from the already-ported dedicated-server twin
+    /// `ServerLoadMDXA` (`tr_model.cpp:683`, ported as
+    /// `RenderModels::server_load_mdxa` in `tr_model/server_load.rs`) — this
+    /// one is `tr_ghoul2.cpp:5256`, reached from `R_RegisterModel`'s client
+    /// path, not `RE_RegisterServerModel`'s. Not a re-port (marker law
+    /// "never re-port an already-ported fn" — the two are genuinely separate
+    /// Raven functions, porting-rules §20 "duplicate, don't unify"), but its
+    /// body mirrors `server_load_mdxa`'s already-established idiom one for
+    /// one wherever the two functions' oracle bodies agree.
+    ///
+    /// `mod` -> `model: qhandle_t` re-resolved into `self.models` inside the
+    /// method body (not a `&mut model_t` sibling parameter), matching
+    /// `server_load_mdxa`'s own established split-borrow rationale (this
+    /// file's `RenderModels` methods borrow `&mut self`, so a second live
+    /// `&mut ModelData` parameter would alias the receiver — `server_load.rs`
+    /// module doc). Out-param `bAlreadyCached` -> `&mut bool` (kept by-ref:
+    /// the caller reads both the load result and the already-cached flag
+    /// independently, so folding it into the return would lose information a
+    /// plain out-param-to-return translation keeps).
+    ///
+    /// `CREATE_LIMB_HIERARCHY` (`tr_ghoul2.cpp:5051`, `//#define
+    /// CREATE_LIMB_HIERARCHY`) is commented out in the oracle source itself
+    /// — dead surface at the source level (porting-rules §20), dropped
+    /// without a per-site note (its four gated blocks, `:5261-5449`, never
+    /// compile in retail). The `#ifndef _M_IX86` skeletal/frame byte-swap
+    /// loop (`:5461-5500`) is likewise dropped — dead on this port's LE
+    /// x86-64 target, matching `server_load_mdxa`'s own `TRM-D3`/ruling 54
+    /// disposition for the identical arm in its own oracle twin.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:5256-5502`
+    pub(crate) fn r_load_mdxa(
+        &mut self,
+        host: &mut impl EngineHost,
+        common: &mut Common,
+        model: qhandle_t,
+        buffer: &[u8],
+        mod_name: &str,
+        already_cached: &mut bool,
+    ) -> bool {
+        // read some fields from the binary, but only LittleLong() them when
+        // we know this wasn't an already-cached model...
+        let mut version = i32::from_le_bytes(buffer[4..8].try_into().unwrap()); // mdxaHeader_t::version
+        let mut size = i32::from_le_bytes(buffer[96..100].try_into().unwrap()); // mdxaHeader_t::ofsEnd
+
+        if !*already_cached {
+            version = LittleLong(version);
+            size = LittleLong(size);
+        }
+
+        let warn = S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII");
+
+        if version != MDXA_VERSION {
+            com_printf(
+                common,
+                &format!(
+                    "{}R_LoadMDXA: {} has wrong version ({} should be {})\n",
+                    warn, mod_name, version, MDXA_VERSION
+                ),
+            );
+            return false;
+        }
+
+        let idx = model as usize;
+        self.models[idx].r#type = modtype_t::MOD_MDXA;
+        self.models[idx].dataSize += size;
+
+        let (ptr, already_found) = re_register_models_malloc(
+            self,
+            host,
+            size,
+            Some(buffer),
+            mod_name,
+            memtag_t::TAG_MODEL_GLA,
+        );
+        // Raven: `assert(bAlreadyCached == bAlreadyFound); // I should
+        // probably eliminate 'bAlreadyFound', but wtf?` — compiled out under
+        // `-DNDEBUG` (house convention), kept as a debug assert.
+        debug_assert_eq!(
+            *already_cached, already_found,
+            "bAlreadyCached == bAlreadyFound"
+        );
+        // `server_load_mdxa`'s own precedent assert for the identical
+        // `AlignedBytes`-backed cast below.
+        debug_assert_eq!(
+            ptr as usize % 16,
+            0,
+            "AlignedBytes base must be 16-byte aligned"
+        );
+
+        let mdxa = ptr as *mut mdxaHeader_t;
+        self.models[idx].mdxa = mdxa;
+
+        if !already_found {
+            // horrible new hackery, if !bAlreadyFound then we've just done a
+            // tag-morph, so we need to set the bool reference passed into
+            // this function to true, to tell the caller NOT to do an
+            // FS_Freefile since we've hijacked that memory block...
+            // Aaaargh. Kill me now...
+            //
+            // `assert( mdxa == buffer )` doesn't hold under the
+            // `re_register_models_malloc` ingest-copy divergence
+            // `server_load_mdxa` already documents (`TRM-D4`(a)/ruling 58)
+            // and is dropped, not ported (§19).
+            *already_cached = true;
+
+            // SAFETY: `mdxa` is the just-copy-constructed 16-byte-aligned
+            // `AlignedBytes` base (`TRM-D4`/ruling 58); the debug alignment
+            // assert above covers the cast, per §D11 — matching
+            // `server_load_mdxa`'s identical quarantine.
+            unsafe {
+                (*mdxa).ident = LittleLong((*mdxa).ident);
+                (*mdxa).version = LittleLong((*mdxa).version);
+                (*mdxa).numFrames = LittleLong((*mdxa).numFrames);
+                (*mdxa).numBones = LittleLong((*mdxa).numBones);
+                (*mdxa).ofsFrames = LittleLong((*mdxa).ofsFrames);
+                (*mdxa).ofsEnd = LittleLong((*mdxa).ofsEnd);
+            }
+        }
+
+        // SAFETY: see above — `mdxa` is the aligned, live block either way.
+        let num_frames = unsafe { (*mdxa).numFrames };
+        if num_frames < 1 {
+            com_printf(
+                common,
+                &format!("{}R_LoadMDXA: {} has no frames\n", warn, mod_name),
+            );
+            return false;
+        }
+
+        if already_found {
+            // All done, stop here, do not LittleLong() etc. Do not pass
+            // go...
+            return true;
+        }
+
+        // `#ifndef _M_IX86` skeletal/frame swaps (`:5461-5500`) — dropped,
+        // see doc comment above.
+
+        // DEC-35: build the parse-once `MdxaParsed` sidecar over the now
+        // swap-completed block (fresh-load path only; a cache hit returned
+        // above and keeps its already-built sidecar) — matching
+        // `server_load_mdxa`'s identical final step.
+        self.store_parsed_mdxa(mod_name);
+        true
+    }
+}
+
+// ---------------------------------------------------------------------------
+// R3 wave 12 (`tr_ghoul2.wave12.md`) — final tail wave of the R3 renderer
+// port.
+// ---------------------------------------------------------------------------
+
+/// Raven `MDXM_VERSION` — cross-verified (never guessed, porting-rules §A2)
+/// against the already-ported copy `tr_model::server_load` carries for the
+/// exact same oracle `#define` (this wave's packet does not list it in its
+/// own `## FILE-SCOPE CONSTANTS` section — it lives in `mdx_format.h`, not
+/// `tr_ghoul2.cpp` — but the never-guess rule permits reuse of an
+/// already-verified copy, matching [`MDXA_VERSION`]'s (wave 9, above)
+/// identical precedent).
+///
+/// Source: `oracle/codemp/renderer/mdx_format.h:28`
+const MDXM_VERSION: i32 = 6;
+
+impl RenderModels {
+    /// Raven `qboolean R_LoadMDXM(model_t *mod, void *buffer, const char
+    /// *mod_name, qboolean &bAlreadyCached)` — the CLIENT model-registration
+    /// path's Ghoul 2 mesh-file (`.glm`) loader. Distinct oracle function
+    /// from the already-ported dedicated-server twin `ServerLoadMDXM`
+    /// (`tr_model.cpp:799`, ported as `RenderModels::server_load_mdxm` in
+    /// `tr_model/server_load.rs`) — this one is `tr_ghoul2.cpp:4816`, reached
+    /// from `RE_RegisterModel_Actual`'s client path, not
+    /// `RE_RegisterServerModel`'s (matching [`Self::r_load_mdxa`]'s (wave 9,
+    /// above) identical "not a re-port" rationale for its own server twin).
+    /// Its body mirrors `server_load_mdxm`'s already-established
+    /// version-peek/malloc/`LL()`-swap/anim-registration/surface-hierarchy/
+    /// LOD-swap idiom one for one wherever the two oracle bodies agree;
+    /// differences are called out per divergent site below.
+    ///
+    /// `mod` -> `model: qhandle_t` re-resolved into `self.models` inside the
+    /// method body (not a `&mut model_t` sibling parameter) — same
+    /// split-borrow rationale `server_load_mdxm`/`r_load_mdxa` already
+    /// establish (`RenderModels` methods borrow `&mut self`, so a second live
+    /// `&mut ModelData` parameter would alias the receiver). Out-param
+    /// `bAlreadyCached` -> `&mut bool`, kept by-ref for the same reason
+    /// `r_load_mdxa` already gives.
+    ///
+    /// `mdxm->animIndex = RE_RegisterModel(va("%s.gla", mdxm->animName))`
+    /// (`:4884-4891`) is a genuine SCC-345 mutual-recursion edge — this
+    /// wave's own packet lists `RE_RegisterModel`/`RE_RegisterModel_Actual`
+    /// as members of the *same* SCC 345 as this fn (`scc 345` in this file's
+    /// own THREADING DIGEST header), assigned to the sibling
+    /// `tr_model.wave12.md` packet (a different porter, `tr_model.cpp`, not
+    /// this file's edit scope). Called here per this packet's own "signatures
+    /// are LAW, do not explore" contract; the parameter threading below
+    /// (`self`/`host`/`common` alongside the name) is this porter's
+    /// best-effort match to every other client model-registration entry
+    /// point this file/module already established (`r_load_mdxa`,
+    /// `re_register_models_malloc`), not a guessed *value* — reconciled
+    /// against the sibling's actually-landed signature at integration if it
+    /// differs.
+    ///
+    /// The surface-hierarchy walk's `Q_strlwr`/trailing-`"_off"`-strip
+    /// (`:4912-4916`) has no twin in `server_load_mdxm` (the dedicated server
+    /// never touches surface names) — transcribed here as new client-path
+    /// behavior, guarding the 4-byte tail read against a short name (§19: the
+    /// oracle's unguarded `&surfInfo->name[strlen(name)-4]` underflows on a
+    /// name shorter than 4 bytes; the defined choice is "too short to end in
+    /// `_off`, don't strip").
+    ///
+    /// The `#ifndef DEDICATED` shader lookup (`:4926-4938`, `R_FindShader(
+    /// surfInfo->shader, lightmapsNone, stylesDefault, qtrue)` ->
+    /// `surfInfo->shaderIndex`) is the client leg under the R3 client-leg
+    /// ruling and belongs in this port, but is NOT transcribed — see the
+    /// `//TODO: Port R_FindShader` marker at its site for the two live gaps
+    /// (`shader_t::index` has no `int` encoding, and `R_FindShader`'s state
+    /// bundle is threaded on a host convention this fn cannot hold).
+    /// `surfInfo->shaderIndex` is left at whatever value it carries on disk
+    /// (not resolved, not zeroed — the `#ifdef DEDICATED` arm's `= 0` doesn't
+    /// apply to this, the non-dedicated, client-path body) rather than
+    /// invented. `RE_RegisterModels_StoreShaderRequest` (`:4939`) still runs
+    /// unconditionally, outside both `#ifdef` arms, exactly as Raven has it.
+    ///
+    /// `SHADER_MAX_VERTEXES`/`SHADER_MAX_INDEXES` bound overflows raise
+    /// `Com_Error(ERR_DROP, ...)` here (`:4968-4975`) — unlike
+    /// `server_load_mdxm`'s own plain `return qfalse` for the identical
+    /// check, a genuine divergence between the two sibling oracle functions
+    /// (faithfully kept, not normalized, §A2), matching `r_load_md3`'s own
+    /// already-ported `Com_Error` transcription of the same pattern.
+    ///
+    /// `if (isAnOldModelFile) { ... OldToNewRemapTable[boneRef[j]] ... }`
+    /// (`:5026-5041`) is transcribed live, against the
+    /// [`OldToNewRemapTable`] this file now carries — the table is file-scope
+    /// in this same oracle TU (`:4469-4542`), not in `G2_bones.cpp`. Raven's
+    /// `assert(boneRef[j] >= 0 && boneRef[j] < 72)` is a debug assert (house
+    /// convention, compiled out under `-DNDEBUG`); the guarded `else
+    /// boneRef[j]=0` arm is kept as Raven has it. Its bracketing
+    /// `isAnOldModelFile` detection is `:4900-4904` (`numBones == 72 &&
+    /// strstr(animName, "_humanoid")`).
+    ///
+    /// Every remaining `LL()` swap, the `SF_MDX` ident stamp, and the
+    /// `#ifndef _M_IX86` bone-ref/triangle/vertex byte-swap block
+    /// (`:4980-5024`, dead on this port's LE x86-64 target, `TRM-D3`/ruling
+    /// 54, matching `server_load_mdxm`'s identical disposition for the exact
+    /// same nested block) transcribe one for one with `server_load_mdxm`.
+    ///
+    /// The `*mut mdxmHeader_t` cast and every in-place surface/LOD field
+    /// read+swap operate on the 16-byte-aligned `AlignedBytes` base
+    /// (`TRM-D4`/ruling 58); `unsafe`-confined at this seam (§D11) with a
+    /// debug alignment assert at each cast site, matching
+    /// `server_load_mdxm`/`r_load_mdxa`.
+    ///
+    /// `assets` carries no oracle parameter — it is threaded solely so the
+    /// `RE_RegisterModel` recursion below can reach
+    /// `R_SyncRenderThread(tr.registered)` (`tr_model.cpp:1270-1273`, the R3
+    /// client-leg ruling's `#ifndef DEDICATED` block).
+    ///
+    /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:4816-5049`
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn r_load_mdxm(
+        &mut self,
+        host: &mut impl EngineHost,
+        common: &mut Common,
+        cvars: &RendererCvars,
+        assets: &RenderAssets,
+        model: qhandle_t,
+        buffer: &[u8],
+        mod_name: &str,
+        already_cached: &mut bool,
+    ) -> bool {
+        // read some fields from the binary, but only LittleLong() them when
+        // we know this wasn't an already-cached model...
+        let mut version = i32::from_le_bytes(buffer[4..8].try_into().unwrap()); // mdxmHeader_t::version
+        let mut size = i32::from_le_bytes(buffer[160..164].try_into().unwrap()); // mdxmHeader_t::ofsEnd
+
+        if !*already_cached {
+            version = LittleLong(version);
+            size = LittleLong(size);
+        }
+
+        let warn = S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII");
+
+        if version != MDXM_VERSION {
+            com_printf(
+                common,
+                &format!(
+                    "{}R_LoadMDXM: {} has wrong version ({} should be {})\n",
+                    warn, mod_name, version, MDXM_VERSION
+                ),
+            );
+            return false;
+        }
+
+        let idx = model as usize;
+        self.models[idx].r#type = modtype_t::MOD_MDXM;
+        self.models[idx].dataSize += size;
+
+        let (ptr, already_found) = re_register_models_malloc(
+            self,
+            host,
+            size,
+            Some(buffer),
+            mod_name,
+            memtag_t::TAG_MODEL_GLM,
+        );
+        // Raven: `assert(bAlreadyCached == bAlreadyFound);` — compiled out
+        // under `-DNDEBUG` (house convention), kept as a debug assert.
+        debug_assert_eq!(
+            *already_cached, already_found,
+            "bAlreadyCached == bAlreadyFound"
+        );
+        debug_assert_eq!(
+            ptr as usize % 16,
+            0,
+            "AlignedBytes base must be 16-byte aligned"
+        );
+
+        let mdxm = ptr as *mut mdxmHeader_t;
+        self.models[idx].mdxm = mdxm;
+
+        if !already_found {
+            // "horrible new hackery" — the one-time ingest copy (`TRM-D4`
+            // (a)/ruling 58); `assert(mdxm == buffer)` doesn't hold under
+            // that divergence and is dropped, not ported (§19).
+            *already_cached = true;
+
+            // SAFETY: `mdxm` is the just-copy-constructed 16-byte-aligned
+            // `AlignedBytes` base (`TRM-D4`/ruling 58); the debug alignment
+            // assert above covers the cast, per §D11 — matching
+            // `server_load_mdxm`'s identical quarantine.
+            unsafe {
+                (*mdxm).ident = LittleLong((*mdxm).ident);
+                (*mdxm).version = LittleLong((*mdxm).version);
+                (*mdxm).numLODs = LittleLong((*mdxm).numLODs);
+                (*mdxm).ofsLODs = LittleLong((*mdxm).ofsLODs);
+                (*mdxm).numSurfaces = LittleLong((*mdxm).numSurfaces);
+                (*mdxm).ofsSurfHierarchy = LittleLong((*mdxm).ofsSurfHierarchy);
+                (*mdxm).ofsEnd = LittleLong((*mdxm).ofsEnd);
+            }
+        }
+
+        // first up, go load in the animation file we need that has the
+        // skeletal animation info for this model.
+        // SAFETY: `mdxm` is the aligned, live block either way; `animName`
+        // is never itself byte-swapped (it's a char array).
+        let anim_name = unsafe { read_qpath(&(*mdxm).animName) };
+        let anim_filename = format!("{}.gla", anim_name);
+        // See the doc comment above: SCC-345 mutual-recursion edge into the
+        // sibling `tr_model.wave12.md` packet.
+        let anim_index = RE_RegisterModel(self, host, common, cvars, assets, &anim_filename);
+        // SAFETY: as above.
+        unsafe {
+            (*mdxm).animIndex = anim_index;
+        }
+
+        if anim_index == 0 {
+            // SAFETY: as above.
+            let mesh_name = unsafe { read_qpath(&(*mdxm).name) };
+            com_printf(
+                common,
+                &format!(
+                    "{}R_LoadMDXM: missing animation file {} for mesh {}\n",
+                    warn, anim_name, mesh_name
+                ),
+            );
+            return false;
+        }
+
+        // copy this up to the model for ease of use - it wil get inced
+        // after this.
+        // SAFETY: as above.
+        let num_lods = unsafe { (*mdxm).numLODs };
+        self.models[idx].numLods = num_lods - 1;
+
+        if already_found {
+            // All done. Stop, go no further, do not LittleLong(), do not
+            // pass Go...
+            return true;
+        }
+
+        // SAFETY: as above.
+        let is_an_old_model_file =
+            unsafe { (*mdxm).numBones == 72 && anim_name.contains("_humanoid") };
+
+        // SAFETY: every pointer walk below stays inside the `AlignedBytes`
+        // block the cache entry owns (its size is the file's `ofsEnd`), off
+        // the 16-byte-aligned base asserted above (§D11).
+        unsafe {
+            let base = ptr;
+            let num_surfaces = (*mdxm).numSurfaces;
+
+            let mut surf_info =
+                base.add((*mdxm).ofsSurfHierarchy as usize) as *mut mdxmSurfHierarchy_t;
+            for _ in 0..num_surfaces {
+                (*surf_info).numChildren = LittleLong((*surf_info).numChildren);
+                (*surf_info).parentIndex = LittleLong((*surf_info).parentIndex);
+
+                // just in case
+                Q_strlwr(&mut (*surf_info).name);
+                // remove "_off" from name (§19: guard the 4-byte tail read
+                // against a short name — see doc comment above). `name_len`
+                // is C `strlen` — bytes before the NUL — not the decoded
+                // `String`'s `.len()`: `read_qpath` widens every byte >= 0x80
+                // to a 2-byte UTF-8 char, so the two diverge on a non-ASCII
+                // surface name.
+                let (name_len, ends_in_off) = {
+                    let name = &(*surf_info).name;
+                    let len = name.iter().position(|&c| c == 0).unwrap_or(name.len());
+                    (
+                        len,
+                        len >= 4
+                            && name[len - 4..len]
+                                .iter()
+                                .zip(b"_off")
+                                .all(|(&c, &b)| c as u8 == b),
+                    )
+                };
+                if ends_in_off {
+                    (*surf_info).name[name_len - 4] = 0;
+                }
+
+                // do all the children indexs
+                let num_children = (*surf_info).numChildren;
+                let child_indexes = core::ptr::addr_of_mut!((*surf_info).childIndexes) as *mut i32;
+                for j in 0..num_children as usize {
+                    let child = child_indexes.add(j);
+                    *child = LittleLong(*child);
+                }
+
+                //TODO: Port R_FindShader
+                // Source: oracle/codemp/renderer/tr_ghoul2.cpp:4923-4938
+                // The `#ifndef DEDICATED` leg is this port's live leg (R3
+                // client-leg ruling: the R3 renderer track is the CLIENT
+                // port). `lightmapsNone`/`stylesDefault` ARE landed
+                // (`tr_shader.rs:159-196`); the two gaps that remain are:
+                // (1) `sh->index` — the `int` the oracle pokes into
+                //     `surfInfo->shaderIndex` — has no landed encoding:
+                //     `R_FindShader` returns a generation-counted
+                //     `ShaderHandle` and `ShaderAsset` carries no `index`
+                //     field, and the read side is itself escalated
+                //     (`render_surfaces`'s "shaderIndex accessor" blocker,
+                //     this file's `:790-821` doc comment);
+                // (2) `R_FindShader`'s state bundle (`tr_shader.rs:4839-4855`)
+                //     threads `view: &mut EngineHostView` plus nine
+                //     render-state params, while this fn's family threads
+                //     `host: &mut impl EngineHost` + `common: &mut Common`.
+                //     `EngineHostView` itself implements `EngineHost` and owns
+                //     `common: &mut Common`, so the two cannot be live
+                //     parameters at once — reconciling them is a
+                //     model-registration-family signature decision above this
+                //     file.
+                // `surfInfo->shaderIndex` is left as whatever it carries on
+                // disk (see doc comment above).
+                let name_offset =
+                    (core::ptr::addr_of!((*surf_info).shader) as usize - base as usize) as i32;
+                let poke_offset =
+                    (core::ptr::addr_of!((*surf_info).shaderIndex) as usize - base as usize) as i32;
+                self.re_register_models_store_shader_request(mod_name, name_offset, poke_offset);
+
+                // find the next surface
+                let surf_info_size = core::mem::offset_of!(mdxmSurfHierarchy_t, childIndexes)
+                    + (num_children as usize) * core::mem::size_of::<i32>();
+                surf_info = (surf_info as *mut u8).add(surf_info_size) as *mut mdxmSurfHierarchy_t;
+            }
+
+            // swap all the LOD's (we need to do the middle part of this even
+            // for intel, because of shader reg and err-check)
+            let mdxm = ptr as *mut mdxmHeader_t;
+            let mut lod = base.add((*mdxm).ofsLODs as usize) as *mut mdxmLOD_t;
+            for _ in 0..(*mdxm).numLODs {
+                (*lod).ofsEnd = LittleLong((*lod).ofsEnd);
+
+                // swap all the surfaces
+                let mut surf = (lod as *mut u8).add(
+                    core::mem::size_of::<mdxmLOD_t>()
+                        + (num_surfaces as usize) * core::mem::size_of::<mdxmLODSurfOffset_t>(),
+                ) as *mut mdxmSurface_t;
+                for _ in 0..num_surfaces {
+                    (*surf).numTriangles = LittleLong((*surf).numTriangles);
+                    (*surf).ofsTriangles = LittleLong((*surf).ofsTriangles);
+                    (*surf).numVerts = LittleLong((*surf).numVerts);
+                    (*surf).ofsVerts = LittleLong((*surf).ofsVerts);
+                    (*surf).ofsEnd = LittleLong((*surf).ofsEnd);
+                    (*surf).ofsHeader = LittleLong((*surf).ofsHeader);
+                    (*surf).numBoneReferences = LittleLong((*surf).numBoneReferences);
+                    (*surf).ofsBoneReferences = LittleLong((*surf).ofsBoneReferences);
+
+                    if (*surf).numVerts > SHADER_MAX_VERTEXES as i32 {
+                        com_error(
+                            errorParm_t::ERR_DROP,
+                            format!(
+                                "R_LoadMDXM: {} has more than {} verts on a surface ({})",
+                                mod_name,
+                                SHADER_MAX_VERTEXES,
+                                (*surf).numVerts
+                            ),
+                        );
+                    }
+                    if (*surf).numTriangles * 3 > SHADER_MAX_INDEXES as i32 {
+                        com_error(
+                            errorParm_t::ERR_DROP,
+                            format!(
+                                "R_LoadMDXM: {} has more than {} triangles on a surface ({})",
+                                mod_name,
+                                SHADER_MAX_INDEXES / 3,
+                                (*surf).numTriangles
+                            ),
+                        );
+                    }
+
+                    // change to surface identifier
+                    (*surf).ident = surfaceType_t::SF_MDX as i32;
+
+                    // `#ifndef _M_IX86` bone-ref/triangle/vertex swaps
+                    // (`:4980-5024`) — §20-dropped (`TRM-D3`/ruling 54).
+
+                    if is_an_old_model_file {
+                        let bone_ref =
+                            (surf as *mut u8).add((*surf).ofsBoneReferences as usize) as *mut i32;
+                        for j in 0..(*surf).numBoneReferences as usize {
+                            let slot = bone_ref.add(j);
+                            // Raven: `assert(boneRef[j] >= 0 && boneRef[j] <
+                            // 72);` — compiled out under `-DNDEBUG` (house
+                            // convention), kept as a debug assert.
+                            debug_assert!(
+                                (0..72).contains(&*slot),
+                                "boneRef[j] >= 0 && boneRef[j] < 72"
+                            );
+                            *slot = if (0..72).contains(&*slot) {
+                                OldToNewRemapTable[*slot as usize]
+                            } else {
+                                0
+                            };
+                        }
+                    }
+
+                    // find the next surface
+                    surf = (surf as *mut u8).add((*surf).ofsEnd as usize) as *mut mdxmSurface_t;
+                }
+
+                // find the next LOD
+                lod = (lod as *mut u8).add((*lod).ofsEnd as usize) as *mut mdxmLOD_t;
+            }
+        }
+
+        self.store_parsed_mdxm(mod_name);
+        true
+    }
+}
+
+/// Raven `void R_AddGhoulSurfaces( trRefEntity_t *ent )` — the per-frame
+/// entry point that culls, sorts, transforms and renders every Ghoul2
+/// construct bolted to `ent`.
+///
+/// DEFERRED: R4/escalation — whole-fn, no partial body survives (matching
+/// this file's own [`rb_surface_ghoul`] precedent for the identical
+/// situation):
+/// - The function's very first live statement (`CGhoul2Info_v &ghoul2 =
+///   *((CGhoul2Info_v *)ent->e.ghoul2)`) needs the entity's actual attached
+///   Ghoul2 instance list. [`RefEntity`] (`render_state::placeholders`, out
+///   of this file's edit scope) carries only `has_ghoul2: bool` — a
+///   presence flag, not a handle — because the tier-1 `refEntity_t`'s `*mut
+///   c_void` ghoul2 tail is forbidden interior (`## Type tiers` preamble)
+///   and no R2-licensed per-entity `Ghoul2System`/`CGhoul2Info_v` threading
+///   path exists yet. Every remaining line of the oracle body reads through
+///   that same `ghoul2` binding, so nothing past the first statement is
+///   reachable — there is no partial prefix to transcribe (unlike
+///   `render_surfaces`/`g2_construct_used_bone_list` in this same file,
+///   which get a real recursive skeleton before their blocked arm).
+/// - `HackadelicOnClient` (write) ESCALATES per this wave's own STATE HOMES
+///   table (DEC-37 A13.3: a per-subsystem state struct is licensed only "if
+///   this file's wave is where the subsystem lands"). It doesn't land here:
+///   its only other touch anywhere in the workspace is as a read the
+///   already-ported `mp_engine_ghoul2::render::{bone_cache,skeleton}` bone
+///   evaluation code hardcodes to `false` ("const-`false` server-side"
+///   ruling, out of this wave's edit scope) — naming a real mutable carrier
+///   here would silently diverge from that already-landed assumption rather
+///   than close it out.
+/// - `goreShader` (write) — cross-verified against the already-ported
+///   `Ghoul2System::gore_shader: qhandle_t` field
+///   (`mp_engine_ghoul2::ghoul2_system`, "folded from the file-scope
+///   `goreShader` per ruling 12") — is a genuine state home, but reaching it
+///   needs the same blocked `Ghoul2System`/entity-ghoul2 threading as the
+///   first bullet.
+/// - `R_GComputeFogNum`/`bInShadowRange`, two of this fn's own in-module
+///   callees, are themselves already `todo!()` in this file (their own
+///   blockers, both pre-existing).
+/// - `RenderSurfaces`'s surface-visible body is itself already `todo!()` in
+///   this file for independent reasons (see [`render_surfaces`]'s doc
+///   comment).
+/// - `ent->e.modelScale`/`radius`/`angles`/`customSkin` are read by this
+///   body but are not fields [`RefEntity`] carries (it has `custom_shader`,
+///   not `customSkin`; no `modelScale`/`radius`/`angles` at all — the same
+///   gap [`g2_compute_lod`]/[`r_g_cull_model`] (this file, earlier waves)
+///   already worked around by threading `model_scale`/`radius` as explicit
+///   parameters instead of reading them off `RefEntity`, a workaround this
+///   fn cannot use because it also needs the blocked `ghoul2`/`angles`
+///   fields those two callees don't).
+///
+/// Loud `todo!()` per the whole-fn-deferral convention.
+///
+/// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:3383-3538`
+#[doc(alias = "R_AddGhoulSurfaces")]
+pub fn r_add_ghoul_surfaces(
+    ent: &RefEntity,
+    assets: &RenderAssets,
+    frame: &mut FrameState,
+    cvars: &RendererCvars,
+    common: &Common,
+) {
+    let _ = (ent, assets, frame, cvars, common);
+    todo!("Port R_AddGhoulSurfaces — oracle/codemp/renderer/tr_ghoul2.cpp:3383-3538")
 }

@@ -575,10 +575,17 @@ impl CFontInfo {
         truncate_to_qpath(&mut me.m_sFontName);
         // so we get better error printing if failed to load shader (ie lose ".fontdat")
         me.m_sFontName = COM_StripExtension(&me.m_sFontName);
-        // DEFERRED: RE_RegisterShaderNoMip — this crate has no ported shader
-        // registration entry point yet (`tr_shader.rs` wave 0 landed the
-        // parser, not the registry seam), so the handle stays 0, Raven's own
-        // "no shader" value.
+        // DEFERRED: RE_RegisterShaderNoMip — landed (wave 8,
+        // `tr_shader.rs:5099`), but its Rust signature threads a dozen
+        // renderer/engine carriers (`QSharedScratch`, `FrameState`,
+        // `RenderAssets`, `RendererCvars`, `RenderAssetsSim`, `RenderModels`,
+        // `TrImageState`, `GpuResources`, `viewParms_t`, `SkyState`) that
+        // `CFontInfo::new` does not have and is out of this wave's scope to
+        // add; its body is also still an unlanded loud stub
+        // (`todo!("Port RE_RegisterShader...")`, `tr_shader.rs:5085-5087`)
+        // pending its own `lightmaps2d`/`stylesDefault` gap, so wiring it here
+        // would only trade this cited gap for an unconditional panic. The
+        // handle stays 0, Raven's own "no shader" value, until both land.
         // Source: `oracle/codemp/renderer/tr_font.cpp:877`
         me.mShader = 0;
 
@@ -806,9 +813,17 @@ impl CFontInfo {
                         // DEFERRED: RE_RegisterShaderNoMip, together with the
                         // `Com_sprintf(sTemp, "fonts/%s_%d_1024_%d", psLang,
                         // 1024/m_iAsianGlyphsAcross, i)` name build that feeds
-                        // it — no ported shader-registration entry point in
-                        // this crate yet. Raven's own comment below states
-                        // what the 0 left here then means.
+                        // it — landed (wave 8, `tr_shader.rs:5099`) but not
+                        // callable from `UpdateAsianIfNeeded`'s own parameter
+                        // list without threading a dozen renderer/engine
+                        // carriers this fn doesn't carry, and its body is
+                        // still an unlanded loud stub
+                        // (`todo!("Port RE_RegisterShader...")`,
+                        // `tr_shader.rs:5085-5087`) pending its own
+                        // `lightmaps2d`/`stylesDefault` gap — see the matching
+                        // note on `CFontInfo::new`'s `mShader` assignment.
+                        // Raven's own comment below states what the 0 left
+                        // here then means.
                         // Source: `oracle/codemp/renderer/tr_font.cpp:1013-1017`
                         //
                         // returning 0 here will automatically inhibit Asian glyph calculations at runtime...

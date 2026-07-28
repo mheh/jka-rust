@@ -7,8 +7,10 @@
 #![allow(non_snake_case)]
 
 use mp_engine_qcommon::common::com_error;
+use mp_engine_qcommon::common::com_printf;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::Common;
+use mp_engine_qcommon::timing::sys_milliseconds;
 use mp_qshared::shared::error_parm::errorParm_t;
 use native_math::rng::Rng;
 
@@ -19,6 +21,7 @@ use crate::render_state::placeholders::Vec3;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
+use crate::tr_cmds::R_SyncRenderThread;
 use crate::tr_image::{R_Images_GetNextIteration, R_Images_StartIteration};
 use crate::tr_local::cull_type_t::cullType_t;
 use crate::tr_main::{DrawSurf, SurfaceGeometry};
@@ -1049,4 +1052,114 @@ pub fn RB_DrawSurfs(
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:1916-1959`
 pub fn RB_ExecuteRenderCommands() {
     todo!("Port RB_ExecuteRenderCommands — oracle/codemp/renderer/tr_backend.cpp:1916-1959")
+}
+
+/// Raven `RE_StretchRaw` — (re)uploads a cinematic video frame into the
+/// per-client scratch texture and draws it as a screen-space quad; the
+/// direct-call twin of the command-buffer-routed [`RE_UploadCinematic`]
+/// (same `tr.scratchImage[client]` target, same format-change/dirty-subimage
+/// decision).
+///
+/// PORT-NOTE: the packet's RESOLVED CALL SURFACE lists `Sys_Milliseconds` as
+/// `mp_engine_core::lifecycle::sys_milliseconds(engine: &Engine, base_time:
+/// bool)`, but that fn is unreachable from this crate — `mp_engine_core`
+/// already depends on `mp_renderer` (the reverse edge would cycle), the same
+/// block `RE_Font_DrawString`'s port hit for the identical callee
+/// (`tr_font.rs`). The oracle call site (`Sys_Milliseconds()`, no args) is
+/// the base-relative clock, whose one real implementation is
+/// `mp_engine_qcommon::timing::sys_milliseconds(common: &Common)` —
+/// `lifecycle::sys_milliseconds`'s own `base_time == false` arm delegates to
+/// it — and `mp_renderer` already depends on `mp_engine_qcommon`, so it is
+/// called directly here.
+///
+/// `Sys_Milliseconds()*com_timescale->value` — `int * float` promotes the
+/// `int` operand to `float` (C's usual arithmetic conversions only reach
+/// `double` when an operand IS `double`/`long double`), so this stays an
+/// `f32` product, no ruling-12 double intermediate.
+///
+/// DEFERRED: R4 — `qglFinish()` ("we definately want to sync every frame for
+/// the cinematics") is GL-only (DEC-37 A13.2).
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1313-1314`
+///
+/// DEFERRED: R4 — `GL_Bind(tr.scratchImage[client])` and the
+/// format-change/dirty-subimage `qgl*` texture upload
+/// (`qglTexImage2D`/`qglTexParameterf`×4/`qglTexSubImage2D`) are GL-only, and
+/// `tr.scratchImage[NUM_SCRATCH_IMAGES]` has no R2-assigned carrier — the
+/// same ESCALATION `RE_UploadCinematic`'s port and `tr_image.rs`'s
+/// `R_CreateBuiltinImages` both cite (DEC-37 A13.2).
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1327-1344`
+///
+/// DEFERRED: R4 — `qglColor3f(tr.identityLight×3)` and the
+/// `qglBegin(GL_QUADS)`/`qglTexCoord2f`/`qglVertex2f`×4/`qglEnd` quad draw
+/// are GL-only (DEC-37 A13.2).
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1353-1364`
+///
+/// Landed: the `tr.registered` early-out, [`R_SyncRenderThread`], both
+/// `r_speeds`-gated timing/`Com_Printf` measurements (real `Common::cvar`
+/// reads, no GL/scratch-image dependency), the power-of-2 `Com_Error` guard,
+/// and the unconditional [`RB_SetGL2D`] call.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1304-1365`
+#[allow(clippy::too_many_arguments)]
+pub fn RE_StretchRaw(
+    frame: &mut FrameState,
+    gpu: &mut GpuResources,
+    assets: &RenderAssets,
+    cvars: &RendererCvars,
+    common: &mut Common,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    cols: i32,
+    rows: i32,
+    data: &[u8],
+    client: i32,
+    dirty: bool,
+) {
+    if !assets.registered {
+        return;
+    }
+    R_SyncRenderThread(assets, common, cvars);
+
+    // DEFERRED: R4 — qglFinish() (see doc comment above) (DEC-37 A13.2)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:1313-1314
+
+    let start = if common.cvar(cvars.r_speeds).integer != 0 {
+        Some((sys_milliseconds(common) as f32 * common.cvar(common.com_timescale).value) as i32)
+    } else {
+        None
+    };
+
+    // make sure rows and cols are powers of 2
+    if (cols & (cols - 1)) != 0 || (rows & (rows - 1)) != 0 {
+        com_error(
+            errorParm_t::ERR_DROP,
+            format!("Draw_StretchRaw: size not a power of 2: {cols} by {rows}"),
+        );
+    }
+
+    // DEFERRED: R4 — GL_Bind(tr.scratchImage[client]) + the format-change/
+    // dirty-subimage qgl* texture upload (see doc comment above) (DEC-37 A13.2)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:1327-1344
+    let _ = (x, y, w, h, data, client, dirty);
+
+    // `r_speeds->integer` can't change between the two oracle checks (nothing
+    // in between re-enters cvar code), so `start.is_some()` stands in for the
+    // oracle's second, independently-re-read `if ( r_speeds->integer )`.
+    if let Some(start) = start {
+        let end =
+            (sys_milliseconds(common) as f32 * common.cvar(common.com_timescale).value) as i32;
+        com_printf(
+            common,
+            &format!("qglTexSubImage2D {cols}, {rows}: {} msec\n", end - start),
+        );
+    }
+
+    RB_SetGL2D(frame, gpu, assets);
+
+    // DEFERRED: R4 — qglColor3f(tr.identityLight x3) + the
+    // qglBegin(GL_QUADS)/qglTexCoord2f/qglVertex2f x4/qglEnd quad draw (see
+    // doc comment above) (DEC-37 A13.2)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:1353-1364
 }

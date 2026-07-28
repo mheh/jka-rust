@@ -66,6 +66,12 @@ pub struct FrameState {
     ///
     /// Source: `oracle/codemp/renderer/tr_local.h:1385`
     pub sun_direction: Vec3,
+    /// `tr.sunAmbient` — Raven: "from the sky shader (only used for John's
+    /// terrain system)" (wave-10 field merge; see `tr_bsp.rs`'s WAVE 10
+    /// ADDITIONS note).
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1387`
+    pub sun_ambient: Vec3,
     /// `tr.externalVisData` — Raven: "from `RE_SetWorldVisData`, shared with
     /// `CM_Load`". Owned here rather than aliasing the collision world's
     /// buffer (interior-safety law); `None` until `CM_LoadMap` hands one over.
