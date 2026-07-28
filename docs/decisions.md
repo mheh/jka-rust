@@ -1005,3 +1005,34 @@ still consumes the doc comments until then.
    worker that touched code is auto-rejected. `cargo build --workspace` green;
    referee run as belt-and-suspenders though comments cannot affect it.
 
+
+## DEC-40 — client-track builds take the non-DEDICATED leg (R3 waves 7-13 close-out, 2026-07-27)
+
+**Ruling (user-ratified 2026-07-27):** every client-track transcription — the
+R3 renderer remainder and the coming cgame/`cl_*` waves — takes the
+**non-DEDICATED** (`#ifndef DEDICATED`) leg of Raven's compile-time split.
+Raven compiles the same TUs into both jamp.exe (DEDICATED undefined) and
+jampDed.exe (defined); our dedicated server never links a renderer beyond its
+headless subset, so all new renderer/client logic is jamp.exe-based.
+
+1. **The jampded headless subset keeps its dedicated-arm dispositions** —
+   `ServerLoadMDXA`/`ServerLoadMDXM`, `RE_RegisterServerModel`, the server
+   skins path (`gServerSkinHack`/`R_FindServerShader`), and every drop the
+   TRM-D2…D5 rulings scoped to the server link set. Those rulings are
+   *scoped*, not overruled: they never license dropping client-leg code in
+   client-track files.
+2. **Runtime switches are not the compile flag.** Where Raven splits at
+   runtime (`com_dedicated` cvar, `com_cl_running`), both arms are
+   transcribed and the check decides at runtime (existing precedent:
+   `R_FindImageFile`, `R_InitShaders(server: bool)`).
+3. **A client-leg call that cannot be wired yet** gets a greppable
+   `//TODO: Port <subject>` naming this DEC and the real gap — never a
+   silent drop citing a jampded precedent (the waves 7-13 defect this DEC
+   closes: two porters dropped `RE_LoadWorldMap_Actual`-on-`#`-models and
+   `R_SyncRenderThread` as "DEDICATED is live").
+4. **Packet preambles state the policy** — R3-tail planning defect #4/#5:
+   wave packets for client-track TUs must declare "client track: take the
+   `#ifndef DEDICATED` leg, cite DEC-40" so porters stop re-deriving it.
+
+Applied in the waves 7-13 fix round (commit 255ec091); review survey: 17 of
+19 guarded sites in that diff already took the client leg.
