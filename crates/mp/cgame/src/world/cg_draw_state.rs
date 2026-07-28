@@ -47,7 +47,7 @@ impl Default for lagometer_t {
 /// tables beside them are compiled-in data, not state; they land as `const`s
 /// beside the functions that read them (§C8).
 ///
-/// Source: `oracle/codemp/cgame/cg_draw.c:23-40,1791-1792,1940-1941,2196,2425,3167,3173-3174,4152,4738-4740,4799-4803,4847,5325-5326,7317-7338,7351-7354,7481`
+/// Source: `oracle/codemp/cgame/cg_draw.c:23-40,1791-1792,1940-1941,2196,2425,3167,3172-3174,4152,4738-4740,4799-4803,4847,5325-5326,7317-7338,7351-7354,7481`
 #[derive(Debug, Clone)]
 pub struct CgDrawState {
     /// Raven `int cg_targVeh` — the vehicle the targeting HUD is locked onto.
@@ -103,11 +103,50 @@ pub struct CgDrawState {
     /// when the round enters pre-round or post-round.
     /// Source: `oracle/codemp/cgame/cg_draw.c:7353`
     pub cgSiegeRoundBeganTime: c_int,
+
+    /// Raven `float *hudTintColor` — the HUD tint `CG_DrawHUD` re-points at
+    /// `redhudtint`/`bluehudtint`/`colorTable[CT_WHITE]` each frame. Raven's
+    /// pointer starts NULL and `trap_R_SetColor(NULL)` is the renderer's
+    /// reset-to-white, so `None` carries that starting state honestly rather
+    /// than inventing a colour.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:26,1234-1242`
+    pub hudTintColor: Option<vec4_t>,
+
+    /// Raven `int cg_vehicleAmmoWarning` — which vehicle weapon (0 = upper,
+    /// 1 = lower) the low-ammo flash belongs to.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:1940`
+    pub cg_vehicleAmmoWarning: c_int,
+
+    /// Raven `int cg_vehicleAmmoWarningTime` — `cg.time` the flash runs until.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:1941`
+    pub cg_vehicleAmmoWarningTime: c_int,
+
+    /// Raven `qboolean cg_drawLink` — last frame's weapons-linked state; a
+    /// change plays the link sound once.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:2196`
+    pub cg_drawLink: bool,
+
+    /// Raven `float cg_radarRange` — the radar's world-units range, overridden
+    /// per map by `CG_ParseEntityFromSpawnVars`.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:3167`,
+    /// `oracle/codemp/cgame/cg_main.c:3631`
+    pub cg_radarRange: f32,
+
+    /// Raven `static int radarLockSoundDebounceTime` — next `cg.time` the
+    /// missile-lock alarm may re-fire.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:3172`
+    pub radarLockSoundDebounceTime: c_int,
+
+    /// Raven `static int impactSoundDebounceTime` — next `cg.time` the
+    /// asteroid-impact alarm may re-fire. Doubles as the fade clock for the
+    /// asteroid blip's alpha, so it is read as well as debounced.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:3173`
+    pub impactSoundDebounceTime: c_int,
 }
 
 impl Default for CgDrawState {
-    /// Raven's initializers — everything is zeroed BSS except `cg_targVeh`,
-    /// which starts at `ENTITYNUM_NONE`.
+    /// Raven's initializers — everything is zeroed BSS except `cg_targVeh`
+    /// (`ENTITYNUM_NONE`) and `cg_radarRange` (2500).
     fn default() -> Self {
         CgDrawState {
             cg_targVeh: ENTITYNUM_NONE,
@@ -122,6 +161,13 @@ impl Default for CgDrawState {
             cg_genericTimerColor: [0.0; 4],
             cgSiegeEntityRender: 0,
             cgSiegeRoundBeganTime: 0,
+            hudTintColor: None,
+            cg_vehicleAmmoWarning: 0,
+            cg_vehicleAmmoWarningTime: 0,
+            cg_drawLink: false,
+            cg_radarRange: 2500.0,
+            radarLockSoundDebounceTime: 0,
+            impactSoundDebounceTime: 0,
         }
     }
 }

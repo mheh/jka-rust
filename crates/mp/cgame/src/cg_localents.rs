@@ -13,12 +13,14 @@ use mp_qshared::shared::{
     qtrue, sfxHandle_t, trType_t, trajectory_t, vec3_t, CHAN_AUTO, ENTITYNUM_WORLD,
 };
 
+use crate::cg_main::CG_Error;
 use crate::local::le_bounce_sound_type_t::leBounceSoundType_t;
 use crate::local::le_mark_type_t::leMarkType_t;
 use crate::local::local_entity_s::localEntity_t;
 use crate::trap;
 use crate::world::cg_context::CgContext;
 use crate::world::cg_world::CgWorld;
+use crate::world::effect_handle::EffectHandle;
 
 // FILE-SCOPE CONSTANTS
 // Source: `oracle/codemp/cgame/cg_localents.c:9,637`
@@ -294,4 +296,18 @@ pub fn CG_AddLine(ctx: &mut CgContext, le: &mut localEntity_t) {
     le.refEntity.reType = refEntityType_t::RT_LINE;
 
     trap::R_AddRefEntityToScene(ctx.engine, &le.refEntity);
+}
+
+/// Raven `CG_FreeLocalEntity` — hands one local entity back to the pool.
+///
+/// The doubly-linked unlink plus the free-list push IS
+/// [`EffectPool::free`](crate::world::effect_pool::EffectPool::free) — the
+/// links dissolved into the slab under DEC-46.3, and its `false` return is
+/// Raven's `!le->prev` "not active" case.
+///
+/// Source: `oracle/codemp/cgame/cg_localents.c:39-51`
+pub fn CG_FreeLocalEntity(ctx: &mut CgContext, le: EffectHandle) {
+    if !ctx.world.cg_localEntities.free(le) {
+        CG_Error(ctx, "CG_FreeLocalEntity: not active");
+    }
 }

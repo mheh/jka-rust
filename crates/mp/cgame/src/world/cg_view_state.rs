@@ -3,6 +3,8 @@
 
 #![allow(non_snake_case)]
 
+use core::ffi::c_int;
+
 use mp_qshared::shared::{qfalse, vec3_t};
 
 use crate::local::cgscreffects_s::cgscreffects_t;
@@ -21,7 +23,7 @@ use crate::local::cgscreffects_s::cgscreffects_t;
 /// and it is not this wave's file to touch. `Default` is hand-written below
 /// instead, which is the only one `CgWorld::new_boxed` asks for.
 ///
-/// Source: `oracle/codemp/cgame/cg_view.c:223-232,1396-1397,1476,2009,2277-2281,2445`
+/// Source: `oracle/codemp/cgame/cg_view.c:223-232,1189,1264,1396-1397,1476,2009,2277-2281,2445`
 pub struct CgViewState {
     /// Raven `vec3_t camerafwd` — the third-person camera's forward axis, the
     /// direction [`crate::cg_view::CG_CalcIdealThirdPersonViewLocation`] backs
@@ -48,6 +50,18 @@ pub struct CgViewState {
     /// music-ducking state the `CG_SE_*` / `CGCam_*` fns drive.
     /// Source: `oracle/codemp/cgame/cg_view.c:2009`
     pub cgScreenEffects: cgscreffects_t,
+
+    /// Raven `float zoomFov` — the live zoom fov, walked down a frametime step
+    /// at a time by [`crate::cg_view::CG_CalcFov`].
+    ///
+    /// Raven: "this has to be global client-side".
+    /// Source: `oracle/codemp/cgame/cg_view.c:1189`
+    pub zoomFov: f32,
+
+    /// Raven's `static int zoomSoundTime` inside `CG_CalcFov` — when the
+    /// disruptor zoom loop is next allowed to fire.
+    /// Source: `oracle/codemp/cgame/cg_view.c:1264`
+    pub zoomSoundTime: c_int,
 }
 
 impl Default for CgViewState {
@@ -69,6 +83,8 @@ impl Default for CgViewState {
                 music_volume_time: 0,
                 music_volume_set: qfalse,
             },
+            zoomFov: 0.0,
+            zoomSoundTime: 0,
         }
     }
 }

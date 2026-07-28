@@ -7,21 +7,34 @@ use core::f64::consts::PI;
 use core::ffi::c_int;
 
 use mp_bg::bg_misc::BG_EmplacedView;
+use mp_bg::public::dm_flags::DF_FIXED_FOV;
 use mp_bg::public::entity_effects::EF2_HELD_BY_MONSTER;
-use mp_bg::public::entity_flags::EF_NODRAW;
+use mp_bg::public::entity_flags::{EF_NODRAW, EF_SOUNDTRACKER};
 use mp_bg::public::entity_type::entityType_t;
 use mp_bg::public::pmtype::pmtype_t;
+use mp_bg::public::stat_index::statIndex_t::{STAT_DEAD_YAW, STAT_HEALTH};
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::game::class_t::class_t;
 use mp_qshared::common::mp::qcommon::player_state::MAX_POWERUPS;
+use mp_qshared::common::mp::qcommon::pm_flags::PMF_DUCKED;
 use mp_qshared::shared::q_math::{
-    _VectorAdd, _VectorCopy, _VectorMA, AnglesToAxis, PITCH, ROLL, YAW,
+    _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorSubtract, AnglesToAxis,
+    VectorNormalize, PITCH, ROLL, YAW,
 };
-use mp_qshared::shared::sound_channel::CHAN_ANNOUNCER;
-use mp_qshared::shared::surface_flags::{CONTENTS_PLAYERCLIP, MASK_SOLID};
-use mp_qshared::shared::{qfalse, qtrue, sfxHandle_t, vec3_t};
+use mp_qshared::shared::sound_channel::{CHAN_ANNOUNCER, CHAN_LOCAL};
+use mp_qshared::shared::surface_flags::{
+    CONTENTS_LAVA, CONTENTS_PLAYERCLIP, CONTENTS_SLIME, CONTENTS_WATER, MASK_SOLID,
+};
+use mp_qshared::shared::{
+    qfalse, qtrue, sfxHandle_t, vec3_t, ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_QPATH,
+};
+use native_string::{atof, buf_to_string, Q_strncpyz};
 
+use crate::cg_ents::CG_S_UpdateLoopingSounds;
+use crate::cg_main::{CG_Argv, CG_Printf};
+use crate::cg_predict::CG_PointContents;
+use crate::cg_weapons::{LAND_DEFLECT_TIME, LAND_RETURN_TIME};
 use crate::local::cg_t::MAX_SOUNDBUFFER;
 use crate::trap;
 use crate::world::cg_context::CgContext;
@@ -101,9 +114,30 @@ const POWERUP_BLINKS: c_int = 5;
 /// Source: `oracle/codemp/cgame/cg_local.h:25`
 const POWERUP_BLINK_TIME: c_int = 1000;
 
+/// Raven `DAMAGE_DEFLECT_TIME` — how long the damage view kick winds out, in
+/// msec.
+/// Source: `oracle/codemp/cgame/cg_local.h:28`
+const DAMAGE_DEFLECT_TIME: c_int = 100;
+
+/// Raven `DAMAGE_RETURN_TIME` — the recovery tail after the deflect, in msec.
+/// Source: `oracle/codemp/cgame/cg_local.h:29`
+const DAMAGE_RETURN_TIME: c_int = 400;
+
 /// Raven `DAMAGE_TIME` — how long the damage blend blob lives, in msec.
 /// Source: `oracle/codemp/cgame/cg_local.h:30`
 pub(crate) const DAMAGE_TIME: c_int = 500;
+
+/// Raven `DUCK_TIME` — how long the crouch view drop smooths over, in msec.
+/// Source: `oracle/codemp/cgame/cg_local.h:34`
+const DUCK_TIME: c_int = 100;
+
+/// Raven `MAX_ZOOM_FOV` — the tightest the disruptor scope zooms in to.
+/// Source: `oracle/codemp/cgame/cg_local.h:41`
+const MAX_ZOOM_FOV: f32 = 3.0;
+
+/// Raven `ZOOM_OUT_TIME` — msec the fov takes to blend back out of a zoom.
+/// Source: `oracle/codemp/cgame/cg_local.h:43`
+const ZOOM_OUT_TIME: f32 = 100.0;
 
 /// Raven `STEP_TIME` — how long the stair-climb view smoothing lasts, in msec.
 /// Source: `oracle/codemp/cgame/cg_local.h:33`
@@ -765,4 +799,529 @@ pub fn CG_AddRefentForAutoMap(ctx: &mut CgContext, centNum: usize) {
     }
 
     trap::R_AddRefEntityToScene(ctx.engine, &ent);
+}
+
+/// Raven `CG_TestModel_f` — the `testmodel` console command; parks a model 100
+/// units in front of the eye so it can be looked at.
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:60-89`
+pub fn CG_TestModel_f(ctx: &mut CgContext) {
+    let mut angles: vec3_t = [0.0; 3];
+
+    ctx.world.cg.testModelEntity = refEntity_t::zeroed();
+    if trap::Argc(ctx.engine) < 2 {
+        return;
+    }
+
+    let modelName = CG_Argv(ctx, 1);
+    Q_strncpyz(&mut ctx.world.cg.testModelName, &modelName, MAX_QPATH);
+    let testModelName = buf_to_string(&ctx.world.cg.testModelName.map(|c| c as u8));
+    ctx.world.cg.testModelEntity.hModel = trap::R_RegisterModel(ctx.engine, &testModelName);
+
+    if trap::Argc(ctx.engine) == 3 {
+        let backlerp = CG_Argv(ctx, 2);
+        ctx.world.cg.testModelEntity.backlerp = atof(&backlerp) as f32;
+        ctx.world.cg.testModelEntity.frame = 1;
+        ctx.world.cg.testModelEntity.oldframe = 0;
+    }
+    if ctx.world.cg.testModelEntity.hModel == 0 {
+        CG_Printf(ctx, "Can't register model\n");
+        return;
+    }
+
+    let vieworg = ctx.world.cg.refdef.vieworg;
+    let forward = ctx.world.cg.refdef.viewaxis[0];
+    _VectorMA(
+        vieworg,
+        100.0,
+        forward,
+        &mut ctx.world.cg.testModelEntity.origin,
+    );
+
+    angles[PITCH] = 0.0;
+    angles[YAW] = 180.0 + ctx.world.cg.refdef.viewangles[1];
+    angles[ROLL] = 0.0;
+
+    AnglesToAxis(angles, ctx.world.cg.testModelEntity.axis.as_mut_ptr());
+    ctx.world.cg.testGun = qfalse;
+}
+
+/// Raven `CG_TestModelNextFrame_f` — the `nextframe` console command.
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:108-111`
+pub fn CG_TestModelNextFrame_f(ctx: &mut CgContext) {
+    ctx.world.cg.testModelEntity.frame += 1;
+    let frame = ctx.world.cg.testModelEntity.frame;
+    CG_Printf(ctx, &format!("frame {}\n", frame));
+}
+
+/// Raven `CG_TestModelPrevFrame_f` — the `prevframe` console command; floors at
+/// frame 0.
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:113-119`
+pub fn CG_TestModelPrevFrame_f(ctx: &mut CgContext) {
+    ctx.world.cg.testModelEntity.frame -= 1;
+    if ctx.world.cg.testModelEntity.frame < 0 {
+        ctx.world.cg.testModelEntity.frame = 0;
+    }
+    let frame = ctx.world.cg.testModelEntity.frame;
+    CG_Printf(ctx, &format!("frame {}\n", frame));
+}
+
+/// Raven `CG_TestModelNextSkin_f` — the `nextskin` console command.
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:121-124`
+pub fn CG_TestModelNextSkin_f(ctx: &mut CgContext) {
+    ctx.world.cg.testModelEntity.skinNum += 1;
+    let skinNum = ctx.world.cg.testModelEntity.skinNum;
+    CG_Printf(ctx, &format!("skin {}\n", skinNum));
+}
+
+/// Raven `CG_TestModelPrevSkin_f` — the `prevskin` console command; floors at
+/// skin 0.
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:126-132`
+pub fn CG_TestModelPrevSkin_f(ctx: &mut CgContext) {
+    ctx.world.cg.testModelEntity.skinNum -= 1;
+    if ctx.world.cg.testModelEntity.skinNum < 0 {
+        ctx.world.cg.testModelEntity.skinNum = 0;
+    }
+    let skinNum = ctx.world.cg.testModelEntity.skinNum;
+    CG_Printf(ctx, &format!("skin {}\n", skinNum));
+}
+
+/// Raven `CG_AddTestModel` — puts the `testmodel` entity into this frame's
+/// scene, re-registering it each time in case the level changed under it.
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:134-160`
+pub fn CG_AddTestModel(ctx: &mut CgContext) {
+    // re-register the model, because the level may have changed
+    let testModelName = buf_to_string(&ctx.world.cg.testModelName.map(|c| c as u8));
+    ctx.world.cg.testModelEntity.hModel = trap::R_RegisterModel(ctx.engine, &testModelName);
+    if ctx.world.cg.testModelEntity.hModel == 0 {
+        CG_Printf(ctx, "Can't register model\n");
+        return;
+    }
+
+    // if testing a gun, set the origin reletive to the view origin
+    if ctx.world.cg.testGun != qfalse {
+        let vieworg = ctx.world.cg.refdef.vieworg;
+        let viewaxis = ctx.world.cg.refdef.viewaxis;
+        _VectorCopy(vieworg, &mut ctx.world.cg.testModelEntity.origin);
+        _VectorCopy(viewaxis[0], &mut ctx.world.cg.testModelEntity.axis[0]);
+        _VectorCopy(viewaxis[1], &mut ctx.world.cg.testModelEntity.axis[1]);
+        _VectorCopy(viewaxis[2], &mut ctx.world.cg.testModelEntity.axis[2]);
+
+        // allow the position to be adjusted
+        let gun_x = ctx.world.cvars.cg_gun_x.value;
+        let gun_y = ctx.world.cvars.cg_gun_y.value;
+        let gun_z = ctx.world.cvars.cg_gun_z.value;
+        for i in 0..3 {
+            ctx.world.cg.testModelEntity.origin[i] += viewaxis[0][i] * gun_x;
+            ctx.world.cg.testModelEntity.origin[i] += viewaxis[1][i] * gun_y;
+            ctx.world.cg.testModelEntity.origin[i] += viewaxis[2][i] * gun_z;
+        }
+    }
+
+    trap::R_AddRefEntityToScene(ctx.engine, &ctx.world.cg.testModelEntity);
+}
+
+/// Raven `CG_OffsetFirstPersonView` — everything that nudges the eye off the
+/// player's exact origin: weapon and damage kick, run/bob lean, view height,
+/// duck/land/step smoothing.
+///
+/// Raven's `origin`/`angles` locals are pointers straight into `cg.refdef`, and
+/// [`CG_StepOffset`] writes the same memory partway through, so the port works
+/// the refdef fields in place rather than on copies.
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:899-1043`
+pub fn CG_OffsetFirstPersonView(world: &mut CgWorld) {
+    // Raven derefs `cg.snap` unguarded for both the intermission test and the
+    // dead test; a null there is UB, so the port leaves the view unoffset (§F19).
+    let Some((pm_type, health, deadYaw)) = world.cg.snap_ref().map(|snap| {
+        (
+            snap.ps.pm_type,
+            snap.ps.stats[STAT_HEALTH as usize],
+            snap.ps.stats[STAT_DEAD_YAW as usize],
+        )
+    }) else {
+        return;
+    };
+
+    if pm_type == pmtype_t::PM_INTERMISSION as c_int {
+        return;
+    }
+
+    // if dead, fix the angle and don't add any kick
+    if health <= 0 {
+        world.cg.refdef.viewangles[ROLL] = 40.0;
+        world.cg.refdef.viewangles[PITCH] = -15.0;
+        world.cg.refdef.viewangles[YAW] = deadYaw as f32;
+        world.cg.refdef.vieworg[2] += world.cg.predictedPlayerState.viewheight as f32;
+        return;
+    }
+
+    // add angles based on weapon kick
+    let mut kickTime = world.cg.time - world.cg.kick_time;
+    if kickTime < 800 {
+        //kicks are always 1 second long.  Deal with it.
+        let kickPerc: f32;
+        if kickTime <= 200 {
+            //winding up
+            kickPerc = kickTime as f32 / 200.0;
+        } else {
+            //returning to normal
+            kickTime = 800 - kickTime;
+            kickPerc = kickTime as f32 / 600.0;
+        }
+        let angles = world.cg.refdef.viewangles;
+        let kick_angles = world.cg.kick_angles;
+        _VectorMA(
+            angles,
+            kickPerc,
+            kick_angles,
+            &mut world.cg.refdef.viewangles,
+        );
+    }
+
+    // add angles based on damage kick
+    if world.cg.damageTime != 0.0 {
+        // `cg.damageTime` is Raven's float, so the int time widens into it.
+        let mut ratio = world.cg.time as f32 - world.cg.damageTime;
+        if ratio < DAMAGE_DEFLECT_TIME as f32 {
+            ratio /= DAMAGE_DEFLECT_TIME as f32;
+            world.cg.refdef.viewangles[PITCH] += ratio * world.cg.v_dmg_pitch;
+            world.cg.refdef.viewangles[ROLL] += ratio * world.cg.v_dmg_roll;
+        } else {
+            // Raven's leading `1.0` is math.h's double, so the whole tail is a
+            // double that rounds back into the float `ratio`.
+            ratio = (1.0f64
+                - ((ratio - DAMAGE_DEFLECT_TIME as f32) / DAMAGE_RETURN_TIME as f32) as f64)
+                as f32;
+            if ratio > 0.0 {
+                world.cg.refdef.viewangles[PITCH] += ratio * world.cg.v_dmg_pitch;
+                world.cg.refdef.viewangles[ROLL] += ratio * world.cg.v_dmg_roll;
+            }
+        }
+    }
+
+    // add pitch based on fall kick
+    // (Raven `#if 0`'d the fall-kick block out; it never ran.)
+
+    // add angles based on velocity
+    let predictedVelocity = world.cg.predictedPlayerState.velocity;
+
+    let delta = _DotProduct(predictedVelocity, world.cg.refdef.viewaxis[0]);
+    world.cg.refdef.viewangles[PITCH] += delta * world.cvars.cg_runpitch.value;
+
+    let delta = _DotProduct(predictedVelocity, world.cg.refdef.viewaxis[1]);
+    world.cg.refdef.viewangles[ROLL] -= delta * world.cvars.cg_runroll.value;
+
+    // add angles based on bob
+
+    // make sure the bob is visible even at low speeds
+    let speed = if world.cg.xyspeed > 200.0 {
+        world.cg.xyspeed
+    } else {
+        200.0
+    };
+
+    let ducked = world.cg.predictedPlayerState.pm_flags & PMF_DUCKED != 0;
+
+    let mut delta = world.cg.bobfracsin * world.cvars.cg_bobpitch.value * speed;
+    if ducked {
+        delta *= 3.0; // crouching
+    }
+    world.cg.refdef.viewangles[PITCH] += delta;
+
+    let mut delta = world.cg.bobfracsin * world.cvars.cg_bobroll.value * speed;
+    if ducked {
+        delta *= 3.0; // crouching accentuates roll
+    }
+    if world.cg.bobcycle & 1 != 0 {
+        delta = -delta;
+    }
+    world.cg.refdef.viewangles[ROLL] += delta;
+
+    //===================================
+
+    // add view height
+    world.cg.refdef.vieworg[2] += world.cg.predictedPlayerState.viewheight as f32;
+
+    // smooth out duck height changes
+    let timeDelta = world.cg.time - world.cg.duckTime;
+    if timeDelta < DUCK_TIME {
+        world.cg.refdef.vieworg[2] -=
+            world.cg.duckChange * (DUCK_TIME - timeDelta) as f32 / DUCK_TIME as f32;
+    }
+
+    // add bob height
+    let mut bob = world.cg.bobfracsin * world.cg.xyspeed * world.cvars.cg_bobup.value;
+    if bob > 6.0 {
+        bob = 6.0;
+    }
+
+    world.cg.refdef.vieworg[2] += bob;
+
+    // add fall height
+    let mut delta = (world.cg.time - world.cg.landTime) as f32;
+    if delta < LAND_DEFLECT_TIME as f32 {
+        let f = delta / LAND_DEFLECT_TIME as f32;
+        world.cg.refdef.vieworg[2] += world.cg.landChange * f;
+    } else if delta < (LAND_DEFLECT_TIME + LAND_RETURN_TIME) as f32 {
+        delta -= LAND_DEFLECT_TIME as f32;
+        // same double-`1.0` promotion as the damage kick above
+        let f = (1.0f64 - (delta / LAND_RETURN_TIME as f32) as f64) as f32;
+        world.cg.refdef.vieworg[2] += world.cg.landChange * f;
+    }
+
+    // add step offset
+    CG_StepOffset(world);
+
+    // add kick offset
+
+    let origin = world.cg.refdef.vieworg;
+    let kick_origin = world.cg.kick_origin;
+    _VectorAdd(origin, kick_origin, &mut world.cg.refdef.vieworg);
+
+    // pivot the eye based on a neck length
+    // (Raven `#if 0`'d the NECK_LENGTH pivot out; it never ran.)
+}
+
+/// Raven `CG_CalcFov` — settles this frame's fov, walking the zoom fov in and
+/// out and warping it while the eye is underwater. True when the eye is in a
+/// liquid.
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:1191-1334`
+pub fn CG_CalcFov(ctx: &mut CgContext) -> bool {
+    let mut cgFov = ctx.world.cvars.cg_fov.value;
+
+    if cgFov < 1.0 {
+        cgFov = 1.0;
+    }
+    if cgFov > 97.0 {
+        cgFov = 97.0;
+    }
+
+    let mut fov_x: f32;
+
+    if ctx.world.cg.predictedPlayerState.pm_type == pmtype_t::PM_INTERMISSION as c_int {
+        // if in intermission, use a fixed value
+        fov_x = 80.0; //90;
+    } else {
+        // user selectable
+        if ctx.world.cgs.dmflags & DF_FIXED_FOV != 0 {
+            // dmflag to prevent wide fov for all clients
+            fov_x = 80.0; //90;
+        } else {
+            fov_x = cgFov;
+            if fov_x < 1.0 {
+                fov_x = 1.0;
+            } else if fov_x > 160.0 {
+                fov_x = 160.0;
+            }
+        }
+
+        if ctx.world.cg.predictedPlayerState.zoomMode == 2 {
+            //binoculars
+            if ctx.world.view.zoomFov > 40.0 {
+                ctx.world.view.zoomFov -= ctx.world.cg.frametime as f32 * 0.075;
+
+                if ctx.world.view.zoomFov < 40.0 {
+                    ctx.world.view.zoomFov = 40.0;
+                } else if ctx.world.view.zoomFov > cgFov {
+                    ctx.world.view.zoomFov = cgFov;
+                }
+            }
+
+            fov_x = ctx.world.view.zoomFov;
+        } else if ctx.world.cg.predictedPlayerState.zoomMode != 0 {
+            if ctx.world.cg.predictedPlayerState.zoomLocked == qfalse {
+                if ctx.world.view.zoomFov > 50.0 {
+                    //Now starting out at nearly half zoomed in
+                    ctx.world.view.zoomFov = 50.0;
+                }
+                ctx.world.view.zoomFov -= ctx.world.cg.frametime as f32 * 0.035; //0.075f;
+
+                if ctx.world.view.zoomFov < MAX_ZOOM_FOV {
+                    ctx.world.view.zoomFov = MAX_ZOOM_FOV;
+                } else if ctx.world.view.zoomFov > cgFov {
+                    ctx.world.view.zoomFov = cgFov;
+                } else {
+                    // Still zooming
+                    if ctx.world.view.zoomSoundTime < ctx.world.cg.time
+                        || ctx.world.view.zoomSoundTime > ctx.world.cg.time + 10000
+                    {
+                        let vieworg = ctx.world.cg.refdef.vieworg;
+                        let disruptorZoomLoop = ctx.world.cgs.media.disruptorZoomLoop;
+                        trap::S_StartSound(
+                            ctx.engine,
+                            Some(&vieworg),
+                            ENTITYNUM_WORLD,
+                            CHAN_LOCAL,
+                            disruptorZoomLoop,
+                        );
+                        ctx.world.view.zoomSoundTime = ctx.world.cg.time + 300;
+                    }
+                }
+            }
+
+            if ctx.world.view.zoomFov < MAX_ZOOM_FOV {
+                ctx.world.view.zoomFov = 50.0; // hack to fix zoom during vid restart
+            }
+            fov_x = ctx.world.view.zoomFov;
+        } else {
+            ctx.world.view.zoomFov = 80.0;
+
+            let f = (ctx.world.cg.time - ctx.world.cg.predictedPlayerState.zoomTime) as f32
+                / ZOOM_OUT_TIME;
+            if f > 1.0 {
+                // Raven's `fov_x = fov_x;` — the blend is over, keep what we have
+            } else {
+                fov_x = ctx.world.cg.predictedPlayerState.zoomFov
+                    + f * (fov_x - ctx.world.cg.predictedPlayerState.zoomFov);
+            }
+        }
+    }
+
+    // Same widths as `CG_CalcFOVFromX`: `fov_x / 360` is a float divide that
+    // only widens to double for the libm call after it.
+    let x = (ctx.world.cg.refdef.width as f64 / ((fov_x / 360.0) as f64 * PI).tan()) as f32;
+    let mut fov_y = (ctx.world.cg.refdef.height as f64).atan2(x as f64) as f32;
+    fov_y = ((fov_y * 360.0) as f64 / PI) as f32;
+
+    // warp if underwater
+    let vieworg = ctx.world.cg.refdef.vieworg;
+    let viewContents = CG_PointContents(ctx, &vieworg, -1);
+    ctx.world.cg.refdef.viewContents = viewContents;
+    let inwater;
+    if ctx.world.cg.refdef.viewContents & (CONTENTS_WATER | CONTENTS_SLIME | CONTENTS_LAVA) != 0 {
+        // Raven's `phase` is a float local, so the double expression rounds into
+        // it before `sin` widens it back out.
+        let phase = (ctx.world.cg.time as f64 / 1000.0 * WAVE_FREQUENCY * PI * 2.0) as f32;
+        let v = (WAVE_AMPLITUDE as f64 * (phase as f64).sin()) as f32;
+        fov_x += v;
+        fov_y -= v;
+        inwater = true;
+    } else {
+        inwater = false;
+    }
+
+    // set it
+    ctx.world.cg.refdef.fov_x = fov_x;
+    ctx.world.cg.refdef.fov_y = fov_y;
+
+    if ctx.world.cg.predictedPlayerState.zoomMode != 0 {
+        ctx.world.cg.zoomSensitivity = ctx.world.view.zoomFov / cgFov;
+    } else if ctx.world.cg.zoomed == qfalse {
+        ctx.world.cg.zoomSensitivity = 1.0;
+    } else {
+        ctx.world.cg.zoomSensitivity = (ctx.world.cg.refdef.fov_y as f64 / 75.0) as f32;
+    }
+
+    inwater
+}
+
+/// Raven `CG_UpdateSoundTrackers` — keeps every sound-tracker entity's sound
+/// origin glued to the entity it was attached to, and refreshes every looping
+/// sound.
+///
+/// PORT-NOTE: Raven's `cent &&` guard tests the address of an array element, so
+/// it is always true; kept as the unconditional walk it already was.
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:1968-1997`
+pub fn CG_UpdateSoundTrackers(ctx: &mut CgContext) {
+    for num in 0..ENTITYNUM_NONE as usize {
+        let cent = ctx.world.entity(num);
+        let eFlags = cent.currentState.eFlags;
+        let number = cent.currentState.number;
+        let trickedentindex = cent.currentState.trickedentindex;
+
+        //make sure the thing is valid at least.
+        if (eFlags & EF_SOUNDTRACKER) != 0 && number == num as c_int {
+            //keep sound for this entity updated in accordance with its attached entity at all times
+            let clientNum = ctx.world.cg.snap_ref().map(|snap| snap.ps.clientNum);
+            if clientNum == Some(trickedentindex) {
+                //this is actually the player, so center the sound origin right on top of us
+                let vieworg = ctx.world.cg.refdef.vieworg;
+                _VectorCopy(vieworg, &mut ctx.world.entity_mut(num).lerpOrigin);
+                let lerpOrigin = ctx.world.entity(num).lerpOrigin;
+                trap::S_UpdateEntityPosition(ctx.engine, number, &lerpOrigin);
+            } else {
+                let lerpOrigin = ctx.world.entity(trickedentindex as usize).lerpOrigin;
+                trap::S_UpdateEntityPosition(ctx.engine, number, &lerpOrigin);
+            }
+        }
+
+        if number == num as c_int {
+            //update all looping sounds..
+            CG_S_UpdateLoopingSounds(ctx, num);
+        }
+    }
+}
+
+/// Raven `CG_CalcScreenEffects` — runs the screen shake over this frame's view
+/// and walks the music duck back up.
+///
+/// Raven hands `CG_SE_UpdateShake` pointers straight into `cg.refdef`; the port
+/// copies out and writes back, which is the same thing because the shake only
+/// jitters the two vectors it is given.
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:2104-2108`
+pub fn CG_CalcScreenEffects(ctx: &mut CgContext) {
+    let mut origin = ctx.world.cg.refdef.vieworg;
+    let mut angles = ctx.world.cg.refdef.viewangles;
+    CG_SE_UpdateShake(ctx.world, &mut origin, &mut angles);
+    ctx.world.cg.refdef.vieworg = origin;
+    ctx.world.cg.refdef.viewangles = angles;
+
+    CG_SE_UpdateMusic(ctx);
+}
+
+/// Raven `CG_DoCameraShake` — shakes the camera for an explosion at `origin`,
+/// falling off linearly to nothing at `radius`.
+///
+/// Raven: "FIXME: When exactly is the vieworg calculated in relation to the rest
+/// of the frame?"
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:2129-2149`
+pub fn CG_DoCameraShake(
+    world: &mut CgWorld,
+    origin: vec3_t,
+    intensity: f32,
+    radius: c_int,
+    time: c_int,
+) {
+    let mut dir: vec3_t = [0.0; 3];
+
+    _VectorSubtract(world.cg.refdef.vieworg, origin, &mut dir);
+    let dist = VectorNormalize(&mut dir);
+
+    //Use the dir to add kick to the explosion
+
+    if dist > radius as f32 {
+        return;
+    }
+
+    let intensityScale = 1.0 - (dist / radius as f32);
+    let realIntensity = intensity * intensityScale;
+
+    CGCam_Shake(world, realIntensity, time);
+}
+
+/// Raven `CG_AddRadarAutomapEnts` — feeds the automap scene with us plus every
+/// entity this frame's radar picked up.
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:2256-2268`
+pub fn CG_AddRadarAutomapEnts(ctx: &mut CgContext) {
+    //first add yourself
+    let clientNum = ctx.world.cg.predictedPlayerState.clientNum as usize;
+    CG_AddRefentForAutoMap(ctx, clientNum);
+
+    let mut i: c_int = 0;
+    while i < ctx.world.cg.radarEntityCount as c_int {
+        let radarEnt = ctx.world.cg.radarEntities[i as usize] as usize;
+        CG_AddRefentForAutoMap(ctx, radarEnt);
+        i += 1;
+    }
 }

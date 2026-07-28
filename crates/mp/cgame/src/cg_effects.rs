@@ -14,10 +14,12 @@ use mp_qshared::common::mp::qcommon::saber::saber_colors::{
     SABER_BLUE, SABER_GREEN, SABER_ORANGE, SABER_PURPLE, SABER_RED, SABER_YELLOW,
 };
 use mp_qshared::shared::q_math::{
-    _VectorAdd, _VectorMA, _VectorScale, _VectorSubtract, CrossProduct, VectorNormalize, VectorSet,
+    _VectorAdd, _VectorMA, _VectorScale, _VectorSubtract, CrossProduct, DistanceSquared,
+    VectorNormalize, VectorSet,
 };
-use mp_qshared::shared::{addpolyArgStruct_t, vec2_t, vec3_t};
+use mp_qshared::shared::{addpolyArgStruct_t, vec2_t, vec3_t, CHAN_AUTO};
 
+use crate::cg_view::CGCam_Shake;
 use crate::trap;
 use crate::world::cg_context::CgContext;
 use crate::world::cg_world::CgWorld;
@@ -366,4 +368,190 @@ pub fn CG_MiscModelExplosion(
             trap::FX_PlayEffectID(ctx.engine, eID1, &org, &dir, -1, -1);
         }
     }
+}
+
+/// Raven `CG_DoGlass` — tesselates a shattered window (`verts`) into glass
+/// shard polys, denser and longer-lived near the impact (`dmgPt`), picking a
+/// coarser or finer "LOD" from the window's height/width.
+///
+/// PORT-NOTE: `mxWidth` scales with the brush's `width` (unlike the fixed
+/// `mxHeight` steps above it) and can run past the 20-wide `offX`/`offZ`
+/// crack table `CG_InitGlass` built — the oracle then reads past the table;
+/// the row side has the same edge (`i + 1` can reach 20 against the 20-row
+/// table). §F19: the `ix()` clamp pins BOTH indices to the table's last
+/// entry instead of reproducing the out-of-bounds reads.
+///
+/// `normal` is accepted (Raven's own signature) but never read in the body.
+///
+/// Source: `oracle/codemp/cgame/cg_effects.c:456-648`
+#[allow(unused_variables)]
+pub fn CG_DoGlass(
+    ctx: &mut CgContext,
+    verts: &[vec3_t; 4],
+    normal: &vec3_t,
+    dmgPt: &vec3_t,
+    dmgDir: &vec3_t,
+    dmgRadius: f32,
+    maxShards: c_int,
+) {
+    // To do a smarter tesselation, we should figure out the relative height and width of the brush face,
+    //	then use this to pick a lod value from 1-3 in each axis.  This will give us 1-9 lod levels, which will
+    //	hopefully be sufficient.
+    let (height, width) = CG_CalcHeightWidth(verts);
+
+    let sfx = trap::S_RegisterSound(ctx.engine, "sound/effects/glassbreak1.wav");
+    trap::S_StartSound(ctx.engine, Some(dmgPt), -1, CHAN_AUTO, sfx);
+
+    // Pick "LOD" for height
+    let stepHeight: f32;
+    let mxHeight: c_int;
+    let mut timeDecay: f32;
+    if height < 100.0 {
+        stepHeight = 0.2;
+        mxHeight = 5;
+        timeDecay = TIME_DECAY_SLOW;
+    } else if height > 220.0 {
+        stepHeight = 0.05;
+        mxHeight = 20;
+        timeDecay = TIME_DECAY_FAST;
+    } else {
+        stepHeight = 0.1;
+        mxHeight = 10;
+        timeDecay = TIME_DECAY_MED;
+    }
+
+    // Attempt to scale the glass directly to the size of the window
+    let mut stepWidth = (0.25 - (width as f64 * 0.0002)) as f32; //(width*0.0005));
+    let mut mxWidth = (width as f64 * 0.2) as c_int;
+    timeDecay = (timeDecay + TIME_DECAY_FAST) * 0.5;
+
+    if stepWidth < 0.01 {
+        stepWidth = 0.01;
+    }
+    if mxWidth < 5 {
+        mxWidth = 5;
+    }
+
+    // mxWidth can exceed the 20-wide offX/offZ table (see doc comment above);
+    // clamp instead of reading past it.
+    let ix = |v: c_int| -> usize { v.clamp(0, 19) as usize };
+
+    let mut glassShards: c_int = 0;
+    let mut z = 0.0f32;
+    let mut i: c_int = 0;
+    while z < 1.0 {
+        let mut x = 0.0f32;
+        let mut t: c_int = 0;
+        while x < 1.0 {
+            let mut biPoints = [[0.0f32; 2]; 4];
+
+            // This is nasty..
+            let xx = if t > 0 && t < mxWidth {
+                x - ctx.world.effects.offX[ix(i)][ix(t)]
+            } else {
+                x
+            };
+            let zz = if i > 0 && i < mxHeight {
+                z - ctx.world.effects.offZ[ix(t)][ix(i)]
+            } else {
+                z
+            };
+            Vector2Set(&mut biPoints[0], xx, zz);
+
+            let xx = if t + 1 > 0 && t + 1 < mxWidth {
+                x - ctx.world.effects.offX[ix(i)][ix(t + 1)]
+            } else {
+                x
+            };
+            let zz = if i > 0 && i < mxHeight {
+                z - ctx.world.effects.offZ[ix(t + 1)][ix(i)]
+            } else {
+                z
+            };
+            Vector2Set(&mut biPoints[1], xx + stepWidth, zz);
+
+            let xx = if t + 1 > 0 && t + 1 < mxWidth {
+                x - ctx.world.effects.offX[ix(i + 1)][ix(t + 1)]
+            } else {
+                x
+            };
+            let zz = if i + 1 > 0 && i + 1 < mxHeight {
+                z - ctx.world.effects.offZ[ix(t + 1)][ix(i + 1)]
+            } else {
+                z
+            };
+            Vector2Set(&mut biPoints[2], xx + stepWidth, zz + stepHeight);
+
+            let xx = if t > 0 && t < mxWidth {
+                x - ctx.world.effects.offX[ix(i + 1)][ix(t)]
+            } else {
+                x
+            };
+            let zz = if i + 1 > 0 && i + 1 < mxHeight {
+                z - ctx.world.effects.offZ[ix(t)][ix(i + 1)]
+            } else {
+                z
+            };
+            Vector2Set(&mut biPoints[3], xx, zz + stepHeight);
+
+            let subVerts = CG_CalcBiLerp(verts, &biPoints);
+
+            let mut dif = DistanceSquared(subVerts[0], *dmgPt) * timeDecay
+                - ctx.world.bg_state.rng.random() * 32.0;
+
+            // If we decrease dif, we are increasing the impact area, making it more likely to blow out large holes
+            dif -= dmgRadius * dmgRadius;
+
+            let (stick, time) = if dif > 1.0 {
+                (
+                    true,
+                    (dif + ctx.world.bg_state.rng.random() * 200.0) as c_int,
+                )
+            } else {
+                (false, 0)
+            };
+
+            CG_DoGlassQuad(ctx, &subVerts, &biPoints, stick, time, dmgDir);
+            glassShards += 1;
+
+            if maxShards != 0 && glassShards >= maxShards {
+                return;
+            }
+
+            x += stepWidth;
+            t += 1;
+        }
+        z += stepHeight;
+        i += 1;
+    }
+}
+
+/// Raven `CG_ExplosionEffects` — shakes the camera in proportion to how close
+/// the view is to an explosion at `origin`, falling off linearly to nothing
+/// at `radius`.
+///
+/// Source: `oracle/codemp/cgame/cg_effects.c:919-939`
+pub fn CG_ExplosionEffects(
+    world: &mut CgWorld,
+    origin: &vec3_t,
+    intensity: f32,
+    radius: c_int,
+    time: c_int,
+) {
+    // FIXME: When exactly is the vieworg calculated in relation to the rest of the frame?s
+
+    let mut dir = [0.0f32; 3];
+    _VectorSubtract(world.cg.refdef.vieworg, *origin, &mut dir);
+    let dist = VectorNormalize(&mut dir);
+
+    // Use the dir to add kick to the explosion
+
+    if dist > radius as f32 {
+        return;
+    }
+
+    let intensityScale = 1.0 - (dist / radius as f32);
+    let realIntensity = intensity * intensityScale;
+
+    CGCam_Shake(world, realIntensity, time);
 }

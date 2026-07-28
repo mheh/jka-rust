@@ -1,18 +1,26 @@
 //! Port of `oracle/codemp/cgame/cg_event.c` — entity-event handling — obituaries, pickups, impacts. Functions land via the C5
 //! transcription waves.
-#![allow(non_snake_case)]
+#![allow(non_snake_case, non_upper_case_globals)]
 
 use core::ffi::c_int;
 use core::ptr::null_mut;
 
-use mp_bg::bg_misc::BG_GiveMeVectorFromMatrix;
+use mp_bg::bg_misc::{BG_CycleInven, BG_FindItemForHoldable, BG_GiveMeVectorFromMatrix};
+use mp_bg::local::bg_customSiegeSoundNames;
+use mp_bg::public::entity_event::entity_event_t::EV_USE_ITEM0;
+use mp_bg::public::holdable::{
+    HI_AMMODISP, HI_BINOCULARS, HI_CLOAK, HI_EWEB, HI_HEALTHDISP, HI_JETPACK, HI_MEDPAC,
+    HI_MEDPAC_BIG, HI_NONE, HI_NUM_HOLDABLE, HI_SEEKER, HI_SENTRY_GUN, HI_SHIELD,
+};
 use mp_bg::public::weaponstate::weaponstate_t;
 use mp_bg::public::{team_t, RANK_TIED_FLAG, TEAM_BLUE, TEAM_RED, TEAM_SPECTATOR};
 use mp_bg::vehicles::vehicle_s::Vehicle_t;
 use mp_qshared::common::mp::qcommon::entityState_t;
 use mp_qshared::shared::{mdxaBone_t, vec3_t, Eorientations, CHAN_AUTO, MAX_CLIENTS_I32};
 
+use crate::cg_main::CG_GetStringEdString;
 use crate::local::centity_s::centity_t;
+use crate::local::client_info_t::MAX_CUSTOM_SIEGE_SOUNDS;
 use crate::trap;
 use crate::world::cg_context::CgContext;
 use crate::world::cg_world::CgWorld;
@@ -32,6 +40,58 @@ fn DEBUGNAME(ctx: &mut CgContext, x: &str) {
         trap::Print(ctx.engine, &format!("{x}\n"));
     }
 }
+
+/// Raven `EV_EVENT_BIT1`.
+///
+/// Source: `oracle/codemp/game/bg_public.h:728`
+const EV_EVENT_BIT1: c_int = 0x00000100;
+
+/// Raven `EV_EVENT_BIT2`.
+///
+/// Source: `oracle/codemp/game/bg_public.h:729`
+const EV_EVENT_BIT2: c_int = 0x00000200;
+
+/// Raven `EV_EVENT_BITS`.
+///
+/// Source: `oracle/codemp/game/bg_public.h:730`
+const EV_EVENT_BITS: c_int = EV_EVENT_BIT1 | EV_EVENT_BIT2;
+
+/// Raven `cg_stringEdVoiceChatTable[MAX_CUSTOM_SIEGE_SOUNDS]` — string-package
+/// `MENUS` reference names, index-parallel with `bg_customSiegeSoundNames`.
+///
+/// Source: `oracle/codemp/cgame/cg_event.c:1429-1459`
+static cg_stringEdVoiceChatTable: [Option<&str>; MAX_CUSTOM_SIEGE_SOUNDS] = [
+    Some("VC_ATT"),           //"*att_attack",
+    Some("VC_ATT_PRIMARY"),   //"*att_primary",
+    Some("VC_ATT_SECONDARY"), //"*att_second",
+    Some("VC_DEF_GUNS"),      //"*def_guns",
+    Some("VC_DEF_POSITION"),  //"*def_position",
+    Some("VC_DEF_PRIMARY"),   //"*def_primary",
+    Some("VC_DEF_SECONDARY"), //"*def_second",
+    Some("VC_REPLY_COMING"),  //"*reply_coming",
+    Some("VC_REPLY_GO"),      //"*reply_go",
+    Some("VC_REPLY_NO"),      //"*reply_no",
+    Some("VC_REPLY_STAY"),    //"*reply_stay",
+    Some("VC_REPLY_YES"),     //"*reply_yes",
+    Some("VC_REQ_ASSIST"),    //"*req_assist",
+    Some("VC_REQ_DEMO"),      //"*req_demo",
+    Some("VC_REQ_HVY"),       //"*req_hvy",
+    Some("VC_REQ_MEDIC"),     //"*req_medic",
+    Some("VC_REQ_SUPPLY"),    //"*req_sup",
+    Some("VC_REQ_TECH"),      //"*req_tech",
+    Some("VC_SPOT_AIR"),      //"*spot_air",
+    Some("VC_SPOT_DEF"),      //"*spot_defenses",
+    Some("VC_SPOT_EMPLACED"), //"*spot_emplaced",
+    Some("VC_SPOT_SNIPER"),   //"*spot_sniper",
+    Some("VC_SPOT_TROOP"),    //"*spot_troops",
+    Some("VC_TAC_COVER"),     //"*tac_cover",
+    Some("VC_TAC_FALLBACK"),  //"*tac_fallback",
+    Some("VC_TAC_FOLLOW"),    //"*tac_follow",
+    Some("VC_TAC_HOLD"),      //"*tac_hold",
+    Some("VC_TAC_SPLIT"),     //"*tac_split",
+    Some("VC_TAC_TOGETHER"),  //"*tac_together",
+    None,
+];
 
 /// Raven `CG_PlaceString` — builds the localized ordinal-rank string ("1st",
 /// "Tied for 2nd", ...) for the scoreboard/reward stack.
@@ -169,8 +229,10 @@ pub fn CG_LocalTimingBar(world: &mut CgWorld, startTime: c_int, duration: c_int)
 /// commented out here — dead code, never compiled.
 ///
 /// Source: `oracle/codemp/cgame/cg_event.c:868-943`
-pub fn CG_ReattachLimb(ctx: &mut CgContext, source: &mut centity_t) {
+pub fn CG_ReattachLimb(ctx: &mut CgContext, sourceNum: usize) {
+    let source = ctx.world.entity(sourceNum);
     let number = source.currentState.number;
+    let ghoul2 = source.ghoul2;
 
     let torso_skin = if number >= MAX_CLIENTS_I32 {
         source.npcClient.as_deref().map(|ci| ci.torsoSkin)
@@ -181,7 +243,7 @@ pub fn CG_ReattachLimb(ctx: &mut CgContext, source: &mut centity_t) {
     // re-apply the skin
     if let Some(torso_skin) = torso_skin {
         if torso_skin > 0 {
-            trap::G2API_SetSkin(ctx.engine, source.ghoul2, 0, torso_skin, torso_skin);
+            trap::G2API_SetSkin(ctx.engine, ghoul2, 0, torso_skin, torso_skin);
         }
     }
 
@@ -236,6 +298,7 @@ pub fn CG_ReattachLimb(ctx: &mut CgContext, source: &mut centity_t) {
     // 	i++;
     // }
 
+    let source = ctx.world.entity_mut(sourceNum);
     source.torsoBolt = 0;
     source.ghoul2weapon = null_mut();
 }
@@ -358,5 +421,136 @@ pub fn CG_VehMuzzleFireFX(ctx: &mut CgContext, veh: &centity_t, broadcaster: &en
     // DEFERRED: muzzle-fire FX loop needs Vehicle_t field access
     // (m_iMuzzleTag, m_pVehicleInfo, weapMuzzle/turret tables) — see the fn
     // doc above.
+    //TODO: Port CG_VehMuzzleFireFX
+    // Source: oracle/codemp/cgame/cg_event.c:1394-1426
     todo!("CG_VehMuzzleFireFX muzzle FX loop — blocked on the Vehicle_t referent pool, oracle/codemp/cgame/cg_event.c:1394-1426")
+}
+
+/// Raven `CG_UseItem` — dispatches on the holdable item just used (server-sent
+/// `EV_USE_ITEM0 + n` event), plays the item's sound, and cycles the local
+/// player's holdable selection off it.
+///
+/// §F19: Raven derefs `cg.snap` unchecked in both the "print a message"
+/// lookup and the trailing cycle-inventory check; before the first snapshot
+/// there's no local player to match against, so `cg_t::snap_ref`'s `None`
+/// takes the no-op in both spots.
+///
+/// Source: `oracle/codemp/cgame/cg_event.c:672-743`
+pub fn CG_UseItem(ctx: &mut CgContext, cent: &centity_t) {
+    let es = &cent.currentState;
+
+    let mut itemNum = (es.event & !EV_EVENT_BITS) - EV_USE_ITEM0 as c_int;
+    if itemNum < 0 || itemNum > HI_NUM_HOLDABLE {
+        itemNum = 0;
+    }
+
+    // print a message if the local player
+    if ctx
+        .world
+        .cg
+        .snap_ref()
+        .is_some_and(|snap| es.number == snap.ps.clientNum)
+        && itemNum != HI_NONE
+    {
+        // Raven's lookup result (`item`) is assigned and never read again
+        // (cg_event.c:690) — the call itself is what matters, since
+        // `BG_FindItemForHoldable` panics on an unknown holdable.
+        let _item = BG_FindItemForHoldable(itemNum);
+    }
+
+    match itemNum {
+        HI_BINOCULARS => CG_ToggleBinoculars(ctx, cent, es.eventParm),
+
+        HI_SEEKER => {
+            trap::S_StartSound(
+                ctx.engine,
+                None,
+                es.number,
+                CHAN_AUTO,
+                ctx.world.cgs.media.deploySeeker,
+            );
+        }
+
+        HI_SHIELD | HI_SENTRY_GUN => {}
+
+        HI_MEDPAC | HI_MEDPAC_BIG => {
+            let clientNum = es.clientNum;
+            if clientNum >= 0 && clientNum < MAX_CLIENTS_I32 {
+                let time = ctx.world.cg.time;
+                ctx.world.cgs.clientinfo[clientNum as usize].medkitUsageTime = time;
+            }
+            //Different sound for big bacta?
+            trap::S_StartSound(
+                ctx.engine,
+                None,
+                es.number,
+                CHAN_AUTO,
+                ctx.world.cgs.media.medkitSound,
+            );
+        }
+
+        HI_JETPACK => {} //Do something?
+
+        HI_HEALTHDISP => {
+            //CG_LocalTimingBar(cg.time, TOSS_DEBOUNCE_TIME);
+        }
+
+        HI_AMMODISP => {
+            //CG_LocalTimingBar(cg.time, TOSS_DEBOUNCE_TIME);
+        }
+
+        HI_EWEB => {}
+
+        HI_CLOAK => {} //Do something?
+
+        // HI_NONE and any out-of-range fallthrough both land here.
+        _ => {
+            //trap_S_StartSound (NULL, es->number, CHAN_BODY, cgs.media.useNothingSound );
+        }
+    }
+
+    let should_cycle = ctx.world.cg.snap_ref().is_some_and(|snap| {
+        snap.ps.clientNum == cent.currentState.number
+            && itemNum != HI_BINOCULARS
+            && itemNum != HI_JETPACK
+            && itemNum != HI_HEALTHDISP
+            && itemNum != HI_AMMODISP
+            && itemNum != HI_CLOAK
+            && itemNum != HI_EWEB
+    });
+
+    if should_cycle {
+        //if not using binoculars/jetpack/dispensers/cloak, we just used that item up, so switch
+        if let Some(snap) = ctx.world.cg.snap_mut() {
+            BG_CycleInven(&mut snap.ps, 1);
+        }
+        ctx.world.cg.itemSelect = -1; //update the client-side selection display
+    }
+}
+
+/// Raven `CG_GetStringForVoiceSound` — maps a custom siege voice-order sound
+/// name (`bg_customSiegeSoundNames`) to its localized `MENUS` string-package
+/// text, falling back to `"voice chat"` on a miss.
+///
+/// Source: `oracle/codemp/cgame/cg_event.c:1464-1479`
+pub fn CG_GetStringForVoiceSound(ctx: &mut CgContext, s: &str) -> String {
+    let mut i = 0;
+    while i < MAX_CUSTOM_SIEGE_SOUNDS {
+        if let Some(name) = bg_customSiegeSoundNames[i] {
+            if name.to_str().unwrap_or("").eq_ignore_ascii_case(s) {
+                //get the matching reference name
+                // Raven asserts in debug and passes the NULL through in the
+                // shipped build; "" is the defined stand-in for that (§F19)
+                debug_assert!(
+                    cg_stringEdVoiceChatTable[i].is_some(),
+                    "cg_stringEdVoiceChatTable entry missing for a populated bg_customSiegeSoundNames slot"
+                );
+                let refName = cg_stringEdVoiceChatTable[i].unwrap_or("");
+                return CG_GetStringEdString(ctx, "MENUS", refName);
+            }
+        }
+        i += 1;
+    }
+
+    "voice chat".to_string()
 }

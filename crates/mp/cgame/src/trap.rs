@@ -3492,10 +3492,16 @@ pub fn G2API_AbsurdSmoothing(engine: &Engine, ghoul2: *mut c_void, status: bool)
 ///
 /// C: `void trap_G2API_SetRagDoll(void *ghoul2, sharedRagDollParams_t *params)`
 /// Source: `oracle/codemp/cgame/cg_syscalls.c:998-1001`
-pub fn G2API_SetRagDoll(engine: &Engine, ghoul2: *mut c_void, params: &mut sharedRagDollParams_t) {
+pub fn G2API_SetRagDoll(
+    engine: &Engine,
+    ghoul2: *mut c_void,
+    params: Option<&mut sharedRagDollParams_t>,
+) {
+    // NULL params is Raven's rag-doll reset arm
+    let params_ptr = params.map_or(null_mut(), |p| p as *mut sharedRagDollParams_t);
     <Engine as Execute<CgG2Setragdoll>>::execute(
         engine,
-        CgG2SetragdollArgs::new(ghoul2, params as *mut sharedRagDollParams_t),
+        CgG2SetragdollArgs::new(ghoul2, params_ptr),
     )
 }
 
@@ -3561,22 +3567,23 @@ pub fn G2API_RagPCJGradientSpeed(
 /// Raven `trap_G2API_RagEffectorGoal` — `CG_G2_RAGEFFECTORGOAL`
 /// (token: `mp_abi::cgame::syscalls::CG_G2_RAGEFFECTORGOAL`).
 ///
+/// `pos` is nullable in Raven — NULL clears the bone's over-goal instead of
+/// setting one (`oracle/codemp/ghoul2/G2_API.cpp:1552-1555`), so `None` rides
+/// through as a null pointer.
+///
 /// C: `qboolean trap_G2API_RagEffectorGoal(void *ghoul2, const char *boneName, vec3_t pos)`
 /// Source: `oracle/codemp/cgame/cg_syscalls.c:1020-1023`
 pub fn G2API_RagEffectorGoal(
     engine: &Engine,
     ghoul2: *mut c_void,
     boneName: &str,
-    pos: &vec3_t,
+    pos: Option<&vec3_t>,
 ) -> bool {
     let bone_name_c = cstr(boneName);
+    let pos_ptr = pos.map_or(null_mut(), |p| p as *const vec3_t as *mut vec3_t);
     <Engine as Execute<CgG2Rageffectorgoal>>::execute(
         engine,
-        CgG2RageffectorgoalArgs::new(
-            ghoul2,
-            bone_name_c.as_ptr(),
-            pos as *const vec3_t as *mut vec3_t,
-        ),
+        CgG2RageffectorgoalArgs::new(ghoul2, bone_name_c.as_ptr(), pos_ptr),
     ) != 0
 }
 

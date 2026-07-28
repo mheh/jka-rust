@@ -3,10 +3,14 @@
 
 #![allow(non_snake_case)]
 
-use native_string::atoi;
+use core::ffi::c_int;
+
+use native_string::{atoi, buf_to_string, Q_stricmp};
 
 use mp_qshared::shared::limits::MAX_TOKEN_CHARS;
+use mp_qshared::shared::q_math::YAW;
 use mp_qshared::shared::qfalse;
+use mp_qshared::shared::SCREEN_HEIGHT;
 
 use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::display_state::DisplayState;
@@ -15,6 +19,17 @@ use mp_uishared::shared::menu_system::MenuSystem;
 use mp_uishared::shared::menudef::{FEEDER_BLUETEAM_LIST, FEEDER_REDTEAM_LIST, FEEDER_SCOREBOARD};
 use mp_uishared::ui_shared::Menu_ScrollFeeder;
 
+use crate::cg_draw::CG_CenterPrint;
+use crate::cg_main::{
+    CG_Argv, CG_CrosshairPlayer, CG_GetStringEdString, CG_LastAttacker, CG_NextForcePower_f,
+    CG_NextInventory_f, CG_PrevForcePower_f, CG_PrevInventory_f, CG_Printf,
+};
+use crate::cg_players::CG_LoadDeferredPlayers;
+use crate::cg_view::{
+    CG_AddBufferedSound, CG_TestModelNextFrame_f, CG_TestModelNextSkin_f, CG_TestModelPrevFrame_f,
+    CG_TestModelPrevSkin_f, CG_TestModel_f,
+};
+use crate::cg_weapons::{CG_NextWeapon_f, CG_PrevWeapon_f, CG_WeaponClean_f, CG_Weapon_f};
 use crate::trap;
 use crate::world::cg_context::CgContext;
 use crate::world::cg_world::CgWorld;
@@ -60,6 +75,21 @@ const COMMANDS: &[&str] = &[
     "siegeCompleteCvarUpdate",
 ];
 
+/// Raven `CG_TargetCommand_f` — sends the `gc <targetNum> <parm>` server
+/// command for whichever crosshair-target console command (bound key) invoked
+/// it; a no-op with nothing under the crosshair.
+///
+/// Source: `oracle/codemp/cgame/cg_consolecmds.c:13-24`
+pub fn CG_TargetCommand_f(ctx: &mut CgContext) {
+    let targetNum = CG_CrosshairPlayer(ctx.world);
+    if targetNum == 0 {
+        return;
+    }
+
+    let test = trap::Argv(ctx.engine, 1, 4);
+    trap::SendConsoleCommand(ctx.engine, &format!("gc {} {}", targetNum, atoi(&test)));
+}
+
 /// Raven `CG_SizeUp_f` — bumps `cg_viewsize` up by 10.
 ///
 /// Source: `oracle/codemp/cgame/cg_consolecmds.c:35-37`
@@ -74,6 +104,25 @@ pub fn CG_SizeUp_f(ctx: &mut CgContext) {
 pub fn CG_SizeDown_f(ctx: &mut CgContext) {
     let size = ctx.world.cvars.cg_viewsize.integer - 10;
     trap::Cvar_Set(ctx.engine, "cg_viewsize", &format!("{}", size));
+}
+
+/// Raven `CG_Viewpos_f` — prints the map name plus the current view origin/yaw
+/// to the console, x86 float-to-int truncation on each component.
+///
+/// Source: `oracle/codemp/cgame/cg_consolecmds.c:59-63`
+pub fn CG_Viewpos_f(ctx: &mut CgContext) {
+    let mapname = buf_to_string(&ctx.world.cgs.mapname.map(|c| c as u8));
+    let vieworg = ctx.world.cg.refdef.vieworg;
+    let viewangles = ctx.world.cg.refdef.viewangles;
+    let msg = format!(
+        "{} ({} {} {}) : {}\n",
+        mapname,
+        vieworg[0] as c_int,
+        vieworg[1] as c_int,
+        vieworg[2] as c_int,
+        viewangles[YAW] as c_int,
+    );
+    CG_Printf(ctx, &msg);
 }
 
 /// Raven `CG_ScoresUp_f` — dismisses the scoreboard if it's showing, latching
@@ -132,6 +181,90 @@ pub fn CG_scrollScoresUp_f(
     }
 }
 
+/// Raven `CG_spWin_f` — the SP mission-win screen: parks the camera in orbit,
+/// plays the winner stinger, and centerprints the "you win" string.
+///
+/// Raven's `trap_S_StartLocalSound` line is commented out in the oracle;
+/// `CG_AddBufferedSound` is the only sound call left live. Kept as written.
+///
+/// Source: `oracle/codemp/cgame/cg_consolecmds.c:116-125`
+pub fn CG_spWin_f(ctx: &mut CgContext) {
+    trap::Cvar_Set(ctx.engine, "cg_cameraOrbit", "2");
+    trap::Cvar_Set(ctx.engine, "cg_cameraOrbitDelay", "35");
+    trap::Cvar_Set(ctx.engine, "cg_thirdPerson", "1");
+    trap::Cvar_Set(ctx.engine, "cg_thirdPersonAngle", "0");
+    trap::Cvar_Set(ctx.engine, "cg_thirdPersonRange", "100");
+
+    let winnerSound = ctx.world.cgs.media.winnerSound;
+    CG_AddBufferedSound(ctx.world, winnerSound);
+    // trap_S_StartLocalSound(cgs.media.winnerSound, CHAN_ANNOUNCER); - commented out in Raven
+
+    let msg = CG_GetStringEdString(ctx, "MP_INGAME", "YOU_WIN");
+    CG_CenterPrint(ctx.world, &msg, (SCREEN_HEIGHT as f64 * 0.30) as c_int, 0);
+}
+
+/// Raven `CG_spLose_f` — the SP mission-loss screen: parks the camera in
+/// orbit, plays the loser stinger, and centerprints the "you lose" string.
+///
+/// Raven's `trap_S_StartLocalSound` line is commented out in the oracle;
+/// `CG_AddBufferedSound` is the only sound call left live. Kept as written.
+///
+/// Source: `oracle/codemp/cgame/cg_consolecmds.c:127-136`
+pub fn CG_spLose_f(ctx: &mut CgContext) {
+    trap::Cvar_Set(ctx.engine, "cg_cameraOrbit", "2");
+    trap::Cvar_Set(ctx.engine, "cg_cameraOrbitDelay", "35");
+    trap::Cvar_Set(ctx.engine, "cg_thirdPerson", "1");
+    trap::Cvar_Set(ctx.engine, "cg_thirdPersonAngle", "0");
+    trap::Cvar_Set(ctx.engine, "cg_thirdPersonRange", "100");
+
+    let loserSound = ctx.world.cgs.media.loserSound;
+    CG_AddBufferedSound(ctx.world, loserSound);
+    // trap_S_StartLocalSound(cgs.media.loserSound, CHAN_ANNOUNCER); - commented out in Raven
+
+    let msg = CG_GetStringEdString(ctx, "MP_INGAME", "YOU_LOSE");
+    CG_CenterPrint(ctx.world, &msg, (SCREEN_HEIGHT as f64 * 0.30) as c_int, 0);
+}
+
+/// Raven `CG_TellTarget_f` — sends a `tell <clientNum> <message>` server
+/// command to whoever is under the crosshair; a no-op with nothing under it.
+///
+/// Source: `oracle/codemp/cgame/cg_consolecmds.c:139-152`
+pub fn CG_TellTarget_f(ctx: &mut CgContext) {
+    let clientNum = CG_CrosshairPlayer(ctx.world);
+    if clientNum == -1 {
+        return;
+    }
+
+    let message = trap::Args(ctx.engine, 128);
+    // Com_sprintf into `command[128]` - one Latin-1 char is one C byte, so 127
+    // of them plus the NUL is everything that survives
+    let command: String = format!("tell {} {}", clientNum, message)
+        .chars()
+        .take(127)
+        .collect();
+    trap::SendClientCommand(ctx.engine, &command);
+}
+
+/// Raven `CG_TellAttacker_f` — sends a `tell <clientNum> <message>` server
+/// command to the local player's last attacker; a no-op with none recorded.
+///
+/// Source: `oracle/codemp/cgame/cg_consolecmds.c:154-167`
+pub fn CG_TellAttacker_f(ctx: &mut CgContext) {
+    let clientNum = CG_LastAttacker(ctx.world);
+    if clientNum == -1 {
+        return;
+    }
+
+    let message = trap::Args(ctx.engine, 128);
+    // Com_sprintf into `command[128]` - one Latin-1 char is one C byte, so 127
+    // of them plus the NUL is everything that survives
+    let command: String = format!("tell {} {}", clientNum, message)
+        .chars()
+        .take(127)
+        .collect();
+    trap::SendClientCommand(ctx.engine, &command);
+}
+
 /// Raven `CG_StartOrbit_f` — toggles the developer-only orbit camera; a no-op
 /// unless `developer` is set (guards a cheat-adjacent debug feature outside
 /// dev builds).
@@ -152,6 +285,104 @@ pub fn CG_StartOrbit_f(ctx: &mut CgContext) {
         trap::Cvar_Set(ctx.engine, "cg_thirdPersonAngle", "0");
         trap::Cvar_Set(ctx.engine, "cg_thirdPersonRange", "100");
     }
+}
+
+/// Raven `CG_ConsoleCommand` — the vmMain console-command dispatch: walks
+/// `commands[]` for a case-insensitive name match against `argv(0)` and calls
+/// the matching handler, `qtrue`; `qfalse` if nothing matched (the engine then
+/// tries the command elsewhere).
+///
+/// DEC-46.4 turns Raven's `commands[]` fn-pointer column into this `match`; the
+/// name loop over `COMMANDS` keeps Raven's `Q_stricmp` case-insensitive
+/// matching instead of a case-sensitive Rust `match` on the string itself.
+/// `menus`/`ds`/`dc`/`menuScoreboard` thread in beside `ctx` because two arms
+/// (`scoresDown`/`scoresUp`) reach [`CG_scrollScoresDown_f`]/
+/// [`CG_scrollScoresUp_f`], which need the shared menu framework the same way
+/// their own doc comments explain.
+///
+/// Five arms (`testgun`, `+scores`, `briefing`, `siegeCvarUpdate`,
+/// `siegeCompleteCvarUpdate`) dispatch to `CG_TestGun_f`/`CG_ScoresDown_f`/
+/// `CG_SiegeBriefing_f`/`CG_SiegeCvarUpdate_f`/`CG_SiegeCompleteCvarUpdate_f`,
+/// none of which exist anywhere in the tree yet (verified by grep) - they land
+/// in `cgame-wave-partition.json` waves 2/3, later than this file's wave 1.
+/// Each is a genuine executable stub: reachable only if a player actually
+/// types that console command, so it panics loudly naming the still-unported
+/// Raven fn rather than silently swallowing the command.
+///
+/// Source: `oracle/codemp/cgame/cg_consolecmds.c:309-323`
+pub fn CG_ConsoleCommand(
+    ctx: &mut CgContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    menuScoreboard: Option<MenuId>,
+) -> bool {
+    let cmd = CG_Argv(ctx, 0);
+
+    for name in COMMANDS.iter().copied() {
+        if Q_stricmp(&cmd, name) != 0 {
+            continue;
+        }
+
+        match name {
+            "testgun" => {
+                // TODO: Port CG_TestGun_f
+                // Source: oracle/codemp/cgame/cg_view.c:98 (cgame module wave 2 - not yet in tree)
+                todo!("CG_TestGun_f - oracle/codemp/cgame/cg_view.c:98")
+            }
+            "testmodel" => CG_TestModel_f(ctx),
+            "nextframe" => CG_TestModelNextFrame_f(ctx),
+            "prevframe" => CG_TestModelPrevFrame_f(ctx),
+            "nextskin" => CG_TestModelNextSkin_f(ctx),
+            "prevskin" => CG_TestModelPrevSkin_f(ctx),
+            "viewpos" => CG_Viewpos_f(ctx),
+            "+scores" => {
+                // TODO: Port CG_ScoresDown_f
+                // Source: oracle/codemp/cgame/cg_consolecmds.c:66 (cgame module wave 3 - not yet in tree)
+                todo!("CG_ScoresDown_f - oracle/codemp/cgame/cg_consolecmds.c:66")
+            }
+            "-scores" => CG_ScoresUp_f(ctx.world),
+            "sizeup" => CG_SizeUp_f(ctx),
+            "sizedown" => CG_SizeDown_f(ctx),
+            "weapnext" => CG_NextWeapon_f(ctx),
+            "weapprev" => CG_PrevWeapon_f(ctx),
+            "weapon" => CG_Weapon_f(ctx),
+            "weaponclean" => CG_WeaponClean_f(ctx),
+            "tell_target" => CG_TellTarget_f(ctx),
+            "tell_attacker" => CG_TellAttacker_f(ctx),
+            "tcmd" => CG_TargetCommand_f(ctx),
+            "spWin" => CG_spWin_f(ctx),
+            "spLose" => CG_spLose_f(ctx),
+            "scoresDown" => CG_scrollScoresDown_f(ctx.world, menus, ds, dc, menuScoreboard),
+            "scoresUp" => CG_scrollScoresUp_f(ctx.world, menus, ds, dc, menuScoreboard),
+            "startOrbit" => CG_StartOrbit_f(ctx),
+            "loaddeferred" => CG_LoadDeferredPlayers(ctx.world),
+            "invnext" => CG_NextInventory_f(ctx.world),
+            "invprev" => CG_PrevInventory_f(ctx.world),
+            "forcenext" => CG_NextForcePower_f(ctx),
+            "forceprev" => CG_PrevForcePower_f(ctx),
+            "briefing" => {
+                // TODO: Port CG_SiegeBriefing_f
+                // Source: oracle/codemp/cgame/cg_consolecmds.c:195 (cgame module wave 2 - not yet in tree)
+                todo!("CG_SiegeBriefing_f - oracle/codemp/cgame/cg_consolecmds.c:195")
+            }
+            "siegeCvarUpdate" => {
+                // TODO: Port CG_SiegeCvarUpdate_f
+                // Source: oracle/codemp/cgame/cg_consolecmds.c:215 (cgame module wave 2 - not yet in tree)
+                todo!("CG_SiegeCvarUpdate_f - oracle/codemp/cgame/cg_consolecmds.c:215")
+            }
+            "siegeCompleteCvarUpdate" => {
+                // TODO: Port CG_SiegeCompleteCvarUpdate_f
+                // Source: oracle/codemp/cgame/cg_consolecmds.c:234 (cgame module wave 2 - not yet in tree)
+                todo!("CG_SiegeCompleteCvarUpdate_f - oracle/codemp/cgame/cg_consolecmds.c:234")
+            }
+            _ => unreachable!("COMMANDS lists {name:?} with no CG_ConsoleCommand dispatch arm"),
+        }
+
+        return true;
+    }
+
+    false
 }
 
 /// Raven `CG_InitConsoleCommands` — registers every cgame console command with

@@ -8,21 +8,23 @@ use core::ptr::null_mut;
 
 use mp_abi::cgame::public::snapshot_t::MAX_ENTITIES_IN_SNAPSHOT;
 use mp_bg::bg_misc::{
-    BG_AddPredictableEventToPlayerstate, BG_CanItemBeGrabbed, BG_PlayerTouchesItem,
+    BG_AddPredictableEventToPlayerstate, BG_CanItemBeGrabbed, BG_EvaluateTrajectory,
+    BG_PlayerTouchesItem, BG_TouchJumpPad,
 };
 use mp_bg::public::bg_itemlist::bg_itemlist;
 use mp_bg::public::entity_event::entity_event_t::EV_ITEM_PICKUP;
 use mp_bg::public::entity_flags::{EF_ITEMPLACEHOLDER, EF_NODRAW};
 use mp_bg::public::entity_type::entityType_t::{
-    ET_ITEM, ET_NPC, ET_PLAYER, ET_PUSH_TRIGGER, ET_TELEPORT_TRIGGER, ET_TERRAIN,
+    ET_ITEM, ET_MISSILE, ET_NPC, ET_PLAYER, ET_PUSH_TRIGGER, ET_TELEPORT_TRIGGER, ET_TERRAIN,
 };
 use mp_bg::public::gametype::{GT_CTF, GT_CTY};
 use mp_bg::public::item_type::{IT_POWERUP, IT_WEAPON};
 use mp_bg::public::pers_enum::persEnum_t::PERS_TEAM;
+use mp_bg::public::pmtype::pmtype_t::{PM_FLOAT, PM_JETPACK, PM_NORMAL, PM_SPECTATOR};
 use mp_bg::public::powerup::{
     PW_BLUEFLAG, PW_FORCE_ENLIGHTENED_DARK, PW_FORCE_ENLIGHTENED_LIGHT, PW_REDFLAG,
 };
-use mp_bg::public::stat_index::statIndex_t::STAT_WEAPONS;
+use mp_bg::public::stat_index::statIndex_t::{STAT_HEALTH, STAT_WEAPONS};
 use mp_bg::public::team::{TEAM_BLUE, TEAM_RED};
 use mp_bg::public::viewheight::{DEFAULT_MAXS_2, DEFAULT_MINS_2};
 use mp_bg::weapons::weapon_t::{WP_EMPLACED_GUN, WP_NONE};
@@ -30,10 +32,13 @@ use mp_qshared::common::mp::game::class_t::class_t::CLASS_VEHICLE;
 use mp_qshared::common::mp::qcommon::usercmd_t;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::force_powers::{FORCE_DARKSIDE, FORCE_LIGHTSIDE};
-use mp_qshared::shared::q_math::{_VectorSubtract, LerpAngle};
+use mp_qshared::shared::q_math::{_VectorSubtract, vec3_origin, LerpAngle};
 use mp_qshared::shared::surface_flags::SOLID_BMODEL;
-use mp_qshared::shared::{qfalse, qtrue, vec3_t, ENTITYNUM_WORLD, MAX_GENTITIES};
+use mp_qshared::shared::{
+    qfalse, qtrue, vec3_t, ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_CLIENTS_I32, MAX_GENTITIES,
+};
 
+use crate::cg_players::CG_G2TraceCollide;
 use crate::local::player_state_ref::PlayerStateRef;
 use crate::trap;
 use crate::world::cg_context::CgContext;
@@ -589,4 +594,240 @@ pub fn CG_UsingEWeb(world: &CgWorld) -> bool {
     }
 
     false
+}
+
+/// Raven `CG_ClipMoveToEntities` — sweeps a box against `cg_solidEntities`,
+/// tightening `tr` against whichever solid entity it lands on first.
+///
+/// PORT-NOTE: the dynamic vehicle-bbox-orientation adjust (`cent->m_pVehicle
+/// ->m_vOrientation` swap around `BG_VehicleAdjustBBoxForOrientation`) is
+/// dropped — DEC-46.2's `Option<VehicleId>` on `centity_t` carries only the
+/// vehicle cent's entity number, presence-only, until the `Vehicle_t`
+/// referent pool lands (`CG_VehicleEffects`, `cg_players.rs:7981-8305`, is the
+/// established precedent for this exact deferral). The encoded bbox still
+/// gets built and traced with the un-adjusted extents.
+/// Source: `oracle/codemp/cgame/cg_predict.c:216-351`
+#[allow(clippy::too_many_arguments)]
+pub fn CG_ClipMoveToEntities(
+    ctx: &mut CgContext,
+    start: &vec3_t,
+    mins: &vec3_t,
+    maxs: &vec3_t,
+    end: &vec3_t,
+    skipNumber: c_int,
+    mask: c_int,
+    tr: &mut trace_t,
+    g2Check: bool,
+) {
+    let ignored: Option<usize> = if skipNumber != -1 && skipNumber != ENTITYNUM_NONE {
+        Some(skipNumber as usize)
+    } else {
+        None
+    };
+    let ignoredHasVeh = ignored
+        .map(|idx| ctx.world.entities[idx].currentState.m_iVehicleNum != 0)
+        .unwrap_or(false);
+
+    let numSolid = ctx.world.predict.cg_numSolidEntities as usize;
+    for i in 0..numSolid {
+        let num = ctx.world.predict.cg_solidEntities[i] as usize;
+        let entNumber = ctx.world.entities[num].currentState.number;
+
+        if entNumber == skipNumber {
+            continue;
+        }
+
+        let genericenemyindex = ctx.world.entities[num].currentState.genericenemyindex;
+        if entNumber > MAX_CLIENTS_I32
+            && (genericenemyindex - MAX_GENTITIES as c_int
+                == ctx.world.cg.predictedPlayerState.clientNum
+                || genericenemyindex - MAX_GENTITIES as c_int
+                    == ctx.world.cg.predictedVehicleState.clientNum)
+        {
+            //rww - method of keeping objects from colliding in client-prediction (in case of ownership)
+            continue;
+        }
+
+        let solid = ctx.world.entities[num].currentState.solid;
+        let cmodel;
+        let origin: vec3_t;
+        let angles: vec3_t;
+
+        if solid == SOLID_BMODEL {
+            // special value for bmodel
+            let modelindex = ctx.world.entities[num].currentState.modelindex;
+            cmodel = trap::CM_InlineModel(ctx.engine, modelindex);
+            angles = ctx.world.entities[num].lerpAngles;
+            let mut o: vec3_t = [0.0; 3];
+            BG_EvaluateTrajectory(
+                &ctx.world.entities[num].currentState.pos,
+                ctx.world.cg.physicsTime,
+                &mut o,
+            );
+            origin = o;
+        } else {
+            // encoded bbox
+            let x = (solid & 255) as f32;
+            let zd = ((solid >> 8) & 255) as f32;
+            let zu = (((solid >> 16) & 255) - 32) as f32;
+
+            let bmins: vec3_t = [-x, -x, -zd];
+            let bmaxs: vec3_t = [x, x, zu];
+
+            // PORT-NOTE: Raven dynamically widens `bmins`/`bmaxs` here for a
+            // vehicle NPC ("if (ent->eType == ET_NPC && ent->NPC_class ==
+            // CLASS_VEHICLE && cent->m_pVehicle) BG_VehicleAdjustBBoxForOrientation(...)").
+            // See the fn doc — unreachable until the Vehicle_t referent pool
+            // lands, so the un-adjusted encoded bbox is traced instead.
+
+            cmodel = trap::CM_TempBoxModel(ctx.engine, &bmins, &bmaxs);
+            angles = vec3_origin;
+            origin = ctx.world.entities[num].lerpOrigin;
+        }
+
+        let mut trace = trace_t::zeroed();
+        trap::CM_TransformedBoxTrace(
+            ctx.engine, &mut trace, start, end, mins, maxs, cmodel, mask, &origin, &angles,
+        );
+        trace.entityNum = if trace.fraction != 1.0 {
+            entNumber as i16
+        } else {
+            ENTITYNUM_NONE as i16
+        };
+
+        let mut oldTrace = trace_t::zeroed();
+        if g2Check || ignoredHasVeh {
+            oldTrace = *tr;
+        }
+
+        if trace.allsolid != 0 || trace.fraction < tr.fraction {
+            trace.entityNum = entNumber as i16;
+            *tr = trace;
+        } else if trace.startsolid != 0 {
+            tr.startsolid = qtrue as u8;
+
+            //rww 12-02-02
+            trace.entityNum = entNumber as i16;
+            tr.entityNum = trace.entityNum;
+        }
+
+        if tr.allsolid != 0 {
+            if ignoredHasVeh {
+                let ignoredIdx = ignored.unwrap();
+                trace.entityNum = entNumber as i16;
+                if CG_VehicleClipCheck(ctx.world, ignoredIdx, &trace) {
+                    //this isn't our vehicle, we're really stuck
+                    return;
+                } else {
+                    //it's alright, keep going
+                    trace = oldTrace;
+                    *tr = trace;
+                }
+            } else {
+                return;
+            }
+        }
+
+        if g2Check {
+            let ghoul2 = ctx.world.entities[num].ghoul2;
+            if trace.entityNum == entNumber as i16 && !ghoul2.is_null() {
+                CG_G2TraceCollide(ctx, &mut trace, Some(mins), Some(maxs), start, end);
+
+                if trace.entityNum == ENTITYNUM_NONE as i16 {
+                    //g2 trace failed, so put it back where it was.
+                    trace = oldTrace;
+                    *tr = trace;
+                }
+            }
+        }
+
+        if ignoredHasVeh {
+            //see if this is the vehicle we hit
+            let ignoredIdx = ignored.unwrap();
+            let hitIdx = trace.entityNum as usize;
+            if !CG_VehicleClipCheck(ctx.world, ignoredIdx, &trace) {
+                //looks like it
+                trace = oldTrace;
+                *tr = trace;
+            } else if ctx.world.entities[hitIdx].currentState.eType == ET_MISSILE as c_int
+                && ctx.world.entities[hitIdx].currentState.owner
+                    == ctx.world.entities[ignoredIdx].currentState.number
+            {
+                //hack, don't hit own missiles
+                trace = oldTrace;
+                *tr = trace;
+            }
+        }
+    }
+}
+
+/// Raven `CG_TouchTriggerPrediction` — fires predicted item pickups and
+/// trigger touches (teleport/push) against `cg_triggerEntities`.
+///
+/// Source: `oracle/codemp/cgame/cg_predict.c:670-726`
+pub fn CG_TouchTriggerPrediction(ctx: &mut CgContext) {
+    // dead clients don't activate triggers
+    if ctx.world.cg.predictedPlayerState.stats[STAT_HEALTH as usize] <= 0 {
+        return;
+    }
+
+    let spectator = ctx.world.cg.predictedPlayerState.pm_type == PM_SPECTATOR as c_int;
+
+    if ctx.world.cg.predictedPlayerState.pm_type != PM_NORMAL as c_int
+        && ctx.world.cg.predictedPlayerState.pm_type != PM_JETPACK as c_int
+        && ctx.world.cg.predictedPlayerState.pm_type != PM_FLOAT as c_int
+        && !spectator
+    {
+        return;
+    }
+
+    let numTrigger = ctx.world.predict.cg_numTriggerEntities as usize;
+    for i in 0..numTrigger {
+        let num = ctx.world.predict.cg_triggerEntities[i] as usize;
+        let eType = ctx.world.entities[num].currentState.eType;
+
+        if eType == ET_ITEM as c_int && !spectator {
+            CG_TouchItem(ctx.world, num);
+            continue;
+        }
+
+        if ctx.world.entities[num].currentState.solid != SOLID_BMODEL {
+            continue;
+        }
+
+        let modelindex = ctx.world.entities[num].currentState.modelindex;
+        let cmodel = trap::CM_InlineModel(ctx.engine, modelindex);
+        if cmodel == 0 {
+            continue;
+        }
+
+        let mut trace = trace_t::zeroed();
+        let origin = ctx.world.cg.predictedPlayerState.origin;
+        let pmins = ctx.world.predict.cg_pmove.mins;
+        let pmaxs = ctx.world.predict.cg_pmove.maxs;
+        trap::CM_BoxTrace(
+            ctx.engine, &mut trace, &origin, &origin, &pmins, &pmaxs, cmodel, -1,
+        );
+
+        if trace.startsolid == 0 {
+            continue;
+        }
+
+        if eType == ET_TELEPORT_TRIGGER as c_int {
+            ctx.world.cg.hyperspace = qtrue;
+        } else if eType == ET_PUSH_TRIGGER as c_int {
+            BG_TouchJumpPad(
+                &raw mut ctx.world.cg.predictedPlayerState,
+                &raw mut ctx.world.entities[num].currentState,
+            );
+        }
+    }
+
+    // if we didn't touch a jump pad this pmove frame
+    if ctx.world.cg.predictedPlayerState.jumppad_frame
+        != ctx.world.cg.predictedPlayerState.pmove_framecount
+    {
+        ctx.world.cg.predictedPlayerState.jumppad_frame = 0;
+        ctx.world.cg.predictedPlayerState.jumppad_ent = 0;
+    }
 }

@@ -5,6 +5,7 @@
 
 use core::ffi::c_int;
 
+use mp_bg::public::stat_index::statIndex_t::{STAT_ARMOR, STAT_HEALTH};
 use mp_qshared::shared::q_color::Q_IsColorString;
 use mp_qshared::shared::{qhandle_t, vec4_t};
 
@@ -20,6 +21,26 @@ const ARMOR_PROTECTION: f32 = 0.50;
 ///
 /// Source: `oracle/codemp/cgame/cg_local.h:26`
 const FADE_TIME: c_int = 200;
+
+/// Raven `#define NUM_FONT_BIG 1` — number-field font style: the default chunky retail HUD digits.
+///
+/// Source: `oracle/codemp/cgame/cg_local.h:70`
+const NUM_FONT_BIG: c_int = 1;
+
+/// Raven `#define NUM_FONT_SMALL 2` — number-field font style: small ammo/health digits.
+///
+/// Source: `oracle/codemp/cgame/cg_local.h:71`
+const NUM_FONT_SMALL: c_int = 2;
+
+/// Raven `#define NUM_FONT_CHUNKY 3` — number-field font style: the wide scoreboard digits.
+///
+/// Source: `oracle/codemp/cgame/cg_local.h:72`
+const NUM_FONT_CHUNKY: c_int = 3;
+
+/// Raven `#define STAT_MINUS 10` — num frame for the '-' stats digit.
+///
+/// Source: `oracle/codemp/cgame/cg_local.h:59`
+const STAT_MINUS: c_int = 10;
 
 /// Raven `CG_GetColorForHealth` — health bar color ramp, armor-adjusted.
 ///
@@ -339,4 +360,226 @@ pub fn CG_ColorForGivenHealth(mut hcolor: vec4_t, health: c_int) -> vec4_t {
     }
 
     hcolor
+}
+
+/// Raven `CG_DrawRect` — a hollow rect border built from top/bottom + side bars.
+///
+/// Source: `oracle/codemp/cgame/cg_drawtools.c:24-31`
+pub fn CG_DrawRect(
+    ctx: &mut CgContext,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    size: f32,
+    color: &vec4_t,
+) {
+    trap::R_SetColor(ctx.engine, Some(color));
+
+    CG_DrawTopBottom(ctx, x, y, width, height, size);
+    CG_DrawSides(ctx, x, y, width, height, size);
+
+    // NULL resets the renderer's tint back to white.
+    trap::R_SetColor(ctx.engine, None);
+}
+
+/// Raven `CG_TileClear` — repaints the letterbox margins around a scaled-down 3D view with the
+/// back-tile shader; a no-op when the refdef already covers the whole screen.
+///
+/// Source: `oracle/codemp/cgame/cg_drawtools.c:350-378`
+pub fn CG_TileClear(ctx: &mut CgContext) {
+    let w = ctx.world.cgs.glconfig.vidWidth;
+    let h = ctx.world.cgs.glconfig.vidHeight;
+
+    if ctx.world.cg.refdef.x == 0
+        && ctx.world.cg.refdef.y == 0
+        && ctx.world.cg.refdef.width == w
+        && ctx.world.cg.refdef.height == h
+    {
+        // full screen rendering
+        return;
+    }
+
+    let top = ctx.world.cg.refdef.y;
+    let bottom = top + ctx.world.cg.refdef.height - 1;
+    let left = ctx.world.cg.refdef.x;
+    let right = left + ctx.world.cg.refdef.width - 1;
+
+    let backTileShader = ctx.world.cgs.media.backTileShader;
+
+    // clear above view screen
+    CG_TileClearBox(ctx, 0, 0, w, top, backTileShader);
+
+    // clear below view screen
+    CG_TileClearBox(ctx, 0, bottom, w, h - bottom, backTileShader);
+
+    // clear left of view screen
+    CG_TileClearBox(ctx, 0, top, left, bottom - top + 1, backTileShader);
+
+    // clear right of view screen
+    CG_TileClearBox(ctx, right, top, w - right, bottom - top + 1, backTileShader);
+}
+
+/// Raven `CG_ColorForHealth` — armor-folded health color for the live `cg.snap` player state,
+/// delegating the green/blue ramp to `CG_ColorForGivenHealth`.
+///
+/// §F19: Raven dereferences `cg.snap` with no null check here - before the first snapshot that's
+/// a null deref. Same hazard `CG_DamageFeedback` (cg_playerstate.c) already takes the neutral
+/// early-out for; this returns the same black/opaque color the `health <= 0` branch below uses.
+/// Source: `oracle/codemp/cgame/cg_drawtools.c:454-481`
+pub fn CG_ColorForHealth(world: &CgWorld) -> vec4_t {
+    let Some(snap) = world.cg.snap_ref() else {
+        return [0.0, 0.0, 0.0, 1.0];
+    };
+
+    // calculate the total points of damage that can
+    // be sustained at the current health / armor level
+    let mut health = snap.ps.stats[STAT_HEALTH as usize];
+
+    if health <= 0 {
+        // black
+        return [0.0, 0.0, 0.0, 1.0];
+    }
+
+    let mut count = snap.ps.stats[STAT_ARMOR as usize];
+    let max = (health as f32 * ARMOR_PROTECTION / (1.0 - ARMOR_PROTECTION)) as c_int;
+    if max < count {
+        count = max;
+    }
+    health += count;
+
+    let hcolor: vec4_t = [0.0, 0.0, 0.0, 1.0];
+    CG_ColorForGivenHealth(hcolor, health)
+}
+
+/// Raven `CG_DrawNumField` — draws a fixed-width numeric field glyph-by-glyph from one of the
+/// three number-shader sets (`NUM_FONT_SMALL`/`CHUNKY`/`BIG`), with optional zero-padding.
+///
+/// Source: `oracle/codemp/cgame/cg_drawtools.c:491-600`
+pub fn CG_DrawNumField(
+    ctx: &mut CgContext,
+    mut x: c_int,
+    y: c_int,
+    mut width: c_int,
+    mut value: c_int,
+    charWidth: c_int,
+    charHeight: c_int,
+    style: c_int,
+    zeroFill: bool,
+) {
+    if width < 1 {
+        return;
+    }
+
+    // draw number string
+    if width > 5 {
+        width = 5;
+    }
+
+    match width {
+        1 => {
+            if value > 9 {
+                value = 9;
+            }
+            if value < 0 {
+                value = 0;
+            }
+        }
+        2 => {
+            if value > 99 {
+                value = 99;
+            }
+            if value < -9 {
+                value = -9;
+            }
+        }
+        3 => {
+            if value > 999 {
+                value = 999;
+            }
+            if value < -99 {
+                value = -99;
+            }
+        }
+        4 => {
+            if value > 9999 {
+                value = 9999;
+            }
+            if value < -999 {
+                value = -999;
+            }
+        }
+        _ => {}
+    }
+
+    let num = format!("{}", value);
+    let mut l = num.len() as c_int;
+    if l > width {
+        l = width;
+    }
+
+    // FIXME: Might need to do something different for the chunky font??
+    let xWidth = match style {
+        NUM_FONT_SMALL => charWidth,
+        NUM_FONT_CHUNKY => (charWidth as f32 / 1.2 + 2.0) as c_int,
+        // default, and NUM_FONT_BIG
+        NUM_FONT_BIG | _ => (charWidth / 2) + 7,
+    };
+
+    if zeroFill {
+        for _ in 0..(width - l) {
+            let shader = match style {
+                NUM_FONT_SMALL => ctx.world.cgs.media.smallnumberShaders[0],
+                NUM_FONT_CHUNKY => ctx.world.cgs.media.chunkyNumberShaders[0],
+                // default, and NUM_FONT_BIG
+                NUM_FONT_BIG | _ => ctx.world.cgs.media.numberShaders[0],
+            };
+            CG_DrawPic(
+                ctx,
+                x as f32,
+                y as f32,
+                charWidth as f32,
+                charHeight as f32,
+                shader,
+            );
+            x += 2 + xWidth;
+        }
+    } else {
+        x += 2 + xWidth * (width - l);
+    }
+
+    let mut chars = num.chars();
+    while l > 0 {
+        let Some(ch) = chars.next() else {
+            break;
+        };
+
+        let frame = if ch == '-' {
+            STAT_MINUS
+        } else {
+            ch as c_int - '0' as c_int
+        };
+
+        let shader = match style {
+            NUM_FONT_SMALL => ctx.world.cgs.media.smallnumberShaders[frame as usize],
+            NUM_FONT_CHUNKY => ctx.world.cgs.media.chunkyNumberShaders[frame as usize],
+            // default, and NUM_FONT_BIG
+            NUM_FONT_BIG | _ => ctx.world.cgs.media.numberShaders[frame as usize],
+        };
+        CG_DrawPic(
+            ctx,
+            x as f32,
+            y as f32,
+            charWidth as f32,
+            charHeight as f32,
+            shader,
+        );
+        if style == NUM_FONT_SMALL {
+            // For a one line gap
+            x += 1;
+        }
+
+        x += xWidth;
+        l -= 1;
+    }
 }

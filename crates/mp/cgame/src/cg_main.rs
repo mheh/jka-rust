@@ -3,20 +3,27 @@
 
 #![allow(non_snake_case)]
 
-use core::ffi::c_int;
+use core::ffi::{c_char, c_int};
 use core::ptr::null_mut;
 
-use mp_abi::cgame::shared_buffer::{TCGGetBoltData, TCGVectorData};
-use mp_bg::bg_misc::{selected_holdable_tag, BG_CycleInven, BG_GetItemIndexByTag};
+use mp_abi::cgame::shared_buffer::{TCGGetBoltData, TCGPointContents, TCGVectorData};
+use mp_bg::bg_misc::{
+    selected_holdable_tag, BG_CycleForce, BG_CycleInven, BG_FindItemForPowerup,
+    BG_GetItemIndexByTag,
+};
+use mp_bg::public::bg_itemlist::bg_itemlist;
 use mp_bg::public::entity_type::entityType_t;
 use mp_bg::public::g_item::MAX_ITEM_MODELS;
-use mp_bg::public::gametype::GT_TEAM;
+use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL, GT_TEAM};
 use mp_bg::public::item_type::IT_HOLDABLE;
 use mp_bg::public::pers_enum::persEnum_t::PERS_ATTACKER;
 use mp_bg::public::pmtype::pmtype_t;
-use mp_bg::public::stat_index::statIndex_t::STAT_HOLDABLE_ITEM;
-use mp_bg::public::team::{TEAM_BLUE, TEAM_RED};
-use mp_qshared::common::mp::qcommon::PMF_FOLLOW;
+use mp_bg::public::powerup::{PW_BLUEFLAG, PW_NEUTRALFLAG, PW_REDFLAG};
+use mp_bg::public::spawn::MAX_SPAWN_VARS_CHARS;
+use mp_bg::public::stat_index::statIndex_t::{STAT_CLIENTS_READY, STAT_HOLDABLE_ITEM};
+use mp_bg::public::team::{TEAM_BLUE, TEAM_RED, TEAM_SPECTATOR};
+use mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_USE;
+use mp_qshared::common::mp::qcommon::{usercmd_t, PMF_FOLLOW};
 use mp_qshared::shared::cvar::{
     CVAR_ARCHIVE, CVAR_CHEAT, CVAR_INTERNAL, CVAR_ROM, CVAR_SERVERINFO, CVAR_USERINFO,
 };
@@ -27,8 +34,8 @@ use mp_qshared::shared::limits::{MAX_CLIENTS_I32, MAX_STRING_CHARS, MAX_TOKEN_CH
 use mp_qshared::shared::q_color::S_COLOR_RED;
 use mp_qshared::shared::q_math::{_VectorCopy, _VectorSubtract, VectorLength, PITCH, ROLL};
 use mp_qshared::shared::{
-    fileHandle_t, pc_token_t, qfalse, qhandle_t, qtrue, vec3_t, CIN_LOOP, FS_READ, MAX_GENTITIES,
-    MAX_TOKENLENGTH,
+    fileHandle_t, pc_token_t, qfalse, qhandle_t, qtrue, vec3_t, CIN_LOOP, FS_READ,
+    MAX_CONFIGSTRINGS, MAX_GENTITIES, MAX_QPATH, MAX_TOKENLENGTH,
 };
 use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::display_state::DisplayState;
@@ -37,10 +44,15 @@ use mp_uishared::shared::menu_id::MenuId;
 use mp_uishared::shared::menu_system::{MenuSystem, MAX_MENUFILE};
 use mp_uishared::shared::menudef::{FEEDER_BLUETEAM_LIST, FEEDER_REDTEAM_LIST, FEEDER_SCOREBOARD};
 use mp_uishared::ui_shared::{
-    Menu_SetFeederSelection, PC_Color_Parse, PC_Float_Parse, PC_Int_Parse, PC_String_Parse,
+    Menu_New, Menu_SetFeederSelection, PC_Color_Parse, PC_Float_Parse, PC_Int_Parse,
+    PC_String_Parse,
 };
 use native_string::{atof, atoi, buf_to_string, latin1_to_string, Q_stricmp};
 
+use crate::cg_effects::CG_InitGlass;
+use crate::cg_new_draw::CG_StatusHandle;
+use crate::cg_predict::CG_PointContents;
+use crate::cg_scoreboard::{CG_GetClassCount, CG_GetTeamNonScoreCount};
 use crate::local::client_info_t::clientInfo_t;
 use crate::local::item_info_t::itemInfo_t;
 use crate::trap;
@@ -1959,6 +1971,8 @@ pub fn CG_AssetCache(ctx: &mut CgContext, ds: &mut DisplayState) {
 /// Source: `oracle/codemp/cgame/cg_main.c:3254-3263`
 pub fn CG_Init_CG(world: &mut CgWorld) {
     let _ = world;
+    //TODO: Port CG_Init_CG
+    // Source: oracle/codemp/cgame/cg_main.c:3254-3263
     todo!("CG_Init_CG — blocked on a safe cg_t zero-fill, oracle/codemp/cgame/cg_main.c:3254-3263")
 }
 
@@ -1972,6 +1986,8 @@ pub fn CG_Init_CG(world: &mut CgWorld) {
 /// Source: `oracle/codemp/cgame/cg_main.c:3274-3278`
 pub fn CG_Init_CGents(world: &mut CgWorld) {
     let _ = world;
+    //TODO: Port CG_Init_CGents
+    // Source: oracle/codemp/cgame/cg_main.c:3274-3278
     todo!(
         "CG_Init_CGents — blocked on a safe centity_t zero-fill, oracle/codemp/cgame/cg_main.c:3274-3278"
     )
@@ -2159,5 +2175,533 @@ fn CG_CycleInventory(world: &mut CgWorld, direction: c_int) {
     if let Some(tag) = tag {
         world.cg.itemSelect = tag;
         world.cg.invenSelectTime = world.cg.time as f32;
+    }
+}
+
+/// Raven `C_PointContents` — the `CG_POINT_CONTENTS` vmcall body.
+///
+/// Same DEC-46.6 shape as [`C_GetLerpOrigin`]: Raven casts `cg.sharedBuffer` to
+/// `TCGPointContents *` right here, the port takes the already-decoded payload
+/// from the vmMain dispatch boundary.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:362-367`
+pub fn C_PointContents(ctx: &mut CgContext, data: &TCGPointContents) -> c_int {
+    CG_PointContents(ctx, &data.mPoint, data.mPassEntityNum)
+}
+
+/// Raven `Com_Error` — the qcommon-shaped fatal-error entry point cgame
+/// supplies for the code it shares with the engine. `level` is dropped, exactly
+/// as [`CG_Error`] drops it.
+///
+/// Raven's `va_list`/`vsprintf` staging into `char text[1024]` collapses to the
+/// caller's already-formatted string (dictionary: `va()`/`Com_sprintf` →
+/// `format!`).
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:1234-1243`
+pub fn Com_Error(ctx: &mut CgContext, _level: c_int, error: &str) {
+    CG_Error(ctx, error);
+}
+
+/// Raven `Com_Printf` — the qcommon-shaped console print cgame supplies; same
+/// `vsprintf`-collapses-to-`format!` shape as [`Com_Error`].
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:1245-1254`
+pub fn Com_Printf(ctx: &mut CgContext, msg: &str) {
+    CG_Printf(ctx, msg);
+}
+
+/// Raven `CG_RegisterItemSounds` — registers item `itemNum`'s pickup sound plus
+/// everything named in its two space-separated precache strings.
+///
+/// The `sounds` string registers every token as a sound; the `precaches` string
+/// registers only the `.efx` tokens (the rest are models/shaders somebody else
+/// precaches).
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:1289-1354`
+pub fn CG_RegisterItemSounds(ctx: &mut CgContext, itemNum: c_int) {
+    let item = &bg_itemlist[itemNum as usize];
+
+    if let Some(pickup_sound) = item.pickup_sound {
+        trap::S_RegisterSound(ctx.engine, pickup_sound);
+    }
+
+    // parse the space seperated precache string for other media
+    let s = item.sounds;
+    if s.is_empty() {
+        return;
+    }
+
+    // Raven walks a `char *` cursor rather than splitting, and the cursor walk
+    // is load-bearing: a doubled space yields a zero-length token, which is the
+    // `len < 5` error below. A trailing space does NOT (the `while (*s)` test
+    // sees the terminator first).
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        let start = i;
+        while i < bytes.len() && bytes[i] != b' ' {
+            i += 1;
+        }
+
+        let len = i - start;
+        if len >= MAX_QPATH || len < 5 {
+            let msg = format!("PrecacheItem: {} has bad precache string", item.classname);
+            CG_Error(ctx, &msg);
+            return;
+        }
+        let data = &s[start..i];
+        if i < bytes.len() {
+            i += 1;
+        }
+
+        trap::S_RegisterSound(ctx.engine, data);
+    }
+
+    // parse the space seperated precache string for other media
+    let s = item.precaches;
+    if s.is_empty() {
+        return;
+    }
+
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        let start = i;
+        while i < bytes.len() && bytes[i] != b' ' {
+            i += 1;
+        }
+
+        let len = i - start;
+        if len >= MAX_QPATH || len < 5 {
+            let msg = format!("PrecacheItem: {} has bad precache string", item.classname);
+            CG_Error(ctx, &msg);
+            return;
+        }
+        let data = &s[start..i];
+        if i < bytes.len() {
+            i += 1;
+        }
+
+        if data.ends_with("efx") {
+            trap::FX_RegisterEffect(ctx.engine, data);
+        }
+    }
+}
+
+/// Raven `CG_RegisterEffects` — the glass mini-system plus the footstep,
+/// landing and splash material effects.
+///
+/// Raven's `CS_EFFECTS` configstring loop above these is commented out in the
+/// oracle: "the above was redundant as it's being done in CG_RegisterSounds".
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:1867-1905`
+pub fn CG_RegisterEffects(ctx: &mut CgContext) {
+    let engine = ctx.engine;
+
+    // Set up the glass effects mini-system.
+    CG_InitGlass(ctx.world);
+
+    //footstep effects
+    ctx.world.cgs.effects.footstepMud = trap::FX_RegisterEffect(engine, "materials/mud");
+    ctx.world.cgs.effects.footstepSand = trap::FX_RegisterEffect(engine, "materials/sand");
+    ctx.world.cgs.effects.footstepSnow = trap::FX_RegisterEffect(engine, "materials/snow");
+    ctx.world.cgs.effects.footstepGravel = trap::FX_RegisterEffect(engine, "materials/gravel");
+    //landing effects
+    ctx.world.cgs.effects.landingMud = trap::FX_RegisterEffect(engine, "materials/mud_large");
+    ctx.world.cgs.effects.landingSand = trap::FX_RegisterEffect(engine, "materials/sand_large");
+    ctx.world.cgs.effects.landingDirt = trap::FX_RegisterEffect(engine, "materials/dirt_large");
+    ctx.world.cgs.effects.landingSnow = trap::FX_RegisterEffect(engine, "materials/snow_large");
+    ctx.world.cgs.effects.landingGravel = trap::FX_RegisterEffect(engine, "materials/gravel_large");
+    //splashes
+    ctx.world.cgs.effects.waterSplash = trap::FX_RegisterEffect(engine, "env/water_impact");
+    ctx.world.cgs.effects.lavaSplash = trap::FX_RegisterEffect(engine, "env/lava_splash");
+    ctx.world.cgs.effects.acidSplash = trap::FX_RegisterEffect(engine, "env/acid_splash");
+}
+
+/// Raven `CG_SiegeCountCvars` — publishes the siege team/class head counts into
+/// the `ui_tm*` cvars the menus read.
+///
+/// Raven's own note on the shader handles: "This is because the only way we can
+/// match up classes is by the gfx handle."
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:2442-2472`
+pub fn CG_SiegeCountCvars(ctx: &mut CgContext) {
+    let engine = ctx.engine;
+    let mut classGfx: [qhandle_t; 6] = [0; 6];
+
+    let tm1 = CG_GetTeamNonScoreCount(ctx.world, TEAM_RED);
+    trap::Cvar_Set(engine, "ui_tm1_cnt", &format!("{tm1}"));
+    let tm2 = CG_GetTeamNonScoreCount(ctx.world, TEAM_BLUE);
+    trap::Cvar_Set(engine, "ui_tm2_cnt", &format!("{tm2}"));
+    let tm3 = CG_GetTeamNonScoreCount(ctx.world, TEAM_SPECTATOR);
+    trap::Cvar_Set(engine, "ui_tm3_cnt", &format!("{tm3}"));
+
+    // This is because the only way we can match up classes is by the gfx handle.
+    classGfx[0] = trap::R_RegisterShaderNoMip(engine, "gfx/mp/c_icon_infantry");
+    classGfx[1] = trap::R_RegisterShaderNoMip(engine, "gfx/mp/c_icon_heavy_weapons");
+    classGfx[2] = trap::R_RegisterShaderNoMip(engine, "gfx/mp/c_icon_demolitionist");
+    classGfx[3] = trap::R_RegisterShaderNoMip(engine, "gfx/mp/c_icon_vanguard");
+    classGfx[4] = trap::R_RegisterShaderNoMip(engine, "gfx/mp/c_icon_support");
+    classGfx[5] = trap::R_RegisterShaderNoMip(engine, "gfx/mp/c_icon_jedi_general");
+
+    let c = CG_GetClassCount(ctx.world, TEAM_RED, classGfx[0]);
+    trap::Cvar_Set(engine, "ui_tm1_c0_cnt", &format!("{c}"));
+    let c = CG_GetClassCount(ctx.world, TEAM_RED, classGfx[1]);
+    trap::Cvar_Set(engine, "ui_tm1_c1_cnt", &format!("{c}"));
+    let c = CG_GetClassCount(ctx.world, TEAM_RED, classGfx[2]);
+    trap::Cvar_Set(engine, "ui_tm1_c2_cnt", &format!("{c}"));
+    let c = CG_GetClassCount(ctx.world, TEAM_RED, classGfx[3]);
+    trap::Cvar_Set(engine, "ui_tm1_c3_cnt", &format!("{c}"));
+    let c = CG_GetClassCount(ctx.world, TEAM_RED, classGfx[4]);
+    trap::Cvar_Set(engine, "ui_tm1_c4_cnt", &format!("{c}"));
+    let c = CG_GetClassCount(ctx.world, TEAM_RED, classGfx[5]);
+    trap::Cvar_Set(engine, "ui_tm1_c5_cnt", &format!("{c}"));
+
+    let c = CG_GetClassCount(ctx.world, TEAM_BLUE, classGfx[0]);
+    trap::Cvar_Set(engine, "ui_tm2_c0_cnt", &format!("{c}"));
+    let c = CG_GetClassCount(ctx.world, TEAM_BLUE, classGfx[1]);
+    trap::Cvar_Set(engine, "ui_tm2_c1_cnt", &format!("{c}"));
+    let c = CG_GetClassCount(ctx.world, TEAM_BLUE, classGfx[2]);
+    trap::Cvar_Set(engine, "ui_tm2_c2_cnt", &format!("{c}"));
+    let c = CG_GetClassCount(ctx.world, TEAM_BLUE, classGfx[3]);
+    trap::Cvar_Set(engine, "ui_tm2_c3_cnt", &format!("{c}"));
+    let c = CG_GetClassCount(ctx.world, TEAM_BLUE, classGfx[4]);
+    trap::Cvar_Set(engine, "ui_tm2_c4_cnt", &format!("{c}"));
+    let c = CG_GetClassCount(ctx.world, TEAM_BLUE, classGfx[5]);
+    trap::Cvar_Set(engine, "ui_tm2_c5_cnt", &format!("{c}"));
+}
+
+/// Raven `CG_ConfigString` — the configstring at `index`, read out of the
+/// gamestate blob the engine handed us.
+///
+/// Raven returned a `char *` into `cgs.gameState.stringData`; the port decodes
+/// an owned `String` at the read, so nothing aliases a buffer the next
+/// `CG_SetConfigValues` can move.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:2535-2540`
+pub fn CG_ConfigString(ctx: &mut CgContext, index: c_int) -> String {
+    if index < 0 || index >= MAX_CONFIGSTRINGS as c_int {
+        let msg = format!("CG_ConfigString: bad index: {index}");
+        CG_Error(ctx, &msg);
+        // Raven's `CG_Error` never comes back; the port's trap wrapper does, so
+        // the bad-index path answers the empty configstring.
+        return String::new();
+    }
+
+    let offset = ctx.world.cgs.gameState.stringOffsets[index as usize] as usize;
+    let tail = &ctx.world.cgs.gameState.stringData[offset..];
+    let end = tail.iter().position(|&c| c == 0).unwrap_or(tail.len());
+    latin1_to_string(&tail[..end].iter().map(|&c| c as u8).collect::<Vec<u8>>())
+}
+
+/// Raven `CG_ParseMenu` — loads one menu script and hands each `menudef` block
+/// to the shared framework.
+///
+/// A menu file that won't open falls back to `ui/testhud.menu`; if that won't
+/// open either there is nothing to parse.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:2753-2797`
+pub fn CG_ParseMenu(
+    ctx: &mut CgContext,
+    menus: &mut MenuSystem,
+    ds: &mut DisplayState,
+    dc: &mut dyn DisplayContext,
+    menuFile: &str,
+) {
+    let mut token = zero_pc_token();
+
+    let mut handle = trap::PC_LoadSource(ctx.engine, menuFile);
+    if handle == 0 {
+        handle = trap::PC_LoadSource(ctx.engine, "ui/testhud.menu");
+    }
+    if handle == 0 {
+        return;
+    }
+
+    loop {
+        if !trap::PC_ReadToken(ctx.engine, handle, &mut token) {
+            break;
+        }
+
+        // Raven's "Missing {" and "Too many menus!" guards are both commented
+        // out in the oracle.
+
+        if token.string[0] == b'}' as c_char {
+            break;
+        }
+
+        let tokenStr = pc_token_str(&token);
+
+        if Q_stricmp(&tokenStr, "assetGlobalDef") == 0 {
+            if CG_Asset_Parse(ctx, ds, dc, handle) {
+                continue;
+            } else {
+                break;
+            }
+        }
+
+        if Q_stricmp(&tokenStr, "menudef") == 0 {
+            // start a new menu
+            Menu_New(menus, ds, dc, handle);
+        }
+    }
+    trap::PC_FreeSource(ctx.engine, handle);
+}
+
+/// Raven `CG_FeederItemText` — one scoreboard-feeder cell: the text for
+/// `column` of row `index`, plus up to three row shader handles.
+///
+/// PORT-NOTE: same `float feederID` handling as [`CG_FeederCount`] — Raven
+/// compares the float against the int `FEEDER_*` defines, the port casts once
+/// and compares ints.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:2909-2994`
+pub fn CG_FeederItemText(
+    world: &CgWorld,
+    feederID: f32,
+    index: c_int,
+    column: c_int,
+    handle1: &mut qhandle_t,
+    handle2: &mut qhandle_t,
+    handle3: &mut qhandle_t,
+) -> String {
+    let feeder = feederID as c_int;
+    let mut team = -1;
+
+    *handle1 = -1;
+    *handle2 = -1;
+    *handle3 = -1;
+
+    if feeder == FEEDER_REDTEAM_LIST {
+        team = TEAM_RED;
+    } else if feeder == FEEDER_BLUETEAM_LIST {
+        team = TEAM_BLUE;
+    }
+
+    // Raven's `info &&` can't fail - `CG_InfoFromScoreIndex` always answers with
+    // a `cgs.clientinfo` row.
+    let (info, scoreIndex) = CG_InfoFromScoreIndex(world, index, team);
+    let sp = &world.cg.scores[scoreIndex as usize];
+
+    if info.infoValid != qfalse {
+        match column {
+            0 => {
+                // §F19: each `BG_FindItemForPowerup` miss is a null deref in
+                // Raven; the port leaves `handle1` at -1 (the "no row icon"
+                // value it was just set to).
+                if info.powerups & (1 << PW_NEUTRALFLAG) != 0 {
+                    if let Some(item) = BG_FindItemForPowerup(PW_NEUTRALFLAG) {
+                        *handle1 = world.cg_items[item.modelindex() as usize].icon;
+                    }
+                } else if info.powerups & (1 << PW_REDFLAG) != 0 {
+                    if let Some(item) = BG_FindItemForPowerup(PW_REDFLAG) {
+                        *handle1 = world.cg_items[item.modelindex() as usize].icon;
+                    }
+                } else if info.powerups & (1 << PW_BLUEFLAG) != 0 {
+                    if let Some(item) = BG_FindItemForPowerup(PW_BLUEFLAG) {
+                        *handle1 = world.cg_items[item.modelindex() as usize].icon;
+                    }
+                } else {
+                    // Raven's bot-skill / handicap fallbacks are commented out.
+                }
+            }
+
+            1 => {
+                if team == -1 {
+                    return String::new();
+                }
+                *handle1 = CG_StatusHandle(world, info.teamTask);
+            }
+
+            2 => {
+                // §F19: Raven reads through `cg.snap` unguarded. With no
+                // snapshot nobody is flagged ready, which is this row's
+                // not-ready answer.
+                let ready = world.cg.snap_ref().is_some_and(|snap| {
+                    snap.ps.stats[STAT_CLIENTS_READY as usize] & (1 << sp.client) != 0
+                });
+                if ready {
+                    return "Ready".to_string();
+                }
+                if team == -1 {
+                    if world.cgs.gametype == GT_DUEL || world.cgs.gametype == GT_POWERDUEL {
+                        return format!("{}/{}", info.wins, info.losses);
+                    } else if info.infoValid != qfalse && info.team == TEAM_SPECTATOR {
+                        return "Spectator".to_string();
+                    } else {
+                        return String::new();
+                    }
+                } else if info.teamLeader != qfalse {
+                    return "Leader".to_string();
+                }
+            }
+
+            3 => {
+                return buf_to_string(&info.name.iter().map(|&c| c as u8).collect::<Vec<u8>>());
+            }
+
+            4 => {
+                return format!("{}", info.score);
+            }
+
+            5 => {
+                return format!("{:4}", sp.time);
+            }
+
+            6 => {
+                if sp.ping == -1 {
+                    return "connecting".to_string();
+                }
+                return format!("{:4}", sp.ping);
+            }
+
+            _ => {}
+        }
+    }
+
+    String::new()
+}
+
+/// Raven `CG_CreateWeatherZoneFromSpawnEnt` — a `misc_weather_zone` brush hands
+/// the renderer's weather system its bounds.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:3445-3449`
+pub fn CG_CreateWeatherZoneFromSpawnEnt(ctx: &mut CgContext, ent: &mut CgSpawnEnt) {
+    CG_CreateBrushEntData(ctx, ent);
+    trap::WE_AddWeatherZone(ctx.engine, &ent.mins, &ent.maxs);
+}
+
+/// Raven `CG_AddSpawnVarToken` — takes one parsed spawn-var token off the
+/// map's `MAX_SPAWN_VARS_CHARS` budget.
+///
+/// Raven bump-copied the token into `cg_spawnVarChars[]` and returned a pointer
+/// into it; the port returns the owned copy and only keeps the budget counter,
+/// because the budget overrun is an observable `CG_Error` (the same fold
+/// `G_AddSpawnVarToken` got — `crates/mp/game/src/g_spawn.rs:828-831`).
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:3515-3531`
+pub fn CG_AddSpawnVarToken(ctx: &mut CgContext, string: &str) -> String {
+    let l = string.len() as c_int;
+    if ctx.world.main.cg_numSpawnVarChars + l + 1 > MAX_SPAWN_VARS_CHARS as c_int {
+        // Raven's `CG_Error` never comes back; the port's trap wrapper does, so
+        // the over-budget token is still handed back below.
+        CG_Error(ctx, "CG_AddSpawnVarToken: MAX_SPAWN_VARS");
+    }
+
+    ctx.world.main.cg_numSpawnVarChars += l + 1;
+
+    string.to_string()
+}
+
+/// Raven `CG_NextForcePower_f` — the `+forcenext` command: cycle the selected
+/// force power forward, unless USE is held (then it's the inventory that
+/// cycles).
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:4023-4063`
+pub fn CG_NextForcePower_f(ctx: &mut CgContext) {
+    if ctx.world.cg.snap.is_null() {
+        return;
+    }
+
+    if ctx.world.cg.predictedPlayerState.pm_type == pmtype_t::PM_SPECTATOR as c_int {
+        return;
+    }
+
+    let current = trap::GetCurrentCmdNumber(ctx.engine);
+    let mut cmd = usercmd_t::default();
+    trap::GetUserCmd(ctx.engine, current, &mut cmd);
+    if cmd.buttons & BUTTON_USE != 0 || CG_NoUseableForce(ctx.world) {
+        CG_NextInventory_f(ctx.world);
+        return;
+    }
+
+    // §F19: `cg.snap` is non-null here, so every `None` arm below is Raven's
+    // null deref and can only answer by doing nothing.
+    let Some(snap) = ctx.world.cg.snap_ref() else {
+        return;
+    };
+    if snap.ps.pm_flags & PMF_FOLLOW != 0 {
+        return;
+    }
+
+    // Raven's first `BG_CycleForce(&cg.snap->ps, 1)` here is commented out.
+    if ctx.world.cg.forceSelect != -1 {
+        let forceSelect = ctx.world.cg.forceSelect;
+        let Some(snap) = ctx.world.cg.snap_mut() else {
+            return;
+        };
+        snap.ps.fd.forcePowerSelected = forceSelect;
+    }
+
+    let Some(snap) = ctx.world.cg.snap_mut() else {
+        return;
+    };
+    BG_CycleForce(&mut snap.ps, 1);
+
+    let selected = match ctx.world.cg.snap_ref() {
+        Some(snap) if snap.ps.fd.forcePowersKnown & (1 << snap.ps.fd.forcePowerSelected) != 0 => {
+            Some(snap.ps.fd.forcePowerSelected)
+        }
+        _ => None,
+    };
+    if let Some(selected) = selected {
+        ctx.world.cg.forceSelect = selected;
+        ctx.world.cg.forceSelectTime = ctx.world.cg.time as f32;
+    }
+}
+
+/// Raven `CG_PrevForcePower_f` — [`CG_NextForcePower_f`] backwards; Raven
+/// duplicated the body verbatim except for the cycle direction and the
+/// inventory command it falls back to.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:4070-4110`
+pub fn CG_PrevForcePower_f(ctx: &mut CgContext) {
+    if ctx.world.cg.snap.is_null() {
+        return;
+    }
+
+    if ctx.world.cg.predictedPlayerState.pm_type == pmtype_t::PM_SPECTATOR as c_int {
+        return;
+    }
+
+    let current = trap::GetCurrentCmdNumber(ctx.engine);
+    let mut cmd = usercmd_t::default();
+    trap::GetUserCmd(ctx.engine, current, &mut cmd);
+    if cmd.buttons & BUTTON_USE != 0 || CG_NoUseableForce(ctx.world) {
+        CG_PrevInventory_f(ctx.world);
+        return;
+    }
+
+    // §F19: same non-null `cg.snap` as [`CG_NextForcePower_f`].
+    let Some(snap) = ctx.world.cg.snap_ref() else {
+        return;
+    };
+    if snap.ps.pm_flags & PMF_FOLLOW != 0 {
+        return;
+    }
+
+    // Raven's first `BG_CycleForce(&cg.snap->ps, -1)` here is commented out.
+    if ctx.world.cg.forceSelect != -1 {
+        let forceSelect = ctx.world.cg.forceSelect;
+        let Some(snap) = ctx.world.cg.snap_mut() else {
+            return;
+        };
+        snap.ps.fd.forcePowerSelected = forceSelect;
+    }
+
+    let Some(snap) = ctx.world.cg.snap_mut() else {
+        return;
+    };
+    BG_CycleForce(&mut snap.ps, -1);
+
+    let selected = match ctx.world.cg.snap_ref() {
+        Some(snap) if snap.ps.fd.forcePowersKnown & (1 << snap.ps.fd.forcePowerSelected) != 0 => {
+            Some(snap.ps.fd.forcePowerSelected)
+        }
+        _ => None,
+    };
+    if let Some(selected) = selected {
+        ctx.world.cg.forceSelect = selected;
+        ctx.world.cg.forceSelectTime = ctx.world.cg.time as f32;
     }
 }

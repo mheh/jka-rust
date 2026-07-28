@@ -183,7 +183,7 @@ pub fn strap_G2API_GetBoneAnim(
 pub fn strap_G2API_SetRagDoll(
     ctx: &mut CgContext,
     ghoul2: *mut c_void,
-    params: &mut sharedRagDollParams_t,
+    params: Option<&mut sharedRagDollParams_t>,
 ) {
     trap::G2API_SetRagDoll(ctx.engine, ghoul2, params)
 }

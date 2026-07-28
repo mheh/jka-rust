@@ -373,10 +373,11 @@ impl BgTraps for CgBgTraps<'_> {
     }
     fn g2api_set_rag_doll(&self, ghoul2: *mut c_void, params: *mut sharedRagDollParams_t) {
         // Raven: `strap_G2API_SetRagDoll`.
-        // SAFETY: bg builds the params block on its own stack before calling.
+        // SAFETY: bg builds the params block on its own stack before calling;
+        // a null pointer rides through as the engine's reset arm.
         // Source: `oracle/codemp/cgame/cg_strap.c:43-46`;
         // `oracle/codemp/cgame/cg_syscalls.c:998-1001`
-        trap::G2API_SetRagDoll(self.engine, ghoul2, unsafe { &mut *params })
+        trap::G2API_SetRagDoll(self.engine, ghoul2, unsafe { params.as_mut() })
     }
     fn g2api_animate_g2_models(
         &self,

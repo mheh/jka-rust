@@ -8,42 +8,56 @@ use core::ffi::{c_char, c_int, c_short, c_void};
 use core::ptr::null_mut;
 
 use mp_bg::bg_misc::BG_GiveMeVectorFromMatrix;
-use mp_bg::bg_panimate::BG_ParseAnimationFile;
+use mp_bg::bg_panimate::{
+    BG_FlippingAnim, BG_InDeathAnim, BG_ParseAnimationFile, BG_SaberStartTransAnim,
+};
+use mp_bg::bg_saber::SFL2_NO_DLIGHT;
 use mp_bg::bg_vehicleLoad::{BG_GetVehicleModelName, BG_GetVehicleSkinName};
+use mp_bg::cstr_util::cstr_to_str;
 use mp_bg::local::{bgToggleableSurfaceDebris, bgToggleableSurfaces, bg_customSiegeSoundNames};
 use mp_bg::public::anim_number::animNumber_t;
-use mp_bg::public::entity_flags::EF_DEAD;
+use mp_bg::public::anim_table::animTable;
+use mp_bg::public::entity_effects::EF2_HYPERSPACE;
+use mp_bg::public::entity_flags::{EF_CONNECTION, EF_DEAD, EF_RAG, EF_TALK};
 use mp_bg::public::entity_type::entityType_t;
 use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL, GT_TEAM};
 use mp_bg::public::gender::gender_t;
+use mp_bg::public::hyperspace::HYPERSPACE_TIME;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::game::class_t::class_t;
 use mp_qshared::common::mp::ghoul2::bone_flags::{
-    BONE_ANGLES_POSTMULT, BONE_ANIM_OVERRIDE, BONE_ANIM_OVERRIDE_FREEZE,
+    BONE_ANGLES_POSTMULT, BONE_ANIM_BLEND, BONE_ANIM_OVERRIDE, BONE_ANIM_OVERRIDE_FREEZE,
+    BONE_ANIM_OVERRIDE_LOOP,
 };
 use mp_qshared::common::mp::qcommon::collision_record::{G2Trace_t, MAX_G2_COLLISIONS};
+use mp_qshared::common::mp::qcommon::saber::blade_info::MAX_BLADES;
 use mp_qshared::common::mp::qcommon::saber::saber_colors::{
     saber_colors_t, SABER_BLUE, SABER_GREEN, SABER_ORANGE, SABER_PURPLE, SABER_RED, SABER_YELLOW,
 };
 use mp_qshared::common::mp::qcommon::saber::saber_flags::SFL_BOLT_TO_WRIST;
+use mp_qshared::common::mp::qcommon::{
+    entityState_t, saberInfo_t, sharedRagDollParams_t, sharedRagDollUpdateParams_t,
+};
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin,
-    vectoangles, AngleVectors, AnglesToAxis, MatrixMultiply, VectorClear, VectorInverse,
+    vectoangles, AngleVectors, AnglesToAxis, Distance, MatrixMultiply, VectorClear, VectorInverse,
     VectorLength, VectorNormalize, VectorSet, PITCH, ROLL, YAW,
 };
 use mp_qshared::shared::q_string::COM_StripExtension;
 use mp_qshared::shared::{
-    addbezierArgStruct_t, mdxaBone_t, orientation_t, qfalse, qhandle_t, qtrue, vec3_t,
-    CollisionRecord_t, Eorientations, CONTENTS_LAVA, CONTENTS_SLIME, CONTENTS_SOLID,
-    CONTENTS_WATER, ENTITYNUM_NONE, ENTITYNUM_WORLD, FP_SEE, FS_READ, MAX_CLIENTS, MAX_CLIENTS_I32,
-    MAX_GENTITIES, MAX_QPATH,
+    addbezierArgStruct_t, mdxaBone_t, orientation_t, qfalse, qhandle_t, qtrue, sharedEIKMoveState,
+    sharedERagPhase, vec3_t, CollisionRecord_t, Eorientations, CONTENTS_LAVA, CONTENTS_SLIME,
+    CONTENTS_SOLID, CONTENTS_WATER, ENTITYNUM_NONE, ENTITYNUM_WORLD, FP_SEE, FS_READ, MASK_SOLID,
+    MAX_CLIENTS, MAX_CLIENTS_I32, MAX_GENTITIES, MAX_QPATH,
 };
 use native_string::{atoi, buf_to_string, cstr, Q_stricmp, Q_strncpyz};
 
 use crate::bg_channel::{CgBgTraps, CgGameCallbacks};
+use crate::cg_ents::ScaleModelAxis;
+use crate::cg_main::{CG_Error, CG_Printf};
 use crate::local::centity_s::centity_t;
 use crate::local::client_info_t::{
     clientInfo_t, MAX_CUSTOM_DUEL_SOUNDS, MAX_CUSTOM_SIEGE_SOUNDS, MAX_CUSTOM_SOUNDS,
@@ -182,6 +196,165 @@ pub static cg_customDuelSoundNames: [Option<&str>; MAX_CUSTOM_DUEL_SOUNDS] = [
     None,
 ];
 
+/// Raven `MAX_CUSTOM_COMBAT_SOUNDS`.
+/// Source: `oracle/codemp/cgame/cg_local.h:187`
+pub const MAX_CUSTOM_COMBAT_SOUNDS: usize = 40;
+
+/// Raven `MAX_CUSTOM_EXTRA_SOUNDS`.
+/// Source: `oracle/codemp/cgame/cg_local.h:188`
+pub const MAX_CUSTOM_EXTRA_SOUNDS: usize = 40;
+
+/// Raven `MAX_CUSTOM_JEDI_SOUNDS`.
+/// Source: `oracle/codemp/cgame/cg_local.h:189`
+pub const MAX_CUSTOM_JEDI_SOUNDS: usize = 40;
+
+/// Raven `cg_customCombatSoundNames[MAX_CUSTOM_COMBAT_SOUNDS]` — the enemy/hazard-team supplement set, scanned until the `NULL`
+/// sentinel (`None`).
+///
+/// Raven: (keep numbers in ascending order in order for variant-capping to
+/// work).
+/// Source: `oracle/codemp/cgame/cg_players.c:47-67`
+pub static cg_customCombatSoundNames: [Option<&str>; MAX_CUSTOM_COMBAT_SOUNDS] = [
+    Some("*anger1"),
+    Some("*anger2"),
+    Some("*anger3"),
+    Some("*victory1"),
+    Some("*victory2"),
+    Some("*victory3"),
+    Some("*confuse1"),
+    Some("*confuse2"),
+    Some("*confuse3"),
+    Some("*pushed1"),
+    Some("*pushed2"),
+    Some("*pushed3"),
+    Some("*choke1"),
+    Some("*choke2"),
+    Some("*choke3"),
+    Some("*ffwarn"),
+    Some("*ffturn"),
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+];
+
+/// Raven `cg_customExtraSoundNames[MAX_CUSTOM_EXTRA_SOUNDS]` — the stormtrooper supplement set, scanned until the `NULL`
+/// sentinel (`None`).
+///
+/// Raven: (keep numbers in ascending order in order for variant-capping to
+/// work).
+/// Source: `oracle/codemp/cgame/cg_players.c:71-109`
+pub static cg_customExtraSoundNames: [Option<&str>; MAX_CUSTOM_EXTRA_SOUNDS] = [
+    Some("*chase1"),
+    Some("*chase2"),
+    Some("*chase3"),
+    Some("*cover1"),
+    Some("*cover2"),
+    Some("*cover3"),
+    Some("*cover4"),
+    Some("*cover5"),
+    Some("*detected1"),
+    Some("*detected2"),
+    Some("*detected3"),
+    Some("*detected4"),
+    Some("*detected5"),
+    Some("*lost1"),
+    Some("*outflank1"),
+    Some("*outflank2"),
+    Some("*escaping1"),
+    Some("*escaping2"),
+    Some("*escaping3"),
+    Some("*giveup1"),
+    Some("*giveup2"),
+    Some("*giveup3"),
+    Some("*giveup4"),
+    Some("*look1"),
+    Some("*look2"),
+    Some("*sight1"),
+    Some("*sight2"),
+    Some("*sight3"),
+    Some("*sound1"),
+    Some("*sound2"),
+    Some("*sound3"),
+    Some("*suspicious1"),
+    Some("*suspicious2"),
+    Some("*suspicious3"),
+    Some("*suspicious4"),
+    Some("*suspicious5"),
+    None,
+    None,
+    None,
+    None,
+];
+
+/// Raven `cg_customJediSoundNames[MAX_CUSTOM_JEDI_SOUNDS]` — the jedi supplement set, scanned until the `NULL`
+/// sentinel (`None`).
+///
+/// Raven: (keep numbers in ascending order in order for variant-capping to
+/// work).
+/// Source: `oracle/codemp/cgame/cg_players.c:113-140`
+pub static cg_customJediSoundNames: [Option<&str>; MAX_CUSTOM_JEDI_SOUNDS] = [
+    Some("*combat1"),
+    Some("*combat2"),
+    Some("*combat3"),
+    Some("*jdetected1"),
+    Some("*jdetected2"),
+    Some("*jdetected3"),
+    Some("*taunt1"),
+    Some("*taunt2"),
+    Some("*taunt3"),
+    Some("*jchase1"),
+    Some("*jchase2"),
+    Some("*jchase3"),
+    Some("*jlost1"),
+    Some("*jlost2"),
+    Some("*jlost3"),
+    Some("*deflect1"),
+    Some("*deflect2"),
+    Some("*deflect3"),
+    Some("*gloat1"),
+    Some("*gloat2"),
+    Some("*gloat3"),
+    Some("*pushfail"),
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+];
+
 /// Raven `RF_FORCE_ENT_ALPHA` — override shader alpha settings. Same
 /// no-ported-home story as [`RF_THIRD_PERSON`].
 /// Source: `oracle/codemp/cgame/tr_types.h:36`
@@ -206,6 +379,27 @@ const SHIPSURF_LEFT: c_int = 3;
 /// Raven `JETPACK_MODEL`.
 /// Source: `oracle/codemp/cgame/cg_players.c:7889`
 const JETPACK_MODEL: &str = "models/weapons2/jetpack/model.glm";
+
+/// Raven `RF_FORCEPOST` — force it to post-render.
+///
+/// Raven: -rww. Same no-ported-home story as [`RF_THIRD_PERSON`].
+/// Source: `oracle/codemp/cgame/tr_types.h:54`
+const RF_FORCEPOST: c_int = 0x200000;
+
+/// Raven `cg_effectorStringTable[]` — the ragdoll effectors a drag is allowed
+/// to kick around.
+///
+/// Raven: list of valid ragdoll effectors. The entries Raven commented out
+/// ("thoracic", "rhand", "rradiusX", "ceyebrow") stay commented out; the `NULL`
+/// terminator its `while` loop walks to becomes the slice length.
+/// Source: `oracle/codemp/cgame/cg_players.c:3440-3455`
+const cg_effectorStringTable: [&str; 8] = [
+    //	"thoracic",
+    //	"rhand",
+    "lhand", "rtibia", "ltibia", "rtalus", "ltalus", //	"rradiusX",
+    "lradiusX", "rfemurX", "lfemurX",
+    //	"ceyebrow",
+];
 
 // ---------------------------------------------------------------------------
 // Functions
@@ -2152,4 +2346,1712 @@ pub fn CG_RadiusForCent(cent: &centity_t) -> f32 {
     }
 
     64.0
+}
+
+/// Raven `CG_ScanForExistingClientInfo` — hunts the client table for an already
+/// loaded model/skin/saber set identical to `ci`'s and adopts its handles.
+/// `false` means nothing matched, which is the caller's cue to defer the load.
+///
+/// Raven: rww - Filthy hack. If this is actually the info already belonging to
+/// us, just reassign the pointer. Switching instances when not necessary
+/// produces small animation glitches.
+/// Source: `oracle/codemp/cgame/cg_players.c:1288-1387`
+pub fn CG_ScanForExistingClientInfo(
+    ctx: &mut CgContext,
+    ci: &mut clientInfo_t,
+    clientNum: c_int,
+) -> bool {
+    let ciModelName = buf_to_string(&ci.modelName.map(|c| c as u8));
+    let ciSkinName = buf_to_string(&ci.skinName.map(|c| c as u8));
+    let ciSaberName = buf_to_string(&ci.saberName.map(|c| c as u8));
+    let ciSaber2Name = buf_to_string(&ci.saber2Name.map(|c| c as u8));
+
+    for i in 0..ctx.world.cgs.maxclients as usize {
+        // the whole match test only reads the table; the borrow dies with this
+        // block so the copy below can take the entry back out mutably
+        let isMatch = {
+            let m = &ctx.world.cgs.clientinfo[i];
+            m.infoValid != qfalse
+                && m.deferred == qfalse
+                && Q_stricmp(&ciModelName, &buf_to_string(&m.modelName.map(|c| c as u8))) == 0
+                && Q_stricmp(&ciSkinName, &buf_to_string(&m.skinName.map(|c| c as u8))) == 0
+                && Q_stricmp(&ciSaberName, &buf_to_string(&m.saberName.map(|c| c as u8))) == 0
+                && Q_stricmp(&ciSaber2Name, &buf_to_string(&m.saber2Name.map(|c| c as u8))) == 0
+                //			&& !Q_stricmp( ci->headModelName, match->headModelName )
+                //			&& !Q_stricmp( ci->headSkinName, match->headSkinName )
+                //			&& !Q_stricmp( ci->blueTeam, match->blueTeam )
+                //			&& !Q_stricmp( ci->redTeam, match->redTeam )
+                && (ctx.world.cgs.gametype < GT_TEAM || ci.team == m.team)
+                && ci.siegeIndex == m.siegeIndex
+                && !m.ghoul2Model.is_null()
+                // if the bolts haven't been initialized, this "match" is useless to us
+                && m.bolt_head != 0
+        };
+
+        if !isMatch {
+            continue;
+        }
+
+        // this clientinfo is identical, so use it's handles
+        ci.deferred = qfalse;
+
+        if clientNum == i as c_int {
+            let matchGhoul2 = ctx.world.cgs.clientinfo[i].ghoul2Model;
+
+            //The match has a valid instance (if it didn't, we'd probably already be fudged (^_^) at this state)
+            if !matchGhoul2.is_null() && trap::G2_HaveWeGhoul2Models(ctx.engine, matchGhoul2) {
+                //First kill the copy we have if we have one. (but it should be null)
+                if !ci.ghoul2Model.is_null()
+                    && trap::G2_HaveWeGhoul2Models(ctx.engine, ci.ghoul2Model)
+                {
+                    trap::G2API_CleanGhoul2Models(
+                        ctx.engine,
+                        &mut ci.ghoul2Model as *mut *mut c_void,
+                    );
+                }
+
+                let m = &ctx.world.cgs.clientinfo[i];
+                _VectorCopy(m.headOffset, &mut ci.headOffset);
+                // ci->footsteps = match->footsteps;
+                ci.gender = m.gender;
+
+                ci.legsModel = m.legsModel;
+                ci.legsSkin = m.legsSkin;
+                ci.torsoModel = m.torsoModel;
+                ci.torsoSkin = m.torsoSkin;
+                ci.modelIcon = m.modelIcon;
+
+                ci.newAnims = m.newAnims;
+
+                ci.bolt_head = m.bolt_head;
+                ci.bolt_lhand = m.bolt_lhand;
+                ci.bolt_rhand = m.bolt_rhand;
+                ci.bolt_motion = m.bolt_motion;
+                ci.bolt_llumbar = m.bolt_llumbar;
+                ci.siegeIndex = m.siegeIndex;
+
+                ci.sounds = m.sounds;
+                ci.siegeSounds = m.siegeSounds;
+                ci.duelSounds = m.duelSounds;
+
+                //We can share this pointer, because it already belongs to this client.
+                //The pointer itself and the ghoul2 instance is never actually changed, just passed between
+                //clientinfo structures.
+                ci.ghoul2Model = m.ghoul2Model;
+
+                // Raven's saber-handle loop below this is commented out
+                // (`cg_players.c:1360-1373`) — "whenever this function is called
+                // the saber stuff should already be taken care of in the new info".
+            }
+        } else {
+            // borrow split, not behavior: `CG_CopyClientInfoModel` wants the
+            // match beside a live `ctx`, so the entry is lifted out of the table
+            // for the copy and put straight back. Nothing in the copy reads
+            // `cgs.clientinfo`.
+            let matched =
+                core::mem::replace(&mut ctx.world.cgs.clientinfo[i], zeroed_client_info());
+            CG_CopyClientInfoModel(ctx, &matched, ci);
+            ctx.world.cgs.clientinfo[i] = matched;
+        }
+
+        return true;
+    }
+
+    // nothing matches, so defer the load
+    false
+}
+
+/// Raven `CG_SetLerpFrameAnimation` — starts `newAnimation` on the ghoul2
+/// skeleton, picking up mid-animation where it can so a speed change doesn't
+/// snap the pose.
+///
+/// PORT-NOTE: Raven's `lf` is `&cent->pe.legs` at every `torsoOnly == qfalse`
+/// call site and `&cent->pe.torso` at every `qtrue` one
+/// (`cg_players.c:3308,3326,11190,11191`), so the selector stands in for the
+/// aliasing pointer parameter — nothing else was ever passed. Raven's `if (ci)`
+/// guards are vestigial too: it derefs `ci` unguarded at lines 2778/2914/2943,
+/// so the writes they wrap are unconditional here.
+///
+/// The broken-arm block after the motion bone is `#if 0`'d out in the oracle
+/// (`cg_players.c:2970-3127`) and is not ported.
+/// Source: `oracle/codemp/cgame/cg_players.c:2768-3129`
+#[allow(clippy::too_many_arguments)]
+pub fn CG_SetLerpFrameAnimation(
+    ctx: &mut CgContext,
+    cent: &mut centity_t,
+    ci: &mut clientInfo_t,
+    newAnimation: c_int,
+    animSpeedMult: f32,
+    torsoOnly: bool,
+    flipState: bool,
+) {
+    let mut flags: c_int = BONE_ANIM_OVERRIDE_FREEZE;
+    let mut blendTime: c_int = 100;
+
+    if cent.localAnimIndex > 0 {
+        //rockettroopers can't have broken arms, nor can anything else but humanoids
+        ci.brokenLimbs = cent.currentState.brokenLimbs;
+    }
+
+    // the cent scalars the body still needs once `lf` holds the only borrow
+    let ghoul2 = cent.ghoul2;
+    let localAnimIndex = cent.localAnimIndex;
+    let csNumber = cent.currentState.number;
+    let csClientNum = cent.currentState.clientNum;
+    let csFireflag = cent.currentState.fireflag;
+    let csWeapon = cent.currentState.weapon;
+    let csBrokenLimbs = cent.currentState.brokenLimbs;
+    let csNPCclass = cent.currentState.NPC_class;
+    let csTorsoAnim = cent.currentState.torsoAnim;
+    let csLegsAnim = cent.currentState.legsAnim;
+    let noLumbar = cent.noLumbar != qfalse;
+
+    let lf: &mut lerpFrame_t = if torsoOnly {
+        &mut cent.pe.torso
+    } else {
+        &mut cent.pe.legs
+    };
+
+    let oldSpeed = lf.animationSpeed;
+    let oldAnim = lf.animationNumber;
+
+    lf.animationNumber = newAnimation;
+
+    if newAnimation < 0 || newAnimation >= animNumber_t::MAX_TOTALANIMATIONS as c_int {
+        // Raven's `CG_Error` never returns; ours does, so the bad index is
+        // stopped here instead of walking off the animation table.
+        CG_Error(ctx, &format!("Bad animation number: {}", newAnimation));
+        return;
+    }
+
+    // §F19: Raven indexes `bgAllAnims[cent->localAnimIndex]` unchecked — an
+    // unparsed skeleton leaves the index at -1 and the table is a `Vec` here, so
+    // an out-of-range index leaves the lerp frame exactly as it was.
+    if localAnimIndex < 0 || localAnimIndex as usize >= ctx.world.bg_state.bgAllAnims.len() {
+        return;
+    }
+    let animations = ctx.world.bg_state.bgAllAnims[localAnimIndex as usize].anims;
+    if animations.is_null() {
+        return;
+    }
+
+    // SAFETY: `anims` is the animation table `BG_ParseAnimationFile` allocated
+    // for this skeleton; Raven indexes it unchecked and so do we.
+    let anim = unsafe { animations.offset(newAnimation as isize) };
+    let (animFirstFrame, animNumFrames, animFrameLerp, animLoopFrames) = unsafe {
+        let a = &*anim;
+        (
+            a.firstFrame as c_int,
+            a.numFrames as c_int,
+            a.frameLerp as c_int,
+            a.loopFrames as c_int,
+        )
+    };
+
+    lf.animation = anim;
+    lf.animationTime = lf.frameTime + animFrameLerp.abs();
+
+    if localAnimIndex > 1 && animFirstFrame == 0 && animNumFrames == 0 {
+        //We'll allow this for non-humanoids.
+        return;
+    }
+
+    let cg_debugAnim = ctx.world.cvars.cg_debugAnim.integer;
+    if cg_debugAnim != 0 && (cg_debugAnim < 0 || cg_debugAnim == csClientNum) {
+        let time = ctx.world.cg.time;
+        // `GetStringForID`'s only ported home is mp_game's `q_shared.rs`, and
+        // mp_cgame does not depend on mp_game (DEC-32 keeps the one copy), so
+        // its table walk is spelled out here: stop at the NULL-name sentinel,
+        // answer the first id match. A miss can't happen past the range check
+        // above, so the empty-string fallback is unreachable.
+        let animName = animTable
+            .iter()
+            .take_while(|e| !e.name.is_null())
+            .find(|e| e.id == newAnimation)
+            // SAFETY: every non-sentinel `animTable` name is a static
+            // NUL-terminated literal, the same read `bg_panimate.rs` makes.
+            .map(|e| unsafe { cstr_to_str(e.name) })
+            .unwrap_or_default();
+
+        // PORT-NOTE: Raven's two labels are swapped — the legs lerp frame prints
+        // "TORSO" and the torso one prints "LEGS". Kept.
+        if !torsoOnly {
+            CG_Printf(
+                ctx,
+                &format!(
+                    "{}: {} TORSO Anim: {}, '{}'\n",
+                    time, csClientNum, newAnimation, animName
+                ),
+            );
+        } else {
+            CG_Printf(
+                ctx,
+                &format!(
+                    "{}: {} LEGS Anim: {}, '{}'\n",
+                    time, csClientNum, newAnimation, animName
+                ),
+            );
+        }
+    }
+
+    if ghoul2.is_null() {
+        return;
+    }
+
+    let engine = ctx.engine;
+    let time = ctx.world.cg.time;
+
+    let mut resumeFrame = false;
+    let mut beginFrame: c_int = -1;
+    let firstFrame;
+    let lastFrame;
+
+    let mut animSpeed = 50.0f32 / animFrameLerp as f32;
+    if animLoopFrames != -1 {
+        flags = BONE_ANIM_OVERRIDE_LOOP;
+    }
+
+    if animSpeed < 0.0 {
+        lastFrame = animFirstFrame;
+        firstFrame = animFirstFrame + animNumFrames;
+    } else {
+        firstFrame = animFirstFrame;
+        lastFrame = animFirstFrame + animNumFrames;
+    }
+
+    if ctx.world.cvars.cg_animBlend.integer != 0 {
+        flags |= BONE_ANIM_BLEND;
+    }
+
+    if BG_InDeathAnim(newAnimation) != qfalse {
+        flags &= !BONE_ANIM_BLEND;
+    } else if oldAnim != -1 && BG_InDeathAnim(oldAnim) != qfalse {
+        flags &= !BONE_ANIM_BLEND;
+    }
+
+    if flags & BONE_ANIM_BLEND != 0 {
+        if BG_FlippingAnim(newAnimation) != qfalse {
+            blendTime = 200;
+        } else if oldAnim != -1 && BG_FlippingAnim(oldAnim) != qfalse {
+            blendTime = 200;
+        }
+    }
+
+    animSpeed *= animSpeedMult;
+
+    let mut callbacks = CgGameCallbacks::new(engine);
+    BG_SaberStartTransAnim(
+        csNumber,
+        csFireflag,
+        csWeapon,
+        newAnimation,
+        &mut animSpeed as *mut f32,
+        csBrokenLimbs,
+        &mut callbacks,
+    );
+
+    if torsoOnly {
+        if lf.animationTorsoSpeed != animSpeedMult
+            && newAnimation == oldAnim
+            && flipState == (lf.lastFlip != qfalse)
+        {
+            //same animation, but changing speed, so we will want to resume off the frame we're on.
+            resumeFrame = true;
+        }
+        lf.animationTorsoSpeed = animSpeedMult;
+    } else {
+        if lf.animationSpeed != animSpeedMult
+            && newAnimation == oldAnim
+            && flipState == (lf.lastFlip != qfalse)
+        {
+            //same animation, but changing speed, so we will want to resume off the frame we're on.
+            resumeFrame = true;
+        }
+        lf.animationSpeed = animSpeedMult;
+    }
+
+    //vehicles may have torso etc but we only want to animate the root bone
+    if csNPCclass == class_t::CLASS_VEHICLE as c_int {
+        trap::G2API_SetBoneAnim(
+            engine,
+            ghoul2,
+            0,
+            "model_root",
+            firstFrame,
+            lastFrame,
+            flags,
+            animSpeed,
+            time,
+            beginFrame as f32,
+            blendTime,
+        );
+        return;
+    }
+
+    // PORT-NOTE: Raven passes NULL for `trap_G2API_GetBoneFrame`'s `modelList`;
+    // the engine forwards it to `G2_Get_Bone_Anim_Index`, which never
+    // dereferences it (`G2_bones.cpp:872-900`), so the wrapper's required slot
+    // gets a throwaway int.
+    let mut modelList: c_int = 0;
+
+    if torsoOnly && !noLumbar {
+        //rww - The guesswork based on the lerp frame figures is usually BS, so I've resorted to a call to get the frame of the bone directly.
+        let mut GBAcFrame: f32 = 0.0;
+        if resumeFrame {
+            //we already checked, and this is the same anim, same flip state, but different speed, so we want to resume with the new speed off of the same frame.
+            trap::G2API_GetBoneFrame(
+                engine,
+                ghoul2,
+                "lower_lumbar",
+                time,
+                &mut GBAcFrame,
+                &mut modelList,
+                0,
+            );
+            beginFrame = GBAcFrame as c_int;
+        }
+
+        //even if resuming, also be sure to check if we are running the same frame on the legs. If so, we want to use their frame no matter what.
+        trap::G2API_GetBoneFrame(
+            engine,
+            ghoul2,
+            "model_root",
+            time,
+            &mut GBAcFrame,
+            &mut modelList,
+            0,
+        );
+
+        if csTorsoAnim == csLegsAnim
+            && GBAcFrame >= animFirstFrame as f32
+            && GBAcFrame <= (animFirstFrame + animNumFrames) as f32
+        {
+            //if the legs are already running this anim, pick up on the exact same frame to avoid the "wobbly spine" problem.
+            beginFrame = GBAcFrame as c_int;
+        }
+
+        if firstFrame > lastFrame || ci.torsoAnim == newAnimation {
+            //don't resume on backwards playing animations.. I guess.
+            beginFrame = -1;
+        }
+
+        trap::G2API_SetBoneAnim(
+            engine,
+            ghoul2,
+            0,
+            "lower_lumbar",
+            firstFrame,
+            lastFrame,
+            flags,
+            animSpeed,
+            time,
+            beginFrame as f32,
+            blendTime,
+        );
+
+        // Update the torso frame with the new animation (this arm's `lf` IS
+        // `cent->pe.torso`, so Raven's explicit write lands here)
+        lf.frame = firstFrame;
+
+        ci.torsoAnim = newAnimation;
+    } else {
+        if resumeFrame {
+            //we already checked, and this is the same anim, same flip state, but different speed, so we want to resume with the new speed off of the same frame.
+            let mut GBAcFrame: f32 = 0.0;
+            trap::G2API_GetBoneFrame(
+                engine,
+                ghoul2,
+                "model_root",
+                time,
+                &mut GBAcFrame,
+                &mut modelList,
+                0,
+            );
+            beginFrame = GBAcFrame as c_int;
+        }
+
+        if beginFrame < firstFrame || beginFrame > lastFrame {
+            //out of range, don't use it then.
+            beginFrame = -1;
+        }
+
+        if csTorsoAnim == csLegsAnim && (ci.legsAnim != newAnimation || oldSpeed != animSpeed) {
+            //alright, we are starting an anim on the legs, and that same anim is already playing on the toro, so pick up the frame.
+            let mut GBAcFrame: f32 = 0.0;
+            let oldBeginFrame = beginFrame;
+
+            trap::G2API_GetBoneFrame(
+                engine,
+                ghoul2,
+                "lower_lumbar",
+                time,
+                &mut GBAcFrame,
+                &mut modelList,
+                0,
+            );
+            beginFrame = GBAcFrame as c_int;
+            if beginFrame < firstFrame || beginFrame > lastFrame {
+                //out of range, don't use it then.
+                beginFrame = oldBeginFrame;
+            }
+        }
+
+        trap::G2API_SetBoneAnim(
+            engine,
+            ghoul2,
+            0,
+            "model_root",
+            firstFrame,
+            lastFrame,
+            flags,
+            animSpeed,
+            time,
+            beginFrame as f32,
+            blendTime,
+        );
+
+        ci.legsAnim = newAnimation;
+    }
+
+    if localAnimIndex <= 1 && csTorsoAnim == newAnimation && !noLumbar {
+        //make sure we're humanoid before we access the motion bone
+        trap::G2API_SetBoneAnim(
+            engine,
+            ghoul2,
+            0,
+            "Motion",
+            firstFrame,
+            lastFrame,
+            flags,
+            animSpeed,
+            time,
+            beginFrame as f32,
+            blendTime,
+        );
+    }
+}
+
+/// Raven `CG_RagDoll` — decides whether a corpse should go limp and, once it
+/// has, feeds the engine's ragdoll solver a fresh position/velocity every frame.
+/// `true` means we are ragging and the caller should skip its normal animation
+/// work.
+/// Source: `oracle/codemp/cgame/cg_players.c:3486-3911`
+pub fn CG_RagDoll(ctx: &mut CgContext, cent: &mut centity_t, forcedAngles: &vec3_t) -> bool {
+    let mut usedOrg: vec3_t = [0.0; 3];
+    let mut inSomething = false;
+
+    if ctx.world.cvars.cg_ragDoll.integer == 0 {
+        return false;
+    }
+
+    if cent.localAnimIndex != 0 {
+        //don't rag non-humanoids
+        return false;
+    }
+
+    _VectorCopy(cent.lerpOrigin, &mut usedOrg);
+
+    if cent.isRagging == qfalse {
+        //If we're not in a ragdoll state, perform the checks.
+        if cent.currentState.eFlags & EF_RAG != 0 {
+            //want to go into it no matter what then
+            inSomething = true;
+        } else if cent.currentState.groundEntityNum == ENTITYNUM_NONE {
+            let mut cVel: vec3_t = [0.0; 3];
+
+            _VectorCopy(cent.currentState.pos.trDelta, &mut cVel);
+
+            if VectorNormalize(&mut cVel) > 400.0 {
+                //if he's flying through the air at a good enough speed, switch into ragdoll
+                inSomething = true;
+            }
+        }
+
+        if cent.currentState.eType == entityType_t::ET_BODY as c_int {
+            //just rag bodies immediately if their own was ragging on respawn
+            if cent.ownerRagging != qfalse {
+                cent.isRagging = qtrue;
+                return false;
+            }
+        }
+
+        if ctx.world.cvars.cg_ragDoll.integer > 1 {
+            inSomething = true;
+        }
+
+        if !inSomething {
+            let anim = cent.currentState.legsAnim;
+            let mut dur: c_int = 0;
+
+            // §F19: same unchecked `bgAllAnims` read as elsewhere in this file —
+            // with no parsed skeleton the duration stays 0, which just makes the
+            // death anim read as finished.
+            if let Some(loaded) = ctx
+                .world
+                .bg_state
+                .bgAllAnims
+                .get(cent.localAnimIndex as usize)
+            {
+                if !loaded.anims.is_null() {
+                    // SAFETY: Raven indexes this table unchecked and so do we.
+                    let (numFrames, frameLerp) = unsafe {
+                        let a = &*loaded.anims.offset(anim as isize);
+                        (a.numFrames as c_int, a.frameLerp as c_int)
+                    };
+                    dur = ((numFrames - 1) as f64 * (frameLerp as f32 as f64).abs()) as c_int;
+                }
+            }
+
+            let mut i: usize = 0;
+            let mut boltChecks: [c_int; 5] = [0; 5];
+            let mut boltPoints: [vec3_t; 5] = [[0.0; 3]; 5];
+            let mut trStart: vec3_t = [0.0; 3];
+            let mut trEnd: vec3_t = [0.0; 3];
+            let mut tAng: vec3_t = [0.0; 3];
+            let mut deathDone = false;
+            let mut tr = trace_t::zeroed();
+            let mut boltMatrix = mdxaBone_t {
+                matrix: [[0.0; 4]; 3],
+            };
+
+            VectorSet(
+                &mut tAng,
+                cent.turAngles[PITCH],
+                cent.turAngles[YAW],
+                cent.turAngles[ROLL],
+            );
+
+            if cent.pe.legs.animationTime > 50
+                && (ctx.world.cg.time - cent.pe.legs.animationTime) > dur
+            {
+                //Looks like the death anim is done playing
+                deathDone = true;
+            }
+
+            let engine = ctx.engine;
+            let ghoul2 = cent.ghoul2;
+            let time = ctx.world.cg.time;
+            let lerpOrigin = cent.lerpOrigin;
+            let modelScale = cent.modelScale;
+            let csNumber = cent.currentState.number;
+
+            if deathDone {
+                //only trace from the hands if the death anim is already done.
+                boltChecks[0] = trap::G2API_AddBolt(engine, ghoul2, 0, "rhand");
+                boltChecks[1] = trap::G2API_AddBolt(engine, ghoul2, 0, "lhand");
+            } else {
+                //otherwise start the trace loop at the cranium.
+                i = 2;
+            }
+            boltChecks[2] = trap::G2API_AddBolt(engine, ghoul2, 0, "cranium");
+            //boltChecks[3] = trap_G2API_AddBolt(cent->ghoul2, 0, "rtarsal");
+            //boltChecks[4] = trap_G2API_AddBolt(cent->ghoul2, 0, "ltarsal");
+            boltChecks[3] = trap::G2API_AddBolt(engine, ghoul2, 0, "rtalus");
+            boltChecks[4] = trap::G2API_AddBolt(engine, ghoul2, 0, "ltalus");
+
+            //This may seem bad, but since we have a bone cache now it should manage to not be too disgustingly slow.
+            //Do the head first, because the hands reference it anyway.
+            trap::G2API_GetBoltMatrix(
+                engine,
+                ghoul2,
+                0,
+                boltChecks[2],
+                &mut boltMatrix,
+                &tAng,
+                &lerpOrigin,
+                time,
+                Some(&mut ctx.world.cgs.gameModels[0]),
+                &modelScale,
+            );
+            BG_GiveMeVectorFromMatrix(
+                &boltMatrix,
+                Eorientations::ORIGIN as c_int,
+                &mut boltPoints[2],
+            );
+
+            while i < 5 {
+                if i < 2 {
+                    //when doing hands, trace to the head instead of origin
+                    trap::G2API_GetBoltMatrix(
+                        engine,
+                        ghoul2,
+                        0,
+                        boltChecks[i],
+                        &mut boltMatrix,
+                        &tAng,
+                        &lerpOrigin,
+                        time,
+                        Some(&mut ctx.world.cgs.gameModels[0]),
+                        &modelScale,
+                    );
+                    BG_GiveMeVectorFromMatrix(
+                        &boltMatrix,
+                        Eorientations::ORIGIN as c_int,
+                        &mut boltPoints[i],
+                    );
+                    _VectorCopy(boltPoints[i], &mut trStart);
+                    _VectorCopy(boltPoints[2], &mut trEnd);
+                } else {
+                    if i > 2 {
+                        //2 is the head, which already has the bolt point.
+                        trap::G2API_GetBoltMatrix(
+                            engine,
+                            ghoul2,
+                            0,
+                            boltChecks[i],
+                            &mut boltMatrix,
+                            &tAng,
+                            &lerpOrigin,
+                            time,
+                            Some(&mut ctx.world.cgs.gameModels[0]),
+                            &modelScale,
+                        );
+                        BG_GiveMeVectorFromMatrix(
+                            &boltMatrix,
+                            Eorientations::ORIGIN as c_int,
+                            &mut boltPoints[i],
+                        );
+                    }
+                    _VectorCopy(boltPoints[i], &mut trStart);
+                    _VectorCopy(lerpOrigin, &mut trEnd);
+                }
+
+                //Now that we have all that sorted out, trace between the two points we desire.
+                //
+                // PORT-NOTE: Raven passes NULL mins/maxs; `CM_Trace` substitutes
+                // `vec3_origin` for a NULL bound (`cm_trace.cpp:1603-1610`), so
+                // the zero vectors are the same point trace.
+                CG_Rag_Trace(
+                    ctx,
+                    &mut tr,
+                    &trStart,
+                    &vec3_origin,
+                    &vec3_origin,
+                    &trEnd,
+                    csNumber,
+                    MASK_SOLID,
+                );
+
+                if tr.fraction != 1.0 || tr.startsolid != 0 || tr.allsolid != 0 {
+                    //Hit something or start in solid, so flag it and break.
+                    //This is a slight hack, but if we aren't done with the death anim, we don't really want to
+                    //go into ragdoll unless our body has a relatively "flat" pitch. (the pitch test itself is
+                    //`#if 0`'d out in the oracle, `cg_players.c:3603-3617`)
+                    inSomething = true;
+                    break;
+                }
+
+                i += 1;
+            }
+        }
+
+        if inSomething {
+            cent.isRagging = qtrue;
+            // VectorClear(cent->lerpOriginOffset) here is `#if 0`'d in the oracle
+        }
+    }
+
+    if cent.isRagging != qfalse {
+        //We're in a ragdoll state, so make the call to keep our positions updated and whatnot.
+        let engine = ctx.engine;
+        let ghoul2 = cent.ghoul2;
+        let time = ctx.world.cg.time;
+
+        let ragAnim = CG_RagAnimForPositioning(ctx, cent);
+
+        if cent.ikStatus != qfalse {
+            //ik must be reset before ragdoll is started, or you'll get some interesting results.
+            trap::G2API_SetBoneIKState(
+                engine,
+                ghoul2,
+                time,
+                None,
+                sharedEIKMoveState::IKS_NONE as c_int,
+                None,
+            );
+            cent.ikStatus = qfalse;
+        }
+
+        //these will be used as "base" frames for the ragoll settling.
+        let mut startFrame: c_int = 0;
+        let mut endFrame: c_int = 0;
+        // §F19: the unchecked `bgAllAnims` read again — no skeleton leaves the
+        // settle range at 0..0, which the solver treats as "no base pose".
+        if let Some(loaded) = ctx
+            .world
+            .bg_state
+            .bgAllAnims
+            .get(cent.localAnimIndex as usize)
+        {
+            if !loaded.anims.is_null() {
+                // SAFETY: Raven indexes this table unchecked and so do we.
+                let (firstFrame, numFrames) = unsafe {
+                    let a = &*loaded.anims.offset(ragAnim as isize);
+                    (a.firstFrame as c_int, a.numFrames as c_int)
+                };
+                startFrame = firstFrame;
+                endFrame = firstFrame + numFrames;
+            }
+        }
+
+        // Raven: with my new method of doing things I want it to continue the anim
+        {
+            let mut currentFrame: f32 = 0.0;
+            let mut gbaStartFrame: c_int = 0;
+            let mut gbaEndFrame: c_int = 0;
+            let mut gbaFlags: c_int = 0;
+            let mut gbaAnimSpeed: f32 = 0.0;
+
+            if trap::G2API_GetBoneAnim(
+                engine,
+                ghoul2,
+                "model_root",
+                time,
+                &mut currentFrame,
+                &mut gbaStartFrame,
+                &mut gbaEndFrame,
+                &mut gbaFlags,
+                &mut gbaAnimSpeed,
+                Some(&mut ctx.world.cgs.gameModels[0]),
+                0,
+            ) {
+                //lock the anim on the current frame.
+                let blendTime: c_int = 500;
+
+                let mut curFirstFrame: c_int = 0;
+                let mut curNumFrames: c_int = 0;
+                if let Some(loaded) = ctx
+                    .world
+                    .bg_state
+                    .bgAllAnims
+                    .get(cent.localAnimIndex as usize)
+                {
+                    if !loaded.anims.is_null() {
+                        // SAFETY: Raven indexes this table unchecked and so do we.
+                        let (ff, nf) = unsafe {
+                            let a = &*loaded.anims.offset(cent.currentState.legsAnim as isize);
+                            (a.firstFrame as c_int, a.numFrames as c_int)
+                        };
+                        curFirstFrame = ff;
+                        curNumFrames = nf;
+                    }
+                }
+
+                if currentFrame >= (curFirstFrame + curNumFrames - 1) as f32 {
+                    //this is sort of silly but it works for now.
+                    currentFrame = (curFirstFrame + curNumFrames - 2) as f32;
+                }
+
+                for bone in ["lower_lumbar", "model_root", "Motion"] {
+                    trap::G2API_SetBoneAnim(
+                        engine,
+                        ghoul2,
+                        0,
+                        bone,
+                        currentFrame as c_int,
+                        (currentFrame + 1.0) as c_int,
+                        gbaFlags,
+                        gbaAnimSpeed,
+                        time,
+                        currentFrame,
+                        blendTime,
+                    );
+                }
+            }
+        }
+
+        // PORT-NOTE: Raven hands `cgs.gameModels` to these four; the borrow can't
+        // ride beside a live `ctx`, and `G2_Set_Bone_Angles` never dereferences
+        // `modelList` (`G2_bones.cpp:477-535`), so `None` is the same call.
+        for bone in ["upper_lumbar", "lower_lumbar", "thoracic", "cervical"] {
+            CG_G2SetBoneAngles(
+                ctx,
+                ghoul2,
+                0,
+                bone,
+                &vec3_origin,
+                BONE_ANGLES_POSTMULT,
+                Eorientations::POSITIVE_X as c_int,
+                Eorientations::NEGATIVE_Y as c_int,
+                Eorientations::NEGATIVE_Z as c_int,
+                None,
+                0,
+                time,
+            );
+        }
+
+        // §F19: Raven's stack `tParms` is only partly filled — the pelvis
+        // offsets, impact strength, begin flag and effector mask are read back
+        // out by the engine, never in, so the port sends zeros rather than
+        // whatever was on the stack.
+        let mut tParms = sharedRagDollParams_t {
+            angles: *forcedAngles,
+            position: usedOrg,
+            scale: cent.modelScale,
+            pelvis_angles_offset: [0.0; 3],
+            pelvis_position_offset: [0.0; 3],
+            f_impact_strength: 0.0,
+            f_shot_strength: 4.0,
+            me: cent.currentState.number,
+            start_frame: startFrame,
+            end_frame: endFrame,
+            collision_type: 1,
+            call_rag_doll_begin: qfalse,
+            rag_phase: sharedERagPhase::RP_DEATH_COLLISION as c_int,
+            effectors_to_turn_off: 0,
+        };
+
+        trap::G2API_SetRagDoll(engine, ghoul2, Some(&mut tParms));
+
+        let mut tuParms = sharedRagDollUpdateParams_t {
+            angles: *forcedAngles,
+            position: usedOrg,
+            scale: cent.modelScale,
+            velocity: [0.0; 3],
+            me: cent.currentState.number,
+            settle_frame: tParms.end_frame - 1,
+        };
+
+        if cent.currentState.groundEntityNum != ENTITYNUM_NONE {
+            VectorClear(&mut tuParms.velocity);
+        } else {
+            _VectorScale(cent.currentState.pos.trDelta, 2.0, &mut tuParms.velocity);
+        }
+
+        trap::G2API_AnimateG2Models(engine, ghoul2, time, &mut tuParms);
+
+        //So if we try to get a bolt point it's still correct
+        cent.turAngles[YAW] = forcedAngles[YAW];
+        cent.lerpAngles[YAW] = forcedAngles[YAW];
+        cent.pe.torso.yawAngle = forcedAngles[YAW];
+        cent.pe.legs.yawAngle = forcedAngles[YAW];
+
+        if cent.currentState.ragAttach != 0
+            && (cent.currentState.eType != entityType_t::ET_NPC as c_int
+                || cent.currentState.NPC_class != class_t::CLASS_VEHICLE as c_int)
+        {
+            let grabNum = if cent.currentState.ragAttach == ENTITYNUM_NONE {
+                //switch cl 0 and entitynum_none, so we can operate on the "if non-0" concept
+                0usize
+            } else {
+                cent.currentState.ragAttach as usize
+            };
+
+            let grabEnt = ctx.world.entity(grabNum);
+            let grabGhoul2 = grabEnt.ghoul2;
+            let grabTurAngles = grabEnt.turAngles;
+            let grabLerpOrigin = grabEnt.lerpOrigin;
+            let grabModelScale = grabEnt.modelScale;
+
+            if !grabGhoul2.is_null() {
+                let mut matrix = mdxaBone_t {
+                    matrix: [[0.0; 4]; 3],
+                };
+                let mut bOrg: vec3_t = [0.0; 3];
+                let mut thisHand: vec3_t = [0.0; 3];
+                let mut hands: vec3_t = [0.0; 3];
+                let mut pcjMin: vec3_t = [0.0; 3];
+                let mut pcjMax: vec3_t = [0.0; 3];
+                let mut pDif: vec3_t = [0.0; 3];
+                let mut thorPoint: vec3_t = [0.0; 3];
+
+                let turAngles = cent.turAngles;
+                let lerpOrigin = cent.lerpOrigin;
+                let modelScale = cent.modelScale;
+
+                //Get the person who is holding our hand's hand location
+                trap::G2API_GetBoltMatrix(
+                    engine,
+                    grabGhoul2,
+                    0,
+                    0,
+                    &mut matrix,
+                    &grabTurAngles,
+                    &grabLerpOrigin,
+                    time,
+                    Some(&mut ctx.world.cgs.gameModels[0]),
+                    &grabModelScale,
+                );
+                BG_GiveMeVectorFromMatrix(&matrix, Eorientations::ORIGIN as c_int, &mut bOrg);
+
+                //Get our hand's location
+                trap::G2API_GetBoltMatrix(
+                    engine,
+                    ghoul2,
+                    0,
+                    0,
+                    &mut matrix,
+                    &turAngles,
+                    &lerpOrigin,
+                    time,
+                    Some(&mut ctx.world.cgs.gameModels[0]),
+                    &modelScale,
+                );
+                BG_GiveMeVectorFromMatrix(&matrix, Eorientations::ORIGIN as c_int, &mut thisHand);
+
+                //Get the position of the thoracic bone for hinting its velocity later on
+                let thorBolt = trap::G2API_AddBolt(engine, ghoul2, 0, "thoracic");
+                trap::G2API_GetBoltMatrix(
+                    engine,
+                    ghoul2,
+                    0,
+                    thorBolt,
+                    &mut matrix,
+                    &turAngles,
+                    &lerpOrigin,
+                    time,
+                    Some(&mut ctx.world.cgs.gameModels[0]),
+                    &modelScale,
+                );
+                BG_GiveMeVectorFromMatrix(&matrix, Eorientations::ORIGIN as c_int, &mut thorPoint);
+
+                _VectorSubtract(bOrg, thisHand, &mut hands);
+
+                if VectorLength(hands) < 3.0 {
+                    trap::G2API_RagForceSolve(engine, ghoul2, false);
+                } else {
+                    trap::G2API_RagForceSolve(engine, ghoul2, true);
+                }
+
+                //got the hand pos of him, now we want to make our hand go to it
+                for bone in ["rhand", "rradius", "rradiusX", "rhumerusX", "rhumerus"] {
+                    trap::G2API_RagEffectorGoal(engine, ghoul2, bone, Some(&bOrg));
+                }
+
+                //Make these two solve quickly so we can update decently
+                trap::G2API_RagPCJGradientSpeed(engine, ghoul2, "rhumerus", 1.5);
+                trap::G2API_RagPCJGradientSpeed(engine, ghoul2, "rradius", 1.5);
+
+                //Break the constraints on them I suppose
+                VectorSet(&mut pcjMin, -999.0, -999.0, -999.0);
+                VectorSet(&mut pcjMax, 999.0, 999.0, 999.0);
+                trap::G2API_RagPCJConstraint(engine, ghoul2, "rhumerus", &pcjMin, &pcjMax);
+                trap::G2API_RagPCJConstraint(engine, ghoul2, "rradius", &pcjMin, &pcjMax);
+
+                cent.overridingBones = time + 2000;
+
+                //hit the thoracic velocity to the hand point
+                _VectorSubtract(bOrg, thorPoint, &mut hands);
+                VectorNormalize(&mut hands);
+                let h = hands;
+                _VectorScale(h, 2048.0, &mut hands);
+                trap::G2API_RagEffectorKick(engine, ghoul2, "thoracic", &hands);
+                trap::G2API_RagEffectorKick(engine, ghoul2, "ceyebrow", &hands);
+
+                _VectorSubtract(cent.ragLastOrigin, cent.lerpOrigin, &mut pDif);
+                let o = cent.lerpOrigin;
+                _VectorCopy(o, &mut cent.ragLastOrigin);
+
+                if cent.ragLastOriginTime >= time
+                    && cent.currentState.groundEntityNum != ENTITYNUM_NONE
+                {
+                    //make sure it's reasonably updated
+                    let difLen = VectorLength(pDif);
+                    if difLen > 0.0 {
+                        //if we're being dragged, then kick all the bones around a bit
+                        if difLen < 12.0 {
+                            let p = pDif;
+                            _VectorScale(p, 12.0 / difLen, &mut pDif);
+                            // Raven stores difLen = 12.0 here; nothing reads it again
+                        }
+
+                        for bone in cg_effectorStringTable {
+                            let mut dVel: vec3_t = [0.0; 3];
+                            let mut rVel: vec3_t = [0.0; 3];
+
+                            _VectorCopy(pDif, &mut dVel);
+                            dVel[2] = 0.0;
+
+                            //Factor in a random velocity
+                            let rx = ctx.world.bg_state.rng.flrand(-0.1, 0.1);
+                            let ry = ctx.world.bg_state.rng.flrand(-0.1, 0.1);
+                            let rz = ctx.world.bg_state.rng.flrand(0.1, 0.5);
+                            VectorSet(&mut rVel, rx, ry, rz);
+                            let r = rVel;
+                            _VectorScale(r, 8.0, &mut rVel);
+
+                            let d = dVel;
+                            _VectorAdd(d, rVel, &mut dVel);
+                            let d = dVel;
+                            _VectorScale(d, 10.0, &mut dVel);
+
+                            trap::G2API_RagEffectorKick(engine, ghoul2, bone, &dVel);
+                        }
+                    }
+                }
+                cent.ragLastOriginTime = time + 1000;
+            }
+        } else if cent.overridingBones != 0 {
+            //reset things to their normal rag state
+            let mut pcjMin: vec3_t = [0.0; 3];
+            let mut pcjMax: vec3_t = [0.0; 3];
+            let mut dVel: vec3_t = [0.0; 3];
+
+            //got the hand pos of him, now we want to make our hand go to it
+            // NULL clears the over-goal - the engine's "go back to none" arm
+            // (`oracle/codemp/ghoul2/G2_API.cpp:1552-1555`)
+            for bone in ["rhand", "rradius", "rradiusX", "rhumerusX", "rhumerus"] {
+                trap::G2API_RagEffectorGoal(engine, ghoul2, bone, None);
+            }
+
+            VectorSet(&mut dVel, 0.0, 0.0, -64.0);
+            trap::G2API_RagEffectorKick(engine, ghoul2, "rhand", &dVel);
+
+            trap::G2API_RagPCJGradientSpeed(engine, ghoul2, "rhumerus", 0.0);
+            trap::G2API_RagPCJGradientSpeed(engine, ghoul2, "rradius", 0.0);
+
+            VectorSet(&mut pcjMin, -100.0, -40.0, -15.0);
+            VectorSet(&mut pcjMax, -15.0, 80.0, 15.0);
+            trap::G2API_RagPCJConstraint(engine, ghoul2, "rhumerus", &pcjMin, &pcjMax);
+
+            VectorSet(&mut pcjMin, -25.0, -20.0, -20.0);
+            VectorSet(&mut pcjMax, 90.0, 20.0, -20.0);
+            trap::G2API_RagPCJConstraint(engine, ghoul2, "rradius", &pcjMin, &pcjMax);
+
+            if cent.overridingBones < time {
+                trap::G2API_RagForceSolve(engine, ghoul2, false);
+                cent.overridingBones = 0;
+            } else {
+                trap::G2API_RagForceSolve(engine, ghoul2, true);
+            }
+        }
+
+        return true;
+    }
+
+    false
+}
+
+/// Raven `CG_G2PlayerHeadAnims` — runs a humanoid's face: blinks, the odd
+/// frown, and the talk pose driven by the voice channel's volume. `true` when a
+/// face animation was actually started this frame.
+///
+/// Raven: Dead people close their eyes and don't make faces!
+/// Source: `oracle/codemp/cgame/cg_players.c:4059-4189`
+pub fn CG_G2PlayerHeadAnims(ctx: &mut CgContext, cent: &mut centity_t) -> bool {
+    let mut anim: c_int = -1;
+
+    if cent.localAnimIndex > 1 {
+        //only do this for humanoids
+        return false;
+    }
+
+    if cent.noFace != qfalse {
+        // i don't have a face
+        return false;
+    }
+
+    let number = cent.currentState.number;
+    let isClient = number < MAX_CLIENTS_I32;
+
+    // the three facial timers live either in the client table or in the NPC's
+    // own info; they are pulled out here and written back at the bottom so the
+    // blink/anim calls can hold `ctx` and `cent` at the same time
+    let (mut facial_blink, mut facial_frown, mut facial_aux) = if isClient {
+        let ci = &ctx.world.cgs.clientinfo[number as usize];
+        (ci.facial_blink, ci.facial_frown, ci.facial_aux)
+    } else {
+        match cent.npcClient.as_ref() {
+            Some(ci) => (ci.facial_blink, ci.facial_frown, ci.facial_aux),
+            None => return false,
+        }
+    };
+
+    let time = ctx.world.cg.time;
+
+    if cent.currentState.eFlags & EF_DEAD != 0 {
+        //Dead people close their eyes and don't make faces!
+        anim = animNumber_t::FACE_DEAD as c_int;
+        facial_blink = -1.0;
+    } else {
+        if facial_blink == 0.0 {
+            // set the timers
+            facial_blink = time as f32 + ctx.world.bg_state.rng.flrand(4000.0, 8000.0);
+            facial_frown = time as f32 + ctx.world.bg_state.rng.flrand(6000.0, 10000.0);
+            facial_aux = time as f32 + ctx.world.bg_state.rng.flrand(6000.0, 10000.0);
+        }
+
+        //are we blinking?
+        if facial_blink < 0.0 {
+            // yes, check if we are we done blinking ?
+            if -facial_blink < time as f32 {
+                // yes, so reset blink timer
+                facial_blink = time as f32 + ctx.world.bg_state.rng.flrand(4000.0, 8000.0);
+                CG_G2SetHeadBlink(ctx, cent, false); //stop the blink
+            }
+        } else {
+            // no we aren't blinking
+            if facial_blink < time as f32 {
+                // but should we start ?
+                CG_G2SetHeadBlink(ctx, cent, true);
+                if facial_blink == 1.0 {
+                    //requested to stay shut by SET_FACEEYESCLOSED
+                    facial_blink = -(time as f32 + 99999999.0f32); // set blink timer
+                } else {
+                    facial_blink = -(time as f32 + 300.0f32); // set blink timer
+                }
+            }
+        }
+
+        let voiceVolume = trap::S_GetVoiceVolume(ctx.engine, number);
+
+        if voiceVolume > 0 {
+            // if we aren't talking, then it will be 0, -1 for talking but paused
+            anim = animNumber_t::FACE_TALK1 as c_int + voiceVolume - 1;
+        } else if voiceVolume == 0 {
+            //don't do aux if in a slient part of speech
+            //not talking
+            if facial_aux < 0.0 {
+                // are we auxing ? yes
+                if -facial_aux < time as f32 {
+                    // are we done auxing ? yes, reset aux timer
+                    facial_aux = time as f32 + ctx.world.bg_state.rng.flrand(7000.0, 10000.0);
+                } else {
+                    // not yet, so choose aux
+                    anim = animNumber_t::FACE_ALERT as c_int;
+                }
+            } else {
+                // no we aren't auxing, but should we start ?
+                if facial_aux < time as f32 {
+                    //yes
+                    anim = animNumber_t::FACE_ALERT as c_int;
+                    // set aux timer
+                    facial_aux = (-(time as f64 + 2000.0)) as f32;
+                }
+            }
+
+            if anim != -1 {
+                //we we are auxing, see if we should override with a frown
+                if facial_frown < 0.0 {
+                    // are we frowning ? yes,
+                    if -facial_frown < time as f32 {
+                        //are we done frowning ? yes, reset frown timer
+                        facial_frown = time as f32 + ctx.world.bg_state.rng.flrand(7000.0, 10000.0);
+                    } else {
+                        // not yet, so choose frown
+                        anim = animNumber_t::FACE_FROWN as c_int;
+                    }
+                } else {
+                    // no we aren't frowning, but should we start ?
+                    if facial_frown < time as f32 {
+                        anim = animNumber_t::FACE_FROWN as c_int;
+                        // set frown timer
+                        facial_frown = (-(time as f64 + 2000.0)) as f32;
+                    }
+                }
+            }
+        } //talking
+    } //dead
+
+    if isClient {
+        let ci = &mut ctx.world.cgs.clientinfo[number as usize];
+        ci.facial_blink = facial_blink;
+        ci.facial_frown = facial_frown;
+        ci.facial_aux = facial_aux;
+    } else if let Some(ci) = cent.npcClient.as_mut() {
+        ci.facial_blink = facial_blink;
+        ci.facial_frown = facial_frown;
+        ci.facial_aux = facial_aux;
+    }
+
+    if anim != -1 {
+        CG_G2SetHeadAnim(ctx, cent, anim);
+        return true;
+    }
+
+    false
+}
+
+/// Raven `CG_PlayerFlag` — the CTF flag hanging off a carrier's lower lumbar,
+/// canted back and to the right. Never drawn on your own body in first person.
+/// Source: `oracle/codemp/cgame/cg_players.c:4367-4441`
+pub fn CG_PlayerFlag(ctx: &mut CgContext, cent: &centity_t, hModel: qhandle_t) {
+    let mut angles: vec3_t = [0.0; 3];
+    let mut axis: [vec3_t; 3] = [[0.0; 3]; 3];
+    let mut boltOrg: vec3_t = [0.0; 3];
+    let mut tAng: vec3_t = [0.0; 3];
+    let mut getAng: vec3_t = [0.0; 3];
+    let mut right: vec3_t = [0.0; 3];
+    let mut boltMatrix = mdxaBone_t {
+        matrix: [[0.0; 4]; 3],
+    };
+
+    // PORT-NOTE: Raven derefs `cg.snap` unguarded; with no snapshot yet nobody
+    // is "us", so the flag renders.
+    let ourClientNum = ctx.world.cg.snap_ref().map_or(-1, |snap| snap.ps.clientNum);
+
+    if cent.currentState.number == ourClientNum && ctx.world.cg.renderingThirdPerson == 0 {
+        return;
+    }
+
+    if cent.ghoul2.is_null() {
+        return;
+    }
+
+    let bolt_llumbar = if cent.currentState.eType == entityType_t::ET_NPC as c_int {
+        match cent.npcClient.as_ref() {
+            Some(ci) => ci.bolt_llumbar,
+            None => {
+                // §F19: Raven asserts here and then derefs the NULL anyway; a
+                // flagless NPC just doesn't get a flag drawn.
+                debug_assert!(false, "flag-carrying NPC with no npcClient");
+                return;
+            }
+        }
+    } else {
+        ctx.world.cgs.clientinfo[cent.currentState.number as usize].bolt_llumbar
+    };
+
+    VectorSet(
+        &mut tAng,
+        cent.turAngles[PITCH],
+        cent.turAngles[YAW],
+        cent.turAngles[ROLL],
+    );
+
+    let engine = ctx.engine;
+    let time = ctx.world.cg.time;
+    trap::G2API_GetBoltMatrix(
+        engine,
+        cent.ghoul2,
+        0,
+        bolt_llumbar,
+        &mut boltMatrix,
+        &tAng,
+        &cent.lerpOrigin,
+        time,
+        Some(&mut ctx.world.cgs.gameModels[0]),
+        &cent.modelScale,
+    );
+    BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut boltOrg);
+
+    BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::POSITIVE_X as c_int, &mut tAng);
+    let t = tAng;
+    vectoangles(t, &mut tAng);
+
+    _VectorCopy(cent.lerpAngles, &mut angles);
+
+    boltOrg[2] -= 12.0;
+    VectorSet(&mut getAng, 0.0, cent.lerpAngles[1], 0.0);
+    AngleVectors(getAng, None, Some(&mut right), None);
+    boltOrg[0] += right[0] * 8.0;
+    boltOrg[1] += right[1] * 8.0;
+    boltOrg[2] += right[2] * 8.0;
+
+    angles[PITCH] = -cent.lerpAngles[PITCH] / 2.0 - 30.0;
+    angles[YAW] = tAng[YAW] + 270.0;
+
+    AnglesToAxis(angles, axis.as_mut_ptr());
+
+    let mut ent = refEntity_t::zeroed();
+    _VectorMA(boltOrg, 24.0, axis[0], &mut ent.origin);
+
+    angles[ROLL] += 20.0;
+    AnglesToAxis(angles, ent.axis.as_mut_ptr());
+
+    ent.hModel = hModel;
+
+    ent.modelScale[0] = 0.5;
+    ent.modelScale[1] = 0.5;
+    ent.modelScale[2] = 0.5;
+    ScaleModelAxis(&mut ent);
+
+    // Raven's RF_FORCE_ENT_ALPHA pass for our own back is commented out
+    // (`cg_players.c:4431-4437`): "Not doing this at the moment because sorting
+    // totally messes up".
+
+    trap::R_AddRefEntityToScene(engine, &ent);
+}
+
+/// Raven `CG_PlayerSprites` — the icon floating over a player's head: the
+/// connection glitch beats everything, then a voice-chat balloon, then a plain
+/// talk balloon. Mind-tricked entities draw nothing.
+/// Source: `oracle/codemp/cgame/cg_players.c:4572-4600`
+pub fn CG_PlayerSprites(ctx: &mut CgContext, cent: &centity_t) {
+    if let Some(snap) = ctx.world.cg.snap_ref() {
+        let ourClientNum = snap.ps.clientNum;
+        if CG_IsMindTricked(
+            ctx.world,
+            cent.currentState.trickedentindex,
+            cent.currentState.trickedentindex2,
+            cent.currentState.trickedentindex3,
+            cent.currentState.trickedentindex4,
+            ourClientNum,
+        ) {
+            return; //this entity is mind-tricking the current client, so don't render it
+        }
+    }
+
+    if cent.currentState.eFlags & EF_CONNECTION != 0 {
+        let shader = ctx.world.cgs.media.connectionShader;
+        CG_PlayerFloatSprite(ctx, cent, shader);
+        return;
+    }
+
+    if cent.vChatTime > ctx.world.cg.time {
+        let shader = ctx.world.cgs.media.vchatShader;
+        CG_PlayerFloatSprite(ctx, cent, shader);
+    } else if cent.currentState.eType != entityType_t::ET_NPC as c_int
+        //don't draw talk balloons on NPCs
+        && (cent.currentState.eFlags & EF_TALK) != 0
+    {
+        let shader = ctx.world.cgs.media.balloonShader;
+        CG_PlayerFloatSprite(ctx, cent, shader);
+    }
+}
+
+/// Raven `CG_AddRefEntityWithPowerups` — the one gate every player refEnt goes
+/// through: an entity mind-tricking us is simply not submitted.
+///
+/// `team` is dead in Raven's body (the powerup shells it named are gone).
+/// Source: `oracle/codemp/cgame/cg_players.c:5059-5071`
+#[allow(unused_variables)]
+pub fn CG_AddRefEntityWithPowerups(
+    ctx: &mut CgContext,
+    ent: &refEntity_t,
+    state: &entityState_t,
+    team: c_int,
+) {
+    // PORT-NOTE: Raven derefs `cg.snap` unguarded; with no snapshot there is
+    // nobody to be tricked, so the entity renders.
+    if let Some(snap) = ctx.world.cg.snap_ref() {
+        let ourClientNum = snap.ps.clientNum;
+        if CG_IsMindTricked(
+            ctx.world,
+            state.trickedentindex,
+            state.trickedentindex2,
+            state.trickedentindex3,
+            state.trickedentindex4,
+            ourClientNum,
+        ) {
+            return; //this entity is mind-tricking the current client, so don't render it
+        }
+    }
+
+    trap::R_AddRefEntityToScene(ctx.engine, ent);
+}
+
+/// Raven `CG_PlayerHitFX` — the personal-shield flash on somebody who just took
+/// a hit. Ships get nothing, and neither do you in first person.
+///
+/// Raven: only do the below fx if the cent in question is...uh...me, and it's
+/// first person.
+/// Source: `oracle/codemp/cgame/cg_players.c:5145-5158`
+pub fn CG_PlayerHitFX(ctx: &mut CgContext, cent: &centity_t) {
+    if cent.currentState.clientNum != ctx.world.cg.predictedPlayerState.clientNum
+        || ctx.world.cg.renderingThirdPerson != 0
+    {
+        if cent.damageTime > ctx.world.cg.time
+            && cent.currentState.NPC_class != class_t::CLASS_VEHICLE as c_int
+        {
+            CG_DrawPlayerShield(ctx, cent, &cent.lerpOrigin);
+        }
+    }
+}
+
+/// Raven `CG_DoSaberLight` — one dynamic light for a whole saber, averaging the
+/// colour and midpoint of every lit blade and sizing the radius off how far
+/// apart the tips are.
+///
+/// Raven: RGB combine all the colors of the sabers you're using into one
+/// averaged color!
+/// Source: `oracle/codemp/cgame/cg_players.c:5234-5318`
+pub fn CG_DoSaberLight(ctx: &mut CgContext, saber: Option<&saberInfo_t>) {
+    let mut positions: [vec3_t; MAX_BLADES * 2] = [[0.0; 3]; MAX_BLADES * 2];
+    let mut mid: vec3_t = [0.0; 3];
+    let mut rgbs: [vec3_t; MAX_BLADES * 2] = [[0.0; 3]; MAX_BLADES * 2];
+    let mut rgb: vec3_t = [0.0; 3];
+    let mut lengths: [f32; MAX_BLADES * 2] = [0.0; MAX_BLADES * 2];
+    let mut totallength: f32 = 0.0;
+    // Raven's counter is a float, and the average below divides by it as one
+    let mut numpositions: f32 = 0.0;
+    let mut diameter: f32 = 0.0;
+
+    let saber = match saber {
+        Some(saber) => saber,
+        None => return,
+    };
+
+    if saber.saberFlags2 & SFL2_NO_DLIGHT != 0 {
+        //no dlight!
+        return;
+    }
+
+    for i in 0..saber.numBlades as usize {
+        if saber.blade[i].length >= 0.5 {
+            //FIXME: make RGB sabers
+            CG_RGBForSaberColor(saber.blade[i].color, &mut rgbs[i]);
+            lengths[i] = saber.blade[i].length;
+            if saber.blade[i].length * 2.0 > diameter {
+                diameter = saber.blade[i].length * 2.0;
+            }
+            totallength += saber.blade[i].length;
+            _VectorMA(
+                saber.blade[i].muzzlePoint,
+                saber.blade[i].length,
+                saber.blade[i].muzzleDir,
+                &mut positions[i],
+            );
+            if numpositions == 0.0 {
+                //first blade, store middle of that as midpoint
+                _VectorMA(
+                    saber.blade[i].muzzlePoint,
+                    saber.blade[i].length * 0.5,
+                    saber.blade[i].muzzleDir,
+                    &mut mid,
+                );
+                _VectorCopy(rgbs[i], &mut rgb);
+            }
+            numpositions += 1.0;
+        }
+    }
+
+    if totallength != 0.0 {
+        //actually have something to do
+        if numpositions == 1.0 {
+            //only 1 blade, midpoint is already set (halfway between the start and end of that blade), rgb is already set, so it diameter
+        } else {
+            //multiple blades, calc averages
+            VectorClear(&mut mid);
+            VectorClear(&mut rgb);
+            //now go through all the data and get the average RGB and middle position and the radius
+            for i in 0..MAX_BLADES * 2 {
+                if lengths[i] != 0.0 {
+                    let r = rgb;
+                    _VectorMA(r, lengths[i], rgbs[i], &mut rgb);
+                    let m = mid;
+                    _VectorAdd(m, positions[i], &mut mid);
+                }
+            }
+
+            //get middle rgb
+            let r = rgb;
+            //get the average, normalized RGB
+            _VectorScale(r, 1.0 / totallength, &mut rgb);
+            //get mid position
+            let m = mid;
+            _VectorScale(m, 1.0 / numpositions, &mut mid);
+            //find the farthest distance between the blade tips, this will be our diameter
+            for i in 0..MAX_BLADES * 2 {
+                if lengths[i] != 0.0 {
+                    for j in 0..MAX_BLADES * 2 {
+                        if lengths[j] != 0.0 {
+                            let dist = Distance(positions[i], positions[j]);
+                            if dist > diameter {
+                                diameter = dist;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let jitter = ctx.world.bg_state.rng.random() * 8.0;
+        trap::R_AddLightToScene(ctx.engine, &mid, diameter + jitter, rgb[0], rgb[1], rgb[2]);
+    }
+}
+
+/// Raven `CG_DoSaber` — draws one blade: a sprite-based glow ref-ent plus the
+/// white-hot line core, both radius-jittered per frame. Blades under half a unit
+/// aren't worth submitting.
+///
+/// Raven: Jeff, I did this because I foolishly wished to have a bright halo as
+/// the saber is unleashed. It's not quite what I'd hoped tho. If you have any
+/// ideas, go for it! --Pat
+/// Source: `oracle/codemp/cgame/cg_players.c:5320-5430`
+#[allow(clippy::too_many_arguments)]
+pub fn CG_DoSaber(
+    ctx: &mut CgContext,
+    origin: &vec3_t,
+    dir: &vec3_t,
+    length: f32,
+    lengthMax: f32,
+    radius: f32,
+    color: saber_colors_t,
+    rfx: c_int,
+    doLight: bool,
+) {
+    let mut rfx = rfx;
+    let mut mid: vec3_t = [0.0; 3];
+
+    if length < 0.5 {
+        // if the thing is so short, just forget even adding me.
+        return;
+    }
+
+    // Find the midpoint of the saber for lighting purposes
+    _VectorMA(*origin, length * 0.5, *dir, &mut mid);
+
+    let media = &ctx.world.cgs.media;
+    let (glow, blade) = match color {
+        SABER_RED => (media.redSaberGlowShader, media.redSaberCoreShader),
+        SABER_ORANGE => (media.orangeSaberGlowShader, media.orangeSaberCoreShader),
+        SABER_YELLOW => (media.yellowSaberGlowShader, media.yellowSaberCoreShader),
+        SABER_GREEN => (media.greenSaberGlowShader, media.greenSaberCoreShader),
+        SABER_BLUE => (media.blueSaberGlowShader, media.blueSaberCoreShader),
+        SABER_PURPLE => (media.purpleSaberGlowShader, media.purpleSaberCoreShader),
+        _ => (media.blueSaberGlowShader, media.blueSaberCoreShader),
+    };
+
+    if doLight {
+        // always add a light because sabers cast a nice glow before they slice you in half!!  or something...
+        let mut rgb: vec3_t = [1.0, 1.0, 1.0];
+        CG_RGBForSaberColor(color, &mut rgb);
+        let jitter = ctx.world.bg_state.rng.random() * 3.0;
+        trap::R_AddLightToScene(
+            ctx.engine,
+            &mid,
+            (length * 1.4) + jitter,
+            rgb[0],
+            rgb[1],
+            rgb[2],
+        );
+    }
+
+    let mut saber = refEntity_t::zeroed();
+
+    // Saber glow is it's own ref type because it uses a ton of sprites, otherwise it would eat up too many
+    //	refEnts to do each glow blob individually
+    saber.saberLength = length;
+
+    let radiusmult: f32 = if length < lengthMax {
+        // Note this creates a curve, and length cannot be < 0.5.
+        (1.0f64 + (2.0f64 / length as f64)) as f32
+    } else {
+        1.0
+    };
+
+    if ctx.world.cvars.cg_saberTrail.integer == 2
+        && ctx.world.cvars.cg_shadows.integer != 2
+        && ctx.world.cgs.glconfig.stencilBits >= 4
+    {
+        //draw the blade as a post-render so it doesn't get in the cap...
+        rfx |= RF_FORCEPOST;
+    }
+
+    let radiusRange = radius * 0.075;
+    let mut radiusStart = radius - radiusRange;
+
+    saber.radius = ((radiusStart as f64 + ctx.world.bg_state.rng.crandom() * radiusRange as f64)
+        * radiusmult as f64) as f32;
+    //saber.radius = (2.8f + crandom() * 0.2f)*radiusmult;
+
+    _VectorCopy(*origin, &mut saber.origin);
+    _VectorCopy(*dir, &mut saber.axis[0]);
+    saber.reType = refEntityType_t::RT_SABER_GLOW;
+    saber.customShader = glow;
+    saber.shaderRGBA = [0xff; 4];
+    saber.renderfx = rfx;
+
+    trap::R_AddRefEntityToScene(ctx.engine, &saber);
+
+    // Do the hot core
+    _VectorMA(*origin, length, *dir, &mut saber.origin);
+    _VectorMA(*origin, -1.0, *dir, &mut saber.oldorigin);
+
+    saber.customShader = blade;
+    saber.reType = refEntityType_t::RT_LINE;
+    radiusStart = radius / 3.0;
+    saber.radius = ((radiusStart as f64 + ctx.world.bg_state.rng.crandom() * radiusRange as f64)
+        * radiusmult as f64) as f32;
+    //	saber.radius = (1.0 + crandom() * 0.2f)*radiusmult;
+
+    saber.shaderTexCoord[0] = 1.0;
+    saber.shaderTexCoord[1] = 1.0;
+    saber.shaderRGBA = [0xff; 4];
+
+    trap::R_AddRefEntityToScene(ctx.engine, &saber);
+}
+
+/// Raven `CG_AddRandomLightning` — jitters both ends of a lightning bolt before
+/// handing it to [`CG_AddLightningBeam`], so a held stream never draws the same
+/// arc twice.
+/// Source: `oracle/codemp/cgame/cg_players.c:6699-6740`
+pub fn CG_AddRandomLightning(ctx: &mut CgContext, start: &vec3_t, end: &vec3_t) {
+    let mut inOrg: vec3_t = [0.0; 3];
+    let mut outOrg: vec3_t = [0.0; 3];
+
+    _VectorCopy(*start, &mut inOrg);
+    _VectorCopy(*end, &mut outOrg);
+
+    if ctx.world.bg_state.rng.rand() & 1 != 0 {
+        outOrg[0] += ctx.world.bg_state.rng.Q_irand(0, 24) as f32;
+        inOrg[0] += ctx.world.bg_state.rng.Q_irand(0, 8) as f32;
+    } else {
+        outOrg[0] -= ctx.world.bg_state.rng.Q_irand(0, 24) as f32;
+        inOrg[0] -= ctx.world.bg_state.rng.Q_irand(0, 8) as f32;
+    }
+
+    if ctx.world.bg_state.rng.rand() & 1 != 0 {
+        outOrg[1] += ctx.world.bg_state.rng.Q_irand(0, 24) as f32;
+        inOrg[1] += ctx.world.bg_state.rng.Q_irand(0, 8) as f32;
+    } else {
+        outOrg[1] -= ctx.world.bg_state.rng.Q_irand(0, 24) as f32;
+        inOrg[1] -= ctx.world.bg_state.rng.Q_irand(0, 8) as f32;
+    }
+
+    if ctx.world.bg_state.rng.rand() & 1 != 0 {
+        outOrg[2] += ctx.world.bg_state.rng.Q_irand(0, 50) as f32;
+        inOrg[2] += ctx.world.bg_state.rng.Q_irand(0, 40) as f32;
+    } else {
+        outOrg[2] -= ctx.world.bg_state.rng.Q_irand(0, 64) as f32;
+        inOrg[2] -= ctx.world.bg_state.rng.Q_irand(0, 40) as f32;
+    }
+
+    CG_AddLightningBeam(ctx, &inOrg, &outOrg);
+}
+
+/// Raven `CG_VehicleEffects` — a ship's per-frame effect pass: the hyperspace
+/// star streak, the flyby whoosh, engine start, exhaust/trail plumes and the
+/// damage smoke off broken surfaces.
+///
+/// DEFERRED past the hyperspace block: everything below it reads
+/// `m_pVehicle->m_pVehicleInfo` (`soundFlyBy`/`soundFlyBy2`, `soundEngineStart`,
+/// `type`, `surfDestruction`, `iTrailFX`/`iExhaustFX`/`iTurboFX`/`iInjureFX`/
+/// `iDmgFX`) plus `m_iExhaustTag[]` and `m_iLastFXTime`, and DEC-46.2's
+/// `Option<VehicleId>` carries only the vehicle cent's entity number until the
+/// `Vehicle_t` referent pool lands ("ported code only tests presence" —
+/// `local/vehicle_id.rs`). `CG_CreateSurfaceDebris`/`CG_CreateSurfaceSmoke` and
+/// the traps those arms need all exist; only the vehicle data is missing.
+/// Source: `oracle/codemp/cgame/cg_players.c:7981-8305`
+pub fn CG_VehicleEffects(ctx: &mut CgContext, cent: &centity_t) {
+    if cent.currentState.eType != entityType_t::ET_NPC as c_int
+        || cent.currentState.NPC_class != class_t::CLASS_VEHICLE as c_int
+        || cent.m_pVehicle.is_none()
+    {
+        return;
+    }
+
+    if cent.currentState.clientNum == ctx.world.cg.predictedPlayerState.m_iVehicleNum //my vehicle
+        && (cent.currentState.eFlags2 & EF2_HYPERSPACE) != 0
+    //hyperspacing
+    {
+        //in hyperspace!
+        let hyperSpaceTime = ctx.world.cg.predictedVehicleState.hyperSpaceTime;
+        let time = ctx.world.cg.time;
+
+        if hyperSpaceTime != 0 && (time - hyperSpaceTime) < HYPERSPACE_TIME {
+            let lastEffect = ctx.world.players.cg_lastHyperSpaceEffectTime;
+            if lastEffect == 0 || (time - lastEffect) > HYPERSPACE_TIME + 500 {
+                //can't be from the last time we were in hyperspace, so play the effect!
+                trap::FX_PlayBoltedEffectID(
+                    ctx.engine,
+                    ctx.world.cgs.effects.mHyperspaceStars,
+                    &cent.lerpOrigin,
+                    cent.ghoul2,
+                    0,
+                    cent.currentState.number,
+                    0,
+                    0,
+                    true,
+                );
+                ctx.world.players.cg_lastHyperSpaceEffectTime = time;
+            }
+        }
+    }
+
+    // DEFERRED: Vehicle_t referent pool — see the fn doc. The FLYBY sound, the
+    // engine-start rev, and the whole `type != VH_ANIMAL` effect body (surface
+    // destruction, exhaust, wing trails, death flames, damage smoke) all hang off
+    // `pVehNPC->m_pVehicleInfo`, which `Option<VehicleId>` cannot reach yet.
 }

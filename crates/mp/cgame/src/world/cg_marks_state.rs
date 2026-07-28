@@ -162,6 +162,12 @@ pub struct CgMarksState {
     /// Source: `oracle/codemp/cgame/cg_marks.c:388`
     pub oldtime: f32,
 
+    /// Raven `static float roll` — the ever-growing roll `CG_AddParticles` adds
+    /// to the view angles before building `rforward`/`rright`/`rup`. Declared
+    /// down beside `CG_AddParticles` rather than up with the rest.
+    /// Source: `oracle/codemp/cgame/cg_marks.c:1074`
+    pub roll: f32,
+
     /// Raven `static qhandle_t shaderAnims[MAX_SHADER_ANIMS][MAX_SHADER_ANIM_FRAMES]`
     /// — the animated-shader frame table. Raven's registration loop in
     /// `CG_ClearParticles` is commented out, so this stays all-zero in the
@@ -194,6 +200,7 @@ impl Default for CgMarksState {
             rright: [0.0; 3],
             rup: [0.0; 3],
             oldtime: 0.0,
+            roll: 0.0,
             shaderAnims: [[0; MAX_SHADER_ANIM_FRAMES]; MAX_SHADER_ANIMS],
             numShaderAnims: 0,
         }

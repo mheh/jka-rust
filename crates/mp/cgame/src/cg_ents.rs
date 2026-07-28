@@ -6,25 +6,42 @@
 use core::ffi::c_int;
 
 use mp_bg::bg_misc::{BG_EvaluateTrajectory, BG_GiveMeVectorFromMatrix};
+use mp_bg::public::bg_itemlist::{bg_itemlist, bg_numItems};
+use mp_bg::public::entity_effects::EF2_HYPERSPACE;
+use mp_bg::public::entity_flags::{
+    EF_DEAD, EF_DROPPEDWEAPON, EF_ITEMPLACEHOLDER, EF_NODRAW, EF_RADAROBJECT, EF_SHADER_ANIM,
+};
 use mp_bg::public::entity_type::entityType_t;
 use mp_bg::public::gametype::{GT_CTF, GT_CTY};
-use mp_bg::public::item_type::IT_POWERUP;
-use mp_bg::public::powerup::{PW_FORCE_ENLIGHTENED_DARK, PW_FORCE_ENLIGHTENED_LIGHT};
+use mp_bg::public::holdable::{HI_BINOCULARS, HI_SEEKER, HI_SHIELD};
+use mp_bg::public::hyperspace::{HYPERSPACE_TELEPORT_FRAC, HYPERSPACE_TIME};
+use mp_bg::public::item_type::{IT_ARMOR, IT_HEALTH, IT_HOLDABLE, IT_POWERUP, IT_TEAM, IT_WEAPON};
+use mp_bg::public::pmtype::pmtype_t;
+use mp_bg::public::powerup::{
+    PW_BLUEFLAG, PW_FORCE_BOON, PW_FORCE_ENLIGHTENED_DARK, PW_FORCE_ENLIGHTENED_LIGHT, PW_REDFLAG,
+};
 use mp_bg::public::team::{TEAM_BLUE, TEAM_RED};
+use mp_bg::weapons::weapon_t::{
+    WP_BLASTER, WP_BOWCASTER, WP_DEMP2, WP_DET_PACK, WP_DISRUPTOR, WP_FLECHETTE, WP_REPEATER,
+    WP_ROCKET_LAUNCHER, WP_THERMAL, WP_TRIP_MINE,
+};
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
 use mp_qshared::shared::force_powers::{FORCE_DARKSIDE, FORCE_LIGHTSIDE};
 use mp_qshared::shared::q_math::{
-    _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vectoangles, AngleVectors,
-    AnglesToAxis, MatrixMultiply, VectorNormalize, VectorSet, PITCH, ROLL, YAW,
+    _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin, vectoangles,
+    AngleVectors, AnglesToAxis, AxisClear, AxisCopy, ByteToDir, CrossProduct, LerpAngle,
+    MatrixMultiply, PerpendicularVector, VectorClear, VectorLength, VectorNormalize, VectorSet,
+    PITCH, ROLL, YAW,
 };
 use mp_qshared::shared::surface_flags::SOLID_BMODEL;
 use mp_qshared::shared::{
     addpolyArgStruct_t, mdxaBone_t, orientation_t, qfalse, qhandle_t, qtrue, sfxHandle_t, vec3_t,
-    Eorientations, ENTITYNUM_MAX_NORMAL, MAX_CLIENTS_I32,
+    Eorientations, CHAN_ITEM, ENTITYNUM_MAX_NORMAL, MAX_CLIENTS_I32,
 };
 
+use crate::cg_main::CG_Error;
 use crate::local::centity_s::{centity_t, MAX_CG_LOOPSOUNDS};
 use crate::local::cg_loop_sound_s::cgLoopSound_t;
 use crate::trap;
@@ -59,6 +76,35 @@ const RF_DISINTEGRATE1: c_int = 0x20000;
 /// scaling at the ripping point.
 /// Source: `oracle/codemp/cgame/tr_types.h:48`
 const RF_DISINTEGRATE2: c_int = 0x40000;
+
+/// Raven `RF_MINLIGHT` — allways have some light (viewmodel, some items).
+/// Source: `oracle/codemp/cgame/tr_types.h:18`
+const RF_MINLIGHT: c_int = 0x00001;
+
+/// Raven `RF_NOSHADOW` — don't add stencil shadows.
+/// Source: `oracle/codemp/cgame/tr_types.h:26`
+const RF_NOSHADOW: c_int = 0x00040;
+
+/// Raven `RF_FORCE_ENT_ALPHA` — override shader alpha settings.
+/// Source: `oracle/codemp/cgame/tr_types.h:36`
+const RF_FORCE_ENT_ALPHA: c_int = 0x00400;
+
+/// Raven `RF_RGB_TINT` — override shader rgb settings.
+/// Source: `oracle/codemp/cgame/tr_types.h:37`
+const RF_RGB_TINT: c_int = 0x00800;
+
+/// Raven `RF_DISTORTION` — area distortion effect.
+/// Source: `oracle/codemp/cgame/tr_types.h:41`
+const RF_DISTORTION: c_int = 0x02000;
+
+/// Raven `RF_SETANIMINDEX` — use `backEnd.currentEntity->e.skinNum` for
+/// `R_BindAnimatedImage`.
+/// Source: `oracle/codemp/cgame/tr_types.h:50`
+const RF_SETANIMINDEX: c_int = 0x80000;
+
+/// Raven `ITEM_SCALEUP_TIME` — how long a just-respawned item fades in for.
+/// Source: `oracle/codemp/cgame/cg_local.h:37`
+const ITEM_SCALEUP_TIME: c_int = 1000;
 
 /// Raven `CG_PositionEntityOnTag` — modifies the entity's position and axis by
 /// the given tag location.
@@ -216,6 +262,20 @@ pub fn CG_S_AddLoopingSound(
     cent.loopingSound[slot].sfx = sfx;
 
     cent.numLoopingSounds += 1;
+}
+
+/// Raven `CG_S_AddRealLoopingSound`.
+///
+/// Raven: For now just redirect, might eventually do something different.
+/// Source: `oracle/codemp/cgame/cg_ents.c:169-172`
+pub fn CG_S_AddRealLoopingSound(
+    world: &mut CgWorld,
+    entityNum: usize,
+    origin: vec3_t,
+    velocity: vec3_t,
+    sfx: sfxHandle_t,
+) {
+    CG_S_AddLoopingSound(world, entityNum, origin, velocity, sfx);
 }
 
 /// Raven `CG_S_StopLoopingSound` — `sfx == -1` clears every looping sound on
@@ -575,6 +635,40 @@ pub fn CG_AddBracketedEnt(world: &mut CgWorld, centNum: usize) {
     world.cg.bracketedEntityCount += 1;
 }
 
+/// Raven `CG_Speaker` — speaker entities can automatically play sounds.
+/// Source: `oracle/codemp/cgame/cg_ents.c:1835-1854`
+pub fn CG_Speaker(ctx: &mut CgContext, centNum: usize) {
+    if ctx.world.entity(centNum).currentState.trickedentindex != 0 {
+        let number = ctx.world.entity(centNum).currentState.number as usize;
+        CG_S_StopLoopingSound(ctx.world, number, -1);
+    }
+
+    // FIXME: use something other than clientNum...
+    if ctx.world.entity(centNum).currentState.clientNum == 0 {
+        return; // not auto triggering
+    }
+
+    if ctx.world.cg.time < ctx.world.entity(centNum).miscTime {
+        return;
+    }
+
+    let number = ctx.world.entity(centNum).currentState.number;
+    let eventParm = ctx.world.entity(centNum).currentState.eventParm;
+    let sfx = ctx.world.cgs.gameSounds[eventParm as usize];
+    trap::S_StartSound(ctx.engine, None, number, CHAN_ITEM, sfx);
+
+    //	ent->s.frame = ent->wait * 10;
+    //	ent->s.clientNum = ent->random * 10;
+    let time = ctx.world.cg.time;
+    let frame = ctx.world.entity(centNum).currentState.frame;
+    let clientNum = ctx.world.entity(centNum).currentState.clientNum;
+    let crandom = ctx.world.bg_state.rng.crandom();
+    // `crandom()` is double-typed, so the whole tail is a double sum that
+    // truncates back into the int slot
+    ctx.world.entity_mut(centNum).miscTime =
+        ((time + frame * 100) as f64 + (clientNum * 100) as f64 * crandom) as c_int;
+}
+
 /// Raven `CG_GreyItem` — true when an enlightenment powerup belongs to the
 /// other force side, so the icon draws greyed out.
 /// Source: `oracle/codemp/cgame/cg_ents.c:1856-1878`
@@ -594,6 +688,604 @@ pub fn CG_GreyItem(r#type: c_int, tag: c_int, plSide: c_int) -> bool {
     }
 
     false
+}
+
+/// Raven `CG_Item` — draws a pickup: the holo cone over weapons/powerups, the
+/// simple-item sprite, or the real model with its bob, spin and respawn fade.
+///
+/// PORT-NOTE: Raven's `wi` local is only read inside the barrel block at the
+/// bottom, which is commented out ("rww - As far as I can see, this is
+/// useless"). The dropped-weapon arm's `wi = &cg_weapons[item->giTag]` is
+/// therefore a bare address-of with no read, so it is dropped rather than
+/// transcribed into an index that would trap for a dropped non-weapon whose
+/// `giTag` runs past `MAX_WEAPONS`.
+/// Source: `oracle/codemp/cgame/cg_ents.c:1885-2327`
+pub fn CG_Item(ctx: &mut CgContext, centNum: usize) {
+    let mut ent: refEntity_t;
+
+    let modelindex = ctx.world.entity(centNum).currentState.modelindex;
+    if modelindex >= bg_numItems {
+        CG_Error(ctx, &format!("Bad item index {modelindex} on entity"));
+        return;
+    }
+
+    // Ghoul2 Insert Start
+    let eFlags = ctx.world.entity(centNum).currentState.eFlags;
+    if (eFlags & EF_NODRAW) != 0 && (eFlags & EF_ITEMPLACEHOLDER) != 0 {
+        ctx.world.entity_mut(centNum).currentState.eFlags &= !EF_NODRAW;
+    }
+
+    if modelindex == 0 {
+        return;
+    }
+
+    let item = &bg_itemlist[modelindex as usize];
+
+    // Raven derefs `cg.snap` for the force side at three points below with no
+    // null check; with no snapshot the port reads side 0, which greys nothing
+    // (§F19).
+    let forceSide = ctx
+        .world
+        .cg
+        .snap_ref()
+        .map_or(0, |snap| snap.ps.fd.forceSide);
+
+    if (item.giType() == IT_WEAPON || item.giType() == IT_POWERUP)
+        && (ctx.world.entity(centNum).currentState.eFlags & EF_DROPPEDWEAPON) == 0
+        && ctx.world.cvars.cg_simpleItems.integer == 0
+    {
+        let mut uNorm: vec3_t = [0.0; 3];
+
+        VectorClear(&mut uNorm);
+
+        uNorm[2] = 1.0;
+
+        ent = refEntity_t::zeroed();
+
+        ent.customShader = 0;
+        _VectorCopy(ctx.world.entity(centNum).lerpOrigin, &mut ent.origin);
+        let angles = ctx.world.entity(centNum).currentState.angles;
+        _VectorCopy(angles, &mut ctx.world.entity_mut(centNum).lerpAngles);
+        let lerpAngles = ctx.world.entity(centNum).lerpAngles;
+        AnglesToAxis(lerpAngles, ent.axis.as_mut_ptr());
+        ent.hModel = ctx.world.cgs.media.itemHoloModel;
+
+        let doGrey = CG_GreyItem(item.giType(), item.giTag(), forceSide);
+
+        if doGrey {
+            ent.renderfx |= RF_RGB_TINT;
+
+            ent.shaderRGBA[0] = 150;
+            ent.shaderRGBA[1] = 150;
+            ent.shaderRGBA[2] = 150;
+        }
+
+        trap::R_AddRefEntityToScene(ctx.engine, &ent);
+
+        if !doGrey {
+            let itemCone = ctx.world.cgs.effects.itemCone;
+            let origin = ent.origin;
+            trap::FX_PlayEffectID(ctx.engine, itemCone, &origin, &uNorm, -1, -1);
+        }
+    }
+
+    // if set to invisible, skip
+    if (ctx.world.entity(centNum).currentState.eFlags & EF_NODRAW) != 0 {
+        return;
+    }
+    // Ghoul2 Insert End
+
+    if ctx.world.cvars.cg_simpleItems.integer != 0 && item.giType() != IT_TEAM {
+        ent = refEntity_t::zeroed();
+        ent.reType = refEntityType_t::RT_SPRITE;
+        _VectorCopy(ctx.world.entity(centNum).lerpOrigin, &mut ent.origin);
+        ent.radius = 14.0;
+        ent.customShader = ctx.world.cg_items[modelindex as usize].icon;
+        ent.shaderRGBA[0] = 255;
+        ent.shaderRGBA[1] = 255;
+        ent.shaderRGBA[2] = 255;
+
+        ent.origin[2] += 16.0;
+
+        if item.giType() != IT_POWERUP || item.giTag() != PW_FORCE_BOON {
+            ent.renderfx |= RF_FORCE_ENT_ALPHA;
+        }
+
+        if (ctx.world.entity(centNum).currentState.eFlags & EF_ITEMPLACEHOLDER) != 0 {
+            if item.giType() == IT_POWERUP && item.giTag() == PW_FORCE_BOON {
+                return;
+            }
+            ent.shaderRGBA[0] = 200;
+            ent.shaderRGBA[1] = 200;
+            ent.shaderRGBA[2] = 200;
+            // `sin` and the literals are doubles, so the pulse is a double that
+            // truncates into the byte slot
+            ent.shaderRGBA[3] =
+                (150.0 + (ctx.world.cg.time as f64 * 0.01).sin() * 30.0) as i32 as u8;
+        } else {
+            ent.shaderRGBA[3] = 255;
+        }
+
+        if CG_GreyItem(item.giType(), item.giTag(), forceSide) {
+            ent.shaderRGBA[0] = 100;
+            ent.shaderRGBA[1] = 100;
+            ent.shaderRGBA[2] = 100;
+
+            ent.shaderRGBA[3] = 200;
+
+            if item.giTag() == PW_FORCE_ENLIGHTENED_LIGHT {
+                ent.customShader =
+                    trap::R_RegisterShader(ctx.engine, "gfx/misc/mp_light_enlight_disable");
+            } else {
+                ent.customShader =
+                    trap::R_RegisterShader(ctx.engine, "gfx/misc/mp_dark_enlight_disable");
+            }
+        }
+        trap::R_AddRefEntityToScene(ctx.engine, &ent);
+        return;
+    }
+
+    if (item.giType() == IT_WEAPON || item.giType() == IT_POWERUP)
+        && (ctx.world.entity(centNum).currentState.eFlags & EF_DROPPEDWEAPON) == 0
+    {
+        ctx.world.entity_mut(centNum).lerpOrigin[2] += 16.0;
+    }
+
+    if ((ctx.world.entity(centNum).currentState.eFlags & EF_DROPPEDWEAPON) == 0
+        || item.giType() == IT_POWERUP)
+        && (item.giType() == IT_WEAPON || item.giType() == IT_POWERUP)
+    {
+        // items bob up and down continuously
+        let number = ctx.world.entity(centNum).currentState.number;
+        let scale = (0.005 + number as f64 * 0.00001) as f32;
+        // `(cg.time + 1000) * scale` stays single-precision, then widens for
+        // `cos`; the `4 +` sum is double and narrows on the `+=`
+        let time = ctx.world.cg.time;
+        let bob = 4.0 + ((((time + 1000) as f32) * scale) as f64).cos() * 4.0;
+        let z = ctx.world.entity(centNum).lerpOrigin[2];
+        ctx.world.entity_mut(centNum).lerpOrigin[2] = (z as f64 + bob) as f32;
+    } else {
+        if item.giType() == IT_HOLDABLE {
+            if item.giTag() == HI_SEEKER {
+                ctx.world.entity_mut(centNum).lerpOrigin[2] += 5.0;
+            }
+            if item.giTag() == HI_SHIELD {
+                ctx.world.entity_mut(centNum).lerpOrigin[2] += 2.0;
+            }
+            if item.giTag() == HI_BINOCULARS {
+                ctx.world.entity_mut(centNum).lerpOrigin[2] += 2.0;
+            }
+        }
+        if item.giType() == IT_HEALTH {
+            ctx.world.entity_mut(centNum).lerpOrigin[2] += 2.0;
+        }
+        if item.giType() == IT_ARMOR && item.quantity == 100 {
+            ctx.world.entity_mut(centNum).lerpOrigin[2] += 7.0;
+        }
+    }
+
+    ent = refEntity_t::zeroed();
+
+    if ((ctx.world.entity(centNum).currentState.eFlags & EF_DROPPEDWEAPON) == 0
+        || item.giType() == IT_POWERUP)
+        && (item.giType() == IT_WEAPON || item.giType() == IT_POWERUP)
+    {
+        //only weapons and powerups rotate now
+        // autorotate at one of two speeds
+        let autoAngles = ctx.world.cg.autoAngles;
+        _VectorCopy(autoAngles, &mut ctx.world.entity_mut(centNum).lerpAngles);
+        AxisCopy(ctx.world.cg.autoAxis.as_mut_ptr(), ent.axis.as_mut_ptr());
+    } else {
+        let angles = ctx.world.entity(centNum).currentState.angles;
+        _VectorCopy(angles, &mut ctx.world.entity_mut(centNum).lerpAngles);
+        let lerpAngles = ctx.world.entity(centNum).lerpAngles;
+        AnglesToAxis(lerpAngles, ent.axis.as_mut_ptr());
+    }
+
+    // the weapons have their origin where they attatch to player
+    // models, so we need to offset them or they will rotate
+    // eccentricly
+    if (ctx.world.entity(centNum).currentState.eFlags & EF_DROPPEDWEAPON) == 0 {
+        if item.giType() == IT_WEAPON {
+            let mid = ctx.world.cg_weapons[item.giTag() as usize].weaponMidpoint;
+            let axis = ent.axis;
+            let cent = ctx.world.entity_mut(centNum);
+            cent.lerpOrigin[0] -= mid[0] * axis[0][0] + mid[1] * axis[1][0] + mid[2] * axis[2][0];
+            cent.lerpOrigin[1] -= mid[0] * axis[0][1] + mid[1] * axis[1][1] + mid[2] * axis[2][1];
+            cent.lerpOrigin[2] -= mid[0] * axis[0][2] + mid[1] * axis[1][2] + mid[2] * axis[2][2];
+
+            cent.lerpOrigin[2] += 8.0; // an extra height boost
+        }
+    } else {
+        let zDrop = match item.giTag() {
+            WP_BLASTER => 12.0,
+            WP_DISRUPTOR => 13.0,
+            WP_BOWCASTER => 16.0,
+            WP_REPEATER => 12.0,
+            WP_DEMP2 => 10.0,
+            WP_FLECHETTE => 6.0,
+            WP_ROCKET_LAUNCHER => 11.0,
+            WP_THERMAL => 12.0,
+            WP_TRIP_MINE => 16.0,
+            WP_DET_PACK => 16.0,
+            _ => 8.0,
+        };
+        ctx.world.entity_mut(centNum).lerpOrigin[2] -= zDrop;
+    }
+
+    ent.hModel = ctx.world.cg_items[modelindex as usize].models[0];
+    // Ghoul2 Insert Start
+    ent.ghoul2 = ctx.world.cg_items[modelindex as usize].g2Models[0];
+    ent.radius = ctx.world.cg_items[modelindex as usize].radius[0];
+    _VectorCopy(ctx.world.entity(centNum).lerpAngles, &mut ent.angles);
+    // Ghoul2 Insert End
+    _VectorCopy(ctx.world.entity(centNum).lerpOrigin, &mut ent.origin);
+    _VectorCopy(ctx.world.entity(centNum).lerpOrigin, &mut ent.oldorigin);
+
+    ent.nonNormalizedAxes = qfalse;
+
+    // if just respawned, slowly scale up
+
+    let msec = ctx.world.cg.time - ctx.world.entity(centNum).miscTime;
+
+    if CG_GreyItem(item.giType(), item.giTag(), forceSide) {
+        ent.renderfx |= RF_RGB_TINT;
+
+        ent.shaderRGBA[0] = 150;
+        ent.shaderRGBA[1] = 150;
+        ent.shaderRGBA[2] = 150;
+
+        ent.renderfx |= RF_FORCE_ENT_ALPHA;
+
+        ent.shaderRGBA[3] = 200;
+
+        if item.giTag() == PW_FORCE_ENLIGHTENED_LIGHT {
+            ent.customShader =
+                trap::R_RegisterShader(ctx.engine, "gfx/misc/mp_light_enlight_disable");
+        } else {
+            ent.customShader =
+                trap::R_RegisterShader(ctx.engine, "gfx/misc/mp_dark_enlight_disable");
+        }
+
+        trap::R_AddRefEntityToScene(ctx.engine, &ent);
+        return;
+    }
+
+    let eFlags = ctx.world.entity(centNum).currentState.eFlags;
+    if (eFlags & EF_ITEMPLACEHOLDER) != 0 {
+        // item has been picked up
+        if (eFlags & EF_DEAD) != 0 {
+            // if item had been droped, don't show at all
+            return;
+        }
+
+        ent.renderfx |= RF_RGB_TINT;
+        ent.shaderRGBA[0] = 0;
+        ent.shaderRGBA[1] = 200;
+        ent.shaderRGBA[2] = 85;
+        ent.customShader = ctx.world.cgs.media.itemRespawningPlaceholder;
+    }
+
+    // increase the size of the weapons when they are presented as items
+    if item.giType() == IT_WEAPON {
+        let axis0 = ent.axis[0];
+        _VectorScale(axis0, 1.5, &mut ent.axis[0]);
+        let axis1 = ent.axis[1];
+        _VectorScale(axis1, 1.5, &mut ent.axis[1]);
+        let axis2 = ent.axis[2];
+        _VectorScale(axis2, 1.5, &mut ent.axis[2]);
+        ent.nonNormalizedAxes = qtrue;
+        //trap_S_AddLoopingSound( cent->currentState.number, cent->lerpOrigin, vec3_origin, cgs.media.weaponHoverSound );
+    }
+
+    if (eFlags & EF_DROPPEDWEAPON) == 0
+        && (item.giType() == IT_WEAPON || item.giType() == IT_POWERUP)
+    {
+        ent.renderfx |= RF_MINLIGHT;
+    }
+
+    if item.giType() != IT_TEAM
+        && msec >= 0
+        && msec < ITEM_SCALEUP_TIME
+        && (eFlags & EF_ITEMPLACEHOLDER) == 0
+        && (eFlags & EF_DROPPEDWEAPON) == 0
+    {
+        // if just respawned, fade in, but don't do this for flags.
+        let alpha = msec as f32 / ITEM_SCALEUP_TIME as f32;
+        let mut a = (alpha as f64 * 255.0) as c_int;
+        if a <= 0 {
+            a = 1;
+        }
+
+        ent.shaderRGBA[3] = a as u8;
+        if item.giType() != IT_POWERUP || item.giTag() != PW_FORCE_BOON {
+            //boon model uses a different blending mode for the sprite inside and doesn't look proper with this method
+            ent.renderfx |= RF_FORCE_ENT_ALPHA;
+        }
+        trap::R_AddRefEntityToScene(ctx.engine, &ent);
+
+        ent.renderfx &= !RF_FORCE_ENT_ALPHA;
+
+        // Now draw the static shader over it.
+        // Alpha in over half the time, out over half.
+
+        //alpha = sin(M_PI*alpha);
+        // PORT-NOTE: Raven recomputes `a = alpha*255`, flips it to `255 - a`
+        // and clamps it to 1..255 here, but both blocks that read it back into
+        // `shaderRGBA` are commented out - the recompute is dead, so it is
+        // recorded here instead of transcribed.
+
+        ent.customShader = ctx.world.cgs.media.itemRespawningRezOut;
+
+        ent.renderfx |= RF_RGB_TINT;
+        ent.shaderRGBA[0] = 0;
+        ent.shaderRGBA[1] = 200;
+        ent.shaderRGBA[2] = 85;
+
+        trap::R_AddRefEntityToScene(ctx.engine, &ent);
+    } else {
+        // add to refresh list  -- normal item
+        if item.giType() == IT_TEAM && (item.giTag() == PW_REDFLAG || item.giTag() == PW_BLUEFLAG) {
+            ent.modelScale[0] = 0.7;
+            ent.modelScale[1] = 0.7;
+            ent.modelScale[2] = 0.7;
+            ScaleModelAxis(&mut ent);
+        }
+        trap::R_AddRefEntityToScene(ctx.engine, &ent);
+    }
+
+    // accompanying rings / spheres for powerups
+    if ctx.world.cvars.cg_simpleItems.integer == 0 {
+        let mut spinAngles: vec3_t = [0.0; 3];
+
+        VectorClear(&mut spinAngles);
+
+        if item.giType() == IT_HEALTH || item.giType() == IT_POWERUP {
+            // Raven assigns `ent.hModel` inside the condition, so the second
+            // model handle lands on the refEntity either way
+            ent.hModel = ctx.world.cg_items[modelindex as usize].models[1];
+            if ent.hModel != 0 {
+                if item.giType() == IT_POWERUP {
+                    ent.origin[2] += 12.0;
+                    spinAngles[1] = ((ctx.world.cg.time & 1023) * 360) as f32 / -1024.0;
+                }
+                AnglesToAxis(spinAngles, ent.axis.as_mut_ptr());
+
+                trap::R_AddRefEntityToScene(ctx.engine, &ent);
+            }
+        }
+    }
+}
+
+/// Raven `CG_CreateDistortionTrailPart` — one segment of the merr-sonn trail's
+/// screen-distortion ribbon.
+/// Source: `oracle/codemp/cgame/cg_ents.c:2331-2393`
+pub fn CG_CreateDistortionTrailPart(ctx: &mut CgContext, centNum: usize, scale: f32, pos: vec3_t) {
+    let mut ang: vec3_t = [0.0; 3];
+
+    if ctx.world.cvars.cg_renderToTextureFX.integer == 0 {
+        return;
+    }
+    let mut ent = refEntity_t::zeroed();
+
+    _VectorCopy(pos, &mut ent.origin);
+
+    let vieworg = ctx.world.cg.refdef.vieworg;
+    _VectorSubtract(ent.origin, vieworg, &mut ent.axis[0]);
+    let vLen = VectorLength(ent.axis[0]);
+    if VectorNormalize(&mut ent.axis[0]) <= 0.1 {
+        // Entity is right on vieworg.  quit.
+        return;
+    }
+
+    _VectorCopy(ctx.world.entity(centNum).lerpAngles, &mut ang);
+    ang[PITCH] += 90.0;
+    AnglesToAxis(ang, ent.axis.as_mut_ptr());
+
+    //radius must be a power of 2, and is the actual captured texture size
+    if vLen < 512.0 {
+        ent.radius = 256.0;
+    } else if vLen < 1024.0 {
+        ent.radius = 128.0;
+    } else if vLen < 2048.0 {
+        ent.radius = 64.0;
+    } else {
+        ent.radius = 32.0;
+    }
+
+    ent.modelScale[0] = scale;
+    ent.modelScale[1] = scale;
+    ent.modelScale[2] = scale * 16.0;
+    ScaleModelAxis(&mut ent);
+
+    ent.hModel = trap::R_RegisterModel(ctx.engine, "models/weapons2/merr_sonn/trailmodel.md3");
+    ent.customShader = ctx.world.cgs.media.itemRespawningRezOut; //cgs.media.cloakedShader;//cgs.media.halfShieldShader;
+
+    // Raven's `#if 1` alpha arm is the live one; the `#else` bare
+    // `RF_DISTORTION` never compiles. The RGBA values are float literals in
+    // Raven, exact in the byte slots.
+    ent.renderfx = RF_DISTORTION | RF_FORCE_ENT_ALPHA;
+    ent.shaderRGBA[0] = 255;
+    ent.shaderRGBA[1] = 255;
+    ent.shaderRGBA[2] = 255;
+    ent.shaderRGBA[3] = 100;
+
+    trap::R_AddRefEntityToScene(ctx.engine, &ent);
+}
+
+/// Raven `CG_Mover` — the bmodel/model mover draw, plus the hyperspace brush's
+/// stuck-to-the-view special case.
+/// Source: `oracle/codemp/cgame/cg_ents.c:2824-2926`
+pub fn CG_Mover(ctx: &mut CgContext, centNum: usize) {
+    // create the render entity
+    let mut ent = refEntity_t::zeroed();
+
+    if (ctx.world.entity(centNum).currentState.eFlags2 & EF2_HYPERSPACE) != 0 {
+        //I'm the hyperspace brush
+        let mut drawMe = false;
+        let time = ctx.world.cg.time;
+        let hyperSpaceTime = ctx.world.cg.predictedVehicleState.hyperSpaceTime;
+        if ctx.world.cg.predictedPlayerState.m_iVehicleNum != 0
+            && hyperSpaceTime != 0
+            && (time - hyperSpaceTime) < HYPERSPACE_TIME
+            && (time - hyperSpaceTime) > 1000
+        {
+            let inIntermission = ctx.world.cg.snap_ref().map_or(false, |snap| {
+                snap.ps.pm_type == pmtype_t::PM_INTERMISSION as c_int
+            });
+            if inIntermission {
+                //in the intermission, stop drawing hyperspace ent
+            } else if (ctx.world.cg.predictedVehicleState.eFlags2 & EF2_HYPERSPACE) != 0 {
+                //actually hyperspacing now
+                let timeFrac =
+                    (time - hyperSpaceTime - 1000) as f32 / (HYPERSPACE_TIME - 1000) as f32;
+                if timeFrac < (HYPERSPACE_TELEPORT_FRAC + 0.1) {
+                    //still in hyperspace or just popped out
+                    let alpha = if timeFrac < 0.5 { timeFrac / 0.5 } else { 1.0 };
+                    drawMe = true;
+                    let vieworg = ctx.world.cg.refdef.vieworg;
+                    let viewaxis0 = ctx.world.cg.refdef.viewaxis[0];
+                    _VectorMA(
+                        vieworg,
+                        1000.0 + ((1.0 - timeFrac) * 1000.0),
+                        viewaxis0,
+                        &mut ctx.world.entity_mut(centNum).lerpOrigin,
+                    );
+                    let viewangles = ctx.world.cg.refdef.viewangles;
+                    VectorSet(
+                        &mut ctx.world.entity_mut(centNum).lerpAngles,
+                        viewangles[PITCH],
+                        viewangles[YAW] - 90.0,
+                        0.0,
+                    ); //cos( ( cg.time + 1000 ) *  scale ) * 4 );
+                    ent.shaderRGBA[0] = 255;
+                    ent.shaderRGBA[1] = 255;
+                    ent.shaderRGBA[2] = 255;
+                    ent.shaderRGBA[3] = (alpha * 255.0) as i32 as u8;
+                }
+            }
+        }
+        if !drawMe {
+            //else, never draw
+            return;
+        }
+    }
+
+    if (ctx.world.entity(centNum).currentState.eFlags & EF_RADAROBJECT) != 0 {
+        CG_AddRadarEnt(ctx.world, centNum);
+    }
+
+    _VectorCopy(ctx.world.entity(centNum).lerpOrigin, &mut ent.origin);
+    _VectorCopy(ctx.world.entity(centNum).lerpOrigin, &mut ent.oldorigin);
+    AnglesToAxis(ctx.world.entity(centNum).lerpAngles, ent.axis.as_mut_ptr());
+
+    ent.renderfx = RF_NOSHADOW;
+    // Ghoul2 Insert Start
+    CG_SetGhoul2Info(&mut ent, ctx.world.entity(centNum));
+    // Ghoul2 Insert End
+    // flicker between two skins (FIXME?)
+    ent.skinNum = (ctx.world.cg.time >> 6) & 1;
+
+    // get the model, either as a bmodel or a modelindex
+    let s1_solid = ctx.world.entity(centNum).currentState.solid;
+    let s1_modelindex = ctx.world.entity(centNum).currentState.modelindex;
+    if s1_solid == SOLID_BMODEL {
+        ent.hModel = ctx.world.cgs.inlineDrawModel[s1_modelindex as usize];
+    } else {
+        ent.hModel = ctx.world.cgs.gameModels[s1_modelindex as usize];
+    }
+
+    if (ctx.world.entity(centNum).currentState.eFlags & EF_SHADER_ANIM) != 0 {
+        ent.renderfx |= RF_SETANIMINDEX;
+        ent.skinNum = ctx.world.entity(centNum).currentState.frame;
+        //ent.shaderTime = cg.time*0.001f - s1->frame/s1->time;//NOTE: s1->time is number of frames
+    }
+
+    // add to refresh list
+    trap::R_AddRefEntityToScene(ctx.engine, &ent);
+
+    // add the secondary model
+    let s1_modelindex2 = ctx.world.entity(centNum).currentState.modelindex2;
+    if s1_modelindex2 != 0 {
+        ent.skinNum = 0;
+        ent.hModel = ctx.world.cgs.gameModels[s1_modelindex2 as usize];
+        let iModelScale = ctx.world.entity(centNum).currentState.iModelScale;
+        if iModelScale != 0 {
+            //custom model2 scale
+            let modelScale = if ctx.world.entity(centNum).currentState.legsFlip != qfalse {
+                //scalar
+                iModelScale as f32
+            } else {
+                //percentage
+                iModelScale as f32 / 100.0
+            };
+            ent.modelScale[0] = modelScale;
+            ent.modelScale[1] = modelScale;
+            ent.modelScale[2] = modelScale;
+            ScaleModelAxis(&mut ent);
+        }
+        trap::R_AddRefEntityToScene(ctx.engine, &ent);
+    }
+}
+
+/// Raven `CG_Beam`.
+///
+/// Raven: Also called as an event.
+/// Source: `oracle/codemp/cgame/cg_ents.c:2935-2959`
+pub fn CG_Beam(ctx: &mut CgContext, centNum: usize) {
+    // create the render entity
+    let mut ent = refEntity_t::zeroed();
+
+    let cent = ctx.world.entity(centNum);
+    let s1 = &cent.currentState;
+
+    _VectorCopy(s1.pos.trBase, &mut ent.origin);
+    _VectorCopy(s1.origin2, &mut ent.oldorigin);
+    AxisClear(ent.axis.as_mut_ptr());
+    ent.reType = refEntityType_t::RT_BEAM;
+
+    ent.renderfx = RF_NOSHADOW;
+    // Ghoul2 Insert Start
+    CG_SetGhoul2Info(&mut ent, cent);
+
+    // Ghoul2 Insert End
+    // add to refresh list
+    trap::R_AddRefEntityToScene(ctx.engine, &ent);
+}
+
+/// Raven `CG_Portal` — the portal-surface marker entity the renderer reads its
+/// camera from.
+/// Source: `oracle/codemp/cgame/cg_ents.c:2967-2998`
+pub fn CG_Portal(ctx: &mut CgContext, centNum: usize) {
+    // create the render entity
+    let mut ent = refEntity_t::zeroed();
+
+    let cent = ctx.world.entity(centNum);
+    let s1 = &cent.currentState;
+
+    _VectorCopy(cent.lerpOrigin, &mut ent.origin);
+    _VectorCopy(s1.origin2, &mut ent.oldorigin);
+    ByteToDir(s1.eventParm, &mut ent.axis[0]);
+    let axis0 = ent.axis[0];
+    PerpendicularVector(&mut ent.axis[1], axis0);
+
+    // negating this tends to get the directions like they want
+    // we really should have a camera roll value
+    let axis1 = ent.axis[1];
+    _VectorSubtract(vec3_origin, axis1, &mut ent.axis[1]);
+
+    let axis0 = ent.axis[0];
+    let axis1 = ent.axis[1];
+    CrossProduct(axis0, axis1, &mut ent.axis[2]);
+    ent.reType = refEntityType_t::RT_PORTALSURFACE;
+    ent.oldframe = s1.powerups;
+    ent.frame = s1.frame; // rotation speed
+    ent.skinNum = (s1.clientNum as f64 / 256.0 * 360.0) as c_int; // roll offset
+                                                                  // Ghoul2 Insert Start
+    CG_SetGhoul2Info(&mut ent, cent);
+    // Ghoul2 Insert End
+    // add to refresh list
+    trap::R_AddRefEntityToScene(ctx.engine, &ent);
 }
 
 /// Raven `CG_AdjustPositionForMover` — moves the given position from one time
@@ -637,6 +1329,52 @@ pub fn CG_AdjustPositionForMover(
     _VectorAdd(r#in, deltaOrigin, out);
 
     // FIXME: origin change when on a rotating object
+}
+
+/// Raven `CG_InterpolateEntityPosition` — lerps an entity between the two
+/// snapshots instead of extrapolating its trajectory.
+/// Source: `oracle/codemp/cgame/cg_ents.c:3043-3070`
+pub fn CG_InterpolateEntityPosition(ctx: &mut CgContext, centNum: usize) {
+    let mut current: vec3_t = [0.0; 3];
+    let mut next: vec3_t = [0.0; 3];
+
+    // it would be an internal error to find an entity that interpolates without
+    // a snapshot ahead of the current one
+    let nextServerTime = ctx.world.cg.next_snap_ref().map(|snap| snap.serverTime);
+    let Some(nextServerTime) = nextServerTime else {
+        CG_Error(ctx, "CG_InterpoateEntityPosition: cg.nextSnap == NULL");
+        return;
+    };
+
+    // Raven derefs `cg.snap` right below with no null check; with no current
+    // snapshot the port leaves the entity's lerped position alone (§F19).
+    let Some(serverTime) = ctx.world.cg.snap_ref().map(|snap| snap.serverTime) else {
+        return;
+    };
+
+    let f = ctx.world.cg.frameInterpolation;
+
+    // this will linearize a sine or parabolic curve, but it is important
+    // to not extrapolate player positions if more recent data is available
+    let pos = ctx.world.entity(centNum).currentState.pos;
+    let nextPos = ctx.world.entity(centNum).nextState.pos;
+    let apos = ctx.world.entity(centNum).currentState.apos;
+    let nextApos = ctx.world.entity(centNum).nextState.apos;
+
+    BG_EvaluateTrajectory(&pos, serverTime, &mut current);
+    BG_EvaluateTrajectory(&nextPos, nextServerTime, &mut next);
+
+    let cent = ctx.world.entity_mut(centNum);
+    cent.lerpOrigin[0] = current[0] + f * (next[0] - current[0]);
+    cent.lerpOrigin[1] = current[1] + f * (next[1] - current[1]);
+    cent.lerpOrigin[2] = current[2] + f * (next[2] - current[2]);
+
+    BG_EvaluateTrajectory(&apos, serverTime, &mut current);
+    BG_EvaluateTrajectory(&nextApos, nextServerTime, &mut next);
+
+    cent.lerpAngles[0] = LerpAngle(current[0], next[0], f);
+    cent.lerpAngles[1] = LerpAngle(current[1], next[1], f);
+    cent.lerpAngles[2] = LerpAngle(current[2], next[2], f);
 }
 
 /// Raven `CG_TeamBase` — draws the CTF flag-base model under a team entity.

@@ -3,8 +3,10 @@
 
 #![allow(non_snake_case)]
 
-use core::ffi::c_void;
+use core::ffi::{c_int, c_void};
 use core::ptr::null_mut;
+
+use mp_qshared::shared::MAX_GENTITIES;
 
 /// `cg_players.c`'s mutable file-scope globals, grouped by owning `.c` file
 /// (§B3: file-scope globals become owned state, they never become Rust
@@ -30,6 +32,21 @@ pub struct CgPlayersState {
     /// (DEC-46.2).
     /// Source: `oracle/codemp/cgame/cg_players.c:7887`
     pub cg_g2JetpackInstance: *mut c_void,
+
+    /// Raven `static int lastFlyBySound[MAX_GENTITIES]` — per-vehicle debounce
+    /// on the flyby whoosh, stamped with `cg.time`.
+    ///
+    /// Its only reader is `CG_VehicleEffects`' flyby block, which is deferred on
+    /// the `Vehicle_t` referent pool (the sound handles live on
+    /// `m_pVehicle->m_pVehicleInfo`); the state lands now so the block only has
+    /// to be filled in when the pool arrives.
+    /// Source: `oracle/codemp/cgame/cg_players.c:7978`
+    pub lastFlyBySound: [c_int; MAX_GENTITIES],
+
+    /// Raven `int cg_lastHyperSpaceEffectTime` — when we last threw the
+    /// hyperspace-stars effect, so a second jump doesn't replay it.
+    /// Source: `oracle/codemp/cgame/cg_players.c:7980`
+    pub cg_lastHyperSpaceEffectTime: c_int,
 }
 
 impl Default for CgPlayersState {
@@ -39,6 +56,8 @@ impl Default for CgPlayersState {
         CgPlayersState {
             cgQueueLoad: false,
             cg_g2JetpackInstance: null_mut(),
+            lastFlyBySound: [0; MAX_GENTITIES],
+            cg_lastHyperSpaceEffectTime: 0,
         }
     }
 }

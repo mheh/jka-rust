@@ -6,24 +6,39 @@
 use core::ffi::c_int;
 
 use mp_bg::public::gametype::{
-    GT_CTF, GT_CTY, GT_FFA, GT_HOLOCRON, GT_JEDIMASTER, GT_SIEGE, GT_TEAM,
+    GT_CTF, GT_CTY, GT_DUEL, GT_FFA, GT_HOLOCRON, GT_JEDIMASTER, GT_POWERDUEL, GT_SIEGE,
+    GT_SINGLE_PLAYER, GT_TEAM,
 };
-use mp_bg::public::pers_enum::persEnum_t::PERS_TEAM;
+use mp_bg::public::pers_enum::persEnum_t::{PERS_RANK, PERS_SCORE, PERS_TEAM};
 use mp_bg::public::pmtype::pmtype_t;
-use mp_bg::public::team::{TEAM_BLUE, TEAM_RED};
+use mp_bg::public::powerup::{PW_BLUEFLAG, PW_NEUTRALFLAG, PW_REDFLAG};
+use mp_bg::public::stat_index::statIndex_t;
+use mp_bg::public::team::{TEAM_BLUE, TEAM_RED, TEAM_SPECTATOR};
 use mp_bg::public::teamtask::teamtask_t;
+use mp_bg::weapons::weapon_data::weaponData;
 
-use mp_qshared::shared::{qfalse, qhandle_t, vec4_t, FLAG_TAKEN};
+use mp_qshared::shared::{qfalse, qhandle_t, vec4_t, FLAG_TAKEN, FLAG_TAKEN_BLUE, FLAG_TAKEN_RED};
 
 use mp_uishared::shared::display_state::DisplayState;
 use mp_uishared::shared::menu_system::MenuSystem;
+use mp_uishared::shared::menudef::{
+    CG_BLUE_SCORE, CG_PLAYER_AMMO_VALUE, CG_PLAYER_ARMOR_VALUE, CG_PLAYER_FORCE_VALUE,
+    CG_PLAYER_HEALTH, CG_PLAYER_SCORE, CG_RED_SCORE, CG_SELECTEDPLAYER_ARMOR,
+    CG_SELECTEDPLAYER_HEALTH, CG_SHOW_ANYNONTEAMGAME, CG_SHOW_ANYTEAMGAME,
+    CG_SHOW_BLUE_TEAM_HAS_REDFLAG, CG_SHOW_CTF, CG_SHOW_DURINGINCOMINGVOICE,
+    CG_SHOW_HEALTHCRITICAL, CG_SHOW_HEALTHOK, CG_SHOW_IF_PLAYER_HAS_FLAG, CG_SHOW_NOTEAMINFO,
+    CG_SHOW_OTHERTEAMHASFLAG, CG_SHOW_RED_TEAM_HAS_BLUEFLAG, CG_SHOW_SINGLEPLAYER,
+    CG_SHOW_TEAMINFO, CG_SHOW_TOURNAMENT, CG_SHOW_YOURTEAMHASENEMYFLAG,
+};
 use mp_uishared::ui_shared::{
     Display_CursorType, Display_MouseMove, Menus_CloseByName, Menus_OpenByName, CURSOR_ARROW,
     CURSOR_SIZER,
 };
 
-use native_string::{string_to_latin1, Q_stricmpBytes};
+use native_string::{latin1_to_string, string_to_latin1, Q_stricmpBytes};
 
+use crate::cg_event::CG_PlaceString;
+use crate::cg_main::CG_GetStringEdString;
 use crate::trap;
 use crate::world::cg_context::CgContext;
 use crate::world::cg_world::CgWorld;
@@ -32,6 +47,17 @@ use crate::world::cg_world::CgWorld;
 ///
 /// Source: `oracle/codemp/cgame/cg_newDraw.c:324`
 pub const PIC_WIDTH: c_int = 12;
+
+/// Raven's anonymous `enum { CGAME_EVENT_NONE, CGAME_EVENT_TEAMMENU,
+/// CGAME_EVENT_SCOREBOARD, CGAME_EVENT_EDITHUD }` - no typedef name, so these
+/// land as plain `c_int` constants; only `CG_EventHandling` in this file
+/// consumes them.
+///
+/// Source: `oracle/codemp/cgame/cg_public.h:37-42`
+pub const CGAME_EVENT_NONE: c_int = 0;
+pub const CGAME_EVENT_TEAMMENU: c_int = 1;
+pub const CGAME_EVENT_SCOREBOARD: c_int = 2;
+pub const CGAME_EVENT_EDITHUD: c_int = 3;
 
 /// Raven `CG_GetSelectedPlayer` — the scoreboard-selected player index, reset
 /// to 0 whenever it falls outside the current team roster.
@@ -317,4 +343,236 @@ pub fn CG_GetTeamColor(world: &CgWorld) -> vec4_t {
         color[3] = 0.25;
     }
     color
+}
+
+/// Raven `CG_GetValue` — the menu-framework owner-draw numeric-value
+/// dispatch backing player/team stat, ammo, score, and force meters; `-1.0`
+/// on an unrecognized `ownerDraw` (and on the ammo arm's "no weapon" branch,
+/// which Raven leaves without a `return`).
+///
+/// Source: `oracle/codemp/cgame/cg_newDraw.c:46-91`
+pub fn CG_GetValue(world: &mut CgWorld, ownerDraw: c_int) -> f32 {
+    // §F19: Raven derefs `cg.snap->ps.clientNum` unconditionally before the
+    // switch ever runs, so every arm - even the ones that never touch `ps` -
+    // crashes alike with no snapshot. The port takes this fn's own default
+    // return uniformly to match that crash-everywhere shape.
+    let Some(snap) = world.cg.snap_ref() else {
+        return -1.0;
+    };
+    let ps = snap.ps;
+    let clientNum = ps.clientNum as usize;
+
+    match ownerDraw {
+        v if v == CG_SELECTEDPLAYER_ARMOR => {
+            let sel = CG_GetSelectedPlayer(world) as usize;
+            let idx = world.draw.sortedTeamPlayers[sel] as usize;
+            world.cgs.clientinfo[idx].armor as f32
+        }
+        v if v == CG_SELECTEDPLAYER_HEALTH => {
+            let sel = CG_GetSelectedPlayer(world) as usize;
+            let idx = world.draw.sortedTeamPlayers[sel] as usize;
+            world.cgs.clientinfo[idx].health as f32
+        }
+        v if v == CG_PLAYER_ARMOR_VALUE => ps.stats[statIndex_t::STAT_ARMOR as usize] as f32,
+        v if v == CG_PLAYER_AMMO_VALUE => {
+            let weapon = world.entities[clientNum].currentState.weapon;
+            if weapon != 0 {
+                let ammoIndex = weaponData[weapon as usize].ammoIndex as usize;
+                ps.ammo[ammoIndex] as f32
+            } else {
+                -1.0
+            }
+        }
+        v if v == CG_PLAYER_SCORE => ps.persistant[PERS_SCORE as usize] as f32,
+        v if v == CG_PLAYER_HEALTH => ps.stats[statIndex_t::STAT_HEALTH as usize] as f32,
+        v if v == CG_RED_SCORE => world.cgs.scores1 as f32,
+        v if v == CG_BLUE_SCORE => world.cgs.scores2 as f32,
+        v if v == CG_PLAYER_FORCE_VALUE => ps.fd.forcePower as f32,
+        _ => -1.0,
+    }
+}
+
+/// Raven `CG_OwnerDrawVisible` — the menu-framework's show/hide test for a
+/// `CG_SHOW_*` flag combination.
+///
+/// Source: `oracle/codemp/cgame/cg_newDraw.c:123-201`
+pub fn CG_OwnerDrawVisible(world: &CgWorld, flags: c_int) -> bool {
+    if flags & CG_SHOW_TEAMINFO != 0 {
+        return world.cvars.cg_currentSelectedPlayer.integer == world.draw.numSortedTeamPlayers;
+    }
+
+    if flags & CG_SHOW_NOTEAMINFO != 0 {
+        return world.cvars.cg_currentSelectedPlayer.integer != world.draw.numSortedTeamPlayers;
+    }
+
+    if flags & CG_SHOW_OTHERTEAMHASFLAG != 0 {
+        return CG_OtherTeamHasFlag(world);
+    }
+
+    if flags & CG_SHOW_YOURTEAMHASENEMYFLAG != 0 {
+        return CG_YourTeamHasFlag(world);
+    }
+
+    if flags & (CG_SHOW_BLUE_TEAM_HAS_REDFLAG | CG_SHOW_RED_TEAM_HAS_BLUEFLAG) != 0 {
+        if flags & CG_SHOW_BLUE_TEAM_HAS_REDFLAG != 0
+            && (world.cgs.redflag == FLAG_TAKEN || world.cgs.flagStatus == FLAG_TAKEN_RED)
+        {
+            return true;
+        } else if flags & CG_SHOW_RED_TEAM_HAS_BLUEFLAG != 0
+            && (world.cgs.blueflag == FLAG_TAKEN || world.cgs.flagStatus == FLAG_TAKEN_BLUE)
+        {
+            return true;
+        }
+        return false;
+    }
+
+    if flags & CG_SHOW_ANYTEAMGAME != 0 && world.cgs.gametype >= GT_TEAM {
+        return true;
+    }
+
+    if flags & CG_SHOW_ANYNONTEAMGAME != 0 && world.cgs.gametype < GT_TEAM {
+        return true;
+    }
+
+    if flags & CG_SHOW_CTF != 0 && (world.cgs.gametype == GT_CTF || world.cgs.gametype == GT_CTY) {
+        return true;
+    }
+
+    // §F19: Raven derefs `cg.snap` unguarded on these two health arms - with
+    // no snapshot the port falls through, same as an out-of-range health
+    // reading would.
+    if flags & CG_SHOW_HEALTHCRITICAL != 0 {
+        if let Some(snap) = world.cg.snap_ref() {
+            if snap.ps.stats[statIndex_t::STAT_HEALTH as usize] < 25 {
+                return true;
+            }
+        }
+    }
+
+    if flags & CG_SHOW_HEALTHOK != 0 {
+        if let Some(snap) = world.cg.snap_ref() {
+            if snap.ps.stats[statIndex_t::STAT_HEALTH as usize] >= 25 {
+                return true;
+            }
+        }
+    }
+
+    if flags & CG_SHOW_SINGLEPLAYER != 0 && world.cgs.gametype == GT_SINGLE_PLAYER {
+        return true;
+    }
+
+    if flags & CG_SHOW_TOURNAMENT != 0
+        && (world.cgs.gametype == GT_DUEL || world.cgs.gametype == GT_POWERDUEL)
+    {
+        return true;
+    }
+
+    // CG_SHOW_DURINGINCOMINGVOICE: Raven's arm has an empty body - carried as
+    // a no-op, matching the C.
+    if flags & CG_SHOW_DURINGINCOMINGVOICE != 0 {}
+
+    if flags & CG_SHOW_IF_PLAYER_HAS_FLAG != 0 {
+        if let Some(snap) = world.cg.snap_ref() {
+            if snap.ps.powerups[PW_REDFLAG as usize] != 0
+                || snap.ps.powerups[PW_BLUEFLAG as usize] != 0
+                || snap.ps.powerups[PW_NEUTRALFLAG as usize] != 0
+            {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+/// Raven `CG_GetKillerText` — the "killed by \<name\>" banner text; empty
+/// once no kill has happened yet.
+///
+/// Raven's function-local `static const char *s` is stateful across calls:
+/// when `cg.killerName` is empty (it IS cleared, `cg_draw.c:6762` /
+/// `cg_scoreboard.c:375`) Raven returns the PREVIOUS call's pointer — which by
+/// then aims at `va()`'s rotating scratch buffer, i.e. stale memory. §F19: the
+/// port answers empty on that path instead of replaying garbage.
+///
+/// Source: `oracle/codemp/cgame/cg_newDraw.c:204-210`
+pub fn CG_GetKillerText(ctx: &mut CgContext) -> String {
+    if ctx.world.cg.killerName[0] != 0 {
+        let killer: Vec<u8> = ctx
+            .world
+            .cg
+            .killerName
+            .iter()
+            .take_while(|&&c| c != 0)
+            .map(|&c| c as u8)
+            .collect();
+        let killerName = latin1_to_string(&killer);
+        let killedBy = CG_GetStringEdString(ctx, "MP_INGAME", "KILLEDBY");
+        return format!("{killedBy} {killerName}");
+    }
+    String::new()
+}
+
+/// Raven `CG_GetGameStatusText` — the scoreboard-header banner: place/score
+/// while free-for-all, blank in power duel, or the team lead/tie line.
+///
+/// Raven cached this behind a function-local `static const char *s`; the
+/// port returns an owned `String` each call, same rationale as
+/// `CG_GetKillerText`.
+///
+/// Source: `oracle/codemp/cgame/cg_newDraw.c:213-240`
+pub fn CG_GetGameStatusText(ctx: &mut CgContext) -> String {
+    if ctx.world.cgs.gametype == GT_POWERDUEL {
+        return String::new();
+    }
+
+    if ctx.world.cgs.gametype < GT_TEAM {
+        // §F19: Raven derefs `cg.snap` unguarded here too - with no snapshot
+        // the port answers empty, matching the fn's own untouched-`s`
+        // default.
+        let Some(snap) = ctx.world.cg.snap_ref() else {
+            return String::new();
+        };
+        if snap.ps.persistant[PERS_TEAM as usize] == TEAM_SPECTATOR {
+            return String::new();
+        }
+        let rank = snap.ps.persistant[PERS_RANK as usize] + 1;
+        let score = snap.ps.persistant[PERS_SCORE as usize];
+
+        let sPlaceWith = trap::SP_GetStringTextString(ctx.engine, "MP_INGAME_PLACE_WITH", 256);
+        let place = CG_PlaceString(ctx, rank);
+        return format!("{place} {sPlaceWith} {score}");
+    }
+
+    let redScore = ctx.world.cg.teamScores[0];
+    let blueScore = ctx.world.cg.teamScores[1];
+    if redScore == blueScore {
+        let tiedAt = CG_GetStringEdString(ctx, "MP_INGAME", "TIEDAT");
+        format!("{tiedAt} {redScore}")
+    } else if redScore >= blueScore {
+        let redLeads = CG_GetStringEdString(ctx, "MP_INGAME", "RED_LEADS");
+        format!("{redLeads}, {redScore} / {blueScore}")
+    } else {
+        let blueLeads = CG_GetStringEdString(ctx, "MP_INGAME", "BLUE_LEADS");
+        format!("{blueLeads}, {blueScore} / {redScore}")
+    }
+}
+
+/// Raven `CG_EventHandling` — switches the active in-menu event mode; the
+/// team-menu arm's `CG_ShowTeamMenu` call is commented out in Raven and the
+/// scoreboard arm has no body, so both land as no-ops.
+///
+/// Source: `oracle/codemp/cgame/cg_newDraw.c:816-825`
+pub fn CG_EventHandling(
+    ctx: &mut CgContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    eventType: c_int,
+) {
+    ctx.world.cgs.eventHandling = eventType;
+    if eventType == CGAME_EVENT_NONE {
+        CG_HideTeamMenu(ctx, menus, ds);
+    } else if eventType == CGAME_EVENT_TEAMMENU {
+        // CG_ShowTeamMenu(); - Raven left this call commented out.
+    } else if eventType == CGAME_EVENT_SCOREBOARD {
+    }
 }

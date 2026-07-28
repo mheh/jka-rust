@@ -17,13 +17,13 @@
 #[derive(Debug, Clone, Default)]
 pub struct CgEffectsState {
     /// Raven `static float offX[20][20]` — `CG_InitGlass`'s random
-    /// crack-offset table, built once and read by the (not-yet-ported) glass
+    /// crack-offset table, built once and read by `CG_DoGlass`'s glass
     /// tesselator.
     /// Source: `oracle/codemp/cgame/cg_effects.c:254-255`
     pub offX: [[f32; 20]; 20],
 
     /// Raven `static float offZ[20][20]` — `CG_InitGlass`'s random
-    /// crack-offset table, built once and read by the (not-yet-ported) glass
+    /// crack-offset table, built once and read by `CG_DoGlass`'s glass
     /// tesselator.
     /// Source: `oracle/codemp/cgame/cg_effects.c:254-255`
     pub offZ: [[f32; 20]; 20],

@@ -65,6 +65,18 @@ pub struct CgMainState {
     /// Source: `oracle/codemp/cgame/cg_main.c:3310`
     pub cg_strPoolSize: c_int,
 
+    /// Raven `static int cg_numSpawnVarChars` — how many bytes of the
+    /// `MAX_SPAWN_VARS_CHARS` spawn-var budget `CG_AddSpawnVarToken` has handed
+    /// out this map load.
+    ///
+    /// Raven's `cg_spawnVarChars[]` backing buffer itself is gone: it only
+    /// existed to give a parsed token stable storage, and the port's tokens are
+    /// owned `String`s (the same fold `G_AddSpawnVarToken` got in
+    /// `crates/mp/game/src/g_spawn.rs:828-831`). The counter stays because the
+    /// budget overrun is an observable `CG_Error`.
+    /// Source: `oracle/codemp/cgame/cg_main.c:3412`
+    pub cg_numSpawnVarChars: c_int,
+
     /// Raven `qboolean cg_noFogOutsidePortal` — the map's sky portal asked for
     /// all global fog to live inside it (`cg_view.c` reads it).
     /// Source: `oracle/codemp/cgame/cg_main.c:3417`
@@ -95,6 +107,7 @@ impl Default for CgMainState {
             forceModelModificationCount: -1,
             cg_permanents: Vec::new(),
             cg_strPoolSize: 0,
+            cg_numSpawnVarChars: 0,
             cg_noFogOutsidePortal: false,
             cg_skyOri: false,
             cg_skyOriPos: [0.0; 3],
