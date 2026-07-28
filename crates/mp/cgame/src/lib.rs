@@ -22,6 +22,7 @@
 //! The cgame root types [`local`] and [`lights`] landed under C1/C2; `CgWorld`
 //! itself arrives with C4/C5.
 
+pub mod bg_channel;
 pub mod lights;
 pub mod local;
 pub mod trap;
