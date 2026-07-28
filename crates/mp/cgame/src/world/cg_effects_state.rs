@@ -5,7 +5,12 @@
 
 use core::ffi::c_int;
 
-use mp_qshared::shared::vec3_t;
+use mp_qshared::shared::{qhandle_t, vec3_t};
+
+use crate::cg_effects::{
+    NUM_DEBRIS_MODELS_CHUNKS, NUM_DEBRIS_MODELS_GLASS, NUM_DEBRIS_MODELS_ROCKS,
+    NUM_DEBRIS_MODELS_WOOD,
+};
 
 /// `cg_effects.c`'s mutable file-scope globals, grouped by owning `.c` file
 /// (§B3: file-scope globals become owned state, they never become Rust
@@ -43,6 +48,32 @@ pub struct CgEffectsState {
     /// overlapping.
     /// Source: `oracle/codemp/cgame/cg_effects.c:1265`
     pub lastPos: vec3_t,
+
+    /// Raven `int dbModels_Glass[NUM_DEBRIS_MODELS_GLASS]` — `CG_CreateDebris`'s
+    /// once-registered debris models for the glass special-case (repurposed
+    /// for metal chunks per Raven's own comment: "glass no longer exists,
+    /// using it for metal").
+    /// Source: `oracle/codemp/cgame/cg_effects.c:766`
+    pub dbModels_Glass: [qhandle_t; NUM_DEBRIS_MODELS_GLASS],
+
+    /// Raven `int dbModels_Wood[NUM_DEBRIS_MODELS_WOOD]` — `CG_CreateDebris`'s
+    /// once-registered debris models for the wood/crate special-case.
+    /// Source: `oracle/codemp/cgame/cg_effects.c:767`
+    pub dbModels_Wood: [qhandle_t; NUM_DEBRIS_MODELS_WOOD],
+
+    /// Raven `int dbModels_Chunks[NUM_DEBRIS_MODELS_CHUNKS]` —
+    /// `CG_CreateDebris`'s once-registered debris models for the generic-chunk
+    /// special-case. Only the first two of the three slots are ever written
+    /// (Raven registers just `chunks_1`/`chunks_2`); the BSS-zero third slot
+    /// stays a null model handle if `Q_irand` ever rolls it.
+    /// Source: `oracle/codemp/cgame/cg_effects.c:768`
+    pub dbModels_Chunks: [qhandle_t; NUM_DEBRIS_MODELS_CHUNKS],
+
+    /// Raven `int dbModels_Rocks[NUM_DEBRIS_MODELS_ROCKS]` —
+    /// `CG_CreateDebris`'s once-registered debris models for the rock
+    /// special-case.
+    /// Source: `oracle/codemp/cgame/cg_effects.c:769`
+    pub dbModels_Rocks: [qhandle_t; NUM_DEBRIS_MODELS_ROCKS],
 }
 
 impl Default for CgEffectsState {
@@ -54,6 +85,10 @@ impl Default for CgEffectsState {
             offZ: [[0.0; 20]; 20],
             seed: 0x92,
             lastPos: [0.0; 3],
+            dbModels_Glass: [0; NUM_DEBRIS_MODELS_GLASS],
+            dbModels_Wood: [0; NUM_DEBRIS_MODELS_WOOD],
+            dbModels_Chunks: [0; NUM_DEBRIS_MODELS_CHUNKS],
+            dbModels_Rocks: [0; NUM_DEBRIS_MODELS_ROCKS],
         }
     }
 }

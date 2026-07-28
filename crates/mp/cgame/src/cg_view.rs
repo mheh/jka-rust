@@ -7,6 +7,7 @@ use core::f64::consts::PI;
 use core::ffi::c_int;
 
 use mp_bg::bg_misc::BG_EmplacedView;
+use mp_bg::bg_pmove::BG_UnrestrainedPitchRoll;
 use mp_bg::public::dm_flags::DF_FIXED_FOV;
 use mp_bg::public::entity_effects::EF2_HELD_BY_MONSTER;
 use mp_bg::public::entity_flags::{EF_NODRAW, EF_SOUNDTRACKER};
@@ -24,12 +25,13 @@ use mp_qshared::common::mp::cgame::refdef_t::{
     refdef_t, MAX_MAP_AREA_BYTES, MAX_RENDER_STRINGS, MAX_RENDER_STRING_LENGTH,
 };
 use mp_qshared::common::mp::game::class_t::class_t;
-use mp_qshared::common::mp::qcommon::player_state::MAX_POWERUPS;
+use mp_qshared::common::mp::qcommon::player_state::{playerState_t, MAX_POWERUPS};
 use mp_qshared::common::mp::qcommon::pm_flags::{PMF_DUCKED, PMF_FOLLOW};
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::q_math::{
-    _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, AngleVectors,
-    AnglesToAxis, Q_fabs, VectorNormalize, VectorSet, PITCH, ROLL, YAW,
+    _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vectoangles,
+    AngleNormalize180, AngleVectors, AnglesToAxis, Q_fabs, VectorNormalize, VectorSet, PITCH, ROLL,
+    YAW,
 };
 use mp_qshared::shared::sound_channel::{CHAN_ANNOUNCER, CHAN_LOCAL};
 use mp_qshared::shared::surface_flags::{
@@ -2002,4 +2004,210 @@ pub fn CG_DrawAutoMap(ctx: &mut CgContext) {
         }
     }
     trap::R_RenderScene(ctx.engine, &refdef);
+}
+
+/// Raven `CG_OffsetThirdPersonView` — works out where the third-person camera
+/// wants to look this frame, damps its target/location toward that, and
+/// copies the result into `cg.refdef`.
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:603-795`
+pub fn CG_OffsetThirdPersonView(ctx: &mut CgContext) {
+    let mut diff: vec3_t = [0.0; 3];
+    let thirdPersonHorzOffset = ctx.world.cvars.cg_thirdPersonHorzOffset.value;
+
+    let vehNum = ctx
+        .world
+        .cg
+        .snap_ref()
+        .map_or(0, |snap| snap.ps.m_iVehicleNum);
+    if vehNum != 0 && ctx.world.entity(vehNum as usize).m_pVehicle.is_some() {
+        // DEFERRED: `Vehicle_t::m_pVehicleInfo->cameraOverride` /
+        // `cameraHorzOffset`, and `veh->playerState->hackingTime` all hang off
+        // the `Vehicle_t` referent pool behind `centity_t.m_pVehicle`, which
+        // lands with `oracle/codemp/cgame/cg_players.c:7014-7042` (DEC-46.2).
+        // Only the presence test is reachable, so `thirdPersonHorzOffset`
+        // keeps the cvar value — what Raven does for any vehicle that isn't
+        // `cameraOverride`.
+        // Source: `oracle/codemp/cgame/cg_view.c:609-621`
+    }
+
+    ctx.world.view.cameraStiffFactor = 0.0;
+
+    // Set camera viewing direction.
+    let viewangles = ctx.world.cg.refdef.viewangles;
+    _VectorCopy(viewangles, &mut ctx.world.view.cameraFocusAngles);
+
+    // if dead, look at killer
+    //
+    // §F19: Raven's `else if` below unguarded-derefs `cg.snap->ps` once the
+    // monster-hold check's own `cg.snap` guard has already failed; a missing
+    // snapshot here takes the "alive" arm instead of reproducing that UB.
+    // only possibility for now, may add Wampa and sand creature later
+    let heldByMonster = ctx.world.cg.snap_ref().map_or(false, |snap| {
+        (snap.ps.eFlags2 & EF2_HELD_BY_MONSTER) != 0 && snap.ps.hasLookTarget != qfalse
+    }) && {
+        let lookTarget = ctx.world.cg.snap_ref().unwrap().ps.lookTarget;
+        ctx.world.entity(lookTarget as usize).currentState.NPC_class
+            == class_t::CLASS_RANCOR as c_int
+    };
+
+    if heldByMonster {
+        // being held
+        let lookTarget = ctx.world.cg.snap_ref().unwrap().ps.lookTarget;
+        let monsterYaw = ctx.world.entity(lookTarget as usize).lerpAngles[YAW];
+        //make the look angle the vector from his mouth to me
+        VectorSet(
+            &mut ctx.world.view.cameraFocusAngles,
+            0.0,
+            AngleNormalize180(monsterYaw + 180.0),
+            0.0,
+        );
+    } else if ctx
+        .world
+        .cg
+        .snap_ref()
+        .map_or(1, |snap| snap.ps.stats[STAT_HEALTH as usize])
+        <= 0
+    {
+        let deadYaw = ctx.world.cg.snap_ref().unwrap().ps.stats[STAT_DEAD_YAW as usize];
+        ctx.world.view.cameraFocusAngles[YAW] = deadYaw as f32;
+    } else {
+        // Add in the third Person Angle.
+        ctx.world.view.cameraFocusAngles[YAW] += ctx.world.cvars.cg_thirdPersonAngle.value;
+        {
+            let pitchOffset = ctx.world.cvars.cg_thirdPersonPitchOffset.value;
+
+            let vehNum2 = ctx
+                .world
+                .cg
+                .snap_ref()
+                .map_or(0, |snap| snap.ps.m_iVehicleNum);
+            if vehNum2 != 0 && ctx.world.entity(vehNum2 as usize).m_pVehicle.is_some() {
+                // DEFERRED: `Vehicle_t::m_pVehicleInfo->cameraPitchDependantVertOffset` /
+                // `cameraPitchOffset` hang off the `Vehicle_t` referent pool
+                // behind `centity_t.m_pVehicle` (`oracle/codemp/cgame/cg_players.c:7014-7042`,
+                // DEC-46.2). Only the presence test is reachable, so
+                // `pitchOffset` keeps the cvar value.
+                // Source: `oracle/codemp/cgame/cg_view.c:656-679`
+            }
+
+            // Raven's `if ( 0 && ... )` is a literal always-false condition
+            // (dead code, `VEH_CONTROL_SCHEME_4`-style guard left in), so the
+            // else arm is the only one that ever runs.
+            // Source: `oracle/codemp/cgame/cg_view.c:681-698`
+            ctx.world.view.cameraFocusAngles[PITCH] += pitchOffset;
+        }
+    }
+
+    // The next thing to do is to see if we need to calculate a new camera target location.
+
+    // If we went back in time for some reason, or if we just started, reset the sample.
+    if ctx.world.view.cameraLastFrame == 0 || ctx.world.view.cameraLastFrame > ctx.world.cg.time {
+        CG_ResetThirdPersonViewDamp(ctx);
+    } else {
+        // Cap the pitch within reasonable limits
+        //
+        // Raven's `BG_UnrestrainedPitchRoll` needs a live `Vehicle_t*`;
+        // DEC-46.2 only carries presence through `centity_t.m_pVehicle`, so
+        // this passes a null vehicle pointer — the same answer
+        // `!pVeh.is_null()` gives inside the fn for the no-vehicle case, and
+        // (per §A2) the defined-behavior default when a vehicle's info is
+        // unresolvable: the pitch stays clamped rather than assuming
+        // unrestricted fighter roll.
+        // Source: `oracle/codemp/cgame/cg_view.c:712-716`
+        let vehNum3 = ctx.world.cg.predictedPlayerState.m_iVehicleNum;
+        let unrestrained = vehNum3 != 0
+            && BG_UnrestrainedPitchRoll(
+                &mut ctx.world.cg.predictedPlayerState as *mut playerState_t,
+                core::ptr::null_mut(),
+                &ctx.world.bg_state,
+            ) != qfalse;
+
+        if unrestrained {
+            //no clamp on pitch
+            //FIXME: when pitch >= 90 or <= -90, camera rotates oddly... need to CrossProduct not just vectoangles
+        } else {
+            if ctx.world.view.cameraFocusAngles[PITCH] > 80.0 {
+                ctx.world.view.cameraFocusAngles[PITCH] = 80.0;
+            } else if ctx.world.view.cameraFocusAngles[PITCH] < -80.0 {
+                ctx.world.view.cameraFocusAngles[PITCH] = -80.0;
+            }
+        }
+
+        let cameraFocusAngles = ctx.world.view.cameraFocusAngles;
+        let mut camerafwd: vec3_t = [0.0; 3];
+        let mut cameraup: vec3_t = [0.0; 3];
+        AngleVectors(
+            cameraFocusAngles,
+            Some(&mut camerafwd),
+            None,
+            Some(&mut cameraup),
+        );
+        ctx.world.view.camerafwd = camerafwd;
+        ctx.world.view.cameraup = cameraup;
+
+        let mut deltayaw = Q_fabs(cameraFocusAngles[YAW] - ctx.world.view.cameraLastYaw);
+        if deltayaw > 180.0 {
+            // Normalize this angle so that it is between 0 and 180.
+            deltayaw = Q_fabs(deltayaw - 360.0);
+        }
+        ctx.world.view.cameraStiffFactor =
+            deltayaw / (ctx.world.cg.time - ctx.world.view.cameraLastFrame) as f32;
+        if ctx.world.view.cameraStiffFactor < 1.0 {
+            ctx.world.view.cameraStiffFactor = 0.0;
+        } else if ctx.world.view.cameraStiffFactor > 2.5 {
+            ctx.world.view.cameraStiffFactor = 0.75;
+        } else {
+            // 1 to 2 scales from 0.0 to 0.5
+            ctx.world.view.cameraStiffFactor = (ctx.world.view.cameraStiffFactor - 1.0) * 0.5;
+        }
+        ctx.world.view.cameraLastYaw = cameraFocusAngles[YAW];
+
+        // Move the target to the new location.
+        CG_UpdateThirdPersonTargetDamp(ctx);
+        CG_UpdateThirdPersonCameraDamp(ctx);
+    }
+
+    // Now interestingly, the Quake method is to calculate a target focus point above the player, and point the camera at it.
+    // We won't do that for now.
+
+    // We must now take the angle taken from the camera target and location.
+    let cameraCurTarget = ctx.world.view.cameraCurTarget;
+    let cameraCurLoc = ctx.world.view.cameraCurLoc;
+    _VectorSubtract(cameraCurTarget, cameraCurLoc, &mut diff);
+    {
+        let dist = VectorNormalize(&mut diff);
+        //under normal circumstances, should never be 0.00000 and so on.
+        if dist == 0.0 || diff[0] == 0.0 || diff[1] == 0.0 {
+            //must be hitting something, need some value to calc angles, so use cam forward
+            let camerafwd = ctx.world.view.camerafwd;
+            _VectorCopy(camerafwd, &mut diff);
+        }
+    }
+
+    // Raven's `if ( 0 && ... )` is a literal always-false condition (dead
+    // code, same `VEH_CONTROL_SCHEME_4`-style guard as above), so the else
+    // arm is the only one that ever runs.
+    // Source: `oracle/codemp/cgame/cg_view.c:772-782`
+    vectoangles(diff, &mut ctx.world.cg.refdef.viewangles);
+
+    // Temp: just move the camera to the side a bit
+    if thirdPersonHorzOffset != 0.0 {
+        let viewangles = ctx.world.cg.refdef.viewangles;
+        AnglesToAxis(viewangles, ctx.world.cg.refdef.viewaxis.as_mut_ptr());
+        let cameraCurLoc = ctx.world.view.cameraCurLoc;
+        let viewaxis1 = ctx.world.cg.refdef.viewaxis[1];
+        _VectorMA(
+            cameraCurLoc,
+            thirdPersonHorzOffset,
+            viewaxis1,
+            &mut ctx.world.view.cameraCurLoc,
+        );
+    }
+
+    // ...and of course we should copy the new view location to the proper spot too.
+    let cameraCurLoc = ctx.world.view.cameraCurLoc;
+    _VectorCopy(cameraCurLoc, &mut ctx.world.cg.refdef.vieworg);
+
+    ctx.world.view.cameraLastFrame = ctx.world.cg.time;
 }

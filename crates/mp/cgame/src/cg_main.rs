@@ -8,7 +8,7 @@ use core::ffi::{c_char, c_int};
 use core::ptr::null_mut;
 
 use mp_abi::cgame::shared_buffer::{
-    TCGG2Mark, TCGGetBoltData, TCGMiscEnt, TCGPointContents, TCGTrace, TCGVectorData,
+    TCGG2Mark, TCGGetBoltData, TCGImpactMark, TCGMiscEnt, TCGPointContents, TCGTrace, TCGVectorData,
 };
 use mp_bg::bg_misc::{
     selected_holdable_tag, BG_CycleForce, BG_CycleInven, BG_FindItemForPowerup,
@@ -74,7 +74,7 @@ use mp_uishared::shared::menudef::{
     FEEDER_REDTEAM_LIST, FEEDER_SCOREBOARD,
 };
 use mp_uishared::ui_shared::{
-    Menu_New, Menu_SetFeederSelection, PC_Color_Parse, PC_Float_Parse, PC_Int_Parse,
+    Menu_New, Menu_Reset, Menu_SetFeederSelection, PC_Color_Parse, PC_Float_Parse, PC_Int_Parse,
     PC_String_Parse, UI_CleanupGhoul2,
 };
 use native_string::{
@@ -83,10 +83,10 @@ use native_string::{
 };
 
 use crate::cg_draw::{CG_Text_Paint, CG_Text_Width};
-use crate::cg_effects::CG_InitGlass;
+use crate::cg_effects::{CG_InitGlass, CG_TestLine};
 use crate::cg_ents::ScaleModelAxis;
 use crate::cg_info::{CG_LoadingItem, CG_LoadingString};
-use crate::cg_marks::CG_ClearParticles;
+use crate::cg_marks::{CG_ClearParticles, CG_ImpactMark};
 use crate::cg_new_draw::{
     CG_GameTypeString, CG_GetGameStatusText, CG_GetKillerText, CG_StatusHandle,
 };
@@ -4702,4 +4702,155 @@ pub fn CG_Shutdown(ctx: &mut CgContext, menus: &mut MenuSystem, dc: &mut dyn Dis
 
     // some mods may need to do cleanup work here,
     // like closing files or archiving session data
+}
+
+/// Raven `CG_DebugBoxLines` — draws the 12 edges of an axis-aligned box as
+/// debug lines, all in the same blue.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:445-505`
+pub fn CG_DebugBoxLines(world: &mut CgWorld, mins: vec3_t, maxs: vec3_t, duration: c_int) {
+    let mut start: vec3_t = [0.0; 3];
+    let mut end: vec3_t = [0.0; 3];
+    let mut vert: vec3_t = [0.0; 3];
+
+    let x = maxs[0] - mins[0];
+    let y = maxs[1] - mins[1];
+
+    start[2] = maxs[2];
+    vert[2] = mins[2];
+
+    vert[0] = mins[0];
+    vert[1] = mins[1];
+    start[0] = vert[0];
+    start[1] = vert[1];
+    CG_TestLine(world, &start, &vert, duration, 0x00000ff, 1);
+
+    vert[0] = mins[0];
+    vert[1] = maxs[1];
+    start[0] = vert[0];
+    start[1] = vert[1];
+    CG_TestLine(world, &start, &vert, duration, 0x00000ff, 1);
+
+    vert[0] = maxs[0];
+    vert[1] = mins[1];
+    start[0] = vert[0];
+    start[1] = vert[1];
+    CG_TestLine(world, &start, &vert, duration, 0x00000ff, 1);
+
+    vert[0] = maxs[0];
+    vert[1] = maxs[1];
+    start[0] = vert[0];
+    start[1] = vert[1];
+    CG_TestLine(world, &start, &vert, duration, 0x00000ff, 1);
+
+    // top of box
+    _VectorCopy(maxs, &mut start);
+    _VectorCopy(maxs, &mut end);
+    start[0] -= x;
+    CG_TestLine(world, &start, &end, duration, 0x00000ff, 1);
+    end[0] = start[0];
+    end[1] -= y;
+    CG_TestLine(world, &start, &end, duration, 0x00000ff, 1);
+    start[1] = end[1];
+    start[0] += x;
+    CG_TestLine(world, &start, &end, duration, 0x00000ff, 1);
+    CG_TestLine(world, &start, &maxs, duration, 0x00000ff, 1);
+    // bottom of box
+    _VectorCopy(mins, &mut start);
+    _VectorCopy(mins, &mut end);
+    start[0] += x;
+    CG_TestLine(world, &start, &end, duration, 0x00000ff, 1);
+    end[0] = start[0];
+    end[1] += y;
+    CG_TestLine(world, &start, &end, duration, 0x00000ff, 1);
+    start[1] = end[1];
+    start[0] -= x;
+    CG_TestLine(world, &start, &end, duration, 0x00000ff, 1);
+    CG_TestLine(world, &start, &mins, duration, 0x00000ff, 1);
+}
+
+/// Raven `C_ImpactMark` — the `CG_IMPACT_MARK` vmMain arm: decode the shared
+/// buffer and forward straight into [`CG_ImpactMark`], always permanent
+/// (`alphaFade` true, `temporary` false — the two flags Raven hardcodes at the
+/// call site, absent from the wire payload).
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:570-580`
+pub fn C_ImpactMark(ctx: &mut CgContext, data: &TCGImpactMark) {
+    CG_ImpactMark(
+        ctx,
+        data.mHandle,
+        data.mPoint,
+        data.mAngle,
+        data.mRotation,
+        data.mRed,
+        data.mGreen,
+        data.mBlue,
+        data.mAlphaStart,
+        true,
+        data.mSizeStart,
+        false,
+    );
+}
+
+/// Raven `CG_LoadHudMenu` — assembles the `cgDC` display vtable and loads the
+/// hud menu set named by `cg_hudFiles` (`ui/jahud.txt` when unset).
+///
+/// PORT-NOTE: the `cgDC.<slot> = &Xxx` assignment block (`cg_main.c:3149-3205`)
+/// and the `Init_Display(&cgDC)` call right after it are dropped — DEC-36 D3
+/// replaces the vtable with the `DisplayContext` trait `impl DisplayContext
+/// for CgContext` already provides
+/// (`crates/mp/cgame/src/world/cg_display_context.rs`), threaded per-call
+/// instead of stored on a file-scope `DC` pointer; there is no `cgDC` field
+/// left for either to assign, matching `Init_Display`'s own DEFERRED note
+/// (`crates/mp/uishared/src/ui_shared.rs:421-428`) and its `_UI_Init` twin
+/// (`crates/mp/ui/src/ui_main.rs:13299-13309`).
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:3145-3219`
+pub fn CG_LoadHudMenu(
+    ctx: &mut CgContext,
+    menus: &mut MenuSystem,
+    ds: &mut DisplayState,
+    dc: &mut dyn DisplayContext,
+) {
+    Menu_Reset(menus);
+
+    let hudSet = buf_to_string(&ctx.world.cvars.cg_hudFiles.string.map(|c| c as u8));
+    let hudSet = if hudSet.is_empty() {
+        "ui/jahud.txt".to_string()
+    } else {
+        hudSet
+    };
+
+    CG_LoadMenus(ctx, menus, ds, dc, &hudSet);
+}
+
+/// Raven `CG_SpawnCGameOnlyEnts` — parses the BSP entity string a second time
+/// cgame-side, looking for the client-only spawn classes `CG_SpawnCGameEntFromVars`
+/// cares about (sky portals, weather zones, cgame-only static models, ...).
+///
+/// PORT-NOTE: Raven's reset call `trap_GetEntityToken(NULL, -1)` passes a NULL
+/// buffer/`-1` length to rewind the engine's parse cursor with no token copy;
+/// the ported `trap::GetEntityToken` wrapper always allocates and passes a
+/// real buffer, so there is no zero-copy NULL-pointer shape to call through -
+/// a zero-length buffer is the closest reachable stand-in and the return value
+/// is discarded either way (Raven's own comment: "make sure it is reset").
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:3664-3682`
+pub fn CG_SpawnCGameOnlyEnts(ctx: &mut CgContext) {
+    //make sure it is reset
+    trap::GetEntityToken(ctx.engine, 0);
+
+    if !CG_ParseSpawnVars(ctx) {
+        //first one is gonna be the world spawn
+        CG_Error(ctx, "no entities for cgame parse");
+        return;
+    } else {
+        //parse the world spawn info we want
+        CG_SpawnCGameEntFromVars(ctx);
+    }
+
+    //now run through the whole list, and look for things we care about cgame-side
+    while CG_ParseSpawnVars(ctx) {
+        CG_SpawnCGameEntFromVars(ctx);
+    }
 }

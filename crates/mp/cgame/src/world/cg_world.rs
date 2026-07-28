@@ -28,6 +28,7 @@ use super::cg_light_state::CgLightState;
 use super::cg_main_state::CgMainState;
 use super::cg_marks_state::CgMarksState;
 use super::cg_players_state::CgPlayersState;
+use super::cg_playerstate_state::CgPlayerstateState;
 use super::cg_predict_state::CgPredictState;
 use super::cg_saga_state::CgSagaState;
 use super::cg_scoreboard_state::CgScoreboardState;
@@ -149,6 +150,10 @@ pub struct CgWorld {
     /// Source: `super::cg_players_state::CgPlayersState`
     pub players: CgPlayersState,
 
+    /// `cg_playerstate.c`'s mutable file-scope globals.
+    /// Source: `super::cg_playerstate_state::CgPlayerstateState`
+    pub playerstate: CgPlayerstateState,
+
     /// `cg_predict.c`'s mutable file-scope globals.
     /// Source: `super::cg_predict_state::CgPredictState`
     pub predict: CgPredictState,
@@ -237,6 +242,7 @@ impl CgWorld {
             addr_of_mut!((*p).players).write(CgPlayersState::default());
             addr_of_mut!((*p).predict).write(CgPredictState::default());
             addr_of_mut!((*p).saga).write(CgSagaState::default());
+            addr_of_mut!((*p).playerstate).write(CgPlayerstateState::default());
             addr_of_mut!((*p).scoreboard).write(CgScoreboardState::default());
             addr_of_mut!((*p).view).write(CgViewState::default());
             addr_of_mut!((*p).weapons).write(CgWeaponsState::default());

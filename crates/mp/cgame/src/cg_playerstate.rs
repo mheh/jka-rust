@@ -5,13 +5,20 @@
 
 use core::ffi::c_int;
 
+use mp_bg::public::gametype::{GT_CTF, GT_DUEL, GT_POWERDUEL, GT_SIEGE};
+use mp_bg::public::pers_enum::persEnum_t::{PERS_HITS, PERS_TEAM};
 use mp_bg::public::stat_index::statIndex_t::STAT_HEALTH;
+use mp_qshared::common::mp::qcommon::player_state::playerState_t;
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorSubtract, vec3_origin, AngleVectors, VectorLength, PITCH, ROLL, YAW,
 };
+use mp_qshared::shared::sound_channel::CHAN_ANNOUNCER;
 use mp_qshared::shared::{qtrue, vec3_t};
 
-use crate::cg_view::DAMAGE_TIME;
+use crate::cg_event::CG_PainEvent;
+use crate::cg_view::{CG_AddBufferedSound, DAMAGE_TIME};
+use crate::trap;
+use crate::world::cg_context::CgContext;
 use crate::world::cg_world::CgWorld;
 
 /// Raven `CG_CheckAmmo` — the low-ammo warning HUD/sound feature.
@@ -147,4 +154,114 @@ pub fn CG_Respawn(world: &mut CgWorld) {
         return;
     };
     world.cg.weaponSelect = weapon;
+}
+
+/// Raven `CG_CheckLocalSounds` — fires local pain/reward/announcer sounds off
+/// the delta between this frame's and the previous frame's `playerState_t`.
+///
+/// The "hit changes" block's own trap calls are all commented out in Raven
+/// (retail shipped silent), so the `armor`/`health` bit-unpack that fed them
+/// is a pure dead store here - dropped. `JK2AWARDS` is never defined for the
+/// MP build (no `#define JK2AWARDS` anywhere in oracle), so the whole reward
+/// block is dead too; Raven's own `#else reward = qfalse;` is what actually
+/// ran, which is what this keeps.
+///
+/// Source: `oracle/codemp/cgame/cg_playerstate.c:311-487`
+pub fn CG_CheckLocalSounds(ctx: &mut CgContext, ps: &playerState_t, ops: &playerState_t) {
+    // don't play the sounds if the player just changed teams
+    if ps.persistant[PERS_TEAM as usize] != ops.persistant[PERS_TEAM as usize] {
+        return;
+    }
+
+    // hit changes - Raven's own trap_S_StartLocalSound calls here are all
+    // commented out in retail, so there's nothing left to port but the
+    // player-hit/team-hit branch labels themselves.
+    if ps.persistant[PERS_HITS as usize] > ops.persistant[PERS_HITS as usize] {
+        // hit an enemy - shield-pierced vs clean-hit sound was already disabled
+    } else if ps.persistant[PERS_HITS as usize] < ops.persistant[PERS_HITS as usize] {
+        // hit a teammate - team-hit sound was already disabled
+    }
+
+    // health changes of more than -3 should make pain sounds
+    if ctx.world.cvars.cg_oldPainSounds.integer != 0
+        && ps.stats[STAT_HEALTH as usize] < ops.stats[STAT_HEALTH as usize] - 3
+        && ps.stats[STAT_HEALTH as usize] > 0
+    {
+        let clientNum = ctx.world.cg.predictedPlayerState.clientNum as usize;
+        CG_PainEvent(ctx, clientNum, ps.stats[STAT_HEALTH as usize]);
+    }
+
+    // if we are going into the intermission, don't start any voices
+    if ctx.world.cg.intermissionStarted != 0 {
+        return;
+    }
+
+    // JK2AWARDS is never defined for this build - Raven's own `#else reward =
+    // qfalse;` ran, and the lead-change block that reads it is fully
+    // commented out (`/* ... */`) besides, so `reward` itself is a dead store.
+
+    // timelimit warnings
+    if ctx.world.cgs.timelimit > 0 && ctx.world.playerstate.cgAnnouncerTime < ctx.world.cg.time {
+        let msec = ctx.world.cg.time - ctx.world.cgs.levelStartTime;
+        if (ctx.world.cg.timelimitWarnings & 4) == 0
+            && msec > (ctx.world.cgs.timelimit * 60 + 2) * 1000
+        {
+            ctx.world.cg.timelimitWarnings |= 1 | 2 | 4;
+            // sudden-death sound is disabled in Raven too (commented out)
+        } else if (ctx.world.cg.timelimitWarnings & 2) == 0
+            && msec > (ctx.world.cgs.timelimit - 1) * 60 * 1000
+        {
+            ctx.world.cg.timelimitWarnings |= 1 | 2;
+            trap::S_StartLocalSound(
+                ctx.engine,
+                ctx.world.cgs.media.oneMinuteSound,
+                CHAN_ANNOUNCER,
+            );
+            ctx.world.playerstate.cgAnnouncerTime = ctx.world.cg.time + 3000;
+        } else if ctx.world.cgs.timelimit > 5
+            && (ctx.world.cg.timelimitWarnings & 1) == 0
+            && msec > (ctx.world.cgs.timelimit - 5) * 60 * 1000
+        {
+            ctx.world.cg.timelimitWarnings |= 1;
+            trap::S_StartLocalSound(
+                ctx.engine,
+                ctx.world.cgs.media.fiveMinuteSound,
+                CHAN_ANNOUNCER,
+            );
+            ctx.world.playerstate.cgAnnouncerTime = ctx.world.cg.time + 3000;
+        }
+    }
+
+    // fraglimit warnings
+    if ctx.world.cgs.fraglimit > 0
+        && ctx.world.cgs.gametype < GT_CTF
+        && ctx.world.cgs.gametype != GT_DUEL
+        && ctx.world.cgs.gametype != GT_POWERDUEL
+        && ctx.world.cgs.gametype != GT_SIEGE
+        && ctx.world.playerstate.cgAnnouncerTime < ctx.world.cg.time
+    {
+        let highScore = ctx.world.cgs.scores1;
+        if (ctx.world.cg.fraglimitWarnings & 4) == 0 && highScore == ctx.world.cgs.fraglimit - 1 {
+            ctx.world.cg.fraglimitWarnings |= 1 | 2 | 4;
+            let sfx = ctx.world.cgs.media.oneFragSound;
+            CG_AddBufferedSound(ctx.world, sfx);
+            ctx.world.playerstate.cgAnnouncerTime = ctx.world.cg.time + 3000;
+        } else if ctx.world.cgs.fraglimit > 2
+            && (ctx.world.cg.fraglimitWarnings & 2) == 0
+            && highScore == ctx.world.cgs.fraglimit - 2
+        {
+            ctx.world.cg.fraglimitWarnings |= 1 | 2;
+            let sfx = ctx.world.cgs.media.twoFragSound;
+            CG_AddBufferedSound(ctx.world, sfx);
+            ctx.world.playerstate.cgAnnouncerTime = ctx.world.cg.time + 3000;
+        } else if ctx.world.cgs.fraglimit > 3
+            && (ctx.world.cg.fraglimitWarnings & 1) == 0
+            && highScore == ctx.world.cgs.fraglimit - 3
+        {
+            ctx.world.cg.fraglimitWarnings |= 1;
+            let sfx = ctx.world.cgs.media.threeFragSound;
+            CG_AddBufferedSound(ctx.world, sfx);
+            ctx.world.playerstate.cgAnnouncerTime = ctx.world.cg.time + 3000;
+        }
+    }
 }

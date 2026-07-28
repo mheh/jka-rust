@@ -2,52 +2,116 @@
 //! transcription waves.
 #![allow(non_snake_case, non_upper_case_globals)]
 
-use core::ffi::c_int;
+use core::ffi::{c_int, c_uint};
 use core::ptr::null_mut;
+
+use mp_abi::ui::public::ui_menu_command_t::UIMENU_PLAYERCONFIG;
 
 use mp_bg::bg_misc::{BG_CycleInven, BG_FindItemForHoldable, BG_GiveMeVectorFromMatrix};
 use mp_bg::bg_panimate::BG_InKnockDownOnly;
+use mp_bg::bg_saber::SFL2_NO_CLASH_FLARE;
+use mp_bg::bg_saberLoad::WP_SaberBladeUseSecondBladeStyle;
 use mp_bg::cstr_util::cstr_to_str;
 use mp_bg::local::bg_customSiegeSoundNames;
-use mp_bg::public::bg_itemlist::bg_itemlist;
-use mp_bg::public::configstring::CS_PLAYERS;
+use mp_bg::public::bg_itemlist::{bg_itemlist, bg_numItems};
+use mp_bg::public::configstring::{CS_AMBIENT_SET, CS_EFFECTS, CS_PLAYERS, CS_SOUNDS};
 use mp_bg::public::ctf_msg::ctfMsg_t;
+use mp_bg::public::effect_types::effectTypes_t;
+use mp_bg::public::entity_event::entity_event_t;
 use mp_bg::public::entity_event::entity_event_t::EV_USE_ITEM0;
-use mp_bg::public::entity_flags::{EF_DEAD, EF_JETPACK_ACTIVE};
-use mp_bg::public::gametype::{GT_DUEL, GT_JEDIMASTER, GT_POWERDUEL, GT_TEAM};
+use mp_bg::public::entity_flags::{EF_ALT_FIRING, EF_DEAD, EF_JETPACK_ACTIVE, EF_SOUNDTRACKER};
+use mp_bg::public::entity_type::entityType_t;
+use mp_bg::public::gametype::{GT_CTY, GT_DUEL, GT_JEDIMASTER, GT_POWERDUEL, GT_TEAM};
 use mp_bg::public::gender::gender_t;
+use mp_bg::public::global_team_sound::global_team_sound_t;
 use mp_bg::public::holdable::{
     HI_AMMODISP, HI_BINOCULARS, HI_CLOAK, HI_EWEB, HI_HEALTHDISP, HI_JETPACK, HI_MEDPAC,
     HI_MEDPAC_BIG, HI_NONE, HI_NUM_HOLDABLE, HI_SEEKER, HI_SENTRY_GUN, HI_SHIELD,
 };
 use mp_bg::public::item_type::{IT_TEAM, IT_WEAPON};
 use mp_bg::public::means_of_death::meansOfDeath_t;
-use mp_bg::public::pers_enum::persEnum_t::{PERS_RANK, PERS_SCORE};
+use mp_bg::public::pd_sounds::pdSounds_t;
+use mp_bg::public::pers_enum::persEnum_t::{PERS_RANK, PERS_SCORE, PERS_TEAM};
+use mp_bg::public::powerup::{PW_BATTLESUIT, PW_QUAD};
 use mp_bg::public::powerup::{PW_BLUEFLAG, PW_REDFLAG};
+use mp_bg::public::stat_index::statIndex_t;
+use mp_bg::public::viewheight::{DEFAULT_MAXS_2, DEFAULT_MINS_2};
 use mp_bg::public::weaponstate::weaponstate_t;
 use mp_bg::public::{team_t, RANK_TIED_FLAG, TEAM_BLUE, TEAM_RED, TEAM_SPECTATOR};
 use mp_bg::vehicles::vehicle_s::{Vehicle_t, MAX_VEHICLES, VEHICLE_BASE};
+use mp_bg::weapons::weaponData;
 use mp_bg::weapons::weapon_t::{
     WP_BLASTER, WP_BOWCASTER, WP_BRYAR_OLD, WP_BRYAR_PISTOL, WP_CONCUSSION, WP_DEMP2, WP_DET_PACK,
-    WP_DISRUPTOR, WP_REPEATER, WP_ROCKET_LAUNCHER, WP_SABER, WP_THERMAL, WP_TRIP_MINE, WP_TURRET,
+    WP_DISRUPTOR, WP_EMPLACED_GUN, WP_NONE, WP_NUM_WEAPONS, WP_REPEATER, WP_ROCKET_LAUNCHER,
+    WP_SABER, WP_THERMAL, WP_TRIP_MINE, WP_TURRET,
 };
+use mp_qshared::common::mp::game::class_t::class_t;
+use mp_qshared::common::mp::ghoul2::bone_flags::{BONE_ANIM_BLEND, BONE_ANIM_OVERRIDE_FREEZE};
 use mp_qshared::common::mp::qcommon::entityState_t;
+use mp_qshared::common::mp::qcommon::player_state::MAX_WEAPONS;
+use mp_qshared::common::mp::qcommon::pm_flags::PMF_FOLLOW;
+use mp_qshared::common::mp::qcommon::saber::saber_info::{saberInfo_t, MAX_SABERS};
 use mp_qshared::common::mp::trace_t::trace_t;
+use mp_qshared::shared::force_powers::{
+    FP_LEVITATION, FP_SABERTHROW, FP_SABER_DEFENSE, FP_SABER_OFFENSE,
+};
+use mp_qshared::shared::item_use_fail::itemUseFail_t;
+use mp_qshared::shared::keycatch::KEYCATCH_UI;
 use mp_qshared::shared::limits::MAX_VEH_WEAPONS;
 use mp_qshared::shared::q_color::S_COLOR_WHITE;
-use mp_qshared::shared::q_math::{vec3_origin, YAW};
-use mp_qshared::shared::{
-    mdxaBone_t, qfalse, vec3_t, Eorientations, BIGCHAR_WIDTH, CHAN_AUTO, CHAN_VOICE,
-    ENTITYNUM_NONE, ENTITYNUM_WORLD, MASK_PLAYERSOLID, MAX_CLIENTS_I32, SCREEN_HEIGHT,
+use mp_qshared::shared::q_math::{
+    _VectorMA, _VectorSubtract, vec3_origin, AngleVectors, ByteToDir, VectorClear, VectorLength,
+    VectorNormalize, ROLL, YAW,
 };
+use mp_qshared::shared::surface_flags::{
+    CONTENTS_SOLID, CONTENTS_TERRAIN, MASK_SOLID, MATERIAL_CANVAS, MATERIAL_CARPET, MATERIAL_DIRT,
+    MATERIAL_FABRIC, MATERIAL_GRAVEL, MATERIAL_HOLLOWMETAL, MATERIAL_HOLLOWWOOD,
+    MATERIAL_LONGGRASS, MATERIAL_MUD, MATERIAL_PLASTIC, MATERIAL_RUBBER, MATERIAL_SAND,
+    MATERIAL_SHORTGRASS, MATERIAL_SNOW, MATERIAL_SOLIDMETAL, MATERIAL_SOLIDWOOD,
+};
+use mp_qshared::shared::trackchan::trackchan_t;
+use mp_qshared::shared::{
+    mdxaBone_t, qfalse, qtrue, vec3_t, Eorientations, BIGCHAR_WIDTH, CHAN_ANNOUNCER, CHAN_AUTO,
+    CHAN_BODY, CHAN_LOCAL, CHAN_MENU1, CHAN_VOICE, CHAN_WEAPON, ENTITYNUM_NONE, ENTITYNUM_WORLD,
+    GIANTCHAR_WIDTH, MASK_PLAYERSOLID, MAX_CLIENTS_I32, SCREEN_HEIGHT,
+};
+use mp_uishared::shared::display_state::DisplayState;
 use native_string::{buf_to_string, string_to_latin1, Info_ValueForKey, Q_strncpyzBytes};
 
-use crate::cg_draw::CG_CenterPrint;
-use crate::cg_main::{CG_ConfigString, CG_Error, CG_GetStringEdString, CG_Printf, Com_Printf};
-use crate::cg_players::{CG_AddGhoul2Mark, CG_CustomSound, CG_ThereIsAMaster};
-use crate::cg_predict::CG_G2Trace;
+use crate::cg_draw::{
+    showPowersName, CG_CenterPrint, CG_ChatBox_AddString, CG_InATST, CG_InFighter,
+};
+use crate::cg_effects::{
+    CG_Chunks, CG_GlassShatter, CG_MiscModelExplosion, CG_ScorePlum, CG_TestLine,
+};
+use crate::cg_ents::{
+    CG_Beam, CG_PlayDoorLoopSound, CG_PlayDoorSound, CG_S_AddRealLoopingSound,
+    CG_S_StopLoopingSound,
+};
+use crate::cg_main::{
+    CG_ConfigString, CG_Error, CG_GetStringEdString, CG_Printf, CG_StartMusic, Com_Printf,
+};
+use crate::cg_players::{
+    CG_AddGhoul2Mark, CG_CreateNPCClient, CG_CustomSound, CG_PlayerShieldHit, CG_ThereIsAMaster,
+};
+use crate::cg_predict::{CG_G2Trace, CG_Trace};
+use crate::cg_saga::{CG_SiegeObjectiveCompleted, CG_SiegeRoundOver};
+use crate::cg_view::{CGCam_SetMusicMult, CGCam_Shake, CG_AddBufferedSound};
+use crate::cg_weaponinit::CG_RegisterWeapon;
+use crate::cg_weapons::{
+    CG_FireWeapon, CG_GetClientWeaponMuzzleBoltPoint, CG_MissileHitPlayer, CG_MissileHitWall,
+    CG_OutOfAmmoChange, CG_VehicleWeaponImpact,
+};
+use crate::fx_bryarpistol::FX_ConcAltShot;
+use crate::fx_demp2::FX_DEMP2_AltDetonate;
+use crate::fx_disruptor::{
+    FX_DisruptorAltMiss, FX_DisruptorAltShot, FX_DisruptorHitPlayer, FX_DisruptorHitWall,
+    FX_DisruptorMainShot,
+};
 use crate::local::centity_s::centity_t;
-use crate::local::client_info_t::MAX_CUSTOM_SIEGE_SOUNDS;
+use crate::local::client_info_t::{clientInfo_t, MAX_CUSTOM_SIEGE_SOUNDS};
+use crate::local::footstep_t::footstep_t;
+use crate::local::impact_sound_t::impactSound_t;
 use crate::trap;
 use crate::world::cg_context::CgContext;
 use crate::world::cg_world::CgWorld;
@@ -79,6 +143,26 @@ const EV_EVENT_BIT2: c_int = 0x00000200;
 ///
 /// Source: `oracle/codemp/game/bg_public.h:730`
 const EV_EVENT_BITS: c_int = EV_EVENT_BIT1 | EV_EVENT_BIT2;
+
+/// Raven `STEP_TIME` — how long the stair-climb view smoothing lasts, in msec.
+/// (Same value as cg_view.rs's private copy of the `cg_local.h` define.)
+///
+/// Source: `oracle/codemp/cgame/cg_local.h:33`
+const STEP_TIME: c_int = 200;
+
+/// Raven `MAX_STEP_CHANGE` — the ceiling the accumulated step smoothing caps at.
+///
+/// Source: `oracle/codemp/cgame/cg_local.h:54`
+const MAX_STEP_CHANGE: c_int = 32;
+
+// The anonymous taunt-index enum from `cg_event.c:30-36` — plain int constants
+// (Raven's `es->eventParm` is compared against them raw). Source:
+// `oracle/codemp/cgame/cg_event.c:30-36`.
+const TAUNT_TAUNT: c_int = 0;
+const TAUNT_BOW: c_int = 1;
+const TAUNT_MEDITATE: c_int = 2;
+const TAUNT_FLOURISH: c_int = 3;
+const TAUNT_GLOAT: c_int = 4;
 
 /// Raven `cg_stringEdVoiceChatTable[MAX_CUSTOM_SIEGE_SOUNDS]` — string-package
 /// `MENUS` reference names, index-parallel with `bg_customSiegeSoundNames`.
@@ -1565,5 +1649,2666 @@ pub fn CG_G2MarkEvent(ctx: &mut CgContext, es: &entityState_t) {
 
         //Issues with small scale?
         _ => {}
+    }
+}
+
+/// Resolves the `clientInfo_t` an `EV_SABER_*` event should read custom
+/// blade fx/sounds from: the entity's own `npcClient` for an NPC, else the
+/// `cgs.clientinfo` slot. `None` when there is no valid slot.
+///
+/// §F19: Raven only bounds-checks the upper `< MAX_CLIENTS`; the negative check
+/// keeps a server-supplied index from reaching past `cgs.clientinfo`.
+fn eventSaberClient(world: &CgWorld, entNum: c_int, isNpc: bool) -> Option<&clientInfo_t> {
+    if isNpc {
+        world.entity(entNum as usize).npcClient.as_deref()
+    } else if entNum >= 0 && entNum < MAX_CLIENTS_I32 {
+        Some(&world.cgs.clientinfo[entNum as usize])
+    } else {
+        None
+    }
+}
+
+/// Raven `CG_EntityEvent` — the client-side event dispatcher: turns one entity's
+/// `entityState_t.event` into its sound / effect / HUD / ghoul2 consequence.
+///
+/// `ds` threads in for the one chat-box call (EV_VOICECMD_SOUND); `position` is
+/// the caller's resolved event origin.
+///
+/// Raven's top-level `ci` (`cgs.clientinfo[clientNum]` / `cent->npcClient`) is a
+/// dead store — every arm that needs client info rebinds its own local — so only
+/// the ET_NPC `npcClient` allocation side-effect and `clientNum = es->number`
+/// survive from that setup.
+///
+/// §F19: many arms deref `cg.snap` unchecked; before the first snapshot the
+/// `snap_ref` `None` arm takes the no-op.
+///
+/// Source: `oracle/codemp/cgame/cg_event.c:1491-3691`
+pub fn CG_EntityEvent(ctx: &mut CgContext, ds: &DisplayState, centNum: usize, position: &vec3_t) {
+    let es = ctx.world.entity(centNum).currentState;
+    let event = es.event & !EV_EVENT_BITS;
+
+    if ctx.world.cvars.cg_debugEvents.integer != 0 {
+        CG_Printf(ctx, &format!("ent:{:3}  event:{:3} ", es.number, event));
+    }
+
+    if event == 0 {
+        DEBUGNAME(ctx, "ZEROEVENT");
+        return;
+    }
+
+    let mut clientNum = es.clientNum;
+    if clientNum < 0 || clientNum >= MAX_CLIENTS_I32 {
+        clientNum = 0;
+    }
+
+    if es.eType == entityType_t::ET_NPC as c_int {
+        clientNum = es.number;
+
+        if ctx.world.entity(centNum).npcClient.is_none() {
+            // allocate memory for it; CG_CreateNPCClient hands back a zeroed
+            // clientInfo_t (ghoul2Model already NULL). Raven's alloc-failure
+            // `assert(0); return;` can't fire — `Box` never returns null.
+            ctx.world.entity_mut(centNum).npcClient = Some(CG_CreateNPCClient());
+        }
+        // Raven's `ci = cent->npcClient; assert(ci)` is a dead store here.
+    }
+    // else: Raven's `ci = &cgs.clientinfo[clientNum]` is a pure dead store; ci
+    // is never read below (each arm rebinds its own), so it is dropped.
+
+    let ppsClientNum = ctx.world.cg.predictedPlayerState.clientNum;
+
+    match event {
+        //
+        // movement generated events
+        //
+        v if v == entity_event_t::EV_CLIENTJOIN as c_int => {
+            DEBUGNAME(ctx, "EV_CLIENTJOIN");
+
+            //Slight hack to force a local reinit of client entity on join.
+            //cl_ent is `&cg_entities[es->eventParm]` — always a valid ref, so
+            //Raven's `if (cl_ent)` is always true.
+            let cl_ent = ctx.world.entity_mut(es.eventParm as usize);
+            //cl_ent->torsoBolt = 0;
+            cl_ent.bolt1 = 0;
+            cl_ent.bolt2 = 0;
+            cl_ent.bolt3 = 0;
+            cl_ent.bolt4 = 0;
+            cl_ent.bodyHeight = 0.0; //SABER_LENGTH_MAX;
+                                     //cl_ent->saberExtendTime = 0;
+            cl_ent.boltInfo = 0;
+            cl_ent.frame_minus1_refreshed = 0;
+            cl_ent.frame_minus2_refreshed = 0;
+            cl_ent.frame_hold_time = 0;
+            cl_ent.frame_hold_refreshed = 0;
+            cl_ent.trickAlpha = 0;
+            cl_ent.trickAlphaTime = 0;
+            cl_ent.ghoul2weapon = null_mut();
+            cl_ent.weapon = WP_NONE;
+            cl_ent.teamPowerEffectTime = 0;
+            cl_ent.teamPowerType = 0;
+            cl_ent.numLoopingSounds = 0;
+            //cl_ent->localAnimIndex = 0;
+        }
+
+        v if v == entity_event_t::EV_FOOTSTEP as c_int => {
+            DEBUGNAME(ctx, "EV_FOOTSTEP");
+            if ctx.world.cvars.cg_footsteps.integer != 0 {
+                let soundType = match es.eventParm {
+                    m if m == MATERIAL_MUD => footstep_t::FOOTSTEP_MUDWALK,
+                    m if m == MATERIAL_DIRT => footstep_t::FOOTSTEP_DIRTWALK,
+                    m if m == MATERIAL_SAND => footstep_t::FOOTSTEP_SANDWALK,
+                    m if m == MATERIAL_SNOW => footstep_t::FOOTSTEP_SNOWWALK,
+                    m if m == MATERIAL_SHORTGRASS || m == MATERIAL_LONGGRASS => {
+                        footstep_t::FOOTSTEP_GRASSWALK
+                    }
+                    m if m == MATERIAL_SOLIDMETAL => footstep_t::FOOTSTEP_METALWALK,
+                    m if m == MATERIAL_HOLLOWMETAL => footstep_t::FOOTSTEP_PIPEWALK,
+                    m if m == MATERIAL_GRAVEL => footstep_t::FOOTSTEP_GRAVELWALK,
+                    m if m == MATERIAL_CARPET
+                        || m == MATERIAL_FABRIC
+                        || m == MATERIAL_CANVAS
+                        || m == MATERIAL_RUBBER
+                        || m == MATERIAL_PLASTIC =>
+                    {
+                        footstep_t::FOOTSTEP_RUGWALK
+                    }
+                    m if m == MATERIAL_SOLIDWOOD || m == MATERIAL_HOLLOWWOOD => {
+                        footstep_t::FOOTSTEP_WOODWALK
+                    }
+                    _ => footstep_t::FOOTSTEP_STONEWALK,
+                };
+
+                let idx = (ctx.world.bg_state.rng.rand() & 3) as usize;
+                let sfx = ctx.world.cgs.media.footsteps[soundType as usize][idx];
+                trap::S_StartSound(ctx.engine, None, es.number, CHAN_BODY, sfx);
+            }
+        }
+
+        v if v == entity_event_t::EV_FOOTSTEP_METAL as c_int => {
+            DEBUGNAME(ctx, "EV_FOOTSTEP_METAL");
+            if ctx.world.cvars.cg_footsteps.integer != 0 {
+                let idx = (ctx.world.bg_state.rng.rand() & 3) as usize;
+                let sfx =
+                    ctx.world.cgs.media.footsteps[footstep_t::FOOTSTEP_METALWALK as usize][idx];
+                trap::S_StartSound(ctx.engine, None, es.number, CHAN_BODY, sfx);
+            }
+        }
+
+        v if v == entity_event_t::EV_FOOTSPLASH as c_int => {
+            DEBUGNAME(ctx, "EV_FOOTSPLASH");
+            if ctx.world.cvars.cg_footsteps.integer != 0 {
+                let idx = (ctx.world.bg_state.rng.rand() & 3) as usize;
+                let sfx = ctx.world.cgs.media.footsteps[footstep_t::FOOTSTEP_SPLASH as usize][idx];
+                trap::S_StartSound(ctx.engine, None, es.number, CHAN_BODY, sfx);
+            }
+        }
+
+        v if v == entity_event_t::EV_FOOTWADE as c_int => {
+            DEBUGNAME(ctx, "EV_FOOTWADE");
+            if ctx.world.cvars.cg_footsteps.integer != 0 {
+                let idx = (ctx.world.bg_state.rng.rand() & 3) as usize;
+                let sfx = ctx.world.cgs.media.footsteps[footstep_t::FOOTSTEP_SPLASH as usize][idx];
+                trap::S_StartSound(ctx.engine, None, es.number, CHAN_BODY, sfx);
+            }
+        }
+
+        v if v == entity_event_t::EV_SWIM as c_int => {
+            DEBUGNAME(ctx, "EV_SWIM");
+            if ctx.world.cvars.cg_footsteps.integer != 0 {
+                let idx = (ctx.world.bg_state.rng.rand() & 3) as usize;
+                let sfx = ctx.world.cgs.media.footsteps[footstep_t::FOOTSTEP_SPLASH as usize][idx];
+                trap::S_StartSound(ctx.engine, None, es.number, CHAN_BODY, sfx);
+            }
+        }
+
+        v if v == entity_event_t::EV_FALL as c_int => {
+            DEBUGNAME(ctx, "EV_FALL");
+            let skip = ctx
+                .world
+                .cg
+                .snap_ref()
+                .is_some_and(|s| es.number == s.ps.clientNum && s.ps.fallingToDeath != 0);
+            if !skip {
+                DoFall(ctx, centNum, &es, clientNum);
+            }
+        }
+
+        v if v == entity_event_t::EV_STEP_4 as c_int
+            || v == entity_event_t::EV_STEP_8 as c_int
+            || v == entity_event_t::EV_STEP_12 as c_int
+            || v == entity_event_t::EV_STEP_16 as c_int =>
+        {
+            // smooth out step up transitions
+            DEBUGNAME(ctx, "EV_STEP");
+            'step: {
+                if clientNum != ctx.world.cg.predictedPlayerState.clientNum {
+                    break 'step;
+                }
+                // if we are interpolating, we don't need to smooth steps
+                let interp = ctx.world.cg.demoPlayback != qfalse
+                    || ctx
+                        .world
+                        .cg
+                        .snap_ref()
+                        .is_some_and(|s| (s.ps.pm_flags & PMF_FOLLOW) != 0)
+                    || ctx.world.cvars.cg_nopredict.integer != 0
+                    || ctx.world.cvars.cg_synchronousClients.integer != 0;
+                if interp {
+                    break 'step;
+                }
+                // check for stepping up before a previous step is completed
+                let delta = ctx.world.cg.time - ctx.world.cg.stepTime;
+                let oldStep = if delta < STEP_TIME {
+                    ctx.world.cg.stepChange * (STEP_TIME - delta) as f32 / STEP_TIME as f32
+                } else {
+                    0.0
+                };
+
+                // add this amount
+                let step = 4 * (event - entity_event_t::EV_STEP_4 as c_int + 1);
+                ctx.world.cg.stepChange = oldStep + step as f32;
+                if ctx.world.cg.stepChange > MAX_STEP_CHANGE as f32 {
+                    ctx.world.cg.stepChange = MAX_STEP_CHANGE as f32;
+                }
+                ctx.world.cg.stepTime = ctx.world.cg.time;
+            }
+        }
+
+        v if v == entity_event_t::EV_JUMP_PAD as c_int => {
+            DEBUGNAME(ctx, "EV_JUMP_PAD");
+        }
+
+        v if v == entity_event_t::EV_GHOUL2_MARK as c_int => {
+            DEBUGNAME(ctx, "EV_GHOUL2_MARK");
+            if ctx.world.cvars.cg_ghoul2Marks.integer != 0 {
+                //Can we put a burn mark on him?
+                CG_G2MarkEvent(ctx, &es);
+            }
+        }
+
+        v if v == entity_event_t::EV_GLOBAL_DUEL as c_int => {
+            DEBUGNAME(ctx, "EV_GLOBAL_DUEL");
+            //used for beginning of power duels
+            if es.otherEntityNum == ppsClientNum
+                || es.otherEntityNum2 == ppsClientNum
+                || es.groundEntityNum == ppsClientNum
+            {
+                let s = CG_GetStringEdString(ctx, "MP_SVGAME", "BEGIN_DUEL");
+                CG_CenterPrint(ctx.world, &s, 120, GIANTCHAR_WIDTH * 2);
+                let sfx = ctx.world.cgs.media.countFightSound;
+                trap::S_StartLocalSound(ctx.engine, sfx, CHAN_ANNOUNCER);
+            }
+        }
+
+        v if v == entity_event_t::EV_PRIVATE_DUEL as c_int => {
+            DEBUGNAME(ctx, "EV_PRIVATE_DUEL");
+            'duel: {
+                let is_me = ctx
+                    .world
+                    .cg
+                    .snap_ref()
+                    .is_some_and(|s| s.ps.clientNum == es.number);
+                if !is_me {
+                    break 'duel;
+                }
+
+                if es.eventParm != 0 {
+                    //starting the duel
+                    if es.eventParm == 2 {
+                        let s = CG_GetStringEdString(ctx, "MP_SVGAME", "BEGIN_DUEL");
+                        CG_CenterPrint(ctx.world, &s, 120, GIANTCHAR_WIDTH * 2);
+                        let sfx = ctx.world.cgs.media.countFightSound;
+                        trap::S_StartLocalSound(ctx.engine, sfx, CHAN_ANNOUNCER);
+                    } else {
+                        trap::S_StartBackgroundTrack(
+                            ctx.engine,
+                            "music/mp/duel.mp3",
+                            "music/mp/duel.mp3",
+                            false,
+                        );
+                    }
+                } else {
+                    //ending the duel
+                    CG_StartMusic(ctx, true);
+                }
+            }
+        }
+
+        v if v == entity_event_t::EV_JUMP as c_int => {
+            DEBUGNAME(ctx, "EV_JUMP");
+            if ctx.world.cvars.cg_jumpSounds.integer != 0 {
+                let custom = CG_CustomSound(ctx, es.number, "*jump1.wav");
+                trap::S_StartSound(ctx.engine, None, es.number, CHAN_VOICE, custom);
+            }
+        }
+
+        v if v == entity_event_t::EV_ROLL as c_int => {
+            DEBUGNAME(ctx, "EV_ROLL");
+            'roll: {
+                let dead_fall = ctx
+                    .world
+                    .cg
+                    .snap_ref()
+                    .is_some_and(|s| es.number == s.ps.clientNum && s.ps.fallingToDeath != 0);
+                if dead_fall {
+                    break 'roll;
+                }
+                if es.eventParm != 0 {
+                    //fall-roll-in-one event
+                    DoFall(ctx, centNum, &es, clientNum);
+                }
+
+                let custom = CG_CustomSound(ctx, es.number, "*jump1.wav");
+                trap::S_StartSound(ctx.engine, None, es.number, CHAN_VOICE, custom);
+                let rollSound = ctx.world.cgs.media.rollSound;
+                trap::S_StartSound(ctx.engine, None, es.number, CHAN_BODY, rollSound);
+                //FIXME: need some sort of body impact on ground sound and maybe kick up some dust?
+            }
+        }
+
+        v if v == entity_event_t::EV_TAUNT as c_int => {
+            DEBUGNAME(ctx, "EV_TAUNT");
+            let mut soundIndex = 0;
+            if ctx.world.cgs.gametype != GT_DUEL
+                && ctx.world.cgs.gametype != GT_POWERDUEL
+                && es.eventParm == TAUNT_TAUNT
+            {
+                //normal taunt
+                soundIndex = CG_CustomSound(ctx, es.number, "*taunt.wav");
+            } else {
+                match es.eventParm {
+                    TAUNT_BOW => {
+                        //soundIndex = CG_CustomSound( es->number, va("*respect%d.wav", Q_irand(1,3)) );
+                    }
+                    TAUNT_MEDITATE => {
+                        //soundIndex = CG_CustomSound( es->number, va("*meditate%d.wav", Q_irand(1,3)) );
+                    }
+                    TAUNT_FLOURISH => {
+                        if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
+                            let r = ctx.world.bg_state.rng.Q_irand(1, 3);
+                            soundIndex =
+                                CG_CustomSound(ctx, es.number, &format!("*deflect{r}.wav"));
+                            if soundIndex == 0 {
+                                let r = ctx.world.bg_state.rng.Q_irand(1, 3);
+                                soundIndex =
+                                    CG_CustomSound(ctx, es.number, &format!("*gloat{r}.wav"));
+                                if soundIndex == 0 {
+                                    let r = ctx.world.bg_state.rng.Q_irand(1, 3);
+                                    soundIndex =
+                                        CG_CustomSound(ctx, es.number, &format!("*anger{r}.wav"));
+                                }
+                            }
+                        } else {
+                            let r = ctx.world.bg_state.rng.Q_irand(1, 3);
+                            soundIndex = CG_CustomSound(ctx, es.number, &format!("*gloat{r}.wav"));
+                            if soundIndex == 0 {
+                                let r = ctx.world.bg_state.rng.Q_irand(1, 3);
+                                soundIndex =
+                                    CG_CustomSound(ctx, es.number, &format!("*deflect{r}.wav"));
+                                if soundIndex == 0 {
+                                    let r = ctx.world.bg_state.rng.Q_irand(1, 3);
+                                    soundIndex =
+                                        CG_CustomSound(ctx, es.number, &format!("*anger{r}.wav"));
+                                }
+                            }
+                        }
+                    }
+                    TAUNT_GLOAT => {
+                        let r = ctx.world.bg_state.rng.Q_irand(1, 3);
+                        soundIndex = CG_CustomSound(ctx, es.number, &format!("*victory{r}.wav"));
+                    }
+                    // TAUNT_TAUNT and any other value both land here.
+                    _ => {
+                        if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
+                            let r = ctx.world.bg_state.rng.Q_irand(1, 3);
+                            soundIndex = CG_CustomSound(ctx, es.number, &format!("*anger{r}.wav"));
+                        } else {
+                            let r = ctx.world.bg_state.rng.Q_irand(1, 3);
+                            soundIndex = CG_CustomSound(ctx, es.number, &format!("*taunt{r}.wav"));
+                            if soundIndex == 0 {
+                                let r = ctx.world.bg_state.rng.Q_irand(1, 3);
+                                soundIndex =
+                                    CG_CustomSound(ctx, es.number, &format!("*anger{r}.wav"));
+                            }
+                        }
+                    }
+                }
+            }
+            if soundIndex == 0 {
+                soundIndex = CG_CustomSound(ctx, es.number, "*taunt.wav");
+            }
+            if soundIndex != 0 {
+                trap::S_StartSound(ctx.engine, None, es.number, CHAN_VOICE, soundIndex);
+            }
+        }
+
+        //Begin NPC sounds
+        v if v == entity_event_t::EV_ANGER1 as c_int
+            || v == entity_event_t::EV_ANGER2 as c_int
+            || v == entity_event_t::EV_ANGER3 as c_int =>
+        {
+            //Say when acquire an enemy when didn't have one before
+            DEBUGNAME(ctx, "EV_ANGERx");
+            let n = event - entity_event_t::EV_ANGER1 as c_int + 1;
+            CG_TryPlayCustomSound(ctx, None, es.number, CHAN_VOICE, &format!("*anger{n}.wav"));
+        }
+
+        v if v == entity_event_t::EV_VICTORY1 as c_int
+            || v == entity_event_t::EV_VICTORY2 as c_int
+            || v == entity_event_t::EV_VICTORY3 as c_int =>
+        {
+            //Say when killed an enemy
+            DEBUGNAME(ctx, "EV_VICTORYx");
+            let n = event - entity_event_t::EV_VICTORY1 as c_int + 1;
+            CG_TryPlayCustomSound(
+                ctx,
+                None,
+                es.number,
+                CHAN_VOICE,
+                &format!("*victory{n}.wav"),
+            );
+        }
+
+        v if v == entity_event_t::EV_CONFUSE1 as c_int
+            || v == entity_event_t::EV_CONFUSE2 as c_int
+            || v == entity_event_t::EV_CONFUSE3 as c_int =>
+        {
+            //Say when confused
+            DEBUGNAME(ctx, "EV_CONFUSEDx");
+            let n = event - entity_event_t::EV_CONFUSE1 as c_int + 1;
+            CG_TryPlayCustomSound(
+                ctx,
+                None,
+                es.number,
+                CHAN_VOICE,
+                &format!("*confuse{n}.wav"),
+            );
+        }
+
+        v if v == entity_event_t::EV_PUSHED1 as c_int
+            || v == entity_event_t::EV_PUSHED2 as c_int
+            || v == entity_event_t::EV_PUSHED3 as c_int =>
+        {
+            //Say when pushed
+            DEBUGNAME(ctx, "EV_PUSHEDx");
+            let n = event - entity_event_t::EV_PUSHED1 as c_int + 1;
+            CG_TryPlayCustomSound(ctx, None, es.number, CHAN_VOICE, &format!("*pushed{n}.wav"));
+        }
+
+        v if v == entity_event_t::EV_CHOKE1 as c_int
+            || v == entity_event_t::EV_CHOKE2 as c_int
+            || v == entity_event_t::EV_CHOKE3 as c_int =>
+        {
+            //Say when choking
+            DEBUGNAME(ctx, "EV_CHOKEx");
+            let n = event - entity_event_t::EV_CHOKE1 as c_int + 1;
+            CG_TryPlayCustomSound(ctx, None, es.number, CHAN_VOICE, &format!("*choke{n}.wav"));
+        }
+
+        v if v == entity_event_t::EV_FFWARN as c_int => {
+            //Warn ally to stop shooting you
+            DEBUGNAME(ctx, "EV_FFWARN");
+            CG_TryPlayCustomSound(ctx, None, es.number, CHAN_VOICE, "*ffwarn.wav");
+        }
+
+        v if v == entity_event_t::EV_FFTURN as c_int => {
+            //Turn on ally after being shot by them
+            DEBUGNAME(ctx, "EV_FFTURN");
+            CG_TryPlayCustomSound(ctx, None, es.number, CHAN_VOICE, "*ffturn.wav");
+        }
+
+        //extra sounds for ST
+        v if v == entity_event_t::EV_CHASE1 as c_int
+            || v == entity_event_t::EV_CHASE2 as c_int
+            || v == entity_event_t::EV_CHASE3 as c_int =>
+        {
+            DEBUGNAME(ctx, "EV_CHASEx");
+            let n = event - entity_event_t::EV_CHASE1 as c_int + 1;
+            CG_TryPlayCustomSound(ctx, None, es.number, CHAN_VOICE, &format!("*chase{n}.wav"));
+        }
+
+        v if v == entity_event_t::EV_COVER1 as c_int
+            || v == entity_event_t::EV_COVER2 as c_int
+            || v == entity_event_t::EV_COVER3 as c_int
+            || v == entity_event_t::EV_COVER4 as c_int
+            || v == entity_event_t::EV_COVER5 as c_int =>
+        {
+            DEBUGNAME(ctx, "EV_COVERx");
+            let n = event - entity_event_t::EV_COVER1 as c_int + 1;
+            CG_TryPlayCustomSound(ctx, None, es.number, CHAN_VOICE, &format!("*cover{n}.wav"));
+        }
+
+        v if v == entity_event_t::EV_DETECTED1 as c_int
+            || v == entity_event_t::EV_DETECTED2 as c_int
+            || v == entity_event_t::EV_DETECTED3 as c_int
+            || v == entity_event_t::EV_DETECTED4 as c_int
+            || v == entity_event_t::EV_DETECTED5 as c_int =>
+        {
+            DEBUGNAME(ctx, "EV_DETECTEDx");
+            let n = event - entity_event_t::EV_DETECTED1 as c_int + 1;
+            CG_TryPlayCustomSound(
+                ctx,
+                None,
+                es.number,
+                CHAN_VOICE,
+                &format!("*detected{n}.wav"),
+            );
+        }
+
+        v if v == entity_event_t::EV_GIVEUP1 as c_int
+            || v == entity_event_t::EV_GIVEUP2 as c_int
+            || v == entity_event_t::EV_GIVEUP3 as c_int
+            || v == entity_event_t::EV_GIVEUP4 as c_int =>
+        {
+            DEBUGNAME(ctx, "EV_GIVEUPx");
+            let n = event - entity_event_t::EV_GIVEUP1 as c_int + 1;
+            CG_TryPlayCustomSound(ctx, None, es.number, CHAN_VOICE, &format!("*giveup{n}.wav"));
+        }
+
+        v if v == entity_event_t::EV_LOOK1 as c_int || v == entity_event_t::EV_LOOK2 as c_int => {
+            DEBUGNAME(ctx, "EV_LOOKx");
+            let n = event - entity_event_t::EV_LOOK1 as c_int + 1;
+            CG_TryPlayCustomSound(ctx, None, es.number, CHAN_VOICE, &format!("*look{n}.wav"));
+        }
+
+        v if v == entity_event_t::EV_LOST1 as c_int => {
+            DEBUGNAME(ctx, "EV_LOST1");
+            CG_TryPlayCustomSound(ctx, None, es.number, CHAN_VOICE, "*lost1.wav");
+        }
+
+        v if v == entity_event_t::EV_OUTFLANK1 as c_int
+            || v == entity_event_t::EV_OUTFLANK2 as c_int =>
+        {
+            DEBUGNAME(ctx, "EV_OUTFLANKx");
+            let n = event - entity_event_t::EV_OUTFLANK1 as c_int + 1;
+            CG_TryPlayCustomSound(
+                ctx,
+                None,
+                es.number,
+                CHAN_VOICE,
+                &format!("*outflank{n}.wav"),
+            );
+        }
+
+        v if v == entity_event_t::EV_ESCAPING1 as c_int
+            || v == entity_event_t::EV_ESCAPING2 as c_int
+            || v == entity_event_t::EV_ESCAPING3 as c_int =>
+        {
+            DEBUGNAME(ctx, "EV_ESCAPINGx");
+            let n = event - entity_event_t::EV_ESCAPING1 as c_int + 1;
+            CG_TryPlayCustomSound(
+                ctx,
+                None,
+                es.number,
+                CHAN_VOICE,
+                &format!("*escaping{n}.wav"),
+            );
+        }
+
+        v if v == entity_event_t::EV_SIGHT1 as c_int
+            || v == entity_event_t::EV_SIGHT2 as c_int
+            || v == entity_event_t::EV_SIGHT3 as c_int =>
+        {
+            DEBUGNAME(ctx, "EV_SIGHTx");
+            let n = event - entity_event_t::EV_SIGHT1 as c_int + 1;
+            CG_TryPlayCustomSound(ctx, None, es.number, CHAN_VOICE, &format!("*sight{n}.wav"));
+        }
+
+        v if v == entity_event_t::EV_SOUND1 as c_int
+            || v == entity_event_t::EV_SOUND2 as c_int
+            || v == entity_event_t::EV_SOUND3 as c_int =>
+        {
+            DEBUGNAME(ctx, "EV_SOUNDx");
+            let n = event - entity_event_t::EV_SOUND1 as c_int + 1;
+            CG_TryPlayCustomSound(ctx, None, es.number, CHAN_VOICE, &format!("*sound{n}.wav"));
+        }
+
+        v if v == entity_event_t::EV_SUSPICIOUS1 as c_int
+            || v == entity_event_t::EV_SUSPICIOUS2 as c_int
+            || v == entity_event_t::EV_SUSPICIOUS3 as c_int
+            || v == entity_event_t::EV_SUSPICIOUS4 as c_int
+            || v == entity_event_t::EV_SUSPICIOUS5 as c_int =>
+        {
+            DEBUGNAME(ctx, "EV_SUSPICIOUSx");
+            let n = event - entity_event_t::EV_SUSPICIOUS1 as c_int + 1;
+            CG_TryPlayCustomSound(
+                ctx,
+                None,
+                es.number,
+                CHAN_VOICE,
+                &format!("*suspicious{n}.wav"),
+            );
+        }
+
+        //extra sounds for Jedi
+        v if v == entity_event_t::EV_COMBAT1 as c_int
+            || v == entity_event_t::EV_COMBAT2 as c_int
+            || v == entity_event_t::EV_COMBAT3 as c_int =>
+        {
+            DEBUGNAME(ctx, "EV_COMBATx");
+            let n = event - entity_event_t::EV_COMBAT1 as c_int + 1;
+            CG_TryPlayCustomSound(ctx, None, es.number, CHAN_VOICE, &format!("*combat{n}.wav"));
+        }
+
+        v if v == entity_event_t::EV_JDETECTED1 as c_int
+            || v == entity_event_t::EV_JDETECTED2 as c_int
+            || v == entity_event_t::EV_JDETECTED3 as c_int =>
+        {
+            DEBUGNAME(ctx, "EV_JDETECTEDx");
+            let n = event - entity_event_t::EV_JDETECTED1 as c_int + 1;
+            CG_TryPlayCustomSound(
+                ctx,
+                None,
+                es.number,
+                CHAN_VOICE,
+                &format!("*jdetected{n}.wav"),
+            );
+        }
+
+        v if v == entity_event_t::EV_TAUNT1 as c_int
+            || v == entity_event_t::EV_TAUNT2 as c_int
+            || v == entity_event_t::EV_TAUNT3 as c_int =>
+        {
+            DEBUGNAME(ctx, "EV_TAUNTx");
+            let n = event - entity_event_t::EV_TAUNT1 as c_int + 1;
+            CG_TryPlayCustomSound(ctx, None, es.number, CHAN_VOICE, &format!("*taunt{n}.wav"));
+        }
+
+        v if v == entity_event_t::EV_JCHASE1 as c_int
+            || v == entity_event_t::EV_JCHASE2 as c_int
+            || v == entity_event_t::EV_JCHASE3 as c_int =>
+        {
+            DEBUGNAME(ctx, "EV_JCHASEx");
+            let n = event - entity_event_t::EV_JCHASE1 as c_int + 1;
+            CG_TryPlayCustomSound(ctx, None, es.number, CHAN_VOICE, &format!("*jchase{n}.wav"));
+        }
+
+        v if v == entity_event_t::EV_JLOST1 as c_int
+            || v == entity_event_t::EV_JLOST2 as c_int
+            || v == entity_event_t::EV_JLOST3 as c_int =>
+        {
+            DEBUGNAME(ctx, "EV_JLOSTx");
+            let n = event - entity_event_t::EV_JLOST1 as c_int + 1;
+            CG_TryPlayCustomSound(ctx, None, es.number, CHAN_VOICE, &format!("*jlost{n}.wav"));
+        }
+
+        v if v == entity_event_t::EV_DEFLECT1 as c_int
+            || v == entity_event_t::EV_DEFLECT2 as c_int
+            || v == entity_event_t::EV_DEFLECT3 as c_int =>
+        {
+            DEBUGNAME(ctx, "EV_DEFLECTx");
+            let n = event - entity_event_t::EV_DEFLECT1 as c_int + 1;
+            CG_TryPlayCustomSound(
+                ctx,
+                None,
+                es.number,
+                CHAN_VOICE,
+                &format!("*deflect{n}.wav"),
+            );
+        }
+
+        v if v == entity_event_t::EV_GLOAT1 as c_int
+            || v == entity_event_t::EV_GLOAT2 as c_int
+            || v == entity_event_t::EV_GLOAT3 as c_int =>
+        {
+            DEBUGNAME(ctx, "EV_GLOATx");
+            let n = event - entity_event_t::EV_GLOAT1 as c_int + 1;
+            CG_TryPlayCustomSound(ctx, None, es.number, CHAN_VOICE, &format!("*gloat{n}.wav"));
+        }
+
+        v if v == entity_event_t::EV_PUSHFAIL as c_int => {
+            DEBUGNAME(ctx, "EV_PUSHFAIL");
+            CG_TryPlayCustomSound(ctx, None, es.number, CHAN_VOICE, "*pushfail.wav");
+        }
+        //End NPC sounds
+        v if v == entity_event_t::EV_SIEGESPEC as c_int => {
+            DEBUGNAME(ctx, "EV_SIEGESPEC");
+            if es.owner == ppsClientNum {
+                ctx.world.draw.cg_siegeDeathTime = es.time;
+            }
+        }
+
+        v if v == entity_event_t::EV_WATER_TOUCH as c_int => {
+            DEBUGNAME(ctx, "EV_WATER_TOUCH");
+            let sfx = ctx.world.cgs.media.watrInSound;
+            trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, sfx);
+        }
+
+        v if v == entity_event_t::EV_WATER_LEAVE as c_int => {
+            DEBUGNAME(ctx, "EV_WATER_LEAVE");
+            let sfx = ctx.world.cgs.media.watrOutSound;
+            trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, sfx);
+        }
+
+        v if v == entity_event_t::EV_WATER_UNDER as c_int => {
+            DEBUGNAME(ctx, "EV_WATER_UNDER");
+            let sfx = ctx.world.cgs.media.watrUnSound;
+            trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, sfx);
+        }
+
+        v if v == entity_event_t::EV_WATER_CLEAR as c_int => {
+            DEBUGNAME(ctx, "EV_WATER_CLEAR");
+            let custom = CG_CustomSound(ctx, es.number, "*gasp.wav");
+            trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, custom);
+        }
+
+        v if v == entity_event_t::EV_ITEM_PICKUP as c_int => {
+            DEBUGNAME(ctx, "EV_ITEM_PICKUP");
+            'pickup: {
+                // player predicted
+                let mut index = ctx
+                    .world
+                    .entity(es.eventParm as usize)
+                    .currentState
+                    .modelindex;
+
+                if index < 1
+                    && ctx
+                        .world
+                        .entity(es.eventParm as usize)
+                        .currentState
+                        .isJediMaster
+                        != qfalse
+                {
+                    //a holocron most likely
+                    index = ctx
+                        .world
+                        .entity(es.eventParm as usize)
+                        .currentState
+                        .trickedentindex4;
+                    let holocronPickup = ctx.world.cgs.media.holocronPickup;
+                    trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, holocronPickup);
+
+                    let is_me = ctx
+                        .world
+                        .cg
+                        .snap_ref()
+                        .is_some_and(|s| es.number == s.ps.clientNum);
+                    // §F19: Raven indexes `showPowersName[index]` unchecked with
+                    // a server-supplied holocron index; out of range reads as
+                    // "no name" (skip the print) here.
+                    let powerName = showPowersName.get(index as usize).copied().flatten();
+                    if is_me {
+                        if let Some(powerName) = powerName {
+                            let strText = CG_GetStringEdString(ctx, "MP_INGAME", "PICKUPLINE");
+                            //Com_Printf("%s %s\n", strText, showPowersName[index]);
+                            let powerText = CG_GetStringEdString(ctx, "SP_INGAME", powerName);
+                            CG_CenterPrint(
+                                ctx.world,
+                                &format!("{strText} {powerText}\n"),
+                                (SCREEN_HEIGHT as f64 * 0.30) as c_int,
+                                BIGCHAR_WIDTH,
+                            );
+                        }
+                    }
+
+                    //Show the player their force selection bar in case picking the holocron up changed the current selection
+                    let sel = ctx.world.cg.snap_ref().map(|s| {
+                        (
+                            s.ps.clientNum,
+                            s.ps.fd.forcePowerSelected,
+                            s.ps.fd.forcePowersActive,
+                        )
+                    });
+                    if let Some((snapClientNum, forcePowerSelected, forcePowersActive)) = sel {
+                        if index != FP_SABER_OFFENSE
+                            && index != FP_SABER_DEFENSE
+                            && index != FP_SABERTHROW
+                            && index != FP_LEVITATION
+                            && es.number == snapClientNum
+                            && (index == forcePowerSelected
+                                || (forcePowersActive & (1 << forcePowerSelected)) == 0)
+                        {
+                            let mut newindex = false;
+                            if ctx.world.cg.forceSelect != index {
+                                ctx.world.cg.forceSelect = index;
+                                newindex = true;
+                            }
+
+                            if es.number == snapClientNum && newindex {
+                                // `cg.forceSelectTime` is `f32` here; Raven's
+                                // `int cg.time` widens into it (and the compare).
+                                let time = ctx.world.cg.time as f32;
+                                if ctx.world.cg.forceSelectTime < time {
+                                    ctx.world.cg.forceSelectTime = time;
+                                }
+                            }
+                        }
+                    }
+
+                    break 'pickup;
+                }
+
+                if ctx.world.entity(es.eventParm as usize).weapon >= ctx.world.cg.time {
+                    //rww - an unfortunately necessary hack to prevent double item pickups
+                    break 'pickup;
+                }
+
+                //Hopefully even if this entity is somehow removed and replaced with, say, another
+                //item, this time will have expired by the time that item needs to be picked up.
+                let time = ctx.world.cg.time;
+                ctx.world.entity_mut(es.eventParm as usize).weapon = time + 500;
+
+                if index < 1 || index >= bg_numItems {
+                    break 'pickup;
+                }
+                let item = &bg_itemlist[index as usize];
+
+                if
+                /*item->giType != IT_POWERUP && */
+                item.giType() != IT_TEAM {
+                    if let Some(pickup_sound) = item.pickup_sound {
+                        if !pickup_sound.is_empty() {
+                            let sfx = trap::S_RegisterSound(ctx.engine, pickup_sound);
+                            trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, sfx);
+                        }
+                    }
+                }
+
+                // show icon and name on status bar
+                let is_me = ctx
+                    .world
+                    .cg
+                    .snap_ref()
+                    .is_some_and(|s| es.number == s.ps.clientNum);
+                if is_me {
+                    CG_ItemPickup(ctx, index);
+                }
+            }
+        }
+
+        v if v == entity_event_t::EV_GLOBAL_ITEM_PICKUP as c_int => {
+            DEBUGNAME(ctx, "EV_GLOBAL_ITEM_PICKUP");
+            'gpickup: {
+                let index = es.eventParm; // player predicted
+
+                if index < 1 || index >= bg_numItems {
+                    break 'gpickup;
+                }
+                let item = &bg_itemlist[index as usize];
+                // powerup pickups are global
+                if let Some(pickup_sound) = item.pickup_sound {
+                    if !pickup_sound.is_empty() {
+                        if let Some(snapClientNum) = ctx.world.cg.snap_ref().map(|s| s.ps.clientNum)
+                        {
+                            let sfx = trap::S_RegisterSound(ctx.engine, pickup_sound);
+                            trap::S_StartSound(ctx.engine, None, snapClientNum, CHAN_AUTO, sfx);
+                        }
+                    }
+                }
+
+                // show icon and name on status bar
+                let is_me = ctx
+                    .world
+                    .cg
+                    .snap_ref()
+                    .is_some_and(|s| es.number == s.ps.clientNum);
+                if is_me {
+                    CG_ItemPickup(ctx, index);
+                }
+            }
+        }
+
+        v if v == entity_event_t::EV_VEH_FIRE as c_int => {
+            DEBUGNAME(ctx, "EV_VEH_FIRE");
+            // veh = &cg_entities[es->owner]; take it out to hand CG_VehMuzzleFireFX
+            // a &centity_t while ctx stays borrowed, then put it back (cg_ents.rs
+            // CG_General precedent).
+            // NOTE: CG_VehMuzzleFireFX's body is a cited todo!() behind the
+            // m_pVehicle presence guard - inert until the Vehicle_t referent
+            // pool lands (nothing assigns m_pVehicle yet), live the moment it
+            // does. Resolve the todo with that pool ruling.
+            let owner = es.owner as usize;
+            let veh = core::mem::replace(ctx.world.entity_mut(owner), centity_t::zeroed());
+            CG_VehMuzzleFireFX(ctx, &veh, &es);
+            *ctx.world.entity_mut(owner) = veh;
+        }
+
+        //
+        // weapon events
+        //
+        v if v == entity_event_t::EV_NOAMMO as c_int => {
+            DEBUGNAME(ctx, "EV_NOAMMO");
+            //		trap_S_StartSound (NULL, es->number, CHAN_AUTO, cgs.media.noAmmoSound );
+            'noammo: {
+                let snapClientNum = ctx.world.cg.snap_ref().map(|s| s.ps.clientNum);
+                let Some(snapClientNum) = snapClientNum else {
+                    break 'noammo;
+                };
+                if es.number != snapClientNum {
+                    break 'noammo;
+                }
+
+                let snapWeapon = ctx.world.cg.snap_ref().map(|s| s.ps.weapon).unwrap_or(0);
+
+                if CG_InFighter(ctx.world) || CG_InATST(ctx.world) || snapWeapon == WP_NONE {
+                    //just letting us know our vehicle is out of ammo
+                    //FIXME: flash something on HUD or give some message so we know we have no ammo
+                    // DEFERRED: Vehicle_t referent pool — Raven picks the
+                    // vehicle weapon's custom `soundNoAmmo` off
+                    // `localCent->m_pVehicle->m_pVehicleInfo->weapon[eventParm]`;
+                    // DEC-46.2's `Option<VehicleId>` answers presence only, so we
+                    // fall back to the default "no ammo" sound until the pool
+                    // lands (cg_draw.rs vehicle-HUD precedent).
+                    // Source: oracle/codemp/cgame/cg_event.c:2170-2179
+                    let noAmmoSound = ctx.world.cgs.media.noAmmoSound;
+                    trap::S_StartSound(ctx.engine, None, snapClientNum, CHAN_AUTO, noAmmoSound);
+
+                    //flash the HUD so they associate the sound with the visual indicator that they don't have enough ammo
+                    let time = ctx.world.cg.time;
+                    if ctx.world.draw.cg_vehicleAmmoWarningTime < time
+                        || ctx.world.draw.cg_vehicleAmmoWarning != es.eventParm
+                    {
+                        //if there's already one going, don't interrupt it (unless they tried to fire another weapon that's out of ammo)
+                        ctx.world.draw.cg_vehicleAmmoWarning = es.eventParm;
+                        ctx.world.draw.cg_vehicleAmmoWarningTime = time + 500;
+                    }
+                } else if snapWeapon == WP_SABER {
+                    let time = ctx.world.cg.time;
+                    ctx.world.cg.forceHUDTotalFlashTime = time + 1000;
+                } else {
+                    let mut weap = 0;
+
+                    if es.eventParm != 0 && es.eventParm < WP_NUM_WEAPONS {
+                        if let Some(s) = ctx.world.cg.snap_mut() {
+                            s.ps.stats[statIndex_t::STAT_WEAPONS as usize] &= !(1 << es.eventParm);
+                            weap = s.ps.weapon;
+                        }
+                    } else if es.eventParm != 0 {
+                        weap = es.eventParm - WP_NUM_WEAPONS;
+                    }
+                    CG_OutOfAmmoChange(ctx, weap);
+                }
+            }
+        }
+
+        v if v == entity_event_t::EV_CHANGE_WEAPON as c_int => {
+            DEBUGNAME(ctx, "EV_CHANGE_WEAPON");
+            let weapon = es.eventParm;
+
+            debug_assert!(weapon >= 0 && (weapon as usize) < MAX_WEAPONS);
+            // §F19: Raven's assert compiles out in retail and the OOB index
+            // reads garbage; eventParm is server-supplied, so skip instead.
+            if weapon < 0 || weapon as usize >= MAX_WEAPONS {
+                return;
+            }
+
+            let selectSound = ctx.world.cg_weapons[weapon as usize].selectSound;
+
+            if selectSound != 0 {
+                trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, selectSound);
+            } else if weapon != WP_SABER {
+                //not sure what SP is doing for this but I don't want a select sound for saber (it has the saber-turn-on)
+                let sfx = ctx.world.cgs.media.selectSound;
+                trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, sfx);
+            }
+        }
+
+        v if v == entity_event_t::EV_FIRE_WEAPON as c_int => {
+            DEBUGNAME(ctx, "EV_FIRE_WEAPON");
+            'fire: {
+                if es.number >= MAX_CLIENTS_I32 && es.eType != entityType_t::ET_NPC as c_int {
+                    //special case for turret firing
+                    if ctx.world.cg_weapons[WP_TURRET as usize].registered == qfalse {
+                        CG_RegisterWeapon(ctx, WP_TURRET);
+                    }
+
+                    let ghoul2 = ctx.world.entity(centNum).ghoul2;
+                    if ghoul2.is_null() {
+                        break 'fire;
+                    }
+
+                    if ctx.world.entity(centNum).bolt1 == 0 {
+                        let b = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*flash01");
+                        ctx.world.entity_mut(centNum).bolt1 = b;
+                    }
+                    if ctx.world.entity(centNum).bolt2 == 0 {
+                        let b = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*flash02");
+                        ctx.world.entity_mut(centNum).bolt2 = b;
+                    }
+                    let time = ctx.world.cg.time;
+                    trap::G2API_SetBoneAnim(
+                        ctx.engine,
+                        ghoul2,
+                        0,
+                        "Bone02",
+                        1,
+                        4,
+                        BONE_ANIM_OVERRIDE_FREEZE | BONE_ANIM_BLEND,
+                        1.0,
+                        time,
+                        -1.0,
+                        300,
+                    );
+
+                    let boltIndex = if es.eventParm != 0 {
+                        ctx.world.entity(centNum).bolt2
+                    } else {
+                        ctx.world.entity(centNum).bolt1
+                    };
+                    let angles = es.angles;
+                    let origin = es.origin;
+                    let modelScale = ctx.world.entity(centNum).modelScale;
+                    let mut matrix = mdxaBone_t {
+                        matrix: [[0.0; 4]; 3],
+                    };
+                    trap::G2API_GetBoltMatrix(
+                        ctx.engine,
+                        ghoul2,
+                        0,
+                        boltIndex,
+                        &mut matrix,
+                        &angles,
+                        &origin,
+                        time,
+                        Some(&mut ctx.world.cgs.gameModels[0]),
+                        &modelScale,
+                    );
+
+                    let gunpoint: vec3_t = [
+                        matrix.matrix[0][3],
+                        matrix.matrix[1][3],
+                        matrix.matrix[2][3],
+                    ];
+                    let gunangle: vec3_t = [
+                        -matrix.matrix[0][0],
+                        -matrix.matrix[1][0],
+                        -matrix.matrix[2][0],
+                    ];
+
+                    let eID = ctx.world.cgs.effects.mEmplacedMuzzleFlash;
+                    trap::FX_PlayEffectID(ctx.engine, eID, &gunpoint, &gunangle, -1, -1);
+                } else if es.weapon != WP_EMPLACED_GUN || es.eType == entityType_t::ET_NPC as c_int
+                {
+                    if es.eType == entityType_t::ET_NPC as c_int
+                        && es.NPC_class == class_t::CLASS_VEHICLE as c_int
+                        && ctx.world.entity(centNum).m_pVehicle.is_some()
+                    {
+                        //vehicles do nothing for clientside weapon fire events.. at least for now.
+                        break 'fire;
+                    }
+                    CG_FireWeapon(ctx, centNum, false);
+                }
+            }
+        }
+
+        v if v == entity_event_t::EV_ALT_FIRE as c_int => {
+            DEBUGNAME(ctx, "EV_ALT_FIRE");
+            'alt: {
+                if es.weapon == WP_EMPLACED_GUN {
+                    //don't do anything for emplaced stuff
+                    break 'alt;
+                }
+
+                if es.eType == entityType_t::ET_NPC as c_int
+                    && es.NPC_class == class_t::CLASS_VEHICLE as c_int
+                    && ctx.world.entity(centNum).m_pVehicle.is_some()
+                {
+                    //vehicles do nothing for clientside weapon fire events.. at least for now.
+                    break 'alt;
+                }
+
+                CG_FireWeapon(ctx, centNum, true);
+
+                //if you just exploded your detpacks and you have no ammo left for them, autoswitch
+                let detEmpty = ctx.world.cg.snap_ref().is_some_and(|s| {
+                    s.ps.clientNum == es.number
+                        && s.ps.weapon == WP_DET_PACK
+                        && s.ps.ammo[weaponData[WP_DET_PACK as usize].ammoIndex as usize] == 0
+                });
+                if detEmpty {
+                    CG_OutOfAmmoChange(ctx, WP_DET_PACK);
+                }
+            }
+        }
+
+        v if v == entity_event_t::EV_SABER_ATTACK as c_int => {
+            DEBUGNAME(ctx, "EV_SABER_ATTACK");
+            let r = ctx.world.bg_state.rng.Q_irand(1, 8);
+            let mut swingSound =
+                trap::S_RegisterSound(ctx.engine, &format!("sound/weapons/saber/saberhup{r}.wav"));
+
+            let idx = es.number;
+            let isNpc =
+                ctx.world.entity(idx as usize).currentState.eType == entityType_t::ET_NPC as c_int;
+            // custom swing sound: only when the client is valid and saber[0] has one
+            let has_swing = eventSaberClient(ctx.world, idx, isNpc)
+                .is_some_and(|c| c.infoValid != qfalse && c.saber[0].swingSound[0] != 0);
+            if has_swing {
+                let sr = ctx.world.bg_state.rng.Q_irand(0, 2) as usize;
+                swingSound =
+                    eventSaberClient(ctx.world, idx, isNpc).unwrap().saber[0].swingSound[sr];
+            }
+            trap::S_StartSound(
+                ctx.engine,
+                Some(&es.pos.trBase),
+                es.number,
+                CHAN_WEAPON,
+                swingSound,
+            );
+        }
+
+        v if v == entity_event_t::EV_SABER_HIT as c_int => {
+            DEBUGNAME(ctx, "EV_SABER_HIT");
+            let mut hitPersonFxID = ctx.world.cgs.effects.mSaberBloodSparks;
+            let mut hitPersonSmallFxID = ctx.world.cgs.effects.mSaberBloodSparksSmall;
+            let mut hitPersonMidFxID = ctx.world.cgs.effects.mSaberBloodSparksMid;
+            let mut hitOtherFxID = ctx.world.cgs.effects.mSaberCut;
+            let r = ctx.world.bg_state.rng.Q_irand(1, 3);
+            let mut hitSound =
+                trap::S_RegisterSound(ctx.engine, &format!("sound/weapons/saber/saberhit{r}.wav"));
+
+            if es.otherEntityNum2 >= 0 && es.otherEntityNum2 < ENTITYNUM_NONE {
+                //we have a specific person who is causing this effect, see if we should override it with any custom saber effects/sounds
+                let idx = es.otherEntityNum2;
+                let isNpc = ctx.world.entity(idx as usize).currentState.eType
+                    == entityType_t::ET_NPC as c_int;
+                let valid =
+                    eventSaberClient(ctx.world, idx, isNpc).is_some_and(|c| c.infoValid != qfalse);
+                if valid {
+                    let saberNum = es.weapon;
+                    let bladeNum = es.legsAnim;
+                    // §F19: `es->weapon` is a server-supplied saber index Raven
+                    // reads unchecked; out of `[MAX_SABERS]` range keeps the
+                    // default fx/sounds here.
+                    if saberNum >= 0 && (saberNum as usize) < MAX_SABERS {
+                        let sNum = saberNum as usize;
+                        let saberPtr: &mut saberInfo_t = if isNpc {
+                            &mut ctx
+                                .world
+                                .entity_mut(idx as usize)
+                                .npcClient
+                                .as_deref_mut()
+                                .unwrap()
+                                .saber[sNum]
+                        } else {
+                            &mut ctx.world.cgs.clientinfo[idx as usize].saber[sNum]
+                        };
+                        let useSecond =
+                            WP_SaberBladeUseSecondBladeStyle(saberPtr, bladeNum) != qfalse;
+
+                        // capture the handles in one borrow (incl. saber[0]'s
+                        // hitOtherEffect for Raven's index-0 quirk below)
+                        let (hitPE, hitPE2, hitOE, hitOE2, hitS, hitS2, saber0HitOther) = {
+                            let c = eventSaberClient(ctx.world, idx, isNpc).unwrap();
+                            let s = &c.saber[sNum];
+                            (
+                                s.hitPersonEffect,
+                                s.hitPersonEffect2,
+                                s.hitOtherEffect,
+                                s.hitOtherEffect2,
+                                s.hitSound,
+                                s.hit2Sound,
+                                c.saber[0].hitOtherEffect,
+                            )
+                        };
+
+                        if useSecond {
+                            //use second blade style values
+                            if hitPE2 != 0 {
+                                //custom hit person effect
+                                hitPersonFxID = hitPE2;
+                                hitPersonSmallFxID = hitPE2;
+                                hitPersonMidFxID = hitPE2;
+                            }
+                            if hitOE2 != 0 {
+                                //custom hit other effect
+                                hitOtherFxID = hitOE2;
+                            }
+                            if hitS2[0] != 0 {
+                                //custom hit sound
+                                hitSound = hitS2[ctx.world.bg_state.rng.Q_irand(0, 2) as usize];
+                            }
+                        } else {
+                            //use first blade style values
+                            if hitPE != 0 {
+                                //custom hit person effect
+                                hitPersonFxID = hitPE;
+                                hitPersonSmallFxID = hitPE;
+                                hitPersonMidFxID = hitPE;
+                            }
+                            if hitOE != 0 {
+                                //custom hit other effect
+                                //Raven reads saber[0] here (not saberNum) - kept.
+                                hitOtherFxID = saber0HitOther;
+                            }
+                            if hitS[0] != 0 {
+                                //custom hit sound
+                                hitSound = hitS[ctx.world.bg_state.rng.Q_irand(0, 2) as usize];
+                            }
+                        }
+                    }
+                }
+            }
+
+            if es.eventParm == 16 {
+                //Make lots of sparks, something special happened
+                let mut fxDir = es.angles;
+                if fxDir[0] == 0.0 && fxDir[1] == 0.0 && fxDir[2] == 0.0 {
+                    fxDir[1] = 1.0;
+                }
+                trap::S_StartSound(ctx.engine, Some(&es.origin), es.number, CHAN_AUTO, hitSound);
+                for _ in 0..6 {
+                    trap::FX_PlayEffectID(ctx.engine, hitPersonFxID, &es.origin, &fxDir, -1, -1);
+                }
+            } else if es.eventParm != 0 {
+                //hit a person
+                let mut fxDir = es.angles;
+                if fxDir[0] == 0.0 && fxDir[1] == 0.0 && fxDir[2] == 0.0 {
+                    fxDir[1] = 1.0;
+                }
+                trap::S_StartSound(ctx.engine, Some(&es.origin), es.number, CHAN_AUTO, hitSound);
+                if es.eventParm == 3 {
+                    // moderate or big hits.
+                    trap::FX_PlayEffectID(
+                        ctx.engine,
+                        hitPersonSmallFxID,
+                        &es.origin,
+                        &fxDir,
+                        -1,
+                        -1,
+                    );
+                } else if es.eventParm == 2 {
+                    // this is for really big hits.
+                    trap::FX_PlayEffectID(ctx.engine, hitPersonMidFxID, &es.origin, &fxDir, -1, -1);
+                } else {
+                    // this should really just be done in the effect itself, no?
+                    for _ in 0..3 {
+                        trap::FX_PlayEffectID(
+                            ctx.engine,
+                            hitPersonFxID,
+                            &es.origin,
+                            &fxDir,
+                            -1,
+                            -1,
+                        );
+                    }
+                }
+            } else {
+                //hit something else
+                let mut fxDir = es.angles;
+                if fxDir[0] == 0.0 && fxDir[1] == 0.0 && fxDir[2] == 0.0 {
+                    fxDir[1] = 1.0;
+                }
+                //old jk2mp method
+                /*
+                trap_S_StartSound(es->origin, es->number, CHAN_AUTO, trap_S_RegisterSound("sound/weapons/saber/saberhit.wav"));
+                trap_FX_PlayEffectID( trap_FX_RegisterEffect("saber/spark.efx"), es->origin, fxDir, -1, -1 );
+                */
+                trap::FX_PlayEffectID(ctx.engine, hitOtherFxID, &es.origin, &fxDir, -1, -1);
+            }
+
+            //rww - store the hit indecies + time so we can do between-frame visual tricks
+            if es.otherEntityNum != ENTITYNUM_NONE && es.otherEntityNum2 != ENTITYNUM_NONE {
+                let time = ctx.world.cg.time;
+                let saberOwner = ctx.world.entity_mut(es.otherEntityNum2 as usize);
+                saberOwner.serverSaberHitIndex = es.otherEntityNum;
+                saberOwner.serverSaberHitTime = time;
+                saberOwner.serverSaberFleshImpact = if es.eventParm != 0 { qtrue } else { qfalse };
+            }
+        }
+
+        v if v == entity_event_t::EV_SABER_BLOCK as c_int => {
+            DEBUGNAME(ctx, "EV_SABER_BLOCK");
+            if es.eventParm != 0 {
+                //saber block
+                let mut blockFXID = ctx.world.cgs.effects.mSaberBlock;
+                let r = ctx.world.bg_state.rng.Q_irand(1, 9);
+                let mut blockSound = trap::S_RegisterSound(
+                    ctx.engine,
+                    &format!("sound/weapons/saber/saberblock{r}.wav"),
+                );
+                let mut noFlare = false;
+
+                if es.otherEntityNum2 >= 0 && es.otherEntityNum2 < ENTITYNUM_NONE {
+                    //we have a specific person causing this, maybe override with custom saber effects/sounds
+                    let idx = es.otherEntityNum2;
+                    let isNpc = ctx.world.entity(idx as usize).currentState.eType
+                        == entityType_t::ET_NPC as c_int;
+                    let valid = eventSaberClient(ctx.world, idx, isNpc)
+                        .is_some_and(|c| c.infoValid != qfalse);
+                    if valid {
+                        let saberNum = es.weapon;
+                        let bladeNum = es.legsAnim;
+                        // §F19: server-supplied saber index, unchecked in Raven.
+                        if saberNum >= 0 && (saberNum as usize) < MAX_SABERS {
+                            let sNum = saberNum as usize;
+                            let saberPtr: &mut saberInfo_t = if isNpc {
+                                &mut ctx
+                                    .world
+                                    .entity_mut(idx as usize)
+                                    .npcClient
+                                    .as_deref_mut()
+                                    .unwrap()
+                                    .saber[sNum]
+                            } else {
+                                &mut ctx.world.cgs.clientinfo[idx as usize].saber[sNum]
+                            };
+                            let useSecond =
+                                WP_SaberBladeUseSecondBladeStyle(saberPtr, bladeNum) != qfalse;
+
+                            let (blockE, blockE2, blockS, blockS2, saberFlags2) = {
+                                let c = eventSaberClient(ctx.world, idx, isNpc).unwrap();
+                                let s = &c.saber[sNum];
+                                (
+                                    s.blockEffect,
+                                    s.blockEffect2,
+                                    s.blockSound,
+                                    s.block2Sound,
+                                    s.saberFlags2,
+                                )
+                            };
+
+                            if useSecond {
+                                //use second blade style values
+                                if blockE2 != 0 {
+                                    blockFXID = blockE2;
+                                }
+                                if blockS2[0] != 0 {
+                                    blockSound =
+                                        blockS2[ctx.world.bg_state.rng.Q_irand(0, 2) as usize];
+                                }
+                            } else {
+                                if blockE != 0 {
+                                    blockFXID = blockE;
+                                }
+                                if blockS[0] != 0 {
+                                    blockSound =
+                                        blockS[ctx.world.bg_state.rng.Q_irand(0, 2) as usize];
+                                }
+                            }
+                            if (saberFlags2 & SFL2_NO_CLASH_FLARE) != 0 {
+                                noFlare = true;
+                            }
+                        }
+                    }
+                }
+
+                let mut cullPass = false;
+                if ctx.world.cg.mInRMG != qfalse {
+                    let vieworg = ctx.world.cg.refdef.vieworg;
+                    let mut vecSub = [0.0; 3];
+                    _VectorSubtract(vieworg, es.origin, &mut vecSub);
+
+                    if VectorLength(vecSub) < 5000.0 {
+                        let mut tr = trace_t::zeroed();
+                        CG_Trace(
+                            ctx,
+                            &mut tr,
+                            &vieworg,
+                            &vec3_origin,
+                            &vec3_origin,
+                            &es.origin,
+                            ENTITYNUM_NONE,
+                            CONTENTS_TERRAIN | CONTENTS_SOLID,
+                        );
+
+                        if tr.fraction == 1.0 || (tr.entityNum as c_int) < MAX_CLIENTS_I32 {
+                            cullPass = true;
+                        }
+                    }
+                } else {
+                    cullPass = true;
+                }
+
+                if cullPass {
+                    let mut fxDir = es.angles;
+                    if fxDir[0] == 0.0 && fxDir[1] == 0.0 && fxDir[2] == 0.0 {
+                        fxDir[1] = 1.0;
+                    }
+                    trap::S_StartSound(
+                        ctx.engine,
+                        Some(&es.origin),
+                        es.number,
+                        CHAN_AUTO,
+                        blockSound,
+                    );
+                    trap::FX_PlayEffectID(ctx.engine, blockFXID, &es.origin, &fxDir, -1, -1);
+
+                    if !noFlare {
+                        ctx.world.draw.cg_saberFlashTime = ctx.world.cg.time - 50;
+                        ctx.world.draw.cg_saberFlashPos = es.origin;
+                    }
+                }
+            } else {
+                //projectile block
+                let mut fxDir = es.angles;
+                if fxDir[0] == 0.0 && fxDir[1] == 0.0 && fxDir[2] == 0.0 {
+                    fxDir[1] = 1.0;
+                }
+                let fx = ctx.world.cgs.effects.mBlasterDeflect;
+                trap::FX_PlayEffectID(ctx.engine, fx, &es.origin, &fxDir, -1, -1);
+            }
+        }
+
+        v if v == entity_event_t::EV_SABER_CLASHFLARE as c_int => {
+            DEBUGNAME(ctx, "EV_SABER_CLASHFLARE");
+            let mut cullPass = false;
+
+            if ctx.world.cg.mInRMG != qfalse {
+                let vieworg = ctx.world.cg.refdef.vieworg;
+                let mut vecSub = [0.0; 3];
+                _VectorSubtract(vieworg, es.origin, &mut vecSub);
+
+                if VectorLength(vecSub) < 5000.0 {
+                    let mut tr = trace_t::zeroed();
+                    CG_Trace(
+                        ctx,
+                        &mut tr,
+                        &vieworg,
+                        &vec3_origin,
+                        &vec3_origin,
+                        &es.origin,
+                        ENTITYNUM_NONE,
+                        CONTENTS_TERRAIN | CONTENTS_SOLID,
+                    );
+
+                    if tr.fraction == 1.0 || (tr.entityNum as c_int) < MAX_CLIENTS_I32 {
+                        cullPass = true;
+                    }
+                }
+            } else {
+                cullPass = true;
+            }
+
+            if cullPass {
+                ctx.world.draw.cg_saberFlashTime = ctx.world.cg.time - 50;
+                ctx.world.draw.cg_saberFlashPos = es.origin;
+            }
+            let r = ctx.world.bg_state.rng.Q_irand(1, 3);
+            let sfx =
+                trap::S_RegisterSound(ctx.engine, &format!("sound/weapons/saber/saberhitwall{r}"));
+            trap::S_StartSound(ctx.engine, Some(&es.origin), -1, CHAN_WEAPON, sfx);
+        }
+
+        v if v == entity_event_t::EV_SABER_UNHOLSTER as c_int => {
+            DEBUGNAME(ctx, "EV_SABER_UNHOLSTER");
+            let isNpc = es.eType == entityType_t::ET_NPC as c_int;
+            // capture the two soundOn handles from the resolved client, if any
+            let sounds = if isNpc {
+                ctx.world
+                    .entity(es.number as usize)
+                    .npcClient
+                    .as_deref()
+                    .map(|ci| (ci.saber[0].soundOn, ci.saber[1].soundOn))
+            } else if es.number < MAX_CLIENTS_I32 && es.number >= 0 {
+                let ci = &ctx.world.cgs.clientinfo[es.number as usize];
+                Some((ci.saber[0].soundOn, ci.saber[1].soundOn))
+            } else {
+                None
+            };
+
+            if let Some((soundOn0, soundOn1)) = sounds {
+                if soundOn0 != 0 {
+                    trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, soundOn0);
+                }
+                if soundOn1 != 0 {
+                    trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, soundOn1);
+                }
+            }
+        }
+
+        v if v == entity_event_t::EV_BECOME_JEDIMASTER as c_int => {
+            DEBUGNAME(ctx, "EV_SABER_UNHOLSTER");
+            let playerMins: vec3_t = [-15.0, -15.0, (DEFAULT_MINS_2 + 8) as f32];
+            let playerMaxs: vec3_t = [15.0, 15.0, DEFAULT_MAXS_2 as f32];
+            let mut ang = [0.0; 3];
+
+            VectorClear(&mut ang);
+            ang[ROLL] = 1.0;
+
+            let mut dpos = *position;
+            dpos[2] -= 4096.0;
+
+            let mut tr = trace_t::zeroed();
+            CG_Trace(
+                ctx,
+                &mut tr,
+                position,
+                &playerMins,
+                &playerMaxs,
+                &dpos,
+                es.number,
+                MASK_SOLID,
+            );
+            let pos = tr.endpos;
+
+            if tr.fraction != 1.0 {
+                let mJediSpawn = ctx.world.cgs.effects.mJediSpawn;
+                trap::FX_PlayEffectID(ctx.engine, mJediSpawn, &pos, &ang, -1, -1);
+
+                let sfx = trap::S_RegisterSound(ctx.engine, "sound/weapons/saber/saberon.wav");
+                trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, sfx);
+
+                let is_me = ctx
+                    .world
+                    .cg
+                    .snap_ref()
+                    .is_some_and(|s| s.ps.clientNum == es.number);
+                if is_me {
+                    let happyMusic = ctx.world.cgs.media.happyMusic;
+                    trap::S_StartLocalSound(ctx.engine, happyMusic, CHAN_LOCAL);
+                    CGCam_SetMusicMult(ctx.world, 0.3, 5000);
+                }
+            }
+        }
+
+        v if v == entity_event_t::EV_DISRUPTOR_MAIN_SHOT as c_int => {
+            DEBUGNAME(ctx, "EV_DISRUPTOR_MAIN_SHOT");
+            let is_local = ctx
+                .world
+                .cg
+                .snap_ref()
+                .is_some_and(|s| es.eventParm == s.ps.clientNum);
+            if !is_local || ctx.world.cg.renderingThirdPerson != qfalse {
+                //h4q3ry
+                let mut to = ctx.world.entity(centNum).currentState.origin2;
+                CG_GetClientWeaponMuzzleBoltPoint(ctx, es.eventParm, &mut to);
+                ctx.world.entity_mut(centNum).currentState.origin2 = to;
+            } else {
+                let fp = ctx.world.cg.lastFPFlashPoint;
+                if fp[0] != 0.0 || fp[1] != 0.0 || fp[2] != 0.0 {
+                    //get the position of the muzzle flash for the first person weapon model from the last frame
+                    ctx.world.entity_mut(centNum).currentState.origin2 = fp;
+                }
+            }
+            let origin2 = ctx.world.entity(centNum).currentState.origin2;
+            let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+            FX_DisruptorMainShot(ctx, &origin2, &lerpOrigin);
+        }
+
+        v if v == entity_event_t::EV_DISRUPTOR_SNIPER_SHOT as c_int => {
+            DEBUGNAME(ctx, "EV_DISRUPTOR_SNIPER_SHOT");
+            let is_local = ctx
+                .world
+                .cg
+                .snap_ref()
+                .is_some_and(|s| es.eventParm == s.ps.clientNum);
+            if !is_local || ctx.world.cg.renderingThirdPerson != qfalse {
+                //h4q3ry
+                let mut to = ctx.world.entity(centNum).currentState.origin2;
+                CG_GetClientWeaponMuzzleBoltPoint(ctx, es.eventParm, &mut to);
+                ctx.world.entity_mut(centNum).currentState.origin2 = to;
+            } else {
+                let fp = ctx.world.cg.lastFPFlashPoint;
+                if fp[0] != 0.0 || fp[1] != 0.0 || fp[2] != 0.0 {
+                    //get the position of the muzzle flash for the first person weapon model from the last frame
+                    ctx.world.entity_mut(centNum).currentState.origin2 = fp;
+                }
+            }
+            let origin2 = ctx.world.entity(centNum).currentState.origin2;
+            let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+            let shouldtarget = ctx.world.entity(centNum).currentState.shouldtarget;
+            FX_DisruptorAltShot(ctx, &origin2, &lerpOrigin, shouldtarget != qfalse);
+        }
+
+        v if v == entity_event_t::EV_DISRUPTOR_SNIPER_MISS as c_int => {
+            DEBUGNAME(ctx, "EV_DISRUPTOR_SNIPER_MISS");
+            let mut dir = [0.0; 3];
+            ByteToDir(es.eventParm, &mut dir);
+            let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+            if es.weapon != 0 {
+                //primary
+                FX_DisruptorHitWall(ctx, &lerpOrigin, &dir);
+            } else {
+                //secondary
+                FX_DisruptorAltMiss(ctx, &lerpOrigin, &dir);
+            }
+        }
+
+        v if v == entity_event_t::EV_DISRUPTOR_HIT as c_int => {
+            DEBUGNAME(ctx, "EV_DISRUPTOR_HIT");
+            let mut dir = [0.0; 3];
+            ByteToDir(es.eventParm, &mut dir);
+            let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+            if es.weapon != 0 {
+                //client
+                FX_DisruptorHitPlayer(ctx, &lerpOrigin, &dir, true);
+            } else {
+                //non-client
+                FX_DisruptorHitWall(ctx, &lerpOrigin, &dir);
+            }
+        }
+
+        v if v == entity_event_t::EV_DISRUPTOR_ZOOMSOUND as c_int => {
+            DEBUGNAME(ctx, "EV_DISRUPTOR_ZOOMSOUND");
+            let snap = ctx
+                .world
+                .cg
+                .snap_ref()
+                .map(|s| (s.ps.clientNum, s.ps.zoomMode));
+            if let Some((snapClientNum, zoomMode)) = snap {
+                if es.number == snapClientNum {
+                    if zoomMode != 0 {
+                        let sfx = trap::S_RegisterSound(
+                            ctx.engine,
+                            "sound/weapons/disruptor/zoomstart.wav",
+                        );
+                        trap::S_StartLocalSound(ctx.engine, sfx, CHAN_AUTO);
+                    } else {
+                        let sfx = trap::S_RegisterSound(
+                            ctx.engine,
+                            "sound/weapons/disruptor/zoomend.wav",
+                        );
+                        trap::S_StartLocalSound(ctx.engine, sfx, CHAN_AUTO);
+                    }
+                }
+            }
+        }
+
+        v if v == entity_event_t::EV_PREDEFSOUND as c_int => {
+            DEBUGNAME(ctx, "EV_PREDEFSOUND");
+            let mut sID = -1;
+
+            match es.eventParm {
+                m if m == pdSounds_t::PDSOUND_PROTECTHIT as c_int => {
+                    sID = trap::S_RegisterSound(ctx.engine, "sound/weapons/force/protecthit.mp3");
+                }
+                m if m == pdSounds_t::PDSOUND_PROTECT as c_int => {
+                    sID = trap::S_RegisterSound(ctx.engine, "sound/weapons/force/protect.mp3");
+                }
+                m if m == pdSounds_t::PDSOUND_ABSORBHIT as c_int => {
+                    sID = trap::S_RegisterSound(ctx.engine, "sound/weapons/force/absorbhit.mp3");
+                    if es.trickedentindex >= 0 && es.trickedentindex < MAX_CLIENTS_I32 {
+                        let clnum = es.trickedentindex as usize;
+                        let time = ctx.world.cg.time;
+                        let cl = ctx.world.entity_mut(clnum);
+                        cl.teamPowerEffectTime = time + 1000;
+                        cl.teamPowerType = 3;
+                    }
+                }
+                m if m == pdSounds_t::PDSOUND_ABSORB as c_int => {
+                    sID = trap::S_RegisterSound(ctx.engine, "sound/weapons/force/absorb.mp3");
+                }
+                m if m == pdSounds_t::PDSOUND_FORCEJUMP as c_int => {
+                    sID = trap::S_RegisterSound(ctx.engine, "sound/weapons/force/jump.mp3");
+                }
+                m if m == pdSounds_t::PDSOUND_FORCEGRIP as c_int => {
+                    sID = trap::S_RegisterSound(ctx.engine, "sound/weapons/force/grip.mp3");
+                }
+                _ => {}
+            }
+
+            // Raven's `if (sID != 1)` (note: not -1) is kept verbatim - the
+            // registered handle is never 1, so this always fires.
+            if sID != 1 {
+                trap::S_StartSound(ctx.engine, Some(&es.origin), es.number, CHAN_AUTO, sID);
+            }
+        }
+
+        v if v == entity_event_t::EV_TEAM_POWER as c_int => {
+            DEBUGNAME(ctx, "EV_TEAM_POWER");
+            let mut clnum = 0;
+            while clnum < MAX_CLIENTS_I32 {
+                if CG_InClientBitflags(&es, clnum) {
+                    let time = ctx.world.cg.time;
+                    if es.eventParm == 1 {
+                        //eventParm 1 is heal
+                        let sfx = ctx.world.cgs.media.teamHealSound;
+                        trap::S_StartSound(ctx.engine, None, clnum, CHAN_AUTO, sfx);
+                        let cl = ctx.world.entity_mut(clnum as usize);
+                        cl.teamPowerEffectTime = time + 1000;
+                        cl.teamPowerType = 1;
+                    } else {
+                        //eventParm 2 is force regen
+                        let sfx = ctx.world.cgs.media.teamRegenSound;
+                        trap::S_StartSound(ctx.engine, None, clnum, CHAN_AUTO, sfx);
+                        let cl = ctx.world.entity_mut(clnum as usize);
+                        cl.teamPowerEffectTime = time + 1000;
+                        cl.teamPowerType = 0;
+                    }
+                }
+                clnum += 1;
+            }
+        }
+
+        v if v == entity_event_t::EV_SCREENSHAKE as c_int => {
+            DEBUGNAME(ctx, "EV_SCREENSHAKE");
+            if es.modelindex == 0
+                || ctx.world.cg.predictedPlayerState.clientNum == es.modelindex - 1
+            {
+                CGCam_Shake(ctx.world, es.angles[0], es.time);
+            }
+        }
+
+        v if v == entity_event_t::EV_LOCALTIMER as c_int => {
+            DEBUGNAME(ctx, "EV_LOCALTIMER");
+            if es.owner == ppsClientNum {
+                CG_LocalTimingBar(ctx.world, es.time, es.time2);
+            }
+        }
+
+        v if v == entity_event_t::EV_USE_ITEM0 as c_int
+            || v == entity_event_t::EV_USE_ITEM1 as c_int
+            || v == entity_event_t::EV_USE_ITEM2 as c_int
+            || v == entity_event_t::EV_USE_ITEM3 as c_int
+            || v == entity_event_t::EV_USE_ITEM4 as c_int
+            || v == entity_event_t::EV_USE_ITEM5 as c_int
+            || v == entity_event_t::EV_USE_ITEM6 as c_int
+            || v == entity_event_t::EV_USE_ITEM7 as c_int
+            || v == entity_event_t::EV_USE_ITEM8 as c_int
+            || v == entity_event_t::EV_USE_ITEM9 as c_int
+            || v == entity_event_t::EV_USE_ITEM10 as c_int
+            || v == entity_event_t::EV_USE_ITEM11 as c_int
+            || v == entity_event_t::EV_USE_ITEM12 as c_int
+            || v == entity_event_t::EV_USE_ITEM13 as c_int
+            || v == entity_event_t::EV_USE_ITEM14 as c_int =>
+        {
+            // Raven has one DEBUGNAME per case (EV_USE_ITEM0..14); the dispatch
+            // body is identical `CG_UseItem(cent)`.
+            DEBUGNAME(ctx, "EV_USE_ITEM");
+            let cent = core::mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+            CG_UseItem(ctx, &cent);
+            *ctx.world.entity_mut(centNum) = cent;
+        }
+
+        v if v == entity_event_t::EV_ITEMUSEFAIL as c_int => {
+            DEBUGNAME(ctx, "EV_ITEMUSEFAIL");
+            let is_me = ctx
+                .world
+                .cg
+                .snap_ref()
+                .is_some_and(|s| s.ps.clientNum == es.number);
+            if is_me {
+                let refName = match es.eventParm {
+                    m if m == itemUseFail_t::SENTRY_NOROOM as c_int => Some("SENTRY_NOROOM"),
+                    m if m == itemUseFail_t::SENTRY_ALREADYPLACED as c_int => {
+                        Some("SENTRY_ALREADYPLACED")
+                    }
+                    m if m == itemUseFail_t::SHIELD_NOROOM as c_int => Some("SHIELD_NOROOM"),
+                    m if m == itemUseFail_t::SEEKER_ALREADYDEPLOYED as c_int => {
+                        Some("SEEKER_ALREADYDEPLOYED")
+                    }
+                    _ => None,
+                };
+
+                if let Some(refName) = refName {
+                    let psStringEDRef = CG_GetStringEdString(ctx, "MP_INGAME", refName);
+                    Com_Printf(ctx, &format!("{psStringEDRef}\n"));
+                }
+            }
+        }
+
+        //=================================================================
+        //
+        // other events
+        //
+        v if v == entity_event_t::EV_PLAYER_TELEPORT_IN as c_int => {
+            DEBUGNAME(ctx, "EV_PLAYER_TELEPORT_IN");
+            let playerMins: vec3_t = [-15.0, -15.0, (DEFAULT_MINS_2 + 8) as f32];
+            let playerMaxs: vec3_t = [15.0, 15.0, DEFAULT_MAXS_2 as f32];
+            let mut ang = [0.0; 3];
+
+            VectorClear(&mut ang);
+            ang[ROLL] = 1.0;
+
+            let mut dpos = *position;
+            dpos[2] -= 4096.0;
+
+            let mut tr = trace_t::zeroed();
+            CG_Trace(
+                ctx,
+                &mut tr,
+                position,
+                &playerMins,
+                &playerMaxs,
+                &dpos,
+                es.number,
+                MASK_SOLID,
+            );
+            let pos = tr.endpos;
+
+            let teleInSound = ctx.world.cgs.media.teleInSound;
+            trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, teleInSound);
+
+            if tr.fraction != 1.0 {
+                let mSpawn = ctx.world.cgs.effects.mSpawn;
+                trap::FX_PlayEffectID(ctx.engine, mSpawn, &pos, &ang, -1, -1);
+            }
+        }
+
+        v if v == entity_event_t::EV_PLAYER_TELEPORT_OUT as c_int => {
+            DEBUGNAME(ctx, "EV_PLAYER_TELEPORT_OUT");
+            let playerMins: vec3_t = [-15.0, -15.0, (DEFAULT_MINS_2 + 8) as f32];
+            let playerMaxs: vec3_t = [15.0, 15.0, DEFAULT_MAXS_2 as f32];
+            let mut ang = [0.0; 3];
+
+            VectorClear(&mut ang);
+            ang[ROLL] = 1.0;
+
+            let mut dpos = *position;
+            dpos[2] -= 4096.0;
+
+            let mut tr = trace_t::zeroed();
+            CG_Trace(
+                ctx,
+                &mut tr,
+                position,
+                &playerMins,
+                &playerMaxs,
+                &dpos,
+                es.number,
+                MASK_SOLID,
+            );
+            let pos = tr.endpos;
+
+            let teleOutSound = ctx.world.cgs.media.teleOutSound;
+            trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, teleOutSound);
+
+            if tr.fraction != 1.0 {
+                let mSpawn = ctx.world.cgs.effects.mSpawn;
+                trap::FX_PlayEffectID(ctx.engine, mSpawn, &pos, &ang, -1, -1);
+            }
+        }
+
+        v if v == entity_event_t::EV_ITEM_POP as c_int => {
+            DEBUGNAME(ctx, "EV_ITEM_POP");
+            let sfx = ctx.world.cgs.media.respawnSound;
+            trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, sfx);
+        }
+
+        v if v == entity_event_t::EV_ITEM_RESPAWN as c_int => {
+            DEBUGNAME(ctx, "EV_ITEM_RESPAWN");
+            let time = ctx.world.cg.time;
+            ctx.world.entity_mut(centNum).miscTime = time; // scale up from this
+            let sfx = ctx.world.cgs.media.respawnSound;
+            trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, sfx);
+        }
+
+        v if v == entity_event_t::EV_GRENADE_BOUNCE as c_int => {
+            DEBUGNAME(ctx, "EV_GRENADE_BOUNCE");
+            //Do something here?
+        }
+
+        v if v == entity_event_t::EV_SCOREPLUM as c_int => {
+            DEBUGNAME(ctx, "EV_SCOREPLUM");
+            let otherEntityNum = ctx.world.entity(centNum).currentState.otherEntityNum;
+            let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+            let time = ctx.world.entity(centNum).currentState.time;
+            CG_ScorePlum(ctx.world, otherEntityNum, &lerpOrigin, time);
+        }
+
+        v if v == entity_event_t::EV_CTFMESSAGE as c_int => {
+            DEBUGNAME(ctx, "EV_CTFMESSAGE");
+            CG_GetCTFMessageEvent(ctx, &es);
+        }
+
+        v if v == entity_event_t::EV_BODYFADE as c_int => {
+            'body: {
+                if es.eType != entityType_t::ET_BODY as c_int {
+                    debug_assert!(false, "EV_BODYFADE event from a non-corpse");
+                    break 'body;
+                }
+
+                let ghoul2 = ctx.world.entity(centNum).ghoul2;
+                if !ghoul2.is_null() && trap::G2_HaveWeGhoul2Models(ctx.engine, ghoul2) {
+                    //turn the inside of the face off, to avoid showing the mouth when we start alpha fading the corpse
+                    trap::G2API_SetSurfaceOnOff(
+                        ctx.engine,
+                        ghoul2,
+                        "head_eyes_mouth",
+                        0x0000_0002, /*G2SURFACEFLAG_OFF*/
+                    );
+                }
+
+                let time = ctx.world.cg.time;
+                ctx.world.entity_mut(centNum).bodyFadeTime = time + 60000;
+            }
+        }
+
+        //
+        // siege gameplay events
+        //
+        v if v == entity_event_t::EV_SIEGE_ROUNDOVER as c_int => {
+            DEBUGNAME(ctx, "EV_SIEGE_ROUNDOVER");
+            let weap = ctx.world.entity(centNum).currentState.weapon;
+            CG_SiegeRoundOver(ctx, weap as usize, es.eventParm);
+        }
+
+        v if v == entity_event_t::EV_SIEGE_OBJECTIVECOMPLETE as c_int => {
+            DEBUGNAME(ctx, "EV_SIEGE_OBJECTIVECOMPLETE");
+            let weap = ctx.world.entity(centNum).currentState.weapon;
+            let trickedentindex = ctx.world.entity(centNum).currentState.trickedentindex;
+            CG_SiegeObjectiveCompleted(ctx, weap as usize, es.eventParm, trickedentindex);
+        }
+
+        v if v == entity_event_t::EV_DESTROY_GHOUL2_INSTANCE as c_int => {
+            DEBUGNAME(ctx, "EV_DESTROY_GHOUL2_INSTANCE");
+            let idx = es.eventParm as usize;
+            let ghoul2 = ctx.world.entity(idx).ghoul2;
+            if !ghoul2.is_null() && trap::G2_HaveWeGhoul2Models(ctx.engine, ghoul2) {
+                if es.eventParm < MAX_CLIENTS_I32 {
+                    //You try to do very bad thing!
+                    // (_DEBUG-only warning omitted - not compiled in retail)
+                } else {
+                    // CleanGhoul2Models nulls the handle through the pointer;
+                    // read-modify-write the entity's `ghoul2` field to match.
+                    let mut g2 = ctx.world.entity(idx).ghoul2;
+                    trap::G2API_CleanGhoul2Models(ctx.engine, &mut g2);
+                    ctx.world.entity_mut(idx).ghoul2 = g2;
+                }
+            }
+        }
+
+        v if v == entity_event_t::EV_DESTROY_WEAPON_MODEL as c_int => {
+            DEBUGNAME(ctx, "EV_DESTROY_WEAPON_MODEL");
+            let idx = es.eventParm as usize;
+            let ghoul2 = ctx.world.entity(idx).ghoul2;
+            if !ghoul2.is_null()
+                && trap::G2_HaveWeGhoul2Models(ctx.engine, ghoul2)
+                && trap::G2API_HasGhoul2ModelOnIndex(ctx.engine, ghoul2, 1)
+            {
+                trap::G2API_RemoveGhoul2Model(ctx.engine, ghoul2, 1);
+                ctx.world.entity_mut(idx).ghoul2 = ghoul2;
+            }
+        }
+
+        v if v == entity_event_t::EV_GIVE_NEW_RANK as c_int => {
+            DEBUGNAME(ctx, "EV_GIVE_NEW_RANK");
+            let is_me = ctx
+                .world
+                .cg
+                .snap_ref()
+                .is_some_and(|s| es.trickedentindex == s.ps.clientNum);
+            if is_me {
+                trap::Cvar_Set(ctx.engine, "ui_rankChange", &format!("{}", es.eventParm));
+                trap::Cvar_Set(ctx.engine, "ui_myteam", &format!("{}", es.bolt2));
+
+                if (trap::Key_GetCatcher(ctx.engine) & KEYCATCH_UI) == 0 && es.bolt1 == 0 {
+                    trap::OpenUIMenu(ctx.engine, UIMENU_PLAYERCONFIG);
+                }
+            }
+        }
+
+        v if v == entity_event_t::EV_SET_FREE_SABER as c_int => {
+            DEBUGNAME(ctx, "EV_SET_FREE_SABER");
+            trap::Cvar_Set(ctx.engine, "ui_freeSaber", &format!("{}", es.eventParm));
+        }
+
+        v if v == entity_event_t::EV_SET_FORCE_DISABLE as c_int => {
+            DEBUGNAME(ctx, "EV_SET_FORCE_DISABLE");
+            trap::Cvar_Set(
+                ctx.engine,
+                "ui_forcePowerDisable",
+                &format!("{}", es.eventParm),
+            );
+        }
+
+        //
+        // missile impacts
+        //
+        v if v == entity_event_t::EV_CONC_ALT_IMPACT as c_int => {
+            DEBUGNAME(ctx, "EV_CONC_ALT_IMPACT");
+            // VectorNormalize mutates es->angles in place (a pointer into the
+            // entity in Raven); mirror that by writing the normalized angles
+            // back to the entity's currentState.
+            let mut angles = es.angles;
+            let shotDist = VectorNormalize(&mut angles);
+            ctx.world.entity_mut(centNum).currentState.angles = angles;
+
+            let mut spot = [0.0; 3];
+            let mut dist = 0.0f32;
+            while dist < shotDist {
+                //one effect would be.. a whole lot better
+                _VectorMA(es.origin2, dist, angles, &mut spot);
+                let ring = ctx.world.cgs.effects.mConcussionAltRing;
+                trap::FX_PlayEffectID(ctx.engine, ring, &spot, &es.angles2, -1, -1);
+                dist += 64.0;
+            }
+
+            let mut dir = [0.0; 3];
+            ByteToDir(es.eventParm, &mut dir);
+            CG_MissileHitWall(
+                ctx,
+                WP_CONCUSSION,
+                es.owner,
+                position,
+                &dir,
+                impactSound_t::IMPACTSOUND_DEFAULT,
+                true,
+                0,
+            );
+
+            FX_ConcAltShot(ctx, &es.origin2, &spot);
+
+            //steal the bezier effect from the disruptor
+            FX_DisruptorAltMiss(ctx, position, &dir);
+        }
+
+        v if v == entity_event_t::EV_MISSILE_STICK as c_int => {
+            DEBUGNAME(ctx, "EV_MISSILE_STICK");
+            //		trap_S_StartSound (NULL, es->number, CHAN_AUTO, cgs.media.missileStick );
+        }
+
+        v if v == entity_event_t::EV_MISSILE_HIT as c_int => {
+            DEBUGNAME(ctx, "EV_MISSILE_HIT");
+            let mut dir = [0.0; 3];
+            ByteToDir(es.eventParm, &mut dir);
+            if es.emplacedOwner != 0 {
+                //hack: this is an index to a custom effect to use
+                let fx = ctx.world.cgs.gameEffects[es.emplacedOwner as usize];
+                trap::FX_PlayEffectID(ctx.engine, fx, position, &dir, -1, -1);
+            } else {
+                let vwi = {
+                    let cent =
+                        core::mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+                    let r = CG_VehicleWeaponImpact(ctx, &cent);
+                    *ctx.world.entity_mut(centNum) = cent;
+                    r
+                };
+                if vwi {
+                    //a vehicle missile that uses an overridden impact effect...
+                } else if (es.eFlags & EF_ALT_FIRING) != 0 {
+                    CG_MissileHitPlayer(ctx, es.weapon, position, &dir, es.otherEntityNum, true);
+                } else {
+                    CG_MissileHitPlayer(ctx, es.weapon, position, &dir, es.otherEntityNum, false);
+                }
+            }
+
+            if ctx.world.cvars.cg_ghoul2Marks.integer != 0 && es.trickedentindex != 0 {
+                //flag to place a ghoul2 mark
+                CG_G2MarkEvent(ctx, &es);
+            }
+        }
+
+        v if v == entity_event_t::EV_MISSILE_MISS as c_int => {
+            DEBUGNAME(ctx, "EV_MISSILE_MISS");
+            let mut dir = [0.0; 3];
+            ByteToDir(es.eventParm, &mut dir);
+            if es.emplacedOwner != 0 {
+                //hack: this is an index to a custom effect to use
+                let fx = ctx.world.cgs.gameEffects[es.emplacedOwner as usize];
+                trap::FX_PlayEffectID(ctx.engine, fx, position, &dir, -1, -1);
+            } else {
+                let vwi = {
+                    let cent =
+                        core::mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+                    let r = CG_VehicleWeaponImpact(ctx, &cent);
+                    *ctx.world.entity_mut(centNum) = cent;
+                    r
+                };
+                if vwi {
+                    //a vehicle missile that used an overridden impact effect...
+                } else if (es.eFlags & EF_ALT_FIRING) != 0 {
+                    CG_MissileHitWall(
+                        ctx,
+                        es.weapon,
+                        0,
+                        position,
+                        &dir,
+                        impactSound_t::IMPACTSOUND_DEFAULT,
+                        true,
+                        es.generic1,
+                    );
+                } else {
+                    CG_MissileHitWall(
+                        ctx,
+                        es.weapon,
+                        0,
+                        position,
+                        &dir,
+                        impactSound_t::IMPACTSOUND_DEFAULT,
+                        false,
+                        0,
+                    );
+                }
+            }
+
+            if ctx.world.cvars.cg_ghoul2Marks.integer != 0 && es.trickedentindex != 0 {
+                //flag to place a ghoul2 mark
+                CG_G2MarkEvent(ctx, &es);
+            }
+        }
+
+        v if v == entity_event_t::EV_MISSILE_MISS_METAL as c_int => {
+            DEBUGNAME(ctx, "EV_MISSILE_MISS_METAL");
+            let mut dir = [0.0; 3];
+            ByteToDir(es.eventParm, &mut dir);
+            if es.emplacedOwner != 0 {
+                //hack: this is an index to a custom effect to use
+                let fx = ctx.world.cgs.gameEffects[es.emplacedOwner as usize];
+                trap::FX_PlayEffectID(ctx.engine, fx, position, &dir, -1, -1);
+            } else {
+                let vwi = {
+                    let cent =
+                        core::mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+                    let r = CG_VehicleWeaponImpact(ctx, &cent);
+                    *ctx.world.entity_mut(centNum) = cent;
+                    r
+                };
+                if vwi {
+                    //a vehicle missile that used an overridden impact effect...
+                } else if (es.eFlags & EF_ALT_FIRING) != 0 {
+                    CG_MissileHitWall(
+                        ctx,
+                        es.weapon,
+                        0,
+                        position,
+                        &dir,
+                        impactSound_t::IMPACTSOUND_METAL,
+                        true,
+                        es.generic1,
+                    );
+                } else {
+                    CG_MissileHitWall(
+                        ctx,
+                        es.weapon,
+                        0,
+                        position,
+                        &dir,
+                        impactSound_t::IMPACTSOUND_METAL,
+                        false,
+                        0,
+                    );
+                }
+            }
+        }
+
+        v if v == entity_event_t::EV_PLAY_EFFECT as c_int => {
+            DEBUGNAME(ctx, "EV_PLAY_EFFECT");
+            let eID = match es.eventParm {
+                //it isn't a hack, it's ingenuity!
+                m if m == effectTypes_t::EFFECT_SMOKE as c_int => {
+                    ctx.world.cgs.effects.mEmplacedDeadSmoke
+                }
+                m if m == effectTypes_t::EFFECT_EXPLOSION as c_int => {
+                    ctx.world.cgs.effects.mEmplacedExplode
+                }
+                m if m == effectTypes_t::EFFECT_EXPLOSION_PAS as c_int => {
+                    ctx.world.cgs.effects.mTurretExplode
+                }
+                m if m == effectTypes_t::EFFECT_SPARK_EXPLOSION as c_int => {
+                    ctx.world.cgs.effects.mSparkExplosion
+                }
+                m if m == effectTypes_t::EFFECT_EXPLOSION_TRIPMINE as c_int => {
+                    ctx.world.cgs.effects.mTripmineExplosion
+                }
+                m if m == effectTypes_t::EFFECT_EXPLOSION_DETPACK as c_int => {
+                    ctx.world.cgs.effects.mDetpackExplosion
+                }
+                m if m == effectTypes_t::EFFECT_EXPLOSION_FLECHETTE as c_int => {
+                    ctx.world.cgs.effects.mFlechetteAltBlow
+                }
+                m if m == effectTypes_t::EFFECT_STUNHIT as c_int => {
+                    ctx.world.cgs.effects.mStunBatonFleshImpact
+                }
+                m if m == effectTypes_t::EFFECT_EXPLOSION_DEMP2ALT as c_int => {
+                    let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+                    FX_DEMP2_AltDetonate(ctx, &lerpOrigin, es.weapon as f32);
+                    ctx.world.cgs.effects.mAltDetonate
+                }
+                m if m == effectTypes_t::EFFECT_EXPLOSION_TURRET as c_int => {
+                    ctx.world.cgs.effects.mTurretExplode
+                }
+                m if m == effectTypes_t::EFFECT_SPARKS as c_int => {
+                    ctx.world.cgs.effects.mSparksExplodeNoSound
+                }
+                m if m == effectTypes_t::EFFECT_WATER_SPLASH as c_int => {
+                    ctx.world.cgs.effects.waterSplash
+                }
+                m if m == effectTypes_t::EFFECT_ACID_SPLASH as c_int => {
+                    ctx.world.cgs.effects.acidSplash
+                }
+                m if m == effectTypes_t::EFFECT_LAVA_SPLASH as c_int => {
+                    ctx.world.cgs.effects.lavaSplash
+                }
+                m if m == effectTypes_t::EFFECT_LANDING_MUD as c_int => {
+                    ctx.world.cgs.effects.landingMud
+                }
+                m if m == effectTypes_t::EFFECT_LANDING_SAND as c_int => {
+                    ctx.world.cgs.effects.landingSand
+                }
+                m if m == effectTypes_t::EFFECT_LANDING_DIRT as c_int => {
+                    ctx.world.cgs.effects.landingDirt
+                }
+                m if m == effectTypes_t::EFFECT_LANDING_SNOW as c_int => {
+                    ctx.world.cgs.effects.landingSnow
+                }
+                m if m == effectTypes_t::EFFECT_LANDING_GRAVEL as c_int => {
+                    ctx.world.cgs.effects.landingGravel
+                }
+                _ => -1,
+            };
+
+            if eID != -1 {
+                let mut fxDir = es.angles;
+                if fxDir[0] == 0.0 && fxDir[1] == 0.0 && fxDir[2] == 0.0 {
+                    fxDir[1] = 1.0;
+                }
+                trap::FX_PlayEffectID(ctx.engine, eID, &es.origin, &fxDir, -1, -1);
+            }
+        }
+
+        v if v == entity_event_t::EV_PLAY_EFFECT_ID as c_int
+            || v == entity_event_t::EV_PLAY_PORTAL_EFFECT_ID as c_int =>
+        {
+            DEBUGNAME(ctx, "EV_PLAY_EFFECT_ID");
+            //This effect should only be played inside sky portals.
+            let portalEffect = event == entity_event_t::EV_PLAY_PORTAL_EFFECT_ID as c_int;
+
+            let mut fxDir = [0.0; 3];
+            AngleVectors(es.angles, Some(&mut fxDir), None, None);
+
+            if fxDir[0] == 0.0 && fxDir[1] == 0.0 && fxDir[2] == 0.0 {
+                fxDir[1] = 1.0;
+            }
+
+            let mut efxIndex = 0;
+            if ctx.world.cgs.gameEffects[es.eventParm as usize] != 0 {
+                efxIndex = ctx.world.cgs.gameEffects[es.eventParm as usize];
+            } else {
+                let s = CG_ConfigString(ctx, CS_EFFECTS + es.eventParm);
+                if !s.is_empty() {
+                    efxIndex = trap::FX_RegisterEffect(ctx.engine, &s);
+                }
+            }
+
+            if efxIndex != 0 {
+                if portalEffect {
+                    trap::FX_PlayPortalEffectID(ctx.engine, efxIndex, position, &fxDir, -1, -1);
+                } else {
+                    trap::FX_PlayEffectID(ctx.engine, efxIndex, position, &fxDir, -1, -1);
+                }
+            }
+        }
+
+        v if v == entity_event_t::EV_PLAYDOORSOUND as c_int => {
+            CG_PlayDoorSound(ctx, centNum, es.eventParm);
+        }
+
+        v if v == entity_event_t::EV_PLAYDOORLOOPSOUND as c_int => {
+            CG_PlayDoorLoopSound(ctx, centNum);
+        }
+
+        v if v == entity_event_t::EV_BMODEL_SOUND as c_int => {
+            DEBUGNAME(ctx, "EV_BMODEL_SOUND");
+            'bmodel: {
+                let soundSet = CG_ConfigString(ctx, CS_AMBIENT_SET + es.soundSetIndex);
+
+                if soundSet.is_empty() {
+                    break 'bmodel;
+                }
+
+                let sfx = trap::AS_GetBModelSound(ctx.engine, &soundSet, es.eventParm);
+
+                if sfx == -1 {
+                    break 'bmodel;
+                }
+
+                trap::S_StartSound(ctx.engine, None, es.number, CHAN_AUTO, sfx);
+            }
+        }
+
+        v if v == entity_event_t::EV_MUTE_SOUND as c_int => {
+            DEBUGNAME(ctx, "EV_MUTE_SOUND");
+            let idx = es.trickedentindex2 as usize;
+            if (ctx.world.entity(idx).currentState.eFlags & EF_SOUNDTRACKER) != 0 {
+                ctx.world.entity_mut(idx).currentState.eFlags -= EF_SOUNDTRACKER;
+            }
+            trap::S_MuteSound(ctx.engine, es.trickedentindex2, es.trickedentindex);
+            CG_S_StopLoopingSound(ctx.world, es.trickedentindex2 as usize, -1);
+        }
+
+        v if v == entity_event_t::EV_VOICECMD_SOUND as c_int => {
+            DEBUGNAME(ctx, "EV_VOICECMD_SOUND");
+            'voice: {
+                if es.groundEntityNum >= MAX_CLIENTS_I32 {
+                    //don't ever use this unless it is being used on a real client
+                    break 'voice;
+                }
+
+                let mut sfx = ctx.world.cgs.gameSounds[es.eventParm as usize];
+                let gnum = es.groundEntityNum as usize;
+
+                let sndStr = CG_ConfigString(ctx, CS_SOUNDS + es.eventParm);
+                let descr = CG_GetStringForVoiceSound(ctx, &sndStr);
+
+                if sfx == 0 {
+                    let s = CG_ConfigString(ctx, CS_SOUNDS + es.eventParm);
+                    sfx = CG_CustomSound(ctx, es.groundEntityNum, &s);
+                }
+
+                if sfx != 0 {
+                    let ciTeam = ctx.world.cgs.clientinfo[gnum].team;
+                    let myTeam = ctx.world.cg.predictedPlayerState.persistant[PERS_TEAM as usize];
+
+                    if es.groundEntityNum != ctx.world.cg.predictedPlayerState.clientNum {
+                        //play on the head as well to simulate hearing in radio and in world
+                        if ciTeam == myTeam {
+                            //don't hear it if this person is on the other team, but they can still
+                            //hear it in the world spot.
+                            if let Some(snapClientNum) =
+                                ctx.world.cg.snap_ref().map(|s| s.ps.clientNum)
+                            {
+                                trap::S_StartSound(
+                                    ctx.engine,
+                                    None,
+                                    snapClientNum,
+                                    CHAN_MENU1,
+                                    sfx,
+                                );
+                            }
+                        }
+                    }
+                    if ciTeam == myTeam {
+                        //add to the chat box
+                        let ciName = buf_to_string(
+                            &ctx.world.cgs.clientinfo[gnum]
+                                .name
+                                .iter()
+                                .map(|&c| c as u8)
+                                .collect::<Vec<u8>>(),
+                        );
+                        let vchatstr = format!("<{ciName}: {descr}>\n");
+                        CG_Printf(ctx, &vchatstr);
+                        CG_ChatBox_AddString(ctx, ds, &vchatstr);
+                    }
+
+                    //and play in world for everyone
+                    trap::S_StartSound(ctx.engine, None, es.groundEntityNum, CHAN_VOICE, sfx);
+                    let time = ctx.world.cg.time;
+                    ctx.world.entity_mut(gnum).vChatTime = time + 1000;
+                }
+            }
+        }
+
+        v if v == entity_event_t::EV_GENERAL_SOUND as c_int => {
+            DEBUGNAME(ctx, "EV_GENERAL_SOUND");
+            if es.saberEntityNum == trackchan_t::TRACK_CHANNEL_2 as c_int
+                || es.saberEntityNum == trackchan_t::TRACK_CHANNEL_3 as c_int
+                || es.saberEntityNum == trackchan_t::TRACK_CHANNEL_5 as c_int
+            {
+                //channels 2 and 3 are for speed and rage, 5 for sight
+                let gs = ctx.world.cgs.gameSounds[es.eventParm as usize];
+                if gs != 0 {
+                    CG_S_AddRealLoopingSound(
+                        ctx.world,
+                        es.number as usize,
+                        es.pos.trBase,
+                        vec3_origin,
+                        gs,
+                    );
+                }
+            } else {
+                let gs = ctx.world.cgs.gameSounds[es.eventParm as usize];
+                if gs != 0 {
+                    trap::S_StartSound(ctx.engine, None, es.number, es.saberEntityNum, gs);
+                } else {
+                    let s = CG_ConfigString(ctx, CS_SOUNDS + es.eventParm);
+                    let custom = CG_CustomSound(ctx, es.number, &s);
+                    trap::S_StartSound(ctx.engine, None, es.number, es.saberEntityNum, custom);
+                }
+            }
+        }
+
+        v if v == entity_event_t::EV_GLOBAL_SOUND as c_int => {
+            // play from the player's head so it never diminishes
+            DEBUGNAME(ctx, "EV_GLOBAL_SOUND");
+            let snapClientNum = ctx.world.cg.snap_ref().map(|s| s.ps.clientNum);
+            let gs = ctx.world.cgs.gameSounds[es.eventParm as usize];
+            if let Some(snapClientNum) = snapClientNum {
+                if gs != 0 {
+                    trap::S_StartSound(ctx.engine, None, snapClientNum, CHAN_MENU1, gs);
+                } else {
+                    let s = CG_ConfigString(ctx, CS_SOUNDS + es.eventParm);
+                    let custom = CG_CustomSound(ctx, es.number, &s);
+                    trap::S_StartSound(ctx.engine, None, snapClientNum, CHAN_MENU1, custom);
+                }
+            }
+        }
+
+        v if v == entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int => {
+            // play from the player's head so it never diminishes
+            DEBUGNAME(ctx, "EV_GLOBAL_TEAM_SOUND");
+            match es.eventParm {
+                m if m == global_team_sound_t::GTS_RED_CAPTURE as c_int => {
+                    // CTF: red team captured the blue flag, 1FCTF: red team captured the neutral flag
+                    //CG_AddBufferedSound( cgs.media.redScoredSound );
+                }
+                m if m == global_team_sound_t::GTS_BLUE_CAPTURE as c_int => {
+                    // CTF: blue team captured the red flag, 1FCTF: blue team captured the neutral flag
+                    //CG_AddBufferedSound( cgs.media.blueScoredSound );
+                }
+                m if m == global_team_sound_t::GTS_RED_RETURN as c_int => {
+                    // CTF: blue flag returned, 1FCTF: never used
+                    if ctx.world.cgs.gametype == GT_CTY {
+                        let sfx = ctx.world.cgs.media.blueYsalReturnedSound;
+                        CG_AddBufferedSound(ctx.world, sfx);
+                    } else {
+                        let sfx = ctx.world.cgs.media.blueFlagReturnedSound;
+                        CG_AddBufferedSound(ctx.world, sfx);
+                    }
+                }
+                m if m == global_team_sound_t::GTS_BLUE_RETURN as c_int => {
+                    // CTF red flag returned, 1FCTF: neutral flag returned
+                    if ctx.world.cgs.gametype == GT_CTY {
+                        let sfx = ctx.world.cgs.media.redYsalReturnedSound;
+                        CG_AddBufferedSound(ctx.world, sfx);
+                    } else {
+                        let sfx = ctx.world.cgs.media.redFlagReturnedSound;
+                        CG_AddBufferedSound(ctx.world, sfx);
+                    }
+                }
+                m if m == global_team_sound_t::GTS_RED_TAKEN as c_int => {
+                    // CTF: red team took blue flag, 1FCTF: blue team took the neutral flag
+                    // if this player picked up the flag then a sound is played in CG_CheckLocalSounds
+                    if ctx.world.cgs.gametype == GT_CTY {
+                        let sfx = ctx.world.cgs.media.redTookYsalSound;
+                        CG_AddBufferedSound(ctx.world, sfx);
+                    } else {
+                        let sfx = ctx.world.cgs.media.redTookFlagSound;
+                        CG_AddBufferedSound(ctx.world, sfx);
+                    }
+                }
+                m if m == global_team_sound_t::GTS_BLUE_TAKEN as c_int => {
+                    // CTF: blue team took the red flag, 1FCTF red team took the neutral flag
+                    // if this player picked up the flag then a sound is played in CG_CheckLocalSounds
+                    if ctx.world.cgs.gametype == GT_CTY {
+                        let sfx = ctx.world.cgs.media.blueTookYsalSound;
+                        CG_AddBufferedSound(ctx.world, sfx);
+                    } else {
+                        let sfx = ctx.world.cgs.media.blueTookFlagSound;
+                        CG_AddBufferedSound(ctx.world, sfx);
+                    }
+                }
+                m if m == global_team_sound_t::GTS_REDTEAM_SCORED as c_int => {
+                    let sfx = ctx.world.cgs.media.redScoredSound;
+                    CG_AddBufferedSound(ctx.world, sfx);
+                }
+                m if m == global_team_sound_t::GTS_BLUETEAM_SCORED as c_int => {
+                    let sfx = ctx.world.cgs.media.blueScoredSound;
+                    CG_AddBufferedSound(ctx.world, sfx);
+                }
+                m if m == global_team_sound_t::GTS_REDTEAM_TOOK_LEAD as c_int => {
+                    let sfx = ctx.world.cgs.media.redLeadsSound;
+                    CG_AddBufferedSound(ctx.world, sfx);
+                }
+                m if m == global_team_sound_t::GTS_BLUETEAM_TOOK_LEAD as c_int => {
+                    let sfx = ctx.world.cgs.media.blueLeadsSound;
+                    CG_AddBufferedSound(ctx.world, sfx);
+                }
+                m if m == global_team_sound_t::GTS_TEAMS_ARE_TIED as c_int => {
+                    let sfx = ctx.world.cgs.media.teamsTiedSound;
+                    CG_AddBufferedSound(ctx.world, sfx);
+                }
+                _ => {}
+            }
+        }
+
+        v if v == entity_event_t::EV_ENTITY_SOUND as c_int => {
+            DEBUGNAME(ctx, "EV_ENTITY_SOUND");
+            //somewhat of a hack - weapon is the caller entity's index, trickedentindex is the proper sound channel
+            let gs = ctx.world.cgs.gameSounds[es.eventParm as usize];
+            if gs != 0 {
+                trap::S_StartSound(ctx.engine, None, es.clientNum, es.trickedentindex, gs);
+            } else {
+                let s = CG_ConfigString(ctx, CS_SOUNDS + es.eventParm);
+                let custom = CG_CustomSound(ctx, es.clientNum, &s);
+                trap::S_StartSound(ctx.engine, None, es.clientNum, es.trickedentindex, custom);
+            }
+        }
+
+        v if v == entity_event_t::EV_PLAY_ROFF as c_int => {
+            DEBUGNAME(ctx, "EV_PLAY_ROFF");
+            trap::ROFF_Play(ctx.engine, es.weapon, es.eventParm, es.trickedentindex != 0);
+        }
+
+        v if v == entity_event_t::EV_GLASS_SHATTER as c_int => {
+            DEBUGNAME(ctx, "EV_GLASS_SHATTER");
+            CG_GlassShatter(
+                ctx,
+                es.genericenemyindex as usize,
+                &es.origin,
+                &es.angles,
+                es.trickedentindex as f32,
+                es.pos.trTime,
+            );
+        }
+
+        v if v == entity_event_t::EV_DEBRIS as c_int => {
+            DEBUGNAME(ctx, "EV_DEBRIS");
+            CG_Chunks(
+                ctx,
+                es.owner,
+                &es.origin,
+                &es.angles,
+                &es.origin2,
+                &es.angles2,
+                es.speed,
+                es.eventParm,
+                es.trickedentindex,
+                es.modelindex,
+                es.apos.trBase[0],
+            );
+        }
+
+        v if v == entity_event_t::EV_MISC_MODEL_EXP as c_int => {
+            DEBUGNAME(ctx, "EV_MISC_MODEL_EXP");
+            CG_MiscModelExplosion(ctx, es.origin2, es.angles2, es.time, es.eventParm);
+        }
+
+        v if v == entity_event_t::EV_PAIN as c_int => {
+            // local player sounds are triggered in CG_CheckLocalSounds,
+            // so ignore events on the player
+            DEBUGNAME(ctx, "EV_PAIN");
+            let is_local = ctx
+                .world
+                .cg
+                .snap_ref()
+                .is_some_and(|s| es.number == s.ps.clientNum);
+            if ctx.world.cvars.cg_oldPainSounds.integer == 0 || !is_local {
+                CG_PainEvent(ctx, centNum, es.eventParm);
+            }
+        }
+
+        v if v == entity_event_t::EV_DEATH1 as c_int
+            || v == entity_event_t::EV_DEATH2 as c_int
+            || v == entity_event_t::EV_DEATH3 as c_int =>
+        {
+            DEBUGNAME(ctx, "EV_DEATHx");
+            let n = event - entity_event_t::EV_DEATH1 as c_int + 1;
+            let custom = CG_CustomSound(ctx, es.number, &format!("*death{n}.wav"));
+            trap::S_StartSound(ctx.engine, None, es.number, CHAN_VOICE, custom);
+            let is_me = ctx
+                .world
+                .cg
+                .snap_ref()
+                .is_some_and(|s| es.number == s.ps.clientNum);
+            if es.eventParm != 0 && is_me {
+                let dramaticFailure = ctx.world.cgs.media.dramaticFailure;
+                trap::S_StartLocalSound(ctx.engine, dramaticFailure, CHAN_LOCAL);
+                CGCam_SetMusicMult(ctx.world, 0.3, 5000);
+            }
+        }
+
+        v if v == entity_event_t::EV_OBITUARY as c_int => {
+            DEBUGNAME(ctx, "EV_OBITUARY");
+            CG_Obituary(ctx, &es);
+        }
+
+        //
+        // powerup events
+        //
+        v if v == entity_event_t::EV_POWERUP_QUAD as c_int => {
+            DEBUGNAME(ctx, "EV_POWERUP_QUAD");
+            let is_me = ctx
+                .world
+                .cg
+                .snap_ref()
+                .is_some_and(|s| es.number == s.ps.clientNum);
+            if is_me {
+                ctx.world.cg.powerupActive = PW_QUAD;
+                ctx.world.cg.powerupTime = ctx.world.cg.time;
+            }
+            //trap_S_StartSound (NULL, es->number, CHAN_ITEM, cgs.media.quadSound );
+        }
+
+        v if v == entity_event_t::EV_POWERUP_BATTLESUIT as c_int => {
+            DEBUGNAME(ctx, "EV_POWERUP_BATTLESUIT");
+            let is_me = ctx
+                .world
+                .cg
+                .snap_ref()
+                .is_some_and(|s| es.number == s.ps.clientNum);
+            if is_me {
+                ctx.world.cg.powerupActive = PW_BATTLESUIT;
+                ctx.world.cg.powerupTime = ctx.world.cg.time;
+            }
+            //trap_S_StartSound (NULL, es->number, CHAN_ITEM, cgs.media.protectSound );
+        }
+
+        v if v == entity_event_t::EV_FORCE_DRAINED as c_int => {
+            DEBUGNAME(ctx, "EV_FORCE_DRAINED");
+            let mut dir = [0.0; 3];
+            ByteToDir(es.eventParm, &mut dir);
+            //FX_ForceDrained(position, dir);
+            let drainSound = ctx.world.cgs.media.drainSound;
+            trap::S_StartSound(ctx.engine, None, es.owner, CHAN_AUTO, drainSound);
+            let time = ctx.world.cg.time;
+            let cl = ctx.world.entity_mut(es.owner as usize);
+            cl.teamPowerEffectTime = time + 1000;
+            cl.teamPowerType = 2;
+        }
+
+        v if v == entity_event_t::EV_GIB_PLAYER as c_int => {
+            DEBUGNAME(ctx, "EV_GIB_PLAYER");
+            //trap_S_StartSound( NULL, es->number, CHAN_BODY, cgs.media.gibSound );
+            //CG_GibPlayer( cent->lerpOrigin );
+        }
+
+        v if v == entity_event_t::EV_STARTLOOPINGSOUND as c_int => {
+            DEBUGNAME(ctx, "EV_STARTLOOPINGSOUND");
+            let isnd = if ctx.world.cgs.gameSounds[es.eventParm as usize] != 0 {
+                ctx.world.cgs.gameSounds[es.eventParm as usize]
+            } else {
+                let s = CG_ConfigString(ctx, CS_SOUNDS + es.eventParm);
+                CG_CustomSound(ctx, es.number, &s)
+            };
+
+            CG_S_AddRealLoopingSound(
+                ctx.world,
+                es.number as usize,
+                es.pos.trBase,
+                vec3_origin,
+                isnd,
+            );
+            ctx.world.entity_mut(centNum).currentState.loopSound = isnd;
+        }
+
+        v if v == entity_event_t::EV_STOPLOOPINGSOUND as c_int => {
+            DEBUGNAME(ctx, "EV_STOPLOOPINGSOUND");
+            CG_S_StopLoopingSound(ctx.world, es.number as usize, -1);
+            ctx.world.entity_mut(centNum).currentState.loopSound = 0;
+        }
+
+        v if v == entity_event_t::EV_WEAPON_CHARGE as c_int => {
+            DEBUGNAME(ctx, "EV_WEAPON_CHARGE");
+            debug_assert!(es.eventParm > WP_NONE && es.eventParm < WP_NUM_WEAPONS);
+            let chargeSound = ctx.world.cg_weapons[es.eventParm as usize].chargeSound;
+            if chargeSound != 0 {
+                trap::S_StartSound(ctx.engine, None, es.number, CHAN_WEAPON, chargeSound);
+            } else if es.eventParm == WP_DISRUPTOR {
+                let sfx = ctx.world.cgs.media.disruptorZoomLoop;
+                trap::S_StartSound(ctx.engine, None, es.number, CHAN_WEAPON, sfx);
+            }
+        }
+
+        v if v == entity_event_t::EV_WEAPON_CHARGE_ALT as c_int => {
+            DEBUGNAME(ctx, "EV_WEAPON_CHARGE_ALT");
+            debug_assert!(es.eventParm > WP_NONE && es.eventParm < WP_NUM_WEAPONS);
+            let altChargeSound = ctx.world.cg_weapons[es.eventParm as usize].altChargeSound;
+            if altChargeSound != 0 {
+                trap::S_StartSound(ctx.engine, None, es.number, CHAN_WEAPON, altChargeSound);
+            }
+        }
+
+        v if v == entity_event_t::EV_SHIELD_HIT as c_int => {
+            DEBUGNAME(ctx, "EV_SHIELD_HIT");
+            let mut dir = [0.0; 3];
+            ByteToDir(es.eventParm, &mut dir);
+            CG_PlayerShieldHit(ctx.world, es.otherEntityNum, &mut dir, es.time2);
+        }
+
+        v if v == entity_event_t::EV_DEBUG_LINE as c_int => {
+            DEBUGNAME(ctx, "EV_DEBUG_LINE");
+            CG_Beam(ctx, centNum);
+        }
+
+        v if v == entity_event_t::EV_TESTLINE as c_int => {
+            DEBUGNAME(ctx, "EV_TESTLINE");
+            CG_TestLine(
+                ctx.world,
+                &es.origin,
+                &es.origin2,
+                es.time2,
+                es.weapon as c_uint,
+                1,
+            );
+        }
+
+        _ => {
+            DEBUGNAME(ctx, "UNKNOWN");
+            CG_Error(ctx, &format!("Unknown event: {event}"));
+        }
     }
 }

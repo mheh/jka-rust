@@ -2421,6 +2421,73 @@ pub fn CG_ImpactMark(
     }
 }
 
+/// Raven `CG_BloodPool` — spawns a fading blood-pool decal particle under a
+/// gib/wound trace, once [`ValidBloodPool`] confirms the spot is flush world
+/// geometry.
+///
+/// Source: `oracle/codemp/cgame/cg_marks.c:1948-2006`
+pub fn CG_BloodPool(ctx: &mut CgContext, _le: EffectHandle, pshader: qhandle_t, tr: &trace_t) {
+    if pshader == 0 {
+        CG_Printf(ctx, "CG_BloodPool pshader == ZERO!\n");
+    }
+
+    let Some(pnum) = ctx.world.marks.free_particles else {
+        return;
+    };
+
+    let start = tr.endpos;
+    let legit = ValidBloodPool(ctx, start);
+
+    if !legit {
+        return;
+    }
+
+    ctx.world.marks.free_particles = ctx.world.marks.particles[pnum].next;
+    ctx.world.marks.particles[pnum].next = ctx.world.marks.active_particles;
+    ctx.world.marks.active_particles = Some(pnum);
+
+    let cgTime = ctx.world.cg.time;
+    // Raven's `float rndSize` narrows once at the assignment, then the four
+    // size products multiply in float
+    let rndSize = (0.4 + ctx.world.bg_state.rng.random() as f64 * 0.6) as f32;
+    let roll = ctx.world.bg_state.rng.rand() % 179;
+
+    let p = &mut ctx.world.marks.particles[pnum];
+    p.time = cgTime as f32;
+
+    p.endtime = (cgTime + 3000) as f32;
+    p.startfade = p.endtime;
+
+    p.alpha = 1.0;
+    p.alphavel = 0.0;
+    p.roll = 0;
+
+    p.pshader = pshader;
+
+    p.width = 8.0 * rndSize;
+    p.height = 8.0 * rndSize;
+
+    p.endheight = 16.0 * rndSize;
+    p.endwidth = 16.0 * rndSize;
+
+    p.r#type = P_FLAT_SCALEUP;
+
+    _VectorCopy(start, &mut p.org);
+
+    p.vel[0] = 0.0;
+    p.vel[1] = 0.0;
+    p.vel[2] = 0.0;
+    VectorClear(&mut p.accel);
+
+    p.rotate = false;
+
+    p.roll = roll;
+
+    p.alpha = 0.75;
+
+    p.color = BLOODRED;
+}
+
 /// Raven `ValidBloodPool` — samples a 2x2 grid of short downward traces above
 /// `start` and only accepts the spot if every sample lands flush on the world
 /// (no entities, no embedded start point).

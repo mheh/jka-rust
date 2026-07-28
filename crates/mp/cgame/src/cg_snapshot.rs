@@ -3,15 +3,22 @@
 
 #![allow(non_snake_case)]
 
+use core::ffi::c_int;
+
 use mp_abi::cgame::public::snapshot_t::snapshot_t;
 use mp_bg::bg_misc::BG_PlayerStateToEntityState;
-use mp_bg::public::entity_flags::EF_TELEPORT_BIT;
+use mp_bg::public::entity_event::EVENT_VALID_MSEC;
+use mp_bg::public::entity_flags::{EF_G2ANIMATING, EF_TELEPORT_BIT};
+use mp_bg::public::entity_type::entityType_t;
 use mp_qshared::common::mp::qcommon::{entityState_t, playerState_t};
+use mp_qshared::shared::q_math::_VectorCopy;
 use mp_qshared::shared::{qfalse, qtrue, SNAPFLAG_SERVERCOUNT};
 
 use crate::cg_draw::CG_AddLagometerSnapshotInfo;
 use crate::cg_main::CG_Printf;
+use crate::cg_players::{zeroed_client_info, CG_ResetPlayerEntity};
 use crate::cg_predict::CG_BuildSolidList;
+use crate::local::centity_s::centity_t;
 use crate::trap;
 use crate::world::cg_context::CgContext;
 use crate::world::cg_world::CgWorld;
@@ -169,4 +176,82 @@ pub fn CG_ReadNextSnapshot(ctx: &mut CgContext) -> Option<usize> {
 
     // nothing left to read
     None
+}
+
+/// Raven `CG_ResetEntity` — wipes an entity's event/lerp state when it
+/// (re)appears in a snapshot: clears a stale previous-event window, snaps
+/// the interpolation origin/angles straight to the fresh snapshot values,
+/// and for G2-animating models resets the torso/legs animation slot so the
+/// next frame picks a fresh anim rather than blending from garbage.
+///
+/// §F19: Raven reads `cg.snap->serverTime` unconditionally here; `CG_ResetEntity`
+/// only runs once a snapshot has landed (same reasoning as `CG_SetNextSnap`'s
+/// note above), so the `None` arm leaves `trailTime` untouched - unreachable
+/// in practice, never a panic.
+///
+/// Source: `oracle/codemp/cgame/cg_snapshot.c:15-43`
+pub fn CG_ResetEntity(ctx: &mut CgContext, centNum: usize) {
+    // take the body out for the CG_ResetPlayerEntity call below - same
+    // pattern as cg_ents.rs's CG_General ragdoll/bolt calls
+    let mut cent = core::mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+
+    // if the previous snapshot this entity was updated in is at least
+    // an event window back in time then we can reset the previous event
+    if cent.snapShotTime < ctx.world.cg.time - EVENT_VALID_MSEC {
+        cent.previousEvent = 0;
+    }
+
+    if let Some(snap) = ctx.world.cg.snap_ref() {
+        cent.trailTime = snap.serverTime;
+    }
+
+    _VectorCopy(cent.currentState.origin, &mut cent.lerpOrigin);
+    _VectorCopy(cent.currentState.angles, &mut cent.lerpAngles);
+
+    if (cent.currentState.eFlags & EF_G2ANIMATING) != 0 {
+        //reset the animation state
+        cent.pe.torso.animationNumber = -1;
+        cent.pe.legs.animationNumber = -1;
+    }
+
+    // Raven's `#if 0` ragdoll lerpOriginOffset block is dead code in the
+    // oracle - nothing to transcribe.
+
+    if cent.currentState.eType == entityType_t::ET_PLAYER as c_int
+        || cent.currentState.eType == entityType_t::ET_NPC as c_int
+    {
+        let isNpc = cent.currentState.eType == entityType_t::ET_NPC as c_int;
+
+        if isNpc {
+            // CG_ResetPlayerEntity's own npcClient alloc always leaves its
+            // internal `npcCi` populated by the time `ci` would be read, so
+            // the param goes unused here - hand it a scratch value instead
+            // of indexing cgs.clientinfo with an NPC's clientNum, which
+            // isn't a client slot.
+            //
+            // SAFETY: clientInfo_t is #[repr(C)] scalars/arrays/qhandle_t
+            // and opaque ghoul2 pointers, and its two enum members
+            // (team_t/gender_t) both have a 0 discriminant, so all-zero is
+            // a legal value (same reasoning as cg_players.rs's private
+            // zeroed_client_info).
+            let mut scratch = zeroed_client_info();
+            CG_ResetPlayerEntity(ctx, &mut cent, &mut scratch);
+        } else if (cent.currentState.clientNum as usize) < ctx.world.cgs.clientinfo.len() {
+            let clientNum = cent.currentState.clientNum as usize;
+            let mut ci = core::mem::replace(
+                &mut ctx.world.cgs.clientinfo[clientNum],
+                zeroed_client_info(),
+            );
+            CG_ResetPlayerEntity(ctx, &mut cent, &mut ci);
+            ctx.world.cgs.clientinfo[clientNum] = ci;
+        } else {
+            // §F19: Raven indexes cgs.clientinfo with a server-supplied
+            // clientNum and reads OOB garbage; the port hands a zeroed scratch
+            // (the NPC-arm treatment) rather than panicking.
+            let mut scratch = zeroed_client_info();
+            CG_ResetPlayerEntity(ctx, &mut cent, &mut scratch);
+        }
+    }
+
+    *ctx.world.entity_mut(centNum) = cent;
 }

@@ -6,7 +6,7 @@
 use core::ffi::{c_int, c_void};
 use core::ptr::null_mut;
 
-use native_string::{atof_bytes, latin1_to_string};
+use native_string::{atof_bytes, atoi, latin1_to_string};
 
 use mp_bg::bg_g2_utils::BG_GetRootSurfNameWithVariant;
 use mp_bg::bg_misc::{
@@ -2522,6 +2522,87 @@ pub fn FX_AddOrientedLine(
     le.lifeRate = (1.0f64 / (le.endTime - le.startTime) as f64) as f32;
 
     handle
+}
+
+/// Raven `FX_DrawPortableShield` — draws the portable-shield wall as an
+/// oriented line, decoding its width/height/axis out of `time2`'s packed
+/// byte fields and its team out of `otherEntityNum2`.
+///
+/// Raven's `#ifdef _DEBUG` note above this comment doesn't exist here; the
+/// only quirk worth flagging is that `cl_paused` gates the whole draw so the
+/// shield doesn't keep re-rendering while the HUD pause menu is up.
+/// Source: `oracle/codemp/cgame/cg_ents.c:379-456`
+pub fn FX_DrawPortableShield(ctx: &mut CgContext, centNum: usize) {
+    let buf = trap::Cvar_VariableStringBuffer(ctx.engine, "cl_paused", 1024);
+    if atoi(&buf) != 0 {
+        //rww - fix to keep from rendering repeatedly while HUD menu is up
+        return;
+    }
+
+    let cent = ctx.world.entity(centNum);
+    if (cent.currentState.eFlags & EF_NODRAW) != 0 {
+        return;
+    }
+
+    // decode the data stored in time2
+    let time2 = cent.currentState.time2;
+    let xaxis = (time2 >> 24) & 1;
+    let height = (time2 >> 16) & 255;
+    let posWidth = (time2 >> 8) & 255;
+    let negWidth = time2 & 255;
+
+    let team = cent.currentState.otherEntityNum2;
+    let trickedentindex = cent.currentState.trickedentindex;
+    let lerpOrigin = cent.lerpOrigin;
+
+    let mut normal: vec3_t = [0.0; 3];
+    VectorClear(&mut normal);
+
+    let mut start = lerpOrigin;
+    let mut end = lerpOrigin;
+
+    if xaxis != 0 {
+        // drawing along x-axis
+        start[0] -= negWidth as f32;
+        end[0] += posWidth as f32;
+    } else {
+        start[1] -= negWidth as f32;
+        end[1] += posWidth as f32;
+    }
+
+    normal[0] = 1.0;
+    normal[1] = 1.0;
+
+    // int division - height/2 truncates before the float add (C widths)
+    start[2] += (height / 2) as f32;
+    end[2] += (height / 2) as f32;
+
+    let engine = ctx.engine;
+    let shader = if team == TEAM_RED {
+        if trickedentindex != 0 {
+            trap::R_RegisterShader(engine, "gfx/misc/red_dmgshield")
+        } else {
+            trap::R_RegisterShader(engine, "gfx/misc/red_portashield")
+        }
+    } else if trickedentindex != 0 {
+        trap::R_RegisterShader(engine, "gfx/misc/blue_dmgshield")
+    } else {
+        trap::R_RegisterShader(engine, "gfx/misc/blue_portashield")
+    };
+
+    FX_AddOrientedLine(
+        ctx.world,
+        start,
+        end,
+        normal,
+        1.0,
+        height as f32,
+        0.0,
+        1.0,
+        1.0,
+        50.0,
+        shader,
+    );
 }
 
 /// Raven `CG_General` — the catch-all entity draw: ragdoll upkeep, the

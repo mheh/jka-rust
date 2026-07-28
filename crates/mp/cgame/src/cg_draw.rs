@@ -26,14 +26,17 @@ use mp_bg::bg_panimate::BG_ParseAnimationFile;
 use mp_bg::bg_saga::BG_SiegeFindClassByName;
 use mp_bg::public::animation::animation_t;
 use mp_bg::public::bg_itemlist::bg_itemlist;
-use mp_bg::public::configstring::{CS_LOCATIONS, CS_PLAYERS, SCORE_NOT_PRESENT};
+use mp_bg::public::configstring::{CS_LOCATIONS, CS_PLAYERS, SCORE_NOT_PRESENT, VOTE_TIME};
 use mp_bg::public::duel_team::duelTeam_t;
-use mp_bg::public::entity_flags::{EF_DEAD, EF_DOUBLE_AMMO, EF_RADAROBJECT};
+use mp_bg::public::entity_flags::{EF_DEAD, EF_DOUBLE_AMMO, EF_NODRAW, EF_RADAROBJECT};
 use mp_bg::public::entity_type::entityType_t;
-use mp_bg::public::gametype::{GT_CTF, GT_CTY, GT_POWERDUEL, GT_SIEGE, GT_TEAM};
+use mp_bg::public::gametype::{
+    GT_CTF, GT_CTY, GT_DUEL, GT_FFA, GT_HOLOCRON, GT_JEDIMASTER, GT_POWERDUEL, GT_SIEGE, GT_TEAM,
+};
 use mp_bg::public::holdable::HI_NUM_HOLDABLE;
 use mp_bg::public::item_type::IT_HOLDABLE;
-use mp_bg::public::pers_enum::persEnum_t::PERS_TEAM;
+use mp_bg::public::pers_enum::persEnum_t::{PERS_SCORE, PERS_TEAM};
+use mp_bg::public::pmtype::pmtype_t::PM_SPECTATOR;
 use mp_bg::public::powerup::{
     PW_BLUEFLAG, PW_CLOAKED, PW_NEUTRALFLAG, PW_NUM_POWERUPS, PW_REDFLAG,
 };
@@ -45,32 +48,36 @@ use mp_bg::public::weaponstate::weaponstate_t::WEAPON_CHARGING_ALT;
 use mp_bg::saga::siege_class_flags_t::siegeClassFlags_t::CFL_STATVIEWER;
 use mp_bg::weapons::ammo_data::ammoData;
 use mp_bg::weapons::weapon_data::weaponData;
-use mp_bg::weapons::weapon_t::{WP_DISRUPTOR, WP_SABER};
+use mp_bg::weapons::weapon_t::{WP_DISRUPTOR, WP_EMPLACED_GUN, WP_NONE, WP_SABER};
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::refdef_t::{
     refdef_t, MAX_MAP_AREA_BYTES, MAX_RENDER_STRINGS, MAX_RENDER_STRING_LENGTH,
 };
 use mp_qshared::common::mp::game::class_t::class_t;
+use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t;
+use mp_qshared::common::mp::qcommon::usercmd_t;
 use mp_qshared::common::mp::qcommon::PMF_FOLLOW;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::force_powers::{
-    FP_ABSORB, FP_HEAL, FP_LEVITATION, FP_PROTECT, FP_RAGE, FP_SABERTHROW, FP_SABER_DEFENSE,
-    FP_SABER_OFFENSE, FP_SEE, FP_SPEED, FP_TELEPATHY, NUM_FORCE_POWERS,
+    FORCE_LEVEL_2, FORCE_LEVEL_3, FP_ABSORB, FP_HEAL, FP_LEVITATION, FP_PROTECT, FP_RAGE,
+    FP_SABERTHROW, FP_SABER_DEFENSE, FP_SABER_OFFENSE, FP_SEE, FP_SPEED, FP_TELEPATHY,
+    NUM_FORCE_POWERS,
 };
 use mp_qshared::shared::limits::MAX_SAY_TEXT;
 use mp_qshared::shared::q_color::{colorWhite, g_color_table};
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorCopy, _VectorMA, _VectorSubtract, vec3_origin, AngleVectors, AnglesToAxis,
-    Distance, VectorClear, VectorLength, VectorNormalize, VectorSet, YAW,
+    Distance, VectorClear, VectorLength, VectorNormalize, VectorSet, PITCH, YAW,
 };
 use mp_qshared::shared::surface_flags::{
-    CONTENTS_LAVA, CONTENTS_OPAQUE, CONTENTS_SLIME, CONTENTS_SOLID, CONTENTS_WATER,
+    CONTENTS_BODY, CONTENTS_FOG, CONTENTS_LAVA, CONTENTS_OPAQUE, CONTENTS_SLIME, CONTENTS_SOLID,
+    CONTENTS_WATER,
 };
 use mp_qshared::shared::{
     ct_table_t, mdxaBone_t, qfalse, qhandle_t, qtrue, vec3_t, vec4_t, Eorientations,
-    BIGCHAR_HEIGHT, BIGCHAR_WIDTH, CHAN_AUTO, CHAN_LOCAL, ENTITYNUM_NONE, ENTITYNUM_WORLD,
-    MAX_CLIENTS, MAX_CLIENTS_I32, MAX_QPATH, SCREEN_HEIGHT, SCREEN_WIDTH, TINYCHAR_HEIGHT,
-    TINYCHAR_WIDTH,
+    BIGCHAR_HEIGHT, BIGCHAR_WIDTH, CHAN_ANNOUNCER, CHAN_AUTO, CHAN_LOCAL, ENTITYNUM_NONE,
+    ENTITYNUM_WORLD, MAX_CLIENTS, MAX_CLIENTS_I32, MAX_QPATH, SCREEN_HEIGHT, SCREEN_WIDTH,
+    SMALLCHAR_HEIGHT, TINYCHAR_HEIGHT, TINYCHAR_WIDTH,
 };
 use mp_uishared::shared::cached_assets_t::NUM_CROSSHAIRS;
 use mp_uishared::shared::display_state::DisplayState;
@@ -85,15 +92,17 @@ use mp_uishared::ui_shared::{Menu_FindItemByName, Menus_CloseByName, Menus_FindB
 
 use crate::bg_channel::{CgBgTraps, CgGameCallbacks};
 use crate::cg_drawtools::{
-    CG_ColorForHealth, CG_DrawNumField, CG_DrawPic, CG_DrawRect, CG_DrawRotatePic,
-    CG_DrawRotatePic2, CG_DrawStringExt, CG_DrawStrlen, CG_FadeColor, CG_FillRect,
-    CG_GetColorForHealth, UI_DrawProportionalString,
+    CG_ColorForHealth, CG_DrawBigString, CG_DrawNumField, CG_DrawPic, CG_DrawRect,
+    CG_DrawRotatePic, CG_DrawRotatePic2, CG_DrawSmallString, CG_DrawStringExt, CG_DrawStrlen,
+    CG_FadeColor, CG_FillRect, CG_GetColorForHealth, UI_DrawProportionalString,
+    UI_DrawScaledProportionalString,
 };
 use crate::cg_main::{CG_ConfigString, CG_Error, CG_GetLocationString, CG_GetStringEdString};
 use crate::cg_new_draw::{CG_OtherTeamHasFlag, CG_YourTeamHasFlag};
-use crate::cg_predict::CG_Trace;
+use crate::cg_players::{CG_IsMindTricked, CG_RadiusForCent};
+use crate::cg_predict::{CG_G2Trace, CG_Trace};
 use crate::cg_view::WAVE_FREQUENCY;
-use crate::cg_weapons::{CG_RegisterItemVisuals, WEAPON_SELECT_TIME};
+use crate::cg_weapons::{CG_CalcMuzzlePoint, CG_RegisterItemVisuals, WEAPON_SELECT_TIME};
 use crate::local::cg_t::MAX_CHATBOX_ITEMS;
 use crate::trap;
 use crate::world::cg_context::CgContext;
@@ -120,6 +129,21 @@ const RF_NOSHADOW: c_int = 0x00040;
 /// Raven `RDF_NOWORLDMODEL` — used for player configuration screen.
 /// Source: `oracle/codemp/cgame/tr_types.h:56`
 const RDF_NOWORLDMODEL: c_int = 1;
+
+// PORT-NOTE: `cg_public.h`'s usercmd ring-buffer depth. This is its first
+// ported consumer in cgame, so it lands file-local like `FONT_SMALL` above.
+/// Raven `#define CMD_BACKUP 64`.
+/// Source: `oracle/codemp/cgame/cg_public.h:6`
+const CMD_BACKUP: c_int = 64;
+
+/// Raven `vec4_t bluehudtint` — the blue-team HUD tint `CG_DrawHUD` points
+/// `hudTintColor` at. Read-only compiled-in data, so a `const` (§C8).
+/// Source: `oracle/codemp/cgame/cg_draw.c:24`
+const bluehudtint: vec4_t = [0.5, 0.5, 1.0, 1.0];
+
+/// Raven `vec4_t redhudtint` — the red-team HUD tint.
+/// Source: `oracle/codemp/cgame/cg_draw.c:25`
+const redhudtint: vec4_t = [1.0, 0.5, 0.5, 1.0];
 
 /// Raven `#define MAX_HUD_TICS 4` — tics per HUD bar (health/armor/force/ammo).
 /// Source: `oracle/codemp/cgame/cg_draw.c:42`
@@ -361,6 +385,8 @@ const TEAM_OVERLAY_MAXLOCATION_WIDTH: c_int = 64;
 const MAX_LOCATIONS: c_int = 64;
 /// Source: `oracle/codemp/game/q_shared.h:489`
 const UI_CENTER: c_int = 0x0000_0001;
+/// Source: `oracle/codemp/game/q_shared.h:490`
+const UI_RIGHT: c_int = 0x0000_0002;
 /// Source: `oracle/codemp/game/q_shared.h:492`
 const UI_SMALLFONT: c_int = 0x0000_0010;
 /// Source: `oracle/codemp/game/q_shared.h:493`
@@ -6727,4 +6753,1285 @@ pub fn CG_Draw2DScreenTints(ctx: &mut CgContext) {
             &hcolor,
         );
     }
+}
+
+/// Raven `CG_DrawHUD` — the whole left/right HUD frame: team tint, scanline and
+/// frame pics, armor/health, the score readout, force power, and ammo or saber
+/// style. The `cg_hudFiles` debug path draws the plain numeric HUD instead.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:1169-1391`
+pub fn CG_DrawHUD(ctx: &mut CgContext, menus: &MenuSystem, ds: &DisplayState, centNum: usize) {
+    if ctx.world.cvars.cg_hudFiles.integer != 0 {
+        let x: c_int = 0;
+        let y: c_int = SCREEN_HEIGHT - 80;
+        let mut weapX: c_int = x;
+
+        // §F19: Raven derefs `cg.snap` unguarded here; no snapshot = no stats
+        // to paint.
+        let (health, armor, snapWeapon, saberLevel, forcePower, ammo) =
+            match ctx.world.cg.snap_ref() {
+                Some(snap) => (
+                    snap.ps.stats[STAT_HEALTH as usize],
+                    snap.ps.stats[STAT_ARMOR as usize],
+                    snap.ps.weapon,
+                    snap.ps.fd.saberDrawAnimLevel,
+                    snap.ps.fd.forcePower,
+                    snap.ps.ammo,
+                ),
+                None => return,
+            };
+
+        UI_DrawProportionalString(
+            ctx,
+            ds,
+            x + 16,
+            y + 40,
+            &format!("{health}"),
+            UI_SMALLFONT | UI_DROPSHADOW,
+            colorTable[ct_table_t::CT_HUD_RED as usize],
+        );
+
+        UI_DrawProportionalString(
+            ctx,
+            ds,
+            x + 18 + 14,
+            y + 40 + 14,
+            &format!("{armor}"),
+            UI_SMALLFONT | UI_DROPSHADOW,
+            colorTable[ct_table_t::CT_HUD_GREEN as usize],
+        );
+
+        let ammoString: String;
+        if snapWeapon == WP_SABER {
+            if saberLevel == saber_styles_t::SS_DUAL as c_int {
+                ammoString = "AKIMBO".to_string();
+                weapX += 16;
+            } else if saberLevel == saber_styles_t::SS_STAFF as c_int {
+                ammoString = "STAFF".to_string();
+                weapX += 16;
+            } else if saberLevel == FORCE_LEVEL_3 {
+                ammoString = "STRONG".to_string();
+                weapX += 16;
+            } else if saberLevel == FORCE_LEVEL_2 {
+                ammoString = "MEDIUM".to_string();
+                weapX += 16;
+            } else {
+                ammoString = "FAST".to_string();
+            }
+        } else {
+            // §F19: `currentState.weapon` and its `ammoIndex` are server-supplied;
+            // a bad index reads garbage in Raven, so the port reads 0 rather than
+            // panic.
+            let weapon = ctx.world.entity(centNum).currentState.weapon;
+            let ammoCount = weaponData
+                .get(usize::try_from(weapon).unwrap_or(usize::MAX))
+                .and_then(|wd| ammo.get(usize::try_from(wd.ammoIndex).unwrap_or(usize::MAX)))
+                .copied()
+                .unwrap_or(0);
+            ammoString = format!("{ammoCount}");
+        }
+
+        UI_DrawProportionalString(
+            ctx,
+            ds,
+            SCREEN_WIDTH - (weapX + 16 + 32),
+            y + 40,
+            &ammoString,
+            UI_SMALLFONT | UI_DROPSHADOW,
+            colorTable[ct_table_t::CT_HUD_ORANGE as usize],
+        );
+
+        UI_DrawProportionalString(
+            ctx,
+            ds,
+            SCREEN_WIDTH - (x + 18 + 14 + 32),
+            y + 40 + 14,
+            &format!("{forcePower}"),
+            UI_SMALLFONT | UI_DROPSHADOW,
+            colorTable[ct_table_t::CT_ICON_BLUE as usize],
+        );
+
+        return;
+    }
+
+    // §F19: Raven derefs `cg.snap` unguarded below (team tint + score); no
+    // snapshot = no HUD stats.
+    let (persTeam, persScore) = match ctx.world.cg.snap_ref() {
+        Some(snap) => (
+            snap.ps.persistant[PERS_TEAM as usize],
+            snap.ps.persistant[PERS_SCORE as usize],
+        ),
+        None => return,
+    };
+
+    let gametype = ctx.world.cgs.gametype;
+    if gametype >= GT_TEAM && gametype != GT_SIEGE {
+        // tint the hud items based on team
+        if persTeam == TEAM_RED {
+            ctx.world.draw.hudTintColor = Some(redhudtint);
+        } else if persTeam == TEAM_BLUE {
+            ctx.world.draw.hudTintColor = Some(bluehudtint);
+        } else {
+            // If we're not on a team for whatever reason, leave things as they are.
+            ctx.world.draw.hudTintColor = Some(colorTable[ct_table_t::CT_WHITE as usize]);
+        }
+    } else {
+        // tint the hud items white (don't tint)
+        ctx.world.draw.hudTintColor = Some(colorTable[ct_table_t::CT_WHITE as usize]);
+    }
+    let tint = ctx
+        .world
+        .draw
+        .hudTintColor
+        .unwrap_or(colorTable[ct_table_t::CT_WHITE as usize]);
+
+    // Draw the left HUD
+    let menuHUD = Menus_FindByName(menus, "lefthud");
+    if menuHUD.is_some() {
+        // Print scanline
+        if let Some(focusItem) = Menu_FindItemByName(menus, menuHUD, "scanline") {
+            trap::R_SetColor(ctx.engine, Some(&tint));
+            let rect = menus.item(focusItem).window.rect;
+            let bg = menus.item(focusItem).window.background;
+            CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, bg);
+        }
+
+        // Print frame
+        if let Some(focusItem) = Menu_FindItemByName(menus, menuHUD, "frame") {
+            trap::R_SetColor(ctx.engine, Some(&tint));
+            let rect = menus.item(focusItem).window.rect;
+            let bg = menus.item(focusItem).window.background;
+            CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, bg);
+        }
+
+        if ctx.world.cg.predictedPlayerState.pm_type != PM_SPECTATOR as c_int {
+            CG_DrawArmor(ctx, menus, menuHUD);
+            CG_DrawHealth(ctx, menus, menuHUD);
+        }
+    }
+    // Raven's else-branch is a commented-out CG_Error; nothing to do.
+
+    let scoreStr: String;
+    if gametype == GT_DUEL {
+        // A duel that requires more than one kill to knock the current enemy
+        // back to the queue: show current kills out of how many needed.
+        scoreStr = format!(
+            "{}: {}/{}",
+            CG_GetStringEdString(ctx, "MP_INGAME", "SCORE"),
+            persScore,
+            ctx.world.cgs.fraglimit
+        );
+    }
+    // Raven's `else if (0 && cgs.gametype < GT_TEAM)` score-bias block is dead
+    // (the `0 &&` short-circuits) and is dropped.
+    else {
+        // Don't draw a bias.
+        scoreStr = format!(
+            "{}: {}",
+            CG_GetStringEdString(ctx, "MP_INGAME", "SCORE"),
+            persScore
+        );
+    }
+
+    let menuHUD = Menus_FindByName(menus, "righthud");
+    if menuHUD.is_some() {
+        if gametype != GT_POWERDUEL {
+            if let Some(focusItem) = Menu_FindItemByName(menus, menuHUD, "score_line") {
+                let rect = menus.item(focusItem).window.rect;
+                let foreColor = menus.item(focusItem).window.foreColor;
+                UI_DrawScaledProportionalString(
+                    ctx,
+                    ds,
+                    rect.x as c_int,
+                    rect.y as c_int,
+                    &scoreStr,
+                    UI_RIGHT | UI_DROPSHADOW,
+                    foreColor,
+                    0.7,
+                );
+            }
+        }
+
+        // Print scanline
+        if let Some(focusItem) = Menu_FindItemByName(menus, menuHUD, "scanline") {
+            trap::R_SetColor(ctx.engine, Some(&tint));
+            let rect = menus.item(focusItem).window.rect;
+            let bg = menus.item(focusItem).window.background;
+            CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, bg);
+        }
+
+        if let Some(focusItem) = Menu_FindItemByName(menus, menuHUD, "frame") {
+            trap::R_SetColor(ctx.engine, Some(&tint));
+            let rect = menus.item(focusItem).window.rect;
+            let bg = menus.item(focusItem).window.background;
+            CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, bg);
+        }
+
+        CG_DrawForcePower(ctx, menus, menuHUD);
+
+        // Draw ammo tics or saber style
+        if ctx.world.entity(centNum).currentState.weapon == WP_SABER {
+            CG_DrawSaberStyle(ctx, menus, centNum, menuHUD);
+        } else {
+            CG_DrawAmmo(ctx, menus, ds, centNum, menuHUD);
+        }
+    }
+    // Raven's else-branch is a commented-out CG_Error; nothing to do.
+}
+
+/// Raven `CG_DrawEnemyInfo` — the top-right enemy/leader panel: their model
+/// icon, name, the mode title, their score, and (in duel) a health bar.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:2866-3040`
+pub fn CG_DrawEnemyInfo(ctx: &mut CgContext, ds: &DisplayState, mut y: f32) -> f32 {
+    let xOffset: c_int = 0;
+
+    // §F19: Raven's `if (!cg.snap) return y;` — the port pulls the snapshot
+    // scalars it needs here and takes the same early-out with no snapshot.
+    let (duelInProgress, duelIndex, snapClientNum) = match ctx.world.cg.snap_ref() {
+        Some(snap) => (snap.ps.duelInProgress, snap.ps.duelIndex, snap.ps.clientNum),
+        None => return y,
+    };
+
+    if ctx.world.cvars.cg_drawEnemyInfo.integer == 0 {
+        return y;
+    }
+
+    if ctx.world.cg.predictedPlayerState.stats[STAT_HEALTH as usize] <= 0 {
+        return y;
+    }
+
+    if ctx.world.cgs.gametype == GT_POWERDUEL {
+        // just get out of here then
+        return y;
+    }
+
+    let title: String;
+    let clientNum: c_int;
+    if ctx.world.cgs.gametype == GT_JEDIMASTER {
+        let jm = ctx.world.cgs.jediMaster;
+        if jm < 0 {
+            let t = CG_GetStringEdString(ctx, "MP_INGAME", "GET_SABER");
+            let size = ICON_SIZE * 1.25;
+            y += 5.0;
+            let icon = ctx.world.cgs.media.weaponIcons[WP_SABER as usize];
+            CG_DrawPic(
+                ctx,
+                640.0 - size - 12.0 + xOffset as f32,
+                y,
+                size,
+                size,
+                icon,
+            );
+            y += size;
+            let w = CG_Text_Width(ctx, ds, &t, 0.7, FONT_MEDIUM);
+            CG_Text_Paint(
+                ctx,
+                ds,
+                630.0 - w as f32 + xOffset as f32,
+                y,
+                0.7,
+                colorWhite,
+                &t,
+                0.0,
+                0,
+                0,
+                FONT_MEDIUM,
+            );
+            return y + BIGCHAR_HEIGHT as f32 + 2.0;
+        }
+        title = CG_GetStringEdString(ctx, "MP_INGAME", "MASTERY7");
+        clientNum = jm;
+    } else if duelInProgress != qfalse {
+        title = CG_GetStringEdString(ctx, "MP_INGAME", "DUELING");
+        clientNum = duelIndex;
+    } else if ctx.world.cgs.gametype == GT_DUEL
+        && ctx.world.cgs.clientinfo[snapClientNum as usize].team != TEAM_SPECTATOR
+    {
+        title = CG_GetStringEdString(ctx, "MP_INGAME", "DUELING");
+        if snapClientNum == ctx.world.cgs.duelist1 {
+            clientNum = ctx.world.cgs.duelist2;
+        } else if snapClientNum == ctx.world.cgs.duelist2 {
+            clientNum = ctx.world.cgs.duelist1;
+        } else if snapClientNum == ctx.world.cgs.duelist3 {
+            clientNum = ctx.world.cgs.duelist1;
+        } else {
+            return y;
+        }
+    } else {
+        // As of current, we don't want to draw the attacker. Instead, draw
+        // whoever is in first place.
+        if ctx.world.cgs.duelWinner < 0 || ctx.world.cgs.duelWinner >= MAX_CLIENTS_I32 {
+            return y;
+        }
+        title = format!(
+            "{}: {}",
+            CG_GetStringEdString(ctx, "MP_INGAME", "LEADER"),
+            ctx.world.cgs.scores1
+        );
+        clientNum = ctx.world.cgs.duelWinner;
+    }
+
+    // §F19: Raven's `!(&cgs.clientinfo[clientNum])` is always false (address of
+    // an array element), so the port keeps only the `>= MAX_CLIENTS` half and
+    // adds a negative guard so a bad `clientNum` skips instead of panicking.
+    if !(0..MAX_CLIENTS_I32).contains(&clientNum) {
+        return y;
+    }
+
+    let size = ICON_SIZE * 1.25;
+    y += 5.0;
+
+    let modelIcon = ctx.world.cgs.clientinfo[clientNum as usize].modelIcon;
+    if modelIcon != 0 {
+        CG_DrawPic(
+            ctx,
+            640.0 - size - 5.0 + xOffset as f32,
+            y,
+            size,
+            size,
+            modelIcon,
+        );
+    }
+
+    y += size;
+
+    let name = buf_to_string(
+        &ctx.world.cgs.clientinfo[clientNum as usize]
+            .name
+            .map(|c| c as u8),
+    );
+    let w = CG_Text_Width(ctx, ds, &name, 1.0, FONT_SMALL2);
+    CG_Text_Paint(
+        ctx,
+        ds,
+        630.0 - w as f32 + xOffset as f32,
+        y,
+        1.0,
+        colorWhite,
+        &name,
+        0.0,
+        0,
+        0,
+        FONT_SMALL2,
+    );
+
+    y += 15.0;
+    let w = CG_Text_Width(ctx, ds, &title, 1.0, FONT_SMALL2);
+    CG_Text_Paint(
+        ctx,
+        ds,
+        630.0 - w as f32 + xOffset as f32,
+        y,
+        1.0,
+        colorWhite,
+        &title,
+        0.0,
+        0,
+        0,
+        FONT_SMALL2,
+    );
+
+    if (ctx.world.cgs.gametype == GT_DUEL || ctx.world.cgs.gametype == GT_POWERDUEL)
+        && ctx.world.cgs.clientinfo[snapClientNum as usize].team != TEAM_SPECTATOR
+    {
+        // also print their score
+        y += 15.0;
+        let text = format!(
+            "{}/{}",
+            ctx.world.cgs.clientinfo[clientNum as usize].score, ctx.world.cgs.fraglimit
+        );
+        let w = CG_Text_Width(ctx, ds, &text, 0.7, FONT_MEDIUM);
+        CG_Text_Paint(
+            ctx,
+            ds,
+            630.0 - w as f32 + xOffset as f32,
+            y,
+            0.7,
+            colorWhite,
+            &text,
+            0.0,
+            0,
+            0,
+            FONT_MEDIUM,
+        );
+    }
+
+    // nmckenzie: DUEL_HEALTH - fixme - need checks and such here. And this is
+    // coded to duelist 1 right now, which is wrongly.
+    if ctx.world.cgs.showDuelHealths >= 2 {
+        y += 15.0;
+        if ctx.world.cgs.duelist1 == clientNum {
+            CG_DrawDuelistHealth(ctx, 640.0 - size - 5.0 + xOffset as f32, y, 64.0, 8.0, 1);
+        } else if ctx.world.cgs.duelist2 == clientNum {
+            CG_DrawDuelistHealth(ctx, 640.0 - size - 5.0 + xOffset as f32, y, 64.0, 8.0, 2);
+        }
+    }
+
+    y + BIGCHAR_HEIGHT as f32 + 2.0
+}
+
+/// Raven `CG_DrawSnapshot` — the timing debug line (server time, snapshot
+/// number, command sequence) in the top-right.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:3047-3063`
+pub fn CG_DrawSnapshot(ctx: &mut CgContext, ds: &DisplayState, y: f32) -> f32 {
+    let xOffset: c_int = 0;
+
+    // §F19: Raven derefs `cg.snap->serverTime` unguarded; no snapshot = nothing
+    // to time.
+    let s = {
+        let Some(snap) = ctx.world.cg.snap_ref() else {
+            return y;
+        };
+        format!(
+            "time:{} snap:{} cmd:{}",
+            snap.serverTime, ctx.world.cg.latestSnapshotNum, ctx.world.cgs.serverCommandSequence
+        )
+    };
+    let w = CG_DrawStrlen(&s) * BIGCHAR_WIDTH;
+
+    CG_DrawBigString(ctx, ds, 635 - w + xOffset, (y + 2.0) as c_int, &s, 1.0);
+
+    y + BIGCHAR_HEIGHT as f32 + 4.0
+}
+
+/// Raven `CG_DrawFPS` — the smoothed frames-per-second counter, sampled off
+/// `trap_Milliseconds` (not server time) at most every 50ms.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:3071-3113`
+pub fn CG_DrawFPS(ctx: &mut CgContext, ds: &DisplayState, y: f32) -> f32 {
+    let xOffset: c_int = 0;
+
+    // don't use serverTime, because that will be drifting to correct for
+    // internet lag changes, timescales, timedemos, etc
+    let t = trap::Milliseconds(ctx.engine);
+    let frameTime = (t - ctx.world.draw.fpsPrevious) as u16;
+    ctx.world.draw.fpsPrevious = t;
+    if t - ctx.world.draw.fpsLastupdate > 50 {
+        // don't sample faster than this
+        ctx.world.draw.fpsLastupdate = t;
+        let idx = ctx.world.draw.fpsIndex as usize % FPS_FRAMES;
+        ctx.world.draw.fpsPreviousTimes[idx] = frameTime;
+        ctx.world.draw.fpsIndex = ctx.world.draw.fpsIndex.wrapping_add(1);
+    }
+
+    // average multiple frames together to smooth changes out a bit
+    let mut total: c_int = 0;
+    for i in 0..FPS_FRAMES {
+        total += ctx.world.draw.fpsPreviousTimes[i] as c_int;
+    }
+    if total == 0 {
+        total = 1;
+    }
+    let fps = 1000 * FPS_FRAMES as c_int / total;
+
+    let s = format!("{fps}fps");
+    let w = CG_DrawStrlen(&s) * BIGCHAR_WIDTH;
+
+    CG_DrawBigString(ctx, ds, 635 - w + xOffset, (y + 2.0) as c_int, &s, 1.0);
+
+    y + BIGCHAR_HEIGHT as f32 + 4.0
+}
+
+/// Raven `CG_DrawTimer` — the mm:ss match clock in the top-right.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:3745-3770`
+pub fn CG_DrawTimer(ctx: &mut CgContext, ds: &DisplayState, y: f32) -> f32 {
+    let xOffset: c_int = 0;
+
+    let msec = ctx.world.cg.time - ctx.world.cgs.levelStartTime;
+
+    let mut seconds = msec / 1000;
+    let mins = seconds / 60;
+    seconds -= mins * 60;
+    let tens = seconds / 10;
+    seconds -= tens * 10;
+
+    let s = format!("{mins}:{tens}{seconds}");
+    let w = CG_DrawStrlen(&s) * BIGCHAR_WIDTH;
+
+    CG_DrawBigString(ctx, ds, 635 - w + xOffset, (y + 2.0) as c_int, &s, 1.0);
+
+    y + BIGCHAR_HEIGHT as f32 + 4.0
+}
+
+/// Raven `CG_DrawDisconnect` — the "connection interrupted" text and blinking
+/// phone-jack icon when we run past our command buffers, plus the map-change
+/// notice.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:4200-4241`
+pub fn CG_DrawDisconnect(ctx: &mut CgContext, ds: &DisplayState) {
+    if ctx.world.cg.mMapChange != qfalse {
+        let s = CG_GetStringEdString(ctx, "MP_INGAME", "SERVER_CHANGING_MAPS");
+        let w = CG_DrawStrlen(&s) * BIGCHAR_WIDTH;
+        CG_DrawBigString(ctx, ds, 320 - w / 2, 100, &s, 1.0);
+
+        let s = CG_GetStringEdString(ctx, "MP_INGAME", "PLEASE_WAIT");
+        let w = CG_DrawStrlen(&s) * BIGCHAR_WIDTH;
+        CG_DrawBigString(ctx, ds, 320 - w / 2, 200, &s, 1.0);
+        return;
+    }
+
+    // draw the phone jack if we are completely past our buffers
+    let cmdNum = trap::GetCurrentCmdNumber(ctx.engine) - CMD_BACKUP + 1;
+    let mut cmd = usercmd_t::default();
+    trap::GetUserCmd(ctx.engine, cmdNum, &mut cmd);
+
+    // §F19: Raven derefs `cg.snap->ps.commandTime` unguarded; no snapshot = no
+    // jack.
+    let commandTime = {
+        let Some(snap) = ctx.world.cg.snap_ref() else {
+            return;
+        };
+        snap.ps.commandTime
+    };
+    if cmd.serverTime <= commandTime || cmd.serverTime > ctx.world.cg.time {
+        // special check for map_restart
+        return;
+    }
+
+    // also add text in center of screen
+    let s = CG_GetStringEdString(ctx, "MP_INGAME", "CONNECTION_INTERRUPTED");
+    let w = CG_DrawStrlen(&s) * BIGCHAR_WIDTH;
+    CG_DrawBigString(ctx, ds, 320 - w / 2, 100, &s, 1.0);
+
+    // blink the icon
+    if (ctx.world.cg.time >> 9) & 1 != 0 {
+        return;
+    }
+
+    let x: f32 = 640.0 - 48.0;
+    let y: f32 = 480.0 - 48.0;
+
+    let shader = trap::R_RegisterShader(ctx.engine, "gfx/2d/net.tga");
+    CG_DrawPic(ctx, x, y, 48.0, 48.0, shader);
+}
+
+/// Raven `CG_DrawBracketedEntities` — draws the targeting bracket around every
+/// entity the server flagged as bracketed this frame.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:5634-5642`
+pub fn CG_DrawBracketedEntities(ctx: &mut CgContext) {
+    for i in 0..ctx.world.cg.bracketedEntityCount as usize {
+        let n = ctx.world.cg.bracketedEntities[i] as usize;
+        let radius = CG_RadiusForCent(ctx.world.entity(n));
+        CG_BracketEntity(ctx, n, radius);
+    }
+}
+
+/// Raven `CG_ScanForCrosshairEntity` — the per-frame trace out of the muzzle
+/// (or camera) that decides which entity the crosshair is over, picks the
+/// pilot's name over a vehicle, and drives the crosshair-name fade timer.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:6072-6286`
+pub fn CG_ScanForCrosshairEntity(ctx: &mut CgContext) {
+    let mut trace = trace_t::zeroed();
+    let mut start: vec3_t = [0.0; 3];
+    let mut end: vec3_t = [0.0; 3];
+
+    let mut ignore = ctx.world.cg.predictedPlayerState.clientNum;
+
+    // §F19: Raven derefs `cg.snap` unguarded at several points below (the muzzle
+    // client index, the mind-trick and team reads, the final crosshair latch);
+    // with no snapshot there is nothing under the crosshair to scan.
+    let (snapWeapon, snapEmplacedIndex, snapClientNum, snapPersTeam) = match ctx.world.cg.snap_ref()
+    {
+        Some(snap) => (
+            snap.ps.weapon,
+            snap.ps.emplacedIndex,
+            snap.ps.clientNum,
+            snap.ps.persistant[PERS_TEAM as usize],
+        ),
+        None => return,
+    };
+
+    if ctx.world.cvars.cg_dynamicCrosshair.integer != 0 {
+        let mut d_f: vec3_t = [0.0; 3];
+        let mut d_rt: vec3_t = [0.0; 3];
+        let mut d_up: vec3_t = [0.0; 3];
+
+        // For now we still want to draw the crosshair in relation to the player's
+        // world coordinates even if we have a melee weapon/no weapon.
+        let m_iVehicleNum = ctx.world.cg.predictedPlayerState.m_iVehicleNum;
+        let eFlags = ctx.world.cg.predictedPlayerState.eFlags;
+        if m_iVehicleNum != 0 && (eFlags & EF_NODRAW) != 0 {
+            // we're *inside* a vehicle - do the vehicle's crosshair instead
+            ignore = m_iVehicleNum;
+            let _gunner = CG_CalcVehicleMuzzlePoint(
+                ctx.world,
+                m_iVehicleNum as usize,
+                &mut start,
+                &mut d_f,
+                &mut d_rt,
+                &mut d_up,
+            );
+            // DEFERRED: the huge-map fighter auto-aim (bVehCheckTraceFromCamPos)
+            // gates on `veh->m_pVehicle->m_pVehicleInfo->type == VH_FIGHTER` and
+            // its extra camera-origin trace reads `m_pVehicleInfo->length`;
+            // DEC-46.2's presence-only `Option<VehicleId>` supplies neither, so
+            // the feature stays off (normal crosshair trace) until the Vehicle_t
+            // referent pool lands.
+            //TODO: Port CG_ScanForCrosshairEntity vehicle arm
+            // Source: oracle/codemp/cgame/cg_draw.c:6116-6216
+        } else if snapWeapon == WP_EMPLACED_GUN
+            && snapEmplacedIndex != 0
+            && !ctx
+                .world
+                .entity(snapEmplacedIndex as usize)
+                .ghoul2
+                .is_null()
+            && ctx
+                .world
+                .entity(snapEmplacedIndex as usize)
+                .currentState
+                .weapon
+                == WP_NONE
+        {
+            // locked into our e-web, calc the muzzle from it
+            CG_CalcEWebMuzzlePoint(
+                ctx,
+                snapEmplacedIndex as usize,
+                &mut start,
+                &mut d_f,
+                &mut d_rt,
+                &mut d_up,
+            );
+        } else {
+            // pitchConstraint's first `VectorCopy(cg.refdef.viewangles, …)` in the
+            // emplaced arm is immediately overwritten by the if/else below, so
+            // only the conditional value survives.
+            let mut pitchConstraint: vec3_t;
+            if snapWeapon == WP_EMPLACED_GUN && snapEmplacedIndex != 0 {
+                ignore = snapEmplacedIndex;
+
+                pitchConstraint = if ctx.world.cg.renderingThirdPerson != qfalse {
+                    ctx.world.cg.predictedPlayerState.viewangles
+                } else {
+                    ctx.world.cg.refdef.viewangles
+                };
+
+                if pitchConstraint[PITCH] > 40.0 {
+                    pitchConstraint[PITCH] = 40.0;
+                }
+            } else {
+                pitchConstraint = if ctx.world.cg.renderingThirdPerson != qfalse {
+                    ctx.world.cg.predictedPlayerState.viewangles
+                } else {
+                    ctx.world.cg.refdef.viewangles
+                };
+            }
+            AngleVectors(
+                pitchConstraint,
+                Some(&mut d_f),
+                Some(&mut d_rt),
+                Some(&mut d_up),
+            );
+            CG_CalcMuzzlePoint(ctx.world, snapClientNum, &mut start);
+        }
+
+        _VectorMA(start, ctx.world.cg.distanceCull, d_f, &mut end);
+    } else {
+        _VectorCopy(ctx.world.cg.refdef.vieworg, &mut start);
+        let axis0 = ctx.world.cg.refdef.viewaxis[0];
+        _VectorMA(start, 131072.0, axis0, &mut end);
+    }
+
+    if ctx.world.cvars.cg_dynamicCrosshair.integer != 0
+        && ctx.world.cvars.cg_dynamicCrosshairPrecision.integer != 0
+    {
+        // then do a trace with ghoul2 models in mind
+        CG_G2Trace(
+            ctx,
+            &mut trace,
+            &start,
+            &vec3_origin,
+            &vec3_origin,
+            &end,
+            ignore,
+            CONTENTS_SOLID | CONTENTS_BODY,
+        );
+    } else {
+        CG_Trace(
+            ctx,
+            &mut trace,
+            &start,
+            &vec3_origin,
+            &vec3_origin,
+            &end,
+            ignore,
+            CONTENTS_SOLID | CONTENTS_BODY,
+        );
+    }
+
+    if (trace.entityNum as c_int) < MAX_CLIENTS_I32 {
+        let cs = ctx.world.entity(trace.entityNum as usize).currentState;
+        if CG_IsMindTricked(
+            ctx.world,
+            cs.trickedentindex,
+            cs.trickedentindex2,
+            cs.trickedentindex3,
+            cs.trickedentindex4,
+            snapClientNum,
+        ) {
+            if ctx.world.cg.crosshairClientNum == trace.entityNum as c_int {
+                ctx.world.cg.crosshairClientNum = ENTITYNUM_NONE;
+                ctx.world.cg.crosshairClientTime = 0;
+            }
+
+            CG_DrawCrosshair(ctx, Some(trace.endpos), 0);
+
+            // this entity is mind-tricking the current client, so don't render it
+            return;
+        }
+    }
+
+    if snapPersTeam != TEAM_SPECTATOR {
+        if (trace.entityNum as c_int) < ENTITYNUM_WORLD {
+            ctx.world.cg.crosshairClientNum = trace.entityNum as c_int;
+            ctx.world.cg.crosshairClientTime = ctx.world.cg.time;
+
+            if ctx.world.cg.crosshairClientNum < ENTITYNUM_WORLD {
+                let ccn = ctx.world.cg.crosshairClientNum;
+                let veh = ctx.world.entity(ccn as usize).currentState;
+
+                if veh.eType == entityType_t::ET_NPC as c_int
+                    && veh.NPC_class == class_t::CLASS_VEHICLE as c_int
+                    && veh.owner < MAX_CLIENTS_I32
+                {
+                    // draw the name of the pilot then
+                    ctx.world.cg.crosshairClientNum = veh.owner;
+                    ctx.world.cg.crosshairVehNum = veh.number;
+                    ctx.world.cg.crosshairVehTime = ctx.world.cg.time;
+                }
+            }
+
+            CG_DrawCrosshair(ctx, Some(trace.endpos), 1);
+        } else {
+            CG_DrawCrosshair(ctx, Some(trace.endpos), 0);
+        }
+    }
+
+    // if the player is in fog, don't show it
+    let content = trap::CM_PointContents(ctx.engine, &trace.endpos, 0);
+    if content & CONTENTS_FOG != 0 {
+        return;
+    }
+
+    // update the fade timer
+    ctx.world.cg.crosshairClientNum = trace.entityNum as c_int;
+    ctx.world.cg.crosshairClientTime = ctx.world.cg.time;
+}
+
+/// Raven `CG_DrawSpectator` — the spectator banner: the "SPECTATOR" line, the
+/// duel matchup with model icons/scores/health, and the join hint.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:6470-6545`
+pub fn CG_DrawSpectator(ctx: &mut CgContext, ds: &DisplayState) {
+    let mut s = CG_GetStringEdString(ctx, "MP_INGAME", "SPECTATOR");
+
+    let gametype = ctx.world.cgs.gametype;
+    if (gametype == GT_DUEL || gametype == GT_POWERDUEL)
+        && ctx.world.cgs.duelist1 != -1
+        && ctx.world.cgs.duelist2 != -1
+    {
+        let size: c_int = 64;
+        let d1 = ctx.world.cgs.duelist1 as usize;
+        let d2 = ctx.world.cgs.duelist2 as usize;
+        let name1 = buf_to_string(&ctx.world.cgs.clientinfo[d1].name.map(|c| c as u8));
+        let name2 = buf_to_string(&ctx.world.cgs.clientinfo[d2].name.map(|c| c as u8));
+
+        let text = if gametype == GT_POWERDUEL && ctx.world.cgs.duelist3 != -1 {
+            let d3 = ctx.world.cgs.duelist3 as usize;
+            let name3 = buf_to_string(&ctx.world.cgs.clientinfo[d3].name.map(|c| c as u8));
+            let versus = CG_GetStringEdString(ctx, "MP_INGAME", "SPECHUD_VERSUS");
+            let and = CG_GetStringEdString(ctx, "MP_INGAME", "AND");
+            format!("{name1}^7 {versus} {name2}^7 {and} {name3}")
+        } else {
+            let versus = CG_GetStringEdString(ctx, "MP_INGAME", "SPECHUD_VERSUS");
+            format!("{name1}^7 {versus} {name2}")
+        };
+        let w = CG_Text_Width(ctx, ds, &text, 1.0, 3);
+        CG_Text_Paint(
+            ctx,
+            ds,
+            (320 - w / 2) as f32,
+            420.0,
+            1.0,
+            colorWhite,
+            &text,
+            0.0,
+            0,
+            0,
+            3,
+        );
+
+        trap::R_SetColor(ctx.engine, Some(&colorTable[ct_table_t::CT_WHITE as usize]));
+        let icon1 = ctx.world.cgs.clientinfo[d1].modelIcon;
+        if icon1 != 0 {
+            CG_DrawPic(
+                ctx,
+                10.0,
+                SCREEN_HEIGHT as f32 - (size as f32 * 1.5),
+                size as f32,
+                size as f32,
+                icon1,
+            );
+        }
+        let icon2 = ctx.world.cgs.clientinfo[d2].modelIcon;
+        if icon2 != 0 {
+            CG_DrawPic(
+                ctx,
+                SCREEN_WIDTH as f32 - size as f32 - 10.0,
+                SCREEN_HEIGHT as f32 - (size as f32 * 1.5),
+                size as f32,
+                size as f32,
+                icon2,
+            );
+        }
+
+        // nmckenzie: DUEL_HEALTH
+        if gametype == GT_DUEL && ctx.world.cgs.showDuelHealths >= 1 {
+            // draw the healths on the two guys - how does this interact with
+            // power duel, though?
+            CG_DrawDuelistHealth(
+                ctx,
+                10.0,
+                SCREEN_HEIGHT as f32 - (size as f32 * 1.5) - 12.0,
+                64.0,
+                8.0,
+                1,
+            );
+            CG_DrawDuelistHealth(
+                ctx,
+                SCREEN_WIDTH as f32 - size as f32 - 10.0,
+                SCREEN_HEIGHT as f32 - (size as f32 * 1.5) - 12.0,
+                64.0,
+                8.0,
+                2,
+            );
+        }
+
+        if gametype != GT_POWERDUEL {
+            let t1 = format!(
+                "{}/{}",
+                ctx.world.cgs.clientinfo[d1].score, ctx.world.cgs.fraglimit
+            );
+            let w = CG_Text_Width(ctx, ds, &t1, 1.0, 2);
+            CG_Text_Paint(
+                ctx,
+                ds,
+                (42 - w / 2) as f32,
+                SCREEN_HEIGHT as f32 - (size as f32 * 1.5) + 64.0,
+                1.0,
+                colorWhite,
+                &t1,
+                0.0,
+                0,
+                0,
+                2,
+            );
+
+            let t2 = format!(
+                "{}/{}",
+                ctx.world.cgs.clientinfo[d2].score, ctx.world.cgs.fraglimit
+            );
+            let w = CG_Text_Width(ctx, ds, &t2, 1.0, 2);
+            CG_Text_Paint(
+                ctx,
+                ds,
+                (SCREEN_WIDTH - size + 22 - w / 2) as f32,
+                SCREEN_HEIGHT as f32 - (size as f32 * 1.5) + 64.0,
+                1.0,
+                colorWhite,
+                &t2,
+                0.0,
+                0,
+                0,
+                2,
+            );
+        }
+
+        if gametype == GT_POWERDUEL && ctx.world.cgs.duelist3 != -1 {
+            let d3 = ctx.world.cgs.duelist3 as usize;
+            let icon3 = ctx.world.cgs.clientinfo[d3].modelIcon;
+            if icon3 != 0 {
+                CG_DrawPic(
+                    ctx,
+                    SCREEN_WIDTH as f32 - size as f32 - 10.0,
+                    SCREEN_HEIGHT as f32 - (size as f32 * 2.8),
+                    size as f32,
+                    size as f32,
+                    icon3,
+                );
+            }
+        }
+    } else {
+        let w = CG_Text_Width(ctx, ds, &s, 1.0, 3);
+        CG_Text_Paint(
+            ctx,
+            ds,
+            (320 - w / 2) as f32,
+            420.0,
+            1.0,
+            colorWhite,
+            &s,
+            0.0,
+            0,
+            0,
+            3,
+        );
+    }
+
+    if gametype == GT_DUEL || gametype == GT_POWERDUEL {
+        s = CG_GetStringEdString(ctx, "MP_INGAME", "WAITING_TO_PLAY");
+        let w = CG_Text_Width(ctx, ds, &s, 1.0, 3);
+        CG_Text_Paint(
+            ctx,
+            ds,
+            (320 - w / 2) as f32,
+            440.0,
+            1.0,
+            colorWhite,
+            &s,
+            0.0,
+            0,
+            0,
+            3,
+        );
+    } else {
+        s = CG_GetStringEdString(ctx, "MP_INGAME", "SPEC_CHOOSEJOIN");
+        let w = CG_Text_Width(ctx, ds, &s, 1.0, 3);
+        CG_Text_Paint(
+            ctx,
+            ds,
+            (320 - w / 2) as f32,
+            440.0,
+            1.0,
+            colorWhite,
+            &s,
+            0.0,
+            0,
+            0,
+            3,
+        );
+    }
+}
+
+/// Raven `CG_DrawVote` — the callvote status line: the command, the yes/no
+/// tally, and the countdown, plus the "press ESC" hint.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:6552-6652`
+pub fn CG_DrawVote(ctx: &mut CgContext, ds: &DisplayState) {
+    if ctx.world.cgs.voteTime == 0 {
+        return;
+    }
+
+    // play a talk beep whenever it is modified
+    if ctx.world.cgs.voteModified != qfalse {
+        ctx.world.cgs.voteModified = qfalse;
+        // Raven's `trap_S_StartLocalSound( cgs.media.talkSound, … )` is commented
+        // out at the site.
+    }
+
+    let mut sec = (VOTE_TIME - (ctx.world.cg.time - ctx.world.cgs.voteTime)) / 1000;
+    if sec < 0 {
+        sec = 0;
+    }
+
+    let voteString = buf_to_string(&ctx.world.cgs.voteString.map(|c| c as u8));
+
+    // §F19: Raven's `sCmd` is an uninitialized stack buffer printed even when no
+    // vote-string prefix matches; the port starts it empty (the one defined
+    // reading of that garbage).
+    let mut sCmd = String::new();
+    let mut sParm: Option<String> = None;
+
+    if voteString.starts_with("map_restart") {
+        sCmd = trap::SP_GetStringTextString(ctx.engine, "MENUS_RESTART_MAP", 100)
+            .unwrap_or_else(|| "??MENUS_RESTART_MAP".to_string());
+    } else if voteString.starts_with("vstr nextmap") {
+        sCmd = trap::SP_GetStringTextString(ctx.engine, "MENUS_NEXT_MAP", 100)
+            .unwrap_or_else(|| "??MENUS_NEXT_MAP".to_string());
+    } else if voteString.starts_with("g_doWarmup") {
+        sCmd = trap::SP_GetStringTextString(ctx.engine, "MENUS_WARMUP", 100)
+            .unwrap_or_else(|| "??MENUS_WARMUP".to_string());
+    } else if voteString.starts_with("g_gametype") {
+        sCmd = trap::SP_GetStringTextString(ctx.engine, "MENUS_GAME_TYPE", 100)
+            .unwrap_or_else(|| "??MENUS_GAME_TYPE".to_string());
+        let parm = voteString.get(11..).unwrap_or("");
+        if parm.eq_ignore_ascii_case("Free For All") {
+            sParm = Some(CG_GetStringEdString(ctx, "MENUS", "FREE_FOR_ALL"));
+        } else if parm.eq_ignore_ascii_case("Duel") {
+            sParm = Some(CG_GetStringEdString(ctx, "MENUS", "DUEL"));
+        } else if parm.eq_ignore_ascii_case("Holocron FFA") {
+            sParm = Some(CG_GetStringEdString(ctx, "MENUS", "HOLOCRON_FFA"));
+        } else if parm.eq_ignore_ascii_case("Power Duel") {
+            sParm = Some(CG_GetStringEdString(ctx, "MENUS", "POWERDUEL"));
+        } else if parm.eq_ignore_ascii_case("Team FFA") {
+            sParm = Some(CG_GetStringEdString(ctx, "MENUS", "TEAM_FFA"));
+        } else if parm.eq_ignore_ascii_case("Siege") {
+            sParm = Some(CG_GetStringEdString(ctx, "MENUS", "SIEGE"));
+        } else if parm.eq_ignore_ascii_case("Capture the Flag") {
+            sParm = Some(CG_GetStringEdString(ctx, "MENUS", "CAPTURE_THE_FLAG"));
+        } else if parm.eq_ignore_ascii_case("Capture the Ysalamiri") {
+            sParm = Some(CG_GetStringEdString(ctx, "MENUS", "CAPTURE_THE_YSALIMARI"));
+        }
+    } else if voteString.starts_with("map") {
+        sCmd = trap::SP_GetStringTextString(ctx.engine, "MENUS_NEW_MAP", 100)
+            .unwrap_or_else(|| "??MENUS_NEW_MAP".to_string());
+        sParm = Some(voteString.get(4..).unwrap_or("").to_string());
+    } else if voteString.starts_with("kick") {
+        sCmd = trap::SP_GetStringTextString(ctx.engine, "MENUS_KICK_PLAYER", 100)
+            .unwrap_or_else(|| "??MENUS_KICK_PLAYER".to_string());
+        sParm = Some(voteString.get(5..).unwrap_or("").to_string());
+    }
+
+    let sVote = trap::SP_GetStringTextString(ctx.engine, "MENUS_VOTE", 20)
+        .unwrap_or_else(|| "??MENUS_VOTE".to_string());
+    let sYes = trap::SP_GetStringTextString(ctx.engine, "MENUS_YES", 20)
+        .unwrap_or_else(|| "??MENUS_YES".to_string());
+    let sNo = trap::SP_GetStringTextString(ctx.engine, "MENUS_NO", 20)
+        .unwrap_or_else(|| "??MENUS_NO".to_string());
+
+    let voteYes = ctx.world.cgs.voteYes;
+    let voteNo = ctx.world.cgs.voteNo;
+    let s = match &sParm {
+        Some(sp) if !sp.is_empty() => {
+            format!("{sVote}({sec}):<{sCmd} {sp}> {sYes}:{voteYes} {sNo}:{voteNo}")
+        }
+        _ => format!("{sVote}({sec}):<{sCmd}> {sYes}:{voteYes} {sNo}:{voteNo}"),
+    };
+    CG_DrawSmallString(ctx, ds, 4, 58, &s, 1.0);
+
+    let s = CG_GetStringEdString(ctx, "MP_INGAME", "OR_PRESS_ESC_THEN_CLICK_VOTE");
+    CG_DrawSmallString(ctx, ds, 4, 58 + SMALLCHAR_HEIGHT + 2, &s, 1.0);
+}
+
+/// Raven `CG_DrawTeamVote` — the team callvote status line for the local
+/// player's team (red uses slot 0, blue slot 1), with a "make X leader" gloss.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:6659-6725`
+pub fn CG_DrawTeamVote(ctx: &mut CgContext, ds: &DisplayState) {
+    let cs_offset = if ctx.world.cgs.clientinfo[0].team == TEAM_RED {
+        0usize
+    } else if ctx.world.cgs.clientinfo[0].team == TEAM_BLUE {
+        1usize
+    } else {
+        return;
+    };
+
+    if ctx.world.cgs.teamVoteTime[cs_offset] == 0 {
+        return;
+    }
+
+    // play a talk beep whenever it is modified
+    if ctx.world.cgs.teamVoteModified[cs_offset] != qfalse {
+        ctx.world.cgs.teamVoteModified[cs_offset] = qfalse;
+        // Raven's `trap_S_StartLocalSound(…)` is commented out at the site.
+    }
+
+    let mut sec = (VOTE_TIME - (ctx.world.cg.time - ctx.world.cgs.teamVoteTime[cs_offset])) / 1000;
+    if sec < 0 {
+        sec = 0;
+    }
+
+    let tvs = buf_to_string(&ctx.world.cgs.teamVoteString[cs_offset].map(|c| c as u8));
+    let voteYes = ctx.world.cgs.teamVoteYes[cs_offset];
+    let voteNo = ctx.world.cgs.teamVoteNo[cs_offset];
+
+    let s = if tvs.contains("leader") {
+        // walk to the first space; the rest is the target client index
+        let bytes = tvs.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() && bytes[i] != b' ' {
+            i += 1;
+        }
+
+        if i < bytes.len() && bytes[i] == b' ' {
+            let voteIndex = atoi(&tvs[i + 1..]);
+            // §F19: `voteIndex` is server-supplied; a bad index reads garbage in
+            // Raven, so an out-of-range one paints an empty name here.
+            let name = if (0..MAX_CLIENTS_I32).contains(&voteIndex) {
+                buf_to_string(
+                    &ctx.world.cgs.clientinfo[voteIndex as usize]
+                        .name
+                        .map(|c| c as u8),
+                )
+            } else {
+                String::new()
+            };
+            format!("TEAMVOTE({sec}):(Make {name} the new team leader) yes:{voteYes} no:{voteNo}")
+        } else {
+            format!("TEAMVOTE({sec}):{tvs} yes:{voteYes} no:{voteNo}")
+        }
+    } else {
+        format!("TEAMVOTE({sec}):{tvs} yes:{voteYes} no:{voteNo}")
+    };
+
+    CG_DrawSmallString(ctx, ds, 4, 90, &s, 1.0);
+}
+
+/// Raven `CG_DrawWarmup` — the pre-match banner: the mode name (or the duel
+/// matchup), the "starts in" countdown, and the announcer count-down beeps.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:6923-7065`
+pub fn CG_DrawWarmup(ctx: &mut CgContext, ds: &DisplayState) {
+    let mut sec = ctx.world.cg.warmup;
+    if sec == 0 {
+        return;
+    }
+
+    if sec < 0 {
+        let s = CG_GetStringEdString(ctx, "MP_INGAME", "WAITING_FOR_PLAYERS");
+        let w = CG_DrawStrlen(&s) * BIGCHAR_WIDTH;
+        CG_DrawBigString(ctx, ds, 320 - w / 2, 24, &s, 1.0);
+        ctx.world.cg.warmupCount = 0;
+        return;
+    }
+
+    let gametype = ctx.world.cgs.gametype;
+    if gametype == GT_DUEL || gametype == GT_POWERDUEL {
+        // find the two (or three) active players
+        let mut ci1: Option<usize> = None;
+        let mut ci2: Option<usize> = None;
+        let mut ci3: Option<usize> = None;
+
+        if gametype == GT_POWERDUEL {
+            if ctx.world.cgs.duelist1 != -1 {
+                ci1 = Some(ctx.world.cgs.duelist1 as usize);
+            }
+            if ctx.world.cgs.duelist2 != -1 {
+                ci2 = Some(ctx.world.cgs.duelist2 as usize);
+            }
+            if ctx.world.cgs.duelist3 != -1 {
+                ci3 = Some(ctx.world.cgs.duelist3 as usize);
+            }
+        } else {
+            for i in 0..ctx.world.cgs.maxclients as usize {
+                if ctx.world.cgs.clientinfo[i].infoValid != qfalse
+                    && ctx.world.cgs.clientinfo[i].team == TEAM_FREE
+                {
+                    if ci1.is_none() {
+                        ci1 = Some(i);
+                    } else {
+                        ci2 = Some(i);
+                    }
+                }
+            }
+        }
+
+        if let (Some(c1), Some(c2)) = (ci1, ci2) {
+            let name1 = buf_to_string(&ctx.world.cgs.clientinfo[c1].name.map(|c| c as u8));
+            let name2 = buf_to_string(&ctx.world.cgs.clientinfo[c2].name.map(|c| c as u8));
+            let s = if let Some(c3) = ci3 {
+                let name3 = buf_to_string(&ctx.world.cgs.clientinfo[c3].name.map(|c| c as u8));
+                format!("{name1} vs {name2} and {name3}")
+            } else {
+                format!("{name1} vs {name2}")
+            };
+            let w = CG_Text_Width(ctx, ds, &s, 0.6, FONT_MEDIUM);
+            CG_Text_Paint(
+                ctx,
+                ds,
+                (320 - w / 2) as f32,
+                60.0,
+                0.6,
+                colorWhite,
+                &s,
+                0.0,
+                0,
+                ITEM_TEXTSTYLE_SHADOWEDMORE,
+                FONT_MEDIUM,
+            );
+        }
+    } else {
+        let s = if gametype == GT_FFA {
+            CG_GetStringEdString(ctx, "MENUS", "FREE_FOR_ALL")
+        } else if gametype == GT_HOLOCRON {
+            CG_GetStringEdString(ctx, "MENUS", "HOLOCRON_FFA")
+        } else if gametype == GT_JEDIMASTER {
+            CG_GetStringEdString(ctx, "MENUS", "POWERDUEL")
+        } else if gametype == GT_TEAM {
+            CG_GetStringEdString(ctx, "MENUS", "TEAM_FFA")
+        } else if gametype == GT_SIEGE {
+            CG_GetStringEdString(ctx, "MENUS", "SIEGE")
+        } else if gametype == GT_CTF {
+            CG_GetStringEdString(ctx, "MENUS", "CAPTURE_THE_FLAG")
+        } else if gametype == GT_CTY {
+            CG_GetStringEdString(ctx, "MENUS", "CAPTURE_THE_YSALIMARI")
+        } else {
+            String::new()
+        };
+        let w = CG_Text_Width(ctx, ds, &s, 1.5, FONT_MEDIUM);
+        CG_Text_Paint(
+            ctx,
+            ds,
+            (320 - w / 2) as f32,
+            90.0,
+            1.5,
+            colorWhite,
+            &s,
+            0.0,
+            0,
+            ITEM_TEXTSTYLE_SHADOWEDMORE,
+            FONT_MEDIUM,
+        );
+    }
+
+    sec = (sec - ctx.world.cg.time) / 1000;
+    if sec < 0 {
+        ctx.world.cg.warmup = 0;
+        sec = 0;
+    }
+    let s = format!(
+        "{}: {}",
+        CG_GetStringEdString(ctx, "MP_INGAME", "STARTS_IN"),
+        sec + 1
+    );
+    if sec != ctx.world.cg.warmupCount {
+        ctx.world.cg.warmupCount = sec;
+
+        if ctx.world.cgs.gametype != GT_SIEGE {
+            match sec {
+                0 => {
+                    let snd = ctx.world.cgs.media.count1Sound;
+                    trap::S_StartLocalSound(ctx.engine, snd, CHAN_ANNOUNCER);
+                }
+                1 => {
+                    let snd = ctx.world.cgs.media.count2Sound;
+                    trap::S_StartLocalSound(ctx.engine, snd, CHAN_ANNOUNCER);
+                }
+                2 => {
+                    let snd = ctx.world.cgs.media.count3Sound;
+                    trap::S_StartLocalSound(ctx.engine, snd, CHAN_ANNOUNCER);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // Raven's `cw` here is a pure dead store (set in the switch, never read),
+    // so only `scale` survives.
+    let scale = match ctx.world.cg.warmupCount {
+        0 => 1.25f32,
+        1 => 1.15,
+        2 => 1.05,
+        _ => 0.9,
+    };
+
+    let w = CG_Text_Width(ctx, ds, &s, scale, FONT_MEDIUM);
+    CG_Text_Paint(
+        ctx,
+        ds,
+        (320 - w / 2) as f32,
+        125.0,
+        scale,
+        colorWhite,
+        &s,
+        0.0,
+        0,
+        ITEM_TEXTSTYLE_SHADOWEDMORE,
+        FONT_MEDIUM,
+    );
 }

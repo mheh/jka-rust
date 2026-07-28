@@ -8,7 +8,7 @@ use core::ffi::c_int;
 use mp_bg::public::team_maxoverlay::TEAM_MAXOVERLAY;
 use mp_qshared::shared::{vec3_t, vec4_t, ENTITYNUM_NONE};
 
-use crate::cg_draw::LAG_SAMPLES;
+use crate::cg_draw::{FPS_FRAMES, LAG_SAMPLES};
 
 /// Raven `lagometer_t` — the lagometer's two ring buffers plus their write
 /// counters. Only one instance ever exists (the `lagometer` global below), so
@@ -158,6 +158,11 @@ pub struct CgDrawState {
     /// Source: `oracle/codemp/cgame/cg_draw.c:7351`
     pub cg_beatingSiegeTime: c_int,
 
+    /// Raven: The time at which you died and the time it will take for you to
+    /// rejoin game. Written by `EV_SIEGESPEC`.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:40`
+    pub cg_siegeDeathTime: c_int,
+
     /// Raven's `static int oldDif = 0` inside `CG_DrawRocketLocking` — last
     /// frame's wedge count; a change fires the tick/lock sound.
     /// Source: `oracle/codemp/cgame/cg_draw.c:5752`
@@ -236,6 +241,28 @@ pub struct CgDrawState {
     /// Raven `float cgYsalFadeVal`.
     /// Source: `oracle/codemp/cgame/cg_draw.c:7335`
     pub cgYsalFadeVal: f32,
+
+    /// Raven's `static unsigned short previousTimes[FPS_FRAMES]` inside
+    /// `CG_DrawFPS` — the ring buffer of recent frame times the fps counter
+    /// averages. `fps`-prefixed here since its three siblings have names too
+    /// generic to fold bare into the shared draw struct.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:3074`
+    pub fpsPreviousTimes: [u16; FPS_FRAMES],
+
+    /// Raven's `static unsigned short index` inside `CG_DrawFPS` — the ring
+    /// write cursor (wrapped by `% FPS_FRAMES`).
+    /// Source: `oracle/codemp/cgame/cg_draw.c:3075`
+    pub fpsIndex: u16,
+
+    /// Raven's `static int previous` inside `CG_DrawFPS` — last frame's
+    /// `trap_Milliseconds`, so this frame's time is the delta.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:3076`
+    pub fpsPrevious: c_int,
+
+    /// Raven's `static int lastupdate` inside `CG_DrawFPS` — the last time we
+    /// wrote a sample; caps sampling at 20Hz.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:3076`
+    pub fpsLastupdate: c_int,
 }
 
 impl Default for CgDrawState {
@@ -284,6 +311,11 @@ impl Default for CgDrawState {
             cgYsalFadeTime: 0,
             cgYsalFadeVal: 0.0,
             cg_beatingSiegeTime: 0,
+            cg_siegeDeathTime: 0,
+            fpsPreviousTimes: [0; FPS_FRAMES],
+            fpsIndex: 0,
+            fpsPrevious: 0,
+            fpsLastupdate: 0,
         }
     }
 }

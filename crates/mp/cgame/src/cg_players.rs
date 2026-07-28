@@ -13,10 +13,11 @@ use mp_bg::bg_misc::{
     BG_ValidateSkinForTeam,
 };
 use mp_bg::bg_panimate::{
-    BG_FlippingAnim, BG_InDeathAnim, BG_ParseAnimationFile, BG_SaberStartTransAnim,
+    BG_FlippingAnim, BG_InDeathAnim, BG_ParseAnimationFile, BG_SaberInAttack,
+    BG_SaberStartTransAnim, BG_SuperBreakWinAnim,
 };
 use mp_bg::bg_pmove::{BG_G2PlayerAngles, BG_IK_MoveArm, PM_RunningAnim, PM_WalkingAnim};
-use mp_bg::bg_saber::SFL2_NO_DLIGHT;
+use mp_bg::bg_saber::{SFL2_NO_BLADE, SFL2_NO_DLIGHT, SFL2_NO_WALL_MARKS};
 use mp_bg::bg_saberLoad::{BG_SI_SetDesiredLength, WP_SaberBladeUseSecondBladeStyle, WP_SetSaber};
 use mp_bg::bg_vehicleLoad::{BG_GetVehicleModelName, BG_GetVehicleSkinName, BG_VehicleGetIndex};
 use mp_bg::cstr_util::cstr_to_str;
@@ -25,12 +26,17 @@ use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::anim_table::animTable;
 use mp_bg::public::configstring::{CS_G2BONES, CS_MODELS};
 use mp_bg::public::entity_effects::EF2_HYPERSPACE;
-use mp_bg::public::entity_flags::{EF_CONNECTION, EF_DEAD, EF_RAG, EF_TALK};
+use mp_bg::public::entity_flags::{EF_CONNECTION, EF_DEAD, EF_PERMANENT, EF_RAG, EF_TALK};
 use mp_bg::public::entity_type::entityType_t;
+use mp_bg::public::footstep_type::footstepType_t;
 use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL, GT_SIEGE, GT_TEAM};
 use mp_bg::public::gender::gender_t;
 use mp_bg::public::hyperspace::HYPERSPACE_TIME;
-use mp_bg::public::powerup::{PW_BLUEFLAG, PW_NEUTRALFLAG, PW_PULL, PW_QUAD, PW_REDFLAG};
+use mp_bg::public::powerup::{
+    PW_BLUEFLAG, PW_CLOAKED, PW_NEUTRALFLAG, PW_PULL, PW_QUAD, PW_REDFLAG, PW_SPEED,
+};
+use mp_bg::public::saber_move_data_table::saberMoveData;
+use mp_bg::public::team::{TEAM_BLUE, TEAM_RED, TEAM_SPECTATOR};
 use mp_bg::vehicles::vehicle_s::{MAX_VEHICLE_EXHAUSTS, MAX_VEHICLE_MUZZLES};
 use mp_bg::weapons::weapon_t::WP_SABER;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
@@ -59,14 +65,20 @@ use mp_qshared::shared::q_math::{
     VectorInverse, VectorLength, VectorNormalize, VectorSet, PITCH, ROLL, YAW,
 };
 use mp_qshared::shared::q_string::COM_StripExtension;
+use mp_qshared::shared::surface_flags::{
+    MATERIAL_CANVAS, MATERIAL_CARPET, MATERIAL_DIRT, MATERIAL_FABRIC, MATERIAL_GRAVEL,
+    MATERIAL_HOLLOWMETAL, MATERIAL_HOLLOWWOOD, MATERIAL_LONGGRASS, MATERIAL_MASK, MATERIAL_MUD,
+    MATERIAL_PLASTIC, MATERIAL_RUBBER, MATERIAL_SAND, MATERIAL_SHORTGRASS, MATERIAL_SNOW,
+    MATERIAL_SOLIDMETAL, MATERIAL_SOLIDWOOD,
+};
 use mp_qshared::shared::trajectory::{trType_t, trajectory_t};
 use mp_qshared::shared::{
-    addElectricityArgStruct_t, addbezierArgStruct_t, addpolyArgStruct_t, fileHandle_t, mdxaBone_t,
-    orientation_t, qboolean, qfalse, qhandle_t, qtrue, sfxHandle_t, sharedEIKMoveState,
-    sharedERagPhase, vec3_t, CollisionRecord_t, Eorientations, CHAN_AUTO, CONTENTS_LAVA,
-    CONTENTS_SLIME, CONTENTS_SOLID, CONTENTS_WATER, ENTITYNUM_NONE, ENTITYNUM_WORLD, FP_RAGE,
-    FP_SEE, FP_SPEED, FS_READ, MASK_PLAYERSOLID, MASK_SOLID, MAX_CLIENTS, MAX_CLIENTS_I32,
-    MAX_GENTITIES, MAX_QPATH,
+    addElectricityArgStruct_t, addbezierArgStruct_t, addpolyArgStruct_t, effectTrailArgStruct_t,
+    fileHandle_t, mdxaBone_t, orientation_t, qboolean, qfalse, qhandle_t, qtrue, sfxHandle_t,
+    sharedEIKMoveState, sharedERagPhase, vec3_t, CollisionRecord_t, Eorientations, CHAN_AUTO,
+    CHAN_BODY, CHAN_WEAPON, CONTENTS_LAVA, CONTENTS_SLIME, CONTENTS_SOLID, CONTENTS_WATER,
+    ENTITYNUM_NONE, ENTITYNUM_WORLD, FP_RAGE, FP_SEE, FP_SPEED, FS_READ, MASK_PLAYERSOLID,
+    MASK_SOLID, MAX_CLIENTS, MAX_CLIENTS_I32, MAX_GENTITIES, MAX_QPATH, SURF_NOIMPACT,
 };
 use native_string::{
     atoi, buf_to_string, cstr, strcat_string, strncpyz_string, Q_stricmp, Q_strncpyz,
@@ -75,8 +87,11 @@ use native_string::{
 use crate::bg_channel::{CgBgTraps, CgGameCallbacks};
 use crate::cg_ents::ScaleModelAxis;
 use crate::cg_localents::CG_AllocLocalEntity;
-use crate::cg_main::{CG_ConfigString, CG_Error, CG_Printf, Com_Printf};
-use crate::cg_marks::CG_AllocMark;
+use crate::cg_main::{
+    CG_ConfigString, CG_Error, CG_Printf, Com_Printf, DEFAULT_BLUETEAM_NAME, DEFAULT_MODEL,
+    DEFAULT_REDTEAM_NAME,
+};
+use crate::cg_marks::{CG_AllocMark, CG_ImpactMark};
 use crate::cg_predict::CG_Trace;
 use crate::cg_servercmds::CG_HandleNPCSounds;
 use crate::cg_weapons::{CG_CopyG2WeaponInstance, CG_G2WeaponInstance};
@@ -84,6 +99,7 @@ use crate::local::centity_s::centity_t;
 use crate::local::client_info_t::{
     clientInfo_t, MAX_CUSTOM_DUEL_SOUNDS, MAX_CUSTOM_SIEGE_SOUNDS, MAX_CUSTOM_SOUNDS, MAX_TEAMNAME,
 };
+use crate::local::footstep_t::footstep_t;
 use crate::local::le_type_t::leType_t;
 use crate::local::lerp_frame_t::lerpFrame_t;
 use crate::local::mark_poly_s::MAX_VERTS_ON_POLY;
@@ -439,6 +455,41 @@ const TURN_OFF: c_int = 0x00000100;
 /// distortion takes to expand and fade.
 /// Source: `oracle/codemp/cgame/cg_players.c:4797`
 const REFRACT_EFFECT_DURATION: c_int = 500;
+
+/// Raven `FOOTSTEP_DISTANCE` — how far below the foot `_PlayerFootStep` traces
+/// down looking for a surface to step on.
+/// Source: `oracle/codemp/cgame/cg_players.c:1988`
+const FOOTSTEP_DISTANCE: f32 = 32.0;
+
+/// Raven `SHADOW_DISTANCE` — how far below the player `CG_PlayerShadow` traces
+/// for the projection/mark shadow (stencil traces the full 4096 instead).
+/// Source: `oracle/codemp/cgame/cg_players.c:4611`
+const SHADOW_DISTANCE: f32 = 128.0;
+
+/// Raven `SABER_TRAIL_TIME` — a float literal, the default trail-slice lifetime
+/// when the move data doesn't name one.
+/// Source: `oracle/codemp/cgame/cg_players.c:5986`
+const SABER_TRAIL_TIME: f32 = 40.0;
+
+/// Raven `FX_USE_ALPHA` — the trail-arg flag telling the effects system to honor
+/// the per-vertex alpha we filled in.
+/// Source: `oracle/codemp/cgame/cg_players.c:5987`
+const FX_USE_ALPHA: c_int = 0x0800_0000;
+
+/// Raven `cg_pushBoneNames[]` — the bones `CG_ForcePushBodyBlur` bolts a blur
+/// effect onto, walked until the `NULL` sentinel (`None`).
+/// Source: `oracle/codemp/cgame/cg_players.c:4945-4956`
+const cg_pushBoneNames: [Option<&str>; 9] = [
+    Some("cranium"),
+    Some("lower_lumbar"),
+    Some("rhand"),
+    Some("lhand"),
+    Some("ltibia"),
+    Some("rtibia"),
+    Some("lradius"),
+    Some("rradius"),
+    None,
+];
 
 /// Raven `MAX_MARK_FRAGMENTS` — the fragment-buffer bound `CG_CreateSaberMarks`
 /// hands `trap_CM_MarkFragments`.
@@ -2332,7 +2383,7 @@ pub fn CG_DestroyNPCClient(ci: &mut Option<Box<clientInfo_t>>) {
 /// The zero fill Raven gets from its `memset(*ci, 0, sizeof(clientInfo_t))`.
 /// `clientInfo_t` is too wide for a derived `Default` (its `char[64]` name
 /// buffers), so the fill is spelled once here for both NPC-client fns.
-fn zeroed_client_info() -> clientInfo_t {
+pub(crate) fn zeroed_client_info() -> clientInfo_t {
     // SAFETY: `clientInfo_t` is `#[repr(C)]` scalars, arrays, `qhandle_t`s and
     // opaque ghoul2 `*mut c_void` tokens; its two enum members (`team_t`,
     // `gender_t`) both have a 0 discriminant, so all-zero is a legal value.
@@ -5993,7 +6044,7 @@ pub fn CG_SaberCompWork(
                     };
 
                     if clientValid {
-                        let saberPtr: *mut saberInfo_t = if isNpc {
+                        let saberPtr: &mut saberInfo_t = if isNpc {
                             &mut ctx
                                 .world
                                 .entity_mut(ownerNum)
@@ -6111,7 +6162,7 @@ pub fn CG_SaberCompWork(
         };
 
         if clientValid {
-            let saberPtr: *mut saberInfo_t = if isNpc {
+            let saberPtr: &mut saberInfo_t = if isNpc {
                 &mut ctx
                     .world
                     .entity_mut(ownerNum)
@@ -6967,5 +7018,1168 @@ pub fn CG_ResetPlayerEntity(ctx: &mut CgContext, cent: &mut centity_t, ci: &mut 
         // so the oracle shows garbage; we print the truncated angle instead.
         let yaw = cent.pe.torso.yawAngle as c_int;
         CG_Printf(ctx, &format!("{} ResetPlayerEntity yaw={}\n", number, yaw));
+    }
+}
+
+/// Raven `CG_LoadClientInfo` — (re)registers a client's model, ghoul2 instance
+/// and sounds, then resets every player entity wearing that client number so it
+/// doesn't hold a frame from the old model.
+///
+/// Raven derives the client index from `ci - cgs.clientinfo` pointer arithmetic;
+/// we take that index as `clientNum` (every caller already knows the slot).
+/// Source: `oracle/codemp/cgame/cg_players.c:1006-1147`
+pub fn CG_LoadClientInfo(ctx: &mut CgContext, clientNum: c_int) {
+    let engine = ctx.engine;
+
+    // ESCALATION (queued for the CG_NewClientInfo wave): Raven's fn takes a
+    // `clientInfo_t *ci` and CG_NewClientInfo calls it twice with a STACK
+    // LOCAL, which this clientNum shape cannot express - that wave either
+    // grows an `&mut clientInfo_t` twin or reshapes this. Until then every
+    // caller must pass a real cgs.clientinfo slot index.
+    // Source: oracle/codemp/cgame/cg_players.c:1803,1809
+
+    // Raven clamps its `clientNum` to -1 when out of range; that value only
+    // gates the ghoul2/attach block. Keep the real slot index separate for the
+    // take/put-back and the reset loop.
+    let mut gateNum = clientNum;
+    if gateNum < 0 || gateNum >= MAX_CLIENTS_I32 {
+        gateNum = -1;
+    }
+
+    // Hand the clientinfo out so we can pass &mut ci alongside ctx (take/put-back).
+    let mut ci = core::mem::replace(
+        &mut ctx.world.cgs.clientinfo[clientNum as usize],
+        zeroed_client_info(),
+    );
+
+    ci.deferred = qfalse;
+
+    let mut teamname = String::new();
+    if ctx.world.cgs.gametype >= GT_TEAM {
+        if ci.team == TEAM_BLUE {
+            teamname = DEFAULT_BLUETEAM_NAME.to_string();
+        } else {
+            teamname = DEFAULT_REDTEAM_NAME.to_string();
+        }
+    }
+    if !teamname.is_empty() {
+        teamname.push('/');
+    }
+
+    let mut modelloaded = true;
+    if ctx.world.cgs.gametype == GT_SIEGE && (ci.team == TEAM_SPECTATOR || ci.siegeIndex == -1) {
+        // yeah.. kind of a hack. Don't care until they're actually ingame with a valid class.
+        if !CG_RegisterClientModelname(ctx, &mut ci, DEFAULT_MODEL, "default", &teamname, -1) {
+            CG_Error(
+                ctx,
+                &format!("DEFAULT_MODEL ({DEFAULT_MODEL}) failed to register"),
+            );
+            ctx.world.cgs.clientinfo[clientNum as usize] = ci;
+            return;
+        }
+    } else {
+        let modelName = buf_to_string(&ci.modelName.map(|c| c as u8));
+        let skinName = buf_to_string(&ci.skinName.map(|c| c as u8));
+        // Raven hands the *clamped* clientNum here, so -1 flows through on the
+        // out-of-range arm
+        if !CG_RegisterClientModelname(ctx, &mut ci, &modelName, &skinName, &teamname, gateNum) {
+            // rww - DO NOT error out here! A nonsense model name would crash
+            // everyone's client; give it a shot at the default model instead.
+
+            // fall back to default team name
+            if ctx.world.cgs.gametype >= GT_TEAM {
+                // keep skin name
+                if ci.team == TEAM_BLUE {
+                    teamname = DEFAULT_BLUETEAM_NAME.to_string();
+                } else {
+                    teamname = DEFAULT_REDTEAM_NAME.to_string();
+                }
+                let skinName = buf_to_string(&ci.skinName.map(|c| c as u8));
+                if !CG_RegisterClientModelname(
+                    ctx,
+                    &mut ci,
+                    DEFAULT_MODEL,
+                    &skinName,
+                    &teamname,
+                    -1,
+                ) {
+                    CG_Error(
+                        ctx,
+                        &format!(
+                            "DEFAULT_MODEL / skin ({DEFAULT_MODEL}/{skinName}) failed to register"
+                        ),
+                    );
+                    ctx.world.cgs.clientinfo[clientNum as usize] = ci;
+                    return;
+                }
+            } else if !CG_RegisterClientModelname(
+                ctx,
+                &mut ci,
+                DEFAULT_MODEL,
+                "default",
+                &teamname,
+                -1,
+            ) {
+                CG_Error(
+                    ctx,
+                    &format!("DEFAULT_MODEL ({DEFAULT_MODEL}) failed to register"),
+                );
+                ctx.world.cgs.clientinfo[clientNum as usize] = ci;
+                return;
+            }
+            modelloaded = false;
+        }
+    }
+
+    if gateNum != -1 {
+        trap::G2API_ClearAttachedInstance(engine, gateNum);
+    }
+
+    if gateNum != -1
+        && !ci.ghoul2Model.is_null()
+        && trap::G2_HaveWeGhoul2Models(engine, ci.ghoul2Model)
+    {
+        let existingGhoul2 = ctx.world.entity(gateNum as usize).ghoul2;
+        if !existingGhoul2.is_null() && trap::G2_HaveWeGhoul2Models(engine, existingGhoul2) {
+            let ghoul2Ptr = &mut ctx.world.entity_mut(gateNum as usize).ghoul2 as *mut *mut c_void;
+            trap::G2API_CleanGhoul2Models(engine, ghoul2Ptr);
+        }
+        let ghoul2Ptr = &mut ctx.world.entity_mut(gateNum as usize).ghoul2 as *mut *mut c_void;
+        trap::G2API_DuplicateGhoul2Instance(engine, ci.ghoul2Model, ghoul2Ptr);
+
+        // Attach the instance to this entity num so we can make use of
+        // client-server shared operations if possible.
+        let dupGhoul2 = ctx.world.entity(gateNum as usize).ghoul2;
+        trap::G2API_AttachInstanceToEntNum(engine, dupGhoul2, gateNum, false);
+
+        if trap::G2API_AddBolt(engine, dupGhoul2, 0, "face") == -1 {
+            // check now to see if we have this bone for setting anims and such
+            ctx.world.entity_mut(gateNum as usize).noFace = qtrue;
+        }
+
+        let dupGhoul2 = ctx.world.entity(gateNum as usize).ghoul2;
+        let localAnimIndex = CG_G2SkelForModel(ctx, dupGhoul2);
+        ctx.world.entity_mut(gateNum as usize).localAnimIndex = localAnimIndex;
+        let dupGhoul2 = ctx.world.entity(gateNum as usize).ghoul2;
+        let eventAnimIndex = CG_G2EvIndexForModel(ctx, dupGhoul2, localAnimIndex);
+        ctx.world.entity_mut(gateNum as usize).eventAnimIndex = eventAnimIndex;
+    }
+
+    ci.newAnims = qfalse;
+    if ci.torsoModel != 0 {
+        let mut tag = orientation_t {
+            origin: [0.0; 3],
+            axis: [[0.0; 3]; 3],
+        };
+        // if the torso model has the "tag_flag"
+        if trap::R_LerpTag(engine, &mut tag, ci.torsoModel, 0, 0, 1.0, "tag_flag") != 0 {
+            ci.newAnims = qtrue;
+        }
+    }
+
+    // sounds
+    if ctx.world.cgs.gametype == GT_SIEGE && (ci.team == TEAM_SPECTATOR || ci.siegeIndex == -1) {
+        // don't need to load sounds
+    } else {
+        CG_LoadCISounds(ctx, &mut ci, modelloaded);
+    }
+
+    ci.deferred = qfalse;
+
+    // put our working copy back before the reset loop walks cg_entities
+    ctx.world.cgs.clientinfo[clientNum as usize] = ci;
+
+    // reset any existing players and bodies, because they might be in bad
+    // frames for this new model
+    for i in 0..MAX_GENTITIES {
+        if ctx.world.entity(i).currentState.clientNum == clientNum
+            && ctx.world.entity(i).currentState.eType == entityType_t::ET_PLAYER as c_int
+        {
+            // take/put-back: CG_ResetPlayerEntity wants (&mut cent, &mut ci), and
+            // this ci is the very slot we just wrote.
+            let mut cent = core::mem::replace(ctx.world.entity_mut(i), centity_t::zeroed());
+            let mut ci = core::mem::replace(
+                &mut ctx.world.cgs.clientinfo[clientNum as usize],
+                zeroed_client_info(),
+            );
+            CG_ResetPlayerEntity(ctx, &mut cent, &mut ci);
+            ctx.world.cgs.clientinfo[clientNum as usize] = ci;
+            *ctx.world.entity_mut(i) = cent;
+        }
+    }
+}
+
+/// Raven `_PlayerFootStep` — traces to the ground under a foot, plays the
+/// material's footstep sound, and (when `cg_footsteps` is turned up) throws the
+/// material effect and stamps a footprint mark.
+///
+/// `centNum` stands in for Raven's `cent` pointer — only the owner's clientNum
+/// (for the sound entity) is read off it.
+/// Source: `oracle/codemp/cgame/cg_players.c:1989-2181`
+pub fn _PlayerFootStep(
+    ctx: &mut CgContext,
+    origin: &vec3_t,
+    orientation: f32,
+    radius: f32,
+    centNum: usize,
+    footStepType: footstepType_t,
+) {
+    let engine = ctx.engine;
+    let mins: vec3_t = [-7.0, -7.0, 0.0];
+    let maxs: vec3_t = [7.0, 7.0, 2.0];
+    let mut trace = trace_t::zeroed();
+    // Raven inits soundType to FOOTSTEP_TOTAL, but every arm below overwrites
+    // it before the read - dead store dropped (difLen precedent)
+    let soundType: c_int;
+    let mut bMark = false;
+    let footMarkShader: qhandle_t;
+    let mut effectID: c_int = -1;
+
+    // send a trace down from the player to the ground
+    let mut end: vec3_t = [0.0; 3];
+    _VectorCopy(*origin, &mut end);
+    end[2] -= FOOTSTEP_DISTANCE;
+
+    trap::CM_BoxTrace(
+        engine,
+        &mut trace,
+        origin,
+        &end,
+        &mins,
+        &maxs,
+        0,
+        MASK_PLAYERSOLID,
+    );
+
+    // no shadow if too high
+    if trace.fraction >= 1.0 {
+        return;
+    }
+
+    let heavy = footStepType == footstepType_t::FOOTSTEP_HEAVY_R
+        || footStepType == footstepType_t::FOOTSTEP_HEAVY_L;
+
+    // check for foot-steppable surface flag
+    match trace.surfaceFlags & MATERIAL_MASK {
+        MATERIAL_MUD => {
+            bMark = true;
+            soundType = (if heavy {
+                footstep_t::FOOTSTEP_MUDRUN
+            } else {
+                footstep_t::FOOTSTEP_MUDWALK
+            }) as c_int;
+            effectID = ctx.world.cgs.effects.footstepMud;
+        }
+        MATERIAL_DIRT => {
+            bMark = true;
+            soundType = (if heavy {
+                footstep_t::FOOTSTEP_DIRTRUN
+            } else {
+                footstep_t::FOOTSTEP_DIRTWALK
+            }) as c_int;
+            effectID = ctx.world.cgs.effects.footstepSand;
+        }
+        MATERIAL_SAND => {
+            bMark = true;
+            soundType = (if heavy {
+                footstep_t::FOOTSTEP_SANDRUN
+            } else {
+                footstep_t::FOOTSTEP_SANDWALK
+            }) as c_int;
+            effectID = ctx.world.cgs.effects.footstepSand;
+        }
+        MATERIAL_SNOW => {
+            bMark = true;
+            soundType = (if heavy {
+                footstep_t::FOOTSTEP_SNOWRUN
+            } else {
+                footstep_t::FOOTSTEP_SNOWWALK
+            }) as c_int;
+            effectID = ctx.world.cgs.effects.footstepSnow;
+        }
+        MATERIAL_SHORTGRASS | MATERIAL_LONGGRASS => {
+            soundType = (if heavy {
+                footstep_t::FOOTSTEP_GRASSRUN
+            } else {
+                footstep_t::FOOTSTEP_GRASSWALK
+            }) as c_int;
+        }
+        MATERIAL_SOLIDMETAL => {
+            soundType = (if heavy {
+                footstep_t::FOOTSTEP_METALRUN
+            } else {
+                footstep_t::FOOTSTEP_METALWALK
+            }) as c_int;
+        }
+        MATERIAL_HOLLOWMETAL => {
+            soundType = (if heavy {
+                footstep_t::FOOTSTEP_PIPERUN
+            } else {
+                footstep_t::FOOTSTEP_PIPEWALK
+            }) as c_int;
+        }
+        MATERIAL_GRAVEL => {
+            soundType = (if heavy {
+                footstep_t::FOOTSTEP_GRAVELRUN
+            } else {
+                footstep_t::FOOTSTEP_GRAVELWALK
+            }) as c_int;
+            effectID = ctx.world.cgs.effects.footstepGravel;
+        }
+        MATERIAL_CARPET | MATERIAL_FABRIC | MATERIAL_CANVAS | MATERIAL_RUBBER
+        | MATERIAL_PLASTIC => {
+            soundType = (if heavy {
+                footstep_t::FOOTSTEP_RUGRUN
+            } else {
+                footstep_t::FOOTSTEP_RUGWALK
+            }) as c_int;
+        }
+        MATERIAL_SOLIDWOOD | MATERIAL_HOLLOWWOOD => {
+            soundType = (if heavy {
+                footstep_t::FOOTSTEP_WOODRUN
+            } else {
+                footstep_t::FOOTSTEP_WOODWALK
+            }) as c_int;
+        }
+        // default: glass/water/flesh/concrete/rock/ice/marble/... all fall
+        // through to the "stone" footstep in Raven's switch.
+        _ => {
+            soundType = (if heavy {
+                footstep_t::FOOTSTEP_STONERUN
+            } else {
+                footstep_t::FOOTSTEP_STONEWALK
+            }) as c_int;
+        }
+    }
+
+    if soundType < footstep_t::FOOTSTEP_TOTAL as c_int {
+        let idx = (ctx.world.bg_state.rng.rand() & 3) as usize;
+        let sfx = ctx.world.cgs.media.footsteps[soundType as usize][idx];
+        let clientNum = ctx.world.entity(centNum).currentState.clientNum;
+        trap::S_StartSound(engine, None, clientNum, CHAN_BODY, sfx);
+    }
+
+    if ctx.world.cvars.cg_footsteps.integer < 4 {
+        // debugging - 4 always does footstep effect
+        if ctx.world.cvars.cg_footsteps.integer < 2 {
+            // 1 for sounds, 2 for effects, 3 for marks
+            return;
+        }
+    }
+
+    if effectID != -1 {
+        trap::FX_PlayEffectID(engine, effectID, &trace.endpos, &trace.plane.normal, -1, -1);
+    }
+
+    if ctx.world.cvars.cg_footsteps.integer < 4 {
+        // debugging - 4 always does footstep effect
+        if !bMark || ctx.world.cvars.cg_footsteps.integer < 3 {
+            // 1 for sounds, 2 for effects, 3 for marks
+            return;
+        }
+    }
+
+    match footStepType {
+        footstepType_t::FOOTSTEP_HEAVY_R => {
+            footMarkShader = ctx.world.cgs.media.fshrMarkShader;
+        }
+        footstepType_t::FOOTSTEP_HEAVY_L => {
+            footMarkShader = ctx.world.cgs.media.fshlMarkShader;
+        }
+        footstepType_t::FOOTSTEP_R => {
+            footMarkShader = ctx.world.cgs.media.fsrMarkShader;
+        }
+        // default / FOOTSTEP_L
+        _ => {
+            footMarkShader = ctx.world.cgs.media.fslMarkShader;
+        }
+    }
+
+    // add the mark as a temporary, so it goes directly to the renderer without
+    // taking a spot in the cg_marks array
+    if trace.plane.normal[0] != 0.0 || trace.plane.normal[1] != 0.0 || trace.plane.normal[2] != 0.0
+    {
+        CG_ImpactMark(
+            ctx,
+            footMarkShader,
+            trace.endpos,
+            trace.plane.normal,
+            orientation,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            false,
+            radius,
+            false,
+        );
+    }
+}
+
+/// Raven `CG_PlayerShadow` — traces down for the player's shadow, sets
+/// `shadowPlane`, and (dropshadow mode only) stamps the shadow mark. Returns
+/// whether the caller should still draw its own shadow geometry.
+/// Source: `oracle/codemp/cgame/cg_players.c:4612-4707`
+pub fn CG_PlayerShadow(ctx: &mut CgContext, centNum: usize, shadowPlane: &mut f32) -> bool {
+    let engine = ctx.engine;
+    let mins: vec3_t = [-15.0, -15.0, 0.0];
+    let maxs: vec3_t = [15.0, 15.0, 2.0];
+    let mut trace = trace_t::zeroed();
+    let mut radius = 24.0f32;
+
+    *shadowPlane = 0.0;
+
+    if ctx.world.cvars.cg_shadows.integer == 0 {
+        return false;
+    }
+
+    // no shadows when cloaked
+    if ctx.world.entity(centNum).currentState.powerups & (1 << PW_CLOAKED) != 0 {
+        return false;
+    }
+
+    if ctx.world.entity(centNum).currentState.eFlags & EF_DEAD != 0 {
+        return false;
+    }
+
+    let ti1 = ctx.world.entity(centNum).currentState.trickedentindex;
+    let ti2 = ctx.world.entity(centNum).currentState.trickedentindex2;
+    let ti3 = ctx.world.entity(centNum).currentState.trickedentindex3;
+    let ti4 = ctx.world.entity(centNum).currentState.trickedentindex4;
+    // §F19: Raven derefs `cg.snap->ps` unconditionally; a null snapshot has no
+    // local client to be tricked, so we read -1.
+    let snapClient = ctx.world.cg.snap_ref().map_or(-1, |snap| snap.ps.clientNum);
+    if CG_IsMindTricked(ctx.world, ti1, ti2, ti3, ti4, snapClient) {
+        // this entity is mind-tricking the current client, so don't render it
+        return false;
+    }
+
+    if ctx.world.cvars.cg_shadows.integer == 1 {
+        // dropshadow
+        if ctx.world.entity(centNum).currentState.m_iVehicleNum != 0
+            && ctx.world.entity(centNum).currentState.NPC_class != class_t::CLASS_VEHICLE as c_int
+        {
+            // riding a vehicle, no dropshadow
+            return false;
+        }
+    }
+
+    // send a trace down from the player to the ground
+    let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+    let mut end: vec3_t = [0.0; 3];
+    _VectorCopy(lerpOrigin, &mut end);
+    if ctx.world.cvars.cg_shadows.integer == 2 {
+        // stencil
+        end[2] -= 4096.0;
+
+        trap::CM_BoxTrace(
+            engine,
+            &mut trace,
+            &lerpOrigin,
+            &end,
+            &mins,
+            &maxs,
+            0,
+            MASK_PLAYERSOLID,
+        );
+
+        if trace.fraction == 1.0 || trace.startsolid != 0 || trace.allsolid != 0 {
+            trace.endpos[2] = lerpOrigin[2] - 25.0;
+        }
+    } else {
+        end[2] -= SHADOW_DISTANCE;
+
+        trap::CM_BoxTrace(
+            engine,
+            &mut trace,
+            &lerpOrigin,
+            &end,
+            &mins,
+            &maxs,
+            0,
+            MASK_PLAYERSOLID,
+        );
+
+        // no shadow if too high
+        if trace.fraction == 1.0 || trace.startsolid != 0 || trace.allsolid != 0 {
+            return false;
+        }
+    }
+
+    if ctx.world.cvars.cg_shadows.integer == 2 {
+        // stencil shadows need plane to be on ground
+        *shadowPlane = trace.endpos[2];
+    } else {
+        *shadowPlane = trace.endpos[2] + 1.0;
+    }
+
+    if ctx.world.cvars.cg_shadows.integer != 1 {
+        // no mark for stencil or projection shadows
+        return true;
+    }
+
+    // fade the shadow out with height (Raven's `1.0` is a double, so the whole
+    // subtract is done wide then narrowed)
+    let alpha = (1.0f64 - trace.fraction as f64) as f32;
+
+    // add the mark as a temporary, so it goes directly to the renderer without
+    // taking a spot in the cg_marks array
+    let npcClass = ctx.world.entity(centNum).currentState.NPC_class;
+    if npcClass == class_t::CLASS_REMOTE as c_int || npcClass == class_t::CLASS_SEEKER as c_int {
+        radius = 8.0;
+    }
+    let yawAngle = ctx.world.entity(centNum).pe.legs.yawAngle;
+    let shadowMarkShader = ctx.world.cgs.media.shadowMarkShader;
+    CG_ImpactMark(
+        ctx,
+        shadowMarkShader,
+        trace.endpos,
+        trace.plane.normal,
+        yawAngle,
+        alpha,
+        alpha,
+        alpha,
+        1.0,
+        false,
+        radius,
+        true,
+    );
+
+    true
+}
+
+/// Raven `CG_ForcePushBodyBlur` — bolts a force-push blur onto each of the
+/// humanoid's push bones. Non-humanoid models (`localAnimIndex > 1`) and
+/// mind-tricking entities are skipped.
+/// Source: `oracle/codemp/cgame/cg_players.c:4958-4998`
+pub fn CG_ForcePushBodyBlur(ctx: &mut CgContext, centNum: usize) {
+    let engine = ctx.engine;
+
+    if ctx.world.entity(centNum).localAnimIndex > 1 {
+        // Sorry, the humanoid IS IN ANOTHER CASTLE.
+        return;
+    }
+
+    if ctx.world.cg.snap_ref().is_some() {
+        let ti1 = ctx.world.entity(centNum).currentState.trickedentindex;
+        let ti2 = ctx.world.entity(centNum).currentState.trickedentindex2;
+        let ti3 = ctx.world.entity(centNum).currentState.trickedentindex3;
+        let ti4 = ctx.world.entity(centNum).currentState.trickedentindex4;
+        let snapClient = ctx.world.cg.snap_ref().map_or(-1, |snap| snap.ps.clientNum);
+        if CG_IsMindTricked(ctx.world, ti1, ti2, ti3, ti4, snapClient) {
+            // this entity is mind-tricking the current client, so don't render it
+            return;
+        }
+    }
+
+    debug_assert!(!ctx.world.entity(centNum).ghoul2.is_null());
+
+    let time = ctx.world.cg.time;
+    for boneName in cg_pushBoneNames {
+        // go through all the bones we want to put a blur effect on
+        let boneName = match boneName {
+            Some(name) => name,
+            None => break,
+        };
+        let ghoul2 = ctx.world.entity(centNum).ghoul2;
+        let bolt = trap::G2API_AddBolt(engine, ghoul2, 0, boneName);
+
+        if bolt == -1 {
+            debug_assert!(
+                false,
+                "You've got an invalid bone/bolt name in cg_pushBoneNames"
+            );
+            continue;
+        }
+
+        let mut boltMatrix = mdxaBone_t {
+            matrix: [[0.0; 4]; 3],
+        };
+        let turAngles = ctx.world.entity(centNum).turAngles;
+        let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+        let modelScale = ctx.world.entity(centNum).modelScale;
+        trap::G2API_GetBoltMatrix(
+            engine,
+            ghoul2,
+            0,
+            bolt,
+            &mut boltMatrix,
+            &turAngles,
+            &lerpOrigin,
+            time,
+            Some(&mut ctx.world.cgs.gameModels[0]),
+            &modelScale,
+        );
+        let mut fxOrg: vec3_t = [0.0; 3];
+        BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut fxOrg);
+
+        // standard effect, don't be refractive (for now)
+        CG_ForcePushBlur(ctx, &fxOrg, None);
+    }
+}
+
+/// Raven `CG_AddSaberBlade` — bolts, traces, marks, trails and finally draws one
+/// saber blade. `centNum`/`scentNum` stand in for Raven's `cent`/`scent`
+/// pointers; `saber` and `modelIndex` ride the signature but aren't read here.
+/// Source: `oracle/codemp/cgame/cg_players.c:5993-6480`
+#[allow(clippy::too_many_arguments)]
+pub fn CG_AddSaberBlade(
+    ctx: &mut CgContext,
+    centNum: usize,
+    scentNum: usize,
+    saber: &mut refEntity_t,
+    renderfx: c_int,
+    modelIndex: c_int,
+    saberNum: usize,
+    bladeNum: c_int,
+    origin: &vec3_t,
+    angles: &vec3_t,
+    fromSaber: bool,
+    dontDraw: bool,
+) {
+    let engine = ctx.engine;
+    // `saber` and `modelIndex` are part of Raven's signature but unread in this body.
+    let _ = (saber, modelIndex);
+
+    let isNpc = ctx.world.entity(centNum).currentState.eType == entityType_t::ET_NPC as c_int;
+    let number = ctx.world.entity(centNum).currentState.number as usize;
+
+    // §F19: Raven indexes cgs.clientinfo with the raw entity number and reads
+    // OOB garbage for a non-client ent; the port skips the blade instead.
+    if !isNpc && number >= MAX_CLIENTS {
+        return;
+    }
+
+    // Raven's `client` is either the NPC's owned clientinfo or the player's slot
+    // in cgs.clientinfo; hand it out (take/put-back) so we can mutate its saber
+    // trail alongside ctx-taking calls. Both arms box up to one binding.
+    let mut client: Box<clientInfo_t> = if isNpc {
+        ctx.world
+            .entity_mut(centNum)
+            .npcClient
+            .take()
+            .unwrap_or_else(|| {
+                debug_assert!(false, "CG_AddSaberBlade: NPC with no npcClient");
+                Box::new(zeroed_client_info())
+            })
+    } else {
+        Box::new(core::mem::replace(
+            &mut ctx.world.cgs.clientinfo[number],
+            zeroed_client_info(),
+        ))
+    };
+
+    let saberEntNum = ctx.world.entity(centNum).currentState.saberEntityNum;
+    let mut saberLen = client.saber[saberNum].blade[bladeNum as usize].length;
+
+    'blade: {
+        if saberLen <= 0.0 && !dontDraw {
+            // don't bother then.
+            break 'blade;
+        }
+
+        let mut org_: vec3_t = [0.0; 3];
+        let mut end: vec3_t = [0.0; 3];
+        let mut v: vec3_t = [0.0; 3];
+        // "shut the compiler up" - Raven zero-inits the axis
+        let mut axis_: [vec3_t; 3] = [[0.0; 3]; 3];
+        let mut trace = trace_t::zeroed();
+
+        let mut futureAngles: vec3_t = [0.0; 3];
+        futureAngles[YAW] = angles[YAW];
+        futureAngles[PITCH] = angles[PITCH];
+        futureAngles[ROLL] = angles[ROLL];
+
+        let useModelIndex: c_int = if fromSaber { 0 } else { saberNum as c_int + 1 };
+
+        // Assume bladeNum equals the bolt index (bolts added in blade order).
+        // If there's an effect on this blade, play it.
+        let scentGhoul2 = ctx.world.entity(scentNum).ghoul2;
+        let scentLerpOrigin = ctx.world.entity(scentNum).lerpOrigin;
+        let scentNumber = ctx.world.entity(scentNum).currentState.number;
+        let saberPtr: &mut saberInfo_t = &mut client.saber[saberNum];
+        let useSecond = WP_SaberBladeUseSecondBladeStyle(saberPtr, bladeNum) != qfalse;
+        if !useSecond && client.saber[saberNum].bladeEffect != 0 {
+            trap::FX_PlayBoltedEffectID(
+                engine,
+                client.saber[saberNum].bladeEffect,
+                &scentLerpOrigin,
+                scentGhoul2,
+                bladeNum,
+                scentNumber,
+                useModelIndex,
+                -1,
+                false,
+            );
+        } else if useSecond && client.saber[saberNum].bladeEffect2 != 0 {
+            trap::FX_PlayBoltedEffectID(
+                engine,
+                client.saber[saberNum].bladeEffect2,
+                &scentLerpOrigin,
+                scentGhoul2,
+                bladeNum,
+                scentNumber,
+                useModelIndex,
+                -1,
+                false,
+            );
+        }
+
+        // get the boltMatrix
+        let mut boltMatrix = mdxaBone_t {
+            matrix: [[0.0; 4]; 3],
+        };
+        let scentModelScale = ctx.world.entity(scentNum).modelScale;
+        let time = ctx.world.cg.time;
+        trap::G2API_GetBoltMatrix(
+            engine,
+            scentGhoul2,
+            useModelIndex,
+            bladeNum,
+            &mut boltMatrix,
+            &futureAngles,
+            origin,
+            time,
+            Some(&mut ctx.world.cgs.gameModels[0]),
+            &scentModelScale,
+        );
+
+        // work the matrix axis stuff into the original axis and origins used.
+        BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut org_);
+        BG_GiveMeVectorFromMatrix(
+            &boltMatrix,
+            Eorientations::NEGATIVE_Y as c_int,
+            &mut axis_[0],
+        );
+
+        let saberInFlight = ctx.world.entity(centNum).currentState.saberInFlight;
+        if !fromSaber && (saberEntNum as usize) < MAX_GENTITIES && saberInFlight == qfalse {
+            // §F19: saberEntityNum is server-supplied; guard the index rather
+            // than let a bad number panic. Raven's `saberEnt` is never null.
+            let sEnt = ctx.world.entity_mut(saberEntNum as usize);
+            _VectorCopy(org_, &mut sEnt.currentState.pos.trBase);
+            _VectorCopy(axis_[0], &mut sEnt.currentState.apos.trBase);
+        }
+
+        _VectorMA(org_, saberLen, axis_[0], &mut end);
+        _VectorAdd(end, axis_[0], &mut end);
+
+        let mut scolor: c_int = if isNpc {
+            client.saber[saberNum].blade[bladeNum as usize].color
+        } else if saberNum == 0 {
+            client.icolor1
+        } else {
+            client.icolor2
+        };
+
+        if ctx.world.cgs.gametype >= GT_TEAM
+            && ctx.world.cgs.gametype != GT_SIEGE
+            && ctx.world.cgs.jediVmerc == qfalse
+            && !isNpc
+        {
+            if client.team == TEAM_RED {
+                scolor = SABER_RED;
+            } else if client.team == TEAM_BLUE {
+                scolor = SABER_BLUE;
+            }
+        }
+
+        // if we don't have saber contact enabled, just add the blade and don't
+        // care what it's touching (Raven's `goto CheckTrail`)
+        if ctx.world.cvars.cg_saberContact.integer != 0 && !dontDraw {
+            if ctx.world.cvars.cg_saberModelTraceEffect.integer != 0 {
+                CG_G2SaberEffects(ctx, &org_, &end, centNum);
+            } else if ctx.world.cvars.cg_saberClientVisualCompensation.integer != 0 {
+                CG_Trace(
+                    ctx,
+                    &mut trace,
+                    &org_,
+                    &vec3_origin,
+                    &vec3_origin,
+                    &end,
+                    ENTITYNUM_NONE,
+                    MASK_SOLID,
+                );
+
+                if trace.fraction != 1.0 {
+                    // nudge the endpos a hair from base->end so the backwards
+                    // comp trace lands at the end and sparks on each side.
+                    let mut seDif: vec3_t = [0.0; 3];
+                    _VectorSubtract(trace.endpos, org_, &mut seDif);
+                    VectorNormalize(&mut seDif);
+                    trace.endpos[0] += seDif[0] * 0.1;
+                    trace.endpos[1] += seDif[1] * 0.1;
+                    trace.endpos[2] += seDif[2] * 0.1;
+                }
+
+                let time = ctx.world.cg.time;
+                // debounce for absurd framerates - storageTime is otherwise unused clientside
+                if client.saber[saberNum].blade[bladeNum as usize].storageTime < time {
+                    // CG_SaberCompWork reads the owner's clientinfo, so our
+                    // working copy has to be in place: put back, call, take out
+                    // again (its writes are captured on the re-take).
+                    if isNpc {
+                        ctx.world.entity_mut(centNum).npcClient = Some(client);
+                    } else {
+                        ctx.world.cgs.clientinfo[number] = *client;
+                    }
+                    let endpos = trace.endpos;
+                    CG_SaberCompWork(ctx, &org_, &endpos, centNum, saberNum, bladeNum);
+                    client = if isNpc {
+                        ctx.world
+                            .entity_mut(centNum)
+                            .npcClient
+                            .take()
+                            .unwrap_or_else(|| Box::new(zeroed_client_info()))
+                    } else {
+                        Box::new(core::mem::replace(
+                            &mut ctx.world.cgs.clientinfo[number],
+                            zeroed_client_info(),
+                        ))
+                    };
+                    client.saber[saberNum].blade[bladeNum as usize].storageTime = time + 5;
+                }
+            }
+
+            // was 2 (both directions) but leaves saber trails on either side of
+            // architecture and still looks bad on corners, so just base->end.
+            for i in 0..1usize {
+                if i != 0 {
+                    // tracing from end to base
+                    CG_Trace(
+                        ctx,
+                        &mut trace,
+                        &end,
+                        &vec3_origin,
+                        &vec3_origin,
+                        &org_,
+                        ENTITYNUM_NONE,
+                        MASK_SOLID,
+                    );
+                } else {
+                    // tracing from base to end
+                    CG_Trace(
+                        ctx,
+                        &mut trace,
+                        &org_,
+                        &vec3_origin,
+                        &vec3_origin,
+                        &end,
+                        ENTITYNUM_NONE,
+                        MASK_SOLID,
+                    );
+                }
+
+                if trace.fraction < 1.0 {
+                    let mut trDir: vec3_t = [0.0; 3];
+                    _VectorCopy(trace.plane.normal, &mut trDir);
+                    if trDir[0] == 0.0 && trDir[1] == 0.0 && trDir[2] == 0.0 {
+                        trDir[1] = 1.0;
+                    }
+
+                    if client.saber[saberNum].saberFlags2 & SFL2_NO_WALL_MARKS != 0 {
+                        // don't actually draw the marks/impact effects
+                    } else if trace.surfaceFlags & SURF_NOIMPACT == 0 {
+                        // never spark on sky
+                        let mSparks = ctx.world.cgs.effects.mSparks;
+                        trap::FX_PlayEffectID(engine, mSparks, &trace.endpos, &trDir, -1, -1);
+                    }
+
+                    // Stop saber? (it wouldn't look right stuck through a thin wall)
+                    _VectorSubtract(org_, trace.endpos, &mut v);
+                    saberLen = VectorLength(v);
+
+                    _VectorCopy(trace.endpos, &mut end);
+
+                    if client.saber[saberNum].saberFlags2 & SFL2_NO_WALL_MARKS != 0 {
+                        // don't actually draw the marks
+                    } else {
+                        // draw marks if we hit a wall. All I need is a bool for
+                        // whether I have a previous point to work with.
+                        if client.saber[saberNum].blade[bladeNum as usize]
+                            .trail
+                            .haveOldPos[i]
+                            != qfalse
+                        {
+                            let entNum = trace.entityNum as usize;
+                            let hitEType = ctx.world.entity(entNum).currentState.eType;
+                            let hitEFlags = ctx.world.entity(entNum).currentState.eFlags;
+                            if trace.entityNum as c_int == ENTITYNUM_WORLD
+                                || hitEType == entityType_t::ET_TERRAIN as c_int
+                                || hitEFlags & EF_PERMANENT != 0
+                            {
+                                // only put marks on architecture - cool burn/glow bits
+                                let oldPos =
+                                    client.saber[saberNum].blade[bladeNum as usize].trail.oldPos[i];
+                                let normal = trace.plane.normal;
+                                let endpos = trace.endpos;
+                                CG_CreateSaberMarks(ctx, &oldPos, &endpos, &normal);
+
+                                // make a sound
+                                let time = ctx.world.cg.time;
+                                if time
+                                    - client.saber[saberNum].blade[bladeNum as usize]
+                                        .hitWallDebounceTime
+                                    >= 100
+                                {
+                                    // ugh, need a real sound debouncer... or do this game-side
+                                    client.saber[saberNum].blade[bladeNum as usize]
+                                        .hitWallDebounceTime = time;
+                                    let n = ctx.world.bg_state.rng.Q_irand(1, 3);
+                                    let sfx = trap::S_RegisterSound(
+                                        engine,
+                                        &format!("sound/weapons/saber/saberhitwall{n}"),
+                                    );
+                                    trap::S_StartSound(
+                                        engine,
+                                        Some(&trace.endpos),
+                                        -1,
+                                        CHAN_WEAPON,
+                                        sfx,
+                                    );
+                                }
+                            }
+                        } else {
+                            // if we impact next frame, we'll mark a slash mark
+                            client.saber[saberNum].blade[bladeNum as usize]
+                                .trail
+                                .haveOldPos[i] = qtrue;
+                        }
+                    }
+
+                    // stash point so we can connect-the-dots later
+                    let endpos = trace.endpos;
+                    let normal = trace.plane.normal;
+                    _VectorCopy(
+                        endpos,
+                        &mut client.saber[saberNum].blade[bladeNum as usize].trail.oldPos[i],
+                    );
+                    _VectorCopy(
+                        normal,
+                        &mut client.saber[saberNum].blade[bladeNum as usize]
+                            .trail
+                            .oldNormal[i],
+                    );
+                } else {
+                    // no impact this frame, so turn off our mark tracking mechanism
+                    client.saber[saberNum].blade[bladeNum as usize]
+                        .trail
+                        .haveOldPos[i] = qfalse;
+                }
+            }
+        }
+
+        // CheckTrail:
+        let cg_saberTrail = ctx.world.cvars.cg_saberTrail.integer;
+        let saberPtr: &mut saberInfo_t = &mut client.saber[saberNum];
+        let useSecondTrail = WP_SaberBladeUseSecondBladeStyle(saberPtr, bladeNum) != qfalse;
+        // don't do the trail (Raven's two `goto JustDoIt`s folded into one skip)
+        let skipTrail = cg_saberTrail == 0
+            || (!useSecondTrail && client.saber[saberNum].trailStyle > 1)
+            || (useSecondTrail && client.saber[saberNum].trailStyle2 > 1);
+        if !skipTrail {
+            // FIXME: if trailStyle is 1, use the motion blur instead
+            let saberMove = ctx.world.entity(centNum).currentState.saberMove;
+            let torsoAnim = ctx.world.entity(centNum).currentState.torsoAnim;
+            client.saber[saberNum].blade[bladeNum as usize]
+                .trail
+                .duration = saberMoveData[saberMove as usize].trailLength;
+
+            // duration is int but Raven divides by 5.0f then truncates back
+            let mut trailDur = (client.saber[saberNum].blade[bladeNum as usize]
+                .trail
+                .duration as f32
+                / 5.0f32) as c_int;
+            if trailDur == 0 {
+                // hmm.. ok, default
+                if BG_SuperBreakWinAnim(torsoAnim) != qfalse {
+                    trailDur = 150;
+                } else {
+                    trailDur = SABER_TRAIL_TIME as c_int;
+                }
+            }
+
+            // if timescaled or high framerate, don't flood the system with very
+            // small trail slices...perhaps by distance would be better?
+            let time = ctx.world.cg.time;
+            let lastTime = client.saber[saberNum].blade[bladeNum as usize]
+                .trail
+                .lastTime;
+            if time > lastTime + 2 || cg_saberTrail == 2 {
+                // 2ms
+                if !dontDraw {
+                    let powerups = ctx.world.entity(centNum).currentState.powerups;
+                    let saberInFlight = ctx.world.entity(centNum).currentState.saberInFlight;
+                    let cg_speedTrail = ctx.world.cvars.cg_speedTrail.integer;
+                    // if we have a stale segment, don't draw until we have a fresh one
+                    if (BG_SuperBreakWinAnim(torsoAnim) != qfalse
+                        || saberMoveData[saberMove as usize].trailLength > 0
+                        || (powerups & (1 << PW_SPEED) != 0 && cg_speedTrail != 0)
+                        || (saberInFlight != qfalse && saberNum == 0))
+                        && time < lastTime + 2000
+                    {
+                        // (Raven's `#if 0` stencil-poly branch is compiled out;
+                        // only the trail-quad `else` survives.)
+                        let mut rgb1: vec3_t = [255.0, 255.0, 255.0];
+                        match scolor {
+                            SABER_RED => VectorSet(&mut rgb1, 255.0, 0.0, 0.0),
+                            SABER_ORANGE => VectorSet(&mut rgb1, 255.0, 64.0, 0.0),
+                            SABER_YELLOW => VectorSet(&mut rgb1, 255.0, 255.0, 0.0),
+                            SABER_GREEN => VectorSet(&mut rgb1, 0.0, 255.0, 0.0),
+                            SABER_BLUE => VectorSet(&mut rgb1, 0.0, 64.0, 255.0),
+                            SABER_PURPLE => VectorSet(&mut rgb1, 220.0, 0.0, 255.0),
+                            _ => VectorSet(&mut rgb1, 0.0, 64.0, 255.0),
+                        }
+
+                        // Fill the arg struct and hand it to the effects system,
+                        // which turns it into a CTrail once it lands there.
+                        // SAFETY: effectTrailArgStruct_t is a #[repr(C)] POD of
+                        // f32/i32/arrays, so all-zero is a valid value. Raven
+                        // leaves it uninitialized and fills only what it uses
+                        // (§19: we pick the defined all-zero for the rest).
+                        let mut fx: effectTrailArgStruct_t = unsafe { core::mem::zeroed() };
+
+                        // new muzzle -> new end -> old end -> old muzzle -> back
+                        _VectorCopy(org_, &mut fx.mVerts[0].origin);
+                        _VectorMA(end, 3.0, axis_[0], &mut fx.mVerts[1].origin);
+                        let tip = client.saber[saberNum].blade[bladeNum as usize].trail.tip;
+                        let base = client.saber[saberNum].blade[bladeNum as usize].trail.base;
+                        _VectorCopy(tip, &mut fx.mVerts[2].origin);
+                        _VectorCopy(base, &mut fx.mVerts[3].origin);
+
+                        let diff = (time - lastTime) as f32;
+
+                        // not sure clipping this is best; prevents the trail from
+                        // showing at all in low framerate situations.
+                        if diff <= 10000.0 {
+                            // don't draw it if the last time is way out of date
+                            let oldAlpha = 1.0 - (diff / trailDur as f32);
+
+                            let cg_shadows = ctx.world.cvars.cg_shadows.integer;
+                            let stencilBits = ctx.world.cgs.glconfig.stencilBits;
+                            if cg_saberTrail == 2 && cg_shadows != 2 && stencilBits >= 4 {
+                                // does other stuff below
+                            } else if (!useSecondTrail && client.saber[saberNum].trailStyle == 1)
+                                || (useSecondTrail && client.saber[saberNum].trailStyle2 == 1)
+                            {
+                                // motion trail
+                                fx.mShader = ctx.world.cgs.media.swordTrailShader;
+                                VectorSet(&mut rgb1, 32.0, 32.0, 32.0); // faint sith sword trail
+                                trailDur = (trailDur as f32 * 2.0) as c_int; // stay around twice as long?
+                                fx.mKillTime = trailDur;
+                                fx.mSetFlags = FX_USE_ALPHA;
+                            } else {
+                                fx.mShader = ctx.world.cgs.media.saberBlurShader;
+                                fx.mKillTime = trailDur;
+                                fx.mSetFlags = FX_USE_ALPHA;
+                            }
+
+                            // New muzzle
+                            _VectorCopy(rgb1, &mut fx.mVerts[0].rgb);
+                            fx.mVerts[0].alpha = 255.0;
+                            fx.mVerts[0].ST[0] = 0.0;
+                            fx.mVerts[0].ST[1] = 1.0;
+                            fx.mVerts[0].destST[0] = 1.0;
+                            fx.mVerts[0].destST[1] = 1.0;
+
+                            // new tip
+                            _VectorCopy(rgb1, &mut fx.mVerts[1].rgb);
+                            fx.mVerts[1].alpha = 255.0;
+                            fx.mVerts[1].ST[0] = 0.0;
+                            fx.mVerts[1].ST[1] = 0.0;
+                            fx.mVerts[1].destST[0] = 1.0;
+                            fx.mVerts[1].destST[1] = 0.0;
+
+                            // old tip
+                            _VectorCopy(rgb1, &mut fx.mVerts[2].rgb);
+                            fx.mVerts[2].alpha = 255.0;
+                            // NOTE: this just happens to contain the value I want
+                            fx.mVerts[2].ST[0] = 1.0 - oldAlpha;
+                            fx.mVerts[2].ST[1] = 0.0;
+                            fx.mVerts[2].destST[0] = 1.0 + fx.mVerts[2].ST[0];
+                            fx.mVerts[2].destST[1] = 0.0;
+
+                            // old muzzle
+                            _VectorCopy(rgb1, &mut fx.mVerts[3].rgb);
+                            fx.mVerts[3].alpha = 255.0;
+                            fx.mVerts[3].ST[0] = 1.0 - oldAlpha;
+                            fx.mVerts[3].ST[1] = 1.0;
+                            fx.mVerts[3].destST[0] = 1.0 + fx.mVerts[2].ST[0];
+                            fx.mVerts[3].destST[1] = 1.0;
+
+                            if cg_saberTrail == 2 && cg_shadows != 2 && stencilBits >= 4 {
+                                // don't need to do this every frame.. but..
+                                trap::R_SetRefractProp(engine, 1.0, 0.0, true, true);
+
+                                let saberMove2 = ctx.world.entity(centNum).currentState.saberMove;
+                                let torsoAnim2 = ctx.world.entity(centNum).currentState.torsoAnim;
+                                if BG_SaberInAttack(saberMove2) != qfalse
+                                    || BG_SuperBreakWinAnim(torsoAnim2) != qfalse
+                                {
+                                    // in attack, strong trail
+                                    fx.mKillTime = 300;
+                                } else {
+                                    // faded trail
+                                    fx.mKillTime = 40;
+                                }
+                                fx.mShader = 2; // 2 is always refractive shader
+                                fx.mSetFlags = FX_USE_ALPHA;
+                            }
+
+                            trap::FX_AddPrimitive(engine, &mut fx);
+                        }
+                    }
+                }
+
+                // we must always do this, even if we aren't active..otherwise we
+                // won't know where to pick up from
+                _VectorCopy(
+                    org_,
+                    &mut client.saber[saberNum].blade[bladeNum as usize].trail.base,
+                );
+                _VectorMA(
+                    end,
+                    3.0,
+                    axis_[0],
+                    &mut client.saber[saberNum].blade[bladeNum as usize].trail.tip,
+                );
+                client.saber[saberNum].blade[bladeNum as usize]
+                    .trail
+                    .lastTime = time;
+            }
+        }
+
+        // JustDoIt:
+        if dontDraw {
+            break 'blade;
+        }
+
+        if client.saber[saberNum].saberFlags2 & SFL2_NO_BLADE != 0 {
+            // don't actually draw the blade at all
+            if client.saber[saberNum].numBlades < 3
+                && client.saber[saberNum].saberFlags2 & SFL2_NO_DLIGHT == 0
+            {
+                // hmm, but still add the dlight
+                CG_DoSaberLight(ctx, Some(&client.saber[saberNum]));
+            }
+            break 'blade;
+        }
+
+        // Pass the renderfx flags attached to the saber weapon model so saber
+        // glows render properly in a mirror...not sure this is necessary??
+        let doLight = client.saber[saberNum].numBlades < 3
+            && client.saber[saberNum].saberFlags2 & SFL2_NO_DLIGHT == 0;
+        let lengthMax = client.saber[saberNum].blade[bladeNum as usize].lengthMax;
+        let bradius = client.saber[saberNum].blade[bladeNum as usize].radius;
+        CG_DoSaber(
+            ctx, &org_, &axis_[0], saberLen, lengthMax, bradius, scolor, renderfx, doLight,
+        );
+    }
+
+    // put our working copy back
+    if isNpc {
+        ctx.world.entity_mut(centNum).npcClient = Some(client);
+    } else {
+        ctx.world.cgs.clientinfo[number] = *client;
     }
 }

@@ -16,8 +16,8 @@ use mp_qshared::common::mp::qcommon::saber::saber_colors::{
 };
 use mp_qshared::shared::q_math::{
     _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, AnglesToAxis, AxisClear,
-    CrossProduct, DistanceSquared, Q_random, RotateAroundDirection, VectorClear, VectorNormalize,
-    VectorSet, YAW,
+    CrossProduct, DistanceSquared, Q_random, RotateAroundDirection, VectorClear, VectorLength,
+    VectorNormalize, VectorSet, YAW,
 };
 use mp_qshared::shared::{
     addpolyArgStruct_t, qhandle_t, qtrue, trType_t, vec2_t, vec3_t, CHAN_AUTO, CHAN_BODY,
@@ -1341,6 +1341,410 @@ pub fn CG_Bleed(world: &mut CgWorld, origin: &vec3_t, entityNum: c_int) {
     // don't show player's own blood in view
     if localClient == Some(entityNum) {
         ex.refEntity.renderfx |= RF_THIRD_PERSON;
+    }
+}
+
+/// Raven `CG_GlassShatter_Old` — tumbles crandom-scattered glass chunks out of
+/// a shattered `[mins, maxs]` window, throwing them until the accumulated
+/// throw-count matches the window's rough size.
+///
+/// Source: `oracle/codemp/cgame/cg_effects.c:674-748`
+pub fn CG_GlassShatter_Old(
+    ctx: &mut CgContext,
+    entnum: c_int,
+    org: &vec3_t,
+    mins: &vec3_t,
+    maxs: &vec3_t,
+) {
+    let sfx = trap::S_RegisterSound(ctx.engine, "sound/effects/glassbreak1.wav");
+    trap::S_StartSound(ctx.engine, Some(org), entnum, CHAN_BODY, sfx);
+
+    let mut a = [0.0f32; 3];
+    _VectorSubtract(*maxs, *mins, &mut a);
+
+    // should give us some idea of how big the chunk of glass is
+    let windowmass = VectorLength(a);
+
+    let mut shardsthrow = 0.0f32;
+    while shardsthrow < windowmass {
+        let velocity: vec3_t = [
+            (ctx.world.bg_state.rng.crandom() * 150.0) as f32,
+            (ctx.world.bg_state.rng.crandom() * 150.0) as f32,
+            150.0 + (ctx.world.bg_state.rng.crandom() * 75.0) as f32,
+        ];
+
+        let chunkname = format!(
+            "models/chunks/glass/glchunks_{}.md3",
+            ctx.world.bg_state.rng.Q_irand(1, 6)
+        );
+        let mut shardorg = *org;
+
+        let mut dif = [0.0f32; 3];
+        dif[0] = (maxs[0] - mins[0]) / 2.0;
+        dif[1] = (maxs[1] - mins[1]) / 2.0;
+        dif[2] = (maxs[2] - mins[2]) / 2.0;
+
+        if dif[0] < 2.0 {
+            dif[0] = 2.0;
+        }
+        if dif[1] < 2.0 {
+            dif[1] = 2.0;
+        }
+        if dif[2] < 2.0 {
+            dif[2] = 2.0;
+        }
+
+        let difx: vec3_t = [
+            ctx.world
+                .bg_state
+                .rng
+                .Q_irand(1, ((dif[0] as f64 * 0.9) * 2.0) as c_int) as f32,
+            ctx.world
+                .bg_state
+                .rng
+                .Q_irand(1, ((dif[1] as f64 * 0.9) * 2.0) as c_int) as f32,
+            ctx.world
+                .bg_state
+                .rng
+                .Q_irand(1, ((dif[2] as f64 * 0.9) * 2.0) as c_int) as f32,
+        ];
+
+        if difx[0] > dif[0] {
+            shardorg[0] += difx[0] - dif[0];
+        } else {
+            shardorg[0] -= difx[0];
+        }
+        if difx[1] > dif[1] {
+            shardorg[1] += difx[1] - dif[1];
+        } else {
+            shardorg[1] -= difx[1];
+        }
+        if difx[2] > dif[2] {
+            shardorg[2] += difx[2] - dif[2];
+        } else {
+            shardorg[2] -= difx[2];
+        }
+
+        // CG_TestLine(org, shardorg, 5000, 0x0000ff, 3);
+
+        let model = trap::R_RegisterModel(ctx.engine, &chunkname);
+        CG_ThrowChunk(ctx.world, &shardorg, &velocity, model, 0, 254);
+
+        shardsthrow += 10.0;
+    }
+}
+
+/// Raven `CG_CreateDebris` — same tumbling-chunk toss as
+/// [`CG_GlassShatter_Old`], but the model comes from `debrismodel` (or, for
+/// the special-case negative sentinels, a lazily-registered debris-model
+/// table picked at random each throw) instead of a fixed glass shard.
+///
+/// Source: `oracle/codemp/cgame/cg_effects.c:771-904`
+#[allow(clippy::too_many_arguments)]
+pub fn CG_CreateDebris(
+    ctx: &mut CgContext,
+    _entnum: c_int,
+    org: &vec3_t,
+    mins: &vec3_t,
+    maxs: &vec3_t,
+    debrissound: c_int,
+    debrismodel: c_int,
+) {
+    let omodel = debrismodel;
+    let mut debrismodel = debrismodel;
+
+    if omodel == DEBRIS_SPECIALCASE_GLASS && ctx.world.effects.dbModels_Glass[0] == 0 {
+        // glass no longer exists, using it for metal.
+        ctx.world.effects.dbModels_Glass[0] =
+            trap::R_RegisterModel(ctx.engine, "models/chunks/metal/metal1_1.md3");
+        ctx.world.effects.dbModels_Glass[1] =
+            trap::R_RegisterModel(ctx.engine, "models/chunks/metal/metal1_2.md3");
+        ctx.world.effects.dbModels_Glass[2] =
+            trap::R_RegisterModel(ctx.engine, "models/chunks/metal/metal1_3.md3");
+        ctx.world.effects.dbModels_Glass[3] =
+            trap::R_RegisterModel(ctx.engine, "models/chunks/metal/metal1_4.md3");
+        ctx.world.effects.dbModels_Glass[4] =
+            trap::R_RegisterModel(ctx.engine, "models/chunks/metal/metal2_1.md3");
+        ctx.world.effects.dbModels_Glass[5] =
+            trap::R_RegisterModel(ctx.engine, "models/chunks/metal/metal2_2.md3");
+        ctx.world.effects.dbModels_Glass[6] =
+            trap::R_RegisterModel(ctx.engine, "models/chunks/metal/metal2_3.md3");
+        ctx.world.effects.dbModels_Glass[7] =
+            trap::R_RegisterModel(ctx.engine, "models/chunks/metal/metal2_4.md3");
+    }
+    if omodel == DEBRIS_SPECIALCASE_WOOD && ctx.world.effects.dbModels_Wood[0] == 0 {
+        ctx.world.effects.dbModels_Wood[0] =
+            trap::R_RegisterModel(ctx.engine, "models/chunks/crate/crate1_1.md3");
+        ctx.world.effects.dbModels_Wood[1] =
+            trap::R_RegisterModel(ctx.engine, "models/chunks/crate/crate1_2.md3");
+        ctx.world.effects.dbModels_Wood[2] =
+            trap::R_RegisterModel(ctx.engine, "models/chunks/crate/crate1_3.md3");
+        ctx.world.effects.dbModels_Wood[3] =
+            trap::R_RegisterModel(ctx.engine, "models/chunks/crate/crate1_4.md3");
+        ctx.world.effects.dbModels_Wood[4] =
+            trap::R_RegisterModel(ctx.engine, "models/chunks/crate/crate2_1.md3");
+        ctx.world.effects.dbModels_Wood[5] =
+            trap::R_RegisterModel(ctx.engine, "models/chunks/crate/crate2_2.md3");
+        ctx.world.effects.dbModels_Wood[6] =
+            trap::R_RegisterModel(ctx.engine, "models/chunks/crate/crate2_3.md3");
+        ctx.world.effects.dbModels_Wood[7] =
+            trap::R_RegisterModel(ctx.engine, "models/chunks/crate/crate2_4.md3");
+    }
+    if omodel == DEBRIS_SPECIALCASE_CHUNKS && ctx.world.effects.dbModels_Chunks[0] == 0 {
+        ctx.world.effects.dbModels_Chunks[0] =
+            trap::R_RegisterModel(ctx.engine, "models/chunks/generic/chunks_1.md3");
+        ctx.world.effects.dbModels_Chunks[1] =
+            trap::R_RegisterModel(ctx.engine, "models/chunks/generic/chunks_2.md3");
+    }
+    if omodel == DEBRIS_SPECIALCASE_ROCK && ctx.world.effects.dbModels_Rocks[0] == 0 {
+        ctx.world.effects.dbModels_Rocks[0] =
+            trap::R_RegisterModel(ctx.engine, "models/chunks/rock/rock1_1.md3");
+        ctx.world.effects.dbModels_Rocks[1] =
+            trap::R_RegisterModel(ctx.engine, "models/chunks/rock/rock1_2.md3");
+        ctx.world.effects.dbModels_Rocks[2] =
+            trap::R_RegisterModel(ctx.engine, "models/chunks/rock/rock1_3.md3");
+        ctx.world.effects.dbModels_Rocks[3] =
+            trap::R_RegisterModel(ctx.engine, "models/chunks/rock/rock1_4.md3");
+        /*
+        dbModels_Rocks[4] = trap_R_RegisterModel("models/chunks/rock/rock2_1.md3");
+        dbModels_Rocks[5] = trap_R_RegisterModel("models/chunks/rock/rock2_2.md3");
+        dbModels_Rocks[6] = trap_R_RegisterModel("models/chunks/rock/rock2_3.md3");
+        dbModels_Rocks[7] = trap_R_RegisterModel("models/chunks/rock/rock2_4.md3");
+        dbModels_Rocks[8] = trap_R_RegisterModel("models/chunks/rock/rock3_1.md3");
+        dbModels_Rocks[9] = trap_R_RegisterModel("models/chunks/rock/rock3_2.md3");
+        dbModels_Rocks[10] = trap_R_RegisterModel("models/chunks/rock/rock3_3.md3");
+        dbModels_Rocks[11] = trap_R_RegisterModel("models/chunks/rock/rock3_4.md3");
+        */
+    }
+
+    let mut a = [0.0f32; 3];
+    _VectorSubtract(*maxs, *mins, &mut a);
+
+    // should give us some idea of how big the chunk of glass is
+    let windowmass = VectorLength(a);
+
+    let mut shardsthrow = 0.0f32;
+    while shardsthrow < windowmass {
+        let velocity: vec3_t = [
+            (ctx.world.bg_state.rng.crandom() * 150.0) as f32,
+            (ctx.world.bg_state.rng.crandom() * 150.0) as f32,
+            150.0 + (ctx.world.bg_state.rng.crandom() * 75.0) as f32,
+        ];
+
+        if omodel == DEBRIS_SPECIALCASE_GLASS {
+            let i = ctx
+                .world
+                .bg_state
+                .rng
+                .Q_irand(0, NUM_DEBRIS_MODELS_GLASS as c_int - 1) as usize;
+            debrismodel = ctx.world.effects.dbModels_Glass[i];
+        } else if omodel == DEBRIS_SPECIALCASE_WOOD {
+            let i = ctx
+                .world
+                .bg_state
+                .rng
+                .Q_irand(0, NUM_DEBRIS_MODELS_WOOD as c_int - 1) as usize;
+            debrismodel = ctx.world.effects.dbModels_Wood[i];
+        } else if omodel == DEBRIS_SPECIALCASE_CHUNKS {
+            let i = ctx
+                .world
+                .bg_state
+                .rng
+                .Q_irand(0, NUM_DEBRIS_MODELS_CHUNKS as c_int - 1) as usize;
+            debrismodel = ctx.world.effects.dbModels_Chunks[i];
+        } else if omodel == DEBRIS_SPECIALCASE_ROCK {
+            let i = ctx
+                .world
+                .bg_state
+                .rng
+                .Q_irand(0, NUM_DEBRIS_MODELS_ROCKS as c_int - 1) as usize;
+            debrismodel = ctx.world.effects.dbModels_Rocks[i];
+        }
+
+        let mut shardorg = *org;
+
+        let mut dif = [0.0f32; 3];
+        dif[0] = (maxs[0] - mins[0]) / 2.0;
+        dif[1] = (maxs[1] - mins[1]) / 2.0;
+        dif[2] = (maxs[2] - mins[2]) / 2.0;
+
+        if dif[0] < 2.0 {
+            dif[0] = 2.0;
+        }
+        if dif[1] < 2.0 {
+            dif[1] = 2.0;
+        }
+        if dif[2] < 2.0 {
+            dif[2] = 2.0;
+        }
+
+        let difx: vec3_t = [
+            ctx.world
+                .bg_state
+                .rng
+                .Q_irand(1, ((dif[0] as f64 * 0.9) * 2.0) as c_int) as f32,
+            ctx.world
+                .bg_state
+                .rng
+                .Q_irand(1, ((dif[1] as f64 * 0.9) * 2.0) as c_int) as f32,
+            ctx.world
+                .bg_state
+                .rng
+                .Q_irand(1, ((dif[2] as f64 * 0.9) * 2.0) as c_int) as f32,
+        ];
+
+        if difx[0] > dif[0] {
+            shardorg[0] += difx[0] - dif[0];
+        } else {
+            shardorg[0] -= difx[0];
+        }
+        if difx[1] > dif[1] {
+            shardorg[1] += difx[1] - dif[1];
+        } else {
+            shardorg[1] -= difx[1];
+        }
+        if difx[2] > dif[2] {
+            shardorg[2] += difx[2] - dif[2];
+        } else {
+            shardorg[2] -= difx[2];
+        }
+
+        // CG_TestLine(org, shardorg, 5000, 0x0000ff, 3);
+
+        CG_ThrowChunk(ctx.world, &shardorg, &velocity, debrismodel, debrissound, 0);
+
+        shardsthrow += 10.0;
+    }
+}
+
+/// Raven `CG_SurfaceExplosion` — a light-tagged core explosion model plus a
+/// scatter of secondary ones and a camera shake at a surface impact; the
+/// spark-trail and smoke-sprite/spawner/impact-mark work sits entirely inside
+/// commented-out `FX_*` calls Raven itself never compiled (dead in the
+/// oracle), so nothing but the loop bounds and RNG draws survive from those
+/// blocks.
+///
+/// Source: `oracle/codemp/cgame/cg_effects.c:1388-1480`
+pub fn CG_SurfaceExplosion(
+    ctx: &mut CgContext,
+    origin: &vec3_t,
+    normal: &vec3_t,
+    radius: f32,
+    shake_speed: f32,
+    smoke: bool,
+) {
+    // Sparks
+    let numSparks = 16 + (ctx.world.bg_state.rng.random() * 16.0) as c_int;
+
+    for _ in 0..numSparks {
+        let scale = 0.25 + (ctx.world.bg_state.rng.random() * 2.0) as f32;
+        let _dscale = -scale * 0.5;
+
+        // particle = FX_AddTrail(...) / FXE_Spray(...) — dead in the oracle
+        // (commented out), so nothing to transcribe past the RNG draws above.
+    }
+
+    // Smoke
+    // Move this out a little from the impact surface
+    let mut new_org = [0.0f32; 3];
+    _VectorMA(*origin, 4.0, *normal, &mut new_org);
+    let velocity: vec3_t = [0.0, 0.0, 16.0];
+
+    for _ in 0..4 {
+        let _temp_org: vec3_t = [
+            new_org[0] + (ctx.world.bg_state.rng.crandom() * 16.0) as f32,
+            new_org[1] + (ctx.world.bg_state.rng.crandom() * 16.0) as f32,
+            new_org[2] + (ctx.world.bg_state.rng.random() * 4.0) as f32,
+        ];
+        let _temp_vel: vec3_t = [
+            velocity[0] + (ctx.world.bg_state.rng.crandom() * 8.0) as f32,
+            velocity[1] + (ctx.world.bg_state.rng.crandom() * 8.0) as f32,
+            velocity[2] + (ctx.world.bg_state.rng.crandom() * 8.0) as f32,
+        ];
+
+        // FX_AddSprite(...) — dead in the oracle (commented out); the temp
+        // org/vel computation above is kept for RNG-stream parity, matching
+        // the dead-store convention (CG_DrawNewTeamInfo precedent).
+    }
+
+    // Core of the explosion
+
+    // Orient the explosions to face the camera
+    let mut direction = [0.0f32; 3];
+    _VectorSubtract(ctx.world.cg.refdef.vieworg, *origin, &mut direction);
+    VectorNormalize(&mut direction);
+
+    // Tag the last one with a light
+    let explosionModel = ctx.world.cgs.media.explosionModel;
+    let surfaceExplosionShader = ctx.world.cgs.media.surfaceExplosionShader;
+    let sizeRand = radius * 0.02 + (ctx.world.bg_state.rng.random() * 0.3) as f32;
+    let handle = CG_MakeExplosion(
+        ctx,
+        origin,
+        Some(&direction),
+        explosionModel,
+        6,
+        surfaceExplosionShader,
+        500,
+        false,
+        sizeRand,
+        0,
+    );
+    if let Some(handle) = handle {
+        let le = ctx
+            .world
+            .cg_localEntities
+            .get_mut(handle)
+            .expect("CG_SurfaceExplosion: fresh slot");
+        le.light = 150.0;
+        VectorSet(&mut le.lightColor, 0.9, 0.8, 0.5);
+    }
+
+    for _ in 0..NUM_EXPLOSIONS - 1 {
+        let new_org: vec3_t = [
+            origin[0]
+                + (16.0 + (ctx.world.bg_state.rng.crandom() * 8.0) as f32)
+                    * ctx.world.bg_state.rng.crandom() as f32,
+            origin[1]
+                + (16.0 + (ctx.world.bg_state.rng.crandom() * 8.0) as f32)
+                    * ctx.world.bg_state.rng.crandom() as f32,
+            origin[2]
+                + (16.0 + (ctx.world.bg_state.rng.crandom() * 8.0) as f32)
+                    * ctx.world.bg_state.rng.crandom() as f32,
+        ];
+        let explosionModel = ctx.world.cgs.media.explosionModel;
+        let surfaceExplosionShader = ctx.world.cgs.media.surfaceExplosionShader;
+        let rockRand = ctx.world.bg_state.rng.rand() & 99;
+        let sizeRand = radius * 0.05 + (ctx.world.bg_state.rng.crandom() * 0.3) as f32;
+        CG_MakeExplosion(
+            ctx,
+            &new_org,
+            Some(&direction),
+            explosionModel,
+            6,
+            surfaceExplosionShader,
+            300 + rockRand,
+            false,
+            sizeRand,
+            0,
+        );
+    }
+
+    // Shake the camera
+    CG_ExplosionEffects(ctx.world, origin, shake_speed, 350, 750);
+
+    // The level designers wanted to be able to turn the smoke spawners off.  The rationale is that they
+    //	want to blow up catwalks and such that fall down...when that happens, it shouldn't really leave a mark
+    //	and a smoke spewer at the explosion point...
+    if smoke {
+        let mut temp_org = [0.0f32; 3];
+        _VectorMA(*origin, -8.0, *normal, &mut temp_org);
+        // FX_AddSpawner(...) — dead in the oracle (commented out).
+
+        // Impact mark
+        // FIXME: Replace mark
+        // CG_ImpactMark(...) — dead in the oracle (commented out).
+        let _ = temp_org;
     }
 }
 

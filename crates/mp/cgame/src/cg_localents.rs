@@ -10,16 +10,18 @@ use mp_bg::bg_misc::{BG_EvaluateTrajectory, BG_EvaluateTrajectoryDelta};
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::q_math::{
-    _DotProduct, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, CrossProduct, VectorLength,
-    VectorNormalize,
+    _DotProduct, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin, CrossProduct,
+    VectorLength, VectorNormalize,
 };
 use mp_qshared::shared::{
     qtrue, sfxHandle_t, trType_t, trajectory_t, vec3_t, CHAN_AUTO, ENTITYNUM_WORLD,
 };
 
+use crate::cg_effects::CG_SmokePuff;
 use crate::cg_main::CG_Error;
 use crate::local::le_bounce_sound_type_t::leBounceSoundType_t;
 use crate::local::le_mark_type_t::leMarkType_t;
+use crate::local::le_type_t::leType_t;
 use crate::local::local_entity_s::localEntity_t;
 use crate::trap;
 use crate::world::cg_context::CgContext;
@@ -673,4 +675,50 @@ pub fn CG_AddOLine(ctx: &mut CgContext, handle: EffectHandle) {
     le.refEntity.reType = refEntityType_t::RT_ORIENTEDLINE;
 
     trap::R_AddRefEntityToScene(ctx.engine, &le.refEntity);
+}
+
+/// Raven `CG_BloodTrail` — walks a fragment's trajectory in fixed 150ms steps
+/// over the current frame and drops a smoke puff at each step, turning each
+/// puff into a falling blood splat.
+///
+/// `cgs.media.bloodTrailShader` is commented out in the oracle (never
+/// registered) — the literal `0` hShader below matches that as-shipped
+/// behavior, not a guess.
+/// Source: `oracle/codemp/cgame/cg_localents.c:101-128`
+pub fn CG_BloodTrail(world: &mut CgWorld, le: &localEntity_t) {
+    let step: c_int = 150;
+    let mut t = step * ((world.cg.time - world.cg.frametime + step) / step);
+    let t2 = step * (world.cg.time / step);
+
+    while t <= t2 {
+        let mut newOrigin: vec3_t = [0.0; 3];
+        BG_EvaluateTrajectory(&le.pos as *const trajectory_t, t, &mut newOrigin);
+
+        let handle = CG_SmokePuff(
+            world,
+            &newOrigin,
+            &vec3_origin,
+            20.0, // radius
+            1.0,
+            1.0,
+            1.0,
+            1.0,    // color
+            2000.0, // trailTime
+            t,      // startTime
+            0,      // fadeInTime
+            0,      // flags
+            0,      // cgs.media.bloodTrailShader
+        );
+
+        let blood = world
+            .cg_localEntities
+            .get_mut(handle)
+            .expect("CG_BloodTrail: fresh slot");
+        // use the optimized version
+        blood.leType = leType_t::LE_FALL_SCALE_FADE;
+        // drop a total of 40 units over its lifetime
+        blood.pos.trDelta[2] = 40.0;
+
+        t += step;
+    }
 }
