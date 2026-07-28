@@ -7,6 +7,10 @@ use core::ffi::c_int;
 
 use native_string::{atoi, buf_to_string, Q_stricmp};
 
+use mp_bg::public::gametype::GT_SIEGE;
+use mp_bg::public::pers_enum::persEnum_t::PERS_TEAM;
+use mp_bg::saga::siege_team_t::{SIEGETEAM_TEAM1, SIEGETEAM_TEAM2};
+
 use mp_qshared::shared::limits::MAX_TOKEN_CHARS;
 use mp_qshared::shared::q_math::YAW;
 use mp_qshared::shared::qfalse;
@@ -25,9 +29,10 @@ use crate::cg_main::{
     CG_NextInventory_f, CG_PrevForcePower_f, CG_PrevInventory_f, CG_Printf,
 };
 use crate::cg_players::CG_LoadDeferredPlayers;
+use crate::cg_saga::CG_SiegeBriefingDisplay;
 use crate::cg_view::{
-    CG_AddBufferedSound, CG_TestModelNextFrame_f, CG_TestModelNextSkin_f, CG_TestModelPrevFrame_f,
-    CG_TestModelPrevSkin_f, CG_TestModel_f,
+    CG_AddBufferedSound, CG_TestGun_f, CG_TestModelNextFrame_f, CG_TestModelNextSkin_f,
+    CG_TestModelPrevFrame_f, CG_TestModelPrevSkin_f, CG_TestModel_f,
 };
 use crate::cg_weapons::{CG_NextWeapon_f, CG_PrevWeapon_f, CG_WeaponClean_f, CG_Weapon_f};
 use crate::trap;
@@ -287,6 +292,60 @@ pub fn CG_StartOrbit_f(ctx: &mut CgContext) {
     }
 }
 
+/// Raven `CG_SiegeBriefing_f` — pops the siege briefing display for the
+/// local player's own team; a no-op outside siege or off a valid siege team.
+///
+/// Source: `oracle/codemp/cgame/cg_consolecmds.c:195-213`
+pub fn CG_SiegeBriefing_f(ctx: &mut CgContext) {
+    if ctx.world.cgs.gametype != GT_SIEGE {
+        // cannot be displayed unless in this gametype
+        return;
+    }
+
+    let team = ctx.world.cg.predictedPlayerState.persistant[PERS_TEAM as usize];
+    if team != SIEGETEAM_TEAM1 && team != SIEGETEAM_TEAM2 {
+        // cannot be displayed if not on a valid team
+        return;
+    }
+
+    CG_SiegeBriefingDisplay(ctx, team, 0);
+}
+
+/// Raven `CG_SiegeCvarUpdate_f` — refreshes the siege briefing cvars for the
+/// local player's own team without popping the display; a no-op outside
+/// siege or off a valid siege team.
+///
+/// Source: `oracle/codemp/cgame/cg_consolecmds.c:215-233`
+pub fn CG_SiegeCvarUpdate_f(ctx: &mut CgContext) {
+    if ctx.world.cgs.gametype != GT_SIEGE {
+        // cannot be displayed unless in this gametype
+        return;
+    }
+
+    let team = ctx.world.cg.predictedPlayerState.persistant[PERS_TEAM as usize];
+    if team != SIEGETEAM_TEAM1 && team != SIEGETEAM_TEAM2 {
+        // cannot be displayed if not on a valid team
+        return;
+    }
+
+    CG_SiegeBriefingDisplay(ctx, team, 1);
+}
+
+/// Raven `CG_SiegeCompleteCvarUpdate_f` — refreshes the siege briefing cvars
+/// for both teams at once (siege load); a no-op outside siege.
+///
+/// Source: `oracle/codemp/cgame/cg_consolecmds.c:234-245`
+pub fn CG_SiegeCompleteCvarUpdate_f(ctx: &mut CgContext) {
+    if ctx.world.cgs.gametype != GT_SIEGE {
+        // cannot be displayed unless in this gametype
+        return;
+    }
+
+    // Set up cvars for both teams
+    CG_SiegeBriefingDisplay(ctx, SIEGETEAM_TEAM1, 1);
+    CG_SiegeBriefingDisplay(ctx, SIEGETEAM_TEAM2, 1);
+}
+
 /// Raven `CG_ConsoleCommand` — the vmMain console-command dispatch: walks
 /// `commands[]` for a case-insensitive name match against `argv(0)` and calls
 /// the matching handler, `qtrue`; `qfalse` if nothing matched (the engine then
@@ -300,14 +359,11 @@ pub fn CG_StartOrbit_f(ctx: &mut CgContext) {
 /// [`CG_scrollScoresUp_f`], which need the shared menu framework the same way
 /// their own doc comments explain.
 ///
-/// Five arms (`testgun`, `+scores`, `briefing`, `siegeCvarUpdate`,
-/// `siegeCompleteCvarUpdate`) dispatch to `CG_TestGun_f`/`CG_ScoresDown_f`/
-/// `CG_SiegeBriefing_f`/`CG_SiegeCvarUpdate_f`/`CG_SiegeCompleteCvarUpdate_f`,
-/// none of which exist anywhere in the tree yet (verified by grep) - they land
-/// in `cgame-wave-partition.json` waves 2/3, later than this file's wave 1.
-/// Each is a genuine executable stub: reachable only if a player actually
-/// types that console command, so it panics loudly naming the still-unported
-/// Raven fn rather than silently swallowing the command.
+/// One arm (`+scores`) still dispatches to `CG_ScoresDown_f`, which doesn't
+/// exist in the tree yet (verified by grep) - it lands in a later wave. A
+/// genuine executable stub: reachable only if a player actually types that
+/// console command, so it panics loudly naming the still-unported Raven fn
+/// rather than silently swallowing the command.
 ///
 /// Source: `oracle/codemp/cgame/cg_consolecmds.c:309-323`
 pub fn CG_ConsoleCommand(
@@ -325,11 +381,7 @@ pub fn CG_ConsoleCommand(
         }
 
         match name {
-            "testgun" => {
-                // TODO: Port CG_TestGun_f
-                // Source: oracle/codemp/cgame/cg_view.c:98 (cgame module wave 2 - not yet in tree)
-                todo!("CG_TestGun_f - oracle/codemp/cgame/cg_view.c:98")
-            }
+            "testgun" => CG_TestGun_f(ctx),
             "testmodel" => CG_TestModel_f(ctx),
             "nextframe" => CG_TestModelNextFrame_f(ctx),
             "prevframe" => CG_TestModelPrevFrame_f(ctx),
@@ -337,7 +389,7 @@ pub fn CG_ConsoleCommand(
             "prevskin" => CG_TestModelPrevSkin_f(ctx),
             "viewpos" => CG_Viewpos_f(ctx),
             "+scores" => {
-                // TODO: Port CG_ScoresDown_f
+                //TODO: Port CG_ScoresDown_f
                 // Source: oracle/codemp/cgame/cg_consolecmds.c:66 (cgame module wave 3 - not yet in tree)
                 todo!("CG_ScoresDown_f - oracle/codemp/cgame/cg_consolecmds.c:66")
             }
@@ -361,21 +413,9 @@ pub fn CG_ConsoleCommand(
             "invprev" => CG_PrevInventory_f(ctx.world),
             "forcenext" => CG_NextForcePower_f(ctx),
             "forceprev" => CG_PrevForcePower_f(ctx),
-            "briefing" => {
-                // TODO: Port CG_SiegeBriefing_f
-                // Source: oracle/codemp/cgame/cg_consolecmds.c:195 (cgame module wave 2 - not yet in tree)
-                todo!("CG_SiegeBriefing_f - oracle/codemp/cgame/cg_consolecmds.c:195")
-            }
-            "siegeCvarUpdate" => {
-                // TODO: Port CG_SiegeCvarUpdate_f
-                // Source: oracle/codemp/cgame/cg_consolecmds.c:215 (cgame module wave 2 - not yet in tree)
-                todo!("CG_SiegeCvarUpdate_f - oracle/codemp/cgame/cg_consolecmds.c:215")
-            }
-            "siegeCompleteCvarUpdate" => {
-                // TODO: Port CG_SiegeCompleteCvarUpdate_f
-                // Source: oracle/codemp/cgame/cg_consolecmds.c:234 (cgame module wave 2 - not yet in tree)
-                todo!("CG_SiegeCompleteCvarUpdate_f - oracle/codemp/cgame/cg_consolecmds.c:234")
-            }
+            "briefing" => CG_SiegeBriefing_f(ctx),
+            "siegeCvarUpdate" => CG_SiegeCvarUpdate_f(ctx),
+            "siegeCompleteCvarUpdate" => CG_SiegeCompleteCvarUpdate_f(ctx),
             _ => unreachable!("COMMANDS lists {name:?} with no CG_ConsoleCommand dispatch arm"),
         }
 

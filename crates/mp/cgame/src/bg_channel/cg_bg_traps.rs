@@ -74,14 +74,14 @@ impl BgTraps for CgBgTraps<'_> {
         _passEntityNum: c_int,
         _contentMask: c_int,
     ) {
-        //TODO: Port CG_Trace
-        // cgame's `pm->trace` is `CG_Trace`, not a trap: `trap_CM_BoxTrace`
-        // against the world, then `CG_ClipMoveToEntities` over
-        // `cg_solidEntities`. That entity list is C5 `CgWorld` state, and a
-        // world-only trace would silently drop every entity hit.
+        //TODO: Port CG_Trace args
+        // cgame's `pm->trace` is `CG_Trace`, not a trap. The body is
+        // transcribed at `crate::cg_predict::CG_Trace`, but it takes
+        // `&mut CgContext` and this seam only carries `&Engine` — same story
+        // as `pointcontents` below.
         // Source: `oracle/codemp/cgame/cg_predict.c:359-369`;
         // binding at `oracle/codemp/cgame/cg_predict.c:1009,1385`
-        todo!("Port CG_Trace — oracle/codemp/cgame/cg_predict.c:359-369 (needs CgWorld's cg_solidEntities, DEC-46.1)")
+        todo!("Port CG_Trace seam — oracle/codemp/cgame/cg_predict.c:359-369 (ported at cg_predict::CG_Trace; this seam lacks CgContext)")
     }
 
     fn pointcontents(&self, _point: *const vec3_t, _passEntityNum: c_int) -> c_int {
@@ -92,7 +92,7 @@ impl BgTraps for CgBgTraps<'_> {
         // and this seam only carries `&Engine`.
         // Source: `oracle/codemp/cgame/cg_predict.c:393-424`;
         // binding at `oracle/codemp/cgame/cg_predict.c:1010,1386`
-        todo!("Port CG_PointContents — oracle/codemp/cgame/cg_predict.c:393-424 (needs CgWorld's cg_solidEntities, DEC-46.1)")
+        todo!("Port CG_PointContents seam — oracle/codemp/cgame/cg_predict.c:393-424 (ported at cg_predict::CG_PointContents; this seam lacks CgContext)")
     }
 
     // ---------------------------------------------------------------------

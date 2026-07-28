@@ -3,16 +3,25 @@
 
 #![allow(non_snake_case)]
 
-use core::ffi::c_int;
+use core::ffi::{c_int, c_void};
+use core::ptr::null_mut;
 
-use mp_bg::bg_misc::{BG_EvaluateTrajectory, BG_GiveMeVectorFromMatrix};
+use native_string::{atof_bytes, latin1_to_string};
+
+use mp_bg::bg_misc::{
+    BG_EvaluateTrajectory, BG_EvaluateTrajectoryDelta, BG_GiveMeVectorFromMatrix,
+};
 use mp_bg::public::bg_itemlist::{bg_itemlist, bg_numItems};
+use mp_bg::public::configstring::{CS_AMBIENT_SET, CS_EFFECTS, CS_MODELS};
 use mp_bg::public::entity_effects::EF2_HYPERSPACE;
 use mp_bg::public::entity_flags::{
-    EF_DEAD, EF_DROPPEDWEAPON, EF_ITEMPLACEHOLDER, EF_NODRAW, EF_RADAROBJECT, EF_SHADER_ANIM,
+    EF_ALT_FIRING, EF_DEAD, EF_DROPPEDWEAPON, EF_FIRING, EF_ITEMPLACEHOLDER, EF_JETPACK_ACTIVE,
+    EF_MISSILE_STICK, EF_NODRAW, EF_RADAROBJECT, EF_SHADER_ANIM,
 };
 use mp_bg::public::entity_type::entityType_t;
-use mp_bg::public::gametype::{GT_CTF, GT_CTY};
+use mp_bg::public::fx_state::{FX_STATE_OFF, FX_STATE_ONE_SHOT_LIMIT};
+use mp_bg::public::g2_model_parts::G2_MODEL_PART;
+use mp_bg::public::gametype::{GT_CTF, GT_CTY, GT_JEDIMASTER};
 use mp_bg::public::holdable::{HI_BINOCULARS, HI_SEEKER, HI_SHIELD};
 use mp_bg::public::hyperspace::{HYPERSPACE_TELEPORT_FRAC, HYPERSPACE_TIME};
 use mp_bg::public::item_type::{IT_ARMOR, IT_HEALTH, IT_HOLDABLE, IT_POWERUP, IT_TEAM, IT_WEAPON};
@@ -20,28 +29,32 @@ use mp_bg::public::pmtype::pmtype_t;
 use mp_bg::public::powerup::{
     PW_BLUEFLAG, PW_FORCE_BOON, PW_FORCE_ENLIGHTENED_DARK, PW_FORCE_ENLIGHTENED_LIGHT, PW_REDFLAG,
 };
-use mp_bg::public::team::{TEAM_BLUE, TEAM_RED};
+use mp_bg::public::team::{TEAM_BLUE, TEAM_FREE, TEAM_RED};
 use mp_bg::weapons::weapon_t::{
-    WP_BLASTER, WP_BOWCASTER, WP_DEMP2, WP_DET_PACK, WP_DISRUPTOR, WP_FLECHETTE, WP_REPEATER,
-    WP_ROCKET_LAUNCHER, WP_THERMAL, WP_TRIP_MINE,
+    WP_BLASTER, WP_BOWCASTER, WP_DEMP2, WP_DET_PACK, WP_DISRUPTOR, WP_FLECHETTE, WP_NUM_WEAPONS,
+    WP_REPEATER, WP_ROCKET_LAUNCHER, WP_SABER, WP_THERMAL, WP_TRIP_MINE,
 };
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
+use mp_qshared::common::mp::game::class_t::class_t::CLASS_VEHICLE;
 use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
 use mp_qshared::shared::force_powers::{FORCE_DARKSIDE, FORCE_LIGHTSIDE};
 use mp_qshared::shared::q_math::{
     _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin, vectoangles,
     AngleVectors, AnglesToAxis, AxisClear, AxisCopy, ByteToDir, CrossProduct, LerpAngle,
-    MatrixMultiply, PerpendicularVector, VectorClear, VectorLength, VectorNormalize, VectorSet,
-    PITCH, ROLL, YAW,
+    MatrixMultiply, PerpendicularVector, RotateAroundDirection, VectorClear, VectorLength,
+    VectorNormalize, VectorNormalize2, VectorSet, PITCH, ROLL, YAW,
 };
 use mp_qshared::shared::surface_flags::SOLID_BMODEL;
 use mp_qshared::shared::{
-    addpolyArgStruct_t, mdxaBone_t, orientation_t, qfalse, qhandle_t, qtrue, sfxHandle_t, vec3_t,
-    Eorientations, CHAN_ITEM, ENTITYNUM_MAX_NORMAL, MAX_CLIENTS_I32,
+    addpolyArgStruct_t, addspriteArgStruct_t, mdxaBone_t, orientation_t, qfalse, qhandle_t, qtrue,
+    sfxHandle_t, trType_t, vec3_t, Eorientations, CHAN_AUTO, CHAN_BODY, CHAN_ITEM,
+    ENTITYNUM_MAX_NORMAL, MAX_CLIENTS_I32,
 };
 
-use crate::cg_main::CG_Error;
+use crate::cg_main::{CG_ConfigString, CG_Error, Com_Printf};
+use crate::cg_players::CG_AddRefEntityWithPowerups;
+use crate::cg_weaponinit::NULL_HANDLE;
 use crate::local::centity_s::{centity_t, MAX_CG_LOOPSOUNDS};
 use crate::local::cg_loop_sound_s::cgLoopSound_t;
 use crate::trap;
@@ -81,6 +94,10 @@ const RF_DISINTEGRATE2: c_int = 0x40000;
 /// Source: `oracle/codemp/cgame/tr_types.h:18`
 const RF_MINLIGHT: c_int = 0x00001;
 
+/// Raven `RF_DEPTHHACK` — for view weapon Z crunching.
+/// Source: `oracle/codemp/cgame/tr_types.h:21`
+const RF_DEPTHHACK: c_int = 0x00008;
+
 /// Raven `RF_NOSHADOW` — don't add stencil shadows.
 /// Source: `oracle/codemp/cgame/tr_types.h:26`
 const RF_NOSHADOW: c_int = 0x00040;
@@ -105,6 +122,16 @@ const RF_SETANIMINDEX: c_int = 0x80000;
 /// Raven `ITEM_SCALEUP_TIME` — how long a just-respawned item fades in for.
 /// Source: `oracle/codemp/cgame/cg_local.h:37`
 const ITEM_SCALEUP_TIME: c_int = 1000;
+
+// Raven's `int CG_BMS_START/MID/END` are file-scope ints that nothing ever
+// writes, so they land as `const`s beside their reader rather than as state.
+// Only `CG_BMS_MID` has a reader in either tree; the other two are kept for the
+// set (`CG_PlayDoorSound`'s `type` argument is the same stage numbering, fed
+// from the event's `eventParm`).
+// Source: `oracle/codemp/cgame/cg_ents.c:2735-2737`
+pub const CG_BMS_START: c_int = 0;
+pub const CG_BMS_MID: c_int = 1;
+pub const CG_BMS_END: c_int = 2;
 
 /// Raven `CG_PositionEntityOnTag` — modifies the entity's position and axis by
 /// the given tag location.
@@ -1476,5 +1503,900 @@ pub fn CG_Cube(ctx: &mut CgContext, mins: vec3_t, maxs: vec3_t, color: vec3_t, a
         for i in 0..3 {
             vec[i] += 1;
         }
+    }
+}
+
+/// Raven `CG_EntityEffects` — the looping sound and constant-light glow every
+/// entity type gets each frame.
+/// Source: `oracle/codemp/cgame/cg_ents.c:264-327`
+pub fn CG_EntityEffects(ctx: &mut CgContext, centNum: usize) {
+    // update sound origins
+    CG_SetEntitySoundPosition(ctx, centNum);
+
+    // add loop sound
+    let loopSound = ctx.world.entity(centNum).currentState.loopSound;
+    let loopIsSoundset = ctx.world.entity(centNum).currentState.loopIsSoundset;
+    let number = ctx.world.entity(centNum).currentState.number;
+    if loopSound != 0 || (loopIsSoundset != qfalse && number >= MAX_CLIENTS_I32) {
+        let mut realSoundIndex: sfxHandle_t = -1;
+
+        if loopIsSoundset != qfalse && number >= MAX_CLIENTS_I32 {
+            //If this is so, then first get our soundset from the index, and loopSound actually contains which part of the set to
+            //use rather than a sound index (BMS_START [0], BMS_MID [1], or BMS_END [2]). Typically loop sounds will be BMS_MID.
+            let soundSetIndex = ctx.world.entity(centNum).currentState.soundSetIndex;
+            let soundSet = CG_ConfigString(ctx, CS_AMBIENT_SET + soundSetIndex);
+
+            if !soundSet.is_empty() {
+                realSoundIndex = trap::AS_GetBModelSound(ctx.engine, &soundSet, loopSound);
+            }
+        } else {
+            realSoundIndex = ctx.world.cgs.gameSounds[loopSound as usize];
+        }
+
+        //rww - doors and things with looping sounds have a crazy origin (being brush models and all)
+        if realSoundIndex != -1 {
+            let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+            if ctx.world.entity(centNum).currentState.solid == SOLID_BMODEL {
+                let modelindex = ctx.world.entity(centNum).currentState.modelindex;
+                let v = ctx.world.cgs.inlineModelMidpoints[modelindex as usize];
+                let mut origin: vec3_t = [0.0; 3];
+                _VectorAdd(lerpOrigin, v, &mut origin);
+                trap::S_AddLoopingSound(ctx.engine, number, &origin, &vec3_origin, realSoundIndex);
+            } else if ctx.world.entity(centNum).currentState.eType
+                != entityType_t::ET_SPEAKER as c_int
+            {
+                trap::S_AddLoopingSound(
+                    ctx.engine,
+                    number,
+                    &lerpOrigin,
+                    &vec3_origin,
+                    realSoundIndex,
+                );
+            } else {
+                trap::S_AddRealLoopingSound(
+                    ctx.engine,
+                    number,
+                    &lerpOrigin,
+                    &vec3_origin,
+                    realSoundIndex,
+                );
+            }
+        }
+    }
+
+    // constant light glow
+    let constantLight = ctx.world.entity(centNum).currentState.constantLight;
+    if constantLight != 0 {
+        let cl = constantLight;
+        let r = cl & 255;
+        let g = (cl >> 8) & 255;
+        let b = (cl >> 16) & 255;
+        let i = ((cl >> 24) & 255) * 4;
+        let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+        trap::R_AddLightToScene(
+            ctx.engine,
+            &lerpOrigin,
+            i as f32,
+            r as f32,
+            g as f32,
+            b as f32,
+        );
+    }
+}
+
+/// Raven `CG_Missile` — the in-flight missile draw: the ghoul2 saber piece, the
+/// per-weapon trail/dlight/sound, the spin, and jedimaster's dropped-saber glow.
+///
+/// PORT-NOTE: Raven's `refEntity_t ent` is a raw stack local, so the
+/// `cent->ghoul2` radius store at :2483 lands *before* the `memset` at :2586
+/// wipes it — a dead store. The port drops the dead store and declares `ent`
+/// at the memset site (wave-1 `difLen` precedent).
+/// Source: `oracle/codemp/cgame/cg_ents.c:2426-2734`
+pub fn CG_Missile(ctx: &mut CgContext, centNum: usize) {
+    let engine = ctx.engine;
+
+    let mut s1_weapon = ctx.world.entity(centNum).currentState.weapon;
+    if s1_weapon > WP_NUM_WEAPONS && s1_weapon != G2_MODEL_PART {
+        ctx.world.entity_mut(centNum).currentState.weapon = 0;
+        s1_weapon = 0;
+    }
+
+    // Two indices slip past Raven's guard and read off the end of
+    // `cg_weapons[MAX_WEAPONS]` (19 entries): `G2_MODEL_PART` (50) on a
+    // model-part missile with no ghoul2 instance, and `WP_NUM_WEAPONS` itself
+    // (19), which `> WP_NUM_WEAPONS` lets through. Both are UB in Raven; the
+    // port's checked indexing traps instead of reading past the array (§F19).
+    let weaponIdx = if !ctx.world.entity(centNum).ghoul2.is_null() && s1_weapon == G2_MODEL_PART {
+        WP_SABER as usize
+    } else {
+        s1_weapon as usize
+    };
+
+    if (ctx.world.entity(centNum).currentState.eFlags & EF_RADAROBJECT) != 0 {
+        CG_AddRadarEnt(ctx.world, centNum);
+    }
+
+    if s1_weapon == WP_SABER {
+        let modelindex = ctx.world.entity(centNum).currentState.modelindex;
+        let serverSaberHitIndex = ctx.world.entity(centNum).serverSaberHitIndex;
+        let eFlags = ctx.world.entity(centNum).currentState.eFlags;
+
+        if (modelindex != serverSaberHitIndex || ctx.world.entity(centNum).ghoul2.is_null())
+            && (eFlags & EF_NODRAW) == 0
+        {
+            //no g2, or server changed the model we are using
+            let saberModel = CG_ConfigString(ctx, CS_MODELS + modelindex);
+
+            ctx.world.entity_mut(centNum).serverSaberHitIndex = modelindex;
+
+            if !ctx.world.entity(centNum).ghoul2.is_null() {
+                //clean if we already have one (because server changed model string index)
+                trap::G2API_CleanGhoul2Models(
+                    engine,
+                    &mut ctx.world.entity_mut(centNum).ghoul2 as *mut *mut c_void,
+                );
+                ctx.world.entity_mut(centNum).ghoul2 = null_mut();
+            }
+
+            if !saberModel.is_empty() {
+                trap::G2API_InitGhoul2Model(
+                    engine,
+                    &mut ctx.world.entity_mut(centNum).ghoul2 as *mut *mut c_void,
+                    &saberModel,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                );
+            } else {
+                trap::G2API_InitGhoul2Model(
+                    engine,
+                    &mut ctx.world.entity_mut(centNum).ghoul2 as *mut *mut c_void,
+                    "models/weapons2/saber/saber_w.glm",
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                );
+            }
+            return;
+        } else if (eFlags & EF_NODRAW) != 0 {
+            return;
+        }
+    }
+
+    // Raven's `ent.radius = g2radius` store sat here (:2483) — dead, wiped by
+    // the memset below; dropped per the PORT-NOTE above.
+
+    // calculate the axis
+    let angles = ctx.world.entity(centNum).currentState.angles;
+    _VectorCopy(angles, &mut ctx.world.entity_mut(centNum).lerpAngles);
+
+    let s1_otherEntityNum2 = ctx.world.entity(centNum).currentState.otherEntityNum2;
+    let s1_eFlags = ctx.world.entity(centNum).currentState.eFlags;
+    let s1_pos = ctx.world.entity(centNum).currentState.pos;
+    let s1_number = ctx.world.entity(centNum).currentState.number;
+    let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+    let time = ctx.world.cg.time;
+
+    if s1_otherEntityNum2 != 0 && s1_weapon != WP_SABER {
+        //using an over-ridden trail effect!
+        let mut forward: vec3_t = [0.0; 3];
+
+        if VectorNormalize2(s1_pos.trDelta, &mut forward) == 0.0 {
+            forward[2] = 1.0;
+        }
+
+        let vehWeapon = &ctx.world.bg_state.g_vehWeaponInfo[s1_otherEntityNum2 as usize];
+        let iShotFX = vehWeapon.iShotFX;
+        let iModel = vehWeapon.iModel;
+        let iLoopSound = vehWeapon.iLoopSound;
+
+        if (s1_eFlags & EF_JETPACK_ACTIVE) != 0 //hack so we know we're a vehicle Weapon shot
+            && (iShotFX != 0 || iModel != NULL_HANDLE)
+        {
+            //a vehicle with an override for the weapon trail fx or model
+            trap::FX_PlayEffectID(engine, iShotFX, &lerpOrigin, &forward, -1, -1);
+            if iLoopSound != 0 {
+                let mut velocity: vec3_t = [0.0; 3];
+                BG_EvaluateTrajectoryDelta(&s1_pos, time, &mut velocity);
+                trap::S_AddLoopingSound(engine, s1_number, &lerpOrigin, &velocity, iLoopSound);
+            }
+            //add custom model
+            if iModel == NULL_HANDLE {
+                return;
+            }
+        } else {
+            //a regular missile
+            let gameEffect = ctx.world.cgs.gameEffects[s1_otherEntityNum2 as usize];
+            trap::FX_PlayEffectID(engine, gameEffect, &lerpOrigin, &forward, -1, -1);
+            let s1_loopSound = ctx.world.entity(centNum).currentState.loopSound;
+            if s1_loopSound != 0 {
+                let mut velocity: vec3_t = [0.0; 3];
+                BG_EvaluateTrajectoryDelta(&s1_pos, time, &mut velocity);
+                trap::S_AddLoopingSound(engine, s1_number, &lerpOrigin, &velocity, s1_loopSound);
+            }
+            //FIXME: if has a custom model, too, then set it and do rest of code below?
+            return;
+        }
+    } else if (s1_eFlags & EF_ALT_FIRING) != 0 {
+        // add trails
+        // DEFERRED: `weapon->altMissileTrailFunc( cent, weapon )`.
+        // `weaponInfo_t.altMissileTrailFunc` is still the transcription-era raw
+        // `extern "C"` fn ptr and every store in `cg_weaponinit.rs` holds it at
+        // `None` (DEC-46.4's closed trail-fn enum has not landed), so the
+        // condition can never be true and there is nothing to dispatch to yet.
+        // Source: `oracle/codemp/cgame/cg_ents.c:2530-2533`
+
+        // add dynamic light
+        let altMissileDlight = ctx.world.cg_weapons[weaponIdx].altMissileDlight;
+        if altMissileDlight != 0.0 {
+            let color = ctx.world.cg_weapons[weaponIdx].altMissileDlightColor;
+            trap::R_AddLightToScene(
+                engine,
+                &lerpOrigin,
+                altMissileDlight,
+                color[0],
+                color[1],
+                color[2],
+            );
+        }
+
+        // add missile sound
+        let altMissileSound = ctx.world.cg_weapons[weaponIdx].altMissileSound;
+        if altMissileSound != 0 {
+            let mut velocity: vec3_t = [0.0; 3];
+
+            BG_EvaluateTrajectoryDelta(&s1_pos, time, &mut velocity);
+
+            trap::S_AddLoopingSound(engine, s1_number, &lerpOrigin, &velocity, altMissileSound);
+        }
+
+        //Don't draw something without a model
+        if ctx.world.cg_weapons[weaponIdx].altMissileModel == NULL_HANDLE {
+            return;
+        }
+    } else {
+        // add trails
+        // DEFERRED: `weapon->missileTrailFunc( cent, weapon )` — the same held
+        // raw fn-ptr field as the alt arm above.
+        // Source: `oracle/codemp/cgame/cg_ents.c:2558-2561`
+
+        // add dynamic light
+        let missileDlight = ctx.world.cg_weapons[weaponIdx].missileDlight;
+        if missileDlight != 0.0 {
+            let color = ctx.world.cg_weapons[weaponIdx].missileDlightColor;
+            trap::R_AddLightToScene(
+                engine,
+                &lerpOrigin,
+                missileDlight,
+                color[0],
+                color[1],
+                color[2],
+            );
+        }
+
+        // add missile sound
+        let missileSound = ctx.world.cg_weapons[weaponIdx].missileSound;
+        if missileSound != 0 {
+            let mut velocity: vec3_t = [0.0; 3];
+
+            BG_EvaluateTrajectoryDelta(&s1_pos, time, &mut velocity);
+
+            trap::S_AddLoopingSound(engine, s1_number, &lerpOrigin, &velocity, missileSound);
+        }
+
+        //Don't draw something without a model
+        //saber uses ghoul2 model, doesn't matter
+        if ctx.world.cg_weapons[weaponIdx].missileModel == NULL_HANDLE
+            && s1_weapon != WP_SABER
+            && s1_weapon != G2_MODEL_PART
+        {
+            return;
+        }
+    }
+
+    // create the render entity
+    let mut ent = refEntity_t::zeroed();
+    _VectorCopy(lerpOrigin, &mut ent.origin);
+    _VectorCopy(lerpOrigin, &mut ent.oldorigin);
+    /*
+    Ghoul2 Insert Start
+    */
+    CG_SetGhoul2Info(&mut ent, ctx.world.entity(centNum));
+
+    /*
+    Ghoul2 Insert End
+    */
+
+    // flicker between two skins
+    ent.skinNum = ctx.world.cg.clientFrame & 1;
+    ent.renderfx = /*weapon->missileRenderfx | */RF_NOSHADOW;
+
+    if (s1_eFlags & EF_JETPACK_ACTIVE) == 0 {
+        if s1_weapon != WP_SABER && s1_weapon != G2_MODEL_PART {
+            //if ( cent->currentState.eFlags | EF_ALT_FIRING )
+            //rww - why was this like this?
+            if (ctx.world.entity(centNum).currentState.eFlags & EF_ALT_FIRING) != 0 {
+                ent.hModel = ctx.world.cg_weapons[weaponIdx].altMissileModel;
+            } else {
+                ent.hModel = ctx.world.cg_weapons[weaponIdx].missileModel;
+            }
+        }
+    }
+    //add custom model
+    else {
+        let iModel = ctx.world.bg_state.g_vehWeaponInfo[s1_otherEntityNum2 as usize].iModel;
+        if iModel != NULL_HANDLE {
+            ent.hModel = iModel;
+        } else {
+            //wtf?  how did we get here?
+            return;
+        }
+    }
+
+    // spin as it moves
+    if ctx.world.entity(centNum).currentState.apos.trType != trType_t::TR_INTERPOLATE {
+        // convert direction of travel into axis
+        if VectorNormalize2(s1_pos.trDelta, &mut ent.axis[0]) == 0.0 {
+            ent.axis[0][2] = 1.0;
+        }
+
+        // spin as it moves
+        if s1_pos.trType != trType_t::TR_STATIONARY {
+            if (s1_eFlags & EF_MISSILE_STICK) != 0 {
+                //Did this so regular missiles don't get broken
+                RotateAroundDirection(ent.axis.as_mut_ptr(), time as f32 * 0.5);
+            } else {
+                //JFM:FLOAT FIX
+                RotateAroundDirection(ent.axis.as_mut_ptr(), time as f32 * 0.25);
+            }
+        } else if (s1_eFlags & EF_MISSILE_STICK) != 0 {
+            RotateAroundDirection(ent.axis.as_mut_ptr(), s1_pos.trTime as f32 * 0.5);
+        } else {
+            let s1_time = ctx.world.entity(centNum).currentState.time;
+            RotateAroundDirection(ent.axis.as_mut_ptr(), s1_time as f32);
+        }
+    } else {
+        let lerpAngles = ctx.world.entity(centNum).lerpAngles;
+        AnglesToAxis(lerpAngles, ent.axis.as_mut_ptr());
+    }
+
+    if s1_weapon == WP_SABER {
+        ent.radius = ctx.world.entity(centNum).currentState.g2radius as f32;
+    }
+
+    // add to refresh list, possibly with quad glow
+    let s1 = ctx.world.entity(centNum).currentState;
+    CG_AddRefEntityWithPowerups(ctx, &ent, &s1, TEAM_FREE);
+
+    if s1_weapon == WP_SABER && ctx.world.cgs.gametype == GT_JEDIMASTER {
+        //in jedimaster always make the saber glow when on the ground
+        let mut org: vec3_t = [0.0; 3];
+        //refEntity_t sRef;
+        //memcpy( &sRef, &ent, sizeof( sRef ) );
+        let mut fxSArgs = addspriteArgStruct_t {
+            origin: [0.0; 3],
+            vel: [0.0; 3],
+            accel: [0.0; 3],
+            scale: 0.0,
+            dscale: 0.0,
+            sAlpha: 0.0,
+            eAlpha: 0.0,
+            rotation: 0.0,
+            bounce: 0.0,
+            life: 0,
+            shader: 0,
+            flags: 0,
+        };
+
+        ent.customShader = ctx.world.cgs.media.solidWhite;
+        ent.renderfx = RF_RGB_TINT;
+        // `sin` and the `0.08f`/`0.1f` literals widen to double, so the whole
+        // tail is a double that narrows back into the float `wv`
+        let wv = (((time as f32 * 0.003) as f64).sin() * 0.08f32 as f64 + 0.1f32 as f64) as f32;
+        ent.shaderRGBA[0] = (wv * 255.0) as i32 as u8;
+        ent.shaderRGBA[1] = (wv * 255.0) as i32 as u8;
+        ent.shaderRGBA[2] = (wv * 0.0) as i32 as u8;
+        trap::R_AddRefEntityToScene(engine, &ent);
+
+        let mut i: c_int = -4;
+        while i < 10 {
+            let axis2 = ent.axis[2];
+            _VectorMA(ent.origin, -(i as f32), axis2, &mut org);
+
+            _VectorCopy(org, &mut fxSArgs.origin);
+            VectorClear(&mut fxSArgs.vel);
+            VectorClear(&mut fxSArgs.accel);
+            fxSArgs.scale = 5.5;
+            fxSArgs.dscale = 5.5;
+            fxSArgs.sAlpha = wv;
+            fxSArgs.eAlpha = wv;
+            fxSArgs.rotation = 0.0;
+            fxSArgs.bounce = 0.0;
+            // Raven writes the float literal `1.0f` into the int `life` slot
+            fxSArgs.life = 1;
+            fxSArgs.shader = ctx.world.cgs.media.yellowDroppedSaberShader;
+            fxSArgs.flags = 0x08000000;
+
+            //trap_FX_AddSprite( org, NULL, NULL, 5.5f, 5.5f, wv, wv, 0.0f, 0.0f, 1.0f, cgs.media.yellowSaberGlowShader, 0x08000000 );
+            trap::FX_AddSprite(engine, &mut fxSArgs);
+
+            i += 1;
+        }
+
+        if ctx.world.cgs.gametype == GT_JEDIMASTER {
+            ent.shaderRGBA[0] = 255;
+            ent.shaderRGBA[1] = 255;
+            ent.shaderRGBA[2] = 0;
+
+            ent.renderfx |= RF_DEPTHHACK;
+            ent.customShader = ctx.world.cgs.media.forceSightBubble;
+
+            trap::R_AddRefEntityToScene(engine, &ent);
+        }
+    }
+
+    if (s1_eFlags & EF_FIRING) != 0 {
+        //special code for adding the beam to the attached tripwire mine
+        let mut beamOrg: vec3_t = [0.0; 3];
+
+        // forward
+        let axis0 = ent.axis[0];
+        _VectorMA(ent.origin, 8.0, axis0, &mut beamOrg);
+        let tripMineLaser = ctx.world.cgs.effects.mTripMineLaster;
+        trap::FX_PlayEffectID(engine, tripMineLaser, &beamOrg, &axis0, -1, -1);
+    }
+}
+
+/// Raven `CG_PlayDoorLoopSound` — the ambient-set loop a mover holds while it
+/// runs.
+/// Source: `oracle/codemp/cgame/cg_ents.c:2746-2784`
+pub fn CG_PlayDoorLoopSound(ctx: &mut CgContext, centNum: usize) {
+    let soundSetIndex = ctx.world.entity(centNum).currentState.soundSetIndex;
+    if soundSetIndex == 0 {
+        return;
+    }
+
+    let soundSet = CG_ConfigString(ctx, CS_AMBIENT_SET + soundSetIndex);
+
+    if soundSet.is_empty() {
+        return;
+    }
+
+    let sfx = trap::AS_GetBModelSound(ctx.engine, &soundSet, CG_BMS_MID);
+
+    if sfx == -1 {
+        return;
+    }
+
+    let mut origin: vec3_t = [0.0; 3];
+    let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+    //shouldn't be in here otherwise, but just in case.
+    if ctx.world.entity(centNum).currentState.eType == entityType_t::ET_MOVER as c_int {
+        let modelindex = ctx.world.entity(centNum).currentState.modelindex;
+        let v = ctx.world.cgs.inlineModelMidpoints[modelindex as usize];
+        _VectorAdd(lerpOrigin, v, &mut origin);
+    } else {
+        _VectorCopy(lerpOrigin, &mut origin);
+    }
+
+    //ent->s.loopSound = sfx;
+    let number = ctx.world.entity(centNum).currentState.number;
+    CG_S_AddRealLoopingSound(ctx.world, number as usize, origin, vec3_origin, sfx);
+}
+
+/// Raven `CG_PlayDoorSound` — the one-shot open/close sound off the mover's
+/// ambient set; `r#type` is the `CG_BMS_*` stage the event carried.
+/// Source: `oracle/codemp/cgame/cg_ents.c:2792-2817`
+pub fn CG_PlayDoorSound(ctx: &mut CgContext, centNum: usize, r#type: c_int) {
+    let soundSetIndex = ctx.world.entity(centNum).currentState.soundSetIndex;
+    if soundSetIndex == 0 {
+        return;
+    }
+
+    let soundSet = CG_ConfigString(ctx, CS_AMBIENT_SET + soundSetIndex);
+
+    if soundSet.is_empty() {
+        return;
+    }
+
+    let sfx = trap::AS_GetBModelSound(ctx.engine, &soundSet, r#type);
+
+    if sfx == -1 {
+        return;
+    }
+
+    let number = ctx.world.entity(centNum).currentState.number;
+    trap::S_StartSound(ctx.engine, None, number, CHAN_AUTO, sfx);
+}
+
+/// Raven `CG_CalcEntityLerpPositions` — picks this entity's frame position:
+/// snapshot interpolation, trajectory extrapolation, or the ridden vehicle's
+/// own special case.
+///
+/// PORT-NOTE: Raven's ragdoll-offset block (:3131-3189) sits inside `#if 0`, so
+/// it never compiled and is not transcribed.
+/// Source: `oracle/codemp/cgame/cg_ents.c:3078-3202`
+pub fn CG_CalcEntityLerpPositions(ctx: &mut CgContext, centNum: usize) {
+    let mut goAway = false;
+
+    // if this player does not want to see extrapolated players
+    if ctx.world.cvars.cg_smoothClients.integer == 0 {
+        // make sure the clients use TR_INTERPOLATE
+        if ctx.world.entity(centNum).currentState.number < MAX_CLIENTS_I32 {
+            let cent = ctx.world.entity_mut(centNum);
+            cent.currentState.pos.trType = trType_t::TR_INTERPOLATE;
+            cent.nextState.pos.trType = trType_t::TR_INTERPOLATE;
+        }
+    }
+
+    let m_iVehicleNum = ctx.world.cg.predictedPlayerState.m_iVehicleNum;
+    let number = ctx.world.entity(centNum).currentState.number;
+    let eType = ctx.world.entity(centNum).currentState.eType;
+    let NPC_class = ctx.world.entity(centNum).currentState.NPC_class;
+    let time = ctx.world.cg.time;
+
+    if m_iVehicleNum != 0
+        && m_iVehicleNum == number
+        && eType == entityType_t::ET_NPC as c_int
+        && NPC_class == CLASS_VEHICLE as c_int
+    {
+        //special case for vehicle we are riding
+        let owner = ctx.world.entity(m_iVehicleNum as usize).currentState.owner;
+
+        if owner == ctx.world.cg.predictedPlayerState.clientNum {
+            //only do this if the vehicle is pilotted by this client and predicting properly
+            let pos = ctx.world.entity(centNum).currentState.pos;
+            let apos = ctx.world.entity(centNum).currentState.apos;
+            let cent = ctx.world.entity_mut(centNum);
+            BG_EvaluateTrajectory(&pos, time, &mut cent.lerpOrigin);
+            BG_EvaluateTrajectory(&apos, time, &mut cent.lerpAngles);
+            return;
+        }
+    }
+
+    let interpolate = ctx.world.entity(centNum).interpolate;
+    let trType = ctx.world.entity(centNum).currentState.pos.trType;
+
+    if interpolate != qfalse && trType == trType_t::TR_INTERPOLATE {
+        CG_InterpolateEntityPosition(ctx, centNum);
+        return;
+    }
+
+    // first see if we can interpolate between two snaps for
+    // linear extrapolated clients
+    if interpolate != qfalse && trType == trType_t::TR_LINEAR_STOP && number < MAX_CLIENTS_I32 {
+        CG_InterpolateEntityPosition(ctx, centNum);
+        goAway = true;
+    } else if interpolate != qfalse
+        && eType == entityType_t::ET_NPC as c_int
+        && NPC_class == CLASS_VEHICLE as c_int
+    {
+        CG_InterpolateEntityPosition(ctx, centNum);
+        goAway = true;
+    } else {
+        // just use the current frame and evaluate as best we can
+        let pos = ctx.world.entity(centNum).currentState.pos;
+        let apos = ctx.world.entity(centNum).currentState.apos;
+        let cent = ctx.world.entity_mut(centNum);
+        BG_EvaluateTrajectory(&pos, time, &mut cent.lerpOrigin);
+        BG_EvaluateTrajectory(&apos, time, &mut cent.lerpAngles);
+    }
+
+    if goAway {
+        return;
+    }
+
+    // adjust for riding a mover if it wasn't rolled into the predicted
+    // player state
+    if number != ctx.world.cg.predictedPlayerState.clientNum {
+        // Raven derefs `cg.snap` here with no null check; with no snapshot the
+        // port leaves the entity's lerped position alone (§F19).
+        let Some(serverTime) = ctx.world.cg.snap_ref().map(|snap| snap.serverTime) else {
+            return;
+        };
+        let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+        let groundEntityNum = ctx.world.entity(centNum).currentState.groundEntityNum;
+        let mut out: vec3_t = [0.0; 3];
+        CG_AdjustPositionForMover(
+            ctx.world,
+            lerpOrigin,
+            groundEntityNum,
+            serverTime,
+            time,
+            &mut out,
+        );
+        _VectorCopy(out, &mut ctx.world.entity_mut(centNum).lerpOrigin);
+    }
+}
+
+/// Raven `CG_FX` — the `target_effect` entity: replays its configstring effect
+/// on its own schedule.
+/// Source: `oracle/codemp/cgame/cg_ents.c:3237-3307`
+pub fn CG_FX(ctx: &mut CgContext, centNum: usize) {
+    let mut fxDir: vec3_t = [0.0; 3];
+    let mut efxIndex: c_int = 0;
+
+    let time = ctx.world.cg.time;
+    if ctx.world.entity(centNum).miscTime > time {
+        return;
+    }
+
+    // Raven's `if (!s1)` null-check on `&cent->currentState` can never fire —
+    // an owned field has no null address (§B5), so it is dropped.
+
+    let s1_modelindex2 = ctx.world.entity(centNum).currentState.modelindex2;
+    if s1_modelindex2 == FX_STATE_OFF {
+        // fx not active
+        return;
+    }
+
+    if s1_modelindex2 < FX_STATE_ONE_SHOT_LIMIT {
+        // fx is single shot
+        if ctx.world.entity(centNum).muzzleFlashTime == s1_modelindex2 {
+            return;
+        }
+
+        ctx.world.entity_mut(centNum).muzzleFlashTime = s1_modelindex2;
+    }
+
+    let s1_speed = ctx.world.entity(centNum).currentState.speed;
+    let s1_time = ctx.world.entity(centNum).currentState.time;
+    let random = ctx.world.bg_state.rng.random();
+    // every term here is float-typed in C, so the sum truncates into the int
+    // `miscTime` slot
+    ctx.world.entity_mut(centNum).miscTime =
+        (time as f32 + s1_speed + random * s1_time as f32) as c_int;
+
+    let s1_angles = ctx.world.entity(centNum).currentState.angles;
+    AngleVectors(s1_angles, Some(&mut fxDir), None, None);
+
+    if fxDir[0] == 0.0 && fxDir[1] == 0.0 && fxDir[2] == 0.0 {
+        fxDir[1] = 1.0;
+    }
+
+    let s1_modelindex = ctx.world.entity(centNum).currentState.modelindex;
+    if ctx.world.cgs.gameEffects[s1_modelindex as usize] != 0 {
+        efxIndex = ctx.world.cgs.gameEffects[s1_modelindex as usize];
+    } else {
+        let s = CG_ConfigString(ctx, CS_EFFECTS + s1_modelindex);
+        if !s.is_empty() {
+            efxIndex = trap::FX_RegisterEffect(ctx.engine, &s);
+            ctx.world.cgs.gameEffects[s1_modelindex as usize] = efxIndex;
+        }
+    }
+
+    if efxIndex != 0 {
+        let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+        if ctx.world.entity(centNum).currentState.isPortalEnt != qfalse {
+            trap::FX_PlayPortalEffectID(ctx.engine, efxIndex, &lerpOrigin, &fxDir, -1, -1);
+        } else {
+            trap::FX_PlayEffectID(ctx.engine, efxIndex, &lerpOrigin, &fxDir, -1, -1);
+        }
+    }
+}
+
+/// Raven's `char buf[N]` scratch buffers are NUL-terminated, and the parse
+/// walks read one past the terminator on the failure paths — in C that reads
+/// uninitialized stack, so the port reads a `\0` there and stops (§F19).
+fn notetrack_byte(buf: &[u8], i: usize) -> u8 {
+    if i < buf.len() {
+        buf[i]
+    } else {
+        0
+    }
+}
+
+/// Raven `CG_ROFF_NotetrackCallback` — runs one ROFF notetrack: `effect
+/// <file> [X+Y+Z [XA-YA-ZA]]` or `sound <file>`.
+///
+/// PORT-NOTE: Raven's fixed `type[256]`/`argument[512]`/`addlArg[512]`/`t[64]`
+/// buffers overrun on a long notetrack (UB); the port's growable buffers just
+/// hold the whole token (§F19).
+/// Source: `oracle/codemp/cgame/cg_ents.c:3555-3758`
+pub fn CG_ROFF_NotetrackCallback(ctx: &mut CgContext, centNum: usize, notetrack: &str) {
+    let mut i: usize = 0;
+    let mut r: usize = 0;
+    let mut anglesGathered: usize = 0;
+    let mut posoffsetGathered: usize = 0;
+    let mut r#type: Vec<u8> = Vec::new();
+    let mut argument: Vec<u8> = Vec::new();
+    let mut addlArg: Vec<u8> = Vec::new();
+    let mut t: Vec<u8> = Vec::new();
+    let mut addlArgs = false;
+    let mut parsedAngles: vec3_t = [0.0; 3];
+    let mut parsedOffset: vec3_t = [0.0; 3];
+    let mut useAngles: vec3_t = [0.0; 3];
+    let mut useOrigin: vec3_t = [0.0; 3];
+    let mut forward: vec3_t = [0.0; 3];
+    let mut right: vec3_t = [0.0; 3];
+    let mut up: vec3_t = [0.0; 3];
+
+    // Raven's `if (!cent || !notetrack)` guard: the entity is an index and the
+    // notetrack is an owned string, so neither can be null (§B5).
+
+    //notetrack = "effect effects/explosion1.efx 0+0+64 0-0-1";
+    let nt = notetrack.as_bytes();
+
+    while notetrack_byte(nt, i) != 0 && notetrack_byte(nt, i) != b' ' {
+        r#type.push(nt[i]);
+        i += 1;
+    }
+
+    if notetrack_byte(nt, i) != b' ' {
+        //didn't pass in a valid notetrack type, or forgot the argument for it
+        return;
+    }
+
+    i += 1;
+
+    while notetrack_byte(nt, i) != 0 && notetrack_byte(nt, i) != b' ' {
+        argument.push(nt[i]);
+        r += 1;
+        i += 1;
+    }
+
+    if r == 0 {
+        return;
+    }
+
+    if notetrack_byte(nt, i) == b' ' {
+        //additional arguments...
+        addlArgs = true;
+
+        i += 1;
+        while notetrack_byte(nt, i) != 0 {
+            addlArg.push(nt[i]);
+            i += 1;
+        }
+    }
+
+    if r#type.as_slice() == b"effect".as_slice() {
+        // Raven's two `goto defaultoffsetposition` jumps skip the rest of the
+        // offset parse
+        let mut defaultOffsetPosition = false;
+
+        if !addlArgs {
+            //sprintf(errMsg, "Offset position argument for 'effect' type is invalid.");
+            //goto functionend;
+            VectorClear(&mut parsedOffset);
+            defaultOffsetPosition = true;
+        }
+
+        if !defaultOffsetPosition {
+            i = 0;
+
+            while posoffsetGathered < 3 {
+                r = 0;
+                t.clear();
+                while notetrack_byte(&addlArg, i) != 0
+                    && notetrack_byte(&addlArg, i) != b'+'
+                    && notetrack_byte(&addlArg, i) != b' '
+                {
+                    t.push(addlArg[i]);
+                    r += 1;
+                    i += 1;
+                }
+                i += 1;
+                if r == 0 {
+                    //failure..
+                    //sprintf(errMsg, "Offset position argument for 'effect' type is invalid.");
+                    //goto functionend;
+                    VectorClear(&mut parsedOffset);
+                    i = 0;
+                    defaultOffsetPosition = true;
+                    break;
+                }
+                parsedOffset[posoffsetGathered] = atof_bytes(&t) as f32;
+                posoffsetGathered += 1;
+            }
+        }
+
+        if !defaultOffsetPosition {
+            if posoffsetGathered < 3 {
+                // dead arm - the loop above only exits at 3 or through the
+                // goto, so Raven's `functionend` tail never runs
+                let errMsg = "Offset position argument for 'effect' type is invalid.";
+                Com_Printf(ctx, &format!("^3Type-specific notetrack error: {errMsg}\n"));
+                return;
+            }
+
+            i -= 1;
+
+            if notetrack_byte(&addlArg, i) != b' ' {
+                addlArgs = false;
+            }
+        }
+
+        // defaultoffsetposition:
+
+        let argumentStr = latin1_to_string(&argument);
+        let objectID = trap::FX_RegisterEffect(ctx.engine, &argumentStr);
+
+        if objectID != 0 {
+            if addlArgs {
+                //if there is an additional argument for an effect it is expected to be XANGLE-YANGLE-ZANGLE
+                i += 1;
+                while anglesGathered < 3 {
+                    r = 0;
+                    t.clear();
+                    while notetrack_byte(&addlArg, i) != 0 && notetrack_byte(&addlArg, i) != b'-' {
+                        t.push(addlArg[i]);
+                        r += 1;
+                        i += 1;
+                    }
+                    i += 1;
+
+                    if r == 0 {
+                        //failed to get a new part of the vector
+                        anglesGathered = 0;
+                        break;
+                    }
+
+                    parsedAngles[anglesGathered] = atof_bytes(&t) as f32;
+                    anglesGathered += 1;
+                }
+
+                if anglesGathered != 0 {
+                    _VectorCopy(parsedAngles, &mut useAngles);
+                } else {
+                    //failed to parse angles from the extra argument provided..
+                    _VectorCopy(ctx.world.entity(centNum).lerpAngles, &mut useAngles);
+                }
+            } else {
+                //if no constant angles, play in direction entity is facing
+                _VectorCopy(ctx.world.entity(centNum).lerpAngles, &mut useAngles);
+            }
+
+            AngleVectors(
+                useAngles,
+                Some(&mut forward),
+                Some(&mut right),
+                Some(&mut up),
+            );
+
+            _VectorCopy(ctx.world.entity(centNum).lerpOrigin, &mut useOrigin);
+
+            //forward
+            useOrigin[0] += forward[0] * parsedOffset[0];
+            useOrigin[1] += forward[1] * parsedOffset[0];
+            useOrigin[2] += forward[2] * parsedOffset[0];
+
+            //right
+            useOrigin[0] += right[0] * parsedOffset[1];
+            useOrigin[1] += right[1] * parsedOffset[1];
+            useOrigin[2] += right[2] * parsedOffset[1];
+
+            //up
+            useOrigin[0] += up[0] * parsedOffset[2];
+            useOrigin[1] += up[1] * parsedOffset[2];
+            useOrigin[2] += up[2] * parsedOffset[2];
+
+            trap::FX_PlayEffectID(ctx.engine, objectID, &useOrigin, &useAngles, -1, -1);
+        }
+    } else if r#type.as_slice() == b"sound".as_slice() {
+        let argumentStr = latin1_to_string(&argument);
+        let objectID = trap::S_RegisterSound(ctx.engine, &argumentStr);
+        let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+        let number = ctx.world.entity(centNum).currentState.number;
+        trap::S_StartSound(ctx.engine, Some(&lerpOrigin), number, CHAN_BODY, objectID);
+    } else if r#type.as_slice() == b"loop".as_slice() {
+        //handled server-side
+    }
+    //else if ...
+    else if !r#type.is_empty() {
+        let typeStr = latin1_to_string(&r#type);
+        Com_Printf(
+            ctx,
+            &format!("^3Warning: \"{typeStr}\" is an invalid ROFF notetrack function\n"),
+        );
+    } else {
+        Com_Printf(
+            ctx,
+            "^3Warning: Notetrack is missing function and/or arguments\n",
+        );
     }
 }

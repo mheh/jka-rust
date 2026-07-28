@@ -8,7 +8,9 @@
 use core::ffi::{c_char, c_int, c_void};
 use core::ptr::null_mut;
 
-use native_string::{atoi, string_to_latin1, Q_strncpyzBytes};
+use native_string::{
+    atoi, buf_to_string, string_to_latin1, Info_ValueForKey, Q_strcat, Q_strncpyz, Q_strncpyzBytes,
+};
 
 use mp_abi::ui::public::ui_menu_command_t::{
     UIMENU_CLOSEALL, UIMENU_SIEGEMESSAGE, UIMENU_SIEGEOBJECTIVES,
@@ -16,15 +18,22 @@ use mp_abi::ui::public::ui_menu_command_t::{
 use mp_bg::bg_misc::{
     forcePowerSorted, BG_EvaluateTrajectory, BG_FindItemForPowerup, BG_GiveMeVectorFromMatrix,
 };
+use mp_bg::bg_saga::BG_SiegeFindClassByName;
 use mp_bg::public::animation::animation_t;
-use mp_bg::public::entity_flags::EF_RADAROBJECT;
+use mp_bg::public::configstring::{CS_PLAYERS, SCORE_NOT_PRESENT};
+use mp_bg::public::duel_team::duelTeam_t;
+use mp_bg::public::entity_flags::{EF_DEAD, EF_DOUBLE_AMMO, EF_RADAROBJECT};
 use mp_bg::public::entity_type::entityType_t;
-use mp_bg::public::gametype::{GT_CTF, GT_CTY};
+use mp_bg::public::gametype::{GT_CTF, GT_CTY, GT_POWERDUEL, GT_SIEGE, GT_TEAM};
 use mp_bg::public::pers_enum::persEnum_t::PERS_TEAM;
 use mp_bg::public::powerup::{PW_BLUEFLAG, PW_NEUTRALFLAG, PW_REDFLAG};
-use mp_bg::public::stat_index::statIndex_t::STAT_HEALTH;
+use mp_bg::public::stat_index::statIndex_t::{STAT_ARMOR, STAT_HEALTH, STAT_MAX_HEALTH};
 use mp_bg::public::team::{TEAM_BLUE, TEAM_FREE, TEAM_RED, TEAM_SPECTATOR};
-use mp_bg::weapons::weapon_t::WP_SABER;
+use mp_bg::public::weaponstate::weaponstate_t::WEAPON_CHARGING_ALT;
+use mp_bg::saga::siege_class_flags_t::siegeClassFlags_t::CFL_STATVIEWER;
+use mp_bg::weapons::ammo_data::ammoData;
+use mp_bg::weapons::weapon_data::weaponData;
+use mp_bg::weapons::weapon_t::{WP_DISRUPTOR, WP_SABER};
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::refdef_t::{
     refdef_t, MAX_MAP_AREA_BYTES, MAX_RENDER_STRINGS, MAX_RENDER_STRING_LENGTH,
@@ -35,15 +44,16 @@ use mp_qshared::shared::force_powers::{
     FP_ABSORB, FP_HEAL, FP_LEVITATION, FP_PROTECT, FP_RAGE, FP_SABERTHROW, FP_SABER_DEFENSE,
     FP_SABER_OFFENSE, FP_SEE, FP_SPEED, FP_TELEPATHY, NUM_FORCE_POWERS,
 };
+use mp_qshared::shared::limits::MAX_SAY_TEXT;
 use mp_qshared::shared::q_color::{colorWhite, g_color_table};
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorCopy, _VectorMA, _VectorSubtract, AngleVectors, AnglesToAxis, Distance,
     VectorClear, VectorNormalize, VectorSet, YAW,
 };
 use mp_qshared::shared::{
-    ct_table_t, mdxaBone_t, qfalse, qhandle_t, vec3_t, vec4_t, Eorientations, BIGCHAR_WIDTH,
-    CHAN_AUTO, CHAN_LOCAL, ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_CLIENTS_I32, SCREEN_HEIGHT,
-    SCREEN_WIDTH,
+    ct_table_t, mdxaBone_t, qfalse, qhandle_t, qtrue, vec3_t, vec4_t, Eorientations,
+    BIGCHAR_HEIGHT, BIGCHAR_WIDTH, CHAN_AUTO, CHAN_LOCAL, ENTITYNUM_NONE, ENTITYNUM_WORLD,
+    MAX_CLIENTS, MAX_CLIENTS_I32, MAX_QPATH, SCREEN_HEIGHT, SCREEN_WIDTH,
 };
 use mp_uishared::shared::display_state::DisplayState;
 use mp_uishared::shared::menu_id::MenuId;
@@ -53,11 +63,16 @@ use mp_uishared::shared::menudef::{
     ITEM_TEXTSTYLE_OUTLINESHADOWED, ITEM_TEXTSTYLE_PULSE, ITEM_TEXTSTYLE_SHADOWED,
     ITEM_TEXTSTYLE_SHADOWEDMORE,
 };
-use mp_uishared::ui_shared::{Menu_FindItemByName, Menus_CloseByName};
+use mp_uishared::ui_shared::{Menu_FindItemByName, Menus_CloseByName, Menus_FindByName};
 
-use crate::cg_drawtools::{CG_DrawPic, CG_DrawRotatePic2, CG_FillRect};
-use crate::cg_main::CG_Error;
+use crate::cg_drawtools::{
+    CG_DrawNumField, CG_DrawPic, CG_DrawRect, CG_DrawRotatePic, CG_DrawRotatePic2, CG_FadeColor,
+    CG_FillRect,
+};
+use crate::cg_main::{CG_ConfigString, CG_Error, CG_GetStringEdString};
 use crate::cg_new_draw::{CG_OtherTeamHasFlag, CG_YourTeamHasFlag};
+use crate::cg_weapons::CG_RegisterItemVisuals;
+use crate::local::cg_t::MAX_CHATBOX_ITEMS;
 use crate::trap;
 use crate::world::cg_context::CgContext;
 use crate::world::cg_world::CgWorld;
@@ -87,6 +102,22 @@ const RDF_NOWORLDMODEL: c_int = 1;
 /// Raven `#define MAX_HUD_TICS 4` — tics per HUD bar (health/armor/force/ammo).
 /// Source: `oracle/codemp/cgame/cg_draw.c:42`
 pub const MAX_HUD_TICS: usize = 4;
+
+/// Raven `const char *armorTicName[MAX_HUD_TICS]` — the armor bar's four menu
+/// item names. Read-only compiled-in data, so a `const` (§C8).
+/// Source: `oracle/codemp/cgame/cg_draw.c:43-49`
+pub const armorTicName: [&str; MAX_HUD_TICS] =
+    ["armor_tic1", "armor_tic2", "armor_tic3", "armor_tic4"];
+
+/// Raven `const char *healthTicName[MAX_HUD_TICS]`.
+/// Source: `oracle/codemp/cgame/cg_draw.c:51-57`
+pub const healthTicName: [&str; MAX_HUD_TICS] =
+    ["health_tic1", "health_tic2", "health_tic3", "health_tic4"];
+
+/// Raven `const char *forceTicName[MAX_HUD_TICS]`.
+/// Source: `oracle/codemp/cgame/cg_draw.c:59-65`
+pub const forceTicName: [&str; MAX_HUD_TICS] =
+    ["force_tic1", "force_tic2", "force_tic3", "force_tic4"];
 
 /// Raven `#define MAX_SHOWPOWERS NUM_FORCE_POWERS`.
 /// Source: `oracle/codemp/cgame/cg_draw.c:1393`
@@ -189,6 +220,10 @@ pub const CRAZY_CROSSHAIR_MAX_ERROR_Y: f32 = 100.0;
 /// Source: `oracle/codemp/cgame/cg_draw.c:6071`
 pub const MAX_XHAIR_DIST_ACCURACY: f32 = 20000.0;
 
+/// Raven `#define JPFUELBAR_H 100.0f`.
+/// Source: `oracle/codemp/cgame/cg_draw.c:7146`
+pub const JPFUELBAR_H: f32 = 100.0;
+
 /// Raven `#define JPFUELBAR_W 20.0f`.
 /// Source: `oracle/codemp/cgame/cg_draw.c:7147`
 pub const JPFUELBAR_W: f32 = 20.0;
@@ -201,6 +236,10 @@ pub const JPFUELBAR_X: f32 = SCREEN_WIDTH as f32 - JPFUELBAR_W - 8.0;
 /// Source: `oracle/codemp/cgame/cg_draw.c:7149`
 pub const JPFUELBAR_Y: f32 = 260.0;
 
+/// Raven `#define EWEBHEALTH_H 100.0f`.
+/// Source: `oracle/codemp/cgame/cg_draw.c:7198`
+pub const EWEBHEALTH_H: f32 = 100.0;
+
 /// Raven `#define EWEBHEALTH_W 20.0f`.
 /// Source: `oracle/codemp/cgame/cg_draw.c:7199`
 pub const EWEBHEALTH_W: f32 = 20.0;
@@ -212,6 +251,10 @@ pub const EWEBHEALTH_X: f32 = SCREEN_WIDTH as f32 - EWEBHEALTH_W - 8.0;
 /// Raven `#define EWEBHEALTH_Y 290.0f`.
 /// Source: `oracle/codemp/cgame/cg_draw.c:7201`
 pub const EWEBHEALTH_Y: f32 = 290.0;
+
+/// Raven `#define CLFUELBAR_H 100.0f`.
+/// Source: `oracle/codemp/cgame/cg_draw.c:7261`
+pub const CLFUELBAR_H: f32 = 100.0;
 
 /// Raven `#define CLFUELBAR_W 20.0f`.
 /// Source: `oracle/codemp/cgame/cg_draw.c:7262`
@@ -232,6 +275,19 @@ pub const CHATBOX_CUTOFF_LEN: c_int = 550;
 /// Raven `#define CHATBOX_FONT_HEIGHT 20`.
 /// Source: `oracle/codemp/cgame/cg_draw.c:7530`
 pub const CHATBOX_FONT_HEIGHT: c_int = 20;
+
+// PORT-NOTE: three `cg_local.h` defines with no crate-level home — `cg_drawtools`
+// already keeps its own file-local copies of the `NUM_FONT_*` pair (they are
+// private there), so cg_draw.c's own users land here, same story as `FONT_SMALL`.
+/// Raven `#define ICON_SIZE 48` — the item/powerup HUD icon edge.
+/// Source: `oracle/codemp/cgame/cg_local.h:61`
+const ICON_SIZE: f32 = 48.0;
+/// Raven `#define NUM_FONT_SMALL 2` — number-field font style: small digits.
+/// Source: `oracle/codemp/cgame/cg_local.h:71`
+const NUM_FONT_SMALL: c_int = 2;
+/// Raven `#define NUM_FONT_CHUNKY 3` — number-field font style: wide digits.
+/// Source: `oracle/codemp/cgame/cg_local.h:72`
+const NUM_FONT_CHUNKY: c_int = 3;
 
 // PORT-NOTE: `qfiles.h`'s two font-render bits, the same file-local pair
 // `mp_ui`'s `ui_main` keeps — they are already a `mp_engine_qcommon` const
@@ -2097,7 +2153,8 @@ pub fn CG_DrawRadar(ctx: &mut CgContext, y: f32) -> f32 {
 pub fn CG_DrawSiegeMessageNonMenu(ctx: &mut CgContext, str: &str) {
     let resolved;
     let str = if let Some(key) = str.strip_prefix('@') {
-        resolved = trap::SP_GetStringTextString(ctx.engine, key, 1024);
+        resolved = trap::SP_GetStringTextString(ctx.engine, key, 1024)
+            .unwrap_or_else(|| format!("??{}", key));
         resolved.as_str()
     } else {
         str
@@ -2449,4 +2506,1845 @@ pub fn CG_ChatBox_ArrayInsert(
 
     //now that we have moved anything that would be in this slot up, insert what we want into the slot
     array[insPoint] = Some(item);
+}
+
+/// Raven `CG_DrawZoomMask` — the binocular and disruptor-scope overlays, each
+/// with its own artwork, scrolling compass and charge readout.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:220-458`
+pub fn CG_DrawZoomMask(ctx: &mut CgContext) {
+    let mut color1: vec4_t = [0.0; 4];
+
+    // int ammo = cg_entities[0].gent->client->ps.ammo[weaponData[cent->currentState.weapon].ammoIndex];
+
+    // Check for Binocular specific zooming since we'll want to render different bits in each case
+    if ctx.world.cg.predictedPlayerState.zoomMode == 2 {
+        // zoom level
+        let mut level = (80.0 - ctx.world.cg.predictedPlayerState.zoomFov) / 80.0;
+
+        // ...so we'll clamp it
+        if level < 0.0 {
+            level = 0.0;
+        } else if level > 1.0 {
+            level = 1.0;
+        }
+
+        // Using a magic number to convert the zoom level to scale amount
+        level *= 162.0;
+
+        // draw blue tinted distortion mask, trying to make it as small as is necessary to fill in the viewable area
+        trap::R_SetColor(ctx.engine, Some(&colorTable[ct_table_t::CT_WHITE as usize]));
+        let binocularStatic = ctx.world.cgs.media.binocularStatic;
+        CG_DrawPic(ctx, 34.0, 48.0, 570.0, 362.0, binocularStatic);
+
+        // Black out the area behind the numbers
+        trap::R_SetColor(ctx.engine, Some(&colorTable[ct_table_t::CT_BLACK as usize]));
+        let whiteShader = ctx.world.cgs.media.whiteShader;
+        CG_DrawPic(ctx, 212.0, 367.0, 200.0, 40.0, whiteShader);
+
+        // Numbers should be kind of greenish
+        color1[0] = 0.2;
+        color1[1] = 0.4;
+        color1[2] = 0.2;
+        color1[3] = 0.3;
+        trap::R_SetColor(ctx.engine, Some(&color1));
+
+        // Draw scrolling numbers, use intervals 10 units apart--sorry, this section of code is just kind of hacked
+        //	up with a bunch of magic numbers.....
+        let yaw = ctx.world.cg.refdef.viewangles[YAW];
+        let mut val: c_int = (((yaw + 180.0) / 10.0) as c_int) * 10;
+        let off: f32 = (yaw + 180.0) - val as f32;
+
+        let mut i: c_int = -10;
+        while i < 30 {
+            val -= 10;
+
+            if val < 0 {
+                val += 360;
+            }
+
+            // we only want to draw the very far left one some of the time, if it's too far to the left it will
+            //	poke outside the mask.
+            if (off > 3.0 && i == -10) || i > -10 {
+                // draw the value, but add 200 just to bump the range up...arbitrary, so change it if you like
+                CG_DrawNumField(
+                    ctx,
+                    ((155 + i * 10) as f32 + off * 10.0) as c_int,
+                    374,
+                    3,
+                    val + 200,
+                    24,
+                    14,
+                    NUM_FONT_CHUNKY,
+                    true,
+                );
+                let whiteShader = ctx.world.cgs.media.whiteShader;
+                CG_DrawPic(
+                    ctx,
+                    (245 + (i - 1) * 10) as f32 + off * 10.0,
+                    376.0,
+                    6.0,
+                    6.0,
+                    whiteShader,
+                );
+            }
+
+            i += 10;
+        }
+
+        let binocularOverlay = ctx.world.cgs.media.binocularOverlay;
+        CG_DrawPic(ctx, 212.0, 367.0, 200.0, 28.0, binocularOverlay);
+
+        color1[0] = (((ctx.world.cg.time as f32 * 0.01) as f64).sin() * 0.5 + 0.5) as f32;
+        color1[0] = color1[0] * color1[0];
+        color1[1] = color1[0];
+        color1[2] = color1[0];
+        color1[3] = 1.0;
+
+        trap::R_SetColor(ctx.engine, Some(&color1));
+
+        let binocularCircle = ctx.world.cgs.media.binocularCircle;
+        CG_DrawPic(ctx, 82.0, 94.0, 16.0, 16.0, binocularCircle);
+
+        // Flickery color
+        color1[0] = (0.7 + ctx.world.bg_state.rng.crandom() * 0.1) as f32;
+        color1[1] = (0.8 + ctx.world.bg_state.rng.crandom() * 0.1) as f32;
+        color1[2] = (0.7 + ctx.world.bg_state.rng.crandom() * 0.1) as f32;
+        color1[3] = 1.0;
+        trap::R_SetColor(ctx.engine, Some(&color1));
+
+        let binocularMask = ctx.world.cgs.media.binocularMask;
+        CG_DrawPic(ctx, 0.0, 0.0, 640.0, 480.0, binocularMask);
+
+        let binocularArrow = ctx.world.cgs.media.binocularArrow;
+        CG_DrawPic(ctx, 4.0, 282.0 - level, 16.0, 16.0, binocularArrow);
+
+        // The top triangle bit randomly flips
+        let binocularTri = ctx.world.cgs.media.binocularTri;
+        if ctx.world.draw.flip {
+            CG_DrawPic(ctx, 330.0, 60.0, -26.0, -30.0, binocularTri);
+        } else {
+            CG_DrawPic(ctx, 307.0, 40.0, 26.0, 30.0, binocularTri);
+        }
+
+        if ctx.world.bg_state.rng.random() > 0.98 && (ctx.world.cg.time & 1024) != 0 {
+            ctx.world.draw.flip = !ctx.world.draw.flip;
+        }
+    } else if ctx.world.cg.predictedPlayerState.zoomMode != 0 {
+        // disruptor zoom mode
+        let mut level = (50.0 - ctx.world.view.zoomFov) / 50.0; //(float)(80.0f - zoomFov) / 80.0f;
+
+        // ...so we'll clamp it
+        if level < 0.0 {
+            level = 0.0;
+        } else if level > 1.0 {
+            level = 1.0;
+        }
+
+        // Using a magic number to convert the zoom level to a rotation amount that correlates more or less with the zoom artwork.
+        level *= 103.0;
+
+        // Draw target mask
+        trap::R_SetColor(ctx.engine, Some(&colorTable[ct_table_t::CT_WHITE as usize]));
+        let disruptorMask = ctx.world.cgs.media.disruptorMask;
+        CG_DrawPic(ctx, 0.0, 0.0, 640.0, 480.0, disruptorMask);
+
+        // apparently 99.0f is the full zoom level
+        if level >= 99.0 {
+            // Fully zoomed, so make the rotating insert pulse
+            color1[0] = 1.0;
+            color1[1] = 1.0;
+            color1[2] = 1.0;
+            color1[3] = (0.7 + ((ctx.world.cg.time as f32 * 0.01) as f64).sin() * 0.3) as f32;
+
+            trap::R_SetColor(ctx.engine, Some(&color1));
+        }
+
+        // Draw rotating insert
+        let disruptorInsert = ctx.world.cgs.media.disruptorInsert;
+        CG_DrawRotatePic2(ctx, 320.0, 240.0, 640.0, 480.0, -level, disruptorInsert);
+
+        // Increase the light levels under the center of the target — Raven's
+        // `CG_DrawPic( 198, 118, 246, 246, cgs.media.disruptorLight )` and the
+        // base-five ammo readout below it are both commented out at the site.
+
+        // §F19: Raven derefs `cg.snap` unguarded for the ammo arc; with no
+        // snapshot there is no ammo to read, so only the arc is skipped — the
+        // charge bar below runs either way.
+        let snapAmmo = ctx
+            .world
+            .cg
+            .snap_ref()
+            .map(|snap| (snap.ps.eFlags, snap.ps.ammo));
+
+        if let Some((eFlags, ammo)) = snapAmmo {
+            let ammoIndex = weaponData[WP_DISRUPTOR as usize].ammoIndex as usize;
+            let mut max = if (eFlags & EF_DOUBLE_AMMO) != 0 {
+                ammo[ammoIndex] as f32 / (ammoData[ammoIndex].max as f32 * 2.0)
+            } else {
+                ammo[ammoIndex] as f32 / ammoData[ammoIndex].max as f32
+            };
+            if max > 1.0 {
+                max = 1.0;
+            }
+
+            color1[0] = (1.0 - max) * 2.0;
+            color1[1] = max * 1.5;
+            color1[2] = 0.0;
+            color1[3] = 1.0;
+
+            // If we are low on health, make us flash
+            if max < 0.15 && (ctx.world.cg.time & 512) != 0 {
+                // Raven's `VectorClear` on a `vec4_t` only touches rgb, so the
+                // alpha stays at the 1.0 set above.
+                color1[0] = 0.0;
+                color1[1] = 0.0;
+                color1[2] = 0.0;
+            }
+
+            if color1[0] > 1.0 {
+                color1[0] = 1.0;
+            }
+
+            if color1[1] > 1.0 {
+                color1[1] = 1.0;
+            }
+
+            trap::R_SetColor(ctx.engine, Some(&color1));
+
+            max *= 58.0;
+
+            // going from 15 to 45 degrees, with 5 degree increments
+            let mut fi: f32 = 18.5;
+            while fi <= 18.5 + max {
+                let cx = (320.0 + (((fi + 90.0) / 57.296) as f64).sin() * 190.0) as f32;
+                let cy = (240.0 + (((fi + 90.0) / 57.296) as f64).cos() * 190.0) as f32;
+
+                let disruptorInsertTick = ctx.world.cgs.media.disruptorInsertTick;
+                CG_DrawRotatePic2(ctx, cx, cy, 12.0, 24.0, 90.0 - fi, disruptorInsertTick);
+
+                fi += 3.0;
+            }
+        }
+
+        if ctx.world.cg.predictedPlayerState.weaponstate == WEAPON_CHARGING_ALT as c_int {
+            trap::R_SetColor(ctx.engine, Some(&colorTable[ct_table_t::CT_WHITE as usize]));
+
+            // draw the charge level
+            // bad hardcodedness 50 is disruptor charge unit and 30 is max charge units allowed.
+            let mut max = (ctx.world.cg.time - ctx.world.cg.predictedPlayerState.weaponChargeTime)
+                as f32
+                / (50.0 * 30.0);
+
+            if max > 1.0 {
+                max = 1.0;
+            }
+
+            let disruptorChargeShader = ctx.world.cgs.media.disruptorChargeShader;
+            trap::R_DrawStretchPic(
+                ctx.engine,
+                257.0,
+                435.0,
+                134.0 * max,
+                34.0,
+                0.0,
+                0.0,
+                max,
+                1.0,
+                disruptorChargeShader,
+            );
+        }
+        // Raven's closing `trap_R_SetColor( colorTable[CT_WHITE] )` +
+        // `CG_DrawPic( 0, 0, 640, 480, cgs.media.disruptorMask )` are commented out.
+    }
+}
+
+/// Raven `CG_DrawHealth` — the four health tics plus the numeric readout, off
+/// whichever HUD menu the caller found.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:614-695`
+pub fn CG_DrawHealth(ctx: &mut CgContext, menus: &MenuSystem, menuHUD: Option<MenuId>) {
+    // Can we find the menu?
+    if menuHUD.is_none() {
+        return;
+    }
+
+    // §F19: Raven derefs `cg.snap` unguarded; with no snapshot there are no
+    // stats to paint.
+    let Some(snap) = ctx.world.cg.snap_ref() else {
+        return;
+    };
+    let stats = snap.ps.stats;
+
+    // What's the health?
+    let mut healthAmt = stats[STAT_HEALTH as usize];
+    if healthAmt > stats[STAT_MAX_HEALTH as usize] {
+        healthAmt = stats[STAT_MAX_HEALTH as usize];
+    }
+
+    let inc = (stats[STAT_MAX_HEALTH as usize] as f32 / MAX_HUD_TICS as f32) as c_int;
+    let mut currValue = healthAmt;
+
+    // Print the health tics, fading out the one which is partial health
+    for i in (0..MAX_HUD_TICS).rev() {
+        // This is bad
+        let Some(focusItem) = Menu_FindItemByName(menus, menuHUD, healthTicName[i]) else {
+            continue;
+        };
+
+        // §F19: Raven derefs the `float *hudTintColor` global, which is NULL
+        // until `CG_DrawHUD` points it somewhere; `trap_R_SetColor(NULL)` is
+        // the renderer's white, so `None` reads as `colorTable[CT_WHITE]`.
+        let mut calcColor = ctx
+            .world
+            .draw
+            .hudTintColor
+            .unwrap_or(colorTable[ct_table_t::CT_WHITE as usize]);
+
+        if currValue <= 0 {
+            // don't show tic
+            break;
+        } else if currValue < inc {
+            // partial tic (alpha it out)
+            let percent = currValue as f32 / inc as f32;
+            calcColor[3] *= percent; // Fade it out
+        }
+
+        trap::R_SetColor(ctx.engine, Some(&calcColor));
+
+        let rect = menus.item(focusItem).window.rect;
+        let background = menus.item(focusItem).window.background;
+        CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, background);
+
+        currValue -= inc;
+    }
+
+    // Print the mueric amount
+    if let Some(focusItem) = Menu_FindItemByName(menus, menuHUD, "healthamount") {
+        // Print health amount
+        let foreColor = menus.item(focusItem).window.foreColor;
+        trap::R_SetColor(ctx.engine, Some(&foreColor));
+
+        let rect = menus.item(focusItem).window.rect;
+        CG_DrawNumField(
+            ctx,
+            rect.x as c_int,
+            rect.y as c_int,
+            3,
+            stats[STAT_HEALTH as usize],
+            rect.w as c_int,
+            rect.h as c_int,
+            NUM_FONT_SMALL,
+            false,
+        );
+    }
+}
+
+/// Raven `CG_DrawArmor` — the armor tics, the numeric readout, and the
+/// low-armor flash latch.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:702-831`
+pub fn CG_DrawArmor(ctx: &mut CgContext, menus: &MenuSystem, menuHUD: Option<MenuId>) {
+    //ps = &cg.snap->ps;
+    let stats = ctx.world.cg.predictedPlayerState.stats;
+
+    // Can we find the menu?
+    if menuHUD.is_none() {
+        return;
+    }
+
+    let mut armor = stats[STAT_ARMOR as usize];
+    let maxArmor = stats[STAT_MAX_HEALTH as usize];
+
+    if armor > maxArmor {
+        armor = maxArmor;
+    }
+
+    let mut currValue = armor;
+    let inc = (maxArmor as f32 / MAX_HUD_TICS as f32) as c_int;
+
+    // Raven's first `memcpy(calcColor, hudTintColor, …)` here is redone inside
+    // the loop before anything reads it.
+    for i in (0..MAX_HUD_TICS).rev() {
+        // This is bad
+        let Some(focusItem) = Menu_FindItemByName(menus, menuHUD, armorTicName[i]) else {
+            continue;
+        };
+
+        // §F19: see `CG_DrawHealth` — a NULL `hudTintColor` reads as white.
+        let mut calcColor = ctx
+            .world
+            .draw
+            .hudTintColor
+            .unwrap_or(colorTable[ct_table_t::CT_WHITE as usize]);
+
+        if currValue <= 0 {
+            // don't show tic
+            break;
+        } else if currValue < inc {
+            // partial tic (alpha it out)
+            let percent = currValue as f32 / inc as f32;
+            calcColor[3] *= percent;
+        }
+
+        trap::R_SetColor(ctx.engine, Some(&calcColor));
+
+        let rect = menus.item(focusItem).window.rect;
+        let background = menus.item(focusItem).window.background;
+
+        // Raven's two arms draw the same pic; the top tic just sits out the
+        // half of the flash cycle where `HUDArmorFlag` is off.
+        if i == (MAX_HUD_TICS - 1) && currValue < inc {
+            if ctx.world.cg.HUDArmorFlag != qfalse {
+                CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, background);
+            }
+        } else {
+            CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, background);
+        }
+
+        currValue -= inc;
+    }
+
+    if let Some(focusItem) = Menu_FindItemByName(menus, menuHUD, "armoramount") {
+        // Print armor amount
+        let foreColor = menus.item(focusItem).window.foreColor;
+        trap::R_SetColor(ctx.engine, Some(&foreColor));
+
+        let rect = menus.item(focusItem).window.rect;
+        CG_DrawNumField(
+            ctx,
+            rect.x as c_int,
+            rect.y as c_int,
+            3,
+            armor,
+            rect.w as c_int,
+            rect.h as c_int,
+            NUM_FONT_SMALL,
+            false,
+        );
+    }
+
+    // If armor is low, flash a graphic to warn the player
+    if armor != 0 {
+        // Is there armor? Draw the HUD Armor TIC
+        let quarterArmor = stats[STAT_MAX_HEALTH as usize] as f32 / 4.0;
+
+        // Make tic flash if armor is at 25% of full armor
+        if (stats[STAT_ARMOR as usize] as f32) < quarterArmor {
+            // Do whatever the flash timer says
+            if ctx.world.cg.HUDTickFlashTime < ctx.world.cg.time as f32 {
+                // Flip at the same time
+                ctx.world.cg.HUDTickFlashTime = (ctx.world.cg.time + 400) as f32;
+                if ctx.world.cg.HUDArmorFlag != qfalse {
+                    ctx.world.cg.HUDArmorFlag = qfalse;
+                } else {
+                    ctx.world.cg.HUDArmorFlag = qtrue;
+                }
+            }
+        } else {
+            ctx.world.cg.HUDArmorFlag = qtrue;
+        }
+    } else {
+        // No armor? Don't show it.
+        ctx.world.cg.HUDArmorFlag = qfalse;
+    }
+}
+
+/// Raven `CG_DrawForcePower` — the force tics and their numeric readout, with
+/// the out-of-force flash the "no force" sound rides on.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:1042-1162`
+pub fn CG_DrawForcePower(ctx: &mut CgContext, menus: &MenuSystem, menuHUD: Option<MenuId>) {
+    let maxForcePower: c_int = 100;
+    let mut flash = false;
+
+    // Can we find the menu?
+    if menuHUD.is_none() {
+        return;
+    }
+
+    // Make the hud flash by setting forceHUDTotalFlashTime above cg.time
+    if ctx.world.cg.forceHUDTotalFlashTime > ctx.world.cg.time {
+        flash = true;
+        if ctx.world.cg.forceHUDNextFlashTime < ctx.world.cg.time {
+            ctx.world.cg.forceHUDNextFlashTime = ctx.world.cg.time + 400;
+            let noforceSound = ctx.world.cgs.media.noforceSound;
+            trap::S_StartSound(ctx.engine, None, 0, CHAN_LOCAL, noforceSound);
+
+            if ctx.world.cg.forceHUDActive != qfalse {
+                ctx.world.cg.forceHUDActive = qfalse;
+            } else {
+                ctx.world.cg.forceHUDActive = qtrue;
+            }
+        }
+    } else {
+        // turn HUD back on if it had just finished flashing time.
+        ctx.world.cg.forceHUDNextFlashTime = 0;
+        ctx.world.cg.forceHUDActive = qtrue;
+    }
+
+    // Raven's `if (!cg.forceHUDActive) return;` is commented out at the site.
+
+    let inc = maxForcePower as f32 / MAX_HUD_TICS as f32;
+
+    // §F19: Raven derefs `cg.snap` unguarded; with no snapshot there is no
+    // force amount to paint.
+    let Some(snap) = ctx.world.cg.snap_ref() else {
+        return;
+    };
+    let forcePower = snap.ps.fd.forcePower;
+    let mut value = forcePower as f32;
+
+    for i in (0..MAX_HUD_TICS).rev() {
+        let Some(focusItem) = Menu_FindItemByName(menus, menuHUD, forceTicName[i]) else {
+            continue;
+        };
+
+        // Raven's `memcpy(calcColor, hudTintColor, …)` is commented out here.
+        let mut calcColor: vec4_t;
+
+        if value <= 0.0 {
+            // done
+            break;
+        } else if value < inc {
+            // partial tic
+            if flash {
+                calcColor = colorTable[ct_table_t::CT_RED as usize];
+            } else {
+                calcColor = colorTable[ct_table_t::CT_WHITE as usize];
+            }
+
+            let percent = value / inc;
+            calcColor[3] = percent;
+        } else if flash {
+            calcColor = colorTable[ct_table_t::CT_RED as usize];
+        } else {
+            calcColor = colorTable[ct_table_t::CT_WHITE as usize];
+        }
+
+        trap::R_SetColor(ctx.engine, Some(&calcColor));
+
+        let rect = menus.item(focusItem).window.rect;
+        let background = menus.item(focusItem).window.background;
+        CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, background);
+
+        value -= inc;
+    }
+
+    if let Some(focusItem) = Menu_FindItemByName(menus, menuHUD, "forceamount") {
+        // Print force amount
+        let foreColor = menus.item(focusItem).window.foreColor;
+        trap::R_SetColor(ctx.engine, Some(&foreColor));
+
+        let rect = menus.item(focusItem).window.rect;
+        CG_DrawNumField(
+            ctx,
+            rect.x as c_int,
+            rect.y as c_int,
+            3,
+            forcePower,
+            rect.w as c_int,
+            rect.h as c_int,
+            NUM_FONT_SMALL,
+            false,
+        );
+    }
+}
+
+/// Raven `CG_DrawVehicleDamageHUD` — the ship silhouette panel: background,
+/// frame, shield wash, then the four damage quarters.
+///
+/// DEFERRED: `Vehicle_t` referent pool — all three pics are
+/// `veh->m_pVehicle->m_pVehicleInfo->dmgIndic*Handle`, which DEC-46.2's
+/// presence-only `Option<VehicleId>` cannot supply; see
+/// [`CG_DrawVehicleShields`]. Each block keeps Raven's item lookup (the work
+/// before the read) and stops at the handle. The four `CG_DrawVehicleDamage`
+/// tail calls are blocked on the same pool inside that fn.
+/// Source: `oracle/codemp/cgame/cg_draw.c:2511,2548,2563`
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:2495-2583`
+pub fn CG_DrawVehicleDamageHUD(
+    ctx: &mut CgContext,
+    menus: &MenuSystem,
+    vehNum: usize,
+    brokenLimbs: c_int,
+    percShields: f32,
+    menuName: &str,
+    alpha: f32,
+) {
+    let menuHUD = Menus_FindByName(menus, menuName);
+
+    if menuHUD.is_none() {
+        return;
+    }
+
+    if Menu_FindItemByName(menus, menuHUD, "background").is_some() {
+        //TODO: Port CG_DrawVehicleDamageHUD vehicle arm
+        // DEFERRED: Vehicle_t referent pool — `dmgIndicBackgroundHandle`
+        // Source: oracle/codemp/cgame/cg_draw.c:2511-2541
+        todo!("CG_DrawVehicleDamageHUD background pic — blocked on the Vehicle_t referent pool, oracle/codemp/cgame/cg_draw.c:2511-2541")
+    }
+
+    if Menu_FindItemByName(menus, menuHUD, "outer_frame").is_some() {
+        //TODO: Port CG_DrawVehicleDamageHUD vehicle arm
+        // DEFERRED: Vehicle_t referent pool — `dmgIndicFrameHandle`
+        // Source: oracle/codemp/cgame/cg_draw.c:2548-2556
+        todo!("CG_DrawVehicleDamageHUD frame pic — blocked on the Vehicle_t referent pool, oracle/codemp/cgame/cg_draw.c:2548-2556")
+    }
+
+    if Menu_FindItemByName(menus, menuHUD, "shields").is_some() {
+        let _ = percShields;
+        //TODO: Port CG_DrawVehicleDamageHUD vehicle arm
+        // DEFERRED: Vehicle_t referent pool — `dmgIndicShieldHandle`
+        // Source: oracle/codemp/cgame/cg_draw.c:2563-2573
+        todo!("CG_DrawVehicleDamageHUD shield pic — blocked on the Vehicle_t referent pool, oracle/codemp/cgame/cg_draw.c:2563-2573")
+    }
+
+    //TODO (Raven): if we check nextState.brokenLimbs & prevState.brokenLimbs, we can tell when a damage flag has been added and flash that part of the ship
+    //FIXME (Raven): when ship explodes, either stop drawing ship or draw all parts black
+    CG_DrawVehicleDamage(
+        ctx,
+        menus,
+        vehNum,
+        brokenLimbs,
+        menuHUD,
+        alpha,
+        VEH_DAMAGE_FRONT,
+    );
+    CG_DrawVehicleDamage(
+        ctx,
+        menus,
+        vehNum,
+        brokenLimbs,
+        menuHUD,
+        alpha,
+        VEH_DAMAGE_BACK,
+    );
+    CG_DrawVehicleDamage(
+        ctx,
+        menus,
+        vehNum,
+        brokenLimbs,
+        menuHUD,
+        alpha,
+        VEH_DAMAGE_LEFT,
+    );
+    CG_DrawVehicleDamage(
+        ctx,
+        menus,
+        vehNum,
+        brokenLimbs,
+        menuHUD,
+        alpha,
+        VEH_DAMAGE_RIGHT,
+    );
+}
+
+/// Raven `CG_DrawPickupItem` — the icon of the item you just picked up, fading
+/// out over three seconds.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:2752-2768`
+pub fn CG_DrawPickupItem(ctx: &mut CgContext) {
+    let value = ctx.world.cg.itemPickup;
+    if value != 0 && ctx.world.cg_items[value as usize].icon != -1 {
+        let itemPickupTime = ctx.world.cg.itemPickupTime;
+        if let Some(fadeColor) = CG_FadeColor(ctx.world, itemPickupTime, 3000) {
+            CG_RegisterItemVisuals(ctx, value);
+            trap::R_SetColor(ctx.engine, Some(&fadeColor));
+            let icon = ctx.world.cg_items[value as usize].icon;
+            CG_DrawPic(ctx, 573.0, 320.0, ICON_SIZE, ICON_SIZE, icon);
+            trap::R_SetColor(ctx.engine, None);
+        }
+    }
+}
+
+/// Raven `CG_DrawMiniScoreboard` — the one-line red/blue score above the
+/// upper-right HUD stack. Returns the y the next element starts at.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:2813-2859`
+pub fn CG_DrawMiniScoreboard(ctx: &mut CgContext, ds: &DisplayState, mut y: f32) -> f32 {
+    // Raven's `#ifdef _XBOX` shifts this by -40; the PC build keeps 0.
+    let xOffset: c_int = 0;
+
+    if ctx.world.cvars.cg_drawScores.integer == 0 {
+        return y;
+    }
+
+    if ctx.world.cgs.gametype == GT_SIEGE {
+        //don't bother with this in siege
+        return y;
+    }
+
+    if ctx.world.cgs.gametype >= GT_TEAM {
+        // §F19: Raven's `strcpy(temp, va("%s: ", …))` is unbounded into a
+        // 64-byte buffer; the port's `Q_strncpyz` truncates there instead.
+        let mut temp = [0 as c_char; MAX_QPATH];
+        let red = CG_GetStringEdString(ctx, "MP_INGAME", "RED");
+        Q_strncpyz(&mut temp, &format!("{red}: "), MAX_QPATH);
+
+        let scores1 = ctx.world.cgs.scores1;
+        let scores2 = ctx.world.cgs.scores2;
+
+        if scores1 == SCORE_NOT_PRESENT {
+            Q_strcat(&mut temp, MAX_QPATH, "-");
+        } else {
+            Q_strcat(&mut temp, MAX_QPATH, &format!("{scores1}"));
+        }
+
+        let blue = CG_GetStringEdString(ctx, "MP_INGAME", "BLUE");
+        Q_strcat(&mut temp, MAX_QPATH, &format!(" {blue}: "));
+
+        if scores2 == SCORE_NOT_PRESENT {
+            Q_strcat(&mut temp, MAX_QPATH, "-");
+        } else {
+            Q_strcat(&mut temp, MAX_QPATH, &format!("{scores2}"));
+        }
+
+        let temp = buf_to_string(&temp.map(|c| c as u8));
+
+        let w = CG_Text_Width(ctx, ds, &temp, 0.7, FONT_MEDIUM);
+        CG_Text_Paint(
+            ctx,
+            ds,
+            (630 - w + xOffset) as f32,
+            y,
+            0.7,
+            colorWhite,
+            &temp,
+            0.0,
+            0,
+            ITEM_TEXTSTYLE_SHADOWEDMORE,
+            FONT_MEDIUM,
+        );
+        y += 15.0;
+    }
+    //rww - no longer doing this. Since the attacker now shows who is first, we print the score there.
+    // (the non-team "1st:/2nd:" block is commented out at the Raven site.)
+
+    y
+}
+
+/// Raven `CG_DrawHealthBarRough` — the chunky three-rect health bar: creme-y
+/// filling, used-up-ness, hard crispy shell.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:3117-3130`
+#[allow(clippy::too_many_arguments)]
+pub fn CG_DrawHealthBarRough(
+    ctx: &mut CgContext,
+    x: f32,
+    y: f32,
+    width: c_int,
+    height: c_int,
+    ratio: f32,
+    color1: &vec4_t,
+    color2: &vec4_t,
+) {
+    let mut color3: vec4_t = [1.0, 0.0, 0.0, 0.7];
+
+    let midpoint = width as f32 * ratio - 1.0;
+    let remainder = width as f32 - midpoint;
+    color3[0] = color1[0] * 0.5;
+
+    debug_assert!(height % 4 == 0, "this won't line up otherwise.");
+    // creme-y filling.
+    CG_DrawRect(
+        ctx,
+        x + 1.0,
+        y + (height / 2 - 1) as f32,
+        midpoint,
+        1.0,
+        (height / 4 + 1) as f32,
+        color1,
+    );
+    // used-up-ness.
+    CG_DrawRect(
+        ctx,
+        x + midpoint,
+        y + (height / 2 - 1) as f32,
+        remainder,
+        1.0,
+        (height / 4 + 1) as f32,
+        &color3,
+    );
+    // hard crispy shell
+    CG_DrawRect(ctx, x, y, width as f32, height as f32, 1.0, color2);
+}
+
+/// Raven `CG_DrawCenterString` — the centerprint text, one line per `\n`,
+/// vertically centered on `cg.centerPrintY`.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:4423-4473`
+pub fn CG_DrawCenterString(ctx: &mut CgContext, ds: &DisplayState) {
+    let scale: f32 = 1.0; //0.5
+
+    if ctx.world.cg.centerPrintTime == 0 {
+        return;
+    }
+
+    let centerPrintTime = ctx.world.cg.centerPrintTime;
+    let totalMsec = (1000.0 * ctx.world.cvars.cg_centertime.value) as c_int;
+    let Some(color) = CG_FadeColor(ctx.world, centerPrintTime, totalMsec) else {
+        return;
+    };
+
+    trap::R_SetColor(ctx.engine, Some(&color));
+
+    let start = buf_to_string(&ctx.world.cg.centerPrint.map(|c| c as u8));
+
+    let mut y = ctx.world.cg.centerPrintY - ctx.world.cg.centerPrintLines * BIGCHAR_HEIGHT / 2;
+
+    for line in start.split('\n') {
+        // Raven's `linebuffer` takes the first 50 characters of the line and
+        // then skips ahead to the newline, so a longer line loses its tail.
+        let linebuffer: String = line.chars().take(50).collect();
+
+        let w = CG_Text_Width(ctx, ds, &linebuffer, scale, FONT_MEDIUM);
+        let h = CG_Text_Height(ctx, ds, &linebuffer, scale, FONT_MEDIUM);
+        let x = (SCREEN_WIDTH - w) / 2;
+        CG_Text_Paint(
+            ctx,
+            ds,
+            x as f32,
+            (y + h) as f32,
+            scale,
+            color,
+            &linebuffer,
+            0.0,
+            0,
+            ITEM_TEXTSTYLE_SHADOWEDMORE,
+            FONT_MEDIUM,
+        );
+        y += h + 6;
+    }
+
+    trap::R_SetColor(ctx.engine, None);
+}
+
+/// Raven `CG_DrawSiegeInfo` — the health and ammo bars a siege class with the
+/// stat-viewer flag sees under a teammate's crosshair.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:4489-4629`
+pub fn CG_DrawSiegeInfo(
+    ctx: &mut CgContext,
+    centNum: usize,
+    chX: f32,
+    chY: f32,
+    chW: f32,
+    chH: f32,
+) {
+    let es = ctx.world.entity(centNum).currentState;
+    let number = es.number as usize;
+
+    debug_assert!(number < MAX_CLIENTS);
+
+    let se = ctx.world.saga.cg_siegeExtendedData[number];
+
+    if se.lastUpdated > ctx.world.cg.time {
+        //strange, shouldn't happen
+        return;
+    }
+
+    if (ctx.world.cg.time - se.lastUpdated) > 10000 {
+        //if you haven't received a status update on this guy in 10 seconds, forget about it
+        return;
+    }
+
+    if es.eFlags & EF_DEAD != 0 {
+        //he's dead, don't display info on him
+        return;
+    }
+
+    if es.weapon != se.weapon {
+        //data is invalidated until it syncs back again
+        return;
+    }
+
+    if ctx.world.cgs.clientinfo[number].team
+        != ctx.world.cg.predictedPlayerState.persistant[PERS_TEAM as usize]
+    {
+        //not on the same team
+        return;
+    }
+
+    let index = ctx.world.cg.predictedPlayerState.clientNum + CS_PLAYERS;
+    let configstring = CG_ConfigString(ctx, index);
+    let v = Info_ValueForKey(&configstring, "siegeclass");
+
+    if v.is_empty() {
+        //don't have siege class in info?
+        return;
+    }
+
+    let siegeClass = BG_SiegeFindClassByName(&v, &ctx.world.bg_state);
+
+    if siegeClass.is_null() {
+        //invalid
+        return;
+    }
+
+    // `BG_SiegeFindClassByName` hands back a raw pointer into `bgSiegeClasses`
+    // and module code never derefs one (§D11), so the same first-match lookup
+    // names the owning slot for the flags read.
+    let classflags = {
+        let n = ctx.world.bg_state.bgNumSiegeClasses as usize;
+        match ctx.world.bg_state.bgSiegeClasses[..n]
+            .iter()
+            .find(|c| c.name.eq_ignore_ascii_case(&v))
+        {
+            Some(c) => c.classflags,
+            None => return,
+        }
+    };
+
+    if classflags & (1 << CFL_STATVIEWER as c_int) == 0 {
+        //doesn't really have the ability to see others' stats
+        return;
+    }
+
+    let mut x = chX + ((chW / 2.0) - (HEALTH_WIDTH / 2.0));
+    let mut y = (chY + chH) + 8.0;
+    let mut percent = (se.health as f32 / se.maxhealth as f32) * HEALTH_WIDTH;
+
+    //color of the bar
+    let mut aColor: vec4_t = [0.0, 1.0, 0.0, 0.4];
+
+    //color of the border — Raven fills it here and never reads it
+    let mut _bColor: vec4_t = [0.0, 0.0, 0.0, 0.3];
+
+    //color of greyed out "missing health"
+    let mut cColor: vec4_t = [0.5, 0.5, 0.5, 0.4];
+
+    //draw the background (black)
+    CG_DrawRect(
+        ctx,
+        x,
+        y,
+        HEALTH_WIDTH,
+        HEALTH_HEIGHT,
+        1.0,
+        &colorTable[ct_table_t::CT_BLACK as usize],
+    );
+
+    //now draw the part to show how much health there is in the color specified
+    CG_FillRect(
+        ctx,
+        x + 1.0,
+        y + 1.0,
+        percent - 1.0,
+        HEALTH_HEIGHT - 1.0,
+        &aColor,
+    );
+
+    //then draw the other part greyed out
+    CG_FillRect(
+        ctx,
+        x + percent,
+        y + 1.0,
+        HEALTH_WIDTH - percent - 1.0,
+        HEALTH_HEIGHT - 1.0,
+        &cColor,
+    );
+
+    //now draw his ammo
+    // `es.weapon` comes off the network snapshot unclamped; an out-of-range
+    // value reads past `weaponData`/`ammoData` in Raven (UB) where the port's
+    // fixed-size array indexing panics instead (§F19).
+    let wd = &weaponData[es.weapon as usize];
+    let mut ammoMax = ammoData[wd.ammoIndex as usize].max;
+    if es.eFlags & EF_DOUBLE_AMMO != 0 {
+        ammoMax *= 2;
+    }
+
+    x = chX + ((chW / 2.0) - (HEALTH_WIDTH / 2.0));
+    y = (chY + chH) + HEALTH_HEIGHT + 10.0;
+
+    if wd.energyPerShot == 0 && wd.altEnergyPerShot == 0 {
+        //a weapon that takes no ammo, so show full
+        percent = HEALTH_WIDTH;
+    } else {
+        percent = (se.ammo as f32 / ammoMax as f32) * HEALTH_WIDTH;
+    }
+
+    //color of the bar
+    aColor[0] = 1.0;
+    aColor[1] = 1.0;
+    aColor[2] = 0.0;
+    aColor[3] = 0.4;
+
+    //color of the border
+    _bColor[0] = 0.0;
+    _bColor[1] = 0.0;
+    _bColor[2] = 0.0;
+    _bColor[3] = 0.3;
+
+    //color of greyed out "missing health"
+    cColor[0] = 0.5;
+    cColor[1] = 0.5;
+    cColor[2] = 0.5;
+    cColor[3] = 0.4;
+
+    //draw the background (black)
+    CG_DrawRect(
+        ctx,
+        x,
+        y,
+        HEALTH_WIDTH,
+        HEALTH_HEIGHT,
+        1.0,
+        &colorTable[ct_table_t::CT_BLACK as usize],
+    );
+
+    //now draw the part to show how much health there is in the color specified
+    CG_FillRect(
+        ctx,
+        x + 1.0,
+        y + 1.0,
+        percent - 1.0,
+        HEALTH_HEIGHT - 1.0,
+        &aColor,
+    );
+
+    //then draw the other part greyed out
+    CG_FillRect(
+        ctx,
+        x + percent,
+        y + 1.0,
+        HEALTH_WIDTH - percent - 1.0,
+        HEALTH_HEIGHT - 1.0,
+        &cColor,
+    );
+}
+
+/// Raven `CG_DrawHealthBar` — the little bar under the crosshair over a
+/// damageable entity, team-coloured where the entity has an owner.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:4632-4688`
+pub fn CG_DrawHealthBar(
+    ctx: &mut CgContext,
+    centNum: usize,
+    chX: f32,
+    chY: f32,
+    chW: f32,
+    chH: f32,
+) {
+    let es = ctx.world.entity(centNum).currentState;
+
+    let x = chX + ((chW / 2.0) - (HEALTH_WIDTH / 2.0));
+    let y = (chY + chH) + 8.0;
+    let percent = (es.health as f32 / es.maxhealth as f32) * HEALTH_WIDTH;
+    if percent <= 0.0 {
+        return;
+    }
+
+    //color of the bar
+    let aColor: vec4_t = if es.teamowner == 0 || ctx.world.cgs.gametype < GT_TEAM {
+        //not owned by a team or teamplay
+        [1.0, 1.0, 0.0, 0.4]
+    } else if es.teamowner == ctx.world.cg.predictedPlayerState.persistant[PERS_TEAM as usize] {
+        //owned by my team
+        [0.0, 1.0, 0.0, 0.4]
+    } else {
+        //hostile
+        [1.0, 0.0, 0.0, 0.4]
+    };
+
+    //color of the border — Raven fills it here and never reads it
+    let _bColor: vec4_t = [0.0, 0.0, 0.0, 0.3];
+
+    //color of greyed out "missing health"
+    let cColor: vec4_t = [0.5, 0.5, 0.5, 0.4];
+
+    //draw the background (black)
+    CG_DrawRect(
+        ctx,
+        x,
+        y,
+        HEALTH_WIDTH,
+        HEALTH_HEIGHT,
+        1.0,
+        &colorTable[ct_table_t::CT_BLACK as usize],
+    );
+
+    //now draw the part to show how much health there is in the color specified
+    CG_FillRect(
+        ctx,
+        x + 1.0,
+        y + 1.0,
+        percent - 1.0,
+        HEALTH_HEIGHT - 1.0,
+        &aColor,
+    );
+
+    //then draw the other part greyed out
+    CG_FillRect(
+        ctx,
+        x + percent,
+        y + 1.0,
+        HEALTH_WIDTH - percent - 1.0,
+        HEALTH_HEIGHT - 1.0,
+        &cColor,
+    );
+}
+
+/// Raven `CG_DrawHaqrBar` — the hacking progress bar under the crosshair, with
+/// the hacker icon above it.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:4691-4735`
+pub fn CG_DrawHaqrBar(ctx: &mut CgContext, chX: f32, chY: f32, chW: f32, chH: f32) {
+    let x = chX + ((chW / 2.0) - (HEALTH_WIDTH / 2.0));
+    let y = (chY + chH) + 8.0;
+    let percent = ((ctx.world.cg.predictedPlayerState.hackingTime as f32
+        - ctx.world.cg.time as f32)
+        / ctx.world.cg.predictedPlayerState.hackingBaseTime as f32)
+        * HEALTH_WIDTH;
+
+    if percent > HEALTH_WIDTH || percent < 1.0 {
+        return;
+    }
+
+    //color of the bar
+    let aColor: vec4_t = [1.0, 1.0, 0.0, 0.4];
+
+    //color of the border — Raven fills it here and never reads it
+    let _bColor: vec4_t = [0.0, 0.0, 0.0, 0.3];
+
+    //color of greyed out done area
+    let cColor: vec4_t = [0.5, 0.5, 0.5, 0.1];
+
+    //draw the background (black)
+    CG_DrawRect(
+        ctx,
+        x,
+        y,
+        HEALTH_WIDTH,
+        HEALTH_HEIGHT,
+        1.0,
+        &colorTable[ct_table_t::CT_BLACK as usize],
+    );
+
+    //now draw the part to show how much health there is in the color specified
+    CG_FillRect(
+        ctx,
+        x + 1.0,
+        y + 1.0,
+        percent - 1.0,
+        HEALTH_HEIGHT - 1.0,
+        &aColor,
+    );
+
+    //then draw the other part greyed out
+    CG_FillRect(
+        ctx,
+        x + percent,
+        y + 1.0,
+        HEALTH_WIDTH - percent - 1.0,
+        HEALTH_HEIGHT - 1.0,
+        &cColor,
+    );
+
+    //draw the hacker icon
+    let hackerIconShader = ctx.world.cgs.media.hackerIconShader;
+    CG_DrawPic(
+        ctx,
+        x,
+        y - HEALTH_WIDTH,
+        HEALTH_WIDTH,
+        HEALTH_WIDTH,
+        hackerIconShader,
+    );
+}
+
+/// Raven `CG_DrawGenericTimerBar` — the scripted countdown bar on the right
+/// edge, in whatever colour the server asked for.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:4745-4790`
+pub fn CG_DrawGenericTimerBar(ctx: &mut CgContext) {
+    let x = CGTIMERBAR_X;
+    let y = CGTIMERBAR_Y;
+    let mut percent = ((ctx.world.draw.cg_genericTimerBar - ctx.world.cg.time) as f32
+        / ctx.world.draw.cg_genericTimerDur as f32)
+        * CGTIMERBAR_H;
+
+    if percent > CGTIMERBAR_H {
+        return;
+    }
+
+    if percent < 0.1 {
+        percent = 0.1;
+    }
+
+    //color of the bar
+    let aColor: vec4_t = ctx.world.draw.cg_genericTimerColor;
+
+    //color of the border — Raven fills it here and never reads it
+    let _bColor: vec4_t = [0.0, 0.0, 0.0, 0.3];
+
+    //color of greyed out "missing fuel"
+    let cColor: vec4_t = [0.5, 0.5, 0.5, 0.1];
+
+    //draw the background (black)
+    CG_DrawRect(
+        ctx,
+        x,
+        y,
+        CGTIMERBAR_W,
+        CGTIMERBAR_H,
+        1.0,
+        &colorTable[ct_table_t::CT_BLACK as usize],
+    );
+
+    //now draw the part to show how much health there is in the color specified
+    CG_FillRect(
+        ctx,
+        x + 1.0,
+        y + 1.0 + (CGTIMERBAR_H - percent),
+        CGTIMERBAR_W - 2.0,
+        CGTIMERBAR_H - 1.0 - (CGTIMERBAR_H - percent),
+        &aColor,
+    );
+
+    //then draw the other part greyed out
+    CG_FillRect(
+        ctx,
+        x + 1.0,
+        y + 1.0,
+        CGTIMERBAR_W - 2.0,
+        CGTIMERBAR_H - percent,
+        &cColor,
+    );
+}
+
+/// Raven `CG_DrawRocketLocking` — the eight wedges closing around a
+/// rocket-lock target, plus the tick and lock sounds.
+///
+/// DEFERRED: `Vehicle_t` referent pool — when you are flying, Raven retimes
+/// the lock off `m_pVehicleInfo->weapon[0/1].ID`'s `g_vehWeaponInfo` entry.
+/// DEC-46.2's presence-only `Option<VehicleId>` cannot name that weapon, so
+/// `vehWeapon` stays NULL and the hard-coded interval stands — the same arm
+/// Raven takes for an out-of-range weapon ID.
+/// Source: `oracle/codemp/cgame/cg_draw.c:5772-5807`
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:5747-5960`
+pub fn CG_DrawRocketLocking(ctx: &mut CgContext, lockEntNum: usize, _lockTime: c_int) {
+    // §F19: Raven derefs `cg.snap` unguarded; with no snapshot there is no
+    // lock to draw.
+    let (rocketLockTime, snapClientNum, rocketLockIndex, m_iVehicleNum) = {
+        let Some(snap) = ctx.world.cg.snap_ref() else {
+            return;
+        };
+        (
+            snap.ps.rocketLockTime,
+            snap.ps.clientNum,
+            snap.ps.rocketLockIndex,
+            snap.ps.m_iVehicleNum,
+        )
+    };
+
+    let lockTimeInterval: f32 = (if ctx.world.cgs.gametype == GT_SIEGE {
+        2400.0
+    } else {
+        1200.0
+    }) / 16.0;
+    //FIXME (Raven): if in a vehicle, use the vehicle's lockOnTime...
+    let mut dif: c_int = ((ctx.world.cg.time as f32 - rocketLockTime) / lockTimeInterval) as c_int;
+
+    if rocketLockTime == 0.0 {
+        return;
+    }
+
+    if ctx.world.cgs.clientinfo[snapClientNum as usize].team == TEAM_SPECTATOR {
+        return;
+    }
+
+    // The `if (cg.snap->ps.m_iVehicleNum)` / `if (veh->m_pVehicle)` pair here
+    // exists only to reach the deferred `m_pVehicleInfo` weapon read (see the
+    // fn doc), so nothing is transcribed for it.
+
+    //We can't check to see in pmove if players are on the same team, so we resort
+    //to just not drawing the lock if a teammate is the locked on ent
+    if rocketLockIndex >= 0 && rocketLockIndex < ENTITYNUM_NONE {
+        let ci_team = if rocketLockIndex < MAX_CLIENTS_I32 {
+            Some(ctx.world.cgs.clientinfo[rocketLockIndex as usize].team)
+        } else {
+            ctx.world
+                .entity(rocketLockIndex as usize)
+                .npcClient
+                .as_deref()
+                .map(|ci| ci.team)
+        };
+
+        if let Some(ci_team) = ci_team {
+            let myTeam = ctx.world.cgs.clientinfo[snapClientNum as usize].team;
+
+            if ci_team == myTeam {
+                if ctx.world.cgs.gametype >= GT_TEAM {
+                    return;
+                }
+            } else if ctx.world.cgs.gametype >= GT_TEAM {
+                let hitEnt = ctx.world.entity(rocketLockIndex as usize).currentState;
+                if hitEnt.eType == entityType_t::ET_NPC as c_int
+                    && hitEnt.NPC_class == class_t::CLASS_VEHICLE as c_int
+                    && hitEnt.owner < ENTITYNUM_WORLD
+                {
+                    //this is a vehicle, if it has a pilot and that pilot is on my team, then...
+                    let pilot_team = if hitEnt.owner < MAX_CLIENTS_I32 {
+                        Some(ctx.world.cgs.clientinfo[hitEnt.owner as usize].team)
+                    } else {
+                        ctx.world
+                            .entity(hitEnt.owner as usize)
+                            .npcClient
+                            .as_deref()
+                            .map(|ci| ci.team)
+                    };
+                    if pilot_team == Some(myTeam) {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    if rocketLockTime != -1.0 {
+        ctx.world.draw.lastvalidlockdif = dif;
+    } else {
+        dif = ctx.world.draw.lastvalidlockdif;
+    }
+
+    // Raven's `if (!cent)` can never fire — `cent` is `&cg_entities[lockEntNum]`.
+    let org = ctx.world.entity(lockEntNum).lerpOrigin;
+
+    if let Some((cx, mut cy)) = CG_WorldCoordToScreenCoord(ctx.world, org) {
+        // we care about distance from enemy to eye, so this is good enough
+        let mut sz = Distance(org, ctx.world.cg.refdef.vieworg) / 1024.0;
+
+        if sz > 1.0 {
+            sz = 1.0;
+        } else if sz < 0.0 {
+            sz = 0.0;
+        }
+
+        sz = (1.0 - sz) * (1.0 - sz) * 32.0 + 6.0;
+
+        if m_iVehicleNum != 0 {
+            sz *= 2.0;
+        }
+
+        cy = (cy as f32 + sz * 0.5) as c_int;
+
+        if dif < 0 {
+            ctx.world.draw.oldDif = 0;
+            return;
+        } else if dif > 8 {
+            dif = 8;
+        }
+
+        // do sounds
+        if ctx.world.draw.oldDif != dif {
+            let sample = if dif == 8 {
+                if m_iVehicleNum != 0 {
+                    "sound/vehicles/weapons/common/lock.wav"
+                } else {
+                    "sound/weapons/rocket/lock.wav"
+                }
+            } else if m_iVehicleNum != 0 {
+                "sound/vehicles/weapons/common/tick.wav"
+            } else {
+                "sound/weapons/rocket/tick.wav"
+            };
+            let sfx = trap::S_RegisterSound(ctx.engine, sample);
+            trap::S_StartSound(ctx.engine, Some(&org), 0, CHAN_AUTO, sfx);
+        }
+
+        ctx.world.draw.oldDif = dif;
+
+        let mut color: vec4_t = [0.0, 0.0, 0.0, 0.0];
+        for i in 0..dif {
+            color[0] = 1.0;
+            color[1] = 0.0;
+            color[2] = 0.0;
+            color[3] = 0.1 * i as f32 + 0.2;
+
+            trap::R_SetColor(ctx.engine, Some(&color));
+
+            // our slices are offset by about 45 degrees.
+            let wedge = trap::R_RegisterShaderNoMip(ctx.engine, "gfx/2d/wedge");
+            CG_DrawRotatePic(
+                ctx,
+                cx as f32 - sz,
+                cy as f32 - sz,
+                sz,
+                sz,
+                i as f32 * 45.0,
+                wedge,
+            );
+        }
+
+        // we are locked and loaded baby
+        if dif == 8 {
+            let pulse = (((ctx.world.cg.time as f32 * 0.05) as f64).sin() * 0.5 + 0.5) as f32;
+            color[0] = pulse;
+            color[1] = pulse;
+            color[2] = pulse;
+            color[3] = 1.0; // this art is additive, so the alpha value does nothing
+
+            trap::R_SetColor(ctx.engine, Some(&color));
+
+            let lock = trap::R_RegisterShaderNoMip(ctx.engine, "gfx/2d/lock");
+            CG_DrawPic(
+                ctx,
+                cx as f32 - sz,
+                cy as f32 - sz * 2.0,
+                sz * 2.0,
+                sz * 2.0,
+                lock,
+            );
+        }
+    }
+}
+
+/// Raven `CG_DrawFollow` — the "following <name>" banner while spectating;
+/// `false` is Raven's qfalse, meaning we are not following anyone.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:6815-6853`
+pub fn CG_DrawFollow(ctx: &mut CgContext, ds: &DisplayState) -> bool {
+    // §F19: Raven derefs `cg.snap` unguarded; with no snapshot we are not
+    // following anyone yet.
+    let (pm_flags, snapClientNum) = {
+        let Some(snap) = ctx.world.cg.snap_ref() else {
+            return false;
+        };
+        (snap.ps.pm_flags, snap.ps.clientNum)
+    };
+
+    if (pm_flags & PMF_FOLLOW) == 0 {
+        return false;
+    }
+
+    //	s = "following";
+    let s = if ctx.world.cgs.gametype == GT_POWERDUEL {
+        let duelTeam = ctx.world.cgs.clientinfo[snapClientNum as usize].duelTeam;
+
+        if duelTeam == duelTeam_t::DUELTEAM_LONE as c_int {
+            CG_GetStringEdString(ctx, "MP_INGAME", "FOLLOWINGLONE")
+        } else if duelTeam == duelTeam_t::DUELTEAM_DOUBLE as c_int {
+            CG_GetStringEdString(ctx, "MP_INGAME", "FOLLOWINGDOUBLE")
+        } else {
+            CG_GetStringEdString(ctx, "MP_INGAME", "FOLLOWING")
+        }
+    } else {
+        CG_GetStringEdString(ctx, "MP_INGAME", "FOLLOWING")
+    };
+
+    let w = CG_Text_Width(ctx, ds, &s, 1.0, FONT_MEDIUM);
+    CG_Text_Paint(
+        ctx,
+        ds,
+        (320 - w / 2) as f32,
+        60.0,
+        1.0,
+        colorWhite,
+        &s,
+        0.0,
+        0,
+        0,
+        FONT_MEDIUM,
+    );
+
+    let s = buf_to_string(
+        &ctx.world.cgs.clientinfo[snapClientNum as usize]
+            .name
+            .map(|c| c as u8),
+    );
+    let w = CG_Text_Width(ctx, ds, &s, 2.0, FONT_MEDIUM);
+    CG_Text_Paint(
+        ctx,
+        ds,
+        (320 - w / 2) as f32,
+        80.0,
+        2.0,
+        colorWhite,
+        &s,
+        0.0,
+        0,
+        0,
+        FONT_MEDIUM,
+    );
+
+    true
+}
+
+/// Raven `CG_DrawJetpackFuel` — the jetpack fuel meter, drawn only while the
+/// tank is not full.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:7150-7195`
+pub fn CG_DrawJetpackFuel(ctx: &mut CgContext) {
+    let x = JPFUELBAR_X;
+    let y = JPFUELBAR_Y;
+
+    // §F19: Raven derefs `cg.snap` unguarded; with no snapshot there is no
+    // fuel level to draw.
+    let Some(snap) = ctx.world.cg.snap_ref() else {
+        return;
+    };
+    let mut percent = (snap.ps.jetpackFuel as f32 / 100.0) * JPFUELBAR_H;
+
+    if percent > JPFUELBAR_H {
+        return;
+    }
+
+    if percent < 0.1 {
+        percent = 0.1;
+    }
+
+    //color of the bar
+    let aColor: vec4_t = [0.5, 0.0, 0.0, 0.8];
+
+    //color of the border — Raven fills it here and never reads it
+    let _bColor: vec4_t = [0.0, 0.0, 0.0, 0.3];
+
+    //color of greyed out "missing fuel"
+    let cColor: vec4_t = [0.5, 0.5, 0.5, 0.1];
+
+    //draw the background (black)
+    CG_DrawRect(
+        ctx,
+        x,
+        y,
+        JPFUELBAR_W,
+        JPFUELBAR_H,
+        1.0,
+        &colorTable[ct_table_t::CT_BLACK as usize],
+    );
+
+    //now draw the part to show how much health there is in the color specified
+    CG_FillRect(
+        ctx,
+        x + 1.0,
+        y + 1.0 + (JPFUELBAR_H - percent),
+        JPFUELBAR_W - 1.0,
+        JPFUELBAR_H - 1.0 - (JPFUELBAR_H - percent),
+        &aColor,
+    );
+
+    //then draw the other part greyed out
+    CG_FillRect(
+        ctx,
+        x + 1.0,
+        y + 1.0,
+        JPFUELBAR_W - 1.0,
+        JPFUELBAR_H - percent,
+        &cColor,
+    );
+}
+
+/// Raven `CG_DrawEWebHealth` — the health meter of the e-web you are manning,
+/// shuffled left past whichever fuel bars are already up.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:7202-7258`
+pub fn CG_DrawEWebHealth(ctx: &mut CgContext) {
+    let mut x = EWEBHEALTH_X;
+    let y = EWEBHEALTH_Y;
+    let emplacedIndex = ctx.world.cg.predictedPlayerState.emplacedIndex as usize;
+    let eweb = ctx.world.entity(emplacedIndex).currentState;
+    let mut percent = (eweb.health as f32 / eweb.maxhealth as f32) * EWEBHEALTH_H;
+
+    if percent > EWEBHEALTH_H {
+        return;
+    }
+
+    if percent < 0.1 {
+        percent = 0.1;
+    }
+
+    // §F19: Raven derefs `cg.snap` unguarded; with no snapshot we skip the
+    // meter entirely rather than read fuel out of nothing.
+    let (jetpackFuel, cloakFuel) = {
+        let Some(snap) = ctx.world.cg.snap_ref() else {
+            return;
+        };
+        (snap.ps.jetpackFuel, snap.ps.cloakFuel)
+    };
+
+    //kind of hacky, need to pass a coordinate in here
+    if jetpackFuel < 100 {
+        x -= JPFUELBAR_W + 8.0;
+    }
+    if cloakFuel < 100 {
+        x -= JPFUELBAR_W + 8.0;
+    }
+
+    //color of the bar
+    let aColor: vec4_t = [0.5, 0.0, 0.0, 0.8];
+
+    //color of the border — Raven fills it here and never reads it
+    let _bColor: vec4_t = [0.0, 0.0, 0.0, 0.3];
+
+    //color of greyed out "missing fuel"
+    let cColor: vec4_t = [0.5, 0.5, 0.5, 0.1];
+
+    //draw the background (black)
+    CG_DrawRect(
+        ctx,
+        x,
+        y,
+        EWEBHEALTH_W,
+        EWEBHEALTH_H,
+        1.0,
+        &colorTable[ct_table_t::CT_BLACK as usize],
+    );
+
+    //now draw the part to show how much health there is in the color specified
+    CG_FillRect(
+        ctx,
+        x + 1.0,
+        y + 1.0 + (EWEBHEALTH_H - percent),
+        EWEBHEALTH_W - 1.0,
+        EWEBHEALTH_H - 1.0 - (EWEBHEALTH_H - percent),
+        &aColor,
+    );
+
+    //then draw the other part greyed out
+    CG_FillRect(
+        ctx,
+        x + 1.0,
+        y + 1.0,
+        EWEBHEALTH_W - 1.0,
+        EWEBHEALTH_H - percent,
+        &cColor,
+    );
+}
+
+/// Raven `CG_DrawCloakFuel` — the cloak fuel meter, shifted left when the
+/// jetpack bar is already sharing that corner.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:7265-7315`
+pub fn CG_DrawCloakFuel(ctx: &mut CgContext) {
+    let mut x = CLFUELBAR_X;
+    let y = CLFUELBAR_Y;
+
+    // §F19: Raven derefs `cg.snap` unguarded; with no snapshot there is no
+    // fuel level to draw.
+    let (jetpackFuel, cloakFuel) = {
+        let Some(snap) = ctx.world.cg.snap_ref() else {
+            return;
+        };
+        (snap.ps.jetpackFuel, snap.ps.cloakFuel)
+    };
+
+    let mut percent = (cloakFuel as f32 / 100.0) * CLFUELBAR_H;
+
+    if percent > CLFUELBAR_H {
+        return;
+    }
+
+    if jetpackFuel < 100 {
+        //if drawing jetpack fuel bar too, then move this over...?
+        x -= JPFUELBAR_W + 8.0;
+    }
+
+    if percent < 0.1 {
+        percent = 0.1;
+    }
+
+    //color of the bar
+    let aColor: vec4_t = [0.0, 0.0, 0.6, 0.8];
+
+    //color of the border — Raven fills it here and never reads it
+    let _bColor: vec4_t = [0.0, 0.0, 0.0, 0.3];
+
+    //color of greyed out "missing fuel"
+    let cColor: vec4_t = [0.1, 0.1, 0.3, 0.1];
+
+    //draw the background (black)
+    CG_DrawRect(
+        ctx,
+        x,
+        y,
+        CLFUELBAR_W,
+        CLFUELBAR_H,
+        1.0,
+        &colorTable[ct_table_t::CT_BLACK as usize],
+    );
+
+    //now draw the part to show how much fuel there is in the color specified
+    CG_FillRect(
+        ctx,
+        x + 1.0,
+        y + 1.0 + (CLFUELBAR_H - percent),
+        CLFUELBAR_W - 1.0,
+        CLFUELBAR_H - 1.0 - (CLFUELBAR_H - percent),
+        &aColor,
+    );
+
+    //then draw the other part greyed out
+    CG_FillRect(
+        ctx,
+        x + 1.0,
+        y + 1.0,
+        CLFUELBAR_W - 1.0,
+        CLFUELBAR_H - percent,
+        &cColor,
+    );
+}
+
+/// Raven `CG_ChatBox_AddString` — latches one chat line into the ring buffer,
+/// hard-wrapping it at the chatbox cutoff width first.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:7557-7624`
+pub fn CG_ChatBox_AddString(ctx: &mut CgContext, ds: &DisplayState, chatStr: &str) {
+    if ctx.world.cvars.cg_chatBox.integer <= 0 {
+        //don't bother then.
+        return;
+    }
+
+    // §F19: Raven truncates at `> sizeof(chat->string)`, so an exactly
+    // 150-character line still `strcpy`s 151 bytes over the slot's end; the
+    // port's bounded copy stops at 149 characters plus the terminator. The
+    // `\n` inserts below also grow a `String` where Raven's StrInsert overruns
+    // its fixed 150-byte buffer on a heavily-wrapped line, so long lines keep
+    // a different visible tail.
+    // PORT-NOTE: Raven truncates the *caller's* buffer in place — every caller
+    // passes a scratch buffer it does not re-read, so the port truncates its
+    // own copy instead.
+    let mut chatChars: Vec<char> = chatStr.chars().collect();
+    if chatChars.len() > MAX_SAY_TEXT {
+        chatChars.truncate(MAX_SAY_TEXT - 1);
+    }
+    let mut string: String = chatChars.into_iter().collect();
+
+    let mut lines: c_int = 1;
+
+    let mut chatLen = CG_Text_Width(ctx, ds, &string, 1.0, FONT_SMALL) as f32;
+    if chatLen > CHATBOX_CUTOFF_LEN as f32 {
+        //we have to break it into segments...
+        let mut i: usize = 0;
+        let mut lastLinePt: usize = 0;
+
+        chatLen = 0.0;
+        loop {
+            let chars: Vec<char> = string.chars().collect();
+            if i >= chars.len() {
+                break;
+            }
+
+            let s: String = chars[i].to_string();
+            chatLen += CG_Text_Width(ctx, ds, &s, 0.65, FONT_SMALL) as f32;
+
+            if chatLen >= CHATBOX_CUTOFF_LEN as f32 {
+                let mut j = i;
+                while j > 0 && j > lastLinePt {
+                    if chars[j] == ' ' {
+                        break;
+                    }
+                    j -= 1;
+                }
+                if chars[j] == ' ' {
+                    i = j;
+                }
+
+                lines += 1;
+                CG_ChatBox_StrInsert(&mut string, i, "\n");
+                i += 1;
+                chatLen = 0.0;
+                lastLinePt = i + 1;
+            }
+            i += 1;
+        }
+    }
+
+    let time = ctx.world.cg.time + ctx.world.cvars.cg_chatBox.integer;
+    let slot = ctx.world.cg.chatItemActive as usize;
+    let bytes = string_to_latin1(&string);
+    {
+        let chat = &mut ctx.world.cg.chatItems[slot];
+        // Raven's `memset(chat, 0, sizeof(chatBoxItem_t))`
+        chat.string.fill(0);
+        chat.time = 0;
+        chat.lines = 0;
+
+        let destsize = chat.string.len();
+        Q_strncpyzBytes(&mut chat.string, &bytes, destsize);
+        chat.time = time;
+        chat.lines = lines;
+    }
+
+    ctx.world.cg.chatItemActive += 1;
+    if ctx.world.cg.chatItemActive >= MAX_CHATBOX_ITEMS as c_int {
+        ctx.world.cg.chatItemActive = 0;
+    }
+}
+
+/// Raven `CG_ChatBox_DrawStrings` — paints the live chat lines bottom-up,
+/// oldest at the top of the stack.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:7643-7699`
+pub fn CG_ChatBox_DrawStrings(ctx: &mut CgContext, ds: &DisplayState) {
+    let mut drawThese: [Option<usize>; MAX_CHATBOX_ITEMS] = [None; MAX_CHATBOX_ITEMS];
+    let mut numToDraw: usize = 0;
+    let mut linesToDraw: c_int = 0;
+    let x: c_int = 30;
+    let mut y: c_int = if ctx.world.cg.scoreBoardShowing != qfalse {
+        475
+    } else {
+        ctx.world.cvars.cg_chatBoxHeight.integer
+    };
+    let fontScale: f32 = 0.65;
+
+    if ctx.world.cvars.cg_chatBox.integer == 0 {
+        return;
+    }
+
+    for i in 0..MAX_CHATBOX_ITEMS {
+        if ctx.world.cg.chatItems[i].time >= ctx.world.cg.time {
+            let mut check = numToDraw as isize;
+            let mut insertionPoint = numToDraw;
+
+            while check >= 0 {
+                //insert here
+                if let Some(slot) = drawThese[check as usize] {
+                    if ctx.world.cg.chatItems[i].time < ctx.world.cg.chatItems[slot].time {
+                        insertionPoint = check as usize;
+                    }
+                }
+                check -= 1;
+            }
+            CG_ChatBox_ArrayInsert(ctx, &mut drawThese, insertionPoint, MAX_CHATBOX_ITEMS, i);
+            numToDraw += 1;
+            linesToDraw += ctx.world.cg.chatItems[i].lines;
+        }
+    }
+
+    if numToDraw == 0 {
+        //nothing, then, just get out of here now.
+        return;
+    }
+
+    //move initial point up so we draw bottom-up (visually)
+    y = (y as f32 - (CHATBOX_FONT_HEIGHT as f32 * fontScale) * linesToDraw as f32) as c_int;
+
+    //we have the items we want to draw, just quickly loop through them now
+    for slot in drawThese.iter().take(numToDraw) {
+        // Raven indexes `drawThese[i]` straight through; every slot below
+        // `numToDraw` was filled by the insert above.
+        let Some(slot) = *slot else {
+            continue;
+        };
+        let string = buf_to_string(&ctx.world.cg.chatItems[slot].string.map(|c| c as u8));
+        let lines = ctx.world.cg.chatItems[slot].lines;
+
+        CG_Text_Paint(
+            ctx,
+            ds,
+            x as f32,
+            y as f32,
+            fontScale,
+            colorWhite,
+            &string,
+            0.0,
+            0,
+            ITEM_TEXTSTYLE_OUTLINED,
+            FONT_SMALL,
+        );
+        y = (y as f32 + (CHATBOX_FONT_HEIGHT as f32 * fontScale) * lines as f32) as c_int;
+    }
 }

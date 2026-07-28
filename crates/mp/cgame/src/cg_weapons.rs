@@ -7,17 +7,21 @@ use core::ffi::{c_int, c_void};
 use core::ptr::null_mut;
 
 use mp_bg::bg_misc::BG_GiveMeVectorFromMatrix;
+use mp_bg::bg_saberLoad::BG_SI_SetDesiredLength;
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::bg_itemlist::{bg_itemlist, bg_numItems};
-use mp_bg::public::entity_flags::{EF_ALT_FIRING, EF_JETPACK_ACTIVE};
+use mp_bg::public::entity_flags::{EF_ALT_FIRING, EF_DEAD, EF_FIRING, EF_JETPACK_ACTIVE};
 use mp_bg::public::entity_type::entityType_t::{ET_NPC, ET_PLAYER};
 use mp_bg::public::force_hand_anims::forceHandAnims_t::HANDEXTEND_NONE;
 use mp_bg::public::gametype::GT_CTY;
 use mp_bg::public::item_kind::ItemKind;
+use mp_bg::public::pers_enum::persEnum_t::PERS_TEAM;
 use mp_bg::public::pmtype::pmtype_t;
 use mp_bg::public::powerup::{PW_BLUEFLAG, PW_REDFLAG};
 use mp_bg::public::stat_index::statIndex_t::{STAT_HEALTH, STAT_WEAPONS};
+use mp_bg::public::team::TEAM_SPECTATOR;
 use mp_bg::public::viewheight::{CROUCH_VIEWHEIGHT, DEFAULT_VIEWHEIGHT};
+use mp_bg::public::weaponstate::weaponstate_t::{WEAPON_CHARGING, WEAPON_CHARGING_ALT};
 use mp_bg::weapons::weapon_data::weaponData;
 use mp_bg::weapons::weapon_t::{
     WP_BLASTER, WP_BOWCASTER, WP_BRYAR_OLD, WP_BRYAR_PISTOL, WP_CONCUSSION, WP_DEMP2, WP_DET_PACK,
@@ -27,16 +31,21 @@ use mp_bg::weapons::weapon_t::{
 use mp_bg::weapons::wp_muzzle_point::WP_MuzzlePoint;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::qcommon::player_state::MAX_WEAPONS;
-use mp_qshared::common::mp::qcommon::{MAX_SABERS, PMF_FOLLOW};
+use mp_qshared::common::mp::qcommon::saber::saber_info::saberInfo_t;
+use mp_qshared::common::mp::qcommon::{playerState_t, MAX_SABERS, PMF_FOLLOW};
 use mp_qshared::shared::q_math::{
-    _VectorCopy, _VectorMA, AngleVectors, ByteToDir, VectorClear, PITCH, ROLL, YAW,
+    _VectorCopy, _VectorMA, vec3_origin, AngleVectors, AnglesToAxis, ByteToDir, VectorClear, PITCH,
+    ROLL, YAW,
 };
 use mp_qshared::shared::{
-    mdxaBone_t, qfalse, qtrue, vec3_t, Eorientations, CHAN_WEAPON, MAX_CLIENTS_I32,
+    addspriteArgStruct_t, mdxaBone_t, qfalse, qtrue, vec3_t, Eorientations, CHAN_AUTO, CHAN_WEAPON,
+    MAX_CLIENTS_I32,
 };
 use native_string::{atoi, Q_stricmp};
 
+use crate::cg_ents::{CG_PositionEntityOnTag, CG_PositionRotatedEntityOnTag};
 use crate::cg_main::{CG_Argv, CG_Error};
+use crate::cg_players::CG_IsMindTricked;
 use crate::cg_view::CGCam_Shake;
 use crate::cg_weaponinit::CG_RegisterWeapon;
 use crate::fx_blaster::{FX_BlasterWeaponHitPlayer, FX_BlasterWeaponHitWall};
@@ -88,6 +97,11 @@ pub const LAND_DEFLECT_TIME: c_int = 150;
 /// Raven `LAND_RETURN_TIME` — the recovery tail after the dip.
 /// Source: `oracle/codemp/cgame/cg_local.h:32`
 pub const LAND_RETURN_TIME: c_int = 300;
+
+/// Raven `MUZZLE_FLASH_TIME` — how long after a shot the muzzle flash is still
+/// drawn, in msec.
+/// Source: `oracle/codemp/cgame/cg_local.h:47`
+pub const MUZZLE_FLASH_TIME: c_int = 20;
 
 /// Raven `WEAPON_SELECT_TIME` — how long a weapon/force/inventory pick keeps
 /// the icon HUD up, in msec.
@@ -385,6 +399,512 @@ pub fn CG_AddWeaponWithPowerups(ctx: &mut CgContext, gun: &mut refEntity_t, _pow
         }
         trap::R_AddRefEntityToScene(engine, gun);
         gun.customShader = preShader; // set back just to be safe
+    }
+}
+
+/// Raven `CG_AddPlayerWeapon` — hangs the gun, its barrels, the charge sprite
+/// and the muzzle flash off a player refEntity.
+///
+/// Raven: "Used for both the view weapon (ps is valid) and the world modelother
+/// character models (ps is NULL). The main player will have this called for
+/// BOTH cases, so effects like light and sound should only be done on the world
+/// model case."
+///
+/// `ps` carries only its presence and `clientNum`; it never aliases `ctx`, so a
+/// caller handing us `cg.predictedPlayerState` copies it out first. `team` is
+/// Raven's unused parameter.
+///
+/// Source: `oracle/codemp/cgame/cg_weapons.c:404-757`
+pub fn CG_AddPlayerWeapon(
+    ctx: &mut CgContext,
+    parent: &refEntity_t,
+    ps: Option<&playerState_t>,
+    centNum: usize,
+    _team: c_int,
+    newAngles: &vec3_t,
+    thirdPerson: bool,
+) {
+    let engine = ctx.engine;
+
+    let weaponNum = ctx.world.entity(centNum).currentState.weapon;
+
+    if ctx.world.entity(centNum).currentState.weapon == WP_EMPLACED_GUN {
+        return;
+    }
+
+    if ctx.world.cg.predictedPlayerState.pm_type == pmtype_t::PM_SPECTATOR as c_int
+        && ctx.world.entity(centNum).currentState.number
+            == ctx.world.cg.predictedPlayerState.clientNum
+    {
+        //spectator mode, don't draw it...
+        return;
+    }
+
+    CG_RegisterWeapon(ctx, weaponNum);
+    let weapSlot = weaponNum as usize;
+    /*
+    Ghoul2 Insert Start
+    */
+
+    let mut gun = refEntity_t::zeroed();
+
+    // only do this if we are in first person, since world weapons are now handled on the server by Ghoul2
+    if !thirdPerson {
+        let mut angles: vec3_t = [0.0; 3];
+
+        // add the weapon
+        _VectorCopy(parent.lightingOrigin, &mut gun.lightingOrigin);
+        gun.shadowPlane = parent.shadowPlane;
+        gun.renderfx = parent.renderfx;
+
+        if ps.is_some() {
+            // this player, in first person view
+            gun.hModel = ctx.world.cg_weapons[weapSlot].viewModel;
+        } else {
+            gun.hModel = ctx.world.cg_weapons[weapSlot].weaponModel;
+        }
+        if gun.hModel == 0 {
+            return;
+        }
+
+        if ps.is_none() {
+            // add weapon ready sound
+            ctx.world.entity_mut(centNum).pe.lightningFiring = qfalse;
+
+            let eFlags = ctx.world.entity(centNum).currentState.eFlags;
+            let number = ctx.world.entity(centNum).currentState.number;
+            let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+            let firingSound = ctx.world.cg_weapons[weapSlot].firingSound;
+            let readySound = ctx.world.cg_weapons[weapSlot].readySound;
+
+            if (eFlags & EF_FIRING) != 0 && firingSound != 0 {
+                // lightning gun and guantlet make a different sound when fire is held down
+                trap::S_AddLoopingSound(engine, number, &lerpOrigin, &vec3_origin, firingSound);
+                ctx.world.entity_mut(centNum).pe.lightningFiring = qtrue;
+            } else if readySound != 0 {
+                trap::S_AddLoopingSound(engine, number, &lerpOrigin, &vec3_origin, readySound);
+            }
+        }
+
+        CG_PositionEntityOnTag(ctx, &mut gun, parent, parent.hModel, "tag_weapon");
+
+        let (trick1, trick2, trick3, trick4) = {
+            let cs = &ctx.world.entity(centNum).currentState;
+            (
+                cs.trickedentindex,
+                cs.trickedentindex2,
+                cs.trickedentindex3,
+                cs.trickedentindex4,
+            )
+        };
+        // Raven reads `cg.snap->ps.clientNum` unchecked; with no snapshot there is
+        // no viewer for the trick to hide from, so we take the not-tricked arm
+        // and draw (§F19).
+        let mindTricked = match ctx.world.cg.snap_ref().map(|snap| snap.ps.clientNum) {
+            Some(clientNum) => {
+                CG_IsMindTricked(ctx.world, trick1, trick2, trick3, trick4, clientNum)
+            }
+            None => false,
+        };
+
+        if !mindTricked {
+            let powerups = ctx.world.entity(centNum).currentState.powerups;
+            //don't draw the weapon if the player is invisible
+            CG_AddWeaponWithPowerups(ctx, &mut gun, powerups);
+            // Raven's stun-baton tint pass sits commented out right here:
+            // `gun.shaderRGBA[0..2] = 25`, `gfx/effects/stunPass`,
+            // `RF_RGB_TINT | RF_FIRST_PERSON | RF_DEPTHHACK`, then a second
+            // `trap_R_AddRefEntityToScene`.
+        }
+
+        if weaponNum == WP_STUN_BATON {
+            let mut i = 0;
+
+            while i < 3 {
+                let mut barrel = refEntity_t::zeroed();
+                _VectorCopy(parent.lightingOrigin, &mut barrel.lightingOrigin);
+                barrel.shadowPlane = parent.shadowPlane;
+                barrel.renderfx = parent.renderfx;
+
+                if i == 0 {
+                    barrel.hModel = trap::R_RegisterModel(
+                        engine,
+                        "models/weapons2/stun_baton/baton_barrel.md3",
+                    );
+                } else if i == 1 {
+                    barrel.hModel = trap::R_RegisterModel(
+                        engine,
+                        "models/weapons2/stun_baton/baton_barrel2.md3",
+                    );
+                } else {
+                    barrel.hModel = trap::R_RegisterModel(
+                        engine,
+                        "models/weapons2/stun_baton/baton_barrel3.md3",
+                    );
+                }
+                angles[YAW] = 0.0;
+                angles[PITCH] = 0.0;
+                angles[ROLL] = 0.0;
+
+                AnglesToAxis(angles, barrel.axis.as_mut_ptr());
+
+                let handsModel = ctx.world.cg_weapons[weapSlot].handsModel;
+                if i == 0 {
+                    CG_PositionRotatedEntityOnTag(
+                        ctx,
+                        &mut barrel,
+                        parent, /*&gun*/
+                        handsModel,
+                        "tag_barrel",
+                    );
+                } else if i == 1 {
+                    CG_PositionRotatedEntityOnTag(
+                        ctx,
+                        &mut barrel,
+                        parent, /*&gun*/
+                        handsModel,
+                        "tag_barrel2",
+                    );
+                } else {
+                    CG_PositionRotatedEntityOnTag(
+                        ctx,
+                        &mut barrel,
+                        parent, /*&gun*/
+                        handsModel,
+                        "tag_barrel3",
+                    );
+                }
+                let powerups = ctx.world.entity(centNum).currentState.powerups;
+                CG_AddWeaponWithPowerups(ctx, &mut barrel, powerups);
+
+                i += 1;
+            }
+        } else {
+            // add the spinning barrel
+            let barrelModel = ctx.world.cg_weapons[weapSlot].barrelModel;
+            if barrelModel != 0 {
+                let mut barrel = refEntity_t::zeroed();
+                _VectorCopy(parent.lightingOrigin, &mut barrel.lightingOrigin);
+                barrel.shadowPlane = parent.shadowPlane;
+                barrel.renderfx = parent.renderfx;
+
+                barrel.hModel = barrelModel;
+                angles[YAW] = 0.0;
+                angles[PITCH] = 0.0;
+                angles[ROLL] = 0.0;
+
+                AnglesToAxis(angles, barrel.axis.as_mut_ptr());
+
+                let handsModel = ctx.world.cg_weapons[weapSlot].handsModel;
+                CG_PositionRotatedEntityOnTag(
+                    ctx,
+                    &mut barrel,
+                    parent, /*&gun*/
+                    handsModel,
+                    "tag_barrel",
+                );
+
+                let powerups = ctx.world.entity(centNum).currentState.powerups;
+                CG_AddWeaponWithPowerups(ctx, &mut barrel, powerups);
+            }
+        }
+    }
+    /*
+    Ghoul2 Insert End
+    */
+
+    let mut flash = refEntity_t::zeroed();
+    CG_PositionEntityOnTag(ctx, &mut flash, &gun, gun.hModel, "tag_flash");
+
+    _VectorCopy(flash.origin, &mut ctx.world.cg.lastFPFlashPoint);
+
+    // Do special charge bits
+    //-----------------------
+    let csWeapon = ctx.world.entity(centNum).currentState.weapon;
+    let modelindex2 = ctx.world.entity(centNum).currentState.modelindex2;
+    let number = ctx.world.entity(centNum).currentState.number;
+
+    if (ps.is_some()
+        || ctx.world.cg.renderingThirdPerson != qfalse
+        || ctx.world.cg.predictedPlayerState.clientNum != number)
+        && ((modelindex2 == WEAPON_CHARGING_ALT as c_int && csWeapon == WP_BRYAR_PISTOL)
+            || (modelindex2 == WEAPON_CHARGING_ALT as c_int && csWeapon == WP_BRYAR_OLD)
+            || (csWeapon == WP_BOWCASTER && modelindex2 == WEAPON_CHARGING as c_int)
+            || (csWeapon == WP_DEMP2 && modelindex2 == WEAPON_CHARGING_ALT as c_int))
+    {
+        let mut shader: c_int = 0;
+        let mut val: f32 = 0.0;
+        let mut scale: f32 = 1.0;
+        let mut fxSArgs = addspriteArgStruct_t {
+            origin: [0.0; 3],
+            vel: [0.0; 3],
+            accel: [0.0; 3],
+            scale: 0.0,
+            dscale: 0.0,
+            sAlpha: 0.0,
+            eAlpha: 0.0,
+            rotation: 0.0,
+            bounce: 0.0,
+            life: 0,
+            shader: 0,
+            flags: 0,
+        };
+        let mut flashorigin: vec3_t = [0.0; 3];
+        let mut flashdir: vec3_t = [0.0; 3];
+
+        if !thirdPerson {
+            _VectorCopy(flash.origin, &mut flashorigin);
+            _VectorCopy(flash.axis[0], &mut flashdir);
+        } else {
+            let mut boltMatrix = mdxaBone_t {
+                matrix: [[0.0; 4]; 3],
+            };
+
+            // `HasGhoul2ModelOnIndex` wants the ADDRESS of the instance slot, not
+            // the token — Raven passes `&(cent->ghoul2)`.
+            if !trap::G2API_HasGhoul2ModelOnIndex(
+                engine,
+                &mut ctx.world.entity_mut(centNum).ghoul2 as *mut *mut c_void as *mut c_void,
+                1,
+            ) {
+                //it's quite possible that we may have have no weapon model and be in a valid state, so return here if this is the case
+                return;
+            }
+
+            let ghoul2 = ctx.world.entity(centNum).ghoul2;
+            let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+            let modelScale = ctx.world.entity(centNum).modelScale;
+            let time = ctx.world.cg.time;
+
+            // go away and get me the bolt position for this frame please
+            if !trap::G2API_GetBoltMatrix(
+                engine,
+                ghoul2,
+                1,
+                0,
+                &mut boltMatrix,
+                newAngles,
+                &lerpOrigin,
+                time,
+                Some(&mut ctx.world.cgs.gameModels[0]),
+                &modelScale,
+            ) {
+                // Couldn't find bolt point.
+                return;
+            }
+
+            BG_GiveMeVectorFromMatrix(
+                &boltMatrix,
+                Eorientations::ORIGIN as c_int,
+                &mut flashorigin,
+            );
+            BG_GiveMeVectorFromMatrix(
+                &boltMatrix,
+                Eorientations::POSITIVE_X as c_int,
+                &mut flashdir,
+            );
+        }
+
+        let time = ctx.world.cg.time;
+        let constantLight = ctx.world.entity(centNum).currentState.constantLight;
+
+        if csWeapon == WP_BRYAR_PISTOL || csWeapon == WP_BRYAR_OLD {
+            // Hardcoded max charge time of 1 second
+            val = (time - constantLight) as f32 * 0.001;
+            shader = ctx.world.cgs.media.bryarFrontFlash;
+        } else if csWeapon == WP_BOWCASTER {
+            // Hardcoded max charge time of 1 second
+            val = (time - constantLight) as f32 * 0.001;
+            shader = ctx.world.cgs.media.greenFrontFlash;
+        } else if csWeapon == WP_DEMP2 {
+            val = (time - constantLight) as f32 * 0.001;
+            shader = ctx.world.cgs.media.lightningFlash;
+            scale = 1.75;
+        }
+
+        if val < 0.0 {
+            val = 0.0;
+        } else if val > 1.0 {
+            val = 1.0;
+            if ps.is_some_and(|ps| number == ps.clientNum) {
+                CGCam_Shake(ctx.world, /*0.1f*/ 0.2, 100);
+            }
+        } else if ps.is_some_and(|ps| number == ps.clientNum) {
+            CGCam_Shake(ctx.world, val * val * /*0.3f*/ 0.6, 100);
+        }
+
+        val += ctx.world.bg_state.rng.random() * 0.5;
+
+        _VectorCopy(flashorigin, &mut fxSArgs.origin);
+        VectorClear(&mut fxSArgs.vel);
+        VectorClear(&mut fxSArgs.accel);
+        fxSArgs.scale = 3.0 * val * scale;
+        fxSArgs.dscale = 0.0;
+        fxSArgs.sAlpha = 0.7;
+        fxSArgs.eAlpha = 0.7;
+        fxSArgs.rotation = ctx.world.bg_state.rng.random() * 360.0;
+        fxSArgs.bounce = 0.0;
+        // Raven writes the float `1.0f` into an `int` field, so it truncates to 1
+        fxSArgs.life = 1;
+        fxSArgs.shader = shader;
+        fxSArgs.flags = 0x08000000;
+
+        //FX_AddSprite( flash.origin, NULL, NULL, 3.0f * val, 0.0f, 0.7f, 0.7f, WHITE, WHITE, random() * 360, 0.0f, 1.0f, shader, FX_USE_ALPHA );
+        trap::FX_AddSprite(engine, &mut fxSArgs);
+    }
+
+    // make sure we aren't looking at cg.predictedPlayerEntity for LG
+    // PORT-NOTE: Raven then tests `(nonPredictedCent - cg_entities) != clientNum`,
+    // which is that same index compared with itself - always false, so the
+    // fall-back to `cent` is dead and the flash always reads the clientNum slot.
+    let nonPredictedNum = ctx.world.entity(centNum).currentState.clientNum as usize;
+
+    // add the flash
+    let nonPredEFlags = ctx.world.entity(nonPredictedNum).currentState.eFlags;
+    if weaponNum == WP_DEMP2 && (nonPredEFlags & EF_FIRING) != 0 {
+        // continuous flash
+    } else {
+        // impulse flash
+        if ctx.world.cg.time - ctx.world.entity(centNum).muzzleFlashTime > MUZZLE_FLASH_TIME {
+            return;
+        }
+    }
+
+    if ps.is_some()
+        || ctx.world.cg.renderingThirdPerson != qfalse
+        || number != ctx.world.cg.predictedPlayerState.clientNum
+    {
+        // Make sure we don't do the thirdperson model effects for the local player if we're in first person
+        let mut flashorigin: vec3_t = [0.0; 3];
+        let mut flashdir: vec3_t = [0.0; 3];
+        let mut flash = refEntity_t::zeroed();
+
+        if !thirdPerson {
+            CG_PositionEntityOnTag(ctx, &mut flash, &gun, gun.hModel, "tag_flash");
+            _VectorCopy(flash.origin, &mut flashorigin);
+            _VectorCopy(flash.axis[0], &mut flashdir);
+        } else {
+            let mut boltMatrix = mdxaBone_t {
+                matrix: [[0.0; 4]; 3],
+            };
+
+            if !trap::G2API_HasGhoul2ModelOnIndex(
+                engine,
+                &mut ctx.world.entity_mut(centNum).ghoul2 as *mut *mut c_void as *mut c_void,
+                1,
+            ) {
+                //it's quite possible that we may have have no weapon model and be in a valid state, so return here if this is the case
+                return;
+            }
+
+            let ghoul2 = ctx.world.entity(centNum).ghoul2;
+            let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+            let modelScale = ctx.world.entity(centNum).modelScale;
+            let time = ctx.world.cg.time;
+
+            // go away and get me the bolt position for this frame please
+            if !trap::G2API_GetBoltMatrix(
+                engine,
+                ghoul2,
+                1,
+                0,
+                &mut boltMatrix,
+                newAngles,
+                &lerpOrigin,
+                time,
+                Some(&mut ctx.world.cgs.gameModels[0]),
+                &modelScale,
+            ) {
+                // Couldn't find bolt point.
+                return;
+            }
+
+            BG_GiveMeVectorFromMatrix(
+                &boltMatrix,
+                Eorientations::ORIGIN as c_int,
+                &mut flashorigin,
+            );
+            BG_GiveMeVectorFromMatrix(
+                &boltMatrix,
+                Eorientations::POSITIVE_X as c_int,
+                &mut flashdir,
+            );
+        }
+
+        if ctx.world.cg.time - ctx.world.entity(centNum).muzzleFlashTime <= MUZZLE_FLASH_TIME + 10 {
+            // Handle muzzle flashes
+            let eFlags = ctx.world.entity(centNum).currentState.eFlags;
+            if (eFlags & EF_ALT_FIRING) != 0 {
+                // Check the alt firing first.
+                let altMuzzleEffect = ctx.world.cg_weapons[weapSlot].altMuzzleEffect;
+                if altMuzzleEffect != 0 {
+                    if !thirdPerson {
+                        trap::FX_PlayEntityEffectID(
+                            engine,
+                            altMuzzleEffect,
+                            &flashorigin,
+                            &flash.axis,
+                            -1,
+                            -1,
+                            -1,
+                            -1,
+                        );
+                    } else {
+                        trap::FX_PlayEffectID(
+                            engine,
+                            altMuzzleEffect,
+                            &flashorigin,
+                            &flashdir,
+                            -1,
+                            -1,
+                        );
+                    }
+                }
+            } else {
+                // Regular firing
+                let muzzleEffect = ctx.world.cg_weapons[weapSlot].muzzleEffect;
+                if muzzleEffect != 0 {
+                    if !thirdPerson {
+                        trap::FX_PlayEntityEffectID(
+                            engine,
+                            muzzleEffect,
+                            &flashorigin,
+                            &flash.axis,
+                            -1,
+                            -1,
+                            -1,
+                            -1,
+                        );
+                    } else {
+                        trap::FX_PlayEffectID(
+                            engine,
+                            muzzleEffect,
+                            &flashorigin,
+                            &flashdir,
+                            -1,
+                            -1,
+                        );
+                    }
+                }
+            }
+        }
+
+        // add lightning bolt
+        CG_LightningBolt(ctx.world.entity(nonPredictedNum), &flashorigin);
+
+        let flashDlightColor = ctx.world.cg_weapons[weapSlot].flashDlightColor;
+        if flashDlightColor[0] != 0.0 || flashDlightColor[1] != 0.0 || flashDlightColor[2] != 0.0 {
+            // the radius is an int sum in C, then widened for the call
+            let intensity = (300 + (ctx.world.bg_state.rng.rand() & 31)) as f32;
+            trap::R_AddLightToScene(
+                engine,
+                &flashorigin,
+                intensity,
+                flashDlightColor[0],
+                flashDlightColor[1],
+                flashDlightColor[2],
+            );
+        }
     }
 }
 
@@ -1652,5 +2172,121 @@ pub fn CG_CopyG2WeaponInstance(
         } else {
             trap::G2API_CopySpecificGhoul2Model(engine, from, 0, toGhoul2, 1);
         }
+    }
+}
+
+/// Raven `CG_CheckPlayerG2Weapons` — keeps the player's ghoul2 gun model in
+/// step with the weapon the playerstate says they are holding, and plays the
+/// saber on/off sounds across the switch.
+///
+/// Raven's `if (!ps) { assert(0); return; }` guard drops — a `&playerState_t`
+/// is never null. `ps` never aliases `ctx`, so a caller handing us
+/// `cg.predictedPlayerState` copies it out first.
+///
+/// Source: `oracle/codemp/cgame/cg_weapons.c:2494-2577`
+pub fn CG_CheckPlayerG2Weapons(ctx: &mut CgContext, ps: &playerState_t, centNum: usize) {
+    let engine = ctx.engine;
+
+    if ps.pm_flags & PMF_FOLLOW != 0 {
+        return;
+    }
+
+    if ctx.world.entity(centNum).currentState.eType == ET_NPC as c_int {
+        debug_assert!(false, "CG_CheckPlayerG2Weapons called on an ET_NPC");
+        return;
+    }
+
+    // should we change the gun model on this player?
+    if ctx.world.entity(centNum).currentState.saberInFlight != qfalse {
+        let world = &*ctx.world;
+        let saberInstance = CG_G2WeaponInstance(world, world.entity(centNum), WP_SABER);
+        ctx.world.entity_mut(centNum).ghoul2weapon = saberInstance;
+    }
+
+    if (ctx.world.entity(centNum).currentState.eFlags & EF_DEAD) != 0 {
+        //no updating weapons when dead
+        ctx.world.entity_mut(centNum).ghoul2weapon = null_mut();
+        return;
+    }
+
+    if ctx.world.entity(centNum).torsoBolt != 0 {
+        //got our limb cut off, no updating weapons until it's restored
+        ctx.world.entity_mut(centNum).ghoul2weapon = null_mut();
+        return;
+    }
+
+    let psClient = ps.clientNum as usize;
+    if ctx.world.cgs.clientinfo[psClient].team == TEAM_SPECTATOR
+        || ps.persistant[PERS_TEAM as usize] == TEAM_SPECTATOR
+    {
+        ctx.world.entity_mut(psClient).ghoul2weapon = null_mut();
+        ctx.world.entity_mut(centNum).ghoul2weapon = null_mut();
+        ctx.world.entity_mut(psClient).weapon = 0;
+        ctx.world.entity_mut(centNum).weapon = 0;
+        return;
+    }
+
+    let ghoul2 = ctx.world.entity(centNum).ghoul2;
+    let ghoul2weapon = ctx.world.entity(centNum).ghoul2weapon;
+    let number = ctx.world.entity(centNum).currentState.number;
+    let wanted = {
+        let world = &*ctx.world;
+        CG_G2WeaponInstance(world, world.entity(centNum), ps.weapon)
+    };
+
+    //don't want spectator mode forcing one client's weapon instance over another's
+    if !ghoul2.is_null() && ghoul2weapon != wanted && ps.clientNum == number {
+        CG_CopyG2WeaponInstance(ctx, centNum, ps.weapon, ghoul2);
+        // the copy can free a saber instance, so re-ask which one we ended up on
+        let nowWanted = {
+            let world = &*ctx.world;
+            CG_G2WeaponInstance(world, world.entity(centNum), ps.weapon)
+        };
+        ctx.world.entity_mut(centNum).ghoul2weapon = nowWanted;
+
+        let centWeapon = ctx.world.entity(centNum).weapon;
+        let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+
+        if centWeapon == WP_SABER && centWeapon != ps.weapon && ps.saberHolstered == 0 {
+            //switching away from the saber
+            //trap_S_StartSound(cent->lerpOrigin, cent->currentState.number, CHAN_AUTO, trap_S_RegisterSound( "sound/weapons/saber/saberoffquick.wav" ));
+            let soundOff0 = ctx.world.cgs.clientinfo[psClient].saber[0].soundOff;
+            if soundOff0 != 0 && ps.saberHolstered == 0 {
+                trap::S_StartSound(engine, Some(&lerpOrigin), number, CHAN_AUTO, soundOff0);
+            }
+
+            let soundOff1 = ctx.world.cgs.clientinfo[psClient].saber[1].soundOff;
+            let hasModel1 = ctx.world.cgs.clientinfo[psClient].saber[1].model[0] != 0;
+            if soundOff1 != 0 && hasModel1 && ps.saberHolstered == 0 {
+                trap::S_StartSound(engine, Some(&lerpOrigin), number, CHAN_AUTO, soundOff1);
+            }
+        } else if ps.weapon == WP_SABER
+            && centWeapon != ps.weapon
+            && ctx.world.entity(centNum).saberWasInFlight == qfalse
+        {
+            //switching to the saber
+            //trap_S_StartSound(cent->lerpOrigin, cent->currentState.number, CHAN_AUTO, trap_S_RegisterSound( "sound/weapons/saber/saberon.wav" ));
+            let soundOn0 = ctx.world.cgs.clientinfo[psClient].saber[0].soundOn;
+            if soundOn0 != 0 {
+                trap::S_StartSound(engine, Some(&lerpOrigin), number, CHAN_AUTO, soundOn0);
+            }
+
+            let soundOn1 = ctx.world.cgs.clientinfo[psClient].saber[1].soundOn;
+            if soundOn1 != 0 {
+                trap::S_StartSound(engine, Some(&lerpOrigin), number, CHAN_AUTO, soundOn1);
+            }
+
+            BG_SI_SetDesiredLength(
+                &mut ctx.world.cgs.clientinfo[psClient].saber[0] as *mut saberInfo_t,
+                0.0,
+                -1,
+            );
+            BG_SI_SetDesiredLength(
+                &mut ctx.world.cgs.clientinfo[psClient].saber[1] as *mut saberInfo_t,
+                0.0,
+                -1,
+            );
+        }
+        ctx.world.entity_mut(centNum).weapon = ps.weapon;
     }
 }

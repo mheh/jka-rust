@@ -2,71 +2,106 @@
 //! transcription waves.
 
 #![allow(non_snake_case)]
+#![allow(non_upper_case_globals)]
 
 use core::ffi::{c_char, c_int};
 use core::ptr::null_mut;
 
-use mp_abi::cgame::shared_buffer::{TCGGetBoltData, TCGPointContents, TCGVectorData};
+use mp_abi::cgame::shared_buffer::{TCGGetBoltData, TCGMiscEnt, TCGPointContents, TCGVectorData};
 use mp_bg::bg_misc::{
     selected_holdable_tag, BG_CycleForce, BG_CycleInven, BG_FindItemForPowerup,
     BG_GetItemIndexByTag,
 };
-use mp_bg::public::bg_itemlist::bg_itemlist;
+use mp_bg::public::bg_itemlist::{bg_itemlist, bg_numItems};
+use mp_bg::public::configstring::{
+    CS_AMBIENT_SET, CS_BSP_MODELS, CS_GLOBAL_AMBIENT_SET, CS_ITEMS, CS_MODELS, CS_MUSIC,
+    CS_TERRAINS,
+};
 use mp_bg::public::entity_type::entityType_t;
 use mp_bg::public::g_item::MAX_ITEM_MODELS;
-use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL, GT_TEAM};
+use mp_bg::public::gametype::{GT_CTF, GT_CTY, GT_DUEL, GT_JEDIMASTER, GT_POWERDUEL, GT_TEAM};
 use mp_bg::public::item_type::IT_HOLDABLE;
+use mp_bg::public::max_items::MAX_ITEMS;
 use mp_bg::public::pers_enum::persEnum_t::PERS_ATTACKER;
 use mp_bg::public::pmtype::pmtype_t;
 use mp_bg::public::powerup::{PW_BLUEFLAG, PW_NEUTRALFLAG, PW_REDFLAG};
-use mp_bg::public::spawn::MAX_SPAWN_VARS_CHARS;
+use mp_bg::public::spawn::{MAX_SPAWN_VARS, MAX_SPAWN_VARS_CHARS};
 use mp_bg::public::stat_index::statIndex_t::{STAT_CLIENTS_READY, STAT_HOLDABLE_ITEM};
 use mp_bg::public::team::{TEAM_BLUE, TEAM_RED, TEAM_SPECTATOR};
+use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
+use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
+use mp_qshared::common::mp::cgame::refdef_t::{
+    refdef_t, MAX_MAP_AREA_BYTES, MAX_RENDER_STRINGS, MAX_RENDER_STRING_LENGTH,
+};
 use mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_USE;
 use mp_qshared::common::mp::qcommon::{usercmd_t, PMF_FOLLOW};
 use mp_qshared::shared::cvar::{
     CVAR_ARCHIVE, CVAR_CHEAT, CVAR_INTERNAL, CVAR_ROM, CVAR_SERVERINFO, CVAR_USERINFO,
 };
+use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::force_powers::{
     FP_HEAL, FP_LEVITATION, FP_SABERTHROW, FP_SABER_DEFENSE, FP_SABER_OFFENSE, NUM_FORCE_POWERS,
 };
-use mp_qshared::shared::limits::{MAX_CLIENTS_I32, MAX_STRING_CHARS, MAX_TOKEN_CHARS};
+use mp_qshared::shared::limits::{
+    MAX_CLIENTS, MAX_CLIENTS_I32, MAX_MODELS, MAX_STRING_CHARS, MAX_SUB_BSP, MAX_TOKEN_CHARS,
+};
 use mp_qshared::shared::q_color::S_COLOR_RED;
-use mp_qshared::shared::q_math::{_VectorCopy, _VectorSubtract, VectorLength, PITCH, ROLL};
+use mp_qshared::shared::q_math::{
+    _VectorCopy, _VectorSubtract, AnglesToAxis, Distance, VectorLength, PITCH, ROLL, YAW,
+};
+use mp_qshared::shared::q_string::COM_Parse;
 use mp_qshared::shared::{
-    fileHandle_t, pc_token_t, qfalse, qhandle_t, qtrue, vec3_t, CIN_LOOP, FS_READ,
+    fileHandle_t, pc_token_t, qfalse, qhandle_t, qtrue, vec3_t, vec4_t, CIN_LOOP, FS_READ,
     MAX_CONFIGSTRINGS, MAX_GENTITIES, MAX_QPATH, MAX_TOKENLENGTH,
 };
+use mp_uishared::shared::cached_assets_t::NUM_CROSSHAIRS;
 use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::display_state::DisplayState;
 use mp_uishared::shared::item_id::ItemId;
 use mp_uishared::shared::menu_id::MenuId;
 use mp_uishared::shared::menu_system::{MenuSystem, MAX_MENUFILE};
-use mp_uishared::shared::menudef::{FEEDER_BLUETEAM_LIST, FEEDER_REDTEAM_LIST, FEEDER_SCOREBOARD};
+use mp_uishared::shared::menudef::{
+    CG_BLUE_NAME, CG_GAME_STATUS, CG_GAME_TYPE, CG_KILLER, CG_RED_NAME, FEEDER_BLUETEAM_LIST,
+    FEEDER_REDTEAM_LIST, FEEDER_SCOREBOARD,
+};
 use mp_uishared::ui_shared::{
     Menu_New, Menu_SetFeederSelection, PC_Color_Parse, PC_Float_Parse, PC_Int_Parse,
     PC_String_Parse,
 };
-use native_string::{atof, atoi, buf_to_string, latin1_to_string, Q_stricmp};
+use native_string::{
+    atof, atoi, buf_to_string, latin1_to_string, string_to_latin1, strncpyz_string, Q_strcat,
+    Q_stricmp,
+};
 
+use crate::cg_draw::{CG_Text_Paint, CG_Text_Width};
 use crate::cg_effects::CG_InitGlass;
-use crate::cg_new_draw::CG_StatusHandle;
+use crate::cg_ents::ScaleModelAxis;
+use crate::cg_info::{CG_LoadingItem, CG_LoadingString};
+use crate::cg_marks::CG_ClearParticles;
+use crate::cg_new_draw::{
+    CG_GameTypeString, CG_GetGameStatusText, CG_GetKillerText, CG_StatusHandle,
+};
+use crate::cg_players::{CG_CacheG2AnimInfo, CG_CleanJetpackGhoul2, CG_HandleAppendedSkin};
 use crate::cg_predict::CG_PointContents;
 use crate::cg_scoreboard::{CG_GetClassCount, CG_GetTeamNonScoreCount};
+use crate::cg_servercmds::CG_KillCEntityG2;
+use crate::cg_weapons::{CG_InitG2Weapons, CG_RegisterItemVisuals, CG_ShutDownG2Weapons};
 use crate::local::client_info_t::clientInfo_t;
 use crate::local::item_info_t::itemInfo_t;
+use crate::local::weapon_info_s::weaponInfo_t;
 use crate::trap;
+use crate::world::cg_main_state::CgMiscEnt;
 use crate::world::{CgContext, CgWorld};
 
 /// Raven `#define MAX_MISC_ENTS` — cgame's client-only "extra visual" registry
-/// capacity (`CG_MISC_ENT` shared-buffer vmcall registers into it; `CG_AddMiscEnt`
-/// / `CG_ClearMiscEnts` own that array and land in a later wave).
+/// capacity. [`CG_MiscEnt`] (the `CG_MISC_ENT` vmcall) and
+/// [`CG_CreateModelFromSpawnEnt`] are the two registrars that check it.
 ///
 /// The oracle spells it twice under an `#ifdef _XBOX` — 500 on Xbox, 4000 on
 /// the PC build this port ships. `CG_DrawMiscEnts`'s backing state is a growable
 /// `Vec` rather than a fixed-size array (see
-/// [`crate::world::cg_main_state::CgMiscEnt`]), so the value only matters to
-/// whichever wave ports `CG_AddMiscEnt`'s cap check.
+/// [`crate::world::cg_main_state::CgMiscEnt`]), so the cap only lives in those
+/// two checks.
 ///
 /// Source: `oracle/codemp/cgame/cg_main.c:137-141`
 pub const MAX_MISC_ENTS: usize = 4000;
@@ -83,10 +118,72 @@ pub const DEFAULT_MODEL: &str = "kyle";
 pub const DEFAULT_FORCEPOWERS: &str = "5-1-000000000000000000";
 
 /// Raven `#define MAX_CGSTRPOOL_SIZE 32768` — capacity of `cg_main.c`'s
-/// string-intern pool (`strPool`). No open fn in this wave reads or writes it.
+/// string-intern pool. The pool's own buffer is gone (see
+/// [`CG_StrPool_Alloc`]); this is the budget the bump counter is checked
+/// against.
 ///
 /// Source: `oracle/codemp/cgame/cg_main.c:3309`
 pub const MAX_CGSTRPOOL_SIZE: usize = 32768;
+
+/// Raven `#define DEFAULT_REDTEAM_NAME "Empire"` — the red team's display
+/// name. `CG_OwnerDrawWidth`/`CG_NewClientInfo` use it in place of the
+/// `cg_redTeamName` cvar, whose `cvarTable` row Raven commented out.
+///
+/// Source: `oracle/codemp/cgame/cg_local.h:87`
+pub const DEFAULT_REDTEAM_NAME: &str = "Empire";
+
+/// Raven `#define DEFAULT_BLUETEAM_NAME "Rebellion"` — [`DEFAULT_REDTEAM_NAME`]'s
+/// twin.
+///
+/// Source: `oracle/codemp/cgame/cg_local.h:88`
+pub const DEFAULT_BLUETEAM_NAME: &str = "Rebellion";
+
+// PORT-NOTE: `q_shared.h`'s font enum is anonymous, so per the anonymous-enum
+// convention this is a `const`; file-local, the same copy `cg_draw.rs` and
+// `mp_uishared::ui_shared` each keep.
+/// Source: `oracle/codemp/game/q_shared.h:3176-3182`
+const FONT_MEDIUM: c_int = 2;
+
+/// Raven `#define MAX_AMBIENT_SETS 256` — ambient soundsets are handed over in
+/// configstrings, so this is how many `CS_AMBIENT_SET` rows exist. No canonical
+/// `mp_qshared` home ported yet (`mp_game` keeps its own copy in `g_spawn.rs`,
+/// a crate cgame does not depend on), so it lands here beside its one reader.
+///
+/// Source: `oracle/codemp/game/q_shared.h:2035`
+const MAX_AMBIENT_SETS: c_int = 256;
+
+/// Raven `#define MAX_TERRAINS 1` — rwwRMG's terrain-configstring budget. Raven
+/// left the `32` it was cut down from in a trailing comment; the shipped value
+/// is 1, so `CG_RegisterGraphics`'s terrain loop runs at most zero times.
+///
+/// Source: `oracle/codemp/game/q_shared.h:1988`
+const MAX_TERRAINS: c_int = 1;
+
+// PORT-NOTE: `cg_local.h`'s chunk-type enum is anonymous, so per the
+// anonymous-enum convention these are `const`s. They index the first axis of
+// `cgs.media.chunkModels`.
+/// Source: `oracle/codemp/cgame/cg_local.h:1048-1059`
+const CHUNK_METAL1: usize = 0;
+/// Source: `oracle/codemp/cgame/cg_local.h:1048-1059`
+const CHUNK_METAL2: usize = 1;
+/// Source: `oracle/codemp/cgame/cg_local.h:1048-1059`
+const CHUNK_ROCK1: usize = 2;
+/// Source: `oracle/codemp/cgame/cg_local.h:1048-1059`
+const CHUNK_ROCK2: usize = 3;
+/// Source: `oracle/codemp/cgame/cg_local.h:1048-1059`
+const CHUNK_ROCK3: usize = 4;
+/// Source: `oracle/codemp/cgame/cg_local.h:1048-1059`
+const CHUNK_CRATE1: usize = 5;
+/// Source: `oracle/codemp/cgame/cg_local.h:1048-1059`
+const CHUNK_CRATE2: usize = 6;
+/// Source: `oracle/codemp/cgame/cg_local.h:1048-1059`
+const CHUNK_WHITE_METAL: usize = 7;
+
+/// Raven `#define NUM_CHUNK_MODELS 4` — how many `.md3` variants each chunk
+/// type registers.
+///
+/// Source: `oracle/codemp/cgame/cg_local.h:1061`
+const NUM_CHUNK_MODELS: usize = 4;
 
 // DEFERRED: CGFOFS — oracle/codemp/cgame/cg_main.c:3390
 // `#define CGFOFS(x) ((int)&(((cgSpawnEnt_t *)0)->x))` computes a field offset into
@@ -1464,6 +1561,7 @@ pub fn CG_ParseSiegeState(world: &mut CgWorld, s: &str) {
 pub fn CG_GetStringEdString(ctx: &mut CgContext, refSection: &str, refName: &str) -> String {
     let key = format!("{refSection}_{refName}");
     trap::SP_GetStringTextString(ctx.engine, &key, MAX_STRING_CHARS)
+        .unwrap_or_else(|| format!("??{key}"))
 }
 
 /// Raven `CG_GetMenuBuffer` — reads a menu script file into memory.
@@ -2113,6 +2211,7 @@ pub fn CG_GetLocationString(ctx: &mut CgContext, loc: &str) -> String {
     }
 
     trap::SP_GetStringTextString(ctx.engine, &loc[1..], 1024)
+        .unwrap_or_else(|| format!("??{}", &loc[1..]))
 }
 
 /// Raven `CG_NextInventory_f` — cycles the held-item selection forward.
@@ -2704,4 +2803,1088 @@ pub fn CG_PrevForcePower_f(ctx: &mut CgContext) {
         ctx.world.cg.forceSelect = selected;
         ctx.world.cg.forceSelectTime = ctx.world.cg.time as f32;
     }
+}
+
+/// The zero fill Raven gets from `memset(&cg.refdef, 0, sizeof(cg.refdef))`.
+/// `refdef_t` is a `#[repr(C)]` seam type with no `Default`, so the fill is
+/// spelled out once.
+fn zeroed_refdef() -> refdef_t {
+    refdef_t {
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        fov_x: 0.0,
+        fov_y: 0.0,
+        vieworg: [0.0; 3],
+        viewangles: [0.0; 3],
+        viewaxis: [[0.0; 3]; 3],
+        viewContents: 0,
+        time: 0,
+        rdflags: 0,
+        areamask: [0; MAX_MAP_AREA_BYTES],
+        text: [[0; MAX_RENDER_STRING_LENGTH]; MAX_RENDER_STRINGS],
+    }
+}
+
+/// The zero fill Raven gets from `memset( cg_weapons, 0, sizeof( cg_weapons ) )`.
+/// `weaponInfo_t` is plain handles plus two trail-fn slots and has no `Default`,
+/// so the fill is spelled out once.
+fn zeroed_weapon_info() -> weaponInfo_t {
+    weaponInfo_t {
+        registered: qfalse,
+        item: None,
+
+        handsModel: 0,
+        weaponModel: 0,
+        viewModel: 0,
+        barrelModel: 0,
+        flashModel: 0,
+
+        weaponMidpoint: [0.0; 3],
+
+        flashDlight: 0.0,
+        flashDlightColor: [0.0; 3],
+
+        weaponIcon: 0,
+        ammoIcon: 0,
+
+        ammoModel: 0,
+
+        flashSound: [0; 4],
+        firingSound: 0,
+        chargeSound: 0,
+        muzzleEffect: 0,
+        missileModel: 0,
+        missileSound: 0,
+        missileTrailFunc: None,
+        missileDlight: 0.0,
+        missileDlightColor: [0.0; 3],
+        missileRenderfx: 0,
+        missileHitSound: 0,
+
+        altFlashSound: [0; 4],
+        altFiringSound: 0,
+        altChargeSound: 0,
+        altMuzzleEffect: 0,
+        altMissileModel: 0,
+        altMissileSound: 0,
+        altMissileTrailFunc: None,
+        altMissileDlight: 0.0,
+        altMissileDlightColor: [0.0; 3],
+        altMissileRenderfx: 0,
+        altMissileHitSound: 0,
+
+        selectSound: 0,
+
+        readySound: 0,
+        trailRadius: 0.0,
+        wiTrailTime: 0.0,
+    }
+}
+
+/// Raven `CG_MiscEnt` — the `CG_MISC_ENT` vmcall body: registers one
+/// client-only decorative model and its cull radius into the misc-ent registry
+/// [`CG_DrawMiscEnts`] walks.
+///
+/// Same DEC-46.6 shape as [`C_GetLerpOrigin`]: Raven casts `cg.sharedBuffer` to
+/// `TCGMiscEnt *` right here, the port takes the already-decoded payload from
+/// the vmMain dispatch boundary.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:582-622`
+pub fn CG_MiscEnt(ctx: &mut CgContext, data: &TCGMiscEnt) {
+    if ctx.world.main.miscEnts.len() >= MAX_MISC_ENTS {
+        return;
+    }
+
+    // `RefEnt = &MiscEnts[NumMiscEnts++]` — the slot is claimed before the model
+    // registers, so the error path below leaves it claimed, exactly as Raven.
+    ctx.world.main.miscEnts.push(CgMiscEnt {
+        ent: refEntity_t::zeroed(),
+        radius: 0.0,
+        zOffset: 0.0,
+    });
+    let slot = ctx.world.main.miscEnts.len() - 1;
+
+    let mModel = buf_to_string(&data.mModel.map(|c| c as u8));
+    let modelIndex = trap::R_RegisterModel(ctx.engine, &mModel);
+    if modelIndex == 0 {
+        Com_Error(
+            ctx,
+            errorParm_t::ERR_DROP as c_int,
+            "client_model has invalid model definition",
+        );
+        return;
+    }
+
+    ctx.world.main.miscEnts[slot].zOffset = 0.0;
+
+    // `memset(RefEnt, 0, sizeof(refEntity_t))` and the fill that follows it; the
+    // finished record goes back into its slot at the bottom.
+    let mut RefEnt = refEntity_t::zeroed();
+    RefEnt.reType = refEntityType_t::RT_MODEL;
+    RefEnt.hModel = modelIndex;
+    RefEnt.frame = 0;
+
+    let mut mins: vec3_t = [0.0; 3];
+    let mut maxs: vec3_t = [0.0; 3];
+    trap::R_ModelBounds(ctx.engine, modelIndex, &mut mins, &mut maxs);
+    _VectorCopy(data.mScale, &mut RefEnt.modelScale);
+    _VectorCopy(data.mOrigin, &mut RefEnt.origin);
+
+    // Raven `VectorScaleVector(mins, data->mScale, mins)` - per-axis scale,
+    // no ported home for the macro yet.
+    mins[0] *= data.mScale[0];
+    mins[1] *= data.mScale[1];
+    mins[2] *= data.mScale[2];
+    maxs[0] *= data.mScale[0];
+    maxs[1] *= data.mScale[1];
+    maxs[2] *= data.mScale[2];
+    ctx.world.main.miscEnts[slot].radius = Distance(mins, maxs);
+
+    AnglesToAxis(data.mAngles, RefEnt.axis.as_mut_ptr());
+    ScaleModelAxis(&mut RefEnt);
+
+    ctx.world.main.miscEnts[slot].ent = RefEnt;
+}
+
+/// Raven `CG_AS_Register` — hands the ambient-sound system every soundset the
+/// server listed in configstrings, then parses them.
+///
+/// Raven's `#if 0` arm (the game-side `as_preCacheMap` walk, "that is evil")
+/// stays out.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:1356-1392`
+pub fn CG_AS_Register(ctx: &mut CgContext) {
+    // CG_LoadingString( "ambient sound sets" );
+
+    // Load the ambient sets
+    trap::AS_AddPrecacheEntry(ctx.engine, "#clear");
+
+    for i in 1..MAX_AMBIENT_SETS {
+        let soundName = CG_ConfigString(ctx, CS_AMBIENT_SET + i);
+        if soundName.is_empty() {
+            break;
+        }
+
+        trap::AS_AddPrecacheEntry(ctx.engine, &soundName);
+    }
+    let soundName = CG_ConfigString(ctx, CS_GLOBAL_AMBIENT_SET);
+    if !soundName.is_empty() && Q_stricmp(&soundName, "default") != 0 {
+        // global soundset
+        trap::AS_AddPrecacheEntry(ctx.engine, &soundName);
+    }
+
+    trap::AS_ParseSets(ctx.engine);
+}
+
+/// Raven `static char *sb_nums[11]` — the full-size HUD number shaders.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:1926-1938`
+const sb_nums: [&str; 11] = [
+    "gfx/2d/numbers/zero",
+    "gfx/2d/numbers/one",
+    "gfx/2d/numbers/two",
+    "gfx/2d/numbers/three",
+    "gfx/2d/numbers/four",
+    "gfx/2d/numbers/five",
+    "gfx/2d/numbers/six",
+    "gfx/2d/numbers/seven",
+    "gfx/2d/numbers/eight",
+    "gfx/2d/numbers/nine",
+    "gfx/2d/numbers/minus",
+];
+
+/// Raven `static char *sb_t_nums[11]` — the small HUD number shaders.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:1940-1952`
+const sb_t_nums: [&str; 11] = [
+    "gfx/2d/numbers/t_zero",
+    "gfx/2d/numbers/t_one",
+    "gfx/2d/numbers/t_two",
+    "gfx/2d/numbers/t_three",
+    "gfx/2d/numbers/t_four",
+    "gfx/2d/numbers/t_five",
+    "gfx/2d/numbers/t_six",
+    "gfx/2d/numbers/t_seven",
+    "gfx/2d/numbers/t_eight",
+    "gfx/2d/numbers/t_nine",
+    "gfx/2d/numbers/t_minus",
+];
+
+/// Raven `static char *sb_c_nums[11]` — the chunky HUD number shaders. The
+/// last row is Raven's own `"gfx/2d/numbers/t_minus", //?????`.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:1954-1966`
+const sb_c_nums: [&str; 11] = [
+    "gfx/2d/numbers/c_zero",
+    "gfx/2d/numbers/c_one",
+    "gfx/2d/numbers/c_two",
+    "gfx/2d/numbers/c_three",
+    "gfx/2d/numbers/c_four",
+    "gfx/2d/numbers/c_five",
+    "gfx/2d/numbers/c_six",
+    "gfx/2d/numbers/c_seven",
+    "gfx/2d/numbers/c_eight",
+    "gfx/2d/numbers/c_nine",
+    "gfx/2d/numbers/t_minus", //?????
+];
+
+/// Raven `CG_RegisterGraphics` — the map load's asset pass: world map, HUD
+/// shaders, effects, chunk models, item visuals, inline/sub-BSP models and
+/// terrain, stepping `cg.loadLCARSStage` as it goes.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:1919-2426`
+pub fn CG_RegisterGraphics(ctx: &mut CgContext) {
+    let engine = ctx.engine;
+
+    // clear any references to old media
+    ctx.world.cg.refdef = zeroed_refdef();
+    trap::R_ClearScene(engine);
+
+    let mapname = buf_to_string(&ctx.world.cgs.mapname.map(|c| c as u8));
+    CG_LoadingString(ctx, &mapname);
+
+    // #ifndef _XBOX
+    trap::R_LoadWorldMap(engine, &mapname);
+    // #endif
+
+    // precache status bar pics
+    // CG_LoadingString( "game media" );
+
+    for i in 0..11 {
+        ctx.world.cgs.media.numberShaders[i] = trap::R_RegisterShader(engine, sb_nums[i]);
+    }
+
+    ctx.world.cg.loadLCARSStage = 3;
+
+    for i in 0..11 {
+        ctx.world.cgs.media.numberShaders[i] = trap::R_RegisterShaderNoMip(engine, sb_nums[i]);
+        ctx.world.cgs.media.smallnumberShaders[i] =
+            trap::R_RegisterShaderNoMip(engine, sb_t_nums[i]);
+        ctx.world.cgs.media.chunkyNumberShaders[i] =
+            trap::R_RegisterShaderNoMip(engine, sb_c_nums[i]);
+    }
+
+    trap::R_RegisterShaderNoMip(engine, "gfx/mp/pduel_icon_lone");
+    trap::R_RegisterShaderNoMip(engine, "gfx/mp/pduel_icon_double");
+
+    ctx.world.cgs.media.balloonShader = trap::R_RegisterShader(engine, "gfx/mp/chat_icon");
+    ctx.world.cgs.media.vchatShader = trap::R_RegisterShader(engine, "gfx/mp/vchat_icon");
+
+    ctx.world.cgs.media.deferShader = trap::R_RegisterShaderNoMip(engine, "gfx/2d/defer.tga");
+
+    ctx.world.cgs.media.radarShader =
+        trap::R_RegisterShaderNoMip(engine, "gfx/menus/radar/radar.png");
+    ctx.world.cgs.media.siegeItemShader =
+        trap::R_RegisterShaderNoMip(engine, "gfx/menus/radar/goalitem");
+    ctx.world.cgs.media.mAutomapPlayerIcon =
+        trap::R_RegisterShader(engine, "gfx/menus/radar/arrow_w");
+    ctx.world.cgs.media.mAutomapRocketIcon =
+        trap::R_RegisterShader(engine, "gfx/menus/radar/rocket");
+
+    ctx.world.cgs.media.wireframeAutomapFrame_left =
+        trap::R_RegisterShader(engine, "gfx/mp_automap/mpauto_frame_left");
+    ctx.world.cgs.media.wireframeAutomapFrame_right =
+        trap::R_RegisterShader(engine, "gfx/mp_automap/mpauto_frame_right");
+    ctx.world.cgs.media.wireframeAutomapFrame_top =
+        trap::R_RegisterShader(engine, "gfx/mp_automap/mpauto_frame_top");
+    ctx.world.cgs.media.wireframeAutomapFrame_bottom =
+        trap::R_RegisterShader(engine, "gfx/mp_automap/mpauto_frame_bottom");
+
+    ctx.world.cgs.media.lagometerShader = trap::R_RegisterShaderNoMip(engine, "gfx/2d/lag");
+    ctx.world.cgs.media.connectionShader = trap::R_RegisterShaderNoMip(engine, "gfx/2d/net");
+
+    trap::FX_InitSystem(engine, &mut ctx.world.cg.refdef);
+    CG_RegisterEffects(ctx);
+
+    ctx.world.cgs.media.boltShader = trap::R_RegisterShader(engine, "gfx/misc/blueLine");
+
+    ctx.world.cgs.effects.turretShotEffect = trap::FX_RegisterEffect(engine, "turret/shot");
+    ctx.world.cgs.effects.mEmplacedDeadSmoke =
+        trap::FX_RegisterEffect(engine, "emplaced/dead_smoke.efx");
+    ctx.world.cgs.effects.mEmplacedExplode =
+        trap::FX_RegisterEffect(engine, "emplaced/explode.efx");
+    ctx.world.cgs.effects.mTurretExplode = trap::FX_RegisterEffect(engine, "turret/explode.efx");
+    ctx.world.cgs.effects.mSparkExplosion =
+        trap::FX_RegisterEffect(engine, "sparks/spark_explosion.efx");
+    ctx.world.cgs.effects.mTripmineExplosion =
+        trap::FX_RegisterEffect(engine, "tripMine/explosion.efx");
+    ctx.world.cgs.effects.mDetpackExplosion =
+        trap::FX_RegisterEffect(engine, "detpack/explosion.efx");
+    ctx.world.cgs.effects.mFlechetteAltBlow =
+        trap::FX_RegisterEffect(engine, "flechette/alt_blow.efx");
+    ctx.world.cgs.effects.mStunBatonFleshImpact =
+        trap::FX_RegisterEffect(engine, "stunBaton/flesh_impact.efx");
+    ctx.world.cgs.effects.mAltDetonate = trap::FX_RegisterEffect(engine, "demp2/altDetonate.efx");
+    ctx.world.cgs.effects.mSparksExplodeNoSound =
+        trap::FX_RegisterEffect(engine, "sparks/spark_exp_nosnd");
+    ctx.world.cgs.effects.mTripMineLaster = trap::FX_RegisterEffect(engine, "tripMine/laser.efx");
+    ctx.world.cgs.effects.mEmplacedMuzzleFlash =
+        trap::FX_RegisterEffect(engine, "effects/emplaced/muzzle_flash");
+    ctx.world.cgs.effects.mConcussionAltRing =
+        trap::FX_RegisterEffect(engine, "concussion/alt_ring");
+
+    ctx.world.cgs.effects.mHyperspaceStars =
+        trap::FX_RegisterEffect(engine, "ships/hyperspace_stars");
+    ctx.world.cgs.effects.mBlackSmoke = trap::FX_RegisterEffect(engine, "volumetric/black_smoke");
+    ctx.world.cgs.effects.mShipDestDestroyed =
+        trap::FX_RegisterEffect(engine, "effects/ships/dest_destroyed.efx");
+    ctx.world.cgs.effects.mShipDestBurning =
+        trap::FX_RegisterEffect(engine, "effects/ships/dest_burning.efx");
+    ctx.world.cgs.effects.mBobaJet = trap::FX_RegisterEffect(engine, "effects/boba/jet.efx");
+
+    ctx.world.cgs.effects.itemCone = trap::FX_RegisterEffect(engine, "mp/itemcone.efx");
+    ctx.world.cgs.effects.mTurretMuzzleFlash =
+        trap::FX_RegisterEffect(engine, "effects/turret/muzzle_flash.efx");
+    ctx.world.cgs.effects.mSparks = trap::FX_RegisterEffect(engine, "sparks/spark_nosnd.efx"); //sparks/spark.efx
+    ctx.world.cgs.effects.mSaberCut = trap::FX_RegisterEffect(engine, "saber/saber_cut.efx");
+    ctx.world.cgs.effects.mSaberBlock = trap::FX_RegisterEffect(engine, "saber/saber_block.efx");
+    ctx.world.cgs.effects.mSaberBloodSparks =
+        trap::FX_RegisterEffect(engine, "saber/blood_sparks_mp.efx");
+    ctx.world.cgs.effects.mSaberBloodSparksSmall =
+        trap::FX_RegisterEffect(engine, "saber/blood_sparks_25_mp.efx");
+    ctx.world.cgs.effects.mSaberBloodSparksMid =
+        trap::FX_RegisterEffect(engine, "saber/blood_sparks_50_mp.efx");
+    ctx.world.cgs.effects.mSpawn = trap::FX_RegisterEffect(engine, "mp/spawn.efx");
+    ctx.world.cgs.effects.mJediSpawn = trap::FX_RegisterEffect(engine, "mp/jedispawn.efx");
+    ctx.world.cgs.effects.mBlasterDeflect = trap::FX_RegisterEffect(engine, "blaster/deflect.efx");
+    ctx.world.cgs.effects.mBlasterSmoke = trap::FX_RegisterEffect(engine, "blaster/smoke_bolton");
+    ctx.world.cgs.effects.mForceConfustionOld =
+        trap::FX_RegisterEffect(engine, "force/confusion_old.efx");
+
+    ctx.world.cgs.effects.forceLightning =
+        trap::FX_RegisterEffect(engine, "effects/force/lightning.efx");
+    ctx.world.cgs.effects.forceLightningWide =
+        trap::FX_RegisterEffect(engine, "effects/force/lightningwide.efx");
+    ctx.world.cgs.effects.forceDrain = trap::FX_RegisterEffect(engine, "effects/mp/drain.efx");
+    ctx.world.cgs.effects.forceDrainWide =
+        trap::FX_RegisterEffect(engine, "effects/mp/drainwide.efx");
+    ctx.world.cgs.effects.forceDrained = trap::FX_RegisterEffect(engine, "effects/mp/drainhit.efx");
+
+    ctx.world.cgs.effects.mDisruptorDeathSmoke =
+        trap::FX_RegisterEffect(engine, "disruptor/death_smoke");
+
+    for i in 0..NUM_CROSSHAIRS {
+        let name = format!("gfx/2d/crosshair{}", (b'a' + i as u8) as char);
+        ctx.world.cgs.media.crosshairShader[i] = trap::R_RegisterShaderNoMip(engine, &name);
+    }
+
+    ctx.world.cg.loadLCARSStage = 4;
+
+    ctx.world.cgs.media.backTileShader = trap::R_RegisterShader(engine, "gfx/2d/backtile");
+
+    // precache the fpls skin
+    // trap_R_RegisterSkin("models/players/kyle/model_fpls2.skin");
+
+    ctx.world.cgs.media.itemRespawningPlaceholder =
+        trap::R_RegisterShader(engine, "powerups/placeholder");
+    ctx.world.cgs.media.itemRespawningRezOut = trap::R_RegisterShader(engine, "powerups/rezout");
+
+    ctx.world.cgs.media.playerShieldDamage =
+        trap::R_RegisterShader(engine, "gfx/misc/personalshield");
+    ctx.world.cgs.media.protectShader = trap::R_RegisterShader(engine, "gfx/misc/forceprotect");
+    ctx.world.cgs.media.forceSightBubble = trap::R_RegisterShader(engine, "gfx/misc/sightbubble");
+    ctx.world.cgs.media.forceShell = trap::R_RegisterShader(engine, "powerups/forceshell");
+    ctx.world.cgs.media.sightShell = trap::R_RegisterShader(engine, "powerups/sightshell");
+
+    ctx.world.cgs.media.itemHoloModel =
+        trap::R_RegisterModel(engine, "models/map_objects/mp/holo.md3");
+
+    // DEFERRED: forceHolocronModels[] — oracle/codemp/cgame/cg_ents.c:632-651
+    // Raven's `if (cgs.gametype == GT_HOLOCRON || cg_buildScript.integer)` block
+    // walks that 18-entry model table and registers each row. The table is
+    // `cg_ents.c` file scope (`cg_main.c:1909` only declares it `extern`), so its
+    // Rust home is `cg_ents.rs` — a file this wave may not open, and nothing in
+    // the tree declares it yet. The models still register lazily when `CG_Item`
+    // draws a holocron; only the up-front precache is missing.
+
+    if ctx.world.cgs.gametype == GT_CTF
+        || ctx.world.cgs.gametype == GT_CTY
+        || ctx.world.cvars.cg_buildScript.integer != 0
+    {
+        if ctx.world.cvars.cg_buildScript.integer != 0 {
+            trap::R_RegisterModel(engine, "models/flags/r_flag.md3");
+            trap::R_RegisterModel(engine, "models/flags/b_flag.md3");
+            trap::R_RegisterModel(engine, "models/flags/r_flag_ysal.md3");
+            trap::R_RegisterModel(engine, "models/flags/b_flag_ysal.md3");
+        }
+
+        if ctx.world.cgs.gametype == GT_CTF {
+            ctx.world.cgs.media.redFlagModel =
+                trap::R_RegisterModel(engine, "models/flags/r_flag.md3");
+            ctx.world.cgs.media.blueFlagModel =
+                trap::R_RegisterModel(engine, "models/flags/b_flag.md3");
+        } else {
+            ctx.world.cgs.media.redFlagModel =
+                trap::R_RegisterModel(engine, "models/flags/r_flag_ysal.md3");
+            ctx.world.cgs.media.blueFlagModel =
+                trap::R_RegisterModel(engine, "models/flags/b_flag_ysal.md3");
+        }
+
+        trap::R_RegisterShaderNoMip(engine, "gfx/hud/mpi_rflag_x");
+        trap::R_RegisterShaderNoMip(engine, "gfx/hud/mpi_bflag_x");
+
+        trap::R_RegisterShaderNoMip(engine, "gfx/hud/mpi_rflag_ys");
+        trap::R_RegisterShaderNoMip(engine, "gfx/hud/mpi_bflag_ys");
+
+        trap::R_RegisterShaderNoMip(engine, "gfx/hud/mpi_rflag");
+        trap::R_RegisterShaderNoMip(engine, "gfx/hud/mpi_bflag");
+
+        trap::R_RegisterShaderNoMip(engine, "gfx/2d/net.tga");
+
+        ctx.world.cgs.media.flagPoleModel =
+            trap::R_RegisterModel(engine, "models/flag2/flagpole.md3");
+        ctx.world.cgs.media.flagFlapModel =
+            trap::R_RegisterModel(engine, "models/flag2/flagflap3.md3");
+
+        ctx.world.cgs.media.redFlagBaseModel =
+            trap::R_RegisterModel(engine, "models/mapobjects/flagbase/red_base.md3");
+        ctx.world.cgs.media.blueFlagBaseModel =
+            trap::R_RegisterModel(engine, "models/mapobjects/flagbase/blue_base.md3");
+        ctx.world.cgs.media.neutralFlagBaseModel =
+            trap::R_RegisterModel(engine, "models/mapobjects/flagbase/ntrl_base.md3");
+    }
+
+    if ctx.world.cgs.gametype >= GT_TEAM || ctx.world.cvars.cg_buildScript.integer != 0 {
+        ctx.world.cgs.media.teamRedShader = trap::R_RegisterShader(engine, "sprites/team_red");
+        ctx.world.cgs.media.teamBlueShader = trap::R_RegisterShader(engine, "sprites/team_blue");
+        // cgs.media.redQuadShader = trap_R_RegisterShader("powerups/blueflag" );
+        ctx.world.cgs.media.teamStatusBar = trap::R_RegisterShader(engine, "gfx/2d/colorbar.tga");
+    } else if ctx.world.cgs.gametype == GT_JEDIMASTER {
+        ctx.world.cgs.media.teamRedShader = trap::R_RegisterShader(engine, "sprites/team_red");
+    }
+
+    if ctx.world.cgs.gametype == GT_POWERDUEL || ctx.world.cvars.cg_buildScript.integer != 0 {
+        // trap_R_RegisterShader("gfx/mp/pduel_gameicon_ally")
+        ctx.world.cgs.media.powerDuelAllyShader =
+            trap::R_RegisterShader(engine, "gfx/mp/pduel_icon_double");
+    }
+
+    ctx.world.cgs.media.heartShader =
+        trap::R_RegisterShaderNoMip(engine, "ui/assets/statusbar/selectedhealth.tga");
+
+    ctx.world.cgs.media.ysaliredShader = trap::R_RegisterShader(engine, "powerups/ysaliredshell");
+    ctx.world.cgs.media.ysaliblueShader = trap::R_RegisterShader(engine, "powerups/ysaliblueshell");
+    ctx.world.cgs.media.ysalimariShader = trap::R_RegisterShader(engine, "powerups/ysalimarishell");
+    ctx.world.cgs.media.boonShader = trap::R_RegisterShader(engine, "powerups/boonshell");
+    ctx.world.cgs.media.endarkenmentShader =
+        trap::R_RegisterShader(engine, "powerups/endarkenmentshell");
+    ctx.world.cgs.media.enlightenmentShader =
+        trap::R_RegisterShader(engine, "powerups/enlightenmentshell");
+    ctx.world.cgs.media.invulnerabilityShader =
+        trap::R_RegisterShader(engine, "powerups/invulnerabilityshell");
+
+    // Raven's six `#ifdef JK2AWARDS` medal shaders are compiled out of the MP
+    // build (`cg_main.c:2163-2170`).
+
+    // Binocular interface
+    ctx.world.cgs.media.binocularCircle = trap::R_RegisterShader(engine, "gfx/2d/binCircle");
+    ctx.world.cgs.media.binocularMask = trap::R_RegisterShader(engine, "gfx/2d/binMask");
+    ctx.world.cgs.media.binocularArrow = trap::R_RegisterShader(engine, "gfx/2d/binSideArrow");
+    ctx.world.cgs.media.binocularTri = trap::R_RegisterShader(engine, "gfx/2d/binTopTri");
+    ctx.world.cgs.media.binocularStatic = trap::R_RegisterShader(engine, "gfx/2d/binocularWindow");
+    ctx.world.cgs.media.binocularOverlay =
+        trap::R_RegisterShader(engine, "gfx/2d/binocularNumOverlay");
+
+    ctx.world.cg.loadLCARSStage = 5;
+
+    // Chunk models
+    // FIXME: jfm:? bother to conditionally load these if an ent has this material type?
+    for i in 0..NUM_CHUNK_MODELS {
+        ctx.world.cgs.media.chunkModels[CHUNK_METAL2][i] =
+            trap::R_RegisterModel(engine, &format!("models/chunks/metal/metal1_{}.md3", i + 1)); //_ /switched\ _
+        ctx.world.cgs.media.chunkModels[CHUNK_METAL1][i] =
+            trap::R_RegisterModel(engine, &format!("models/chunks/metal/metal2_{}.md3", i + 1)); //  \switched/
+        ctx.world.cgs.media.chunkModels[CHUNK_ROCK1][i] =
+            trap::R_RegisterModel(engine, &format!("models/chunks/rock/rock1_{}.md3", i + 1));
+        ctx.world.cgs.media.chunkModels[CHUNK_ROCK2][i] =
+            trap::R_RegisterModel(engine, &format!("models/chunks/rock/rock2_{}.md3", i + 1));
+        ctx.world.cgs.media.chunkModels[CHUNK_ROCK3][i] =
+            trap::R_RegisterModel(engine, &format!("models/chunks/rock/rock3_{}.md3", i + 1));
+        ctx.world.cgs.media.chunkModels[CHUNK_CRATE1][i] =
+            trap::R_RegisterModel(engine, &format!("models/chunks/crate/crate1_{}.md3", i + 1));
+        ctx.world.cgs.media.chunkModels[CHUNK_CRATE2][i] =
+            trap::R_RegisterModel(engine, &format!("models/chunks/crate/crate2_{}.md3", i + 1));
+        ctx.world.cgs.media.chunkModels[CHUNK_WHITE_METAL][i] = trap::R_RegisterModel(
+            engine,
+            &format!("models/chunks/metal/wmetal1_{}.md3", i + 1),
+        );
+    }
+
+    ctx.world.cgs.media.chunkSound =
+        trap::S_RegisterSound(engine, "sound/weapons/explosions/glasslcar");
+    ctx.world.cgs.media.grateSound = trap::S_RegisterSound(engine, "sound/effects/grate_destroy");
+    ctx.world.cgs.media.rockBreakSound = trap::S_RegisterSound(engine, "sound/effects/wall_smash");
+    ctx.world.cgs.media.rockBounceSound[0] =
+        trap::S_RegisterSound(engine, "sound/effects/stone_bounce");
+    ctx.world.cgs.media.rockBounceSound[1] =
+        trap::S_RegisterSound(engine, "sound/effects/stone_bounce2");
+    ctx.world.cgs.media.metalBounceSound[0] =
+        trap::S_RegisterSound(engine, "sound/effects/metal_bounce");
+    ctx.world.cgs.media.metalBounceSound[1] =
+        trap::S_RegisterSound(engine, "sound/effects/metal_bounce2");
+    ctx.world.cgs.media.glassChunkSound =
+        trap::S_RegisterSound(engine, "sound/weapons/explosions/glassbreak1");
+    ctx.world.cgs.media.crateBreakSound[0] =
+        trap::S_RegisterSound(engine, "sound/weapons/explosions/crateBust1");
+    ctx.world.cgs.media.crateBreakSound[1] =
+        trap::S_RegisterSound(engine, "sound/weapons/explosions/crateBust2");
+
+    // Ghoul2 Insert Start
+    CG_InitItems(ctx.world);
+    // Ghoul2 Insert End
+
+    for w in ctx.world.cg_weapons.iter_mut() {
+        *w = zeroed_weapon_info();
+    }
+
+    // only register the items that the server says we need
+    let items = CG_ConfigString(ctx, CS_ITEMS);
+    let itemBytes = items.as_bytes();
+
+    for i in 1..bg_numItems {
+        // §F19: Raven reads `char items[MAX_ITEMS+1]` past the copied string's
+        // terminator when the configstring is short; a byte that isn't there is
+        // "not requested" here.
+        if itemBytes.get(i as usize) == Some(&b'1') || ctx.world.cvars.cg_buildScript.integer != 0 {
+            CG_LoadingItem(ctx, i);
+            CG_RegisterItemVisuals(ctx, i);
+        }
+    }
+
+    ctx.world.cg.loadLCARSStage = 6;
+
+    ctx.world.cgs.media.glassShardShader = trap::R_RegisterShader(engine, "gfx/misc/test_crackle");
+
+    // doing one shader just makes it look like a shell.  By using two shaders with different bulge offsets and different texture scales, it has a much more chaotic look
+    ctx.world.cgs.media.electricBodyShader = trap::R_RegisterShader(engine, "gfx/misc/electric");
+    ctx.world.cgs.media.electricBody2Shader =
+        trap::R_RegisterShader(engine, "gfx/misc/fullbodyelectric2");
+
+    ctx.world.cgs.media.fsrMarkShader = trap::R_RegisterShader(engine, "footstep_r");
+    ctx.world.cgs.media.fslMarkShader = trap::R_RegisterShader(engine, "footstep_l");
+    ctx.world.cgs.media.fshrMarkShader = trap::R_RegisterShader(engine, "footstep_heavy_r");
+    ctx.world.cgs.media.fshlMarkShader = trap::R_RegisterShader(engine, "footstep_heavy_l");
+
+    ctx.world.cgs.media.refractionShader = trap::R_RegisterShader(engine, "effects/refraction");
+
+    ctx.world.cgs.media.cloakedShader = trap::R_RegisterShader(engine, "gfx/effects/cloakedShader");
+
+    // wall marks
+    ctx.world.cgs.media.shadowMarkShader = trap::R_RegisterShader(engine, "markShadow");
+    ctx.world.cgs.media.wakeMarkShader = trap::R_RegisterShader(engine, "wake");
+
+    ctx.world.cgs.media.viewPainShader = trap::R_RegisterShader(engine, "gfx/misc/borgeyeflare");
+    ctx.world.cgs.media.viewPainShader_Shields =
+        trap::R_RegisterShader(engine, "gfx/mp/dmgshader_shields");
+    ctx.world.cgs.media.viewPainShader_ShieldsAndHealth =
+        trap::R_RegisterShader(engine, "gfx/mp/dmgshader_shieldsandhealth");
+
+    // register the inline models
+    ctx.world.cgs.numInlineModels = trap::CM_NumInlineModels(engine);
+    let mut breakPoint = ctx.world.cgs.numInlineModels;
+    for i in 1..ctx.world.cgs.numInlineModels {
+        let name = format!("*{i}");
+        ctx.world.cgs.inlineDrawModel[i as usize] = trap::R_RegisterModel(engine, &name);
+        if ctx.world.cgs.inlineDrawModel[i as usize] == 0 {
+            breakPoint = i;
+            break;
+        }
+
+        let mut mins: vec3_t = [0.0; 3];
+        let mut maxs: vec3_t = [0.0; 3];
+        trap::R_ModelBounds(
+            engine,
+            ctx.world.cgs.inlineDrawModel[i as usize],
+            &mut mins,
+            &mut maxs,
+        );
+        for j in 0..3 {
+            ctx.world.cgs.inlineModelMidpoints[i as usize][j] =
+                (mins[j] as f64 + 0.5 * (maxs[j] as f64 - mins[j] as f64)) as f32;
+        }
+    }
+
+    ctx.world.cg.loadLCARSStage = 7;
+
+    // register all the server specified models
+    for i in 1..MAX_MODELS {
+        let cModelName = CG_ConfigString(ctx, CS_MODELS + i);
+        if cModelName.is_empty() {
+            break;
+        }
+
+        let mut modelName = cModelName;
+        if modelName.contains(".glm") || modelName.starts_with('$') {
+            // Check to see if it has a custom skin attached.
+            CG_HandleAppendedSkin(ctx, &mut modelName);
+            CG_CacheG2AnimInfo(ctx, &modelName);
+        }
+
+        if !modelName.starts_with('$') && !modelName.starts_with('@') {
+            // don't register vehicle names and saber names as models.
+            ctx.world.cgs.gameModels[i as usize] = trap::R_RegisterModel(engine, &modelName);
+        } else {
+            // FIXME: register here so that stuff gets precached!!!
+            ctx.world.cgs.gameModels[i as usize] = 0;
+        }
+    }
+    ctx.world.cg.loadLCARSStage = 8;
+    // Ghoul2 Insert Start
+
+    // CG_LoadingString( "BSP instances" );
+
+    for i in 1..MAX_SUB_BSP {
+        let bspName = CG_ConfigString(ctx, CS_BSP_MODELS + i);
+        if bspName.is_empty() {
+            break;
+        }
+
+        trap::CM_LoadMap(engine, &bspName, true);
+        ctx.world.cgs.inlineDrawModel[breakPoint as usize] =
+            trap::R_RegisterModel(engine, &bspName);
+        let mut mins: vec3_t = [0.0; 3];
+        let mut maxs: vec3_t = [0.0; 3];
+        trap::R_ModelBounds(
+            engine,
+            ctx.world.cgs.inlineDrawModel[breakPoint as usize],
+            &mut mins,
+            &mut maxs,
+        );
+        for j in 0..3 {
+            ctx.world.cgs.inlineModelMidpoints[breakPoint as usize][j] =
+                (mins[j] as f64 + 0.5 * (maxs[j] as f64 - mins[j] as f64)) as f32;
+        }
+        breakPoint += 1;
+        for sub in 1..MAX_MODELS {
+            let temp = format!("*{i}-{sub}");
+            ctx.world.cgs.inlineDrawModel[breakPoint as usize] =
+                trap::R_RegisterModel(engine, &temp);
+            if ctx.world.cgs.inlineDrawModel[breakPoint as usize] == 0 {
+                break;
+            }
+            let mut mins: vec3_t = [0.0; 3];
+            let mut maxs: vec3_t = [0.0; 3];
+            trap::R_ModelBounds(
+                engine,
+                ctx.world.cgs.inlineDrawModel[breakPoint as usize],
+                &mut mins,
+                &mut maxs,
+            );
+            for j in 0..3 {
+                ctx.world.cgs.inlineModelMidpoints[breakPoint as usize][j] =
+                    (mins[j] as f64 + 0.5 * (maxs[j] as f64 - mins[j] as f64)) as f32;
+            }
+            breakPoint += 1;
+        }
+    }
+
+    // CG_LoadingString( "Creating terrain" );
+    for i in 1..MAX_TERRAINS {
+        let terrainInfo = CG_ConfigString(ctx, CS_TERRAINS + i);
+        if terrainInfo.is_empty() {
+            break;
+        }
+
+        let terrainID = trap::CM_RegisterTerrain(engine, &terrainInfo);
+
+        trap::RMG_Init(engine, terrainID, &terrainInfo);
+
+        // Send off the terrainInfo to the renderer
+        trap::RE_InitRendererTerrain(engine, &terrainInfo);
+    }
+
+    // Raven's `CS_CHARSKINS` skin loop is commented out; rww replaced it with
+    // CS_G2BONES - a custom skin is now a `*` suffix on the indexed model name,
+    // used for NPCs only.
+
+    // CG_LoadingString("weapons");
+
+    CG_InitG2Weapons(ctx);
+
+    // Ghoul2 Insert End
+    ctx.world.cg.loadLCARSStage = 9;
+
+    // new stuff
+    ctx.world.cgs.media.patrolShader =
+        trap::R_RegisterShaderNoMip(engine, "ui/assets/statusbar/patrol.tga");
+    ctx.world.cgs.media.assaultShader =
+        trap::R_RegisterShaderNoMip(engine, "ui/assets/statusbar/assault.tga");
+    ctx.world.cgs.media.campShader =
+        trap::R_RegisterShaderNoMip(engine, "ui/assets/statusbar/camp.tga");
+    ctx.world.cgs.media.followShader =
+        trap::R_RegisterShaderNoMip(engine, "ui/assets/statusbar/follow.tga");
+    ctx.world.cgs.media.defendShader =
+        trap::R_RegisterShaderNoMip(engine, "ui/assets/statusbar/defend.tga");
+    ctx.world.cgs.media.teamLeaderShader =
+        trap::R_RegisterShaderNoMip(engine, "ui/assets/statusbar/team_leader.tga");
+    ctx.world.cgs.media.retrieveShader =
+        trap::R_RegisterShaderNoMip(engine, "ui/assets/statusbar/retrieve.tga");
+    ctx.world.cgs.media.escortShader =
+        trap::R_RegisterShaderNoMip(engine, "ui/assets/statusbar/escort.tga");
+    ctx.world.cgs.media.cursor = trap::R_RegisterShaderNoMip(engine, "menu/art/3_cursor2");
+    ctx.world.cgs.media.sizeCursor =
+        trap::R_RegisterShaderNoMip(engine, "ui/assets/sizecursor.tga");
+    ctx.world.cgs.media.selectCursor =
+        trap::R_RegisterShaderNoMip(engine, "ui/assets/selectcursor.tga");
+    ctx.world.cgs.media.flagShaders[0] =
+        trap::R_RegisterShaderNoMip(engine, "ui/assets/statusbar/flag_in_base.tga");
+    ctx.world.cgs.media.flagShaders[1] =
+        trap::R_RegisterShaderNoMip(engine, "ui/assets/statusbar/flag_capture.tga");
+    ctx.world.cgs.media.flagShaders[2] =
+        trap::R_RegisterShaderNoMip(engine, "ui/assets/statusbar/flag_missing.tga");
+
+    ctx.world.cgs.media.halfShieldModel =
+        trap::R_RegisterModel(engine, "models/weaphits/testboom.md3");
+    ctx.world.cgs.media.halfShieldShader = trap::R_RegisterShader(engine, "halfShieldShell");
+
+    trap::FX_RegisterEffect(engine, "force/force_touch");
+
+    CG_ClearParticles(ctx.world);
+
+    // Raven's `MAX_PARTICLES_AREAS` `CG_NewParticleArea` loop is commented out.
+}
+
+/// Raven `CG_BuildSpectatorString` — rebuilds the scrolling spectator list and
+/// latches its width for a re-measure when the text changed.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:2480-2497`
+pub fn CG_BuildSpectatorString(ctx: &mut CgContext) {
+    ctx.world.cg.spectatorList[0] = 0;
+
+    // Count up the number of players per team and per class
+    CG_SiegeCountCvars(ctx);
+
+    for i in 0..MAX_CLIENTS {
+        if ctx.world.cgs.clientinfo[i].infoValid != qfalse
+            && ctx.world.cgs.clientinfo[i].team == TEAM_SPECTATOR
+        {
+            let name = buf_to_string(&ctx.world.cgs.clientinfo[i].name.map(|c| c as u8));
+            Q_strcat(
+                &mut ctx.world.cg.spectatorList,
+                MAX_STRING_CHARS,
+                &format!("{name}     "),
+            );
+        }
+    }
+    let i = ctx
+        .world
+        .cg
+        .spectatorList
+        .iter()
+        .position(|&c| c == 0)
+        .unwrap_or(MAX_STRING_CHARS) as c_int;
+    if i != ctx.world.cg.spectatorLen {
+        ctx.world.cg.spectatorLen = i;
+        ctx.world.cg.spectatorWidth = -1.0;
+    }
+}
+
+/// Raven `CG_StartMusic` — starts the map's background track from the
+/// `CS_MUSIC` configstring's intro/loop pair.
+///
+/// `bForceStart` is inverted at the trap: Raven passes it as
+/// `bReturnWithoutStarting`.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:2550-2560`
+pub fn CG_StartMusic(ctx: &mut CgContext, bForceStart: bool) {
+    // start the background music
+    let s = CG_ConfigString(ctx, CS_MUSIC);
+    let (tok1, s) = COM_Parse(&s, true);
+    let parm1 = strncpyz_string(&string_to_latin1(&tok1), MAX_QPATH);
+    let (tok2, _s) = COM_Parse(s, true);
+    let parm2 = strncpyz_string(&string_to_latin1(&tok2), MAX_QPATH);
+
+    trap::S_StartBackgroundTrack(ctx.engine, &parm1, &parm2, !bForceStart);
+}
+
+/// Raven `CG_Load_Menu` — consumes one `{ menufile menufile … }` block out of
+/// the hud-menu list and parses each named file. `p` is the caller's cursor,
+/// advanced in place.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:2800-2826`
+pub fn CG_Load_Menu(
+    ctx: &mut CgContext,
+    menus: &mut MenuSystem,
+    ds: &mut DisplayState,
+    dc: &mut dyn DisplayContext,
+    p: &mut &str,
+) -> bool {
+    // Raven's `COM_ParseExt(p, qtrue)`; the ported `COM_Parse` already carries
+    // the `allowLineBreaks` flag.
+    let (token, rest) = COM_Parse(*p, true);
+    *p = rest;
+
+    if !token.starts_with('{') {
+        return false;
+    }
+
+    loop {
+        let (token, rest) = COM_Parse(*p, true);
+        *p = rest;
+
+        if Q_stricmp(&token, "}") == 0 {
+            return true;
+        }
+
+        if token.is_empty() {
+            return false;
+        }
+
+        CG_ParseMenu(ctx, menus, ds, dc, &token);
+    }
+    // Raven's trailing `return qfalse;` is unreachable past the `while (1)`.
+}
+
+/// Raven `CG_Text_PaintWithCursor` — the menu framework's edit-field text slot.
+/// Raven never draws the cursor here, it just forwards to
+/// [`CG_Text_Paint`](crate::cg_draw::CG_Text_Paint) with `adjust` zeroed.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:3027-3029`
+#[allow(clippy::too_many_arguments)]
+pub fn CG_Text_PaintWithCursor(
+    ctx: &CgContext,
+    cgDC: &DisplayState,
+    x: f32,
+    y: f32,
+    scale: f32,
+    color: vec4_t,
+    text: &str,
+    _cursorPos: c_int,
+    _cursor: u8,
+    limit: c_int,
+    style: c_int,
+    iMenuFont: c_int,
+) {
+    CG_Text_Paint(
+        ctx, cgDC, x, y, scale, color, text, 0.0, limit, style, iMenuFont,
+    );
+}
+
+/// Raven `CG_OwnerDrawWidth` — how wide the five text ownerdraws paint, so the
+/// menu framework can right-align them. Anything else measures 0.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:3031-3051`
+pub fn CG_OwnerDrawWidth(
+    ctx: &mut CgContext,
+    _menus: &mut MenuSystem,
+    ds: &DisplayState,
+    ownerDraw: c_int,
+    scale: f32,
+) -> c_int {
+    match ownerDraw {
+        CG_GAME_TYPE => {
+            let s = CG_GameTypeString(ctx.world);
+            CG_Text_Width(ctx, ds, s, scale, FONT_MEDIUM)
+        }
+        CG_GAME_STATUS => {
+            let s = CG_GetGameStatusText(ctx);
+            CG_Text_Width(ctx, ds, &s, scale, FONT_MEDIUM)
+        }
+        CG_KILLER => {
+            let s = CG_GetKillerText(ctx);
+            CG_Text_Width(ctx, ds, &s, scale, FONT_MEDIUM)
+        }
+        // cg_redTeamName.string
+        CG_RED_NAME => CG_Text_Width(ctx, ds, DEFAULT_REDTEAM_NAME, scale, FONT_MEDIUM),
+        // cg_blueTeamName.string
+        CG_BLUE_NAME => CG_Text_Width(ctx, ds, DEFAULT_BLUETEAM_NAME, scale, FONT_MEDIUM),
+
+        _ => 0,
+    }
+}
+
+/// Raven `CG_StrPool_Alloc` — hands out `size` zeroed bytes off the 32K
+/// ent-parsing pool.
+///
+/// The bump arena is gone: the pool's one consumer (`CG_NewString`) builds an
+/// owned string, so this returns the owned zeroed buffer and only the budget
+/// counter survives (the same fold [`CG_AddSpawnVarToken`] got). The overrun
+/// `Com_Error` is kept because it is observable; Raven's never comes back and
+/// the port's does, so an over-budget request is still served below.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:3313-3329`
+pub fn CG_StrPool_Alloc(ctx: &mut CgContext, size: c_int) -> Vec<u8> {
+    if ctx.world.main.cg_strPoolSize + size >= MAX_CGSTRPOOL_SIZE as c_int {
+        Com_Error(
+            ctx,
+            errorParm_t::ERR_DROP as c_int,
+            "You exceeded the cgame string pool size. Bad programmer!\n",
+        );
+    }
+
+    ctx.world.main.cg_strPoolSize += size;
+
+    // memset it for them, just to be nice.
+    // §F19: a negative `size` is a negative `memset` length in Raven; here it
+    // clamps to an empty buffer.
+    vec![0u8; size.max(0) as usize]
+}
+
+/// Raven `CG_CreateModelFromSpawnEnt` — a `misc_model_static` becomes one
+/// misc-ent draw record, scaled, z-offset and yawed into place.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:3452-3508`
+pub fn CG_CreateModelFromSpawnEnt(ctx: &mut CgContext, ent: &mut CgSpawnEnt) {
+    if ctx.world.main.miscEnts.len() >= MAX_MISC_ENTS {
+        let msg = format!("Too many misc_model_static's on level, ask a programmer to raise the limit (currently {MAX_MISC_ENTS}), or take some out.");
+        Com_Error(ctx, errorParm_t::ERR_DROP as c_int, &msg);
+        return;
+    }
+
+    // Raven's `!ent || !ent->model` null tests are gone with the reference and
+    // the owned `String`; the empty-model test is the one that survives.
+    if ent.model.is_empty() {
+        Com_Error(
+            ctx,
+            errorParm_t::ERR_DROP as c_int,
+            "misc_model_static with no model.",
+        );
+        return;
+    }
+
+    // `RefEnt = &MiscEnts[NumMiscEnts++]` — same claim-then-fill as [`CG_MiscEnt`].
+    ctx.world.main.miscEnts.push(CgMiscEnt {
+        ent: refEntity_t::zeroed(),
+        radius: 0.0,
+        zOffset: 0.0,
+    });
+    let slot = ctx.world.main.miscEnts.len() - 1;
+
+    let modelIndex = trap::R_RegisterModel(ctx.engine, &ent.model);
+    if modelIndex == 0 {
+        let msg = format!("misc_model_static failed to load model '{}'", ent.model);
+        Com_Error(ctx, errorParm_t::ERR_DROP as c_int, &msg);
+        return;
+    }
+
+    let mut RefEnt = refEntity_t::zeroed();
+    RefEnt.reType = refEntityType_t::RT_MODEL;
+    RefEnt.hModel = modelIndex;
+    RefEnt.frame = 0;
+
+    let mut mins: vec3_t = [0.0; 3];
+    let mut maxs: vec3_t = [0.0; 3];
+    trap::R_ModelBounds(ctx.engine, modelIndex, &mut mins, &mut maxs);
+    _VectorCopy(ent.scale, &mut RefEnt.modelScale);
+    if ent.fScale != 0.0 {
+        // use same scale on each axis then
+        RefEnt.modelScale[0] = ent.fScale;
+        RefEnt.modelScale[1] = ent.fScale;
+        RefEnt.modelScale[2] = ent.fScale;
+    }
+    _VectorCopy(ent.origin, &mut RefEnt.origin);
+    _VectorCopy(ent.origin, &mut RefEnt.lightingOrigin);
+
+    // Raven `VectorScaleVector(mins, ent->scale, mins)` - the per-axis `scale`,
+    // not the `fScale` override applied above.
+    mins[0] *= ent.scale[0];
+    mins[1] *= ent.scale[1];
+    mins[2] *= ent.scale[2];
+    maxs[0] *= ent.scale[0];
+    maxs[1] *= ent.scale[1];
+    maxs[2] *= ent.scale[2];
+    ctx.world.main.miscEnts[slot].radius = Distance(mins, maxs);
+    ctx.world.main.miscEnts[slot].zOffset = ent.zoffset;
+
+    if ent.angle != 0.0 {
+        // only yaw supplied...
+        ent.angles[YAW] = ent.angle;
+    }
+
+    AnglesToAxis(ent.angles, RefEnt.axis.as_mut_ptr());
+    ScaleModelAxis(&mut RefEnt);
+
+    ctx.world.main.miscEnts[slot].ent = RefEnt;
+}
+
+/// Raven `CG_ParseSpawnVars` — pulls one map entity's key/value pairs out of the
+/// engine's entity-token stream into `cg_spawnVars`. `false` is the end of the
+/// spawn string.
+///
+/// Raven's `CG_Error` never comes back; the port's trap wrapper does, so every
+/// error path below answers `false` — the same "no more entities" the missing
+/// opening brace already answers.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:3541-3593`
+pub fn CG_ParseSpawnVars(ctx: &mut CgContext) -> bool {
+    ctx.world.main.cg_spawnVars.clear();
+    ctx.world.main.cg_numSpawnVarChars = 0;
+
+    // parse the opening brace
+    let Some(com_token) = trap::GetEntityToken(ctx.engine, MAX_TOKEN_CHARS) else {
+        // end of spawn string
+        return false;
+    };
+    if !com_token.starts_with('{') {
+        let msg = format!("CG_ParseSpawnVars: found {com_token} when expecting {{");
+        CG_Error(ctx, &msg);
+        return false;
+    }
+
+    // go through all the key / value pairs
+    loop {
+        // parse key
+        let Some(keyname) = trap::GetEntityToken(ctx.engine, MAX_TOKEN_CHARS) else {
+            CG_Error(ctx, "CG_ParseSpawnVars: EOF without closing brace");
+            return false;
+        };
+
+        if keyname.starts_with('}') {
+            break;
+        }
+
+        // parse value
+        let Some(com_token) = trap::GetEntityToken(ctx.engine, MAX_TOKEN_CHARS) else {
+            // this happens on mike's test level, I don't know why. Fixme?
+            // CG_Error( "CG_ParseSpawnVars: EOF without closing brace" );
+            break;
+        };
+
+        if com_token.starts_with('}') {
+            CG_Error(ctx, "CG_ParseSpawnVars: closing brace without data");
+            return false;
+        }
+        if ctx.world.main.cg_spawnVars.len() == MAX_SPAWN_VARS {
+            CG_Error(ctx, "CG_ParseSpawnVars: MAX_SPAWN_VARS");
+            return false;
+        }
+        let key = CG_AddSpawnVarToken(ctx, &keyname);
+        let value = CG_AddSpawnVarToken(ctx, &com_token);
+        ctx.world.main.cg_spawnVars.push([key, value]);
+    }
+
+    true
+}
+
+/// Raven `CG_DestroyAllGhoul2` — the map-teardown sweep: every entity's ghoul2
+/// instances and npc client info, the weapon instances, every item's g2 models
+/// and the global jetpack instance.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:3951-3984`
+pub fn CG_DestroyAllGhoul2(ctx: &mut CgContext) {
+    // Com_Printf("... CGameside GHOUL2 Cleanup\n");
+    // free all dynamically allocated npc client info structs and ghoul2 instances
+    for i in 0..MAX_GENTITIES {
+        CG_KillCEntityG2(ctx, i);
+    }
+
+    // Clean the weapon instances
+    CG_ShutDownG2Weapons(ctx);
+
+    let engine = ctx.engine;
+    // and now for items
+    for i in 0..MAX_ITEMS {
+        for j in 0..MAX_ITEM_MODELS {
+            let g2 = ctx.world.cg_items[i].g2Models[j];
+            if !g2.is_null() && trap::G2_HaveWeGhoul2Models(engine, g2) {
+                trap::G2API_CleanGhoul2Models(engine, &mut ctx.world.cg_items[i].g2Models[j]);
+                ctx.world.cg_items[i].g2Models[j] = null_mut();
+            }
+        }
+    }
+
+    // Clean the global jetpack instance
+    CG_CleanJetpackGhoul2(ctx);
 }

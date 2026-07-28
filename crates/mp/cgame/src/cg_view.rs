@@ -1325,3 +1325,21 @@ pub fn CG_AddRadarAutomapEnts(ctx: &mut CgContext) {
         i += 1;
     }
 }
+
+/// Raven `RF_DEPTHHACK` — for view weapon Z crunching. `cg_ents.rs` has its
+/// own private copy beside its own reader; this TU gets its own per §C8.
+/// Source: `oracle/codemp/cgame/tr_types.h:21`
+const RF_DEPTHHACK: c_int = 0x00008;
+
+/// Raven `CG_TestGun_f` — the `testgun` console command; parks the test model
+/// on the view weapon path instead of `CG_TestModel_f`'s free-floating one.
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:98-105`
+pub fn CG_TestGun_f(ctx: &mut CgContext) {
+    CG_TestModel_f(ctx);
+    ctx.world.cg.testGun = qtrue;
+    //cg.testModelEntity.renderfx = RF_MINLIGHT | RF_DEPTHHACK | RF_FIRST_PERSON;
+
+    // rww - 9-13-01 [1-26-01-sof2]
+    ctx.world.cg.testModelEntity.renderfx = RF_DEPTHHACK | RF_FIRST_PERSON;
+}

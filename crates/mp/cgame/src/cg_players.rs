@@ -17,12 +17,14 @@ use mp_bg::cstr_util::cstr_to_str;
 use mp_bg::local::{bgToggleableSurfaceDebris, bgToggleableSurfaces, bg_customSiegeSoundNames};
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::anim_table::animTable;
+use mp_bg::public::configstring::CS_G2BONES;
 use mp_bg::public::entity_effects::EF2_HYPERSPACE;
 use mp_bg::public::entity_flags::{EF_CONNECTION, EF_DEAD, EF_RAG, EF_TALK};
 use mp_bg::public::entity_type::entityType_t;
 use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL, GT_TEAM};
 use mp_bg::public::gender::gender_t;
 use mp_bg::public::hyperspace::HYPERSPACE_TIME;
+use mp_bg::public::powerup::{PW_BLUEFLAG, PW_NEUTRALFLAG, PW_QUAD, PW_REDFLAG};
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
@@ -41,6 +43,7 @@ use mp_qshared::common::mp::qcommon::{
     entityState_t, saberInfo_t, sharedRagDollParams_t, sharedRagDollUpdateParams_t,
 };
 use mp_qshared::common::mp::trace_t::trace_t;
+use mp_qshared::shared::com_parse::{COM_ParseExt, COM_ParseString, QSharedScratch};
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin,
     vectoangles, AngleVectors, AnglesToAxis, Distance, MatrixMultiply, VectorClear, VectorInverse,
@@ -48,16 +51,18 @@ use mp_qshared::shared::q_math::{
 };
 use mp_qshared::shared::q_string::COM_StripExtension;
 use mp_qshared::shared::{
-    addbezierArgStruct_t, mdxaBone_t, orientation_t, qfalse, qhandle_t, qtrue, sharedEIKMoveState,
-    sharedERagPhase, vec3_t, CollisionRecord_t, Eorientations, CONTENTS_LAVA, CONTENTS_SLIME,
-    CONTENTS_SOLID, CONTENTS_WATER, ENTITYNUM_NONE, ENTITYNUM_WORLD, FP_SEE, FS_READ, MASK_SOLID,
-    MAX_CLIENTS, MAX_CLIENTS_I32, MAX_GENTITIES, MAX_QPATH,
+    addbezierArgStruct_t, fileHandle_t, mdxaBone_t, orientation_t, qfalse, qhandle_t, qtrue,
+    sfxHandle_t, sharedEIKMoveState, sharedERagPhase, vec3_t, CollisionRecord_t, Eorientations,
+    CONTENTS_LAVA, CONTENTS_SLIME, CONTENTS_SOLID, CONTENTS_WATER, ENTITYNUM_NONE, ENTITYNUM_WORLD,
+    FP_SEE, FS_READ, MASK_SOLID, MAX_CLIENTS, MAX_CLIENTS_I32, MAX_GENTITIES, MAX_QPATH,
 };
-use native_string::{atoi, buf_to_string, cstr, Q_stricmp, Q_strncpyz};
+use native_string::{
+    atoi, buf_to_string, cstr, strcat_string, strncpyz_string, Q_stricmp, Q_strncpyz,
+};
 
 use crate::bg_channel::{CgBgTraps, CgGameCallbacks};
 use crate::cg_ents::ScaleModelAxis;
-use crate::cg_main::{CG_Error, CG_Printf};
+use crate::cg_main::{CG_ConfigString, CG_Error, CG_Printf, Com_Printf};
 use crate::local::centity_s::centity_t;
 use crate::local::client_info_t::{
     clientInfo_t, MAX_CUSTOM_DUEL_SOUNDS, MAX_CUSTOM_SIEGE_SOUNDS, MAX_CUSTOM_SOUNDS,
@@ -90,6 +95,11 @@ const DEFAULT_FEMALE_SOUNDPATH: &str = "chars/mp_generic_female/misc";
 /// Raven: the commented-out original was `"chars/kyle/misc"`.
 /// Source: `oracle/codemp/cgame/cg_players.c:798`
 const DEFAULT_MALE_SOUNDPATH: &str = "chars/mp_generic_male/misc";
+
+/// Raven `MAX_SURF_LIST_SIZE` — the `surfOff`/`surfOn` accumulator bound
+/// `CG_ParseSurfsFile` folds its comma-joined surface list into.
+/// Source: `oracle/codemp/cgame/cg_players.c:313`
+const MAX_SURF_LIST_SIZE: usize = 1024;
 
 /// Raven `MAX_SHIELD_TIME` — a double literal, so the `cg.time + MAX_SHIELD_TIME`
 /// it feeds is a double expression that truncates back to `int`.
@@ -4054,4 +4064,571 @@ pub fn CG_VehicleEffects(ctx: &mut CgContext, cent: &centity_t) {
     // engine-start rev, and the whole `type != VH_ANIMAL` effect body (surface
     // destruction, exhaust, wing trails, death flames, damage smoke) all hang off
     // `pVehNPC->m_pVehicleInfo`, which `Option<VehicleId>` cannot reach yet.
+}
+
+/// Raven `CG_CustomSound` — resolves a `*`-prefixed custom sound reference
+/// against a client's (or NPC's) per-model sound table, falling back to a
+/// straight `trap_S_RegisterSound` for anything that isn't a custom
+/// reference.
+/// Source: `oracle/codemp/cgame/cg_players.c:170-304`
+pub fn CG_CustomSound(ctx: &mut CgContext, clientNum: c_int, soundName: &str) -> sfxHandle_t {
+    if !soundName.starts_with('*') {
+        return trap::S_RegisterSound(ctx.engine, soundName);
+    }
+
+    let lSoundName = COM_StripExtension(soundName);
+
+    let clientNum = if clientNum < 0 { 0 } else { clientNum };
+    let isNpc = clientNum as usize >= MAX_CLIENTS;
+
+    let ci = if isNpc {
+        ctx.world.entities[clientNum as usize].npcClient.as_deref()
+    } else {
+        Some(&ctx.world.cgs.clientinfo[clientNum as usize])
+    };
+
+    let ci = match ci {
+        Some(ci) => ci,
+        None => return 0,
+    };
+
+    let numCSounds = cg_customSoundNames
+        .iter()
+        .position(Option::is_none)
+        .unwrap_or(MAX_CUSTOM_SOUNDS);
+
+    let mut numCComSounds = 0;
+    let mut numCExSounds = 0;
+    let mut numCJediSounds = 0;
+
+    if isNpc {
+        // these are only for npc's
+        numCComSounds = cg_customCombatSoundNames
+            .iter()
+            .position(Option::is_none)
+            .unwrap_or(MAX_CUSTOM_COMBAT_SOUNDS);
+        numCExSounds = cg_customExtraSoundNames
+            .iter()
+            .position(Option::is_none)
+            .unwrap_or(MAX_CUSTOM_EXTRA_SOUNDS);
+        numCJediSounds = cg_customJediSoundNames
+            .iter()
+            .position(Option::is_none)
+            .unwrap_or(MAX_CUSTOM_JEDI_SOUNDS);
+    }
+
+    let siege = ctx.world.cgs.gametype >= GT_TEAM || ctx.world.cvars.cg_buildScript.integer != 0;
+    // PORT-NOTE: Raven's counting loop scans `bg_customSiegeSoundNames` up to
+    // `MAX_CUSTOM_SOUNDS` (40), but the array itself is `MAX_CUSTOM_SIEGE_SOUNDS`
+    // (30) long (own comment: "for now these must all be the same" — they
+    // aren't) — an OOB C read past the real 30 entries. `.position()` only ever
+    // walks the array's real length, so it can't reproduce that read; every
+    // table has its `None` sentinel well inside 30, so the count is identical
+    // either way.
+    let mut numCSiegeSounds = 0;
+    if siege {
+        // siege only
+        numCSiegeSounds = bg_customSiegeSoundNames
+            .iter()
+            .position(Option::is_none)
+            .unwrap_or(bg_customSiegeSoundNames.len());
+    }
+
+    let duel = ctx.world.cgs.gametype == GT_DUEL
+        || ctx.world.cgs.gametype == GT_POWERDUEL
+        || ctx.world.cvars.cg_buildScript.integer != 0;
+    let mut numCDuelSounds = 0;
+    if duel {
+        // Duel only
+        numCDuelSounds = cg_customDuelSoundNames
+            .iter()
+            .position(Option::is_none)
+            .unwrap_or(MAX_CUSTOM_DUEL_SOUNDS);
+    }
+
+    for i in 0..MAX_CUSTOM_SOUNDS {
+        if i < numCSounds && cg_customSoundNames[i] == Some(lSoundName.as_str()) {
+            return ci.sounds[i];
+        } else if siege
+            && i < numCSiegeSounds
+            && bg_customSiegeSoundNames[i].and_then(|s| s.to_str().ok())
+                == Some(lSoundName.as_str())
+        {
+            // siege only
+            return ci.siegeSounds[i];
+        } else if duel
+            && i < numCDuelSounds
+            && cg_customDuelSoundNames[i] == Some(lSoundName.as_str())
+        {
+            // siege only
+            return ci.duelSounds[i];
+        } else if isNpc
+            && i < numCComSounds
+            && cg_customCombatSoundNames[i] == Some(lSoundName.as_str())
+        {
+            // npc only
+            return ci.combatSounds[i];
+        } else if isNpc
+            && i < numCExSounds
+            && cg_customExtraSoundNames[i] == Some(lSoundName.as_str())
+        {
+            // npc only
+            return ci.extraSounds[i];
+        } else if isNpc
+            && i < numCJediSounds
+            && cg_customJediSoundNames[i] == Some(lSoundName.as_str())
+        {
+            // npc only
+            return ci.jediSounds[i];
+        }
+    }
+
+    //CG_Error( "Unknown custom sound: %s", lSoundName );
+    //
+    // PORT-NOTE: FINAL_BUILD is never defined for this port (release parity),
+    // so Raven's `#ifndef FINAL_BUILD` diagnostic always fires.
+    Com_Printf(ctx, &format!("Unknown custom sound: {}", lSoundName));
+    0
+}
+
+/// Raven `CG_ParseSurfsFile` — loads `models/players/<model>/model_<skin>.surf`
+/// and folds its `surfOff`/`surfOn` directives into two comma-joined lists.
+///
+/// Out-params become the return value: `Some((surfOff, surfOn))` for Raven's
+/// `qtrue`, `None` for `qfalse`. Raven's
+/// `memset( (char *)surfOff, 0, sizeof(surfOff) )` only clears
+/// `sizeof(char*)` bytes of the caller's buffer (a sizeof-on-a-pointer-param
+/// bug) — but that's enough to zero byte 0, the only byte either
+/// `if (surfOff[0])` check ever reads, so the accumulators behave exactly as
+/// if freshly cleared regardless of what a caller passed in. The port starts
+/// both empty and hands them back instead of writing through caller buffers.
+/// Source: `oracle/codemp/cgame/cg_players.c:314-409`
+pub fn CG_ParseSurfsFile(
+    ctx: &mut CgContext,
+    modelName: &str,
+    skinName: &str,
+) -> Option<(String, String)> {
+    // this is a multi-part skin, said skins do not support .surf files
+    if skinName.contains('|') {
+        return None;
+    }
+
+    // Load and parse .surf file
+    let sfilename = format!("models/players/{}/model_{}.surf", modelName, skinName);
+
+    // load the file
+    let mut f: fileHandle_t = 0;
+    let len = trap::FS_FOpenFile(ctx.engine, &sfilename, &mut f, FS_READ);
+    if len <= 0 {
+        // no file
+        return None;
+    }
+    if len >= 20000 - 1 {
+        Com_Printf(ctx, &format!("File {} too long\n", sfilename));
+        return None;
+    }
+
+    let mut text = vec![0u8; len as usize];
+    trap::FS_Read(ctx.engine, &mut text, f);
+    trap::FS_FCloseFile(ctx.engine, f);
+
+    // parse the text
+    let mut text_p: Option<&[u8]> = Some(&text[..]);
+
+    let mut surfOff = String::new();
+    let mut surfOn = String::new();
+    let mut qs = QSharedScratch::zeroed();
+
+    // read information for surfOff and surfOn
+    loop {
+        let (token, rest) = COM_ParseExt(&mut qs, text_p, true);
+        text_p = rest;
+        if token.is_empty() {
+            break;
+        }
+
+        // surfOff
+        if Q_stricmp(&token, "surfOff") == 0 {
+            // Raven's `COM_ParseString` guard tests the (always non-NULL)
+            // token pointer, never the parsed value, so its `continue`-on-error
+            // arm is dead (see `COM_ParseString`'s own doc); dropped here too.
+            let (value, rest2) = COM_ParseString(&mut qs, text_p);
+            text_p = rest2;
+
+            if !surfOff.is_empty() {
+                strcat_string(&mut surfOff, MAX_SURF_LIST_SIZE, ",");
+                strcat_string(&mut surfOff, MAX_SURF_LIST_SIZE, &value);
+            } else {
+                surfOff = strncpyz_string(value.as_bytes(), MAX_SURF_LIST_SIZE);
+            }
+            continue;
+        }
+
+        // surfOn
+        if Q_stricmp(&token, "surfOn") == 0 {
+            let (value, rest2) = COM_ParseString(&mut qs, text_p);
+            text_p = rest2;
+
+            if !surfOn.is_empty() {
+                strcat_string(&mut surfOn, MAX_SURF_LIST_SIZE, ",");
+                strcat_string(&mut surfOn, MAX_SURF_LIST_SIZE, &value);
+            } else {
+                surfOn = strncpyz_string(value.as_bytes(), MAX_SURF_LIST_SIZE);
+            }
+            continue;
+        }
+    }
+
+    Some((surfOff, surfOn))
+}
+
+/// Raven `CG_RunLerpFrame` — advances one lerp-frame's animation state
+/// (torso or legs, chosen by `torsoOnly`) by one client render frame.
+///
+/// The port derives `lf` from `cent.pe.torso`/`cent.pe.legs` by `torsoOnly`
+/// rather than threading Raven's `lerpFrame_t *lf` param — every oracle call
+/// site passes exactly one of those two fields (`cg_players.c:3308,3326`),
+/// matching the already-ported `CG_SetLerpFrameAnimation`'s own shape.
+/// Source: `oracle/codemp/cgame/cg_players.c:3185-3235`
+pub fn CG_RunLerpFrame(
+    ctx: &mut CgContext,
+    cent: &mut centity_t,
+    ci: &mut clientInfo_t,
+    flipState: bool,
+    newAnimation: c_int,
+    speedScale: f32,
+    torsoOnly: bool,
+) {
+    // debugging tool to get no animations
+    if ctx.world.cvars.cg_animSpeed.integer == 0 {
+        let lf = if torsoOnly {
+            &mut cent.pe.torso
+        } else {
+            &mut cent.pe.legs
+        };
+        lf.oldFrame = 0;
+        lf.frame = 0;
+        lf.backlerp = 0.0;
+        return;
+    }
+
+    let ghoul2 = cent.ghoul2;
+    let forceFrame = cent.currentState.forceFrame;
+    let csBrokenLimbs = cent.currentState.brokenLimbs;
+    let time = ctx.world.cg.time;
+
+    // see if the animation sequence is switching
+    if forceFrame != 0 {
+        let lf = if torsoOnly {
+            &mut cent.pe.torso
+        } else {
+            &mut cent.pe.legs
+        };
+
+        if lf.lastForcedFrame != forceFrame {
+            let flags = BONE_ANIM_OVERRIDE_FREEZE | BONE_ANIM_BLEND;
+            let animSpeed = 1.0f32;
+            trap::G2API_SetBoneAnim(
+                ctx.engine,
+                ghoul2,
+                0,
+                "lower_lumbar",
+                forceFrame,
+                forceFrame + 1,
+                flags,
+                animSpeed,
+                time,
+                -1.0,
+                150,
+            );
+            trap::G2API_SetBoneAnim(
+                ctx.engine,
+                ghoul2,
+                0,
+                "model_root",
+                forceFrame,
+                forceFrame + 1,
+                flags,
+                animSpeed,
+                time,
+                -1.0,
+                150,
+            );
+            trap::G2API_SetBoneAnim(
+                ctx.engine,
+                ghoul2,
+                0,
+                "Motion",
+                forceFrame,
+                forceFrame + 1,
+                flags,
+                animSpeed,
+                time,
+                -1.0,
+                150,
+            );
+        }
+
+        lf.lastForcedFrame = forceFrame;
+        lf.animationNumber = 0;
+    } else {
+        let needsNewAnim = {
+            let lf = if torsoOnly {
+                &mut cent.pe.torso
+            } else {
+                &mut cent.pe.legs
+            };
+            lf.lastForcedFrame = -1;
+
+            newAnimation != lf.animationNumber
+                || csBrokenLimbs != ci.brokenLimbs
+                || flipState != (lf.lastFlip != qfalse)
+                || lf.animation.is_null()
+                || CG_FirstAnimFrame(lf, torsoOnly, speedScale)
+        };
+
+        if needsNewAnim {
+            CG_SetLerpFrameAnimation(
+                ctx,
+                cent,
+                ci,
+                newAnimation,
+                speedScale,
+                torsoOnly,
+                flipState,
+            );
+        }
+    }
+
+    let lf = if torsoOnly {
+        &mut cent.pe.torso
+    } else {
+        &mut cent.pe.legs
+    };
+    lf.lastFlip = if flipState { qtrue } else { qfalse };
+
+    if lf.frameTime > time + 200 {
+        lf.frameTime = time;
+    }
+
+    if lf.oldFrameTime > time {
+        lf.oldFrameTime = time;
+    }
+
+    // calculate current lerp value
+    if lf.frameTime == lf.oldFrameTime {
+        lf.backlerp = 0.0;
+    } else {
+        lf.backlerp =
+            1.0 - (time - lf.oldFrameTime) as f32 / (lf.frameTime - lf.oldFrameTime) as f32;
+    }
+}
+
+/// Raven `CG_ClearLerpFrame` — snaps one lerp-frame (torso or legs, chosen by
+/// `torsoOnly`) straight onto `animationNumber`'s first frame, no blend.
+///
+/// `lf` is derived from `cent.pe.torso`/`cent.pe.legs` the same way
+/// `CG_RunLerpFrame` derives it — see that fn's doc.
+/// Source: `oracle/codemp/cgame/cg_players.c:3243-3255`
+pub fn CG_ClearLerpFrame(
+    ctx: &mut CgContext,
+    cent: &mut centity_t,
+    ci: &mut clientInfo_t,
+    animationNumber: c_int,
+    torsoOnly: bool,
+) {
+    let time = ctx.world.cg.time;
+    {
+        let lf = if torsoOnly {
+            &mut cent.pe.torso
+        } else {
+            &mut cent.pe.legs
+        };
+        lf.frameTime = time;
+        lf.oldFrameTime = time;
+    }
+
+    CG_SetLerpFrameAnimation(ctx, cent, ci, animationNumber, 1.0, torsoOnly, false);
+
+    let lf = if torsoOnly {
+        &mut cent.pe.torso
+    } else {
+        &mut cent.pe.legs
+    };
+
+    if lf.animation.is_null() {
+        // §F19: `CG_SetLerpFrameAnimation`'s ported early-return (unparsed
+        // skeleton / out-of-range `localAnimIndex`) can leave `animation`
+        // unset; Raven trusted `bgAllAnims[cent->localAnimIndex]` was always
+        // valid and dereferenced it unconditionally. Leave the frame exactly
+        // as `CG_SetLerpFrameAnimation` left it rather than deref null.
+        return;
+    }
+
+    // SAFETY: `animation` was just resolved by `CG_SetLerpFrameAnimation` (or
+    // is a still-valid earlier resolution); Raven dereferences it unchecked
+    // and so do we.
+    let (frameLerp, firstFrame, numFrames) = unsafe {
+        let a = &*lf.animation;
+        (a.frameLerp, a.firstFrame, a.numFrames)
+    };
+
+    if frameLerp < 0 {
+        //Plays backwards
+        let frame = firstFrame as c_int + numFrames as c_int;
+        lf.oldFrame = frame;
+        lf.frame = frame;
+    } else {
+        lf.oldFrame = firstFrame as c_int;
+        lf.frame = firstFrame as c_int;
+    }
+}
+
+/// Raven `CG_G2ServerBoneAngles` — replays the server's four packed
+/// `boneIndex`/`boneAngles` overrides from `entityState_t` onto the client's
+/// ghoul2 instance.
+/// Source: `oracle/codemp/cgame/cg_players.c:3914-3962`
+pub fn CG_G2ServerBoneAngles(ctx: &mut CgContext, cent: &centity_t) {
+    let mut bone = cent.currentState.boneIndex1;
+    let mut boneAngles: vec3_t = [0.0; 3];
+    _VectorCopy(cent.currentState.boneAngles1, &mut boneAngles);
+
+    let boneOrient = cent.currentState.boneOrient;
+    let ghoul2 = cent.ghoul2;
+    let engine = ctx.engine;
+    let time = ctx.world.cg.time;
+
+    for i in 0..4 {
+        // cycle through the 4 bone index values on the entstate
+        if bone != 0 {
+            // if it's non-0 then it could have something in it.
+            let boneName = CG_ConfigString(ctx, CS_G2BONES + bone);
+
+            if !boneName.is_empty() {
+                // got the bone, now set the angles from the corresponding
+                // entitystate boneangles value.
+                let flags = BONE_ANGLES_POSTMULT;
+
+                // get the orientation out of our bit field
+                let forward = boneOrient & 7; // 3 bits from bit 0
+                let right = (boneOrient >> 3) & 7; // 3 bits from bit 3
+                let up = (boneOrient >> 6) & 7; // 3 bits from bit 6
+
+                trap::G2API_SetBoneAngles(
+                    engine,
+                    ghoul2,
+                    0,
+                    &boneName,
+                    &boneAngles,
+                    flags,
+                    up,
+                    right,
+                    forward,
+                    Some(&mut ctx.world.cgs.gameModels[0]),
+                    100,
+                    time,
+                );
+            }
+        }
+
+        match i {
+            0 => {
+                bone = cent.currentState.boneIndex2;
+                _VectorCopy(cent.currentState.boneAngles2, &mut boneAngles);
+            }
+            1 => {
+                bone = cent.currentState.boneIndex3;
+                _VectorCopy(cent.currentState.boneAngles3, &mut boneAngles);
+            }
+            2 => {
+                bone = cent.currentState.boneIndex4;
+                _VectorCopy(cent.currentState.boneAngles4, &mut boneAngles);
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Raven `CG_PlayerPowerups` — the powerup-driven dlights (quad/redflag/
+/// blueflag/neutralflag) plus the flag models themselves.
+///
+/// `torso` is unused in Raven's own body (kept for signature parity with the
+/// caller). `ci` resolves the owning `clientInfo_t` purely to mirror Raven's
+/// `assert(ci)` NPC-sanity check — nothing downstream reads it, matching the
+/// oracle body exactly.
+/// Source: `oracle/codemp/cgame/cg_players.c:4449-4495`
+pub fn CG_PlayerPowerups(ctx: &mut CgContext, cent: &centity_t, _torso: &refEntity_t) {
+    let powerups = cent.currentState.powerups;
+    if powerups == 0 {
+        return;
+    }
+
+    // quad gives a dlight
+    if powerups & (1 << PW_QUAD) != 0 {
+        let intensity = 200 + (ctx.world.bg_state.rng.rand() & 31);
+        trap::R_AddLightToScene(
+            ctx.engine,
+            &cent.lerpOrigin,
+            intensity as f32,
+            0.2,
+            0.2,
+            1.0,
+        );
+    }
+
+    let ci = if cent.currentState.eType == entityType_t::ET_NPC as c_int {
+        cent.npcClient.as_deref()
+    } else {
+        Some(&ctx.world.cgs.clientinfo[cent.currentState.clientNum as usize])
+    };
+    debug_assert!(ci.is_some(), "CG_PlayerPowerups: NPC with no npcClient");
+
+    // redflag
+    if powerups & (1 << PW_REDFLAG) != 0 {
+        let hModel = ctx.world.cgs.media.redFlagModel;
+        CG_PlayerFlag(ctx, cent, hModel);
+        let intensity = 200 + (ctx.world.bg_state.rng.rand() & 31);
+        trap::R_AddLightToScene(
+            ctx.engine,
+            &cent.lerpOrigin,
+            intensity as f32,
+            1.0,
+            0.2,
+            0.2,
+        );
+    }
+
+    // blueflag
+    if powerups & (1 << PW_BLUEFLAG) != 0 {
+        let hModel = ctx.world.cgs.media.blueFlagModel;
+        CG_PlayerFlag(ctx, cent, hModel);
+        let intensity = 200 + (ctx.world.bg_state.rng.rand() & 31);
+        trap::R_AddLightToScene(
+            ctx.engine,
+            &cent.lerpOrigin,
+            intensity as f32,
+            0.2,
+            0.2,
+            1.0,
+        );
+    }
+
+    // neutralflag
+    if powerups & (1 << PW_NEUTRALFLAG) != 0 {
+        let intensity = 200 + (ctx.world.bg_state.rng.rand() & 31);
+        trap::R_AddLightToScene(
+            ctx.engine,
+            &cent.lerpOrigin,
+            intensity as f32,
+            1.0,
+            1.0,
+            1.0,
+        );
+    }
+
+    // haste leaves smoke trails
+    //
+    // if ( powerups & ( 1 << PW_HASTE ) ) {
+    //     CG_HasteTrail( cent );
+    // }
 }

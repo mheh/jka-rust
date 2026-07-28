@@ -2632,14 +2632,15 @@ pub fn FX_AddElectricity(engine: &Engine, p: &mut addElectricityArgStruct_t) {
 /// C: `int trap_SP_GetStringTextString(const char *text, char *buffer, int bufferLength)`
 /// Source: `oracle/codemp/cgame/cg_syscalls.c:725-728`
 ///
-/// The engine fills the buffer either way, so the buffer is the whole answer
-/// and the `qboolean` carries nothing extra: on a miss it writes the marker
-/// `"??<key>"` and returns `qfalse`, which is exactly what Raven's callers go
-/// on to print (`oracle/codemp/client/cl_cgame.cpp:1668-1680`).
-pub fn SP_GetStringTextString(engine: &Engine, text: &str, buffer_len: usize) -> String {
+/// `qfalse` (no such string-package reference) -> `None`, matching the ui twin.
+/// On a miss the engine still writes the `"??<key>"` marker into the buffer
+/// (`oracle/codemp/client/cl_cgame.cpp:1668-1680`); callers that print
+/// regardless reconstruct it with `unwrap_or_else` (without the engine's
+/// bufferLength clip - broken-asset path only).
+pub fn SP_GetStringTextString(engine: &Engine, text: &str, buffer_len: usize) -> Option<String> {
     let text_c = cstr(text);
     let mut buffer = vec![0u8; buffer_len];
-    <Engine as Execute<CgSpGetstringtextstring>>::execute(
+    let found = <Engine as Execute<CgSpGetstringtextstring>>::execute(
         engine,
         CgSpGetstringtextstringArgs::new(
             text_c.as_ptr(),
@@ -2648,7 +2649,7 @@ pub fn SP_GetStringTextString(engine: &Engine, text: &str, buffer_len: usize) ->
         ),
     );
     let nul = buffer.iter().position(|&b| b == 0).unwrap_or(buffer.len());
-    latin1_to_string(&buffer[..nul])
+    (found != 0).then(|| latin1_to_string(&buffer[..nul]))
 }
 
 /// Raven `trap_ROFF_Clean` — `CG_ROFF_CLEAN` (token: `mp_abi::cgame::syscalls::CG_ROFF_CLEAN`).

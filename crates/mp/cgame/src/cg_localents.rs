@@ -3,12 +3,16 @@
 
 #![allow(non_snake_case)]
 
+use core::f64::consts::PI;
 use core::ffi::c_int;
 
-use mp_bg::bg_misc::BG_EvaluateTrajectoryDelta;
+use mp_bg::bg_misc::{BG_EvaluateTrajectory, BG_EvaluateTrajectoryDelta};
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::trace_t::trace_t;
-use mp_qshared::shared::q_math::{_DotProduct, _VectorCopy, _VectorMA, _VectorScale};
+use mp_qshared::shared::q_math::{
+    _DotProduct, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, CrossProduct, VectorLength,
+    VectorNormalize,
+};
 use mp_qshared::shared::{
     qtrue, sfxHandle_t, trType_t, trajectory_t, vec3_t, CHAN_AUTO, ENTITYNUM_WORLD,
 };
@@ -30,9 +34,18 @@ use crate::world::effect_handle::EffectHandle;
 // (DEC-46.3) — not redeclared here.
 
 /// Raven `#define NUMBER_SIZE 8` — digit-glyph count `CG_AddScorePlum` sizes its
-/// per-digit refEntity array with (a later wave's fn; not consumed here).
+/// per-digit refEntity array with.
 /// Source: `oracle/codemp/cgame/cg_localents.c:637`
 pub const NUMBER_SIZE: usize = 8;
+
+/// Raven `LEF_PUFF_DONT_SCALE` — `localEntity_t::leFlags` bit meaning "do not
+/// scale size over time", tested by the puff/move-scale-fade add fns.
+///
+/// Lives in the anonymous `leFlags` enum in `cg_local.h`, not in
+/// `cg_localents.c` itself, but every add fn below reads it straight out of
+/// `leFlags`, so it's pulled in here rather than guessed.
+/// Source: `oracle/codemp/cgame/cg_local.h:499`
+pub const LEF_PUFF_DONT_SCALE: c_int = 0x0001;
 
 /// Raven `CG_InitLocalEntities` — resets the local-entity pool to all-free.
 ///
@@ -310,4 +323,354 @@ pub fn CG_FreeLocalEntity(ctx: &mut CgContext, le: EffectHandle) {
     if !ctx.world.cg_localEntities.free(le) {
         CG_Error(ctx, "CG_FreeLocalEntity: not active");
     }
+}
+
+/// Raven `CG_AllocLocalEntity` — grabs a free local-entity slot, stealing the
+/// oldest active one when the pool is full, and zeroes it.
+///
+/// DEC-46.3 folds the steal-and-`memset` dance into
+/// [`EffectPool::alloc`](crate::world::effect_pool::EffectPool::alloc); this
+/// just forwards to it.
+/// Source: `oracle/codemp/cgame/cg_localents.c:60-80`
+pub fn CG_AllocLocalEntity(world: &mut CgWorld) -> EffectHandle {
+    world.cg_localEntities.alloc()
+}
+
+/// Raven `CG_AddMoveScaleFade` — grows or fades a local entity toward its
+/// trajectory position and adds it to the scene, killing it early if the view
+/// origin winds up inside the sprite.
+///
+/// Takes the pool handle rather than a resolved `localEntity_t` (unlike the
+/// earlier-wave add fns in this file) so it can hand the same handle to
+/// [`CG_FreeLocalEntity`] on the early-out.
+/// Source: `oracle/codemp/cgame/cg_localents.c:397-432`
+pub fn CG_AddMoveScaleFade(ctx: &mut CgContext, handle: EffectHandle) {
+    let le = ctx
+        .world
+        .cg_localEntities
+        .get_mut(handle)
+        .expect("CG_AddMoveScaleFade: not active");
+
+    let c = if le.fadeInTime > le.startTime && ctx.world.cg.time < le.fadeInTime {
+        // fade / grow time
+        1.0 - (le.fadeInTime - ctx.world.cg.time) as f32 / (le.fadeInTime - le.startTime) as f32
+    } else {
+        // fade / grow time
+        (le.endTime - ctx.world.cg.time) as f32 * le.lifeRate
+    };
+
+    // see CG_AddFadeRGB for the truncate-through-i32 note.
+    le.refEntity.shaderRGBA[3] = (0xff as f32 * c * le.color[3]) as i32 as u8;
+
+    if (le.leFlags & LEF_PUFF_DONT_SCALE) == 0 {
+        le.refEntity.radius = le.radius * (1.0 - c) + 8.0;
+    }
+
+    BG_EvaluateTrajectory(
+        &le.pos as *const trajectory_t,
+        ctx.world.cg.time,
+        &mut le.refEntity.origin,
+    );
+
+    // if the view would be "inside" the sprite, kill the sprite
+    // so it doesn't add too much overdraw
+    let mut delta: vec3_t = [0.0; 3];
+    _VectorSubtract(le.refEntity.origin, ctx.world.cg.refdef.vieworg, &mut delta);
+    let len = VectorLength(delta);
+    if len < le.radius {
+        CG_FreeLocalEntity(ctx, handle);
+        return;
+    }
+
+    trap::R_AddRefEntityToScene(ctx.engine, &le.refEntity);
+}
+
+/// Raven `CG_AddPuff` — fades a puff local entity's color and radius toward
+/// its trajectory position and adds it to the scene, killing it early if the
+/// view origin winds up inside the sprite.
+///
+/// See [`CG_AddMoveScaleFade`] for why this takes the pool handle.
+/// Source: `oracle/codemp/cgame/cg_localents.c:439-470`
+pub fn CG_AddPuff(ctx: &mut CgContext, handle: EffectHandle) {
+    let le = ctx
+        .world
+        .cg_localEntities
+        .get_mut(handle)
+        .expect("CG_AddPuff: not active");
+
+    // fade / grow time
+    let c = (le.endTime - ctx.world.cg.time) as f32 / (le.endTime - le.startTime) as f32;
+
+    // see CG_AddFadeRGB for the truncate-through-i32 note.
+    le.refEntity.shaderRGBA[0] = (le.color[0] * c) as i32 as u8;
+    le.refEntity.shaderRGBA[1] = (le.color[1] * c) as i32 as u8;
+    le.refEntity.shaderRGBA[2] = (le.color[2] * c) as i32 as u8;
+
+    if (le.leFlags & LEF_PUFF_DONT_SCALE) == 0 {
+        le.refEntity.radius = le.radius * (1.0 - c) + 8.0;
+    }
+
+    BG_EvaluateTrajectory(
+        &le.pos as *const trajectory_t,
+        ctx.world.cg.time,
+        &mut le.refEntity.origin,
+    );
+
+    // if the view would be "inside" the sprite, kill the sprite
+    // so it doesn't add too much overdraw
+    let mut delta: vec3_t = [0.0; 3];
+    _VectorSubtract(le.refEntity.origin, ctx.world.cg.refdef.vieworg, &mut delta);
+    let len = VectorLength(delta);
+    if len < le.radius {
+        CG_FreeLocalEntity(ctx, handle);
+        return;
+    }
+
+    trap::R_AddRefEntityToScene(ctx.engine, &le.refEntity);
+}
+
+/// Raven `CG_AddScaleFade` — fades a local entity's alpha and radius over its
+/// remaining lifetime, leaving whatever origin it already carries, and adds
+/// it to the scene, killing it early if the view origin winds up inside the
+/// sprite.
+///
+/// See [`CG_AddMoveScaleFade`] for why this takes the pool handle.
+/// Source: `oracle/codemp/cgame/cg_localents.c:481-505`
+pub fn CG_AddScaleFade(ctx: &mut CgContext, handle: EffectHandle) {
+    let le = ctx
+        .world
+        .cg_localEntities
+        .get_mut(handle)
+        .expect("CG_AddScaleFade: not active");
+
+    // fade / grow time
+    let c = (le.endTime - ctx.world.cg.time) as f32 * le.lifeRate;
+
+    // see CG_AddFadeRGB for the truncate-through-i32 note.
+    le.refEntity.shaderRGBA[3] = (0xff as f32 * c * le.color[3]) as i32 as u8;
+    le.refEntity.radius = le.radius * (1.0 - c) + 8.0;
+
+    // if the view would be "inside" the sprite, kill the sprite
+    // so it doesn't add too much overdraw
+    let mut delta: vec3_t = [0.0; 3];
+    _VectorSubtract(le.refEntity.origin, ctx.world.cg.refdef.vieworg, &mut delta);
+    let len = VectorLength(delta);
+    if len < le.radius {
+        CG_FreeLocalEntity(ctx, handle);
+        return;
+    }
+
+    trap::R_AddRefEntityToScene(ctx.engine, &le.refEntity);
+}
+
+/// Raven `CG_AddFallScaleFade` — fades a falling local entity's alpha and
+/// radius over its remaining lifetime, tracking its Z drop directly off
+/// `pos.trBase`/`trDelta` rather than a trajectory eval, and adds it to the
+/// scene, killing it early if the view origin winds up inside the sprite.
+///
+/// See [`CG_AddMoveScaleFade`] for why this takes the pool handle.
+/// Source: `oracle/codemp/cgame/cg_localents.c:518-545`
+pub fn CG_AddFallScaleFade(ctx: &mut CgContext, handle: EffectHandle) {
+    let le = ctx
+        .world
+        .cg_localEntities
+        .get_mut(handle)
+        .expect("CG_AddFallScaleFade: not active");
+
+    // fade time
+    let c = (le.endTime - ctx.world.cg.time) as f32 * le.lifeRate;
+
+    // see CG_AddFadeRGB for the truncate-through-i32 note.
+    le.refEntity.shaderRGBA[3] = (0xff as f32 * c * le.color[3]) as i32 as u8;
+
+    le.refEntity.origin[2] = le.pos.trBase[2] - (1.0 - c) * le.pos.trDelta[2];
+
+    le.refEntity.radius = le.radius * (1.0 - c) + 16.0;
+
+    // if the view would be "inside" the sprite, kill the sprite
+    // so it doesn't add too much overdraw
+    let mut delta: vec3_t = [0.0; 3];
+    _VectorSubtract(le.refEntity.origin, ctx.world.cg.refdef.vieworg, &mut delta);
+    let len = VectorLength(delta);
+    if len < le.radius {
+        CG_FreeLocalEntity(ctx, handle);
+        return;
+    }
+
+    trap::R_AddRefEntityToScene(ctx.engine, &le.refEntity);
+}
+
+/// Raven `CG_AddRefEntity` — adds a local entity's refEntity to the scene
+/// as-is, killing it once its lifetime is up.
+///
+/// See [`CG_AddMoveScaleFade`] for why this takes the pool handle.
+/// Source: `oracle/codemp/cgame/cg_localents.c:624-630`
+pub fn CG_AddRefEntity(ctx: &mut CgContext, handle: EffectHandle) {
+    let le = ctx
+        .world
+        .cg_localEntities
+        .get_mut(handle)
+        .expect("CG_AddRefEntity: not active");
+
+    if le.endTime < ctx.world.cg.time {
+        CG_FreeLocalEntity(ctx, handle);
+        return;
+    }
+
+    trap::R_AddRefEntityToScene(ctx.engine, &le.refEntity);
+}
+
+/// Raven `CG_AddScorePlum` — draws a floating score number that billboards
+/// toward the view, colored by score magnitude/sign, drawing one digit
+/// refEntity at a time, killing it early if the view origin winds up inside
+/// it.
+///
+/// See [`CG_AddMoveScaleFade`] for why this takes the pool handle.
+/// Source: `oracle/codemp/cgame/cg_localents.c:639-716`
+pub fn CG_AddScorePlum(ctx: &mut CgContext, handle: EffectHandle) {
+    let le = ctx
+        .world
+        .cg_localEntities
+        .get_mut(handle)
+        .expect("CG_AddScorePlum: not active");
+
+    let c = (le.endTime - ctx.world.cg.time) as f32 * le.lifeRate;
+
+    let mut score = le.radius as i32;
+    if score < 0 {
+        le.refEntity.shaderRGBA[0] = 0xff;
+        le.refEntity.shaderRGBA[1] = 0x11;
+        le.refEntity.shaderRGBA[2] = 0x11;
+    } else {
+        le.refEntity.shaderRGBA[0] = 0xff;
+        le.refEntity.shaderRGBA[1] = 0xff;
+        le.refEntity.shaderRGBA[2] = 0xff;
+        if score >= 50 {
+            le.refEntity.shaderRGBA[1] = 0;
+        } else if score >= 20 {
+            le.refEntity.shaderRGBA[0] = 0;
+            le.refEntity.shaderRGBA[1] = 0;
+        } else if score >= 10 {
+            le.refEntity.shaderRGBA[2] = 0;
+        } else if score >= 2 {
+            le.refEntity.shaderRGBA[0] = 0;
+            le.refEntity.shaderRGBA[2] = 0;
+        }
+    }
+
+    if c < 0.25 {
+        // see CG_AddFadeRGB for the truncate-through-i32 note.
+        le.refEntity.shaderRGBA[3] = (0xff as f32 * 4.0 * c) as i32 as u8;
+    } else {
+        le.refEntity.shaderRGBA[3] = 0xff;
+    }
+
+    le.refEntity.radius = (NUMBER_SIZE / 2) as f32;
+
+    let mut origin: vec3_t = [0.0; 3];
+    _VectorCopy(le.pos.trBase, &mut origin);
+    origin[2] += 110.0 - c * 100.0;
+
+    let mut dir: vec3_t = [0.0; 3];
+    _VectorSubtract(ctx.world.cg.refdef.vieworg, origin, &mut dir);
+    let up: vec3_t = [0.0, 0.0, 1.0];
+    let mut vec: vec3_t = [0.0; 3];
+    CrossProduct(dir, up, &mut vec);
+    VectorNormalize(&mut vec);
+
+    // Raven's `sin` is the double libm call, and `c * 2` computes in float before widening to
+    // double for the `* M_PI` (see CG_CalcFOVFromX in cg_view.rs for the same promotion note);
+    // the whole `-10 + 20 * sin(...)` stays double until it narrows into VectorMA's float scale.
+    let sinArg = (c * 2.0) as f64 * PI;
+    let moveScale = (-10.0 + 20.0 * sinArg.sin()) as f32;
+    _VectorMA(origin, moveScale, vec, &mut origin);
+
+    // if the view would be "inside" the sprite, kill the sprite
+    // so it doesn't add too much overdraw
+    let mut delta: vec3_t = [0.0; 3];
+    _VectorSubtract(origin, ctx.world.cg.refdef.vieworg, &mut delta);
+    let len = VectorLength(delta);
+    if len < 20.0 {
+        CG_FreeLocalEntity(ctx, handle);
+        return;
+    }
+
+    let mut negative = false;
+    if score < 0 {
+        negative = true;
+        score = -score;
+    }
+
+    let mut digits: [i32; 10] = [0; 10];
+    let mut numdigits: usize = 0;
+    while !(numdigits != 0 && score == 0) {
+        digits[numdigits] = score % 10;
+        score /= 10;
+        numdigits += 1;
+    }
+
+    if negative {
+        digits[numdigits] = 10;
+        numdigits += 1;
+    }
+
+    for i in 0..numdigits {
+        let digitScale = (numdigits as f32 / 2.0 - i as f32) * NUMBER_SIZE as f32;
+        _VectorMA(origin, digitScale, vec, &mut le.refEntity.origin);
+        le.refEntity.customShader =
+            ctx.world.cgs.media.numberShaders[digits[numdigits - 1 - i] as usize];
+        trap::R_AddRefEntityToScene(ctx.engine, &le.refEntity);
+    }
+}
+
+/// Raven `CG_AddOLine` — scales an oriented-line local entity's width/alpha
+/// over its lifetime and adds it to the scene, killing it early once its
+/// width fades to nothing.
+///
+/// See [`CG_AddMoveScaleFade`] for why this takes the pool handle. The
+/// `data.line` reads/writes below match Raven's raw struct access through the
+/// same anonymous union on both `localEntity_t` and `refEntity_t` — both
+/// variants are POD f32 structs, so it's always defined.
+/// Source: `oracle/codemp/cgame/cg_localents.c:725-761`
+pub fn CG_AddOLine(ctx: &mut CgContext, handle: EffectHandle) {
+    let le = ctx
+        .world
+        .cg_localEntities
+        .get_mut(handle)
+        .expect("CG_AddOLine: not active");
+
+    let mut frac = (ctx.world.cg.time - le.startTime) as f32 / (le.endTime - le.startTime) as f32;
+    if frac > 1.0 {
+        frac = 1.0; // can happen during connection problems
+    } else if frac < 0.0 {
+        frac = 0.0;
+    }
+
+    // Use the liferate to set the scale over time.
+    // SAFETY: `data.line` mirrors Raven's raw access through the same
+    // anonymous union — every variant is a POD f32 struct, always defined.
+    let width = unsafe { le.data.line.width + le.data.line.dwidth * frac };
+    le.refEntity.data.line.width = width;
+    if width <= 0.0 {
+        CG_FreeLocalEntity(ctx, handle);
+        return;
+    }
+
+    // We will assume here that we want additive transparency effects.
+    let alpha = le.alpha + le.dalpha * frac;
+    // see CG_AddFadeRGB for the truncate-through-i32 note.
+    le.refEntity.shaderRGBA[0] = (0xff as f32 * alpha) as i32 as u8;
+    le.refEntity.shaderRGBA[1] = (0xff as f32 * alpha) as i32 as u8;
+    le.refEntity.shaderRGBA[2] = (0xff as f32 * alpha) as i32 as u8;
+    // Yes, we could apply c to this too, but fading the color is better for lines.
+    le.refEntity.shaderRGBA[3] = (0xff as f32 * alpha) as i32 as u8;
+
+    le.refEntity.shaderTexCoord[0] = 1.0;
+    le.refEntity.shaderTexCoord[1] = 1.0;
+
+    le.refEntity.rotation = 90.0;
+
+    le.refEntity.reType = refEntityType_t::RT_ORIENTEDLINE;
+
+    trap::R_AddRefEntityToScene(ctx.engine, &le.refEntity);
 }

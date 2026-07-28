@@ -555,3 +555,29 @@ pub fn CG_ExplosionEffects(
 
     CGCam_Shake(world, realIntensity, time);
 }
+
+/// Raven `CG_GlassShatter` — tesselates the `entnum` brush model's window into
+/// glass shards, if it actually has one registered.
+///
+/// Raven: "otherwise something awful has happened." — the missing-model arm
+/// is a no-op, matching the oracle's silent bail.
+///
+/// Source: `oracle/codemp/cgame/cg_effects.c:656-666`
+pub fn CG_GlassShatter(
+    ctx: &mut CgContext,
+    entnum: usize,
+    dmgPt: &vec3_t,
+    dmgDir: &vec3_t,
+    dmgRadius: f32,
+    maxShards: c_int,
+) {
+    let modelindex = ctx.world.entities[entnum].currentState.modelindex as usize;
+    let bmodel = ctx.world.cgs.inlineDrawModel[modelindex];
+    if bmodel != 0 {
+        let mut verts = [[0.0f32; 3]; 4];
+        let normal = [0.0f32; 3];
+        trap::R_GetBModelVerts(ctx.engine, bmodel, &mut verts, &normal);
+        CG_DoGlass(ctx, &verts, &normal, dmgPt, dmgDir, dmgRadius, maxShards);
+    }
+    // otherwise something awful has happened.
+}

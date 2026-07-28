@@ -6,9 +6,12 @@
 use core::ffi::c_int;
 
 use mp_bg::public::stat_index::statIndex_t::{STAT_ARMOR, STAT_HEALTH};
-use mp_qshared::shared::q_color::Q_IsColorString;
+use mp_qshared::shared::q_color::{g_color_table, Q_IsColorString};
 use mp_qshared::shared::{qhandle_t, vec4_t};
+use mp_uishared::shared::display_state::DisplayState;
+use mp_uishared::shared::menudef::{ITEM_TEXTSTYLE_BLINK, ITEM_TEXTSTYLE_SHADOWED};
 
+use crate::cg_draw::{CG_Text_Paint, CG_Text_Width};
 use crate::trap;
 use crate::world::{CgContext, CgWorld};
 
@@ -41,6 +44,40 @@ const NUM_FONT_CHUNKY: c_int = 3;
 ///
 /// Source: `oracle/codemp/cgame/cg_local.h:59`
 const STAT_MINUS: c_int = 10;
+
+// PORT-NOTE: `q_shared.h`'s font enum is anonymous (`enum { FONT_NONE,
+// FONT_SMALL=1, ... }`), so per the anonymous-enum convention these are
+// `const`s; local, same file-local-copy story `cg_draw.rs` already carries.
+/// Source: `oracle/codemp/game/q_shared.h:3176-3182`
+const FONT_SMALL: c_int = 1;
+/// Source: `oracle/codemp/game/q_shared.h:3176-3182`
+const FONT_MEDIUM: c_int = 2;
+
+// Raven `UI_*` text-flag `#define`s (porting-rules §C8): this is their first
+// ported consumer, so they land here, file-local like `FONT_SMALL` above.
+/// Source: `oracle/codemp/game/q_shared.h:487`
+const UI_LEFT: c_int = 0x00000000;
+/// Source: `oracle/codemp/game/q_shared.h:488`
+const UI_CENTER: c_int = 0x00000001;
+/// Source: `oracle/codemp/game/q_shared.h:489`
+const UI_RIGHT: c_int = 0x00000002;
+/// Source: `oracle/codemp/game/q_shared.h:491`
+const UI_SMALLFONT: c_int = 0x00000010;
+/// Source: `oracle/codemp/game/q_shared.h:494`
+const UI_DROPSHADOW: c_int = 0x00000800;
+/// Source: `oracle/codemp/game/q_shared.h:495`
+const UI_BLINK: c_int = 0x00001000;
+/// Source: `oracle/codemp/game/q_shared.h:497`
+const UI_PULSE: c_int = 0x00004000;
+
+/// Raven `ColorIndex` — a `q_shared.h` inline macro (`((c) - '0') & 0x07`),
+/// no ported Rust home yet; reproduced file-local per the precedent at
+/// `crates/mp/renderer/src/tr_font.rs:2435` / `crates/mp/game/src/g_client.rs:1524`.
+///
+/// Source: `oracle/codemp/game/q_shared.h:1158`
+fn ColorIndex(c: u8) -> c_int {
+    (c as c_int - '0' as c_int) & 0x07
+}
 
 /// Raven `CG_GetColorForHealth` — health bar color ramp, armor-adjusted.
 ///
@@ -582,4 +619,174 @@ pub fn CG_DrawNumField(
         x += xWidth;
         l -= 1;
     }
+}
+
+/// Raven `CG_DrawStringExt` — the console-font string painter: drop shadow
+/// pass then a colored pass, switching per glyph on embedded `^N` color codes.
+///
+/// PORT-NOTE: `maxChars` is a dead parameter - Raven's body never reads it (no
+/// truncation happens here despite the name), preserved as an unused param.
+/// Source: `oracle/codemp/cgame/cg_drawtools.c:212-274`
+#[allow(clippy::too_many_arguments)]
+pub fn CG_DrawStringExt(
+    ctx: &mut CgContext,
+    ds: &DisplayState,
+    x: c_int,
+    y: c_int,
+    string: &str,
+    setColor: &vec4_t,
+    forceColor: bool,
+    shadow: bool,
+    charWidth: c_int,
+    charHeight: c_int,
+    _maxChars: c_int,
+) {
+    if trap::Language_IsAsian(ctx.engine) {
+        // hack-a-doodle-do (post-release quick fix code)...
+        let color: vec4_t = *setColor; // de-const it
+        CG_Text_Paint(
+            ctx,
+            ds,
+            x as f32,
+            y as f32,
+            1.0,
+            color,
+            string,
+            0.0,
+            0,
+            if shadow { ITEM_TEXTSTYLE_SHADOWED } else { 0 },
+            FONT_MEDIUM,
+        );
+    } else {
+        // draw the drop shadow
+        if shadow {
+            let color: vec4_t = [0.0, 0.0, 0.0, setColor[3]];
+            trap::R_SetColor(ctx.engine, Some(&color));
+            let mut xx = x;
+            let mut chars = string.chars().peekable();
+            while let Some(c) = chars.next() {
+                let pair = [c as u32 as u8, chars.peek().map_or(0, |&n| n as u32 as u8)];
+                if Q_IsColorString(&pair) {
+                    chars.next();
+                    continue;
+                }
+                CG_DrawChar(ctx, xx + 2, y + 2, charWidth, charHeight, pair[0] as c_int);
+                xx += charWidth;
+            }
+        }
+
+        // draw the colored text
+        let mut xx = x;
+        trap::R_SetColor(ctx.engine, Some(setColor));
+        let mut chars = string.chars().peekable();
+        while let Some(c) = chars.next() {
+            let pair = [c as u32 as u8, chars.peek().map_or(0, |&n| n as u32 as u8)];
+            if Q_IsColorString(&pair) {
+                if !forceColor {
+                    let mut color = g_color_table[ColorIndex(pair[1]) as usize];
+                    color[3] = setColor[3];
+                    trap::R_SetColor(ctx.engine, Some(&color));
+                }
+                chars.next();
+                continue;
+            }
+            CG_DrawChar(ctx, xx, y, charWidth, charHeight, pair[0] as c_int);
+            xx += charWidth;
+        }
+        trap::R_SetColor(ctx.engine, None);
+    }
+}
+
+/// Raven `UI_DrawProportionalString` — the shared/UI proportional-font string
+/// painter: left/center/right justify, then style flags folded to
+/// `CG_Text_Paint`'s `ITEM_TEXTSTYLE_*` set.
+///
+/// Raven comment: "having all these different style defines (1 for UI, one
+/// for CG, and now one for the re->font stuff) is dumb, but for now..."
+/// Source: `oracle/codemp/cgame/cg_drawtools.c:603-644`
+pub fn UI_DrawProportionalString(
+    ctx: &CgContext,
+    ds: &DisplayState,
+    x: c_int,
+    y: c_int,
+    str: &str,
+    style: c_int,
+    color: vec4_t,
+) {
+    let iMenuFont = if style & UI_SMALLFONT != 0 {
+        FONT_SMALL
+    } else {
+        FONT_MEDIUM
+    };
+
+    let mut x = x;
+    match style & (UI_LEFT | UI_CENTER | UI_RIGHT) {
+        UI_CENTER => {
+            x -= CG_Text_Width(ctx, ds, str, 1.0, iMenuFont) / 2;
+        }
+        UI_RIGHT => {
+            x -= CG_Text_Width(ctx, ds, str, 1.0, iMenuFont) / 2;
+        }
+        // default, and UI_LEFT
+        _ => {}
+    }
+
+    let mut iStyle: c_int = 0;
+    if style & UI_DROPSHADOW != 0 {
+        iStyle = ITEM_TEXTSTYLE_SHADOWED;
+    } else if style & (UI_BLINK | UI_PULSE) != 0 {
+        iStyle = ITEM_TEXTSTYLE_BLINK;
+    }
+
+    CG_Text_Paint(
+        ctx, ds, x as f32, y as f32, 1.0, color, str, 0.0, 0, iStyle, iMenuFont,
+    );
+}
+
+/// Raven `UI_DrawScaledProportionalString` — `UI_DrawProportionalString` with
+/// an explicit scale and always `FONT_MEDIUM` (no `UI_SMALLFONT` read here).
+///
+/// Source: `oracle/codemp/cgame/cg_drawtools.c:646-686`
+pub fn UI_DrawScaledProportionalString(
+    ctx: &CgContext,
+    ds: &DisplayState,
+    x: c_int,
+    y: c_int,
+    str: &str,
+    style: c_int,
+    color: vec4_t,
+    scale: f32,
+) {
+    let mut x = x;
+    match style & (UI_LEFT | UI_CENTER | UI_RIGHT) {
+        UI_CENTER => {
+            x -= CG_Text_Width(ctx, ds, str, scale, FONT_MEDIUM) / 2;
+        }
+        UI_RIGHT => {
+            x -= CG_Text_Width(ctx, ds, str, scale, FONT_MEDIUM) / 2;
+        }
+        // default, and UI_LEFT
+        _ => {}
+    }
+
+    let mut iStyle: c_int = 0;
+    if style & UI_DROPSHADOW != 0 {
+        iStyle = ITEM_TEXTSTYLE_SHADOWED;
+    } else if style & (UI_BLINK | UI_PULSE) != 0 {
+        iStyle = ITEM_TEXTSTYLE_BLINK;
+    }
+
+    CG_Text_Paint(
+        ctx,
+        ds,
+        x as f32,
+        y as f32,
+        scale,
+        color,
+        str,
+        0.0,
+        0,
+        iStyle,
+        FONT_MEDIUM,
+    );
 }

@@ -10,10 +10,11 @@ use mp_qshared::shared::q_math::{
     _VectorCopy, _VectorMA, vectoangles, AngleVectors, Distance, VectorClear, VectorLength,
     VectorSet, ROLL,
 };
+use mp_qshared::shared::q_string::COM_Parse;
 use mp_qshared::shared::{qhandle_t, vec3_t};
-use native_string::Q_stricmp;
+use native_string::{atof, atoi, Q_stricmp};
 
-use crate::cg_main::{CG_Error, CG_Printf};
+use crate::cg_main::{CG_ConfigString, CG_Error, CG_Printf};
 use crate::trap;
 use crate::world::cg_context::CgContext;
 use crate::world::cg_marks_state::particle_type_t::{
@@ -2086,4 +2087,180 @@ pub fn CG_ParticleMisc(
     _VectorCopy(origin, &mut p.org);
 
     p.rotate = false;
+}
+
+/// Raven `CG_AllocMark` — hands out a fresh mark poly, stealing from the tail
+/// of the active chain when the pool is full.
+///
+/// The steal-oldest-on-empty-free-list and the memset-plus-link-to-head that
+/// follow it ARE [`EffectPool::alloc`](crate::world::effect_pool::EffectPool::alloc)
+/// (DEC-46.3) — this fn only carries the part `alloc` deliberately doesn't
+/// know: Raven frees *every* mark sharing the oldest one's `time`, not just
+/// the one `alloc` would steal on its own, so the extra sweep runs first and
+/// `alloc` is left to do its ordinary steal-of-one on whatever remains.
+///
+/// Source: `oracle/codemp/cgame/cg_marks.c:68-92`
+pub fn CG_AllocMark(world: &mut CgWorld) -> EffectHandle {
+    if world.cg_markPolys.len() == world.cg_markPolys.capacity() {
+        // no free entities, so free the one at the end of the chain
+        // remove the oldest active entity
+        if let Some(oldest) = world.cg_markPolys.oldest() {
+            let time = world.cg_markPolys.get(oldest).map(|mp| mp.time);
+            while let Some(oldest) = world.cg_markPolys.oldest() {
+                if world.cg_markPolys.get(oldest).map(|mp| mp.time) != time {
+                    break;
+                }
+                world.cg_markPolys.free(oldest);
+            }
+        }
+    }
+
+    world.cg_markPolys.alloc()
+}
+
+/// Raven `CG_AddMarks` — ages every live mark poly, drops the ones past
+/// [`MARK_TOTAL_TIME`], and hands survivors to the renderer with their
+/// fade-out modulate baked in.
+///
+/// Raven's `if (0)` block (the commented-out `energyMarkShader` fade) never
+/// runs in the shipped build — dropped as unreachable.
+///
+/// Source: `oracle/codemp/cgame/cg_marks.c:221-292`
+pub fn CG_AddMarks(ctx: &mut CgContext) {
+    if ctx.world.cvars.cg_addMarks.integer == 0 {
+        return;
+    }
+
+    let cgTime = ctx.world.cg.time;
+
+    // Raven walks `cg_activeMarkPolys.nextMark`, i.e. newest-linked-first.
+    let live: Vec<EffectHandle> = ctx.world.cg_markPolys.active_newest_first().collect();
+
+    for mp in live {
+        let Some(mark) = ctx.world.cg_markPolys.get(mp) else {
+            // freed earlier in this same walk — mirrors Raven grabbing `next`
+            // before a possible free.
+            continue;
+        };
+        let time = mark.time;
+
+        // see if it is time to completely remove it
+        if cgTime > time + MARK_TOTAL_TIME {
+            CG_FreeMarkPoly(ctx, mp);
+            continue;
+        }
+
+        // fade all marks out with time
+        let t = time + MARK_TOTAL_TIME - cgTime;
+
+        let mark = ctx.world.cg_markPolys.get_mut(mp).expect("resolved above");
+        let numVerts = mark.poly.numVerts as usize;
+
+        if t < MARK_FADE_TIME {
+            let fade = 255 * t / MARK_FADE_TIME;
+            if mark.alphaFade != 0 {
+                for j in 0..numVerts {
+                    mark.verts[j].modulate[3] = fade as u8;
+                }
+            } else {
+                let f = t as f32 / MARK_FADE_TIME as f32;
+                let color = mark.color;
+                for j in 0..numVerts {
+                    mark.verts[j].modulate[0] = (color[0] * f) as i32 as u8;
+                    mark.verts[j].modulate[1] = (color[1] * f) as i32 as u8;
+                    mark.verts[j].modulate[2] = (color[2] * f) as i32 as u8;
+                }
+            }
+        } else {
+            let color = mark.color;
+            for j in 0..numVerts {
+                mark.verts[j].modulate[0] = color[0] as i32 as u8;
+                mark.verts[j].modulate[1] = color[1] as i32 as u8;
+                mark.verts[j].modulate[2] = color[2] as i32 as u8;
+            }
+        }
+
+        let mark = ctx.world.cg_markPolys.get(mp).expect("resolved above");
+        trap::R_AddPolyToScene(ctx.engine, mark.markShader, &mark.verts[..numVerts]);
+    }
+}
+
+/// Raven `CG_NewParticleArea` — parses one `CS_PARTICLES_*` configstring into
+/// its emitter recipe.
+///
+/// Raven's spawn loop that would consume `type`/`range`/`origin`/`origin2`/
+/// `numparticles`/`turb`/`snum` (`CG_ParticleBubble`/`CG_ParticleSnow`) is
+/// commented out in the shipped source, so every value this parses is dead —
+/// underscore-prefixed rather than dropped, since the tokenizer still has to
+/// walk the whole configstring in Raven's order regardless.
+///
+/// Source: `oracle/codemp/cgame/cg_marks.c:1556-1627`
+pub fn CG_NewParticleArea(ctx: &mut CgContext, num: c_int) -> c_int {
+    let configString = CG_ConfigString(ctx, num);
+    if configString.is_empty() {
+        return 0;
+    }
+    let mut rest: &str = &configString;
+
+    // returns type 128 64 or 32
+    let (token, next) = COM_Parse(rest, true);
+    rest = next;
+    let _type = atoi(&token);
+
+    let _range: f32 = if _type == 1 {
+        128.0
+    } else if _type == 2 {
+        64.0
+    } else if _type == 3 {
+        32.0
+    } else if _type == 0 {
+        256.0
+    } else if _type == 4 {
+        8.0
+    } else if _type == 5 {
+        16.0
+    } else if _type == 6 {
+        32.0
+    } else if _type == 7 {
+        64.0
+    } else {
+        0.0
+    };
+
+    let mut _origin: vec3_t = [0.0; 3];
+    for i in 0..3 {
+        let (token, next) = COM_Parse(rest, true);
+        rest = next;
+        _origin[i] = atof(&token) as f32;
+    }
+
+    let mut _origin2: vec3_t = [0.0; 3];
+    for i in 0..3 {
+        let (token, next) = COM_Parse(rest, true);
+        rest = next;
+        _origin2[i] = atof(&token) as f32;
+    }
+
+    let (token, next) = COM_Parse(rest, true);
+    rest = next;
+    let _numparticles = atoi(&token);
+
+    let (token, next) = COM_Parse(rest, true);
+    rest = next;
+    let _turb = atoi(&token);
+
+    let (token, _next) = COM_Parse(rest, true);
+    let _snum = atoi(&token);
+
+    /*
+    for (i=0; i<numparticles; i++)
+    {
+        if (type >= 4)
+            CG_ParticleBubble (cgs.media.waterBubbleShader, origin, origin2, turb, range, snum);
+        else
+            CG_ParticleSnow (cgs.media.waterBubbleShader, origin, origin2, turb, range, snum);
+    }
+    */
+
+    1
 }

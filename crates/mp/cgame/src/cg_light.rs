@@ -5,6 +5,12 @@
 
 use core::ffi::c_int;
 
+use mp_bg::public::configstring::CS_LIGHT_STYLES;
+use mp_qshared::shared::error_parm::errorParm_t;
+use mp_qshared::shared::MAX_QPATH;
+use native_string::string_to_latin1;
+
+use crate::cg_main::{CG_ConfigString, Com_Error};
 use crate::trap;
 use crate::world::CgContext;
 
@@ -56,5 +62,36 @@ pub fn CG_RunLightStyles(ctx: &mut CgContext) {
 
         let color = i32::from_ne_bytes(ls.value);
         trap::R_SetLightStyle(ctx.engine, i as c_int, color);
+    }
+}
+
+/// Raven `CG_SetLightstyle` — compiles configstring `i`'s lightstyle string
+/// into `cl_lightstyle[i/3]`'s per-frame animation map.
+///
+/// Every char maps `'a'..'z'` onto a 0-255 brightness byte; `i%3` picks which
+/// color channel this configstring feeds (three consecutive configstrings
+/// drive R/G/B of one compiled style).
+///
+/// Source: `oracle/codemp/cgame/cg_light.c:68-85`
+pub fn CG_SetLightstyle(ctx: &mut CgContext, i: c_int) {
+    let s = CG_ConfigString(ctx, i + CS_LIGHT_STYLES);
+    // raw wire bytes, not the decoded String's UTF-8 length - matches Raven's strlen
+    let bytes = string_to_latin1(&s);
+    let j = bytes.len();
+    if j >= MAX_QPATH {
+        let msg = format!("svc_lightstyle length={j}");
+        Com_Error(ctx, errorParm_t::ERR_DROP as c_int, &msg);
+        return;
+    }
+
+    let idx = (i / 3) as usize;
+    let channel = (i % 3) as usize;
+    ctx.world.light.cl_lightstyle[idx].length = j as i32;
+    for k in 0..j {
+        // Raven's `255.0` is a double literal, so the f32 quotient promotes to
+        // double before the multiply and byte narrowing.
+        ctx.world.light.cl_lightstyle[idx].map[k][channel] =
+            (((bytes[k] as i32 - 'a' as i32) as f32 / ('z' as i32 - 'a' as i32) as f32) as f64
+                * 255.0) as i32 as u8;
     }
 }

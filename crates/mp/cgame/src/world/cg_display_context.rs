@@ -56,7 +56,8 @@ use mp_uishared::shared::item_def_s::ItemDef;
 use mp_uishared::shared::item_id::ItemId;
 use mp_uishared::shared::menu_system::MenuSystem;
 
-use crate::cg_drawtools::{CG_DrawPic, CG_DrawSides, CG_DrawTopBottom, CG_FillRect};
+use crate::cg_draw::{CG_Text_Height, CG_Text_Paint, CG_Text_Width};
+use crate::cg_drawtools::{CG_DrawPic, CG_DrawRect, CG_DrawSides, CG_DrawTopBottom, CG_FillRect};
 use crate::cg_main::{
     CG_Cvar_Get, CG_DrawCinematic, CG_FeederCount, CG_FeederItemImage, CG_FeederSelection,
     CG_OwnerDrawHandleKey, CG_PlayCinematic, CG_Printf, CG_RunCinematicFrame, CG_StopCinematic,
@@ -111,42 +112,32 @@ impl<'e> DisplayContext for CgContext<'e> {
     /// Source: `oracle/codemp/cgame/cg_main.c:3153`
     fn drawText(
         &mut self,
-        _ds: &DisplayState,
-        _x: f32,
-        _y: f32,
-        _scale: f32,
-        _color: vec4_t,
-        _text: &str,
-        _adjust: f32,
-        _limit: c_int,
-        _style: c_int,
-        _iMenuFont: c_int,
+        ds: &DisplayState,
+        x: f32,
+        y: f32,
+        scale: f32,
+        color: vec4_t,
+        text: &str,
+        adjust: f32,
+        limit: c_int,
+        style: c_int,
+        iMenuFont: c_int,
     ) {
-        todo!("CG_Text_Paint — oracle/codemp/cgame/cg_draw.c:138-162, lands with its C5 wave")
+        CG_Text_Paint(
+            self, ds, x, y, scale, color, text, adjust, limit, style, iMenuFont,
+        )
     }
 
     /// Raven `cgDC.textWidth = &CG_Text_Width`.
     /// Source: `oracle/codemp/cgame/cg_main.c:3154`
-    fn textWidth(
-        &mut self,
-        _ds: &DisplayState,
-        _text: &str,
-        _scale: f32,
-        _iMenuFont: c_int,
-    ) -> c_int {
-        todo!("CG_Text_Width — oracle/codemp/cgame/cg_draw.c:123-128, lands with its C5 wave")
+    fn textWidth(&mut self, ds: &DisplayState, text: &str, scale: f32, iMenuFont: c_int) -> c_int {
+        CG_Text_Width(self, ds, text, scale, iMenuFont)
     }
 
     /// Raven `cgDC.textHeight = &CG_Text_Height`.
     /// Source: `oracle/codemp/cgame/cg_main.c:3155`
-    fn textHeight(
-        &mut self,
-        _ds: &DisplayState,
-        _text: &str,
-        _scale: f32,
-        _iMenuFont: c_int,
-    ) -> c_int {
-        todo!("CG_Text_Height — oracle/codemp/cgame/cg_draw.c:130-135, lands with its C5 wave")
+    fn textHeight(&mut self, ds: &DisplayState, text: &str, scale: f32, iMenuFont: c_int) -> c_int {
+        CG_Text_Height(self, ds, text, scale, iMenuFont)
     }
 
     /// Raven `cgDC.registerModel = &trap_R_RegisterModel`.
@@ -176,14 +167,14 @@ impl<'e> DisplayContext for CgContext<'e> {
     fn drawRect(
         &mut self,
         _ds: &DisplayState,
-        _x: f32,
-        _y: f32,
-        _w: f32,
-        _h: f32,
-        _size: f32,
-        _color: vec4_t,
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        size: f32,
+        color: vec4_t,
     ) {
-        todo!("CG_DrawRect — oracle/codemp/cgame/cg_drawtools.c:24-31, lands with its C5 wave")
+        CG_DrawRect(self, x, y, w, h, size, &color)
     }
 
     /// Raven `cgDC.drawSides = &CG_DrawSides`.
@@ -651,7 +642,7 @@ impl<'e> DisplayContext for CgContext<'e> {
 
     /// Raven `trap_SP_GetStringTextString` (`ui_shared.c` direct call).
     fn SP_GetStringTextString(&mut self, text: &str, buffer_len: usize) -> Option<String> {
-        Some(trap::SP_GetStringTextString(self.engine, text, buffer_len))
+        trap::SP_GetStringTextString(self.engine, text, buffer_len)
     }
 
     /// Raven `trap_R_RegisterSkin` (`ui_shared.c` direct call).

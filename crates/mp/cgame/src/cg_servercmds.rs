@@ -10,18 +10,27 @@ use core::ptr::null_mut;
 use mp_bg::bg_panimate::BG_InDeathAnim;
 use mp_bg::local::bg_customSiegeSoundNames;
 use mp_bg::public::anim_number::animNumber_t;
+use mp_bg::public::configstring::{
+    CS_CLIENT_DUELISTS, CS_CLIENT_DUELWINNER, CS_CLIENT_JEDIMASTER, CS_FLAGSTATUS,
+    CS_LEVEL_START_TIME, CS_SCORES1, CS_SCORES2, CS_SERVERINFO, CS_SHADERSTATE, CS_SOUNDS,
+    CS_TERRAINS, CS_WARMUP,
+};
+use mp_bg::public::gametype::{GT_CTF, GT_CTY};
 use mp_bg::weapons::weapon_t::WP_BRYAR_PISTOL;
 use mp_engine_select::Engine;
 use mp_qshared::common::mp::ghoul2::bone_flags::BONE_ANIM_OVERRIDE_FREEZE;
 use mp_qshared::common::mp::qcommon::saber::saber_info::MAX_SABERS;
-use mp_qshared::shared::{qfalse, sfxHandle_t, MAX_CLIENTS, MAX_CLIENTS_I32};
+use mp_qshared::shared::q_math::VectorClear;
+use mp_qshared::shared::{
+    qfalse, qtrue, sfxHandle_t, MAX_CLIENTS, MAX_CLIENTS_I32, MAX_GENTITIES, MAX_QPATH,
+};
 use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::display_state::DisplayState;
 use mp_uishared::shared::menu_system::MenuSystem;
-use native_string::{atoi, strcat_string};
+use native_string::{atoi, strcat_string, Info_ValueForKey, Q_strncpyz};
 
 use crate::cg_event::CG_ReattachLimb;
-use crate::cg_main::{CG_Argv, CG_GetStringEdString, CG_SetScoreSelection};
+use crate::cg_main::{CG_Argv, CG_ConfigString, CG_GetStringEdString, CG_SetScoreSelection};
 use crate::cg_players::{
     cg_customCombatSoundNames, cg_customDuelSoundNames, cg_customExtraSoundNames,
     cg_customJediSoundNames, cg_customSoundNames, CG_DestroyNPCClient,
@@ -109,6 +118,8 @@ pub fn SetDuelistHealthsFromConfigString(world: &mut CgWorld, s: &str) {
     world.cgs.duelist1health = atoi(&buf);
 
     buf.clear();
+    // §F19: with no `|` in the string Raven's `i++` steps past the terminator
+    // and reads OOB; the length bound stops at the end and yields `atoi("")`.
     i += 1;
     while i < bytes.len() && bytes[i] != b'|' {
         buf.push(bytes[i] as char);
@@ -717,5 +728,389 @@ pub fn CG_BodyQueueCopy(ctx: &mut CgContext, centNum: usize, clientNum: c_int, k
     // After we create the bodyqueue, regenerate any limbs on the real instance
     if ctx.world.entity(sourceNum).torsoBolt != 0 {
         CG_ReattachLimb(ctx, sourceNum);
+    }
+}
+
+/// Raven `CG_ParseServerinfo` — pulls the gameplay cvars off the
+/// `CS_SERVERINFO` configstring into `cgs`/`cg` and mirrors the "about"/RMG
+/// cvars the UI reads back out.
+///
+/// Raven: rww - You must do this one here, Info_ValueForKey always uses the
+/// same memory pointer.
+///
+/// Source: `oracle/codemp/cgame/cg_servercmds.c:105-187`
+pub fn CG_ParseServerinfo(ctx: &mut CgContext) {
+    let info = CG_ConfigString(ctx, CS_SERVERINFO);
+
+    ctx.world.cgs.debugMelee = atoi(&Info_ValueForKey(&info, "g_debugMelee"));
+    ctx.world.cgs.stepSlideFix = atoi(&Info_ValueForKey(&info, "g_stepSlideFix"));
+
+    ctx.world.cgs.noSpecMove = atoi(&Info_ValueForKey(&info, "g_noSpecMove"));
+
+    trap::Cvar_Set(
+        ctx.engine,
+        "bg_fighterAltControl",
+        &Info_ValueForKey(&info, "bg_fighterAltControl"),
+    );
+
+    ctx.world.cgs.siegeTeamSwitch = atoi(&Info_ValueForKey(&info, "g_siegeTeamSwitch"));
+
+    ctx.world.cgs.showDuelHealths = atoi(&Info_ValueForKey(&info, "g_showDuelHealths"));
+
+    ctx.world.cgs.gametype = atoi(&Info_ValueForKey(&info, "g_gametype"));
+    trap::Cvar_Set(
+        ctx.engine,
+        "g_gametype",
+        &format!("{}", ctx.world.cgs.gametype),
+    );
+    ctx.world.cgs.needpass = atoi(&Info_ValueForKey(&info, "needpass"));
+    ctx.world.cgs.jediVmerc = atoi(&Info_ValueForKey(&info, "g_jediVmerc"));
+    ctx.world.cgs.wDisable = atoi(&Info_ValueForKey(&info, "wdisable"));
+    ctx.world.cgs.fDisable = atoi(&Info_ValueForKey(&info, "fdisable"));
+    ctx.world.cgs.dmflags = atoi(&Info_ValueForKey(&info, "dmflags"));
+    ctx.world.cgs.teamflags = atoi(&Info_ValueForKey(&info, "teamflags"));
+    ctx.world.cgs.fraglimit = atoi(&Info_ValueForKey(&info, "fraglimit"));
+    ctx.world.cgs.duel_fraglimit = atoi(&Info_ValueForKey(&info, "duel_fraglimit"));
+    ctx.world.cgs.capturelimit = atoi(&Info_ValueForKey(&info, "capturelimit"));
+    ctx.world.cgs.timelimit = atoi(&Info_ValueForKey(&info, "timelimit"));
+    ctx.world.cgs.maxclients = atoi(&Info_ValueForKey(&info, "sv_maxclients"));
+    let mapname = Info_ValueForKey(&info, "mapname");
+
+    // rww - You must do this one here, Info_ValueForKey always uses the same memory pointer.
+    trap::Cvar_Set(ctx.engine, "ui_about_mapname", &mapname);
+
+    Q_strncpyz(
+        &mut ctx.world.cgs.mapname,
+        &format!("maps/{mapname}.bsp"),
+        MAX_QPATH,
+    );
+
+    trap::Cvar_Set(
+        ctx.engine,
+        "ui_about_gametype",
+        &format!("{}", ctx.world.cgs.gametype),
+    );
+    trap::Cvar_Set(
+        ctx.engine,
+        "ui_about_fraglimit",
+        &format!("{}", ctx.world.cgs.fraglimit),
+    );
+    trap::Cvar_Set(
+        ctx.engine,
+        "ui_about_duellimit",
+        &format!("{}", ctx.world.cgs.duel_fraglimit),
+    );
+    trap::Cvar_Set(
+        ctx.engine,
+        "ui_about_capturelimit",
+        &format!("{}", ctx.world.cgs.capturelimit),
+    );
+    trap::Cvar_Set(
+        ctx.engine,
+        "ui_about_timelimit",
+        &format!("{}", ctx.world.cgs.timelimit),
+    );
+    trap::Cvar_Set(
+        ctx.engine,
+        "ui_about_maxclients",
+        &format!("{}", ctx.world.cgs.maxclients),
+    );
+    trap::Cvar_Set(
+        ctx.engine,
+        "ui_about_dmflags",
+        &format!("{}", ctx.world.cgs.dmflags),
+    );
+    trap::Cvar_Set(
+        ctx.engine,
+        "ui_about_hostname",
+        &Info_ValueForKey(&info, "sv_hostname"),
+    );
+    trap::Cvar_Set(
+        ctx.engine,
+        "ui_about_needpass",
+        &Info_ValueForKey(&info, "g_needpass"),
+    );
+    trap::Cvar_Set(
+        ctx.engine,
+        "ui_about_botminplayers",
+        &Info_ValueForKey(&info, "bot_minplayers"),
+    );
+
+    // Set the siege teams based on what the server has for overrides.
+    trap::Cvar_Set(
+        ctx.engine,
+        "cg_siegeTeam1",
+        &Info_ValueForKey(&info, "g_siegeTeam1"),
+    );
+    trap::Cvar_Set(
+        ctx.engine,
+        "cg_siegeTeam2",
+        &Info_ValueForKey(&info, "g_siegeTeam2"),
+    );
+
+    let tinfo = CG_ConfigString(ctx, CS_TERRAINS + 1);
+    if tinfo.is_empty() {
+        ctx.world.cg.mInRMG = qfalse;
+    } else {
+        ctx.world.cg.mInRMG = qtrue;
+        trap::Cvar_Set(ctx.engine, "RMG", "1");
+
+        let weather = atoi(&Info_ValueForKey(&info, "RMG_weather"));
+
+        trap::Cvar_Set(ctx.engine, "RMG_weather", &format!("{weather}"));
+
+        if weather == 1 || weather == 2 {
+            ctx.world.cg.mRMGWeather = qtrue;
+        } else {
+            ctx.world.cg.mRMGWeather = qfalse;
+        }
+    }
+}
+
+/// Raven `CG_ParseWarmup` — reads the `CS_WARMUP` configstring into `cg.warmup`
+/// and resets the countdown display.
+///
+/// Source: `oracle/codemp/cgame/cg_servercmds.c:194-204`
+pub fn CG_ParseWarmup(ctx: &mut CgContext) {
+    let info = CG_ConfigString(ctx, CS_WARMUP);
+
+    let warmup = atoi(&info);
+    ctx.world.cg.warmupCount = -1;
+
+    ctx.world.cg.warmup = warmup;
+}
+
+/// Raven `CG_SetConfigValues` — refreshes the small scoreboard/warmup/duel
+/// fields cgame re-reads out of their configstrings on every relevant
+/// `CS_*_CHANGED` event, rather than caching them once.
+///
+/// Source: `oracle/codemp/cgame/cg_servercmds.c:213-262`
+pub fn CG_SetConfigValues(ctx: &mut CgContext) {
+    let s = CG_ConfigString(ctx, CS_SCORES1);
+    ctx.world.cgs.scores1 = atoi(&s);
+    let s = CG_ConfigString(ctx, CS_SCORES2);
+    ctx.world.cgs.scores2 = atoi(&s);
+    let s = CG_ConfigString(ctx, CS_LEVEL_START_TIME);
+    ctx.world.cgs.levelStartTime = atoi(&s);
+
+    if ctx.world.cgs.gametype == GT_CTF || ctx.world.cgs.gametype == GT_CTY {
+        let s = CG_ConfigString(ctx, CS_FLAGSTATUS);
+        let bytes = s.as_bytes();
+
+        // §F19: Raven indexes `s[0]`/`s[1]` unchecked; a short/empty
+        // configstring here leaves the flag fields at 0 instead of reading OOB.
+        ctx.world.cgs.redflag = bytes.first().map(|&b| b as i32 - '0' as i32).unwrap_or(0);
+        ctx.world.cgs.blueflag = bytes.get(1).map(|&b| b as i32 - '0' as i32).unwrap_or(0);
+    }
+
+    let s = CG_ConfigString(ctx, CS_WARMUP);
+    ctx.world.cg.warmup = atoi(&s);
+
+    // Track who the jedi master is
+    let s = CG_ConfigString(ctx, CS_CLIENT_JEDIMASTER);
+    ctx.world.cgs.jediMaster = atoi(&s);
+    let s = CG_ConfigString(ctx, CS_CLIENT_DUELWINNER);
+    ctx.world.cgs.duelWinner = atoi(&s);
+
+    let s = CG_ConfigString(ctx, CS_CLIENT_DUELISTS);
+
+    if !s.is_empty() {
+        let bytes = s.as_bytes();
+        let mut buf = String::new();
+        let mut i = 0usize;
+
+        while i < bytes.len() && bytes[i] != b'|' {
+            buf.push(bytes[i] as char);
+            i += 1;
+        }
+        ctx.world.cgs.duelist1 = atoi(&buf);
+
+        buf.clear();
+        i += 1;
+
+        while i < bytes.len() {
+            buf.push(bytes[i] as char);
+            i += 1;
+        }
+        ctx.world.cgs.duelist2 = atoi(&buf);
+    }
+}
+
+/// Raven `CG_ShaderStateChanged` — walks the `=`/`:`/`@`-delimited
+/// `CS_SHADERSTATE` configstring and remaps each `original=new:timeOffset`
+/// triple through the renderer.
+///
+/// PORT-NOTE: a `:` that never turns up after a `=` (or a trailing entry with
+/// no `@`) ends the whole scan, not just that entry - Raven's `break`/dropped-
+/// pointer behavior. Kept as written.
+///
+/// §F19: Raven's `strncpy` fills fixed `originalShader[MAX_QPATH]`/
+/// `newShader[MAX_QPATH]`/`timeOffset[16]` stack buffers with no length check
+/// against the segment it found, so an oversized segment overflows the stack
+/// (UB); the port slices the live `String` instead, so there's no buffer to
+/// overrun.
+///
+/// Source: `oracle/codemp/cgame/cg_servercmds.c:269-302`
+pub fn CG_ShaderStateChanged(ctx: &mut CgContext) {
+    let o = CG_ConfigString(ctx, CS_SHADERSTATE);
+    let mut rest: &str = &o;
+
+    while !rest.is_empty() {
+        let Some(eq) = rest.find('=') else { break };
+        let originalShader = &rest[..eq];
+        let afterEq = &rest[eq + 1..];
+
+        let Some(colon) = afterEq.find(':') else {
+            break;
+        };
+        let newShader = &afterEq[..colon];
+        let afterColon = &afterEq[colon + 1..];
+
+        // Raven's `o = strstr(t, "@")` going NULL here just fails the outer
+        // `while (o && *o)` check on the next spin; breaking straight away is
+        // the same outcome without a dead re-check.
+        let Some(at) = afterColon.find('@') else {
+            break;
+        };
+        let timeOffset = &afterColon[..at];
+
+        trap::R_RemapShader(ctx.engine, originalShader, newShader, timeOffset);
+
+        rest = &afterColon[at + 1..];
+    }
+}
+
+/// Raven `CG_HandleNPCSounds` — mirrors an NPC's four server-driven custom
+/// sound sets (standard/combat/extra/jedi) onto its `npcClient`, registering
+/// whatever set the current configstring names or clearing the table when the
+/// server stopped naming one.
+///
+/// Source: `oracle/codemp/cgame/cg_servercmds.c:484-606`
+pub fn CG_HandleNPCSounds(ctx: &mut CgContext, centNum: usize) {
+    if ctx.world.entity(centNum).npcClient.is_none() {
+        return;
+    }
+
+    // standard
+    let csSounds_Std = ctx.world.entity(centNum).currentState.csSounds_Std;
+    if csSounds_Std != 0 {
+        let s = CG_ConfigString(ctx, CS_SOUNDS + csSounds_Std);
+
+        if !s.is_empty() {
+            // Parse past the initial "*" which indicates this is a custom
+            // sound, and the "$" which indicates it is an NPC custom sound dir.
+            let sEnd: String = s.as_bytes().iter().skip(2).map(|&b| b as char).collect();
+
+            let mut npc = ctx.world.entity_mut(centNum).npcClient.take();
+            if let Some(ci) = npc.as_deref_mut() {
+                CG_RegisterCustomSounds(ctx, ci, 1, &sEnd);
+            }
+            ctx.world.entity_mut(centNum).npcClient = npc;
+        }
+    } else if let Some(ci) = ctx.world.entity_mut(centNum).npcClient.as_deref_mut() {
+        ci.sounds = [0; MAX_CUSTOM_SOUNDS];
+    }
+
+    // combat
+    let csSounds_Combat = ctx.world.entity(centNum).currentState.csSounds_Combat;
+    if csSounds_Combat != 0 {
+        let s = CG_ConfigString(ctx, CS_SOUNDS + csSounds_Combat);
+
+        if !s.is_empty() {
+            let sEnd: String = s.as_bytes().iter().skip(2).map(|&b| b as char).collect();
+
+            let mut npc = ctx.world.entity_mut(centNum).npcClient.take();
+            if let Some(ci) = npc.as_deref_mut() {
+                CG_RegisterCustomSounds(ctx, ci, 2, &sEnd);
+            }
+            ctx.world.entity_mut(centNum).npcClient = npc;
+        }
+    } else if let Some(ci) = ctx.world.entity_mut(centNum).npcClient.as_deref_mut() {
+        ci.combatSounds = [0; MAX_CUSTOM_COMBAT_SOUNDS];
+    }
+
+    // extra
+    let csSounds_Extra = ctx.world.entity(centNum).currentState.csSounds_Extra;
+    if csSounds_Extra != 0 {
+        let s = CG_ConfigString(ctx, CS_SOUNDS + csSounds_Extra);
+
+        if !s.is_empty() {
+            let sEnd: String = s.as_bytes().iter().skip(2).map(|&b| b as char).collect();
+
+            let mut npc = ctx.world.entity_mut(centNum).npcClient.take();
+            if let Some(ci) = npc.as_deref_mut() {
+                CG_RegisterCustomSounds(ctx, ci, 3, &sEnd);
+            }
+            ctx.world.entity_mut(centNum).npcClient = npc;
+        }
+    } else if let Some(ci) = ctx.world.entity_mut(centNum).npcClient.as_deref_mut() {
+        ci.extraSounds = [0; MAX_CUSTOM_EXTRA_SOUNDS];
+    }
+
+    // jedi
+    let csSounds_Jedi = ctx.world.entity(centNum).currentState.csSounds_Jedi;
+    if csSounds_Jedi != 0 {
+        let s = CG_ConfigString(ctx, CS_SOUNDS + csSounds_Jedi);
+
+        if !s.is_empty() {
+            let sEnd: String = s.as_bytes().iter().skip(2).map(|&b| b as char).collect();
+
+            let mut npc = ctx.world.entity_mut(centNum).npcClient.take();
+            if let Some(ci) = npc.as_deref_mut() {
+                CG_RegisterCustomSounds(ctx, ci, 4, &sEnd);
+            }
+            ctx.world.entity_mut(centNum).npcClient = npc;
+        }
+    } else if let Some(ci) = ctx.world.entity_mut(centNum).npcClient.as_deref_mut() {
+        ci.jediSounds = [0; MAX_CUSTOM_JEDI_SOUNDS];
+    }
+}
+
+/// Raven `CG_KillCEntityInstances` — resets every entity slot's ghoul2-adjacent
+/// bolt/trail/anim latches for a fresh map/snapshot, additionally tearing down
+/// non-client slots' live ghoul2 instances (client slots keep theirs - they're
+/// constant across the connection).
+///
+/// Source: `oracle/codemp/cgame/cg_servercmds.c:937-981`
+pub fn CG_KillCEntityInstances(ctx: &mut CgContext) {
+    let mut i: usize = 0;
+
+    while i < MAX_GENTITIES {
+        if i >= MAX_CLIENTS && ctx.world.entity(i).currentState.number == i as c_int {
+            // do not clear G2 instances on client ents, they are constant
+            CG_KillCEntityG2(ctx, i);
+        }
+
+        let cent = ctx.world.entity_mut(i);
+
+        cent.bolt1 = 0;
+        cent.bolt2 = 0;
+        cent.bolt3 = 0;
+        cent.bolt4 = 0;
+
+        cent.bodyHeight = 0.0; //SABER_LENGTH_MAX;
+                               //cent->saberExtendTime = 0;
+
+        cent.boltInfo = 0;
+
+        cent.frame_minus1_refreshed = 0;
+        cent.frame_minus2_refreshed = 0;
+        cent.dustTrailTime = 0;
+        cent.ghoul2weapon = null_mut();
+        //cent->torsoBolt = 0;
+        cent.trailTime = 0;
+        cent.frame_hold_time = 0;
+        cent.frame_hold_refreshed = 0;
+        cent.trickAlpha = 0;
+        cent.trickAlphaTime = 0;
+        VectorClear(&mut cent.turAngles);
+        cent.weapon = 0;
+        cent.teamPowerEffectTime = 0;
+        cent.teamPowerType = 0;
+        cent.numLoopingSounds = 0;
+
+        cent.localAnimIndex = 0;
+
+        i += 1;
     }
 }

@@ -142,11 +142,26 @@ pub struct CgDrawState {
     /// asteroid blip's alpha, so it is read as well as debounced.
     /// Source: `oracle/codemp/cgame/cg_draw.c:3173`
     pub impactSoundDebounceTime: c_int,
+
+    /// Raven `int lastvalidlockdif` — the last rocket-lock wedge count taken
+    /// while the lock was still live; replayed once the lock time goes to -1.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:31`
+    pub lastvalidlockdif: c_int,
+
+    /// Raven's `static qboolean flip = qtrue` inside `CG_DrawZoomMask` — which
+    /// way the binocular mask's top triangle currently points.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:224`
+    pub flip: bool,
+
+    /// Raven's `static int oldDif = 0` inside `CG_DrawRocketLocking` — last
+    /// frame's wedge count; a change fires the tick/lock sound.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:5752`
+    pub oldDif: c_int,
 }
 
 impl Default for CgDrawState {
     /// Raven's initializers — everything is zeroed BSS except `cg_targVeh`
-    /// (`ENTITYNUM_NONE`) and `cg_radarRange` (2500).
+    /// (`ENTITYNUM_NONE`), `cg_radarRange` (2500) and `flip` (`qtrue`).
     fn default() -> Self {
         CgDrawState {
             cg_targVeh: ENTITYNUM_NONE,
@@ -168,6 +183,9 @@ impl Default for CgDrawState {
             cg_radarRange: 2500.0,
             radarLockSoundDebounceTime: 0,
             impactSoundDebounceTime: 0,
+            lastvalidlockdif: 0,
+            flip: true,
+            oldDif: 0,
         }
     }
 }

@@ -90,6 +90,24 @@ pub struct CgSagaState {
     /// Source: `oracle/codemp/cgame/cg_saga.c:19`
     pub team2: String,
 
+    /// Raven `int team1Timed` — side-1's round time limit in msec, 0 when the
+    /// team has no `Timed` entry.
+    /// Source: `oracle/codemp/cgame/cg_saga.c:21`
+    pub team1Timed: i32,
+
+    /// Raven `int team2Timed` — side-2's round time limit in msec.
+    /// Source: `oracle/codemp/cgame/cg_saga.c:22`
+    pub team2Timed: i32,
+
+    /// Raven `int cgSiegeTeam1PlShader` — friendly-player HUD shader for side 1.
+    /// Raven types it `int` even though it holds a `qhandle_t`; kept as `i32`.
+    /// Source: `oracle/codemp/cgame/cg_saga.c:24`
+    pub cgSiegeTeam1PlShader: i32,
+
+    /// Raven `int cgSiegeTeam2PlShader` — friendly-player HUD shader for side 2.
+    /// Source: `oracle/codemp/cgame/cg_saga.c:25`
+    pub cgSiegeTeam2PlShader: i32,
+
     /// Raven `siegeExtended_t cg_siegeExtendedData[MAX_CLIENTS]` — per-client
     /// cached health/ammo/weapon HUD extras for siege mode, refreshed from the
     /// server's extended-data string.

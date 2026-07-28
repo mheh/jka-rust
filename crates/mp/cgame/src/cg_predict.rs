@@ -831,3 +831,60 @@ pub fn CG_TouchTriggerPrediction(ctx: &mut CgContext) {
         ctx.world.cg.predictedPlayerState.jumppad_ent = 0;
     }
 }
+
+/// Raven `CG_Trace` — a straight `trap_CM_BoxTrace` sweep, then narrowed
+/// against `cg_solidEntities` (no ghoul2 sub-model check).
+/// Source: `oracle/codemp/cgame/cg_predict.c:359-369`
+#[allow(clippy::too_many_arguments)]
+pub fn CG_Trace(
+    ctx: &mut CgContext,
+    result: &mut trace_t,
+    start: &vec3_t,
+    mins: &vec3_t,
+    maxs: &vec3_t,
+    end: &vec3_t,
+    skipNumber: c_int,
+    mask: c_int,
+) {
+    let mut t = trace_t::zeroed();
+
+    trap::CM_BoxTrace(ctx.engine, &mut t, start, end, mins, maxs, 0, mask);
+    t.entityNum = if t.fraction != 1.0 {
+        ENTITYNUM_WORLD as i16
+    } else {
+        ENTITYNUM_NONE as i16
+    };
+    // check all other solid models
+    CG_ClipMoveToEntities(ctx, start, mins, maxs, end, skipNumber, mask, &mut t, false);
+
+    *result = t;
+}
+
+/// Raven `CG_G2Trace` — identical to [`CG_Trace`] but flips the
+/// `CG_ClipMoveToEntities` `g2Check` arm on, so the sweep also probes ghoul2
+/// sub-models.
+/// Source: `oracle/codemp/cgame/cg_predict.c:376-386`
+#[allow(clippy::too_many_arguments)]
+pub fn CG_G2Trace(
+    ctx: &mut CgContext,
+    result: &mut trace_t,
+    start: &vec3_t,
+    mins: &vec3_t,
+    maxs: &vec3_t,
+    end: &vec3_t,
+    skipNumber: c_int,
+    mask: c_int,
+) {
+    let mut t = trace_t::zeroed();
+
+    trap::CM_BoxTrace(ctx.engine, &mut t, start, end, mins, maxs, 0, mask);
+    t.entityNum = if t.fraction != 1.0 {
+        ENTITYNUM_WORLD as i16
+    } else {
+        ENTITYNUM_NONE as i16
+    };
+    // check all other solid models
+    CG_ClipMoveToEntities(ctx, start, mins, maxs, end, skipNumber, mask, &mut t, true);
+
+    *result = t;
+}

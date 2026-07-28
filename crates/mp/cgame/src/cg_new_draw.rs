@@ -4,6 +4,7 @@
 #![allow(non_snake_case)]
 
 use core::ffi::c_int;
+use core::ptr::null_mut;
 
 use mp_bg::public::gametype::{
     GT_CTF, GT_CTY, GT_DUEL, GT_FFA, GT_HOLOCRON, GT_JEDIMASTER, GT_POWERDUEL, GT_SIEGE,
@@ -22,21 +23,25 @@ use mp_qshared::shared::{qfalse, qhandle_t, vec4_t, FLAG_TAKEN, FLAG_TAKEN_BLUE,
 use mp_uishared::shared::display_state::DisplayState;
 use mp_uishared::shared::menu_system::MenuSystem;
 use mp_uishared::shared::menudef::{
-    CG_BLUE_SCORE, CG_PLAYER_AMMO_VALUE, CG_PLAYER_ARMOR_VALUE, CG_PLAYER_FORCE_VALUE,
+    CG_ACCURACY, CG_ASSISTS, CG_BLUE_SCORE, CG_CAPTURES, CG_DEFEND, CG_EXCELLENT, CG_GAUNTLET,
+    CG_IMPRESSIVE, CG_PERFECT, CG_PLAYER_AMMO_VALUE, CG_PLAYER_ARMOR_VALUE, CG_PLAYER_FORCE_VALUE,
     CG_PLAYER_HEALTH, CG_PLAYER_SCORE, CG_RED_SCORE, CG_SELECTEDPLAYER_ARMOR,
     CG_SELECTEDPLAYER_HEALTH, CG_SHOW_ANYNONTEAMGAME, CG_SHOW_ANYTEAMGAME,
     CG_SHOW_BLUE_TEAM_HAS_REDFLAG, CG_SHOW_CTF, CG_SHOW_DURINGINCOMINGVOICE,
     CG_SHOW_HEALTHCRITICAL, CG_SHOW_HEALTHOK, CG_SHOW_IF_PLAYER_HAS_FLAG, CG_SHOW_NOTEAMINFO,
     CG_SHOW_OTHERTEAMHASFLAG, CG_SHOW_RED_TEAM_HAS_BLUEFLAG, CG_SHOW_SINGLEPLAYER,
-    CG_SHOW_TEAMINFO, CG_SHOW_TOURNAMENT, CG_SHOW_YOURTEAMHASENEMYFLAG,
+    CG_SHOW_TEAMINFO, CG_SHOW_TOURNAMENT, CG_SHOW_YOURTEAMHASENEMYFLAG, ITEM_TEXTSTYLE_NORMAL,
 };
+use mp_uishared::shared::rect_def_t::RectDef;
 use mp_uishared::ui_shared::{
-    Display_CursorType, Display_MouseMove, Menus_CloseByName, Menus_OpenByName, CURSOR_ARROW,
-    CURSOR_SIZER,
+    Display_CursorType, Display_HandleKey, Display_MouseMove, Menus_CloseByName, Menus_OpenByName,
+    CURSOR_ARROW, CURSOR_SIZER,
 };
 
 use native_string::{latin1_to_string, string_to_latin1, Q_stricmpBytes};
 
+use crate::cg_draw::{CG_Text_Paint, CG_Text_Width, MenuFontToHandle};
+use crate::cg_drawtools::CG_DrawPic;
 use crate::cg_event::CG_PlaceString;
 use crate::cg_main::CG_GetStringEdString;
 use crate::trap;
@@ -47,6 +52,18 @@ use crate::world::cg_world::CgWorld;
 ///
 /// Source: `oracle/codemp/cgame/cg_newDraw.c:324`
 pub const PIC_WIDTH: c_int = 12;
+
+// PORT-NOTE: `q_shared.h`'s font enum is anonymous, so per the
+// anonymous-enum convention this is a file-local `const`, mirroring
+// `cg_draw.rs`'s own copy.
+/// Source: `oracle/codemp/game/q_shared.h:3176-3182`
+const FONT_MEDIUM: c_int = 2;
+
+// PORT-NOTE: `keycodes.h`'s `A_*` enum has no `mp_qshared` home (see
+// `mp_uishared::ui_shared`'s own file-local copies), so this key code gets a
+// local numeric twin - the same ordinal as `fakeAscii_t::A_MOUSE2`.
+/// Source: `oracle/codemp/ui/keycodes.h:156`
+const A_MOUSE2: c_int = 142;
 
 /// Raven's anonymous `enum { CGAME_EVENT_NONE, CGAME_EVENT_TEAMMENU,
 /// CGAME_EVENT_SCOREBOARD, CGAME_EVENT_EDITHUD }` - no typedef name, so these
@@ -538,7 +555,8 @@ pub fn CG_GetGameStatusText(ctx: &mut CgContext) -> String {
         let rank = snap.ps.persistant[PERS_RANK as usize] + 1;
         let score = snap.ps.persistant[PERS_SCORE as usize];
 
-        let sPlaceWith = trap::SP_GetStringTextString(ctx.engine, "MP_INGAME_PLACE_WITH", 256);
+        let sPlaceWith = trap::SP_GetStringTextString(ctx.engine, "MP_INGAME_PLACE_WITH", 256)
+            .unwrap_or_else(|| "??MP_INGAME_PLACE_WITH".to_string());
         let place = CG_PlaceString(ctx, rank);
         return format!("{place} {sPlaceWith} {score}");
     }
@@ -574,5 +592,227 @@ pub fn CG_EventHandling(
     } else if eventType == CGAME_EVENT_TEAMMENU {
         // CG_ShowTeamMenu(); - Raven left this call commented out.
     } else if eventType == CGAME_EVENT_SCOREBOARD {
+    }
+}
+
+/// Raven `CG_Text_Paint_Limit` — paints `text` inside the `[x, *maxX]` pixel
+/// budget, truncating to whatever prefix fits when the whole string is too
+/// wide; feeds `*maxX` back to the caller either way (the next paint
+/// position when it all fit, `0` once truncated).
+///
+/// Raven's truncation scratch buffer always drops the very last "letter" it
+/// decoded, even when that letter would still have fit: `psOutLastGood` is
+/// reset to the buffer position from BEFORE each iteration's append, and the
+/// final NUL lands there once the loop exits - so whatever the exiting
+/// iteration just appended never survives into the printed prefix. Kept
+/// verbatim (§A2 - no speculative off-by-one fix).
+///
+/// Source: `oracle/codemp/cgame/cg_newDraw.c:267-320`
+#[allow(clippy::too_many_arguments)]
+pub fn CG_Text_Paint_Limit(
+    ctx: &CgContext,
+    cgDC: &DisplayState,
+    maxX: &mut f32,
+    x: f32,
+    y: f32,
+    scale: f32,
+    color: vec4_t,
+    text: &str,
+    adjust: f32,
+    limit: c_int,
+    iMenuFont: c_int,
+) {
+    let iFontIndex = MenuFontToHandle(cgDC, iMenuFont);
+
+    let iPixelLen = trap::R_Font_StrLenPixels(ctx.engine, text, iFontIndex, scale);
+    if x + iPixelLen as f32 > *maxX {
+        // whole text won't fit, so print just the amount that does - walk it
+        // one engine-decoded "letter" (possibly a 2-byte code) at a time.
+        let queryBytes = string_to_latin1(text);
+        let mut sTemp: Vec<u8> = Vec::new();
+        let mut lastGoodLen: usize = 0;
+        let mut pos: usize = 0;
+
+        while pos < queryBytes.len() {
+            let soFar = latin1_to_string(&sTemp);
+            let widthSoFar = trap::R_Font_StrLenPixels(ctx.engine, &soFar, iFontIndex, scale);
+            if x + widthSoFar as f32 > *maxX {
+                break;
+            }
+            // sanity: leave room for at least one more byte, mirroring
+            // Raven's `char sTemp[4096]` scratch bound.
+            if sTemp.len() >= 4095 {
+                break;
+            }
+
+            lastGoodLen = sTemp.len();
+
+            let (uiLetter, advanceCount, _bIsTrailingPunctuation) =
+                trap::AnyLanguage_ReadCharFromString(ctx.engine, &queryBytes[pos..]);
+            pos += advanceCount as usize;
+
+            if uiLetter > 255 {
+                sTemp.push((uiLetter >> 8) as u8);
+                sTemp.push((uiLetter & 0xFF) as u8);
+            } else {
+                sTemp.push((uiLetter & 0xFF) as u8);
+            }
+        }
+        sTemp.truncate(lastGoodLen);
+
+        *maxX = 0.0; // feedback
+        let sTempStr = latin1_to_string(&sTemp);
+        CG_Text_Paint(
+            ctx,
+            cgDC,
+            x,
+            y,
+            scale,
+            color,
+            &sTempStr,
+            adjust,
+            limit,
+            ITEM_TEXTSTYLE_NORMAL,
+            iMenuFont,
+        );
+    } else {
+        // whole text fits fine, so print it all
+        *maxX = x + iPixelLen as f32; // feedback the next position, as the caller expects
+        CG_Text_Paint(
+            ctx,
+            cgDC,
+            x,
+            y,
+            scale,
+            color,
+            text,
+            adjust,
+            limit,
+            ITEM_TEXTSTYLE_NORMAL,
+            iMenuFont,
+        );
+    }
+}
+
+/// Raven `CG_DrawMedal` — the scoreboard "medal" owner-draw: an accuracy/
+/// award icon plus its numeric caption for `cg.scores[cg.selectedScore]`.
+///
+/// Raven's `vec4_t color` parameter is a C array, so it decays to a pointer
+/// and the in-body writes (`color[3] = ...`) are really an in/out parameter;
+/// this fn has no live caller (its one call site, `CG_OwnerDraw`'s switch, is
+/// `#if 0`'d out in Raven and lands as the empty stub above), so the port
+/// keeps this file's established by-value `vec4_t` shape rather than
+/// threading a `&mut`.
+///
+/// Source: `oracle/codemp/cgame/cg_newDraw.c:496-558`
+pub fn CG_DrawMedal(
+    ctx: &mut CgContext,
+    cgDC: &DisplayState,
+    ownerDraw: c_int,
+    rect: &RectDef,
+    scale: f32,
+    mut color: vec4_t,
+    shader: qhandle_t,
+) {
+    let mut value: f32 = 0.0;
+    let mut text: Option<String> = None;
+    color[3] = 0.25;
+
+    let score = &ctx.world.cg.scores[ctx.world.cg.selectedScore as usize];
+    match ownerDraw {
+        v if v == CG_ACCURACY => value = score.accuracy as f32,
+        v if v == CG_ASSISTS => value = score.assistCount as f32,
+        v if v == CG_DEFEND => value = score.defendCount as f32,
+        v if v == CG_EXCELLENT => value = score.excellentCount as f32,
+        v if v == CG_IMPRESSIVE => value = score.impressiveCount as f32,
+        v if v == CG_PERFECT => value = score.perfect as f32,
+        v if v == CG_GAUNTLET => value = score.guantletCount as f32,
+        v if v == CG_CAPTURES => value = score.captures as f32,
+        _ => {}
+    }
+
+    if value > 0.0 {
+        if ownerDraw != CG_PERFECT {
+            if ownerDraw == CG_ACCURACY {
+                text = Some(format!("{}%", value as i32));
+                if value > 50.0 {
+                    color[3] = 1.0;
+                }
+            } else {
+                text = Some(format!("{}", value as i32));
+                color[3] = 1.0;
+            }
+        } else {
+            if value != 0.0 {
+                color[3] = 1.0;
+            }
+            text = Some("Wow".to_string());
+        }
+    }
+
+    trap::R_SetColor(ctx.engine, Some(&color));
+    CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, shader);
+
+    if let Some(text) = text {
+        color[3] = 1.0;
+        let textWidth = CG_Text_Width(ctx, cgDC, &text, scale, 0);
+        CG_Text_Paint(
+            ctx,
+            cgDC,
+            rect.x + (rect.w - textWidth as f32) / 2.0,
+            rect.y + rect.h + 10.0,
+            scale,
+            color,
+            &text,
+            0.0,
+            0,
+            0,
+            FONT_MEDIUM,
+        );
+    }
+    trap::R_SetColor(ctx.engine, None);
+}
+
+/// Raven `CG_KeyEvent` — routes a key press either to the movement
+/// key-catcher (gameplay states, scoreboard closed) or into the menu
+/// framework's key handling / captured-item release.
+///
+/// DEFERRED: the captured-item ACQUIRE branch - `cgs.capturedItem` is still
+/// the raw `*mut c_void` C1 port noted on `CG_MouseEvent` above, and
+/// `Display_CaptureItem` now returns `Option<MenuId>`, an arena index with no
+/// address to store there. Releasing it (nulling on a non-null capture) needs
+/// none of that and is ported faithfully.
+/// Source: `oracle/codemp/cgame/cg_newDraw.c:851-856`
+pub fn CG_KeyEvent(
+    ctx: &mut CgContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    key: c_int,
+    down: bool,
+) {
+    if !down {
+        return;
+    }
+
+    // Raven checks `PM_NORMAL` twice (a duplicate arm) - kept verbatim.
+    let pm_type = ctx.world.cg.predictedPlayerState.pm_type;
+    if pm_type == pmtype_t::PM_NORMAL as c_int
+        || pm_type == pmtype_t::PM_JETPACK as c_int
+        || pm_type == pmtype_t::PM_NORMAL as c_int
+        || (pm_type == pmtype_t::PM_SPECTATOR as c_int && ctx.world.cg.showScores == qfalse)
+    {
+        CG_EventHandling(ctx, menus, ds, CGAME_EVENT_NONE);
+        trap::Key_SetCatcher(ctx.engine, 0);
+        return;
+    }
+
+    let (cx, cy) = (ctx.world.cgs.cursorX, ctx.world.cgs.cursorY);
+    Display_HandleKey(menus, ds, ctx, key, down, cx, cy);
+
+    if !ctx.world.cgs.capturedItem.is_null() {
+        ctx.world.cgs.capturedItem = null_mut();
+    } else if key == A_MOUSE2 && down {
+        // DEFERRED: see the fn doc above.
+        // Source: oracle/codemp/cgame/cg_newDraw.c:854-855
     }
 }

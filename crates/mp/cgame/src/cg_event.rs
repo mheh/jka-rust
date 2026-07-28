@@ -6,19 +6,41 @@ use core::ffi::c_int;
 use core::ptr::null_mut;
 
 use mp_bg::bg_misc::{BG_CycleInven, BG_FindItemForHoldable, BG_GiveMeVectorFromMatrix};
+use mp_bg::cstr_util::cstr_to_str;
 use mp_bg::local::bg_customSiegeSoundNames;
+use mp_bg::public::bg_itemlist::bg_itemlist;
+use mp_bg::public::configstring::CS_PLAYERS;
+use mp_bg::public::ctf_msg::ctfMsg_t;
 use mp_bg::public::entity_event::entity_event_t::EV_USE_ITEM0;
+use mp_bg::public::gametype::{GT_DUEL, GT_JEDIMASTER, GT_POWERDUEL, GT_TEAM};
+use mp_bg::public::gender::gender_t;
 use mp_bg::public::holdable::{
     HI_AMMODISP, HI_BINOCULARS, HI_CLOAK, HI_EWEB, HI_HEALTHDISP, HI_JETPACK, HI_MEDPAC,
     HI_MEDPAC_BIG, HI_NONE, HI_NUM_HOLDABLE, HI_SEEKER, HI_SENTRY_GUN, HI_SHIELD,
 };
+use mp_bg::public::item_type::{IT_TEAM, IT_WEAPON};
+use mp_bg::public::means_of_death::meansOfDeath_t;
+use mp_bg::public::pers_enum::persEnum_t::{PERS_RANK, PERS_SCORE};
+use mp_bg::public::powerup::{PW_BLUEFLAG, PW_REDFLAG};
 use mp_bg::public::weaponstate::weaponstate_t;
 use mp_bg::public::{team_t, RANK_TIED_FLAG, TEAM_BLUE, TEAM_RED, TEAM_SPECTATOR};
-use mp_bg::vehicles::vehicle_s::Vehicle_t;
+use mp_bg::vehicles::vehicle_s::{Vehicle_t, MAX_VEHICLES, VEHICLE_BASE};
+use mp_bg::weapons::weapon_t::{
+    WP_BLASTER, WP_DEMP2, WP_DET_PACK, WP_ROCKET_LAUNCHER, WP_SABER, WP_THERMAL, WP_TRIP_MINE,
+    WP_TURRET,
+};
 use mp_qshared::common::mp::qcommon::entityState_t;
-use mp_qshared::shared::{mdxaBone_t, vec3_t, Eorientations, CHAN_AUTO, MAX_CLIENTS_I32};
+use mp_qshared::shared::limits::MAX_VEH_WEAPONS;
+use mp_qshared::shared::q_color::S_COLOR_WHITE;
+use mp_qshared::shared::{
+    mdxaBone_t, qfalse, vec3_t, Eorientations, BIGCHAR_WIDTH, CHAN_AUTO, ENTITYNUM_WORLD,
+    MAX_CLIENTS_I32, SCREEN_HEIGHT,
+};
+use native_string::{buf_to_string, string_to_latin1, Info_ValueForKey, Q_strncpyzBytes};
 
-use crate::cg_main::CG_GetStringEdString;
+use crate::cg_draw::CG_CenterPrint;
+use crate::cg_main::{CG_ConfigString, CG_Error, CG_GetStringEdString, CG_Printf, Com_Printf};
+use crate::cg_players::CG_ThereIsAMaster;
 use crate::local::centity_s::centity_t;
 use crate::local::client_info_t::MAX_CUSTOM_SIEGE_SOUNDS;
 use crate::trap;
@@ -32,12 +54,9 @@ use crate::world::cg_world::CgWorld;
 #[allow(dead_code)]
 fn DEBUGNAME(ctx: &mut CgContext, x: &str) {
     if ctx.world.cvars.cg_debugEvents.integer != 0 {
-        // DEFERRED: CG_Printf (oracle/codemp/cgame/cg_main.c:1209) isn't
-        // ported yet — it's cg_main.c's varargs wrapper over trap_Print.
-        // Raven's macro hands the caller's string straight through as the
-        // format string (no substitution), so calling trap_Print directly is
-        // the faithful stand-in until CG_Printf lands.
-        trap::Print(ctx.engine, &format!("{x}\n"));
+        // Raven's macro pastes the newline onto the literal and hands it
+        // straight through as CG_Printf's format string (no substitution).
+        CG_Printf(ctx, &format!("{x}\n"));
     }
 }
 
@@ -107,11 +126,16 @@ static cg_stringEdVoiceChatTable: [Option<&str>; MAX_CUSTOM_SIEGE_SOUNDS] = [
 ///
 /// Source: `oracle/codemp/cgame/cg_event.c:45-94`
 pub fn CG_PlaceString(ctx: &mut CgContext, mut rank: c_int) -> String {
-    let s_st = trap::SP_GetStringTextString(ctx.engine, "MP_INGAME_NUMBER_ST", 10);
-    let s_nd = trap::SP_GetStringTextString(ctx.engine, "MP_INGAME_NUMBER_ND", 10);
-    let s_rd = trap::SP_GetStringTextString(ctx.engine, "MP_INGAME_NUMBER_RD", 10);
-    let s_th = trap::SP_GetStringTextString(ctx.engine, "MP_INGAME_NUMBER_TH", 10);
-    let mut s_tied_for = trap::SP_GetStringTextString(ctx.engine, "MP_INGAME_TIED_FOR", 64);
+    let s_st = trap::SP_GetStringTextString(ctx.engine, "MP_INGAME_NUMBER_ST", 10)
+        .unwrap_or_else(|| "??MP_INGAME_NUMBER_ST".to_string());
+    let s_nd = trap::SP_GetStringTextString(ctx.engine, "MP_INGAME_NUMBER_ND", 10)
+        .unwrap_or_else(|| "??MP_INGAME_NUMBER_ND".to_string());
+    let s_rd = trap::SP_GetStringTextString(ctx.engine, "MP_INGAME_NUMBER_RD", 10)
+        .unwrap_or_else(|| "??MP_INGAME_NUMBER_RD".to_string());
+    let s_th = trap::SP_GetStringTextString(ctx.engine, "MP_INGAME_NUMBER_TH", 10)
+        .unwrap_or_else(|| "??MP_INGAME_NUMBER_TH".to_string());
+    let mut s_tied_for = trap::SP_GetStringTextString(ctx.engine, "MP_INGAME_TIED_FOR", 64)
+        .unwrap_or_else(|| "??MP_INGAME_TIED_FOR".to_string());
     // save worrying about translators adding spaces or not
     s_tied_for.push(' ');
 
@@ -553,4 +577,672 @@ pub fn CG_GetStringForVoiceSound(ctx: &mut CgContext, s: &str) -> String {
     }
 
     "voice chat".to_string()
+}
+
+/// Raven `CG_Obituary` — turns an `EV_OBITUARY` entity event into the console
+/// death message (plus the centerprint when the local player got the kill).
+///
+/// Raven's `goto clientkilled` is the fall-through when the kill is *not*
+/// client-on-client, so the port hangs the same block off the negated test.
+/// The four `char[32]` name buffers become owned `String`s clipped to Raven's
+/// `sizeof(buf) - 2` (29 Latin-1 chars) so the `^7` `strcat` still fits.
+///
+/// §F19: Raven derefs `cg.snap` unchecked; with no snapshot yet there is no
+/// local client, so both "is this about me?" tests take the no arm.
+///
+/// Source: `oracle/codemp/cgame/cg_event.c:103-607`
+pub fn CG_Obituary(ctx: &mut CgContext, ent: &entityState_t) {
+    let mut message: Option<&str>;
+    let mut vehMessage = false;
+
+    let target = ent.otherEntityNum;
+    let attacker = ent.otherEntityNum2;
+    let r#mod = ent.eventParm;
+
+    if target < 0 || target >= MAX_CLIENTS_I32 {
+        CG_Error(ctx, "CG_Obituary: target out of range");
+        return;
+    }
+    // Raven's `ci = &cgs.clientinfo[target]` is only ever read for its gender.
+    let gender = ctx.world.cgs.clientinfo[target as usize].gender;
+
+    let attackerInfo = if attacker < 0 || attacker >= MAX_CLIENTS_I32 {
+        //attacker = ENTITYNUM_WORLD;
+        None
+    } else {
+        Some(CG_ConfigString(ctx, CS_PLAYERS + attacker))
+    };
+
+    let targetInfo = CG_ConfigString(ctx, CS_PLAYERS + target);
+    // PORT-NOTE: Raven's `if (!targetInfo) return;` guards a pointer
+    // `CG_ConfigString` never hands back as NULL; the owned `String` keeps the
+    // guard just as dead, so it is not transcribed.
+
+    let mut targetName: String = Info_ValueForKey(&targetInfo, "n")
+        .chars()
+        .take(29)
+        .collect();
+    targetName.push_str(S_COLOR_WHITE.to_str().unwrap());
+
+    // check for target in a vehicle
+    let mut targetVehName = String::new();
+    if ent.lookTarget > VEHICLE_BASE && ent.lookTarget < MAX_VEHICLES as c_int {
+        let name = ctx.world.bg_state.g_vehicleInfo[ent.lookTarget as usize].name;
+        if !name.is_null() {
+            // SAFETY: `.name` points into `bg_state`'s own `VehicleParms` parse
+            // buffer - the same read `bg_vehicleLoad.rs:809` makes.
+            targetVehName = unsafe { cstr_to_str(name) }.chars().take(29).collect();
+        }
+    }
+
+    // check for attacker in a vehicle
+    // DEFERRED: `Vehicle_t` referent pool — Raven copies
+    // `attVehCent->m_pVehicle->m_pVehicleInfo->name` out of
+    // `cg_entities[ent->brokenLimbs]`, and DEC-46.2's `Option<VehicleId>`
+    // answers presence only until the pool lands (`local/vehicle_id.rs`), so
+    // there is nothing to read the name from and this stays empty.
+    // Source: oracle/codemp/cgame/cg_event.c:147-158
+    let attackerVehName = String::new();
+
+    //check for specific vehicle weapon
+    let mut attackerVehWeapName = String::new();
+    if ent.weapon > 0 {
+        // §F19: Raven indexes `g_vehWeaponInfo[MAX_VEH_WEAPONS]` with
+        // `ent->weapon-1`, which runs past the table for the top `weapon_t`
+        // values; out of range reads as "no name" here.
+        if (ent.weapon as usize) <= MAX_VEH_WEAPONS {
+            let name = ctx.world.bg_state.g_vehWeaponInfo[(ent.weapon - 1) as usize].name;
+            if !name.is_null() {
+                // SAFETY: `.name` points into `bg_state`'s own `VehWeaponParms`
+                // parse buffer - the same read `bg_vehicleLoad.rs:305` makes.
+                attackerVehWeapName = unsafe { cstr_to_str(name) }.chars().take(29).collect();
+            }
+        }
+    }
+
+    // check for single client messages
+
+    if ent.saberInFlight != qfalse {
+        //asteroid->vehicle collision
+        message = match ctx.world.bg_state.rng.Q_irand(0, 2) {
+            1 => Some("DIED_ASTEROID2"),
+            2 => Some("DIED_ASTEROID3"),
+            // Raven's `default:` falls into `case 0:`
+            _ => Some("DIED_ASTEROID1"),
+        };
+        vehMessage = true;
+    } else {
+        message = match r#mod {
+            m if m == meansOfDeath_t::MOD_VEHICLE as c_int
+                || m == meansOfDeath_t::MOD_SUICIDE as c_int
+                || m == meansOfDeath_t::MOD_FALLING as c_int
+                || m == meansOfDeath_t::MOD_COLLISION as c_int
+                || m == meansOfDeath_t::MOD_VEH_EXPLOSION as c_int
+                || m == meansOfDeath_t::MOD_CRUSH as c_int
+                || m == meansOfDeath_t::MOD_WATER as c_int
+                || m == meansOfDeath_t::MOD_SLIME as c_int
+                || m == meansOfDeath_t::MOD_LAVA as c_int
+                || m == meansOfDeath_t::MOD_TRIGGER_HURT as c_int =>
+            {
+                Some("DIED_GENERIC")
+            }
+
+            m if m == meansOfDeath_t::MOD_TARGET_LASER as c_int => {
+                vehMessage = true;
+                Some("DIED_TURBOLASER")
+            }
+
+            _ => None,
+        };
+    }
+
+    // Attacker killed themselves.  Ridicule them for it.
+    if attacker == target {
+        vehMessage = false;
+        message = Some(match r#mod {
+            m if m == meansOfDeath_t::MOD_BRYAR_PISTOL as c_int
+                || m == meansOfDeath_t::MOD_BRYAR_PISTOL_ALT as c_int
+                || m == meansOfDeath_t::MOD_BLASTER as c_int
+                || m == meansOfDeath_t::MOD_TURBLAST as c_int
+                || m == meansOfDeath_t::MOD_DISRUPTOR as c_int
+                || m == meansOfDeath_t::MOD_DISRUPTOR_SPLASH as c_int
+                || m == meansOfDeath_t::MOD_DISRUPTOR_SNIPER as c_int
+                || m == meansOfDeath_t::MOD_BOWCASTER as c_int
+                || m == meansOfDeath_t::MOD_REPEATER as c_int
+                || m == meansOfDeath_t::MOD_REPEATER_ALT as c_int
+                || m == meansOfDeath_t::MOD_FLECHETTE as c_int =>
+            {
+                match gender {
+                    gender_t::GENDER_FEMALE => "SUICIDE_SHOT_FEMALE",
+                    gender_t::GENDER_NEUTER => "SUICIDE_SHOT_GENDERLESS",
+                    _ => "SUICIDE_SHOT_MALE",
+                }
+            }
+
+            m if m == meansOfDeath_t::MOD_REPEATER_ALT_SPLASH as c_int
+                || m == meansOfDeath_t::MOD_FLECHETTE_ALT_SPLASH as c_int
+                || m == meansOfDeath_t::MOD_ROCKET as c_int
+                || m == meansOfDeath_t::MOD_ROCKET_SPLASH as c_int
+                || m == meansOfDeath_t::MOD_ROCKET_HOMING as c_int
+                || m == meansOfDeath_t::MOD_ROCKET_HOMING_SPLASH as c_int
+                || m == meansOfDeath_t::MOD_THERMAL as c_int
+                || m == meansOfDeath_t::MOD_THERMAL_SPLASH as c_int
+                || m == meansOfDeath_t::MOD_TRIP_MINE_SPLASH as c_int
+                || m == meansOfDeath_t::MOD_TIMED_MINE_SPLASH as c_int
+                || m == meansOfDeath_t::MOD_DET_PACK_SPLASH as c_int
+                || m == meansOfDeath_t::MOD_VEHICLE as c_int
+                || m == meansOfDeath_t::MOD_CONC as c_int
+                || m == meansOfDeath_t::MOD_CONC_ALT as c_int =>
+            {
+                match gender {
+                    gender_t::GENDER_FEMALE => "SUICIDE_EXPLOSIVES_FEMALE",
+                    gender_t::GENDER_NEUTER => "SUICIDE_EXPLOSIVES_GENDERLESS",
+                    _ => "SUICIDE_EXPLOSIVES_MALE",
+                }
+            }
+
+            m if m == meansOfDeath_t::MOD_DEMP2 as c_int => match gender {
+                gender_t::GENDER_FEMALE => "SUICIDE_ELECTROCUTED_FEMALE",
+                gender_t::GENDER_NEUTER => "SUICIDE_ELECTROCUTED_GENDERLESS",
+                _ => "SUICIDE_ELECTROCUTED_MALE",
+            },
+
+            m if m == meansOfDeath_t::MOD_FALLING as c_int => match gender {
+                gender_t::GENDER_FEMALE => "SUICIDE_FALLDEATH_FEMALE",
+                gender_t::GENDER_NEUTER => "SUICIDE_FALLDEATH_GENDERLESS",
+                _ => "SUICIDE_FALLDEATH_MALE",
+            },
+
+            _ => match gender {
+                gender_t::GENDER_FEMALE => "SUICIDE_GENERICDEATH_FEMALE",
+                gender_t::GENDER_NEUTER => "SUICIDE_GENERICDEATH_GENDERLESS",
+                _ => "SUICIDE_GENERICDEATH_MALE",
+            },
+        });
+    }
+
+    // Raven's `goto clientkilled` skips this block for a client-on-client kill.
+    if !(target != attacker && target < MAX_CLIENTS_I32 && attacker < MAX_CLIENTS_I32) {
+        if let Some(mut msg) = message {
+            // PORT-NOTE: Raven's `!message[0]` arm is unreachable - every path
+            // that leaves `message` non-NULL sets a non-empty literal. Kept.
+            if msg.is_empty() {
+                vehMessage = false;
+                msg = match gender {
+                    gender_t::GENDER_FEMALE => "SUICIDE_GENERICDEATH_FEMALE",
+                    gender_t::GENDER_NEUTER => "SUICIDE_GENERICDEATH_GENDERLESS",
+                    _ => "SUICIDE_GENERICDEATH_MALE",
+                };
+            }
+            let text = if vehMessage {
+                CG_GetStringEdString(ctx, "MP_INGAMEVEH", msg)
+            } else {
+                CG_GetStringEdString(ctx, "MP_INGAME", msg)
+            };
+
+            CG_Printf(ctx, &format!("{targetName} {text}\n"));
+            return;
+        }
+    }
+
+    // clientkilled:
+
+    // check for kill messages from the current clientNum
+    let snapInfo = ctx.world.cg.snap_ref().map(|snap| {
+        (
+            snap.ps.clientNum,
+            snap.ps.isJediMaster,
+            snap.ps.persistant[PERS_RANK as usize],
+            snap.ps.persistant[PERS_SCORE as usize],
+        )
+    });
+
+    if let Some((snapClientNum, snapIsJediMaster, persRank, persScore)) = snapInfo {
+        if attacker == snapClientNum {
+            let s;
+
+            if ctx.world.cgs.gametype < GT_TEAM
+                && ctx.world.cgs.gametype != GT_DUEL
+                && ctx.world.cgs.gametype != GT_POWERDUEL
+            {
+                if ctx.world.cgs.gametype == GT_JEDIMASTER
+                    && attacker < MAX_CLIENTS_I32
+                    && ent.isJediMaster == qfalse
+                    && snapIsJediMaster == qfalse
+                    && CG_ThereIsAMaster(ctx.world)
+                {
+                    let part1 =
+                        trap::SP_GetStringTextString(ctx.engine, "MP_INGAME_KILLED_MESSAGE", 512)
+                            .unwrap_or_else(|| "??MP_INGAME_KILLED_MESSAGE".to_string());
+                    let part2 =
+                        trap::SP_GetStringTextString(ctx.engine, "MP_INGAME_JMKILLED_NOTJM", 512)
+                            .unwrap_or_else(|| "??MP_INGAME_JMKILLED_NOTJM".to_string());
+                    s = format!("{part1} {targetName}\n{part2}\n");
+                } else if ctx.world.cgs.gametype == GT_JEDIMASTER
+                    && attacker < MAX_CLIENTS_I32
+                    && ent.isJediMaster == qfalse
+                    && snapIsJediMaster == qfalse
+                {
+                    //no JM, saber must be out
+                    let part1 =
+                        trap::SP_GetStringTextString(ctx.engine, "MP_INGAME_KILLED_MESSAGE", 512)
+                            .unwrap_or_else(|| "??MP_INGAME_KILLED_MESSAGE".to_string());
+                    /*
+                    kmsg1 = "for 0 points.\nGo for the saber!";
+                    strcpy(part2, kmsg1);
+
+                    s = va("%s %s %s\n", part1, targetName, part2);
+                    */
+                    s = format!("{part1} {targetName}\n");
+                } else if ctx.world.cgs.gametype == GT_POWERDUEL {
+                    // PORT-NOTE: unreachable - the enclosing test already ruled
+                    // GT_POWERDUEL out. Raven's dead arm, kept.
+                    s = String::new();
+                } else {
+                    let sPlaceWith =
+                        trap::SP_GetStringTextString(ctx.engine, "MP_INGAME_PLACE_WITH", 256)
+                            .unwrap_or_else(|| "??MP_INGAME_PLACE_WITH".to_string());
+                    let sKilledStr =
+                        trap::SP_GetStringTextString(ctx.engine, "MP_INGAME_KILLED_MESSAGE", 256)
+                            .unwrap_or_else(|| "??MP_INGAME_KILLED_MESSAGE".to_string());
+
+                    let place = CG_PlaceString(ctx, persRank + 1);
+                    s = format!("{sKilledStr} {targetName}.\n{place} {sPlaceWith} {persScore}.");
+                }
+            } else {
+                let sKilledStr =
+                    trap::SP_GetStringTextString(ctx.engine, "MP_INGAME_KILLED_MESSAGE", 256)
+                        .unwrap_or_else(|| "??MP_INGAME_KILLED_MESSAGE".to_string());
+                s = format!("{sKilledStr} {targetName}");
+            }
+
+            //if (!(cg_singlePlayerActive.integer && cg_cameraOrbit.integer)) {
+            CG_CenterPrint(
+                ctx.world,
+                &s,
+                (SCREEN_HEIGHT as f64 * 0.30) as c_int,
+                BIGCHAR_WIDTH,
+            );
+            //}
+            // print the text message as well
+        }
+    }
+
+    // check for double client messages
+    let attackerName = match &attackerInfo {
+        None => {
+            //attacker = ENTITYNUM_WORLD;
+            "noname".to_string()
+        }
+        Some(info) => {
+            let mut name: String = Info_ValueForKey(info, "n").chars().take(29).collect();
+            name.push_str(S_COLOR_WHITE.to_str().unwrap());
+            // check for kill messages about the current clientNum
+            if let Some((snapClientNum, ..)) = snapInfo {
+                if target == snapClientNum {
+                    let destsize = ctx.world.cg.killerName.len();
+                    let bytes = string_to_latin1(&name);
+                    Q_strncpyzBytes(&mut ctx.world.cg.killerName, &bytes, destsize);
+                }
+            }
+            name
+        }
+    };
+
+    if attacker != ENTITYNUM_WORLD {
+        message = match r#mod {
+            m if m == meansOfDeath_t::MOD_STUN_BATON as c_int => Some("KILLED_STUN"),
+
+            m if m == meansOfDeath_t::MOD_MELEE as c_int => Some("KILLED_MELEE"),
+
+            m if m == meansOfDeath_t::MOD_SABER as c_int => Some("KILLED_SABER"),
+
+            m if m == meansOfDeath_t::MOD_BRYAR_PISTOL as c_int
+                || m == meansOfDeath_t::MOD_BRYAR_PISTOL_ALT as c_int =>
+            {
+                Some("KILLED_BRYAR")
+            }
+
+            m if m == meansOfDeath_t::MOD_BLASTER as c_int => Some("KILLED_BLASTER"),
+
+            m if m == meansOfDeath_t::MOD_TURBLAST as c_int => Some("KILLED_BLASTER"),
+
+            m if m == meansOfDeath_t::MOD_DISRUPTOR as c_int
+                || m == meansOfDeath_t::MOD_DISRUPTOR_SPLASH as c_int =>
+            {
+                Some("KILLED_DISRUPTOR")
+            }
+
+            m if m == meansOfDeath_t::MOD_DISRUPTOR_SNIPER as c_int => {
+                Some("KILLED_DISRUPTORSNIPE")
+            }
+
+            m if m == meansOfDeath_t::MOD_BOWCASTER as c_int => Some("KILLED_BOWCASTER"),
+
+            m if m == meansOfDeath_t::MOD_REPEATER as c_int => Some("KILLED_REPEATER"),
+
+            m if m == meansOfDeath_t::MOD_REPEATER_ALT as c_int
+                || m == meansOfDeath_t::MOD_REPEATER_ALT_SPLASH as c_int =>
+            {
+                Some("KILLED_REPEATERALT")
+            }
+
+            m if m == meansOfDeath_t::MOD_DEMP2 as c_int
+                || m == meansOfDeath_t::MOD_DEMP2_ALT as c_int =>
+            {
+                Some("KILLED_DEMP2")
+            }
+
+            m if m == meansOfDeath_t::MOD_FLECHETTE as c_int => Some("KILLED_FLECHETTE"),
+
+            m if m == meansOfDeath_t::MOD_FLECHETTE_ALT_SPLASH as c_int => {
+                Some("KILLED_FLECHETTE_MINE")
+            }
+
+            m if m == meansOfDeath_t::MOD_ROCKET as c_int
+                || m == meansOfDeath_t::MOD_ROCKET_SPLASH as c_int =>
+            {
+                Some("KILLED_ROCKET")
+            }
+
+            m if m == meansOfDeath_t::MOD_ROCKET_HOMING as c_int
+                || m == meansOfDeath_t::MOD_ROCKET_HOMING_SPLASH as c_int =>
+            {
+                Some("KILLED_ROCKET_HOMING")
+            }
+
+            m if m == meansOfDeath_t::MOD_THERMAL as c_int
+                || m == meansOfDeath_t::MOD_THERMAL_SPLASH as c_int =>
+            {
+                Some("KILLED_THERMAL")
+            }
+
+            m if m == meansOfDeath_t::MOD_TRIP_MINE_SPLASH as c_int => Some("KILLED_TRIPMINE"),
+
+            m if m == meansOfDeath_t::MOD_TIMED_MINE_SPLASH as c_int => {
+                Some("KILLED_TRIPMINE_TIMED")
+            }
+
+            m if m == meansOfDeath_t::MOD_DET_PACK_SPLASH as c_int => Some("KILLED_DETPACK"),
+
+            m if m == meansOfDeath_t::MOD_VEHICLE as c_int => {
+                vehMessage = true;
+                match ent.generic1 {
+                    //primary blasters
+                    WP_BLASTER => match ctx.world.bg_state.rng.Q_irand(0, 2) {
+                        2 => Some("KILLED_VEH_BLASTER3"),
+                        1 => Some("KILLED_VEH_BLASTER2"),
+                        _ => Some("KILLED_VEH_BLASTER1"),
+                    },
+
+                    //missile
+                    WP_ROCKET_LAUNCHER => {
+                        if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
+                            Some("KILLED_VEH_MISSILE2")
+                        } else {
+                            Some("KILLED_VEH_MISSILE1")
+                        }
+                    }
+
+                    //bomb
+                    WP_THERMAL => Some("KILLED_VEH_BOMB"),
+
+                    //ion cannon
+                    WP_DEMP2 => Some("KILLED_VEH_ION"),
+
+                    //turret
+                    WP_TURRET => Some("KILLED_VEH_TURRET"),
+
+                    _ => {
+                        vehMessage = false;
+                        Some("KILLED_GENERIC")
+                    }
+                }
+            }
+
+            m if m == meansOfDeath_t::MOD_CONC as c_int
+                || m == meansOfDeath_t::MOD_CONC_ALT as c_int =>
+            {
+                Some("KILLED_GENERIC")
+            }
+
+            m if m == meansOfDeath_t::MOD_FORCE_DARK as c_int => Some("KILLED_DARKFORCE"),
+
+            m if m == meansOfDeath_t::MOD_SENTRY as c_int => Some("KILLED_SENTRY"),
+
+            m if m == meansOfDeath_t::MOD_TELEFRAG as c_int => Some("KILLED_TELEFRAG"),
+
+            m if m == meansOfDeath_t::MOD_CRUSH as c_int => Some("KILLED_GENERIC"), //"KILLED_FORCETOSS"
+
+            m if m == meansOfDeath_t::MOD_FALLING as c_int => Some("KILLED_FORCETOSS"),
+
+            m if m == meansOfDeath_t::MOD_COLLISION as c_int
+                || m == meansOfDeath_t::MOD_VEH_EXPLOSION as c_int =>
+            {
+                let msg = match ctx.world.bg_state.rng.Q_irand(0, 2) {
+                    1 => "KILLED_VEH_COLLISION2",
+                    2 => "KILLED_VEH_COLLISION3",
+                    // Raven's `default:` falls into `case 0:`
+                    _ => "KILLED_VEH_COLLISION1",
+                };
+                vehMessage = true;
+                Some(msg)
+            }
+
+            m if m == meansOfDeath_t::MOD_TRIGGER_HURT as c_int => Some("KILLED_GENERIC"), //"KILLED_FORCETOSS"
+
+            m if m == meansOfDeath_t::MOD_TARGET_LASER as c_int => {
+                let msg = if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
+                    "KILLED_TURRET1"
+                } else {
+                    "KILLED_TURRET2"
+                };
+                vehMessage = true;
+                Some(msg)
+            }
+
+            _ => Some("KILLED_GENERIC"),
+        };
+
+        if let Some(msg) = message {
+            let text = if vehMessage {
+                CG_GetStringEdString(ctx, "MP_INGAMEVEH", msg)
+            } else {
+                CG_GetStringEdString(ctx, "MP_INGAME", msg)
+            };
+
+            CG_Printf(ctx, &format!("{targetName} "));
+            if !targetVehName.is_empty() {
+                CG_Printf(ctx, &format!("({targetVehName}) "));
+            }
+            if r#mod == meansOfDeath_t::MOD_TARGET_LASER as c_int {
+                //no attacker name, just a turbolaser or other kind of turret...
+                CG_Printf(ctx, &text);
+            } else {
+                CG_Printf(ctx, &format!("{text} {attackerName}"));
+
+                if !attackerVehName.is_empty() && !attackerVehWeapName.is_empty() {
+                    CG_Printf(ctx, &format!(" ({attackerVehName} {attackerVehWeapName})"));
+                } else if !attackerVehName.is_empty() {
+                    CG_Printf(ctx, &format!(" ({attackerVehName})"));
+                } else if !attackerVehWeapName.is_empty() {
+                    CG_Printf(ctx, &format!(" ({attackerVehWeapName})"));
+                }
+            }
+            CG_Printf(ctx, "\n");
+            return;
+        }
+    }
+
+    // we don't know what it was
+    let died = CG_GetStringEdString(ctx, "MP_INGAME", "DIED_GENERIC");
+    CG_Printf(ctx, &format!("{targetName} {died}\n"));
+}
+
+/// Raven `CG_ItemPickup` — latches the pickup HUD blend, runs the
+/// `cg_autoswitch` "is this a better gun?" rule, and prints the pickup line.
+///
+/// §F19: Raven derefs `cg.snap` for the weapon compare behind its own NULL
+/// test; the port reads the two `ps` fields it needs through `snap_ref` and
+/// skips the whole autoswitch block when there is no snapshot, same as Raven.
+///
+/// Source: `oracle/codemp/cgame/cg_event.c:753-832`
+pub fn CG_ItemPickup(ctx: &mut CgContext, itemNum: c_int) {
+    let time = ctx.world.cg.time;
+    ctx.world.cg.itemPickup = itemNum;
+    ctx.world.cg.itemPickupTime = time;
+    ctx.world.cg.itemPickupBlendTime = time;
+
+    let item = &bg_itemlist[itemNum as usize];
+
+    // see if it should be the grabbed weapon
+    let snapPs = ctx
+        .world
+        .cg
+        .snap_ref()
+        .map(|snap| (snap.ps.weapon, snap.ps.emplacedIndex));
+
+    if let Some((psWeapon, psEmplacedIndex)) = snapPs {
+        if item.giType() == IT_WEAPON {
+            // 0 == no switching
+            // 1 == automatically switch to best SAFE weapon
+            // 2 == automatically switch to best weapon, safe or otherwise
+            // 3 == if not saber, automatically switch to best weapon, safe or otherwise
+
+            let cg_autoswitch = ctx.world.cvars.cg_autoswitch.integer;
+            if cg_autoswitch == 0 {
+                // don't switch
+            } else if cg_autoswitch == 1 {
+                //only autoselect if not explosive ("safe")
+                if item.giTag() != WP_TRIP_MINE
+                    && item.giTag() != WP_DET_PACK
+                    && item.giTag() != WP_THERMAL
+                    && item.giTag() != WP_ROCKET_LAUNCHER
+                    && item.giTag() > psWeapon
+                    && psWeapon != WP_SABER
+                {
+                    if psEmplacedIndex == 0 {
+                        ctx.world.cg.weaponSelectTime = time;
+                    }
+                    ctx.world.cg.weaponSelect = item.giTag();
+                }
+            } else if cg_autoswitch == 2 {
+                //autoselect if better
+                if item.giTag() > psWeapon && psWeapon != WP_SABER {
+                    if psEmplacedIndex == 0 {
+                        ctx.world.cg.weaponSelectTime = time;
+                    }
+                    ctx.world.cg.weaponSelect = item.giTag();
+                }
+            }
+            /*
+            else if ( cg_autoswitch.integer == 3)
+            { //autoselect if better and not using the saber as a weapon
+                if (bg_itemlist[itemNum].giTag > cg.snap->ps.weapon &&
+                    cg.snap->ps.weapon != WP_SABER)
+                {
+                    if (!cg.snap->ps.emplacedIndex)
+                    {
+                        cg.weaponSelectTime = cg.time;
+                    }
+                    cg.weaponSelect = bg_itemlist[itemNum].giTag;
+                }
+            }
+            */
+            //No longer required - just not switching ever if using saber
+        }
+    }
+
+    //rww - print pickup messages
+    if !item.classname.is_empty()
+        && (item.giType() != IT_TEAM || (item.giTag() != PW_REDFLAG && item.giTag() != PW_BLUEFLAG))
+    {
+        //don't print messages for flags, they have their own pickup event broadcasts
+        let upperKey = item.classname.to_ascii_uppercase();
+        let key = format!("SP_INGAME_{upperKey}");
+        let text = trap::SP_GetStringTextString(ctx.engine, &key, 1024);
+        let pickupLine = CG_GetStringEdString(ctx, "MP_INGAME", "PICKUPLINE");
+
+        if let Some(text) = text {
+            Com_Printf(ctx, &format!("{pickupLine} {text}\n"));
+        } else {
+            Com_Printf(ctx, &format!("{pickupLine} {}\n", item.classname));
+        }
+    }
+}
+
+/// Raven `CG_PrintCTFMessage` — prints one CTF flag-event line, splicing the
+/// team name into the localized string's `%s` when it has one.
+///
+/// Raven's `clientInfo_t *ci` becomes the `cgs.clientinfo` slot index (NULL ->
+/// `None`) so the fn can take `&mut CgContext` without holding a borrow into
+/// the array across the print; only `ci->name` is ever read.
+///
+/// Source: `oracle/codemp/cgame/cg_event.c:956-1042`
+pub fn CG_PrintCTFMessage(
+    ctx: &mut CgContext,
+    ci: Option<usize>,
+    teamName: Option<&str>,
+    ctfMessage: c_int,
+) {
+    let refName = match ctfMessage {
+        m if m == ctfMsg_t::CTFMESSAGE_FRAGGED_FLAG_CARRIER as c_int => "FRAGGED_FLAG_CARRIER",
+        m if m == ctfMsg_t::CTFMESSAGE_FLAG_RETURNED as c_int => "FLAG_RETURNED",
+        m if m == ctfMsg_t::CTFMESSAGE_PLAYER_RETURNED_FLAG as c_int => "PLAYER_RETURNED_FLAG",
+        m if m == ctfMsg_t::CTFMESSAGE_PLAYER_CAPTURED_FLAG as c_int => "PLAYER_CAPTURED_FLAG",
+        m if m == ctfMsg_t::CTFMESSAGE_PLAYER_GOT_FLAG as c_int => "PLAYER_GOT_FLAG",
+        _ => return,
+    };
+
+    let psStringEDString = CG_GetStringEdString(ctx, "MP_INGAME", refName);
+
+    if psStringEDString.is_empty() {
+        return;
+    }
+
+    let ciName = ci.map(|n| {
+        buf_to_string(
+            &ctx.world.cgs.clientinfo[n]
+                .name
+                .iter()
+                .map(|&c| c as u8)
+                .collect::<Vec<u8>>(),
+        )
+    });
+
+    if let Some(teamName) = teamName {
+        if !teamName.is_empty() && psStringEDString.contains("%s") {
+            let mut printMsg = String::new();
+
+            if let Some(name) = &ciName {
+                printMsg = format!("{name} ");
+            }
+
+            let src: Vec<char> = psStringEDString.chars().collect();
+            let mut i = 0;
+            while i < src.len() && i < 512 {
+                if src[i] == '%' && src.get(i + 1) == Some(&'s') {
+                    printMsg.push_str(teamName);
+
+                    i += 1;
+                } else {
+                    printMsg.push(src[i]);
+                }
+
+                i += 1;
+            }
+
+            Com_Printf(ctx, &format!("{printMsg}\n"));
+            return;
+        }
+    }
+
+    let printMsg = match &ciName {
+        Some(name) => format!("{name} {psStringEDString}"),
+        None => psStringEDString,
+    };
+    // Com_sprintf into `printMsg[1024]` - one Latin-1 char is one C byte
+    let printMsg: String = printMsg.chars().take(1023).collect();
+
+    Com_Printf(ctx, &format!("{printMsg}\n"));
 }

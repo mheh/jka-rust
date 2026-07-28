@@ -5,13 +5,14 @@
 
 use core::ffi::c_int;
 
-use native_string::Q_strncpyz;
+use native_string::{strncpyz_string, Info_ValueForKey, Q_CleanStr, Q_strncpyz};
 
 use mp_bg::public::bg_itemlist::bg_itemlist;
-use mp_qshared::shared::{colorWhite, MAX_STRING_CHARS};
+use mp_bg::public::configstring::CS_PLAYERS;
+use mp_qshared::shared::{colorWhite, MAX_QPATH, MAX_STRING_CHARS};
 
 use crate::cg_drawtools::CG_DrawPic;
-use crate::cg_main::CG_GetStringEdString;
+use crate::cg_main::{CG_ConfigString, CG_GetStringEdString};
 use crate::trap;
 use crate::world::cg_context::CgContext;
 
@@ -125,4 +126,22 @@ pub fn CG_LoadBar(ctx: &mut CgContext) {
         tickheight as f32,
         loadBarLEDCap,
     );
+}
+
+/// Raven `CG_LoadingClient` — pulls the connecting client's personality name
+/// out of its configstring and posts it as the loading-screen status text.
+///
+/// Raven's per-client loading icon block (registering `icon_<model>_<skin>.tga`
+/// into `loadingPlayerIcons`) and the singleplayer announce-sound block are
+/// both `/* */`-commented out in the oracle; left unported to match, per
+/// porting-rules §A2 (transcribe what Raven actually runs).
+///
+/// Source: `oracle/codemp/cgame/cg_info.c:53-98`
+pub fn CG_LoadingClient(ctx: &mut CgContext, clientNum: c_int) {
+    let info = CG_ConfigString(ctx, CS_PLAYERS + clientNum);
+
+    let personality = strncpyz_string(Info_ValueForKey(&info, "n").as_bytes(), MAX_QPATH);
+    let personality = Q_CleanStr(&personality);
+
+    CG_LoadingString(ctx, &personality);
 }
