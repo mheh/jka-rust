@@ -1130,3 +1130,29 @@ stitching, and tr_world's dispatch sites):
    variants — no call-site changes — rather than re-opening per-kind pools.
 
 Sketch record: session scratchpad `surfaces-carrier-sketch.md` (2026-07-27).
+
+## DEC-44 — R4 kickoff rulings (2026-07-27)
+
+User-settled at the R4 kickoff sit-down, on the standing DEC-37 architecture
+(two-backend uber-shader, wgpu lean, 2D-first slices):
+
+1. **Foreground priority is the R4 backend track** — the user's stated goal
+   is seeing the PBR/upscale visuals soon; cgame scoping (#46) parks until
+   the R4 track is rolling (cgame validates under OpenJK's renderer and is
+   off the PBR-visibility path entirely).
+2. **Backend build order: faithful gates first.** R4a/R4b/world land on
+   backend #1 (faithful uber-shader) and pass their image-golden gates; #2
+   (PBR) starts when the world slice is gate-green, so the R5 windowed
+   harness ships with the #1/#2 runtime toggle within a build or two of
+   first light. One backend under parity test at a time.
+3. **AI enhancement scope: materials only for now.** DEC-37's sidecar
+   pipeline (normal/roughness/AO, content-hash disk cache, ML never in the
+   game binary) is the whole AI surface through R4. Mesh
+   enhancement/replacement is a recorded design point on the R5 agenda —
+   decided when the cache, registry, and viewer exist. **Law, recorded
+   now:** any mesh swap is presentation-only; collision, traces, and
+   hitboxes stay the authored geometry (deviation charter's sim-visible
+   subset, referee-gated).
+4. The #51 models-pool ruling (arena mechanics in place inside
+   `RenderModels`) is recorded in `docs/subsystems/tr-model.md`'s
+   2026-07-27 amendment.
