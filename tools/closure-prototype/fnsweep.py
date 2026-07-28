@@ -55,12 +55,31 @@ def basename(cur):
 #   (b) codemp/ui/ui_syscalls.c — the trap seam (owned by crates/mp/abi/src/ui);
 #       every fn it defines (trap_* wrappers + PASSFLOAT/dllEntry) buckets as
 #       "syscall" so it never enters the in-module port graph.
+#
+# mp-cgame adds a THIRD kind of satisfied dependency on top of bg/seam: its
+# srcglob (closure.py) rides in codemp/ui/ui_shared.c as a callee body — it's
+# already ported as mp_uishared (crates/mp/uishared), shared with ui via the
+# MenuSystem crate (scoping.md). `dep_files` maps such a single filename to
+# its OWN callee bucket name (not reused as "bg" — mislabeling a mp_uishared
+# call as mp_bg would misdirect a packet's resolved-signature lookup).
 MODULE_FILTERS = {
-    "mp-game": dict(port_dir="/game/", seam_files=set()),
-    "mp-ui": dict(port_dir="/ui/", seam_files={"ui_syscalls.c"}),
+    "mp-game": dict(port_dir="/game/", seam_files=set(), dep_files={}),
+    "mp-ui": dict(port_dir="/ui/", seam_files={"ui_syscalls.c"}, dep_files={}),
+    "mp-cgame": dict(port_dir="/cgame/", seam_files={"cg_syscalls.c"},
+                     dep_files={"ui_shared.c": "uishared"}),
 }
 # Active filter — set by build_manifest; defaults keep the mp-game path identical.
 _FILTER = MODULE_FILTERS["mp-game"]
+
+
+def bucket_names():
+    """Ordered callee-classification buckets for the active module filter: the
+    four universal buckets plus any per-module `dep_files` buckets (e.g.
+    mp-cgame's 'uishared'). Threaded through info["callees"] init, the callee
+    census, and the stats renderer so an extra bucket needs no hardcoding at
+    each of those sites."""
+    extra = sorted(set(_FILTER.get("dep_files", {}).values()))
+    return ("in-module", "bg", *extra, "syscall", "libc/other")
 
 
 def is_port_target_c(cur):
@@ -91,11 +110,14 @@ def cite(cur):
 
 # --------------------------------------------------------- callee bucketing
 def classify_callee(callee):
-    """One of: syscall | bg | in-module | libc/other.
+    """One of: syscall | bg | in-module | libc/other | a per-module `dep_files`
+    bucket (e.g. mp-cgame's "uishared").
 
-    `trap_*` and any fn defined in a module `seam_file` (ui_syscalls.c) bucket as
-    "syscall" (the trap seam); bg_*.c bodies bucket as "bg" (satisfied dep); all
-    other in-tree bodies are "in-module" port targets."""
+    `trap_*` and any fn defined in a module `seam_file` (ui_syscalls.c,
+    cg_syscalls.c) bucket as "syscall" (the trap seam); bg_*.c bodies bucket as
+    "bg" (satisfied dep); a `dep_files`-listed filename (mp-cgame's
+    ui_shared.c -> "uishared") buckets as its own satisfied-dep name; all other
+    in-tree bodies are "in-module" port targets."""
     name = callee.spelling
     if name.startswith("trap_"):
         return "syscall"
@@ -108,6 +130,9 @@ def classify_callee(callee):
                 return "bg"
             if bn in _FILTER["seam_files"]:
                 return "syscall"
+            dep = _FILTER.get("dep_files", {}).get(bn)
+            if dep:
+                return dep
             return "in-module"
         return "libc/other"
     # no body in the TU: engine import or libc/SDK prototype
@@ -216,7 +241,7 @@ def analyze_fn(fn):
         # variadic query — ui carries a few; treat them as non-variadic.
         "variadic": (fn.type.kind == TypeKind.FUNCTIONPROTO
                      and fn.type.is_function_variadic()),
-        "callees": {"in-module": [], "bg": [], "syscall": [], "libc/other": []},
+        "callees": {b: [] for b in bucket_names()},
         "callee_usrs": [],          # in-module + bg targets, for the call graph
         "statics": [],              # function-scope static VAR_DECLs
         "globals_read": [],
@@ -278,7 +303,7 @@ def analyze_fn(fn):
     for usr, callee in seen_callee.items():
         bucket = classify_callee(callee)
         entry = {"name": callee.spelling, "cite":
-                 cite(callee) if bucket in ("in-module", "bg", "syscall") else None}
+                 cite(callee) if bucket != "libc/other" else None}
         info["callees"][bucket].append(entry)
         if bucket in ("in-module", "bg"):
             tgt = callee.get_definition()
@@ -474,29 +499,33 @@ def build_manifest(module):
 
     # callee-edge census over ALL call sites (how the outgoing surface resolves):
     # in-module port targets vs already-satisfied bg vs the trap seam vs libc.
+    buckets = bucket_names()
     callee_census = defaultdict(int)
-    callee_distinct = {"in-module": set(), "bg": set(), "syscall": set(),
-                       "libc/other": set()}
+    callee_distinct = {k: set() for k in buckets}
     for f in funcs:
         for bucket, entries in f["callees"].items():
             callee_census[bucket] += len(entries)
             for e in entries:
                 callee_distinct[bucket].add(e["name"])
 
-    lbl = {"mp-game": "jampgame", "mp-ui": "ui"}.get(module, module)
-    srcdesc = {"mp-ui": "oracle/codemp/ui/*.c (port targets; bg_*.c + "
-               "ui_syscalls.c parsed as satisfied deps/seam)"}.get(
-                   module, "oracle/codemp/game/*.c")
+    lbl = {"mp-game": "jampgame", "mp-ui": "ui", "mp-cgame": "cgame"}.get(
+        module, module)
+    srcdesc = {
+        "mp-ui": "oracle/codemp/ui/*.c (port targets; bg_*.c + "
+                 "ui_syscalls.c parsed as satisfied deps/seam)",
+        "mp-cgame": "oracle/codemp/cgame/*.c (port targets; bg_*.c + "
+                    "ui_shared.c parsed as satisfied deps, cg_syscalls.c as "
+                    "the trap seam)",
+    }.get(module, "oracle/codemp/game/*.c")
 
     stats = {
         "module": module,
         "label": lbl,
         "srcdesc": srcdesc,
         "callee_census": {
-            "edges": {k: callee_census[k] for k in
-                      ("in-module", "bg", "syscall", "libc/other")},
-            "distinct": {k: len(callee_distinct[k]) for k in
-                         ("in-module", "bg", "syscall", "libc/other")},
+            "edges": {k: callee_census[k] for k in buckets},
+            "distinct": {k: len(callee_distinct[k]) for k in buckets},
+            "buckets": list(buckets),
         },
         "total_functions": len(funcs),
         "total_loc": total_loc,
@@ -550,13 +579,15 @@ def render_stats_md(manifest, skel_samples):
     if cc:
         o.append("## Callee resolution census\n")
         o.append("Every call site from a port-target fn, bucketed by where the "
-                 "callee resolves. `bg` = already ported (mp_bg); `syscall` = trap "
-                 "seam (crates/mp/abi/src/ui, incl. ui_syscalls.c wrappers); "
-                 "`in-module` = ui port targets; `libc/other` = C runtime / engine "
-                 "prototypes with no body in the TU.\n")
+                 "callee resolves. `bg` = already ported (mp_bg); `uishared` "
+                 "(mp-cgame only) = already ported (mp_uishared, ui_shared.c); "
+                 "`syscall` = the trap seam (crates/mp/abi/src/<module>, incl. "
+                 "the seam .c file's wrappers); `in-module` = this module's "
+                 "port targets; `libc/other` = C runtime / engine prototypes "
+                 "with no body in the TU.\n")
         o.append("| bucket | call-site edges | distinct callees |")
         o.append("| --- | ---: | ---: |")
-        for k in ("in-module", "bg", "syscall", "libc/other"):
+        for k in cc.get("buckets", ("in-module", "bg", "syscall", "libc/other")):
             o.append(f"| {k} | {cc['edges'][k]} | {cc['distinct'][k]} |")
         o.append("")
 
@@ -694,10 +725,12 @@ def main():
     wpath = outdir / f"{prefix}-wave-partition.json"
     wpath.write_text(json.dumps(build_wave_partition(manifest), indent=1))
     cc = manifest["stats"]["callee_census"]["edges"]
+    buckets = manifest["stats"]["callee_census"].get(
+        "buckets", ("in-module", "bg", "syscall", "libc/other"))
     print(f"[fnsweep] {manifest['stats']['total_functions']} functions, "
           f"{manifest['stats']['total_loc']:,} LOC")
-    print(f"[fnsweep] callee edges: in-module={cc['in-module']} bg={cc['bg']} "
-          f"syscall={cc['syscall']} libc/other={cc['libc/other']}")
+    print("[fnsweep] callee edges: "
+          + " ".join(f"{k}={cc[k]}" for k in buckets))
     print(f"[fnsweep] wrote {mpath}")
     print(f"[fnsweep] wrote {spath}")
     print(f"[fnsweep] wrote {wpath}")
