@@ -29,6 +29,7 @@ members = [
     "crates/mp/engine/icarus",
     "crates/mp/engine/rmg",
     "crates/mp/renderer",
+    "crates/mp/renderer-gpu",
     "crates/mp/app",
     "crates/sp/qshared",
     "crates/sp/bg",

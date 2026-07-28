@@ -1,0 +1,32 @@
+//! `mp_renderer_gpu` — the wgpu backend crate ruled by DEC-37 (R0 sit-down)
+//! ruling 16 and DEC-44 (R4 kickoff).
+//!
+//! **This crate is R4's home.** `mp_renderer` stays CPU-only forever: assets,
+//! shader-script parse, cull/sort, and `tr_model` all live there so
+//! `jampded`'s dedicated-server link — and every CPU-only oracle-differential
+//! golden in `mp_renderer`'s own test suite — stays GPU-free (`cargo build -p
+//! mp_renderer` never touches `wgpu`/`winit`). This crate is the sibling that
+//! owns the GPU: window/surface/device/queue and, eventually, the two
+//! uber-shader backends (DEC-37 ruling 5) sit here, one door above
+//! `mp_renderer`.
+//!
+//! DEC-37's threading topology (ruling 2) puts the render thread — not the
+//! sim/VM thread — in charge of this crate's state: it owns the GPU and runs
+//! cull → sort → skinning dispatch → encode → submit → present. The
+//! state-partition law (ruling 3) is the hard edge: **no trap query may touch
+//! GPU state**; every synchronous seam query (`CG_R_*`/`UI_R_*`) reads
+//! `RenderAssets` (CPU-side, in `mp_renderer`) only, never anything owned by
+//! [`Gpu`].
+//!
+//! DEC-44's stage order (ruling 2) lands backend #1 (faithful uber-shader)
+//! first, gated per-slice: R4a is the 13-fn ui 2D command surface
+//! (`R_RegisterShaderNoMip`, `R_DrawStretchPic`, `R_SetColor`, `R_Font_*`,
+//! …) rendered end-to-end through this backend; backend #2 (PBR, materials
+//! only per DEC-44 ruling 3) starts once the world slice (R3) is
+//! gate-green. Reconciling `mp_renderer`'s `GpuResources` stub — the
+//! CPU-registry-to-GPU-resource bridge — against this crate's device/queue
+//! is an R4a design item, not scaffold scope: this file only stands up the
+//! device/surface plumbing every later slice needs.
+mod gpu;
+
+pub use gpu::{FrameError, Gpu};

@@ -1,0 +1,13 @@
+[package]
+name = "mp_renderer_gpu"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "mp_renderer_gpu"
+
+[dependencies]
+mp_renderer = { path = "../renderer" }
+pollster = "1.0.1"
+wgpu = "30.0.0"
+winit = "0.30.13"
