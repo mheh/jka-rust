@@ -27,7 +27,10 @@ pub struct SkinSurface {
 /// `RE_RegisterIndividualSkin`'s overflow warning, not as a fixed-size field.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:609-613`
-#[derive(Clone)]
+// `Default` = the zeroed pre-`R_InitSkins` slot-0 placeholder (A12
+// constructor, harness boot support); `R_InitSkins`' reset re-seats the real
+// `"<default skin>"` entry.
+#[derive(Clone, Default)]
 pub struct SkinAsset {
     /// `name[MAX_QPATH]` — Raven: "game path, including extension".
     pub name: String,

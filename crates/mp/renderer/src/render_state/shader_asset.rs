@@ -18,7 +18,10 @@ use crate::tr_shader::FogParms;
 /// that read them.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:459-530`
-#[derive(Clone)]
+// `Default` = the zeroed `shader_t` Raven's registry starts every slot from
+// (`Com_Memset` in `R_Init`) — the pre-`CreateInternalShaders` slot-0
+// placeholder the A12 constructor needs (harness boot support).
+#[derive(Clone, Default)]
 pub struct ShaderAsset {
     /// `name` — game path, including extension.
     pub name: String,

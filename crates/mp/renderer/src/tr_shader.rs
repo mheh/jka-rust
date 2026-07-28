@@ -5739,11 +5739,44 @@ pub fn CreateExternalShaders(
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
 ) {
-    let _ = (
-        qs, frame, assets, view, cvars, sim, models, img_state, gpu, sky_view, sky,
+    let projection_shadow = R_FindShader(
+        "projectionShadow",
+        &lightmapsNone,
+        &stylesDefault,
+        true,
+        qs,
+        frame,
+        assets,
+        view,
+        cvars,
+        sim,
+        models,
+        img_state,
+        gpu,
+        sky_view,
+        sky,
     );
-    todo!(
-        "Port CreateExternalShaders — oracle/codemp/renderer/tr_shader.cpp:4253-4257 (tr.projectionShadowShader/sunShader unhomed)"
+    assets.projection_shadow_shader = projection_shadow;
+    // tr.projectionShadowShader->sort = SS_STENCIL_SHADOW;
+    if let Some(shader) = assets.shaders.get_mut(projection_shadow) {
+        shader.sort = shaderSort_t::SS_STENCIL_SHADOW as i32 as f32;
+    }
+    assets.sun_shader = R_FindShader(
+        "sun",
+        &lightmapsNone,
+        &stylesDefault,
+        true,
+        qs,
+        frame,
+        assets,
+        view,
+        cvars,
+        sim,
+        models,
+        img_state,
+        gpu,
+        sky_view,
+        sky,
     );
 }
 

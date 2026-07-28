@@ -16,6 +16,7 @@ use mp_engine_qcommon::common::error::com_error;
 use mp_engine_qcommon::common_fns::Com_DPrintf;
 use mp_engine_qcommon::cvar_fns::Cvar_Set;
 use mp_engine_qcommon::files_common::{FS_FCloseFile, FS_FOpenFileRead, FS_Read, FS_ReadFileVec};
+use mp_qshared::common::mp::cgame::texture_compression_t::textureCompression_t;
 use mp_qshared::shared::com_parse::QSharedScratch;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::q_color::{S_COLOR_RED, S_COLOR_YELLOW};
@@ -181,19 +182,15 @@ impl Default for TrImageState {
 /// `oracle/codemp/renderer/tr_image.cpp:2574-2575`), we deliberately retain
 /// (documented deviation, presentation-side only).
 ///
-/// `pixels`/`width`/`height` are the exact RGBA8 buffer and dimensions
-/// `Upload32` receives as its `data`/`*pUploadWidth`/`*pUploadHeight`
-/// arguments — i.e. `R_CreateImage`'s own `pic`/`width`/`height` — captured
-/// *before* any of `Upload32`'s internal `R_MipMap` (picmip/max-size
-/// clamping), `R_LightScaleTexture`, or per-miplevel work, all of which read
-/// and rewrite through that same buffer in place
-/// (`oracle/codemp/renderer/tr_image.cpp:599-762`). `width`/`height` are
-/// stored alongside the bytes because `ImageAsset::width`/`height` hold the
-/// *post*-transform values Upload32 eventually reports back
-/// (`ImageAsset`'s own doc comment: "after power of two and picmip") — a
-/// size a still-unimplemented `Upload32` never actually sets, so this
-/// struct's own copy is the only faithful pairing available while that gap
-/// stands.
+/// `pixels`/`width`/`height` are the RGBA8 buffer and dimensions `Upload32`
+/// hands its first `qglTexImage2D` — i.e. *after* picmip, after the
+/// max-texture-size clamp, and after `R_LightScaleTexture`
+/// (`oracle/codemp/renderer/tr_image.cpp:599-762`) — so the GPU upload
+/// receives exactly what GL would have. Mip levels 1..N are computed by
+/// `Upload32`'s loop and not carried yet (`gpu_images::upload_pending`'s own
+/// `TODO: Port Upload32's mipmap chain`). `width`/`height` duplicate
+/// `ImageAsset::width`/`height` (both now the post-transform size) so the
+/// consumer needs no arena lookup to size the texture.
 ///
 /// Source: `oracle/codemp/renderer/tr_image.cpp:584-606,1272-1279`
 #[derive(Clone)]
@@ -376,6 +373,33 @@ pub fn R_BlendOverTexture(data: &mut [u8], pixel_count: i32, blend: [u8; 4]) {
         data[p + 2] = ((data[p + 2] as i32 * inverse_alpha + premult[2]) >> 9) as u8;
     }
 }
+
+/// Raven `byte mipBlendColors[16][4]` — the per-miplevel tint
+/// `R_BlendOverTexture` lays down when `r_colorMipLevels` is on. File-scope
+/// and never written, so it is a `const` here rather than a `TrImageState`
+/// field (the escalation `Upload32`'s wave-2 doc comment raised, resolved:
+/// read-only data has no state home to earn).
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:504-521
+#[allow(non_upper_case_globals)]
+const mipBlendColors: [[u8; 4]; 16] = [
+    [0, 0, 0, 0],
+    [255, 0, 0, 128],
+    [0, 255, 0, 128],
+    [0, 0, 255, 128],
+    [255, 0, 0, 128],
+    [0, 255, 0, 128],
+    [0, 0, 255, 128],
+    [255, 0, 0, 128],
+    [0, 255, 0, 128],
+    [0, 0, 255, 128],
+    [255, 0, 0, 128],
+    [0, 255, 0, 128],
+    [0, 0, 255, 128],
+    [255, 0, 0, 128],
+    [0, 255, 0, 128],
+    [0, 0, 255, 128],
+];
 
 // PORT-NOTE: Raven `CStringComparator::operator()`
 // (oracle/codemp/renderer/tr_image.cpp:530) was the
@@ -1680,48 +1704,211 @@ pub fn R_Resample(
 
 /// Raven `Upload32`.
 ///
-/// ESCALATION: the whole body (the oracle's `if (format == GL_RGBA)` arm; its
-/// `else` is empty, `tr_image.cpp:764-766`) is a later wave's work — the
-/// `format` comparison itself is now resolvable (`GL_RGBA` landed in
-/// `crate::gl_constants`), but the body still needs `TrImageState` extended
-/// with the `mipBlendColors[16][4]` blend table (STATE HOMES row "NAMED BY
-/// THIS WAVE", DEC-37 A13.3 — not added while nothing consumes it,
-/// porting-rules §A2 no speculative behavior) and the R4
-/// `qglTexImage2D`/`qglTexParameterf` GL entry points (DEC-37 A13.2, unhomed)
-/// for the upload/mipmap-refresh calls this fn's own threading digest already
-/// flags DEFERRED. What's blocked is strictly that GL-side math and the
-/// mip/picmip/light-scale transforms it drives (`R_MipMap`,
-/// `R_LightScaleTexture`, `R_BlendOverTexture` against `mipBlendColors`) —
-/// **not** the pixel data itself: `R_CreateImage` already stages the exact
-/// `data` buffer this fn would scale/mip in place onto
-/// `TrImageState::pending_uploads` (keyed by the `ImageHandle` it returns),
-/// for R4a's renderer-gpu upload to read once that crate exists.
+/// Out-params collapse to a return tuple (§C7): `*pformat`,
+/// `*pUploadWidth`/`*pUploadHeight` (in/out — the entry values are the
+/// `upload_width`/`upload_height` arguments), plus the level-0 pixel buffer
+/// the first `qglTexImage2D` would have received. `data` is RGBA8 bytes
+/// rather than Raven's `unsigned *` — every transform this body drives is
+/// byte-addressed (`R_MipMap`, `R_BlendOverTexture`); the one `unsigned`
+/// consumer (`R_LightScaleTexture`) gets the same explicit little-endian
+/// round-trip `R_MipMap` already uses in this file.
+///
+/// R4 disposition: `qglTexImage2D`/`qglTexParameterf`/`GL_CheckErrors` have
+/// no GL to call — the wgpu backend (`mp_renderer_gpu::gpu_images`) performs
+/// the upload and owns the filter/anisotropy state as sampler descriptors.
+/// The CPU-observable contract is what this fn returns; `R_CreateImage`
+/// stages the returned level-0 buffer on `TrImageState::pending_uploads` so
+/// the GPU receives exactly the bytes GL would have.
 ///
 /// Source: oracle/codemp/renderer/tr_image.cpp:584-786
 pub fn Upload32(
-    _view: &mut EngineHostView,
-    _cvars: &RendererCvars,
-    _assets: &RenderAssets,
-    _state: &TrImageState,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    assets: &RenderAssets,
+    state: &TrImageState,
     _gpu: &mut GpuResources,
-    _data: &mut [u32],
+    data: &mut [u8],
     format: i32,
-    _mipmap: bool,
-    _picmip: bool,
-    _is_lightmap: bool,
-    _allow_tc: bool,
-    _upload_width: u16,
-    _upload_height: u16,
-    _b_rectangle: bool,
-) -> (i32, u16, u16) {
-    let _ = format;
-    //TODO: Port Upload32
-    // Source: oracle/codemp/renderer/tr_image.cpp:584-786 (blocked on the
-    // `mipBlendColors[16][4]` table's state home and the R4 GL upload
-    // surface; see the doc comment above — the pixel data itself is already
-    // staged by `R_CreateImage` via `TrImageState::pending_uploads`, so this
-    // gap is GL-math-only)
-    todo!("Port Upload32 — oracle/codemp/renderer/tr_image.cpp:584-786")
+    mipmap: bool,
+    picmip: bool,
+    is_lightmap: bool,
+    allow_tc: bool,
+    upload_width: u16,
+    upload_height: u16,
+    b_rectangle: bool,
+) -> (i32, u16, u16, Option<Vec<u8>>) {
+    // Raven: `GLuint uiTarget = GL_TEXTURE_2D; if (bRectangle) { uiTarget =
+    // GL_TEXTURE_RECTANGLE_EXT; }` — `uiTarget`'s only consumers are the
+    // `qgl*` calls below, so no target value is computed here.
+    // R4: a rectangle texture is a wgpu texture like any other (no separate
+    // target, no separate enable); the `g_bTextureRectangleHack` toggle that
+    // drove it stays deferred (`tr_init.rs:407`), and no live `R_CreateImage`
+    // caller passes `bRectangle = true`.
+    let _ = b_rectangle;
+
+    if format != GL_RGBA {
+        // Raven's `else` arm is empty (`:764-766`): control falls straight to
+        // `done:`, so neither `*pformat` nor the two size out-params are
+        // written — `internalFormat` keeps `image_t`'s `Z_Malloc(…, qtrue)`
+        // zero and the sizes keep `R_CreateImage`'s own values. Nothing is
+        // uploaded, hence no level-0 buffer.
+        return (0, upload_width, upload_height, None);
+    }
+
+    let mut width = upload_width as i32;
+    let mut height = upload_height as i32;
+
+    //
+    // perform optional picmip operation
+    //
+    if picmip {
+        for _ in 0..view.common.cvar(cvars.r_picmip).integer {
+            R_MipMap(view, cvars, data, width, height);
+            width >>= 1;
+            height >>= 1;
+            if width < 1 {
+                width = 1;
+            }
+            if height < 1 {
+                height = 1;
+            }
+        }
+    }
+
+    //
+    // clamp to the current upper OpenGL limit
+    // scale both axis down equally so we don't have to
+    // deal with a half mip resampling
+    //
+    while width > assets.glconfig.max_texture_size || height > assets.glconfig.max_texture_size {
+        R_MipMap(view, cvars, data, width, height);
+        width >>= 1;
+        height >>= 1;
+    }
+
+    //
+    // scan the texture for each channel's max values
+    // and verify if the alpha channel is being used or not
+    //
+    // PORT-NOTE: Raven's `rMax`/`gMax`/`bMax` accumulators (and the byte->float
+    // promotion in their comparisons) are written and never read again — dead
+    // stores, dropped; only the `samples` result survives the loop.
+    let c = (width * height).max(0) as usize;
+    let mut samples = 3;
+    for i in 0..c {
+        if data[i * 4 + 3] != 255 {
+            samples = 4;
+            break;
+        }
+    }
+
+    // select proper internal format
+    //
+    // Raven leaves `*pformat` untouched on the `isLightmap` arm when
+    // `r_texturebitslm` is neither 16 nor 32, so `internalFormat` keeps
+    // `image_t`'s zero-initialized value — reproduced by initializing to 0 and
+    // assigning only inside the matching arms.
+    let mut pformat: i32 = 0;
+    if samples == 3 {
+        if assets.glconfig.texture_compression == textureCompression_t::TC_S3TC && allow_tc {
+            pformat = GL_RGB4_S3TC;
+        } else if assets.glconfig.texture_compression == textureCompression_t::TC_S3TC_DXT
+            && allow_tc
+        {
+            // Compress purely color - no alpha
+            if view.common.cvar(cvars.r_texturebits).integer == 16 {
+                pformat = GL_COMPRESSED_RGB_S3TC_DXT1_EXT; //this format cuts to 16 bit
+            } else {
+                //if we aren't using 16 bit then, use 32 bit compression
+                pformat = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
+            }
+        } else if is_lightmap && view.common.cvar(cvars.r_texturebitslm).integer > 0 {
+            // Allow different bit depth when we are a lightmap
+            if view.common.cvar(cvars.r_texturebitslm).integer == 16 {
+                pformat = GL_RGB5;
+            } else if view.common.cvar(cvars.r_texturebitslm).integer == 32 {
+                pformat = GL_RGB8;
+            }
+        } else if view.common.cvar(cvars.r_texturebits).integer == 16 {
+            pformat = GL_RGB5;
+        } else if view.common.cvar(cvars.r_texturebits).integer == 32 {
+            pformat = GL_RGB8;
+        } else {
+            pformat = 3;
+        }
+    } else if samples == 4 {
+        if assets.glconfig.texture_compression == textureCompression_t::TC_S3TC_DXT && allow_tc {
+            // Compress both alpha and color
+            pformat = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
+        } else if view.common.cvar(cvars.r_texturebits).integer == 16 {
+            pformat = GL_RGBA4;
+        } else if view.common.cvar(cvars.r_texturebits).integer == 32 {
+            pformat = GL_RGBA8;
+        } else {
+            pformat = 4;
+        }
+    }
+
+    // Raven: `*pUploadWidth = width; *pUploadHeight = height;` — written here,
+    // before the mipmap loop below walks the *local* `width`/`height` down to
+    // 1x1, so the reported size is the level-0 size.
+    let out_width = width as u16;
+    let out_height = height as u16;
+
+    // copy or resample data as appropriate for first MIP level
+    if !mipmap {
+        // R4: `qglTexImage2D(uiTarget, 0, …, data)` — `gpu_images` creates the
+        // texture and writes this level-0 buffer instead.
+        let level0 = data[..c * 4].to_vec();
+        return (pformat, out_width, out_height, Some(level0));
+    }
+
+    // Little-endian byte<->u32 round-trip for the one `unsigned *` consumer,
+    // matching `R_MipMap`'s identical precedent above.
+    let mut px: Vec<u32> = data[..c * 4]
+        .chunks_exact(4)
+        .map(|p| u32::from_le_bytes([p[0], p[1], p[2], p[3]]))
+        .collect();
+    R_LightScaleTexture(&mut px, width, height, !mipmap, &assets.glconfig, state);
+    for (i, value) in px.iter().enumerate() {
+        data[i * 4..i * 4 + 4].copy_from_slice(&value.to_le_bytes());
+    }
+
+    // R4: `qglTexImage2D(uiTarget, 0, …, data)` — as above, level 0 goes home
+    // through `pending_uploads` rather than a GL call.
+    let level0 = data[..c * 4].to_vec();
+
+    let mut miplevel = 0;
+    while width > 1 || height > 1 {
+        R_MipMap(view, cvars, data, width, height);
+        width >>= 1;
+        height >>= 1;
+        if width < 1 {
+            width = 1;
+        }
+        if height < 1 {
+            height = 1;
+        }
+        miplevel += 1;
+
+        if view.common.cvar(cvars.r_colorMipLevels).integer != 0 {
+            R_BlendOverTexture(data, width * height, mipBlendColors[miplevel as usize]);
+        }
+
+        // R4: `qglTexImage2D(uiTarget, miplevel, …, data)` — `gpu_images`
+        // uploads level 0 only for now (its own `TODO: Port Upload32's mipmap
+        // chain`); the chain is still computed here, in place, exactly as
+        // Raven computes it, so wiring the levels through is a
+        // `PendingUpload` shape change and nothing more.
+    }
+
+    // R4: the `done:` tail — `qglTexParameterf(GL_TEXTURE_MIN/MAG_FILTER, …)`
+    // from `gl_filter_min`/`gl_filter_max`, the
+    // `r_ext_texture_filter_anisotropic`/`maxTextureFilterAnisotropy` arm, and
+    // `GL_CheckErrors()`. All three are wgpu `SamplerDescriptor` fields and
+    // wgpu's own validation in `gpu_images::create_sampler`.
+
+    (pformat, out_width, out_height, Some(level0))
 }
 
 /// Raven `R_Images_DeleteLightMaps`.
@@ -1974,26 +2161,15 @@ pub fn R_CreateImage(
     // block; see the doc comment above.
     // Source: oracle/codemp/renderer/tr_image.cpp:1254-1270
 
-    // Raven: `Upload32((unsigned *)pic, format, …)` — the `(unsigned *)pic`
-    // reinterpret-cast becomes an owned little-endian byte->u32 collection
-    // (interior-safety law forbids a raw reinterpret cast), matching
-    // `R_MipMap`'s identical `to_le_bytes`/`from_le_bytes` precedent in this
-    // same file.
-    //
-    // PORT-NOTE: the owned copy also drops Raven's in-place write-back —
-    // `Upload32` scales/mips through the caller's `pic` buffer — but no
-    // oracle caller reads `pic` after the call, so the divergence is
-    // unobservable. `data` is separate, scratch-only working state for
-    // `Upload32`'s still-todo `R_MipMap`/`R_LightScaleTexture` math; the
-    // R4a-consumable copy is staged straight off `pic` below (this fn's own
-    // `state.pending_uploads.insert(...)` call, past the `Upload32` call).
+    // Raven: `Upload32((unsigned *)pic, format, …)` — `Upload32` scales/mips
+    // in place through the caller's `pic` buffer; here it works on an owned
+    // copy instead (`pic` is a `&[u8]`, and no oracle caller reads `pic` after
+    // the call, so the divergence is unobservable — `R_FindImageFile` `Z_Free`s
+    // it immediately).
     let pixel_count = (width * height).max(0) as usize;
-    let mut data: Vec<u32> = pic[..pixel_count * 4]
-        .chunks_exact(4)
-        .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
-        .collect();
+    let mut data: Vec<u8> = pic[..pixel_count * 4].to_vec();
 
-    let (internal_format, out_width, out_height) = Upload32(
+    let (internal_format, out_width, out_height, level0) = Upload32(
         view,
         cvars,
         &*sim.published,
@@ -2036,20 +2212,18 @@ pub fn R_CreateImage(
     assets.image_names.insert(p_name, handle);
 
     // R4a bridge (see `TrImageState::pending_uploads`'s doc comment): stage
-    // the exact RGBA8 buffer `Upload32` receives — pre-`R_MipMap`/pre-
-    // `R_LightScaleTexture`, at `pic`'s own `width`x`height` — for the
-    // renderer-gpu upload this CPU-only crate cannot itself perform. Gated
-    // the same `format == GL_RGBA` way Upload32's own body is
-    // (`oracle/codemp/renderer/tr_image.cpp:599`); the `else` arm
-    // (`:764-766`) is empty, so a non-`GL_RGBA` format uploads nothing in
-    // the oracle and stages nothing here either.
-    if format == GL_RGBA {
+    // the level-0 buffer `Upload32` handed to its first `qglTexImage2D` —
+    // post-picmip, post-max-size clamp, post-`R_LightScaleTexture` — at the
+    // size it reported back, so the GPU receives exactly the bytes GL would
+    // have. `None` is the oracle's empty non-`GL_RGBA` arm
+    // (`tr_image.cpp:764-766`): nothing uploaded, nothing staged.
+    if let Some(pixels) = level0 {
         state.pending_uploads.insert(
             handle,
             PendingUpload {
-                pixels: pic[..pixel_count * 4].to_vec(),
-                width,
-                height,
+                pixels,
+                width: out_width as i32,
+                height: out_height as i32,
             },
         );
     }

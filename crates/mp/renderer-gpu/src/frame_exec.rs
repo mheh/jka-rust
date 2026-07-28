@@ -175,17 +175,23 @@ impl FrameExecutor {
         target: &TextureView,
         frame_data: &FrameData,
         assets: &RenderAssets,
+        image_assets: &RenderAssets,
         img_state: &mut TrImageState,
         gpu_images: &mut GpuImages,
         fonts: &mut FontState,
     ) -> FrameStats {
+        // Two registries by design (A9): shader registration writes the direct
+        // `assets` instance, image registration writes the sim-published Arc
+        // master (`Arc::make_mut(&mut sim.published)` in `tr_image.rs`), so
+        // stage image handles resolve against `image_assets` = the published
+        // side. A single-registry caller passes the same reference twice.
         let mut stats = FrameStats::default();
         let mut color = DEFAULT_COLOR;
 
         // Frame start: every image `R_CreateImage` staged since the last
         // frame becomes a texture, so a shader registered mid-frame is
         // drawable by the time its quad is bound.
-        stats.images_uploaded = gpu_images.upload_pending(gpu, img_state, assets) as u32;
+        stats.images_uploaded = gpu_images.upload_pending(gpu, img_state, image_assets) as u32;
 
         self.batch.clear();
 

@@ -104,6 +104,16 @@ pub struct RenderAssets {
     /// tr_image.cpp:3128-3136`) compares the full name only — plain
     /// name→handle (`R2-D4`).
     pub skin_lookup: HashMap<String, SkinHandle>,
+    /// `tr.projectionShadowShader` — filled by `CreateExternalShaders`;
+    /// `ShaderHandle::slot_zero()` (the default shader, A12) before that,
+    /// where Raven's memset-null pointer would be a UB deref (§19).
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1359`
+    pub projection_shadow_shader: ShaderHandle,
+    /// `tr.sunShader` — same lifecycle as `projection_shadow_shader`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1361`
+    pub sun_shader: ShaderHandle,
     // The model registry (`models: Arena<ModelAsset>` + `model_lookup`) is
     // RETIRED from this struct: `tr.models[]`/`tr.numModels`/`mhHashTable`
     // keep their arena mechanics in place on `RenderModels`

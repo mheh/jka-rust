@@ -148,6 +148,9 @@ impl ApplicationHandler for App {
                             &view,
                             &test_pattern(self.registries.checker),
                             &self.registries.assets,
+                            // Single-registry harness: images live in the same
+                            // instance as the shaders.
+                            &self.registries.assets,
                             &mut self.registries.img_state,
                             images,
                             &mut self.fonts,
@@ -331,6 +334,8 @@ fn dev_registries() -> DevRegistries {
         defer_load: false,
         skins: Arena::new_unbounded(),
         skin_lookup: HashMap::new(),
+        projection_shadow_shader: ShaderHandle::slot_zero(),
+        sun_shader: ShaderHandle::slot_zero(),
         world: None,
         bsp_models: Vec::new(),
         function_tables: FunctionTables::default(),

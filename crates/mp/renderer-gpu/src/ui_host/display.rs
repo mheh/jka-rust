@@ -62,6 +62,7 @@ use mp_engine_qcommon::cvar_fns::{
     Cvar_Set, Cvar_SetValue, Cvar_VariableString, Cvar_VariableValue,
 };
 use mp_engine_qcommon::qfiles::font_style::{STYLE_BLINK, STYLE_DROPSHADOW};
+use mp_engine_qcommon::stringed::api::SE_GetString;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_qshared::shared::com_parse::QSharedScratch;
@@ -1139,11 +1140,11 @@ impl DisplayContext for HarnessDc<'_> {
         (status, filename, line)
     }
 
-    /// STUB — no StringEd package is loaded, so every `@KEY` lookup misses;
-    /// `None` makes the framework fall back to the literal key text.
-    fn SP_GetStringTextString(&mut self, _text: &str, _buffer_len: usize) -> Option<String> {
-        self.stubs.hit("SP_GetStringTextString");
-        None
+    /// REAL — the engine's StringEd (`SE_GetString`, lazy package load via
+    /// FS); `SE_Init` runs at boot. An unknown reference returns Raven's empty
+    /// string, which the framework renders as-is.
+    fn SP_GetStringTextString(&mut self, text: &str, _buffer_len: usize) -> Option<String> {
+        Some(SE_GetString(&mut self.view, text))
     }
 
     /// REAL — enters `mp_renderer`'s `RE_RegisterSkin`.

@@ -25,7 +25,9 @@ use mp_engine_qcommon::common::opaque_slots::{
 };
 use mp_engine_qcommon::cvar_fns::{Cvar_Get, Cvar_Init};
 use mp_engine_qcommon::files_common::FS_InitFilesystem;
+use mp_engine_qcommon::stringed::api::SE_Init;
 use mp_engine_qcommon::z_memman_pc::{Com_InitHunkMemory, Com_InitZoneMemory};
+use mp_engine_server::botlib_import::{arm_botlib_slot, botlib_import_table};
 use mp_engine_server::Server;
 use mp_qshared::shared::com_parse::QSharedScratch;
 use mp_qshared::shared::cvar::CVAR_INIT;
@@ -42,6 +44,8 @@ use mp_renderer::render_state::placeholders::{
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::render_assets_sim::RenderAssetsSim;
 use mp_renderer::render_state::renderer_cvars::RendererCvars;
+use mp_renderer::render_state::shader_asset::{ShaderAsset, ShaderHandle};
+use mp_renderer::render_state::skin_asset::SkinAsset;
 use mp_renderer::tr_font::FontState;
 use mp_renderer::tr_image::TrImageState;
 use mp_renderer::tr_init::R_Init;
@@ -119,9 +123,17 @@ pub fn boot(cfg: &BootConfig) -> UiHost {
         Cvar_Get(&mut view, "fs_game", &cfg.fs_game, CVAR_INIT);
         let ded = Cvar_Get(&mut view, "dedicated", "0", 0);
         view.common.com_dedicated = Some(ded);
+        // `Com_Init` registers `journal` and stores the handle
+        // (`common_fns.rs:667`); `Com_GetRealEvent` (under `Com_Milliseconds`,
+        // reached by `R_InitWorldEffects`) reads it unconditionally.
+        let journal = Cvar_Get(&mut view, "journal", "0", CVAR_INIT);
+        view.common.com_journal = Some(journal);
 
         FS_InitFilesystem(&mut view);
         Com_InitHunkMemory(&mut view);
+        // `Com_Init` runs `SE_Init` after FS is up (language load; menu `@KEY`
+        // references resolve through the packages it manages).
+        SE_Init(&mut view);
         println!(
             "ui_harness: FS up — {} files in pk3 files under {}",
             view.common.fs_packFiles, cfg.basepath
@@ -229,6 +241,20 @@ pub fn boot(cfg: &BootConfig) -> UiHost {
 /// and need `UiContext`; they are not reachable here and are not needed to
 /// paint a menu.
 fn ui_init_equivalent(host: &mut UiHost, cfg: &BootConfig) {
+    // The PC_* precompiler reads menu files through the botlib import table
+    // (`botimport.FS_FOpenFile`, `l_script_fns.rs:1155`) — `SV_BotInitBotLib`
+    // wires it in the live engine; the harness wires the identical table and
+    // arms the ambient slot its trampolines read. Armed HERE, not in `boot()`:
+    // the captured pointers must come from `UiHost`'s settled location
+    // (`engine` is `Box`-pinned, `models` is not).
+    host.engine.bot.botimport = botlib_import_table();
+    {
+        let models_ptr: *mut RenderModels = &mut host.models;
+        let Engine { common, cm, sv, .. } = &mut *host.engine;
+        let sv_ptr: *mut () = sv as *mut Server as *mut ();
+        let mut view = host_view(common, cm, sv_ptr, models_ptr);
+        arm_botlib_slot(&mut view, sv);
+    }
     // `trap_GetGlconfig` — the harness IS the renderer, so the virtual screen
     // is the one `pipeline2d` rasterises into.
     host.ui.uiDC.glconfig.vidWidth = SCREEN_WIDTH as c_int;
@@ -382,8 +408,26 @@ fn host_view<'a>(
     }
 }
 
+/// `MAX_SHADERS` (non-`_XBOX`) — the shader arena's A12 soft cap.
+/// Harness-local restatement (the canonical private const sits in
+/// `mp_renderer::tr_main`; #51 tracks flag/limit consolidation).
+///
+/// Source: `oracle/codemp/renderer/tr_local.h` (`MAX_SHADERS`)
+const MAX_SHADERS: u32 = 16384;
+
+/// `MAX_SKINS` — the skin arena's A12 soft cap (same restatement note).
+///
+/// Source: `oracle/codemp/renderer/tr_local.h:1204`
+const MAX_SKINS: u32 = 1024;
+
 /// A `RenderAssets` at the state `R_Init`'s partial clear leaves it — the
 /// arenas empty, the tables empty. `R_InitImages`/`R_InitShaders` fill it.
+///
+/// Arena shapes per A12/A5: `shaders`/`skins` are capped with slot 0
+/// pre-populated (a zeroed placeholder — `CreateInternalShaders`' and
+/// `R_InitSkins`' `Arena::reset` re-seat the real defaults during `R_Init`);
+/// `images` stays unbounded (A5 — its purge is `R_DeleteTextures`, never
+/// `reset`).
 fn empty_assets() -> RenderAssets {
     RenderAssets {
         images: Arena::new_unbounded(),
@@ -393,20 +437,32 @@ fn empty_assets() -> RenderAssets {
         dlight_image: None,
         white_image: None,
         lightmaps: Vec::new(),
-        shaders: Arena::new_unbounded(),
+        shaders: Arena::new_with_slot0(MAX_SHADERS, ShaderAsset::default()),
         shader_lookup: Default::default(),
         sorted_shaders: Vec::new(),
         shader_text: String::new(),
         shader_text_hash_table: Vec::new(),
         defer_load: false,
-        skins: Arena::new_unbounded(),
+        skins: Arena::new_with_slot0(MAX_SKINS, SkinAsset::default()),
         skin_lookup: Default::default(),
+        projection_shadow_shader: ShaderHandle::slot_zero(),
+        sun_shader: ShaderHandle::slot_zero(),
         world: None,
         bsp_models: Vec::new(),
         function_tables: FunctionTables::default(),
         distance_cull: 0.0,
         distance_cull_squared: 0.0,
-        glconfig: GlConfig::default(),
+        glconfig: GlConfig {
+            // Raven fills this from `qglGetIntegerv(GL_MAX_TEXTURE_SIZE, …)`
+            // during `GLimp_Init`, which the harness has no equivalent of.
+            // `Upload32`'s clamp loop (`while width > maxTextureSize`) would
+            // otherwise mip every image down to 0x0 against the zeroed
+            // default. 2048 is wgpu's `downlevel_defaults()`
+            // `max_texture_dimension_2d` — the smallest size any backend we
+            // can run on guarantees, and above every retail `base/` texture.
+            max_texture_size: 2048,
+            ..GlConfig::default()
+        },
         registered: false,
         world_map_loaded: false,
         max_polys: 0,
