@@ -1502,13 +1502,15 @@ const MAX_POLYVERTS: i32 = 3000;
 /// - `sortedShaders` (`:1407`) — `CreateInternalShaders`
 ///   (`tr_shader.rs`, reached through `R_InitShaders` below) clears it, so a
 ///   redundant pre-clear here is skipped.
-/// - `shaders` (`:1405-1406`), `skins` (`:1409-1410`), `models`
-///   (`:1396-1397`) — the three `Arena`-backed
-///   registries are NOT rebuilt by any later statement in this fn:
-///   `R_InitShaders` resets only `shader_lookup`/`defer_load`, and
-///   `RenderModels::init_skins`/`model_init` reset that struct's own
-///   `Vec` fields, never `RenderAssets::{skins, models}`. Clearing them is
-///   blocked on a missing `Arena` teardown entry point — see the
+/// - `shaders` (`:1405-1406`) — rebuilt by `R_InitShaders` below, which
+///   clears `shader_lookup`/`defer_load` and hands the arena purge itself to
+///   `CreateInternalShaders`' `Arena::reset` (DEC-42.1: every pre-reset
+///   handle stales, the `<default>` shader is re-created at index 0), so a
+///   pre-clear here would be redundant.
+/// - `skins` (`:1409-1410`), `models` (`:1396-1397`) — not rebuilt by any
+///   later statement in this fn: `RenderModels::init_skins`/`model_init`
+///   reset that struct's own `Vec` fields, never `RenderAssets::{skins,
+///   models}`. Both arenas are still producer-less in this crate — see the
 ///   `//TODO: Port R_Init registry reset` marker in the rebuild region below.
 /// - `skin_lookup`/`model_lookup` — plain name->handle maps with no reserved
 ///   -slot semantics and no later re-establishment; zeroed here.
@@ -1605,22 +1607,26 @@ pub fn R_Init(
     assets.skin_lookup.clear();
     assets.model_lookup.clear();
 
+    // `RenderAssets::shaders` is purged by `R_InitShaders` ->
+    // `CreateInternalShaders`' `Arena::reset` below (DEC-42.1), so it is not
+    // touched here.
+
     //TODO: Port R_Init registry reset
     // Source: oracle/codemp/renderer/tr_init.cpp:1232
-    // (`oracle/codemp/renderer/tr_local.h:1396-1397,1405-1406,1409-1410` for
-    // the `models`/`shaders`/`skins` fields that memset zeroes)
-    // `RenderAssets::{shaders, skins, models}` are `Arena`-backed and survive
-    // this memset: `Arena` (`render_state/arena.rs`) exposes only
-    // `insert`/`get`/`get_mut`/`remove`/`iter`, no teardown entry point, and
-    // a `remove`-every-handle sweep would vacate the A12 reserved slot 0
-    // permanently (`remove`'s own rule: slot 0 of a capped arena never
-    // re-enters the free list), breaking every overflow path that returns
-    // `Handle::slot_zero()`. Reconstructing them instead needs
-    // `Arena::new_with_slot0(cap, default_entry)` — and which value each
-    // registry's default entry takes is the open A12 wiring question
-    // `CreateInternalShaders`'s own PORT-NOTE (`tr_shader.rs`) already
-    // escalates ("no `RenderAssets` constructor has landed in this crate
-    // yet"). Escalated, not invented (porting-rules §A2).
+    // (`oracle/codemp/renderer/tr_local.h:1396-1397,1409-1410` for the
+    // `models`/`skins` fields that memset zeroes)
+    // `RenderAssets::{skins, models}` still have no producer anywhere in this
+    // crate — the landed skin/model registries are `RenderModels`' own `Vec`s
+    // (`tr_model/server_skins.rs`, `tr_model/render_models.rs`), and nothing
+    // inserts into either arena. `Arena::reset(slot0)` (DEC-42.1) needs the
+    // registry's slot-0 default entry, which only the client-side registration
+    // code that populates these arenas can build (`"<default skin>"`,
+    // `R_InitSkins`, `oracle/codemp/renderer/tr_image.cpp:3324-3332`;
+    // `MOD_BAD`, `R_ModelInit`, `oracle/codemp/renderer/
+    // tr_model.cpp:1665-1680`); inventing one here would fabricate a live
+    // default for a registry that has no entries at all. Wires up with those
+    // registration paths, not before (porting-rules §A2).
+
     // Com_Memset(&backEnd, 0, sizeof(backEnd)) — full rebuild; see doc
     // comment above (nothing else in this fn writes into `frame`).
     *frame = FrameState {

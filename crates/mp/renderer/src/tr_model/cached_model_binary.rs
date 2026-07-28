@@ -22,16 +22,21 @@
 //! only within this file stay module-private.
 //!
 //! **§20-dropped, no stub (`## Files roster`/`divergences`):**
-//! - `RE_RegisterModels_Malloc` (client, `tr_model.cpp:179`) + its
-//!   `#ifndef DEDICATED` shader-poke replay (`:221-242`) — client model-load
-//!   path, no live dedicated caller (`TRM-D3`/ruling 54).
 //! - `RE_RegisterMedia_LevelLoadEnd` (`tr_model.cpp:577`) — sole caller is the
 //!   client `cl_cgame.cpp:1942`, zero dedicated callers (`TRM-D5`/ruling
 //!   59b); the live eviction path is [`RenderModels::models_level_load_end`].
 //!
+//! `RE_RegisterModels_Malloc` (client, `tr_model.cpp:179`) + its
+//! `#ifndef DEDICATED` shader-poke replay (`:221-242`) were §20-dropped under
+//! the dedicated-only-scope FROZEN design (`TRM-D3`/ruling 54); the R3 client
+//! track superseded that (DEC-40) and both are live in
+//! [`super::frontend::re_register_models_malloc`], the replay reading and
+//! writing this file's cache through [`RenderModels::shader_register_requests`]
+//! / [`RenderModels::poke_shader_index`].
+//!
 //! Source: `oracle/codemp/renderer/tr_model.cpp:48-68,70-568`
 
-use core::ffi::c_void;
+use core::ffi::{c_char, c_void};
 
 use mp_host_interface::mdx::mdxa::{MdxaParsed, MdxaView};
 use mp_host_interface::mdx::mdxm::{MdxmParsed, MdxmView};
@@ -116,9 +121,9 @@ pub(crate) struct CachedEndianedModelBinary {
     /// `ShaderRegisterData` — `vector<pair<int,int>>` of
     /// (name-offset, poke-offset) pairs recorded by
     /// `RE_RegisterModels_StoreShaderRequest`. Recorded server-side even
-    /// though the server never replays it (`TRM-D3`/ruling 54 — only the
-    /// client `#ifndef DEDICATED` replay in the dead `RE_RegisterModels_Malloc`
-    /// is dropped).
+    /// though the server never replays it; the client replay
+    /// (`RE_RegisterModels_Malloc`'s `#ifndef DEDICATED` block) reads it back
+    /// through [`RenderModels::shader_register_requests`].
     ///
     /// Source: `oracle/codemp/renderer/tr_model.cpp:46-47,52`
     shader_register_data: Vec<(i32, i32)>,
@@ -398,6 +403,78 @@ impl RenderModels {
         );
 
         entry.shader_register_data.push((name_offset, poke_offset));
+    }
+
+    /// The named entry's recorded shader-registration requests, each resolved
+    /// to `(shader name, poke offset)` — the read side of
+    /// [`Self::re_register_models_store_shader_request`], consumed by
+    /// `frontend.rs`'s [`re_register_models_malloc`] repeat-registration
+    /// replay, where Raven indexes `pModelDiskImage` by the stored name
+    /// offset directly (`char *psShaderName = &((char*)pModelDiskImage)
+    /// [iShaderNameOffset]`). Kept here rather than handing the disk image
+    /// out, so the block stays private to this file. An unknown entry, or one
+    /// with no disk image, has no requests.
+    ///
+    /// [`re_register_models_malloc`]: super::frontend::re_register_models_malloc
+    ///
+    /// Source: `oracle/codemp/renderer/tr_model.cpp:224-231`
+    pub(crate) fn shader_register_requests(&self, model_file_name: &str) -> Vec<(String, i32)> {
+        let key = model_file_name.to_lowercase();
+        let Some(entry) = self.cached.get(&key) else {
+            return Vec::new();
+        };
+        let Some(disk_image) = &entry.disk_image else {
+            return Vec::new();
+        };
+
+        entry
+            .shader_register_data
+            .iter()
+            .map(|&(name_offset, poke_offset)| {
+                // SAFETY: `disk_image` owns `disk_image.len()` initialized
+                // bytes for its whole life (`TRM-D4`), and `name_offset` is a
+                // byte offset into that same block, recorded off it by
+                // `re_register_models_store_shader_request`; `read_qpath`
+                // stops at the first NUL inside the block-tail slice.
+                let name = unsafe {
+                    let base = disk_image.as_ptr().add(name_offset as usize) as *const c_char;
+                    read_qpath(core::slice::from_raw_parts(
+                        base,
+                        disk_image.len() - name_offset as usize,
+                    ))
+                };
+                (name, poke_offset)
+            })
+            .collect()
+    }
+
+    /// Poke a resolved shader index into the named entry's disk image at
+    /// `poke_offset` — Raven's `*piShaderPokePtr = ...`, the write side of the
+    /// replay above. No-op for an unknown entry or one with no disk image.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_model.cpp:231,235-240`
+    pub(crate) fn poke_shader_index(
+        &mut self,
+        model_file_name: &str,
+        poke_offset: i32,
+        value: i32,
+    ) {
+        let key = model_file_name.to_lowercase();
+        let Some(entry) = self.cached.get_mut(&key) else {
+            return;
+        };
+        let Some(disk_image) = &mut entry.disk_image else {
+            return;
+        };
+
+        // SAFETY: as [`Self::shader_register_requests`] — `poke_offset` is a
+        // byte offset into this same live block, recorded off it by the store
+        // call; written unaligned because the offset is a file-layout field
+        // position, not a Rust-typed one.
+        unsafe {
+            let slot = disk_image.as_mut_ptr().add(poke_offset as usize) as *mut i32;
+            slot.write_unaligned(value);
+        }
     }
 
     /// Raven `RE_RegisterModels_LevelLoadEnd` — the live eviction path

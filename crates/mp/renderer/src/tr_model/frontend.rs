@@ -1,6 +1,29 @@
 //! Raven `tr_model.cpp` client-rendering remainder (R3) — the server-subset
 //! loaders live in this dir's other files and are NOT re-ported here.
 //!
+//! # The client model family's carrier shape (DEC-42.3)
+//!
+//! Every client-only registration entry point below — [`RE_RegisterModel`],
+//! `RE_RegisterModel_Actual`, [`r_load_md3`], [`re_register_models_malloc`],
+//! and their `tr_ghoul2.rs` siblings `RenderModels::r_load_mdxa`/`r_load_mdxm`
+//! — takes `view: &mut EngineHostView` as its engine carrier and threads the
+//! renderer-state bundle `R_FindShader`/`RE_LoadWorldMap_Actual` need beside
+//! it, in those two fns' own parameter order (`qs, frame, assets, view,
+//! cvars, sim, models, img_state, gpu, sky_view, sky[, world_effects]`).
+//! `common` is reached as `view.common` by sequential reborrow; server-shared
+//! helpers that take `host: &mut impl EngineHost`
+//! (`re_register_models_get_disk_file`, `re_register_server_models_malloc`)
+//! are handed `view` itself, which implements the trait.
+//!
+//! DEC-42.3 words `RenderModels` as reached "via the ruled scoped slot-cast".
+//! It is threaded as an explicit `rm: &mut RenderModels` parameter instead —
+//! the shape the already-landed `R_FindShader`/`RE_LoadWorldMap_Actual` chose
+//! for the same state (`models: &RenderModels` beside `view`), so the family
+//! composes with them without a cast at every call site. `view.rm` names the
+//! same object; no `EngineHost` service this family calls reaches it (only
+//! `print`/`fs_read_file`/`fs_free_file`/`fs_file_is_in_pak`, all
+//! `Common`-side), so the two never alias live.
+//!
 //! Source: `oracle/codemp/renderer/tr_model.cpp`
 
 // Raven fn names keep their casing (house convention, same as the sibling
@@ -14,6 +37,7 @@ use mp_engine_qcommon::common_fns::Com_DPrintf;
 use mp_engine_qcommon::qfiles::md3_frame_s::md3Frame_t;
 use mp_engine_qcommon::qfiles::md3_header_t::md3Header_t;
 use mp_engine_qcommon::qfiles::md3_limits::{MD3_IDENT, MD3_VERSION};
+use mp_engine_qcommon::qfiles::md3_shader_t::md3Shader_t;
 use mp_engine_qcommon::qfiles::md3_surface_t::md3Surface_t;
 use mp_engine_qcommon::qfiles::md3_tag_s::md3Tag_t;
 use mp_host_interface::mdx::mdxm::MdxmView;
@@ -32,10 +56,11 @@ use super::server_load::read_qpath;
 use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::gpu_resources::GpuResources;
-use crate::render_state::placeholders::GlConfig;
+use crate::render_state::placeholders::{GlConfig, WorldAsset};
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
+use crate::tr_bsp::RE_LoadWorldMap_Actual;
 use crate::tr_cmds::{RE_StretchPic, R_SyncRenderThread};
 use crate::tr_font::FontState;
 use crate::tr_image::TrImageState;
@@ -48,6 +73,7 @@ use crate::tr_local::surface_type_t::surfaceType_t;
 use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_noise::NoiseState;
 use crate::tr_scene::{RE_ClearScene, SceneState};
+use crate::tr_shader::{lightmapsNone, stylesDefault, R_FindShader};
 use crate::tr_sky::SkyState;
 use crate::tr_worldeffects::world_effects::WorldEffectsState;
 
@@ -303,17 +329,21 @@ pub unsafe fn r_model_bounds(rm: &RenderModels, handle: qhandle_t) -> (vec3_t, v
 /// never-null map.
 ///
 /// On a repeat registration the oracle additionally runs an `#ifndef
-/// DEDICATED` shader-poke replay (`:221-242`): for each `(nameOffset,
-/// pokeOffset)` pair this model recorded, it re-resolves the shader via
-/// `R_FindShader(psShaderName, lightmapsNone, stylesDefault, qtrue)` and
-/// pokes the resolved registry index (or `0` for a fallback default shader)
-/// back into the disk image at `pokeOffset`.
+/// DEDICATED` shader-poke replay (`:221-242`), transcribed live here (DEC-40
+/// client leg): for each `(nameOffset, pokeOffset)` pair this model recorded,
+/// it re-resolves the shader via `R_FindShader(psShaderName, lightmapsNone,
+/// stylesDefault, qtrue)` and pokes the resolved registry index (or `0` for a
+/// fallback default shader) back into the disk image at `pokeOffset`. The
+/// poked `int` is `handle.index() as i32` — the arena slot number IS Raven's
+/// `shader_t::index` (DEC-42.2).
 ///
-/// That replay is this port's live leg (R3 client-leg ruling) but is not
-/// transcribed — see the `//TODO: Port R_FindShader` marker at its site for
-/// the two live gaps. A repeat registration under this port therefore leaves
-/// the model's disk-image shader-index pokes at whatever they already hold
-/// (their last real resolution) rather than re-resolving them.
+/// Raven walks `ModelBin` in place, resolving and poking one entry at a time;
+/// this reads the whole request list out first
+/// ([`RenderModels::shader_register_requests`]) and pokes back through
+/// [`RenderModels::poke_shader_index`], because `R_FindShader` borrows the
+/// same `RenderModels` this fn holds mutably. Behaviorally identical:
+/// `R_FindShader` takes `models: &RenderModels`, so nothing it does can
+/// change the request list or the disk image mid-walk.
 /// Source: `oracle/codemp/renderer/tr_model.cpp:221-242`
 ///
 /// Raven's `Z_Malloc`/`Z_MorphMallocTag` zone-allocator calls are not
@@ -326,44 +356,70 @@ pub unsafe fn r_model_bounds(rm: &RenderModels, handle: qhandle_t) -> (vec3_t, v
 /// disk-image base pointer, matching the delegated twin's `*mut u8`.
 ///
 /// Source: `oracle/codemp/renderer/tr_model.cpp:179-249`
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn re_register_models_malloc(
+    qs: &mut QSharedScratch,
+    frame: &mut FrameState,
+    assets: &mut RenderAssets,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
     rm: &mut RenderModels,
-    host: &mut impl EngineHost,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
     size: i32,
     disk_buffer_if_just_loaded: Option<&[u8]>,
     model_file_name: &str,
     tag: memtag_t,
 ) -> (*mut u8, bool) {
-    //TODO: Port R_FindShader
-    // Source: oracle/codemp/renderer/tr_model.cpp:221-242
-    // The `#ifndef DEDICATED` shader-poke replay is this port's live leg (R3
-    // client-leg ruling) and is not transcribed. `lightmapsNone`/
-    // `stylesDefault` ARE landed (`tr_shader.rs:159-196`); the two gaps that
-    // remain are:
-    // (1) `sh->index` — the `int` the oracle pokes back into the disk image —
-    //     has no landed encoding: `R_FindShader` returns a
-    //     generation-counted `ShaderHandle` and `ShaderAsset` carries no
-    //     `index` field, and the read side is itself escalated
-    //     (`tr_ghoul2.rs`'s `render_surfaces` "shaderIndex accessor"
-    //     blocker);
-    // (2) `R_FindShader`'s state bundle (`tr_shader.rs:4839-4855`) threads
-    //     `view: &mut EngineHostView` plus nine render-state params, while
-    //     this fn's family threads `host: &mut impl EngineHost` (and, at its
-    //     callers, `common: &mut Common`); `EngineHostView` itself implements
-    //     `EngineHost` and owns `common: &mut Common`, so the two cannot be
-    //     live parameters at once — reconciling them is a
-    //     model-registration-family signature decision above this file.
-    //
-    // The remaining fresh/repeat-entry ingest logic is identical to the
-    // already-ported server twin, so this delegates to it rather than
-    // duplicating it (porting-rules §C10).
-    rm.re_register_server_models_malloc(
-        host,
+    // The fresh/repeat-entry ingest logic is identical to the already-ported
+    // server twin, so this delegates to it rather than duplicating it
+    // (porting-rules §C10).
+    let (ptr, already_found) = rm.re_register_server_models_malloc(
+        view,
         size,
         disk_buffer_if_just_loaded,
         model_file_name,
         tag,
-    )
+    );
+
+    if already_found {
+        // if we already had this model entry, then re-register all the shaders it wanted...
+        for (shader_name, poke_offset) in rm.shader_register_requests(model_file_name) {
+            let sh = R_FindShader(
+                &shader_name,
+                &lightmapsNone,
+                &stylesDefault,
+                true,
+                qs,
+                frame,
+                assets,
+                view,
+                cvars,
+                sim,
+                rm,
+                img_state,
+                gpu,
+                sky_view,
+                sky,
+            );
+            let is_default_shader = assets
+                .shaders
+                .get(sh)
+                .map(|shader| shader.default_shader)
+                .unwrap_or(false);
+            let poked = if is_default_shader {
+                0
+            } else {
+                sh.index() as i32
+            };
+            rm.poke_shader_index(model_file_name, poke_offset, poked);
+        }
+    }
+
+    (ptr, already_found)
 }
 
 /// Raven's `LL(x)` macro (`tr_model.cpp:20`) — identity on the LE hosts this
@@ -410,11 +466,15 @@ fn ll(x: i32) -> i32 {
 /// unlike the sibling GLM/GLA loaders — faithfully kept, not normalized,
 /// §A2), forced `surf.ident = SF_MD3`, and the lowercase-name +
 /// trailing-`_1`/`_2`-strip (`Q_strlwr`, "a crutch for q3data being a mess"
-/// per Raven's comment). Only the nested `#ifndef DEDICATED`
-/// shader-registration block and the nested `#ifndef _M_IX86` triangle/ST/
-/// XyzNormal swaps are dropped — the shader block per the
-/// `//TODO: Port R_FindShader` marker at its site below, the swaps under the
-/// same ruling-54 identity-on-LE disposition as the frame/tag swaps above.
+/// per Raven's comment), and the nested `#ifndef DEDICATED` shader
+/// registration (`:1567-1582`) — live per DEC-40, resolving each
+/// `md3Shader_t::name` through `R_FindShader(name, lightmapsNone,
+/// stylesDefault, qtrue)` into `md3Shader_t::shaderIndex` (`0` for a default
+/// shader, else `handle.index() as i32` — the arena slot number IS Raven's
+/// `shader_t::index`, DEC-42.2) and recording the request for
+/// [`re_register_models_malloc`]'s repeat replay. Only the nested
+/// `#ifndef _M_IX86` triangle/ST/XyzNormal swaps are dropped, under the same
+/// ruling-54 identity-on-LE disposition as the frame/tag swaps above.
 ///
 /// The `*mut md3Header_t`/`*mut md3Surface_t` casts operate on the
 /// 16-byte-aligned `AlignedBytes` base the cache entry owns (`TRM-D4`/ruling
@@ -422,9 +482,19 @@ fn ll(x: i32) -> i32 {
 /// at the cast site.
 ///
 /// Source: `oracle/codemp/renderer/tr_model.cpp:1427-1621`
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn r_load_md3(
+    qs: &mut QSharedScratch,
+    frame: &mut FrameState,
+    assets: &mut RenderAssets,
+    view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    sim: &mut RenderAssetsSim,
     rm: &mut RenderModels,
-    host: &mut impl EngineHost,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
     model: qhandle_t,
     lod: i32,
     buffer: &[u8],
@@ -440,7 +510,7 @@ pub(crate) fn r_load_md3(
     }
 
     if version != MD3_VERSION {
-        host.print(&format!(
+        view.print(&format!(
             "{}R_LoadMD3: {} has wrong version ({} should be {})\n",
             S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII"),
             mod_name,
@@ -456,8 +526,17 @@ pub(crate) fn r_load_md3(
     rm.models[idx].dataSize += size;
 
     let (ptr, already_found) = re_register_models_malloc(
+        qs,
+        frame,
+        assets,
+        view,
+        cvars,
+        sim,
         rm,
-        host,
+        img_state,
+        gpu,
+        sky_view,
+        sky,
         size,
         Some(buffer),
         mod_name,
@@ -501,7 +580,7 @@ pub(crate) fn r_load_md3(
     // SAFETY: see above — `header` is the aligned, live block either way.
     let num_frames = unsafe { (*header).numFrames };
     if num_frames < 1 {
-        host.print(&format!(
+        view.print(&format!(
             "{}R_LoadMD3: {} has no frames\n",
             S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII"),
             mod_name
@@ -580,17 +659,50 @@ pub(crate) fn r_load_md3(
                 (*surf).name[name_len - 2] = 0;
             }
 
-            //TODO: Port R_FindShader
+            // register the shaders
             // Source: oracle/codemp/renderer/tr_model.cpp:1567-1582
-            // The `#ifndef DEDICATED` shader registration is this port's live
-            // leg (R3 client-leg ruling) and is not transcribed — the same
-            // two gaps this file's `re_register_models_malloc` marker states
-            // (no `int` encoding for `sh->index`; `R_FindShader`'s
-            // `EngineHostView` state bundle cannot coexist with this
-            // family's `host` + `common` threading). A registered MD3's
-            // `md3Shader_t::shaderIndex` is left at whatever value it carries
-            // on disk rather than resolved through `R_FindShader`/stored via
-            // `RE_RegisterModels_StoreShaderRequest`.
+            let mut shader = (surf as *mut u8).add((*surf).ofsShaders as usize) as *mut md3Shader_t;
+            for _ in 0..(*surf).numShaders {
+                let shader_name = read_qpath(&(*shader).name);
+                let sh = R_FindShader(
+                    &shader_name,
+                    &lightmapsNone,
+                    &stylesDefault,
+                    true,
+                    qs,
+                    frame,
+                    assets,
+                    view,
+                    cvars,
+                    sim,
+                    rm,
+                    img_state,
+                    gpu,
+                    sky_view,
+                    sky,
+                );
+                let is_default_shader = assets
+                    .shaders
+                    .get(sh)
+                    .map(|s| s.default_shader)
+                    .unwrap_or(false);
+                (*shader).shaderIndex = if is_default_shader {
+                    0
+                } else {
+                    // DEC-42.2: the arena slot number IS `shader_t::index`.
+                    sh.index() as i32
+                };
+                // Raven passes the two `char*`/`int*` addresses; the port's
+                // store takes them as block-relative byte offsets (that
+                // method's own doc comment).
+                let name_offset =
+                    (core::ptr::addr_of!((*shader).name) as usize - ptr as usize) as i32;
+                let poke_offset =
+                    (core::ptr::addr_of!((*shader).shaderIndex) as usize - ptr as usize) as i32;
+                rm.re_register_models_store_shader_request(mod_name, name_offset, poke_offset);
+
+                shader = shader.add(1);
+            }
 
             // `#ifndef _M_IX86` triangle/ST/XyzNormal swaps (`:1589-1613`) —
             // §20-dropped, same ruling-54 identity-on-LE disposition as the
@@ -743,27 +855,25 @@ fn write_qpath(dest: &mut [c_char; MAX_QPATH], src: &str) {
 /// `re_insert_model_into_hash`'s own doc comment already states for the
 /// bucket scheme it subsumes).
 ///
-/// Both `#ifndef DEDICATED` blocks are this port's live leg (R3 client-leg
-/// ruling: the R3 renderer track is the CLIENT port; the jampDed disposition
-/// is scoped to the dedicated-server link set):
-/// - `R_SyncRenderThread()` (`:1270-1273`) is transcribed — hence the
-///   `assets` parameter, which carries nothing else (`R_SyncRenderThread`
-///   reads `tr.registered`, `tr_cmds.rs:296`).
-/// - `RE_LoadWorldMap_Actual(...)` (`:1232-1234`) is NOT transcribed; see the
-///   `//TODO: Port RE_LoadWorldMap_Actual call` marker at its site for the
-///   three live gaps. Until it lands, nothing on the `'#'`-prefixed path
-///   inserts the `"*<N>-0"` hash key, so that lookup always misses and falls
-///   through to `return 0` — a consequence of the unported call, not retail
-///   behavior.
+/// Both `#ifndef DEDICATED` blocks are this port's live leg (DEC-40: the R3
+/// renderer track is the CLIENT port; the jampDed disposition is scoped to
+/// the dedicated-server link set):
+/// - `R_SyncRenderThread()` (`:1270-1273`) — hence the `assets` parameter
+///   carrying `tr.registered` (`tr_cmds.rs:296`).
+/// - `RE_LoadWorldMap_Actual(va("maps/%s.bsp", name+1), tr.bspModels[
+///   tr.numBSPModels-1], tr.numBSPModels)` (`:1232-1234`). Raven hands over a
+///   fixed-array element; the port loads into a locally-owned [`WorldAsset`]
+///   and moves it into `RenderAssets::bsp_models` at the same
+///   `num_bsp_models - 1` index afterwards — `RE_LoadWorldMap_Actual` takes
+///   `assets: &mut RenderAssets` *and* `world: &mut WorldAsset`, so the world
+///   cannot be borrowed out of `assets` while it runs. Same shape
+///   `RE_LoadWorldMap` (`tr_bsp.rs`) already uses for the `index == 0` load.
+///   This is `bsp_models`' first writer.
 ///
-/// `R_LoadMDXM` is `tr_ghoul2.cpp`'s wave-12 sibling loader — this packet's
-/// own RESOLVED CALL SURFACE lists it cross-file, same wave 12 as this
-/// packet (not yet landed at transcription time). Called here as
-/// `RenderModels::r_load_mdxm(host, common, cvars, model, buffer, mod_name,
-/// already_cached)`, mirroring `R_LoadMDXA`'s already-landed sibling
-/// (`tr_ghoul2.rs::r_load_mdxa`) exactly — both are the same GLM/GLA loader
-/// pair in the same oracle TU, so the established idiom is reused rather
-/// than invented; a same-wave integration checkpoint, not a guess.
+/// `R_LoadMDXM` is `tr_ghoul2.cpp`'s sibling loader, called here through
+/// [`RenderModels::r_load_mdxm`] with this family's carrier bundle (file-top
+/// DEC-42.3 note), mirroring `R_LoadMDXA`'s sibling
+/// (`tr_ghoul2.rs::r_load_mdxa`).
 ///
 /// The `#ifdef _DEBUG` `r_noPrecacheGLA` early-return (`:1375-1380`) and the
 /// `#ifdef _DEBUG else { Com_Printf(...) }` branch (`:1388-1392`) are
@@ -775,23 +885,30 @@ fn write_qpath(dest: &mut [c_char; MAX_QPATH], src: &str) {
 /// Source: `oracle/codemp/renderer/tr_model.cpp:1169-1400`
 #[allow(clippy::too_many_arguments)]
 fn RE_RegisterModel_Actual(
-    rm: &mut RenderModels,
-    host: &mut impl EngineHost,
-    common: &mut Common,
+    qs: &mut QSharedScratch,
+    frame: &mut FrameState,
+    assets: &mut RenderAssets,
+    view: &mut EngineHostView,
     cvars: &RendererCvars,
-    assets: &RenderAssets,
+    sim: &mut RenderAssetsSim,
+    rm: &mut RenderModels,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
+    world_effects: &mut WorldEffectsState,
     name: &str,
 ) -> qhandle_t {
     let warn = S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII");
 
     if name.is_empty() {
-        com_printf(common, "RE_RegisterModel: NULL name\n");
+        com_printf(view.common, "RE_RegisterModel: NULL name\n");
         return 0;
     }
 
     if name.len() >= MAX_QPATH {
         let red = S_COLOR_RED.to_str().expect("S_COLOR_RED is ASCII");
-        Com_DPrintf(common, &format!("{red}Model name exceeds MAX_QPATH\n"));
+        Com_DPrintf(view.common, &format!("{red}Model name exceeds MAX_QPATH\n"));
         return 0;
     }
 
@@ -806,28 +923,36 @@ fn RE_RegisterModel_Actual(
     if name.as_bytes().first() == Some(&b'#') {
         rm.num_bsp_models += 1;
 
-        //TODO: Port RE_LoadWorldMap_Actual call ('#' bsp-model registration)
         // Source: oracle/codemp/renderer/tr_model.cpp:1232-1234
-        // `RE_LoadWorldMap_Actual(va("maps/%s.bsp", name+1),
-        // tr.bspModels[tr.numBSPModels-1], tr.numBSPModels)` is this port's
-        // live leg (R3 client-leg ruling) and is not transcribed. Three gaps:
-        // (1) `tr.bspModels` is `RenderAssets::bsp_models`
-        //     (`render_state/render_assets.rs:118-122`) and has no writer
-        //     anywhere in the crate — only `tr_init.rs:1599` clears it — so
-        //     the `[tr.numBSPModels - 1]` element the oracle hands over does
-        //     not exist yet;
-        // (2) even once it does, `RE_LoadWorldMap_Actual`
-        //     (`tr_bsp.rs:3463-3479`) takes `assets: &mut RenderAssets` AND
-        //     `world: &mut WorldAsset` — the latter being an element of the
-        //     former — which is one aliasing `&mut` too many for safe Rust;
-        //     splitting it is a `RenderAssets` ownership decision above this
-        //     file;
-        // (3) its remaining bundle threads `view: &mut EngineHostView` plus
-        //     eleven render-state params, while this fn's family threads
-        //     `host: &mut impl EngineHost` + `common: &mut Common`;
-        //     `EngineHostView` itself implements `EngineHost` and owns
-        //     `common: &mut Common`, so the two cannot be live parameters at
-        //     once.
+        let index = rm.num_bsp_models;
+        let mut world = WorldAsset::default();
+        RE_LoadWorldMap_Actual(
+            qs,
+            frame,
+            assets,
+            view,
+            cvars,
+            sim,
+            rm,
+            img_state,
+            gpu,
+            sky_view,
+            sky,
+            world_effects,
+            &format!("maps/{}.bsp", &name[1..]),
+            &mut world,
+            index,
+        );
+        // `tr.bspModels[tr.numBSPModels - 1] = <the loaded world>`: Raven's
+        // store is a fixed `MAX_SUB_BSP` array indexed by the just-bumped
+        // counter, so the port writes that same index (growing the `Vec` to
+        // reach it), never appends blindly — `media_level_load_begin` zeroes
+        // `num_bsp_models` on every level load while the `Vec` persists.
+        let slot = (index - 1) as usize;
+        if assets.bsp_models.len() <= slot {
+            assets.bsp_models.resize_with(slot + 1, WorldAsset::default);
+        }
+        assets.bsp_models[slot] = world;
 
         let temp = format!("*{}-0", rm.num_bsp_models);
         if let Some(&handle) = rm.hash.get(&temp.to_ascii_lowercase()) {
@@ -848,7 +973,7 @@ fn RE_RegisterModel_Actual(
 
     let Some(handle) = rm.r_alloc_model() else {
         com_printf(
-            common,
+            view.common,
             &format!("{warn}RE_RegisterModel: R_AllocModel() failed for '{name}'\n"),
         );
         return 0;
@@ -859,7 +984,7 @@ fn RE_RegisterModel_Actual(
     write_qpath(&mut rm.models[idx].name, name);
 
     // make sure the render thread is stopped
-    R_SyncRenderThread(assets, common, cvars);
+    R_SyncRenderThread(assets, view.common, cvars);
 
     let mut lod: i32 = if name.contains(".md3") {
         // this loads the md3s in reverse so they can be biased
@@ -885,7 +1010,7 @@ fn RE_RegisterModel_Actual(
         }
 
         if let Some((buf, mut already_cached)) =
-            rm.re_register_models_get_disk_file(host, &filename)
+            rm.re_register_models_get_disk_file(view, &filename)
         {
             // important that from now on we pass 'filename' instead of
             // 'name' to all model load functions, because 'filename'
@@ -899,25 +1024,60 @@ fn RE_RegisterModel_Actual(
             let ident = i32::from_le_bytes(buf[0..4].try_into().unwrap());
 
             let loaded = match ident {
-                MDXA_IDENT => {
-                    rm.r_load_mdxa(host, common, handle, &buf, &filename, &mut already_cached)
-                }
-                MDXM_IDENT => rm.r_load_mdxm(
-                    host,
-                    common,
-                    cvars,
+                MDXA_IDENT => rm.r_load_mdxa(
+                    qs,
+                    frame,
                     assets,
+                    view,
+                    cvars,
+                    sim,
+                    img_state,
+                    gpu,
+                    sky_view,
+                    sky,
                     handle,
                     &buf,
                     &filename,
                     &mut already_cached,
                 ),
-                MD3_IDENT => {
-                    r_load_md3(rm, host, handle, lod, &buf, &filename, &mut already_cached)
-                }
+                MDXM_IDENT => rm.r_load_mdxm(
+                    qs,
+                    frame,
+                    assets,
+                    view,
+                    cvars,
+                    sim,
+                    img_state,
+                    gpu,
+                    sky_view,
+                    sky,
+                    world_effects,
+                    handle,
+                    &buf,
+                    &filename,
+                    &mut already_cached,
+                ),
+                MD3_IDENT => r_load_md3(
+                    qs,
+                    frame,
+                    assets,
+                    view,
+                    cvars,
+                    sim,
+                    rm,
+                    img_state,
+                    gpu,
+                    sky_view,
+                    sky,
+                    handle,
+                    lod,
+                    &buf,
+                    &filename,
+                    &mut already_cached,
+                ),
                 _ => {
                     com_printf(
-                        common,
+                        view.common,
                         &format!("{warn}RE_RegisterModel: unknown fileid for {filename}\n"),
                     );
                     // `default: goto fail;` skips the `FS_FreeFile` call
@@ -931,7 +1091,7 @@ fn RE_RegisterModel_Actual(
 
             if !already_cached {
                 // important to check!!
-                host.fs_free_file(buf);
+                view.fs_free_file(buf);
             }
 
             if !loaded {
@@ -947,7 +1107,7 @@ fn RE_RegisterModel_Actual(
             num_loaded += 1;
             // if we have a valid model and are biased so that we won't
             // see any higher detail ones, stop loading them
-            if lod <= common.cvar(cvars.r_lodbias).integer {
+            if lod <= view.common.cvar(cvars.r_lodbias).integer {
                 break;
             }
         }
@@ -994,17 +1154,38 @@ fn RE_RegisterModel_Actual(
 /// Source: `oracle/codemp/renderer/tr_model.cpp:1407-1417`
 #[allow(clippy::too_many_arguments)]
 pub fn RE_RegisterModel(
-    rm: &mut RenderModels,
-    host: &mut impl EngineHost,
-    common: &mut Common,
+    qs: &mut QSharedScratch,
+    frame: &mut FrameState,
+    assets: &mut RenderAssets,
+    view: &mut EngineHostView,
     cvars: &RendererCvars,
-    assets: &RenderAssets,
+    sim: &mut RenderAssetsSim,
+    rm: &mut RenderModels,
+    img_state: &mut TrImageState,
+    gpu: &mut GpuResources,
+    sky_view: &mut viewParms_t,
+    sky: &mut SkyState,
+    world_effects: &mut WorldEffectsState,
     name: &str,
 ) -> qhandle_t {
     let was_inside = rm.inside_register_model;
     rm.inside_register_model = true;
 
-    let q = RE_RegisterModel_Actual(rm, host, common, cvars, assets, name);
+    let q = RE_RegisterModel_Actual(
+        qs,
+        frame,
+        assets,
+        view,
+        cvars,
+        sim,
+        rm,
+        img_state,
+        gpu,
+        sky_view,
+        sky,
+        world_effects,
+        name,
+    );
 
     rm.inside_register_model = was_inside;
 

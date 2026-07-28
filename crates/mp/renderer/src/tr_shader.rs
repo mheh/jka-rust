@@ -3596,14 +3596,20 @@ pub fn RE_RegisterShaderFromImage(
 
 /// Raven `CreateInternalShaders`.
 ///
-/// PORT-NOTE: `arena.rs`'s `Arena::new_with_slot0` doc comment (A12) names
-/// this fn as the shaders registry's slot-0 constructor — `Handle{0,0}` must
-/// resolve to the `"<default>"` shader built below. This transcription calls
-/// `FinishShader` for all three markers exactly as the oracle does, relying
-/// on `assets.shaders` already being `Arena::new_with_slot0`-constructed by
-/// whichever fn calls `CreateInternalShaders` (no `RenderAssets` constructor
-/// has landed in this crate yet — out of this wave's file/scope). Flagged as
-/// an open wiring question for that wave, not resolved here.
+/// PORT-NOTE: `tr.numShaders = 0` is a whole-registry invalidation — the
+/// array AND every `hashTable` bucket pointing into it — which the
+/// `Arena`-backed registry spells as `Arena::reset` (DEC-42.1). `reset`
+/// re-seats slot 0 with a value its caller supplies, and this registry's
+/// slot-0 value is the `"<default>"` shader below, which `FinishShader` can
+/// only hand back by inserting; so the purge lands right after that first
+/// `FinishShader`, which lifts the new default straight back out of the
+/// outgoing arena and re-seats it at slot 0 — the oracle's "index 0 is
+/// re-created, never re-numbered" (A12), with no second `<default>` copy left
+/// in the registry. `sorted_shaders`/`shader_lookup` are then re-registered
+/// against `ShaderHandle::slot_zero()`; at that point each holds only the one
+/// now-stale pre-reset handle, since this fn clears `sorted_shaders` on entry
+/// and `R_InitShaders` — its only caller, here and in the oracle — clears
+/// `shader_lookup` immediately before calling it.
 ///
 /// The oracle reuses the SAME file-scope `shader`/`stages` globals across all
 /// three `FinishShader` calls below — only `.name`/`.sort`/`.defaultShader`
@@ -3618,15 +3624,10 @@ pub fn CreateInternalShaders(
     cvars: &RendererCvars,
 ) {
     // tr.numShaders = 0; — the Arena-backed registry has no explicit counter
-    // to reset (R2-D3); `sorted_shaders` is cleared to match the oracle's
-    // "start the registry over" intent.
-    //
-    // PORT-NOTE: clearing only `sorted_shaders` is asymmetric against the
-    // oracle's single `tr.numShaders = 0`, which invalidates the whole
-    // registry (both the array and every `hashTable` bucket pointing into
-    // it). The matching `shader_lookup` reset is `R_InitShaders`' job — it is
-    // the fn that owns registry teardown/rebuild and calls this one — and
-    // lands with that fn in a later wave.
+    // to reset (R2-D3): the array half of the invalidation is
+    // `Arena::reset`, which runs below once the new slot-0 value exists (see
+    // doc comment); the `hashTable` half is `R_InitShaders`' own
+    // `shader_lookup` clear.
     assets.sorted_shaders.clear();
 
     // init the default shader
@@ -3650,7 +3651,28 @@ pub fn CreateInternalShaders(
     state.stages[0].active = true;
     state.stages[0].state_bits = GLS_DEFAULT as u32;
 
-    let _default_shader = FinishShader(assets, common, cvars, &mut state);
+    let default_shader = FinishShader(assets, common, cvars, &mut state);
+
+    // tr.numShaders = 0 (cont.) — the registry purge (DEC-42.1): every
+    // pre-reset handle goes stale and the `<default>` shader just built takes
+    // index 0.
+    let default_entry = assets
+        .shaders
+        .remove(default_shader)
+        .expect("FinishShader registered the <default> shader in the arena");
+    assets.shaders.reset(default_entry);
+
+    // The two registrations `GeneratePermanentShader` made for the now-stale
+    // pre-reset handle, redone against the reserved slot 0.
+    assets.sorted_shaders.clear();
+    SortNewShader(assets, ShaderHandle::slot_zero());
+    assets.shader_lookup.clear();
+    assets
+        .shader_lookup
+        .entry(COM_StripExtension(&state.name))
+        .or_default()
+        .push(ShaderHandle::slot_zero());
+
     // tr.defaultShader = ... — no separate field needed: `ShaderHandle::
     // slot_zero()` already IS the live default shader by construction (A12),
     // the convention every other fn in this file uses (`R_FindShaderByName`,
@@ -5397,7 +5419,9 @@ pub fn R_InitShaders(
     // transcribed as the write it observably is (porting-rules §A1
     // behavioral parity) — `shader_lookup` is the STATE HOMES-assigned
     // carrier for `hashTable` (this packet, `R_RemapShader`/`R_InitShaders`
-    // rows).
+    // rows). The array half of the same invalidation is `Arena::reset`
+    // (DEC-42.1), owned by `CreateInternalShaders` below, so this clear
+    // precedes it and leaves no stale handle behind.
     assets.shader_lookup.clear();
 
     // deferLoad = qfalse;

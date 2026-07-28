@@ -13,6 +13,7 @@
 //! timer touches per the same ruling (DEC-37 A13.5) without a per-site note.
 
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
+use mp_qshared::shared::com_parse::QSharedScratch;
 use mp_qshared::shared::q_color::S_COLOR_YELLOW;
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorMA, _VectorSubtract, vec3_origin, CrossProduct, DotProductRow,
@@ -41,7 +42,7 @@ use mp_engine_ghoul2::shared::cghoul2_info::CGhoul2Info;
 use mp_engine_ghoul2::shared::surface_info_t::surfaceInfo_t;
 use mp_engine_ghoul2::surfaces::g2_find_override_surface;
 
-use mp_engine_qcommon::common::{com_error, com_printf, Common};
+use mp_engine_qcommon::common::{com_error, com_printf, Common, EngineHostView};
 use native_string::q_string::Q_strlwr;
 
 use crate::mdx_format::mdxa_header_t::mdxaHeader_t;
@@ -52,12 +53,15 @@ use crate::mdx_format::mdxm_surf_hierarchy_t::mdxmSurfHierarchy_t;
 use crate::mdx_format::mdxm_surface_t::mdxmSurface_t;
 use crate::mdx_format::mdxm_vertex_t::mdxmVertex_t;
 use crate::render_state::frame_state::FrameState;
+use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::model_asset::ModelHandle;
 use crate::render_state::placeholders::RefEntity;
 use crate::render_state::render_assets::RenderAssets;
+use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::render_state::skin_asset::SkinHandle;
+use crate::tr_image::TrImageState;
 use crate::tr_local::crenderable_surface::CRenderableSurface;
 use crate::tr_local::model_s::model_t;
 use crate::tr_local::modtype_t::modtype_t;
@@ -65,12 +69,16 @@ use crate::tr_local::orientationr_t::orientationr_t;
 use crate::tr_local::shader_commands_s::SHADER_MAX_INDEXES;
 use crate::tr_local::stage_vars::SHADER_MAX_VERTEXES;
 use crate::tr_local::surface_type_t::surfaceType_t;
+use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_main::{R_CullLocalPointAndRadius, CULL_CLIP, CULL_IN, CULL_OUT};
 use crate::tr_mesh::project_radius;
 use crate::tr_model::frontend::{mdxm_view_of, re_register_models_malloc, RE_RegisterModel};
 use crate::tr_model::render_models::RenderModels;
 use crate::tr_model::server_load::read_qpath;
 use crate::tr_shade_calc::myftol;
+use crate::tr_shader::{lightmapsNone, stylesDefault, R_FindShader};
+use crate::tr_sky::SkyState;
+use crate::tr_worldeffects::world_effects::WorldEffectsState;
 
 // ---------------------------------------------------------------------------
 // Confirmed `#define` values (porting-rules §C8: `#define` -> `const`).
@@ -813,7 +821,10 @@ pub fn g2_process_generated_surface_bolts(
 /// - the default-shader-resolution arm needs `surfInfo->shaderIndex`, which
 ///   `MdxmSurfHierarchyView` (`crates/mp/host-interface/src/mdx/mdxm.rs`)
 ///   does not expose (only `shader_first_byte`/`flags`/`parent_index`/
-///   `num_children`/`child`);
+///   `num_children`/`child`). The *encoding* half of this blocker is closed
+///   — DEC-42.2 makes the poked `int` the shader arena's slot number, read
+///   back through `Arena::handle_at_slot`, and [`RenderModels::r_load_mdxm`]
+///   now writes it — what is still missing is only the view accessor;
 /// - the skin-shader-match arm needs `SkinAsset`'s `surfaces`/`name`/
 ///   `shader` fields, and `render_state::skin_asset::SkinAsset` is still the
 ///   empty `{}` client-rendering placeholder;
@@ -1660,11 +1671,26 @@ impl RenderModels {
     /// x86-64 target, matching `server_load_mdxa`'s own `TRM-D3`/ruling 54
     /// disposition for the identical arm in its own oracle twin.
     ///
+    /// Carrier shape: this file's client model loaders take the same bundle
+    /// as their `tr_model/frontend.rs` family (that file's top-of-module
+    /// DEC-42.3 note) — `view: &mut EngineHostView` for engine services,
+    /// `common` reached as `view.common`, and the renderer state
+    /// `re_register_models_malloc`/`R_FindShader` need threaded beside it.
+    ///
     /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:5256-5502`
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn r_load_mdxa(
         &mut self,
-        host: &mut impl EngineHost,
-        common: &mut Common,
+        qs: &mut QSharedScratch,
+        frame: &mut FrameState,
+        assets: &mut RenderAssets,
+        view: &mut EngineHostView,
+        cvars: &RendererCvars,
+        sim: &mut RenderAssetsSim,
+        img_state: &mut TrImageState,
+        gpu: &mut GpuResources,
+        sky_view: &mut viewParms_t,
+        sky: &mut SkyState,
         model: qhandle_t,
         buffer: &[u8],
         mod_name: &str,
@@ -1684,7 +1710,7 @@ impl RenderModels {
 
         if version != MDXA_VERSION {
             com_printf(
-                common,
+                view.common,
                 &format!(
                     "{}R_LoadMDXA: {} has wrong version ({} should be {})\n",
                     warn, mod_name, version, MDXA_VERSION
@@ -1698,8 +1724,17 @@ impl RenderModels {
         self.models[idx].dataSize += size;
 
         let (ptr, already_found) = re_register_models_malloc(
+            qs,
+            frame,
+            assets,
+            view,
+            cvars,
+            sim,
             self,
-            host,
+            img_state,
+            gpu,
+            sky_view,
+            sky,
             size,
             Some(buffer),
             mod_name,
@@ -1754,7 +1789,7 @@ impl RenderModels {
         let num_frames = unsafe { (*mdxa).numFrames };
         if num_frames < 1 {
             com_printf(
-                common,
+                view.common,
                 &format!("{}R_LoadMDXA: {} has no frames\n", warn, mod_name),
             );
             return false;
@@ -1818,19 +1853,12 @@ impl RenderModels {
     /// `r_load_mdxa` already gives.
     ///
     /// `mdxm->animIndex = RE_RegisterModel(va("%s.gla", mdxm->animName))`
-    /// (`:4884-4891`) is a genuine SCC-345 mutual-recursion edge — this
-    /// wave's own packet lists `RE_RegisterModel`/`RE_RegisterModel_Actual`
-    /// as members of the *same* SCC 345 as this fn (`scc 345` in this file's
-    /// own THREADING DIGEST header), assigned to the sibling
-    /// `tr_model.wave12.md` packet (a different porter, `tr_model.cpp`, not
-    /// this file's edit scope). Called here per this packet's own "signatures
-    /// are LAW, do not explore" contract; the parameter threading below
-    /// (`self`/`host`/`common` alongside the name) is this porter's
-    /// best-effort match to every other client model-registration entry
-    /// point this file/module already established (`r_load_mdxa`,
-    /// `re_register_models_malloc`), not a guessed *value* — reconciled
-    /// against the sibling's actually-landed signature at integration if it
-    /// differs.
+    /// (`:4884-4891`) is a genuine SCC-345 mutual-recursion edge back into
+    /// `tr_model/frontend.rs`'s [`RE_RegisterModel`], called here with this
+    /// family's shared carrier bundle (that file's top-of-module DEC-42.3
+    /// note): `view: &mut EngineHostView` for engine services, `common`
+    /// reached as `view.common`, and the renderer state `R_FindShader`/
+    /// `RE_LoadWorldMap_Actual` need threaded beside it.
     ///
     /// The surface-hierarchy walk's `Q_strlwr`/trailing-`"_off"`-strip
     /// (`:4912-4916`) has no twin in `server_load_mdxm` (the dedicated server
@@ -1842,15 +1870,10 @@ impl RenderModels {
     ///
     /// The `#ifndef DEDICATED` shader lookup (`:4926-4938`, `R_FindShader(
     /// surfInfo->shader, lightmapsNone, stylesDefault, qtrue)` ->
-    /// `surfInfo->shaderIndex`) is the client leg under the R3 client-leg
-    /// ruling and belongs in this port, but is NOT transcribed — see the
-    /// `//TODO: Port R_FindShader` marker at its site for the two live gaps
-    /// (`shader_t::index` has no `int` encoding, and `R_FindShader`'s state
-    /// bundle is threaded on a host convention this fn cannot hold).
-    /// `surfInfo->shaderIndex` is left at whatever value it carries on disk
-    /// (not resolved, not zeroed — the `#ifdef DEDICATED` arm's `= 0` doesn't
-    /// apply to this, the non-dedicated, client-path body) rather than
-    /// invented. `RE_RegisterModels_StoreShaderRequest` (`:4939`) still runs
+    /// `surfInfo->shaderIndex`) is the client leg (DEC-40) and is transcribed
+    /// live: a default shader pokes `0`, else the resolved handle's arena
+    /// slot number, which IS Raven's `shader_t::index` (DEC-42.2).
+    /// `RE_RegisterModels_StoreShaderRequest` (`:4939`) still runs
     /// unconditionally, outside both `#ifdef` arms, exactly as Raven has it.
     ///
     /// `SHADER_MAX_VERTEXES`/`SHADER_MAX_INDEXES` bound overflows raise
@@ -1882,19 +1905,21 @@ impl RenderModels {
     /// debug alignment assert at each cast site, matching
     /// `server_load_mdxm`/`r_load_mdxa`.
     ///
-    /// `assets` carries no oracle parameter — it is threaded solely so the
-    /// `RE_RegisterModel` recursion below can reach
-    /// `R_SyncRenderThread(tr.registered)` (`tr_model.cpp:1270-1273`, the R3
-    /// client-leg ruling's `#ifndef DEDICATED` block).
-    ///
     /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:4816-5049`
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn r_load_mdxm(
         &mut self,
-        host: &mut impl EngineHost,
-        common: &mut Common,
+        qs: &mut QSharedScratch,
+        frame: &mut FrameState,
+        assets: &mut RenderAssets,
+        view: &mut EngineHostView,
         cvars: &RendererCvars,
-        assets: &RenderAssets,
+        sim: &mut RenderAssetsSim,
+        img_state: &mut TrImageState,
+        gpu: &mut GpuResources,
+        sky_view: &mut viewParms_t,
+        sky: &mut SkyState,
+        world_effects: &mut WorldEffectsState,
         model: qhandle_t,
         buffer: &[u8],
         mod_name: &str,
@@ -1914,7 +1939,7 @@ impl RenderModels {
 
         if version != MDXM_VERSION {
             com_printf(
-                common,
+                view.common,
                 &format!(
                     "{}R_LoadMDXM: {} has wrong version ({} should be {})\n",
                     warn, mod_name, version, MDXM_VERSION
@@ -1928,8 +1953,17 @@ impl RenderModels {
         self.models[idx].dataSize += size;
 
         let (ptr, already_found) = re_register_models_malloc(
+            qs,
+            frame,
+            assets,
+            view,
+            cvars,
+            sim,
             self,
-            host,
+            img_state,
+            gpu,
+            sky_view,
+            sky,
             size,
             Some(buffer),
             mod_name,
@@ -1977,9 +2011,23 @@ impl RenderModels {
         // is never itself byte-swapped (it's a char array).
         let anim_name = unsafe { read_qpath(&(*mdxm).animName) };
         let anim_filename = format!("{}.gla", anim_name);
-        // See the doc comment above: SCC-345 mutual-recursion edge into the
-        // sibling `tr_model.wave12.md` packet.
-        let anim_index = RE_RegisterModel(self, host, common, cvars, assets, &anim_filename);
+        // See the doc comment above: the SCC-345 mutual-recursion edge back
+        // into `tr_model/frontend.rs`.
+        let anim_index = RE_RegisterModel(
+            qs,
+            frame,
+            assets,
+            view,
+            cvars,
+            sim,
+            self,
+            img_state,
+            gpu,
+            sky_view,
+            sky,
+            world_effects,
+            &anim_filename,
+        );
         // SAFETY: as above.
         unsafe {
             (*mdxm).animIndex = anim_index;
@@ -1989,7 +2037,7 @@ impl RenderModels {
             // SAFETY: as above.
             let mesh_name = unsafe { read_qpath(&(*mdxm).name) };
             com_printf(
-                common,
+                view.common,
                 &format!(
                     "{}R_LoadMDXM: missing animation file {} for mesh {}\n",
                     warn, anim_name, mesh_name
@@ -2059,30 +2107,39 @@ impl RenderModels {
                     *child = LittleLong(*child);
                 }
 
-                //TODO: Port R_FindShader
-                // Source: oracle/codemp/renderer/tr_ghoul2.cpp:4923-4938
-                // The `#ifndef DEDICATED` leg is this port's live leg (R3
-                // client-leg ruling: the R3 renderer track is the CLIENT
-                // port). `lightmapsNone`/`stylesDefault` ARE landed
-                // (`tr_shader.rs:159-196`); the two gaps that remain are:
-                // (1) `sh->index` — the `int` the oracle pokes into
-                //     `surfInfo->shaderIndex` — has no landed encoding:
-                //     `R_FindShader` returns a generation-counted
-                //     `ShaderHandle` and `ShaderAsset` carries no `index`
-                //     field, and the read side is itself escalated
-                //     (`render_surfaces`'s "shaderIndex accessor" blocker,
-                //     this file's `:790-821` doc comment);
-                // (2) `R_FindShader`'s state bundle (`tr_shader.rs:4839-4855`)
-                //     threads `view: &mut EngineHostView` plus nine
-                //     render-state params, while this fn's family threads
-                //     `host: &mut impl EngineHost` + `common: &mut Common`.
-                //     `EngineHostView` itself implements `EngineHost` and owns
-                //     `common: &mut Common`, so the two cannot be live
-                //     parameters at once — reconciling them is a
-                //     model-registration-family signature decision above this
-                //     file.
-                // `surfInfo->shaderIndex` is left as whatever it carries on
-                // disk (see doc comment above).
+                // get the shader name
+                // Source: oracle/codemp/renderer/tr_ghoul2.cpp:4926-4938
+                let shader_name = read_qpath(&(*surf_info).shader);
+                let sh = R_FindShader(
+                    &shader_name,
+                    &lightmapsNone,
+                    &stylesDefault,
+                    true,
+                    qs,
+                    frame,
+                    assets,
+                    view,
+                    cvars,
+                    sim,
+                    self,
+                    img_state,
+                    gpu,
+                    sky_view,
+                    sky,
+                );
+                // insert it in the surface list
+                let is_default_shader = assets
+                    .shaders
+                    .get(sh)
+                    .map(|shader| shader.default_shader)
+                    .unwrap_or(false);
+                (*surf_info).shaderIndex = if is_default_shader {
+                    0
+                } else {
+                    // DEC-42.2: the arena slot number IS `shader_t::index`.
+                    sh.index() as i32
+                };
+
                 let name_offset =
                     (core::ptr::addr_of!((*surf_info).shader) as usize - base as usize) as i32;
                 let poke_offset =
