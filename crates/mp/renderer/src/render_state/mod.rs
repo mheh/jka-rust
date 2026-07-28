@@ -28,7 +28,11 @@ pub mod gpu_resources;
 pub mod handle;
 pub mod image_asset;
 pub mod light_style_table;
-pub mod model_asset;
+// `model_asset` (the `ModelAsset` payload + `ModelHandle` alias) is retired:
+// the model registry keeps its arena mechanics inside `RenderModels`' own pool
+// (`crate::tr_model::model_pool`), per `docs/subsystems/tr-model.md`
+// `## Amendment 2026-07-27 — models pool: arena mechanics` (#51). Unifying the
+// server and client model registries is deferred to the client-engine island.
 pub mod placeholders;
 pub mod render_assets;
 pub mod render_assets_sim;

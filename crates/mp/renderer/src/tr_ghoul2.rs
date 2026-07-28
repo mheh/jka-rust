@@ -55,7 +55,6 @@ use crate::mdx_format::mdxm_surface_t::mdxmSurface_t;
 use crate::mdx_format::mdxm_vertex_t::mdxmVertex_t;
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::gpu_resources::GpuResources;
-use crate::render_state::model_asset::ModelHandle;
 use crate::render_state::placeholders::RefEntity;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
@@ -72,6 +71,7 @@ use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_main::{R_CullLocalPointAndRadius, CULL_CLIP, CULL_IN, CULL_OUT};
 use crate::tr_mesh::project_radius;
 use crate::tr_model::frontend::{mdxm_view_of, re_register_models_malloc, RE_RegisterModel};
+use crate::tr_model::model_pool::ModelHandle;
 use crate::tr_model::render_models::RenderModels;
 use crate::tr_model::server_load::read_qpath;
 use crate::tr_shade_calc::myftol;
@@ -974,9 +974,9 @@ pub fn process_model_bolt_surfaces(
 ///   reconstructible from `CConstructBoneList` alone.
 ///
 /// `CBL.currentModel: Option<ModelHandle>` (this file's pre-existing
-/// `CConstructBoneList` field) resolves to the empty `ModelAsset`
-/// client-rendering placeholder (`render_state::model_asset`), not the live
-/// server-side `model_t` this fn actually walks — so, matching the wave-0
+/// `CConstructBoneList` field) is a `ModelPool` handle
+/// (`crate::tr_model::model_pool`), which this fn has no pool receiver to
+/// resolve against — so, matching the wave-0
 /// precedent `g2_find_surface_bc`/`g2_process_surface_bolt` already set
 /// (both take `&model_t` directly), `current_model` is threaded as an
 /// explicit parameter instead; `CBL.current_model` is left unread by this
@@ -1716,8 +1716,8 @@ impl RenderModels {
         }
 
         let idx = model as usize;
-        self.models[idx].r#type = modtype_t::MOD_MDXA;
-        self.models[idx].dataSize += size;
+        self.models.slot_mut(idx).r#type = modtype_t::MOD_MDXA;
+        self.models.slot_mut(idx).dataSize += size;
 
         let (ptr, already_found) = re_register_models_malloc(
             qs,
@@ -1752,7 +1752,7 @@ impl RenderModels {
         );
 
         let mdxa = ptr as *mut mdxaHeader_t;
-        self.models[idx].mdxa = mdxa;
+        self.models.slot_mut(idx).mdxa = mdxa;
 
         if !already_found {
             // horrible new hackery, if !bAlreadyFound then we've just done a
@@ -1945,8 +1945,8 @@ impl RenderModels {
         }
 
         let idx = model as usize;
-        self.models[idx].r#type = modtype_t::MOD_MDXM;
-        self.models[idx].dataSize += size;
+        self.models.slot_mut(idx).r#type = modtype_t::MOD_MDXM;
+        self.models.slot_mut(idx).dataSize += size;
 
         let (ptr, already_found) = re_register_models_malloc(
             qs,
@@ -1978,7 +1978,7 @@ impl RenderModels {
         );
 
         let mdxm = ptr as *mut mdxmHeader_t;
-        self.models[idx].mdxm = mdxm;
+        self.models.slot_mut(idx).mdxm = mdxm;
 
         if !already_found {
             // "horrible new hackery" — the one-time ingest copy (`TRM-D4`
@@ -2046,7 +2046,7 @@ impl RenderModels {
         // after this.
         // SAFETY: as above.
         let num_lods = unsafe { (*mdxm).numLODs };
-        self.models[idx].numLods = num_lods - 1;
+        self.models.slot_mut(idx).numLods = num_lods - 1;
 
         if already_found {
             // All done. Stop, go no further, do not LittleLong(), do not

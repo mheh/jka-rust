@@ -2,9 +2,11 @@
 //! idiomatic reimplementation of the WinDed DEDICATED renderer's live model
 //! surface).
 //!
-//! Design: `docs/subsystems/tr-model.md` (FROZEN). The `RenderModels` aggregate
-//! owner (`render_models`) holds the registry state; the sibling per-class
-//! modules carry the disk-image buffer (`aligned_bytes`), the cache-entry type +
+//! Design: `docs/subsystems/tr-model.md` (FROZEN, plus its amendment
+//! 2026-07-27 — models pool: arena mechanics, #51). The `RenderModels`
+//! aggregate owner (`render_models`) holds the registry state; the sibling
+//! per-class modules carry the `tr.models[]` pool itself (`model_pool`), the
+//! disk-image buffer (`aligned_bytes`), the cache-entry type +
 //! cache free-fns (`cached_model_binary`), the sole live model entry
 //! (`server_load`), and the dedicated `.skin` registration family
 //! (`server_skin`/`server_skin_surface`/`server_skins`, user ruling 2026-07-12
@@ -14,6 +16,7 @@
 pub mod aligned_bytes;
 pub mod cached_model_binary;
 pub mod frontend;
+pub mod model_pool;
 pub mod render_models;
 pub mod server_load;
 pub mod server_skin;

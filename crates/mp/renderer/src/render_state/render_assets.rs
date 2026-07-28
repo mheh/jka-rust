@@ -5,7 +5,6 @@ use std::collections::HashMap;
 
 use crate::render_state::arena::Arena;
 use crate::render_state::image_asset::{ImageAsset, ImageHandle};
-use crate::render_state::model_asset::{ModelAsset, ModelHandle};
 use crate::render_state::placeholders::{AutomapWireframe, FunctionTables, GlConfig, WorldAsset};
 use crate::render_state::shader_asset::{ShaderAsset, ShaderHandle};
 use crate::render_state::skin_asset::{SkinAsset, SkinHandle};
@@ -105,14 +104,13 @@ pub struct RenderAssets {
     /// tr_image.cpp:3128-3136`) compares the full name only — plain
     /// name→handle (`R2-D4`).
     pub skin_lookup: HashMap<String, SkinHandle>,
-    /// Soft-capped at `MAX_MOD_KNOWN = 1024`; slot 0 pre-populated with
-    /// `MOD_BAD`; overflow is silent in retail, this port adds a marked
-    /// warning, returns `Handle{0,0}` (A5, A5 amendment, A12).
-    pub models: Arena<ModelAsset>,
-    /// `RE_RegisterModel`'s `mhHashTable` walk (`oracle/codemp/renderer/
-    /// tr_model.cpp:1211-1215`) — plain name→handle, same shape as
-    /// `skin_lookup`, kept separate for per-kind handle typing (`R2-D4`).
-    pub model_lookup: HashMap<String, ModelHandle>,
+    // The model registry (`models: Arena<ModelAsset>` + `model_lookup`) is
+    // RETIRED from this struct: `tr.models[]`/`tr.numModels`/`mhHashTable`
+    // keep their arena mechanics in place on `RenderModels`
+    // (`crate::tr_model::model_pool`, `crate::tr_model::render_models`), per
+    // `docs/subsystems/tr-model.md` `## Amendment 2026-07-27 — models pool:
+    // arena mechanics` (#51). Unifying the server and client model registries
+    // is deferred to the client-engine island.
     /// `tr.world` — replaced wholesale on level load.
     pub world: Option<WorldAsset>,
     /// `tr.bspModels[MAX_SUB_BSP]` — sub-BSP worlds, homed beside `world`

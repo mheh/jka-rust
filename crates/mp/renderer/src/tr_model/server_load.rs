@@ -160,15 +160,15 @@ impl RenderModels {
         // "only set the name after the model has been successfully loaded"
         // (Raven's comment) — Raven actually sets it here, before the LOD
         // loop; kept faithful to the code, not the comment.
-        write_qpath(&mut self.models[idx].name, name);
+        write_qpath(&mut self.models.slot_mut(idx).name, name);
 
-        let lod_count = self.models[idx].md3.len(); // MD3_MAX_LODS
+        let lod_count = self.models.slot(idx).md3.len(); // MD3_MAX_LODS
         let mut lod: i32 = if name.contains(".md3") {
             (lod_count - 1) as i32
         } else {
             0
         };
-        self.models[idx].numLods = 0;
+        self.models.slot_mut(idx).numLods = 0;
 
         let mut num_loaded = 0i32;
 
@@ -200,7 +200,7 @@ impl RenderModels {
                         // `default: goto fail;` — jumps past the
                         // `FS_FreeFile` call below entirely; `buf` is simply
                         // dropped here (Raven leaks it, kept faithful, §A2).
-                        self.models[idx].r#type = modtype_t::MOD_BAD;
+                        self.models.slot_mut(idx).r#type = modtype_t::MOD_BAD;
                         self.re_insert_model_into_hash(name, handle);
                         return 0;
                     }
@@ -212,14 +212,14 @@ impl RenderModels {
 
                 if !loaded {
                     if lod == 0 {
-                        self.models[idx].r#type = modtype_t::MOD_BAD;
+                        self.models.slot_mut(idx).r#type = modtype_t::MOD_BAD;
                         self.re_insert_model_into_hash(name, handle);
                         return 0;
                     }
                     break;
                 }
 
-                self.models[idx].numLods += 1;
+                self.models.slot_mut(idx).numLods += 1;
                 num_loaded += 1;
             }
             // `continue` (GetDiskFile failure) falls straight through to the
@@ -234,8 +234,9 @@ impl RenderModels {
             // lod--)`).
             let mut l = lod - 1;
             while l >= 0 {
-                self.models[idx].numLods += 1;
-                self.models[idx].md3[l as usize] = self.models[idx].md3[(l + 1) as usize];
+                let m = self.models.slot_mut(idx);
+                m.numLods += 1;
+                m.md3[l as usize] = m.md3[(l + 1) as usize];
                 l -= 1;
             }
 
@@ -245,7 +246,7 @@ impl RenderModels {
 
         // fail: — still keep the model_t around (hashed as MOD_BAD) so the
         // name isn't rescanned; return the literal 0, not mod.index.
-        self.models[idx].r#type = modtype_t::MOD_BAD;
+        self.models.slot_mut(idx).r#type = modtype_t::MOD_BAD;
         self.re_insert_model_into_hash(name, handle);
         0
     }
@@ -297,8 +298,8 @@ impl RenderModels {
         }
 
         let idx = model as usize;
-        self.models[idx].r#type = modtype_t::MOD_MDXA;
-        self.models[idx].dataSize += size;
+        self.models.slot_mut(idx).r#type = modtype_t::MOD_MDXA;
+        self.models.slot_mut(idx).dataSize += size;
 
         let (ptr, already_found) = self.re_register_server_models_malloc(
             host,
@@ -318,7 +319,7 @@ impl RenderModels {
         );
 
         let mdxa = ptr as *mut mdxaHeader_t;
-        self.models[idx].mdxa = mdxa;
+        self.models.slot_mut(idx).mdxa = mdxa;
 
         if !already_found {
             // "we've just done a tag-morph" (Raven) — here, the one-time
@@ -405,8 +406,8 @@ impl RenderModels {
         }
 
         let idx = model as usize;
-        self.models[idx].r#type = modtype_t::MOD_MDXM;
-        self.models[idx].dataSize += size;
+        self.models.slot_mut(idx).r#type = modtype_t::MOD_MDXM;
+        self.models.slot_mut(idx).dataSize += size;
 
         let (ptr, already_found) = self.re_register_server_models_malloc(
             host,
@@ -426,7 +427,7 @@ impl RenderModels {
         );
 
         let mdxm = ptr as *mut mdxmHeader_t;
-        self.models[idx].mdxm = mdxm;
+        self.models.slot_mut(idx).mdxm = mdxm;
 
         if !already_found {
             // "we've just done a tag-morph" — the one-time ingest copy
@@ -469,7 +470,7 @@ impl RenderModels {
         // loop increments `numLods` by 1 right after this call returns.
         // SAFETY: as above.
         let num_lods = unsafe { (*mdxm).numLODs };
-        self.models[idx].numLods = num_lods - 1;
+        self.models.slot_mut(idx).numLods = num_lods - 1;
 
         if already_found {
             // "All done. Stop, go no further, do not LittleLong(), do not

@@ -521,8 +521,8 @@ pub(crate) fn r_load_md3(
 
     let idx = model as usize;
     let lod_idx = lod as usize;
-    rm.models[idx].r#type = modtype_t::MOD_MESH;
-    rm.models[idx].dataSize += size;
+    rm.models.slot_mut(idx).r#type = modtype_t::MOD_MESH;
+    rm.models.slot_mut(idx).dataSize += size;
 
     let (ptr, already_found) = re_register_models_malloc(
         qs,
@@ -552,7 +552,7 @@ pub(crate) fn r_load_md3(
     );
 
     let header = ptr as *mut md3Header_t;
-    rm.models[idx].md3[lod_idx] = header;
+    rm.models.slot_mut(idx).md3[lod_idx] = header;
 
     if !already_found {
         // "we've just done a tag-morph" (Raven) — the one-time ingest copy
@@ -977,18 +977,18 @@ fn RE_RegisterModel_Actual(
     let idx = handle as usize;
 
     // only set the name after the model has been successfully loaded
-    write_qpath(&mut rm.models[idx].name, name);
+    write_qpath(&mut rm.models.slot_mut(idx).name, name);
 
     // make sure the render thread is stopped
     R_SyncRenderThread(assets, view.common, cvars);
 
     let mut lod: i32 = if name.contains(".md3") {
         // this loads the md3s in reverse so they can be biased
-        (rm.models[idx].md3.len() - 1) as i32
+        (rm.models.slot(idx).md3.len() - 1) as i32
     } else {
         0
     };
-    rm.models[idx].numLods = 0;
+    rm.models.slot_mut(idx).numLods = 0;
 
     //
     // load the files
@@ -1079,7 +1079,7 @@ fn RE_RegisterModel_Actual(
                     // `default: goto fail;` skips the `FS_FreeFile` call
                     // below entirely; `buf` is simply dropped here (Raven
                     // leaks it, kept faithful, §A2).
-                    rm.models[idx].r#type = modtype_t::MOD_BAD;
+                    rm.models.slot_mut(idx).r#type = modtype_t::MOD_BAD;
                     rm.re_insert_model_into_hash(name, handle);
                     return 0;
                 }
@@ -1092,14 +1092,14 @@ fn RE_RegisterModel_Actual(
 
             if !loaded {
                 if lod == 0 {
-                    rm.models[idx].r#type = modtype_t::MOD_BAD;
+                    rm.models.slot_mut(idx).r#type = modtype_t::MOD_BAD;
                     rm.re_insert_model_into_hash(name, handle);
                     return 0;
                 }
                 break;
             }
 
-            rm.models[idx].numLods += 1;
+            rm.models.slot_mut(idx).numLods += 1;
             num_loaded += 1;
             // if we have a valid model and are biased so that we won't
             // see any higher detail ones, stop loading them
@@ -1118,8 +1118,9 @@ fn RE_RegisterModel_Actual(
         // the user changes r_lodbias on the fly
         let mut l = lod - 1;
         while l >= 0 {
-            rm.models[idx].numLods += 1;
-            rm.models[idx].md3[l as usize] = rm.models[idx].md3[(l + 1) as usize];
+            let m = rm.models.slot_mut(idx);
+            m.numLods += 1;
+            m.md3[l as usize] = m.md3[(l + 1) as usize];
             l -= 1;
         }
 
@@ -1136,7 +1137,7 @@ fn RE_RegisterModel_Actual(
     // fail:
     // we still keep the model_t around, so if the model name is asked for
     // again, we won't bother scanning the filesystem
-    rm.models[idx].r#type = modtype_t::MOD_BAD;
+    rm.models.slot_mut(idx).r#type = modtype_t::MOD_BAD;
     rm.re_insert_model_into_hash(name, handle);
     0
 }

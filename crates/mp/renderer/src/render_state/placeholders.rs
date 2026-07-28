@@ -79,7 +79,7 @@ pub struct RefEntity {
     pub re_type: refEntityType_t,
     /// `e.renderfx`.
     pub renderfx: i32,
-    /// `e.hModel` — kept as the oracle's raw index, not `Handle<ModelAsset>`:
+    /// `e.hModel` — kept as the oracle's raw index, not a `ModelHandle`:
     /// zero means "unset" here, where `Handle{0,0}` means the registry's live
     /// default entry (A12).
     pub h_model: qhandle_t,

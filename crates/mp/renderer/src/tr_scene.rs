@@ -45,7 +45,7 @@ use crate::tr_shader::R_GetShaderByHandle;
 // `origin`/`lighting_origin`/`ambient_light`/`directed_light`/
 // `light_dir: vec3_t`) with the fields `RE_AddRefEntityToScene` needs:
 // `re_type: refEntityType_t`; `h_model`/`custom_shader: qhandle_t` — kept as
-// the oracle's raw index, not `Handle<ModelAsset>`/`Handle<ShaderAsset>`
+// the oracle's raw index, not `ModelHandle`/`Handle<ShaderAsset>`
 // (`tr_font.rs`'s `CFontInfo::mShader` precedent: zero means "unset" here,
 // but `Handle{0,0}` means the registry's *live default* entry (A12), and
 // reconciling the two conventions is a design decision this packet doesn't

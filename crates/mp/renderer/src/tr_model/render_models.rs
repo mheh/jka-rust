@@ -17,24 +17,12 @@ use mp_engine_qcommon::qfiles::md3_limits::MD3_MAX_LODS;
 use mp_host_interface::EngineHost;
 use mp_qshared::shared::qhandle_t;
 
-use crate::tr_local::model_s::model_t;
 use crate::tr_local::modtype_t::modtype_t;
 
 use super::cached_model_binary::CachedEndianedModelBinary;
+use super::model_pool::{ModelData, ModelPool};
 use super::server_load::read_qpath;
 use super::server_skin::ServerSkin;
-
-/// `MAX_MOD_KNOWN`.
-///
-/// Source: `oracle/codemp/renderer/tr_local.h:1138`
-const MAX_MOD_KNOWN: usize = 1024;
-
-/// `ModelData` — the `tr.models[]` pool entry (ruling 40 reuse: the already-
-/// ported `model_t`, imported never re-declared; a thin wrapper vs the bare
-/// `model_t` is §D12 porter latitude, and the skeleton pins the direct reuse).
-///
-/// Type reuse source: `oracle/codemp/renderer/tr_local.h:1117-1135`
-pub type ModelData = model_t;
 
 /// Raven's renderer model registry — the `CachedModels` map, the `tr.models[]`
 /// pool + `mhHashTable`, and the loader's file-static bookkeeping, gathered onto
@@ -56,19 +44,18 @@ pub type ModelData = model_t;
 /// Source: `oracle/codemp/renderer/tr_model.cpp:35-36,67-68,521,560,1406`;
 /// `oracle/codemp/renderer/tr_local.h:1396-1397`
 pub struct RenderModels {
-    /// `tr.models[MAX_MOD_KNOWN=1024]` — the Hunk-allocated `model_t*` pool.
-    /// `qhandle_t` is the `Vec` index; `Box`-pinned so a registered `model_t*`
-    /// stays address-stable (`G2_API.cpp:2716` caches `currentModel`). Cap at
-    /// `MAX_MOD_KNOWN` → `R_AllocModel` returns `None`.
+    /// `tr.models[MAX_MOD_KNOWN=1024]` + `tr.numModels` — the Hunk-allocated
+    /// `model_t*` pool, carrying the R2 arena mechanics in place (slot-0
+    /// reservation, generation counting, `handle_at_slot`) per the
+    /// `docs/subsystems/tr-model.md` amendment 2026-07-27 (#51). Entries stay
+    /// `Box`-pinned so a registered `model_t*` is address-stable
+    /// (`G2_API.cpp:2716` caches `currentModel`; the DEC-35 mdx views read the
+    /// blocks out of this pool). Cap at `MAX_MOD_KNOWN` → `R_AllocModel`
+    /// returns `None`.
     ///
     /// Source: `oracle/codemp/renderer/tr_model.cpp:611-624`;
-    /// `oracle/codemp/renderer/tr_local.h:1396`
-    pub(crate) models: Vec<Box<ModelData>>,
-
-    /// `tr.numModels` — the pool high-water mark.
-    ///
-    /// Source: `oracle/codemp/renderer/tr_local.h:1397`
-    pub(crate) num_models: i32,
+    /// `oracle/codemp/renderer/tr_local.h:1396-1397`
+    pub(crate) models: ModelPool,
 
     /// `mhHashTable[FILE_HASH_SIZE]` intrusive chains, replaced by a
     /// case-insensitive name → handle map (`TRM-D3`/ruling 53). Lookup-only, no
@@ -127,15 +114,15 @@ pub struct RenderModels {
 }
 
 impl Default for RenderModels {
-    /// The construction story (`## State ownership`): the pool/hash/cache start
+    /// The construction story (`## State ownership`): the hash/cache start
     /// empty (filled lazily by `R_ModelInit`/`R_AllocModel`/registration), the
+    /// pool starts at its A12 slot-0 reservation with `tr.numModels == 0`, the
     /// level counter and BSP count start at `0`, the previous map name empty,
     /// and the re-entrancy guard `false`. Matches Raven's zero-init file
     /// statics plus the lazily-`new`d `CachedModels` map.
     fn default() -> Self {
         Self {
-            models: Vec::new(),
-            num_models: 0,
+            models: ModelPool::new(),
             hash: HashMap::new(),
             cached: BTreeMap::new(),
             current_level: 0,
@@ -163,17 +150,19 @@ impl RenderModels {
         // already live here (`cached` exists via `Default`), so there is nothing
         // to lazily construct.
 
-        // `tr.numModels = 0; memset(mhHashTable, 0, ...)`. The `models` Vec is
-        // left intact (Raven leaves the `tr.models[]` array untouched and just
-        // resets the high-water mark); `r_alloc_model` overwrites slot 0 below.
-        self.num_models = 0;
+        // `tr.numModels = 0; memset(mhHashTable, 0, ...)`. `ModelPool::reset`
+        // is the DEC-42.1 registry teardown: the entries stay in place (Raven
+        // leaves the `tr.models[]` array untouched and just resets the
+        // high-water mark) while every pre-reset handle above slot 0 goes
+        // stale; `r_alloc_model` re-creates slot 0 below.
+        self.models.reset();
         self.hash.clear();
 
         // leave a space for NULL model
         let null_model = self
             .r_alloc_model()
             .expect("R_AllocModel for the reserved NULL model must succeed at init");
-        self.models[null_model as usize].r#type = modtype_t::MOD_BAD;
+        self.models.slot_mut(null_model as usize).r#type = modtype_t::MOD_BAD;
     }
 
     /// Raven `R_ModelFree` — on a live `CachedModels` map, runs
@@ -202,8 +191,10 @@ impl RenderModels {
         // `KillTheShaderHashTable()` — the name pool is this slice's flattened
         // server-shader hash table.
         self.server_shaders.clear();
-        // `tr.numModels = 0; memset(mhHashTable, 0, ...)`.
-        self.num_models = 0;
+        // `tr.numModels = 0; memset(mhHashTable, 0, ...)` — the same DEC-42.1
+        // pool teardown `model_init` runs, minus the slot-0 re-creation
+        // (Raven's `R_HunkClearCrap` drops the mark and stops there).
+        self.models.reset();
         self.hash.clear();
         // `tr.numSkins = 0` (the skin memory itself lived on the just-reset
         // hunk); `tr.numShaders = 0` stays §20, not a field of this struct.
@@ -217,11 +208,7 @@ impl RenderModels {
     ///
     /// Source: `oracle/codemp/renderer/tr_model.cpp:591-604`
     pub fn get_model(&self, handle: qhandle_t) -> &ModelData {
-        // out of range gets the default model (`tr.models[0]`)
-        if handle < 1 || handle >= self.num_models {
-            return &self.models[0];
-        }
-        &self.models[handle as usize]
+        self.models.by_handle(handle)
     }
 
     /// Raven `R_Modellist_f` — prints each registered model's `dataSize`/LOD
@@ -230,8 +217,7 @@ impl RenderModels {
     /// Source: `oracle/codemp/renderer/tr_model.cpp:1705-1730`
     pub fn modellist_f(&self, host: &mut impl EngineHost) {
         let mut total: i32 = 0;
-        for i in 1..self.num_models {
-            let m = &self.models[i as usize];
+        for m in self.models.registered() {
             let mut lods = 1;
             for j in 1..MD3_MAX_LODS {
                 if !m.md3[j].is_null() && m.md3[j] != m.md3[j - 1] {
@@ -260,32 +246,12 @@ impl RenderModels {
     ///
     /// Source: `oracle/codemp/renderer/tr_model.cpp:611-624`
     pub(super) fn r_alloc_model(&mut self) -> Option<qhandle_t> {
-        if self.num_models == MAX_MOD_KNOWN as i32 {
-            return None;
-        }
-
-        let index = self.num_models;
-        // Raven `Hunk_Alloc` returns zeroed memory; mirror that with a zeroed
-        // `model_t`. This is sound: every field has a valid all-zero bit pattern
-        // (`modtype_t::MOD_BAD == 0`, null raw pointers, `qboolean::qfalse == 0`)
-        // and `model_t` holds no references. Confined internal `unsafe`.
-        let mut m: Box<ModelData> = Box::new(unsafe { core::mem::zeroed() });
-        m.index = index;
-
-        // Raven writes `tr.models[tr.numModels]` in a fixed 1024-slot array and
-        // bumps the high-water mark. The Vec mirrors that: append at the mark, or
-        // overwrite an out-of-mark slot left over from a prior `model_init`/
-        // `hunk_clear` reset (the old entry is logically dead once `num_models`
-        // was reset below it).
-        let slot = index as usize;
-        if slot < self.models.len() {
-            self.models[slot] = m;
-        } else {
-            self.models.push(m);
-        }
-        self.num_models += 1;
-
-        Some(index)
+        // The mechanics themselves live on `ModelPool` (`model_pool.rs`) —
+        // sequential high-water allocation, the `MAX_MOD_KNOWN` cap, the
+        // zeroed `Hunk_Alloc` entry with `->index` set, and the generation the
+        // vacating reset assigned. The returned `qhandle_t` is the bare slot
+        // number DEC-42.2 pins.
+        self.models.alloc()
     }
 
     /// Raven `RE_InsertModelIntoHash` — replaced by a direct
@@ -308,6 +274,7 @@ impl RenderModels {
 
 #[cfg(test)]
 mod tests {
+    use super::super::model_pool::MAX_MOD_KNOWN;
     use super::*;
 
     #[test]
@@ -315,15 +282,17 @@ mod tests {
         let mut rm = RenderModels::default();
         assert_eq!(rm.r_alloc_model(), Some(0));
         assert_eq!(rm.r_alloc_model(), Some(1));
-        assert_eq!(rm.num_models, 2);
-        assert_eq!(rm.models[0].index, 0);
-        assert_eq!(rm.models[1].index, 1);
+        assert_eq!(rm.models.num_models(), 2);
+        assert_eq!(rm.models.slot(0).index, 0);
+        assert_eq!(rm.models.slot(1).index, 1);
     }
 
     #[test]
     fn alloc_model_caps_at_max_mod_known() {
         let mut rm = RenderModels::default();
-        rm.num_models = MAX_MOD_KNOWN as i32;
+        while rm.models.num_models() < MAX_MOD_KNOWN as i32 {
+            assert!(rm.r_alloc_model().is_some());
+        }
         assert_eq!(rm.r_alloc_model(), None);
     }
 
@@ -331,8 +300,8 @@ mod tests {
     fn model_init_reserves_null_model_as_mod_bad() {
         let mut rm = RenderModels::default();
         rm.model_init();
-        assert_eq!(rm.num_models, 1);
-        assert!(matches!(rm.models[0].r#type, modtype_t::MOD_BAD));
+        assert_eq!(rm.models.num_models(), 1);
+        assert!(matches!(rm.models.slot(0).r#type, modtype_t::MOD_BAD));
     }
 
     #[test]
@@ -361,7 +330,7 @@ mod tests {
         rm.r_alloc_model();
         rm.re_insert_model_into_hash("foo", 1);
         rm.hunk_clear();
-        assert_eq!(rm.num_models, 0);
+        assert_eq!(rm.models.num_models(), 0);
         assert!(rm.hash.is_empty());
         // Raven leaves tr.models[0] in place after a hunk reset; get_model still
         // resolves the stale default slot rather than panicking.

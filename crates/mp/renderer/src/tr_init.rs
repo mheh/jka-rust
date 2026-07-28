@@ -1512,14 +1512,15 @@ const MAX_POLYVERTS: i32 = 3000;
 ///   arena purge to `Arena::reset` (DEC-42.1: every pre-reset handle stales,
 ///   the `"<default skin>"` entry is re-created at index 0), so a pre-clear
 ///   here would be redundant.
-/// - `models` (`:1396-1397`) — not rebuilt by any later statement in this fn:
-///   `RenderModels::model_init` resets that struct's own `Vec` field, never
-///   `RenderAssets::models`, and the arena is still producer-less in this
-///   crate — see the `//TODO: Port R_Init registry reset (models)` marker in
-///   the rebuild region below.
-/// - `skin_lookup`/`model_lookup` — plain name->handle maps with no reserved
-///   -slot semantics; zeroed here (`R_InitSkins` clears `skin_lookup` again
-///   as the map half of its own purge).
+/// - `models` (`:1396-1397`) — rebuilt by `RenderModels::model_init` below,
+///   which hands the pool purge to `ModelPool::reset` (DEC-42.1: the
+///   high-water mark drops, every pre-reset handle above slot 0 stales) and
+///   re-creates the `MOD_BAD` entry at index 0, so a pre-clear here would be
+///   redundant. The pool lives on `RenderModels`, not `RenderAssets`
+///   (`docs/subsystems/tr-model.md` amendment 2026-07-27, #51).
+/// - `skin_lookup` — a plain name->handle map with no reserved-slot
+///   semantics; zeroed here (`R_InitSkins` clears it again as the map half of
+///   its own purge).
 /// - `images`/`image_names` (`AllocatedImages`, a separate `tr_image.cpp`
 ///   global, not a `trGlobals_t` field), `shader_text`/
 ///   `shader_text_hash_table`/`defer_load`'s own storage (`s_shaderText`/
@@ -1611,7 +1612,6 @@ pub fn R_Init(
     assets.registered = false;
     assets.world_map_loaded = false;
     assets.skin_lookup.clear();
-    assets.model_lookup.clear();
 
     // `RenderAssets::shaders` is purged by `R_InitShaders` ->
     // `CreateInternalShaders`' `Arena::reset` below (DEC-42.1), so it is not
@@ -1620,20 +1620,15 @@ pub fn R_Init(
     // `RenderAssets::skins` is purged by `R_InitSkins`' `Arena::reset` below
     // (DEC-42.1), so it is not touched here either.
 
-    //TODO: Port R_Init registry reset (models)
-    // Source: oracle/codemp/renderer/tr_init.cpp:1232
-    // (`oracle/codemp/renderer/tr_local.h:1396-1397` for the `models` field
-    // that memset zeroes)
-    // `RenderAssets::models` still has no producer anywhere in this crate —
-    // the landed model registry is `RenderModels`' own `Vec`
-    // (`tr_model/render_models.rs`), and nothing inserts into the arena.
-    // `Arena::reset(slot0)` (DEC-42.1) needs the registry's slot-0 default
-    // entry (`MOD_BAD`, `R_ModelInit`, `oracle/codemp/renderer/
-    // tr_model.cpp:1665-1680`); inventing one here would fabricate a live
-    // default for a registry that has no entries at all. The tier-2 pass that
-    // migrates `RenderModels`' tier-2 `models` Vec into the `ModelAsset` arena
-    // (#41) is that producer — this wires up with it, not before
-    // (porting-rules §A2).
+    // `tr.models`/`tr.numModels`/`mhHashTable` (`tr_local.h:1396-1397`) — the
+    // memset's model half. Nothing to pre-clear here: the pool lives on
+    // `RenderModels` (`tr_model/model_pool.rs`, amendment 2026-07-27 / #51),
+    // and `models.model_init()` below IS its DEC-42.1 reset — it drops the
+    // high-water mark, stales every pre-reset handle above slot 0, clears the
+    // hash, and re-creates the `MOD_BAD` entry at slot 0 (`R_ModelInit`,
+    // `oracle/codemp/renderer/tr_model.cpp:1665-1680`). Same disposition as
+    // `shaders`/`skins` above, whose purges also ride their own `R_Init*`
+    // rebuild statement.
 
     // Com_Memset(&backEnd, 0, sizeof(backEnd)) — full rebuild; see doc
     // comment above (nothing else in this fn writes into `frame`).
