@@ -59,6 +59,7 @@ pub mod set_anim;
 pub mod spawn;
 pub mod stat_index;
 pub mod team;
+pub mod team_maxoverlay;
 pub mod teamtask;
 pub mod transition_move_table;
 pub mod viewheight;

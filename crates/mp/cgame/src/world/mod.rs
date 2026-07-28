@@ -18,6 +18,7 @@
 
 pub mod cg_context;
 pub mod cg_cvars;
+pub mod cg_display_context;
 pub mod cg_draw_state;
 pub mod cg_effects_state;
 pub mod cg_ents_state;

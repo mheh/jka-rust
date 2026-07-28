@@ -318,6 +318,54 @@ pub struct cg_t {
     pub chatItemActive: i32,
 }
 
+impl cg_t {
+    /// The snapshot `cg.snap` points at. `cg_snapshot.c` only ever stores
+    /// `&cg.activeSnapshots[0]` or `[1]` there (`cg_snapshot.c:281-284`), so
+    /// the raw self-pointer resolves safely by comparing addresses. `None` is
+    /// the pre-first-snapshot state Raven errors out on (`cg_snapshot.c:402`)
+    /// - callers name the defined answer they take there.
+    ///
+    /// Canonical home for the address-compare shape three wave-0 TUs invented
+    /// independently; a DEC-46 addendum may later replace the raw pointer with
+    /// an index, and only this impl changes.
+    pub fn snap_ref(&self) -> Option<&snapshot_t> {
+        let snap = self.snap as *const snapshot_t;
+        if snap == &self.activeSnapshots[0] as *const snapshot_t {
+            Some(&self.activeSnapshots[0])
+        } else if snap == &self.activeSnapshots[1] as *const snapshot_t {
+            Some(&self.activeSnapshots[1])
+        } else {
+            None
+        }
+    }
+
+    /// Mutable [`Self::snap_ref`].
+    pub fn snap_mut(&mut self) -> Option<&mut snapshot_t> {
+        let snap = self.snap as *const snapshot_t;
+        let which = if snap == &self.activeSnapshots[0] as *const snapshot_t {
+            0
+        } else if snap == &self.activeSnapshots[1] as *const snapshot_t {
+            1
+        } else {
+            return None;
+        };
+        Some(&mut self.activeSnapshots[which])
+    }
+
+    /// [`Self::snap_ref`] for `cg.nextSnap` - NULL between snapshot pairs, so
+    /// `None` here is a normal answer, not an error state.
+    pub fn next_snap_ref(&self) -> Option<&snapshot_t> {
+        let snap = self.nextSnap as *const snapshot_t;
+        if snap == &self.activeSnapshots[0] as *const snapshot_t {
+            Some(&self.activeSnapshots[0])
+        } else if snap == &self.activeSnapshots[1] as *const snapshot_t {
+            Some(&self.activeSnapshots[1])
+        } else {
+            None
+        }
+    }
+}
+
 const _: () = assert!(core::mem::offset_of!(cg_t, clientFrame) == 0);
 const _: () = assert!(core::mem::offset_of!(cg_t, clientNum) == 4);
 const _: () = assert!(core::mem::offset_of!(cg_t, demoPlayback) == 8);

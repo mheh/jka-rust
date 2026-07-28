@@ -22,13 +22,13 @@ pub use native_math::qmath::PerpendicularVectorMP as PerpendicularVector;
 pub use native_math::qmath::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin,
     vectoangles, vectoyaw, AngleDelta, AngleDifference, AngleMod, AngleNormZero, AngleNormalize180,
-    AngleNormalize360, AngleSubtract, AngleVectors, AnglesSubtract, AnglesToAxis, Create_Matrix,
-    CrossProduct, Distance, DistanceSquared, DotProductRow, Inverse_Matrix, MatrixMultiply,
-    ProjectPointOnPlane, Q_fabs, Q_rand, TransformAndTranslatePoint, TransformPoint,
-    Q_random, RadiusFromBounds, VectorBetweenVectors, VectorClear, VectorCompare, VectorCompare2,
-    VectorInverse, VectorLength, VectorLengthSquared, VectorNPos, VectorNormalize,
-    VectorNormalize2, VectorNormalizeRow, VectorSet, ANGLE2SHORT, PITCH, ROLL, SHORT2ANGLE,
-    VEC3_ORIGIN, YAW,
+    AngleNormalize360, AngleSubtract, AngleVectors, AnglesSubtract, AnglesToAxis, AxisClear,
+    AxisCopy, ByteToDir, Create_Matrix, CrossProduct, DirToByte, Distance, DistanceSquared,
+    DotProductRow, Inverse_Matrix, LerpAngle, MatrixMultiply, ProjectPointOnPlane, Q_fabs, Q_rand,
+    Q_random, RadiusFromBounds, TransformAndTranslatePoint, TransformPoint, VectorBetweenVectors,
+    VectorClear, VectorCompare, VectorCompare2, VectorInverse, VectorLength, VectorLengthSquared,
+    VectorNPos, VectorNormalize, VectorNormalize2, VectorNormalizeRow, VectorSet, ANGLE2SHORT,
+    PITCH, ROLL, SHORT2ANGLE, VEC3_ORIGIN, YAW,
 };
 
 /// Raven `SetPlaneSignbits`.

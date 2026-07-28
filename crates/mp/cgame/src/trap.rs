@@ -985,16 +985,20 @@ pub fn S_MuteSound(engine: &Engine, entityNum: c_int, entchannel: c_int) {
 ///
 /// C: `void trap_S_StartSound( vec3_t origin, int entityNum, int entchannel, sfxHandle_t sfx )`
 /// Source: `oracle/codemp/cgame/cg_syscalls.c:192-194`
+///
+/// `None` is Raven's NULL origin — the engine then plays the sound at
+/// `entityNum`'s own tracked position instead of a fixed point.
 pub fn S_StartSound(
     engine: &Engine,
-    origin: &vec3_t,
+    origin: Option<&vec3_t>,
     entityNum: c_int,
     entchannel: c_int,
     sfx: sfxHandle_t,
 ) {
+    let origin = origin.map_or(null(), |o| o as *const vec3_t);
     <Engine as Execute<CgSStartsound>>::execute(
         engine,
-        CgSStartsoundArgs::new(origin as *const vec3_t, entityNum, entchannel, sfx),
+        CgSStartsoundArgs::new(origin, entityNum, entchannel, sfx),
     )
 }
 
@@ -2628,11 +2632,14 @@ pub fn FX_AddElectricity(engine: &Engine, p: &mut addElectricityArgStruct_t) {
 /// C: `int trap_SP_GetStringTextString(const char *text, char *buffer, int bufferLength)`
 /// Source: `oracle/codemp/cgame/cg_syscalls.c:725-728`
 ///
-/// `qfalse` (no such string-package reference) -> `None`.
-pub fn SP_GetStringTextString(engine: &Engine, text: &str, buffer_len: usize) -> Option<String> {
+/// The engine fills the buffer either way, so the buffer is the whole answer
+/// and the `qboolean` carries nothing extra: on a miss it writes the marker
+/// `"??<key>"` and returns `qfalse`, which is exactly what Raven's callers go
+/// on to print (`oracle/codemp/client/cl_cgame.cpp:1668-1680`).
+pub fn SP_GetStringTextString(engine: &Engine, text: &str, buffer_len: usize) -> String {
     let text_c = cstr(text);
     let mut buffer = vec![0u8; buffer_len];
-    let found = <Engine as Execute<CgSpGetstringtextstring>>::execute(
+    <Engine as Execute<CgSpGetstringtextstring>>::execute(
         engine,
         CgSpGetstringtextstringArgs::new(
             text_c.as_ptr(),
@@ -2641,7 +2648,7 @@ pub fn SP_GetStringTextString(engine: &Engine, text: &str, buffer_len: usize) ->
         ),
     );
     let nul = buffer.iter().position(|&b| b == 0).unwrap_or(buffer.len());
-    (found != 0).then(|| latin1_to_string(&buffer[..nul]))
+    latin1_to_string(&buffer[..nul])
 }
 
 /// Raven `trap_ROFF_Clean` — `CG_ROFF_CLEAN` (token: `mp_abi::cgame::syscalls::CG_ROFF_CLEAN`).
@@ -3096,6 +3103,9 @@ pub fn G2API_SetBoneAnim(
 ///
 /// C: `qboolean trap_G2API_GetBoneAnim(void *ghoul2, const char *boneName, const int currentTime, float *currentFrame, int *startFrame, int *endFrame, int *flags, float *animSpeed, int *modelList, const int modelIndex)`
 /// Source: `oracle/codemp/cgame/cg_syscalls.c:874-878`
+///
+/// `modelList` is nullable in Raven — bg's `BG_IK_MoveArm` passes NULL
+/// (`bg_pmove.c:8721`) — so `None` rides through as a null pointer.
 #[allow(clippy::too_many_arguments)]
 pub fn G2API_GetBoneAnim(
     engine: &Engine,
@@ -3107,10 +3117,11 @@ pub fn G2API_GetBoneAnim(
     endFrame: &mut c_int,
     flags: &mut c_int,
     animSpeed: &mut f32,
-    modelList: &mut c_int,
+    modelList: Option<&mut c_int>,
     modelIndex: c_int,
 ) -> bool {
     let bone_name_c = cstr(boneName);
+    let model_list_ptr = modelList.map_or(null_mut(), |m| m as *mut c_int);
     <Engine as Execute<CgG2Getboneanim>>::execute(
         engine,
         CgG2GetboneanimArgs::new(
@@ -3122,7 +3133,7 @@ pub fn G2API_GetBoneAnim(
             endFrame as *mut c_int,
             flags as *mut c_int,
             animSpeed as *mut f32,
-            modelList as *mut c_int,
+            model_list_ptr,
             modelIndex,
         ),
     ) != 0
@@ -3637,19 +3648,23 @@ pub fn G2API_RagForceSolve(engine: &Engine, ghoul2: *mut c_void, force: bool) ->
 ///
 /// C: `qboolean trap_G2API_SetBoneIKState(void *ghoul2, int time, const char *boneName, int ikState, sharedSetBoneIKStateParams_t *params)`
 /// Source: `oracle/codemp/cgame/cg_syscalls.c:1040-1043`
+///
+/// `boneName` is nullable in Raven: NULL selects the engine's init/reset-IK
+/// branch, so `None` here encodes a null pointer on the wire.
 pub fn G2API_SetBoneIKState(
     engine: &Engine,
     ghoul2: *mut c_void,
     time: c_int,
-    boneName: &str,
+    boneName: Option<&str>,
     ikState: c_int,
     params: Option<&mut sharedSetBoneIKStateParams_t>,
 ) -> bool {
-    let bone_name_c = cstr(boneName);
+    let bone_name_c = boneName.map(cstr);
+    let bone_name_ptr = bone_name_c.as_ref().map_or(null(), |b| b.as_ptr());
     let params_ptr = params.map_or(null_mut(), |p| p as *mut sharedSetBoneIKStateParams_t);
     <Engine as Execute<CgG2Setboneikstate>>::execute(
         engine,
-        CgG2SetboneikstateArgs::new(ghoul2, time, bone_name_c.as_ptr(), ikState, params_ptr),
+        CgG2SetboneikstateArgs::new(ghoul2, time, bone_name_ptr, ikState, params_ptr),
     ) != 0
 }
 
