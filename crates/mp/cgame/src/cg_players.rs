@@ -16,8 +16,8 @@ use mp_bg::bg_misc::{
     BG_IsValidCharacterModel, BG_ValidateSkinForTeam,
 };
 use mp_bg::bg_panimate::{
-    BG_FlippingAnim, BG_InDeathAnim, BG_ParseAnimationFile, BG_SaberInAttack,
-    BG_SaberStartTransAnim, BG_SuperBreakWinAnim,
+    BG_FlippingAnim, BG_InDeathAnim, BG_ParseAnimationEvtFile, BG_ParseAnimationFile,
+    BG_SaberInAttack, BG_SaberStartTransAnim, BG_SuperBreakWinAnim,
 };
 use mp_bg::bg_pmove::{BG_G2PlayerAngles, BG_IK_MoveArm, PM_RunningAnim, PM_WalkingAnim};
 use mp_bg::bg_saber::{SFL2_NO_BLADE, SFL2_NO_DLIGHT, SFL2_NO_WALL_MARKS};
@@ -737,7 +737,7 @@ pub fn CG_G2SkelForModel(ctx: &mut CgContext, g2: *mut c_void) -> c_int {
 /// instance, parsed from the `animevents.cfg` beside its `.gla`.
 /// Source: `oracle/codemp/cgame/cg_players.c:770-795`
 pub fn CG_G2EvIndexForModel(ctx: &mut CgContext, g2: *mut c_void, animIndex: c_int) -> c_int {
-    let evtIndex: c_int = -1;
+    let mut evtIndex: c_int = -1;
 
     if animIndex == -1 {
         debug_assert!(false, "shouldn't happen, bad animIndex");
@@ -751,12 +751,17 @@ pub fn CG_G2EvIndexForModel(ctx: &mut CgContext, g2: *mut c_void, animIndex: c_i
         // trailing separator.
         GLAName.truncate(slash + 1);
 
-        //TODO: Port BG_ParseAnimationEvtFile
-        // DEFERRED: BG_ParseAnimationEvtFile — `oracle/codemp/game/bg_panimate.c:1756-2328`.
-        // The whole anim-event block sits inside `#ifndef QAGAME`, so `mp_bg`
-        // deliberately did NOT port it (see that file's module doc); there is
-        // no cgame-side home for it yet. Until it lands the index stays -1.
-        //   evtIndex = BG_ParseAnimationEvtFile(&GLAName, animIndex, bgNumAnimEvents);
+        let bgNumAnimEvents = ctx.world.bg_state.bgNumAnimEvents;
+        let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+        let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
+        evtIndex = BG_ParseAnimationEvtFile(
+            &mut ctx.world.bg_state,
+            &traps,
+            &mut callbacks,
+            &GLAName,
+            animIndex,
+            bgNumAnimEvents,
+        );
     }
 
     evtIndex
@@ -2267,15 +2272,25 @@ pub fn CG_CacheG2AnimInfo(ctx: &mut CgContext, modelName: &str) {
         }
 
         if animIndex != -1 {
-            //TODO: Port BG_ParseAnimationEvtFile
-            // DEFERRED: BG_ParseAnimationEvtFile —
-            // `oracle/codemp/game/bg_panimate.c:2169-2328`. Raven cuts
-            // `originalModelName` (its pre-GLA copy of `useModel`) back to its
-            // directory and registers the model's animation events against
-            // `bgNumAnimEvents`. The whole event-file block sits inside
-            // `#ifndef QAGAME`, so `mp_bg` deliberately did NOT port it and
-            // there is no cgame home for it yet.
-            //   BG_ParseAnimationEvtFile(originalModelName, animIndex, bgNumAnimEvents);
+            // Raven cuts `originalModelName` (its pre-GLA copy of `useModel`)
+            // back to its directory with the trailing slash - `useModel` is
+            // that untouched copy here
+            let mut originalModelName = useModel.clone();
+            if let Some(slash) = originalModelName.rfind('/') {
+                originalModelName.truncate(slash + 1);
+            }
+
+            let bgNumAnimEvents = ctx.world.bg_state.bgNumAnimEvents;
+            let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+            let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
+            BG_ParseAnimationEvtFile(
+                &mut ctx.world.bg_state,
+                &traps,
+                &mut callbacks,
+                &originalModelName,
+                animIndex,
+                bgNumAnimEvents,
+            );
         }
 
         // Now free the temp instance
@@ -5063,23 +5078,33 @@ pub fn CG_RegisterClientModelname(
                 return false;
             }
 
-            //TODO: Port BG_ParseAnimationEvtFile
-            // DEFERRED: BG_ParseAnimationEvtFile —
-            // `oracle/codemp/game/bg_panimate.c:1756-2328`. Raven pulls the
-            // humanoid anim sounds here with
-            // `BG_ParseAnimationEvtFile( "models/players/_humanoid/", 0, -1 )`;
-            // the whole event-file block sits inside `#ifndef QAGAME`, so
-            // `mp_bg` deliberately did NOT port it (see that file's module doc)
-            // and there is no cgame-side home for it yet.
-            //
+            //get the sounds for the humanoid anims
+            {
+                let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+                let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
+                BG_ParseAnimationEvtFile(
+                    &mut ctx.world.bg_state,
+                    &traps,
+                    &mut callbacks,
+                    "models/players/_humanoid/",
+                    0,
+                    -1,
+                );
+            }
             //For the time being, we're going to have all real players use the generic humanoid soundset and that's it.
             //Only npc's will use model-specific soundsets.
         } else if ctx.world.bg_state.bgAllEvents[0].eventsParsed == qfalse {
             //make sure the player anim sounds are loaded even if the anims already are
-            //
-            //TODO: Port BG_ParseAnimationEvtFile
-            // DEFERRED: BG_ParseAnimationEvtFile — same missing bg surface as
-            // the arm above; `oracle/codemp/cgame/cg_players.c:556`.
+            let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+            let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
+            BG_ParseAnimationEvtFile(
+                &mut ctx.world.bg_state,
+                &traps,
+                &mut callbacks,
+                "models/players/_humanoid/",
+                0,
+                -1,
+            );
         }
 
         if let Some((surfOff, surfOn)) = CG_ParseSurfsFile(ctx, &modelName, &skinName) {
@@ -6734,14 +6759,19 @@ pub fn CG_G2AnimEntModelLoad(ctx: &mut CgContext, centNum: usize) {
                     originalModelName.truncate(slash + 1);
                 }
 
-                //TODO: Port BG_ParseAnimationEvtFile
-                // DEFERRED: BG_ParseAnimationEvtFile —
-                // `oracle/codemp/game/bg_panimate.c:1756-2328` sits inside
-                // `#ifndef QAGAME`, so `mp_bg` deliberately did NOT port it and
-                // cgame has no home for it yet; `eventAnimIndex` keeps whatever
-                // it had.
-                //   cent->eventAnimIndex = BG_ParseAnimationEvtFile(originalModelName, cent->localAnimIndex, bgNumAnimEvents);
-                let _ = originalModelName;
+                let localAnimIndex = ctx.world.entity(centNum).localAnimIndex;
+                let bgNumAnimEvents = ctx.world.bg_state.bgNumAnimEvents;
+                let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+                let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
+                let eventAnimIndex = BG_ParseAnimationEvtFile(
+                    &mut ctx.world.bg_state,
+                    &traps,
+                    &mut callbacks,
+                    &originalModelName,
+                    localAnimIndex,
+                    bgNumAnimEvents,
+                );
+                ctx.world.entity_mut(centNum).eventAnimIndex = eventAnimIndex;
             }
         }
     }

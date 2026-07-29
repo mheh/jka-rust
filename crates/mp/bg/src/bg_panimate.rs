@@ -10,24 +10,20 @@
 //! `pmove_t *pm` / `g_entities` state-threading precedent in `bg_saber.rs` /
 //! `g_combat.rs`.
 //!
-//! Dropped dead surface (porting-rules §20): the animation-*event* parser —
-//! `CheckAnimFrameForEventType`, `ParseAnimationEvtBlock`,
-//! `BG_ParseAnimationEvtFile`, the `bgAllEvents`/`bgNumAnimEvents`/
-//! `bg_animParseIncluding` file-statics, and the `animEventTypeTable` /
-//! `footstepTypeTable` string tables — is intentionally NOT ported into this
-//! (QAGAME / jampgame) module. In the oracle these all live inside a single
-//! `#ifndef QAGAME` block (`oracle/codemp/game/bg_panimate.c:1756-2328`,
-//! guard comment: "none of this is actually needed serverside"), so they are
-//! compiled OUT of the server game module and exist only in CGAME/UI. Every
-//! caller of `BG_ParseAnimationEvtFile` is likewise CGAME-only
-//! (`oracle/codemp/cgame/cg_players.c:544,556,791,6933,7254`), and the
-//! only reads of `bgAllEvents` are CGAME-side
-//! (`cg_players.c:2470,2474`); no `game/` TU parses or reads anim events. The
-//! wave-2 audit flagged these three as unported, but that is a false positive
-//! against the `#ifndef QAGAME` guard — this file is the game module, so the
-//! correct action is the drop, not a port. (`BgState::bgAllEvents` still exists
-//! as a faithful field of the shared state struct but is never populated or
-//! read game-side, mirroring the compiled-out C global.)
+//! Animation-*event* parser (DEC-47.5): the `#ifndef QAGAME` block —
+//! `animEventTypeTable` / `footstepTypeTable`, `CheckAnimFrameForEventType`,
+//! `ParseAnimationEvtBlock`, `BG_ParseAnimationEvtFile`, and the
+//! `bgAllEvents`/`bgNumAnimEvents`/`bg_animParseIncluding` statics — lives here
+//! in the shared bg tier. In the oracle it sits inside a single `#ifndef QAGAME`
+//! block (`oracle/codemp/game/bg_panimate.c:1756-2328`, guard comment: "none of
+//! this is actually needed serverside"), so it is compiled OUT of the server
+//! game module: nothing in jampgame calls it. The callers are all CGAME —
+//! `BG_ParseAnimationEvtFile` (`oracle/codemp/cgame/cg_players.c:544,556,791,
+//! 6933,7254`) and the reads of `bgAllEvents` (`cg_players.c:2470,2474`). DEC-47.5
+//! puts the family in bg (the ratified shared home) because the cgame build needs
+//! it and bg is the tier both modules already share; the game module simply never
+//! reaches it. `bg_animParseIncluding` is a `BgState` field alongside
+//! `bgAllEvents`/`bgNumAnimEvents`, threaded through the `bg: &mut BgState` param.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use core::ffi::CStr;
@@ -35,8 +31,16 @@ use core::ffi::CStr;
 use crate::bg_channel::GameCallbacks;
 use crate::bg_pmove::{PM_RunningAnim, PM_WalkingAnim};
 use crate::prelude::*;
+use crate::public::anim_event_type::animEventType_t;
+use crate::public::animevent::{animevent_t, AED_ARRAY_SIZE, MAX_RANDOM_ANIM_SOUNDS};
 use crate::public::bg_loaded_anim::bgLoadedAnim_t;
-use mp_qshared::shared::com_parse::COM_Parse;
+use crate::public::bg_loaded_events::MAX_ANIM_EVENTS;
+use crate::public::footstep_type::footstepType_t;
+use mp_qshared::shared::com_parse::{COM_Parse, COM_ParseExt, SkipRestOfLine};
+use mp_qshared::shared::sound_channel::{
+    CHAN_ANNOUNCER, CHAN_AUTO, CHAN_BODY, CHAN_VOICE, CHAN_VOICE_ATTEN, CHAN_VOICE_GLOBAL,
+    CHAN_WEAPON,
+};
 use native_string::atof::atof_bytes;
 use native_string::atoi::atoi_bytes;
 use native_string::strncpyz_string;
@@ -2040,7 +2044,9 @@ impl PmoveContext<'_> {
         }
 
         if self.bg.BGPAFtextLoaded == 0 || isHumanoid == 0 {
-            len = self.traps.fs_fopen(&(unsafe { cstr_to_str(filename) }), &mut f, FS_READ);
+            len = self
+                .traps
+                .fs_fopen(&(unsafe { cstr_to_str(filename) }), &mut f, FS_READ);
             if len <= 0 || len >= BGPAFtext.len() as c_int - 1 {
                 if dynAlloc != 0 {
                     BG_AnimsetFree(animset);
@@ -2712,4 +2718,715 @@ impl PmoveContext<'_> {
         let (ps, animations) = unsafe { ((*self.pm).ps, (*self.pm).animations) };
         self.BG_SetAnim(ps, animations, setAnimParts, anim, setAnimFlags, blendTime);
     }
+}
+
+// ===========================================================================
+// `#ifndef QAGAME` animation-event parser family (DEC-47.5).
+//
+// The game module never compiles this block; cgame does. It lives in bg because
+// bg is the tier both modules share. See the module doc for the ruling.
+// Source: `oracle/codemp/game/bg_panimate.c:1756-2328`
+// ===========================================================================
+
+// indices into `animevent_t.eventData` (`#define`s → `const`s).
+// Source: `oracle/codemp/game/bg_public.h:273-302`
+// indices for AEV_SOUND data
+const AED_SOUNDINDEX_START: usize = 0;
+const AED_SOUNDINDEX_END: usize = MAX_RANDOM_ANIM_SOUNDS - 1;
+const AED_SOUND_NUMRANDOMSNDS: usize = MAX_RANDOM_ANIM_SOUNDS;
+const AED_SOUND_PROBABILITY: usize = MAX_RANDOM_ANIM_SOUNDS + 1;
+// indices for AEV_SOUNDCHAN data
+const AED_SOUNDCHANNEL: usize = MAX_RANDOM_ANIM_SOUNDS + 2;
+// indices for AEV_FOOTSTEP data
+const AED_FOOTSTEP_TYPE: usize = 0;
+const AED_FOOTSTEP_PROBABILITY: usize = 1;
+// indices for AEV_EFFECT data
+const AED_EFFECTINDEX: usize = 0;
+const AED_EFFECT_PROBABILITY: usize = 2;
+// indices for AEV_FIRE data
+const AED_FIRE_ALT: usize = 0;
+const AED_FIRE_PROBABILITY: usize = 1;
+// indices for AEV_MOVE data
+const AED_MOVE_FWD: usize = 0;
+const AED_MOVE_RT: usize = 1;
+const AED_MOVE_UP: usize = 2;
+// indices for AEV_SABER_SWING data
+const AED_SABER_SWING_SABERNUM: usize = 0;
+const AED_SABER_SWING_TYPE: usize = 1;
+const AED_SABER_SWING_PROBABILITY: usize = 2;
+// indices for AEV_SABER_SPIN data
+const AED_SABER_SPIN_SABERNUM: usize = 0;
+const AED_SABER_SPIN_TYPE: usize = 1;
+const AED_SABER_SPIN_PROBABILITY: usize = 2;
+
+/// Raven `animEventTypeTable[MAX_ANIM_EVENTS+1]`.
+///
+/// `ENUM2STRING(X)` rows (name + id), NULL/-1 terminated. Raven over-sizes the
+/// static to `MAX_ANIM_EVENTS+1`; only the 8 initialised rows + terminator
+/// matter (`GetIDForString` stops at the empty-name terminator), so we size to
+/// the literal row count like the other tables in this codebase.
+/// Source: `oracle/codemp/game/bg_panimate.c:1758-1770`
+pub static animEventTypeTable: [stringID_table_t; 9] = [
+    stringID_table_t {
+        name: c"AEV_SOUND".as_ptr() as *mut c_char,
+        id: animEventType_t::AEV_SOUND as c_int,
+    },
+    stringID_table_t {
+        name: c"AEV_FOOTSTEP".as_ptr() as *mut c_char,
+        id: animEventType_t::AEV_FOOTSTEP as c_int,
+    },
+    stringID_table_t {
+        name: c"AEV_EFFECT".as_ptr() as *mut c_char,
+        id: animEventType_t::AEV_EFFECT as c_int,
+    },
+    stringID_table_t {
+        name: c"AEV_FIRE".as_ptr() as *mut c_char,
+        id: animEventType_t::AEV_FIRE as c_int,
+    },
+    stringID_table_t {
+        name: c"AEV_MOVE".as_ptr() as *mut c_char,
+        id: animEventType_t::AEV_MOVE as c_int,
+    },
+    stringID_table_t {
+        name: c"AEV_SOUNDCHAN".as_ptr() as *mut c_char,
+        id: animEventType_t::AEV_SOUNDCHAN as c_int,
+    },
+    stringID_table_t {
+        name: c"AEV_SABER_SWING".as_ptr() as *mut c_char,
+        id: animEventType_t::AEV_SABER_SWING as c_int,
+    },
+    stringID_table_t {
+        name: c"AEV_SABER_SPIN".as_ptr() as *mut c_char,
+        id: animEventType_t::AEV_SABER_SPIN as c_int,
+    },
+    // must be terminated
+    stringID_table_t {
+        name: c"".as_ptr() as *mut c_char,
+        id: -1,
+    },
+];
+
+/// Raven `footstepTypeTable[NUM_FOOTSTEP_TYPES+1]`.
+///
+/// Source: `oracle/codemp/game/bg_panimate.c:1772-1780`
+pub static footstepTypeTable: [stringID_table_t; 5] = [
+    stringID_table_t {
+        name: c"FOOTSTEP_R".as_ptr() as *mut c_char,
+        id: footstepType_t::FOOTSTEP_R as c_int,
+    },
+    stringID_table_t {
+        name: c"FOOTSTEP_L".as_ptr() as *mut c_char,
+        id: footstepType_t::FOOTSTEP_L as c_int,
+    },
+    stringID_table_t {
+        name: c"FOOTSTEP_HEAVY_R".as_ptr() as *mut c_char,
+        id: footstepType_t::FOOTSTEP_HEAVY_R as c_int,
+    },
+    stringID_table_t {
+        name: c"FOOTSTEP_HEAVY_L".as_ptr() as *mut c_char,
+        id: footstepType_t::FOOTSTEP_HEAVY_L as c_int,
+    },
+    // must be terminated
+    stringID_table_t {
+        name: c"".as_ptr() as *mut c_char,
+        id: -1,
+    },
+];
+
+/// Maps `GetIDForString(animEventTypeTable, ...)` back to the enum. The caller
+/// only converts once it has ruled out `-1`/`AEV_NONE`, so the ids here are
+/// always 1..=8; the unreachable arm stays `AEV_NONE` rather than transmuting a
+/// stray int (§19 — pick one defined behavior).
+fn animEventType_from_id(id: c_int) -> animEventType_t {
+    use animEventType_t::*;
+    match id {
+        1 => AEV_SOUND,
+        2 => AEV_FOOTSTEP,
+        3 => AEV_EFFECT,
+        4 => AEV_FIRE,
+        5 => AEV_MOVE,
+        6 => AEV_SOUNDCHAN,
+        7 => AEV_SABER_SWING,
+        8 => AEV_SABER_SPIN,
+        _ => AEV_NONE,
+    }
+}
+
+/// Replicates `va(pattern, n)` for the numbered sound-variant paths in
+/// animevents.cfg. C runs the runtime pattern through `vsprintf`; the shipped
+/// sound paths carry a single `%d`, so we substitute `n`'s decimal at the first
+/// `%d`/`%i`, pass `%%` through as `%`, and return a pattern with no conversion
+/// unchanged (C ignores the extra arg).
+/// Source: `oracle/codemp/game/bg_panimate.c:1973`
+fn va_sound_variant(pattern: &str, n: c_int) -> String {
+    let bytes = pattern.as_bytes();
+    let mut out = String::new();
+    let mut i = 0;
+    let mut done = false;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 1 < bytes.len() {
+            match bytes[i + 1] {
+                b'%' => {
+                    out.push('%');
+                    i += 2;
+                    continue;
+                }
+                b'd' | b'i' if !done => {
+                    out.push_str(&n.to_string());
+                    done = true;
+                    i += 2;
+                    continue;
+                }
+                _ => {}
+            }
+        }
+        out.push(bytes[i] as char);
+        i += 1;
+    }
+    out
+}
+
+/// Raven `CheckAnimFrameForEventType`.
+///
+/// Returns the index of an existing event of `eventType` already sitting on
+/// `keyFrame` (so a new event stomps it), or -1 if there's none.
+/// Source: `oracle/codemp/game/bg_panimate.c:1782-1798`
+pub fn CheckAnimFrameForEventType(
+    animEvents: *mut animevent_t,
+    keyFrame: c_int,
+    eventType: animEventType_t,
+) -> c_int {
+    unsafe {
+        for i in 0..MAX_ANIM_EVENTS as isize {
+            let ev = &*animEvents.offset(i);
+            if ev.keyFrame as c_int == keyFrame {
+                // there is an animevent on this frame already
+                if ev.eventType == eventType {
+                    // and it is of the same type
+                    return i as c_int;
+                }
+            }
+        }
+    }
+    // nope
+    -1
+}
+
+/// Raven `ParseAnimationEvtBlock`.
+///
+/// Parses one UPPEREVENTS/LOWEREVENTS block into `animEvents`. `animEvents` and
+/// `animations` are raw pointers into bg-owned storage (matching the file's
+/// `BG_ParseAnimationFile` idiom) so `bg` can be threaded mutably alongside for
+/// `COM_Parse`/`BG_Alloc` without aliasing the borrow. `text_p` is the byte
+/// cursor, advanced in place. Raven's per-field `if ( !token )` guards test the
+/// `com_token` pointer, which the byte cursor never makes NULL, so they are dead
+/// and omitted; their effect (never break early) is preserved.
+/// Source: `oracle/codemp/game/bg_panimate.c:1800-2153`
+pub(crate) fn ParseAnimationEvtBlock<'a>(
+    bg: &mut BgState,
+    traps: &dyn BgTraps,
+    callbacks: &mut dyn GameCallbacks,
+    aeb_filename: &str,
+    animEvents: *mut animevent_t,
+    animations: *mut animation_t,
+    _i: &mut c_int,
+    text_p: &mut Option<&'a [u8]>,
+) {
+    use animEventType_t::*;
+
+    let mut lastAnimEvent: c_int = 0;
+    // C-side stack buffer `char stringData[MAX_QPATH]`; we hold the token as an
+    // owned `String` (no fixed-64 overflow, §19) — `strcpy(stringData, token)`.
+    let mut stringData = String::new();
+
+    // get past starting bracket
+    loop {
+        let (token, rest) = COM_Parse(&mut bg.qs, *text_p);
+        *text_p = rest;
+        if token == "{" {
+            break;
+        }
+    }
+
+    // NOTE: instead of a blind increment, increase the index
+    //          this way if we have an event on an anim that already
+    //          has an event of that type, it stomps it
+
+    // read information for each frame
+    loop {
+        if lastAnimEvent >= MAX_ANIM_EVENTS as c_int {
+            let s = format!(
+                "ParseAnimationEvtBlock: number events in animEvent file {} > MAX_ANIM_EVENTS({})",
+                aeb_filename, MAX_ANIM_EVENTS
+            );
+            traps.com_error(ERR_DROP as c_int, &s);
+            return;
+        }
+        // Get base frame of sequence
+        let (mut token, rest) = COM_Parse(&mut bg.qs, *text_p);
+        *text_p = rest;
+        if token.is_empty() {
+            break;
+        }
+
+        if token == "}" {
+            // At end of block
+            break;
+        }
+
+        // Compare to same table as animations used so we don't have to use
+        // actual numbers for animation first frames, just need offsets.
+        let animNum = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &token);
+        if animNum == -1 {
+            // Unrecognized ANIM ENUM name, keep going till you get a good one.
+            // "^3" = S_COLOR_YELLOW.
+            traps.com_printf(&format!(
+                "^3WARNING: Unknown token {} in animEvent file {}\n",
+                token, aeb_filename
+            ));
+            while !token.is_empty() {
+                // returns empty string when next token is EOL
+                let (t, rest) = COM_ParseExt(&mut bg.qs, *text_p, false);
+                *text_p = rest;
+                token = t;
+            }
+            continue;
+        }
+
+        if unsafe { (*animations.offset(animNum as isize)).numFrames } == 0 {
+            // we don't use this anim
+            traps.com_printf(&format!(
+                "^3WARNING: {} animevents.cfg: anim {} not used by this model\n",
+                aeb_filename, token
+            ));
+            // skip this entry
+            *text_p = SkipRestOfLine(&mut bg.qs, *text_p);
+            continue;
+        }
+
+        let (token, rest) = COM_Parse(&mut bg.qs, *text_p);
+        *text_p = rest;
+        let eventTypeId =
+            GetIDForString(animEventTypeTable.as_ptr() as *mut stringID_table_t, &token);
+        if eventTypeId == AEV_NONE as c_int || eventTypeId == -1 {
+            // Unrecognized ANIM EVENT TYPE, keep going till you get a good one.
+            continue;
+        }
+        let eventType = animEventType_from_id(eventTypeId);
+
+        // set our start frame
+        let mut keyFrame = unsafe { (*animations.offset(animNum as isize)).firstFrame as c_int };
+        // Get offset to frame within sequence
+        let (token, rest) = COM_Parse(&mut bg.qs, *text_p);
+        *text_p = rest;
+        keyFrame += atoi_bytes(token.as_bytes()) as c_int;
+
+        // see if this frame already has an event of this type on it, if so, overwrite it
+        let mut curAnimEvent = CheckAnimFrameForEventType(animEvents, keyFrame, eventType);
+        if curAnimEvent == -1 {
+            // this anim frame doesn't already have an event of this type on it
+            curAnimEvent = lastAnimEvent;
+        }
+
+        // now that we know which event index we're going to plug the data into, start doing it
+        let ae = unsafe { &mut *animEvents.offset(curAnimEvent as isize) };
+        ae.eventType = eventType;
+        ae.keyFrame = keyFrame as c_ushort;
+
+        // now read out the proper data based on the type
+        match ae.eventType {
+            // AEV_SOUNDCHAN falls through to AEV_SOUND in the oracle; the
+            // channel token is parsed first only for AEV_SOUNDCHAN.
+            AEV_SOUNDCHAN | AEV_SOUND => {
+                if ae.eventType == AEV_SOUNDCHAN {
+                    //# animID AEV_SOUNDCHAN framenum CHANNEL soundpath randomlow randomhi chancetoplay
+                    let (token, rest) = COM_Parse(&mut bg.qs, *text_p);
+                    *text_p = rest;
+                    let chan = if token.eq_ignore_ascii_case("CHAN_VOICE_ATTEN") {
+                        CHAN_VOICE_ATTEN
+                    } else if token.eq_ignore_ascii_case("CHAN_VOICE_GLOBAL") {
+                        CHAN_VOICE_GLOBAL
+                    } else if token.eq_ignore_ascii_case("CHAN_ANNOUNCER") {
+                        CHAN_ANNOUNCER
+                    } else if token.eq_ignore_ascii_case("CHAN_BODY") {
+                        CHAN_BODY
+                    } else if token.eq_ignore_ascii_case("CHAN_WEAPON") {
+                        CHAN_WEAPON
+                    } else if token.eq_ignore_ascii_case("CHAN_VOICE") {
+                        CHAN_VOICE
+                    } else {
+                        CHAN_AUTO
+                    };
+                    ae.eventData[AED_SOUNDCHANNEL] = chan as c_short;
+                }
+
+                //# animID AEV_SOUND framenum soundpath randomlow randomhi chancetoplay
+                // get soundstring
+                let (token, rest) = COM_Parse(&mut bg.qs, *text_p);
+                *text_p = rest;
+                stringData = token;
+                // get lowest value
+                let (token, rest) = COM_Parse(&mut bg.qs, *text_p);
+                *text_p = rest;
+                let lowestVal = atoi_bytes(token.as_bytes()) as c_int;
+                // get highest value
+                let (token, rest) = COM_Parse(&mut bg.qs, *text_p);
+                *text_p = rest;
+                let mut highestVal = atoi_bytes(token.as_bytes()) as c_int;
+                // Now precache all the sounds. NOTE: cannot store indices since
+                // handles may not be sequential if previously registered.
+                if lowestVal != 0 && highestVal != 0 {
+                    if (highestVal - lowestVal) >= MAX_RANDOM_ANIM_SOUNDS as c_int {
+                        highestVal = lowestVal + (MAX_RANDOM_ANIM_SOUNDS as c_int - 1);
+                    }
+                    let mut n = lowestVal;
+                    let mut num = AED_SOUNDINDEX_START as c_int;
+                    while n <= highestVal && num <= AED_SOUNDINDEX_END as c_int {
+                        if stringData.as_bytes().first() == Some(&b'*') {
+                            // FIXME? (Raven) custom sounds with animEvents.
+                            ae.eventData[num as usize] = 0;
+                        } else {
+                            ae.eventData[num as usize] =
+                                callbacks.sound_index(&va_sound_variant(&stringData, n)) as c_short;
+                        }
+                        n += 1;
+                        num += 1;
+                    }
+                    ae.eventData[AED_SOUND_NUMRANDOMSNDS] = (num - 1) as c_short;
+                } else {
+                    if stringData.as_bytes().first() == Some(&b'*') {
+                        // FIXME? (Raven) custom sounds with animEvents.
+                        ae.eventData[AED_SOUNDINDEX_START] = 0;
+                    } else {
+                        ae.eventData[AED_SOUNDINDEX_START] =
+                            callbacks.sound_index(&stringData) as c_short;
+                    }
+                    // #ifndef FINAL_BUILD
+                    if ae.eventData[AED_SOUNDINDEX_START] == 0
+                        && stringData.as_bytes().first() != Some(&b'*')
+                    {
+                        // couldn't register it - file not found. "^1" = S_COLOR_RED.
+                        traps.com_printf(&format!(
+                            "^1ParseAnimationSndBlock: sound {} does not exist (animevents.cfg {})!\n",
+                            stringData, aeb_filename
+                        ));
+                    }
+                    ae.eventData[AED_SOUND_NUMRANDOMSNDS] = 0;
+                }
+                // get probability
+                let (token, rest) = COM_Parse(&mut bg.qs, *text_p);
+                *text_p = rest;
+                ae.eventData[AED_SOUND_PROBABILITY] = atoi_bytes(token.as_bytes()) as c_short;
+
+                // last part - cheat and check if it's a special overridable saber sound we know of...
+                let sd = stringData.as_bytes();
+                if sd.len() >= 28 && sd[..28].eq_ignore_ascii_case(b"sound/weapons/saber/saberhup")
+                {
+                    // a saber swing
+                    ae.eventType = AEV_SABER_SWING;
+                    // since we don't know which one they meant, always use first saber
+                    ae.eventData[AED_SABER_SWING_SABERNUM] = 0;
+                    ae.eventData[AED_SABER_SWING_PROBABILITY] = ae.eventData[AED_SOUND_PROBABILITY];
+                    if lowestVal < 4 {
+                        // fast swing (SWING_FAST)
+                        ae.eventData[AED_SABER_SWING_TYPE] = 0;
+                    } else if lowestVal < 7 {
+                        // medium swing (SWING_MEDIUM)
+                        ae.eventData[AED_SABER_SWING_TYPE] = 1;
+                    } else {
+                        // strong swing (SWING_STRONG)
+                        ae.eventData[AED_SABER_SWING_TYPE] = 2;
+                    }
+                } else if sd.len() >= 29
+                    && sd[..29].eq_ignore_ascii_case(b"sound/weapons/saber/saberspin")
+                {
+                    // a saber spin
+                    ae.eventType = AEV_SABER_SPIN;
+                    // since we don't know which one they meant, always use first saber
+                    ae.eventData[AED_SABER_SPIN_SABERNUM] = 0;
+                    ae.eventData[AED_SABER_SPIN_PROBABILITY] = ae.eventData[AED_SOUND_PROBABILITY];
+                    // stringData[29] is the terminator (0) when the path is exactly
+                    // "...saberspin"; C reads that NUL, so `unwrap_or(0)` matches.
+                    match sd.get(29).copied().unwrap_or(0) {
+                        b'o' => ae.eventData[AED_SABER_SPIN_TYPE] = 0, // saberspinoff
+                        b'1' => ae.eventData[AED_SABER_SPIN_TYPE] = 2, // saberspin1
+                        b'2' => ae.eventData[AED_SABER_SPIN_TYPE] = 3, // saberspin2
+                        b'3' => ae.eventData[AED_SABER_SPIN_TYPE] = 4, // saberspin3
+                        b'%' => ae.eventData[AED_SABER_SPIN_TYPE] = 5, // saberspin%d
+                        _ => ae.eventData[AED_SABER_SPIN_TYPE] = 1,    // just plain saberspin
+                    }
+                }
+            }
+            AEV_FOOTSTEP => {
+                //# animID AEV_FOOTSTEP framenum footstepType
+                // get footstep type
+                let (token, rest) = COM_Parse(&mut bg.qs, *text_p);
+                *text_p = rest;
+                ae.eventData[AED_FOOTSTEP_TYPE] =
+                    GetIDForString(footstepTypeTable.as_ptr() as *mut stringID_table_t, &token)
+                        as c_short;
+                // get probability
+                let (token, rest) = COM_Parse(&mut bg.qs, *text_p);
+                *text_p = rest;
+                ae.eventData[AED_FOOTSTEP_PROBABILITY] = atoi_bytes(token.as_bytes()) as c_short;
+            }
+            AEV_EFFECT => {
+                //# animID AEV_EFFECT framenum effectpath boltName
+                // get effect index
+                let (token, rest) = COM_Parse(&mut bg.qs, *text_p);
+                *text_p = rest;
+                ae.eventData[AED_EFFECTINDEX] = callbacks.effect_index(&token) as c_short;
+                // get bolt index
+                let (token, rest) = COM_Parse(&mut bg.qs, *text_p);
+                *text_p = rest;
+                if !token.eq_ignore_ascii_case("none") && !token.eq_ignore_ascii_case("NULL") {
+                    // actually are specifying a bolt to use
+                    if ae.stringData.is_null() {
+                        // eh, whatever. no dynamic stuff, so this will do.
+                        ae.stringData = crate::bg_misc::BG_Alloc(2048, bg) as *mut c_char;
+                    }
+                    // strcpy(ae.stringData, token): raw c_char write, NUL-terminated.
+                    // cg_players consumes stringData as a C string, so it stays a
+                    // `*mut c_char` (not reshaped). Token < MAX_TOKEN_CHARS < 2048.
+                    unsafe {
+                        let src = token.as_bytes();
+                        for (k, &b) in src.iter().enumerate() {
+                            *ae.stringData.add(k) = b as c_char;
+                        }
+                        *ae.stringData.add(src.len()) = 0;
+                    }
+                }
+                // NOTE: this string will later be used to add a bolt and store the index.
+                // get probability
+                let (token, rest) = COM_Parse(&mut bg.qs, *text_p);
+                *text_p = rest;
+                ae.eventData[AED_EFFECT_PROBABILITY] = atoi_bytes(token.as_bytes()) as c_short;
+            }
+            AEV_FIRE => {
+                //# animID AEV_FIRE framenum altfire chancetofire
+                // get altfire
+                let (token, rest) = COM_Parse(&mut bg.qs, *text_p);
+                *text_p = rest;
+                ae.eventData[AED_FIRE_ALT] = atoi_bytes(token.as_bytes()) as c_short;
+                // get probability
+                let (token, rest) = COM_Parse(&mut bg.qs, *text_p);
+                *text_p = rest;
+                ae.eventData[AED_FIRE_PROBABILITY] = atoi_bytes(token.as_bytes()) as c_short;
+            }
+            AEV_MOVE => {
+                //# animID AEV_MOVE framenum forwardpush rightpush uppush
+                // get forward push
+                let (token, rest) = COM_Parse(&mut bg.qs, *text_p);
+                *text_p = rest;
+                ae.eventData[AED_MOVE_FWD] = atoi_bytes(token.as_bytes()) as c_short;
+                // get right push
+                let (token, rest) = COM_Parse(&mut bg.qs, *text_p);
+                *text_p = rest;
+                ae.eventData[AED_MOVE_RT] = atoi_bytes(token.as_bytes()) as c_short;
+                // get upwards push
+                let (token, rest) = COM_Parse(&mut bg.qs, *text_p);
+                *text_p = rest;
+                ae.eventData[AED_MOVE_UP] = atoi_bytes(token.as_bytes()) as c_short;
+            }
+            _ => {
+                // unknown?
+                *text_p = SkipRestOfLine(&mut bg.qs, *text_p);
+                continue;
+            }
+        }
+
+        if curAnimEvent == lastAnimEvent {
+            lastAnimEvent += 1;
+        }
+    }
+}
+
+/// Raven `BG_ParseAnimationEvtFile`.
+///
+/// Reads models/players/<x>/animevents.cfg (presence not required) into
+/// `bgAllEvents[eventFileIndex]`, matching UPPEREVENTS/LOWEREVENTS blocks to the
+/// anim set at `bgAllAnims[animFileIndex]`. Recurses on `include` lines
+/// (`bg_animParseIncluding` gates the cache/init/mark bookkeeping so an included
+/// file appends into the same slot). Returns the index used (or 0/forcedIndex on
+/// the WTF paths).
+/// Source: `oracle/codemp/game/bg_panimate.c:2169-2327`
+pub fn BG_ParseAnimationEvtFile(
+    bg: &mut BgState,
+    traps: &dyn BgTraps,
+    callbacks: &mut dyn GameCallbacks,
+    as_filename: &str,
+    animFileIndex: c_int,
+    eventFileIndex: c_int,
+) -> c_int {
+    debug_assert!(animFileIndex < MAX_ANIM_FILES);
+    debug_assert!(eventFileIndex < MAX_ANIM_FILES);
+
+    if animFileIndex < 0 || animFileIndex >= MAX_ANIM_FILES {
+        // WTF??!!
+        return 0;
+    }
+
+    let forcedIndex = if eventFileIndex < 0 || eventFileIndex >= MAX_ANIM_FILES {
+        // WTF??!!
+        0
+    } else {
+        eventFileIndex
+    };
+
+    if bg.bg_animParseIncluding <= 0 {
+        // if we should be parsing an included file, skip this part
+        if bg.bgAllEvents[forcedIndex as usize].eventsParsed != 0 {
+            // already cached this one
+            return forcedIndex;
+        }
+    }
+
+    let legsAnimEvents: *mut animevent_t = bg.bgAllEvents[forcedIndex as usize]
+        .legsAnimEvents
+        .as_mut_ptr();
+    let torsoAnimEvents: *mut animevent_t = bg.bgAllEvents[forcedIndex as usize]
+        .torsoAnimEvents
+        .as_mut_ptr();
+    let animations: *mut animation_t = bg.bgAllAnims[animFileIndex as usize].anims;
+
+    if bg.bg_animParseIncluding <= 0 {
+        // if we should be parsing an included file, skip this part
+        // Go through and see if this filename is already in the table.
+        let mut i = 0;
+        while i < bg.bgNumAnimEvents && forcedIndex != 0 {
+            if as_filename.eq_ignore_ascii_case(&bg.bgAllEvents[i as usize].filename) {
+                // looks like we have it already.
+                return i;
+            }
+            i += 1;
+        }
+    }
+
+    // Load and parse animevents.cfg file
+    let sfilename = format!("{}animevents.cfg", as_filename);
+
+    if bg.bg_animParseIncluding <= 0 {
+        // should already be done if we're including
+        // initialize anim event array
+        for i in 0..MAX_ANIM_EVENTS as isize {
+            unsafe {
+                // Type of event
+                (*torsoAnimEvents.offset(i)).eventType = animEventType_t::AEV_NONE;
+                (*legsAnimEvents.offset(i)).eventType = animEventType_t::AEV_NONE;
+                // Frame to play event on
+                (*torsoAnimEvents.offset(i)).keyFrame = -1i32 as c_ushort;
+                (*legsAnimEvents.offset(i)).keyFrame = -1i32 as c_ushort;
+                // one temporarily-stored string; NULL so the look-up runs once
+                (*torsoAnimEvents.offset(i)).stringData = core::ptr::null_mut();
+                (*legsAnimEvents.offset(i)).stringData = core::ptr::null_mut();
+                // Unique IDs (soundIndex / effect index / footstep type, etc.)
+                for j in 0..AED_ARRAY_SIZE {
+                    (*torsoAnimEvents.offset(i)).eventData[j] = -1;
+                    (*legsAnimEvents.offset(i)).eventData[j] = -1;
+                }
+            }
+        }
+    }
+
+    let mut usedIndex: c_int = -1;
+
+    // load the file
+    let mut text: [u8; 80000] = [0; 80000];
+    let mut f: fileHandle_t = 0;
+    'fin: {
+        let len = traps.fs_fopen(&sfilename, &mut f, FS_READ);
+        if len <= 0 {
+            // no file
+            break 'fin;
+        }
+        if len >= text.len() as c_int - 1 {
+            traps.fs_fclose(f);
+            // #ifndef FINAL_BUILD
+            traps.com_error(ERR_DROP as c_int, &format!("File {} too long\n", sfilename));
+            break 'fin;
+        }
+
+        traps.fs_read(text.as_mut_ptr() as *mut c_void, len, f);
+        text[len as usize] = 0;
+        traps.fs_fclose(f);
+
+        // parse the text
+        let mut text_p: Option<&[u8]> = Some(&text[..]);
+        let mut upper_i: c_int = 0;
+        let mut lower_i: c_int = 0;
+
+        // read information for batches of sounds (UPPER or LOWER)
+        loop {
+            // Get base frame of sequence
+            let (token, rest) = COM_Parse(&mut bg.qs, text_p);
+            text_p = rest;
+            if token.is_empty() {
+                break;
+            }
+
+            if token.eq_ignore_ascii_case("include") {
+                // grab from another animevents.cfg
+                // NOTE: you REALLY should NOT do this after the main block of
+                // UPPERSOUNDS and LOWERSOUNDS
+                let (include_filename, rest) = COM_Parse(&mut bg.qs, text_p);
+                text_p = rest;
+                // Raven's `include_filename != NULL` guard is dead (com_token is
+                // never NULL); recurse as it always would.
+                let fullIPath = format!("models/players/{}/", include_filename);
+                bg.bg_animParseIncluding += 1;
+                BG_ParseAnimationEvtFile(
+                    bg,
+                    traps,
+                    callbacks,
+                    &fullIPath,
+                    animFileIndex,
+                    forcedIndex,
+                );
+                bg.bg_animParseIncluding -= 1;
+            }
+
+            if token.eq_ignore_ascii_case("UPPEREVENTS") {
+                // A batch of upper sounds
+                ParseAnimationEvtBlock(
+                    bg,
+                    traps,
+                    callbacks,
+                    as_filename,
+                    torsoAnimEvents,
+                    animations,
+                    &mut upper_i,
+                    &mut text_p,
+                );
+            } else if token.eq_ignore_ascii_case("LOWEREVENTS") {
+                // A batch of lower sounds
+                ParseAnimationEvtBlock(
+                    bg,
+                    traps,
+                    callbacks,
+                    as_filename,
+                    legsAnimEvents,
+                    animations,
+                    &mut lower_i,
+                    &mut text_p,
+                );
+            }
+        }
+
+        usedIndex = forcedIndex;
+    }
+
+    // fin:
+    // Mark this anim set so we know we tried to load the sounds, don't care if
+    // the load failed.
+    if bg.bg_animParseIncluding <= 0 {
+        // if we should be parsing an included file, skip this part
+        bg.bgAllEvents[forcedIndex as usize].eventsParsed = 1;
+        bg.bgAllEvents[forcedIndex as usize].filename =
+            strncpyz_string(as_filename.as_bytes(), MAX_QPATH);
+        if forcedIndex != 0 {
+            bg.bgNumAnimEvents += 1;
+        }
+    }
+
+    usedIndex
 }
