@@ -1228,3 +1228,17 @@ BINDINGS (CONFIG_FINALIZED) before C5 waves:
    on CgWorld**, registered once via `CG_SET_SHARED_BUFFER`; consuming
    vmcalls copy-out and decode through the existing abi `TCG*` types at
    entry — no Rust reference outlives a call into engine-mutated memory.
+
+## DEC-47 — cgame design-tail sit-down (2026-07-28)
+
+Rulings closing the post-transcription design queue. Recorded one per
+line as settled; execution lands as its own commits after the wave-13
+close-out.
+
+1. **ctx/dc split = DEC-38 applied to cgame.** The wave-era
+   `(ctx, menus, ds, dc: &mut dyn DisplayContext)` signatures drop the
+   `dc` param; `CgContext` is the sole DisplayContext carrier, exactly
+   the mp_ui shape. ~18 call sites across cg_view/cg_consolecmds/
+   cg_snapshot/cg_servercmds/cg_main amend mechanically; vmMain's four
+   blocked arms (CG_INIT/CG_SHUTDOWN/CG_CONSOLE_COMMAND/
+   CG_DRAW_ACTIVE_FRAME) then wire directly. No unsafe shim.
