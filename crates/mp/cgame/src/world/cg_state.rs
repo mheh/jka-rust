@@ -8,6 +8,7 @@ use core::ptr::addr_of_mut;
 
 use mp_uishared::shared::display_state::DisplayState;
 use mp_uishared::shared::menu_system::MenuSystem;
+use mp_uishared::shared::ui_host::UiHost;
 
 use super::cg_world::CgWorld;
 
@@ -62,7 +63,7 @@ impl CgState {
         // once before `assume_init`.
         unsafe {
             addr_of_mut!((*p).world).write(CgWorld::new_boxed());
-            addr_of_mut!((*p).menus).write(MenuSystem::default());
+            addr_of_mut!((*p).menus).write(MenuSystem::for_host(UiHost::Cgame));
             addr_of_mut!((*p).cgDC).write(DisplayState::default());
             boxed.assume_init()
         }

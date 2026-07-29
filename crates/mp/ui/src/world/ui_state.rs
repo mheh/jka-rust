@@ -5,6 +5,7 @@
 
 use mp_uishared::shared::display_state::DisplayState;
 use mp_uishared::shared::menu_system::MenuSystem;
+use mp_uishared::shared::ui_host::UiHost;
 
 use super::ui_world::UiWorld;
 
@@ -45,7 +46,7 @@ impl Default for UiState {
     fn default() -> Self {
         UiState {
             world: UiWorld::default(),
-            menus: MenuSystem::default(),
+            menus: MenuSystem::for_host(UiHost::Ui),
             uiDC: DisplayState::default(),
         }
     }

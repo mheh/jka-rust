@@ -63,6 +63,7 @@ use crate::shared::scroll_info_s::{
     SCROLL_TIME_ADJUST, SCROLL_TIME_ADJUSTOFFSET, SCROLL_TIME_FLOOR, SCROLL_TIME_START,
 };
 use crate::shared::text_scroll_def_s::{TextScrollDef, MAX_TEXTSCROLL_LINES};
+use crate::shared::ui_host::UiHost;
 use crate::shared::window_def_t::WindowDef;
 
 /// Raven `#define WINDOW_MOUSEOVER 0x00000001`.
@@ -1504,8 +1505,9 @@ pub fn Window_Paint(
         // gradient bar
         GradientBar_Paint(ds, dc, &fillRect, w.backColor);
     } else if w.style == WINDOW_STYLE_SHADER {
-        // PORT-NOTE: the `WINDOW_PLAYERCOLOR` block is the `#ifndef CGAME` (ui) arm,
-        // per this file's convention.
+        // PORT-NOTE: the `WINDOW_PLAYERCOLOR` block is the `#ifndef CGAME` (ui) arm.
+        // DEC-47.9 audit: cgame never enters the shared paint path, so the
+        // divergence is dead surface - no host gate.
         if w.flags & WINDOW_PLAYERCOLOR != 0 {
             // PORT-NOTE: Raven reads `ui_char_color_*.integer`; the `as c_int`
             // truncation is preserved.
@@ -2142,9 +2144,9 @@ pub fn Rect_ToWindowCoords(rect: &mut RectDef, window: &WindowDef) {
 /// PORT-NOTE: `se_language.modificationCount` is an `mp_ui`-owned `vmCvar_t`
 /// this host-agnostic crate cannot reach as cached state; threaded in as
 /// `seLanguageModCount`, the value the caller reads off its own
-/// `world.se_language`. The `#ifndef CGAME` guard picks the `ui` arm (this
-/// crate's only linkage so far — cgame's twin will special-case this branch
-/// out when it lands).
+/// `world.se_language`. The `#ifndef CGAME` guard picks the `ui` arm —
+/// DEC-47.9 audit: cgame never enters the shared paint path that reaches
+/// this fn, so the divergence is dead surface, no host gate.
 /// Source: `oracle/codemp/ui/ui_shared.c:4740-4791`
 #[allow(clippy::too_many_arguments)]
 pub fn Item_SetTextExtents(
@@ -3268,9 +3270,10 @@ pub fn Display_CloseCinematics(menus: &mut MenuSystem, dc: &mut dyn DisplayConte
 /// either a ghoul2 `.glm` model (tracked for shutdown cleanup) or a plain
 /// `.md3` model.
 ///
-/// PORT-NOTE (dead surface): the `#ifndef CGAME` guard picks the `ui` arm
-/// unconditionally, matching this file's existing convention (see
-/// `Window_Paint`'s PORT-NOTE) — this crate has only the `ui` linkage so far.
+/// PORT-NOTE (DEC-47.9 host arm): Raven's whole body is `#ifndef CGAME` -
+/// the cgame build's fn is a bare `return qtrue`. Reachable from cgame's
+/// `CG_ParseMenu` (`asset_model` keyword), so it takes the runtime
+/// [`UiHost`] gate below.
 ///
 /// PORT-NOTE: `ds` is an added param beyond Raven's signature — the
 /// `modelPtr->g2anim` branch below needs `DC->realTime` for its
@@ -3285,6 +3288,12 @@ pub fn ItemParse_asset_model_go(
     name: &str,
     runTimeLength: &mut c_int,
 ) -> bool {
+    // the cgame arm: no ghoul2/md3 loading at all (Raven leaves
+    // `*runTimeLength` unwritten there too - callers pre-zero it here)
+    if menus.host == UiHost::Cgame {
+        return true;
+    }
+
     Item_ValidateTypeData(menus.item_mut(item));
     *runTimeLength = 0;
 
@@ -5567,7 +5576,8 @@ pub fn Item_ListBox_Paint(
             while i < count {
                 let image = dc.feederItemImage(menus, ds, special, i);
                 if image != 0 {
-                    // PORT-NOTE: the `#ifndef CGAME` (ui) arm, per this file's convention.
+                    // PORT-NOTE: the `#ifndef CGAME` (ui) arm - DEC-47.9
+                    // audit: paint path unreachable from cgame, dead surface.
                     if windowFlags & WINDOW_PLAYERCOLOR != 0 {
                         let color: vec4_t = [
                             (dc.getCVarValue("ui_char_color_red") as c_int) as f32 / 255.0,
@@ -5992,7 +6002,10 @@ pub fn ItemParse_group(
 /// Raven `ItemParse_asset_model` — parse an item's model asset path, with the
 /// `ui_char_model` name a special-cased indirection through that cvar.
 ///
-/// PORT-NOTE: the `#ifndef CGAME` (ui) arm, per this file's convention.
+/// PORT-NOTE (DEC-47.9 host arm): only the `ui_char_model` cvar indirection
+/// is `#ifndef CGAME` in Raven; the cgame build passes the raw token
+/// straight down. Reachable from cgame's `CG_ParseMenu`, so that block
+/// gates on [`UiHost`].
 ///
 /// PORT-NOTE: `ds` threads down the keyword-dispatch chain
 /// (`Item_Parse`/`dispatch_item_keyword`) to reach
@@ -6015,7 +6028,7 @@ pub fn ItemParse_asset_model(
     }
     let mut temp = pc_token_str(&token);
 
-    if stricmp_eq(&temp, "ui_char_model") {
+    if menus.host == UiHost::Ui && stricmp_eq(&temp, "ui_char_model") {
         let ui_char_model = dc.getCVarString("ui_char_model", MAX_QPATH as usize);
         temp = format!("models/players/{}/model.glm", ui_char_model);
     }
@@ -7342,10 +7355,11 @@ pub fn ItemParse_Appearance_slot(
 /// Raven `ItemParse_isSaber` — mark/unmark an item as drawing the first
 /// saber blade.
 ///
-/// PORT-NOTE: Raven's `#ifndef CGAME` guard restricts this whole body to the
-/// ui host at compile time; `mp_uishared` carries no compile-time host
-/// distinction (DEC-36 D3 threads the host through `dc`/state params at
-/// runtime, not `#ifdef`), so the flag toggle below runs for every host.
+/// PORT-NOTE (DEC-47.9 host arm): Raven's whole body is `#ifndef CGAME` -
+/// the cgame build returns `qfalse` WITHOUT consuming the keyword's argument
+/// token, which makes `Item_Parse` abort the menu ("couldn't parse menu
+/// item keyword"). Reachable from cgame's `CG_ParseMenu`, so the [`UiHost`]
+/// gate reproduces that parse-abort exactly.
 /// Source: `oracle/codemp/ui/ui_shared.c:8833-8859`
 pub fn ItemParse_isSaber(
     menus: &mut MenuSystem,
@@ -7353,6 +7367,11 @@ pub fn ItemParse_isSaber(
     item: ItemId,
     handle: c_int,
 ) -> bool {
+    // cgame arm: fail without touching the token stream
+    if menus.host == UiHost::Cgame {
+        return false;
+    }
+
     let mut i: c_int = 0;
     if PC_Int_Parse(dc, handle, &mut i) {
         if i != 0 {
@@ -7369,7 +7388,7 @@ pub fn ItemParse_isSaber(
 /// Raven `ItemParse_isSaber2` — mark/unmark an item as drawing the second
 /// saber blade.
 ///
-/// PORT-NOTE: see `ItemParse_isSaber`.
+/// PORT-NOTE: see `ItemParse_isSaber` (same DEC-47.9 host arm).
 /// Source: `oracle/codemp/ui/ui_shared.c:8865-8890`
 pub fn ItemParse_isSaber2(
     menus: &mut MenuSystem,
@@ -7377,6 +7396,11 @@ pub fn ItemParse_isSaber2(
     item: ItemId,
     handle: c_int,
 ) -> bool {
+    // cgame arm: fail without touching the token stream
+    if menus.host == UiHost::Cgame {
+        return false;
+    }
+
     let mut i: c_int = 0;
     if PC_Int_Parse(dc, handle, &mut i) {
         if i != 0 {
@@ -10159,8 +10183,8 @@ pub fn Item_Text_Paint(
 /// model into its own mini scene.
 ///
 /// PORT-NOTE (dead surface): the `#ifndef CGAME` guards throughout pick the
-/// `ui` arm (this crate's only linkage so far — cgame's twin will
-/// special-case them out when it lands, same as `Item_SetTextExtents`).
+/// `ui` arm — DEC-47.9 audit: cgame never enters the shared paint path, so
+/// no host gate (same verdict as `Item_SetTextExtents`).
 ///
 /// PORT-NOTE: Raven's `modelPtr` is a pointer into `item->typeData`'s live
 /// storage, so the "moves datapad anim" block's writes (through

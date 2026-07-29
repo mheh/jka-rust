@@ -36,4 +36,5 @@ pub mod rect_def_t;
 pub mod script_def_t;
 pub mod scroll_info_s;
 pub mod text_scroll_def_s;
+pub mod ui_host;
 pub mod window_def_t;

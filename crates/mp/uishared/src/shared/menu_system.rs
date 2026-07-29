@@ -13,6 +13,7 @@ use super::menu_def_t::MenuDef;
 use super::menu_id::MenuId;
 use super::menu_scratch::MenuScratch;
 use super::scroll_info_s::ScrollInfo;
+use super::ui_host::UiHost;
 
 /// Raven `#define MAX_MENUS 64`.
 ///
@@ -72,6 +73,12 @@ pub const DOUBLE_CLICK_DELAY: c_int = 300;
 #[derive(Debug)]
 #[allow(non_snake_case)]
 pub struct MenuSystem {
+    /// Which module this system serves — the DEC-36 D3 runtime stand-in for
+    /// Raven's compile-time `CGAME` define. Stamped at construction
+    /// ([`Self::for_host`]); only the DEC-47.9 reachable parse arms branch
+    /// on it.
+    pub host: UiHost,
+
     /// Raven `menuDef_t Menus[MAX_MENUS]` + `int menuCount` — the defined-menu
     /// arena. `menuCount` is `menus.len()`.
     /// Source: `oracle/codemp/ui/ui_shared.c:111-112`
@@ -181,6 +188,9 @@ impl Default for MenuSystem {
     /// never been transcribed).
     fn default() -> Self {
         MenuSystem {
+            // the crate's original single linkage; cgame stamps its arm via
+            // `for_host`
+            host: UiHost::Ui,
             menus: Default::default(),
             items: Default::default(),
             menuStack: Default::default(),
@@ -207,6 +217,14 @@ impl Default for MenuSystem {
 }
 
 impl MenuSystem {
+    /// A fresh system stamped with the constructing module's host arm.
+    pub fn for_host(host: UiHost) -> Self {
+        MenuSystem {
+            host,
+            ..Default::default()
+        }
+    }
+
     /// Borrow menu `id` out of the arena.
     #[inline]
     pub fn menu(&self, id: MenuId) -> &MenuDef {
