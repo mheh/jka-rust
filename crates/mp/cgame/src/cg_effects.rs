@@ -6,6 +6,7 @@
 use core::ffi::{c_int, c_uint};
 
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
+use mp_qshared::common::mp::cgame::tr_types::RF_THIRD_PERSON;
 use mp_qshared::common::mp::gentity::{
     material_t, MAT_CRATE1, MAT_CRATE2, MAT_DRK_STONE, MAT_ELECTRICAL, MAT_ELEC_METAL, MAT_GLASS,
     MAT_GLASS_METAL, MAT_GRATE1, MAT_GREY_STONE, MAT_LT_STONE, MAT_METAL, MAT_METAL2, MAT_METAL3,
@@ -111,11 +112,6 @@ pub const NUM_EXPLOSIONS: usize = 4;
 // Constants the fns below read that live outside `cg_effects.c` and have no
 // ported cross-crate home yet, so they land beside their readers (the
 // `RF_THIRD_PERSON` treatment in `cg_players.rs`).
-
-/// Raven `RF_THIRD_PERSON` — don't draw through eyes, only mirrors (player
-/// bodies, chat sprites).
-/// Source: `oracle/codemp/cgame/tr_types.h:19`
-const RF_THIRD_PERSON: c_int = 0x00002;
 
 /// Raven `vec3_t axisDefault[3]` — the identity basis every
 /// `AxisCopy( axisDefault, … )` below copies. `q_math.c`'s global is not ported

@@ -57,6 +57,7 @@ use mp_qshared::common::mp::cgame::refdef_t::{
 use mp_qshared::common::mp::cgame::stereo_frame_t::{
     stereoFrame_t, STEREO_CENTER, STEREO_LEFT, STEREO_RIGHT,
 };
+use mp_qshared::common::mp::cgame::tr_types::{RDF_DRAWSKYBOX, RDF_NOWORLDMODEL, RF_NOSHADOW};
 use mp_qshared::common::mp::game::class_t::class_t;
 use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t;
 use mp_qshared::common::mp::qcommon::usercmd_t;
@@ -128,19 +129,6 @@ const FONT_MEDIUM: c_int = 2;
 const FONT_LARGE: c_int = 3;
 /// Source: `oracle/codemp/game/q_shared.h:3176-3182`
 const FONT_SMALL2: c_int = 4;
-
-// PORT-NOTE: `tr_types.h`'s render flags have no `mp_qshared` home yet (the
-// renderer crate keeps its own copy in `tr_public::ref_flags`, which cgame does
-// not depend on), so the two `CG_Draw3DModel` needs land here.
-/// Raven `RF_NOSHADOW` — don't add stencil shadows.
-/// Source: `oracle/codemp/cgame/tr_types.h:25`
-const RF_NOSHADOW: c_int = 0x00040;
-/// Raven `RDF_NOWORLDMODEL` — used for player configuration screen.
-/// Source: `oracle/codemp/cgame/tr_types.h:56`
-const RDF_NOWORLDMODEL: c_int = 1;
-/// Raven `RDF_DRAWSKYBOX` — marks a scene as a 'portal sky' and says to draw it.
-/// Source: `oracle/codemp/cgame/tr_types.h:61`
-const RDF_DRAWSKYBOX: c_int = 16;
 
 // PORT-NOTE: `cg_public.h`'s usercmd ring-buffer depth. This is its first
 // ported consumer in cgame, so it lands file-local like `FONT_SMALL` above.

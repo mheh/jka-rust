@@ -29,6 +29,10 @@ use mp_qshared::common::mp::cgame::refdef_t::{
     refdef_t, MAX_MAP_AREA_BYTES, MAX_RENDER_STRINGS, MAX_RENDER_STRING_LENGTH,
 };
 use mp_qshared::common::mp::cgame::stereo_frame_t::{stereoFrame_t, STEREO_RIGHT};
+use mp_qshared::common::mp::cgame::tr_types::{
+    RDF_AUTOMAP, RDF_DRAWSKYBOX, RDF_HYPERSPACE, RDF_NOFOG, RDF_NOWORLDMODEL, RDF_SKYBOXPORTAL,
+    RF_DEPTHHACK, RF_FIRST_PERSON,
+};
 use mp_qshared::common::mp::game::class_t::class_t;
 use mp_qshared::common::mp::qcommon::player_state::{playerState_t, MAX_POWERUPS};
 use mp_qshared::common::mp::qcommon::pm_flags::{PMF_DUCKED, PMF_FOLLOW};
@@ -172,12 +176,6 @@ const ZOOM_OUT_TIME: f32 = 100.0;
 /// Raven `STEP_TIME` — how long the stair-climb view smoothing lasts, in msec.
 /// Source: `oracle/codemp/cgame/cg_local.h:33`
 const STEP_TIME: c_int = 200;
-
-/// Raven `RF_FIRST_PERSON` — only draw through eyes (view weapon, damage blood
-/// blob). `tr_types.h`'s renderfx bits have no ported cross-crate home yet, so
-/// the one this TU sets lands here beside its reader (§C8).
-/// Source: `oracle/codemp/cgame/tr_types.h:20`
-const RF_FIRST_PERSON: c_int = 0x00004;
 
 /// Raven `CG_CalcVrect` — sets the coordinates of the rendered window from
 /// `cg_viewsize`, clamping the cvar back into 30..100 as a side effect.
@@ -1356,11 +1354,6 @@ pub fn CG_AddRadarAutomapEnts(ctx: &mut CgContext) {
     }
 }
 
-/// Raven `RF_DEPTHHACK` — for view weapon Z crunching. `cg_ents.rs` has its
-/// own private copy beside its own reader; this TU gets its own per §C8.
-/// Source: `oracle/codemp/cgame/tr_types.h:21`
-const RF_DEPTHHACK: c_int = 0x00008;
-
 /// Raven `CG_TestGun_f` — the `testgun` console command; parks the test model
 /// on the view weapon path instead of `CG_TestModel_f`'s free-floating one.
 ///
@@ -1801,19 +1794,6 @@ pub fn CG_OffsetFighterView(ctx: &mut CgContext) {
     // ...and of course we should copy the new view location to the proper spot too.
     ctx.world.cg.refdef.vieworg = camOrg;
 }
-
-/// Raven `RDF_NOWORLDMODEL` — used for player configuration screen. `cg_draw.rs`
-/// has its own private copy beside its own reader; this TU gets its own per §C8.
-/// Source: `oracle/codemp/cgame/tr_types.h:57`
-const RDF_NOWORLDMODEL: c_int = 1;
-
-/// Raven `RDF_AUTOMAP` — Raven: "means this scene is to draw the automap -rww".
-/// Source: `oracle/codemp/cgame/tr_types.h:63`
-const RDF_AUTOMAP: c_int = 32;
-
-/// Raven `RDF_HYPERSPACE` — teleportation effect.
-/// Source: `oracle/codemp/cgame/tr_types.h:58`
-const RDF_HYPERSPACE: c_int = 4;
 
 /// Raven `CG_DrawAutoMap` — draws the automap scene. -rww
 ///
@@ -2510,20 +2490,6 @@ pub fn CG_CalcViewValues(ctx: &mut CgContext) -> bool {
     // field of view
     CG_CalcFov(ctx)
 }
-
-/// Raven `RDF_SKYBOXPORTAL` — marks a scene as a 'portal sky'. `tr_types.h`'s
-/// flag; this TU gets its own private copy beside its reader per §C8.
-/// Source: `oracle/codemp/cgame/tr_types.h:60`
-const RDF_SKYBOXPORTAL: c_int = 8;
-
-/// Raven `RDF_DRAWSKYBOX` — the above (`RDF_SKYBOXPORTAL`) marks a scene as a
-/// 'portal sky'; this flag says to draw it.
-/// Source: `oracle/codemp/cgame/tr_types.h:61`
-const RDF_DRAWSKYBOX: c_int = 16;
-
-/// Raven `RDF_NOFOG` — no global fog in this scene (but still brush fog). -rww
-/// Source: `oracle/codemp/cgame/tr_types.h:64`
-const RDF_NOFOG: c_int = 64;
 
 /// Raven `CG_DrawSkyBoxPortal` — parses a sky-portal configstring into a
 /// portal `refdef_t` and renders it, restoring the normal `cg.refdef`

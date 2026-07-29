@@ -30,6 +30,7 @@ use mp_bg::weapons::weapon_t::{
 };
 use mp_bg::weapons::wp_muzzle_point::WP_MuzzlePoint;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
+use mp_qshared::common::mp::cgame::tr_types::{RF_DEPTHHACK, RF_FIRST_PERSON};
 use mp_qshared::common::mp::qcommon::player_state::MAX_WEAPONS;
 use mp_qshared::common::mp::qcommon::saber::saber_info::saberInfo_t;
 use mp_qshared::common::mp::qcommon::{playerState_t, MAX_SABERS, PMF_FOLLOW};
@@ -119,15 +120,6 @@ pub const LAST_USEABLE_WEAPON: c_int = WP_BRYAR_OLD;
 // `tr_types.h`'s renderfx bits and `q_shared.h`'s `UI_*` text flags have no
 // ported cross-crate home, so the two this file reads land beside their reader —
 // the same file-local-copy story `cg_players.rs`/`cg_drawtools.rs` carry.
-
-/// Raven `RF_FIRST_PERSON` — only draw through eyes (view weapon, damage blood
-/// blob).
-/// Source: `oracle/codemp/cgame/tr_types.h:20`
-const RF_FIRST_PERSON: c_int = 0x00004;
-
-/// Raven `RF_DEPTHHACK` — for view weapon Z crunching.
-/// Source: `oracle/codemp/cgame/tr_types.h:21`
-const RF_DEPTHHACK: c_int = 0x00008;
 
 /// Raven `UI_CENTER`.
 /// Source: `oracle/codemp/game/q_shared.h:488`

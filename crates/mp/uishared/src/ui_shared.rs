@@ -16,6 +16,7 @@ use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::refdef_t::{
     refdef_t, MAX_MAP_AREA_BYTES, MAX_RENDER_STRINGS, MAX_RENDER_STRING_LENGTH,
 };
+use mp_qshared::common::mp::cgame::tr_types::{RDF_NOWORLDMODEL, RF_LIGHTING_ORIGIN, RF_NOSHADOW};
 use mp_qshared::common::mp::ghoul2::bone_flags::{
     BONE_ANIM_OVERRIDE_FREEZE, BONE_ANIM_OVERRIDE_LOOP,
 };
@@ -163,19 +164,6 @@ pub const ITF_ISSABER2: c_int = 0x0008;
 /// Raven `#define ITF_ISANYSABER (ITF_ISSABER|ITF_ISSABER2)` — either saber.
 /// Source: `oracle/codemp/ui/ui_shared.h:256`
 pub const ITF_ISANYSABER: c_int = ITF_ISSABER | ITF_ISSABER2;
-
-/// Raven `#define RDF_NOWORLDMODEL 1` — used for player configuration screen.
-///
-/// No prior home in the port; ui_shared.c is its only caller so far.
-/// Source: `oracle/codemp/cgame/tr_types.h:57`
-const RDF_NOWORLDMODEL: c_int = 1;
-/// Raven `#define RF_LIGHTING_ORIGIN 0x00080` — use `lightingOrigin` instead
-/// of `origin`.
-/// Source: `oracle/codemp/cgame/tr_types.h:28`
-const RF_LIGHTING_ORIGIN: c_int = 0x0080;
-/// Raven `#define RF_NOSHADOW 0x00040` — don't add stencil shadows.
-/// Source: `oracle/codemp/cgame/tr_types.h:26`
-const RF_NOSHADOW: c_int = 0x0040;
 
 /// Raven `#define CVAR_ENABLE 0x00000001`.
 /// Source: `oracle/codemp/ui/ui_shared.h:246`

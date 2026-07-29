@@ -10,3 +10,4 @@ pub mod ref_entity_type_t;
 pub mod refdef_t;
 pub mod stereo_frame_t;
 pub mod texture_compression_t;
+pub mod tr_types;

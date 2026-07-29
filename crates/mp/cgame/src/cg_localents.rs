@@ -8,6 +8,7 @@ use core::ffi::c_int;
 
 use mp_bg::bg_misc::{BG_EvaluateTrajectory, BG_EvaluateTrajectoryDelta};
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
+use mp_qshared::common::mp::cgame::tr_types::RF_FORCE_ENT_ALPHA;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin, AnglesToAxis,
@@ -59,12 +60,6 @@ pub const LEF_PUFF_DONT_SCALE: c_int = 0x0001;
 /// guessed.
 /// Source: `oracle/codemp/cgame/cg_local.h:48`
 const SINK_TIME: c_int = 1000;
-
-/// Raven `RF_FORCE_ENT_ALPHA` — override shader alpha settings. Same
-/// no-ported-home story as `cg_players.rs`'s own private copy — redeclared
-/// here rather than made `pub` and imported cross-TU.
-/// Source: `oracle/codemp/cgame/tr_types.h:36`
-const RF_FORCE_ENT_ALPHA: c_int = 0x00400;
 
 /// Raven `CG_InitLocalEntities` — resets the local-entity pool to all-free.
 ///

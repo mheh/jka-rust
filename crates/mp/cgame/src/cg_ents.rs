@@ -41,6 +41,10 @@ use mp_bg::weapons::weapon_t::{
 };
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
+use mp_qshared::common::mp::cgame::tr_types::{
+    RF_DEPTHHACK, RF_DISINTEGRATE1, RF_DISINTEGRATE2, RF_DISTORTION, RF_FORCE_ENT_ALPHA,
+    RF_MINLIGHT, RF_NOSHADOW, RF_RGB_TINT, RF_SETANIMINDEX, RF_THIRD_PERSON,
+};
 use mp_qshared::common::mp::game::class_t::class_t::CLASS_VEHICLE;
 use mp_qshared::common::mp::ghoul2::bone_flags::{
     BONE_ANGLES_POSTMULT, BONE_ANGLES_REPLACE, BONE_ANIM_BLEND, BONE_ANIM_OVERRIDE_FREEZE,
@@ -104,49 +108,6 @@ const ENTITY_AND: c_int = (1 << ENTITY_WIDTH) - 1;
 const BOLT_SHIFT: c_int = 0;
 const MODEL_SHIFT: c_int = BOLT_SHIFT + BOLT_WIDTH;
 const ENTITY_SHIFT: c_int = MODEL_SHIFT + MODEL_WIDTH;
-
-/// Raven `RF_DISINTEGRATE1` — does a procedural hole-ripping thing.
-/// Source: `oracle/codemp/cgame/tr_types.h:47`
-const RF_DISINTEGRATE1: c_int = 0x20000;
-
-/// Raven `RF_DISINTEGRATE2` — does a procedural hole-ripping thing with
-/// scaling at the ripping point.
-/// Source: `oracle/codemp/cgame/tr_types.h:48`
-const RF_DISINTEGRATE2: c_int = 0x40000;
-
-/// Raven `RF_MINLIGHT` — allways have some light (viewmodel, some items).
-/// Source: `oracle/codemp/cgame/tr_types.h:18`
-const RF_MINLIGHT: c_int = 0x00001;
-
-/// Raven `RF_DEPTHHACK` — for view weapon Z crunching.
-/// Source: `oracle/codemp/cgame/tr_types.h:21`
-const RF_DEPTHHACK: c_int = 0x00008;
-
-/// Raven `RF_NOSHADOW` — don't add stencil shadows.
-/// Source: `oracle/codemp/cgame/tr_types.h:26`
-const RF_NOSHADOW: c_int = 0x00040;
-
-/// Raven `RF_FORCE_ENT_ALPHA` — override shader alpha settings.
-/// Source: `oracle/codemp/cgame/tr_types.h:36`
-const RF_FORCE_ENT_ALPHA: c_int = 0x00400;
-
-/// Raven `RF_RGB_TINT` — override shader rgb settings.
-/// Source: `oracle/codemp/cgame/tr_types.h:37`
-const RF_RGB_TINT: c_int = 0x00800;
-
-/// Raven `RF_DISTORTION` — area distortion effect.
-/// Source: `oracle/codemp/cgame/tr_types.h:41`
-const RF_DISTORTION: c_int = 0x02000;
-
-/// Raven `RF_SETANIMINDEX` — use `backEnd.currentEntity->e.skinNum` for
-/// `R_BindAnimatedImage`.
-/// Source: `oracle/codemp/cgame/tr_types.h:50`
-const RF_SETANIMINDEX: c_int = 0x80000;
-
-/// Raven `RF_THIRD_PERSON` — don't draw through eyes, only mirrors (player
-/// bodies, chat sprites).
-/// Source: `oracle/codemp/cgame/tr_types.h:19`
-const RF_THIRD_PERSON: c_int = 0x00002;
 
 /// Raven `forceHolocronModels[]` — the holocron pickup model per force power,
 /// indexed by `s1->modelindex + 128`.

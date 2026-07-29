@@ -3,9 +3,8 @@
 
 #![allow(non_snake_case)]
 
-use core::ffi::c_int;
-
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
+use mp_qshared::common::mp::cgame::tr_types::RF_VOLUMETRIC;
 use mp_qshared::shared::q_math::{_VectorCopy, VectorNormalize2};
 use mp_qshared::shared::vec3_t;
 
@@ -71,10 +70,6 @@ pub fn FX_DEMP2_HitPlayer(ctx: &mut CgContext, origin: &vec3_t, normal: &vec3_t,
         -1,
     );
 }
-
-/// Raven `RF_VOLUMETRIC` — fake volumetric shading.
-/// Source: `oracle/codemp/cgame/tr_types.h:24`
-const RF_VOLUMETRIC: c_int = 0x00020;
 
 /// Raven `FX_DEMP2_AltDetonate` — spawns a fading shell-model local entity
 /// at the alt-fire detonation point.

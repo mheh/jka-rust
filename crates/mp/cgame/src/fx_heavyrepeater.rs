@@ -3,9 +3,8 @@
 
 #![allow(non_snake_case)]
 
-use core::ffi::c_int;
-
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
+use mp_qshared::common::mp::cgame::tr_types::{RF_DISTORTION, RF_RGB_TINT};
 use mp_qshared::shared::q_math::{
     _VectorCopy, _VectorScale, _VectorSubtract, vectoangles, AnglesToAxis, VectorLength,
     VectorNormalize, VectorNormalize2, ROLL,
@@ -16,14 +15,6 @@ use crate::local::centity_s::centity_t;
 use crate::local::weapon_info_s::weaponInfo_t;
 use crate::trap;
 use crate::world::cg_context::CgContext;
-
-/// Raven `RF_DISTORTION` — area distortion effect.
-/// Source: `oracle/codemp/cgame/tr_types.h:41`
-const RF_DISTORTION: c_int = 0x02000;
-
-/// Raven `RF_RGB_TINT` — override shader rgb settings.
-/// Source: `oracle/codemp/cgame/tr_types.h:37`
-const RF_RGB_TINT: c_int = 0x00800;
 
 /// Raven `FX_RepeaterProjectileThink` — plays the repeater bolt flight effect
 /// at the entity's lerped origin, oriented along its velocity (straight up if

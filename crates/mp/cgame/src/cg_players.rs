@@ -68,6 +68,10 @@ use mp_bg::weapons::weapon_t::{WP_EMPLACED_GUN, WP_SABER, WP_STUN_BATON};
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
+use mp_qshared::common::mp::cgame::tr_types::{
+    RF_DISTORTION, RF_FORCEPOST, RF_FORCE_ENT_ALPHA, RF_LIGHTING_ORIGIN, RF_MINLIGHT, RF_NODEPTH,
+    RF_RGB_TINT, RF_SHADOW_ONLY, RF_SHADOW_PLANE, RF_THIRD_PERSON,
+};
 use mp_qshared::common::mp::game::class_t::class_t;
 use mp_qshared::common::mp::ghoul2::bone_flags::{
     BONE_ANGLES_POSTMULT, BONE_ANIM_BLEND, BONE_ANIM_OVERRIDE, BONE_ANIM_OVERRIDE_FREEZE,
@@ -150,13 +154,6 @@ use crate::world::cg_world::CgWorld;
 // ---------------------------------------------------------------------------
 // File-scope constants and tables
 // ---------------------------------------------------------------------------
-
-/// Raven `RF_THIRD_PERSON` — don't draw through eyes, only mirrors (player
-/// bodies, chat sprites). `tr_types.h`'s renderfx bits have no ported
-/// cross-crate home yet, so this one lands beside its reader (the
-/// `RF_DISINTEGRATE1` treatment in `cg_ents.rs`).
-/// Source: `oracle/codemp/cgame/tr_types.h:19`
-const RF_THIRD_PERSON: c_int = 0x00002;
 
 /// Raven `DEFAULT_FEMALE_SOUNDPATH`.
 ///
@@ -497,43 +494,6 @@ pub static cg_customJediSoundNames: [Option<&str>; MAX_CUSTOM_JEDI_SOUNDS] = [
     None,
 ];
 
-/// Raven `RF_FORCE_ENT_ALPHA` — override shader alpha settings. Same
-/// no-ported-home story as [`RF_THIRD_PERSON`].
-/// Source: `oracle/codemp/cgame/tr_types.h:36`
-const RF_FORCE_ENT_ALPHA: c_int = 0x00400;
-
-/// Raven `RF_MINLIGHT` — always have some light (viewmodel, some items).
-/// Same no-ported-home story as [`RF_THIRD_PERSON`].
-/// Source: `oracle/codemp/cgame/tr_types.h:18`
-const RF_MINLIGHT: c_int = 0x00001;
-
-/// Raven `RF_NODEPTH` — no depth at all (seeing through walls).
-/// Source: `oracle/codemp/cgame/tr_types.h:22`
-const RF_NODEPTH: c_int = 0x00010;
-
-/// Raven `RF_LIGHTING_ORIGIN` — use `refEntity->lightingOrigin` instead of
-/// `refEntity->origin`.
-/// Source: `oracle/codemp/cgame/tr_types.h:28`
-const RF_LIGHTING_ORIGIN: c_int = 0x00080;
-
-/// Raven `RF_SHADOW_PLANE` — use `refEntity->shadowPlane`.
-/// Source: `oracle/codemp/cgame/tr_types.h:32`
-const RF_SHADOW_PLANE: c_int = 0x00100;
-
-/// Raven `RF_RGB_TINT` — override shader rgb settings.
-/// Source: `oracle/codemp/cgame/tr_types.h:37`
-const RF_RGB_TINT: c_int = 0x00800;
-
-/// Raven `RF_SHADOW_ONLY` — add surfs for shadowing but don't draw them (-rww).
-/// Source: `oracle/codemp/cgame/tr_types.h:39`
-const RF_SHADOW_ONLY: c_int = 0x01000;
-
-/// Raven `RF_DISTORTION` — area distortion effect.
-///
-/// Raven: -rww
-/// Source: `oracle/codemp/cgame/tr_types.h:41`
-const RF_DISTORTION: c_int = 0x02000;
-
 /// Raven `SHIPSURF_FRONT` — the impact-damage surface indices. `bg_vehicles.h`'s
 /// `#define`s have no ported cross-crate home (mp_game keeps its own copy in
 /// `g_vehicles.rs`, which cgame must not depend on), so they land beside their
@@ -547,12 +507,6 @@ const SHIPSURF_LEFT: c_int = 3;
 /// Raven `JETPACK_MODEL`.
 /// Source: `oracle/codemp/cgame/cg_players.c:7889`
 const JETPACK_MODEL: &str = "models/weapons2/jetpack/model.glm";
-
-/// Raven `RF_FORCEPOST` — force it to post-render.
-///
-/// Raven: -rww. Same no-ported-home story as [`RF_THIRD_PERSON`].
-/// Source: `oracle/codemp/cgame/tr_types.h:54`
-const RF_FORCEPOST: c_int = 0x200000;
 
 /// Raven `cg_effectorStringTable[]` — the ragdoll effectors a drag is allowed
 /// to kick around.
