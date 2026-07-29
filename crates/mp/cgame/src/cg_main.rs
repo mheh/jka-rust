@@ -4,19 +4,21 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 
-use core::ffi::{c_char, c_int, c_uint};
+use core::ffi::{c_char, c_int, c_uint, CStr};
 use core::ptr::null_mut;
 
+use mp_abi::cgame::exports::MpCgameExport;
 use mp_abi::cgame::public::rag_callback_bone_snap_t::ragCallbackBoneSnap_t;
 use mp_abi::cgame::public::rag_callback_debug_box_t::ragCallbackDebugBox_t;
 use mp_abi::cgame::public::rag_callback_debug_line_t::ragCallbackDebugLine_t;
 use mp_abi::cgame::public::rag_callback_trace_line_t::ragCallbackTraceLine_t;
 use mp_abi::cgame::shared_buffer::{
-    TCGG2Mark, TCGGetBoltData, TCGImpactMark, TCGMiscEnt, TCGPointContents, TCGTrace, TCGVectorData,
+    autoMapInput_t, TCGCameraShake, TCGG2Mark, TCGGetBoltData, TCGImpactMark, TCGMiscEnt,
+    TCGPointContents, TCGTrace, TCGVectorData,
 };
 use mp_bg::bg_channel::PmoveContext;
 use mp_bg::bg_misc::{
-    selected_holdable_tag, BG_CycleForce, BG_CycleInven, BG_FindItemForPowerup,
+    forcePowerSorted, selected_holdable_tag, BG_CycleForce, BG_CycleInven, BG_FindItemForPowerup,
     BG_FindItemForWeapon, BG_GetItemIndexByTag,
 };
 use mp_bg::bg_panimate::BG_ClearAnimsets;
@@ -43,6 +45,7 @@ use mp_bg::public::spawn::{MAX_SPAWN_VARS, MAX_SPAWN_VARS_CHARS};
 use mp_bg::public::stat_index::statIndex_t::{STAT_CLIENTS_READY, STAT_HOLDABLE_ITEM};
 use mp_bg::public::team::{TEAM_BLUE, TEAM_RED, TEAM_SPECTATOR};
 use mp_bg::weapons::weapon_t::{WP_BRYAR_PISTOL, WP_NONE};
+use mp_engine_select::Engine;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::refdef_t::{
@@ -96,13 +99,14 @@ use crate::bg_channel::{CgBgTraps, CgGameCallbacks};
 use crate::cg_consolecmds::CG_InitConsoleCommands;
 use crate::cg_draw::{CG_Text_Paint, CG_Text_Width};
 use crate::cg_effects::{CG_InitGlass, CG_TestLine};
-use crate::cg_ents::ScaleModelAxis;
+use crate::cg_ents::{CG_CalcEntityLerpPositions, CG_ROFF_NotetrackCallback, ScaleModelAxis};
 use crate::cg_info::{CG_LoadingClient, CG_LoadingItem, CG_LoadingString};
 use crate::cg_light::CG_ClearLightStyles;
 use crate::cg_localents::CG_InitLocalEntities;
 use crate::cg_marks::{CG_ClearParticles, CG_ImpactMark, CG_InitMarkPolys};
 use crate::cg_new_draw::{
-    CG_GameTypeString, CG_GetGameStatusText, CG_GetKillerText, CG_StatusHandle,
+    CG_EventHandling, CG_GameTypeString, CG_GetGameStatusText, CG_GetKillerText, CG_KeyEvent,
+    CG_MouseEvent, CG_StatusHandle,
 };
 use crate::cg_players::{
     CG_AddGhoul2Mark, CG_CacheG2AnimInfo, CG_CleanJetpackGhoul2, CG_HandleAppendedSkin,
@@ -115,6 +119,7 @@ use crate::cg_servercmds::{
     CG_KillCEntityG2, CG_ParseServerinfo, CG_PrecacheNPCSounds, CG_SetConfigValues,
     CG_ShaderStateChanged,
 };
+use crate::cg_view::CG_DoCameraShake;
 use crate::cg_weapons::{
     CG_InitG2Weapons, CG_RegisterItemVisuals, CG_ShutDownG2Weapons, LAST_USEABLE_WEAPON,
 };
@@ -125,7 +130,7 @@ use crate::local::item_info_t::itemInfo_t;
 use crate::local::weapon_info_s::weaponInfo_t;
 use crate::trap;
 use crate::world::cg_main_state::CgMiscEnt;
-use crate::world::{CgContext, CgWorld};
+use crate::world::{CgContext, CgState, CgWorld};
 
 /// Raven `#define MAX_MISC_ENTS` — cgame's client-only "extra visual" registry
 /// capacity. [`CG_MiscEnt`] (the `CG_MISC_ENT` vmcall) and
@@ -4734,7 +4739,7 @@ pub fn CG_SpawnCGameEntFromVars(ctx: &mut CgContext) {
 /// instance, tear the FX/ROFF systems down and put the weather back.
 ///
 /// Source: `oracle/codemp/cgame/cg_main.c:3993-4016`
-pub fn CG_Shutdown(ctx: &mut CgContext, menus: &mut MenuSystem, dc: &mut dyn DisplayContext) {
+pub fn CG_Shutdown(ctx: &mut CgContext, menus: &mut MenuSystem) {
     BG_ClearAnimsets(); //free all dynamic allocations made through the engine
 
     CG_DestroyAllGhoul2(ctx);
@@ -4750,7 +4755,8 @@ pub fn CG_Shutdown(ctx: &mut CgContext, menus: &mut MenuSystem, dc: &mut dyn Dis
     //reset weather
     trap::R_WorldEffectCommand(ctx.engine, "die");
 
-    UI_CleanupGhoul2(menus, dc);
+    // ctx is the DisplayContext (DEC-47.1, the DEC-38 shape applied to cgame).
+    UI_CleanupGhoul2(menus, ctx);
     //If there was any ghoul2 stuff in our side of the shared ui code, then remove it now.
 
     // some mods may need to do cleanup work here,
@@ -5529,4 +5535,363 @@ pub fn CG_Init(
 
     //now get all the cgame only cents
     CG_SpawnCGameOnlyEnts(ctx);
+}
+
+/// Raven `vmMain` — the module's one ABI dispatch shell, `mp_ui`'s `vmMain`
+/// shape (DEC-38 ruling 1 revised): the shell owns the one [`CgState`],
+/// splits it into its three disjoint borrows, builds a [`CgContext`] over the
+/// world half, and routes the command to the matching `CG_*`/`C_*` handler.
+///
+/// No `MpCgameExport::try_from` exists yet (unlike `mp_ui`'s `MpUiExport`,
+/// `mp_abi::cgame::exports` carries no `TryFrom<i32>` impl and this wave may
+/// not touch `mp_abi`), so the dispatch is a chain of `c if c == X as c_int`
+/// guards over the plain `c_int` wire value instead of a `match` on the enum
+/// itself; the `_` arm reproduces Raven's `default: CG_Error(...); break;`
+/// falling through to the trailing `return -1`.
+///
+/// Several arms (`CG_GET_ORIGIN`/`CG_GET_ANGLES`/`CG_GET_ORIGIN_TRAJECTORY`/
+/// `CG_GET_ANGLE_TRAJECTORY`/`CG_GET_GHOUL2`/`CG_GET_MODEL_LIST`) hand the
+/// engine a raw address (Raven's `(float *)arg1` / `(int)&x` casts) - this
+/// `vmMain` boundary is the ABI seam itself (porting-rules §D11). The slots
+/// and return are `isize` (the platform layer's `AbiWord`), Raven's `int`
+/// being pointer-width only because retail is ILP32 - so the address arms are
+/// sound on both the i686 module builds and the LP64 dev builds. Each carries
+/// a `SAFETY` note at the site.
+///
+/// PORT-NOTE: `CG_INIT`, `CG_CONSOLE_COMMAND` and `CG_DRAW_ACTIVE_FRAME` are
+/// cited `todo!()`s awaiting the DEC-47.1 execution pass (ruled 2026-07-28:
+/// the DEC-38 shape applies to cgame — the wave-era `dc: &mut dyn
+/// DisplayContext` params drop, `ctx` is the carrier). Their signatures live
+/// in other TUs (`cg_view.rs::CG_DrawActiveFrame`,
+/// `cg_consolecmds.rs::CG_ConsoleCommand`, plus the `dc` forwards into
+/// `CG_ProcessSnapshots` and the scroll fns), so they wire when that
+/// amendment lands; `CG_SHUTDOWN` is already wired the DEC-47.1 way. Why the
+/// old shape could not be dispatched: `CgContext` is the sole `DisplayContext`
+/// implementor in `mp_cgame` (`world/cg_display_context.rs`) and every
+/// `DisplayContext` method takes `&mut self` (`feederSelection` genuinely
+/// mutates `self.world`), so supplying `ctx` AND `dc` from the one owned
+/// `CgState` needs two live `&mut` paths into the same `CgWorld` — the exact
+/// E0499 pattern DEC-38 ruling 1's revision proved unbuildable for `mp_ui`.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:190-359`
+#[allow(clippy::too_many_arguments)]
+pub fn vmMain(
+    state: &mut CgState,
+    engine: &Engine,
+    command: isize,
+    arg0: isize,
+    arg1: isize,
+    _arg2: isize,
+    _arg3: isize,
+    _arg4: isize,
+    _arg5: isize,
+    _arg6: isize,
+    _arg7: isize,
+    _arg8: isize,
+    _arg9: isize,
+    _arg10: isize,
+    _arg11: isize,
+) -> isize {
+    let CgState {
+        world,
+        menus,
+        cgDC: ds,
+    } = state;
+    let mut ctx = CgContext {
+        world: &mut **world,
+        engine,
+    };
+
+    match command {
+        c if c == MpCgameExport::CG_INIT as isize => {
+            //TODO: Port vmMain CG_INIT dispatch
+            // Source: oracle/codemp/cgame/cg_main.c:193-195
+            todo!("vmMain CG_INIT dispatch - awaiting the DEC-47.1 dc-param amendment, see fn doc")
+        }
+
+        c if c == MpCgameExport::CG_SHUTDOWN as isize => {
+            CG_Shutdown(&mut ctx, menus);
+            0
+        }
+
+        c if c == MpCgameExport::CG_CONSOLE_COMMAND as isize => {
+            //TODO: Port vmMain CG_CONSOLE_COMMAND dispatch
+            // Source: oracle/codemp/cgame/cg_main.c:199-200
+            todo!("vmMain CG_CONSOLE_COMMAND dispatch - awaiting the DEC-47.1 dc-param amendment, see fn doc")
+        }
+
+        c if c == MpCgameExport::CG_DRAW_ACTIVE_FRAME as isize => {
+            //TODO: Port vmMain CG_DRAW_ACTIVE_FRAME dispatch
+            // Source: oracle/codemp/cgame/cg_main.c:201-203
+            todo!("vmMain CG_DRAW_ACTIVE_FRAME dispatch - awaiting the DEC-47.1 dc-param amendment, see fn doc")
+        }
+
+        c if c == MpCgameExport::CG_CROSSHAIR_PLAYER as isize => {
+            CG_CrosshairPlayer(ctx.world) as isize
+        }
+
+        c if c == MpCgameExport::CG_LAST_ATTACKER as isize => CG_LastAttacker(ctx.world) as isize,
+
+        c if c == MpCgameExport::CG_KEY_EVENT as isize => {
+            CG_KeyEvent(&mut ctx, menus, ds, arg0 as c_int, arg1 != 0);
+            0
+        }
+
+        c if c == MpCgameExport::CG_MOUSE_EVENT as isize => {
+            ds.cursorx = ctx.world.cgs.cursorX;
+            ds.cursory = ctx.world.cgs.cursorY;
+            CG_MouseEvent(&mut ctx, menus, ds, arg0 as c_int, arg1 as c_int);
+            0
+        }
+
+        c if c == MpCgameExport::CG_EVENT_HANDLING as isize => {
+            CG_EventHandling(&mut ctx, menus, ds, arg0 as c_int);
+            0
+        }
+
+        c if c == MpCgameExport::CG_POINT_CONTENTS as isize => {
+            // SAFETY: the engine writes a `TCGPointContents` into
+            // `cg.sharedBuffer` before invoking `CG_POINT_CONTENTS`;
+            // `read_unaligned` copies it out without forming a reference into
+            // the byte buffer (alignment 1).
+            let data = unsafe {
+                (ctx.world.shared_buffer.as_ptr() as *const TCGPointContents).read_unaligned()
+            };
+            C_PointContents(&mut ctx, &data) as isize
+        }
+
+        c if c == MpCgameExport::CG_GET_LERP_ORIGIN as isize => {
+            // SAFETY: same shared-buffer contract as `CG_POINT_CONTENTS`,
+            // typed `TCGVectorData`.
+            let mut data = unsafe {
+                (ctx.world.shared_buffer.as_ptr() as *const TCGVectorData).read_unaligned()
+            };
+            C_GetLerpOrigin(ctx.world, &mut data);
+            // SAFETY: same buffer contract; the engine reads `mPoint` back out
+            // of `cg.sharedBuffer` after this call returns.
+            unsafe {
+                (ctx.world.shared_buffer.as_mut_ptr() as *mut TCGVectorData).write_unaligned(data);
+            }
+            0
+        }
+
+        c if c == MpCgameExport::CG_GET_LERP_DATA as isize => {
+            // SAFETY: same shared-buffer contract, typed `TCGGetBoltData`.
+            let mut data = unsafe {
+                (ctx.world.shared_buffer.as_ptr() as *const TCGGetBoltData).read_unaligned()
+            };
+            C_GetLerpData(ctx.world, &mut data);
+            // SAFETY: same buffer contract; the engine reads the filled
+            // origin/scale/angles back out of `cg.sharedBuffer` after this
+            // call returns.
+            unsafe {
+                (ctx.world.shared_buffer.as_mut_ptr() as *mut TCGGetBoltData).write_unaligned(data);
+            }
+            0
+        }
+
+        c if c == MpCgameExport::CG_GET_GHOUL2 as isize => {
+            //NOTE: This is used by the effect bolting which is actually not used at all.
+            //I'm fairly sure if you try to use it with vm's it will just give you total
+            //garbage. In other words, use at your own risk.
+            //
+            // SAFETY: this vmMain boundary IS the ABI seam (§D11); the engine
+            // treats the return as a native pointer-width address. The raw
+            // entity index is engine-supplied (ROFF's mEntID and friends) - a
+            // bad one panics via entity(), the crate's posture, where Raven
+            // read garbage; same at every CG_GET_*/lerp arm below.
+            ctx.world.entity(arg0 as usize).ghoul2 as isize
+        }
+
+        c if c == MpCgameExport::CG_GET_MODEL_LIST as isize => {
+            // SAFETY: same ABI-seam address convention as `CG_GET_GHOUL2`.
+            // The engine keeps this address across calls (RoffSystem), which
+            // is fine: `CgState.world` is a Box that lives for the module's
+            // whole life, so the array never moves.
+            ctx.world.cgs.gameModels.as_ptr() as isize
+        }
+
+        c if c == MpCgameExport::CG_CALC_LERP_POSITIONS as isize => {
+            CG_CalcEntityLerpPositions(&mut ctx, arg0 as usize);
+            0
+        }
+
+        c if c == MpCgameExport::CG_TRACE as isize => {
+            // SAFETY: same shared-buffer contract as `CG_POINT_CONTENTS`,
+            // typed `TCGTrace`.
+            let mut td =
+                unsafe { (ctx.world.shared_buffer.as_ptr() as *const TCGTrace).read_unaligned() };
+            C_Trace(&mut ctx, &mut td);
+            // SAFETY: same buffer contract; the engine reads `mResult` back
+            // out of `cg.sharedBuffer` after this call returns
+            // (G2_bones.cpp precedent - see `CG_RagCallback`'s
+            // `RAG_CALLBACK_TRACELINE` arm above).
+            unsafe {
+                (ctx.world.shared_buffer.as_mut_ptr() as *mut TCGTrace).write_unaligned(td);
+            }
+            0
+        }
+
+        c if c == MpCgameExport::CG_GET_SORTED_FORCE_POWER as isize => {
+            // §F19: `arg0` is an engine-supplied index into the 18-entry
+            // `forcePowerSorted` table; Raven read whatever followed the
+            // array on an out-of-range index. No engine caller of this export
+            // exists in-tree (§20 dead surface, arm kept for the dispatch
+            // contract) - neutral "no power" (`-1`) instead of indexing OOB.
+            forcePowerSorted.get(arg0 as usize).copied().unwrap_or(-1) as isize
+        }
+
+        c if c == MpCgameExport::CG_G2TRACE as isize => {
+            // SAFETY: same shared-buffer contract as `CG_TRACE`.
+            let mut td =
+                unsafe { (ctx.world.shared_buffer.as_ptr() as *const TCGTrace).read_unaligned() };
+            C_G2Trace(&mut ctx, &mut td);
+            // SAFETY: same buffer contract as `CG_TRACE`'s write-back.
+            unsafe {
+                (ctx.world.shared_buffer.as_mut_ptr() as *mut TCGTrace).write_unaligned(td);
+            }
+            0
+        }
+
+        c if c == MpCgameExport::CG_G2MARK as isize => {
+            // SAFETY: same shared-buffer contract as `CG_POINT_CONTENTS`,
+            // typed `TCGG2Mark`.
+            let data =
+                unsafe { (ctx.world.shared_buffer.as_ptr() as *const TCGG2Mark).read_unaligned() };
+            C_G2Mark(&mut ctx, &data);
+            0
+        }
+
+        c if c == MpCgameExport::CG_RAG_CALLBACK as isize => {
+            CG_RagCallback(&mut ctx, arg0 as c_int) as isize
+        }
+
+        c if c == MpCgameExport::CG_INCOMING_CONSOLE_COMMAND as isize => {
+            // Raven's `#if 0` filter block (cg_main.c:264-279) never compiled
+            // in retail - not transcribed. The live body is just this.
+            1
+        }
+
+        c if c == MpCgameExport::CG_GET_USEABLE_FORCE as isize => {
+            CG_NoUseableForce(ctx.world) as isize
+        }
+
+        c if c == MpCgameExport::CG_GET_ORIGIN as isize => {
+            let origin = ctx.world.entity(arg0 as usize).currentState.pos.trBase;
+            // SAFETY: this vmMain boundary IS the ABI seam (§D11); `arg1` is
+            // the native pointer-width out-param address the engine handed
+            // this call to receive 3 floats into.
+            unsafe {
+                (arg1 as *mut vec3_t).write_unaligned(origin);
+            }
+            0
+        }
+
+        c if c == MpCgameExport::CG_GET_ANGLES as isize => {
+            let angles = ctx.world.entity(arg0 as usize).currentState.apos.trBase;
+            // SAFETY: same ABI-seam out-param contract as `CG_GET_ORIGIN`.
+            unsafe {
+                (arg1 as *mut vec3_t).write_unaligned(angles);
+            }
+            0
+        }
+
+        c if c == MpCgameExport::CG_GET_ORIGIN_TRAJECTORY as isize => {
+            // SAFETY: same ABI-seam address convention as `CG_GET_GHOUL2`.
+            // The engine WRITES through this (RoffSystem's SetLerp stores
+            // trType/trTime/trBase/trDelta), so the address must carry mut
+            // provenance and stays valid for the module's life (Box'd world).
+            &mut ctx.world.entity_mut(arg0 as usize).nextState.pos as *mut _ as isize
+        }
+
+        c if c == MpCgameExport::CG_GET_ANGLE_TRAJECTORY as isize => {
+            // SAFETY: same ABI-seam mutable-address contract as
+            // `CG_GET_ORIGIN_TRAJECTORY`.
+            &mut ctx.world.entity_mut(arg0 as usize).nextState.apos as *mut _ as isize
+        }
+
+        c if c == MpCgameExport::CG_ROFF_NOTETRACK_CALLBACK as isize => {
+            // SAFETY: `arg1` is the native address of a NUL-terminated C
+            // string the engine handed this call; borrow-only read, no
+            // ownership transfer.
+            let notetrack =
+                latin1_to_string(unsafe { CStr::from_ptr(arg1 as *const c_char) }.to_bytes());
+            CG_ROFF_NotetrackCallback(&mut ctx, arg0 as usize, &notetrack);
+            0
+        }
+
+        c if c == MpCgameExport::CG_IMPACT_MARK as isize => {
+            // SAFETY: same shared-buffer contract as `CG_POINT_CONTENTS`,
+            // typed `TCGImpactMark`.
+            let data = unsafe {
+                (ctx.world.shared_buffer.as_ptr() as *const TCGImpactMark).read_unaligned()
+            };
+            C_ImpactMark(&mut ctx, &data);
+            0
+        }
+
+        c if c == MpCgameExport::CG_MAP_CHANGE as isize => {
+            // this trap may be called more than once for a given map change,
+            // as the server is going to attempt to send out multiple
+            // broadcasts in hopes that the client will receive one of them
+            ctx.world.cg.mMapChange = qtrue;
+            0
+        }
+
+        c if c == MpCgameExport::CG_AUTOMAP_INPUT as isize => {
+            //special input during automap mode -rww
+            // SAFETY: same shared-buffer contract as `CG_POINT_CONTENTS`,
+            // typed `autoMapInput_t`.
+            let autoInput = unsafe {
+                (ctx.world.shared_buffer.as_ptr() as *const autoMapInput_t).read_unaligned()
+            };
+            ctx.world.view.cg_autoMapInput = autoInput;
+
+            if arg0 == 0 {
+                //if this is non-0, it's actually a one-frame mouse event
+                ctx.world.view.cg_autoMapInputTime = ctx.world.cg.time + 1000;
+            } else {
+                if ctx.world.view.cg_autoMapInput.yaw != 0.0 {
+                    ctx.world.view.cg_autoMapAngle[YAW] += ctx.world.view.cg_autoMapInput.yaw;
+                }
+
+                if ctx.world.view.cg_autoMapInput.pitch != 0.0 {
+                    ctx.world.view.cg_autoMapAngle[PITCH] += ctx.world.view.cg_autoMapInput.pitch;
+                }
+                ctx.world.view.cg_autoMapInput.yaw = 0.0;
+                ctx.world.view.cg_autoMapInput.pitch = 0.0;
+            }
+            0
+        }
+
+        c if c == MpCgameExport::CG_MISC_ENT as isize => {
+            // SAFETY: same shared-buffer contract as `CG_POINT_CONTENTS`,
+            // typed `TCGMiscEnt`.
+            let data =
+                unsafe { (ctx.world.shared_buffer.as_ptr() as *const TCGMiscEnt).read_unaligned() };
+            CG_MiscEnt(&mut ctx, &data);
+            0
+        }
+
+        c if c == MpCgameExport::CG_FX_CAMERASHAKE as isize => {
+            // SAFETY: same shared-buffer contract as `CG_POINT_CONTENTS`,
+            // typed `TCGCameraShake`.
+            let data = unsafe {
+                (ctx.world.shared_buffer.as_ptr() as *const TCGCameraShake).read_unaligned()
+            };
+            CG_DoCameraShake(
+                ctx.world,
+                data.mOrigin,
+                data.mIntensity,
+                data.mRadius,
+                data.mTime,
+            );
+            0
+        }
+
+        _ => {
+            CG_Error(&mut ctx, &format!("vmMain: unknown command {command}"));
+            return -1;
+        }
+    }
 }
