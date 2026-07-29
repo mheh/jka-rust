@@ -43,6 +43,8 @@ use mp_bg::public::viewheight::{DEFAULT_MAXS_2, DEFAULT_MINS_2};
 use mp_bg::public::weaponstate::weaponstate_t;
 use mp_bg::public::{team_t, RANK_TIED_FLAG, TEAM_BLUE, TEAM_RED, TEAM_SPECTATOR};
 use mp_bg::vehicles::vehicle_s::{Vehicle_t, MAX_VEHICLES, VEHICLE_BASE};
+use mp_bg::vehicles::vehicle_s::{MAX_VEHICLE_MUZZLES, MAX_VEHICLE_TURRETS};
+use mp_bg::vehicles::vehicle_type_t::vehicleType_t;
 use mp_bg::weapons::weaponData;
 use mp_bg::weapons::weapon_t::{
     WP_BLASTER, WP_BOWCASTER, WP_BRYAR_OLD, WP_BRYAR_PISTOL, WP_CONCUSSION, WP_DEMP2, WP_DET_PACK,
@@ -65,7 +67,7 @@ use mp_qshared::shared::limits::MAX_VEH_WEAPONS;
 use mp_qshared::shared::q_color::S_COLOR_WHITE;
 use mp_qshared::shared::q_math::{
     _VectorMA, _VectorSubtract, vec3_origin, AngleVectors, ByteToDir, VectorClear, VectorLength,
-    VectorNormalize, ROLL, YAW,
+    VectorNormalize, PITCH, ROLL, YAW,
 };
 use mp_qshared::shared::surface_flags::{
     CONTENTS_SOLID, CONTENTS_TERRAIN, MASK_SOLID, MATERIAL_CANVAS, MATERIAL_CARPET, MATERIAL_DIRT,
@@ -460,13 +462,6 @@ pub fn CG_InClientBitflags(ent: &entityState_t, client: c_int) -> bool {
 ///
 /// Raven's `assert(pVeh)` is vacuous once the parameter is a Rust reference.
 ///
-/// DEFERRED: the `VH_ANIMAL`/`VH_WALKER`/`VH_SPEEDER` pitch/roll zeroing reads
-/// `pVeh->m_pVehicleInfo->type`; `Vehicle_t.m_pVehicleInfo` is still a raw
-/// `*mut vehicleInfo_t` (no safe accessor exists yet) and this wave forbids
-/// `unsafe` outside `trap.rs`, so that branch never fires — `vehAngles` is
-/// always the entity's raw `lerpAngles` here.
-/// Source: `oracle/codemp/cgame/cg_event.c:1365-1376`
-///
 /// Source: `oracle/codemp/cgame/cg_event.c:1350-1381`
 pub fn CG_CalcVehMuzzle(
     ctx: &mut CgContext,
@@ -483,9 +478,15 @@ pub fn CG_CalcVehMuzzle(
     // Uh... how about we set this, hunh...?  :)
     pVeh.m_iMuzzleTime[muzzle_idx] = ctx.world.cg.time;
 
-    let veh_angles: vec3_t = ent.lerpAngles;
+    let mut veh_angles: vec3_t = ent.lerpAngles;
     if !pVeh.m_pVehicleInfo.is_null() {
-        // DEFERRED: vehicleInfo_t.type read — see the fn doc above.
+        let vehType = unsafe { (*pVeh.m_pVehicleInfo).r#type };
+        if vehType == vehicleType_t::VH_ANIMAL || vehType == vehicleType_t::VH_WALKER {
+            veh_angles[PITCH] = 0.0;
+            veh_angles[ROLL] = 0.0;
+        } else if vehType == vehicleType_t::VH_SPEEDER {
+            veh_angles[PITCH] = 0.0;
+        }
     }
 
     let mut bolt_matrix = mdxaBone_t {
@@ -519,28 +520,57 @@ pub fn CG_CalcVehMuzzle(
 /// vehicle muzzle the broadcaster's `trickedentindex` bits report as fired
 /// this frame.
 ///
-/// ESCALATION: blocked past the presence guard — `centity_t.m_pVehicle` is
-/// DEC-46.2's `Option<VehicleId>`, which carries only the vehicle cent's
-/// entity number ("ported code only tests presence… until [the Vehicle_t
-/// referent pool] lands"). The muzzle loop needs the actual `Vehicle_t` data
-/// (`m_iMuzzleTag`, `m_pVehicleInfo`, the turret/weapon tables) that only a
-/// `VehicleId -> &Vehicle_t` accessor can supply, and that pool hasn't landed
-/// yet. This blocks every future cgame fn that walks a `centity_t`'s vehicle
-/// through `m_pVehicle` the same way.
-///
 /// Source: `oracle/codemp/cgame/cg_event.c:1384-1427`
 pub fn CG_VehMuzzleFireFX(ctx: &mut CgContext, veh: &centity_t, broadcaster: &entityState_t) {
-    if veh.m_pVehicle.is_none() || veh.ghoul2.is_null() {
+    let Some(veh_id) = veh.m_pVehicle else {
+        return;
+    };
+    if veh.ghoul2.is_null() {
         return;
     }
+    let row_idx = veh_id.ent_num() as usize;
 
-    let _ = (ctx, broadcaster);
-    // DEFERRED: muzzle-fire FX loop needs Vehicle_t field access
-    // (m_iMuzzleTag, m_pVehicleInfo, weapMuzzle/turret tables) — see the fn
-    // doc above.
-    //TODO: Port CG_VehMuzzleFireFX
-    // Source: oracle/codemp/cgame/cg_event.c:1394-1426
-    todo!("CG_VehMuzzleFireFX muzzle FX loop — blocked on the Vehicle_t referent pool, oracle/codemp/cgame/cg_event.c:1394-1426")
+    for curMuz in 0..MAX_VEHICLE_MUZZLES {
+        //go through all muzzles and
+        let muzzleTag = ctx.world.vehicle_pool[row_idx].m_iMuzzleTag[curMuz];
+        if muzzleTag != -1 // valid muzzle bolt
+            && (broadcaster.trickedentindex & (1 << curMuz)) != 0
+        {
+            //this muzzle fired
+            let info = unsafe { &*ctx.world.vehicle_pool[row_idx].m_pVehicleInfo };
+            let mut muzFX = 0;
+            if info.weapMuzzle[curMuz] == 0 {
+                //no weaopon for this muzzle?  check turrets
+                for i in 0..MAX_VEHICLE_TURRETS {
+                    for j in 0..MAX_VEHICLE_TURRETS {
+                        if info.turret[i].iMuzzle[j] - 1 == curMuz as c_int {
+                            //this muzzle belongs to this turret
+                            muzFX = ctx.world.bg_state.g_vehWeaponInfo
+                                [info.turret[i].iWeapon as usize]
+                                .iMuzzleFX;
+                            break;
+                        }
+                    }
+                }
+            } else {
+                muzFX =
+                    ctx.world.bg_state.g_vehWeaponInfo[info.weapMuzzle[curMuz] as usize].iMuzzleFX;
+            }
+            if muzFX != 0 {
+                trap::FX_PlayBoltedEffectID(
+                    ctx.engine,
+                    muzFX,
+                    &veh.currentState.origin,
+                    veh.ghoul2,
+                    muzzleTag,
+                    veh.currentState.number,
+                    0,
+                    0,
+                    true,
+                );
+            }
+        }
+    }
 }
 
 /// Raven `CG_UseItem` — dispatches on the holdable item just used (server-sent
@@ -729,13 +759,22 @@ pub fn CG_Obituary(ctx: &mut CgContext, ent: &entityState_t) {
     }
 
     // check for attacker in a vehicle
-    // DEFERRED: `Vehicle_t` referent pool — Raven copies
-    // `attVehCent->m_pVehicle->m_pVehicleInfo->name` out of
-    // `cg_entities[ent->brokenLimbs]`, and DEC-46.2's `Option<VehicleId>`
-    // answers presence only until the pool lands (`local/vehicle_id.rs`), so
-    // there is nothing to read the name from and this stays empty.
     // Source: oracle/codemp/cgame/cg_event.c:147-158
-    let attackerVehName = String::new();
+    let mut attackerVehName = String::new();
+    if ent.brokenLimbs >= MAX_CLIENTS_I32 {
+        let attVehNum = ent.brokenLimbs as usize;
+        if let Some(id) = ctx.world.entity(attVehNum).m_pVehicle {
+            let info_ptr = ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo;
+            if !info_ptr.is_null() {
+                let name = unsafe { (*info_ptr).name };
+                if !name.is_null() {
+                    // SAFETY: `.name` points into `bg_state`'s own `VehicleParms`
+                    // parse buffer - the same read `bg_vehicleLoad.rs:809` makes.
+                    attackerVehName = unsafe { cstr_to_str(name) }.chars().take(29).collect();
+                }
+            }
+        }
+    }
 
     //check for specific vehicle weapon
     let mut attackerVehWeapName = String::new();
@@ -2518,10 +2557,6 @@ pub fn CG_EntityEvent(ctx: &mut CgContext, ds: &DisplayState, centNum: usize, po
             // veh = &cg_entities[es->owner]; take it out to hand CG_VehMuzzleFireFX
             // a &centity_t while ctx stays borrowed, then put it back (cg_ents.rs
             // CG_General precedent).
-            // NOTE: CG_VehMuzzleFireFX's body is a cited todo!() behind the
-            // m_pVehicle presence guard - inert until the Vehicle_t referent
-            // pool lands (nothing assigns m_pVehicle yet), live the moment it
-            // does. Resolve the todo with that pool ruling.
             let owner = es.owner as usize;
             let veh = core::mem::replace(ctx.world.entity_mut(owner), centity_t::zeroed());
             CG_VehMuzzleFireFX(ctx, &veh, &es);
@@ -2548,14 +2583,37 @@ pub fn CG_EntityEvent(ctx: &mut CgContext, ds: &DisplayState, centNum: usize, po
                 if CG_InFighter(ctx.world) || CG_InATST(ctx.world) || snapWeapon == WP_NONE {
                     //just letting us know our vehicle is out of ammo
                     //FIXME: flash something on HUD or give some message so we know we have no ammo
-                    // DEFERRED: Vehicle_t referent pool — Raven picks the
-                    // vehicle weapon's custom `soundNoAmmo` off
-                    // `localCent->m_pVehicle->m_pVehicleInfo->weapon[eventParm]`;
-                    // DEC-46.2's `Option<VehicleId>` answers presence only, so we
-                    // fall back to the default "no ammo" sound until the pool
-                    // lands (cg_draw.rs vehicle-HUD precedent).
+                    // localCent = cg_entities[cg.snap->ps.clientNum]; its vehicle
+                    // weapon may carry a custom "no ammo" sound.
+                    // §19: Raven indexes `weapon[eventParm]` unchecked; an
+                    // out-of-range parm reads as "no custom sound" here.
                     // Source: oracle/codemp/cgame/cg_event.c:2170-2179
-                    let noAmmoSound = ctx.world.cgs.media.noAmmoSound;
+                    let customNoAmmo = ctx
+                        .world
+                        .entity(snapClientNum as usize)
+                        .m_pVehicle
+                        .and_then(|id| {
+                            let info_ptr =
+                                ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo;
+                            if info_ptr.is_null() {
+                                None
+                            } else {
+                                let s = unsafe {
+                                    (*info_ptr)
+                                        .weapon
+                                        .get(es.eventParm as usize)
+                                        .map(|w| w.soundNoAmmo)
+                                        .unwrap_or(0)
+                                };
+                                (s != 0).then_some(s)
+                            }
+                        });
+                    let noAmmoSound = match customNoAmmo {
+                        //play the "no Ammo" sound for this weapon
+                        Some(s) => s,
+                        //play the default "no ammo" sound
+                        None => ctx.world.cgs.media.noAmmoSound,
+                    };
                     trap::S_StartSound(ctx.engine, None, snapClientNum, CHAN_AUTO, noAmmoSound);
 
                     //flash the HUD so they associate the sound with the visual indicator that they don't have enough ammo

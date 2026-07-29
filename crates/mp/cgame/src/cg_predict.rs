@@ -920,9 +920,8 @@ pub fn CG_G2Trace(
 /// on `CgBgTraps`, and `baseEnt` walks the `CgWorld.bg_ents` shadow rows this
 /// fn syncs from the entities up front (Raven's overlay read `cg_entities`
 /// directly - nothing here writes those synced fields back except Raven's own
-/// explicit `revertES` pump). The piloted-vehicle sub-blocks that deref
-/// `veh->m_pVehicle` keep ruling-4 `todo!()`s until the DEC-47.3 pool lands;
-/// nothing sets `m_pVehicle` before then, so the gates cannot fire.
+/// explicit `revertES` pump). The piloted-vehicle sub-blocks deref the
+/// DEC-47.3 `vehicle_pool` rows behind `m_pVehicle`.
 ///
 /// Source: `oracle/codemp/cgame/cg_predict.c:963-1511`
 pub fn CG_PredictPlayerState(ctx: &mut CgContext, ds: &DisplayState) {
@@ -983,13 +982,19 @@ pub fn CG_PredictPlayerState(ctx: &mut CgContext, ds: &DisplayState) {
     {
         let world = &mut *ctx.world;
         for i in 0..MAX_GENTITIES {
+            let m_pVehicle = match world.entities[i].m_pVehicle {
+                // bg reads the referent through pm_entVeh during vehicle
+                // prediction, so the row carries the live pool address
+                Some(id) => &raw mut world.vehicle_pool[id.ent_num() as usize],
+                None => null_mut(),
+            };
             let ent = &world.entities[i];
             let row = &mut world.bg_ents[i];
             row.s = ent.currentState;
             row.ghoul2 = ent.ghoul2;
             row.localAnimIndex = ent.localAnimIndex;
             row.modelScale = ent.modelScale;
-            // row.m_pVehicle stays null until the DEC-47.3 pool exists
+            row.m_pVehicle = m_pVehicle;
         }
     }
 

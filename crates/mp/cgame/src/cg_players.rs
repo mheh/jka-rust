@@ -19,14 +19,18 @@ use mp_bg::bg_panimate::{
     BG_FlippingAnim, BG_InDeathAnim, BG_ParseAnimationEvtFile, BG_ParseAnimationFile,
     BG_SaberInAttack, BG_SaberStartTransAnim, BG_SuperBreakWinAnim,
 };
-use mp_bg::bg_pmove::{BG_G2PlayerAngles, BG_IK_MoveArm, PM_RunningAnim, PM_WalkingAnim};
+use mp_bg::bg_pmove::{
+    BG_G2ATSTAngles, BG_G2PlayerAngles, BG_IK_MoveArm, PM_RunningAnim, PM_WalkingAnim,
+};
 use mp_bg::bg_saber::{SFL2_NO_BLADE, SFL2_NO_DLIGHT, SFL2_NO_WALL_MARKS};
 use mp_bg::bg_saberLoad::{
     BG_SI_SetDesiredLength, BG_SI_SetLength, BG_SI_SetLengthGradual,
     WP_SaberBladeUseSecondBladeStyle, WP_SetSaber,
 };
 use mp_bg::bg_saga::{BG_SiegeFindClassByName, BG_SiegeFindClassIndexByName};
-use mp_bg::bg_vehicleLoad::{BG_GetVehicleModelName, BG_GetVehicleSkinName, BG_VehicleGetIndex};
+use mp_bg::bg_vehicleLoad::{
+    AttachRidersGeneric, BG_GetVehicleModelName, BG_GetVehicleSkinName, BG_VehicleGetIndex,
+};
 use mp_bg::cstr_util::cstr_to_str;
 use mp_bg::local::{bgToggleableSurfaceDebris, bgToggleableSurfaces, bg_customSiegeSoundNames};
 use mp_bg::public::anim_event_type::animEventType_t;
@@ -63,7 +67,7 @@ use mp_bg::public::powerup::{
 use mp_bg::public::saber_move_data_table::saberMoveData;
 use mp_bg::public::team::{TEAM_BLUE, TEAM_FREE, TEAM_RED, TEAM_SPECTATOR};
 use mp_bg::saga::siege_team_t::SIEGETEAM_TEAM1;
-use mp_bg::vehicles::vehicle_s::{MAX_VEHICLE_EXHAUSTS, MAX_VEHICLE_MUZZLES};
+use mp_bg::vehicles::vehicle_s::{MAX_VEHICLE_EXHAUSTS, MAX_VEHICLE_MUZZLES, MAX_VEHICLE_TURRETS};
 use mp_bg::vehicles::vehicle_type_t::vehicleType_t;
 use mp_bg::weapons::weapon_t::{WP_EMPLACED_GUN, WP_SABER, WP_STUN_BATON};
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
@@ -111,11 +115,11 @@ use mp_qshared::shared::{
     addElectricityArgStruct_t, addbezierArgStruct_t, addpolyArgStruct_t, addspriteArgStruct_t,
     effectTrailArgStruct_t, fileHandle_t, mdxaBone_t, orientation_t, qboolean, qfalse, qhandle_t,
     qtrue, sfxHandle_t, sharedEIKMoveState, sharedERagPhase, vec3_t, CollisionRecord_t,
-    Eorientations, CHAN_AUTO, CHAN_BODY, CHAN_WEAPON, CONTENTS_LAVA, CONTENTS_SLIME,
-    CONTENTS_SOLID, CONTENTS_WATER, ENTITYNUM_NONE, ENTITYNUM_WORLD, FP_ABSORB, FP_GRIP,
-    FP_PROTECT, FP_RAGE, FP_SABERTHROW, FP_SABER_DEFENSE, FP_SABER_OFFENSE, FP_SEE, FP_SPEED,
-    FS_READ, MASK_PLAYERSOLID, MASK_SOLID, MAX_CLIENTS, MAX_CLIENTS_I32, MAX_GENTITIES, MAX_QPATH,
-    NUM_FORCE_POWERS, SURF_NOIMPACT,
+    Eorientations, CHAN_AUTO, CHAN_BODY, CHAN_LESS_ATTEN, CHAN_WEAPON, CONTENTS_BODY,
+    CONTENTS_LAVA, CONTENTS_SLIME, CONTENTS_SOLID, CONTENTS_WATER, ENTITYNUM_NONE, ENTITYNUM_WORLD,
+    FP_ABSORB, FP_GRIP, FP_PROTECT, FP_RAGE, FP_SABERTHROW, FP_SABER_DEFENSE, FP_SABER_OFFENSE,
+    FP_SEE, FP_SPEED, FS_READ, MASK_PLAYERSOLID, MASK_SOLID, MAX_CLIENTS, MAX_CLIENTS_I32,
+    MAX_GENTITIES, MAX_QPATH, NUM_FORCE_POWERS, SURF_NOIMPACT,
 };
 use native_string::{
     atoi, buf_to_string, cstr, strcat_string, strncpyz_string, Info_ValueForKey, Q_stricmp,
@@ -135,7 +139,7 @@ use crate::cg_main::{
     DEFAULT_REDTEAM_NAME,
 };
 use crate::cg_marks::{CG_AllocMark, CG_ImpactMark};
-use crate::cg_predict::CG_Trace;
+use crate::cg_predict::{CG_G2Trace, CG_Trace};
 use crate::cg_servercmds::CG_HandleNPCSounds;
 use crate::cg_weapons::{CG_AddPlayerWeapon, CG_CopyG2WeaponInstance, CG_G2WeaponInstance};
 use crate::local::centity_s::centity_t;
@@ -507,6 +511,21 @@ const SHIPSURF_FRONT: c_int = 0;
 const SHIPSURF_BACK: c_int = 1;
 const SHIPSURF_RIGHT: c_int = 2;
 const SHIPSURF_LEFT: c_int = 3;
+
+/// Raven `SHIPSURF_DAMAGE_*` — the brokenLimbs damage-severity bit indices.
+/// Source: `oracle/codemp/game/bg_vehicles.h:432-439`
+const SHIPSURF_DAMAGE_FRONT_LIGHT: c_int = 0;
+const SHIPSURF_DAMAGE_BACK_LIGHT: c_int = 1;
+const SHIPSURF_DAMAGE_FRONT_HEAVY: c_int = 4;
+const SHIPSURF_DAMAGE_BACK_HEAVY: c_int = 5;
+
+/// Raven `FLYBYSOUNDTIME` — the per-vehicle flyby-sound debounce, in ms.
+/// Source: `oracle/codemp/cgame/cg_players.c:7979`
+const FLYBYSOUNDTIME: c_int = 2000;
+
+/// Raven `BG_NUM_TOGGLEABLE_SURFACES`.
+/// Source: `oracle/codemp/game/bg_public.h:138`
+const BG_NUM_TOGGLEABLE_SURFACES: usize = 31;
 
 /// Raven `JETPACK_MODEL`.
 /// Source: `oracle/codemp/cgame/cg_players.c:7889`
@@ -2268,12 +2287,8 @@ pub fn CG_RegisterVehicleAssets(_pVeh: VehicleId) {}
 /// playing the debris effect at the surface's bolt (or at the ship's origin when
 /// the surface has no bolt).
 ///
-/// DEFERRED past the vehicle presence test: the five wing/nose arms also read
-/// `m_pVehicle->m_pVehicleInfo->i{R,L}WingFX`/`iNoseFX` for the thrown-part
-/// effect, and DEC-46.2's `Option<VehicleId>` carries only the vehicle cent's
-/// entity number until the `Vehicle_t` referent pool lands. `lostPartFX` stays
-/// 0, so the thrown ship part at the end never fires; the debris effect itself
-/// plays normally.
+/// The five wing/nose arms read `m_pVehicle->m_pVehicleInfo->i{R,L}WingFX`/
+/// `iNoseFX` through the pool for the thrown-part effect.
 /// Source: `oracle/codemp/cgame/cg_players.c:7266-7361`
 pub fn CG_CreateSurfaceDebris(
     ctx: &mut CgContext,
@@ -2282,7 +2297,7 @@ pub fn CG_CreateSurfaceDebris(
     fxID: c_int,
     throwPart: bool,
 ) {
-    let lostPartFX: c_int = 0;
+    let mut lostPartFX: c_int = 0;
     let mut b: c_int = -1;
     let mut v: vec3_t = [0.0; 3];
     let mut d: vec3_t = [0.0; 3];
@@ -2315,22 +2330,60 @@ pub fn CG_CreateSurfaceDebris(
         .copied()
         .unwrap_or(-1);
 
+    // the ship's `m_pVehicleInfo` (if any) supplies the thrown-part effect.
+    let vehInfoPtr = cent
+        .m_pVehicle
+        .map(|id| ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo);
+
     // let's add the surface as a bolt so we can get the base point of it
     if debris == 3 {
         // right wing flame
         b = trap::G2API_AddBolt(engine, cent.ghoul2, 0, "*r_wingdamage");
+        if throwPart {
+            if let Some(ptr) = vehInfoPtr {
+                if !ptr.is_null() {
+                    lostPartFX = unsafe { (*ptr).iRWingFX };
+                }
+            }
+        }
     } else if debris == 4 {
         // left wing flame
         b = trap::G2API_AddBolt(engine, cent.ghoul2, 0, "*l_wingdamage");
+        if throwPart {
+            if let Some(ptr) = vehInfoPtr {
+                if !ptr.is_null() {
+                    lostPartFX = unsafe { (*ptr).iLWingFX };
+                }
+            }
+        }
     } else if debris == 5 {
         // right wing flame 2
         b = trap::G2API_AddBolt(engine, cent.ghoul2, 0, "*r_wingdamage");
+        if throwPart {
+            if let Some(ptr) = vehInfoPtr {
+                if !ptr.is_null() {
+                    lostPartFX = unsafe { (*ptr).iRWingFX };
+                }
+            }
+        }
     } else if debris == 6 {
         // left wing flame 2
         b = trap::G2API_AddBolt(engine, cent.ghoul2, 0, "*l_wingdamage");
+        if throwPart {
+            if let Some(ptr) = vehInfoPtr {
+                if !ptr.is_null() {
+                    lostPartFX = unsafe { (*ptr).iLWingFX };
+                }
+            }
+        }
     } else if debris == 7 {
         // nose flame
         b = trap::G2API_AddBolt(engine, cent.ghoul2, 0, "*nosedamage");
+        if let Some(ptr) = vehInfoPtr {
+            if !ptr.is_null() {
+                lostPartFX = unsafe { (*ptr).iNoseFX };
+            }
+        }
     } else if let Some(surfName) = surfName {
         b = trap::G2API_AddBolt(engine, cent.ghoul2, 0, surfName);
     }
@@ -2434,27 +2487,21 @@ pub fn CG_CreateSurfaceSmoke(ctx: &mut CgContext, cent: &centity_t, shipSurf: c_
 /// Raven `CG_VehicleShouldDrawShields` — are this ship's shields currently
 /// taking damage, so the shell should be drawn?
 ///
-/// DEFERRED: Raven's last clause is `m_pVehicle->m_pVehicleInfo` non-null;
-/// DEC-46.2's `Option<VehicleId>` answers only the presence half until the
-/// `Vehicle_t` referent pool lands, so a vehicle with no vehicle info would
-/// wrongly draw shields here.
 /// Source: `oracle/codemp/cgame/cg_players.c:7415-7425`
 pub fn CG_VehicleShouldDrawShields(world: &CgWorld, vehCent: &centity_t) -> bool {
     // ship shields currently taking damage
     vehCent.damageTime > world.cg.time
         && vehCent.currentState.NPC_class == class_t::CLASS_VEHICLE as c_int
-        && vehCent.m_pVehicle.is_some()
+        && vehCent.m_pVehicle.is_some_and(|id| {
+            !world.vehicle_pool[id.ent_num() as usize]
+                .m_pVehicleInfo
+                .is_null()
+        })
 }
 
 /// Raven `CG_VehicleAttachDroidUnit` — snaps an astromech onto its ship's droid
 /// tag, taking the droid's whole origin and orientation off the bolt.
 ///
-/// ESCALATION: blocked past the presence guard — the bolt index is
-/// `m_pVehicle->m_iDroidUnitTag`, and DEC-46.2's `Option<VehicleId>` carries
-/// only the vehicle cent's entity number until the `Vehicle_t` referent pool
-/// lands ("ported code only tests presence"). There is no honest bolt index to
-/// pass, so this answers Raven's own "not attached" (`qfalse`) and the droid
-/// keeps its snapshot position — a visual miss, not a crash.
 /// Source: `oracle/codemp/cgame/cg_players.c:7433-7461`
 #[allow(unused_variables)]
 pub fn CG_VehicleAttachDroidUnit(
@@ -2464,13 +2511,56 @@ pub fn CG_VehicleAttachDroidUnit(
 ) -> bool {
     if droidCent.currentState.owner != 0 && droidCent.currentState.clientNum >= MAX_CLIENTS_I32 {
         // the only NPCs that can ride a vehicle are droids...???
-        let vehCent = ctx.world.entity(droidCent.currentState.owner as usize);
+        let vehNum = droidCent.currentState.owner as usize;
+        let vehGhoul2 = ctx.world.entity(vehNum).ghoul2;
+        let droidUnitTag = ctx
+            .world
+            .entity(vehNum)
+            .m_pVehicle
+            .map(|id| ctx.world.vehicle_pool[id.ent_num() as usize].m_iDroidUnitTag);
 
-        if vehCent.m_pVehicle.is_some() && !vehCent.ghoul2.is_null() {
-            // DEFERRED: Vehicle_t::m_iDroidUnitTag — see the fn doc. Raven bolts
-            // `droidCent->lerpOrigin` to that tag's matrix and rebuilds
-            // `lerpAngles` from its POSITIVE_X/NEGATIVE_Y vectors ("WTF???" is
-            // Raven's own comment on the axis choice).
+        if let Some(droidUnitTag) = droidUnitTag {
+            if !vehGhoul2.is_null() && droidUnitTag != -1 {
+                let mut boltMatrix = mdxaBone_t {
+                    matrix: [[0.0; 4]; 3],
+                };
+                let mut fwd: vec3_t = [0.0; 3];
+                let mut rt: vec3_t = [0.0; 3];
+                let mut tempAng: vec3_t = [0.0; 3];
+
+                let vehAngles = ctx.world.entity(vehNum).lerpAngles;
+                let vehOrigin = ctx.world.entity(vehNum).lerpOrigin;
+                let vehScale = ctx.world.entity(vehNum).modelScale;
+                let time = ctx.world.cg.time;
+                trap::G2API_GetBoltMatrix(
+                    ctx.engine,
+                    vehGhoul2,
+                    0,
+                    droidUnitTag,
+                    &mut boltMatrix,
+                    &vehAngles,
+                    &vehOrigin,
+                    time,
+                    Some(&mut ctx.world.cgs.gameModels[0]),
+                    &vehScale,
+                );
+                BG_GiveMeVectorFromMatrix(
+                    &boltMatrix,
+                    Eorientations::ORIGIN as c_int,
+                    &mut droidCent.lerpOrigin,
+                );
+                BG_GiveMeVectorFromMatrix(
+                    &boltMatrix,
+                    Eorientations::POSITIVE_X as c_int,
+                    &mut fwd,
+                ); //WTF???
+                BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::NEGATIVE_Y as c_int, &mut rt); //WTF???
+                vectoangles(fwd, &mut droidCent.lerpAngles);
+                vectoangles(rt, &mut tempAng);
+                droidCent.lerpAngles[ROLL] = tempAng[PITCH];
+
+                return true;
+            }
         }
     }
 
@@ -2555,17 +2645,25 @@ pub fn CG_CleanJetpackGhoul2(ctx: &mut CgContext) {
     }
 }
 
-/// Raven `CG_RadiusForCent` — the ghoul2 cull radius for an entity: its own
-/// `g2radius` when it has one, otherwise 64.
+/// Raven `CG_RadiusForCent` — the ghoul2 cull radius for an entity: an NPC
+/// vehicle's `m_pVehicleInfo->g2radius` override, its own `g2radius`, or 64.
 ///
-/// DEFERRED: an NPC vehicle first checks `m_pVehicle->m_pVehicleInfo->g2radius`
-/// for an override, which DEC-46.2's `Option<VehicleId>` can't reach until the
-/// `Vehicle_t` referent pool lands; a vehicle with an override falls through to
-/// its entity-state radius here.
 /// Source: `oracle/codemp/cgame/cg_players.c:8316-8336`
-pub fn CG_RadiusForCent(cent: &centity_t) -> f32 {
+pub fn CG_RadiusForCent(world: &CgWorld, cent: &centity_t) -> f32 {
     if cent.currentState.eType == entityType_t::ET_NPC as c_int {
-        if cent.currentState.g2radius != 0 {
+        let vehG2Radius = if cent.currentState.NPC_class == class_t::CLASS_VEHICLE as c_int {
+            cent.m_pVehicle
+                .map(|id| unsafe {
+                    (*world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo).g2radius
+                })
+                .unwrap_or(0)
+        } else {
+            0
+        };
+        if vehG2Radius != 0 {
+            //has override
+            return vehG2Radius as f32;
+        } else if cent.currentState.g2radius != 0 {
             return cent.currentState.g2radius as f32;
         }
     } else if cent.currentState.g2radius != 0 {
@@ -4235,14 +4333,10 @@ pub fn CG_AddRandomLightning(ctx: &mut CgContext, start: &vec3_t, end: &vec3_t) 
 /// star streak, the flyby whoosh, engine start, exhaust/trail plumes and the
 /// damage smoke off broken surfaces.
 ///
-/// DEFERRED past the hyperspace block: everything below it reads
-/// `m_pVehicle->m_pVehicleInfo` (`soundFlyBy`/`soundFlyBy2`, `soundEngineStart`,
-/// `type`, `surfDestruction`, `iTrailFX`/`iExhaustFX`/`iTurboFX`/`iInjureFX`/
-/// `iDmgFX`) plus `m_iExhaustTag[]` and `m_iLastFXTime`, and DEC-46.2's
-/// `Option<VehicleId>` carries only the vehicle cent's entity number until the
-/// `Vehicle_t` referent pool lands ("ported code only tests presence" —
-/// `local/vehicle_id.rs`). `CG_CreateSurfaceDebris`/`CG_CreateSurfaceSmoke` and
-/// the traps those arms need all exist; only the vehicle data is missing.
+/// The body past the hyperspace block reads `m_pVehicle->m_pVehicleInfo`
+/// (`soundFlyBy`/`soundFlyBy2`, `soundEngineStart`, `type`, `surfDestruction`,
+/// `iTrailFX`/`iExhaustFX`/`iTurboFX`/`iInjureFX`/`iDmgFX`) plus `m_iExhaustTag[]`
+/// and `m_iLastFXTime` through the pool.
 /// Source: `oracle/codemp/cgame/cg_players.c:7981-8305`
 pub fn CG_VehicleEffects(ctx: &mut CgContext, cent: &centity_t) {
     if cent.currentState.eType != entityType_t::ET_NPC as c_int
@@ -4280,10 +4374,331 @@ pub fn CG_VehicleEffects(ctx: &mut CgContext, cent: &centity_t) {
         }
     }
 
-    // DEFERRED: Vehicle_t referent pool — see the fn doc. The FLYBY sound, the
-    // engine-start rev, and the whole `type != VH_ANIMAL` effect body (surface
-    // destruction, exhaust, wing trails, death flames, damage smoke) all hang off
-    // `pVehNPC->m_pVehicleInfo`, which `Option<VehicleId>` cannot reach yet.
+    // presence is guaranteed by the early-out above.
+    let vehId = cent.m_pVehicle.expect("CG_VehicleEffects: m_pVehicle");
+    let row_idx = vehId.ent_num() as usize;
+    let info_ptr = ctx.world.vehicle_pool[row_idx].m_pVehicleInfo;
+
+    let clientNum = cent.currentState.clientNum;
+    let time = ctx.world.cg.time;
+
+    //FLYBY sound
+    if clientNum != ctx.world.cg.predictedPlayerState.m_iVehicleNum
+        && (unsafe { (*info_ptr).soundFlyBy } != 0 || unsafe { (*info_ptr).soundFlyBy2 } != 0)
+    {
+        //not my vehicle
+        let psSpeed = ctx.world.cg.predictedPlayerState.speed;
+        if cent.currentState.speed != 0.0 && psSpeed + cent.currentState.speed > 500.0 {
+            //he's moving and between the two of us, we're moving fast
+            let mut diff: vec3_t = [0.0; 3];
+            let psOrigin = ctx.world.cg.predictedPlayerState.origin;
+            _VectorSubtract(cent.lerpOrigin, psOrigin, &mut diff);
+            if VectorLength(diff) < 2048.0 {
+                //close
+                let mut myFwd: vec3_t = [0.0; 3];
+                let mut theirFwd: vec3_t = [0.0; 3];
+                let psViewangles = ctx.world.cg.predictedPlayerState.viewangles;
+                AngleVectors(psViewangles, Some(&mut myFwd), None, None);
+                _VectorScale(myFwd, psSpeed, &mut myFwd);
+                AngleVectors(cent.lerpAngles, Some(&mut theirFwd), None, None);
+                _VectorScale(theirFwd, cent.currentState.speed, &mut theirFwd);
+                if ctx.world.players.lastFlyBySound[clientNum as usize] + FLYBYSOUNDTIME < time {
+                    //okay to do a flyby sound on this vehicle
+                    if _DotProduct(myFwd, theirFwd) < 500.0 {
+                        let soundFlyBy = unsafe { (*info_ptr).soundFlyBy };
+                        let soundFlyBy2 = unsafe { (*info_ptr).soundFlyBy2 };
+                        let flyBySound = if soundFlyBy != 0 && soundFlyBy2 != 0 {
+                            if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
+                                soundFlyBy
+                            } else {
+                                soundFlyBy2
+                            }
+                        } else if soundFlyBy != 0 {
+                            soundFlyBy
+                        } else {
+                            soundFlyBy2
+                        };
+                        trap::S_StartSound(
+                            ctx.engine,
+                            None,
+                            clientNum,
+                            CHAN_LESS_ATTEN,
+                            flyBySound,
+                        );
+                        ctx.world.players.lastFlyBySound[clientNum as usize] = time;
+                    }
+                }
+            }
+        }
+    }
+
+    if cent.currentState.speed == 0.0 //was stopped
+        && cent.nextState.speed > 0.0 //now moving forward
+        && unsafe { (*info_ptr).soundEngineStart } != 0
+    {
+        //engines rev up for the first time
+        let soundEngineStart = unsafe { (*info_ptr).soundEngineStart };
+        trap::S_StartSound(
+            ctx.engine,
+            None,
+            clientNum,
+            CHAN_LESS_ATTEN,
+            soundEngineStart,
+        );
+    }
+
+    // Animals don't exude any effects...
+    if unsafe { (*info_ptr).r#type } != vehicleType_t::VH_ANIMAL {
+        let mut didFireTrail = false;
+        if unsafe { (*info_ptr).surfDestruction } != 0 && !cent.ghoul2.is_null() {
+            //see if anything has been blown off
+            let mut surfDmg = false;
+
+            for i in 0..BG_NUM_TOGGLEABLE_SURFACES {
+                if bgToggleableSurfaceDebris.get(i).copied().unwrap_or(0) > 1 {
+                    //this is decidedly a destroyable surface, let's check its status
+                    let surfName = bgToggleableSurfaces
+                        .get(i)
+                        .and_then(|s| *s)
+                        .map(|s| s.to_str().unwrap_or(""))
+                        .unwrap_or("");
+                    let surfTest =
+                        trap::G2API_GetSurfaceRenderStatus(ctx.engine, cent.ghoul2, 0, surfName);
+
+                    if surfTest != -1 && (surfTest & TURN_OFF) != 0 {
+                        //it exists, but it's off...
+                        surfDmg = true;
+
+                        //create some flames
+                        let burning = ctx.world.cgs.effects.mShipDestBurning;
+                        CG_CreateSurfaceDebris(ctx, cent, i as c_int, burning, false);
+                        didFireTrail = true;
+                    }
+                }
+            }
+
+            if surfDmg {
+                //if any surface are damaged, neglect exhaust etc effects (so we don't have exhaust trails coming out of invisible surfaces)
+                return;
+            }
+        }
+        if !didFireTrail && (cent.currentState.eFlags & EF_DEAD) != 0 {
+            //spiralling out of control anyway
+            let burning = ctx.world.cgs.effects.mShipDestBurning;
+            CG_CreateSurfaceDebris(ctx, cent, -1, burning, false);
+        }
+
+        if ctx.world.vehicle_pool[row_idx].m_iLastFXTime <= time {
+            //until we attach it, we need to debounce this
+            let mut fwd: vec3_t = [0.0; 3];
+            let mut rt: vec3_t = [0.0; 3];
+            let mut up: vec3_t = [0.0; 3];
+            let mut flat: vec3_t = [0.0; 3];
+            let nextFXDelay: f32 = 50.0;
+            VectorSet(&mut flat, 0.0, cent.lerpAngles[1], cent.lerpAngles[2]);
+            AngleVectors(flat, Some(&mut fwd), Some(&mut rt), Some(&mut up));
+            if cent.currentState.speed > 0.0 {
+                //FIXME: only do this when accelerator is being pressed! (must have a driver?)
+                let mut org: vec3_t = [0.0; 3];
+                let doExhaust;
+                _VectorMA(cent.lerpOrigin, -16.0, up, &mut org);
+                let orgTmp = org;
+                _VectorMA(orgTmp, -42.0, fwd, &mut org);
+                // Play damage effects.
+                //if ( pVehNPC->m_iArmor <= 75 )
+                if false {
+                    //hurt
+                    let blackSmoke = ctx.world.cgs.effects.mBlackSmoke;
+                    trap::FX_PlayEffectID(ctx.engine, blackSmoke, &org, &fwd, -1, -1);
+                } else if unsafe { (*info_ptr).iTrailFX } != 0 {
+                    //okay, do normal trail
+                    let iTrailFX = unsafe { (*info_ptr).iTrailFX };
+                    trap::FX_PlayEffectID(ctx.engine, iTrailFX, &org, &fwd, -1, -1);
+                }
+                //=====================================================================
+                //EXHAUST FX
+                //=====================================================================
+                //do exhaust
+                if (cent.currentState.eFlags & EF_JETPACK_ACTIVE) != 0 {
+                    //cheap way of telling us the vehicle is in "turbo" mode
+                    doExhaust = unsafe { (*info_ptr).iTurboFX } != 0;
+                } else {
+                    doExhaust = unsafe { (*info_ptr).iExhaustFX } != 0;
+                }
+                if doExhaust && !cent.ghoul2.is_null() {
+                    for i in 0..MAX_VEHICLE_EXHAUSTS {
+                        // We hit an invalid tag, we quit (they should be created in order so tough luck if not).
+                        let exhaustTag = ctx.world.vehicle_pool[row_idx].m_iExhaustTag[i];
+                        if exhaustTag == -1 {
+                            break;
+                        }
+
+                        if (cent.currentState.brokenLimbs & (1 << SHIPSURF_DAMAGE_BACK_HEAVY)) != 0
+                        {
+                            //engine has taken heavy damage
+                            if ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
+                                //50% chance of not drawing this engine glow this frame
+                                continue;
+                            }
+                        } else if (cent.currentState.brokenLimbs
+                            & (1 << SHIPSURF_DAMAGE_BACK_LIGHT))
+                            != 0
+                        {
+                            //engine has taken light damage
+                            if ctx.world.bg_state.rng.Q_irand(0, 4) == 0 {
+                                //20% chance of not drawing this engine glow this frame
+                                continue;
+                            }
+                        }
+
+                        let fx = if (cent.currentState.eFlags & EF_JETPACK_ACTIVE) != 0 //cheap way of telling us the vehicle is in "turbo" mode
+                            && unsafe { (*info_ptr).iTurboFX } != 0
+                        //they have a valid turbo exhaust effect to play
+                        {
+                            unsafe { (*info_ptr).iTurboFX }
+                        } else {
+                            //play the normal one
+                            unsafe { (*info_ptr).iExhaustFX }
+                        };
+
+                        if unsafe { (*info_ptr).r#type } == vehicleType_t::VH_FIGHTER {
+                            trap::FX_PlayBoltedEffectID(
+                                ctx.engine,
+                                fx,
+                                &cent.lerpOrigin,
+                                cent.ghoul2,
+                                exhaustTag,
+                                cent.currentState.number,
+                                0,
+                                0,
+                                true,
+                            );
+                        } else {
+                            //fixme: bolt these too
+                            let mut boltMatrix = mdxaBone_t {
+                                matrix: [[0.0; 4]; 3],
+                            };
+                            let mut boltOrg: vec3_t = [0.0; 3];
+
+                            trap::G2API_GetBoltMatrix(
+                                ctx.engine,
+                                cent.ghoul2,
+                                0,
+                                exhaustTag,
+                                &mut boltMatrix,
+                                &flat,
+                                &cent.lerpOrigin,
+                                time,
+                                Some(&mut ctx.world.cgs.gameModels[0]),
+                                &cent.modelScale,
+                            );
+
+                            BG_GiveMeVectorFromMatrix(
+                                &boltMatrix,
+                                Eorientations::ORIGIN as c_int,
+                                &mut boltOrg,
+                            );
+                            let boltDir = fwd; //fixme?
+
+                            trap::FX_PlayEffectID(ctx.engine, fx, &boltOrg, &boltDir, -1, -1);
+                        }
+                    }
+                }
+                //=====================================================================
+                //WING TRAIL FX
+                //=====================================================================
+                //do trail
+                //FIXME: not in space!!!
+                if unsafe { (*info_ptr).iTrailFX } != 0 && !cent.ghoul2.is_null() {
+                    let mut getBoltAngles: vec3_t = cent.lerpAngles;
+                    if unsafe { (*info_ptr).r#type } != vehicleType_t::VH_FIGHTER {
+                        //only fighters use pitch/roll in refent axis
+                        getBoltAngles[PITCH] = 0.0;
+                        getBoltAngles[ROLL] = 0.0;
+                    }
+
+                    for i in 1..5 {
+                        let trailBolt = trap::G2API_AddBolt(
+                            ctx.engine,
+                            cent.ghoul2,
+                            0,
+                            &format!("*trail{}", i),
+                        );
+                        // We hit an invalid tag, we quit (they should be created in order so tough luck if not).
+                        if trailBolt == -1 {
+                            break;
+                        }
+
+                        let mut boltMatrix = mdxaBone_t {
+                            matrix: [[0.0; 4]; 3],
+                        };
+                        let mut boltOrg: vec3_t = [0.0; 3];
+                        trap::G2API_GetBoltMatrix(
+                            ctx.engine,
+                            cent.ghoul2,
+                            0,
+                            trailBolt,
+                            &mut boltMatrix,
+                            &getBoltAngles,
+                            &cent.lerpOrigin,
+                            time,
+                            Some(&mut ctx.world.cgs.gameModels[0]),
+                            &cent.modelScale,
+                        );
+
+                        BG_GiveMeVectorFromMatrix(
+                            &boltMatrix,
+                            Eorientations::ORIGIN as c_int,
+                            &mut boltOrg,
+                        );
+                        let boltDir = fwd; //fixme?
+
+                        let iTrailFX = unsafe { (*info_ptr).iTrailFX };
+                        trap::FX_PlayEffectID(ctx.engine, iTrailFX, &boltOrg, &boltDir, -1, -1);
+                    }
+                }
+            }
+            //FIXME armor needs to be sent over network
+            if (cent.currentState.eFlags & EF_DEAD) != 0 {
+                //just plain dead, use flames
+                let up: vec3_t = [0.0, 0.0, 1.0];
+                //doh!  no tag
+                let boltOrg = cent.lerpOrigin;
+                let burning = ctx.world.cgs.effects.mShipDestBurning;
+                trap::FX_PlayEffectID(ctx.engine, burning, &boltOrg, &up, -1, -1);
+            }
+            if cent.currentState.brokenLimbs != 0 {
+                if ctx.world.bg_state.rng.Q_irand(0, 5) == 0 {
+                    for i in SHIPSURF_FRONT..=SHIPSURF_LEFT {
+                        if (cent.currentState.brokenLimbs
+                            & (1 << ((i - SHIPSURF_FRONT) + SHIPSURF_DAMAGE_FRONT_HEAVY)))
+                            != 0
+                        {
+                            //heavy damage, do both effects
+                            if unsafe { (*info_ptr).iInjureFX } != 0 {
+                                let iInjureFX = unsafe { (*info_ptr).iInjureFX };
+                                CG_CreateSurfaceSmoke(ctx, cent, i, iInjureFX);
+                            }
+                            if unsafe { (*info_ptr).iDmgFX } != 0 {
+                                let iDmgFX = unsafe { (*info_ptr).iDmgFX };
+                                CG_CreateSurfaceSmoke(ctx, cent, i, iDmgFX);
+                            }
+                        } else if (cent.currentState.brokenLimbs
+                            & (1 << ((i - SHIPSURF_FRONT) + SHIPSURF_DAMAGE_FRONT_LIGHT)))
+                            != 0
+                        {
+                            //only light damage
+                            if unsafe { (*info_ptr).iInjureFX } != 0 {
+                                let iInjureFX = unsafe { (*info_ptr).iInjureFX };
+                                CG_CreateSurfaceSmoke(ctx, cent, i, iInjureFX);
+                            }
+                        }
+                    }
+                }
+            }
+            ctx.world.vehicle_pool[row_idx].m_iLastFXTime = time + nextFXDelay as c_int;
+        }
+    }
 }
 
 /// Raven `CG_CustomSound` — resolves a `*`-prefixed custom sound reference
@@ -5339,13 +5754,8 @@ pub fn CG_PlayerAnimation(
 /// the entity's own `npcClient` for NPCs, the live `clientinfo` row otherwise —
 /// and it happens after the ragdoll block so `CG_RagDoll` sees the real row.
 ///
-/// DEFERRED (two arms): Raven's walker arm and its fighter/speeder arms test
-/// `m_pVehicle->m_pVehicleInfo->type`, which DEC-46.2's `Option<VehicleId>`
-/// cannot answer until the `Vehicle_t` referent pool lands. The walker test
-/// reads as false (an AT-ST takes the generic axis rather than every vehicle
-/// taking ATST angles) and the fighter test as presence-only (cg_draw.rs's
-/// precedent for the same `VH_FIGHTER` test), which leaves Raven's speeder hack
-/// unreachable.
+/// The walker/fighter/speeder arms read `m_pVehicle->m_pVehicleInfo->type`
+/// through the pool (resolved once as `cent_veh_type`).
 /// Source: `oracle/codemp/cgame/cg_players.c:4192-4331`
 pub fn CG_G2PlayerAngles(
     ctx: &mut CgContext,
@@ -5353,6 +5763,13 @@ pub fn CG_G2PlayerAngles(
     legs: &mut [vec3_t; 3],
     legsAngles: &mut vec3_t,
 ) {
+    // Raven reads `cent->m_pVehicle->m_pVehicleInfo->type` in the vehicle arms
+    // below; resolve it once through the pool up front (the referent can't
+    // change while we're in here).
+    let cent_veh_type: Option<vehicleType_t> = cent.m_pVehicle.map(|id| unsafe {
+        (*ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo).r#type
+    });
+
     //rww - now do ragdoll stuff
     if (cent.currentState.eFlags & EF_DEAD) != 0 || (cent.currentState.eFlags & EF_RAG) != 0 {
         let mut forcedAngles: vec3_t = [0.0; 3];
@@ -5566,17 +5983,28 @@ pub fn CG_G2PlayerAngles(
             ctx.world.cgs.clientinfo[ciNumber] = s;
         }
     }
-    // DEFERRED: Vehicle_t::m_pVehicleInfo->type == VH_WALKER — Raven's next arm
-    // (zero the legs pitch, then `BG_G2ATSTAngles` with a yaw-only look vector)
-    // is gated entirely on that read, so it drops out rather than firing for
-    // every vehicle. See the fn doc.
+    // a walker (AT-ST): zero the legs pitch, then drive the torso through
+    // `BG_G2ATSTAngles` with a yaw/roll-free look vector.
     // Source: oracle/codemp/cgame/cg_players.c:4280-4292
-    else if cent.currentState.eType == entityType_t::ET_NPC as c_int
+    else if cent.m_pVehicle.is_some() && cent_veh_type == Some(vehicleType_t::VH_WALKER) {
+        let mut lookAngles: vec3_t = [0.0; 3];
+
+        _VectorCopy(cent.lerpAngles, legsAngles);
+        legsAngles[PITCH] = 0.0;
+        AnglesToAxis(*legsAngles, legs.as_mut_ptr());
+
+        _VectorCopy(cent.lerpAngles, &mut lookAngles);
+        lookAngles[YAW] = 0.0;
+        lookAngles[ROLL] = 0.0;
+
+        let time = ctx.world.cg.time;
+        let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+        BG_G2ATSTAngles(cent.ghoul2, time, lookAngles, &traps);
+    } else if cent.currentState.eType == entityType_t::ET_NPC as c_int
         && cent.currentState.NPC_class == class_t::CLASS_VEHICLE as c_int
         && cent.m_pVehicle.is_some()
+        && cent_veh_type == Some(vehicleType_t::VH_FIGHTER)
     {
-        // DEFERRED: Vehicle_t::m_pVehicleInfo->type == VH_FIGHTER — presence
-        // only, see the fn doc.
         //fighters actually want to take pitch and roll into account for the axial angles
         _VectorCopy(cent.lerpAngles, legsAngles);
         AnglesToAxis(*legsAngles, legs.as_mut_ptr());
@@ -5590,12 +6018,21 @@ pub fn CG_G2PlayerAngles(
     } else {
         let mut nhAngles: vec3_t = [0.0; 3];
 
-        // DEFERRED: Vehicle_t::m_pVehicleInfo->type == VH_SPEEDER — Raven's own
-        // "yeah, a hack, sorry" arm keeps a speeder's roll. It is unreachable
-        // while the fighter test above is presence-only, so the generic
-        // yaw-only set is all that runs.
-        // Source: oracle/codemp/cgame/cg_players.c:4314-4320
-        VectorSet(&mut nhAngles, 0.0, cent.lerpAngles[YAW], 0.0);
+        if cent.currentState.eType == entityType_t::ET_NPC as c_int
+            && cent.currentState.NPC_class == class_t::CLASS_VEHICLE as c_int
+            && cent.m_pVehicle.is_some()
+            && cent_veh_type == Some(vehicleType_t::VH_SPEEDER)
+        {
+            //yeah, a hack, sorry.
+            VectorSet(
+                &mut nhAngles,
+                0.0,
+                cent.lerpAngles[YAW],
+                cent.lerpAngles[ROLL],
+            );
+        } else {
+            VectorSet(&mut nhAngles, 0.0, cent.lerpAngles[YAW], 0.0);
+        }
         AnglesToAxis(nhAngles, legs.as_mut_ptr());
     }
 
@@ -6112,10 +6549,8 @@ pub fn CG_G2SaberEffects(ctx: &mut CgContext, start: &vec3_t, end: &vec3_t, owne
 /// at the bottom of the loop (the flip block is commented out — "sometimes it
 /// just makes too many effects"), so this is the single forward trace.
 ///
-/// DEFERRED: the mark is skipped for `VH_FIGHTER` vehicles in Raven ("they have
-/// crazy full axial angles"); DEC-46.2's `Option<VehicleId>` cannot answer the
-/// type half until the `Vehicle_t` referent pool lands, so every vehicle-class
-/// NPC gets a mark here.
+/// The mark is skipped for `VH_FIGHTER` vehicles ("they have crazy full axial
+/// angles"), read through the pool.
 /// Source: `oracle/codemp/cgame/cg_players.c:5798-5984`
 pub fn CG_SaberCompWork(
     ctx: &mut CgContext,
@@ -6174,17 +6609,18 @@ pub fn CG_SaberCompWork(
                 let trEntNum = trace.entityNum as usize;
                 let trGhoul2 = ctx.world.entity(trEntNum).ghoul2;
 
-                if !trGhoul2.is_null() {
-                    // DEFERRED: Vehicle_t::m_pVehicleInfo->type != VH_FIGHTER —
-                    // see the fn doc; presence alone can't rule a fighter out.
-                    let isVehicle = ctx.world.entity(trEntNum).currentState.eType
-                        == entityType_t::ET_NPC as c_int
-                        && ctx.world.entity(trEntNum).currentState.NPC_class
-                            == class_t::CLASS_VEHICLE as c_int
-                        && ctx.world.entity(trEntNum).m_pVehicle.is_some();
-                    let _ = isVehicle;
+                let trVehType: Option<vehicleType_t> =
+                    ctx.world.entity(trEntNum).m_pVehicle.map(|id| unsafe {
+                        (*ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo).r#type
+                    });
+                //don't do on fighters cause they have crazy full axial angles
+                let isVehicleFighter = ctx.world.entity(trEntNum).currentState.eType
+                    == entityType_t::ET_NPC as c_int
+                    && ctx.world.entity(trEntNum).currentState.NPC_class
+                        == class_t::CLASS_VEHICLE as c_int
+                    && trVehType == Some(vehicleType_t::VH_FIGHTER);
 
-                    //don't do on fighters cause they have crazy full axial angles
+                if !trGhoul2.is_null() && !isVehicleFighter {
                     let mut ePos: vec3_t = [0.0; 3];
                     let mut weaponMarkShader: c_int = 0;
                     let mut markShader: c_int = ctx.world.cgs.media.bdecal_saberglow;
@@ -6550,45 +6986,53 @@ pub fn CG_G2AnimEntModelLoad(ctx: &mut CgContext, centNum: usize) {
             let number = ctx.world.entity(centNum).currentState.number;
             let npcClass = ctx.world.entity(centNum).currentState.NPC_class;
 
-            if npcClass == class_t::CLASS_VEHICLE as c_int
-                && ctx.world.entity(centNum).m_pVehicle.is_some()
-            {
-                //do special vehicle stuff
+            if npcClass == class_t::CLASS_VEHICLE as c_int {
+                if let Some(vehId) = ctx.world.entity(centNum).m_pVehicle {
+                    //do special vehicle stuff
+                    let row_idx = vehId.ent_num() as usize;
 
-                // Setup the default first bolt
-                trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "model_root");
+                    // Setup the default first bolt
+                    trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "model_root");
 
-                // Setup the droid unit.
-                //
-                // DEFERRED: Vehicle_t::m_iDroidUnitTag / m_iExhaustTag /
-                // m_iMuzzleTag / m_iGunnerViewTag — the bolts are still added
-                // (they shift every later bolt index), only the tag stores are
-                // out of reach until the referent pool lands.
-                // Source: oracle/codemp/cgame/cg_players.c:7097-7129
-                trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*droidunit");
+                    // Setup the droid unit.
+                    let tag = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*droidunit");
+                    ctx.world.vehicle_pool[row_idx].m_iDroidUnitTag = tag;
 
-                // Setup the Exhausts.
-                for i in 0..MAX_VEHICLE_EXHAUSTS {
-                    let strTemp = format!("*exhaust{}", i + 1);
-                    trap::G2API_AddBolt(ctx.engine, ghoul2, 0, &strTemp);
-                }
+                    // Setup the Exhausts.
+                    for i in 0..MAX_VEHICLE_EXHAUSTS {
+                        let strTemp = format!("*exhaust{}", i + 1);
+                        let tag = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, &strTemp);
+                        ctx.world.vehicle_pool[row_idx].m_iExhaustTag[i] = tag;
+                    }
 
-                // Setup the Muzzles.
-                for i in 0..MAX_VEHICLE_MUZZLES {
-                    let strTemp = format!("*muzzle{}", i + 1);
-                    if trap::G2API_AddBolt(ctx.engine, ghoul2, 0, &strTemp) == -1 {
-                        //ergh, try *flash?
-                        let strTemp = format!("*flash{}", i + 1);
-                        trap::G2API_AddBolt(ctx.engine, ghoul2, 0, &strTemp);
+                    // Setup the Muzzles.
+                    for i in 0..MAX_VEHICLE_MUZZLES {
+                        let strTemp = format!("*muzzle{}", i + 1);
+                        let tag = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, &strTemp);
+                        ctx.world.vehicle_pool[row_idx].m_iMuzzleTag[i] = tag;
+                        if ctx.world.vehicle_pool[row_idx].m_iMuzzleTag[i] == -1 {
+                            //ergh, try *flash?
+                            let strTemp = format!("*flash{}", i + 1);
+                            let tag = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, &strTemp);
+                            ctx.world.vehicle_pool[row_idx].m_iMuzzleTag[i] = tag;
+                        }
+                    }
+
+                    // Setup the Turrets.
+                    for i in 0..MAX_VEHICLE_TURRETS {
+                        let gunnerViewTag = unsafe {
+                            (*ctx.world.vehicle_pool[row_idx].m_pVehicleInfo).turret[i]
+                                .gunnerViewTag
+                        };
+                        if !gunnerViewTag.is_null() {
+                            let name = unsafe { cstr_to_str(gunnerViewTag) };
+                            let tag = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, &name);
+                            ctx.world.vehicle_pool[row_idx].m_iGunnerViewTag[i] = tag;
+                        } else {
+                            ctx.world.vehicle_pool[row_idx].m_iGunnerViewTag[i] = -1;
+                        }
                     }
                 }
-
-                // Setup the Turrets.
-                //
-                // DEFERRED: Vehicle_t::m_pVehicleInfo->turret[i].gunnerViewTag —
-                // the bolt name itself comes out of the vehicle info, so nothing
-                // of this loop survives the missing referent pool.
-                // Source: oracle/codemp/cgame/cg_players.c:7119-7129
             }
 
             // the NPC's clientinfo lives on the entity; taking the box out lets
@@ -6979,44 +7423,102 @@ pub fn CG_ForceElectrocution(
 /// Raven `CG_CheckThirdPersonAlpha` — fades your own body (or the ship you are
 /// flying) out when the third-person camera is inside it.
 ///
-/// DEFERRED (both vehicle arms): every branch that matters here reads
-/// `m_pVehicle->m_pVehicleInfo->cameraOverride`/`cameraAlpha`/`cameraRange`,
-/// which DEC-46.2's `Option<VehicleId>` cannot answer until the `Vehicle_t`
-/// referent pool lands. Each unavailable test reads as false, so an alpha-capable
-/// ship keeps Raven's own no-auto-alpha behaviour (`cg_thirdPersonAlpha`), and
-/// the `CG_G2Trace` camera probe that would ease `cg_vehThirdPersonAlpha` never
-/// runs.
 /// Source: `oracle/codemp/cgame/cg_players.c:8341-8421`
 pub fn CG_CheckThirdPersonAlpha(ctx: &mut CgContext, centNum: usize, legs: &mut refEntity_t) {
     let mut alpha: f32 = 1.0;
     let mut setFlags: c_int = 0;
 
-    // DEFERRED: Vehicle_t::m_pVehicleInfo->cameraOverride/cameraAlpha — Raven's
-    // first arm (a vehicle that isn't mine and carries alpha gets forced fully
-    // opaque, then returns) is gated on that read, so it drops out. See the fn
-    // doc.
-    // Source: oracle/codemp/cgame/cg_players.c:8346-8357
+    let clientNum = ctx.world.entity(centNum).currentState.clientNum;
+
+    if let Some(vehId) = ctx.world.entity(centNum).m_pVehicle {
+        //a vehicle
+        let info_ptr = ctx.world.vehicle_pool[vehId.ent_num() as usize].m_pVehicleInfo;
+        let hasAlpha = ctx.world.cg.predictedPlayerState.m_iVehicleNum != clientNum //not mine
+            && !info_ptr.is_null()
+            && unsafe { (*info_ptr).cameraOverride != qfalse } //has an override
+            && unsafe { (*info_ptr).cameraAlpha != 0.0 }; //it has alpha
+        if hasAlpha {
+            //make sure it's not using any alpha
+            legs.renderfx |= RF_FORCE_ENT_ALPHA;
+            legs.shaderRGBA[3] = 255;
+            return;
+        }
+    }
 
     if ctx.world.cg.renderingThirdPerson == qfalse {
         return;
     }
 
-    let clientNum = ctx.world.entity(centNum).currentState.clientNum;
-
     if ctx.world.cg.predictedPlayerState.m_iVehicleNum != 0 {
         //in a vehicle
         if ctx.world.cg.predictedPlayerState.m_iVehicleNum == clientNum {
             //this is my vehicle
-            //
-            // DEFERRED: the auto-alpha arm (`cameraOverride`/`cameraAlpha`/
-            // `cameraRange` + the `CG_G2Trace` probe) — see the fn doc; this is
-            // Raven's else, "use the cvar".
-            // Source: oracle/codemp/cgame/cg_players.c:8368-8397
+            let vehInfo = ctx.world.entity(centNum).m_pVehicle.and_then(|vehId| {
+                let info_ptr = ctx.world.vehicle_pool[vehId.ent_num() as usize].m_pVehicleInfo;
+                if info_ptr.is_null() {
+                    None
+                } else {
+                    let info = unsafe { &*info_ptr };
+                    Some((
+                        info.cameraOverride != qfalse,
+                        info.cameraAlpha,
+                        info.cameraRange,
+                    ))
+                }
+            });
 
-            //reset this
-            ctx.world.players.cg_vehThirdPersonAlpha = 1.0;
-            //use the cvar
-            alpha = ctx.world.cvars.cg_thirdPersonAlpha.value;
+            if let Some((cameraOverride, cameraAlpha, cameraRange)) = vehInfo {
+                if cameraOverride && cameraAlpha != 0.0 {
+                    //vehicle has auto third-person alpha on
+                    let mut trace = trace_t::zeroed();
+                    let mut dir2Crosshair: vec3_t = [0.0; 3];
+                    let mut end: vec3_t = [0.0; 3];
+                    let cameraCurLoc = ctx.world.view.cameraCurLoc;
+                    let cg_crosshairPos = ctx.world.draw.cg_crosshairPos;
+                    _VectorSubtract(cg_crosshairPos, cameraCurLoc, &mut dir2Crosshair);
+                    VectorNormalize(&mut dir2Crosshair);
+                    _VectorMA(cameraCurLoc, cameraRange * 2.0, dir2Crosshair, &mut end);
+                    CG_G2Trace(
+                        ctx,
+                        &mut trace,
+                        &cameraCurLoc,
+                        &vec3_origin,
+                        &vec3_origin,
+                        &end,
+                        ENTITYNUM_NONE,
+                        CONTENTS_BODY,
+                    );
+                    if trace.entityNum as c_int == clientNum
+                        || trace.entityNum as c_int == ctx.world.cg.predictedPlayerState.clientNum
+                    {
+                        //hit me or the vehicle I'm in
+                        ctx.world.players.cg_vehThirdPersonAlpha -=
+                            0.1 * ctx.world.cg.frametime as f32 / 50.0;
+                        if ctx.world.players.cg_vehThirdPersonAlpha < cameraAlpha {
+                            ctx.world.players.cg_vehThirdPersonAlpha = cameraAlpha;
+                        }
+                    } else {
+                        ctx.world.players.cg_vehThirdPersonAlpha +=
+                            0.1 * ctx.world.cg.frametime as f32 / 50.0;
+                        if ctx.world.players.cg_vehThirdPersonAlpha > 1.0 {
+                            ctx.world.players.cg_vehThirdPersonAlpha = 1.0;
+                        }
+                    }
+                    alpha = ctx.world.players.cg_vehThirdPersonAlpha;
+                } else {
+                    //use the cvar
+                    //reset this
+                    ctx.world.players.cg_vehThirdPersonAlpha = 1.0;
+                    //use the cvar
+                    alpha = ctx.world.cvars.cg_thirdPersonAlpha.value;
+                }
+            } else {
+                //use the cvar
+                //reset this
+                ctx.world.players.cg_vehThirdPersonAlpha = 1.0;
+                //use the cvar
+                alpha = ctx.world.cvars.cg_thirdPersonAlpha.value;
+            }
         }
     } else if ctx.world.cg.predictedPlayerState.clientNum == clientNum {
         //it's me
@@ -7042,10 +7544,8 @@ pub fn CG_CheckThirdPersonAlpha(ctx: &mut CgContext, centNum: usize, legs: &mut 
 /// `&mut` borrows disjoint from `ctx.world`. Raven picks `ci` itself, and the
 /// `ET_NPC` half of that pick (including the allocation) still happens below.
 ///
-/// DEFERRED: the fighter-in-my-own-ship early-out tests
-/// `m_pVehicle->m_pVehicleInfo->type == VH_FIGHTER`; DEC-46.2's
-/// `Option<VehicleId>` answers presence only (cg_draw.rs's precedent for the
-/// same test), so any vehicle I am flying takes Raven's "holy hackery" bail.
+/// The fighter-in-my-own-ship early-out reads
+/// `m_pVehicle->m_pVehicleInfo->type == VH_FIGHTER` through the pool.
 /// Source: `oracle/codemp/cgame/cg_players.c:11119-11273`
 pub fn CG_ResetPlayerEntity(ctx: &mut CgContext, cent: &mut centity_t, ci: &mut clientInfo_t) {
     // Raven's `cent->errorTime`/`extrapolated` resets are commented out in the
@@ -7054,10 +7554,11 @@ pub fn CG_ResetPlayerEntity(ctx: &mut CgContext, cent: &mut centity_t, ci: &mut 
     let isNpc = cent.currentState.eType == entityType_t::ET_NPC as c_int;
 
     if isNpc {
-        // DEFERRED: Vehicle_t::m_pVehicleInfo->type == VH_FIGHTER — presence
-        // only, see the fn doc.
         if cent.currentState.NPC_class == class_t::CLASS_VEHICLE as c_int
-            && cent.m_pVehicle.is_some()
+            && cent.m_pVehicle.is_some_and(|id| unsafe {
+                (*ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo).r#type
+                    == vehicleType_t::VH_FIGHTER
+            })
             && ctx.world.cg.predictedPlayerState.m_iVehicleNum != 0
             && cent.currentState.number == ctx.world.cg.predictedPlayerState.m_iVehicleNum
         {
@@ -9846,10 +10347,11 @@ fn cg_draw_player_sphere(
 /// a take/put-back swap with [`centity_t::zeroed`], and `ci` is resolved in
 /// place through [`player_ci`]/[`player_ci_mut`].
 ///
-/// DEFERRED (Vehicle_t referent pool, DEC-46.2): the flying-vehicle smoothing
-/// arm, the "has a pilot" rider-attach branch, and the vehicle-shield shader all
-/// hang off `m_pVehicle->m_pVehicleInfo`, which `Option<VehicleId>` answers only
-/// for presence; each is noted at its site.
+/// ESCALATION (Vehicle_t referent pool, DEC-46.2): the "has a pilot"
+/// rider-attach branch calls `m_pVehicleInfo->AttachRiders`, a `Vehicle_t`
+/// callback that has no member on the Rust `vehicleInfo_t` and whose only impl
+/// lives game-side (mp_game `g_vehicles.rs`), which cgame cannot depend on; it
+/// stays inert. The smoothing and shield-shader arms read the pool directly.
 /// Source: `oracle/codemp/cgame/cg_players.c:8423-11107`
 #[allow(clippy::needless_range_loop)]
 pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
@@ -9937,12 +10439,15 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
             smoothFactor = 0.6;
         } else if eType0 == entityType_t::ET_NPC as c_int
             && ctx.world.entity(centNum).currentState.NPC_class == class_t::CLASS_VEHICLE as c_int
-            && ctx.world.entity(centNum).m_pVehicle.is_some()
+            && ctx
+                .world
+                .entity(centNum)
+                .m_pVehicle
+                .is_some_and(|id| unsafe {
+                    (*ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo).r#type
+                        == vehicleType_t::VH_FIGHTER
+                })
         {
-            // DEFERRED: Vehicle_t referent — Raven also tests
-            // `m_pVehicle->m_pVehicleInfo->type == VH_FIGHTER`; DEC-46.2's
-            // Option<VehicleId> answers presence only (cg_draw.rs's VH_FIGHTER
-            // precedent), so any vehicle here takes the fighter smoothing.
             //greater smoothing for flying vehicles, since they move so fast
             fTolerance = 6000000.0; //500000.0f; //yeah, this is so wrong..but..
             smoothFactor = 0.5;
@@ -10000,12 +10505,76 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
                 }
             } else if owner != ENTITYNUM_NONE {
                 //has a pilot...???
-                // DEFERRED: Vehicle_t referent pool (DEC-46.2). Raven sets the
-                // vehicle's `m_pPilot`/`m_pParentEntity`, copies the two
-                // playerState origins in, calls `m_pVehicleInfo->AttachRiders`,
-                // then copies the resulting origin back onto `cent->lerpOrigin`.
-                // `m_pVehicleInfo` hangs off the `Vehicle_t` an `Option<VehicleId>`
-                // cannot reach yet, so the rider keeps its own lerp position.
+
+                // Raven calls the `m_pVehicleInfo->AttachRiders` fn-ptr slot,
+                // which the Rust `vehicleInfo_t` retired - every CGAME-side
+                // setter binds it to bg's `AttachRidersGeneric` (the `#ifndef
+                // QAGAME` arm, e.g. AnimalNPC.c:879-881), so the call is
+                // direct.
+                // Source: oracle/codemp/cgame/cg_players.c:8544-8562
+                if let Some(vehId) = ctx.world.entity(vehNum).m_pVehicle {
+                    let row_idx = vehId.ent_num() as usize;
+                    let (pVeh, veh_ps, cent_ps, vehLerpOrigin, vehLerpAngles, centLerpOrigin) = {
+                        let world = &mut *ctx.world;
+
+                        // re-sync the two bg rows first - the predict-time
+                        // sync can be a model-reload stale by draw time, and
+                        // the attach reads ghoul2/modelScale through them
+                        for i in [vehNum, centNum] {
+                            let m_pVehicle = match world.entities[i].m_pVehicle {
+                                Some(id) => &raw mut world.vehicle_pool[id.ent_num() as usize],
+                                None => null_mut(),
+                            };
+                            let ent = &world.entities[i];
+                            let row = &mut world.bg_ents[i];
+                            row.s = ent.currentState;
+                            row.ghoul2 = ent.ghoul2;
+                            row.localAnimIndex = ent.localAnimIndex;
+                            row.modelScale = ent.modelScale;
+                            row.m_pVehicle = m_pVehicle;
+                        }
+
+                        //make sure it has its pilot and parent set
+                        world.vehicle_pool[row_idx].m_pPilot =
+                            &raw mut world.bg_ents[owner as usize];
+                        world.vehicle_pool[row_idx].m_pParentEntity =
+                            &raw mut world.bg_ents[vehNum];
+
+                        (
+                            &raw mut world.vehicle_pool[row_idx],
+                            world.bg_ents[vehNum].playerState,
+                            world.bg_ents[centNum].playerState,
+                            world.entities[vehNum].lerpOrigin,
+                            world.entities[vehNum].lerpAngles,
+                            world.entities[centNum].lerpOrigin,
+                        )
+                    };
+                    let time = ctx.world.cg.time;
+
+                    // SAFETY: both rows' playerState pointers are wired
+                    // (CG_PmoveClientPointerUpdate + the predict repoints) and
+                    // gated non-None above; no Rust borrow of their targets is
+                    // live across the bg call
+                    unsafe {
+                        let oldPSOrg = (*veh_ps).origin;
+
+                        //update the veh's playerstate org for getting the bolt
+                        (*veh_ps).origin = vehLerpOrigin;
+                        (*cent_ps).origin = centLerpOrigin;
+
+                        //Now do the attach
+                        (*veh_ps).viewangles = vehLerpAngles;
+                        {
+                            let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+                            AttachRidersGeneric(pVeh, &ctx.world.bg_state, &traps, time);
+                        }
+
+                        //copy the "playerstate origin" to the lerpOrigin since that's what we use to display
+                        ctx.world.entity_mut(centNum).lerpOrigin = (*cent_ps).origin;
+
+                        (*veh_ps).origin = oldPSOrg;
+                    }
+                }
             }
         }
     }
@@ -10557,7 +11126,7 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
     CG_SetGhoul2Info(&mut legs, ctx.world.entity(centNum));
 
     _VectorCopy(ctx.world.entity(centNum).modelScale, &mut legs.modelScale);
-    legs.radius = CG_RadiusForCent(ctx.world.entity(centNum));
+    legs.radius = CG_RadiusForCent(ctx.world, ctx.world.entity(centNum));
     VectorClear(&mut legs.angles);
 
     let colorOverride = player_ci(ctx.world, is_npc, centNum, clientNum).colorOverride;
@@ -12566,11 +13135,28 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
         legs.renderfx &= !RF_RGB_TINT;
         legs.renderfx &= !RF_FORCE_ENT_ALPHA;
 
-        // DEFERRED: Vehicle_t referent — Raven uses
-        // `pVeh->m_pVehicleInfo->shieldShaderHandle` when the vehicle supplies
-        // one; `Option<VehicleId>` can't reach `m_pVehicleInfo` (DEC-46.2), so the
-        // port takes Raven's own no-vehicle-shader fallback.
-        legs.customShader = ctx.world.cgs.media.playerShieldDamage;
+        // the ship's own Vehicle_t, or the ridden vehicle's when a droid is
+        // attached.
+        let pVehId = if checkDroidShields {
+            let vehNum = ctx.world.entity(centNum).currentState.m_iVehicleNum as usize;
+            ctx.world.entity(vehNum).m_pVehicle
+        } else {
+            ctx.world.entity(centNum).m_pVehicle
+        };
+        let shieldShader = pVehId.and_then(|id| {
+            let info_ptr = ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo;
+            if info_ptr.is_null() {
+                None
+            } else {
+                let h = unsafe { (*info_ptr).shieldShaderHandle };
+                (h != 0).then_some(h)
+            }
+        });
+        legs.customShader = match shieldShader {
+            //use the vehicle-specific shader
+            Some(h) => h,
+            None => ctx.world.cgs.media.playerShieldDamage,
+        };
 
         trap::R_AddRefEntityToScene(engine, &legs);
     }

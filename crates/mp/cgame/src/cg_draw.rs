@@ -1355,14 +1355,6 @@ pub fn CG_DrawSaberStyle(
 /// Raven `CG_DrawVehicleShields` — the vehicle HUD's shield tic bar; returns
 /// the shield fraction the caller uses to flash the rest of the HUD.
 ///
-/// DEFERRED: `Vehicle_t` referent pool — `maxShields` is
-/// `veh->m_pVehicle->m_pVehicleInfo->shields`, and DEC-46.2's
-/// `Option<VehicleId>` answers presence only ("ported code only tests
-/// presence" until the pool lands, `local/vehicle_id.rs`). Both the tic loop
-/// and the returned percentage hang off that number, so only the background
-/// pic — everything Raven does before the read — is transcribed.
-/// Source: `oracle/codemp/cgame/cg_draw.c:1895-1937`
-///
 /// Source: `oracle/codemp/cgame/cg_draw.c:1873-1938`
 pub fn CG_DrawVehicleShields(
     ctx: &mut CgContext,
@@ -1379,18 +1371,49 @@ pub fn CG_DrawVehicleShields(
         CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, background);
     }
 
-    let _ = vehNum;
-    //TODO: Port CG_DrawVehicleShields
-    // Source: oracle/codemp/cgame/cg_draw.c:1895-1937
-    todo!("CG_DrawVehicleShields shield tics — blocked on the Vehicle_t referent pool, oracle/codemp/cgame/cg_draw.c:1895-1937")
+    // Raven derefs `veh->m_pVehicle->m_pVehicleInfo` unguarded; no referent
+    // means no bar and a zero shield fraction (§19).
+    let Some(id) = ctx.world.entity(vehNum).m_pVehicle else {
+        return 0.0;
+    };
+    let maxShields =
+        unsafe { &*ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo }.shields as f32;
+    let mut currValue = ctx.world.cg.predictedVehicleState.stats[STAT_ARMOR as usize] as f32;
+    let percShields = currValue / maxShields;
+
+    // Print all the tics of the shield graphic
+    // Look at the amount of health left and show only as much of the graphic as there is health.
+    // Use alpha to fade out partial section of health
+    let inc = maxShields / MAX_VHUD_ARMOR_TICS as f32;
+    for i in 1..=MAX_VHUD_ARMOR_TICS {
+        let Some(item) = Menu_FindItemByName(menus, menuHUD, &format!("armor_tic{}", i)) else {
+            continue;
+        };
+
+        let mut calcColor = menus.item(item).window.foreColor;
+
+        if currValue <= 0.0 {
+            // don't show tic
+            break;
+        } else if currValue < inc {
+            // partial tic (alpha it out)
+            let percent = currValue / inc;
+            calcColor[3] *= percent; // Fade it out
+        }
+
+        trap::R_SetColor(ctx.engine, Some(&calcColor));
+
+        let rect = menus.item(item).window.rect;
+        let background = menus.item(item).window.background;
+        CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, background);
+
+        currValue -= inc;
+    }
+
+    percShields
 }
 
 /// Raven `CG_DrawVehicleAmmo` — the single-weapon vehicle ammo tic bar.
-///
-/// DEFERRED: `Vehicle_t` referent pool — `maxAmmo` is
-/// `m_pVehicleInfo->weapon[0].ammoMax`; see [`CG_DrawVehicleShields`] for the
-/// same blocker. The background pic is everything Raven does before the read.
-/// Source: `oracle/codemp/cgame/cg_draw.c:1963-2009`
 ///
 /// Source: `oracle/codemp/cgame/cg_draw.c:1942-2010`
 pub fn CG_DrawVehicleAmmo(
@@ -1408,17 +1431,53 @@ pub fn CG_DrawVehicleAmmo(
         CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, background);
     }
 
-    let _ = vehNum;
-    //TODO: Port CG_DrawVehicleAmmo
-    // Source: oracle/codemp/cgame/cg_draw.c:1963-2009
-    todo!("CG_DrawVehicleAmmo ammo tics — blocked on the Vehicle_t referent pool, oracle/codemp/cgame/cg_draw.c:1963-2009")
+    // Raven derefs `veh->m_pVehicle->m_pVehicleInfo` unguarded; no referent, no bar (§19).
+    let Some(id) = ctx.world.entity(vehNum).m_pVehicle else {
+        return;
+    };
+    let maxAmmo = unsafe { &*ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo }.weapon
+        [0]
+    .ammoMax as f32;
+    let mut currValue = ctx.world.cg.predictedVehicleState.ammo[0] as f32;
+
+    let inc = maxAmmo / MAX_VHUD_AMMO_TICS as f32;
+    for i in 1..=MAX_VHUD_AMMO_TICS {
+        let Some(item) = Menu_FindItemByName(menus, menuHUD, &format!("ammo_tic{}", i)) else {
+            continue;
+        };
+
+        let calcColor;
+        if ctx.world.draw.cg_vehicleAmmoWarningTime > ctx.world.cg.time
+            && ctx.world.draw.cg_vehicleAmmoWarning == 0
+        {
+            let mut c = g_color_table[COLOR_RED_INDEX];
+            c[3] = (ctx.world.cg.time as f64 * 0.005).sin() as f32 * 0.5 + 0.5;
+            calcColor = c;
+        } else {
+            let mut c = menus.item(item).window.foreColor;
+
+            if currValue <= 0.0 {
+                // don't show tic
+                break;
+            } else if currValue < inc {
+                // partial tic (alpha it out)
+                let percent = currValue / inc;
+                c[3] *= percent; // Fade it out
+            }
+            calcColor = c;
+        }
+
+        trap::R_SetColor(ctx.engine, Some(&calcColor));
+
+        let rect = menus.item(item).window.rect;
+        let background = menus.item(item).window.background;
+        CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, background);
+
+        currValue -= inc;
+    }
 }
 
 /// Raven `CG_DrawVehicleAmmoUpper` — the upper weapon's ammo tic bar.
-///
-/// DEFERRED: `Vehicle_t` referent pool — `maxAmmo` is
-/// `m_pVehicleInfo->weapon[0].ammoMax`; see [`CG_DrawVehicleShields`].
-/// Source: `oracle/codemp/cgame/cg_draw.c:2034-2080`
 ///
 /// Source: `oracle/codemp/cgame/cg_draw.c:2013-2081`
 pub fn CG_DrawVehicleAmmoUpper(
@@ -1436,17 +1495,53 @@ pub fn CG_DrawVehicleAmmoUpper(
         CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, background);
     }
 
-    let _ = vehNum;
-    //TODO: Port CG_DrawVehicleAmmoUpper
-    // Source: oracle/codemp/cgame/cg_draw.c:2034-2080
-    todo!("CG_DrawVehicleAmmoUpper ammo tics — blocked on the Vehicle_t referent pool, oracle/codemp/cgame/cg_draw.c:2034-2080")
+    // Raven derefs `veh->m_pVehicle->m_pVehicleInfo` unguarded; no referent, no bar (§19).
+    let Some(id) = ctx.world.entity(vehNum).m_pVehicle else {
+        return;
+    };
+    let maxAmmo = unsafe { &*ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo }.weapon
+        [0]
+    .ammoMax as f32;
+    let mut currValue = ctx.world.cg.predictedVehicleState.ammo[0] as f32;
+
+    let inc = maxAmmo / MAX_VHUD_AMMO_TICS as f32;
+    for i in 1..MAX_VHUD_AMMO_TICS {
+        let Some(item) = Menu_FindItemByName(menus, menuHUD, &format!("ammoupper_tic{}", i)) else {
+            continue;
+        };
+
+        let calcColor;
+        if ctx.world.draw.cg_vehicleAmmoWarningTime > ctx.world.cg.time
+            && ctx.world.draw.cg_vehicleAmmoWarning == 0
+        {
+            let mut c = g_color_table[COLOR_RED_INDEX];
+            c[3] = (ctx.world.cg.time as f64 * 0.005).sin() as f32 * 0.5 + 0.5;
+            calcColor = c;
+        } else {
+            let mut c = menus.item(item).window.foreColor;
+
+            if currValue <= 0.0 {
+                // don't show tic
+                break;
+            } else if currValue < inc {
+                // partial tic (alpha it out)
+                let percent = currValue / inc;
+                c[3] *= percent; // Fade it out
+            }
+            calcColor = c;
+        }
+
+        trap::R_SetColor(ctx.engine, Some(&calcColor));
+
+        let rect = menus.item(item).window.rect;
+        let background = menus.item(item).window.background;
+        CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, background);
+
+        currValue -= inc;
+    }
 }
 
 /// Raven `CG_DrawVehicleAmmoLower` — the lower weapon's ammo tic bar.
-///
-/// DEFERRED: `Vehicle_t` referent pool — `maxAmmo` is
-/// `m_pVehicleInfo->weapon[1].ammoMax`; see [`CG_DrawVehicleShields`].
-/// Source: `oracle/codemp/cgame/cg_draw.c:2106-2152`
 ///
 /// Source: `oracle/codemp/cgame/cg_draw.c:2084-2153`
 pub fn CG_DrawVehicleAmmoLower(
@@ -1464,19 +1559,56 @@ pub fn CG_DrawVehicleAmmoLower(
         CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, background);
     }
 
-    let _ = vehNum;
-    //TODO: Port CG_DrawVehicleAmmoLower
-    // Source: oracle/codemp/cgame/cg_draw.c:2106-2152
-    todo!("CG_DrawVehicleAmmoLower ammo tics — blocked on the Vehicle_t referent pool, oracle/codemp/cgame/cg_draw.c:2106-2152")
+    // Raven derefs `veh->m_pVehicle->m_pVehicleInfo` unguarded; no referent, no bar (§19).
+    let Some(id) = ctx.world.entity(vehNum).m_pVehicle else {
+        return;
+    };
+    let maxAmmo = unsafe { &*ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo }.weapon
+        [1]
+    .ammoMax as f32;
+    let mut currValue = ctx.world.cg.predictedVehicleState.ammo[1] as f32;
+
+    let inc = maxAmmo / MAX_VHUD_AMMO_TICS as f32;
+    for i in 1..MAX_VHUD_AMMO_TICS {
+        let Some(item) = Menu_FindItemByName(menus, menuHUD, &format!("ammolower_tic{}", i)) else {
+            continue;
+        };
+
+        let calcColor;
+        if ctx.world.draw.cg_vehicleAmmoWarningTime > ctx.world.cg.time
+            && ctx.world.draw.cg_vehicleAmmoWarning == 1
+        {
+            let mut c = g_color_table[COLOR_RED_INDEX];
+            c[3] = (ctx.world.cg.time as f64 * 0.005).sin() as f32 * 0.5 + 0.5;
+            calcColor = c;
+        } else {
+            let mut c = menus.item(item).window.foreColor;
+
+            if currValue <= 0.0 {
+                // don't show tic
+                break;
+            } else if currValue < inc {
+                // partial tic (alpha it out)
+                let percent = currValue / inc;
+                c[3] *= percent; // Fade it out
+            }
+            calcColor = c;
+        }
+
+        trap::R_SetColor(ctx.engine, Some(&calcColor));
+
+        let rect = menus.item(item).window.rect;
+        let background = menus.item(item).window.background;
+        CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, background);
+
+        currValue -= inc;
+    }
 }
 
 /// Raven `CG_DrawVehicleTurboRecharge` — the turbo bar filling back up.
 ///
-/// DEFERRED: `Vehicle_t` referent pool — the whole `if (item)` body reads
-/// `veh->m_pVehicle->m_iTurboTime` and `m_pVehicleInfo->turboRecharge`, which
-/// DEC-46.2's presence-only id cannot supply; see [`CG_DrawVehicleShields`].
-/// With no such item in the hud, Raven does nothing and so does this.
-/// Source: `oracle/codemp/cgame/cg_draw.c:2165-2193`
+/// The HUD.menu file prints the graphic with a negative height, so it fills
+/// from the bottom up.
 ///
 /// Source: `oracle/codemp/cgame/cg_draw.c:2156-2194`
 pub fn CG_DrawVehicleTurboRecharge(
@@ -1485,11 +1617,38 @@ pub fn CG_DrawVehicleTurboRecharge(
     menuHUD: Option<MenuId>,
     vehNum: usize,
 ) {
-    if Menu_FindItemByName(menus, menuHUD, "turborecharge").is_some() {
-        let _ = (ctx, vehNum);
-        //TODO: Port CG_DrawVehicleTurboRecharge
-        // Source: oracle/codemp/cgame/cg_draw.c:2165-2193
-        todo!("CG_DrawVehicleTurboRecharge bar — blocked on the Vehicle_t referent pool, oracle/codemp/cgame/cg_draw.c:2165-2193")
+    if let Some(item) = Menu_FindItemByName(menus, menuHUD, "turborecharge") {
+        // Raven derefs `veh->m_pVehicle` unguarded; no referent, no bar (§19).
+        let Some(id) = ctx.world.entity(vehNum).m_pVehicle else {
+            return;
+        };
+        let row_idx = id.ent_num() as usize;
+        let turboRecharge =
+            unsafe { &*ctx.world.vehicle_pool[row_idx].m_pVehicleInfo }.turboRecharge;
+        let m_iTurboTime = ctx.world.vehicle_pool[row_idx].m_iTurboTime;
+
+        // Raven keeps `height` as an int, so `item->window.rect.h` truncates.
+        let mut height = menus.item(item).window.rect.h as c_int;
+
+        let percent;
+        let diff = ctx.world.cg.time - m_iTurboTime;
+        if diff > turboRecharge {
+            percent = 1.0;
+            trap::R_SetColor(ctx.engine, Some(&colorTable[ct_table_t::CT_GREEN as usize]));
+        } else {
+            let mut p = diff as f32 / turboRecharge as f32;
+            if p < 0.0 {
+                p = 0.0;
+            }
+            percent = p;
+            trap::R_SetColor(ctx.engine, Some(&colorTable[ct_table_t::CT_RED as usize]));
+        }
+
+        height = (height as f32 * percent) as c_int;
+
+        let rect = menus.item(item).window.rect;
+        let whiteShader = ctx.world.cgs.media.whiteShader;
+        CG_DrawPic(ctx, rect.x, rect.y, rect.w, height as f32, whiteShader);
     }
 }
 
@@ -1543,12 +1702,6 @@ pub fn CG_DrawVehicleWeaponsLinked(
 
 /// Raven `CG_DrawVehicleSpeed` — the speed tic bar, flashing red in turbo.
 ///
-/// DEFERRED: `Vehicle_t` referent pool — `maxSpeed` is
-/// `m_pVehicleInfo->speedMax` and the turbo flash reads `m_iTurboTime`; see
-/// [`CG_DrawVehicleShields`]. The background pic is everything Raven does
-/// before the read.
-/// Source: `oracle/codemp/cgame/cg_draw.c:2272-2341`
-///
 /// Source: `oracle/codemp/cgame/cg_draw.c:2251-2342`
 pub fn CG_DrawVehicleSpeed(
     ctx: &mut CgContext,
@@ -1565,19 +1718,68 @@ pub fn CG_DrawVehicleSpeed(
         CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, background);
     }
 
-    let _ = vehNum;
-    //TODO: Port CG_DrawVehicleSpeed
-    // Source: oracle/codemp/cgame/cg_draw.c:2272-2341
-    todo!("CG_DrawVehicleSpeed speed tics — blocked on the Vehicle_t referent pool, oracle/codemp/cgame/cg_draw.c:2272-2341")
+    // Raven derefs `veh->m_pVehicle->m_pVehicleInfo` unguarded; no referent, no bar (§19).
+    let Some(id) = ctx.world.entity(vehNum).m_pVehicle else {
+        return;
+    };
+    let row_idx = id.ent_num() as usize;
+    let maxSpeed = unsafe { &*ctx.world.vehicle_pool[row_idx].m_pVehicleInfo }.speedMax;
+    let m_iTurboTime = ctx.world.vehicle_pool[row_idx].m_iTurboTime;
+    let mut currValue = ctx.world.cg.predictedVehicleState.speed;
+
+    // Print all the tics of the shield graphic
+    // Look at the amount of health left and show only as much of the graphic as there is health.
+    // Use alpha to fade out partial section of health
+    let inc = maxSpeed / MAX_VHUD_SPEED_TICS as f32;
+    for i in 1..=MAX_VHUD_SPEED_TICS {
+        let Some(item) = Menu_FindItemByName(menus, menuHUD, &format!("speed_tic{}", i)) else {
+            continue;
+        };
+
+        let mut calcColor;
+        if ctx.world.cg.time > m_iTurboTime {
+            calcColor = menus.item(item).window.foreColor;
+        } else {
+            // In turbo mode
+            if ctx.world.cg.VHUDFlashTime < ctx.world.cg.time {
+                ctx.world.cg.VHUDFlashTime = ctx.world.cg.time + 200;
+                if ctx.world.cg.VHUDTurboFlag != qfalse {
+                    ctx.world.cg.VHUDTurboFlag = qfalse;
+                } else {
+                    ctx.world.cg.VHUDTurboFlag = qtrue;
+                }
+            }
+
+            if ctx.world.cg.VHUDTurboFlag != qfalse {
+                calcColor = colorTable[ct_table_t::CT_LTRED1 as usize];
+            } else {
+                calcColor = menus.item(item).window.foreColor;
+            }
+        }
+
+        if currValue <= 0.0 {
+            // don't show tic
+            break;
+        } else if currValue < inc {
+            // partial tic (alpha it out)
+            let percent = currValue / inc;
+            calcColor[3] *= percent; // Fade it out
+        }
+
+        trap::R_SetColor(ctx.engine, Some(&calcColor));
+
+        let rect = menus.item(item).window.rect;
+        let background = menus.item(item).window.background;
+        CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, background);
+
+        currValue -= inc;
+    }
 }
 
 /// Raven `CG_DrawVehicleArmor` — the vehicle hull (armor) tic bar.
 ///
-/// DEFERRED: `Vehicle_t` referent pool — `maxArmor` is
-/// `m_pVehicleInfo->armor`; see [`CG_DrawVehicleShields`]. Raven reads it
-/// before painting the background, but the read makes no engine call, so
-/// painting first and blocking after leaves the trap order untouched.
-/// Source: `oracle/codemp/cgame/cg_draw.c:2352-2407`
+/// Raven reads `maxArmor`/`currValue` before painting the background, but the
+/// read makes no engine call, so painting first leaves the trap order untouched.
 ///
 /// Source: `oracle/codemp/cgame/cg_draw.c:2344-2408`
 pub fn CG_DrawVehicleArmor(
@@ -1595,20 +1797,46 @@ pub fn CG_DrawVehicleArmor(
         CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, background);
     }
 
-    let _ = vehNum;
-    //TODO: Port CG_DrawVehicleArmor
-    // Source: oracle/codemp/cgame/cg_draw.c:2352-2407
-    todo!("CG_DrawVehicleArmor armor tics — blocked on the Vehicle_t referent pool, oracle/codemp/cgame/cg_draw.c:2352-2407")
+    // Raven derefs `veh->m_pVehicle->m_pVehicleInfo` unguarded; no referent, no bar (§19).
+    let Some(id) = ctx.world.entity(vehNum).m_pVehicle else {
+        return;
+    };
+    let maxArmor =
+        unsafe { &*ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo }.armor as f32;
+    let mut currValue = ctx.world.cg.predictedVehicleState.stats[STAT_HEALTH as usize] as f32;
+
+    // Print all the tics of the shield graphic
+    // Look at the amount of health left and show only as much of the graphic as there is health.
+    // Use alpha to fade out partial section of health
+    let inc = maxArmor / MAX_VHUD_SHIELD_TICS as f32;
+    for i in 1..=MAX_VHUD_SHIELD_TICS {
+        let Some(item) = Menu_FindItemByName(menus, menuHUD, &format!("shield_tic{}", i)) else {
+            continue;
+        };
+
+        let mut calcColor = menus.item(item).window.foreColor;
+
+        if currValue <= 0.0 {
+            // don't show tic
+            break;
+        } else if currValue < inc {
+            // partial tic (alpha it out)
+            let percent = currValue / inc;
+            calcColor[3] *= percent; // Fade it out
+        }
+
+        trap::R_SetColor(ctx.engine, Some(&calcColor));
+
+        let rect = menus.item(item).window.rect;
+        let background = menus.item(item).window.background;
+        CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, background);
+
+        currValue -= inc;
+    }
 }
 
 /// Raven `CG_DrawVehicleDamage` — tints one quarter of the vehicle-damage
 /// silhouette green/yellow/red/grey from the `brokenLimbs` bits.
-///
-/// DEFERRED: `Vehicle_t` referent pool — the silhouette handle itself is
-/// `m_pVehicleInfo->iconFront/Back/Left/RightHandle`; see
-/// [`CG_DrawVehicleShields`]. The colour pick and `trap_R_SetColor` are
-/// everything Raven does before that switch.
-/// Source: `oracle/codemp/cgame/cg_draw.c:2465-2489`
 ///
 /// Source: `oracle/codemp/cgame/cg_draw.c:2434-2491`
 pub fn CG_DrawVehicleDamage(
@@ -1620,7 +1848,7 @@ pub fn CG_DrawVehicleDamage(
     alpha: f32,
     index: usize,
 ) {
-    if Menu_FindItemByName(menus, menuHUD, vehDamageData[index].itemName).is_some() {
+    if let Some(item) = Menu_FindItemByName(menus, menuHUD, vehDamageData[index].itemName) {
         let heavy = 1 << vehDamageData[index].heavyDamage as c_int;
         let light = 1 << vehDamageData[index].lightDamage as c_int;
 
@@ -1640,10 +1868,23 @@ pub fn CG_DrawVehicleDamage(
         color[3] = alpha;
         trap::R_SetColor(ctx.engine, Some(&color));
 
-        let _ = vehNum;
-        //TODO: Port CG_DrawVehicleDamage
-        // Source: oracle/codemp/cgame/cg_draw.c:2465-2489
-        todo!("CG_DrawVehicleDamage silhouette handle — blocked on the Vehicle_t referent pool, oracle/codemp/cgame/cg_draw.c:2465-2489")
+        // Raven derefs `veh->m_pVehicle->m_pVehicleInfo` unguarded; no referent, nothing to draw (§19).
+        let Some(id) = ctx.world.entity(vehNum).m_pVehicle else {
+            return;
+        };
+        let info = unsafe { &*ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo };
+        let graphicHandle = match index {
+            VEH_DAMAGE_FRONT => info.iconFrontHandle,
+            VEH_DAMAGE_BACK => info.iconBackHandle,
+            VEH_DAMAGE_LEFT => info.iconLeftHandle,
+            VEH_DAMAGE_RIGHT => info.iconRightHandle,
+            _ => 0,
+        };
+
+        if graphicHandle != 0 {
+            let rect = menus.item(item).window.rect;
+            CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, graphicHandle);
+        }
     }
 }
 
@@ -3174,15 +3415,8 @@ pub fn CG_DrawForcePower(ctx: &mut CgContext, menus: &MenuSystem, menuHUD: Optio
 }
 
 /// Raven `CG_DrawVehicleDamageHUD` — the ship silhouette panel: background,
-/// frame, shield wash, then the four damage quarters.
-///
-/// DEFERRED: `Vehicle_t` referent pool — all three pics are
-/// `veh->m_pVehicle->m_pVehicleInfo->dmgIndic*Handle`, which DEC-46.2's
-/// presence-only `Option<VehicleId>` cannot supply; see
-/// [`CG_DrawVehicleShields`]. Each block keeps Raven's item lookup (the work
-/// before the read) and stops at the handle. The four `CG_DrawVehicleDamage`
-/// tail calls are blocked on the same pool inside that fn.
-/// Source: `oracle/codemp/cgame/cg_draw.c:2511,2548,2563`
+/// frame, shield wash, then the four damage quarters. Used on both damage
+/// indicators — the player's vehicle and the vehicle the player is locked on.
 ///
 /// Source: `oracle/codemp/cgame/cg_draw.c:2495-2583`
 pub fn CG_DrawVehicleDamageHUD(
@@ -3200,26 +3434,71 @@ pub fn CG_DrawVehicleDamageHUD(
         return;
     }
 
-    if Menu_FindItemByName(menus, menuHUD, "background").is_some() {
-        //TODO: Port CG_DrawVehicleDamageHUD vehicle arm
-        // DEFERRED: Vehicle_t referent pool — `dmgIndicBackgroundHandle`
-        // Source: oracle/codemp/cgame/cg_draw.c:2511-2541
-        todo!("CG_DrawVehicleDamageHUD background pic — blocked on the Vehicle_t referent pool, oracle/codemp/cgame/cg_draw.c:2511-2541")
+    if let Some(item) = Menu_FindItemByName(menus, menuHUD, "background") {
+        // Raven derefs `veh->m_pVehicle->m_pVehicleInfo` unguarded; no referent, no pic (§19).
+        let Some(id) = ctx.world.entity(vehNum).m_pVehicle else {
+            return;
+        };
+        let handle = unsafe { &*ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo }
+            .dmgIndicBackgroundHandle;
+        if handle != 0 {
+            let foreColor = menus.item(item).window.foreColor;
+
+            if ctx.world.entity(vehNum).damageTime > ctx.world.cg.time {
+                // ship shields currently taking damage
+                // NOTE: cent->damageAngle can be accessed to get the direction from the ship origin to the impact point (in 3-D space)
+                let mut perc = 1.0
+                    - ((ctx.world.entity(vehNum).damageTime - ctx.world.cg.time) as f32 / 2000.0/*MIN_SHIELD_TIME*/);
+                if perc < 0.0 {
+                    perc = 0.0;
+                } else if perc > 1.0 {
+                    perc = 1.0;
+                }
+                let color: vec4_t = [
+                    foreColor[0],        // flash red
+                    foreColor[1] * perc, // fade other colors back in over time
+                    foreColor[2] * perc, // fade other colors back in over time
+                    foreColor[3],        // always normal alpha
+                ];
+                trap::R_SetColor(ctx.engine, Some(&color));
+            } else {
+                trap::R_SetColor(ctx.engine, Some(&foreColor));
+            }
+
+            let rect = menus.item(item).window.rect;
+            CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, handle);
+        }
     }
 
-    if Menu_FindItemByName(menus, menuHUD, "outer_frame").is_some() {
-        //TODO: Port CG_DrawVehicleDamageHUD vehicle arm
-        // DEFERRED: Vehicle_t referent pool — `dmgIndicFrameHandle`
-        // Source: oracle/codemp/cgame/cg_draw.c:2548-2556
-        todo!("CG_DrawVehicleDamageHUD frame pic — blocked on the Vehicle_t referent pool, oracle/codemp/cgame/cg_draw.c:2548-2556")
+    if let Some(item) = Menu_FindItemByName(menus, menuHUD, "outer_frame") {
+        // Raven derefs `veh->m_pVehicle->m_pVehicleInfo` unguarded; no referent, no pic (§19).
+        let Some(id) = ctx.world.entity(vehNum).m_pVehicle else {
+            return;
+        };
+        let handle = unsafe { &*ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo }
+            .dmgIndicFrameHandle;
+        if handle != 0 {
+            let foreColor = menus.item(item).window.foreColor;
+            trap::R_SetColor(ctx.engine, Some(&foreColor));
+            let rect = menus.item(item).window.rect;
+            CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, handle);
+        }
     }
 
-    if Menu_FindItemByName(menus, menuHUD, "shields").is_some() {
-        let _ = percShields;
-        //TODO: Port CG_DrawVehicleDamageHUD vehicle arm
-        // DEFERRED: Vehicle_t referent pool — `dmgIndicShieldHandle`
-        // Source: oracle/codemp/cgame/cg_draw.c:2563-2573
-        todo!("CG_DrawVehicleDamageHUD shield pic — blocked on the Vehicle_t referent pool, oracle/codemp/cgame/cg_draw.c:2563-2573")
+    if let Some(item) = Menu_FindItemByName(menus, menuHUD, "shields") {
+        // Raven derefs `veh->m_pVehicle->m_pVehicleInfo` unguarded; no referent, no pic (§19).
+        let Some(id) = ctx.world.entity(vehNum).m_pVehicle else {
+            return;
+        };
+        let handle = unsafe { &*ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo }
+            .dmgIndicShieldHandle;
+        if handle != 0 {
+            let mut color = colorTable[ct_table_t::CT_HUD_GREEN as usize];
+            color[3] = percShields;
+            trap::R_SetColor(ctx.engine, Some(&color));
+            let rect = menus.item(item).window.rect;
+            CG_DrawPic(ctx, rect.x, rect.y, rect.w, rect.h, handle);
+        }
     }
 
     //TODO (Raven): if we check nextState.brokenLimbs & prevState.brokenLimbs, we can tell when a damage flag has been added and flash that part of the ship
@@ -5048,13 +5327,6 @@ pub fn CG_DrawInvenSelect(ctx: &mut CgContext, ds: &DisplayState) {
 /// Raven takes a `cent` it never reads; the panel is built from
 /// `cg.predictedPlayerState.m_iVehicleNum` instead.
 ///
-/// DEFERRED: `Vehicle_t` referent pool — the ammo-bar pick and the `hideRider`
-/// damage panel both read `veh->m_pVehicle->m_pVehicleInfo`, which DEC-46.2's
-/// presence-only `Option<VehicleId>` cannot supply; see
-/// [`CG_DrawVehicleShields`]. Every call Raven makes before that read is
-/// transcribed.
-/// Source: `oracle/codemp/cgame/cg_draw.c:2665-2687`
-///
 /// Source: `oracle/codemp/cgame/cg_draw.c:2585-2691`
 pub fn CG_DrawVehicleHud(ctx: &mut CgContext, menus: &MenuSystem, _centNum: usize) -> bool {
     let menuHUD = Menus_FindByName(menus, "swoopvehiclehud");
@@ -5099,13 +5371,56 @@ pub fn CG_DrawVehicleHud(ctx: &mut CgContext, menus: &MenuSystem, _centNum: usiz
     // is commented out at the site.
     CG_DrawVehicleSpeed(ctx, menus, menuHUD, vehNum);
 
-    let _shieldPerc = CG_DrawVehicleShields(ctx, menus, menuHUD, vehNum);
+    let shieldPerc = CG_DrawVehicleShields(ctx, menus, menuHUD, vehNum);
 
-    //TODO: Port CG_DrawVehicleHud vehicle arm
-    // DEFERRED: Vehicle_t referent pool — `m_pVehicleInfo->weapon[0/1].ID` and
-    // `->hideRider`; see the fn doc.
-    // Source: oracle/codemp/cgame/cg_draw.c:2665-2687
-    todo!("CG_DrawVehicleHud weapon/hideRider arms — blocked on the Vehicle_t referent pool, oracle/codemp/cgame/cg_draw.c:2665-2687")
+    // Raven derefs `veh->m_pVehicle->m_pVehicleInfo` unguarded; no referent, draw the player HUD (§19).
+    let Some(id) = ctx.world.entity(vehNum).m_pVehicle else {
+        return true;
+    };
+    let (w0ID, w1ID, hideRider) = {
+        let info = unsafe { &*ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo };
+        (info.weapon[0].ID, info.weapon[1].ID, info.hideRider)
+    };
+
+    if w0ID != 0 && w1ID == 0 {
+        CG_DrawVehicleAmmo(ctx, menus, menuHUD, vehNum);
+    } else if w0ID != 0 && w1ID != 0 {
+        CG_DrawVehicleAmmoUpper(ctx, menus, menuHUD, vehNum);
+        CG_DrawVehicleAmmoLower(ctx, menus, menuHUD, vehNum);
+    }
+
+    // If he's hidden, he must be in a vehicle
+    if hideRider != qfalse {
+        let brokenLimbs = ctx.world.cg.predictedVehicleState.brokenLimbs;
+        CG_DrawVehicleDamageHUD(
+            ctx,
+            menus,
+            vehNum,
+            brokenLimbs,
+            shieldPerc,
+            "vehicledamagehud",
+            1.0,
+        );
+
+        // Has he targeted an enemy?
+        if let Some((targVeh, alpha)) = CG_CheckTargetVehicle(ctx.world) {
+            let targBrokenLimbs = ctx.world.entity(targVeh).currentState.brokenLimbs;
+            let activeForcePass = ctx.world.entity(targVeh).currentState.activeForcePass;
+            CG_DrawVehicleDamageHUD(
+                ctx,
+                menus,
+                targVeh,
+                targBrokenLimbs,
+                activeForcePass as f32 / 10.0,
+                "enemyvehicledamagehud",
+                alpha,
+            );
+        }
+
+        return false; // Don't draw player HUD
+    }
+
+    true // Draw player HUD
 }
 
 /// Raven `CG_DrawDuelistHealth` — one duelist's health bar on the spectator
@@ -7324,7 +7639,7 @@ pub fn CG_DrawDisconnect(ctx: &mut CgContext, ds: &DisplayState) {
 pub fn CG_DrawBracketedEntities(ctx: &mut CgContext) {
     for i in 0..ctx.world.cg.bracketedEntityCount as usize {
         let n = ctx.world.cg.bracketedEntities[i] as usize;
-        let radius = CG_RadiusForCent(ctx.world.entity(n));
+        let radius = CG_RadiusForCent(ctx.world, ctx.world.entity(n));
         CG_BracketEntity(ctx, n, radius);
     }
 }

@@ -22,6 +22,8 @@ use mp_bg::public::pmtype::pmtype_t;
 use mp_bg::public::stat_index::statIndex_t::{STAT_DEAD_YAW, STAT_HEALTH};
 use mp_bg::public::team::TEAM_SPECTATOR;
 use mp_bg::public::viewheight::{DEFAULT_MAXS_2, DEFAULT_MINS_2};
+use mp_bg::vehicles::vehicle_s::MAX_VEHICLE_TURRETS;
+use mp_bg::vehicles::vehicle_type_t::vehicleType_t;
 use mp_bg::weapons::weapon_t::{WP_EMPLACED_GUN, WP_MELEE, WP_SABER};
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
@@ -70,6 +72,7 @@ use crate::cg_predict::{CG_PointContents, CG_PredictPlayerState, CG_Trace};
 use crate::cg_snapshot::CG_ProcessSnapshots;
 use crate::cg_weapons::{CG_AddViewWeapon, LAND_DEFLECT_TIME, LAND_RETURN_TIME};
 use crate::local::cg_t::MAX_SOUNDBUFFER;
+use crate::local::player_state_ref::PlayerStateRef;
 use crate::trap;
 use crate::world::cg_context::CgContext;
 use crate::world::cg_world::CgWorld;
@@ -177,6 +180,22 @@ const ZOOM_OUT_TIME: f32 = 100.0;
 /// Source: `oracle/codemp/cgame/cg_local.h:33`
 const STEP_TIME: c_int = 200;
 
+/// Raven `MAX_STRAFE_TIME` (`bg_vehicles.h:398`, "FIXME: extern?"). Lands beside
+/// its cg_view readers since the `#define` has no ported cross-crate home.
+/// Source: `oracle/codemp/game/bg_vehicles.h:398`
+const MAX_STRAFE_TIME: f32 = 2000.0;
+
+/// Resolve `veh->playerState->hackingTime` through DEC-46.2's `PlayerStateRef`.
+/// A `None` referent (Raven's null pointer) reads as 0 rather than deref UB.
+fn veh_hacking_time(world: &CgWorld, vehNum: usize) -> c_int {
+    match world.entity(vehNum).playerState {
+        PlayerStateRef::None => 0,
+        PlayerStateRef::Predicted => world.cg.predictedPlayerState.hackingTime,
+        PlayerStateRef::PredictedVehicle => world.cg.predictedVehicleState.hackingTime,
+        PlayerStateRef::Snap => world.cgSendPSPool[vehNum].hackingTime,
+    }
+}
+
 /// Raven `CG_CalcVrect` — sets the coordinates of the rendered window from
 /// `cg_viewsize`, clamping the cvar back into 30..100 as a side effect.
 ///
@@ -266,26 +285,47 @@ pub fn CG_CalcIdealThirdPersonViewTarget(world: &mut CgWorld) {
     let mut cameraIdealTarget = cameraFocusLoc;
 
     {
-        // not `mut` only because every arm that would reassign it is deferred
-        // below.
-        let vertOffset = world.cvars.cg_thirdPersonVertOffset.value;
+        let mut vertOffset = world.cvars.cg_thirdPersonVertOffset.value;
 
-        let m_iVehicleNum = world
+        let snapInfo = world
             .cg
             .snap_ref()
-            .map(|snap| snap.ps.m_iVehicleNum)
-            .unwrap_or(0);
-        if m_iVehicleNum != 0 && world.entity(m_iVehicleNum as usize).m_pVehicle.is_some() {
-            // DEFERRED: `Vehicle_t::m_pVehicleInfo` — `cameraOverride`,
-            // `cameraPitchDependantVertOffset`, `cameraVertOffset` and
-            // `type == VH_ANIMAL` all hang off the `Vehicle_t` referent pool
-            // behind `centity_t.m_pVehicle`, which lands with
-            // `oracle/codemp/cgame/cg_players.c:7014-7042` (DEC-46.2). Only the
-            // presence test is reachable, so `vertOffset` keeps the cvar value
-            // — that matches Raven for any vehicle that isn't `cameraOverride`
-            // and isn't `VH_ANIMAL` (Raven's else-if zeroes it for animals);
-            // the animal case is a known divergence until the referent lands.
-            // Source: `oracle/codemp/cgame/cg_view.c:284-320`
+            .map(|snap| (snap.ps.m_iVehicleNum, snap.ps.viewangles[PITCH]));
+        if let Some((m_iVehicleNum, snapPitch)) = snapInfo {
+            if m_iVehicleNum != 0 {
+                let vehNum = m_iVehicleNum as usize;
+                let info_ptr = world
+                    .entity(vehNum)
+                    .m_pVehicle
+                    .map(|id| world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo);
+                if let Some(info_ptr) = info_ptr {
+                    if unsafe { (*info_ptr).cameraOverride } != qfalse {
+                        //override the range with what the vehicle wants it to be
+                        if unsafe { (*info_ptr).cameraPitchDependantVertOffset } != qfalse {
+                            let predPitch = world.cg.predictedPlayerState.viewangles[PITCH];
+                            if snapPitch > 0.0 {
+                                vertOffset = 130.0 + predPitch * -10.0;
+                                if vertOffset < -170.0 {
+                                    vertOffset = -170.0;
+                                }
+                            } else if snapPitch < 0.0 {
+                                vertOffset = 130.0 + predPitch * -5.0;
+                                if vertOffset > 130.0 {
+                                    vertOffset = 130.0;
+                                }
+                            } else {
+                                vertOffset = 30.0;
+                            }
+                        } else {
+                            vertOffset = unsafe { (*info_ptr).cameraVertOffset };
+                        }
+                    } else if !info_ptr.is_null()
+                        && unsafe { (*info_ptr).r#type } == vehicleType_t::VH_ANIMAL
+                    {
+                        vertOffset = 0.0;
+                    }
+                }
+            }
         }
 
         cameraIdealTarget[2] += vertOffset;
@@ -312,14 +352,22 @@ pub fn CG_CalcIdealThirdPersonViewLocation(world: &mut CgWorld) {
     });
 
     if let Some((m_iVehicleNum, eFlags2, hasLookTarget, lookTarget)) = snapPs {
-        if m_iVehicleNum != 0 && world.entity(m_iVehicleNum as usize).m_pVehicle.is_some() {
-            // DEFERRED: `Vehicle_t::m_pVehicleInfo->cameraOverride` /
-            // `cameraRange`, and `veh->playerState->hackingTime` — same missing
-            // `Vehicle_t` referent pool as
-            // `CG_CalcIdealThirdPersonViewTarget` above
-            // (`oracle/codemp/cgame/cg_players.c:7014-7042`, DEC-46.2), so the
-            // range keeps the cvar value.
-            // Source: `oracle/codemp/cgame/cg_view.c:342-350`
+        if m_iVehicleNum != 0 {
+            let vehNum = m_iVehicleNum as usize;
+            let info_ptr = world
+                .entity(vehNum)
+                .m_pVehicle
+                .map(|id| world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo);
+            if let Some(info_ptr) = info_ptr {
+                if unsafe { (*info_ptr).cameraOverride } != qfalse {
+                    //override the range with what the vehicle wants it to be
+                    thirdPersonRange = unsafe { (*info_ptr).cameraRange };
+                    let hackingTime = veh_hacking_time(world, vehNum);
+                    if hackingTime != 0 {
+                        thirdPersonRange += (hackingTime as f32 / MAX_STRAFE_TIME).abs() * 100.0;
+                    }
+                }
+            }
         }
 
         // only possibility for now, may add Wampa and sand creature later
@@ -494,15 +542,27 @@ pub fn CG_CheckPassengerTurretView(world: &mut CgWorld) -> bool {
     {
         // passenger in a vehicle
         let vehNum = world.cg.predictedPlayerState.m_iVehicleNum as usize;
-        if world.entity(vehNum).m_pVehicle.is_some() {
-            // DEFERRED: `Vehicle_t::m_pVehicleInfo->maxPassengers` and the
-            // `turret[MAX_VEHICLE_TURRETS]` table (`iAmmoMax`, `passengerNum`)
-            // — the `Vehicle_t` referent pool behind `centity_t.m_pVehicle`
-            // lands with `oracle/codemp/cgame/cg_players.c:7014-7042`
-            // (DEC-46.2), so the turret scan can't run and the fn answers
-            // Raven's no-turret-matched `qfalse`. The receiver stays `&mut`
-            // because the matched arm writes `cg.refdef.vieworg`/`viewangles`.
-            // Source: `oracle/codemp/cgame/cg_view.c:1483-1552`
+        if let Some(id) = world.entity(vehNum).m_pVehicle {
+            let info_ptr = world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo;
+            if !info_ptr.is_null() && unsafe { (*info_ptr).maxPassengers } != 0 {
+                //a vehicle capable of carrying passengers
+                let generic1 = world.cg.predictedPlayerState.generic1;
+                for turretNum in 0..MAX_VEHICLE_TURRETS {
+                    let turret = unsafe { &(*info_ptr).turret[turretNum] };
+                    if turret.iAmmoMax != 0 {
+                        // valid turret
+                        if turret.passengerNum == generic1 {
+                            //I control this turret
+                            //Ah, crap, just look around freely... below method is way too wiggy
+                            let origin = world.cg.predictedPlayerState.origin;
+                            let viewangles = world.cg.predictedPlayerState.viewangles;
+                            world.cg.refdef.vieworg = origin;
+                            world.cg.refdef.viewangles = viewangles;
+                            return true;
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -1709,13 +1769,11 @@ pub fn CG_OffsetFighterView(ctx: &mut CgContext) {
     let mut backDir: vec3_t = [0.0; 3];
     let mut camOrg: vec3_t = [0.0; 3];
     let mut camBackOrg: vec3_t = [0.0; 3];
-    // none of these are `mut`: the only arm that would reassign them is the
-    // deferred vehicle override below.
-    let horzOffset = ctx.world.cvars.cg_thirdPersonHorzOffset.value;
-    let vertOffset = ctx.world.cvars.cg_thirdPersonVertOffset.value;
-    let pitchOffset = ctx.world.cvars.cg_thirdPersonPitchOffset.value;
+    let mut horzOffset = ctx.world.cvars.cg_thirdPersonHorzOffset.value;
+    let mut vertOffset = ctx.world.cvars.cg_thirdPersonVertOffset.value;
+    let mut pitchOffset = ctx.world.cvars.cg_thirdPersonPitchOffset.value;
     let yawOffset = ctx.world.cvars.cg_thirdPersonAngle.value;
-    let range = ctx.world.cvars.cg_thirdPersonRange.value;
+    let mut range = ctx.world.cvars.cg_thirdPersonRange.value;
     let mut trace = trace_t::zeroed();
     let veh = ctx.world.cg.predictedPlayerState.m_iVehicleNum as usize;
 
@@ -1724,15 +1782,25 @@ pub fn CG_OffsetFighterView(ctx: &mut CgContext) {
     let viewangles = ctx.world.cg.refdef.viewangles;
     AngleVectors(viewangles, None, Some(&mut vehRight), Some(&mut vehUp));
 
-    if ctx.world.entity(veh).m_pVehicle.is_some() {
-        // DEFERRED: `Vehicle_t::m_pVehicleInfo` — `cameraOverride` and the four
-        // `camera*Offset`/`cameraRange` values it gates, plus
-        // `veh->playerState->hackingTime`, all hang off the `Vehicle_t` referent
-        // pool behind `centity_t.m_pVehicle`, which lands with
-        // `oracle/codemp/cgame/cg_players.c:7014-7042` (DEC-46.2). Only the
-        // presence test is reachable, so the five values keep their cvars — what
-        // Raven does for any vehicle that isn't `cameraOverride`.
-        // Source: `oracle/codemp/cgame/cg_view.c:1059-1072`
+    let info_ptr = ctx
+        .world
+        .entity(veh)
+        .m_pVehicle
+        .map(|id| ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo);
+    if let Some(info_ptr) = info_ptr {
+        if unsafe { (*info_ptr).cameraOverride } != qfalse {
+            //override the horizontal offset with what the vehicle wants it to be
+            horzOffset = unsafe { (*info_ptr).cameraHorzOffset };
+            vertOffset = unsafe { (*info_ptr).cameraVertOffset };
+            //NOTE: no yaw offset?
+            pitchOffset = unsafe { (*info_ptr).cameraPitchOffset };
+            range = unsafe { (*info_ptr).cameraRange };
+            let hackingTime = veh_hacking_time(&ctx.world, veh);
+            if hackingTime != 0 {
+                horzOffset += (hackingTime as f32 / MAX_STRAFE_TIME) * -80.0;
+                range += (hackingTime as f32 / MAX_STRAFE_TIME).abs() * 100.0;
+            }
+        }
     }
 
     //Set camera viewing position
@@ -1962,18 +2030,19 @@ pub fn CG_DrawAutoMap(ctx: &mut CgContext) {
     trap::R_ClearScene(ctx.engine);
     CG_AddRadarAutomapEnts(ctx);
 
-    // DEFERRED: `Vehicle_t::m_pVehicleInfo->type == VH_FIGHTER` — the last term
-    // of Raven's chain hangs off the `Vehicle_t` referent pool behind
-    // `centity_t.m_pVehicle` (`oracle/codemp/cgame/cg_players.c:7014-7042`,
-    // DEC-46.2), so DEC-46.2's `Option<VehicleId>` can only answer the presence
-    // half and this accepts every vehicle class — the same disposition
-    // `cg_draw.rs`'s `CG_DrawVehicleHUD` fighter test took.
     // Source: `oracle/codemp/cgame/cg_view.c:2401-2405`
     let vehNum = ctx.world.cg.predictedPlayerState.m_iVehicleNum as usize;
     let inFighter = ctx.world.cg.predictedPlayerState.m_iVehicleNum != 0
         && ctx.world.entity(vehNum).currentState.eType == entityType_t::ET_NPC as c_int
         && ctx.world.entity(vehNum).currentState.NPC_class == class_t::CLASS_VEHICLE as c_int
-        && ctx.world.entity(vehNum).m_pVehicle.is_some();
+        && ctx
+            .world
+            .entity(vehNum)
+            .m_pVehicle
+            .is_some_and(|id| unsafe {
+                (*ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo).r#type
+                    == vehicleType_t::VH_FIGHTER
+            });
 
     if inFighter {
         //constantly adjust to current height
@@ -2015,22 +2084,30 @@ pub fn CG_DrawAutoMap(ctx: &mut CgContext) {
 /// Source: `oracle/codemp/cgame/cg_view.c:603-795`
 pub fn CG_OffsetThirdPersonView(ctx: &mut CgContext) {
     let mut diff: vec3_t = [0.0; 3];
-    let thirdPersonHorzOffset = ctx.world.cvars.cg_thirdPersonHorzOffset.value;
+    let mut thirdPersonHorzOffset = ctx.world.cvars.cg_thirdPersonHorzOffset.value;
 
     let vehNum = ctx
         .world
         .cg
         .snap_ref()
         .map_or(0, |snap| snap.ps.m_iVehicleNum);
-    if vehNum != 0 && ctx.world.entity(vehNum as usize).m_pVehicle.is_some() {
-        // DEFERRED: `Vehicle_t::m_pVehicleInfo->cameraOverride` /
-        // `cameraHorzOffset`, and `veh->playerState->hackingTime` all hang off
-        // the `Vehicle_t` referent pool behind `centity_t.m_pVehicle`, which
-        // lands with `oracle/codemp/cgame/cg_players.c:7014-7042` (DEC-46.2).
-        // Only the presence test is reachable, so `thirdPersonHorzOffset`
-        // keeps the cvar value — what Raven does for any vehicle that isn't
-        // `cameraOverride`.
-        // Source: `oracle/codemp/cgame/cg_view.c:609-621`
+    if vehNum != 0 {
+        let vn = vehNum as usize;
+        let info_ptr = ctx
+            .world
+            .entity(vn)
+            .m_pVehicle
+            .map(|id| ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo);
+        if let Some(info_ptr) = info_ptr {
+            if unsafe { (*info_ptr).cameraOverride } != qfalse {
+                //override the range with what the vehicle wants it to be
+                thirdPersonHorzOffset = unsafe { (*info_ptr).cameraHorzOffset };
+                let hackingTime = veh_hacking_time(&ctx.world, vn);
+                if hackingTime != 0 {
+                    thirdPersonHorzOffset += (hackingTime as f32 / MAX_STRAFE_TIME) * -80.0;
+                }
+            }
+        }
     }
 
     ctx.world.view.cameraStiffFactor = 0.0;
@@ -2077,20 +2154,42 @@ pub fn CG_OffsetThirdPersonView(ctx: &mut CgContext) {
         // Add in the third Person Angle.
         ctx.world.view.cameraFocusAngles[YAW] += ctx.world.cvars.cg_thirdPersonAngle.value;
         {
-            let pitchOffset = ctx.world.cvars.cg_thirdPersonPitchOffset.value;
+            let mut pitchOffset = ctx.world.cvars.cg_thirdPersonPitchOffset.value;
 
             let vehNum2 = ctx
                 .world
                 .cg
                 .snap_ref()
                 .map_or(0, |snap| snap.ps.m_iVehicleNum);
-            if vehNum2 != 0 && ctx.world.entity(vehNum2 as usize).m_pVehicle.is_some() {
-                // DEFERRED: `Vehicle_t::m_pVehicleInfo->cameraPitchDependantVertOffset` /
-                // `cameraPitchOffset` hang off the `Vehicle_t` referent pool
-                // behind `centity_t.m_pVehicle` (`oracle/codemp/cgame/cg_players.c:7014-7042`,
-                // DEC-46.2). Only the presence test is reachable, so
-                // `pitchOffset` keeps the cvar value.
-                // Source: `oracle/codemp/cgame/cg_view.c:656-679`
+            if vehNum2 != 0 {
+                let vn = vehNum2 as usize;
+                let info_ptr = ctx
+                    .world
+                    .entity(vn)
+                    .m_pVehicle
+                    .map(|id| ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo);
+                if let Some(info_ptr) = info_ptr {
+                    if unsafe { (*info_ptr).cameraOverride } != qfalse {
+                        //override the range with what the vehicle wants it to be
+                        if unsafe { (*info_ptr).cameraPitchDependantVertOffset } != qfalse {
+                            let snapPitch = ctx
+                                .world
+                                .cg
+                                .snap_ref()
+                                .map_or(0.0, |snap| snap.ps.viewangles[PITCH]);
+                            let predPitch = ctx.world.cg.predictedPlayerState.viewangles[PITCH];
+                            if snapPitch > 0.0 {
+                                pitchOffset = predPitch * -0.75;
+                            } else if snapPitch < 0.0 {
+                                pitchOffset = predPitch * -0.75;
+                            } else {
+                                pitchOffset = 0.0;
+                            }
+                        } else {
+                            pitchOffset = unsafe { (*info_ptr).cameraPitchOffset };
+                        }
+                    }
+                }
             }
 
             // Raven's `if ( 0 && ... )` is a literal always-false condition
@@ -2819,16 +2918,20 @@ pub fn CG_DrawActiveFrame(
     // selects to the engine every frame too.
     let fighterControls = match ctx.world.view.veh {
         Some(vehIdx) => {
-            let veh = ctx.world.entity(vehIdx);
-            // DEFERRED: `Vehicle_t::m_pVehicleInfo->type == VH_FIGHTER` hangs off
-            // the `Vehicle_t` referent pool behind `centity_t.m_pVehicle`
-            // (`oracle/codemp/cgame/cg_players.c:7014-7042`, DEC-46.2), so the
-            // presence test stands in for the fighter-type check — the same
-            // disposition `CG_DrawAutoMap`'s automap-elevation branch took.
             // Source: `oracle/codemp/cgame/cg_view.c:2579-2588`
-            veh.currentState.eType == entityType_t::ET_NPC as c_int
-                && veh.currentState.NPC_class == class_t::CLASS_VEHICLE as c_int
-                && veh.m_pVehicle.is_some()
+            let eType = ctx.world.entity(vehIdx).currentState.eType;
+            let npcClass = ctx.world.entity(vehIdx).currentState.NPC_class;
+            let isFighter = ctx
+                .world
+                .entity(vehIdx)
+                .m_pVehicle
+                .is_some_and(|id| unsafe {
+                    (*ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo).r#type
+                        == vehicleType_t::VH_FIGHTER
+                });
+            eType == entityType_t::ET_NPC as c_int
+                && npcClass == class_t::CLASS_VEHICLE as c_int
+                && isFighter
                 && ctx.world.cvars.bg_fighterAltControl.integer != 0
         }
         None => false,
