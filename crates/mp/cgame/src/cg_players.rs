@@ -10565,7 +10565,7 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
                         (*veh_ps).viewangles = vehLerpAngles;
                         {
                             let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
-                            AttachRidersGeneric(pVeh, &ctx.world.bg_state, &traps, time);
+                            AttachRidersGeneric(pVeh, &traps, time);
                         }
 
                         //copy the "playerstate origin" to the lerpOrigin since that's what we use to display

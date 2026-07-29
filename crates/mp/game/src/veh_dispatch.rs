@@ -25,7 +25,9 @@
 //! through [`crate::bg_channel::GameCallbacks::board_vehicle`].
 #![allow(non_snake_case)]
 
+use crate::bg_channel::{GameBgTraps, GameCallbacksImpl, PmoveContext};
 use crate::prelude::*;
+use mp_bg::vehicles::veh_process;
 
 /// Read the vehicle's static type (the dispatch key). Safe as long as `pVeh`
 /// and its `m_pVehicleInfo` are valid, which every call site already assumes.
@@ -159,28 +161,47 @@ pub fn animate_riders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     }
 }
 
-/// `ProcessMoveCommands` — per-class only.
+/// `ProcessMoveCommands` — per-class only. The dispatch and bodies moved to
+/// `mp_bg::vehicles::veh_process` (shared with cgame prediction, DEC-32 one-home);
+/// this game-tier adapter builds a `pm`-null `PmoveContext` and forwards.
 /// Source: `oracle/codemp/game/{Fighter,Speeder,Walker,Animal}NPC.c`.
 pub fn process_move_commands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
-    match unsafe { veh_type(pVeh) } {
-        vehicleType_t::VH_SPEEDER => crate::SpeederNPC::ProcessMoveCommands(ctx, pVeh),
-        vehicleType_t::VH_WALKER => crate::WalkerNPC::ProcessMoveCommands(ctx, pVeh),
-        vehicleType_t::VH_ANIMAL => crate::AnimalNPC::ProcessMoveCommands(ctx, pVeh),
-        vehicleType_t::VH_FIGHTER => crate::FighterNPC::ProcessMoveCommands(ctx, pVeh),
-        _ => {}
-    }
+    let traps = GameBgTraps::new(ctx.engine);
+    let mut callbacks = GameCallbacksImpl {
+        world: ctx.world_raw(),
+        engine: ctx.engine,
+    };
+    // Raven reaches these bodies with the TU-static `pm` still pointing at the
+    // last Pmove, whose baseEnt/entSize are the g_entities arena - the bodies'
+    // PM_BGEntForNum rider lookups depend on exactly those two fields, so the
+    // shim carries them (a bare pm-null context resolved every rider to the
+    // vehicle itself - review blocker B1 2026-07-29).
+    // SAFETY: zeroed pmove_t is the g_active.rs pmove-setup precedent.
+    let mut shim_pm: pmove_t = unsafe { core::mem::zeroed() };
+    shim_pm.baseEnt = ctx.world.g_entities.as_mut_ptr() as *mut _;
+    shim_pm.entSize = core::mem::size_of::<gentity_t>() as c_int;
+    let mut pmc = PmoveContext::new(&mut ctx.world.bg_state, &traps, &mut callbacks);
+    pmc.pm = &raw mut shim_pm;
+    veh_process::process_move_commands(&mut pmc, pVeh);
 }
 
-/// `ProcessOrientCommands` — per-class only.
+/// `ProcessOrientCommands` — per-class only. Moved to `mp_bg::vehicles::veh_process`;
+/// game-tier adapter (see [`process_move_commands`], incl. the baseEnt shim).
 /// Source: `oracle/codemp/game/{Fighter,Speeder,Walker,Animal}NPC.c`.
 pub fn process_orient_commands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
-    match unsafe { veh_type(pVeh) } {
-        vehicleType_t::VH_SPEEDER => crate::SpeederNPC::ProcessOrientCommands(ctx, pVeh),
-        vehicleType_t::VH_WALKER => crate::WalkerNPC::ProcessOrientCommands(ctx, pVeh),
-        vehicleType_t::VH_ANIMAL => crate::AnimalNPC::ProcessOrientCommands(ctx, pVeh),
-        vehicleType_t::VH_FIGHTER => crate::FighterNPC::ProcessOrientCommands(ctx, pVeh),
-        _ => {}
-    }
+    let traps = GameBgTraps::new(ctx.engine);
+    let mut callbacks = GameCallbacksImpl {
+        world: ctx.world_raw(),
+        engine: ctx.engine,
+    };
+    // same rider-lookup shim as `process_move_commands`
+    // SAFETY: zeroed pmove_t is the g_active.rs pmove-setup precedent.
+    let mut shim_pm: pmove_t = unsafe { core::mem::zeroed() };
+    shim_pm.baseEnt = ctx.world.g_entities.as_mut_ptr() as *mut _;
+    shim_pm.entSize = core::mem::size_of::<gentity_t>() as c_int;
+    let mut pmc = PmoveContext::new(&mut ctx.world.bg_state, &traps, &mut callbacks);
+    pmc.pm = &raw mut shim_pm;
+    veh_process::process_orient_commands(&mut pmc, pVeh);
 }
 
 /// `Update` — per-class where the class setter overrides the base slot.

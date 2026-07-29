@@ -244,6 +244,24 @@ impl GameCallbacks for UiGameCallbacks<'_> {
         // Source: `oracle/codemp/game/bg_slidemove.c:313-398`; `oracle/codemp/game/FighterNPC.c:300-308`
         unreachable!("FighterIsLanded is unreachable from ui: UI_SiegeInit's siege-loader path never calls callbacks.fighter_is_landed")
     }
+    fn entity_sound(&mut self, _ent_num: c_int, _channel: c_int, _sound_index: c_int) {
+        // Source: `oracle/codemp/game/FighterNPC.c:463,512`
+        unreachable!("entity_sound is unreachable from ui: ui never runs the vehicle Pmove that hosts the fighter move")
+    }
+    fn fighter_is_in_space(&mut self, _ent_num: c_int) -> qboolean {
+        // Source: `oracle/codemp/game/FighterNPC.c:275-287`
+        unreachable!("fighter_is_in_space is unreachable from ui: ui never runs the vehicle Pmove that hosts the fighter move")
+    }
+    fn veh_turbo_start_fx(&mut self, _veh_ent_num: c_int) {
+        // Source: `oracle/codemp/game/SpeederNPC.c:350-371`
+        unreachable!("veh_turbo_start_fx is unreachable from ui: ui never runs the vehicle Pmove")
+    }
+    fn veh_fighter_crash_suicide(&mut self, _parent_ent_num: c_int) {
+        // Source: `oracle/codemp/game/FighterNPC.c:1021-1032`
+        unreachable!(
+            "veh_fighter_crash_suicide is unreachable from ui: ui never runs the vehicle Pmove"
+        )
+    }
 
     // ---------------------------------------------------------------------
     // DEC-36 D5 — per-module bg arms. `UI_SiegeInit`'s call chain never

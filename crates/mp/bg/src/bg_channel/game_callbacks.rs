@@ -286,6 +286,37 @@ pub trait GameCallbacks {
     /// `oracle/codemp/game/FighterNPC.c:300-308`.
     fn fighter_is_landed(&self, veh_ent_num: c_int) -> qboolean;
 
+    /// Raven `G_EntitySound(ent, channel, soundIndex)` — the `#ifdef QAGAME`
+    /// island in the moved fighter `ProcessMoveCommands` (takeoff/turbo sounds);
+    /// the cgame `#else` arm compiles these out, so the Cgame host never calls
+    /// this and its impl is unreachable.
+    /// Source: `oracle/codemp/game/FighterNPC.c:463,512`; `g_utils.c` (`G_EntitySound`).
+    fn entity_sound(&mut self, ent_num: c_int, channel: c_int, sound_index: c_int);
+
+    /// Raven `FighterIsInSpace(gParent)` — the whole function is `#ifdef QAGAME`
+    /// (it reads `client->inSpaceIndex`, absent from the bg overlay), so the moved
+    /// fighter move/orient code reaches it here only under the Game host; the
+    /// Cgame `#else` arm compiles the callers out, so its impl is unreachable.
+    /// Source: `oracle/codemp/game/FighterNPC.c:275-287`.
+    fn fighter_is_in_space(&mut self, ent_num: c_int) -> qboolean;
+
+    /// The moved speeder `ProcessMoveCommands` turbo-start effect: the whole
+    /// per-exhaust `trap_G2API_GetBoltMatrix` + `G_PlayEffectID` block is `#ifdef
+    /// QAGAME` and reaches the parent gentity's `ghoul2`/`modelScale` (absent from
+    /// the bg overlay), so bg hands the vehicle number to the game tier, which
+    /// reproduces the loop. The cgame `#else` arm compiles the block out, so this
+    /// impl is unreachable there. Source: `oracle/codemp/game/SpeederNPC.c:350-371`.
+    fn veh_turbo_start_fx(&mut self, veh_ent_num: c_int);
+
+    /// The moved fighter `FighterDamageRoutine` land-while-broken suicide: the
+    /// `#ifdef QAGAME` `G_DamageFromKiller(parent, parent, NULL,
+    /// parent->client->ps.origin, 999999, DAMAGE_NO_ARMOR, MOD_SUICIDE)`. The NULL
+    /// attacker can't cross the number-only `damage_from_killer` seam, so bg hands
+    /// the parent number over and the game tier issues the exact call. The cgame
+    /// `#else` arm compiles it out, so this impl is unreachable there.
+    /// Source: `oracle/codemp/game/FighterNPC.c:1021-1032`.
+    fn veh_fighter_crash_suicide(&mut self, parent_ent_num: c_int);
+
     // ---------------------------------------------------------------------
     // DEC-36 D5 — per-module bg arms.
     //
@@ -390,5 +421,8 @@ pub trait GameCallbacks {
         &mut self,
         class_shader: &str,
         class_name: &str,
-    ) -> (c_int /* handle */, bool /* run class determination */);
+    ) -> (
+        c_int, /* handle */
+        bool,  /* run class determination */
+    );
 }

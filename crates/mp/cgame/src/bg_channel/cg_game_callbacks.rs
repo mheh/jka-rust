@@ -47,6 +47,9 @@ use core::ffi::{c_char, c_int, c_void};
 use core::ptr::null_mut;
 
 use mp_bg::bg_channel::GameCallbacks;
+use mp_bg::bg_vehicleLoad::AttachRidersGeneric;
+
+use crate::bg_channel::CgBgTraps;
 use mp_engine_select::Engine;
 use mp_qshared::common::mp::qcommon::{saberInfo_t, usercmd_t};
 use mp_qshared::common::mp::trace_t::trace_t;
@@ -227,19 +230,25 @@ impl GameCallbacks for CgGameCallbacks<'_> {
         // the same `#ifdef QAGAME` block.
         // Source: `oracle/codemp/game/bg_pmove.c:10948,10957`
     }
-    fn attach_riders(&mut self, _vehEntNum: c_int) {
-        // Inert. The one method whose call site is NOT `#ifdef`-gated: the
-        // `AttachRiders` dispatch at `bg_pmove.c:11148` compiles into cgame,
-        // where `G_Set<Type>VehicleFunctions` binds the slot to bg's own
-        // `AttachRidersGeneric` (`bg_vehicleLoad.c:1643`) — the game's
-        // overriding `AttachRiders` comes from `G_SetSharedVehicleFunctions`,
-        // which is `#ifdef QAGAME` (`bg_vehicleLoad.c:685-688`). The enclosing
-        // block still requires `pm->ps->clientNum >= MAX_CLIENTS`, and cgame
-        // only ever `Pmove`s the local client's playerState
-        // (`cg_predict.c:1319,1408`), so the block is dead in the cgame build.
-        // DEC-46.5's "prefer inert" applies; C5 revisits it if a vehicle-NPC
-        // prediction path ever appears.
+    fn attach_riders(&mut self, vehEntNum: c_int) {
+        // The one `AttachRiders` dispatch (`bg_pmove.c:11148`) is NOT
+        // `#ifdef`-gated: cgame binds the slot to bg's `AttachRidersGeneric`
+        // (`bg_vehicleLoad.c:1643`), and the vehicle `Pmove`'s `clientNum >=
+        // MAX_CLIENTS` gate does pass in prediction (the vehicle NPC's own
+        // playerState), so the call is live. Resolve the vehicle pool row and
+        // invoke it, mirroring `cg_players.rs`'s draw-time attach.
         // Source: `oracle/codemp/game/bg_pmove.c:11133-11150`
+        unsafe {
+            let world = &mut *self.world;
+            let vehId = match world.entities[vehEntNum as usize].m_pVehicle {
+                Some(id) => id,
+                None => return,
+            };
+            let pVeh = &raw mut world.vehicle_pool[vehId.ent_num() as usize];
+            let time = world.cg.time;
+            let traps = CgBgTraps::new(self.engine, self.world);
+            AttachRidersGeneric(pVeh, &traps, time);
+        }
     }
     fn suspended_vehicle_boardable(&self, _veh_ent_num: c_int) -> qboolean {
         // Inert: the suspended-vehicle gate lives inside the `#ifdef QAGAME`
@@ -308,6 +317,31 @@ impl GameCallbacks for CgGameCallbacks<'_> {
         // `#ifdef QAGAME`.
         // Source: `oracle/codemp/game/bg_slidemove.c:42,316`
         qfalse
+    }
+    fn entity_sound(&mut self, _ent_num: c_int, _channel: c_int, _sound_index: c_int) {
+        // Unreachable: the moved fighter `ProcessMoveCommands` only calls this
+        // under the Game host — the takeoff/turbo `G_EntitySound` islands are
+        // `#ifdef QAGAME`, compiled out of the cgame `#else` arm.
+        // Source: `oracle/codemp/game/FighterNPC.c:463,512`
+        unreachable!("entity_sound (G_EntitySound) is unreachable from cgame: the fighter move's takeoff/turbo sound is #ifdef QAGAME")
+    }
+    fn fighter_is_in_space(&mut self, _ent_num: c_int) -> qboolean {
+        // Unreachable: every `FighterIsInSpace` caller in the moved fighter
+        // move/orient code is `#ifdef QAGAME`, so the Cgame host never reaches it.
+        // Source: `oracle/codemp/game/FighterNPC.c:275-287`
+        unreachable!("fighter_is_in_space (FighterIsInSpace) is unreachable from cgame: all callers are #ifdef QAGAME")
+    }
+    fn veh_turbo_start_fx(&mut self, _veh_ent_num: c_int) {
+        // Unreachable: the speeder turbo-start effect loop is `#ifdef QAGAME`,
+        // compiled out of the cgame `#else` arm.
+        // Source: `oracle/codemp/game/SpeederNPC.c:350-371`
+        unreachable!("veh_turbo_start_fx is unreachable from cgame: the speeder turbo-start FX loop is #ifdef QAGAME")
+    }
+    fn veh_fighter_crash_suicide(&mut self, _parent_ent_num: c_int) {
+        // Unreachable: the fighter land-while-broken suicide is `#ifdef QAGAME`,
+        // compiled out of the cgame `#else` arm.
+        // Source: `oracle/codemp/game/FighterNPC.c:1021-1032`
+        unreachable!("veh_fighter_crash_suicide is unreachable from cgame: the land-while-broken suicide is #ifdef QAGAME")
     }
 
     // ---------------------------------------------------------------------

@@ -6,6 +6,16 @@
 
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 
+// Shared (game + cgame) vehicle steering/physics TUs (`JK2_cgame.vcproj` lists
+// SpeederNPC/FighterNPC/WalkerNPC/AnimalNPC): the `ProcessMoveCommands`/
+// `ProcessOrientCommands` families + fighter `BG_FighterUpdate` and helpers, run
+// inside `Pmove` on both hosts.
+pub mod animal_npc;
+pub mod fighter_npc;
+pub mod speeder_npc;
+pub mod veh_process;
+pub mod walker_npc;
+
 pub mod e_weapon_pose;
 pub mod min_landing_slope;
 pub mod turret_stats_t;

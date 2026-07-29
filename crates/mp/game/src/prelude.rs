@@ -326,9 +326,7 @@ pub use crate::q_shared::{
     va, COM_StripExtension, GetIDForString, Q_strchr, Q_strcmp, Q_stricmp, Q_strncmp, Q_strncpyz,
     Q_strupr,
 };
-pub use native_string::{Info_RemoveKey, Info_Validate, Info_ValueForKey};
 pub use crate::w_saber::WP_SaberCanBlock;
-pub use crate::FighterNPC::FighterIsLanded;
 pub use crate::NPC_AI_Atst::NPC_ATST_Precache;
 pub use crate::NPC_AI_Droid::{
     NPC_Gonk_Precache, NPC_Mouse_Precache, NPC_Protocol_Precache, NPC_R2D2_Precache,
@@ -362,6 +360,8 @@ pub use crate::NPC_utils::{
 pub use mp_bg::bg_misc::{BG_EmplacedView, BG_FindItemForWeapon};
 pub use mp_bg::bg_panimate::{BG_InKnockDownOnly, BG_InReboundHold, BG_InReboundJump};
 pub use mp_bg::bg_pmove::BG_SabersOff;
+pub use mp_bg::vehicles::fighter_npc::FighterIsLanded;
+pub use native_string::{Info_RemoveKey, Info_Validate, Info_ValueForKey};
 
 // preflight.py: file-level symbol re-exports (aggregate re-export plan)
 pub use crate::ai::consts::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/ai/consts.rs

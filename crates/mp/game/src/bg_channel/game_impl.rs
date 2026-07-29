@@ -20,23 +20,26 @@ use core::ffi::{c_char, c_int, c_void};
 
 use mp_engine_select::Engine;
 
-use crate::prelude::*;
-use crate::FighterNPC::FighterIsLanded;
 use crate::g_ICARUScb::Q3_SetParm;
 use crate::g_active::{Client_CheckImpactBBrush, G_CheapWeaponFire};
 use crate::g_cmds::TryGrapple;
 use crate::g_combat::{G_Damage, G_DamageFromKiller};
 use crate::g_mem::G_Alloc;
 use crate::g_utils::{
-    G_AddEvent, G_EffectIndex, G_ModelIndex, G_PlayEffect, G_PlayEffectID, G_SetAnim, G_SoundIndex,
+    G_AddEvent, G_EffectIndex, G_EntitySound, G_ModelIndex, G_PlayEffect, G_PlayEffectID,
+    G_SetAnim, G_SoundIndex,
 };
 use crate::g_vehicles::G_FlyVehicleSurfaceDestruction;
 use crate::g_weapon::WP_GetVehicleCamPos;
 use crate::npc_c::NPC_SetAnim;
+use crate::prelude::*;
 use crate::trap;
 use crate::veh_dispatch;
 use crate::w_saber::G_CanBeEnemy;
 use crate::world::GameWorld;
+use crate::FighterNPC::FighterIsInSpace;
+use mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs;
+use mp_bg::vehicles::fighter_npc::FighterIsLanded;
 
 use super::bg_traps::BgTraps;
 use super::game_callbacks::GameCallbacks;
@@ -89,8 +92,7 @@ impl BgTraps for GameBgTraps<'_> {
     fn fs_read(&self, buffer: *mut c_void, len: c_int, f: fileHandle_t) {
         // Mechanical delegation — matches the proven `pointcontents`
         // shape. Raven: `trap_FS_Read` (`G_FS_READ`).
-        let buf =
-            unsafe { core::slice::from_raw_parts_mut(buffer as *mut u8, len as usize) };
+        let buf = unsafe { core::slice::from_raw_parts_mut(buffer as *mut u8, len as usize) };
         trap::FS_Read(self.engine, buf, f)
     }
     fn fs_write(&self, buffer: *const c_void, len: c_int, f: fileHandle_t) {
@@ -110,8 +112,7 @@ impl BgTraps for GameBgTraps<'_> {
         bufsize: c_int,
     ) -> c_int {
         // Raven: `trap_FS_GetFileList` (`G_FS_GETFILELIST`).
-        let list =
-            unsafe { core::slice::from_raw_parts_mut(listbuf as *mut u8, bufsize as usize) };
+        let list = unsafe { core::slice::from_raw_parts_mut(listbuf as *mut u8, bufsize as usize) };
         trap::FS_GetFileList(self.engine, path, extension, list)
     }
 
@@ -647,13 +648,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             world: unsafe { &mut *self.world },
             engine: self.engine,
         };
-        G_FlyVehicleSurfaceDestruction(
-            &mut ctx,
-            EntityId(entNum as u32),
-            trace,
-            magnitude,
-            force,
-        );
+        G_FlyVehicleSurfaceDestruction(&mut ctx, EntityId(entNum as u32), trace, magnitude, force);
     }
     fn set_anim(
         &mut self,
@@ -965,6 +960,120 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         unsafe {
             let ent = &(*self.world).g_entities[veh_ent_num as usize] as *const gentity_t;
             FighterIsLanded((*ent).m_pVehicle, (*ent).playerState)
+        }
+    }
+    fn entity_sound(&mut self, ent_num: c_int, channel: c_int, sound_index: c_int) {
+        // QAGAME island in the moved fighter `ProcessMoveCommands` (takeoff/turbo
+        // sounds); resolve `ent_num`, rebuild `ctx`, delegate to `G_EntitySound`.
+        // Source: `oracle/codemp/game/FighterNPC.c:463,512`.
+        unsafe {
+            let mut ctx = GameContext {
+                world: &mut *self.world,
+                engine: self.engine,
+            };
+            let ent = &mut (*self.world).g_entities[ent_num as usize] as *mut gentity_t;
+            let ent_id = ctx.entity_id_of(ent).unwrap();
+            G_EntitySound(&mut ctx, ent_id, channel, sound_index);
+        }
+    }
+    fn fighter_is_in_space(&mut self, ent_num: c_int) -> qboolean {
+        // `FighterIsInSpace` is `#ifdef QAGAME` (reads `client->inSpaceIndex`);
+        // resolve `ent_num` and delegate the read-only check.
+        // Source: `oracle/codemp/game/FighterNPC.c:275-287`.
+        unsafe {
+            let ent = &(*self.world).g_entities[ent_num as usize];
+            FighterIsInSpace(ent)
+        }
+    }
+    fn veh_turbo_start_fx(&mut self, veh_ent_num: c_int) {
+        // The `#ifdef QAGAME` turbo-start effect loop from the moved speeder
+        // `ProcessMoveCommands`; it reaches the parent's `ghoul2`/`modelScale`,
+        // so it lives game-side. Raven: "fine, I'll use a tempent for this, but
+        // only because it's played only once at the start of a turbo."
+        // Source: `oracle/codemp/game/SpeederNPC.c:350-371`.
+        unsafe {
+            let ctx = GameContext {
+                world: &mut *self.world,
+                engine: self.engine,
+            };
+            let veh_ent = &mut (*self.world).g_entities[veh_ent_num as usize] as *mut gentity_t;
+            let pVeh = (*veh_ent).m_pVehicle;
+            let iTurboStartFX = (*pVeh)
+                .m_pVehicleInfo
+                .as_ref()
+                .map(|vi| vi.iTurboStartFX)
+                .unwrap_or(0);
+            if iTurboStartFX == 0 {
+                return;
+            }
+            let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
+            let mut i: c_int = 0;
+            while (i as usize) < MAX_VEHICLE_EXHAUSTS && (*pVeh).m_iExhaustTag[i as usize] != -1 {
+                if !parent.is_null()
+                    && !(*parent).ghoul2.is_null()
+                    && !(*parent).playerState.is_null()
+                {
+                    let mut boltOrg: vec3_t = [0.0; 3];
+                    let mut boltDir: vec3_t = [0.0, (*(*parent).playerState).viewangles[YAW], 0.0];
+                    let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
+                    let ps_origin = (*(*parent).playerState).origin;
+                    let model_scale = (*parent).modelScale;
+                    let level_time = (*self.world).level.time;
+                    trap::G2API_GetBoltMatrix(
+                        ctx.engine,
+                        GG2GetboltArgs::new(
+                            (*parent).ghoul2,
+                            0,
+                            (*pVeh).m_iExhaustTag[i as usize],
+                            &mut boltMatrix as *mut mdxaBone_t,
+                            &boltDir as *const vec3_t,
+                            &ps_origin as *const vec3_t,
+                            level_time,
+                            core::ptr::null_mut(),
+                            &model_scale as *const vec3_t,
+                        ),
+                    );
+                    BG_GiveMeVectorFromMatrix(
+                        &boltMatrix,
+                        Eorientations::ORIGIN as c_int,
+                        &mut boltOrg,
+                    );
+                    // Raven fills boltDir from ORIGIN too (not a direction); preserved.
+                    // Source: oracle/codemp/game/SpeederNPC.c:366-367
+                    BG_GiveMeVectorFromMatrix(
+                        &boltMatrix,
+                        Eorientations::ORIGIN as c_int,
+                        &mut boltDir,
+                    );
+                    G_PlayEffectID(iTurboStartFX, boltOrg, boltDir);
+                }
+                i += 1;
+            }
+        }
+    }
+    fn veh_fighter_crash_suicide(&mut self, parent_ent_num: c_int) {
+        // The `#ifdef QAGAME` land-while-broken suicide from the moved fighter
+        // `FighterDamageRoutine`; the NULL attacker is preserved as `None`.
+        // Source: `oracle/codemp/game/FighterNPC.c:1021-1032`.
+        unsafe {
+            let mut ctx = GameContext {
+                world: &mut *self.world,
+                engine: self.engine,
+            };
+            let parent = &mut (*self.world).g_entities[parent_ent_num as usize] as *mut gentity_t;
+            let parent_id = ctx.entity_id_of(parent).unwrap();
+            let parent_client = (*parent).client;
+            let parent_origin = (*parent_client).ps.origin;
+            G_DamageFromKiller(
+                &mut ctx,
+                Some(parent_id),
+                Some(parent_id),
+                None,
+                parent_origin,
+                999999,
+                DAMAGE_NO_ARMOR,
+                MOD_SUICIDE as c_int,
+            );
         }
     }
 

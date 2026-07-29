@@ -41,14 +41,13 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::bg_channel::GameBgTraps;
+use crate::g_utils::G_EffectIndex;
 use crate::g_utils::G_SoundIndex;
 use crate::prelude::*;
-use crate::g_utils::G_EffectIndex;
 use crate::q_math::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vectoangles,
     AngleSubtract, AngleVectors, VectorNormalize,
 };
-use native_string::Q_strncmp;
 use crate::trap;
 use crate::NPC_spawn::NPC_Spawn_Do;
 use mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs;
@@ -56,6 +55,7 @@ use mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_bg::vehicles::vehicleType_t;
+use native_string::Q_strncmp;
 
 // Raven vehicle constants spelled locally per this file's staging convention
 // (the integrator wires the const home later; the name preserves intent).
@@ -1702,7 +1702,6 @@ pub fn AttachRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
 
         mp_bg::bg_vehicleLoad::AttachRidersGeneric(
             pVeh,
-            &ctx.world.bg_state,
             &GameBgTraps::new(ctx.engine),
             ctx.world.level.time,
         );

@@ -43,6 +43,9 @@ use crate::bg_panimate::{
 use crate::bg_saber::BG_ForcePowerDrain;
 use crate::public::anim_number::animNumber_t;
 use crate::vehicles::MIN_LANDING_SLOPE;
+// The shared (game + cgame) vehicle steering/physics the CGAME `#else` vehicle
+// arm calls directly during prediction.
+use crate::vehicles::{fighter_npc, veh_process};
 use mp_qshared::probe;
 use mp_qshared::shared::error_parm::errorParm_t::ERR_DROP;
 use mp_qshared::shared::q_math::{CrossProduct, VectorLength};
@@ -1653,13 +1656,16 @@ impl PmoveContext<'_> {
                 }
 
                 if (*ps).m_iVehicleNum == 0 {
-                    // no one is driving, just update and get out (QAGAME). The
+                    // no one is driving, just update and get out. The
                     // `Update`/`Animate` virtuals are game-tier; bg reaches them via
-                    // the GameCallbacks upcalls (by entity number).
-                    // Source: oracle/codemp/game/bg_pmove.c:10919-10922
-                    self.callbacks
-                        .update_vehicle((*veh).s.number, &(*self.pm).cmd);
-                    self.callbacks.pm_animate_vehicle((*veh).s.number);
+                    // the GameCallbacks upcalls (by entity number). Both calls are
+                    // `#ifdef QAGAME`, so the Cgame host does nothing here.
+                    // Source: oracle/codemp/game/bg_pmove.c:10917-10923
+                    if self.bg.host == BgHost::Game {
+                        self.callbacks
+                            .update_vehicle((*veh).s.number, &(*self.pm).cmd);
+                        self.callbacks.pm_animate_vehicle((*veh).s.number);
+                    }
                 } else {
                     let selfEnt = self.pm_entVeh;
 
@@ -1687,33 +1693,120 @@ impl PmoveContext<'_> {
                         );
                     }
 
-                    // The `Update`/`Animate`/`UpdateRider` virtuals and the passenger
-                    // `UpdateRider` loop are game-tier; bg reaches them via the
-                    // GameCallbacks upcalls. The driver's cmd is the bg-reachable
-                    // `m_ucmd`; each passenger's `client->pers.cmd` is game-side, so a
-                    // null `ucmd` signals the impl to use the rider's own pers.cmd
-                    // (and to guard `inuse && client`).
-                    // Source: oracle/codemp/game/bg_pmove.c:10944-10961
-                    self.callbacks
-                        .update_vehicle((*veh).s.number, &(*pVeh).m_ucmd);
-                    self.callbacks.pm_animate_vehicle((*veh).s.number);
-                    self.callbacks.update_rider(
-                        (*veh).s.number,
-                        (*selfEnt).s.number,
-                        &mut (*pVeh).m_ucmd,
-                    );
-                    // update the passengers
-                    let mut i: c_int = 0;
-                    while i < (*pVeh).m_iNumPassengers {
-                        if !(*pVeh).m_ppPassengers[i as usize].is_null() {
-                            let passNum = (*(*pVeh).m_ppPassengers[i as usize]).s.number;
-                            self.callbacks.update_rider(
-                                (*veh).s.number,
-                                passNum,
-                                core::ptr::null_mut(),
-                            );
+                    if self.bg.host == BgHost::Game {
+                        // QAGAME: the `Update`/`Animate`/`UpdateRider` virtuals and the
+                        // passenger `UpdateRider` loop are game-tier; bg reaches them via
+                        // the GameCallbacks upcalls. The driver's cmd is the bg-reachable
+                        // `m_ucmd`; each passenger's `client->pers.cmd` is game-side, so a
+                        // null `ucmd` signals the impl to use the rider's own pers.cmd
+                        // (and to guard `inuse && client`).
+                        // Source: oracle/codemp/game/bg_pmove.c:10944-10961
+                        self.callbacks
+                            .update_vehicle((*veh).s.number, &(*pVeh).m_ucmd);
+                        self.callbacks.pm_animate_vehicle((*veh).s.number);
+                        self.callbacks.update_rider(
+                            (*veh).s.number,
+                            (*selfEnt).s.number,
+                            &mut (*pVeh).m_ucmd,
+                        );
+                        // update the passengers
+                        let mut i: c_int = 0;
+                        while i < (*pVeh).m_iNumPassengers {
+                            if !(*pVeh).m_ppPassengers[i as usize].is_null() {
+                                let passNum = (*(*pVeh).m_ppPassengers[i as usize]).s.number;
+                                self.callbacks.update_rider(
+                                    (*veh).s.number,
+                                    passNum,
+                                    core::ptr::null_mut(),
+                                );
+                            }
+                            i += 1;
                         }
-                        i += 1;
+                    } else {
+                        // CGAME `#else`: the client explicitly steers the vehicle during
+                        // prediction. Source: oracle/codemp/game/bg_pmove.c:10962-11019
+                        if (*(*veh).playerState).vehBoarding == qfalse {
+                            if (*(*pVeh).m_pVehicleInfo).r#type as c_int == VH_FIGHTER as c_int {
+                                // client must explicitly call this for prediction
+                                let grav = (*(*selfEnt).playerState).gravity as f32;
+                                fighter_npc::BG_FighterUpdate(
+                                    self,
+                                    pVeh,
+                                    &(*pVeh).m_ucmd as *const usercmd_t,
+                                    (*self.pm).mins,
+                                    (*self.pm).maxs,
+                                    grav,
+                                );
+                            }
+
+                            if (*pVeh).m_iBoarding == 0 {
+                                // make sure we are set as its pilot cgame side
+                                (*pVeh).m_pPilot = selfEnt;
+
+                                // Keep track of the old orientation.
+                                (*pVeh).m_vPrevOrientation = [
+                                    *(*pVeh).m_vOrientation.add(0),
+                                    *(*pVeh).m_vOrientation.add(1),
+                                    *(*pVeh).m_vOrientation.add(2),
+                                ];
+
+                                veh_process::process_orient_commands(self, pVeh);
+                                let ori: vec3_t = [
+                                    *(*pVeh).m_vOrientation.add(0),
+                                    *(*pVeh).m_vOrientation.add(1),
+                                    *(*pVeh).m_vOrientation.add(2),
+                                ];
+                                PM_SetPMViewAngle((*veh).playerState, ori, &mut (*pVeh).m_ucmd);
+                                veh_process::process_move_commands(self, pVeh);
+
+                                let vRollAng: vec3_t = [
+                                    (*(*selfEnt).playerState).viewangles[PITCH],
+                                    (*(*selfEnt).playerState).viewangles[YAW],
+                                    *(*pVeh).m_vOrientation.add(ROLL),
+                                ];
+                                PM_SetPMViewAngle(
+                                    (*selfEnt).playerState,
+                                    vRollAng,
+                                    &mut (*self.pm).cmd,
+                                );
+
+                                // Setup the move direction.
+                                if (*(*pVeh).m_pVehicleInfo).r#type as c_int == VH_FIGHTER as c_int
+                                {
+                                    let ori2: vec3_t = [
+                                        *(*pVeh).m_vOrientation.add(0),
+                                        *(*pVeh).m_vOrientation.add(1),
+                                        *(*pVeh).m_vOrientation.add(2),
+                                    ];
+                                    AngleVectors(
+                                        ori2,
+                                        Some(&mut (*(*veh).playerState).moveDir),
+                                        None,
+                                        None,
+                                    );
+                                } else {
+                                    let vVehAngles: vec3_t =
+                                        [0.0, *(*pVeh).m_vOrientation.add(YAW), 0.0];
+                                    AngleVectors(
+                                        vVehAngles,
+                                        Some(&mut (*(*veh).playerState).moveDir),
+                                        None,
+                                        None,
+                                    );
+                                }
+                            }
+                        } else if !(*veh).playerState.is_null() {
+                            (*(*veh).playerState).speed = 0.0;
+                            if !pVeh.is_null() {
+                                let ori: vec3_t = [
+                                    *(*pVeh).m_vOrientation.add(0),
+                                    *(*pVeh).m_vOrientation.add(1),
+                                    *(*pVeh).m_vOrientation.add(2),
+                                ];
+                                PM_SetPMViewAngle((*selfEnt).playerState, ori, &mut (*self.pm).cmd);
+                                PM_SetPMViewAngle((*veh).playerState, ori, &mut (*self.pm).cmd);
+                            }
+                        }
                     }
                 }
                 noAnimate = qtrue;
@@ -7048,8 +7141,25 @@ impl PmoveContext<'_> {
                 } {
                     //riding a walker/fighter: keep saber off, do no weapon stuff at all!
                     (*ps).saberHolstered = 2;
-                    // QAGAME
-                    (*pm).cmd.buttons &= !(BUTTON_ATTACK | BUTTON_ALT_ATTACK);
+                    if self.bg.host == BgHost::Game {
+                        // QAGAME
+                        (*pm).cmd.buttons &= !(BUTTON_ATTACK | BUTTON_ALT_ATTACK);
+                    } else {
+                        // CGAME `#else`: a homing (rocket-lock) vehicle keeps
+                        // BUTTON_ALT_ATTACK so the lock-on can run; QAGAME strips both.
+                        // Source: oracle/codemp/game/bg_pmove.c:6701-6711
+                        let pv = (*veh).m_pVehicle as *mut Vehicle_t;
+                        let id0 = (*(*pv).m_pVehicleInfo).weapon[0].ID as usize;
+                        let id1 = (*(*pv).m_pVehicleInfo).weapon[1].ID as usize;
+                        if self.bg.g_vehWeaponInfo[id0].fHoming != 0.0
+                            || self.bg.g_vehWeaponInfo[id1].fHoming != 0.0
+                        {
+                            vehicleRocketLock = qtrue;
+                            (*pm).cmd.buttons &= !BUTTON_ATTACK;
+                        } else {
+                            (*pm).cmd.buttons &= !(BUTTON_ATTACK | BUTTON_ALT_ATTACK);
+                        }
+                    }
                 }
             }
 
@@ -7646,11 +7756,19 @@ impl PmoveContext<'_> {
                         && (*pm).cmd.buttons & BUTTON_ATTACK != 0
                         && (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0
                     {
-                        //ok, grapple time (QAGAME)
-                        if !self.pm_entSelf.is_null() {
-                            if self.callbacks.try_grapple((*self.pm_entSelf).s.number) != qfalse {
-                                return;
+                        //ok, grapple time
+                        if self.bg.host == BgHost::Game {
+                            // QAGAME
+                            if !self.pm_entSelf.is_null() {
+                                if self.callbacks.try_grapple((*self.pm_entSelf).s.number) != qfalse
+                                {
+                                    return;
+                                }
                             }
+                        } else {
+                            // CGAME `#else`: prediction returns here.
+                            // Source: oracle/codemp/game/bg_pmove.c:7486-7488
+                            return;
                         }
                     } else if (*pm).debugMelee != 0 && (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
                         //kicks

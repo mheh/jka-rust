@@ -98,18 +98,14 @@ pub fn BG_ParseVehWeaponParm(
                             if atof(&value) != 0.0 { qtrue } else { qfalse };
                     }
                     VF_VEHTYPE => {
-                        let vt = GetIDForString(
-                            VehicleTable.as_ptr() as *mut stringID_table_t,
-                            &value,
-                        );
+                        let vt =
+                            GetIDForString(VehicleTable.as_ptr() as *mut stringID_table_t, &value);
                         *(b.add(field.ofs as usize) as *mut vehicleType_t) =
                             core::mem::transmute(vt);
                     }
                     VF_ANIM => {
-                        let anim = GetIDForString(
-                            animTable.as_ptr() as *mut stringID_table_t,
-                            &value,
-                        );
+                        let anim =
+                            GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &value);
                         *(b.add(field.ofs as usize) as *mut c_int) = anim;
                     }
                     VF_WEAPON => {
@@ -119,8 +115,10 @@ pub fn BG_ParseVehWeaponParm(
                         callbacks.veh_field_model(&value, b.add(field.ofs as usize) as *mut c_int);
                     }
                     VF_MODEL_CLIENT => {
-                        callbacks
-                            .veh_field_model_client(&value, b.add(field.ofs as usize) as *mut c_int);
+                        callbacks.veh_field_model_client(
+                            &value,
+                            b.add(field.ofs as usize) as *mut c_int,
+                        );
                     }
                     VF_EFFECT => {
                         callbacks.veh_field_effect(&value, b.add(field.ofs as usize) as *mut c_int);
@@ -135,15 +133,19 @@ pub fn BG_ParseVehWeaponParm(
                         callbacks.veh_field_shader(&value, b.add(field.ofs as usize) as *mut c_int);
                     }
                     VF_SHADER_NOMIP => {
-                        callbacks
-                            .veh_field_shader_nomip(&value, b.add(field.ofs as usize) as *mut c_int);
+                        callbacks.veh_field_shader_nomip(
+                            &value,
+                            b.add(field.ofs as usize) as *mut c_int,
+                        );
                     }
                     VF_SOUND => {
                         callbacks.veh_field_sound(&value, b.add(field.ofs as usize) as *mut c_int);
                     }
                     VF_SOUND_CLIENT => {
-                        callbacks
-                            .veh_field_sound_client(&value, b.add(field.ofs as usize) as *mut c_int);
+                        callbacks.veh_field_sound_client(
+                            &value,
+                            b.add(field.ofs as usize) as *mut c_int,
+                        );
                     }
                     _ => return qfalse,
                 }
@@ -219,13 +221,11 @@ pub fn VEH_LoadVehWeapon(
             p = rest;
             if token.is_empty() {
                 let name = cstr_to_str(vehWeaponName);
-                traps.com_printf(
-                    &format!(
-                        "{}ERROR: unexpected EOF while parsing Vehicle Weapon '{}'\n",
-                        S_COLOR_RED.to_str().unwrap(),
-                        name
-                    ),
-                );
+                traps.com_printf(&format!(
+                    "{}ERROR: unexpected EOF while parsing Vehicle Weapon '{}'\n",
+                    S_COLOR_RED.to_str().unwrap(),
+                    name
+                ));
                 return VEH_WEAPON_NONE;
             }
             if token.eq_ignore_ascii_case("}") {
@@ -237,13 +237,11 @@ pub fn VEH_LoadVehWeapon(
             p = rest;
             if value.is_empty() {
                 let pn = cstr_to_str(parmName.as_ptr());
-                traps.com_printf(
-                    &format!(
-                        "{}ERROR: Vehicle Weapon token '{}' has no value!\n",
-                        S_COLOR_RED.to_str().unwrap(),
-                        pn
-                    ),
-                );
+                traps.com_printf(&format!(
+                    "{}ERROR: Vehicle Weapon token '{}' has no value!\n",
+                    S_COLOR_RED.to_str().unwrap(),
+                    pn
+                ));
             } else if BG_ParseVehWeaponParm(
                 vehWeapon,
                 parmName.as_mut_ptr(),
@@ -255,14 +253,12 @@ pub fn VEH_LoadVehWeapon(
             {
                 let pn = cstr_to_str(parmName.as_ptr());
                 let v = value;
-                traps.com_printf(
-                    &format!(
-                        "{}ERROR: Unknown Vehicle Weapon key/value pair '{}','{}'!\n",
-                        S_COLOR_RED.to_str().unwrap(),
-                        pn,
-                        v
-                    ),
-                );
+                traps.com_printf(&format!(
+                    "{}ERROR: Unknown Vehicle Weapon key/value pair '{}','{}'!\n",
+                    S_COLOR_RED.to_str().unwrap(),
+                    pn,
+                    v
+                ));
             }
         }
 
@@ -292,12 +288,10 @@ pub fn VEH_VehWeaponIndexForName(
 ) -> c_int {
     unsafe {
         if vehWeaponName.is_null() || *vehWeaponName == 0 {
-            traps.com_printf(
-                &format!(
-                    "{}ERROR: Trying to read Vehicle Weapon with no name!\n",
-                    S_COLOR_RED.to_str().unwrap()
-                ),
-            );
+            traps.com_printf(&format!(
+                "{}ERROR: Trying to read Vehicle Weapon with no name!\n",
+                S_COLOR_RED.to_str().unwrap()
+            ));
             return VEH_WEAPON_NONE;
         }
         let mut vw = VEH_WEAPON_BASE;
@@ -310,25 +304,21 @@ pub fn VEH_VehWeaponIndexForName(
         }
         if vw >= MAX_VEH_WEAPONS as c_int {
             let name = cstr_to_str(vehWeaponName);
-            traps.com_printf(
-                &format!(
-                    "{}ERROR: Too many Vehicle Weapons (max 16), aborting load on {}!\n",
-                    S_COLOR_RED.to_str().unwrap(),
-                    name
-                ),
-            );
+            traps.com_printf(&format!(
+                "{}ERROR: Too many Vehicle Weapons (max 16), aborting load on {}!\n",
+                S_COLOR_RED.to_str().unwrap(),
+                name
+            ));
             return VEH_WEAPON_NONE;
         }
         vw = VEH_LoadVehWeapon(vehWeaponName, bg, traps, callbacks);
         if vw == VEH_WEAPON_NONE {
             let name = cstr_to_str(vehWeaponName);
-            traps.com_printf(
-                &format!(
-                    "{}ERROR: Could not find Vehicle Weapon {}!\n",
-                    S_COLOR_RED.to_str().unwrap(),
-                    name
-                ),
-            );
+            traps.com_printf(&format!(
+                "{}ERROR: Could not find Vehicle Weapon {}!\n",
+                S_COLOR_RED.to_str().unwrap(),
+                name
+            ));
         }
         vw
     }
@@ -458,18 +448,14 @@ pub fn BG_ParseVehicleParm(
                             if atof(&value) != 0.0 { qtrue } else { qfalse };
                     }
                     VF_VEHTYPE => {
-                        let vt = GetIDForString(
-                            VehicleTable.as_ptr() as *mut stringID_table_t,
-                            &value,
-                        );
+                        let vt =
+                            GetIDForString(VehicleTable.as_ptr() as *mut stringID_table_t, &value);
                         *(b.add(field.ofs as usize) as *mut vehicleType_t) =
                             core::mem::transmute(vt);
                     }
                     VF_ANIM => {
-                        let anim = GetIDForString(
-                            animTable.as_ptr() as *mut stringID_table_t,
-                            &value,
-                        );
+                        let anim =
+                            GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &value);
                         *(b.add(field.ofs as usize) as *mut c_int) = anim;
                     }
                     VF_WEAPON => {
@@ -483,8 +469,10 @@ pub fn BG_ParseVehicleParm(
                         callbacks.veh_field_model(&value, b.add(field.ofs as usize) as *mut c_int);
                     }
                     VF_MODEL_CLIENT => {
-                        callbacks
-                            .veh_field_model_client(&value, b.add(field.ofs as usize) as *mut c_int);
+                        callbacks.veh_field_model_client(
+                            &value,
+                            b.add(field.ofs as usize) as *mut c_int,
+                        );
                     }
                     VF_EFFECT => {
                         callbacks.veh_field_effect(&value, b.add(field.ofs as usize) as *mut c_int);
@@ -499,15 +487,19 @@ pub fn BG_ParseVehicleParm(
                         callbacks.veh_field_shader(&value, b.add(field.ofs as usize) as *mut c_int);
                     }
                     VF_SHADER_NOMIP => {
-                        callbacks
-                            .veh_field_shader_nomip(&value, b.add(field.ofs as usize) as *mut c_int);
+                        callbacks.veh_field_shader_nomip(
+                            &value,
+                            b.add(field.ofs as usize) as *mut c_int,
+                        );
                     }
                     VF_SOUND => {
                         callbacks.veh_field_sound(&value, b.add(field.ofs as usize) as *mut c_int);
                     }
                     VF_SOUND_CLIENT => {
-                        callbacks
-                            .veh_field_sound_client(&value, b.add(field.ofs as usize) as *mut c_int);
+                        callbacks.veh_field_sound_client(
+                            &value,
+                            b.add(field.ofs as usize) as *mut c_int,
+                        );
                     }
                     _ => return qfalse,
                 }
@@ -592,13 +584,11 @@ pub fn VEH_LoadVehicle(
             p = rest;
             if token.is_empty() {
                 let name = cstr_to_str(vehicleName);
-                traps.com_printf(
-                    &format!(
-                        "{}ERROR: unexpected EOF while parsing Vehicle '{}'\n",
-                        S_COLOR_RED.to_str().unwrap(),
-                        name
-                    ),
-                );
+                traps.com_printf(&format!(
+                    "{}ERROR: unexpected EOF while parsing Vehicle '{}'\n",
+                    S_COLOR_RED.to_str().unwrap(),
+                    name
+                ));
                 return VEHICLE_NONE;
             }
             if token.eq_ignore_ascii_case("}") {
@@ -610,13 +600,11 @@ pub fn VEH_LoadVehicle(
             p = rest;
             if value.is_empty() {
                 let pn = cstr_to_str(parmName.as_ptr());
-                traps.com_printf(
-                    &format!(
-                        "{}ERROR: Vehicle token '{}' has no value!\n",
-                        S_COLOR_RED.to_str().unwrap(),
-                        pn
-                    ),
-                );
+                traps.com_printf(&format!(
+                    "{}ERROR: Vehicle token '{}' has no value!\n",
+                    S_COLOR_RED.to_str().unwrap(),
+                    pn
+                ));
             } else if Q_stricmp(cstr("weap1").as_ptr(), parmName.as_ptr()) == 0 {
                 Q_strncpyzBytes(&mut weap1, value.as_bytes(), 128);
             } else if Q_stricmp(cstr("weap2").as_ptr(), parmName.as_ptr()) == 0 {
@@ -639,14 +627,12 @@ pub fn VEH_LoadVehicle(
             {
                 let pn = cstr_to_str(parmName.as_ptr());
                 let v = value;
-                traps.com_printf(
-                    &format!(
-                        "{}ERROR: Unknown Vehicle key/value pair '{}', '{}'!\n",
-                        S_COLOR_RED.to_str().unwrap(),
-                        pn,
-                        v
-                    ),
-                );
+                traps.com_printf(&format!(
+                    "{}ERROR: Unknown Vehicle key/value pair '{}', '{}'!\n",
+                    S_COLOR_RED.to_str().unwrap(),
+                    pn,
+                    v
+                ));
             }
         }
 
@@ -662,13 +648,11 @@ pub fn VEH_LoadVehicle(
             ) == qfalse
             {
                 let w = cstr_to_str(weap1.as_ptr());
-                traps.com_printf(
-                    &format!(
-                        "{}ERROR: Unknown Vehicle key/value pair 'weap1', '{}'!\n",
-                        S_COLOR_RED.to_str().unwrap(),
-                        w
-                    ),
-                );
+                traps.com_printf(&format!(
+                    "{}ERROR: Unknown Vehicle key/value pair 'weap1', '{}'!\n",
+                    S_COLOR_RED.to_str().unwrap(),
+                    w
+                ));
             }
         }
         if weap2[0] != 0 {
@@ -682,13 +666,11 @@ pub fn VEH_LoadVehicle(
             ) == qfalse
             {
                 let w = cstr_to_str(weap2.as_ptr());
-                traps.com_printf(
-                    &format!(
-                        "{}ERROR: Unknown Vehicle key/value pair 'weap2', '{}'!\n",
-                        S_COLOR_RED.to_str().unwrap(),
-                        w
-                    ),
-                );
+                traps.com_printf(&format!(
+                    "{}ERROR: Unknown Vehicle key/value pair 'weap2', '{}'!\n",
+                    S_COLOR_RED.to_str().unwrap(),
+                    w
+                ));
             }
         }
         for n in 1..=10usize {
@@ -704,14 +686,12 @@ pub fn VEH_LoadVehicle(
                 ) == qfalse
                 {
                     let w = cstr_to_str(weap_muzzle[n - 1].as_ptr());
-                    traps.com_printf(
-                        &format!(
-                            "{}ERROR: Unknown Vehicle key/value pair '{}', '{}'!\n",
-                            S_COLOR_RED.to_str().unwrap(),
-                            key,
-                            w
-                        ),
-                    );
+                    traps.com_printf(&format!(
+                        "{}ERROR: Unknown Vehicle key/value pair '{}', '{}'!\n",
+                        S_COLOR_RED.to_str().unwrap(),
+                        key,
+                        w
+                    ));
                 }
             }
         }
@@ -732,8 +712,8 @@ pub fn VEH_LoadVehicle(
 
         if !(*vehicle).model.is_null() {
             let model = cstr_to_str((*vehicle).model);
-            (*vehicle).modelIndex = callbacks
-                .model_index(&format!("models/players/{}/model.glm", model));
+            (*vehicle).modelIndex =
+                callbacks.model_index(&format!("models/players/{}/model.glm", model));
         }
 
         // The SP-only skin-registration block (`#ifndef _JK2MP`) stays dropped
@@ -796,12 +776,10 @@ pub fn VEH_VehicleIndexForName(
 ) -> c_int {
     unsafe {
         if vehicleName.is_null() || *vehicleName == 0 {
-            traps.com_printf(
-                &format!(
-                    "{}ERROR: Trying to read Vehicle with no name!\n",
-                    S_COLOR_RED.to_str().unwrap()
-                ),
-            );
+            traps.com_printf(&format!(
+                "{}ERROR: Trying to read Vehicle with no name!\n",
+                S_COLOR_RED.to_str().unwrap()
+            ));
             return VEHICLE_NONE;
         }
         let mut v = VEHICLE_BASE;
@@ -814,25 +792,21 @@ pub fn VEH_VehicleIndexForName(
         }
         if v >= MAX_VEHICLES as c_int {
             let name = cstr_to_str(vehicleName);
-            traps.com_printf(
-                &format!(
-                    "{}ERROR: Too many Vehicles (max 64), aborting load on {}!\n",
-                    S_COLOR_RED.to_str().unwrap(),
-                    name
-                ),
-            );
+            traps.com_printf(&format!(
+                "{}ERROR: Too many Vehicles (max 64), aborting load on {}!\n",
+                S_COLOR_RED.to_str().unwrap(),
+                name
+            ));
             return VEHICLE_NONE;
         }
         v = VEH_LoadVehicle(vehicleName, bg, traps, callbacks);
         if v == VEHICLE_NONE {
             let name = cstr_to_str(vehicleName);
-            traps.com_printf(
-                &format!(
-                    "{}ERROR: Could not find Vehicle {}!\n",
-                    S_COLOR_RED.to_str().unwrap(),
-                    name
-                ),
-            );
+            traps.com_printf(&format!(
+                "{}ERROR: Could not find Vehicle {}!\n",
+                S_COLOR_RED.to_str().unwrap(),
+                name
+            ));
         }
         v
     }
@@ -912,12 +886,8 @@ pub fn BG_VehicleLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
         bg.VehicleParms[0] = 0;
 
         let mut list_buf: [c_char; 2048] = [0; 2048];
-        let file_cnt = traps.fs_getfilelist(
-            "ext_data/vehicles",
-            ".veh",
-            list_buf.as_mut_ptr(),
-            2048,
-        );
+        let file_cnt =
+            traps.fs_getfilelist("ext_data/vehicles", ".veh", list_buf.as_mut_ptr(), 2048);
 
         let mut temp_read_buffer: Vec<u8> = vec![0u8; MAX_VEHICLE_DATA_SIZE as usize];
         let mut hold_char = list_buf.as_ptr();
@@ -1005,10 +975,7 @@ pub fn BG_GetVehicleModelName(
             let name = cstr_to_str(veh_name);
             traps.com_error(
                 ERR_DROP as c_int,
-                &format!(
-                    "BG_GetVehicleModelName:  couldn't find vehicle {}",
-                    name
-                ),
+                &format!("BG_GetVehicleModelName:  couldn't find vehicle {}", name),
             );
         }
 
@@ -1040,10 +1007,7 @@ pub fn BG_GetVehicleSkinName(
             let name = cstr_to_str(veh_name);
             traps.com_error(
                 ERR_DROP as c_int,
-                &format!(
-                    "BG_GetVehicleSkinName:  couldn't find vehicle {}",
-                    name
-                ),
+                &format!("BG_GetVehicleSkinName:  couldn't find vehicle {}", name),
             );
         }
 
@@ -1064,12 +1028,7 @@ pub fn BG_GetVehicleSkinName(
 /// Raven `AttachRidersGeneric`.
 ///
 /// Source: `oracle/codemp/game/bg_vehicleLoad.c:1643-1664`
-pub fn AttachRidersGeneric(
-    pVeh: *mut Vehicle_t,
-    bg: &BgState,
-    traps: &dyn BgTraps,
-    levelTime: c_int,
-) {
+pub fn AttachRidersGeneric(pVeh: *mut Vehicle_t, traps: &dyn BgTraps, levelTime: c_int) {
     unsafe {
         if !(*pVeh).m_pPilot.is_null() {
             let mut boltMatrix: mdxaBone_t = core::mem::zeroed();

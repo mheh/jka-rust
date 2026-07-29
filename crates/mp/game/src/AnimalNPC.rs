@@ -1,23 +1,15 @@
 // PORT-COMPLETE: AnimalNPC.c
-//! FAITHFUL port of `oracle/codemp/game/AnimalNPC.c` (MP `_JK2MP` +
-//! `QAGAME` compile path).
+//! Game-only half of `oracle/codemp/game/AnimalNPC.c`.
 //!
-//! Filled by the jampgame mega-pass.
-//!
-//! Parking pattern in this file (mirrors `SpeederNPC.rs`/`g_vehicles.rs`):
-//! - `raw-ptr-skeleton-no-world-handle` / `ambient-global (level.time)`: reads
-//!   `level.time`, unreachable from the raw-pointer skeleton signature
-//!   (rulings item 1: `level` lives on the world).
-//! - `ambient-global (g_vehicleInfo)`: reads the file-static `g_vehicleInfo`
-//!   table to dispatch the base vehicle-type vtable.
-//! - `bg-dep (vehicleInfo_t)`: dereferences `Vehicle_t::m_pVehicleInfo`
-//!   (`*mut vehicleInfo_t`) to read the base vehicle-type stats table.
+//! The shared (game + cgame) `ProcessMoveCommands`/`ProcessOrientCommands` moved
+//! to `mp_bg::vehicles::animal_npc` (a cgame TU in `JK2_cgame.vcproj`) so the
+//! cgame vehicle `Pmove` can steer animal vehicles during prediction. What stays
+//! here is `#ifdef QAGAME`-only: `DeathUpdate`, `Update`, `AnimalProcessOri`,
+//! `AnimateVehicle`, `AnimateRiders`, `G_CreateAnimalNPC`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_main::level_time;
 use crate::prelude::*;
-
-// `YAW` (angle-vector index) comes from the prelude (`crate::q_math::YAW`).
 
 /// Raven `DeathUpdate` — update death sequence.
 ///
@@ -44,163 +36,20 @@ pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUcmd: *const usercmd
     crate::g_vehicles::Update(ctx, pVeh, pUcmd)
 }
 
-/// `ProcessMoveCommands` the Vehicle.
-///
-/// Raven: MP RULE - ALL PROCESSMOVECOMMANDS FUNCTIONS MUST BE BG-COMPATIBLE!!!
-/// If you really need to violate this rule for SP, then use ifdefs.
-/// By BG-compatible, I mean no use of game-specific data - ONLY use
-/// stuff available in the MP bgEntity.
-/// Source: `oracle/codemp/game/AnimalNPC.c:168-329`
-pub fn ProcessMoveCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
-    unsafe {
-        let mut speedInc: f32;
-        let mut speedIdleDec: f32;
-        let speedIdle: f32;
-        let mut speedIdleAccel: f32;
-        let speedMin: f32;
-        let mut speedMax: f32;
-        let fWalkSpeedMax: f32;
-        let curTime: c_int = level_time(ctx);
-
-        // `pVeh` (Vehicle_t) and its `m_pVehicleInfo` (bg vehicleInfo_t) are pool
-        // objects with no accessor — their fields stay raw. `m_pParentEntity` is a
-        // g_entities arena entity: recover its handle and read `playerState` (a
-        // pool-client ptr, derefed raw below) through the accessor.
-        let parent = (*pVeh).m_pParentEntity;
-        let parent_id = ctx.entity_id_of(parent as *const gentity_t).unwrap();
-        let parentPS = ctx.world.entity(parent_id).playerState;
-
-        speedIdleDec = (*(*pVeh).m_pVehicleInfo).decelIdle * (*pVeh).m_fTimeModifier;
-        speedMax = (*(*pVeh).m_pVehicleInfo).speedMax;
-        speedIdle = (*(*pVeh).m_pVehicleInfo).speedIdle;
-        speedIdleAccel = (*(*pVeh).m_pVehicleInfo).accelIdle * (*pVeh).m_fTimeModifier;
-        speedMin = (*(*pVeh).m_pVehicleInfo).speedMin;
-
-        if !(*pVeh).m_pPilot.is_null()
-            && ((*pVeh).m_ucmd.buttons & BUTTON_ALT_ATTACK) != 0
-            && (*(*pVeh).m_pVehicleInfo).turboSpeed > 0.0f32
-        {
-            if (curTime - (*pVeh).m_iTurboTime) > (*(*pVeh).m_pVehicleInfo).turboRecharge {
-                (*pVeh).m_iTurboTime = curTime + (*(*pVeh).m_pVehicleInfo).turboDuration;
-                (*parentPS).speed = (*(*pVeh).m_pVehicleInfo).turboSpeed;
-            }
-        }
-
-        if curTime < (*pVeh).m_iTurboTime {
-            speedMax = (*(*pVeh).m_pVehicleInfo).turboSpeed;
-        } else {
-            speedMax = (*(*pVeh).m_pVehicleInfo).speedMax;
-        }
-
-        if (*parentPS).m_iVehicleNum == 0 {
-            speedInc = speedIdle * (*pVeh).m_fTimeModifier;
-            crate::q_math::VectorClear(&mut (*parentPS).moveDir);
-            (*parentPS).speed = 0.0f32;
-        } else {
-            speedInc = (*(*pVeh).m_pVehicleInfo).acceleration * (*pVeh).m_fTimeModifier;
-        }
-
-        if (*parentPS).speed != 0.0f32
-            || (*parentPS).groundEntityNum == ENTITYNUM_NONE
-            || (*pVeh).m_ucmd.forwardmove != 0
-            || (*pVeh).m_ucmd.upmove > 0
-        {
-            if (*pVeh).m_ucmd.forwardmove > 0 && speedInc != 0.0f32 {
-                (*parentPS).speed += speedInc;
-            } else if (*pVeh).m_ucmd.forwardmove < 0 {
-                if (*parentPS).speed > speedIdle {
-                    (*parentPS).speed -= speedInc;
-                } else if (*parentPS).speed > speedMin {
-                    (*parentPS).speed -= speedIdleDec;
-                }
-            } else if (*parentPS).speed > 0.0f32 {
-                (*parentPS).speed -= speedIdleDec;
-                if (*parentPS).speed < 0.0f32 {
-                    (*parentPS).speed = 0.0f32;
-                }
-            } else if (*parentPS).speed < 0.0f32 {
-                (*parentPS).speed += speedIdleDec;
-                if (*parentPS).speed > 0.0f32 {
-                    (*parentPS).speed = 0.0f32;
-                }
-            }
-        } else {
-            if (*pVeh).m_ucmd.forwardmove < 0 {
-                (*pVeh).m_ucmd.forwardmove = 0;
-            }
-            if (*pVeh).m_ucmd.upmove < 0 {
-                (*pVeh).m_ucmd.upmove = 0;
-            }
-        }
-
-        fWalkSpeedMax = speedMax * 0.275f32;
-        if curTime > (*pVeh).m_iTurboTime
-            && ((*pVeh).m_ucmd.buttons & BUTTON_WALKING) != 0
-            && (*parentPS).speed > fWalkSpeedMax
-        {
-            (*parentPS).speed = fWalkSpeedMax;
-        } else if (*parentPS).speed > speedMax {
-            (*parentPS).speed = speedMax;
-        } else if (*parentPS).speed < speedMin {
-            (*parentPS).speed = speedMin;
-        }
-    }
-}
-
-/// `ProcessOrientCommands` the Vehicle.
-///
-/// Raven: MP RULE - ALL PROCESSORIENTCOMMANDS FUNCTIONS MUST BE BG-COMPATIBLE!!!
-/// If you really need to violate this rule for SP, then use ifdefs.
-/// By BG-compatible, I mean no use of game-specific data - ONLY use
-/// stuff available in the MP bgEntity.
-/// Source: `oracle/codemp/game/AnimalNPC.c:338-464`
-pub fn ProcessOrientCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
-    unsafe {
-        // `pVeh` (Vehicle_t) and `m_pVehicleInfo` have no accessor — raw. `parent`
-        // and the owner-derived `rider` are g_entities arena entities: read their
-        // `playerState` (pool-client ptrs, derefed raw) through the accessor.
-        let parent = (*pVeh).m_pParentEntity;
-        let parent_id = ctx.entity_id_of(parent as *const gentity_t).unwrap();
-
-        // Oracle `_JK2MP`: `if (owner != ENTITYNUM_NONE) rider =
-        // PM_BGEntForNum(owner);` (== `&g_entities[owner]`) then `if (!rider)
-        // rider = parent;`. `EntityId::from_num` maps NONE → the parent fallback.
-        let owner = ctx.world.entity(parent_id).s.owner;
-        let rider_id = EntityId::from_num(owner).unwrap_or(parent_id);
-
-        let parentPS = ctx.world.entity(parent_id).playerState;
-        let riderPS = ctx.world.entity(rider_id).playerState;
-
-        // Oracle: `if (rider)` — always true after the fallback above.
-        let mut angDif = crate::q_math::AngleSubtract(
-            *(*pVeh).m_vOrientation.add(YAW),
-            (*riderPS).viewangles[YAW],
-        );
-        if !parentPS.is_null() && (*parentPS).speed != 0.0f32 {
-            let mut s = (*parentPS).speed;
-            let maxDif = (*(*pVeh).m_pVehicleInfo).turningSpeed * 4.0f32;
-            if s < 0.0f32 {
-                s = -s;
-            }
-            angDif *= s / (*(*pVeh).m_pVehicleInfo).speedMax;
-            if angDif > maxDif {
-                angDif = maxDif;
-            } else if angDif < -maxDif {
-                angDif = -maxDif;
-            }
-            *(*pVeh).m_vOrientation.add(YAW) = crate::q_math::AngleNormalize180(
-                *(*pVeh).m_vOrientation.add(YAW) - angDif * ((*pVeh).m_fTimeModifier * 0.2f32),
-            );
-        }
-    }
-}
-
 /// Raven `AnimalProcessOri` — temp hack til mp speeder controls are sorted
-/// (`_JK2MP` only).
-///
+/// (`_JK2MP` only). The `ProcessOrientCommands` body it forwards to moved to bg;
+/// this game-tier adapter builds a `pm`-null `PmoveContext` to reach it. It has
+/// no live caller (Raven only `extern`-declares it), kept for faithfulness.
 /// Source: `oracle/codemp/game/AnimalNPC.c:467-470`
 pub fn AnimalProcessOri(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
-    ProcessOrientCommands(ctx, pVeh);
+    let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
+    let mut callbacks = crate::bg_channel::GameCallbacksImpl {
+        world: ctx.world_raw(),
+        engine: ctx.engine,
+    };
+    let mut pmc =
+        crate::bg_channel::PmoveContext::new(&mut ctx.world.bg_state, &traps, &mut callbacks);
+    mp_bg::vehicles::animal_npc::ProcessOrientCommands(&mut pmc, pVeh);
 }
 
 /// Raven `AnimateVehicle`.
