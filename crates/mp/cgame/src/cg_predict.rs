@@ -588,9 +588,9 @@ pub fn CG_PmoveClientPointerUpdate(world: &mut CgWorld) {
     for i in 0..MAX_GENTITIES {
         // Raven stores `&cgSendPSPool[i]`, i.e. entity `i`'s own snapshot
         // playerstate — the DEC-46.2 `Snap` arm, and the live pointer on the
-        // bg view row.
+        // bg view row (raw-derived so later pool borrows don't retag it).
         world.entities[i].playerState = PlayerStateRef::Snap;
-        world.bg_ents[i].playerState = &mut world.cgSendPSPool[i];
+        world.bg_ents[i].playerState = &raw mut world.cgSendPSPool[i];
     }
 
     // Set up bg entity data
@@ -1044,9 +1044,11 @@ pub fn CG_PredictPlayerState(ctx: &mut CgContext, ds: &DisplayState) {
 
     // save the state before the pmove so we can detect transitions
     let mut oldPlayerState = ctx.world.cg.predictedPlayerState;
-    // Raven's `oldVehicleState` local is uninitialized unless piloting; every
-    // later read sits behind the same piloting gate, so the zero seed is never
-    // observed
+    // Raven's `oldVehicleState` local is uninitialized unless piloting. The
+    // copy gate reads the CURRENT ps while the later reads gate on
+    // oldPlayerState's vehicle, so a vehicle-num change between them can read
+    // the seed - Raven read uninitialized stack there; zeros are the defined
+    // stand-in
     let mut oldVehicleState = playerState_t::zeroed();
     if CG_Piloting(ctx.world, ctx.world.cg.predictedPlayerState.m_iVehicleNum) {
         oldVehicleState = ctx.world.cg.predictedVehicleState;
@@ -1166,9 +1168,29 @@ pub fn CG_PredictPlayerState(ctx: &mut CgContext, ds: &DisplayState) {
         if ctx.world.predict.cg_pmove.pmove_fixed != 0 {
             let ps_ptr = &raw mut ctx.world.cg.predictedPlayerState;
             let cmd_ptr = &raw const ctx.world.predict.cg_pmove.cmd;
+            let clientNum = ctx.world.cg.predictedPlayerState.clientNum;
+            let m_iVehicleNum = ctx.world.cg.predictedPlayerState.m_iVehicleNum;
             let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
             let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
             let mut pmctx = PmoveContext::new(&mut ctx.world.bg_state, &traps, &mut callbacks);
+            // Raven's pm/pm_entSelf/pm_entVeh are TU statics still holding
+            // the last PmoveSingle's values at this call; the fresh context
+            // re-derives them from the current ps (PmoveSingle's own rule) so
+            // the fighter pitch-clamp arm in PM_UpdateViewAngles can see the
+            // vehicle
+            pmctx.pm = &raw mut ctx.world.predict.cg_pmove;
+            pmctx.pm_entSelf = pmctx.PM_BGEntForNum(clientNum);
+            pmctx.pm_entVeh = if m_iVehicleNum != 0 {
+                if clientNum < MAX_CLIENTS_I32 {
+                    // player riding vehicle
+                    pmctx.PM_BGEntForNum(m_iVehicleNum)
+                } else {
+                    // vehicle with player pilot
+                    pmctx.PM_BGEntForNum(m_iVehicleNum - 1)
+                }
+            } else {
+                null_mut()
+            };
             pmctx.PM_UpdateViewAngles(ps_ptr, cmd_ptr);
         }
 
@@ -1335,8 +1357,17 @@ pub fn CG_PredictPlayerState(ctx: &mut CgContext, ds: &DisplayState) {
         }
 
         let localAnimIndex = ctx.world.entity(pEntNum).localAnimIndex;
-        ctx.world.predict.cg_pmove.animations =
-            ctx.world.bg_state.bgAllAnims[localAnimIndex as usize].anims;
+        // §F19: Raven indexes `bgAllAnims[pEnt->localAnimIndex]` unchecked -
+        // an unparsed skeleton's -1 read garbage there. The defined answer is
+        // a null table, which Pmove's own animations guards read as "no
+        // anims" (same guard shape as CG_SetLerpFrameAnimation's).
+        ctx.world.predict.cg_pmove.animations = if localAnimIndex >= 0
+            && (localAnimIndex as usize) < ctx.world.bg_state.bgAllAnims.len()
+        {
+            ctx.world.bg_state.bgAllAnims[localAnimIndex as usize].anims
+        } else {
+            null_mut()
+        };
         ctx.world.predict.cg_pmove.gametype = ctx.world.cgs.gametype;
 
         ctx.world.predict.cg_pmove.debugMelee = ctx.world.cgs.debugMelee;
@@ -1503,7 +1534,8 @@ pub fn CG_PredictPlayerState(ctx: &mut CgContext, ds: &DisplayState) {
         let clientNum = ctx.world.cg.predictedPlayerState.clientNum as usize;
         // Raven keys the vehicle's pool row by `veh->currentState.number`
         // (== vehNum whenever the snapshot is coherent); the raw bg row keeps
-        // the literal semantic, the Snap arm resolves by entity number
+        // the literal semantic, the Snap arm resolves by entity number. The
+        // index is wire-bounded (GENTITYNUM_BITS decode < MAX_GENTITIES)
         let vehStateNum = ctx.world.entity(vehNum).currentState.number as usize;
         let world = &mut *ctx.world;
         world.entities[clientNum].playerState = PlayerStateRef::Snap;
