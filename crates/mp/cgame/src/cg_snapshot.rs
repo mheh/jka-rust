@@ -14,7 +14,7 @@ use mp_bg::weapons::weapon_t::WP_BRYAR_PISTOL;
 use mp_qshared::common::mp::qcommon::pm_flags::PMF_FOLLOW;
 use mp_qshared::common::mp::qcommon::{entityState_t, playerState_t};
 use mp_qshared::shared::q_math::_VectorCopy;
-use mp_qshared::shared::{qfalse, qtrue, SNAPFLAG_SERVERCOUNT};
+use mp_qshared::shared::{qfalse, qtrue, SNAPFLAG_NOT_ACTIVE, SNAPFLAG_SERVERCOUNT};
 use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::display_state::DisplayState;
 use mp_uishared::shared::menu_system::MenuSystem;
@@ -128,8 +128,7 @@ pub fn CG_SetNextSnap(world: &mut CgWorld, slot: usize) {
 /// (the `cg.activeSnapshots` slot) instead of a reference keeps this composable
 /// with [`CG_SetNextSnap`] - a caller does
 /// `if let Some(slot) = CG_ReadNextSnapshot(ctx) { CG_SetNextSnap(ctx.world, slot); }`,
-/// the same two-step Raven's `CG_ProcessSnapshots` (not in this wave) does with
-/// its `snap` local.
+/// the same two-step [`CG_ProcessSnapshots`] does with its `snap` local.
 ///
 /// Source: `oracle/codemp/cgame/cg_snapshot.c:270-316`
 pub fn CG_ReadNextSnapshot(ctx: &mut CgContext) -> Option<usize> {
@@ -490,5 +489,109 @@ pub fn CG_TransitionSnapshot(
         // CG_SetNextSnap overwrites it, so the write-back below reproduces
         // that in-place mutation faithfully.
         ctx.world.cg.activeSnapshots[oldSlot].ps = ops;
+    }
+}
+
+/// Raven `CG_ProcessSnapshots` — pulls in every snapshot the client system has
+/// queued since last frame: latches the very first one via
+/// [`CG_SetInitialSnapshot`], keeps [`CG_SetNextSnap`] fed so there's always a
+/// `cg.nextSnap` to interpolate towards, and walks [`CG_TransitionSnapshot`]
+/// forward through however many frames it takes for `cg.time` to land inside
+/// the `[cg.snap, cg.nextSnap)` window (or until snapshots run out and we fall
+/// back to extrapolating off the last one).
+///
+/// Source: `oracle/codemp/cgame/cg_snapshot.c:338-413`
+pub fn CG_ProcessSnapshots(
+    ctx: &mut CgContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+) {
+    // see what the latest snapshot the client system has is
+    let (n, latestSnapshotTime) = trap::GetCurrentSnapshotNumber(ctx.engine);
+    ctx.world.cg.latestSnapshotTime = latestSnapshotTime;
+    if n != ctx.world.cg.latestSnapshotNum {
+        if n < ctx.world.cg.latestSnapshotNum {
+            // this should never happen
+            CG_Error(ctx, "CG_ProcessSnapshots: n < cg.latestSnapshotNum");
+            return;
+        }
+        ctx.world.cg.latestSnapshotNum = n;
+    }
+
+    // If we have yet to receive a snapshot, check for it.
+    // Once we have gotten the first snapshot, cg.snap will
+    // always have valid data for the rest of the game
+    while ctx.world.cg.snap_ref().is_none() {
+        let slot = CG_ReadNextSnapshot(ctx);
+        let slot = match slot {
+            Some(slot) => slot,
+            None => {
+                // we can't continue until we get a snapshot
+                return;
+            }
+        };
+
+        // set our weapon selection to what
+        // the playerstate is currently using
+        if (ctx.world.cg.activeSnapshots[slot].snapFlags & SNAPFLAG_NOT_ACTIVE) == 0 {
+            CG_SetInitialSnapshot(ctx, menus, ds, dc, slot);
+        }
+    }
+
+    // loop until we either have a valid nextSnap with a serverTime
+    // greater than cg.time to interpolate towards, or we run
+    // out of available snapshots
+    loop {
+        // if we don't have a nextframe, try and read a new one in
+        if ctx.world.cg.next_snap_ref().is_none() {
+            let slot = CG_ReadNextSnapshot(ctx);
+
+            // if we still don't have a nextframe, we will just have to
+            // extrapolate
+            let slot = match slot {
+                Some(slot) => slot,
+                None => break,
+            };
+
+            CG_SetNextSnap(ctx.world, slot);
+
+            // if time went backwards, we have a level restart
+            if ctx.world.cg.next_snap_ref().unwrap().serverTime
+                < ctx.world.cg.snap_ref().unwrap().serverTime
+            {
+                CG_Error(ctx, "CG_ProcessSnapshots: Server time went backwards");
+                return;
+            }
+        }
+
+        // if our time is < nextFrame's, we have a nice interpolating state
+        if ctx.world.cg.time >= ctx.world.cg.snap_ref().unwrap().serverTime
+            && ctx.world.cg.time < ctx.world.cg.next_snap_ref().unwrap().serverTime
+        {
+            break;
+        }
+
+        // we have passed the transition from nextFrame to frame
+        CG_TransitionSnapshot(ctx, menus, ds, dc);
+    }
+
+    // assert our valid conditions upon exiting
+    if ctx.world.cg.snap_ref().is_none() {
+        CG_Error(ctx, "CG_ProcessSnapshots: cg.snap == NULL");
+        return;
+    }
+    if ctx.world.cg.time < ctx.world.cg.snap_ref().unwrap().serverTime {
+        // this can happen right after a vid_restart
+        ctx.world.cg.time = ctx.world.cg.snap_ref().unwrap().serverTime;
+    }
+    if ctx.world.cg.next_snap_ref().is_some()
+        && ctx.world.cg.next_snap_ref().unwrap().serverTime <= ctx.world.cg.time
+    {
+        CG_Error(
+            ctx,
+            "CG_ProcessSnapshots: cg.nextSnap->serverTime <= cg.time",
+        );
+        return;
     }
 }

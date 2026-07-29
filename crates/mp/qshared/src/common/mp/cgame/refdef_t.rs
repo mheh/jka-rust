@@ -26,6 +26,7 @@ pub const MAX_RENDER_STRING_LENGTH: usize = 32;
 ///
 /// Type definition source: `oracle/codemp/cgame/tr_types.h:257-275`
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct refdef_t {
     pub x: i32,
     pub y: i32,

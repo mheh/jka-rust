@@ -147,6 +147,12 @@ pub struct CgViewState {
     /// block (`cg_view.c:1541-1544`), preserved faithfully.
     /// Source: `oracle/codemp/cgame/cg_view.c:1476,1646`
     pub cg_lastTurretViewAngles: vec3_t,
+
+    /// Raven's `static float lastfov` inside `CG_DrawSkyBoxPortal` — latches
+    /// the live zoom fov on entry, for transitions back out of a zoomed-in
+    /// mode; walked further while the portal sky's own fov is zooming in.
+    /// Source: `oracle/codemp/cgame/cg_view.c:1750`
+    pub lastfov: f32,
 }
 
 impl Default for CgViewState {
@@ -192,6 +198,7 @@ impl Default for CgViewState {
             cg_actionCamLastPos: [0.0; 3],
             cg_actionCamLastTime: 0,
             cg_lastTurretViewAngles: [0.0; 3],
+            lastfov: 0.0,
         }
     }
 }

@@ -30,6 +30,7 @@ use mp_qshared::common::mp::game::class_t::class_t;
 use mp_qshared::common::mp::qcommon::player_state::{playerState_t, MAX_POWERUPS};
 use mp_qshared::common::mp::qcommon::pm_flags::{PMF_DUCKED, PMF_FOLLOW};
 use mp_qshared::common::mp::trace_t::trace_t;
+use mp_qshared::shared::com_parse::{COM_ParseExt, QSharedScratch};
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin,
     vectoangles, AngleNormalize180, AngleVectors, AnglesToAxis, Q_fabs, VectorLength,
@@ -42,11 +43,11 @@ use mp_qshared::shared::surface_flags::{
 use mp_qshared::shared::{
     qfalse, qtrue, sfxHandle_t, trType_t, vec3_t, ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_QPATH,
 };
-use native_string::{atof, buf_to_string, Q_strncpyz};
+use native_string::{atof, atoi, buf_to_string, Q_strncpyz};
 
 use crate::cg_drawtools::CG_DrawPic;
-use crate::cg_ents::{CG_CalcEntityLerpPositions, CG_S_UpdateLoopingSounds};
-use crate::cg_main::{CG_Argv, CG_Printf};
+use crate::cg_ents::{CG_AddPacketEntities, CG_CalcEntityLerpPositions, CG_S_UpdateLoopingSounds};
+use crate::cg_main::{CG_Argv, CG_Error, CG_Printf};
 use crate::cg_predict::{CG_PointContents, CG_Trace};
 use crate::cg_weapons::{LAND_DEFLECT_TIME, LAND_RETURN_TIME};
 use crate::local::cg_t::MAX_SOUNDBUFFER;
@@ -2493,4 +2494,220 @@ pub fn CG_CalcViewValues(ctx: &mut CgContext) -> bool {
 
     // field of view
     CG_CalcFov(ctx)
+}
+
+/// Raven `RDF_SKYBOXPORTAL` — marks a scene as a 'portal sky'. `tr_types.h`'s
+/// flag; this TU gets its own private copy beside its reader per §C8.
+/// Source: `oracle/codemp/cgame/tr_types.h:60`
+const RDF_SKYBOXPORTAL: c_int = 8;
+
+/// Raven `RDF_DRAWSKYBOX` — the above (`RDF_SKYBOXPORTAL`) marks a scene as a
+/// 'portal sky'; this flag says to draw it.
+/// Source: `oracle/codemp/cgame/tr_types.h:61`
+const RDF_DRAWSKYBOX: c_int = 16;
+
+/// Raven `RDF_NOFOG` — no global fog in this scene (but still brush fog). -rww
+/// Source: `oracle/codemp/cgame/tr_types.h:64`
+const RDF_NOFOG: c_int = 64;
+
+/// Raven `CG_DrawSkyBoxPortal` — parses a sky-portal configstring into a
+/// portal `refdef_t` and renders it, restoring the normal `cg.refdef`
+/// afterward so the caller's own scene build is untouched.
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:1748-1935`
+pub fn CG_DrawSkyBoxPortal(ctx: &mut CgContext, cstr: &str) {
+    // for transitions back from zoomed in modes
+    ctx.world.view.lastfov = ctx.world.view.zoomFov;
+
+    let mut backuprefdef = ctx.world.cg.refdef;
+
+    let mut qs = QSharedScratch::zeroed();
+    let mut cursor: Option<&[u8]> = Some(cstr.as_bytes());
+
+    let (token, rest) = COM_ParseExt(&mut qs, cursor, false);
+    cursor = rest;
+    if token.is_empty() {
+        CG_Error(
+            ctx,
+            "CG_DrawSkyBoxPortal: error parsing skybox configstring\n",
+        );
+        return;
+    }
+    ctx.world.cg.refdef.vieworg[0] = atof(&token) as f32;
+
+    let (token, rest) = COM_ParseExt(&mut qs, cursor, false);
+    cursor = rest;
+    if token.is_empty() {
+        CG_Error(
+            ctx,
+            "CG_DrawSkyBoxPortal: error parsing skybox configstring\n",
+        );
+        return;
+    }
+    ctx.world.cg.refdef.vieworg[1] = atof(&token) as f32;
+
+    let (token, rest) = COM_ParseExt(&mut qs, cursor, false);
+    cursor = rest;
+    if token.is_empty() {
+        CG_Error(
+            ctx,
+            "CG_DrawSkyBoxPortal: error parsing skybox configstring\n",
+        );
+        return;
+    }
+    ctx.world.cg.refdef.vieworg[2] = atof(&token) as f32;
+
+    let (token, rest) = COM_ParseExt(&mut qs, cursor, false);
+    cursor = rest;
+    if token.is_empty() {
+        CG_Error(
+            ctx,
+            "CG_DrawSkyBoxPortal: error parsing skybox configstring\n",
+        );
+        return;
+    }
+    // Raven's `fov_x = atoi(token); if (!fov_x) fov_x = cg_fov.value;` is a
+    // dead store — both the intermission and non-intermission arms below
+    // unconditionally overwrite fov_x from cg_fov.value before it is ever
+    // read, so only the parse (needed to hold cstr's cursor position) and the
+    // empty-token error above carry forward.
+
+    // setup fog the first time, ignore this part of the configstring after that
+    let (token, rest) = COM_ParseExt(&mut qs, cursor, false);
+    cursor = rest;
+    if token.is_empty() {
+        CG_Error(
+            ctx,
+            "CG_DrawSkyBoxPortal: error parsing skybox configstring.  No fog state\n",
+        );
+        return;
+    } else if atoi(&token) != 0 {
+        // this camera has fog
+        // Raven parses fogColor/fogStart/fogEnd here but never stores them
+        // anywhere afterward (verified: no further read of any of the three
+        // in cg_view.c) — the parse and its error checks are the only
+        // observable behavior, kept faithfully; the values themselves are
+        // genuinely dead.
+        let (token, rest) = COM_ParseExt(&mut qs, cursor, false);
+        cursor = rest;
+        if token.is_empty() {
+            CG_Error(
+                ctx,
+                "CG_DrawSkyBoxPortal: error parsing skybox configstring.  No fog[0]\n",
+            );
+            return;
+        }
+
+        let (token, rest) = COM_ParseExt(&mut qs, cursor, false);
+        cursor = rest;
+        if token.is_empty() {
+            CG_Error(
+                ctx,
+                "CG_DrawSkyBoxPortal: error parsing skybox configstring.  No fog[1]\n",
+            );
+            return;
+        }
+
+        let (token, rest) = COM_ParseExt(&mut qs, cursor, false);
+        cursor = rest;
+        if token.is_empty() {
+            CG_Error(
+                ctx,
+                "CG_DrawSkyBoxPortal: error parsing skybox configstring.  No fog[2]\n",
+            );
+            return;
+        }
+
+        let (token, rest) = COM_ParseExt(&mut qs, cursor, false);
+        cursor = rest;
+        let _fogStart = if token.is_empty() { 0 } else { atoi(&token) };
+
+        let (token, rest) = COM_ParseExt(&mut qs, cursor, false);
+        cursor = rest;
+        let _fogEnd = if token.is_empty() { 0 } else { atoi(&token) };
+    }
+    let _ = cursor; // cstr isn't parsed any further past this point
+
+    let mut fov_x: f32;
+    if ctx.world.cg.predictedPlayerState.pm_type == pmtype_t::PM_INTERMISSION as c_int {
+        // if in intermission, use a fixed value
+        fov_x = ctx.world.cvars.cg_fov.value;
+    } else {
+        fov_x = ctx.world.cvars.cg_fov.value;
+        if fov_x < 1.0 {
+            fov_x = 1.0;
+        } else if fov_x > 160.0 {
+            fov_x = 160.0;
+        }
+
+        if ctx.world.cg.predictedPlayerState.zoomMode != 0 {
+            fov_x = ctx.world.view.zoomFov;
+        }
+
+        // do smooth transitions for zooming
+        if ctx.world.cg.predictedPlayerState.zoomMode != 0 {
+            // zoomed/zooming in
+            let f = (ctx.world.cg.time - ctx.world.cg.zoomTime) as f32 / ZOOM_OUT_TIME;
+            if f > 1.0 {
+                fov_x = ctx.world.view.zoomFov;
+            } else {
+                fov_x += f * (ctx.world.view.zoomFov - fov_x);
+            }
+            ctx.world.view.lastfov = fov_x;
+        } else {
+            // zooming out
+            let f = (ctx.world.cg.time - ctx.world.cg.zoomTime) as f32 / ZOOM_OUT_TIME;
+            if f > 1.0 {
+                // Raven's `fov_x = fov_x;` — the blend is over, keep what we have
+            } else {
+                fov_x = ctx.world.view.zoomFov + f * (fov_x - ctx.world.view.zoomFov);
+            }
+        }
+    }
+
+    // Same widths as `CG_CalcFov`: `fov_x / 360` is a float divide that only
+    // widens to double for the libm call after it.
+    let x = (ctx.world.cg.refdef.width as f64 / ((fov_x / 360.0) as f64 * PI).tan()) as f32;
+    let mut fov_y = (ctx.world.cg.refdef.height as f64).atan2(x as f64) as f32;
+    fov_y = ((fov_y * 360.0) as f64 / PI) as f32;
+
+    ctx.world.cg.refdef.fov_x = fov_x;
+    ctx.world.cg.refdef.fov_y = fov_y;
+
+    ctx.world.cg.refdef.rdflags |= RDF_SKYBOXPORTAL;
+    ctx.world.cg.refdef.rdflags |= RDF_DRAWSKYBOX;
+
+    ctx.world.cg.refdef.time = ctx.world.cg.time;
+
+    if ctx.world.cg.hyperspace == qfalse {
+        // rww - also had to add this to add effects being rendered in portal sky
+        // areas properly.
+        trap::FX_AddScheduledEffects(ctx.engine, true);
+    }
+
+    // rww - there was no proper way to put real entities inside the portal view
+    // before. this will put specially flagged entities in the render.
+    CG_AddPacketEntities(ctx, qtrue);
+
+    if ctx.world.main.cg_skyOri {
+        // ok, we want to orient the sky refdef vieworg based on the normal
+        // vieworg's relation to the ori pos
+        let mut dif: vec3_t = [0.0; 3];
+        _VectorSubtract(backuprefdef.vieworg, ctx.world.main.cg_skyOriPos, &mut dif);
+        _VectorScale(dif, ctx.world.main.cg_skyOriScale, &mut dif);
+        let vieworg = ctx.world.cg.refdef.vieworg;
+        _VectorAdd(vieworg, dif, &mut ctx.world.cg.refdef.vieworg);
+    }
+
+    if ctx.world.main.cg_noFogOutsidePortal {
+        // make sure no fog flag is stripped first, and make sure it is set on
+        // the normal refdef
+        ctx.world.cg.refdef.rdflags &= !RDF_NOFOG;
+        backuprefdef.rdflags |= RDF_NOFOG;
+    }
+
+    // draw the skybox
+    trap::R_RenderScene(ctx.engine, &ctx.world.cg.refdef);
+
+    ctx.world.cg.refdef = backuprefdef;
 }
