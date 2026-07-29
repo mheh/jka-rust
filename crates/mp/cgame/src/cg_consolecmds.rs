@@ -16,7 +16,6 @@ use mp_qshared::shared::q_math::YAW;
 use mp_qshared::shared::SCREEN_HEIGHT;
 use mp_qshared::shared::{qfalse, qtrue};
 
-use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::display_state::DisplayState;
 use mp_uishared::shared::menu_id::MenuId;
 use mp_uishared::shared::menu_system::MenuSystem;
@@ -178,16 +177,15 @@ pub fn CG_ScoresUp_f(world: &mut CgWorld) {
 ///
 /// Source: `oracle/codemp/cgame/cg_consolecmds.c:98-104`
 pub fn CG_scrollScoresDown_f(
-    world: &CgWorld,
+    ctx: &mut CgContext,
     menus: &mut MenuSystem,
     ds: &DisplayState,
-    dc: &mut dyn DisplayContext,
     menuScoreboard: Option<MenuId>,
 ) {
-    if menuScoreboard.is_some() && world.cg.scoreBoardShowing != qfalse {
-        Menu_ScrollFeeder(menus, ds, dc, menuScoreboard, FEEDER_SCOREBOARD, true);
-        Menu_ScrollFeeder(menus, ds, dc, menuScoreboard, FEEDER_REDTEAM_LIST, true);
-        Menu_ScrollFeeder(menus, ds, dc, menuScoreboard, FEEDER_BLUETEAM_LIST, true);
+    if menuScoreboard.is_some() && ctx.world.cg.scoreBoardShowing != qfalse {
+        Menu_ScrollFeeder(menus, ds, ctx, menuScoreboard, FEEDER_SCOREBOARD, true);
+        Menu_ScrollFeeder(menus, ds, ctx, menuScoreboard, FEEDER_REDTEAM_LIST, true);
+        Menu_ScrollFeeder(menus, ds, ctx, menuScoreboard, FEEDER_BLUETEAM_LIST, true);
     }
 }
 
@@ -199,16 +197,15 @@ pub fn CG_scrollScoresDown_f(
 ///
 /// Source: `oracle/codemp/cgame/cg_consolecmds.c:107-113`
 pub fn CG_scrollScoresUp_f(
-    world: &CgWorld,
+    ctx: &mut CgContext,
     menus: &mut MenuSystem,
     ds: &DisplayState,
-    dc: &mut dyn DisplayContext,
     menuScoreboard: Option<MenuId>,
 ) {
-    if menuScoreboard.is_some() && world.cg.scoreBoardShowing != qfalse {
-        Menu_ScrollFeeder(menus, ds, dc, menuScoreboard, FEEDER_SCOREBOARD, false);
-        Menu_ScrollFeeder(menus, ds, dc, menuScoreboard, FEEDER_REDTEAM_LIST, false);
-        Menu_ScrollFeeder(menus, ds, dc, menuScoreboard, FEEDER_BLUETEAM_LIST, false);
+    if menuScoreboard.is_some() && ctx.world.cg.scoreBoardShowing != qfalse {
+        Menu_ScrollFeeder(menus, ds, ctx, menuScoreboard, FEEDER_SCOREBOARD, false);
+        Menu_ScrollFeeder(menus, ds, ctx, menuScoreboard, FEEDER_REDTEAM_LIST, false);
+        Menu_ScrollFeeder(menus, ds, ctx, menuScoreboard, FEEDER_BLUETEAM_LIST, false);
     }
 }
 
@@ -390,7 +387,6 @@ pub fn CG_ConsoleCommand(
     ctx: &mut CgContext,
     menus: &mut MenuSystem,
     ds: &DisplayState,
-    dc: &mut dyn DisplayContext,
     menuScoreboard: Option<MenuId>,
 ) -> bool {
     let cmd = CG_Argv(ctx, 0);
@@ -421,8 +417,8 @@ pub fn CG_ConsoleCommand(
             "tcmd" => CG_TargetCommand_f(ctx),
             "spWin" => CG_spWin_f(ctx),
             "spLose" => CG_spLose_f(ctx),
-            "scoresDown" => CG_scrollScoresDown_f(ctx.world, menus, ds, dc, menuScoreboard),
-            "scoresUp" => CG_scrollScoresUp_f(ctx.world, menus, ds, dc, menuScoreboard),
+            "scoresDown" => CG_scrollScoresDown_f(ctx, menus, ds, menuScoreboard),
+            "scoresUp" => CG_scrollScoresUp_f(ctx, menus, ds, menuScoreboard),
             "startOrbit" => CG_StartOrbit_f(ctx),
             "loaddeferred" => CG_LoadDeferredPlayers(ctx.world),
             "invnext" => CG_NextInventory_f(ctx.world),

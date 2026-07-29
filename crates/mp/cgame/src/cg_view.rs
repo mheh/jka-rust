@@ -47,7 +47,6 @@ use mp_qshared::shared::{
     qboolean, qfalse, qtrue, sfxHandle_t, trType_t, vec3_t, ENTITYNUM_NONE, ENTITYNUM_WORLD,
     MAX_QPATH, SNAPFLAG_NOT_ACTIVE,
 };
-use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::display_state::DisplayState;
 use mp_uishared::shared::menu_system::MenuSystem;
 use native_string::{atof, atoi, buf_to_string, Q_strncpyz};
@@ -2749,7 +2748,6 @@ pub fn CG_DrawActiveFrame(
     demoPlayback: qboolean,
     menus: &mut MenuSystem,
     ds: &DisplayState,
-    dc: &mut dyn DisplayContext,
 ) {
     let mSensitivity = ctx.world.cg.zoomSensitivity;
     let mPitchOverride = 0.0f32;
@@ -2815,7 +2813,7 @@ pub fn CG_DrawActiveFrame(
     trap::R_ClearScene(ctx.engine);
 
     // set up cg.snap and possibly cg.nextSnap
-    CG_ProcessSnapshots(ctx, menus, ds, dc);
+    CG_ProcessSnapshots(ctx, menus, ds);
 
     trap::ROFF_UpdateEntities(ctx.engine);
 

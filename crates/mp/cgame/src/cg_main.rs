@@ -96,7 +96,7 @@ use native_string::{
 };
 
 use crate::bg_channel::{CgBgTraps, CgGameCallbacks};
-use crate::cg_consolecmds::CG_InitConsoleCommands;
+use crate::cg_consolecmds::{CG_ConsoleCommand, CG_InitConsoleCommands};
 use crate::cg_draw::{CG_Text_Paint, CG_Text_Width};
 use crate::cg_effects::{CG_InitGlass, CG_TestLine};
 use crate::cg_ents::{CG_CalcEntityLerpPositions, CG_ROFF_NotetrackCallback, ScaleModelAxis};
@@ -119,7 +119,7 @@ use crate::cg_servercmds::{
     CG_KillCEntityG2, CG_ParseServerinfo, CG_PrecacheNPCSounds, CG_SetConfigValues,
     CG_ShaderStateChanged,
 };
-use crate::cg_view::CG_DoCameraShake;
+use crate::cg_view::{CG_DoCameraShake, CG_DrawActiveFrame};
 use crate::cg_weapons::{
     CG_InitG2Weapons, CG_RegisterItemVisuals, CG_ShutDownG2Weapons, LAST_USEABLE_WEAPON,
 };
@@ -1712,12 +1712,7 @@ fn pc_token_str(token: &pc_token_t) -> String {
 ///
 /// Source: `oracle/codemp/cgame/cg_main.c:2592-2751`
 #[allow(clippy::too_many_lines)]
-pub fn CG_Asset_Parse(
-    ctx: &mut CgContext,
-    ds: &mut DisplayState,
-    dc: &mut dyn DisplayContext,
-    handle: c_int,
-) -> bool {
+pub fn CG_Asset_Parse(ctx: &mut CgContext, ds: &mut DisplayState, handle: c_int) -> bool {
     let mut token = zero_pc_token();
 
     if !trap::PC_ReadToken(ctx.engine, handle, &mut token) {
@@ -1742,11 +1737,11 @@ pub fn CG_Asset_Parse(
         if Q_stricmp(&tokenStr, "font") == 0 {
             let mut pointSize = 0;
             if !trap::PC_ReadToken(ctx.engine, handle, &mut token)
-                || !PC_Int_Parse(dc, handle, &mut pointSize)
+                || !PC_Int_Parse(ctx, handle, &mut pointSize)
             {
                 return false;
             }
-            ds.Assets.qhMediumFont = dc.RegisterFont(&pc_token_str(&token));
+            ds.Assets.qhMediumFont = ctx.RegisterFont(&pc_token_str(&token));
             continue;
         }
 
@@ -1754,11 +1749,11 @@ pub fn CG_Asset_Parse(
         if Q_stricmp(&tokenStr, "smallFont") == 0 {
             let mut pointSize = 0;
             if !trap::PC_ReadToken(ctx.engine, handle, &mut token)
-                || !PC_Int_Parse(dc, handle, &mut pointSize)
+                || !PC_Int_Parse(ctx, handle, &mut pointSize)
             {
                 return false;
             }
-            ds.Assets.qhSmallFont = dc.RegisterFont(&pc_token_str(&token));
+            ds.Assets.qhSmallFont = ctx.RegisterFont(&pc_token_str(&token));
             continue;
         }
 
@@ -1766,11 +1761,11 @@ pub fn CG_Asset_Parse(
         if Q_stricmp(&tokenStr, "small2Font") == 0 {
             let mut pointSize = 0;
             if !trap::PC_ReadToken(ctx.engine, handle, &mut token)
-                || !PC_Int_Parse(dc, handle, &mut pointSize)
+                || !PC_Int_Parse(ctx, handle, &mut pointSize)
             {
                 return false;
             }
-            ds.Assets.qhSmall2Font = dc.RegisterFont(&pc_token_str(&token));
+            ds.Assets.qhSmall2Font = ctx.RegisterFont(&pc_token_str(&token));
             continue;
         }
 
@@ -1778,11 +1773,11 @@ pub fn CG_Asset_Parse(
         if Q_stricmp(&tokenStr, "bigfont") == 0 {
             let mut pointSize = 0;
             if !trap::PC_ReadToken(ctx.engine, handle, &mut token)
-                || !PC_Int_Parse(dc, handle, &mut pointSize)
+                || !PC_Int_Parse(ctx, handle, &mut pointSize)
             {
                 return false;
             }
-            ds.Assets.qhBigFont = dc.RegisterFont(&pc_token_str(&token));
+            ds.Assets.qhBigFont = ctx.RegisterFont(&pc_token_str(&token));
             continue;
         }
 
@@ -1832,7 +1827,7 @@ pub fn CG_Asset_Parse(
         }
 
         if Q_stricmp(&tokenStr, "cursor") == 0 {
-            if !PC_String_Parse(dc, handle, &mut ds.Assets.cursorStr) {
+            if !PC_String_Parse(ctx, handle, &mut ds.Assets.cursorStr) {
                 return false;
             }
             let cursorStr = ds.Assets.cursorStr.clone();
@@ -1841,42 +1836,42 @@ pub fn CG_Asset_Parse(
         }
 
         if Q_stricmp(&tokenStr, "fadeClamp") == 0 {
-            if !PC_Float_Parse(dc, handle, &mut ds.Assets.fadeClamp) {
+            if !PC_Float_Parse(ctx, handle, &mut ds.Assets.fadeClamp) {
                 return false;
             }
             continue;
         }
 
         if Q_stricmp(&tokenStr, "fadeCycle") == 0 {
-            if !PC_Int_Parse(dc, handle, &mut ds.Assets.fadeCycle) {
+            if !PC_Int_Parse(ctx, handle, &mut ds.Assets.fadeCycle) {
                 return false;
             }
             continue;
         }
 
         if Q_stricmp(&tokenStr, "fadeAmount") == 0 {
-            if !PC_Float_Parse(dc, handle, &mut ds.Assets.fadeAmount) {
+            if !PC_Float_Parse(ctx, handle, &mut ds.Assets.fadeAmount) {
                 return false;
             }
             continue;
         }
 
         if Q_stricmp(&tokenStr, "shadowX") == 0 {
-            if !PC_Float_Parse(dc, handle, &mut ds.Assets.shadowX) {
+            if !PC_Float_Parse(ctx, handle, &mut ds.Assets.shadowX) {
                 return false;
             }
             continue;
         }
 
         if Q_stricmp(&tokenStr, "shadowY") == 0 {
-            if !PC_Float_Parse(dc, handle, &mut ds.Assets.shadowY) {
+            if !PC_Float_Parse(ctx, handle, &mut ds.Assets.shadowY) {
                 return false;
             }
             continue;
         }
 
         if Q_stricmp(&tokenStr, "shadowColor") == 0 {
-            if !PC_Color_Parse(dc, handle, &mut ds.Assets.shadowColor) {
+            if !PC_Color_Parse(ctx, handle, &mut ds.Assets.shadowColor) {
                 return false;
             }
             ds.Assets.shadowFadeClamp = ds.Assets.shadowColor[3];
@@ -1936,27 +1931,26 @@ pub fn CG_FeederCount(world: &CgWorld, feederID: f32) -> c_int {
 ///
 /// Source: `oracle/codemp/cgame/cg_main.c:2856-2888`
 pub fn CG_SetScoreSelection(
-    world: &mut CgWorld,
+    ctx: &mut CgContext,
     menus: &mut MenuSystem,
     ds: &DisplayState,
-    dc: &mut dyn DisplayContext,
     p: Option<MenuId>,
 ) {
     // §F19: on the null-snap path Raven reads through a null `ps`. -1 matches no
     // `scores[i].client`, so `cg.selectedScore` keeps its previous value and the
     // rest of the fn runs exactly as Raven's.
-    let clientNum = world.cg.snap_ref().map_or(-1, |snap| snap.ps.clientNum);
+    let clientNum = ctx.world.cg.snap_ref().map_or(-1, |snap| snap.ps.clientNum);
 
     let mut red = 0;
     let mut blue = 0;
-    for i in 0..world.cg.numScores as usize {
-        if world.cg.scores[i].team == TEAM_RED {
+    for i in 0..ctx.world.cg.numScores as usize {
+        if ctx.world.cg.scores[i].team == TEAM_RED {
             red += 1;
-        } else if world.cg.scores[i].team == TEAM_BLUE {
+        } else if ctx.world.cg.scores[i].team == TEAM_BLUE {
             blue += 1;
         }
-        if clientNum == world.cg.scores[i].client {
-            world.cg.selectedScore = i as c_int;
+        if clientNum == ctx.world.cg.scores[i].client {
+            ctx.world.cg.selectedScore = i as c_int;
         }
     }
 
@@ -1965,24 +1959,17 @@ pub fn CG_SetScoreSelection(
         return;
     }
 
-    if world.cgs.gametype >= GT_TEAM {
+    if ctx.world.cgs.gametype >= GT_TEAM {
         let mut feeder = FEEDER_REDTEAM_LIST;
         let mut i = red;
-        if world.cg.scores[world.cg.selectedScore as usize].team == TEAM_BLUE {
+        if ctx.world.cg.scores[ctx.world.cg.selectedScore as usize].team == TEAM_BLUE {
             feeder = FEEDER_BLUETEAM_LIST;
             i = blue;
         }
-        Menu_SetFeederSelection(menus, ds, dc, p, feeder, i, None);
+        Menu_SetFeederSelection(menus, ds, ctx, p, feeder, i, None);
     } else {
-        Menu_SetFeederSelection(
-            menus,
-            ds,
-            dc,
-            p,
-            FEEDER_SCOREBOARD,
-            world.cg.selectedScore,
-            None,
-        );
+        let selectedScore = ctx.world.cg.selectedScore;
+        Menu_SetFeederSelection(menus, ds, ctx, p, FEEDER_SCOREBOARD, selectedScore, None);
     }
 }
 
@@ -2569,7 +2556,6 @@ pub fn CG_ParseMenu(
     ctx: &mut CgContext,
     menus: &mut MenuSystem,
     ds: &mut DisplayState,
-    dc: &mut dyn DisplayContext,
     menuFile: &str,
 ) {
     let mut token = zero_pc_token();
@@ -2597,7 +2583,7 @@ pub fn CG_ParseMenu(
         let tokenStr = pc_token_str(&token);
 
         if Q_stricmp(&tokenStr, "assetGlobalDef") == 0 {
-            if CG_Asset_Parse(ctx, ds, dc, handle) {
+            if CG_Asset_Parse(ctx, ds, handle) {
                 continue;
             } else {
                 break;
@@ -2606,7 +2592,7 @@ pub fn CG_ParseMenu(
 
         if Q_stricmp(&tokenStr, "menudef") == 0 {
             // start a new menu
-            Menu_New(menus, ds, dc, handle);
+            Menu_New(menus, ds, ctx, handle);
         }
     }
     trap::PC_FreeSource(ctx.engine, handle);
@@ -3673,7 +3659,6 @@ pub fn CG_Load_Menu(
     ctx: &mut CgContext,
     menus: &mut MenuSystem,
     ds: &mut DisplayState,
-    dc: &mut dyn DisplayContext,
     p: &mut &str,
 ) -> bool {
     // Raven's `COM_ParseExt(p, qtrue)`; the ported `COM_Parse` already carries
@@ -3697,7 +3682,7 @@ pub fn CG_Load_Menu(
             return false;
         }
 
-        CG_ParseMenu(ctx, menus, ds, dc, &token);
+        CG_ParseMenu(ctx, menus, ds, &token);
     }
     // Raven's trailing `return qfalse;` is unreachable past the `while (1)`.
 }
@@ -4510,7 +4495,6 @@ pub fn CG_LoadMenus(
     ctx: &mut CgContext,
     menus: &mut MenuSystem,
     ds: &mut DisplayState,
-    dc: &mut dyn DisplayContext,
     menuFile: &str,
 ) {
     // Raven's `static char buf[MAX_MENUDEFFILE]` is read-then-parse scratch that
@@ -4582,7 +4566,7 @@ pub fn CG_LoadMenus(
         }
 
         if Q_stricmp(&token, "loadmenu") == 0 {
-            if CG_Load_Menu(ctx, menus, ds, dc, &mut p) {
+            if CG_Load_Menu(ctx, menus, ds, &mut p) {
                 continue;
             } else {
                 break;
@@ -4865,12 +4849,7 @@ pub fn C_ImpactMark(ctx: &mut CgContext, data: &TCGImpactMark) {
 /// (`crates/mp/ui/src/ui_main.rs:13299-13309`).
 ///
 /// Source: `oracle/codemp/cgame/cg_main.c:3145-3219`
-pub fn CG_LoadHudMenu(
-    ctx: &mut CgContext,
-    menus: &mut MenuSystem,
-    ds: &mut DisplayState,
-    dc: &mut dyn DisplayContext,
-) {
+pub fn CG_LoadHudMenu(ctx: &mut CgContext, menus: &mut MenuSystem, ds: &mut DisplayState) {
     Menu_Reset(menus);
 
     let hudSet = buf_to_string(&ctx.world.cvars.cg_hudFiles.string.map(|c| c as u8));
@@ -4880,7 +4859,7 @@ pub fn CG_LoadHudMenu(
         hudSet
     };
 
-    CG_LoadMenus(ctx, menus, ds, dc, &hudSet);
+    CG_LoadMenus(ctx, menus, ds, &hudSet);
 }
 
 /// Raven `CG_SpawnCGameOnlyEnts` — parses the BSP entity string a second time
@@ -5284,7 +5263,6 @@ pub fn CG_Init(
     ctx: &mut CgContext,
     menus: &mut MenuSystem,
     ds: &mut DisplayState,
-    dc: &mut dyn DisplayContext,
     serverMessageNum: c_int,
     serverCommandSequence: c_int,
     clientNum: c_int,
@@ -5484,7 +5462,7 @@ pub fn CG_Init(
     let mapname = buf_to_string(&ctx.world.cgs.mapname.map(|c| c as u8));
     trap::CM_LoadMap(engine, &mapname, false);
 
-    String_Init(menus, dc);
+    String_Init(menus, ctx);
 
     ctx.world.cg.loading = qtrue; // force players to load instead of defer
 
@@ -5502,7 +5480,7 @@ pub fn CG_Init(
     CG_RegisterClients(ctx); // if low on memory, some clients will be deferred
 
     CG_AssetCache(ctx, ds);
-    CG_LoadHudMenu(ctx, menus, ds, dc); // load new hud stuff
+    CG_LoadHudMenu(ctx, menus, ds); // load new hud stuff
 
     ctx.world.cg.loading = qfalse; // future players will be deferred
 
@@ -5558,20 +5536,14 @@ pub fn CG_Init(
 /// sound on both the i686 module builds and the LP64 dev builds. Each carries
 /// a `SAFETY` note at the site.
 ///
-/// PORT-NOTE: `CG_INIT`, `CG_CONSOLE_COMMAND` and `CG_DRAW_ACTIVE_FRAME` are
-/// cited `todo!()`s awaiting the DEC-47.1 execution pass (ruled 2026-07-28:
-/// the DEC-38 shape applies to cgame — the wave-era `dc: &mut dyn
-/// DisplayContext` params drop, `ctx` is the carrier). Their signatures live
-/// in other TUs (`cg_view.rs::CG_DrawActiveFrame`,
-/// `cg_consolecmds.rs::CG_ConsoleCommand`, plus the `dc` forwards into
-/// `CG_ProcessSnapshots` and the scroll fns), so they wire when that
-/// amendment lands; `CG_SHUTDOWN` is already wired the DEC-47.1 way. Why the
-/// old shape could not be dispatched: `CgContext` is the sole `DisplayContext`
-/// implementor in `mp_cgame` (`world/cg_display_context.rs`) and every
-/// `DisplayContext` method takes `&mut self` (`feederSelection` genuinely
-/// mutates `self.world`), so supplying `ctx` AND `dc` from the one owned
-/// `CgState` needs two live `&mut` paths into the same `CgWorld` — the exact
-/// E0499 pattern DEC-38 ruling 1's revision proved unbuildable for `mp_ui`.
+/// All 32 arms dispatch live under DEC-47.1 (ruled 2026-07-28: the DEC-38
+/// shape applies to cgame — no fn takes a separate `dc: &mut dyn
+/// DisplayContext`, `ctx` is the carrier). The wave-era two-param shape could
+/// never be dispatched from here: `CgContext` is the sole `DisplayContext`
+/// implementor in `mp_cgame` and every `DisplayContext` method takes
+/// `&mut self`, so `ctx` AND `dc` from the one owned `CgState` would need two
+/// live `&mut` paths into the same `CgWorld` — the E0499 pattern DEC-38
+/// ruling 1's revision proved unbuildable for `mp_ui`.
 ///
 /// Source: `oracle/codemp/cgame/cg_main.c:190-359`
 #[allow(clippy::too_many_arguments)]
@@ -5581,7 +5553,7 @@ pub fn vmMain(
     command: isize,
     arg0: isize,
     arg1: isize,
-    _arg2: isize,
+    arg2: isize,
     _arg3: isize,
     _arg4: isize,
     _arg5: isize,
@@ -5604,9 +5576,15 @@ pub fn vmMain(
 
     match command {
         c if c == MpCgameExport::CG_INIT as isize => {
-            //TODO: Port vmMain CG_INIT dispatch
-            // Source: oracle/codemp/cgame/cg_main.c:193-195
-            todo!("vmMain CG_INIT dispatch - awaiting the DEC-47.1 dc-param amendment, see fn doc")
+            CG_Init(
+                &mut ctx,
+                menus,
+                ds,
+                arg0 as c_int,
+                arg1 as c_int,
+                arg2 as c_int,
+            );
+            0
         }
 
         c if c == MpCgameExport::CG_SHUTDOWN as isize => {
@@ -5615,15 +5593,23 @@ pub fn vmMain(
         }
 
         c if c == MpCgameExport::CG_CONSOLE_COMMAND as isize => {
-            //TODO: Port vmMain CG_CONSOLE_COMMAND dispatch
-            // Source: oracle/codemp/cgame/cg_main.c:199-200
-            todo!("vmMain CG_CONSOLE_COMMAND dispatch - awaiting the DEC-47.1 dc-param amendment, see fn doc")
+            // PORT-NOTE: menuScoreboard is cg_draw's cached scoreboard handle
+            // with no CgWorld home yet (the ownerdraw tail owns it); None
+            // reproduces Raven's NULL until the scoreboard menu first caches.
+            CG_ConsoleCommand(&mut ctx, menus, ds, None) as isize
         }
 
         c if c == MpCgameExport::CG_DRAW_ACTIVE_FRAME as isize => {
-            //TODO: Port vmMain CG_DRAW_ACTIVE_FRAME dispatch
-            // Source: oracle/codemp/cgame/cg_main.c:201-203
-            todo!("vmMain CG_DRAW_ACTIVE_FRAME dispatch - awaiting the DEC-47.1 dc-param amendment, see fn doc")
+            let demoPlayback = if arg2 != 0 { qtrue } else { qfalse };
+            CG_DrawActiveFrame(
+                &mut ctx,
+                arg0 as c_int,
+                arg1 as c_int,
+                demoPlayback,
+                menus,
+                ds,
+            );
+            0
         }
 
         c if c == MpCgameExport::CG_CROSSHAIR_PLAYER as isize => {

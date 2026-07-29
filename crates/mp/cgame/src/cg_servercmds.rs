@@ -32,7 +32,6 @@ use mp_qshared::shared::{
     qfalse, qtrue, sfxHandle_t, BIGCHAR_WIDTH, GIANTCHAR_WIDTH, MAX_CLIENTS, MAX_CLIENTS_I32,
     MAX_GENTITIES, MAX_QPATH, MAX_STRING_CHARS, SCREEN_HEIGHT,
 };
-use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::display_state::DisplayState;
 use mp_uishared::shared::menu_system::MenuSystem;
 use native_string::{atoi, strcat_string, Info_ValueForKey, Q_stricmp, Q_strncpyz};
@@ -208,12 +207,7 @@ fn zeroed_score() -> score_t {
 /// next line overwrites `cg.numScores` with `readScores`. Kept as written.
 ///
 /// Source: `oracle/codemp/cgame/cg_servercmds.c:21-69`
-pub fn CG_ParseScores(
-    ctx: &mut CgContext,
-    menus: &mut MenuSystem,
-    ds: &DisplayState,
-    dc: &mut dyn DisplayContext,
-) {
+pub fn CG_ParseScores(ctx: &mut CgContext, menus: &mut MenuSystem, ds: &DisplayState) {
     let arg = CG_Argv(ctx, 1);
     ctx.world.cg.numScores = atoi(&arg);
 
@@ -286,7 +280,7 @@ pub fn CG_ParseScores(
         i += 1;
     }
 
-    CG_SetScoreSelection(ctx.world, menus, ds, dc, None);
+    CG_SetScoreSelection(ctx, menus, ds, None);
 }
 
 /// Raven `CG_ParseTeamInfo` — decodes the `tinfo` server command into the team
@@ -1403,12 +1397,7 @@ fn cap_say_text(s: String) -> String {
 /// Raven's own quirk, preserved.
 ///
 /// Source: `oracle/codemp/cgame/cg_servercmds.c:1257-1670`
-pub fn CG_ServerCommand(
-    ctx: &mut CgContext,
-    menus: &mut MenuSystem,
-    ds: &DisplayState,
-    dc: &mut dyn DisplayContext,
-) {
+pub fn CG_ServerCommand(ctx: &mut CgContext, menus: &mut MenuSystem, ds: &DisplayState) {
     let cmd = CG_Argv(ctx, 0);
 
     if cmd.is_empty() {
@@ -1732,7 +1721,7 @@ pub fn CG_ServerCommand(
     }
 
     if cmd == "scores" {
-        CG_ParseScores(ctx, menus, ds, dc);
+        CG_ParseScores(ctx, menus, ds);
         return;
     }
 
@@ -1781,12 +1770,11 @@ pub fn CG_ExecuteNewServerCommands(
     latestSequence: c_int,
     menus: &mut MenuSystem,
     ds: &DisplayState,
-    dc: &mut dyn DisplayContext,
 ) {
     while ctx.world.cgs.serverCommandSequence < latestSequence {
         ctx.world.cgs.serverCommandSequence += 1;
         if trap::GetServerCommand(ctx.engine, ctx.world.cgs.serverCommandSequence) {
-            CG_ServerCommand(ctx, menus, ds, dc);
+            CG_ServerCommand(ctx, menus, ds);
         }
     }
 }

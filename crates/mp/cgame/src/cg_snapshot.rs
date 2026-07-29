@@ -15,7 +15,6 @@ use mp_qshared::common::mp::qcommon::pm_flags::PMF_FOLLOW;
 use mp_qshared::common::mp::qcommon::{entityState_t, playerState_t};
 use mp_qshared::shared::q_math::_VectorCopy;
 use mp_qshared::shared::{qfalse, qtrue, SNAPFLAG_NOT_ACTIVE, SNAPFLAG_SERVERCOUNT};
-use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::display_state::DisplayState;
 use mp_uishared::shared::menu_system::MenuSystem;
 
@@ -316,7 +315,6 @@ pub fn CG_SetInitialSnapshot(
     ctx: &mut CgContext,
     menus: &mut MenuSystem,
     ds: &DisplayState,
-    dc: &mut dyn DisplayContext,
     slot: usize,
 ) {
     ctx.world.cg.snap = &mut ctx.world.cg.activeSnapshots[slot] as *mut snapshot_t;
@@ -351,7 +349,7 @@ pub fn CG_SetInitialSnapshot(
     CG_BuildSolidList(ctx.world);
 
     let serverCommandSequence = ctx.world.cg.activeSnapshots[slot].serverCommandSequence;
-    CG_ExecuteNewServerCommands(ctx, serverCommandSequence, menus, ds, dc);
+    CG_ExecuteNewServerCommands(ctx, serverCommandSequence, menus, ds);
 
     // set our local weapon selection pointer to
     // what the server has indicated the current weapon is
@@ -388,12 +386,7 @@ pub fn CG_SetInitialSnapshot(
 /// instead of a dangling local `snapshot_t*`.
 ///
 /// Source: `oracle/codemp/cgame/cg_snapshot.c:133-196`
-pub fn CG_TransitionSnapshot(
-    ctx: &mut CgContext,
-    menus: &mut MenuSystem,
-    ds: &DisplayState,
-    dc: &mut dyn DisplayContext,
-) {
+pub fn CG_TransitionSnapshot(ctx: &mut CgContext, menus: &mut MenuSystem, ds: &DisplayState) {
     if ctx.world.cg.snap_ref().is_none() {
         CG_Error(ctx, "CG_TransitionSnapshot: NULL cg.snap");
         return;
@@ -405,7 +398,7 @@ pub fn CG_TransitionSnapshot(
 
     // execute any server string commands before transitioning entities
     let nextSnapCmdSeq = ctx.world.cg.next_snap_ref().unwrap().serverCommandSequence;
-    CG_ExecuteNewServerCommands(ctx, nextSnapCmdSeq, menus, ds, dc);
+    CG_ExecuteNewServerCommands(ctx, nextSnapCmdSeq, menus, ds);
 
     // Raven's `if ( !cg.snap ) { }` guard here has an empty body (a gutted
     // map_restart special-case) - nothing to transcribe.
@@ -501,12 +494,7 @@ pub fn CG_TransitionSnapshot(
 /// back to extrapolating off the last one).
 ///
 /// Source: `oracle/codemp/cgame/cg_snapshot.c:338-413`
-pub fn CG_ProcessSnapshots(
-    ctx: &mut CgContext,
-    menus: &mut MenuSystem,
-    ds: &DisplayState,
-    dc: &mut dyn DisplayContext,
-) {
+pub fn CG_ProcessSnapshots(ctx: &mut CgContext, menus: &mut MenuSystem, ds: &DisplayState) {
     // see what the latest snapshot the client system has is
     let (n, latestSnapshotTime) = trap::GetCurrentSnapshotNumber(ctx.engine);
     ctx.world.cg.latestSnapshotTime = latestSnapshotTime;
@@ -535,7 +523,7 @@ pub fn CG_ProcessSnapshots(
         // set our weapon selection to what
         // the playerstate is currently using
         if (ctx.world.cg.activeSnapshots[slot].snapFlags & SNAPFLAG_NOT_ACTIVE) == 0 {
-            CG_SetInitialSnapshot(ctx, menus, ds, dc, slot);
+            CG_SetInitialSnapshot(ctx, menus, ds, slot);
         }
     }
 
@@ -573,7 +561,7 @@ pub fn CG_ProcessSnapshots(
         }
 
         // we have passed the transition from nextFrame to frame
-        CG_TransitionSnapshot(ctx, menus, ds, dc);
+        CG_TransitionSnapshot(ctx, menus, ds);
     }
 
     // assert our valid conditions upon exiting
