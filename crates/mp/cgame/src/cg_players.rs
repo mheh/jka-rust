@@ -716,8 +716,8 @@ pub fn CG_G2SkelForModel(ctx: &mut CgContext, g2: *mut c_void) -> c_int {
         GLAName.truncate(slash);
         GLAName.push_str("/animation.cfg");
 
-        let traps = CgBgTraps::new(ctx.engine);
-        let mut callbacks = CgGameCallbacks::new(ctx.engine);
+        let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+        let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
         let filename = cstr(&GLAName);
 
         animIndex = BG_ParseAnimationFile(
@@ -2191,8 +2191,8 @@ pub fn CG_CacheG2AnimInfo(ctx: &mut CgContext, modelName: &str) {
 
     if modelName.starts_with('$') {
         // it's a vehicle name actually, let's precache the whole vehicle
-        let traps = CgBgTraps::new(ctx.engine);
-        let mut callbacks = CgGameCallbacks::new(ctx.engine);
+        let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+        let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
 
         // both bg fns stomp the `$name` they were handed with their answer, so
         // each gets its own copy of it the way Raven's two stack buffers do
@@ -2252,8 +2252,8 @@ pub fn CG_CacheG2AnimInfo(ctx: &mut CgContext, modelName: &str) {
             GLAName.truncate(slash);
             GLAName.push_str("/animation.cfg");
 
-            let traps = CgBgTraps::new(ctx.engine);
-            let mut callbacks = CgGameCallbacks::new(ctx.engine);
+            let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+            let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
             let filename = cstr(&GLAName);
 
             animIndex = BG_ParseAnimationFile(
@@ -2893,7 +2893,10 @@ pub fn CG_SetLerpFrameAnimation(
 
     animSpeed *= animSpeedMult;
 
-    let mut callbacks = CgGameCallbacks::new(engine);
+    let mut callbacks = CgGameCallbacks::new(engine, ctx.world_raw());
+    // the CG_Player chain holds this entity's clientInfo swapped out of the
+    // world (slot-swap/npcClient take), so my_saber must resolve the live one
+    callbacks.live_ci = Some((csNumber, &raw mut *ci));
     BG_SaberStartTransAnim(
         csNumber,
         csFireflag,
@@ -4943,7 +4946,7 @@ pub fn CG_RegisterClientModelname(
             && ctx.world.cgs.gametype != GT_SIEGE
         {
             //We won't force colors for siege.
-            let traps = CgBgTraps::new(ctx.engine);
+            let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
             let ciModelName = ci.modelName.as_ptr();
             let ciSkinName = ci.skinName.as_mut_ptr();
             let colors = ci.colorOverride.as_mut_ptr();
@@ -5040,8 +5043,8 @@ pub fn CG_RegisterClientModelname(
                 return false;
             }
 
-            let traps = CgBgTraps::new(ctx.engine);
-            let mut callbacks = CgGameCallbacks::new(ctx.engine);
+            let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+            let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
             let humanoidAnims = ctx.world.bg_state.bgHumanoidAnimations.as_mut_ptr();
             let humanoidCfg = cstr("models/players/_humanoid/animation.cfg");
             if BG_ParseAnimationFile(
@@ -5463,7 +5466,7 @@ pub fn CG_G2PlayerAngles(
         let ciTorso = ci.torsoAnim;
         let lookTime = ci.lookTime;
         let boltMotion = ci.bolt_motion;
-        let traps = CgBgTraps::new(ctx.engine);
+        let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
 
         BG_G2PlayerAngles(
             ghoul2,
@@ -6457,8 +6460,8 @@ pub fn CG_G2AnimEntModelLoad(ctx: &mut CgContext, centNum: usize) {
             //create a vehicle object clientside for this type
             let vehType = modelName[1..].to_string();
             let vehType_c = cstr(&vehType);
-            let traps = CgBgTraps::new(ctx.engine);
-            let mut callbacks = CgGameCallbacks::new(ctx.engine);
+            let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+            let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
             let iVehIndex = BG_VehicleGetIndex(
                 vehType_c.as_ptr(),
                 &mut ctx.world.bg_state,
@@ -6474,8 +6477,8 @@ pub fn CG_G2AnimEntModelLoad(ctx: &mut CgContext, centNum: usize) {
 
             let mut modelBuf: [c_char; MAX_QPATH] = [0; MAX_QPATH];
             Q_strncpyz(&mut modelBuf, &modelName, MAX_QPATH);
-            let traps = CgBgTraps::new(ctx.engine);
-            let mut callbacks = CgGameCallbacks::new(ctx.engine);
+            let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+            let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
             BG_GetVehicleModelName(
                 modelBuf.as_mut_ptr(),
                 &mut ctx.world.bg_state,
@@ -6581,8 +6584,8 @@ pub fn CG_G2AnimEntModelLoad(ctx: &mut CgContext, centNum: usize) {
                     let saber_c = cstr(&saber);
                     if let Some(ci) = npcCi.as_deref_mut() {
                         let sabers = ci.saber.as_mut_ptr();
-                        let traps = CgBgTraps::new(ctx.engine);
-                        let mut callbacks = CgGameCallbacks::new(ctx.engine);
+                        let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+                        let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
                         WP_SetSaber(
                             number,
                             sabers,
@@ -6607,8 +6610,8 @@ pub fn CG_G2AnimEntModelLoad(ctx: &mut CgContext, centNum: usize) {
                     let saber_c = cstr(&saber);
                     if let Some(ci) = npcCi.as_deref_mut() {
                         let sabers = ci.saber.as_mut_ptr();
-                        let traps = CgBgTraps::new(ctx.engine);
-                        let mut callbacks = CgGameCallbacks::new(ctx.engine);
+                        let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+                        let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
                         WP_SetSaber(
                             number,
                             sabers,
@@ -6670,8 +6673,8 @@ pub fn CG_G2AnimEntModelLoad(ctx: &mut CgContext, centNum: usize) {
                     GLAName.truncate(slash);
                     GLAName.push_str("/animation.cfg");
 
-                    let traps = CgBgTraps::new(ctx.engine);
-                    let mut callbacks = CgGameCallbacks::new(ctx.engine);
+                    let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+                    let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
                     let filename = cstr(&GLAName);
                     let animIndex = BG_ParseAnimationFile(
                         &mut ctx.world.bg_state,
@@ -8752,8 +8755,8 @@ pub fn CG_NewClientInfo(ctx: &mut CgContext, clientNum: c_int, entitiesInitializ
         Q_strncpyz(&mut newInfo.saberName, &v, 64);
         let sabers = newInfo.saber.as_mut_ptr();
         let saberName_ptr = newInfo.saberName.as_ptr();
-        let traps = CgBgTraps::new(ctx.engine);
-        let mut callbacks = CgGameCallbacks::new(ctx.engine);
+        let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+        let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
         WP_SetSaber(
             clientNum,
             sabers,
@@ -8777,8 +8780,8 @@ pub fn CG_NewClientInfo(ctx: &mut CgContext, clientNum: c_int, entitiesInitializ
         Q_strncpyz(&mut newInfo.saber2Name, &v, 64);
         let sabers = newInfo.saber.as_mut_ptr();
         let saber2Name_ptr = newInfo.saber2Name.as_ptr();
-        let traps = CgBgTraps::new(ctx.engine);
-        let mut callbacks = CgGameCallbacks::new(ctx.engine);
+        let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+        let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
         WP_SetSaber(
             clientNum,
             sabers,
@@ -8850,7 +8853,7 @@ pub fn CG_NewClientInfo(ctx: &mut CgContext, clientNum: c_int, entitiesInitializ
         && ctx.world.cgs.gametype != GT_SIEGE
     {
         // We won't force colors for siege.
-        let traps = CgBgTraps::new(ctx.engine);
+        let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
         let modelName_ptr = newInfo.modelName.as_ptr();
         let skinName_ptr = newInfo.skinName.as_mut_ptr();
         let team = newInfo.team;
@@ -10764,7 +10767,7 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
         // `modelList` is a read-only registry lookup for the callee; copy it to a
         // local so the mutable `*mut` doesn't alias the shared `&bg_state` borrow.
         let mut gameModelsCopy = ctx.world.cgs.gameModels;
-        let traps = CgBgTraps::new(engine);
+        let traps = CgBgTraps::new(engine, ctx.world_raw());
         BG_AttachToRancor(
             rancGhoul2,
             rancYaw,

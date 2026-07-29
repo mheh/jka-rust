@@ -2873,7 +2873,7 @@ pub fn CG_General(ctx: &mut CgContext, centNum: usize) {
             // caching the handle across the removes below is fine - G2 only
             // nulls the slot when the whole model vector empties, model 0 stays
             let clGhoul2 = ctx.world.entity(clEntNum).ghoul2;
-            let traps = CgBgTraps::new(engine);
+            let traps = CgBgTraps::new(engine, ctx.world_raw());
             let rotateBone: &str;
             let limbName: String;
             let limbCapName: String;

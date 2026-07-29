@@ -17,17 +17,16 @@
 //! (`bg_slidemove.c:37-39,550`).
 //!
 //! The two exceptions are `trace` and `pointcontents`. cgame does not answer
-//! those with a syscall at all — `CG_PmoveClientThink` binds
-//! `cg_pmove.trace = CG_Trace` / `cg_pmove.pointcontents = CG_PointContents`
-//! (`cg_predict.c:1009-1010`, and again for `cg_vehPmove` at 1385-1386), and
-//! both walk `cg_solidEntities` before/after the collision-model traps. That is
-//! C5 `CgWorld` state this seam cannot reach yet, so both take the C4-precedent
-//! `todo!()` + `TODO: Port` marker (DEC-46.1); a neutral trace would be the
-//! silent fake porting-rules §14 forbids.
+//! those with a syscall at all — Raven binds `cg_pmove.trace = CG_Trace` /
+//! `cg_pmove.pointcontents = CG_PointContents` (`cg_predict.c:1009-1010`, and
+//! again for `cg_vehPmove` at 1385-1386), and both walk `cg_solidEntities`
+//! before/after the collision-model traps. DEC-47.2 rules the seam: the struct
+//! carries a raw `*mut CgWorld` (the `GameCallbacksImpl.world` "STAGE-2b:
+//! irreducible" precedent), and the two methods rebuild a `CgContext` inside
+//! and call the ported bodies.
 //!
-//! State: only the engine transport, matching
-//! [`CgGameCallbacks`](crate::bg_channel::CgGameCallbacks). The two blocked
-//! methods above are where `CgWorld` will enter this file.
+//! State: the engine transport plus the raw world, matching
+//! [`CgGameCallbacks`](crate::bg_channel::CgGameCallbacks).
 
 #![allow(non_snake_case)]
 
@@ -43,19 +42,24 @@ use mp_qshared::shared::{
     fileHandle_t, fsMode_t, mdxaBone_t, qboolean, qhandle_t, sharedIKMoveParams_t, vec3_t, vmCvar_t,
 };
 
+use crate::cg_predict::{CG_PointContents, CG_Trace};
 use crate::trap;
+use crate::world::cg_context::CgContext;
+use crate::world::cg_world::CgWorld;
 
-/// The cgame-side `BgTraps` implementation: holds the `&Engine` every
-/// delegating method issues its `crate::trap` calls through. Same shape as
-/// `mp_game`'s `GameBgTraps` and `mp_ui`'s `UiBgTraps` — a borrowed engine
-/// handle, no other state.
+/// The cgame-side `BgTraps` implementation: the `&Engine` every delegating
+/// method issues its `crate::trap` calls through, plus the raw world
+/// `trace`/`pointcontents` rebuild a `CgContext` from (DEC-47.2 - `mp_game`'s
+/// `GameCallbacksImpl.world` raw-seam shape, because `Pmove` already holds
+/// `&mut BgState` borrowed out of the same world).
 pub struct CgBgTraps<'a> {
     pub engine: &'a Engine,
+    pub world: *mut CgWorld,
 }
 
 impl<'a> CgBgTraps<'a> {
-    pub fn new(engine: &'a Engine) -> Self {
-        Self { engine }
+    pub fn new(engine: &'a Engine, world: *mut CgWorld) -> Self {
+        Self { engine, world }
     }
 }
 
@@ -66,33 +70,50 @@ impl BgTraps for CgBgTraps<'_> {
 
     fn trace(
         &self,
-        _results: *mut trace_t,
-        _start: *const vec3_t,
-        _mins: *const vec3_t,
-        _maxs: *const vec3_t,
-        _end: *const vec3_t,
-        _passEntityNum: c_int,
-        _contentMask: c_int,
+        results: *mut trace_t,
+        start: *const vec3_t,
+        mins: *const vec3_t,
+        maxs: *const vec3_t,
+        end: *const vec3_t,
+        passEntityNum: c_int,
+        contentMask: c_int,
     ) {
-        //TODO: Port CG_Trace args
-        // cgame's `pm->trace` is `CG_Trace`, not a trap. The body is
-        // transcribed at `crate::cg_predict::CG_Trace`, but it takes
-        // `&mut CgContext` and this seam only carries `&Engine` — same story
-        // as `pointcontents` below.
+        // cgame's `pm->trace` is `CG_Trace`, not a trap: `trap_CM_BoxTrace`
+        // narrowed against `cg_solidEntities`.
+        // SAFETY: DEC-47.2 raw-seam reborrow, `GameCallbacksImpl.world`'s
+        // "STAGE-2b: irreducible" precedent - `Pmove` holds `&mut BgState`
+        // (a disjoint `CgWorld` field) while this call rebuilds a `CgContext`;
+        // the borrow ends at return. The pointer args are `Pmove`'s live
+        // stack slots.
         // Source: `oracle/codemp/cgame/cg_predict.c:359-369`;
         // binding at `oracle/codemp/cgame/cg_predict.c:1009,1385`
-        todo!("Port CG_Trace seam — oracle/codemp/cgame/cg_predict.c:359-369 (ported at cg_predict::CG_Trace; this seam lacks CgContext)")
+        let mut ctx = CgContext {
+            world: unsafe { &mut *self.world },
+            engine: self.engine,
+        };
+        CG_Trace(
+            &mut ctx,
+            unsafe { &mut *results },
+            unsafe { &*start },
+            unsafe { &*mins },
+            unsafe { &*maxs },
+            unsafe { &*end },
+            passEntityNum,
+            contentMask,
+        )
     }
 
-    fn pointcontents(&self, _point: *const vec3_t, _passEntityNum: c_int) -> c_int {
-        //TODO: Port CG_PointContents
-        // Same story: `CG_PointContents` ORs `trap_CM_PointContents` with a
-        // `cg_solidEntities` walk. The body is transcribed at
-        // `crate::cg_predict::CG_PointContents`, but it takes `&mut CgContext`
-        // and this seam only carries `&Engine`.
+    fn pointcontents(&self, point: *const vec3_t, passEntityNum: c_int) -> c_int {
+        // cgame's `pm->pointcontents` is `CG_PointContents`:
+        // `trap_CM_PointContents` OR'd with a `cg_solidEntities` walk.
+        // SAFETY: as `trace` above.
         // Source: `oracle/codemp/cgame/cg_predict.c:393-424`;
         // binding at `oracle/codemp/cgame/cg_predict.c:1010,1386`
-        todo!("Port CG_PointContents seam — oracle/codemp/cgame/cg_predict.c:393-424 (ported at cg_predict::CG_PointContents; this seam lacks CgContext)")
+        let mut ctx = CgContext {
+            world: unsafe { &mut *self.world },
+            engine: self.engine,
+        };
+        CG_PointContents(&mut ctx, unsafe { &*point }, passEntityNum)
     }
 
     // ---------------------------------------------------------------------

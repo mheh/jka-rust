@@ -4,6 +4,7 @@
 #![allow(non_snake_case)]
 
 use core::ffi::c_int;
+use core::mem::size_of;
 use core::ptr::null_mut;
 
 use mp_abi::cgame::public::snapshot_t::MAX_ENTITIES_IN_SNAPSHOT;
@@ -11,6 +12,7 @@ use mp_bg::bg_misc::{
     BG_AddPredictableEventToPlayerstate, BG_CanItemBeGrabbed, BG_EvaluateTrajectory,
     BG_PlayerTouchesItem, BG_TouchJumpPad,
 };
+use mp_bg::public::bg_entity::bgEntity_t;
 use mp_bg::public::bg_itemlist::bg_itemlist;
 use mp_bg::public::entity_event::entity_event_t::EV_ITEM_PICKUP;
 use mp_bg::public::entity_flags::{EF_ITEMPLACEHOLDER, EF_NODRAW};
@@ -29,6 +31,7 @@ use mp_bg::public::team::{TEAM_BLUE, TEAM_RED};
 use mp_bg::public::viewheight::{DEFAULT_MAXS_2, DEFAULT_MINS_2};
 use mp_bg::weapons::weapon_t::{WP_EMPLACED_GUN, WP_NONE};
 use mp_qshared::common::mp::game::class_t::class_t::CLASS_VEHICLE;
+use mp_qshared::common::mp::qcommon::playerState_t;
 use mp_qshared::common::mp::qcommon::usercmd_t;
 use mp_qshared::common::mp::qcommon::PMF_FOLLOW;
 use mp_qshared::common::mp::trace_t::trace_t;
@@ -553,29 +556,31 @@ pub fn CG_TouchItem(world: &mut CgWorld, cent: usize) {
 /// so that we can access playerstate stuff in bg code (and then translate it
 /// back to entitystate data).
 ///
-/// PORT-NOTE: Raven's `cg_pmove.baseEnt = (bgEntity_t *)cg_entities` /
-/// `cg_pmove.entSize = sizeof(centity_t)` pair is deliberately not set here.
-/// `pmove_t` still carries both fields and `PM_BGEntForNum` is still the
-/// head-overlay pun that reads through them (`bg_pmove.rs`), but DEC-46.2
-/// reshaped `centity_t`'s head — `playerState`/`m_pVehicle` are now a
-/// `PlayerStateRef` and an `Option<VehicleId>` where Raven had two 8-byte
-/// pointers — so an overlay onto `cg_entities` would misread every field. The
-/// cgame pmove entity seam is an open DEC-46 design point and it blocks the
-/// `CG_PredictPlayerState` wave.
-/// Source: `oracle/codemp/cgame/cg_predict.c:913-914`
+/// Raven's `cg_pmove.baseEnt = (bgEntity_t *)cg_entities` overlay pun cannot
+/// read the DEC-46.2 reshaped `centity_t`, so `baseEnt` aims at the
+/// `CgWorld.bg_ents` shadow rows instead (DEC-47.2) - real `bgEntity_t`s whose
+/// `playerState` pointers wire up here and whose entity-state fields
+/// `CG_PredictPlayerState` syncs before each `Pmove`. The stride is
+/// `sizeof(bgEntity_t)`, not Raven's `sizeof(centity_t)`, because the shadow
+/// array is the thing being walked.
+/// Source: `oracle/codemp/cgame/cg_predict.c:883-918`
 pub fn CG_PmoveClientPointerUpdate(world: &mut CgWorld) {
-    // DEFERRED: cgSendPSPool — `oracle/codemp/cgame/cg_predict.c:853,888`. The
-    // `playerState_t cgSendPSPool[MAX_GENTITIES]` backing store for
-    // `PlayerStateRef::Snap` has no home in DEC-46 yet, and `playerState_t` has
-    // no safe zeroed constructor for this wave to build one from (no `Default`,
-    // no `zeroed`, and `unsafe` is off the table here). Raven's `memset` of the
-    // pool belongs at this line.
+    // Raven: memset(&cgSendPSPool[0], 0, sizeof(cgSendPSPool));
+    for ps in world.cgSendPSPool.iter_mut() {
+        *ps = playerState_t::zeroed();
+    }
 
     for i in 0..MAX_GENTITIES {
         // Raven stores `&cgSendPSPool[i]`, i.e. entity `i`'s own snapshot
-        // playerstate — the DEC-46.2 `Snap` arm.
+        // playerstate — the DEC-46.2 `Snap` arm, and the live pointer on the
+        // bg view row.
         world.entities[i].playerState = PlayerStateRef::Snap;
+        world.bg_ents[i].playerState = &mut world.cgSendPSPool[i];
     }
+
+    // Set up bg entity data
+    world.predict.cg_pmove.baseEnt = world.bg_ents.as_mut_ptr();
+    world.predict.cg_pmove.entSize = size_of::<bgEntity_t>() as c_int;
 
     world.predict.cg_pmove.ghoul2 = null_mut();
 }

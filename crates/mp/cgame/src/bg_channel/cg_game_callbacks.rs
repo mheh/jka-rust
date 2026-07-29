@@ -25,43 +25,58 @@
 //!   no-op). Each cites the oracle `#ifdef` proving it. A live `cg_entities`
 //!   read here would execute logic the oracle cgame never ran, which the C6b
 //!   demo referee would see as divergence.
-//! - **2 methods are genuinely unreachable**: `alloc` (`G_Alloc`) and `set_anim`
-//!   (`G_SetAnim`) have no live bg call site in either build, so they take the
+//! - **3 methods are genuinely unreachable**: `alloc` (`G_Alloc`) and `set_anim`
+//!   (`G_SetAnim`) have no live bg call site in either build, and `new_string`
+//!   lost its one bg caller in the port — the cgame spawn-var parse collapsed
+//!   `cg_spawnFields` + `BG_ParseField` into `cg_main.rs`'s native dispatch,
+//!   which calls the ported `CG_NewString` directly. All three take the
 //!   ui-style loud panic naming the Raven subject.
-//! - **2 methods are real cgame arms blocked on C5 state**: `my_saber`
-//!   (`bg_saber.c:4115-4137`, needs `cgs.clientinfo` / `cg_entities[].npcClient`)
-//!   and `new_string` (`bg_misc.c:375`'s `CG_NewString`, needs cgame's string
-//!   pool). Both are `todo!()` + `TODO: Port` markers until `CgWorld` lands
-//!   (DEC-46.1); porting-rules §14 forbids the silent fake a neutral value
-//!   would be here.
+//! - **1 method is a real cgame arm**: `my_saber` (`bg_saber.c:4115-4137`)
+//!   resolves `cgs.clientinfo` / `cg_entities[].npcClient` through the DEC-47.2
+//!   raw world.
 //!
-//! State: only the engine transport. No cgame D5 arm caches — Raven's cgame
-//! arms either store the handle through the bg-owned `dest` slot or discard it
-//! (the precache blocks throw their handles away), so there is no media table
-//! for `CgWorld` to absorb (DEC-46.1). The two C5-blocked methods above are the
-//! only places `CgWorld` enters this file.
+//! State: the engine transport plus the DEC-47.2 raw world (`my_saber`'s
+//! tables). No cgame D5 arm caches — Raven's cgame arms either store the handle
+//! through the bg-owned `dest` slot or discard it (the precache blocks throw
+//! their handles away), so there is no media table for `CgWorld` to absorb
+//! (DEC-46.1).
 
 #![allow(non_snake_case)]
 
 use core::ffi::{c_char, c_int, c_void};
+use core::ptr::null_mut;
 
 use mp_bg::bg_channel::GameCallbacks;
 use mp_engine_select::Engine;
 use mp_qshared::common::mp::qcommon::{saberInfo_t, usercmd_t};
 use mp_qshared::common::mp::trace_t::trace_t;
-use mp_qshared::shared::{qboolean, qfalse, vec3_t, ENTITYNUM_NONE};
+use mp_qshared::shared::{qboolean, qfalse, vec3_t, ENTITYNUM_NONE, MAX_CLIENTS};
 
+use crate::local::client_info_t::clientInfo_t;
 use crate::trap;
+use crate::world::cg_world::CgWorld;
 
-/// The cgame-side `GameCallbacks` implementation: holds the `&Engine` the 16
-/// DEC-36 D5 registration arms issue their `crate::trap` calls through.
+/// The cgame-side `GameCallbacks` implementation: the `&Engine` the 16 DEC-36
+/// D5 registration arms issue their `crate::trap` calls through, plus the raw
+/// world `my_saber` resolves its clientInfo tables from (DEC-47.2 - `mp_game`'s
+/// `GameCallbacksImpl.world` raw-seam shape).
 pub struct CgGameCallbacks<'a> {
     pub engine: &'a Engine,
+    pub world: *mut CgWorld,
+    /// The clientInfo row the calling chain holds swapped out of the world
+    /// (the slot-swap/`npcClient.take()` patterns leave a zeroed placeholder
+    /// behind) - `my_saber` for this entity number resolves here instead of
+    /// the vacated row. Only the swap-window call sites set it.
+    pub live_ci: Option<(c_int, *mut clientInfo_t)>,
 }
 
 impl<'a> CgGameCallbacks<'a> {
-    pub fn new(engine: &'a Engine) -> Self {
-        Self { engine }
+    pub fn new(engine: &'a Engine, world: *mut CgWorld) -> Self {
+        Self {
+            engine,
+            world,
+            live_ci: None,
+        }
     }
 }
 
@@ -324,31 +339,57 @@ impl GameCallbacks for CgGameCallbacks<'_> {
         )
     }
 
+    fn new_string(&mut self, _string: &str) -> *mut c_char {
+        // `BG_ParseField`'s `F_LSTRING` case is the only bg caller, and the
+        // port's only `BG_ParseField` callers live in mp_game (`g_spawn.rs`) -
+        // cgame's spawn-var parse collapsed `cg_spawnFields` + `BG_ParseField`
+        // into `cg_main.rs`'s native dispatch, which calls the ported
+        // `CG_NewString` directly. No cgame path reaches this method.
+        // Source: `oracle/codemp/game/bg_misc.c:375`;
+        // `oracle/codemp/cgame/cg_main.c:3344-3370`
+        unreachable!("CG_NewString is unreachable from cgame: the spawn-var parse calls cg_main's ported CG_NewString directly, not callbacks.new_string")
+    }
+
     // ---------------------------------------------------------------------
-    // Real cgame arms blocked on C5 state (`CgWorld`, DEC-46.1).
+    // Real cgame arm — the DEC-47.2 raw world resolves its tables.
     // ---------------------------------------------------------------------
 
-    fn new_string(&mut self, _string: &str) -> *mut c_char {
-        //TODO: Port CG_NewString
-        // `BG_ParseField`'s `F_LSTRING` case takes `CG_NewString` in the cgame
-        // build (the `#else` of `#ifdef QAGAME`), reached from
-        // `CG_ParseSpawnVars`. `CG_NewString` copies into cgame's string pool
-        // (`CG_StrPool_Alloc`) — C5 state, so this cannot be answered yet, and
-        // a neutral pointer would be the silent fake porting-rules §14 forbids.
-        // Source: `oracle/codemp/game/bg_misc.c:342-375`;
-        // `oracle/codemp/cgame/cg_main.c:3344-3370`
-        todo!("Port CG_NewString — oracle/codemp/cgame/cg_main.c:3344-3370 (needs CgWorld's string pool, DEC-46.1)")
-    }
-    fn my_saber(&mut self, _client_num: c_int, _saber_num: c_int) -> *mut saberInfo_t {
-        //TODO: Port BG_MySaber
-        // `BG_MySaber`'s `#elif defined CGAME` arm is a real implementation:
-        // resolve `cgs.clientinfo[clientNum]` (or `cg_entities[clientNum]
-        // .npcClient` above `MAX_CLIENTS`), require `ci->infoValid` and a
-        // non-empty `saber[saberNum].model`, and return `&ci->saber[saberNum]`.
-        // Both tables are C5 `CgWorld` state; returning NULL instead would
-        // silently disable saber prediction rather than reproduce the arm.
-        // Source: `oracle/codemp/game/bg_saber.c:4115-4137`
-        todo!("Port BG_MySaber cgame arm — oracle/codemp/game/bg_saber.c:4115-4137 (needs CgWorld's cgs.clientinfo / cg_entities, DEC-46.1)")
+    fn my_saber(&mut self, client_num: c_int, saber_num: c_int) -> *mut saberInfo_t {
+        // `BG_MySaber`'s `#elif defined CGAME` arm: resolve the clientInfo row
+        // (`cgs.clientinfo` for real clients, the cent's `npcClient` above
+        // MAX_CLIENTS), require `infoValid` and a hilt model, and hand bg a
+        // pointer at the saber. Raven's `!model` array test never fires (array
+        // decays to a non-null pointer); `model[0]` carries the check.
+        // SAFETY: DEC-47.2 raw-seam reborrow; the returned pointer aims into
+        // the world island (a clientinfo row or the boxed npcClient) or the
+        // caller's swapped-out row, live for the bg call that asked.
+        // Source: `oracle/codemp/game/bg_saber.c:4100-4141`
+        if let Some((num, live)) = self.live_ci {
+            if num == client_num {
+                // the world row is a zeroed placeholder right now - this is
+                // the real one
+                let ci = unsafe { &mut *live };
+                return if ci.infoValid != qfalse && ci.saber[saber_num as usize].model[0] != 0 {
+                    &mut ci.saber[saber_num as usize]
+                } else {
+                    null_mut()
+                };
+            }
+        }
+        let world = unsafe { &mut *self.world };
+        let ci: &mut clientInfo_t = if (client_num as usize) < MAX_CLIENTS {
+            &mut world.cgs.clientinfo[client_num as usize]
+        } else {
+            match world.entities[client_num as usize].npcClient.as_deref_mut() {
+                Some(c) => c,
+                None => return null_mut(),
+            }
+        };
+        if ci.infoValid != qfalse && ci.saber[saber_num as usize].model[0] != 0 {
+            &mut ci.saber[saber_num as usize]
+        } else {
+            null_mut()
+        }
     }
 
     // ---------------------------------------------------------------------

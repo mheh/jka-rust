@@ -5260,8 +5260,8 @@ pub fn CG_Init(
 
     // clear it out
     {
-        let traps = CgBgTraps::new(engine);
-        let mut callbacks = CgGameCallbacks::new(engine);
+        let traps = CgBgTraps::new(engine, ctx.world_raw());
+        let mut callbacks = CgGameCallbacks::new(engine, ctx.world_raw());
         let mut pmctx = PmoveContext::new(&mut ctx.world.bg_state, &traps, &mut callbacks);
         pmctx.BG_InitAnimsets();
     }
@@ -5270,7 +5270,7 @@ pub fn CG_Init(
 
     // Load external vehicle data
     {
-        let traps = CgBgTraps::new(engine);
+        let traps = CgBgTraps::new(engine, ctx.world_raw());
         BG_VehicleLoadParms(&mut ctx.world.bg_state, &traps);
     }
 
@@ -5297,7 +5297,7 @@ pub fn CG_Init(
 
     // Load sabers.cfg data
     {
-        let traps = CgBgTraps::new(engine);
+        let traps = CgBgTraps::new(engine, ctx.world_raw());
         WP_SaberLoadParms(&mut ctx.world.bg_state, &traps);
     }
 

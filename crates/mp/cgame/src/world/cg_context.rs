@@ -29,3 +29,14 @@ pub struct CgContext<'e> {
     pub world: &'e mut CgWorld,
     pub engine: &'e Engine,
 }
+
+impl CgContext<'_> {
+    /// Raw world pointer for the pmove seam structs (`CgBgTraps` /
+    /// `CgGameCallbacks`) - `mp_game`'s `GameContext::world_raw` shape
+    /// (DEC-47.2). The seam methods reborrow it for the duration of one call;
+    /// no borrow outlives the call.
+    #[inline]
+    pub fn world_raw(&mut self) -> *mut CgWorld {
+        &raw mut *self.world
+    }
+}

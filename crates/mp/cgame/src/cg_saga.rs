@@ -718,8 +718,8 @@ pub fn CG_InitSiegeMode(ctx: &mut CgContext) {
 
         //Load the player class types
         {
-            let traps = CgBgTraps::new(ctx.engine);
-            let mut callbacks = CgGameCallbacks::new(ctx.engine);
+            let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+            let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
             BG_SiegeLoadClasses(null_mut(), &mut ctx.world.bg_state, &traps, &mut callbacks);
         }
 
@@ -731,7 +731,7 @@ pub fn CG_InitSiegeMode(ctx: &mut CgContext) {
 
         //Now load the teams since we have class data.
         {
-            let traps = CgBgTraps::new(ctx.engine);
+            let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
             BG_SiegeLoadTeams(&mut ctx.world.bg_state, &traps);
         }
 
@@ -828,8 +828,8 @@ pub fn CG_InitSiegeMode(ctx: &mut CgContext) {
 
         //precache saber data for classes that use sabers on both teams
         {
-            let traps = CgBgTraps::new(ctx.engine);
-            let mut callbacks = CgGameCallbacks::new(ctx.engine);
+            let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+            let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
             BG_PrecacheSabersForSiegeTeam(
                 SIEGETEAM_TEAM1,
                 &mut ctx.world.bg_state,

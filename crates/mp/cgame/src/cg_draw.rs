@@ -594,8 +594,8 @@ pub fn UI_ParseAnimationFile(
     animset: *mut animation_t,
     isHumanoid: bool,
 ) -> c_int {
-    let traps = CgBgTraps::new(ctx.engine);
-    let mut callbacks = CgGameCallbacks::new(ctx.engine);
+    let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+    let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
     let filename_c = cstr(filename);
     BG_ParseAnimationFile(
         &mut ctx.world.bg_state,

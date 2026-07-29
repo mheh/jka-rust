@@ -8,7 +8,9 @@ use std::alloc::{alloc_zeroed, handle_alloc_error, Layout};
 
 use mp_bg::bg_channel::BgState;
 use mp_bg::bg_misc::MAX_POOL_SIZE_CGAME;
+use mp_bg::public::bg_entity::bgEntity_t;
 use mp_bg::public::max_items::MAX_ITEMS;
+use mp_qshared::common::mp::qcommon::playerState_t;
 use mp_qshared::common::mp::qcommon::player_state::MAX_WEAPONS;
 use mp_qshared::shared::MAX_GENTITIES;
 
@@ -81,6 +83,21 @@ pub struct CgWorld {
     /// ~2 MB and must never transit the stack.
     /// Source: `oracle/codemp/cgame/cg_main.c:693`
     pub entities: Box<[centity_t; MAX_GENTITIES]>,
+
+    /// Raven `playerState_t cgSendPSPool[MAX_GENTITIES]` - the per-entity
+    /// snapshot playerStates bg logic reads through `centity_t.playerState`;
+    /// `PlayerStateRef::Snap` resolves to row `n` here (DEC-47.2).
+    /// Source: `oracle/codemp/cgame/cg_predict.c:853`
+    pub cgSendPSPool: Box<[playerState_t; MAX_GENTITIES]>,
+
+    /// The bg tier's `bgEntity_t` view of `cg_entities`. Raven's
+    /// `cg_pmove.baseEnt = (bgEntity_t *)cg_entities` head-overlay pun cannot
+    /// read the DEC-46.2 reshaped `centity_t`, so the port owns real rows:
+    /// `CG_PmoveClientPointerUpdate` wires each row's `playerState` at the
+    /// matching `cgSendPSPool` row, and `CG_PredictPlayerState` syncs the
+    /// entity-state fields before running `Pmove` over them (DEC-47.2).
+    /// Source: `oracle/codemp/cgame/cg_predict.c:912-914`
+    pub bg_ents: Box<[bgEntity_t; MAX_GENTITIES]>,
 
     /// Raven `weaponInfo_t cg_weapons[MAX_WEAPONS]` — the per-weapon
     /// model/sound/effect registry.
@@ -220,6 +237,12 @@ impl CgWorld {
             // `NonZeroU32` niche) / `None::<Box<clientInfo_t>>` (the null
             // niche).
             addr_of_mut!((*p).entities).write(zeroed_box::<[centity_t; MAX_GENTITIES]>());
+            // SAFETY: `playerState_t` is `#[repr(C)]` scalars all the way down
+            // (`playerState_t::zeroed` documents it).
+            addr_of_mut!((*p).cgSendPSPool).write(zeroed_box::<[playerState_t; MAX_GENTITIES]>());
+            // SAFETY: `bgEntity_t` is an entityState POD, raw pointers (null
+            // when zeroed) and scalars.
+            addr_of_mut!((*p).bg_ents).write(zeroed_box::<[bgEntity_t; MAX_GENTITIES]>());
             // SAFETY: `weaponInfo_t` is scalars, arrays, an `Option<ItemId>`
             // (zero == `None`) and `Option<fn>` trail hooks (zero == `None`).
             addr_of_mut!((*p).cg_weapons).write(zeroed_box::<[weaponInfo_t; MAX_WEAPONS]>());
