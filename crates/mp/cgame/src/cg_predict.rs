@@ -8,12 +8,15 @@ use core::mem::size_of;
 use core::ptr::null_mut;
 
 use mp_abi::cgame::public::snapshot_t::MAX_ENTITIES_IN_SNAPSHOT;
+use mp_bg::bg_channel::PmoveContext;
 use mp_bg::bg_misc::{
     BG_AddPredictableEventToPlayerstate, BG_CanItemBeGrabbed, BG_EvaluateTrajectory,
     BG_PlayerTouchesItem, BG_TouchJumpPad,
 };
+use mp_bg::bg_pmove::Pmove;
 use mp_bg::public::bg_entity::bgEntity_t;
 use mp_bg::public::bg_itemlist::bg_itemlist;
+use mp_bg::public::dm_flags::DF_NO_FOOTSTEPS;
 use mp_bg::public::entity_event::entity_event_t::EV_ITEM_PICKUP;
 use mp_bg::public::entity_flags::{EF_ITEMPLACEHOLDER, EF_NODRAW};
 use mp_bg::public::entity_type::entityType_t::{
@@ -22,27 +25,39 @@ use mp_bg::public::entity_type::entityType_t::{
 use mp_bg::public::gametype::{GT_CTF, GT_CTY};
 use mp_bg::public::item_type::{IT_POWERUP, IT_WEAPON};
 use mp_bg::public::pers_enum::persEnum_t::PERS_TEAM;
-use mp_bg::public::pmtype::pmtype_t::{PM_FLOAT, PM_JETPACK, PM_NORMAL, PM_SPECTATOR};
+use mp_bg::public::pmtype::pmtype_t::{
+    PM_DEAD, PM_FLOAT, PM_INTERMISSION, PM_JETPACK, PM_NORMAL, PM_SPECTATOR,
+};
 use mp_bg::public::powerup::{
     PW_BLUEFLAG, PW_FORCE_ENLIGHTENED_DARK, PW_FORCE_ENLIGHTENED_LIGHT, PW_REDFLAG,
 };
 use mp_bg::public::stat_index::statIndex_t::{STAT_HEALTH, STAT_WEAPONS};
-use mp_bg::public::team::{TEAM_BLUE, TEAM_RED};
+use mp_bg::public::team::{TEAM_BLUE, TEAM_RED, TEAM_SPECTATOR};
 use mp_bg::public::viewheight::{DEFAULT_MAXS_2, DEFAULT_MINS_2};
 use mp_bg::weapons::weapon_t::{WP_EMPLACED_GUN, WP_NONE};
 use mp_qshared::common::mp::game::class_t::class_t::CLASS_VEHICLE;
 use mp_qshared::common::mp::qcommon::playerState_t;
+use mp_qshared::common::mp::qcommon::player_state::MAX_PS_EVENTS;
+use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t::{SS_DUAL, SS_STAFF};
 use mp_qshared::common::mp::qcommon::usercmd_t;
 use mp_qshared::common::mp::qcommon::PMF_FOLLOW;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::force_powers::{FORCE_DARKSIDE, FORCE_LIGHTSIDE};
-use mp_qshared::shared::q_math::{_VectorSubtract, vec3_origin, LerpAngle};
-use mp_qshared::shared::surface_flags::SOLID_BMODEL;
+use mp_qshared::shared::q_math::{
+    _VectorAdd, _VectorScale, _VectorSubtract, vec3_origin, vectoangles, AngleSubtract, LerpAngle,
+    VectorClear, VectorCompare, VectorLength,
+};
+use mp_qshared::shared::surface_flags::{CONTENTS_BODY, MASK_PLAYERSOLID, SOLID_BMODEL};
 use mp_qshared::shared::{
     qfalse, qtrue, vec3_t, ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_CLIENTS_I32, MAX_GENTITIES,
 };
+use mp_uishared::shared::display_state::DisplayState;
 
+use crate::bg_channel::{CgBgTraps, CgGameCallbacks};
+use crate::cg_ents::CG_AdjustPositionForMover;
+use crate::cg_main::CG_Printf;
 use crate::cg_players::CG_G2TraceCollide;
+use crate::cg_playerstate::CG_TransitionPlayerState;
 use crate::local::player_state_ref::PlayerStateRef;
 use crate::trap;
 use crate::world::cg_context::CgContext;
@@ -899,31 +914,17 @@ pub fn CG_G2Trace(
 /// current cg.time from the last snapshot plus the pending usercmds, running
 /// the same `Pmove` the server did.
 ///
-/// PORT-NOTE: only the three non-predicting prologue paths are transcribed
-/// here — the first-frame `validPPS` seed and the demo/follow +
-/// nopredict/synchronous/eweb interpolation early-returns, all of which land
-/// clean. The predicting body (the whole `Pmove`-driven remainder from Raven's
-/// "prepare for pmove", `cg_predict.c:1007`) is blocked on two DEC-46 design
-/// points, both already cited by [`CG_PmoveClientPointerUpdate`]:
-///
-/// 1. The cgame pmove entity seam. Raven binds `cg_pmove.ps =
-///    &cg.predictedPlayerState`, `cg_pmove.trace = CG_Trace`,
-///    `cg_pmove.pointcontents = CG_PointContents`, and
-///    `cg_pmove.baseEnt = (bgEntity_t *)cg_entities` before `Pmove`. The
-///    ported `Pmove` drives `self.traps.trace()` / `self.traps.pointcontents()`
-///    (`bg_pmove.rs`), and `CgBgTraps`'s two methods are still `todo!()`s
-///    because the seam carries `&Engine`, not the `&mut CgContext` the ported
-///    `CG_Trace`/`CG_PointContents` need
-///    (`bg_channel/cg_bg_traps.rs:67-96`). The raw self-pointer into
-///    `predictedPlayerState` and the `baseEnt` overlay pun are the open DEC-46
-///    ruling `CG_PmoveClientPointerUpdate` names as blocking this wave.
-/// 2. `cgSendPSPool`. The `VectorCopy(... cgSendPS[i]->origin)` pump and the
-///    `revertES` copy-back read/write `playerState_t cgSendPSPool[MAX_GENTITIES]`
-///    (`cg_predict.c:853,888`), which has no DEC-46 home yet — the same
-///    deferral `CG_PmoveClientPointerUpdate` records.
+/// The DEC-47.2 seam carries the body: `cg_pmove.ps` is the raw self-pointer
+/// into `cg.predictedPlayerState` Raven stores, `trace`/`pointcontents` live
+/// on `CgBgTraps`, and `baseEnt` walks the `CgWorld.bg_ents` shadow rows this
+/// fn syncs from the entities up front (Raven's overlay read `cg_entities`
+/// directly - nothing here writes those synced fields back except Raven's own
+/// explicit `revertES` pump). The piloted-vehicle sub-blocks that deref
+/// `veh->m_pVehicle` keep ruling-4 `todo!()`s until the DEC-47.3 pool lands;
+/// nothing sets `m_pVehicle` before then, so the gates cannot fire.
 ///
 /// Source: `oracle/codemp/cgame/cg_predict.c:963-1511`
-pub fn CG_PredictPlayerState(ctx: &mut CgContext) {
+pub fn CG_PredictPlayerState(ctx: &mut CgContext, ds: &DisplayState) {
     ctx.world.cg.hyperspace = qfalse; // will be set if touching a trigger_teleport
 
     // if this is the first frame we must guarantee predictedPlayerState is
@@ -971,11 +972,563 @@ pub fn CG_PredictPlayerState(ctx: &mut CgContext) {
         return;
     }
 
-    //TODO: Port CG_PredictPlayerState
-    // Source: `oracle/codemp/cgame/cg_predict.c:1007-1511`
-    // The predicting body ("prepare for pmove" onward) is blocked on the two
-    // DEC-46 design points documented in this fn's doc comment: the pmove
-    // entity seam (raw `cg_pmove.ps`/`baseEnt`, plus `CgBgTraps::trace` /
-    // `pointcontents` still `todo!()`) and the unhomed `cgSendPSPool`.
-    todo!("Port CG_PredictPlayerState predicting body — oracle/codemp/cgame/cg_predict.c:1007-1511 (blocked on the DEC-46 pmove entity seam + cgSendPSPool; see CG_PmoveClientPointerUpdate)")
+    // prepare for pmove
+    // Raven also rebinds cg_pmove.trace/pointcontents here; those live on
+    // CgBgTraps (DEC-47.2), and pmove_t's fn-ptr fields stay for layout only.
+    ctx.world.predict.cg_pmove.ps = &raw mut ctx.world.cg.predictedPlayerState;
+
+    // sync the bg view rows before bg walks them through baseEnt - port-only
+    // plumbing for the overlay Raven read straight off cg_entities
+    {
+        let world = &mut *ctx.world;
+        for i in 0..MAX_GENTITIES {
+            let ent = &world.entities[i];
+            let row = &mut world.bg_ents[i];
+            row.s = ent.currentState;
+            row.ghoul2 = ent.ghoul2;
+            row.localAnimIndex = ent.localAnimIndex;
+            row.modelScale = ent.modelScale;
+            // row.m_pVehicle stays null until the DEC-47.3 pool exists
+        }
+    }
+
+    let pEntNum = ctx.world.cg.predictedPlayerState.clientNum as usize;
+    //rww - bgghoul2
+    if ctx.world.predict.cg_pmove.ghoul2 != ctx.world.entity(pEntNum).ghoul2 {
+        //only update it if the g2 instance has changed
+        let pGhoul2 = ctx.world.entity(pEntNum).ghoul2;
+        let snapOk = ctx.world.cg.snap_ref().is_some_and(|snap| {
+            snap.ps.pm_flags & PMF_FOLLOW == 0
+                && snap.ps.persistant[PERS_TEAM as usize] != TEAM_SPECTATOR
+        });
+        if snapOk && !pGhoul2.is_null() {
+            ctx.world.predict.cg_pmove.ghoul2 = pGhoul2;
+            ctx.world.predict.cg_pmove.g2Bolts_LFoot =
+                trap::G2API_AddBolt(ctx.engine, pGhoul2, 0, "*l_leg_foot");
+            ctx.world.predict.cg_pmove.g2Bolts_RFoot =
+                trap::G2API_AddBolt(ctx.engine, pGhoul2, 0, "*r_leg_foot");
+        } else {
+            ctx.world.predict.cg_pmove.ghoul2 = null_mut();
+        }
+    }
+
+    // Raven grabs `ci = &cgs.clientinfo[clientNum]` here; the saberHolstered
+    // block below reads the row at its use site instead.
+
+    //I'll just do this every frame in case the scale changes in realtime (don't need to update the g2 inst for that)
+    ctx.world.predict.cg_pmove.modelScale = ctx.world.entity(pEntNum).modelScale;
+    //rww end bgghoul2
+
+    if ctx.world.cg.predictedPlayerState.pm_type == PM_DEAD as c_int {
+        ctx.world.predict.cg_pmove.tracemask = MASK_PLAYERSOLID & !CONTENTS_BODY;
+    } else {
+        ctx.world.predict.cg_pmove.tracemask = MASK_PLAYERSOLID;
+    }
+    // §F19: the `cg.snap->` derefs from here down are unguarded in Raven;
+    // CG_DrawActiveFrame never runs prediction without a snapshot, so a
+    // missing snap reads as its zero value.
+    if ctx
+        .world
+        .cg
+        .snap_ref()
+        .is_some_and(|s| s.ps.persistant[PERS_TEAM as usize] == TEAM_SPECTATOR)
+    {
+        // spectators can fly through bodies
+        ctx.world.predict.cg_pmove.tracemask &= !CONTENTS_BODY;
+    }
+    ctx.world.predict.cg_pmove.noFootsteps = if ctx.world.cgs.dmflags & DF_NO_FOOTSTEPS > 0 {
+        qtrue
+    } else {
+        qfalse
+    };
+
+    // save the state before the pmove so we can detect transitions
+    let mut oldPlayerState = ctx.world.cg.predictedPlayerState;
+    // Raven's `oldVehicleState` local is uninitialized unless piloting; every
+    // later read sits behind the same piloting gate, so the zero seed is never
+    // observed
+    let mut oldVehicleState = playerState_t::zeroed();
+    if CG_Piloting(ctx.world, ctx.world.cg.predictedPlayerState.m_iVehicleNum) {
+        oldVehicleState = ctx.world.cg.predictedVehicleState;
+    }
+
+    let current = trap::GetCurrentCmdNumber(ctx.engine);
+
+    // if we don't have the commands right after the snapshot, we
+    // can't accurately predict a current position, so just freeze at
+    // the last good position we had
+    let cmdNum = current - CMD_BACKUP + 1;
+    let mut oldestCmd = usercmd_t::default();
+    trap::GetUserCmd(ctx.engine, cmdNum, &mut oldestCmd);
+    let snapCommandTime = ctx.world.cg.snap_ref().map_or(0, |s| s.ps.commandTime);
+    if oldestCmd.serverTime > snapCommandTime && oldestCmd.serverTime < ctx.world.cg.time {
+        // special check for map_restart
+        if ctx.world.cvars.cg_showmiss.integer != 0 {
+            CG_Printf(ctx, "exceeded PACKET_BACKUP on commands\n");
+        }
+        return;
+    }
+
+    // get the latest command so we can know which commands are from previous map_restarts
+    let mut latestCmd = usercmd_t::default();
+    trap::GetUserCmd(ctx.engine, current, &mut latestCmd);
+
+    // get the most recent information we have, even if
+    // the server time is beyond our current cg.time,
+    // because predicted player positions are going to
+    // be ahead of everything else anyway
+    let slopeRecalcTime = ctx.world.cg.predictedPlayerState.slopeRecalcTime;
+    if ctx.world.cg.next_snap_ref().is_some()
+        && ctx.world.cg.nextFrameTeleport == qfalse
+        && ctx.world.cg.thisFrameTeleport == qfalse
+    {
+        let (ps, vps, serverTime) = {
+            let snap = ctx.world.cg.next_snap_mut().unwrap();
+            //this is the only value we want to maintain seperately on server/client
+            snap.ps.slopeRecalcTime = slopeRecalcTime;
+            (snap.ps, snap.vps, snap.serverTime)
+        };
+        ctx.world.cg.predictedPlayerState = ps;
+        if CG_Piloting(ctx.world, ps.m_iVehicleNum) {
+            ctx.world.cg.predictedVehicleState = vps;
+        }
+        ctx.world.cg.physicsTime = serverTime;
+    } else if let Some((ps, vps, serverTime)) = {
+        let snap = ctx.world.cg.snap_mut();
+        snap.map(|snap| {
+            //this is the only value we want to maintain seperately on server/client
+            snap.ps.slopeRecalcTime = slopeRecalcTime;
+            (snap.ps, snap.vps, snap.serverTime)
+        })
+    } {
+        ctx.world.cg.predictedPlayerState = ps;
+        if CG_Piloting(ctx.world, ps.m_iVehicleNum) {
+            ctx.world.cg.predictedVehicleState = vps;
+        }
+        ctx.world.cg.physicsTime = serverTime;
+    }
+
+    if ctx.world.cvars.pmove_msec.integer < 8 {
+        trap::Cvar_Set(ctx.engine, "pmove_msec", "8");
+    } else if ctx.world.cvars.pmove_msec.integer > 33 {
+        trap::Cvar_Set(ctx.engine, "pmove_msec", "33");
+    }
+
+    ctx.world.predict.cg_pmove.pmove_fixed = ctx.world.cvars.pmove_fixed.integer; // | cg_pmove_fixed.integer;
+    ctx.world.predict.cg_pmove.pmove_msec = ctx.world.cvars.pmove_msec.integer;
+
+    {
+        let world = &mut *ctx.world;
+        for i in 0..MAX_GENTITIES {
+            //Written this way for optimal speed, even though it doesn't look pretty.
+            //(we don't want to spend the time assigning pointers as it does take
+            //a small precious fraction of time and adds up in the loop.. so says
+            //the precision timer!)
+
+            let es = &world.entities[i].currentState;
+            if es.eType == ET_PLAYER as c_int || es.eType == ET_NPC as c_int {
+                let ps = &mut world.cgSendPSPool[i];
+                ps.origin = es.pos.trBase;
+                ps.velocity = es.pos.trDelta;
+                ps.saberLockFrame = es.forceFrame;
+                ps.legsAnim = es.legsAnim;
+                ps.torsoAnim = es.torsoAnim;
+                ps.legsFlip = es.legsFlip;
+                ps.torsoFlip = es.torsoFlip;
+                ps.clientNum = es.clientNum;
+                ps.saberMove = es.saberMove;
+            }
+        }
+    }
+
+    if CG_Piloting(ctx.world, ctx.world.cg.predictedPlayerState.m_iVehicleNum) {
+        let clientNum = ctx.world.cg.predictedPlayerState.clientNum as usize;
+        let vehNum = ctx.world.cg.predictedPlayerState.m_iVehicleNum as usize;
+        let world = &mut *ctx.world;
+        // both rows repoint at the predicted states - enum arm for the cgame
+        // readers, raw pointer for the bg view (DEC-47.2)
+        world.entities[clientNum].playerState = PlayerStateRef::Predicted;
+        world.bg_ents[clientNum].playerState = &raw mut world.cg.predictedPlayerState;
+        world.entities[vehNum].playerState = PlayerStateRef::PredictedVehicle;
+        world.bg_ents[vehNum].playerState = &raw mut world.cg.predictedVehicleState;
+
+        //use the player command time, because we are running with the player cmds (this is even the case
+        //on the server)
+        world.cg.predictedVehicleState.commandTime = world.cg.predictedPlayerState.commandTime;
+    }
+
+    // run cmds
+    let mut moved = qfalse;
+    for cmdNum in (current - CMD_BACKUP + 1)..=current {
+        // get the command
+        trap::GetUserCmd(ctx.engine, cmdNum, &mut ctx.world.predict.cg_pmove.cmd);
+
+        if ctx.world.predict.cg_pmove.pmove_fixed != 0 {
+            let ps_ptr = &raw mut ctx.world.cg.predictedPlayerState;
+            let cmd_ptr = &raw const ctx.world.predict.cg_pmove.cmd;
+            let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+            let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
+            let mut pmctx = PmoveContext::new(&mut ctx.world.bg_state, &traps, &mut callbacks);
+            pmctx.PM_UpdateViewAngles(ps_ptr, cmd_ptr);
+        }
+
+        // don't do anything if the time is before the snapshot player time
+        if ctx.world.predict.cg_pmove.cmd.serverTime
+            <= ctx.world.cg.predictedPlayerState.commandTime
+        {
+            continue;
+        }
+
+        // don't do anything if the command was from a previous map_restart
+        if ctx.world.predict.cg_pmove.cmd.serverTime > latestCmd.serverTime {
+            continue;
+        }
+
+        // check for a prediction error from last frame
+        // on a lan, this will often be the exact value
+        // from the snapshot, but on a wan we will have
+        // to predict several commands to get to the point
+        // we want to compare
+        if CG_Piloting(ctx.world, oldPlayerState.m_iVehicleNum)
+            && ctx.world.cg.predictedVehicleState.commandTime == oldVehicleState.commandTime
+        {
+            if ctx.world.cg.thisFrameTeleport != qfalse {
+                // a teleport will not cause an error decay
+                VectorClear(&mut ctx.world.cg.predictedError);
+                if ctx.world.cvars.cg_showVehMiss.integer != 0 {
+                    CG_Printf(ctx, "VEH PredictionTeleport\n");
+                }
+                ctx.world.cg.thisFrameTeleport = qfalse;
+            } else {
+                let mut adjusted: vec3_t = [0.0; 3];
+                CG_AdjustPositionForMover(
+                    ctx.world,
+                    ctx.world.cg.predictedVehicleState.origin,
+                    ctx.world.cg.predictedVehicleState.groundEntityNum,
+                    ctx.world.cg.physicsTime,
+                    ctx.world.cg.oldTime,
+                    &mut adjusted,
+                );
+
+                if ctx.world.cvars.cg_showVehMiss.integer != 0
+                    && !VectorCompare(oldVehicleState.origin, adjusted)
+                {
+                    CG_Printf(ctx, "VEH prediction error\n");
+                }
+                let mut delta: vec3_t = [0.0; 3];
+                _VectorSubtract(oldVehicleState.origin, adjusted, &mut delta);
+                let len = VectorLength(delta);
+                if len > 0.1 {
+                    if ctx.world.cvars.cg_showVehMiss.integer != 0 {
+                        CG_Printf(ctx, &format!("VEH Prediction miss: {:.6}\n", len));
+                    }
+                    if ctx.world.cvars.cg_errorDecay.integer != 0 {
+                        let t = ctx.world.cg.time - ctx.world.cg.predictedErrorTime;
+                        let mut f = (ctx.world.cvars.cg_errorDecay.value - t as f32)
+                            / ctx.world.cvars.cg_errorDecay.value;
+                        if f < 0.0 {
+                            f = 0.0;
+                        }
+                        if f > 0.0 && ctx.world.cvars.cg_showVehMiss.integer != 0 {
+                            CG_Printf(ctx, &format!("VEH Double prediction decay: {:.6}\n", f));
+                        }
+                        let pe = ctx.world.cg.predictedError;
+                        _VectorScale(pe, f, &mut ctx.world.cg.predictedError);
+                    } else {
+                        VectorClear(&mut ctx.world.cg.predictedError);
+                    }
+                    let pe = ctx.world.cg.predictedError;
+                    _VectorAdd(delta, pe, &mut ctx.world.cg.predictedError);
+                    ctx.world.cg.predictedErrorTime = ctx.world.cg.oldTime;
+                }
+                //
+                if ctx.world.cvars.cg_showVehMiss.integer != 0
+                    && !VectorCompare(
+                        oldVehicleState.vehOrientation,
+                        ctx.world.cg.predictedVehicleState.vehOrientation,
+                    )
+                {
+                    let pvs = ctx.world.cg.predictedVehicleState.vehOrientation;
+                    CG_Printf(ctx, "VEH orient prediction error\n");
+                    CG_Printf(
+                        ctx,
+                        &format!(
+                            "VEH pitch prediction miss: {:.6}\n",
+                            AngleSubtract(oldVehicleState.vehOrientation[0], pvs[0])
+                        ),
+                    );
+                    CG_Printf(
+                        ctx,
+                        &format!(
+                            "VEH yaw prediction miss: {:.6}\n",
+                            AngleSubtract(oldVehicleState.vehOrientation[1], pvs[1])
+                        ),
+                    );
+                    CG_Printf(
+                        ctx,
+                        &format!(
+                            "VEH roll prediction miss: {:.6}\n",
+                            AngleSubtract(oldVehicleState.vehOrientation[2], pvs[2])
+                        ),
+                    );
+                }
+            }
+        } else if oldPlayerState.m_iVehicleNum == 0 //don't do pred err on ps while riding veh
+            && ctx.world.cg.predictedPlayerState.commandTime == oldPlayerState.commandTime
+        {
+            if ctx.world.cg.thisFrameTeleport != qfalse {
+                // a teleport will not cause an error decay
+                VectorClear(&mut ctx.world.cg.predictedError);
+                if ctx.world.cvars.cg_showmiss.integer != 0 {
+                    CG_Printf(ctx, "PredictionTeleport\n");
+                }
+                ctx.world.cg.thisFrameTeleport = qfalse;
+            } else {
+                let mut adjusted: vec3_t = [0.0; 3];
+                CG_AdjustPositionForMover(
+                    ctx.world,
+                    ctx.world.cg.predictedPlayerState.origin,
+                    ctx.world.cg.predictedPlayerState.groundEntityNum,
+                    ctx.world.cg.physicsTime,
+                    ctx.world.cg.oldTime,
+                    &mut adjusted,
+                );
+
+                if ctx.world.cvars.cg_showmiss.integer != 0
+                    && !VectorCompare(oldPlayerState.origin, adjusted)
+                {
+                    CG_Printf(ctx, "prediction error\n");
+                }
+                let mut delta: vec3_t = [0.0; 3];
+                _VectorSubtract(oldPlayerState.origin, adjusted, &mut delta);
+                let len = VectorLength(delta);
+                if len > 0.1 {
+                    if ctx.world.cvars.cg_showmiss.integer != 0 {
+                        CG_Printf(ctx, &format!("Prediction miss: {:.6}\n", len));
+                    }
+                    if ctx.world.cvars.cg_errorDecay.integer != 0 {
+                        let t = ctx.world.cg.time - ctx.world.cg.predictedErrorTime;
+                        let mut f = (ctx.world.cvars.cg_errorDecay.value - t as f32)
+                            / ctx.world.cvars.cg_errorDecay.value;
+                        if f < 0.0 {
+                            f = 0.0;
+                        }
+                        if f > 0.0 && ctx.world.cvars.cg_showmiss.integer != 0 {
+                            CG_Printf(ctx, &format!("Double prediction decay: {:.6}\n", f));
+                        }
+                        let pe = ctx.world.cg.predictedError;
+                        _VectorScale(pe, f, &mut ctx.world.cg.predictedError);
+                    } else {
+                        VectorClear(&mut ctx.world.cg.predictedError);
+                    }
+                    let pe = ctx.world.cg.predictedError;
+                    _VectorAdd(delta, pe, &mut ctx.world.cg.predictedError);
+                    ctx.world.cg.predictedErrorTime = ctx.world.cg.oldTime;
+                }
+            }
+        }
+
+        if ctx.world.predict.cg_pmove.pmove_fixed != 0 {
+            let msec = ctx.world.cvars.pmove_msec.integer;
+            ctx.world.predict.cg_pmove.cmd.serverTime =
+                ((ctx.world.predict.cg_pmove.cmd.serverTime + msec - 1) / msec) * msec;
+        }
+
+        let localAnimIndex = ctx.world.entity(pEntNum).localAnimIndex;
+        ctx.world.predict.cg_pmove.animations =
+            ctx.world.bg_state.bgAllAnims[localAnimIndex as usize].anims;
+        ctx.world.predict.cg_pmove.gametype = ctx.world.cgs.gametype;
+
+        ctx.world.predict.cg_pmove.debugMelee = ctx.world.cgs.debugMelee;
+        ctx.world.predict.cg_pmove.stepSlideFix = ctx.world.cgs.stepSlideFix;
+        ctx.world.predict.cg_pmove.noSpecMove = ctx.world.cgs.noSpecMove;
+
+        ctx.world.predict.cg_pmove.nonHumanoid = if localAnimIndex > 0 { qtrue } else { qfalse };
+
+        let saberLock = ctx
+            .world
+            .cg
+            .snap_ref()
+            .map(|s| (s.ps.saberLockTime, s.ps.saberLockEnemy, s.ps.origin));
+        if let Some((saberLockTime, saberLockEnemy, snapOrigin)) = saberLock {
+            if saberLockTime > ctx.world.cg.time {
+                // Raven's `if (blockOpp)` tests the address of
+                // `&cg_entities[...]` - always true - so the block is
+                // unconditional
+                let blockOppLerpOrigin = ctx.world.entity(saberLockEnemy as usize).lerpOrigin;
+
+                let mut lockDir: vec3_t = [0.0; 3];
+                let mut lockAng: vec3_t = [0.0; 3];
+                _VectorSubtract(blockOppLerpOrigin, snapOrigin, &mut lockDir);
+                vectoangles(lockDir, &mut lockAng);
+
+                ctx.world.cg.predictedPlayerState.viewangles = lockAng;
+            }
+        }
+
+        //THIS is pretty much bad, but...
+        ctx.world.cg.predictedPlayerState.fd.saberAnimLevelBase =
+            ctx.world.cg.predictedPlayerState.fd.saberAnimLevel;
+        if ctx.world.cg.predictedPlayerState.saberHolstered == 1 {
+            let ci = &ctx.world.cgs.clientinfo[pEntNum];
+            if ci.saber[0].numBlades > 0 {
+                ctx.world.cg.predictedPlayerState.fd.saberAnimLevelBase = SS_STAFF as c_int;
+            } else if ci.saber[1].model[0] != 0 {
+                ctx.world.cg.predictedPlayerState.fd.saberAnimLevelBase = SS_DUAL as c_int;
+            }
+        }
+
+        {
+            let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+            let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
+            let pm_ptr = &raw mut ctx.world.predict.cg_pmove;
+            Pmove(pm_ptr, &mut ctx.world.bg_state, &traps, &mut callbacks);
+        }
+
+        if CG_Piloting(ctx.world, ctx.world.cg.predictedPlayerState.m_iVehicleNum)
+            && ctx.world.cg.predictedPlayerState.pm_type != PM_INTERMISSION as c_int
+        {
+            //we're riding a vehicle, let's predict it
+            let vehNum = ctx.world.cg.predictedPlayerState.m_iVehicleNum as usize;
+            if ctx.world.entity(vehNum).m_pVehicle.is_some() {
+                //TODO: Port CG_PredictPlayerState vehicle-predict block
+                // Raven derefs `veh->m_pVehicle` throughout the block
+                // (m_vOrientation repoint, m_iRemovedSurfaces, m_ucmd,
+                // m_iBoarding) - blocked on the DEC-47.3 Vehicle_t pool, and
+                // nothing sets `m_pVehicle` until that pool lands, so this arm
+                // cannot fire yet (DEC-47.4 loud-marker policy).
+                // Source: oracle/codemp/cgame/cg_predict.c:1322-1424
+                todo!("Port CG_PredictPlayerState vehicle-predict block — oracle/codemp/cgame/cg_predict.c:1322-1424 (blocked on the DEC-47.3 Vehicle_t pool)")
+            }
+        }
+
+        moved = qtrue;
+
+        // add push trigger movement effects
+        CG_TouchTriggerPrediction(ctx);
+
+        // check for predictable events that changed from previous predictions
+        //CG_CheckChangedPredictableEvents(&cg.predictedPlayerState);
+    }
+
+    if ctx.world.cvars.cg_showmiss.integer > 1 {
+        CG_Printf(
+            ctx,
+            &format!(
+                "[{} : {}] ",
+                ctx.world.predict.cg_pmove.cmd.serverTime, ctx.world.cg.time
+            ),
+        );
+    }
+
+    // Raven's `if (!moved) goto revertES;` - the moved tail runs here, the
+    // revertES section below runs either way
+    if moved == qfalse {
+        if ctx.world.cvars.cg_showmiss.integer != 0 {
+            CG_Printf(ctx, "not moved\n");
+        }
+    } else {
+        if CG_Piloting(ctx.world, ctx.world.cg.predictedPlayerState.m_iVehicleNum) {
+            let mut adjusted: vec3_t = [0.0; 3];
+            CG_AdjustPositionForMover(
+                ctx.world,
+                ctx.world.cg.predictedVehicleState.origin,
+                ctx.world.cg.predictedVehicleState.groundEntityNum,
+                ctx.world.cg.physicsTime,
+                ctx.world.cg.time,
+                &mut adjusted,
+            );
+            ctx.world.cg.predictedVehicleState.origin = adjusted;
+        } else {
+            // adjust for the movement of the groundentity
+            let mut adjusted: vec3_t = [0.0; 3];
+            CG_AdjustPositionForMover(
+                ctx.world,
+                ctx.world.cg.predictedPlayerState.origin,
+                ctx.world.cg.predictedPlayerState.groundEntityNum,
+                ctx.world.cg.physicsTime,
+                ctx.world.cg.time,
+                &mut adjusted,
+            );
+            ctx.world.cg.predictedPlayerState.origin = adjusted;
+        }
+
+        if ctx.world.cvars.cg_showmiss.integer != 0
+            && ctx.world.cg.predictedPlayerState.eventSequence
+                > oldPlayerState.eventSequence + MAX_PS_EVENTS as c_int
+        {
+            CG_Printf(ctx, "WARNING: dropped event\n");
+        }
+
+        // fire events and other transition triggered things
+        let pps = ctx.world.cg.predictedPlayerState;
+        CG_TransitionPlayerState(
+            ctx,
+            ds,
+            &pps,
+            &mut oldPlayerState,
+            PlayerStateRef::Predicted,
+        );
+
+        if ctx.world.cvars.cg_showmiss.integer != 0
+            && ctx.world.cg.eventSequence > ctx.world.cg.predictedPlayerState.eventSequence
+        {
+            CG_Printf(ctx, "WARNING: double event\n");
+            ctx.world.cg.eventSequence = ctx.world.cg.predictedPlayerState.eventSequence;
+        }
+
+        if ctx.world.cg.predictedPlayerState.m_iVehicleNum != 0
+            && !CG_Piloting(ctx.world, ctx.world.cg.predictedPlayerState.m_iVehicleNum)
+        {
+            //a passenger on this vehicle, bolt them in
+            let vehNum = ctx.world.cg.predictedPlayerState.m_iVehicleNum as usize;
+            let lerpOrigin = ctx.world.entity(vehNum).lerpOrigin;
+            ctx.world.cg.predictedPlayerState.origin = lerpOrigin;
+        }
+    }
+
+    // revertES:
+    if CG_Piloting(ctx.world, ctx.world.cg.predictedPlayerState.m_iVehicleNum) {
+        let vehNum = ctx.world.cg.predictedPlayerState.m_iVehicleNum as usize;
+
+        if ctx.world.entity(vehNum).m_pVehicle.is_some() {
+            //TODO: Port CG_PredictPlayerState revertES m_vOrientation repoint
+            // Raven switches `veh->m_pVehicle->m_vOrientation` back at the
+            // vehicle's cgSendPS row in case we stop riding it - the same
+            // DEC-47.3 gate as the vehicle-predict block above.
+            // Source: oracle/codemp/cgame/cg_predict.c:1486-1493
+            todo!("Port CG_PredictPlayerState revertES m_vOrientation repoint — oracle/codemp/cgame/cg_predict.c:1486-1493 (blocked on the DEC-47.3 Vehicle_t pool)")
+        }
+
+        let clientNum = ctx.world.cg.predictedPlayerState.clientNum as usize;
+        // Raven keys the vehicle's pool row by `veh->currentState.number`
+        // (== vehNum whenever the snapshot is coherent); the raw bg row keeps
+        // the literal semantic, the Snap arm resolves by entity number
+        let vehStateNum = ctx.world.entity(vehNum).currentState.number as usize;
+        let world = &mut *ctx.world;
+        world.entities[clientNum].playerState = PlayerStateRef::Snap;
+        world.bg_ents[clientNum].playerState = &raw mut world.cgSendPSPool[clientNum];
+        world.entities[vehNum].playerState = PlayerStateRef::Snap;
+        world.bg_ents[vehNum].playerState = &raw mut world.cgSendPSPool[vehStateNum];
+    }
+
+    //copy some stuff back into the entstates to help actually "predict" them if applicable
+    {
+        let world = &mut *ctx.world;
+        for i in 0..MAX_GENTITIES {
+            let es = &mut world.entities[i].currentState;
+            if es.eType == ET_PLAYER as c_int || es.eType == ET_NPC as c_int {
+                let ps = &world.cgSendPSPool[i];
+                es.torsoAnim = ps.torsoAnim;
+                es.legsAnim = ps.legsAnim;
+                es.forceFrame = ps.saberLockFrame;
+                es.saberMove = ps.saberMove;
+            }
+        }
+    }
 }
+
+/// Raven `#define CMD_BACKUP 64`.
+///
+/// Source: `oracle/codemp/game/q_shared.h:2914`
+const CMD_BACKUP: c_int = 64;

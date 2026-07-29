@@ -2900,7 +2900,7 @@ pub fn CG_DrawActiveFrame(
     ctx.world.cg.clientFrame += 1;
 
     // update cg.predictedPlayerState
-    CG_PredictPlayerState(ctx);
+    CG_PredictPlayerState(ctx, ds);
 
     // decide on third person view
     let snapHealthPersistant = ctx.world.cg.snap_ref().map(|snap| {

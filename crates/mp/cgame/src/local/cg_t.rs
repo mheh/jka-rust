@@ -378,6 +378,19 @@ impl cg_t {
             None
         }
     }
+
+    /// Mutable [`Self::next_snap_ref`].
+    pub fn next_snap_mut(&mut self) -> Option<&mut snapshot_t> {
+        let snap = self.nextSnap as *const snapshot_t;
+        let which = if snap == &self.activeSnapshots[0] as *const snapshot_t {
+            0
+        } else if snap == &self.activeSnapshots[1] as *const snapshot_t {
+            1
+        } else {
+            return None;
+        };
+        Some(&mut self.activeSnapshots[which])
+    }
 }
 
 const _: () = assert!(core::mem::offset_of!(cg_t, clientFrame) == 0);
