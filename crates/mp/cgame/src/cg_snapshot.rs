@@ -3,27 +3,40 @@
 
 #![allow(non_snake_case)]
 
-use core::ffi::c_int;
+use core::ffi::{c_int, c_void};
 
 use mp_abi::cgame::public::snapshot_t::snapshot_t;
 use mp_bg::bg_misc::BG_PlayerStateToEntityState;
 use mp_bg::public::entity_event::EVENT_VALID_MSEC;
 use mp_bg::public::entity_flags::{EF_G2ANIMATING, EF_TELEPORT_BIT};
 use mp_bg::public::entity_type::entityType_t;
+use mp_bg::weapons::weapon_t::WP_BRYAR_PISTOL;
+use mp_qshared::common::mp::qcommon::pm_flags::PMF_FOLLOW;
 use mp_qshared::common::mp::qcommon::{entityState_t, playerState_t};
 use mp_qshared::shared::q_math::_VectorCopy;
 use mp_qshared::shared::{qfalse, qtrue, SNAPFLAG_SERVERCOUNT};
+use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::display_state::DisplayState;
+use mp_uishared::shared::menu_system::MenuSystem;
 
 use crate::cg_draw::CG_AddLagometerSnapshotInfo;
 use crate::cg_event::CG_CheckEvents;
-use crate::cg_main::CG_Printf;
+use crate::cg_main::{CG_Error, CG_Printf};
 use crate::cg_players::{zeroed_client_info, CG_ResetPlayerEntity};
-use crate::cg_predict::CG_BuildSolidList;
+use crate::cg_playerstate::{CG_Respawn, CG_TransitionPlayerState};
+use crate::cg_predict::{CG_BuildSolidList, CG_UsingEWeb};
+use crate::cg_servercmds::CG_ExecuteNewServerCommands;
+use crate::cg_weapons::CG_CopyG2WeaponInstance;
 use crate::local::centity_s::centity_t;
+use crate::local::player_state_ref::PlayerStateRef;
 use crate::trap;
 use crate::world::cg_context::CgContext;
 use crate::world::cg_world::CgWorld;
+
+/// Raven `FIRST_WEAPON` - the first weapon for next/prev weapon switching.
+///
+/// Source: `oracle/codemp/game/bg_weapons.h:100`
+const FIRST_WEAPON: c_int = WP_BRYAR_PISTOL;
 
 /// Raven `CG_SetNextSnap` — latches a freshly-read snapshot in as `cg.nextSnap`,
 /// folds its entity states into `cg_entities[].nextState`, and figures out
@@ -287,4 +300,195 @@ pub fn CG_TransitionEntity(ctx: &mut CgContext, ds: &DisplayState, centNum: usiz
 
     // check for events
     CG_CheckEvents(ctx, ds, centNum);
+}
+
+/// Raven `CG_SetInitialSnapshot` — latches the very first snapshot in as
+/// `cg.snap`, spins up the local player's ghoul2 instance if the model hasn't
+/// been duplicated yet, and folds every entity in the snapshot into
+/// `cg_entities[]` as a hard (non-interpolated) reset.
+///
+/// PORT-NOTE: Raven's `snapshot_t *snap` param is always the value
+/// [`CG_ReadNextSnapshot`] just handed the caller (`cg_snapshot.c:365`), a
+/// `cg.activeSnapshots` slot - `slot` names it directly, same handle shape as
+/// [`CG_SetNextSnap`].
+///
+/// Source: `oracle/codemp/cgame/cg_snapshot.c:80-122`
+pub fn CG_SetInitialSnapshot(
+    ctx: &mut CgContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+    slot: usize,
+) {
+    ctx.world.cg.snap = &mut ctx.world.cg.activeSnapshots[slot] as *mut snapshot_t;
+
+    let clientNum = ctx.world.cg.activeSnapshots[slot].ps.clientNum as usize;
+
+    if ctx.world.entity(clientNum).ghoul2.is_null()
+        && trap::G2_HaveWeGhoul2Models(ctx.engine, ctx.world.cgs.clientinfo[clientNum].ghoul2Model)
+    {
+        let ghoul2Model = ctx.world.cgs.clientinfo[clientNum].ghoul2Model;
+        let ghoul2Slot: &mut *mut c_void = &mut ctx.world.entity_mut(clientNum).ghoul2;
+        trap::G2API_DuplicateGhoul2Instance(
+            ctx.engine,
+            ghoul2Model,
+            ghoul2Slot as *mut *mut c_void,
+        );
+        let ghoul2 = ctx.world.entity(clientNum).ghoul2;
+        CG_CopyG2WeaponInstance(ctx, clientNum, FIRST_WEAPON, ghoul2);
+
+        // check now to see if we have this bone for setting anims and such
+        let ghoul2 = ctx.world.entity(clientNum).ghoul2;
+        if trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "face") == -1 {
+            ctx.world.entity_mut(clientNum).noFace = qtrue;
+        }
+    }
+
+    let ps_ptr = &mut ctx.world.cg.activeSnapshots[slot].ps as *mut playerState_t;
+    let es_ptr = &mut ctx.world.entity_mut(clientNum).currentState as *mut entityState_t;
+    BG_PlayerStateToEntityState(ps_ptr, es_ptr, qfalse);
+
+    // sort out solid entities
+    CG_BuildSolidList(ctx.world);
+
+    let serverCommandSequence = ctx.world.cg.activeSnapshots[slot].serverCommandSequence;
+    CG_ExecuteNewServerCommands(ctx, serverCommandSequence, menus, ds, dc);
+
+    // set our local weapon selection pointer to
+    // what the server has indicated the current weapon is
+    CG_Respawn(ctx.world);
+
+    let numEntities = ctx.world.cg.activeSnapshots[slot].numEntities;
+    for i in 0..numEntities as usize {
+        let state = ctx.world.cg.activeSnapshots[slot].entities[i];
+        let entNum = state.number as usize;
+
+        let cent = ctx.world.entity_mut(entNum);
+        cent.currentState = state;
+        cent.interpolate = qfalse;
+        cent.currentValid = qtrue;
+
+        CG_ResetEntity(ctx, entNum);
+
+        // check for events
+        CG_CheckEvents(ctx, ds, entNum);
+    }
+}
+
+/// Raven `CG_TransitionSnapshot` — retires the frame's old snapshot in favor
+/// of `cg.nextSnap`, transitioning every entity's `nextState` into
+/// `currentState`, then, if client-side movement prediction isn't running
+/// this frame for any reason, drives the local playerstate's
+/// respawn/damage/sound/event side effects directly off the snap-to-snap
+/// delta.
+///
+/// PORT-NOTE: Raven addresses the old/new snapshot pair as `oldFrame`/
+/// `cg.snap` pointers; the port names the two `cg.activeSnapshots` slots
+/// (`oldSlot`/`newSlot`) the same way [`CG_ReadNextSnapshot`]'s `dest`
+/// computation already does, so `ops`/`ps` read/write through real slots
+/// instead of a dangling local `snapshot_t*`.
+///
+/// Source: `oracle/codemp/cgame/cg_snapshot.c:133-196`
+pub fn CG_TransitionSnapshot(
+    ctx: &mut CgContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+) {
+    if ctx.world.cg.snap_ref().is_none() {
+        CG_Error(ctx, "CG_TransitionSnapshot: NULL cg.snap");
+        return;
+    }
+    if ctx.world.cg.next_snap_ref().is_none() {
+        CG_Error(ctx, "CG_TransitionSnapshot: NULL cg.nextSnap");
+        return;
+    }
+
+    // execute any server string commands before transitioning entities
+    let nextSnapCmdSeq = ctx.world.cg.next_snap_ref().unwrap().serverCommandSequence;
+    CG_ExecuteNewServerCommands(ctx, nextSnapCmdSeq, menus, ds, dc);
+
+    // Raven's `if ( !cg.snap ) { }` guard here has an empty body (a gutted
+    // map_restart special-case) - nothing to transcribe.
+
+    // which activeSnapshots slots cg.snap/cg.nextSnap currently name, same
+    // address-compare idiom CG_ReadNextSnapshot's `dest` computation uses
+    let snapPtr = ctx.world.cg.snap as *const snapshot_t;
+    let oldSlot: usize = if snapPtr == &ctx.world.cg.activeSnapshots[0] as *const snapshot_t {
+        0
+    } else {
+        1
+    };
+    let nextPtr = ctx.world.cg.nextSnap as *const snapshot_t;
+    let newSlot: usize = if nextPtr == &ctx.world.cg.activeSnapshots[0] as *const snapshot_t {
+        0
+    } else {
+        1
+    };
+
+    // clear the currentValid flag for all entities in the existing snapshot
+    let numEntities = ctx.world.cg.activeSnapshots[oldSlot].numEntities;
+    for i in 0..numEntities as usize {
+        let entNum = ctx.world.cg.activeSnapshots[oldSlot].entities[i].number as usize;
+        ctx.world.entity_mut(entNum).currentValid = qfalse;
+    }
+
+    // move nextSnap to snap and do the transitions
+    ctx.world.cg.snap = ctx.world.cg.nextSnap;
+
+    // CG_CheckPlayerG2Weapons calls here are commented out in the oracle -
+    // nothing to transcribe.
+    let snapClientNum = ctx.world.cg.activeSnapshots[newSlot].ps.clientNum as usize;
+    let ps_ptr = &mut ctx.world.cg.activeSnapshots[newSlot].ps as *mut playerState_t;
+    let es_ptr = &mut ctx.world.entity_mut(snapClientNum).currentState as *mut entityState_t;
+    BG_PlayerStateToEntityState(ps_ptr, es_ptr, qfalse);
+    ctx.world.entity_mut(snapClientNum).interpolate = qfalse;
+
+    let newNumEntities = ctx.world.cg.activeSnapshots[newSlot].numEntities;
+    for i in 0..newNumEntities as usize {
+        let entNum = ctx.world.cg.activeSnapshots[newSlot].entities[i].number as usize;
+        CG_TransitionEntity(ctx, ds, entNum);
+
+        // remember time of snapshot this entity was last updated in
+        let serverTime = ctx.world.cg.activeSnapshots[newSlot].serverTime;
+        ctx.world.entity_mut(entNum).snapShotTime = serverTime;
+    }
+
+    ctx.world.cg.nextSnap = core::ptr::null_mut();
+
+    // check for playerstate transition events
+    //
+    // `oldFrame` is always non-null here - the fn errors out above when
+    // `cg.snap` starts NULL, and `oldSlot` was captured from that non-null
+    // value before the reassignment above.
+    let opsEFlags = ctx.world.cg.activeSnapshots[oldSlot].ps.eFlags;
+    let psEFlags = ctx.world.cg.activeSnapshots[newSlot].ps.eFlags;
+    // teleporting checks are irrespective of prediction
+    if (psEFlags ^ opsEFlags) & EF_TELEPORT_BIT != 0 {
+        ctx.world.cg.thisFrameTeleport = qtrue;
+    }
+
+    // if we are not doing client side movement prediction for any
+    // reason, then the client events and view changes will be issued now
+    let psPmFlags = ctx.world.cg.activeSnapshots[newSlot].ps.pm_flags;
+    if ctx.world.cg.demoPlayback == qtrue
+        || (psPmFlags & PMF_FOLLOW) != 0
+        || ctx.world.cvars.cg_nopredict.integer != 0
+        || ctx.world.cvars.cg_synchronousClients.integer != 0
+        || CG_UsingEWeb(ctx.world)
+    {
+        let ps = ctx.world.cg.activeSnapshots[newSlot].ps;
+        let mut ops = ctx.world.cg.activeSnapshots[oldSlot].ps;
+        // PORT-NOTE: Raven's referent here is `&cg.snap->ps`, not entity
+        // clientNum's cgSendPSPool row that `Snap` documents. Today's sole
+        // consumer only tests `!= None`, so the arms coincide; when a consumer
+        // resolves `Snap` through cgSendPSPool this call site needs its own arm
+        // (cgSendPSPool-home ruling, design queue item 1/10).
+        CG_TransitionPlayerState(ctx, ds, &ps, &mut ops, PlayerStateRef::Snap);
+        // Raven writes through `ops` in place (`*ops = *ps` on the follow-mode
+        // branch) - `oldFrame`'s slot is never read again once the next
+        // CG_SetNextSnap overwrites it, so the write-back below reproduces
+        // that in-place mutation faithfully.
+        ctx.world.cg.activeSnapshots[oldSlot].ps = ops;
+    }
 }

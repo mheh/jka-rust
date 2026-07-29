@@ -11,6 +11,7 @@ use native_string::{atof_bytes, atoi, latin1_to_string};
 use mp_bg::bg_g2_utils::BG_GetRootSurfNameWithVariant;
 use mp_bg::bg_misc::{
     BG_EvaluateTrajectory, BG_EvaluateTrajectoryDelta, BG_GiveMeVectorFromMatrix,
+    BG_PlayerStateToEntityState,
 };
 use mp_bg::bg_panimate::BG_InDeathAnim;
 use mp_bg::public::anim_number::animNumber_t;
@@ -45,6 +46,7 @@ use mp_qshared::common::mp::ghoul2::bone_flags::{
     BONE_ANGLES_POSTMULT, BONE_ANGLES_REPLACE, BONE_ANIM_BLEND, BONE_ANIM_OVERRIDE_FREEZE,
 };
 use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
+use mp_qshared::common::mp::qcommon::player_state::playerState_t;
 use mp_qshared::shared::force_powers::{
     FORCE_DARKSIDE, FORCE_LIGHTSIDE, FP_SABERTHROW, FP_SABER_DEFENSE, FP_SABER_OFFENSE, FP_SEE,
     NUM_FORCE_POWERS,
@@ -57,9 +59,9 @@ use mp_qshared::shared::q_math::{
 };
 use mp_qshared::shared::surface_flags::SOLID_BMODEL;
 use mp_qshared::shared::{
-    addpolyArgStruct_t, addspriteArgStruct_t, mdxaBone_t, orientation_t, qfalse, qhandle_t, qtrue,
-    sfxHandle_t, trType_t, vec3_t, Eorientations, CHAN_AUTO, CHAN_BODY, CHAN_ITEM,
-    ENTITYNUM_MAX_NORMAL, ENTITYNUM_WORLD, MAX_CLIENTS_I32, MAX_QPATH,
+    addpolyArgStruct_t, addspriteArgStruct_t, mdxaBone_t, orientation_t, qboolean, qfalse,
+    qhandle_t, qtrue, sfxHandle_t, trType_t, vec3_t, Eorientations, CHAN_AUTO, CHAN_BODY,
+    CHAN_ITEM, ENTITYNUM_MAX_NORMAL, ENTITYNUM_WORLD, MAX_CLIENTS_I32, MAX_QPATH,
 };
 
 use crate::bg_channel::CgBgTraps;
@@ -72,6 +74,7 @@ use crate::cg_players::{
 };
 use crate::cg_turret::TurretClientRun;
 use crate::cg_weaponinit::NULL_HANDLE;
+use crate::cg_weapons::CG_CheckPlayerG2Weapons;
 use crate::local::centity_s::{centity_t, MAX_CG_LOOPSOUNDS};
 use crate::local::cg_loop_sound_s::cgLoopSound_t;
 use crate::local::le_type_t::leType_t;
@@ -4109,4 +4112,146 @@ pub fn CG_AddCEntity(ctx: &mut CgContext, centNum: usize) {
 /// Source: `oracle/codemp/cgame/cg_ents.c:3417-3420`
 pub fn CG_ManualEntityRender(ctx: &mut CgContext, centNum: usize) {
     CG_AddCEntity(ctx, centNum);
+}
+
+/// Raven `CG_AddPacketEntities` - the per-frame pass that turns the current
+/// snapshot into the render list; portal entities get a separate quick pass
+/// off the current snapshot only, everything else drives frame interpolation,
+/// the predicted player (and the vehicle they're riding), the snapshot's own
+/// entities, and the RMG's latched permanents.
+///
+/// Source: `oracle/codemp/cgame/cg_ents.c:3428-3553`
+pub fn CG_AddPacketEntities(ctx: &mut CgContext, isPortal: qboolean) {
+    if isPortal != qfalse {
+        let Some(numEntities) = ctx.world.cg.snap_ref().map(|snap| snap.numEntities) else {
+            return;
+        };
+        for num in 0..numEntities as usize {
+            let number = ctx.world.cg.snap_ref().unwrap().entities[num].number;
+            if ctx.world.entity(number as usize).currentState.isPortalEnt != qfalse {
+                CG_AddCEntity(ctx, number as usize);
+            }
+        }
+        return;
+    }
+
+    // Raven derefs `cg.snap` unguarded for the rest of this function (§F19);
+    // with no snapshot yet there's nothing here to add.
+    let Some(numEntities) = ctx.world.cg.snap_ref().map(|snap| snap.numEntities) else {
+        return;
+    };
+    let snapServerTime = ctx.world.cg.snap_ref().unwrap().serverTime;
+    let psClientNum = ctx.world.cg.snap_ref().unwrap().ps.clientNum;
+
+    // set cg.frameInterpolation
+    if let Some(nextServerTime) = ctx.world.cg.next_snap_ref().map(|snap| snap.serverTime) {
+        let delta = nextServerTime - snapServerTime;
+        ctx.world.cg.frameInterpolation = if delta == 0 {
+            0.0
+        } else {
+            let time = ctx.world.cg.time;
+            (time - snapServerTime) as f32 / delta as f32
+        };
+    } else {
+        // actually, it should never be used, because
+        // no entities should be marked as interpolating
+        ctx.world.cg.frameInterpolation = 0.0;
+    }
+
+    // the auto-rotating items will all have the same axis
+    let time = ctx.world.cg.time;
+    ctx.world.cg.autoAngles[0] = 0.0;
+    ctx.world.cg.autoAngles[1] = (time & 2047) as f32 * 360.0 / 2048.0;
+    ctx.world.cg.autoAngles[2] = 0.0;
+
+    ctx.world.cg.autoAnglesFast[0] = 0.0;
+    ctx.world.cg.autoAnglesFast[1] = (time & 1023) as f32 * 360.0 / 1024.0;
+    ctx.world.cg.autoAnglesFast[2] = 0.0;
+
+    let autoAngles = ctx.world.cg.autoAngles;
+    AnglesToAxis(autoAngles, ctx.world.cg.autoAxis.as_mut_ptr());
+    let autoAnglesFast = ctx.world.cg.autoAnglesFast;
+    AnglesToAxis(autoAnglesFast, ctx.world.cg.autoAxisFast.as_mut_ptr());
+
+    // Reset radar entities
+    ctx.world.cg.radarEntityCount = 0;
+    ctx.world.cg.bracketedEntityCount = 0;
+
+    // generate and add the entity from the playerstate
+    let ps = ctx.world.cg.predictedPlayerState;
+    let clientNum = ps.clientNum as usize;
+
+    CG_CheckPlayerG2Weapons(ctx, &ps, clientNum);
+    let ps_ptr = &mut ctx.world.cg.predictedPlayerState as *mut playerState_t;
+    let es_ptr = &mut ctx.world.entity_mut(clientNum).currentState as *mut entityState_t;
+    BG_PlayerStateToEntityState(ps_ptr, es_ptr, qfalse);
+
+    if ps.m_iVehicleNum != 0 {
+        // add the vehicle I'm riding first
+        //BG_PlayerStateToEntityState( &cg.predictedVehicleState, &cg_entities[cg.predictedPlayerState.m_iVehicleNum].currentState, qfalse );
+        //cg_entities[cg.predictedPlayerState.m_iVehicleNum].currentState.eType = ET_NPC;
+        let vehNum = ps.m_iVehicleNum as usize;
+        let owner = ctx.world.entity(vehNum).currentState.owner;
+
+        if owner == ps.clientNum {
+            // live pointer - the callee advances entityEventSequence and Raven keeps that.
+            let pvs_ptr = &mut ctx.world.cg.predictedVehicleState as *mut playerState_t;
+            let veh_ptr = &mut ctx.world.entity_mut(vehNum).currentState as *mut entityState_t;
+            BG_PlayerStateToEntityState(pvs_ptr, veh_ptr, qfalse);
+            ctx.world.entity_mut(vehNum).currentState.eType = entityType_t::ET_NPC as c_int;
+
+            ctx.world.entity_mut(vehNum).currentState.pos.trType = trType_t::TR_INTERPOLATE;
+        }
+        CG_AddCEntity(ctx, vehNum);
+        let time = ctx.world.cg.time;
+        ctx.world.entity_mut(vehNum).bodyHeight = time as f32; // indicate we have already been added
+    }
+
+    CG_AddCEntity(ctx, clientNum);
+
+    // lerp the non-predicted value for lightning gun origins
+    // CG_CalcEntityLerpPositions( &cg_entities[ cg.snap->ps.clientNum ] );
+    // No longer have to do this.
+
+    // add each entity sent over by the server
+    for num in 0..numEntities as usize {
+        let number = ctx.world.cg.snap_ref().unwrap().entities[num].number;
+        // Don't re-add ents that have been predicted.
+        if number != psClientNum {
+            let centNum = number as usize;
+            let eType = ctx.world.entity(centNum).currentState.eType;
+            let m_iVehicleNum = ctx.world.entity(centNum).currentState.m_iVehicleNum;
+
+            if eType == entityType_t::ET_PLAYER as c_int && m_iVehicleNum != 0 {
+                // add his veh first
+                let mut j = 0usize;
+                while j < numEntities as usize {
+                    let jNumber = ctx.world.cg.snap_ref().unwrap().entities[j].number;
+                    if jNumber == m_iVehicleNum {
+                        let vehNum = jNumber as usize;
+                        CG_AddCEntity(ctx, vehNum);
+                        let time = ctx.world.cg.time;
+                        ctx.world.entity_mut(vehNum).bodyHeight = time as f32; // indicate we have already been added
+                        break;
+                    }
+                    j += 1;
+                }
+            } else if eType == entityType_t::ET_NPC as c_int
+                && m_iVehicleNum != 0
+                && ctx.world.entity(centNum).bodyHeight == ctx.world.cg.time as f32
+            {
+                // never add a vehicle with a pilot, his pilot entity will get him added first.
+                // if we were to add the vehicle after the pilot, the pilot's bolt would lag a frame behind.
+                continue;
+            }
+            CG_AddCEntity(ctx, centNum);
+        }
+    }
+
+    for num in 0..ctx.world.main.cg_permanents.len() {
+        let entNum = ctx.world.main.cg_permanents[num];
+        if ctx.world.entity(entNum).currentValid != qfalse {
+            CG_AddCEntity(ctx, entNum);
+        }
+    }
 }
