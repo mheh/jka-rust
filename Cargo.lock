@@ -255,6 +255,10 @@ name = "cgame"
 version = "0.1.0"
 dependencies = [
  "abi_transport",
+ "mp_abi",
+ "mp_cgame",
+ "mp_engine_qcommon",
+ "native_platform",
 ]
 
 [[package]]
