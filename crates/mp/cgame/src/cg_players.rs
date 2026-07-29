@@ -10814,7 +10814,11 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
         //should have a jetpack attached
         //1 is rhand weap, 2 is lhand weap (akimbo sabs), 3 is jetpack
         let g2 = ctx.world.entity(centNum).ghoul2;
-        if !trap::G2API_HasGhoul2ModelOnIndex(engine, g2, 3) {
+        if !trap::G2API_HasGhoul2ModelOnIndex(
+            engine,
+            &raw mut ctx.world.entity_mut(centNum).ghoul2,
+            3,
+        ) {
             let jet = ctx.world.players.cg_g2JetpackInstance;
             trap::G2API_CopySpecificGhoul2Model(engine, jet, 0, g2, 3);
         }
@@ -10907,13 +10911,17 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
             let sfx = trap::S_RegisterSound(engine, "sound/boba/JETHOVER");
             trap::S_AddLoopingSound(engine, number, &lerpOrigin, &vec3_origin, sfx);
         }
-    } else if trap::G2API_HasGhoul2ModelOnIndex(engine, ctx.world.entity(centNum).ghoul2, 3) {
+    } else if trap::G2API_HasGhoul2ModelOnIndex(
+        engine,
+        &raw mut ctx.world.entity_mut(centNum).ghoul2,
+        3,
+    ) {
         //fixme: would be good if this could be done not every frame
-        let g2 = ctx.world.entity(centNum).ghoul2;
-        trap::G2API_RemoveGhoul2Model(engine, g2, 3);
+        trap::G2API_RemoveGhoul2Model(engine, &raw mut ctx.world.entity_mut(centNum).ghoul2, 3);
     }
 
-    g2HasWeapon = trap::G2API_HasGhoul2ModelOnIndex(engine, ctx.world.entity(centNum).ghoul2, 1);
+    g2HasWeapon =
+        trap::G2API_HasGhoul2ModelOnIndex(engine, &raw mut ctx.world.entity_mut(centNum).ghoul2, 1);
 
     if !g2HasWeapon {
         //force a redup of the weapon instance onto the client instance
@@ -10947,8 +10955,7 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
         && g2HasWeapon
     {
         //kill the weapon if the limb holding it is no longer on the model
-        let g2 = ctx.world.entity(centNum).ghoul2;
-        trap::G2API_RemoveGhoul2Model(engine, g2, 1);
+        trap::G2API_RemoveGhoul2Model(engine, &raw mut ctx.world.entity_mut(centNum).ghoul2, 1);
         g2HasWeapon = false;
     }
 
@@ -12142,8 +12149,11 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
                 && g2HasWeapon
             {
                 //special case, kill the saber on a freshly dead player if another source says to.
-                let g2 = ctx.world.entity(centNum).ghoul2;
-                trap::G2API_RemoveGhoul2Model(engine, g2, 1);
+                trap::G2API_RemoveGhoul2Model(
+                    engine,
+                    &raw mut ctx.world.entity_mut(centNum).ghoul2,
+                    1,
+                );
                 // Raven clears g2HasWeapon here but returns right after - dead store dropped.
             }
             return;
@@ -12197,7 +12207,11 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
                     );
                     ctx.world.entity_mut(saberNum).currentState.pos.trBase = trBase;
 
-                    trap::G2API_RemoveGhoul2Model(engine, g2, 1);
+                    trap::G2API_RemoveGhoul2Model(
+                        engine,
+                        &raw mut ctx.world.entity_mut(centNum).ghoul2,
+                        1,
+                    );
                     g2HasWeapon = false;
                 }
 
@@ -12745,8 +12759,7 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
 
         if g2HasWeapon {
             //and remember to kill the bolton model in case we didn't get a thrown saber update first
-            let g2 = ctx.world.entity(centNum).ghoul2;
-            trap::G2API_RemoveGhoul2Model(engine, g2, 1);
+            trap::G2API_RemoveGhoul2Model(engine, &raw mut ctx.world.entity_mut(centNum).ghoul2, 1);
             g2HasWeapon = false;
         }
         ctx.world.entity_mut(centNum).bolt3 = 0;
@@ -12759,8 +12772,7 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
         && g2HasWeapon
     {
         //special case, kill the saber on a freshly dead player if another source says to.
-        let g2 = ctx.world.entity(centNum).ghoul2;
-        trap::G2API_RemoveGhoul2Model(engine, g2, 1);
+        trap::G2API_RemoveGhoul2Model(engine, &raw mut ctx.world.entity_mut(centNum).ghoul2, 1);
         g2HasWeapon = false;
     }
     let _ = g2HasWeapon;

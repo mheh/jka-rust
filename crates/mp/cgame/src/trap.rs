@@ -3259,14 +3259,18 @@ pub fn G2API_DuplicateGhoul2Instance(engine: &Engine, g2From: *mut c_void, g2To:
 ///
 /// C: `qboolean trap_G2API_HasGhoul2ModelOnIndex(void *ghlInfo, int modelIndex)`
 /// Source: `oracle/codemp/cgame/cg_syscalls.c:905-908`
+///
+/// The engine casts arg 1 to `CGhoul2Info_v **` (`cl_cgame.cpp:1434`) - Raven
+/// callers pass `&(cent->ghoul2)`, the ADDRESS of the live slot, never the
+/// instance value (live crash at 0x828, 2026-07-29). The param type forces it.
 pub fn G2API_HasGhoul2ModelOnIndex(
     engine: &Engine,
-    ghlInfo: *mut c_void,
+    ghoul2Ptr: *mut *mut c_void,
     modelIndex: c_int,
 ) -> bool {
     <Engine as Execute<CgG2Hasghoul2modelonindex>>::execute(
         engine,
-        CgG2Hasghoul2modelonindexArgs::new(ghlInfo, modelIndex),
+        CgG2Hasghoul2modelonindexArgs::new(ghoul2Ptr as *mut c_void, modelIndex),
     ) != 0
 }
 
@@ -3275,10 +3279,18 @@ pub fn G2API_HasGhoul2ModelOnIndex(
 ///
 /// C: `qboolean trap_G2API_RemoveGhoul2Model(void *ghlInfo, int modelIndex)`
 /// Source: `oracle/codemp/cgame/cg_syscalls.c:910-913`
-pub fn G2API_RemoveGhoul2Model(engine: &Engine, ghlInfo: *mut c_void, modelIndex: c_int) -> bool {
+///
+/// Same `CGhoul2Info_v **` contract as ``G2API_HasGhoul2ModelOnIndex``
+/// (`cl_cgame.cpp:1441`) - and Remove WRITES back through the slot, so the
+/// address of the live field is load-bearing, not just crash-avoidance.
+pub fn G2API_RemoveGhoul2Model(
+    engine: &Engine,
+    ghoul2Ptr: *mut *mut c_void,
+    modelIndex: c_int,
+) -> bool {
     <Engine as Execute<CgG2Removeghoul2model>>::execute(
         engine,
-        CgG2Removeghoul2modelArgs::new(ghlInfo, modelIndex),
+        CgG2Removeghoul2modelArgs::new(ghoul2Ptr as *mut c_void, modelIndex),
     ) != 0
 }
 

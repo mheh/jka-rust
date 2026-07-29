@@ -3618,10 +3618,18 @@ pub fn CG_EntityEvent(ctx: &mut CgContext, ds: &DisplayState, centNum: usize, po
             let ghoul2 = ctx.world.entity(idx).ghoul2;
             if !ghoul2.is_null()
                 && trap::G2_HaveWeGhoul2Models(ctx.engine, ghoul2)
-                && trap::G2API_HasGhoul2ModelOnIndex(ctx.engine, ghoul2, 1)
+                && trap::G2API_HasGhoul2ModelOnIndex(
+                    ctx.engine,
+                    &raw mut ctx.world.entity_mut(idx).ghoul2,
+                    1,
+                )
             {
-                trap::G2API_RemoveGhoul2Model(ctx.engine, ghoul2, 1);
-                ctx.world.entity_mut(idx).ghoul2 = ghoul2;
+                // Remove writes the surviving instance back through the slot
+                trap::G2API_RemoveGhoul2Model(
+                    ctx.engine,
+                    &raw mut ctx.world.entity_mut(idx).ghoul2,
+                    1,
+                );
             }
         }
 

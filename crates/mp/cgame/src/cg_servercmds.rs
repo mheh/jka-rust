@@ -646,18 +646,18 @@ pub fn CG_BodyQueueCopy(ctx: &mut CgContext, centNum: usize, clientNum: c_int, k
     if knownWeapon > WP_BRYAR_PISTOL
         && trap::G2API_HasGhoul2ModelOnIndex(
             engine,
-            &mut ctx.world.entity_mut(centNum).ghoul2 as *mut *mut c_void as *mut c_void,
+            &mut ctx.world.entity_mut(centNum).ghoul2 as *mut *mut c_void,
             1,
         )
     {
         trap::G2API_RemoveGhoul2Model(
             engine,
-            &mut ctx.world.entity_mut(centNum).ghoul2 as *mut *mut c_void as *mut c_void,
+            &mut ctx.world.entity_mut(centNum).ghoul2 as *mut *mut c_void,
             1,
         );
     } else if trap::G2API_HasGhoul2ModelOnIndex(
         engine,
-        &mut ctx.world.entity_mut(centNum).ghoul2 as *mut *mut c_void as *mut c_void,
+        &mut ctx.world.entity_mut(centNum).ghoul2 as *mut *mut c_void,
         1,
     ) {
         let world = &*ctx.world;

@@ -681,7 +681,7 @@ pub fn CG_AddPlayerWeapon(
             // the token — Raven passes `&(cent->ghoul2)`.
             if !trap::G2API_HasGhoul2ModelOnIndex(
                 engine,
-                &mut ctx.world.entity_mut(centNum).ghoul2 as *mut *mut c_void as *mut c_void,
+                &mut ctx.world.entity_mut(centNum).ghoul2 as *mut *mut c_void,
                 1,
             ) {
                 //it's quite possible that we may have have no weapon model and be in a valid state, so return here if this is the case
@@ -807,7 +807,7 @@ pub fn CG_AddPlayerWeapon(
 
             if !trap::G2API_HasGhoul2ModelOnIndex(
                 engine,
-                &mut ctx.world.entity_mut(centNum).ghoul2 as *mut *mut c_void as *mut c_void,
+                &mut ctx.world.entity_mut(centNum).ghoul2 as *mut *mut c_void,
                 1,
             ) {
                 //it's quite possible that we may have have no weapon model and be in a valid state, so return here if this is the case
@@ -1907,7 +1907,7 @@ pub fn CG_GetClientWeaponMuzzleBoltPoint(ctx: &mut CgContext, clIndex: c_int, to
         || !trap::G2_HaveWeGhoul2Models(engine, ghoul2)
         || !trap::G2API_HasGhoul2ModelOnIndex(
             engine,
-            &mut ctx.world.entity_mut(idx).ghoul2 as *mut *mut c_void as *mut c_void,
+            &mut ctx.world.entity_mut(idx).ghoul2 as *mut *mut c_void,
             1,
         )
     {
@@ -2549,17 +2549,13 @@ pub fn CG_CopyG2WeaponInstance(
                     //if the second saber has been removed, then be sure to remove it and free the instance.
                     let g2HasSecondSaber = trap::G2API_HasGhoul2ModelOnIndex(
                         engine,
-                        &mut toGhoul2 as *mut *mut c_void as *mut c_void,
+                        &mut toGhoul2 as *mut *mut c_void,
                         2,
                     );
 
                     if g2HasSecondSaber {
                         //remove it now since we're switching away from sabers
-                        trap::G2API_RemoveGhoul2Model(
-                            engine,
-                            &mut toGhoul2 as *mut *mut c_void as *mut c_void,
-                            2,
-                        );
+                        trap::G2API_RemoveGhoul2Model(engine, &mut toGhoul2 as *mut *mut c_void, 2);
                     }
                     if isNpc {
                         if let Some(ci) = ctx.world.entity_mut(centNum).npcClient.as_deref_mut() {
@@ -2579,46 +2575,23 @@ pub fn CG_CopyG2WeaponInstance(
             }
         }
     } else {
-        let g2HasSecondSaber = trap::G2API_HasGhoul2ModelOnIndex(
-            engine,
-            &mut toGhoul2 as *mut *mut c_void as *mut c_void,
-            2,
-        );
+        let g2HasSecondSaber =
+            trap::G2API_HasGhoul2ModelOnIndex(engine, &mut toGhoul2 as *mut *mut c_void, 2);
 
         if g2HasSecondSaber {
             //remove it now since we're switching away from sabers
-            trap::G2API_RemoveGhoul2Model(
-                engine,
-                &mut toGhoul2 as *mut *mut c_void as *mut c_void,
-                2,
-            );
+            trap::G2API_RemoveGhoul2Model(engine, &mut toGhoul2 as *mut *mut c_void, 2);
         }
 
         if weaponNum == WP_EMPLACED_GUN {
             //a bit of a hack to remove gun model when using an emplaced weap
-            if trap::G2API_HasGhoul2ModelOnIndex(
-                engine,
-                &mut toGhoul2 as *mut *mut c_void as *mut c_void,
-                1,
-            ) {
-                trap::G2API_RemoveGhoul2Model(
-                    engine,
-                    &mut toGhoul2 as *mut *mut c_void as *mut c_void,
-                    1,
-                );
+            if trap::G2API_HasGhoul2ModelOnIndex(engine, &mut toGhoul2 as *mut *mut c_void, 1) {
+                trap::G2API_RemoveGhoul2Model(engine, &mut toGhoul2 as *mut *mut c_void, 1);
             }
         } else if weaponNum == WP_MELEE {
             //don't want a weapon on the model for this one
-            if trap::G2API_HasGhoul2ModelOnIndex(
-                engine,
-                &mut toGhoul2 as *mut *mut c_void as *mut c_void,
-                1,
-            ) {
-                trap::G2API_RemoveGhoul2Model(
-                    engine,
-                    &mut toGhoul2 as *mut *mut c_void as *mut c_void,
-                    1,
-                );
+            if trap::G2API_HasGhoul2ModelOnIndex(engine, &mut toGhoul2 as *mut *mut c_void, 1) {
+                trap::G2API_RemoveGhoul2Model(engine, &mut toGhoul2 as *mut *mut c_void, 1);
             }
         } else {
             trap::G2API_CopySpecificGhoul2Model(engine, from, 0, toGhoul2, 1);

@@ -2948,28 +2948,26 @@ pub fn CG_General(ctx: &mut CgContext, centNum: usize) {
                 // `CG_ReattachLimb` uses.
                 if trap::G2API_HasGhoul2ModelOnIndex(
                     engine,
-                    &mut ctx.world.entity_mut(clEntNum).ghoul2 as *mut *mut c_void as *mut c_void,
+                    &mut ctx.world.entity_mut(clEntNum).ghoul2 as *mut *mut c_void,
                     2,
                 ) {
                     //don't want to bother dealing with a second saber on limbs and stuff, just remove the thing
                     trap::G2API_RemoveGhoul2Model(
                         engine,
-                        &mut ctx.world.entity_mut(clEntNum).ghoul2 as *mut *mut c_void
-                            as *mut c_void,
+                        &mut ctx.world.entity_mut(clEntNum).ghoul2 as *mut *mut c_void,
                         2,
                     );
                 }
 
                 if trap::G2API_HasGhoul2ModelOnIndex(
                     engine,
-                    &mut ctx.world.entity_mut(clEntNum).ghoul2 as *mut *mut c_void as *mut c_void,
+                    &mut ctx.world.entity_mut(clEntNum).ghoul2 as *mut *mut c_void,
                     3,
                 ) {
                     //turn off jetpack also I suppose
                     trap::G2API_RemoveGhoul2Model(
                         engine,
-                        &mut ctx.world.entity_mut(clEntNum).ghoul2 as *mut *mut c_void
-                            as *mut c_void,
+                        &mut ctx.world.entity_mut(clEntNum).ghoul2 as *mut *mut c_void,
                         3,
                     );
                 }
@@ -3217,13 +3215,12 @@ pub fn CG_General(ctx: &mut CgContext, centNum: usize) {
                 //Cut his weapon holding arm off, so remove the weapon
                 if trap::G2API_HasGhoul2ModelOnIndex(
                     engine,
-                    &mut ctx.world.entity_mut(clEntNum).ghoul2 as *mut *mut c_void as *mut c_void,
+                    &mut ctx.world.entity_mut(clEntNum).ghoul2 as *mut *mut c_void,
                     1,
                 ) {
                     trap::G2API_RemoveGhoul2Model(
                         engine,
-                        &mut ctx.world.entity_mut(clEntNum).ghoul2 as *mut *mut c_void
-                            as *mut c_void,
+                        &mut ctx.world.entity_mut(clEntNum).ghoul2 as *mut *mut c_void,
                         1,
                     );
                 }
