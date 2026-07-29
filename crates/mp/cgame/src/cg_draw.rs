@@ -54,10 +54,13 @@ use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::refdef_t::{
     refdef_t, MAX_MAP_AREA_BYTES, MAX_RENDER_STRINGS, MAX_RENDER_STRING_LENGTH,
 };
+use mp_qshared::common::mp::cgame::stereo_frame_t::{
+    stereoFrame_t, STEREO_CENTER, STEREO_LEFT, STEREO_RIGHT,
+};
 use mp_qshared::common::mp::game::class_t::class_t;
 use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t;
 use mp_qshared::common::mp::qcommon::usercmd_t;
-use mp_qshared::common::mp::qcommon::PMF_FOLLOW;
+use mp_qshared::common::mp::qcommon::{PMF_FOLLOW, PMF_SCOREBOARD};
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::force_powers::{
     FORCE_LEVEL_2, FORCE_LEVEL_3, FP_ABSORB, FP_HEAL, FP_LEVITATION, FP_PROTECT, FP_RAGE,
@@ -95,9 +98,10 @@ use crate::bg_channel::{CgBgTraps, CgGameCallbacks};
 use crate::cg_drawtools::{
     CG_ColorForHealth, CG_DrawBigString, CG_DrawNumField, CG_DrawPic, CG_DrawRect,
     CG_DrawRotatePic, CG_DrawRotatePic2, CG_DrawSmallString, CG_DrawStringExt, CG_DrawStrlen,
-    CG_FadeColor, CG_FillRect, CG_GetColorForHealth, UI_DrawProportionalString,
+    CG_FadeColor, CG_FillRect, CG_GetColorForHealth, CG_TileClear, UI_DrawProportionalString,
     UI_DrawScaledProportionalString,
 };
+use crate::cg_info::CG_DrawInformation;
 use crate::cg_main::{CG_ConfigString, CG_Error, CG_GetLocationString, CG_GetStringEdString};
 use crate::cg_new_draw::{CG_OtherTeamHasFlag, CG_YourTeamHasFlag};
 use crate::cg_players::{CG_IsMindTricked, CG_RadiusForCent};
@@ -134,6 +138,9 @@ const RF_NOSHADOW: c_int = 0x00040;
 /// Raven `RDF_NOWORLDMODEL` — used for player configuration screen.
 /// Source: `oracle/codemp/cgame/tr_types.h:56`
 const RDF_NOWORLDMODEL: c_int = 1;
+/// Raven `RDF_DRAWSKYBOX` — marks a scene as a 'portal sky' and says to draw it.
+/// Source: `oracle/codemp/cgame/tr_types.h:61`
+const RDF_DRAWSKYBOX: c_int = 16;
 
 // PORT-NOTE: `cg_public.h`'s usercmd ring-buffer depth. This is its first
 // ported consumer in cgame, so it lands file-local like `FONT_SMALL` above.
@@ -8779,4 +8786,70 @@ pub fn CG_Draw2D(ctx: &mut CgContext, menus: &MenuSystem, ds: &DisplayState) {
 
     // always draw chat
     CG_ChatBox_DrawStrings(ctx, ds);
+}
+
+/// Raven `CG_DrawActive` — renders the 3D view (with stereo separation offset
+/// if asked) then hands off to `CG_Draw2D` for the HUD, or substitutes the
+/// info screen / tourney scoreboard when there's no snapshot yet / spectating.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:8528-8582`
+pub fn CG_DrawActive(
+    ctx: &mut CgContext,
+    stereoView: stereoFrame_t,
+    menus: &MenuSystem,
+    ds: &DisplayState,
+) {
+    // optionally draw the info screen instead
+    if ctx.world.cg.snap_ref().is_none() {
+        CG_DrawInformation(ctx, ds);
+        return;
+    }
+
+    // optionally draw the tournement scoreboard instead
+    let snap = ctx.world.cg.snap_ref().unwrap();
+    if snap.ps.persistant[PERS_TEAM as usize] == TEAM_SPECTATOR
+        && (snap.ps.pm_flags & PMF_SCOREBOARD) != 0
+    {
+        CG_DrawTourneyScoreboard();
+        return;
+    }
+
+    let separation;
+    match stereoView {
+        STEREO_CENTER => separation = 0.0,
+        STEREO_LEFT => separation = -ctx.world.cvars.cg_stereoSeparation.value / 2.0,
+        STEREO_RIGHT => separation = ctx.world.cvars.cg_stereoSeparation.value / 2.0,
+        _ => {
+            // Raven's `separation = 0` here is dead - CG_Error never returns
+            CG_Error(ctx, "CG_DrawActive: Undefined stereoView");
+            return;
+        }
+    }
+
+    // clear around the rendered view if sized down
+    CG_TileClear(ctx);
+
+    // offset vieworg appropriately if we're doing stereo separation
+    let mut baseOrg = vec3_origin;
+    _VectorCopy(ctx.world.cg.refdef.vieworg, &mut baseOrg);
+    if separation != 0.0 {
+        let viewaxis1 = ctx.world.cg.refdef.viewaxis[1];
+        let vieworg = ctx.world.cg.refdef.vieworg;
+        let mut newOrg = vec3_origin;
+        _VectorMA(vieworg, -separation, viewaxis1, &mut newOrg);
+        ctx.world.cg.refdef.vieworg = newOrg;
+    }
+
+    ctx.world.cg.refdef.rdflags |= RDF_DRAWSKYBOX;
+
+    // draw 3D view
+    trap::R_RenderScene(ctx.engine, &ctx.world.cg.refdef);
+
+    // restore original viewpoint if running stereo
+    if separation != 0.0 {
+        ctx.world.cg.refdef.vieworg = baseOrg;
+    }
+
+    // draw status bar and other floating elements
+    CG_Draw2D(ctx, menus, ds);
 }

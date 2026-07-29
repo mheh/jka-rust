@@ -7,6 +7,7 @@
 use core::ffi::{c_int, c_void};
 use core::ptr::null_mut;
 
+use mp_abi::ui::public::ui_menu_command_t::{UIMENU_CLASSSEL, UIMENU_PLAYERCONFIG};
 use mp_bg::bg_panimate::BG_InDeathAnim;
 use mp_bg::local::bg_customSiegeSoundNames;
 use mp_bg::public::anim_number::animNumber_t;
@@ -23,19 +24,21 @@ use mp_bg::weapons::weapon_t::WP_BRYAR_PISTOL;
 use mp_engine_select::Engine;
 use mp_qshared::common::mp::ghoul2::bone_flags::BONE_ANIM_OVERRIDE_FREEZE;
 use mp_qshared::common::mp::qcommon::saber::saber_info::MAX_SABERS;
-use mp_qshared::shared::limits::MAX_STRING_TOKENS;
+use mp_qshared::shared::keycatch::KEYCATCH_UI;
+use mp_qshared::shared::limits::{MAX_SAY_TEXT, MAX_STRING_TOKENS};
 use mp_qshared::shared::q_math::VectorClear;
-use mp_qshared::shared::sound_channel::CHAN_ANNOUNCER;
+use mp_qshared::shared::sound_channel::{CHAN_ANNOUNCER, CHAN_LOCAL_SOUND};
 use mp_qshared::shared::{
-    qfalse, qtrue, sfxHandle_t, GIANTCHAR_WIDTH, MAX_CLIENTS, MAX_CLIENTS_I32, MAX_GENTITIES,
-    MAX_QPATH,
+    qfalse, qtrue, sfxHandle_t, BIGCHAR_WIDTH, GIANTCHAR_WIDTH, MAX_CLIENTS, MAX_CLIENTS_I32,
+    MAX_GENTITIES, MAX_QPATH, MAX_STRING_CHARS, SCREEN_HEIGHT,
 };
 use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::display_state::DisplayState;
 use mp_uishared::shared::menu_system::MenuSystem;
-use native_string::{atoi, strcat_string, Info_ValueForKey, Q_strncpyz};
+use native_string::{atoi, strcat_string, Info_ValueForKey, Q_stricmp, Q_strncpyz};
 
-use crate::cg_draw::CG_CenterPrint;
+use crate::cg_draw::{CG_CenterPrint, CG_ChatBox_AddString};
+use crate::cg_ents::CG_S_StopLoopingSound;
 use crate::cg_event::CG_ReattachLimb;
 use crate::cg_light::CG_SetLightstyle;
 use crate::cg_localents::CG_InitLocalEntities;
@@ -47,9 +50,12 @@ use crate::cg_marks::{CG_ClearParticles, CG_InitMarkPolys};
 use crate::cg_players::{
     cg_customCombatSoundNames, cg_customDuelSoundNames, cg_customExtraSoundNames,
     cg_customJediSoundNames, cg_customSoundNames, CG_CacheG2AnimInfo, CG_DestroyNPCClient,
-    CG_HandleAppendedSkin, CG_NewClientInfo,
+    CG_HandleAppendedSkin, CG_LoadDeferredPlayers, CG_NewClientInfo,
 };
-use crate::cg_saga::{CG_ParseSiegeObjectiveStatus, CG_SetSiegeTimerCvar};
+use crate::cg_saga::{
+    CG_ParseSiegeExtendedData, CG_ParseSiegeObjectiveStatus, CG_SetSiegeTimerCvar,
+    CG_SiegeBriefingDisplay,
+};
 use crate::cg_weapons::CG_G2WeaponInstance;
 use crate::local::client_info_t::{
     clientInfo_t, MAX_CUSTOM_COMBAT_SOUNDS, MAX_CUSTOM_EXTRA_SOUNDS, MAX_CUSTOM_JEDI_SOUNDS,
@@ -1375,4 +1381,393 @@ pub fn CG_ConfigStringModified(ctx: &mut CgContext) {
     } else if num >= CS_LIGHT_STYLES && num < CS_LIGHT_STYLES + (MAX_LIGHT_STYLES * 3) {
         CG_SetLightstyle(ctx, num - CS_LIGHT_STYLES);
     }
+}
+
+/// Raven's `char text[MAX_SAY_TEXT]` copy discipline - `Q_strncpyz`/`Com_sprintf`
+/// into that fixed buffer stop at `MAX_SAY_TEXT-1` bytes; one Latin-1 char is one
+/// byte, so we cap by char count.
+fn cap_say_text(s: String) -> String {
+    if s.chars().count() >= MAX_SAY_TEXT {
+        s.chars().take(MAX_SAY_TEXT - 1).collect()
+    } else {
+        s
+    }
+}
+
+/// Raven `CG_ServerCommand` — the client-game side of a reliable server command:
+/// dispatches the leading token onto siege/menu/ghoul2-reset/chat/configstring
+/// handlers, printing "Unknown client game command" for anything unrecognized.
+///
+/// PORT-NOTE: the `remapShader` arm has no `return`, so a `remapShader` command
+/// falls through and prints "Unknown client game command" after remapping -
+/// Raven's own quirk, preserved.
+///
+/// Source: `oracle/codemp/cgame/cg_servercmds.c:1257-1670`
+pub fn CG_ServerCommand(
+    ctx: &mut CgContext,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+) {
+    let cmd = CG_Argv(ctx, 0);
+
+    if cmd.is_empty() {
+        // server claimed the command
+        return;
+    }
+
+    // The `#if 0` "spd" arm (`cg_servercmds.c:1269-1294`) never shipped -Ste; dropped.
+
+    if cmd == "sxd" {
+        //siege extended data, contains extra info certain classes may want to know about other clients
+        CG_ParseSiegeExtendedData(ctx);
+        return;
+    }
+
+    if cmd == "sb" {
+        //siege briefing display
+        let team = atoi(&CG_Argv(ctx, 1));
+        CG_SiegeBriefingDisplay(ctx, team, 0);
+        return;
+    }
+
+    if cmd == "scl" {
+        //if (!( trap_Key_GetCatcher() & KEYCATCH_UI ))
+        //Well, I want it to come up even if the briefing display is up.
+        trap::OpenUIMenu(ctx.engine, UIMENU_CLASSSEL); //UIMENU_CLASSSEL
+        return;
+    }
+
+    if cmd == "spc" {
+        trap::Cvar_Set(ctx.engine, "ui_myteam", "3");
+        trap::OpenUIMenu(ctx.engine, UIMENU_PLAYERCONFIG); //UIMENU_CLASSSEL
+        return;
+    }
+
+    if cmd == "nfr" {
+        //"nfr" == "new force rank" (want a short string)
+        if trap::Argc(ctx.engine) < 3 {
+            // _DEBUG-only "Invalid newForceRank string" warning is compiled out.
+            return;
+        }
+
+        let newRank = atoi(&CG_Argv(ctx, 1));
+        let doMenu = atoi(&CG_Argv(ctx, 2));
+        let setTeam = atoi(&CG_Argv(ctx, 3));
+
+        trap::Cvar_Set(ctx.engine, "ui_rankChange", &format!("{newRank}"));
+
+        trap::Cvar_Set(ctx.engine, "ui_myteam", &format!("{setTeam}"));
+
+        if (trap::Key_GetCatcher(ctx.engine) & KEYCATCH_UI) == 0 && doMenu != 0 {
+            trap::OpenUIMenu(ctx.engine, UIMENU_PLAYERCONFIG);
+        }
+
+        return;
+    }
+
+    if cmd == "kg2" {
+        //Kill a ghoul2 instance in this slot.
+        //If it has been occupied since this message was sent somehow, the worst that can (should) happen
+        //is the instance will have to reinit with its current info.
+        let argNum = trap::Argc(ctx.engine);
+        let mut i = 1;
+
+        if argNum < 1 {
+            return;
+        }
+
+        while i < argNum {
+            let indexNum = atoi(&CG_Argv(ctx, i));
+
+            // §F19: `indexNum` is server-supplied; Raven indexes `cg_entities`
+            // unchecked - out of range we skip instead of reading OOB.
+            if indexNum >= 0 && (indexNum as usize) < MAX_GENTITIES {
+                let idx = indexNum as usize;
+                let ghoul2 = ctx.world.entity(idx).ghoul2;
+
+                if !ghoul2.is_null() && trap::G2_HaveWeGhoul2Models(ctx.engine, ghoul2) {
+                    if idx < MAX_CLIENTS {
+                        //You try to do very bad thing!
+                        // _DEBUG-only warning compiled out; the return is not.
+                        return;
+                    }
+
+                    CG_KillCEntityG2(ctx, idx);
+                }
+            }
+
+            i += 1;
+        }
+
+        return;
+    }
+
+    if cmd == "kls" {
+        //kill looping sounds
+        let argNum = trap::Argc(ctx.engine);
+
+        if argNum < 1 {
+            // Raven's assert(0) here is _DEBUG-only - compiled out in retail
+            return;
+        }
+
+        let indexNum = atoi(&CG_Argv(ctx, 1));
+
+        // §F19: Raven filters only -1 and reads any other index unchecked; we
+        // guard the whole OOB range (server-supplied) and keep the -1 skip.
+        let clentNum: Option<usize> =
+            (indexNum >= 0 && (indexNum as usize) < MAX_GENTITIES).then_some(indexNum as usize);
+
+        let mut trackerentNum: Option<usize> = None;
+        if argNum >= 2 {
+            let indexNum = atoi(&CG_Argv(ctx, 2));
+
+            if indexNum >= 0 && (indexNum as usize) < MAX_GENTITIES {
+                trackerentNum = Some(indexNum as usize);
+            }
+        }
+
+        if let Some(clentNum) = clentNum {
+            let number = ctx.world.entity(clentNum).currentState.number;
+            CG_S_StopLoopingSound(ctx.world, number as usize, -1);
+        }
+        if let Some(trackerentNum) = trackerentNum {
+            let number = ctx.world.entity(trackerentNum).currentState.number;
+            CG_S_StopLoopingSound(ctx.world, number as usize, -1);
+        }
+
+        return;
+    }
+
+    let mut IRCG = false;
+    if cmd == "ircg" {
+        //this means param 2 is the body index and we want to copy to bodyqueue on it
+        IRCG = true;
+    }
+
+    if cmd == "rcg" || IRCG {
+        //rcg - Restore Client Ghoul (make sure limbs are reattached and ragdoll state is reset - this must be done reliably)
+        let argNum = trap::Argc(ctx.engine);
+
+        if argNum < 1 {
+            // Raven's assert(0) here is _DEBUG-only - compiled out in retail
+            return;
+        }
+
+        let indexNum = atoi(&CG_Argv(ctx, 1));
+        if indexNum < 0 || indexNum >= MAX_CLIENTS_I32 {
+            // server-supplied client index; Raven asserts, we just bail (§F19).
+            return;
+        }
+        let idx = indexNum as usize;
+
+        //assert(clent->ghoul2);
+        let ghoul2 = ctx.world.entity(idx).ghoul2;
+        if ghoul2.is_null() {
+            //this can happen while connecting as a client
+            return;
+        }
+
+        if IRCG {
+            let bodyIndex = atoi(&CG_Argv(ctx, 2));
+            let weaponIndex = atoi(&CG_Argv(ctx, 3));
+            let side = atoi(&CG_Argv(ctx, 4));
+
+            // §F19: `bodyIndex` is server-supplied; the guard covers the OOB
+            // `cg_entities` read AND Raven's unconditional CG_BodyQueueCopy
+            // call, which only ran usefully on the in-bounds path anyway.
+            if bodyIndex >= 0 && (bodyIndex as usize) < MAX_GENTITIES {
+                let bodyNum = bodyIndex as usize;
+
+                ctx.world.entity_mut(bodyNum).teamPowerType = if side != 0 {
+                    qtrue //light side
+                } else {
+                    qfalse //dark side
+                };
+
+                let clientNum = ctx.world.entity(idx).currentState.number;
+                CG_BodyQueueCopy(ctx, bodyNum, clientNum, weaponIndex);
+            }
+        }
+
+        //reattach any missing limbs
+        if ctx.world.entity(idx).torsoBolt != 0 {
+            CG_ReattachLimb(ctx, idx);
+        }
+
+        //make sure ragdoll state is reset
+        if ctx.world.entity(idx).isRagging != qfalse {
+            ctx.world.entity_mut(idx).isRagging = qfalse;
+            //calling with null parms resets to no ragdoll.
+            let ghoul2 = ctx.world.entity(idx).ghoul2;
+            trap::G2API_SetRagDoll(ctx.engine, ghoul2, None);
+        }
+
+        //clear all the decals as well
+        let ghoul2 = ctx.world.entity(idx).ghoul2;
+        trap::G2API_ClearSkinGore(ctx.engine, ghoul2);
+
+        ctx.world.entity_mut(idx).weapon = 0;
+        ctx.world.entity_mut(idx).ghoul2weapon = null_mut(); //force a weapon reinit
+
+        return;
+    }
+
+    if cmd == "cp" {
+        let arg = CG_Argv(ctx, 1);
+        let strEd = CG_CheckSVStringEdRef(ctx, &arg);
+        CG_CenterPrint(
+            ctx.world,
+            &strEd,
+            (SCREEN_HEIGHT as f64 * 0.30) as c_int,
+            BIGCHAR_WIDTH,
+        );
+        return;
+    }
+
+    if cmd == "cps" {
+        let arg = CG_Argv(ctx, 1);
+        let x = arg.strip_prefix('@').unwrap_or(&arg);
+        let strEd = trap::SP_GetStringTextString(ctx.engine, x, MAX_STRINGED_SV_STRING)
+            .unwrap_or_else(|| format!("??{x}"));
+        CG_CenterPrint(
+            ctx.world,
+            &strEd,
+            (SCREEN_HEIGHT as f64 * 0.20) as c_int,
+            BIGCHAR_WIDTH,
+        );
+        return;
+    }
+
+    if cmd == "cs" {
+        CG_ConfigStringModified(ctx);
+        return;
+    }
+
+    if cmd == "print" {
+        let arg = CG_Argv(ctx, 1);
+        let strEd = CG_CheckSVStringEdRef(ctx, &arg);
+        CG_Printf(ctx, &strEd);
+        return;
+    }
+
+    if cmd == "chat" {
+        if ctx.world.cvars.cg_teamChatsOnly.integer == 0 {
+            let talkSound = ctx.world.cgs.media.talkSound;
+            trap::S_StartLocalSound(ctx.engine, talkSound, CHAN_LOCAL_SOUND);
+            let text = cap_say_text(CG_Argv(ctx, 1));
+            let text = CG_RemoveChatEscapeChar(&text);
+            CG_ChatBox_AddString(ctx, ds, &text);
+            CG_Printf(ctx, &format!("*{text}\n"));
+        }
+        return;
+    }
+
+    if cmd == "tchat" {
+        let talkSound = ctx.world.cgs.media.talkSound;
+        trap::S_StartLocalSound(ctx.engine, talkSound, CHAN_LOCAL_SOUND);
+        let text = cap_say_text(CG_Argv(ctx, 1));
+        let text = CG_RemoveChatEscapeChar(&text);
+        CG_ChatBox_AddString(ctx, ds, &text);
+        CG_Printf(ctx, &format!("*{text}\n"));
+
+        return;
+    }
+
+    //chat with location, possibly localized.
+    if cmd == "lchat" {
+        if ctx.world.cvars.cg_teamChatsOnly.integer == 0 {
+            if trap::Argc(ctx.engine) < 4 {
+                return;
+            }
+
+            let name = CG_Argv(ctx, 1);
+            // §F19: Raven strcpy's this into char color[8] - a server token
+            // past 7 bytes overruns his stack; the owned String just holds it.
+            let color = CG_Argv(ctx, 3);
+            let message = CG_Argv(ctx, 4);
+            let mut loc = CG_Argv(ctx, 2);
+
+            if loc.starts_with('@') {
+                //get localized text
+                loc = trap::SP_GetStringTextString(ctx.engine, &loc[1..], MAX_STRING_CHARS)
+                    .unwrap_or_else(|| format!("??{}", &loc[1..]));
+            }
+
+            let talkSound = ctx.world.cgs.media.talkSound;
+            trap::S_StartLocalSound(ctx.engine, talkSound, CHAN_LOCAL_SOUND);
+            let text = cap_say_text(format!("{name}<{loc}>^{color}{message}"));
+            let text = CG_RemoveChatEscapeChar(&text);
+            CG_ChatBox_AddString(ctx, ds, &text);
+            CG_Printf(ctx, &format!("*{text}\n"));
+        }
+        return;
+    }
+    if cmd == "ltchat" {
+        if trap::Argc(ctx.engine) < 4 {
+            return;
+        }
+
+        let name = CG_Argv(ctx, 1);
+        // §F19: same char color[8] strcpy overrun as the lchat arm above
+        let color = CG_Argv(ctx, 3);
+        let message = CG_Argv(ctx, 4);
+        let mut loc = CG_Argv(ctx, 2);
+
+        if loc.starts_with('@') {
+            //get localized text
+            loc = trap::SP_GetStringTextString(ctx.engine, &loc[1..], MAX_STRING_CHARS)
+                .unwrap_or_else(|| format!("??{}", &loc[1..]));
+        }
+
+        let talkSound = ctx.world.cgs.media.talkSound;
+        trap::S_StartLocalSound(ctx.engine, talkSound, CHAN_LOCAL_SOUND);
+        let text = cap_say_text(format!("{name}<{loc}> ^{color}{message}"));
+        let text = CG_RemoveChatEscapeChar(&text);
+        CG_ChatBox_AddString(ctx, ds, &text);
+        CG_Printf(ctx, &format!("*{text}\n"));
+
+        return;
+    }
+
+    if cmd == "scores" {
+        CG_ParseScores(ctx, menus, ds, dc);
+        return;
+    }
+
+    if cmd == "tinfo" {
+        CG_ParseTeamInfo(ctx);
+        return;
+    }
+
+    if cmd == "map_restart" {
+        CG_MapRestart(ctx);
+        return;
+    }
+
+    if Q_stricmp(&cmd, "remapShader") == 0 {
+        if trap::Argc(ctx.engine) == 4 {
+            let old = CG_Argv(ctx, 1);
+            let new = CG_Argv(ctx, 2);
+            let timeOffset = CG_Argv(ctx, 3);
+            trap::R_RemapShader(ctx.engine, &old, &new, &timeOffset);
+        }
+    }
+
+    // loaddeferred can be both a servercmd and a consolecmd
+    if cmd == "loaddefered" {
+        // FIXME: spelled wrong, but not changing for demo
+        CG_LoadDeferredPlayers(ctx.world);
+        return;
+    }
+
+    // clientLevelShot is sent before taking a special screenshot for
+    // the menu system during development
+    if cmd == "clientLevelShot" {
+        ctx.world.cg.levelShot = qtrue;
+        return;
+    }
+
+    CG_Printf(ctx, &format!("Unknown client game command: {cmd}\n"));
 }

@@ -9439,3 +9439,79 @@ pub fn CG_PlayerAnimEvents(
         }
     }
 }
+
+/// Raven `CG_TriggerAnimSounds` - this also sets the lerp frames, so I suggest you keep calling
+/// it regardless of if you want anim sounds.
+/// Source: `oracle/codemp/cgame/cg_players.c:2676-2716`
+pub fn CG_TriggerAnimSounds(ctx: &mut CgContext, cent: &mut centity_t) {
+    let mut curFrame: c_int = 0;
+    let mut currentFrame: f32 = 0.0;
+
+    // Raven's assert compiles out in release; debug_assert matches (a
+    // non-humanoid GLA with no '/' in its name leaves this -1)
+    debug_assert!(cent.localAnimIndex >= 0);
+
+    let sFileIndex = cent.eventAnimIndex;
+
+    let engine = ctx.engine;
+    let time = ctx.world.cg.time;
+
+    if trap::G2API_GetBoneFrame(
+        engine,
+        cent.ghoul2,
+        "model_root",
+        time,
+        &mut currentFrame,
+        &mut ctx.world.cgs.gameModels[0],
+        0,
+    ) {
+        // the above may have failed, not sure what to do about it, current frame will be zero in that case
+        curFrame = currentFrame.floor() as c_int;
+    }
+    if curFrame != cent.pe.legs.frame {
+        CG_PlayerAnimEvents(
+            ctx,
+            cent.localAnimIndex,
+            sFileIndex,
+            false,
+            cent.pe.legs.frame,
+            curFrame,
+            cent.currentState.number as usize,
+        );
+    }
+    cent.pe.legs.oldFrame = cent.pe.torso.frame;
+    cent.pe.legs.frame = curFrame;
+
+    if cent.noLumbar != qfalse {
+        //probably a droid or something.
+        cent.pe.torso.oldFrame = cent.pe.legs.oldFrame;
+        cent.pe.torso.frame = cent.pe.legs.frame;
+        return;
+    }
+
+    if trap::G2API_GetBoneFrame(
+        engine,
+        cent.ghoul2,
+        "lower_lumbar",
+        time,
+        &mut currentFrame,
+        &mut ctx.world.cgs.gameModels[0],
+        0,
+    ) {
+        curFrame = currentFrame.floor() as c_int;
+    }
+    if curFrame != cent.pe.torso.frame {
+        CG_PlayerAnimEvents(
+            ctx,
+            cent.localAnimIndex,
+            sFileIndex,
+            true,
+            cent.pe.torso.frame,
+            curFrame,
+            cent.currentState.number as usize,
+        );
+    }
+    cent.pe.torso.oldFrame = cent.pe.torso.frame;
+    cent.pe.torso.frame = curFrame;
+    cent.pe.torso.backlerp = 1.0 - (currentFrame - curFrame as f32);
+}

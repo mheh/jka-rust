@@ -14,22 +14,26 @@ use mp_abi::cgame::public::rag_callback_trace_line_t::ragCallbackTraceLine_t;
 use mp_abi::cgame::shared_buffer::{
     TCGG2Mark, TCGGetBoltData, TCGImpactMark, TCGMiscEnt, TCGPointContents, TCGTrace, TCGVectorData,
 };
+use mp_bg::bg_channel::PmoveContext;
 use mp_bg::bg_misc::{
     selected_holdable_tag, BG_CycleForce, BG_CycleInven, BG_FindItemForPowerup,
-    BG_GetItemIndexByTag,
+    BG_FindItemForWeapon, BG_GetItemIndexByTag,
 };
 use mp_bg::bg_panimate::BG_ClearAnimsets;
+use mp_bg::bg_saberLoad::WP_SaberLoadParms;
+use mp_bg::bg_vehicleLoad::BG_VehicleLoadParms;
 use mp_bg::public::bg_itemlist::{bg_itemlist, bg_numItems};
 use mp_bg::public::configstring::{
-    CS_AMBIENT_SET, CS_BSP_MODELS, CS_EFFECTS, CS_GLOBAL_AMBIENT_SET, CS_ICONS, CS_ITEMS,
-    CS_MODELS, CS_MUSIC, CS_PLAYERS, CS_SIEGE_OBJECTIVES, CS_SIEGE_STATE, CS_SIEGE_TIMEOVERRIDE,
-    CS_SIEGE_WINTEAM, CS_SOUNDS, CS_TERRAINS,
+    CS_AMBIENT_SET, CS_BSP_MODELS, CS_EFFECTS, CS_GAME_VERSION, CS_GLOBAL_AMBIENT_SET, CS_ICONS,
+    CS_ITEMS, CS_LEVEL_START_TIME, CS_MODELS, CS_MUSIC, CS_PLAYERS, CS_SIEGE_OBJECTIVES,
+    CS_SIEGE_STATE, CS_SIEGE_TIMEOVERRIDE, CS_SIEGE_WINTEAM, CS_SOUNDS, CS_TERRAINS,
 };
 use mp_bg::public::entity_type::entityType_t;
 use mp_bg::public::g_item::MAX_ITEM_MODELS;
 use mp_bg::public::gametype::{
     GT_CTF, GT_CTY, GT_DUEL, GT_JEDIMASTER, GT_POWERDUEL, GT_SIEGE, GT_TEAM,
 };
+use mp_bg::public::item_kind::ItemKind;
 use mp_bg::public::item_type::IT_HOLDABLE;
 use mp_bg::public::max_items::MAX_ITEMS;
 use mp_bg::public::pers_enum::persEnum_t::PERS_ATTACKER;
@@ -38,6 +42,7 @@ use mp_bg::public::powerup::{PW_BLUEFLAG, PW_NEUTRALFLAG, PW_REDFLAG};
 use mp_bg::public::spawn::{MAX_SPAWN_VARS, MAX_SPAWN_VARS_CHARS};
 use mp_bg::public::stat_index::statIndex_t::{STAT_CLIENTS_READY, STAT_HOLDABLE_ITEM};
 use mp_bg::public::team::{TEAM_BLUE, TEAM_RED, TEAM_SPECTATOR};
+use mp_bg::weapons::weapon_t::{WP_BRYAR_PISTOL, WP_NONE};
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::refdef_t::{
@@ -80,30 +85,39 @@ use mp_uishared::shared::menudef::{
 };
 use mp_uishared::ui_shared::{
     Menu_New, Menu_Reset, Menu_SetFeederSelection, PC_Color_Parse, PC_Float_Parse, PC_Int_Parse,
-    PC_String_Parse, UI_CleanupGhoul2,
+    PC_String_Parse, String_Init, UI_CleanupGhoul2,
 };
 use native_string::{
     atof, atoi, buf_to_string, latin1_to_string, sscanf_f32s, string_to_latin1, strncpyz_string,
     Q_strcat, Q_stricmp,
 };
 
+use crate::bg_channel::{CgBgTraps, CgGameCallbacks};
+use crate::cg_consolecmds::CG_InitConsoleCommands;
 use crate::cg_draw::{CG_Text_Paint, CG_Text_Width};
 use crate::cg_effects::{CG_InitGlass, CG_TestLine};
 use crate::cg_ents::ScaleModelAxis;
 use crate::cg_info::{CG_LoadingClient, CG_LoadingItem, CG_LoadingString};
-use crate::cg_marks::{CG_ClearParticles, CG_ImpactMark};
+use crate::cg_light::CG_ClearLightStyles;
+use crate::cg_localents::CG_InitLocalEntities;
+use crate::cg_marks::{CG_ClearParticles, CG_ImpactMark, CG_InitMarkPolys};
 use crate::cg_new_draw::{
     CG_GameTypeString, CG_GetGameStatusText, CG_GetKillerText, CG_StatusHandle,
 };
 use crate::cg_players::{
     CG_AddGhoul2Mark, CG_CacheG2AnimInfo, CG_CleanJetpackGhoul2, CG_HandleAppendedSkin,
-    CG_NewClientInfo,
+    CG_InitJetpackGhoul2, CG_NewClientInfo,
 };
-use crate::cg_predict::{CG_G2Trace, CG_PointContents, CG_Trace};
-use crate::cg_saga::{CG_ParseSiegeObjectiveStatus, CG_SetSiegeTimerCvar};
+use crate::cg_predict::{CG_G2Trace, CG_PmoveClientPointerUpdate, CG_PointContents, CG_Trace};
+use crate::cg_saga::{CG_InitSiegeMode, CG_ParseSiegeObjectiveStatus, CG_SetSiegeTimerCvar};
 use crate::cg_scoreboard::{CG_GetClassCount, CG_GetTeamNonScoreCount};
-use crate::cg_servercmds::{CG_KillCEntityG2, CG_PrecacheNPCSounds};
-use crate::cg_weapons::{CG_InitG2Weapons, CG_RegisterItemVisuals, CG_ShutDownG2Weapons};
+use crate::cg_servercmds::{
+    CG_KillCEntityG2, CG_ParseServerinfo, CG_PrecacheNPCSounds, CG_SetConfigValues,
+    CG_ShaderStateChanged,
+};
+use crate::cg_weapons::{
+    CG_InitG2Weapons, CG_RegisterItemVisuals, CG_ShutDownG2Weapons, LAST_USEABLE_WEAPON,
+};
 use crate::local::centity_s::centity_t;
 use crate::local::client_info_t::clientInfo_t;
 use crate::local::footstep_t::footstep_t;
@@ -157,6 +171,39 @@ pub const DEFAULT_REDTEAM_NAME: &str = "Empire";
 ///
 /// Source: `oracle/codemp/cgame/cg_local.h:88`
 pub const DEFAULT_BLUETEAM_NAME: &str = "Rebellion";
+
+/// Raven `#define GAME_VERSION "basejka-1"` — `CG_Init`'s client/server build
+/// check against the `CS_GAME_VERSION` configstring.
+///
+/// Source: `oracle/codemp/game/bg_public.h:20`
+pub const GAME_VERSION: &str = "basejka-1";
+
+/// Raven `char *HolocronIcons[]` (`oracle/codemp/cgame/holocronicons.h`,
+/// `#include`d by `cg_main.c:34`) — indexed by `forcePowers_t`. cgame's own
+/// copy of the same table `ui_main.rs` keeps (`holocronicons.h` compiles into
+/// both hosts).
+///
+/// Source: `oracle/codemp/cgame/holocronicons.h:4-22`
+const HOLOCRON_ICONS: [&str; NUM_FORCE_POWERS as usize] = [
+    "gfx/mp/f_icon_lt_heal",       // FP_HEAL
+    "gfx/mp/f_icon_levitation",    // FP_LEVITATION
+    "gfx/mp/f_icon_speed",         // FP_SPEED
+    "gfx/mp/f_icon_push",          // FP_PUSH
+    "gfx/mp/f_icon_pull",          // FP_PULL
+    "gfx/mp/f_icon_lt_telepathy",  // FP_TELEPATHY
+    "gfx/mp/f_icon_dk_grip",       // FP_GRIP
+    "gfx/mp/f_icon_dk_l1",         // FP_LIGHTNING
+    "gfx/mp/f_icon_dk_rage",       // FP_RAGE
+    "gfx/mp/f_icon_lt_protect",    // FP_PROTECT
+    "gfx/mp/f_icon_lt_absorb",     // FP_ABSORB
+    "gfx/mp/f_icon_lt_healother",  // FP_TEAM_HEAL
+    "gfx/mp/f_icon_dk_forceother", // FP_TEAM_FORCE
+    "gfx/mp/f_icon_dk_drain",      // FP_DRAIN
+    "gfx/mp/f_icon_sight",         // FP_SEE
+    "gfx/mp/f_icon_saber_attack",  // FP_SABER_OFFENSE
+    "gfx/mp/f_icon_saber_defend",  // FP_SABER_DEFENSE
+    "gfx/mp/f_icon_saber_throw",   // FP_SABERTHROW
+];
 
 // PORT-NOTE: `q_shared.h`'s font enum is anonymous, so per the anonymous-enum
 // convention this is a `const`; file-local, the same copy `cg_draw.rs` and
@@ -5042,4 +5089,444 @@ pub fn CG_RegisterClients(ctx: &mut CgContext) {
     }
 
     CG_BuildSpectatorString(ctx);
+}
+
+/// Raven `CG_UpdateCvars` — refreshes every registered cvar's local mirror
+/// from the engine, then handles the two side effects that fire when a
+/// tracked cvar's `modificationCount` moved since the last call.
+///
+/// PORT-NOTE: `cvarTable`'s literal row order (`cg_main.c:882-1053`) is not in
+/// this packet; `CG_RegisterCvars` already walks `CgCvars`'s declaration order
+/// in its place (its own PORT-NOTE, `cg_main.c:1062-1112`) with the same
+/// reasoning — each `trap_Cvar_Update` call is independent of the others, so
+/// the reorder is behaviorally inert. This walk matches that one call-for-call.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:1157-1187`
+pub fn CG_UpdateCvars(ctx: &mut CgContext) {
+    let engine = ctx.engine;
+
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_centertime);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_runpitch);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_runroll);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_bobup);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_bobpitch);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_bobroll);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_shadows);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_renderToTextureFX);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawTimer);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawFPS);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawSnapshot);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_draw3dIcons);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawIcons);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawAmmoWarning);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawCrosshair);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawCrosshairNames);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawRadar);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawVehLeadIndicator);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_dynamicCrosshair);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_dynamicCrosshairPrecision);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawRewards);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawScores);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_crosshairSize);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_crosshairX);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_crosshairY);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_crosshairHealth);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_draw2D);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawStatus);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_animSpeed);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_debugAnim);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_debugSaber);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_debugPosition);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_debugEvents);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_errorDecay);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_nopredict);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_noPlayerAnims);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_showmiss);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_showVehMiss);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_footsteps);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_addMarks);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_viewsize);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawGun);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_gun_x);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_gun_y);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_gun_z);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_autoswitch);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_ignore);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_simpleItems);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_fov);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_zoomFov);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_swingAngles);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_oldPainSounds);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_ragDoll);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_jumpSounds);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_autoMap);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_autoMapX);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_autoMapY);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_autoMapW);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_autoMapH);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.bg_fighterAltControl);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_chatBox);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_chatBoxHeight);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_saberModelTraceEffect);
+    trap::Cvar_Update(
+        engine,
+        &mut ctx.world.cvars.cg_saberClientVisualCompensation,
+    );
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_g2TraceLod);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_fpls);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_ghoul2Marks);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_optvehtrace);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_saberDynamicMarks);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_saberDynamicMarkTime);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_saberContact);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_saberTrail);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_duelHeadAngles);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_speedTrail);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_auraShell);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_repeaterOrb);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_animBlend);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_dismember);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_thirdPersonSpecialCam);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_thirdPerson);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_thirdPersonRange);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_thirdPersonAngle);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_thirdPersonPitchOffset);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_thirdPersonVertOffset);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_thirdPersonCameraDamp);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_thirdPersonTargetDamp);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_thirdPersonAlpha);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_thirdPersonHorzOffset);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_stereoSeparation);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_lagometer);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawEnemyInfo);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_synchronousClients);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_stats);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_buildScript);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_forceModel);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_paused);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_blood);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_predictItems);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_deferPlayers);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawTeamOverlay);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_teamOverlayUserinfo);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawFriend);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_teamChatsOnly);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_hudFiles);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_scorePlum);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_smoothClients);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.pmove_fixed);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.pmove_msec);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_cameraMode);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_cameraOrbit);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_cameraOrbitDelay);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_timescaleFadeEnd);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_timescaleFadeSpeed);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_timescale);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_noTaunt);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_noProjectileTrail);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_debugBB);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_currentSelectedPlayer);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_currentSelectedPlayerName);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_recordSPDemo);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_recordSPDemoName);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_showVehBounds);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.ui_myteam);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_snapshotTimeout);
+
+    // check for modications here
+
+    // If team overlay is on, ask for updates from the server.  If its off,
+    // let the server know so we don't receive it
+    if ctx.world.main.drawTeamOverlayModificationCount
+        != ctx.world.cvars.cg_drawTeamOverlay.modificationCount
+    {
+        ctx.world.main.drawTeamOverlayModificationCount =
+            ctx.world.cvars.cg_drawTeamOverlay.modificationCount;
+
+        if ctx.world.cvars.cg_drawTeamOverlay.integer > 0 {
+            trap::Cvar_Set(engine, "teamoverlay", "1");
+        } else {
+            trap::Cvar_Set(engine, "teamoverlay", "0");
+        }
+        // FIXME E3 HACK
+        trap::Cvar_Set(engine, "teamoverlay", "1");
+    }
+
+    // if force model changed
+    if ctx.world.main.forceModelModificationCount != ctx.world.cvars.cg_forceModel.modificationCount
+    {
+        ctx.world.main.forceModelModificationCount =
+            ctx.world.cvars.cg_forceModel.modificationCount;
+        CG_ForceModelChange(ctx);
+    }
+}
+
+/// Raven `CG_Init` — the module's one-time load/reload entry point: resets
+/// bg/pmove/menu state, registers cvars/console commands, pulls the engine's
+/// glconfig/gamestate/map, validates the client/server build against
+/// `GAME_VERSION`, then registers every sound/graphic/client asset and spawns
+/// the local-only entity set.
+///
+/// PORT-NOTE: `item` (Raven `static gitem_t *item`) is assigned then read back
+/// inline within the same loop iteration and never observed across calls —
+/// unlike `forceModelModificationCount`/`drawTeamOverlayModificationCount`
+/// (`CG_UpdateCvars`), it does not fold into `CgMainState`; a local binding is
+/// behaviorally identical.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:3704-3933`
+pub fn CG_Init(
+    ctx: &mut CgContext,
+    menus: &mut MenuSystem,
+    ds: &mut DisplayState,
+    dc: &mut dyn DisplayContext,
+    serverMessageNum: c_int,
+    serverCommandSequence: c_int,
+    clientNum: c_int,
+) {
+    let engine = ctx.engine;
+
+    // clear it out
+    {
+        let traps = CgBgTraps::new(engine);
+        let mut callbacks = CgGameCallbacks::new(engine);
+        let mut pmctx = PmoveContext::new(&mut ctx.world.bg_state, &traps, &mut callbacks);
+        pmctx.BG_InitAnimsets();
+    }
+
+    trap::CG_RegisterSharedMemory(engine, &mut ctx.world.shared_buffer);
+
+    // Load external vehicle data
+    {
+        let traps = CgBgTraps::new(engine);
+        BG_VehicleLoadParms(&mut ctx.world.bg_state, &traps);
+    }
+
+    // clear everything
+    /*
+    Ghoul2 Insert Start
+    */
+
+    // memset( cg_entities, 0, sizeof( cg_entities ) );
+    CG_Init_CGents(ctx.world);
+    // this is a No-No now we have stl vector classes in here.
+    // memset( &cg, 0, sizeof( cg ) );
+    // PORT-NOTE: CG_Init_CG is still a cited todo!() (blocked on a safe cg_t
+    // zero-fill) - CG_Init panics here until that lands.
+    CG_Init_CG(ctx.world);
+    CG_InitItems(ctx.world);
+
+    // create the global jetpack instance
+    CG_InitJetpackGhoul2(ctx);
+
+    CG_PmoveClientPointerUpdate(ctx.world);
+
+    /*
+    Ghoul2 Insert End
+    */
+
+    // Load sabers.cfg data
+    {
+        let traps = CgBgTraps::new(engine);
+        WP_SaberLoadParms(&mut ctx.world.bg_state, &traps);
+    }
+
+    // this is kinda dumb as well, but I need to pre-load some fonts in order to have the text available
+    //	to say I'm loading the assets.... which includes loading the fonts. So I'll set these up as reasonable
+    //	defaults, then let the menu asset parser (which actually specifies the ingame fonts) load over them
+    //	if desired during parse.  Dunno how legal it is to store in these cgDC things, but it causes no harm
+    //	and even if/when they get overwritten they'll be legalised by the menu asset parser :-)
+    // CG_LoadFonts();
+    ds.Assets.qhSmallFont = trap::R_RegisterFont(engine, "ocr_a");
+    ds.Assets.qhMediumFont = trap::R_RegisterFont(engine, "ergoec");
+    ds.Assets.qhBigFont = ds.Assets.qhMediumFont;
+
+    // SAFETY: `cgs_t` is POD (fixed arrays/ints/handles, no owned heap fields)
+    // - same zero-fill shape `centity_t`/`clientInfo_t` already use elsewhere
+    // in this crate. Raven: `memset( &cgs, 0, sizeof( cgs ) )`.
+    ctx.world.cgs = unsafe { core::mem::zeroed() };
+    // Raven: `memset( cg_weapons, 0, sizeof(cg_weapons) )`.
+    for w in ctx.world.cg_weapons.iter_mut() {
+        *w = zeroed_weapon_info();
+    }
+
+    ctx.world.cg.clientNum = clientNum;
+
+    ctx.world.cgs.processedSnapshotNum = serverMessageNum;
+    ctx.world.cgs.serverCommandSequence = serverCommandSequence;
+
+    ctx.world.cg.loadLCARSStage = 0;
+
+    ctx.world.cg.itemSelect = -1;
+    ctx.world.cg.forceSelect = -1;
+
+    // load a few needed things before we do any screen updates
+    ctx.world.cgs.media.charsetShader = trap::R_RegisterShaderNoMip(engine, "gfx/2d/charsgrid_med");
+    ctx.world.cgs.media.whiteShader = trap::R_RegisterShader(engine, "white");
+
+    ctx.world.cgs.media.loadBarLED = trap::R_RegisterShaderNoMip(engine, "gfx/hud/load_tick");
+    ctx.world.cgs.media.loadBarLEDCap =
+        trap::R_RegisterShaderNoMip(engine, "gfx/hud/load_tick_cap");
+    ctx.world.cgs.media.loadBarLEDSurround =
+        trap::R_RegisterShaderNoMip(engine, "gfx/hud/mp_levelload");
+
+    // Force HUD set up
+    ctx.world.cg.forceHUDActive = qtrue;
+    ctx.world.cg.forceHUDTotalFlashTime = 0;
+    ctx.world.cg.forceHUDNextFlashTime = 0;
+
+    let mut i = WP_NONE + 1;
+    while i <= LAST_USEABLE_WEAPON {
+        let item = BG_FindItemForWeapon(i);
+        let icon = item.item().icon;
+
+        if let Some(icon) = icon.filter(|s| !s.is_empty()) {
+            ctx.world.cgs.media.weaponIcons[i as usize] = trap::R_RegisterShaderNoMip(engine, icon);
+            ctx.world.cgs.media.weaponIcons_NA[i as usize] =
+                trap::R_RegisterShaderNoMip(engine, &format!("{icon}_na"));
+        } else {
+            // make sure it is zero'd (default shader)
+            ctx.world.cgs.media.weaponIcons[i as usize] = 0;
+            ctx.world.cgs.media.weaponIcons_NA[i as usize] = 0;
+        }
+        i += 1;
+    }
+    let buf = trap::Cvar_VariableStringBuffer(engine, "com_buildscript", 64);
+    if atoi(&buf) != 0 {
+        trap::R_RegisterShaderNoMip(engine, "gfx/hud/w_icon_saberstaff");
+        trap::R_RegisterShaderNoMip(engine, "gfx/hud/w_icon_duallightsaber");
+    }
+
+    // HUD artwork for cycling inventory,weapons and force powers
+    ctx.world.cgs.media.weaponIconBackground =
+        trap::R_RegisterShaderNoMip(engine, "gfx/hud/background");
+    ctx.world.cgs.media.forceIconBackground =
+        trap::R_RegisterShaderNoMip(engine, "gfx/hud/background_f");
+    ctx.world.cgs.media.inventoryIconBackground =
+        trap::R_RegisterShaderNoMip(engine, "gfx/hud/background_i");
+
+    //rww - precache holdable item icons here
+    // Raven resets its loop index (`i = 0`) here to walk `bg_itemlist` with the
+    // same variable the weapon-icon loop above used; the port gives this loop
+    // its own iterator instead of reusing a shared index (§C10 - shape is free).
+    for it in bg_itemlist.iter().take(bg_numItems as usize) {
+        if let ItemKind::Holdable(giTag) = it.kind {
+            if let Some(icon) = it.icon {
+                ctx.world.cgs.media.invenIcons[giTag as usize] =
+                    trap::R_RegisterShaderNoMip(engine, icon);
+            } else {
+                ctx.world.cgs.media.invenIcons[giTag as usize] = 0;
+            }
+        }
+    }
+
+    //rww - precache force power icons here
+    for (i, path) in HOLOCRON_ICONS.iter().enumerate() {
+        ctx.world.cgs.media.forcePowerIcons[i] = trap::R_RegisterShaderNoMip(engine, path);
+    }
+    ctx.world.cgs.media.rageRecShader =
+        trap::R_RegisterShaderNoMip(engine, "gfx/mp/f_icon_ragerec");
+
+    //body decal shaders -rww
+    ctx.world.cgs.media.bdecal_bodyburn1 =
+        trap::R_RegisterShader(engine, "gfx/damage/bodyburnmark1");
+    ctx.world.cgs.media.bdecal_saberglow =
+        trap::R_RegisterShader(engine, "gfx/damage/saberglowmark");
+    ctx.world.cgs.media.bdecal_burn1 =
+        trap::R_RegisterShader(engine, "gfx/damage/bodybigburnmark1");
+    ctx.world.cgs.media.mSaberDamageGlow =
+        trap::R_RegisterShader(engine, "gfx/effects/saberDamageGlow");
+
+    CG_RegisterCvars(ctx);
+
+    CG_InitConsoleCommands(ctx);
+
+    ctx.world.cg.weaponSelect = WP_BRYAR_PISTOL;
+
+    ctx.world.cgs.redflag = -1; // For compatibily, default to unset for
+    ctx.world.cgs.blueflag = -1;
+    ctx.world.cgs.flagStatus = -1;
+    // old servers
+
+    // get the rendering configuration from the client system
+    trap::GetGlconfig(engine, &mut ctx.world.cgs.glconfig);
+    ctx.world.cgs.screenXScale = ctx.world.cgs.glconfig.vidWidth as f32 / 640.0;
+    ctx.world.cgs.screenYScale = ctx.world.cgs.glconfig.vidHeight as f32 / 480.0;
+
+    // get the gamestate from the client system
+    trap::GetGameState(engine, &mut ctx.world.cgs.gameState);
+
+    CG_TransitionPermanent(ctx); //rwwRMG - added
+
+    // check version
+    let s = CG_ConfigString(ctx, CS_GAME_VERSION);
+    if s != GAME_VERSION {
+        CG_Error(
+            ctx,
+            &format!("Client/Server game mismatch: {GAME_VERSION}/{s}"),
+        );
+        return;
+    }
+
+    let s = CG_ConfigString(ctx, CS_LEVEL_START_TIME);
+    ctx.world.cgs.levelStartTime = atoi(&s);
+
+    CG_ParseServerinfo(ctx);
+
+    // load the new map
+    // CG_LoadingString( "collision map" );
+
+    let mapname = buf_to_string(&ctx.world.cgs.mapname.map(|c| c as u8));
+    trap::CM_LoadMap(engine, &mapname, false);
+
+    String_Init(menus, dc);
+
+    ctx.world.cg.loading = qtrue; // force players to load instead of defer
+
+    //make sure saber data is loaded before this! (so we can precache the appropriate hilts)
+    CG_InitSiegeMode(ctx);
+
+    CG_RegisterSounds(ctx);
+
+    // CG_LoadingString( "graphics" );
+
+    CG_RegisterGraphics(ctx);
+
+    // CG_LoadingString( "clients" );
+
+    CG_RegisterClients(ctx); // if low on memory, some clients will be deferred
+
+    CG_AssetCache(ctx, ds);
+    CG_LoadHudMenu(ctx, menus, ds, dc); // load new hud stuff
+
+    ctx.world.cg.loading = qfalse; // future players will be deferred
+
+    CG_InitLocalEntities(ctx.world);
+
+    CG_InitMarkPolys(ctx.world);
+
+    // remove the last loading update
+    ctx.world.cg.infoScreenText[0] = 0;
+
+    // Make sure we have update values (scores)
+    CG_SetConfigValues(ctx);
+
+    CG_StartMusic(ctx, false);
+
+    // CG_LoadingString( "Clearing light styles" );
+    CG_ClearLightStyles(ctx);
+
+    // CG_LoadingString( "Creating automap data" );
+    //init automap
+    trap::R_InitWireframeAutomap(engine);
+
+    CG_LoadingString(ctx, "");
+
+    CG_ShaderStateChanged(ctx);
+
+    trap::S_ClearLoopingSounds(engine);
+
+    ctx.world.cg.distanceCull = trap::R_GetDistanceCull(engine);
+
+    //now get all the cgame only cents
+    CG_SpawnCGameOnlyEnts(ctx);
 }

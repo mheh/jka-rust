@@ -112,6 +112,12 @@ pub struct CgMainState {
     /// Transcribed anyway - the test is Raven's.
     /// Source: `oracle/codemp/cgame/cg_main.c:113,1117-1127`
     pub cgWeatherOverride: c_int,
+
+    /// Raven `static int drawTeamOverlayModificationCount` — `CG_UpdateCvars`'s
+    /// last-seen `cg_drawTeamOverlay.modificationCount`, starting at `-1` so the
+    /// first update always fires the `teamoverlay` cvar sync.
+    /// Source: `oracle/codemp/cgame/cg_main.c:1160`
+    pub drawTeamOverlayModificationCount: c_int,
 }
 
 impl Default for CgMainState {
@@ -132,6 +138,7 @@ impl Default for CgMainState {
             cg_skyOriPos: [0.0; 3],
             cg_skyOriScale: 0.0,
             cgWeatherOverride: 0,
+            drawTeamOverlayModificationCount: -1,
         }
     }
 }
