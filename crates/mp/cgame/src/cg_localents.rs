@@ -889,3 +889,161 @@ pub fn CG_AddFragment(ctx: &mut CgContext, handle: EffectHandle) {
         .get_mut(handle)
         .expect("CG_AddFragment: not active") = le;
 }
+
+/// Raven `CG_AddLocalEntities` — walks every active local entity, frees the
+/// ones whose `endTime` has passed, and dispatches the rest to their
+/// per-`leType` add fn.
+///
+/// Raven walks the intrusive active list backwards (`cg_activeLocalEntities.prev`)
+/// so anything a `CG_Add*` spawns this frame (trails, marks, etc) is still
+/// present for this same walk — new entries link at the head, so the cursor
+/// reaches them before it finishes. The port collects a batch of handles, and
+/// after processing re-collects for anything spawned mid-walk, until a pass
+/// spawns nothing new (same entities visited, same oldest-first order; frees
+/// mid-walk are safe because a stale handle just resolves to `None`).
+///
+/// `LE_FADE_SCALE_MODEL`/`LE_FADE_RGB`/`LE_LINE`/`LE_EXPLOSION`/
+/// `LE_SPRITE_EXPLOSION` take a resolved `localEntity_t` reference rather than
+/// a handle (earlier-wave shape) — those five go through the take/put-back
+/// dance so the borrowed record doesn't alias the `ctx: &mut CgContext` those
+/// fns also need.
+/// Source: `oracle/codemp/cgame/cg_localents.c:789-865`
+pub fn CG_AddLocalEntities(ctx: &mut CgContext) {
+    // grab next now, so if the local entity is freed we still have it
+    let mut visited: Vec<EffectHandle> = Vec::new();
+    loop {
+        let batch: Vec<EffectHandle> = ctx
+            .world
+            .cg_localEntities
+            .active_oldest_first()
+            .filter(|h| !visited.contains(h))
+            .collect();
+        if batch.is_empty() {
+            // nothing new spawned mid-walk - Raven's cursor would be done too
+            break;
+        }
+        for handle in batch {
+            visited.push(handle);
+            add_local_entity(ctx, handle);
+        }
+    }
+}
+
+/// One iteration of [`CG_AddLocalEntities`]'s walk - the body of Raven's
+/// `for` loop over the active list, split out so the spawn-during-walk
+/// re-collect above stays readable.
+/// Source: `oracle/codemp/cgame/cg_localents.c:798-864`
+fn add_local_entity(ctx: &mut CgContext, handle: EffectHandle) {
+    {
+        let le = match ctx.world.cg_localEntities.get(handle) {
+            Some(le) => le,
+            // already freed earlier this same walk
+            None => return,
+        };
+
+        if ctx.world.cg.time >= le.endTime {
+            CG_FreeLocalEntity(ctx, handle);
+            return;
+        }
+
+        let leType = le.leType;
+        match leType {
+            leType_t::LE_MARK => {}
+
+            leType_t::LE_SPRITE_EXPLOSION => {
+                let le = core::mem::replace(
+                    ctx.world
+                        .cg_localEntities
+                        .get_mut(handle)
+                        .expect("CG_AddLocalEntities: not active"),
+                    localEntity_t::zeroed(),
+                );
+                CG_AddSpriteExplosion(ctx, &le);
+                *ctx.world
+                    .cg_localEntities
+                    .get_mut(handle)
+                    .expect("CG_AddLocalEntities: not active") = le;
+            }
+
+            leType_t::LE_EXPLOSION => {
+                let le = core::mem::replace(
+                    ctx.world
+                        .cg_localEntities
+                        .get_mut(handle)
+                        .expect("CG_AddLocalEntities: not active"),
+                    localEntity_t::zeroed(),
+                );
+                CG_AddExplosion(ctx, &le);
+                *ctx.world
+                    .cg_localEntities
+                    .get_mut(handle)
+                    .expect("CG_AddLocalEntities: not active") = le;
+            }
+
+            leType_t::LE_FADE_SCALE_MODEL => {
+                let mut le = core::mem::replace(
+                    ctx.world
+                        .cg_localEntities
+                        .get_mut(handle)
+                        .expect("CG_AddLocalEntities: not active"),
+                    localEntity_t::zeroed(),
+                );
+                CG_AddFadeScaleModel(ctx, &mut le);
+                *ctx.world
+                    .cg_localEntities
+                    .get_mut(handle)
+                    .expect("CG_AddLocalEntities: not active") = le;
+            }
+
+            leType_t::LE_FRAGMENT => CG_AddFragment(ctx, handle), // gibs and brass
+
+            leType_t::LE_PUFF => CG_AddPuff(ctx, handle),
+
+            leType_t::LE_MOVE_SCALE_FADE => CG_AddMoveScaleFade(ctx, handle), // water bubbles
+
+            leType_t::LE_FADE_RGB => {
+                // teleporters, railtrails
+                let mut le = core::mem::replace(
+                    ctx.world
+                        .cg_localEntities
+                        .get_mut(handle)
+                        .expect("CG_AddLocalEntities: not active"),
+                    localEntity_t::zeroed(),
+                );
+                CG_AddFadeRGB(ctx, &mut le);
+                *ctx.world
+                    .cg_localEntities
+                    .get_mut(handle)
+                    .expect("CG_AddLocalEntities: not active") = le;
+            }
+
+            leType_t::LE_FALL_SCALE_FADE => CG_AddFallScaleFade(ctx, handle), // gib blood trails
+
+            leType_t::LE_SCALE_FADE => CG_AddScaleFade(ctx, handle), // rocket trails
+
+            leType_t::LE_SCOREPLUM => CG_AddScorePlum(ctx, handle),
+
+            leType_t::LE_OLINE => CG_AddOLine(ctx, handle),
+
+            leType_t::LE_SHOWREFENTITY => CG_AddRefEntity(ctx, handle),
+
+            leType_t::LE_LINE => {
+                // oriented lines for FX
+                let mut le = core::mem::replace(
+                    ctx.world
+                        .cg_localEntities
+                        .get_mut(handle)
+                        .expect("CG_AddLocalEntities: not active"),
+                    localEntity_t::zeroed(),
+                );
+                CG_AddLine(ctx, &mut le);
+                *ctx.world
+                    .cg_localEntities
+                    .get_mut(handle)
+                    .expect("CG_AddLocalEntities: not active") = le;
+            } // no default: Raven's `default` arm (`CG_Error("Bad leType: %i", ...)`) is
+              // unreachable here — `leType_t` is an exhaustive Rust enum, so every value
+              // that can land in the field is already one of the arms above.
+        }
+    }
+}

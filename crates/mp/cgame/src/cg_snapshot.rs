@@ -13,8 +13,10 @@ use mp_bg::public::entity_type::entityType_t;
 use mp_qshared::common::mp::qcommon::{entityState_t, playerState_t};
 use mp_qshared::shared::q_math::_VectorCopy;
 use mp_qshared::shared::{qfalse, qtrue, SNAPFLAG_SERVERCOUNT};
+use mp_uishared::shared::display_state::DisplayState;
 
 use crate::cg_draw::CG_AddLagometerSnapshotInfo;
+use crate::cg_event::CG_CheckEvents;
 use crate::cg_main::CG_Printf;
 use crate::cg_players::{zeroed_client_info, CG_ResetPlayerEntity};
 use crate::cg_predict::CG_BuildSolidList;
@@ -254,4 +256,35 @@ pub fn CG_ResetEntity(ctx: &mut CgContext, centNum: usize) {
     }
 
     *ctx.world.entity_mut(centNum) = cent;
+}
+
+/// Raven `CG_TransitionEntity` — latches an entity's nextState in as its
+/// currentState once a new snapshot lands, resetting event/lerp state first
+/// if the entity wasn't interpolating from the previous frame (new arrival or
+/// teleport), then checks for events on the fresh currentState.
+///
+/// PORT-NOTE: Raven's fn signature is `(centity_t *cent)`; [`CG_ResetEntity`]
+/// and [`CG_CheckEvents`] - both already ported by an earlier wave - take
+/// `(ctx, centNum)` instead, so this fn threads `ctx`/`centNum` too and
+/// mutates the entity through `ctx.world.entity_mut` rather than holding a
+/// `&mut centity_t` across those calls.
+///
+/// Source: `oracle/codemp/cgame/cg_snapshot.c:52-66`
+pub fn CG_TransitionEntity(ctx: &mut CgContext, ds: &DisplayState, centNum: usize) {
+    {
+        let cent = ctx.world.entity_mut(centNum);
+        cent.currentState = cent.nextState;
+        cent.currentValid = qtrue;
+    }
+
+    // reset if the entity wasn't in the last frame or was teleported
+    if ctx.world.entity_mut(centNum).interpolate == qfalse {
+        CG_ResetEntity(ctx, centNum);
+    }
+
+    // clear the next state.  if will be set by the next CG_SetNextSnap
+    ctx.world.entity_mut(centNum).interpolate = qfalse;
+
+    // check for events
+    CG_CheckEvents(ctx, ds, centNum);
 }

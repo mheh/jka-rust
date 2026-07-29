@@ -140,6 +140,13 @@ pub struct CgViewState {
     /// ran; a 300ms gap re-seeds it from a fresh third-person offset.
     /// Source: `oracle/codemp/cgame/cg_view.c:1397`
     pub cg_actionCamLastTime: c_int,
+
+    /// Raven `vec3_t cg_lastTurretViewAngles` — the view angles
+    /// [`crate::cg_view::CG_CalcViewValues`] last latched on a turret frame.
+    /// Write-only in retail: Raven's sole reader sits inside a commented-out
+    /// block (`cg_view.c:1541-1544`), preserved faithfully.
+    /// Source: `oracle/codemp/cgame/cg_view.c:1476,1646`
+    pub cg_lastTurretViewAngles: vec3_t,
 }
 
 impl Default for CgViewState {
@@ -184,6 +191,7 @@ impl Default for CgViewState {
             cg_linearFogOverride: 0.0,
             cg_actionCamLastPos: [0.0; 3],
             cg_actionCamLastTime: 0,
+            cg_lastTurretViewAngles: [0.0; 3],
         }
     }
 }

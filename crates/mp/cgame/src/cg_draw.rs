@@ -8381,3 +8381,17 @@ pub fn CG_DrawCrosshairNames(ctx: &mut CgContext, ds: &DisplayState) {
 pub fn CG_DrawScoreboard(ctx: &mut CgContext, ds: &DisplayState) -> bool {
     CG_DrawOldScoreboard(ctx, ds)
 }
+
+/// Raven `CG_DrawIntermission`.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:6800-6808`
+pub fn CG_DrawIntermission(ctx: &mut CgContext, ds: &DisplayState) {
+    // int key;
+    // if (cg_singlePlayer.integer) {
+    // 	CG_DrawCenterString();
+    // 	return;
+    // }
+    ctx.world.cg.scoreFadeTime = ctx.world.cg.time;
+    let scoreBoardShowing = CG_DrawScoreboard(ctx, ds);
+    ctx.world.cg.scoreBoardShowing = if scoreBoardShowing { qtrue } else { qfalse };
+}

@@ -7,6 +7,7 @@ use core::f64::consts::PI;
 use core::ffi::c_int;
 
 use mp_bg::bg_misc::BG_EmplacedView;
+use mp_bg::bg_panimate::BG_SaberInSpecial;
 use mp_bg::bg_pmove::BG_UnrestrainedPitchRoll;
 use mp_bg::public::dm_flags::DF_FIXED_FOV;
 use mp_bg::public::entity_effects::EF2_HELD_BY_MONSTER;
@@ -19,7 +20,7 @@ use mp_bg::public::pmtype::pmtype_t;
 use mp_bg::public::stat_index::statIndex_t::{STAT_DEAD_YAW, STAT_HEALTH};
 use mp_bg::public::team::TEAM_SPECTATOR;
 use mp_bg::public::viewheight::{DEFAULT_MAXS_2, DEFAULT_MINS_2};
-use mp_bg::weapons::weapon_t::WP_SABER;
+use mp_bg::weapons::weapon_t::{WP_EMPLACED_GUN, WP_SABER};
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::refdef_t::{
@@ -1794,6 +1795,10 @@ const RDF_NOWORLDMODEL: c_int = 1;
 /// Source: `oracle/codemp/cgame/tr_types.h:63`
 const RDF_AUTOMAP: c_int = 32;
 
+/// Raven `RDF_HYPERSPACE` — teleportation effect.
+/// Source: `oracle/codemp/cgame/tr_types.h:58`
+const RDF_HYPERSPACE: c_int = 4;
+
 /// Raven `CG_DrawAutoMap` — draws the automap scene. -rww
 ///
 /// Source: `oracle/codemp/cgame/cg_view.c:2284-2425`
@@ -2317,4 +2322,175 @@ pub fn CG_ThirdPersonActionCam(ctx: &mut CgContext) -> bool {
     // just set the angles for now
     ctx.world.cg.refdef.viewangles = desiredAngles;
     true
+}
+
+/// Raven `CG_CalcViewValues` — settles this frame's `cg.refdef`: intermission
+/// override, bob/xyspeed, turret-manning vs normal view angles, camera orbit,
+/// predicted-error decay, the emplaced-gun constraint, then hands off to the
+/// vehicle/third-person/first-person offset before axis-ing the result.
+/// Returns [`CG_CalcFov`]'s liquid-eye flag.
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:1564-1712`
+pub fn CG_CalcViewValues(ctx: &mut CgContext) -> bool {
+    // Raven's `memset( &cg.refdef, 0, sizeof( cg.refdef ) )` — `refdef_t` is
+    // scalars and arrays with no padding, so the zeroed literal is the memset.
+    ctx.world.cg.refdef = refdef_t {
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        fov_x: 0.0,
+        fov_y: 0.0,
+        vieworg: [0.0; 3],
+        viewangles: [0.0; 3],
+        viewaxis: [[0.0; 3]; 3],
+        viewContents: 0,
+        time: 0,
+        rdflags: 0,
+        areamask: [0; MAX_MAP_AREA_BYTES],
+        text: [[0; MAX_RENDER_STRING_LENGTH]; MAX_RENDER_STRINGS],
+    };
+
+    // calculate size of 3D view
+    CG_CalcVrect(ctx);
+
+    let ps = ctx.world.cg.predictedPlayerState;
+
+    // intermission view
+    if ps.pm_type == pmtype_t::PM_INTERMISSION as c_int {
+        _VectorCopy(ps.origin, &mut ctx.world.cg.refdef.vieworg);
+        _VectorCopy(ps.viewangles, &mut ctx.world.cg.refdef.viewangles);
+        let viewangles = ctx.world.cg.refdef.viewangles;
+        AnglesToAxis(viewangles, ctx.world.cg.refdef.viewaxis.as_mut_ptr());
+        return CG_CalcFov(ctx);
+    }
+
+    ctx.world.cg.bobcycle = (ps.bobCycle & 128) >> 7;
+    // `fabs(sin(...))` runs in double (the `127.0`/`M_PI` promote it), then
+    // narrows once at assignment to the float field.
+    ctx.world.cg.bobfracsin = (((ps.bobCycle & 127) as f64 / 127.0 * PI).sin()).abs() as f32;
+    ctx.world.cg.xyspeed =
+        ((ps.velocity[0] * ps.velocity[0] + ps.velocity[1] * ps.velocity[1]) as f64).sqrt() as f32;
+
+    if ctx.world.cg.xyspeed > 270.0 {
+        ctx.world.cg.xyspeed = 270.0;
+    }
+
+    let manningTurret = CG_CheckPassengerTurretView(ctx.world);
+    if !manningTurret {
+        // not manning a turret on a vehicle
+        _VectorCopy(ps.origin, &mut ctx.world.cg.refdef.vieworg);
+
+        // Raven's `VEH_CONTROL_SCHEME_4` is never defined in this tree, so the
+        // `#else` arm below is the only one that ever built.
+        // Source: `oracle/codemp/cgame/cg_view.c:1634-1644`
+        //
+        // `BG_UnrestrainedPitchRoll` needs a live `Vehicle_t*`; DEC-46.2 only
+        // carries presence through `centity_t.m_pVehicle`, so this passes a
+        // null vehicle pointer — the same answer `!pVeh.is_null()` gives
+        // inside the fn for the no-vehicle case (`CG_OffsetThirdPersonView`
+        // precedent, `cg_view.c:712-716`).
+        let vehNum = ps.m_iVehicleNum;
+        let unrestrained = vehNum != 0
+            && BG_UnrestrainedPitchRoll(
+                &mut ctx.world.cg.predictedPlayerState as *mut playerState_t,
+                core::ptr::null_mut(),
+                &ctx.world.bg_state,
+            ) != qfalse;
+
+        if unrestrained {
+            // use the vehicle's viewangles to render view!
+            let predictedVehicleViewangles = ctx.world.cg.predictedVehicleState.viewangles;
+            ctx.world.cg.refdef.viewangles = predictedVehicleViewangles;
+        } else {
+            _VectorCopy(ps.viewangles, &mut ctx.world.cg.refdef.viewangles);
+        }
+    }
+    let viewangles = ctx.world.cg.refdef.viewangles;
+    ctx.world.view.cg_lastTurretViewAngles = viewangles;
+
+    if ctx.world.cvars.cg_cameraOrbit.integer != 0 {
+        if ctx.world.cg.time > ctx.world.cg.nextOrbitTime {
+            ctx.world.cg.nextOrbitTime =
+                ctx.world.cg.time + ctx.world.cvars.cg_cameraOrbitDelay.integer;
+            ctx.world.cvars.cg_thirdPersonAngle.value += ctx.world.cvars.cg_cameraOrbit.value;
+        }
+    }
+
+    // add error decay
+    if ctx.world.cvars.cg_errorDecay.value > 0.0 {
+        let t = ctx.world.cg.time - ctx.world.cg.predictedErrorTime;
+        let f =
+            (ctx.world.cvars.cg_errorDecay.value - t as f32) / ctx.world.cvars.cg_errorDecay.value;
+        if f > 0.0 && f < 1.0 {
+            let vieworg = ctx.world.cg.refdef.vieworg;
+            let predictedError = ctx.world.cg.predictedError;
+            _VectorMA(vieworg, f, predictedError, &mut ctx.world.cg.refdef.vieworg);
+        } else {
+            ctx.world.cg.predictedErrorTime = 0;
+        }
+    }
+
+    // §F19: Raven derefs `cg.snap` unguarded; with no snapshot the emplaced
+    // constraint is simply skipped.
+    let emplacedGun = ctx
+        .world
+        .cg
+        .snap_ref()
+        .map(|snap| (snap.ps.weapon, snap.ps.emplacedIndex));
+    if let Some((weapon, emplacedIndex)) = emplacedGun {
+        if weapon == WP_EMPLACED_GUN && emplacedIndex != 0 {
+            // constrain the view properly for emplaced guns
+            let angles = ctx.world.entity(emplacedIndex as usize).currentState.angles;
+            CG_EmplacedView(ctx, angles);
+        }
+    }
+
+    // FIX: okay, if manning a turret, let view turn freely,
+    //      and use the vehicle chase camera info to place vieworg
+    // if ( !manningTurret )
+    {
+        let vehNum = ps.m_iVehicleNum;
+        let unrestrained = vehNum != 0
+            && BG_UnrestrainedPitchRoll(
+                &mut ctx.world.cg.predictedPlayerState as *mut playerState_t,
+                core::ptr::null_mut(),
+                &ctx.world.bg_state,
+            ) != qfalse;
+
+        if unrestrained {
+            // use the vehicle's viewangles to render view!
+            CG_OffsetFighterView(ctx);
+        } else if ctx.world.cg.renderingThirdPerson != qfalse {
+            // back away from character
+            // §F19: null-snap arm reads "not in a special move" (Raven derefs
+            // unguarded at cg_view.c:1690)
+            let snapSaberMove = ctx.world.cg.snap_ref().map(|snap| snap.ps.saberMove);
+            let actionCam = ctx.world.cvars.cg_thirdPersonSpecialCam.integer != 0
+                && snapSaberMove.is_some_and(|m| BG_SaberInSpecial(m) != qfalse);
+            if actionCam {
+                // the action cam
+                if !CG_ThirdPersonActionCam(ctx) {
+                    // couldn't do it for whatever reason, resort back to third person then
+                    CG_OffsetThirdPersonView(ctx);
+                }
+            } else {
+                CG_OffsetThirdPersonView(ctx);
+            }
+        } else {
+            // offset for local bobbing and kicks
+            CG_OffsetFirstPersonView(ctx.world);
+        }
+    }
+
+    // position eye relative to origin
+    let viewangles = ctx.world.cg.refdef.viewangles;
+    AnglesToAxis(viewangles, ctx.world.cg.refdef.viewaxis.as_mut_ptr());
+
+    if ctx.world.cg.hyperspace != qfalse {
+        ctx.world.cg.refdef.rdflags |= RDF_NOWORLDMODEL | RDF_HYPERSPACE;
+    }
+
+    // field of view
+    CG_CalcFov(ctx)
 }

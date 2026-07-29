@@ -19,12 +19,15 @@ use mp_bg::bg_panimate::{
 use mp_bg::bg_pmove::{BG_G2PlayerAngles, BG_IK_MoveArm, PM_RunningAnim, PM_WalkingAnim};
 use mp_bg::bg_saber::{SFL2_NO_BLADE, SFL2_NO_DLIGHT, SFL2_NO_WALL_MARKS};
 use mp_bg::bg_saberLoad::{BG_SI_SetDesiredLength, WP_SaberBladeUseSecondBladeStyle, WP_SetSaber};
+use mp_bg::bg_saga::{BG_SiegeFindClassByName, BG_SiegeFindClassIndexByName};
 use mp_bg::bg_vehicleLoad::{BG_GetVehicleModelName, BG_GetVehicleSkinName, BG_VehicleGetIndex};
 use mp_bg::cstr_util::cstr_to_str;
 use mp_bg::local::{bgToggleableSurfaceDebris, bgToggleableSurfaces, bg_customSiegeSoundNames};
+use mp_bg::public::anim_event_type::animEventType_t;
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::anim_table::animTable;
-use mp_bg::public::configstring::{CS_G2BONES, CS_MODELS};
+use mp_bg::public::animevent::{animevent_t, MAX_RANDOM_ANIM_SOUNDS};
+use mp_bg::public::configstring::{CS_G2BONES, CS_MODELS, CS_PLAYERS};
 use mp_bg::public::entity_effects::EF2_HYPERSPACE;
 use mp_bg::public::entity_flags::{EF_CONNECTION, EF_DEAD, EF_PERMANENT, EF_RAG, EF_TALK};
 use mp_bg::public::entity_type::entityType_t;
@@ -81,7 +84,8 @@ use mp_qshared::shared::{
     MASK_SOLID, MAX_CLIENTS, MAX_CLIENTS_I32, MAX_GENTITIES, MAX_QPATH, SURF_NOIMPACT,
 };
 use native_string::{
-    atoi, buf_to_string, cstr, strcat_string, strncpyz_string, Q_stricmp, Q_strncpyz,
+    atoi, buf_to_string, cstr, strcat_string, strncpyz_string, Info_ValueForKey, Q_stricmp,
+    Q_stricmpn, Q_strncpyz, Q_strncpyzBytes,
 };
 
 use crate::bg_channel::{CgBgTraps, CgGameCallbacks};
@@ -144,6 +148,46 @@ const MAX_SHIELD_TIME: f64 = 2000.0;
 /// Raven `MIN_SHIELD_TIME` — same double literal, the shield-alpha divisor.
 /// Source: `oracle/codemp/cgame/cg_players.c:5074`
 const MIN_SHIELD_TIME: f64 = 2000.0;
+
+// `animevent_t.eventData` index constants — Raven's `bg_public.h` `#define`s that
+// name the slots in a parsed animation event's payload. They have no ported
+// cross-crate home yet, so they land beside `CG_PlayerAnimEventDo`, the only
+// reader in this file. Values transcribed verbatim.
+// Source: `oracle/codemp/game/bg_public.h:273-302`
+
+/// `AEV_SOUND` payload — first random-sound-index slot.
+/// Source: `oracle/codemp/game/bg_public.h:274`
+const AED_SOUNDINDEX_START: usize = 0;
+/// `AEV_SOUND` payload — how many random sounds to pick from.
+/// Source: `oracle/codemp/game/bg_public.h:276`
+const AED_SOUND_NUMRANDOMSNDS: usize = MAX_RANDOM_ANIM_SOUNDS;
+/// `AEV_SOUNDCHAN` payload — the `soundChannel_t` to play on.
+/// Source: `oracle/codemp/game/bg_public.h:279`
+const AED_SOUNDCHANNEL: usize = MAX_RANDOM_ANIM_SOUNDS + 2;
+/// `AEV_FOOTSTEP` payload — the `footstepType_t`.
+/// Source: `oracle/codemp/game/bg_public.h:281`
+const AED_FOOTSTEP_TYPE: usize = 0;
+/// `AEV_EFFECT` payload — the effect index.
+/// Source: `oracle/codemp/game/bg_public.h:284`
+const AED_EFFECTINDEX: usize = 0;
+/// `AEV_EFFECT` payload — the resolved bolt index (cached after first lookup).
+/// Source: `oracle/codemp/game/bg_public.h:285`
+const AED_BOLTINDEX: usize = 1;
+/// `AEV_EFFECT` payload — which ghoul2 model the bolt lives on.
+/// Source: `oracle/codemp/game/bg_public.h:287`
+const AED_MODELINDEX: usize = 3;
+/// `AEV_SABER_SWING` payload — which saber swung.
+/// Source: `oracle/codemp/game/bg_public.h:296`
+const AED_SABER_SWING_SABERNUM: usize = 0;
+/// `AEV_SABER_SWING` payload — swing strength (fast/medium/strong).
+/// Source: `oracle/codemp/game/bg_public.h:297`
+const AED_SABER_SWING_TYPE: usize = 1;
+/// `AEV_SABER_SPIN` payload — which saber is spinning.
+/// Source: `oracle/codemp/game/bg_public.h:300`
+const AED_SABER_SPIN_SABERNUM: usize = 0;
+/// `AEV_SABER_SPIN` payload — spin sound variant.
+/// Source: `oracle/codemp/game/bg_public.h:301`
+const AED_SABER_SPIN_TYPE: usize = 1;
 
 /// Raven `cg_customSoundNames[MAX_CUSTOM_SOUNDS]` — the base per-client custom
 /// sound set, scanned until the `NULL` sentinel (`None`). The leading `*` is
@@ -7021,36 +7065,43 @@ pub fn CG_ResetPlayerEntity(ctx: &mut CgContext, cent: &mut centity_t, ci: &mut 
     }
 }
 
-/// Raven `CG_LoadClientInfo` — (re)registers a client's model, ghoul2 instance
-/// and sounds, then resets every player entity wearing that client number so it
-/// doesn't hold a frame from the old model.
+/// Raven `CG_LoadClientInfo` — thin wrapper over `CG_LoadClientInfoFor` for the
+/// callers that hold a real slot index (`CG_ActualLoadDeferredPlayers`).
 ///
-/// Raven derives the client index from `ci - cgs.clientinfo` pointer arithmetic;
-/// we take that index as `clientNum` (every caller already knows the slot).
+/// Raven's `CG_LoadClientInfo(&cgs.clientinfo[i])` derives `clientNum = ci -
+/// cgs.clientinfo` = i (in range, so unclamped == clamped). We hand the record
+/// out of the slot, run the body against it with `gateNum = clientNum`, and put
+/// it back — the real-slot semantics Raven had when passed a real `&ci`.
 /// Source: `oracle/codemp/cgame/cg_players.c:1006-1147`
 pub fn CG_LoadClientInfo(ctx: &mut CgContext, clientNum: c_int) {
-    let engine = ctx.engine;
-
-    // ESCALATION (queued for the CG_NewClientInfo wave): Raven's fn takes a
-    // `clientInfo_t *ci` and CG_NewClientInfo calls it twice with a STACK
-    // LOCAL, which this clientNum shape cannot express - that wave either
-    // grows an `&mut clientInfo_t` twin or reshapes this. Until then every
-    // caller must pass a real cgs.clientinfo slot index.
-    // Source: oracle/codemp/cgame/cg_players.c:1803,1809
-
-    // Raven clamps its `clientNum` to -1 when out of range; that value only
-    // gates the ghoul2/attach block. Keep the real slot index separate for the
-    // take/put-back and the reset loop.
+    // Raven clamps the derived index to -1 when out of range; a real slot is
+    // always in range, so this is a no-op for these callers.
     let mut gateNum = clientNum;
     if gateNum < 0 || gateNum >= MAX_CLIENTS_I32 {
         gateNum = -1;
     }
 
-    // Hand the clientinfo out so we can pass &mut ci alongside ctx (take/put-back).
     let mut ci = core::mem::replace(
         &mut ctx.world.cgs.clientinfo[clientNum as usize],
         zeroed_client_info(),
     );
+    CG_LoadClientInfoFor(ctx, &mut ci, gateNum);
+    ctx.world.cgs.clientinfo[clientNum as usize] = ci;
+}
+
+/// Raven `CG_LoadClientInfo`'s body, operating on the caller's `clientInfo_t`
+/// record directly — Raven's stack-local dataflow made explicit.
+///
+/// `gateNum` is Raven's clamped `clientNum` (the `ci - cgs.clientinfo` value,
+/// -1 when the record isn't inside `cgs.clientinfo` — which is every call
+/// forwarding a stack-local `&newInfo`). It gates `ClearAttachedInstance`, the
+/// ghoul2 duplicate/attach/face-bolt block, the `clientNum` passed through to
+/// `CG_RegisterClientModelname`, and the tail entity-reset sweep. With
+/// `gateNum == -1` all of those skip — Raven's unclamped re-derivation at
+/// `:1140` yields an address that matches no entity, so nothing resets.
+/// Source: `oracle/codemp/cgame/cg_players.c:1006-1147`
+pub(crate) fn CG_LoadClientInfoFor(ctx: &mut CgContext, ci: &mut clientInfo_t, gateNum: c_int) {
+    let engine = ctx.engine;
 
     ci.deferred = qfalse;
 
@@ -7069,12 +7120,11 @@ pub fn CG_LoadClientInfo(ctx: &mut CgContext, clientNum: c_int) {
     let mut modelloaded = true;
     if ctx.world.cgs.gametype == GT_SIEGE && (ci.team == TEAM_SPECTATOR || ci.siegeIndex == -1) {
         // yeah.. kind of a hack. Don't care until they're actually ingame with a valid class.
-        if !CG_RegisterClientModelname(ctx, &mut ci, DEFAULT_MODEL, "default", &teamname, -1) {
+        if !CG_RegisterClientModelname(ctx, ci, DEFAULT_MODEL, "default", &teamname, -1) {
             CG_Error(
                 ctx,
                 &format!("DEFAULT_MODEL ({DEFAULT_MODEL}) failed to register"),
             );
-            ctx.world.cgs.clientinfo[clientNum as usize] = ci;
             return;
         }
     } else {
@@ -7082,7 +7132,7 @@ pub fn CG_LoadClientInfo(ctx: &mut CgContext, clientNum: c_int) {
         let skinName = buf_to_string(&ci.skinName.map(|c| c as u8));
         // Raven hands the *clamped* clientNum here, so -1 flows through on the
         // out-of-range arm
-        if !CG_RegisterClientModelname(ctx, &mut ci, &modelName, &skinName, &teamname, gateNum) {
+        if !CG_RegisterClientModelname(ctx, ci, &modelName, &skinName, &teamname, gateNum) {
             // rww - DO NOT error out here! A nonsense model name would crash
             // everyone's client; give it a shot at the default model instead.
 
@@ -7095,36 +7145,21 @@ pub fn CG_LoadClientInfo(ctx: &mut CgContext, clientNum: c_int) {
                     teamname = DEFAULT_REDTEAM_NAME.to_string();
                 }
                 let skinName = buf_to_string(&ci.skinName.map(|c| c as u8));
-                if !CG_RegisterClientModelname(
-                    ctx,
-                    &mut ci,
-                    DEFAULT_MODEL,
-                    &skinName,
-                    &teamname,
-                    -1,
-                ) {
+                if !CG_RegisterClientModelname(ctx, ci, DEFAULT_MODEL, &skinName, &teamname, -1) {
                     CG_Error(
                         ctx,
                         &format!(
                             "DEFAULT_MODEL / skin ({DEFAULT_MODEL}/{skinName}) failed to register"
                         ),
                     );
-                    ctx.world.cgs.clientinfo[clientNum as usize] = ci;
                     return;
                 }
-            } else if !CG_RegisterClientModelname(
-                ctx,
-                &mut ci,
-                DEFAULT_MODEL,
-                "default",
-                &teamname,
-                -1,
-            ) {
+            } else if !CG_RegisterClientModelname(ctx, ci, DEFAULT_MODEL, "default", &teamname, -1)
+            {
                 CG_Error(
                     ctx,
                     &format!("DEFAULT_MODEL ({DEFAULT_MODEL}) failed to register"),
                 );
-                ctx.world.cgs.clientinfo[clientNum as usize] = ci;
                 return;
             }
             modelloaded = false;
@@ -7181,30 +7216,26 @@ pub fn CG_LoadClientInfo(ctx: &mut CgContext, clientNum: c_int) {
     if ctx.world.cgs.gametype == GT_SIEGE && (ci.team == TEAM_SPECTATOR || ci.siegeIndex == -1) {
         // don't need to load sounds
     } else {
-        CG_LoadCISounds(ctx, &mut ci, modelloaded);
+        CG_LoadCISounds(ctx, ci, modelloaded);
     }
 
     ci.deferred = qfalse;
 
-    // put our working copy back before the reset loop walks cg_entities
-    ctx.world.cgs.clientinfo[clientNum as usize] = ci;
-
     // reset any existing players and bodies, because they might be in bad
-    // frames for this new model
-    for i in 0..MAX_GENTITIES {
-        if ctx.world.entity(i).currentState.clientNum == clientNum
-            && ctx.world.entity(i).currentState.eType == entityType_t::ET_PLAYER as c_int
-        {
-            // take/put-back: CG_ResetPlayerEntity wants (&mut cent, &mut ci), and
-            // this ci is the very slot we just wrote.
-            let mut cent = core::mem::replace(ctx.world.entity_mut(i), centity_t::zeroed());
-            let mut ci = core::mem::replace(
-                &mut ctx.world.cgs.clientinfo[clientNum as usize],
-                zeroed_client_info(),
-            );
-            CG_ResetPlayerEntity(ctx, &mut cent, &mut ci);
-            ctx.world.cgs.clientinfo[clientNum as usize] = ci;
-            *ctx.world.entity_mut(i) = cent;
+    // frames for this new model. Raven re-derives `clientNum = ci -
+    // cgs.clientinfo` unclamped here; with a stack-local record (gateNum == -1)
+    // that address matches no entity, so the sweep is skipped entirely.
+    if gateNum != -1 {
+        for i in 0..MAX_GENTITIES {
+            if ctx.world.entity(i).currentState.clientNum == gateNum
+                && ctx.world.entity(i).currentState.eType == entityType_t::ET_PLAYER as c_int
+            {
+                // take/put-back: CG_ResetPlayerEntity wants (&mut cent, &mut ci);
+                // `ci` is a live &mut param, so only `cent` needs lifting.
+                let mut cent = core::mem::replace(ctx.world.entity_mut(i), centity_t::zeroed());
+                CG_ResetPlayerEntity(ctx, &mut cent, ci);
+                *ctx.world.entity_mut(i) = cent;
+            }
         }
     }
 }
@@ -8189,25 +8220,18 @@ pub fn CG_AddSaberBlade(
 /// (exact match loads for real, a same-skin teammate donates its handles),
 /// falling back to a real load when nobody matches.
 ///
-/// ESCALATION (queued for the CG_NewClientInfo wave, same family as
-/// `CG_LoadClientInfo`'s note): Raven's ONLY caller passes a STACK LOCAL
-/// (`CG_SetDeferredClientInfo(&newInfo)`, cg_players.c:1807) while
-/// `cgs.clientinfo[clientNum]` still holds the OLD occupant - so in Raven the
-/// scan loops can match the old slot, and the old ghoul2 handle gets cleaned
-/// before `*ci = newInfo` lands (:1814-1819). This clientNum shape takes the
-/// slot out (it can't match itself, and writes land uncleaned) - that wave
-/// must reconcile before wiring the caller.
+/// Raven passes a stack-local `&newInfo` here (cg_players.c:1807) while the old
+/// occupant still sits in `cgs.clientinfo[clientNum]`, so we take `ci` as a
+/// detached `&mut clientInfo_t` — the three scans read `cgs.clientinfo` directly
+/// (no aliasing; the old occupant IS a legitimate donor candidate, exactly as in
+/// Raven), and the loader hand-off forwards `gateNum = -1` (Raven's `ci -
+/// cgs.clientinfo` on a stack address). CG_NewClientInfo cleans the old ghoul2
+/// from its captured `oldGhoul2` and writes `ci` into the slot afterward.
 /// Source: `oracle/codemp/cgame/cg_players.c:1397-1492`
-pub fn CG_SetDeferredClientInfo(ctx: &mut CgContext, clientNum: c_int) {
+pub fn CG_SetDeferredClientInfo(ctx: &mut CgContext, ci: &mut clientInfo_t) {
     let maxclients = ctx.world.cgs.maxclients;
     let gametype = ctx.world.cgs.gametype;
 
-    // Take ci out up front so the scan below never aliases its own slot - a
-    // self-match in Raven is a same-value no-op copy anyway.
-    let mut ci = core::mem::replace(
-        &mut ctx.world.cgs.clientinfo[clientNum as usize],
-        zeroed_client_info(),
-    );
     let ciSkinName = buf_to_string(&ci.skinName.map(|c| c as u8));
     let ciModelName = buf_to_string(&ci.modelName.map(|c| c as u8));
 
@@ -8228,8 +8252,7 @@ pub fn CG_SetDeferredClientInfo(ctx: &mut CgContext, clientNum: c_int) {
         }
 
         // just load the real info cause it uses the same models and skins
-        ctx.world.cgs.clientinfo[clientNum as usize] = ci;
-        CG_LoadClientInfo(ctx, clientNum);
+        CG_LoadClientInfoFor(ctx, ci, -1);
         return;
     }
 
@@ -8253,19 +8276,19 @@ pub fn CG_SetDeferredClientInfo(ctx: &mut CgContext, clientNum: c_int) {
             }
 
             ci.deferred = qtrue;
+            // borrow split: lift the match out of the table for the copy and put
+            // it straight back. Nothing in the copy reads `cgs.clientinfo`.
             let matchCi =
                 core::mem::replace(&mut ctx.world.cgs.clientinfo[iu], zeroed_client_info());
-            CG_CopyClientInfoModel(ctx, &matchCi, &mut ci);
+            CG_CopyClientInfoModel(ctx, &matchCi, ci);
             ctx.world.cgs.clientinfo[iu] = matchCi;
-            ctx.world.cgs.clientinfo[clientNum as usize] = ci;
             return;
         }
         // load the full model, because we don't ever want to show
         // an improper team skin.  This will cause a hitch for the first
         // player, when the second enters.  Combat shouldn't be going on
         // yet, so it shouldn't matter
-        ctx.world.cgs.clientinfo[clientNum as usize] = ci;
-        CG_LoadClientInfo(ctx, clientNum);
+        CG_LoadClientInfoFor(ctx, ci, -1);
         return;
     }
 
@@ -8283,16 +8306,14 @@ pub fn CG_SetDeferredClientInfo(ctx: &mut CgContext, clientNum: c_int) {
 
         ci.deferred = qtrue;
         let matchCi = core::mem::replace(&mut ctx.world.cgs.clientinfo[iu], zeroed_client_info());
-        CG_CopyClientInfoModel(ctx, &matchCi, &mut ci);
+        CG_CopyClientInfoModel(ctx, &matchCi, ci);
         ctx.world.cgs.clientinfo[iu] = matchCi;
-        ctx.world.cgs.clientinfo[clientNum as usize] = ci;
         return;
     }
 
     // we should never get here...
     // Actually it is possible now because of the unique sabers.
-    ctx.world.cgs.clientinfo[clientNum as usize] = ci;
-    CG_LoadClientInfo(ctx, clientNum);
+    CG_LoadClientInfoFor(ctx, ci, -1);
 }
 
 /// Raven `CG_ActualLoadDeferredPlayers` — scans every client slot for one still
@@ -8383,4 +8404,793 @@ pub fn CG_PlayerFootsteps(ctx: &mut CgContext, centNum: usize, footStepType: foo
     BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut sideOrigin);
     sideOrigin[2] += 15.0; // fudge up a bit for coplanar
     _PlayerFootStep(ctx, &sideOrigin, yawAngle, 6.0, centNum, footStepType);
+}
+
+/// Raven `CG_NewClientInfo` — rebuilds a client's cached model/skin/saber/force
+/// info from its `CS_PLAYERS` configstring, reusing existing ghoul2 handles where
+/// it can and re-attaching the entity's instance when the model actually changed.
+/// An empty configstring means the player just left, so we clean up and clear the
+/// slot.
+///
+/// Raven builds a stack-local `newInfo`, runs the scan/load/defer helpers against
+/// it while `cgs.clientinfo[clientNum]` still holds the old occupant, then copies
+/// it into the slot last. We keep `newInfo` detached the whole way through —
+/// `CG_ScanForExistingClientInfo`, `CG_LoadClientInfoFor(.., -1)` and
+/// `CG_SetDeferredClientInfo` all take it as a `&mut clientInfo_t` and read the
+/// old occupant straight from the slot, so the loader sees `gateNum == -1` (Raven's
+/// `ci - cgs.clientinfo` on a stack address). `oldGhoul2` captured up front is the
+/// pre-copy slot handle Raven cleans at :1815, then `newInfo` writes into the slot.
+/// Source: `oracle/codemp/cgame/cg_players.c:1503-1942`
+pub fn CG_NewClientInfo(ctx: &mut CgContext, clientNum: c_int, entitiesInitialized: bool) {
+    let cn = clientNum as usize;
+
+    let oldGhoul2 = ctx.world.cgs.clientinfo[cn].ghoul2Model;
+
+    let mut oldG2Weapons: [*mut c_void; MAX_SABERS] = [null_mut(); MAX_SABERS];
+    let mut k = 0;
+    while k < MAX_SABERS {
+        oldG2Weapons[k] = ctx.world.cgs.clientinfo[cn].ghoul2Weapons[k];
+        k += 1;
+    }
+
+    let configstring = CG_ConfigString(ctx, clientNum + CS_PLAYERS);
+    if configstring.is_empty() {
+        let engine = ctx.engine;
+        // clean this stuff up first
+        let ghoul2Model = ctx.world.cgs.clientinfo[cn].ghoul2Model;
+        if !ghoul2Model.is_null() && trap::G2_HaveWeGhoul2Models(engine, ghoul2Model) {
+            trap::G2API_CleanGhoul2Models(
+                engine,
+                &mut ctx.world.cgs.clientinfo[cn].ghoul2Model as *mut *mut c_void,
+            );
+        }
+        let mut k = 0;
+        while k < MAX_SABERS {
+            let w = ctx.world.cgs.clientinfo[cn].ghoul2Weapons[k];
+            if !w.is_null() && trap::G2_HaveWeGhoul2Models(engine, w) {
+                trap::G2API_CleanGhoul2Models(
+                    engine,
+                    &mut ctx.world.cgs.clientinfo[cn].ghoul2Weapons[k] as *mut *mut c_void,
+                );
+            }
+            k += 1;
+        }
+
+        ctx.world.cgs.clientinfo[cn] = zeroed_client_info();
+        return; // player just left
+    }
+
+    // build into a temp buffer so the defer checks can use the old value
+    let mut newInfo = zeroed_client_info();
+
+    // isolate the player's name
+    let v = Info_ValueForKey(&configstring, "n");
+    Q_strncpyz(&mut newInfo.name, &v, MAX_QPATH);
+
+    // colors
+    let v = Info_ValueForKey(&configstring, "c1");
+    CG_ColorFromString(&v, &mut newInfo.color1);
+    newInfo.icolor1 = atoi(&v);
+
+    let v = Info_ValueForKey(&configstring, "c2");
+    CG_ColorFromString(&v, &mut newInfo.color2);
+    newInfo.icolor2 = atoi(&v);
+
+    // bot skill
+    let v = Info_ValueForKey(&configstring, "skill");
+    newInfo.botSkill = atoi(&v);
+
+    // handicap
+    let v = Info_ValueForKey(&configstring, "hc");
+    newInfo.handicap = atoi(&v);
+
+    // wins
+    let v = Info_ValueForKey(&configstring, "w");
+    newInfo.wins = atoi(&v);
+
+    // losses
+    let v = Info_ValueForKey(&configstring, "l");
+    newInfo.losses = atoi(&v);
+
+    // team
+    let v = Info_ValueForKey(&configstring, "t");
+    newInfo.team = atoi(&v);
+
+    // copy team info out to menu
+    if clientNum == ctx.world.cg.clientNum {
+        // this is me
+        trap::Cvar_Set(ctx.engine, "ui_team", &v);
+    }
+
+    // team task
+    let v = Info_ValueForKey(&configstring, "tt");
+    newInfo.teamTask = atoi(&v);
+
+    // team leader
+    let v = Info_ValueForKey(&configstring, "tl");
+    newInfo.teamLeader = atoi(&v);
+
+    // model
+    let v = Info_ValueForKey(&configstring, "model");
+    if ctx.world.cvars.cg_forceModel.integer != 0 {
+        // forcemodel makes everyone use a single model to prevent load hitches
+        let modelStr = trap::Cvar_VariableStringBuffer(ctx.engine, "model", MAX_QPATH);
+        // strchr splits modelStr at the first '/': before it is the model, after
+        // it is the skin; no '/' means the default skin
+        let (modelStr, skin): (String, String) = match modelStr.find('/') {
+            None => (modelStr, "default".to_string()),
+            Some(pos) => (modelStr[..pos].to_string(), modelStr[pos + 1..].to_string()),
+        };
+        Q_strncpyz(&mut newInfo.skinName, &skin, MAX_QPATH);
+        Q_strncpyz(&mut newInfo.modelName, &modelStr, MAX_QPATH);
+
+        if ctx.world.cgs.gametype >= GT_TEAM {
+            // keep skin name
+            if let Some(pos) = v.find('/') {
+                Q_strncpyz(&mut newInfo.skinName, &v[pos + 1..], MAX_QPATH);
+            }
+        }
+    } else {
+        Q_strncpyz(&mut newInfo.modelName, &v, MAX_QPATH);
+
+        // strchr runs over the just-copied (and possibly truncated) buffer
+        let modelName = buf_to_string(&newInfo.modelName.map(|c| c as u8));
+        match modelName.find('/') {
+            None => {
+                // modelName didn not include a skin name
+                Q_strncpyz(&mut newInfo.skinName, "default", MAX_QPATH);
+            }
+            Some(pos) => {
+                Q_strncpyz(&mut newInfo.skinName, &modelName[pos + 1..], MAX_QPATH);
+                // truncate modelName
+                Q_strncpyz(&mut newInfo.modelName, &modelName[..pos], MAX_QPATH);
+            }
+        }
+    }
+
+    if ctx.world.cgs.gametype == GT_SIEGE {
+        // entries only sent in siege mode
+
+        // siege desired team
+        let v = Info_ValueForKey(&configstring, "sdt");
+        if !v.is_empty() {
+            newInfo.siegeDesiredTeam = atoi(&v);
+        } else {
+            newInfo.siegeDesiredTeam = 0;
+        }
+
+        // siege classname
+        let v = Info_ValueForKey(&configstring, "siegeclass");
+        newInfo.siegeIndex = -1;
+
+        // Info_ValueForKey never hands back NULL (Raven's `if (v)` is always
+        // taken), so we always run the lookup.
+        let siegeClass = BG_SiegeFindClassByName(&v, &ctx.world.bg_state);
+        if !siegeClass.is_null() {
+            // See if this class forces a model, if so, then use it. Same for skin.
+            newInfo.siegeIndex = BG_SiegeFindClassIndexByName(&v, &ctx.world.bg_state);
+
+            // `BG_SiegeFindClassByName` hands back a raw pointer module code
+            // never derefs (§D11); the index it just found (>= 0 since the name
+            // matched) names the owning `bgSiegeClasses` slot for the reads.
+            let idx = newInfo.siegeIndex as usize;
+            let (forcedModel, forcedSkin, hasSaberColor, saberColor, hasSaber2Color, saber2Color) = {
+                let sc = &ctx.world.bg_state.bgSiegeClasses[idx];
+                (
+                    sc.forcedModel.clone(),
+                    sc.forcedSkin.clone(),
+                    sc.hasForcedSaberColor,
+                    sc.forcedSaberColor,
+                    sc.hasForcedSaber2Color,
+                    sc.forcedSaber2Color,
+                )
+            };
+
+            if !forcedModel.is_empty() {
+                Q_strncpyz(&mut newInfo.modelName, &forcedModel, MAX_QPATH);
+            }
+
+            if !forcedSkin.is_empty() {
+                Q_strncpyz(&mut newInfo.skinName, &forcedSkin, MAX_QPATH);
+            }
+
+            if hasSaberColor != qfalse {
+                newInfo.icolor1 = saberColor;
+                CG_ColorFromInt(newInfo.icolor1, &mut newInfo.color1);
+            }
+            if hasSaber2Color != qfalse {
+                newInfo.icolor2 = saber2Color;
+                CG_ColorFromInt(newInfo.icolor2, &mut newInfo.color2);
+            }
+        }
+    }
+
+    let mut saberUpdate = [false; MAX_SABERS];
+
+    // saber being used (Raven's `if (v && ...)` — `v` is never NULL)
+    let v = Info_ValueForKey(&configstring, "st");
+    let ciSaberName = buf_to_string(&ctx.world.cgs.clientinfo[cn].saberName.map(|c| c as u8));
+    if Q_stricmp(&v, &ciSaberName) != 0 {
+        Q_strncpyz(&mut newInfo.saberName, &v, 64);
+        let sabers = newInfo.saber.as_mut_ptr();
+        let saberName_ptr = newInfo.saberName.as_ptr();
+        let traps = CgBgTraps::new(ctx.engine);
+        let mut callbacks = CgGameCallbacks::new(ctx.engine);
+        WP_SetSaber(
+            clientNum,
+            sabers,
+            0,
+            saberName_ptr,
+            &mut ctx.world.bg_state,
+            &traps,
+            &mut callbacks,
+        );
+        saberUpdate[0] = true;
+    } else {
+        let ciSaberNameBuf = ctx.world.cgs.clientinfo[cn].saberName.map(|c| c as u8);
+        Q_strncpyzBytes(&mut newInfo.saberName, &ciSaberNameBuf, 64);
+        newInfo.saber[0] = ctx.world.cgs.clientinfo[cn].saber[0];
+        newInfo.ghoul2Weapons[0] = ctx.world.cgs.clientinfo[cn].ghoul2Weapons[0];
+    }
+
+    let v = Info_ValueForKey(&configstring, "st2");
+    let ciSaber2Name = buf_to_string(&ctx.world.cgs.clientinfo[cn].saber2Name.map(|c| c as u8));
+    if Q_stricmp(&v, &ciSaber2Name) != 0 {
+        Q_strncpyz(&mut newInfo.saber2Name, &v, 64);
+        let sabers = newInfo.saber.as_mut_ptr();
+        let saber2Name_ptr = newInfo.saber2Name.as_ptr();
+        let traps = CgBgTraps::new(ctx.engine);
+        let mut callbacks = CgGameCallbacks::new(ctx.engine);
+        WP_SetSaber(
+            clientNum,
+            sabers,
+            1,
+            saber2Name_ptr,
+            &mut ctx.world.bg_state,
+            &traps,
+            &mut callbacks,
+        );
+        saberUpdate[1] = true;
+    } else {
+        let ciSaber2NameBuf = ctx.world.cgs.clientinfo[cn].saber2Name.map(|c| c as u8);
+        Q_strncpyzBytes(&mut newInfo.saber2Name, &ciSaber2NameBuf, 64);
+        newInfo.saber[1] = ctx.world.cgs.clientinfo[cn].saber[1];
+        newInfo.ghoul2Weapons[1] = ctx.world.cgs.clientinfo[cn].ghoul2Weapons[1];
+    }
+
+    if saberUpdate[0] || saberUpdate[1] {
+        let mut j = 0;
+        while j < MAX_SABERS {
+            if saberUpdate[j] {
+                if newInfo.saber[j].model[0] != 0 {
+                    if !oldG2Weapons[j].is_null() {
+                        // free the old instance(s)
+                        trap::G2API_CleanGhoul2Models(
+                            ctx.engine,
+                            &mut oldG2Weapons[j] as *mut *mut c_void,
+                        );
+                        oldG2Weapons[j] = null_mut();
+                    }
+
+                    CG_InitG2SaberData(ctx, j, &mut newInfo);
+                } else if !oldG2Weapons[j].is_null() {
+                    // free the old instance(s)
+                    trap::G2API_CleanGhoul2Models(
+                        ctx.engine,
+                        &mut oldG2Weapons[j] as *mut *mut c_void,
+                    );
+                    oldG2Weapons[j] = null_mut();
+                }
+
+                ctx.world.entity_mut(cn).weapon = 0;
+                ctx.world.entity_mut(cn).ghoul2weapon = null_mut(); // force a refresh
+            }
+            j += 1;
+        }
+    }
+
+    // Check for any sabers that didn't get set again, if they didn't, then
+    // reassign the pointers for the new ci
+    let mut k = 0;
+    while k < MAX_SABERS {
+        if !oldG2Weapons[k].is_null() {
+            newInfo.ghoul2Weapons[k] = oldG2Weapons[k];
+        }
+        k += 1;
+    }
+
+    // duel team (Raven's `if (v)` — never NULL, so always atoi)
+    let v = Info_ValueForKey(&configstring, "dt");
+    newInfo.duelTeam = atoi(&v);
+
+    // force powers
+    let v = Info_ValueForKey(&configstring, "forcepowers");
+    Q_strncpyz(&mut newInfo.forcePowers, &v, MAX_QPATH);
+
+    if ctx.world.cgs.gametype >= GT_TEAM
+        && ctx.world.cgs.jediVmerc == qfalse
+        && ctx.world.cgs.gametype != GT_SIEGE
+    {
+        // We won't force colors for siege.
+        let traps = CgBgTraps::new(ctx.engine);
+        let modelName_ptr = newInfo.modelName.as_ptr();
+        let skinName_ptr = newInfo.skinName.as_mut_ptr();
+        let team = newInfo.team;
+        let colors_ptr = newInfo.colorOverride.as_mut_ptr();
+        BG_ValidateSkinForTeam(
+            modelName_ptr,
+            skinName_ptr,
+            team,
+            colors_ptr,
+            &ctx.world.bg_state,
+            &traps,
+        );
+    } else {
+        newInfo.colorOverride[0] = 0.0;
+        newInfo.colorOverride[1] = 0.0;
+        newInfo.colorOverride[2] = 0.0;
+    }
+
+    // scan for an existing clientinfo that matches this modelname so we can
+    // avoid loading checks if possible
+    if !CG_ScanForExistingClientInfo(ctx, &mut newInfo, clientNum) {
+        // newInfo stays detached — the loaders read the old occupant straight
+        // from the slot and forward gateNum -1 (Raven's stack-local `&newInfo`).
+
+        // if we are defering loads, just have it pick the first valid
+        if ctx
+            .world
+            .cg
+            .snap_ref()
+            .is_some_and(|snap| snap.ps.clientNum == clientNum)
+        {
+            // rww - don't defer your own client info ever
+            CG_LoadClientInfoFor(ctx, &mut newInfo, -1);
+        } else if ctx.world.cvars.cg_deferPlayers.integer != 0
+            && ctx.world.cgs.gametype != GT_SIEGE
+            && ctx.world.cvars.cg_buildScript.integer == 0
+            && ctx.world.cg.loading == qfalse
+        {
+            // keep whatever they had if it won't violate team skins
+            CG_SetDeferredClientInfo(ctx, &mut newInfo);
+        } else {
+            CG_LoadClientInfoFor(ctx, &mut newInfo, -1);
+        }
+    }
+
+    // replace whatever was there with the new one
+    newInfo.infoValid = qtrue;
+    let engine = ctx.engine;
+    if !oldGhoul2.is_null()
+        && oldGhoul2 != newInfo.ghoul2Model
+        && trap::G2_HaveWeGhoul2Models(engine, oldGhoul2)
+    {
+        // We must kill this instance before we remove our only pointer to it from
+        // the cgame. Otherwise we will end up with extra instances all over the
+        // place, I think.
+        let mut g = oldGhoul2;
+        trap::G2API_CleanGhoul2Models(engine, &mut g as *mut *mut c_void);
+    }
+    ctx.world.cgs.clientinfo[cn] = newInfo;
+
+    // force a weapon change anyway, for all clients being rendered to the current
+    // client
+    let mut i = 0;
+    while i < MAX_CLIENTS {
+        ctx.world.entity_mut(i).ghoul2weapon = null_mut();
+        i += 1;
+    }
+
+    if clientNum != -1 {
+        // don't want it using an invalid pointer to share
+        trap::G2API_ClearAttachedInstance(engine, clientNum);
+    }
+
+    // Check if the ghoul2 model changed in any way. This is safer than assuming
+    // we have a legal cent shile loading info.
+    let ciGhoul2Model = ctx.world.cgs.clientinfo[cn].ghoul2Model;
+    if entitiesInitialized && !ciGhoul2Model.is_null() && oldGhoul2 != ciGhoul2Model {
+        // Copy the new ghoul2 model to the centity.
+        let time = ctx.world.cg.time;
+
+        // §F19: Raven indexes `bgHumanoidAnimations[legsAnim]` unchecked and its
+        // `if (anim)` never fails (address of an array slot); legsAnim is
+        // server-supplied, so an OOB index draws nothing here instead of reading
+        // garbage.
+        let legsAnim = ctx.world.entity(cn).currentState.legsAnim as usize;
+        if legsAnim < ctx.world.bg_state.bgHumanoidAnimations.len() {
+            let anim = ctx.world.bg_state.bgHumanoidAnimations[legsAnim];
+            let mut flags = BONE_ANIM_OVERRIDE_FREEZE;
+            let firstFrame = anim.firstFrame as c_int;
+            let mut setFrame: c_int = -1;
+            let animSpeed = 50.0f32 / anim.frameLerp as f32;
+
+            if anim.loopFrames != -1 {
+                flags = BONE_ANIM_OVERRIDE_LOOP;
+            }
+
+            let legsFrame = ctx.world.entity(cn).pe.legs.frame;
+            if legsFrame >= anim.firstFrame as c_int
+                && legsFrame <= (anim.firstFrame as c_int + anim.numFrames as c_int)
+            {
+                setFrame = legsFrame;
+            }
+
+            // rww - Set the animation again because it just got reset due to the
+            // model change
+            trap::G2API_SetBoneAnim(
+                engine,
+                ciGhoul2Model,
+                0,
+                "model_root",
+                firstFrame,
+                anim.firstFrame as c_int + anim.numFrames as c_int,
+                flags,
+                animSpeed,
+                time,
+                setFrame as f32,
+                150,
+            );
+        }
+        // Raven's clear runs regardless (his `if (anim)` never fails), so it
+        // stays outside the OOB guard
+        ctx.world.entity_mut(cn).currentState.legsAnim = 0;
+
+        let torsoAnim = ctx.world.entity(cn).currentState.torsoAnim as usize;
+        if torsoAnim < ctx.world.bg_state.bgHumanoidAnimations.len() {
+            let anim = ctx.world.bg_state.bgHumanoidAnimations[torsoAnim];
+            let mut flags = BONE_ANIM_OVERRIDE_FREEZE;
+            let firstFrame = anim.firstFrame as c_int;
+            let mut setFrame: c_int = -1;
+            let animSpeed = 50.0f32 / anim.frameLerp as f32;
+
+            if anim.loopFrames != -1 {
+                flags = BONE_ANIM_OVERRIDE_LOOP;
+            }
+
+            let torsoFrame = ctx.world.entity(cn).pe.torso.frame;
+            if torsoFrame >= anim.firstFrame as c_int
+                && torsoFrame <= (anim.firstFrame as c_int + anim.numFrames as c_int)
+            {
+                setFrame = torsoFrame;
+            }
+
+            // rww - Set the animation again because it just got reset due to the
+            // model change
+            trap::G2API_SetBoneAnim(
+                engine,
+                ciGhoul2Model,
+                0,
+                "lower_lumbar",
+                firstFrame,
+                anim.firstFrame as c_int + anim.numFrames as c_int,
+                flags,
+                animSpeed,
+                time,
+                setFrame as f32,
+                150,
+            );
+        }
+        // same always-run clear as legsAnim above
+        ctx.world.entity_mut(cn).currentState.torsoAnim = 0;
+
+        let entGhoul2 = ctx.world.entity(cn).ghoul2;
+        if !entGhoul2.is_null() && trap::G2_HaveWeGhoul2Models(engine, entGhoul2) {
+            trap::G2API_CleanGhoul2Models(
+                engine,
+                &mut ctx.world.entity_mut(cn).ghoul2 as *mut *mut c_void,
+            );
+        }
+        trap::G2API_DuplicateGhoul2Instance(
+            engine,
+            ciGhoul2Model,
+            &mut ctx.world.entity_mut(cn).ghoul2 as *mut *mut c_void,
+        );
+
+        if clientNum != -1 {
+            // Attach the instance to this entity num so we can make use of
+            // client-server shared operations if possible.
+            let g2 = ctx.world.entity(cn).ghoul2;
+            trap::G2API_AttachInstanceToEntNum(engine, g2, clientNum, false);
+        }
+
+        // check now to see if we have this bone for setting anims and such
+        let g2 = ctx.world.entity(cn).ghoul2;
+        if trap::G2API_AddBolt(engine, g2, 0, "face") == -1 {
+            ctx.world.entity_mut(cn).noFace = qtrue;
+        }
+
+        let g2 = ctx.world.entity(cn).ghoul2;
+        let localAnimIndex = CG_G2SkelForModel(ctx, g2);
+        ctx.world.entity_mut(cn).localAnimIndex = localAnimIndex;
+
+        let g2 = ctx.world.entity(cn).ghoul2;
+        let eventAnimIndex = CG_G2EvIndexForModel(ctx, g2, localAnimIndex);
+        ctx.world.entity_mut(cn).eventAnimIndex = eventAnimIndex;
+
+        let stateNumber = ctx.world.entity(cn).currentState.number;
+        let stateWeapon = ctx.world.entity(cn).currentState.weapon;
+        if stateNumber != ctx.world.cg.predictedPlayerState.clientNum && stateWeapon == WP_SABER {
+            ctx.world.entity_mut(cn).weapon = stateWeapon;
+
+            let entGhoul2 = ctx.world.entity(cn).ghoul2;
+            if !entGhoul2.is_null() && !ciGhoul2Model.is_null() {
+                CG_CopyG2WeaponInstance(ctx, cn, stateWeapon, entGhoul2);
+                let world = &*ctx.world;
+                let gw = CG_G2WeaponInstance(world, world.entity(cn), stateWeapon);
+                ctx.world.entity_mut(cn).ghoul2weapon = gw;
+            }
+
+            if ctx.world.entity(cn).currentState.saberHolstered == 0 {
+                // if not holstered set length and desired length for both blades
+                // to full right now.
+                let saber0: *mut saberInfo_t = &mut ctx.world.cgs.clientinfo[cn].saber[0];
+                BG_SI_SetDesiredLength(saber0, 0.0, -1);
+                let saber1: *mut saberInfo_t = &mut ctx.world.cgs.clientinfo[cn].saber[1];
+                BG_SI_SetDesiredLength(saber1, 0.0, -1);
+
+                let mut i = 0;
+                while i < MAX_SABERS {
+                    let numBlades = ctx.world.cgs.clientinfo[cn].saber[i].numBlades as usize;
+                    let mut j = 0;
+                    while j < numBlades {
+                        ctx.world.cgs.clientinfo[cn].saber[i].blade[j].length =
+                            ctx.world.cgs.clientinfo[cn].saber[i].blade[j].lengthMax;
+                        j += 1;
+                    }
+                    i += 1;
+                }
+            }
+        }
+    }
+}
+
+/// Raven `CG_PlayerAnimEventDo` — fires the one animation event that just came
+/// due on a player/NPC: a sound, a saber swing/spin whoosh, a footstep, or a
+/// bolt-anchored effect. `AEV_FIRE`/`AEV_MOVE` are server-side only and do
+/// nothing here.
+///
+/// `cent` is read-only so it threads as `centNum`; `animEvent` is mutated in
+/// place (the effect arm caches its resolved bolt/model index and NULs its
+/// `stringData` so the lookup only runs once), so it stays `&mut`.
+/// Source: `oracle/codemp/cgame/cg_players.c:2237-2453`
+pub fn CG_PlayerAnimEventDo(ctx: &mut CgContext, centNum: usize, animEvent: &mut animevent_t) {
+    // Raven's `if (!cent || !animEvent) return;` null guard drops - both are
+    // references here, unreachable by construction
+    let engine = ctx.engine;
+
+    match animEvent.eventType {
+        // AEV_SOUNDCHAN falls through into AEV_SOUND in Raven; the only difference
+        // is that it first reads the channel out of the event data.
+        animEventType_t::AEV_SOUNDCHAN | animEventType_t::AEV_SOUND => {
+            let mut channel: c_int = CHAN_AUTO;
+            if animEvent.eventType == animEventType_t::AEV_SOUNDCHAN {
+                channel = animEvent.eventData[AED_SOUNDCHANNEL] as c_int;
+            }
+            // are there variations on the sound?
+            let pick = ctx
+                .world
+                .bg_state
+                .rng
+                .Q_irand(0, animEvent.eventData[AED_SOUND_NUMRANDOMSNDS] as c_int)
+                as usize;
+            let holdSnd = animEvent.eventData[AED_SOUNDINDEX_START + pick] as c_int;
+            if holdSnd > 0 {
+                let num = ctx.world.entity(centNum).currentState.number;
+                trap::S_StartSound(engine, None, num, channel, holdSnd);
+            }
+        }
+
+        animEventType_t::AEV_SABER_SWING => {
+            let eType = ctx.world.entity(centNum).currentState.eType;
+            let stateClientNum = ctx.world.entity(centNum).currentState.clientNum;
+            let saberNum = animEvent.eventData[AED_SABER_SWING_SABERNUM] as usize;
+
+            // custom swing sound off the client's saber, if it has one
+            let customSwing: Option<[qhandle_t; 3]> = {
+                // §F19: `clientNum` is server-supplied; an OOB one yields no
+                // client (random fallback) instead of indexing past the table.
+                let client: Option<&clientInfo_t> = if eType == entityType_t::ET_NPC as c_int {
+                    let c = ctx.world.entity(centNum).npcClient.as_deref();
+                    debug_assert!(c.is_some());
+                    c
+                } else {
+                    ctx.world.cgs.clientinfo.get(stateClientNum as usize)
+                };
+                match client {
+                    // §F19: `saberNum` comes from event data; an OOB saber index
+                    // yields no custom sound (the random fallback below) rather
+                    // than reading past the array.
+                    Some(cl)
+                        if cl.infoValid != qfalse
+                            && cl.saber.get(saberNum).is_some_and(|s| s.swingSound[0] != 0) =>
+                    {
+                        // custom swing sound
+                        Some(cl.saber[0].swingSound)
+                    }
+                    _ => None,
+                }
+            };
+
+            let swingSound: qhandle_t = if let Some(sounds) = customSwing {
+                sounds[ctx.world.bg_state.rng.Q_irand(0, 2) as usize]
+            } else {
+                let randomSwing = match animEvent.eventData[AED_SABER_SWING_TYPE] {
+                    1 => ctx.world.bg_state.rng.Q_irand(4, 6), // SWING_MEDIUM
+                    2 => ctx.world.bg_state.rng.Q_irand(7, 9), // SWING_STRONG
+                    // default / 0 == SWING_FAST
+                    _ => ctx.world.bg_state.rng.Q_irand(1, 3),
+                };
+                trap::S_RegisterSound(
+                    engine,
+                    &format!("sound/weapons/saber/saberhup{randomSwing}.wav"),
+                )
+            };
+
+            let pos = ctx.world.entity(centNum).currentState.pos.trBase;
+            let num = ctx.world.entity(centNum).currentState.number;
+            trap::S_StartSound(engine, Some(&pos), num, CHAN_AUTO, swingSound);
+        }
+
+        animEventType_t::AEV_SABER_SPIN => {
+            let eType = ctx.world.entity(centNum).currentState.eType;
+            let stateClientNum = ctx.world.entity(centNum).currentState.clientNum;
+
+            // override spin sound off the client's saber, if it has one
+            let overrideSpin: Option<qhandle_t> = {
+                // §F19: `clientNum` is server-supplied; an OOB one yields no
+                // client (default spin sound) instead of indexing past the table.
+                let client: Option<&clientInfo_t> = if eType == entityType_t::ET_NPC as c_int {
+                    let c = ctx.world.entity(centNum).npcClient.as_deref();
+                    debug_assert!(c.is_some());
+                    c
+                } else {
+                    ctx.world.cgs.clientinfo.get(stateClientNum as usize)
+                };
+                match client {
+                    Some(cl)
+                        if cl.infoValid != qfalse
+                            && cl.saber[AED_SABER_SPIN_SABERNUM].spinSound != 0 =>
+                    {
+                        // use override
+                        Some(cl.saber[AED_SABER_SPIN_SABERNUM].spinSound)
+                    }
+                    _ => None,
+                }
+            };
+
+            let spinSound: qhandle_t = if let Some(s) = overrideSpin {
+                s
+            } else {
+                match animEvent.eventData[AED_SABER_SPIN_TYPE] {
+                    0 => trap::S_RegisterSound(engine, "sound/weapons/saber/saberspinoff.wav"),
+                    1 => trap::S_RegisterSound(engine, "sound/weapons/saber/saberspin.wav"),
+                    2 => trap::S_RegisterSound(engine, "sound/weapons/saber/saberspin1.wav"),
+                    3 => trap::S_RegisterSound(engine, "sound/weapons/saber/saberspin2.wav"),
+                    4 => trap::S_RegisterSound(engine, "sound/weapons/saber/saberspin3.wav"),
+                    // random saberspin1-3
+                    _ => trap::S_RegisterSound(
+                        engine,
+                        &format!(
+                            "sound/weapons/saber/saberspin{}.wav",
+                            ctx.world.bg_state.rng.Q_irand(1, 3)
+                        ),
+                    ),
+                }
+            };
+
+            if spinSound != 0 {
+                trap::S_StartSound(engine, None, stateClientNum, CHAN_AUTO, spinSound);
+            }
+        }
+
+        animEventType_t::AEV_FOOTSTEP => {
+            let footStepType = match animEvent.eventData[AED_FOOTSTEP_TYPE] {
+                0 => footstepType_t::FOOTSTEP_R,
+                1 => footstepType_t::FOOTSTEP_L,
+                2 => footstepType_t::FOOTSTEP_HEAVY_R,
+                3 => footstepType_t::FOOTSTEP_HEAVY_L,
+                // §F19: config-supplied type; an out-of-range value can't form a
+                // footstepType_t, so it falls to the left-foot step (which is
+                // CG_PlayerFootsteps' own default arm) rather than reinterpreting
+                // garbage.
+                _ => footstepType_t::FOOTSTEP_L,
+            };
+            CG_PlayerFootsteps(ctx, centNum, footStepType);
+        }
+
+        animEventType_t::AEV_EFFECT => {
+            // my method (Raven's `#if 0` SP branch is dropped)
+            let ghoul2 = ctx.world.entity(centNum).ghoul2;
+            let stringData = animEvent.stringData;
+
+            // SAFETY: `stringData`, when non-NULL, is the anim event's own C string
+            // buffer; we read the bone name out of it and, mirroring Raven, NUL its
+            // first byte so the bolt lookup only runs once (the engine reads that
+            // back on later events, so the write must land).
+            if !stringData.is_null() && unsafe { *stringData } != 0 && !ghoul2.is_null() {
+                let boneName = unsafe { cstr_to_str(stringData) };
+                animEvent.eventData[AED_MODELINDEX] = 0;
+                if Q_stricmpn("*blade", &boneName, 6) == 0 || Q_stricmp("*flash", &boneName) == 0 {
+                    // must be a weapon, try weapon 0?
+                    animEvent.eventData[AED_BOLTINDEX] =
+                        trap::G2API_AddBolt(engine, ghoul2, 1, &boneName) as c_short;
+                    if animEvent.eventData[AED_BOLTINDEX] != -1 {
+                        // found it!
+                        animEvent.eventData[AED_MODELINDEX] = 1;
+                    } else {
+                        // hmm, just try on the player model, then?
+                        animEvent.eventData[AED_BOLTINDEX] =
+                            trap::G2API_AddBolt(engine, ghoul2, 0, &boneName) as c_short;
+                    }
+                } else {
+                    animEvent.eventData[AED_BOLTINDEX] =
+                        trap::G2API_AddBolt(engine, ghoul2, 0, &boneName) as c_short;
+                }
+                unsafe {
+                    *stringData = 0;
+                }
+            }
+
+            if animEvent.eventData[AED_BOLTINDEX] != -1 {
+                let mut lAngles: vec3_t = [0.0; 3];
+                let mut bPoint: vec3_t = [0.0; 3];
+                let mut bAngle: vec3_t = [0.0; 3];
+                let mut matrix = mdxaBone_t {
+                    matrix: [[0.0; 4]; 3],
+                };
+
+                let lerpAngles = ctx.world.entity(centNum).lerpAngles;
+                let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+                let modelScale = ctx.world.entity(centNum).modelScale;
+                let time = ctx.world.cg.time;
+
+                VectorSet(&mut lAngles, 0.0, lerpAngles[YAW], 0.0);
+
+                trap::G2API_GetBoltMatrix(
+                    engine,
+                    ghoul2,
+                    animEvent.eventData[AED_MODELINDEX] as c_int,
+                    animEvent.eventData[AED_BOLTINDEX] as c_int,
+                    &mut matrix,
+                    &lAngles,
+                    &lerpOrigin,
+                    time,
+                    Some(&mut ctx.world.cgs.gameModels[0]),
+                    &modelScale,
+                );
+                BG_GiveMeVectorFromMatrix(&matrix, Eorientations::ORIGIN as c_int, &mut bPoint);
+                VectorSet(&mut bAngle, 0.0, 1.0, 0.0);
+
+                trap::FX_PlayEffectID(
+                    engine,
+                    animEvent.eventData[AED_EFFECTINDEX] as c_int,
+                    &bPoint,
+                    &bAngle,
+                    -1,
+                    -1,
+                );
+            } else {
+                let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+                let mut bAngle: vec3_t = [0.0; 3];
+
+                VectorSet(&mut bAngle, 0.0, 1.0, 0.0);
+                trap::FX_PlayEffectID(
+                    engine,
+                    animEvent.eventData[AED_EFFECTINDEX] as c_int,
+                    &lerpOrigin,
+                    &bAngle,
+                    -1,
+                    -1,
+                );
+            }
+        }
+
+        // Would have to keep track of this on server to for these, it's not worth
+        // it. (Raven's AEV_FIRE/AEV_MOVE bodies are commented out.)
+        animEventType_t::AEV_FIRE | animEventType_t::AEV_MOVE => {}
+
+        // Raven's `default: return;` — AEV_NONE and the AEV_NUM_AEV sentinel.
+        _ => {}
+    }
 }

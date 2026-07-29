@@ -6,8 +6,10 @@
 use core::ffi::c_int;
 
 use mp_bg::public::gametype::{GT_CTF, GT_DUEL, GT_POWERDUEL, GT_SIEGE};
-use mp_bg::public::pers_enum::persEnum_t::{PERS_HITS, PERS_TEAM};
+use mp_bg::public::pers_enum::persEnum_t::{PERS_HITS, PERS_SPAWN_COUNT, PERS_TEAM};
+use mp_bg::public::pmtype::pmtype_t::PM_INTERMISSION;
 use mp_bg::public::stat_index::statIndex_t::STAT_HEALTH;
+use mp_bg::public::team::TEAM_SPECTATOR;
 use mp_qshared::common::mp::qcommon::player_state::{playerState_t, MAX_PS_EVENTS};
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorSubtract, vec3_origin, AngleVectors, VectorLength, PITCH, ROLL, YAW,
@@ -368,5 +370,70 @@ pub fn CG_CheckChangedPredictableEvents(
                 }
             }
         }
+    }
+}
+
+/// Raven `CG_TransitionPlayerState` - runs once per new `playerState_t`
+/// (predicted-locally or from a fresh snapshot), firing the respawn/damage/
+/// local-sound/event side effects off the delta against last frame's state.
+///
+/// `psRef` names which of `cg.predictedPlayerState`/`cg.snap->ps` the caller
+/// handed us, forwarded into `CG_CheckPlayerstateEvents` per DEC-46.2.
+///
+/// Source: `oracle/codemp/cgame/cg_playerstate.c:495-534`
+pub fn CG_TransitionPlayerState(
+    ctx: &mut CgContext,
+    ds: &DisplayState,
+    ps: &playerState_t,
+    ops: &mut playerState_t,
+    psRef: PlayerStateRef,
+) {
+    // check for changing follow mode
+    if ps.clientNum != ops.clientNum {
+        ctx.world.cg.thisFrameTeleport = qtrue;
+        // make sure we don't get any unwanted transition effects
+        *ops = *ps;
+    }
+
+    // damage events (player is getting wounded)
+    if ps.damageEvent != ops.damageEvent && ps.damageCount != 0 {
+        CG_DamageFeedback(ctx.world, ps.damageYaw, ps.damagePitch, ps.damageCount);
+    }
+
+    // respawning
+    if ps.persistant[PERS_SPAWN_COUNT as usize] != ops.persistant[PERS_SPAWN_COUNT as usize] {
+        CG_Respawn(ctx.world);
+    }
+
+    if ctx.world.cg.mapRestart != 0 {
+        CG_Respawn(ctx.world);
+        ctx.world.cg.mapRestart = 0;
+    }
+
+    // §F19: Raven derefs `cg.snap->ps` here with no null check - before the
+    // first snapshot that's a null deref, so the port takes the neutral
+    // early-out (skip the local-sounds check) rather than reading through a
+    // null, same posture as CG_Respawn/CG_DamageFeedback above. The snapshot
+    // read is done up front so the borrow doesn't outlive the `ctx` we hand
+    // CG_CheckLocalSounds below.
+    let not_intermission = ctx
+        .world
+        .cg
+        .snap_ref()
+        .is_some_and(|snap| snap.ps.pm_type != PM_INTERMISSION as c_int);
+    if not_intermission && ps.persistant[PERS_TEAM as usize] != TEAM_SPECTATOR as c_int {
+        CG_CheckLocalSounds(ctx, ps, ops);
+    }
+
+    // check for going low on ammo
+    CG_CheckAmmo();
+
+    // run events
+    CG_CheckPlayerstateEvents(ctx, ds, ps, ops, psRef);
+
+    // smooth the ducking viewheight change
+    if ps.viewheight != ops.viewheight {
+        ctx.world.cg.duckChange = (ps.viewheight - ops.viewheight) as f32;
+        ctx.world.cg.duckTime = ctx.world.cg.time;
     }
 }
