@@ -1242,3 +1242,40 @@ close-out.
    cg_snapshot/cg_servercmds/cg_main amend mechanically; vmMain's four
    blocked arms (CG_INIT/CG_SHUTDOWN/CG_CONSOLE_COMMAND/
    CG_DRAW_ACTIVE_FRAME) then wire directly. No unsafe shim.
+
+2. **pmove seam = mp_game's shape.** `CgBgTraps` carries a raw
+   `*mut CgWorld` (the `GameCallbacksImpl.world` "STAGE-2b: irreducible"
+   precedent); `trace`/`pointcontents` rebuild a `CgContext` inside and
+   call the ported `CG_Trace`/`CG_PointContents`. Unsafe confined to the
+   seam (§D11); lands with the two-axis aliasing review. `cgSendPSPool`
+   = `Box<[playerState_t; MAX_GENTITIES]>` on `CgWorld`. Unblocks the
+   `CG_PredictPlayerState` body.
+3. **Vehicle_t referent = owned cgame pool.** `CgWorld` owns the vehicle
+   slab (DEC-46.3 shape); `VehicleId` indexes it; `m_pVehicleInfo`
+   becomes an index into a CgWorld-owned `g_vehicleInfo`; the client
+   `G_Create*NPC` arms port to fill it. Unblocks the 13 vehicle todo
+   arms + ~12 presence-only sites.
+4. **Deferred-draw arms keep `todo!()`** until their blocker lands — the
+   §14 loud marker; a panic on the first vehicle frame is the desired
+   incomplete-wiring signal.
+5. **Anim-event tables live on `BgState`** (`BG_ParseAnimationEvtFile`
+   body + `bgNumAnimEvents`) — Raven's bg globals in the ratified bg
+   home; game/cgame share one parse. 6 cgame sites clear as follow-up.
+6. **Trail/think fn-ptrs = two closed enums** (`TrailFn` for the
+   `FX_*ProjectileThink` set, `LeThinkFn` for the `CG_*Think` set), one
+   match dispatcher each — DEC-46.4 applied, `leType` precedent.
+7. **`cg_t.snap` keeps the pointer + accessor shape.** The
+   `snap_ref()`/`snap_mut()`/`next_snap_ref()` accessors already hide
+   it; slot-index reshape deferred to the great refactor.
+8. **RDF_*/RF_* get one canonical `tr_types` module in mp_qshared**,
+   imported by cgame + uishared; the ~38 per-TU §C8 copies retire
+   (homogenization ruling).
+9. **uishared host arms: audit first.** The 7 `#ifndef CGAME` arms get
+   a reachability audit; only genuinely-reachable divergences take the
+   DEC-36 D3 runtime host discriminant.
+10. **Zero-fill = per-type `zeroed()`s.** `playerState_t::zeroed()` +
+    a boxed in-place `cg_t` zero over the existing `zeroed_box` helpers
+    (the shipped `centity_t::zeroed()` pattern); `CG_Init_CG` uses it.
+    The "lerp-family shape" ledger item is CLOSED as already resolved —
+    `CG_CalcEntityLerpPositions` is fully ported on ctx with live
+    callers.
