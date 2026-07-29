@@ -153,6 +153,28 @@ pub struct CgViewState {
     /// mode; walked further while the portal sky's own fov is zooming in.
     /// Source: `oracle/codemp/cgame/cg_view.c:1750`
     pub lastfov: f32,
+
+    /// Raven `int cg_siegeClassIndex` — the local player's last-seen siege
+    /// class, so [`crate::cg_view::CG_DrawActiveFrame`] only re-fires
+    /// `ui_mySiegeClass` when it changes. Starts at Raven's -2 sentinel, which
+    /// no real siegeIndex (-1 = none, >= 0 = a class) can equal, so the first
+    /// siege frame always fires.
+    /// Source: `oracle/codemp/cgame/cg_view.c:2445`
+    pub cg_siegeClassIndex: c_int,
+
+    /// Raven `qboolean cg_rangedFogging` — so we know if we should go back to
+    /// normal fog.
+    /// Source: `oracle/codemp/cgame/cg_view.c:2434`
+    pub cg_rangedFogging: bool,
+
+    /// Raven's `static centity_t *veh` inside `CG_DrawActiveFrame` — the last
+    /// vehicle entity latched for the fighter-alt-control check; an
+    /// `Option<usize>` index into `cg_entities` per DEC-46.2, since it is
+    /// never reset back to `None` except by the fighter-alt-control branch
+    /// itself (Raven's own comment: "so I don't want an extra assign each
+    /// frame").
+    /// Source: `oracle/codemp/cgame/cg_view.c:2453`
+    pub veh: Option<usize>,
 }
 
 impl Default for CgViewState {
@@ -199,6 +221,10 @@ impl Default for CgViewState {
             cg_actionCamLastTime: 0,
             cg_lastTurretViewAngles: [0.0; 3],
             lastfov: 0.0,
+            // Raven's loaded initializer, not BSS zero - see the field doc.
+            cg_siegeClassIndex: -2,
+            cg_rangedFogging: false,
+            veh: None,
         }
     }
 }

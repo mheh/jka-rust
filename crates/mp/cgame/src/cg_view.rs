@@ -7,25 +7,28 @@ use core::f64::consts::PI;
 use core::ffi::c_int;
 
 use mp_bg::bg_misc::BG_EmplacedView;
-use mp_bg::bg_panimate::BG_SaberInSpecial;
+use mp_bg::bg_panimate::{BG_InGrappleMove, BG_SaberInSpecial, PM_InKnockDown};
 use mp_bg::bg_pmove::BG_UnrestrainedPitchRoll;
+use mp_bg::public::configstring::{CS_GLOBAL_AMBIENT_SET, CS_SKYBOXORG};
 use mp_bg::public::dm_flags::DF_FIXED_FOV;
 use mp_bg::public::entity_effects::EF2_HELD_BY_MONSTER;
 use mp_bg::public::entity_flags::{EF_NODRAW, EF_SOUNDTRACKER};
 use mp_bg::public::entity_type::entityType_t;
-use mp_bg::public::gametype::GT_TEAM;
+use mp_bg::public::force_hand_anims::forceHandAnims_t::HANDEXTEND_KNOCKDOWN;
+use mp_bg::public::gametype::{GT_SIEGE, GT_TEAM};
 use mp_bg::public::hyperspace::HYPERSPACE_TIME;
 use mp_bg::public::pers_enum::persEnum_t::PERS_TEAM;
 use mp_bg::public::pmtype::pmtype_t;
 use mp_bg::public::stat_index::statIndex_t::{STAT_DEAD_YAW, STAT_HEALTH};
 use mp_bg::public::team::TEAM_SPECTATOR;
 use mp_bg::public::viewheight::{DEFAULT_MAXS_2, DEFAULT_MINS_2};
-use mp_bg::weapons::weapon_t::{WP_EMPLACED_GUN, WP_SABER};
+use mp_bg::weapons::weapon_t::{WP_EMPLACED_GUN, WP_MELEE, WP_SABER};
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::refdef_t::{
     refdef_t, MAX_MAP_AREA_BYTES, MAX_RENDER_STRINGS, MAX_RENDER_STRING_LENGTH,
 };
+use mp_qshared::common::mp::cgame::stereo_frame_t::{stereoFrame_t, STEREO_RIGHT};
 use mp_qshared::common::mp::game::class_t::class_t;
 use mp_qshared::common::mp::qcommon::player_state::{playerState_t, MAX_POWERUPS};
 use mp_qshared::common::mp::qcommon::pm_flags::{PMF_DUCKED, PMF_FOLLOW};
@@ -41,15 +44,28 @@ use mp_qshared::shared::surface_flags::{
     CONTENTS_LAVA, CONTENTS_PLAYERCLIP, CONTENTS_SLIME, CONTENTS_WATER, MASK_SOLID, SOLID_BMODEL,
 };
 use mp_qshared::shared::{
-    qfalse, qtrue, sfxHandle_t, trType_t, vec3_t, ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_QPATH,
+    qboolean, qfalse, qtrue, sfxHandle_t, trType_t, vec3_t, ENTITYNUM_NONE, ENTITYNUM_WORLD,
+    MAX_QPATH, SNAPFLAG_NOT_ACTIVE,
 };
+use mp_uishared::shared::display_context::DisplayContext;
+use mp_uishared::shared::display_state::DisplayState;
+use mp_uishared::shared::menu_system::MenuSystem;
 use native_string::{atof, atoi, buf_to_string, Q_strncpyz};
 
+use crate::cg_draw::{CG_AddLagometerFrameInfo, CG_DrawActive};
 use crate::cg_drawtools::CG_DrawPic;
 use crate::cg_ents::{CG_AddPacketEntities, CG_CalcEntityLerpPositions, CG_S_UpdateLoopingSounds};
-use crate::cg_main::{CG_Argv, CG_Error, CG_Printf};
-use crate::cg_predict::{CG_PointContents, CG_Trace};
-use crate::cg_weapons::{LAND_DEFLECT_TIME, LAND_RETURN_TIME};
+use crate::cg_info::CG_DrawInformation;
+use crate::cg_light::CG_RunLightStyles;
+use crate::cg_localents::CG_AddLocalEntities;
+use crate::cg_main::{
+    CG_Argv, CG_ConfigString, CG_DrawMiscEnts, CG_Error, CG_Printf, CG_UpdateCvars,
+};
+use crate::cg_marks::{CG_AddMarks, CG_AddParticles};
+use crate::cg_players::CG_ActualLoadDeferredPlayers;
+use crate::cg_predict::{CG_PointContents, CG_PredictPlayerState, CG_Trace};
+use crate::cg_snapshot::CG_ProcessSnapshots;
+use crate::cg_weapons::{CG_AddViewWeapon, LAND_DEFLECT_TIME, LAND_RETURN_TIME};
 use crate::local::cg_t::MAX_SOUNDBUFFER;
 use crate::trap;
 use crate::world::cg_context::CgContext;
@@ -2710,4 +2726,373 @@ pub fn CG_DrawSkyBoxPortal(ctx: &mut CgContext, cstr: &str) {
     trap::R_RenderScene(ctx.engine, &ctx.world.cg.refdef);
 
     ctx.world.cg.refdef = backuprefdef;
+}
+
+/// Raven `CG_DrawActiveFrame` — the top of the per-frame draw: pulls in the
+/// snapshot, runs prediction, builds the render/sound lists, and issues the
+/// actual draw. `menus`/`ds`/`dc` thread through to the fns further down the
+/// call chain that need the menu framework (`CG_ProcessSnapshots`,
+/// `CG_DrawInformation`, `CG_DrawActive`) per cg_draw.rs precedent.
+///
+/// Raven's `#ifdef VEH_CONTROL_SCHEME_4` block (fov override for fighter
+/// pilots) is dead in the retail build — `VEH_CONTROL_SCHEME_4` is never
+/// defined anywhere in the oracle tree — so it, and the `mSensitivityOverride`
+/// / `bUseFighterPitch` / `isFighter` locals that only exist to feed it, are
+/// dropped.
+///
+/// Source: `oracle/codemp/cgame/cg_view.c:2447-2762`
+#[allow(clippy::too_many_arguments)]
+pub fn CG_DrawActiveFrame(
+    ctx: &mut CgContext,
+    serverTime: c_int,
+    stereoView: stereoFrame_t,
+    demoPlayback: qboolean,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+) {
+    let mSensitivity = ctx.world.cg.zoomSensitivity;
+    let mPitchOverride = 0.0f32;
+    let mYawOverride = 0.0f32;
+
+    if ctx.world.players.cgQueueLoad {
+        // do this before you start messing around with adding ghoul2 refents and crap
+        CG_ActualLoadDeferredPlayers(ctx);
+        ctx.world.players.cgQueueLoad = false;
+    }
+
+    ctx.world.cg.time = serverTime;
+    ctx.world.cg.demoPlayback = demoPlayback;
+
+    if let Some(snap) = ctx.world.cg.snap_ref() {
+        let team = snap.ps.persistant[PERS_TEAM as usize];
+        if ctx.world.cvars.ui_myteam.integer != team {
+            trap::Cvar_Set(ctx.engine, "ui_myteam", &format!("{team}"));
+        }
+    }
+
+    if ctx.world.cgs.gametype == GT_SIEGE {
+        if let Some(snap) = ctx.world.cg.snap_ref() {
+            let clientNum = snap.ps.clientNum as usize;
+            let siegeIndex = ctx.world.cgs.clientinfo[clientNum].siegeIndex;
+            if ctx.world.view.cg_siegeClassIndex != siegeIndex {
+                ctx.world.view.cg_siegeClassIndex = siegeIndex;
+                if ctx.world.view.cg_siegeClassIndex == -1 {
+                    trap::Cvar_Set(ctx.engine, "ui_mySiegeClass", "<none>");
+                } else {
+                    // §F19: siegeIndex comes off the server's clientinfo; past
+                    // the parsed class count Raven read a zeroed fixed-array
+                    // slot (empty name) - we skip the set instead of panicking.
+                    let idx = ctx.world.view.cg_siegeClassIndex as usize;
+                    if let Some(class) = ctx.world.bg_state.bgSiegeClasses.get(idx) {
+                        let name = class.name.clone();
+                        trap::Cvar_Set(ctx.engine, "ui_mySiegeClass", &name);
+                    }
+                }
+            }
+        }
+    }
+
+    // update cvars
+    CG_UpdateCvars(ctx);
+
+    // if we are only updating the screen as a loading
+    // pacifier, don't even try to read snapshots
+    if ctx.world.cg.infoScreenText[0] != 0 {
+        CG_DrawInformation(ctx, ds);
+        return;
+    }
+
+    trap::FX_AdjustTime(ctx.engine, ctx.world.cg.time);
+
+    CG_RunLightStyles(ctx);
+
+    // any looped sounds will be respecified as entities
+    // are added to the render list
+    trap::S_ClearLoopingSounds(ctx.engine);
+
+    // clear all the render lists
+    trap::R_ClearScene(ctx.engine);
+
+    // set up cg.snap and possibly cg.nextSnap
+    CG_ProcessSnapshots(ctx, menus, ds, dc);
+
+    trap::ROFF_UpdateEntities(ctx.engine);
+
+    // if we haven't received any snapshots yet, all
+    // we can draw is the information screen
+    let snapNotActive = match ctx.world.cg.snap_ref() {
+        None => true,
+        Some(snap) => (snap.snapFlags & SNAPFLAG_NOT_ACTIVE) != 0,
+    };
+    if snapNotActive {
+        // Raven's `#if 0` snapshot-timeout block (cg_view.c:2518-2540) never
+        // compiled in retail; not transcribed.
+        CG_DrawInformation(ctx, ds);
+        return;
+    }
+
+    // let the client system know what our weapon and zoom settings are
+    let mSensitivity = if ctx
+        .world
+        .cg
+        .snap_ref()
+        .is_some_and(|snap| snap.ps.saberLockTime > ctx.world.cg.time)
+    {
+        0.01f32
+    } else if ctx.world.cg.predictedPlayerState.weapon == WP_EMPLACED_GUN as c_int {
+        // lower sens for emplaced guns and vehicles
+        0.2f32
+    } else {
+        mSensitivity
+    };
+
+    if ctx.world.cg.predictedPlayerState.m_iVehicleNum != 0 {
+        ctx.world.view.veh = Some(ctx.world.cg.predictedPlayerState.m_iVehicleNum as usize);
+    }
+    // Raven's `veh &&` is only the first conjunct of the if - a NULL veh still
+    // takes the else arm, so on-foot players push their weapon/force/item
+    // selects to the engine every frame too.
+    let fighterControls = match ctx.world.view.veh {
+        Some(vehIdx) => {
+            let veh = ctx.world.entity(vehIdx);
+            // DEFERRED: `Vehicle_t::m_pVehicleInfo->type == VH_FIGHTER` hangs off
+            // the `Vehicle_t` referent pool behind `centity_t.m_pVehicle`
+            // (`oracle/codemp/cgame/cg_players.c:7014-7042`, DEC-46.2), so the
+            // presence test stands in for the fighter-type check — the same
+            // disposition `CG_DrawAutoMap`'s automap-elevation branch took.
+            // Source: `oracle/codemp/cgame/cg_view.c:2579-2588`
+            veh.currentState.eType == entityType_t::ET_NPC as c_int
+                && veh.currentState.NPC_class == class_t::CLASS_VEHICLE as c_int
+                && veh.m_pVehicle.is_some()
+                && ctx.world.cvars.bg_fighterAltControl.integer != 0
+        }
+        None => false,
+    };
+    if fighterControls {
+        trap::SetUserCmdValue(
+            ctx.engine,
+            ctx.world.cg.weaponSelect,
+            mSensitivity,
+            mPitchOverride,
+            mYawOverride,
+            0.0,
+            ctx.world.cg.forceSelect,
+            ctx.world.cg.itemSelect,
+            true,
+        );
+        // this is done because I don't want an extra assign each frame
+        // because I am so perfect and super efficient.
+        ctx.world.view.veh = None;
+    } else {
+        trap::SetUserCmdValue(
+            ctx.engine,
+            ctx.world.cg.weaponSelect,
+            mSensitivity,
+            mPitchOverride,
+            mYawOverride,
+            0.0,
+            ctx.world.cg.forceSelect,
+            ctx.world.cg.itemSelect,
+            false,
+        );
+    }
+
+    // this counter will be bumped for every valid scene we generate
+    ctx.world.cg.clientFrame += 1;
+
+    // update cg.predictedPlayerState
+    CG_PredictPlayerState(ctx);
+
+    // decide on third person view
+    let snapHealthPersistant = ctx.world.cg.snap_ref().map(|snap| {
+        (
+            snap.ps.stats[STAT_HEALTH as usize],
+            snap.ps.persistant[PERS_TEAM as usize],
+        )
+    });
+    let (snapHealth, snapTeam) = snapHealthPersistant.unwrap();
+    ctx.world.cg.renderingThirdPerson =
+        (ctx.world.cvars.cg_thirdPerson.integer != 0 || snapHealth <= 0) as c_int;
+
+    if snapHealth > 0 {
+        if ctx.world.cg.predictedPlayerState.weapon == WP_EMPLACED_GUN as c_int
+            && ctx.world.cg.predictedPlayerState.emplacedIndex != 0
+        {
+            // force third person for e-web and emplaced use
+            // (the commented-out `cg_entities[emplacedIndex]` weapon check
+            // Raven left in cg_view.c:2607 never ran; not transcribed)
+            ctx.world.cg.renderingThirdPerson = 1;
+        } else if ctx.world.cg.predictedPlayerState.weapon == WP_SABER as c_int
+            || ctx.world.cg.predictedPlayerState.weapon == WP_MELEE
+            || BG_InGrappleMove(ctx.world.cg.predictedPlayerState.torsoAnim) != 0
+            || BG_InGrappleMove(ctx.world.cg.predictedPlayerState.legsAnim) != 0
+            || ctx.world.cg.predictedPlayerState.forceHandExtend == HANDEXTEND_KNOCKDOWN as c_int
+            || ctx.world.cg.predictedPlayerState.fallingToDeath != 0
+            || ctx.world.cg.predictedPlayerState.m_iVehicleNum != 0
+            || PM_InKnockDown(&mut ctx.world.cg.predictedPlayerState) != qfalse
+        {
+            if ctx.world.cvars.cg_fpls.integer != 0
+                && ctx.world.cg.predictedPlayerState.weapon == WP_SABER as c_int
+            {
+                // force to first person for fpls
+                ctx.world.cg.renderingThirdPerson = 0;
+            } else {
+                ctx.world.cg.renderingThirdPerson = 1;
+            }
+        } else if ctx
+            .world
+            .cg
+            .snap_ref()
+            // Raven reads the SNAPSHOT zoomMode here (not the predicted one the
+            // fog chain below uses); §F19: the fn already returned before this
+            // point if no snap, so the None arm can't fire - it reads as 0.
+            .is_some_and(|snap| snap.ps.zoomMode != 0)
+        {
+            // always force first person when zoomed
+            ctx.world.cg.renderingThirdPerson = 0;
+        }
+    }
+
+    if ctx.world.cg.predictedPlayerState.pm_type == pmtype_t::PM_SPECTATOR as c_int {
+        // always first person for spec
+        ctx.world.cg.renderingThirdPerson = 0;
+    }
+
+    if snapTeam == TEAM_SPECTATOR {
+        ctx.world.cg.renderingThirdPerson = 0;
+    }
+
+    // build cg.refdef
+    let inwater = CG_CalcViewValues(ctx);
+
+    if ctx.world.view.cg_linearFogOverride != 0.0 {
+        trap::R_SetRangeFog(ctx.engine, -ctx.world.view.cg_linearFogOverride);
+    } else if ctx.world.cg.predictedPlayerState.zoomMode != 0 {
+        // zooming with binoculars or sniper, set the fog range based on the
+        // zoom level -rww
+        ctx.world.view.cg_rangedFogging = true;
+        // smaller the fov the less fog we have between the view and cull dist
+        trap::R_SetRangeFog(ctx.engine, ctx.world.cg.refdef.fov_x * 64.0);
+    } else if ctx.world.view.cg_rangedFogging {
+        // disable it
+        ctx.world.view.cg_rangedFogging = false;
+        trap::R_SetRangeFog(ctx.engine, 0.0);
+    }
+
+    let cstr = CG_ConfigString(ctx, CS_SKYBOXORG);
+    if !cstr.is_empty() {
+        // we have a skyportal
+        CG_DrawSkyBoxPortal(ctx, &cstr);
+    }
+
+    CG_CalcScreenEffects(ctx);
+
+    // first person blend blobs, done after AnglesToAxis
+    if ctx.world.cg.renderingThirdPerson == 0
+        && ctx.world.cg.predictedPlayerState.pm_type != pmtype_t::PM_SPECTATOR as c_int
+    {
+        CG_DamageBlendBlob(ctx);
+    }
+
+    // build the render lists
+    if ctx.world.cg.hyperspace == qfalse {
+        CG_AddPacketEntities(ctx, qfalse); // adter calcViewValues, so predicted player state is correct
+        CG_AddMarks(ctx);
+        CG_AddParticles(ctx);
+        CG_AddLocalEntities(ctx);
+        CG_DrawMiscEnts(ctx);
+    }
+    let predictedPs = ctx.world.cg.predictedPlayerState;
+    CG_AddViewWeapon(ctx, &predictedPs);
+
+    if ctx.world.cg.hyperspace == qfalse {
+        trap::FX_AddScheduledEffects(ctx.engine, false);
+    }
+
+    // add buffered sounds
+    CG_PlayBufferedSounds(ctx);
+
+    // finish up the rest of the refdef
+    if ctx.world.cg.testModelEntity.hModel != 0 {
+        CG_AddTestModel(ctx);
+    }
+    ctx.world.cg.refdef.time = ctx.world.cg.time;
+    let areamask = ctx.world.cg.snap_ref().unwrap().areamask;
+    ctx.world.cg.refdef.areamask = areamask;
+
+    // warning sounds when powerup is wearing off
+    CG_PowerupTimerSounds(ctx.world);
+
+    // if there are any entities flagged as sound trackers and attached to
+    // other entities, update their sound pos
+    CG_UpdateSoundTrackers(ctx);
+
+    if ctx.world.draw.gCGHasFallVector {
+        let mut lookAng: vec3_t = [0.0; 3];
+        let snapOrigin = ctx.world.cg.snap_ref().unwrap().ps.origin;
+        let vieworg = ctx.world.cg.refdef.vieworg;
+        _VectorSubtract(snapOrigin, vieworg, &mut lookAng);
+        VectorNormalize(&mut lookAng);
+        vectoangles(lookAng, &mut lookAng);
+
+        let fallVector = ctx.world.draw.gCGFallVector;
+        _VectorCopy(fallVector, &mut ctx.world.cg.refdef.vieworg);
+        AnglesToAxis(lookAng, ctx.world.cg.refdef.viewaxis.as_mut_ptr());
+    }
+
+    // This is done from the vieworg to get origin for non-attenuated sounds
+    let cstr = CG_ConfigString(ctx, CS_GLOBAL_AMBIENT_SET);
+    if !cstr.is_empty() {
+        let vieworg = ctx.world.cg.refdef.vieworg;
+        trap::S_UpdateAmbientSet(ctx.engine, &cstr, &vieworg);
+    }
+
+    // update audio positions
+    let clientNum = ctx.world.cg.snap_ref().unwrap().ps.clientNum;
+    let vieworg = ctx.world.cg.refdef.vieworg;
+    let viewaxis = ctx.world.cg.refdef.viewaxis;
+    trap::S_Respatialize(ctx.engine, clientNum, &vieworg, &viewaxis, inwater as c_int);
+
+    // make sure the lagometerSample and frame timing isn't done twice when in stereo
+    if stereoView != STEREO_RIGHT {
+        ctx.world.cg.frametime = ctx.world.cg.time - ctx.world.cg.oldTime;
+        if ctx.world.cg.frametime < 0 {
+            ctx.world.cg.frametime = 0;
+        }
+        ctx.world.cg.oldTime = ctx.world.cg.time;
+        CG_AddLagometerFrameInfo(ctx.world);
+    }
+
+    if ctx.world.cvars.cg_timescale.value != ctx.world.cvars.cg_timescaleFadeEnd.value {
+        if ctx.world.cvars.cg_timescale.value < ctx.world.cvars.cg_timescaleFadeEnd.value {
+            ctx.world.cvars.cg_timescale.value += ctx.world.cvars.cg_timescaleFadeSpeed.value
+                * (ctx.world.cg.frametime as f32)
+                / 1000.0;
+            if ctx.world.cvars.cg_timescale.value > ctx.world.cvars.cg_timescaleFadeEnd.value {
+                ctx.world.cvars.cg_timescale.value = ctx.world.cvars.cg_timescaleFadeEnd.value;
+            }
+        } else {
+            ctx.world.cvars.cg_timescale.value -= ctx.world.cvars.cg_timescaleFadeSpeed.value
+                * (ctx.world.cg.frametime as f32)
+                / 1000.0;
+            if ctx.world.cvars.cg_timescale.value < ctx.world.cvars.cg_timescaleFadeEnd.value {
+                ctx.world.cvars.cg_timescale.value = ctx.world.cvars.cg_timescaleFadeEnd.value;
+            }
+        }
+        if ctx.world.cvars.cg_timescaleFadeSpeed.value != 0.0 {
+            let value = ctx.world.cvars.cg_timescale.value;
+            trap::Cvar_Set(ctx.engine, "timescale", &format!("{value:.6}"));
+        }
+    }
+
+    // actually issue the rendering calls
+    CG_DrawActive(ctx, stereoView, menus, ds);
+
+    CG_DrawAutoMap(ctx);
+
+    if ctx.world.cvars.cg_stats.integer != 0 {
+        let clientFrame = ctx.world.cg.clientFrame;
+        CG_Printf(ctx, &format!("cg.clientFrame:{clientFrame}\n"));
+    }
 }
