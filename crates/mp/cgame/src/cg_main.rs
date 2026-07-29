@@ -22,7 +22,7 @@ use mp_bg::bg_panimate::BG_ClearAnimsets;
 use mp_bg::public::bg_itemlist::{bg_itemlist, bg_numItems};
 use mp_bg::public::configstring::{
     CS_AMBIENT_SET, CS_BSP_MODELS, CS_EFFECTS, CS_GLOBAL_AMBIENT_SET, CS_ICONS, CS_ITEMS,
-    CS_MODELS, CS_MUSIC, CS_SIEGE_OBJECTIVES, CS_SIEGE_STATE, CS_SIEGE_TIMEOVERRIDE,
+    CS_MODELS, CS_MUSIC, CS_PLAYERS, CS_SIEGE_OBJECTIVES, CS_SIEGE_STATE, CS_SIEGE_TIMEOVERRIDE,
     CS_SIEGE_WINTEAM, CS_SOUNDS, CS_TERRAINS,
 };
 use mp_bg::public::entity_type::entityType_t;
@@ -90,13 +90,14 @@ use native_string::{
 use crate::cg_draw::{CG_Text_Paint, CG_Text_Width};
 use crate::cg_effects::{CG_InitGlass, CG_TestLine};
 use crate::cg_ents::ScaleModelAxis;
-use crate::cg_info::{CG_LoadingItem, CG_LoadingString};
+use crate::cg_info::{CG_LoadingClient, CG_LoadingItem, CG_LoadingString};
 use crate::cg_marks::{CG_ClearParticles, CG_ImpactMark};
 use crate::cg_new_draw::{
     CG_GameTypeString, CG_GetGameStatusText, CG_GetKillerText, CG_StatusHandle,
 };
 use crate::cg_players::{
     CG_AddGhoul2Mark, CG_CacheG2AnimInfo, CG_CleanJetpackGhoul2, CG_HandleAppendedSkin,
+    CG_NewClientInfo,
 };
 use crate::cg_predict::{CG_G2Trace, CG_PointContents, CG_Trace};
 use crate::cg_saga::{CG_ParseSiegeObjectiveStatus, CG_SetSiegeTimerCvar};
@@ -4996,4 +4997,49 @@ pub fn CG_RagCallback(ctx: &mut CgContext, callType: c_int) -> c_int {
     }
 
     0
+}
+
+/// Raven `CG_ForceModelChange` — reloads every present client's ghoul2 model
+/// off its `CS_PLAYERS` configstring, forcing a rebuild.
+///
+/// Raven stashed `oldGhoul2` from `cgs.clientinfo[i].ghoul2Model` but never
+/// read it back before `CG_NewClientInfo` overwrote the slot - dead store,
+/// dropped.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:1135-1150`
+pub fn CG_ForceModelChange(ctx: &mut CgContext) {
+    for i in 0..MAX_CLIENTS {
+        let clientInfo = CG_ConfigString(ctx, CS_PLAYERS + i as c_int);
+        if clientInfo.is_empty() {
+            continue;
+        }
+
+        CG_NewClientInfo(ctx, i as c_int, true);
+    }
+}
+
+/// Raven `CG_RegisterClients` — loads the local client first, then every
+/// other present client, then rebuilds the spectator-follow string.
+///
+/// Source: `oracle/codemp/cgame/cg_main.c:2505-2526`
+pub fn CG_RegisterClients(ctx: &mut CgContext) {
+    let clientNum = ctx.world.cg.clientNum;
+
+    CG_LoadingClient(ctx, clientNum);
+    CG_NewClientInfo(ctx, clientNum, false);
+
+    for i in 0..MAX_CLIENTS_I32 {
+        if clientNum == i {
+            continue;
+        }
+
+        let clientInfo = CG_ConfigString(ctx, CS_PLAYERS + i);
+        if clientInfo.is_empty() {
+            continue;
+        }
+        CG_LoadingClient(ctx, i);
+        CG_NewClientInfo(ctx, i, false);
+    }
+
+    CG_BuildSpectatorString(ctx);
 }

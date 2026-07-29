@@ -163,6 +163,21 @@ pub struct CgDrawState {
     /// Source: `oracle/codemp/cgame/cg_draw.c:40`
     pub cg_siegeDeathTime: c_int,
 
+    /// Raven `int cgSiegeRoundCountTime` — the last round-begin countdown value
+    /// (1/2/3) the announcer already spoke; guards the count sound to once each.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:7354`
+    pub cgSiegeRoundCountTime: c_int,
+
+    /// Raven `vec3_t gCGFallVector` — the origin latched the frame the local
+    /// client started falling to his death; the death-cam looks back at it.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:7338`
+    pub gCGFallVector: vec3_t,
+
+    /// Raven `qboolean gCGHasFallVector` — whether `gCGFallVector` currently
+    /// holds a live fall origin.
+    /// Source: `oracle/codemp/cgame/cg_draw.c:7337`
+    pub gCGHasFallVector: bool,
+
     /// Raven's `static int oldDif = 0` inside `CG_DrawRocketLocking` — last
     /// frame's wedge count; a change fires the tick/lock sound.
     /// Source: `oracle/codemp/cgame/cg_draw.c:5752`
@@ -312,6 +327,9 @@ impl Default for CgDrawState {
             cgYsalFadeVal: 0.0,
             cg_beatingSiegeTime: 0,
             cg_siegeDeathTime: 0,
+            cgSiegeRoundCountTime: 0,
+            gCGFallVector: [0.0; 3],
+            gCGHasFallVector: false,
             fpsPreviousTimes: [0; FPS_FRAMES],
             fpsIndex: 0,
             fpsPrevious: 0,

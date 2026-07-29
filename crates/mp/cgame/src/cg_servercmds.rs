@@ -11,15 +11,19 @@ use mp_bg::bg_panimate::BG_InDeathAnim;
 use mp_bg::local::bg_customSiegeSoundNames;
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::configstring::{
-    CS_CLIENT_DUELISTS, CS_CLIENT_DUELWINNER, CS_CLIENT_JEDIMASTER, CS_FLAGSTATUS,
-    CS_LEVEL_START_TIME, CS_SCORES1, CS_SCORES2, CS_SERVERINFO, CS_SHADERSTATE, CS_SOUNDS,
-    CS_TERRAINS, CS_WARMUP,
+    CS_CLIENT_DUELHEALTHS, CS_CLIENT_DUELISTS, CS_CLIENT_DUELWINNER, CS_CLIENT_JEDIMASTER,
+    CS_EFFECTS, CS_FLAGSTATUS, CS_INTERMISSION, CS_LEVEL_START_TIME, CS_LIGHT_STYLES, CS_MODELS,
+    CS_MUSIC, CS_PLAYERS, CS_SCORES1, CS_SCORES2, CS_SERVERINFO, CS_SHADERSTATE,
+    CS_SIEGE_OBJECTIVES, CS_SIEGE_STATE, CS_SIEGE_TIMEOVERRIDE, CS_SIEGE_WINTEAM, CS_SOUNDS,
+    CS_TEAMVOTE_NO, CS_TEAMVOTE_STRING, CS_TEAMVOTE_TIME, CS_TEAMVOTE_YES, CS_TERRAINS, CS_VOTE_NO,
+    CS_VOTE_STRING, CS_VOTE_TIME, CS_VOTE_YES, CS_WARMUP, MAX_FX, MAX_MODELS, MAX_SOUNDS,
 };
 use mp_bg::public::gametype::{GT_CTF, GT_CTY, GT_POWERDUEL, GT_SIEGE};
 use mp_bg::weapons::weapon_t::WP_BRYAR_PISTOL;
 use mp_engine_select::Engine;
 use mp_qshared::common::mp::ghoul2::bone_flags::BONE_ANIM_OVERRIDE_FREEZE;
 use mp_qshared::common::mp::qcommon::saber::saber_info::MAX_SABERS;
+use mp_qshared::shared::limits::MAX_STRING_TOKENS;
 use mp_qshared::shared::q_math::VectorClear;
 use mp_qshared::shared::sound_channel::CHAN_ANNOUNCER;
 use mp_qshared::shared::{
@@ -33,15 +37,19 @@ use native_string::{atoi, strcat_string, Info_ValueForKey, Q_strncpyz};
 
 use crate::cg_draw::CG_CenterPrint;
 use crate::cg_event::CG_ReattachLimb;
+use crate::cg_light::CG_SetLightstyle;
 use crate::cg_localents::CG_InitLocalEntities;
 use crate::cg_main::{
-    CG_Argv, CG_ConfigString, CG_GetStringEdString, CG_Printf, CG_SetScoreSelection, CG_StartMusic,
+    CG_Argv, CG_BuildSpectatorString, CG_ConfigString, CG_GetStringEdString, CG_ParseSiegeState,
+    CG_ParseWeatherEffect, CG_Printf, CG_SetScoreSelection, CG_StartMusic,
 };
 use crate::cg_marks::{CG_ClearParticles, CG_InitMarkPolys};
 use crate::cg_players::{
     cg_customCombatSoundNames, cg_customDuelSoundNames, cg_customExtraSoundNames,
-    cg_customJediSoundNames, cg_customSoundNames, CG_DestroyNPCClient,
+    cg_customJediSoundNames, cg_customSoundNames, CG_CacheG2AnimInfo, CG_DestroyNPCClient,
+    CG_HandleAppendedSkin, CG_NewClientInfo,
 };
+use crate::cg_saga::{CG_ParseSiegeObjectiveStatus, CG_SetSiegeTimerCvar};
 use crate::cg_weapons::CG_G2WeaponInstance;
 use crate::local::client_info_t::{
     clientInfo_t, MAX_CUSTOM_COMBAT_SOUNDS, MAX_CUSTOM_EXTRA_SOUNDS, MAX_CUSTOM_JEDI_SOUNDS,
@@ -56,6 +64,13 @@ use crate::world::CgWorld;
 ///
 /// Source: `oracle/codemp/cgame/cg_servercmds.c:1057`
 pub const MAX_STRINGED_SV_STRING: usize = 1024;
+
+/// Raven `MAX_LIGHT_STYLES` — `mp_bg::public::configstring` never re-exported
+/// this one (only its derived `CS_*` offsets), so it's spelled here at its
+/// only cgame call site.
+///
+/// Source: `oracle/codemp/game/q_shared.h:424`
+const MAX_LIGHT_STYLES: c_int = 64;
 
 /// Raven `MAX_CLIENT_SCORE_SEND` — the score rows one `scores` command carries.
 ///
@@ -1182,4 +1197,182 @@ pub fn CG_MapRestart(ctx: &mut CgContext) {
     }
     */
     trap::Cvar_Set(ctx.engine, "cg_thirdPerson", "0");
+}
+
+/// Raven `CG_ConfigStringModified` — dispatches one changed configstring index
+/// onto the right piece of `cg`/`cgs`, re-fetching the whole `gameState` first
+/// since the client system already folded the new string in.
+///
+/// Source: `oracle/codemp/cgame/cg_servercmds.c:671-860`
+pub fn CG_ConfigStringModified(ctx: &mut CgContext) {
+    let arg = CG_Argv(ctx, 1);
+    let num = atoi(&arg);
+
+    // get the gamestate from the client system, which will have the
+    // new configstring already integrated
+    trap::GetGameState(ctx.engine, &mut ctx.world.cgs.gameState);
+
+    // look up the individual string that was modified
+    let s = CG_ConfigString(ctx, num);
+
+    // do something with it if necessary
+    if num == CS_MUSIC {
+        CG_StartMusic(ctx, true);
+    } else if num == CS_SERVERINFO {
+        CG_ParseServerinfo(ctx);
+    } else if num == CS_WARMUP {
+        CG_ParseWarmup(ctx);
+    } else if num == CS_SCORES1 {
+        ctx.world.cgs.scores1 = atoi(&s);
+    } else if num == CS_SCORES2 {
+        ctx.world.cgs.scores2 = atoi(&s);
+    } else if num == CS_CLIENT_JEDIMASTER {
+        ctx.world.cgs.jediMaster = atoi(&s);
+    } else if num == CS_CLIENT_DUELWINNER {
+        ctx.world.cgs.duelWinner = atoi(&s);
+    } else if num == CS_CLIENT_DUELISTS {
+        let bytes = s.as_bytes();
+        let mut buf = String::new();
+        let mut i = 0usize;
+
+        while i < bytes.len() && bytes[i] != b'|' {
+            buf.push(bytes[i] as char);
+            i += 1;
+        }
+        ctx.world.cgs.duelist1 = atoi(&buf);
+
+        buf.clear();
+        // §F19: same OOB-after-terminator quirk `SetDuelistHealthsFromConfigString`
+        // above documents - a string with no `|` steps `i` past the end and the
+        // length bound below just yields the rest as empty.
+        i += 1;
+        while i < bytes.len() && bytes[i] != b'|' {
+            buf.push(bytes[i] as char);
+            i += 1;
+        }
+        ctx.world.cgs.duelist2 = atoi(&buf);
+
+        if i < bytes.len() {
+            buf.clear();
+            i += 1;
+
+            while i < bytes.len() {
+                buf.push(bytes[i] as char);
+                i += 1;
+            }
+            ctx.world.cgs.duelist3 = atoi(&buf);
+        }
+    } else if num == CS_CLIENT_DUELHEALTHS {
+        // nmckenzie: DUEL_HEALTH
+        SetDuelistHealthsFromConfigString(ctx.world, &s);
+    } else if num == CS_LEVEL_START_TIME {
+        ctx.world.cgs.levelStartTime = atoi(&s);
+    } else if num == CS_VOTE_TIME {
+        ctx.world.cgs.voteTime = atoi(&s);
+        ctx.world.cgs.voteModified = qtrue;
+    } else if num == CS_VOTE_YES {
+        ctx.world.cgs.voteYes = atoi(&s);
+        ctx.world.cgs.voteModified = qtrue;
+    } else if num == CS_VOTE_NO {
+        ctx.world.cgs.voteNo = atoi(&s);
+        ctx.world.cgs.voteModified = qtrue;
+    } else if num == CS_VOTE_STRING {
+        Q_strncpyz(&mut ctx.world.cgs.voteString, &s, MAX_STRING_TOKENS);
+    } else if num >= CS_TEAMVOTE_TIME && num <= CS_TEAMVOTE_TIME + 1 {
+        let idx = (num - CS_TEAMVOTE_TIME) as usize;
+        ctx.world.cgs.teamVoteTime[idx] = atoi(&s);
+        ctx.world.cgs.teamVoteModified[idx] = qtrue;
+    } else if num >= CS_TEAMVOTE_YES && num <= CS_TEAMVOTE_YES + 1 {
+        let idx = (num - CS_TEAMVOTE_YES) as usize;
+        ctx.world.cgs.teamVoteYes[idx] = atoi(&s);
+        ctx.world.cgs.teamVoteModified[idx] = qtrue;
+    } else if num >= CS_TEAMVOTE_NO && num <= CS_TEAMVOTE_NO + 1 {
+        let idx = (num - CS_TEAMVOTE_NO) as usize;
+        ctx.world.cgs.teamVoteNo[idx] = atoi(&s);
+        ctx.world.cgs.teamVoteModified[idx] = qtrue;
+    } else if num >= CS_TEAMVOTE_STRING && num <= CS_TEAMVOTE_STRING + 1 {
+        let idx = (num - CS_TEAMVOTE_STRING) as usize;
+        // §F19: Raven's sizeof here is the whole 2D array (2048), so a >1023
+        // char string overruns row 0 into row 1 (UB); the port caps at the row.
+        Q_strncpyz(
+            &mut ctx.world.cgs.teamVoteString[idx],
+            &s,
+            MAX_STRING_TOKENS,
+        );
+    } else if num == CS_INTERMISSION {
+        ctx.world.cg.intermissionStarted = atoi(&s);
+    } else if num >= CS_MODELS && num < CS_MODELS + MAX_MODELS {
+        // Raven `strcpy(modelName, str)` into a fixed `MAX_QPATH` stack buffer
+        // with no length check (UB on overflow); the port's `String` just grows.
+        let mut modelName = s.clone();
+
+        if modelName.contains(".glm") || modelName.starts_with('$') {
+            // Check to see if it has a custom skin attached.
+            CG_HandleAppendedSkin(ctx, &mut modelName);
+            CG_CacheG2AnimInfo(ctx, &modelName);
+        }
+
+        let idx = (num - CS_MODELS) as usize;
+        if !modelName.starts_with('$') && !modelName.starts_with('@') {
+            // don't register vehicle names and saber names as models.
+            ctx.world.cgs.gameModels[idx] = trap::R_RegisterModel(ctx.engine, &modelName);
+        } else {
+            ctx.world.cgs.gameModels[idx] = 0;
+        }
+        // GHOUL2 Insert start
+        // cgs.skins[ num-CS_CHARSKINS ] = trap_R_RegisterSkin( str );
+        // rww - removed and replaced with CS_G2BONES
+        // Ghoul2 Insert end
+    } else if num >= CS_SOUNDS && num < CS_SOUNDS + MAX_SOUNDS {
+        let bytes = s.as_bytes();
+        if bytes.first().copied().unwrap_or(0) != b'*' {
+            // player specific sounds don't register here
+            let idx = (num - CS_SOUNDS) as usize;
+            ctx.world.cgs.gameSounds[idx] = trap::S_RegisterSound(ctx.engine, &s);
+        } else if bytes.get(1) == Some(&b'$') {
+            // an NPC soundset
+            CG_PrecacheNPCSounds(ctx, &s);
+        }
+    } else if num >= CS_EFFECTS && num < CS_EFFECTS + MAX_FX {
+        let idx = (num - CS_EFFECTS) as usize;
+        if s.as_bytes().first() == Some(&b'*') {
+            // it's a special global weather effect
+            CG_ParseWeatherEffect(ctx, &s);
+            ctx.world.cgs.gameEffects[idx] = 0;
+        } else {
+            ctx.world.cgs.gameEffects[idx] = trap::FX_RegisterEffect(ctx.engine, &s);
+        }
+    } else if num >= CS_SIEGE_STATE && num < CS_SIEGE_STATE + 1 {
+        if !s.is_empty() {
+            CG_ParseSiegeState(ctx.world, &s);
+        }
+    } else if num >= CS_SIEGE_WINTEAM && num < CS_SIEGE_WINTEAM + 1 {
+        if !s.is_empty() {
+            ctx.world.scoreboard.cg_siegeWinTeam = atoi(&s);
+        }
+    } else if num >= CS_SIEGE_OBJECTIVES && num < CS_SIEGE_OBJECTIVES + 1 {
+        CG_ParseSiegeObjectiveStatus(ctx, &s);
+    } else if num >= CS_SIEGE_TIMEOVERRIDE && num < CS_SIEGE_TIMEOVERRIDE + 1 {
+        ctx.world.draw.cg_beatingSiegeTime = atoi(&s);
+        let msec = ctx.world.draw.cg_beatingSiegeTime;
+        CG_SetSiegeTimerCvar(ctx, msec);
+    } else if num >= CS_PLAYERS && num < CS_PLAYERS + MAX_CLIENTS_I32 {
+        CG_NewClientInfo(ctx, num - CS_PLAYERS, true);
+        CG_BuildSpectatorString(ctx);
+    } else if num == CS_FLAGSTATUS {
+        if ctx.world.cgs.gametype == GT_CTF || ctx.world.cgs.gametype == GT_CTY {
+            // format is rb where its red/blue, 0 is at base, 1 is taken, 2 is dropped
+            let bytes = s.as_bytes();
+            // Raven reads through the NUL on a short string: an empty
+            // configstring gives `0 - '0'` = -48 (matches no flag-status arm,
+            // draws nothing). Reproduced; only a true end-of-gamestate overrun
+            // diverges (§F19: bound instead of reading past our String).
+            ctx.world.cgs.redflag = bytes.first().map_or(-48, |&b| b as i32 - '0' as i32);
+            ctx.world.cgs.blueflag = bytes.get(1).map_or(-48, |&b| b as i32 - '0' as i32);
+        }
+    } else if num == CS_SHADERSTATE {
+        CG_ShaderStateChanged(ctx);
+    } else if num >= CS_LIGHT_STYLES && num < CS_LIGHT_STYLES + (MAX_LIGHT_STYLES * 3) {
+        CG_SetLightstyle(ctx, num - CS_LIGHT_STYLES);
+    }
 }

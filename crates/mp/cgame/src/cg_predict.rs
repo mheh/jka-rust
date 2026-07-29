@@ -30,6 +30,7 @@ use mp_bg::public::viewheight::{DEFAULT_MAXS_2, DEFAULT_MINS_2};
 use mp_bg::weapons::weapon_t::{WP_EMPLACED_GUN, WP_NONE};
 use mp_qshared::common::mp::game::class_t::class_t::CLASS_VEHICLE;
 use mp_qshared::common::mp::qcommon::usercmd_t;
+use mp_qshared::common::mp::qcommon::PMF_FOLLOW;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::force_powers::{FORCE_DARKSIDE, FORCE_LIGHTSIDE};
 use mp_qshared::shared::q_math::{_VectorSubtract, vec3_origin, LerpAngle};
@@ -887,4 +888,89 @@ pub fn CG_G2Trace(
     CG_ClipMoveToEntities(ctx, start, mins, maxs, end, skipNumber, mask, &mut t, true);
 
     *result = t;
+}
+
+/// Raven `CG_PredictPlayerState` — generates `cg.predictedPlayerState` for the
+/// current cg.time from the last snapshot plus the pending usercmds, running
+/// the same `Pmove` the server did.
+///
+/// PORT-NOTE: only the three non-predicting prologue paths are transcribed
+/// here — the first-frame `validPPS` seed and the demo/follow +
+/// nopredict/synchronous/eweb interpolation early-returns, all of which land
+/// clean. The predicting body (the whole `Pmove`-driven remainder from Raven's
+/// "prepare for pmove", `cg_predict.c:1007`) is blocked on two DEC-46 design
+/// points, both already cited by [`CG_PmoveClientPointerUpdate`]:
+///
+/// 1. The cgame pmove entity seam. Raven binds `cg_pmove.ps =
+///    &cg.predictedPlayerState`, `cg_pmove.trace = CG_Trace`,
+///    `cg_pmove.pointcontents = CG_PointContents`, and
+///    `cg_pmove.baseEnt = (bgEntity_t *)cg_entities` before `Pmove`. The
+///    ported `Pmove` drives `self.traps.trace()` / `self.traps.pointcontents()`
+///    (`bg_pmove.rs`), and `CgBgTraps`'s two methods are still `todo!()`s
+///    because the seam carries `&Engine`, not the `&mut CgContext` the ported
+///    `CG_Trace`/`CG_PointContents` need
+///    (`bg_channel/cg_bg_traps.rs:67-96`). The raw self-pointer into
+///    `predictedPlayerState` and the `baseEnt` overlay pun are the open DEC-46
+///    ruling `CG_PmoveClientPointerUpdate` names as blocking this wave.
+/// 2. `cgSendPSPool`. The `VectorCopy(... cgSendPS[i]->origin)` pump and the
+///    `revertES` copy-back read/write `playerState_t cgSendPSPool[MAX_GENTITIES]`
+///    (`cg_predict.c:853,888`), which has no DEC-46 home yet — the same
+///    deferral `CG_PmoveClientPointerUpdate` records.
+///
+/// Source: `oracle/codemp/cgame/cg_predict.c:963-1511`
+pub fn CG_PredictPlayerState(ctx: &mut CgContext) {
+    ctx.world.cg.hyperspace = qfalse; // will be set if touching a trigger_teleport
+
+    // if this is the first frame we must guarantee predictedPlayerState is
+    // valid even if there is some other error condition
+    if ctx.world.cg.validPPS == qfalse {
+        ctx.world.cg.validPPS = qtrue;
+        // §F19: Raven derefs `cg.snap` unguarded; before the first snapshot the
+        // port leaves `predictedPlayerState`/`predictedVehicleState` alone.
+        if let Some((ps, vps)) = ctx.world.cg.snap_ref().map(|s| (s.ps, s.vps)) {
+            ctx.world.cg.predictedPlayerState = ps;
+            if CG_Piloting(ctx.world, ps.m_iVehicleNum) {
+                ctx.world.cg.predictedVehicleState = vps;
+            }
+        }
+    }
+
+    // demo playback just copies the moves
+    // §F19: `cg.snap->ps.pm_flags` is an unguarded deref in Raven; with no
+    // snapshot the follow test reads as unset.
+    let demo_or_follow = ctx.world.cg.demoPlayback != qfalse
+        || ctx
+            .world
+            .cg
+            .snap_ref()
+            .map_or(false, |s| s.ps.pm_flags & PMF_FOLLOW != 0);
+    if demo_or_follow {
+        CG_InterpolatePlayerState(ctx, false);
+        let vehNum = ctx.world.cg.predictedPlayerState.m_iVehicleNum;
+        if CG_Piloting(ctx.world, vehNum) {
+            CG_InterpolateVehiclePlayerState(ctx, false);
+        }
+        return;
+    }
+
+    // non-predicting local movement will grab the latest angles
+    if ctx.world.cvars.cg_nopredict.integer != 0
+        || ctx.world.cvars.cg_synchronousClients.integer != 0
+        || CG_UsingEWeb(ctx.world)
+    {
+        CG_InterpolatePlayerState(ctx, true);
+        let vehNum = ctx.world.cg.predictedPlayerState.m_iVehicleNum;
+        if CG_Piloting(ctx.world, vehNum) {
+            CG_InterpolateVehiclePlayerState(ctx, true);
+        }
+        return;
+    }
+
+    //TODO: Port CG_PredictPlayerState
+    // Source: `oracle/codemp/cgame/cg_predict.c:1007-1511`
+    // The predicting body ("prepare for pmove" onward) is blocked on the two
+    // DEC-46 design points documented in this fn's doc comment: the pmove
+    // entity seam (raw `cg_pmove.ps`/`baseEnt`, plus `CgBgTraps::trace` /
+    // `pointcontents` still `todo!()`) and the unhomed `cgSendPSPool`.
+    todo!("Port CG_PredictPlayerState predicting body — oracle/codemp/cgame/cg_predict.c:1007-1511 (blocked on the DEC-46 pmove entity seam + cgSendPSPool; see CG_PmoveClientPointerUpdate)")
 }

@@ -27,6 +27,7 @@ use mp_bg::public::anim_event_type::animEventType_t;
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::anim_table::animTable;
 use mp_bg::public::animevent::{animevent_t, MAX_RANDOM_ANIM_SOUNDS};
+use mp_bg::public::bg_loaded_events::MAX_ANIM_EVENTS;
 use mp_bg::public::configstring::{CS_G2BONES, CS_MODELS, CS_PLAYERS};
 use mp_bg::public::entity_effects::EF2_HYPERSPACE;
 use mp_bg::public::entity_flags::{EF_CONNECTION, EF_DEAD, EF_PERMANENT, EF_RAG, EF_TALK};
@@ -188,6 +189,24 @@ const AED_SABER_SPIN_SABERNUM: usize = 0;
 /// `AEV_SABER_SPIN` payload — spin sound variant.
 /// Source: `oracle/codemp/game/bg_public.h:301`
 const AED_SABER_SPIN_TYPE: usize = 1;
+/// `AEV_SOUND`/`AEV_SOUNDCHAN` payload — chance-to-play, 0 means always.
+/// Source: `oracle/codemp/game/bg_public.h:277`
+const AED_SOUND_PROBABILITY: usize = MAX_RANDOM_ANIM_SOUNDS + 1;
+/// `AEV_FOOTSTEP` payload — chance-to-play, 0 means always.
+/// Source: `oracle/codemp/game/bg_public.h:282`
+const AED_FOOTSTEP_PROBABILITY: usize = 1;
+/// `AEV_EFFECT` payload — chance-to-play, 0 means always.
+/// Source: `oracle/codemp/game/bg_public.h:286`
+const AED_EFFECT_PROBABILITY: usize = 2;
+/// `AEV_FIRE` payload — chance-to-fire, 0 means always.
+/// Source: `oracle/codemp/game/bg_public.h:290`
+const AED_FIRE_PROBABILITY: usize = 1;
+/// `AEV_SABER_SWING` payload — chance-to-play, 0 means always.
+/// Source: `oracle/codemp/game/bg_public.h:298`
+const AED_SABER_SWING_PROBABILITY: usize = 2;
+/// `AEV_SABER_SPIN` payload — chance-to-play, 0 means always.
+/// Source: `oracle/codemp/game/bg_public.h:302`
+const AED_SABER_SPIN_PROBABILITY: usize = 2;
 
 /// Raven `cg_customSoundNames[MAX_CUSTOM_SOUNDS]` — the base per-client custom
 /// sound set, scanned until the `NULL` sentinel (`None`). The leading `*` is
@@ -9192,5 +9211,231 @@ pub fn CG_PlayerAnimEventDo(ctx: &mut CgContext, centNum: usize, animEvent: &mut
 
         // Raven's `default: return;` — AEV_NONE and the AEV_NUM_AEV sentinel.
         _ => {}
+    }
+}
+
+/// Raven `CG_PlayerAnimEvents` — walks a parsed legs/torso event list looking
+/// for one whose keyframe the legs/torso lerp just crossed this frame, firing
+/// it through `CG_PlayerAnimEventDo`. Frame steps bigger than 1 (a lerp that
+/// skipped frames, or a new anim starting) fall back to a same-anim/looped
+/// range check instead of an exact match.
+///
+/// `CG_PlayerAnimEventDo` caches its resolved bolt/model index back into the
+/// event and NULs `stringData` so the effect lookup only runs once — Raven
+/// mutates the entry in the live `bgAllEvents` cache in place, so each hit is
+/// copied out, mutated, and written back rather than transcribed as a
+/// borrowed reference (which the `ctx` reborrow for the `Do` call rules out).
+/// Source: `oracle/codemp/cgame/cg_players.c:2461-2674`
+pub fn CG_PlayerAnimEvents(
+    ctx: &mut CgContext,
+    animFileIndex: c_int,
+    eventFileIndex: c_int,
+    torso: bool,
+    oldFrame: c_int,
+    frame: c_int,
+    centNum: usize,
+) {
+    let mut firstFrame: c_int = 0;
+    let mut lastFrame: c_int = 0;
+    let mut inSameAnim = false;
+    let mut loopAnim = false;
+    let mut animBackward = false;
+    // Raven declares doEvent at fn scope and never resets it in the loop, so
+    // once any event fires, every later matching event fires too - probability
+    // roll or not. Accidental, but §20 keeps it (the roll still draws).
+    let mut doEvent = false;
+
+    //given a range, see if keyFrame falls in that range
+    if ((oldFrame - frame) as f32).abs() as f64 > 1.0 {
+        let (oldAnim, anim) = if torso {
+            let cent = ctx.world.entity(centNum);
+            (cent.currentState.torsoAnim, cent.nextState.torsoAnim)
+        } else {
+            let cent = ctx.world.entity(centNum);
+            (cent.currentState.legsAnim, cent.nextState.legsAnim)
+        };
+        if anim != oldAnim {
+            // not in same anim
+            inSameAnim = false;
+            //FIXME: we *could* see if the oldFrame was *just about* to play the keyframed sound...
+        } else {
+            // still in same anim, check for looping anim
+            inSameAnim = true;
+
+            // `bgAllAnims[..].anims` is still `mp_bg`'s raw `animation_t*` table; the
+            // whole workspace reads it through a pointer (see `CG_G2SetHeadAnim`).
+            let animations = ctx.world.bg_state.bgAllAnims[animFileIndex as usize].anims;
+            // SAFETY: same raw-ptr pattern as `CG_G2SetHeadAnim` — Raven indexes it
+            // unchecked and so do we.
+            let (frameLerp, loopFrames, animFirstFrame, numFrames) = unsafe {
+                let a = &*animations.offset(anim as isize);
+                (
+                    a.frameLerp,
+                    a.loopFrames,
+                    a.firstFrame as c_int,
+                    a.numFrames as c_int,
+                )
+            };
+            animBackward = frameLerp < 0;
+            if loopFrames != -1 {
+                // a looping anim!
+                loopAnim = true;
+                firstFrame = animFirstFrame;
+                lastFrame = animFirstFrame + numFrames;
+            }
+        }
+    }
+
+    // Check for anim sound
+    for i in 0..MAX_ANIM_EVENTS {
+        let animEvent = if torso {
+            ctx.world.bg_state.bgAllEvents[eventFileIndex as usize].torsoAnimEvents[i]
+        } else {
+            ctx.world.bg_state.bgAllEvents[eventFileIndex as usize].legsAnimEvents[i]
+        };
+
+        if animEvent.eventType == animEventType_t::AEV_NONE {
+            // No event, end of list
+            break;
+        }
+
+        let mut matched = false;
+        if animEvent.keyFrame as c_int == frame {
+            // exact match
+            matched = true;
+        } else if ((oldFrame - frame) as f32).abs() as f64 > 1.0 {
+            //given a range, see if keyFrame falls in that range
+            if inSameAnim {
+                // if changed anims altogether, sorry, the sound is lost
+                let keyFrame = animEvent.keyFrame as c_int;
+                if ((oldFrame - keyFrame) as f32).abs() as f64 <= 3.0
+                    || ((frame - keyFrame) as f32).abs() as f64 <= 3.0
+                {
+                    //must be at least close to the keyframe
+                    if animBackward {
+                        // animation plays backwards
+                        if oldFrame > keyFrame && frame < keyFrame {
+                            // old to new passed through keyframe
+                            matched = true;
+                        } else if loopAnim {
+                            //hmm, didn't pass through it linearally, see if we looped
+                            if keyFrame >= firstFrame && keyFrame < lastFrame {
+                                //keyframe is in this anim
+                                if oldFrame > keyFrame && frame > oldFrame {
+                                    // old to new passed through keyframe
+                                    matched = true;
+                                }
+                            }
+                        }
+                    } else {
+                        // anim plays forwards
+                        if oldFrame < keyFrame && frame > keyFrame {
+                            // old to new passed through keyframe
+                            matched = true;
+                        } else if loopAnim {
+                            //hmm, didn't pass through it linearally, see if we looped
+                            if keyFrame >= firstFrame && keyFrame < lastFrame {
+                                //keyframe is in this anim
+                                if oldFrame < keyFrame && frame < oldFrame {
+                                    // old to new passed through keyframe
+                                    matched = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if matched {
+            match animEvent.eventType {
+                animEventType_t::AEV_SOUND | animEventType_t::AEV_SOUNDCHAN => {
+                    // Determine probability of playing sound
+                    if animEvent.eventData[AED_SOUND_PROBABILITY] == 0 {
+                        // 100%
+                        doEvent = true;
+                    } else if animEvent.eventData[AED_SOUND_PROBABILITY] as c_int
+                        > ctx.world.bg_state.rng.Q_irand(0, 99)
+                    {
+                        doEvent = true;
+                    }
+                }
+                animEventType_t::AEV_SABER_SWING => {
+                    // Determine probability of playing sound
+                    if animEvent.eventData[AED_SABER_SWING_PROBABILITY] == 0 {
+                        // 100%
+                        doEvent = true;
+                    } else if animEvent.eventData[AED_SABER_SWING_PROBABILITY] as c_int
+                        > ctx.world.bg_state.rng.Q_irand(0, 99)
+                    {
+                        doEvent = true;
+                    }
+                }
+                animEventType_t::AEV_SABER_SPIN => {
+                    // Determine probability of playing sound
+                    if animEvent.eventData[AED_SABER_SPIN_PROBABILITY] == 0 {
+                        // 100%
+                        doEvent = true;
+                    } else if animEvent.eventData[AED_SABER_SPIN_PROBABILITY] as c_int
+                        > ctx.world.bg_state.rng.Q_irand(0, 99)
+                    {
+                        doEvent = true;
+                    }
+                }
+                animEventType_t::AEV_FOOTSTEP => {
+                    // Determine probability of playing sound
+                    if animEvent.eventData[AED_FOOTSTEP_PROBABILITY] == 0 {
+                        // 100%
+                        doEvent = true;
+                    } else if animEvent.eventData[AED_FOOTSTEP_PROBABILITY] as c_int
+                        > ctx.world.bg_state.rng.Q_irand(0, 99)
+                    {
+                        doEvent = true;
+                    }
+                }
+                animEventType_t::AEV_EFFECT => {
+                    // Determine probability of playing sound
+                    if animEvent.eventData[AED_EFFECT_PROBABILITY] == 0 {
+                        // 100%
+                        doEvent = true;
+                    } else if animEvent.eventData[AED_EFFECT_PROBABILITY] as c_int
+                        > ctx.world.bg_state.rng.Q_irand(0, 99)
+                    {
+                        doEvent = true;
+                    }
+                }
+                animEventType_t::AEV_FIRE => {
+                    // Determine probability of playing sound
+                    if animEvent.eventData[AED_FIRE_PROBABILITY] == 0 {
+                        // 100%
+                        doEvent = true;
+                    } else if animEvent.eventData[AED_FIRE_PROBABILITY] as c_int
+                        > ctx.world.bg_state.rng.Q_irand(0, 99)
+                    {
+                        doEvent = true;
+                    }
+                }
+                animEventType_t::AEV_MOVE => {
+                    doEvent = true;
+                }
+                _ => {
+                    //doEvent = qfalse;//implicit
+                }
+            }
+
+            // do event
+            if doEvent {
+                let mut ev = animEvent;
+                CG_PlayerAnimEventDo(ctx, centNum, &mut ev);
+                // `CG_PlayerAnimEventDo` caches its resolved index into the event
+                // and NULs `stringData` so the lookup only runs once - write the
+                // mutated copy back into the live parsed-event cache.
+                if torso {
+                    ctx.world.bg_state.bgAllEvents[eventFileIndex as usize].torsoAnimEvents[i] = ev;
+                } else {
+                    ctx.world.bg_state.bgAllEvents[eventFileIndex as usize].legsAnimEvents[i] = ev;
+                }
+            }
+        }
     }
 }

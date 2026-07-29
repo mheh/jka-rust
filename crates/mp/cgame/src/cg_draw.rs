@@ -36,7 +36,7 @@ use mp_bg::public::gametype::{
 use mp_bg::public::holdable::HI_NUM_HOLDABLE;
 use mp_bg::public::item_type::IT_HOLDABLE;
 use mp_bg::public::pers_enum::persEnum_t::{PERS_SCORE, PERS_TEAM};
-use mp_bg::public::pmtype::pmtype_t::PM_SPECTATOR;
+use mp_bg::public::pmtype::pmtype_t::{PM_INTERMISSION, PM_SPECTATOR};
 use mp_bg::public::powerup::{
     PW_BLUEFLAG, PW_CLOAKED, PW_NEUTRALFLAG, PW_NUM_POWERUPS, PW_REDFLAG,
 };
@@ -46,6 +46,7 @@ use mp_bg::public::stat_index::statIndex_t::{
 use mp_bg::public::team::{TEAM_BLUE, TEAM_FREE, TEAM_RED, TEAM_SPECTATOR};
 use mp_bg::public::weaponstate::weaponstate_t::WEAPON_CHARGING_ALT;
 use mp_bg::saga::siege_class_flags_t::siegeClassFlags_t::CFL_STATVIEWER;
+use mp_bg::saga::siege_team_t::SIEGE_ROUND_BEGIN_TIME;
 use mp_bg::weapons::ammo_data::ammoData;
 use mp_bg::weapons::weapon_data::weaponData;
 use mp_bg::weapons::weapon_t::{WP_DISRUPTOR, WP_EMPLACED_GUN, WP_NONE, WP_SABER};
@@ -103,7 +104,10 @@ use crate::cg_players::{CG_IsMindTricked, CG_RadiusForCent};
 use crate::cg_predict::{CG_G2Trace, CG_Trace};
 use crate::cg_scoreboard::CG_DrawOldScoreboard;
 use crate::cg_view::WAVE_FREQUENCY;
-use crate::cg_weapons::{CG_CalcMuzzlePoint, CG_RegisterItemVisuals, WEAPON_SELECT_TIME};
+use crate::cg_weapons::{
+    CG_CalcMuzzlePoint, CG_DrawIconBackground, CG_DrawWeaponSelect, CG_RegisterItemVisuals,
+    WEAPON_SELECT_TIME,
+};
 use crate::local::cg_t::MAX_CHATBOX_ITEMS;
 use crate::trap;
 use crate::world::cg_context::CgContext;
@@ -354,6 +358,11 @@ pub const CHATBOX_CUTOFF_LEN: c_int = 550;
 /// Raven `#define CHATBOX_FONT_HEIGHT 20`.
 /// Source: `oracle/codemp/cgame/cg_draw.c:7530`
 pub const CHATBOX_FONT_HEIGHT: c_int = 20;
+
+/// Raven `#define FALL_FADE_TIME 3000` — how long the black fall-to-death fade
+/// takes to reach full opacity. A `q_shared.h` define with no crate-level home.
+/// Source: `oracle/codemp/game/q_shared.h:2148`
+const FALL_FADE_TIME: c_int = 3000;
 
 // PORT-NOTE: three `cg_local.h` defines with no crate-level home — `cg_drawtools`
 // already keeps its own file-local copies of the `NUM_FONT_*` pair (they are
@@ -8394,4 +8403,380 @@ pub fn CG_DrawIntermission(ctx: &mut CgContext, ds: &DisplayState) {
     ctx.world.cg.scoreFadeTime = ctx.world.cg.time;
     let scoreBoardShowing = CG_DrawScoreboard(ctx, ds);
     ctx.world.cg.scoreBoardShowing = if scoreBoardShowing { qtrue } else { qfalse };
+}
+
+/// Raven `CG_Draw2D` — the whole 2D pass: screen tints, rocket/holocron/power
+/// overlays, fuel and e-web bars, the zoom mask, spectator vs. live status
+/// (crosshair, selection wheels, stats), the fall-to-death fade, votes,
+/// lagometer, follow/warmup, siege round + death timers, scoreboard and chat.
+///
+/// Source: `oracle/codemp/cgame/cg_draw.c:8118-8515`
+pub fn CG_Draw2D(ctx: &mut CgContext, menus: &MenuSystem, ds: &DisplayState) {
+    let inTime = ctx.world.cg.invenSelectTime + WEAPON_SELECT_TIME as f32;
+    let wpTime = ctx.world.cg.weaponSelectTime as f32 + WEAPON_SELECT_TIME as f32;
+
+    // if we are taking a levelshot for the menu, don't draw anything
+    if ctx.world.cg.levelShot != qfalse {
+        return;
+    }
+
+    // Raven derefs `cg.snap` unguarded through this whole body; §F19 — with no
+    // snapshot yet there's no HUD to draw, so bail rather than fault on a
+    // server-supplied null.
+    let ps = match ctx.world.cg.snap_ref() {
+        Some(snap) => &snap.ps,
+        None => return,
+    };
+    let clientNum = ps.clientNum;
+    let pm_type = ps.pm_type;
+    let rocketLockIndex = ps.rocketLockIndex;
+    let rocketLockTime = ps.rocketLockTime;
+    let holocronBits = ps.holocronBits;
+    let forcePowersActive = ps.fd.forcePowersActive;
+    let forceRageRecoveryTime = ps.fd.forceRageRecoveryTime;
+    let jetpackFuel = ps.jetpackFuel;
+    let cloakFuel = ps.cloakFuel;
+    let persTeam = ps.persistant[PERS_TEAM as usize];
+    let health = ps.stats[STAT_HEALTH as usize];
+    let fallingToDeath = ps.fallingToDeath;
+    let psOrigin = ps.origin;
+
+    if ctx.world.cgs.clientinfo[clientNum as usize].team == TEAM_SPECTATOR {
+        ctx.world.draw.cgRageTime = 0;
+        ctx.world.draw.cgRageFadeTime = 0;
+        ctx.world.draw.cgRageFadeVal = 0.0;
+
+        ctx.world.draw.cgRageRecTime = 0;
+        ctx.world.draw.cgRageRecFadeTime = 0;
+        ctx.world.draw.cgRageRecFadeVal = 0.0;
+
+        ctx.world.draw.cgAbsorbTime = 0;
+        ctx.world.draw.cgAbsorbFadeTime = 0;
+        ctx.world.draw.cgAbsorbFadeVal = 0.0;
+
+        ctx.world.draw.cgProtectTime = 0;
+        ctx.world.draw.cgProtectFadeTime = 0;
+        ctx.world.draw.cgProtectFadeVal = 0.0;
+
+        ctx.world.draw.cgYsalTime = 0;
+        ctx.world.draw.cgYsalFadeTime = 0;
+        ctx.world.draw.cgYsalFadeVal = 0.0;
+    }
+
+    if ctx.world.cvars.cg_draw2D.integer == 0 {
+        return;
+    }
+
+    if pm_type == PM_INTERMISSION as c_int {
+        CG_DrawIntermission(ctx, ds);
+        CG_ChatBox_DrawStrings(ctx, ds);
+        return;
+    }
+
+    CG_Draw2DScreenTints(ctx);
+
+    if rocketLockIndex != ENTITYNUM_NONE && (ctx.world.cg.time as f32 - rocketLockTime) > 0.0 {
+        CG_DrawRocketLocking(ctx, rocketLockIndex as usize, rocketLockTime as c_int);
+    }
+
+    if holocronBits != 0 {
+        CG_DrawHolocronIcons(ctx);
+    }
+    if forcePowersActive != 0 || forceRageRecoveryTime > ctx.world.cg.time {
+        CG_DrawActivePowers(ctx);
+    }
+
+    if jetpackFuel < 100 {
+        //draw it as long as it isn't full
+        CG_DrawJetpackFuel(ctx);
+    }
+    if cloakFuel < 100 {
+        //draw it as long as it isn't full
+        CG_DrawCloakFuel(ctx);
+    }
+    if ctx.world.cg.predictedPlayerState.emplacedIndex > 0 {
+        let emplacedIndex = ctx.world.cg.predictedPlayerState.emplacedIndex as usize;
+
+        if ctx.world.entity(emplacedIndex).currentState.weapon == WP_NONE as c_int {
+            //using an e-web, draw its health
+            CG_DrawEWebHealth(ctx);
+        }
+    }
+
+    // Draw this before the text so that any text won't get clipped off
+    CG_DrawZoomMask(ctx);
+
+    if persTeam == TEAM_SPECTATOR {
+        CG_DrawSpectator(ctx, ds);
+        CG_DrawCrosshair(ctx, None, 0);
+        CG_DrawCrosshairNames(ctx, ds);
+        CG_SaberClashFlare(ctx);
+    } else {
+        // don't draw any status if dead or the scoreboard is being explicitly shown
+        if ctx.world.cg.showScores == qfalse && health > 0 {
+            // Raven's `if (0)` Menu_PaintAll/CG_DrawTimedMenus block ("Reenable
+            // if stats are drawn with menu system again") never runs in the
+            // shipped build - dropped as unreachable, cg_marks.c precedent.
+
+            CG_DrawAmmoWarning();
+
+            CG_DrawCrosshairNames(ctx, ds);
+
+            if ctx.world.cvars.cg_drawStatus.integer != 0 {
+                CG_DrawIconBackground(ctx.world);
+            }
+
+            let bestTime: f32;
+            let mut drawSelect: c_int;
+            if inTime > wpTime {
+                drawSelect = 1;
+                bestTime = ctx.world.cg.invenSelectTime;
+            } else {
+                //only draw the most recent since they're drawn in the same place
+                drawSelect = 2;
+                bestTime = ctx.world.cg.weaponSelectTime as f32;
+            }
+
+            if ctx.world.cg.forceSelectTime > bestTime {
+                drawSelect = 3;
+            }
+
+            match drawSelect {
+                1 => CG_DrawInvenSelect(ctx, ds),
+                2 => CG_DrawWeaponSelect(ctx, ds),
+                3 => CG_DrawForceSelect(ctx, ds),
+                _ => {}
+            }
+
+            if ctx.world.cvars.cg_drawStatus.integer != 0 {
+                //Powerups now done with upperright stuff
+                CG_DrawFlagStatus(ctx);
+            }
+
+            CG_SaberClashFlare(ctx);
+
+            if ctx.world.cvars.cg_drawStatus.integer != 0 {
+                CG_DrawStats(ctx, menus, ds);
+            }
+
+            CG_DrawPickupItem(ctx);
+        }
+    }
+
+    if fallingToDeath != 0 {
+        let mut fallTime = (ctx.world.cg.time - fallingToDeath) as f32;
+
+        fallTime /= (FALL_FADE_TIME / 2) as f32;
+
+        if fallTime < 0.0 {
+            fallTime = 0.0;
+        }
+        if fallTime > 1.0 {
+            fallTime = 1.0;
+        }
+
+        let hcolor: vec4_t = [0.0, 0.0, 0.0, fallTime];
+
+        CG_DrawRect(
+            ctx,
+            0.0,
+            0.0,
+            SCREEN_WIDTH as f32,
+            SCREEN_HEIGHT as f32,
+            (SCREEN_WIDTH * SCREEN_HEIGHT) as f32,
+            &hcolor,
+        );
+
+        if !ctx.world.draw.gCGHasFallVector {
+            ctx.world.draw.gCGFallVector = psOrigin;
+            ctx.world.draw.gCGHasFallVector = true;
+        }
+    } else if ctx.world.draw.gCGHasFallVector {
+        ctx.world.draw.gCGHasFallVector = false;
+        ctx.world.draw.gCGFallVector = [0.0; 3];
+    }
+
+    CG_DrawVote(ctx, ds);
+    CG_DrawTeamVote(ctx, ds);
+
+    CG_DrawLagometer(ctx, ds);
+
+    if ctx.world.cvars.cg_paused.integer == 0 {
+        CG_DrawBracketedEntities(ctx);
+        CG_DrawUpperRight(ctx, ds);
+    }
+
+    if !CG_DrawFollow(ctx, ds) {
+        CG_DrawWarmup(ctx, ds);
+    }
+
+    if ctx.world.saga.cgSiegeRoundState != 0 {
+        //cgSiegeRoundBeganTime = 0;
+
+        match ctx.world.saga.cgSiegeRoundState {
+            1 => {
+                let s = CG_GetStringEdString(ctx, "MP_INGAME", "WAITING_FOR_PLAYERS");
+                CG_CenterPrint(
+                    ctx.world,
+                    &s,
+                    (SCREEN_HEIGHT as f64 * 0.30) as c_int,
+                    BIGCHAR_WIDTH,
+                );
+            }
+
+            2 => {
+                let mut rTime =
+                    SIEGE_ROUND_BEGIN_TIME - (ctx.world.cg.time - ctx.world.saga.cgSiegeRoundTime);
+
+                if rTime < 0 {
+                    rTime = 0;
+                }
+                if rTime > SIEGE_ROUND_BEGIN_TIME {
+                    rTime = SIEGE_ROUND_BEGIN_TIME;
+                }
+
+                rTime /= 1000;
+
+                rTime += 1;
+
+                if rTime < 1 {
+                    rTime = 1;
+                }
+
+                if rTime <= 3 && rTime != ctx.world.draw.cgSiegeRoundCountTime {
+                    ctx.world.draw.cgSiegeRoundCountTime = rTime;
+
+                    match rTime {
+                        1 => trap::S_StartLocalSound(
+                            ctx.engine,
+                            ctx.world.cgs.media.count1Sound,
+                            CHAN_ANNOUNCER,
+                        ),
+                        2 => trap::S_StartLocalSound(
+                            ctx.engine,
+                            ctx.world.cgs.media.count2Sound,
+                            CHAN_ANNOUNCER,
+                        ),
+                        3 => trap::S_StartLocalSound(
+                            ctx.engine,
+                            ctx.world.cgs.media.count3Sound,
+                            CHAN_ANNOUNCER,
+                        ),
+                        _ => {}
+                    }
+                }
+
+                let ed = CG_GetStringEdString(ctx, "MP_INGAME", "ROUNDBEGINSIN");
+                let pStr = format!("{} {}...", ed, rTime);
+                CG_CenterPrint(
+                    ctx.world,
+                    &pStr,
+                    (SCREEN_HEIGHT as f64 * 0.30) as c_int,
+                    BIGCHAR_WIDTH,
+                );
+                //same
+            }
+
+            _ => {}
+        }
+
+        ctx.world.draw.cgSiegeEntityRender = 0;
+    } else if ctx.world.saga.cgSiegeRoundTime != 0 {
+        CG_CenterPrint(
+            ctx.world,
+            "",
+            (SCREEN_HEIGHT as f64 * 0.30) as c_int,
+            BIGCHAR_WIDTH,
+        );
+        ctx.world.saga.cgSiegeRoundTime = 0;
+
+        //cgSiegeRoundBeganTime = cg.time;
+        ctx.world.draw.cgSiegeEntityRender = 0;
+    } else if ctx.world.draw.cgSiegeRoundBeganTime != 0 {
+        //Draw how much time is left in the round based on local info.
+        let mut timedTeam = TEAM_FREE;
+        let mut timedValue = 0;
+
+        if ctx.world.draw.cgSiegeEntityRender != 0 {
+            //render the objective item model since this client has it
+            CG_DrawSiegeHUDItem(ctx);
+        }
+
+        if ctx.world.saga.team1Timed != 0 {
+            timedTeam = TEAM_RED; //team 1
+            if ctx.world.draw.cg_beatingSiegeTime != 0 {
+                timedValue = ctx.world.draw.cg_beatingSiegeTime;
+            } else {
+                timedValue = ctx.world.saga.team1Timed;
+            }
+        } else if ctx.world.saga.team2Timed != 0 {
+            timedTeam = TEAM_BLUE; //team 2
+            if ctx.world.draw.cg_beatingSiegeTime != 0 {
+                timedValue = ctx.world.draw.cg_beatingSiegeTime;
+            } else {
+                timedValue = ctx.world.saga.team2Timed;
+            }
+        }
+
+        if timedTeam != TEAM_FREE {
+            //one of the teams has a timer
+            let mut timeRemaining;
+            let mut isMyTeam = false;
+
+            if ctx.world.cgs.siegeTeamSwitch != 0 && ctx.world.draw.cg_beatingSiegeTime == 0 {
+                //in switchy mode but not beating a time, so count up.
+                timeRemaining = ctx.world.cg.time - ctx.world.draw.cgSiegeRoundBeganTime;
+                if timeRemaining < 0 {
+                    timeRemaining = 0;
+                }
+            } else {
+                timeRemaining =
+                    (ctx.world.draw.cgSiegeRoundBeganTime + timedValue) - ctx.world.cg.time;
+            }
+
+            if timeRemaining > timedValue {
+                timeRemaining = timedValue;
+            } else if timeRemaining < 0 {
+                timeRemaining = 0;
+            }
+
+            if timeRemaining != 0 {
+                timeRemaining /= 1000;
+            }
+
+            if ctx.world.cg.predictedPlayerState.persistant[PERS_TEAM as usize] == timedTeam {
+                //the team that's timed is the one this client is on
+                isMyTeam = true;
+            }
+
+            CG_DrawSiegeTimer(ctx, menus, ds, timeRemaining, isMyTeam);
+        }
+    } else {
+        ctx.world.draw.cgSiegeEntityRender = 0;
+    }
+
+    if ctx.world.draw.cg_siegeDeathTime != 0 {
+        let mut timeRemaining = ctx.world.draw.cg_siegeDeathTime - ctx.world.cg.time;
+
+        if timeRemaining < 0 {
+            timeRemaining = 0;
+            ctx.world.draw.cg_siegeDeathTime = 0;
+        }
+
+        if timeRemaining != 0 {
+            timeRemaining /= 1000;
+        }
+
+        CG_DrawSiegeDeathTimer(ctx, menus, ds, timeRemaining);
+    }
+
+    // don't draw center string if scoreboard is up
+    let scoreBoardShowing = CG_DrawScoreboard(ctx, ds);
+    ctx.world.cg.scoreBoardShowing = if scoreBoardShowing { qtrue } else { qfalse };
+    if ctx.world.cg.scoreBoardShowing == qfalse {
+        CG_DrawCenterString(ctx, ds);
+    }
+
+    // always draw chat
+    CG_ChatBox_DrawStrings(ctx, ds);
 }
