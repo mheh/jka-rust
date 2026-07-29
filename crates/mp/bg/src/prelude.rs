@@ -188,7 +188,7 @@ pub use mp_qshared::shared::{
 pub use crate::public::bg_entity::bgEntity_t;
 
 // --- moved bg function-module re-exports (the bare-symbol landing surface) ---
-pub use crate::bg_channel::{BgState, BgTraps, GameCallbacks, PmoveContext};
+pub use crate::bg_channel::{BgHost, BgState, BgTraps, GameCallbacks, PmoveContext};
 pub use crate::bg_misc::*;
 pub use crate::bg_panimate::{BG_InKnockDownOnly, BG_InReboundHold, BG_InReboundJump};
 pub use crate::bg_pmove::{MIN_WALK_NORMAL, *};

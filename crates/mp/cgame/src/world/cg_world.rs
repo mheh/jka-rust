@@ -6,7 +6,7 @@ use core::mem::MaybeUninit;
 use core::ptr::{addr_of_mut, write_bytes};
 use std::alloc::{alloc_zeroed, handle_alloc_error, Layout};
 
-use mp_bg::bg_channel::BgState;
+use mp_bg::bg_channel::{BgHost, BgState};
 use mp_bg::bg_misc::MAX_POOL_SIZE_CGAME;
 use mp_bg::public::bg_entity::bgEntity_t;
 use mp_bg::public::max_items::MAX_ITEMS;
@@ -269,7 +269,8 @@ impl CgWorld {
             addr_of_mut!((*p).scoreboard).write(CgScoreboardState::default());
             addr_of_mut!((*p).view).write(CgViewState::default());
             addr_of_mut!((*p).weapons).write(CgWeaponsState::default());
-            addr_of_mut!((*p).bg_state).write(BgState::with_pool_size(MAX_POOL_SIZE_CGAME));
+            addr_of_mut!((*p).bg_state)
+                .write(BgState::with_pool_size(MAX_POOL_SIZE_CGAME, BgHost::Cgame));
             boxed.assume_init()
         }
     }

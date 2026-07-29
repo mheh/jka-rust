@@ -4,7 +4,7 @@
 
 use core::ffi::c_int;
 
-use mp_bg::bg_channel::BgState;
+use mp_bg::bg_channel::{BgHost, BgState};
 use mp_bg::bg_misc::MAX_POOL_SIZE_UI;
 use mp_qshared::shared::qhandle_t;
 use mp_qshared::shared::sfxHandle_t;
@@ -226,7 +226,7 @@ impl Default for UiWorld {
     /// Source: `oracle/codemp/ui/ui_main.c:875`
     fn default() -> Self {
         UiWorld {
-            bg_state: BgState::with_pool_size(MAX_POOL_SIZE_UI),
+            bg_state: BgState::with_pool_size(MAX_POOL_SIZE_UI, BgHost::Ui),
             newHighScoreTime: 0,
             newBestTime: 0,
             showPostGameTime: 0,

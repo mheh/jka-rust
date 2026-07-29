@@ -745,7 +745,9 @@ impl PmoveContext<'_> {
                         // do vehicle impact stuff then
                         self.PM_VehicleImpact(pEnt, &mut trace);
                     }
-                } else if self.PM_ClientImpact(&mut trace) != 0 {
+                } else if self.bg.host == BgHost::Game && self.PM_ClientImpact(&mut trace) != 0 {
+                    // the whole else-arm is `#ifdef QAGAME` - Raven's cgame
+                    // build falls straight through to the clip handling below
                     bumpcount += 1;
                     continue;
                 }

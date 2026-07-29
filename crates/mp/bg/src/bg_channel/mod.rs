@@ -12,12 +12,14 @@
 //! `mp_game`'s `bg_channel::game_impl`) implement these traits over the engine
 //! and world handles.
 
+pub mod bg_host;
 pub mod bg_state;
 pub mod bg_traps;
 pub mod game_callbacks;
 pub mod pmove_context;
 pub mod rng;
 
+pub use bg_host::BgHost;
 pub use bg_state::BgState;
 pub use bg_traps::BgTraps;
 pub use game_callbacks::GameCallbacks;

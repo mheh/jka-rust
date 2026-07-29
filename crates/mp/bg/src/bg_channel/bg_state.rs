@@ -17,6 +17,7 @@ use core::ffi::{c_char, c_int};
 use crate::prelude::*;
 use mp_qshared::shared::com_parse::QSharedScratch;
 
+use super::bg_host::BgHost;
 use super::rng::Rng;
 use crate::bg_misc::{bgForcePowerCost, bgForcePowerCostSaberThrow};
 use crate::bg_panimate::MAX_ANIM_FILES;
@@ -63,6 +64,14 @@ pub struct BgState {
     /// Raven `int bgNumAnimEvents = 1` (first one is null/default).
     /// Source: `oracle/codemp/game/bg_panimate.c:2167`
     pub bgNumAnimEvents: c_int,
+    /// Raven `static int bg_animParseIncluding = 0` — recursion depth of the
+    /// `include`-file arm in `BG_ParseAnimationEvtFile`. While > 0 the parser
+    /// is filling an included file, so it skips the cache/init/mark bookkeeping.
+    /// Source: `oracle/codemp/game/bg_panimate.c:2168`
+    pub bg_animParseIncluding: c_int,
+    /// Which module compiled this bg copy — Raven's preprocessor build arms as
+    /// a runtime constant (DEC-36 D3 shape); see [`BgHost`].
+    pub host: BgHost,
     /// Raven `animation_t bgHumanoidAnimations[MAX_TOTALANIMATIONS]` — the only
     /// statically-allocated animation set.
     /// Source: `oracle/codemp/game/bg_panimate.c:1672`
@@ -188,14 +197,15 @@ impl BgState {
     /// with a different Raven pool arm (ui: 512000, DEC-36 addendum 11) uses
     /// [`BgState::with_pool_size`].
     pub fn new() -> Self {
-        Self::with_pool_size(crate::bg_misc::MAX_POOL_SIZE)
+        Self::with_pool_size(crate::bg_misc::MAX_POOL_SIZE, BgHost::Game)
     }
 
     /// [`BgState::new`] with an explicit `BG_Alloc` pool size — Raven sized
     /// `bg_pool[MAX_POOL_SIZE]` per module (`#define` arms in bg_misc.c), so
-    /// each hosting module passes its own arm (§F20 duplicate-don't-unify).
+    /// each hosting module passes its own arm (§F20 duplicate-don't-unify) —
+    /// and its [`BgHost`] build-arm stamp.
     /// Source: `oracle/codemp/game/bg_misc.c:3311-3316`
-    pub fn with_pool_size(pool_size: c_int) -> Self {
+    pub fn with_pool_size(pool_size: c_int, host: BgHost) -> Self {
         // Seed the runtime cost table from the `bg_misc` consts, folding the
         // separately-held `FP_SABERTHROW` row back into its Raven row index
         // (the same fold `bg_misc::force_power_cost` performed).
@@ -207,6 +217,7 @@ impl BgState {
         forcePowerCost[FP_SABERTHROW as usize] = bgForcePowerCostSaberThrow;
 
         Self {
+            host,
             qs: QSharedScratch::zeroed(),
             rng: Rng::new(),
             // Sized like Raven's fixed `bgLoadedAnim_t bgAllAnims[MAX_ANIM_FILES]` /
@@ -228,6 +239,8 @@ impl BgState {
             bgAllEvents: vec![bgLoadedEvents_t::default(); MAX_ANIM_FILES as usize],
             // Raven initialises this to 1 (first entry is the null/default).
             bgNumAnimEvents: 1,
+            // Raven's `static int bg_animParseIncluding = 0`.
+            bg_animParseIncluding: 0,
             // Sized like Raven's fixed `animation_t bgHumanoidAnimations[
             // MAX_TOTALANIMATIONS]` zeroed static (the only statically-allocated
             // animation set): `BG_ParseAnimationFile` receives `.as_mut_ptr()` as
