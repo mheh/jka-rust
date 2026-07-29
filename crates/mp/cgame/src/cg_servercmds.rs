@@ -1771,3 +1771,22 @@ pub fn CG_ServerCommand(
 
     CG_Printf(ctx, &format!("Unknown client game command: {cmd}\n"));
 }
+
+/// Raven `CG_ExecuteNewServerCommands` - drains reliable server commands up to `latestSequence`,
+/// running each one through `CG_ServerCommand`.
+///
+/// Source: `oracle/codemp/cgame/cg_servercmds.c:1681-1687`
+pub fn CG_ExecuteNewServerCommands(
+    ctx: &mut CgContext,
+    latestSequence: c_int,
+    menus: &mut MenuSystem,
+    ds: &DisplayState,
+    dc: &mut dyn DisplayContext,
+) {
+    while ctx.world.cgs.serverCommandSequence < latestSequence {
+        ctx.world.cgs.serverCommandSequence += 1;
+        if trap::GetServerCommand(ctx.engine, ctx.world.cgs.serverCommandSequence) {
+            CG_ServerCommand(ctx, menus, ds, dc);
+        }
+    }
+}

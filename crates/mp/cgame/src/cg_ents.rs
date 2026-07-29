@@ -67,7 +67,8 @@ use crate::cg_draw::CG_InFighter;
 use crate::cg_localents::CG_AllocLocalEntity;
 use crate::cg_main::{CG_ConfigString, CG_Error, Com_Printf};
 use crate::cg_players::{
-    CG_AddRefEntityWithPowerups, CG_G2ServerBoneAngles, CG_IsMindTricked, CG_RagDoll,
+    CG_AddRefEntityWithPowerups, CG_G2Animated, CG_G2ServerBoneAngles, CG_IsMindTricked, CG_Player,
+    CG_RagDoll,
 };
 use crate::cg_turret::TurretClientRun;
 use crate::cg_weaponinit::NULL_HANDLE;
@@ -3988,4 +3989,124 @@ pub fn CG_Special(ctx: &mut CgContext, centNum: usize) {
         FX_DrawPortableShield(ctx, centNum);
         return;
     }
+}
+
+/// Raven `CG_AddCEntity` - dispatches a snapshot entity to its per-type render fn.
+///
+/// Source: `oracle/codemp/cgame/cg_ents.c:3316-3415`
+pub fn CG_AddCEntity(ctx: &mut CgContext, centNum: usize) {
+    // event-only entities will have been dealt with already
+    if ctx.world.entity(centNum).currentState.eType >= entityType_t::ET_EVENTS as c_int {
+        return;
+    }
+
+    if ctx.world.cg.predictedPlayerState.pm_type == pmtype_t::PM_INTERMISSION as c_int {
+        //don't render anything then
+        let eType = ctx.world.entity(centNum).currentState.eType;
+        if eType == entityType_t::ET_GENERAL as c_int
+            || eType == entityType_t::ET_PLAYER as c_int
+            || eType == entityType_t::ET_INVISIBLE as c_int
+        {
+            return;
+        }
+        if eType == entityType_t::ET_NPC as c_int {
+            //NPC in intermission
+            if ctx.world.entity(centNum).currentState.NPC_class == CLASS_VEHICLE as c_int {
+                //don't render vehicles in intermissions, allow other NPCs for scripts
+                return;
+            }
+        }
+    }
+
+    // calculate the current origin
+    CG_CalcEntityLerpPositions(ctx, centNum);
+
+    // add automatic effects
+    CG_EntityEffects(ctx, centNum);
+    /*
+    Ghoul2 Insert Start
+    */
+
+    // add local sound set if any
+    let soundSetIndex = ctx.world.entity(centNum).currentState.soundSetIndex;
+    let eType = ctx.world.entity(centNum).currentState.eType;
+    if soundSetIndex != 0 && eType != entityType_t::ET_MOVER as c_int {
+        let soundSet = CG_ConfigString(ctx, CS_AMBIENT_SET + soundSetIndex);
+
+        if !soundSet.is_empty() {
+            let vieworg = ctx.world.cg.refdef.vieworg;
+            let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+            let entNum = ctx.world.entity(centNum).currentState.number;
+            let time = ctx.world.cg.time;
+            trap::S_AddLocalSet(ctx.engine, &soundSet, &vieworg, &lerpOrigin, entNum, time);
+        }
+    }
+    /*
+    Ghoul2 Insert End
+    */
+    match ctx.world.entity(centNum).currentState.eType {
+        eType if eType == entityType_t::ET_FX as c_int => {
+            CG_FX(ctx, centNum);
+        }
+
+        eType
+            if eType == entityType_t::ET_INVISIBLE as c_int
+                || eType == entityType_t::ET_PUSH_TRIGGER as c_int
+                || eType == entityType_t::ET_TELEPORT_TRIGGER as c_int
+                || eType == entityType_t::ET_TERRAIN as c_int =>
+        {
+            // no render
+        }
+        eType if eType == entityType_t::ET_GENERAL as c_int => {
+            CG_General(ctx, centNum);
+        }
+        eType if eType == entityType_t::ET_PLAYER as c_int => {
+            CG_Player(ctx, centNum);
+        }
+        eType if eType == entityType_t::ET_ITEM as c_int => {
+            CG_Item(ctx, centNum);
+        }
+        eType if eType == entityType_t::ET_MISSILE as c_int => {
+            CG_Missile(ctx, centNum);
+        }
+        eType if eType == entityType_t::ET_SPECIAL as c_int => {
+            CG_Special(ctx, centNum);
+        }
+        eType if eType == entityType_t::ET_HOLOCRON as c_int => {
+            CG_General(ctx, centNum);
+        }
+        eType if eType == entityType_t::ET_MOVER as c_int => {
+            CG_Mover(ctx, centNum);
+        }
+        eType if eType == entityType_t::ET_BEAM as c_int => {
+            CG_Beam(ctx, centNum);
+        }
+        eType if eType == entityType_t::ET_PORTAL as c_int => {
+            CG_Portal(ctx, centNum);
+        }
+        eType if eType == entityType_t::ET_SPEAKER as c_int => {
+            CG_Speaker(ctx, centNum);
+        }
+        // An entity that wants to be able to use ghoul2 humanoid (and other) anims. Like a player, but not.
+        eType if eType == entityType_t::ET_NPC as c_int => {
+            CG_G2Animated(ctx, centNum);
+        }
+        eType if eType == entityType_t::ET_TEAM as c_int => {
+            CG_TeamBase(ctx, centNum);
+        }
+        eType if eType == entityType_t::ET_BODY as c_int => {
+            CG_General(ctx, centNum);
+        }
+        eType => {
+            CG_Error(ctx, &format!("Bad entity type: {}\n", eType));
+            return;
+        }
+    }
+}
+
+/// Raven `CG_ManualEntityRender` - thin public wrapper over `CG_AddCEntity`.
+///
+/// Source: `oracle/codemp/cgame/cg_ents.c:3417-3420`
+pub fn CG_ManualEntityRender(ctx: &mut CgContext, centNum: usize) {
+    CG_AddCEntity(ctx, centNum);
 }

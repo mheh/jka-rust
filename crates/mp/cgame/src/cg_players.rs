@@ -4,13 +4,16 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 
+use core::f64::consts::PI;
 use core::ffi::{c_char, c_int, c_short, c_void};
+use core::mem;
 use core::ptr::null_mut;
 
 use mp_abi::cgame::syscalls::CG_CM_MARKFRAGMENTS::markFragment_t;
+use mp_bg::bg_g2_utils::BG_AttachToRancor;
 use mp_bg::bg_misc::{
-    BG_EvaluateTrajectory, BG_GiveMeVectorFromMatrix, BG_IsValidCharacterModel,
-    BG_ValidateSkinForTeam,
+    forcePowerDarkLight, BG_EmplacedView, BG_EvaluateTrajectory, BG_GiveMeVectorFromMatrix,
+    BG_IsValidCharacterModel, BG_ValidateSkinForTeam,
 };
 use mp_bg::bg_panimate::{
     BG_FlippingAnim, BG_InDeathAnim, BG_ParseAnimationFile, BG_SaberInAttack,
@@ -18,7 +21,10 @@ use mp_bg::bg_panimate::{
 };
 use mp_bg::bg_pmove::{BG_G2PlayerAngles, BG_IK_MoveArm, PM_RunningAnim, PM_WalkingAnim};
 use mp_bg::bg_saber::{SFL2_NO_BLADE, SFL2_NO_DLIGHT, SFL2_NO_WALL_MARKS};
-use mp_bg::bg_saberLoad::{BG_SI_SetDesiredLength, WP_SaberBladeUseSecondBladeStyle, WP_SetSaber};
+use mp_bg::bg_saberLoad::{
+    BG_SI_SetDesiredLength, BG_SI_SetLength, BG_SI_SetLengthGradual,
+    WP_SaberBladeUseSecondBladeStyle, WP_SetSaber,
+};
 use mp_bg::bg_saga::{BG_SiegeFindClassByName, BG_SiegeFindClassIndexByName};
 use mp_bg::bg_vehicleLoad::{BG_GetVehicleModelName, BG_GetVehicleSkinName, BG_VehicleGetIndex};
 use mp_bg::cstr_util::cstr_to_str;
@@ -28,21 +34,37 @@ use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::anim_table::animTable;
 use mp_bg::public::animevent::{animevent_t, MAX_RANDOM_ANIM_SOUNDS};
 use mp_bg::public::bg_loaded_events::MAX_ANIM_EVENTS;
+use mp_bg::public::broken_limb::brokenLimb_t;
 use mp_bg::public::configstring::{CS_G2BONES, CS_MODELS, CS_PLAYERS};
-use mp_bg::public::entity_effects::EF2_HYPERSPACE;
-use mp_bg::public::entity_flags::{EF_CONNECTION, EF_DEAD, EF_PERMANENT, EF_RAG, EF_TALK};
+use mp_bg::public::duel_team::duelTeam_t::DUELTEAM_DOUBLE;
+use mp_bg::public::entity_effects::{
+    EF2_GENERIC_NPC_FLAG, EF2_HELD_BY_MONSTER, EF2_HYPERSPACE, EF2_SHIP_DEATH,
+};
+use mp_bg::public::entity_flags::{
+    EF_BODYPUSH, EF_CONNECTION, EF_DEAD, EF_DISINTEGRATION, EF_INVULNERABLE, EF_JETPACK,
+    EF_JETPACK_ACTIVE, EF_JETPACK_FLAMING, EF_NODRAW, EF_PERMANENT, EF_RAG, EF_SEEKERDRONE,
+    EF_TALK,
+};
 use mp_bg::public::entity_type::entityType_t;
 use mp_bg::public::footstep_type::footstepType_t;
-use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL, GT_SIEGE, GT_TEAM};
+use mp_bg::public::g2_model_parts::g2ModelParts_t;
+use mp_bg::public::gametype::{
+    GT_CTY, GT_DUEL, GT_HOLOCRON, GT_JEDIMASTER, GT_POWERDUEL, GT_SIEGE, GT_TEAM,
+};
 use mp_bg::public::gender::gender_t;
 use mp_bg::public::hyperspace::HYPERSPACE_TIME;
+use mp_bg::public::pers_enum::persEnum_t::PERS_TEAM;
+use mp_bg::public::pmtype::pmtype_t::PM_INTERMISSION;
 use mp_bg::public::powerup::{
-    PW_BLUEFLAG, PW_CLOAKED, PW_NEUTRALFLAG, PW_PULL, PW_QUAD, PW_REDFLAG, PW_SPEED,
+    PW_BLUEFLAG, PW_CLOAKED, PW_DISINT_4, PW_FORCE_BOON, PW_FORCE_ENLIGHTENED_DARK,
+    PW_FORCE_ENLIGHTENED_LIGHT, PW_NEUTRALFLAG, PW_PULL, PW_QUAD, PW_REDFLAG, PW_SHIELDHIT,
+    PW_SPEED, PW_SPEEDBURST, PW_YSALAMIRI,
 };
 use mp_bg::public::saber_move_data_table::saberMoveData;
-use mp_bg::public::team::{TEAM_BLUE, TEAM_RED, TEAM_SPECTATOR};
+use mp_bg::public::team::{TEAM_BLUE, TEAM_FREE, TEAM_RED, TEAM_SPECTATOR};
+use mp_bg::saga::siege_team_t::SIEGETEAM_TEAM1;
 use mp_bg::vehicles::vehicle_s::{MAX_VEHICLE_EXHAUSTS, MAX_VEHICLE_MUZZLES};
-use mp_bg::weapons::weapon_t::WP_SABER;
+use mp_bg::weapons::weapon_t::{WP_EMPLACED_GUN, WP_SABER, WP_STUN_BATON};
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
@@ -56,17 +78,21 @@ use mp_qshared::common::mp::qcommon::saber::blade_info::MAX_BLADES;
 use mp_qshared::common::mp::qcommon::saber::saber_colors::{
     saber_colors_t, SABER_BLUE, SABER_GREEN, SABER_ORANGE, SABER_PURPLE, SABER_RED, SABER_YELLOW,
 };
-use mp_qshared::common::mp::qcommon::saber::saber_flags::SFL_BOLT_TO_WRIST;
+use mp_qshared::common::mp::qcommon::saber::saber_flags::{SFL_BOLT_TO_WRIST, SFL_RETURN_DAMAGE};
 use mp_qshared::common::mp::qcommon::saber::saber_info::MAX_SABERS;
 use mp_qshared::common::mp::qcommon::{
-    entityState_t, saberInfo_t, sharedRagDollParams_t, sharedRagDollUpdateParams_t,
+    entityState_t, saberInfo_t, sharedRagDollParams_t, sharedRagDollUpdateParams_t, PMF_FOLLOW,
 };
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::com_parse::{COM_ParseExt, COM_ParseString, QSharedScratch};
+use mp_qshared::shared::force_powers::{
+    FORCE_DARKSIDE, FORCE_LEVEL_2, FORCE_LEVEL_3, FORCE_LIGHTSIDE,
+};
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin,
-    vectoangles, AngleVectors, AnglesToAxis, CrossProduct, Distance, MatrixMultiply, VectorClear,
-    VectorInverse, VectorLength, VectorNormalize, VectorSet, PITCH, ROLL, YAW,
+    vectoangles, AngleVectors, AnglesToAxis, CrossProduct, Distance, DistanceSquared,
+    MatrixMultiply, VectorClear, VectorInverse, VectorLength, VectorNormalize, VectorSet, PITCH,
+    ROLL, YAW,
 };
 use mp_qshared::shared::q_string::COM_StripExtension;
 use mp_qshared::shared::surface_flags::{
@@ -77,12 +103,14 @@ use mp_qshared::shared::surface_flags::{
 };
 use mp_qshared::shared::trajectory::{trType_t, trajectory_t};
 use mp_qshared::shared::{
-    addElectricityArgStruct_t, addbezierArgStruct_t, addpolyArgStruct_t, effectTrailArgStruct_t,
-    fileHandle_t, mdxaBone_t, orientation_t, qboolean, qfalse, qhandle_t, qtrue, sfxHandle_t,
-    sharedEIKMoveState, sharedERagPhase, vec3_t, CollisionRecord_t, Eorientations, CHAN_AUTO,
-    CHAN_BODY, CHAN_WEAPON, CONTENTS_LAVA, CONTENTS_SLIME, CONTENTS_SOLID, CONTENTS_WATER,
-    ENTITYNUM_NONE, ENTITYNUM_WORLD, FP_RAGE, FP_SEE, FP_SPEED, FS_READ, MASK_PLAYERSOLID,
-    MASK_SOLID, MAX_CLIENTS, MAX_CLIENTS_I32, MAX_GENTITIES, MAX_QPATH, SURF_NOIMPACT,
+    addElectricityArgStruct_t, addbezierArgStruct_t, addpolyArgStruct_t, addspriteArgStruct_t,
+    effectTrailArgStruct_t, fileHandle_t, mdxaBone_t, orientation_t, qboolean, qfalse, qhandle_t,
+    qtrue, sfxHandle_t, sharedEIKMoveState, sharedERagPhase, vec3_t, CollisionRecord_t,
+    Eorientations, CHAN_AUTO, CHAN_BODY, CHAN_WEAPON, CONTENTS_LAVA, CONTENTS_SLIME,
+    CONTENTS_SOLID, CONTENTS_WATER, ENTITYNUM_NONE, ENTITYNUM_WORLD, FP_ABSORB, FP_GRIP,
+    FP_PROTECT, FP_RAGE, FP_SABERTHROW, FP_SABER_DEFENSE, FP_SABER_OFFENSE, FP_SEE, FP_SPEED,
+    FS_READ, MASK_PLAYERSOLID, MASK_SOLID, MAX_CLIENTS, MAX_CLIENTS_I32, MAX_GENTITIES, MAX_QPATH,
+    NUM_FORCE_POWERS, SURF_NOIMPACT,
 };
 use native_string::{
     atoi, buf_to_string, cstr, strcat_string, strncpyz_string, Info_ValueForKey, Q_stricmp,
@@ -90,7 +118,12 @@ use native_string::{
 };
 
 use crate::bg_channel::{CgBgTraps, CgGameCallbacks};
-use crate::cg_ents::ScaleModelAxis;
+use crate::cg_draw::CG_InFighter;
+use crate::cg_ents::{
+    forceHolocronModels, CG_AddBracketedEnt, CG_AddRadarEnt, CG_Disintegration,
+    CG_ManualEntityRender, CG_SetGhoul2Info, ScaleModelAxis,
+};
+use crate::cg_event::CG_ReattachLimb;
 use crate::cg_localents::CG_AllocLocalEntity;
 use crate::cg_main::{
     CG_ConfigString, CG_Error, CG_Printf, Com_Printf, DEFAULT_BLUETEAM_NAME, DEFAULT_MODEL,
@@ -99,7 +132,7 @@ use crate::cg_main::{
 use crate::cg_marks::{CG_AllocMark, CG_ImpactMark};
 use crate::cg_predict::CG_Trace;
 use crate::cg_servercmds::CG_HandleNPCSounds;
-use crate::cg_weapons::{CG_CopyG2WeaponInstance, CG_G2WeaponInstance};
+use crate::cg_weapons::{CG_AddPlayerWeapon, CG_CopyG2WeaponInstance, CG_G2WeaponInstance};
 use crate::local::centity_s::centity_t;
 use crate::local::client_info_t::{
     clientInfo_t, MAX_CUSTOM_DUEL_SOUNDS, MAX_CUSTOM_SIEGE_SOUNDS, MAX_CUSTOM_SOUNDS, MAX_TEAMNAME,
@@ -108,6 +141,7 @@ use crate::local::footstep_t::footstep_t;
 use crate::local::le_type_t::leType_t;
 use crate::local::lerp_frame_t::lerpFrame_t;
 use crate::local::mark_poly_s::MAX_VERTS_ON_POLY;
+use crate::local::player_state_ref::PlayerStateRef;
 use crate::local::vehicle_id::VehicleId;
 use crate::trap;
 use crate::world::cg_context::CgContext;
@@ -468,6 +502,32 @@ pub static cg_customJediSoundNames: [Option<&str>; MAX_CUSTOM_JEDI_SOUNDS] = [
 /// Source: `oracle/codemp/cgame/tr_types.h:36`
 const RF_FORCE_ENT_ALPHA: c_int = 0x00400;
 
+/// Raven `RF_MINLIGHT` — always have some light (viewmodel, some items).
+/// Same no-ported-home story as [`RF_THIRD_PERSON`].
+/// Source: `oracle/codemp/cgame/tr_types.h:18`
+const RF_MINLIGHT: c_int = 0x00001;
+
+/// Raven `RF_NODEPTH` — no depth at all (seeing through walls).
+/// Source: `oracle/codemp/cgame/tr_types.h:22`
+const RF_NODEPTH: c_int = 0x00010;
+
+/// Raven `RF_LIGHTING_ORIGIN` — use `refEntity->lightingOrigin` instead of
+/// `refEntity->origin`.
+/// Source: `oracle/codemp/cgame/tr_types.h:28`
+const RF_LIGHTING_ORIGIN: c_int = 0x00080;
+
+/// Raven `RF_SHADOW_PLANE` — use `refEntity->shadowPlane`.
+/// Source: `oracle/codemp/cgame/tr_types.h:32`
+const RF_SHADOW_PLANE: c_int = 0x00100;
+
+/// Raven `RF_RGB_TINT` — override shader rgb settings.
+/// Source: `oracle/codemp/cgame/tr_types.h:37`
+const RF_RGB_TINT: c_int = 0x00800;
+
+/// Raven `RF_SHADOW_ONLY` — add surfs for shadowing but don't draw them (-rww).
+/// Source: `oracle/codemp/cgame/tr_types.h:39`
+const RF_SHADOW_ONLY: c_int = 0x01000;
+
 /// Raven `RF_DISTORTION` — area distortion effect.
 ///
 /// Raven: -rww
@@ -509,10 +569,32 @@ const cg_effectorStringTable: [&str; 8] = [
     //	"ceyebrow",
 ];
 
+/// Raven `TURN_ON` — the `G2SURFACEFLAG_OFF`-cleared bit, spelled as a
+/// surface-toggle flag to re-show a ghoul2 surface.
+/// Source: `oracle/codemp/cgame/cg_players.c:20`
+const TURN_ON: c_int = 0x00000000;
+
 /// Raven `TURN_OFF` — the `G2SURFACEFLAG_OFF` bit spelled as a surface-toggle
 /// name, used to hide boba_fett's jetpack surfaces.
 /// Source: `oracle/codemp/cgame/cg_players.c:21`
 const TURN_OFF: c_int = 0x00000100;
+
+/// Raven `SPEED_TRAIL_DISTANCE` — the per-frame spacing (scaled by velocity)
+/// between the two force-speed motion-trail refents behind a running player.
+/// Source: `oracle/codemp/cgame/cg_players.c:6520`
+const SPEED_TRAIL_DISTANCE: c_int = 6;
+
+/// Raven `RARMBIT` — the `torsoBolt` bit for the right arm limb.
+/// Source: `oracle/codemp/cgame/cg_players.c:7922`
+const RARMBIT: c_int = 1 << (g2ModelParts_t::G2_MODELPART_RARM as c_int - 10);
+
+/// Raven `RHANDBIT` — the `torsoBolt` bit for the right hand limb.
+/// Source: `oracle/codemp/cgame/cg_players.c:7923`
+const RHANDBIT: c_int = 1 << (g2ModelParts_t::G2_MODELPART_RHAND as c_int - 10);
+
+/// Raven `WAISTBIT` — the `torsoBolt` bit for the waist limb.
+/// Source: `oracle/codemp/cgame/cg_players.c:7924`
+const WAISTBIT: c_int = 1 << (g2ModelParts_t::G2_MODELPART_WAIST as c_int - 10);
 
 /// Raven `REFRACT_EFFECT_DURATION` — how long the render-to-texture force-push
 /// distortion takes to expand and fade.
@@ -5265,9 +5347,11 @@ pub fn CG_PlayerAnimation(
 /// ragdoll angles when it is limp, the full bg torso/legs/head solve for
 /// humanoids, and a plain yaw-only axis for everything else.
 ///
-/// ESCALATION (shape): `ci` and `cent` are parameters for the same reason
-/// [`CG_PlayerAnimation`]'s are — wave 2's `CG_RagDoll` wants `cent` as a `&mut`
-/// borrow disjoint from `ctx.world`.
+/// ESCALATION (shape): `cent` is a parameter for the same reason
+/// [`CG_PlayerAnimation`]'s is — wave 2's `CG_RagDoll` wants `cent` as a `&mut`
+/// borrow disjoint from `ctx.world`. The `ci` pick happens inside, like Raven's:
+/// the entity's own `npcClient` for NPCs, the live `clientinfo` row otherwise —
+/// and it happens after the ragdoll block so `CG_RagDoll` sees the real row.
 ///
 /// DEFERRED (two arms): Raven's walker arm and its fighter/speeder arms test
 /// `m_pVehicle->m_pVehicleInfo->type`, which DEC-46.2's `Option<VehicleId>`
@@ -5280,7 +5364,6 @@ pub fn CG_PlayerAnimation(
 pub fn CG_G2PlayerAngles(
     ctx: &mut CgContext,
     cent: &mut centity_t,
-    ci: &mut clientInfo_t,
     legs: &mut [vec3_t; 3],
     legsAngles: &mut vec3_t,
 ) {
@@ -5306,6 +5389,35 @@ pub fn CG_G2PlayerAngles(
     //rww - Quite possibly the most arguments for a function ever.
     if cent.localAnimIndex <= 1 {
         //don't do these things on non-humanoids
+
+        // Raven picks ci right at the top of the fn: npcClient for NPCs, the
+        // clientinfo row (by currentState.number) for players. We take it out
+        // here instead - after the ragdoll block, which never touches ci - so
+        // it can be borrowed beside ctx; it goes straight back at the arm end.
+        // Source: oracle/codemp/cgame/cg_players.c:4217-4225
+        let mut npcCi = if cent.currentState.eType == entityType_t::ET_NPC as c_int {
+            cent.npcClient.take()
+        } else {
+            None
+        };
+        debug_assert!(
+            cent.currentState.eType != entityType_t::ET_NPC as c_int || npcCi.is_some(),
+            "CG_G2PlayerAngles: NPC with no npcClient"
+        );
+        let ciNumber = cent.currentState.number as usize;
+        let mut ci_slot = if npcCi.is_some() {
+            None
+        } else {
+            Some(mem::replace(
+                &mut ctx.world.cgs.clientinfo[ciNumber],
+                zeroed_client_info(),
+            ))
+        };
+        let ci: &mut clientInfo_t = match npcCi.as_deref_mut() {
+            Some(c) => c,
+            None => ci_slot.as_mut().unwrap(),
+        };
+
         let mut lookAngles: vec3_t = [0.0; 3];
 
         if cent.currentState.hasLookTarget != qfalse {
@@ -5459,6 +5571,13 @@ pub fn CG_G2PlayerAngles(
                 &ctx.world.bg_state,
                 &traps,
             );
+        }
+
+        if let Some(b) = npcCi {
+            cent.npcClient = Some(b);
+        }
+        if let Some(s) = ci_slot {
+            ctx.world.cgs.clientinfo[ciNumber] = s;
         }
     }
     // DEFERRED: Vehicle_t::m_pVehicleInfo->type == VH_WALKER — Raven's next arm
@@ -9514,4 +9633,3086 @@ pub fn CG_TriggerAnimSounds(ctx: &mut CgContext, cent: &mut centity_t) {
     cent.pe.torso.oldFrame = cent.pe.torso.frame;
     cent.pe.torso.frame = curFrame;
     cent.pe.torso.backlerp = 1.0 - (currentFrame - curFrame as f32);
+}
+
+/// Raven `CG_G2Animated` — the per-frame update for a ghoul2-animated,
+/// non-player `ET_NPC`: it loads the model the first frame, reflects the
+/// server's surface on/off toggles into the local ghoul2 instance (throwing off
+/// debris where a surface just came off), reattaches a severed limb, drives the
+/// ragdoll while dead/ragging, smooths the yaw, then hands the whole thing to
+/// [`CG_Player`] to actually render.
+///
+/// The `SMOOTH_G2ANIM_LERPANGLES` block is compiled in (Raven defines it right
+/// above the function); the commented-out weapon-copy and `cg_showVehBounds`
+/// debug blocks are dropped.
+/// Source: `oracle/codemp/cgame/cg_players.c:7463-7578`
+pub fn CG_G2Animated(ctx: &mut CgContext, centNum: usize) {
+    // SMOOTH_G2ANIM_LERPANGLES
+    let angSmoothFactor = 0.7f32;
+
+    if ctx.world.entity(centNum).ghoul2.is_null() {
+        //Initialize this g2 anim ent, then return (will start rendering next frame)
+        CG_G2AnimEntModelLoad(ctx, centNum);
+        ctx.world.entity_mut(centNum).npcLocalSurfOff = 0;
+        ctx.world.entity_mut(centNum).npcLocalSurfOn = 0;
+        return;
+    }
+
+    let surfacesOff = ctx.world.entity(centNum).currentState.surfacesOff;
+    let surfacesOn = ctx.world.entity(centNum).currentState.surfacesOn;
+
+    if ctx.world.entity(centNum).npcLocalSurfOff != surfacesOff
+        || ctx.world.entity(centNum).npcLocalSurfOn != surfacesOn
+    {
+        //looks like it's time for an update.
+        // PORT-NOTE: Raven's `BG_NUM_TOGGLEABLE_SURFACES` bound equals the length
+        // of the `bgToggleableSurfaces` table (31); the `.is_some()` sentinel
+        // ends the walk at the same slot Raven's non-NULL test does.
+        let mut i: c_int = 0;
+        while (i as usize) < bgToggleableSurfaces.len()
+            && bgToggleableSurfaces[i as usize].is_some()
+        {
+            let localSurfOff = ctx.world.entity(centNum).npcLocalSurfOff;
+            if (localSurfOff & (1 << i)) == 0 && (surfacesOff & (1 << i)) != 0 {
+                //it wasn't off before but it's off now, so reflect this change in the g2 instance.
+                if bgToggleableSurfaceDebris[i as usize] > 0 {
+                    //make some local debris of this thing?
+                    //FIXME: throw off the proper model effect, too
+                    let fxID = ctx.world.cgs.effects.mShipDestDestroyed;
+                    // CG_CreateSurfaceDebris wants `&centity_t` beside `ctx`; hand
+                    // the slot out and straight back.
+                    let cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+                    CG_CreateSurfaceDebris(ctx, &cent_tmp, i, fxID, true);
+                    *ctx.world.entity_mut(centNum) = cent_tmp;
+                }
+
+                let surfName = bgToggleableSurfaces[i as usize]
+                    .unwrap()
+                    .to_str()
+                    .unwrap_or("");
+                let g2 = ctx.world.entity(centNum).ghoul2;
+                trap::G2API_SetSurfaceOnOff(ctx.engine, g2, surfName, TURN_OFF);
+            }
+
+            let localSurfOn = ctx.world.entity(centNum).npcLocalSurfOn;
+            if (localSurfOn & (1 << i)) == 0 && (surfacesOn & (1 << i)) != 0 {
+                //same as above, but on instead of off.
+                let surfName = bgToggleableSurfaces[i as usize]
+                    .unwrap()
+                    .to_str()
+                    .unwrap_or("");
+                let g2 = ctx.world.entity(centNum).ghoul2;
+                trap::G2API_SetSurfaceOnOff(ctx.engine, g2, surfName, TURN_ON);
+            }
+
+            i += 1;
+        }
+
+        ctx.world.entity_mut(centNum).npcLocalSurfOff = surfacesOff;
+        ctx.world.entity_mut(centNum).npcLocalSurfOn = surfacesOn;
+    }
+
+    // Raven's commented-out weapon-copy block here is dropped.
+
+    if ctx.world.entity(centNum).torsoBolt != 0
+        && (ctx.world.entity(centNum).currentState.eFlags & EF_DEAD) == 0
+    {
+        //he's alive and has a limb missing still, reattach it and reset the weapon
+        CG_ReattachLimb(ctx, centNum);
+    }
+
+    let eFlags = ctx.world.entity(centNum).currentState.eFlags;
+    if ((eFlags & EF_DEAD) != 0 || (eFlags & EF_RAG) != 0)
+        && ctx.world.entity(centNum).localAnimIndex == 0
+    {
+        let mut forcedAngles: vec3_t = [0.0; 3];
+
+        VectorClear(&mut forcedAngles);
+        forcedAngles[YAW] = ctx.world.entity(centNum).lerpAngles[YAW];
+
+        // CG_RagDoll wants `cent` as a `&mut` disjoint from `ctx.world`.
+        let mut cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+        CG_RagDoll(ctx, &mut cent_tmp, &forcedAngles);
+        *ctx.world.entity_mut(centNum) = cent_tmp;
+    }
+
+    // SMOOTH_G2ANIM_LERPANGLES
+    let yaw = ctx.world.entity(centNum).lerpAngles[YAW];
+    let smoothYaw = ctx.world.entity(centNum).smoothYaw;
+    if (yaw > 0.0 && smoothYaw < 0.0) || (yaw < 0.0 && smoothYaw > 0.0) {
+        //keep it from snapping around on the threshold
+        ctx.world.entity_mut(centNum).smoothYaw = -smoothYaw;
+    }
+    let smoothYaw = ctx.world.entity(centNum).smoothYaw;
+    let yaw = ctx.world.entity(centNum).lerpAngles[YAW];
+    let newYaw = smoothYaw + (yaw - smoothYaw) * angSmoothFactor;
+    ctx.world.entity_mut(centNum).lerpAngles[YAW] = newYaw;
+    ctx.world.entity_mut(centNum).smoothYaw = newYaw;
+
+    //now just render as a player
+    CG_Player(ctx, centNum);
+
+    // Raven's commented-out `cg_showVehBounds` bbox debug block here is dropped.
+}
+
+/// Resolve the `clientInfo_t` Raven's `ci` local aims at: an `ET_NPC`'s owned
+/// `npcClient`, otherwise the shared `cgs.clientinfo` slot. Taken as a
+/// short-lived borrow at each use so it never fights the surrounding `ctx.world`
+/// accesses, and so the live slot is never swapped out from under callees like
+/// `CG_AddSaberBlade` that re-read it by client number (DEC-46.2).
+fn player_ci(world: &CgWorld, is_npc: bool, centNum: usize, clientNum: c_int) -> &clientInfo_t {
+    if is_npc {
+        world.entity(centNum).npcClient.as_deref().unwrap()
+    } else {
+        &world.cgs.clientinfo[clientNum as usize]
+    }
+}
+
+/// Mutable twin of [`player_ci`].
+fn player_ci_mut(
+    world: &mut CgWorld,
+    is_npc: bool,
+    centNum: usize,
+    clientNum: c_int,
+) -> &mut clientInfo_t {
+    if is_npc {
+        world.entity_mut(centNum).npcClient.as_deref_mut().unwrap()
+    } else {
+        &mut world.cgs.clientinfo[clientNum as usize]
+    }
+}
+
+/// [`CG_PlayerFloatSprite`] wants `&centity_t` beside `ctx`; swap the arena slot
+/// out and back around the call (the entity stays authoritative for callees that
+/// re-read it by number).
+fn cg_player_float_sprite(ctx: &mut CgContext, centNum: usize, shader: qhandle_t) {
+    let cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+    CG_PlayerFloatSprite(ctx, &cent_tmp, shader);
+    *ctx.world.entity_mut(centNum) = cent_tmp;
+}
+
+/// Same swap for [`CG_DrawPlayerSphere`].
+fn cg_draw_player_sphere(
+    ctx: &mut CgContext,
+    centNum: usize,
+    origin: &vec3_t,
+    scale: f32,
+    shader: c_int,
+) {
+    let cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+    CG_DrawPlayerSphere(ctx, &cent_tmp, origin, scale, shader);
+    *ctx.world.entity_mut(centNum) = cent_tmp;
+}
+
+/// Raven `CG_Player` — the whole client-entity render: smoothing, vehicle
+/// attach, weapon-model swaps, team/duel sprites, shadow, force-power effects,
+/// the saber(s), cloak, speed trails and every powerup shell, all funnelled into
+/// `trap_R_AddRefEntityToScene` calls.
+///
+/// Threading (DEC-46.1/.2): the entity stays in the arena, reached inline as
+/// `ctx.world.entity(centNum)`; callees that want a `&mut centity_t` disjoint
+/// from `ctx.world` (the anim/angles/headanim/trigger/attach family) get it via
+/// a take/put-back swap with [`centity_t::zeroed`], and `ci` is resolved in
+/// place through [`player_ci`]/[`player_ci_mut`].
+///
+/// DEFERRED (Vehicle_t referent pool, DEC-46.2): the flying-vehicle smoothing
+/// arm, the "has a pilot" rider-attach branch, and the vehicle-shield shader all
+/// hang off `m_pVehicle->m_pVehicleInfo`, which `Option<VehicleId>` answers only
+/// for presence; each is noted at its site.
+/// Source: `oracle/codemp/cgame/cg_players.c:8423-11107`
+#[allow(clippy::needless_range_loop)]
+pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
+    let engine = ctx.engine;
+
+    let mut legs = refEntity_t::zeroed();
+    let mut torso: refEntity_t;
+    let mut rootAngles: vec3_t = [0.0; 3];
+    let mut renderfx: c_int;
+    let shadow: bool;
+    let mut shadowPlane: f32 = 0.0;
+    let mut dead = false;
+    let mut angle: f32;
+    let mut angles: vec3_t = [0.0; 3];
+    let mut dir: vec3_t = [0.0; 3];
+    let mut elevated: vec3_t = [0.0; 3];
+    let mut seekorg: vec3_t = [0.0; 3];
+    let mut iwantout: c_int = 0;
+    let mut successchange: c_int;
+    let team: c_int;
+    let mut boltMatrix = mdxaBone_t {
+        matrix: [[0.0; 4]; 3],
+    };
+    let mut lHandMatrix = mdxaBone_t {
+        matrix: [[0.0; 4]; 3],
+    };
+    let mut doAlpha: c_int = 0;
+    let mut gotLHandMatrix: bool;
+    let mut g2HasWeapon: bool;
+    let mut drawPlayerSaber = false;
+    let mut checkDroidShields = false;
+
+    //first if we are not an npc and we are using an emplaced gun then make sure our
+    //angles are visually capped to the constraints (otherwise it's possible to lerp
+    //a little outside and look kind of twitchy)
+    if ctx.world.entity(centNum).currentState.weapon == WP_EMPLACED_GUN
+        && ctx.world.entity(centNum).currentState.otherEntityNum2 != 0
+    {
+        let otherNum = ctx.world.entity(centNum).currentState.otherEntityNum2 as usize;
+        let baseAngles = ctx.world.entity(centNum).lerpAngles;
+        let otherAngles = ctx.world.entity(otherNum).currentState.angles;
+        let constraint = ctx.world.entity(otherNum).currentState.origin2[0];
+        let mut empYaw: f32 = 0.0;
+        if BG_EmplacedView(baseAngles, otherAngles, &mut empYaw, constraint) != 0 {
+            ctx.world.entity_mut(centNum).lerpAngles[YAW] = empYaw;
+        }
+    }
+
+    if ctx.world.entity(centNum).currentState.iModelScale != 0 {
+        //if the server says we have a custom scale then set it now.
+        let s = ctx.world.entity(centNum).currentState.iModelScale as f32 / 100.0;
+        ctx.world.entity_mut(centNum).modelScale = [s, s, s];
+        if ctx.world.entity(centNum).currentState.NPC_class != class_t::CLASS_VEHICLE as c_int {
+            let ms2 = ctx.world.entity(centNum).modelScale[2];
+            if ms2 != 0.0 && ms2 != 1.0 {
+                ctx.world.entity_mut(centNum).lerpOrigin[2] += 24.0 * (ms2 - 1.0);
+            }
+        }
+    } else {
+        VectorClear(&mut ctx.world.entity_mut(centNum).modelScale);
+    }
+
+    let smoothClients = ctx.world.cvars.cg_smoothClients.integer != 0;
+    let heldByClient = ctx.world.entity(centNum).currentState.heldByClient;
+    let groundEntityNum = ctx.world.entity(centNum).currentState.groundEntityNum;
+    let eType0 = ctx.world.entity(centNum).currentState.eType;
+    let eFlags2_0 = ctx.world.entity(centNum).currentState.eFlags2;
+    let number0 = ctx.world.entity(centNum).currentState.number;
+    if (smoothClients || heldByClient != 0)
+        && (groundEntityNum >= ENTITYNUM_WORLD || eType0 == entityType_t::ET_TERRAIN as c_int)
+        && (eFlags2_0 & EF2_HYPERSPACE) == 0
+        && ctx.world.cg.predictedPlayerState.m_iVehicleNum != number0
+    {
+        //always smooth when being thrown
+        let mut fTolerance = 20000.0f32;
+        let smoothFactor: f32;
+
+        if heldByClient != 0 {
+            //smooth the origin more when in this state, because movement is origin-based on server.
+            smoothFactor = 0.2;
+        } else if (ctx.world.entity(centNum).currentState.powerups & (1 << PW_SPEED)) != 0
+            || (ctx.world.entity(centNum).currentState.forcePowersActive & (1 << FP_RAGE)) != 0
+        {
+            //we're moving fast so don't smooth as much
+            smoothFactor = 0.6;
+        } else if eType0 == entityType_t::ET_NPC as c_int
+            && ctx.world.entity(centNum).currentState.NPC_class == class_t::CLASS_VEHICLE as c_int
+            && ctx.world.entity(centNum).m_pVehicle.is_some()
+        {
+            // DEFERRED: Vehicle_t referent — Raven also tests
+            // `m_pVehicle->m_pVehicleInfo->type == VH_FIGHTER`; DEC-46.2's
+            // Option<VehicleId> answers presence only (cg_draw.rs's VH_FIGHTER
+            // precedent), so any vehicle here takes the fighter smoothing.
+            //greater smoothing for flying vehicles, since they move so fast
+            fTolerance = 6000000.0; //500000.0f; //yeah, this is so wrong..but..
+            smoothFactor = 0.5;
+        } else {
+            smoothFactor = 0.5;
+        }
+
+        let beamEnd = ctx.world.entity(centNum).beamEnd;
+        let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+        if DistanceSquared(beamEnd, lerpOrigin) > smoothFactor * fTolerance {
+            //10000
+            ctx.world.entity_mut(centNum).beamEnd = lerpOrigin;
+        }
+
+        let mut posDif: vec3_t = [0.0; 3];
+        let beamEnd = ctx.world.entity(centNum).beamEnd;
+        let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+        _VectorSubtract(lerpOrigin, beamEnd, &mut posDif);
+
+        for k in 0..3 {
+            let nv = ctx.world.entity(centNum).beamEnd[k] + posDif[k] * smoothFactor;
+            ctx.world.entity_mut(centNum).beamEnd[k] = nv;
+            ctx.world.entity_mut(centNum).lerpOrigin[k] = nv;
+        }
+    } else {
+        let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+        ctx.world.entity_mut(centNum).beamEnd = lerpOrigin;
+    }
+
+    if ctx.world.entity(centNum).currentState.m_iVehicleNum != 0
+        && ctx.world.entity(centNum).currentState.NPC_class != class_t::CLASS_VEHICLE as c_int
+    {
+        //this player is riding a vehicle
+        let vehNum = ctx.world.entity(centNum).currentState.m_iVehicleNum as usize;
+
+        let vehYaw = ctx.world.entity(vehNum).lerpAngles[YAW];
+        ctx.world.entity_mut(centNum).lerpAngles[YAW] = vehYaw;
+
+        //Attach ourself to the vehicle
+        let vehHasVehicle = ctx.world.entity(vehNum).m_pVehicle.is_some();
+        let centHasPs = ctx.world.entity(centNum).playerState != PlayerStateRef::None;
+        let vehHasPs = ctx.world.entity(vehNum).playerState != PlayerStateRef::None;
+        let centGhoul2 = ctx.world.entity(centNum).ghoul2;
+        let vehGhoul2 = ctx.world.entity(vehNum).ghoul2;
+        if vehHasVehicle && centHasPs && vehHasPs && !centGhoul2.is_null() && !vehGhoul2.is_null() {
+            let owner = ctx.world.entity(vehNum).currentState.owner;
+            let centClientNum = ctx.world.entity(centNum).currentState.clientNum;
+            if owner != centClientNum {
+                //FIXME: what about visible passengers?
+                let mut cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+                let attached = CG_VehicleAttachDroidUnit(ctx, &mut cent_tmp, &legs);
+                *ctx.world.entity_mut(centNum) = cent_tmp;
+                if attached {
+                    checkDroidShields = true;
+                }
+            } else if owner != ENTITYNUM_NONE {
+                //has a pilot...???
+                // DEFERRED: Vehicle_t referent pool (DEC-46.2). Raven sets the
+                // vehicle's `m_pPilot`/`m_pParentEntity`, copies the two
+                // playerState origins in, calls `m_pVehicleInfo->AttachRiders`,
+                // then copies the resulting origin back onto `cent->lerpOrigin`.
+                // `m_pVehicleInfo` hangs off the `Vehicle_t` an `Option<VehicleId>`
+                // cannot reach yet, so the rider keeps its own lerp position.
+            }
+        }
+    }
+
+    // the client number is stored in clientNum.  It can't be derived
+    // from the entity number, because a single client may have
+    // multiple corpses on the level using the same clientinfo
+    let is_npc = ctx.world.entity(centNum).currentState.eType == entityType_t::ET_NPC as c_int;
+    let clientNum: c_int;
+    if !is_npc {
+        clientNum = ctx.world.entity(centNum).currentState.clientNum;
+        if clientNum < 0 || clientNum >= MAX_CLIENTS_I32 {
+            CG_Error(ctx, "Bad clientNum on player entity");
+            return;
+        }
+    } else {
+        clientNum = 0; // unused for NPCs — ci lives on the entity
+        if ctx.world.entity(centNum).npcClient.is_none() {
+            //allocate memory for it
+            // Raven's `assert(0); return;` on a NULL alloc is unreachable: the box
+            // allocation panics on OOM rather than returning NULL, and
+            // CG_CreateNPCClient hands back a zeroed block (the memset +
+            // ghoul2Model = NULL that follow in Raven are already satisfied).
+            ctx.world.entity_mut(centNum).npcClient = Some(CG_CreateNPCClient());
+        }
+
+        let centGhoul2 = ctx.world.entity(centNum).ghoul2;
+        let localAnimIndex = ctx.world.entity(centNum).localAnimIndex;
+        let ciGhoul2Model = ctx
+            .world
+            .entity(centNum)
+            .npcClient
+            .as_deref()
+            .unwrap()
+            .ghoul2Model;
+        if ciGhoul2Model != centGhoul2 && !centGhoul2.is_null() {
+            {
+                let ci = ctx
+                    .world
+                    .entity_mut(centNum)
+                    .npcClient
+                    .as_deref_mut()
+                    .unwrap();
+                ci.ghoul2Model = centGhoul2;
+            }
+            if localAnimIndex <= 1 {
+                let g2 = centGhoul2;
+                let rhand = trap::G2API_AddBolt(engine, g2, 0, "*r_hand");
+                let lhand = trap::G2API_AddBolt(engine, g2, 0, "*l_hand");
+
+                //rhand must always be first bolt. lhand always second. Whichever you want the
+                //jetpack bolted to must always be third.
+                trap::G2API_AddBolt(engine, g2, 0, "*chestg");
+
+                //claw bolts
+                trap::G2API_AddBolt(engine, g2, 0, "*r_hand_cap_r_arm");
+                trap::G2API_AddBolt(engine, g2, 0, "*l_hand_cap_l_arm");
+
+                let mut head = trap::G2API_AddBolt(engine, g2, 0, "*head_top");
+                if head == -1 {
+                    head = trap::G2API_AddBolt(engine, g2, 0, "ceyebrow");
+                }
+                let motion = trap::G2API_AddBolt(engine, g2, 0, "Motion");
+                let llumbar = trap::G2API_AddBolt(engine, g2, 0, "lower_lumbar");
+
+                let ci = ctx
+                    .world
+                    .entity_mut(centNum)
+                    .npcClient
+                    .as_deref_mut()
+                    .unwrap();
+                ci.bolt_rhand = rhand;
+                ci.bolt_lhand = lhand;
+                ci.bolt_head = head;
+                ci.bolt_motion = motion;
+                ci.bolt_llumbar = llumbar;
+            } else {
+                let ci = ctx
+                    .world
+                    .entity_mut(centNum)
+                    .npcClient
+                    .as_deref_mut()
+                    .unwrap();
+                ci.bolt_rhand = -1;
+                ci.bolt_lhand = -1;
+                ci.bolt_head = -1;
+                ci.bolt_motion = -1;
+                ci.bolt_llumbar = -1;
+            }
+            let ci = ctx
+                .world
+                .entity_mut(centNum)
+                .npcClient
+                .as_deref_mut()
+                .unwrap();
+            ci.team = TEAM_FREE;
+            ci.infoValid = qtrue;
+        }
+    }
+
+    // it is possible to see corpses from disconnected players that may
+    // not have valid clientinfo
+    if player_ci(ctx.world, is_npc, centNum, clientNum).infoValid == qfalse {
+        return;
+    }
+
+    // cg.snap anchors every viewer-relative test below. Raven dereferences it
+    // unconditionally in render; §F19: with no snapshot there is nothing to draw
+    // against, so skip the whole entity.
+    let (
+        snapClientNum,
+        snapPersTeam,
+        snapPmFlags,
+        snapDuelInProgress,
+        snapDuelIndex,
+        snapIsJediMaster,
+        snapOrigin,
+        snapMt1,
+        snapMt2,
+        snapMt3,
+        snapMt4,
+        snapFdForceActive,
+        snapSeeLevel,
+    ) = match ctx.world.cg.snap_ref() {
+        Some(s) => (
+            s.ps.clientNum,
+            s.ps.persistant[PERS_TEAM as usize],
+            s.ps.pm_flags,
+            s.ps.duelInProgress,
+            s.ps.duelIndex,
+            s.ps.isJediMaster,
+            s.ps.origin,
+            s.ps.fd.forceMindtrickTargetIndex,
+            s.ps.fd.forceMindtrickTargetIndex2,
+            s.ps.fd.forceMindtrickTargetIndex3,
+            s.ps.fd.forceMindtrickTargetIndex4,
+            s.ps.fd.forcePowersActive,
+            s.ps.fd.forcePowerLevel[FP_SEE as usize],
+        ),
+        None => return,
+    };
+
+    // Add the player to the radar if on the same team and its a team game
+    if ctx.world.cgs.gametype >= GT_TEAM {
+        let eType = ctx.world.entity(centNum).currentState.eType;
+        let number = ctx.world.entity(centNum).currentState.number;
+        let ciTeam = player_ci(ctx.world, is_npc, centNum, clientNum).team;
+        if eType != entityType_t::ET_NPC as c_int
+            && snapClientNum != number
+            && ciTeam == snapPersTeam
+        {
+            CG_AddRadarEnt(ctx.world, centNum);
+        }
+    }
+
+    if ctx.world.entity(centNum).currentState.eType == entityType_t::ET_NPC as c_int
+        && ctx.world.entity(centNum).currentState.NPC_class == class_t::CLASS_VEHICLE as c_int
+    {
+        //add vehicles
+        CG_AddRadarEnt(ctx.world, centNum);
+        if CG_InFighter(ctx.world) {
+            //this is a vehicle, bracket it
+            let clientNumState = ctx.world.entity(centNum).currentState.clientNum;
+            if ctx.world.cg.predictedPlayerState.m_iVehicleNum != clientNumState {
+                //don't add the vehicle I'm in... :)
+                CG_AddBracketedEnt(ctx.world, centNum);
+            }
+        }
+    }
+
+    if ctx.world.entity(centNum).ghoul2.is_null() {
+        //not ready yet?
+        // (Raven's _DEBUG Com_Printf dropped — release parity.)
+        let number = ctx.world.entity(centNum).currentState.number;
+        trap::G2API_ClearAttachedInstance(engine, number);
+
+        let ciGhoul2Model = player_ci(ctx.world, is_npc, centNum, clientNum).ghoul2Model;
+        if !ciGhoul2Model.is_null() && trap::G2_HaveWeGhoul2Models(engine, ciGhoul2Model) {
+            let mut newG2: *mut c_void = null_mut();
+            trap::G2API_DuplicateGhoul2Instance(engine, ciGhoul2Model, &mut newG2);
+            ctx.world.entity_mut(centNum).ghoul2 = newG2;
+
+            //Attach the instance to this entity num so we can make use of client-server
+            //shared operations if possible.
+            trap::G2API_AttachInstanceToEntNum(engine, newG2, number, false);
+
+            if trap::G2API_AddBolt(engine, newG2, 0, "face") == -1 {
+                //check now to see if we have this bone for setting anims and such
+                ctx.world.entity_mut(centNum).noFace = qtrue;
+            }
+
+            let localAnimIndex = CG_G2SkelForModel(ctx, newG2);
+            ctx.world.entity_mut(centNum).localAnimIndex = localAnimIndex;
+            let eventAnimIndex = CG_G2EvIndexForModel(ctx, newG2, localAnimIndex);
+            ctx.world.entity_mut(centNum).eventAnimIndex = eventAnimIndex;
+        }
+        return;
+    }
+
+    if player_ci(ctx.world, is_npc, centNum, clientNum).superSmoothTime != 0 {
+        //do crazy smoothing
+        let superSmoothTime = player_ci(ctx.world, is_npc, centNum, clientNum).superSmoothTime;
+        let g2 = ctx.world.entity(centNum).ghoul2;
+        if superSmoothTime > ctx.world.cg.time {
+            //do it
+            trap::G2API_AbsurdSmoothing(engine, g2, true);
+        } else {
+            //turn it off
+            player_ci_mut(ctx.world, is_npc, centNum, clientNum).superSmoothTime = 0;
+            trap::G2API_AbsurdSmoothing(engine, g2, false);
+        }
+    }
+
+    if ctx.world.cg.predictedPlayerState.pm_type == PM_INTERMISSION as c_int {
+        //don't show all this shit during intermission
+        let eType = ctx.world.entity(centNum).currentState.eType;
+        let npcClass = ctx.world.entity(centNum).currentState.NPC_class;
+        if eType == entityType_t::ET_NPC as c_int && npcClass != class_t::CLASS_VEHICLE as c_int {
+            //NPC in intermission
+        } else {
+            //don't render players or vehicles in intermissions, allow other NPCs for scripts
+            return;
+        }
+    }
+
+    {
+        // CG_VehicleEffects wants `&centity_t`; hand the slot out and back.
+        let cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+        CG_VehicleEffects(ctx, &cent_tmp);
+        *ctx.world.entity_mut(centNum) = cent_tmp;
+    }
+
+    let eFlags = ctx.world.entity(centNum).currentState.eFlags;
+    if (eFlags & EF_JETPACK) != 0
+        && (eFlags & EF_DEAD) == 0
+        && !ctx.world.players.cg_g2JetpackInstance.is_null()
+    {
+        //should have a jetpack attached
+        //1 is rhand weap, 2 is lhand weap (akimbo sabs), 3 is jetpack
+        let g2 = ctx.world.entity(centNum).ghoul2;
+        if !trap::G2API_HasGhoul2ModelOnIndex(engine, g2, 3) {
+            let jet = ctx.world.players.cg_g2JetpackInstance;
+            trap::G2API_CopySpecificGhoul2Model(engine, jet, 0, g2, 3);
+        }
+
+        if (eFlags & EF_JETPACK_ACTIVE) != 0 {
+            let mut n = 0;
+            while n < 2 {
+                //Get the position/dir of the flame bolt on the jetpack model bolted to the player
+                let mut mat = mdxaBone_t {
+                    matrix: [[0.0; 4]; 3],
+                };
+                let g2 = ctx.world.entity(centNum).ghoul2;
+                let turAngles = ctx.world.entity(centNum).turAngles;
+                let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+                let modelScale = ctx.world.entity(centNum).modelScale;
+                let time = ctx.world.cg.time;
+                trap::G2API_GetBoltMatrix(
+                    engine,
+                    g2,
+                    3,
+                    n,
+                    &mut mat,
+                    &turAngles,
+                    &lerpOrigin,
+                    time,
+                    Some(&mut ctx.world.cgs.gameModels[0]),
+                    &modelScale,
+                );
+                let mut flamePos: vec3_t = [0.0; 3];
+                let mut flameDir: vec3_t = [0.0; 3];
+                BG_GiveMeVectorFromMatrix(&mat, Eorientations::ORIGIN as c_int, &mut flamePos);
+
+                if n == 0 {
+                    BG_GiveMeVectorFromMatrix(
+                        &mat,
+                        Eorientations::NEGATIVE_Y as c_int,
+                        &mut flameDir,
+                    );
+                    let base = flamePos;
+                    _VectorMA(base, -9.5, flameDir, &mut flamePos);
+                    BG_GiveMeVectorFromMatrix(
+                        &mat,
+                        Eorientations::POSITIVE_X as c_int,
+                        &mut flameDir,
+                    );
+                    let base = flamePos;
+                    _VectorMA(base, -13.5, flameDir, &mut flamePos);
+                } else {
+                    BG_GiveMeVectorFromMatrix(
+                        &mat,
+                        Eorientations::POSITIVE_X as c_int,
+                        &mut flameDir,
+                    );
+                    let base = flamePos;
+                    _VectorMA(base, -9.5, flameDir, &mut flamePos);
+                    BG_GiveMeVectorFromMatrix(
+                        &mat,
+                        Eorientations::NEGATIVE_Y as c_int,
+                        &mut flameDir,
+                    );
+                    let base = flamePos;
+                    _VectorMA(base, -13.5, flameDir, &mut flamePos);
+                }
+
+                let jetFx = ctx.world.cgs.effects.mBobaJet;
+                if (ctx.world.entity(centNum).currentState.eFlags & EF_JETPACK_FLAMING) != 0 {
+                    //create effects
+                    //FIXME: Just one big effect
+                    //Play the effect
+                    trap::FX_PlayEffectID(engine, jetFx, &flamePos, &flameDir, -1, -1);
+                    trap::FX_PlayEffectID(engine, jetFx, &flamePos, &flameDir, -1, -1);
+
+                    //Keep the jet fire sound looping
+                    let number = ctx.world.entity(centNum).currentState.number;
+                    let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+                    let sfx = trap::S_RegisterSound(engine, "sound/effects/fire_lp");
+                    trap::S_AddLoopingSound(engine, number, &lerpOrigin, &vec3_origin, sfx);
+                } else {
+                    //just idling
+                    //FIXME: Different smaller effect for idle
+                    //Play the effect
+                    trap::FX_PlayEffectID(engine, jetFx, &flamePos, &flameDir, -1, -1);
+                }
+
+                n += 1;
+            }
+
+            let number = ctx.world.entity(centNum).currentState.number;
+            let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+            let sfx = trap::S_RegisterSound(engine, "sound/boba/JETHOVER");
+            trap::S_AddLoopingSound(engine, number, &lerpOrigin, &vec3_origin, sfx);
+        }
+    } else if trap::G2API_HasGhoul2ModelOnIndex(engine, ctx.world.entity(centNum).ghoul2, 3) {
+        //fixme: would be good if this could be done not every frame
+        let g2 = ctx.world.entity(centNum).ghoul2;
+        trap::G2API_RemoveGhoul2Model(engine, g2, 3);
+    }
+
+    g2HasWeapon = trap::G2API_HasGhoul2ModelOnIndex(engine, ctx.world.entity(centNum).ghoul2, 1);
+
+    if !g2HasWeapon {
+        //force a redup of the weapon instance onto the client instance
+        ctx.world.entity_mut(centNum).ghoul2weapon = null_mut();
+        ctx.world.entity_mut(centNum).weapon = 0;
+    }
+
+    if ctx.world.entity(centNum).torsoBolt != 0
+        && (ctx.world.entity(centNum).currentState.eFlags & EF_DEAD) == 0
+    {
+        //he's alive and has a limb missing still, reattach it and reset the weapon
+        CG_ReattachLimb(ctx, centNum);
+    }
+
+    if ctx.world.entity(centNum).isRagging != qfalse
+        && (ctx.world.entity(centNum).currentState.eFlags & EF_DEAD) == 0
+        && (ctx.world.entity(centNum).currentState.eFlags & EF_RAG) == 0
+    {
+        //make sure we don't ragdoll ever while alive unless directly told to with eFlags
+        ctx.world.entity_mut(centNum).isRagging = qfalse;
+        let g2 = ctx.world.entity(centNum).ghoul2;
+        trap::G2API_SetRagDoll(engine, g2, None); //calling with null parms resets to no ragdoll.
+    }
+
+    let torsoBolt = ctx.world.entity(centNum).torsoBolt;
+    if !ctx.world.entity(centNum).ghoul2.is_null()
+        && torsoBolt != 0
+        && ((torsoBolt & RARMBIT) != 0
+            || (torsoBolt & RHANDBIT) != 0
+            || (torsoBolt & WAISTBIT) != 0)
+        && g2HasWeapon
+    {
+        //kill the weapon if the limb holding it is no longer on the model
+        let g2 = ctx.world.entity(centNum).ghoul2;
+        trap::G2API_RemoveGhoul2Model(engine, g2, 1);
+        g2HasWeapon = false;
+    }
+
+    let cgTime = ctx.world.cg.time;
+    if ctx.world.entity(centNum).trickAlphaTime == 0
+        || (cgTime - ctx.world.entity(centNum).trickAlphaTime) > 1000
+    {
+        //things got out of sync, perhaps a new client is trying to fill in this slot
+        ctx.world.entity_mut(centNum).trickAlpha = 255;
+        ctx.world.entity_mut(centNum).trickAlphaTime = cgTime;
+    }
+
+    if (ctx.world.entity(centNum).currentState.eFlags & EF_NODRAW) != 0 {
+        //If nodraw, return here
+        return;
+    } else if (ctx.world.entity(centNum).currentState.eFlags2 & EF2_SHIP_DEATH) != 0 {
+        //died in ship, don't draw, we were "obliterated"
+        return;
+    }
+
+    //If this client has tricked you.
+    let ti1 = ctx.world.entity(centNum).currentState.trickedentindex;
+    let ti2 = ctx.world.entity(centNum).currentState.trickedentindex2;
+    let ti3 = ctx.world.entity(centNum).currentState.trickedentindex3;
+    let ti4 = ctx.world.entity(centNum).currentState.trickedentindex4;
+    if CG_IsMindTricked(ctx.world, ti1, ti2, ti3, ti4, snapClientNum) {
+        if ctx.world.entity(centNum).trickAlpha > 1 {
+            let cgTime = ctx.world.cg.time;
+            let trickAlphaTime = ctx.world.entity(centNum).trickAlphaTime;
+            // Raven computes `trickAlpha - (dt)*0.5` in double, then truncates.
+            let newAlpha = (ctx.world.entity(centNum).trickAlpha as f64
+                - (cgTime - trickAlphaTime) as f64 * 0.5) as c_int;
+            ctx.world.entity_mut(centNum).trickAlpha = newAlpha;
+            ctx.world.entity_mut(centNum).trickAlphaTime = cgTime;
+
+            if ctx.world.entity(centNum).trickAlpha < 0 {
+                ctx.world.entity_mut(centNum).trickAlpha = 0;
+            }
+
+            doAlpha = 1;
+        } else {
+            doAlpha = 1;
+            ctx.world.entity_mut(centNum).trickAlpha = 1;
+            ctx.world.entity_mut(centNum).trickAlphaTime = ctx.world.cg.time;
+            iwantout = 1;
+        }
+    } else if ctx.world.entity(centNum).trickAlpha < 255 {
+        let cgTime = ctx.world.cg.time;
+        let trickAlphaTime = ctx.world.entity(centNum).trickAlphaTime;
+        let newAlpha = ctx.world.entity(centNum).trickAlpha + (cgTime - trickAlphaTime);
+        ctx.world.entity_mut(centNum).trickAlpha = newAlpha;
+        ctx.world.entity_mut(centNum).trickAlphaTime = cgTime;
+
+        if ctx.world.entity(centNum).trickAlpha > 255 {
+            ctx.world.entity_mut(centNum).trickAlpha = 255;
+        }
+
+        doAlpha = 1;
+    } else {
+        ctx.world.entity_mut(centNum).trickAlpha = 255;
+        ctx.world.entity_mut(centNum).trickAlphaTime = ctx.world.cg.time;
+    }
+
+    // get the player model information
+    renderfx = 0;
+    if ctx.world.entity(centNum).currentState.number == snapClientNum {
+        if ctx.world.cg.renderingThirdPerson == qfalse {
+            if ctx.world.entity(centNum).currentState.weapon != WP_SABER {
+                renderfx = RF_THIRD_PERSON; // only draw in mirrors
+            }
+        } else if ctx.world.cvars.cg_cameraMode.integer != 0 {
+            // Raven sets `iwantout = 1` here but returns immediately (goto minimal_add
+            // commented out) - dead store dropped.
+            // goto minimal_add;
+            // NOTENOTE Temporary
+            return;
+        }
+    }
+
+    // Update the player's client entity information regarding weapons.
+    // rww - Make sure weapons don't get set BEFORE cent->ghoul2 is initialized or else we'll have no
+    // weapon bolted on
+    if ctx.world.entity(centNum).currentState.saberInFlight != qfalse {
+        let world = &*ctx.world;
+        let gw = CG_G2WeaponInstance(world, world.entity(centNum), WP_SABER);
+        ctx.world.entity_mut(centNum).ghoul2weapon = gw;
+    }
+
+    let stateWeapon = ctx.world.entity(centNum).currentState.weapon;
+    let curWeapInstance = {
+        let world = &*ctx.world;
+        CG_G2WeaponInstance(world, world.entity(centNum), stateWeapon)
+    };
+    let npcClass = ctx.world.entity(centNum).currentState.NPC_class;
+    let eType = ctx.world.entity(centNum).currentState.eType;
+    let eFlags = ctx.world.entity(centNum).currentState.eFlags;
+    let number = ctx.world.entity(centNum).currentState.number;
+    if !ctx.world.entity(centNum).ghoul2.is_null()
+        && (eType != entityType_t::ET_NPC as c_int
+            || (npcClass != class_t::CLASS_VEHICLE as c_int
+                && npcClass != class_t::CLASS_REMOTE as c_int
+                && npcClass != class_t::CLASS_SEEKER as c_int)) //don't add weapon models to NPCs that have no bolt for them!
+        && ctx.world.entity(centNum).ghoul2weapon != curWeapInstance
+        && (eFlags & EF_DEAD) == 0
+        && ctx.world.entity(centNum).torsoBolt == 0
+        && (number != snapClientNum || (snapPmFlags & PMF_FOLLOW) != 0)
+    {
+        if player_ci(ctx.world, is_npc, centNum, clientNum).team == TEAM_SPECTATOR {
+            ctx.world.entity_mut(centNum).ghoul2weapon = null_mut();
+            ctx.world.entity_mut(centNum).weapon = 0;
+        } else {
+            let g2 = ctx.world.entity(centNum).ghoul2;
+            CG_CopyG2WeaponInstance(ctx, centNum, stateWeapon, g2);
+
+            if ctx.world.entity(centNum).currentState.eType != entityType_t::ET_NPC as c_int {
+                let centWeapon = ctx.world.entity(centNum).weapon;
+                let saberHolstered = ctx.world.entity(centNum).currentState.saberHolstered;
+                if centWeapon == WP_SABER && centWeapon != stateWeapon && saberHolstered == 0 {
+                    //switching away from the saber
+                    let s0Off = player_ci(ctx.world, is_npc, centNum, clientNum).saber[0].soundOff;
+                    let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+                    if s0Off != 0 && saberHolstered == 0 {
+                        trap::S_StartSound(engine, Some(&lerpOrigin), number, CHAN_AUTO, s0Off);
+                    }
+
+                    let s1Off = player_ci(ctx.world, is_npc, centNum, clientNum).saber[1].soundOff;
+                    let s1Model0 =
+                        player_ci(ctx.world, is_npc, centNum, clientNum).saber[1].model[0];
+                    if s1Off != 0 && s1Model0 != 0 && saberHolstered == 0 {
+                        trap::S_StartSound(engine, Some(&lerpOrigin), number, CHAN_AUTO, s1Off);
+                    }
+                } else if stateWeapon == WP_SABER
+                    && centWeapon != stateWeapon
+                    && ctx.world.entity(centNum).saberWasInFlight == qfalse
+                {
+                    //switching to the saber
+                    let s0On = player_ci(ctx.world, is_npc, centNum, clientNum).saber[0].soundOn;
+                    let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+                    if s0On != 0 {
+                        trap::S_StartSound(engine, Some(&lerpOrigin), number, CHAN_AUTO, s0On);
+                    }
+
+                    let s1On = player_ci(ctx.world, is_npc, centNum, clientNum).saber[1].soundOn;
+                    if s1On != 0 {
+                        trap::S_StartSound(engine, Some(&lerpOrigin), number, CHAN_AUTO, s1On);
+                    }
+
+                    let s0: *mut saberInfo_t =
+                        &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[0];
+                    BG_SI_SetDesiredLength(s0, 0.0, -1);
+                    let s1: *mut saberInfo_t =
+                        &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[1];
+                    BG_SI_SetDesiredLength(s1, 0.0, -1);
+                }
+            }
+
+            ctx.world.entity_mut(centNum).weapon = stateWeapon;
+            let world = &*ctx.world;
+            let gw = CG_G2WeaponInstance(world, world.entity(centNum), stateWeapon);
+            ctx.world.entity_mut(centNum).ghoul2weapon = gw;
+        }
+    } else if (ctx.world.entity(centNum).currentState.eFlags & EF_DEAD) != 0
+        || ctx.world.entity(centNum).torsoBolt != 0
+    {
+        ctx.world.entity_mut(centNum).ghoul2weapon = null_mut(); //be sure to update after respawning/getting limb regrown
+    }
+
+    if ctx.world.entity(centNum).saberWasInFlight != qfalse && g2HasWeapon {
+        ctx.world.entity_mut(centNum).saberWasInFlight = qfalse;
+    }
+
+    legs = refEntity_t::zeroed();
+
+    CG_SetGhoul2Info(&mut legs, ctx.world.entity(centNum));
+
+    _VectorCopy(ctx.world.entity(centNum).modelScale, &mut legs.modelScale);
+    legs.radius = CG_RadiusForCent(ctx.world.entity(centNum));
+    VectorClear(&mut legs.angles);
+
+    let colorOverride = player_ci(ctx.world, is_npc, centNum, clientNum).colorOverride;
+    if colorOverride[0] != 0.0 || colorOverride[1] != 0.0 || colorOverride[2] != 0.0 {
+        legs.shaderRGBA[0] = (colorOverride[0] * 255.0) as i32 as u8;
+        legs.shaderRGBA[1] = (colorOverride[1] * 255.0) as i32 as u8;
+        legs.shaderRGBA[2] = (colorOverride[2] * 255.0) as i32 as u8;
+        legs.shaderRGBA[3] = ctx.world.entity(centNum).currentState.customRGBA[3] as u8;
+    } else {
+        let customRGBA = ctx.world.entity(centNum).currentState.customRGBA;
+        legs.shaderRGBA[0] = customRGBA[0] as u8;
+        legs.shaderRGBA[1] = customRGBA[1] as u8;
+        legs.shaderRGBA[2] = customRGBA[2] as u8;
+        legs.shaderRGBA[3] = customRGBA[3] as u8;
+    }
+
+    // minimal_add: (label dead — the only goto to it is commented out)
+
+    team = player_ci(ctx.world, is_npc, centNum, clientNum).team;
+
+    let number = ctx.world.entity(centNum).currentState.number;
+    let eType = ctx.world.entity(centNum).currentState.eType;
+    if ctx.world.cgs.gametype >= GT_TEAM
+        && ctx.world.cvars.cg_drawFriend.integer != 0
+        && number != snapClientNum
+        && eType != entityType_t::ET_NPC as c_int
+    {
+        // If the view is either a spectator or on the same team as this character, show a symbol above their head.
+        if (snapPersTeam == TEAM_SPECTATOR || snapPersTeam == team)
+            && (ctx.world.entity(centNum).currentState.eFlags & EF_DEAD) == 0
+        {
+            if ctx.world.cgs.gametype == GT_SIEGE {
+                //check for per-map team shaders
+                if team == SIEGETEAM_TEAM1 {
+                    let plShader = ctx.world.saga.cgSiegeTeam1PlShader;
+                    if plShader != 0 {
+                        cg_player_float_sprite(ctx, centNum, plShader);
+                    } else {
+                        //if there isn't one fallback to default
+                        let sh = ctx.world.cgs.media.teamRedShader;
+                        cg_player_float_sprite(ctx, centNum, sh);
+                    }
+                } else {
+                    let plShader = ctx.world.saga.cgSiegeTeam2PlShader;
+                    if plShader != 0 {
+                        cg_player_float_sprite(ctx, centNum, plShader);
+                    } else {
+                        //if there isn't one fallback to default
+                        let sh = ctx.world.cgs.media.teamBlueShader;
+                        cg_player_float_sprite(ctx, centNum, sh);
+                    }
+                }
+            } else {
+                //generic teamplay
+                if team == TEAM_RED {
+                    let sh = ctx.world.cgs.media.teamRedShader;
+                    cg_player_float_sprite(ctx, centNum, sh);
+                } else {
+                    // if (team == TEAM_BLUE)
+                    let sh = ctx.world.cgs.media.teamBlueShader;
+                    cg_player_float_sprite(ctx, centNum, sh);
+                }
+            }
+        }
+    } else if ctx.world.cgs.gametype == GT_POWERDUEL
+        && ctx.world.cvars.cg_drawFriend.integer != 0
+        && number != snapClientNum
+    {
+        let ciDuelTeam = player_ci(ctx.world, is_npc, centNum, clientNum).duelTeam;
+        let viewerDuelTeam = ctx.world.cgs.clientinfo[snapClientNum as usize].duelTeam;
+        if ctx.world.cg.predictedPlayerState.persistant[PERS_TEAM as usize] != TEAM_SPECTATOR
+            && number < MAX_CLIENTS_I32
+            && (ctx.world.entity(centNum).currentState.eFlags & EF_DEAD) == 0
+            && viewerDuelTeam == ciDuelTeam
+        {
+            //ally in powerduel, so draw the icon
+            let sh = ctx.world.cgs.media.powerDuelAllyShader;
+            cg_player_float_sprite(ctx, centNum, sh);
+        } else if ctx.world.cg.predictedPlayerState.persistant[PERS_TEAM as usize] == TEAM_SPECTATOR
+            && number < MAX_CLIENTS_I32
+            && (ctx.world.entity(centNum).currentState.eFlags & EF_DEAD) == 0
+            && ciDuelTeam == DUELTEAM_DOUBLE as c_int
+        {
+            let sh = ctx.world.cgs.media.powerDuelAllyShader;
+            cg_player_float_sprite(ctx, centNum, sh);
+        }
+    }
+
+    if ctx.world.cgs.gametype == GT_JEDIMASTER
+        && ctx.world.cvars.cg_drawFriend.integer != 0
+        && number != snapClientNum
+    {
+        // Don't show a sprite above a player's own head in 3rd person.
+        // If the view is either a spectator or on the same team as this character, show a symbol above their head.
+        if (snapPersTeam == TEAM_SPECTATOR || snapPersTeam == team)
+            && (ctx.world.entity(centNum).currentState.eFlags & EF_DEAD) == 0
+            && CG_ThereIsAMaster(ctx.world)
+            && snapIsJediMaster == qfalse
+            && ctx.world.entity(centNum).currentState.isJediMaster == qfalse
+        {
+            let sh = ctx.world.cgs.media.teamRedShader;
+            cg_player_float_sprite(ctx, centNum, sh);
+        }
+    }
+
+    // add the shadow
+    shadow = CG_PlayerShadow(ctx, centNum, &mut shadowPlane);
+
+    let eFlags = ctx.world.entity(centNum).currentState.eFlags;
+    let genericenemyindex = ctx.world.entity(centNum).currentState.genericenemyindex;
+    let eType = ctx.world.entity(centNum).currentState.eType;
+    if ((eFlags & EF_SEEKERDRONE) != 0 || genericenemyindex != -1)
+        && eType != entityType_t::ET_NPC as c_int
+    {
+        let mut seeker = refEntity_t::zeroed();
+
+        let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+        _VectorCopy(lerpOrigin, &mut elevated);
+        elevated[2] += 40.0;
+
+        _VectorCopy(elevated, &mut seeker.lightingOrigin);
+        seeker.shadowPlane = shadowPlane;
+        seeker.renderfx = 0; //renderfx;
+                             //don't show in first person?
+
+        let cgTime = ctx.world.cg.time;
+        angle = (((cgTime / 12) & 255) as f64 * (PI * 2.0) / 255.0) as f32;
+        dir[0] = ((angle as f64).cos() * 20.0) as f32;
+        dir[1] = ((angle as f64).sin() * 20.0) as f32;
+        dir[2] = ((angle as f64).cos() * 5.0) as f32;
+        _VectorAdd(elevated, dir, &mut seeker.origin);
+
+        _VectorCopy(seeker.origin, &mut seekorg);
+
+        successchange = 0;
+        if genericenemyindex > MAX_GENTITIES as c_int {
+            let mut prefig = ((genericenemyindex - cgTime) / 80) as f32;
+
+            if prefig > 55.0 {
+                prefig = 55.0;
+            } else if prefig < 1.0 {
+                prefig = 1.0;
+            }
+
+            elevated[2] -= 55.0 - prefig;
+
+            angle = (((cgTime / 12) & 255) as f64 * (PI * 2.0) / 255.0) as f32;
+            dir[0] = ((angle as f64).cos() * 20.0) as f32;
+            dir[1] = ((angle as f64).sin() * 20.0) as f32;
+            dir[2] = ((angle as f64).cos() * 5.0) as f32;
+            _VectorAdd(elevated, dir, &mut seeker.origin);
+        } else if genericenemyindex != ENTITYNUM_NONE
+            && genericenemyindex != -1
+            // wire-sourced 32-bit field (doubles as a seeker time offset), so
+            // exactly MAX_GENTITIES or a stray negative reaches this arm; Raven
+            // reads garbage there, we keep the no-enemy wobble instead (§F19).
+            && (0..MAX_GENTITIES as c_int).contains(&genericenemyindex)
+        {
+            let enentOrigin = ctx.world.entity(genericenemyindex as usize).lerpOrigin;
+            let mut enang: vec3_t = [0.0; 3];
+            _VectorSubtract(enentOrigin, seekorg, &mut enang);
+            VectorNormalize(&mut enang);
+            vectoangles(enang, &mut angles);
+            successchange = 1;
+        }
+
+        if successchange == 0 {
+            angles[0] = ((angle as f64).sin() * 30.0) as f32;
+            angles[1] = (angle as f64 * 180.0 / PI + 90.0) as f32;
+            if angles[1] > 360.0 {
+                angles[1] -= 360.0;
+            }
+            angles[2] = 0.0;
+        }
+
+        AnglesToAxis(angles, seeker.axis.as_mut_ptr());
+
+        seeker.hModel = trap::R_RegisterModel(engine, "models/items/remote.md3");
+        trap::R_AddRefEntityToScene(engine, &seeker);
+    }
+
+    // add a water splash if partially in and out of water
+    {
+        let cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+        CG_PlayerSplash(ctx, &cent_tmp);
+        *ctx.world.entity_mut(centNum) = cent_tmp;
+    }
+
+    let cgShadows = ctx.world.cvars.cg_shadows.integer;
+    if (cgShadows == 3 || cgShadows == 2) && shadow {
+        renderfx |= RF_SHADOW_PLANE;
+    }
+    renderfx |= RF_LIGHTING_ORIGIN; // use the same origin for all
+
+    // if we've been hit, display proper fullscreen fx
+    {
+        let cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+        CG_PlayerHitFX(ctx, &cent_tmp);
+        *ctx.world.entity_mut(centNum) = cent_tmp;
+    }
+
+    let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+    _VectorCopy(lerpOrigin, &mut legs.origin);
+    _VectorCopy(lerpOrigin, &mut legs.lightingOrigin);
+    legs.shadowPlane = shadowPlane;
+    legs.renderfx = renderfx;
+    if ctx.world.cvars.cg_shadows.integer == 2 && (renderfx & RF_THIRD_PERSON) != 0 {
+        //can see own shadow
+        legs.renderfx |= RF_SHADOW_ONLY;
+    }
+    let legsOrigin = legs.origin;
+    _VectorCopy(legsOrigin, &mut legs.oldorigin); // don't positionally lerp at all
+
+    // CG_G2PlayerAngles + head anims want `cent` disjoint from ctx.world; the
+    // ci pick happens inside CG_G2PlayerAngles like Raven's.
+    {
+        let mut cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+        CG_G2PlayerAngles(ctx, &mut cent_tmp, &mut legs.axis, &mut rootAngles);
+        CG_G2PlayerHeadAnims(ctx, &mut cent_tmp);
+        *ctx.world.entity_mut(centNum) = cent_tmp;
+    }
+
+    if (ctx.world.entity(centNum).currentState.eFlags2 & EF2_HELD_BY_MONSTER) != 0
+        && ctx.world.entity(centNum).currentState.hasLookTarget != qfalse
+    {
+        //NOTE: lookTarget is an entity number, so this presumes that client 0 is NOT a Rancor...
+        let rancorNum = ctx.world.entity(centNum).currentState.lookTarget as usize;
+        // Raven guards `if (rancor)`; a reference is always non-NULL, so the body always runs.
+        let rancYaw = ctx.world.entity(rancorNum).lerpAngles[YAW];
+        let rancOrigin = ctx.world.entity(rancorNum).lerpOrigin;
+        let rancModelScale = ctx.world.entity(rancorNum).modelScale;
+        let rancGhoul2 = ctx.world.entity(rancorNum).ghoul2;
+        let inMouth = ctx.world.entity(rancorNum).currentState.eFlags2 & EF2_GENERIC_NPC_FLAG;
+        let cgTime = ctx.world.cg.time;
+        // `modelList` is a read-only registry lookup for the callee; copy it to a
+        // local so the mutable `*mut` doesn't alias the shared `&bg_state` borrow.
+        let mut gameModelsCopy = ctx.world.cgs.gameModels;
+        let traps = CgBgTraps::new(engine);
+        BG_AttachToRancor(
+            rancGhoul2,
+            rancYaw,
+            rancOrigin,
+            cgTime,
+            gameModelsCopy.as_mut_ptr(),
+            rancModelScale,
+            inMouth,
+            &mut legs.origin,
+            &mut legs.angles,
+            null_mut(), // Raven passes NULL - the axis out-param must stay untouched
+            &ctx.world.bg_state,
+            &traps,
+        );
+
+        if ctx.world.entity(centNum).isRagging != qfalse {
+            //hack, ragdoll has you way at bottom of bounding box
+            let legsAxis2 = legs.axis[2];
+            let base = legs.origin;
+            _VectorMA(base, 32.0, legsAxis2, &mut legs.origin);
+        }
+        let legsOrigin = legs.origin;
+        _VectorCopy(legsOrigin, &mut legs.oldorigin);
+        _VectorCopy(legsOrigin, &mut legs.lightingOrigin);
+
+        let legsAngles = legs.angles;
+        _VectorCopy(legsAngles, &mut ctx.world.entity_mut(centNum).lerpAngles);
+        let lerpAngles = ctx.world.entity(centNum).lerpAngles;
+        _VectorCopy(lerpAngles, &mut rootAngles); //??? tempAngles);//tempAngles is needed a lot below
+        _VectorCopy(lerpAngles, &mut ctx.world.entity_mut(centNum).turAngles);
+        _VectorCopy(legs.origin, &mut ctx.world.entity_mut(centNum).lerpOrigin);
+    }
+
+    //This call is mainly just to reconstruct the skeleton. But we'll get the left hand matrix while we're at it.
+    {
+        let g2 = ctx.world.entity(centNum).ghoul2;
+        let boltLhand = player_ci(ctx.world, is_npc, centNum, clientNum).bolt_lhand;
+        let turAngles = ctx.world.entity(centNum).turAngles;
+        let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+        let modelScale = ctx.world.entity(centNum).modelScale;
+        let cgTime = ctx.world.cg.time;
+        trap::G2API_GetBoltMatrix(
+            engine,
+            g2,
+            0,
+            boltLhand,
+            &mut lHandMatrix,
+            &turAngles,
+            &lerpOrigin,
+            cgTime,
+            Some(&mut ctx.world.cgs.gameModels[0]),
+            &modelScale,
+        );
+    }
+    gotLHandMatrix = true;
+
+    if (ctx.world.entity(centNum).currentState.eFlags & EF_DEAD) != 0 {
+        dead = true;
+        //rww - since our angles are fixed when we're dead this shouldn't be an issue anyway
+    }
+    let _ = dead;
+
+    ScaleModelAxis(&mut legs);
+
+    torso = refEntity_t::zeroed();
+
+    //rww - force speed "trail" effect
+    if (ctx.world.entity(centNum).currentState.powerups & (1 << PW_SPEED)) == 0
+        || doAlpha != 0
+        || ctx.world.cvars.cg_speedTrail.integer == 0
+    {
+        ctx.world.entity_mut(centNum).frame_minus1_refreshed = 0;
+        ctx.world.entity_mut(centNum).frame_minus2_refreshed = 0;
+    }
+
+    if ctx.world.entity(centNum).frame_minus1_refreshed != 0
+        || ctx.world.entity(centNum).frame_minus2_refreshed != 0
+    {
+        let mut tDir = ctx.world.entity(centNum).currentState.pos.trDelta;
+        // Raven's distVelBase is an int - the double-valued product truncates on assignment.
+        let distVelBase =
+            (SPEED_TRAIL_DISTANCE as f64 * (VectorNormalize(&mut tDir) as f64 * 0.004)) as c_int;
+
+        if ctx.world.entity(centNum).frame_minus1_refreshed != 0 {
+            let mut reframe_minus1 = legs;
+            reframe_minus1.renderfx |= RF_FORCE_ENT_ALPHA;
+            reframe_minus1.shaderRGBA[0] = legs.shaderRGBA[0];
+            reframe_minus1.shaderRGBA[1] = legs.shaderRGBA[1];
+            reframe_minus1.shaderRGBA[2] = legs.shaderRGBA[2];
+            reframe_minus1.shaderRGBA[3] = 100;
+
+            let mut tDir: vec3_t = [0.0; 3];
+            let frame_minus1 = ctx.world.entity(centNum).frame_minus1;
+            _VectorSubtract(frame_minus1, legs.origin, &mut tDir);
+            VectorNormalize(&mut tDir);
+
+            let nx = legs.origin[0] + tDir[0] * distVelBase as f32;
+            let ny = legs.origin[1] + tDir[1] * distVelBase as f32;
+            let nz = legs.origin[2] + tDir[2] * distVelBase as f32;
+            ctx.world.entity_mut(centNum).frame_minus1 = [nx, ny, nz];
+
+            _VectorCopy(
+                ctx.world.entity(centNum).frame_minus1,
+                &mut reframe_minus1.origin,
+            );
+
+            trap::R_AddRefEntityToScene(engine, &reframe_minus1);
+        }
+
+        if ctx.world.entity(centNum).frame_minus2_refreshed != 0 {
+            let mut reframe_minus2 = legs;
+
+            reframe_minus2.renderfx |= RF_FORCE_ENT_ALPHA;
+            reframe_minus2.shaderRGBA[0] = legs.shaderRGBA[0];
+            reframe_minus2.shaderRGBA[1] = legs.shaderRGBA[1];
+            reframe_minus2.shaderRGBA[2] = legs.shaderRGBA[2];
+            reframe_minus2.shaderRGBA[3] = 50;
+
+            let mut tDir: vec3_t = [0.0; 3];
+            let frame_minus2 = ctx.world.entity(centNum).frame_minus2;
+            let frame_minus1 = ctx.world.entity(centNum).frame_minus1;
+            _VectorSubtract(frame_minus2, frame_minus1, &mut tDir);
+            VectorNormalize(&mut tDir);
+
+            let f1 = ctx.world.entity(centNum).frame_minus1;
+            let nx = f1[0] + tDir[0] * distVelBase as f32;
+            let ny = f1[1] + tDir[1] * distVelBase as f32;
+            let nz = f1[2] + tDir[2] * distVelBase as f32;
+            ctx.world.entity_mut(centNum).frame_minus2 = [nx, ny, nz];
+
+            _VectorCopy(
+                ctx.world.entity(centNum).frame_minus2,
+                &mut reframe_minus2.origin,
+            );
+
+            trap::R_AddRefEntityToScene(engine, &reframe_minus2);
+        }
+    }
+
+    //trigger animation-based sounds, done before next lerp frame.
+    {
+        let mut cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+        CG_TriggerAnimSounds(ctx, &mut cent_tmp);
+        *ctx.world.entity_mut(centNum) = cent_tmp;
+    }
+
+    // get the animation state (after rotation, to allow feet shuffle)
+    {
+        let mut cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+        if is_npc {
+            let mut dummy = zeroed_client_info();
+            CG_PlayerAnimation(
+                ctx,
+                &mut cent_tmp,
+                &mut dummy,
+                &mut legs.oldframe,
+                &mut legs.frame,
+                &mut legs.backlerp,
+                &mut torso.oldframe,
+                &mut torso.frame,
+                &mut torso.backlerp,
+            );
+        } else {
+            let mut ci_slot = mem::replace(
+                &mut ctx.world.cgs.clientinfo[clientNum as usize],
+                zeroed_client_info(),
+            );
+            CG_PlayerAnimation(
+                ctx,
+                &mut cent_tmp,
+                &mut ci_slot,
+                &mut legs.oldframe,
+                &mut legs.frame,
+                &mut legs.backlerp,
+                &mut torso.oldframe,
+                &mut torso.frame,
+                &mut torso.backlerp,
+            );
+            ctx.world.cgs.clientinfo[clientNum as usize] = ci_slot;
+        }
+        *ctx.world.entity_mut(centNum) = cent_tmp;
+    }
+
+    // add the talk baloon or disconnect icon
+    {
+        let cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+        CG_PlayerSprites(ctx, &cent_tmp);
+        *ctx.world.entity_mut(centNum) = cent_tmp;
+    }
+
+    if (ctx.world.entity(centNum).currentState.eFlags & EF_DEAD) != 0 {
+        //keep track of death anim frame for when we copy off the bodyqueue
+        let torsoFrame = ctx.world.entity(centNum).pe.torso.frame;
+        player_ci_mut(ctx.world, is_npc, centNum, clientNum).frame = torsoFrame;
+    }
+
+    let activeForcePass = ctx.world.entity(centNum).currentState.activeForcePass;
+    let npcClass = ctx.world.entity(centNum).currentState.NPC_class;
+    if activeForcePass > FORCE_LEVEL_3 && npcClass != class_t::CLASS_VEHICLE as c_int {
+        let mut axis: [vec3_t; 3] = [[0.0; 3]; 3];
+        let mut fAng: vec3_t = [0.0; 3];
+        let mut fxDir: vec3_t = [0.0; 3];
+        let mut efOrg: vec3_t = [0.0; 3];
+
+        let realForceLev = activeForcePass - FORCE_LEVEL_3;
+
+        // Raven's `tAng` here is a dead store (VectorSet then unused); dropped.
+        let torsoPitch = ctx.world.entity(centNum).pe.torso.pitchAngle;
+        let torsoYaw = ctx.world.entity(centNum).pe.torso.yawAngle;
+        VectorSet(&mut fAng, torsoPitch, torsoYaw, 0.0);
+
+        AngleVectors(fAng, Some(&mut fxDir), None, None);
+        let _ = fxDir; // computed by Raven, read only by commented-out code
+
+        let torsoAnim = ctx.world.entity(centNum).currentState.torsoAnim;
+        if torsoAnim == animNumber_t::BOTH_FORCE_2HANDEDLIGHTNING_HOLD as c_int
+            && ctx.world.bg_state.rng.Q_irand(0, 1) != 0
+        {
+            //alternate back and forth between left and right
+            let mut rHandMatrix = mdxaBone_t {
+                matrix: [[0.0; 4]; 3],
+            };
+            let g2 = ctx.world.entity(centNum).ghoul2;
+            let boltRhand = player_ci(ctx.world, is_npc, centNum, clientNum).bolt_rhand;
+            let turAngles = ctx.world.entity(centNum).turAngles;
+            let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+            let modelScale = ctx.world.entity(centNum).modelScale;
+            let cgTime = ctx.world.cg.time;
+            trap::G2API_GetBoltMatrix(
+                engine,
+                g2,
+                0,
+                boltRhand,
+                &mut rHandMatrix,
+                &turAngles,
+                &lerpOrigin,
+                cgTime,
+                Some(&mut ctx.world.cgs.gameModels[0]),
+                &modelScale,
+            );
+            efOrg[0] = rHandMatrix.matrix[0][3];
+            efOrg[1] = rHandMatrix.matrix[1][3];
+            efOrg[2] = rHandMatrix.matrix[2][3];
+        } else {
+            if !gotLHandMatrix {
+                let g2 = ctx.world.entity(centNum).ghoul2;
+                let boltLhand = player_ci(ctx.world, is_npc, centNum, clientNum).bolt_lhand;
+                let turAngles = ctx.world.entity(centNum).turAngles;
+                let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+                let modelScale = ctx.world.entity(centNum).modelScale;
+                let cgTime = ctx.world.cg.time;
+                trap::G2API_GetBoltMatrix(
+                    engine,
+                    g2,
+                    0,
+                    boltLhand,
+                    &mut lHandMatrix,
+                    &turAngles,
+                    &lerpOrigin,
+                    cgTime,
+                    Some(&mut ctx.world.cgs.gameModels[0]),
+                    &modelScale,
+                );
+                gotLHandMatrix = true;
+            }
+            efOrg[0] = lHandMatrix.matrix[0][3];
+            efOrg[1] = lHandMatrix.matrix[1][3];
+            efOrg[2] = lHandMatrix.matrix[2][3];
+        }
+
+        AnglesToAxis(fAng, axis.as_mut_ptr());
+
+        if realForceLev > FORCE_LEVEL_2 {
+            //arc
+            let fx = ctx.world.cgs.effects.forceDrainWide;
+            trap::FX_PlayEntityEffectID(engine, fx, &efOrg, &axis, -1, -1, -1, -1);
+        } else {
+            //line
+            let fx = ctx.world.cgs.effects.forceDrain;
+            trap::FX_PlayEntityEffectID(engine, fx, &efOrg, &axis, -1, -1, -1, -1);
+        }
+    } else if activeForcePass != 0 && npcClass != class_t::CLASS_VEHICLE as c_int {
+        //doing the electrocuting
+        let mut axis: [vec3_t; 3] = [[0.0; 3]; 3];
+        let mut fAng: vec3_t = [0.0; 3];
+        let mut fxDir: vec3_t = [0.0; 3];
+        let mut efOrg: vec3_t = [0.0; 3];
+
+        let torsoPitch = ctx.world.entity(centNum).pe.torso.pitchAngle;
+        let torsoYaw = ctx.world.entity(centNum).pe.torso.yawAngle;
+        VectorSet(&mut fAng, torsoPitch, torsoYaw, 0.0);
+
+        AngleVectors(fAng, Some(&mut fxDir), None, None);
+        let _ = fxDir;
+
+        if !gotLHandMatrix {
+            let g2 = ctx.world.entity(centNum).ghoul2;
+            let boltLhand = player_ci(ctx.world, is_npc, centNum, clientNum).bolt_lhand;
+            let turAngles = ctx.world.entity(centNum).turAngles;
+            let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+            let modelScale = ctx.world.entity(centNum).modelScale;
+            let cgTime = ctx.world.cg.time;
+            trap::G2API_GetBoltMatrix(
+                engine,
+                g2,
+                0,
+                boltLhand,
+                &mut lHandMatrix,
+                &turAngles,
+                &lerpOrigin,
+                cgTime,
+                Some(&mut ctx.world.cgs.gameModels[0]),
+                &modelScale,
+            );
+            gotLHandMatrix = true;
+        }
+
+        efOrg[0] = lHandMatrix.matrix[0][3];
+        efOrg[1] = lHandMatrix.matrix[1][3];
+        efOrg[2] = lHandMatrix.matrix[2][3];
+
+        AnglesToAxis(fAng, axis.as_mut_ptr());
+
+        if activeForcePass > FORCE_LEVEL_2 {
+            //arc
+            let fx = ctx.world.cgs.effects.forceLightningWide;
+            trap::FX_PlayEntityEffectID(engine, fx, &efOrg, &axis, -1, -1, -1, -1);
+        } else {
+            //line
+            let fx = ctx.world.cgs.effects.forceLightning;
+            trap::FX_PlayEntityEffectID(engine, fx, &efOrg, &axis, -1, -1, -1, -1);
+        }
+    }
+
+    //fullbody push effect
+    if (ctx.world.entity(centNum).currentState.eFlags & EF_BODYPUSH) != 0 {
+        CG_ForcePushBodyBlur(ctx, centNum);
+    }
+
+    if (ctx.world.entity(centNum).currentState.powerups & (1 << PW_DISINT_4)) != 0 {
+        let mut efOrg: vec3_t = [0.0; 3];
+
+        // Raven's `tAng` VectorSet here is a dead store (unused); dropped.
+        if !gotLHandMatrix {
+            let g2 = ctx.world.entity(centNum).ghoul2;
+            let boltLhand = player_ci(ctx.world, is_npc, centNum, clientNum).bolt_lhand;
+            let turAngles = ctx.world.entity(centNum).turAngles;
+            let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+            let modelScale = ctx.world.entity(centNum).modelScale;
+            let cgTime = ctx.world.cg.time;
+            trap::G2API_GetBoltMatrix(
+                engine,
+                g2,
+                0,
+                boltLhand,
+                &mut lHandMatrix,
+                &turAngles,
+                &lerpOrigin,
+                cgTime,
+                Some(&mut ctx.world.cgs.gameModels[0]),
+                &modelScale,
+            );
+            // Raven sets gotLHandMatrix here too; nothing reads it again - dead store dropped.
+        }
+
+        efOrg[0] = lHandMatrix.matrix[0][3];
+        efOrg[1] = lHandMatrix.matrix[1][3];
+        efOrg[2] = lHandMatrix.matrix[2][3];
+
+        let forcePowersActive = ctx.world.entity(centNum).currentState.forcePowersActive;
+        let number = ctx.world.entity(centNum).currentState.number;
+        if (forcePowersActive & (1 << FP_GRIP)) != 0
+            && (ctx.world.cg.renderingThirdPerson != qfalse || number != snapClientNum)
+        {
+            // Raven's origBolt/boltDir (+ its BG_GiveMeVectorFromMatrix) feed only
+            // the commented-out regrip-arm render; dropped as a pure dead store.
+            CG_ForceGripEffect(ctx, &efOrg);
+            CG_ForceGripEffect(ctx, &efOrg);
+        } else if (forcePowersActive & (1 << FP_GRIP)) == 0 {
+            //use refractive effect
+            CG_ForcePushBlur(ctx, &efOrg, Some(centNum));
+        }
+    } else if ctx.world.entity(centNum).bodyFadeTime != 0 {
+        //reset the counter for keeping track of push refraction effect state
+        ctx.world.entity_mut(centNum).bodyFadeTime = 0;
+    }
+
+    if ctx.world.entity(centNum).currentState.weapon == WP_STUN_BATON
+        && ctx.world.entity(centNum).currentState.number == snapClientNum
+    {
+        let number = ctx.world.entity(centNum).currentState.number;
+        let vieworg = ctx.world.cg.refdef.vieworg;
+        let sfx = trap::S_RegisterSound(engine, "sound/weapons/baton/idle.wav");
+        trap::S_AddLoopingSound(engine, number, &vieworg, &vec3_origin, sfx);
+    }
+
+    //NOTE: All effects that should be visible during mindtrick should go above here
+
+    // Raven `if (iwantout) goto stillDoSaber;` — everything below up to the saber
+    // handling is the skipped-when-`iwantout` span.
+    if iwantout == 0 {
+        if doAlpha != 0 {
+            legs.renderfx |= RF_FORCE_ENT_ALPHA;
+            legs.shaderRGBA[3] = ctx.world.entity(centNum).trickAlpha as u8;
+
+            if legs.shaderRGBA[3] < 1 {
+                //don't cancel it out even if it's < 1
+                legs.shaderRGBA[3] = 1;
+            }
+        }
+
+        if ctx.world.entity(centNum).teamPowerEffectTime > ctx.world.cg.time {
+            if ctx.world.entity(centNum).teamPowerType == 3 {
+                //absorb is a somewhat different effect entirely, handled below
+            } else {
+                let preRFX = legs.renderfx;
+
+                legs.renderfx |= RF_RGB_TINT;
+                legs.renderfx |= RF_FORCE_ENT_ALPHA;
+
+                // preCol saves the four byte components (Raven uses a vec4_t; the
+                // 0..255 values round-trip exactly either way).
+                let preCol = legs.shaderRGBA;
+
+                match ctx.world.entity(centNum).teamPowerType {
+                    1 => {
+                        //heal
+                        legs.shaderRGBA[0] = 0;
+                        legs.shaderRGBA[1] = 255;
+                        legs.shaderRGBA[2] = 0;
+                    }
+                    0 => {
+                        //regen
+                        legs.shaderRGBA[0] = 0;
+                        legs.shaderRGBA[1] = 0;
+                        legs.shaderRGBA[2] = 255;
+                    }
+                    _ => {
+                        //drain
+                        legs.shaderRGBA[0] = 255;
+                        legs.shaderRGBA[1] = 0;
+                        legs.shaderRGBA[2] = 0;
+                    }
+                }
+
+                let teamPowerEffectTime = ctx.world.entity(centNum).teamPowerEffectTime;
+                let cgTime = ctx.world.cg.time;
+                legs.shaderRGBA[3] = ((teamPowerEffectTime - cgTime) / 8) as u8;
+
+                legs.customShader = trap::R_RegisterShader(engine, "powerups/ysalimarishell");
+                trap::R_AddRefEntityToScene(engine, &legs);
+
+                legs.customShader = 0;
+                legs.renderfx = preRFX;
+                legs.shaderRGBA = preCol;
+            }
+        }
+
+        //If you've tricked this client.
+        let number = ctx.world.entity(centNum).currentState.number;
+        if CG_IsMindTricked(ctx.world, snapMt1, snapMt2, snapMt3, snapMt4, number)
+            && !ctx.world.entity(centNum).ghoul2.is_null()
+        {
+            let mut efOrg: vec3_t = [0.0; 3];
+            let mut axis: [vec3_t; 3] = [[0.0; 3]; 3];
+
+            let tAng = ctx.world.entity(centNum).turAngles;
+            let g2 = ctx.world.entity(centNum).ghoul2;
+            let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+            let modelScale = ctx.world.entity(centNum).modelScale;
+            let cgTime = ctx.world.cg.time;
+            let boltHead = player_ci(ctx.world, is_npc, centNum, clientNum).bolt_head;
+            trap::G2API_GetBoltMatrix(
+                engine,
+                g2,
+                0,
+                boltHead,
+                &mut boltMatrix,
+                &tAng,
+                &lerpOrigin,
+                cgTime,
+                Some(&mut ctx.world.cgs.gameModels[0]),
+                &modelScale,
+            );
+
+            BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut efOrg);
+            // Raven's `fxAng` NEGATIVE_Y read is a pure dead store; dropped.
+
+            axis[0][0] = boltMatrix.matrix[0][0];
+            axis[0][1] = boltMatrix.matrix[1][0];
+            axis[0][2] = boltMatrix.matrix[2][0];
+
+            axis[1][0] = boltMatrix.matrix[0][1];
+            axis[1][1] = boltMatrix.matrix[1][1];
+            axis[1][2] = boltMatrix.matrix[2][1];
+
+            axis[2][0] = boltMatrix.matrix[0][2];
+            axis[2][1] = boltMatrix.matrix[1][2];
+            axis[2][2] = boltMatrix.matrix[2][2];
+
+            let fx = ctx.world.cgs.effects.mForceConfustionOld;
+            trap::FX_PlayEntityEffectID(engine, fx, &efOrg, &axis, -1, -1, -1, -1);
+        }
+
+        if ctx.world.cgs.gametype == GT_HOLOCRON
+            && ctx.world.entity(centNum).currentState.time2 != 0
+            && (ctx.world.cg.renderingThirdPerson != qfalse
+                || snapClientNum != ctx.world.entity(centNum).currentState.number)
+        {
+            let mut i: c_int = 0;
+            let mut renderedHolos = 0;
+            let mut holoRef;
+
+            while i < NUM_FORCE_POWERS as c_int && renderedHolos < 3 {
+                if (ctx.world.entity(centNum).currentState.time2 & (1 << i)) != 0 {
+                    holoRef = refEntity_t::zeroed();
+
+                    let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+                    _VectorCopy(lerpOrigin, &mut elevated);
+                    elevated[2] += 8.0;
+
+                    _VectorCopy(elevated, &mut holoRef.lightingOrigin);
+                    holoRef.shadowPlane = shadowPlane;
+                    holoRef.renderfx = 0; //RF_THIRD_PERSON;
+
+                    let cgTime = ctx.world.cg.time;
+                    if renderedHolos == 0 {
+                        angle = (((cgTime / 8) & 255) as f64 * (PI * 2.0) / 255.0) as f32;
+                        dir[0] = ((angle as f64).cos() * 20.0) as f32;
+                        dir[1] = ((angle as f64).sin() * 20.0) as f32;
+                        dir[2] = ((angle as f64).cos() * 20.0) as f32;
+                        _VectorAdd(elevated, dir, &mut holoRef.origin);
+
+                        angles[0] = ((angle as f64).sin() * 30.0) as f32;
+                        angles[1] = (angle as f64 * 180.0 / PI + 90.0) as f32;
+                        if angles[1] > 360.0 {
+                            angles[1] -= 360.0;
+                        }
+                        angles[2] = 0.0;
+                        AnglesToAxis(angles, holoRef.axis.as_mut_ptr());
+                    } else if renderedHolos == 1 {
+                        angle = ((((cgTime / 8) & 255) as f64 * (PI * 2.0) / 255.0) + PI) as f32;
+                        if angle as f64 > PI * 2.0 {
+                            angle -= (PI as f32) * 2.0;
+                        }
+                        dir[0] = ((angle as f64).sin() * 20.0) as f32;
+                        dir[1] = ((angle as f64).cos() * 20.0) as f32;
+                        dir[2] = ((angle as f64).cos() * 20.0) as f32;
+                        _VectorAdd(elevated, dir, &mut holoRef.origin);
+
+                        angles[0] = ((angle as f64 - 0.5 * PI).cos() * 30.0) as f32;
+                        angles[1] = (360.0 - (angle as f64 * 180.0 / PI)) as f32;
+                        if angles[1] > 360.0 {
+                            angles[1] -= 360.0;
+                        }
+                        angles[2] = 0.0;
+                        AnglesToAxis(angles, holoRef.axis.as_mut_ptr());
+                    } else {
+                        angle =
+                            ((((cgTime / 6) & 255) as f64 * (PI * 2.0) / 255.0) + 0.5 * PI) as f32;
+                        if angle as f64 > PI * 2.0 {
+                            angle -= (PI as f32) * 2.0;
+                        }
+                        dir[0] = ((angle as f64).sin() * 20.0) as f32;
+                        dir[1] = ((angle as f64).cos() * 20.0) as f32;
+                        dir[2] = 0.0;
+                        _VectorAdd(elevated, dir, &mut holoRef.origin);
+
+                        _VectorCopy(dir, &mut holoRef.axis[1]);
+                        VectorNormalize(&mut holoRef.axis[1]);
+                        VectorSet(&mut holoRef.axis[2], 0.0, 0.0, 1.0);
+                        let a1 = holoRef.axis[1];
+                        let a2 = holoRef.axis[2];
+                        CrossProduct(a1, a2, &mut holoRef.axis[0]);
+                    }
+
+                    holoRef.modelScale[0] = 0.5;
+                    holoRef.modelScale[1] = 0.5;
+                    holoRef.modelScale[2] = 0.5;
+                    ScaleModelAxis(&mut holoRef);
+
+                    {
+                        // SAFETY: `addspriteArgStruct_t` is all POD (vec3/f32/int
+                        // handles); all-zero is a valid bit pattern, matching
+                        // Raven's stack `fxSArgs` before it fills the fields.
+                        let mut fxSArgs: addspriteArgStruct_t = unsafe { core::mem::zeroed() };
+                        let mut holoCenter: vec3_t = [0.0; 3];
+
+                        holoCenter[0] = holoRef.origin[0] + holoRef.axis[2][0] * 18.0;
+                        holoCenter[1] = holoRef.origin[1] + holoRef.axis[2][1] * 18.0;
+                        holoCenter[2] = holoRef.origin[2] + holoRef.axis[2][2] * 18.0;
+
+                        let wv: f32 =
+                            (((cgTime as f32 * 0.004f32) as f64).sin() * 0.08 + 0.1) as f32;
+
+                        _VectorCopy(holoCenter, &mut fxSArgs.origin);
+                        VectorClear(&mut fxSArgs.vel);
+                        VectorClear(&mut fxSArgs.accel);
+                        fxSArgs.scale = wv * 60.0;
+                        fxSArgs.dscale = wv * 60.0;
+                        fxSArgs.sAlpha = wv * 12.0;
+                        fxSArgs.eAlpha = wv * 12.0;
+                        fxSArgs.rotation = 0.0;
+                        fxSArgs.bounce = 0.0;
+                        fxSArgs.life = 1;
+
+                        fxSArgs.flags = 0x08000000 | 0x00000001;
+
+                        if forcePowerDarkLight[i as usize] == FORCE_DARKSIDE {
+                            //dark
+                            fxSArgs.sAlpha *= 3.0;
+                            fxSArgs.eAlpha *= 3.0;
+                            fxSArgs.shader = ctx.world.cgs.media.redSaberGlowShader;
+                            trap::FX_AddSprite(engine, &mut fxSArgs);
+                        } else if forcePowerDarkLight[i as usize] == FORCE_LIGHTSIDE {
+                            //light
+                            fxSArgs.sAlpha *= 1.5;
+                            fxSArgs.eAlpha *= 1.5;
+                            fxSArgs.shader = ctx.world.cgs.media.redSaberGlowShader;
+                            trap::FX_AddSprite(engine, &mut fxSArgs);
+                            fxSArgs.shader = ctx.world.cgs.media.greenSaberGlowShader;
+                            trap::FX_AddSprite(engine, &mut fxSArgs);
+                            fxSArgs.shader = ctx.world.cgs.media.blueSaberGlowShader;
+                            trap::FX_AddSprite(engine, &mut fxSArgs);
+                        } else {
+                            //neutral
+                            if i == FP_SABER_OFFENSE || i == FP_SABER_DEFENSE || i == FP_SABERTHROW
+                            {
+                                //saber power
+                                fxSArgs.sAlpha *= 1.5;
+                                fxSArgs.eAlpha *= 1.5;
+                                fxSArgs.shader = ctx.world.cgs.media.greenSaberGlowShader;
+                                trap::FX_AddSprite(engine, &mut fxSArgs);
+                            } else {
+                                fxSArgs.sAlpha *= 0.5;
+                                fxSArgs.eAlpha *= 0.5;
+                                fxSArgs.shader = ctx.world.cgs.media.greenSaberGlowShader;
+                                trap::FX_AddSprite(engine, &mut fxSArgs);
+                                fxSArgs.shader = ctx.world.cgs.media.blueSaberGlowShader;
+                                trap::FX_AddSprite(engine, &mut fxSArgs);
+                            }
+                        }
+                    }
+
+                    holoRef.hModel = trap::R_RegisterModel(engine, forceHolocronModels[i as usize]);
+                    trap::R_AddRefEntityToScene(engine, &holoRef);
+
+                    renderedHolos += 1;
+                }
+                i += 1;
+            }
+        }
+
+        let powerups = ctx.world.entity(centNum).currentState.powerups;
+        let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+        if (powerups & (1 << PW_YSALAMIRI)) != 0
+            || (ctx.world.cgs.gametype == GT_CTY
+                && ((powerups & (1 << PW_REDFLAG)) != 0 || (powerups & (1 << PW_BLUEFLAG)) != 0))
+        {
+            if ctx.world.cgs.gametype == GT_CTY && (powerups & (1 << PW_REDFLAG)) != 0 {
+                let sh = ctx.world.cgs.media.ysaliredShader;
+                cg_draw_player_sphere(ctx, centNum, &lerpOrigin, 1.4, sh);
+            } else if ctx.world.cgs.gametype == GT_CTY && (powerups & (1 << PW_BLUEFLAG)) != 0 {
+                let sh = ctx.world.cgs.media.ysaliblueShader;
+                cg_draw_player_sphere(ctx, centNum, &lerpOrigin, 1.4, sh);
+            } else {
+                let sh = ctx.world.cgs.media.ysalimariShader;
+                cg_draw_player_sphere(ctx, centNum, &lerpOrigin, 1.4, sh);
+            }
+        }
+
+        if (ctx.world.entity(centNum).currentState.powerups & (1 << PW_FORCE_BOON)) != 0 {
+            let sh = ctx.world.cgs.media.boonShader;
+            cg_draw_player_sphere(ctx, centNum, &lerpOrigin, 2.0, sh);
+        }
+
+        if (ctx.world.entity(centNum).currentState.powerups & (1 << PW_FORCE_ENLIGHTENED_DARK)) != 0
+        {
+            let sh = ctx.world.cgs.media.endarkenmentShader;
+            cg_draw_player_sphere(ctx, centNum, &lerpOrigin, 2.0, sh);
+        } else if (ctx.world.entity(centNum).currentState.powerups
+            & (1 << PW_FORCE_ENLIGHTENED_LIGHT))
+            != 0
+        {
+            let sh = ctx.world.cgs.media.enlightenmentShader;
+            cg_draw_player_sphere(ctx, centNum, &lerpOrigin, 2.0, sh);
+        }
+
+        if (ctx.world.entity(centNum).currentState.eFlags & EF_INVULNERABLE) != 0 {
+            let sh = ctx.world.cgs.media.invulnerabilityShader;
+            cg_draw_player_sphere(ctx, centNum, &lerpOrigin, 1.0, sh);
+        }
+    }
+
+    // stillDoSaber:
+    let stateWeapon = ctx.world.entity(centNum).currentState.weapon;
+    let eFlags = ctx.world.entity(centNum).currentState.eFlags;
+    let saberHolstered = ctx.world.entity(centNum).currentState.saberHolstered;
+    if (eFlags & EF_DEAD) != 0 && stateWeapon == WP_SABER {
+        let s0: *mut saberInfo_t =
+            &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[0];
+        BG_SI_SetDesiredLength(s0, 0.0, -1);
+        let s1: *mut saberInfo_t =
+            &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[1];
+        BG_SI_SetDesiredLength(s1, 0.0, -1);
+
+        drawPlayerSaber = true;
+    } else if stateWeapon == WP_SABER && saberHolstered < 2 {
+        let saberInFlight = ctx.world.entity(centNum).currentState.saberInFlight;
+        let s1SoundLoop = player_ci(ctx.world, is_npc, centNum, clientNum).saber[1].soundLoop;
+        if (saberInFlight == qfalse || s1SoundLoop != 0) && (eFlags & EF_DEAD) == 0
+        //still alive
+        {
+            let soundSpot: vec3_t;
+            let mut didFirstSound = false;
+
+            let number = ctx.world.entity(centNum).currentState.number;
+            if snapClientNum == number {
+                soundSpot = ctx.world.cg.refdef.vieworg;
+            } else {
+                soundSpot = ctx.world.entity(centNum).lerpOrigin;
+            }
+
+            let s0Model0 = player_ci(ctx.world, is_npc, centNum, clientNum).saber[0].model[0];
+            let s0SoundLoop = player_ci(ctx.world, is_npc, centNum, clientNum).saber[0].soundLoop;
+            if s0Model0 != 0 && s0SoundLoop != 0 && saberInFlight == qfalse {
+                let numBlades = player_ci(ctx.world, is_npc, centNum, clientNum).saber[0].numBlades;
+                let mut i = 0;
+                let mut hasLen = false;
+                while i < numBlades {
+                    if player_ci(ctx.world, is_npc, centNum, clientNum).saber[0].blade[i as usize]
+                        .length
+                        != 0.0
+                    {
+                        hasLen = true;
+                        break;
+                    }
+                    i += 1;
+                }
+
+                if hasLen {
+                    trap::S_AddLoopingSound(engine, number, &soundSpot, &vec3_origin, s0SoundLoop);
+                    didFirstSound = true;
+                }
+            }
+
+            let s1Model0 = player_ci(ctx.world, is_npc, centNum, clientNum).saber[1].model[0];
+            let s1SoundLoop = player_ci(ctx.world, is_npc, centNum, clientNum).saber[1].soundLoop;
+            let s0SoundLoop = player_ci(ctx.world, is_npc, centNum, clientNum).saber[0].soundLoop;
+            if s1Model0 != 0 && s1SoundLoop != 0 && (!didFirstSound || s0SoundLoop != s1SoundLoop) {
+                let numBlades = player_ci(ctx.world, is_npc, centNum, clientNum).saber[1].numBlades;
+                let mut i = 0;
+                let mut hasLen = false;
+                while i < numBlades {
+                    if player_ci(ctx.world, is_npc, centNum, clientNum).saber[1].blade[i as usize]
+                        .length
+                        != 0.0
+                    {
+                        hasLen = true;
+                        break;
+                    }
+                    i += 1;
+                }
+
+                if hasLen {
+                    trap::S_AddLoopingSound(engine, number, &soundSpot, &vec3_origin, s1SoundLoop);
+                }
+            }
+        }
+
+        let saberInFlight = ctx.world.entity(centNum).currentState.saberInFlight;
+        if iwantout != 0 && saberInFlight == qfalse {
+            if (ctx.world.entity(centNum).currentState.eFlags & EF_DEAD) != 0
+                && !ctx.world.entity(centNum).ghoul2.is_null()
+                && ctx.world.entity(centNum).currentState.saberInFlight != qfalse
+                && g2HasWeapon
+            {
+                //special case, kill the saber on a freshly dead player if another source says to.
+                let g2 = ctx.world.entity(centNum).ghoul2;
+                trap::G2API_RemoveGhoul2Model(engine, g2, 1);
+                // Raven clears g2HasWeapon here but returns right after - dead store dropped.
+            }
+            return;
+        }
+
+        if g2HasWeapon && ctx.world.entity(centNum).currentState.saberInFlight != qfalse {
+            //keep this set, so we don't re-unholster the thing when we get it back, even if it's knocked away.
+            ctx.world.entity_mut(centNum).saberWasInFlight = qtrue;
+        }
+
+        if ctx.world.entity(centNum).currentState.saberInFlight != qfalse
+            && ctx.world.entity(centNum).currentState.saberEntityNum != 0
+        {
+            let saberNum = ctx.world.entity(centNum).currentState.saberEntityNum as usize;
+
+            let bolt3 = ctx.world.entity(centNum).bolt3;
+            let saberServerHit = ctx.world.entity(saberNum).serverSaberHitIndex;
+            let saberModelidx = ctx.world.entity(saberNum).currentState.modelindex;
+            if g2HasWeapon || bolt3 == 0 || saberServerHit != saberModelidx {
+                //saber is in flight, do not have it as a standard weapon model
+                let mut addBolts = false;
+
+                if g2HasWeapon {
+                    //ah well, just stick it over the right hand right now.
+                    let mut boltMat = mdxaBone_t {
+                        matrix: [[0.0; 4]; 3],
+                    };
+                    let g2 = ctx.world.entity(centNum).ghoul2;
+                    let boltRhand = player_ci(ctx.world, is_npc, centNum, clientNum).bolt_rhand;
+                    let turAngles = ctx.world.entity(centNum).turAngles;
+                    let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+                    let modelScale = ctx.world.entity(centNum).modelScale;
+                    let cgTime = ctx.world.cg.time;
+                    trap::G2API_GetBoltMatrix(
+                        engine,
+                        g2,
+                        0,
+                        boltRhand,
+                        &mut boltMat,
+                        &turAngles,
+                        &lerpOrigin,
+                        cgTime,
+                        Some(&mut ctx.world.cgs.gameModels[0]),
+                        &modelScale,
+                    );
+                    let mut trBase: vec3_t = [0.0; 3];
+                    BG_GiveMeVectorFromMatrix(
+                        &boltMat,
+                        Eorientations::ORIGIN as c_int,
+                        &mut trBase,
+                    );
+                    ctx.world.entity_mut(saberNum).currentState.pos.trBase = trBase;
+
+                    trap::G2API_RemoveGhoul2Model(engine, g2, 1);
+                    g2HasWeapon = false;
+                }
+
+                let cgTime = ctx.world.cg.time;
+                ctx.world.entity_mut(saberNum).currentState.pos.trTime = cgTime;
+                ctx.world.entity_mut(saberNum).currentState.apos.trTime = cgTime;
+
+                let posBase = ctx.world.entity(saberNum).currentState.pos.trBase;
+                ctx.world.entity_mut(saberNum).lerpOrigin = posBase;
+                let aposBase = ctx.world.entity(saberNum).currentState.apos.trBase;
+                ctx.world.entity_mut(saberNum).lerpAngles = aposBase;
+
+                let newBolt3 = ctx.world.entity(saberNum).currentState.apos.trBase[0] as i32;
+                ctx.world.entity_mut(centNum).bolt3 = newBolt3;
+                if ctx.world.entity(centNum).bolt3 == 0 {
+                    ctx.world.entity_mut(centNum).bolt3 = 1;
+                }
+                ctx.world.entity_mut(centNum).bolt2 = 0;
+
+                ctx.world.entity_mut(saberNum).currentState.bolt2 = 123;
+
+                let saberGhoul2 = ctx.world.entity(saberNum).ghoul2;
+                let saberServerHit = ctx.world.entity(saberNum).serverSaberHitIndex;
+                let saberModelidx = ctx.world.entity(saberNum).currentState.modelindex;
+                if !saberGhoul2.is_null() && saberServerHit == saberModelidx {
+                    // now set up the gun bolt on it
+                    addBolts = true;
+                } else {
+                    let saberModel = CG_ConfigString(
+                        ctx,
+                        CS_MODELS + ctx.world.entity(saberNum).currentState.modelindex,
+                    );
+
+                    let modelidx = ctx.world.entity(saberNum).currentState.modelindex;
+                    ctx.world.entity_mut(saberNum).serverSaberHitIndex = modelidx;
+
+                    if !ctx.world.entity(saberNum).ghoul2.is_null() {
+                        //clean if we already have one (because server changed model string index)
+                        let g2 = ctx.world.entity(saberNum).ghoul2;
+                        let mut g2p = g2;
+                        trap::G2API_CleanGhoul2Models(engine, &mut g2p);
+                        ctx.world.entity_mut(saberNum).ghoul2 = g2p;
+                        ctx.world.entity_mut(saberNum).ghoul2 = null_mut();
+                    }
+
+                    if !saberModel.is_empty() {
+                        let mut g2p = ctx.world.entity(saberNum).ghoul2;
+                        trap::G2API_InitGhoul2Model(engine, &mut g2p, &saberModel, 0, 0, 0, 0, 0);
+                        ctx.world.entity_mut(saberNum).ghoul2 = g2p;
+                    } else {
+                        let s0Model0 =
+                            player_ci(ctx.world, is_npc, centNum, clientNum).saber[0].model[0];
+                        if s0Model0 != 0 {
+                            let s0Model = unsafe {
+                                cstr_to_str(
+                                    player_ci(ctx.world, is_npc, centNum, clientNum).saber[0]
+                                        .model
+                                        .as_ptr(),
+                                )
+                            };
+                            let mut g2p = ctx.world.entity(saberNum).ghoul2;
+                            trap::G2API_InitGhoul2Model(engine, &mut g2p, &s0Model, 0, 0, 0, 0, 0);
+                            ctx.world.entity_mut(saberNum).ghoul2 = g2p;
+                        } else {
+                            let mut g2p = ctx.world.entity(saberNum).ghoul2;
+                            trap::G2API_InitGhoul2Model(
+                                engine,
+                                &mut g2p,
+                                "models/weapons2/saber/saber_w.glm",
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                            );
+                            ctx.world.entity_mut(saberNum).ghoul2 = g2p;
+                        }
+                    }
+
+                    if !ctx.world.entity(saberNum).ghoul2.is_null() {
+                        addBolts = true;
+
+                        let posBase = ctx.world.entity(saberNum).currentState.pos.trBase;
+                        ctx.world.entity_mut(saberNum).lerpOrigin = posBase;
+                        let aposBase = ctx.world.entity(saberNum).currentState.apos.trBase;
+                        ctx.world.entity_mut(saberNum).lerpAngles = aposBase;
+                        let cgTime = ctx.world.cg.time;
+                        ctx.world.entity_mut(saberNum).currentState.pos.trTime = cgTime;
+                        ctx.world.entity_mut(saberNum).currentState.apos.trTime = cgTime;
+                    }
+                }
+
+                if addBolts {
+                    let numBlades =
+                        player_ci(ctx.world, is_npc, centNum, clientNum).saber[0].numBlades;
+                    let mut m = 0;
+                    while m < numBlades {
+                        let tagName = format!("*blade{}", m + 1);
+                        let saberGhoul2 = ctx.world.entity(saberNum).ghoul2;
+                        let mut tagBolt = trap::G2API_AddBolt(engine, saberGhoul2, 0, &tagName);
+
+                        if tagBolt == -1 {
+                            if m == 0 {
+                                //guess this is an 0ldsk3wl saber
+                                tagBolt = trap::G2API_AddBolt(engine, saberGhoul2, 0, "*flash");
+
+                                if tagBolt == -1 {
+                                    debug_assert!(false, "CG_Player: no *flash bolt on saber");
+                                }
+                                break;
+                            }
+
+                            // a later blade tag is missing - Raven's second arm
+                            // (its assert is the redundant part, not the break)
+                            // stops the scan here.
+                            break;
+                        }
+
+                        m += 1;
+                    }
+                }
+            }
+
+            let saberGhoul2 = ctx.world.entity(saberNum).ghoul2;
+            if !saberGhoul2.is_null() {
+                let mut bladeAngles: vec3_t;
+                let mut efOrg: vec3_t = [0.0; 3];
+                let wv: f32;
+
+                if ctx.world.entity(centNum).bolt2 == 0 {
+                    let cgTime = ctx.world.cg.time;
+                    ctx.world.entity_mut(centNum).bolt2 = cgTime;
+                }
+
+                if ctx.world.entity(centNum).bolt3 != 90 {
+                    if ctx.world.entity(centNum).bolt3 < 90 {
+                        let cgTime = ctx.world.cg.time;
+                        let bolt2 = ctx.world.entity(centNum).bolt2;
+                        let newBolt3 = (ctx.world.entity(centNum).bolt3 as f64
+                            + (cgTime - bolt2) as f64 * 0.5)
+                            as i32;
+                        ctx.world.entity_mut(centNum).bolt3 = newBolt3;
+
+                        if ctx.world.entity(centNum).bolt3 > 90 {
+                            ctx.world.entity_mut(centNum).bolt3 = 90;
+                        }
+                    } else if ctx.world.entity(centNum).bolt3 > 90 {
+                        let cgTime = ctx.world.cg.time;
+                        let bolt2 = ctx.world.entity(centNum).bolt2;
+                        let newBolt3 = (ctx.world.entity(centNum).bolt3 as f64
+                            - (cgTime - bolt2) as f64 * 0.5)
+                            as i32;
+                        ctx.world.entity_mut(centNum).bolt3 = newBolt3;
+
+                        if ctx.world.entity(centNum).bolt3 < 90 {
+                            ctx.world.entity_mut(centNum).bolt3 = 90;
+                        }
+                    }
+                }
+
+                let cgTime = ctx.world.cg.time;
+                ctx.world.entity_mut(centNum).bolt2 = cgTime;
+
+                let bolt3 = ctx.world.entity(centNum).bolt3;
+                ctx.world.entity_mut(saberNum).currentState.apos.trBase[0] = bolt3 as f32;
+                ctx.world.entity_mut(saberNum).lerpAngles[0] = bolt3 as f32;
+
+                let saberInFlightState = ctx.world.entity(saberNum).currentState.saberInFlight;
+                let saberStateBolt2 = ctx.world.entity(saberNum).currentState.bolt2;
+                if saberInFlightState == qfalse && saberStateBolt2 != 123 {
+                    //owner is pulling is back
+                    let saberFlags =
+                        player_ci(ctx.world, is_npc, centNum, clientNum).saber[0].saberFlags;
+                    let saberHolstered = ctx.world.entity(centNum).currentState.saberHolstered;
+                    if (saberFlags & SFL_RETURN_DAMAGE) == 0 || saberHolstered != 0 {
+                        let mut owndir: vec3_t = [0.0; 3];
+
+                        let saberLerp = ctx.world.entity(saberNum).lerpOrigin;
+                        let centLerp = ctx.world.entity(centNum).lerpOrigin;
+                        _VectorSubtract(saberLerp, centLerp, &mut owndir);
+                        VectorNormalize(&mut owndir);
+
+                        let mut owndir2: vec3_t = [0.0; 3];
+                        vectoangles(owndir, &mut owndir2);
+                        owndir2[0] += 90.0;
+
+                        ctx.world.entity_mut(saberNum).currentState.apos.trBase = owndir2;
+                        ctx.world.entity_mut(saberNum).lerpAngles = owndir2;
+                        VectorClear(&mut ctx.world.entity_mut(saberNum).currentState.apos.trDelta);
+                    }
+                }
+
+                //We don't actually want to rely entirely on server updates to render the position of the saber...
+                let saberInFlightState = ctx.world.entity(saberNum).currentState.saberInFlight;
+                let saberStateBolt2 = ctx.world.entity(saberNum).currentState.bolt2;
+                if saberInFlightState == qfalse && saberStateBolt2 != 123 {
+                    //tell it that we're a saber and to render the glow around our handle because we're being pulled back
+                    ctx.world.entity_mut(saberNum).bolt3 = 999;
+                }
+
+                ctx.world.entity_mut(saberNum).currentState.modelGhoul2 = 1;
+                CG_ManualEntityRender(ctx, saberNum);
+                ctx.world.entity_mut(saberNum).bolt3 = 0;
+                ctx.world.entity_mut(saberNum).currentState.modelGhoul2 = 127;
+
+                bladeAngles = ctx.world.entity(saberNum).lerpAngles;
+                bladeAngles[ROLL] = 0.0;
+
+                let numBlades = player_ci(ctx.world, is_npc, centNum, clientNum).saber[0].numBlades;
+                let saberHolstered = ctx.world.entity(centNum).currentState.saberHolstered;
+                if numBlades > 1 && saberHolstered == 1 {
+                    //only first blade should be on
+                    let s0: *mut saberInfo_t =
+                        &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[0];
+                    BG_SI_SetDesiredLength(s0, 0.0, -1);
+                    let s0: *mut saberInfo_t =
+                        &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[0];
+                    BG_SI_SetDesiredLength(s0, -1.0, 0);
+                } else {
+                    let s0: *mut saberInfo_t =
+                        &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[0];
+                    BG_SI_SetDesiredLength(s0, -1.0, -1);
+                }
+                // Raven tests `ci->saber[1].model` - the array itself, always
+                // true - so this is just the holster check.
+                if saberHolstered == 1 {
+                    let s1: *mut saberInfo_t =
+                        &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[1];
+                    BG_SI_SetDesiredLength(s1, 0.0, -1);
+                } else {
+                    let s1: *mut saberInfo_t =
+                        &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[1];
+                    BG_SI_SetDesiredLength(s1, -1.0, -1);
+                }
+
+                //Only want to do for the first saber actually, it's the one in flight.
+                let mut l = 0;
+                while l < 1 {
+                    if player_ci(ctx.world, is_npc, centNum, clientNum).saber[l].model[0] == 0 {
+                        break;
+                    }
+
+                    let numBlades =
+                        player_ci(ctx.world, is_npc, centNum, clientNum).saber[l].numBlades;
+                    let mut k = 0;
+                    while k < numBlades {
+                        let saberHolstered = ctx.world.entity(centNum).currentState.saberHolstered;
+                        let saberLerp = ctx.world.entity(saberNum).lerpOrigin;
+                        let mut nullSaber = refEntity_t::zeroed();
+                        if l == 0 && saberHolstered == 1 && k > 0 {
+                            //extra blades off — don't draw them
+                            CG_AddSaberBlade(
+                                ctx,
+                                centNum,
+                                saberNum,
+                                &mut nullSaber,
+                                0,
+                                0,
+                                l,
+                                k,
+                                &saberLerp,
+                                &bladeAngles,
+                                true,
+                                true,
+                            );
+                        } else {
+                            CG_AddSaberBlade(
+                                ctx,
+                                centNum,
+                                saberNum,
+                                &mut nullSaber,
+                                0,
+                                0,
+                                l,
+                                k,
+                                &saberLerp,
+                                &bladeAngles,
+                                true,
+                                false,
+                            );
+                        }
+
+                        k += 1;
+                    }
+                    if player_ci(ctx.world, is_npc, centNum, clientNum).saber[l].numBlades > 2 {
+                        //add a single glow for the saber based on all the blade colors combined
+                        let saberCopy = player_ci(ctx.world, is_npc, centNum, clientNum).saber[l];
+                        CG_DoSaberLight(ctx, Some(&saberCopy));
+                    }
+
+                    l += 1;
+                }
+
+                //Make the player's hand glow while guiding the saber
+                let mut tAng: vec3_t = [0.0; 3];
+                let turAngles = ctx.world.entity(centNum).turAngles;
+                VectorSet(&mut tAng, turAngles[PITCH], turAngles[YAW], turAngles[ROLL]);
+
+                let g2 = ctx.world.entity(centNum).ghoul2;
+                let boltRhand = player_ci(ctx.world, is_npc, centNum, clientNum).bolt_rhand;
+                let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
+                let modelScale = ctx.world.entity(centNum).modelScale;
+                let cgTime = ctx.world.cg.time;
+                trap::G2API_GetBoltMatrix(
+                    engine,
+                    g2,
+                    0,
+                    boltRhand,
+                    &mut boltMatrix,
+                    &tAng,
+                    &lerpOrigin,
+                    cgTime,
+                    Some(&mut ctx.world.cgs.gameModels[0]),
+                    &modelScale,
+                );
+
+                efOrg[0] = boltMatrix.matrix[0][3];
+                efOrg[1] = boltMatrix.matrix[1][3];
+                efOrg[2] = boltMatrix.matrix[2][3];
+
+                wv = (((cgTime as f32 * 0.003f32) as f64).sin() * 0.08 + 0.1) as f32;
+
+                let mut fxSArgs: addspriteArgStruct_t = unsafe { core::mem::zeroed() };
+                _VectorCopy(efOrg, &mut fxSArgs.origin);
+                VectorClear(&mut fxSArgs.vel);
+                VectorClear(&mut fxSArgs.accel);
+                fxSArgs.scale = 8.0;
+                fxSArgs.dscale = 8.0;
+                fxSArgs.sAlpha = wv;
+                fxSArgs.eAlpha = wv;
+                fxSArgs.rotation = 0.0;
+                fxSArgs.bounce = 0.0;
+                fxSArgs.life = 1;
+                fxSArgs.shader = ctx.world.cgs.media.yellowDroppedSaberShader;
+                fxSArgs.flags = 0x08000000;
+                trap::FX_AddSprite(engine, &mut fxSArgs);
+            }
+        } else {
+            let numBlades = player_ci(ctx.world, is_npc, centNum, clientNum).saber[0].numBlades;
+            let saberHolstered = ctx.world.entity(centNum).currentState.saberHolstered;
+            if numBlades > 1 && saberHolstered == 1 {
+                //only first blade should be on
+                let s0: *mut saberInfo_t =
+                    &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[0];
+                BG_SI_SetDesiredLength(s0, 0.0, -1);
+                let s0: *mut saberInfo_t =
+                    &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[0];
+                BG_SI_SetDesiredLength(s0, -1.0, 0);
+            } else {
+                let s0: *mut saberInfo_t =
+                    &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[0];
+                BG_SI_SetDesiredLength(s0, -1.0, -1);
+            }
+            // Raven tests `ci->saber[1].model` - the array itself, always true -
+            // so this is just the holster check.
+            if saberHolstered == 1 {
+                let s1: *mut saberInfo_t =
+                    &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[1];
+                BG_SI_SetDesiredLength(s1, 0.0, -1);
+            } else {
+                let s1: *mut saberInfo_t =
+                    &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[1];
+                BG_SI_SetDesiredLength(s1, -1.0, -1);
+            }
+        }
+
+        //If the arm the saber is in is broken, turn it off.
+        //Leaving right arm on, at least for now.
+        if (ctx.world.entity(centNum).currentState.brokenLimbs
+            & (1 << brokenLimb_t::BROKENLIMB_LARM as c_int))
+            != 0
+        {
+            let s1: *mut saberInfo_t =
+                &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[1];
+            BG_SI_SetDesiredLength(s1, 0.0, -1);
+        }
+
+        if ctx.world.entity(centNum).currentState.saberEntityNum == 0 {
+            let s0: *mut saberInfo_t =
+                &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[0];
+            BG_SI_SetDesiredLength(s0, 0.0, -1);
+        }
+        drawPlayerSaber = true;
+    } else if stateWeapon == WP_SABER {
+        let s0: *mut saberInfo_t =
+            &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[0];
+        BG_SI_SetDesiredLength(s0, 0.0, -1);
+        let s1: *mut saberInfo_t =
+            &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[1];
+        BG_SI_SetDesiredLength(s1, 0.0, -1);
+
+        drawPlayerSaber = true;
+    } else {
+        let s0: *mut saberInfo_t =
+            &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[0];
+        BG_SI_SetDesiredLength(s0, 0.0, -1);
+        let s1: *mut saberInfo_t =
+            &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[1];
+        BG_SI_SetDesiredLength(s1, 0.0, -1);
+
+        let s0: *mut saberInfo_t =
+            &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[0];
+        BG_SI_SetLength(s0, 0.0);
+        let s1: *mut saberInfo_t =
+            &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[1];
+        BG_SI_SetLength(s1, 0.0);
+    }
+
+    if ctx.world.entity(centNum).currentState.weapon == WP_SABER {
+        let cgTime = ctx.world.cg.time;
+        let s0: *mut saberInfo_t =
+            &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[0];
+        BG_SI_SetLengthGradual(s0, cgTime);
+        let s1: *mut saberInfo_t =
+            &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[1];
+        BG_SI_SetLengthGradual(s1, cgTime);
+    }
+
+    if drawPlayerSaber {
+        let mut l = 0;
+
+        if ctx.world.entity(centNum).currentState.saberEntityNum == 0 {
+            l = 1; //The "primary" saber is missing or in flight or something, so only try to draw in the second one
+        } else if ctx.world.entity(centNum).currentState.saberInFlight == qfalse {
+            let saberNum = ctx.world.entity(centNum).currentState.saberEntityNum as usize;
+
+            if !g2HasWeapon {
+                let g2 = ctx.world.entity(centNum).ghoul2;
+                let src = {
+                    let world = &*ctx.world;
+                    CG_G2WeaponInstance(world, world.entity(centNum), WP_SABER)
+                };
+                trap::G2API_CopySpecificGhoul2Model(engine, src, 0, g2, 1);
+
+                let saberGhoul2 = ctx.world.entity(saberNum).ghoul2;
+                if !saberGhoul2.is_null() {
+                    let mut g2p = saberGhoul2;
+                    trap::G2API_CleanGhoul2Models(engine, &mut g2p);
+                    ctx.world.entity_mut(saberNum).ghoul2 = g2p;
+                }
+
+                ctx.world.entity_mut(saberNum).currentState.modelindex = 0;
+                ctx.world.entity_mut(saberNum).ghoul2 = null_mut();
+                VectorClear(&mut ctx.world.entity_mut(saberNum).currentState.pos.trBase);
+            }
+
+            ctx.world.entity_mut(centNum).bolt3 = 0;
+            ctx.world.entity_mut(centNum).bolt2 = 0;
+        } else {
+            l = 1; //The "primary" saber is missing or in flight or something, so only try to draw in the second one
+        }
+
+        while l < MAX_SABERS {
+            let mut k = 0;
+
+            if player_ci(ctx.world, is_npc, centNum, clientNum).saber[l].model[0] == 0 {
+                break;
+            }
+
+            if (ctx.world.entity(centNum).currentState.eFlags2 & EF2_HELD_BY_MONSTER) != 0 {
+                let axis0 = legs.axis[0];
+                vectoangles(axis0, &mut rootAngles);
+            }
+
+            let numBlades = player_ci(ctx.world, is_npc, centNum, clientNum).saber[l].numBlades;
+            while k < numBlades {
+                let saberHolstered = ctx.world.entity(centNum).currentState.saberHolstered;
+                let bladeLen = player_ci(ctx.world, is_npc, centNum, clientNum).saber[l].blade
+                    [k as usize]
+                    .length;
+                let s1Model0 = player_ci(ctx.world, is_npc, centNum, clientNum).saber[1].model[0];
+                let origin = legs.origin;
+                let mut nullSaber = refEntity_t::zeroed();
+                if saberHolstered == 1 && k > 0 && bladeLen <= 0.0 {
+                    //extra blades off — don't draw them
+                    CG_AddSaberBlade(
+                        ctx,
+                        centNum,
+                        centNum,
+                        &mut nullSaber,
+                        0,
+                        0,
+                        l,
+                        k,
+                        &origin,
+                        &rootAngles,
+                        false,
+                        true,
+                    );
+                } else if s1Model0 != 0 && saberHolstered == 1 && l > 0 && bladeLen <= 0.0 {
+                    //second saber is turned off and this blade is done with turning off
+                    CG_AddSaberBlade(
+                        ctx,
+                        centNum,
+                        centNum,
+                        &mut nullSaber,
+                        0,
+                        0,
+                        l,
+                        k,
+                        &origin,
+                        &rootAngles,
+                        false,
+                        true,
+                    );
+                } else {
+                    CG_AddSaberBlade(
+                        ctx,
+                        centNum,
+                        centNum,
+                        &mut nullSaber,
+                        0,
+                        0,
+                        l,
+                        k,
+                        &origin,
+                        &rootAngles,
+                        false,
+                        false,
+                    );
+                }
+
+                k += 1;
+            }
+            if player_ci(ctx.world, is_npc, centNum, clientNum).saber[l].numBlades > 2 {
+                //add a single glow for the saber based on all the blade colors combined
+                let saberCopy = player_ci(ctx.world, is_npc, centNum, clientNum).saber[l];
+                CG_DoSaberLight(ctx, Some(&saberCopy));
+            }
+
+            l += 1;
+        }
+    }
+
+    if ctx.world.entity(centNum).currentState.saberInFlight != qfalse
+        && ctx.world.entity(centNum).currentState.saberEntityNum == 0
+    {
+        //reset the length if the saber is knocked away
+        let s0: *mut saberInfo_t =
+            &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[0];
+        BG_SI_SetDesiredLength(s0, 0.0, -1);
+        let s1: *mut saberInfo_t =
+            &mut player_ci_mut(ctx.world, is_npc, centNum, clientNum).saber[1];
+        BG_SI_SetDesiredLength(s1, 0.0, -1);
+
+        if g2HasWeapon {
+            //and remember to kill the bolton model in case we didn't get a thrown saber update first
+            let g2 = ctx.world.entity(centNum).ghoul2;
+            trap::G2API_RemoveGhoul2Model(engine, g2, 1);
+            g2HasWeapon = false;
+        }
+        ctx.world.entity_mut(centNum).bolt3 = 0;
+        ctx.world.entity_mut(centNum).bolt2 = 0;
+    }
+
+    if (ctx.world.entity(centNum).currentState.eFlags & EF_DEAD) != 0
+        && !ctx.world.entity(centNum).ghoul2.is_null()
+        && ctx.world.entity(centNum).currentState.saberInFlight != qfalse
+        && g2HasWeapon
+    {
+        //special case, kill the saber on a freshly dead player if another source says to.
+        let g2 = ctx.world.entity(centNum).ghoul2;
+        trap::G2API_RemoveGhoul2Model(engine, g2, 1);
+        g2HasWeapon = false;
+    }
+    let _ = g2HasWeapon;
+
+    if iwantout != 0 {
+        return;
+    }
+
+    let number = ctx.world.entity(centNum).currentState.number;
+    if (snapFdForceActive & (1 << FP_SEE)) != 0 && snapClientNum != number {
+        legs.shaderRGBA[0] = 255;
+        legs.shaderRGBA[1] = 255;
+        legs.shaderRGBA[2] = 0;
+        legs.renderfx |= RF_MINLIGHT;
+    }
+
+    if snapDuelInProgress != qfalse {
+        //I guess go ahead and glow your own client too in a duel
+        if number != snapDuelIndex && number != snapClientNum {
+            //everyone not involved in the duel is drawn very dark
+            legs.shaderRGBA[0] = (legs.shaderRGBA[0] as f32 / 5.0) as i32 as u8;
+            legs.shaderRGBA[1] = (legs.shaderRGBA[1] as f32 / 5.0) as i32 as u8;
+            legs.shaderRGBA[2] = (legs.shaderRGBA[2] as f32 / 5.0) as i32 as u8;
+            legs.renderfx |= RF_RGB_TINT;
+        } else {
+            //adjust the glow by how far away you are from your dueling partner
+            let duelLerp = ctx.world.entity(snapDuelIndex as usize).lerpOrigin;
+            let mut vecSub: vec3_t = [0.0; 3];
+            _VectorSubtract(duelLerp, snapOrigin, &mut vecSub);
+            let mut subLen = VectorLength(vecSub);
+
+            if subLen < 1.0 {
+                subLen = 1.0;
+            }
+            if subLen > 1020.0 {
+                subLen = 1020.0;
+            }
+
+            let savRGBA: [u8; 3] = [legs.shaderRGBA[0], legs.shaderRGBA[1], legs.shaderRGBA[2]];
+            legs.shaderRGBA[0] = (255.0 - subLen / 4.0).max(1.0) as i32 as u8;
+            legs.shaderRGBA[1] = (255.0 - subLen / 4.0).max(1.0) as i32 as u8;
+            legs.shaderRGBA[2] = (255.0 - subLen / 4.0).max(1.0) as i32 as u8;
+
+            legs.renderfx &= !RF_RGB_TINT;
+            legs.renderfx &= !RF_FORCE_ENT_ALPHA;
+            legs.customShader = ctx.world.cgs.media.forceShell;
+
+            trap::R_AddRefEntityToScene(engine, &legs); //draw the shell
+
+            legs.customShader = 0; //reset to player model
+
+            legs.shaderRGBA[0] = (savRGBA[0] as f32 - subLen / 8.0).max(1.0) as i32 as u8;
+            legs.shaderRGBA[1] = (savRGBA[1] as f32 - subLen / 8.0).max(1.0) as i32 as u8;
+            legs.shaderRGBA[2] = (savRGBA[2] as f32 - subLen / 8.0).max(1.0) as i32 as u8;
+
+            if subLen <= 1024.0 {
+                legs.renderfx |= RF_RGB_TINT;
+            }
+        }
+    } else if ctx.world.entity(centNum).currentState.bolt1 != 0
+        && (ctx.world.entity(centNum).currentState.eFlags & EF_DEAD) == 0
+        && number != snapClientNum
+        && (snapDuelInProgress == qfalse || snapDuelIndex != number)
+    {
+        legs.shaderRGBA[0] = 50;
+        legs.shaderRGBA[1] = 50;
+        legs.shaderRGBA[2] = 50;
+        legs.renderfx |= RF_RGB_TINT;
+    }
+
+    if (ctx.world.entity(centNum).currentState.eFlags & EF_DISINTEGRATION) != 0 {
+        if ctx.world.entity(centNum).dustTrailTime == 0 {
+            let cgTime = ctx.world.cg.time;
+            ctx.world.entity_mut(centNum).dustTrailTime = cgTime;
+            ctx.world.entity_mut(centNum).miscTime = legs.frame;
+        }
+
+        if (ctx.world.cg.time - ctx.world.entity(centNum).dustTrailTime) > 1500 {
+            //avoid rendering the entity after disintegration has finished anyway
+            return;
+        }
+
+        let miscTime = ctx.world.entity(centNum).miscTime;
+        let cgTime = ctx.world.cg.time;
+        trap::G2API_SetBoneAnim(
+            engine,
+            legs.ghoul2,
+            0,
+            "model_root",
+            miscTime,
+            miscTime,
+            BONE_ANIM_OVERRIDE_FREEZE,
+            1.0,
+            cgTime,
+            miscTime as f32,
+            -1,
+        );
+
+        if ctx.world.entity(centNum).noLumbar == qfalse {
+            trap::G2API_SetBoneAnim(
+                engine,
+                legs.ghoul2,
+                0,
+                "lower_lumbar",
+                miscTime,
+                miscTime,
+                BONE_ANIM_OVERRIDE_FREEZE,
+                1.0,
+                cgTime,
+                miscTime as f32,
+                -1,
+            );
+
+            if ctx.world.entity(centNum).localAnimIndex <= 1 {
+                trap::G2API_SetBoneAnim(
+                    engine,
+                    legs.ghoul2,
+                    0,
+                    "Motion",
+                    miscTime,
+                    miscTime,
+                    BONE_ANIM_OVERRIDE_FREEZE,
+                    1.0,
+                    cgTime,
+                    miscTime as f32,
+                    -1,
+                );
+            }
+        }
+
+        // CG_Disintegration re-reads the entity by number, so the slot must stay
+        // in place (no take/put-back); `legs` is a local, no borrow conflict.
+        CG_Disintegration(ctx, centNum, &mut legs);
+
+        return;
+    } else {
+        ctx.world.entity_mut(centNum).dustTrailTime = 0;
+        ctx.world.entity_mut(centNum).miscTime = 0;
+    }
+
+    if (ctx.world.entity(centNum).currentState.powerups & (1 << PW_CLOAKED)) != 0 {
+        if ctx.world.entity(centNum).cloaked == qfalse {
+            ctx.world.entity_mut(centNum).cloaked = qtrue;
+            let cgTime = ctx.world.cg.time;
+            ctx.world.entity_mut(centNum).uncloaking = cgTime + 2000;
+        }
+    } else if ctx.world.entity(centNum).cloaked != qfalse {
+        ctx.world.entity_mut(centNum).cloaked = qfalse;
+        let cgTime = ctx.world.cg.time;
+        ctx.world.entity_mut(centNum).uncloaking = cgTime + 2000;
+    }
+
+    if ctx.world.entity(centNum).uncloaking > ctx.world.cg.time {
+        //in the middle of cloaking
+        let number = ctx.world.entity(centNum).currentState.number;
+        if (snapFdForceActive & (1 << FP_SEE)) != 0 && snapClientNum != number {
+            //just draw him
+            trap::R_AddRefEntityToScene(engine, &legs);
+        } else {
+            let uncloaking = ctx.world.entity(centNum).uncloaking;
+            let cgTime = ctx.world.cg.time;
+            let mut perc = (uncloaking - cgTime) as f32 / 2000.0;
+            if (ctx.world.entity(centNum).currentState.powerups & (1 << PW_CLOAKED)) != 0 {
+                //actually cloaking, so reverse it
+                perc = 1.0 - perc;
+            }
+
+            if (0.0..=1.0).contains(&perc) {
+                legs.renderfx &= !RF_FORCE_ENT_ALPHA;
+                legs.renderfx |= RF_RGB_TINT;
+                let v = (255.0 * perc) as i32 as u8;
+                legs.shaderRGBA[0] = v;
+                legs.shaderRGBA[1] = v;
+                legs.shaderRGBA[2] = v;
+                legs.shaderRGBA[3] = 0;
+                legs.customShader = ctx.world.cgs.media.cloakedShader;
+                trap::R_AddRefEntityToScene(engine, &legs);
+
+                legs.shaderRGBA[0] = 255;
+                legs.shaderRGBA[1] = 255;
+                legs.shaderRGBA[2] = 255;
+                legs.shaderRGBA[3] = (255.0 * (1.0 - perc)) as i32 as u8; // let model alpha in
+                legs.customShader = 0; // use regular skin
+                legs.renderfx &= !RF_RGB_TINT;
+                legs.renderfx |= RF_FORCE_ENT_ALPHA;
+                trap::R_AddRefEntityToScene(engine, &legs);
+            }
+        }
+    } else if (ctx.world.entity(centNum).currentState.powerups & (1 << PW_CLOAKED)) != 0 {
+        //fully cloaked
+        let number = ctx.world.entity(centNum).currentState.number;
+        if (snapFdForceActive & (1 << FP_SEE)) != 0 && snapClientNum != number {
+            //just draw him
+            trap::R_AddRefEntityToScene(engine, &legs);
+        } else if ctx.world.cg.renderingThirdPerson != qfalse
+            || number != ctx.world.cg.predictedPlayerState.clientNum
+        {
+            if ctx.world.cvars.cg_shadows.integer != 2
+                && ctx.world.cgs.glconfig.stencilBits >= 4
+                && ctx.world.cvars.cg_renderToTextureFX.integer != 0
+            {
+                trap::R_SetRefractProp(engine, 1.0, 0.0, false, false); //don't need to do this every frame.. but..
+                legs.customShader = 2; //crazy "refractive" shader
+                trap::R_AddRefEntityToScene(engine, &legs);
+                legs.customShader = 0;
+            } else {
+                //stencil buffer's in use, sorry
+                legs.renderfx = 0; //&= ~(RF_RGB_TINT|RF_ALPHA_FADE);
+                legs.shaderRGBA[0] = 255;
+                legs.shaderRGBA[1] = 255;
+                legs.shaderRGBA[2] = 255;
+                legs.shaderRGBA[3] = 255;
+                legs.customShader = ctx.world.cgs.media.cloakedShader;
+                trap::R_AddRefEntityToScene(engine, &legs);
+                legs.customShader = 0;
+            }
+        }
+    }
+
+    if (ctx.world.entity(centNum).currentState.powerups & (1 << PW_CLOAKED)) == 0 {
+        //don't add the normal model if cloaked
+        CG_CheckThirdPersonAlpha(ctx, centNum, &mut legs);
+        trap::R_AddRefEntityToScene(engine, &legs);
+    }
+
+    let f1 = ctx.world.entity(centNum).frame_minus1;
+    ctx.world.entity_mut(centNum).frame_minus2 = f1;
+
+    if ctx.world.entity(centNum).frame_minus1_refreshed != 0 {
+        ctx.world.entity_mut(centNum).frame_minus2_refreshed = 1;
+    }
+
+    ctx.world.entity_mut(centNum).frame_minus1 = legs.origin;
+
+    ctx.world.entity_mut(centNum).frame_minus1_refreshed = 1;
+
+    if ctx.world.entity(centNum).frame_hold_refreshed == 0
+        && (ctx.world.entity(centNum).currentState.powerups & (1 << PW_SPEEDBURST)) != 0
+    {
+        let cgTime = ctx.world.cg.time;
+        ctx.world.entity_mut(centNum).frame_hold_time = cgTime + 254;
+    }
+
+    if ctx.world.entity(centNum).frame_hold_time >= ctx.world.cg.time {
+        let mut reframe_hold;
+
+        if ctx.world.entity(centNum).frame_hold_refreshed == 0 {
+            //We're taking the ghoul2 instance from the original refent and duplicating it onto our refent alias
+            let frame_hold = ctx.world.entity(centNum).frame_hold;
+            let centGhoul2 = ctx.world.entity(centNum).ghoul2;
+            if !frame_hold.is_null()
+                && trap::G2_HaveWeGhoul2Models(engine, frame_hold)
+                && frame_hold != centGhoul2
+            {
+                let mut g2p = frame_hold;
+                trap::G2API_CleanGhoul2Models(engine, &mut g2p);
+                ctx.world.entity_mut(centNum).frame_hold = g2p;
+            }
+            reframe_hold = legs;
+            ctx.world.entity_mut(centNum).frame_hold_refreshed = 1;
+            reframe_hold.ghoul2 = null_mut();
+
+            let centGhoul2 = ctx.world.entity(centNum).ghoul2;
+            let mut g2p = ctx.world.entity(centNum).frame_hold;
+            trap::G2API_DuplicateGhoul2Instance(engine, centGhoul2, &mut g2p);
+            ctx.world.entity_mut(centNum).frame_hold = g2p;
+
+            //Set the animation to the current frame and freeze on end
+            let cgTime = ctx.world.cg.time;
+            let holdGhoul2 = ctx.world.entity(centNum).frame_hold;
+            trap::G2API_SetBoneAnim(
+                engine,
+                holdGhoul2,
+                0,
+                "model_root",
+                legs.frame,
+                legs.frame,
+                0,
+                1.0,
+                cgTime,
+                legs.frame as f32,
+                -1,
+            );
+        } else {
+            reframe_hold = legs;
+            reframe_hold.ghoul2 = ctx.world.entity(centNum).frame_hold;
+        }
+
+        reframe_hold.renderfx |= RF_FORCE_ENT_ALPHA;
+        let frame_hold_time = ctx.world.entity(centNum).frame_hold_time;
+        let cgTime = ctx.world.cg.time;
+        reframe_hold.shaderRGBA[3] = (frame_hold_time - cgTime) as u8;
+        if reframe_hold.shaderRGBA[3] > 254 {
+            reframe_hold.shaderRGBA[3] = 254;
+        }
+        if reframe_hold.shaderRGBA[3] < 1 {
+            reframe_hold.shaderRGBA[3] = 1;
+        }
+
+        reframe_hold.ghoul2 = ctx.world.entity(centNum).frame_hold;
+        trap::R_AddRefEntityToScene(engine, &reframe_hold);
+    } else {
+        ctx.world.entity_mut(centNum).frame_hold_refreshed = 0;
+    }
+
+    //
+    // add the gun / barrel / flash
+    //
+    if ctx.world.entity(centNum).currentState.weapon != WP_EMPLACED_GUN {
+        CG_AddPlayerWeapon(ctx, &legs, None, centNum, team, &rootAngles, true);
+    }
+    // add powerups floating behind the player
+    {
+        let cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+        CG_PlayerPowerups(ctx, &cent_tmp, &legs);
+        *ctx.world.entity_mut(centNum) = cent_tmp;
+    }
+
+    let number = ctx.world.entity(centNum).currentState.number;
+    if (ctx.world.entity(centNum).currentState.forcePowersActive & (1 << FP_RAGE)) != 0
+        && (ctx.world.cg.renderingThirdPerson != qfalse || number != snapClientNum)
+    {
+        legs.renderfx &= !RF_FORCE_ENT_ALPHA;
+        legs.renderfx &= !RF_MINLIGHT;
+
+        legs.renderfx |= RF_RGB_TINT;
+        legs.shaderRGBA[0] = 255;
+        legs.shaderRGBA[1] = 0;
+        legs.shaderRGBA[2] = 0;
+        legs.shaderRGBA[3] = 255;
+
+        if ctx.world.bg_state.rng.rand() & 1 != 0 {
+            legs.customShader = ctx.world.cgs.media.electricBodyShader;
+        } else {
+            legs.customShader = ctx.world.cgs.media.electricBody2Shader;
+        }
+
+        trap::R_AddRefEntityToScene(engine, &legs);
+    }
+
+    if snapDuelInProgress == qfalse
+        && ctx.world.entity(centNum).currentState.bolt1 != 0
+        && (ctx.world.entity(centNum).currentState.eFlags & EF_DEAD) == 0
+        && number != snapClientNum
+        && (snapDuelInProgress == qfalse || snapDuelIndex != number)
+    {
+        legs.shaderRGBA[0] = 50;
+        legs.shaderRGBA[1] = 50;
+        legs.shaderRGBA[2] = 255;
+
+        legs.renderfx &= !RF_RGB_TINT;
+        legs.renderfx &= !RF_FORCE_ENT_ALPHA;
+        legs.customShader = ctx.world.cgs.media.forceSightBubble;
+
+        trap::R_AddRefEntityToScene(engine, &legs);
+    }
+
+    let drawVehShields = CG_VehicleShouldDrawShields(ctx.world, ctx.world.entity(centNum))
+        || (checkDroidShields && {
+            let vehNum = ctx.world.entity(centNum).currentState.m_iVehicleNum as usize;
+            CG_VehicleShouldDrawShields(ctx.world, ctx.world.entity(vehNum))
+        });
+    if drawVehShields {
+        //Vehicles have form-fitting shields
+        legs.shaderRGBA[0] = 255;
+        legs.shaderRGBA[1] = 255;
+        legs.shaderRGBA[2] = 255;
+        let cgTime = ctx.world.cg.time;
+        legs.shaderRGBA[3] = (10.0 + ((cgTime / 4) as f32 as f64).sin() * 128.0) as i32 as u8;
+
+        legs.renderfx &= !RF_RGB_TINT;
+        legs.renderfx &= !RF_FORCE_ENT_ALPHA;
+
+        // DEFERRED: Vehicle_t referent — Raven uses
+        // `pVeh->m_pVehicleInfo->shieldShaderHandle` when the vehicle supplies
+        // one; `Option<VehicleId>` can't reach `m_pVehicleInfo` (DEC-46.2), so the
+        // port takes Raven's own no-vehicle-shader fallback.
+        legs.customShader = ctx.world.cgs.media.playerShieldDamage;
+
+        trap::R_AddRefEntityToScene(engine, &legs);
+    }
+    //For now, these two are using the old shield shader...
+    if (ctx.world.entity(centNum).currentState.forcePowersActive & (1 << FP_PROTECT)) != 0 {
+        //absorb is represented by green..
+        let mut prot = legs;
+
+        prot.shaderRGBA[0] = 0;
+        prot.shaderRGBA[1] = 128;
+        prot.shaderRGBA[2] = 0;
+        prot.shaderRGBA[3] = 254;
+
+        prot.renderfx &= !RF_RGB_TINT;
+        prot.renderfx &= !RF_FORCE_ENT_ALPHA;
+        prot.customShader = ctx.world.cgs.media.protectShader;
+
+        trap::R_AddRefEntityToScene(engine, &prot);
+    }
+    //Showing only when the power has been active (absorbed something) recently now, instead of always.
+    let number = ctx.world.entity(centNum).currentState.number;
+    if (number == ctx.world.cg.predictedPlayerState.clientNum
+        && (ctx.world.cg.predictedPlayerState.fd.forcePowersActive & (1 << FP_ABSORB)) != 0)
+        || (ctx.world.entity(centNum).teamPowerEffectTime > ctx.world.cg.time
+            && ctx.world.entity(centNum).teamPowerType == 3)
+    {
+        //absorb is represented by blue..
+        legs.shaderRGBA[0] = 0;
+        legs.shaderRGBA[1] = 0;
+        legs.shaderRGBA[2] = 255;
+        legs.shaderRGBA[3] = 254;
+
+        legs.renderfx &= !RF_RGB_TINT;
+        legs.renderfx &= !RF_FORCE_ENT_ALPHA;
+        legs.customShader = ctx.world.cgs.media.playerShieldDamage;
+
+        trap::R_AddRefEntityToScene(engine, &legs);
+    }
+
+    if ctx.world.entity(centNum).currentState.isJediMaster != qfalse && snapClientNum != number {
+        legs.shaderRGBA[0] = 100;
+        legs.shaderRGBA[1] = 100;
+        legs.shaderRGBA[2] = 255;
+
+        legs.renderfx &= !RF_RGB_TINT;
+        legs.renderfx &= !RF_FORCE_ENT_ALPHA;
+        legs.renderfx |= RF_NODEPTH;
+        legs.customShader = ctx.world.cgs.media.forceShell;
+
+        trap::R_AddRefEntityToScene(engine, &legs);
+
+        legs.renderfx &= !RF_NODEPTH;
+    }
+
+    if (snapFdForceActive & (1 << FP_SEE)) != 0
+        && snapClientNum != number
+        && ctx.world.cvars.cg_auraShell.integer != 0
+    {
+        let teamCi = player_ci(ctx.world, is_npc, centNum, clientNum).team;
+        if ctx.world.cgs.gametype == GT_SIEGE {
+            // A team game
+            let viewerTeam = ctx.world.cgs.clientinfo[snapClientNum as usize].team;
+            if teamCi == TEAM_SPECTATOR || teamCi == TEAM_FREE {
+                //yellow
+                legs.shaderRGBA[0] = 255;
+                legs.shaderRGBA[1] = 255;
+                legs.shaderRGBA[2] = 0;
+            } else if teamCi != viewerTeam {
+                //red
+                legs.shaderRGBA[0] = 255;
+                legs.shaderRGBA[1] = 50;
+                legs.shaderRGBA[2] = 50;
+            } else {
+                //green
+                legs.shaderRGBA[0] = 50;
+                legs.shaderRGBA[1] = 255;
+                legs.shaderRGBA[2] = 50;
+            }
+        } else if ctx.world.cgs.gametype >= GT_TEAM {
+            // A team game
+            if teamCi == TEAM_RED {
+                legs.shaderRGBA[0] = 255;
+                legs.shaderRGBA[1] = 50;
+                legs.shaderRGBA[2] = 50;
+            } else if teamCi == TEAM_BLUE {
+                legs.shaderRGBA[0] = 75;
+                legs.shaderRGBA[1] = 75;
+                legs.shaderRGBA[2] = 255;
+            } else {
+                legs.shaderRGBA[0] = 255;
+                legs.shaderRGBA[1] = 255;
+                legs.shaderRGBA[2] = 0;
+            }
+        } else {
+            // Not a team game
+            legs.shaderRGBA[0] = 255;
+            legs.shaderRGBA[1] = 255;
+            legs.shaderRGBA[2] = 0;
+        }
+
+        // See through walls.
+        legs.renderfx |= RF_MINLIGHT | RF_NODEPTH;
+
+        if snapSeeLevel < FORCE_LEVEL_2 {
+            //only level 2+ can see players through walls
+            legs.renderfx &= !RF_NODEPTH;
+        }
+
+        legs.renderfx &= !RF_RGB_TINT;
+        legs.renderfx &= !RF_FORCE_ENT_ALPHA;
+        legs.customShader = ctx.world.cgs.media.sightShell;
+
+        trap::R_AddRefEntityToScene(engine, &legs);
+    }
+
+    // Electricity
+    //------------------------------------------------
+    if ctx.world.entity(centNum).currentState.emplacedOwner > ctx.world.cg.time {
+        let emplacedOwner = ctx.world.entity(centNum).currentState.emplacedOwner;
+        let cgTime = ctx.world.cg.time;
+        let dif = emplacedOwner - cgTime;
+
+        if dif > 0 && ctx.world.bg_state.rng.random() > 0.4 {
+            // fade out over the last 500 ms
+            let mut brightness = 255;
+
+            if dif < 500 {
+                brightness = ((dif as f32 - 500.0) / 500.0 * 255.0).floor() as i32;
+            }
+
+            legs.renderfx &= !RF_FORCE_ENT_ALPHA;
+            legs.renderfx &= !RF_MINLIGHT;
+
+            legs.renderfx |= RF_RGB_TINT;
+            legs.shaderRGBA[0] = brightness as u8;
+            legs.shaderRGBA[1] = brightness as u8;
+            legs.shaderRGBA[2] = brightness as u8;
+            legs.shaderRGBA[3] = 255;
+
+            if ctx.world.bg_state.rng.rand() & 1 != 0 {
+                legs.customShader = ctx.world.cgs.media.electricBodyShader;
+            } else {
+                legs.customShader = ctx.world.cgs.media.electricBody2Shader;
+            }
+
+            trap::R_AddRefEntityToScene(engine, &legs);
+
+            if ctx.world.bg_state.rng.random() > 0.9 {
+                let number = ctx.world.entity(centNum).currentState.number;
+                let crackle = ctx.world.cgs.media.crackleSound;
+                trap::S_StartSound(engine, None, number, CHAN_AUTO, crackle);
+            }
+        }
+
+        let mut tempAngles: vec3_t = [0.0; 3];
+        let lerpYaw = ctx.world.entity(centNum).lerpAngles[YAW];
+        VectorSet(&mut tempAngles, 0.0, lerpYaw, 0.0);
+        let legsOrigin = legs.origin;
+        let boltShader = ctx.world.cgs.media.boltShader;
+        CG_ForceElectrocution(ctx, centNum, &legsOrigin, &tempAngles, boltShader, false);
+    }
+
+    if (ctx.world.entity(centNum).currentState.powerups & (1 << PW_SHIELDHIT)) != 0 {
+        let v = ctx.world.bg_state.rng.Q_irand(1, 255) as u8;
+        legs.shaderRGBA[0] = v;
+        legs.shaderRGBA[1] = v;
+        legs.shaderRGBA[2] = v;
+
+        legs.renderfx &= !RF_FORCE_ENT_ALPHA;
+        legs.renderfx &= !RF_MINLIGHT;
+        legs.renderfx &= !RF_RGB_TINT;
+        legs.customShader = ctx.world.cgs.media.playerShieldDamage;
+
+        trap::R_AddRefEntityToScene(engine, &legs);
+    }
 }
