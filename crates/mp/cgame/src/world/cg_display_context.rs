@@ -38,9 +38,6 @@
 //!   `_UI_Init` fills them, and no `DC->` call site for any of them exists
 //!   anywhere in `oracle/codemp` — the same census `mp_ui`'s impl ran. They
 //!   panic with their subject rather than forwarding a trap nothing calls.
-//!
-//! Targets that land with a later C5 wave carry `todo!()` naming the Raven fn
-//! and its source lines; they are never quietly neutralized.
 
 #![allow(non_snake_case)]
 
@@ -59,10 +56,14 @@ use mp_uishared::shared::menu_system::MenuSystem;
 use crate::cg_draw::{CG_Text_Height, CG_Text_Paint, CG_Text_Width};
 use crate::cg_drawtools::{CG_DrawPic, CG_DrawRect, CG_DrawSides, CG_DrawTopBottom, CG_FillRect};
 use crate::cg_main::{
-    CG_Cvar_Get, CG_DrawCinematic, CG_FeederCount, CG_FeederItemImage, CG_FeederSelection,
-    CG_OwnerDrawHandleKey, CG_PlayCinematic, CG_Printf, CG_RunCinematicFrame, CG_StopCinematic,
+    CG_Cvar_Get, CG_DrawCinematic, CG_FeederCount, CG_FeederItemImage, CG_FeederItemText,
+    CG_FeederSelection, CG_OwnerDrawHandleKey, CG_OwnerDrawWidth, CG_PlayCinematic, CG_Printf,
+    CG_RunCinematicFrame, CG_StopCinematic, CG_Text_PaintWithCursor,
 };
-use crate::cg_new_draw::{CG_DeferMenuScript, CG_GetTeamColor, CG_OwnerDraw, CG_RunMenuScript};
+use crate::cg_new_draw::{
+    CG_DeferMenuScript, CG_GetTeamColor, CG_GetValue, CG_OwnerDraw, CG_OwnerDrawVisible,
+    CG_RunMenuScript,
+};
 use crate::trap;
 use crate::world::cg_context::CgContext;
 
@@ -328,16 +329,14 @@ impl<'e> DisplayContext for CgContext<'e> {
 
     /// Raven `cgDC.getValue = &CG_GetValue`.
     /// Source: `oracle/codemp/cgame/cg_main.c:3174`
-    fn getValue(&mut self, _ownerDraw: c_int) -> f32 {
-        todo!("CG_GetValue — oracle/codemp/cgame/cg_newDraw.c:46-91, lands with its C5 wave")
+    fn getValue(&mut self, ownerDraw: c_int) -> f32 {
+        CG_GetValue(self.world, ownerDraw)
     }
 
     /// Raven `cgDC.ownerDrawVisible = &CG_OwnerDrawVisible`.
     /// Source: `oracle/codemp/cgame/cg_main.c:3175`
-    fn ownerDrawVisible(&mut self, _ds: &DisplayState, _flags: c_int) -> bool {
-        todo!(
-            "CG_OwnerDrawVisible — oracle/codemp/cgame/cg_newDraw.c:123-201, lands with its C5 wave"
-        )
+    fn ownerDrawVisible(&mut self, _ds: &DisplayState, flags: c_int) -> bool {
+        CG_OwnerDrawVisible(self.world, flags)
     }
 
     /// Raven `cgDC.runScript = &CG_RunMenuScript` — cgame's hook does nothing;
@@ -383,20 +382,20 @@ impl<'e> DisplayContext for CgContext<'e> {
     /// Source: `oracle/codemp/cgame/cg_main.c:3182`
     fn drawTextWithCursor(
         &mut self,
-        _ds: &DisplayState,
-        _x: f32,
-        _y: f32,
-        _scale: f32,
-        _color: vec4_t,
-        _text: &str,
-        _cursorPos: c_int,
-        _cursor: u8,
-        _limit: c_int,
-        _style: c_int,
-        _iFontIndex: c_int,
+        ds: &DisplayState,
+        x: f32,
+        y: f32,
+        scale: f32,
+        color: vec4_t,
+        text: &str,
+        cursorPos: c_int,
+        cursor: u8,
+        limit: c_int,
+        style: c_int,
+        iFontIndex: c_int,
     ) {
-        todo!(
-            "CG_Text_PaintWithCursor — oracle/codemp/cgame/cg_main.c:3027-3029, lands with its C5 wave"
+        CG_Text_PaintWithCursor(
+            self, ds, x, y, scale, color, text, cursorPos, cursor, limit, style, iFontIndex,
         )
     }
 
@@ -442,16 +441,30 @@ impl<'e> DisplayContext for CgContext<'e> {
         CG_FeederCount(self.world, feederID)
     }
 
-    /// Raven `cgDC.feederItemText = &CG_FeederItemText`.
+    /// Raven `cgDC.feederItemText = &CG_FeederItemText` — cgame's fn never
+    /// returns NULL (every fall-through hands back `""`), so the text is
+    /// always `Some`; the framework's NULL-continue path stays ui-only.
     /// Source: `oracle/codemp/cgame/cg_main.c:3189`
     fn feederItemText(
         &mut self,
         _ds: &DisplayState,
-        _feederID: f32,
-        _index: c_int,
-        _column: c_int,
+        feederID: f32,
+        index: c_int,
+        column: c_int,
     ) -> (Option<String>, qhandle_t, qhandle_t, qhandle_t) {
-        todo!("CG_FeederItemText — oracle/codemp/cgame/cg_main.c:2909-2994, lands with its C5 wave")
+        let mut handle1: qhandle_t = -1;
+        let mut handle2: qhandle_t = -1;
+        let mut handle3: qhandle_t = -1;
+        let text = CG_FeederItemText(
+            self.world,
+            feederID,
+            index,
+            column,
+            &mut handle1,
+            &mut handle2,
+            &mut handle3,
+        );
+        (Some(text), handle1, handle2, handle3)
     }
 
     /// Raven `cgDC.feederItemImage = &CG_FeederItemImage` — cgame's feeders
@@ -537,12 +550,12 @@ impl<'e> DisplayContext for CgContext<'e> {
     /// Source: `oracle/codemp/cgame/cg_main.c:3197`
     fn ownerDrawWidth(
         &mut self,
-        _menus: &mut MenuSystem,
-        _ds: &DisplayState,
-        _ownerDraw: c_int,
-        _scale: f32,
+        menus: &mut MenuSystem,
+        ds: &DisplayState,
+        ownerDraw: c_int,
+        scale: f32,
     ) -> c_int {
-        todo!("CG_OwnerDrawWidth — oracle/codemp/cgame/cg_main.c:3031-3051, lands with its C5 wave")
+        CG_OwnerDrawWidth(self, menus, ds, ownerDraw, scale)
     }
 
     /// Raven `cgDC.registerSound = &trap_S_RegisterSound`.
