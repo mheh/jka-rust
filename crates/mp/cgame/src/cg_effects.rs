@@ -618,7 +618,7 @@ pub fn CG_GlassShatter(
     maxShards: c_int,
 ) {
     let modelindex = ctx.world.entities[entnum].currentState.modelindex as usize;
-    let bmodel = ctx.world.cgs.inlineDrawModel[modelindex];
+    let bmodel = ctx.world.cgs.inline_draw_model(modelindex);
     if bmodel != 0 {
         let mut verts = [[0.0f32; 3]; 4];
         let normal = [0.0f32; 3];

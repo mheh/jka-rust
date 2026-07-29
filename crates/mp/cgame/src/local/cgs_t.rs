@@ -129,6 +129,24 @@ pub struct cgs_t {
     pub effects: cgEffects_t,
 }
 
+impl cgs_t {
+    /// §19: a server bmodel `modelindex` can exceed `MAX_MODELS` on huge maps
+    /// (live Lugormod map with 590 inline models, 2026-07-29) - Raven reads
+    /// adjacent-memory garbage there; out-of-range answers the zero midpoint.
+    pub fn inline_model_midpoint(&self, modelindex: usize) -> vec3_t {
+        *self
+            .inlineModelMidpoints
+            .get(modelindex)
+            .unwrap_or(&[0.0; 3])
+    }
+
+    /// §19: same out-of-range family as ``inline_model_midpoint`` - Raven
+    /// hands the renderer a garbage handle; out-of-range answers handle 0.
+    pub fn inline_draw_model(&self, modelindex: usize) -> qhandle_t {
+        *self.inlineDrawModel.get(modelindex).unwrap_or(&0)
+    }
+}
+
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::size_of::<cgs_t>() == 229576);
 #[cfg(target_pointer_width = "64")]

@@ -245,7 +245,10 @@ pub fn CG_PositionRotatedEntityOnTag(
 pub fn CG_SetEntitySoundPosition(ctx: &mut CgContext, centNum: usize) {
     let cent = ctx.world.entity(centNum);
     if cent.currentState.solid == SOLID_BMODEL {
-        let v = ctx.world.cgs.inlineModelMidpoints[cent.currentState.modelindex as usize];
+        let v = ctx
+            .world
+            .cgs
+            .inline_model_midpoint(cent.currentState.modelindex as usize);
         let mut origin: vec3_t = [0.0; 3];
         _VectorAdd(cent.lerpOrigin, v, &mut origin);
         trap::S_UpdateEntityPosition(ctx.engine, cent.currentState.number, &origin);
@@ -379,7 +382,10 @@ pub fn CG_S_UpdateLoopingSounds(ctx: &mut CgContext, entityNum: usize) {
     }
 
     if cent.currentState.eType == entityType_t::ET_MOVER as c_int {
-        let v = ctx.world.cgs.inlineModelMidpoints[cent.currentState.modelindex as usize];
+        let v = ctx
+            .world
+            .cgs
+            .inline_model_midpoint(cent.currentState.modelindex as usize);
         _VectorAdd(cent.lerpOrigin, v, &mut lerpOrg);
     } else {
         _VectorCopy(cent.lerpOrigin, &mut lerpOrg);
@@ -1235,7 +1241,7 @@ pub fn CG_Mover(ctx: &mut CgContext, centNum: usize) {
     let s1_solid = ctx.world.entity(centNum).currentState.solid;
     let s1_modelindex = ctx.world.entity(centNum).currentState.modelindex;
     if s1_solid == SOLID_BMODEL {
-        ent.hModel = ctx.world.cgs.inlineDrawModel[s1_modelindex as usize];
+        ent.hModel = ctx.world.cgs.inline_draw_model(s1_modelindex as usize);
     } else {
         ent.hModel = ctx.world.cgs.gameModels[s1_modelindex as usize];
     }
@@ -1556,7 +1562,7 @@ pub fn CG_EntityEffects(ctx: &mut CgContext, centNum: usize) {
             let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
             if ctx.world.entity(centNum).currentState.solid == SOLID_BMODEL {
                 let modelindex = ctx.world.entity(centNum).currentState.modelindex;
-                let v = ctx.world.cgs.inlineModelMidpoints[modelindex as usize];
+                let v = ctx.world.cgs.inline_model_midpoint(modelindex as usize);
                 let mut origin: vec3_t = [0.0; 3];
                 _VectorAdd(lerpOrigin, v, &mut origin);
                 trap::S_AddLoopingSound(ctx.engine, number, &origin, &vec3_origin, realSoundIndex);
@@ -2013,7 +2019,7 @@ pub fn CG_PlayDoorLoopSound(ctx: &mut CgContext, centNum: usize) {
     //shouldn't be in here otherwise, but just in case.
     if ctx.world.entity(centNum).currentState.eType == entityType_t::ET_MOVER as c_int {
         let modelindex = ctx.world.entity(centNum).currentState.modelindex;
-        let v = ctx.world.cgs.inlineModelMidpoints[modelindex as usize];
+        let v = ctx.world.cgs.inline_model_midpoint(modelindex as usize);
         _VectorAdd(lerpOrigin, v, &mut origin);
     } else {
         _VectorCopy(lerpOrigin, &mut origin);
