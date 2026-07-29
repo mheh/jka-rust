@@ -13,7 +13,7 @@ use mp_bg::bg_misc::{
     BG_AddPredictableEventToPlayerstate, BG_CanItemBeGrabbed, BG_EvaluateTrajectory,
     BG_PlayerTouchesItem, BG_TouchJumpPad,
 };
-use mp_bg::bg_pmove::Pmove;
+use mp_bg::bg_pmove::{BG_VehicleAdjustBBoxForOrientation, Pmove};
 use mp_bg::public::bg_entity::bgEntity_t;
 use mp_bg::public::bg_itemlist::bg_itemlist;
 use mp_bg::public::dm_flags::DF_NO_FOOTSTEPS;
@@ -693,14 +693,35 @@ pub fn CG_ClipMoveToEntities(
             let zd = ((solid >> 8) & 255) as f32;
             let zu = (((solid >> 16) & 255) - 32) as f32;
 
-            let bmins: vec3_t = [-x, -x, -zd];
-            let bmaxs: vec3_t = [x, x, zu];
+            let mut bmins: vec3_t = [-x, -x, -zd];
+            let mut bmaxs: vec3_t = [x, x, zu];
 
-            // PORT-NOTE: Raven dynamically widens `bmins`/`bmaxs` here for a
-            // vehicle NPC ("if (ent->eType == ET_NPC && ent->NPC_class ==
-            // CLASS_VEHICLE && cent->m_pVehicle) BG_VehicleAdjustBBoxForOrientation(...)").
-            // See the fn doc — unreachable until the Vehicle_t referent pool
-            // lands, so the un-adjusted encoded bbox is traced instead.
+            let eType = ctx.world.entities[num].currentState.eType;
+            let npcClass = ctx.world.entities[num].currentState.NPC_class;
+            if eType == ET_NPC as c_int && npcClass == CLASS_VEHICLE as c_int {
+                if let Some(id) = ctx.world.entities[num].m_pVehicle {
+                    //try to dynamically adjust his bbox dynamically, if possible
+                    let row_idx = id.ent_num() as usize;
+                    // Raven swaps `m_vOrientation` at the cent's lerpAngles
+                    // around the call and back; the None trace channel is
+                    // Raven's NULL localTrace arm (always accept)
+                    let old = ctx.world.vehicle_pool[row_idx].m_vOrientation;
+                    ctx.world.vehicle_pool[row_idx].m_vOrientation =
+                        &raw mut ctx.world.entities[num].lerpAngles[0];
+                    let pVeh = &raw mut ctx.world.vehicle_pool[row_idx];
+                    let lerpOrigin = ctx.world.entities[num].lerpOrigin;
+                    BG_VehicleAdjustBBoxForOrientation(
+                        pVeh,
+                        lerpOrigin,
+                        &mut bmins,
+                        &mut bmaxs,
+                        entNumber,
+                        MASK_PLAYERSOLID,
+                        None,
+                    );
+                    ctx.world.vehicle_pool[row_idx].m_vOrientation = old;
+                }
+            }
 
             cmodel = trap::CM_TempBoxModel(ctx.engine, &bmins, &bmaxs);
             angles = vec3_origin;

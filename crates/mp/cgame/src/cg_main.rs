@@ -44,6 +44,7 @@ use mp_bg::public::powerup::{PW_BLUEFLAG, PW_NEUTRALFLAG, PW_REDFLAG};
 use mp_bg::public::spawn::{MAX_SPAWN_VARS, MAX_SPAWN_VARS_CHARS};
 use mp_bg::public::stat_index::statIndex_t::{STAT_CLIENTS_READY, STAT_HOLDABLE_ITEM};
 use mp_bg::public::team::{TEAM_BLUE, TEAM_RED, TEAM_SPECTATOR};
+use mp_bg::vehicles::vehicle_type_t::vehicleType_t;
 use mp_bg::weapons::weapon_t::{WP_BRYAR_PISTOL, WP_NONE};
 use mp_engine_select::Engine;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
@@ -331,15 +332,17 @@ pub fn C_GetLerpData(world: &CgWorld, data: &mut TCGGetBoltData) {
                 data.mAngles[PITCH] = 0.0;
                 data.mAngles[ROLL] = 0.0;
             }
-            Some(_veh) => {
-                // DEFERRED: Vehicle_t / m_pVehicleInfo->type — oracle/codemp/cgame/cg_players.c:7014-7042
-                // `VehicleId` doesn't resolve to its owning `Vehicle_t`/`vehicleInfo_t` yet
-                // (DEC-46.2: "until then ported code only tests presence"), so the
-                // VH_SPEEDER-vs-VH_FIGHTER split below can't run. Defaulting to the "not a
-                // fighter" outcome (zero both) — 1 of Raven's 3 vehicle branches (a speeder
-                // keeps its roll, a fighter keeps both) — until the vehicle referent pool lands.
-                data.mAngles[PITCH] = 0.0;
-                data.mAngles[ROLL] = 0.0;
+            Some(id) => {
+                let vehType =
+                    unsafe { (*world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo).r#type };
+                if vehType == vehicleType_t::VH_SPEEDER {
+                    //speeder wants no pitch but a roll
+                    data.mAngles[PITCH] = 0.0;
+                } else if vehType != vehicleType_t::VH_FIGHTER {
+                    //fighters want all angles
+                    data.mAngles[PITCH] = 0.0;
+                    data.mAngles[ROLL] = 0.0;
+                }
             }
         }
     }

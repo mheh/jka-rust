@@ -7,7 +7,7 @@
 
 use core::f64::consts::PI;
 use core::ffi::{c_char, c_int, c_void};
-use core::ptr::null_mut;
+use core::ptr::{addr_of_mut, null_mut};
 
 use native_string::{
     atoi, buf_to_string, cstr, string_to_latin1, Info_ValueForKey, Q_strcat, Q_strncpyz,
@@ -44,9 +44,13 @@ use mp_bg::public::stat_index::statIndex_t::{
     STAT_ARMOR, STAT_HEALTH, STAT_HOLDABLE_ITEM, STAT_HOLDABLE_ITEMS, STAT_MAX_HEALTH,
 };
 use mp_bg::public::team::{TEAM_BLUE, TEAM_FREE, TEAM_RED, TEAM_SPECTATOR};
+use mp_bg::public::viewheight::DEFAULT_MINS_2;
 use mp_bg::public::weaponstate::weaponstate_t::WEAPON_CHARGING_ALT;
 use mp_bg::saga::siege_class_flags_t::siegeClassFlags_t::CFL_STATVIEWER;
 use mp_bg::saga::siege_team_t::SIEGE_ROUND_BEGIN_TIME;
+use mp_bg::vehicles::turret_stats_t::MAX_VEHICLE_TURRET_MUZZLES;
+use mp_bg::vehicles::vehicle_s::{Vehicle_t, MAX_VEHICLE_TURRETS};
+use mp_bg::vehicles::vehicle_type_t::vehicleType_t;
 use mp_bg::weapons::ammo_data::ammoData;
 use mp_bg::weapons::weapon_data::weaponData;
 use mp_bg::weapons::weapon_t::{WP_DISRUPTOR, WP_EMPLACED_GUN, WP_NONE, WP_SABER};
@@ -68,11 +72,14 @@ use mp_qshared::shared::force_powers::{
     FP_SABERTHROW, FP_SABER_DEFENSE, FP_SABER_OFFENSE, FP_SEE, FP_SPEED, FP_TELEPATHY,
     NUM_FORCE_POWERS,
 };
-use mp_qshared::shared::limits::{MAX_SAY_TEXT, SNAPFLAG_RATE_DELAYED};
+use mp_qshared::shared::limits::{
+    MAX_SAY_TEXT, MAX_VEH_WEAPONS, SNAPFLAG_RATE_DELAYED, VEH_WEAPON_BASE,
+};
 use mp_qshared::shared::q_color::{colorWhite, g_color_table};
 use mp_qshared::shared::q_math::{
-    _DotProduct, _VectorCopy, _VectorMA, _VectorSubtract, vec3_origin, AngleVectors, AnglesToAxis,
-    Distance, VectorClear, VectorLength, VectorNormalize, VectorSet, PITCH, YAW,
+    _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin,
+    AngleVectors, AnglesToAxis, Distance, VectorClear, VectorCompare, VectorLength,
+    VectorNormalize, VectorSet, PITCH, YAW,
 };
 use mp_qshared::shared::surface_flags::{
     CONTENTS_BODY, CONTENTS_FOG, CONTENTS_LAVA, CONTENTS_OPAQUE, CONTENTS_SLIME, CONTENTS_SOLID,
@@ -102,6 +109,7 @@ use crate::cg_drawtools::{
     CG_FadeColor, CG_FillRect, CG_GetColorForHealth, CG_TileClear, UI_DrawProportionalString,
     UI_DrawScaledProportionalString,
 };
+use crate::cg_event::CG_CalcVehMuzzle;
 use crate::cg_info::CG_DrawInformation;
 use crate::cg_main::{CG_ConfigString, CG_Error, CG_GetLocationString, CG_GetStringEdString};
 use crate::cg_new_draw::{CG_OtherTeamHasFlag, CG_YourTeamHasFlag};
@@ -113,6 +121,7 @@ use crate::cg_weapons::{
     CG_CalcMuzzlePoint, CG_DrawIconBackground, CG_DrawWeaponSelect, CG_RegisterItemVisuals,
     WEAPON_SELECT_TIME,
 };
+use crate::local::centity_s::centity_t;
 use crate::local::cg_t::MAX_CHATBOX_ITEMS;
 use crate::trap;
 use crate::world::cg_context::CgContext;
@@ -746,14 +755,16 @@ pub fn CG_CheckTargetVehicle(world: &mut CgWorld) -> Option<(usize, f32)> {
 
     if targetNum < ENTITYNUM_WORLD && targetNum >= MAX_CLIENTS_I32 {
         let cent = world.entity(targetNum as usize);
-        // DEFERRED: Vehicle_t::m_pVehicleInfo->type == VH_FIGHTER — cgame owns
-        // no `Vehicle_t` pool yet, so DEC-46.2's `Option<VehicleId>` can only
-        // answer the presence half of Raven's test; the fighter-vs-anything
-        // -else half is unavailable and this accepts every vehicle class.
+        let npc_class = cent.currentState.NPC_class;
+        let m_pVehicle = cent.m_pVehicle;
+        // Raven derefs `m_pVehicle->m_pVehicleInfo` unguarded for the type test;
+        // no referent means not-a-fighter (§19).
         // Source: oracle/codemp/cgame/cg_draw.c:1831-1834
-        if cent.currentState.NPC_class == class_t::CLASS_VEHICLE as c_int
-            && cent.m_pVehicle.is_some()
-        {
+        let is_fighter = m_pVehicle.is_some_and(|id| {
+            let info = world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo;
+            !info.is_null() && unsafe { &*info }.r#type == vehicleType_t::VH_FIGHTER
+        });
+        if npc_class == class_t::CLASS_VEHICLE as c_int && is_fighter {
             // it's a vehicle
             world.draw.cg_targVeh = targetNum;
             world.draw.cg_targVehLastTime = world.cg.time;
@@ -949,11 +960,12 @@ pub fn CG_InFighter(world: &CgWorld) -> bool {
     if world.cg.predictedPlayerState.m_iVehicleNum != 0 {
         // I'm in a vehicle
         let vehCent = world.entity(world.cg.predictedPlayerState.m_iVehicleNum as usize);
-        // DEFERRED: Vehicle_t::m_pVehicleInfo->type == VH_FIGHTER — cgame owns
-        // no `Vehicle_t` pool yet, so only the presence half of Raven's test
-        // survives and this answers true for any vehicle, fighter or not.
+        // Raven derefs `m_pVehicle->m_pVehicleInfo` unguarded for the type test (§19).
         // Source: oracle/codemp/cgame/cg_draw.c:5608-5610
-        if vehCent.m_pVehicle.is_some() {
+        if vehCent.m_pVehicle.is_some_and(|id| {
+            let info = world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo;
+            !info.is_null() && unsafe { &*info }.r#type == vehicleType_t::VH_FIGHTER
+        }) {
             // I'm in a fighter
             return true;
         }
@@ -968,11 +980,12 @@ pub fn CG_InATST(world: &CgWorld) -> bool {
     if world.cg.predictedPlayerState.m_iVehicleNum != 0 {
         // I'm in a vehicle
         let vehCent = world.entity(world.cg.predictedPlayerState.m_iVehicleNum as usize);
-        // DEFERRED: Vehicle_t::m_pVehicleInfo->type == VH_WALKER — same missing
-        // `Vehicle_t` pool as `CG_InFighter`; the walker-vs-anything-else half
-        // of Raven's test is unavailable, so this answers true for any vehicle.
+        // Raven derefs `m_pVehicle->m_pVehicleInfo` unguarded for the type test (§19).
         // Source: oracle/codemp/cgame/cg_draw.c:5624-5626
-        if vehCent.m_pVehicle.is_some() {
+        if vehCent.m_pVehicle.is_some_and(|id| {
+            let info = world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo;
+            !info.is_null() && unsafe { &*info }.r#type == vehicleType_t::VH_WALKER
+        }) {
             // I'm in an atst
             return true;
         }
@@ -1655,30 +1668,36 @@ pub fn CG_DrawVehicleTurboRecharge(
 /// Raven `CG_DrawVehicleWeaponsLinked` — the "weapons linked" lamp, plus the
 /// one-shot chirp when the link state flips.
 ///
-/// DEFERRED: `Vehicle_t` referent pool — Raven's first arm is
-/// `m_pVehicleInfo->weapon[0/1].linkable == 2` ("weapon is always linked"),
-/// unanswerable through DEC-46.2's presence-only id. Taking the else arm means
-/// no vehicle counts as always-linked and the networked
-/// `predictedVehicleState.vehWeaponsLinked` bit is the only source until the
-/// pool lands.
-/// Source: `oracle/codemp/cgame/cg_draw.c:2200-2205`
-///
 /// Source: `oracle/codemp/cgame/cg_draw.c:2197-2249`
 pub fn CG_DrawVehicleWeaponsLinked(
     ctx: &mut CgContext,
     menus: &MenuSystem,
     menuHUD: Option<MenuId>,
-    _vehNum: usize,
+    vehNum: usize,
 ) {
     let mut drawLink = false;
 
-    //MP way:
-    //must get sent over network
-    if ctx.world.cg.predictedVehicleState.vehWeaponsLinked != qfalse {
+    // Raven derefs `m_pVehicle->m_pVehicleInfo` unguarded here (§19: no referent
+    // means not-always-linked, so fall through to the networked bit).
+    // Source: oracle/codemp/cgame/cg_draw.c:2200-2205
+    let alwaysLinked = ctx.world.entity(vehNum).m_pVehicle.is_some_and(|id| {
+        let info = ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo;
+        !info.is_null()
+            && (unsafe { &*info }.weapon[0].linkable == 2
+                || unsafe { &*info }.weapon[1].linkable == 2)
+    });
+    if alwaysLinked {
+        //weapon is always linked
         drawLink = true;
+    } else {
+        //MP way:
+        //must get sent over network
+        if ctx.world.cg.predictedVehicleState.vehWeaponsLinked != qfalse {
+            drawLink = true;
+        }
+        //NOTE: the SP way — cheating it off `veh->gent->m_pVehicle->weaponStatus[]`
+        //— is commented out at the Raven site.
     }
-    //NOTE: the SP way — cheating it off `veh->gent->m_pVehicle->weaponStatus[]`
-    //— is commented out at the Raven site.
 
     if ctx.world.draw.cg_drawLink != drawLink {
         // state changed, play sound
@@ -1925,12 +1944,6 @@ pub fn CG_DrawTeamBackground(
 /// server flagged as a radar object, plus asteroid-impact and missile-lock
 /// alarms. Returns the y below the disc so the HUD stacker can continue.
 ///
-/// DEFERRED: `Vehicle_t` referent pool — the `ET_NPC` arm draws
-/// `m_pVehicleInfo->radarIconHandle`, unavailable through DEC-46.2's
-/// presence-only id, so vehicle blips are skipped entirely (Raven skips them
-/// too when that handle is 0). Every other arm is complete.
-/// Source: `oracle/codemp/cgame/cg_draw.c:3392-3454`
-///
 /// Source: `oracle/codemp/cgame/cg_draw.c:3179-3738`
 pub fn CG_DrawRadar(ctx: &mut CgContext, y: f32) -> f32 {
     let xOffset: c_int = 0;
@@ -1994,6 +2007,7 @@ pub fn CG_DrawRadar(ctx: &mut CgContext, y: f32) -> f32 {
         let cent_lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
         let cent_lerpAngles = ctx.world.entity(centNum).lerpAngles;
         let cent_vChatTime = ctx.world.entity(centNum).vChatTime;
+        let cent_m_pVehicle = ctx.world.entity(centNum).m_pVehicle;
         let cg_radarRange = ctx.world.draw.cg_radarRange;
 
         // Get the distances first
@@ -2040,9 +2054,80 @@ pub fn CG_DrawRadar(ctx: &mut CgContext, y: f32) -> f32 {
 
         if es.eType == entityType_t::ET_NPC as c_int {
             //FIXME: draw last, with players...
-            // DEFERRED: `m_pVehicleInfo->radarIconHandle` — see the fn doc.
             // Source: oracle/codemp/cgame/cg_draw.c:3392-3454
-            continue;
+            if es.NPC_class == class_t::CLASS_VEHICLE as c_int && es.speed > 0.0 {
+                // Raven guards `m_pVehicle` then derefs `m_pVehicleInfo` unguarded
+                // for the icon handle; no handle means no blip (§19).
+                let radarIcon = cent_m_pVehicle.map_or(0, |id| {
+                    let info = ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo;
+                    if info.is_null() {
+                        0
+                    } else {
+                        unsafe { &*info }.radarIconHandle
+                    }
+                });
+                if radarIcon != 0 {
+                    let x = RADAR_X as f32
+                        + RADAR_RADIUS as f32
+                        + (angle as f64).sin() as f32 * distance;
+                    let ly = y + RADAR_RADIUS as f32 + (angle as f64).cos() as f32 * distance;
+
+                    arrowBaseScale = 9.0;
+                    zScale = 1.0;
+
+                    //we want to scale the thing up/down based on the relative Z (up/down) positioning
+                    let myZ = ctx.world.cg.predictedPlayerState.origin[2];
+                    if cent_lerpOrigin[2] > myZ {
+                        //higher, scale up (between 16 and 24)
+                        let mut dif = cent_lerpOrigin[2] - myZ;
+                        //max out to 1.5x scale at 512 units above local player's height
+                        dif /= 4096.0;
+                        if dif > 0.5 {
+                            dif = 0.5;
+                        }
+                        zScale += dif;
+                    } else if cent_lerpOrigin[2] < myZ {
+                        //lower, scale down (between 16 and 8)
+                        let mut dif = myZ - cent_lerpOrigin[2];
+                        //half scale at 512 units below local player's height
+                        dif /= 4096.0;
+                        if dif > 0.5 {
+                            dif = 0.5;
+                        }
+                        zScale -= dif;
+                    }
+
+                    arrowBaseScale *= zScale;
+
+                    // §F19: a driverless vehicle has m_iVehicleNum 0 and Raven reads
+                    // clientinfo[-1] (benign OOB garbage); the port requires a real
+                    // driver instead of panicking on -1.
+                    if es.m_iVehicleNum > 0
+                        && es.m_iVehicleNum <= MAX_CLIENTS_I32
+                        //vehicle has a driver
+                        && ctx.world.cgs.clientinfo[(es.m_iVehicleNum - 1) as usize].infoValid
+                            != qfalse
+                    {
+                        if ctx.world.cgs.clientinfo[(es.m_iVehicleNum - 1) as usize].team
+                            == local_team
+                        {
+                            trap::R_SetColor(ctx.engine, Some(&teamColor));
+                        } else {
+                            trap::R_SetColor(ctx.engine, Some(&g_color_table[COLOR_RED_INDEX]));
+                        }
+                    } else {
+                        trap::R_SetColor(ctx.engine, None);
+                    }
+                    CG_DrawPic(
+                        ctx,
+                        x - 4.0 + xOffset as f32,
+                        ly - 4.0,
+                        arrowBaseScale,
+                        arrowBaseScale,
+                        radarIcon,
+                    );
+                }
+            }
         } else if es.eType == entityType_t::ET_MOVER as c_int {
             if es.speed != 0.0
                 //the mover's size, actually
@@ -2708,28 +2793,97 @@ pub fn CG_DrawActivePowers(ctx: &mut CgContext) {
 /// Raven `CG_CalcVehicleMuzzlePoint` — where the crosshair trace starts when
 /// you are flying/driving. `true` is Raven's `qtrue`, the turret-gunner case.
 ///
-/// DEFERRED: `Vehicle_t` referent pool — both branches Raven can take need
-/// `m_pVehicleInfo` (the `VH_WALKER` barrel offset, and the turret table the
-/// muzzle averaging walks), which DEC-46.2's presence-only `Option<VehicleId>`
-/// cannot supply, so the port always takes Raven's fall-through: the vehicle's
-/// own origin and angles, `qfalse`. Restoring the turret branch also needs a
-/// `CgContext` here, since `CG_CalcVehMuzzle` takes one.
-/// Source: `oracle/codemp/cgame/cg_draw.c:5966-6035`
-///
 /// Source: `oracle/codemp/cgame/cg_draw.c:5963-6040`
 pub fn CG_CalcVehicleMuzzlePoint(
-    world: &CgWorld,
+    ctx: &mut CgContext,
     entityNum: usize,
     start: &mut vec3_t,
     d_f: &mut vec3_t,
     d_rt: &mut vec3_t,
     d_up: &mut vec3_t,
 ) -> bool {
-    let vehCent = world.entity(entityNum);
+    let lerpOrigin = ctx.world.entity(entityNum).lerpOrigin;
+    let lerpAngles = ctx.world.entity(entityNum).lerpAngles;
+    let m_pVehicle = ctx.world.entity(entityNum).m_pVehicle;
 
-    _VectorCopy(vehCent.lerpOrigin, start);
-    AngleVectors(vehCent.lerpAngles, Some(d_f), Some(d_rt), Some(d_up));
+    if let Some(id) = m_pVehicle {
+        let row_idx = id.ent_num() as usize;
+        // Raven derefs `m_pVehicleInfo` unguarded in the walker test (§19).
+        let info = ctx.world.vehicle_pool[row_idx].m_pVehicleInfo;
+        if !info.is_null() && unsafe { &*info }.r#type == vehicleType_t::VH_WALKER {
+            //draw from barrels
+            _VectorCopy(lerpOrigin, start);
+            start[2] += unsafe { &*info }.height - DEFAULT_MINS_2 as f32 - 48.0;
+            AngleVectors(lerpAngles, Some(d_f), Some(d_rt), Some(d_up));
+            return false;
+        }
+    }
 
+    //check to see if we're a turret gunner on this vehicle
+    let generic1 = ctx.world.cg.predictedPlayerState.generic1;
+    if generic1 != 0 {
+        //passenger in a vehicle
+        if let Some(id) = m_pVehicle {
+            let row_idx = id.ent_num() as usize;
+            let info = ctx.world.vehicle_pool[row_idx].m_pVehicleInfo;
+            if !info.is_null() && unsafe { &*info }.maxPassengers != 0 {
+                //a vehicle capable of carrying passengers
+                for turretNum in 0..MAX_VEHICLE_TURRETS {
+                    let iAmmoMax = unsafe { (*info).turret[turretNum].iAmmoMax };
+                    let passengerNum = unsafe { (*info).turret[turretNum].passengerNum };
+                    // valid turret that I control
+                    if iAmmoMax != 0 && passengerNum == generic1 {
+                        //Go through all muzzles, average their positions and directions
+                        let mut muzzlesAvgPos: vec3_t = [0.0; 3];
+                        let mut muzzlesAvgDir: vec3_t = [0.0; 3];
+                        let mut numMuzzles: c_int = 0;
+
+                        for i in 0..MAX_VEHICLE_TURRET_MUZZLES {
+                            let mut vehMuzzle = unsafe { (*info).turret[turretNum].iMuzzle[i] };
+                            if vehMuzzle != 0 {
+                                vehMuzzle -= 1;
+                                // seam: `CG_CalcVehMuzzle` wants `&mut CgContext` and
+                                // `&mut Vehicle_t`, and the vehicle lives inside
+                                // `ctx.world.vehicle_pool`; we hand it a raw `&mut`
+                                // like the rest of the pool seam does (it only mutates
+                                // the vehicle, never the pool through ctx).
+                                let pVeh: *mut Vehicle_t =
+                                    addr_of_mut!(ctx.world.vehicle_pool[row_idx]);
+                                let entPtr: *const centity_t = ctx.world.entity(entityNum);
+                                CG_CalcVehMuzzle(
+                                    ctx,
+                                    unsafe { &mut *pVeh },
+                                    unsafe { &*entPtr },
+                                    vehMuzzle,
+                                );
+                                let mp = ctx.world.vehicle_pool[row_idx].m_vMuzzlePos
+                                    [vehMuzzle as usize];
+                                let md = ctx.world.vehicle_pool[row_idx].m_vMuzzleDir
+                                    [vehMuzzle as usize];
+                                _VectorAdd(muzzlesAvgPos, mp, &mut muzzlesAvgPos);
+                                _VectorAdd(muzzlesAvgDir, md, &mut muzzlesAvgDir);
+                                numMuzzles += 1;
+                            }
+                            // PORT-NOTE: Raven's `if (numMuzzles)` sits inside the
+                            // muzzle loop, so it returns on the very first valid
+                            // muzzle - the "average" never spans more than one. Kept
+                            // as-is (§20).
+                            if numMuzzles != 0 {
+                                _VectorScale(muzzlesAvgPos, 1.0 / numMuzzles as f32, start);
+                                _VectorScale(muzzlesAvgDir, 1.0 / numMuzzles as f32, d_f);
+                                VectorClear(d_rt);
+                                VectorClear(d_up);
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    _VectorCopy(lerpOrigin, start);
+    AngleVectors(lerpAngles, Some(d_f), Some(d_rt), Some(d_up));
     false
 }
 
@@ -4118,13 +4272,6 @@ pub fn CG_DrawGenericTimerBar(ctx: &mut CgContext) {
 /// Raven `CG_DrawRocketLocking` — the eight wedges closing around a
 /// rocket-lock target, plus the tick and lock sounds.
 ///
-/// DEFERRED: `Vehicle_t` referent pool — when you are flying, Raven retimes
-/// the lock off `m_pVehicleInfo->weapon[0/1].ID`'s `g_vehWeaponInfo` entry.
-/// DEC-46.2's presence-only `Option<VehicleId>` cannot name that weapon, so
-/// `vehWeapon` stays NULL and the hard-coded interval stands — the same arm
-/// Raven takes for an out-of-range weapon ID.
-/// Source: `oracle/codemp/cgame/cg_draw.c:5772-5807`
-///
 /// Source: `oracle/codemp/cgame/cg_draw.c:5747-5960`
 pub fn CG_DrawRocketLocking(ctx: &mut CgContext, lockEntNum: usize, _lockTime: c_int) {
     // §F19: Raven derefs `cg.snap` unguarded; with no snapshot there is no
@@ -4141,7 +4288,7 @@ pub fn CG_DrawRocketLocking(ctx: &mut CgContext, lockEntNum: usize, _lockTime: c
         )
     };
 
-    let lockTimeInterval: f32 = (if ctx.world.cgs.gametype == GT_SIEGE {
+    let mut lockTimeInterval: f32 = (if ctx.world.cgs.gametype == GT_SIEGE {
         2400.0
     } else {
         1200.0
@@ -4157,9 +4304,38 @@ pub fn CG_DrawRocketLocking(ctx: &mut CgContext, lockEntNum: usize, _lockTime: c
         return;
     }
 
-    // The `if (cg.snap->ps.m_iVehicleNum)` / `if (veh->m_pVehicle)` pair here
-    // exists only to reach the deferred `m_pVehicleInfo` weapon read (see the
-    // fn doc), so nothing is transcribed for it.
+    if m_iVehicleNum != 0 {
+        //driving a vehicle
+        if let Some(id) = ctx.world.entity(m_iVehicleNum as usize).m_pVehicle {
+            // Raven derefs `m_pVehicleInfo` unguarded once `m_pVehicle` is set (§19).
+            // Source: oracle/codemp/cgame/cg_draw.c:5772-5807
+            let info = ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo;
+            if !info.is_null() {
+                // alt-charge fires weapon[1], otherwise weapon[0]
+                let slot = if ctx.world.cg.predictedVehicleState.weaponstate
+                    == WEAPON_CHARGING_ALT as c_int
+                {
+                    1
+                } else {
+                    0
+                };
+                let wid = unsafe { &*info }.weapon[slot].ID;
+                if wid > VEH_WEAPON_BASE && (wid as usize) < MAX_VEH_WEAPONS {
+                    //we are trying to lock on with a valid vehicle weapon, so use *its* locktime, not the hard-coded one
+                    let iLockOnTime = ctx.world.bg_state.g_vehWeaponInfo[wid as usize].iLockOnTime;
+                    if iLockOnTime == 0 {
+                        //instant lock-on
+                        dif = 10;
+                    } else {
+                        //use the custom vehicle lockOnTime
+                        lockTimeInterval = iLockOnTime as f32 / 16.0;
+                        dif = ((ctx.world.cg.time as f32 - rocketLockTime) / lockTimeInterval)
+                            as c_int;
+                    }
+                }
+            }
+        }
+    }
 
     //We can't check to see in pmove if players are on the same team, so we resort
     //to just not drawing the lock if a teammate is the locked on ent
@@ -5798,14 +5974,6 @@ pub fn CG_DrawPowerupIcons(ctx: &mut CgContext, ds: &DisplayState, mut y: c_int)
 /// Raven's optional world anchor (NULL falls back to the `cg_crosshairX/Y`
 /// cvars).
 ///
-/// DEFERRED: `Vehicle_t` referent pool — a ship's own crosshair art is
-/// `vehCent->m_pVehicle->m_pVehicleInfo->crosshairShaderHandle`, unreachable
-/// through DEC-46.2's presence-only `Option<VehicleId>` (see
-/// [`CG_DrawVehicleShields`]), so `hShader` stays 0 and the default
-/// `cgs.media.crosshairShader` is drawn — Raven's arm for a vehicle with no
-/// crosshair of its own. The doubled size still applies.
-/// Source: `oracle/codemp/cgame/cg_draw.c:5163-5170`
-///
 /// Source: `oracle/codemp/cgame/cg_draw.c:4848-5268`
 pub fn CG_DrawCrosshair(ctx: &mut CgContext, worldPoint: Option<vec3_t>, chEntValid: c_int) {
     let mut hShader: qhandle_t = 0;
@@ -6071,8 +6239,14 @@ pub fn CG_DrawCrosshair(ctx: &mut CgContext, worldPoint: Option<vec3_t>, chEntVa
     let mut w;
     let mut h;
     if ctx.world.cg.predictedPlayerState.m_iVehicleNum != 0 {
-        //I'm in a vehicle — the custom crosshair handle is deferred (fn doc),
-        //so `hShader` stays 0 here.
+        //I'm in a vehicle
+        let vehNum = ctx.world.cg.predictedPlayerState.m_iVehicleNum as usize;
+        if let Some(id) = ctx.world.entity(vehNum).m_pVehicle {
+            let info = ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo;
+            if !info.is_null() && unsafe { &*info }.crosshairShaderHandle != 0 {
+                hShader = unsafe { &*info }.crosshairShaderHandle;
+            }
+        }
         //bigger by default
         w = ctx.world.cvars.cg_crosshairSize.value * 2.0;
         h = w;
@@ -6273,14 +6447,6 @@ pub fn CG_SaberClashFlare(ctx: &mut CgContext) {
 /// Raven `CG_BracketEntity` — the four corner brackets a fighter's HUD paints
 /// around a distant ship, green for a friend and red for a foe.
 ///
-/// DEFERRED: `Vehicle_t` referent pool — the lead indicator needs my ship's
-/// `m_pVehicle->m_pVehicleInfo->weapon[0].ID` to look the projectile speed up
-/// in `g_vehWeaponInfo`, and DEC-46.2's presence-only `Option<VehicleId>`
-/// cannot name that weapon; see [`CG_DrawVehicleShields`]. The arm Raven takes
-/// for a ship with no valid primary weapon draws nothing, which is what happens
-/// here — everything before that read is pure, so nothing is transcribed for it.
-/// Source: `oracle/codemp/cgame/cg_draw.c:5545-5599`
-///
 /// Source: `oracle/codemp/cgame/cg_draw.c:5413-5600`
 pub fn CG_BracketEntity(ctx: &mut CgContext, centNum: usize, radius: f32) {
     let mut isEnemy = false;
@@ -6457,11 +6623,85 @@ pub fn CG_BracketEntity(ctx: &mut CgContext, centNum: usize, radius: f32) {
     );
 
     //Lead Indicator...
-    // The `cg_drawVehLeadIndicator` / `isEnemy` / `CLASS_VEHICLE` /
-    // `VectorCompare` chain exists only to reach the deferred vehicle-weapon
-    // read (see the fn doc); every test in it is pure, so nothing is
-    // transcribed for it.
-    let _ = isEnemy;
+    // Source: oracle/codemp/cgame/cg_draw.c:5545-5599
+    if ctx.world.cvars.cg_drawVehLeadIndicator.integer != 0 {
+        //draw the lead indicator
+        if isEnemy
+            && es.NPC_class == class_t::CLASS_VEHICLE as c_int
+            && !VectorCompare(es.pos.trDelta, vec3_origin)
+            && ctx.world.cg.predictedPlayerState.m_iVehicleNum != 0
+        {
+            //enemy vehicle is moving and I'm in a vehicle
+            let vehNum = ctx.world.cg.predictedPlayerState.m_iVehicleNum as usize;
+            let weaponId = ctx
+                .world
+                .entity(vehNum)
+                .m_pVehicle
+                .map(|id| {
+                    let info = ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo;
+                    if info.is_null() {
+                        0
+                    } else {
+                        unsafe { &*info }.weapon[0].ID
+                    }
+                })
+                .unwrap_or(0);
+            if weaponId > VEH_WEAPON_BASE {
+                //valid vehicle weapon
+                let vehWeapon = &ctx.world.bg_state.g_vehWeaponInfo[weaponId as usize];
+                if vehWeapon.bIsProjectile != qfalse //primary weapon's shot is a projectile
+                    && vehWeapon.bHasGravity == qfalse //primary weapon's shot is not affected by gravity
+                    && vehWeapon.fHoming == 0.0 //primary weapon's shot is not homing
+                    && vehWeapon.fSpeed != 0.0
+                {
+                    //our primary weapon's projectile has a speed
+                    let fSpeed = vehWeapon.fSpeed;
+                    let mut vehDiff: vec3_t = [0.0; 3];
+                    _VectorSubtract(
+                        lerpOrigin,
+                        ctx.world.cg.predictedVehicleState.origin,
+                        &mut vehDiff,
+                    );
+                    let vehDist = VectorNormalize(&mut vehDiff);
+                    //how many seconds it would take for my primary weapon's projectile to get from my ship to theirs
+                    let eta = vehDist / fSpeed;
+                    //now extrapolate their position that number of seconds into the future based on their velocity
+                    let mut vehLeadPos: vec3_t = [0.0; 3];
+                    _VectorMA(lerpOrigin, eta, es.pos.trDelta, &mut vehLeadPos);
+                    //now we have where we should be aiming at, project that onto the screen at a 2D co-ord
+                    let Some((x, y)) = CG_WorldCoordToScreenCoordFloat(ctx.world, lerpOrigin)
+                    else {
+                        //off-screen, don't draw it
+                        return;
+                    };
+                    let Some((leadX, leadY)) =
+                        CG_WorldCoordToScreenCoordFloat(ctx.world, vehLeadPos)
+                    else {
+                        // §19: Raven's off-screen arm still draws the dotted
+                        // line from uninitialized stack leadX/leadY; the
+                        // defined choice is to skip the draw
+                        return;
+                    };
+                    //draw a line from the ship's cur pos to the lead pos
+                    CG_DottedLine(
+                        ctx,
+                        x,
+                        y,
+                        leadX,
+                        leadY,
+                        1.0,
+                        10,
+                        g_color_table[COLOR_RED_INDEX],
+                        0.5,
+                    );
+                    //now draw the lead indicator
+                    trap::R_SetColor(ctx.engine, Some(&g_color_table[COLOR_RED_INDEX]));
+                    let lead = trap::R_RegisterShader(ctx.engine, "gfx/menus/radar/lead");
+                    CG_DrawPic(ctx, leadX - 8.0, leadY - 8.0, 16.0, 16.0, lead);
+                }
+            }
+        }
+    }
 }
 
 /// Raven `CG_DrawSiegeTimer` — the round clock on the siege HUD.
@@ -7655,6 +7895,7 @@ pub fn CG_ScanForCrosshairEntity(ctx: &mut CgContext) {
     let mut end: vec3_t = [0.0; 3];
 
     let mut ignore = ctx.world.cg.predictedPlayerState.clientNum;
+    let mut bVehCheckTraceFromCamPos = false;
 
     // §F19: Raven derefs `cg.snap` unguarded at several points below (the muzzle
     // client index, the mind-trick and team reads, the final crosshair latch);
@@ -7682,22 +7923,27 @@ pub fn CG_ScanForCrosshairEntity(ctx: &mut CgContext) {
         if m_iVehicleNum != 0 && (eFlags & EF_NODRAW) != 0 {
             // we're *inside* a vehicle - do the vehicle's crosshair instead
             ignore = m_iVehicleNum;
-            let _gunner = CG_CalcVehicleMuzzlePoint(
-                ctx.world,
+            //the pilot
+            let gunner = CG_CalcVehicleMuzzlePoint(
+                ctx,
                 m_iVehicleNum as usize,
                 &mut start,
                 &mut d_f,
                 &mut d_rt,
                 &mut d_up,
             );
-            // DEFERRED: the huge-map fighter auto-aim (bVehCheckTraceFromCamPos)
-            // gates on `veh->m_pVehicle->m_pVehicleInfo->type == VH_FIGHTER` and
-            // its extra camera-origin trace reads `m_pVehicleInfo->length`;
-            // DEC-46.2's presence-only `Option<VehicleId>` supplies neither, so
-            // the feature stays off (normal crosshair trace) until the Vehicle_t
-            // referent pool lands.
-            //TODO: Port CG_ScanForCrosshairEntity vehicle arm
-            // Source: oracle/codemp/cgame/cg_draw.c:6116-6216
+            // On huge maps the muzzle crosshair goes inaccurate at close range, so a
+            // non-gunner fighter pilot flags an extra trace from the camera origin
+            // (run below). Raven derefs `m_pVehicle->m_pVehicleInfo` unguarded here (§19).
+            // Source: oracle/codemp/cgame/cg_draw.c:6116-6125
+            let veh_mpv = ctx.world.entity(m_iVehicleNum as usize).m_pVehicle;
+            let is_fighter = veh_mpv.is_some_and(|id| {
+                let info = ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo;
+                !info.is_null() && unsafe { &*info }.r#type == vehicleType_t::VH_FIGHTER
+            });
+            if is_fighter && ctx.world.cg.distanceCull > MAX_XHAIR_DIST_ACCURACY && !gunner {
+                bVehCheckTraceFromCamPos = true;
+            }
         } else if snapWeapon == WP_EMPLACED_GUN
             && snapEmplacedIndex != 0
             && !ctx
@@ -7775,6 +8021,52 @@ pub fn CG_ScanForCrosshairEntity(ctx: &mut CgContext) {
             ignore,
             CONTENTS_SOLID | CONTENTS_BODY,
         );
+        if bVehCheckTraceFromCamPos {
+            //NOTE: this MUST stay up to date with the method used in WP_VehCheckTraceFromCamPos
+            let vehNum = ctx.world.cg.predictedPlayerState.m_iVehicleNum as usize;
+            let veh_lerpOrigin = ctx.world.entity(vehNum).lerpOrigin;
+            // Raven derefs `m_pVehicle->m_pVehicleInfo->length` unguarded (§19: 0 if absent).
+            let veh_mpv = ctx.world.entity(vehNum).m_pVehicle;
+            let veh_length = veh_mpv.map_or(0.0, |id| {
+                let info = ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo;
+                if info.is_null() {
+                    0.0
+                } else {
+                    unsafe { &*info }.length
+                }
+            });
+            let vieworg = ctx.world.cg.refdef.vieworg;
+            let minAutoAimDist = Distance(veh_lerpOrigin, vieworg) + (veh_length / 2.0) + 200.0;
+
+            let mut viewDir2End: vec3_t = [0.0; 3];
+            _VectorSubtract(end, vieworg, &mut viewDir2End);
+            VectorNormalize(&mut viewDir2End);
+            let mut extraEnd: vec3_t = [0.0; 3];
+            _VectorMA(vieworg, MAX_XHAIR_DIST_ACCURACY, viewDir2End, &mut extraEnd);
+
+            let mut extraTrace = trace_t::zeroed();
+            CG_G2Trace(
+                ctx,
+                &mut extraTrace,
+                &vieworg,
+                &vec3_origin,
+                &vec3_origin,
+                &extraEnd,
+                ignore,
+                CONTENTS_SOLID | CONTENTS_BODY,
+            );
+            if extraTrace.allsolid == 0
+                && extraTrace.startsolid == 0
+                && extraTrace.fraction < 1.0
+                && (extraTrace.fraction * MAX_XHAIR_DIST_ACCURACY) > minAutoAimDist
+                && ((extraTrace.fraction * MAX_XHAIR_DIST_ACCURACY)
+                    - Distance(veh_lerpOrigin, vieworg))
+                    < (trace.fraction * ctx.world.cg.distanceCull)
+            {
+                //this trace hit *something* that's closer than the thing the main trace hit, so use this result instead
+                trace = extraTrace;
+            }
+        }
     } else {
         CG_Trace(
             ctx,

@@ -10347,11 +10347,10 @@ fn cg_draw_player_sphere(
 /// a take/put-back swap with [`centity_t::zeroed`], and `ci` is resolved in
 /// place through [`player_ci`]/[`player_ci_mut`].
 ///
-/// ESCALATION (Vehicle_t referent pool, DEC-46.2): the "has a pilot"
-/// rider-attach branch calls `m_pVehicleInfo->AttachRiders`, a `Vehicle_t`
-/// callback that has no member on the Rust `vehicleInfo_t` and whose only impl
-/// lives game-side (mp_game `g_vehicles.rs`), which cgame cannot depend on; it
-/// stays inert. The smoothing and shield-shader arms read the pool directly.
+/// The vehicle arms (rider attach, smoothing, shield shader) read the
+/// DEC-47.3 pool directly; the rider-attach branch calls bg's
+/// `AttachRidersGeneric`, the fn Raven's CGAME build binds to the retired
+/// `AttachRiders` slot.
 /// Source: `oracle/codemp/cgame/cg_players.c:8423-11107`
 #[allow(clippy::needless_range_loop)]
 pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {

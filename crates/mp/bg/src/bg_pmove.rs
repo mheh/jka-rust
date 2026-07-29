@@ -8471,13 +8471,8 @@ pub fn BG_IK_MoveArm(
             ikP.force_anim_on_bone = qfalse; // let it use existing anim if same as this one
 
             // call with a null bone name first to init the ik system on the g2 instance
-            if traps.g2api_set_bone_ik_state(
-                ghoul2,
-                time,
-                None,
-                IKS_DYNAMIC as c_int,
-                &mut ikP,
-            ) == qfalse
+            if traps.g2api_set_bone_ik_state(ghoul2, time, None, IKS_DYNAMIC as c_int, &mut ikP)
+                == qfalse
             {
                 debug_assert!(false, "Failed to init IK system for g2 instance!");
             }
@@ -10098,16 +10093,144 @@ impl PmoveContext<'_> {
     }
 }
 
+/// The trace channel [`BG_VehicleAdjustBBoxForOrientation`] validates the
+/// oriented box through — Raven's `localTrace` fn-ptr param, `None` being
+/// Raven's NULL ("don't care about solid stuff", cgame's
+/// `CG_ClipMoveToEntities` arm).
+pub type VehBBoxTraceFn<'a> = &'a dyn Fn(
+    &mut trace_t,
+    *const vec3_t,
+    *const vec3_t,
+    *const vec3_t,
+    *const vec3_t,
+    c_int,
+    c_int,
+);
+
 /// Raven `BG_VehicleAdjustBBoxForOrientation` — resize a fighter/flier vehicle's
 /// bbox to its oriented extents, tracing to confirm the new box is valid.
 ///
-/// Raven's `localTrace` fn-ptr param is dropped; the bg callee reaches
-/// the engine trace through `self.traps.trace` (the `pm->trace` channel via
-/// `BgTraps`). Raven's pmove caller always passes a non-null `pm->trace`, so
-/// the old NULL-`localTrace` "don't care about solids" branch is unreachable and
-/// dropped.
 /// Source: `oracle/codemp/game/bg_pmove.c:9993-10076`
+pub fn BG_VehicleAdjustBBoxForOrientation(
+    veh: *mut Vehicle_t,
+    origin: vec3_t,
+    mins: &mut vec3_t,
+    maxs: &mut vec3_t,
+    clientNum: c_int,
+    tracemask: c_int,
+    localTrace: Option<VehBBoxTraceFn>,
+) {
+    // `DEFAULT_MINS_2` canonical in `crate::public::viewheight` (`c_int`,
+    // cast here to match the `vec3_t` component it seeds).
+    // Source: `oracle/codemp/game/bg_public.h:41`
+    const DEFAULT_MINS_2: f32 = crate::public::viewheight::DEFAULT_MINS_2 as f32;
+
+    unsafe {
+        if veh.is_null() {
+            return;
+        }
+        let vi = (*veh).m_pVehicleInfo;
+        if (*vi).length == 0.0 || (*vi).width == 0.0 || (*vi).height == 0.0 {
+            return;
+        } else if (*vi).r#type as c_int != vehicleType_t::VH_FIGHTER as c_int
+            && (*vi).r#type as c_int != vehicleType_t::VH_FLIER as c_int
+        {
+            // only those types have dynamic bboxes, the rest use a static bbox
+            VectorSet(
+                maxs,
+                (*vi).width / 2.0,
+                (*vi).width / 2.0,
+                (*vi).height + DEFAULT_MINS_2,
+            );
+            VectorSet(mins, (*vi).width / -2.0, (*vi).width / -2.0, DEFAULT_MINS_2);
+            return;
+        } else {
+            let mut axis: [vec3_t; 3] = [[0.0; 3]; 3];
+            let mut point: [vec3_t; 8] = [[0.0; 3]; 8];
+            let mut newMins: vec3_t = [0.0; 3];
+            let mut newMaxs: vec3_t = [0.0; 3];
+            let mut trace: trace_t = core::mem::zeroed();
+
+            let len = (*vi).length;
+            let wid = (*vi).width;
+            let hgt = (*vi).height;
+
+            // m_vOrientation is a `vec3_t*` into the owner; read the 3 floats.
+            let orient: vec3_t = [
+                *(*veh).m_vOrientation.add(0),
+                *(*veh).m_vOrientation.add(1),
+                *(*veh).m_vOrientation.add(2),
+            ];
+            AnglesToAxis(orient, axis.as_mut_ptr());
+            _VectorMA(origin, len / 2.0, axis[0], &mut point[0]);
+            _VectorMA(origin, -len / 2.0, axis[0], &mut point[1]);
+            // extrapolate each side up and down
+            let p0 = point[0];
+            _VectorMA(p0, hgt / 2.0, axis[2], &mut point[0]);
+            let p0 = point[0];
+            _VectorMA(p0, -hgt, axis[2], &mut point[2]);
+            let p1 = point[1];
+            _VectorMA(p1, hgt / 2.0, axis[2], &mut point[1]);
+            let p1 = point[1];
+            _VectorMA(p1, -hgt, axis[2], &mut point[3]);
+
+            _VectorMA(origin, wid / 2.0, axis[1], &mut point[4]);
+            _VectorMA(origin, -wid / 2.0, axis[1], &mut point[5]);
+            // extrapolate each side up and down
+            let p4 = point[4];
+            _VectorMA(p4, hgt / 2.0, axis[2], &mut point[4]);
+            let p4 = point[4];
+            _VectorMA(p4, -hgt, axis[2], &mut point[6]);
+            let p5 = point[5];
+            _VectorMA(p5, hgt / 2.0, axis[2], &mut point[5]);
+            let p5 = point[5];
+            _VectorMA(p5, -hgt, axis[2], &mut point[7]);
+
+            // Now inflate a bbox around these points
+            _VectorCopy(origin, &mut newMins);
+            _VectorCopy(origin, &mut newMaxs);
+            for curAxis in 0..3usize {
+                for i in 0..8usize {
+                    if point[i][curAxis] > newMaxs[curAxis] {
+                        newMaxs[curAxis] = point[i][curAxis];
+                    } else if point[i][curAxis] < newMins[curAxis] {
+                        newMins[curAxis] = point[i][curAxis];
+                    }
+                }
+            }
+            let nmn = newMins;
+            _VectorSubtract(nmn, origin, &mut newMins);
+            let nmx = newMaxs;
+            _VectorSubtract(nmx, origin, &mut newMaxs);
+            // now see if that's a valid way to be
+            if let Some(localTrace) = localTrace {
+                localTrace(
+                    &mut trace,
+                    &origin as *const vec3_t,
+                    &newMins as *const vec3_t,
+                    &newMaxs as *const vec3_t,
+                    &origin as *const vec3_t,
+                    clientNum,
+                    tracemask,
+                );
+            } else {
+                // don't care about solid stuff then
+                trace.startsolid = 0;
+                trace.allsolid = 0;
+            }
+            if trace.startsolid == 0 && trace.allsolid == 0 {
+                // let's use it!
+                _VectorCopy(newMins, mins);
+                _VectorCopy(newMaxs, maxs);
+            }
+            // else: just use the last one
+        }
+    }
+}
+
 impl PmoveContext<'_> {
+    /// The pmove caller's arm: `localTrace` is the `pm->trace` channel
+    /// (`self.traps.trace` via `BgTraps`), always non-null in Raven.
     pub fn BG_VehicleAdjustBBoxForOrientation(
         &self,
         veh: *mut Vehicle_t,
@@ -10117,106 +10240,18 @@ impl PmoveContext<'_> {
         clientNum: c_int,
         tracemask: c_int,
     ) {
-        // `DEFAULT_MINS_2` canonical in `crate::public::viewheight` (`c_int`,
-        // cast here to match the `vec3_t` component it seeds).
-        // Source: `oracle/codemp/game/bg_public.h:41`
-        const DEFAULT_MINS_2: f32 = crate::public::viewheight::DEFAULT_MINS_2 as f32;
-
-        unsafe {
-            if veh.is_null() {
-                return;
-            }
-            let vi = (*veh).m_pVehicleInfo;
-            if (*vi).length == 0.0 || (*vi).width == 0.0 || (*vi).height == 0.0 {
-                return;
-            } else if (*vi).r#type as c_int != vehicleType_t::VH_FIGHTER as c_int
-                && (*vi).r#type as c_int != vehicleType_t::VH_FLIER as c_int
-            {
-                // only those types have dynamic bboxes, the rest use a static bbox
-                VectorSet(
-                    maxs,
-                    (*vi).width / 2.0,
-                    (*vi).width / 2.0,
-                    (*vi).height + DEFAULT_MINS_2,
-                );
-                VectorSet(mins, (*vi).width / -2.0, (*vi).width / -2.0, DEFAULT_MINS_2);
-                return;
-            } else {
-                let mut axis: [vec3_t; 3] = [[0.0; 3]; 3];
-                let mut point: [vec3_t; 8] = [[0.0; 3]; 8];
-                let mut newMins: vec3_t = [0.0; 3];
-                let mut newMaxs: vec3_t = [0.0; 3];
-                let mut trace: trace_t = core::mem::zeroed();
-
-                let len = (*vi).length;
-                let wid = (*vi).width;
-                let hgt = (*vi).height;
-
-                // m_vOrientation is a `vec3_t*` into the owner; read the 3 floats.
-                let orient: vec3_t = [
-                    *(*veh).m_vOrientation.add(0),
-                    *(*veh).m_vOrientation.add(1),
-                    *(*veh).m_vOrientation.add(2),
-                ];
-                AnglesToAxis(orient, axis.as_mut_ptr());
-                _VectorMA(origin, len / 2.0, axis[0], &mut point[0]);
-                _VectorMA(origin, -len / 2.0, axis[0], &mut point[1]);
-                // extrapolate each side up and down
-                let p0 = point[0];
-                _VectorMA(p0, hgt / 2.0, axis[2], &mut point[0]);
-                let p0 = point[0];
-                _VectorMA(p0, -hgt, axis[2], &mut point[2]);
-                let p1 = point[1];
-                _VectorMA(p1, hgt / 2.0, axis[2], &mut point[1]);
-                let p1 = point[1];
-                _VectorMA(p1, -hgt, axis[2], &mut point[3]);
-
-                _VectorMA(origin, wid / 2.0, axis[1], &mut point[4]);
-                _VectorMA(origin, -wid / 2.0, axis[1], &mut point[5]);
-                // extrapolate each side up and down
-                let p4 = point[4];
-                _VectorMA(p4, hgt / 2.0, axis[2], &mut point[4]);
-                let p4 = point[4];
-                _VectorMA(p4, -hgt, axis[2], &mut point[6]);
-                let p5 = point[5];
-                _VectorMA(p5, hgt / 2.0, axis[2], &mut point[5]);
-                let p5 = point[5];
-                _VectorMA(p5, -hgt, axis[2], &mut point[7]);
-
-                // Now inflate a bbox around these points
-                _VectorCopy(origin, &mut newMins);
-                _VectorCopy(origin, &mut newMaxs);
-                for curAxis in 0..3usize {
-                    for i in 0..8usize {
-                        if point[i][curAxis] > newMaxs[curAxis] {
-                            newMaxs[curAxis] = point[i][curAxis];
-                        } else if point[i][curAxis] < newMins[curAxis] {
-                            newMins[curAxis] = point[i][curAxis];
-                        }
-                    }
-                }
-                let nmn = newMins;
-                _VectorSubtract(nmn, origin, &mut newMins);
-                let nmx = newMaxs;
-                _VectorSubtract(nmx, origin, &mut newMaxs);
-                // now see if that's a valid way to be
-                self.traps.trace(
-                    &mut trace,
-                    &origin as *const vec3_t,
-                    &newMins as *const vec3_t,
-                    &newMaxs as *const vec3_t,
-                    &origin as *const vec3_t,
-                    clientNum,
-                    tracemask,
-                );
-                if trace.startsolid == 0 && trace.allsolid == 0 {
-                    // let's use it!
-                    _VectorCopy(newMins, mins);
-                    _VectorCopy(newMaxs, maxs);
-                }
-                // else: just use the last one
-            }
-        }
+        BG_VehicleAdjustBBoxForOrientation(
+            veh,
+            origin,
+            mins,
+            maxs,
+            clientNum,
+            tracemask,
+            Some(&|results, start, bmins, bmaxs, end, pass, mask| {
+                self.traps
+                    .trace(results, start, bmins, bmaxs, end, pass, mask)
+            }),
+        )
     }
 }
 
