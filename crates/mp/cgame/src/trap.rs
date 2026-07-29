@@ -3302,7 +3302,8 @@ pub fn G2API_GetNumGoreMarks(engine: &Engine, ghlInfo: *mut c_void, modelIndex: 
 /// `gore` stays an opaque engine token: `SSkinGoreData` has no MP-side Rust
 /// type (the only Rust definition lives in the engine ghoul2 crate, which
 /// mp_cgame must not depend on).
-//TODO: Port SSkinGoreData
+// `SSkinGoreData` stays an opaque engine token per DEC-46.2 - the only Rust
+// definition lives engine-side, which mp_cgame must not depend on.
 // Source: oracle/codemp/game/q_shared.h:3111-3145
 pub fn G2API_AddSkinGore(engine: &Engine, ghlInfo: *mut c_void, gore: *mut c_void) {
     <Engine as Execute<CgG2Addskingore>>::execute(engine, CgG2AddskingoreArgs::new(ghlInfo, gore))

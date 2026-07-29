@@ -54,7 +54,8 @@ pub struct clientInfo_t {
     pub colorOverride: [f32; 3],
 
     pub saber: [saberInfo_t; MAX_SABERS],
-    //TODO: Port ghoul2Weapons element type (CGhoul2Info_v*)
+    // Raven `CGhoul2Info_v*` - stays an opaque engine token per DEC-46.2
+    // (never dereferenced module-side, ui precedent).
     // Source: oracle/codemp/cgame/cg_local.h:202
     pub ghoul2Weapons: [*mut c_void; MAX_SABERS],
 
@@ -139,7 +140,8 @@ pub struct clientInfo_t {
     pub torsoModel: qhandle_t,
     pub torsoSkin: qhandle_t,
 
-    //TODO: Port ghoul2Model (CGhoul2Info_v*)
+    // Raven `CGhoul2Info_v*` - stays an opaque engine token per DEC-46.2
+    // (never dereferenced module-side, ui precedent).
     // Source: oracle/codemp/cgame/cg_local.h:279
     pub ghoul2Model: *mut c_void,
 
