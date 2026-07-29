@@ -39,6 +39,7 @@ use mp_qshared::common::mp::game::class_t::class_t::CLASS_VEHICLE;
 use mp_qshared::common::mp::qcommon::playerState_t;
 use mp_qshared::common::mp::qcommon::player_state::MAX_PS_EVENTS;
 use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t::{SS_DUAL, SS_STAFF};
+use mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_TALK;
 use mp_qshared::common::mp::qcommon::usercmd_t;
 use mp_qshared::common::mp::qcommon::PMF_FOLLOW;
 use mp_qshared::common::mp::trace_t::trace_t;
@@ -54,7 +55,7 @@ use mp_qshared::shared::{
 use mp_uishared::shared::display_state::DisplayState;
 
 use crate::bg_channel::{CgBgTraps, CgGameCallbacks};
-use crate::cg_ents::CG_AdjustPositionForMover;
+use crate::cg_ents::{CG_AdjustPositionForMover, CG_Cube};
 use crate::cg_main::CG_Printf;
 use crate::cg_players::CG_G2TraceCollide;
 use crate::cg_playerstate::CG_TransitionPlayerState;
@@ -1421,15 +1422,131 @@ pub fn CG_PredictPlayerState(ctx: &mut CgContext, ds: &DisplayState) {
         {
             //we're riding a vehicle, let's predict it
             let vehNum = ctx.world.cg.predictedPlayerState.m_iVehicleNum as usize;
-            if ctx.world.entity(vehNum).m_pVehicle.is_some() {
-                //TODO: Port CG_PredictPlayerState vehicle-predict block
-                // Raven derefs `veh->m_pVehicle` throughout the block
-                // (m_vOrientation repoint, m_iRemovedSurfaces, m_ucmd,
-                // m_iBoarding) - blocked on the DEC-47.3 Vehicle_t pool, and
-                // nothing sets `m_pVehicle` until that pool lands, so this arm
-                // cannot fire yet (DEC-47.4 loud-marker policy).
-                // Source: oracle/codemp/cgame/cg_predict.c:1322-1424
-                todo!("Port CG_PredictPlayerState vehicle-predict block — oracle/codemp/cgame/cg_predict.c:1322-1424 (blocked on the DEC-47.3 Vehicle_t pool)")
+            if let Some(id) = ctx.world.entity(vehNum).m_pVehicle {
+                let row_idx = id.ent_num() as usize;
+
+                //make sure pointer is set up to go to our predicted state
+                ctx.world.vehicle_pool[row_idx].m_vOrientation =
+                    &raw mut ctx.world.cg.predictedVehicleState.vehOrientation[0];
+
+                //keep this updated based on what the playerstate says
+                ctx.world.vehicle_pool[row_idx].m_iRemovedSurfaces =
+                    ctx.world.cg.predictedVehicleState.vehSurfaces;
+
+                trap::GetUserCmd(
+                    ctx.engine,
+                    cmdNum,
+                    &mut ctx.world.vehicle_pool[row_idx].m_ucmd,
+                );
+
+                if ctx.world.vehicle_pool[row_idx].m_ucmd.buttons & BUTTON_TALK != 0 {
+                    //forced input if "chat bubble" is up
+                    let ucmd = &mut ctx.world.vehicle_pool[row_idx].m_ucmd;
+                    ucmd.buttons = BUTTON_TALK;
+                    ucmd.forwardmove = 0;
+                    ucmd.rightmove = 0;
+                    ucmd.upmove = 0;
+                }
+                ctx.world.predict.cg_vehPmove.ps = &raw mut ctx.world.cg.predictedVehicleState;
+                let vehLocalAnimIndex = ctx.world.entity(vehNum).localAnimIndex;
+                // §F19: same unchecked `bgAllAnims[localAnimIndex]` as
+                // cg_pmove above - a -1 reads as the null table
+                ctx.world.predict.cg_vehPmove.animations = if vehLocalAnimIndex >= 0
+                    && (vehLocalAnimIndex as usize) < ctx.world.bg_state.bgAllAnims.len()
+                {
+                    ctx.world.bg_state.bgAllAnims[vehLocalAnimIndex as usize].anims
+                } else {
+                    null_mut()
+                };
+
+                ctx.world.predict.cg_vehPmove.cmd = ctx.world.vehicle_pool[row_idx].m_ucmd;
+
+                ctx.world.predict.cg_vehPmove.gametype = ctx.world.cgs.gametype;
+                ctx.world.predict.cg_vehPmove.ghoul2 = ctx.world.entity(vehNum).ghoul2;
+
+                ctx.world.predict.cg_vehPmove.nonHumanoid =
+                    if vehLocalAnimIndex > 0 { qtrue } else { qfalse };
+
+                //I think this was actually wrong.. just copy-pasted from id code. Oh well.
+                let solid = ctx.world.entity(vehNum).currentState.solid;
+                let x = solid & 255;
+                let mut zd = (solid >> 8) & 255;
+                let mut zu = (solid >> 15) & 255;
+
+                zu -= 32; //I don't quite get the reason for this.
+                zd = -zd;
+
+                //z/y must be symmetrical (blah)
+                ctx.world.predict.cg_vehPmove.mins[0] = -(x as f32);
+                ctx.world.predict.cg_vehPmove.mins[1] = -(x as f32);
+                ctx.world.predict.cg_vehPmove.maxs[0] = x as f32;
+                ctx.world.predict.cg_vehPmove.maxs[1] = x as f32;
+                ctx.world.predict.cg_vehPmove.mins[2] = zd as f32;
+                ctx.world.predict.cg_vehPmove.maxs[2] = zu as f32;
+
+                ctx.world.predict.cg_vehPmove.modelScale = ctx.world.entity(vehNum).modelScale;
+
+                if ctx.world.predict.cg_vehPmoveSet == qfalse {
+                    //do all the one-time things
+                    // Raven binds cg_vehPmove.trace/pointcontents here; those
+                    // live on CgBgTraps (DEC-47.2), pmove_t's fn-ptr fields
+                    // stay for layout only
+                    ctx.world.predict.cg_vehPmove.tracemask = MASK_PLAYERSOLID;
+                    ctx.world.predict.cg_vehPmove.debugLevel = 0;
+                    ctx.world.predict.cg_vehPmove.g2Bolts_LFoot = -1;
+                    ctx.world.predict.cg_vehPmove.g2Bolts_RFoot = -1;
+
+                    // the bg_ents shadow walk, sizeof(bgEntity_t) stride -
+                    // same DEC-47.2 divergence as cg_pmove (Raven casts
+                    // cg_entities and strides sizeof(centity_t))
+                    ctx.world.predict.cg_vehPmove.baseEnt = ctx.world.bg_ents.as_mut_ptr();
+                    ctx.world.predict.cg_vehPmove.entSize = size_of::<bgEntity_t>() as c_int;
+
+                    ctx.world.predict.cg_vehPmoveSet = qtrue;
+                }
+
+                ctx.world.predict.cg_vehPmove.noFootsteps =
+                    if ctx.world.cgs.dmflags & DF_NO_FOOTSTEPS > 0 {
+                        qtrue
+                    } else {
+                        qfalse
+                    };
+                ctx.world.predict.cg_vehPmove.pmove_fixed = ctx.world.cvars.pmove_fixed.integer;
+                ctx.world.predict.cg_vehPmove.pmove_msec = ctx.world.cvars.pmove_msec.integer;
+
+                {
+                    let clientNum = ctx.world.cg.predictedPlayerState.clientNum as usize;
+                    let world = &mut *ctx.world;
+                    // both rows repoint at the predicted states - enum arm for
+                    // the cgame readers, raw pointer for the bg view (DEC-47.2)
+                    world.entities[clientNum].playerState = PlayerStateRef::Predicted;
+                    world.bg_ents[clientNum].playerState = &raw mut world.cg.predictedPlayerState;
+                    world.entities[vehNum].playerState = PlayerStateRef::PredictedVehicle;
+                    world.bg_ents[vehNum].playerState = &raw mut world.cg.predictedVehicleState;
+                }
+
+                //update boarding value sent from server. boarding is not predicted, but no big deal
+                ctx.world.vehicle_pool[row_idx].m_iBoarding =
+                    ctx.world.cg.predictedVehicleState.vehBoarding;
+
+                {
+                    let traps = CgBgTraps::new(ctx.engine, ctx.world_raw());
+                    let mut callbacks = CgGameCallbacks::new(ctx.engine, ctx.world_raw());
+                    let pm_ptr = &raw mut ctx.world.predict.cg_vehPmove;
+                    Pmove(pm_ptr, &mut ctx.world.bg_state, &traps, &mut callbacks);
+                }
+
+                if ctx.world.cvars.cg_showVehBounds.integer != 0 {
+                    let NPCDEBUG_RED: vec3_t = [1.0, 0.0, 0.0];
+                    // Raven reads `cg_vehPmove.ps->origin` - that ps was aimed
+                    // at predictedVehicleState just above
+                    let origin = ctx.world.cg.predictedVehicleState.origin;
+                    let mut absmin: vec3_t = [0.0; 3];
+                    let mut absmax: vec3_t = [0.0; 3];
+                    _VectorAdd(origin, ctx.world.predict.cg_vehPmove.mins, &mut absmin);
+                    _VectorAdd(origin, ctx.world.predict.cg_vehPmove.maxs, &mut absmax);
+                    CG_Cube(ctx, absmin, absmax, NPCDEBUG_RED, 0.25);
+                }
             }
         }
 
@@ -1522,13 +1639,11 @@ pub fn CG_PredictPlayerState(ctx: &mut CgContext, ds: &DisplayState) {
     if CG_Piloting(ctx.world, ctx.world.cg.predictedPlayerState.m_iVehicleNum) {
         let vehNum = ctx.world.cg.predictedPlayerState.m_iVehicleNum as usize;
 
-        if ctx.world.entity(vehNum).m_pVehicle.is_some() {
-            //TODO: Port CG_PredictPlayerState revertES m_vOrientation repoint
-            // Raven switches `veh->m_pVehicle->m_vOrientation` back at the
-            // vehicle's cgSendPS row in case we stop riding it - the same
-            // DEC-47.3 gate as the vehicle-predict block above.
-            // Source: oracle/codemp/cgame/cg_predict.c:1486-1493
-            todo!("Port CG_PredictPlayerState revertES m_vOrientation repoint — oracle/codemp/cgame/cg_predict.c:1486-1493 (blocked on the DEC-47.3 Vehicle_t pool)")
+        if let Some(id) = ctx.world.entity(vehNum).m_pVehicle {
+            //switch ptr back for this ent in case we stop riding it
+            let sn = ctx.world.entity(vehNum).currentState.number as usize;
+            ctx.world.vehicle_pool[id.ent_num() as usize].m_vOrientation =
+                &raw mut ctx.world.cgSendPSPool[sn].vehOrientation[0];
         }
 
         let clientNum = ctx.world.cg.predictedPlayerState.clientNum as usize;

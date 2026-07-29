@@ -64,6 +64,7 @@ use mp_bg::public::saber_move_data_table::saberMoveData;
 use mp_bg::public::team::{TEAM_BLUE, TEAM_FREE, TEAM_RED, TEAM_SPECTATOR};
 use mp_bg::saga::siege_team_t::SIEGETEAM_TEAM1;
 use mp_bg::vehicles::vehicle_s::{MAX_VEHICLE_EXHAUSTS, MAX_VEHICLE_MUZZLES};
+use mp_bg::vehicles::vehicle_type_t::vehicleType_t;
 use mp_bg::weapons::weapon_t::{WP_EMPLACED_GUN, WP_SABER, WP_STUN_BATON};
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
@@ -148,6 +149,9 @@ use crate::local::mark_poly_s::MAX_VERTS_ON_POLY;
 use crate::local::player_state_ref::PlayerStateRef;
 use crate::local::vehicle_id::VehicleId;
 use crate::trap;
+use crate::vehicle_npc::{
+    G_CreateAnimalNPC, G_CreateFighterNPC, G_CreateSpeederNPC, G_CreateWalkerNPC,
+};
 use crate::world::cg_context::CgContext;
 use crate::world::cg_world::CgWorld;
 
@@ -6408,16 +6412,9 @@ pub fn CG_SaberCompWork(
 /// from its configstring model name, bolts the humanoid tags it needs, resolves
 /// its animation set and hands its sabers and sounds over.
 ///
-/// DEFERRED (the vehicle path): Raven creates the clientside `Vehicle_t` here
-/// with `G_CreateAnimalNPC`/`G_CreateSpeederNPC`/`G_CreateFighterNPC`/
-/// `G_CreateWalkerNPC`. Those four live in `mp_game` (`AnimalNPC.rs`,
-/// `SpeederNPC.rs`, `FighterNPC.rs`, `WalkerNPC.rs`) and cgame does not — must
-/// not — depend on that crate, and DEC-46.2's `Option<VehicleId>` has no
-/// referent pool to hold the result anyway. `BG_VehicleGetIndex` still runs (it
-/// is what loads and registers the vehicle), the model name is still resolved
-/// off it, and the default skin is used since `m_pVehicleInfo->skin` is out of
-/// reach; `cent.m_pVehicle` stays `None`, so the bolt-tag block further down
-/// never runs.
+/// The vehicle path creates the clientside `Vehicle_t` out of
+/// `CgWorld::vehicle_pool` via the CGAME `G_Create*NPC` arms in
+/// [`crate::vehicle_npc`] (DEC-47.3).
 /// Source: `oracle/codemp/cgame/cg_players.c:6998-7262`
 pub fn CG_G2AnimEntModelLoad(ctx: &mut CgContext, centNum: usize) {
     let modelindex = ctx.world.entity(centNum).currentState.modelindex;
@@ -6447,12 +6444,47 @@ pub fn CG_G2AnimEntModelLoad(ctx: &mut CgContext, centNum: usize) {
                 &traps,
                 &mut callbacks,
             );
-            let _ = iVehIndex;
+            match ctx.world.bg_state.g_vehicleInfo[iVehIndex as usize].r#type {
+                vehicleType_t::VH_ANIMAL => {
+                    // Create the animal (making sure all it's data is initialized).
+                    G_CreateAnimalNPC(ctx, centNum, &vehType);
+                }
+                vehicleType_t::VH_SPEEDER => {
+                    // Create the speeder (making sure all it's data is initialized).
+                    G_CreateSpeederNPC(ctx, centNum, &vehType);
+                }
+                vehicleType_t::VH_FIGHTER => {
+                    // Create the fighter (making sure all it's data is initialized).
+                    G_CreateFighterNPC(ctx, centNum, &vehType);
+                }
+                vehicleType_t::VH_WALKER => {
+                    // Create the walker (making sure all it's data is initialized).
+                    G_CreateWalkerNPC(ctx, centNum, &vehType);
+                }
+                _ => {
+                    // Raven: assert(!"vehicle with an unknown type - couldn't create vehicle_t")
+                    CG_Printf(
+                        ctx,
+                        "vehicle with an unknown type - couldn't create vehicle_t\n",
+                    );
+                }
+            }
 
-            // DEFERRED: G_Create{Animal,Speeder,Fighter,Walker}NPC + the
-            // `m_vOrientation`/`m_pParentEntity` prediction hack +
-            // `CG_RegisterVehicleAssets` — see the fn doc.
-            // Source: oracle/codemp/cgame/cg_players.c:7021-7051
+            // Raven derefs `cent->m_pVehicle` with no null check - on the
+            // unknown-type arm above that's a release-build null deref, so the
+            // defined behavior here is to skip the block instead (§19)
+            if let Some(id) = ctx.world.entity(centNum).m_pVehicle {
+                let sn = ctx.world.entity(centNum).currentState.number as usize;
+                let row = &mut ctx.world.vehicle_pool[id.ent_num() as usize];
+
+                //set up my happy prediction hack
+                row.m_vOrientation = &raw mut ctx.world.cgSendPSPool[sn].vehOrientation[0];
+
+                row.m_pParentEntity = &raw mut ctx.world.bg_ents[centNum];
+
+                //attach the handles for fx cgame-side
+                CG_RegisterVehicleAssets(id);
+            }
 
             let mut modelBuf: [c_char; MAX_QPATH] = [0; MAX_QPATH];
             Q_strncpyz(&mut modelBuf, &modelName, MAX_QPATH);
@@ -6466,13 +6498,25 @@ pub fn CG_G2AnimEntModelLoad(ctx: &mut CgContext, centNum: usize) {
             );
             modelName = buf_to_string(&modelBuf.map(|c| c as u8));
 
-            // DEFERRED: Vehicle_t::m_pVehicleInfo->skin — the custom-skin arm is
-            // unreachable without the referent pool, so the default skin loads.
-            // Source: oracle/codemp/cgame/cg_players.c:7054-7062
-            skinID = trap::R_RegisterSkin(
-                ctx.engine,
-                &format!("models/players/{}/model_default.skin", modelName),
-            );
+            let skin_ptr = match ctx.world.entity(centNum).m_pVehicle {
+                Some(id) => unsafe {
+                    (*ctx.world.vehicle_pool[id.ent_num() as usize].m_pVehicleInfo).skin
+                },
+                None => null_mut(),
+            };
+            if !skin_ptr.is_null() && unsafe { *skin_ptr } != 0 {
+                //use a custom skin
+                let skin_str = unsafe { cstr_to_str(skin_ptr) };
+                skinID = trap::R_RegisterSkin(
+                    ctx.engine,
+                    &format!("models/players/{}/model_{}.skin", modelName, skin_str),
+                );
+            } else {
+                skinID = trap::R_RegisterSkin(
+                    ctx.engine,
+                    &format!("models/players/{}/model_default.skin", modelName),
+                );
+            }
             modelName = format!("models/players/{}/model.glm", modelName);
 
             //this sound is *only* used for vehicles now

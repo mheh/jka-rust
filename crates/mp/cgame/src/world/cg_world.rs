@@ -10,6 +10,7 @@ use mp_bg::bg_channel::{BgHost, BgState};
 use mp_bg::bg_misc::MAX_POOL_SIZE_CGAME;
 use mp_bg::public::bg_entity::bgEntity_t;
 use mp_bg::public::max_items::MAX_ITEMS;
+use mp_bg::vehicles::vehicle_s::Vehicle_t;
 use mp_qshared::common::mp::qcommon::playerState_t;
 use mp_qshared::common::mp::qcommon::player_state::MAX_WEAPONS;
 use mp_qshared::shared::MAX_GENTITIES;
@@ -98,6 +99,16 @@ pub struct CgWorld {
     /// entity-state fields before running `Pmove` over them (DEC-47.2).
     /// Source: `oracle/codemp/cgame/cg_predict.c:912-914`
     pub bg_ents: Box<[bgEntity_t; MAX_GENTITIES]>,
+
+    /// The DEC-47.3 referent pool behind `centity_t.m_pVehicle`: Raven's
+    /// client side heap-allocates one `Vehicle_t` per vehicle cent
+    /// (`BG_Alloc`, never freed, pointer never stomped) — here that is one
+    /// entity-number-indexed slab, `VehicleId::ent_num()` keying the row and
+    /// the cent's `Option<VehicleId>` carrying the null test. Zeroed with the
+    /// cents on map init, Raven's per-map `BG_Alloc` lifetime.
+    /// Source: `oracle/codemp/game/AnimalNPC.c:914-918` (same shape in the
+    /// three sibling `G_Create*NPC` CGAME arms)
+    pub vehicle_pool: Box<[Vehicle_t; MAX_GENTITIES]>,
 
     /// Raven `weaponInfo_t cg_weapons[MAX_WEAPONS]` — the per-weapon
     /// model/sound/effect registry.
@@ -243,6 +254,8 @@ impl CgWorld {
             // SAFETY: `bgEntity_t` is an entityState POD, raw pointers (null
             // when zeroed) and scalars.
             addr_of_mut!((*p).bg_ents).write(zeroed_box::<[bgEntity_t; MAX_GENTITIES]>());
+
+            addr_of_mut!((*p).vehicle_pool).write(zeroed_box::<[Vehicle_t; MAX_GENTITIES]>());
             // SAFETY: `weaponInfo_t` is scalars, arrays, an `Option<ItemId>`
             // (zero == `None`) and the `TrailFn` dispatch enums (zero == the
             // `None` arm).

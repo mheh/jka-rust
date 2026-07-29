@@ -61,4 +61,5 @@ pub mod fx_rocketlauncher;
 pub mod lights;
 pub mod local;
 pub mod trap;
+pub mod vehicle_npc;
 pub mod world;
