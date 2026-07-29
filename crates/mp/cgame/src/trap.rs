@@ -2302,6 +2302,19 @@ pub fn GetEntityToken(engine: &Engine, buffer_len: usize) -> Option<String> {
     (more != 0).then(|| buf_to_string(&buffer))
 }
 
+/// Raven `trap_GetEntityToken( NULL, -1 )` — the engine's force-reset arm
+/// (`R_GetEntityToken` keys on `size == -1` and rewinds its parse cursor
+/// before ever touching the buffer, `tr_bsp.cpp:1981-1985`). A real buffer
+/// must NOT stand in here: an empty `Vec`'s dangling ptr + size 0 walked past
+/// the reset check straight into `Q_strncpyz(dest, src, 0)` (live segfault,
+/// 2026-07-29).
+pub fn GetEntityTokenReset(engine: &Engine) {
+    <Engine as Execute<CgGetEntityToken>>::execute(
+        engine,
+        CgGetEntityTokenArgs::new(null_mut(), -1),
+    );
+}
+
 /// Raven `trap_R_inPVS` — `CG_R_INPVS`
 /// (token: `mp_abi::cgame::syscalls::CG_R_INPVS`).
 ///

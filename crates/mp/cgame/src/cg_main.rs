@@ -3486,39 +3486,37 @@ pub fn CG_RegisterGraphics(ctx: &mut CgContext) {
         }
 
         trap::CM_LoadMap(engine, &bspName, true);
-        ctx.world.cgs.inlineDrawModel[breakPoint as usize] =
-            trap::R_RegisterModel(engine, &bspName);
+        // §19: Raven's breakPoint is unbounded - once the map's inline-model
+        // registrations reach MAX_MODELS the C writes walk off inlineDrawModel
+        // into inlineModelMidpoints (live crash on a Lugormod map, 2026-07-29);
+        // we keep the trap calls and drop the out-of-bounds stores.
+        let handle = trap::R_RegisterModel(engine, &bspName);
         let mut mins: vec3_t = [0.0; 3];
         let mut maxs: vec3_t = [0.0; 3];
-        trap::R_ModelBounds(
-            engine,
-            ctx.world.cgs.inlineDrawModel[breakPoint as usize],
-            &mut mins,
-            &mut maxs,
-        );
-        for j in 0..3 {
-            ctx.world.cgs.inlineModelMidpoints[breakPoint as usize][j] =
-                (mins[j] as f64 + 0.5 * (maxs[j] as f64 - mins[j] as f64)) as f32;
+        trap::R_ModelBounds(engine, handle, &mut mins, &mut maxs);
+        if (breakPoint as usize) < MAX_MODELS as usize {
+            ctx.world.cgs.inlineDrawModel[breakPoint as usize] = handle;
+            for j in 0..3 {
+                ctx.world.cgs.inlineModelMidpoints[breakPoint as usize][j] =
+                    (mins[j] as f64 + 0.5 * (maxs[j] as f64 - mins[j] as f64)) as f32;
+            }
         }
         breakPoint += 1;
         for sub in 1..MAX_MODELS {
             let temp = format!("*{i}-{sub}");
-            ctx.world.cgs.inlineDrawModel[breakPoint as usize] =
-                trap::R_RegisterModel(engine, &temp);
-            if ctx.world.cgs.inlineDrawModel[breakPoint as usize] == 0 {
+            let handle = trap::R_RegisterModel(engine, &temp);
+            if handle == 0 {
                 break;
             }
             let mut mins: vec3_t = [0.0; 3];
             let mut maxs: vec3_t = [0.0; 3];
-            trap::R_ModelBounds(
-                engine,
-                ctx.world.cgs.inlineDrawModel[breakPoint as usize],
-                &mut mins,
-                &mut maxs,
-            );
-            for j in 0..3 {
-                ctx.world.cgs.inlineModelMidpoints[breakPoint as usize][j] =
-                    (mins[j] as f64 + 0.5 * (maxs[j] as f64 - mins[j] as f64)) as f32;
+            trap::R_ModelBounds(engine, handle, &mut mins, &mut maxs);
+            if (breakPoint as usize) < MAX_MODELS as usize {
+                ctx.world.cgs.inlineDrawModel[breakPoint as usize] = handle;
+                for j in 0..3 {
+                    ctx.world.cgs.inlineModelMidpoints[breakPoint as usize][j] =
+                        (mins[j] as f64 + 0.5 * (maxs[j] as f64 - mins[j] as f64)) as f32;
+                }
             }
             breakPoint += 1;
         }
@@ -4859,17 +4857,10 @@ pub fn CG_LoadHudMenu(ctx: &mut CgContext, menus: &mut MenuSystem, ds: &mut Disp
 /// cgame-side, looking for the client-only spawn classes `CG_SpawnCGameEntFromVars`
 /// cares about (sky portals, weather zones, cgame-only static models, ...).
 ///
-/// PORT-NOTE: Raven's reset call `trap_GetEntityToken(NULL, -1)` passes a NULL
-/// buffer/`-1` length to rewind the engine's parse cursor with no token copy;
-/// the ported `trap::GetEntityToken` wrapper always allocates and passes a
-/// real buffer, so there is no zero-copy NULL-pointer shape to call through -
-/// a zero-length buffer is the closest reachable stand-in and the return value
-/// is discarded either way (Raven's own comment: "make sure it is reset").
-///
 /// Source: `oracle/codemp/cgame/cg_main.c:3664-3682`
 pub fn CG_SpawnCGameOnlyEnts(ctx: &mut CgContext) {
     //make sure it is reset
-    trap::GetEntityToken(ctx.engine, 0);
+    trap::GetEntityTokenReset(ctx.engine);
 
     if !CG_ParseSpawnVars(ctx) {
         //first one is gonna be the world spawn
