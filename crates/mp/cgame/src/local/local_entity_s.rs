@@ -103,6 +103,9 @@ pub struct localEntity_t_electricity {
 pub struct localEntity_t_particle {
     pub radius: f32,
     pub dradius: f32,
+    /// Dead in MP: no cgame TU ever stores or calls a local-entity `thinkFn`
+    /// (SP's particle system does) - kept for the union shape only, so the
+    /// DEC-47.6 `LeThinkFn` enum collapsed to nothing to dispatch (§20).
     pub thinkFn: Option<unsafe extern "C" fn(le: *mut localEntity_t) -> qboolean>,
     pub dir: vec3_t,
 }
@@ -118,6 +121,7 @@ pub struct localEntity_t_spawner {
     pub variance: f32,
     pub delay: c_int,
     pub nextthink: c_int,
+    /// Dead in MP, as `localEntity_t_particle::thinkFn`.
     pub thinkFn: Option<unsafe extern "C" fn(le: *mut localEntity_t) -> qboolean>,
     pub data1: c_int,
     pub data2: c_int,

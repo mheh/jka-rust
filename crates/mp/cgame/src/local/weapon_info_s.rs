@@ -4,7 +4,7 @@ use core::ffi::{c_float, c_int};
 
 use mp_bg::public::item_id::ItemId;
 
-use super::centity_s::centity_t;
+use super::trail_fn::TrailFn;
 use mp_qshared::shared::{fxHandle_t, qboolean, qhandle_t, sfxHandle_t, vec3_t};
 
 /// Raven `weaponInfo_t`.
@@ -44,8 +44,9 @@ pub struct weaponInfo_t {
     pub muzzleEffect: fxHandle_t,
     pub missileModel: qhandle_t,
     pub missileSound: sfxHandle_t,
-    pub missileTrailFunc:
-        Option<unsafe extern "C" fn(cent: *mut centity_t, wi: *const weaponInfo_t)>,
+    /// Raven `void (*missileTrailFunc)( centity_t *, const struct weaponInfo_s * )`
+    /// as the DEC-47.6 closed dispatch enum (``TrailFn``).
+    pub missileTrailFunc: TrailFn,
     pub missileDlight: c_float,
     pub missileDlightColor: vec3_t,
     pub missileRenderfx: c_int,
@@ -57,8 +58,8 @@ pub struct weaponInfo_t {
     pub altMuzzleEffect: fxHandle_t,
     pub altMissileModel: qhandle_t,
     pub altMissileSound: sfxHandle_t,
-    pub altMissileTrailFunc:
-        Option<unsafe extern "C" fn(cent: *mut centity_t, wi: *const weaponInfo_t)>,
+    /// The alt-fire arm of ``TrailFn``.
+    pub altMissileTrailFunc: TrailFn,
     pub altMissileDlight: c_float,
     pub altMissileDlightColor: vec3_t,
     pub altMissileRenderfx: c_int,
@@ -68,5 +69,16 @@ pub struct weaponInfo_t {
 
     pub readySound: sfxHandle_t,
     pub trailRadius: c_float,
+
     pub wiTrailTime: c_float,
+}
+
+impl weaponInfo_t {
+    /// All-zero row - the swap-out placeholder the trail dispatch leaves in
+    /// `cg_weapons`, the same value `CgWorld::new_boxed`'s zero fill builds.
+    pub fn zeroed() -> Self {
+        // SAFETY: handles/floats/arrays, `TrailFn` (0 = its `None` arm) and a
+        // zero-niche `Option<ItemId>` - all-zero is a valid value.
+        unsafe { core::mem::zeroed() }
+    }
 }

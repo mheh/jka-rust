@@ -27,5 +27,6 @@ pub mod q3print_t;
 pub mod score_t;
 pub mod siege_extended_s;
 pub mod skulltrail_t;
+pub mod trail_fn;
 pub mod vehicle_id;
 pub mod weapon_info_s;

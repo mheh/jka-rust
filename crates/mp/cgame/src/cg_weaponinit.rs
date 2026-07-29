@@ -19,6 +19,7 @@ use mp_qshared::shared::{fxHandle_t, qfalse, qhandle_t, qtrue, sfxHandle_t, vec3
 
 use crate::cg_main::CG_Error;
 use crate::cg_weapons::CG_RegisterItemVisuals;
+use crate::local::trail_fn::TrailFn;
 use crate::local::weapon_info_s::weaponInfo_t;
 use crate::trap;
 use crate::world::cg_context::CgContext;
@@ -88,7 +89,7 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
         muzzleEffect: 0,
         missileModel: 0,
         missileSound: 0,
-        missileTrailFunc: None,
+        missileTrailFunc: TrailFn::None,
         missileDlight: 0.0,
         missileDlightColor: [0.0; 3],
         missileRenderfx: 0,
@@ -99,7 +100,7 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
         altMuzzleEffect: 0,
         altMissileModel: 0,
         altMissileSound: 0,
-        altMissileTrailFunc: None,
+        altMissileTrailFunc: TrailFn::None,
         altMissileDlight: 0.0,
         altMissileDlightColor: [0.0; 3],
         altMissileRenderfx: 0,
@@ -257,15 +258,8 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.missileDlight = 0.0;
             //weaponInfo->missileDlightColor= {0,0,0};
             weaponInfo.missileHitSound = NULL_SOUND;
-            // DEFERRED: `missileTrailFunc = FX_ConcussionProjectileThink`.
-            // `weaponInfo_t.missileTrailFunc` is still the transcription-era raw
-            // `extern "C"` fn ptr, which cannot hold a ported think fn (they take
-            // `&mut CgContext`); DEC-46.4's closed trail-fn enum has not landed and
-            // `local/weapon_info_s.rs` is outside this wave's target set. Every
-            // `*TrailFunc` store below is held the same way — the field has no
-            // reader in the tree yet.
             // Source: `oracle/codemp/cgame/cg_weaponinit.c:159`
-            weaponInfo.missileTrailFunc = None;
+            weaponInfo.missileTrailFunc = TrailFn::Concussion;
 
             weaponInfo.altFlashSound[0] = NULL_SOUND;
             weaponInfo.altFiringSound = NULL_SOUND;
@@ -278,9 +272,8 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.altMissileDlight = 0.0;
             //weaponInfo->altMissileDlightColor= {0,0,0};
             weaponInfo.altMissileHitSound = NULL_SOUND;
-            // DEFERRED: `altMissileTrailFunc = FX_ConcussionProjectileThink` — see above.
             // Source: `oracle/codemp/cgame/cg_weaponinit.c:170`
-            weaponInfo.altMissileTrailFunc = None;
+            weaponInfo.altMissileTrailFunc = TrailFn::Concussion;
 
             // the concussion case really does register the disruptor's alt-miss
             // effect - Raven's own crossover, kept
@@ -309,10 +302,8 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.missileDlight = 0.0;
             //weaponInfo->missileDlightColor= {0,0,0};
             weaponInfo.missileHitSound = NULL_SOUND;
-            // DEFERRED: `missileTrailFunc = FX_BryarProjectileThink` — see the
-            // WP_CONCUSSION note.
             // Source: `oracle/codemp/cgame/cg_weaponinit.c:193`
-            weaponInfo.missileTrailFunc = None;
+            weaponInfo.missileTrailFunc = TrailFn::Bryar;
 
             weaponInfo.altFlashSound[0] =
                 trap::S_RegisterSound(engine, "sound/weapons/bryar/alt_fire.wav");
@@ -325,10 +316,8 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.altMissileDlight = 0.0;
             //weaponInfo->altMissileDlightColor= {0,0,0};
             weaponInfo.altMissileHitSound = NULL_SOUND;
-            // DEFERRED: `altMissileTrailFunc = FX_BryarAltProjectileThink` — see the
-            // WP_CONCUSSION note.
             // Source: `oracle/codemp/cgame/cg_weaponinit.c:204`
-            weaponInfo.altMissileTrailFunc = None;
+            weaponInfo.altMissileTrailFunc = TrailFn::BryarAlt;
 
             world.cgs.effects.bryarShotEffect = trap::FX_RegisterEffect(engine, "bryar/shot");
             world.cgs.effects.bryarPowerupShotEffect =
@@ -367,10 +356,8 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.missileDlight = 0.0;
             //		weaponInfo->missileDlightColor	= {0,0,0};
             weaponInfo.missileHitSound = NULL_SOUND;
-            // DEFERRED: `missileTrailFunc = FX_BlasterProjectileThink` — see the
-            // WP_CONCUSSION note.
             // Source: `oracle/codemp/cgame/cg_weaponinit.c:235`
-            weaponInfo.missileTrailFunc = None;
+            weaponInfo.missileTrailFunc = TrailFn::Blaster;
 
             weaponInfo.altFlashSound[0] =
                 trap::S_RegisterSound(engine, "sound/weapons/blaster/alt_fire.wav");
@@ -382,10 +369,8 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.altMissileDlight = 0.0;
             //		weaponInfo->altMissileDlightColor= {0,0,0};
             weaponInfo.altMissileHitSound = NULL_SOUND;
-            // DEFERRED: `altMissileTrailFunc = FX_BlasterProjectileThink` — see the
-            // WP_CONCUSSION note.
             // Source: `oracle/codemp/cgame/cg_weaponinit.c:246`
-            weaponInfo.altMissileTrailFunc = None;
+            weaponInfo.altMissileTrailFunc = TrailFn::Blaster;
 
             trap::FX_RegisterEffect(engine, "blaster/deflect");
             world.cgs.effects.blasterShotEffect = trap::FX_RegisterEffect(engine, "blaster/shot");
@@ -411,7 +396,7 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.missileDlight = 0.0;
             //		weaponInfo->missileDlightColor	= {0,0,0};
             weaponInfo.missileHitSound = NULL_SOUND;
-            weaponInfo.missileTrailFunc = None;
+            weaponInfo.missileTrailFunc = TrailFn::None;
 
             weaponInfo.altFlashSound[0] =
                 trap::S_RegisterSound(engine, "sound/weapons/disruptor/alt_fire.wav");
@@ -424,7 +409,7 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.altMissileDlight = 0.0;
             //		weaponInfo->altMissileDlightColor= {0,0,0};
             weaponInfo.altMissileHitSound = NULL_SOUND;
-            weaponInfo.altMissileTrailFunc = None;
+            weaponInfo.altMissileTrailFunc = TrailFn::None;
 
             world.cgs.effects.disruptorRingsEffect =
                 trap::FX_RegisterEffect(engine, "disruptor/rings");
@@ -474,10 +459,8 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.altMissileDlight = 0.0;
             //		weaponInfo->altMissileDlightColor	= {0,0,0};
             weaponInfo.altMissileHitSound = NULL_SOUND;
-            // DEFERRED: `altMissileTrailFunc = FX_BowcasterProjectileThink` — see the
-            // WP_CONCUSSION note.
             // Source: `oracle/codemp/cgame/cg_weaponinit.c:316`
-            weaponInfo.altMissileTrailFunc = None;
+            weaponInfo.altMissileTrailFunc = TrailFn::Bowcaster;
 
             weaponInfo.flashSound[0] =
                 trap::S_RegisterSound(engine, "sound/weapons/bowcaster/fire.wav");
@@ -490,10 +473,8 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.missileDlight = 0.0;
             //		weaponInfo->missileDlightColor= {0,0,0};
             weaponInfo.missileHitSound = NULL_SOUND;
-            // DEFERRED: `missileTrailFunc = FX_BowcasterAltProjectileThink` — see the
-            // WP_CONCUSSION note.
             // Source: `oracle/codemp/cgame/cg_weaponinit.c:327`
-            weaponInfo.missileTrailFunc = None;
+            weaponInfo.missileTrailFunc = TrailFn::BowcasterAlt;
 
             world.cgs.effects.bowcasterShotEffect =
                 trap::FX_RegisterEffect(engine, "bowcaster/shot");
@@ -520,10 +501,8 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.missileDlight = 0.0;
             //		weaponInfo->missileDlightColor	= {0,0,0};
             weaponInfo.missileHitSound = NULL_SOUND;
-            // DEFERRED: `missileTrailFunc = FX_RepeaterProjectileThink` — see the
-            // WP_CONCUSSION note.
             // Source: `oracle/codemp/cgame/cg_weaponinit.c:349`
-            weaponInfo.missileTrailFunc = None;
+            weaponInfo.missileTrailFunc = TrailFn::Repeater;
 
             weaponInfo.altFlashSound[0] =
                 trap::S_RegisterSound(engine, "sound/weapons/repeater/alt_fire.wav");
@@ -535,10 +514,8 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.altMissileDlight = 0.0;
             //		weaponInfo->altMissileDlightColor= {0,0,0};
             weaponInfo.altMissileHitSound = NULL_SOUND;
-            // DEFERRED: `altMissileTrailFunc = FX_RepeaterAltProjectileThink` — see the
-            // WP_CONCUSSION note.
             // Source: `oracle/codemp/cgame/cg_weaponinit.c:360`
-            weaponInfo.altMissileTrailFunc = None;
+            weaponInfo.altMissileTrailFunc = TrailFn::RepeaterAlt;
 
             world.cgs.effects.repeaterProjectileEffect =
                 trap::FX_RegisterEffect(engine, "repeater/projectile");
@@ -567,10 +544,8 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.missileDlight = 0.0;
             //		weaponInfo->missileDlightColor	= {0,0,0};
             weaponInfo.missileHitSound = NULL_SOUND;
-            // DEFERRED: `missileTrailFunc = FX_DEMP2_ProjectileThink` — see the
-            // WP_CONCUSSION note.
             // Source: `oracle/codemp/cgame/cg_weaponinit.c:382`
-            weaponInfo.missileTrailFunc = None;
+            weaponInfo.missileTrailFunc = TrailFn::Demp2;
 
             weaponInfo.altFlashSound[0] =
                 trap::S_RegisterSound(engine, "sound/weapons/demp2/altfire.wav");
@@ -583,7 +558,7 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.altMissileDlight = 0.0;
             //		weaponInfo->altMissileDlightColor= {0,0,0};
             weaponInfo.altMissileHitSound = NULL_SOUND;
-            weaponInfo.altMissileTrailFunc = None;
+            weaponInfo.altMissileTrailFunc = TrailFn::None;
 
             world.cgs.effects.demp2ProjectileEffect =
                 trap::FX_RegisterEffect(engine, "demp2/projectile");
@@ -615,10 +590,8 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.missileDlight = 0.0;
             //		weaponInfo->missileDlightColor	= {0,0,0};
             weaponInfo.missileHitSound = NULL_SOUND;
-            // DEFERRED: `missileTrailFunc = FX_FlechetteProjectileThink` — see the
-            // WP_CONCUSSION note.
             // Source: `oracle/codemp/cgame/cg_weaponinit.c:417`
-            weaponInfo.missileTrailFunc = None;
+            weaponInfo.missileTrailFunc = TrailFn::Flechette;
 
             weaponInfo.altFlashSound[0] =
                 trap::S_RegisterSound(engine, "sound/weapons/flechette/alt_fire.wav");
@@ -631,10 +604,8 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.altMissileDlight = 0.0;
             //		weaponInfo->altMissileDlightColor= {0,0,0};
             weaponInfo.altMissileHitSound = NULL_SOUND;
-            // DEFERRED: `altMissileTrailFunc = FX_FlechetteAltProjectileThink` — see the
-            // WP_CONCUSSION note.
             // Source: `oracle/codemp/cgame/cg_weaponinit.c:428`
-            weaponInfo.altMissileTrailFunc = None;
+            weaponInfo.altMissileTrailFunc = TrailFn::FlechetteAlt;
 
             world.cgs.effects.flechetteShotEffect =
                 trap::FX_RegisterEffect(engine, "flechette/shot");
@@ -663,10 +634,8 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.missileDlight = 125.0;
             VectorSet(&mut weaponInfo.missileDlightColor, 1.0, 1.0, 0.5);
             weaponInfo.missileHitSound = NULL_SOUND;
-            // DEFERRED: `missileTrailFunc = FX_RocketProjectileThink` — see the
-            // WP_CONCUSSION note.
             // Source: `oracle/codemp/cgame/cg_weaponinit.c:449`
-            weaponInfo.missileTrailFunc = None;
+            weaponInfo.missileTrailFunc = TrailFn::Rocket;
 
             weaponInfo.altFlashSound[0] =
                 trap::S_RegisterSound(engine, "sound/weapons/rocket/alt_fire.wav");
@@ -680,10 +649,8 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.altMissileDlight = 125.0;
             VectorSet(&mut weaponInfo.altMissileDlightColor, 1.0, 1.0, 0.5);
             weaponInfo.altMissileHitSound = NULL_SOUND;
-            // DEFERRED: `altMissileTrailFunc = FX_RocketAltProjectileThink` — see the
-            // WP_CONCUSSION note.
             // Source: `oracle/codemp/cgame/cg_weaponinit.c:460`
-            weaponInfo.altMissileTrailFunc = None;
+            weaponInfo.altMissileTrailFunc = TrailFn::RocketAlt;
 
             world.cgs.effects.rocketShotEffect = trap::FX_RegisterEffect(engine, "rocket/shot");
             world.cgs.effects.rocketExplosionEffect =
@@ -712,7 +679,7 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.missileDlight = 0.0;
             //		weaponInfo->missileDlightColor	= {0,0,0};
             weaponInfo.missileHitSound = NULL_SOUND;
-            weaponInfo.missileTrailFunc = None;
+            weaponInfo.missileTrailFunc = TrailFn::None;
 
             weaponInfo.altFlashSound[0] =
                 trap::S_RegisterSound(engine, "sound/weapons/thermal/fire.wav");
@@ -726,7 +693,7 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.altMissileDlight = 0.0;
             //		weaponInfo->altMissileDlightColor= {0,0,0};
             weaponInfo.altMissileHitSound = NULL_SOUND;
-            weaponInfo.altMissileTrailFunc = None;
+            weaponInfo.altMissileTrailFunc = TrailFn::None;
 
             world.cgs.effects.thermalExplosionEffect =
                 trap::FX_RegisterEffect(engine, "thermal/explosion");
@@ -756,7 +723,7 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.missileDlight = 0.0;
             //		weaponInfo->missileDlightColor	= {0,0,0};
             weaponInfo.missileHitSound = NULL_SOUND;
-            weaponInfo.missileTrailFunc = None;
+            weaponInfo.missileTrailFunc = TrailFn::None;
 
             weaponInfo.altFlashSound[0] =
                 trap::S_RegisterSound(engine, "sound/weapons/laser_trap/fire.wav");
@@ -768,7 +735,7 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.altMissileDlight = 0.0;
             //		weaponInfo->altMissileDlightColor= {0,0,0};
             weaponInfo.altMissileHitSound = NULL_SOUND;
-            weaponInfo.altMissileTrailFunc = None;
+            weaponInfo.altMissileTrailFunc = TrailFn::None;
 
             world.cgs.effects.tripmineLaserFX =
                 trap::FX_RegisterEffect(engine, "tripMine/laserMP.efx");
@@ -796,7 +763,7 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.missileDlight = 0.0;
             //		weaponInfo->missileDlightColor	= {0,0,0};
             weaponInfo.missileHitSound = NULL_SOUND;
-            weaponInfo.missileTrailFunc = None;
+            weaponInfo.missileTrailFunc = TrailFn::None;
 
             weaponInfo.altFlashSound[0] =
                 trap::S_RegisterSound(engine, "sound/weapons/detpack/fire.wav");
@@ -809,7 +776,7 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.altMissileDlight = 0.0;
             //		weaponInfo->altMissileDlightColor= {0,0,0};
             weaponInfo.altMissileHitSound = NULL_SOUND;
-            weaponInfo.altMissileTrailFunc = None;
+            weaponInfo.altMissileTrailFunc = TrailFn::None;
 
             trap::R_RegisterModel(engine, "models/weapons2/detpack/det_pack.md3");
             trap::S_RegisterSound(engine, "sound/weapons/detpack/stick.wav");
@@ -826,10 +793,8 @@ pub fn CG_RegisterWeapon(ctx: &mut CgContext, weaponNum: c_int) {
             weaponInfo.missileSound = NULL_SOUND;
             weaponInfo.missileDlight = 0.0;
             weaponInfo.missileHitSound = NULL_SOUND;
-            // DEFERRED: `missileTrailFunc = FX_TurretProjectileThink` — see the
-            // WP_CONCUSSION note.
             // Source: `oracle/codemp/cgame/cg_weaponinit.c:581`
-            weaponInfo.missileTrailFunc = None;
+            weaponInfo.missileTrailFunc = TrailFn::Turret;
 
             trap::FX_RegisterEffect(engine, "effects/blaster/wall_impact.efx");
             trap::FX_RegisterEffect(engine, "effects/blaster/flesh_impact.efx");

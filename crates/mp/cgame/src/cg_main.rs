@@ -127,6 +127,7 @@ use crate::local::centity_s::centity_t;
 use crate::local::client_info_t::clientInfo_t;
 use crate::local::footstep_t::footstep_t;
 use crate::local::item_info_t::itemInfo_t;
+use crate::local::trail_fn::TrailFn;
 use crate::local::weapon_info_s::weaponInfo_t;
 use crate::trap;
 use crate::world::cg_main_state::CgMiscEnt;
@@ -2897,7 +2898,7 @@ fn zeroed_weapon_info() -> weaponInfo_t {
         muzzleEffect: 0,
         missileModel: 0,
         missileSound: 0,
-        missileTrailFunc: None,
+        missileTrailFunc: TrailFn::None,
         missileDlight: 0.0,
         missileDlightColor: [0.0; 3],
         missileRenderfx: 0,
@@ -2909,7 +2910,7 @@ fn zeroed_weapon_info() -> weaponInfo_t {
         altMuzzleEffect: 0,
         altMissileModel: 0,
         altMissileSound: 0,
-        altMissileTrailFunc: None,
+        altMissileTrailFunc: TrailFn::None,
         altMissileDlight: 0.0,
         altMissileDlightColor: [0.0; 3],
         altMissileRenderfx: 0,

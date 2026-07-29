@@ -78,6 +78,8 @@ use crate::cg_weapons::CG_CheckPlayerG2Weapons;
 use crate::local::centity_s::{centity_t, MAX_CG_LOOPSOUNDS};
 use crate::local::cg_loop_sound_s::cgLoopSound_t;
 use crate::local::le_type_t::leType_t;
+use crate::local::trail_fn::TrailFn;
+use crate::local::weapon_info_s::weaponInfo_t;
 use crate::trap;
 use crate::world::cg_context::CgContext;
 use crate::world::cg_world::CgWorld;
@@ -1778,12 +1780,20 @@ pub fn CG_Missile(ctx: &mut CgContext, centNum: usize) {
         }
     } else if (s1_eFlags & EF_ALT_FIRING) != 0 {
         // add trails
-        // DEFERRED: `weapon->altMissileTrailFunc( cent, weapon )`.
-        // `weaponInfo_t.altMissileTrailFunc` is still the transcription-era raw
-        // `extern "C"` fn ptr and every store in `cg_weaponinit.rs` holds it at
-        // `None` (DEC-46.4's closed trail-fn enum has not landed), so the
-        // condition can never be true and there is nothing to dispatch to yet.
+        // Raven: if ( weapon->altMissileTrailFunc ) weapon->altMissileTrailFunc( cent, weapon );
+        // the cent row and the weapon row swap out for the dispatch so the
+        // think fn can hold ctx beside them (the CG_Player slot-swap shape)
         // Source: `oracle/codemp/cgame/cg_ents.c:2530-2533`
+        let trailFn = ctx.world.cg_weapons[weaponIdx].altMissileTrailFunc;
+        if trailFn != TrailFn::None {
+            let mut cent_tmp =
+                core::mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+            let weapon_tmp =
+                core::mem::replace(&mut ctx.world.cg_weapons[weaponIdx], weaponInfo_t::zeroed());
+            trailFn.dispatch(ctx, &mut cent_tmp, &weapon_tmp);
+            ctx.world.cg_weapons[weaponIdx] = weapon_tmp;
+            *ctx.world.entity_mut(centNum) = cent_tmp;
+        }
 
         // add dynamic light
         let altMissileDlight = ctx.world.cg_weapons[weaponIdx].altMissileDlight;
@@ -1815,9 +1825,19 @@ pub fn CG_Missile(ctx: &mut CgContext, centNum: usize) {
         }
     } else {
         // add trails
-        // DEFERRED: `weapon->missileTrailFunc( cent, weapon )` — the same held
-        // raw fn-ptr field as the alt arm above.
+        // Raven: if ( weapon->missileTrailFunc ) weapon->missileTrailFunc( cent, weapon );
+        // same swap-out shape as the alt arm above
         // Source: `oracle/codemp/cgame/cg_ents.c:2558-2561`
+        let trailFn = ctx.world.cg_weapons[weaponIdx].missileTrailFunc;
+        if trailFn != TrailFn::None {
+            let mut cent_tmp =
+                core::mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+            let weapon_tmp =
+                core::mem::replace(&mut ctx.world.cg_weapons[weaponIdx], weaponInfo_t::zeroed());
+            trailFn.dispatch(ctx, &mut cent_tmp, &weapon_tmp);
+            ctx.world.cg_weapons[weaponIdx] = weapon_tmp;
+            *ctx.world.entity_mut(centNum) = cent_tmp;
+        }
 
         // add dynamic light
         let missileDlight = ctx.world.cg_weapons[weaponIdx].missileDlight;

@@ -244,7 +244,8 @@ impl CgWorld {
             // when zeroed) and scalars.
             addr_of_mut!((*p).bg_ents).write(zeroed_box::<[bgEntity_t; MAX_GENTITIES]>());
             // SAFETY: `weaponInfo_t` is scalars, arrays, an `Option<ItemId>`
-            // (zero == `None`) and `Option<fn>` trail hooks (zero == `None`).
+            // (zero == `None`) and the `TrailFn` dispatch enums (zero == the
+            // `None` arm).
             addr_of_mut!((*p).cg_weapons).write(zeroed_box::<[weaponInfo_t; MAX_WEAPONS]>());
             // SAFETY: `itemInfo_t` is a `#[repr(C)]` POD — handles, floats and
             // ghoul2 `*mut c_void` tokens, all null/0 when zeroed.
