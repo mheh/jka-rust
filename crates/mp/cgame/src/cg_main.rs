@@ -2113,24 +2113,13 @@ pub fn CG_AssetCache(ctx: &mut CgContext, ds: &mut DisplayState) {
 
 /// Raven `CG_Init_CG` — wipes `cg` between map loads.
 ///
-/// ESCALATION: blocked on a safe zero-fill for `cg_t`. Raven's body is one
-/// `memset( &cg, 0, sizeof(cg) )`; `cg_t` is the ~295 KB `#[repr(C)]` C1 port
-/// with no `zeroed()`/`Default`, and the only zero-fill in the crate is
-/// `CgWorld::new_boxed`'s `unsafe write_bytes` — which lives in `cg_world.rs`, a
-/// file a wave transcriber may not touch, and this wave may not write `unsafe`
-/// either. A by-value literal is out too: a 295 KB `cg_t` on the stack is the
-/// guard-page overflow `CgWorld::new_boxed` documents. Needs `cg_t::zeroed()`
-/// (in-place, boxed) before this fn can be filled in.
-///
 /// The `_XBOX` `widescreen` save/restore around the memset is not in the MP PC
 /// build.
 ///
 /// Source: `oracle/codemp/cgame/cg_main.c:3254-3263`
 pub fn CG_Init_CG(world: &mut CgWorld) {
-    let _ = world;
-    //TODO: Port CG_Init_CG
-    // Source: oracle/codemp/cgame/cg_main.c:3254-3263
-    todo!("CG_Init_CG — blocked on a safe cg_t zero-fill, oracle/codemp/cgame/cg_main.c:3254-3263")
+    // Raven: memset( &cg, 0, sizeof(cg));
+    world.cg.zero_in_place();
 }
 
 /// Raven `CG_Init_CGents` — wipes the entity array between map loads.
@@ -5294,8 +5283,6 @@ pub fn CG_Init(
     CG_Init_CGents(ctx.world);
     // this is a No-No now we have stl vector classes in here.
     // memset( &cg, 0, sizeof( cg ) );
-    // PORT-NOTE: CG_Init_CG is still a cited todo!() (blocked on a safe cg_t
-    // zero-fill) - CG_Init panics here until that lands.
     CG_Init_CG(ctx.world);
     CG_InitItems(ctx.world);
 

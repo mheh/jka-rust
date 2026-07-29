@@ -247,6 +247,17 @@ pub struct playerState_t {
     pub userVec2: vec3_t,
 }
 
+impl playerState_t {
+    /// All-zero value - the analogue of Raven's zeroed-BSS `playerState_t`
+    /// instances (the cgame `cgSendPS` pool rows, `memset`-cleared locals).
+    pub fn zeroed() -> Self {
+        // SAFETY: `#[repr(C)]` plain-old-data (ints/floats/vec3s and a
+        // `forcedata_t` of the same) with no niche/invariant - all-zero is a
+        // valid value.
+        unsafe { core::mem::zeroed() }
+    }
+}
+
 const _: () = assert!(core::mem::size_of::<forcedata_t>() == 464);
 const _: () = assert!(core::mem::offset_of!(forcedata_t, forcePowerDebounce) == 0);
 const _: () = assert!(core::mem::offset_of!(forcedata_t, forcePowersKnown) == 72);

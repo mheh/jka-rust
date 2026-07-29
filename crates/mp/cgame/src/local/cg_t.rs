@@ -1,6 +1,7 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
 use core::ffi::c_char;
+use core::ptr::write_bytes;
 
 use mp_abi::cgame::public::snapshot_t::snapshot_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
@@ -319,6 +320,19 @@ pub struct cg_t {
 }
 
 impl cg_t {
+    /// In-place all-zero fill - Raven's `memset( &cg, 0, sizeof( cg ) )`
+    /// between map loads. In place because `cg_t` is ~295 KB: a by-value zero
+    /// would transit the caller's stack (the guard-page overflow
+    /// `CgWorld::new_boxed` documents).
+    ///
+    /// Source: `oracle/codemp/cgame/cg_main.c:3258`
+    pub fn zero_in_place(&mut self) {
+        // SAFETY: `#[repr(C)]` plain-old-data all the way down - scalars,
+        // arrays, POD snapshots, and the raw `snap`/`nextSnap` self-pointers,
+        // which null out to the `None` arm of `snap_ref`.
+        unsafe { write_bytes(self, 0, 1) }
+    }
+
     /// The snapshot `cg.snap` points at. `cg_snapshot.c` only ever stores
     /// `&cg.activeSnapshots[0]` or `[1]` there (`cg_snapshot.c:281-284`), so
     /// the raw self-pointer resolves safely by comparing addresses. `None` is
