@@ -206,7 +206,12 @@ pub fn CG_ReadNextSnapshot(ctx: &mut CgContext) -> Option<usize> {
 pub fn CG_ResetEntity(ctx: &mut CgContext, centNum: usize) {
     // take the body out for the CG_ResetPlayerEntity call below - same
     // pattern as cg_ents.rs's CG_General ragdoll/bolt calls
-    let mut cent = core::mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+    // bitwise copy-in/copy-back, original left in place - a zeroed-swap here is
+    // visible to every ctx-reading helper down the call chain (CG_CopyG2WeaponInstance
+    // reads entity(centNum).currentState.number mid-call; the zeroed placeholder
+    // made every client copy client 0's saber - C6b referee catch).
+    // SAFETY: centity_t is #[repr(C)] plain data; the copy is written back whole.
+    let mut cent = unsafe { core::ptr::read(ctx.world.entity(centNum)) };
 
     // if the previous snapshot this entity was updated in is at least
     // an event window back in time then we can reset the previous event
@@ -251,10 +256,16 @@ pub fn CG_ResetEntity(ctx: &mut CgContext, centNum: usize) {
             CG_ResetPlayerEntity(ctx, &mut cent, &mut scratch);
         } else if (cent.currentState.clientNum as usize) < ctx.world.cgs.clientinfo.len() {
             let clientNum = cent.currentState.clientNum as usize;
-            let mut ci = core::mem::replace(
-                &mut ctx.world.cgs.clientinfo[clientNum],
-                zeroed_client_info(),
-            );
+            // bitwise copy-in/copy-back, ORIGINAL LEFT IN PLACE - the earlier
+            // swap-out left a zeroed placeholder in the world slot, and
+            // CG_CopyG2WeaponInstance re-reads cgs.clientinfo[n] mid-call, so
+            // dual-saber clients lost their second saber copy (C6b referee
+            // caught it: shared-instance tokens where Raven had per-client
+            // ghoul2Weapons). ci mutations before any helper read are limited
+            // to fields the helpers never touch, so value-aliasing is safe.
+            // SAFETY: clientInfo_t is #[repr(C)] plain data (see the scratch
+            // arm note); the bit-copy is written back whole after the call.
+            let mut ci = unsafe { core::ptr::read(&ctx.world.cgs.clientinfo[clientNum]) };
             CG_ResetPlayerEntity(ctx, &mut cent, &mut ci);
             ctx.world.cgs.clientinfo[clientNum] = ci;
         } else {

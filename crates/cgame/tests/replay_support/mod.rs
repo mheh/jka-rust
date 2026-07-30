@@ -703,7 +703,14 @@ impl ReplayState {
         };
         let number = frame[0];
         if std::env::var_os("JKA_REPLAY_TRACE").is_some() {
-            eprintln!("trap {number} seq~{}", self.syscall_count.get());
+            if number == 308 {
+                eprintln!("trap 308 src={:#x} dst={:#x} slots {} -> {}", frame[1], frame[3], frame[2], frame[4]);
+            } else if number == 297 {
+                let nm = String::from_utf8_lossy(&read_module_cstr(frame[2])).into_owned();
+                eprintln!("trap 297 slot={:#x} model={nm}", frame[1]);
+            } else {
+                eprintln!("trap {number} seq~{}", self.syscall_count.get());
+            }
         }
 
         // register the module's shared region (host-owned; re-pointed each run).
@@ -897,6 +904,10 @@ impl ReplayState {
                 }
                 ArgKind::DoublePtr => {
                     if let Some(b) = exit.blob(i as u8, BLOB_DOUBLE_PTR_SLOT) {
+                        if std::env::var_os("JKA_REPLAY_TRACE").is_some() && b.bytes.len() == 8 {
+                            let tok = u64::from_le_bytes(b.bytes[..8].try_into().unwrap());
+                            eprintln!("  serve trap {} slot={ptr:#x} token={tok:#x}", sh.num);
+                        }
                         write_module(ptr, &b.bytes);
                     }
                 }

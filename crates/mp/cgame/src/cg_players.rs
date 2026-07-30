@@ -7902,7 +7902,10 @@ pub(crate) fn CG_LoadClientInfoFor(ctx: &mut CgContext, ci: &mut clientInfo_t, g
             {
                 // take/put-back: CG_ResetPlayerEntity wants (&mut cent, &mut ci);
                 // `ci` is a live &mut param, so only `cent` needs lifting.
-                let mut cent = core::mem::replace(ctx.world.entity_mut(i), centity_t::zeroed());
+                // copy-in/copy-back with the original left in place (see the
+                // cg_snapshot.rs caller note - zeroed swap-outs alias wrong)
+                // SAFETY: centity_t is #[repr(C)] plain data, written back whole.
+                let mut cent = unsafe { core::ptr::read(ctx.world.entity(i)) };
                 CG_ResetPlayerEntity(ctx, &mut cent, ci);
                 *ctx.world.entity_mut(i) = cent;
             }

@@ -391,59 +391,62 @@ pub fn CG_DrawMiscEnts(ctx: &mut CgContext) {
 /// read-only UI/server transfer cvars, and snapshots whether the local
 /// machine is also running the server.
 ///
-/// PORT-NOTE: Raven walks a `cvarTable[]` built in a separate declaration order
-/// (`cg_main.c:882-1053`) from the field order `CgCvars` documents
-/// (`cg_main.c:702-873`); that table's literal row order isn't in this
-/// packet, so the registrations below walk `CgCvars`'s declaration order
-/// instead — every row still registers with its correct name/default/flags,
-/// only the wall-clock registration order (behaviorally inert; each
-/// `trap_Cvar_Register` call is independent) differs from Raven's.
+/// The registrations below walk `cvarTable[]`'s literal row order
+/// (`cg_main.c:882-1053`) - the C6b demo referee diffs the registration
+/// sequence call-for-call, so the order is observable, not inert (the first
+/// rust replay desynced on it).
 ///
 /// Source: `oracle/codemp/cgame/cg_main.c:1062-1112`
 pub fn CG_RegisterCvars(ctx: &mut CgContext) {
     trap::Cvar_Register(
         ctx.engine,
-        Some(&mut ctx.world.cvars.cg_centertime),
-        "cg_centertime",
-        "3",
-        CVAR_CHEAT,
+        Some(&mut ctx.world.cvars.cg_ignore),
+        "cg_ignore",
+        "0",
+        0,
     );
     trap::Cvar_Register(
         ctx.engine,
-        Some(&mut ctx.world.cvars.cg_runpitch),
-        "cg_runpitch",
-        "0.002",
+        Some(&mut ctx.world.cvars.cg_autoswitch),
+        "cg_autoswitch",
+        "1",
         CVAR_ARCHIVE,
     );
     trap::Cvar_Register(
         ctx.engine,
-        Some(&mut ctx.world.cvars.cg_runroll),
-        "cg_runroll",
-        "0.005",
+        Some(&mut ctx.world.cvars.cg_drawGun),
+        "cg_drawGun",
+        "1",
         CVAR_ARCHIVE,
     );
     trap::Cvar_Register(
         ctx.engine,
-        Some(&mut ctx.world.cvars.cg_bobup),
-        "cg_bobup",
-        "0.005",
+        Some(&mut ctx.world.cvars.cg_zoomFov),
+        "cg_zoomfov",
+        "40.0",
         CVAR_ARCHIVE,
     );
     trap::Cvar_Register(
         ctx.engine,
-        Some(&mut ctx.world.cvars.cg_bobpitch),
-        "cg_bobpitch",
-        "0.002",
+        Some(&mut ctx.world.cvars.cg_fov),
+        "cg_fov",
+        "80",
         CVAR_ARCHIVE,
     );
     trap::Cvar_Register(
         ctx.engine,
-        Some(&mut ctx.world.cvars.cg_bobroll),
-        "cg_bobroll",
-        "0.002",
+        Some(&mut ctx.world.cvars.cg_viewsize),
+        "cg_viewsize",
+        "100",
         CVAR_ARCHIVE,
     );
-
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut ctx.world.cvars.cg_stereoSeparation),
+        "cg_stereoSeparation",
+        "0.4",
+        CVAR_ARCHIVE,
+    );
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_shadows),
@@ -455,6 +458,20 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_renderToTextureFX),
         "cg_renderToTextureFX",
+        "1",
+        CVAR_ARCHIVE,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut ctx.world.cvars.cg_draw2D),
+        "cg_draw2D",
+        "1",
+        CVAR_ARCHIVE,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut ctx.world.cvars.cg_drawStatus),
+        "cg_drawStatus",
         "1",
         CVAR_ARCHIVE,
     );
@@ -502,6 +519,13 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
     );
     trap::Cvar_Register(
         ctx.engine,
+        Some(&mut ctx.world.cvars.cg_drawEnemyInfo),
+        "cg_drawEnemyInfo",
+        "1",
+        CVAR_ARCHIVE,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
         Some(&mut ctx.world.cvars.cg_drawCrosshair),
         "cg_drawCrosshair",
         "1",
@@ -530,6 +554,13 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
     );
     trap::Cvar_Register(
         ctx.engine,
+        Some(&mut ctx.world.cvars.cg_drawScores),
+        "cg_drawScores",
+        "1",
+        CVAR_ARCHIVE,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
         Some(&mut ctx.world.cvars.cg_dynamicCrosshair),
         "cg_dynamicCrosshair",
         "1",
@@ -551,16 +582,16 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
     );
     trap::Cvar_Register(
         ctx.engine,
-        Some(&mut ctx.world.cvars.cg_drawScores),
-        "cg_drawScores",
-        "1",
+        Some(&mut ctx.world.cvars.cg_crosshairSize),
+        "cg_crosshairSize",
+        "24",
         CVAR_ARCHIVE,
     );
     trap::Cvar_Register(
         ctx.engine,
-        Some(&mut ctx.world.cvars.cg_crosshairSize),
-        "cg_crosshairSize",
-        "24",
+        Some(&mut ctx.world.cvars.cg_crosshairHealth),
+        "cg_crosshairHealth",
+        "0",
         CVAR_ARCHIVE,
     );
     trap::Cvar_Register(
@@ -579,23 +610,87 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
     );
     trap::Cvar_Register(
         ctx.engine,
-        Some(&mut ctx.world.cvars.cg_crosshairHealth),
-        "cg_crosshairHealth",
+        Some(&mut ctx.world.cvars.cg_simpleItems),
+        "cg_simpleItems",
         "0",
         CVAR_ARCHIVE,
     );
     trap::Cvar_Register(
         ctx.engine,
-        Some(&mut ctx.world.cvars.cg_draw2D),
-        "cg_draw2D",
+        Some(&mut ctx.world.cvars.cg_addMarks),
+        "cg_marks",
         "1",
         CVAR_ARCHIVE,
     );
     trap::Cvar_Register(
         ctx.engine,
-        Some(&mut ctx.world.cvars.cg_drawStatus),
-        "cg_drawStatus",
-        "1",
+        Some(&mut ctx.world.cvars.cg_lagometer),
+        "cg_lagometer",
+        "0",
+        CVAR_ARCHIVE,
+    );
+    // `cg_gun_frame` — declared and read, never registered in `cvarTable` (CgCvars doc).
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut ctx.world.cvars.cg_gun_x),
+        "cg_gunX",
+        "0",
+        CVAR_CHEAT,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut ctx.world.cvars.cg_gun_y),
+        "cg_gunY",
+        "0",
+        CVAR_CHEAT,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut ctx.world.cvars.cg_gun_z),
+        "cg_gunZ",
+        "0",
+        CVAR_CHEAT,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut ctx.world.cvars.cg_centertime),
+        "cg_centertime",
+        "3",
+        CVAR_CHEAT,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut ctx.world.cvars.cg_runpitch),
+        "cg_runpitch",
+        "0.002",
+        CVAR_ARCHIVE,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut ctx.world.cvars.cg_runroll),
+        "cg_runroll",
+        "0.005",
+        CVAR_ARCHIVE,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut ctx.world.cvars.cg_bobup),
+        "cg_bobup",
+        "0.005",
+        CVAR_ARCHIVE,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut ctx.world.cvars.cg_bobpitch),
+        "cg_bobpitch",
+        "0.002",
+        CVAR_ARCHIVE,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut ctx.world.cvars.cg_bobroll),
+        "cg_bobroll",
+        "0.002",
         CVAR_ARCHIVE,
     );
     trap::Cvar_Register(
@@ -677,91 +772,11 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
     );
     trap::Cvar_Register(
         ctx.engine,
-        Some(&mut ctx.world.cvars.cg_addMarks),
-        "cg_marks",
-        "1",
-        CVAR_ARCHIVE,
-    );
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_viewsize),
-        "cg_viewsize",
-        "100",
-        CVAR_ARCHIVE,
-    );
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_drawGun),
-        "cg_drawGun",
-        "1",
-        CVAR_ARCHIVE,
-    );
-    // `cg_gun_frame` — declared and read, never registered in `cvarTable` (CgCvars doc).
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_gun_x),
-        "cg_gunX",
-        "0",
-        CVAR_CHEAT,
-    );
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_gun_y),
-        "cg_gunY",
-        "0",
-        CVAR_CHEAT,
-    );
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_gun_z),
-        "cg_gunZ",
-        "0",
-        CVAR_CHEAT,
-    );
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_autoswitch),
-        "cg_autoswitch",
-        "1",
-        CVAR_ARCHIVE,
-    );
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_ignore),
-        "cg_ignore",
-        "0",
-        0,
-    );
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_simpleItems),
-        "cg_simpleItems",
-        "0",
-        CVAR_ARCHIVE,
-    );
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_fov),
-        "cg_fov",
-        "80",
-        CVAR_ARCHIVE,
-    );
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_zoomFov),
-        "cg_zoomfov",
-        "40.0",
-        CVAR_ARCHIVE,
-    );
-
-    trap::Cvar_Register(
-        ctx.engine,
         Some(&mut ctx.world.cvars.cg_swingAngles),
         "cg_swingAngles",
         "1",
         0,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_oldPainSounds),
@@ -769,7 +784,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "0",
         0,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_ragDoll),
@@ -777,7 +791,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "0",
         0,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_jumpSounds),
@@ -785,7 +798,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "0",
         0,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_autoMap),
@@ -821,7 +833,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "128",
         CVAR_ARCHIVE,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.bg_fighterAltControl),
@@ -829,7 +840,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "0",
         CVAR_SERVERINFO,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_chatBox),
@@ -844,7 +854,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "350",
         CVAR_ARCHIVE,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_saberModelTraceEffect),
@@ -852,7 +861,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "0",
         0,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_saberClientVisualCompensation),
@@ -860,7 +868,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "1",
         0,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_g2TraceLod),
@@ -868,7 +875,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "2",
         0,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_fpls),
@@ -876,7 +882,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "0",
         0,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_ghoul2Marks),
@@ -884,7 +889,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "16",
         0,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_optvehtrace),
@@ -892,7 +896,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "0",
         0,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_saberDynamicMarks),
@@ -907,7 +910,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "60000",
         0,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_saberContact),
@@ -922,7 +924,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "1",
         0,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_duelHeadAngles),
@@ -930,7 +931,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "0",
         0,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_speedTrail),
@@ -945,7 +945,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "1",
         0,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_repeaterOrb),
@@ -953,7 +952,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "0",
         0,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_animBlend),
@@ -961,7 +959,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "1",
         0,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_dismember),
@@ -969,7 +966,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "0",
         CVAR_ARCHIVE,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_thirdPersonSpecialCam),
@@ -977,7 +973,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "0",
         0,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_thirdPerson),
@@ -1027,7 +1022,13 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "0.5",
         CVAR_CHEAT,
     );
-
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut ctx.world.cvars.cg_thirdPersonHorzOffset),
+        "cg_thirdPersonHorzOffset",
+        "0",
+        CVAR_CHEAT,
+    );
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_thirdPersonAlpha),
@@ -1037,73 +1038,9 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
     );
     trap::Cvar_Register(
         ctx.engine,
-        Some(&mut ctx.world.cvars.cg_thirdPersonHorzOffset),
-        "cg_thirdPersonHorzOffset",
-        "0",
-        CVAR_CHEAT,
-    );
-
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_stereoSeparation),
-        "cg_stereoSeparation",
-        "0.4",
-        CVAR_ARCHIVE,
-    );
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_lagometer),
-        "cg_lagometer",
-        "0",
-        CVAR_ARCHIVE,
-    );
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_drawEnemyInfo),
-        "cg_drawEnemyInfo",
-        "1",
-        CVAR_ARCHIVE,
-    );
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_synchronousClients),
-        "g_synchronousClients",
-        "0",
-        0,
-    );
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_stats),
-        "cg_stats",
-        "0",
-        0,
-    );
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_buildScript),
-        "com_buildScript",
-        "0",
-        0,
-    );
-    trap::Cvar_Register(
-        ctx.engine,
         Some(&mut ctx.world.cvars.cg_forceModel),
         "cg_forceModel",
         "0",
-        CVAR_ARCHIVE,
-    );
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_paused),
-        "cl_paused",
-        "0",
-        CVAR_ROM,
-    );
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_blood),
-        "com_blood",
-        "1",
         CVAR_ARCHIVE,
     );
     trap::Cvar_Register(
@@ -1136,6 +1073,13 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
     );
     trap::Cvar_Register(
         ctx.engine,
+        Some(&mut ctx.world.cvars.cg_stats),
+        "cg_stats",
+        "0",
+        0,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
         Some(&mut ctx.world.cvars.cg_drawFriend),
         "cg_drawFriend",
         "1",
@@ -1150,49 +1094,59 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
     );
     trap::Cvar_Register(
         ctx.engine,
-        Some(&mut ctx.world.cvars.cg_hudFiles),
-        "cg_hudFiles",
-        "ui/jahud.txt",
-        CVAR_ARCHIVE,
+        Some(&mut ctx.world.cvars.cg_buildScript),
+        "com_buildScript",
+        "0",
+        0,
     );
     trap::Cvar_Register(
         ctx.engine,
-        Some(&mut ctx.world.cvars.cg_scorePlum),
-        "cg_scorePlums",
+        Some(&mut ctx.world.cvars.cg_paused),
+        "cl_paused",
+        "0",
+        CVAR_ROM,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut ctx.world.cvars.cg_blood),
+        "com_blood",
         "1",
         CVAR_ARCHIVE,
     );
     trap::Cvar_Register(
         ctx.engine,
-        Some(&mut ctx.world.cvars.cg_smoothClients),
-        "cg_smoothClients",
-        "1",
+        Some(&mut ctx.world.cvars.cg_synchronousClients),
+        "g_synchronousClients",
+        "0",
+        0,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut ctx.world.cvars.cg_currentSelectedPlayer),
+        "cg_currentSelectedPlayer",
+        "0",
         CVAR_ARCHIVE,
     );
-
     trap::Cvar_Register(
         ctx.engine,
-        Some(&mut ctx.world.cvars.pmove_fixed),
-        "pmove_fixed",
-        "0",
-        0,
+        Some(&mut ctx.world.cvars.cg_currentSelectedPlayerName),
+        "cg_currentSelectedPlayerName",
+        "",
+        CVAR_ARCHIVE,
     );
-
     trap::Cvar_Register(
         ctx.engine,
-        Some(&mut ctx.world.cvars.pmove_msec),
-        "pmove_msec",
-        "8",
-        0,
-    );
-
-    // `g_showDuelHealths`/`cg_pmove_msec` — declared and read, never registered in `cvarTable`.
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_cameraMode),
-        "com_cameraMode",
+        Some(&mut ctx.world.cvars.cg_recordSPDemo),
+        "ui_recordSPDemo",
         "0",
-        CVAR_CHEAT,
+        CVAR_ARCHIVE,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut ctx.world.cvars.cg_recordSPDemoName),
+        "ui_recordSPDemoName",
+        "",
+        CVAR_ARCHIVE,
     );
     trap::Cvar_Register(
         ctx.engine,
@@ -1231,6 +1185,49 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
     );
     trap::Cvar_Register(
         ctx.engine,
+        Some(&mut ctx.world.cvars.cg_scorePlum),
+        "cg_scorePlums",
+        "1",
+        CVAR_ARCHIVE,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut ctx.world.cvars.cg_hudFiles),
+        "cg_hudFiles",
+        "ui/jahud.txt",
+        CVAR_ARCHIVE,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut ctx.world.cvars.cg_smoothClients),
+        "cg_smoothClients",
+        "1",
+        CVAR_ARCHIVE,
+    );
+    // `g_showDuelHealths`/`cg_pmove_msec` — declared and read, never registered in `cvarTable`.
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut ctx.world.cvars.cg_cameraMode),
+        "com_cameraMode",
+        "0",
+        CVAR_CHEAT,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut ctx.world.cvars.pmove_fixed),
+        "pmove_fixed",
+        "0",
+        0,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut ctx.world.cvars.pmove_msec),
+        "pmove_msec",
+        "8",
+        0,
+    );
+    trap::Cvar_Register(
+        ctx.engine,
         Some(&mut ctx.world.cvars.cg_noTaunt),
         "cg_noTaunt",
         "0",
@@ -1243,44 +1240,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "0",
         CVAR_ARCHIVE,
     );
-
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_debugBB),
-        "debugBB",
-        "0",
-        0,
-    );
-
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_currentSelectedPlayer),
-        "cg_currentSelectedPlayer",
-        "0",
-        CVAR_ARCHIVE,
-    );
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_currentSelectedPlayerName),
-        "cg_currentSelectedPlayerName",
-        "",
-        CVAR_ARCHIVE,
-    );
-
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_recordSPDemo),
-        "ui_recordSPDemo",
-        "0",
-        CVAR_ARCHIVE,
-    );
-    trap::Cvar_Register(
-        ctx.engine,
-        Some(&mut ctx.world.cvars.cg_recordSPDemoName),
-        "ui_recordSPDemoName",
-        "",
-        CVAR_ARCHIVE,
-    );
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_showVehBounds),
@@ -1288,7 +1247,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "0",
         0,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.ui_myteam),
@@ -1296,7 +1254,6 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "0",
         CVAR_ROM | CVAR_INTERNAL,
     );
-
     trap::Cvar_Register(
         ctx.engine,
         Some(&mut ctx.world.cvars.cg_snapshotTimeout),
@@ -1304,7 +1261,13 @@ pub fn CG_RegisterCvars(ctx: &mut CgContext) {
         "10",
         CVAR_ARCHIVE,
     );
-
+    trap::Cvar_Register(
+        ctx.engine,
+        Some(&mut ctx.world.cvars.cg_debugBB),
+        "debugBB",
+        "0",
+        0,
+    );
     // see if we are also running the server on this machine
     let var = trap::Cvar_VariableStringBuffer(ctx.engine, "sv_running", MAX_TOKEN_CHARS);
     ctx.world.cgs.localServer = atoi(&var);
@@ -5064,44 +5027,53 @@ pub fn CG_RegisterClients(ctx: &mut CgContext) {
 /// from the engine, then handles the two side effects that fire when a
 /// tracked cvar's `modificationCount` moved since the last call.
 ///
-/// PORT-NOTE: `cvarTable`'s literal row order (`cg_main.c:882-1053`) is not in
-/// this packet; `CG_RegisterCvars` already walks `CgCvars`'s declaration order
-/// in its place (its own PORT-NOTE, `cg_main.c:1062-1112`) with the same
-/// reasoning — each `trap_Cvar_Update` call is independent of the others, so
-/// the reorder is behaviorally inert. This walk matches that one call-for-call.
-///
-/// Source: `oracle/codemp/cgame/cg_main.c:1157-1187`
+/// Walks `cvarTable[]`'s literal row order (`cg_main.c:882-1053`), same as
+/// `CG_RegisterCvars` - the C6b referee diffs the update sequence too.
 pub fn CG_UpdateCvars(ctx: &mut CgContext) {
     let engine = ctx.engine;
 
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_centertime);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_runpitch);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_runroll);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_bobup);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_bobpitch);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_bobroll);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_ignore);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_autoswitch);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawGun);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_zoomFov);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_fov);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_viewsize);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_stereoSeparation);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_shadows);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_renderToTextureFX);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_draw2D);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawStatus);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawTimer);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawFPS);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawSnapshot);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_draw3dIcons);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawIcons);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawAmmoWarning);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawEnemyInfo);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawCrosshair);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawCrosshairNames);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawRadar);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawVehLeadIndicator);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawScores);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_dynamicCrosshair);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_dynamicCrosshairPrecision);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawRewards);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawScores);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_crosshairSize);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_crosshairHealth);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_crosshairX);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_crosshairY);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_crosshairHealth);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_draw2D);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawStatus);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_simpleItems);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_addMarks);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_lagometer);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_gun_x);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_gun_y);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_gun_z);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_centertime);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_runpitch);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_runroll);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_bobup);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_bobpitch);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_bobroll);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_animSpeed);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_debugAnim);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_debugSaber);
@@ -5113,17 +5085,6 @@ pub fn CG_UpdateCvars(ctx: &mut CgContext) {
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_showmiss);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_showVehMiss);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_footsteps);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_addMarks);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_viewsize);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawGun);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_gun_x);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_gun_y);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_gun_z);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_autoswitch);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_ignore);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_simpleItems);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_fov);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_zoomFov);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_swingAngles);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_oldPainSounds);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_ragDoll);
@@ -5163,44 +5124,41 @@ pub fn CG_UpdateCvars(ctx: &mut CgContext) {
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_thirdPersonVertOffset);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_thirdPersonCameraDamp);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_thirdPersonTargetDamp);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_thirdPersonAlpha);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_thirdPersonHorzOffset);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_stereoSeparation);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_lagometer);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawEnemyInfo);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_synchronousClients);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_stats);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_buildScript);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_thirdPersonAlpha);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_forceModel);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_paused);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_blood);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_predictItems);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_deferPlayers);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawTeamOverlay);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_teamOverlayUserinfo);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_stats);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_drawFriend);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_teamChatsOnly);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_hudFiles);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_scorePlum);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_smoothClients);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.pmove_fixed);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.pmove_msec);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_cameraMode);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_buildScript);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_paused);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_blood);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_synchronousClients);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_currentSelectedPlayer);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_currentSelectedPlayerName);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_recordSPDemo);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_recordSPDemoName);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_cameraOrbit);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_cameraOrbitDelay);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_timescaleFadeEnd);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_timescaleFadeSpeed);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_timescale);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_scorePlum);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_hudFiles);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_smoothClients);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_cameraMode);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.pmove_fixed);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.pmove_msec);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_noTaunt);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_noProjectileTrail);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_debugBB);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_currentSelectedPlayer);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_currentSelectedPlayerName);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_recordSPDemo);
-    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_recordSPDemoName);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_showVehBounds);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.ui_myteam);
     trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_snapshotTimeout);
+    trap::Cvar_Update(engine, &mut ctx.world.cvars.cg_debugBB);
 
     // check for modications here
 

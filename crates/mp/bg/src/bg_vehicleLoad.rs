@@ -459,11 +459,14 @@ pub fn BG_ParseVehicleParm(
                         *(b.add(field.ofs as usize) as *mut c_int) = anim;
                     }
                     VF_WEAPON => {
-                        // Raven: assignment is commented out in the oracle — the
-                        // VF_WEAPON case is a no-op `break;`.
-                        // Source: `oracle/codemp/game/bg_vehicleLoad.c:228-230`
-                        //*(b.add(field.ofs as usize) as *mut c_int) =
-                        //    VEH_VehWeaponIndexForName(cstr(&value).as_ptr(), bg);
+                        // LIVE in the vehicle-fields loop (only the WEAPON-fields
+                        // loop's arm is commented out, bg_vehicleLoad.c:228-230) -
+                        // resolves weap1/weap2 and inline-parses the .vwp, which
+                        // registers its client fx. The C6b referee caught this as
+                        // three missing swoop_blaster* FX registrations.
+                        // Source: `oracle/codemp/game/bg_vehicleLoad.c:902-904`
+                        *(b.add(field.ofs as usize) as *mut c_int) =
+                            VEH_VehWeaponIndexForName(cstr(&value).as_ptr(), bg, traps, callbacks);
                     }
                     VF_MODEL => {
                         callbacks.veh_field_model(&value, b.add(field.ofs as usize) as *mut c_int);
