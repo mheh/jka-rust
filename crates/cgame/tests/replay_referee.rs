@@ -155,6 +155,10 @@ fn print_summary(label: &str, o: &RunOutcome) {
         o.records, o.vmcalls, o.syscalls
     );
     eprintln!("[{label}] findings={}", o.finding_total);
+    for (class, count, first) in &o.finding_census {
+        eprintln!("[{label}]   census {count:>8}  {class}");
+        eprintln!("[{label}]            first: {first}");
+    }
     if let Some(d) = &o.desync {
         eprintln!("[{label}] HARD DESYNC: {d}");
     }

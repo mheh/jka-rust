@@ -347,6 +347,10 @@ pub struct ReplayState {
     module_shared_ptr: Cell<usize>,
     findings: RefCell<Vec<Finding>>,
     finding_total: Cell<u64>,
+    /// Per finding class (`"<trap> <argN kind>"`): count over ALL findings plus
+    /// the first exemplar - the stored list caps at `MAX_FINDINGS`, this map
+    /// does not.
+    finding_census: RefCell<std::collections::BTreeMap<String, (u64, String)>>,
     syscall_count: Cell<u64>,
     vmcall_count: Cell<u64>,
     desync: Cell<bool>,
@@ -369,6 +373,8 @@ pub struct RunOutcome {
     pub records: u64,
     pub finding_total: u64,
     pub findings: Vec<Finding>,
+    /// `(class, count, first exemplar)` over ALL findings, highest count first.
+    pub finding_census: Vec<(String, u64, String)>,
     pub desync: Option<String>,
 }
 
@@ -381,6 +387,7 @@ impl ReplayState {
             module_shared_ptr: Cell::new(0),
             findings: RefCell::new(Vec::new()),
             finding_total: Cell::new(0),
+            finding_census: RefCell::new(std::collections::BTreeMap::new()),
             syscall_count: Cell::new(0),
             vmcall_count: Cell::new(0),
             desync: Cell::new(false),
@@ -425,6 +432,13 @@ impl ReplayState {
 
     fn finding(&self, seq: u64, name: &str, what: String) {
         self.finding_total.set(self.finding_total.get() + 1);
+        let class = format!("{name} {}", what.split(':').next().unwrap_or(""));
+        let mut census = self.finding_census.borrow_mut();
+        let entry = census
+            .entry(class)
+            .or_insert_with(|| (0, format!("seq {seq} {what}")));
+        entry.0 += 1;
+        drop(census);
         let mut v = self.findings.borrow_mut();
         if v.len() < MAX_FINDINGS {
             v.push(Finding {
@@ -481,12 +495,20 @@ impl ReplayState {
             }
         }
         let msg = self.desync_msg.borrow().clone();
+        let mut census: Vec<(String, u64, String)> = self
+            .finding_census
+            .borrow_mut()
+            .iter()
+            .map(|(k, (n, first))| (k.clone(), *n, first.clone()))
+            .collect();
+        census.sort_by(|a, b| b.1.cmp(&a.1));
         RunOutcome {
             syscalls: self.syscall_count.get(),
             vmcalls: self.vmcall_count.get(),
             records: self.record_total(),
             finding_total: self.finding_total.get(),
             findings: std::mem::take(&mut self.findings.borrow_mut()),
+            finding_census: census,
             desync: msg,
         }
     }
@@ -704,7 +726,10 @@ impl ReplayState {
         let number = frame[0];
         if std::env::var_os("JKA_REPLAY_TRACE").is_some() {
             if number == 308 {
-                eprintln!("trap 308 src={:#x} dst={:#x} slots {} -> {}", frame[1], frame[3], frame[2], frame[4]);
+                eprintln!(
+                    "trap 308 src={:#x} dst={:#x} slots {} -> {}",
+                    frame[1], frame[3], frame[2], frame[4]
+                );
             } else if number == 297 {
                 let nm = String::from_utf8_lossy(&read_module_cstr(frame[2])).into_owned();
                 eprintln!("trap 297 slot={:#x} model={nm}", frame[1]);
