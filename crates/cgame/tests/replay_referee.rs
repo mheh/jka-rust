@@ -6,16 +6,17 @@
 //! - `replay_oracle_self_check` - the oracle dylib replayed against its OWN
 //!   recording must be byte-identical (zero findings, reaches the end).
 //! - `replay_rust_cgame` - the Rust cgame dylib replayed against the same
-//!   recording. Reports findings; does NOT yet assert zero (the first run's
-//!   finding list is the deliverable - wave fixes come later). Asserts only that
-//!   the replay reaches the end of the recording or reports a hard desync
-//!   cleanly.
+//!   recording must also be byte-identical (zero findings, reaches the end).
+//!   The report-only phase closed at commit 153ade70 (full swoop1 trace clean).
 //!
 //! Traces stay OUT of git (DEC-48.4): the trace path comes from `JKA_TRACE`
 //! (default `$HOME/Developer/jka/trace-swoop1.bin`); both tests SKIP with a clear
 //! message when no trace file is present.
 //!
-//! Run serially (the game slot + module statics are process singletons):
+//! Run serially (the game slot + module statics are process singletons), and
+//! build the cdylib first - `cargo test` does NOT refresh the dylib this test
+//! dlopens:
+//!   cargo build -p cgame --release
 //!   cargo test -p cgame --release -- --ignored --test-threads=1
 //!
 //! Modeled on tests/abi_smoke.rs for the dylib loader + trampoline handshake.
@@ -66,7 +67,8 @@ fn rust_cgame_dylib() -> PathBuf {
     }
     panic!(
         "built cdylib `{filename}` not found next to the test binary ({}). \
-         Run `cargo build --workspace` (or `cargo test -p cgame`) first.",
+         Run `cargo build -p cgame --release` first - `cargo test` does not \
+         build or refresh this dylib.",
         deps.display()
     );
 }
@@ -229,14 +231,25 @@ fn replay_rust_cgame() {
     let o = drive(dylib, trace);
     print_summary("rust-cgame", &o);
 
-    // Deliverable is the finding LIST, not zero findings yet (wave fixes come
-    // later). Assert only that the replay reached the end of the recording OR
-    // reported a hard desync cleanly - never that it silently stalled.
+    // The bar matches the oracle self-check: the Rust dylib must replay the
+    // whole recording byte-identical. A stale dylib fakes a regression - run
+    // `cargo build -p cgame --release` before this test.
+    assert!(
+        o.desync.is_none(),
+        "rust replay hit a hard desync: {:?}",
+        o.desync
+    );
+    assert_eq!(
+        o.finding_total,
+        0,
+        "rust replay must be byte-identical; first finding: {}",
+        o.findings
+            .first()
+            .map(|f| f.to_string())
+            .unwrap_or_default()
+    );
     assert!(
         o.records > 0,
         "rust replay consumed no records - the recording never opened"
     );
-    if let Some(d) = &o.desync {
-        eprintln!("[rust-cgame] replay stopped at a hard desync (clean stop): {d}");
-    }
 }
