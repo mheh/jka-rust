@@ -1264,6 +1264,10 @@ close-out.
 6. **Trail/think fn-ptrs = two closed enums** (`TrailFn` for the
    `FX_*ProjectileThink` set, `LeThinkFn` for the `CG_*Think` set), one
    match dispatcher each — DEC-46.4 applied, `leType` precedent.
+   *Amended at execution (74f6771e):* the `LeThinkFn` half collapsed to
+   §20 dead surface — no MP cgame TU ever stores or calls a local-entity
+   `thinkFn` (SP's particle system does); both union fields carry the
+   note at `local_entity_s.rs`, no enum shipped.
 7. **`cg_t.snap` keeps the pointer + accessor shape.** The
    `snap_ref()`/`snap_mut()`/`next_snap_ref()` accessors already hide
    it; slot-index reshape deferred to the great refactor.
