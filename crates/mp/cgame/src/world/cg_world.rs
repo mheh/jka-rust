@@ -21,6 +21,7 @@ use crate::local::cgs_t::cgs_t;
 use crate::local::item_info_t::itemInfo_t;
 use crate::local::local_entity_s::localEntity_t;
 use crate::local::mark_poly_s::markPoly_t;
+use crate::local::player_state_ref::PlayerStateRef;
 use crate::local::weapon_info_s::weaponInfo_t;
 
 use super::cg_cvars::CgCvars;
@@ -301,6 +302,21 @@ impl CgWorld {
     #[inline]
     pub fn entity_mut(&mut self, n: usize) -> &mut centity_t {
         &mut self.entities[n]
+    }
+
+    /// Raven `cent->playerState = ps` for entity `n` — stores the DEC-46.2 arm
+    /// and repoints the bg view row's raw pointer in the same breath
+    /// (DEC-47.2).
+    pub fn set_player_state(&mut self, n: usize, psRef: PlayerStateRef) {
+        self.entities[n].playerState = psRef;
+        self.bg_ents[n].playerState = match psRef {
+            // Raven's null pointer.
+            PlayerStateRef::None => core::ptr::null_mut(),
+            PlayerStateRef::Predicted => &raw mut self.cg.predictedPlayerState,
+            PlayerStateRef::PredictedVehicle => &raw mut self.cg.predictedVehicleState,
+            PlayerStateRef::Snap => &raw mut self.cgSendPSPool[n],
+            PlayerStateRef::ActiveSnap(slot) => &raw mut self.cg.activeSnapshots[slot as usize].ps,
+        };
     }
 }
 

@@ -310,15 +310,17 @@ pub fn CG_CheckPlayerstateEvents(
                 let cent = ctx.world.entity_mut(centNum);
                 cent.currentState.event = event;
                 cent.currentState.eventParm = ps.eventParms[idx];
-                // JLF ADDED to hopefully mark events as player event
-                //
-                // Raven stores the caller's `ps` pointer verbatim here
-                // (`cg.predictedPlayerState` on the predict path,
-                // `cg.snap->ps` on the cg_snapshot.c one) - and cg_view.c /
-                // cg_players.c DO read it back. The caller says which target
-                // it handed us (DEC-46.2 resolution enum).
-                cent.playerState = psRef;
             }
+            // JLF ADDED to hopefully mark events as player event
+            //
+            // Raven stores the caller's `ps` pointer verbatim here
+            // (`cg.predictedPlayerState` on the predict path, `cg.snap->ps`
+            // on the cg_snapshot.c one) - and cg_view.c / cg_players.c DO
+            // read AND write it back (the vehicle-attach block writes the
+            // rider origin through it into the stored snapshot). The caller
+            // says which target it handed us, and the bg view row repoints in
+            // the same breath (DEC-46.2 / DEC-47.2).
+            ctx.world.set_player_state(centNum, psRef);
             let position = ctx.world.entity(centNum).lerpOrigin;
             CG_EntityEvent(ctx, ds, centNum, &position);
 

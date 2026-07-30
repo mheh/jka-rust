@@ -488,12 +488,18 @@ pub fn CG_TransitionSnapshot(ctx: &mut CgContext, menus: &mut MenuSystem, ds: &D
     {
         let ps = ctx.world.cg.activeSnapshots[newSlot].ps;
         let mut ops = ctx.world.cg.activeSnapshots[oldSlot].ps;
-        // PORT-NOTE: Raven's referent here is `&cg.snap->ps`, not entity
-        // clientNum's cgSendPSPool row that `Snap` documents. Today's sole
-        // consumer only tests `!= None`, so the arms coincide; when a consumer
-        // resolves `Snap` through cgSendPSPool this call site needs its own arm
-        // (cgSendPSPool-home ruling, design queue item 1/10).
-        CG_TransitionPlayerState(ctx, ds, &ps, &mut ops, PlayerStateRef::Snap);
+        // Raven's referent here is `&cg.snap->ps`. The `ActiveSnap` arm pins
+        // the slot the way Raven's raw pointer pins the address, so the
+        // vehicle-attach write through `cent->playerState` lands in the
+        // stored snapshot - the base the next frame's
+        // CG_InterpolatePlayerState lerps from.
+        CG_TransitionPlayerState(
+            ctx,
+            ds,
+            &ps,
+            &mut ops,
+            PlayerStateRef::ActiveSnap(newSlot as u8),
+        );
         // Raven writes through `ops` in place (`*ops = *ps` on the follow-mode
         // branch) - `oldFrame`'s slot is never read again once the next
         // CG_SetNextSnap overwrites it, so the write-back below reproduces

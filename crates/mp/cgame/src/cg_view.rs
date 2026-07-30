@@ -193,6 +193,7 @@ fn veh_hacking_time(world: &CgWorld, vehNum: usize) -> c_int {
         PlayerStateRef::Predicted => world.cg.predictedPlayerState.hackingTime,
         PlayerStateRef::PredictedVehicle => world.cg.predictedVehicleState.hackingTime,
         PlayerStateRef::Snap => world.cgSendPSPool[vehNum].hackingTime,
+        PlayerStateRef::ActiveSnap(slot) => world.cg.activeSnapshots[slot as usize].ps.hackingTime,
     }
 }
 
