@@ -1283,3 +1283,38 @@ close-out.
     The "lerp-family shape" ledger item is CLOSED as already resolved —
     `CG_CalcEntityLerpPositions` is fully ported on ctx with live
     callers.
+
+## DEC-48 — C6b demo-referee rig design (sit-down, 2026-07-29)
+
+Five user rulings designing the DEC-45.2 rig; all execution follows
+these shapes:
+
+1. **Host = record-once, replay headless.** Phase 1: an interposer shim
+   dylib sits between openjk.app and the cgame module during one demo
+   playback, recording the full bidirectional stream (vmMain calls in,
+   trap calls + engine returns out). Phase 2: a headless harness replays
+   the recorded inputs to BOTH dylibs in lockstep and diffs their
+   outgoing trap streams call-for-call — the jampgame referee's
+   recorded-trace mode. Engine wall-clock nondeterminism vanishes at
+   replay by construction; no cl_parse porting (the .dm_26 is parsed by
+   the live engine at record time only).
+2. **Reference = the oracle cgame dylib.** Extend the
+   `tools/referee-oracle` recipe: oracle/codemp/cgame TUs + the shared
+   bg TUs compiled under `CGAME` with Homebrew GCC into
+   `liboraclecgame.dylib`. Standing tiebreak honored (oracle over
+   OpenJK); the CGAME-side bg branches compile live as Raven shipped
+   them.
+3. **Diff scope = the full trap stream, per-trap serializers.** Every
+   outgoing call: command + all arg words, pointed-to buffers serialized
+   via a per-trap arg-shape table (the C3 218-trap manifest /
+   docs/abi-traps.md). Byte-identical is the bar.
+4. **Fixtures = rust-rig demos, traces committed.** 2-3 short .dm_26
+   demos recorded on the all-Rust local rig covering the C6a paths
+   (vehicles, sabers, spectate/scoreboard); the recorded traces (replay
+   inputs + oracle output stream) are the committed goldens per §18 —
+   cargo test needs neither engine nor C++ toolchain; .dm_26 files kept
+   alongside for re-recording.
+5. **Gate = referee-style `--ignored` test** in the cgame crate, run at
+   commit boundaries whenever cgame/bg/qshared is touched, expected
+   byte-identical; divergences block unless triaged to a cited §19
+   ledger entry. No CI lane until the client track has one.
