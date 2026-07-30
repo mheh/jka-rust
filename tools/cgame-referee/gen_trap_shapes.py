@@ -50,7 +50,7 @@ def vin(note=None):  return ibuf("vec3_t", 12, note=note)
 def vout(note=None): return obuf("vec3_t", 12, note=note)
 def viob(note=None): return iobuf("vec3_t", 12, note=note)
 def dptr(note):      return {"kind": "double_ptr", "type": "void**", "size_of": 8, "note": note}
-def g2h(note="opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"):
+def g2h(note="opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"):
     return {"kind": "scalar", "type": "CGhoul2Info_v*", "size_of": 8, "note": note}
 
 # --- the table -----------------------------------------------------------
@@ -92,7 +92,7 @@ BLOCK0 = [
  ("CG_CM_CAPSULETRACE", "void", [obuf("trace_t", note="trace result"), vin("start"), vin("mins"), vin("maxs"), vin("end"), S("int32", "passEntityNum"), S("int32", "contentmask")]),
  ("CG_CM_TRANSFORMEDBOXTRACE", "void", [obuf("trace_t"), vin("start"), vin("mins"), vin("maxs"), vin("end"), S("int32", "passEntityNum"), S("int32", "contentmask"), vin("origin"), vin("angles")]),
  ("CG_CM_TRANSFORMEDCAPSULETRACE", "void", [obuf("trace_t"), vin("start"), vin("mins"), vin("maxs"), vin("end"), S("int32", "passEntityNum"), S("int32", "contentmask"), vin("origin"), vin("angles")]),
- ("CG_CM_MARKFRAGMENTS", "scalar", [S("int32", "numPoints"), ibuf("vec3_t", 12, len_arg=1, note="points array, count = args[1]"), vin("projection"), S("int32", "maxPoints"), obuf("vec3_t", 12, note="pointBuffer OUT, up to args[4] verts (args[4]*12 bytes)"), S("int32", "maxFragments"), obuf("markFragment_t", note="fragment array OUT, up to args[6]")]),
+ ("CG_CM_MARKFRAGMENTS", "scalar", [S("int32", "numPoints"), ibuf("vec3_t", 12, len_arg=1, note="points array, count = args[1]"), vin("projection"), S("int32", "maxPoints"), obuf("vec3_t", 12, len_arg=4, note="pointBuffer OUT, up to args[4] verts (args[4]*12 bytes) - maximum, not exact"), S("int32", "maxFragments"), obuf("markFragment_t", 8, len_arg=6, note="fragment array OUT, up to args[6] (8-byte {firstPoint,numPoints}, q_shared.h:1919-1922) - maximum, not exact")]),
  ("CG_S_GETVOICEVOLUME", "scalar", [S("int32", "entityNum")], "DIVERGE: oracle indexes s_entityWavVol[args[1]] directly; OpenJK CL_S_GetVoiceVolume. same shape."),
  ("CG_S_MUTESOUND", "void", [S("int32", "entityNum"), S("int32", "entchannel")]),
  ("CG_S_STARTSOUND", "void", [vin("origin, may be NULL"), S("int32", "entityNum"), S("int32", "entchannel"), S("sfxHandle_t", "sfx")]),
@@ -149,8 +149,8 @@ BLOCK200 = [
  ("CG_R_CLEARSCENE", "void", []),
  ("CG_R_CLEARDECALS", "void", []),
  ("CG_R_ADDREFENTITYTOSCENE", "void", [ibuf("refEntity_t", note="render entity")]),
- ("CG_R_ADDPOLYTOSCENE", "void", [S("qhandle_t", "shader"), S("int32", "numVerts"), ibuf("polyVert_t", len_arg=2, note="verts, count args[2]")]),
- ("CG_R_ADDPOLYSTOSCENE", "void", [S("qhandle_t", "shader"), S("int32", "numVerts"), ibuf("polyVert_t", len_arg=2, note="verts, count = args[2]*args[4] (numVerts per poly x numPolys)"), S("int32", "numPolys")]),
+ ("CG_R_ADDPOLYTOSCENE", "void", [S("qhandle_t", "shader"), S("int32", "numVerts"), ibuf("polyVert_t", 24, len_arg=2, note="verts, count args[2] (24-byte xyz+st+modulate, tr_types.h:70-75)")]),
+ ("CG_R_ADDPOLYSTOSCENE", "void", [S("qhandle_t", "shader"), S("int32", "numVerts"), ibuf("polyVert_t", 24, len_arg=2, note="verts, count = args[2]*args[4] (numVerts per poly x numPolys; 24-byte stride, tr_types.h:70-75)"), S("int32", "numPolys")]),
  ("CG_R_ADDDECALTOSCENE", "void", [S("qhandle_t", "shader"), vin("origin"), vin("dir"), F("orientation"), F("r"), F("g"), F("b"), F("a"), S("qboolean", "alphaFade"), F("radius"), S("qboolean", "temporary")]),
  ("CG_R_LIGHTFORPOINT", "scalar", [vin("point"), vout("ambientLight"), vout("directedLight"), vout("lightDir")]),
  ("CG_R_ADDLIGHTTOSCENE", "void", [vin("origin"), F("intensity"), F("r"), F("g"), F("b")]),

@@ -1,0 +1,313 @@
+{
+  "schema": "cgame-export-shapes/1",
+  "engine": "OpenJK codemp client (openjk.app) - CGVM_* wrappers (cl_cgameapi.cpp) drive vmMain",
+  "numbering": "cgameExport_t (oracle/codemp/cgame/cg_public.h:352-440), byte-identical to OpenJK cgameExportLegacy_e",
+  "arg_kinds": ["scalar", "in_str", "in_buf", "out_buf", "inout_buf"],
+  "ret_kinds": ["void", "scalar", "ptr_opaque", "ptr_deref"],
+  "shared_buffer_kinds": ["in", "out", "inout"],
+  "note": "the engine->module side. arg index N in `args[]` is the raw vmMain word `argN` (no trap-number prefix, unlike trap-shapes.json). MANY arms carry their real payload not in the arg words but through `cg.sharedBuffer` (the 2048-byte region registered by the CG_SET_SHARED_BUFFER trap, 344): the engine stages a struct there before the VM call and reads results back after. Those arms carry a `shared_buffer` field (in/out/inout) and the recorder dumps the whole 2048-byte region at ENTER and EXIT. `ptr_opaque` returns an engine-meaningful host pointer the recorder logs as a token (no deref). `ptr_deref` returns a pointer the engine reads/writes THROUGH later; the recorder dereferences `size_of` bytes at EXIT. See README.md 'vmMain export shapes'.",
+  "count": 32,
+  "exports": [
+    {
+      "num": 0,
+      "name": "CG_INIT",
+      "ret": "void",
+      "args": [
+        {"kind": "scalar", "type": "int32", "note": "serverMessageNum"},
+        {"kind": "scalar", "type": "int32", "note": "serverCommandSequence"},
+        {"kind": "scalar", "type": "int32", "note": "clientNum"}
+      ],
+      "cite": "oracle/codemp/cgame/cg_main.c:193-195; caller OpenJK/codemp/client/cl_cgame.cpp CL_InitCGame",
+      "note": "CG_Init registers the shared buffer (CG_SET_SHARED_BUFFER) during this call; every later shared_buffer arm depends on it."
+    },
+    {
+      "num": 1,
+      "name": "CG_SHUTDOWN",
+      "ret": "void",
+      "args": [],
+      "cite": "oracle/codemp/cgame/cg_main.c:196-198",
+      "note": "recorder flushes and closes the journal on EXIT of this arm."
+    },
+    {
+      "num": 2,
+      "name": "CG_CONSOLE_COMMAND",
+      "ret": "scalar",
+      "args": [],
+      "cite": "oracle/codemp/cgame/cg_main.c:199-200",
+      "note": "qboolean - qfalse when the command is not cgame's."
+    },
+    {
+      "num": 3,
+      "name": "CG_DRAW_ACTIVE_FRAME",
+      "ret": "void",
+      "args": [
+        {"kind": "scalar", "type": "int32", "note": "serverTime"},
+        {"kind": "scalar", "type": "stereoFrame_t", "note": "stereoView"},
+        {"kind": "scalar", "type": "qboolean", "note": "demoPlayback"}
+      ],
+      "cite": "oracle/codemp/cgame/cg_main.c:201-203"
+    },
+    {
+      "num": 4,
+      "name": "CG_CROSSHAIR_PLAYER",
+      "ret": "scalar",
+      "args": [],
+      "cite": "oracle/codemp/cgame/cg_main.c:204-205"
+    },
+    {
+      "num": 5,
+      "name": "CG_LAST_ATTACKER",
+      "ret": "scalar",
+      "args": [],
+      "cite": "oracle/codemp/cgame/cg_main.c:206-207"
+    },
+    {
+      "num": 6,
+      "name": "CG_KEY_EVENT",
+      "ret": "void",
+      "args": [
+        {"kind": "scalar", "type": "int32", "note": "key"},
+        {"kind": "scalar", "type": "qboolean", "note": "down"}
+      ],
+      "cite": "oracle/codemp/cgame/cg_main.c:208-210"
+    },
+    {
+      "num": 7,
+      "name": "CG_MOUSE_EVENT",
+      "ret": "void",
+      "args": [
+        {"kind": "scalar", "type": "int32", "note": "dx"},
+        {"kind": "scalar", "type": "int32", "note": "dy"}
+      ],
+      "cite": "oracle/codemp/cgame/cg_main.c:211-215"
+    },
+    {
+      "num": 8,
+      "name": "CG_EVENT_HANDLING",
+      "ret": "void",
+      "args": [
+        {"kind": "scalar", "type": "int32", "note": "type"}
+      ],
+      "cite": "oracle/codemp/cgame/cg_main.c:216-218"
+    },
+    {
+      "num": 9,
+      "name": "CG_POINT_CONTENTS",
+      "ret": "scalar",
+      "args": [],
+      "shared_buffer": "in",
+      "cite": "oracle/codemp/cgame/cg_main.c:220-221, C_PointContents cg_main.c:362-367",
+      "note": "reads TCGPointContents { vec3_t mPoint; int mPassEntityNum; } from cg.sharedBuffer; returns contents mask."
+    },
+    {
+      "num": 10,
+      "name": "CG_GET_LERP_ORIGIN",
+      "ret": "void",
+      "args": [],
+      "shared_buffer": "inout",
+      "cite": "oracle/codemp/cgame/cg_main.c:223-225, C_GetLerpOrigin cg_main.c:369-374",
+      "note": "reads TCGVectorData.mEntityNum, writes mPoint (vec3) back into cg.sharedBuffer."
+    },
+    {
+      "num": 11,
+      "name": "CG_GET_LERP_DATA",
+      "ret": "void",
+      "args": [],
+      "shared_buffer": "inout",
+      "cite": "oracle/codemp/cgame/cg_main.c:227-229, C_GetLerpData cg_main.c:376-406",
+      "note": "reads TCGGetBoltData.mEntityNum, writes mOrigin/mScale/mAngles back (FX getboltmat feed)."
+    },
+    {
+      "num": 12,
+      "name": "CG_GET_GHOUL2",
+      "ret": "ptr_opaque",
+      "args": [
+        {"kind": "scalar", "type": "int32", "note": "entnum (arg0)"}
+      ],
+      "cite": "oracle/codemp/cgame/cg_main.c:231-234",
+      "note": "returns (int)cg_entities[arg0].ghoul2 - a CGhoul2Info_v* host handle. DEAD in OpenJK: no CGVM_ wrapper reads it (grep codemp/ finds no caller); Raven's own comment says effect bolting 'is actually not used at all'. Recorder logs the return word as an opaque token, no deref."
+    },
+    {
+      "num": 13,
+      "name": "CG_GET_MODEL_LIST",
+      "ret": "ptr_opaque",
+      "args": [],
+      "cite": "oracle/codemp/cgame/cg_main.c:236-237",
+      "note": "returns (int)cgs.gameModels - a pointer to the module's model-handle array. DEAD in OpenJK: no CGVM_ wrapper reads it. Recorder logs the return word as an opaque token, no deref."
+    },
+    {
+      "num": 14,
+      "name": "CG_CALC_LERP_POSITIONS",
+      "ret": "void",
+      "args": [
+        {"kind": "scalar", "type": "int32", "note": "entnum (arg0)"}
+      ],
+      "cite": "oracle/codemp/cgame/cg_main.c:239-241"
+    },
+    {
+      "num": 15,
+      "name": "CG_TRACE",
+      "ret": "void",
+      "args": [],
+      "shared_buffer": "inout",
+      "cite": "oracle/codemp/cgame/cg_main.c:243-245, C_Trace cg_main.c:408-413",
+      "note": "reads TCGTrace start/mins/maxs/end/skip/mask, writes mResult (trace_t) back into cg.sharedBuffer."
+    },
+    {
+      "num": 16,
+      "name": "CG_G2TRACE",
+      "ret": "void",
+      "args": [],
+      "shared_buffer": "inout",
+      "cite": "oracle/codemp/cgame/cg_main.c:248-250, C_G2Trace cg_main.c:415-420",
+      "note": "same TCGTrace shape as CG_TRACE, ghoul2-aware."
+    },
+    {
+      "num": 17,
+      "name": "CG_G2MARK",
+      "ret": "void",
+      "args": [],
+      "shared_buffer": "in",
+      "cite": "oracle/codemp/cgame/cg_main.c:252-254, C_G2Mark cg_main.c:422-443",
+      "note": "reads TCGG2Mark { shader,size,start,dir } from cg.sharedBuffer; no writeback."
+    },
+    {
+      "num": 18,
+      "name": "CG_RAG_CALLBACK",
+      "ret": "scalar",
+      "args": [
+        {"kind": "scalar", "type": "int32", "note": "callType (arg0)"}
+      ],
+      "shared_buffer": "inout",
+      "cite": "oracle/codemp/cgame/cg_main.c:256-257, CG_RagCallback cg_main.c:508-568",
+      "note": "the shared-buffer struct depends on callType (ragCallbackDebugBox/DebugLine/BoneSnap/TraceLine); RAG_CALLBACK_TRACELINE writes tr back, so inout. always returns 0."
+    },
+    {
+      "num": 19,
+      "name": "CG_INCOMING_CONSOLE_COMMAND",
+      "ret": "scalar",
+      "args": [],
+      "shared_buffer": "in",
+      "cite": "oracle/codemp/cgame/cg_main.c:259-280",
+      "note": "would read/rewrite TCGIncomingConsoleCommand in cg.sharedBuffer, but the body is #if 0 in retail - always returns 1 and touches nothing. shared_buffer flagged for the live mod hook that never ships."
+    },
+    {
+      "num": 20,
+      "name": "CG_GET_USEABLE_FORCE",
+      "ret": "scalar",
+      "args": [],
+      "cite": "oracle/codemp/cgame/cg_main.c:282-283"
+    },
+    {
+      "num": 21,
+      "name": "CG_GET_ORIGIN",
+      "ret": "void",
+      "args": [
+        {"kind": "scalar", "type": "int32", "note": "entnum (arg0)"},
+        {"kind": "out_buf", "type": "vec3_t", "size_of": 12, "note": "engine-supplied out vec3 (arg1); VectorCopy of currentState.pos.trBase"}
+      ],
+      "cite": "oracle/codemp/cgame/cg_main.c:285-287; caller CGVM_GetOrigin cl_cgameapi.cpp:216",
+      "note": "arg1 is reinterpret_cast<intptr_t>(out) - the engine's vec3 the module fills."
+    },
+    {
+      "num": 22,
+      "name": "CG_GET_ANGLES",
+      "ret": "void",
+      "args": [
+        {"kind": "scalar", "type": "int32", "note": "entnum (arg0)"},
+        {"kind": "out_buf", "type": "vec3_t", "size_of": 12, "note": "engine-supplied out vec3 (arg1); VectorCopy of currentState.apos.trBase"}
+      ],
+      "cite": "oracle/codemp/cgame/cg_main.c:289-291; caller CGVM_GetAngles cl_cgameapi.cpp:226"
+    },
+    {
+      "num": 23,
+      "name": "CG_GET_ORIGIN_TRAJECTORY",
+      "ret": "ptr_deref",
+      "ret_type": "trajectory_t",
+      "ret_size_of": 36,
+      "args": [
+        {"kind": "scalar", "type": "int32", "note": "entnum (arg0)"}
+      ],
+      "cite": "oracle/codemp/cgame/cg_main.c:293-294; caller CGVM_GetOriginTrajectory cl_cgameapi.cpp:236",
+      "note": "returns (int)&cg_entities[arg0].nextState.pos. The engine (RoffSystem.cpp:876,1023) reads AND writes through it - SetLerp(originTrajectory, TR_LINEAR/TR_STATIONARY, ...) at RoffSystem.cpp:903,924,939. Recorder dereferences 36 bytes (trajectory_t: q_shared.h:2654-2660) at EXIT."
+    },
+    {
+      "num": 24,
+      "name": "CG_GET_ANGLE_TRAJECTORY",
+      "ret": "ptr_deref",
+      "ret_type": "trajectory_t",
+      "ret_size_of": 36,
+      "args": [
+        {"kind": "scalar", "type": "int32", "note": "entnum (arg0)"}
+      ],
+      "cite": "oracle/codemp/cgame/cg_main.c:296-297; caller CGVM_GetAngleTrajectory cl_cgameapi.cpp:245",
+      "note": "returns (int)&cg_entities[arg0].nextState.apos; same engine read/write via RoffSystem SetLerp(angleTrajectory, ...). Recorder dereferences 36 bytes at EXIT."
+    },
+    {
+      "num": 25,
+      "name": "CG_ROFF_NOTETRACK_CALLBACK",
+      "ret": "void",
+      "args": [
+        {"kind": "scalar", "type": "int32", "note": "entnum (arg0)"},
+        {"kind": "in_str", "type": "char*", "note": "notetrack string (arg1); engine passes reinterpret_cast<intptr_t>(notetrack)"}
+      ],
+      "cite": "oracle/codemp/cgame/cg_main.c:299-301; caller CGVM_ROFF_NotetrackCallback cl_cgameapi.cpp:254"
+    },
+    {
+      "num": 26,
+      "name": "CG_IMPACT_MARK",
+      "ret": "void",
+      "args": [],
+      "shared_buffer": "in",
+      "cite": "oracle/codemp/cgame/cg_main.c:303-305, C_ImpactMark cg_main.c:570-580",
+      "note": "reads TCGImpactMark (handle/point/angle/rotation/rgba/size) from cg.sharedBuffer; the old raw-arg form is commented out at the site."
+    },
+    {
+      "num": 27,
+      "name": "CG_MAP_CHANGE",
+      "ret": "void",
+      "args": [],
+      "cite": "oracle/codemp/cgame/cg_main.c:307-312",
+      "note": "sets cg.mMapChange; may be called more than once per map change."
+    },
+    {
+      "num": 28,
+      "name": "CG_AUTOMAP_INPUT",
+      "ret": "void",
+      "args": [
+        {"kind": "scalar", "type": "int32", "note": "arg0 - non-0 means a one-frame mouse event"}
+      ],
+      "shared_buffer": "in",
+      "cite": "oracle/codemp/cgame/cg_main.c:314-340",
+      "note": "reads autoMapInput_t from cg.sharedBuffer into cg_autoMapInput."
+    },
+    {
+      "num": 29,
+      "name": "CG_MISC_ENT",
+      "ret": "void",
+      "args": [],
+      "shared_buffer": "in",
+      "cite": "oracle/codemp/cgame/cg_main.c:342-344, CG_MiscEnt cg_main.c:582+",
+      "note": "reads TCGMiscEnt (model name + placement) from cg.sharedBuffer (RMG static ents)."
+    },
+    {
+      "num": 30,
+      "name": "CG_GET_SORTED_FORCE_POWER",
+      "ret": "scalar",
+      "args": [
+        {"kind": "scalar", "type": "int32", "note": "index (arg0)"}
+      ],
+      "cite": "oracle/codemp/cgame/cg_main.c:246-247",
+      "note": "returns forcePowerSorted[arg0]. Declared out of enum order in the switch (sits between CG_TRACE and CG_G2TRACE) but numbered 30."
+    },
+    {
+      "num": 31,
+      "name": "CG_FX_CAMERASHAKE",
+      "ret": "void",
+      "args": [],
+      "shared_buffer": "in",
+      "cite": "oracle/codemp/cgame/cg_main.c:346-352",
+      "note": "reads TCGCameraShake { mOrigin, mIntensity, mRadius, mTime } from cg.sharedBuffer."
+    }
+  ]
+}

@@ -1,16 +1,28 @@
 # cgame trap-shape manifest
 
-Per-trap argument-shape table for the MP cgame syscall surface. It drives the
-C6b trap-stream logger shim and the headless replay (DEC-48 ruling 3: full
-stream, per-trap serializers, byte-identical bar). One entry per `cgameImport_t`
-value: for every argument, what the engine reads or writes through it, plus the
-return kind.
+Argument-shape tables for the MP cgame ABI seam, both directions. They drive the
+C6b trap-stream RECORDER shim (`shim/`) and the headless replay (DEC-48 rulings
+1+3: full bidirectional stream, per-call serializers, byte-identical bar).
+
+- `trap-shapes.json` - the module->engine side (233 `cgameImport_t` traps): for
+  every argument, what the engine reads or writes through it, plus the return
+  kind.
+- `export-shapes.json` - the engine->module side (32 `cgameExport_t` vmMain
+  commands): same, plus which arms carry their payload through the engine-
+  retained shared buffer, and the pointer-returning arms. See
+  'vmMain export shapes' below.
+- `shim/` - the standalone recorder cdylib that interposes between openjk.app
+  and the real cgame module and journals both streams. See 'The recorder shim'
+  and 'Journal format' below.
 
 `trap-shapes.json` is generated - edit `gen_trap_shapes.py` and re-run:
 
 ```
 python3 gen_trap_shapes.py > trap-shapes.json
 ```
+
+`export-shapes.json` is hand-authored (32 entries, each cited to
+`cg_main.c`/`cl_cgameapi.cpp`); edit the JSON directly.
 
 ## Ground truth
 
@@ -245,3 +257,189 @@ engine); the note flags the oracle difference.
   the API may write adjusted values back; recorded as `out_buf` to be safe (the
   cache variant reads them as `in`). Confirm against `G2API_CollisionDetect` if a
   parity miss shows up here. (cl_cgameapi.cpp:1506.)
+
+## vmMain export shapes (`export-shapes.json`)
+
+The trap manifest above covers imports only. `export-shapes.json` is the
+engine->module half: one entry per `cgameExport_t` value (0..31,
+`cg_public.h:352-440`), classified the same way. Ground truth is
+`oracle/codemp/cgame/cg_main.c:190-359` (the `vmMain` switch) and the OpenJK
+`CGVM_*` wrappers that call it (`cl_cgameapi.cpp`), cited on every entry.
+
+Schema differs from the trap side in three ways:
+
+- **Arg indexing is direct.** Export arg index N is the raw vmMain word `argN` -
+  there is no trap-number prefix, so no `+1` (`args[0]` on the trap side).
+- **The shared buffer is the real payload for most arms.** Only 11 of the 32
+  arms carry data in their arg words. The rest stage their struct through
+  `cg.sharedBuffer` - the engine writes a `TCG*` struct into the 2048-byte region
+  before the VM call and reads results back after (`C_PointContents`,
+  `C_GetLerpData`, `C_Trace`, ... `cg_main.c:362-580`). Those entries carry a
+  `shared_buffer` field (`in` / `out` / `inout`); the recorder dumps the whole
+  2048-byte region at ENTER and/or EXIT rather than trying to read the arg words.
+- **`ret` adds two pointer kinds.** `ptr_opaque` and `ptr_deref` below.
+
+### The pointer-returning arms
+
+Four arms return a pointer the engine casts back from the `int`/`intptr_t`
+result word (the four `return (int)ptr` casts at `cg_main.c:232,237,294,297`,
+widened to `intptr_t` in the oracle build):
+
+- **`CG_GET_GHOUL2` (12)** - `return (int)cg_entities[arg0].ghoul2`, a
+  `CGhoul2Info_v*` host handle. **Dead in OpenJK**: grep of `codemp/` finds no
+  `CGVM_` wrapper reading it, and Raven's own comment (`cg_main.c:232-234`) says
+  the effect bolting it feeds "is actually not used at all". Recorded
+  `ptr_opaque`: the return word is logged as a token, no deref.
+- **`CG_GET_MODEL_LIST` (13)** - `return (int)cgs.gameModels`, the module's model-
+  handle array. Also dead in OpenJK (no `CGVM_` caller). `ptr_opaque`.
+- **`CG_GET_ORIGIN_TRAJECTORY` (23)** - `return (int)&cg_entities[arg0].nextState.pos`,
+  a `trajectory_t*`. **Live**: `CGVM_GetOriginTrajectory` (`cl_cgameapi.cpp:236`)
+  hands it to the ROFF system, which reads AND writes through it -
+  `SetLerp(originTrajectory, TR_LINEAR/TR_STATIONARY, ...)` at
+  `RoffSystem.cpp:903,924,939` (call sites `:876,:1023`). Recorded `ptr_deref`:
+  the recorder dereferences 36 bytes (`trajectory_t`, `q_shared.h:2654-2660`) at
+  EXIT.
+- **`CG_GET_ANGLE_TRAJECTORY` (24)** - `return (int)&cg_entities[arg0].nextState.apos`,
+  same `trajectory_t*` read/written by `CGVM_GetAngleTrajectory`
+  (`cl_cgameapi.cpp:245`) via the same ROFF `SetLerp`. `ptr_deref`, 36 bytes at
+  EXIT.
+
+The two plain out-vec arms are ordinary `out_buf`: `CG_GET_ORIGIN` (21) and
+`CG_GET_ANGLES` (22) `VectorCopy` into the engine's `arg1` vec3
+(`cl_cgameapi.cpp:216,226`). `CG_ROFF_NOTETRACK_CALLBACK` (25) reads an `in_str`
+at `arg1` (`cl_cgameapi.cpp:254`).
+
+## The recorder shim (`shim/`)
+
+A standalone cargo project (its own empty `[workspace]` table keeps it out of the
+main jka-rust workspace). openjk.app dlopens the cdylib as the cgame module
+(`libcgamearm64.dylib`; stage it as `cgamearm64.dylib`). On `dllEntry` it stores
+the engine syscall, dlopens the REAL module named by `JKA_SHIM_REAL_CGAME`, and
+hands it OUR logging trampoline in place of the engine syscall. Every `vmMain`
+and every trap is journaled, then forwarded unchanged.
+
+- **Env.** `JKA_SHIM_REAL_CGAME` (required, the real module to forward to; loud
+  stderr + a `MARKER` record + abort if unset/unloadable). `JKA_SHIM_JOURNAL`
+  (journal path; defaults to `cgame-shim-journal.bin` **beside the real module**,
+  never a silent `/tmp` default). Journal is buffered, flushed on CG_SHUTDOWN.
+- **The variadic seam is in C.** `src/trampoline.c` holds the variadic
+  trampoline the real module calls and the forward to the real engine - stable
+  Rust can neither define nor correctly call a C-variadic fn on Apple arm64
+  (stack-passed va-args), the same reason
+  `crates/mp/engine/qcommon/src/vm/game_syscall_trampoline.c` exists. It grabs 16
+  words the way oracle `VM_DllSyscall` does (`vm.cpp:363-377`) and calls the Rust
+  loggers around the forward.
+- **Serializers are table-driven, generated at build time.** `build.rs` parses
+  `../trap-shapes.json` and `../export-shapes.json` and emits the Rust shape
+  tables into `$OUT_DIR/manifest_tables.rs` - chosen over a checked-in generated
+  `.rs` so the tables can never drift from the manifests (edit the JSON, rebuild,
+  the shim serializes the new shape). `serde_json` is a build-dependency only, so
+  the runtime cdylib ships no JSON parser.
+- **Reentrancy.** Traps re-enter vmMain (CG_INIT -> trap_UpdateScreen ->
+  CG_DRAW_ACTIVE_FRAME). The journal lock is only ever held to write one record,
+  never across a forwarded call, so the nested chain cannot deadlock; the bracket
+  records nest naturally (LIFO). ENTER/EXIT are paired by a per-thread seq stack.
+- **Never aborts a session on bad data.** An unclassifiable command still gets
+  its ENTER/EXIT bracket plus a `MALFORMED` record with the raw words; the diff
+  tooling surfaces it later. Every foreign-memory read null-checks and caps its
+  length.
+
+Build + prove the interpose chain without the engine:
+
+```sh
+cd tools/cgame-referee/shim
+cargo test        # tests/interpose.rs drives the oracle dylib through the shim
+```
+
+The test points `JKA_SHIM_REAL_CGAME` at
+`tools/cgame-oracle/build/liboraclecgame.dylib` (run
+`tools/cgame-oracle/build.sh` first if absent), installs a stub engine syscall,
+drives `vmMain` with an unknown command, and asserts (a) the `CG_ERROR` syscall
+reached the stub THROUGH the shim's trampoline and (b) the journal holds the
+`VMCALL_ENTER / SYSCALL_ENTER / SYSCALL_EXIT / VMCALL_EXIT` bracket.
+
+## Journal format
+
+The contract the headless replay harness is written against. Length-prefixed
+little-endian binary, all multi-byte integers LE.
+
+**File header:** magic `CGSHIMJ1` (8 bytes) + `u32` format version (currently 1).
+
+**Then a sequence of records**, each:
+
+```
+u32  payload_len          bytes that follow this field (skip-ahead length)
+u8   rec_type             1..6 (below)
+u64  seq                  monotonic; ENTER and its EXIT share one seq
+...  body                 rec_type-specific
+```
+
+`rec_type`:
+
+- `1` VMCALL_ENTER, `2` VMCALL_EXIT - the engine->module direction (`vmMain`).
+- `3` SYSCALL_ENTER, `4` SYSCALL_EXIT - the module->engine direction (traps).
+- `5` MALFORMED - an unclassifiable command; raw words only, forwarding continued.
+- `6` MARKER - a free-text note (module loaded, fatal setup failure).
+
+Nesting is real and encoded by sequential bracketing: a trap fired from inside a
+vmMain call writes its SYSCALL_ENTER/EXIT between that call's VMCALL_ENTER and
+VMCALL_EXIT; a trap that re-enters vmMain nests another VMCALL pair inside its
+own. Records are strictly ordered on the single engine thread.
+
+### Bodies
+
+A **raw word block** is `u8 count` then `count` * `i64` words.
+
+A **blob section** is `u16 blob_count` then that many blobs, each:
+
+```
+u8   arg_index            manifest arg position; 0xFF = shared buffer, 0xFE = return deref
+u8   blob_kind            1 in_str, 2 in_buf, 3 out_buf, 4 inout_buf,
+                          5 double_ptr_slot, 6 shared_buffer, 7 ret_deref
+u32  blob_len
+...  blob_len bytes
+```
+
+**VMCALL_ENTER (1):** `i64 cmd` (cgameExport_t), raw word block (12 words:
+arg0..arg11), blob section. Blobs: `in_str`/`in_buf` args per the export shape,
+plus a `shared_buffer` (0xFF) dump of the 2048-byte region when the arm's
+`shared_buffer` is `in`/`inout`.
+
+**VMCALL_EXIT (2):** `i64 cmd`, `i64 ret`, blob section. Blobs: `out_buf`/
+`inout_buf` args (engine-written vec3 for GET_ORIGIN/GET_ANGLES), a `shared_buffer`
+dump when `shared_buffer` is `out`/`inout`, and a `ret_deref` (0xFE) blob of the
+pointed-to bytes for the `ptr_deref` arms (36-byte `trajectory_t` for
+GET_ORIGIN_TRAJECTORY / GET_ANGLE_TRAJECTORY). `ptr_opaque` returns carry no
+blob - the token is the bare `ret` word.
+
+**SYSCALL_ENTER (3):** `i64 cmd` (cgameImport_t trap number), raw word block (16
+words: `args[0]`=trap number, `args[1..15]` grabbed by the trampoline), blob
+section. Blobs per `trap-shapes.json`: `in_str`, `in_buf` (fixed `size_of`, or
+`len_arg`-counted with `size_of` as the element stride - counted wins when both
+are present - or trap 204's `args[2]*args[4]` product special-case),
+`inout_buf`, and `double_ptr_slot` (0..; the slot value BEFORE the engine writes
+a new host token). The G2/FX families additionally carry a `shared_buffer` (0xFF)
+dump. `CG_SET_SHARED_BUFFER` (344) registers the region pointer for those dumps.
+
+**SYSCALL_EXIT (4):** `i64 cmd`, `i64 ret`, blob section. Blobs: `out_buf`/
+`inout_buf` args (engine-written), `double_ptr_slot` (the engine-written token
+after INIT/DUPLICATE/etc.), and the `shared_buffer` dump for the G2/FX families.
+
+**MALFORMED (5):** `i64 cmd`, raw word block. Emitted alongside (not instead of)
+the ENTER/EXIT bracket when the command has no manifest shape.
+
+**MARKER (6):** `u32 text_len`, `text_len` UTF-8 bytes.
+
+### Shared-buffer note
+
+The shared-buffer dump keys off two things the recorder derives, because
+`trap-shapes.json` does not yet carry a per-trap shared-buffer flag (see 'Things
+that turned out ambiguous'):
+
+- **Exports** dump per the `shared_buffer` field authored in `export-shapes.json`
+  (derived from `cg_main.c`, authoritative).
+- **Traps** dump for the `CG_G2_*` and `CG_FX_*` families - the "G2 and FX
+  families stage their big argument structs into this buffer" note above. This is
+  a name-family heuristic pending a real manifest flag; a differ that needs a
+  tighter set should add a `shared_buffer` field to the trap manifest and the
+  build.rs derivation will pick it up.

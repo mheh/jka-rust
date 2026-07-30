@@ -768,7 +768,8 @@
           "kind": "out_buf",
           "type": "vec3_t",
           "size_of": 12,
-          "note": "pointBuffer OUT, up to args[4] verts (args[4]*12 bytes)"
+          "len_arg": 4,
+          "note": "pointBuffer OUT, up to args[4] verts (args[4]*12 bytes) - maximum, not exact"
         },
         {
           "kind": "scalar",
@@ -778,7 +779,9 @@
         {
           "kind": "out_buf",
           "type": "markFragment_t",
-          "note": "fragment array OUT, up to args[6]"
+          "size_of": 8,
+          "len_arg": 6,
+          "note": "fragment array OUT, up to args[6] (8-byte {firstPoint,numPoints}, q_shared.h:1919-1922) - maximum, not exact"
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1024"
@@ -1670,8 +1673,9 @@
         {
           "kind": "in_buf",
           "type": "polyVert_t",
+          "size_of": 24,
           "len_arg": 2,
-          "note": "verts, count args[2]"
+          "note": "verts, count args[2] (24-byte xyz+st+modulate, tr_types.h:70-75)"
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1148"
@@ -1694,8 +1698,9 @@
         {
           "kind": "in_buf",
           "type": "polyVert_t",
+          "size_of": 24,
           "len_arg": 2,
-          "note": "verts, count = args[2]*args[4] (numVerts per poly x numPolys)"
+          "note": "verts, count = args[2]*args[4] (numVerts per poly x numPolys; 24-byte stride, tr_types.h:70-75)"
         },
         {
           "kind": "scalar",
@@ -3494,7 +3499,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "in_buf",
@@ -3518,7 +3523,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1484"
@@ -3532,7 +3537,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "scalar",
@@ -3590,7 +3595,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "scalar",
@@ -3649,7 +3654,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "scalar",
@@ -3752,7 +3757,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "scalar",
@@ -3786,7 +3791,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "in_buf",
@@ -3861,7 +3866,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "in_buf",
@@ -3930,7 +3935,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "scalar",
@@ -4009,7 +4014,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "scalar",
@@ -4068,7 +4073,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "in_str",
@@ -4133,7 +4138,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "in_str",
@@ -4175,7 +4180,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "scalar",
@@ -4312,7 +4317,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "scalar",
@@ -4331,7 +4336,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "scalar",
@@ -4351,7 +4356,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "in_buf",
@@ -4371,7 +4376,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1561",
@@ -4386,7 +4391,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1565"
@@ -4400,7 +4405,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "scalar",
@@ -4459,7 +4464,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "scalar",
@@ -4483,7 +4488,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "scalar",
@@ -4507,7 +4512,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "in_str",
@@ -4531,7 +4536,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "scalar",
@@ -4550,7 +4555,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "scalar",
@@ -4574,7 +4579,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "scalar",
@@ -4623,7 +4628,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "scalar",
@@ -4642,7 +4647,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "in_buf",
@@ -4661,7 +4666,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "scalar",
@@ -4685,7 +4690,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "in_str",
@@ -4716,7 +4721,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "in_str",
@@ -4740,7 +4745,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "in_str",
@@ -4765,7 +4770,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "in_str",
@@ -4808,7 +4813,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "in_str",
@@ -4833,7 +4838,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "scalar",
@@ -4852,7 +4857,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "scalar",
@@ -4886,7 +4891,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "scalar",
@@ -4910,7 +4915,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "in_str",
@@ -4934,7 +4939,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "scalar",
@@ -4978,7 +4983,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1653"
@@ -4992,7 +4997,7 @@
           "kind": "scalar",
           "type": "CGhoul2Info_v*",
           "size_of": 8,
-          "note": "opaque CGhoul2Info_v* host handle minted by the engine (InitGhoul2Model); a token, not a buffer to serialize"
+          "note": "opaque CGhoul2Info_v* host handle the engine created (InitGhoul2Model); a token, not a buffer to serialize"
         },
         {
           "kind": "scalar",
