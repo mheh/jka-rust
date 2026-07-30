@@ -8,6 +8,7 @@
     "in_buf",
     "out_buf",
     "inout_buf",
+    "out_str",
     "double_ptr",
     "retained_ptr"
   ],
@@ -88,7 +89,8 @@
         {
           "kind": "out_buf",
           "type": "vmCvar_t",
-          "note": "engine fills the vmCvar_t"
+          "note": "engine fills the vmCvar_t",
+          "size_of": 272
         },
         {
           "kind": "in_str",
@@ -116,7 +118,8 @@
         {
           "kind": "inout_buf",
           "type": "vmCvar_t",
-          "note": "reads name+modCount, writes current value"
+          "note": "reads name+modCount, writes current value",
+          "size_of": 272
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:917"
@@ -534,7 +537,8 @@
         {
           "kind": "out_buf",
           "type": "trace_t",
-          "note": "trace result"
+          "note": "trace result",
+          "size_of": 48
         },
         {
           "kind": "in_buf",
@@ -581,7 +585,8 @@
         {
           "kind": "out_buf",
           "type": "trace_t",
-          "note": "trace result"
+          "note": "trace result",
+          "size_of": 48
         },
         {
           "kind": "in_buf",
@@ -627,7 +632,8 @@
       "args": [
         {
           "kind": "out_buf",
-          "type": "trace_t"
+          "type": "trace_t",
+          "size_of": 48
         },
         {
           "kind": "in_buf",
@@ -685,7 +691,8 @@
       "args": [
         {
           "kind": "out_buf",
-          "type": "trace_t"
+          "type": "trace_t",
+          "size_of": 48
         },
         {
           "kind": "in_buf",
@@ -1650,7 +1657,8 @@
         {
           "kind": "in_buf",
           "type": "refEntity_t",
-          "note": "render entity"
+          "note": "render entity",
+          "size_of": 216
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1144"
@@ -1883,7 +1891,8 @@
         {
           "kind": "in_buf",
           "type": "refdef_t",
-          "note": "scene refdef"
+          "note": "scene refdef",
+          "size_of": 384
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1171"
@@ -1988,7 +1997,8 @@
         {
           "kind": "out_buf",
           "type": "orientation_t",
-          "note": "tag orientation OUT"
+          "note": "tag orientation OUT",
+          "size_of": 48
         },
         {
           "kind": "scalar",
@@ -2406,7 +2416,8 @@
         {
           "kind": "out_buf",
           "type": "glconfig_t",
-          "note": "filled by engine"
+          "note": "filled by engine",
+          "size_of": 96
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1206"
@@ -2419,7 +2430,8 @@
         {
           "kind": "out_buf",
           "type": "gameState_t",
-          "note": "filled by engine"
+          "note": "filled by engine",
+          "size_of": 22804
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1210"
@@ -2457,7 +2469,8 @@
         {
           "kind": "out_buf",
           "type": "snapshot_t",
-          "note": "filled by engine"
+          "note": "filled by engine",
+          "size_of": 139352
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1218"
@@ -2475,7 +2488,8 @@
         {
           "kind": "out_buf",
           "type": "entityState_t",
-          "note": "filled by engine"
+          "note": "filled by engine",
+          "size_of": 532
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1221"
@@ -2514,7 +2528,8 @@
         {
           "kind": "out_buf",
           "type": "usercmd_t",
-          "note": "filled by engine"
+          "note": "filled by engine",
+          "size_of": 28
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1230"
@@ -2730,7 +2745,8 @@
         {
           "kind": "out_buf",
           "type": "pc_token_t",
-          "note": "token OUT"
+          "note": "token OUT",
+          "size_of": 1040
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1273"
@@ -2746,8 +2762,8 @@
           "note": "handle"
         },
         {
-          "kind": "out_buf",
-          "type": "char",
+          "kind": "out_str",
+          "type": "char*",
           "note": "filename OUT, caller MAX_QPATH buffer, no len arg"
         },
         {
@@ -2794,7 +2810,8 @@
         {
           "kind": "out_buf",
           "type": "qtime_t",
-          "note": "qtime_s OUT"
+          "note": "qtime_s OUT",
+          "size_of": 36
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1290"
@@ -2962,7 +2979,8 @@
         {
           "kind": "in_buf",
           "type": "byte",
-          "note": "PVS/area mask, engine reads"
+          "size_of": 32,
+          "note": "PVS/area mask, engine reads MAX_MAP_AREA_BYTES=32"
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1355"
@@ -3209,7 +3227,8 @@
         {
           "kind": "in_buf",
           "type": "refdef_t",
-          "note": "refdef"
+          "note": "refdef",
+          "size_of": 384
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1399"
@@ -3222,7 +3241,8 @@
         {
           "kind": "in_buf",
           "type": "refdef_t",
-          "note": "refdef"
+          "note": "refdef",
+          "size_of": 384
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1402"
@@ -3280,7 +3300,8 @@
         {
           "kind": "in_buf",
           "type": "addpolyArgStruct_t",
-          "note": "poly args"
+          "note": "poly args",
+          "size_of": 180
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1417"
@@ -3293,7 +3314,8 @@
         {
           "kind": "in_buf",
           "type": "addbezierArgStruct_t",
-          "note": "bezier args"
+          "note": "bezier args",
+          "size_of": 136
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1420"
@@ -3306,7 +3328,8 @@
         {
           "kind": "in_buf",
           "type": "effectTrailArgStruct_t",
-          "note": "trail args"
+          "note": "trail args",
+          "size_of": 348
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1423"
@@ -3319,7 +3342,8 @@
         {
           "kind": "in_buf",
           "type": "addspriteArgStruct_t",
-          "note": "sprite args"
+          "note": "sprite args",
+          "size_of": 72
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1426"
@@ -3332,7 +3356,8 @@
         {
           "kind": "in_buf",
           "type": "addElectricityArgStruct_t",
-          "note": "electricity args"
+          "note": "electricity args",
+          "size_of": 92
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1429"
@@ -3504,12 +3529,14 @@
         {
           "kind": "in_buf",
           "type": "qhandle_t",
-          "note": "modelList array, NUL/index-terminated"
+          "size_of": 2048,
+          "note": "modelList qhandle_t[MAX_MODELS=512] (Raven passes cgs.gameModels; engine indexes by mModelindex)"
         },
         {
           "kind": "in_buf",
           "type": "qhandle_t",
-          "note": "skinList array"
+          "size_of": 2048,
+          "note": "skinList, same 512-handle shape"
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1487"
@@ -3573,9 +3600,9 @@
           "note": "frameNum"
         },
         {
-          "kind": "inout_buf",
-          "type": "qhandle_t",
-          "note": "modelList"
+          "kind": "scalar",
+          "type": "qhandle_t*",
+          "note": "modelList - dead param, unused inside rd-vanilla G2API_GetBoltMatrix"
         },
         {
           "kind": "in_buf",
@@ -3631,9 +3658,9 @@
           "note": "frameNum"
         },
         {
-          "kind": "inout_buf",
-          "type": "qhandle_t",
-          "note": "modelList"
+          "kind": "scalar",
+          "type": "qhandle_t*",
+          "note": "modelList - dead param, unused inside rd-vanilla G2API_GetBoltMatrix"
         },
         {
           "kind": "in_buf",
@@ -3690,9 +3717,9 @@
           "note": "frameNum"
         },
         {
-          "kind": "inout_buf",
-          "type": "qhandle_t",
-          "note": "modelList"
+          "kind": "scalar",
+          "type": "qhandle_t*",
+          "note": "modelList - dead param, unused inside rd-vanilla G2API_GetBoltMatrix"
         },
         {
           "kind": "in_buf",
@@ -3785,7 +3812,8 @@
         {
           "kind": "out_buf",
           "type": "CollisionRecord_t",
-          "note": "collRecMap OUT array, MAX_G2_COLLISIONS=16"
+          "size_of": 1024,
+          "note": "collRecMap OUT: G2Trace_t = MAX_G2_COLLISIONS(16) x 64B"
         },
         {
           "kind": "scalar",
@@ -3860,7 +3888,8 @@
         {
           "kind": "out_buf",
           "type": "CollisionRecord_t",
-          "note": "collRecMap OUT array"
+          "size_of": 1024,
+          "note": "collRecMap OUT: G2Trace_t = MAX_G2_COLLISIONS(16) x 64B"
         },
         {
           "kind": "scalar",
@@ -3928,6 +3957,20 @@
     },
     {
       "num": 301,
+      "name": "CG_G2_CLEANMODELS",
+      "ret": "void",
+      "args": [
+        {
+          "kind": "double_ptr",
+          "type": "void**",
+          "size_of": 8,
+          "note": "CGhoul2Info_v** slot; engine frees the vector and nulls the slot (in/out)"
+        }
+      ],
+      "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1517"
+    },
+    {
+      "num": 302,
       "name": "CG_G2_ANGLEOVERRIDE",
       "ret": "scalar",
       "args": [
@@ -3974,9 +4017,9 @@
           "note": "forward"
         },
         {
-          "kind": "inout_buf",
-          "type": "qhandle_t",
-          "note": "modelList"
+          "kind": "scalar",
+          "type": "qhandle_t*",
+          "note": "modelList - engine reads it only in the Matrix bone variant (G2_bones.cpp:587), never on this angles path"
         },
         {
           "kind": "scalar",
@@ -3990,20 +4033,6 @@
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1514"
-    },
-    {
-      "num": 302,
-      "name": "CG_G2_CLEANMODELS",
-      "ret": "void",
-      "args": [
-        {
-          "kind": "double_ptr",
-          "type": "void**",
-          "size_of": 8,
-          "note": "CGhoul2Info_v** slot; engine frees the vector and nulls the slot (in/out)"
-        }
-      ],
-      "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1517"
     },
     {
       "num": 303,
@@ -4188,8 +4217,8 @@
           "note": "modelIndex"
         },
         {
-          "kind": "out_buf",
-          "type": "char",
+          "kind": "out_str",
+          "type": "char*",
           "note": "GLA name OUT, caller buffer, no len (strcpy)"
         }
       ],
@@ -4361,7 +4390,8 @@
         {
           "kind": "in_buf",
           "type": "SSkinGoreData",
-          "note": "gore data"
+          "note": "gore data",
+          "size_of": 144
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1557",
@@ -4652,7 +4682,8 @@
         {
           "kind": "in_buf",
           "type": "sharedRagDollParams_t",
-          "note": "ragdoll params; NULL resets the ragdoll"
+          "note": "ragdoll params; NULL resets the ragdoll",
+          "size_of": 96
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1605"
@@ -4676,7 +4707,8 @@
         {
           "kind": "in_buf",
           "type": "sharedRagDollUpdateParams_t",
-          "note": "update params; NULL = early return"
+          "note": "update params; NULL = early return",
+          "size_of": 56
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1609"
@@ -4877,7 +4909,8 @@
         {
           "kind": "in_buf",
           "type": "sharedSetBoneIKStateParams_t",
-          "note": "params, may be NULL"
+          "note": "params, may be NULL",
+          "size_of": 84
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1632"
@@ -4901,7 +4934,8 @@
         {
           "kind": "in_buf",
           "type": "sharedIKMoveParams_t",
-          "note": "move params"
+          "note": "move params",
+          "size_of": 540
         }
       ],
       "cite": "OpenJK/codemp/client/cl_cgameapi.cpp:1635"
@@ -5010,8 +5044,8 @@
           "note": "modelIndex"
         },
         {
-          "kind": "out_buf",
-          "type": "char",
+          "kind": "out_str",
+          "type": "char*",
           "note": "surface name OUT, caller buffer, no len (strcpy)"
         }
       ],

@@ -21,3 +21,7 @@ mp_cgame = { path = "../mp/cgame" }
 mp_engine_qcommon = { path = "../mp/engine/qcommon" }
 native_platform = { path = "../native/platform" }
 mp_abi = { path = "../mp/abi" }
+# C6b REPLAY referee (tests/replay_referee.rs): flate2 reads the gzip journal,
+# serde_json parses the shape manifests at runtime through the shared shapes.rs.
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+serde_json = "1"

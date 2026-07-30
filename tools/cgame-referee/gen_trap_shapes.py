@@ -40,6 +40,10 @@ def obuf(t, size=None, len_arg=None, note=None):
     if len_arg is not None: a["len_arg"] = len_arg
     if note: a["note"] = note
     return a
+def ostr(note=None):
+    # engine strcpys a NUL-terminated string into a caller-sized buffer with no
+    # length arg - recorded as a cstring at EXIT, served back with its NUL
+    return {"kind": "out_str", "type": "char*", "note": note}
 def iobuf(t, size=None, len_arg=None, note=None):
     a = {"kind": "inout_buf", "type": t}
     if size is not None: a["size_of"] = size
@@ -196,7 +200,7 @@ BLOCK200 = [
  ("CG_PC_LOAD_SOURCE", "scalar", [istr(note="filename")]),
  ("CG_PC_FREE_SOURCE", "scalar", [S("int32", "handle")]),
  ("CG_PC_READ_TOKEN", "scalar", [S("int32", "handle"), obuf("pc_token_t", note="token OUT")]),
- ("CG_PC_SOURCE_FILE_AND_LINE", "scalar", [S("int32", "handle"), obuf("char", note="filename OUT, caller MAX_QPATH buffer, no len arg"), obuf("int32", 4, note="line OUT")]),
+ ("CG_PC_SOURCE_FILE_AND_LINE", "scalar", [S("int32", "handle"), ostr(note="filename OUT, caller MAX_QPATH buffer, no len arg"), obuf("int32", 4, note="line OUT")]),
  ("CG_PC_LOAD_GLOBAL_DEFINES", "scalar", [istr(note="filename")]),
  ("CG_PC_REMOVE_ALL_GLOBAL_DEFINES", "void", []),
  ("CG_S_STOPBACKGROUNDTRACK", "void", []),
@@ -208,7 +212,7 @@ BLOCK200 = [
  ("CG_CIN_DRAWCINEMATIC", "void", [S("int32", "handle")]),
  ("CG_CIN_SETEXTENTS", "void", [S("int32", "handle"), S("int32", "x"), S("int32", "y"), S("int32", "w"), S("int32", "h")]),
  ("CG_GET_ENTITY_TOKEN", "scalar", [obuf("char", len_arg=2, note="token OUT"), S("int32", "size")]),
- ("CG_R_INPVS", "scalar", [vin("p1"), vin("p2"), ibuf("byte", note="PVS/area mask, engine reads")]),
+ ("CG_R_INPVS", "scalar", [vin("p1"), vin("p2"), ibuf("byte", 32, note="PVS/area mask, engine reads MAX_MAP_AREA_BYTES=32")]),
  ("CG_FX_REGISTER_EFFECT", "handle", [istr(note="effect path")]),
  ("CG_FX_PLAY_EFFECT", "void", [istr(note="effect path"), vin("origin"), vin("fwd/axis"), S("int32", "vol"), S("int32", "rad")]),
  ("CG_FX_PLAY_ENTITY_EFFECT", "void", [], "DEAD: assert(0) in both engines; args unread. never call in replay."),
@@ -238,21 +242,21 @@ BLOCK200 = [
  ("CG_TRUEFREE", "void", [dptr("engine reads *arg1, frees it, nulls the slot")]),
  ("CG_G2_LISTSURFACES", "void", [g2h("single CGhoul2Info* (oracle casts args[1] raw)")]),
  ("CG_G2_LISTBONES", "void", [g2h("single CGhoul2Info*"), S("int32", "frame")]),
- ("CG_G2_SETMODELS", "void", [g2h(), ibuf("qhandle_t", note="modelList array, NUL/index-terminated"), ibuf("qhandle_t", note="skinList array")]),
+ ("CG_G2_SETMODELS", "void", [g2h(), ibuf("qhandle_t", 2048, note="modelList qhandle_t[MAX_MODELS=512] (Raven passes cgs.gameModels; engine indexes by mModelindex)"), ibuf("qhandle_t", 2048, note="skinList, same 512-handle shape")]),
  ("CG_G2_HAVEWEGHOULMODELS", "scalar", [g2h()]),
- ("CG_G2_GETBOLT", "scalar", [g2h(), S("int32", "modelIndex"), S("int32", "boltIndex"), obuf("mdxaBone_t", 48, note="bolt matrix OUT"), vin("angles"), vin("position"), S("int32", "frameNum"), iobuf("qhandle_t", note="modelList"), vin("scale")]),
- ("CG_G2_GETBOLT_NOREC", "scalar", [g2h(), S("int32", "modelIndex"), S("int32", "boltIndex"), obuf("mdxaBone_t", 48, note="bolt matrix OUT"), vin("angles"), vin("position"), S("int32", "frameNum"), iobuf("qhandle_t", note="modelList"), vin("scale")], "oracle sets gG2_GBMNoReconstruct before same call."),
- ("CG_G2_GETBOLT_NOREC_NOROT", "scalar", [g2h(), S("int32", "modelIndex"), S("int32", "boltIndex"), obuf("mdxaBone_t", 48, note="bolt matrix OUT"), vin("angles"), vin("position"), S("int32", "frameNum"), iobuf("qhandle_t", note="modelList"), vin("scale")], "oracle sets gG2_GBMUseSPMethod before same call."),
+ ("CG_G2_GETBOLT", "scalar", [g2h(), S("int32", "modelIndex"), S("int32", "boltIndex"), obuf("mdxaBone_t", 48, note="bolt matrix OUT"), vin("angles"), vin("position"), S("int32", "frameNum"), S("qhandle_t*", "modelList - dead param, unused inside rd-vanilla G2API_GetBoltMatrix"), vin("scale")]),
+ ("CG_G2_GETBOLT_NOREC", "scalar", [g2h(), S("int32", "modelIndex"), S("int32", "boltIndex"), obuf("mdxaBone_t", 48, note="bolt matrix OUT"), vin("angles"), vin("position"), S("int32", "frameNum"), S("qhandle_t*", "modelList - dead param, unused inside rd-vanilla G2API_GetBoltMatrix"), vin("scale")], "oracle sets gG2_GBMNoReconstruct before same call."),
+ ("CG_G2_GETBOLT_NOREC_NOROT", "scalar", [g2h(), S("int32", "modelIndex"), S("int32", "boltIndex"), obuf("mdxaBone_t", 48, note="bolt matrix OUT"), vin("angles"), vin("position"), S("int32", "frameNum"), S("qhandle_t*", "modelList - dead param, unused inside rd-vanilla G2API_GetBoltMatrix"), vin("scale")], "oracle sets gG2_GBMUseSPMethod before same call."),
  ("CG_G2_INITGHOUL2MODEL", "scalar", [dptr("CGhoul2Info_v** slot; engine allocates the instance vector on first use and writes the host ptr back into *arg1 (in/out)"), istr(note="model name"), S("int32", "modelIndex"), S("qhandle_t", "customSkin"), S("qhandle_t", "customShader"), S("int32", "modelFlags"), S("int32", "lodBias")]),
  ("CG_G2_SETSKIN", "scalar", [g2h(), S("int32", "modelIndex"), S("qhandle_t", "customSkin"), S("qhandle_t", "renderSkin")]),
- ("CG_G2_COLLISIONDETECT", "void", [obuf("CollisionRecord_t", note="collRecMap OUT array, MAX_G2_COLLISIONS=16"), g2h(), vin("angles"), vin("position"), S("int32", "frameNumber"), S("int32", "entNum"), vout("rayStart"), vout("rayEnd"), vin("scale"), S("int32", "traceFlags"), S("int32", "useLod"), F("fRadius")], "rayStart/rayEnd (args 7,8) are passed in and may be adjusted; treat as in vec3."),
- ("CG_G2_COLLISIONDETECTCACHE", "void", [obuf("CollisionRecord_t", note="collRecMap OUT array"), g2h(), vin("angles"), vin("position"), S("int32", "frameNumber"), S("int32", "entNum"), vin("rayStart"), vin("rayEnd"), vin("scale"), S("int32", "traceFlags"), S("int32", "useLod"), F("fRadius")]),
- ("CG_G2_ANGLEOVERRIDE", "scalar", [g2h(), S("int32", "modelIndex"), istr(note="boneName"), vin("angles"), S("int32", "flags"), S("Eorientations", "up"), S("Eorientations", "right"), S("Eorientations", "forward"), iobuf("qhandle_t", note="modelList"), S("int32", "blendTime"), S("int32", "currentTime")]),
+ ("CG_G2_COLLISIONDETECT", "void", [obuf("CollisionRecord_t", 1024, note="collRecMap OUT: G2Trace_t = MAX_G2_COLLISIONS(16) x 64B"), g2h(), vin("angles"), vin("position"), S("int32", "frameNumber"), S("int32", "entNum"), vout("rayStart"), vout("rayEnd"), vin("scale"), S("int32", "traceFlags"), S("int32", "useLod"), F("fRadius")], "rayStart/rayEnd (args 7,8) are passed in and may be adjusted; treat as in vec3."),
+ ("CG_G2_COLLISIONDETECTCACHE", "void", [obuf("CollisionRecord_t", 1024, note="collRecMap OUT: G2Trace_t = MAX_G2_COLLISIONS(16) x 64B"), g2h(), vin("angles"), vin("position"), S("int32", "frameNumber"), S("int32", "entNum"), vin("rayStart"), vin("rayEnd"), vin("scale"), S("int32", "traceFlags"), S("int32", "useLod"), F("fRadius")]),
  ("CG_G2_CLEANMODELS", "void", [dptr("CGhoul2Info_v** slot; engine frees the vector and nulls the slot (in/out)")]),
+ ("CG_G2_ANGLEOVERRIDE", "scalar", [g2h(), S("int32", "modelIndex"), istr(note="boneName"), vin("angles"), S("int32", "flags"), S("Eorientations", "up"), S("Eorientations", "right"), S("Eorientations", "forward"), S("qhandle_t*", "modelList - engine reads it only in the Matrix bone variant (G2_bones.cpp:587), never on this angles path"), S("int32", "blendTime"), S("int32", "currentTime")]),
  ("CG_G2_PLAYANIM", "scalar", [g2h(), S("int32", "modelIndex"), istr(note="boneName"), S("int32", "startFrame"), S("int32", "endFrame"), S("int32", "flags"), F("animSpeed"), S("int32", "blendTime"), F("setFrame"), S("int32", "currentTime")]),
  ("CG_G2_GETBONEANIM", "scalar", [g2h(), istr(note="boneName"), S("int32", "currentTime"), obuf("float", 4, note="currentFrame OUT"), obuf("int32", 4, note="startFrame OUT"), obuf("int32", 4, note="endFrame OUT"), obuf("int32", 4, note="flags OUT"), obuf("float", 4, note="animSpeed OUT"), obuf("int32", 4, note="modelList OUT"), S("int32", "modelIndex")]),
  ("CG_G2_GETBONEFRAME", "scalar", [g2h(), istr(note="boneName"), S("int32", "currentTime"), obuf("float", 4, note="currentFrame OUT"), obuf("int32", 4, note="modelList OUT"), S("int32", "modelIndex")], "trimmed GetBoneAnim: engine discards startFrame/endFrame/flags/animSpeed internally."),
- ("CG_G2_GETGLANAME", "void", [g2h(), S("int32", "modelIndex"), obuf("char", note="GLA name OUT, caller buffer, no len (strcpy)")]),
+ ("CG_G2_GETGLANAME", "void", [g2h(), S("int32", "modelIndex"), ostr(note="GLA name OUT, caller buffer, no len (strcpy)")]),
  ("CG_G2_COPYGHOUL2INSTANCE", "scalar", [g2h("source instance"), g2h("dest instance"), S("int32", "modelIndex")]),
  ("CG_G2_COPYSPECIFICGHOUL2MODEL", "void", [g2h("source"), S("int32", "modelFrom"), g2h("dest"), S("int32", "modelTo")]),
  ("CG_G2_DUPLICATEGHOUL2INSTANCE", "void", [g2h("source instance"), dptr("CGhoul2Info_v** dest slot; engine allocates a copy and writes host ptr into *arg2")]),
@@ -289,7 +293,7 @@ BLOCK200 = [
  ("CG_G2_CLEARATTACHEDINSTANCE", "void", [S("int32", "entNum")]),
  ("CG_G2_CLEANENTATTACHMENTS", "void", []),
  ("CG_G2_OVERRIDESERVER", "scalar", [g2h()]),
- ("CG_G2_GETSURFACENAME", "void", [g2h(), S("int32", "surfNumber"), S("int32", "modelIndex"), obuf("char", note="surface name OUT, caller buffer, no len (strcpy)")]),
+ ("CG_G2_GETSURFACENAME", "void", [g2h(), S("int32", "surfNumber"), S("int32", "modelIndex"), ostr(note="surface name OUT, caller buffer, no len (strcpy)")]),
  ("CG_SET_SHARED_BUFFER", "void", [{"kind": "retained_ptr", "type": "char*", "size_of": 2048, "note": "engine STORES the pointer (cl.mSharedMemory / RegisterSharedMemory) and reads through it during later G2/FX traps and VM calls; buffer is MAX_CG_SHARED_BUFFER_SIZE = 2048 (cg_public.h:593). replay must keep a live 2048-byte region and re-point the engine at it, not copy-at-call."}], "the one engine-retained pointer; model specially."),
  ("CG_CM_REGISTER_TERRAIN", "scalar", [istr(note="terrain config")], "DIVERGE: OpenJK returns 0 (RMG stripped); oracle CM_RegisterTerrain(...)->GetTerrainId(). shape recorded from oracle; OpenJK ignores the arg."),
  ("CG_RMG_INIT", "void", [S("int32", "count"), istr(note="terrain string")], "DIVERGE: OpenJK returns 0 (no-op); oracle runs RM_CreateRandomModels(args[1], VMA(2)). shape recorded from oracle; OpenJK reads neither arg."),
@@ -389,12 +393,46 @@ def cite_for(name):
         return f"{OPENJK}:{OPENJK_LINE[name]}"
     return f"{CGPUBLIC} (declared, no dispatch case)"
 
+# Engine-native (LP64, arm64 gcc) sizeof for every named struct that crosses as
+# a fixed buffer. Probed against the oracle headers with the cgame-oracle build
+# flags (sizeprobe, 2026-07-30) - a missing size here silently records an EMPTY
+# blob (the gamestate defect that broke the first two swoop1 traces).
+TYPE_SIZES = {
+    "gameState_t": 22804, "glconfig_t": 96, "snapshot_t": 139352,
+    "entityState_t": 532, "usercmd_t": 28, "orientation_t": 48,
+    "pc_token_t": 1040, "qtime_t": 36, "refEntity_t": 216, "refdef_t": 384,
+    "trace_t": 48, "vmCvar_t": 272, "SSkinGoreData": 144,
+    "addElectricityArgStruct_t": 92, "addbezierArgStruct_t": 136,
+    "addpolyArgStruct_t": 180, "addspriteArgStruct_t": 72,
+    "effectTrailArgStruct_t": 348, "sharedIKMoveParams_t": 540,
+    "sharedRagDollParams_t": 96, "sharedRagDollUpdateParams_t": 56,
+    "sharedSetBoneIKStateParams_t": 84, "mdxaBone_t": 48,
+    "vec3_t": 12, "vec4_t": 16, "trajectory_t": 36,
+}
+
+def fill_sizes(args):
+    # every buf-kind arg without an explicit size or count gets its type's
+    # probed sizeof; buf types not in the table stay unsized and MUST carry an
+    # explicit size/len_arg at the site (asserted so a new trap can't silently
+    # record empty blobs again)
+    for a in args:
+        if not a.get("kind", "").endswith("_buf"):
+            continue
+        if a.get("size_of") or "len_arg" in a:
+            continue
+        t = a.get("type")
+        if t in TYPE_SIZES:
+            a["size_of"] = TYPE_SIZES[t]
+        else:
+            raise SystemExit(f"unsized buf type {t!r} - add it to TYPE_SIZES or size the site")
+    return args
+
 def build():
     traps = []
     for num, e in entries_with_numbers():
         name, ret, args = e[0], e[1], e[2]
         note = e[3] if len(e) > 3 else None
-        entry = {"num": num, "name": name, "ret": ret, "args": args, "cite": cite_for(name)}
+        entry = {"num": num, "name": name, "ret": ret, "args": fill_sizes(args), "cite": cite_for(name)}
         if note:
             entry["note"] = note
         traps.append(entry)
@@ -402,7 +440,7 @@ def build():
         "schema": "cgame-trap-shapes/1",
         "engine": "OpenJK codemp client (openjk.app) — CL_CgameSystemCalls",
         "numbering": "cgameImport_t (oracle/codemp/cgame/cg_public.h), byte-identical to OpenJK cgameImportLegacy_e",
-        "arg_kinds": ["scalar", "in_str", "in_buf", "out_buf", "inout_buf", "double_ptr", "retained_ptr"],
+        "arg_kinds": ["scalar", "in_str", "in_buf", "out_buf", "inout_buf", "out_str", "double_ptr", "retained_ptr"],
         "ret_kinds": ["void", "scalar", "handle", "float"],
         "note": "arg index N in `args[]` maps to VMA(N+1)/args[N+1] in the dispatch (args[0] is the trap number). size_of is the engine-native (LP64) sizeof of the named type in bytes where fixed; len_arg names the 0-based args[] index holding the byte/element count. See README.md.",
         "count": len(traps),

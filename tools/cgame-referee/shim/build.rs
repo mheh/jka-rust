@@ -39,6 +39,7 @@ fn arg_kind(kind: &str) -> &'static str {
         "in_str" => "ArgKind::InStr",
         "in_buf" => "ArgKind::InBuf",
         "out_buf" => "ArgKind::OutBuf",
+        "out_str" => "ArgKind::OutStr",
         "inout_buf" => "ArgKind::InoutBuf",
         "double_ptr" => "ArgKind::DoublePtr",
         "retained_ptr" => "ArgKind::RetainedPtr",

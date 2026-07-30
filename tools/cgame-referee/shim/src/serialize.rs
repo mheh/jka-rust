@@ -33,6 +33,7 @@ pub enum ArgKind {
     InStr,
     InBuf,
     OutBuf,
+    OutStr,
     InoutBuf,
     DoublePtr,
     RetainedPtr,
@@ -143,7 +144,11 @@ fn read_slot(slot_ptr: isize) -> Vec<u8> {
 fn special_count(num: i64, idx: usize, args: &[isize]) -> Option<u64> {
     match (num, idx) {
         // CG_R_ADDPOLYSTOSCENE (204): verts = numVerts(args[2]) * numPolys(args[4]).
-        (204, 2) => Some((args[2].max(0) as u64).saturating_mul(args[4].max(0) as u64)),
+        // count words are 32-bit ints - mask off the variadic-trampoline garbage
+        // in the high 32 bits before multiplying (see arg_len).
+        (204, 2) => {
+            Some(((args[2] as i32).max(0) as u64).saturating_mul((args[4] as i32).max(0) as u64))
+        }
         _ => None,
     }
 }
@@ -152,7 +157,11 @@ fn special_count(num: i64, idx: usize, args: &[isize]) -> Option<u64> {
 fn buf_len(shape_len_arg: i32, elem: u32, num: i64, idx: usize, args: &[isize]) -> u64 {
     let count = special_count(num, idx, args).unwrap_or_else(|| {
         if shape_len_arg >= 0 && (shape_len_arg as usize) < args.len() {
-            args[shape_len_arg as usize].max(0) as u64
+            // count args are 32-bit ints; the variadic trampoline grabs 64-bit
+            // words whose high 32 bits are stack garbage. Masking to i32 is what
+            // the engine dispatch does (it casts args[n] to int) - reading the
+            // full 64-bit word blows past MAX_BLOB and drops the buffer.
+            (args[shape_len_arg as usize] as i32).max(0) as u64
         } else {
             0
         }
@@ -188,7 +197,7 @@ pub fn trap_enter_blobs(shape: &TrapShape, args: &[isize], sink: &mut dyn BlobSi
             }
             // slot value BEFORE the engine (maybe) writes a new host ptr back.
             ArgKind::DoublePtr => sink.blob(i as u8, BlobKind::DoublePtrSlot, &read_slot(ptr)),
-            ArgKind::Scalar | ArgKind::OutBuf | ArgKind::RetainedPtr => {}
+            ArgKind::Scalar | ArgKind::OutBuf | ArgKind::OutStr | ArgKind::RetainedPtr => {}
         }
     }
 }
@@ -206,6 +215,8 @@ pub fn trap_exit_blobs(shape: &TrapShape, args: &[isize], sink: &mut dyn BlobSin
                 let len = arg_len(a, shape.num, i, args);
                 sink.blob(i as u8, BlobKind::InoutBuf, &read_bytes(ptr, len));
             }
+            // engine strcpy'd a name into the caller's buffer - cstring shape
+            ArgKind::OutStr => sink.blob(i as u8, BlobKind::OutStr, &read_cstr(ptr)),
             // engine-written token in the slot after INIT/DUPLICATE/etc.
             ArgKind::DoublePtr => sink.blob(i as u8, BlobKind::DoublePtrSlot, &read_slot(ptr)),
             ArgKind::Scalar | ArgKind::InStr | ArgKind::InBuf | ArgKind::RetainedPtr => {}

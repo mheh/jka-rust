@@ -450,3 +450,82 @@ data (FxScheduler.cpp:144,914,1083), the console-command block
   trap sets it. The first recorder build used a `CG_G2_*`/`CG_FX_*` name-family
   heuristic here. That build wrote 4KB around every bolt-matrix call and
   journaled 3GB in 12 seconds. The ground truth above replaced it.
+
+## The headless replay referee
+
+The reader for this journal is `crates/cgame/tests/replay_referee.rs` (DEC-48
+rulings 1,2,5). It drives ONE cgame module dylib from a recorded trace and
+byte-diffs the module's outgoing trap stream against the recording. The
+recording came from the oracle cgame under the live engine, so the recorded
+module-side stream IS the oracle reference stream: the oracle dylib replayed
+against its own recording must be byte-identical (the self-check), and the Rust
+cgame dylib replayed against the same recording gives the verdict.
+
+Two `--ignored` tests, run serially (the game slot + module statics are process
+singletons):
+
+```
+cargo test -p cgame --release -- --ignored --test-threads=1
+```
+
+The trace path comes from `JKA_TRACE` (default
+`$HOME/Developer/jka/trace-swoop1.bin`); both tests SKIP with a clear message
+when no trace is present (DEC-48.4 - traces stay out of git). The shape tables
+are parsed at runtime from the two manifests through the shared
+`tools/cgame-referee/shapes.rs` (included via `#[path]`, so crates/cgame takes no
+dependency on the shim crate).
+
+Scalar arg words are compared at 32-bit width and pointer-token scalars (ghoul2
+handles, type ending in `*`) are not compared at all: the cgame VM args are
+32-bit ints, the variadic trampoline grabs 64-bit words, and the high 32 bits are
+stack garbage that differs run-to-run. Pointer-arg words are ASLR-dependent and
+never compared - the serialized pointee blob is the deterministic witness.
+
+### The `len_arg` 32-bit count bug (fixed 2026-07-30)
+
+`buf_len` / `special_count` read the count word as a full 64-bit `isize`. Count
+args are 32-bit ints, so the high 32 bits are variadic-trampoline garbage. For
+`CG_FS_GETFILELIST` (17) the `bufsize` word recorded as `0x500_0000_0800` (low 32
+= 2048) - past `MAX_BLOB`, so the recorder journaled an EMPTY out-buffer for the
+vehicle list (seq 4) and the saber list (seq ~105). Both `serialize.rs` (the
+recorder) and `shapes.rs` (the replay) now mask the count to `i32`, matching the
+engine dispatch (it casts `args[n]` to `int`). Traces recorded before this fix
+carry empty `len_arg` buffers and cannot self-check past the first
+`CG_FS_GETFILELIST`; re-record to validate.
+
+### The ROFF SetLerp gap
+
+`CG_GET_ORIGIN_TRAJECTORY` (23) and `CG_GET_ANGLE_TRAJECTORY` (24) return a
+`trajectory_t*` that the ROFF system reads AND writes through AFTER the vmcall
+returns - `SetLerp(originTrajectory, TR_LINEAR/TR_STATIONARY, ...)` at
+`RoffSystem.cpp:903,924,939` (call sites `:876,:1023`). The shim records a
+`ptr_deref` dump of the 36-byte `trajectory_t` at vmcall EXIT, but it cannot see
+the engine's later SetLerp write, so the replay does not reproduce it. Replay
+diffs the deref at EXIT and will show a finding here for any fixture that runs
+ROFFs. Modeled gap, not solved - it only matters for ROFF fixtures.
+
+### Replay diff policy (what is NOT compared)
+
+Three exclusions from the byte-identical bar, each because the bytes are host
+state, not module behavior:
+
+- **Pointer arg words** are never compared. The pointee blob is the witness.
+  Scalar words compare on the low 32 bits only (the trampoline's high 32 are
+  stack garbage).
+- **`double_ptr` slot contents** are host tokens. The replay serves recorded
+  tokens back, so a compare is a tautology. A mis-shaped word here derefs a
+  token and faults - this is how the ANGLEOVERRIDE/CLEANMODELS manifest
+  numbering swap was caught (fixed; the full 233-name sweep against
+  `cg_public.h` now matches exactly).
+- **`CG_FX_ADDPRIMITIVE` (279)** compares masked ranges only: each vert's
+  origin plus the mShader/mSetFlags/mKillTime tail. The rest of the 348-byte
+  `effectTrailArgStruct_t` (q_shared.h:2615-2620) is uninitialized caller
+  stack - Raven fills fields per `mSetFlags` and the engine reads them the
+  same way, so unset bytes differ run to run by design.
+
+The harness reads and writes module memory through mach `vm_read_overwrite` /
+`vm_write`, so a quirk address returns empty instead of SIGBUS. Set
+`JKA_REPLAY_TRACE=1` for a per-trap call trace while debugging.
+
+Bar proven 2026-07-30: the oracle dylib replayed against its own swoop1
+recording - 33.5M records, 16.77M syscalls, 2,148 vmcalls - with ZERO findings.

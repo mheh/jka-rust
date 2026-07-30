@@ -32,6 +32,7 @@ pub enum BlobKind {
     DoublePtrSlot = 5,
     SharedBuffer = 6,
     RetDeref = 7,
+    OutStr = 8,
 }
 
 /// Anything the serializers can append a blob to. Keeps serialize.rs free of the
