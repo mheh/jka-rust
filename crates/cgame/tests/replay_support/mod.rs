@@ -294,6 +294,36 @@ fn masked_ranges(num: i64, arg: usize) -> Option<&'static [(usize, usize)]> {
     }
 }
 
+/// Raven UB sites keyed by argument VALUE, where a static (trap, arg) mask
+/// would blind the whole trap.
+///
+/// CG_R_SETCOLOR (210): `CG_SaberClashFlare` hands the engine a `vec3_t`, so
+/// the fourth float is a frame padding hole past the array - per-host stack
+/// residue that even the oracle SELF-check cannot reproduce
+/// (`oracle/codemp/cgame/cg_draw.c:5380-5381`). No other SetColor site passes
+/// the (0.8, 0.8, 0.8) triple, so that value keys the mask (porting rule 19:
+/// normalize the UB in the referee, never in fixtures).
+fn value_masked_ranges(
+    num: i64,
+    module: &[u8],
+    recorded: &[u8],
+) -> Option<&'static [(usize, usize)]> {
+    // 0.8f32 little-endian, three times.
+    const CLASH_RGB: [u8; 12] = [
+        0xcd, 0xcc, 0x4c, 0x3f, 0xcd, 0xcc, 0x4c, 0x3f, 0xcd, 0xcc, 0x4c, 0x3f,
+    ];
+    const RGB_ONLY: &[(usize, usize)] = &[(0, 12)];
+    if num == 210
+        && module.len() == 16
+        && recorded.len() == 16
+        && module[..12] == CLASH_RGB
+        && recorded[..12] == CLASH_RGB
+    {
+        return Some(RGB_ONLY);
+    }
+    None
+}
+
 /// Diff only the masked ranges of two equal-length buffers.
 fn diff_masked(module: &[u8], recorded: &[u8], ranges: &[(usize, usize)]) -> Option<String> {
     for &(a, b) in ranges {
@@ -873,6 +903,8 @@ impl ReplayState {
                     let got = read_module(ptr, len);
                     if let Some(b) = enter.blob(i as u8, BLOB_IN_BUF) {
                         let d = if let Some(ranges) = masked_ranges(sh.num, i) {
+                            diff_masked(&got, &b.bytes, ranges)
+                        } else if let Some(ranges) = value_masked_ranges(sh.num, &got, &b.bytes) {
                             diff_masked(&got, &b.bytes, ranges)
                         } else {
                             diff_bytes(&got, &b.bytes)

@@ -6053,6 +6053,8 @@ pub fn CG_ForcePushBlur(ctx: &mut CgContext, org: &vec3_t, centNum: Option<usize
     if centNum.is_none() || ctx.world.cvars.cg_renderToTextureFX.integer == 0 {
         let time = ctx.world.cg.time;
         let viewaxis1 = ctx.world.cg.refdef.viewaxis[1];
+        // Raven registers the shader once per sprite. The demo referee
+        // byte-diffs the trap stream, so we keep both calls.
         let pushShader = trap::R_RegisterShader(ctx.engine, "gfx/effects/forcePush");
 
         let handle = CG_AllocLocalEntity(ctx.world);
@@ -6077,6 +6079,8 @@ pub fn CG_ForcePushBlur(ctx: &mut CgContext, org: &vec3_t, centNum: Option<usize
             ex.color[2] = 40.0;
             ex.refEntity.customShader = pushShader;
         }
+
+        let pushShader = trap::R_RegisterShader(ctx.engine, "gfx/effects/forcePush");
 
         let handle = CG_AllocLocalEntity(ctx.world);
         let ex = ctx

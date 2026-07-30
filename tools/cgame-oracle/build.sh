@@ -208,6 +208,11 @@ esac
 #   returns +0.0 imag for a -0.0 angle, where sin(-0.0) is -0.0. AngleVectors
 #   hit this (509 shield-axis sign-of-zero diffs in the C6b referee). These
 #   flags keep every sin/cos a real libm call, the regime the line above claims.
+# -ftrivial-auto-var-init=zero: zero-fills every named stack local at function
+#   entry, so an engine read past a short argument lands on deterministic bytes
+#   whenever the overrun hits a neighboring local. Frame PADDING holes stay
+#   junk: the CG_SaberClashFlare vec3_t overrun (cg_draw.c:5380-5381) proved
+#   per-host and is normalized in the replay referee (value_masked_ranges).
 # Defines: from JK2_cgame.vcproj Release (NDEBUG;WIN32;_WINDOWS;MISSIONPACK;_JK2;
 #   CGAME) with the win32 pair swapped for __linux__ - the host branch that
 #   selects the macro SnapVector (past the x86 __asm one) and `ID_INLINE inline`.
@@ -217,6 +222,7 @@ esac
 CFLAGS="-x c -std=gnu99 -fpermissive -w -O2 -fno-fast-math -ffp-contract=off \
 	-fno-builtin-sin -fno-builtin-cos -fno-builtin-sinf -fno-builtin-cosf \
 	-fno-builtin-sincos -fno-builtin-sincosf \
+	-ftrivial-auto-var-init=zero \
 	-fsigned-char $PICFLAG \
 	-DNDEBUG -DMISSIONPACK -D_JK2 -DCGAME -D__linux__ -D_FORTIFY_SOURCE=0 \
 	-include $SHIM \

@@ -6430,6 +6430,7 @@ pub fn CG_SaberClashFlare(ctx: &mut CgContext) {
 
     // §F19: Raven hands `trap_R_SetColor` a `vec3_t`, so the alpha it reads is
     // whatever follows the array on the stack; the port sends a 1.0 alpha.
+    // The demo referee masks the alpha compare at this site (value_masked_ranges).
     let color: vec4_t = [0.8, 0.8, 0.8, 1.0];
     trap::R_SetColor(ctx.engine, Some(&color));
 
