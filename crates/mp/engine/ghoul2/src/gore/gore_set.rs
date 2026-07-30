@@ -61,17 +61,17 @@ use std::collections::BTreeMap;
 use core::ffi::c_void;
 
 use mp_qshared::shared::q_math::{
-    CrossProduct, Inverse_Matrix, TransformPoint, VectorNormalize, _DotProduct, _VectorMA,
-    _VectorScale, _VectorSubtract,
+    _DotProduct, _VectorMA, _VectorScale, _VectorSubtract, CrossProduct, Inverse_Matrix,
+    TransformPoint, VectorNormalize,
 };
 use mp_qshared::shared::{mdxaBone_t, vec3_t};
 
 use crate::api_collision::g2api_get_time;
 use crate::ghoul2_system::Ghoul2System;
 use crate::gore::gore_texture_coordinates::{GoreTextureCoordinates, MAX_LODS};
-use mp_host_interface::mdx::mdxm::MdxmSurfaceView;
 use crate::gore::sgore_surface::SGoreSurface;
 use crate::shared::cghoul2_info::CGhoul2Info;
+use mp_host_interface::mdx::mdxm::MdxmSurfaceView;
 
 /// Raven `#define GORE_TAG_UPPER (256)` — the per-generation gore-tag block
 /// size `CurrentTag`/`CurrentTagUpper` step by.

@@ -5,4 +5,7 @@ pub mod gore_set;
 pub mod gore_texture_coordinates;
 pub mod sgore_surface;
 pub mod srag_doll_effector_collision;
-pub mod sskin_gore_data;
+
+/// `SSkinGoreData` crosses the module seam (`trap_G2API_AddSkinGore`), so its
+/// canonical home is `mp_qshared`, matching Raven's `q_shared.h` placement.
+pub use mp_qshared::common::mp::ghoul2::sskin_gore_data;

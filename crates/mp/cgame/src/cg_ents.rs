@@ -4,6 +4,7 @@
 #![allow(non_snake_case, non_upper_case_globals)]
 
 use core::ffi::{c_int, c_void};
+use core::mem::ManuallyDrop;
 use core::ptr::null_mut;
 
 use native_string::{atof_bytes, atoi, latin1_to_string};
@@ -83,7 +84,6 @@ use crate::local::centity_s::{centity_t, MAX_CG_LOOPSOUNDS};
 use crate::local::cg_loop_sound_s::cgLoopSound_t;
 use crate::local::le_type_t::leType_t;
 use crate::local::trail_fn::TrailFn;
-use crate::local::weapon_info_s::weaponInfo_t;
 use crate::trap;
 use crate::world::cg_context::CgContext;
 use crate::world::cg_world::CgWorld;
@@ -1748,18 +1748,25 @@ pub fn CG_Missile(ctx: &mut CgContext, centNum: usize) {
     } else if (s1_eFlags & EF_ALT_FIRING) != 0 {
         // add trails
         // Raven: if ( weapon->altMissileTrailFunc ) weapon->altMissileTrailFunc( cent, weapon );
-        // the cent row and the weapon row swap out for the dispatch so the
-        // think fn can hold ctx beside them (the CG_Player slot-swap shape)
+        // bitwise copy-in/copy-back, originals left in place - a zeroed-swap here
+        // is visible to every ctx-reading helper inside the trail fn (C6b referee
+        // catch). The weapon copy is read-only, so it does not write back.
         // Source: `oracle/codemp/cgame/cg_ents.c:2530-2533`
         let trailFn = ctx.world.cg_weapons[weaponIdx].altMissileTrailFunc;
         if trailFn != TrailFn::None {
+            // SAFETY: `npcClient` is an owned Box, so the cent copy never drops
+            // and the ptr::write write-back does not drop the original. The
+            // weapon copy is plain data.
             let mut cent_tmp =
-                core::mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
-            let weapon_tmp =
-                core::mem::replace(&mut ctx.world.cg_weapons[weaponIdx], weaponInfo_t::zeroed());
+                ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(centNum)) });
+            let weapon_tmp = unsafe { core::ptr::read(&ctx.world.cg_weapons[weaponIdx]) };
             trailFn.dispatch(ctx, &mut cent_tmp, &weapon_tmp);
-            ctx.world.cg_weapons[weaponIdx] = weapon_tmp;
-            *ctx.world.entity_mut(centNum) = cent_tmp;
+            unsafe {
+                core::ptr::write(
+                    ctx.world.entity_mut(centNum),
+                    ManuallyDrop::into_inner(cent_tmp),
+                )
+            };
         }
 
         // add dynamic light
@@ -1793,17 +1800,23 @@ pub fn CG_Missile(ctx: &mut CgContext, centNum: usize) {
     } else {
         // add trails
         // Raven: if ( weapon->missileTrailFunc ) weapon->missileTrailFunc( cent, weapon );
-        // same swap-out shape as the alt arm above
+        // same copy-in/copy-back shape as the alt arm above
         // Source: `oracle/codemp/cgame/cg_ents.c:2558-2561`
         let trailFn = ctx.world.cg_weapons[weaponIdx].missileTrailFunc;
         if trailFn != TrailFn::None {
+            // SAFETY: `npcClient` is an owned Box, so the cent copy never drops
+            // and the ptr::write write-back does not drop the original. The
+            // weapon copy is plain data.
             let mut cent_tmp =
-                core::mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
-            let weapon_tmp =
-                core::mem::replace(&mut ctx.world.cg_weapons[weaponIdx], weaponInfo_t::zeroed());
+                ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(centNum)) });
+            let weapon_tmp = unsafe { core::ptr::read(&ctx.world.cg_weapons[weaponIdx]) };
             trailFn.dispatch(ctx, &mut cent_tmp, &weapon_tmp);
-            ctx.world.cg_weapons[weaponIdx] = weapon_tmp;
-            *ctx.world.entity_mut(centNum) = cent_tmp;
+            unsafe {
+                core::ptr::write(
+                    ctx.world.entity_mut(centNum),
+                    ManuallyDrop::into_inner(cent_tmp),
+                )
+            };
         }
 
         // add dynamic light
@@ -2722,11 +2735,20 @@ pub fn CG_General(ctx: &mut CgContext, centNum: usize) {
             VectorClear(&mut forcedAngles);
             forcedAngles[YAW] = ctx.world.entity(centNum).lerpAngles[YAW];
 
-            // take the body out while ragdolling - CG_RagDoll only touches
-            // itself through this local (its grab target is another ent)
-            let mut cent = core::mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+            // bitwise copy-in/copy-back, original left in place - a zeroed-swap
+            // is visible to every ctx-reading helper inside CG_RagDoll (C6b
+            // referee catch). Its grab target is another ent, so the write-back
+            // stomps nothing.
+            // SAFETY: `npcClient` is an owned Box, so the copy never drops and
+            // the ptr::write write-back does not drop the original.
+            let mut cent = ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(centNum)) });
             CG_RagDoll(ctx, &mut cent, &forcedAngles);
-            *ctx.world.entity_mut(centNum) = cent;
+            unsafe {
+                core::ptr::write(
+                    ctx.world.entity_mut(centNum),
+                    ManuallyDrop::into_inner(cent),
+                )
+            };
         }
     } else if ctx.world.entity(centNum).isRagging != qfalse {
         ctx.world.entity_mut(centNum).isRagging = qfalse;
@@ -2742,10 +2764,12 @@ pub fn CG_General(ctx: &mut CgContext, centNum: usize) {
         && !ctx.world.entity(centNum).ghoul2.is_null()
     {
         //server sent us some bone angles to use
-        // same take/put-back as the ragdoll call above
-        let cent = core::mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+        // same copy-in shape as the ragdoll call above; the copy is read-only,
+        // so it does not write back.
+        // SAFETY: `npcClient` is an owned Box, so the ManuallyDrop copy never
+        // drops. The original keeps the one live Box.
+        let cent = ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(centNum)) });
         CG_G2ServerBoneAngles(ctx, &cent);
-        *ctx.world.entity_mut(centNum) = cent;
     }
 
     let ghoul2 = ctx.world.entity(centNum).ghoul2;

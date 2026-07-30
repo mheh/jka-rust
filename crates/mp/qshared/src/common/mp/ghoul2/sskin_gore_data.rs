@@ -2,7 +2,7 @@
 
 use core::ffi::{c_float, c_int};
 
-use mp_qshared::shared::{qboolean, vec3_t};
+use crate::shared::{qboolean, vec3_t};
 
 /// Raven `SSkinGoreData` — one gore-mark (splotch) request applied to a Ghoul2 skin.
 ///

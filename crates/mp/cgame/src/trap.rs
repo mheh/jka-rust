@@ -398,6 +398,7 @@ use mp_qshared::common::mp::cgame::glconfig_t::glconfig_t;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
+use mp_qshared::common::mp::ghoul2::sskin_gore_data::SSkinGoreData;
 use mp_qshared::common::mp::qcommon::{
     entityState_t, qtime_t, sharedRagDollParams_t, sharedRagDollUpdateParams_t,
     sharedSetBoneIKStateParams_t, usercmd_t,
@@ -3324,14 +3325,12 @@ pub fn G2API_GetNumGoreMarks(engine: &Engine, ghlInfo: *mut c_void, modelIndex: 
 /// C: `void trap_G2API_AddSkinGore(void *ghlInfo,SSkinGoreData *gore)`
 /// Source: `oracle/codemp/cgame/cg_syscalls.c:925-928`
 ///
-/// `gore` stays an opaque engine token: `SSkinGoreData` has no MP-side Rust
-/// type (the only Rust definition lives in the engine ghoul2 crate, which
-/// mp_cgame must not depend on).
-// `SSkinGoreData` stays an opaque engine token per DEC-46.2 - the only Rust
-// definition lives engine-side, which mp_cgame must not depend on.
-// Source: oracle/codemp/game/q_shared.h:3111-3145
-pub fn G2API_AddSkinGore(engine: &Engine, ghlInfo: *mut c_void, gore: *mut c_void) {
-    <Engine as Execute<CgG2Addskingore>>::execute(engine, CgG2AddskingoreArgs::new(ghlInfo, gore))
+/// The engine writes `myIndex` back through the pointer, so `gore` is `&mut`.
+pub fn G2API_AddSkinGore(engine: &Engine, ghlInfo: *mut c_void, gore: &mut SSkinGoreData) {
+    <Engine as Execute<CgG2Addskingore>>::execute(
+        engine,
+        CgG2AddskingoreArgs::new(ghlInfo, gore as *mut SSkinGoreData as *mut c_void),
+    )
 }
 
 /// Raven `trap_G2API_ClearSkinGore` — `CG_G2_CLEARSKINGORE`

@@ -4,6 +4,7 @@
 #![allow(non_snake_case)]
 
 use core::ffi::{c_int, c_void};
+use core::mem::ManuallyDrop;
 
 use mp_abi::cgame::public::snapshot_t::snapshot_t;
 use mp_bg::bg_misc::BG_PlayerStateToEntityState;
@@ -209,8 +210,9 @@ pub fn CG_ResetEntity(ctx: &mut CgContext, centNum: usize) {
     // visible to every ctx-reading helper down the call chain (CG_CopyG2WeaponInstance
     // reads entity(centNum).currentState.number mid-call; the zeroed placeholder
     // made every client copy client 0's saber - C6b referee catch).
-    // SAFETY: centity_t is #[repr(C)] plain data; the copy is written back whole.
-    let mut cent = unsafe { core::ptr::read(ctx.world.entity(centNum)) };
+    // SAFETY: `npcClient` is an owned Box, so the copy never drops and the
+    // ptr::write write-back does not drop the original.
+    let mut cent = ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(centNum)) });
 
     // if the previous snapshot this entity was updated in is at least
     // an event window back in time then we can reset the previous event
@@ -276,7 +278,12 @@ pub fn CG_ResetEntity(ctx: &mut CgContext, centNum: usize) {
         }
     }
 
-    *ctx.world.entity_mut(centNum) = cent;
+    unsafe {
+        core::ptr::write(
+            ctx.world.entity_mut(centNum),
+            ManuallyDrop::into_inner(cent),
+        )
+    };
 }
 
 /// Raven `CG_TransitionEntity` — latches an entity's nextState in as its

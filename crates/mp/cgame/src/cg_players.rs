@@ -6,7 +6,7 @@
 
 use core::f64::consts::PI;
 use core::ffi::{c_char, c_int, c_short, c_void};
-use core::mem;
+use core::mem::ManuallyDrop;
 use core::ptr::null_mut;
 
 use mp_abi::cgame::syscalls::CG_CM_MARKFRAGMENTS::markFragment_t;
@@ -82,6 +82,7 @@ use mp_qshared::common::mp::ghoul2::bone_flags::{
     BONE_ANGLES_POSTMULT, BONE_ANIM_BLEND, BONE_ANIM_OVERRIDE, BONE_ANIM_OVERRIDE_FREEZE,
     BONE_ANIM_OVERRIDE_LOOP,
 };
+use mp_qshared::common::mp::ghoul2::sskin_gore_data::SSkinGoreData;
 use mp_qshared::common::mp::qcommon::collision_record::{G2Trace_t, MAX_G2_COLLISIONS};
 use mp_qshared::common::mp::qcommon::saber::blade_info::MAX_BLADES;
 use mp_qshared::common::mp::qcommon::saber::saber_colors::{
@@ -1815,15 +1816,6 @@ pub fn CG_G2TraceCollide(
 /// Raven `CG_AddGhoul2Mark` — puts a gore decal on a ghoul2 skin along the
 /// start→end ray. Bails when the instance is already carrying `cg_ghoul2Marks`
 /// decals, or when the ray is too short to have a direction.
-///
-/// DEFERRED: the `SSkinGoreData` fill and the `trap_G2API_AddSkinGore` call —
-/// `SSkinGoreData` (`oracle/codemp/game/q_shared.h:3111-3144`) has no
-/// mp_cgame-reachable Rust home: the only MP definition lives in the engine
-/// ghoul2 crate, which this module must not depend on, and `trap.rs`'s wrapper
-/// therefore takes the gore block as an opaque `*mut c_void`. Everything with a
-/// side effect (the mark-count early-out, the `flrand` draw, Raven's argument-
-/// swapped scale copy, the ray-length early-out) is transcribed; only the
-/// engine hand-off is missing, so no mark is added yet.
 /// Source: `oracle/codemp/cgame/cg_players.c:5738-5796`
 #[allow(clippy::too_many_arguments)]
 pub fn CG_AddGhoul2Mark(
@@ -1841,51 +1833,54 @@ pub fn CG_AddGhoul2Mark(
 ) {
     debug_assert!(!ghoul2.is_null());
 
+    // Raven memsets the block; every field the fill below skips stays zero, and
+    // the C6b referee compares all 144 bytes.
+    // SAFETY: SSkinGoreData is #[repr(C)] plain data; all-zero bytes are valid.
+    let mut goreSkin: SSkinGoreData = unsafe { core::mem::zeroed() };
+
     if trap::G2API_GetNumGoreMarks(ctx.engine, ghoul2, 0) >= ctx.world.cvars.cg_ghoul2Marks.integer
     {
         // you've got too many marks already
         return;
     }
 
-    // Raven's field fill, in its order — the `theta` draw moves the shared RNG
-    // and so has to happen even while the block itself can't be handed over.
-    let theta = ctx.world.bg_state.rng.flrand(0.0, 6.28);
+    goreSkin.growDuration = -1; // default expandy time
+    goreSkin.goreScaleStartFraction = 1.0; // default start scale
+    goreSkin.frontFaces = qtrue;
+    goreSkin.backFaces = qtrue;
+    goreSkin.lifeTime = lifeTime; //last randomly 10-20 seconds
+                                  //rwwFIXMEFIXME: fade has sorting issues with other non-fading decals, disabled until fixed
+
+    goreSkin.baseModelOnly = qfalse;
+
+    goreSkin.currentTime = ctx.world.cg.time;
+    goreSkin.entNum = entnum;
+    goreSkin.SSize = size;
+    goreSkin.TSize = size;
+    goreSkin.theta = ctx.world.bg_state.rng.flrand(0.0, 6.28);
+    goreSkin.shader = shader;
 
     // PORT-NOTE: Raven's else arm is `VectorCopy(goreSkin.scale, scale)` — the
     // arguments are the wrong way round, so it copies the memset-zeroed
     // `goreSkin.scale` OVER the caller's vector and leaves the gore scale at
     // zero. Kept: the caller really does get stomped.
-    let goreScale: vec3_t = if scale[0] == 0.0 && scale[1] == 0.0 && scale[2] == 0.0 {
-        [1.0, 1.0, 1.0]
+    if scale[0] == 0.0 && scale[1] == 0.0 && scale[2] == 0.0 {
+        VectorSet(&mut goreSkin.scale, 1.0, 1.0, 1.0);
     } else {
-        _VectorCopy([0.0; 3], scale);
-        [0.0; 3]
-    };
+        _VectorCopy(goreSkin.scale, scale);
+    }
 
-    let mut rayDirection: vec3_t = [0.0; 3];
-    _VectorSubtract(*end, *start, &mut rayDirection);
-    if VectorNormalize(&mut rayDirection) < 0.1 {
+    _VectorCopy(*start, &mut goreSkin.hitLocation);
+
+    _VectorSubtract(*end, *start, &mut goreSkin.rayDirection);
+    if VectorNormalize(&mut goreSkin.rayDirection) < 0.1 {
         return;
     }
 
-    // DEFERRED: SSkinGoreData — `oracle/codemp/game/q_shared.h:3111-3144`.
-    // The remaining fields Raven sets are growDuration -1, goreScaleStartFraction
-    // 1.0, frontFaces/backFaces true, baseModelOnly false, lifeTime, currentTime
-    // cg.time, entNum, SSize/TSize size, theta, shader, scale, hitLocation start,
-    // rayDirection, position entposition and angles[YAW] entangle; then
-    // `trap_G2API_AddSkinGore(ghoul2, &goreSkin)`.
-    let _ = (
-        shader,
-        size,
-        start,
-        entnum,
-        entposition,
-        entangle,
-        lifeTime,
-        theta,
-        goreScale,
-        rayDirection,
-    );
+    _VectorCopy(*entposition, &mut goreSkin.position);
+    goreSkin.angles[YAW] = entangle;
+
+    trap::G2API_AddSkinGore(ctx.engine, ghoul2, &mut goreSkin);
 }
 
 /// Raven `CG_IsMindTricked` — is this client hidden from us by mind trick? The
@@ -2774,14 +2769,14 @@ pub fn CG_ScanForExistingClientInfo(
                 // the saber stuff should already be taken care of in the new info".
             }
         } else {
-            // borrow split, not behavior: `CG_CopyClientInfoModel` wants the
-            // match beside a live `ctx`, so the entry is lifted out of the table
-            // for the copy and put straight back. Nothing in the copy reads
-            // `cgs.clientinfo`.
-            let matched =
-                core::mem::replace(&mut ctx.world.cgs.clientinfo[i], zeroed_client_info());
+            // borrow split, not behavior: `CG_CopyClientInfoModel` reads the
+            // match beside a live `ctx`.
+            // bitwise copy-in, original left in place - a zeroed-swap is visible
+            // to every ctx-reading helper inside CG_CopyClientInfoModel (C6b
+            // referee catch). The copy is read-only, so it does not write back.
+            // SAFETY: clientInfo_t is #[repr(C)] plain data.
+            let matched = unsafe { core::ptr::read(&ctx.world.cgs.clientinfo[i]) };
             CG_CopyClientInfoModel(ctx, &matched, ci);
-            ctx.world.cgs.clientinfo[i] = matched;
         }
 
         return true;
@@ -5813,13 +5808,14 @@ pub fn CG_G2PlayerAngles(
             "CG_G2PlayerAngles: NPC with no npcClient"
         );
         let ciNumber = cent.currentState.number as usize;
+        // bitwise copy-in, original left in place - a zeroed-swap is visible to
+        // every ctx-reading helper that reads clientinfo[ciNumber] below (C6b
+        // referee catch). The copy writes back at the tail if it is Some.
+        // SAFETY: clientInfo_t is #[repr(C)] plain data; the copy is written back whole.
         let mut ci_slot = if npcCi.is_some() {
             None
         } else {
-            Some(mem::replace(
-                &mut ctx.world.cgs.clientinfo[ciNumber],
-                zeroed_client_info(),
-            ))
+            Some(unsafe { core::ptr::read(&ctx.world.cgs.clientinfo[ciNumber]) })
         };
         let ci: &mut clientInfo_t = match npcCi.as_deref_mut() {
             Some(c) => c,
@@ -7754,10 +7750,11 @@ pub fn CG_LoadClientInfo(ctx: &mut CgContext, clientNum: c_int) {
         gateNum = -1;
     }
 
-    let mut ci = core::mem::replace(
-        &mut ctx.world.cgs.clientinfo[clientNum as usize],
-        zeroed_client_info(),
-    );
+    // bitwise copy-in/copy-back, original left in place - a zeroed-swap is
+    // visible to every ctx-reading helper inside CG_LoadClientInfoFor (C6b
+    // referee catch). The copy is written back whole.
+    // SAFETY: clientInfo_t is #[repr(C)] plain data; the copy is written back whole.
+    let mut ci = unsafe { core::ptr::read(&ctx.world.cgs.clientinfo[clientNum as usize]) };
     CG_LoadClientInfoFor(ctx, &mut ci, gateNum);
     ctx.world.cgs.clientinfo[clientNum as usize] = ci;
 }
@@ -7907,10 +7904,13 @@ pub(crate) fn CG_LoadClientInfoFor(ctx: &mut CgContext, ci: &mut clientInfo_t, g
                 // `ci` is a live &mut param, so only `cent` needs lifting.
                 // copy-in/copy-back with the original left in place (see the
                 // cg_snapshot.rs caller note - zeroed swap-outs alias wrong)
-                // SAFETY: centity_t is #[repr(C)] plain data, written back whole.
-                let mut cent = unsafe { core::ptr::read(ctx.world.entity(i)) };
+                // SAFETY: `npcClient` is an owned Box, so the copy never drops and the
+                // ptr::write write-back does not drop the original.
+                let mut cent = ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(i)) });
                 CG_ResetPlayerEntity(ctx, &mut cent, ci);
-                *ctx.world.entity_mut(i) = cent;
+                unsafe {
+                    core::ptr::write(ctx.world.entity_mut(i), ManuallyDrop::into_inner(cent))
+                };
             }
         }
     }
@@ -8952,12 +8952,13 @@ pub fn CG_SetDeferredClientInfo(ctx: &mut CgContext, ci: &mut clientInfo_t) {
             }
 
             ci.deferred = qtrue;
-            // borrow split: lift the match out of the table for the copy and put
-            // it straight back. Nothing in the copy reads `cgs.clientinfo`.
-            let matchCi =
-                core::mem::replace(&mut ctx.world.cgs.clientinfo[iu], zeroed_client_info());
+            // borrow split: `CG_CopyClientInfoModel` reads the match beside `ctx`.
+            // bitwise copy-in, original left in place - a zeroed-swap is visible
+            // to every ctx-reading helper inside CG_CopyClientInfoModel (C6b
+            // referee catch). The copy is read-only, so it does not write back.
+            // SAFETY: clientInfo_t is #[repr(C)] plain data.
+            let matchCi = unsafe { core::ptr::read(&ctx.world.cgs.clientinfo[iu]) };
             CG_CopyClientInfoModel(ctx, &matchCi, ci);
-            ctx.world.cgs.clientinfo[iu] = matchCi;
             return;
         }
         // load the full model, because we don't ever want to show
@@ -8981,9 +8982,12 @@ pub fn CG_SetDeferredClientInfo(ctx: &mut CgContext, ci: &mut clientInfo_t) {
         }
 
         ci.deferred = qtrue;
-        let matchCi = core::mem::replace(&mut ctx.world.cgs.clientinfo[iu], zeroed_client_info());
+        // bitwise copy-in, original left in place - a zeroed-swap is visible to
+        // every ctx-reading helper inside CG_CopyClientInfoModel (C6b referee
+        // catch). The copy is read-only, so it does not write back.
+        // SAFETY: clientInfo_t is #[repr(C)] plain data.
+        let matchCi = unsafe { core::ptr::read(&ctx.world.cgs.clientinfo[iu]) };
         CG_CopyClientInfoModel(ctx, &matchCi, ci);
-        ctx.world.cgs.clientinfo[iu] = matchCi;
         return;
     }
 
@@ -10217,11 +10221,16 @@ pub fn CG_G2Animated(ctx: &mut CgContext, centNum: usize) {
                     //make some local debris of this thing?
                     //FIXME: throw off the proper model effect, too
                     let fxID = ctx.world.cgs.effects.mShipDestDestroyed;
-                    // CG_CreateSurfaceDebris wants `&centity_t` beside `ctx`; hand
-                    // the slot out and straight back.
-                    let cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+                    // CG_CreateSurfaceDebris reads `&centity_t` beside `ctx`.
+                    // bitwise copy-in, original left in place - a zeroed-swap is
+                    // visible to every ctx-reading helper inside
+                    // CG_CreateSurfaceDebris (C6b referee catch). The copy is
+                    // read-only, so it does not write back.
+                    // SAFETY: `npcClient` is an owned Box, so the ManuallyDrop copy never
+                    // drops. The original keeps the one live Box.
+                    let cent_tmp =
+                        ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(centNum)) });
                     CG_CreateSurfaceDebris(ctx, &cent_tmp, i, fxID, true);
-                    *ctx.world.entity_mut(centNum) = cent_tmp;
                 }
 
                 let surfName = bgToggleableSurfaces[i as usize]
@@ -10269,9 +10278,19 @@ pub fn CG_G2Animated(ctx: &mut CgContext, centNum: usize) {
         forcedAngles[YAW] = ctx.world.entity(centNum).lerpAngles[YAW];
 
         // CG_RagDoll wants `cent` as a `&mut` disjoint from `ctx.world`.
-        let mut cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+        // bitwise copy-in/copy-back, original left in place - a zeroed-swap is
+        // visible to every ctx-reading helper inside CG_RagDoll (C6b referee
+        // catch). The copy is written back whole.
+        // SAFETY: `npcClient` is an owned Box, so the copy never drops and the
+        // ptr::write write-back does not drop the original.
+        let mut cent_tmp = ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(centNum)) });
         CG_RagDoll(ctx, &mut cent_tmp, &forcedAngles);
-        *ctx.world.entity_mut(centNum) = cent_tmp;
+        unsafe {
+            core::ptr::write(
+                ctx.world.entity_mut(centNum),
+                ManuallyDrop::into_inner(cent_tmp),
+            )
+        };
     }
 
     // SMOOTH_G2ANIM_LERPANGLES
@@ -10320,16 +10339,19 @@ fn player_ci_mut(
     }
 }
 
-/// [`CG_PlayerFloatSprite`] wants `&centity_t` beside `ctx`; swap the arena slot
-/// out and back around the call (the entity stays authoritative for callees that
-/// re-read it by number).
+/// [`CG_PlayerFloatSprite`] reads `&centity_t` beside `ctx`; the entity stays
+/// authoritative for callees that re-read it by number.
 fn cg_player_float_sprite(ctx: &mut CgContext, centNum: usize, shader: qhandle_t) {
-    let cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+    // bitwise copy-in, original left in place - a zeroed-swap is visible to
+    // every ctx-reading helper inside CG_PlayerFloatSprite (C6b referee catch).
+    // The copy is read-only, so it does not write back.
+    // SAFETY: `npcClient` is an owned Box, so the ManuallyDrop copy never
+    // drops. The original keeps the one live Box.
+    let cent_tmp = ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(centNum)) });
     CG_PlayerFloatSprite(ctx, &cent_tmp, shader);
-    *ctx.world.entity_mut(centNum) = cent_tmp;
 }
 
-/// Same swap for [`CG_DrawPlayerSphere`].
+/// Same copy for [`CG_DrawPlayerSphere`], which reads `&centity_t`.
 fn cg_draw_player_sphere(
     ctx: &mut CgContext,
     centNum: usize,
@@ -10337,9 +10359,13 @@ fn cg_draw_player_sphere(
     scale: f32,
     shader: c_int,
 ) {
-    let cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+    // bitwise copy-in, original left in place - a zeroed-swap is visible to
+    // every ctx-reading helper inside CG_DrawPlayerSphere (C6b referee catch).
+    // The copy is read-only, so it does not write back.
+    // SAFETY: `npcClient` is an owned Box, so the ManuallyDrop copy never
+    // drops. The original keeps the one live Box.
+    let cent_tmp = ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(centNum)) });
     CG_DrawPlayerSphere(ctx, &cent_tmp, origin, scale, shader);
-    *ctx.world.entity_mut(centNum) = cent_tmp;
 }
 
 /// Raven `CG_Player` — the whole client-entity render: smoothing, vehicle
@@ -10502,9 +10528,21 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
             let centClientNum = ctx.world.entity(centNum).currentState.clientNum;
             if owner != centClientNum {
                 //FIXME: what about visible passengers?
-                let mut cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+                // bitwise copy-in/copy-back, original left in place - a
+                // zeroed-swap is visible to every ctx-reading helper inside
+                // CG_VehicleAttachDroidUnit (C6b referee catch). The copy is
+                // written back whole.
+                // SAFETY: `npcClient` is an owned Box, so the copy never drops and the
+                // ptr::write write-back does not drop the original.
+                let mut cent_tmp =
+                    ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(centNum)) });
                 let attached = CG_VehicleAttachDroidUnit(ctx, &mut cent_tmp, &legs);
-                *ctx.world.entity_mut(centNum) = cent_tmp;
+                unsafe {
+                    core::ptr::write(
+                        ctx.world.entity_mut(centNum),
+                        ManuallyDrop::into_inner(cent_tmp),
+                    )
+                };
                 if attached {
                     checkDroidShields = true;
                 }
@@ -10806,10 +10844,14 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
     }
 
     {
-        // CG_VehicleEffects wants `&centity_t`; hand the slot out and back.
-        let cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+        // CG_VehicleEffects reads `&centity_t`.
+        // bitwise copy-in, original left in place - a zeroed-swap is visible to
+        // every ctx-reading helper inside CG_VehicleEffects (C6b referee catch).
+        // The copy is read-only, so it does not write back.
+        // SAFETY: `npcClient` is an owned Box, so the ManuallyDrop copy never
+        // drops. The original keeps the one live Box.
+        let cent_tmp = ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(centNum)) });
         CG_VehicleEffects(ctx, &cent_tmp);
-        *ctx.world.entity_mut(centNum) = cent_tmp;
     }
 
     let eFlags = ctx.world.entity(centNum).currentState.eFlags;
@@ -11322,9 +11364,13 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
 
     // add a water splash if partially in and out of water
     {
-        let cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+        // bitwise copy-in, original left in place - a zeroed-swap is visible to
+        // every ctx-reading helper inside CG_PlayerSplash (C6b referee catch).
+        // The copy is read-only, so it does not write back.
+        // SAFETY: `npcClient` is an owned Box, so the ManuallyDrop copy never
+        // drops. The original keeps the one live Box.
+        let cent_tmp = ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(centNum)) });
         CG_PlayerSplash(ctx, &cent_tmp);
-        *ctx.world.entity_mut(centNum) = cent_tmp;
     }
 
     let cgShadows = ctx.world.cvars.cg_shadows.integer;
@@ -11335,9 +11381,13 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
 
     // if we've been hit, display proper fullscreen fx
     {
-        let cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+        // bitwise copy-in, original left in place - a zeroed-swap is visible to
+        // every ctx-reading helper inside CG_PlayerHitFX (C6b referee catch).
+        // The copy is read-only, so it does not write back.
+        // SAFETY: `npcClient` is an owned Box, so the ManuallyDrop copy never
+        // drops. The original keeps the one live Box.
+        let cent_tmp = ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(centNum)) });
         CG_PlayerHitFX(ctx, &cent_tmp);
-        *ctx.world.entity_mut(centNum) = cent_tmp;
     }
 
     let lerpOrigin = ctx.world.entity(centNum).lerpOrigin;
@@ -11355,10 +11405,20 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
     // CG_G2PlayerAngles + head anims want `cent` disjoint from ctx.world; the
     // ci pick happens inside CG_G2PlayerAngles like Raven's.
     {
-        let mut cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+        // bitwise copy-in/copy-back, original left in place - a zeroed-swap is
+        // visible to every ctx-reading helper inside these calls (C6b referee
+        // catch). The copy is written back whole.
+        // SAFETY: `npcClient` is an owned Box, so the copy never drops and the
+        // ptr::write write-back does not drop the original.
+        let mut cent_tmp = ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(centNum)) });
         CG_G2PlayerAngles(ctx, &mut cent_tmp, &mut legs.axis, &mut rootAngles);
         CG_G2PlayerHeadAnims(ctx, &mut cent_tmp);
-        *ctx.world.entity_mut(centNum) = cent_tmp;
+        unsafe {
+            core::ptr::write(
+                ctx.world.entity_mut(centNum),
+                ManuallyDrop::into_inner(cent_tmp),
+            )
+        };
     }
 
     if (ctx.world.entity(centNum).currentState.eFlags2 & EF2_HELD_BY_MONSTER) != 0
@@ -11518,14 +11578,29 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
 
     //trigger animation-based sounds, done before next lerp frame.
     {
-        let mut cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+        // bitwise copy-in/copy-back, original left in place - a zeroed-swap is
+        // visible to every ctx-reading helper inside CG_TriggerAnimSounds (C6b
+        // referee catch). The copy is written back whole.
+        // SAFETY: `npcClient` is an owned Box, so the copy never drops and the
+        // ptr::write write-back does not drop the original.
+        let mut cent_tmp = ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(centNum)) });
         CG_TriggerAnimSounds(ctx, &mut cent_tmp);
-        *ctx.world.entity_mut(centNum) = cent_tmp;
+        unsafe {
+            core::ptr::write(
+                ctx.world.entity_mut(centNum),
+                ManuallyDrop::into_inner(cent_tmp),
+            )
+        };
     }
 
     // get the animation state (after rotation, to allow feet shuffle)
     {
-        let mut cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+        // bitwise copy-in/copy-back, original left in place - a zeroed-swap is
+        // visible to every ctx-reading helper inside CG_PlayerAnimation (C6b
+        // referee catch). The copy is written back whole.
+        // SAFETY: `npcClient` is an owned Box, so the copy never drops and the
+        // ptr::write write-back does not drop the original.
+        let mut cent_tmp = ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(centNum)) });
         if is_npc {
             let mut dummy = zeroed_client_info();
             CG_PlayerAnimation(
@@ -11540,10 +11615,10 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
                 &mut torso.backlerp,
             );
         } else {
-            let mut ci_slot = mem::replace(
-                &mut ctx.world.cgs.clientinfo[clientNum as usize],
-                zeroed_client_info(),
-            );
+            // same copy-in/copy-back for the clientinfo row (C6b referee catch).
+            // SAFETY: clientInfo_t is #[repr(C)] plain data; the copy is written back whole.
+            let mut ci_slot =
+                unsafe { core::ptr::read(&ctx.world.cgs.clientinfo[clientNum as usize]) };
             CG_PlayerAnimation(
                 ctx,
                 &mut cent_tmp,
@@ -11557,14 +11632,23 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
             );
             ctx.world.cgs.clientinfo[clientNum as usize] = ci_slot;
         }
-        *ctx.world.entity_mut(centNum) = cent_tmp;
+        unsafe {
+            core::ptr::write(
+                ctx.world.entity_mut(centNum),
+                ManuallyDrop::into_inner(cent_tmp),
+            )
+        };
     }
 
     // add the talk baloon or disconnect icon
     {
-        let cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+        // bitwise copy-in, original left in place - a zeroed-swap is visible to
+        // every ctx-reading helper inside CG_PlayerSprites (C6b referee catch).
+        // The copy is read-only, so it does not write back.
+        // SAFETY: `npcClient` is an owned Box, so the ManuallyDrop copy never
+        // drops. The original keeps the one live Box.
+        let cent_tmp = ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(centNum)) });
         CG_PlayerSprites(ctx, &cent_tmp);
-        *ctx.world.entity_mut(centNum) = cent_tmp;
     }
 
     if (ctx.world.entity(centNum).currentState.eFlags & EF_DEAD) != 0 {
@@ -13092,9 +13176,13 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
     }
     // add powerups floating behind the player
     {
-        let cent_tmp = mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+        // bitwise copy-in, original left in place - a zeroed-swap is visible to
+        // every ctx-reading helper inside CG_PlayerPowerups (C6b referee catch).
+        // The copy is read-only, so it does not write back.
+        // SAFETY: `npcClient` is an owned Box, so the ManuallyDrop copy never
+        // drops. The original keeps the one live Box.
+        let cent_tmp = ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(centNum)) });
         CG_PlayerPowerups(ctx, &cent_tmp, &legs);
-        *ctx.world.entity_mut(centNum) = cent_tmp;
     }
 
     let number = ctx.world.entity(centNum).currentState.number;

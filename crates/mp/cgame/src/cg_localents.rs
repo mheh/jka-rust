@@ -946,43 +946,50 @@ fn add_local_entity(ctx: &mut CgContext, handle: EffectHandle) {
             leType_t::LE_MARK => {}
 
             leType_t::LE_SPRITE_EXPLOSION => {
-                let le = core::mem::replace(
-                    ctx.world
-                        .cg_localEntities
-                        .get_mut(handle)
-                        .expect("CG_AddLocalEntities: not active"),
-                    localEntity_t::zeroed(),
-                );
+                // bitwise copy-in, original left in place - a zeroed-swap is
+                // visible to every ctx-reading helper inside CG_AddSpriteExplosion
+                // (C6b referee catch). The copy is read-only, so it does not write back.
+                // SAFETY: localEntity_t is #[repr(C)] plain data.
+                let le = unsafe {
+                    core::ptr::read(
+                        ctx.world
+                            .cg_localEntities
+                            .get(handle)
+                            .expect("CG_AddLocalEntities: not active"),
+                    )
+                };
                 CG_AddSpriteExplosion(ctx, &le);
-                *ctx.world
-                    .cg_localEntities
-                    .get_mut(handle)
-                    .expect("CG_AddLocalEntities: not active") = le;
             }
 
             leType_t::LE_EXPLOSION => {
-                let le = core::mem::replace(
-                    ctx.world
-                        .cg_localEntities
-                        .get_mut(handle)
-                        .expect("CG_AddLocalEntities: not active"),
-                    localEntity_t::zeroed(),
-                );
+                // bitwise copy-in, original left in place - a zeroed-swap is
+                // visible to every ctx-reading helper inside CG_AddExplosion (C6b
+                // referee catch). The copy is read-only, so it does not write back.
+                // SAFETY: localEntity_t is #[repr(C)] plain data.
+                let le = unsafe {
+                    core::ptr::read(
+                        ctx.world
+                            .cg_localEntities
+                            .get(handle)
+                            .expect("CG_AddLocalEntities: not active"),
+                    )
+                };
                 CG_AddExplosion(ctx, &le);
-                *ctx.world
-                    .cg_localEntities
-                    .get_mut(handle)
-                    .expect("CG_AddLocalEntities: not active") = le;
             }
 
             leType_t::LE_FADE_SCALE_MODEL => {
-                let mut le = core::mem::replace(
-                    ctx.world
-                        .cg_localEntities
-                        .get_mut(handle)
-                        .expect("CG_AddLocalEntities: not active"),
-                    localEntity_t::zeroed(),
-                );
+                // bitwise copy-in/copy-back, original left in place - a zeroed-swap
+                // is visible to every ctx-reading helper inside CG_AddFadeScaleModel
+                // (C6b referee catch). The copy is written back whole.
+                // SAFETY: localEntity_t is #[repr(C)] plain data; the copy is written back whole.
+                let mut le = unsafe {
+                    core::ptr::read(
+                        ctx.world
+                            .cg_localEntities
+                            .get(handle)
+                            .expect("CG_AddLocalEntities: not active"),
+                    )
+                };
                 CG_AddFadeScaleModel(ctx, &mut le);
                 *ctx.world
                     .cg_localEntities
@@ -998,13 +1005,18 @@ fn add_local_entity(ctx: &mut CgContext, handle: EffectHandle) {
 
             leType_t::LE_FADE_RGB => {
                 // teleporters, railtrails
-                let mut le = core::mem::replace(
-                    ctx.world
-                        .cg_localEntities
-                        .get_mut(handle)
-                        .expect("CG_AddLocalEntities: not active"),
-                    localEntity_t::zeroed(),
-                );
+                // bitwise copy-in/copy-back, original left in place - a zeroed-swap
+                // is visible to every ctx-reading helper inside CG_AddFadeRGB (C6b
+                // referee catch). The copy is written back whole.
+                // SAFETY: localEntity_t is #[repr(C)] plain data; the copy is written back whole.
+                let mut le = unsafe {
+                    core::ptr::read(
+                        ctx.world
+                            .cg_localEntities
+                            .get(handle)
+                            .expect("CG_AddLocalEntities: not active"),
+                    )
+                };
                 CG_AddFadeRGB(ctx, &mut le);
                 *ctx.world
                     .cg_localEntities
@@ -1024,13 +1036,18 @@ fn add_local_entity(ctx: &mut CgContext, handle: EffectHandle) {
 
             leType_t::LE_LINE => {
                 // oriented lines for FX
-                let mut le = core::mem::replace(
-                    ctx.world
-                        .cg_localEntities
-                        .get_mut(handle)
-                        .expect("CG_AddLocalEntities: not active"),
-                    localEntity_t::zeroed(),
-                );
+                // bitwise copy-in/copy-back, original left in place - a zeroed-swap
+                // is visible to every ctx-reading helper inside CG_AddLine (C6b
+                // referee catch). The copy is written back whole.
+                // SAFETY: localEntity_t is #[repr(C)] plain data; the copy is written back whole.
+                let mut le = unsafe {
+                    core::ptr::read(
+                        ctx.world
+                            .cg_localEntities
+                            .get(handle)
+                            .expect("CG_AddLocalEntities: not active"),
+                    )
+                };
                 CG_AddLine(ctx, &mut le);
                 *ctx.world
                     .cg_localEntities

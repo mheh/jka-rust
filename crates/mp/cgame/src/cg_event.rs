@@ -3,6 +3,7 @@
 #![allow(non_snake_case, non_upper_case_globals)]
 
 use core::ffi::{c_int, c_uint};
+use core::mem::ManuallyDrop;
 use core::ptr::null_mut;
 
 use mp_abi::ui::public::ui_menu_command_t::UIMENU_PLAYERCONFIG;
@@ -2554,13 +2555,15 @@ pub fn CG_EntityEvent(ctx: &mut CgContext, ds: &DisplayState, centNum: usize, po
 
         v if v == entity_event_t::EV_VEH_FIRE as c_int => {
             DEBUGNAME(ctx, "EV_VEH_FIRE");
-            // veh = &cg_entities[es->owner]; take it out to hand CG_VehMuzzleFireFX
-            // a &centity_t while ctx stays borrowed, then put it back (cg_ents.rs
-            // CG_General precedent).
+            // veh = &cg_entities[es->owner]; bitwise copy-in, original left in
+            // place - a zeroed-swap is visible to every ctx-reading helper
+            // inside CG_VehMuzzleFireFX (C6b referee catch). The copy is
+            // read-only, so it does not write back.
+            // SAFETY: `npcClient` is an owned Box, so the ManuallyDrop copy never
+            // drops. The original keeps the one live Box.
             let owner = es.owner as usize;
-            let veh = core::mem::replace(ctx.world.entity_mut(owner), centity_t::zeroed());
+            let veh = ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(owner)) });
             CG_VehMuzzleFireFX(ctx, &veh, &es);
-            *ctx.world.entity_mut(owner) = veh;
         }
 
         //
@@ -3419,9 +3422,13 @@ pub fn CG_EntityEvent(ctx: &mut CgContext, ds: &DisplayState, centNum: usize, po
             // Raven has one DEBUGNAME per case (EV_USE_ITEM0..14); the dispatch
             // body is identical `CG_UseItem(cent)`.
             DEBUGNAME(ctx, "EV_USE_ITEM");
-            let cent = core::mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
+            // bitwise copy-in, original left in place - a zeroed-swap is visible
+            // to every ctx-reading helper inside CG_UseItem (C6b referee catch).
+            // The copy is read-only, so it does not write back.
+            // SAFETY: `npcClient` is an owned Box, so the ManuallyDrop copy never
+            // drops. The original keeps the one live Box.
+            let cent = ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(centNum)) });
             CG_UseItem(ctx, &cent);
-            *ctx.world.entity_mut(centNum) = cent;
         }
 
         v if v == entity_event_t::EV_ITEMUSEFAIL as c_int => {
@@ -3719,12 +3726,16 @@ pub fn CG_EntityEvent(ctx: &mut CgContext, ds: &DisplayState, centNum: usize, po
                 let fx = ctx.world.cgs.gameEffects[es.emplacedOwner as usize];
                 trap::FX_PlayEffectID(ctx.engine, fx, position, &dir, -1, -1);
             } else {
+                // bitwise copy-in, original left in place - a zeroed-swap is
+                // visible to every ctx-reading helper inside
+                // CG_VehicleWeaponImpact (C6b referee catch). The copy is
+                // read-only, so it does not write back.
+                // SAFETY: `npcClient` is an owned Box, so the ManuallyDrop copy never
+                // drops. The original keeps the one live Box.
                 let vwi = {
                     let cent =
-                        core::mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
-                    let r = CG_VehicleWeaponImpact(ctx, &cent);
-                    *ctx.world.entity_mut(centNum) = cent;
-                    r
+                        ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(centNum)) });
+                    CG_VehicleWeaponImpact(ctx, &cent)
                 };
                 if vwi {
                     //a vehicle missile that uses an overridden impact effect...
@@ -3750,12 +3761,16 @@ pub fn CG_EntityEvent(ctx: &mut CgContext, ds: &DisplayState, centNum: usize, po
                 let fx = ctx.world.cgs.gameEffects[es.emplacedOwner as usize];
                 trap::FX_PlayEffectID(ctx.engine, fx, position, &dir, -1, -1);
             } else {
+                // bitwise copy-in, original left in place - a zeroed-swap is
+                // visible to every ctx-reading helper inside
+                // CG_VehicleWeaponImpact (C6b referee catch). The copy is
+                // read-only, so it does not write back.
+                // SAFETY: `npcClient` is an owned Box, so the ManuallyDrop copy never
+                // drops. The original keeps the one live Box.
                 let vwi = {
                     let cent =
-                        core::mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
-                    let r = CG_VehicleWeaponImpact(ctx, &cent);
-                    *ctx.world.entity_mut(centNum) = cent;
-                    r
+                        ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(centNum)) });
+                    CG_VehicleWeaponImpact(ctx, &cent)
                 };
                 if vwi {
                     //a vehicle missile that used an overridden impact effect...
@@ -3799,12 +3814,16 @@ pub fn CG_EntityEvent(ctx: &mut CgContext, ds: &DisplayState, centNum: usize, po
                 let fx = ctx.world.cgs.gameEffects[es.emplacedOwner as usize];
                 trap::FX_PlayEffectID(ctx.engine, fx, position, &dir, -1, -1);
             } else {
+                // bitwise copy-in, original left in place - a zeroed-swap is
+                // visible to every ctx-reading helper inside
+                // CG_VehicleWeaponImpact (C6b referee catch). The copy is
+                // read-only, so it does not write back.
+                // SAFETY: `npcClient` is an owned Box, so the ManuallyDrop copy never
+                // drops. The original keeps the one live Box.
                 let vwi = {
                     let cent =
-                        core::mem::replace(ctx.world.entity_mut(centNum), centity_t::zeroed());
-                    let r = CG_VehicleWeaponImpact(ctx, &cent);
-                    *ctx.world.entity_mut(centNum) = cent;
-                    r
+                        ManuallyDrop::new(unsafe { core::ptr::read(ctx.world.entity(centNum)) });
+                    CG_VehicleWeaponImpact(ctx, &cent)
                 };
                 if vwi {
                     //a vehicle missile that used an overridden impact effect...
