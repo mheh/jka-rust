@@ -689,12 +689,14 @@ pub fn CG_ClipMoveToEntities(
             origin = o;
         } else {
             // encoded bbox
-            let x = (solid & 255) as f32;
-            let zd = ((solid >> 8) & 255) as f32;
-            let zu = (((solid >> 16) & 255) - 32) as f32;
+            // Raven negates x/zd as ints, so a zero stays +0.0 - a float
+            // negation gives -0.0 and the C6b referee sees the sign bit.
+            let x = solid & 255;
+            let zd = (solid >> 8) & 255;
+            let zu = ((solid >> 16) & 255) - 32;
 
-            let mut bmins: vec3_t = [-x, -x, -zd];
-            let mut bmaxs: vec3_t = [x, x, zu];
+            let mut bmins: vec3_t = [(-x) as f32, (-x) as f32, (-zd) as f32];
+            let mut bmaxs: vec3_t = [x as f32, x as f32, zu as f32];
 
             let eType = ctx.world.entities[num].currentState.eType;
             let npcClass = ctx.world.entities[num].currentState.NPC_class;

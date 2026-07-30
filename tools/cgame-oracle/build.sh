@@ -203,6 +203,11 @@ esac
 # -fsigned-char: pins retail `char` semantics on platforms defaulting unsigned.
 # FP regime (parity-defining): -fno-fast-math -ffp-contract=off matches what
 #   rustc/LLVM do for the Rust cdylib (IEEE, no fused multiply-add). -O2 = release.
+# -fno-builtin sin/cos family: GCC -O2 fuses a same-argument sin+cos pair into
+#   one __builtin_cexpi call, which lands on Apple's cexp - and Apple's cexp
+#   returns +0.0 imag for a -0.0 angle, where sin(-0.0) is -0.0. AngleVectors
+#   hit this (509 shield-axis sign-of-zero diffs in the C6b referee). These
+#   flags keep every sin/cos a real libm call, the regime the line above claims.
 # Defines: from JK2_cgame.vcproj Release (NDEBUG;WIN32;_WINDOWS;MISSIONPACK;_JK2;
 #   CGAME) with the win32 pair swapped for __linux__ - the host branch that
 #   selects the macro SnapVector (past the x86 __asm one) and `ID_INLINE inline`.
@@ -210,6 +215,8 @@ esac
 #   _JK2 -> _JK2MP themselves, bg_vehicleLoad.c self-#defines _JK2MP, and no
 #   other TU here reads _JK2MP. _FORTIFY_SOURCE=0 = no fortify wrappers.
 CFLAGS="-x c -std=gnu99 -fpermissive -w -O2 -fno-fast-math -ffp-contract=off \
+	-fno-builtin-sin -fno-builtin-cos -fno-builtin-sinf -fno-builtin-cosf \
+	-fno-builtin-sincos -fno-builtin-sincosf \
 	-fsigned-char $PICFLAG \
 	-DNDEBUG -DMISSIONPACK -D_JK2 -DCGAME -D__linux__ -D_FORTIFY_SOURCE=0 \
 	-include $SHIM \
