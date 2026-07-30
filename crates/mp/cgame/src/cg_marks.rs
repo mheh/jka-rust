@@ -9,9 +9,9 @@ use mp_abi::cgame::syscalls::CG_CM_MARKFRAGMENTS::markFragment_t;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::q_math::{
-    _DotProduct, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin, vectoangles,
-    AngleVectors, CrossProduct, Distance, PerpendicularVector, RotatePointAroundVector,
-    VectorClear, VectorLength, VectorNormalize2, VectorSet, ROLL,
+    _DotProduct, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vectoangles, AngleVectors,
+    CrossProduct, Distance, PerpendicularVector, RotatePointAroundVector, VectorClear,
+    VectorLength, VectorNormalize2, VectorSet, ROLL,
 };
 use mp_qshared::shared::q_string::COM_Parse;
 use mp_qshared::shared::surface_flags::CONTENTS_SOLID;
@@ -2522,15 +2522,12 @@ pub fn ValidBloodPool(ctx: &mut CgContext, start: vec3_t) -> bool {
             _VectorMA(this_pos, -EXTRUDE_DIST * 2.0, normal, &mut end_pos);
 
             let mut trace = trace_t::zeroed();
-            // PORT-NOTE: Raven passes NULL mins/maxs; `CM_Trace` substitutes
-            // `vec3_origin` for a NULL bound (`cm_trace.cpp:1603-1610`), so the
-            // zero vector below is the same point trace.
             CG_Trace(
                 ctx,
                 &mut trace,
                 &this_pos,
-                &vec3_origin,
-                &vec3_origin,
+                None,
+                None,
                 &end_pos,
                 -1,
                 CONTENTS_SOLID,

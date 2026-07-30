@@ -1197,7 +1197,16 @@ pub fn CG_Rag_Trace(
     skipNumber: c_int,
     mask: c_int,
 ) {
-    trap::CM_BoxTrace(ctx.engine, result, start, end, mins, maxs, 0, mask);
+    trap::CM_BoxTrace(
+        ctx.engine,
+        result,
+        start,
+        end,
+        Some(mins),
+        Some(maxs),
+        0,
+        mask,
+    );
     result.entityNum = if result.fraction != 1.0 {
         ENTITYNUM_WORLD as c_short
     } else {
@@ -1455,17 +1464,13 @@ pub fn CG_PlayerSplash(ctx: &mut CgContext, cent: &centity_t) {
     }
 
     // trace down to find the surface
-    //
-    // PORT-NOTE: Raven passes NULL mins/maxs; `CM_Trace` substitutes
-    // `vec3_origin` for a NULL bound (`cm_trace.cpp:1603-1610`), so the zero
-    // vectors below are the same point trace.
     trap::CM_BoxTrace(
         engine,
         &mut trace,
         &start,
         &end,
-        &vec3_origin,
-        &vec3_origin,
+        None,
+        None,
         0,
         CONTENTS_WATER | CONTENTS_SLIME | CONTENTS_LAVA,
     );
@@ -6490,14 +6495,12 @@ pub fn CG_G2SaberEffects(ctx: &mut CgContext, start: &vec3_t, end: &vec3_t, owne
             _VectorCopy(*start, &mut endTr);
         }
 
-        // Raven's NULL mins/maxs are `vec3_origin` by the time the engine sees
-        // them (`CM_BoxTrace` substitutes it), which is what we pass.
         CG_Trace(
             ctx,
             &mut trace,
             &startTr,
-            &vec3_origin,
-            &vec3_origin,
+            None,
+            None,
             &endTr,
             ownerEnt,
             MASK_PLAYERSOLID,
@@ -6585,8 +6588,8 @@ pub fn CG_SaberCompWork(
         ctx,
         &mut trace,
         &startTr,
-        &vec3_origin,
-        &vec3_origin,
+        None,
+        None,
         &endTr,
         ownerEnt,
         MASK_PLAYERSOLID,
@@ -7379,8 +7382,8 @@ pub fn CG_ForceElectrocution(
         ctx,
         &mut tr,
         &fxOrg,
-        &vec3_origin,
-        &vec3_origin,
+        None,
+        None,
         &fxOrg2,
         -1,
         CONTENTS_SOLID,
@@ -7482,8 +7485,8 @@ pub fn CG_CheckThirdPersonAlpha(ctx: &mut CgContext, centNum: usize, legs: &mut 
                         ctx,
                         &mut trace,
                         &cameraCurLoc,
-                        &vec3_origin,
-                        &vec3_origin,
+                        Some(&vec3_origin),
+                        Some(&vec3_origin),
                         &end,
                         ENTITYNUM_NONE,
                         CONTENTS_BODY,
@@ -7949,8 +7952,8 @@ pub fn _PlayerFootStep(
         &mut trace,
         origin,
         &end,
-        &mins,
-        &maxs,
+        Some(&mins),
+        Some(&maxs),
         0,
         MASK_PLAYERSOLID,
     );
@@ -8181,8 +8184,8 @@ pub fn CG_PlayerShadow(ctx: &mut CgContext, centNum: usize, shadowPlane: &mut f3
             &mut trace,
             &lerpOrigin,
             &end,
-            &mins,
-            &maxs,
+            Some(&mins),
+            Some(&maxs),
             0,
             MASK_PLAYERSOLID,
         );
@@ -8198,8 +8201,8 @@ pub fn CG_PlayerShadow(ctx: &mut CgContext, centNum: usize, shadowPlane: &mut f3
             &mut trace,
             &lerpOrigin,
             &end,
-            &mins,
-            &maxs,
+            Some(&mins),
+            Some(&maxs),
             0,
             MASK_PLAYERSOLID,
         );
@@ -8498,8 +8501,8 @@ pub fn CG_AddSaberBlade(
                     ctx,
                     &mut trace,
                     &org_,
-                    &vec3_origin,
-                    &vec3_origin,
+                    None,
+                    None,
                     &end,
                     ENTITYNUM_NONE,
                     MASK_SOLID,
@@ -8554,8 +8557,8 @@ pub fn CG_AddSaberBlade(
                         ctx,
                         &mut trace,
                         &end,
-                        &vec3_origin,
-                        &vec3_origin,
+                        None,
+                        None,
                         &org_,
                         ENTITYNUM_NONE,
                         MASK_SOLID,
@@ -8566,8 +8569,8 @@ pub fn CG_AddSaberBlade(
                         ctx,
                         &mut trace,
                         &org_,
-                        &vec3_origin,
-                        &vec3_origin,
+                        None,
+                        None,
                         &end,
                         ENTITYNUM_NONE,
                         MASK_SOLID,

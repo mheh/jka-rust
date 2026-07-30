@@ -26,7 +26,6 @@ use crate::cg_playerstate::{CG_Respawn, CG_TransitionPlayerState};
 use crate::cg_predict::{CG_BuildSolidList, CG_UsingEWeb};
 use crate::cg_servercmds::CG_ExecuteNewServerCommands;
 use crate::cg_weapons::CG_CopyG2WeaponInstance;
-use crate::local::centity_s::centity_t;
 use crate::local::player_state_ref::PlayerStateRef;
 use crate::trap;
 use crate::world::cg_context::CgContext;

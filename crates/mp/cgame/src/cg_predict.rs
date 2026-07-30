@@ -633,8 +633,8 @@ pub fn CG_UsingEWeb(world: &CgWorld) -> bool {
 pub fn CG_ClipMoveToEntities(
     ctx: &mut CgContext,
     start: &vec3_t,
-    mins: &vec3_t,
-    maxs: &vec3_t,
+    mins: Option<&vec3_t>,
+    maxs: Option<&vec3_t>,
     end: &vec3_t,
     skipNumber: c_int,
     mask: c_int,
@@ -774,7 +774,7 @@ pub fn CG_ClipMoveToEntities(
         if g2Check {
             let ghoul2 = ctx.world.entities[num].ghoul2;
             if trace.entityNum == entNumber as i16 && !ghoul2.is_null() {
-                CG_G2TraceCollide(ctx, &mut trace, Some(mins), Some(maxs), start, end);
+                CG_G2TraceCollide(ctx, &mut trace, mins, maxs, start, end);
 
                 if trace.entityNum == ENTITYNUM_NONE as i16 {
                     //g2 trace failed, so put it back where it was.
@@ -849,7 +849,14 @@ pub fn CG_TouchTriggerPrediction(ctx: &mut CgContext) {
         let pmins = ctx.world.predict.cg_pmove.mins;
         let pmaxs = ctx.world.predict.cg_pmove.maxs;
         trap::CM_BoxTrace(
-            ctx.engine, &mut trace, &origin, &origin, &pmins, &pmaxs, cmodel, -1,
+            ctx.engine,
+            &mut trace,
+            &origin,
+            &origin,
+            Some(&pmins),
+            Some(&pmaxs),
+            cmodel,
+            -1,
         );
 
         if trace.startsolid == 0 {
@@ -883,8 +890,8 @@ pub fn CG_Trace(
     ctx: &mut CgContext,
     result: &mut trace_t,
     start: &vec3_t,
-    mins: &vec3_t,
-    maxs: &vec3_t,
+    mins: Option<&vec3_t>,
+    maxs: Option<&vec3_t>,
     end: &vec3_t,
     skipNumber: c_int,
     mask: c_int,
@@ -912,8 +919,8 @@ pub fn CG_G2Trace(
     ctx: &mut CgContext,
     result: &mut trace_t,
     start: &vec3_t,
-    mins: &vec3_t,
-    maxs: &vec3_t,
+    mins: Option<&vec3_t>,
+    maxs: Option<&vec3_t>,
     end: &vec3_t,
     skipNumber: c_int,
     mask: c_int,

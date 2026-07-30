@@ -68,8 +68,7 @@ use mp_qshared::shared::limits::{
 };
 use mp_qshared::shared::q_color::S_COLOR_RED;
 use mp_qshared::shared::q_math::{
-    _VectorCopy, _VectorMA, _VectorSubtract, vec3_origin, AnglesToAxis, Distance, VectorLength,
-    PITCH, ROLL, YAW,
+    _VectorCopy, _VectorMA, _VectorSubtract, AnglesToAxis, Distance, VectorLength, PITCH, ROLL, YAW,
 };
 use mp_qshared::shared::q_string::COM_Parse;
 use mp_qshared::shared::sound_channel::CHAN_AUTO;
@@ -3905,8 +3904,8 @@ pub fn C_Trace(ctx: &mut CgContext, td: &mut TCGTrace) {
         ctx,
         &mut td.mResult,
         &td.mStart,
-        &td.mMins,
-        &td.mMaxs,
+        Some(&td.mMins),
+        Some(&td.mMaxs),
         &td.mEnd,
         td.mSkipNumber,
         td.mMask,
@@ -3922,8 +3921,8 @@ pub fn C_G2Trace(ctx: &mut CgContext, td: &mut TCGTrace) {
         ctx,
         &mut td.mResult,
         &td.mStart,
-        &td.mMins,
-        &td.mMaxs,
+        Some(&td.mMins),
+        Some(&td.mMaxs),
         &td.mEnd,
         td.mSkipNumber,
         td.mMask,
@@ -3939,16 +3938,12 @@ pub fn C_G2Mark(ctx: &mut CgContext, td: &TCGG2Mark) {
     let mut end: vec3_t = [0.0; 3];
 
     _VectorMA(td.start, 64.0, td.dir, &mut end);
-    // Raven passes NULL mins/maxs; `CM_BoxTrace` substitutes `vec3_origin` for a
-    // NULL box (`oracle/codemp/qcommon/cm_trace.cpp:1603-1606`) and
-    // `CG_ClipMoveToEntities` only forwards them, so the zero vector is the same
-    // trace.
     CG_G2Trace(
         ctx,
         &mut tr,
         &td.start,
-        &vec3_origin,
-        &vec3_origin,
+        None,
+        None,
         &end,
         ENTITYNUM_NONE,
         MASK_PLAYERSOLID,
@@ -4952,7 +4947,16 @@ pub fn CG_RagCallback(ctx: &mut CgContext, callType: c_int) -> c_int {
             );
             let mut tr = callData.tr;
 
-            CG_Trace(ctx, &mut tr, &start, &mins, &maxs, &end, ignore, mask);
+            CG_Trace(
+                ctx,
+                &mut tr,
+                &start,
+                Some(&mins),
+                Some(&maxs),
+                &end,
+                ignore,
+                mask,
+            );
 
             // Raven traces straight into `callData->tr` and the engine reads
             // the result back out of shared memory (G2_bones.cpp:2690-2701) -

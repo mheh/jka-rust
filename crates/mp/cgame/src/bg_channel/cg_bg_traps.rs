@@ -84,7 +84,8 @@ impl BgTraps for CgBgTraps<'_> {
         // "STAGE-2b: irreducible" precedent - `Pmove` holds `&mut BgState`
         // (a disjoint `CgWorld` field) while this call rebuilds a `CgContext`;
         // the borrow ends at return. The pointer args are `Pmove`'s live
-        // stack slots.
+        // stack slots. A null `mins` or `maxs` from bg code maps to `None`
+        // through `as_ref`, so we pass Raven's NULL through untouched.
         // Source: `oracle/codemp/cgame/cg_predict.c:359-369`;
         // binding at `oracle/codemp/cgame/cg_predict.c:1009,1385`
         let mut ctx = CgContext {
@@ -95,8 +96,8 @@ impl BgTraps for CgBgTraps<'_> {
             &mut ctx,
             unsafe { &mut *results },
             unsafe { &*start },
-            unsafe { &*mins },
-            unsafe { &*maxs },
+            unsafe { mins.as_ref() },
+            unsafe { maxs.as_ref() },
             unsafe { &*end },
             passEntityNum,
             contentMask,
