@@ -119,14 +119,18 @@ pub extern "C" fn rust_log_syscall_enter(args: *const isize) {
 
         let mut rec = Record::new(REC_SYSCALL_ENTER, seq);
         rec.push_i64(number);
-        rec.push_words(&frame);
         let known = if let Some(shape) = trap_shape(number) {
+            // trim the word block to the trap's real arity - the trampoline
+            // grabs 16 stack words and everything past the arity is garbage
+            // that would false-diff between the two modules at replay
+            rec.push_words(&frame[..shape.args.len() + 1]);
             trap_enter_blobs(shape, &frame, &mut rec);
             if shape.dumps_shared {
                 dump_shared(&mut rec);
             }
             true
         } else {
+            rec.push_words(&frame);
             false
         };
         with_journal(|j| {
@@ -320,9 +324,15 @@ pub extern "C-unwind" fn vmMain(
     // EXIT.
     let _ = std::panic::catch_unwind(|| write_vmcall_exit(seq, cmd, &words, ret));
 
-    // CG_SHUTDOWN (cgameExport_t = 1): flush and close.
+    // CG_SHUTDOWN (cgameExport_t = 1): the recording session ends here - finish
+    // the gzip stream so the trailer lands (statics never run Drop at exit).
+    // Anything after a vid_restart-style re-init goes unrecorded.
     if cmd == 1 {
-        with_journal(|j| j.flush());
+        if let Ok(mut g) = JOURNAL.lock() {
+            if let Some(j) = g.take() {
+                j.finish();
+            }
+        }
     }
     ret
 }

@@ -40,9 +40,13 @@ fn oracle_dylib() -> PathBuf {
         .expect("oracle cgame dylib present - run tools/cgame-oracle/build.sh first")
 }
 
-/// (rec_type, cmd) for every non-marker record, in file order.
+/// (rec_type, cmd) for every non-marker record, in file order. The journal file
+/// is one gzip stream with the CGSHIMJ1 format inside.
 fn parse_journal(path: &PathBuf) -> Vec<(u8, i64)> {
-    let buf = std::fs::read(path).expect("read journal");
+    let raw = std::fs::read(path).expect("read journal");
+    let mut buf = Vec::new();
+    std::io::Read::read_to_end(&mut flate2::read::GzDecoder::new(&raw[..]), &mut buf)
+        .expect("gunzip journal");
     assert_eq!(&buf[..8], b"CGSHIMJ1", "journal magic");
     let mut pos = 12; // magic(8) + version(4)
     let mut out = Vec::new();

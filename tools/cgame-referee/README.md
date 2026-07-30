@@ -116,16 +116,18 @@ Everything that does not serialize as a plain copy-in / copy-out.
 ### The engine-retained shared buffer - `CG_SET_SHARED_BUFFER` (344)
 
 `RegisterSharedMemory((char*)VMA(1))` (OpenJK) / `cl.mSharedMemory = (char*)VMA(1)`
-(oracle). The engine **stores the pointer** and reads through it during **later**
-traps and VM calls (the G2 and FX families stage their big argument structs into
-this buffer). Size is `MAX_CG_SHARED_BUFFER_SIZE` = 2048 (`cg_public.h:593`); the
-Rust cgame types it as `&mut [u8; 2048]` (`crates/mp/cgame/src/trap.rs:3830`).
+(oracle). The engine **stores the pointer** and touches it during **later**
+`CGVM_*` vmcalls. The engine writes a parameter struct into the region, then
+calls into the module (see the Shared-buffer note in the Journal format
+section). No trap dispatch case reads it. Size is `MAX_CG_SHARED_BUFFER_SIZE` =
+2048 (`cg_public.h:593`); the Rust cgame types it as `&mut [u8; 2048]`
+(`crates/mp/cgame/src/trap.rs:3830`).
 
-For replay: the buffer's **contents at each later call** are the payload, not the
-one register value handed to this trap. The logger has to snapshot the shared
-region at the traps that consume it (or diff it per frame), and the replay must
-own a live 2048-byte region and point the engine at it once, rather than
-recording a pointer.
+For replay: the buffer's **contents at each vmcall** are the payload, not the
+one register value handed to this trap. The logger snapshots the shared region
+around the vmcall arms that carry a `shared_buffer` field in
+`export-shapes.json`. The replay must own a live 2048-byte region and point the
+engine at it once, rather than record a pointer.
 
 ### Ghoul2 double pointers - the `CGhoul2Info_v**` slot family
 
@@ -418,12 +420,14 @@ section. Blobs per `trap-shapes.json`: `in_str`, `in_buf` (fixed `size_of`, or
 `len_arg`-counted with `size_of` as the element stride - counted wins when both
 are present - or trap 204's `args[2]*args[4]` product special-case),
 `inout_buf`, and `double_ptr_slot` (0..; the slot value BEFORE the engine writes
-a new host token). The G2/FX families additionally carry a `shared_buffer` (0xFF)
-dump. `CG_SET_SHARED_BUFFER` (344) registers the region pointer for those dumps.
+a new host token). A trap carries a `shared_buffer` (0xFF) dump only when its
+manifest entry sets `shared_buffer: true`. Today no trap sets it.
+`CG_SET_SHARED_BUFFER` (344) registers the region pointer for the export-side
+dumps.
 
 **SYSCALL_EXIT (4):** `i64 cmd`, `i64 ret`, blob section. Blobs: `out_buf`/
-`inout_buf` args (engine-written), `double_ptr_slot` (the engine-written token
-after INIT/DUPLICATE/etc.), and the `shared_buffer` dump for the G2/FX families.
+`inout_buf` args (engine-written) and `double_ptr_slot` (the engine-written token
+after INIT/DUPLICATE/etc.).
 
 **MALFORMED (5):** `i64 cmd`, raw word block. Emitted alongside (not instead of)
 the ENTER/EXIT bracket when the command has no manifest shape.
@@ -432,14 +436,17 @@ the ENTER/EXIT bracket when the command has no manifest shape.
 
 ### Shared-buffer note
 
-The shared-buffer dump keys off two things the recorder derives, because
-`trap-shapes.json` does not yet carry a per-trap shared-buffer flag (see 'Things
-that turned out ambiguous'):
+The shared traffic is on the export (vmcall) side only. No trap dispatch case
+reads the shared region. Each engine touch of `cl.mSharedMemory` writes a
+parameter struct and then calls INTO the module through a `CGVM_*` vmcall:
+`SFxHelper::CameraShake`/`GetOriginAxisFromBolt` (FxSystem.cpp:100-118),
+the FX trace and G2 mark helpers (FxSystem.h:97-151), the scheduler vector
+data (FxScheduler.cpp:144,914,1083), the console-command block
+(cl_keys.cpp:689), and the automap input (cl_input.cpp:525).
 
-- **Exports** dump per the `shared_buffer` field authored in `export-shapes.json`
-  (derived from `cg_main.c`, authoritative).
-- **Traps** dump for the `CG_G2_*` and `CG_FX_*` families - the "G2 and FX
-  families stage their big argument structs into this buffer" note above. This is
-  a name-family heuristic pending a real manifest flag; a differ that needs a
-  tighter set should add a `shared_buffer` field to the trap manifest and the
-  build.rs derivation will pick it up.
+- **Exports** dump per the `shared_buffer` field in `export-shapes.json`. This
+  set is authoritative.
+- **Traps** dump only when a manifest entry sets `shared_buffer: true`. Today no
+  trap sets it. The first recorder build used a `CG_G2_*`/`CG_FX_*` name-family
+  heuristic here. That build wrote 4KB around every bolt-matrix call and
+  journaled 3GB in 12 seconds. The ground truth above replaced it.

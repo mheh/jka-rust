@@ -8,6 +8,9 @@ use std::fs::File;
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
 
+use flate2::write::GzEncoder;
+use flate2::Compression;
+
 pub const MAGIC: &[u8; 8] = b"CGSHIMJ1";
 pub const FORMAT_VERSION: u32 = 1;
 
@@ -82,14 +85,16 @@ impl BlobSink for Record {
     }
 }
 
+// the journal file is one gzip stream; the CGSHIMJ1 format lives inside it.
+// Compression::fast() so deflate never stalls the trap path at record time.
 pub struct Journal {
-    w: BufWriter<File>,
+    w: BufWriter<GzEncoder<File>>,
 }
 
 impl Journal {
     pub fn create(path: &Path) -> io::Result<Journal> {
         let f = File::create(path)?;
-        let mut w = BufWriter::new(f);
+        let mut w = BufWriter::new(GzEncoder::new(f, Compression::fast()));
         w.write_all(MAGIC)?;
         w.write_all(&FORMAT_VERSION.to_le_bytes())?;
         Ok(Journal { w })
@@ -118,5 +123,19 @@ impl Journal {
 
     pub fn flush(&mut self) {
         let _ = self.w.flush();
+    }
+
+    /// Ends the gzip stream (writes the trailer). Statics never run Drop at
+    /// process exit, so the recorder calls this at CG_SHUTDOWN - the end of a
+    /// recording session.
+    pub fn finish(self) {
+        match self.w.into_inner() {
+            Ok(enc) => {
+                if let Err(e) = enc.finish() {
+                    eprintln!("cgame-shim: journal finish failed: {e}");
+                }
+            }
+            Err(e) => eprintln!("cgame-shim: journal buffer flush failed: {e}"),
+        }
     }
 }

@@ -76,11 +76,15 @@ fn gen_traps(out: &mut String, path: &str) {
         let num = t["num"].as_i64().unwrap();
         let name = t["name"].as_str().unwrap();
         let ret = trap_ret(t["ret"].as_str().unwrap());
-        // README: the G2 and FX families stage their big structs into the
-        // engine-retained shared buffer. The manifest carries no shared flag
-        // (see README 'Things flagged as not certain'), so we derive the set by
-        // family name - the recorder dumps the 2048-byte region around these.
-        let dumps_shared = name.starts_with("CG_G2_") || name.starts_with("CG_FX_");
+        // Ground truth: NO trap dispatch case reads the shared buffer - every
+        // engine mSharedMemory touch (FxSystem.cpp:100-118, FxScheduler,
+        // cl_keys.cpp:689, cl_input.cpp:525) writes it and then calls INTO the
+        // module via a CGVM_* vmcall, so the shared traffic is entirely on the
+        // export side (export-shapes.json `shared`). The trap side honors an
+        // explicit `shared_buffer` manifest field only; today that set is empty.
+        // (The first recording ran the old G2/FX family heuristic here and
+        // journaled 3GB in 12s - 4KB per bolt-matrix call for nothing.)
+        let dumps_shared = t["shared_buffer"].as_bool().unwrap_or(false);
 
         let mut args_lit = String::new();
         for a in t["args"].as_array().unwrap() {

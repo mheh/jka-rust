@@ -1314,6 +1314,12 @@ these shapes:
    inputs + oracle output stream) are the committed goldens per §18 —
    cargo test needs neither engine nor C++ toolchain; .dm_26 files kept
    alongside for re-recording.
+   *Amended 2026-07-30 (user: "Don't commit it"):* the traces stay OUT
+   of git. Measured volume forced the call: a busy 32-client scene makes
+   ~3,100 syscalls per frame (CG_ClipMoveToEntities clips every trace
+   against every solid entity), ~130 MB/s of journal. Traces live on
+   local disk; the small .dm_26 demos stay committed for re-recording;
+   the gate test skips with a clear message when no trace is present.
 5. **Gate = referee-style `--ignored` test** in the cgame crate, run at
    commit boundaries whenever cgame/bg/qshared is touched, expected
    byte-identical; divergences block unless triaged to a cited §19
