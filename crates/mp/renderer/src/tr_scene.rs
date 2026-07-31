@@ -16,21 +16,24 @@ use mp_qshared::common::mp::cgame::mini_ref_entity_s::miniRefEntity_t;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
-use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
+use mp_qshared::common::mp::cgame::refdef_t::{
+    refdef_t, MAX_MAP_AREA_BYTES, MAX_RENDER_STRINGS, MAX_RENDER_STRING_LENGTH,
+};
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::qhandle_t;
 
 use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_event::FrameEvent;
 use crate::render_state::frame_state::FrameState;
-use crate::render_state::placeholders::{PolyVert, RefEntity, Vec3};
+use crate::render_state::light_style_table::LightStyleTable;
+use crate::render_state::placeholders::{PolyVert, RefEntity, TrRefdef, Vec3};
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::tr_local::decal_poly_s::{decalPoly_t, MAX_VERTS_ON_DECAL_POLY};
 use crate::tr_main::{DrawSurf, R_AddDrawSurf, SurfaceGeometry};
 use crate::tr_marks::{MarkNode, R_MarkFragments};
-use crate::tr_public::ref_flags::RDF_NOWORLDMODEL;
+use crate::tr_public::ref_flags::{RDF_DRAWSKYBOX, RDF_NOWORLDMODEL, RDF_SKYBOXPORTAL};
 use crate::tr_shader::R_GetShaderByHandle;
 
 // This wave threads `RenderAssets`, `FrameData`/`FrameEvent` and `Common`
@@ -116,6 +119,25 @@ pub struct SceneState {
     ///
     /// Source: `oracle/codemp/renderer/tr_scene.cpp:709`
     pub last_time: i32,
+    /// The trap-side persistent `tr.refdef.areamask` — the previous scene's
+    /// area bits. `RE_RenderScene` compares the new `fd->areamask` against
+    /// this to set `areamaskModified`, then stores the new bits here. The
+    /// render-thread `tr.refdef` is not reachable at trap time, so the diff
+    /// state lives beside `last_time`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_scene.cpp:770-786`
+    pub refdef_areamask: [u8; MAX_MAP_AREA_BYTES],
+    /// The oracle's sticky `skyboxportal` file-scope static, write side.
+    /// `RE_RenderScene` sets it to 1 when `RDF_SKYBOXPORTAL` is present and
+    /// never clears it, so the trap side keeps it across scenes.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_scene.cpp:35,744-747`
+    pub skyboxportal: i32,
+    /// The oracle's `drawskyboxportal` file-scope static, write side.
+    /// `RE_RenderScene` sets it to 1 or 0 each scene from `RDF_DRAWSKYBOX`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_scene.cpp:36,749-756`
+    pub drawskyboxportal: i32,
 }
 
 impl Default for SceneState {
@@ -127,6 +149,9 @@ impl Default for SceneState {
             decal_poly_total: Vec::new(),
             last_mark_count: -1,
             last_time: 0,
+            refdef_areamask: [0; MAX_MAP_AREA_BYTES],
+            skyboxportal: 0,
+            drawskyboxportal: 0,
         }
     }
 }
@@ -1108,45 +1133,27 @@ pub fn RE_AddDecalToScene(
 // wave 13
 // ---------------------------------------------------------------------
 
-/// Raven `RE_RenderScene` — commits a scene's `refdef_t` and, in the
-/// oracle, immediately renders it (`R_RenderView`) before returning.
+/// Raven `RE_RenderScene` — commits a scene's `refdef_t` into a
+/// `FrameEvent::RenderScene` for the render side to replay (DEC-50).
 ///
-/// Landed here: the `tr.registered` guard, the `r_norefresh` early-out, the
-/// `tr.world`/`RDF_NOWORLDMODEL` validation, the `lastTime` static update,
-/// the `R_AddDecals` call, and the `refEntParent` reset. Everything past
-/// those is DEFERRED at its own site below, for reasons that don't dissolve
-/// with more threading:
+/// This is a trap-time handler (`CG_R_/UI_R_RENDERSCENE`). It records the
+/// scene into `FrameData` and returns. The render side replays the event and
+/// runs `R_RenderView` against render-side world assets, so this fn never
+/// calls `R_RenderView` itself (ruling 3: `R_RenderView` touches
+/// render-thread-only `GpuResources`).
 ///
-/// - `R_RenderView`'s already-landed (wave 12, `tr_main.rs`) signature takes
-///   `gpu: &mut GpuResources`, which `## Seam definition`'s own doc comment
-///   marks "Render-thread-only. Never touched by a trap query (ruling 3
-///   invariant)." `RE_RenderScene` is exactly a trap-time handler
-///   (`CG_R_/UI_R_RENDERSCENE`) — calling `R_RenderView` from here would
-///   violate that frozen invariant regardless of how much additional
-///   context this fn threads in. `FrameEvent::RenderScene`'s existing
-///   "seals the accumulated scene" shape (`render_state/frame_event.rs`)
-///   confirms the intended split: a future render-thread orchestrator
-///   consumes that event and calls `R_RenderView` itself, not this
-///   trap-time fn.
-/// - Pushing `FrameEvent::RenderScene` here anyway is not done either:
-///   `TrRefdef` (its payload type, `render_state/placeholders.rs`) carries
-///   only 4 of the oracle `trRefdef_t`'s ~15 fields (`fov_x`/`fov_y`/
-///   `view_origin`/`view_axis`) — `x`/`y`/`width`/`height`/`time`/
-///   `frametime`/`rdflags`/`areamask`/`areamaskModified`/`floatTime`/`text`/
-///   the four count+pointer pairs are absent. `TrRefdef`'s own doc comment
-///   says the rest "lands with the `tr_scene` R3 wave" (this wave), but
-///   extending it means editing `render_state/placeholders.rs`, outside
-///   this wave's scoped file. Pushing a silently-incomplete `TrRefdef` for a
-///   future consumer to read would be exactly the invented partial state
-///   the never-guess rule guards against, so the whole event push waits for
-///   that field-merge.
-/// - `tr.frameSceneNum`/`tr.sceneCount` have no `FrameState` field
-///   (`FrameState` carries `frame_count`/`view_count` only) — UNMAPPED, not
-///   invented.
-/// - `RE_RenderWorldEffects`/`RE_RenderAutoMap` are themselves unported —
-///   `tr_cmds.rs` carries its own `DEFERRED: RE_RenderWorldEffects`/
-///   `DEFERRED: RE_RenderAutoMap` markers, no callable fn under either name
-///   exists anywhere in the crate (verified by grep, not assumed).
+/// The `refdef` payload carries the scalar `trRefdef_t` fields. The four
+/// oracle count+pointer pairs (entities, polys, dlights, draw surfaces) stay
+/// out. The render side rebuilds those from the `Add*ToScene` events. The
+/// dynamic-light disable decision rides `disable_dynamic_light` because
+/// `num_dlights` is one of those rebuilt-render-side counts.
+///
+/// `light_styles` is the A11 snapshot: the sim copies `LightStyleTable::
+/// colors` into the event so render-side consumers read the frame's snapshot,
+/// not the live table.
+///
+/// Still deferred below: `startTime`/`frontEndMsec` timing, the `R_RenderView`
+/// call, and `RE_RenderWorldEffects`/`RE_RenderAutoMap` (both unported).
 ///
 /// Source: `oracle/codemp/renderer/tr_scene.cpp:706-874`
 pub fn RE_RenderScene(
@@ -1156,6 +1163,7 @@ pub fn RE_RenderScene(
     cvars: &RendererCvars,
     scene: &mut SceneState,
     common: &mut Common,
+    light_styles: &LightStyleTable,
 ) {
     if !assets.registered {
         return;
@@ -1192,59 +1200,117 @@ pub fn RE_RenderScene(
         );
     }
 
-    // DEFERRED: the rest of `tr.refdef`'s field-by-field commit
-    // (`text`/`x`/`y`/`width`/`height`/`fov_x`/`fov_y`/`vieworg`/`viewaxis`/
-    // `time`/`frametime`/`rdflags`/`areamask`/`areamaskModified`/
-    // `floatTime`/the four count+pointer pairs) — see this fn's own doc
-    // comment for why committing only `TrRefdef`'s 4 already-landed fields
-    // into a `FrameEvent::RenderScene` push is not done either. Escalate a
-    // `TrRefdef`/`FrameState` field-merge for the wave that lands
-    // `R_IssueRenderCommands`'s render-thread orchestrator.
-    // Source: oracle/codemp/renderer/tr_scene.cpp:726-743,758-803,811-814
-    // (narrowed from the field-commit block's full :726-822 span — :744-756
-    // is the skyboxportal/drawskyboxportal write, marked separately below;
-    // :807-810 is `R_AddDecals`, landed a few lines below this comment;
-    // :815-822 is the dynamic-lighting-disable block, also marked
-    // separately below — none of those three sub-ranges belong to this
-    // deferral).
+    // Build the scene refdef payload field by field, in oracle order.
+    let mut refdef = TrRefdef::default();
 
-    // `static int lastTime` (kind-3 fn-scope state, this file's own
-    // `SceneState` carrier) — landed independent of `frametime`'s own
-    // (deferred, see above) destination field.
-    // Source: oracle/codemp/renderer/tr_scene.cpp:709,741-742
+    // `Com_Memcpy( tr.refdef.text, fd->text, ... )` — copy each NUL-terminated
+    // Latin-1 row into an owned string (one row per `MAX_RENDER_STRINGS`).
+    // Source: oracle/codemp/renderer/tr_scene.cpp:726
+    for row in 0..MAX_RENDER_STRINGS {
+        let bytes = &fd.text[row][..MAX_RENDER_STRING_LENGTH];
+        let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
+        refdef
+            .text
+            .push(bytes[..end].iter().map(|&b| b as u8 as char).collect());
+    }
+
+    refdef.x = fd.x;
+    refdef.y = fd.y;
+    refdef.width = fd.width;
+    refdef.height = fd.height;
+    refdef.fov_x = fd.fov_x;
+    refdef.fov_y = fd.fov_y;
+
+    refdef.view_origin = fd.vieworg;
+    refdef.view_axis = fd.viewaxis;
+
+    refdef.time = fd.time;
+    // `frametime = fd->time - lastTime; lastTime = fd->time;` — `lastTime` is
+    // this file's `SceneState` carrier (kind-3 fn-scope state; DEC-37 A13.3).
+    let mut frametime = fd.time - scene.last_time;
     scene.last_time = fd.time;
 
-    // DEFERRED: `skyboxportal`/`drawskyboxportal` writes. Both blockers the
-    // wave-13 note listed are closed: the masks are ported
-    // (`tr_public::ref_flags::{RDF_SKYBOXPORTAL, RDF_DRAWSKYBOX}`) and the
-    // destination is named (`FrameState::skyboxportal`/`drawskyboxportal`,
-    // campaign #41 batch 1, DEC-37 A13.3). What remains is reach: this fn is
-    // a trap-time sim-side handler and takes `FrameData`, not the
-    // render-thread-local `FrameState` (ruling 3), so the two writes have to
-    // ride the `FrameEvent::RenderScene` payload — the same field-merge this
-    // fn's `tr.refdef` commit above already escalates for the wave that lands
-    // `R_IssueRenderCommands`'s render-thread orchestrator.
+    // `skyboxportal` is sticky in the oracle - set to 1 and never cleared here.
+    // `drawskyboxportal` is set or cleared each scene. Both live on the
+    // trap-side `SceneState` carrier, then ride the payload to write
+    // `FrameState::skyboxportal`/`drawskyboxportal` render-side.
     // Source: oracle/codemp/renderer/tr_scene.cpp:744-756
+    if fd.rdflags & RDF_SKYBOXPORTAL != 0 {
+        scene.skyboxportal = 1;
+    }
+    if fd.rdflags & RDF_DRAWSKYBOX != 0 {
+        scene.drawskyboxportal = 1;
+    } else {
+        scene.drawskyboxportal = 0;
+    }
+    refdef.skyboxportal = scene.skyboxportal;
+    refdef.drawskyboxportal = scene.drawskyboxportal;
 
+    // Clamp `frametime` to 0-500 ms.
+    if frametime > 500 {
+        frametime = 500;
+    } else if frametime < 0 {
+        frametime = 0;
+    }
+    refdef.frametime = frametime;
+    refdef.rdflags = fd.rdflags;
+
+    // Copy the areamask over and note a change, which forces `R_MarkLeaves` to
+    // re-mark even if the view did not move. The previous scene's bits live on
+    // the `SceneState` carrier because the render-thread `tr.refdef` is not
+    // reachable at trap time (ruling 3). The oracle diffs 4 bytes at a time
+    // with XOR - a byte compare gives the same nonzero result.
+    // Source: oracle/codemp/renderer/tr_scene.cpp:768-786
+    refdef.areamask_modified = false;
+    if fd.rdflags & RDF_NOWORLDMODEL == 0 {
+        let mut area_diff = false;
+        for i in 0..MAX_MAP_AREA_BYTES {
+            if scene.refdef_areamask[i] != fd.areamask[i] {
+                area_diff = true;
+            }
+            scene.refdef_areamask[i] = fd.areamask[i];
+        }
+        if area_diff {
+            // a door just opened or something
+            refdef.areamask_modified = true;
+        }
+    }
+    refdef.areamask = scene.refdef_areamask;
+
+    // derived info
+    refdef.float_time = refdef.time as f32 * 0.001;
+
+    // Add the decals here because decals add polys, and the polys must be
+    // added before the scene is sealed.
+    // Source: oracle/codemp/renderer/tr_scene.cpp:805-810
     if fd.rdflags & RDF_NOWORLDMODEL == 0 {
         R_AddDecals(frame, assets, scene, cvars, common, fd.time);
     }
 
-    // DEFERRED: the dynamic-lighting-disable block (`r_dynamiclight->integer
-    // == 0 || r_vertexLight->integer == 1` clearing `tr.refdef.num_dlights`)
-    // — `num_dlights` has no `TrRefdef` field (see above).
+    // The oracle clears `tr.refdef.num_dlights` when dynamic light is off or
+    // vertex light is on. `num_dlights` has no `TrRefdef` field because the
+    // render side replays dlights from events, so the payload carries the
+    // disable decision as a bool the replay reads.
     // Source: oracle/codemp/renderer/tr_scene.cpp:815-822
+    let disable_dynamic_light = common.cvar(cvars.r_dynamiclight).integer == 0
+        || common.cvar(cvars.r_vertexLight).integer == 1;
 
-    // DEFERRED: `tr.frameSceneNum++; tr.sceneCount++;` — `FrameState`
-    // carries `frame_count`/`view_count` only; `frameSceneNum`/`sceneCount`
-    // are UNMAPPED (no field), not invented.
+    // `tr.frameSceneNum++; tr.sceneCount++;` is render-thread state
+    // (`FrameState::frame_scene_num`/`scene_count`), so ruling 3 keeps it off
+    // this trap-time fn. The render-side `R_RenderView` driver bumps both
+    // before it stamps `view.frameSceneNum` (see `boot.rs`'s
+    // `load_world_and_render`).
     // Source: oracle/codemp/renderer/tr_scene.cpp:829-830
 
-    // DEFERRED: the local `viewParms_t parms` setup and the `R_RenderView`
-    // call itself — see this fn's own doc comment (ruling-3 invariant:
-    // `R_RenderView` touches render-thread-only `GpuResources`, unreachable
-    // from this trap-time handler).
+    // Seal the scene. This push stands in for the oracle's `R_RenderView`
+    // call: the render side replays the event and runs `R_RenderView` itself
+    // (DEC-50), against render-side world assets (ruling 3).
     // Source: oracle/codemp/renderer/tr_scene.cpp:832-855
+    frame.events.push(FrameEvent::RenderScene {
+        refdef,
+        light_styles: light_styles.colors,
+        disable_dynamic_light,
+    });
 
     // The `r_firstSceneDrawSurf`/`Entity`/`Dlight`/`Poly` per-scene-offset
     // bookkeeping (oracle lines 857-862) is not a Rust write at all: same

@@ -2035,6 +2035,13 @@ pub fn R_GenerateDrawSurfs<'a>(
         draw_surfs,
     );
 
+    // The world walk cleared and grew `frame.view.vis_bounds`, not the ABI
+    // `view.visBounds`. `SetFarClip` reads `view.visBounds` to derive `zFar`,
+    // so we copy the grown box back before `R_SetupProjection` runs. Without
+    // this the far plane clamps to 2048 and geometry past that clips away.
+    // Source: oracle/codemp/renderer/tr_main.cpp:568-598
+    view.visBounds = frame.view.vis_bounds;
+
     // set the projection matrix with the minimum zfar and now that we have
     // the world bounded this needs to be done before entities are added,
     // because they use the projection matrix for lod calculation
@@ -2517,6 +2524,16 @@ pub fn R_RenderView<'a>(
     R_RotateForViewer(view);
 
     R_SetupFrustum(view);
+
+    // Publish the view fields the world walk reads from `frame.view` (the
+    // `ViewParms` placeholder). `R_MarkLeaves` reads `pvs_origin`,
+    // `R_RecursiveWorldNode` reads `frustum`, and `R_AddWorldSurfaces` clears
+    // then grows `vis_bounds`. The two view types are not yet unified (#51),
+    // so the fields cross here after `R_SetupFrustum` fills them.
+    // Source: oracle/codemp/renderer/tr_main.cpp:1614-1616
+    frame.view.pvs_origin = view.pvsOrigin;
+    frame.view.frustum = view.frustum;
+    frame.view.vis_bounds = view.visBounds;
 
     R_GenerateDrawSurfs(
         engine_view,

@@ -99,6 +99,14 @@ pub enum FrameEvent {
     RenderScene {
         refdef: TrRefdef,
         light_styles: [[u8; 4]; MAX_LIGHT_STYLES],
+        /// The oracle's `tr.refdef.num_dlights = 0` disable decision
+        /// (`r_dynamiclight->integer == 0 || r_vertexLight->integer == 1`).
+        /// `num_dlights` has no `TrRefdef` field because the render side
+        /// replays dlights from `AddLightToScene` events, so this flag carries
+        /// the disable to the replay, which drops the frame's dlight set.
+        ///
+        /// Source: `oracle/codemp/renderer/tr_scene.cpp:817-822`
+        disable_dynamic_light: bool,
     },
 
     // --- 2D draw commands (RC_SET_COLOR / RC_STRETCH_PIC / RC_ROTATE_PIC family) ---

@@ -15,8 +15,8 @@ use core::ptr::null_mut;
 
 use mp_engine_botlib::l_precomp_fns::PC_SetBaseFolder;
 use mp_engine_core::Engine;
-use mp_engine_qcommon::cmd_common::{Cbuf_Init, Cmd_Init};
 use mp_engine_qcommon::cm_terrain::CmLandScape;
+use mp_engine_qcommon::cmd_common::{Cbuf_Init, Cmd_Init};
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
@@ -58,14 +58,13 @@ use mp_renderer::tr_local::tr_ref_entity_t::trRefEntity_t;
 use mp_renderer::tr_local::tr_refdef_t::trRefdef_t;
 use mp_renderer::tr_local::view_parms_t::viewParms_t;
 use mp_renderer::tr_main::{
-    DrawSurf, R_RenderView, R_RotateForViewer, R_SetupFrustum, SurfaceGeometry, TrMainScratch,
-    WorldSurfaceRef,
+    DrawSurf, R_RenderView, SurfaceGeometry, TrMainScratch, WorldSurfaceRef,
 };
-use mp_renderer::tr_terrain::R_TerrainInit;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_noise::NoiseState;
 use mp_renderer::tr_scene::SceneState;
 use mp_renderer::tr_sky::SkyState;
+use mp_renderer::tr_terrain::R_TerrainInit;
 use mp_renderer::tr_worldeffects::world_effects::WorldEffectsState;
 use mp_ui::world::ui_state::UiState;
 use mp_uishared::shared::display_context::DisplayContext;
@@ -406,7 +405,7 @@ pub fn with_dc<R>(host: &mut UiHost, body: impl FnOnce(&mut HarnessDc, &mut UiSt
 /// headless server subset and is not what `R_Init` initialised. Every other
 /// opaque slot is null: no path this harness runs reads them, and a null slot
 /// makes that a loud crash rather than a silent wrong-island read.
-fn host_view<'a>(
+pub fn host_view<'a>(
     common: &'a mut Common,
     cm: &'a mut CollisionWorld,
     sv: *mut (),
@@ -444,7 +443,7 @@ const MAX_SKINS: u32 = 1024;
 /// `R_InitSkins`' `Arena::reset` re-seat the real defaults during `R_Init`);
 /// `images` stays unbounded (A5 — its purge is `R_DeleteTextures`, never
 /// `reset`).
-pub(crate) fn empty_assets() -> RenderAssets {
+pub fn empty_assets() -> RenderAssets {
     RenderAssets {
         images: Arena::new_unbounded(),
         image_names: Default::default(),
@@ -506,6 +505,8 @@ fn zeroed_frame_state() -> FrameState {
             mp_engine_qcommon::qfiles::light_style_limits::MAX_LIGHT_STYLES],
         frame_count: 0,
         view_count: 0,
+        scene_count: 0,
+        frame_scene_num: 0,
         vis_count: 0,
         view_cluster: 0,
         skyboxportal: 0,
@@ -558,14 +559,91 @@ pub struct WorldSpikeReport {
     pub visible_leaves: usize,
 }
 
+/// Loads a BSP through `RE_LoadWorldMap` and initializes the null-landscape
+/// terrain surface. Returns whether the world loaded, plus the terrain surface
+/// the per-frame world pass reuses.
+///
+/// The window harness calls this once, then feeds the returned terrain surface
+/// into every `WorldFrame` it builds. `R_TerrainInit` also registers the
+/// terrain cvars and sets `RenderAssets::distance_cull`, which the world pass
+/// reads.
+pub fn load_world(host: &mut UiHost, map: &str) -> (bool, srfTerrain_t) {
+    // ---- load the BSP --------------------------------------------------
+    {
+        let UiHost {
+            engine,
+            models,
+            cvars,
+            assets,
+            sim,
+            img_state,
+            gpu_res,
+            frame,
+            qs,
+            sky_view,
+            sky,
+            world_effects,
+            ..
+        } = &mut *host;
+        let models_ptr: *mut RenderModels = &mut *models;
+        let Engine { common, cm, sv, .. } = &mut **engine;
+        let sv_ptr: *mut () = sv as *mut Server as *mut ();
+        let mut view = host_view(common, cm, sv_ptr, models_ptr);
+        RE_LoadWorldMap(
+            qs,
+            frame,
+            assets,
+            &mut view,
+            cvars,
+            sim,
+            models,
+            img_state,
+            gpu_res,
+            sky_view,
+            sky,
+            world_effects,
+            map,
+        );
+    }
+
+    let loaded = host.assets.world.is_some();
+    println!(
+        "world_harness: RE_LoadWorldMap(\"{map}\") -> {}",
+        if loaded { "loaded" } else { "NOT LOADED" }
+    );
+
+    // ---- init the null-landscape terrain surface -----------------------
+    // SAFETY: `srfTerrain_t` is a frozen `#[repr(C)]` POD (scalars, fixed
+    // arrays, and raw pointers whose all-zero value is null). `R_TerrainInit`
+    // overwrites both its fields with the null-landscape terrain surface, which
+    // makes `R_AddTerrainSurfaces` return early.
+    let mut land_scape: srfTerrain_t = unsafe { core::mem::zeroed() };
+    {
+        let UiHost {
+            engine,
+            models,
+            cvars,
+            assets,
+            ..
+        } = &mut *host;
+        let models_ptr: *mut RenderModels = &mut *models;
+        let Engine { common, cm, sv, .. } = &mut **engine;
+        let sv_ptr: *mut () = sv as *mut Server as *mut ();
+        let mut view = host_view(common, cm, sv_ptr, models_ptr);
+        R_TerrainInit(&mut view, cvars, assets, &mut land_scape);
+    }
+
+    (loaded, land_scape)
+}
+
 /// Loads a BSP through `RE_LoadWorldMap`, builds a refdef at a spawn point, and
 /// drives one `R_RenderView` — the R4 world feasibility spike.
 ///
 /// `R_RenderView` runs `R_RotateForViewer`/`R_SetupFrustum` against the ABI
-/// `viewParms_t`, but the world walk (`R_MarkLeaves`/`R_RecursiveWorldNode`)
-/// reads `frame.view` — the `ViewParms` placeholder that the tier-2 pass has
-/// not yet unified with `viewParms_t` (#51). Nothing bridges the two, so this
-/// harness copies the computed frustum and PVS origin across before the call.
+/// `viewParms_t`, then publishes the PVS origin, frustum, and vis bounds into
+/// `frame.view` (the `ViewParms` placeholder the world walk reads). The two
+/// view types are not yet unified (#51), so the harness only forces
+/// `areamask_modified` to make `R_MarkLeaves` re-mark this first frame.
 pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
     // ---- load the BSP --------------------------------------------------
     {
@@ -606,7 +684,10 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
     }
 
     let loaded = host.assets.world.is_some();
-    println!("world_spike: RE_LoadWorldMap(\"{map}\") -> {}", if loaded { "loaded" } else { "NOT LOADED" });
+    println!(
+        "world_spike: RE_LoadWorldMap(\"{map}\") -> {}",
+        if loaded { "loaded" } else { "NOT LOADED" }
+    );
 
     // A spawn origin from the stored entity lump, bumped to eye height.
     let eye = host
@@ -666,11 +747,10 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
         parms.ori.axis = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
         parms.pvsOrigin = eye;
 
-        // Bridge the ABI view into the walk's `frame.view` carrier (see this
-        // fn's doc comment): `R_RotateForViewer`/`R_SetupFrustum` fill `parms`,
-        // and the frustum/PVS origin cross to `frame.view` here.
-        R_RotateForViewer(&mut parms);
-        R_SetupFrustum(&mut parms);
+        // `R_RenderView` publishes `frame.view` (PVS origin, frustum, vis
+        // bounds) from its own `R_RotateForViewer`/`R_SetupFrustum`. The fov
+        // args come straight off `parms` - `R_SetupFrustum` does not change
+        // them.
         let fov_x = parms.fovX;
         let fov_y = parms.fovY;
 
@@ -683,11 +763,18 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
             frame,
             ..
         } = &mut *host;
-        frame.view.pvs_origin = eye;
-        frame.view.frustum = parms.frustum;
         // Force `R_MarkLeaves` to re-mark this frame regardless of the leftover
         // view cluster.
         frame.refdef.areamask_modified = true;
+
+        // Bump the per-scene counters, the render-side stand-in for the
+        // oracle's `tr.frameSceneNum++`/`tr.sceneCount++` in `RE_RenderScene`
+        // (ruling 3 keeps that trap-time fn off `FrameState`). `R_RenderView`
+        // stamps `view.frameSceneNum` from this value.
+        // Source: oracle/codemp/renderer/tr_scene.cpp:829-830
+        frame.frame_scene_num += 1;
+        frame.scene_count += 1;
+        let frame_scene_num = frame.frame_scene_num;
 
         let models_ptr: *mut RenderModels = &mut *models;
         let Engine { common, cm, sv, .. } = &mut **engine;
@@ -703,7 +790,7 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
         let mut view = zeroed_view_parms();
         R_RenderView(
             &parms,
-            0,
+            frame_scene_num,
             0,
             &mut view,
             &mut engine_view,
@@ -766,7 +853,7 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
 /// Scans the BSP entity lump for a spawn origin. Prefers
 /// `info_player_deathmatch`, falls back to `info_player_start`. A plain token
 /// scan is enough for the harness.
-fn find_spawn_origin(entities: &str) -> Option<[f32; 3]> {
+pub fn find_spawn_origin(entities: &str) -> Option<[f32; 3]> {
     for want in ["info_player_deathmatch", "info_player_start"] {
         for block in entities.split('{') {
             if !block.contains(want) {

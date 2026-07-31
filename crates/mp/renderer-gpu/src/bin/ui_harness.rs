@@ -252,6 +252,8 @@ impl App {
                     &mut self.host.font,
                     &self.host.noise,
                     float_time,
+                    // Menu frames draw 2D only; no world scene.
+                    None,
                 );
                 if !self.reported {
                     self.reported = true;

@@ -1647,6 +1647,8 @@ pub fn R_Init(
         scene_light_styles: [[0; 4]; MAX_LIGHT_STYLES],
         frame_count: 0,
         view_count: 0,
+        scene_count: 0,
+        frame_scene_num: 0,
         vis_count: 0,
         view_cluster: 0,
         skyboxportal: 0,

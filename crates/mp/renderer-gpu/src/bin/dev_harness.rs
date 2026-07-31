@@ -162,6 +162,8 @@ impl ApplicationHandler for App {
                             &mut self.fonts,
                             &NoiseState::default(),
                             self.start.elapsed().as_secs_f32(),
+                            // 2D-only harness: no world scene to render.
+                            None,
                         );
                         if !self.reported {
                             self.reported = true;

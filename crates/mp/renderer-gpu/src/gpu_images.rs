@@ -36,9 +36,11 @@ use crate::gpu::Gpu;
 pub struct GpuImage {
     #[allow(dead_code)]
     texture: Texture,
-    #[allow(dead_code)]
     view: TextureView,
     bind_group: BindGroup,
+    /// `wrapClampMode == GL_REPEAT` — the world pipeline picks the wrapping
+    /// sampler for a tiling diffuse texture and the clamping one otherwise.
+    repeat: bool,
 }
 
 /// The uploaded-image store, plus the shared sampler pair and the fallback
@@ -95,6 +97,7 @@ impl GpuImages {
             &[0xff, 0xff, 0xff, 0xff],
             1,
             1,
+            false,
         );
 
         GpuImages {
@@ -161,7 +164,8 @@ impl GpuImages {
                 continue;
             };
 
-            let sampler = if asset.wrap_clamp_mode == GL_REPEAT {
+            let repeat = asset.wrap_clamp_mode == GL_REPEAT;
+            let sampler = if repeat {
                 &self.sampler_repeat
             } else {
                 &self.sampler_clamp
@@ -174,6 +178,7 @@ impl GpuImages {
                 &pending.pixels,
                 pending.width.max(0) as u32,
                 pending.height.max(0) as u32,
+                repeat,
             );
             self.images.insert(handle, image);
             uploaded += 1;
@@ -194,6 +199,64 @@ impl GpuImages {
     /// "resolved" before it decides to log a fallback.
     pub fn contains(&self, handle: ImageHandle) -> bool {
         self.images.contains_key(&handle)
+    }
+
+    /// The uploaded image for `handle`, or the white fallback when `handle` is
+    /// `None` or names an image that never uploaded.
+    fn image_or_white(&self, handle: Option<ImageHandle>) -> &GpuImage {
+        handle
+            .and_then(|h| self.images.get(&h))
+            .unwrap_or(&self.white)
+    }
+
+    /// Builds a two-texture bind group (diffuse plus lightmap) for the world
+    /// pipeline against `layout`. The diffuse texture keeps its own wrap mode
+    /// so a tiling world surface repeats. The lightmap always clamps, matching
+    /// the oracle's `GL_CLAMP` lightmap upload.
+    ///
+    /// This builds a fresh bind group per call, so the world backend makes one
+    /// per surface per frame. The first world wave keeps one draw call per
+    /// surface, so the extra bind groups cost nothing a batching pass will not
+    /// remove later.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_bsp.cpp:241` (`GL_CLAMP` lightmaps)
+    pub fn world_bind_group(
+        &self,
+        gpu: &Gpu,
+        layout: &BindGroupLayout,
+        diffuse: Option<ImageHandle>,
+        lightmap: Option<ImageHandle>,
+    ) -> BindGroup {
+        let diffuse_image = self.image_or_white(diffuse);
+        let lightmap_image = self.image_or_white(lightmap);
+        let diffuse_sampler = if diffuse_image.repeat {
+            &self.sampler_repeat
+        } else {
+            &self.sampler_clamp
+        };
+
+        gpu.device().create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("mp_renderer_gpu world texture bind group"),
+            layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&diffuse_image.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(diffuse_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&lightmap_image.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler_clamp),
+                },
+            ],
+        })
     }
 }
 
@@ -225,6 +288,7 @@ fn create_image(
     pixels: &[u8],
     width: u32,
     height: u32,
+    repeat: bool,
 ) -> GpuImage {
     let width = width.max(1);
     let height = height.max(1);
@@ -298,5 +362,6 @@ fn create_image(
         texture,
         view,
         bind_group,
+        repeat,
     }
 }

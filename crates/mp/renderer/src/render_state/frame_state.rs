@@ -48,6 +48,16 @@ pub struct FrameState {
     ///
     /// Source: `oracle/codemp/renderer/tr_local.h:1315`
     pub view_count: i32,
+    /// `tr.sceneCount` — Raven: incremented every scene. The light-flare code
+    /// distinguishes per-scene surface visibility by this count.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1314`
+    pub scene_count: i32,
+    /// `tr.frameSceneNum` — Raven: zeroed at `RE_BeginFrame`, bumped per
+    /// scene. `R_RenderView` stamps the view's `frameSceneNum` from it.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1318`
+    pub frame_scene_num: i32,
     /// `tr.visCount` — Raven: "incremented every time a new vis cluster is
     /// entered". `R_MarkLeaves` bumps it and stamps every visible node's
     /// `visframe` with it; `R_RecursiveWorldNode` gates the walk on the

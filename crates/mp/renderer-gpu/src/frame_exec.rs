@@ -40,14 +40,29 @@
 //! image has not been uploaded. Both log once per process rather than dropping
 //! the quad.
 
+use mp_engine_qcommon::cm_terrain::CmLandScape;
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::qfiles::font_style::SET_MASK;
+use mp_engine_qcommon::qfiles::light_style_limits::MAX_LIGHT_STYLES;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::frame_event::FrameEvent;
+use mp_renderer::render_state::frame_state::FrameState;
+use mp_renderer::render_state::gpu_resources::GpuResources;
 use mp_renderer::render_state::image_asset::ImageHandle;
+use mp_renderer::render_state::placeholders::{TrRefdef, WorldAsset};
 use mp_renderer::render_state::render_assets::RenderAssets;
+use mp_renderer::render_state::renderer_cvars::RendererCvars;
 use mp_renderer::render_state::shader_asset::ShaderHandle;
 use mp_renderer::tr_font::{layout_font_string, FontDrawItem, FontState, Language_e};
 use mp_renderer::tr_image::TrImageState;
+use mp_renderer::tr_local::dlight_s::dlight_t;
+use mp_renderer::tr_local::fog_t::fog_t;
+use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
+use mp_renderer::tr_local::tr_ref_entity_t::trRefEntity_t;
+use mp_renderer::tr_local::tr_refdef_t::trRefdef_t;
+use mp_renderer::tr_local::view_parms_t::viewParms_t;
+use mp_renderer::tr_main::{DrawSurf, R_RenderView, SurfaceGeometry, TrMainScratch};
+use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_noise::NoiseState;
 use wgpu::TextureView;
 
@@ -55,6 +70,7 @@ use crate::blend::{blend_state_from_gls, GLS_2D_DEFAULT};
 use crate::gpu::Gpu;
 use crate::gpu_images::GpuImages;
 use crate::pipeline2d::{Pipeline2d, QuadBatch, Rect, UvRect};
+use crate::pipeline3d::{Pipeline3d, WorldGeometry, WorldStats};
 use crate::stage2d::{stage_color, stage_image, stage_texcoords, Stage2dWarnings, StageTime};
 
 /// `tr.identityLight` at its default (no overbright) — the colour a frame
@@ -89,11 +105,15 @@ pub struct FrameStats {
     pub skipped_strings: u32,
     /// `DrawRotatePic`/`DrawRotatePic2` events skipped.
     pub skipped_rotate_pics: u32,
-    /// Scene-composition events skipped (`AddRefEntityToScene`,
-    /// `RenderScene`, lights, polys, decals, …) — backend #1's world path.
+    /// Scene-composition events skipped (`AddRefEntityToScene`, lights, polys,
+    /// decals, …) — backend #1's world path. `RenderScene` is no longer here
+    /// when a world context is supplied.
     pub skipped_scene_events: u32,
     /// Everything else skipped (world-effect commands, automap elevation).
     pub skipped_other: u32,
+    /// The last `RenderScene` event's world pass result. Stays at its default
+    /// when no world context was supplied or no world was drawn.
+    pub world: WorldStats,
 }
 
 impl FrameStats {
@@ -122,10 +142,12 @@ enum Warned {
     UnknownFont,
     /// A glyph's page shader resolved to no uploaded image.
     NoGlyphImage,
+    /// A `RenderScene` arrived before the world geometry was uploaded.
+    NoWorldGeometry,
 }
 
 impl Warned {
-    const COUNT: usize = 7;
+    const COUNT: usize = 8;
 
     fn slot(self) -> usize {
         match self {
@@ -136,6 +158,7 @@ impl Warned {
             Warned::NoStageImage => 4,
             Warned::UnknownFont => 5,
             Warned::NoGlyphImage => 6,
+            Warned::NoWorldGeometry => 7,
         }
     }
 
@@ -143,21 +166,49 @@ impl Warned {
         match self {
             Warned::RotatePic => "skips DrawRotatePic/DrawRotatePic2 — not rendered yet",
             Warned::SceneEvent => {
-                "skips scene composition (RenderScene and friends) — not rendered yet"
+                "skips scene composition (ClearScene, entities, lights) — not rendered yet"
             }
             Warned::Other => "skips world-effect / automap commands — not rendered yet",
             Warned::UnknownShader => "drew a pic whose shader handle is not registered — white",
             Warned::NoStageImage => "drew a stage whose image is not uploaded — white",
             Warned::UnknownFont => "drew a string with an unloaded font handle — nothing drawn",
             Warned::NoGlyphImage => "drew a glyph whose page shader has no image — white",
+            Warned::NoWorldGeometry => "got a RenderScene before the world geometry uploaded",
         }
     }
 }
 
-/// Owns the render-thread state one frame's execution needs: the 2D pipeline,
-/// the reused geometry batch, and the warn-once flags.
+/// The render-side world state one `RenderScene` event needs to run
+/// `R_RenderView` and draw. The harness split-borrows its host and engine into
+/// this bundle each frame, the same borrows `load_world_and_render` builds.
+///
+/// The scratch buffers are empty this wave. Models, polys, and lights are
+/// later waves, so `dlights`/`fogs`/`entities` stay empty and the terrain
+/// surface is the null-landscape one.
+pub struct WorldFrame<'a, 'e> {
+    pub engine_view: &'a mut EngineHostView<'e>,
+    pub assets: &'a mut RenderAssets,
+    pub cvars: &'a mut RendererCvars,
+    pub frame: &'a mut FrameState,
+    pub gpu_res: &'a mut GpuResources,
+    pub models: &'a RenderModels,
+    pub land_scape: &'a srfTerrain_t,
+    pub land: &'a CmLandScape,
+    pub dlights: &'a mut [dlight_t],
+    pub fogs: &'a [fog_t],
+    pub entities: &'a mut [trRefEntity_t],
+    pub scratch: &'a mut TrMainScratch,
+}
+
+/// Owns the render-thread state one frame's execution needs: the 2D and world
+/// pipelines, the uploaded world geometry, the reused 2D batch, and the
+/// warn-once flags.
 pub struct FrameExecutor {
     pipeline: Pipeline2d,
+    pipeline3d: Pipeline3d,
+    /// The uploaded world mesh, `None` until [`FrameExecutor::set_world`] runs
+    /// after a map load.
+    world_geometry: Option<WorldGeometry>,
     batch: QuadBatch,
     warned: [bool; Warned::COUNT],
     stage_warnings: Stage2dWarnings,
@@ -170,10 +221,24 @@ impl FrameExecutor {
     pub fn new(gpu: &Gpu, images: &GpuImages) -> FrameExecutor {
         FrameExecutor {
             pipeline: Pipeline2d::new(gpu, images),
+            pipeline3d: Pipeline3d::new(gpu),
+            world_geometry: None,
             batch: QuadBatch::new(),
             warned: [false; Warned::COUNT],
             stage_warnings: Stage2dWarnings::default(),
         }
+    }
+
+    /// Uploads the loaded world's geometry so the world pass can draw it. Call
+    /// once after `RE_LoadWorldMap` and before the first frame that renders a
+    /// scene.
+    pub fn set_world(&mut self, gpu: &Gpu, world: &WorldAsset) {
+        self.world_geometry = Some(WorldGeometry::upload(gpu, world));
+    }
+
+    /// Recreates the world depth texture on a window resize.
+    pub fn resize(&mut self, gpu: &Gpu, width: u32, height: u32) {
+        self.pipeline3d.resize(gpu, width, height);
     }
 
     /// Replays `frame_data`'s events in order into `target`.
@@ -202,6 +267,7 @@ impl FrameExecutor {
         fonts: &mut FontState,
         noise: &NoiseState,
         float_time: f32,
+        mut world: Option<&mut WorldFrame>,
     ) -> FrameStats {
         // Two registries by design (A9): shader registration writes the direct
         // `assets` instance, image registration writes the sim-published Arc
@@ -213,8 +279,14 @@ impl FrameExecutor {
 
         // Frame start: every image `R_CreateImage` staged since the last
         // frame becomes a texture, so a shader registered mid-frame is
-        // drawable by the time its quad is bound.
-        stats.images_uploaded = gpu_images.upload_pending(gpu, img_state, image_assets) as u32;
+        // drawable by the time its quad is bound. A world frame keeps its
+        // textures (lightmaps, surface diffuse maps) in its own asset registry,
+        // so uploads resolve there.
+        let upload_assets: &RenderAssets = match world.as_deref() {
+            Some(w) => &*w.assets,
+            None => image_assets,
+        };
+        stats.images_uploaded = gpu_images.upload_pending(gpu, img_state, upload_assets) as u32;
 
         self.batch.clear();
 
@@ -296,8 +368,41 @@ impl FrameExecutor {
                     self.warn_once(Warned::RotatePic);
                 }
 
-                FrameEvent::ClearScene
-                | FrameEvent::ClearDecals
+                FrameEvent::RenderScene {
+                    refdef,
+                    light_styles,
+                    disable_dynamic_light,
+                } => match world.as_deref_mut() {
+                    // DEC-50: the render side rebuilds the view and runs
+                    // `R_RenderView` itself, then draws the sorted world surfaces.
+                    Some(w) => {
+                        stats.world = self.render_world(
+                            gpu,
+                            target,
+                            w,
+                            frame_data,
+                            refdef,
+                            light_styles,
+                            *disable_dynamic_light,
+                            gpu_images,
+                        );
+                    }
+                    // No world context, so this frame cannot draw a scene.
+                    None => {
+                        stats.skipped_scene_events += 1;
+                        self.warn_once(Warned::SceneEvent);
+                    }
+                },
+
+                FrameEvent::ClearScene => {
+                    // The executor keeps no per-scene accumulation yet — models,
+                    // polys, and lights are later waves — so there is nothing to
+                    // reset here.
+                    stats.skipped_scene_events += 1;
+                    self.warn_once(Warned::SceneEvent);
+                }
+
+                FrameEvent::ClearDecals
                 | FrameEvent::AddRefEntityToScene(_)
                 | FrameEvent::AddPolyToScene { .. }
                 | FrameEvent::AddPolysToScene { .. }
@@ -305,8 +410,7 @@ impl FrameExecutor {
                 | FrameEvent::AddAdditiveLightToScene { .. }
                 | FrameEvent::AddDecalToScene { .. }
                 | FrameEvent::SetRangeFog(_)
-                | FrameEvent::SetRefractionProp { .. }
-                | FrameEvent::RenderScene { .. } => {
+                | FrameEvent::SetRefractionProp { .. } => {
                     stats.skipped_scene_events += 1;
                     self.warn_once(Warned::SceneEvent);
                 }
@@ -320,6 +424,121 @@ impl FrameExecutor {
 
         stats.draw_calls = self.pipeline.draw(gpu, target, &self.batch, gpu_images);
         stats
+    }
+
+    /// Runs one scene's world pass (DEC-50): builds the view parameters from
+    /// the `RenderScene` payload, runs `R_RenderView` against the render-side
+    /// world assets, then draws the sorted world surfaces. The world pass
+    /// clears color and depth, so it is the frame's base pass and the 2D batch
+    /// composites over it.
+    ///
+    /// `R_RenderView` builds `view.projectionMatrix` through its own
+    /// `R_SetupProjection` call, which runs after the world walk bounds the
+    /// view. This fn reads that matrix straight for the GPU clip transform.
+    #[allow(clippy::too_many_arguments)]
+    fn render_world<'f>(
+        &mut self,
+        gpu: &mut Gpu,
+        target: &TextureView,
+        world: &mut WorldFrame,
+        frame_data: &'f FrameData,
+        refdef: &TrRefdef,
+        light_styles: &[[u8; 4]; MAX_LIGHT_STYLES],
+        disable_dynamic_light: bool,
+        gpu_images: &GpuImages,
+    ) -> WorldStats {
+        let Some(geometry) = self.world_geometry.as_ref() else {
+            self.warn_once(Warned::NoWorldGeometry);
+            return WorldStats::default();
+        };
+
+        // Build the view parameters from the scene refdef.
+        let mut parms = zeroed_view_parms();
+        parms.viewportX = refdef.x;
+        // The oracle flips y into GL's 0-at-the-bottom space here:
+        // `viewportY = glConfig.vidHeight - (refdef.y + refdef.height)`.
+        // Nothing reads `viewportY` yet, so we carry the unflipped value until
+        // the backend calls `set_viewport` for a sub-viewport.
+        //TODO: Port viewportY GL flip
+        // Source: oracle/codemp/renderer/tr_scene.cpp:838
+        parms.viewportY = refdef.y;
+        parms.viewportWidth = refdef.width;
+        parms.viewportHeight = refdef.height;
+        parms.fovX = refdef.fov_x;
+        parms.fovY = refdef.fov_y;
+        parms.ori.origin = refdef.view_origin;
+        parms.ori.axis = refdef.view_axis;
+        parms.pvsOrigin = refdef.view_origin;
+
+        // Install the scene refdef so the world walk reads this frame's
+        // areamask, view-cluster mask, and time. `R_MarkLeaves` reads
+        // `frame.refdef.areamask`/`areamask_modified`, and the shader clock
+        // reads `frame.refdef.time`.
+        world.frame.refdef = refdef.clone();
+        world.frame.scene_light_styles = *light_styles;
+
+        // Bump the per-scene counters, the render-side stand-in for the
+        // oracle's `tr.frameSceneNum++`/`tr.sceneCount++`. Ruling 3 keeps that
+        // off the trap-time `RE_RenderScene`, so the render-side driver does it.
+        // Source: oracle/codemp/renderer/tr_scene.cpp:829-830
+        world.frame.frame_scene_num += 1;
+        world.frame.scene_count += 1;
+        let frame_scene_num = world.frame.frame_scene_num;
+
+        let refdef_rdflags = refdef.rdflags;
+        let fov_x = refdef.fov_x;
+        let fov_y = refdef.fov_y;
+        let refdef_time = refdef.time;
+        // Dlights replay from `AddLightToScene` events in a later wave. None
+        // land yet, so the disable decision drops an already-empty set.
+        let refdef_num_dlights = if disable_dynamic_light {
+            0
+        } else {
+            world.dlights.len() as i32
+        };
+        let distance_cull = world.assets.distance_cull;
+
+        // SAFETY: `trRefdef_t` is a frozen `#[repr(C)]` POD (scalars, fixed
+        // arrays, and raw pointers whose all-zero value is null).
+        // `R_AddTerrainSurfaces` reads `rdflags` and `vieworg` off this struct,
+        // so the zeroed value is only correct while the null landscape keeps
+        // the terrain walk inert. A live landscape must carry the real refdef.
+        let abi_refdef: trRefdef_t = unsafe { core::mem::zeroed() };
+        let mut draw_surfs: Vec<DrawSurf<SurfaceGeometry<'f>>> = Vec::new();
+        let mut view = zeroed_view_parms();
+
+        R_RenderView(
+            &parms,
+            frame_scene_num,
+            refdef_time,
+            &mut view,
+            world.engine_view,
+            world.assets,
+            world.cvars,
+            world.frame,
+            world.gpu_res,
+            frame_data,
+            &abi_refdef,
+            refdef_rdflags,
+            fov_x,
+            fov_y,
+            refdef_num_dlights,
+            world.dlights,
+            world.fogs,
+            distance_cull,
+            world.land_scape,
+            world.land,
+            0,
+            world.entities,
+            world.scratch,
+            world.models,
+            &mut draw_surfs,
+        );
+
+        self.pipeline3d
+            .set_view(gpu, &view.world.modelMatrix, &view.projectionMatrix);
+        self.pipeline3d
+            .draw(gpu, target, &draw_surfs, geometry, world.assets, gpu_images)
     }
 
     /// Draws one `DrawStretchPic` as `RB_StageIteratorGeneric` does: one
@@ -549,4 +768,14 @@ fn latin1_bytes(text: &str) -> Vec<u8> {
     text.chars()
         .map(|c| if (c as u32) < 0x100 { c as u8 } else { b'?' })
         .collect()
+}
+
+/// A zeroed `viewParms_t`, the value `Com_Memset(&tr.viewParms, 0, ...)` gives
+/// it before per-view setup fills it.
+///
+/// `viewParms_t` is a frozen `#[repr(C)]` struct of scalars, fixed arrays, and
+/// `#[repr(C)]` sub-structs, so an all-zero bit pattern is a valid value.
+fn zeroed_view_parms() -> viewParms_t {
+    // SAFETY: POD `#[repr(C)]`; see the doc comment.
+    unsafe { core::mem::zeroed() }
 }

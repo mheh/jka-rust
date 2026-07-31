@@ -189,14 +189,33 @@ impl Default for RefEntity {
 
 /// The owned form of Raven `trRefdef_t` — the scene description
 /// `FrameEvent::RenderScene` carries and `FrameState::refdef` holds
-/// render-side. Independently shaped from `refdef_t` (`R2-D6`); the oracle's
-/// array pointers become owned `Vec`s on the event, `areamaskModified` a
-/// `bool`, `text` a `Vec<String>`. The fields below are real (landed with the
-/// `tr_backend` R3 wave-0); the rest lands with the `tr_scene` R3 wave.
+/// render-side. Independently shaped from `refdef_t` (`R2-D6`);
+/// `areamaskModified` is a `bool` and `text` a `Vec<String>`.
+///
+/// The four oracle count+pointer pairs (`num_entities`/`entities`,
+/// `numPolys`/`polys`, `num_dlights`/`dlights`, `numDrawSurfs`/`drawSurfs`)
+/// stay OUT. The render side rebuilds those sets by replaying the
+/// `Add*ToScene` `FrameEvent`s, so `TrRefdef` never carries a scene list
+/// (DEC-50).
+///
+/// `skyboxportal`/`drawskyboxportal` are not `trRefdef_t` fields. They are the
+/// oracle's `tr_scene.cpp` file-scope statics, carried here so the
+/// `FrameEvent::RenderScene` payload can write `FrameState::skyboxportal`/
+/// `drawskyboxportal` render-side (DEC-37 A13.3).
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:563-598`
 #[derive(Clone)]
 pub struct TrRefdef {
+    /// `x` — Raven: viewport corner, 0-at-the-top y coordinates.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:564`
+    pub x: i32,
+    /// `y`.
+    pub y: i32,
+    /// `width`.
+    pub width: i32,
+    /// `height`.
+    pub height: i32,
     /// `fov_x`.
     pub fov_x: f32,
     /// `fov_y`.
@@ -205,6 +224,20 @@ pub struct TrRefdef {
     pub view_origin: Vec3,
     /// `viewaxis[3]` — the view transformation matrix.
     pub view_axis: [Vec3; 3],
+    /// `time` — Raven: time in milliseconds for shader effects and other time
+    /// dependent rendering issues.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:569`
+    pub time: i32,
+    /// `frametime` — the delta from the previous scene's `time`, clamped to
+    /// 0-500 ms by `RE_RenderScene`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:570`
+    pub frametime: i32,
+    /// `rdflags` — Raven: `RDF_NOWORLDMODEL`, etc.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:571`
+    pub rdflags: i32,
     /// `areamask[MAX_MAP_AREA_BYTES]` — Raven: "1 bits will prevent the
     /// associated area from rendering at all". Read by `R_MarkLeaves` per
     /// leaf area, written by the scene wave from the refdef event; grown by
@@ -218,6 +251,26 @@ pub struct TrRefdef {
     ///
     /// Source: `oracle/codemp/renderer/tr_local.h:575`
     pub areamask_modified: bool,
+    /// `floatTime` — Raven: `tr.refdef.time / 1000.0`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:577`
+    pub float_time: f32,
+    /// `text[MAX_RENDER_STRINGS][MAX_RENDER_STRING_LENGTH]` — Raven: text
+    /// messages for deform text shaders. The oracle's fixed byte matrix
+    /// becomes owned NUL-terminated Latin-1 strings, one per row.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:580`
+    pub text: Vec<String>,
+    /// `skyboxportal` — the oracle's sticky file-scope static, carried to
+    /// write `FrameState::skyboxportal` render-side. Raven's `int`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_scene.cpp:35`
+    pub skyboxportal: i32,
+    /// `drawskyboxportal` — the oracle's file-scope static, carried to write
+    /// `FrameState::drawskyboxportal` render-side. Raven's `int`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_scene.cpp:36`
+    pub drawskyboxportal: i32,
 }
 
 // The refdef is zeroed by `R_Init`'s `Com_Memset(&backEnd, 0, ...)` until the
@@ -226,12 +279,23 @@ pub struct TrRefdef {
 impl Default for TrRefdef {
     fn default() -> TrRefdef {
         TrRefdef {
+            x: 0,
+            y: 0,
+            width: 0,
+            height: 0,
             fov_x: 0.0,
             fov_y: 0.0,
             view_origin: [0.0; 3],
             view_axis: [[0.0; 3]; 3],
+            time: 0,
+            frametime: 0,
+            rdflags: 0,
             areamask: [0; MAX_MAP_AREA_BYTES],
             areamask_modified: false,
+            float_time: 0.0,
+            text: Vec::new(),
+            skyboxportal: 0,
+            drawskyboxportal: 0,
         }
     }
 }
