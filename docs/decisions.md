@@ -1376,3 +1376,12 @@ gists and links (this inverts wayfinder's detail-in-ticket rule on
 purpose). One-ticket-per-session applies to planning sessions only - wave
 execution keeps its rolling cadence, referees, and reviews. The DEC
 ledger and the wave process do not migrate.
+
+Amended same day: the adoption is not only a fold-in of the open-work
+layer. When the wayfinder point is reached, a process-revision pass
+reshapes the repo's process documentation around the tool: the process
+sections of CLAUDE.md, docs/doc-standards.md, the handoff practice, the
+parked-item and plan-doc conventions, and the agent memory usage (which
+shrinks to operational lessons plus a map pointer). Localized scope
+tracking moves into maps. The DEC ledger remains the decision store per
+the conditions above unless a later ruling changes that.
