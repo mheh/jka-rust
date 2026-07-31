@@ -43,7 +43,11 @@ use mp_renderer::tr_bsp::{FaceVertex, SurfaceData};
 use mp_renderer::tr_local::alpha_gen_t::alphaGen_t;
 use mp_renderer::tr_local::color_gen_t::colorGen_t;
 use mp_renderer::tr_local::tex_coord_gen_t::texCoordGen_t;
-use mp_renderer::tr_main::{DrawSurf, R_DecomposeSort, SurfaceGeometry, WorldSurfaceRef};
+use mp_renderer::tr_local::tr_ref_entity_t::trRefEntity_t;
+use mp_renderer::tr_local::view_parms_t::viewParms_t;
+use mp_renderer::tr_main::{
+    DrawSurf, R_DecomposeSort, R_RotateForEntity, SurfaceGeometry, TrMainScratch, WorldSurfaceRef,
+};
 use mp_renderer::tr_noise::NoiseState;
 use mp_renderer::tr_shader::{
     GLS_ATEST_GE_80, GLS_ATEST_GE_C0, GLS_ATEST_GT_0, GLS_ATEST_LT_80, GLS_DEPTHFUNC_EQUAL,
@@ -413,6 +417,30 @@ impl DepthTexture {
 /// backend, so 256 is always legal.
 const SURFACE_FLAGS_STRIDE: u64 = 256;
 
+/// The per-entity clip-matrix stride for the dynamic-offset globals buffer.
+/// wgpu requires a dynamic offset that is a multiple of
+/// `min_uniform_buffer_offset_alignment`, at most 256 on every backend, so 256
+/// is always legal. One aligned slot holds one `[f32; 16]` clip matrix.
+const GLOBALS_STRIDE: u64 = 256;
+
+/// The clip-matrix binding size, one `[f32; 16]`.
+const CLIP_MATRIX_SIZE: u64 = size_of::<[f32; 16]>() as u64;
+
+/// Raven `MAX_ENTITIES` — the per-frame ref-entity bound. The non-`_XBOX`
+/// build selects 2048; `_XBOX` selects 1024. We build the 2048 target.
+///
+/// Source: `oracle/codemp/cgame/tr_types.h:9-12`
+const MAX_ENTITIES: i32 = 2048;
+
+/// The world entity number the frontend tags every world (non-inline-model)
+/// surface with (`R_AddWorldSurfaces` sets `tr.currentEntityNum = TR_WORLDENT`).
+/// The world slot is slot 0 of the globals buffer, so a draw surf decoded to
+/// this number uses the view matrix, not a per-entity matrix. `MAX_ENTITIES - 1`
+/// reserves the last slot for the world.
+///
+/// Source: `oracle/codemp/cgame/tr_types.h:15`
+const TR_WORLDENT: i32 = MAX_ENTITIES - 1;
+
 /// The per-pass uniform the fragment shader reads through group 2. `mode`
 /// picks the single-texture or two-texture path, `tex_from_lightmap` selects
 /// the lightmap texcoord for a single-texture lightmap stage, and `alpha_func`
@@ -485,8 +513,14 @@ impl Warned {
 /// What one [`Pipeline3d::draw`] call did.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct WorldStats {
-    /// World surfaces that drew at least one stage pass.
+    /// World surfaces that drew at least one stage pass. Inline brush-model
+    /// entity surfaces count here too, since they draw through the same world
+    /// path.
     pub surfaces_drawn: u32,
+    /// The subset of `surfaces_drawn` that belong to a real entity (an inline
+    /// brush model), not the world itself. A surface counts here when its sort
+    /// key decodes to an entity number other than the world entity.
+    pub entity_surfaces_drawn: u32,
     /// `draw_indexed` calls issued — one per active stage per surface.
     pub draw_calls: u32,
     /// Stage passes that bound the lightmap through the two-texture path.
@@ -527,6 +561,9 @@ struct StageDrawItem {
     index_count: u32,
     base_vertex: i32,
     dynamic: bool,
+    /// The byte offset of this surface's clip matrix in the dynamic-offset
+    /// globals buffer. Slot 0 (offset 0) is the world matrix.
+    globals_offset: u32,
 }
 
 /// The world pipeline's GPU-side resources: shader module, layouts, the clip
@@ -542,8 +579,13 @@ pub struct Pipeline3d {
     texture_layout: wgpu::BindGroupLayout,
     pipelines: HashMap<PipelineKey, RenderPipeline>,
     surface_format: wgpu::TextureFormat,
+    globals_layout: wgpu::BindGroupLayout,
     globals_buffer: wgpu::Buffer,
     globals_bind_group: wgpu::BindGroup,
+    /// The number of clip-matrix slots the globals buffer holds. It grows to
+    /// cover the distinct entity numbers a scene uses and is reused across
+    /// frames.
+    globals_capacity: usize,
     flags_layout: wgpu::BindGroupLayout,
     flags_buffer: wgpu::Buffer,
     flags_bind_group: wgpu::BindGroup,
@@ -577,8 +619,11 @@ impl Pipeline3d {
                 visibility: wgpu::ShaderStages::VERTEX,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
+                    // The globals buffer holds one clip matrix per distinct
+                    // entity number this scene draws, and the draw picks its
+                    // matrix with a dynamic offset (slot 0 is the world).
+                    has_dynamic_offset: true,
+                    min_binding_size: wgpu::BufferSize::new(CLIP_MATRIX_SIZE),
                 },
                 count: None,
             }],
@@ -618,26 +663,14 @@ impl Pipeline3d {
             immediate_size: 0,
         });
 
-        let globals_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("mp_renderer_gpu world globals uniform"),
-            size: size_of::<[f32; 16]>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let identity: [f32; 16] = [
-            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-        ];
-        gpu.queue()
-            .write_buffer(&globals_buffer, 0, bytemuck::cast_slice(&identity));
+        // `draw` calls `write_globals` before the pass reads the buffer, and
+        // `build_entity_slots` always fills slot 0 with the world matrix, so the
+        // buffer needs no construction-time default.
+        let globals_capacity = 1;
+        let globals_buffer = create_globals_buffer(device, globals_capacity);
 
-        let globals_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("mp_renderer_gpu world globals bind group"),
-            layout: &globals_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: globals_buffer.as_entire_binding(),
-            }],
-        });
+        let globals_bind_group =
+            create_globals_bind_group(device, &globals_layout, &globals_buffer);
 
         let flags_capacity = 1;
         let flags_buffer = create_flags_buffer(device, flags_capacity);
@@ -652,8 +685,10 @@ impl Pipeline3d {
             texture_layout,
             pipelines: HashMap::new(),
             surface_format: gpu.surface_format(),
+            globals_layout,
             globals_buffer,
             globals_bind_group,
+            globals_capacity,
             flags_layout,
             flags_buffer,
             flags_bind_group,
@@ -671,15 +706,6 @@ impl Pipeline3d {
         self.depth.resize(gpu, width, height);
     }
 
-    /// Writes the clip matrix `correction * projection * model` into the
-    /// globals uniform. The caller feeds `viewParms_t.world.modelMatrix` and
-    /// `viewParms_t.projectionMatrix`.
-    pub fn set_view(&self, gpu: &Gpu, model: &[f32; 16], projection: &[f32; 16]) {
-        let clip = world_clip_matrix(model, projection);
-        gpu.queue()
-            .write_buffer(&self.globals_buffer, 0, bytemuck::cast_slice(&clip));
-    }
-
     /// Draws the sorted world draw-surf list, one pass per active stage per
     /// surface in stage order (`RB_IterateStagesGeneric`). Each surface resolves
     /// its shader through `R_DecomposeSort`. A sky-parms shader is skipped whole.
@@ -689,6 +715,13 @@ impl Pipeline3d {
     /// and `noise` drives the waveform generators. A stage with dynamic
     /// texcoords or colours evaluates its own vertices into the per-frame
     /// dynamic buffer, so this fn writes that buffer before the pass reads it.
+    ///
+    /// `view`, `entities` and `scratch` build the per-entity clip matrices. Each
+    /// draw surf's sort key decodes to an entity number. The world entity uses
+    /// the view matrix (`view.world.modelMatrix`). A real entity uses
+    /// `R_RotateForEntity`'s model matrix against its `trRefEntity_t` row. Every
+    /// distinct entity number gets one aligned slot in the globals buffer, and
+    /// the draw picks its matrix with a dynamic offset.
     ///
     /// The pass clears the depth buffer to 1.0 per view but loads the color
     /// target, because `Gpu::begin_frame` already cleared color for the frame.
@@ -704,8 +737,19 @@ impl Pipeline3d {
         gpu_images: &GpuImages,
         noise: &NoiseState,
         float_time: f32,
+        view: &viewParms_t,
+        entities: &[trRefEntity_t],
+        scratch: &mut TrMainScratch,
     ) -> WorldStats {
         let mut stats = WorldStats::default();
+
+        // Build one clip matrix per distinct entity number this scene draws,
+        // slot 0 the world, then upload them to the dynamic-offset globals
+        // buffer. The slot map tags each draw item with its own offset.
+        let (clips, slot_map) = build_entity_slots(draw_surfs, assets, view, entities, scratch);
+        self.reserve_globals(gpu, clips.len());
+        self.write_globals(gpu, &clips);
+
         let mut dynamic_vertices: Vec<WorldVertex> = Vec::new();
         let items = self.collect_stage_items(
             draw_surfs,
@@ -715,6 +759,7 @@ impl Pipeline3d {
             float_time,
             &mut dynamic_vertices,
             &mut stats,
+            &slot_map,
         );
 
         if items.is_empty() {
@@ -801,7 +846,6 @@ impl Pipeline3d {
                 multiview_mask: None,
             });
 
-            pass.set_bind_group(0, &self.globals_bind_group, &[]);
             pass.set_index_buffer(geometry.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
 
             for (draw_index, item) in items.iter().enumerate() {
@@ -820,6 +864,8 @@ impl Pipeline3d {
                 };
 
                 pass.set_pipeline(pipeline);
+                // Group 0 selects this surface's clip matrix by its entity slot.
+                pass.set_bind_group(0, &self.globals_bind_group, &[item.globals_offset]);
                 pass.set_bind_group(1, &bind_groups[item_group[draw_index]], &[]);
                 pass.set_bind_group(2, &self.flags_bind_group, &[offset]);
                 pass.set_vertex_buffer(0, vertex_buffer.slice(..));
@@ -853,6 +899,7 @@ impl Pipeline3d {
         float_time: f32,
         dynamic_vertices: &mut Vec<WorldVertex>,
         stats: &mut WorldStats,
+        slot_map: &HashMap<i32, u32>,
     ) -> Vec<StageDrawItem> {
         let mut items: Vec<StageDrawItem> = Vec::new();
 
@@ -872,11 +919,17 @@ impl Pipeline3d {
                 continue;
             }
 
-            let (_entity_num, shader_handle, _fog_num, _dlight_map) =
+            let (entity_num, shader_handle, _fog_num, _dlight_map) =
                 R_DecomposeSort(surf.sort, &assets.sorted_shaders);
             let Some(shader) = assets.shaders.get(shader_handle) else {
                 continue;
             };
+
+            // Slot 0 is the world. A draw surf with an unmapped entity number
+            // uses slot 0. `build_entity_slots` maps every entity number the
+            // draw list carries, so an unmapped number does not occur here.
+            let slot = slot_map.get(&entity_num).copied().unwrap_or(0);
+            let globals_offset = (slot as u64 * GLOBALS_STRIDE) as u32;
 
             // The sky draws through its own chain in a later wave, so a
             // sky-parms shader skips the whole surface.
@@ -903,6 +956,7 @@ impl Pipeline3d {
                     noise,
                     float_time,
                     dynamic_vertices,
+                    globals_offset,
                 );
                 // A surface-sprite stage draws nothing here, so it yields no item.
                 if let Some(item) = item {
@@ -911,6 +965,9 @@ impl Pipeline3d {
             }
             if items.len() > before {
                 stats.surfaces_drawn += 1;
+                if entity_num != TR_WORLDENT {
+                    stats.entity_surfaces_drawn += 1;
+                }
             }
         }
 
@@ -942,6 +999,7 @@ impl Pipeline3d {
         noise: &NoiseState,
         float_time: f32,
         dynamic_vertices: &mut Vec<WorldVertex>,
+        globals_offset: u32,
     ) -> Option<StageDrawItem> {
         // A surface-sprite stage draws no plain geometry. The sprite chain is a
         // later wave, so the stage is skipped whole, as the oracle does.
@@ -1019,6 +1077,7 @@ impl Pipeline3d {
                 index_count: range.index_count,
                 base_vertex,
                 dynamic,
+                globals_offset,
             });
         }
 
@@ -1058,6 +1117,7 @@ impl Pipeline3d {
                 index_count: range.index_count,
                 base_vertex,
                 dynamic: true,
+                globals_offset,
             })
         } else {
             Some(StageDrawItem {
@@ -1072,6 +1132,7 @@ impl Pipeline3d {
                 index_count: range.index_count,
                 base_vertex: range.base_vertex,
                 dynamic: false,
+                globals_offset,
             })
         }
     }
@@ -1150,6 +1211,35 @@ impl Pipeline3d {
         self.flags_capacity = capacity;
     }
 
+    /// Grows the globals buffer (and its bind group) when `needed` clip-matrix
+    /// slots exceed capacity. The buffer is reused across frames, so it only
+    /// ever grows.
+    fn reserve_globals(&mut self, gpu: &Gpu, needed: usize) {
+        if needed <= self.globals_capacity {
+            return;
+        }
+        let mut capacity = self.globals_capacity.max(1);
+        while capacity < needed {
+            capacity *= 2;
+        }
+        self.globals_buffer = create_globals_buffer(gpu.device(), capacity);
+        self.globals_bind_group =
+            create_globals_bind_group(gpu.device(), &self.globals_layout, &self.globals_buffer);
+        self.globals_capacity = capacity;
+    }
+
+    /// Writes one clip matrix per slot into the globals buffer, each at its own
+    /// stride slot so the dynamic offset lands on it. Slot 0 is the world.
+    fn write_globals(&self, gpu: &Gpu, clips: &[[f32; 16]]) {
+        let mut bytes = vec![0u8; clips.len() * GLOBALS_STRIDE as usize];
+        for (slot, clip) in clips.iter().enumerate() {
+            let offset = slot * GLOBALS_STRIDE as usize;
+            let src = bytemuck::bytes_of(clip);
+            bytes[offset..offset + src.len()].copy_from_slice(src);
+        }
+        gpu.queue().write_buffer(&self.globals_buffer, 0, &bytes);
+    }
+
     /// Grows the per-frame dynamic vertex buffer when `needed` vertices exceed
     /// its capacity. The buffer is reused across frames, so it only ever grows.
     fn reserve_dynamic(&mut self, gpu: &Gpu, needed: usize) {
@@ -1191,6 +1281,52 @@ impl Pipeline3d {
         self.warned[slot] = true;
         eprintln!("mp_renderer_gpu: pipeline3d {}", kind.describe());
     }
+}
+
+/// Builds one clip matrix per distinct entity number the draw list carries,
+/// plus the entity-number-to-slot map. Slot 0 is always the world matrix
+/// (`view.world.modelMatrix`). Each real entity's matrix comes from
+/// `R_RotateForEntity` against its `trRefEntity_t` row and the view. The clip
+/// matrix is `correction * projection * model` in every slot.
+///
+/// A draw surf whose decoded entity number is out of the `entities` slice falls
+/// back to the world matrix, so a stale sort key can never index past the row
+/// list.
+///
+/// Source: `oracle/codemp/renderer/tr_main.cpp:302-360` (`R_RotateForEntity`)
+fn build_entity_slots(
+    draw_surfs: &[DrawSurf<SurfaceGeometry>],
+    assets: &RenderAssets,
+    view: &viewParms_t,
+    entities: &[trRefEntity_t],
+    scratch: &mut TrMainScratch,
+) -> (Vec<[f32; 16]>, HashMap<i32, u32>) {
+    let projection = &view.projectionMatrix;
+    let mut clips: Vec<[f32; 16]> = Vec::new();
+    let mut slot_map: HashMap<i32, u32> = HashMap::new();
+
+    // Slot 0 is the world, so the entity-free path keeps one aligned slot at
+    // offset 0 with the plain view clip matrix.
+    clips.push(world_clip_matrix(&view.world.modelMatrix, projection));
+    slot_map.insert(TR_WORLDENT, 0);
+
+    for surf in draw_surfs {
+        let (entity_num, _shader, _fog, _dlight) =
+            R_DecomposeSort(surf.sort, &assets.sorted_shaders);
+        if slot_map.contains_key(&entity_num) {
+            continue;
+        }
+
+        let model = match entities.get(entity_num as usize) {
+            Some(ent) => R_RotateForEntity(ent, view, scratch).modelMatrix,
+            None => view.world.modelMatrix,
+        };
+        let slot = clips.len() as u32;
+        clips.push(world_clip_matrix(&model, projection));
+        slot_map.insert(entity_num, slot);
+    }
+
+    (clips, slot_map)
 }
 
 /// The `WorldSurfaceRef` flat surface index, regardless of kind.
@@ -1421,6 +1557,34 @@ fn create_dynamic_buffer(device: &wgpu::Device, capacity: usize) -> wgpu::Buffer
         size: capacity as u64 * size_of::<WorldVertex>() as u64,
         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
+    })
+}
+
+fn create_globals_buffer(device: &wgpu::Device, capacity: usize) -> wgpu::Buffer {
+    device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("mp_renderer_gpu world globals buffer"),
+        size: capacity as u64 * GLOBALS_STRIDE,
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    })
+}
+
+fn create_globals_bind_group(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    buffer: &wgpu::Buffer,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("mp_renderer_gpu world globals bind group"),
+        layout,
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                buffer,
+                offset: 0,
+                size: wgpu::BufferSize::new(CLIP_MATRIX_SIZE),
+            }),
+        }],
     })
 }
 
@@ -1816,5 +1980,94 @@ mod tests {
         );
 
         assert_eq!(out[0].st, [0.8, 0.9]);
+    }
+
+    // entity clip-matrix slot assignment
+
+    /// `QSORT_ENTITYNUM_SHIFT` (`tr_main`), restated for the test's sort keys.
+    const QSORT_ENTITYNUM_SHIFT: u32 = 7;
+
+    fn assets_with_one_shader() -> RenderAssets {
+        let mut assets = empty_assets();
+        // `R_DecomposeSort` indexes `sorted_shaders`, so it needs one entry.
+        let handle = assets
+            .shaders
+            .handle_at_slot(0)
+            .expect("slot 0 exists in a fresh shader arena");
+        assets.sorted_shaders.push(handle);
+        assets
+    }
+
+    fn zeroed_view() -> viewParms_t {
+        // SAFETY: `viewParms_t` is a frozen `#[repr(C)]` POD.
+        unsafe { core::mem::zeroed() }
+    }
+
+    fn zeroed_entity() -> trRefEntity_t {
+        // SAFETY: `trRefEntity_t` is a frozen `#[repr(C)]` POD. A zeroed value
+        // has `reType == RT_MODEL`, the arm `R_RotateForEntity` rotates.
+        unsafe { core::mem::zeroed() }
+    }
+
+    #[test]
+    fn a_world_only_draw_list_uses_slot_zero() {
+        // The world entity always maps to slot 0, so an entity-free draw list
+        // builds exactly one clip-matrix slot.
+        let assets = assets_with_one_shader();
+        let view = zeroed_view();
+        let entities: Vec<trRefEntity_t> = Vec::new();
+        let mut scratch = TrMainScratch {
+            pre_trans_ent_matrix: [0.0; 16],
+        };
+        let draw_surfs = vec![DrawSurf {
+            sort: (TR_WORLDENT as u32) << QSORT_ENTITYNUM_SHIFT,
+            surface: SurfaceGeometry::Other,
+        }];
+
+        let (clips, slot_map) =
+            build_entity_slots(&draw_surfs, &assets, &view, &entities, &mut scratch);
+
+        assert_eq!(clips.len(), 1);
+        assert_eq!(slot_map.get(&TR_WORLDENT), Some(&0));
+    }
+
+    #[test]
+    fn each_distinct_entity_gets_its_own_slot_with_world_at_zero() {
+        // The world is slot 0, and each real entity number gets the next slot
+        // in first-appearance order.
+        let assets = assets_with_one_shader();
+        let view = zeroed_view();
+        let entities = vec![zeroed_entity(), zeroed_entity()];
+        let mut scratch = TrMainScratch {
+            pre_trans_ent_matrix: [0.0; 16],
+        };
+        let draw_surfs = vec![
+            DrawSurf {
+                sort: 1u32 << QSORT_ENTITYNUM_SHIFT,
+                surface: SurfaceGeometry::Other,
+            },
+            DrawSurf {
+                sort: (TR_WORLDENT as u32) << QSORT_ENTITYNUM_SHIFT,
+                surface: SurfaceGeometry::Other,
+            },
+            DrawSurf {
+                sort: 0u32 << QSORT_ENTITYNUM_SHIFT,
+                surface: SurfaceGeometry::Other,
+            },
+            // A repeat of entity 1 must not add a second slot.
+            DrawSurf {
+                sort: 1u32 << QSORT_ENTITYNUM_SHIFT,
+                surface: SurfaceGeometry::Other,
+            },
+        ];
+
+        let (clips, slot_map) =
+            build_entity_slots(&draw_surfs, &assets, &view, &entities, &mut scratch);
+
+        // World plus entity 1 plus entity 0 is three distinct slots.
+        assert_eq!(clips.len(), 3);
+        assert_eq!(slot_map.get(&TR_WORLDENT), Some(&0));
+        assert_eq!(slot_map.get(&1), Some(&1));
+        assert_eq!(slot_map.get(&0), Some(&2));
     }
 }

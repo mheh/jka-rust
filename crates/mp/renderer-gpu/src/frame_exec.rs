@@ -49,7 +49,7 @@ use mp_renderer::render_state::frame_event::FrameEvent;
 use mp_renderer::render_state::frame_state::FrameState;
 use mp_renderer::render_state::gpu_resources::GpuResources;
 use mp_renderer::render_state::image_asset::ImageHandle;
-use mp_renderer::render_state::placeholders::{TrRefdef, WorldAsset};
+use mp_renderer::render_state::placeholders::{RefEntity, TrRefdef, WorldAsset};
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::renderer_cvars::RendererCvars;
 use mp_renderer::render_state::shader_asset::ShaderHandle;
@@ -61,7 +61,9 @@ use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
 use mp_renderer::tr_local::tr_ref_entity_t::trRefEntity_t;
 use mp_renderer::tr_local::tr_refdef_t::trRefdef_t;
 use mp_renderer::tr_local::view_parms_t::viewParms_t;
-use mp_renderer::tr_main::{DrawSurf, R_RenderView, SurfaceGeometry, TrMainScratch};
+use mp_renderer::tr_main::{
+    tr_ref_entity_from_ref_entity, DrawSurf, R_RenderView, SurfaceGeometry, TrMainScratch,
+};
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_noise::NoiseState;
 use wgpu::TextureView;
@@ -105,12 +107,16 @@ pub struct FrameStats {
     pub skipped_strings: u32,
     /// `DrawRotatePic`/`DrawRotatePic2` events skipped.
     pub skipped_rotate_pics: u32,
-    /// Scene-composition events skipped (`AddRefEntityToScene`, lights, polys,
-    /// decals, …) — backend #1's world path. `RenderScene` is no longer here
-    /// when a world context is supplied.
+    /// Scene-composition events skipped (lights, polys, decals, …) — later
+    /// waves of backend #1's world path. `RenderScene`, `ClearScene`, and
+    /// `AddRefEntityToScene` are no longer here when a world context is
+    /// supplied.
     pub skipped_scene_events: u32,
     /// Everything else skipped (world-effect commands, automap elevation).
     pub skipped_other: u32,
+    /// Ref-entities the last `RenderScene` rebuilt into `tr.refdef.entities`
+    /// from the accumulated `AddRefEntityToScene` payloads.
+    pub entities: u32,
     /// The last `RenderScene` event's world pass result. Stays at its default
     /// when no world context was supplied or no world was drawn.
     pub world: WorldStats,
@@ -166,7 +172,7 @@ impl Warned {
         match self {
             Warned::RotatePic => "skips DrawRotatePic/DrawRotatePic2 — not rendered yet",
             Warned::SceneEvent => {
-                "skips scene composition (ClearScene, entities, lights) — not rendered yet"
+                "skips scene composition (lights, polys, decals) — not rendered yet"
             }
             Warned::Other => "skips world-effect / automap commands — not rendered yet",
             Warned::UnknownShader => "drew a pic whose shader handle is not registered — white",
@@ -182,9 +188,11 @@ impl Warned {
 /// `R_RenderView` and draw. The harness split-borrows its host and engine into
 /// this bundle each frame, the same borrows `load_world_and_render` builds.
 ///
-/// The scratch buffers are empty this wave. Models, polys, and lights are
-/// later waves, so `dlights`/`fogs`/`entities` stay empty and the terrain
-/// surface is the null-landscape one.
+/// The scratch buffers are empty this wave. Polys and lights are later waves,
+/// so `dlights`/`fogs` stay empty and the terrain surface is the null-landscape
+/// one. The entity list is not passed in: the executor accumulates
+/// `AddRefEntityToScene` payloads itself and rebuilds `tr.refdef.entities` from
+/// them at `RenderScene` (DEC-50).
 pub struct WorldFrame<'a, 'e> {
     pub engine_view: &'a mut EngineHostView<'e>,
     pub assets: &'a mut RenderAssets,
@@ -196,7 +204,6 @@ pub struct WorldFrame<'a, 'e> {
     pub land: &'a CmLandScape,
     pub dlights: &'a mut [dlight_t],
     pub fogs: &'a [fog_t],
-    pub entities: &'a mut [trRefEntity_t],
     pub scratch: &'a mut TrMainScratch,
 }
 
@@ -210,6 +217,20 @@ pub struct FrameExecutor {
     /// after a map load.
     world_geometry: Option<WorldGeometry>,
     batch: QuadBatch,
+    /// The frame's accumulated ref-entities, in trap-call order, the render
+    /// -side stand-in for `backEndData->entities`. `AddRefEntityToScene`
+    /// appends. Each frame's first event replay clears the list, the render
+    /// -side `R_ToggleSmpFrame`. The trap caps the count at `TR_WORLDENT`, so
+    /// this list never overflows the oracle bound.
+    scene_entities: Vec<RefEntity>,
+    /// The start of the current scene's window into `scene_entities`, the render
+    /// -side `r_firstSceneEntity`. `RenderScene` draws the slice from this index
+    /// to the list end, then advances it to the end, so a later scene in the
+    /// same frame sees only the entities added after it. `ClearScene` advances
+    /// it without drawing, and a frame start resets it to 0.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_scene.cpp:56,76,859`
+    first_scene_entity: usize,
     warned: [bool; Warned::COUNT],
     stage_warnings: Stage2dWarnings,
 }
@@ -224,6 +245,8 @@ impl FrameExecutor {
             pipeline3d: Pipeline3d::new(gpu),
             world_geometry: None,
             batch: QuadBatch::new(),
+            scene_entities: Vec::new(),
+            first_scene_entity: 0,
             warned: [false; Warned::COUNT],
             stage_warnings: Stage2dWarnings::default(),
         }
@@ -289,6 +312,13 @@ impl FrameExecutor {
         stats.images_uploaded = gpu_images.upload_pending(gpu, img_state, upload_assets) as u32;
 
         self.batch.clear();
+
+        // Frame start, the render-side `R_ToggleSmpFrame`: reset the whole
+        // ref-entity list and the scene window. A frame that renders without a
+        // `ClearScene` must not inherit the last frame's entities.
+        // Source: oracle/codemp/renderer/tr_scene.cpp:55-56
+        self.scene_entities.clear();
+        self.first_scene_entity = 0;
 
         for event in &frame_data.events {
             match event {
@@ -372,39 +402,56 @@ impl FrameExecutor {
                     refdef,
                     light_styles,
                     disable_dynamic_light,
-                } => match world.as_deref_mut() {
-                    // DEC-50: the render side rebuilds the view and runs
-                    // `R_RenderView` itself, then draws the sorted world surfaces.
-                    Some(w) => {
-                        stats.world = self.render_world(
-                            gpu,
-                            target,
-                            w,
-                            frame_data,
-                            refdef,
-                            light_styles,
-                            *disable_dynamic_light,
-                            gpu_images,
-                            noise,
-                        );
+                } => {
+                    match world.as_deref_mut() {
+                        // DEC-50: the render side rebuilds the view and runs
+                        // `R_RenderView` itself, then draws the world surfaces.
+                        Some(w) => {
+                            stats.entities =
+                                (self.scene_entities.len() - self.first_scene_entity) as u32;
+                            stats.world = self.render_world(
+                                gpu,
+                                target,
+                                w,
+                                frame_data,
+                                refdef,
+                                light_styles,
+                                *disable_dynamic_light,
+                                gpu_images,
+                                noise,
+                            );
+                        }
+                        // No world context, so this frame cannot draw a scene.
+                        None => {
+                            stats.skipped_scene_events += 1;
+                            self.warn_once(Warned::SceneEvent);
+                        }
                     }
-                    // No world context, so this frame cannot draw a scene.
-                    None => {
-                        stats.skipped_scene_events += 1;
-                        self.warn_once(Warned::SceneEvent);
-                    }
-                },
+
+                    // The next scene in this frame tacks on after this one, so
+                    // the window start moves to the current list end.
+                    // Source: oracle/codemp/renderer/tr_scene.cpp:859
+                    self.first_scene_entity = self.scene_entities.len();
+                }
+
+                FrameEvent::AddRefEntityToScene(re) => {
+                    // Accumulate the ref-entity for this scene. `RenderScene`
+                    // converts the list into `tr.refdef.entities`. The trap
+                    // already dropped anything past `TR_WORLDENT`, so no cap is
+                    // needed here.
+                    self.scene_entities.push(re.clone());
+                }
 
                 FrameEvent::ClearScene => {
-                    // The executor keeps no per-scene accumulation yet — models,
-                    // polys, and lights are later waves — so there is nothing to
-                    // reset here.
-                    stats.skipped_scene_events += 1;
-                    self.warn_once(Warned::SceneEvent);
+                    // Move the scene window past every entity added so far,
+                    // without drawing. The oracle keeps the buffer and only
+                    // advances `r_firstSceneEntity`, so a following scene starts
+                    // empty. Polys and lights are later waves.
+                    // Source: oracle/codemp/renderer/tr_scene.cpp:76
+                    self.first_scene_entity = self.scene_entities.len();
                 }
 
                 FrameEvent::ClearDecals
-                | FrameEvent::AddRefEntityToScene(_)
                 | FrameEvent::AddPolyToScene { .. }
                 | FrameEvent::AddPolysToScene { .. }
                 | FrameEvent::AddLightToScene { .. }
@@ -453,6 +500,17 @@ impl FrameExecutor {
             self.warn_once(Warned::NoWorldGeometry);
             return WorldStats::default();
         };
+
+        // Rebuild `tr.refdef.entities` from this scene's window into the
+        // accumulated payloads (DEC-50). The window starts at
+        // `first_scene_entity`, so a later scene in the same frame sees only the
+        // entities added after the last `RenderScene` or `ClearScene`.
+        // `R_AddEntitySurfaces` iterates this list, and the brush-model arm
+        // appends each inline submodel surface through the world draw-surf path.
+        let mut entities: Vec<trRefEntity_t> = self.scene_entities[self.first_scene_entity..]
+            .iter()
+            .map(tr_ref_entity_from_ref_entity)
+            .collect();
 
         // Build the view parameters from the scene refdef.
         let mut parms = zeroed_view_parms();
@@ -531,14 +589,12 @@ impl FrameExecutor {
             world.land_scape,
             world.land,
             0,
-            world.entities,
+            &mut entities,
             world.scratch,
             world.models,
             &mut draw_surfs,
         );
 
-        self.pipeline3d
-            .set_view(gpu, &view.world.modelMatrix, &view.projectionMatrix);
         self.pipeline3d.draw(
             gpu,
             target,
@@ -548,6 +604,9 @@ impl FrameExecutor {
             gpu_images,
             noise,
             refdef.float_time,
+            &view,
+            &entities,
+            world.scratch,
         )
     }
 

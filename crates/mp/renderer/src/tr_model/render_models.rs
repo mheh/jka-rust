@@ -329,6 +329,23 @@ impl RenderModels {
     pub(crate) fn bmodel_index(&self, handle: qhandle_t) -> Option<usize> {
         self.bmodel_indices.get(&handle).copied()
     }
+
+    /// The registered model handle for a case-insensitive name, or `None` when
+    /// no model of that name is registered. Inline brush submodels register
+    /// under `*<n>` ([`Self::register_bmodel`]), so `"*1"` names the first
+    /// inline submodel.
+    ///
+    /// This stands in for `RE_RegisterModel`'s opening hash lookup for a debug
+    /// harness that already registered the model. The full `RE_RegisterModel`
+    /// (`frontend.rs`) takes 13 parameters, so a caller that only needs a handle
+    /// for an already-registered name uses this, not the loader. It is not a
+    /// general model lookup: a name never registered returns `None`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_model.cpp:1407-1417`
+    /// (`RE_RegisterModel_Actual` hash lookup)
+    pub fn handle_for_name(&self, name: &str) -> Option<qhandle_t> {
+        self.hash.get(&name.to_ascii_lowercase()).copied()
+    }
 }
 
 #[cfg(test)]

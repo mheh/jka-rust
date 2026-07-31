@@ -22,16 +22,18 @@ use std::time::Instant;
 use mp_engine_core::Engine;
 use mp_engine_qcommon::cm_terrain::CmLandScape;
 use mp_engine_server::Server;
+use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
+use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
+use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::tr_local::dlight_s::dlight_t;
 use mp_renderer::tr_local::fog_t::fog_t;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
-use mp_renderer::tr_local::tr_ref_entity_t::trRefEntity_t;
 use mp_renderer::tr_main::TrMainScratch;
 use mp_renderer::tr_model::render_models::RenderModels;
-use mp_renderer::tr_scene::RE_RenderScene;
+use mp_renderer::tr_scene::{RE_AddRefEntityToScene, RE_ClearScene, RE_RenderScene};
 use mp_renderer_gpu::ui_host::boot;
 use mp_renderer_gpu::ui_host::{BootConfig, UiHost};
 use mp_renderer_gpu::{FrameExecutor, FrameStats, Gpu, GpuImages, WorldFrame};
@@ -51,6 +53,14 @@ const MOUSE_SENS: f32 = 0.12;
 
 /// Eye height added to a spawn origin, matching `world_spike`'s bump.
 const EYE_HEIGHT: f32 = 40.0;
+
+/// The test entity's vertical bob amplitude in world units. Inline brush
+/// geometry sits at absolute map coordinates, so the entity origin stays at
+/// zero and only this offset moves, the func_plat motion shape.
+const ENTITY_BOB_AMPLITUDE: f32 = 48.0;
+
+/// The test entity's bob period in seconds.
+const ENTITY_BOB_PERIOD: f32 = 3.0;
 
 /// The free-fly camera. `pitch`/`yaw` are Raven view angles in degrees.
 struct Camera {
@@ -80,9 +90,11 @@ struct App {
     /// waves.
     dlights: Vec<dlight_t>,
     fogs: Vec<fog_t>,
-    entities: Vec<trRefEntity_t>,
     scratch: TrMainScratch,
     camera: Camera,
+    /// The brush submodel handle the one test entity draws (`*1`), computed
+    /// once at boot. The entity origin is the per-frame bob, not a field.
+    test_model: qhandle_t,
     /// The movement keys currently held down.
     keys: HashSet<KeyCode>,
     start: Instant,
@@ -99,6 +111,7 @@ impl App {
         land_scape: srfTerrain_t,
         dummy_assets: RenderAssets,
         eye: [f32; 3],
+        test_model: qhandle_t,
     ) -> App {
         App {
             window: None,
@@ -111,7 +124,6 @@ impl App {
             land: CmLandScape::empty(),
             dlights: Vec::new(),
             fogs: Vec::new(),
-            entities: Vec::new(),
             scratch: TrMainScratch {
                 pre_trans_ent_matrix: [0.0; 16],
             },
@@ -120,6 +132,7 @@ impl App {
                 pitch: 0.0,
                 yaw: 0.0,
             },
+            test_model,
             keys: HashSet::new(),
             start: Instant::now(),
             last_frame: Instant::now(),
@@ -208,10 +221,15 @@ impl App {
         rd
     }
 
-    /// Records this frame's scene through the trap-side `RE_RenderScene`, which
-    /// pushes a `FrameEvent::RenderScene` the executor replays.
+    /// Records this frame's scene through the trap-side traps, which push the
+    /// `FrameEvent`s the executor replays. The scene clears, adds one spinning
+    /// brush-model entity, then renders. The order matches a real cgame frame.
     fn record_scene(&mut self, refdef: &refdef_t) -> FrameData {
         let mut frame_data = FrameData { events: Vec::new() };
+
+        RE_ClearScene(&mut frame_data, &mut self.host.scene);
+        self.record_test_entity(&mut frame_data, refdef.time);
+
         RE_RenderScene(
             refdef,
             &mut frame_data,
@@ -222,6 +240,31 @@ impl App {
             &self.host.sim.light_styles,
         );
         frame_data
+    }
+
+    /// Records one test brush-model entity through the trap-side
+    /// `RE_AddRefEntityToScene`. Inline brush geometry lives at absolute map
+    /// coordinates, so the origin carries only a vertical bob and the axis
+    /// stays identity. The bob shows the per-entity transform as motion. A
+    /// missing `*1` submodel handle (a map with no inline models) skips the
+    /// entity.
+    fn record_test_entity(&mut self, frame_data: &mut FrameData, time_ms: i32) {
+        if self.test_model == 0 {
+            return;
+        }
+
+        let bob_phase = (time_ms as f32) * 0.001 / ENTITY_BOB_PERIOD * std::f32::consts::TAU;
+        let bob = ENTITY_BOB_AMPLITUDE * bob_phase.sin();
+
+        let mut ent = refEntity_t::zeroed();
+        ent.reType = refEntityType_t::RT_MODEL;
+        ent.hModel = self.test_model;
+        ent.origin = [0.0, 0.0, bob];
+        ent.oldorigin = ent.origin;
+        ent.shaderRGBA = [255, 255, 255, 255];
+        AnglesToAxis([0.0, 0.0, 0.0], ent.axis.as_mut_ptr());
+
+        RE_AddRefEntityToScene(frame_data, &self.host.assets, &mut self.host.scene, &ent);
     }
 
     /// One frame: advance the camera, record the scene, draw it.
@@ -252,7 +295,6 @@ impl App {
             land,
             dlights,
             fogs,
-            entities,
             scratch,
             reported,
             ..
@@ -313,7 +355,6 @@ impl App {
                         land: &*land,
                         dlights: dlights.as_mut_slice(),
                         fogs: fogs.as_slice(),
-                        entities: entities.as_mut_slice(),
                         scratch,
                     };
 
@@ -443,13 +484,16 @@ impl ApplicationHandler for App {
 fn report(stats: &FrameStats) {
     println!(
         "world_harness: first frame — {} images uploaded, {} world surfaces drawn \
-         ({} lightmapped, {} draw calls), {} non-world skipped, {} empty surfaces",
+         ({} lightmapped, {} draw calls), {} non-world skipped, {} empty surfaces, \
+         {} entities ({} entity surfaces drawn)",
         stats.images_uploaded,
         stats.world.surfaces_drawn,
         stats.world.lightmapped,
         stats.world.draw_calls,
         stats.world.skipped_non_world,
         stats.world.empty_surfaces,
+        stats.entities,
+        stats.world.entity_surfaces_drawn,
     );
 }
 
@@ -491,8 +535,40 @@ fn main() {
         .unwrap_or([0.0, 0.0, 0.0]);
     println!("world_harness: camera at {eye:?}");
 
+    // The first inline brush submodel (`*1`) is the one test entity. A map with
+    // no inline models leaves the handle at 0, and the harness draws no entity.
+    let test_model = host.models.handle_for_name("*1").unwrap_or(0);
+    println!("world_harness: test entity model handle *1 = {test_model}");
+
+    // Inline brush geometry sits at absolute map coordinates, so the entity
+    // shows at its compile spot. Aim the starting camera at that spot.
+    let entity_center = host
+        .assets
+        .world
+        .as_ref()
+        .and_then(|w| w.bmodels.get(1))
+        .map(|b| {
+            [
+                (b.bounds[0][0] + b.bounds[1][0]) * 0.5,
+                (b.bounds[0][1] + b.bounds[1][1]) * 0.5,
+                (b.bounds[0][2] + b.bounds[1][2]) * 0.5,
+            ]
+        });
+    if let Some(c) = entity_center {
+        println!("world_harness: test entity geometry center {c:?}");
+    }
+
     let dummy_assets = boot::empty_assets();
-    let mut app = App::new(host, land_scape, dummy_assets, eye);
+    let mut app = App::new(host, land_scape, dummy_assets, eye, test_model);
+
+    // Point the first view at the entity geometry (Raven vectoangles shape:
+    // yaw from x/y, pitch negative when the target is above the eye).
+    if let Some(c) = entity_center {
+        let d = [c[0] - eye[0], c[1] - eye[1], c[2] - eye[2]];
+        let flat = (d[0] * d[0] + d[1] * d[1]).sqrt();
+        app.camera.yaw = d[1].atan2(d[0]).to_degrees();
+        app.camera.pitch = (-d[2].atan2(flat)).to_degrees();
+    }
 
     let event_loop = EventLoop::new().expect("EventLoop::new: failed to create the event loop");
     event_loop.set_control_flow(ControlFlow::Poll);

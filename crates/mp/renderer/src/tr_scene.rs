@@ -360,6 +360,7 @@ pub fn RE_AddRefEntityToScene(
         renderfx: ent.renderfx,
         h_model: ent.hModel,
         axis: ent.axis,
+        non_normalized_axes: ent.nonNormalizedAxes != 0,
         origin: ent.origin,
         old_origin: ent.oldorigin,
         custom_shader: ent.customShader,

@@ -60,6 +60,7 @@ use mp_engine_qcommon::common::{com_error, Common, EngineHostView};
 use mp_engine_qcommon::common_fns::Com_DPrintf;
 use mp_engine_qcommon::qfiles::draw_vert_t::drawVert_t;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
+use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::q_color::S_COLOR_RED;
@@ -1626,6 +1627,7 @@ fn ref_entity_from_tr(ent: &trRefEntity_t) -> RefEntity {
         renderfx: ent.e.renderfx,
         h_model: ent.e.hModel,
         axis: ent.e.axis,
+        non_normalized_axes: ent.e.nonNormalizedAxes != 0,
         origin: ent.e.origin,
         old_origin: ent.e.oldorigin,
         custom_shader: ent.e.customShader,
@@ -1667,6 +1669,65 @@ fn write_back_lighting(ent: &mut trRefEntity_t, re: &RefEntity) {
     ent.ambientLightInt = i32::from_le_bytes(re.ambient_light_int);
     ent.directedLight = re.directed_light;
     ent.dlightBits = re.dlight_bits;
+}
+
+/// Builds a `trRefEntity_t` from the `RefEntity` scene payload a
+/// `FrameEvent::AddRefEntityToScene` recorded (`tr_scene.rs`).
+///
+/// The render side rebuilds `tr.refdef.entities` by replaying the scene events
+/// (DEC-50). This is the reverse of [`ref_entity_from_tr`]. The oracle's
+/// `backEndData->entities[n].e = *ent` whole-struct copy becomes a field walk.
+/// The fields `RefEntity` does not carry stay at their zero value. The MD3
+/// and sprite tail (`oldframe`, `backlerp`, `skinNum`, `customSkin`, `uRefEnt`,
+/// `data`, `shadowPlane`) is data no brush model reads, so its zero value is
+/// correct for the brush path. The `ghoul2` pointer stays null, matching a
+/// scene payload that carries only the `has_ghoul2` presence flag.
+///
+/// Two `.e` fields are read on every non-world surface, not only sprites, and
+/// `RefEntity` carries neither, so both stay zero here. The backend derives
+/// `tess.shaderTime` from `e.shaderTime` for every entity that is not the world
+/// entity. The `TMOD_ENTITY_TRANSLATE` texmod reads `e.shaderTexCoord`. A
+/// per-entity animation clock or an entity-translate tcMod on an inline brush
+/// model draws from the wrong offset until the payload carries both fields and
+/// the draw path applies them. The harness entity leaves `shaderTime` at 0, so
+/// the current gates pass.
+///
+/// Source: `oracle/codemp/renderer/tr_scene.cpp:249` (`entities[n].e = *ent`)
+//TODO: Port refEntity_t shaderTime + shaderTexCoord into the scene payload and draw path
+// Source: oracle/codemp/renderer/tr_backend.cpp:910-916 (shaderTime derive),
+// oracle/codemp/renderer/tr_shade.cpp:1891-1893 (shaderTexCoord read),
+// oracle/codemp/cgame/tr_types.h:155,162 (both fields)
+pub fn tr_ref_entity_from_ref_entity(re: &RefEntity) -> trRefEntity_t {
+    let mut e = refEntity_t::zeroed();
+    e.reType = re.re_type;
+    e.renderfx = re.renderfx;
+    e.hModel = re.h_model;
+    e.axis = re.axis;
+    e.nonNormalizedAxes = re.non_normalized_axes as i32;
+    e.origin = re.origin;
+    e.oldorigin = re.old_origin;
+    e.customShader = re.custom_shader;
+    e.shaderRGBA = re.shader_rgba;
+    e.radius = re.radius;
+    e.rotation = re.rotation;
+    e.frame = re.frame;
+    e.lightingOrigin = re.lighting_origin;
+    e.endTime = re.end_time;
+    e.saberLength = re.saber_length;
+    e.angles = re.angles;
+    e.modelScale = re.model_scale;
+
+    trRefEntity_t {
+        e,
+        axisLength: 0.0,
+        needDlights: re.need_dlights as i32,
+        lightingCalculated: re.lighting_calculated as i32,
+        lightDir: re.light_dir,
+        ambientLight: re.ambient_light,
+        ambientLightInt: i32::from_le_bytes(re.ambient_light_int),
+        directedLight: re.directed_light,
+        dlightBits: re.dlight_bits,
+    }
 }
 
 /// Raven `R_AddEntitySurfaces`.
@@ -2597,4 +2658,84 @@ pub fn R_RenderView<'a>(
         frame,
         gpu,
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ref-entity conversion
+
+    #[test]
+    fn tr_ref_entity_from_ref_entity_maps_every_carried_field() {
+        // given a payload with a distinct value in each carried field
+        let mut re = RefEntity::default();
+        re.re_type = refEntityType_t::RT_MODEL;
+        re.renderfx = 7;
+        re.h_model = 42;
+        re.axis = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]];
+        re.non_normalized_axes = true;
+        re.origin = [10.0, 11.0, 12.0];
+        re.old_origin = [13.0, 14.0, 15.0];
+        re.custom_shader = 5;
+        re.shader_rgba = [1, 2, 3, 4];
+        re.radius = 1.5;
+        re.rotation = 2.5;
+        re.frame = 9;
+        re.lighting_origin = [16.0, 17.0, 18.0];
+        re.end_time = 3.5;
+        re.saber_length = 4.5;
+        re.angles = [19.0, 20.0, 21.0];
+        re.model_scale = [22.0, 23.0, 24.0];
+        re.need_dlights = true;
+        re.lighting_calculated = true;
+        re.light_dir = [25.0, 26.0, 27.0];
+        re.ambient_light = [28.0, 29.0, 30.0];
+        re.ambient_light_int = [31, 32, 33, 34];
+        re.directed_light = [35.0, 36.0, 37.0];
+        re.dlight_bits = 99;
+
+        // when converted to the render-side row
+        let tr = tr_ref_entity_from_ref_entity(&re);
+
+        // then the embedded refEntity_t carries every field
+        assert_eq!(tr.e.reType, refEntityType_t::RT_MODEL);
+        assert_eq!(tr.e.renderfx, 7);
+        assert_eq!(tr.e.hModel, 42);
+        assert_eq!(tr.e.axis, re.axis);
+        assert_eq!(tr.e.nonNormalizedAxes, 1);
+        assert_eq!(tr.e.origin, [10.0, 11.0, 12.0]);
+        assert_eq!(tr.e.oldorigin, [13.0, 14.0, 15.0]);
+        assert_eq!(tr.e.customShader, 5);
+        assert_eq!(tr.e.shaderRGBA, [1, 2, 3, 4]);
+        assert_eq!(tr.e.radius, 1.5);
+        assert_eq!(tr.e.rotation, 2.5);
+        assert_eq!(tr.e.frame, 9);
+        assert_eq!(tr.e.lightingOrigin, [16.0, 17.0, 18.0]);
+        assert_eq!(tr.e.endTime, 3.5);
+        assert_eq!(tr.e.saberLength, 4.5);
+        assert_eq!(tr.e.angles, [19.0, 20.0, 21.0]);
+        assert_eq!(tr.e.modelScale, [22.0, 23.0, 24.0]);
+        assert!(tr.e.ghoul2.is_null());
+
+        // and the trRefEntity_t lighting tail carries every field
+        assert_eq!(tr.needDlights, 1);
+        assert_eq!(tr.lightingCalculated, 1);
+        assert_eq!(tr.lightDir, [25.0, 26.0, 27.0]);
+        assert_eq!(tr.ambientLight, [28.0, 29.0, 30.0]);
+        assert_eq!(tr.ambientLightInt, i32::from_le_bytes([31, 32, 33, 34]));
+        assert_eq!(tr.directedLight, [35.0, 36.0, 37.0]);
+        assert_eq!(tr.dlightBits, 99);
+    }
+
+    #[test]
+    fn tr_ref_entity_from_ref_entity_zeroes_the_uncarried_tail() {
+        // A default payload leaves the MD3/sprite tail of refEntity_t at zero.
+        let tr = tr_ref_entity_from_ref_entity(&RefEntity::default());
+        assert_eq!(tr.e.oldframe, 0);
+        assert_eq!(tr.e.backlerp, 0.0);
+        assert_eq!(tr.e.skinNum, 0);
+        assert_eq!(tr.e.shaderTime, 0.0);
+        assert_eq!(tr.axisLength, 0.0);
+    }
 }

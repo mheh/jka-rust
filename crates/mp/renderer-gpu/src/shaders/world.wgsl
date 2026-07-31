@@ -1,10 +1,13 @@
 // The R4 world uber-shader v0: a lightmapped BSP surface.
 //
 // Vertex positions arrive in world space (Raven's `drawVert_t`/`FaceVertex`
-// xyz) and are mapped to clip space by the one clip matrix in group 0. That
-// matrix is `correction * projection * modelMatrix`, where `modelMatrix` is the
-// view orientation `R_RotateForViewer` builds and `correction` remaps GL's
-// -1..1 clip z to wgpu's 0..1 (see `pipeline3d::world_clip_matrix`).
+// xyz) and are mapped to clip space by one clip matrix in group 0. Group 0
+// holds one 256-byte slot per distinct entity number the scene draws, and the
+// draw selects its slot with a dynamic offset. That matrix is
+// `correction * projection * modelMatrix`. For the world entity, `modelMatrix`
+// is the view orientation `R_RotateForViewer` builds. For a real entity (an
+// inline brush model), it is `R_RotateForEntity`'s output. `correction` remaps
+// GL's -1..1 clip z to wgpu's 0..1 (see `pipeline3d::world_clip_matrix`).
 //
 // One pass draws one shader stage. `SurfaceFlags.mode` picks the path:
 //   mode 0 (single texture): `texture(uv) * color`, the common stage pass.

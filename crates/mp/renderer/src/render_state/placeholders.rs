@@ -95,6 +95,11 @@ pub struct RefEntity {
     pub h_model: qhandle_t,
     /// `e.axis[3]` — rotation vectors.
     pub axis: [Vec3; 3],
+    /// `e.nonNormalizedAxes` — Raven: axis are not normalized, they have scale.
+    /// `R_RotateForEntity` reads it to scale the model-space view origin.
+    ///
+    /// Source: `oracle/codemp/cgame/tr_types.h:144`
+    pub non_normalized_axes: bool,
     /// `e.origin`.
     pub origin: Vec3,
     /// `e.oldorigin`.
@@ -163,6 +168,7 @@ impl Default for RefEntity {
             renderfx: 0,
             h_model: 0,
             axis: [[0.0; 3]; 3],
+            non_normalized_axes: false,
             origin: [0.0; 3],
             old_origin: [0.0; 3],
             custom_shader: 0,

@@ -29,7 +29,6 @@ use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::tr_local::dlight_s::dlight_t;
 use mp_renderer::tr_local::fog_t::fog_t;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
-use mp_renderer::tr_local::tr_ref_entity_t::trRefEntity_t;
 use mp_renderer::tr_main::TrMainScratch;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_scene::RE_RenderScene;
@@ -206,7 +205,6 @@ fn golden_world_duel1() {
     let land = CmLandScape::empty();
     let mut dlights: Vec<dlight_t> = Vec::new();
     let fogs: Vec<fog_t> = Vec::new();
-    let mut entities: Vec<trRefEntity_t> = Vec::new();
     let mut scratch = TrMainScratch {
         pre_trans_ent_matrix: [0.0; 16],
     };
@@ -255,7 +253,6 @@ fn golden_world_duel1() {
             land: &land,
             dlights: dlights.as_mut_slice(),
             fogs: fogs.as_slice(),
-            entities: entities.as_mut_slice(),
             scratch: &mut scratch,
         };
 
