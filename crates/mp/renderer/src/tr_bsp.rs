@@ -184,6 +184,14 @@ pub struct Node {
     /// are set in that loop) — leafs keep the zero-initialized value here,
     /// same as the oracle's zeroed `Hunk_Alloc` block.
     pub contents: i32,
+    /// `visframe` — Raven: "node needs to be traversed if current". The
+    /// per-node runtime visited-scratch `R_MarkLeaves` stamps with
+    /// `tr.visCount` and `R_RecursiveWorldNode` gates the walk on. Zero until
+    /// the first `R_MarkLeaves`, matching the oracle's zeroed `Hunk_Alloc`
+    /// block; grown by the `tr_world` PVS-walk wave that lands those two fns.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:919`
+    pub visframe: i32,
     /// `mins`/`maxs` — frustum-culling bounds (decision nodes and leafs
     /// alike).
     pub mins: [i32; 3],
@@ -968,6 +976,7 @@ fn R_LoadNodesAndLeafs(
             parent: None,
             children,
             contents: -1, // CONTENTS_NODE — differentiate from leafs
+            visframe: 0,
             mins,
             maxs,
             plane: Some(plane_num as usize),
@@ -1012,6 +1021,7 @@ fn R_LoadNodesAndLeafs(
             // keep the zero-initialized default (see the `Node::contents`
             // doc comment).
             contents: 0,
+            visframe: 0,
             mins,
             maxs,
             plane: None,

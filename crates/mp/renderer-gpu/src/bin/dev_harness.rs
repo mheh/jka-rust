@@ -39,6 +39,7 @@ use mp_renderer::render_state::placeholders::{AutomapWireframe, FunctionTables, 
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::shader_asset::{ShaderAsset, ShaderHandle};
 use mp_renderer::render_state::shader_stage::ShaderStage;
+use mp_renderer::tr_shader::CullType;
 use mp_renderer::tr_font::FontState;
 use mp_renderer::tr_image::{PendingUpload, TrImageState};
 use mp_renderer::tr_noise::NoiseState;
@@ -398,6 +399,7 @@ fn shader_asset(name: &str, stages: Vec<ShaderStage>) -> ShaderAsset {
         styles: [0; MAXLIGHTMAPS],
         sort: 0.0,
         sorted_index: 0,
+        cull_type: CullType::FrontSided,
         surface_flags: 0,
         content_flags: 0,
         multitexture_env: 0,

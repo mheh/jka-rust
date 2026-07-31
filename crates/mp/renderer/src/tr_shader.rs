@@ -3237,6 +3237,7 @@ pub fn GeneratePermanentShader(
         styles: state.styles,
         sort: state.sort,
         sorted_index: 0, // set below by `SortNewShader`
+        cull_type: state.cull_type,
         surface_flags: state.surface_flags,
         content_flags: state.content_flags,
         multitexture_env: state.multitexture_env,

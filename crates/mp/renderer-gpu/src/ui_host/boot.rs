@@ -479,13 +479,8 @@ pub(crate) fn empty_assets() -> RenderAssets {
 /// `*frame = FrameState { .. }`).
 fn zeroed_frame_state() -> FrameState {
     FrameState {
-        refdef: TrRefdef {
-            fov_x: 0.0,
-            fov_y: 0.0,
-            view_origin: Vec3::default(),
-            view_axis: [Vec3::default(); 3],
-        },
-        view: ViewParms {},
+        refdef: TrRefdef::default(),
+        view: ViewParms::default(),
         ori: OrientationR::default(),
         counters: BackEndCounters {},
         is_hyperspace: false,
@@ -499,6 +494,7 @@ fn zeroed_frame_state() -> FrameState {
             mp_engine_qcommon::qfiles::light_style_limits::MAX_LIGHT_STYLES],
         frame_count: 0,
         view_count: 0,
+        vis_count: 0,
         view_cluster: 0,
         skyboxportal: 0,
         drawskyboxportal: 0,

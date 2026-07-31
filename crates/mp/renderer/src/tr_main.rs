@@ -51,7 +51,7 @@ use crate::tr_public::ref_flags::RDF_NOWORLDMODEL;
 use crate::tr_scene::R_AddPolygonSurfaces;
 use crate::tr_shader::R_GetShaderByHandle;
 use crate::tr_terrain::R_AddTerrainSurfaces;
-use crate::tr_world::{R_AddBrushModelSurfaces, R_AddWorldSurfaces};
+use crate::tr_world::R_AddBrushModelSurfaces;
 
 use core::f64::consts::PI;
 
@@ -1981,7 +1981,9 @@ pub fn R_GenerateDrawSurfs<'a>(
     refdef_rdflags: i32,
     refdef_fov_x: f32,
     refdef_fov_y: f32,
-    refdef_num_dlights: i32,
+    // Held for the deferred `R_AddWorldSurfaces` call below (its only reader in
+    // this fn); threaded by `R_RenderView` alongside the rest of the bundle.
+    _refdef_num_dlights: i32,
     dlights: &mut [dlight_t],
     fogs: &[fog_t],
     distance_cull: f32,
@@ -1993,15 +1995,18 @@ pub fn R_GenerateDrawSurfs<'a>(
     models: &RenderModels,
     draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
 ) {
-    R_AddWorldSurfaces(
-        engine_view.common,
-        cvars,
-        assets,
-        frame,
-        dlights,
-        refdef_rdflags,
-        refdef_num_dlights,
-    );
+    // DEFERRED: the R_AddWorldSurfaces call. Its whole four-fn PVS chain
+    // (R_AddWorldSurfaces -> R_MarkLeaves -> R_RecursiveWorldNode ->
+    // R_AddWorldSurface) is landed and compiles, and its `ori`/`engine_view`
+    // inputs are already available here (`&view.world` is R_RotateForViewer's
+    // `tr.ori`). The one missing carrier is the world draw-surf sink
+    // `Vec<DrawSurf<WorldSurfaceRef>>` (DEC-43.3): the frontend threads only
+    // the `Vec<DrawSurf<SurfaceGeometry>>` list `R_SortDrawSurfs` consumes, so
+    // a world list here would be a sink nothing reads (porting-rules §14 —
+    // the identical block that keeps `R_AddBrushModelSurfaces`'s own loop
+    // deferred). It lands when the R4 world draw-surf wave threads that list
+    // and its backend consumer through R_RenderView (out of scope this wave).
+    // Source: oracle/codemp/renderer/tr_main.cpp:1519 (R_AddWorldSurfaces call)
 
     R_AddPolygonSurfaces(frame_data, assets, engine_view.common, draw_surfs);
 

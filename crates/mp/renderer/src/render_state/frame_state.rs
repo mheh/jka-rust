@@ -48,6 +48,13 @@ pub struct FrameState {
     ///
     /// Source: `oracle/codemp/renderer/tr_local.h:1315`
     pub view_count: i32,
+    /// `tr.visCount` — Raven: "incremented every time a new vis cluster is
+    /// entered". `R_MarkLeaves` bumps it and stamps every visible node's
+    /// `visframe` with it; `R_RecursiveWorldNode` gates the walk on the
+    /// match. Distinct from `view_count` (`tr.viewCount`, per-surface).
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1316`
+    pub vis_count: i32,
     /// `tr.viewCluster` — the PVS cluster the current view origin sits in,
     /// reset to `-1` by `RE_BeginRegistration` and by `R_MarkLeaves`'s
     /// novis path.

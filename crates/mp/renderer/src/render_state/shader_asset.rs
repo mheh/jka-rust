@@ -5,7 +5,7 @@ use mp_engine_qcommon::qfiles::draw_vert_t::MAXLIGHTMAPS;
 use crate::render_state::handle::Handle;
 use crate::render_state::placeholders::SkyParms;
 use crate::render_state::shader_stage::ShaderStage;
-use crate::tr_shader::FogParms;
+use crate::tr_shader::{CullType, FogParms};
 
 /// The owned form of Raven `shader_t` — `RenderAssets::shaders`' element
 /// (`R2-D3`), in the shape the tier-2 transition audit assigns (`name` →
@@ -33,6 +33,14 @@ pub struct ShaderAsset {
     pub sort: f32,
     /// `sortedIndex` — this shader's index in `RenderAssets::sorted_shaders`.
     pub sorted_index: i32,
+    /// `cullType` — which sides of the surface the renderer culls
+    /// (`CT_FRONT_SIDED`/`CT_BACK_SIDED`/`CT_TWO_SIDED`). Read by
+    /// `R_CullSurface`'s backface test; captured by `ParseShader`'s `cull`
+    /// keyword and copied here by `GeneratePermanentShader`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shader.cpp:2507-2530` (parse),
+    /// `oracle/codemp/renderer/tr_world.cpp:158,264` (read)
+    pub cull_type: CullType,
     /// `surfaceFlags` — if explicitlyDefined, this will have `SURF_*` flags.
     pub surface_flags: i32,
     /// `contentFlags`.

@@ -14,8 +14,11 @@
 //! `WorldAsset`, `FunctionTables` and `GlConfig` (each type's doc comment says
 //! which set is real and which wave lands the rest), and campaign #41 batch 1
 //! filled `OrientationR` outright (all four oracle fields are value arrays).
-//! `Poly`, `ViewParms`, `BackEndCounters`, `SkyParms`, `AutomapWireframe` and
-//! `GlStatePlaceholder` are untouched by wave-0 and stay empty.
+//! `ViewParms` and `TrRefdef` carry only the subset of fields the world
+//! PVS-walk wave (`R_MarkLeaves`/`R_RecursiveWorldNode`) reads or writes; the
+//! rest lands with the `tr_main`/`tr_scene` waves. `Poly`, `BackEndCounters`,
+//! `SkyParms`, `AutomapWireframe` and `GlStatePlaceholder` are untouched by
+//! wave-0 and stay empty.
 //!
 //! Two exceptions carry a real shape already, because the oracle payload they
 //! stand for is itself pointer-free and already ported at the seam: `Vec3` and
@@ -24,6 +27,7 @@
 
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
+use mp_qshared::common::mp::cgame::refdef_t::MAX_MAP_AREA_BYTES;
 use mp_qshared::common::mp::cgame::texture_compression_t::textureCompression_t;
 use mp_qshared::shared::{cplane_t, qhandle_t, vec3_t};
 
@@ -201,6 +205,35 @@ pub struct TrRefdef {
     pub view_origin: Vec3,
     /// `viewaxis[3]` — the view transformation matrix.
     pub view_axis: [Vec3; 3],
+    /// `areamask[MAX_MAP_AREA_BYTES]` — Raven: "1 bits will prevent the
+    /// associated area from rendering at all". Read by `R_MarkLeaves` per
+    /// leaf area, written by the scene wave from the refdef event; grown by
+    /// the `tr_world` PVS-walk wave that lands `R_MarkLeaves`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:574`
+    pub areamask: [u8; MAX_MAP_AREA_BYTES],
+    /// `areamaskModified` — Raven: "qtrue if areamask changed since last
+    /// scene". `R_MarkLeaves`'s remark trigger; a `bool` per the tier-2
+    /// audit's `qboolean` -> `bool` pick.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:575`
+    pub areamask_modified: bool,
+}
+
+// The refdef is zeroed by `R_Init`'s `Com_Memset(&backEnd, 0, ...)` until the
+// scene wave fills it (DEC-42.1). All fields are value types with a zero
+// meaning, so a whole-struct zero is the init.
+impl Default for TrRefdef {
+    fn default() -> TrRefdef {
+        TrRefdef {
+            fov_x: 0.0,
+            fov_y: 0.0,
+            view_origin: [0.0; 3],
+            view_axis: [[0.0; 3]; 3],
+            areamask: [0; MAX_MAP_AREA_BYTES],
+            areamask_modified: false,
+        }
+    }
 }
 
 /// The owned form of Raven `viewParms_t` — `FrameState::view`. Its
@@ -210,7 +243,46 @@ pub struct TrRefdef {
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:629-644`
 #[derive(Clone)]
-pub struct ViewParms {}
+pub struct ViewParms {
+    /// `pvsOrigin` — Raven: "may be different than or.origin for portals".
+    /// `R_MarkLeaves` finds the current view cluster from this point. Grown
+    /// by the `tr_world` PVS-walk wave that lands `R_MarkLeaves`; the rest of
+    /// `viewParms_t` lands with the `tr_main` wave.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:632`
+    pub pvs_origin: Vec3,
+    /// `frustum[4]` — the four view-frustum clip planes `R_RecursiveWorldNode`
+    /// tests each BSP node's bounding box against (`FRUSTUM_PLANES` = 4 MP).
+    /// Set up by the `tr_main` wave's `R_SetupFrustum`; read here.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:642`
+    pub frustum: [cplane_t; 4],
+    /// `visBounds[2]` — the accumulated bounding box of every visible leaf,
+    /// grown by `R_RecursiveWorldNode` and cleared by `R_AddWorldSurfaces`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:643`
+    pub vis_bounds: [Vec3; 2],
+}
+
+// Zeroed by `R_Init` until the `tr_main` wave's per-view setup fills it. The
+// frustum planes zero out too (`cplane_t` has no `Default`, so the zero plane
+// is written explicitly); `R_SetupFrustum` overwrites them before the walk.
+impl Default for ViewParms {
+    fn default() -> ViewParms {
+        let zero_plane = cplane_t {
+            normal: [0.0; 3],
+            dist: 0.0,
+            r#type: 0,
+            signbits: 0,
+            pad: [0, 0],
+        };
+        ViewParms {
+            pvs_origin: [0.0; 3],
+            frustum: [zero_plane; 4],
+            vis_bounds: [[0.0; 3]; 2],
+        }
+    }
+}
 
 /// The owned form of Raven `orientationr_t` — `FrameState::ori` (`R2-D7`(b):
 /// Rust spells it `ori` on both modes). All four oracle fields are plain

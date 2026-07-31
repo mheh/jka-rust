@@ -1633,13 +1633,8 @@ pub fn R_Init(
     // Com_Memset(&backEnd, 0, sizeof(backEnd)) — full rebuild; see doc
     // comment above (nothing else in this fn writes into `frame`).
     *frame = FrameState {
-        refdef: TrRefdef {
-            fov_x: 0.0,
-            fov_y: 0.0,
-            view_origin: [0.0; 3],
-            view_axis: [[0.0; 3]; 3],
-        },
-        view: ViewParms {},
+        refdef: TrRefdef::default(),
+        view: ViewParms::default(),
         ori: OrientationR::default(),
         counters: BackEndCounters {},
         is_hyperspace: false,
@@ -1652,6 +1647,7 @@ pub fn R_Init(
         scene_light_styles: [[0; 4]; MAX_LIGHT_STYLES],
         frame_count: 0,
         view_count: 0,
+        vis_count: 0,
         view_cluster: 0,
         skyboxportal: 0,
         drawskyboxportal: 0,

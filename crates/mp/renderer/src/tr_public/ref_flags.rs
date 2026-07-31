@@ -23,6 +23,12 @@ pub const RF_GROW: i32 = 0x10000;
 /// Source: `oracle/codemp/cgame/tr_types.h:57`
 pub const RDF_NOWORLDMODEL: i32 = 1;
 
+/// Raven `RDF_NOFOG` — Raven: "no global fog in this scene (but still brush
+/// fog)".
+///
+/// Source: `oracle/codemp/cgame/tr_types.h:64`
+pub const RDF_NOFOG: i32 = 64;
+
 /// Raven `RDF_SKYBOXPORTAL` — marks a scene as being a 'portal sky'.
 ///
 /// Source: `oracle/codemp/cgame/tr_types.h:60`
