@@ -43,7 +43,7 @@ use crate::tr_local::orientationr_t::orientationr_t;
 use crate::tr_shader::CullType;
 use crate::tr_main::{
     DrawSurf, R_AddDrawSurf, R_CullLocalBox, R_CullLocalPointAndRadius, R_CullPointAndRadius,
-    WorldSurfaceRef, CULL_CLIP, CULL_IN, CULL_OUT,
+    SurfaceGeometry, WorldSurfaceRef, CULL_CLIP, CULL_IN, CULL_OUT,
 };
 use crate::tr_model::render_models::RenderModels;
 use crate::tr_public::ref_flags::{RDF_NOFOG, RDF_NOWORLDMODEL};
@@ -1404,7 +1404,7 @@ const QSORT_ENTITYNUM_SHIFT: u32 = 7;
 ///
 /// Source: `oracle/codemp/renderer/tr_world.cpp:408-555`
 #[allow(clippy::too_many_arguments)]
-pub fn R_AddWorldSurface(
+pub fn R_AddWorldSurface<'a>(
     surf: &mut Surface,
     surf_index: u32,
     mut dlight_bits: i32,
@@ -1430,7 +1430,7 @@ pub fn R_AddWorldSurface(
     dlights: &[dlight_t],
     dlight_surfaces_culled: &mut u32,
     dlight_surfaces: &mut u32,
-    draw_surfs: &mut Vec<DrawSurf<WorldSurfaceRef>>,
+    draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
 ) {
     if !no_view_count {
         if surf.view_count == view_count {
@@ -1485,7 +1485,7 @@ pub fn R_AddWorldSurface(
     let fog_index = surf.fog_index;
     let shifted_entity_num = current_entity_num << QSORT_ENTITYNUM_SHIFT;
     R_AddDrawSurf(
-        WorldSurfaceRef::of(surf, surf_index),
+        SurfaceGeometry::World(WorldSurfaceRef::of(surf, surf_index)),
         shader.sorted_index,
         shifted_entity_num,
         rdf_nofog,
@@ -1570,26 +1570,20 @@ pub fn R_InitializeWireframeAutomap(
 /// surface's owned `dlight_bits` over the `[first, first + num)` range into
 /// `WorldAsset::surfaces` (no `unsafe` — the interior-safety law).
 ///
-/// DEFERRED: the closing `for (i = 0; i < bmodel->numSurfaces; i++)
-/// R_AddWorldSurface(bmodel->firstSurface + i, tr.currentEntity->dlightBits,
-/// qtrue)` loop. The #51 shader bridge this note used to name as the sole
-/// blocker is CLOSED: `ShaderAsset` now carries `cull_type` (copied from the
-/// parser by `GeneratePermanentShader`) and `sorted_index` (derived by
-/// `SortNewShader`), and `R_CullSurface`/`R_AddWorldSurface` read the owned
-/// `&ShaderAsset` the caller resolves from each surface's `ShaderHandle`. A
-/// second, distinct blocker keeps the loop deferred: `R_AddWorldSurface`
-/// appends `DrawSurf<WorldSurfaceRef>` to a world draw-surf list and tallies
-/// the eight `tr.pc.c_*` cull/dlight counters, but neither carrier is live
-/// yet. The world draw-surf pipeline (`R_RecursiveWorldNode` -> the sort ->
-/// the backend consume) is unbuilt (`R_RecursiveWorldNode` is a loud stub
-/// below), so no `Vec<DrawSurf<WorldSurfaceRef>>` reaches this fn, and
-/// `BackEndCounters` is still the empty R4 placeholder. Threading a throwaway
-/// list here would build a draw-surf sink nothing consumes (porting-rules §14,
-/// never a silent fake); the loop lands with the R4 world draw-surf wave.
-/// Source: `oracle/codemp/renderer/tr_world.cpp:608-610` (the deferred loop)
+/// The closing `for (i = 0; i < bmodel->numSurfaces; i++) R_AddWorldSurface(
+/// bmodel->firstSurface + i, tr.currentEntity->dlightBits, qtrue)` loop is
+/// live: it hands each submodel surface to `R_AddWorldSurface`, which appends
+/// it through the `SurfaceGeometry::World` arm of the one frontend draw-surf
+/// list (DEC-43.3). `tr.currentEntity->dlightBits` is `frame.current_entity.
+/// dlight_bits`, the mask `R_DlightBmodel` just wrote; `noViewCount` is
+/// `qtrue`. The eight `tr.pc.c_*` cull/dlight counters stay UNMAPPED
+/// `frontEndCounters_t` scratch, owned here and threaded down exactly as
+/// `R_AddWorldSurfaces` owns them.
+/// Source: `oracle/codemp/renderer/tr_world.cpp:608-610`
 ///
 /// Source: `oracle/codemp/renderer/tr_world.cpp:570-611`
-pub fn R_AddBrushModelSurfaces(
+#[allow(clippy::too_many_arguments)]
+pub fn R_AddBrushModelSurfaces<'a>(
     ent: &mut RefEntity,
     models: &RenderModels,
     r_nocull_integer: i32,
@@ -1597,10 +1591,12 @@ pub fn R_AddBrushModelSurfaces(
     frustum: &[cplane_t; 4],
     view: &mut EngineHostView<'_>,
     cvars: &RendererCvars,
-    assets: &RenderAssets,
+    assets: &mut RenderAssets,
     frame: &mut FrameState,
     refdef_rdflags: i32,
+    current_entity_num: i32,
     dlights: &mut [dlight_t],
+    draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
 ) {
     let p_model = models.get_model(ent.h_model);
 
@@ -1659,10 +1655,75 @@ pub fn R_AddBrushModelSurfaces(
     };
     R_DlightBmodel(&mut dlight_bmodel, false, dlights, ori, frame);
 
-    // DEFERRED: bmodel->numSurfaces R_AddWorldSurface loop — see this fn's
-    // own doc comment above (the #51 shader bridge is closed; the loop now
-    // waits on the R4 world draw-surf list and BackEndCounters homes).
-    // Source: oracle/codemp/renderer/tr_world.cpp:608-610
+    // `tr.currentEntity->dlightBits` — the mask `R_DlightBmodel` just wrote,
+    // passed to every submodel surface below.
+    let entity_dlight_bits = frame
+        .current_entity
+        .as_ref()
+        .expect("R_AddBrushModelSurfaces: tr.currentEntity not set")
+        .dlight_bits;
+    let view_count = frame.view_count;
+    let rdf_nofog = refdef_rdflags & RDF_NOFOG != 0;
+
+    let r_nocurves_integer = view.common.cvar(cvars.r_nocurves).integer;
+    let r_face_plane_cull_integer = view.common.cvar(cvars.r_facePlaneCull).integer;
+    let r_cull_roof_faces_integer = view.common.cvar(cvars.r_cullRoofFaces).integer;
+    let r_roof_cull_ceil_dist_value = view.common.cvar(cvars.r_roofCullCeilDist).value;
+
+    // `frontEndCounters_t` scratch — UNMAPPED across the renderer, owned here
+    // and threaded down (the `R_AddWorldSurfaces` precedent).
+    let mut c_sphere_cull_patch_out = 0i32;
+    let mut c_sphere_cull_patch_clip = 0i32;
+    let mut c_sphere_cull_patch_in = 0i32;
+    let mut c_box_cull_patch_out = 0i32;
+    let mut c_box_cull_patch_in = 0i32;
+    let mut c_box_cull_patch_clip = 0i32;
+    let mut dlight_surfaces_culled = 0u32;
+    let mut dlight_surfaces = 0u32;
+
+    // Borrow the shader registry and the world surfaces disjointly, exactly as
+    // `R_RecursiveWorldNode`'s own leaf loop does.
+    let shaders = &assets.shaders;
+    let world = assets
+        .world
+        .as_mut()
+        .expect("R_AddBrushModelSurfaces needs the loaded world");
+
+    for i in 0..num {
+        let surf_index = (first + i) as u32;
+        let shader_handle = world.surfaces[first + i].shader;
+        let shader = shaders
+            .get(shader_handle)
+            .expect("R_AddWorldSurface reached a surface with an unresolved shader handle");
+        R_AddWorldSurface(
+            &mut world.surfaces[first + i],
+            surf_index,
+            entity_dlight_bits,
+            true,
+            view_count,
+            shader,
+            current_entity_num,
+            r_nocull_integer,
+            r_nocurves_integer,
+            r_face_plane_cull_integer,
+            r_cull_roof_faces_integer,
+            r_roof_cull_ceil_dist_value,
+            rdf_nofog,
+            view,
+            ori,
+            frustum,
+            &mut c_sphere_cull_patch_out,
+            &mut c_sphere_cull_patch_clip,
+            &mut c_sphere_cull_patch_in,
+            &mut c_box_cull_patch_out,
+            &mut c_box_cull_patch_in,
+            &mut c_box_cull_patch_clip,
+            dlights,
+            &mut dlight_surfaces_culled,
+            &mut dlight_surfaces,
+            draw_surfs,
+        );
+    }
 }
 
 /// Raven `R_RecursiveWorldNode` — walk the BSP tree from a node, frustum-cull
@@ -1702,7 +1763,7 @@ pub fn R_AddBrushModelSurfaces(
 ///
 /// Source: `oracle/codemp/renderer/tr_world.cpp:1503-1663`
 #[allow(clippy::too_many_arguments)]
-pub fn R_RecursiveWorldNode(
+pub fn R_RecursiveWorldNode<'a>(
     node_index: usize,
     plane_bits: i32,
     dlight_bits: i32,
@@ -1732,7 +1793,7 @@ pub fn R_RecursiveWorldNode(
     c_box_cull_patch_clip: &mut i32,
     dlight_surfaces_culled: &mut u32,
     dlight_surfaces: &mut u32,
-    draw_surfs: &mut Vec<DrawSurf<WorldSurfaceRef>>,
+    draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
 ) {
     // The frustum planes are constant across the walk; snapshot once so the
     // leaf branch's `R_AddWorldSurface` call borrows a local, not `frame`.
@@ -1956,11 +2017,11 @@ pub fn R_RecursiveWorldNode(
 /// current call graph reads it). Escalate a `FrameState` field-merge if a
 /// later wave needs either value read back outside this call.
 ///
-/// PORT-NOTE: `draw_surfs` (`Vec<DrawSurf<WorldSurfaceRef>>`), `view`
-/// (`EngineHostView`, for `R_CullSurface`'s roof-cull `CM_BoxTrace`) and `ori`
-/// (`tr.ori`) are threaded in from this fn's own future caller
-/// (`R_GenerateDrawSurfs`/`R_RenderView`, the R4 world draw-surf wave, out of
-/// scope here). The eight `tr.pc.c_*` `frontEndCounters_t` counters are owned
+/// PORT-NOTE: `draw_surfs` (the one `Vec<DrawSurf<SurfaceGeometry>>` the
+/// frontend threads end to end, world surfaces landing through the
+/// `SurfaceGeometry::World` arm), `view` (`EngineHostView`, for
+/// `R_CullSurface`'s roof-cull `CM_BoxTrace`) and `ori` (`tr.ori`) are
+/// threaded in from this fn's caller (`R_GenerateDrawSurfs`). The eight `tr.pc.c_*` `frontEndCounters_t` counters are owned
 /// as scratch here and threaded down — that type stays UNMAPPED across the
 /// renderer, and its only reader is the deferred R4 `R_PerformanceCounters`
 /// (see `R_RecursiveWorldNode`'s own note).
@@ -1986,7 +2047,7 @@ pub fn R_RecursiveWorldNode(
 ///
 /// Source: `oracle/codemp/renderer/tr_world.cpp:1934-1958`
 #[allow(clippy::too_many_arguments)]
-pub fn R_AddWorldSurfaces(
+pub fn R_AddWorldSurfaces<'a>(
     view: &mut EngineHostView<'_>,
     cvars: &RendererCvars,
     assets: &mut RenderAssets,
@@ -1995,7 +2056,7 @@ pub fn R_AddWorldSurfaces(
     dlights: &[dlight_t],
     refdef_rdflags: i32,
     refdef_num_dlights: i32,
-    draw_surfs: &mut Vec<DrawSurf<WorldSurfaceRef>>,
+    draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
 ) {
     if view.common.cvar(cvars.r_drawworld).integer == 0 {
         return;

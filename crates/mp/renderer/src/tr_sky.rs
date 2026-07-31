@@ -583,6 +583,16 @@ pub fn FillCloudBox(_shader: ShaderHandle, stage: i32, view: &viewParms_t, sky: 
 pub fn R_InitSkyTexCoords(height_cloud: f32, view: &mut viewParms_t, sky: &mut SkyState) {
     let radius_world: f32 = 4096.0;
 
+    // Raven's `s_cloudTexP[6][SKY_SUBDIVISIONS+1][SKY_SUBDIVISIONS+1]` and
+    // `s_cloudTexCoords[6][...][...]` are fixed-size static arrays; the port
+    // holds them as jagged `Vec`s (`SkyState`), so this writer sizes them to
+    // those dimensions before it indexes. The loop below fills every element,
+    // so a fresh zeroed allocation each call matches the static array exactly.
+    // Source: `oracle/codemp/renderer/tr_sky.cpp:39-40`
+    let dim = (SKY_SUBDIVISIONS + 1) as usize;
+    sky.cloud_tex_p = vec![vec![vec![0.0f32; dim]; dim]; 6];
+    sky.cloud_tex_coords = vec![vec![vec![[0.0f32; 2]; dim]; dim]; 6];
+
     // init zfar so MakeSkyVec works even though
     // a world hasn't been bounded
     view.zFar = 1024.0;

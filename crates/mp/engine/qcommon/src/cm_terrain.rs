@@ -309,6 +309,37 @@ pub struct CmLandScape {
 }
 
 impl CmLandScape {
+    /// A rest-state landscape: every field zero, both `Vec`s empty, and no
+    /// patches. A map with no terrain brush has no `CmLandScape`, so a caller
+    /// that must still pass one (the world-render feasibility harness) uses
+    /// this. Nothing reads it while the terrain surface pointer is null.
+    pub fn empty() -> Self {
+        CmLandScape {
+            height_map: Vec::new(),
+            flatten_map: Vec::new(),
+            width: 0,
+            height: 0,
+            terxels: 0,
+            terxel_size: [0.0; 3],
+            bounds: [[0.0; 3]; 2],
+            size: [0.0; 3],
+            patch_size: [0.0; 3],
+            patch_scalar_size: 0.0,
+            block_width: 0,
+            block_height: 0,
+            patches: Vec::new(),
+            patch_brush_data: Vec::new(),
+            has_physics: false,
+            base_water_height: 0,
+            water_height: 0.0,
+            water_contents: 0,
+            water_surface_flags: 0,
+            holdrand: 0,
+            height_details: [CmHeightDetails::default(); HEIGHT_RESOLUTION],
+            coords: Vec::new(),
+        }
+    }
+
     /// `CCMLandScape::CCMLandScape` — the LIVE construction under
     /// `DEDICATED`: info-string config parse (`heightMap`/`numPatches`/
     /// `terxels`/`physics`/`seed`/`minx..maxz`), bounds/size/block/patch-size

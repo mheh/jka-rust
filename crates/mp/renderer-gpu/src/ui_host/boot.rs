@@ -16,6 +16,7 @@ use core::ptr::null_mut;
 use mp_engine_botlib::l_precomp_fns::PC_SetBaseFolder;
 use mp_engine_core::Engine;
 use mp_engine_qcommon::cmd_common::{Cbuf_Init, Cmd_Init};
+use mp_engine_qcommon::cm_terrain::CmLandScape;
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
@@ -46,10 +47,21 @@ use mp_renderer::render_state::render_assets_sim::RenderAssetsSim;
 use mp_renderer::render_state::renderer_cvars::RendererCvars;
 use mp_renderer::render_state::shader_asset::{ShaderAsset, ShaderHandle};
 use mp_renderer::render_state::skin_asset::SkinAsset;
+use mp_renderer::tr_bsp::RE_LoadWorldMap;
 use mp_renderer::tr_font::FontState;
 use mp_renderer::tr_image::TrImageState;
 use mp_renderer::tr_init::R_Init;
+use mp_renderer::tr_local::dlight_s::dlight_t;
+use mp_renderer::tr_local::fog_t::fog_t;
+use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
+use mp_renderer::tr_local::tr_ref_entity_t::trRefEntity_t;
+use mp_renderer::tr_local::tr_refdef_t::trRefdef_t;
 use mp_renderer::tr_local::view_parms_t::viewParms_t;
+use mp_renderer::tr_main::{
+    DrawSurf, R_RenderView, R_RotateForViewer, R_SetupFrustum, SurfaceGeometry, TrMainScratch,
+    WorldSurfaceRef,
+};
+use mp_renderer::tr_terrain::R_TerrainInit;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_noise::NoiseState;
 use mp_renderer::tr_scene::SceneState;
@@ -517,6 +529,265 @@ fn zeroed_frame_state() -> FrameState {
 fn zeroed_view_parms() -> viewParms_t {
     // SAFETY: POD `#[repr(C)]`; see the doc comment.
     unsafe { core::mem::zeroed() }
+}
+
+/// What the world-render feasibility spike observed for one map load and one
+/// `R_RenderView`.
+pub struct WorldSpikeReport {
+    /// The map loaded and rendered without a panic.
+    pub loaded: bool,
+    /// The eye point the refdef was built at (a spawn origin, z-bumped to eye
+    /// height).
+    pub eye: [f32; 3],
+    /// Every draw surface the sorted list holds after `R_RenderView`.
+    pub total_draw_surfs: usize,
+    /// `SurfaceGeometry::World` entries, then their world-surface kind split.
+    pub world: usize,
+    pub world_face: usize,
+    pub world_grid: usize,
+    pub world_triangles: usize,
+    pub world_flare: usize,
+    pub world_skip: usize,
+    /// Non-world arms.
+    pub face: usize,
+    pub triangles: usize,
+    pub poly: usize,
+    pub other: usize,
+    /// World leaves the walk left marked in this view (an approximation of the
+    /// oracle's `c_leafs`, which `R_AddWorldSurfaces` owns as private scratch).
+    pub visible_leaves: usize,
+}
+
+/// Loads a BSP through `RE_LoadWorldMap`, builds a refdef at a spawn point, and
+/// drives one `R_RenderView` — the R4 world feasibility spike.
+///
+/// `R_RenderView` runs `R_RotateForViewer`/`R_SetupFrustum` against the ABI
+/// `viewParms_t`, but the world walk (`R_MarkLeaves`/`R_RecursiveWorldNode`)
+/// reads `frame.view` — the `ViewParms` placeholder that the tier-2 pass has
+/// not yet unified with `viewParms_t` (#51). Nothing bridges the two, so this
+/// harness copies the computed frustum and PVS origin across before the call.
+pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
+    // ---- load the BSP --------------------------------------------------
+    {
+        let UiHost {
+            engine,
+            models,
+            cvars,
+            assets,
+            sim,
+            img_state,
+            gpu_res,
+            frame,
+            qs,
+            sky_view,
+            sky,
+            world_effects,
+            ..
+        } = &mut *host;
+        let models_ptr: *mut RenderModels = &mut *models;
+        let Engine { common, cm, sv, .. } = &mut **engine;
+        let sv_ptr: *mut () = sv as *mut Server as *mut ();
+        let mut view = host_view(common, cm, sv_ptr, models_ptr);
+        RE_LoadWorldMap(
+            qs,
+            frame,
+            assets,
+            &mut view,
+            cvars,
+            sim,
+            models,
+            img_state,
+            gpu_res,
+            sky_view,
+            sky,
+            world_effects,
+            map,
+        );
+    }
+
+    let loaded = host.assets.world.is_some();
+    println!("world_spike: RE_LoadWorldMap(\"{map}\") -> {}", if loaded { "loaded" } else { "NOT LOADED" });
+
+    // A spawn origin from the stored entity lump, bumped to eye height.
+    let eye = host
+        .assets
+        .world
+        .as_ref()
+        .and_then(|w| find_spawn_origin(&w.entity_string))
+        .map(|o| [o[0], o[1], o[2] + 40.0])
+        .unwrap_or([0.0, 0.0, 0.0]);
+    println!("world_spike: eye at {:?}", eye);
+
+    let mut r = WorldSpikeReport {
+        loaded,
+        eye,
+        total_draw_surfs: 0,
+        world: 0,
+        world_face: 0,
+        world_grid: 0,
+        world_triangles: 0,
+        world_flare: 0,
+        world_skip: 0,
+        face: 0,
+        triangles: 0,
+        poly: 0,
+        other: 0,
+        visible_leaves: 0,
+    };
+
+    // ---- one R_RenderView ----------------------------------------------
+    // `draw_surfs` and `frame_data` share a lifetime (the `SurfaceGeometry`
+    // polygon arm can borrow the event stream), so the tally runs inside this
+    // block. The `WorldSpikeReport` it fills owns no borrow.
+    {
+        let mut draw_surfs: Vec<DrawSurf<SurfaceGeometry>> = Vec::new();
+        let frame_data = FrameData { events: Vec::new() };
+        let mut entities: Vec<trRefEntity_t> = Vec::new();
+        let mut dlights: Vec<dlight_t> = Vec::new();
+        let fogs: Vec<fog_t> = Vec::new();
+        let mut scratch = TrMainScratch {
+            pre_trans_ent_matrix: [0.0; 16],
+        };
+        // SAFETY: `srfTerrain_t`/`trRefdef_t` are frozen `#[repr(C)]` POD (scalars,
+        // fixed arrays and raw pointers whose all-zero value is null). `R_TerrainInit`
+        // below overwrites `land_scape` (both its fields) with a null-landscape
+        // terrain surface, which makes `R_AddTerrainSurfaces` return early, so
+        // neither the terrain surface nor `land` is read past the cvar check.
+        let mut land_scape: srfTerrain_t = unsafe { core::mem::zeroed() };
+        let refdef: trRefdef_t = unsafe { core::mem::zeroed() };
+        let land = CmLandScape::empty();
+
+        let mut parms = zeroed_view_parms();
+        parms.viewportWidth = SCREEN_WIDTH as c_int;
+        parms.viewportHeight = SCREEN_HEIGHT as c_int;
+        parms.fovX = 90.0;
+        parms.fovY = 90.0 * SCREEN_HEIGHT / SCREEN_WIDTH;
+        parms.ori.origin = eye;
+        parms.ori.axis = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+        parms.pvsOrigin = eye;
+
+        // Bridge the ABI view into the walk's `frame.view` carrier (see this
+        // fn's doc comment): `R_RotateForViewer`/`R_SetupFrustum` fill `parms`,
+        // and the frustum/PVS origin cross to `frame.view` here.
+        R_RotateForViewer(&mut parms);
+        R_SetupFrustum(&mut parms);
+        let fov_x = parms.fovX;
+        let fov_y = parms.fovY;
+
+        let UiHost {
+            engine,
+            models,
+            cvars,
+            assets,
+            gpu_res,
+            frame,
+            ..
+        } = &mut *host;
+        frame.view.pvs_origin = eye;
+        frame.view.frustum = parms.frustum;
+        // Force `R_MarkLeaves` to re-mark this frame regardless of the leftover
+        // view cluster.
+        frame.refdef.areamask_modified = true;
+
+        let models_ptr: *mut RenderModels = &mut *models;
+        let Engine { common, cm, sv, .. } = &mut **engine;
+        let sv_ptr: *mut () = sv as *mut Server as *mut ();
+        let mut engine_view = host_view(common, cm, sv_ptr, models_ptr);
+
+        // Register the terrain cvars (`r_drawTerrain`, siblings) and init the
+        // null-landscape terrain surface. `R_Init`'s ui subset skips this, so
+        // the harness runs it before the first `R_AddTerrainSurfaces` read.
+        R_TerrainInit(&mut engine_view, cvars, assets, &mut land_scape);
+        let distance_cull = assets.distance_cull;
+
+        let mut view = zeroed_view_parms();
+        R_RenderView(
+            &parms,
+            0,
+            0,
+            &mut view,
+            &mut engine_view,
+            assets,
+            cvars,
+            frame,
+            gpu_res,
+            &frame_data,
+            &refdef,
+            0,
+            fov_x,
+            fov_y,
+            0,
+            &mut dlights,
+            &fogs,
+            distance_cull,
+            &land_scape,
+            &land,
+            0,
+            &mut entities,
+            &mut scratch,
+            models,
+            &mut draw_surfs,
+        );
+
+        // ---- tally (inside the block, while `frame_data` lives) --------
+        r.total_draw_surfs = draw_surfs.len();
+        for ds in &draw_surfs {
+            match ds.surface {
+                SurfaceGeometry::World(w) => {
+                    r.world += 1;
+                    match w {
+                        WorldSurfaceRef::Face(_) => r.world_face += 1,
+                        WorldSurfaceRef::Grid(_) => r.world_grid += 1,
+                        WorldSurfaceRef::Triangles(_) => r.world_triangles += 1,
+                        WorldSurfaceRef::Flare(_) => r.world_flare += 1,
+                        WorldSurfaceRef::Skip(_) => r.world_skip += 1,
+                    }
+                }
+                SurfaceGeometry::Face(_) => r.face += 1,
+                SurfaceGeometry::Triangles { .. } => r.triangles += 1,
+                SurfaceGeometry::Poly { .. } => r.poly += 1,
+                SurfaceGeometry::Other => r.other += 1,
+            }
+        }
+    }
+
+    if let Some(w) = host.assets.world.as_ref() {
+        let vis_count = host.frame.vis_count;
+        r.visible_leaves = w
+            .nodes
+            .iter()
+            .filter(|n| n.contents != -1 && n.visframe == vis_count)
+            .count();
+    }
+
+    r
+}
+
+/// Scans the BSP entity lump for a spawn origin. Prefers
+/// `info_player_deathmatch`, falls back to `info_player_start`. A plain token
+/// scan is enough for the harness.
+fn find_spawn_origin(entities: &str) -> Option<[f32; 3]> {
+    for want in ["info_player_deathmatch", "info_player_start"] {
+        for block in entities.split('{') {
+            if !block.contains(want) {
+                continue;
+            }
+            let Some(oi) = block.find("\"origin\"") else {
+                continue;
+            };
+            let rest = &block[oi + "\"origin\"".len()..];
+            let start = rest.find('"')? + 1;
+            let end = rest[start..].find('"')? + start;
+            let vals: Vec<f32> = rest[start..end]
+                .split_whitespace()
+                .filter_map(|s| s.parse().ok())
+                .collect();
+            if vals.len() == 3 {
+                return Some([vals[0], vals[1], vals[2]]);
+            }
+        }
+    }
+    None
 }
 
 /// A `SkyState` at rest (`tr_sky`'s file-scope statics, zeroed).

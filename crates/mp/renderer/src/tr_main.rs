@@ -51,7 +51,7 @@ use crate::tr_public::ref_flags::RDF_NOWORLDMODEL;
 use crate::tr_scene::R_AddPolygonSurfaces;
 use crate::tr_shader::R_GetShaderByHandle;
 use crate::tr_terrain::R_AddTerrainSurfaces;
-use crate::tr_world::R_AddBrushModelSurfaces;
+use crate::tr_world::{R_AddBrushModelSurfaces, R_AddWorldSurfaces};
 
 use core::f64::consts::PI;
 
@@ -202,6 +202,11 @@ pub enum SurfaceGeometry<'a> {
     Poly {
         verts: &'a [polyVert_t],
     },
+    /// A world (BSP) surface, carried as a `Copy` [`WorldSurfaceRef`] handle
+    /// into `WorldAsset::surfaces` (DEC-43.3). The frontend threads one
+    /// `Vec<DrawSurf<SurfaceGeometry>>` end to end, so the world walk appends
+    /// through this arm rather than a second draw-surf list.
+    World(WorldSurfaceRef),
     Other,
 }
 
@@ -692,6 +697,14 @@ pub fn R_PlaneForSurface(surf_type: Option<&SurfaceGeometry>) -> cplane_t {
                 pad: [0, 0],
             }
         }
+        // A world surface carries only its `WorldSurfaceRef` index handle, not
+        // the geometry `R_PlaneForSurface` needs to re-derive the plane. The
+        // re-fetch from `WorldAsset::surfaces` (the oracle reads `surf->data`
+        // directly) lands with the R4 world-draw wave that gives the mirror
+        // path world access; until then a world portal falls back to the
+        // default plane the way `SF_BAD`/`SF_SKIP` already do here.
+        // Source: oracle/codemp/renderer/tr_main.cpp:648-671
+        SurfaceGeometry::World(_) => default_plane(),
         SurfaceGeometry::Other => default_plane(),
     }
 }
@@ -1720,7 +1733,7 @@ pub fn R_AddEntitySurfaces<'a>(
     view: &viewParms_t,
     scratch: &mut TrMainScratch,
     engine_view: &mut EngineHostView<'_>,
-    assets: &RenderAssets,
+    assets: &mut RenderAssets,
     models: &RenderModels,
     cvars: &RendererCvars,
     frame: &mut FrameState,
@@ -1844,7 +1857,9 @@ pub fn R_AddEntitySurfaces<'a>(
                             assets,
                             frame,
                             refdef_rdflags,
+                            current_entity_num as i32,
                             dlights,
+                            draw_surfs,
                         );
                         let current_entity = frame
                             .current_entity
@@ -1981,9 +1996,7 @@ pub fn R_GenerateDrawSurfs<'a>(
     refdef_rdflags: i32,
     refdef_fov_x: f32,
     refdef_fov_y: f32,
-    // Held for the deferred `R_AddWorldSurfaces` call below (its only reader in
-    // this fn); threaded by `R_RenderView` alongside the rest of the bundle.
-    _refdef_num_dlights: i32,
+    refdef_num_dlights: i32,
     dlights: &mut [dlight_t],
     fogs: &[fog_t],
     distance_cull: f32,
@@ -1995,18 +2008,19 @@ pub fn R_GenerateDrawSurfs<'a>(
     models: &RenderModels,
     draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
 ) {
-    // DEFERRED: the R_AddWorldSurfaces call. Its whole four-fn PVS chain
-    // (R_AddWorldSurfaces -> R_MarkLeaves -> R_RecursiveWorldNode ->
-    // R_AddWorldSurface) is landed and compiles, and its `ori`/`engine_view`
-    // inputs are already available here (`&view.world` is R_RotateForViewer's
-    // `tr.ori`). The one missing carrier is the world draw-surf sink
-    // `Vec<DrawSurf<WorldSurfaceRef>>` (DEC-43.3): the frontend threads only
-    // the `Vec<DrawSurf<SurfaceGeometry>>` list `R_SortDrawSurfs` consumes, so
-    // a world list here would be a sink nothing reads (porting-rules §14 —
-    // the identical block that keeps `R_AddBrushModelSurfaces`'s own loop
-    // deferred). It lands when the R4 world draw-surf wave threads that list
-    // and its backend consumer through R_RenderView (out of scope this wave).
-    // Source: oracle/codemp/renderer/tr_main.cpp:1519 (R_AddWorldSurfaces call)
+    // `&view.world` is `R_RotateForViewer`'s `tr.ori`; world surfaces append
+    // through the `SurfaceGeometry::World` arm of the one draw-surf list.
+    R_AddWorldSurfaces(
+        engine_view,
+        cvars,
+        assets,
+        frame,
+        &view.world,
+        dlights,
+        refdef_rdflags,
+        refdef_num_dlights,
+        draw_surfs,
+    );
 
     R_AddPolygonSurfaces(frame_data, assets, engine_view.common, draw_surfs);
 
