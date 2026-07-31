@@ -66,9 +66,11 @@ struct App {
     executor: Option<FrameExecutor>,
     host: UiHost,
     /// The 2D command surface reads these, and this harness draws no 2D, so
-    /// they stand in for the unused `assets`/`image_assets` parameters. The
-    /// world's own registry (`host.assets`) is borrowed by the `WorldFrame`, so
-    /// it cannot also fill those parameters.
+    /// they stand in for the `assets`/`image_assets` parameters. The world's
+    /// own registry (`host.assets`) is borrowed by the `WorldFrame`, so it
+    /// cannot also fill those parameters. The harness therefore drains the
+    /// staged image uploads against the real registry itself, before the
+    /// split borrow (see `draw_world_frame`).
     dummy_assets: RenderAssets,
     /// The null-landscape terrain surface, initialized once and reused every
     /// frame.
@@ -270,7 +272,17 @@ impl App {
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
-                let stats = {
+                // Drain the staged image uploads before the split borrow
+                // below. `execute_frame` drains with its `image_assets`
+                // parameter, which this harness fills with `dummy_assets`,
+                // and a drain against an empty registry drops every staged
+                // world texture and lightmap for good.
+                // Image registration writes the sim-published master (A9),
+                // so the drain resolves the staged handles there, not in
+                // `host.assets`.
+                let uploaded = images.upload_pending(gpu, &mut host.img_state, &host.sim.published);
+
+                let mut stats = {
                     // Split the host and engine into disjoint borrows, the same
                     // shape `load_world_and_render` builds.
                     let UiHost {
@@ -319,6 +331,8 @@ impl App {
                         Some(&mut world),
                     )
                 };
+
+                stats.images_uploaded += uploaded as u32;
 
                 if !*reported {
                     *reported = true;
@@ -460,6 +474,12 @@ fn main() {
     // leftover view cluster, the same first-mark guarantee `load_world_and_render`
     // gets from forcing `areamask_modified`.
     host.frame.view_cluster = -1;
+
+    // `RE_RenderScene` returns before it pushes the scene event while the
+    // renderer is unregistered. Only `RE_BeginRegistration` sets the flag
+    // (`tr_model/frontend.rs:791`), and this harness boots through the ui
+    // path without it, so we set the flag here.
+    host.assets.registered = true;
 
     // Start the camera at a spawn origin, bumped to eye height.
     let eye = host
