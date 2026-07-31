@@ -1324,3 +1324,13 @@ these shapes:
    commit boundaries whenever cgame/bg/qshared is touched, expected
    byte-identical; divergences block unless triaged to a cited §19
    ledger entry. No CI lane until the client track has one.
+
+## DEC-49 — zune-jpeg stays a plain mp_renderer dependency (ratified 2026-07-30)
+
+`LoadJPG` decodes through `zune-jpeg` (pure Rust; Raven's `jpeg-6` is
+vendored third-party C, so §F licenses an idiomatic replacement — landed
+`34be058d`). `mp_renderer` also links into `jampded`, whose dedicated lane
+never calls `R_LoadImage`, so the decoder rides inert in the server binary.
+Ruled: accept as-is. No feature gate, no client-only decode seam — one
+build graph beats the dead bytes. Revisit only if a server-size constraint
+ever appears.
