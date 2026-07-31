@@ -1334,3 +1334,16 @@ never calls `R_LoadImage`, so the decoder rides inert in the server binary.
 Ruled: accept as-is. No feature gate, no client-only decode seam — one
 build graph beats the dead bytes. Revisit only if a server-size constraint
 ever appears.
+
+## DEC-50 — render-side world traversal (ratified 2026-07-30, feasibility met)
+
+Ruled conditionally ("Investigate implementation of 1. If 1 works then use
+it") and proven by the wave-3 spike: the executor side owns the world view
+traversal. Trap time only records scene events into `FrameData` (the stream
+it already carries); the render side replays them and runs `R_RenderView`
+(PVS walk, cull, sort) against render-side world assets. The seam stays
+thin - no drawSurf serialization crosses it. Proof: `world_spike` loads
+`maps/mp/duel1.bsp` through the real FS and reports 57 sorted drawSurfs
+(50 faces, 5 grids, 2 tris), 97 visible leaves, no panic. The rejected
+alternative (Raven-literal trap-side traversal with a fat serialized seam)
+is closed.
