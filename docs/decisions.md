@@ -1363,3 +1363,16 @@ parameter, the folded client branches are restored from the oracle, every
 server caller passes false, and the lockstep referee plus the cgame
 replay referee gate the wave to prove the server path stays
 byte-identical.
+
+## DEC-52 — wayfinder adoption for the planning layer (ruled 2026-07-31)
+
+When the R4/entity renderer tasks close, the open-work tracking layer
+migrates to the wayfinder skill: one in-repo local-markdown map per big
+effort, with decision tickets as children. The first map is the `jamp`
+client-engine island. Three conditions bound the adoption. The tracker is
+local markdown, in-repo, push-free. The DEC ledger stays the single
+decision store - a ticket resolves into a DEC entry, and the map only
+gists and links (this inverts wayfinder's detail-in-ticket rule on
+purpose). One-ticket-per-session applies to planning sessions only - wave
+execution keeps its rolling cadence, referees, and reviews. The DEC
+ledger and the wave process do not migrate.
