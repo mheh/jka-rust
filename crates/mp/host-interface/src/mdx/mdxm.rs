@@ -25,7 +25,8 @@ const HEADER_SIZE: usize = OFS_END + 4; // 164
 // mdxmSurfHierarchy_t offsets (`mdx_format.h:187-195`).
 const SH_OFS_FLAGS: usize = MAX_QPATH; // name[64] -> 64
 const SH_OFS_SHADER: usize = SH_OFS_FLAGS + 4; // 68
-const SH_OFS_PARENT_INDEX: usize = SH_OFS_SHADER + MAX_QPATH + 4; // shader[64],shaderIndex -> 136
+const SH_OFS_SHADER_INDEX: usize = SH_OFS_SHADER + MAX_QPATH; // shader[64] -> 132
+const SH_OFS_PARENT_INDEX: usize = SH_OFS_SHADER_INDEX + 4; // shaderIndex -> 136
 const SH_OFS_NUM_CHILDREN: usize = SH_OFS_PARENT_INDEX + 4; // 140
 const SH_OFS_CHILD_INDEXES: usize = SH_OFS_NUM_CHILDREN + 4; // 144
 
@@ -212,6 +213,13 @@ impl MdxmSurfHierarchyView<'_> {
         self.bytes[SH_OFS_SHADER]
     }
 
+    /// `surf->shaderIndex` — DEC-42.2 stores the shader arena slot number here,
+    /// so the render-side default-shader resolve reads it back through
+    /// `Arena::handle_at_slot`.
+    pub fn shader_index(&self) -> i32 {
+        read_i32(self.bytes, SH_OFS_SHADER_INDEX)
+    }
+
     /// `surf->parentIndex`.
     pub fn parent_index(&self) -> i32 {
         read_i32(self.bytes, SH_OFS_PARENT_INDEX)
@@ -356,6 +364,8 @@ pub struct MdxmSurfHierarchy {
     flags: i32,
     /// First byte of `surf->shader` (Raven's `surf->shader[0]` shaderless test).
     shader_first_byte: u8,
+    /// `surf->shaderIndex` — DEC-42.2 shader arena slot number.
+    shader_index: i32,
     /// `surf->parentIndex`.
     parent_index: i32,
     /// `surf->childIndexes[0..numChildren]`.
@@ -382,6 +392,11 @@ impl MdxmSurfHierarchy {
     /// First byte of `surf->shader`.
     pub fn shader_first_byte(&self) -> u8 {
         self.shader_first_byte
+    }
+
+    /// `surf->shaderIndex` — DEC-42.2 shader arena slot number.
+    pub fn shader_index(&self) -> i32 {
+        self.shader_index
     }
 
     /// `surf->parentIndex`.
@@ -441,6 +456,7 @@ impl MdxmParsed {
                 name: s.name_lossy(),
                 flags: s.flags(),
                 shader_first_byte: s.shader_first_byte(),
+                shader_index: s.shader_index(),
                 parent_index: s.parent_index(),
                 children: (0..s.num_children()).map(|i| s.child(i)).collect(),
             })

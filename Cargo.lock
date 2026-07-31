@@ -1075,6 +1075,7 @@ dependencies = [
  "mp_bg",
  "mp_engine_botlib",
  "mp_engine_core",
+ "mp_engine_ghoul2",
  "mp_engine_qcommon",
  "mp_engine_server",
  "mp_qshared",

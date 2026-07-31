@@ -8,6 +8,7 @@ name = "mp_renderer_gpu"
 
 [dependencies]
 bytemuck = { version = "1.25.2", features = ["derive"] }
+mp_engine_ghoul2 = { path = "../engine/ghoul2" }
 mp_engine_qcommon = { path = "../engine/qcommon" }
 mp_renderer = { path = "../renderer" }
 pollster = "1.0.1"

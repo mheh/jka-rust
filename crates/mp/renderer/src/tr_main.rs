@@ -48,13 +48,14 @@ use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_mesh::r_add_md3_surfaces;
 use crate::tr_model::render_models::RenderModels;
 use crate::tr_public::ref_flags::RDF_NOWORLDMODEL;
-use crate::tr_scene::R_AddPolygonSurfaces;
+use crate::tr_scene::{ghoul2_token_decode, ghoul2_token_encode, R_AddPolygonSurfaces};
 use crate::tr_shader::R_GetShaderByHandle;
 use crate::tr_terrain::R_AddTerrainSurfaces;
 use crate::tr_world::{R_AddBrushModelSurfaces, R_AddWorldSurfaces};
 
 use core::f64::consts::PI;
 
+use mp_engine_ghoul2::ghoul2_system::{BoneCacheId, Ghoul2System};
 use mp_engine_qcommon::cm_terrain::CmLandScape;
 use mp_engine_qcommon::common::{com_error, Common, EngineHostView};
 use mp_engine_qcommon::common_fns::Com_DPrintf;
@@ -212,7 +213,38 @@ pub enum SurfaceGeometry<'a> {
     /// [`Md3SurfaceRef`] the backend decodes per frame (DEC-43.3 precedent).
     /// The shader still travels through the sort key, not this ref.
     Md3(Md3SurfaceRef),
+    /// A Ghoul2 (`MOD_MDXM`) skinned surface, carried as a `Copy`
+    /// [`G2SurfaceRef`]. This ref replaces the raw-pointer tier-2
+    /// `CRenderableSurface` on the render path (R2 Group-4 table).
+    Ghoul2(G2SurfaceRef),
     Other,
+}
+
+/// The `drawSurf_t::surface` payload for a **Ghoul2** (`MOD_MDXM`) surface: a
+/// `Copy` handle the backend deforms by its lerped bone matrices per frame.
+/// Raven hands the render list a raw-pointer `CRenderableSurface` carrying a
+/// `mdxmSurface_t *` and a `CBoneCache *`. Under the owned model this ref
+/// carries the instance's model handle, the resolved LOD, the surface ordinal,
+/// and the bone-cache arena id, so the backend re-locates the surface and
+/// reads the cache from `Ghoul2System.bone_caches` instead of holding raw
+/// pointers.
+///
+/// The gore fields (`scale`/`fade`/`impactTime`/`alternateTex`/`goreChain`)
+/// stay out of this wave — gore rendering is a later wave.
+///
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:656-678`
+/// (`surfaceType_t`), `oracle/codemp/renderer/tr_ghoul2.cpp:800-864`
+/// (`CRenderableSurface`)
+#[derive(Clone, Copy)]
+pub struct G2SurfaceRef {
+    /// The instance's `currentModel` handle, whose `mdxm[lod]` owns the surface.
+    pub model: qhandle_t,
+    /// The resolved LOD level (`G2_ComputeLOD`).
+    pub lod: i32,
+    /// The surface ordinal inside the model (`RS.surfaceNum`).
+    pub surface_index: i32,
+    /// The bone-cache arena id (`RS.boneCache`), the deform's bone matrices.
+    pub bone_cache: BoneCacheId,
 }
 
 /// The `drawSurf_t::surface` payload for an **MD3** entity surface: a `Copy`
@@ -743,6 +775,8 @@ pub fn R_PlaneForSurface(surf_type: Option<&SurfaceGeometry>) -> cplane_t {
         // An MD3 entity surface never drives a portal, so it falls back to the
         // default plane the same way `SF_BAD`/`SF_SKIP` do.
         SurfaceGeometry::Md3(_) => default_plane(),
+        // A Ghoul2 surface never drives a portal either.
+        SurfaceGeometry::Ghoul2(_) => default_plane(),
         SurfaceGeometry::Other => default_plane(),
     }
 }
@@ -1682,7 +1716,7 @@ pub(crate) fn ref_entity_from_tr(ent: &trRefEntity_t) -> RefEntity {
         saber_length: ent.e.saberLength,
         angles: ent.e.angles,
         model_scale: ent.e.modelScale,
-        has_ghoul2: !ent.e.ghoul2.is_null(),
+        ghoul2: ghoul2_token_decode(ent.e.ghoul2),
         need_dlights: ent.needDlights != 0,
         lighting_calculated: ent.lightingCalculated != 0,
         light_dir: ent.lightDir,
@@ -1730,6 +1764,10 @@ pub(crate) fn write_back_lighting(ent: &mut trRefEntity_t, re: &RefEntity) {
 /// from the wrong offset until the payload carries it and the draw path applies
 /// it. No harness entity uses that texmod, so the current gates pass.
 ///
+/// The `ghoul2` field re-encodes the [`RefEntity`] handle back into the pointer
+/// token (`ghoul2_token_encode`), so `R_AddEntitySurfaces` recovers the same
+/// `Ghoul2Handle` the scene payload carried.
+///
 /// Source: `oracle/codemp/renderer/tr_scene.cpp:249` (`entities[n].e = *ent`)
 //TODO: Port refEntity_t shaderTexCoord into the scene payload and draw path
 // Source: oracle/codemp/renderer/tr_shade.cpp:1891-1893 (shaderTexCoord read),
@@ -1758,6 +1796,7 @@ pub fn tr_ref_entity_from_ref_entity(re: &RefEntity) -> trRefEntity_t {
     e.saberLength = re.saber_length;
     e.angles = re.angles;
     e.modelScale = re.model_scale;
+    e.ghoul2 = ghoul2_token_encode(re.ghoul2);
 
     trRefEntity_t {
         e,
@@ -1840,6 +1879,7 @@ pub fn R_AddEntitySurfaces<'a>(
     models: &RenderModels,
     cvars: &RendererCvars,
     frame: &mut FrameState,
+    g2: &mut Ghoul2System,
     refdef_rdflags: i32,
     fogs: &[fog_t],
     dlights: &mut [dlight_t],
@@ -1987,9 +2027,24 @@ pub fn R_AddEntitySurfaces<'a>(
 
                     // g2r
                     modtype_t::MOD_MDXM => {
-                        if !ent.e.ghoul2.is_null() {
-                            let re = ref_entity_from_tr(ent);
-                            r_add_ghoul_surfaces(&re, assets, frame, cvars, &*engine_view.common);
+                        let re = ref_entity_from_tr(ent);
+                        if let Some(handle) = re.ghoul2 {
+                            r_add_ghoul_surfaces(
+                                &re,
+                                handle,
+                                engine_view,
+                                assets,
+                                models,
+                                view,
+                                &ori,
+                                cvars,
+                                frame,
+                                g2,
+                                fogs,
+                                refdef_rdflags,
+                                shifted_entity_num,
+                                draw_surfs,
+                            );
                         }
                     }
 
@@ -2102,6 +2157,7 @@ pub fn R_GenerateDrawSurfs<'a>(
     assets: &mut RenderAssets,
     cvars: &mut RendererCvars,
     frame: &mut FrameState,
+    g2: &mut Ghoul2System,
     frame_data: &'a FrameData,
     view: &mut viewParms_t,
     refdef: &trRefdef_t,
@@ -2176,6 +2232,7 @@ pub fn R_GenerateDrawSurfs<'a>(
         models,
         cvars,
         frame,
+        g2,
         refdef_rdflags,
         fogs,
         dlights,
@@ -2285,6 +2342,7 @@ pub fn R_MirrorViewBySurface<'a>(
     assets: &mut RenderAssets,
     cvars: &mut RendererCvars,
     frame: &mut FrameState,
+    g2: &mut Ghoul2System,
     gpu: &mut GpuResources,
     frame_data: &'a FrameData,
     view: &mut viewParms_t,
@@ -2382,6 +2440,7 @@ pub fn R_MirrorViewBySurface<'a>(
         assets,
         cvars,
         frame,
+        g2,
         gpu,
         frame_data,
         refdef,
@@ -2455,6 +2514,7 @@ pub fn R_SortDrawSurfs<'a>(
     assets: &mut RenderAssets,
     cvars: &mut RendererCvars,
     frame: &mut FrameState,
+    g2: &mut Ghoul2System,
     gpu: &mut GpuResources,
     frame_data: &'a FrameData,
     view: &mut viewParms_t,
@@ -2528,6 +2588,7 @@ pub fn R_SortDrawSurfs<'a>(
             assets,
             cvars,
             frame,
+            g2,
             gpu,
             frame_data,
             view,
@@ -2590,6 +2651,7 @@ pub fn R_RenderView<'a>(
     assets: &mut RenderAssets,
     cvars: &mut RendererCvars,
     frame: &mut FrameState,
+    g2: &mut Ghoul2System,
     gpu: &mut GpuResources,
     frame_data: &'a FrameData,
     refdef: &trRefdef_t,
@@ -2652,6 +2714,7 @@ pub fn R_RenderView<'a>(
         assets,
         cvars,
         frame,
+        g2,
         frame_data,
         view,
         refdef,
@@ -2680,6 +2743,7 @@ pub fn R_RenderView<'a>(
         assets,
         cvars,
         frame,
+        g2,
         gpu,
         frame_data,
         view,

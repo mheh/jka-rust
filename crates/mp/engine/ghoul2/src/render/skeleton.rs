@@ -104,6 +104,27 @@ const MODEL_SHIFT: i32 = BOLT_SHIFT + BOLT_WIDTH;
 /// duplication convention.
 const GHOUL2_NEWORIGIN: i32 = 0x008;
 
+/// Raven `#define GHOUL2_NORENDER 0x002` (`ghoul2_shared.h:230`) — the render
+/// traversal skips this model. Duplicated locally per this crate's per-file
+/// constant convention.
+const GHOUL2_NORENDER: i32 = 0x002;
+
+/// Raven `#define GHOUL2_NOMODEL 0x004` (`ghoul2_shared.h:231`) — the render
+/// traversal skips this model.
+const GHOUL2_NOMODEL: i32 = 0x004;
+
+/// Raven `#define GHOUL2_RAG_STARTED 0x0010` (`G2_local.h:11`) — the model is a
+/// live ragdoll, so the smoothing amount comes from the root bone timing.
+const GHOUL2_RAG_STARTED: i32 = 0x0010;
+
+/// Raven `#define GHOUL2_CRAZY_SMOOTH 0x2000` (`G2_local.h:12`) — forces the
+/// smoothing amount to 0.9.
+const GHOUL2_CRAZY_SMOOTH: i32 = 0x2000;
+
+/// Raven `#define BONE_ANGLES_RAGDOLL 0x2000` (`ghoul2_shared.h`) — the bone is
+/// under ragdoll control, so its collision timing drives the smoothing amount.
+const BONE_ANGLES_RAGDOLL: i32 = 0x2000;
+
 /// Raven's file-scope `const static mdxaBone_t identityMatrix` —
 /// `tr_ghoul2.cpp:128-133`. A real (not `const`) item so the "yikes"/no-cache
 /// fallback paths below can hand out a stable `*mut mdxaBone_t` into it,
@@ -417,14 +438,8 @@ fn g2_transform_ghoul_bones_inner(
     ghoul2: &mut CGhoul2Info,
     time: i32,
     smooth: bool,
+    render_traversal: bool,
 ) {
-    // `HackadelicOnClient` is const-`false` server-side (module doc `##
-    // Raven ground truth`), so `smooth` never affects the folded-`else`
-    // bodies below — kept as a parameter only for 1:1 arity (`G2SV-D6`-style
-    // fidelity), matching `api_bolts.rs`'s own `let _ = model_list;` precedent
-    // for an unread Raven parameter.
-    let _ = smooth;
-
     // Raven: `model_t *currentModel=(model_t*)ghoul2.currentModel; mdxaHeader_t
     // *aHeader=(mdxaHeader_t*)ghoul2.aHeader;` then the (compiled-out-under-
     // NDEBUG) non-null asserts. Per `G2SV-D5` this crate routes every header
@@ -474,13 +489,64 @@ fn g2_transform_ghoul_bones_inner(
     cache.smoothing_active = false;
     cache.unsquash = false;
 
-    // Master smoothing control (`:2124-2201`) and the touch-render stamp
-    // (`:2205-2215`): `HackadelicOnClient` is const-`false` server-side
-    // (module doc), so both permanently fold to their `else` arms —
-    // `mSmoothFactor=1.0f` and `mCurrentTouchRender=0` unconditionally.
-    cache.smooth_factor = 1.0;
+    // Master smoothing control (`:2124-2201`). Raven's file-scope
+    // `HackadelicOnClient` is `render_traversal` here (DEC-51): the client
+    // render traversal passes true and activates smoothing, and every server
+    // caller passes false and folds to `mSmoothFactor=1.0f`.
+    if render_traversal && smooth && host.cvar_integer("com_dedicated") == 0 {
+        cache.last_touch = cache.last_last_touch;
+
+        let anim_smooth = host.cvar_value("r_ghoul2animsmooth");
+        if anim_smooth > 0.0 && anim_smooth < 1.0 {
+            let mut val = anim_smooth;
+
+            if ghoul2.flags & GHOUL2_CRAZY_SMOOTH != 0 {
+                val = 0.9;
+            } else if ghoul2.flags & GHOUL2_RAG_STARTED != 0 {
+                // Raven scans the root bone list for the first ragdoll bone and
+                // reads the smoothing amount from its collision and air timing.
+                // SAFETY: `root_bone_list` is the caller's live `mBlist`, valid
+                // for this call, matching `bone_transform.rs`'s deref of the
+                // same field.
+                let bones = unsafe { &*root_bone_list };
+                for bone in bones.iter() {
+                    if bone.flags & BONE_ANGLES_RAGDOLL != 0 {
+                        if bone.firstCollisionTime != 0
+                            && bone.firstCollisionTime > time - 250
+                            && bone.firstCollisionTime < time
+                        {
+                            val = 0.9;
+                        } else if bone.airTime > time {
+                            val = 0.2;
+                        } else {
+                            val = 0.8;
+                        }
+                        break;
+                    }
+                }
+            }
+
+            cache.smooth_factor = val;
+            cache.smoothing_active = true;
+
+            if host.cvar_integer("r_ghoul2unsqashaftersmooth") != 0 {
+                cache.unsquash = true;
+            }
+        }
+    } else {
+        cache.smooth_factor = 1.0;
+    }
+
     cache.current_touch += 1;
-    cache.current_touch_render = 0;
+
+    // Touch-render stamp (`:2205-2215`): the client render traversal records
+    // the render touch, the server path clears it.
+    if render_traversal {
+        cache.last_last_touch = cache.current_touch;
+        cache.current_touch_render = cache.current_touch;
+    } else {
+        cache.current_touch_render = 0;
+    }
 
     // Raven: `ghoul2.mBoneCache->frameSize = 0;` ("can be deleted in new G2
     // format").
@@ -579,6 +645,7 @@ pub fn g2_construct_ghoul_skeleton(
                 ghl,
                 frame_num,
                 check_for_new_origin,
+                false,
             );
         } else {
             let blist_ptr = &mut models[i_usize].blist as *mut Vec<boneInfo_t>;
@@ -591,9 +658,104 @@ pub fn g2_construct_ghoul_skeleton(
                 ghl,
                 frame_num,
                 check_for_new_origin,
+                false,
             );
         }
     }
+}
+
+/// Raven `R_AddGhoulSurfaces`'s inline transform loop
+/// (`tr_ghoul2.cpp:3427-3531`, transform half). This is the client render path,
+/// so it is separate from [`g2_construct_ghoul_skeleton`] (the server
+/// `G2_ConstructGhoulSkeleton`): it always computes the root matrix, and it
+/// gates the transform on the render flags (`mValid && !GHOUL2_NOMODEL &&
+/// !GHOUL2_NORENDER`), so a NOMODEL or NORENDER model keeps its stale bone
+/// cache and a bolt-child reads that stale cache.
+///
+/// Runs `G2_TransformGhoulBones` with `smooth = true` and `render_traversal =
+/// true`, matching the oracle's default `smooth` and `HackadelicOnClient=true`
+/// at this call site. Returns the sorted model list so the caller's render
+/// loop walks the same order without a second sort.
+/// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:3427-3531`
+pub fn g2_construct_render_skeleton(
+    g2: &mut Ghoul2System,
+    host: &mut impl EngineHost,
+    ghoul2: &mut CGhoul2Info_v,
+    frame_num: i32,
+    scale: vec3_t,
+) -> Vec<i32> {
+    let root_mtx = root_matrix(g2, host, ghoul2, frame_num, scale);
+
+    let model_list = g2_sort_models(g2, ghoul2);
+    let item = ghoul2.mItem;
+
+    for (j, &i) in model_list.iter().enumerate() {
+        // Disjoint-borrow `info_array`/`bone_caches` (module-doc aliasing
+        // finding), the same split [`g2_construct_ghoul_skeleton`] takes.
+        let Ghoul2System {
+            info_array,
+            bone_caches,
+            ..
+        } = &mut *g2;
+        let models = info_array.get_mut(item);
+        let i_usize = i as usize;
+
+        // Raven render gate (`:3467`): a NOMODEL or NORENDER model is not
+        // transformed, so a later bolt-child reads the parent's stale cache.
+        if !models[i_usize].valid
+            || models[i_usize].flags & GHOUL2_NOMODEL != 0
+            || models[i_usize].flags & GHOUL2_NORENDER != 0
+        {
+            continue;
+        }
+
+        let model_bolt_link = models[i_usize].model_bolt_link;
+        if j != 0 && model_bolt_link != -1 {
+            let bolt_mod = ((model_bolt_link >> MODEL_SHIFT) & MODEL_AND) as usize;
+            let bolt_num = (model_bolt_link >> BOLT_SHIFT) & BOLT_AND;
+
+            let bolt = {
+                let parent = &models[bolt_mod];
+                resolve_bolt_matrix_low(
+                    bone_caches,
+                    host,
+                    parent.bone_cache,
+                    &parent.slist,
+                    &parent.bltlist,
+                    bolt_num,
+                    scale,
+                )
+            };
+
+            let blist_ptr = &mut models[i_usize].blist as *mut Vec<boneInfo_t>;
+            let ghl = &mut models[i_usize];
+            g2_transform_ghoul_bones_inner(
+                bone_caches,
+                host,
+                blist_ptr,
+                &bolt,
+                ghl,
+                frame_num,
+                true,
+                true,
+            );
+        } else {
+            let blist_ptr = &mut models[i_usize].blist as *mut Vec<boneInfo_t>;
+            let ghl = &mut models[i_usize];
+            g2_transform_ghoul_bones_inner(
+                bone_caches,
+                host,
+                blist_ptr,
+                &root_mtx,
+                ghl,
+                frame_num,
+                true,
+                true,
+            );
+        }
+    }
+
+    model_list
 }
 
 /// Raven `void G2_TransformGhoulBones(boneInfo_v &rootBoneList, mdxaBone_t
@@ -606,11 +768,12 @@ pub fn g2_construct_ghoul_skeleton(
 /// traversal root's `SBoneCalc`. The C++ default arg (`smooth=true`) has no
 /// Rust equivalent; callers pass it explicitly.
 ///
-/// `HackadelicOnClient` is const-`false` server-side (`## Raven ground
-/// truth`), so the `if (HackadelicOnClient && smooth && !com_dedicated->
-/// integer)` smoothing-control branch and the `if (HackadelicOnClient) {...}`
-/// touch-render branch both permanently fold to their `else` arms here
-/// (§C10) — `mSmoothFactor=1.0f` and `mCurrentTouchRender=0` unconditionally.
+/// Raven's file-scope `HackadelicOnClient` is the `render_traversal` parameter
+/// (DEC-51): true drives the client smoothing-control branch
+/// (`if (HackadelicOnClient && smooth && !com_dedicated->integer)`) and the
+/// touch-render stamp, false folds both to their `else` arms
+/// (`mSmoothFactor=1.0f` and `mCurrentTouchRender=0`). Every server caller
+/// passes false.
 ///
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:2075-2234`
 pub fn g2_transform_ghoul_bones(
@@ -621,6 +784,7 @@ pub fn g2_transform_ghoul_bones(
     ghoul2: &mut CGhoul2Info,
     time: i32,
     smooth: bool,
+    render_traversal: bool,
 ) {
     g2_transform_ghoul_bones_inner(
         &mut g2.bone_caches,
@@ -630,6 +794,7 @@ pub fn g2_transform_ghoul_bones(
         ghoul2,
         time,
         smooth,
+        render_traversal,
     );
 }
 
@@ -781,7 +946,7 @@ pub fn g2_rag_get_bone_base_pose_matrix_low(
 /// count, per §C7 (internal-only, no ABI surface, §A1 latitude).
 ///
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:2877-2950`
-fn g2_sort_models(g2: &Ghoul2System, ghoul2: &CGhoul2Info_v) -> Vec<i32> {
+pub fn g2_sort_models(g2: &Ghoul2System, ghoul2: &CGhoul2Info_v) -> Vec<i32> {
     let models = g2.info_array.get(ghoul2.mItem);
     let mut model_list = Vec::new();
 
@@ -830,7 +995,7 @@ fn g2_sort_models(g2: &Ghoul2System, ghoul2: &CGhoul2Info_v) -> Vec<i32> {
 /// model has the flag. Always writes, so returned by value per §C7.
 ///
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:3333-3366`
-fn root_matrix(
+pub fn root_matrix(
     g2: &mut Ghoul2System,
     host: &mut impl EngineHost,
     ghoul2: &mut CGhoul2Info_v,

@@ -15,6 +15,7 @@ use core::ptr::null_mut;
 
 use mp_engine_botlib::l_precomp_fns::PC_SetBaseFolder;
 use mp_engine_core::Engine;
+use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::cm_terrain::CmLandScape;
 use mp_engine_qcommon::cmd_common::{Cbuf_Init, Cmd_Init};
 use mp_engine_qcommon::collision_world::CollisionWorld;
@@ -829,6 +830,9 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
         R_TerrainInit(&mut engine_view, cvars, assets, &mut land_scape);
         let distance_cull = assets.distance_cull;
 
+        // The ui background render has no live Ghoul2 state, so it threads an
+        // empty owned system (design point 2).
+        let mut g2_system = Ghoul2System::default();
         let mut view = zeroed_view_parms();
         R_RenderView(
             &parms,
@@ -839,6 +843,7 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
             assets,
             cvars,
             frame,
+            &mut g2_system,
             gpu_res,
             &frame_data,
             &refdef,
@@ -878,6 +883,7 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
                 // The world spike loads no MD3 entity, so this arm never fires;
                 // it folds into `other` for exhaustiveness.
                 SurfaceGeometry::Md3(_) => r.other += 1,
+                SurfaceGeometry::Ghoul2(_) => r.other += 1,
                 SurfaceGeometry::Other => r.other += 1,
             }
         }

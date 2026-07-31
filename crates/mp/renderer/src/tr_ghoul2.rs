@@ -31,11 +31,16 @@ use mp_host_interface::EngineHost;
 // `tr_ghoul2.cpp` definitions), never re-declared in this crate.
 use mp_engine_ghoul2::bolts::g2_find_bolt_surface_num;
 use mp_engine_ghoul2::bones::{g2_add_bone, g2_find_bone};
+use mp_engine_ghoul2::api_collision::g2api_get_time;
 use mp_engine_ghoul2::ghoul2_system::{BoneCacheArena, BoneCacheId, Ghoul2System};
-use mp_engine_ghoul2::misc::g2_setup_model_pointers;
+use mp_engine_ghoul2::info_array::Ghoul2Handle;
+use mp_engine_ghoul2::misc::{g2_setup_model_pointers, g2_setup_model_pointers_v};
+use mp_engine_ghoul2::shared::cghoul2_info_v::CGhoul2Info_v;
 use mp_engine_ghoul2::render::bone_cache::CBoneCache;
 use mp_engine_ghoul2::render::bone_transform::{multiply_3x4_matrix, uncompress_bone};
-use mp_engine_ghoul2::render::skeleton::g2_get_bone_matrix_low;
+use mp_engine_ghoul2::render::skeleton::{
+    g2_construct_render_skeleton, g2_get_bone_matrix_low,
+};
 use mp_engine_ghoul2::shared::bolt_info_t::boltInfo_t;
 use mp_engine_ghoul2::shared::bone_info_t::boneInfo_t;
 use mp_engine_ghoul2::shared::cghoul2_info::CGhoul2Info;
@@ -61,21 +66,27 @@ use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::render_state::skin_asset::SkinHandle;
-use crate::tr_image::TrImageState;
+use crate::tr_image::{TrImageState, R_GetSkinByHandle};
 use crate::tr_local::crenderable_surface::CRenderableSurface;
+use crate::tr_local::fog_t::fog_t;
 use crate::tr_local::model_s::model_t;
 use crate::tr_local::modtype_t::modtype_t;
 use crate::tr_local::orientationr_t::orientationr_t;
 use crate::tr_local::surface_type_t::surfaceType_t;
 use crate::tr_local::view_parms_t::viewParms_t;
-use crate::tr_main::{R_CullLocalPointAndRadius, CULL_CLIP, CULL_IN, CULL_OUT};
+use crate::tr_main::{
+    DrawSurf, G2SurfaceRef, R_AddDrawSurf, R_CullLocalPointAndRadius, SurfaceGeometry, CULL_CLIP,
+    CULL_IN, CULL_OUT,
+};
 use crate::tr_mesh::project_radius;
+use crate::tr_public::ref_flags::{RDF_NOFOG, RDF_NOWORLDMODEL};
 use crate::tr_model::frontend::{mdxm_view_of, re_register_models_malloc, RE_RegisterModel};
 use crate::tr_model::model_pool::ModelHandle;
 use crate::tr_model::render_models::RenderModels;
 use crate::tr_model::server_load::read_qpath;
 use crate::tr_shade_calc::myftol;
-use crate::tr_shader::{lightmapsNone, stylesDefault, R_FindShader};
+use crate::tr_shader::{lightmapsNone, stylesDefault, R_FindShader, R_GetShaderByHandle};
+use mp_qshared::common::mp::cgame::tr_types::RF_THIRD_PERSON;
 use crate::tr_sky::SkyState;
 use crate::tr_worldeffects::world_effects::WorldEffectsState;
 
@@ -339,17 +350,38 @@ pub fn alloc_rs() -> CRenderableSurface {
 }
 
 /// Raven `static int R_GComputeFogNum(trRefEntity_t *ent)` — the fog volume
-/// `ent` falls inside, if any.
-// DEFERRED: R_GComputeFogNum — depends on `RenderAssets::world`
-// (`WorldAsset`, an empty placeholder struct pending the `tr_bsp` wave's
-// `numfogs`/`fogs` fields) and `FrameState::refdef` (`TrRefdef`, empty
-// pending the `tr_scene` wave's `rdflags` field) — see
-// `crates/mp/renderer/src/render_state/placeholders.rs`, out of this file's
-// edit scope. A state home this packet marks mapped-but-not-yet-populated is
-// an escalation, not an invention (preamble "state home ... ESCALATION").
-// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:939-964`
-pub fn r_g_compute_fog_num(_ent: &RefEntity, _assets: &RenderAssets, _frame: &FrameState) -> i32 {
-    todo!("Port R_GComputeFogNum — oracle/codemp/renderer/tr_ghoul2.cpp:939-964")
+/// `ent`'s bounding sphere falls inside, if any.
+///
+/// `fogs` is `tr.world->fogs` (index 0 is the reserved "no fog" slot, matching
+/// the oracle's `for (i=1; i<numfogs; i++)`); `refdef_rdflags` is
+/// `tr.refdef.rdflags`. The entity's own `origin`/`radius` bound the test, not
+/// a frame-array read as the MD3 twin ([`r_compute_fog_num`], `tr_mesh.rs`)
+/// does.
+///
+/// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:939-964`
+pub fn r_g_compute_fog_num(ent: &RefEntity, fogs: &[fog_t], refdef_rdflags: i32) -> i32 {
+    if refdef_rdflags & RDF_NOWORLDMODEL != 0 {
+        return 0;
+    }
+
+    for i in 1..fogs.len() {
+        let fog = &fogs[i];
+        let mut j = 0usize;
+        while j < 3 {
+            if ent.origin[j] - ent.radius >= fog.bounds[1][j] {
+                break;
+            }
+            if ent.origin[j] + ent.radius <= fog.bounds[0][j] {
+                break;
+            }
+            j += 1;
+        }
+        if j == 3 {
+            return i as i32;
+        }
+    }
+
+    0
 }
 
 /// Raven `static inline bool bInShadowRange(vec3_t location)`.
@@ -643,20 +675,16 @@ pub fn g2_get_vert_bone_weight_not_slow(p_vert: &mdxmVertex_t, i_weight_num: i32
 /// *currentModel, int lodBias)`.
 ///
 /// `ent->e.modelScale`/`ent->e.radius` are threaded as explicit
-/// `model_scale`/`radius` parameters rather than read off `RefEntity`,
-/// because that placeholder carried neither field when this wave landed.
-/// Campaign #41 batch 1 added both (`RefEntity::model_scale`/`radius`,
-/// `render_state/placeholders.rs`), so dropping the two extra parameters and
-/// reading them off `ent` is the follow-up rewire. `ent` itself is already
-/// threaded for `.origin`.
+/// `model_scale`/`radius` parameters. `R_AddGhoulSurfaces` passes
+/// `ent.model_scale`/`ent.radius` off `RefEntity`, which now carries both
+/// fields (`RefEntity::model_scale`/`radius`, `render_state/placeholders.rs`).
 ///
 /// `r_lodbias`/`r_lodscale`/`r_autolodscalevalue` read through
 /// `Common::cvar` (the `RendererCvars`-handle + live-engine-table pattern
 /// `tr_light.rs`'s `R_SetupEntityLightingGrid` already established).
 /// `ProjectRadius`/`myftol` are the cross-file in-module callees.
-/// `project_radius` now takes the live `viewParms_t` (E2), so `view` threads
-/// straight through to it; this fn has no live caller yet, so the parameter
-/// waits for the ghoul2 LOD arm to land.
+/// `project_radius` takes the live `viewParms_t` (E2), so `view` threads
+/// straight through to it.
 ///
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:967-1041`
 pub fn g2_compute_lod(
@@ -809,46 +837,37 @@ pub fn g2_process_generated_surface_bolts(
 }
 
 /// Raven `void RenderSurfaces(CRenderSurface &RS)` — "also ended up just
-/// ripping right from SP." The recursive offFlags/child-walk skeleton is
-/// live; the surface-visible body (`if (!offFlags) { ... }`,
-/// `tr_ghoul2.cpp:2554-2717`) is DEFERRED — four independent, out-of-this-
-/// file's-edit-scope blockers stack in that one block:
-/// - the default-shader-resolution arm needs `surfInfo->shaderIndex`, which
-///   `MdxmSurfHierarchyView` (`crates/mp/host-interface/src/mdx/mdxm.rs`)
-///   does not expose (only `shader_first_byte`/`flags`/`parent_index`/
-///   `num_children`/`child`). The *encoding* half of this blocker is closed
-///   — DEC-42.2 makes the poked `int` the shader arena's slot number, read
-///   back through `Arena::handle_at_slot`, and [`RenderModels::r_load_mdxm`]
-///   now writes it — what is still missing is only the view accessor;
-/// - the skin-shader-match arm needs `SkinAsset`'s `surfaces`/`name`/
-///   `shader` fields, and `render_state::skin_asset::SkinAsset` is still the
-///   empty `{}` client-rendering placeholder;
-/// - the shadow-surface and third-person arms both build a
-///   `CRenderableSurface` through [`alloc_rs`] — itself already `todo!()` in
-///   this file (the `RSStorage` ring has no state carrier) — and populate
-///   its tier-2 raw-pointer fields (`surfaceData: *mut mdxmSurface_t`,
-///   `boneCache: *mut c_void`) from a safe `MdxmSurfaceView`/`BoneCacheId`,
-///   which needs new unsafe plumbing this wave does not own (R2's own
-///   Group-4 table marks `CRenderableSurface`'s replacement shape
-///   "re-verify when the ghoul2 render-side integration wave lands" — not
-///   this wave);
-/// - the `_G2_GORE` arm needs `FindGoreRecord`/`G2API_GetTime` (this
-///   packet's own call-surface section flags both "NOT RESOLVED ... confirm
-///   before use; escalate, never stub") and `CGoreSet::mGoreRecords`, which
-///   `CRenderSurface::gore_set: Option<u32>` (already an opaque
-///   placeholder, this file's own earlier doc comment) cannot express.
+/// ripping right from SP." Walks the surface tree, resolves each visible
+/// surface's shader, and pushes a Ghoul2 draw surf.
+///
+/// The shader resolve follows the oracle priority: the custom shader first,
+/// else a skin-name match against [`SkinAsset::surfaces`], else the surface's
+/// own default shader. DEC-42.2 stores that default in `surfInfo->shaderIndex`
+/// as the shader arena slot number, so the handle reads back through
+/// `Arena::handle_at_slot`.
+///
+/// The draw surf is a `Copy` [`G2SurfaceRef`] rather than the raw-pointer
+/// tier-2 `CRenderableSurface` (R2 Group-4 table): it carries the model handle,
+/// the LOD, the surface index, and the bone-cache id, so the backend re-locates
+/// the surface and reads the cache from the arena.
+///
+/// DEFERRED in this arm: the stencil- and projection-shadow pushes
+/// (`r_shadows == 2`/`3`) and the `_G2_GORE` overlay chain. Both build extra
+/// draw surfs from tier-2 fields and land with the shadow/gore backend waves.
+/// The gore fields (`scale`/`fade`/`impactTime`) stay off [`G2SurfaceRef`].
 ///
 /// `RS.currentModel`/`RS.currentModel->mdxm` non-null asserts are dropped —
 /// compiled-out under this build's `-DNDEBUG` (house convention, e.g.
 /// `mp_engine_ghoul2::bolts`'s module doc comment).
 ///
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:2521-2735`
-pub fn render_surfaces(
+pub fn render_surfaces<'a>(
     rs: &mut CRenderSurface,
     current_model: &model_t,
     assets: &RenderAssets,
-    cvars: &RendererCvars,
-    common: &Common,
+    shifted_entity_num: i32,
+    rdf_nofog: bool,
+    draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
 ) {
     // back track and get the surfinfo struct for this surface
     let mdxm = mdxm_view_of(current_model);
@@ -867,13 +886,68 @@ pub fn render_surfaces(
 
     // if this surface is not off, add it to the shader render list
     if off_flags == 0 {
-        let _ = (assets, cvars, common);
-        // DEFERRED: RenderSurfaces surface-visible body (see doc comment
-        // above).
-        // Source: oracle/codemp/renderer/tr_ghoul2.cpp:2554-2717
-        todo!(
-            "Port RenderSurfaces surface-visible body — shaderIndex accessor / SkinAsset fields / CRenderableSurface tier-2 fields (AllocRS) / _G2_GORE subsystem — oracle/codemp/renderer/tr_ghoul2.cpp:2554-2717"
-        );
+        // figure out whether we should be using a custom shader for this
+        // surface, else the skin match, else the surface's default shader.
+        let shader = if let Some(cust) = rs.cust_shader {
+            cust
+        } else if let Some(skin_handle) = rs.skin {
+            // match the surface name to something in the skin file
+            let surf_name = surf_info.name_lossy();
+            match assets.skins.get(skin_handle) {
+                Some(skin) => {
+                    let mut resolved = ShaderHandle::slot_zero();
+                    for skin_surface in &skin.surfaces {
+                        // the names have both been lowercased
+                        if skin_surface.name == surf_name {
+                            resolved = skin_surface.shader;
+                            break;
+                        }
+                    }
+                    resolved
+                }
+                None => ShaderHandle::slot_zero(),
+            }
+        } else {
+            // Raven: `R_GetShaderByHandle(surfInfo->shaderIndex)`. DEC-42.2
+            // stores the shader arena slot in `shaderIndex`.
+            assets
+                .shaders
+                .handle_at_slot(surf_info.shader_index() as u32)
+                .unwrap_or_else(ShaderHandle::slot_zero)
+        };
+
+        // DEFERRED: the stencil-shadow (`r_shadows == 2`), projection-shadow
+        // (`r_shadows == 3`), and `_G2_GORE` overlay pushes — see the doc
+        // comment above.
+        // Source: oracle/codemp/renderer/tr_ghoul2.cpp:2586-2715
+
+        // don't add third_person objects if not viewing through a portal
+        if !rs.personal_model {
+            // A live render surface always has a built bone cache
+            // (`G2_TransformGhoulBones` ran first). A missing cache means the
+            // surface is not renderable, so it is dropped.
+            if let Some(bone_cache) = rs.bone_cache {
+                let sorted_index = assets
+                    .shaders
+                    .get(shader)
+                    .map(|s| s.sorted_index)
+                    .unwrap_or(0);
+                R_AddDrawSurf(
+                    SurfaceGeometry::Ghoul2(G2SurfaceRef {
+                        model: current_model.index,
+                        lod: rs.lod,
+                        surface_index: rs.surface_num,
+                        bone_cache,
+                    }),
+                    sorted_index,
+                    shifted_entity_num,
+                    rdf_nofog,
+                    rs.fog_num,
+                    0,
+                    draw_surfs,
+                );
+            }
+        }
     }
 
     // if we are turning off all descendants, then stop this recursion now
@@ -884,7 +958,14 @@ pub fn render_surfaces(
     // now recursively call for the children
     for i in 0..surf_info.num_children() {
         rs.surface_num = surf_info.child(i);
-        render_surfaces(rs, current_model, assets, cvars, common);
+        render_surfaces(
+            rs,
+            current_model,
+            assets,
+            shifted_entity_num,
+            rdf_nofog,
+            draw_surfs,
+        );
     }
 }
 
@@ -2232,65 +2313,200 @@ impl RenderModels {
     }
 }
 
+/// Raven `#define GHOUL2_NORENDER 0x002` (`ghoul2_shared.h:230`) — skip this
+/// model's render pass.
+const GHOUL2_NORENDER: i32 = 0x002;
+/// Raven `#define GHOUL2_NOMODEL 0x004` (`ghoul2_shared.h:231`) — this model
+/// slot carries no model.
+const GHOUL2_NOMODEL: i32 = 0x004;
+
 /// Raven `void R_AddGhoulSurfaces( trRefEntity_t *ent )` — the per-frame
 /// entry point that culls, sorts, transforms and renders every Ghoul2
 /// construct bolted to `ent`.
 ///
-/// DEFERRED: R4/escalation — whole-fn, no partial body survives (matching
-/// this file's own [`rb_surface_ghoul`] precedent for the identical
-/// situation):
-/// - The function's very first live statement (`CGhoul2Info_v &ghoul2 =
-///   *((CGhoul2Info_v *)ent->e.ghoul2)`) needs the entity's actual attached
-///   Ghoul2 instance list. [`RefEntity`] (`render_state::placeholders`, out
-///   of this file's edit scope) carries only `has_ghoul2: bool` — a
-///   presence flag, not a handle — because the tier-1 `refEntity_t`'s `*mut
-///   c_void` ghoul2 tail is forbidden interior (`## Type tiers` preamble)
-///   and no R2-licensed per-entity `Ghoul2System`/`CGhoul2Info_v` threading
-///   path exists yet. Every remaining line of the oracle body reads through
-///   that same `ghoul2` binding, so nothing past the first statement is
-///   reachable — there is no partial prefix to transcribe (unlike
-///   `render_surfaces`/`g2_construct_used_bone_list` in this same file,
-///   which get a real recursive skeleton before their blocked arm).
-/// - `HackadelicOnClient` (write) ESCALATES per this wave's own STATE HOMES
-///   table (DEC-37 A13.3: a per-subsystem state struct is licensed only "if
-///   this file's wave is where the subsystem lands"). It doesn't land here:
-///   its only other touch anywhere in the workspace is as a read the
-///   already-ported `mp_engine_ghoul2::render::{bone_cache,skeleton}` bone
-///   evaluation code hardcodes to `false` ("const-`false` server-side"
-///   ruling, out of this wave's edit scope) — naming a real mutable carrier
-///   here would silently diverge from that already-landed assumption rather
-///   than close it out.
-/// - `goreShader` (write) — cross-verified against the already-ported
-///   `Ghoul2System::gore_shader: qhandle_t` field
-///   (`mp_engine_ghoul2::ghoul2_system`, "folded from the file-scope
-///   `goreShader` per ruling 12") — is a genuine state home, but reaching it
-///   needs the same blocked `Ghoul2System`/entity-ghoul2 threading as the
-///   first bullet.
-/// - `R_GComputeFogNum`/`bInShadowRange`, two of this fn's own in-module
-///   callees, are themselves already `todo!()` in this file (their own
-///   blockers, both pre-existing).
-/// - `RenderSurfaces`'s surface-visible body is itself already `todo!()` in
-///   this file for independent reasons (see [`render_surfaces`]'s doc
-///   comment).
-/// - `ent->e.customSkin` is read by this body but is not a field
-///   [`RefEntity`] carries (it has `custom_shader`, not `customSkin`).
-///   `modelScale`/`radius`/`angles` were part of the same gap until campaign
-///   #41 batch 1 added all three to [`RefEntity`]; they are no longer
-///   blockers, and reading them off `ent` (instead of the explicit
-///   `model_scale`/`radius` parameters [`g2_compute_lod`]/[`r_g_cull_model`]
-///   thread) is the follow-up rewire.
+/// `ent->e.ghoul2` is decoded into `handle` at the entry seam
+/// (`R_AddEntitySurfaces`, `tr_main.rs`), so this body reaches the instance
+/// list through `CGhoul2Info_v { mItem: handle }` and the threaded
+/// `&mut Ghoul2System` (design point 1/2). The oracle's inline per-model
+/// transform loop is `g2_construct_render_skeleton` (`mp_engine_ghoul2`): it
+/// computes the root matrix (`RootMatrix`), sorts the models, and transforms
+/// each render-visible model off its bolt or the root matrix, exactly as this
+/// oracle body does before it renders. It returns the sorted model list, so the
+/// render loop reads the built caches in the same order with no second sort.
 ///
-/// Loud `todo!()` per the whole-fn-deferral convention.
+/// DEFERRED in this body:
+/// - Entity lighting (`R_SetupEntityLighting`, `:3438-3443`) — the deform that
+///   consumes it is a later backend wave, so the result is unread now.
+/// - The `bInShadowRange` shadow-plane adjust (`:3525-3528`) — `bInShadowRange`
+///   is still a marked stub in this file (needs `r_shadowRange` plus the shadow
+///   backend).
+/// - `_G2_GORE` (`gore`/`gore_shader`) — gore rendering is a later wave.
 ///
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:3383-3538`
 #[doc(alias = "R_AddGhoulSurfaces")]
-pub fn r_add_ghoul_surfaces(
+#[allow(clippy::too_many_arguments)]
+pub fn r_add_ghoul_surfaces<'a>(
     ent: &RefEntity,
+    handle: Ghoul2Handle,
+    host: &mut EngineHostView,
     assets: &RenderAssets,
-    frame: &mut FrameState,
+    models: &RenderModels,
+    view: &viewParms_t,
+    ori: &orientationr_t,
     cvars: &RendererCvars,
-    common: &Common,
+    frame: &FrameState,
+    g2: &mut Ghoul2System,
+    fogs: &[fog_t],
+    refdef_rdflags: i32,
+    shifted_entity_num: i32,
+    draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
 ) {
-    let _ = (ent, assets, frame, cvars, common);
-    todo!("Port R_AddGhoulSurfaces — oracle/codemp/renderer/tr_ghoul2.cpp:3383-3538")
+    let mut ghoul2 = CGhoul2Info_v { mItem: handle.0 };
+
+    if !ghoul2.is_valid(g2) {
+        return;
+    }
+
+    // if we don't want server ghoul2 models and this is one, or we just don't
+    // want ghoul2 models at all, then return
+    if host.common.cvar(cvars.r_noServerGhoul2).integer != 0 {
+        return;
+    }
+
+    if !g2_setup_model_pointers_v(g2, host, &ghoul2) {
+        return;
+    }
+
+    let current_time = g2api_get_time(g2, frame.refdef.time);
+
+    // cull the entire model if the merged bounding box is outside the frustum
+    let r_nocull_integer = host.common.cvar(cvars.r_nocull).integer;
+    let mut cull_out = 0;
+    let mut cull_in = 0;
+    let mut cull_clip = 0;
+    let cull = r_g_cull_model(
+        ent.model_scale,
+        ent.radius,
+        ori,
+        r_nocull_integer,
+        &view.frustum,
+        &mut cull_out,
+        &mut cull_in,
+        &mut cull_clip,
+    );
+    if cull == CULL_OUT {
+        return;
+    }
+
+    // don't add third_person objects if not in a portal
+    let personal_model = (ent.renderfx & RF_THIRD_PERSON) != 0 && view.isPortal == 0;
+
+    // DEFERRED: R_SetupEntityLighting (`:3438-3443`) — the deform that reads the
+    // lighting output is a later backend wave, so the call is not made yet.
+    // Source: oracle/codemp/renderer/tr_ghoul2.cpp:3438-3443
+
+    // see if we are in a fog volume
+    let fog_num = r_g_compute_fog_num(ent, fogs, refdef_rdflags);
+
+    // Transform every render-visible model's skeleton (root matrix + sort +
+    // per-model bolt or root transform, flags-gated). This is the oracle's
+    // inline transform loop. It returns the sort order so bolt-ons render
+    // against the right parent model without a second sort.
+    let model_list = g2_construct_render_skeleton(g2, host, &mut ghoul2, current_time, ent.model_scale);
+    let rdf_nofog = refdef_rdflags & RDF_NOFOG != 0;
+
+    // walk each model for this entity and render it out
+    for &i in &model_list {
+        let item = ghoul2.mItem;
+        let inst = &g2.info_array.get(item)[i as usize];
+
+        if !inst.valid
+            || (inst.flags & GHOUL2_NOMODEL) != 0
+            || (inst.flags & GHOUL2_NORENDER) != 0
+        {
+            continue;
+        }
+
+        // figure out the custom shader or the custom skin for this model
+        let (cust_shader, skin): (Option<ShaderHandle>, Option<SkinHandle>) =
+            if ent.custom_shader != 0 {
+                (
+                    Some(R_GetShaderByHandle(assets, host.common, ent.custom_shader)),
+                    None,
+                )
+            } else if inst.custom_skin != 0 {
+                (None, Some(R_GetSkinByHandle(assets, inst.custom_skin)))
+            } else if ent.custom_skin != 0 {
+                (None, Some(R_GetSkinByHandle(assets, ent.custom_skin)))
+            } else if inst.skin > 0
+                && u32::try_from(inst.skin)
+                    .ok()
+                    .and_then(|slot| assets.skins.handle_at_slot(slot))
+                    .is_some()
+            {
+                // Raven guards this arm with `mSkin > 0 && mSkin < tr.numSkins`
+                // (`:3489`). An out-of-range `mSkin` leaves `skin` NULL and
+                // falls through to the surface's own shader, so the arm entry
+                // needs the registered-slot probe, not just `mSkin > 0`.
+                (None, Some(R_GetSkinByHandle(assets, inst.skin)))
+            } else {
+                (None, None)
+            };
+
+        let current_model = models.get_model(inst.model);
+        let which_lod = g2_compute_lod(
+            ent,
+            ent.model_scale,
+            ent.radius,
+            current_model,
+            inst.lod_bias,
+            view,
+            host.common,
+            cvars,
+        );
+
+        // The bone transforms already ran through `g2_construct_render_skeleton`
+        // above, so the render only reads the built cache. Clone the surface
+        // and bolt lists into owned locals so the render surface borrows them
+        // instead of the arena (which the loop still reads by index).
+        let root_s_list = inst.slist.clone();
+        let mut bolt_list = inst.bltlist.clone();
+        let bone_cache = inst.bone_cache;
+        let surface_root = inst.surface_root;
+        // `render_surfaces` reads the model through its own `current_model`
+        // parameter, so the render surface's own `current_model` field is unread
+        // and stays `None`.
+        let model_handle = None;
+
+        // DEFERRED: the `RF_SHADOW_PLANE`/`bInShadowRange` `RF_NOSHADOW` adjust
+        // (`:3525-3528`) — `bInShadowRange` needs the shadow backend. The
+        // `RF_SHADOW_PLANE`/`RF_NOSHADOW` imports return with that wave.
+        // Source: oracle/codemp/renderer/tr_ghoul2.cpp:3525-3528
+        let renderfx = ent.renderfx;
+
+        let mut rs = CRenderSurface::new(
+            surface_root,
+            &root_s_list,
+            cust_shader,
+            fog_num,
+            personal_model,
+            bone_cache,
+            renderfx,
+            skin,
+            model_handle,
+            which_lod,
+            &mut bolt_list,
+            None,
+            None,
+        );
+
+        render_surfaces(
+            &mut rs,
+            current_model,
+            assets,
+            shifted_entity_num,
+            rdf_nofog,
+            draw_surfs,
+        );
+    }
 }

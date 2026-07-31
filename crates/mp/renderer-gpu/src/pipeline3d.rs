@@ -32,6 +32,7 @@ use std::collections::HashMap;
 use std::mem::size_of;
 
 use bytemuck::{Pod, Zeroable};
+use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::qfiles::draw_vert_t::drawVert_t;
 use mp_engine_qcommon::qfiles::md3_limits::MD3_XYZ_SCALE;
 use mp_engine_qcommon::qfiles::md3_surface_t::md3Surface_t;
@@ -48,9 +49,10 @@ use mp_renderer::tr_local::tex_coord_gen_t::texCoordGen_t;
 use mp_renderer::tr_local::tr_ref_entity_t::trRefEntity_t;
 use mp_renderer::tr_local::view_parms_t::viewParms_t;
 use mp_renderer::tr_main::{
-    DrawSurf, Md3SurfaceRef, R_DecomposeSort, R_RotateForEntity, SurfaceGeometry, TrMainScratch,
-    WorldSurfaceRef,
+    DrawSurf, G2SurfaceRef, Md3SurfaceRef, R_DecomposeSort, R_RotateForEntity, SurfaceGeometry,
+    TrMainScratch, WorldSurfaceRef,
 };
+use mp_renderer::tr_model::frontend::mdxm_view_of;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_noise::NoiseState;
 use mp_renderer::tr_shader::{
@@ -483,10 +485,11 @@ enum Warned {
     Glow,
     VideoMap,
     Md3Lighting,
+    Ghoul2Lighting,
 }
 
 impl Warned {
-    const COUNT: usize = 8;
+    const COUNT: usize = 9;
 
     fn slot(self) -> usize {
         match self {
@@ -498,6 +501,7 @@ impl Warned {
             Warned::Glow => 5,
             Warned::VideoMap => 6,
             Warned::Md3Lighting => 7,
+            Warned::Ghoul2Lighting => 8,
         }
     }
 
@@ -514,6 +518,9 @@ impl Warned {
             Warned::VideoMap => "draws a videoMap world stage as a plain stage — no cinematic yet",
             Warned::Md3Lighting => {
                 "draws an MD3 lighting-diffuse stage with the entity color — the vertex normal is dropped"
+            }
+            Warned::Ghoul2Lighting => {
+                "draws a Ghoul2 lighting-diffuse stage with the entity color — the vertex normal is dropped"
             }
         }
     }
@@ -545,6 +552,12 @@ pub struct WorldStats {
     /// MD3 draw surfs the decode dropped (a bad model handle or a purged model).
     /// This stays separate from `skipped_non_world` so the two causes read apart.
     pub md3_decode_failed: u32,
+    /// Ghoul2 (`MOD_MDXM`) entity surfaces that drew at least one stage pass.
+    pub ghoul2_surfaces_drawn: u32,
+    /// Ghoul2 draw surfs the decode dropped (a stale bone-cache handle, a null
+    /// mdxm block, or an empty surface). Separate from `skipped_non_world` so the
+    /// causes read apart.
+    pub ghoul2_decode_failed: u32,
 }
 
 /// The pipeline cache key: one pipeline per distinct blend state and depth
@@ -769,6 +782,7 @@ impl Pipeline3d {
         entities: &[trRefEntity_t],
         scratch: &mut TrMainScratch,
         models: &RenderModels,
+        g2: &mut Ghoul2System,
     ) -> WorldStats {
         let mut stats = WorldStats::default();
 
@@ -793,6 +807,7 @@ impl Pipeline3d {
             &slot_map,
             entities,
             models,
+            g2,
         );
 
         if items.is_empty() {
@@ -953,6 +968,7 @@ impl Pipeline3d {
         slot_map: &HashMap<i32, u32>,
         entities: &[trRefEntity_t],
         models: &RenderModels,
+        g2: &mut Ghoul2System,
     ) -> Vec<StageDrawItem> {
         let mut items: Vec<StageDrawItem> = Vec::new();
 
@@ -986,6 +1002,23 @@ impl Pipeline3d {
                         slot_map,
                         entities,
                         models,
+                        &mut items,
+                    );
+                }
+                SurfaceGeometry::Ghoul2(g2_ref) => {
+                    self.collect_ghoul2_surface(
+                        surf.sort,
+                        g2_ref,
+                        assets,
+                        noise,
+                        float_time,
+                        dynamic_vertices,
+                        dynamic_indices,
+                        stats,
+                        slot_map,
+                        entities,
+                        models,
+                        g2,
                         &mut items,
                     );
                 }
@@ -1148,7 +1181,7 @@ impl Pipeline3d {
             if stage.rgb_gen == colorGen_t::CGEN_LIGHTING_DIFFUSE {
                 self.warn_once(Warned::Md3Lighting);
             }
-            let item = self.build_md3_stage_item(
+            let item = self.build_cpu_surface_stage_item(
                 shader,
                 stage,
                 &md3_vertices,
@@ -1167,6 +1200,108 @@ impl Pipeline3d {
         if items.len() > before {
             stats.surfaces_drawn += 1;
             stats.md3_surfaces_drawn += 1;
+            if entity_num != TR_WORLDENT {
+                stats.entity_surfaces_drawn += 1;
+            }
+        }
+    }
+
+    /// Resolves one Ghoul2 (`MOD_MDXM`) entity draw surf: it deforms the
+    /// surface's vertices on the CPU per frame by the lerped bone matrices
+    /// (`RB_SurfaceGhoul`, the non-gore main arm), packs its indices into the
+    /// per-frame index buffer, then draws one dynamic-buffer pass per active
+    /// stage with the entity's per-entity clip matrix and shader clock.
+    ///
+    /// The shared per-stage build is [`Self::build_cpu_surface_stage_item`], the
+    /// same path the MD3 surface uses.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:4060-4451` (the non-gore
+    /// main arm)
+    #[allow(clippy::too_many_arguments)]
+    fn collect_ghoul2_surface(
+        &mut self,
+        sort: u32,
+        g2_ref: G2SurfaceRef,
+        assets: &RenderAssets,
+        noise: &NoiseState,
+        float_time: f32,
+        dynamic_vertices: &mut Vec<WorldVertex>,
+        dynamic_indices: &mut Vec<u32>,
+        stats: &mut WorldStats,
+        slot_map: &HashMap<i32, u32>,
+        entities: &[trRefEntity_t],
+        models: &RenderModels,
+        g2: &mut Ghoul2System,
+        items: &mut Vec<StageDrawItem>,
+    ) {
+        let (entity_num, shader_handle, _fog_num, _dlight_map) =
+            R_DecomposeSort(sort, &assets.sorted_shaders);
+        let Some(shader) = assets.shaders.get(shader_handle) else {
+            return;
+        };
+
+        let slot = slot_map.get(&entity_num).copied().unwrap_or(0);
+        let globals_offset = (slot as u64 * GLOBALS_STRIDE) as u32;
+        let entity_float_time = float_time - entity_shader_time(entities, entity_num);
+        // The identity-light default vertex colour is the entity's shaderRGBA.
+        let rgba = entities
+            .get(entity_num as usize)
+            .map(|ent| ent.e.shaderRGBA)
+            .unwrap_or([255, 255, 255, 255]);
+
+        // Deform the surface by the lerped bones and read the triangle indices.
+        let Some((g2_vertices, g2_index_block)) =
+            decode_ghoul2_surface(models, g2, g2_ref, rgba)
+        else {
+            stats.ghoul2_decode_failed += 1;
+            return;
+        };
+        if g2_index_block.is_empty() {
+            stats.empty_surfaces += 1;
+            return;
+        }
+
+        // The sky chain is a later wave. A Ghoul2 sky-parms shader skips whole.
+        if shader.sky.is_some() {
+            self.warn_once(Warned::SkyParms);
+            stats.skipped_sky += 1;
+            return;
+        }
+        if shader.fog_parms.is_some() {
+            self.warn_once(Warned::Fog);
+        }
+
+        // One shared index block per surface, in the per-frame index buffer.
+        let first_index = dynamic_indices.len() as u32;
+        let index_count = g2_index_block.len() as u32;
+        dynamic_indices.extend_from_slice(&g2_index_block);
+
+        let before = items.len();
+        for stage in shader.stages.iter().filter(|stage| stage.active) {
+            // CGEN_LIGHTING_DIFFUSE needs the vertex normal, which this wave
+            // drops, so the stage draws with the entity colour instead.
+            if stage.rgb_gen == colorGen_t::CGEN_LIGHTING_DIFFUSE {
+                self.warn_once(Warned::Ghoul2Lighting);
+            }
+            let item = self.build_cpu_surface_stage_item(
+                shader,
+                stage,
+                &g2_vertices,
+                first_index,
+                index_count,
+                entity_float_time,
+                noise,
+                assets,
+                dynamic_vertices,
+                globals_offset,
+            );
+            if let Some(item) = item {
+                items.push(item);
+            }
+        }
+        if items.len() > before {
+            stats.surfaces_drawn += 1;
+            stats.ghoul2_surfaces_drawn += 1;
             if entity_num != TR_WORLDENT {
                 stats.entity_surfaces_drawn += 1;
             }
@@ -1339,8 +1474,9 @@ impl Pipeline3d {
         }
     }
 
-    /// Resolves one active MD3 stage into its draw pass. MD3 vertices live only
-    /// on the CPU (they are keyframe-lerped per frame), so every stage builds a
+    /// Resolves one active stage of a CPU-decoded entity surface (MD3 or Ghoul2)
+    /// into its draw pass. These surfaces live only on the CPU - MD3 is
+    /// keyframe-lerped, Ghoul2 is bone-deformed - so every stage builds a
     /// per-stage dynamic vertex block from the decoded surface, runs the stage's
     /// texcoord and colour evaluators over it, and draws it single-textured. The
     /// shared index block already sits in the per-frame index buffer.
@@ -1350,11 +1486,11 @@ impl Pipeline3d {
     ///
     /// Source: `oracle/codemp/renderer/tr_shade.cpp:2136-2158`
     #[allow(clippy::too_many_arguments)]
-    fn build_md3_stage_item(
+    fn build_cpu_surface_stage_item(
         &mut self,
         shader: &ShaderAsset,
         stage: &ShaderStage,
-        md3_vertices: &[WorldVertex],
+        cpu_vertices: &[WorldVertex],
         first_index: u32,
         index_count: u32,
         float_time: f32,
@@ -1399,7 +1535,7 @@ impl Pipeline3d {
         // The MD3 vertices are CPU-only, so every stage builds its own block in
         // the dynamic vertex buffer.
         let base_vertex = build_dynamic_block(
-            md3_vertices,
+            cpu_vertices,
             stage,
             source,
             false,
@@ -1943,6 +2079,99 @@ fn decode_md3_surface(
 
         Some((vertices, indices))
     }
+}
+
+/// Deforms one Ghoul2 (`MOD_MDXM`) surface into GPU vertices and triangle
+/// indices. Each vertex sums its weighted bones (`RB_SurfaceGhoul`, the non-gore
+/// main arm): the bone matrix per weight comes from the surface's bone-cache
+/// `EvalRender`, and the packed normal is dropped this wave, the same way
+/// [`WorldVertex`] drops the BSP normal. The texcoords come from the parallel
+/// texcoord array, and the vertex colour is the entity's `shaderRGBA`.
+///
+/// Returns `None` when the model has no mdxm block or the bone-cache handle is
+/// stale, so the caller skips the surface.
+///
+/// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:4060-4451` (the non-gore main
+/// arm)
+fn decode_ghoul2_surface(
+    models: &RenderModels,
+    g2: &mut Ghoul2System,
+    g2_ref: G2SurfaceRef,
+    rgba: [u8; 4],
+) -> Option<(Vec<WorldVertex>, Vec<u32>)> {
+    let model = models.get_model(g2_ref.model);
+    // The render surface only reaches here for a live `MOD_MDXM` model whose
+    // `mdxm` block the loader filled. A null block is not renderable, so it
+    // drops rather than reach `mdxm_view_of`'s null deref.
+    if model.mdxm.is_null() {
+        return None;
+    }
+    let mdxm = mdxm_view_of(model);
+    let surface = mdxm.find_surface(g2_ref.surface_index, g2_ref.lod);
+
+    let num_verts = surface.num_verts();
+    let num_tris = surface.num_triangles();
+
+    // The triangle indices are 0-based within this surface's own vertex block.
+    let mut indices: Vec<u32> = Vec::with_capacity((num_tris * 3) as usize);
+    for j in 0..num_tris {
+        let t = surface.triangle(j);
+        indices.push(t[0] as u32);
+        indices.push(t[1] as u32);
+        indices.push(t[2] as u32);
+    }
+
+    // A stale or absent bone-cache handle means the skeleton never built, so the
+    // surface is not renderable (Raven's null `boneCache`).
+    let cache = g2.bone_caches.get_mut(g2_ref.bone_cache)?;
+
+    // DEFERRED: this loop follows Raven's dead `#if 0` weight arm
+    // (`:4263-4302`), which reads every weight through `G2_GetVertBoneWeight`.
+    // The shipped arm (`:4313-4374`) special-cases 1 and 2 weights
+    // (`fBoneWeight * (t1 - t2) + t2` for two weights) and closes the last
+    // weight with `1.0f - fTotalWeight` outside the loop. The two arms are
+    // algebraically equal, so this is a last-bit floating-point association
+    // difference. No ghoul2-vertex differential golden gates it yet, so the
+    // byte-faithful shipped arm waits for that harness (porting-rules A2/F18).
+    // Source: oracle/codemp/renderer/tr_ghoul2.cpp:4313-4374
+    let mut vertices: Vec<WorldVertex> = Vec::with_capacity(num_verts as usize);
+    for j in 0..num_verts {
+        let vert = surface.vert(j);
+        let num_weights = vert.num_weights();
+        let mut total_weight = 0.0f32;
+        let vert_coords = vert.vert_coords();
+        let mut p = [0.0f32; 3];
+        for k in 0..num_weights {
+            let bone_index = vert.bone_index(k);
+            let weight = vert.bone_weight(k, &mut total_weight, num_weights);
+            let bone_ref = surface.bone_ref(bone_index);
+            // `EvalRender` lazily evaluates and smooths the bone, matching
+            // Raven's `bones->EvalRender(piBoneReferences[boneIndex])`.
+            let m = cache.eval_render(bone_ref);
+            for row in 0..3 {
+                p[row] += weight
+                    * (m.matrix[row][0] * vert_coords[0]
+                        + m.matrix[row][1] * vert_coords[1]
+                        + m.matrix[row][2] * vert_coords[2]
+                        + m.matrix[row][3]);
+            }
+        }
+
+        // DEFERRED: RB_SurfaceGhoul normal deform — the oracle transforms
+        // `v->normal` by bone 0 into `tess.normal`. This wave drops it, the same
+        // way `WorldVertex` drops the BSP normal, so lit Ghoul2 stages fall back
+        // to the entity colour.
+        // Source: oracle/codemp/renderer/tr_ghoul2.cpp:4308-4310
+        let st = surface.texcoord(j);
+        vertices.push(WorldVertex {
+            position: p,
+            st,
+            lightmap_st: st,
+            color: rgba,
+        });
+    }
+
+    Some((vertices, indices))
 }
 
 /// The CPU keyframe lerp of one MD3 surface's vertices (`LerpMeshVertexes`),

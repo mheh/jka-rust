@@ -40,6 +40,7 @@
 //! image has not been uploaded. Both log once per process rather than dropping
 //! the quad.
 
+use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::cm_terrain::CmLandScape;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::qfiles::font_style::SET_MASK;
@@ -198,6 +199,10 @@ pub struct WorldFrame<'a, 'e> {
     pub assets: &'a mut RenderAssets,
     pub cvars: &'a mut RendererCvars,
     pub frame: &'a mut FrameState,
+    /// The engine's Ghoul2 instance owner, threaded into `R_RenderView` so the
+    /// entity walk reaches `R_AddGhoulSurfaces`. A caller with no live Ghoul2
+    /// state (the golden test, the world spike) threads an empty owned system.
+    pub g2: &'a mut Ghoul2System,
     pub gpu_res: &'a mut GpuResources,
     pub models: &'a RenderModels,
     pub land_scape: &'a srfTerrain_t,
@@ -576,6 +581,7 @@ impl FrameExecutor {
             world.assets,
             world.cvars,
             world.frame,
+            world.g2,
             world.gpu_res,
             frame_data,
             &abi_refdef,
@@ -608,6 +614,7 @@ impl FrameExecutor {
             &entities,
             world.scratch,
             world.models,
+            world.g2,
         )
     }
 

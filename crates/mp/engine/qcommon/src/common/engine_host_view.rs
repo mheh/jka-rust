@@ -33,7 +33,9 @@ use crate::collision_world::CollisionWorld;
 use crate::common::common::{com_printf, Common};
 use crate::common::error::com_error;
 use crate::common::opaque_slots::{BotLib, Client, Ghoul2System, RenderModels, RmManager, Server};
-use crate::cvar_fns::{Cvar_FindVar, Cvar_Get, Cvar_VariableIntegerValue, Cvar_VariableString};
+use crate::cvar_fns::{
+    Cvar_FindVar, Cvar_Get, Cvar_VariableIntegerValue, Cvar_VariableString, Cvar_VariableValue,
+};
 use crate::files_common::{FS_FCloseFile, FS_FreeFile, FS_ListFiles, FS_ReadFile, FS_Write};
 use crate::files_pc::{FS_FOpenFileByMode, FS_FileIsInPAK};
 use crate::sys_net::Sys_IsLANAddress;
@@ -186,6 +188,12 @@ impl EngineHost for EngineHostView<'_> {
     /// Source: `oracle/codemp/qcommon/cvar.cpp:118-124`
     fn cvar_integer(&mut self, name: &str) -> i32 {
         Cvar_VariableIntegerValue(self.common, name)
+    }
+
+    /// Raven `Cvar_VariableValue` (unregistered name reads 0.0).
+    /// Source: `oracle/codemp/qcommon/cvar.cpp:105-111`
+    fn cvar_value(&mut self, name: &str) -> f32 {
+        Cvar_VariableValue(self.common, name)
     }
 
     /// Raven `svs.time` — server-installed accessor.

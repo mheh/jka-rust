@@ -529,7 +529,7 @@ pub fn RB_CalcSpecularAlpha(
     shade_state: &ShadeCalcState,
 ) {
     // this is a model so we can use world lights instead fake light
-    let entity_light_dir = current_entity.filter(|ent| ent.h_model != 0 || ent.has_ghoul2);
+    let entity_light_dir = current_entity.filter(|ent| ent.h_model != 0 || ent.has_ghoul2());
 
     for ((v, n), a) in xyz.iter().zip(normal.iter()).zip(alphas.iter_mut()) {
         let v3 = [v[0], v[1], v[2]];

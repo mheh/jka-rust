@@ -20,6 +20,10 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use mp_engine_core::Engine;
+use mp_engine_ghoul2::api_models::g2api_init_ghoul2_model;
+use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
+use mp_engine_ghoul2::info_array::Ghoul2Handle;
+use mp_engine_ghoul2::shared::cghoul2_info_v::CGhoul2Info_v;
 use mp_engine_qcommon::cm_terrain::CmLandScape;
 use mp_engine_server::Server;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
@@ -33,7 +37,9 @@ use mp_renderer::tr_local::fog_t::fog_t;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
 use mp_renderer::tr_main::TrMainScratch;
 use mp_renderer::tr_model::render_models::RenderModels;
-use mp_renderer::tr_scene::{RE_AddRefEntityToScene, RE_ClearScene, RE_RenderScene};
+use mp_renderer::tr_scene::{
+    ghoul2_token_encode, RE_AddRefEntityToScene, RE_ClearScene, RE_RenderScene,
+};
 use mp_renderer_gpu::ui_host::boot;
 use mp_renderer_gpu::ui_host::{BootConfig, UiHost};
 use mp_renderer_gpu::{FrameExecutor, FrameStats, Gpu, GpuImages, WorldFrame};
@@ -72,6 +78,18 @@ const MD3_SPIN_RATE: f32 = 45.0;
 /// The map object the MD3 test entity draws — the model duel1 mounts on its
 /// func_bobbing.
 const MD3_MODEL_NAME: &str = "models/map_objects/bespin/twinpodcc.md3";
+
+/// The Ghoul2 (`.glm`) skinned model the third test entity draws — a shipped
+/// player model in its base skeleton pose (no animation).
+const GHOUL2_MODEL_NAME: &str = "models/players/stormtrooper/model.glm";
+
+/// The Ghoul2 test entity's height above the brush entity's geometry center,
+/// beside the MD3 entity.
+const GHOUL2_LIFT: f32 = 64.0;
+
+/// The Ghoul2 test entity's sideways offset from the MD3 entity, so the two do
+/// not overlap.
+const GHOUL2_SIDE_OFFSET: f32 = 96.0;
 
 /// The free-fly camera. `pitch`/`yaw` are Raven view angles in degrees.
 struct Camera {
@@ -112,6 +130,16 @@ struct App {
     /// The world-space point the MD3 test entity sits above (the `*1` geometry
     /// center, or the eye when the map has no inline model).
     md3_center: [f32; 3],
+    /// The live Ghoul2 state, threaded into every `WorldFrame`. It holds the
+    /// bone caches the render path builds each frame, so it persists across
+    /// frames rather than reset per frame.
+    g2: Ghoul2System,
+    /// The Ghoul2 instance handle the third test entity carries in its
+    /// `refEntity_t.ghoul2` token, `None` when the `.glm` file is absent.
+    ghoul2_handle: Option<Ghoul2Handle>,
+    /// The `.glm` model handle the Ghoul2 test entity draws (its `hModel`), 0
+    /// when the model file is absent.
+    ghoul2_model: qhandle_t,
     /// The movement keys currently held down.
     keys: HashSet<KeyCode>,
     start: Instant,
@@ -132,6 +160,9 @@ impl App {
         test_model: qhandle_t,
         md3_model: qhandle_t,
         md3_center: [f32; 3],
+        g2: Ghoul2System,
+        ghoul2_handle: Option<Ghoul2Handle>,
+        ghoul2_model: qhandle_t,
     ) -> App {
         App {
             window: None,
@@ -155,6 +186,9 @@ impl App {
             test_model,
             md3_model,
             md3_center,
+            g2,
+            ghoul2_handle,
+            ghoul2_model,
             keys: HashSet::new(),
             start: Instant::now(),
             last_frame: Instant::now(),
@@ -252,6 +286,7 @@ impl App {
         RE_ClearScene(&mut frame_data, &mut self.host.scene);
         self.record_test_entity(&mut frame_data, refdef.time);
         self.record_md3_entity(&mut frame_data, refdef.time);
+        self.record_ghoul2_entity(&mut frame_data, refdef.time);
 
         RE_RenderScene(
             refdef,
@@ -321,6 +356,43 @@ impl App {
         RE_AddRefEntityToScene(frame_data, &self.host.assets, &mut self.host.scene, &ent);
     }
 
+    /// Records the Ghoul2 skinned test entity through `RE_AddRefEntityToScene`.
+    /// It sits beside the MD3 entity above the brush entity's geometry center,
+    /// with the same vertical bob plus a slow yaw spin, and carries the Ghoul2
+    /// instance handle in its `refEntity_t.ghoul2` token. The render path builds
+    /// the skeleton and deforms the surfaces each frame. A missing model handle
+    /// or instance skips the entity.
+    fn record_ghoul2_entity(&mut self, frame_data: &mut FrameData, time_ms: i32) {
+        let Some(handle) = self.ghoul2_handle else {
+            return;
+        };
+        if self.ghoul2_model == 0 {
+            return;
+        }
+
+        let seconds = time_ms as f32 * 0.001;
+        let bob_phase = seconds / ENTITY_BOB_PERIOD * std::f32::consts::TAU;
+        let bob = ENTITY_BOB_AMPLITUDE * bob_phase.sin();
+        let yaw = (seconds * MD3_SPIN_RATE) % 360.0;
+
+        let mut ent = refEntity_t::zeroed();
+        ent.reType = refEntityType_t::RT_MODEL;
+        ent.hModel = self.ghoul2_model;
+        ent.ghoul2 = ghoul2_token_encode(Some(handle));
+        ent.origin = [
+            self.md3_center[0] + GHOUL2_SIDE_OFFSET,
+            self.md3_center[1],
+            self.md3_center[2] + GHOUL2_LIFT + bob,
+        ];
+        ent.oldorigin = ent.origin;
+        ent.frame = 0;
+        ent.oldframe = 0;
+        ent.shaderRGBA = [255, 255, 255, 255];
+        AnglesToAxis([0.0, yaw, 0.0], ent.axis.as_mut_ptr());
+
+        RE_AddRefEntityToScene(frame_data, &self.host.assets, &mut self.host.scene, &ent);
+    }
+
     /// One frame: advance the camera, record the scene, draw it.
     fn frame(&mut self) {
         let now = Instant::now();
@@ -352,6 +424,8 @@ impl App {
             scratch,
             reported,
             md3_model,
+            g2,
+            ghoul2_handle,
             ..
         } = self;
         let (Some(gpu), Some(executor), Some(images), Some(window)) = (
@@ -399,11 +473,15 @@ impl App {
                     let sv_ptr: *mut () = sv as *mut Server as *mut ();
                     let mut engine_view = boot::host_view(common, cm, sv_ptr, models_ptr);
 
+                    // The persisted Ghoul2 state threads into the frame, so the
+                    // bone caches the render path builds survive across frames
+                    // (design point 2).
                     let mut world = WorldFrame {
                         engine_view: &mut engine_view,
                         assets,
                         cvars,
                         frame: fstate,
+                        g2,
                         gpu_res,
                         models: &*models,
                         land_scape: &*land_scape,
@@ -432,7 +510,7 @@ impl App {
 
                 if !*reported {
                     *reported = true;
-                    report(&stats, *md3_model);
+                    report(&stats, *md3_model, *ghoul2_handle);
                 }
                 gpu.present(frame);
             }
@@ -536,12 +614,14 @@ impl ApplicationHandler for App {
     }
 }
 
-fn report(stats: &FrameStats, md3_model: qhandle_t) {
+fn report(stats: &FrameStats, md3_model: qhandle_t, ghoul2_handle: Option<Ghoul2Handle>) {
+    let ghoul2_handle = ghoul2_handle.map(|h| h.0).unwrap_or(-1);
     println!(
         "world_harness: first frame — {} images uploaded, {} world surfaces drawn \
          ({} lightmapped, {} draw calls), {} non-world skipped, {} empty surfaces, \
          {} entities ({} entity surfaces drawn), md3 handle {} ({} md3 entity surfaces, \
-         {} md3 decode failed)",
+         {} md3 decode failed), ghoul2 handle {} ({} ghoul2 surfaces drawn, \
+         {} ghoul2 decode failed)",
         stats.images_uploaded,
         stats.world.surfaces_drawn,
         stats.world.lightmapped,
@@ -553,7 +633,40 @@ fn report(stats: &FrameStats, md3_model: qhandle_t) {
         md3_model,
         stats.world.md3_surfaces_drawn,
         stats.world.md3_decode_failed,
+        ghoul2_handle,
+        stats.world.ghoul2_surfaces_drawn,
+        stats.world.ghoul2_decode_failed,
     );
+}
+
+/// Inits one Ghoul2 model instance through the real `mp_engine_ghoul2` init
+/// path (`G2API_InitGhoul2Model`). It allocates a `CGhoul2Info_v` handle, loads
+/// the `.glm` through the renderer model path the init helper drives, and reads
+/// back the instance's model handle. Returns the live system, the instance
+/// handle for the `refEntity_t.ghoul2` token, and the model handle for
+/// `hModel`. Returns `None` when the model file is absent (the init returns a
+/// negative model index), so the harness draws no Ghoul2 entity.
+fn init_ghoul2(host: &mut UiHost, name: &str) -> Option<(Ghoul2System, Ghoul2Handle, qhandle_t)> {
+    let mut g2 = Ghoul2System::default();
+    let mut info = CGhoul2Info_v { mItem: 0 };
+    info.alloc(&mut g2);
+
+    let model_index = {
+        let UiHost {
+            engine, models, ..
+        } = &mut *host;
+        let models_ptr: *mut RenderModels = &mut *models;
+        let Engine { common, cm, sv, .. } = &mut **engine;
+        let sv_ptr: *mut () = sv as *mut Server as *mut ();
+        let mut view = boot::host_view(common, cm, sv_ptr, models_ptr);
+        g2api_init_ghoul2_model(&mut g2, &mut view, &mut info, name, 0, 0, 0, 0, 0)
+    };
+    if model_index < 0 {
+        return None;
+    }
+
+    let model_handle = info.get(&g2, 0).model;
+    Some((g2, Ghoul2Handle(info.mItem), model_handle))
 }
 
 fn main() {
@@ -631,6 +744,25 @@ fn main() {
     // when the map has no inline model.
     let md3_center = entity_center.unwrap_or(eye);
 
+    // Init one Ghoul2 model through the real init path. A missing `.glm` file
+    // leaves the state empty and the harness draws no Ghoul2 entity.
+    let (g2, ghoul2_handle, ghoul2_model) = match init_ghoul2(&mut host, GHOUL2_MODEL_NAME) {
+        Some((g2, handle, model)) => {
+            println!(
+                "world_harness: ghoul2 entity model {GHOUL2_MODEL_NAME} = {model}, \
+                 instance handle {}",
+                handle.0
+            );
+            (g2, Some(handle), model)
+        }
+        None => {
+            println!(
+                "world_harness: Ghoul2 model {GHOUL2_MODEL_NAME} absent, skipping ghoul2 entity"
+            );
+            (Ghoul2System::default(), None, 0)
+        }
+    };
+
     let dummy_assets = boot::empty_assets();
     let mut app = App::new(
         host,
@@ -640,6 +772,9 @@ fn main() {
         test_model,
         md3_model,
         md3_center,
+        g2,
+        ghoul2_handle,
+        ghoul2_model,
     );
 
     // Point the first view at the entity geometry (Raven vectoangles shape:

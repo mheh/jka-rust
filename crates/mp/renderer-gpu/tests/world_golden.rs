@@ -22,6 +22,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use mp_engine_core::Engine;
+use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::cm_terrain::CmLandScape;
 use mp_engine_server::Server;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
@@ -242,11 +243,15 @@ fn golden_world_duel1() {
         let sv_ptr: *mut () = sv as *mut Server as *mut ();
         let mut engine_view = boot::host_view(common, cm, sv_ptr, models_ptr);
 
+        // The golden test has no live Ghoul2 state, so it threads an empty
+        // owned system (design point 2).
+        let mut g2_system = Ghoul2System::default();
         let mut world = WorldFrame {
             engine_view: &mut engine_view,
             assets,
             cvars,
             frame: fstate,
+            g2: &mut g2_system,
             gpu_res,
             models: &*models,
             land_scape: &land_scape,

@@ -25,6 +25,7 @@
 //! `PolyVert` alias `mp_qshared`'s `vec3_t`/`polyVert_t` rather than duplicate
 //! them.
 
+use mp_engine_ghoul2::info_array::Ghoul2Handle;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::refdef_t::MAX_MAP_AREA_BYTES;
@@ -160,9 +161,12 @@ pub struct RefEntity {
     ///
     /// Source: `oracle/codemp/cgame/tr_types.h:245`
     pub model_scale: Vec3,
-    /// `e.ghoul2 != NULL` — a presence flag, not the pointer: the tier-1
-    /// `*mut c_void` tail is forbidden interior.
-    pub has_ghoul2: bool,
+    /// The entity's attached Ghoul2 instance list, decoded from the tier-1
+    /// `*mut c_void ghoul2` token (`ghoul2_token_decode`, `tr_scene.rs`). Raven
+    /// carries a raw `CGhoul2Info_v *`. The render side threads a
+    /// `&mut Ghoul2System` and looks the list up by this `Ghoul2Handle`, so no
+    /// raw pointer crosses the seam.
+    pub ghoul2: Option<Ghoul2Handle>,
     /// `needDlights` — Raven: true for bmodels that touch a dlight.
     pub need_dlights: bool,
     /// `lightingCalculated`.
@@ -180,6 +184,13 @@ pub struct RefEntity {
     pub directed_light: Vec3,
     /// `dlightBits`.
     pub dlight_bits: i32,
+}
+
+impl RefEntity {
+    /// Raven's `ent->e.ghoul2 != NULL` presence test, now a live-handle test.
+    pub fn has_ghoul2(&self) -> bool {
+        self.ghoul2.is_some()
+    }
 }
 
 // `refEntityType_t` has no `Default`, so `RefEntity`'s cannot be derived;
@@ -209,7 +220,7 @@ impl Default for RefEntity {
             saber_length: 0.0,
             angles: [0.0; 3],
             model_scale: [0.0; 3],
-            has_ghoul2: false,
+            ghoul2: None,
             need_dlights: false,
             lighting_calculated: false,
             light_dir: [0.0; 3],

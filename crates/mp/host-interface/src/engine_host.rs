@@ -120,6 +120,13 @@ pub trait EngineHost {
     /// Source: `oracle/codemp/qcommon/cvar.cpp:118-124`
     fn cvar_integer(&mut self, name: &str) -> i32;
 
+    /// Per-call float cvar read (ruling 36) — collapses Raven's cached
+    /// `cvar_t->value` reads, used by the ghoul2 render smoothing control
+    /// (`r_ghoul2animsmooth`, `tr_ghoul2.cpp:2151`). An unregistered name
+    /// reads 0.0, as `Cvar_VariableValue` does.
+    /// Source: `oracle/codemp/qcommon/cvar.cpp:105-111`
+    fn cvar_value(&mut self, name: &str) -> f32;
+
     /// Raven `svs.time` — the `serverStatic_t` frame clock ("strictly
     /// increasing across level changes"), consumed by nav's failed-node/edge
     /// recheck timers (`navigator.cpp:1733,1763,1778,1797,1987,2010,2065,
@@ -349,6 +356,10 @@ impl<T: EngineHost + ?Sized> EngineHost for &mut T {
 
     fn cvar_integer(&mut self, name: &str) -> i32 {
         (**self).cvar_integer(name)
+    }
+
+    fn cvar_value(&mut self, name: &str) -> f32 {
+        (**self).cvar_value(name)
     }
 
     fn sv_time(&mut self) -> i32 {

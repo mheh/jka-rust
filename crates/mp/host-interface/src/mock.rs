@@ -43,6 +43,7 @@ use core::ffi::{c_char, c_ulong, c_void};
 
 use std::collections::{BTreeMap, VecDeque};
 
+use native_string::atof::atof;
 use native_string::atoi::atoi;
 
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;
@@ -350,6 +351,13 @@ impl EngineHost for MockHost {
         // atoi(var->string)` invariant. Missing name reads 0
         // (Cvar_VariableIntegerValue, cvar.cpp:118-124).
         self.cvars.get(name).map(|c| atoi(&c.string)).unwrap_or(0)
+    }
+
+    fn cvar_value(&mut self, name: &str) -> f32 {
+        // Derived from the string per read — Raven's `var->value =
+        // atof(var->string)` invariant. Missing name reads 0.0
+        // (Cvar_VariableValue, cvar.cpp:105-111).
+        self.cvars.get(name).map(|c| atof(&c.string) as f32).unwrap_or(0.0)
     }
 
     fn sv_time(&mut self) -> i32 {
