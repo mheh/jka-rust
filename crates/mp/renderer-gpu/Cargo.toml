@@ -28,3 +28,8 @@ mp_ui = { path = "../ui" }
 mp_uishared = { path = "../uishared" }
 native_math = { path = "../../native/math" }
 native_string = { path = "../../native/string" }
+
+[dev-dependencies]
+# The R4 image-golden gate writes and reads the committed world goldens as PNG.
+# DEC-49 allows plain image deps in this crate family (zune-jpeg precedent).
+png = "0.18.1"

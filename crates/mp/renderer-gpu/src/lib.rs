@@ -58,7 +58,7 @@ pub mod ui_host;
 
 pub use blend::{blend_state_from_gls, ALPHA_BLEND, GLS_2D_DEFAULT};
 pub use frame_exec::{FrameExecutor, FrameStats, WorldFrame};
-pub use gpu::{FrameError, Gpu};
+pub use gpu::{read_target_rgba, FrameError, Gpu};
 pub use gpu_images::{GpuImage, GpuImages};
 pub use pipeline2d::{Pipeline2d, QuadBatch, Rect, UvRect, SCREEN_HEIGHT, SCREEN_WIDTH};
 pub use pipeline3d::{

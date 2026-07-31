@@ -3,3 +3,4 @@ __pycache__/
 *.py[cod]
 .claude/worktrees/
 tools/closure-prototype/out/
+crates/mp/renderer-gpu/tests/goldens/*.actual.png
