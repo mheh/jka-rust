@@ -1347,3 +1347,19 @@ thin - no drawSurf serialization crosses it. Proof: `world_spike` loads
 (50 faces, 5 grids, 2 tris), 97 visible leaves, no panic. The rejected
 alternative (Raven-literal trap-side traversal with a fat serialized seam)
 is closed.
+
+## DEC-51 — ghoul2 render threading + smoothing restore (ruled 2026-07-31)
+
+Two rulings for the E3 ghoul2 render wave. First, the instance carrier:
+the `refEntity_t.ghoul2` pointer field carries the `Ghoul2System` instance
+id as a token (id plus 1, null means none), the `RefEntity` payload holds
+the decoded id, and the executor threads `&mut Ghoul2System` through
+`WorldFrame` into `R_AddGhoulSurfaces`. This is the DEC-35 arena-and-id
+shape, and it matches retail MP, where the engine owns every ghoul2
+instance and cgame holds opaque engine pointers. Second, the client
+smoothing arm returns in the same wave: the oracle file-scope
+`HackadelicOnClient` bool becomes an explicit `render_traversal`
+parameter, the folded client branches are restored from the oracle, every
+server caller passes false, and the lockstep referee plus the cgame
+replay referee gate the wave to prove the server path stays
+byte-identical.
