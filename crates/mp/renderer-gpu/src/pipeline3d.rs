@@ -8,16 +8,25 @@
 //! diffuse and lightmap textures under a depth test.
 //!
 //! One clip matrix (group 0), a diffuse-plus-lightmap texture pair (group 1),
-//! and a per-surface `has_lightmap` flag (group 2, dynamic offset) drive the
-//! `world.wgsl` shader. The fragment output is `diffuse.rgb * lightmap.rgb` on
-//! a lightmapped surface, or `diffuse.rgb * vertex_color.rgb` where no lightmap
-//! exists.
+//! and a per-pass flags block (group 2, dynamic offset) drive the `world.wgsl`
+//! shader. `RB_IterateStagesGeneric` draws one pass per active stage over the
+//! same geometry, so this module draws one indexed pass per active stage per
+//! surface, in stage order. Each pass carries its own image, its own blend and
+//! depth state from `pStage->stateBits`, and its own per-vertex colours and
+//! texcoords.
 //!
-//! Out of this wave: tcMod, animMap, rgbGen waves, fog, and multi-stage
-//! shaders. Each is counted and warned once in the `frame_exec` `Warned` style.
+//! A stage whose bundle needs no per-frame vertex work (no tcMods, no waveform
+//! colour) draws from the static world buffer. A stage with dynamic texcoords
+//! or colours gets its per-vertex data evaluated on the CPU each frame through
+//! the shared `stage2d` evaluators and written to a per-frame dynamic buffer.
+//!
+//! Out of this wave: fog (warned) and the sky chain (skipped and warned). tcMod,
+//! animMap, rgbGen/alphaGen waves, and multi-stage shaders are real here.
 //!
 //! DEC-37 ruling 2/3: this is render-thread-owned state. Nothing here is
 //! reachable from a trap query.
+//!
+//! Source: `oracle/codemp/renderer/tr_shade.cpp:1953-2231` (`RB_IterateStagesGeneric`)
 
 use std::collections::HashMap;
 use std::mem::size_of;
@@ -27,16 +36,27 @@ use mp_engine_qcommon::qfiles::draw_vert_t::drawVert_t;
 use mp_renderer::render_state::image_asset::ImageHandle;
 use mp_renderer::render_state::placeholders::WorldAsset;
 use mp_renderer::render_state::render_assets::RenderAssets;
-use mp_renderer::render_state::shader_asset::{ShaderAsset, ShaderHandle};
+use mp_renderer::render_state::shader_asset::ShaderAsset;
+use mp_renderer::render_state::shader_stage::ShaderStage;
+use mp_renderer::render_state::texture_bundle::TextureBundle;
 use mp_renderer::tr_bsp::{FaceVertex, SurfaceData};
+use mp_renderer::tr_local::alpha_gen_t::alphaGen_t;
 use mp_renderer::tr_local::color_gen_t::colorGen_t;
+use mp_renderer::tr_local::tex_coord_gen_t::texCoordGen_t;
 use mp_renderer::tr_main::{DrawSurf, R_DecomposeSort, SurfaceGeometry, WorldSurfaceRef};
-use mp_renderer::tr_shader::{GLS_DEPTHFUNC_EQUAL, GLS_DEPTHMASK_TRUE};
+use mp_renderer::tr_noise::NoiseState;
+use mp_renderer::tr_shader::{
+    GLS_ATEST_GE_80, GLS_ATEST_GE_C0, GLS_ATEST_GT_0, GLS_ATEST_LT_80, GLS_DEPTHFUNC_EQUAL,
+    GLS_DEPTHMASK_TRUE, GL_MODULATE,
+};
 use wgpu::{BlendState, RenderPipeline, TextureView};
 
 use crate::blend::blend_state_from_gls;
 use crate::gpu::Gpu;
 use crate::gpu_images::GpuImages;
+use crate::stage2d::{
+    apply_tex_mods, stage_colors_into, stage_image, Stage2dWarnings, StageTime, IDENTITY_LIGHT,
+};
 
 /// The GPU vertex the three CPU surface shapes converge on. `FaceVertex`
 /// (`tr_bsp`), `drawVert_t` (`qfiles`), and grid `drawVert_t` verts
@@ -101,6 +121,9 @@ pub struct SurfaceRange {
     pub base_vertex: i32,
     pub first_index: u32,
     pub index_count: u32,
+    /// The vertex count this surface owns, so the CPU evaluators can slice its
+    /// own block out of `WorldGeometry::cpu_vertices`.
+    pub vertex_count: u32,
 }
 
 impl SurfaceRange {
@@ -109,6 +132,7 @@ impl SurfaceRange {
         base_vertex: 0,
         first_index: 0,
         index_count: 0,
+        vertex_count: 0,
     };
 }
 
@@ -118,6 +142,10 @@ pub struct WorldGeometry {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     ranges: Vec<SurfaceRange>,
+    /// The same vertices the static buffer holds, kept on the CPU so a stage
+    /// with dynamic texcoords or colours can re-evaluate its own block per
+    /// frame.
+    cpu_vertices: Vec<WorldVertex>,
 }
 
 impl WorldGeometry {
@@ -159,6 +187,7 @@ impl WorldGeometry {
             vertex_buffer,
             index_buffer,
             ranges,
+            cpu_vertices: vertices,
         }
     }
 
@@ -224,10 +253,12 @@ pub fn build_world_mesh(world: &WorldAsset) -> (Vec<WorldVertex>, Vec<u32>, Vec<
         }
 
         let index_count = indices.len() as u32 - first_index;
+        let vertex_count = vertices.len() as u32 - base_vertex as u32;
         ranges.push(SurfaceRange {
             base_vertex,
             first_index,
             index_count,
+            vertex_count,
         });
     }
 
@@ -382,46 +413,71 @@ impl DepthTexture {
 /// backend, so 256 is always legal.
 const SURFACE_FLAGS_STRIDE: u64 = 256;
 
-/// The per-surface uniform the fragment shader reads through group 2. Only
-/// `has_lightmap` matters. The padding rounds the write size to 16 bytes.
+/// The per-pass uniform the fragment shader reads through group 2. `mode`
+/// picks the single-texture or two-texture path, `tex_from_lightmap` selects
+/// the lightmap texcoord for a single-texture lightmap stage, and `alpha_func`
+/// tells the shader which `GLS_ATEST` compare to discard by. The padding rounds
+/// the write size to 16 bytes.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Pod, Zeroable)]
 struct SurfaceFlagsGpu {
-    has_lightmap: u32,
-    _pad: [u32; 3],
+    mode: u32,
+    tex_from_lightmap: u32,
+    alpha_func: u32,
+    _pad: [u32; 1],
 }
 
-/// The out-of-scope shader features the world backend cannot render yet,
-/// tracked so each one logs once per process rather than once per surface.
+/// The single-texture pass: sample bundle 0 and multiply by the per-vertex
+/// colour (`RB_IterateStagesGeneric`'s common `R_DrawElements` arm).
+const MODE_SINGLE: u32 = 0;
+/// The two-texture pass: sample bundle 0 times the lightmap
+/// (`DrawMultitextured` under `GL_MODULATE`).
+///
+/// `CollapseMultitexture` is a deferred R4 stub (`tr_shader.rs`, returns false),
+/// so `ShaderAsset::multitexture_env` stays 0 and this path stays unreached
+/// until that fn lands. A lightmapped world surface draws its lightmap as its
+/// own single-texture stage instead, through the `tex_from_lightmap` flag.
+const MODE_MULTITEXTURE: u32 = 1;
+
+/// The shader features the world backend cannot render yet, tracked so each one
+/// logs once per process rather than once per surface.
 #[derive(Clone, Copy, Debug)]
 enum Warned {
-    TcMod,
-    AnimMap,
-    RgbGenWave,
     Fog,
-    MultiStage,
+    SkyParms,
+    TcGen,
+    MultitexEnv,
+    SurfaceSprite,
+    Glow,
+    VideoMap,
 }
 
 impl Warned {
-    const COUNT: usize = 5;
+    const COUNT: usize = 7;
 
     fn slot(self) -> usize {
         match self {
-            Warned::TcMod => 0,
-            Warned::AnimMap => 1,
-            Warned::RgbGenWave => 2,
-            Warned::Fog => 3,
-            Warned::MultiStage => 4,
+            Warned::Fog => 0,
+            Warned::SkyParms => 1,
+            Warned::TcGen => 2,
+            Warned::MultitexEnv => 3,
+            Warned::SurfaceSprite => 4,
+            Warned::Glow => 5,
+            Warned::VideoMap => 6,
         }
     }
 
     fn describe(self) -> &'static str {
         match self {
-            Warned::TcMod => "skips tcMod on a world stage — not applied yet",
-            Warned::AnimMap => "skips animMap on a world stage — first frame only",
-            Warned::RgbGenWave => "skips rgbGen wave on a world stage — not applied yet",
             Warned::Fog => "skips fog on a world shader — not applied yet",
-            Warned::MultiStage => "draws a multi-stage world shader as diffuse plus lightmap only",
+            Warned::SkyParms => "skips a sky-parms world shader — the sky chain is a later wave",
+            Warned::TcGen => "reads base texcoords for an unsupported tcGen on a world stage",
+            Warned::MultitexEnv => {
+                "draws bundle 0 only for a non-modulate multitexture world shader"
+            }
+            Warned::SurfaceSprite => "skips a surface-sprite world stage, drawn in a later wave",
+            Warned::Glow => "draws a glow world stage as a plain stage",
+            Warned::VideoMap => "draws a videoMap world stage as a plain stage — no cinematic yet",
         }
     }
 }
@@ -429,16 +485,18 @@ impl Warned {
 /// What one [`Pipeline3d::draw`] call did.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct WorldStats {
-    /// World surfaces drawn (one indexed draw each).
+    /// World surfaces that drew at least one stage pass.
     pub surfaces_drawn: u32,
-    /// `draw_indexed` calls issued — the same as `surfaces_drawn` this wave.
+    /// `draw_indexed` calls issued — one per active stage per surface.
     pub draw_calls: u32,
-    /// World surfaces with a real lightmap bound.
+    /// Stage passes that bound the lightmap through the two-texture path.
     pub lightmapped: u32,
     /// Non-world draw-surf entries skipped (entity models, polys, and so on).
     pub skipped_non_world: u32,
     /// World surfaces whose range was empty (`Skip`/`Flare`), so nothing drew.
     pub empty_surfaces: u32,
+    /// Sky-parms world surfaces skipped whole, waiting on the sky chain wave.
+    pub skipped_sky: u32,
 }
 
 /// The pipeline cache key: one pipeline per distinct blend state and depth
@@ -450,14 +508,25 @@ struct PipelineKey {
     depth_write: bool,
 }
 
-/// The resolved state one world surface draws with, collected before the render
-/// pass so the pass borrows `self` immutably.
-struct WorldDrawItem {
-    range: SurfaceRange,
+/// The resolved state one stage pass draws with, collected before the render
+/// pass so the pass borrows `self` immutably. `dynamic` selects the per-frame
+/// dynamic vertex buffer over the static world buffer, and `base_vertex` then
+/// indexes that buffer.
+struct StageDrawItem {
     key: PipelineKey,
     diffuse: Option<ImageHandle>,
     lightmap: Option<ImageHandle>,
-    has_lightmap: bool,
+    mode: u32,
+    tex_from_lightmap: bool,
+    /// The `GLS_ATEST` compare code the shader discards by. See [`alpha_func_code`].
+    alpha_func: u32,
+    /// Whether this pass reads a lightmap texture, so `WorldStats::lightmapped`
+    /// counts the real lightmapping path.
+    reads_lightmap: bool,
+    first_index: u32,
+    index_count: u32,
+    base_vertex: i32,
+    dynamic: bool,
 }
 
 /// The world pipeline's GPU-side resources: shader module, layouts, the clip
@@ -479,8 +548,15 @@ pub struct Pipeline3d {
     flags_buffer: wgpu::Buffer,
     flags_bind_group: wgpu::BindGroup,
     flags_capacity: usize,
+    /// The per-frame vertex buffer a dynamic stage writes its evaluated
+    /// texcoords and colours into. It grows and is reused across frames.
+    dynamic_buffer: wgpu::Buffer,
+    dynamic_capacity: usize,
     depth: DepthTexture,
     warned: [bool; Warned::COUNT],
+    /// The dedup log the shared `stage2d` evaluators write their own rgbGen,
+    /// alphaGen, and tcMod fallbacks into.
+    stage_warnings: Stage2dWarnings,
 }
 
 impl Pipeline3d {
@@ -567,6 +643,9 @@ impl Pipeline3d {
         let flags_buffer = create_flags_buffer(device, flags_capacity);
         let flags_bind_group = create_flags_bind_group(device, &flags_layout, &flags_buffer);
 
+        let dynamic_capacity = 1;
+        let dynamic_buffer = create_dynamic_buffer(device, dynamic_capacity);
+
         Pipeline3d {
             shader,
             pipeline_layout,
@@ -579,8 +658,11 @@ impl Pipeline3d {
             flags_buffer,
             flags_bind_group,
             flags_capacity,
+            dynamic_buffer,
+            dynamic_capacity,
             depth: DepthTexture::new(gpu, width, height),
             warned: [false; Warned::COUNT],
+            stage_warnings: Stage2dWarnings::default(),
         }
     }
 
@@ -598,14 +680,20 @@ impl Pipeline3d {
             .write_buffer(&self.globals_buffer, 0, bytemuck::cast_slice(&clip));
     }
 
-    /// Draws the sorted world draw-surf list. Each `SurfaceGeometry::World`
-    /// entry resolves its shader through `R_DecomposeSort`, binds its diffuse
-    /// and lightmap textures, and draws its indexed range. Non-world entries
-    /// are counted and skipped.
+    /// Draws the sorted world draw-surf list, one pass per active stage per
+    /// surface in stage order (`RB_IterateStagesGeneric`). Each surface resolves
+    /// its shader through `R_DecomposeSort`. A sky-parms shader is skipped whole.
+    /// Non-world entries are counted and skipped.
+    ///
+    /// `float_time` is the scene shader clock in seconds (`refdef.floatTime`),
+    /// and `noise` drives the waveform generators. A stage with dynamic
+    /// texcoords or colours evaluates its own vertices into the per-frame
+    /// dynamic buffer, so this fn writes that buffer before the pass reads it.
     ///
     /// The pass clears the depth buffer to 1.0 per view but loads the color
     /// target, because `Gpu::begin_frame` already cleared color for the frame.
     /// A later 2D pass or a second scene draws over the world.
+    #[allow(clippy::too_many_arguments)]
     pub fn draw(
         &mut self,
         gpu: &Gpu,
@@ -614,9 +702,20 @@ impl Pipeline3d {
         geometry: &WorldGeometry,
         assets: &RenderAssets,
         gpu_images: &GpuImages,
+        noise: &NoiseState,
+        float_time: f32,
     ) -> WorldStats {
         let mut stats = WorldStats::default();
-        let items = self.collect_items(draw_surfs, geometry, assets, &mut stats);
+        let mut dynamic_vertices: Vec<WorldVertex> = Vec::new();
+        let items = self.collect_stage_items(
+            draw_surfs,
+            geometry,
+            assets,
+            noise,
+            float_time,
+            &mut dynamic_vertices,
+            &mut stats,
+        );
 
         if items.is_empty() {
             return stats;
@@ -631,12 +730,39 @@ impl Pipeline3d {
         self.reserve_flags(gpu, items.len());
         self.write_flags(gpu, &items);
 
-        let bind_groups: Vec<wgpu::BindGroup> = items
-            .iter()
-            .map(|item| {
-                gpu_images.world_bind_group(gpu, &self.texture_layout, item.diffuse, item.lightmap)
-            })
-            .collect();
+        // The dynamic buffer holds every dynamic stage's evaluated vertices for
+        // this frame, addressed by each item's `base_vertex`.
+        if !dynamic_vertices.is_empty() {
+            self.reserve_dynamic(gpu, dynamic_vertices.len());
+            gpu.queue().write_buffer(
+                &self.dynamic_buffer,
+                0,
+                bytemuck::cast_slice(&dynamic_vertices),
+            );
+        }
+
+        // One bind group per distinct image pair, reused across the passes that
+        // share it. Most surfaces in a frame repeat the same diffuse-plus-lightmap
+        // pair, so the cache holds the allocation count near surface count rather
+        // than stage-times-surface count.
+        let mut group_cache: HashMap<(Option<ImageHandle>, Option<ImageHandle>), usize> =
+            HashMap::new();
+        let mut bind_groups: Vec<wgpu::BindGroup> = Vec::new();
+        let mut item_group: Vec<usize> = Vec::with_capacity(items.len());
+        for item in &items {
+            let cache_key = (item.diffuse, item.lightmap);
+            let group_index = *group_cache.entry(cache_key).or_insert_with(|| {
+                let group = gpu_images.world_bind_group(
+                    gpu,
+                    &self.texture_layout,
+                    item.diffuse,
+                    item.lightmap,
+                );
+                bind_groups.push(group);
+                bind_groups.len() - 1
+            });
+            item_group.push(group_index);
+        }
 
         let mut encoder = gpu
             .device()
@@ -676,7 +802,6 @@ impl Pipeline3d {
             });
 
             pass.set_bind_group(0, &self.globals_bind_group, &[]);
-            pass.set_vertex_buffer(0, geometry.vertex_buffer.slice(..));
             pass.set_index_buffer(geometry.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
 
             for (draw_index, item) in items.iter().enumerate() {
@@ -686,18 +811,26 @@ impl Pipeline3d {
                     .expect("world pipeline was created for every item's key above");
                 let offset = (draw_index as u64 * SURFACE_FLAGS_STRIDE) as u32;
 
+                // A dynamic stage draws from the per-frame buffer, a static
+                // stage from the concatenated world buffer.
+                let vertex_buffer = if item.dynamic {
+                    &self.dynamic_buffer
+                } else {
+                    &geometry.vertex_buffer
+                };
+
                 pass.set_pipeline(pipeline);
-                pass.set_bind_group(1, &bind_groups[draw_index], &[]);
+                pass.set_bind_group(1, &bind_groups[item_group[draw_index]], &[]);
                 pass.set_bind_group(2, &self.flags_bind_group, &[offset]);
+                pass.set_vertex_buffer(0, vertex_buffer.slice(..));
                 pass.draw_indexed(
-                    item.range.first_index..item.range.first_index + item.range.index_count,
-                    item.range.base_vertex,
+                    item.first_index..item.first_index + item.index_count,
+                    item.base_vertex,
                     0..1,
                 );
 
-                stats.surfaces_drawn += 1;
                 stats.draw_calls += 1;
-                if item.has_lightmap {
+                if item.reads_lightmap {
                     stats.lightmapped += 1;
                 }
             }
@@ -707,16 +840,21 @@ impl Pipeline3d {
         stats
     }
 
-    /// Resolves every world draw surf into a [`WorldDrawItem`], counting the
-    /// non-world and empty entries into `stats`.
-    fn collect_items(
+    /// Resolves every world draw surf into its per-stage [`StageDrawItem`]
+    /// passes, in stage order, and builds any dynamic vertex blocks. Non-world,
+    /// empty, and sky-parms entries are counted into `stats`.
+    #[allow(clippy::too_many_arguments)]
+    fn collect_stage_items(
         &mut self,
         draw_surfs: &[DrawSurf<SurfaceGeometry>],
         geometry: &WorldGeometry,
         assets: &RenderAssets,
+        noise: &NoiseState,
+        float_time: f32,
+        dynamic_vertices: &mut Vec<WorldVertex>,
         stats: &mut WorldStats,
-    ) -> Vec<WorldDrawItem> {
-        let mut items: Vec<WorldDrawItem> = Vec::new();
+    ) -> Vec<StageDrawItem> {
+        let mut items: Vec<StageDrawItem> = Vec::new();
 
         for surf in draw_surfs {
             let world_ref = match surf.surface {
@@ -736,93 +874,205 @@ impl Pipeline3d {
 
             let (_entity_num, shader_handle, _fog_num, _dlight_map) =
                 R_DecomposeSort(surf.sort, &assets.sorted_shaders);
+            let Some(shader) = assets.shaders.get(shader_handle) else {
+                continue;
+            };
 
-            let (key, diffuse, lightmap, has_lightmap) =
-                self.resolve_surface(shader_handle, assets);
-            items.push(WorldDrawItem {
-                range,
-                key,
-                diffuse,
-                lightmap,
-                has_lightmap,
-            });
+            // The sky draws through its own chain in a later wave, so a
+            // sky-parms shader skips the whole surface.
+            if shader.sky.is_some() {
+                self.warn_once(Warned::SkyParms);
+                stats.skipped_sky += 1;
+                continue;
+            }
+            if shader.fog_parms.is_some() {
+                self.warn_once(Warned::Fog);
+            }
+
+            let cpu_start = range.base_vertex as usize;
+            let cpu = &geometry.cpu_vertices[cpu_start..cpu_start + range.vertex_count as usize];
+
+            let before = items.len();
+            for stage in shader.stages.iter().filter(|stage| stage.active) {
+                let item = self.build_stage_item(
+                    shader,
+                    stage,
+                    &range,
+                    cpu,
+                    assets,
+                    noise,
+                    float_time,
+                    dynamic_vertices,
+                );
+                // A surface-sprite stage draws nothing here, so it yields no item.
+                if let Some(item) = item {
+                    items.push(item);
+                }
+            }
+            if items.len() > before {
+                stats.surfaces_drawn += 1;
+            }
         }
 
         items
     }
 
-    /// Resolves one surface's shader into a pipeline key, a diffuse image, and
-    /// a lightmap image. A shader with no stages draws opaque with the default
-    /// depth state. The lightmap comes from `RenderAssets::lightmaps` indexed by
-    /// the shader's style-0 lightmap index. A negative index means no lightmap,
-    /// so the surface shades by vertex color.
-    fn resolve_surface(
+    /// Resolves one active stage into its draw pass, or `None` when the stage
+    /// draws nothing here. The two-texture path is the `GL_MODULATE` collapse
+    /// (`DrawMultitextured`), the single-texture path is the common
+    /// `R_DrawElements` arm. A stage with tcMods, a waveform gen, or a colour
+    /// gen other than a vertex pass-through evaluates its vertices into
+    /// `dynamic_vertices` and draws from there.
+    ///
+    /// A surface-sprite stage yields `None`. `RB_IterateStagesGeneric` skips it
+    /// with a `continue` because `RB_DrawSurfaceSprites` handles sprites after
+    /// every other stage.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shade.cpp:2136-2158` (multitexture vs
+    /// single), `oracle/codemp/renderer/tr_shade.cpp:394-441` (`DrawMultitextured`),
+    /// `oracle/codemp/renderer/tr_shade.cpp:2055-2059` (surface-sprite skip)
+    #[allow(clippy::too_many_arguments)]
+    fn build_stage_item(
         &mut self,
-        shader_handle: ShaderHandle,
+        shader: &ShaderAsset,
+        stage: &ShaderStage,
+        range: &SurfaceRange,
+        cpu: &[WorldVertex],
         assets: &RenderAssets,
-    ) -> (PipelineKey, Option<ImageHandle>, Option<ImageHandle>, bool) {
-        let Some(shader) = assets.shaders.get(shader_handle) else {
-            return (default_pipeline_key(), None, None, false);
+        noise: &NoiseState,
+        float_time: f32,
+        dynamic_vertices: &mut Vec<WorldVertex>,
+    ) -> Option<StageDrawItem> {
+        // A surface-sprite stage draws no plain geometry. The sprite chain is a
+        // later wave, so the stage is skipped whole, as the oracle does.
+        if let Some(ss) = &stage.ss {
+            if ss.surfaceSpriteType != 0 {
+                self.warn_once(Warned::SurfaceSprite);
+                return None;
+            }
+        }
+
+        let time = StageTime::new(float_time, shader.time_offset);
+        let alpha_func = alpha_func_code(stage.state_bits);
+        let key = PipelineKey {
+            blend: blend_state_from_gls(stage.state_bits),
+            depth_equal: (stage.state_bits & GLS_DEPTHFUNC_EQUAL as u32) != 0,
+            depth_write: (stage.state_bits & GLS_DEPTHMASK_TRUE as u32) != 0,
         };
 
-        self.warn_features(shader);
+        // These stage kinds still draw as a plain stage, but each logs once so
+        // the missing behavior stays visible.
+        if stage.glow {
+            self.warn_once(Warned::Glow);
+        }
+        let bundle0 = &stage.bundle[0];
+        if bundle0.is_video_map {
+            self.warn_once(Warned::VideoMap);
+        }
 
-        // The pipeline state comes from the first active stage's GLS bits, or
-        // opaque defaults when the shader has no active stage.
-        let first_active = shader.stages.iter().find(|stage| stage.active);
-        let key = match first_active {
-            Some(stage) => PipelineKey {
-                blend: blend_state_from_gls(stage.state_bits),
-                depth_equal: (stage.state_bits & GLS_DEPTHFUNC_EQUAL as u32) != 0,
-                depth_write: (stage.state_bits & GLS_DEPTHMASK_TRUE as u32) != 0,
-            },
-            None => default_pipeline_key(),
-        };
+        let modulate = is_modulate_collapse(shader, stage);
 
-        // The diffuse texture is the first active non-lightmap stage's image,
-        // or the first active stage's image when every stage is a lightmap.
-        let diffuse = shader
-            .stages
-            .iter()
-            .filter(|stage| stage.active)
-            .find(|stage| !stage.bundle[0].is_lightmap && stage.bundle[0].image.is_some())
-            .or_else(|| shader.stages.iter().find(|stage| stage.active))
-            .and_then(|stage| stage.bundle[0].image);
+        // A second bundle under any other env has no collapse path here, so it
+        // draws bundle 0 alone.
+        if stage.bundle[1].image.is_some() && !modulate {
+            self.warn_once(Warned::MultitexEnv);
+        }
 
-        let lightmap_index = shader.lightmap_index[0];
-        let lightmap = if lightmap_index >= 0 {
-            assets.lightmaps.get(lightmap_index as usize).copied()
+        if modulate {
+            // Two-texture pass: bundle 0 times the lightmap, the per-vertex
+            // colour ignored, so only bundle 0's texcoords can force a dynamic
+            // block. `is_modulate_collapse` guarantees bundle 1 is the lightmap,
+            // and texture unit 1 reads `lightmap_st`. A bundle-1 tcMod has no
+            // effect through this port, so it logs once.
+            if !stage.bundle[1].tex_mods.is_empty() {
+                self.warn_once(Warned::MultitexEnv);
+            }
+            let diffuse = stage_image(bundle0, time.shader_time);
+            let lightmap = stage_image(&stage.bundle[1], time.shader_time);
+            let dynamic = !bundle0.tex_mods.is_empty();
+            let base_vertex = if dynamic {
+                let (source, _) = st_source(bundle0);
+                build_dynamic_block(
+                    cpu,
+                    stage,
+                    source,
+                    true,
+                    time,
+                    noise,
+                    assets,
+                    &shader.name,
+                    &mut self.stage_warnings,
+                    dynamic_vertices,
+                )
+            } else {
+                range.base_vertex
+            };
+            return Some(StageDrawItem {
+                key,
+                diffuse,
+                lightmap,
+                mode: MODE_MULTITEXTURE,
+                tex_from_lightmap: false,
+                alpha_func,
+                reads_lightmap: true,
+                first_index: range.first_index,
+                index_count: range.index_count,
+                base_vertex,
+                dynamic,
+            });
+        }
+
+        // Single-texture pass.
+        let (source, unsupported) = st_source(bundle0);
+        if unsupported {
+            self.warn_once(Warned::TcGen);
+        }
+        let reads_lightmap = source == StSource::Lightmap;
+        let diffuse = stage_image(bundle0, time.shader_time);
+        let dynamic = stage_is_dynamic(stage, false);
+
+        if dynamic {
+            let base_vertex = build_dynamic_block(
+                cpu,
+                stage,
+                source,
+                false,
+                time,
+                noise,
+                assets,
+                &shader.name,
+                &mut self.stage_warnings,
+                dynamic_vertices,
+            );
+            Some(StageDrawItem {
+                key,
+                diffuse,
+                lightmap: None,
+                mode: MODE_SINGLE,
+                // The dynamic block already holds the resolved texcoords in the
+                // `st` field, so the shader reads `st` directly.
+                tex_from_lightmap: false,
+                alpha_func,
+                reads_lightmap,
+                first_index: range.first_index,
+                index_count: range.index_count,
+                base_vertex,
+                dynamic: true,
+            })
         } else {
-            None
-        };
-        let has_lightmap = lightmap.is_some();
-
-        (key, diffuse, lightmap, has_lightmap)
-    }
-
-    /// Counts and warns once for each out-of-scope shader feature a surface
-    /// carries.
-    fn warn_features(&mut self, shader: &ShaderAsset) {
-        if shader.fog_parms.is_some() {
-            self.warn_once(Warned::Fog);
-        }
-
-        let active: Vec<_> = shader.stages.iter().filter(|stage| stage.active).collect();
-        if active.len() > 2 {
-            self.warn_once(Warned::MultiStage);
-        }
-
-        for stage in &active {
-            let bundle = &stage.bundle[0];
-            if !bundle.tex_mods.is_empty() {
-                self.warn_once(Warned::TcMod);
-            }
-            if bundle.num_image_animations > 0 {
-                self.warn_once(Warned::AnimMap);
-            }
-            if stage.rgb_gen == colorGen_t::CGEN_WAVEFORM {
-                self.warn_once(Warned::RgbGenWave);
-            }
+            Some(StageDrawItem {
+                key,
+                diffuse,
+                lightmap: None,
+                mode: MODE_SINGLE,
+                tex_from_lightmap: reads_lightmap,
+                alpha_func,
+                reads_lightmap,
+                first_index: range.first_index,
+                index_count: range.index_count,
+                base_vertex: range.base_vertex,
+                dynamic: false,
+            })
         }
     }
 
@@ -900,14 +1150,30 @@ impl Pipeline3d {
         self.flags_capacity = capacity;
     }
 
-    /// Writes one `has_lightmap` flag per draw item into the flags buffer, each
-    /// at its own stride slot so the dynamic offset lands on it.
-    fn write_flags(&self, gpu: &Gpu, items: &[WorldDrawItem]) {
+    /// Grows the per-frame dynamic vertex buffer when `needed` vertices exceed
+    /// its capacity. The buffer is reused across frames, so it only ever grows.
+    fn reserve_dynamic(&mut self, gpu: &Gpu, needed: usize) {
+        if needed <= self.dynamic_capacity {
+            return;
+        }
+        let mut capacity = self.dynamic_capacity.max(1);
+        while capacity < needed {
+            capacity *= 2;
+        }
+        self.dynamic_buffer = create_dynamic_buffer(gpu.device(), capacity);
+        self.dynamic_capacity = capacity;
+    }
+
+    /// Writes one flags block per draw item into the flags buffer, each at its
+    /// own stride slot so the dynamic offset lands on it.
+    fn write_flags(&self, gpu: &Gpu, items: &[StageDrawItem]) {
         let mut bytes = vec![0u8; items.len() * SURFACE_FLAGS_STRIDE as usize];
         for (draw_index, item) in items.iter().enumerate() {
             let flags = SurfaceFlagsGpu {
-                has_lightmap: item.has_lightmap as u32,
-                _pad: [0; 3],
+                mode: item.mode,
+                tex_from_lightmap: item.tex_from_lightmap as u32,
+                alpha_func: item.alpha_func,
+                _pad: [0; 1],
             };
             let offset = draw_index * SURFACE_FLAGS_STRIDE as usize;
             let src = bytemuck::bytes_of(&flags);
@@ -938,13 +1204,172 @@ fn world_ref_index(world_ref: WorldSurfaceRef) -> u32 {
     }
 }
 
-/// The opaque, depth-writing, less-equal state a stage-less shader draws with.
-fn default_pipeline_key() -> PipelineKey {
-    PipelineKey {
-        blend: blend_state_from_gls(0),
-        depth_equal: false,
-        depth_write: true,
+/// Which vertex texcoord a world stage's bundle reads before any tcMod.
+///
+/// - `Base`: the surface's own `st`.
+/// - `Lightmap`: the surface's lightmap `st`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum StSource {
+    Base,
+    Lightmap,
+}
+
+/// The texcoord source a bundle's `tcGen` selects, plus whether that `tcGen`
+/// has no world path yet. `TCGEN_LIGHTMAP` reads the lightmap st, `TCGEN_TEXTURE`
+/// reads the base st, and every other kind reads the base st and reports the gap.
+///
+/// The generator switch here is a second copy of the one `stage2d::stage_texcoords`
+/// owns, and the two disagree on `TCGEN_IDENTITY`: `stage_texcoords` zeroes the
+/// st, this reads the base st. The world path picks the base or lightmap source
+/// before it runs the tcMod loop, and it has no zero source yet, so the two
+/// copies stay split until a `TCGEN_IDENTITY` world stage needs the zero.
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:1820-1854` (`ComputeTexCoords`)
+//TODO: Port TCGEN_IDENTITY world path (unify the generator switch into stage2d)
+// Source: oracle/codemp/renderer/tr_shade.cpp:1809-1854
+fn st_source(bundle: &TextureBundle) -> (StSource, bool) {
+    match bundle.tc_gen {
+        texCoordGen_t::TCGEN_LIGHTMAP => (StSource::Lightmap, false),
+        texCoordGen_t::TCGEN_TEXTURE => (StSource::Base, false),
+        _ => (StSource::Base, true),
     }
+}
+
+/// Whether a stage needs a per-frame dynamic vertex block rather than the static
+/// world buffer. A two-texture collapse ignores the vertex colour, so only its
+/// bundle 0 tcMods can force a dynamic block. A single-texture stage also needs
+/// a dynamic block when its colour gen is not a plain vertex pass-through, since
+/// `ComputeColors` then writes a new colour the static buffer does not hold.
+fn stage_is_dynamic(stage: &ShaderStage, two_texture: bool) -> bool {
+    let has_tex_mods = !stage.bundle[0].tex_mods.is_empty();
+    if two_texture {
+        return has_tex_mods;
+    }
+    has_tex_mods || !stage_colors_are_vertex_passthrough(stage)
+}
+
+/// Whether the stage's rgbGen and alphaGen pass the BSP vertex colour through
+/// unchanged. Only then does the static buffer's own colour serve the stage.
+/// `CGEN_IDENTITY` writes white, `CGEN_CONST` writes the constant, and every
+/// other gen writes something new, so those stages need `ComputeColors` on a
+/// per-frame dynamic block. `CGEN_EXACT_VERTEX` and `CGEN_VERTEX` (at identity
+/// light) keep the vertex colour, and `AGEN_SKIP`/`AGEN_VERTEX` keep the vertex
+/// alpha.
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:1591-1779` (`ComputeColors`)
+fn stage_colors_are_vertex_passthrough(stage: &ShaderStage) -> bool {
+    let rgb_passthrough = stage.rgb_gen == colorGen_t::CGEN_EXACT_VERTEX
+        || (stage.rgb_gen == colorGen_t::CGEN_VERTEX && IDENTITY_LIGHT == 1.0);
+    let alpha_passthrough = matches!(
+        stage.alpha_gen,
+        alphaGen_t::AGEN_SKIP | alphaGen_t::AGEN_VERTEX
+    );
+    rgb_passthrough && alpha_passthrough
+}
+
+/// The shader's `GLS_ATEST` alpha-test compare, as the code the world shader
+/// discards by: 0 none, 1 `GT_0`, 2 `LT_80`, 3 `GE_80`, 4 `GE_C0`. Alpha test
+/// is a per-fragment discard the shader drives through the flags uniform, so it
+/// stays out of [`PipelineKey`].
+///
+/// Source: `oracle/codemp/renderer/tr_local.h` (`GLS_ATEST_*`), `GL_State`
+fn alpha_func_code(state_bits: u32) -> u32 {
+    if state_bits & GLS_ATEST_GT_0 != 0 {
+        1
+    } else if state_bits & GLS_ATEST_LT_80 != 0 {
+        2
+    } else if state_bits & GLS_ATEST_GE_80 != 0 {
+        3
+    } else if state_bits & GLS_ATEST_GE_C0 != 0 {
+        4
+    } else {
+        0
+    }
+}
+
+/// Whether the shader collapses bundle 0 and bundle 1 into one modulated pass.
+/// Only `GL_MODULATE` over a lightmap bundle 1 keeps the two-texture pass. The
+/// oracle draws it as diffuse times lightmap in one `DrawMultitextured` call,
+/// and texture unit 1 reads the lightmap st.
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:2136-2140`
+fn is_modulate_collapse(shader: &ShaderAsset, stage: &ShaderStage) -> bool {
+    shader.multitexture_env == GL_MODULATE
+        && stage.bundle[1].image.is_some()
+        && stage.bundle[1].is_lightmap
+}
+
+/// Evaluates one stage's per-vertex texcoords and colours for `cpu` and appends
+/// the result to `out`, returning the block's base vertex in the dynamic buffer.
+/// A two-texture collapse copies the vertex colour through unchanged, since its
+/// shader path ignores it.
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:2117-2118` (`ComputeColors`
+/// then `ComputeTexCoords` per stage)
+#[allow(clippy::too_many_arguments)]
+fn build_dynamic_block(
+    cpu: &[WorldVertex],
+    stage: &ShaderStage,
+    source: StSource,
+    two_texture: bool,
+    time: StageTime,
+    noise: &NoiseState,
+    assets: &RenderAssets,
+    shader_name: &str,
+    warnings: &mut Stage2dWarnings,
+    out: &mut Vec<WorldVertex>,
+) -> i32 {
+    let base_vertex = out.len() as i32;
+    let count = cpu.len();
+
+    // Seed the texcoords from the chosen source, then run the tcMod loop.
+    let mut st: Vec<[f32; 2]> = cpu
+        .iter()
+        .map(|v| match source {
+            StSource::Base => v.st,
+            StSource::Lightmap => v.lightmap_st,
+        })
+        .collect();
+    apply_tex_mods(
+        &stage.bundle[0],
+        &mut st,
+        time,
+        noise,
+        assets,
+        shader_name,
+        warnings,
+    );
+
+    // A single-texture stage runs the full rgbGen/alphaGen. A two-texture
+    // collapse keeps the input colour, which its shader path never reads.
+    let colors: Vec<[u8; 4]> = if two_texture {
+        cpu.iter().map(|v| v.color).collect()
+    } else {
+        let input: Vec<[u8; 4]> = cpu.iter().map(|v| v.color).collect();
+        let mut evaluated = vec![[0u8; 4]; count];
+        stage_colors_into(
+            stage,
+            &input,
+            &mut evaluated,
+            time,
+            noise,
+            assets,
+            shader_name,
+            warnings,
+        );
+        evaluated
+    };
+
+    for i in 0..count {
+        out.push(WorldVertex {
+            position: cpu[i].position,
+            st: st[i],
+            lightmap_st: cpu[i].lightmap_st,
+            color: colors[i],
+        });
+    }
+
+    base_vertex
 }
 
 fn texture_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
@@ -990,6 +1415,15 @@ fn create_buffer(
     buffer
 }
 
+fn create_dynamic_buffer(device: &wgpu::Device, capacity: usize) -> wgpu::Buffer {
+    device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("mp_renderer_gpu world dynamic vertex buffer"),
+        size: capacity as u64 * size_of::<WorldVertex>() as u64,
+        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    })
+}
+
 fn create_flags_buffer(device: &wgpu::Device, capacity: usize) -> wgpu::Buffer {
     device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("mp_renderer_gpu world flags buffer"),
@@ -1022,6 +1456,13 @@ fn create_flags_bind_group(
 mod tests {
     use super::*;
     use mp_engine_qcommon::qfiles::draw_vert_t::MAXLIGHTMAPS;
+    use mp_renderer::tr_local::acff_t::acff_t;
+    use mp_renderer::tr_local::eglfog_override::EGLFogOverride;
+    use mp_renderer::tr_local::gen_func_t::genFunc_t;
+    use mp_renderer::tr_local::tex_mod_info_t::texModInfo_t;
+    use mp_renderer::tr_local::wave_form_t::waveForm_t;
+
+    use crate::ui_host::boot::empty_assets;
 
     fn sample_draw_vert() -> drawVert_t {
         drawVert_t {
@@ -1138,5 +1579,242 @@ mod tests {
             "far z = {}",
             far[2] / far[3]
         );
+    }
+
+    // stage classification and dynamic-block evaluation
+
+    use mp_renderer::tr_local::tex_mod_t::texMod_t;
+
+    fn flat_wave() -> waveForm_t {
+        waveForm_t {
+            func: genFunc_t::GF_NONE,
+            base: 0.0,
+            amplitude: 0.0,
+            phase: 0.0,
+            frequency: 0.0,
+        }
+    }
+
+    fn empty_bundle() -> TextureBundle {
+        TextureBundle {
+            image: None,
+            tc_gen: texCoordGen_t::TCGEN_TEXTURE,
+            tc_gen_vectors: [[0.0; 3]; 2],
+            tex_mods: Vec::new(),
+            num_image_animations: 0,
+            image_animation_speed: 0.0,
+            is_lightmap: false,
+            one_shot_anim_map: false,
+            vertex_lightmap: false,
+            is_video_map: false,
+            video_map_handle: 0,
+            image_animations: Vec::new(),
+        }
+    }
+
+    fn plain_stage() -> ShaderStage {
+        ShaderStage {
+            active: true,
+            is_detail: false,
+            index: 0,
+            lightmap_style: 0,
+            bundle: std::array::from_fn(|_| empty_bundle()),
+            rgb_wave: flat_wave(),
+            rgb_gen: colorGen_t::CGEN_IDENTITY,
+            alpha_wave: flat_wave(),
+            alpha_gen: alphaGen_t::AGEN_IDENTITY,
+            constant_color: [255, 255, 255, 255],
+            state_bits: 0,
+            adjust_colors_for_fog: acff_t::ACFF_NONE,
+            gl_fog_color_override: EGLFogOverride::GLFOGOVERRIDE_NONE,
+            ss: None,
+            glow: false,
+        }
+    }
+
+    fn scroll_tex_mod(translate: [f32; 2]) -> texModInfo_t {
+        texModInfo_t {
+            r#type: texMod_t::TMOD_SCROLL,
+            wave: flat_wave(),
+            matrix: [[0.0; 2]; 2],
+            translate,
+        }
+    }
+
+    fn cpu_vertex(st: [f32; 2], lightmap_st: [f32; 2], color: [u8; 4]) -> WorldVertex {
+        WorldVertex {
+            position: [0.0, 0.0, 0.0],
+            st,
+            lightmap_st,
+            color,
+        }
+    }
+
+    // static-vs-dynamic classification
+
+    #[test]
+    fn an_identity_colour_stage_is_dynamic() {
+        // `CGEN_IDENTITY` writes white, which the static BSP vertex colour does
+        // not hold, so the stage needs `ComputeColors` on a dynamic block.
+        assert!(stage_is_dynamic(&plain_stage(), false));
+    }
+
+    #[test]
+    fn a_vertex_passthrough_stage_is_static() {
+        // `CGEN_EXACT_VERTEX` with `AGEN_SKIP` keeps the BSP vertex colour, so
+        // the static world buffer serves it.
+        let mut stage = plain_stage();
+        stage.rgb_gen = colorGen_t::CGEN_EXACT_VERTEX;
+        stage.alpha_gen = alphaGen_t::AGEN_SKIP;
+        assert!(!stage_is_dynamic(&stage, false));
+    }
+
+    #[test]
+    fn a_tcmod_stage_is_dynamic() {
+        let mut stage = plain_stage();
+        stage.bundle[0].tex_mods = vec![scroll_tex_mod([0.0, 0.025])];
+        assert!(stage_is_dynamic(&stage, false));
+        // A two-texture collapse still needs the dynamic block for tcMods.
+        assert!(stage_is_dynamic(&stage, true));
+    }
+
+    #[test]
+    fn a_waveform_colour_stage_is_dynamic_only_as_single_texture() {
+        let mut stage = plain_stage();
+        stage.rgb_gen = colorGen_t::CGEN_WAVEFORM;
+        assert!(stage_is_dynamic(&stage, false));
+        // A two-texture collapse ignores the vertex colour, so a waveform gen
+        // alone keeps it static.
+        assert!(!stage_is_dynamic(&stage, true));
+
+        let mut alpha_stage = plain_stage();
+        alpha_stage.alpha_gen = alphaGen_t::AGEN_WAVEFORM;
+        assert!(stage_is_dynamic(&alpha_stage, false));
+    }
+
+    // multitexture-env collapse decision
+
+    #[test]
+    fn modulate_env_with_a_lightmap_second_bundle_collapses() {
+        let mut stage = plain_stage();
+        stage.bundle[1].image = Some(ImageHandle::new(7, 0));
+        stage.bundle[1].is_lightmap = true;
+        let shader = ShaderAsset {
+            multitexture_env: GL_MODULATE,
+            ..Default::default()
+        };
+        assert!(is_modulate_collapse(&shader, &stage));
+    }
+
+    #[test]
+    fn modulate_env_with_a_non_lightmap_second_bundle_does_not_collapse() {
+        // The collapse feeds lightmap st to texture unit 1, so a non-lightmap
+        // bundle 1 has no collapse path and draws bundle 0 alone.
+        let mut stage = plain_stage();
+        stage.bundle[1].image = Some(ImageHandle::new(7, 0));
+        let shader = ShaderAsset {
+            multitexture_env: GL_MODULATE,
+            ..Default::default()
+        };
+        assert!(!is_modulate_collapse(&shader, &stage));
+    }
+
+    #[test]
+    fn a_non_modulate_env_does_not_collapse() {
+        let mut stage = plain_stage();
+        stage.bundle[1].image = Some(ImageHandle::new(7, 0));
+        // `GL_ADD` = 0x0104 is a real env, but only `GL_MODULATE` keeps the
+        // two-texture pass here.
+        let shader = ShaderAsset {
+            multitexture_env: 0x0104,
+            ..Default::default()
+        };
+        assert!(!is_modulate_collapse(&shader, &stage));
+    }
+
+    #[test]
+    fn modulate_env_without_a_second_image_does_not_collapse() {
+        let shader = ShaderAsset {
+            multitexture_env: GL_MODULATE,
+            ..Default::default()
+        };
+        assert!(!is_modulate_collapse(&shader, &plain_stage()));
+    }
+
+    // per-vertex texcoord evaluation
+
+    #[test]
+    fn a_scroll_tcmod_offsets_every_vertex_at_a_fixed_time() {
+        // `tcMod scroll 0 0.025` at t = 4s adds 0.1 in t to each vertex, nothing
+        // in s, from each vertex's own base st.
+        let mut stage = plain_stage();
+        stage.bundle[0].tex_mods = vec![scroll_tex_mod([0.0, 0.025])];
+
+        let cpu = [
+            cpu_vertex([0.0, 0.0], [0.5, 0.5], [10, 20, 30, 40]),
+            cpu_vertex([1.0, 0.25], [0.6, 0.6], [10, 20, 30, 40]),
+            cpu_vertex([0.5, 0.75], [0.7, 0.7], [10, 20, 30, 40]),
+        ];
+
+        let assets = empty_assets();
+        let noise = NoiseState::default();
+        let mut warnings = Stage2dWarnings::default();
+        let mut out: Vec<WorldVertex> = Vec::new();
+        let base = build_dynamic_block(
+            &cpu,
+            &stage,
+            StSource::Base,
+            false,
+            StageTime::new(4.0, 0.0),
+            &noise,
+            &assets,
+            "test",
+            &mut warnings,
+            &mut out,
+        );
+
+        assert_eq!(base, 0);
+        assert_eq!(out.len(), cpu.len());
+        for (moved, original) in out.iter().zip(cpu) {
+            assert!((moved.st[0] - original.st[0]).abs() < 1e-6);
+            assert!(
+                (moved.st[1] - (original.st[1] + 0.1)).abs() < 1e-6,
+                "{:?} vs {:?}",
+                moved.st,
+                original.st
+            );
+            // The position and lightmap st copy through unchanged.
+            assert_eq!(moved.lightmap_st, original.lightmap_st);
+        }
+    }
+
+    #[test]
+    fn a_lightmap_source_seeds_the_dynamic_block_from_lightmap_st() {
+        // A `TCGEN_LIGHTMAP` stage with a tcMod reads the lightmap st, so the
+        // dynamic block starts from `lightmap_st`, not `st`.
+        let mut stage = plain_stage();
+        stage.bundle[0].tc_gen = texCoordGen_t::TCGEN_LIGHTMAP;
+        stage.bundle[0].tex_mods = vec![scroll_tex_mod([0.0, 0.0])];
+
+        let cpu = [cpu_vertex([0.1, 0.2], [0.8, 0.9], [1, 2, 3, 4])];
+
+        let assets = empty_assets();
+        let noise = NoiseState::default();
+        let mut warnings = Stage2dWarnings::default();
+        let mut out: Vec<WorldVertex> = Vec::new();
+        build_dynamic_block(
+            &cpu,
+            &stage,
+            StSource::Lightmap,
+            false,
+            StageTime::new(0.0, 0.0),
+            &noise,
+            &assets,
+            "test",
+            &mut warnings,
+            &mut out,
+        );
+
+        assert_eq!(out[0].st, [0.8, 0.9]);
     }
 }

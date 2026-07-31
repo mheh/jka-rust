@@ -6,17 +6,22 @@
 // view orientation `R_RotateForViewer` builds and `correction` remaps GL's
 // -1..1 clip z to wgpu's 0..1 (see `pipeline3d::world_clip_matrix`).
 //
-// The fragment output for this wave is `diffuse.rgb * lightmap.rgb` on a
-// lightmapped surface, or `diffuse.rgb * vertex_color.rgb` where no lightmap
-// exists. `SurfaceFlags.has_lightmap` selects between the two. tcMod, animMap,
-// rgbGen waves, fog, and multi-stage shaders are out of this wave.
+// One pass draws one shader stage. `SurfaceFlags.mode` picks the path:
+//   mode 0 (single texture): `texture(uv) * color`, the common stage pass.
+//   mode 1 (two texture): `diffuse.rgb * lightmap.rgb`, the GL_MODULATE collapse.
+// In mode 0, `tex_from_lightmap` reads the lightmap st for a lightmap stage;
+// a dynamic stage instead writes its resolved st into the `st` field, so the
+// flag stays 0. The per-vertex `color` carries the stage's rgbGen/alphaGen
+// result (or the BSP vertex colour on a static stage).
 
 struct WorldGlobals {
     clip: mat4x4<f32>,
 }
 
 struct SurfaceFlags {
-    has_lightmap: u32,
+    mode: u32,
+    tex_from_lightmap: u32,
+    alpha_func: u32,
 }
 
 @group(0) @binding(0) var<uniform> globals: WorldGlobals;
@@ -54,10 +59,25 @@ fn vs_main(input: VertexInput) -> VertexOutput {
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-    let diffuse = textureSample(t_diffuse, s_diffuse, input.st);
-    if (surface.has_lightmap != 0u) {
+    var color: vec4<f32>;
+    if (surface.mode == 1u) {
+        let diffuse = textureSample(t_diffuse, s_diffuse, input.st);
         let lightmap = textureSample(t_lightmap, s_lightmap, input.lightmap_st);
-        return vec4<f32>(diffuse.rgb * lightmap.rgb, diffuse.a);
+        color = vec4<f32>(diffuse.rgb * lightmap.rgb, diffuse.a);
+    } else {
+        var uv = input.st;
+        if (surface.tex_from_lightmap != 0u) {
+            uv = input.lightmap_st;
+        }
+        let tex = textureSample(t_diffuse, s_diffuse, uv);
+        color = tex * input.color;
     }
-    return vec4<f32>(diffuse.rgb * input.color.rgb, diffuse.a);
+
+    // Alpha test discards a fragment the GLS_ATEST bits reject, before blending.
+    // Codes: 0 none, 1 GT_0, 2 LT_80 (< 0.5), 3 GE_80 (>= 0.5), 4 GE_C0 (>= 0.75).
+    if (surface.alpha_func == 1u && color.a <= 0.0) { discard; }
+    if (surface.alpha_func == 2u && color.a >= 0.5) { discard; }
+    if (surface.alpha_func == 3u && color.a < 0.5) { discard; }
+    if (surface.alpha_func == 4u && color.a < 0.75) { discard; }
+    return color;
 }

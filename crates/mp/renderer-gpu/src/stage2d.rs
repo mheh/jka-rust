@@ -120,12 +120,9 @@ impl Stage2dWarnings {
 /// (`RB_SetColor`'s `cmd->color[i] * 255`), so this quantises it the same way
 /// before any `CGEN_VERTEX`/`AGEN_VERTEX` arithmetic touches it.
 ///
-/// The oracle's entity-driven arms (`CGEN_ENTITY`, `CGEN_LIGHTING_*`,
-/// `AGEN_LIGHTING_SPECULAR`, …) read `backEnd.currentEntity` — for a 2D pic
-/// that is `backEnd.entity2D`, a zeroed `trRefEntity_t`, which no menu shader
-/// in the retail tree relies on. They fall back to the `RE_SetColor` register
-/// with a once-per-kind log rather than being guessed at. `CGEN_BAD` keeps the
-/// oracle's own `default:` arm (identity lighting).
+/// This is the quad-shaped wrapper over [`stage_colors_into`]. Every vertex of
+/// a stretch-pic quad carries the same input colour, so the whole `svars.colors`
+/// run collapses back to element 0 for the pipeline2d vertex format.
 ///
 /// Source: `oracle/codemp/renderer/tr_shade.cpp:1591-1779`
 #[allow(clippy::too_many_arguments)]
@@ -146,51 +143,107 @@ pub fn stage_color(
         (vertex_color[2] * 255.0) as u8,
         (vertex_color[3] * 255.0) as u8,
     ];
-    let mut colors = [vertex; QUAD_VERTS];
+    let input = [vertex; QUAD_VERTS];
+    let mut colors = [[0u8; 4]; QUAD_VERTS];
+    stage_colors_into(
+        stage,
+        &input,
+        &mut colors,
+        time,
+        noise,
+        assets,
+        shader_name,
+        warnings,
+    );
 
-    // `forceRGBGen` is 0 (`CGEN_BAD`) for every 2D pass — `RB_StageIteratorGeneric`
-    // passes it only for the entity-forced paths — so it always falls back to
-    // the stage's own `rgbGen`.
+    [
+        colors[0][0] as f32 / 255.0,
+        colors[0][1] as f32 / 255.0,
+        colors[0][2] as f32 / 255.0,
+        colors[0][3] as f32 / 255.0,
+    ]
+}
+
+/// `ComputeColors` over a whole vertex run: `rgbGen` then `alphaGen` fill `out`
+/// from the per-vertex input colours. `out` and `input_colors` must have the
+/// same length. The world pass feeds the BSP vertex colours here, and the 2D
+/// pass feeds four copies of the `RE_SetColor` register.
+///
+/// The oracle's entity-driven arms (`CGEN_ENTITY`, `CGEN_LIGHTING_*`,
+/// `AGEN_LIGHTING_SPECULAR`, …) read `backEnd.currentEntity`, which is null or
+/// zeroed on both paths this port drives. They fall back to the input colour
+/// with a once-per-kind log rather than being guessed at. `CGEN_BAD` keeps the
+/// oracle's own `default:` arm (identity lighting).
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:1591-1779`
+#[allow(clippy::too_many_arguments)]
+pub fn stage_colors_into(
+    stage: &ShaderStage,
+    input_colors: &[[u8; 4]],
+    out: &mut [[u8; 4]],
+    time: StageTime,
+    noise: &NoiseState,
+    assets: &RenderAssets,
+    shader_name: &str,
+    warnings: &mut Stage2dWarnings,
+) {
+    // The `default:`/unimplemented arms keep the input colour, so start there.
+    out.copy_from_slice(input_colors);
+
+    // `forceRGBGen` is 0 (`CGEN_BAD`) for every pass this port drives —
+    // `RB_StageIteratorGeneric` passes it only for the entity-forced paths — so
+    // it always falls back to the stage's own `rgbGen`.
     let force_rgb_gen = stage.rgb_gen;
 
     //
     // rgbGen
     //
     match force_rgb_gen {
-        colorGen_t::CGEN_IDENTITY => colors = [[0xff; 4]; QUAD_VERTS],
-        colorGen_t::CGEN_IDENTITY_LIGHTING | colorGen_t::CGEN_BAD => {
-            colors = [[IDENTITY_LIGHT_BYTE; 4]; QUAD_VERTS]
+        colorGen_t::CGEN_IDENTITY => {
+            for c in out.iter_mut() {
+                *c = [0xff; 4];
+            }
         }
-        colorGen_t::CGEN_EXACT_VERTEX => colors = [vertex; QUAD_VERTS],
-        colorGen_t::CGEN_CONST => colors = [stage.constant_color; QUAD_VERTS],
+        colorGen_t::CGEN_IDENTITY_LIGHTING | colorGen_t::CGEN_BAD => {
+            for c in out.iter_mut() {
+                *c = [IDENTITY_LIGHT_BYTE; 4];
+            }
+        }
+        // `CGEN_EXACT_VERTEX` is the input colour, which `out` already holds.
+        colorGen_t::CGEN_EXACT_VERTEX => {}
+        colorGen_t::CGEN_CONST => {
+            for c in out.iter_mut() {
+                *c = stage.constant_color;
+            }
+        }
         colorGen_t::CGEN_VERTEX => {
-            if IDENTITY_LIGHT == 1.0 {
-                colors = [vertex; QUAD_VERTS];
-            } else {
-                for c in colors.iter_mut() {
-                    c[0] = (vertex[0] as f32 * IDENTITY_LIGHT) as u8;
-                    c[1] = (vertex[1] as f32 * IDENTITY_LIGHT) as u8;
-                    c[2] = (vertex[2] as f32 * IDENTITY_LIGHT) as u8;
-                    c[3] = vertex[3];
+            for (c, v) in out.iter_mut().zip(input_colors) {
+                if IDENTITY_LIGHT == 1.0 {
+                    *c = *v;
+                } else {
+                    c[0] = (v[0] as f32 * IDENTITY_LIGHT) as u8;
+                    c[1] = (v[1] as f32 * IDENTITY_LIGHT) as u8;
+                    c[2] = (v[2] as f32 * IDENTITY_LIGHT) as u8;
+                    c[3] = v[3];
                 }
             }
         }
         colorGen_t::CGEN_ONE_MINUS_VERTEX => {
-            for c in colors.iter_mut() {
+            for (c, v) in out.iter_mut().zip(input_colors) {
                 if IDENTITY_LIGHT == 1.0 {
-                    c[0] = 255 - vertex[0];
-                    c[1] = 255 - vertex[1];
-                    c[2] = 255 - vertex[2];
+                    c[0] = 255 - v[0];
+                    c[1] = 255 - v[1];
+                    c[2] = 255 - v[2];
                 } else {
-                    c[0] = ((255 - vertex[0]) as f32 * IDENTITY_LIGHT) as u8;
-                    c[1] = ((255 - vertex[1]) as f32 * IDENTITY_LIGHT) as u8;
-                    c[2] = ((255 - vertex[2]) as f32 * IDENTITY_LIGHT) as u8;
+                    c[0] = ((255 - v[0]) as f32 * IDENTITY_LIGHT) as u8;
+                    c[1] = ((255 - v[1]) as f32 * IDENTITY_LIGHT) as u8;
+                    c[2] = ((255 - v[2]) as f32 * IDENTITY_LIGHT) as u8;
                 }
             }
         }
         colorGen_t::CGEN_WAVEFORM => RB_CalcWaveColor(
             &stage.rgb_wave,
-            &mut colors,
+            out,
             noise,
             time.refdef_time,
             time.refdef_float_time,
@@ -212,21 +265,21 @@ pub fn stage_color(
                 && ((force_rgb_gen == colorGen_t::CGEN_VERTEX && IDENTITY_LIGHT != 1.0)
                     || force_rgb_gen != colorGen_t::CGEN_VERTEX)
             {
-                for c in colors.iter_mut() {
+                for c in out.iter_mut() {
                     c[3] = 0xff;
                 }
             }
         }
         alphaGen_t::AGEN_CONST => {
             if force_rgb_gen != colorGen_t::CGEN_CONST {
-                for c in colors.iter_mut() {
+                for c in out.iter_mut() {
                     c[3] = stage.constant_color[3];
                 }
             }
         }
         alphaGen_t::AGEN_WAVEFORM => RB_CalcWaveAlpha(
             &stage.alpha_wave,
-            &mut colors,
+            out,
             noise,
             time.refdef_time,
             time.refdef_float_time,
@@ -236,27 +289,18 @@ pub fn stage_color(
         ),
         alphaGen_t::AGEN_VERTEX => {
             if force_rgb_gen != colorGen_t::CGEN_VERTEX {
-                for c in colors.iter_mut() {
-                    c[3] = vertex[3];
+                for (c, v) in out.iter_mut().zip(input_colors) {
+                    c[3] = v[3];
                 }
             }
         }
         alphaGen_t::AGEN_ONE_MINUS_VERTEX => {
-            for c in colors.iter_mut() {
-                c[3] = 255 - vertex[3];
+            for (c, v) in out.iter_mut().zip(input_colors) {
+                c[3] = 255 - v[3];
             }
         }
         other => warnings.once("alphaGen", other as i32, shader_name),
     }
-
-    // Every vertex of a stretch-pic quad carries the same colour, so the whole
-    // `svars.colors` run collapses to element 0.
-    [
-        colors[0][0] as f32 / 255.0,
-        colors[0][1] as f32 / 255.0,
-        colors[0][2] as f32 / 255.0,
-        colors[0][3] as f32 / 255.0,
-    ]
 }
 
 /// `ComputeTexCoords` for bundle 0 of a stretch-pic quad: the command's own
@@ -277,7 +321,7 @@ pub fn stage_color(
 #[allow(clippy::too_many_arguments)]
 pub fn stage_texcoords(
     bundle: &TextureBundle,
-    st: &mut [[f32; 2]; QUAD_VERTS],
+    st: &mut [[f32; 2]],
     time: StageTime,
     noise: &NoiseState,
     assets: &RenderAssets,
@@ -288,12 +332,35 @@ pub fn stage_texcoords(
     // generate the texture coordinates
     //
     match bundle.tc_gen {
-        texCoordGen_t::TCGEN_IDENTITY => *st = [[0.0; 2]; QUAD_VERTS],
+        texCoordGen_t::TCGEN_IDENTITY => {
+            for c in st.iter_mut() {
+                *c = [0.0; 2];
+            }
+        }
         texCoordGen_t::TCGEN_TEXTURE => {}
         texCoordGen_t::TCGEN_BAD => return,
         other => warnings.once("tcGen", other as i32, shader_name),
     }
 
+    apply_tex_mods(bundle, st, time, noise, assets, shader_name, warnings);
+}
+
+/// `ComputeTexCoords`' `tcMod` loop over a whole vertex run: each `texMod`
+/// rewrites `st` in place. The generator switch is the caller's — the 2D path
+/// runs it through [`stage_texcoords`], and the world path picks the base or
+/// lightmap source itself before it calls this.
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:1855-1925`
+#[allow(clippy::too_many_arguments)]
+pub fn apply_tex_mods(
+    bundle: &TextureBundle,
+    st: &mut [[f32; 2]],
+    time: StageTime,
+    noise: &NoiseState,
+    assets: &RenderAssets,
+    shader_name: &str,
+    warnings: &mut Stage2dWarnings,
+) {
     //
     // alter texture coordinates
     //

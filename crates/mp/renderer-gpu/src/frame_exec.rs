@@ -385,6 +385,7 @@ impl FrameExecutor {
                             light_styles,
                             *disable_dynamic_light,
                             gpu_images,
+                            noise,
                         );
                     }
                     // No world context, so this frame cannot draw a scene.
@@ -446,6 +447,7 @@ impl FrameExecutor {
         light_styles: &[[u8; 4]; MAX_LIGHT_STYLES],
         disable_dynamic_light: bool,
         gpu_images: &GpuImages,
+        noise: &NoiseState,
     ) -> WorldStats {
         let Some(geometry) = self.world_geometry.as_ref() else {
             self.warn_once(Warned::NoWorldGeometry);
@@ -537,8 +539,16 @@ impl FrameExecutor {
 
         self.pipeline3d
             .set_view(gpu, &view.world.modelMatrix, &view.projectionMatrix);
-        self.pipeline3d
-            .draw(gpu, target, &draw_surfs, geometry, world.assets, gpu_images)
+        self.pipeline3d.draw(
+            gpu,
+            target,
+            &draw_surfs,
+            geometry,
+            world.assets,
+            gpu_images,
+            noise,
+            refdef.float_time,
+        )
     }
 
     /// Draws one `DrawStretchPic` as `RB_StageIteratorGeneric` does: one
