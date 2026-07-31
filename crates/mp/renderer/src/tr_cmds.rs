@@ -20,7 +20,6 @@ use crate::render_state::frame_state::FrameState;
 use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
-use crate::tr_backend::RB_ExecuteRenderCommands;
 use crate::tr_image::{GL_TextureMode, R_SetColorMappings, TrImageState};
 use crate::tr_scene::{R_ToggleSmpFrame, SceneState};
 use crate::tr_shader::R_GetShaderByHandle;
@@ -52,8 +51,8 @@ pub fn r_shutdown_command_buffers() {}
 /// `r_skipBackEnd` reads through the live engine cvar table
 /// (`RendererCvars::r_skipBackEnd`, DEC-37 A13.1).
 ///
-/// Panics via `RB_ExecuteRenderCommands`'s loud stub until its owning wave
-/// lands.
+/// The dispatch itself is render-side under DEC-50 (`FrameExecutor::
+/// execute_frame`), so this trap-time fn starts nothing.
 ///
 /// Source: `oracle/codemp/renderer/tr_cmds.cpp:88-110`
 pub fn R_IssueRenderCommands(
@@ -77,11 +76,14 @@ pub fn R_IssueRenderCommands(
         // Source: oracle/codemp/renderer/tr_cmds.cpp:101-103
     }
 
-    // actually start the commands going
-    if common.cvar(cvars.r_skipBackEnd).integer == 0 {
-        // let it start on the new batch
-        RB_ExecuteRenderCommands();
-    }
+    // The oracle starts the backend on the accumulated command list here.
+    // Under DEC-50 the command list IS `FrameData::events`, and the
+    // render-side executor (`FrameExecutor::execute_frame` in
+    // `mp_renderer_gpu`) is the ported dispatch. Ruling 3 keeps that
+    // dispatch off this trap-time fn, so nothing starts here.
+    // DEFERRED: the `r_skipBackEnd` guard belongs to the executor's replay.
+    // Source: oracle/codemp/renderer/tr_cmds.cpp:105-109
+    let _ = (common, cvars);
 }
 
 // DEFERRED: R_GetCommandBuffer — `backEndData_t` (and its byte-packed
@@ -280,8 +282,8 @@ pub fn RE_RotatePic2(
 // otherwise available — can be transcribed standalone, because every path
 // shares the trailing unconditional reset of both blocked counter structs.
 // Nothing in the ported crate calls `R_PerformanceCounters` yet (its sole
-// caller, `RB_ExecuteRenderCommands`, lands in a later wave per
-// `tr_cmds.wave7.md`), so no stub is required for compilation.
+// oracle caller, `RB_ExecuteRenderCommands`, is superseded by the
+// render-side executor per DEC-50), so no stub is required for compilation.
 // (R2 `## State ownership` row `tr` frontend scratch/counters, row
 // `backEnd`; `placeholders.rs` `BackEndCounters`/`ViewParms` doc comments)
 // Source: `oracle/codemp/renderer/tr_cmds.cpp:12-64`

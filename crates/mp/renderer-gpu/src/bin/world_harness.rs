@@ -62,6 +62,17 @@ const ENTITY_BOB_AMPLITUDE: f32 = 48.0;
 /// The test entity's bob period in seconds.
 const ENTITY_BOB_PERIOD: f32 = 3.0;
 
+/// The MD3 test entity's height above the brush entity's geometry center.
+const MD3_LIFT: f32 = 64.0;
+
+/// The MD3 test entity's yaw spin rate in degrees per second. MD3 vertices are
+/// entity-local, so a spin is correct there, unlike the brush entity.
+const MD3_SPIN_RATE: f32 = 45.0;
+
+/// The map object the MD3 test entity draws — the model duel1 mounts on its
+/// func_bobbing.
+const MD3_MODEL_NAME: &str = "models/map_objects/bespin/twinpodcc.md3";
+
 /// The free-fly camera. `pitch`/`yaw` are Raven view angles in degrees.
 struct Camera {
     pos: [f32; 3],
@@ -95,6 +106,12 @@ struct App {
     /// The brush submodel handle the one test entity draws (`*1`), computed
     /// once at boot. The entity origin is the per-frame bob, not a field.
     test_model: qhandle_t,
+    /// The MD3 map-object handle the second test entity draws, 0 when the model
+    /// file is absent.
+    md3_model: qhandle_t,
+    /// The world-space point the MD3 test entity sits above (the `*1` geometry
+    /// center, or the eye when the map has no inline model).
+    md3_center: [f32; 3],
     /// The movement keys currently held down.
     keys: HashSet<KeyCode>,
     start: Instant,
@@ -106,12 +123,15 @@ struct App {
 }
 
 impl App {
+    #[allow(clippy::too_many_arguments)]
     fn new(
         host: UiHost,
         land_scape: srfTerrain_t,
         dummy_assets: RenderAssets,
         eye: [f32; 3],
         test_model: qhandle_t,
+        md3_model: qhandle_t,
+        md3_center: [f32; 3],
     ) -> App {
         App {
             window: None,
@@ -133,6 +153,8 @@ impl App {
                 yaw: 0.0,
             },
             test_model,
+            md3_model,
+            md3_center,
             keys: HashSet::new(),
             start: Instant::now(),
             last_frame: Instant::now(),
@@ -229,6 +251,7 @@ impl App {
 
         RE_ClearScene(&mut frame_data, &mut self.host.scene);
         self.record_test_entity(&mut frame_data, refdef.time);
+        self.record_md3_entity(&mut frame_data, refdef.time);
 
         RE_RenderScene(
             refdef,
@@ -267,6 +290,37 @@ impl App {
         RE_AddRefEntityToScene(frame_data, &self.host.assets, &mut self.host.scene, &ent);
     }
 
+    /// Records the MD3 map-object entity through `RE_AddRefEntityToScene`. It
+    /// sits above the brush entity's geometry center with the same vertical bob
+    /// plus a slow yaw spin. MD3 vertices are entity-local, so the spin rotates
+    /// the model in place. A missing model handle skips the entity.
+    fn record_md3_entity(&mut self, frame_data: &mut FrameData, time_ms: i32) {
+        if self.md3_model == 0 {
+            return;
+        }
+
+        let seconds = time_ms as f32 * 0.001;
+        let bob_phase = seconds / ENTITY_BOB_PERIOD * std::f32::consts::TAU;
+        let bob = ENTITY_BOB_AMPLITUDE * bob_phase.sin();
+        let yaw = (seconds * MD3_SPIN_RATE) % 360.0;
+
+        let mut ent = refEntity_t::zeroed();
+        ent.reType = refEntityType_t::RT_MODEL;
+        ent.hModel = self.md3_model;
+        ent.origin = [
+            self.md3_center[0],
+            self.md3_center[1],
+            self.md3_center[2] + MD3_LIFT + bob,
+        ];
+        ent.oldorigin = ent.origin;
+        ent.frame = 0;
+        ent.oldframe = 0;
+        ent.shaderRGBA = [255, 255, 255, 255];
+        AnglesToAxis([0.0, yaw, 0.0], ent.axis.as_mut_ptr());
+
+        RE_AddRefEntityToScene(frame_data, &self.host.assets, &mut self.host.scene, &ent);
+    }
+
     /// One frame: advance the camera, record the scene, draw it.
     fn frame(&mut self) {
         let now = Instant::now();
@@ -297,6 +351,7 @@ impl App {
             fogs,
             scratch,
             reported,
+            md3_model,
             ..
         } = self;
         let (Some(gpu), Some(executor), Some(images), Some(window)) = (
@@ -377,7 +432,7 @@ impl App {
 
                 if !*reported {
                     *reported = true;
-                    report(&stats);
+                    report(&stats, *md3_model);
                 }
                 gpu.present(frame);
             }
@@ -481,11 +536,12 @@ impl ApplicationHandler for App {
     }
 }
 
-fn report(stats: &FrameStats) {
+fn report(stats: &FrameStats, md3_model: qhandle_t) {
     println!(
         "world_harness: first frame — {} images uploaded, {} world surfaces drawn \
          ({} lightmapped, {} draw calls), {} non-world skipped, {} empty surfaces, \
-         {} entities ({} entity surfaces drawn)",
+         {} entities ({} entity surfaces drawn), md3 handle {} ({} md3 entity surfaces, \
+         {} md3 decode failed)",
         stats.images_uploaded,
         stats.world.surfaces_drawn,
         stats.world.lightmapped,
@@ -494,6 +550,9 @@ fn report(stats: &FrameStats) {
         stats.world.empty_surfaces,
         stats.entities,
         stats.world.entity_surfaces_drawn,
+        md3_model,
+        stats.world.md3_surfaces_drawn,
+        stats.world.md3_decode_failed,
     );
 }
 
@@ -558,8 +617,30 @@ fn main() {
         println!("world_harness: test entity geometry center {c:?}");
     }
 
+    // Register the MD3 map object through the real RE_RegisterModel chain, the
+    // model duel1 mounts on its func_bobbing. A missing file leaves the handle
+    // at 0, and the harness draws no MD3 entity.
+    let md3_model = boot::register_model(&mut host, MD3_MODEL_NAME);
+    if md3_model == 0 {
+        println!("world_harness: MD3 model {MD3_MODEL_NAME} absent, skipping md3 entity");
+    } else {
+        println!("world_harness: md3 entity model {MD3_MODEL_NAME} = {md3_model}");
+    }
+
+    // The MD3 entity sits above the brush entity's geometry center, or the eye
+    // when the map has no inline model.
+    let md3_center = entity_center.unwrap_or(eye);
+
     let dummy_assets = boot::empty_assets();
-    let mut app = App::new(host, land_scape, dummy_assets, eye, test_model);
+    let mut app = App::new(
+        host,
+        land_scape,
+        dummy_assets,
+        eye,
+        test_model,
+        md3_model,
+        md3_center,
+    );
 
     // Point the first view at the entity geometry (Raven vectoangles shape:
     // yaw from x/y, pitch negative when the target is above the eye).

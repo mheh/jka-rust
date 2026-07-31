@@ -1002,54 +1002,13 @@ pub fn RB_DrawSurfs(
     }
 }
 
-/// Raven `RB_ExecuteRenderCommands` — the backend command-list dispatch
-/// loop: walks the render-thread command buffer (`data`), switching on each
-/// entry's `RC_*` tag to `RB_SetColor`/`RB_StretchPic`/`RB_RotatePic`/
-/// `RB_RotatePic2`/`RB_DrawSurfs`/`RB_DrawBuffer`/`RB_SwapBuffers`/
-/// `RB_WorldEffects`/`R_DrawWireframeAutomap` in order, then stamps
-/// `backEnd.pc.msec` from a `com_timescale`-scaled `Sys_Milliseconds` delta
-/// once it hits `RC_END_OF_LIST`.
-///
-/// Whole-body deferral — every input the loop needs is unhomed at this wave:
-/// - The walk itself has no carrier. `data`'s ordered `RC_*` command buffer
-///   is the oracle's `renderCommandList_t` (`### A1 disposition table` —
-///   "dissolved"); its R3 successor, `FrameData::events: Vec<FrameEvent>`,
-///   carries only the trap-sourced event kinds (`SetColor`/`DrawStretchPic`/
-///   `DrawRotatePic`/`DrawRotatePic2`/`RenderScene`/...). `RC_DRAW_SURFS`/
-///   `RC_DRAW_BUFFER`/`RC_SWAP_BUFFERS`/`RC_WORLD_EFFECTS`/`RC_AUTO_MAP` are
-///   deliberately absent from `FrameEvent` (`tr_cmds.rs`'s
-///   `R_AddDrawSurfCmd`/`RE_RenderWorldEffects`/`RE_RenderAutoMap` DEFERRED
-///   notes) — those five are frame-orchestration commands
-///   `R_IssueRenderCommands` (not yet ported) issues directly, not
-///   trap-pushed events, so there is no single Rust value this fn could
-///   accept as "the command list to execute" without inventing one
-///   (interior-safety law: no new carrier outside R2's licensed vocabulary).
-/// - Even if the walk existed, the callees it would dispatch to take
-///   mutually incompatible argument shapes (`RB_DrawSurfs` needs a
-///   `&[DrawSurf<SurfaceGeometry>]` cull/sort slice, `RB_WorldEffects` needs
-///   `WorldEffectsState`/`WindZoneState`/`EngineHostView`/`Rng`,
-///   `RB_SwapBuffers` needs `Common`, `R_DrawWireframeAutomap` needs
-///   `WireframeAutomap`/`player_height`/`r_auto_map_integer`) — no uniform
-///   `data = handler(data)` shape survives the translation regardless of the
-///   carrier question above.
-/// - `com_timescale`'s live value has no resolved receiver at this fn: this
-///   packet's STATE HOMES row marks it "outside R2's scope (not a
-///   renderer-owned global)... confirm the exact receiver at port time", and
-///   the resolved call surface gives no accessor for it — only
-///   `sys_milliseconds` itself is LAW.
-/// - The terminal `backEnd.pc.msec = t2 - t1;` write has no home either:
-///   `BackEndCounters` is `tr_cmds.rs`'s established empty tier-3
-///   placeholder, `msec` explicitly owned by "the R4 backend wave" (same
-///   precedent `R_PerformanceCounters`'s DEFERRED note cites).
-///
-/// No computation survives once every input above is removed, so this lands
-/// as a loud `todo!()` rather than a partial-body DEFERRED
-/// (`RB_RenderDrawSurfList`'s whole-body-deferral precedent, same file).
-///
-/// Source: `oracle/codemp/renderer/tr_backend.cpp:1916-1959`
-pub fn RB_ExecuteRenderCommands() {
-    todo!("Port RB_ExecuteRenderCommands — oracle/codemp/renderer/tr_backend.cpp:1916-1959")
-}
+// PORT-NOTE: `RB_ExecuteRenderCommands` (the backend command-list dispatch
+// loop) is superseded, not stubbed. Under DEC-50 the command list IS
+// `FrameData::events`, and the render-side executor
+// (`mp_renderer_gpu::FrameExecutor::execute_frame`) is the ported dispatch:
+// it walks the events in order and draws. The `backEnd.pc.msec` stamp waits
+// for a `BackEndCounters` home with the other performance counters.
+// Source: `oracle/codemp/renderer/tr_backend.cpp:1916-1959`
 
 /// Raven `RE_StretchRaw` — (re)uploads a cinematic video frame into the
 /// per-client scratch texture and draws it as a screen-space quad; the

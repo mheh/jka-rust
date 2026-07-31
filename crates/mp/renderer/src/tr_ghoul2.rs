@@ -653,11 +653,10 @@ pub fn g2_get_vert_bone_weight_not_slow(p_vert: &mdxmVertex_t, i_weight_num: i32
 /// `r_lodbias`/`r_lodscale`/`r_autolodscalevalue` read through
 /// `Common::cvar` (the `RendererCvars`-handle + live-engine-table pattern
 /// `tr_light.rs`'s `R_SetupEntityLightingGrid` already established).
-/// `ProjectRadius`/`myftol` are the wave-0 in-module callees (cross-file,
-/// signatures are LAW); `ProjectRadius` is itself still a wave-0
-/// `todo!()` (blocked on `FrameState::view`/`ori`, per its own doc comment)
-/// so this fn's call into it inherits that same, already-declared block
-/// rather than introducing a new one.
+/// `ProjectRadius`/`myftol` are the cross-file in-module callees.
+/// `project_radius` now takes the live `viewParms_t` (E2), so `view` threads
+/// straight through to it; this fn has no live caller yet, so the parameter
+/// waits for the ghoul2 LOD arm to land.
 ///
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:967-1041`
 pub fn g2_compute_lod(
@@ -666,7 +665,7 @@ pub fn g2_compute_lod(
     radius: f32,
     current_model: &model_t,
     lod_bias: i32,
-    frame: &FrameState,
+    view: &viewParms_t,
     common: &Common,
     cvars: &RendererCvars,
 ) -> i32 {
@@ -699,7 +698,7 @@ pub fn g2_compute_lod(
     let scaled_radius = (0.75_f64 * largest_scale as f64 * radius as f64) as f32;
     // we reduce the radius to make the LOD match other model types which use
     // the actual bound box size
-    let projected_radius = project_radius(scaled_radius, ent.origin, frame);
+    let projected_radius = project_radius(scaled_radius, ent.origin, view);
     let mut flod;
     if projected_radius != 0.0 {
         let mut lodscale =

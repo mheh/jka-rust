@@ -116,11 +116,34 @@ pub struct RefEntity {
     ///
     /// Source: `oracle/codemp/cgame/tr_types.h:159`
     pub rotation: f32,
+    /// `e.shaderTime` — Raven: subtracted from refdef time to control effect
+    /// start times. The draw path derives the per-entity shader clock from it.
+    ///
+    /// Source: `oracle/codemp/cgame/tr_types.h:162`
+    pub shader_time: f32,
     /// `e.frame` — Raven: also used as `MODEL_BEAM`'s diameter, and as the
     /// `Q_random`/`Q_crandom` seed the lightning surfaces step through.
     ///
     /// Source: `oracle/codemp/cgame/tr_types.h:163`
     pub frame: i32,
+    /// `e.oldframe` — Raven: previous frame for MD3 keyframe interpolation.
+    ///
+    /// Source: `oracle/codemp/cgame/tr_types.h:179`
+    pub old_frame: i32,
+    /// `e.backlerp` — Raven: 0.0 is the current frame, 1.0 is the old frame.
+    ///
+    /// Source: `oracle/codemp/cgame/tr_types.h:180`
+    pub backlerp: f32,
+    /// `e.skinNum` — Raven: inline skin index, picks the per-surface MD3
+    /// shader when no custom shader or custom skin is set.
+    ///
+    /// Source: `oracle/codemp/cgame/tr_types.h:183`
+    pub skin_num: i32,
+    /// `e.customSkin` — raw index into the skin registry, same reasoning as
+    /// `h_model`. Zero means the default skin.
+    ///
+    /// Source: `oracle/codemp/cgame/tr_types.h:184`
+    pub custom_skin: qhandle_t,
     /// `e.lightingOrigin`.
     pub lighting_origin: Vec3,
     /// `e.endTime`.
@@ -175,7 +198,12 @@ impl Default for RefEntity {
             shader_rgba: [0; 4],
             radius: 0.0,
             rotation: 0.0,
+            shader_time: 0.0,
             frame: 0,
+            old_frame: 0,
+            backlerp: 0.0,
+            skin_num: 0,
+            custom_skin: 0,
             lighting_origin: [0.0; 3],
             end_time: 0.0,
             saber_length: 0.0,

@@ -70,7 +70,7 @@ use mp_qshared::shared::q_math::{
     vec3_origin, CrossProduct, DistanceSquared, PerpendicularVector, SetPlaneSignbits, VectorClear,
     VectorLength,
 };
-use mp_qshared::shared::{cplane_t, orientation_t, qfalse, qtrue, vec3_t, vec4_t};
+use mp_qshared::shared::{cplane_t, orientation_t, qfalse, qhandle_t, qtrue, vec3_t, vec4_t};
 // `PlaneFromPoints`/`RotatePointAroundVector` have no `mp_qshared::shared::
 // q_math` re-export (unlike the other `q_math` helpers above); taken from
 // their canonical `native_math` home, the same edge `tr_shade_calc` uses for
@@ -208,7 +208,41 @@ pub enum SurfaceGeometry<'a> {
     /// `Vec<DrawSurf<SurfaceGeometry>>` end to end, so the world walk appends
     /// through this arm rather than a second draw-surf list.
     World(WorldSurfaceRef),
+    /// An MD3 (`MOD_MESH`) entity surface, carried as a `Copy`
+    /// [`Md3SurfaceRef`] the backend decodes per frame (DEC-43.3 precedent).
+    /// The shader still travels through the sort key, not this ref.
+    Md3(Md3SurfaceRef),
     Other,
+}
+
+/// The `drawSurf_t::surface` payload for an **MD3** entity surface: a `Copy`
+/// handle the backend decodes into geometry per frame. Raven hands the raw
+/// `md3Surface_t *` straight to `R_AddDrawSurf`, then `RB_SurfaceMesh` walks it
+/// off `backEnd.currentEntity` at draw time. Under the owned model the ref
+/// carries the model handle, the resolved LOD, the surface ordinal inside that
+/// LOD header, and the frame/oldframe/backlerp the keyframe lerp reads, so the
+/// backend re-locates the surface and decodes it instead of holding a raw
+/// pointer.
+///
+/// Type definition source: `oracle/codemp/renderer/tr_local.h:656-678`
+/// (`surfaceType_t`), `oracle/codemp/qcommon/qfiles.h:130-149`
+/// (`md3Surface_t`)
+#[derive(Clone, Copy)]
+pub struct Md3SurfaceRef {
+    /// `ent->e.hModel` — the model registry handle whose `md3[lod]` header owns
+    /// the surface.
+    pub h_model: qhandle_t,
+    /// The resolved LOD level (`R_ComputeLOD`), the index into `model_t::md3`.
+    pub lod: i32,
+    /// The surface ordinal inside the LOD header, walked from `ofsSurfaces` by
+    /// `ofsEnd` at decode time.
+    pub surface_index: i32,
+    /// `ent->e.frame` — the current MD3 keyframe.
+    pub frame: i32,
+    /// `ent->e.oldframe` — the previous MD3 keyframe.
+    pub old_frame: i32,
+    /// `ent->e.backlerp` — 0.0 is the current frame, 1.0 is the old frame.
+    pub backlerp: f32,
 }
 
 /// The `drawSurf_t::surface` payload for a **world** surface (DEC-43.3): a
@@ -706,6 +740,9 @@ pub fn R_PlaneForSurface(surf_type: Option<&SurfaceGeometry>) -> cplane_t {
         // default plane the way `SF_BAD`/`SF_SKIP` already do here.
         // Source: oracle/codemp/renderer/tr_main.cpp:648-671
         SurfaceGeometry::World(_) => default_plane(),
+        // An MD3 entity surface never drives a portal, so it falls back to the
+        // default plane the same way `SF_BAD`/`SF_SKIP` do.
+        SurfaceGeometry::Md3(_) => default_plane(),
         SurfaceGeometry::Other => default_plane(),
     }
 }
@@ -1621,7 +1658,7 @@ pub fn R_DebugGraphics(
 /// same way Raven's own byte writes do (`((byte *)&ent->ambientLightInt)[N]`,
 /// cited on [`RefEntity::ambient_light_int`]'s own doc comment) — a
 /// little-endian byte reinterpretation, matching x86.
-fn ref_entity_from_tr(ent: &trRefEntity_t) -> RefEntity {
+pub(crate) fn ref_entity_from_tr(ent: &trRefEntity_t) -> RefEntity {
     RefEntity {
         re_type: ent.e.reType,
         renderfx: ent.e.renderfx,
@@ -1634,7 +1671,12 @@ fn ref_entity_from_tr(ent: &trRefEntity_t) -> RefEntity {
         shader_rgba: ent.e.shaderRGBA,
         radius: ent.e.radius,
         rotation: ent.e.rotation,
+        shader_time: ent.e.shaderTime,
         frame: ent.e.frame,
+        old_frame: ent.e.oldframe,
+        backlerp: ent.e.backlerp,
+        skin_num: ent.e.skinNum,
+        custom_skin: ent.e.customSkin,
         lighting_origin: ent.e.lightingOrigin,
         end_time: ent.e.endTime,
         saber_length: ent.e.saberLength,
@@ -1661,7 +1703,7 @@ fn ref_entity_from_tr(ent: &trRefEntity_t) -> RefEntity {
 /// Raven mutates `*ent` in place, so a later per-frame stage reading
 /// `tr.refdef.entities[n]`'s lighting fields must observe them; the reverse
 /// of [`ref_entity_from_tr`] above.
-fn write_back_lighting(ent: &mut trRefEntity_t, re: &RefEntity) {
+pub(crate) fn write_back_lighting(ent: &mut trRefEntity_t, re: &RefEntity) {
     ent.needDlights = re.need_dlights as i32;
     ent.lightingCalculated = re.lighting_calculated as i32;
     ent.lightDir = re.light_dir;
@@ -1677,26 +1719,21 @@ fn write_back_lighting(ent: &mut trRefEntity_t, re: &RefEntity) {
 /// The render side rebuilds `tr.refdef.entities` by replaying the scene events
 /// (DEC-50). This is the reverse of [`ref_entity_from_tr`]. The oracle's
 /// `backEndData->entities[n].e = *ent` whole-struct copy becomes a field walk.
-/// The fields `RefEntity` does not carry stay at their zero value. The MD3
-/// and sprite tail (`oldframe`, `backlerp`, `skinNum`, `customSkin`, `uRefEnt`,
-/// `data`, `shadowPlane`) is data no brush model reads, so its zero value is
-/// correct for the brush path. The `ghoul2` pointer stays null, matching a
-/// scene payload that carries only the `has_ghoul2` presence flag.
+/// The fields `RefEntity` does not carry stay at their zero value. The sprite
+/// tail `RefEntity` still omits (`uRefEnt`, `data`, `shadowPlane`) is data no
+/// brush or MD3 model reads, so its zero value is correct here. The `ghoul2`
+/// pointer stays null, matching a scene payload that carries only the
+/// `has_ghoul2` presence flag.
 ///
-/// Two `.e` fields are read on every non-world surface, not only sprites, and
-/// `RefEntity` carries neither, so both stay zero here. The backend derives
-/// `tess.shaderTime` from `e.shaderTime` for every entity that is not the world
-/// entity. The `TMOD_ENTITY_TRANSLATE` texmod reads `e.shaderTexCoord`. A
-/// per-entity animation clock or an entity-translate tcMod on an inline brush
-/// model draws from the wrong offset until the payload carries both fields and
-/// the draw path applies them. The harness entity leaves `shaderTime` at 0, so
-/// the current gates pass.
+/// `shaderTexCoord` is the one draw-path field still uncarried. The
+/// `TMOD_ENTITY_TRANSLATE` texmod reads it, so an entity-translate tcMod draws
+/// from the wrong offset until the payload carries it and the draw path applies
+/// it. No harness entity uses that texmod, so the current gates pass.
 ///
 /// Source: `oracle/codemp/renderer/tr_scene.cpp:249` (`entities[n].e = *ent`)
-//TODO: Port refEntity_t shaderTime + shaderTexCoord into the scene payload and draw path
-// Source: oracle/codemp/renderer/tr_backend.cpp:910-916 (shaderTime derive),
-// oracle/codemp/renderer/tr_shade.cpp:1891-1893 (shaderTexCoord read),
-// oracle/codemp/cgame/tr_types.h:155,162 (both fields)
+//TODO: Port refEntity_t shaderTexCoord into the scene payload and draw path
+// Source: oracle/codemp/renderer/tr_shade.cpp:1891-1893 (shaderTexCoord read),
+// oracle/codemp/cgame/tr_types.h:155 (the field)
 pub fn tr_ref_entity_from_ref_entity(re: &RefEntity) -> trRefEntity_t {
     let mut e = refEntity_t::zeroed();
     e.reType = re.re_type;
@@ -1710,7 +1747,12 @@ pub fn tr_ref_entity_from_ref_entity(re: &RefEntity) -> trRefEntity_t {
     e.shaderRGBA = re.shader_rgba;
     e.radius = re.radius;
     e.rotation = re.rotation;
+    e.shaderTime = re.shader_time;
     e.frame = re.frame;
+    e.oldframe = re.old_frame;
+    e.backlerp = re.backlerp;
+    e.skinNum = re.skin_num;
+    e.customSkin = re.custom_skin;
     e.lightingOrigin = re.lighting_origin;
     e.endTime = re.end_time;
     e.saberLength = re.saber_length;
@@ -1884,12 +1926,21 @@ pub fn R_AddEntitySurfaces<'a>(
                     modtype_t::MOD_MESH => {
                         let r_shadows_integer = engine_view.common.cvar(cvars.r_shadows).integer;
                         r_add_md3_surfaces(
-                            engine_view.common,
+                            ent,
+                            models,
+                            view,
+                            &ori,
+                            engine_view,
                             cvars,
-                            r_shadows_integer,
                             assets,
                             &*frame,
-                            ent,
+                            refdef_rdflags,
+                            rdf_nofog,
+                            r_shadows_integer,
+                            shifted_entity_num,
+                            fogs,
+                            dlights,
+                            draw_surfs,
                         );
                     }
 
@@ -2681,7 +2732,12 @@ mod tests {
         re.shader_rgba = [1, 2, 3, 4];
         re.radius = 1.5;
         re.rotation = 2.5;
+        re.shader_time = 6.5;
         re.frame = 9;
+        re.old_frame = 8;
+        re.backlerp = 0.25;
+        re.skin_num = 2;
+        re.custom_skin = 6;
         re.lighting_origin = [16.0, 17.0, 18.0];
         re.end_time = 3.5;
         re.saber_length = 4.5;
@@ -2710,7 +2766,12 @@ mod tests {
         assert_eq!(tr.e.shaderRGBA, [1, 2, 3, 4]);
         assert_eq!(tr.e.radius, 1.5);
         assert_eq!(tr.e.rotation, 2.5);
+        assert_eq!(tr.e.shaderTime, 6.5);
         assert_eq!(tr.e.frame, 9);
+        assert_eq!(tr.e.oldframe, 8);
+        assert_eq!(tr.e.backlerp, 0.25);
+        assert_eq!(tr.e.skinNum, 2);
+        assert_eq!(tr.e.customSkin, 6);
         assert_eq!(tr.e.lightingOrigin, [16.0, 17.0, 18.0]);
         assert_eq!(tr.e.endTime, 3.5);
         assert_eq!(tr.e.saberLength, 4.5);
@@ -2730,12 +2791,11 @@ mod tests {
 
     #[test]
     fn tr_ref_entity_from_ref_entity_zeroes_the_uncarried_tail() {
-        // A default payload leaves the MD3/sprite tail of refEntity_t at zero.
+        // A default payload leaves the fields `RefEntity` still omits at zero:
+        // `shaderTexCoord`, `shadowPlane`, and `axisLength`.
         let tr = tr_ref_entity_from_ref_entity(&RefEntity::default());
-        assert_eq!(tr.e.oldframe, 0);
-        assert_eq!(tr.e.backlerp, 0.0);
-        assert_eq!(tr.e.skinNum, 0);
-        assert_eq!(tr.e.shaderTime, 0.0);
+        assert_eq!(tr.e.shaderTexCoord, [0.0, 0.0]);
+        assert_eq!(tr.e.shadowPlane, 0.0);
         assert_eq!(tr.axisLength, 0.0);
     }
 }

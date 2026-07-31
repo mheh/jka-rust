@@ -285,26 +285,19 @@ pub fn RB_SurfaceOrientedLine(current_entity: Option<&RefEntity>) {
 
 /// Raven `LerpMeshVertexes` — MD3 mesh vertex lerp: decompresses/
 /// interpolates per-vertex position+normal between the current entity's
-/// `frame`/`oldframe` MD3 keyframes into the tessellation buffer.
+/// `frame`/`oldframe` MD3 keyframes.
 ///
-/// DEFERRED: R4/escalation — every target this fn writes into is
-/// unavailable at R3: `tess.xyz`/`tess.normal` (`shaderCommands_t`) dissolved
-/// entirely into R4's tessellation/vertex-building pipeline with no
-/// replacement scratch carrier (R2 `## State ownership` row `tess`); its
-/// `md3Surface_t *surf` input has no ported Rust type anywhere in the crate
-/// yet (out-of-packet — no `tr_model`/MD3 wave has landed it); and
-/// `backEnd.currentEntity->e.frame`/`.oldframe` are not among the fields
-/// wave 0 landed on `RefEntity` (`render_state/placeholders.rs`). No partial
-/// CPU logic survives dropping all three — this file may not invent a state
-/// home for any of them (preamble: "a state home this packet marks UNMAPPED
-/// is an ESCALATION, never an invention").
+/// PORT-NOTE: the live MD3 decode lands in the R4 backend, not here. The
+/// backend home is `mp_renderer_gpu::pipeline3d::lerp_md3_vertexes`, which
+/// decodes each `Md3SurfaceRef` into GPU vertices per frame. This `tess`-shaped
+/// entry point stays dead: `shaderCommands_t` (`tess.xyz`/`tess.normal`)
+/// dissolved into the wgpu vertex pipeline and has no replacement carrier here.
 ///
 /// Source: `oracle/codemp/renderer/tr_surface.cpp:1235-1346`
 pub fn LerpMeshVertexes(backlerp: f32) {
     let _ = backlerp;
-    // DEFERRED: R4/escalation — LerpMeshVertexes (see doc comment above):
-    // needs `tess.xyz`/`tess.normal` (dissolved), `md3Surface_t` (unported),
-    // and `RefEntity::frame`/`::oldframe` (not landed).
+    // DEFERRED: R4 — the live decode is `pipeline3d::lerp_md3_vertexes`; this
+    // `tess`-shaped entry point stays dead (no `shaderCommands_t` carrier).
     // Source: oracle/codemp/renderer/tr_surface.cpp:1235-1346
 }
 
@@ -669,33 +662,20 @@ pub fn DoCylinderPart(verts: &[polyVert_t; 4], frame: &mut FrameState) {
 /// `numVertexes`/`numIndexes`) and per-vertex UVs to the tessellation
 /// buffer.
 ///
-/// DEFERRED: R4/escalation — every write target is `tess`
-/// (`shaderCommands_t`: `.indexes`, `.texCoords`, `.numIndexes`,
-/// `.numVertexes`), which dissolves entirely into R4's tessellation/
-/// vertex-building pipeline with no replacement scratch carrier at R3
-/// (packet STATE HOMES row `RB_SurfaceMesh` / `tess`; R2 `## State
-/// ownership` row `tess`). The read side is blocked independently too:
-/// `surface->ofsTriangles`/`::ofsSt` are byte offsets the oracle walks via
-/// raw pointer arithmetic off `surface` itself (`(int *)((byte *)surface +
-/// surface->ofsTriangles)`) — `md3Surface_t`
-/// (`mp_engine_qcommon::qfiles::md3_surface_t`) is an on-disk header with no
-/// quarantine accessor for that trailing-data walk; performing it here
-/// would be new unsafe, banned by this wave's law. `backEnd.currentEntity->
-/// e.oldframe`/`.frame`/`.backlerp` (the `backlerp` computation) are also
-/// not among the fields wave 0 landed on `RefEntity`
-/// (`render_state/placeholders.rs`). The sole in-module callees
-/// (`LerpMeshVertexes`, `RB_CheckOverflow`) are both `todo!()`/DEFERRED
-/// stubs in this same file already. No partial CPU logic survives dropping
-/// the write target, the read source, and the entity fields.
+/// PORT-NOTE: the live MD3 surface draw lands in the R4 backend, not here. The
+/// backend home is `mp_renderer_gpu::pipeline3d::collect_md3_surface`, which
+/// decodes each `Md3SurfaceRef` into GPU vertices and indices per frame and
+/// draws one pass per active stage. This `tess`-shaped entry point stays dead:
+/// `shaderCommands_t` (`.indexes`/`.texCoords`/`.numVertexes`) dissolved into
+/// the wgpu vertex pipeline with no replacement carrier here.
 ///
-/// Whole-body deferral: no partial body survives, so this lands as a loud
-/// `todo!()` rather than a silent no-op (whole-fn-deferral convention —
-/// partial-body fns keep DEFERRED comments instead).
+/// Whole-body deferral: no partial body survives here, so this lands as a loud
+/// `todo!()` rather than a silent no-op.
 ///
 /// Source: `oracle/codemp/renderer/tr_surface.cpp:1353-1397`
 pub fn RB_SurfaceMesh(surface: &md3Surface_t, frame: &mut FrameState) {
     let _ = (surface, frame);
-    todo!("Port RB_SurfaceMesh — oracle/codemp/renderer/tr_surface.cpp:1353-1397")
+    todo!("Port RB_SurfaceMesh — the live decode is pipeline3d::collect_md3_surface; oracle/codemp/renderer/tr_surface.cpp:1353-1397")
 }
 
 /// Raven `RB_SurfaceFace` — the `SF_FACE` dispatch-table entry: appends a

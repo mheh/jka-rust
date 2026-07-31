@@ -2,75 +2,197 @@
 //!
 //! Source: `oracle/codemp/renderer/tr_mesh.cpp`
 
+use core::ffi::c_char;
+
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::Common;
+use mp_engine_qcommon::common_fns::Com_DPrintf;
+use mp_engine_qcommon::qfiles::md3_frame_s::md3Frame_t;
 use mp_engine_qcommon::qfiles::md3_header_t::md3Header_t;
+use mp_engine_qcommon::qfiles::md3_shader_t::md3Shader_t;
+use mp_engine_qcommon::qfiles::md3_surface_t::md3Surface_t;
+use mp_qshared::common::mp::cgame::tr_types::{RF_THIRD_PERSON, RF_WRAP_FRAMES};
+use mp_qshared::shared::q_color::S_COLOR_RED;
+use mp_qshared::shared::q_math::_DotProduct as DotProduct;
 use mp_qshared::shared::{cplane_t, vec3_t};
+
+use native_math::qmath::RadiusFromBounds;
 
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::placeholders::RefEntity;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
+use crate::render_state::shader_asset::ShaderHandle;
+use crate::render_state::skin_asset::SkinAsset;
+use crate::tr_image::R_GetSkinByHandle;
+use crate::tr_light::R_SetupEntityLighting;
+use crate::tr_local::dlight_s::dlight_t;
+use crate::tr_local::fog_t::fog_t;
+use crate::tr_local::model_s::model_t;
 use crate::tr_local::orientationr_t::orientationr_t;
 use crate::tr_local::tr_ref_entity_t::trRefEntity_t;
+use crate::tr_local::view_parms_t::viewParms_t;
+use crate::tr_main::{
+    ref_entity_from_tr, write_back_lighting, DrawSurf, Md3SurfaceRef, R_AddDrawSurf,
+    R_CullLocalBox, R_CullLocalPointAndRadius, SurfaceGeometry, CULL_CLIP, CULL_IN, CULL_OUT,
+};
 use crate::tr_model::render_models::RenderModels;
+use crate::tr_public::ref_flags::RDF_NOWORLDMODEL;
+use crate::tr_shade_calc::myftol;
+use crate::tr_shader::R_GetShaderByHandle;
+
+/// Reads one on-disk `md3Frame_t` off `header` by frame index, returning the
+/// bounds, local origin, and radius the cull and LOD math read. The oracle
+/// walks the same `((byte *)header + ofsFrames) + index` frame array by raw
+/// pointer.
+///
+/// SAFETY: `header` is the 16-byte-aligned `AlignedBytes` base a registered
+/// `MOD_MESH` model owns, and `index` is range-checked by `R_AddMD3Surfaces`
+/// against `numFrames` before any decode. The read stays inside the block the
+/// file's `ofsEnd` sizes.
+///
+/// Source: `oracle/codemp/renderer/tr_mesh.cpp:64-65`
+unsafe fn read_md3_frame(header: *const md3Header_t, index: i32) -> ([vec3_t; 2], vec3_t, f32) {
+    let base = header as *const u8;
+    let frames = base.add((*header).ofsFrames as usize) as *const md3Frame_t;
+    let frame = &*frames.add(index as usize);
+    (frame.bounds, frame.localOrigin, frame.radius)
+}
+
+/// Reads a NUL-terminated `md3` name field into an owned `String`. The bytes
+/// are lower-cased Latin-1 at load, so a byte-to-char map decodes them.
+fn md3_name(name: &[c_char]) -> String {
+    let end = name.iter().position(|&c| c == 0).unwrap_or(name.len());
+    name[..end].iter().map(|&c| (c as u8) as char).collect()
+}
+
+/// Wraps and checks an MD3 entity's frame indices. `RF_WRAP_FRAMES` mods both
+/// by `num_frames` with the oracle's truncating `%`, so a negative frame keeps
+/// its sign. The returned values are post-wrap and not clamped. The `bad` flag
+/// is true when a frame is still outside `0..num_frames`. The caller then
+/// prints the post-wrap values and resets both to 0.
+///
+/// Source: `oracle/codemp/renderer/tr_mesh.cpp:294-315`
+fn wrap_and_check_md3_frames(
+    frame: i32,
+    oldframe: i32,
+    num_frames: i32,
+    wrap: bool,
+) -> (i32, i32, bool) {
+    let mut frame = frame;
+    let mut oldframe = oldframe;
+    if wrap {
+        // The oracle wraps with truncating `%`, so `ent->e.frame %= numFrames`
+        // leaves a negative frame negative for the range check below to catch.
+        frame %= num_frames;
+        oldframe %= num_frames;
+    }
+
+    let bad = frame >= num_frames || frame < 0 || oldframe >= num_frames || oldframe < 0;
+    (frame, oldframe, bad)
+}
+
+/// Matches an MD3 surface name against a skin's per-surface list, returning the
+/// skin surface's shader on a match or the default shader (slot 0) on none. The
+/// names are lower-cased at load, so the compare is exact.
+///
+/// Source: `oracle/codemp/renderer/tr_mesh.cpp:365-372`
+fn resolve_skin_shader(skin: &SkinAsset, surface_name: &str) -> ShaderHandle {
+    for skin_surface in &skin.surfaces {
+        if skin_surface.name == surface_name {
+            return skin_surface.shader;
+        }
+    }
+    ShaderHandle::slot_zero()
+}
 
 /// Raven `float ProjectRadius(float r, vec3_t location)` — projects a
 /// world-space radius `r` at `location` into a screen-space fraction, for
 /// LOD/culling decisions.
-// DEFERRED: ProjectRadius — depends on `FrameState::view`/`FrameState::ori`
-// (`ViewParms`/`OrientationR`, both empty placeholder structs pending the
-// `tr_main` wave's `ori.axis`/`ori.origin`/`view.projectionMatrix` fields)
-// — see `crates/mp/renderer/src/render_state/placeholders.rs`, out of this
-// file's edit scope. A state home this packet marks mapped-but-not-yet-
-// populated is an escalation, not an invention (preamble "state home ...
-// ESCALATION").
-// Source: `oracle/codemp/renderer/tr_mesh.cpp:12-50`
-pub fn project_radius(_r: f32, _location: vec3_t, _frame: &FrameState) -> f32 {
-    todo!("Port ProjectRadius — oracle/codemp/renderer/tr_mesh.cpp:12-50")
+///
+/// `view` is `tr.viewParms` (`.ori.axis[0]`/`.ori.origin`/`.projectionMatrix`).
+/// The `_XBOX` sign flip is dropped - MP never builds `_XBOX`.
+///
+/// Source: `oracle/codemp/renderer/tr_mesh.cpp:12-50`
+pub fn project_radius(r: f32, location: vec3_t, view: &viewParms_t) -> f32 {
+    let c = DotProduct(view.ori.axis[0], view.ori.origin);
+    let dist = DotProduct(view.ori.axis[0], location) - c;
+
+    if dist <= 0.0 {
+        return 0.0;
+    }
+
+    let p = [0.0f32, r.abs(), -dist];
+    let m = &view.projectionMatrix;
+
+    let width = p[0] * m[1] + p[1] * m[5] + p[2] * m[9] + m[13];
+    let depth = p[0] * m[3] + p[1] * m[7] + p[2] * m[11] + m[15];
+
+    let mut pr = width / depth;
+    if pr > 1.0 {
+        pr = 1.0;
+    }
+    pr
 }
 
 /// Raven `int R_ComputeFogNum(md3Header_t *header, trRefEntity_t *ent)` —
 /// the fog volume `ent`'s MD3 frame bounds fall inside, if any.
-// DEFERRED: R_ComputeFogNum — depends on `RenderAssets::world` (`WorldAsset`,
-// an empty placeholder struct pending the `tr_bsp` wave's `numfogs`/`fogs`
-// fields) and `FrameState::refdef` (`TrRefdef`, empty pending the `tr_scene`
-// wave's `rdflags` field) — see
-// `crates/mp/renderer/src/render_state/placeholders.rs`, out of this file's
-// edit scope. Also needs a parsed-frame accessor for `md3Header_t`'s
-// `ofsFrames`-relative frame array (the oracle's raw
-// `(byte*)header + header->ofsFrames + ent->e.frame` walk) and `ent`'s owned
-// `RefEntity` (empty placeholder, same `tr_scene` wave) — no such accessor is
-// in this wave's resolved call surface. A state home this packet marks
-// mapped-but-not-yet-populated is an escalation, not an invention (preamble
-// "state home ... ESCALATION"). Same blocker already hit by the ghoul2
-// variant of this fn (`r_g_compute_fog_num`, `crates/mp/renderer/src/
-// tr_ghoul2.rs`).
-// Source: `oracle/codemp/renderer/tr_mesh.cpp:244-273`
-pub fn r_compute_fog_num(
-    _header: &md3Header_t,
-    _ent: &RefEntity,
-    _assets: &RenderAssets,
-    _frame: &FrameState,
+///
+/// `fogs` is `tr.world->fogs` (index 0 is the reserved "no fog" slot, matching
+/// the oracle's `for (i=1; i<numfogs; i++)`); `refdef_rdflags` is
+/// `tr.refdef.rdflags`. The `header`/frame walk reads the on-disk frame array
+/// through [`read_md3_frame`].
+///
+/// Source: `oracle/codemp/renderer/tr_mesh.cpp:244-273`
+fn r_compute_fog_num(
+    header: *const md3Header_t,
+    ent_frame: i32,
+    ent_origin: vec3_t,
+    fogs: &[fog_t],
+    refdef_rdflags: i32,
 ) -> i32 {
-    todo!("Port R_ComputeFogNum — oracle/codemp/renderer/tr_mesh.cpp:244-273")
+    if refdef_rdflags & RDF_NOWORLDMODEL != 0 {
+        return 0;
+    }
+
+    // SAFETY: `ent_frame` is clamped to `numFrames` by the caller before this
+    // fog lookup; see [`read_md3_frame`].
+    let (_, local_origin, radius) = unsafe { read_md3_frame(header, ent_frame) };
+    let world_origin = [
+        ent_origin[0] + local_origin[0],
+        ent_origin[1] + local_origin[1],
+        ent_origin[2] + local_origin[2],
+    ];
+
+    for i in 1..fogs.len() {
+        let fog = &fogs[i];
+        let mut j = 0usize;
+        while j < 3 {
+            if world_origin[j] - radius >= fog.bounds[1][j] {
+                break;
+            }
+            if world_origin[j] + radius <= fog.bounds[0][j] {
+                break;
+            }
+            j += 1;
+        }
+        if j == 3 {
+            return i as i32;
+        }
+    }
+
+    0
 }
 
 /// Raven `void RE_GetModelBounds(refEntity_t *refEnt, vec3_t bounds1, vec3_t
 /// bounds2)` — the MD3 model's per-frame bounding box for `refEnt->hModel`
 /// at `refEnt->frame`. Out-params fold into a returned pair (dictionary:
 /// out-params→returns).
-// DEFERRED: RE_GetModelBounds — the oracle body indexes the on-disk frame
-// array by `refEnt->frame` (`(md3Frame_t *)((byte *)header + header->
-// ofsFrames) + refEnt->frame`, a walk `md3Frame_t`
-// (`mp_engine_qcommon::qfiles::md3_frame_s::md3Frame_t`) already supports and
-// tier-2's `model_t.md3: [*mut md3Header_t; 3]` (`RenderModels::get_model`,
-// the already-ported `R_GetModelByHandle`) is legal to READ through per the
-// interior-safety law — but `refEntity_t.frame` has no landing field on
-// `RefEntity` yet (`crate::render_state::placeholders`, owned by the
-// `tr_scene` wave, out of this file's edit scope). A state home this packet
-// marks mapped-but-not-yet-populated is an escalation, not an invention
-// (preamble "state home ... ESCALATION").
-// Source: `oracle/codemp/renderer/tr_mesh.cpp:148-165`
+// DEFERRED: RE_GetModelBounds — no caller in this crate reaches it yet
+// (rwwRMG-added, driven by the RMG terrain path, not the world/entity walk).
+// The frame-array read now has a home ([`read_md3_frame`]); this fn stays
+// deferred until its RMG caller lands, to avoid a dead public entry point.
+// Source: oracle/codemp/renderer/tr_mesh.cpp:148-165
 pub fn re_get_model_bounds(_ref_ent: &RefEntity, _models: &RenderModels) -> (vec3_t, vec3_t) {
     todo!("Port RE_GetModelBounds — oracle/codemp/renderer/tr_mesh.cpp:148-165")
 }
@@ -79,134 +201,422 @@ pub fn re_get_model_bounds(_ref_ent: &RefEntity, _models: &RenderModels) -> (vec
 /// from its projected screen-space bounding-sphere radius, biased by
 /// `r_lodscale`/`r_autolodscalevalue`/`r_lodbias` and clamped to
 /// `tr.currentModel->numLods`.
-// DEFERRED: R_ComputeLOD — same `md3Frame_t`/`ofsFrames` walk as
-// `RE_GetModelBounds` above (tier-2 `model_t.md3[0]` is legal to READ
-// through), plus two fields this wave cannot add (out of this file's edit
-// scope): `tr.currentModel` has no landing field on `FrameState` yet (STATE
-// HOMES: "frontend scratch/counters/.../currentModel → RenderWorld::frame:
-// FrameState" — `crate::render_state::frame_state`, owned by the `tr_main`
-// wave per its `## Seam definition` row) and `ent->e.frame` has no landing
-// field on `RefEntity` yet (`crate::render_state::placeholders`, owned by
-// the `tr_scene` wave — same field `RE_GetModelBounds` needs). A state home
-// this packet marks mapped-but-not-yet-populated is an escalation, not an
-// invention (preamble "state home ... ESCALATION").
-// Source: `oracle/codemp/renderer/tr_mesh.cpp:173-236`
-pub fn r_compute_lod(
-    _common: &Common,
-    _cvars: &RendererCvars,
-    _assets: &RenderAssets,
-    _frame: &FrameState,
-    _ent: &RefEntity,
+///
+/// `current_model` is `tr.currentModel`; `view` is `tr.viewParms`
+/// (`ProjectRadius`); the three lod cvars read through `Common::cvar`. The
+/// frame-array read for the projected radius runs through [`read_md3_frame`].
+///
+/// Source: `oracle/codemp/renderer/tr_mesh.cpp:173-236`
+fn r_compute_lod(
+    current_model: &model_t,
+    ent_frame: i32,
+    ent_origin: vec3_t,
+    view: &viewParms_t,
+    common: &Common,
+    cvars: &RendererCvars,
 ) -> i32 {
-    todo!("Port R_ComputeLOD — oracle/codemp/renderer/tr_mesh.cpp:173-236")
+    let mut lod;
+
+    if current_model.numLods < 2 {
+        // model has only 1 LOD level, skip computations and bias
+        lod = 0;
+    } else {
+        // multiple LODs exist, so compute projected bounding sphere and use
+        // that as a criteria for selecting LOD.
+        // SAFETY: `ent_frame` is clamped to `numFrames` by the caller before
+        // the LOD read; see [`read_md3_frame`].
+        let (bounds, _, _) = unsafe { read_md3_frame(current_model.md3[0], ent_frame) };
+        let radius = RadiusFromBounds(bounds[0], bounds[1]);
+
+        let projected_radius = project_radius(radius, ent_origin, view);
+        let flod;
+        if projected_radius != 0.0 {
+            let mut lodscale =
+                common.cvar(cvars.r_lodscale).value + common.cvar(cvars.r_autolodscalevalue).value;
+            if lodscale > 20.0 {
+                lodscale = 20.0;
+            } else if lodscale < 0.0 {
+                lodscale = 0.0;
+            }
+            flod = 1.0f32 - projected_radius * lodscale;
+        } else {
+            // object intersects near view plane, e.g. view weapon
+            flod = 0.0;
+        }
+
+        let flod = flod * current_model.numLods as f32;
+        lod = myftol(flod);
+
+        if lod < 0 {
+            lod = 0;
+        } else if lod >= current_model.numLods {
+            lod = current_model.numLods - 1;
+        }
+    }
+
+    lod += common.cvar(cvars.r_lodbias).integer;
+
+    if lod >= current_model.numLods {
+        lod = current_model.numLods - 1;
+    }
+    if lod < 0 {
+        lod = 0;
+    }
+
+    lod
 }
 
 /// Raven `static int R_CullModel(md3Header_t *header, trRefEntity_t *ent)` —
 /// culls an MD3 model against the view frustum: first a bounding-sphere test
-/// against the current (and, when animating, previous) frame's
-/// `localOrigin`/`radius` — skipped for non-normalized-axis (upscaled)
-/// entities — then, only when the sphere test doesn't already resolve to
-/// IN/OUT, a bounding-box test against the interpolated old/new frame
-/// bounds.
-// DEFERRED: R_CullModel — two blockers this wave cannot supply (whole-fn
-// deferral, no body transcribed):
-//   - the on-disk MD3 frame-array walk (`(md3Frame_t *)((byte *)header +
-//     header->ofsFrames) + ent->e.frame`/`oldframe`) has no SAFE quarantine
-//     accessor to call: the only existing Rust walk of this exact shape is
-//     `tr_model/frontend.rs::r_model_bounds`'s `header`/`ofsFrames`/
-//     `md3Frame_t` cast (`oracle/codemp/renderer/tr_model.cpp:1811-1836`),
-//     and that fn is `pub unsafe fn` — calling it needs an `unsafe` block at
-//     the call site, and this file bans unsafe outright (task rule: "UNSAFE
-//     IS BANNED IN THIS FILE ... If none fits, leave todo!() ... report it as
-//     an escalation"). `ent.e.frame`/`oldframe`/`nonNormalizedAxes` are
-//     themselves readable straight off the tier-1 `refEntity_t` embedded in
-//     `trRefEntity_t.e` (same carve-out `tr_main.rs::R_RotateForEntity`
-//     already uses for `ent.e.reType`/`axis`) — only the frame-array walk
-//     is blocked.
-//   - `tr.pc.c_sphere_cull_md3_in/clip/out`/`c_box_cull_md3_in/clip/out`
-//     (`frontEndCounters_t`) have no `FrameState` field home: the same
-//     UNMAPPED finding `tr_cmds.rs`'s `R_PerformanceCounters` deferral
-//     already recorded — "`tr.pc` (`frontEndCounters_t`) has no R2/
-//     placeholder home at all ... UNMAPPED, not invented, per the preamble's
-//     ... rule" (`tr_cmds.rs:203-208`).
-// `header`/`ent` are threaded as the already-ported tier-1/tier-2 shapes and
-// `R_CullLocalBox`/`R_CullLocalPointAndRadius`'s own params (`ori`,
-// `r_nocull_integer`, `frustum`) threaded straight through per their STATE
-// HOMES in `tr_main.rs`, so a later wave's fix is a body-only fill, not a
-// signature change.
-// Source: `oracle/codemp/renderer/tr_mesh.cpp:58-137`
-pub fn r_cull_model(
-    _header: &md3Header_t,
-    _ent: &trRefEntity_t,
-    _ori: &orientationr_t,
-    _r_nocull_integer: i32,
-    _frustum: &[cplane_t; 4],
+/// against the current (and, when animating, previous) frame, skipped for
+/// non-normalized-axis (upscaled) entities, then a merged bounding-box test.
+///
+/// `ori` is the entity orientation `R_RotateForEntity` built.
+/// `r_nocull_integer` is `r_nocull->integer`.
+/// `frustum` is `tr.viewParms.frustum`.
+///
+// PORT-NOTE: the `tr.pc.c_sphere_cull_md3_*`/`c_box_cull_md3_*`
+// (`frontEndCounters_t`) increments are dropped - `tr.pc` has no `FrameState`
+// home yet, the same UNMAPPED finding `tr_cmds.rs`'s `R_PerformanceCounters`
+// deferral records.
+/// Source: `oracle/codemp/renderer/tr_mesh.cpp:58-137`
+fn r_cull_model(
+    header: *const md3Header_t,
+    ent: &trRefEntity_t,
+    ori: &orientationr_t,
+    r_nocull_integer: i32,
+    frustum: &[cplane_t; 4],
 ) -> i32 {
-    todo!("Port R_CullModel — oracle/codemp/renderer/tr_mesh.cpp:58-137")
-}
+    // SAFETY: both frame indices are clamped to `numFrames` by the caller
+    // before this cull; see [`read_md3_frame`].
+    let (new_bounds, new_local, new_radius) = unsafe { read_md3_frame(header, ent.e.frame) };
+    let (old_bounds, old_local, old_radius) = unsafe { read_md3_frame(header, ent.e.oldframe) };
 
-// ===== wave 3 =====
+    // cull bounding sphere ONLY if this is not an upscaled entity
+    if ent.e.nonNormalizedAxes == 0 {
+        if ent.e.frame == ent.e.oldframe {
+            match R_CullLocalPointAndRadius(new_local, new_radius, ori, r_nocull_integer, frustum) {
+                CULL_OUT => return CULL_OUT,
+                CULL_IN => return CULL_IN,
+                _ => {}
+            }
+        } else {
+            let sphere_cull =
+                R_CullLocalPointAndRadius(new_local, new_radius, ori, r_nocull_integer, frustum);
+            let sphere_cull_b =
+                R_CullLocalPointAndRadius(old_local, old_radius, ori, r_nocull_integer, frustum);
+
+            if sphere_cull == sphere_cull_b {
+                if sphere_cull == CULL_OUT {
+                    return CULL_OUT;
+                } else if sphere_cull == CULL_IN {
+                    return CULL_IN;
+                }
+            }
+        }
+    }
+
+    // calculate a bounding box in the current coordinate system
+    let mut bounds = [[0.0f32; 3]; 2];
+    for i in 0..3 {
+        bounds[0][i] = old_bounds[0][i].min(new_bounds[0][i]);
+        bounds[1][i] = old_bounds[1][i].max(new_bounds[1][i]);
+    }
+
+    match R_CullLocalBox(bounds, r_nocull_integer, ori, frustum) {
+        CULL_IN => CULL_IN,
+        CULL_CLIP => CULL_CLIP,
+        _ => CULL_OUT,
+    }
+}
 
 /// Raven `void R_AddMD3Surfaces(trRefEntity_t *ent)` — validates `ent`'s
 /// current/old MD3 frame indices, computes LOD, culls the merged bounding
 /// box, sets up lighting, resolves the fog volume, then walks every MD3
-/// surface resolving its shader (custom shader / custom skin / per-surface
-/// MD3 shader) and pushing shadow + main draw-surf entries.
-// DEFERRED: R_AddMD3Surfaces — whole-fn, four independent blockers this wave
-// cannot supply (out of this file's edit scope in every case):
-//   - `tr.currentModel` (`header = tr.currentModel->md3[lod]`, `ent->e.frame
-//     %= tr.currentModel->md3[0]->numFrames`) has no landing field on
-//     `FrameState` — the identical blocker this file's own `r_compute_lod`
-//     deferral already recorded ("`tr.currentModel` has no landing field on
-//     `FrameState` yet ... owned by the `tr_main` wave").
-//   - The on-disk MD3 surface-array walk (`(md3Surface_t *)((byte *)header +
-//     header->ofsSurfaces)`, then per-surface `ofsShaders`/`ofsEnd`) has no
-//     SAFE quarantine accessor to call — `tr_surface.rs::LerpMeshVertexes`
-//     already recorded the identical finding for this exact struct family:
-//     "`md3Surface_t *surf` input has no ported Rust type anywhere in the
-//     crate yet (out-of-packet — no `tr_model`/MD3 wave has landed it)". The
-//     only existing Rust code touching this offset family is raw/`unsafe`
-//     (`tr_model/frontend.rs`, `tr_model/server_load.rs`), and this file
-//     bans unsafe outright.
-//   - `tr.viewParms.isPortal` (`personalModel = ... && !tr.viewParms.
-//     isPortal`) has no landed field — `FrameState::view` is still the empty
-//     `ViewParms {}` placeholder, the same UNMAPPED finding
-//     `tr_shade.rs:303` already recorded ("`backEnd.viewParms.isPortal` has
-//     no landed field").
-//   - The skin-resolution branch (`tr.skins[hSkin]->numSurfaces`/
-//     `->surfaces[j]->name`/`->shader`, `tr.numSkins`) needs per-surface skin
-//     data `RenderAssets::skins: Arena<SkinAsset>` does not carry yet
-//     (`SkinAsset {}` is still an empty placeholder, owned by the `tr_image`
-//     wave). The live reconciled skin API, `RenderModels::skin_surfaces`
-//     (`tr_model/server_skins.rs:283`, PORT-NOTE at `tr_image.rs:878`),
-//     returns a flattened `Vec<(surface_name, shader_name)>` with no
-//     `ShaderHandle`/`.sort`/`.defaultShader` to reproduce the oracle's
-//     `shader->sort == SS_OPAQUE`/`shader->defaultShader` warning checks —
-//     bridging it would require inventing a shader-name→handle resolver not
-//     in this packet's resolved call surface, so it is flagged rather than
-//     bridged.
-//   - `RF_THIRD_PERSON`/`RF_WRAP_FRAMES`/`RF_NOSHADOW`/`RF_DEPTHHACK`/
-//     `RF_SHADOW_PLANE` (the `renderfx` bit tests) are genuinely absent: not
-//     in this packet's (nonexistent) `## FILE-SCOPE CONSTANTS` section and
-//     not found anywhere else in the crate — never-guess-a-constant.
-// `ent->e.frame`/`oldframe`/`customShader`/`customSkin`/`skinNum`/`renderfx`
-// themselves ARE readable straight off the tier-1 `refEntity_t` embedded in
-// `trRefEntity_t.e` (same carve-out `tr_main.rs::R_RotateForEntity`/this
-// file's own `r_cull_model` already use) — only the four blockers above are
-// out of reach. `ent`/`r_shadows_integer` (the `RendererCvars::r_shadows`
-// cvar, threaded the same way `tr_shadows.rs::RB_ShadowFinish` threads it)
-// are threaded as the already-ported shapes so a later wave's fix is a
-// body-only fill, not a signature change; `header` itself is left off the
-// signature because it is derived from the blocked `tr.currentModel` field
-// above, not an independent input.
-// Source: `oracle/codemp/renderer/tr_mesh.cpp:281-420`
-pub fn r_add_md3_surfaces(
-    _common: &mut Common,
-    _cvars: &RendererCvars,
-    _r_shadows_integer: i32,
-    _assets: &RenderAssets,
-    _frame: &FrameState,
-    _ent: &mut trRefEntity_t,
+/// surface resolving its shader and pushing a draw surf.
+///
+/// `models` resolves `tr.currentModel` (`R_GetModelByHandle`).
+/// `view` is `tr.viewParms` (`.isPortal`/`.frustum`).
+/// `ori` is the entity orientation `R_RotateForEntity` built.
+/// The cvars read through `engine_view.common`.
+/// `assets` holds the shader and skin registries and the world fog list.
+/// `shifted_entity_num`/`rdf_nofog` feed `R_AddDrawSurf`'s sort key
+/// (the shader travels through the sort key, not the surface ref, DEC-43.3).
+///
+/// PORT-NOTE: `ent->e.frame`/`oldframe` are written in place by the wrap and
+/// clamp below, so a later per-frame read of `tr.refdef.entities[n]` sees the
+/// validated values, matching the oracle's direct write into the entity.
+///
+/// Source: `oracle/codemp/renderer/tr_mesh.cpp:281-420`
+#[allow(clippy::too_many_arguments)]
+pub fn r_add_md3_surfaces<'a>(
+    ent: &mut trRefEntity_t,
+    models: &RenderModels,
+    view: &viewParms_t,
+    ori: &orientationr_t,
+    engine_view: &mut EngineHostView,
+    cvars: &RendererCvars,
+    assets: &RenderAssets,
+    frame: &FrameState,
+    refdef_rdflags: i32,
+    rdf_nofog: bool,
+    r_shadows_integer: i32,
+    shifted_entity_num: i32,
+    fogs: &[fog_t],
+    dlights: &[dlight_t],
+    draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
 ) {
-    todo!("Port R_AddMD3Surfaces — oracle/codemp/renderer/tr_mesh.cpp:281-420")
+    // don't add third_person objects if not in a portal
+    let personal_model = (ent.e.renderfx & RF_THIRD_PERSON) != 0 && view.isPortal == 0;
+
+    let current_model = models.get_model(ent.e.hModel);
+    let num_frames = {
+        // SAFETY: `md3[0]` is the LOD-0 header of a registered `MOD_MESH`
+        // model, the aligned block the loader owns.
+        unsafe { (*current_model.md3[0]).numFrames }
+    };
+
+    // Wrap and validate the frames so there is no chance of a crash. The wrap
+    // writes into the entity first, so the surfaces render without a re-check.
+    // The warning then prints the post-wrap values, and only after that does a
+    // bad frame reset both to 0. This matches the oracle write order.
+    let wrap = ent.e.renderfx & RF_WRAP_FRAMES != 0;
+    let (wrapped_frame, wrapped_oldframe, bad_frame) =
+        wrap_and_check_md3_frames(ent.e.frame, ent.e.oldframe, num_frames, wrap);
+    ent.e.frame = wrapped_frame;
+    ent.e.oldframe = wrapped_oldframe;
+    if bad_frame {
+        Com_DPrintf(
+            engine_view.common,
+            &format!(
+                "{}R_AddMD3Surfaces: no such frame {} to {} for '{}'\n",
+                S_COLOR_RED.to_str().expect("S_COLOR_RED is ASCII"),
+                ent.e.oldframe,
+                ent.e.frame,
+                md3_name(&current_model.name),
+            ),
+        );
+        ent.e.frame = 0;
+        ent.e.oldframe = 0;
+    }
+
+    // compute LOD
+    let lod = r_compute_lod(
+        current_model,
+        ent.e.frame,
+        ent.e.origin,
+        view,
+        engine_view.common,
+        cvars,
+    );
+
+    let header = current_model.md3[lod as usize];
+
+    // cull the whole model if the merged bounding box of both frames is
+    // outside the view frustum
+    let r_nocull_integer = engine_view.common.cvar(cvars.r_nocull).integer;
+    let cull = r_cull_model(header, ent, ori, r_nocull_integer, &view.frustum);
+    if cull == CULL_OUT {
+        return;
+    }
+
+    // set up lighting now that we know we aren't culled
+    // PORT-NOTE: the MOD_BRUSH arm at `tr_main.rs` also folds the lighting onto
+    // `frame.current_entity`, but `frame` arrives here shared, so this arm cannot.
+    // No MD3 reader of `frame.current_entity` exists yet, so the fold is latent.
+    // Source: oracle/codemp/renderer/tr_mesh.cpp:335-340
+    if !personal_model || r_shadows_integer > 1 {
+        let mut re = ref_entity_from_tr(ent);
+        R_SetupEntityLighting(
+            engine_view.common,
+            cvars,
+            assets,
+            frame,
+            refdef_rdflags,
+            dlights,
+            &mut re,
+        );
+        write_back_lighting(ent, &re);
+    }
+
+    // see if we are in a fog volume
+    let fog_num = r_compute_fog_num(header, ent.e.frame, ent.e.origin, fogs, refdef_rdflags);
+
+    // draw all surfaces
+    // SAFETY: every walk below stays inside the aligned block `ofsEnd` sizes.
+    // Each surface advances by its own `ofsEnd`, matching the loader's walk.
+    let num_surfaces = unsafe { (*header).numSurfaces };
+    let mut surf =
+        unsafe { (header as *const u8).add((*header).ofsSurfaces as usize) } as *const md3Surface_t;
+
+    for i in 0..num_surfaces {
+        let num_shaders = unsafe { (*surf).numShaders };
+        let surface_name = md3_name(unsafe { &(*surf).name });
+
+        let shader: ShaderHandle = if ent.e.customShader != 0 {
+            R_GetShaderByHandle(assets, engine_view.common, ent.e.customShader)
+        } else if ent.e.customSkin > 0
+            && assets
+                .skins
+                .handle_at_slot(ent.e.customSkin as u32)
+                .is_some()
+        {
+            let skin_handle = R_GetSkinByHandle(assets, ent.e.customSkin);
+
+            // match the surface name to something in the skin file. The names
+            // have both been lowercased
+            let mut resolved = ShaderHandle::slot_zero();
+            let mut skin_name = String::new();
+            if let Some(skin) = assets.skins.get(skin_handle) {
+                skin_name = skin.name.clone();
+                resolved = resolve_skin_shader(skin, &surface_name);
+            }
+
+            if resolved == ShaderHandle::slot_zero() {
+                Com_DPrintf(
+                    engine_view.common,
+                    &format!(
+                        "{}WARNING: no shader for surface {} in skin {}\n",
+                        S_COLOR_RED.to_str().expect("S_COLOR_RED is ASCII"),
+                        surface_name,
+                        skin_name,
+                    ),
+                );
+            } else if assets
+                .shaders
+                .get(resolved)
+                .map(|s| s.default_shader)
+                .unwrap_or(false)
+            {
+                let shader_name = assets
+                    .shaders
+                    .get(resolved)
+                    .map(|s| s.name.clone())
+                    .unwrap_or_default();
+                Com_DPrintf(
+                    engine_view.common,
+                    &format!(
+                        "{}WARNING: shader {} in skin {} not found\n",
+                        S_COLOR_RED.to_str().expect("S_COLOR_RED is ASCII"),
+                        shader_name,
+                        skin_name,
+                    ),
+                );
+            }
+            resolved
+        } else if num_shaders <= 0 {
+            ShaderHandle::slot_zero()
+        } else {
+            // The oracle indexes `md3Shader[skinNum % numShaders]`. A negative
+            // `skinNum` would index before the array (Raven UB, §19). Here
+            // `rem_euclid` keeps the index in range, the one defined behavior.
+            let sel = ent.e.skinNum.rem_euclid(num_shaders);
+            let shaders_base = unsafe { (surf as *const u8).add((*surf).ofsShaders as usize) }
+                as *const md3Shader_t;
+            let shader_index = unsafe { (*shaders_base.add(sel as usize)).shaderIndex };
+            R_GetShaderByHandle(assets, engine_view.common, shader_index)
+        };
+
+        // DEFERRED: R_AddMD3Surfaces stencil-shadow and projection-shadow
+        // pushes — the `tr.shadowShader`/`tr.projectionShadowShader` arms
+        // (`r_shadows == 2`/`3`) need the shadow backend, which does not exist.
+        // Source: oracle/codemp/renderer/tr_mesh.cpp:388-405
+
+        // don't add third_person objects if not viewing through a portal
+        if !personal_model {
+            let sorted_index = assets
+                .shaders
+                .get(shader)
+                .map(|s| s.sorted_index)
+                .unwrap_or(0);
+            R_AddDrawSurf(
+                SurfaceGeometry::Md3(Md3SurfaceRef {
+                    h_model: ent.e.hModel,
+                    lod,
+                    surface_index: i,
+                    frame: ent.e.frame,
+                    old_frame: ent.e.oldframe,
+                    backlerp: ent.e.backlerp,
+                }),
+                sorted_index,
+                shifted_entity_num,
+                rdf_nofog,
+                fog_num,
+                0,
+                draw_surfs,
+            );
+        }
+
+        // find the next surface
+        surf = unsafe { (surf as *const u8).add((*surf).ofsEnd as usize) } as *const md3Surface_t;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::render_state::skin_asset::SkinSurface;
+
+    // frame wrap and clamp
+
+    #[test]
+    fn frames_in_range_pass_through_unchanged() {
+        // given three frames and both indices in range
+        let (frame, oldframe, bad) = wrap_and_check_md3_frames(2, 1, 3, false);
+        // then nothing changes and the frames are not flagged bad
+        assert_eq!((frame, oldframe, bad), (2, 1, false));
+    }
+
+    #[test]
+    fn wrap_mods_the_frames_by_the_count() {
+        // given RF_WRAP_FRAMES and indices past the count
+        let (frame, oldframe, bad) = wrap_and_check_md3_frames(7, 4, 3, true);
+        // then both wrap into range and are not bad
+        assert_eq!((frame, oldframe, bad), (1, 1, false));
+    }
+
+    #[test]
+    fn truncating_wrap_keeps_a_negative_frame_negative_and_flags_bad() {
+        // given RF_WRAP_FRAMES and a negative old frame
+        let (frame, oldframe, bad) = wrap_and_check_md3_frames(1, -1, 3, true);
+        // then the truncating mod leaves -1, unlike rem_euclid, and flags bad
+        assert_eq!((frame, oldframe, bad), (1, -1, true));
+    }
+
+    #[test]
+    fn out_of_range_frames_are_flagged_bad_without_clamp() {
+        // given an out-of-range frame with no wrap
+        let (frame, oldframe, bad) = wrap_and_check_md3_frames(5, 1, 3, false);
+        // then the post-wrap values pass through and the frame is flagged bad
+        assert_eq!((frame, oldframe, bad), (5, 1, true));
+
+        // a negative old frame is bad too
+        let (frame, oldframe, bad) = wrap_and_check_md3_frames(1, -1, 3, false);
+        assert_eq!((frame, oldframe, bad), (1, -1, true));
+    }
+
+    // skin-name shader resolve
+
+    #[test]
+    fn skin_shader_resolves_by_lowercased_name() {
+        // given a skin with two surfaces
+        let skin = SkinAsset {
+            name: "models/players/kyle/model_default.skin".to_owned(),
+            surfaces: vec![
+                SkinSurface {
+                    name: "torso".to_owned(),
+                    shader: ShaderHandle::new(7, 0),
+                },
+                SkinSurface {
+                    name: "head".to_owned(),
+                    shader: ShaderHandle::new(9, 0),
+                },
+            ],
+        };
+        // then a matching name returns that surface's shader (`ShaderHandle`
+        // has no `Debug`, so the compare is `==`, not `assert_eq!`)
+        assert!(resolve_skin_shader(&skin, "head") == ShaderHandle::new(9, 0));
+        // and a non-matching name returns the default (slot 0)
+        assert!(resolve_skin_shader(&skin, "legs") == ShaderHandle::slot_zero());
+    }
 }

@@ -33,6 +33,8 @@ use std::mem::size_of;
 
 use bytemuck::{Pod, Zeroable};
 use mp_engine_qcommon::qfiles::draw_vert_t::drawVert_t;
+use mp_engine_qcommon::qfiles::md3_limits::MD3_XYZ_SCALE;
+use mp_engine_qcommon::qfiles::md3_surface_t::md3Surface_t;
 use mp_renderer::render_state::image_asset::ImageHandle;
 use mp_renderer::render_state::placeholders::WorldAsset;
 use mp_renderer::render_state::render_assets::RenderAssets;
@@ -46,8 +48,10 @@ use mp_renderer::tr_local::tex_coord_gen_t::texCoordGen_t;
 use mp_renderer::tr_local::tr_ref_entity_t::trRefEntity_t;
 use mp_renderer::tr_local::view_parms_t::viewParms_t;
 use mp_renderer::tr_main::{
-    DrawSurf, R_DecomposeSort, R_RotateForEntity, SurfaceGeometry, TrMainScratch, WorldSurfaceRef,
+    DrawSurf, Md3SurfaceRef, R_DecomposeSort, R_RotateForEntity, SurfaceGeometry, TrMainScratch,
+    WorldSurfaceRef,
 };
+use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_noise::NoiseState;
 use mp_renderer::tr_shader::{
     GLS_ATEST_GE_80, GLS_ATEST_GE_C0, GLS_ATEST_GT_0, GLS_ATEST_LT_80, GLS_DEPTHFUNC_EQUAL,
@@ -478,10 +482,11 @@ enum Warned {
     SurfaceSprite,
     Glow,
     VideoMap,
+    Md3Lighting,
 }
 
 impl Warned {
-    const COUNT: usize = 7;
+    const COUNT: usize = 8;
 
     fn slot(self) -> usize {
         match self {
@@ -492,6 +497,7 @@ impl Warned {
             Warned::SurfaceSprite => 4,
             Warned::Glow => 5,
             Warned::VideoMap => 6,
+            Warned::Md3Lighting => 7,
         }
     }
 
@@ -506,6 +512,9 @@ impl Warned {
             Warned::SurfaceSprite => "skips a surface-sprite world stage, drawn in a later wave",
             Warned::Glow => "draws a glow world stage as a plain stage",
             Warned::VideoMap => "draws a videoMap world stage as a plain stage — no cinematic yet",
+            Warned::Md3Lighting => {
+                "draws an MD3 lighting-diffuse stage with the entity color — the vertex normal is dropped"
+            }
         }
     }
 }
@@ -531,6 +540,11 @@ pub struct WorldStats {
     pub empty_surfaces: u32,
     /// Sky-parms world surfaces skipped whole, waiting on the sky chain wave.
     pub skipped_sky: u32,
+    /// MD3 (`MOD_MESH`) entity surfaces that drew at least one stage pass.
+    pub md3_surfaces_drawn: u32,
+    /// MD3 draw surfs the decode dropped (a bad model handle or a purged model).
+    /// This stays separate from `skipped_non_world` so the two causes read apart.
+    pub md3_decode_failed: u32,
 }
 
 /// The pipeline cache key: one pipeline per distinct blend state and depth
@@ -561,6 +575,9 @@ struct StageDrawItem {
     index_count: u32,
     base_vertex: i32,
     dynamic: bool,
+    /// Whether this pass reads its indices from the per-frame dynamic index
+    /// buffer (MD3 entity surfaces) rather than the static world index buffer.
+    index_dynamic: bool,
     /// The byte offset of this surface's clip matrix in the dynamic-offset
     /// globals buffer. Slot 0 (offset 0) is the world matrix.
     globals_offset: u32,
@@ -594,6 +611,12 @@ pub struct Pipeline3d {
     /// texcoords and colours into. It grows and is reused across frames.
     dynamic_buffer: wgpu::Buffer,
     dynamic_capacity: usize,
+    /// The per-frame index buffer an MD3 entity surface writes its decoded
+    /// triangle indices into. The static world index buffer holds only world
+    /// surfaces, so MD3 indices need their own buffer. It grows and is reused
+    /// across frames.
+    dynamic_index_buffer: wgpu::Buffer,
+    dynamic_index_capacity: usize,
     depth: DepthTexture,
     warned: [bool; Warned::COUNT],
     /// The dedup log the shared `stage2d` evaluators write their own rgbGen,
@@ -679,6 +702,9 @@ impl Pipeline3d {
         let dynamic_capacity = 1;
         let dynamic_buffer = create_dynamic_buffer(device, dynamic_capacity);
 
+        let dynamic_index_capacity = 1;
+        let dynamic_index_buffer = create_dynamic_index_buffer(device, dynamic_index_capacity);
+
         Pipeline3d {
             shader,
             pipeline_layout,
@@ -695,6 +721,8 @@ impl Pipeline3d {
             flags_capacity,
             dynamic_buffer,
             dynamic_capacity,
+            dynamic_index_buffer,
+            dynamic_index_capacity,
             depth: DepthTexture::new(gpu, width, height),
             warned: [false; Warned::COUNT],
             stage_warnings: Stage2dWarnings::default(),
@@ -740,6 +768,7 @@ impl Pipeline3d {
         view: &viewParms_t,
         entities: &[trRefEntity_t],
         scratch: &mut TrMainScratch,
+        models: &RenderModels,
     ) -> WorldStats {
         let mut stats = WorldStats::default();
 
@@ -751,6 +780,7 @@ impl Pipeline3d {
         self.write_globals(gpu, &clips);
 
         let mut dynamic_vertices: Vec<WorldVertex> = Vec::new();
+        let mut dynamic_indices: Vec<u32> = Vec::new();
         let items = self.collect_stage_items(
             draw_surfs,
             geometry,
@@ -758,8 +788,11 @@ impl Pipeline3d {
             noise,
             float_time,
             &mut dynamic_vertices,
+            &mut dynamic_indices,
             &mut stats,
             &slot_map,
+            entities,
+            models,
         );
 
         if items.is_empty() {
@@ -783,6 +816,16 @@ impl Pipeline3d {
                 &self.dynamic_buffer,
                 0,
                 bytemuck::cast_slice(&dynamic_vertices),
+            );
+        }
+
+        // The MD3 entity surfaces decoded their indices into this buffer.
+        if !dynamic_indices.is_empty() {
+            self.reserve_dynamic_indices(gpu, dynamic_indices.len());
+            gpu.queue().write_buffer(
+                &self.dynamic_index_buffer,
+                0,
+                bytemuck::cast_slice(&dynamic_indices),
             );
         }
 
@@ -846,8 +889,6 @@ impl Pipeline3d {
                 multiview_mask: None,
             });
 
-            pass.set_index_buffer(geometry.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-
             for (draw_index, item) in items.iter().enumerate() {
                 let pipeline = self
                     .pipelines
@@ -862,6 +903,15 @@ impl Pipeline3d {
                 } else {
                     &geometry.vertex_buffer
                 };
+
+                // An MD3 entity surface indexes the per-frame index buffer, a
+                // world surface the static world index buffer.
+                let index_buffer = if item.index_dynamic {
+                    &self.dynamic_index_buffer
+                } else {
+                    &geometry.index_buffer
+                };
+                pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
 
                 pass.set_pipeline(pipeline);
                 // Group 0 selects this surface's clip matrix by its entity slot.
@@ -898,80 +948,229 @@ impl Pipeline3d {
         noise: &NoiseState,
         float_time: f32,
         dynamic_vertices: &mut Vec<WorldVertex>,
+        dynamic_indices: &mut Vec<u32>,
         stats: &mut WorldStats,
         slot_map: &HashMap<i32, u32>,
+        entities: &[trRefEntity_t],
+        models: &RenderModels,
     ) -> Vec<StageDrawItem> {
         let mut items: Vec<StageDrawItem> = Vec::new();
 
         for surf in draw_surfs {
-            let world_ref = match surf.surface {
-                SurfaceGeometry::World(world_ref) => world_ref,
+            match surf.surface {
+                SurfaceGeometry::World(world_ref) => {
+                    self.collect_world_surface(
+                        surf.sort,
+                        world_ref,
+                        geometry,
+                        assets,
+                        noise,
+                        float_time,
+                        dynamic_vertices,
+                        stats,
+                        slot_map,
+                        entities,
+                        &mut items,
+                    );
+                }
+                SurfaceGeometry::Md3(md3_ref) => {
+                    self.collect_md3_surface(
+                        surf.sort,
+                        md3_ref,
+                        assets,
+                        noise,
+                        float_time,
+                        dynamic_vertices,
+                        dynamic_indices,
+                        stats,
+                        slot_map,
+                        entities,
+                        models,
+                        &mut items,
+                    );
+                }
                 _ => {
                     stats.skipped_non_world += 1;
-                    continue;
-                }
-            };
-
-            let index = world_ref_index(world_ref);
-            let range = geometry.range(index);
-            if range.index_count == 0 {
-                stats.empty_surfaces += 1;
-                continue;
-            }
-
-            let (entity_num, shader_handle, _fog_num, _dlight_map) =
-                R_DecomposeSort(surf.sort, &assets.sorted_shaders);
-            let Some(shader) = assets.shaders.get(shader_handle) else {
-                continue;
-            };
-
-            // Slot 0 is the world. A draw surf with an unmapped entity number
-            // uses slot 0. `build_entity_slots` maps every entity number the
-            // draw list carries, so an unmapped number does not occur here.
-            let slot = slot_map.get(&entity_num).copied().unwrap_or(0);
-            let globals_offset = (slot as u64 * GLOBALS_STRIDE) as u32;
-
-            // The sky draws through its own chain in a later wave, so a
-            // sky-parms shader skips the whole surface.
-            if shader.sky.is_some() {
-                self.warn_once(Warned::SkyParms);
-                stats.skipped_sky += 1;
-                continue;
-            }
-            if shader.fog_parms.is_some() {
-                self.warn_once(Warned::Fog);
-            }
-
-            let cpu_start = range.base_vertex as usize;
-            let cpu = &geometry.cpu_vertices[cpu_start..cpu_start + range.vertex_count as usize];
-
-            let before = items.len();
-            for stage in shader.stages.iter().filter(|stage| stage.active) {
-                let item = self.build_stage_item(
-                    shader,
-                    stage,
-                    &range,
-                    cpu,
-                    assets,
-                    noise,
-                    float_time,
-                    dynamic_vertices,
-                    globals_offset,
-                );
-                // A surface-sprite stage draws nothing here, so it yields no item.
-                if let Some(item) = item {
-                    items.push(item);
-                }
-            }
-            if items.len() > before {
-                stats.surfaces_drawn += 1;
-                if entity_num != TR_WORLDENT {
-                    stats.entity_surfaces_drawn += 1;
                 }
             }
         }
 
         items
+    }
+
+    /// Resolves one world (BSP) draw surf into its per-stage passes, appending
+    /// them to `items`. The per-item shader clock is `floatTime - e.shaderTime`
+    /// for the surface's entity, so an inline brush model with a `shaderTime`
+    /// animates from its own offset.
+    #[allow(clippy::too_many_arguments)]
+    fn collect_world_surface(
+        &mut self,
+        sort: u32,
+        world_ref: WorldSurfaceRef,
+        geometry: &WorldGeometry,
+        assets: &RenderAssets,
+        noise: &NoiseState,
+        float_time: f32,
+        dynamic_vertices: &mut Vec<WorldVertex>,
+        stats: &mut WorldStats,
+        slot_map: &HashMap<i32, u32>,
+        entities: &[trRefEntity_t],
+        items: &mut Vec<StageDrawItem>,
+    ) {
+        let index = world_ref_index(world_ref);
+        let range = geometry.range(index);
+        if range.index_count == 0 {
+            stats.empty_surfaces += 1;
+            return;
+        }
+
+        let (entity_num, shader_handle, _fog_num, _dlight_map) =
+            R_DecomposeSort(sort, &assets.sorted_shaders);
+        let Some(shader) = assets.shaders.get(shader_handle) else {
+            return;
+        };
+
+        // Slot 0 is the world. A draw surf with an unmapped entity number uses
+        // slot 0. `build_entity_slots` maps every entity number the draw list
+        // carries, so an unmapped number does not occur here.
+        let slot = slot_map.get(&entity_num).copied().unwrap_or(0);
+        let globals_offset = (slot as u64 * GLOBALS_STRIDE) as u32;
+        let entity_float_time = float_time - entity_shader_time(entities, entity_num);
+
+        // The sky draws through its own chain in a later wave, so a sky-parms
+        // shader skips the whole surface.
+        if shader.sky.is_some() {
+            self.warn_once(Warned::SkyParms);
+            stats.skipped_sky += 1;
+            return;
+        }
+        if shader.fog_parms.is_some() {
+            self.warn_once(Warned::Fog);
+        }
+
+        let cpu_start = range.base_vertex as usize;
+        let cpu = &geometry.cpu_vertices[cpu_start..cpu_start + range.vertex_count as usize];
+
+        let before = items.len();
+        for stage in shader.stages.iter().filter(|stage| stage.active) {
+            let item = self.build_stage_item(
+                shader,
+                stage,
+                &range,
+                cpu,
+                assets,
+                noise,
+                entity_float_time,
+                dynamic_vertices,
+                globals_offset,
+            );
+            // A surface-sprite stage draws nothing here, so it yields no item.
+            if let Some(item) = item {
+                items.push(item);
+            }
+        }
+        if items.len() > before {
+            stats.surfaces_drawn += 1;
+            if entity_num != TR_WORLDENT {
+                stats.entity_surfaces_drawn += 1;
+            }
+        }
+    }
+
+    /// Resolves one MD3 (`MOD_MESH`) entity draw surf: it decodes the surface's
+    /// vertices on the CPU per frame (`LerpMeshVertexes`), packs its indices
+    /// into the per-frame index buffer, then draws one dynamic-buffer pass per
+    /// active stage with the entity's per-entity clip matrix and shader clock.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_surface.cpp:1235-1397`
+    /// (`LerpMeshVertexes`/`RB_SurfaceMesh`)
+    #[allow(clippy::too_many_arguments)]
+    fn collect_md3_surface(
+        &mut self,
+        sort: u32,
+        md3_ref: Md3SurfaceRef,
+        assets: &RenderAssets,
+        noise: &NoiseState,
+        float_time: f32,
+        dynamic_vertices: &mut Vec<WorldVertex>,
+        dynamic_indices: &mut Vec<u32>,
+        stats: &mut WorldStats,
+        slot_map: &HashMap<i32, u32>,
+        entities: &[trRefEntity_t],
+        models: &RenderModels,
+        items: &mut Vec<StageDrawItem>,
+    ) {
+        let (entity_num, shader_handle, _fog_num, _dlight_map) =
+            R_DecomposeSort(sort, &assets.sorted_shaders);
+        let Some(shader) = assets.shaders.get(shader_handle) else {
+            return;
+        };
+
+        let slot = slot_map.get(&entity_num).copied().unwrap_or(0);
+        let globals_offset = (slot as u64 * GLOBALS_STRIDE) as u32;
+        let entity_float_time = float_time - entity_shader_time(entities, entity_num);
+        // The identity-light default vertex colour is the entity's shaderRGBA.
+        let rgba = entities
+            .get(entity_num as usize)
+            .map(|ent| ent.e.shaderRGBA)
+            .unwrap_or([255, 255, 255, 255]);
+
+        // Decode the keyframe-lerped vertices and the triangle indices.
+        let Some((md3_vertices, md3_index_block)) = decode_md3_surface(models, md3_ref, rgba)
+        else {
+            stats.md3_decode_failed += 1;
+            return;
+        };
+        if md3_index_block.is_empty() {
+            stats.empty_surfaces += 1;
+            return;
+        }
+
+        // The sky chain is a later wave. An MD3 sky-parms shader skips whole.
+        if shader.sky.is_some() {
+            self.warn_once(Warned::SkyParms);
+            stats.skipped_sky += 1;
+            return;
+        }
+        if shader.fog_parms.is_some() {
+            self.warn_once(Warned::Fog);
+        }
+
+        // One shared index block per surface, in the per-frame index buffer.
+        let first_index = dynamic_indices.len() as u32;
+        let index_count = md3_index_block.len() as u32;
+        dynamic_indices.extend_from_slice(&md3_index_block);
+
+        let before = items.len();
+        for stage in shader.stages.iter().filter(|stage| stage.active) {
+            // CGEN_LIGHTING_DIFFUSE needs the vertex normal, which this wave
+            // drops, so the stage draws with the entity colour instead.
+            if stage.rgb_gen == colorGen_t::CGEN_LIGHTING_DIFFUSE {
+                self.warn_once(Warned::Md3Lighting);
+            }
+            let item = self.build_md3_stage_item(
+                shader,
+                stage,
+                &md3_vertices,
+                first_index,
+                index_count,
+                entity_float_time,
+                noise,
+                assets,
+                dynamic_vertices,
+                globals_offset,
+            );
+            if let Some(item) = item {
+                items.push(item);
+            }
+        }
+        if items.len() > before {
+            stats.surfaces_drawn += 1;
+            stats.md3_surfaces_drawn += 1;
+            if entity_num != TR_WORLDENT {
+                stats.entity_surfaces_drawn += 1;
+            }
+        }
     }
 
     /// Resolves one active stage into its draw pass, or `None` when the stage
@@ -1077,6 +1276,7 @@ impl Pipeline3d {
                 index_count: range.index_count,
                 base_vertex,
                 dynamic,
+                index_dynamic: false,
                 globals_offset,
             });
         }
@@ -1117,6 +1317,7 @@ impl Pipeline3d {
                 index_count: range.index_count,
                 base_vertex,
                 dynamic: true,
+                index_dynamic: false,
                 globals_offset,
             })
         } else {
@@ -1132,9 +1333,99 @@ impl Pipeline3d {
                 index_count: range.index_count,
                 base_vertex: range.base_vertex,
                 dynamic: false,
+                index_dynamic: false,
                 globals_offset,
             })
         }
+    }
+
+    /// Resolves one active MD3 stage into its draw pass. MD3 vertices live only
+    /// on the CPU (they are keyframe-lerped per frame), so every stage builds a
+    /// per-stage dynamic vertex block from the decoded surface, runs the stage's
+    /// texcoord and colour evaluators over it, and draws it single-textured. The
+    /// shared index block already sits in the per-frame index buffer.
+    ///
+    /// A surface-sprite stage yields `None`, the same skip `build_stage_item`
+    /// makes for the world path.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shade.cpp:2136-2158`
+    #[allow(clippy::too_many_arguments)]
+    fn build_md3_stage_item(
+        &mut self,
+        shader: &ShaderAsset,
+        stage: &ShaderStage,
+        md3_vertices: &[WorldVertex],
+        first_index: u32,
+        index_count: u32,
+        float_time: f32,
+        noise: &NoiseState,
+        assets: &RenderAssets,
+        dynamic_vertices: &mut Vec<WorldVertex>,
+        globals_offset: u32,
+    ) -> Option<StageDrawItem> {
+        // A surface-sprite stage draws no plain geometry.
+        if let Some(ss) = &stage.ss {
+            if ss.surfaceSpriteType != 0 {
+                self.warn_once(Warned::SurfaceSprite);
+                return None;
+            }
+        }
+
+        let time = StageTime::new(float_time, shader.time_offset);
+        let alpha_func = alpha_func_code(stage.state_bits);
+        let key = PipelineKey {
+            blend: blend_state_from_gls(stage.state_bits),
+            depth_equal: (stage.state_bits & GLS_DEPTHFUNC_EQUAL as u32) != 0,
+            depth_write: (stage.state_bits & GLS_DEPTHMASK_TRUE as u32) != 0,
+        };
+
+        if stage.glow {
+            self.warn_once(Warned::Glow);
+        }
+        let bundle0 = &stage.bundle[0];
+        if bundle0.is_video_map {
+            self.warn_once(Warned::VideoMap);
+        }
+        if stage.bundle[1].image.is_some() {
+            self.warn_once(Warned::MultitexEnv);
+        }
+
+        let (source, unsupported) = st_source(bundle0);
+        if unsupported {
+            self.warn_once(Warned::TcGen);
+        }
+        let diffuse = stage_image(bundle0, time.shader_time);
+
+        // The MD3 vertices are CPU-only, so every stage builds its own block in
+        // the dynamic vertex buffer.
+        let base_vertex = build_dynamic_block(
+            md3_vertices,
+            stage,
+            source,
+            false,
+            time,
+            noise,
+            assets,
+            &shader.name,
+            &mut self.stage_warnings,
+            dynamic_vertices,
+        );
+
+        Some(StageDrawItem {
+            key,
+            diffuse,
+            lightmap: None,
+            mode: MODE_SINGLE,
+            tex_from_lightmap: false,
+            alpha_func,
+            reads_lightmap: false,
+            first_index,
+            index_count,
+            base_vertex,
+            dynamic: true,
+            index_dynamic: true,
+            globals_offset,
+        })
     }
 
     /// Builds and caches the pipeline for `key` if it is not already there.
@@ -1252,6 +1543,20 @@ impl Pipeline3d {
         }
         self.dynamic_buffer = create_dynamic_buffer(gpu.device(), capacity);
         self.dynamic_capacity = capacity;
+    }
+
+    /// Grows the per-frame dynamic index buffer when `needed` indices exceed its
+    /// capacity. The buffer is reused across frames, so it only ever grows.
+    fn reserve_dynamic_indices(&mut self, gpu: &Gpu, needed: usize) {
+        if needed <= self.dynamic_index_capacity {
+            return;
+        }
+        let mut capacity = self.dynamic_index_capacity.max(1);
+        while capacity < needed {
+            capacity *= 2;
+        }
+        self.dynamic_index_buffer = create_dynamic_index_buffer(gpu.device(), capacity);
+        self.dynamic_index_capacity = capacity;
     }
 
     /// Writes one flags block per draw item into the flags buffer, each at its
@@ -1558,6 +1863,146 @@ fn create_dynamic_buffer(device: &wgpu::Device, capacity: usize) -> wgpu::Buffer
         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     })
+}
+
+fn create_dynamic_index_buffer(device: &wgpu::Device, capacity: usize) -> wgpu::Buffer {
+    device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("mp_renderer_gpu world dynamic index buffer"),
+        size: capacity as u64 * size_of::<u32>() as u64,
+        usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    })
+}
+
+/// The per-entity shader clock offset `floatTime - e.shaderTime` reads: the
+/// entity's own `shaderTime`, or 0 for the world entity and any unmapped
+/// number.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:910-916`
+fn entity_shader_time(entities: &[trRefEntity_t], entity_num: i32) -> f32 {
+    entities
+        .get(entity_num as usize)
+        .map(|ent| ent.e.shaderTime)
+        .unwrap_or(0.0)
+}
+
+/// Decodes one MD3 (`MOD_MESH`) surface into GPU vertices and triangle indices.
+/// The vertices are keyframe-lerped on the CPU (`LerpMeshVertexes`): the packed
+/// shorts scale by `MD3_XYZ_SCALE`, blended by `backlerp` between the old and
+/// new frame blocks. The texcoords come from `ofsSt`, the indices from
+/// `ofsTriangles`, and the vertex colour is the entity's `shaderRGBA`. The
+/// packed normal is dropped this wave, the same way [`WorldVertex`] drops the
+/// BSP normal.
+///
+/// Returns `None` when the model handle resolves to no MD3 header (a bad handle
+/// or a purged model), so the caller skips the surface.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:1235-1397`
+fn decode_md3_surface(
+    models: &RenderModels,
+    md3_ref: Md3SurfaceRef,
+    rgba: [u8; 4],
+) -> Option<(Vec<WorldVertex>, Vec<u32>)> {
+    let model = models.get_model(md3_ref.h_model);
+    let header = *model.md3.get(md3_ref.lod as usize)?;
+    if header.is_null() {
+        return None;
+    }
+
+    // The oracle recomputes backlerp at draw time: a still model (old frame ==
+    // current frame) lerps nothing.
+    // Source: oracle/codemp/renderer/tr_surface.cpp:1362-1366
+    let backlerp = if md3_ref.old_frame == md3_ref.frame {
+        0.0
+    } else {
+        md3_ref.backlerp
+    };
+
+    // SAFETY: `header` is the aligned MD3 header block a registered `MOD_MESH`
+    // model owns, and `surface_index`/`ofsEnd` walks stay inside that block.
+    // `R_AddMD3Surfaces` range-checks `frame`/`old_frame` against
+    // `md3[0]->numFrames`, the header count. The stride below assumes every LOD
+    // and surface shares that frame count, which the loader upholds for valid
+    // MD3 files. A malformed file with a shorter surface reads past the block,
+    // the same hole Raven has.
+    unsafe {
+        let mut surf =
+            (header as *const u8).add((*header).ofsSurfaces as usize) as *const md3Surface_t;
+        for _ in 0..md3_ref.surface_index {
+            surf = (surf as *const u8).add((*surf).ofsEnd as usize) as *const md3Surface_t;
+        }
+
+        let vertices = lerp_md3_vertexes(surf, md3_ref.frame, md3_ref.old_frame, backlerp, rgba);
+
+        let num_indexes = ((*surf).numTriangles * 3) as usize;
+        let triangles = (surf as *const u8).add((*surf).ofsTriangles as usize) as *const i32;
+        let mut indices: Vec<u32> = Vec::with_capacity(num_indexes);
+        for j in 0..num_indexes {
+            indices.push(*triangles.add(j) as u32);
+        }
+
+        Some((vertices, indices))
+    }
+}
+
+/// The CPU keyframe lerp of one MD3 surface's vertices (`LerpMeshVertexes`),
+/// producing one [`WorldVertex`] per vertex. Each MD3 vertex is four shorts
+/// (xyz plus a packed normal), so a frame block is `numVerts * 4` shorts. The
+/// `st` texcoords are shared across frames.
+///
+/// SAFETY: the caller ([`decode_md3_surface`]) guarantees `surf` is a live,
+/// range-checked surface header inside an aligned MD3 block.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:1235-1346`
+unsafe fn lerp_md3_vertexes(
+    surf: *const md3Surface_t,
+    frame: i32,
+    old_frame: i32,
+    backlerp: f32,
+    rgba: [u8; 4],
+) -> Vec<WorldVertex> {
+    let num_verts = (*surf).numVerts as usize;
+    let xyz_base = (surf as *const u8).add((*surf).ofsXyzNormals as usize) as *const i16;
+    let st_base = (surf as *const u8).add((*surf).ofsSt as usize) as *const f32;
+
+    // frame block stride = numVerts entries of four shorts each
+    let new_base = xyz_base.add(frame as usize * num_verts * 4);
+    let old_base = xyz_base.add(old_frame as usize * num_verts * 4);
+
+    let new_scale = MD3_XYZ_SCALE * (1.0 - backlerp);
+    let old_scale = MD3_XYZ_SCALE * backlerp;
+
+    // DEFERRED: LerpMeshVertexes normal unpack — the fourth short is a packed
+    // lat/lng normal the oracle unpacks through `sinTable` and blends with
+    // `VectorArrayNormalize`. This wave drops it, the same way `WorldVertex`
+    // drops the BSP normal, so lit MD3 stages fall back to the entity colour.
+    // Source: oracle/codemp/renderer/tr_surface.cpp:1258-1341
+    let mut out: Vec<WorldVertex> = Vec::with_capacity(num_verts);
+    for v in 0..num_verts {
+        let n = new_base.add(v * 4);
+        let position = if backlerp == 0.0 {
+            [
+                *n as f32 * new_scale,
+                *n.add(1) as f32 * new_scale,
+                *n.add(2) as f32 * new_scale,
+            ]
+        } else {
+            let o = old_base.add(v * 4);
+            [
+                *o as f32 * old_scale + *n as f32 * new_scale,
+                *o.add(1) as f32 * old_scale + *n.add(1) as f32 * new_scale,
+                *o.add(2) as f32 * old_scale + *n.add(2) as f32 * new_scale,
+            ]
+        };
+        let st = [*st_base.add(v * 2), *st_base.add(v * 2 + 1)];
+        out.push(WorldVertex {
+            position,
+            st,
+            lightmap_st: st,
+            color: rgba,
+        });
+    }
+    out
 }
 
 fn create_globals_buffer(device: &wgpu::Device, capacity: usize) -> wgpu::Buffer {
@@ -2069,5 +2514,124 @@ mod tests {
         assert_eq!(slot_map.get(&TR_WORLDENT), Some(&0));
         assert_eq!(slot_map.get(&1), Some(&1));
         assert_eq!(slot_map.get(&0), Some(&2));
+    }
+
+    // md3 keyframe decode
+
+    /// Builds an in-memory MD3 surface: one vertex, two frames, packed into the
+    /// on-disk layout `lerp_md3_vertexes` walks. Frame 0 is (100, 200, 300),
+    /// frame 1 is (200, 400, 600) in raw shorts; the st is (0.25, 0.5).
+    fn build_two_frame_surface() -> Vec<u8> {
+        let header_size = size_of::<md3Surface_t>(); // 108
+        let ofs_xyz = header_size as i32; // 108
+        let ofs_st = ofs_xyz + 2 * 1 * 4 * 2; // 2 frames * 1 vert * 4 shorts * 2 bytes = 124
+        let ofs_end = ofs_st + 2 * 4; // one vert of two f32 st = 132
+
+        let mut buf = vec![0u8; ofs_end as usize];
+
+        let surf = md3Surface_t {
+            ident: 0,
+            name: [0; 64],
+            flags: 0,
+            numFrames: 2,
+            numShaders: 0,
+            numVerts: 1,
+            numTriangles: 0,
+            ofsTriangles: ofs_end,
+            ofsShaders: header_size as i32,
+            ofsSt: ofs_st,
+            ofsXyzNormals: ofs_xyz,
+            ofsEnd: ofs_end,
+        };
+        // SAFETY: `md3Surface_t` is a `#[repr(C)]` POD; its bytes copy into the
+        // buffer head, matching the on-disk layout.
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                &surf as *const md3Surface_t as *const u8,
+                buf.as_mut_ptr(),
+                header_size,
+            );
+        }
+
+        // Frame 0 vertex, then frame 1 vertex, four shorts each (xyz + normal).
+        let xyz: [i16; 8] = [100, 200, 300, 0, 200, 400, 600, 0];
+        let st: [f32; 2] = [0.25, 0.5];
+        // SAFETY: the writes land inside the buffer at the offsets above.
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                xyz.as_ptr() as *const u8,
+                buf.as_mut_ptr().add(ofs_xyz as usize),
+                xyz.len() * size_of::<i16>(),
+            );
+            std::ptr::copy_nonoverlapping(
+                st.as_ptr() as *const u8,
+                buf.as_mut_ptr().add(ofs_st as usize),
+                st.len() * size_of::<f32>(),
+            );
+        }
+        buf
+    }
+
+    #[test]
+    fn lerp_md3_at_backlerp_zero_takes_the_current_frame() {
+        let buf = build_two_frame_surface();
+        // SAFETY: the buffer head is a valid `md3Surface_t` from the builder.
+        let verts = unsafe {
+            lerp_md3_vertexes(
+                buf.as_ptr() as *const md3Surface_t,
+                1,
+                0,
+                0.0,
+                [10, 20, 30, 40],
+            )
+        };
+        assert_eq!(verts.len(), 1);
+        // frame 1 (200, 400, 600) times MD3_XYZ_SCALE (1/64)
+        assert_eq!(
+            verts[0].position,
+            [200.0 / 64.0, 400.0 / 64.0, 600.0 / 64.0]
+        );
+        assert_eq!(verts[0].st, [0.25, 0.5]);
+        assert_eq!(verts[0].color, [10, 20, 30, 40]);
+    }
+
+    #[test]
+    fn lerp_md3_at_backlerp_one_takes_the_old_frame() {
+        let buf = build_two_frame_surface();
+        // SAFETY: see above.
+        let verts = unsafe {
+            lerp_md3_vertexes(
+                buf.as_ptr() as *const md3Surface_t,
+                1,
+                0,
+                1.0,
+                [255, 255, 255, 255],
+            )
+        };
+        // frame 0 (100, 200, 300) times MD3_XYZ_SCALE
+        assert_eq!(
+            verts[0].position,
+            [100.0 / 64.0, 200.0 / 64.0, 300.0 / 64.0]
+        );
+    }
+
+    #[test]
+    fn lerp_md3_at_backlerp_half_blends_the_two_frames() {
+        let buf = build_two_frame_surface();
+        // SAFETY: see above.
+        let verts = unsafe {
+            lerp_md3_vertexes(
+                buf.as_ptr() as *const md3Surface_t,
+                1,
+                0,
+                0.5,
+                [255, 255, 255, 255],
+            )
+        };
+        // half of each frame: (100+200)/2, (200+400)/2, (300+600)/2, all /64
+        assert_eq!(
+            verts[0].position,
+            [150.0 / 64.0, 300.0 / 64.0, 450.0 / 64.0]
+        );
     }
 }

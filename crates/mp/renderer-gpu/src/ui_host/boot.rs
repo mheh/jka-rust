@@ -33,6 +33,7 @@ use mp_engine_server::Server;
 use mp_qshared::shared::com_parse::QSharedScratch;
 use mp_qshared::shared::cvar::CVAR_INIT;
 use mp_qshared::shared::qfalse;
+use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::arena::Arena;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::frame_state::FrameState;
@@ -60,6 +61,7 @@ use mp_renderer::tr_local::view_parms_t::viewParms_t;
 use mp_renderer::tr_main::{
     DrawSurf, R_RenderView, SurfaceGeometry, TrMainScratch, WorldSurfaceRef,
 };
+use mp_renderer::tr_model::frontend::RE_RegisterModel;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_noise::NoiseState;
 use mp_renderer::tr_scene::SceneState;
@@ -636,6 +638,46 @@ pub fn load_world(host: &mut UiHost, map: &str) -> (bool, srfTerrain_t) {
     (loaded, land_scape)
 }
 
+/// Registers one model through the real `RE_RegisterModel` chain, split-borrowing
+/// the host bundle the loader needs, and returns its handle (0 when the file is
+/// absent). The world harness registers a map object this way.
+pub fn register_model(host: &mut UiHost, name: &str) -> qhandle_t {
+    let UiHost {
+        engine,
+        models,
+        cvars,
+        assets,
+        sim,
+        img_state,
+        gpu_res,
+        frame,
+        qs,
+        sky_view,
+        sky,
+        world_effects,
+        ..
+    } = &mut *host;
+    let models_ptr: *mut RenderModels = &mut *models;
+    let Engine { common, cm, sv, .. } = &mut **engine;
+    let sv_ptr: *mut () = sv as *mut Server as *mut ();
+    let mut view = host_view(common, cm, sv_ptr, models_ptr);
+    RE_RegisterModel(
+        qs,
+        frame,
+        assets,
+        &mut view,
+        cvars,
+        sim,
+        models,
+        img_state,
+        gpu_res,
+        sky_view,
+        sky,
+        world_effects,
+        name,
+    )
+}
+
 /// Loads a BSP through `RE_LoadWorldMap`, builds a refdef at a spawn point, and
 /// drives one `R_RenderView` — the R4 world feasibility spike.
 ///
@@ -833,6 +875,9 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
                 SurfaceGeometry::Face(_) => r.face += 1,
                 SurfaceGeometry::Triangles { .. } => r.triangles += 1,
                 SurfaceGeometry::Poly { .. } => r.poly += 1,
+                // The world spike loads no MD3 entity, so this arm never fires;
+                // it folds into `other` for exhaustiveness.
+                SurfaceGeometry::Md3(_) => r.other += 1,
                 SurfaceGeometry::Other => r.other += 1,
             }
         }

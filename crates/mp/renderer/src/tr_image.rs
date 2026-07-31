@@ -1040,7 +1040,8 @@ pub fn R_SetColorMappings(
 // `RenderModels::init_skins`/`skin_surfaces` drive the dedicated
 // `RenderModels.skins: Vec<ServerSkin>` registry (user ruling 2026-07-12
 // "server skins name-pool", amending the FROZEN `tr-model.md`). The client
-// `R_GetSkinByHandle` has no consumer in this crate yet and is not ported.
+// `R_GetSkinByHandle` (below) drives `RenderAssets::skins`, read by
+// `R_AddMD3Surfaces`'s custom-skin arm.
 
 // ============================================================================
 // wave 1
@@ -3150,6 +3151,29 @@ pub fn R_InitSkins(assets: &mut RenderAssets) {
         }],
     });
     assets.skin_lookup.clear();
+}
+
+/// Raven `R_GetSkinByHandle` — the skin registry's index lookup, with the
+/// oracle bounds behavior: a handle below 1 or past the registry falls back to
+/// the default skin (slot 0).
+///
+/// The oracle's `hSkin >= tr.numSkins` upper bound becomes an
+/// [`Arena::handle_at_slot`] probe: a registered slot resolves, an out-of-range
+/// or vacated slot returns the default. `R_AddMD3Surfaces` reads the returned
+/// skin's surface list.
+///
+/// Source: oracle/codemp/renderer/tr_image.cpp:3342-3347
+pub fn R_GetSkinByHandle(assets: &RenderAssets, h_skin: qhandle_t) -> SkinHandle {
+    if h_skin < 1 {
+        return SkinHandle::slot_zero();
+    }
+    match u32::try_from(h_skin)
+        .ok()
+        .and_then(|slot| assets.skins.handle_at_slot(slot))
+    {
+        Some(handle) => handle,
+        None => SkinHandle::slot_zero(),
+    }
 }
 
 /// Raven `R_SkinList_f` — the `skinlist` console command's handler.

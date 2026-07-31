@@ -607,6 +607,7 @@ impl FrameExecutor {
             &view,
             &entities,
             world.scratch,
+            world.models,
         )
     }
 
