@@ -15,13 +15,13 @@ use std::collections::{BTreeMap, HashMap};
 
 use mp_engine_qcommon::qfiles::md3_limits::MD3_MAX_LODS;
 use mp_host_interface::EngineHost;
-use mp_qshared::shared::qhandle_t;
+use mp_qshared::shared::{qhandle_t, qtrue};
 
 use crate::tr_local::modtype_t::modtype_t;
 
 use super::cached_model_binary::CachedEndianedModelBinary;
 use super::model_pool::{ModelData, ModelPool};
-use super::server_load::read_qpath;
+use super::server_load::{read_qpath, write_qpath};
 use super::server_skin::ServerSkin;
 
 /// Raven's renderer model registry — the `CachedModels` map, the `tr.models[]`
@@ -111,6 +111,15 @@ pub struct RenderModels {
     ///
     /// Source: `oracle/codemp/renderer/tr_shader.cpp:3560-3596`
     pub(crate) server_shaders: Vec<String>,
+
+    /// Brush `model_t` handle -> its `WorldAsset::bmodels` index. The owned
+    /// replacement for `R_LoadSubmodels`' `model->bmodel = out` pointer write:
+    /// the render walk resolves a handle to the owned submodel row through this
+    /// map instead of the retired `model_t::bmodel` raw pointer. Filled by
+    /// [`Self::register_bmodel`]; the field itself retires at the #51 type pass.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_bsp.cpp:1441`
+    pub(crate) bmodel_indices: HashMap<qhandle_t, usize>,
 }
 
 impl Default for RenderModels {
@@ -131,6 +140,7 @@ impl Default for RenderModels {
             num_bsp_models: 0,
             skins: Vec::new(),
             server_shaders: Vec::new(),
+            bmodel_indices: HashMap::new(),
         }
     }
 }
@@ -270,6 +280,55 @@ impl RenderModels {
         // without reproducing `generateHashValue`.
         self.hash.insert(name.to_ascii_lowercase(), handle);
     }
+
+    /// Raven `R_LoadSubmodels`' per-submodel `model_t` registration — allocate a
+    /// pool slot, mark it `MOD_BRUSH`, name it `*i` for the main world or
+    /// `*index-i` with `bspInstance` set for an RMG instance, then hash-insert
+    /// the name. Records the handle against its `WorldAsset::bmodels` index so
+    /// the render walk reaches the owned submodel row.
+    ///
+    /// `world_index` is `R_LoadSubmodels`' own `index` argument (0 for the main
+    /// world, nonzero for an RMG instance); `submodel` is the submodel's index
+    /// into `WorldAsset::bmodels`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_bsp.cpp:1433-1463`
+    pub(crate) fn register_bmodel(&mut self, submodel: usize, world_index: i32) -> qhandle_t {
+        // `assert(model != NULL)` — R_AllocModel only fails at the MAX_MOD_KNOWN
+        // cap, which this reserved-pool registration never reaches.
+        let handle = self
+            .r_alloc_model()
+            .expect("R_AllocModel for a brush submodel must succeed");
+        let idx = handle as usize;
+
+        let name = if world_index != 0 {
+            format!("*{world_index}-{submodel}")
+        } else {
+            format!("*{submodel}")
+        };
+
+        {
+            let slot = self.models.slot_mut(idx);
+            slot.r#type = modtype_t::MOD_BRUSH;
+            // `model->bmodel = out` stays NULL — the bmodel_indices side map
+            // replaces the raw pointer, and the field retires at the #51 type
+            // pass.
+            if world_index != 0 {
+                slot.bspInstance = qtrue;
+            }
+            write_qpath(&mut slot.name, &name);
+        }
+
+        self.re_insert_model_into_hash(&name, handle);
+        self.bmodel_indices.insert(handle, submodel);
+        handle
+    }
+
+    /// The `WorldAsset::bmodels` index a brush `model_t` handle was registered
+    /// against by [`Self::register_bmodel`] — the owned replacement for the
+    /// `model_t::bmodel` deref. `None` for a handle that names no brush submodel.
+    pub(crate) fn bmodel_index(&self, handle: qhandle_t) -> Option<usize> {
+        self.bmodel_indices.get(&handle).copied()
+    }
 }
 
 #[cfg(test)]
@@ -314,6 +373,32 @@ mod tests {
         assert_eq!(rm.get_model(-5).index, 0);
         assert_eq!(rm.get_model(99).index, 0);
         assert_eq!(rm.get_model(1).index, 1);
+    }
+
+    #[test]
+    fn register_bmodel_names_and_maps_main_world_and_rmg_instances() {
+        let mut rm = RenderModels::default();
+        rm.model_init(); // reserves models[0]
+
+        // Main world (index 0): name "*i", bspInstance stays false.
+        let h0 = rm.register_bmodel(0, 0);
+        let h1 = rm.register_bmodel(1, 0);
+        assert_eq!(read_qpath(&rm.models.slot(h0 as usize).name), "*0");
+        assert_eq!(read_qpath(&rm.models.slot(h1 as usize).name), "*1");
+        assert!(matches!(rm.models.slot(h0 as usize).r#type, modtype_t::MOD_BRUSH));
+        assert_eq!(rm.models.slot(h0 as usize).bspInstance, 0);
+        assert_eq!(rm.bmodel_index(h0), Some(0));
+        assert_eq!(rm.bmodel_index(h1), Some(1));
+        assert_eq!(rm.hash.get("*1"), Some(&h1));
+
+        // RMG instance (index 3): name "*3-2", bspInstance set.
+        let h2 = rm.register_bmodel(2, 3);
+        assert_eq!(read_qpath(&rm.models.slot(h2 as usize).name), "*3-2");
+        assert_eq!(rm.models.slot(h2 as usize).bspInstance, 1);
+        assert_eq!(rm.bmodel_index(h2), Some(2));
+
+        // A handle that names no submodel resolves to None.
+        assert_eq!(rm.bmodel_index(999), None);
     }
 
     #[test]

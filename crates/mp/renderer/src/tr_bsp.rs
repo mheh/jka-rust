@@ -1664,25 +1664,25 @@ pub fn R_StitchPatches(grid1num: usize, grid2num: usize, world_data: &mut [Surfa
 /// Raven `R_LoadSubmodels`.
 ///
 /// PORT-NOTE: the lump-parsing half (bounds/`firstSurface`/`numSurfaces` per
-/// submodel, feeding `WorldAsset::bmodels`) is fully ported below — it needs
-/// no tier-2 access. The per-submodel `model_t` registration half is a
-/// documented escalation (porting-rules §14 — the gap panics loudly rather
-/// than silently dropping the registration): the packet's resolved call
-/// surface names `R_AllocModel`/`RE_InsertModelIntoHash` as already-landed
-/// (wave 0/wave 1), but the real landed shapes
-/// (`RenderModels::r_alloc_model`/`re_insert_model_into_hash`,
-/// `tr_model/render_models.rs:258,295`) are `pub(super)` — visible inside
-/// `tr_model` only, unreachable from `tr_bsp.rs` (a sibling module, not an
-/// ancestor). Even with access, wiring `model.bmodel` (`*mut bmodel_t`,
-/// still tier-2 raw-pointer, `tr_local/model_s.rs`) at this submodel, or
-/// `bmodel_t.firstSurface` (`*mut msurface_t`, `tr_local/bmodel_t.rs`) at a
-/// surface range, needs raw-pointer construction with no safe quarantine
-/// accessor — forbidden by this file's interior-safety law ("UNSAFE IS
-/// BANNED IN THIS FILE"). Both are escalations for the integrate phase /
-/// wave-planning, not numeric guesses.
+/// submodel, feeding `WorldAsset::bmodels`) needs no tier-2 access. The
+/// per-submodel `model_t` registration half runs through
+/// `RenderModels::register_bmodel` (`tr_model/render_models.rs`), the
+/// `pub(crate)` wrapper over `r_alloc_model`/`re_insert_model_into_hash`. It
+/// records the handle against its `WorldAsset::bmodels` index in a side map
+/// rather than writing the retired `model_t::bmodel` raw pointer, so no
+/// tier-2 pointer is constructed here (interior-safety law: "UNSAFE IS BANNED
+/// IN THIS FILE"). Registration runs in a second pass after `world.bmodels`
+/// is fully populated, so a handle always resolves to a parsed row; the
+/// allocation order (`i = 0..count`) matches the oracle's interleaved loop.
 ///
 /// Source: `oracle/codemp/renderer/tr_bsp.cpp:1421-1467`
-fn R_LoadSubmodels(ctx: &BspLoadContext, l: &lump_t, world: &mut WorldAsset, index: i32) {
+fn R_LoadSubmodels(
+    ctx: &BspLoadContext,
+    l: &lump_t,
+    world: &mut WorldAsset,
+    models: &mut RenderModels,
+    index: i32,
+) {
     let entry_size = size_of::<dmodel_t>();
     if (l.filelen as usize) % entry_size != 0 {
         com_error(
@@ -1715,34 +1715,18 @@ fn R_LoadSubmodels(ctx: &BspLoadContext, l: &lump_t, world: &mut WorldAsset, ind
             first_surface: first_surface as usize,
             num_surfaces,
         });
-
-        // model = R_AllocModel(); assert(model != NULL);
-        // model->type = MOD_BRUSH; model->bmodel = out;
-        // if (index) sprintf(model->name, "*%d-%d", index, i), model->bspInstance = qtrue;
-        // else sprintf(model->name, "*%d", i);
-        // RE_InsertModelIntoHash(model->name, model);
-        // See the ESCALATION doc comment above — genuinely unreachable from
-        // this file today. Deferred to after the loop (below) so the safe
-        // bounds/surface-range parsing above always completes and
-        // `world.bmodels` is always fully populated before the escalation
-        // fires, rather than aborting partway through the lump.
     }
 
     world.bmodels = bmodels;
 
-    //TODO: Port R_LoadSubmodels model_t registration
+    // Register a `model_t` for each parsed submodel. The oracle interleaves
+    // this with the bounds parse above; running it as a second pass over the
+    // fully populated `world.bmodels` is behaviorally identical (same
+    // allocation order i = 0..count) and keeps the parse free of the model
+    // registry.
     // Source: oracle/codemp/renderer/tr_bsp.cpp:1433-1463
-    if count > 0 {
-        let _ = index;
-        todo!(
-            "Port R_LoadSubmodels model_t registration — RenderModels::r_alloc_model/\
-             re_insert_model_into_hash are pub(super) (unreachable from tr_bsp.rs), and \
-             model_t.bmodel/bmodel_t.firstSurface are tier-2 raw-pointer fields with no \
-             safe accessor to wire under the interior-safety law. R_LoadSubmodels as a \
-             whole is unusable until that model_t registration lands — every non-empty \
-             submodel lump trips this — \
-             oracle/codemp/renderer/tr_bsp.cpp:1433-1463"
-        );
+    for i in 0..count {
+        models.register_bmodel(i, index);
     }
 }
 
@@ -3623,7 +3607,7 @@ pub fn RE_LoadWorldMap_Actual(
     view: &mut EngineHostView,
     cvars: &RendererCvars,
     sim: &mut RenderAssetsSim,
-    models: &RenderModels,
+    models: &mut RenderModels,
     img_state: &mut TrImageState,
     gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
@@ -3835,7 +3819,7 @@ pub fn RE_LoadWorldMap_Actual(
     );
     R_LoadMarksurfaces(&ctx, &lumps[LUMP_LEAFSURFACES], world);
     R_LoadNodesAndLeafs(&ctx, &lumps[LUMP_NODES], &lumps[LUMP_LEAFS], world);
-    R_LoadSubmodels(&ctx, &lumps[LUMP_MODELS], world, index);
+    R_LoadSubmodels(&ctx, &lumps[LUMP_MODELS], world, models, index);
     R_LoadVisibility(&ctx, frame, &lumps[LUMP_VISIBILITY], world);
 
     if index == 0 {
@@ -3931,7 +3915,7 @@ pub fn RE_LoadWorldMap(
     view: &mut EngineHostView,
     cvars: &RendererCvars,
     sim: &mut RenderAssetsSim,
-    models: &RenderModels,
+    models: &mut RenderModels,
     img_state: &mut TrImageState,
     gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,

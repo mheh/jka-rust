@@ -82,7 +82,7 @@ fn ll(x: i32) -> i32 {
 /// `MAX_QPATH` `c_char` buffer (`mod->name = name` at `:1049`).
 ///
 /// Source: `oracle/codemp/qcommon/q_shared.c` (`Q_strncpyz`)
-fn write_qpath(dest: &mut [c_char; MAX_QPATH], src: &str) {
+pub(super) fn write_qpath(dest: &mut [c_char; MAX_QPATH], src: &str) {
     for slot in dest.iter_mut() {
         *slot = 0;
     }

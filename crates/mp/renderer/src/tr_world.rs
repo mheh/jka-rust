@@ -37,7 +37,6 @@ use crate::tr_light::{
 };
 use crate::tr_local::cull_type_t::cullType_t;
 use crate::tr_local::dlight_s::dlight_t;
-use crate::tr_local::msurface_s::SurfaceRef;
 use crate::tr_local::orientationr_t::orientationr_t;
 use crate::tr_local::shader_s::shader_t;
 use crate::tr_main::{
@@ -543,7 +542,9 @@ pub fn R_DlightSurface(
 /// does it invent a defined-behavior guard the oracle lacks). This walk is
 /// the reason `msurface_t`'s quarantine survives DEC-43: the world's own
 /// surfaces are owned now, but a brush model still reaches its range through
-/// `model_t::bmodel`, whose registration `R_LoadSubmodels` has not ported.
+/// `model_t::bmodel`.
+///
+/// FOLLOW-UP: this fn has no caller yet; migrate it to `RenderModels::bmodel_index` + `assets.world.surfaces` (as `R_AddBrushModelSurfaces` now does) when a live path first calls it.
 ///
 /// Source: `oracle/codemp/renderer/tr_world.cpp:653-744`
 pub fn RE_GetBModelVerts(
@@ -1434,31 +1435,31 @@ pub fn R_InitializeWireframeAutomap(
 /// The `//rww` commented-out `com_RMG` branch below the `R_DlightBmodel`
 /// call is plain dead prose in the oracle (not `#if 0`), nothing to port.
 ///
-/// PORT-NOTE: `pModel`/`bmodel` are read through the already-established
-/// tier-2 quarantine accessors `RenderModels::get_model`/`model_t::bmodel`
-/// (§D11, `RE_GetBModelVerts` precedent, this file). `R_DlightBmodel`'s own
-/// already-ported signature (wave 1) takes an owned `DlightBmodel` snapshot,
-/// not `bmodel_t` directly; the snapshot is built here from `bmodel.bounds`
-/// and a safe read of each surface's `surface_kind()` (no `unsafe` written
-/// in this file — the interior-safety law).
+/// PORT-NOTE: `pModel->bmodel` is resolved through the owned path — the handle
+/// maps to a `WorldAsset::bmodels` index (`RenderModels::bmodel_index`, filled
+/// by `R_LoadSubmodels`), and both the cull bounds and the surface range read
+/// off `assets.world`, never the retired `model_t::bmodel` raw pointer.
+/// `pModel->bspInstance` still reads the `model_t` (`RenderModels::get_model`).
+/// `R_DlightBmodel`'s own already-ported signature (wave 1) takes an owned
+/// `DlightBmodel` snapshot; it is built here from the submodel bounds and each
+/// surface's owned `dlight_bits` over the `[first, first + num)` range into
+/// `WorldAsset::surfaces` (no `unsafe` — the interior-safety law).
 ///
 /// DEFERRED: the closing `for (i = 0; i < bmodel->numSurfaces; i++)
 /// R_AddWorldSurface(bmodel->firstSurface + i, tr.currentEntity->dlightBits,
-/// qtrue)` loop — `R_AddWorldSurface` now takes `(&mut Surface, surf_index)`
-/// into `WorldAsset::surfaces` (DEC-43.3), which is exactly the range
-/// `BModel::first_surface`/`num_surfaces` describes; but this fn reaches its
-/// brush model through the tier-2 `model_t::bmodel` raw pointer, and the
-/// `R_LoadSubmodels` half that would register a `model_t` against a `BModel`
-/// (and so let this walk address the owned array) is itself unported
-/// (`tr_bsp.rs`, `//TODO: Port R_LoadSubmodels model_t registration`).
-/// `R_AddWorldSurface` also needs `shader: &shader_t` per surface, resolved
-/// from `Surface::shader`'s `ShaderHandle` — available once the walk is on
-/// the owned array, unavailable through `msurface_t::shader` (a `*mut
-/// shader_s` with no quarantine accessor; dereferencing it inline would be
-/// new `unsafe`, banned here). `R_DlightBmodel`'s snapshot write-back
-/// (`bmodel.surfaces` on the throwaway `DlightBmodel`, not the live
-/// `msurface_t`s) is therefore also unobserved by this call — a narrow
-/// fidelity gap only visible for a surface this loop never reaches anyway.
+/// qtrue)` loop — `R_AddWorldSurface` takes a `shader: &shader_t` per surface,
+/// the `#[repr(C)]` tier-2 type, but nothing in the owned world can produce
+/// one: `Surface::shader` is a `ShaderHandle` into `RenderAssets::shaders`,
+/// whose element is `ShaderAsset` (the owned shader form), and `ShaderAsset`
+/// carries no `cull_type` field — `R_CullSurface`/`R_AddWorldSurface` read
+/// `shader.cullType`/`shader.sortedIndex`. Bridging `ShaderHandle` to
+/// `&shader_t` is the #51 shader-registry reconciliation (fold `shader_t` into
+/// `ShaderAsset`, retype `R_CullSurface`/`R_AddWorldSurface` to `&ShaderAsset`,
+/// populate `cull_type` at parse), not this wave — populating `cull_type` from
+/// a `Default` would wrongly cull two-sided faces (porting-rules §A2, no
+/// invented behavior). The owned bounds/dlight snapshot above is unblocked and
+/// lands now; the surface-add loop slots in unchanged once that bridge exists.
+/// Source: `oracle/codemp/renderer/tr_world.cpp:608-610` (the deferred loop)
 ///
 /// Source: `oracle/codemp/renderer/tr_world.cpp:570-611`
 pub fn R_AddBrushModelSurfaces(
@@ -1475,7 +1476,18 @@ pub fn R_AddBrushModelSurfaces(
     dlights: &mut [dlight_t],
 ) {
     let p_model = models.get_model(ent.h_model);
-    let bmodel = p_model.bmodel();
+
+    // `pModel->bmodel` — the handle resolves to its `WorldAsset::bmodels` index
+    // through the side map `R_LoadSubmodels` fills, and the owned submodel row
+    // lives on the loaded world.
+    let bmodel_idx = models
+        .bmodel_index(ent.h_model)
+        .expect("R_AddBrushModelSurfaces reached a non-brush model handle");
+    let world = assets
+        .world
+        .as_ref()
+        .expect("R_AddBrushModelSurfaces needs the loaded world");
+    let bmodel = &world.bmodels[bmodel_idx];
 
     let clip = R_CullLocalBox(bmodel.bounds, r_nocull_integer, ori, frustum);
     if clip == CULL_OUT {
@@ -1496,23 +1508,24 @@ pub fn R_AddBrushModelSurfaces(
     }
 
     // rww - Take this into account later?
+    let first = bmodel.first_surface;
+    let num = bmodel.num_surfaces.max(0) as usize;
     let mut dlight_bmodel = DlightBmodel {
         bounds: bmodel.bounds,
-        surfaces: bmodel
-            .surfaces()
+        surfaces: world.surfaces[first..first + num]
             .iter()
             .map(|s| DlightSurface {
-                data: match s.surface_kind() {
-                    SurfaceRef::Face(f) => DlightSurfaceData::Face {
-                        dlightBits: f.dlightBits,
+                data: match &s.data {
+                    SurfaceData::Face(f) => DlightSurfaceData::Face {
+                        dlightBits: f.dlight_bits,
                     },
-                    SurfaceRef::Grid(g) => DlightSurfaceData::Grid {
-                        dlightBits: g.dlightBits,
+                    SurfaceData::Grid(g) => DlightSurfaceData::Grid {
+                        dlightBits: g.dlight_bits,
                     },
-                    SurfaceRef::Triangles(t) => DlightSurfaceData::Triangles {
-                        dlightBits: t.dlightBits,
+                    SurfaceData::Triangles(t) => DlightSurfaceData::Triangles {
+                        dlightBits: t.dlight_bits,
                     },
-                    SurfaceRef::Other => DlightSurfaceData::Other,
+                    SurfaceData::Skip | SurfaceData::Flare(_) => DlightSurfaceData::Other,
                 },
             })
             .collect(),
@@ -1520,7 +1533,7 @@ pub fn R_AddBrushModelSurfaces(
     R_DlightBmodel(&mut dlight_bmodel, false, dlights, ori, frame);
 
     // DEFERRED: bmodel->numSurfaces R_AddWorldSurface loop — see this fn's
-    // own doc comment above.
+    // own doc comment above (blocked on the shader_t -> ShaderAsset bridge).
     // Source: oracle/codemp/renderer/tr_world.cpp:608-610
 }
 

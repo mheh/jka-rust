@@ -931,6 +931,7 @@ version = "0.1.0"
 dependencies = [
  "mp_host_interface",
  "mp_qshared",
+ "native_string",
  "testkit",
 ]
 
