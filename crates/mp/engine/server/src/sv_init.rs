@@ -15,12 +15,12 @@ use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::force_reload::ForceReload_e;
 use mp_qshared::shared::game_state::MAX_CONFIGSTRINGS;
 use mp_qshared::shared::limits::{MAX_CLIENTS, MAX_INFO_STRING, MAX_NAME_LENGTH, MAX_STRING_CHARS};
+use mp_qshared::shared::qboolean;
 use native_string::cstr::strncpyz_string;
 use native_string::q_string::Q_stricmpBytes;
 use native_string::q_strncpyz::Q_strncpyzBytes;
-use native_string::{latin1_to_string, string_to_latin1};
 use native_string::Info_ValueForKey;
-use mp_qshared::shared::qboolean;
+use native_string::{latin1_to_string, string_to_latin1};
 
 use mp_engine_ghoul2::api_collision::g2api_set_time;
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
@@ -740,7 +740,7 @@ pub fn SV_SpawnServer(
                     // this generally shouldn't happen, because the client
                     // was connected before the level change
                     // (module-memory seam: convert the denial text at the arm)
-                    let denied = core::ffi::CStr::from_ptr(denied).to_string_lossy();
+                    let denied = latin1_to_string(core::ffi::CStr::from_ptr(denied).to_bytes());
                     SV_DropClient(view.common, sv, client, &denied);
                 } else if isBot == 0 {
                     // when we get the next packet from a connected client,
@@ -784,7 +784,7 @@ pub fn SV_SpawnServer(
         // load pk3s also loaded at the server
         unsafe {
             p = FS_LoadedPakChecksums(view.common);
-            let p_s = CStr::from_ptr(p).to_string_lossy().into_owned();
+            let p_s = latin1_to_string(CStr::from_ptr(p).to_bytes());
             Cvar_Set(view, "sv_paks", &p_s);
             if libc::strlen(p) == 0 {
                 com_printf(
@@ -793,7 +793,7 @@ pub fn SV_SpawnServer(
                 );
             }
             p = FS_LoadedPakNames(view.common);
-            let p_s = CStr::from_ptr(p).to_string_lossy().into_owned();
+            let p_s = latin1_to_string(CStr::from_ptr(p).to_bytes());
             Cvar_Set(view, "sv_pakNames", &p_s);
         }
 
@@ -810,10 +810,10 @@ pub fn SV_SpawnServer(
     // out which pk3s should be auto-downloaded
     unsafe {
         p = FS_ReferencedPakChecksums(view.common);
-        let p_s = CStr::from_ptr(p).to_string_lossy().into_owned();
+        let p_s = latin1_to_string(CStr::from_ptr(p).to_bytes());
         Cvar_Set(view, "sv_referencedPaks", &p_s);
         p = FS_ReferencedPakNames(view.common);
-        let p_s = CStr::from_ptr(p).to_string_lossy().into_owned();
+        let p_s = latin1_to_string(CStr::from_ptr(p).to_bytes());
         Cvar_Set(view, "sv_referencedPakNames", &p_s);
     }
 

@@ -15,6 +15,7 @@ use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::ha_pref;
 use mp_qshared::shared::limits::MAX_TOKEN_CHARS;
+use native_string::latin1_to_string;
 use native_types::{qfalse, qtrue, MAX_QPATH};
 
 use crate::common::engine_host_view::EngineHostView;
@@ -74,7 +75,7 @@ pub fn VM_ValueToSymbol(common: &mut Common, vm: *mut vm_t, value: c_int) -> *co
             return (*sym).symName.as_ptr();
         }
 
-        let name = std::ffi::CStr::from_ptr((*sym).symName.as_ptr()).to_string_lossy();
+        let name = latin1_to_string(std::ffi::CStr::from_ptr((*sym).symName.as_ptr()).to_bytes());
         let text = format!("{}+{}", name, value - (*sym).symValue);
         let bytes = text.as_bytes();
         let n = bytes.len().min(MAX_TOKEN_CHARS - 1);
@@ -484,7 +485,8 @@ pub fn VM_VmProfile_f(view: &mut EngineHostView) {
         for i in 0..(*vm).numSymbols as isize {
             let sym = *sorted.offset(i);
             let perc = (100.0 * (*sym).profileCount as f32 / total as f32) as c_int;
-            let name = std::ffi::CStr::from_ptr((*sym).symName.as_ptr()).to_string_lossy();
+            let name =
+                latin1_to_string(std::ffi::CStr::from_ptr((*sym).symName.as_ptr()).to_bytes());
             view.print(&format!("{perc:2}% {:9} {name}\n", (*sym).profileCount));
             (*sym).profileCount = 0;
         }
@@ -594,7 +596,7 @@ pub fn VM_LoadSymbols(view: &mut EngineHostView, vm: *mut vm_t) {
         let n = stripped.len().min(name.len() - 1);
         name[..n].copy_from_slice(&stripped.as_bytes()[..n]);
 
-        let symbols = format!("vm/{}.map", String::from_utf8_lossy(&name[..n]));
+        let symbols = format!("vm/{}.map", latin1_to_string(&name[..n]));
 
         let mapfile = match view.fs_read_file(&symbols) {
             Some(bytes) => bytes,
@@ -607,7 +609,7 @@ pub fn VM_LoadSymbols(view: &mut EngineHostView, vm: *mut vm_t) {
         let numInstructions = (*vm).instructionPointersLength >> 2;
 
         // parse the symbols
-        let text = String::from_utf8_lossy(&mapfile).into_owned();
+        let text = latin1_to_string(&mapfile);
         let mut cursor = text.as_str();
         let mut prev: *mut *mut vmSymbol_t = &mut (*vm).symbols;
         let mut count: c_int = 0;

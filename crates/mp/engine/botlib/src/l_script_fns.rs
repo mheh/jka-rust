@@ -31,6 +31,8 @@
 use core::ffi::{c_char, c_int, c_long, c_void};
 use std::ffi::{CStr, CString};
 
+use native_string::latin1_to_string;
+
 use crate::l_script::consts::{
     MAX_TOKEN, SCFL_NOERRORS, SCFL_NOSTRINGESCAPECHARS, SCFL_NOSTRINGWHITESPACES, SCFL_NOWARNINGS,
     SCFL_PRIMITIVE, TT_BINARY, TT_DECIMAL, TT_FLOAT, TT_HEX, TT_INTEGER, TT_LITERAL, TT_LONG,
@@ -264,7 +266,12 @@ pub fn PS_ReadEscapeCharacter(bot: &mut BotLib, script: &mut Script) -> Option<c
 /// script's escape-char and whitespace-between-strings flags.
 ///
 /// Source: `oracle/codemp/botlib/l_script.cpp:422-504`
-pub fn PS_ReadString(bot: &mut BotLib, script: &mut Script, token: &mut Token, quote: c_int) -> c_int {
+pub fn PS_ReadString(
+    bot: &mut BotLib,
+    script: &mut Script,
+    token: &mut Token,
+    quote: c_int,
+) -> c_int {
     if quote == b'\"' as c_int {
         token.type_ = TT_STRING;
     } else {
@@ -467,7 +474,8 @@ pub fn PS_ReadNumber(bot: &mut BotLib, script: &mut Script, token: &mut Token) -
     token.type_ = TT_NUMBER;
     // check for a hexadecimal number
     if script.buffer[script.script_p] == b'0'
-        && (script.buffer[script.script_p + 1] == b'x' || script.buffer[script.script_p + 1] == b'X')
+        && (script.buffer[script.script_p + 1] == b'x'
+            || script.buffer[script.script_p + 1] == b'X')
     {
         token.string.push(script.buffer[script.script_p] as char);
         script.script_p += 1;
@@ -498,7 +506,8 @@ pub fn PS_ReadNumber(bot: &mut BotLib, script: &mut Script, token: &mut Token) -
     }
     // check for a binary number
     else if script.buffer[script.script_p] == b'0'
-        && (script.buffer[script.script_p + 1] == b'b' || script.buffer[script.script_p + 1] == b'B')
+        && (script.buffer[script.script_p + 1] == b'b'
+            || script.buffer[script.script_p + 1] == b'B')
     {
         token.string.push(script.buffer[script.script_p] as char);
         script.script_p += 1;
@@ -1145,14 +1154,24 @@ pub fn LoadScriptFile(bot: &mut BotLib, filename: &str) -> Option<Script> {
     let mut fp: fileHandle_t = 0;
 
     if bot.basefolder[0] != 0 {
-        let basefolder = unsafe { CStr::from_ptr(bot.basefolder.as_ptr()) }.to_string_lossy();
+        let basefolder =
+            unsafe { latin1_to_string(CStr::from_ptr(bot.basefolder.as_ptr()).to_bytes()) };
         let pathname_c = CString::new(format!("{}/{}", basefolder, filename)).unwrap_or_default();
-        Q_strncpyz(pathname.as_mut_ptr(), pathname_c.as_ptr(), MAX_QPATH as c_int);
+        Q_strncpyz(
+            pathname.as_mut_ptr(),
+            pathname_c.as_ptr(),
+            MAX_QPATH as c_int,
+        );
     } else {
         let pathname_c = CString::new(filename).unwrap_or_default();
-        Q_strncpyz(pathname.as_mut_ptr(), pathname_c.as_ptr(), MAX_QPATH as c_int);
+        Q_strncpyz(
+            pathname.as_mut_ptr(),
+            pathname_c.as_ptr(),
+            MAX_QPATH as c_int,
+        );
     }
-    let length = unsafe { (bot.botimport.FS_FOpenFile.unwrap())(pathname.as_ptr(), &mut fp, FS_READ) };
+    let length =
+        unsafe { (bot.botimport.FS_FOpenFile.unwrap())(pathname.as_ptr(), &mut fp, FS_READ) };
     if fp == 0 {
         return None;
     }
@@ -1237,5 +1256,9 @@ pub fn FreeScript(script: Script) {
 /// Source: `oracle/codemp/botlib/l_script.cpp:1411-1418`
 pub fn PS_SetBaseFolder(bot: &mut BotLib, path: &str) {
     let path_c = CString::new(path).unwrap_or_default();
-    Q_strncpyz(bot.basefolder.as_mut_ptr(), path_c.as_ptr(), MAX_QPATH as c_int);
+    Q_strncpyz(
+        bot.basefolder.as_mut_ptr(),
+        path_c.as_ptr(),
+        MAX_QPATH as c_int,
+    );
 }

@@ -14,6 +14,8 @@
 use core::ffi::{c_char, c_int, c_ulong};
 use std::ffi::{CStr, CString};
 
+use native_string::latin1_to_string;
+
 use mp_engine_qcommon::common::Common;
 use mp_engine_qcommon::common_fns::{Com_Memcpy, Com_Memset};
 use mp_qshared::common::mp::botlib::aas_entityinfo_s::aas_entityinfo_t;
@@ -73,9 +75,9 @@ use crate::l_precomp_fns::{
 };
 use crate::l_script_fns::StripDoubleQuotes;
 use crate::l_struct_fns::ReadStructure;
+use mp_qshared::shared::q_math::{_VectorAdd, _VectorScale, _VectorSubtract, VectorLength};
 use mp_qshared::shared::q_string::chars_str;
 use mp_qshared::shared::q_string::Q_strncpyz;
-use mp_qshared::shared::q_math::{_VectorAdd, _VectorScale, _VectorSubtract, VectorLength};
 
 // helper: vector arithmetic used inline below (mirrors the qshared q_math
 // primitives; ported bodies transcribed inline to avoid a spurious edge for
@@ -380,7 +382,7 @@ pub fn BotDumpAvoidGoals(bot: &mut BotLib, goalstate: c_int) {
                 let remaining = (*gs).avoidgoaltimes[i] - AAS_Time(bot);
                 let __m = std::ffi::CString::new(format!(
                     "avoid goal {}, number {} for {} seconds",
-                    std::ffi::CStr::from_ptr(name.as_ptr()).to_string_lossy(),
+                    latin1_to_string(std::ffi::CStr::from_ptr(name.as_ptr()).to_bytes()),
                     (*gs).avoidgoals[i],
                     remaining as f64,
                 ))
@@ -475,7 +477,7 @@ pub fn BotDumpGoalStack(bot: &mut BotLib, goalstate: c_int) {
             let __m = std::ffi::CString::new(format!(
                 "{}: {}",
                 i,
-                std::ffi::CStr::from_ptr(name.as_ptr()).to_string_lossy(),
+                latin1_to_string(std::ffi::CStr::from_ptr(name.as_ptr()).to_bytes()),
             ))
             .unwrap_or_default();
             Log_Write(bot, __m.as_ptr() as *mut c_char);
@@ -1320,8 +1322,7 @@ pub fn BotInitLevelItems(bot: &mut BotLib) {
 
                 let mut i = 0;
                 while i < numiteminfo {
-                    if chars_str(&classname) == (*(*ic).iteminfo.add(i as usize)).classname_str()
-                    {
+                    if chars_str(&classname) == (*(*ic).iteminfo.add(i as usize)).classname_str() {
                         break;
                     }
                     i += 1;
@@ -1329,7 +1330,7 @@ pub fn BotInitLevelItems(bot: &mut BotLib) {
                 if i >= numiteminfo {
                     let __m = std::ffi::CString::new(format!(
                         "entity {} unknown item\r\n",
-                        std::ffi::CStr::from_ptr(classname.as_ptr()).to_string_lossy(),
+                        latin1_to_string(std::ffi::CStr::from_ptr(classname.as_ptr()).to_bytes()),
                     ))
                     .unwrap_or_default();
                     Log_Write(bot, __m.as_ptr() as *mut c_char);
@@ -1827,7 +1828,7 @@ pub fn LoadItemConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut itemconfi
         let mut path = [0 as c_char; MAX_PATH];
         libc::strncpy(path.as_mut_ptr(), filename, MAX_PATH);
         PC_SetBaseFolder(bot, BOTFILESBASEFOLDER);
-        let path_str = CStr::from_ptr(path.as_ptr()).to_string_lossy().into_owned();
+        let path_str = latin1_to_string(CStr::from_ptr(path.as_ptr()).to_bytes());
         let mut source = match LoadSourceFile(bot, &path_str) {
             Some(s) => s,
             None => {
@@ -1925,7 +1926,7 @@ pub fn BotLoadItemWeights(bot: &mut BotLib, goalstate: c_int, filename: *mut c_c
     }
     unsafe {
         //load the weight configuration
-        let filename_str = std::ffi::CStr::from_ptr(filename).to_string_lossy().into_owned();
+        let filename_str = latin1_to_string(std::ffi::CStr::from_ptr(filename).to_bytes());
         (*gs).itemweightconfig = ReadWeightConfig(bot, &filename_str);
         if (*gs).itemweightconfig.is_none() {
             bot.botimport.Print.unwrap()(

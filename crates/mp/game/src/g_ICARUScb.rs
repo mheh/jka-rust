@@ -20,6 +20,7 @@ use core::ffi::CStr;
 use crate::g_nav::NAV_FindClosestWaypointForEnt;
 use crate::prelude::*;
 use crate::q_math::vec3_origin;
+use native_string::latin1_to_string;
 use native_string::{atof, atof_bytes};
 use native_string::{Q_stricmp, Q_strncmp};
 
@@ -76,11 +77,15 @@ pub fn G_DebugPrint(
     }
 
     if level == WL_ERROR as c_int {
-        Com_Printf(&format!("{}ERROR: {}", S_COLOR_RED.to_string_lossy(), text));
+        Com_Printf(&format!(
+            "{}ERROR: {}",
+            latin1_to_string(S_COLOR_RED.to_bytes()),
+            text
+        ));
     } else if level == WL_WARNING as c_int {
         Com_Printf(&format!(
             "{}WARNING: {}",
-            S_COLOR_YELLOW.to_string_lossy(),
+            latin1_to_string(S_COLOR_YELLOW.to_bytes()),
             text
         ));
     } else if level == WL_DEBUG as c_int {
@@ -100,7 +105,7 @@ pub fn G_DebugPrint(
             .unwrap_or_default();
         Com_Printf(&format!(
             "{}DEBUG: {}({}): {}\n",
-            S_COLOR_BLUE.to_string_lossy(),
+            latin1_to_string(S_COLOR_BLUE.to_bytes()),
             targ_str,
             ent_num,
             buffer
@@ -109,7 +114,7 @@ pub fn G_DebugPrint(
         // default / WL_VERBOSE
         Com_Printf(&format!(
             "{}INFO: {}",
-            S_COLOR_GREEN.to_string_lossy(),
+            latin1_to_string(S_COLOR_GREEN.to_bytes()),
             text
         ));
     }
@@ -458,8 +463,7 @@ pub fn Q3_Lerp2Start(ctx: &mut GameContext, entID: c_int, taskID: c_int, duratio
 
     let is_not_mover = {
         let e = ctx.world.entity(id);
-        !e.client.is_null()
-            || Q_stricmp(&e.classname_str(), "target_scriptrunner") == 0
+        !e.client.is_null() || Q_stricmp(&e.classname_str(), "target_scriptrunner") == 0
     };
     if is_not_mover {
         G_DebugPrint(
@@ -513,8 +517,7 @@ pub fn Q3_Lerp2End(ctx: &mut GameContext, entID: c_int, taskID: c_int, duration:
 
     let is_not_mover = {
         let e = ctx.world.entity(id);
-        !e.client.is_null()
-            || Q_stricmp(&e.classname_str(), "target_scriptrunner") == 0
+        !e.client.is_null() || Q_stricmp(&e.classname_str(), "target_scriptrunner") == 0
     };
     if is_not_mover {
         G_DebugPrint(
@@ -575,8 +578,7 @@ pub fn Q3_Lerp2Pos(
 
     let is_not_mover = {
         let e = ctx.world.entity(id);
-        !e.client.is_null()
-            || Q_stricmp(&e.classname_str(), "target_scriptrunner") == 0
+        !e.client.is_null() || Q_stricmp(&e.classname_str(), "target_scriptrunner") == 0
     };
     if is_not_mover {
         G_DebugPrint(
@@ -785,11 +787,7 @@ pub fn Q3_Use(ctx: &mut GameContext, entID: c_int, target: *const c_char) {
     let id = EntityId(entID as u32);
 
     if target.is_null() || unsafe { *target } == 0 {
-        G_DebugPrint(
-            ctx,
-            WL_WARNING as c_int,
-            "Q3_Use: string is NULL!\n",
-        );
+        G_DebugPrint(ctx, WL_WARNING as c_int, "Q3_Use: string is NULL!\n");
         return;
     }
 
@@ -821,9 +819,7 @@ pub fn Q3_Kill(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
         G_DebugPrint(
             ctx,
             WL_WARNING as c_int,
-            &format!("Q3_Kill: can't find {}\n", unsafe {
-                cstr_to_str(name)
-            }),
+            &format!("Q3_Kill: can't find {}\n", unsafe { cstr_to_str(name) }),
         );
         return;
     };
@@ -890,11 +886,7 @@ pub fn Q3_Remove(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
     } else if Q_stricmp("enemy", &(unsafe { cstr_to_str(name) })) == 0 {
         let victim = ctx.world.entity(id).enemy;
         if victim.is_none() {
-            G_DebugPrint(
-                ctx,
-                WL_WARNING as c_int,
-                "Q3_Remove: can't find enemy\n",
-            );
+            G_DebugPrint(ctx, WL_WARNING as c_int, "Q3_Remove: can't find enemy\n");
             return;
         }
         Q3_RemoveEnt(ctx, victim.unwrap());
@@ -906,11 +898,7 @@ pub fn Q3_Remove(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
             &(unsafe { cstr_to_str(name) }),
         );
         if victim.is_null() {
-            G_DebugPrint(
-                ctx,
-                WL_WARNING as c_int,
-                "Q3_Remove: can't find target\n",
-            );
+            G_DebugPrint(ctx, WL_WARNING as c_int, "Q3_Remove: can't find target\n");
             return;
         }
         while !victim.is_null() {
@@ -939,7 +927,10 @@ pub fn Q3_GetFloat(
     unsafe {
         let id = EntityId(entID as u32);
 
-        let toGet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(name));
+        let toGet = GetIDForString(
+            setTable.as_ptr() as *mut stringID_table_t,
+            &cstr_to_str(name),
+        );
 
         match toGet {
             _ if toGet == SET_PARM1 as i32
@@ -968,8 +959,7 @@ pub fn Q3_GetFloat(
                         WL_ERROR as c_int,
                         &format!(
                             "GET_PARM: {} {} did not have any parms set!\n",
-                            classname,
-                            targetname
+                            classname, targetname
                         ),
                     );
                     return 0;
@@ -990,10 +980,7 @@ pub fn Q3_GetFloat(
                     G_DebugPrint(
                         ctx,
                         WL_WARNING as c_int,
-                        &format!(
-                            "Q3_GetFloat: SET_XVELOCITY, {} not a client\n",
-                            targetname
-                        ),
+                        &format!("Q3_GetFloat: SET_XVELOCITY, {} not a client\n", targetname),
                     );
                     return 0;
                 }
@@ -1006,10 +993,7 @@ pub fn Q3_GetFloat(
                     G_DebugPrint(
                         ctx,
                         WL_WARNING as c_int,
-                        &format!(
-                            "Q3_GetFloat: SET_YVELOCITY, {} not a client\n",
-                            targetname
-                        ),
+                        &format!("Q3_GetFloat: SET_YVELOCITY, {} not a client\n", targetname),
                     );
                     return 0;
                 }
@@ -1022,10 +1006,7 @@ pub fn Q3_GetFloat(
                     G_DebugPrint(
                         ctx,
                         WL_WARNING as c_int,
-                        &format!(
-                            "Q3_GetFloat: SET_ZVELOCITY, {} not a client\n",
-                            targetname
-                        ),
+                        &format!("Q3_GetFloat: SET_ZVELOCITY, {} not a client\n", targetname),
                     );
                     return 0;
                 }
@@ -1108,10 +1089,7 @@ pub fn Q3_GetFloat(
                     G_DebugPrint(
                         ctx,
                         WL_WARNING as c_int,
-                        &format!(
-                            "Q3_GetFloat: SET_ARMOR, {} not a client\n",
-                            targetname
-                        ),
+                        &format!("Q3_GetFloat: SET_ARMOR, {} not a client\n", targetname),
                     );
                     return 0;
                 }
@@ -1251,7 +1229,10 @@ pub fn Q3_GetVector(
     unsafe {
         let id = EntityId(entID as u32);
 
-        let toGet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(name));
+        let toGet = GetIDForString(
+            setTable.as_ptr() as *mut stringID_table_t,
+            &cstr_to_str(name),
+        );
 
         match toGet {
             _ if toGet == SET_PARM1 as i32
@@ -1315,7 +1296,10 @@ pub fn Q3_GetString(
     unsafe {
         let id = EntityId(entID as u32);
 
-        let toGet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(name));
+        let toGet = GetIDForString(
+            setTable.as_ptr() as *mut stringID_table_t,
+            &cstr_to_str(name),
+        );
 
         match toGet {
             _ if toGet == SET_ANIM_BOTH as i32 => {
@@ -1349,10 +1333,7 @@ pub fn Q3_GetString(
                     G_DebugPrint(
                         ctx,
                         WL_WARNING as c_int,
-                        &format!(
-                            "Q3_GetString: invalid ent {} has no parms!\n",
-                            targetname
-                        ),
+                        &format!("Q3_GetString: invalid ent {} has no parms!\n", targetname),
                     );
                     return 0;
                 }
@@ -1748,8 +1729,7 @@ pub fn Q3_Lerp2Origin(
 
     let is_not_mover = {
         let e = ctx.world.entity(id);
-        !e.client.is_null()
-            || Q_stricmp(&e.classname_str(), "target_scriptrunner") == 0
+        !e.client.is_null() || Q_stricmp(&e.classname_str(), "target_scriptrunner") == 0
     };
     if is_not_mover {
         G_DebugPrint(
@@ -1825,17 +1805,13 @@ pub fn Q3_SetOriginOffset(ctx: &mut GameContext, entID: c_int, axis: c_int, offs
 
     let is_not_mover = {
         let e = ctx.world.entity(id);
-        !e.client.is_null()
-            || Q_stricmp(&e.classname_str(), "target_scriptrunner") == 0
+        !e.client.is_null() || Q_stricmp(&e.classname_str(), "target_scriptrunner") == 0
     };
     if is_not_mover {
         G_DebugPrint(
             ctx,
             WL_ERROR as c_int,
-            &format!(
-                "Q3_SetOriginOffset: ent {} is NOT a mover!\n",
-                entID
-            ),
+            &format!("Q3_SetOriginOffset: ent {} is NOT a mover!\n", entID),
         );
         return;
     }
@@ -1878,11 +1854,7 @@ pub fn Q3_SetEnemy(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
         );
 
         if enemy.is_null() {
-            G_DebugPrint(
-                ctx,
-                WL_ERROR as c_int,
-                "Q3_SetEnemy: no such enemy\n",
-            );
+            G_DebugPrint(ctx, WL_ERROR as c_int, "Q3_SetEnemy: no such enemy\n");
             return;
         }
 
@@ -1905,10 +1877,7 @@ pub fn Q3_SetLeader(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
         G_DebugPrint(
             ctx,
             WL_ERROR as c_int,
-            &format!(
-                "Q3_SetLeader: ent {} is NOT a player or NPC!\n",
-                entID
-            ),
+            &format!("Q3_SetLeader: ent {} is NOT a player or NPC!\n", entID),
         );
         return;
     }
@@ -1950,7 +1919,11 @@ pub fn Q3_SetNavGoal(ctx: &mut GameContext, entID: c_int, name: *const c_char) -
         let mut goalPos: vec3_t = [0.0, 0.0, 0.0];
 
         if ctx.world.entity(id).health == 0 {
-            let st = ctx.world.entity(id).script_targetname_str().unwrap_or_default();
+            let st = ctx
+                .world
+                .entity(id)
+                .script_targetname_str()
+                .unwrap_or_default();
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
@@ -1963,7 +1936,11 @@ pub fn Q3_SetNavGoal(ctx: &mut GameContext, entID: c_int, name: *const c_char) -
             return qfalse;
         }
         if ctx.world.entity(id).NPC.is_null() {
-            let st = ctx.world.entity(id).script_targetname_str().unwrap_or_default();
+            let st = ctx
+                .world
+                .entity(id)
+                .script_targetname_str()
+                .unwrap_or_default();
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
@@ -1977,7 +1954,11 @@ pub fn Q3_SetNavGoal(ctx: &mut GameContext, entID: c_int, name: *const c_char) -
         }
         let npc = ctx.world.entity(id).NPC;
         if (*npc).tempGoal.is_none() {
-            let st = ctx.world.entity(id).script_targetname_str().unwrap_or_default();
+            let st = ctx
+                .world
+                .entity(id)
+                .script_targetname_str()
+                .unwrap_or_default();
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
@@ -1991,7 +1972,11 @@ pub fn Q3_SetNavGoal(ctx: &mut GameContext, entID: c_int, name: *const c_char) -
         }
         let temp_goal_id = (*npc).tempGoal.unwrap();
         if ctx.world.entity(temp_goal_id).inuse == 0 {
-            let st = ctx.world.entity(id).script_targetname_str().unwrap_or_default();
+            let st = ctx
+                .world
+                .entity(id)
+                .script_targetname_str()
+                .unwrap_or_default();
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
@@ -2004,8 +1989,7 @@ pub fn Q3_SetNavGoal(ctx: &mut GameContext, entID: c_int, name: *const c_char) -
             return qfalse;
         }
 
-        if Q_stricmp("null", &cstr_to_str(name)) == 0
-            || Q_stricmp("NULL", &cstr_to_str(name)) == 0
+        if Q_stricmp("null", &cstr_to_str(name)) == 0 || Q_stricmp("NULL", &cstr_to_str(name)) == 0
         {
             (*npc).goalEntity = None;
             trap::ICARUS_TaskIDComplete(
@@ -2120,7 +2104,10 @@ pub fn SetUpperAnim(ctx: &mut GameContext, entID: c_int, animID: c_int) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2384-2405`
 pub fn Q3_SetAnimUpper(ctx: &mut GameContext, entID: c_int, anim_name: *const c_char) -> qboolean {
     unsafe {
-        let animID = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(anim_name));
+        let animID = GetIDForString(
+            animTable.as_ptr() as *mut stringID_table_t,
+            &cstr_to_str(anim_name),
+        );
 
         if animID == -1 {
             G_DebugPrint(
@@ -2144,7 +2131,10 @@ pub fn Q3_SetAnimUpper(ctx: &mut GameContext, entID: c_int, anim_name: *const c_
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2414-2437`
 pub fn Q3_SetAnimLower(ctx: &mut GameContext, entID: c_int, anim_name: *const c_char) -> qboolean {
     unsafe {
-        let animID = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(anim_name));
+        let animID = GetIDForString(
+            animTable.as_ptr() as *mut stringID_table_t,
+            &cstr_to_str(anim_name),
+        );
 
         if animID == -1 {
             G_DebugPrint(
@@ -2254,16 +2244,16 @@ pub fn Q3_SetBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_char)
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
-                &format!(
-                    "Q3_SetBState: '{}' is not an NPC\n",
-                    tn
-                ),
+                &format!("Q3_SetBState: '{}' is not an NPC\n", tn),
             );
             return qtrue;
         }
         let npc = ctx.world.entity(id).NPC;
 
-        let bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(bs_name));
+        let bSID = GetIDForString(
+            BSTable.as_ptr() as *mut stringID_table_t,
+            &cstr_to_str(bs_name),
+        );
         if bSID > -1 {
             if bSID == (BS_SEARCH) as i32 || bSID == (BS_WANDER) as i32 {
                 let wp = ctx.world.entity(id).waypoint;
@@ -2340,16 +2330,16 @@ pub fn Q3_SetTempBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_c
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
-                &format!(
-                    "Q3_SetTempBState: '{}' is not an NPC\n",
-                    tn
-                ),
+                &format!("Q3_SetTempBState: '{}' is not an NPC\n", tn),
             );
             return qtrue;
         }
         let npc = ctx.world.entity(id).NPC;
 
-        let bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(bs_name));
+        let bSID = GetIDForString(
+            BSTable.as_ptr() as *mut stringID_table_t,
+            &cstr_to_str(bs_name),
+        );
         if bSID > -1 {
             (*npc).tempBehavior = core::mem::transmute::<c_int, bState_t>(bSID);
         }
@@ -2371,16 +2361,16 @@ pub fn Q3_SetDefaultBState(ctx: &mut GameContext, entID: c_int, bs_name: *const 
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
-                &format!(
-                    "Q3_SetDefaultBState: '{}' is not an NPC\n",
-                    tn
-                ),
+                &format!("Q3_SetDefaultBState: '{}' is not an NPC\n", tn),
             );
             return;
         }
         let npc = ctx.world.entity(id).NPC;
 
-        let bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(bs_name));
+        let bSID = GetIDForString(
+            BSTable.as_ptr() as *mut stringID_table_t,
+            &cstr_to_str(bs_name),
+        );
         if bSID > -1 {
             (*npc).defaultBehavior = core::mem::transmute::<c_int, bState_t>(bSID);
         }
@@ -2691,10 +2681,7 @@ pub fn Q3_SetWalkSpeed(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
-                &format!(
-                    "Q3_SetWalkSpeed: '{}' is not an NPC!\n",
-                    tn
-                ),
+                &format!("Q3_SetWalkSpeed: '{}' is not an NPC!\n", tn),
             );
             return;
         }
@@ -2724,10 +2711,7 @@ pub fn Q3_SetRunSpeed(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
-                &format!(
-                    "Q3_SetRunSpeed: '{}' is not an NPC!\n",
-                    tn
-                ),
+                &format!("Q3_SetRunSpeed: '{}' is not an NPC!\n", tn),
             );
             return;
         }
@@ -2770,11 +2754,7 @@ pub fn Q3_SetAggression(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3239-3243`
 pub fn Q3_SetAim(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
-    G_DebugPrint(
-        ctx,
-        WL_WARNING as c_int,
-        "Q3_SetAim: NOT SUPPORTED IN MP\n",
-    );
+    G_DebugPrint(ctx, WL_WARNING as c_int, "Q3_SetAim: NOT SUPPORTED IN MP\n");
 }
 
 /// Raven `Q3_SetFriction`.
@@ -2788,10 +2768,7 @@ pub fn Q3_SetFriction(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
         G_DebugPrint(
             ctx,
             WL_ERROR as c_int,
-            &format!(
-                "Q3_SetFriction: '{}' is not an NPC/player!\n",
-                tn
-            ),
+            &format!("Q3_SetFriction: '{}' is not an NPC/player!\n", tn),
         );
         return;
     }
@@ -2816,10 +2793,7 @@ pub fn Q3_SetGravity(ctx: &mut GameContext, entID: c_int, float_data: f32) {
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
-                &format!(
-                    "Q3_SetGravity: '{}' is not an NPC/player!\n",
-                    tn
-                ),
+                &format!("Q3_SetGravity: '{}' is not an NPC/player!\n", tn),
             );
             return;
         }
@@ -3265,10 +3239,7 @@ pub fn Q3_SetWalking(ctx: &mut GameContext, entID: c_int, add: qboolean) {
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
-                &format!(
-                    "Q3_SetWalking: '{}' is not an NPC!\n",
-                    tn
-                ),
+                &format!("Q3_SetWalking: '{}' is not an NPC!\n", tn),
             );
             return;
         }
@@ -3517,10 +3488,7 @@ pub fn Q3_SetNoAvoid(ctx: &mut GameContext, entID: c_int, noAvoid: qboolean) {
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
-                &format!(
-                    "Q3_SetNoAvoid: '{}' is not an NPC!\n",
-                    tn
-                ),
+                &format!("Q3_SetNoAvoid: '{}' is not an NPC!\n", tn),
             );
             return;
         }
@@ -3629,10 +3597,7 @@ pub fn Q3_SetForwardMove(ctx: &mut GameContext, entID: c_int, fmoveVal: c_int) {
         G_DebugPrint(
             ctx,
             WL_ERROR as c_int,
-            &format!(
-                "Q3_SetForwardMove: '{}' is not an NPC/player!\n",
-                tn
-            ),
+            &format!("Q3_SetForwardMove: '{}' is not an NPC/player!\n", tn),
         );
         return;
     }
@@ -3782,11 +3747,7 @@ pub fn Q3_LookTarget(ctx: &mut GameContext, entID: c_int, targetName: *mut c_cha
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:4546-4549`
 pub fn Q3_Face(ctx: &mut GameContext, entID: c_int, expression: c_int, holdtime: f32) {
-    G_DebugPrint(
-        ctx,
-        WL_WARNING as c_int,
-        "Q3_Face: NOT SUPPORTED IN MP\n",
-    );
+    G_DebugPrint(ctx, WL_WARNING as c_int, "Q3_Face: NOT SUPPORTED IN MP\n");
 }
 
 /// Raven `Q3_SetLocation`.
@@ -3876,12 +3837,22 @@ pub fn Q3_SetBehaviorSet(
         }
 
         if Q_stricmp("NULL", &(unsafe { cstr_to_str(scriptname) })) == 0 {
-            if ctx.world.entity(id).behavior_set_str(bSet as usize).is_some() {
+            if ctx
+                .world
+                .entity(id)
+                .behavior_set_str(bSet as usize)
+                .is_some()
+            {
                 //			gi.TagFree( ent->behaviorSet[bSet] );
             }
             ctx.ent_set(id, PrefixSet::BehaviorSet(bSet as usize, None));
         } else if !scriptname.is_null() {
-            if ctx.world.entity(id).behavior_set_str(bSet as usize).is_some() {
+            if ctx
+                .world
+                .entity(id)
+                .behavior_set_str(bSet as usize)
+                .is_some()
+            {
                 //				gi.TagFree( ent->behaviorSet[bSet] );
             }
             //FIXME: This really isn't good...
@@ -4149,7 +4120,10 @@ pub fn Q3_Set(
         let data_s = cstr_to_str(data);
 
         // Set this for callbacks
-        let toSet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(type_name));
+        let toSet = GetIDForString(
+            setTable.as_ptr() as *mut stringID_table_t,
+            &cstr_to_str(type_name),
+        );
 
         // Raven's `sscanf(data, "%f %f %f", ...)` at the three vector arms
         // below now routes through the shared libc-`%f` scanner
@@ -4635,11 +4609,7 @@ pub fn Q3_Set(
             }
 
             _ if toSet == SET_LEAN as i32 => {
-                G_DebugPrint(
-                    ctx,
-                    WL_WARNING as c_int,
-                    "SET_LEAN NOT SUPPORTED IN MP\n",
-                );
+                G_DebugPrint(ctx, WL_WARNING as c_int, "SET_LEAN NOT SUPPORTED IN MP\n");
             }
 
             _ if toSet == SET_SHOOTDIST as i32 => {
@@ -5378,11 +5348,7 @@ pub fn Q3_Set(
             _ if toSet == SET_CLEAN_DAMAGING_ENTS as i32 => Q3_SetCleanDamagingEnts(ctx),
 
             _ if toSet == SET_HUD as i32 => {
-                G_DebugPrint(
-                    ctx,
-                    WL_WARNING as c_int,
-                    "SET_HUD: NOT SUPPORTED IN MP\n",
-                );
+                G_DebugPrint(ctx, WL_WARNING as c_int, "SET_HUD: NOT SUPPORTED IN MP\n");
             }
 
             _ if toSet == SET_FORCE_HEAL_LEVEL as i32

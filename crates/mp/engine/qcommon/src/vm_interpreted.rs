@@ -4,6 +4,8 @@
 
 use std::os::raw::{c_char, c_int};
 
+use native_string::latin1_to_string;
+
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::ha_pref;
 
@@ -59,7 +61,7 @@ pub fn VM_StackTrace(
     unsafe {
         loop {
             let sym = VM_ValueToSymbol(common, vm, program_counter);
-            let sym_str = std::ffi::CStr::from_ptr(sym).to_string_lossy();
+            let sym_str = latin1_to_string(std::ffi::CStr::from_ptr(sym).to_bytes());
             com_printf(common, &format!("{}\n", sym_str));
             program_stack = *((*vm).dataBase.offset((program_stack + 4) as isize) as *const i32);
             program_counter = *((*vm).dataBase.offset(program_stack as isize) as *const i32);

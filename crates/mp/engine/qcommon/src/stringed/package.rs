@@ -17,6 +17,7 @@ use std::collections::BTreeMap;
 
 use mp_host_interface::EngineHost;
 use native_string::atoi::atoi_bytes;
+use native_string::latin1_to_string;
 
 use super::entry::SeEntry;
 use super::{
@@ -245,7 +246,7 @@ impl StringEdPackage {
         } else if self.check_line_for_keyword(SE_KEYWORD_REFERENCE, &mut rest) {
             // REFERENCE	GUARD_GOOD_TO_SEE_YOU
             let local_reference = self.inside_quotes(rest);
-            let local_reference = String::from_utf8_lossy(&local_reference).into_owned();
+            let local_reference = latin1_to_string(&local_reference);
             self.add_entry(&local_reference);
             None
         } else if self.check_line_for_keyword(SE_KEYWORD_FLAGS, &mut rest) {
@@ -257,7 +258,7 @@ impl StringEdPackage {
                     .filter(|t| !t.is_empty())
                 {
                     // psToken = flag name (in caps)
-                    let flag_name = String::from_utf8_lossy(token).to_ascii_uppercase(); // jic
+                    let flag_name = latin1_to_string(token).to_ascii_uppercase(); // jic
                     self.add_flag_reference(&reference, &flag_name);
                 }
                 None
@@ -283,7 +284,7 @@ impl StringEdPackage {
                     .iter()
                     .position(|&b| b == b' ' || b == b'\t')
                     .unwrap_or(lang_bytes.len());
-                let this_language = String::from_utf8_lossy(&lang_bytes[..word_end]).into_owned();
+                let this_language = latin1_to_string(&lang_bytes[..word_end]);
                 let after_lang = &lang_bytes[word_end..];
 
                 let quoted = self.inside_quotes(after_lang);
@@ -326,7 +327,7 @@ impl StringEdPackage {
         } else {
             Some(format!(
                 "Unknown keyword at linestart: \"{}\"\n",
-                String::from_utf8_lossy(rest)
+                latin1_to_string(rest)
             ))
         }
     }
@@ -413,8 +414,8 @@ impl StringEdPackage {
             // (so it's the debug-key text), or it's the only text when it's
             // english being loaded...
             let leet = api::leetify(new_string, host);
-            let leet_string = String::from_utf8_lossy(&leet).into_owned();
-            let raw_string = String::from_utf8_lossy(new_string).into_owned();
+            let leet_string = latin1_to_string(&leet);
+            let raw_string = latin1_to_string(new_string);
 
             if let Some(entry) = self.string_entries.get_mut(&key) {
                 entry.m_str_string = leet_string;
@@ -440,7 +441,7 @@ impl StringEdPackage {
                 }
             } else {
                 // foreign is just foreign
-                let raw_string = String::from_utf8_lossy(new_string).into_owned();
+                let raw_string = latin1_to_string(new_string);
                 if let Some(entry) = self.string_entries.get_mut(&key) {
                     entry.m_str_string = raw_string;
                 }

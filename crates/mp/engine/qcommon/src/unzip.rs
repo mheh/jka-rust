@@ -6,6 +6,7 @@ use core::ffi::{c_char, c_int, c_long, c_uint, c_ulong};
 
 use flate2::{Decompress, FlushDecompress, Status};
 use libc::{SEEK_CUR, SEEK_END, SEEK_SET};
+use native_string::latin1_to_string;
 
 use crate::files::unz_file::unzFile;
 use crate::files::unz_types::{
@@ -944,9 +945,9 @@ pub fn unzLocateFile(file: unzFile, szFileName: &str, iCaseSensitivity: c_int) -
                 0,
             );
             let szCurrentFileName_str =
-                core::ffi::CStr::from_ptr(szCurrentFileName.as_ptr()).to_string_lossy();
+                latin1_to_string(core::ffi::CStr::from_ptr(szCurrentFileName.as_ptr()).to_bytes());
             if unzStringFileNameCompare(
-                szCurrentFileName_str.as_ref(),
+                szCurrentFileName_str.as_str(),
                 szFileName,
                 iCaseSensitivity,
             ) == 0

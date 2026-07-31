@@ -6,6 +6,7 @@
 
 use crate::prelude::*;
 use core::ffi::CStr;
+use native_string::latin1_to_string;
 
 use crate::client::gclient::gclient_t;
 use mp_bg::bg_misc::{
@@ -593,8 +594,7 @@ pub fn PlaceShield(ctx: &mut GameContext, playerent: EntityId) -> qboolean {
     if ctx.world.globals.shieldAttachSound == 0 {
         ctx.world.globals.shieldLoopSound =
             G_SoundIndex(ctx, "sound/movers/doors/forcefield_lp.wav");
-        ctx.world.globals.shieldAttachSound =
-            G_SoundIndex(ctx, "sound/weapons/detpack/stick.wav");
+        ctx.world.globals.shieldAttachSound = G_SoundIndex(ctx, "sound/weapons/detpack/stick.wav");
         ctx.world.globals.shieldActivateSound =
             G_SoundIndex(ctx, "sound/movers/doors/forcefield_on.wav");
         ctx.world.globals.shieldDeactivateSound =
@@ -2579,8 +2579,7 @@ pub fn EWeb_Create(ctx: &mut GameContext, spawner: EntityId) -> *mut gentity_t {
         vec3_origin,
     );
 
-    let genericValue10 =
-        trap::G2API_AddBolt(ctx.engine, ctx.entity(ent).ghoul2, 0, "*cannonflash"); // muzzle bolt
+    let genericValue10 = trap::G2API_AddBolt(ctx.engine, ctx.entity(ent).ghoul2, 0, "*cannonflash"); // muzzle bolt
     ctx.entity_mut(ent).genericValue10 = genericValue10;
     let genericValue9 = trap::G2API_AddBolt(ctx.engine, ctx.entity(ent).ghoul2, 0, "cannon_Yrot"); // for placing the owner relative to rotation
     ctx.entity_mut(ent).genericValue9 = genericValue9;
@@ -3808,7 +3807,7 @@ pub fn SaveRegisteredItems(ctx: &mut GameContext) {
     string[bg_numItems as usize] = 0;
 
     //	G_Printf( "%i items registered\n", count );
-    let s = cstr_from_chars(&string).to_string_lossy().into_owned();
+    let s = latin1_to_string(cstr_from_chars(&string).to_bytes());
     trap::SetConfigstring(ctx.engine, CS_ITEMS, &s);
 }
 

@@ -30,21 +30,22 @@
 use crate::q_shared::Q_strlen as strlen;
 use std::ffi::CStr;
 
-use crate::prelude::*;
 use crate::ent_fn_enums::{dispatch_spawn, spawn_for_classname};
+use crate::prelude::*;
 use crate::trap;
 use crate::world::GameContext;
 use native_string::atof_bytes;
 use native_string::atoi_bytes;
+use native_string::latin1_to_string;
 
 use crate::g_items::G_SpawnItem;
 use crate::g_main::{G_Error, G_Printf};
 use crate::g_misc::{SP_info_notnull, SP_info_null};
 use crate::g_utils::{G_FreeEntity, G_SetOrigin, G_SoundIndex, G_SoundSetIndex, G_Spawn};
 use crate::NPC_utils::G_ActivateBehavior;
-use native_string::{Q_stricmp, Q_strncmp};
 use mp_bg::bg_misc::{BG_FindItem, BG_ParseField};
 use mp_bg::bg_panimate::BG_ParseAnimationFile;
+use native_string::{Q_stricmp, Q_strncmp};
 
 use crate::ent_fn_enums::EntThink;
 use mp_abi::game::syscalls::G_ICARUS_INITENT::GIcarusInitentArgs;
@@ -55,9 +56,9 @@ use mp_abi::game::syscalls::G_G2_SETBOLTINFO::GG2SetboltinfoArgs as GG2SetBoltIn
 use mp_abi::game::syscalls::G_G2_SETSKIN::GG2SetskinArgs as GG2SetSkinArgs;
 use mp_abi::game::syscalls::G_SET_SERVER_CULL::GSetServerCullArgs;
 
+use crate::q_shared;
 use mp_bg::public::bg_field::SpawnStringSetter;
 use mp_bg::public::fieldtype::fieldtype_t;
-use crate::q_shared;
 
 // `TEAM_RED`/`TEAM_BLUE` (`bg_public.h`) — local consts, same convention as
 // `g_team.rs`, resolved at integration.
@@ -425,8 +426,8 @@ pub static FIELDS: &[BG_field_t] = &[
     field_owned(c"closetarget", set_closetarget), // for doors
     field_owned(c"opentarget", set_opentarget),   // for doors
     field_owned(c"paintarget", set_paintarget),   // for doors
-    field_owned(c"goaltarget", set_goaltarget), // for siege
-    field_owned(c"idealclass", set_idealclass), // for siege spawnpoints
+    field_owned(c"goaltarget", set_goaltarget),   // for siege
+    field_owned(c"idealclass", set_idealclass),   // for siege spawnpoints
     // rww - icarus stuff:
     field(
         c"spawnscript",
@@ -840,7 +841,10 @@ pub fn AddSpawnField(ctx: &mut GameContext, field: &str, value: &str) {
             return;
         }
     }
-    ctx.world.level.spawnVars.push((field.to_owned(), value.to_owned()));
+    ctx.world
+        .level
+        .spawnVars
+        .push((field.to_owned(), value.to_owned()));
 }
 
 pub const NOVALUE: &CStr = c"novalue";
@@ -930,7 +934,7 @@ fn HandleEntityAdjustment(ctx: &mut GameContext) {
         let target_adjust_str = if target_adjust.is_null() {
             String::new()
         } else {
-            CStr::from_ptr(target_adjust).to_string_lossy().into_owned()
+            latin1_to_string(CStr::from_ptr(target_adjust).to_bytes())
         };
 
         AddSpawnField(ctx, "BSPInstanceID", &target_adjust_str);
@@ -1098,7 +1102,8 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
             );
 
             if !ctx.world.globals.precachedKyle.is_null() {
-                defSkin = trap::R_RegisterSkin(ctx.engine, "models/players/kyle/model_default.skin");
+                defSkin =
+                    trap::R_RegisterSkin(ctx.engine, "models/players/kyle/model_default.skin");
                 trap::G2API_SetSkin(
                     ctx.engine,
                     GG2SetSkinArgs::new(ctx.world.globals.precachedKyle, 0, defSkin, defSkin),
@@ -1153,7 +1158,7 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
         trap::SetConfigstring(
             ctx.engine,
             CS_MOTD,
-            &cstr_from_chars(&ctx.world.cvars.g_motd.string).to_string_lossy(),
+            &latin1_to_string(cstr_from_chars(&ctx.world.cvars.g_motd.string).to_bytes()),
         ); // message of the day
 
         text = G_SpawnString(ctx, "gravity", "800").1;
@@ -1170,7 +1175,10 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
         );
 
         ctx.world.g_entities[ENTITYNUM_WORLD as usize].s.number = ENTITYNUM_WORLD;
-        ctx.ent_set(EntityId(ENTITYNUM_WORLD as u32), PrefixSet::ClassnameStatic(c"worldspawn"));
+        ctx.ent_set(
+            EntityId(ENTITYNUM_WORLD as u32),
+            PrefixSet::ClassnameStatic(c"worldspawn"),
+        );
 
         // see if we want a warmup time
         trap::SetConfigstring(ctx.engine, CS_WARMUP, "");

@@ -1,5 +1,7 @@
 //! Raven `CBlock` — a block of `CBlockMember`s in an ICARUS block stream.
 
+use native_string::latin1_to_string;
+
 use mp_qshared::shared::vec3_t;
 
 use crate::blockstream::cblock_member::BlockMember;
@@ -211,10 +213,10 @@ pub(crate) fn member_int(block: &Block, member_num: &mut i32) -> i32 {
 }
 
 /// A raw byte field (`(char *)GetMemberData`) read as a C string: bytes up to
-/// the first NUL, lossy UTF-8.
+/// the first NUL, decoded as Latin-1.
 pub(crate) fn bytes_to_c_string(data: &[u8]) -> String {
     let len = data.iter().position(|&b| b == 0).unwrap_or(data.len());
-    String::from_utf8_lossy(&data[..len]).into_owned()
+    latin1_to_string(&data[..len])
 }
 
 /// Read a member's data as a C string **without** advancing.

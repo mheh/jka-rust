@@ -32,10 +32,10 @@ use native_math::vector::vec3_t;
 use native_platform::Sys_CheckCD;
 use native_types::clipHandle_t;
 
+use crate::hook_install::sv_from_view;
 use crate::server::client_s::client_t;
 use crate::server::server_state_t::serverState_t;
 use crate::server::sv_entity_s::svEntity_t;
-use crate::hook_install::sv_from_view;
 use crate::server_host::sv_game_system_call;
 use crate::sv_referee::ref_tap_syscall;
 use crate::sv_renderer::RE_RegisterServerSkin;
@@ -373,9 +373,7 @@ pub fn ConvertedEntity(
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:36-38`
 pub fn SV_GameError(string: *const c_char) {
-    let msg = unsafe { core::ffi::CStr::from_ptr(string) }
-        .to_string_lossy()
-        .into_owned();
+    let msg = latin1_to_string(unsafe { core::ffi::CStr::from_ptr(string) }.to_bytes());
     mp_engine_qcommon::common::com_error(errorParm_t::ERR_DROP, msg);
 }
 
@@ -383,7 +381,7 @@ pub fn SV_GameError(string: *const c_char) {
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:40-42`
 pub fn SV_GamePrint(common: &mut Common, string: *const c_char) {
-    let msg = unsafe { core::ffi::CStr::from_ptr(string) }.to_string_lossy();
+    let msg = latin1_to_string(unsafe { core::ffi::CStr::from_ptr(string) }.to_bytes());
     mp_engine_qcommon::common::common::com_printf(common, &msg);
 }
 
@@ -648,7 +646,7 @@ pub fn SV_SetBrushModel(
             );
         }
 
-        let name_str = core::ffi::CStr::from_ptr(name).to_string_lossy();
+        let name_str = latin1_to_string(core::ffi::CStr::from_ptr(name).to_bytes());
         let mut mins = [0.0f32; 3];
         let mut maxs = [0.0f32; 3];
 
@@ -859,14 +857,15 @@ pub fn SV_GameSystemCalls(
         } else if trap == T::TRAP_ASIN as isize {
             return FloatAsInt(mp_engine_qcommon::common_fns::Q_asin(vmf(args, 1))) as isize;
         } else if trap == G::G_PRINT as isize {
-            let s = core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
-                .to_string_lossy();
+            let s = latin1_to_string(
+                core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char).to_bytes(),
+            );
             mp_engine_qcommon::common::common::com_printf(view.common, &s);
             return 0;
         } else if trap == G::G_ERROR as isize {
-            let s = core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
-                .to_string_lossy()
-                .into_owned();
+            let s = latin1_to_string(
+                core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char).to_bytes(),
+            );
             mp_engine_qcommon::common::com_error(errorParm_t::ERR_DROP, s);
         } else if trap == G::G_MILLISECONDS as isize {
             return mp_engine_qcommon::timing::sys_milliseconds(view.common) as isize;
@@ -888,10 +887,14 @@ pub fn SV_GameSystemCalls(
             Cvar_Register(
                 view,
                 vma(view.common, args, 1) as *mut mp_qshared::shared::cvar::vmCvar_t,
-                &core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
-                    .to_string_lossy(),
-                &core::ffi::CStr::from_ptr(vma(view.common, args, 3) as *const c_char)
-                    .to_string_lossy(),
+                &latin1_to_string(
+                    core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
+                        .to_bytes(),
+                ),
+                &latin1_to_string(
+                    core::ffi::CStr::from_ptr(vma(view.common, args, 3) as *const c_char)
+                        .to_bytes(),
+                ),
                 *args.offset(4) as c_int,
             );
             return 0;
@@ -904,23 +907,31 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_CVAR_SET as isize {
             Cvar_Set(
                 view,
-                &core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
-                    .to_string_lossy(),
-                &core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
-                    .to_string_lossy(),
+                &latin1_to_string(
+                    core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
+                        .to_bytes(),
+                ),
+                &latin1_to_string(
+                    core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
+                        .to_bytes(),
+                ),
             );
             return 0;
         } else if trap == G::G_CVAR_VARIABLE_INTEGER_VALUE as isize {
             return Cvar_VariableIntegerValue(
                 view.common,
-                &core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
-                    .to_string_lossy(),
+                &latin1_to_string(
+                    core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
+                        .to_bytes(),
+                ),
             ) as isize;
         } else if trap == G::G_CVAR_VARIABLE_STRING_BUFFER as isize {
             Cvar_VariableStringBuffer(
                 view.common,
-                &core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
-                    .to_string_lossy(),
+                &latin1_to_string(
+                    core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
+                        .to_bytes(),
+                ),
                 vma(view.common, args, 2) as *mut c_char,
                 *args.offset(3) as c_int,
             );
@@ -942,15 +953,15 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::G_SEND_CONSOLE_COMMAND as isize {
             // module-memory seam: one conversion at the trap arm.
-            let text = core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
-                .to_string_lossy()
-                .into_owned();
+            let text = latin1_to_string(
+                core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char).to_bytes(),
+            );
             mp_engine_qcommon::cmd_common::Cbuf_ExecuteText(view, *args.offset(1) as c_int, &text);
             return 0;
         } else if trap == G::G_FS_FOPEN_FILE as isize {
-            let qpath = core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
-                .to_string_lossy()
-                .into_owned();
+            let qpath = latin1_to_string(
+                core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char).to_bytes(),
+            );
             return mp_engine_qcommon::files_pc::FS_FOpenFileByMode(
                 view,
                 &qpath,
@@ -979,12 +990,12 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_FS_GETFILELIST as isize {
             // module-memory seam: path/extension convert at the trap arm; the
             // out-buffer stays caller-owned module memory.
-            let path = core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
-                .to_string_lossy()
-                .into_owned();
-            let extension = core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
-                .to_string_lossy()
-                .into_owned();
+            let path = latin1_to_string(
+                core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char).to_bytes(),
+            );
+            let extension = latin1_to_string(
+                core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char).to_bytes(),
+            );
             return mp_engine_qcommon::files_pc::FS_GetFileList(
                 view,
                 &path,
@@ -1010,8 +1021,9 @@ pub fn SV_GameSystemCalls(
             // module-memory seam: one conversion at the trap arm. The drop
             // reason reaches the wire (broadcast "print"/"disconnect"), so it is
             // Latin-1-decoded for byte transparency, not lossy.
-            let reason =
-                latin1_to_string(core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char).to_bytes());
+            let reason = latin1_to_string(
+                core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char).to_bytes(),
+            );
             SV_GameDropClient(view.common, sv, *args.offset(1) as c_int, &reason);
             return 0;
         } else if trap == G::G_SEND_SERVER_COMMAND as isize {

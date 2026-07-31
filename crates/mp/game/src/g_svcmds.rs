@@ -6,11 +6,12 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_main::G_Printf;
-use crate::q_shared::{COM_BeginParseSession, COM_ParseExt};
 use crate::prelude::*;
+use crate::q_shared::{COM_BeginParseSession, COM_ParseExt};
 use crate::trap;
 use crate::world::GameWorld;
 use native_string::atoi_bytes;
+use native_string::latin1_to_string;
 use native_string::Q_stricmp;
 
 // IP filter type: holds mask and compare value for IP filtering.
@@ -74,9 +75,11 @@ pub fn StringToFilter(ctx: &mut GameContext, s: *mut c_char, f: *mut ipFilter_t)
         }
         num[i as usize] = 0;
 
-        let num_str = std::ffi::CStr::from_bytes_until_nul(&num[..])
-            .unwrap_or_default()
-            .to_string_lossy();
+        let num_str = latin1_to_string(
+            std::ffi::CStr::from_bytes_until_nul(&num[..])
+                .unwrap_or_default()
+                .to_bytes(),
+        );
         // Oracle assigns `atoi(num)` (int) into a byte, truncating to the low 8
         // bits (e.g. "300" -> 44); `as u8` reproduces that wrap. g_svcmds.c:89.
         // `num` was hand-extracted above as a digit-only substring (the loop
@@ -294,7 +297,12 @@ pub fn Svcmd_RemoveIP_f(ctx: &mut GameContext) {
         mask: 0,
         compare: 0,
     };
-    if StringToFilter(ctx, str_cstr.as_ptr() as *mut c_char, &mut f as *mut ipFilter_t) == qfalse {
+    if StringToFilter(
+        ctx,
+        str_cstr.as_ptr() as *mut c_char,
+        &mut f as *mut ipFilter_t,
+    ) == qfalse
+    {
         return;
     }
 

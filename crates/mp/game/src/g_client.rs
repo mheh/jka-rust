@@ -20,7 +20,6 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::ai_main::BotAIShutdownClient;
-use crate::g_utils::G_Find;
 use crate::entity::flags::{FL_NO_BOTS, FL_NO_HUMANS};
 use crate::g_bot::G_RemoveQueuedBotBegin;
 use crate::g_cmds::{BroadcastTeamChange, G_SetSaber, SetTeam, StopFollowing};
@@ -29,9 +28,10 @@ use crate::g_main::{CalculateRanks, G_GetStringEdString, G_LogPrintf};
 use crate::g_saga::{G_ValidateSiegeClassForTeam, SetTeamQuick};
 use crate::g_session::{G_InitSessionData, G_ReadSessionData, G_WriteClientSessionData};
 use crate::g_team::{SelectCTFSpawnPoint, SelectSiegeSpawnPoint, TeamName};
+use crate::g_utils::G_Find;
+use crate::g_utils::G_ModelIndex;
 use crate::g_utils::{G_EntitySound, G_MuteSound, G_PlayerHasCustomSkeleton};
 use crate::prelude::*;
-use crate::g_utils::G_ModelIndex;
 use crate::q_shared::Info_SetValueForKey;
 use crate::trap;
 use crate::w_force::{WP_ForcePowerStop, WP_HasForcePowers, WP_InitForcePowers};
@@ -47,6 +47,7 @@ use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t::{
     SS_DUAL, SS_FAST, SS_STAFF, SS_STRONG,
 };
 use native_string::atoi;
+use native_string::latin1_to_string;
 use native_string::strncpyz_string;
 use native_string::Q_stricmp;
 use native_string::Q_strncpyzBytes;
@@ -602,8 +603,7 @@ pub fn SP_info_jedimaster_start(ctx: &mut GameContext, ent: EntityId) {
 
     ctx.world.entity_mut(ent).flags = FL_BOUNCE_HALF;
 
-    ctx.world.entity_mut(ent).s.modelindex =
-        G_ModelIndex(ctx, "models/weapons2/saber/saber_w.glm");
+    ctx.world.entity_mut(ent).s.modelindex = G_ModelIndex(ctx, "models/weapons2/saber/saber_w.glm");
     ctx.world.entity_mut(ent).s.modelGhoul2 = 1;
     ctx.world.entity_mut(ent).s.g2radius = 20;
     // (*ent).s.eType = ET_GENERAL;
@@ -986,8 +986,12 @@ pub fn SelectDuelSpawnPoint(
             let mut spot: *mut gentity_t = core::ptr::null_mut();
 
             loop {
-                spot =
-                    G_Find(ctx, ctx.entity_id_of(spot), EntFindField::Classname, spotName);
+                spot = G_Find(
+                    ctx,
+                    ctx.entity_id_of(spot),
+                    EntFindField::Classname,
+                    spotName,
+                );
                 if spot.is_null() {
                     break;
                 }
@@ -1594,7 +1598,7 @@ pub fn ClientCleanName(ctx: &mut GameContext, r#in: &str, outSize: c_int) -> Str
         // `outSize` as the buffer bound.
         return strncpyz_string(b"Padawan", outSize.max(0) as usize);
     }
-    String::from_utf8_lossy(&out).into_owned()
+    latin1_to_string(&out)
 }
 
 /// Raven `G_SaberModelSetup`.
@@ -1874,7 +1878,8 @@ pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboo
                 let mut team_str = "Red";
 
                 (*((*ent).client)).sess.sessionTeam = PickTeam(ctx, -1);
-                let mut userinfo = trap::GetUserinfo(ctx.engine, clientNum, MAX_INFO_STRING as usize);
+                let mut userinfo =
+                    trap::GetUserinfo(ctx.engine, clientNum, MAX_INFO_STRING as usize);
                 if (*((*ent).client)).sess.sessionTeam == TEAM_SPECTATOR {
                     (*((*ent).client)).sess.sessionTeam = TEAM_RED;
                 }
@@ -2151,21 +2156,11 @@ pub fn G_BreakArm(ctx: &mut GameContext, ent: EntityId, arm: c_int) {
     // This could be combined into a single event. But I guess limbs don't break often
     // enough to worry about it.
     let sound = G_SoundIndex(ctx, "*pain25.wav");
-    G_EntitySound(
-        ctx,
-        ent,
-        CHAN_VOICE,
-        sound,
-    );
+    G_EntitySound(ctx, ent, CHAN_VOICE, sound);
     // FIXME: A nice bone snapping sound instead if possible
     let n = ctx.world.bg_state.rng.Q_irand(1, 3);
     let sound = G_SoundIndex(ctx, &format!("sound/player/bodyfall_human{}.wav", n));
-    G_Sound(
-        ctx,
-        Some(ent),
-        CHAN_AUTO,
-        sound,
-    );
+    G_Sound(ctx, Some(ent), CHAN_AUTO, sound);
 }
 
 /// Raven `G_UpdateClientAnims`.
@@ -2418,8 +2413,7 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
                     || saber.is_empty()
                     || (*client).saber[0].model[0] == 0
                 {
-                    if G_SetSaber(ctx, ctx.entity_id_of(ent).unwrap(), l, &value, qfalse)
-                        != qfalse
+                    if G_SetSaber(ctx, ctx.entity_id_of(ent).unwrap(), l, &value, qfalse) != qfalse
                     {
                         changed_saber = qtrue;
                     } else if saber.is_empty() || (*client).saber[0].model[0] == 0 {
@@ -3410,8 +3404,7 @@ pub fn SetupGameGhoul2Model(
                 return;
             }
 
-            defSkin =
-                trap::R_RegisterSkin(ctx.engine, "models/players/kyle/model_default.skin");
+            defSkin = trap::R_RegisterSkin(ctx.engine, "models/players/kyle/model_default.skin");
             trap::G2API_SetSkin(
                 ctx.engine,
                 GG2SetSkinArgs::new(ctx.world.globals.precachedKyle, 0, defSkin, defSkin),
@@ -3595,7 +3588,7 @@ pub fn SetupGameGhoul2Model(
 
                     GLAName[0] = 0;
                     let glaName = trap::G2API_GetGLAName(ctx.engine, (*ent).ghoul2, 0, 260);
-                        write_cstr_field(&mut GLAName, &glaName);
+                    write_cstr_field(&mut GLAName, &glaName);
 
                     if GLAName[0] as c_int == 0
                         || crate::q_shared::Q_strstr(
@@ -3637,9 +3630,11 @@ pub fn SetupGameGhoul2Model(
                         if !(*ent).client.is_null() && (*((*ent).client)).NPC_class == CLASS_VEHICLE
                         {
                             // vehicles are tricky and send over their vehicle names as the model
-                            (*ent).s.modelindex = G_ModelIndex(ctx, &cstr_to_str(vehicleName.as_ptr()));
+                            (*ent).s.modelindex =
+                                G_ModelIndex(ctx, &cstr_to_str(vehicleName.as_ptr()));
                         } else {
-                            (*ent).s.modelindex = G_ModelIndex(ctx, &cstr_to_str(modelFullPath.as_ptr()));
+                            (*ent).s.modelindex =
+                                G_ModelIndex(ctx, &cstr_to_str(modelFullPath.as_ptr()));
                         }
                     }
                 }
@@ -3693,7 +3688,7 @@ pub fn SetupGameGhoul2Model(
 
             GLAName[0] = 0;
             let glaName = trap::G2API_GetGLAName(ctx.engine, (*ent).ghoul2, 0, 260);
-                write_cstr_field(&mut GLAName, &glaName);
+            write_cstr_field(&mut GLAName, &glaName);
 
             if GLAName[0] as c_int != 0
                 && crate::q_shared::Q_strstr(
@@ -3752,7 +3747,7 @@ pub fn SetupGameGhoul2Model(
         } else {
             GLAName[0] = 0;
             let glaName = trap::G2API_GetGLAName(ctx.engine, (*ent).ghoul2, 0, 260);
-                write_cstr_field(&mut GLAName, &glaName);
+            write_cstr_field(&mut GLAName, &glaName);
 
             if !crate::q_shared::Q_strstr(
                 GLAName.as_ptr(),
@@ -3776,13 +3771,19 @@ pub fn SetupGameGhoul2Model(
             i = trap::G2API_AddBolt(ctx.engine, (*ent).ghoul2, 0, "model_root");
 
             // Setup the droid unit.
-            (*((*ent).m_pVehicle)).m_iDroidUnitTag = trap::G2API_AddBolt(ctx.engine, (*ent).ghoul2, 0, "*droidunit");
+            (*((*ent).m_pVehicle)).m_iDroidUnitTag =
+                trap::G2API_AddBolt(ctx.engine, (*ent).ghoul2, 0, "*droidunit");
 
             // Setup the Exhausts.
             i = 0;
             while i < (MAX_VEHICLE_EXHAUSTS) as i32 {
                 write_cstr_field(&mut strTemp, &format!("*exhaust{}", i + 1));
-                (*((*ent).m_pVehicle)).m_iExhaustTag[i as usize] = trap::G2API_AddBolt(ctx.engine, (*ent).ghoul2, 0, &cstr_to_str(strTemp.as_ptr()));
+                (*((*ent).m_pVehicle)).m_iExhaustTag[i as usize] = trap::G2API_AddBolt(
+                    ctx.engine,
+                    (*ent).ghoul2,
+                    0,
+                    &cstr_to_str(strTemp.as_ptr()),
+                );
                 i += 1;
             }
 
@@ -3790,11 +3791,21 @@ pub fn SetupGameGhoul2Model(
             i = 0;
             while i < (MAX_VEHICLE_MUZZLES) as i32 {
                 write_cstr_field(&mut strTemp, &format!("*muzzle{}", i + 1));
-                (*((*ent).m_pVehicle)).m_iMuzzleTag[i as usize] = trap::G2API_AddBolt(ctx.engine, (*ent).ghoul2, 0, &cstr_to_str(strTemp.as_ptr()));
+                (*((*ent).m_pVehicle)).m_iMuzzleTag[i as usize] = trap::G2API_AddBolt(
+                    ctx.engine,
+                    (*ent).ghoul2,
+                    0,
+                    &cstr_to_str(strTemp.as_ptr()),
+                );
                 if (*((*ent).m_pVehicle)).m_iMuzzleTag[i as usize] == -1 {
                     // ergh, try *flash?
                     write_cstr_field(&mut strTemp, &format!("*flash{}", i + 1));
-                    (*((*ent).m_pVehicle)).m_iMuzzleTag[i as usize] = trap::G2API_AddBolt(ctx.engine, (*ent).ghoul2, 0, &cstr_to_str(strTemp.as_ptr()));
+                    (*((*ent).m_pVehicle)).m_iMuzzleTag[i as usize] = trap::G2API_AddBolt(
+                        ctx.engine,
+                        (*ent).ghoul2,
+                        0,
+                        &cstr_to_str(strTemp.as_ptr()),
+                    );
                 }
                 i += 1;
             }
@@ -3899,7 +3910,12 @@ pub fn SetupGameGhoul2Model(
                         GG2SetBoltInfoArgs::new(ctx.world.globals.g2SaberInstance, 0, 0),
                     );
                     // now set up the gun bolt on it
-                    trap::G2API_AddBolt(ctx.engine, ctx.world.globals.g2SaberInstance, 0, "*blade1");
+                    trap::G2API_AddBolt(
+                        ctx.engine,
+                        ctx.world.globals.g2SaberInstance,
+                        0,
+                        "*blade1",
+                    );
                 }
             }
 
@@ -3920,8 +3936,7 @@ pub fn SetupGameGhoul2Model(
 
         if (*ent).s.number >= (MAX_CLIENTS) as i32 {
             // some extra NPC stuff
-            if trap::G2API_AddBolt(ctx.engine, (*ent).ghoul2, 0, "lower_lumbar") == -1
-            {
+            if trap::G2API_AddBolt(ctx.engine, (*ent).ghoul2, 0, "lower_lumbar") == -1 {
                 // check now to see if we have this bone for setting anims and such
                 (*ent).noLumbar = qtrue;
             }
@@ -4088,7 +4103,8 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
                 // ok, get the first valid class for the team you're on then, I guess.
                 BG_SiegeCheckClassLegality(team, &mut className, &ctx.world.bg_state);
                 (*client).sess.siegeClass = strncpyz_string(className.as_bytes(), 64);
-                (*client).siegeClass = BG_SiegeFindClassIndexByName(&className, &ctx.world.bg_state);
+                (*client).siegeClass =
+                    BG_SiegeFindClassIndexByName(&className, &ctx.world.bg_state);
             } else {
                 // otherwise, make sure the class we are using is legal.
                 G_ValidateSiegeClassForTeam(ctx, ctx.entity_id_of(ent).unwrap(), team);

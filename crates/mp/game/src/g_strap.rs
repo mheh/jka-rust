@@ -18,6 +18,7 @@ use std::ffi::CStr;
 use std::sync::OnceLock;
 
 use mp_engine_select::Engine;
+use native_string::latin1_to_string;
 
 use crate::prelude::*;
 
@@ -189,7 +190,7 @@ pub fn strap_G2API_SetBoneAngles(
     currentTime: c_int,
 ) -> qboolean {
     // ctx-less bg-boundary wrapper; engine via the seam cell.
-    let bone = unsafe { CStr::from_ptr(boneName) }.to_string_lossy();
+    let bone = latin1_to_string(unsafe { CStr::from_ptr(boneName) }.to_bytes());
     (crate::trap::G2API_SetBoneAngles(
         strap_engine(),
         ghoul2,
@@ -222,7 +223,7 @@ pub fn strap_G2API_SetBoneAnim(
     blendTime: c_int,
 ) -> qboolean {
     // ctx-less bg-boundary wrapper; engine via the seam cell.
-    let bone = unsafe { CStr::from_ptr(boneName) }.to_string_lossy();
+    let bone = latin1_to_string(unsafe { CStr::from_ptr(boneName) }.to_bytes());
     (crate::trap::G2API_SetBoneAnim(
         strap_engine(),
         ghoul2,
@@ -254,7 +255,7 @@ pub fn strap_G2API_GetBoneAnim(
     modelIndex: c_int,
 ) -> qboolean {
     // ctx-less bg-boundary wrapper; engine via the seam cell.
-    let bone = unsafe { CStr::from_ptr(boneName) }.to_string_lossy();
+    let bone = latin1_to_string(unsafe { CStr::from_ptr(boneName) }.to_bytes());
     (crate::trap::G2API_GetBoneAnim(
         strap_engine(),
         ghoul2,
@@ -313,7 +314,9 @@ pub fn strap_G2API_SetBoneIKState(
     let bone = if boneName.is_null() {
         None
     } else {
-        Some(unsafe { CStr::from_ptr(boneName) }.to_string_lossy())
+        Some(latin1_to_string(
+            unsafe { CStr::from_ptr(boneName) }.to_bytes(),
+        ))
     };
     (crate::trap::G2API_SetBoneIKState(
         strap_engine(),

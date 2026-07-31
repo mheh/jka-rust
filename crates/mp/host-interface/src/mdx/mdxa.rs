@@ -6,6 +6,7 @@ use core::ffi::c_void;
 use core::slice;
 
 use mp_qshared::shared::{mdxaBone_t, MAX_QPATH};
+use native_string::latin1_to_string;
 
 // mdxaHeader_t offsets (`mdx_format.h:351-371`). MAX_QPATH == 64.
 const OFS_NUM_FRAMES: usize = 4 + 4 + MAX_QPATH + 4; // ident,version,name[],fScale
@@ -34,7 +35,11 @@ fn read_bone(b: &[u8], off: usize) -> mdxaBone_t {
     let mut m = [[0.0f32; 4]; 3];
     for (r, row) in m.iter_mut().enumerate() {
         for (c, v) in row.iter_mut().enumerate() {
-            *v = f32::from_le_bytes(b[off + (r * 4 + c) * 4..off + (r * 4 + c) * 4 + 4].try_into().unwrap());
+            *v = f32::from_le_bytes(
+                b[off + (r * 4 + c) * 4..off + (r * 4 + c) * 4 + 4]
+                    .try_into()
+                    .unwrap(),
+            );
         }
     }
     mdxaBone_t { matrix: m }
@@ -53,7 +58,9 @@ impl<'a> MdxaView<'a> {
     pub unsafe fn from_block(ptr: *const c_void) -> Self {
         let base = ptr as *const u8;
         let ofs_end = unsafe { base.add(OFS_END).cast::<i32>().read_unaligned() };
-        Self { bytes: unsafe { slice::from_raw_parts(base, ofs_end as usize) } }
+        Self {
+            bytes: unsafe { slice::from_raw_parts(base, ofs_end as usize) },
+        }
     }
 
     /// `mdxaHeader_t->numFrames`.
@@ -77,7 +84,9 @@ impl<'a> MdxaView<'a> {
     /// `header + sizeof(mdxaHeader_t)` (`mdx_format.h:376-379`).
     pub fn skel(&self, i: i32) -> MdxaSkelView<'a> {
         let rel = read_i32(self.bytes, HEADER_SIZE + i as usize * 4);
-        MdxaSkelView { bytes: &self.bytes[HEADER_SIZE + rel as usize..] }
+        MdxaSkelView {
+            bytes: &self.bytes[HEADER_SIZE + rel as usize..],
+        }
     }
 
     /// `G2_GetBonePoolIndex` — the compressed-bone pool index for
@@ -107,7 +116,10 @@ pub struct MdxaSkelView<'a> {
 
 impl<'a> MdxaSkelView<'a> {
     fn name_bytes(&self) -> &'a [u8] {
-        let n = self.bytes[..MAX_QPATH].iter().position(|&b| b == 0).unwrap_or(MAX_QPATH);
+        let n = self.bytes[..MAX_QPATH]
+            .iter()
+            .position(|&b| b == 0)
+            .unwrap_or(MAX_QPATH);
         &self.bytes[..n]
     }
 
@@ -116,9 +128,9 @@ impl<'a> MdxaSkelView<'a> {
         self.name_bytes().eq_ignore_ascii_case(name.as_bytes())
     }
 
-    /// `skel->name` (`CStr::to_string_lossy` equivalent).
+    /// `skel->name`, decoded from Latin-1.
     pub fn name_lossy(&self) -> String {
-        String::from_utf8_lossy(self.name_bytes()).into_owned()
+        latin1_to_string(self.name_bytes())
     }
 
     /// `skel->parent`.
@@ -287,13 +299,17 @@ impl<'a> MdxaRef<'a> {
     pub fn frame_bone_pool_index(&self, frame: i32, bone: i32) -> i32 {
         let num_bones = self.parsed.num_bones;
         let ofs = (frame * num_bones * 3) + (bone * 3);
-        read_i32(self.view.bytes, self.parsed.ofs_frames as usize + ofs as usize) & 0x00FF_FFFF
+        read_i32(
+            self.view.bytes,
+            self.parsed.ofs_frames as usize + ofs as usize,
+        ) & 0x00FF_FFFF
     }
 
     /// The 14-byte `mdxaCompQuatBone_t` at `pool_index` (per-frame bulk read off
     /// `view` with the parsed `ofsCompBonePool`).
     pub fn comp_bone(&self, pool_index: i32) -> &'a [u8] {
-        let start = self.parsed.ofs_comp_bone_pool as usize + pool_index as usize * COMP_QUAT_BONE_SIZE;
+        let start =
+            self.parsed.ofs_comp_bone_pool as usize + pool_index as usize * COMP_QUAT_BONE_SIZE;
         &self.view.bytes[start..start + COMP_QUAT_BONE_SIZE]
     }
 }
@@ -303,7 +319,12 @@ mod tests {
     use super::*;
 
     /// Header + one-entry offset table + one skel (name/parent/basepose).
-    fn one_bone_mdxa(num_frames: i32, name: &str, base: mdxaBone_t, base_inv: mdxaBone_t) -> Vec<u8> {
+    fn one_bone_mdxa(
+        num_frames: i32,
+        name: &str,
+        base: mdxaBone_t,
+        base_inv: mdxaBone_t,
+    ) -> Vec<u8> {
         let mut buf = vec![0u8; HEADER_SIZE];
         buf[OFS_NUM_FRAMES..OFS_NUM_FRAMES + 4].copy_from_slice(&num_frames.to_le_bytes());
         buf[OFS_NUM_BONES..OFS_NUM_BONES + 4].copy_from_slice(&1i32.to_le_bytes());
@@ -332,8 +353,20 @@ mod tests {
 
     #[test]
     fn reads_match_layout() {
-        let base = mdxaBone_t { matrix: [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0]] };
-        let base_inv = mdxaBone_t { matrix: [[21.0, 22.0, 23.0, 24.0], [25.0, 26.0, 27.0, 28.0], [29.0, 30.0, 31.0, 32.0]] };
+        let base = mdxaBone_t {
+            matrix: [
+                [1.0, 2.0, 3.0, 4.0],
+                [5.0, 6.0, 7.0, 8.0],
+                [9.0, 10.0, 11.0, 12.0],
+            ],
+        };
+        let base_inv = mdxaBone_t {
+            matrix: [
+                [21.0, 22.0, 23.0, 24.0],
+                [25.0, 26.0, 27.0, 28.0],
+                [29.0, 30.0, 31.0, 32.0],
+            ],
+        };
         let buf = one_bone_mdxa(42, "Pelvis", base, base_inv);
         let v = unsafe { MdxaView::from_block(buf.as_ptr() as *const c_void) };
         assert_eq!(v.num_frames(), 42);
@@ -349,12 +382,27 @@ mod tests {
 
     #[test]
     fn parsed_and_ref_match_the_view() {
-        let base = mdxaBone_t { matrix: [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0]] };
-        let base_inv = mdxaBone_t { matrix: [[21.0, 22.0, 23.0, 24.0], [25.0, 26.0, 27.0, 28.0], [29.0, 30.0, 31.0, 32.0]] };
+        let base = mdxaBone_t {
+            matrix: [
+                [1.0, 2.0, 3.0, 4.0],
+                [5.0, 6.0, 7.0, 8.0],
+                [9.0, 10.0, 11.0, 12.0],
+            ],
+        };
+        let base_inv = mdxaBone_t {
+            matrix: [
+                [21.0, 22.0, 23.0, 24.0],
+                [25.0, 26.0, 27.0, 28.0],
+                [29.0, 30.0, 31.0, 32.0],
+            ],
+        };
         let buf = one_bone_mdxa(42, "Pelvis", base, base_inv);
         let view = unsafe { MdxaView::from_block(buf.as_ptr() as *const c_void) };
         let parsed = MdxaParsed::parse(view);
-        let r = MdxaRef { parsed: &parsed, view };
+        let r = MdxaRef {
+            parsed: &parsed,
+            view,
+        };
         assert_eq!(r.num_frames(), 42);
         assert_eq!(r.num_bones(), 1);
         let skel = r.skel(0);

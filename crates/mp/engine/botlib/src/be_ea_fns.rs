@@ -10,6 +10,8 @@
 use core::ffi::{c_char, c_int, c_ulong};
 use std::ffi::{CStr, CString};
 
+use native_string::latin1_to_string;
+
 use mp_qshared::common::mp::botlib::action::{
     ACTION_ALT_ATTACK, ACTION_ATTACK, ACTION_CROUCH, ACTION_DELAYEDJUMP, ACTION_FORCEPOWER,
     ACTION_GESTURE, ACTION_JUMP, ACTION_MOVEBACK, ACTION_MOVEDOWN, ACTION_MOVEFORWARD,
@@ -32,8 +34,11 @@ use mp_engine_qcommon::common_fns::Com_Memcpy;
 /// Source: `oracle/codemp/botlib/be_ea.cpp:35-38`
 pub fn EA_Say(bot: &mut BotLib, client: c_int, str: *mut c_char) {
     unsafe {
-        let command_c =
-            CString::new(format!("say {}", CStr::from_ptr(str).to_string_lossy())).unwrap_or_default();
+        let command_c = CString::new(format!(
+            "say {}",
+            latin1_to_string(CStr::from_ptr(str).to_bytes())
+        ))
+        .unwrap_or_default();
         bot.botimport.BotClientCommand.unwrap()(client, command_c.as_ptr() as *mut c_char);
     }
 }
@@ -43,8 +48,11 @@ pub fn EA_Say(bot: &mut BotLib, client: c_int, str: *mut c_char) {
 /// Source: `oracle/codemp/botlib/be_ea.cpp:45-48`
 pub fn EA_SayTeam(bot: &mut BotLib, client: c_int, str: *mut c_char) {
     unsafe {
-        let command_c = CString::new(format!("say_team {}", CStr::from_ptr(str).to_string_lossy()))
-            .unwrap_or_default();
+        let command_c = CString::new(format!(
+            "say_team {}",
+            latin1_to_string(CStr::from_ptr(str).to_bytes())
+        ))
+        .unwrap_or_default();
         bot.botimport.BotClientCommand.unwrap()(client, command_c.as_ptr() as *mut c_char);
     }
 }
@@ -54,9 +62,12 @@ pub fn EA_SayTeam(bot: &mut BotLib, client: c_int, str: *mut c_char) {
 /// Source: `oracle/codemp/botlib/be_ea.cpp:55-58`
 pub fn EA_Tell(bot: &mut BotLib, client: c_int, clientto: c_int, str: *mut c_char) {
     unsafe {
-        let command_c =
-            CString::new(format!("tell {}, {}", clientto, CStr::from_ptr(str).to_string_lossy()))
-                .unwrap_or_default();
+        let command_c = CString::new(format!(
+            "tell {}, {}",
+            clientto,
+            latin1_to_string(CStr::from_ptr(str).to_bytes())
+        ))
+        .unwrap_or_default();
         bot.botimport.BotClientCommand.unwrap()(client, command_c.as_ptr() as *mut c_char);
     }
 }
@@ -66,8 +77,11 @@ pub fn EA_Tell(bot: &mut BotLib, client: c_int, clientto: c_int, str: *mut c_cha
 /// Source: `oracle/codemp/botlib/be_ea.cpp:65-68`
 pub fn EA_UseItem(bot: &mut BotLib, client: c_int, it: *mut c_char) {
     unsafe {
-        let command_c =
-            CString::new(format!("use {}", CStr::from_ptr(it).to_string_lossy())).unwrap_or_default();
+        let command_c = CString::new(format!(
+            "use {}",
+            latin1_to_string(CStr::from_ptr(it).to_bytes())
+        ))
+        .unwrap_or_default();
         bot.botimport.BotClientCommand.unwrap()(client, command_c.as_ptr() as *mut c_char);
     }
 }
@@ -77,8 +91,11 @@ pub fn EA_UseItem(bot: &mut BotLib, client: c_int, it: *mut c_char) {
 /// Source: `oracle/codemp/botlib/be_ea.cpp:75-78`
 pub fn EA_DropItem(bot: &mut BotLib, client: c_int, it: *mut c_char) {
     unsafe {
-        let command_c = CString::new(format!("drop {}", CStr::from_ptr(it).to_string_lossy()))
-            .unwrap_or_default();
+        let command_c = CString::new(format!(
+            "drop {}",
+            latin1_to_string(CStr::from_ptr(it).to_bytes())
+        ))
+        .unwrap_or_default();
         bot.botimport.BotClientCommand.unwrap()(client, command_c.as_ptr() as *mut c_char);
     }
 }
@@ -88,8 +105,11 @@ pub fn EA_DropItem(bot: &mut BotLib, client: c_int, it: *mut c_char) {
 /// Source: `oracle/codemp/botlib/be_ea.cpp:85-88`
 pub fn EA_UseInv(bot: &mut BotLib, client: c_int, inv: *mut c_char) {
     unsafe {
-        let command_c = CString::new(format!("invuse {}", CStr::from_ptr(inv).to_string_lossy()))
-            .unwrap_or_default();
+        let command_c = CString::new(format!(
+            "invuse {}",
+            latin1_to_string(CStr::from_ptr(inv).to_bytes())
+        ))
+        .unwrap_or_default();
         bot.botimport.BotClientCommand.unwrap()(client, command_c.as_ptr() as *mut c_char);
     }
 }
@@ -99,8 +119,11 @@ pub fn EA_UseInv(bot: &mut BotLib, client: c_int, inv: *mut c_char) {
 /// Source: `oracle/codemp/botlib/be_ea.cpp:95-98`
 pub fn EA_DropInv(bot: &mut BotLib, client: c_int, inv: *mut c_char) {
     unsafe {
-        let command_c = CString::new(format!("invdrop {}", CStr::from_ptr(inv).to_string_lossy()))
-            .unwrap_or_default();
+        let command_c = CString::new(format!(
+            "invdrop {}",
+            latin1_to_string(CStr::from_ptr(inv).to_bytes())
+        ))
+        .unwrap_or_default();
         bot.botimport.BotClientCommand.unwrap()(client, command_c.as_ptr() as *mut c_char);
     }
 }

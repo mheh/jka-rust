@@ -1134,9 +1134,8 @@ impl DisplayContext for HarnessDc<'_> {
         );
         // SAFETY: `PC_SourceFileAndLine` NUL-terminates `buf` on success, and
         // `buf` was zero-filled, so a failure leaves a valid empty C string.
-        let filename = unsafe { CStr::from_ptr(buf.as_ptr() as *const c_char) }
-            .to_string_lossy()
-            .into_owned();
+        let filename =
+            latin1_to_string(unsafe { CStr::from_ptr(buf.as_ptr() as *const c_char) }.to_bytes());
         (status, filename, line)
     }
 

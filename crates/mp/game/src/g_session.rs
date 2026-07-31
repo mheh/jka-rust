@@ -12,6 +12,7 @@ use crate::g_main::{G_PowerDuelCount, G_Printf};
 use crate::prelude::*;
 use mp_bg::public::duel_team::duelTeam_t::*;
 use native_string::atoi;
+use native_string::latin1_to_string;
 use native_string::strncpyz_string;
 
 /// Raven `G_WriteClientSessionData`.
@@ -55,12 +56,11 @@ pub fn G_WriteClientSessionData(ctx: &mut GameContext, client: usize) {
         }
     }
 
-    // Only ' '(0x20) -> 0x01 was substituted, so the bytes stay valid UTF-8;
-    // the lossy decode is an identity round-trip that keeps the cvar bytes
-    // byte-identical to Raven's `%s`.
-    let siege_class_str = String::from_utf8_lossy(&siege_class);
-    let saber_type_str = String::from_utf8_lossy(&saber_type);
-    let saber2_type_str = String::from_utf8_lossy(&saber2_type);
+    // Space (0x20) becomes 0x01 so the space-separated session cvar parses. The
+    // Latin-1 decode keeps every byte, so the cvar text matches Raven's `%s`.
+    let siege_class_str = latin1_to_string(&siege_class);
+    let saber_type_str = latin1_to_string(&saber_type);
+    let saber2_type_str = latin1_to_string(&saber2_type);
 
     // `client - level.clients` recomputes to the client index `client` (both
     // alias `world.clients`), so the session cvar name uses it directly.

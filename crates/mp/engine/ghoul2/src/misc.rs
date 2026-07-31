@@ -157,6 +157,7 @@
 //! (`G2_API.cpp:282,312,359,2714`) to `register_model`.
 
 use mp_host_interface::EngineHost;
+use native_string::latin1_to_string;
 use mp_qshared::shared::q_math::{
     Create_Matrix, Inverse_Matrix, TransformAndTranslatePoint, TransformPoint, _DotProduct,
     _VectorAdd, _VectorMA, _VectorScale, _VectorSubtract, CrossProduct, VectorLength,
@@ -1704,7 +1705,7 @@ pub fn g2_load_ghoul2_model(
         let name_bytes = &buffer[pos..pos + MAX_QPATH];
         pos += MAX_QPATH;
         let end = name_bytes.iter().position(|&b| b == 0).unwrap_or(MAX_QPATH);
-        let file_name = String::from_utf8_lossy(&name_bytes[..end]).into_owned();
+        let file_name = latin1_to_string(&name_bytes[..end]);
         let anim_frame_default = read_i32_seq(buffer, &mut pos);
         let skel_frame_num = read_i32_seq(buffer, &mut pos);
         let mesh_frame_num = read_i32_seq(buffer, &mut pos);

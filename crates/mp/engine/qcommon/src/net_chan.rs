@@ -7,6 +7,8 @@
 
 use core::ffi::{c_char, c_int};
 
+use native_string::latin1_to_string;
+
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;
 use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
@@ -219,7 +221,7 @@ pub fn NET_SendPacket(
 /// Source: `oracle/codemp/qcommon/net_chan.cpp:617-656`
 pub fn NET_StringToAdr(s: *const c_char, a: *mut netadr_t) -> qboolean {
     unsafe {
-        let s_str = core::ffi::CStr::from_ptr(s).to_string_lossy().into_owned();
+        let s_str = latin1_to_string(core::ffi::CStr::from_ptr(s).to_bytes());
 
         if s_str == "localhost" {
             crate::common_fns::Com_Memset(a as *mut (), 0, core::mem::size_of::<netadr_t>());
@@ -705,9 +707,7 @@ pub fn Netchan_Process(common: &mut Common, chan: *mut netchan_t, msg: *mut msg_
         if sequence <= (*chan).incomingSequence {
             if common.showdrop != 0 || common.showpackets != 0 {
                 let adr = NET_AdrToString(common, (*chan).remoteAddress);
-                let adr_str = core::ffi::CStr::from_ptr(adr)
-                    .to_string_lossy()
-                    .into_owned();
+                let adr_str = latin1_to_string(core::ffi::CStr::from_ptr(adr).to_bytes());
                 crate::common::common::com_printf(
                     common,
                     &format!(
@@ -727,9 +727,7 @@ pub fn Netchan_Process(common: &mut Common, chan: *mut netchan_t, msg: *mut msg_
         (*chan).dropped = sequence - ((*chan).incomingSequence + 1);
         if (*chan).dropped > 0 && (common.showdrop != 0 || common.showpackets != 0) {
             let adr = NET_AdrToString(common, (*chan).remoteAddress);
-            let adr_str = core::ffi::CStr::from_ptr(adr)
-                .to_string_lossy()
-                .into_owned();
+            let adr_str = latin1_to_string(core::ffi::CStr::from_ptr(adr).to_bytes());
             crate::common::common::com_printf(
                 common,
                 &format!(
@@ -756,9 +754,7 @@ pub fn Netchan_Process(common: &mut Common, chan: *mut netchan_t, msg: *mut msg_
             if fragment_start != (*chan).fragmentLength {
                 if common.showdrop != 0 || common.showpackets != 0 {
                     let adr = NET_AdrToString(common, (*chan).remoteAddress);
-                    let adr_str = core::ffi::CStr::from_ptr(adr)
-                        .to_string_lossy()
-                        .into_owned();
+                    let adr_str = latin1_to_string(core::ffi::CStr::from_ptr(adr).to_bytes());
                     crate::common::common::com_printf(
                         common,
                         &format!("{}:Dropped a message fragment\n", adr_str),
@@ -777,9 +773,7 @@ pub fn Netchan_Process(common: &mut Common, chan: *mut netchan_t, msg: *mut msg_
             {
                 if common.showdrop != 0 || common.showpackets != 0 {
                     let adr = NET_AdrToString(common, (*chan).remoteAddress);
-                    let adr_str = core::ffi::CStr::from_ptr(adr)
-                        .to_string_lossy()
-                        .into_owned();
+                    let adr_str = latin1_to_string(core::ffi::CStr::from_ptr(adr).to_bytes());
                     crate::common::common::com_printf(
                         common,
                         &format!("{}:illegal fragment length\n", adr_str),
@@ -806,9 +800,7 @@ pub fn Netchan_Process(common: &mut Common, chan: *mut netchan_t, msg: *mut msg_
 
             if (*chan).fragmentLength + 4 > (*msg).maxsize {
                 let adr = NET_AdrToString(common, (*chan).remoteAddress);
-                let adr_str = core::ffi::CStr::from_ptr(adr)
-                    .to_string_lossy()
-                    .into_owned();
+                let adr_str = latin1_to_string(core::ffi::CStr::from_ptr(adr).to_bytes());
                 crate::common::common::com_printf(
                     common,
                     &format!(

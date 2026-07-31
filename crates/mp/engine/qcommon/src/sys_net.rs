@@ -17,6 +17,8 @@
 
 use core::ffi::c_int;
 
+use native_string::latin1_to_string;
+
 use native_platform::net::{
     ip_socket, ipx_socket, net_collect_local_addresses, net_ip_socket, net_is_lan_ip, net_recvfrom,
     net_select_sleep, net_sendto, set_ip_socket, NetRecvResult,
@@ -38,7 +40,7 @@ use crate::qcommon::protocol::PORT_SERVER;
 /// (which reborrows `Common`) does not alias the buffer.
 fn adr_to_string(common: &mut Common, a: netadr_t) -> String {
     let p = NET_AdrToString(common, a);
-    unsafe { core::ffi::CStr::from_ptr(p).to_string_lossy().into_owned() }
+    unsafe { latin1_to_string(core::ffi::CStr::from_ptr(p).to_bytes()) }
 }
 
 /// Raven `Sys_StringToAdr` (unix) — `Sys_StringToSockaddr` (dotted-quad or DNS

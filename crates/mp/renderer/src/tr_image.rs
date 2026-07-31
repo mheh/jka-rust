@@ -23,6 +23,7 @@ use mp_qshared::shared::q_color::{S_COLOR_RED, S_COLOR_YELLOW};
 use mp_qshared::shared::q_string::COM_StripExtension;
 use mp_qshared::shared::{fileHandle_t, qhandle_t, MAX_QPATH};
 use native_math::qmath::Com_Clamp;
+use native_string::latin1_to_string;
 use native_string::q_string::Q_stricmp;
 use zune_jpeg::zune_core::bytestream::ZCursor;
 use zune_jpeg::zune_core::colorspace::ColorSpace;
@@ -2945,7 +2946,7 @@ pub fn RE_RegisterIndividualSkin(
         }
 
         let shader = R_FindShader(
-            &String::from_utf8_lossy(&token),
+            &latin1_to_string(&token),
             &lightmapsNone,
             &stylesDefault,
             true,
@@ -2967,7 +2968,7 @@ pub fn RE_RegisterIndividualSkin(
             .expect("checked above; nothing below vacates the skin arena")
             .surfaces
             .push(SkinSurface {
-                name: String::from_utf8_lossy(&surf_name).into_owned(),
+                name: latin1_to_string(&surf_name),
                 shader,
             });
     }

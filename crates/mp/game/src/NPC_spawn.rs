@@ -25,21 +25,22 @@
 //! parity rests on the compile + golden suite.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::prelude::*;
 use crate::g_utils::G_ModelIndex;
+use crate::prelude::*;
 // Dedupe SVF_NOCLIENT glob ambiguity (g_items::* / g_public_consts::* both
 // define it): the canonical home is g_public_consts, per house convention.
 use crate::ent_fn_enums::dispatch_die;
 use crate::g_ICARUScb::G_DebugPrint;
 use crate::g_ICARUScb::Q3_SetParm;
 use crate::g_public_consts::SVF_NOCLIENT;
+use crate::q_shared;
 use crate::NPC_stats::TeamTable;
 use mp_qshared::common::mp::gentity::BSET_FIRST;
 use native_string::atoi_bytes;
+use native_string::latin1_to_string;
+use native_string::strncpyz_string;
 use native_string::Q_stricmp;
 use native_string::Q_strncmp;
-use native_string::strncpyz_string;
-use crate::q_shared;
 
 // Unported types referenced in this file (need porting before this compiles):
 // PAIN_FUNC, TOUCH_FUNC
@@ -910,7 +911,9 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
                 let droid_npc_type = if !model2.is_empty() {
                     Some(model2)
                 } else if !(*(*veh).m_pVehicleInfo).droidNPC.is_null() {
-                    Some(cstr_to_str((*(*veh).m_pVehicleInfo).droidNPC as *const c_char))
+                    Some(cstr_to_str(
+                        (*(*veh).m_pVehicleInfo).droidNPC as *const c_char,
+                    ))
                 } else {
                     None
                 };
@@ -925,8 +928,7 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
                             "r5d2".to_string()
                         };
                     }
-                    let droid_ent =
-                        NPC_SpawnType(ctx, Some(ent), &droid_npc_type_s, None, qfalse);
+                    let droid_ent = NPC_SpawnType(ctx, Some(ent), &droid_npc_type_s, None, qfalse);
                     if !droid_ent.is_null() {
                         if !(*droid_ent).client.is_null() {
                             let ent_number = ctx.world.entity(ent).s.number;
@@ -1073,12 +1075,10 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         newent = ctx.entity_mut(__teid16);
 
         if newent.is_null() {
-            crate::g_main::Com_Printf(
-                &format!(
-                    "{}ERROR: NPC G_Spawn failed\n",
-                    S_COLOR_RED.to_string_lossy()
-                ),
-            );
+            crate::g_main::Com_Printf(&format!(
+                "{}ERROR: NPC G_Spawn failed\n",
+                latin1_to_string(S_COLOR_RED.to_bytes())
+            ));
             return core::ptr::null_mut();
         }
 
@@ -1087,12 +1087,10 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
 
         (*newent).NPC = New_NPC_t(ctx, (*newent).s.number);
         if (*newent).NPC.is_null() {
-            crate::g_main::Com_Printf(
-                &format!(
-                    "{}ERROR: NPC G_Alloc NPC failed\n",
-                    S_COLOR_RED.to_string_lossy()
-                ),
-            );
+            crate::g_main::Com_Printf(&format!(
+                "{}ERROR: NPC G_Alloc NPC failed\n",
+                latin1_to_string(S_COLOR_RED.to_bytes())
+            ));
             // Raven: goto finish; (unreachable `return NULL;` right after — the
             // goto always wins). Preserve control-flow, not shape (§C10).
             if (*ent).spawnflags & NSF_DROP_TO_FLOOR != 0 {
@@ -1119,17 +1117,18 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
             ctx.world.g_entities.as_mut_ptr(),
             (*((*newent).NPC)).tempGoal,
         );
-        ctx.ent_set(ctx.entity_id_of(temp_goal).unwrap(), PrefixSet::ClassnameStatic(c"NPC_goal"));
+        ctx.ent_set(
+            ctx.entity_id_of(temp_goal).unwrap(),
+            PrefixSet::ClassnameStatic(c"NPC_goal"),
+        );
         (*temp_goal).parent = Some(ent_id(ctx.world.g_entities.as_mut_ptr(), newent));
         (*temp_goal).r.svFlags |= SVF_NOCLIENT;
 
         if (*newent).client.is_null() {
-            crate::g_main::Com_Printf(
-                &format!(
-                    "{}ERROR: NPC BG_Alloc client failed\n",
-                    S_COLOR_RED.to_string_lossy()
-                ),
-            );
+            crate::g_main::Com_Printf(&format!(
+                "{}ERROR: NPC BG_Alloc client failed\n",
+                latin1_to_string(S_COLOR_RED.to_bytes())
+            ));
             if (*ent).spawnflags & NSF_DROP_TO_FLOOR != 0 {
                 crate::g_utils::G_SetOrigin(&mut *(ent), save_org);
             }
@@ -1229,13 +1228,11 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
                     );
                 }
                 _ => {
-                    crate::g_main::Com_Printf(
-                        &format!(
-                            "{} ERROR: Couldn't spawn NPC {}\n",
-                            S_COLOR_RED.to_string_lossy(),
-                            (*ent).NPC_type.as_deref().unwrap_or("")
-                        ),
-                    );
+                    crate::g_main::Com_Printf(&format!(
+                        "{} ERROR: Couldn't spawn NPC {}\n",
+                        latin1_to_string(S_COLOR_RED.to_bytes()),
+                        (*ent).NPC_type.as_deref().unwrap_or("")
+                    ));
                     crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(newent));
                     crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(ent));
                     return core::ptr::null_mut();
@@ -1284,19 +1281,14 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         crate::q_math::_VectorCopy((*ent).s.origin, &mut (*newent).r.currentOrigin);
         crate::g_utils::G_SetOrigin(&mut *(newent), (*ent).s.origin);
         let npc_type_owned = (*ent).NPC_type.clone().unwrap_or_default();
-        if crate::NPC_stats::NPC_ParseParms(
-            ctx,
-            &npc_type_owned,
-            ctx.entity_id_of(newent).unwrap(),
-        ) == qfalse
+        if crate::NPC_stats::NPC_ParseParms(ctx, &npc_type_owned, ctx.entity_id_of(newent).unwrap())
+            == qfalse
         {
-            crate::g_main::Com_Printf(
-                &format!(
-                    "{} ERROR: Couldn't spawn NPC {}\n",
-                    S_COLOR_RED.to_string_lossy(),
-                    npc_type_owned
-                ),
-            );
+            crate::g_main::Com_Printf(&format!(
+                "{} ERROR: Couldn't spawn NPC {}\n",
+                latin1_to_string(S_COLOR_RED.to_bytes()),
+                npc_type_owned
+            ));
             crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(newent));
             crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return core::ptr::null_mut();
@@ -2861,9 +2853,7 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
 
     if name.is_empty() {
         Com_Printf("Error, Expected:\n");
-        Com_Printf(
-            "NPC kill '[NPC targetname]' - kills NPCs with certain targetname\n",
-        );
+        Com_Printf("NPC kill '[NPC targetname]' - kills NPCs with certain targetname\n");
         Com_Printf("or\n");
         Com_Printf("NPC kill 'all' - kills all NPCs\n");
         Com_Printf("or\n");
@@ -2876,9 +2866,7 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
         name = strncpyz_string(arg3.as_bytes(), 1024);
 
         if name.is_empty() {
-            Com_Printf(
-                "NPC_Kill Error: 'npc kill team' requires a team name!\n",
-            );
+            Com_Printf("NPC_Kill Error: 'npc kill team' requires a team name!\n");
             Com_Printf("Valid team names are:\n");
             for n in (TEAM_FREE + 1)..TEAM_NUM_TEAMS {
                 // Raven `TeamNames[]` (NPC_stats.c:133) — the NPC team_t names.
@@ -2895,9 +2883,7 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
                 GetIDForString(TeamTable.as_ptr() as *mut stringID_table_t, &name) as team_t;
 
             if kill_team == TEAM_FREE {
-                Com_Printf(
-                    &format!("NPC_Kill Error: team '{}' not recognized\n", name),
-                );
+                Com_Printf(&format!("NPC_Kill Error: team '{}' not recognized\n", name));
                 Com_Printf("Valid team names are:\n");
                 for n in (TEAM_FREE + 1)..TEAM_NUM_TEAMS {
                     // Raven `TeamNames[]` (NPC_stats.c:133) — the NPC team_t names.
@@ -2923,13 +2909,11 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
         if kill_non_sf != 0 {
             if !player.client.is_null() {
                 if unsafe { (*(player.client)).playerTeam } != NPCTEAM_PLAYER {
-                    Com_Printf(
-                        &format!(
-                            "Killing NPC {} named {}\n",
-                            player.NPC_type.as_deref().unwrap_or(""),
-                            player.targetname_str().unwrap_or_default()
-                        ),
-                    );
+                    Com_Printf(&format!(
+                        "Killing NPC {} named {}\n",
+                        player.NPC_type.as_deref().unwrap_or(""),
+                        player.targetname_str().unwrap_or_default()
+                    ));
                     player.health = 0;
 
                     if let Some(die_fn) = player.die.get() {
@@ -2952,13 +2936,11 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
                 && !player.classname_str().is_empty()
                 && Q_stricmp("NPC_starfleet", &player.classname_str()) != 0
             {
-                Com_Printf(
-                    &format!(
-                        "Removing NPC spawner {} with NPC named {}\n",
-                        player.NPC_type.as_deref().unwrap_or(""),
-                        player.NPC_targetname.clone()
-                    ),
-                );
+                Com_Printf(&format!(
+                    "Removing NPC spawner {} with NPC named {}\n",
+                    player.NPC_type.as_deref().unwrap_or(""),
+                    player.NPC_targetname.clone()
+                ));
                 // STAGE-1: raw pointer cast ends the `player` borrow before
                 // re-entering `ctx` (Stage-2 debt).
                 let player_ptr = player as *mut gentity_t;
@@ -2967,13 +2949,11 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
         } else if !player.NPC.is_null() && !player.client.is_null() {
             if kill_team != TEAM_FREE {
                 if unsafe { (*(player.client)).playerTeam } == kill_team {
-                    Com_Printf(
-                        &format!(
-                            "Killing NPC {} named {}\n",
-                            player.NPC_type.as_deref().unwrap_or(""),
-                            player.targetname_str().unwrap_or_default()
-                        ),
-                    );
+                    Com_Printf(&format!(
+                        "Killing NPC {} named {}\n",
+                        player.NPC_type.as_deref().unwrap_or(""),
+                        player.targetname_str().unwrap_or_default()
+                    ));
                     player.health = 0;
                     if let Some(die_fn) = player.die.get() {
                         let health = unsafe { (*(player.client)).pers.maxHealth };
@@ -2989,17 +2969,17 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
                         );
                     }
                 }
-            } else if player.targetname_str().as_deref().is_some_and(|tn| {
-                Q_stricmp(&name, tn) == 0
-            }) || Q_stricmp("all", &name) == 0
+            } else if player
+                .targetname_str()
+                .as_deref()
+                .is_some_and(|tn| Q_stricmp(&name, tn) == 0)
+                || Q_stricmp("all", &name) == 0
             {
-                Com_Printf(
-                    &format!(
-                        "Killing NPC {} named {}\n",
-                        player.NPC_type.as_deref().unwrap_or(""),
-                        player.targetname_str().unwrap_or_default()
-                    ),
-                );
+                Com_Printf(&format!(
+                    "Killing NPC {} named {}\n",
+                    player.NPC_type.as_deref().unwrap_or(""),
+                    player.targetname_str().unwrap_or_default()
+                ));
                 player.health = 0;
                 unsafe {
                     (*(player.client)).ps.stats[STAT_HEALTH as usize] = 0;
@@ -3033,13 +3013,9 @@ pub fn Cmd_NPC_f(ctx: &mut GameContext, ent: EntityId) {
     if cmd.is_empty() {
         Com_Printf("Valid NPC commands are:\n");
         Com_Printf(" spawn [NPC type (from NCPCs.cfg)]\n");
-        Com_Printf(
-            " kill [NPC targetname] or [all(kills all NPCs)] or 'team [teamname]'\n",
-        );
+        Com_Printf(" kill [NPC targetname] or [all(kills all NPCs)] or 'team [teamname]'\n");
         Com_Printf(" showbounds (draws exact bounding boxes of NPCs)\n");
-        Com_Printf(
-            " score [NPC targetname] (prints number of kills per NPC)\n",
-        );
+        Com_Printf(" score [NPC targetname] (prints number of kills per NPC)\n");
     } else if Q_stricmp("spawn", &cmd) == 0 {
         NPC_Spawn_f(ctx, ent);
     } else if Q_stricmp("kill", &cmd) == 0 {
@@ -3075,9 +3051,7 @@ pub fn Cmd_NPC_f(ctx: &mut GameContext, ent: EntityId) {
             if !found_ent.is_null() && !unsafe { (*found_ent).client.is_null() } {
                 NPC_PrintScore(ctx, ctx.entity_id_of(found_ent).unwrap());
             } else {
-                Com_Printf(
-                    &format!("ERROR: NPC score - no such NPC {}\n", cmd2),
-                );
+                Com_Printf(&format!("ERROR: NPC score - no such NPC {}\n", cmd2));
             }
         }
     }

@@ -46,15 +46,16 @@ use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::ha_pref;
 use mp_qshared::shared::{fileHandle_t, fsMode_t, qtrue, vec3_t};
 
+use crate::server::client_s::client_t;
 use crate::sv_bot::{
     BotImport_DebugLineCreate, BotImport_DebugLineDelete, BotImport_DebugLineShow,
     BotImport_DebugPolygonCreate, BotImport_DebugPolygonDelete,
 };
-use crate::server::client_s::client_t;
 use crate::sv_client::SV_ExecuteClientCommand;
 use crate::sv_game::SV_inPVS;
 use crate::sv_world::SV_PointContents;
 use crate::Server;
+use native_string::latin1_to_string;
 
 extern "C" {
     /// The C-variadic `Print` shim (`botlib_import_trampoline.c`) assigned to the
@@ -155,9 +156,9 @@ const I_MAX_BOTLIB_MEM: c_int = 8 * 1024 * 1024;
 pub extern "C-unwind" fn bot_import_print_forward(r#type: c_int, str: *const c_char) {
     let common = unsafe { &mut *ctx().common };
     // SAFETY: the shim passes its NUL-terminated `char str[2048]`.
-    let text = unsafe { CStr::from_ptr(str) }.to_string_lossy();
+    let text = unsafe { latin1_to_string(CStr::from_ptr(str).to_bytes()) };
     match r#type {
-        PRT_MESSAGE => com_printf(common, text.as_ref()),
+        PRT_MESSAGE => com_printf(common, &text),
         PRT_WARNING => com_printf(common, &format!("^3Warning: {text}")),
         PRT_ERROR => com_printf(common, &format!("^1Error: {text}")),
         PRT_FATAL => com_printf(common, &format!("^1Fatal: {text}")),
@@ -237,9 +238,7 @@ extern "C" fn bot_import_fs_fopen_file(
     // SAFETY: single-threaded callback; the armed slot's islands are live.
     let mut view = unsafe { ctx_view(ctx()) };
     // botlib C-callback seam: one conversion at the head.
-    let qpath = unsafe { core::ffi::CStr::from_ptr(qpath) }
-        .to_string_lossy()
-        .into_owned();
+    let qpath = unsafe { latin1_to_string(core::ffi::CStr::from_ptr(qpath).to_bytes()) };
     FS_FOpenFileByMode(&mut view, &qpath, file, mode)
 }
 
@@ -323,7 +322,7 @@ extern "C" fn bot_import_bot_client_command(client: c_int, command: *mut c_char)
         let sv = &mut *c.sv;
         let cl = &mut sv.svs.clients[client as usize] as *mut client_t;
         // botlib C-callback seam: one conversion at the head.
-        let command = core::ffi::CStr::from_ptr(command).to_string_lossy();
+        let command = latin1_to_string(core::ffi::CStr::from_ptr(command).to_bytes());
         SV_ExecuteClientCommand(&mut view, sv, cl, &command, qtrue);
     }
 }

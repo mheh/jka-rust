@@ -29,6 +29,7 @@ use core::ffi::{c_char, c_double, c_int};
 use std::ffi::{CStr, CString};
 
 use libc::strncpy;
+use native_string::latin1_to_string;
 use native_types::{qfalse, qtrue};
 
 use mp_qshared::common::mp::botlib::botlib_misc::BOTFILESBASEFOLDER;
@@ -97,9 +98,14 @@ pub fn BotFindCachedCharacter(bot: &mut BotLib, charfile: &str, skill: f32) -> c
 ///
 /// Source: `oracle/codemp/botlib/be_ai_char.cpp:88-105`
 pub fn BotDumpCharacter(bot: &mut BotLib, handle: c_int) {
-    let __m =
-        CString::new(bot.botcharacters[handle as usize].as_ref().unwrap().filename.clone())
-            .unwrap_or_default();
+    let __m = CString::new(
+        bot.botcharacters[handle as usize]
+            .as_ref()
+            .unwrap()
+            .filename
+            .clone(),
+    )
+    .unwrap_or_default();
     Log_Write(bot, __m.as_ptr() as *mut c_char);
     // Raven's own format string uses `%d` for the (float) `skill` field —
     // an oracle bug, kept faithful.
@@ -237,7 +243,11 @@ pub fn BotInterpolateCharacters(
 
     let ch1_skill = bot.botcharacters[handle1 as usize].as_ref().unwrap().skill;
     let ch2_skill = bot.botcharacters[handle2 as usize].as_ref().unwrap().skill;
-    let filename = bot.botcharacters[handle1 as usize].as_ref().unwrap().filename.clone();
+    let filename = bot.botcharacters[handle1 as usize]
+        .as_ref()
+        .unwrap()
+        .filename
+        .clone();
     let scale = (desiredskill - ch1_skill) / (ch2_skill - ch1_skill);
     let mut c: Vec<Characteristic> = vec![Characteristic::None; MAX_CHARACTERISTICS as usize + 1];
     for i in 0..MAX_CHARACTERISTICS as usize {
@@ -452,7 +462,11 @@ pub fn BotShutdownCharacters(bot: &mut BotLib) {
 /// characteristic strings), retiring Raven's `BotFreeCharacterStrings`+`FreeMemory`.
 ///
 /// Source: `oracle/codemp/botlib/be_ai_char.cpp:195-338`
-pub fn BotLoadCharacterFromFile(bot: &mut BotLib, charfile: &str, skill: c_int) -> Option<BotCharacter> {
+pub fn BotLoadCharacterFromFile(
+    bot: &mut BotLib,
+    charfile: &str,
+    skill: c_int,
+) -> Option<BotCharacter> {
     let mut index: c_int;
     let mut foundcharacter = false;
     //a bot character is parsed in two phases
@@ -545,7 +559,10 @@ pub fn BotLoadCharacterFromFile(bot: &mut BotLib, charfile: &str, skill: c_int) 
                         SourceError(
                             bot,
                             &source,
-                            &format!("expected integer, float or string, found {}\n", token.string),
+                            &format!(
+                                "expected integer, float or string, found {}\n",
+                                token.string
+                            ),
                         );
                         FreeSource(source);
                         return None;
@@ -571,7 +588,11 @@ pub fn BotLoadCharacterFromFile(bot: &mut BotLib, charfile: &str, skill: c_int) 
         }
         //end if
         else {
-            SourceError(bot, &source, &format!("unknown definition {}\n", token.string));
+            SourceError(
+                bot,
+                &source,
+                &format!("unknown definition {}\n", token.string),
+            );
             FreeSource(source);
             return None;
         } //end else
@@ -590,7 +611,12 @@ pub fn BotLoadCharacterFromFile(bot: &mut BotLib, charfile: &str, skill: c_int) 
 ///
 /// The `#ifdef DEBUG` timing print (`Sys_MilliSeconds`/`bot_developer`) is
 /// dropped; `DEBUG` is not defined in this retail build.
-pub fn BotLoadCachedCharacter(bot: &mut BotLib, charfile: &str, skill: f32, reload: c_int) -> c_int {
+pub fn BotLoadCachedCharacter(
+    bot: &mut BotLib,
+    charfile: &str,
+    skill: f32,
+    reload: c_int,
+) -> c_int {
     let charfile_c = CString::new(charfile).unwrap_or_default();
     unsafe {
         //find a free spot for a character
@@ -668,7 +694,10 @@ pub fn BotLoadCachedCharacter(bot: &mut BotLib, charfile: &str, skill: f32, relo
             //try to load a cached character with any skill
             let cachedhandle = BotFindCachedCharacter(bot, charfile, -1.0);
             if cachedhandle != 0 {
-                let skill_v = bot.botcharacters[cachedhandle as usize].as_ref().unwrap().skill;
+                let skill_v = bot.botcharacters[cachedhandle as usize]
+                    .as_ref()
+                    .unwrap()
+                    .skill;
                 bot.botimport.Print.unwrap()(
                     PRT_MESSAGE,
                     c"loaded cached skill %f from %s\n".as_ptr() as *mut c_char,
@@ -695,7 +724,10 @@ pub fn BotLoadCachedCharacter(bot: &mut BotLib, charfile: &str, skill: f32, relo
             //try to load a cached character with any skill
             let cachedhandle = BotFindCachedCharacter(bot, DEFAULT_CHARACTER, -1.0);
             if cachedhandle != 0 {
-                let skill_v = bot.botcharacters[cachedhandle as usize].as_ref().unwrap().skill;
+                let skill_v = bot.botcharacters[cachedhandle as usize]
+                    .as_ref()
+                    .unwrap()
+                    .skill;
                 bot.botimport.Print.unwrap()(
                     PRT_MESSAGE,
                     c"loaded cached default skill %f from %s\n".as_ptr() as *mut c_char,
@@ -748,7 +780,7 @@ pub fn BotLoadCharacterSkill(bot: &mut BotLib, charfile: &str, skill: f32) -> c_
 ///
 /// Source: `oracle/codemp/botlib/be_ai_char.cpp:551-593`
 pub fn BotLoadCharacter(bot: &mut BotLib, charfile: *mut c_char, skill: f32) -> c_int {
-    let charfile_owned = unsafe { CStr::from_ptr(charfile).to_string_lossy().into_owned() };
+    let charfile_owned = unsafe { latin1_to_string(CStr::from_ptr(charfile).to_bytes()) };
     let charfile = charfile_owned.as_str();
     let mut skill = skill;
     //make sure the skill is in the valid range

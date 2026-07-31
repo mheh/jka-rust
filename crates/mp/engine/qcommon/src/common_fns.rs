@@ -20,6 +20,7 @@ use mp_qshared::shared::cvar::{
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::{qboolean, qfalse, qtrue, CPUSTRING, FS_READ, Q3_VERSION};
 use native_string::cstr::buf_to_string;
+use native_string::latin1_to_string;
 use native_string::q_string::{Q_strcmp, Q_stricmp, Q_stricmpn};
 
 use crate::collision_world::CollisionWorld;
@@ -1292,7 +1293,7 @@ pub fn Com_ParseTextFile(
     FS_Read(view.common, buf.as_mut_ptr() as *mut (), length, f);
     buf[length as usize] = 0;
 
-    let text = String::from_utf8_lossy(&buf[..length as usize]).into_owned();
+    let text = latin1_to_string(&buf[..length as usize]);
     let _ = parser.parse(&text, cleanFirst);
 
     FS_FCloseFile(view.common, f);
@@ -1327,7 +1328,7 @@ pub fn Com_ParseTextFile2(
     FS_FCloseFile(view.common, f);
     buf[length as usize] = 0;
 
-    let text = String::from_utf8_lossy(&buf[..length as usize]).into_owned();
+    let text = latin1_to_string(&buf[..length as usize]);
 
     let mut parse = Box::new(GenericParser2::new());
     if parse.parse(&text, cleanFirst).is_err() {

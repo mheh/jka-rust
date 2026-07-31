@@ -10,6 +10,8 @@
 
 use std::os::raw::{c_char, c_int, c_ulong};
 
+use native_string::latin1_to_string;
+
 use mp_qshared::common::mp::botlib::aas_predictroute_s::aas_predictroute_s;
 use mp_qshared::common::mp::botlib::aas_route_stop_event::{
     RSE_ENTERAREA, RSE_ENTERCONTENTS, RSE_NONE, RSE_NOROUTE, RSE_USETRAVELTYPE,
@@ -973,7 +975,7 @@ pub fn AAS_WriteRouteCache(bot: &mut BotLib) {
         }
 
         let mapname_str =
-            core::ffi::CStr::from_ptr(bot.aasworld.mapname.as_ptr()).to_string_lossy();
+            latin1_to_string(core::ffi::CStr::from_ptr(bot.aasworld.mapname.as_ptr()).to_bytes());
         let filename = format!("maps/{}.rcd", mapname_str);
         let c_filename = std::ffi::CString::new(filename.clone()).unwrap_or_default();
         let mut fp: fileHandle_t = 0;
@@ -1057,7 +1059,7 @@ pub fn AAS_WriteRouteCache(bot: &mut BotLib) {
 pub fn AAS_ReadRouteCache(bot: &mut BotLib) -> c_int {
     unsafe {
         let mapname_str =
-            core::ffi::CStr::from_ptr(bot.aasworld.mapname.as_ptr()).to_string_lossy();
+            latin1_to_string(core::ffi::CStr::from_ptr(bot.aasworld.mapname.as_ptr()).to_bytes());
         let filename = format!("maps/{}.rcd", mapname_str);
         let c_filename = std::ffi::CString::new(filename.clone()).unwrap_or_default();
         let mut fp: fileHandle_t = 0;
@@ -1564,8 +1566,7 @@ pub fn AAS_InitRouting(bot: &mut BotLib) {
     AAS_InitPortalMaxTravelTimes(bot);
     AAS_InitReachabilityAreas(bot);
     bot.routingcachesize = 0;
-    bot.max_routingcachesize = 1024
-        * LibVarValue(bot, "max_routingcache", "4096") as c_int;
+    bot.max_routingcachesize = 1024 * LibVarValue(bot, "max_routingcache", "4096") as c_int;
     AAS_ReadRouteCache(bot);
 }
 

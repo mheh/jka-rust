@@ -16,8 +16,9 @@
 
 use crate::prelude::*;
 use crate::q_math::{_DotProduct, _VectorMA, _VectorSubtract};
-use native_string::Q_stricmp;
+use native_string::latin1_to_string;
 use native_string::strncpyz_string;
+use native_string::Q_stricmp;
 
 use crate::client::gclient_t;
 use crate::g_main::G_Printf;
@@ -117,7 +118,10 @@ pub fn BuildShaderStateConfig(ctx: &GameContext) -> String {
         let new_shader_str = &ctx.world.globals.remappedShaders.0[i].newShader;
         let time_offset = ctx.world.globals.remappedShaders.0[i].timeOffset;
 
-        buff.push_str(&format!("{}={}:{:5.2}@", old_shader_str, new_shader_str, time_offset));
+        buff.push_str(&format!(
+            "{}={}:{:5.2}@",
+            old_shader_str, new_shader_str, time_offset
+        ));
     }
     strncpyz_string(buff.as_bytes(), MAX_STRING_CHARS * 4)
 }
@@ -236,7 +240,7 @@ pub fn G_TeamCommand(ctx: &mut GameContext, team: team_t, cmd: *mut c_char) {
     use crate::client::client_connected::CON_CONNECTED;
 
     unsafe {
-        let text = CStr::from_ptr(cmd).to_string_lossy().into_owned();
+        let text = latin1_to_string(CStr::from_ptr(cmd).to_bytes());
         for i in 0..ctx.world.level.maxclients {
             let client = &ctx.world.clients[i as usize];
             if client.pers.connected == CON_CONNECTED && client.sess.sessionTeam == team {
@@ -627,7 +631,12 @@ pub fn G_PickTarget(ctx: &mut GameContext, targetname: Option<&str>) -> *mut gen
     unsafe {
         let mut ent: *mut gentity_t = core::ptr::null_mut();
         loop {
-            ent = G_Find(ctx, ctx.entity_id_of(ent), EntFindField::Targetname, targetname);
+            ent = G_Find(
+                ctx,
+                ctx.entity_id_of(ent),
+                EntFindField::Targetname,
+                targetname,
+            );
             if ent.is_null() {
                 break;
             }
@@ -1591,12 +1600,7 @@ pub fn G_EntitySound(ctx: &mut GameContext, ent: EntityId, channel: c_int, sound
 /// Raven `G_SoundOnEnt`.
 ///
 /// Source: `oracle/codemp/game/g_utils.c:1402-1411`
-pub fn G_SoundOnEnt(
-    ctx: &mut GameContext,
-    ent: EntityId,
-    channel: c_int,
-    soundPath: &str,
-) {
+pub fn G_SoundOnEnt(ctx: &mut GameContext, ent: EntityId, channel: c_int, soundPath: &str) {
     // Safe-state 2c: EntityId param; te + ent fields via the accessor.
     let origin = ctx.world.entity(ent).r.currentOrigin;
     let te_id = G_TempEntity(ctx, origin, EV_ENTITY_SOUND as c_int);
@@ -1796,7 +1800,8 @@ pub fn TryHeal(ctx: &mut GameContext, ent: Option<EntityId>, target: Option<Enti
 
     let scl_matches = {
         let scl = &ctx.world.bg_state.bgSiegeClasses[siegeClass as usize];
-        scl.name.eq_ignore_ascii_case(&ctx.world.entity(target_id).healingclass)
+        scl.name
+            .eq_ignore_ascii_case(&ctx.world.entity(target_id).healingclass)
     };
     if !scl_matches {
         return qfalse;

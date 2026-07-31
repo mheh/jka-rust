@@ -81,6 +81,7 @@ use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::{vec3_t, vec3pair_t};
 use native_string::atof::atof;
 use native_string::atoi::atoi;
+use native_string::latin1_to_string;
 use native_string::Info_ValueForKey;
 
 use crate::cm::cbrush_s::cbrush_t;
@@ -137,7 +138,7 @@ fn com_parse_text_file(
 ) -> bool {
     match host.fs_read_file(file) {
         Some(data) if !data.is_empty() => {
-            let text = String::from_utf8_lossy(&data);
+            let text = latin1_to_string(&data);
             let _ = parser.parse(&text, true);
             host.fs_free_file(data);
             true

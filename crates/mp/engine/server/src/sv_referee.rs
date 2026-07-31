@@ -64,6 +64,7 @@ use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::limits::MAX_INFO_STRING;
 use mp_qshared::shared::{qfalse, qtrue};
 use native_string::cstr::strncpyz_string;
+use native_string::latin1_to_string;
 
 use crate::server::client_s::client_t;
 use crate::server::client_state_t::clientState_t;
@@ -1236,7 +1237,7 @@ fn ref_inject_one(view: &mut EngineHostView, sv: &mut Server, rec: Rec) {
             unsafe {
                 (*cl).lastPacketTime = sv.svs.time; // see Rec::Think
             }
-            let cmd_str = String::from_utf8_lossy(&cmd).into_owned();
+            let cmd_str = latin1_to_string(&cmd);
             SV_ExecuteClientCommand(view, sv, cl, &cmd_str, if ok != 0 { qtrue } else { qfalse });
         }
         Rec::Connect { client, userinfo } => {
@@ -1650,8 +1651,7 @@ fn parse_line(line: &str, lineno: usize) -> Result<Option<Rec>, String> {
         }
         "C" => {
             let client = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
-            let userinfo =
-                String::from_utf8_lossy(&hex_decode(it.next().unwrap_or(""))).into_owned();
+            let userinfo = latin1_to_string(&hex_decode(it.next().unwrap_or("")));
             Rec::Connect { client, userinfo }
         }
         "X" => {
@@ -1778,7 +1778,7 @@ impl TailReader {
         while let Some(pos) = self.partial.iter().position(|&b| b == b'\n') {
             let line: Vec<u8> = self.partial.drain(..=pos).collect();
             self.lineno += 1;
-            let line = String::from_utf8_lossy(&line[..line.len() - 1]).into_owned();
+            let line = latin1_to_string(&line[..line.len() - 1]);
             if let Some(rec) = parse_line(&line, self.lineno)? {
                 out.push(rec);
             }

@@ -30,6 +30,7 @@ use mp_qshared::shared::q_math::{vectoangles, AngleNormalize180, AngleSubtract};
 use mp_qshared::shared::q_string::{Q_stricmp, Q_strlen};
 use native_string::atof::atof_bytes;
 use native_string::atoi::atoi_bytes;
+use native_string::latin1_to_string;
 
 /// Raven `GIB_HEALTH` — health threshold below which a corpse gibs.
 /// Source: `oracle/codemp/game/bg_public.h:25`
@@ -287,7 +288,7 @@ pub fn BG_ParseField(
                         // sscanf(value, "%f %f %f", &vec[0], &vec[1], &vec[2]) —
                         // oracle bg_misc.c:379 has no count check; unmatched
                         // components are left at the 0.0 seed (porting-rules §19).
-                        let text = std::ffi::CStr::from_ptr(value).to_string_lossy();
+                        let text = latin1_to_string(std::ffi::CStr::from_ptr(value).to_bytes());
                         let mut vec: vec3_t = [0.0, 0.0, 0.0];
                         sscanf_f32s(&text, &mut vec);
                         let dst = b.offset((*f).ofs as isize) as *mut f32;

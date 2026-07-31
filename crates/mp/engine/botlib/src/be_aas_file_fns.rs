@@ -11,6 +11,8 @@
 
 use core::ffi::{c_char, c_int, c_long, c_uchar, c_void};
 
+use native_string::latin1_to_string;
+
 use mp_engine_qcommon::common_fns::Com_Memset;
 use mp_qshared::common::mp::botlib::botlib_error::{
     BLERR_CANNOTOPENAASFILE, BLERR_CANNOTREADAASLUMP, BLERR_NOERROR, BLERR_WRONGAASFILEID,
@@ -380,7 +382,7 @@ pub fn AAS_LoadAASFile(bot: &mut BotLib, filename: *mut c_char) -> c_int {
         if fp == 0 {
             let msg = std::ffi::CString::new(format!(
                 "can't open {}\n",
-                core::ffi::CStr::from_ptr(filename).to_string_lossy()
+                latin1_to_string(core::ffi::CStr::from_ptr(filename).to_bytes())
             ))
             .unwrap_or_default();
             AAS_Error(bot, msg.as_ptr() as *mut c_char);
@@ -398,7 +400,7 @@ pub fn AAS_LoadAASFile(bot: &mut BotLib, filename: *mut c_char) -> c_int {
         if header.ident != AASID {
             let msg = std::ffi::CString::new(format!(
                 "{} is not an AAS file\n",
-                core::ffi::CStr::from_ptr(filename).to_string_lossy()
+                latin1_to_string(core::ffi::CStr::from_ptr(filename).to_bytes())
             ))
             .unwrap_or_default();
             AAS_Error(bot, msg.as_ptr() as *mut c_char);
@@ -411,7 +413,7 @@ pub fn AAS_LoadAASFile(bot: &mut BotLib, filename: *mut c_char) -> c_int {
         if header.version != AASVERSION_OLD && header.version != AASVERSION {
             let msg = std::ffi::CString::new(format!(
                 "aas file {} is version {}, not {}\n",
-                core::ffi::CStr::from_ptr(filename).to_string_lossy(),
+                latin1_to_string(core::ffi::CStr::from_ptr(filename).to_bytes()),
                 header.version,
                 AASVERSION
             ))
@@ -428,12 +430,13 @@ pub fn AAS_LoadAASFile(bot: &mut BotLib, filename: *mut c_char) -> c_int {
             );
         }
         //
-        let sv_mapchecksum = std::ffi::CString::new(LibVarGetString(bot, "sv_mapChecksum")).unwrap();
+        let sv_mapchecksum =
+            std::ffi::CString::new(LibVarGetString(bot, "sv_mapChecksum")).unwrap();
         bot.aasworld.bspchecksum = libc::atoi(sv_mapchecksum.as_ptr());
         if LittleLong(header.bspchecksum) != bot.aasworld.bspchecksum {
             let msg = std::ffi::CString::new(format!(
                 "aas file {} is out of date\n",
-                core::ffi::CStr::from_ptr(filename).to_string_lossy()
+                latin1_to_string(core::ffi::CStr::from_ptr(filename).to_bytes())
             ))
             .unwrap_or_default();
             AAS_Error(bot, msg.as_ptr() as *mut c_char);

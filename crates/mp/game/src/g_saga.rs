@@ -30,9 +30,8 @@ use crate::g_utils::{
     G_EffectIndex, G_Find, G_IconIndex, G_PlayEffectID, G_SetOrigin, G_Sound, G_TempEntity,
     G_UseTargets2, GlobalUse,
 };
+use crate::q_shared;
 use crate::q_shared::Info_SetValueForKey;
-use native_string::strncpyz_string;
-use native_string::{atoi_bytes, buf_to_string, strcat_string, Q_stricmp, Q_strncpyzBytes};
 use mp_bg::bg_misc::{BG_FindItemForHoldable, BG_FindItemForWeapon};
 use mp_bg::bg_saga::{
     BG_PrecacheSabersForSiegeTeam, BG_SiegeFindClassIndexByName, BG_SiegeFindThemeForTeam,
@@ -43,7 +42,9 @@ use mp_bg::public::entity_event::entity_event_t;
 use mp_bg::public::holdable::HI_NUM_HOLDABLE;
 use mp_bg::weapons::weapon_t::WP_NUM_WEAPONS;
 use mp_qshared::shared::surface_flags::{CONTENTS_SOLID, CONTENTS_TERRAIN};
-use crate::q_shared;
+use native_string::latin1_to_string;
+use native_string::strncpyz_string;
+use native_string::{atoi_bytes, buf_to_string, strcat_string, Q_stricmp, Q_strncpyzBytes};
 
 // Raven `qboolean` is `c_int`; keep the source spelling at call sites.
 // Source: `oracle/codemp/game/q_shared.h`
@@ -167,7 +168,7 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
 
             let levelname_s = format!(
                 "maps/{}.siege\0",
-                cstr_from_chars(&mapname.string).to_string_lossy()
+                latin1_to_string(cstr_from_chars(&mapname.string).to_bytes())
             );
 
             if levelname_s.is_empty() || levelname_s.as_bytes()[0] == 0 {
@@ -219,8 +220,7 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
                     );
                 } else {
                     // otherwise use level default
-                    if let Some(val) =
-                        BG_SiegeGetPairedValue(&cstr_to_str(teams.as_ptr()), "team1")
+                    if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(teams.as_ptr()), "team1")
                     {
                         ctx.world.globals.team1 = val;
                     }
@@ -237,8 +237,7 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
                         512,
                     );
                 } else {
-                    if let Some(val) =
-                        BG_SiegeGetPairedValue(&cstr_to_str(teams.as_ptr()), "team2")
+                    if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(teams.as_ptr()), "team2")
                     {
                         ctx.world.globals.team2 = val;
                     }
@@ -500,7 +499,7 @@ pub fn G_SiegeSetObjectiveComplete(
         p += 1;
     }
 
-    ctx.world.globals.gObjectiveCfgStr = String::from_utf8_lossy(&buf).into_owned();
+    ctx.world.globals.gObjectiveCfgStr = latin1_to_string(&buf);
 
     // Now re-update the configstring.
     let cfg = ctx.world.globals.gObjectiveCfgStr.clone();
@@ -847,9 +846,10 @@ pub fn SiegeRoundComplete(ctx: &mut GameContext, winningteam: c_int, winningclie
             &cstr_to_str(teamstr.as_ptr()),
         ) {
             ctx.world.globals.gParseObjectives = val;
-            if let Some(val) =
-                BG_SiegeGetPairedValue(&ctx.world.globals.gParseObjectives.clone(), "roundover_target")
-            {
+            if let Some(val) = BG_SiegeGetPairedValue(
+                &ctx.world.globals.gParseObjectives.clone(),
+                "roundover_target",
+            ) {
                 Q_strncpyzBytes(&mut teamstr, val.as_bytes(), teamstr_len);
             } else {
                 // didn't find the name of the thing to target upon win, just
@@ -1306,19 +1306,21 @@ pub fn siegeTriggerUse(
             teamstr = strncpyz_string(ctx.world.globals.team2.as_bytes(), 64);
         }
 
-        if let Some(objectives) = BG_SiegeGetValueGroup(
-            &buf_to_string(&ctx.world.bg_state.siege_info),
-            &teamstr,
-        ) {
+        if let Some(objectives) =
+            BG_SiegeGetValueGroup(&buf_to_string(&ctx.world.bg_state.siege_info), &teamstr)
+        {
             ctx.world.globals.gParseObjectives = objectives;
             let obj_num = ctx.world.entity(ent).objective;
             objectivestr = strncpyz_string(format!("Objective{}", obj_num).as_bytes(), 64);
 
-            if let Some(desired) = BG_SiegeGetValueGroup(
-                &ctx.world.globals.gParseObjectives.clone(),
-                &objectivestr,
-            ) {
-                Q_strncpyzBytes(&mut desiredobjective, desired.as_bytes(), desiredobjective_len);
+            if let Some(desired) =
+                BG_SiegeGetValueGroup(&ctx.world.globals.gParseObjectives.clone(), &objectivestr)
+            {
+                Q_strncpyzBytes(
+                    &mut desiredobjective,
+                    desired.as_bytes(),
+                    desiredobjective_len,
+                );
                 if let Some(val) =
                     BG_SiegeGetPairedValue(&cstr_to_str(desiredobjective.as_ptr()), "final")
                 {
@@ -1331,8 +1333,10 @@ pub fn siegeTriggerUse(
                 {
                     teamstr = strncpyz_string(val.as_bytes(), 64);
                     // Raven NUL-terminates at the first carriage-return/newline.
-                    if let Some(pos) =
-                        teamstr.as_bytes().iter().position(|&b| b == b'\r' || b == b'\n')
+                    if let Some(pos) = teamstr
+                        .as_bytes()
+                        .iter()
+                        .position(|&b| b == b'\r' || b == b'\n')
                     {
                         teamstr.truncate(pos);
                     }
@@ -1540,7 +1544,11 @@ pub fn decompTriggerUse(
                 &ctx.world.globals.gParseObjectives.clone(),
                 &cstr_to_str(objectivestr.as_ptr()),
             ) {
-                Q_strncpyzBytes(&mut desiredobjective, desired.as_bytes(), desiredobjective_len);
+                Q_strncpyzBytes(
+                    &mut desiredobjective,
+                    desired.as_bytes(),
+                    desiredobjective_len,
+                );
                 if let Some(val) =
                     BG_SiegeGetPairedValue(&cstr_to_str(desiredobjective.as_ptr()), "final")
                 {
@@ -2067,7 +2075,14 @@ pub fn SP_misc_siege_item(ctx: &mut GameContext, ent: EntityId) {
         }
 
         // `None`/`""` ≡ Raven's `!ent->model || !ent->model[0]` guard.
-        if ctx.world.entity(ent).model.as_deref().unwrap_or("").is_empty() {
+        if ctx
+            .world
+            .entity(ent)
+            .model
+            .as_deref()
+            .unwrap_or("")
+            .is_empty()
+        {
             G_Error(ctx, "You must specify a model for misc_siege_item types.");
         }
 

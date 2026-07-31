@@ -39,6 +39,7 @@ use mp_qshared::shared::swap::LittleLong;
 use native_string::atoi::atoi;
 use native_string::cstr::buf_to_string;
 use native_string::filter::Com_FilterPath;
+use native_string::latin1_to_string;
 use native_string::q_string::{Q_stricmp, Q_stricmpn, Q_strlwr};
 use native_string::q_strncpyz::Q_strncpyz;
 
@@ -1264,9 +1265,7 @@ fn FS_LoadZipFile(view: &mut EngineHostView, zipfile: &str, basename: &str) -> *
                 fs_headerLongs.push(LittleLong(file_info.crc as c_int));
             }
             Q_strlwr(&mut filename_inzip);
-            let name = CStr::from_ptr(filename_inzip.as_ptr())
-                .to_string_lossy()
-                .into_owned();
+            let name = latin1_to_string(CStr::from_ptr(filename_inzip.as_ptr()).to_bytes());
             let hash = FS_HashFileName(&name, pack.hashSize);
             // store the file position in the zip
             let mut pos: core::ffi::c_ulong = 0;

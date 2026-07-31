@@ -20,6 +20,8 @@
 
 use core::ffi::{c_char, c_int, c_void, CStr};
 
+use native_string::latin1_to_string;
+
 use crate::be_interface::botlib_globals_s::botlib_globals_t;
 use crate::BotLib;
 
@@ -195,7 +197,7 @@ pub fn Export_BotLibVarGet(
     // Thin ABI adapter (frozen signature): decode the incoming C string once,
     // drive the idiomatic internal, then copy the result back with Raven's
     // `strncpy(value, varvalue, size-1); value[size-1] = 0;` truncation.
-    let name = unsafe { CStr::from_ptr(var_name) }.to_string_lossy();
+    let name = unsafe { latin1_to_string(CStr::from_ptr(var_name).to_bytes()) };
     let varvalue = LibVarGetString(bot, &name);
     let src = varvalue.as_bytes();
     let cap = (size - 1).max(0) as usize;
@@ -250,8 +252,8 @@ pub fn Init_EA_Export(ea: *mut ea_export_t) {
 pub fn Export_BotLibVarSet(bot: &mut BotLib, var_name: *mut c_char, value: *mut c_char) -> c_int {
     // Thin ABI adapter (frozen signature): decode both C strings at the seam,
     // then drive the idiomatic internal.
-    let name = unsafe { CStr::from_ptr(var_name) }.to_string_lossy();
-    let val = unsafe { CStr::from_ptr(value) }.to_string_lossy();
+    let name = unsafe { latin1_to_string(CStr::from_ptr(var_name).to_bytes()) };
+    let val = unsafe { latin1_to_string(CStr::from_ptr(value).to_bytes()) };
     LibVarSet(bot, &name, &val);
     BLERR_NOERROR
 }

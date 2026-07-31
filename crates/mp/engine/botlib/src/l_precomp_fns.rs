@@ -49,7 +49,7 @@ use core::ffi::{c_char, c_int, c_long};
 use std::ffi::{CStr, CString};
 
 use libc::time;
-use native_string::string_to_latin1;
+use native_string::{latin1_to_string, string_to_latin1};
 
 use crate::l_precomp::builtin_defines::{
     BUILTIN_DATE, BUILTIN_FILE, BUILTIN_LINE, BUILTIN_STDC, BUILTIN_TIME,
@@ -484,7 +484,7 @@ fn PC_ConvertPath(path: &mut String) {
             *b = PATHSEPERATOR_CHAR;
         }
     }
-    *path = String::from_utf8_lossy(&out).into_owned();
+    *path = latin1_to_string(&out);
 }
 
 /// Raven `PC_WhiteSpaceBeforeToken` — true if the token has leading whitespace.
@@ -2578,9 +2578,7 @@ pub fn PC_LoadSourceHandle(bot: &mut BotLib, filename: *const c_char) -> c_int {
         return 0;
     }
     PS_SetBaseFolder(bot, "");
-    let filename = unsafe { CStr::from_ptr(filename) }
-        .to_string_lossy()
-        .into_owned();
+    let filename = unsafe { latin1_to_string(CStr::from_ptr(filename).to_bytes()) };
     let source = match LoadSourceFile(bot, &filename) {
         Some(s) => s,
         None => return 0,

@@ -11,6 +11,7 @@ use mp_bg::public::gametype::{
 use mp_bg::public::{MAX_ARENAS_TEXT, MAX_BOTS_TEXT};
 use native_string::atof;
 use native_string::atoi;
+use native_string::latin1_to_string;
 
 use crate::ai_main::BotAISetupClient;
 use crate::ai_wpnav::LoadPath_ThisLevel;
@@ -102,7 +103,7 @@ pub fn G_LoadArenasFromFile(ctx: &mut GameContext, filename: &str) {
     if f == 0 {
         let s = format!(
             "{}file not found: {}\n",
-            S_COLOR_RED.to_string_lossy(),
+            latin1_to_string(S_COLOR_RED.to_bytes()),
             filename
         );
         trap::Printf(ctx.engine, &s);
@@ -111,7 +112,7 @@ pub fn G_LoadArenasFromFile(ctx: &mut GameContext, filename: &str) {
     if len >= MAX_ARENAS_TEXT as c_int {
         let s = format!(
             "{}file too large: {} is {}, max allowed is {}",
-            S_COLOR_RED.to_string_lossy(),
+            latin1_to_string(S_COLOR_RED.to_bytes()),
             filename,
             len,
             MAX_ARENAS_TEXT
@@ -583,7 +584,7 @@ pub fn AddBotToSpawnQueue(ctx: &mut GameContext, clientNum: c_int, delay: c_int)
         ctx,
         &format!(
             "{}Unable to delay spawn\n",
-            S_COLOR_YELLOW.to_string_lossy()
+            latin1_to_string(S_COLOR_YELLOW.to_bytes())
         ),
     );
     ClientBegin(ctx, clientNum, qfalse);
@@ -652,7 +653,7 @@ pub fn G_AddBot(
                 ctx,
                 &format!(
                     "{}Error: Bot '{}' not defined\n",
-                    S_COLOR_RED.to_string_lossy(),
+                    latin1_to_string(S_COLOR_RED.to_bytes()),
                     name
                 ),
             );
@@ -946,7 +947,7 @@ pub fn G_LoadBotsFromFile(ctx: &mut GameContext, filename: &str) {
     if f == 0 {
         let s = format!(
             "{}file not found: {}\n",
-            S_COLOR_RED.to_string_lossy(),
+            latin1_to_string(S_COLOR_RED.to_bytes()),
             filename
         );
         trap::Printf(ctx.engine, &s);
@@ -955,7 +956,7 @@ pub fn G_LoadBotsFromFile(ctx: &mut GameContext, filename: &str) {
     if len >= MAX_BOTS_TEXT as c_int {
         let s = format!(
             "{}file too large: {} is {}, max allowed is {}",
-            S_COLOR_RED.to_string_lossy(),
+            latin1_to_string(S_COLOR_RED.to_bytes()),
             filename,
             len,
             MAX_BOTS_TEXT
@@ -1020,7 +1021,7 @@ pub fn G_GetBotInfoByNumber(ctx: &mut GameContext, num: c_int) -> Option<String>
     if num < 0 || num >= ctx.world.globals.g_numBots {
         let s = format!(
             "{}Invalid bot number: {}\n",
-            S_COLOR_RED.to_string_lossy(),
+            latin1_to_string(S_COLOR_RED.to_bytes()),
             num
         );
         trap::Printf(ctx.engine, &s);

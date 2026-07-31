@@ -21,6 +21,7 @@ use crate::common::Common;
 
 use libc::memmove;
 use native_string::atoi::atoi;
+use native_string::latin1_to_string;
 
 use crate::cmd::Cmd_AddCommand;
 use crate::common::{com_error, com_printf};
@@ -123,9 +124,7 @@ pub fn Cmd_TokenizeString(common: &mut Common, text_in: &str) {
             while i < text.len() && text[i] != 0 && text[i] != b'"' {
                 i += 1;
             }
-            common
-                .cmd_argv
-                .push(String::from_utf8_lossy(&text[start..i]).into_owned());
+            common.cmd_argv.push(latin1_to_string(&text[start..i]));
             if i >= text.len() || text[i] == 0 {
                 return; // all tokens parsed
             }
@@ -151,9 +150,7 @@ pub fn Cmd_TokenizeString(common: &mut Common, text_in: &str) {
 
             i += 1;
         }
-        common
-            .cmd_argv
-            .push(String::from_utf8_lossy(&text[start..i]).into_owned());
+        common.cmd_argv.push(latin1_to_string(&text[start..i]));
 
         if i >= text.len() || text[i] == 0 {
             return; // all tokens parsed
@@ -304,7 +301,7 @@ pub fn Cmd_Exec_f(view: &mut EngineHostView) {
     }
     com_printf(view.common, &format!("execing {filename}\n"));
 
-    let text = unsafe { CStr::from_ptr(f) }.to_string_lossy().into_owned();
+    let text = latin1_to_string(unsafe { CStr::from_ptr(f) }.to_bytes());
     Cbuf_InsertText(view.common, &text);
 
     FS_FreeFile(view.common, f as *mut ());
@@ -363,7 +360,7 @@ pub fn Cbuf_Execute(view: &mut EngineHostView) {
                 i = MAX_CMD_LINE as c_int - 1;
             }
 
-            line = String::from_utf8_lossy(from_raw_parts(text, i as usize)).into_owned();
+            line = latin1_to_string(from_raw_parts(text, i as usize));
 
             // delete the text from the command buffer and move remaining commands down
             // this is necessary because commands (exec) can insert data at the

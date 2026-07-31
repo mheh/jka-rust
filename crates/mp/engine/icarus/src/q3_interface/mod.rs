@@ -43,6 +43,7 @@ use mp_qshared::shared::vec3_t;
 use mp_qshared::shared::wl_e::WL_e;
 use native_string::atof::atof;
 use native_string::atoi::atoi;
+use native_string::latin1_to_string;
 use native_string::sscanf::sscanf_f32s;
 use native_string::stricmp::stricmp;
 
@@ -119,7 +120,7 @@ unsafe fn read_c_field(ptr: *const u8, cap: usize) -> String {
         len += 1;
     }
     let slice = core::slice::from_raw_parts(ptr, len);
-    String::from_utf8_lossy(slice).into_owned()
+    latin1_to_string(slice)
 }
 
 /// Inlines Raven `CTaskManager::Completed(int id)` (`TaskManager.cpp:912-925`):
@@ -279,9 +280,7 @@ pub fn Q3_DebugPrint(icarus: &mut Icarus, host: &mut dyn EngineHost, level: i32,
                 if p.is_null() {
                     String::new()
                 } else {
-                    unsafe { CStr::from_ptr(p as *const c_char) }
-                        .to_string_lossy()
-                        .into_owned()
+                    latin1_to_string(unsafe { CStr::from_ptr(p as *const c_char) }.to_bytes())
                 }
             };
 

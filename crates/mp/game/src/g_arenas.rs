@@ -11,6 +11,7 @@
 use crate::g_main::CalculateRanks;
 use crate::prelude::*;
 use crate::trap;
+use native_string::latin1_to_string;
 
 /// Raven `UpdateTournamentInfo`.
 ///
@@ -160,6 +161,6 @@ pub fn UpdateTournamentInfo(ctx: &mut GameContext) {
         i += 1;
     }
 
-    let msg_str = cstr_from_chars(&msg).to_string_lossy().into_owned();
+    let msg_str = latin1_to_string(cstr_from_chars(&msg).to_bytes());
     trap::SendConsoleCommand(ctx.engine, EXEC_APPEND as c_int, &msg_str);
 }

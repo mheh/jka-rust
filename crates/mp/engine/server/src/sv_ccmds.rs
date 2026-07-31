@@ -33,6 +33,7 @@ use mp_qshared::shared::force_reload::ForceReload_e;
 use mp_qshared::shared::q_string::Q_CleanStr;
 use mp_qshared::shared::{qfalse, qtrue, SNAPFLAG_SERVERCOUNT};
 use native_string::atoi::atoi;
+use native_string::latin1_to_string;
 use native_string::q_string::{Q_stricmp, Q_stricmpBytes, Q_stricmpn};
 use native_string::q_strncpyz::Q_strncpyzBytes;
 
@@ -81,21 +82,13 @@ pub fn SV_GetPlayerByFedName(common: &mut Common, sv: &mut Server, name: &str) -
         // client_t.name is a String now; byte-exact compares at the site (Q_CleanStr
         // works on the local C-copy).
         unsafe {
-            if Q_stricmpBytes(
-                (*cl).name.as_bytes(),
-                name.as_bytes(),
-            ) == 0
-            {
+            if Q_stricmpBytes((*cl).name.as_bytes(), name.as_bytes()) == 0 {
                 return cl;
             }
 
             let mut cleanName = [0 as c_char; 64];
             let clean_len = cleanName.len();
-            Q_strncpyzBytes(
-                &mut cleanName,
-                (*cl).name.as_bytes(),
-                clean_len,
-            );
+            Q_strncpyzBytes(&mut cleanName, (*cl).name.as_bytes(), clean_len);
             Q_CleanStr(cleanName.as_mut_ptr());
             if Q_stricmpBytes(
                 core::ffi::CStr::from_ptr(cleanName.as_ptr()).to_bytes(),
@@ -153,21 +146,13 @@ pub fn SV_GetPlayerByName(common: &mut Common, sv: &mut Server) -> *mut client_t
         // client_t.name is a String now; byte-exact compares at the site (Q_CleanStr
         // works on the local C-copy).
         unsafe {
-            if Q_stricmpBytes(
-                (*cl).name.as_bytes(),
-                s.as_bytes(),
-            ) == 0
-            {
+            if Q_stricmpBytes((*cl).name.as_bytes(), s.as_bytes()) == 0 {
                 return cl;
             }
 
             let mut cleanName = [0 as c_char; 64];
             let clean_len = cleanName.len();
-            Q_strncpyzBytes(
-                &mut cleanName,
-                (*cl).name.as_bytes(),
-                clean_len,
-            );
+            Q_strncpyzBytes(&mut cleanName, (*cl).name.as_bytes(), clean_len);
             Q_CleanStr(cleanName.as_mut_ptr());
             if Q_stricmpBytes(
                 core::ffi::CStr::from_ptr(cleanName.as_ptr()).to_bytes(),
@@ -338,9 +323,13 @@ pub fn SV_Status_f(view: &mut EngineHostView, sv: &mut Server) {
 
         let ps = SV_GameClientNum(sv, i);
         let s = unsafe {
-            core::ffi::CStr::from_ptr(NET_AdrToString(view.common, (*cl).netchan.remoteAddress))
-                .to_string_lossy()
-                .into_owned()
+            latin1_to_string(
+                core::ffi::CStr::from_ptr(NET_AdrToString(
+                    view.common,
+                    (*cl).netchan.remoteAddress,
+                ))
+                .to_bytes(),
+            )
         };
 
         let name = unsafe { (*cl).name.clone() };
@@ -888,7 +877,7 @@ pub fn SV_MapRestart_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghou
             // this generally shouldn't happen, because the client
             // was connected before the level change
             // (module-memory seam: convert the denial text at the arm)
-            let denied = unsafe { core::ffi::CStr::from_ptr(denied) }.to_string_lossy();
+            let denied = unsafe { latin1_to_string(core::ffi::CStr::from_ptr(denied).to_bytes()) };
             SV_DropClient(view.common, sv, client, &denied);
             com_printf(
                 view.common,

@@ -20,6 +20,8 @@
 use core::ffi::{c_char, c_int, c_ulong, c_void};
 use std::ffi::{CStr, CString};
 
+use native_string::latin1_to_string;
+
 use mp_engine_qcommon::common::Common;
 use mp_qshared::common::mp::botlib::bot_consolemessage_s::bot_consolemessage_t;
 use mp_qshared::common::mp::botlib::bot_match_s::{bot_match_t, MAX_MATCHVARIABLES};
@@ -804,8 +806,7 @@ pub fn StringsMatch(pieces: &[BotMatchPiece], r#match: *mut bot_match_t) -> c_in
                 strptr = newstrptr.offset(matched_len as isize);
             } else if mp.type_ == MT_VARIABLE {
                 let var = mp.variable as usize;
-                (*r#match).variables[var].offset =
-                    ((strptr as isize) - (base as isize)) as c_char;
+                (*r#match).variables[var].offset = ((strptr as isize) - (base as isize)) as c_char;
                 lastvariable = var as isize;
             }
         }
@@ -854,10 +855,9 @@ pub fn BotDumpReplyChat(bot: &mut BotLib, replychat: &[BotReplyChatRule]) {
                     let npieces = key.match_.len();
                     for (mi, mp) in key.match_.iter().enumerate() {
                         if mp.type_ == MT_STRING {
-                            let ms_c = CString::new(
-                                mp.strings.first().map(|s| s.as_str()).unwrap_or(""),
-                            )
-                            .unwrap_or_default();
+                            let ms_c =
+                                CString::new(mp.strings.first().map(|s| s.as_str()).unwrap_or(""))
+                                    .unwrap_or_default();
                             libc::fprintf(fp, c"\"%s\"".as_ptr(), ms_c.as_ptr());
                         } else {
                             libc::fprintf(fp, c"%d".as_ptr(), mp.variable);
@@ -893,7 +893,11 @@ pub fn BotDumpReplyChat(bot: &mut BotLib, replychat: &[BotReplyChatRule]) {
 /// conditions match Raven.
 ///
 /// Source: `oracle/codemp/botlib/be_ai_chat.cpp:1704-1804`
-pub fn BotCheckValidReplyChatKeySet(bot: &mut BotLib, source: &mut Source, keys: &[BotReplyChatKey]) {
+pub fn BotCheckValidReplyChatKeySet(
+    bot: &mut BotLib,
+    source: &mut Source,
+    keys: &[BotReplyChatKey],
+) {
     let mut allprefixed = true;
     let mut hasvariableskey = false;
     let mut hasstringkey = false;
@@ -1166,7 +1170,7 @@ pub fn BotSetChatName(bot: &mut BotLib, chatstate: c_int, name: *mut c_char, cli
         Some(i) => i,
         None => return,
     };
-    let name_str = unsafe { CStr::from_ptr(name).to_string_lossy().into_owned() };
+    let name_str = unsafe { latin1_to_string(CStr::from_ptr(name).to_bytes()) };
     let cs = bot.botchatstates[idx].as_mut().unwrap();
     cs.client = client;
     cs.name = name_str.chars().take(31).collect();
@@ -1244,7 +1248,7 @@ pub fn BotCheckChatMessageIntegrety(
                     while i < msg.len() && msg[i] != ESCAPE_CHAR {
                         i += 1;
                     }
-                    let name = String::from_utf8_lossy(&msg[start..i]).into_owned();
+                    let name = latin1_to_string(&msg[start..i]);
                     if i < msg.len() {
                         i += 1;
                     }
@@ -1283,7 +1287,7 @@ pub fn BotNumInitialChats(bot: &mut BotLib, chatstate: c_int, r#type: *mut c_cha
         Some(h) => h,
         None => return 0,
     };
-    let type_str = unsafe { CStr::from_ptr(r#type).to_string_lossy().into_owned() };
+    let type_str = unsafe { latin1_to_string(CStr::from_ptr(r#type).to_bytes()) };
     let mut result: Option<c_int> = None;
     for t in &bot.botchat(chat_handle).types {
         if t.name.eq_ignore_ascii_case(&type_str) {
@@ -1312,7 +1316,12 @@ pub fn BotEnterChat(bot: &mut BotLib, chatstate: c_int, clientto: c_int, sendto:
         Some(i) => i,
         None => return,
     };
-    if bot.botchatstates[idx].as_ref().unwrap().chatmessage.is_empty() {
+    if bot.botchatstates[idx]
+        .as_ref()
+        .unwrap()
+        .chatmessage
+        .is_empty()
+    {
         return;
     }
     BotRemoveTildes(&mut bot.botchatstates[idx].as_mut().unwrap().chatmessage);
@@ -1393,7 +1402,11 @@ pub fn BotCheckInitialChatIntegrety(common: &mut Common, bot: &mut BotLib, chat:
 /// Raven `BotCheckReplyChatIntegrety`.
 ///
 /// Source: `oracle/codemp/botlib/be_ai_chat.cpp:1593-1612`
-pub fn BotCheckReplyChatIntegrety(common: &mut Common, bot: &mut BotLib, replychat: &[BotReplyChatRule]) {
+pub fn BotCheckReplyChatIntegrety(
+    common: &mut Common,
+    bot: &mut BotLib,
+    replychat: &[BotReplyChatRule],
+) {
     let mut stringlist: Vec<String> = Vec::new();
     for rp in replychat {
         for cm in &rp.chatmessages {
@@ -1441,7 +1454,11 @@ pub fn BotExpandChatMessage(
                             msgptr = msgptr.offset(1);
                         }
                         if num as usize > MAX_MATCHVARIABLES {
-                            botimport_print(bot, PRT_ERROR, "BotConstructChat: variable out of range\n");
+                            botimport_print(
+                                bot,
+                                PRT_ERROR,
+                                "BotConstructChat: variable out of range\n",
+                            );
                             return 0;
                         }
                         let var = &(*r#match).variables[num as usize];
@@ -1458,7 +1475,11 @@ pub fn BotExpandChatMessage(
                             }
                             let tlen = libc::strlen(temp.as_ptr()) as isize;
                             if len + tlen >= MAX_MESSAGE_SIZE as isize {
-                                botimport_print(bot, PRT_ERROR, "BotConstructChat: message too long\n");
+                                botimport_print(
+                                    bot,
+                                    PRT_ERROR,
+                                    "BotConstructChat: message too long\n",
+                                );
                                 return 0;
                             }
                             libc::strcpy(outputbuf.offset(len), temp.as_ptr());
@@ -1477,11 +1498,15 @@ pub fn BotExpandChatMessage(
                         if *msgptr != 0 {
                             msgptr = msgptr.offset(1);
                         }
-                        let name = CStr::from_ptr(temp.as_ptr()).to_string_lossy().into_owned();
+                        let name = latin1_to_string(CStr::from_ptr(temp.as_ptr()).to_bytes());
                         let s = match RandomString(common, bot, &name) {
                             Some(s) => s,
                             None => {
-                                botimport_print(bot, PRT_ERROR, "BotConstructChat: unknown random string\n");
+                                botimport_print(
+                                    bot,
+                                    PRT_ERROR,
+                                    "BotConstructChat: unknown random string\n",
+                                );
                                 return 0;
                             }
                         };
@@ -1612,7 +1637,7 @@ pub fn BotConstructChatMessage(
             botimport_print(bot, PRT_WARNING, "too many expansions in chat message\n");
             botimport_print(bot, PRT_WARNING, "chatmessage\n");
         }
-        let out = CStr::from_ptr(outbuf.as_ptr()).to_string_lossy().into_owned();
+        let out = latin1_to_string(CStr::from_ptr(outbuf.as_ptr()).to_bytes());
         bot.botchatstates[cs_idx].as_mut().unwrap().chatmessage = out;
     }
 }
@@ -1647,7 +1672,7 @@ pub fn BotInitialChat(
         None => return,
     };
     unsafe {
-        let type_str = CStr::from_ptr(r#type).to_string_lossy().into_owned();
+        let type_str = latin1_to_string(CStr::from_ptr(r#type).to_bytes());
         let message = match BotChooseInitialChatMessage(common, bot, chat_handle, &type_str) {
             Some(m) => m,
             None => return,
@@ -1656,7 +1681,10 @@ pub fn BotInitialChat(
             string: [0; MAX_MESSAGE_SIZE],
             r#type: 0,
             subtype: 0,
-            variables: core::array::from_fn(|_| bot_matchvariable_t { offset: 0, length: 0 }),
+            variables: core::array::from_fn(|_| bot_matchvariable_t {
+                offset: 0,
+                length: 0,
+            }),
         };
         Com_Memset(
             &mut r#match as *mut bot_match_t as *mut (),
@@ -1676,7 +1704,16 @@ pub fn BotInitialChat(
                 index += vlen as isize;
             }
         }
-        BotConstructChatMessage(common, bot, idx, &message, mcontext as c_ulong, &mut r#match, 0, 0);
+        BotConstructChatMessage(
+            common,
+            bot,
+            idx,
+            &message,
+            mcontext as c_ulong,
+            &mut r#match,
+            0,
+            0,
+        );
     }
 }
 
@@ -1717,7 +1754,10 @@ pub fn BotReplyChat(
             string: [0; MAX_MESSAGE_SIZE],
             r#type: 0,
             subtype: 0,
-            variables: core::array::from_fn(|_| bot_matchvariable_t { offset: 0, length: 0 }),
+            variables: core::array::from_fn(|_| bot_matchvariable_t {
+                offset: 0,
+                length: 0,
+            }),
         };
         Com_Memset(
             &mut r#match as *mut bot_match_t as *mut (),
@@ -1731,7 +1771,10 @@ pub fn BotReplyChat(
             string: [0; MAX_MESSAGE_SIZE],
             r#type: 0,
             subtype: 0,
-            variables: core::array::from_fn(|_| bot_matchvariable_t { offset: 0, length: 0 }),
+            variables: core::array::from_fn(|_| bot_matchvariable_t {
+                offset: 0,
+                length: 0,
+            }),
         };
         for (ri, rchat) in bot.replychats.iter().enumerate() {
             let mut found = false;
@@ -2045,7 +2088,10 @@ pub fn BotLoadMatchPieces(
                 SourceError(
                     bot,
                     source,
-                    &format!("can't have more than {} match variables\n", MAX_MATCHVARIABLES),
+                    &format!(
+                        "can't have more than {} match variables\n",
+                        MAX_MATCHVARIABLES
+                    ),
                 );
                 return None;
             }
@@ -2228,7 +2274,11 @@ pub fn BotLoadMatchTemplates(bot: &mut BotLib, matchfile: &str) -> Vec<BotMatchT
 /// to keep the reply RNG stream and priority tie-break byte-identical.
 ///
 /// Source: `oracle/codemp/botlib/be_ai_chat.cpp:1811-1964`
-pub fn BotLoadReplyChat(common: &mut Common, bot: &mut BotLib, filename: &str) -> Vec<BotReplyChatRule> {
+pub fn BotLoadReplyChat(
+    common: &mut Common,
+    bot: &mut BotLib,
+    filename: &str,
+) -> Vec<BotReplyChatRule> {
     let mut replychatlist: Vec<BotReplyChatRule> = Vec::new();
     PC_SetBaseFolder(bot, BOTFILESBASEFOLDER);
     let mut source = match LoadSourceFile(bot, filename) {
@@ -2401,7 +2451,11 @@ pub fn BotLoadInitialChat(
                         break;
                     }
                     if token.string != "type" {
-                        SourceError(bot, &source, &format!("expected type found {}\n", token.string));
+                        SourceError(
+                            bot,
+                            &source,
+                            &format!("expected type found {}\n", token.string),
+                        );
                         FreeSource(source);
                         return None;
                     }
@@ -2452,7 +2506,11 @@ pub fn BotLoadInitialChat(
                 }
             }
         } else {
-            SourceError(bot, &source, &format!("unknown definition {}\n", token.string));
+            SourceError(
+                bot,
+                &source,
+                &format!("unknown definition {}\n", token.string),
+            );
             FreeSource(source);
             return None;
         }
@@ -2486,8 +2544,8 @@ pub fn BotLoadChatFile(
         None => return BLERR_CANNOTLOADICHAT,
     };
     BotFreeChatFile(bot, chatstate);
-    let chatfile_str = unsafe { CStr::from_ptr(chatfile).to_string_lossy().into_owned() };
-    let chatname_str = unsafe { CStr::from_ptr(chatname).to_string_lossy().into_owned() };
+    let chatfile_str = unsafe { latin1_to_string(CStr::from_ptr(chatfile).to_bytes()) };
+    let chatname_str = unsafe { latin1_to_string(CStr::from_ptr(chatname).to_bytes()) };
     let reload = LibVarGetValue(bot, "bot_reloadcharacters");
     let mut avail: isize = 0;
     if reload == 0.0 {

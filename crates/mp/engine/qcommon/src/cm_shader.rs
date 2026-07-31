@@ -41,6 +41,7 @@ use mp_qshared::shared::ha_pref;
 use mp_qshared::shared::q_string::Q_strncpyz;
 use mp_qshared::shared::q_string::{COM_Parse, SkipBracedSection, SkipRestOfLine};
 use native_string::atof;
+use native_string::latin1_to_string;
 use native_string::q_string::Q_stricmp;
 
 /// Raven `SV_ParseSurfaceParm` — match the next token against `svInfoParms`,
@@ -132,8 +133,8 @@ pub fn CM_GetShaderText(view: &mut EngineHostView, key: *const c_char) -> *const
     // The map yields the stored byte offset; `GetData` (the captured `mData`)
     // is `shaderText + offset`.
     // Source: `oracle/codemp/qcommon/cm_shader.cpp:158-168`
-    let key_str = unsafe { core::ffi::CStr::from_ptr(key) }.to_string_lossy();
-    if let Some(&offset) = view.cm.shaderTextTable.get(key_str.as_ref()) {
+    let key_str = latin1_to_string(unsafe { core::ffi::CStr::from_ptr(key) }.to_bytes());
+    if let Some(&offset) = view.cm.shaderTextTable.get(key_str.as_str()) {
         return unsafe { view.cm.shaderText.add(offset) } as *const c_char;
     }
     core::ptr::null()
@@ -252,7 +253,9 @@ pub fn SV_ParseMaterial(
             &format!(
                 "{}WARNING: missing material in shader '{}'\n",
                 S_COLOR_YELLOW,
-                unsafe { core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_string_lossy() }
+                latin1_to_string(unsafe {
+                    core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_bytes()
+                })
             ),
         );
         return;
@@ -286,7 +289,9 @@ pub fn CM_ParseVector(
             &format!(
                 "{}WARNING: missing parenthesis in shader '{}'\n",
                 S_COLOR_YELLOW,
-                unsafe { core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_string_lossy() }
+                latin1_to_string(unsafe {
+                    core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_bytes()
+                })
             ),
         );
         return qfalse;
@@ -301,9 +306,9 @@ pub fn CM_ParseVector(
                 &format!(
                     "{}WARNING: missing vector element in shader '{}'\n",
                     S_COLOR_YELLOW,
-                    unsafe {
-                        core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_string_lossy()
-                    }
+                    latin1_to_string(unsafe {
+                        core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_bytes()
+                    })
                 ),
             );
             return qfalse;
@@ -321,7 +326,9 @@ pub fn CM_ParseVector(
             &format!(
                 "{}WARNING: missing parenthesis in shader '{}'\n",
                 S_COLOR_YELLOW,
-                unsafe { core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_string_lossy() }
+                latin1_to_string(unsafe {
+                    core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_bytes()
+                })
             ),
         );
         return qfalse;
@@ -367,7 +374,9 @@ pub fn CM_ParseShader(
                 "{}WARNING: expecting '{{', found '{}' instead in shader '{}'\n",
                 S_COLOR_YELLOW,
                 token,
-                unsafe { core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_string_lossy() }
+                latin1_to_string(unsafe {
+                    core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_bytes()
+                })
             ),
         );
         return;
@@ -382,9 +391,9 @@ pub fn CM_ParseShader(
                 &format!(
                     "{}WARNING: no concluding '}}' in shader {}\n",
                     S_COLOR_YELLOW,
-                    unsafe {
-                        core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_string_lossy()
-                    }
+                    latin1_to_string(unsafe {
+                        core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_bytes()
+                    })
                 ),
             );
             return;
@@ -402,7 +411,8 @@ pub fn CM_ParseShader(
         }
         // material deprecated as of 11 Jan 01
         // material undeprecated as of 7 May 01 - q3map_material deprecated
-        else if (Q_stricmp(&token, "material") == 0) || (Q_stricmp(&token, "q3map_material") == 0) {
+        else if (Q_stricmp(&token, "material") == 0) || (Q_stricmp(&token, "q3map_material") == 0)
+        {
             SV_ParseMaterial(common, cm, shader, text);
         }
         // sun parms
@@ -455,9 +465,9 @@ pub fn CM_ParseShader(
                     &format!(
                         "{}WARNING: missing parm for 'fogParms' keyword in shader '{}'\n",
                         S_COLOR_YELLOW,
-                        unsafe {
-                            core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_string_lossy()
-                        }
+                        latin1_to_string(unsafe {
+                            core::ffi::CStr::from_ptr((*shader).shader.as_ptr()).to_bytes()
+                        })
                     ),
                 );
                 continue;
@@ -487,9 +497,7 @@ pub fn CM_SetupShaderProperties(view: &mut EngineHostView) {
         let shader = CM_GetShaderInfo(view.cm, i);
         let def = CM_GetShaderText(view, unsafe { (*shader).shader.as_ptr() });
         if !def.is_null() {
-            let def_str = unsafe { core::ffi::CStr::from_ptr(def) }
-                .to_string_lossy()
-                .into_owned();
+            let def_str = latin1_to_string(unsafe { core::ffi::CStr::from_ptr(def) }.to_bytes());
             let mut cursor: &str = &def_str;
             CM_ParseShader(view.common, view.cm, shader, &mut cursor);
         }
@@ -524,9 +532,7 @@ pub fn CM_GetShaderInfo_ByName(view: &mut EngineHostView, name: *const c_char) -
     // Parse in any text if it exists
     let def = CM_GetShaderText(view, name);
     if !def.is_null() {
-        let def_str = unsafe { core::ffi::CStr::from_ptr(def) }
-            .to_string_lossy()
-            .into_owned();
+        let def_str = latin1_to_string(unsafe { core::ffi::CStr::from_ptr(def) }.to_bytes());
         let mut cursor: &str = &def_str;
         CM_ParseShader(view.common, view.cm, out, &mut cursor);
     }

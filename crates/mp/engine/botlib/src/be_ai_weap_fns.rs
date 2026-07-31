@@ -11,6 +11,8 @@
 use core::ffi::{c_char, c_int, c_ulong};
 use std::ffi::{CStr, CString};
 
+use native_string::latin1_to_string;
+
 use mp_engine_qcommon::common_fns::{Com_Memcpy, Com_Memset};
 use mp_qshared::common::mp::botlib::botlib_error::{
     BLERR_CANNOTLOADWEAPONCONFIG, BLERR_CANNOTLOADWEAPONWEIGHTS, BLERR_NOERROR,
@@ -367,7 +369,7 @@ pub fn LoadWeaponConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weaponc
         let mut path = [0 as c_char; MAX_PATH];
         libc::strncpy(path.as_mut_ptr(), filename, MAX_PATH);
         PC_SetBaseFolder(bot, BOTFILESBASEFOLDER);
-        let path_str = CStr::from_ptr(path.as_ptr()).to_string_lossy().into_owned();
+        let path_str = latin1_to_string(CStr::from_ptr(path.as_ptr()).to_bytes());
         let mut source = match LoadSourceFile(bot, &path_str) {
             Some(s) => s,
             None => {
@@ -592,7 +594,7 @@ pub fn BotLoadWeaponWeights(bot: &mut BotLib, weaponstate: c_int, filename: *mut
     }
     BotFreeWeaponWeights(bot, weaponstate);
     unsafe {
-        let filename_str = CStr::from_ptr(filename).to_string_lossy().into_owned();
+        let filename_str = latin1_to_string(CStr::from_ptr(filename).to_bytes());
         (*ws).weaponweightconfig = ReadWeightConfig(bot, &filename_str);
         if (*ws).weaponweightconfig.is_none() {
             bot.botimport.Print.unwrap()(

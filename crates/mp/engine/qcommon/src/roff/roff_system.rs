@@ -22,6 +22,8 @@
 
 use std::ffi::CString;
 
+use native_string::latin1_to_string;
+
 use mp_host_interface::vm_slot::VmSlot;
 use mp_host_interface::EngineHost;
 use mp_qshared::common::mp::qcommon::game_export_t::gameExport_t;
@@ -874,14 +876,14 @@ impl RoffSystem {
 
     /// Reads the `index`-th cached note-track string out of the roff's packed
     /// blob (ROFF-V5) as an owned `String`, mirroring the oracle's
-    /// `mNoteTrackIndexes[index]` `char*` deref. Non-UTF-8 bytes are replaced
-    /// (note tracks are ASCII in practice); the value is consumed byte-wise by
-    /// [`Self::process_note`].
+    /// `mNoteTrackIndexes[index]` `char*` deref. Each byte maps to its Latin-1
+    /// code point (note tracks are ASCII in practice); the value is consumed
+    /// byte-wise by [`Self::process_note`].
     fn note_track_string(&self, roff_id: i32, index: usize) -> String {
         let croff = &self.roff_list[&roff_id];
         let start = croff.note_track_offsets[index];
         let len = c_strlen(&croff.note_track_blob, start);
-        String::from_utf8_lossy(&croff.note_track_blob[start..start + len]).into_owned()
+        latin1_to_string(&croff.note_track_blob[start..start + len])
     }
 }
 

@@ -19,6 +19,7 @@ use crate::c_format::{c_vsprintf, FmtArg};
 use crate::prelude::*;
 use native_string::atof_bytes;
 use native_string::atoi_bytes;
+use native_string::latin1_to_string;
 use native_string::InfoSetResult;
 
 // S5-5: the `QSharedScratch` type and the `QSharedScratch`-threaded
@@ -230,8 +231,8 @@ pub fn FloatNoSwap(f: *const f32) -> f32 {
 /// Source: `oracle/codemp/game/q_shared.c:300-310`
 pub fn COM_ParseError(qs: &QSharedScratch, format: *mut c_char) {
     unsafe {
-        let fmt_str = std::ffi::CStr::from_ptr(format as *const c_char).to_string_lossy();
-        let parsename_str = cstr_from_chars(&qs.com_parsename).to_string_lossy();
+        let fmt_str = latin1_to_string(CStr::from_ptr(format as *const c_char).to_bytes());
+        let parsename_str = latin1_to_string(cstr_from_chars(&qs.com_parsename).to_bytes());
         let com_lines = qs.com_lines;
         let msg = format!("ERROR: {}, line {}: {}", parsename_str, com_lines, fmt_str);
         crate::g_main::Com_Printf(&msg);
@@ -244,8 +245,8 @@ pub fn COM_ParseError(qs: &QSharedScratch, format: *mut c_char) {
 /// Source: `oracle/codemp/game/q_shared.c:312-322`
 pub fn COM_ParseWarning(qs: &QSharedScratch, format: *mut c_char) {
     unsafe {
-        let fmt_str = std::ffi::CStr::from_ptr(format as *const c_char).to_string_lossy();
-        let parsename_str = cstr_from_chars(&qs.com_parsename).to_string_lossy();
+        let fmt_str = latin1_to_string(CStr::from_ptr(format as *const c_char).to_bytes());
+        let parsename_str = latin1_to_string(cstr_from_chars(&qs.com_parsename).to_bytes());
         let com_lines = qs.com_lines;
         let msg = format!(
             "WARNING: {}, line {}: {}",

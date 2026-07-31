@@ -21,6 +21,8 @@
 
 use core::ffi::{c_char, c_int};
 
+use native_string::latin1_to_string;
+
 use mp_qshared::common::mp::botlib::botlib_error::BLERR_NOERROR;
 use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_FATAL, PRT_MESSAGE};
 use mp_qshared::shared::q_math::{_DotProduct, _VectorMA, _VectorSubtract};
@@ -256,13 +258,9 @@ pub fn AAS_ContinueInit(bot: &mut BotLib, time: f32) {
         AAS_InitClustering(bot);
         // if reachability has been calculated and an AAS file should be written
         // or there is a forced data optimization
-        if bot.aasworld.savefile != 0
-            || (LibVarGetValue(bot, "forcewrite") as c_int) != 0
-        {
+        if bot.aasworld.savefile != 0 || (LibVarGetValue(bot, "forcewrite") as c_int) != 0 {
             // optimize the AAS data
-            if (LibVarValue(bot, "aasoptimize", "0") as c_int)
-                != 0
-            {
+            if (LibVarValue(bot, "aasoptimize", "0") as c_int) != 0 {
                 AAS_Optimize(bot);
             }
             // save the AAS file
@@ -350,7 +348,7 @@ pub fn AAS_LoadFiles(bot: &mut BotLib, mapname: *const c_char) -> c_int {
         AAS_LoadBSPFile(bot);
 
         // load the aas file
-        let mapname_str = core::ffi::CStr::from_ptr(mapname).to_string_lossy();
+        let mapname_str = latin1_to_string(core::ffi::CStr::from_ptr(mapname).to_bytes());
         let __s = std::ffi::CString::new(format!("maps/{}.aas", mapname_str)).unwrap_or_default();
         Q_strncpyz(aasfile.as_mut_ptr(), __s.as_ptr(), MAX_PATH as c_int);
         let errnum = AAS_LoadAASFile(bot, aasfile.as_mut_ptr());

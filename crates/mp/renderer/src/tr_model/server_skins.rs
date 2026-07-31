@@ -27,6 +27,7 @@ use mp_host_interface::EngineHost;
 use mp_qshared::shared::limits::MAX_TOKEN_CHARS;
 use mp_qshared::shared::q_string::COM_StripExtension;
 use mp_qshared::shared::{qhandle_t, MAX_QPATH};
+use native_string::latin1_to_string;
 
 use super::render_models::RenderModels;
 use super::server_skin::ServerSkin;
@@ -243,11 +244,11 @@ impl RenderModels {
             // `surf->shader = R_FindServerShader(token, lightmapsNone,
             // stylesDefault, qtrue)` — the live `gServerSkinHack` arm (module
             // doc-comment).
-            let shader = self.find_server_shader(&String::from_utf8_lossy(&token));
+            let shader = self.find_server_shader(&latin1_to_string(&token));
             self.skins[h_skin as usize]
                 .surfaces
                 .push(ServerSkinSurface {
-                    name: String::from_utf8_lossy(&surf_name).into_owned(),
+                    name: latin1_to_string(&surf_name),
                     shader,
                 });
         }

@@ -50,8 +50,8 @@ use mp_qshared::shared::q_string::{Com_sprintf, Q_strncmp, Q_strncpyz};
 use mp_qshared::shared::swap::BigShort;
 use mp_qshared::shared::{qboolean, qfalse, qtrue, MAX_STRING_CHARS};
 use native_string::cstr::buf_to_string;
-use native_string::string_to_latin1;
 use native_string::q_string::{Q_strcmp, Q_stricmp};
+use native_string::{latin1_to_string, string_to_latin1};
 use native_string::{Info_SetValueForKey, Info_ValueForKey};
 
 use crate::server::client_s::client_t;
@@ -171,7 +171,7 @@ pub fn SV_AddServerCommand(common: &mut Common, sv: &mut Server, client: *mut cl
                     &format!(
                         "cmd {:5}: {}\n",
                         i,
-                        core::ffi::CStr::from_ptr(slot.as_ptr()).to_string_lossy()
+                        latin1_to_string(core::ffi::CStr::from_ptr(slot.as_ptr()).to_bytes())
                     ),
                 );
                 i += 1;
@@ -220,9 +220,7 @@ pub fn SV_SendServerCommand(common: &mut Common, sv: &mut Server, cl: *mut clien
             .collect();
         let expanded = unsafe {
             let expanded = SV_ExpandNewlines(sv, message.as_mut_ptr());
-            core::ffi::CStr::from_ptr(expanded)
-                .to_string_lossy()
-                .into_owned()
+            latin1_to_string(core::ffi::CStr::from_ptr(expanded).to_bytes())
         };
         com_printf(common, &format!("broadcast: {}\n", expanded));
     }
@@ -472,7 +470,7 @@ pub fn SVC_Status(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
             format!(
                 "statusResponse\n{}\n{}",
                 infostring,
-                CStr::from_ptr(status.as_ptr()).to_string_lossy()
+                latin1_to_string(CStr::from_ptr(status.as_ptr()).to_bytes())
             ),
         );
     }
@@ -644,7 +642,7 @@ pub fn SV_FlushRedirect(common: &mut Common, sv: &mut Server, outputbuf: *mut c_
         netsrc_t::NS_SERVER,
         sv.svs.redirectAddress,
         format!("print\n{}", unsafe {
-            CStr::from_ptr(outputbuf).to_string_lossy()
+            latin1_to_string(CStr::from_ptr(outputbuf).to_bytes())
         }),
     );
 }
@@ -679,16 +677,14 @@ pub fn SVC_RemoteCommand(
         let valid: qboolean;
         if rconpw.is_empty() || Q_strcmp(Cmd_Argv(view.common, 1), &rconpw) != 0 {
             valid = qfalse;
-            let adr = CStr::from_ptr(NET_AdrToString(view.common, from))
-                .to_string_lossy()
-                .into_owned();
+            let adr =
+                latin1_to_string(CStr::from_ptr(NET_AdrToString(view.common, from)).to_bytes());
             let arg = Cmd_Argv(view.common, 2).to_owned();
             Com_DPrintf(view.common, &format!("Bad rcon from {adr}:\n{arg}\n"));
         } else {
             valid = qtrue;
-            let adr = CStr::from_ptr(NET_AdrToString(view.common, from))
-                .to_string_lossy()
-                .into_owned();
+            let adr =
+                latin1_to_string(CStr::from_ptr(NET_AdrToString(view.common, from)).to_bytes());
             let arg = Cmd_Argv(view.common, 2).to_owned();
             Com_DPrintf(view.common, &format!("Rcon from {adr}:\n{arg}\n"));
         }
@@ -759,9 +755,7 @@ pub fn SV_ConnectionlessPacket(
         Cmd_TokenizeString(view.common, &s);
 
         let c = Cmd_Argv(view.common, 0).to_owned();
-        let adr = CStr::from_ptr(NET_AdrToString(view.common, from))
-            .to_string_lossy()
-            .into_owned();
+        let adr = latin1_to_string(CStr::from_ptr(NET_AdrToString(view.common, from)).to_bytes());
         Com_DPrintf(view.common, &format!("SV packet {adr} : {c}\n"));
 
         if Q_stricmp(&c, "getstatus") == 0 {
@@ -937,10 +931,7 @@ pub fn SV_CheckTimeouts(common: &mut Common, sv: &mut Server) {
             if (*cl).state == clientState_t::CS_ZOMBIE && (*cl).lastPacketTime < zombiepoint {
                 Com_DPrintf(
                     common,
-                    &format!(
-                        "Going from CS_ZOMBIE to CS_FREE for {}\n",
-                        (*cl).name
-                    ),
+                    &format!("Going from CS_ZOMBIE to CS_FREE for {}\n", (*cl).name),
                 );
                 (*cl).state = clientState_t::CS_FREE; // can now be reused
                 continue;
@@ -986,9 +977,8 @@ pub fn SV_CheckCvars(view: &mut EngineHostView, sv: &mut Server) {
             }
         }
         if changed != qfalse {
-            let hostname_s = unsafe { CStr::from_ptr(hostname.as_ptr()) }
-                .to_string_lossy()
-                .into_owned();
+            let hostname_s =
+                unsafe { latin1_to_string(CStr::from_ptr(hostname.as_ptr()).to_bytes()) };
             Cvar_Set(view, "sv_hostname", &hostname_s);
         }
     }

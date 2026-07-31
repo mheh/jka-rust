@@ -20,6 +20,7 @@ use mp_host_interface::VmSlot;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::vec3_t;
+use native_string::latin1_to_string;
 
 use crate::server::server_state_t::serverState_t;
 use crate::server_host::Server;
@@ -126,11 +127,9 @@ fn sv_shownet_entity_classname_hook(view: &mut EngineHostView, number: c_int) ->
         if ent.is_null() || (*ent).classname.is_null() {
             return None;
         }
-        Some(
-            CStr::from_ptr((*ent).classname)
-                .to_string_lossy()
-                .into_owned(),
-        )
+        Some(latin1_to_string(
+            CStr::from_ptr((*ent).classname).to_bytes(),
+        ))
     }
 }
 
