@@ -90,6 +90,25 @@ of the same source targets our engine later (registers/SSE2/addr-space wins;
   referee's digests cover exactly the seam memory, which is exactly the
   memory that never changes shape.
 
+### Workspace hygiene — ruled into this stage (2026-07-30)
+
+The user parked these alongside the crate/folder relayout. They run as
+one-time mechanical campaigns behind green gates, not during porting:
+
+- **Folder hierarchy / crate relayout** (the already-ruled parking, restated
+  here as the anchor for the items below).
+- **Import normalization**: one workspace-wide commit that applies rustfmt
+  plus import grouping. This retires the per-file import mess the porting
+  era left. During porting, whole-file reflow stays banned because it
+  pollutes diffs.
+- **Lint lane**: a curated clippy set plus a small grep-lint in CI
+  (function-body `use`, inline `crate::` paths in expressions, marker-less
+  `todo!()`). This turns the import and stub rules from review discipline
+  into mechanical failure.
+- **Duplication censuses**: campaign-style sweeps for repeated string
+  literals, magic numbers, and near-duplicate function bodies, each run as
+  census -> ruling -> worker waves (the DEC-32 / #13 recipe).
+
 ## Stage 3 — The single-writer platform (mailbox + snapshots)
 
 Frame thread stays sole owner of GameWorld (compiler-enforced). Two channels:
