@@ -18,22 +18,21 @@
 
 use mp_engine_qcommon::common::{com_error, Common};
 use mp_engine_qcommon::common_fns::Q_acos;
+use mp_engine_qcommon::qfiles::shader_limits::SHADER_MAX_VERTEXES;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::q_math::{
-    _DotProduct as DotProduct, _VectorAdd as VectorAdd, _VectorScale as VectorScale, vec3_origin,
-    CrossProduct, PerpendicularVector,
+    _DotProduct as DotProduct, _VectorAdd as VectorAdd, _VectorScale as VectorScale,
+    _VectorSubtract as VectorSubtract, vec3_origin, CrossProduct, PerpendicularVector,
 };
 use mp_qshared::shared::vec3_t;
 use native_math::qmath::VectorNormalize;
 
 use crate::render_state::frame_state::FrameState;
-use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::image_asset::ImageHandle;
-use crate::render_state::render_assets::RenderAssets;
+use crate::render_state::placeholders::SkyParms;
 use crate::render_state::renderer_cvars::RendererCvars;
-use crate::render_state::shader_asset::ShaderHandle;
-use crate::tr_backend::GL_Bind;
 use crate::tr_local::view_parms_t::viewParms_t;
+use crate::tr_public::ref_flags::RDF_SKYBOXPORTAL;
 use crate::tr_shade_calc::myftol;
 
 /// Per-subsystem carrier for `tr_sky.cpp`'s file-scope sky-box scratch
@@ -107,15 +106,93 @@ pub struct SkyState {
     pub cloud_tex_p: Vec<Vec<Vec<f32>>>,
 }
 
+/// One outer-box face's draw list — the render-side product of one iteration
+/// of Raven `DrawSkyBox`'s per-face loop, in the DEC-50 shape: the frontend
+/// returns geometry data, and the backend binds the image and emits the
+/// triangle strips (Raven `DrawSkySide`'s GL body, now the backend's
+/// `build_sky_face_block`).
+///
+/// `points`/`tex_coords` snapshot the whole `s_skyPoints`/`s_skyTexCoords`
+/// grid at the moment the face was projected, so the backend indexes them by
+/// the same `[t][s]` scheme `DrawSkySide` uses over `mins`/`maxs`. The
+/// grid is shared scratch that the next face overwrites, so each face keeps
+/// its own copy.
+///
+/// Source: `oracle/codemp/renderer/tr_sky.cpp:347-444`
+pub struct SkyBoxFace {
+    /// `shader->sky->outerbox[i]` — the face image the backend's `GL_Bind`
+    /// binds. `None` for a face `ParseSkyParms` left unset.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_sky.cpp:441`
+    pub image: Option<ImageHandle>,
+    /// `sky_mins_subd` — the face's lower subdivision bound, `[s, t]`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_sky.cpp:442`
+    pub mins: [i32; 2],
+    /// `sky_maxs_subd` — the face's upper subdivision bound, `[s, t]`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_sky.cpp:443`
+    pub maxs: [i32; 2],
+    /// `s_skyPoints` — the projected sky-box grid vertex positions, relative
+    /// to the view origin. The backend applies the view-origin translate.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_sky.cpp:344`
+    pub points: Vec<Vec<vec3_t>>,
+    /// `s_skyTexCoords` — the grid's texture coordinates.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_sky.cpp:345`
+    pub tex_coords: Vec<Vec<[f32; 2]>>,
+}
+
+/// The cloud layer's world-space geometry — the render-side product of
+/// Raven `R_BuildCloudData`, which the oracle stamps into the global `tess`
+/// and draws through `RB_StageIteratorGeneric`. Under DEC-50 the frontend
+/// returns it as owned buffers and the backend feeds the same generic stage
+/// machinery.
+///
+/// Source: `oracle/codemp/renderer/tr_sky.cpp:448-496,596-619`
+#[derive(Default)]
+pub struct SkyCloudData {
+    /// `tess.xyz` — the cloud vertices in world space (`s_skyPoints` plus the
+    /// view origin).
+    ///
+    /// Source: `oracle/codemp/renderer/tr_sky.cpp:461`
+    pub xyz: Vec<vec3_t>,
+    /// `tess.texCoords[..][0]` — the per-vertex cloud texture coordinates.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_sky.cpp:462-463`
+    pub tex_coords: Vec<[f32; 2]>,
+    /// `tess.indexes` — the cloud triangle indexes into [`Self::xyz`].
+    ///
+    /// Source: `oracle/codemp/renderer/tr_sky.cpp:480-492`
+    pub indexes: Vec<u32>,
+}
+
+/// The full render-side product of Raven `RB_StageIteratorSky` — the six
+/// outer-box faces plus the cloud layer, for the backend to draw. Sky is
+/// drawn inline in the sorted draw-surf loop, one call per sky-shader surface
+/// batch (DEC-50).
+///
+/// Source: `oracle/codemp/renderer/tr_sky.cpp:786-848`
+pub struct SkyBoxDrawData {
+    /// The six outer-box faces (`rt`/`lf`/`bk`/`ft`/`up`/`dn`). A face is
+    /// `None` when it projects to nothing or when the shader draws no outer
+    /// box.
+    pub faces: [Option<SkyBoxFace>; 6],
+    /// The cloud layer geometry.
+    pub cloud: SkyCloudData,
+}
+
 /// Raven `SKY_SUBDIVISIONS`.
 ///
 /// Source: `oracle/codemp/renderer/tr_sky.cpp:7`
 const SKY_SUBDIVISIONS: i32 = 8;
 
-/// Raven `HALF_SKY_SUBDIVISIONS` (`SKY_SUBDIVISIONS/2`).
+/// Raven `HALF_SKY_SUBDIVISIONS` (`SKY_SUBDIVISIONS/2`). The GPU backend
+/// imports this to index the sky-box grid, so the loop bounds have one home.
 ///
 /// Source: `oracle/codemp/renderer/tr_sky.cpp:8`
-const HALF_SKY_SUBDIVISIONS: i32 = SKY_SUBDIVISIONS / 2;
+pub const HALF_SKY_SUBDIVISIONS: i32 = SKY_SUBDIVISIONS / 2;
 
 /// Raven `MAX_CLIP_VERTS`.
 ///
@@ -137,6 +214,23 @@ const ON_EPSILON: f32 = 0.1;
 const SIDE_FRONT: i32 = 0;
 const SIDE_BACK: i32 = 1;
 const SIDE_ON: i32 = 2;
+
+/// Raven `sky_clip[6]` — the six clip-plane normals `ClipSkyPolygon` clips
+/// the box polygon against. The port carries the live values in
+/// `SkyState::sky_clip` because the earlier wave's oracle slice omitted this
+/// definition. This wave has the definition, so `RB_ClipSkyPolygons` copies
+/// it in before the clip pass. The oracle keeps them as an immutable
+/// file-scope const, so the copy never changes them.
+///
+/// Source: `oracle/codemp/renderer/tr_sky.cpp:23-31`
+const SKY_CLIP: [vec3_t; 6] = [
+    [1.0, 1.0, 0.0],
+    [1.0, -1.0, 0.0],
+    [0.0, -1.0, 1.0],
+    [0.0, 1.0, 1.0],
+    [1.0, 0.0, 1.0],
+    [-1.0, 0.0, 1.0],
+];
 
 /// Raven `vec_to_st[6][3]` — `AddSkyPolygon`'s face-axis -> (s,t,dv) index
 /// table. Const per the three-kind fn-scope-statics rule (kind 1: never
@@ -313,16 +407,69 @@ pub fn MakeSkyVec(
 
 /// Raven `FillCloudySkySide`.
 ///
-/// DEFERRED: R4 — every write lives on `tess` (dissolved into R4's
-/// tessellation/vertex-building pipeline; R2 `## State ownership` row
-/// `tess`), including the `SHADER_MAX_VERTEXES` `Com_Error` bound check
-/// (`tess.numVertexes`); no R3 carrier holds `tess.xyz`/`texCoords`/
-/// `indexes`/`numVertexes`/`numIndexes` to read or write.
+/// The oracle stamps the cloud grid into the global `tess`; this port appends
+/// into an owned `SkyCloudData` accumulator (DEC-50). `tess.numVertexes` at
+/// entry becomes `cloud.xyz.len()` (`vertex_start`), so the index offsets stay
+/// correct as later faces append. `view_origin` is `backEnd.viewParms.ori
+/// .origin`. The `SHADER_MAX_VERTEXES` `Com_Error` bound check is kept against
+/// the accumulator length to reproduce the oracle overflow behavior.
 ///
 /// Source: `oracle/codemp/renderer/tr_sky.cpp:448-496`
-pub fn FillCloudySkySide(_mins: [i32; 2], _maxs: [i32; 2], _add_indexes: bool) {
-    // DEFERRED: R4 — FillCloudySkySide (see doc comment above)
-    // Source: oracle/codemp/renderer/tr_sky.cpp:448-496
+pub fn FillCloudySkySide(
+    mins: [i32; 2],
+    maxs: [i32; 2],
+    add_indexes: bool,
+    view_origin: vec3_t,
+    sky: &SkyState,
+    cloud: &mut SkyCloudData,
+) {
+    let vertex_start = cloud.xyz.len() as i32;
+    let t_height = maxs[1] - mins[1] + 1;
+    let s_width = maxs[0] - mins[0] + 1;
+
+    for t in (mins[1] + HALF_SKY_SUBDIVISIONS)..=(maxs[1] + HALF_SKY_SUBDIVISIONS) {
+        for s in (mins[0] + HALF_SKY_SUBDIVISIONS)..=(maxs[0] + HALF_SKY_SUBDIVISIONS) {
+            let mut xyz: vec3_t = [0.0; 3];
+            VectorAdd(sky.sky_points[t as usize][s as usize], view_origin, &mut xyz);
+            cloud.xyz.push(xyz);
+            cloud
+                .tex_coords
+                .push(sky.sky_tex_coords[t as usize][s as usize]);
+
+            if cloud.xyz.len() >= SHADER_MAX_VERTEXES as usize {
+                com_error(
+                    errorParm_t::ERR_DROP,
+                    "SHADER_MAX_VERTEXES hit in FillCloudySkySide()\n".to_string(),
+                );
+            }
+        }
+    }
+
+    // only add indexes for one pass, otherwise it would draw multiple times
+    // for each pass
+    if add_indexes {
+        for t in 0..(t_height - 1) {
+            for s in 0..(s_width - 1) {
+                cloud.indexes.push((vertex_start + s + t * s_width) as u32);
+                cloud
+                    .indexes
+                    .push((vertex_start + s + (t + 1) * s_width) as u32);
+                cloud
+                    .indexes
+                    .push((vertex_start + s + 1 + t * s_width) as u32);
+
+                cloud
+                    .indexes
+                    .push((vertex_start + s + (t + 1) * s_width) as u32);
+                cloud
+                    .indexes
+                    .push((vertex_start + s + 1 + (t + 1) * s_width) as u32);
+                cloud
+                    .indexes
+                    .push((vertex_start + s + 1 + t * s_width) as u32);
+            }
+        }
+    }
 }
 
 /// Raven `ClipSkyPolygon`.
@@ -420,66 +567,28 @@ pub fn ClipSkyPolygon(vecs: &[vec3_t], stage: i32, sky: &mut SkyState) {
     ClipSkyPolygon(&newv[1], stage + 1, sky);
 }
 
-/// Raven `DrawSkySide`.
-///
-/// GL/WGL surface (`qglBegin`/`qglTexCoord2fv`/`qglVertex3fv`/`qglEnd`): DEC-01/
-/// DEC-37 — the backend is an idiomatic wgpu rewrite, not a GL
-/// transcription, and R2 leaves these fixed-function entry points unhomed
-/// (`GpuResources::gl_state` is a named placeholder until R4). Each is
-/// DEFERRED at its call site below; the surrounding CPU logic (the
-/// subdivision loop bounds and per-vertex texcoord/vertex lookups) is
-/// ported in full — `GL_Bind` (already ported, wave 0 `tr_backend.cpp`) is
-/// called for real.
-///
-/// `image` is the oracle's `struct image_s *image` → `Option<ImageHandle>`
-/// per the interior-safety law (handle, not a raw pointer).
-///
-/// Source: `oracle/codemp/renderer/tr_sky.cpp:347-376`
-pub fn DrawSkySide(
-    gpu: &mut GpuResources,
-    image: Option<ImageHandle>,
-    mins: [i32; 2],
-    maxs: [i32; 2],
-    sky: &SkyState,
-) {
-    GL_Bind(gpu, image);
-
-    for t in (mins[1] + HALF_SKY_SUBDIVISIONS)..(maxs[1] + HALF_SKY_SUBDIVISIONS) {
-        // DEFERRED: R4 — qglBegin(GL_TRIANGLE_STRIP) (DEC-37 A13.2, unhomed
-        // GL/WGL entry point)
-        // Source: oracle/codemp/renderer/tr_sky.cpp:362
-
-        for s in (mins[0] + HALF_SKY_SUBDIVISIONS)..=(maxs[0] + HALF_SKY_SUBDIVISIONS) {
-            let _tex_coord_0 = sky.sky_tex_coords[t as usize][s as usize];
-            let _vertex_0 = sky.sky_points[t as usize][s as usize];
-            let _tex_coord_1 = sky.sky_tex_coords[(t + 1) as usize][s as usize];
-            let _vertex_1 = sky.sky_points[(t + 1) as usize][s as usize];
-            // DEFERRED: R4 — qglTexCoord2fv/qglVertex3fv ×2 (DEC-37 A13.2,
-            // unhomed GL/WGL entry points)
-            // Source: oracle/codemp/renderer/tr_sky.cpp:367-371
-        }
-
-        // DEFERRED: R4 — qglEnd() (DEC-37 A13.2, unhomed GL/WGL entry point)
-        // Source: oracle/codemp/renderer/tr_sky.cpp:374
-    }
-}
-
 /// Raven `FillCloudBox`.
 ///
-/// `shader` is kept for signature parity only — the oracle's
-/// `shader->sky->fullClouds` branch is hard-coded to `if ( 1 )` with a
-/// `// FIXME?` left in place, so the field is never actually read
-/// (porting-rules §A2: port the behavior as written, not a "cleaner"
-/// reading of the dead branch). `view` threads `backEnd.viewParms` into
-/// `MakeSkyVec` (same top-of-file PORT-NOTE precedent as wave 0). `sky`
-/// carries `sky_mins`/`sky_maxs`/`sky_points`/`sky_tex_coords`/
-/// `cloud_tex_coords` (`SkyState`, DEC-37 A13.3). The `floor`/`ceil` calls
-/// are the C `<math.h>` double overloads (no `floorf`/`ceilf`), so their
-/// operand promotes to `f64` and the result rounds back to `f32` once at
-/// the assignment (wave-0 ruling 12).
+/// The oracle's `const shader_t *shader` argument drops: its only read is the
+/// `shader->sky->fullClouds` branch, which is hard-coded to `if ( 1 )` with a
+/// `// FIXME?` left in place, so the shader is never actually read
+/// (porting-rules §A2: port the behavior as written, not a "cleaner" reading
+/// of the dead branch). `view` threads `backEnd.viewParms` into `MakeSkyVec`
+/// (same top-of-file PORT-NOTE precedent as wave 0) and supplies the view
+/// origin for `FillCloudySkySide`. `sky` carries `sky_mins`/`sky_maxs`/
+/// `sky_points`/`sky_tex_coords`/`cloud_tex_coords` (`SkyState`, DEC-37
+/// A13.3). `cloud` accumulates the cloud geometry (DEC-50). The `floor`/`ceil`
+/// calls are the C `<math.h>` double overloads (no `floorf`/`ceilf`), so their
+/// operand promotes to `f64` and the result rounds back to `f32` once at the
+/// assignment (wave-0 ruling 12).
 ///
 /// Source: `oracle/codemp/renderer/tr_sky.cpp:498-591`
-pub fn FillCloudBox(_shader: ShaderHandle, stage: i32, view: &viewParms_t, sky: &mut SkyState) {
+pub fn FillCloudBox(
+    stage: i32,
+    view: &viewParms_t,
+    sky: &mut SkyState,
+    cloud: &mut SkyCloudData,
+) {
     for i in 0..6usize {
         let min_t: f32;
 
@@ -558,7 +667,14 @@ pub fn FillCloudBox(_shader: ShaderHandle, stage: i32, view: &viewParms_t, sky: 
         }
 
         // only add indexes for first stage
-        FillCloudySkySide(sky_mins_subd, sky_maxs_subd, stage == 0);
+        FillCloudySkySide(
+            sky_mins_subd,
+            sky_maxs_subd,
+            stage == 0,
+            view.ori.origin,
+            sky,
+            cloud,
+        );
     }
 }
 
@@ -649,27 +765,40 @@ pub fn R_InitSkyTexCoords(height_cloud: f32, view: &mut viewParms_t, sky: &mut S
 
 /// Raven `RB_ClipSkyPolygons`.
 ///
-/// DEFERRED: R4 — the clip loop's every read comes from `input`
-/// (`shaderCommands_t *`, the same dissolved type as the global `tess` — R2
-/// `## State ownership` row `tess`: "dissolved into R4's
-/// tessellation/vertex-building pipeline ... no single global scratch
-/// buffer survives the new topology"; no R3 type exists for
-/// `input->numIndexes`/`->xyz`/`->indexes` to be read from). No computation
-/// survives once `input` is removed — the loop's only output (`p[j]`, via
-/// `VectorSubtract` against `backEnd.viewParms.ori.origin`) feeds straight
-/// into the already-ported `ClipSkyPolygon`. `ClearSkyBox`'s reset at the top
-/// of the fn is unconditional and independent of `input`, so it is
-/// transcribed for real (porting-rules: port the surrounding CPU logic,
-/// defer only the blocked piece). `_view` threads `backEnd.viewParms` for
-/// the deferred leg's future completion (top-of-file PORT-NOTE precedent).
+/// The oracle reads the surface triangles from the global `tess`
+/// (`input->numIndexes`/`->xyz`/`->indexes`); DEC-50 hands them in as
+/// `verts`/`indexes` (the sky-shader surface batch, world space). Each
+/// triangle vertex is offset by the view origin (`view.ori.origin`) into the
+/// clip-space direction vector, then clipped by `ClipSkyPolygon`. The port
+/// copies the six clip-plane normals into `sky.sky_clip` first (see
+/// [`SKY_CLIP`]).
+///
+/// Raven's `vec3_t p[5]` scratch keeps one spare for clipping but fills only
+/// `p[0..3]` and passes `nump = 3`; the port uses a plain `[vec3_t; 3]`.
 ///
 /// Source: `oracle/codemp/renderer/tr_sky.cpp:244-261`
-pub fn RB_ClipSkyPolygons(_view: &viewParms_t, sky: &mut SkyState) {
+pub fn RB_ClipSkyPolygons(
+    verts: &[vec3_t],
+    indexes: &[u32],
+    view: &viewParms_t,
+    sky: &mut SkyState,
+) {
+    sky.sky_clip = SKY_CLIP;
     ClearSkyBox(sky);
 
-    // DEFERRED: R4 — the `for (i = 0; i < input->numIndexes; i += 3)` clip
-    // loop (see doc comment above)
-    // Source: oracle/codemp/renderer/tr_sky.cpp:251-260
+    let mut i = 0usize;
+    while i < indexes.len() {
+        let mut p: [vec3_t; 3] = [[0.0; 3]; 3];
+        for j in 0..3usize {
+            VectorSubtract(
+                verts[indexes[i + j] as usize],
+                view.ori.origin,
+                &mut p[j],
+            );
+        }
+        ClipSkyPolygon(&p, 0, sky);
+        i += 3;
+    }
 }
 
 /// Raven `DrawSkyBox`.
@@ -687,28 +816,24 @@ pub fn RB_ClipSkyPolygons(_view: &viewParms_t, sky: &mut SkyState) {
 /// the already-ported `Com_Memset(dest: *mut (), ...)` cannot be called here.
 ///
 /// `sky` carries `sky_min`/`sky_max` (write)/`sky_mins`/`sky_maxs`
-/// (write)/`sky_points`/`sky_tex_coords` (`SkyState`, DEC-37 A13.3 — already
-/// landed by wave 0/1, not newly named here). `view` threads
-/// `backEnd.viewParms` into `MakeSkyVec` (top-of-file PORT-NOTE precedent).
+/// (write)/`sky_points`/`sky_tex_coords` (`SkyState`, DEC-37 A13.3). `view`
+/// threads `backEnd.viewParms` into `MakeSkyVec` (top-of-file PORT-NOTE
+/// precedent).
 ///
-/// `shader->sky->outerbox[i]` feeds `DrawSkySide`'s `image` argument, but
-/// `ShaderAsset::sky` is still the empty `SkyParms` placeholder
-/// (`render_state/placeholders.rs` — untouched by wave 0, fields land with
-/// the `tr_shader` wave that ports `skyParms_t`) — `outerbox` has no landed
-/// field, and this file cannot extend `placeholders.rs` (out of scope):
-/// DEFERRED, `todo!()`, not a guess. `gpu`/`shader_handle` are kept unread
-/// for call-site signature parity (same "kept for signature parity only"
-/// precedent this file's own `FillCloudBox` already established for its
-/// `_shader` param) — nothing downstream of the `outerbox` gap is reachable
-/// to read them.
+/// The oracle draws each face inline (`DrawSkySide`); DEC-50 returns the six
+/// faces as data instead. `sky_parms.outerbox[i]` is the face image the
+/// backend binds. After a face fills the shared grid, this function snapshots
+/// the grid into the `SkyBoxFace`, because the next face overwrites it. A face
+/// that projects to nothing (the `sky_mins >= sky_maxs` skip) stays `None`.
 ///
 /// Source: `oracle/codemp/renderer/tr_sky.cpp:378-446`
 pub fn DrawSkyBox(
-    _gpu: &mut GpuResources,
-    _shader_handle: ShaderHandle,
+    sky_parms: &SkyParms,
     view: &viewParms_t,
     sky: &mut SkyState,
-) {
+) -> [Option<SkyBoxFace>; 6] {
+    let mut faces: [Option<SkyBoxFace>; 6] = core::array::from_fn(|_| None);
+
     sky.sky_min = 0.0;
     sky.sky_max = 1.0;
 
@@ -779,68 +904,56 @@ pub fn DrawSkyBox(
             }
         }
 
-        // DEFERRED: skyParms_t.outerbox — SkyParms interior not yet landed
-        // (see doc comment above); lands with a later tr_shader wave
-        // Source: oracle/codemp/renderer/tr_local.h:449-452
-        todo!("Port skyParms_t.outerbox — oracle/codemp/renderer/tr_local.h:449-452");
+        // The oracle calls DrawSkySide( shader->sky->outerbox[i], ... ) here.
+        // DEC-50 snapshots the grid into the face draw data instead.
+        faces[i] = Some(SkyBoxFace {
+            image: sky_parms.outerbox[i],
+            mins: sky_mins_subd,
+            maxs: sky_maxs_subd,
+            points: sky.sky_points.clone(),
+            tex_coords: sky.sky_tex_coords.clone(),
+        });
     }
+
+    faces
 }
 
 /// Raven `R_BuildCloudData`.
 ///
-/// `input->shader` resolves through `RenderAssets::shaders` (same
-/// handle-threading translation as sibling `DrawSkyBox`, and the same
-/// `if let Some(...)` guard convention this crate already uses at
-/// `assets.shaders.get(...)` call sites). `assert( shader->sky )` becomes
-/// `debug_assert!` (existing precedent, e.g. `tr_scene.rs`'s
-/// `debug_assert!(ent.renderfx >= 0)`) — `ShaderAsset::sky` is a real,
-/// landed `Option<SkyParms>` field, so the assert itself is checkable even
-/// though `SkyParms`'s interior is still the empty wave-0 placeholder.
+/// The oracle reads `input->shader`; DEC-50 hands in the shader's `sky_parms`
+/// and `num_unfogged_passes` directly. `assert( shader->sky )` drops: the
+/// backend only calls this for a sky shader, so `sky_parms` is always present.
 ///
 /// `sky_min`/`sky_max`'s RHS mixes an unsuffixed (`double`) literal with an
 /// `f`-suffixed one (`1.0 / 256.0f`), so the divide promotes to `f64` and
 /// rounds once at the assignment (wave-0 ruling 12) — Raven's own
 /// `// FIXME: not correct?` comment is kept verbatim. `tess.numIndexes = 0;
-/// tess.numVertexes = 0;` write the dissolved `tess`/`shaderCommands_t` (R2
-/// `## State ownership` row `tess`, no R3 carrier — DEFERRED).
+/// tess.numVertexes = 0;` reset the cloud accumulator (`cloud`) instead of the
+/// dissolved `tess` (DEC-50).
 ///
-/// `input->shader->sky->cloudHeight` gates the `FillCloudBox` loop, but
-/// `ShaderAsset::sky`'s interior (`SkyParms`) has no landed `cloudHeight`
-/// field yet (same placeholder as `DrawSkyBox`'s `outerbox` gap, and this
-/// file cannot extend `placeholders.rs`): DEFERRED, `todo!()`, not a guess.
-/// `input->shader->numUnfoggedPasses` is real
-/// (`ShaderAsset::num_unfogged_passes`) and threads straight into the
-/// already-ported `FillCloudBox`.
+/// `sky_parms.cloud_height` gates the `FillCloudBox` loop, and
+/// `num_unfogged_passes` (`shader->numUnfoggedPasses`) bounds it.
 ///
 /// Source: `oracle/codemp/renderer/tr_sky.cpp:596-619`
-#[allow(unreachable_code, unused_variables)]
 pub fn R_BuildCloudData(
-    assets: &RenderAssets,
-    shader_handle: ShaderHandle,
+    sky_parms: &SkyParms,
+    num_unfogged_passes: i32,
     view: &viewParms_t,
     sky: &mut SkyState,
+    cloud: &mut SkyCloudData,
 ) {
-    let Some(shader) = assets.shaders.get(shader_handle) else {
-        return;
-    };
-
-    debug_assert!(shader.sky.is_some(), "R_BuildCloudData: shader->sky");
-
     // FIXME: not correct?
     sky.sky_min = (1.0_f64 / 256.0_f64) as f32;
     sky.sky_max = (255.0_f64 / 256.0_f64) as f32;
 
-    // DEFERRED: R4 — tess.numIndexes = 0; tess.numVertexes = 0; (dissolved
-    // `tess`/`shaderCommands_t`, R2 `## State ownership` row `tess`, no R3
-    // carrier)
-    // Source: oracle/codemp/renderer/tr_sky.cpp:609-610
+    // set up for drawing
+    cloud.xyz.clear();
+    cloud.tex_coords.clear();
+    cloud.indexes.clear();
 
-    // DEFERRED: skyParms_t.cloudHeight — SkyParms interior not yet landed
-    // (see doc comment above); lands with a later tr_shader wave
-    // Source: oracle/codemp/renderer/tr_local.h:449-452
-    if todo!("Port skyParms_t.cloudHeight — oracle/codemp/renderer/tr_local.h:449-452") {
-        for i in 0..shader.num_unfogged_passes {
-            FillCloudBox(shader_handle, i, view, sky);
+    if sky_parms.cloud_height != 0.0 {
+        for i in 0..num_unfogged_passes {
+            FillCloudBox(i, view, sky, cloud);
         }
     }
 }
@@ -924,64 +1037,93 @@ pub fn RB_DrawSun(frame: &FrameState, common: &Common, cvars: &RendererCvars, vi
     // Source: oracle/codemp/renderer/tr_sky.cpp:771
 }
 
-/// Raven `RB_StageIteratorSky` — wave 10, final tail wave for this file.
+/// Raven `RB_StageIteratorSky`.
 ///
 /// Raven: go through all the polygons and project them onto the sky box to
-/// see which blocks on each side need to be drawn; `r_showsky` will let all
-/// the sky blocks be drawn in front of everything to allow developers to see
-/// how much sky is getting sucked in; note that sky was drawn so we will
-/// draw a sun later.
+/// see which blocks on each side need to be drawn; note that sky was drawn so
+/// we will draw a sun later.
 ///
-/// Whole-fn deferral, not a partial body: the function's very first
-/// statement, `if ( g_bRenderGlowingObjects ) return;`, gates every single
-/// statement that follows it — including the trailing unconditional
-/// `backEnd.skyRenderedThisView = qtrue;` write. That gate is no longer the
-/// blocker: campaign #41 batch 1 homed `g_bRenderGlowingObjects` and
-/// `skyboxportal` on `FrameState` (`render_glowing_objects`/`skyboxportal`,
-/// DEC-37 A13.3) and landed `RDF_SKYBOXPORTAL` in the crate's canonical flag
-/// home (`tr_public::ref_flags`), so the two early-out guards
-/// (`if (g_bRenderGlowingObjects) return;` and
-/// `if (skyboxportal && !(backEnd.refdef.rdflags & RDF_SKYBOXPORTAL))
-/// return;`) are a follow-up rewire once this fn takes `FrameState` and the
-/// `refdef_rdflags: i32` parameter this crate threads elsewhere
-/// (`tr_backend.rs`, `tr_light.rs`, `tr_world.rs`).
+/// DEC-50: the backend calls this once per sky-shader surface batch with the
+/// batch's world-space triangles (`verts`/`indexes`), and this returns the
+/// six outer-box faces plus the cloud geometry for the backend to draw. The
+/// oracle reads all of it from the global `tess`; the port hands the pieces
+/// in and returns owned data.
 ///
-/// What still forces the whole-fn deferral is the body itself:
-/// - `RB_ClipSkyPolygons( &tess )`, `tess.shader->sky->outerbox[...]`,
-///   `DrawSkyBox( tess.shader )`, `R_BuildCloudData( &tess )`, and
-///   `if (tess.numIndexes && tess.numVertexes) RB_StageIteratorGeneric()`
-///   all key off the dissolved `tess`/`shaderCommands_t` global (R2
-///   `## State ownership` row `tess`: "no single global scratch buffer
-///   survives the new topology") — there is no R3 carrier from which to read
-///   `tess.shader` (the `ShaderHandle` every one of those already-ported
-///   in-module callees needs) or `tess.numIndexes`/`numVertexes`.
+/// The two early-out guards port: `g_bRenderGlowingObjects` reads
+/// `frame.render_glowing_objects`, and the portal guard reads
+/// `frame.skyboxportal`/`frame.refdef.rdflags` against `RDF_SKYBOXPORTAL`
+/// (campaign #41 batch 1 homed these). A guard that trips returns `None` and
+/// leaves `sky_rendered_this_view` unset, matching the oracle's early return
+/// before the trailing write.
 ///
-/// `r_fastsky`/`r_showsky` genuinely do have real carriers (`RendererCvars`,
-/// DEC-37 A13.1 — see `RB_ClipSkyPolygons`'s sibling wave-9 fn
-/// `RB_StageIteratorGeneric` for the established `common.cvar(cvars.r_x)
-/// .integer` idiom) but sit behind the first unresolved gate above, so
-/// reading them here would not shorten the deferral — the fn can still
-/// return before ever reaching them.
+/// The oracle's `r_fastsky` guard, the `r_showsky`/`qglDepthRange` depth-range
+/// trick, and the actual draw calls are GPU/executor concerns the backend
+/// owns (same as `DrawSkySide`'s deferred GL body). This function returns
+/// geometry data only, no GPU state.
 ///
-/// Every `qgl*` call (`qglDepthRange`/`qglColor3f`/`qglPushMatrix`/
-/// `qglPopMatrix`/`qglTranslatef`) is additionally unhomed GL/WGL surface
-/// (DEC-01/DEC-37, `GpuResources::gl_state` a named placeholder until R4).
-///
-/// Loud `todo!()` per the whole-fn-deferral convention (partial-body fns
-/// keep `DEFERRED:` comments instead of panicking) — same convention this
-/// crate already applied at `tr_ghoul2.rs`'s `rb_surface_ghoul`
-/// (`RB_SurfaceGhoul`).
+/// `sky_parms` is `tess.shader->sky`, and `num_unfogged_passes` is
+/// `tess.shader->numUnfoggedPasses` (read by `R_BuildCloudData`).
+/// `default_image` is `tr.defaultImage`, the value the outer-box gate compares
+/// `outerbox[0]` against. `view` threads `backEnd.viewParms` (the view origin
+/// and `zFar`, top-of-file PORT-NOTE precedent).
 ///
 /// Source: `oracle/codemp/renderer/tr_sky.cpp:786-848`
 pub fn RB_StageIteratorSky(
     frame: &mut FrameState,
-    common: &Common,
-    cvars: &RendererCvars,
-    gpu: &mut GpuResources,
-    assets: &RenderAssets,
     sky: &mut SkyState,
+    sky_parms: &SkyParms,
+    num_unfogged_passes: i32,
+    default_image: Option<ImageHandle>,
+    verts: &[vec3_t],
+    indexes: &[u32],
     view: &viewParms_t,
-) {
-    let _ = (frame, common, cvars, gpu, assets, sky, view);
-    todo!("Port RB_StageIteratorSky — oracle/codemp/renderer/tr_sky.cpp:786-848")
+) -> Option<SkyBoxDrawData> {
+    if frame.render_glowing_objects {
+        return None;
+    }
+
+    // DEFERRED: R4 — the `r_fastsky` early-out is an executor concern (the
+    // backend owns whether the sky draws at all, same as the `r_showsky`
+    // depth-range trick below).
+    // Source: oracle/codemp/renderer/tr_sky.cpp:791-793
+
+    if frame.skyboxportal != 0 && (frame.refdef.rdflags & RDF_SKYBOXPORTAL) == 0 {
+        return None;
+    }
+
+    // The oracle's `s_skyPoints`/`s_skyTexCoords` are fixed static arrays; the
+    // port holds them as jagged `Vec`s, so size the grid scratch before
+    // `DrawSkyBox`/`FillCloudBox` index it (a fresh zeroed grid each pass
+    // matches the static array, which `DrawSkyBox` also `Com_Memset`s).
+    let dim = (SKY_SUBDIVISIONS + 1) as usize;
+    sky.sky_points = vec![vec![[0.0f32; 3]; dim]; dim];
+    sky.sky_tex_coords = vec![vec![[0.0f32; 2]; dim]; dim];
+
+    // go through all the polygons and project them onto the sky box to see
+    // which blocks on each side need to be drawn
+    RB_ClipSkyPolygons(verts, indexes, view, sky);
+
+    // DEFERRED: R4 — the `r_showsky`/`qglDepthRange` depth-range trick is GPU
+    // state the backend owns.
+    // Source: oracle/codemp/renderer/tr_sky.cpp:808-816
+
+    // draw the outer skybox, only when outerbox[0] is a real image (not the
+    // default image and not the "-" no-outer-box shader)
+    let draw_outerbox =
+        sky_parms.outerbox[0].is_some() && sky_parms.outerbox[0] != default_image;
+    let faces = if draw_outerbox {
+        DrawSkyBox(sky_parms, view, sky)
+    } else {
+        core::array::from_fn(|_| None)
+    };
+
+    // generate the vertexes for all the clouds, which the backend draws
+    // through its generic stage machinery (RB_StageIteratorGeneric)
+    let mut cloud = SkyCloudData::default();
+    R_BuildCloudData(sky_parms, num_unfogged_passes, view, sky, &mut cloud);
+
+    // note that sky was drawn so we will draw a sun later
+    frame.sky_rendered_this_view = true;
+
+    Some(SkyBoxDrawData { faces, cloud })
 }

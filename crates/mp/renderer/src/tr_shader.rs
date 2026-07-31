@@ -4875,21 +4875,24 @@ pub fn ParseStage<'a>(
 
 /// Raven `ParseSkyParms`.
 ///
-/// `shader.sky = Hunk_Alloc(...)` collapses to constructing an owned
-/// `SkyParms` value — `SkyParms` is still the zero-field placeholder
-/// (`render_state/placeholders.rs`: "fields land with the `tr_sky` R3 wave,
-/// the first that reads one — wave-0 `tr_shader` only tests the option for
-/// presence"), so this (later) `tr_shader` wave still has nowhere to store
-/// `outerbox`/`cloudHeight`. The 6 `R_FindImageFile` calls are still issued
-/// — they carry a real, observable side effect (loading/registering the
-/// actual assets, exactly matching the oracle) — but their returned handles
-/// are discarded, and the oracle's `outerbox[i-1]`/`tr.defaultImage`
-/// fallback chain isn't reproduced (nothing to chain into). `Com_sprintf`
-/// into a `pathname[MAX_QPATH]` buffer collapses to `format!` (established
-/// `char[N]` -> `String` translation, no truncation modeled, same as
-/// `R_CreateExtendedName` elsewhere in this file) rather than calling the
-/// LAW `Com_sprintf(dest: *mut c_char, ...)` — that signature is raw-pointer
-/// C ABI and would require `unsafe`, banned by the interior-safety law.
+/// `shader.sky = Hunk_Alloc(...)` constructs an owned zeroed `SkyParms` up
+/// front, so a malformed `skyParms` shader still reads as a sky shader
+/// (`sky.is_some()`) on the early-return paths, matching the oracle's
+/// non-null `shader->sky`. The six `R_FindImageFile` calls now store their
+/// handles into `SkyParms::outerbox` and reproduce the oracle fallback chain:
+/// a face whose file does not load takes the previous face's image, and face
+/// 0 takes `tr.defaultImage` (`sim.published.default_image`). `cloudHeight`
+/// stores into `SkyParms::cloud_height` with the default-512 rule. The
+/// `#ifdef DEDICATED` arm (`outerbox[i] = NULL`) is not reproduced: this
+/// crate is the client renderer, and `R_FindImageFile` already returns `None`
+/// on a dedicated server through its own `com_dedicated` guard.
+///
+/// `Com_sprintf` into a `pathname[MAX_QPATH]` buffer collapses to `format!`
+/// (established `char[N]` -> `String` translation, no truncation modeled,
+/// same as `R_CreateExtendedName` elsewhere in this file) rather than calling
+/// the LAW `Com_sprintf(dest: *mut c_char, ...)` — that signature is
+/// raw-pointer C ABI and would require `unsafe`, banned by the
+/// interior-safety law.
 ///
 /// Source: `oracle/codemp/renderer/tr_shader.cpp:2086-2137`
 pub fn ParseSkyParms<'a>(
@@ -4908,7 +4911,10 @@ pub fn ParseSkyParms<'a>(
     let warn = S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII");
     const SUF: [&str; 6] = ["rt", "lf", "bk", "ft", "up", "dn"];
 
-    state.sky = Some(SkyParms {});
+    state.sky = Some(SkyParms {
+        cloud_height: 0.0,
+        outerbox: [None; 6],
+    });
 
     // outerbox
     let (token, rest) = COM_ParseExt(qs, *text, false);
@@ -4924,12 +4930,11 @@ pub fn ParseSkyParms<'a>(
         return;
     }
     if token != "-" {
-        // DEFERRED: `skyParms_t::outerbox[6]` storage — see doc comment
-        // above (`SkyParms` has no fields until the `tr_sky` wave).
-        // Source: oracle/codemp/renderer/tr_shader.cpp:2100-2116
-        for suf in SUF.iter() {
+        let default_image = sim.published.default_image;
+        let mut outerbox: [Option<ImageHandle>; 6] = [None; 6];
+        for (i, suf) in SUF.iter().enumerate() {
             let pathname = format!("{}_{}", token, suf);
-            let _ = R_FindImageFile(
+            let mut image = R_FindImageFile(
                 view,
                 cvars,
                 sim,
@@ -4942,6 +4947,18 @@ pub fn ParseSkyParms<'a>(
                 !state.no_tc,
                 GL_CLAMP,
             );
+            if image.is_none() {
+                if i != 0 {
+                    // not found, so let's use the previous image
+                    image = outerbox[i - 1];
+                } else {
+                    image = default_image;
+                }
+            }
+            outerbox[i] = image;
+        }
+        if let Some(sky) = state.sky.as_mut() {
+            sky.outerbox = outerbox;
         }
     }
 
@@ -4961,6 +4978,9 @@ pub fn ParseSkyParms<'a>(
     let mut cloud_height = atof(&token) as f32;
     if cloud_height == 0.0 {
         cloud_height = 512.0;
+    }
+    if let Some(sky) = state.sky.as_mut() {
+        sky.cloud_height = cloud_height;
     }
     R_InitSkyTexCoords(cloud_height, sky_view, sky);
 

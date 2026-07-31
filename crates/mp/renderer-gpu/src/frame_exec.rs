@@ -67,6 +67,7 @@ use mp_renderer::tr_main::{
 };
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_noise::NoiseState;
+use mp_renderer::tr_sky::SkyState;
 use wgpu::TextureView;
 
 use crate::blend::{blend_state_from_gls, GLS_2D_DEFAULT};
@@ -204,6 +205,10 @@ pub struct WorldFrame<'a, 'e> {
     /// state (the golden test, the world spike) threads an empty owned system.
     pub g2: &'a mut Ghoul2System,
     pub gpu_res: &'a mut GpuResources,
+    /// The sky-box scratch carrier `ParseSkyParms` seeded through
+    /// `R_InitSkyTexCoords`. The world pass reads its cloud tex-coord tables
+    /// and reuses its grid scratch when a sky-shader surface draws (DEC-50).
+    pub sky: &'a mut SkyState,
     pub models: &'a RenderModels,
     pub land_scape: &'a srfTerrain_t,
     pub land: &'a CmLandScape,
@@ -601,6 +606,11 @@ impl FrameExecutor {
             &mut draw_surfs,
         );
 
+        // The view begins here, so the sky flag resets before any sky surface
+        // can set it, as `RB_BeginDrawingView` does.
+        // Source: oracle/codemp/renderer/tr_backend.cpp:570
+        world.frame.sky_rendered_this_view = false;
+
         self.pipeline3d.draw(
             gpu,
             target,
@@ -615,6 +625,8 @@ impl FrameExecutor {
             world.scratch,
             world.models,
             world.g2,
+            world.frame,
+            world.sky,
         )
     }
 

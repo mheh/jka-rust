@@ -36,8 +36,10 @@ use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::qfiles::draw_vert_t::drawVert_t;
 use mp_engine_qcommon::qfiles::md3_limits::MD3_XYZ_SCALE;
 use mp_engine_qcommon::qfiles::md3_surface_t::md3Surface_t;
+use mp_qshared::shared::vec3_t;
+use mp_renderer::render_state::frame_state::FrameState;
 use mp_renderer::render_state::image_asset::ImageHandle;
-use mp_renderer::render_state::placeholders::WorldAsset;
+use mp_renderer::render_state::placeholders::{SkyParms, WorldAsset};
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::shader_asset::ShaderAsset;
 use mp_renderer::render_state::shader_stage::ShaderStage;
@@ -59,6 +61,7 @@ use mp_renderer::tr_shader::{
     GLS_ATEST_GE_80, GLS_ATEST_GE_C0, GLS_ATEST_GT_0, GLS_ATEST_LT_80, GLS_DEPTHFUNC_EQUAL,
     GLS_DEPTHMASK_TRUE, GL_MODULATE,
 };
+use mp_renderer::tr_sky::{RB_StageIteratorSky, SkyBoxFace, SkyState, HALF_SKY_SUBDIVISIONS};
 use wgpu::{BlendState, RenderPipeline, TextureView};
 
 use crate::blend::blend_state_from_gls;
@@ -156,6 +159,10 @@ pub struct WorldGeometry {
     /// with dynamic texcoords or colours can re-evaluate its own block per
     /// frame.
     cpu_vertices: Vec<WorldVertex>,
+    /// The same indices the static buffer holds, kept on the CPU so a sky-shader
+    /// surface can hand its own triangles to the sky-box projection. Each range
+    /// slice holds the surface's own 0-based triangle indices.
+    cpu_indices: Vec<u32>,
 }
 
 impl WorldGeometry {
@@ -198,6 +205,7 @@ impl WorldGeometry {
             index_buffer,
             ranges,
             cpu_vertices: vertices,
+            cpu_indices: indices,
         }
     }
 
@@ -478,7 +486,6 @@ const MODE_MULTITEXTURE: u32 = 1;
 #[derive(Clone, Copy, Debug)]
 enum Warned {
     Fog,
-    SkyParms,
     TcGen,
     MultitexEnv,
     SurfaceSprite,
@@ -489,26 +496,24 @@ enum Warned {
 }
 
 impl Warned {
-    const COUNT: usize = 9;
+    const COUNT: usize = 8;
 
     fn slot(self) -> usize {
         match self {
             Warned::Fog => 0,
-            Warned::SkyParms => 1,
-            Warned::TcGen => 2,
-            Warned::MultitexEnv => 3,
-            Warned::SurfaceSprite => 4,
-            Warned::Glow => 5,
-            Warned::VideoMap => 6,
-            Warned::Md3Lighting => 7,
-            Warned::Ghoul2Lighting => 8,
+            Warned::TcGen => 1,
+            Warned::MultitexEnv => 2,
+            Warned::SurfaceSprite => 3,
+            Warned::Glow => 4,
+            Warned::VideoMap => 5,
+            Warned::Md3Lighting => 6,
+            Warned::Ghoul2Lighting => 7,
         }
     }
 
     fn describe(self) -> &'static str {
         match self {
             Warned::Fog => "skips fog on a world shader — not applied yet",
-            Warned::SkyParms => "skips a sky-parms world shader — the sky chain is a later wave",
             Warned::TcGen => "reads base texcoords for an unsupported tcGen on a world stage",
             Warned::MultitexEnv => {
                 "draws bundle 0 only for a non-modulate multitexture world shader"
@@ -545,8 +550,10 @@ pub struct WorldStats {
     pub skipped_non_world: u32,
     /// World surfaces whose range was empty (`Skip`/`Flare`), so nothing drew.
     pub empty_surfaces: u32,
-    /// Sky-parms world surfaces skipped whole, waiting on the sky chain wave.
-    pub skipped_sky: u32,
+    /// Sky-shader surfaces that drew their sky box, clouds, or both. The oracle
+    /// forks a sky shader into `RB_StageIteratorSky`. A surface counts here when
+    /// that chain drew at least one face or cloud pass.
+    pub sky_surfaces_drawn: u32,
     /// MD3 (`MOD_MESH`) entity surfaces that drew at least one stage pass.
     pub md3_surfaces_drawn: u32,
     /// MD3 draw surfs the decode dropped (a bad model handle or a purged model).
@@ -594,6 +601,13 @@ struct StageDrawItem {
     /// The byte offset of this surface's clip matrix in the dynamic-offset
     /// globals buffer. Slot 0 (offset 0) is the world matrix.
     globals_offset: u32,
+    /// Whether this pass draws under the far-plane depth range (`qglDepthRange(
+    /// 1.0, 1.0)`), the sky-box and cloud state. The draw loop calls
+    /// `set_viewport` with `min_depth = max_depth = 1.0` around the run of
+    /// far-plane items and restores `0.0..1.0` after.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_sky.cpp:814`
+    depth_far: bool,
 }
 
 /// The world pipeline's GPU-side resources: shader module, layouts, the clip
@@ -749,8 +763,13 @@ impl Pipeline3d {
 
     /// Draws the sorted world draw-surf list, one pass per active stage per
     /// surface in stage order (`RB_IterateStagesGeneric`). Each surface resolves
-    /// its shader through `R_DecomposeSort`. A sky-parms shader is skipped whole.
-    /// Non-world entries are counted and skipped.
+    /// its shader through `R_DecomposeSort`. A sky-shader surface forks into the
+    /// sky-box and cloud chain (`RB_StageIteratorSky`), drawn inline at the
+    /// surface's sorted position under the far-plane depth range. Non-world
+    /// entries are counted and skipped.
+    ///
+    /// `frame` and `sky` thread the sky-box scratch (`RB_StageIteratorSky` reads
+    /// the portal guards off `frame` and reuses `sky`'s cloud tex-coord tables).
     ///
     /// `float_time` is the scene shader clock in seconds (`refdef.floatTime`),
     /// and `noise` drives the waveform generators. A stage with dynamic
@@ -783,6 +802,8 @@ impl Pipeline3d {
         scratch: &mut TrMainScratch,
         models: &RenderModels,
         g2: &mut Ghoul2System,
+        frame: &mut FrameState,
+        sky: &mut SkyState,
     ) -> WorldStats {
         let mut stats = WorldStats::default();
 
@@ -808,6 +829,9 @@ impl Pipeline3d {
             entities,
             models,
             g2,
+            frame,
+            sky,
+            view,
         );
 
         if items.is_empty() {
@@ -904,7 +928,28 @@ impl Pipeline3d {
                 multiview_mask: None,
             });
 
+            // The sky box and clouds draw at the far plane. wgpu forces that
+            // through the viewport depth range, not a fixed-function call, so the
+            // loop calls `set_viewport(.., 1.0, 1.0)` when it enters the sky run
+            // and restores `0.0..1.0` when it leaves. A frame with no sky never
+            // sets a viewport, keeping the default full-target range. The rect
+            // comes from the view, as the oracle's `qglViewport` does, so a
+            // future sub-rect view keeps its inset through the toggle.
+            // Source: oracle/codemp/renderer/tr_sky.cpp:808-816,843-844
+            // Source: oracle/codemp/renderer/tr_backend.cpp:463-464
+            let vp_x = view.viewportX as f32;
+            let vp_y = view.viewportY as f32;
+            let vp_w = view.viewportWidth as f32;
+            let vp_h = view.viewportHeight as f32;
+            let mut depth_far = false;
+
             for (draw_index, item) in items.iter().enumerate() {
+                if item.depth_far != depth_far {
+                    depth_far = item.depth_far;
+                    let (min_depth, max_depth) = if depth_far { (1.0, 1.0) } else { (0.0, 1.0) };
+                    pass.set_viewport(vp_x, vp_y, vp_w, vp_h, min_depth, max_depth);
+                }
+
                 let pipeline = self
                     .pipelines
                     .get(&item.key)
@@ -952,8 +997,9 @@ impl Pipeline3d {
     }
 
     /// Resolves every world draw surf into its per-stage [`StageDrawItem`]
-    /// passes, in stage order, and builds any dynamic vertex blocks. Non-world,
-    /// empty, and sky-parms entries are counted into `stats`.
+    /// passes, in stage order, and builds any dynamic vertex blocks. Non-world
+    /// and empty entries are counted into `stats`, and a sky-parms entry forks
+    /// into the sky-box and cloud chain (`collect_sky_surface`).
     #[allow(clippy::too_many_arguments)]
     fn collect_stage_items(
         &mut self,
@@ -969,6 +1015,9 @@ impl Pipeline3d {
         entities: &[trRefEntity_t],
         models: &RenderModels,
         g2: &mut Ghoul2System,
+        frame: &mut FrameState,
+        sky: &mut SkyState,
+        view: &viewParms_t,
     ) -> Vec<StageDrawItem> {
         let mut items: Vec<StageDrawItem> = Vec::new();
 
@@ -983,9 +1032,13 @@ impl Pipeline3d {
                         noise,
                         float_time,
                         dynamic_vertices,
+                        dynamic_indices,
                         stats,
                         slot_map,
                         entities,
+                        frame,
+                        sky,
+                        view,
                         &mut items,
                     );
                 }
@@ -1002,6 +1055,9 @@ impl Pipeline3d {
                         slot_map,
                         entities,
                         models,
+                        frame,
+                        sky,
+                        view,
                         &mut items,
                     );
                 }
@@ -1019,6 +1075,9 @@ impl Pipeline3d {
                         entities,
                         models,
                         g2,
+                        frame,
+                        sky,
+                        view,
                         &mut items,
                     );
                 }
@@ -1045,9 +1104,13 @@ impl Pipeline3d {
         noise: &NoiseState,
         float_time: f32,
         dynamic_vertices: &mut Vec<WorldVertex>,
+        dynamic_indices: &mut Vec<u32>,
         stats: &mut WorldStats,
         slot_map: &HashMap<i32, u32>,
         entities: &[trRefEntity_t],
+        frame: &mut FrameState,
+        sky: &mut SkyState,
+        view: &viewParms_t,
         items: &mut Vec<StageDrawItem>,
     ) {
         let index = world_ref_index(world_ref);
@@ -1070,19 +1133,51 @@ impl Pipeline3d {
         let globals_offset = (slot as u64 * GLOBALS_STRIDE) as u32;
         let entity_float_time = float_time - entity_shader_time(entities, entity_num);
 
-        // The sky draws through its own chain in a later wave, so a sky-parms
-        // shader skips the whole surface.
-        if shader.sky.is_some() {
-            self.warn_once(Warned::SkyParms);
-            stats.skipped_sky += 1;
+        let cpu_start = range.base_vertex as usize;
+        let cpu = &geometry.cpu_vertices[cpu_start..cpu_start + range.vertex_count as usize];
+
+        // A sky shader forks into the sky-box and cloud chain, drawn inline at
+        // this surface's sorted position (RB_BeginSurface's fork on
+        // shader->sky). The oracle batches contiguous same-shader surfaces into
+        // one tess and runs RB_StageIteratorSky once for that run (RB_EndSurface).
+        // This backend runs the iterator once per surface instead.
+        //
+        // The outer-box faces draw with GL_State(0) and depth writes off, so a
+        // repeat per surface is idempotent and the drawn union covers the same
+        // sky-box area. The cloud layer is not idempotent. It carries the sky
+        // shader stage's own blend, so a blended or additive cloud stage
+        // composites once per sky surface and compounds over the surfaces. This
+        // is a preserved behavioral quirk of the per-surface shape, not the
+        // oracle's per-run batch.
+        // Source: oracle/codemp/renderer/tr_shade.cpp:362-372 (RB_BeginSurface),
+        // 2391-2432 (RB_EndSurface runs the sky iterator once per batch)
+        if let Some(sky_parms) = &shader.sky {
+            let verts: Vec<vec3_t> = cpu.iter().map(|v| v.position).collect();
+            let idx_start = range.first_index as usize;
+            let indexes =
+                &geometry.cpu_indices[idx_start..idx_start + range.index_count as usize];
+            self.collect_sky_surface(
+                shader,
+                sky_parms,
+                &verts,
+                indexes,
+                entity_float_time,
+                noise,
+                assets,
+                frame,
+                sky,
+                view,
+                globals_offset,
+                dynamic_vertices,
+                dynamic_indices,
+                stats,
+                items,
+            );
             return;
         }
         if shader.fog_parms.is_some() {
             self.warn_once(Warned::Fog);
         }
-
-        let cpu_start = range.base_vertex as usize;
-        let cpu = &geometry.cpu_vertices[cpu_start..cpu_start + range.vertex_count as usize];
 
         let before = items.len();
         for stage in shader.stages.iter().filter(|stage| stage.active) {
@@ -1131,6 +1226,9 @@ impl Pipeline3d {
         slot_map: &HashMap<i32, u32>,
         entities: &[trRefEntity_t],
         models: &RenderModels,
+        frame: &mut FrameState,
+        sky: &mut SkyState,
+        view: &viewParms_t,
         items: &mut Vec<StageDrawItem>,
     ) {
         let (entity_num, shader_handle, _fog_num, _dlight_map) =
@@ -1159,10 +1257,31 @@ impl Pipeline3d {
             return;
         }
 
-        // The sky chain is a later wave. An MD3 sky-parms shader skips whole.
-        if shader.sky.is_some() {
-            self.warn_once(Warned::SkyParms);
-            stats.skipped_sky += 1;
+        // A sky shader forks into the sky chain (RB_BeginSurface's fork on
+        // shader->sky), the same as the world path. An MD3 surface hands its
+        // decoded vertices in model space, since the entity transform lives in
+        // the per-entity clip matrix, not the CPU positions. No shipped content
+        // puts a sky shader on an entity model, so this arm stays untested by a
+        // live scene.
+        if let Some(sky_parms) = &shader.sky {
+            let verts: Vec<vec3_t> = md3_vertices.iter().map(|v| v.position).collect();
+            self.collect_sky_surface(
+                shader,
+                sky_parms,
+                &verts,
+                &md3_index_block,
+                entity_float_time,
+                noise,
+                assets,
+                frame,
+                sky,
+                view,
+                globals_offset,
+                dynamic_vertices,
+                dynamic_indices,
+                stats,
+                items,
+            );
             return;
         }
         if shader.fog_parms.is_some() {
@@ -1232,6 +1351,9 @@ impl Pipeline3d {
         entities: &[trRefEntity_t],
         models: &RenderModels,
         g2: &mut Ghoul2System,
+        frame: &mut FrameState,
+        sky: &mut SkyState,
+        view: &viewParms_t,
         items: &mut Vec<StageDrawItem>,
     ) {
         let (entity_num, shader_handle, _fog_num, _dlight_map) =
@@ -1261,10 +1383,30 @@ impl Pipeline3d {
             return;
         }
 
-        // The sky chain is a later wave. A Ghoul2 sky-parms shader skips whole.
-        if shader.sky.is_some() {
-            self.warn_once(Warned::SkyParms);
-            stats.skipped_sky += 1;
+        // A sky shader forks into the sky chain (RB_BeginSurface's fork on
+        // shader->sky), the same as the world path. A Ghoul2 surface hands its
+        // bone-deformed vertices in model space, since the entity transform
+        // lives in the per-entity clip matrix. No shipped content puts a sky
+        // shader on an entity model, so this arm stays untested by a live scene.
+        if let Some(sky_parms) = &shader.sky {
+            let verts: Vec<vec3_t> = g2_vertices.iter().map(|v| v.position).collect();
+            self.collect_sky_surface(
+                shader,
+                sky_parms,
+                &verts,
+                &g2_index_block,
+                entity_float_time,
+                noise,
+                assets,
+                frame,
+                sky,
+                view,
+                globals_offset,
+                dynamic_vertices,
+                dynamic_indices,
+                stats,
+                items,
+            );
             return;
         }
         if shader.fog_parms.is_some() {
@@ -1305,6 +1447,151 @@ impl Pipeline3d {
             if entity_num != TR_WORLDENT {
                 stats.entity_surfaces_drawn += 1;
             }
+        }
+    }
+
+    /// Draws one sky-shader surface's box and clouds inline (`RB_StageIteratorSky`).
+    /// The surface's triangles project onto the sky box. Each visible outer-box
+    /// face binds its image and draws its grid, and the cloud layer feeds the
+    /// generic stage machinery, one pass per active stage. Every sky pass carries
+    /// `depth_far`, so the draw loop forces the far-plane depth range around them.
+    ///
+    /// The sky box draws with `GL_State(0)`: no blend, depth compare
+    /// less-or-equal, depth writes off. The vertex colour is
+    /// `qglColor3f(tr.identityLight, ...)`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_sky.cpp:786-848`
+    #[allow(clippy::too_many_arguments)]
+    fn collect_sky_surface(
+        &mut self,
+        shader: &ShaderAsset,
+        sky_parms: &SkyParms,
+        verts: &[vec3_t],
+        indexes: &[u32],
+        float_time: f32,
+        noise: &NoiseState,
+        assets: &RenderAssets,
+        frame: &mut FrameState,
+        sky: &mut SkyState,
+        view: &viewParms_t,
+        globals_offset: u32,
+        dynamic_vertices: &mut Vec<WorldVertex>,
+        dynamic_indices: &mut Vec<u32>,
+        stats: &mut WorldStats,
+        items: &mut Vec<StageDrawItem>,
+    ) {
+        // Project the surface onto the sky box and build the cloud geometry. A
+        // tripped guard (glow pass, sky-box portal) draws no sky.
+        // DEFERRED: R4 - the `r_fastsky` early-out is not ported because the
+        // cvar does not reach the backend. The oracle returns before the
+        // `skyRenderedThisView` write, so the port must keep that order when
+        // the cvar lands.
+        // Source: oracle/codemp/renderer/tr_sky.cpp:791-793
+        let Some(data) = RB_StageIteratorSky(
+            frame,
+            sky,
+            sky_parms,
+            shader.num_unfogged_passes,
+            assets.default_image,
+            verts,
+            indexes,
+            view,
+        ) else {
+            return;
+        };
+
+        // DEFERRED: R4 - RB_DrawSun waits on frame.sky_rendered_this_view, which
+        // RB_StageIteratorSky set above. The sun draw is a later wave.
+        // Source: oracle/codemp/renderer/tr_sky.cpp:846-847
+
+        let before = items.len();
+
+        // The GL_State(0) sky-box pass: no blend, depth compare less-or-equal,
+        // depth writes off.
+        let box_key = PipelineKey {
+            blend: blend_state_from_gls(0),
+            depth_equal: false,
+            depth_write: false,
+        };
+        let color = sky_identity_color();
+
+        // Each visible outer-box face binds its image and draws its grid strips.
+        for face in data.faces.iter().flatten() {
+            let (first_index, index_count, base_vertex) = build_sky_face_block(
+                face,
+                view.ori.origin,
+                color,
+                dynamic_vertices,
+                dynamic_indices,
+            );
+            if index_count == 0 {
+                continue;
+            }
+            items.push(StageDrawItem {
+                key: box_key,
+                diffuse: face.image,
+                lightmap: None,
+                mode: MODE_SINGLE,
+                tex_from_lightmap: false,
+                alpha_func: 0,
+                reads_lightmap: false,
+                first_index,
+                index_count,
+                base_vertex,
+                dynamic: true,
+                index_dynamic: true,
+                globals_offset,
+                depth_far: true,
+            });
+        }
+
+        // The cloud layer feeds the generic stage machinery, one pass per active
+        // stage of the sky shader (the oracle hands its cloud tess to
+        // RB_StageIteratorGeneric).
+        if !data.cloud.indexes.is_empty() {
+            let cloud_first = dynamic_indices.len() as u32;
+            dynamic_indices.extend_from_slice(&data.cloud.indexes);
+            let cloud_count = data.cloud.indexes.len() as u32;
+
+            // The cloud xyz already bakes in the view origin (FillCloudySkySide).
+            // The stage evaluators overwrite the colour, so the input is the
+            // identity white the tess starts at.
+            let cloud_cpu: Vec<WorldVertex> = data
+                .cloud
+                .xyz
+                .iter()
+                .zip(&data.cloud.tex_coords)
+                .map(|(xyz, st)| WorldVertex {
+                    position: *xyz,
+                    st: *st,
+                    lightmap_st: *st,
+                    color: [255, 255, 255, 255],
+                })
+                .collect();
+
+            for stage in shader.stages.iter().filter(|stage| stage.active) {
+                let item = self.build_cpu_surface_stage_item(
+                    shader,
+                    stage,
+                    &cloud_cpu,
+                    cloud_first,
+                    cloud_count,
+                    float_time,
+                    noise,
+                    assets,
+                    dynamic_vertices,
+                    globals_offset,
+                );
+                if let Some(mut item) = item {
+                    item.depth_far = true;
+                    items.push(item);
+                }
+            }
+        }
+
+        if items.len() > before {
+            stats.surfaces_drawn += 1;
+            stats.sky_surfaces_drawn += 1;
         }
     }
 
@@ -1413,6 +1700,7 @@ impl Pipeline3d {
                 dynamic,
                 index_dynamic: false,
                 globals_offset,
+                depth_far: false,
             });
         }
 
@@ -1454,6 +1742,7 @@ impl Pipeline3d {
                 dynamic: true,
                 index_dynamic: false,
                 globals_offset,
+                depth_far: false,
             })
         } else {
             Some(StageDrawItem {
@@ -1470,6 +1759,7 @@ impl Pipeline3d {
                 dynamic: false,
                 index_dynamic: false,
                 globals_offset,
+                depth_far: false,
             })
         }
     }
@@ -1561,6 +1851,7 @@ impl Pipeline3d {
             dynamic: true,
             index_dynamic: true,
             globals_offset,
+            depth_far: false,
         })
     }
 
@@ -1779,6 +2070,73 @@ fn world_ref_index(world_ref: WorldSurfaceRef) -> u32 {
         | WorldSurfaceRef::Triangles(index)
         | WorldSurfaceRef::Flare(index) => index,
     }
+}
+
+/// The identity-light white the sky box draws with (`qglColor3f(tr.identityLight,
+/// tr.identityLight, tr.identityLight)`, alpha 1). The world shader multiplies
+/// the face texel by this per-vertex colour.
+///
+/// Source: `oracle/codemp/renderer/tr_sky.cpp:820`
+fn sky_identity_color() -> [u8; 4] {
+    let c = (255.0 * IDENTITY_LIGHT) as u8;
+    [c, c, c, 255]
+}
+
+/// Builds one outer-box face's grid vertices and triangle indices into the
+/// per-frame dynamic buffers, returning `(first_index, index_count, base_vertex)`.
+/// `DrawSkySide` emits one `GL_TRIANGLE_STRIP` per grid row over the face's
+/// subdivision bounds. This converts each row strip into an indexed triangle
+/// list, keeping the strip vertex order. The face points are view-origin
+/// relative, so each vertex adds the view origin (the oracle's `qglTranslatef`).
+///
+/// Source: `oracle/codemp/renderer/tr_sky.cpp:347-376`
+fn build_sky_face_block(
+    face: &SkyBoxFace,
+    view_origin: vec3_t,
+    color: [u8; 4],
+    dynamic_vertices: &mut Vec<WorldVertex>,
+    dynamic_indices: &mut Vec<u32>,
+) -> (u32, u32, i32) {
+    let base_vertex = dynamic_vertices.len() as i32;
+    let first_index = dynamic_indices.len() as u32;
+    let half = HALF_SKY_SUBDIVISIONS;
+
+    for t in (face.mins[1] + half)..(face.maxs[1] + half) {
+        // The strip's first vertex, local to this face's own vertex block.
+        let strip_start = dynamic_vertices.len() as u32 - base_vertex as u32;
+        let mut strip_len = 0u32;
+
+        for s in (face.mins[0] + half)..=(face.maxs[0] + half) {
+            let s = s as usize;
+            for row in [t as usize, (t + 1) as usize] {
+                let p = face.points[row][s];
+                let st = face.tex_coords[row][s];
+                dynamic_vertices.push(WorldVertex {
+                    position: [
+                        p[0] + view_origin[0],
+                        p[1] + view_origin[1],
+                        p[2] + view_origin[2],
+                    ],
+                    st,
+                    lightmap_st: st,
+                    color,
+                });
+            }
+            strip_len += 2;
+        }
+
+        // A triangle strip of N vertices makes N - 2 triangles, each (i, i+1,
+        // i+2). The pipeline culls no faces, so the strip's own winding carries
+        // straight into the list.
+        for i in 0..strip_len.saturating_sub(2) {
+            dynamic_indices.push(strip_start + i);
+            dynamic_indices.push(strip_start + i + 1);
+            dynamic_indices.push(strip_start + i + 2);
+        }
+    }
+
+    let index_count = dynamic_indices.len() as u32 - first_index;
+    (first_index, index_count, base_vertex)
 }
 
 /// Which vertex texcoord a world stage's bundle reads before any tcMod.

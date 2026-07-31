@@ -466,6 +466,7 @@ impl App {
                         img_state,
                         font,
                         noise,
+                        sky,
                         ..
                     } = host;
                     let models_ptr: *mut RenderModels = &mut *models;
@@ -483,6 +484,7 @@ impl App {
                         frame: fstate,
                         g2,
                         gpu_res,
+                        sky,
                         models: &*models,
                         land_scape: &*land_scape,
                         land: &*land,
@@ -619,7 +621,8 @@ fn report(stats: &FrameStats, md3_model: qhandle_t, ghoul2_handle: Option<Ghoul2
     println!(
         "world_harness: first frame — {} images uploaded, {} world surfaces drawn \
          ({} lightmapped, {} draw calls), {} non-world skipped, {} empty surfaces, \
-         {} entities ({} entity surfaces drawn), md3 handle {} ({} md3 entity surfaces, \
+         {} entities ({} entity surfaces drawn), {} sky surfaces drawn, \
+         md3 handle {} ({} md3 entity surfaces, \
          {} md3 decode failed), ghoul2 handle {} ({} ghoul2 surfaces drawn, \
          {} ghoul2 decode failed)",
         stats.images_uploaded,
@@ -630,6 +633,7 @@ fn report(stats: &FrameStats, md3_model: qhandle_t, ghoul2_handle: Option<Ghoul2
         stats.world.empty_surfaces,
         stats.entities,
         stats.world.entity_surfaces_drawn,
+        stats.world.sky_surfaces_drawn,
         md3_model,
         stats.world.md3_surfaces_drawn,
         stats.world.md3_decode_failed,

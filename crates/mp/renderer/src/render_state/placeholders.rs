@@ -32,6 +32,7 @@ use mp_qshared::common::mp::cgame::refdef_t::MAX_MAP_AREA_BYTES;
 use mp_qshared::common::mp::cgame::texture_compression_t::textureCompression_t;
 use mp_qshared::shared::{cplane_t, qhandle_t, vec3_t};
 
+use crate::render_state::image_asset::ImageHandle;
 use crate::tr_bsp::{BModel, DShader, Fog, Node, Surface};
 use crate::tr_local::mgrid_t::mgrid_t;
 
@@ -625,14 +626,28 @@ impl Default for GlConfig {
 }
 
 /// The owned form of Raven `skyParms_t` — `ShaderAsset::sky`, owned inline
-/// instead of the oracle's `skyParms_t *`. Its `outerbox` becomes
-/// `[ImageHandle; 6]` per the tier-2 transition audit (`skyParms_t` row);
-/// fields land with the `tr_sky` R3 wave, the first that reads one — wave-0
-/// `tr_shader` only tests the option for presence.
+/// instead of the oracle's `skyParms_t *`. The `image_t *outerbox[6]` becomes
+/// `[Option<ImageHandle>; 6]` per the tier-2 transition audit (`skyParms_t`
+/// row): the interior-safety law replaces `image_t *` with a handle, and a
+/// `NULL` face becomes `None`. `ParseSkyParms` fills both fields.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:449-452`
 #[derive(Clone)]
-pub struct SkyParms {}
+pub struct SkyParms {
+    /// `cloudHeight`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:450`
+    pub cloud_height: f32,
+    /// `outerbox[6]` — the six sky-box face images, one per suffix
+    /// (`rt`/`lf`/`bk`/`ft`/`up`/`dn`). `None` marks a face `ParseSkyParms`
+    /// left unset, which happens only for the `-` no-outer-box shader.
+    /// `ParseSkyParms` reproduces the oracle fallback: a face whose file does
+    /// not load takes the previous face's image, and face 0 takes
+    /// `tr.defaultImage`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:451`
+    pub outerbox: [Option<ImageHandle>; 6],
+}
 
 /// The wireframe automap surface list — `RenderAssets::automap_wireframe`,
 /// rebuilt by `RenderAssetsSim::rebuild_automap_wireframe` (A10/`R2-D10`),

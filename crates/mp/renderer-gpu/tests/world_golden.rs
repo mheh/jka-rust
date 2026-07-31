@@ -236,6 +236,7 @@ fn golden_world_duel1() {
             img_state,
             font,
             noise,
+            sky,
             ..
         } = &mut host;
         let models_ptr: *mut RenderModels = &mut *models;
@@ -253,6 +254,7 @@ fn golden_world_duel1() {
             frame: fstate,
             g2: &mut g2_system,
             gpu_res,
+            sky,
             models: &*models,
             land_scape: &land_scape,
             land: &land,
