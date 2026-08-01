@@ -349,6 +349,18 @@ impl MdxmVertView<'_> {
             bone_weight
         }
     }
+
+    /// `G2_GetVertBoneWeightNotSlow` — the raw `weight_num`-th weight, decoded
+    /// from the 8-bit `BoneWeightings` entry plus its 2-bit overflow in the
+    /// packed int. The shipped render arm uses this decode. It never closes the
+    /// last weight and never accumulates a total, so the caller owns both.
+    /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:3628-3639`
+    pub fn bone_weight_not_slow(&self, weight_num: i32) -> f32 {
+        let mut temp = self.bytes[VERT_OFS_BONE_WEIGHTINGS + weight_num as usize] as u32;
+        temp |= (self.packed() >> (IG2_BONEWEIGHT_TOPBITS_SHIFT + (weight_num as u32 * 2)))
+            & IG2_BONEWEIGHT_TOPBITS_AND;
+        FG2_BONEWEIGHT_RECIPROCAL_MULT * temp as f32
+    }
 }
 
 /// One parsed `mdxmSurfHierarchy_t` (DEC-35 parse-once sidecar) — the

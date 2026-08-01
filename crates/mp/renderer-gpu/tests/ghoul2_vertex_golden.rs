@@ -2,12 +2,12 @@
 //! its default skeleton pose and compare the bone-deformed vertex streams to a
 //! committed binary fixture.
 //!
-//! This gates the shipped-weight arm swap in `decode_ghoul2_surface`
-//! (`crates/mp/renderer-gpu/src/pipeline3d.rs`, the DEFERRED note). The current
-//! arm follows Raven's dead `#if 0` weight loop. The shipped arm special-cases
-//! one and two weights and closes the last weight outside the loop. The two arms
-//! are algebraically equal, so the swap must show only last-bit drift. This
-//! fixture proves it: the delta report names the exact slot count that moves.
+//! This locks the vertex stream of `decode_ghoul2_surface`
+//! (`crates/mp/renderer-gpu/src/pipeline3d.rs`), which runs Raven's shipped
+//! weight arm. The shipped arm special-cases one and two weights and closes
+//! the last weight outside the loop. The fixture caught the swap from the dead
+//! `#if 0` arm at last-bit drift (954 slots, max delta `1.9e-6`), and the
+//! delta report names the exact slot count any future change moves.
 //! Source: `oracle/codemp/renderer/tr_ghoul2.cpp:4313-4374`.
 //!
 //! The scene boots exactly like `tests/world_golden.rs`: the same `BootConfig`,

@@ -36,6 +36,7 @@ use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::qfiles::draw_vert_t::drawVert_t;
 use mp_engine_qcommon::qfiles::md3_limits::MD3_XYZ_SCALE;
 use mp_engine_qcommon::qfiles::md3_surface_t::md3Surface_t;
+use mp_qshared::shared::mdxaBone_t;
 use mp_qshared::shared::vec3_t;
 use mp_renderer::render_state::frame_state::FrameState;
 use mp_renderer::render_state::image_asset::ImageHandle;
@@ -3107,49 +3108,78 @@ fn decode_ghoul2_surface(
     // surface is not renderable (Raven's null `boneCache`).
     let cache = g2.bone_caches.get_mut(g2_ref.bone_cache)?;
 
-    // DEFERRED: this loop follows Raven's dead `#if 0` weight arm
-    // (`:4263-4302`), which reads every weight through `G2_GetVertBoneWeight`.
-    // The shipped arm (`:4313-4374`) special-cases 1 and 2 weights
-    // (`fBoneWeight * (t1 - t2) + t2` for two weights) and closes the last
-    // weight with `1.0f - fTotalWeight` outside the loop. The two arms are
-    // algebraically equal, so this is a last-bit floating-point association
-    // difference. No ghoul2-vertex differential golden gates it yet, so the
-    // byte-faithful shipped arm waits for that harness (porting-rules A2/F18).
+    // This loop is Raven's shipped weight arm (`:4313-4374`): it special-cases
+    // 1 and 2 weights (`fBoneWeight * (t1 - t2) + t2` for two weights) and
+    // closes the last weight with `1.0f - fTotalWeight` outside the loop. The
+    // ghoul2 vertex golden gates the byte-faithful arithmetic.
     // Source: oracle/codemp/renderer/tr_ghoul2.cpp:4313-4374
     let mut vertices: Vec<WorldVertex> = Vec::with_capacity(num_verts as usize);
     let mut normals: Vec<[f32; 4]> = Vec::with_capacity(num_verts as usize);
     for j in 0..num_verts {
         let vert = surface.vert(j);
         let num_weights = vert.num_weights();
-        let mut total_weight = 0.0f32;
         let vert_coords = vert.vert_coords();
+
+        // `bone` is bone 0, the normal bone and the first position bone.
+        let bone = cache.eval_render(surface.bone_ref(vert.bone_index(0)));
 
         // The normal transforms by bone 0 only, a genuine Raven asymmetry: the
         // position blends every weight, the normal does not.
-        // Source: oracle/codemp/renderer/tr_ghoul2.cpp:4314-4318
-        let bone0 = cache.eval_render(surface.bone_ref(vert.bone_index(0)));
+        // Source: oracle/codemp/renderer/tr_ghoul2.cpp:4316-4318
         let vn = vert.normal();
         let normal = [
-            bone0.matrix[0][0] * vn[0] + bone0.matrix[0][1] * vn[1] + bone0.matrix[0][2] * vn[2],
-            bone0.matrix[1][0] * vn[0] + bone0.matrix[1][1] * vn[1] + bone0.matrix[1][2] * vn[2],
-            bone0.matrix[2][0] * vn[0] + bone0.matrix[2][1] * vn[1] + bone0.matrix[2][2] * vn[2],
+            bone.matrix[0][0] * vn[0] + bone.matrix[0][1] * vn[1] + bone.matrix[0][2] * vn[2],
+            bone.matrix[1][0] * vn[0] + bone.matrix[1][1] * vn[1] + bone.matrix[1][2] * vn[2],
+            bone.matrix[2][0] * vn[0] + bone.matrix[2][1] * vn[1] + bone.matrix[2][2] * vn[2],
             0.0,
         ];
 
+        // One row of `DotProduct( m.matrix[row], vertCoords ) + m.matrix[row][3]`.
+        let affine = |m: &mdxaBone_t, row: usize| -> f32 {
+            m.matrix[row][0] * vert_coords[0]
+                + m.matrix[row][1] * vert_coords[1]
+                + m.matrix[row][2] * vert_coords[2]
+                + m.matrix[row][3]
+        };
+
         let mut p = [0.0f32; 3];
-        for k in 0..num_weights {
-            let bone_index = vert.bone_index(k);
-            let weight = vert.bone_weight(k, &mut total_weight, num_weights);
-            let bone_ref = surface.bone_ref(bone_index);
-            // `EvalRender` lazily evaluates and smooths the bone, matching
-            // Raven's `bones->EvalRender(piBoneReferences[boneIndex])`.
-            let m = cache.eval_render(bone_ref);
+        if num_weights == 1 {
+            // One bone, no weight multiply.
             for row in 0..3 {
-                p[row] += weight
-                    * (m.matrix[row][0] * vert_coords[0]
-                        + m.matrix[row][1] * vert_coords[1]
-                        + m.matrix[row][2] * vert_coords[2]
-                        + m.matrix[row][3]);
+                p[row] = affine(&bone, row);
+            }
+        } else {
+            let mut bone_weight = vert.bone_weight_not_slow(0);
+            if num_weights == 2 {
+                // Two bones: interpolate each component between bone 0 and bone 1.
+                let bone2 = cache.eval_render(surface.bone_ref(vert.bone_index(1)));
+                for row in 0..3 {
+                    let t1 = affine(&bone, row);
+                    let t2 = affine(&bone2, row);
+                    p[row] = bone_weight * (t1 - t2) + t2;
+                }
+            } else {
+                // Three or more bones: weight the first, accumulate the middle
+                // weights, then close the last weight with `1.0 - fTotalWeight`.
+                for row in 0..3 {
+                    p[row] = bone_weight * affine(&bone, row);
+                }
+                let mut total_weight = bone_weight;
+                let mut k = 1;
+                while k < num_weights - 1 {
+                    let bone = cache.eval_render(surface.bone_ref(vert.bone_index(k)));
+                    bone_weight = vert.bone_weight_not_slow(k);
+                    total_weight += bone_weight;
+                    for row in 0..3 {
+                        p[row] += bone_weight * affine(&bone, row);
+                    }
+                    k += 1;
+                }
+                let bone = cache.eval_render(surface.bone_ref(vert.bone_index(k)));
+                bone_weight = 1.0 - total_weight;
+                for row in 0..3 {
+                    p[row] += bone_weight * affine(&bone, row);
+                }
             }
         }
 
