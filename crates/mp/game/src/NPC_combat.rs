@@ -1337,7 +1337,8 @@ pub fn NPC_PickEnemy(
 
         let mut num_choices: usize = 0;
         // §19: a >128th valid candidate silently overruns the stack array in C
-        // (UB); here the index panics — unreachable with realistic enemy counts.
+        // (UB); here the writes ignore extra candidates (quirk ledger Q-37,
+        // ratified 2026-08-01), so a dense map cannot panic the server.
         let mut choice: [c_int; 128] = [0; 128];
         let mut closestEnemy: Option<EntityId> = None;
         let mut bestDist: f32 = crate::g_public_consts::Q3_INFINITE as f32;
@@ -1486,11 +1487,12 @@ pub fn NPC_PickEnemy(
                                     Some(newenemy_id),
                                     CHECK_360 | CHECK_FOV | CHECK_VISRANGE,
                                 ) == visibility_t::VIS_FOV
+                                    && num_choices < choice.len()
                                 {
                                     choice[num_choices] = ctx.world.entity(newenemy_id).s.number;
                                     num_choices += 1;
                                 }
-                            } else {
+                            } else if num_choices < choice.len() {
                                 choice[num_choices] = ctx.world.entity(newenemy_id).s.number;
                                 num_choices += 1;
                             }
@@ -1655,11 +1657,12 @@ pub fn NPC_PickEnemy(
                     if NPC_CheckVisibility(ctx, Some(newenemy_id), CHECK_360 | CHECK_VISRANGE)
                         as i32
                         >= visibility_t::VIS_360 as i32
+                        && num_choices < choice.len()
                     {
                         choice[num_choices] = ctx.world.entity(newenemy_id).s.number;
                         num_choices += 1;
                     }
-                } else {
+                } else if num_choices < choice.len() {
                     choice[num_choices] = ctx.world.entity(newenemy_id).s.number;
                     num_choices += 1;
                 }

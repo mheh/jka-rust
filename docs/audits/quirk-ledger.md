@@ -260,12 +260,12 @@ This ledger collects the Raven behavioral quirks that the port preserves on purp
 **Class.** UB-divergence
 **Verdict.** PROPOSED keep. Every site is a §19 pick and the referee stayed green through all of them.
 
-## Q-37 Enemy-choice array panics past 128 candidates
+## Q-37 Enemy-choice array ignores candidates past 128
 
-**What.** C silently overruns its `choice[128]` stack array on a 129th valid enemy candidate, which is UB. The port panics on the same index instead, unreachable with realistic entity counts.
-**Where.** `crates/mp/game/src/NPC_combat.rs:1338-1341`. Oracle: `oracle/codemp/game/NPC_combat.c:1508`.
+**What.** C silently overruns its `choice[128]` stack array on a 129th valid enemy candidate, which is UB. The port ignores the extra candidates, so the random pick chooses among the first 128.
+**Where.** `crates/mp/game/src/NPC_combat.rs:1338-1342` and the four guarded writes below it. Oracle: `oracle/codemp/game/NPC_combat.c:1508`.
 **Class.** UB-divergence
-**Verdict.** PROPOSED fix. A hostile map with 129+ candidates can panic a live server, so the pick should become "ignore extra candidates" instead of a panic.
+**Verdict.** RATIFIED fix (user, 2026-08-01). The earlier panic could kill a live server on a dense map, so the writes now drop extra candidates.
 
 ## Q-38 Jump-route scan reads gWPArray[-1]
 
