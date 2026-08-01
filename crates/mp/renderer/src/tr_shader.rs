@@ -2459,7 +2459,9 @@ static COLLAPSE: [Collapse; 8] = [
 /// The backend draws the `GL_MODULATE` collapse only when bundle 1 is a
 /// lightmap. `is_modulate_collapse` in `pipeline3d.rs` reads
 /// `multitexture_env == GL_MODULATE` with a lightmap in bundle 1. Any other
-/// bundle 1 draws bundle 0 alone with a `warn_once`.
+/// bundle 1 draws bundle 0 alone with a `warn_once`. DEC-53 rules the limit
+/// stays: the retail census found six affected shaders, all SP content, and
+/// `maps/t1_fatal.bsp` is the one BSP consumer.
 ///
 /// Source: `oracle/codemp/renderer/tr_shader.cpp:2612-2713`
 pub fn CollapseMultitexture(
