@@ -115,8 +115,8 @@ pub struct RenderModels {
     /// Brush `model_t` handle -> its `WorldAsset::bmodels` index. The owned
     /// replacement for `R_LoadSubmodels`' `model->bmodel = out` pointer write:
     /// the render walk resolves a handle to the owned submodel row through this
-    /// map instead of the retired `model_t::bmodel` raw pointer. Filled by
-    /// [`Self::register_bmodel`]; the field itself retires at the #51 type pass.
+    /// map instead of the retired `model_t::bmodel` raw pointer, which the
+    /// struct no longer carries. Filled by [`Self::register_bmodel`].
     ///
     /// Source: `oracle/codemp/renderer/tr_bsp.cpp:1441`
     pub(crate) bmodel_indices: HashMap<qhandle_t, usize>,
@@ -309,9 +309,8 @@ impl RenderModels {
         {
             let slot = self.models.slot_mut(idx);
             slot.r#type = modtype_t::MOD_BRUSH;
-            // `model->bmodel = out` stays NULL — the bmodel_indices side map
-            // replaces the raw pointer, and the field retires at the #51 type
-            // pass.
+            // Raven's `model->bmodel = out` write has no twin. The
+            // `bmodel_indices` side map replaces that pointer.
             if world_index != 0 {
                 slot.bspInstance = qtrue;
             }

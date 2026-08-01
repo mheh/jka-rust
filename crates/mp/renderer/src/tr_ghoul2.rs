@@ -68,7 +68,6 @@ use crate::render_state::shader_asset::ShaderHandle;
 use crate::render_state::skin_asset::SkinHandle;
 use crate::tr_image::{TrImageState, R_GetSkinByHandle};
 use crate::tr_light::R_SetupEntityLighting;
-use crate::tr_local::crenderable_surface::CRenderableSurface;
 use crate::tr_local::dlight_s::dlight_t;
 use crate::tr_local::fog_t::fog_t;
 use crate::tr_local::model_s::model_t;
@@ -129,11 +128,6 @@ const MDX_TAG_ORIGIN: usize = 2;
 const IG2_BONEWEIGHT_TOPBITS_SHIFT: u32 = 12;
 const IG2_BONEWEIGHT_TOPBITS_AND: u32 = 0x300;
 const FG2_BONEWEIGHT_RECIPROCAL_MULT: f32 = 1.0 / 1023.0;
-/// `#define MAX_RENDER_SURFACES (2048)` — the `RSStorage` ring's length
-/// (`tr_ghoul2.cpp:865`, four lines above `AllocRS`).
-// Its one reader, `alloc_rs`, is still deferred on the ring's state carrier.
-#[allow(dead_code)]
-const MAX_RENDER_SURFACES: usize = 2048;
 
 /// Raven `int OldToNewRemapTable[72]` — the JK2->JKA bone remap table
 /// [`RenderModels::r_load_mdxm`] runs over an old (`numBones == 72`,
@@ -336,19 +330,6 @@ pub fn g2_get_bone_name_from_skel(
         .expect("G2_GetBoneNameFromSkel: bone cache has no mdxa header");
     debug_assert!(bone_num >= 0 && bone_num < mdxa.num_bones());
     Some(mdxa.skel(bone_num).name.clone())
-}
-
-/// Raven `CRenderableSurface *AllocRS(void)` — hands out the next
-/// render-thread-local `CRenderableSurface` scratch slot from a
-/// `RSStorage[MAX_RENDER_SURFACES]` ring buffer.
-// DEFERRED: AllocRS — the `RSStorage[MAX_RENDER_SURFACES]` ring and its
-// `NextRS` cursor need a render-thread state carrier named (DEC-37 A13.3);
-// Raven hands out a pointer *into* that ring, which the by-value signature
-// below cannot express. The cap itself is resolved (see `MAX_RENDER_SURFACES`
-// above).
-// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:865-876`
-pub fn alloc_rs() -> CRenderableSurface {
-    todo!("Port AllocRS — oracle/codemp/renderer/tr_ghoul2.cpp:869-876")
 }
 
 /// Raven `static int R_GComputeFogNum(trRefEntity_t *ent)` — the fog volume
@@ -676,11 +657,6 @@ pub fn g2_get_vert_bone_weight_not_slow(p_vert: &mdxmVertex_t, i_weight_num: i32
 /// Raven `static int G2_ComputeLOD(trRefEntity_t *ent, const model_t
 /// *currentModel, int lodBias)`.
 ///
-/// `ent->e.modelScale`/`ent->e.radius` are threaded as explicit
-/// `model_scale`/`radius` parameters. `R_AddGhoulSurfaces` passes
-/// `ent.model_scale`/`ent.radius` off `RefEntity`, which now carries both
-/// fields (`RefEntity::model_scale`/`radius`, `render_state/placeholders.rs`).
-///
 /// `r_lodbias`/`r_lodscale`/`r_autolodscalevalue` read through
 /// `Common::cvar` (the `RendererCvars`-handle + live-engine-table pattern
 /// `tr_light.rs`'s `R_SetupEntityLightingGrid` already established).
@@ -691,8 +667,6 @@ pub fn g2_get_vert_bone_weight_not_slow(p_vert: &mdxmVertex_t, i_weight_num: i32
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:967-1041`
 pub fn g2_compute_lod(
     ent: &RefEntity,
-    model_scale: vec3_t,
-    radius: f32,
     current_model: &model_t,
     lod_bias: i32,
     view: &viewParms_t,
@@ -703,6 +677,8 @@ pub fn g2_compute_lod(
     if current_model.numLods < 2 {
         return 0;
     }
+
+    let model_scale = ent.model_scale;
 
     let mut lod_bias = lod_bias;
     if common.cvar(cvars.r_lodbias).integer > lod_bias {
@@ -725,7 +701,7 @@ pub fn g2_compute_lod(
     // literal promotes the whole expression to `double`, narrowed to `float`
     // once at the `ProjectRadius(float, ...)` call boundary (wave-0 ruling
     // 12).
-    let scaled_radius = (0.75_f64 * largest_scale as f64 * radius as f64) as f32;
+    let scaled_radius = (0.75_f64 * largest_scale as f64 * ent.radius as f64) as f32;
     // we reduce the radius to make the LOD match other model types which use
     // the actual bound box size
     let projected_radius = project_radius(scaled_radius, ent.origin, view);
@@ -848,8 +824,8 @@ pub fn g2_process_generated_surface_bolts(
 /// as the shader arena slot number, so the handle reads back through
 /// `Arena::handle_at_slot`.
 ///
-/// The draw surf is a `Copy` [`G2SurfaceRef`] rather than the raw-pointer
-/// tier-2 `CRenderableSurface` (R2 Group-4 table): it carries the model handle,
+/// The draw surf is a `Copy` [`G2SurfaceRef`] rather than Raven's raw-pointer
+/// `CRenderableSurface` (R2 Group-4 table): it carries the model handle,
 /// the LOD, the surface index, and the bone-cache id, so the backend re-locates
 /// the surface and reads the cache from the arena.
 ///
@@ -934,6 +910,13 @@ pub fn render_surfaces<'a>(
                     .get(shader)
                     .map(|s| s.sorted_index)
                     .unwrap_or(0);
+
+                // Raven's `RB_SurfaceGhoul` tess body
+                // (`oracle/codemp/renderer/tr_ghoul2.cpp:4060-4451`) has no
+                // Rust twin. Its bone deform dissolves into the R4 vertex
+                // pipeline, which reads this `G2SurfaceRef`. The gore chain,
+                // the `alternateTex` overlay, and the dynamic-glow arms of
+                // that body stay unported.
                 R_AddDrawSurf(
                     SurfaceGeometry::Ghoul2(G2SurfaceRef {
                         model: current_model.index,
@@ -1539,11 +1522,8 @@ pub fn g2_rag_get_anim_matrix(
 /// bounding sphere against the view frustum, bumping the matching
 /// `tr.pc.c_sphere_cull_md3_{out,in,clip}` perf counter.
 ///
-/// `ent->e.modelScale`/`ent->e.radius` are threaded as explicit
-/// `model_scale`/`radius` parameters rather than read off `RefEntity` — same
-/// rationale (and same now-available follow-up rewire) [`g2_compute_lod`]
-/// (this file, wave 1) already documents for the same two fields, and `ent->e.origin` is unread here (oracle culls around
-/// `vec3_origin`, not the entity's world position). The three `tr.pc.*`
+/// `ent->e.origin` is unread here, because the oracle culls around
+/// `vec3_origin`, not the entity's world position. The three `tr.pc.*`
 /// counters have no state carrier yet (`FrameState::counters: BackEndCounters`
 /// is still the R4-backend-wave empty placeholder, `render_state::
 /// placeholders`, out of this file's edit scope) — threaded as explicit
@@ -1557,8 +1537,7 @@ pub fn g2_rag_get_anim_matrix(
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:896-930`
 #[allow(clippy::too_many_arguments)]
 pub fn r_g_cull_model(
-    model_scale: vec3_t,
-    radius: f32,
+    ent: &RefEntity,
     ori: &orientationr_t,
     r_nocull_integer: i32,
     frustum: &[cplane_t; 4],
@@ -1566,6 +1545,8 @@ pub fn r_g_cull_model(
     c_sphere_cull_md3_in: &mut i32,
     c_sphere_cull_md3_clip: &mut i32,
 ) -> i32 {
+    let model_scale = ent.model_scale;
+
     // scale the radius if need be
     let mut largest_scale = model_scale[0];
     if model_scale[1] > largest_scale {
@@ -1581,7 +1562,7 @@ pub fn r_g_cull_model(
     // cull bounding sphere
     match R_CullLocalPointAndRadius(
         vec3_origin,
-        radius * largest_scale,
+        ent.radius * largest_scale,
         ori,
         r_nocull_integer,
         frustum,
@@ -1642,65 +1623,6 @@ pub fn r_g_cull_model(
 // `ConstructGhoulSkeleton`/`EvalLow`), so no re-export was needed to keep
 // this wave's live call graph closed.
 // ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// R3 wave 5 (`tr_ghoul2.wave5.md`).
-// ---------------------------------------------------------------------------
-
-/// Raven `RB_SurfaceGhoul` — the `SF_MDX` dispatch-table entry: deforms a
-/// Ghoul2 render surface's vertexes/normals by its lerped bone matrices and
-/// appends them to the tessellation buffer (the `_G2_GORE` branch instead
-/// fast-paths a pre-deformed gore overlay's vertex/normal/texcoord/fade data
-/// straight out of `surf->alternateTex`, walking `surf->goreChain` for every
-/// gore layer stacked on this surface), then frees `surf` — except when
-/// `_G2_GORE` is compiled in (unconditionally true for MP, `_G2_GORE`
-/// `oracle/codemp/game/q_shared.h:3110`), where ownership instead passes to
-/// `storeSurf`/the glow-pass free gate below.
-///
-/// DEFERRED: R4/escalation — whole-fn, no partial body survives:
-/// - Every write target is `tess` (`shaderCommands_t`: `.xyz`/`.normal`/
-///   `.texCoords`/`.svars.colors`/`.indexes`/`.numVertexes`/`.numIndexes`/
-///   `.fading`), which dissolves entirely into R4's tessellation/
-///   vertex-building pipeline with no replacement scratch carrier at R3
-///   (packet STATE HOMES row `RB_SurfaceGhoul` / `tess`; R2 `## State
-///   ownership` row `tess`).
-/// - The read side is independently blocked: `surf.surfaceData`
-///   (`*mut mdxmSurface_t`), `surf.boneCache` (`*mut c_void`, the packed
-///   `CBoneCache*`), and `surf.alternateTex`/`surf.goreChain` are raw-pointer
-///   fields on the tier-2 `CRenderableSurface`
-///   (`tr_local/crenderable_surface.rs`) with no quarantine accessor
-///   licensed for this wave — dereferencing them here would be new unsafe,
-///   banned by this wave's law. R2's own Group-4 table marks
-///   `CRenderableSurface`'s replacement shape "re-verify when the ghoul2
-///   render-side integration wave lands", not this one; this file's own
-///   `render_surfaces`/`alloc_rs` (wave 2/earlier) already reached the same
-///   conclusion for the same struct.
-/// - `RB_CheckOverflow`, the one in-module callee this fn leans on before
-///   writing `tess`, is itself already `todo!()` for the identical `tess`
-///   reason (`tr_surface.rs:394-421`) — no gap closes by calling it.
-/// - The dynamic-glow gate (`g_bDynamicGlowSupported`/
-///   `g_bRenderGlowingObjects`) has no R3 carrier: DEC-37 A13.3 assigns it a
-///   per-subsystem owned state struct "NAMED BY THIS WAVE if this file's
-///   wave is where the subsystem lands" — the dynamic-glow subsystem does
-///   not land in this wave (its only other touch anywhere in this file's
-///   packets is this one read), so naming a struct for it here would be an
-///   invented carrier, not a licensed one; left unresolved rather than
-///   guessed. `r_DynamicGlow` itself does have a home (`RendererCvars`,
-///   DEC-37 A13.1) but gates nothing reachable without the other two.
-/// - `G2PerformanceTimer_RB_SurfaceGhoul` (read)/`G2Time_RB_SurfaceGhoul`
-///   (write) are dropped per DEC-37 A13.5 (dead `#ifndef FINAL_BUILD`
-///   surface, this file's module-doc note) — not transcribed even as a
-///   comment inside the body.
-///
-/// Loud `todo!()` per the whole-fn-deferral convention (partial-body fns
-/// keep `DEFERRED:` comments instead of panicking).
-///
-/// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:4060-4451`
-#[doc(alias = "RB_SurfaceGhoul")]
-pub fn rb_surface_ghoul(surf: CRenderableSurface, frame: &mut FrameState) {
-    let _ = (surf, frame);
-    todo!("Port RB_SurfaceGhoul — oracle/codemp/renderer/tr_ghoul2.cpp:4060-4451")
-}
 
 // ---------------------------------------------------------------------------
 // R3 wave 9 (`tr_ghoul2.wave9.md`) — final tail wave.
@@ -2390,8 +2312,7 @@ pub fn r_add_ghoul_surfaces<'a>(
     let mut cull_in = 0;
     let mut cull_clip = 0;
     let cull = r_g_cull_model(
-        ent.model_scale,
-        ent.radius,
+        ent,
         ori,
         r_nocull_integer,
         &view.frustum,
@@ -2472,16 +2393,7 @@ pub fn r_add_ghoul_surfaces<'a>(
             };
 
         let current_model = models.get_model(inst.model);
-        let which_lod = g2_compute_lod(
-            ent,
-            ent.model_scale,
-            ent.radius,
-            current_model,
-            inst.lod_bias,
-            view,
-            host.common,
-            cvars,
-        );
+        let which_lod = g2_compute_lod(ent, current_model, inst.lod_bias, view, host.common, cvars);
 
         // The bone transforms already ran through `g2_construct_render_skeleton`
         // above, so the render only reads the built cache. Clone the surface

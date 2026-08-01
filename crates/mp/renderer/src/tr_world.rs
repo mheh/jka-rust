@@ -559,9 +559,28 @@ pub fn R_DlightSurface(
     dlight_bits
 }
 
+/// The submodel surface as a planar face with the four corner points the quad
+/// math reads.
+///
+/// Raven casts every submodel surface to `srfSurfaceFace_t` without a tag
+/// test, which is undefined behavior for any other surface kind.
+/// We return `None` there instead (porting-rules §19).
+///
+/// Source: `oracle/codemp/renderer/tr_world.cpp:672`
+fn bmodel_quad_face(surf: &Surface) -> Option<&SurfaceFace> {
+    match &surf.data {
+        SurfaceData::Face(face) if face.points.len() >= 4 => Some(face),
+        _ => None,
+    }
+}
+
 /// Raven `RE_GetBModelVerts` — the two largest-area faces of an inline
 /// (brush) model's surfaces, picking whichever one faces the current view,
 /// as its 4 corner verts.
+///
+/// The handle resolves to a `WorldAsset::bmodels` row through
+/// `RenderModels::bmodel_index`, and that row's range addresses the owned
+/// `WorldAsset::surfaces` (the path `R_AddBrushModelSurfaces` uses).
 ///
 /// PORT-NOTE: the oracle's `vec3_t normal` out-param is declared but never
 /// written anywhere in the body — a dead out-param, dropped per
@@ -574,42 +593,42 @@ pub fn R_DlightSurface(
 /// double-promoted math, not this int-truncation quirk, so it is called out
 /// separately here).
 ///
-/// PORT-NOTE: `RenderModels::get_model` (the already-ported
-/// `R_GetModelByHandle`) returns `&model_t`, whose `.bmodel: *mut bmodel_t`
-/// is real on the client-rendering path; the walk goes through the tier-2
-/// accessors `model_t::bmodel`, `bmodel_t::surfaces`, `msurface_t::face` and
-/// `srfSurfaceFace_t::point` (§D11 quarantine). A null `bmodel`, a
-/// `firstSurface` array shorter than `numSurfaces`, or a surface that is not
-/// really an `SF_FACE` mirrors the oracle's own unchecked dereference — not a
-/// divergence, Raven has no guard here either (porting-rules §19: this is
-/// oracle UB, not a case this port need reproduce more safely, but neither
-/// does it invent a defined-behavior guard the oracle lacks). This walk is
-/// the reason `msurface_t`'s quarantine survives DEC-43: the world's own
-/// surfaces are owned now, but a brush model still reaches its range through
-/// `model_t::bmodel`.
-///
-/// FOLLOW-UP: this fn has no caller yet; migrate it to `RenderModels::bmodel_index` + `assets.world.surfaces` (as `R_AddBrushModelSurfaces` now does) when a live path first calls it.
-///
 /// Source: `oracle/codemp/renderer/tr_world.cpp:653-744`
 pub fn RE_GetBModelVerts(
     bmodel_index: qhandle_t,
     models: &RenderModels,
+    assets: &RenderAssets,
     frame: &FrameState,
 ) -> [vec3_t; 4] {
-    let model = models.get_model(bmodel_index);
-
-    let surfs = model.bmodel().surfaces();
+    let idx = models
+        .bmodel_index(bmodel_index)
+        .expect("RE_GetBModelVerts reached a non-brush model handle");
+    let world = assets
+        .world
+        .as_ref()
+        .expect("RE_GetBModelVerts needs the loaded world");
+    let bmodel = &world.bmodels[idx];
+    let first = bmodel.first_surface;
+    let num = bmodel.num_surfaces.max(0) as usize;
+    let surfs = &world.surfaces[first..first + num];
 
     // Not sure if we really need to track the best two candidates
     let mut max_dist = [0i32; 2];
     let mut max_indx = [0usize; 2];
 
     for (i, surf) in surfs.iter().enumerate() {
-        let face = surf.face();
+        let Some(face) = bmodel_quad_face(surf) else {
+            continue;
+        };
 
         // It seems that the safest way to handle this is by finding the
         // area of the faces
-        let dist = GetQuadArea(face.point(0), face.point(1), face.point(2), face.point(3)) as i32;
+        let dist = GetQuadArea(
+            face.points[0].xyz,
+            face.points[1].xyz,
+            face.points[2].xyz,
+            face.points[3].xyz,
+        ) as i32;
 
         // Check against the highest max
         if dist > max_dist[0] {
@@ -628,24 +647,36 @@ pub fn RE_GetBModelVerts(
 
     // Hopefully we've found two best case candidates. Now we should see
     // which of these faces the viewer
-    let face0 = surfs[max_indx[0]].face();
+    let Some(face0) = surfs.get(max_indx[0]).and_then(bmodel_quad_face) else {
+        // The submodel holds no usable face, so we return a zero quad.
+        return [[0.0; 3]; 4];
+    };
     let dot1 = _DotProduct(face0.plane.normal, frame.refdef.view_axis[0]);
 
-    let face1 = surfs[max_indx[1]].face();
-    let dot2 = _DotProduct(face1.plane.normal, frame.refdef.view_axis[0]);
+    // The second candidate falls back to the first when its surface is no
+    // face, and then the first face wins the test below.
+    let face1 = surfs.get(max_indx[1]).and_then(bmodel_quad_face);
+    let dot2 = match face1 {
+        Some(face) => _DotProduct(face.plane.normal, frame.refdef.view_axis[0]),
+        None => dot1,
+    };
 
-    let i = if dot2 < dot1 && dot2 < 0.0 {
-        max_indx[1] // use the second face
-    } else if dot1 < dot2 && dot1 < 0.0 {
-        max_indx[0] // use the first face
+    // Raven's two `use the first face` arms collapse into one `else`.
+    let face = if dot2 < dot1 && dot2 < 0.0 {
+        // use the second face
+        face1.unwrap_or(face0)
     } else {
         // Possibly only have one face, so may as well use the first
         // face, which also should be the best one
-        max_indx[0]
+        face0
     };
 
-    let face = surfs[i].face();
-    [face.point(0), face.point(1), face.point(2), face.point(3)]
+    [
+        face.points[0].xyz,
+        face.points[1].xyz,
+        face.points[2].xyz,
+        face.points[3].xyz,
+    ]
 }
 
 /// Raven `R_EvaluateWireframeSurf` — bake one BSP face surface into a new

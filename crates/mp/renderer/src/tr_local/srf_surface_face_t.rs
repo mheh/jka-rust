@@ -32,8 +32,10 @@ pub struct srfSurfaceFace_t {
 // `points` is a flexible array member: the nominal `[[f32; VERTEXSIZE]; 1]`
 // bound covers only the first point, and the real trailing arrays (points,
 // then indices at `ofsIndices`) are sized by the loader's allocation. The
-// walks past that bound are quarantined here (§D11) so the `tr_world.cpp`
-// logic port stays entirely safe.
+// walks past that bound are quarantined here (§D11) so the logic ports that
+// read a face stay entirely safe. The world and its brush submodels own their
+// faces now (DEC-43), so `tr_surface.rs`'s `RB_SurfaceFace` is the one
+// remaining reader.
 impl srfSurfaceFace_t {
     /// Point `idx`'s leading xyz triple — the `VERTEXSIZE`-float stride walk
     /// over the trailing point array (`VectorCopy(face->points[i], ...)`,
