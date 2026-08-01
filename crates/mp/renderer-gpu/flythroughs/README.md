@@ -29,7 +29,4 @@ The file is plain text.
 
 ## Determinism
 
-Replay time advances from the per-frame delta the harness already tracks. That
-delta is real elapsed time, so poses vary across runs with GPU load. A later
-image gate needs a fixed-dt mode in the harness before it can compare poses
-across runs.
+Replay time advances from the per-frame delta the harness tracks. In wall-clock mode that delta is real elapsed time, so poses vary across runs with GPU load. The `--fixed-dt[=<ms>]` flag steps every frame by a fixed delta instead, 60 frames per second unless `=<ms>` gives the delta in milliseconds. The whole timeline (camera delta, scene time, shader time) then comes from the frame count, so frame N draws the same pose and scene every run. An image gate uses `--flythrough --fixed-dt` together.

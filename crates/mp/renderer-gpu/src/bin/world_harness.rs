@@ -29,13 +29,18 @@
 //! free-fly. The replay follows a closed-loop Catmull-Rom spline through the
 //! waypoints at constant parameter speed. It falls back to linear interpolation
 //! for fewer than four waypoints. Replay time advances from the per-frame delta
-//! the harness already tracks. That delta is real elapsed time, so poses vary
-//! across runs with GPU load. An image gate needs a fixed-dt mode first.
+//! the harness tracks. In wall-clock mode that delta is real elapsed time, so
+//! poses vary across runs with GPU load. The `--fixed-dt` mode replaces the
+//! whole timeline (camera delta, scene time, shader time) with a frame counter,
+//! so a recorded path replays identically every run. An image gate uses that
+//! mode.
 //!
 //! Usage: `cargo run --release -p mp_renderer_gpu --bin world_harness
-//! [-- [--flythrough] [--pbr] <basepath> [map]]`. The `--flythrough` flag starts
-//! replay at boot when the map has a path file. The `--pbr` flag boots on the
-//! PBR backend instead of the faithful one.
+//! [-- [--flythrough] [--pbr] [--fixed-dt[=<ms>]] <basepath> [map]]`. The
+//! `--flythrough` flag starts replay at boot when the map has a path file. The
+//! `--pbr` flag boots on the PBR backend instead of the faithful one. The
+//! `--fixed-dt` flag steps every frame by a fixed delta, 60 frames per second
+//! unless `=<ms>` gives the delta in milliseconds.
 
 use std::collections::HashSet;
 use std::fs;
@@ -118,6 +123,17 @@ const GHOUL2_SIDE_OFFSET: f32 = 96.0;
 /// The default replay speed in world units per second. The recorder writes this
 /// into a saved path file's header.
 const DEFAULT_REPLAY_SPEED: f32 = 300.0;
+
+/// The frame delta a bare `--fixed-dt` selects, 60 frames per second.
+const DEFAULT_FIXED_DT: f32 = 1.0 / 60.0;
+
+/// Returns the simulated clock for a fixed-dt frame, in milliseconds and in
+/// seconds. The frame time is the product `index * dt`, not an accumulated sum,
+/// so a frame's clock depends on its index alone.
+fn fixed_timeline(index: u64, dt: f32) -> (i32, f32) {
+    let t = index as f64 * dt as f64;
+    ((t * 1000.0) as i32, t as f32)
+}
 
 /// One recorded camera pose. `pitch`/`yaw` are Raven view angles in degrees.
 /// The recorder captures these while free-flying, and the replay walks a spline
@@ -211,7 +227,10 @@ fn parse_flythrough(text: &str) -> Result<(f32, Vec<Waypoint>), String> {
         .next()
         .ok_or_else(|| format!("line {}: missing version", hdr_no + 1))?;
     if version != "1" {
-        return Err(format!("line {}: unsupported version {version}", hdr_no + 1));
+        return Err(format!(
+            "line {}: unsupported version {version}",
+            hdr_no + 1
+        ));
     }
     let speed_tok = htok
         .next()
@@ -450,6 +469,12 @@ struct App {
     /// The replay clock in seconds. It advances by the per-frame delta, so a
     /// fixed frame sequence gives a fixed camera path.
     replay_time: f32,
+    /// The fixed frame delta in seconds, `None` in wall-clock mode.
+    /// `--fixed-dt` sets it, and the whole timeline then steps by it.
+    fixed_dt: Option<f32>,
+    /// The count of frames drawn so far.
+    /// Fixed-dt mode derives its clock from this count.
+    frame_index: u64,
     /// The render cvar snapshot the executor reads each frame. F9 flips its
     /// `pbr` field, and `--pbr` sets it at boot. Every other field keeps the
     /// retail default, so the faithful path stays byte-exact.
@@ -505,6 +530,8 @@ impl App {
             flythrough: None,
             replaying: false,
             replay_time: 0.0,
+            fixed_dt: None,
+            frame_index: 0,
             cvars: RenderCvarSnapshot::default(),
         }
     }
@@ -512,7 +539,10 @@ impl App {
     /// Flips the shader backend and prints the new mode. F9 calls it.
     fn toggle_backend(&mut self) {
         self.cvars.pbr = if self.cvars.pbr != 0 { 0 } else { 1 };
-        println!("world_harness: backend now {}", backend_name(self.cvars.pbr));
+        println!(
+            "world_harness: backend now {}",
+            backend_name(self.cvars.pbr)
+        );
     }
 
     /// Moves the camera along its forward and right vectors from the held keys.
@@ -593,7 +623,10 @@ impl App {
         let path = flythrough_file_path(&self.map_stem);
         if let Some(dir) = path.parent() {
             if let Err(error) = fs::create_dir_all(dir) {
-                println!("world_harness: could not create {} ({error})", dir.display());
+                println!(
+                    "world_harness: could not create {} ({error})",
+                    dir.display()
+                );
                 return;
             }
         }
@@ -614,7 +647,10 @@ impl App {
                 println!("world_harness: F7 now replays the saved path");
             }
             Err(error) => {
-                println!("world_harness: could not write {} ({error})", path.display())
+                println!(
+                    "world_harness: could not write {} ({error})",
+                    path.display()
+                )
             }
         }
     }
@@ -806,18 +842,30 @@ impl App {
     }
 
     /// One frame: advance the camera, record the scene, draw it.
+    /// Fixed-dt mode takes the whole clock from the frame count, so no wall
+    /// time reaches the camera, the scene, or the shaders.
     fn frame(&mut self) {
-        let now = Instant::now();
-        let dt = (now - self.last_frame).as_secs_f32();
-        self.last_frame = now;
+        let (dt, time_ms, float_time) = match self.fixed_dt {
+            Some(fdt) => {
+                let (ms, s) = fixed_timeline(self.frame_index, fdt);
+                (fdt, ms, s)
+            }
+            None => {
+                let now = Instant::now();
+                let dt = (now - self.last_frame).as_secs_f32();
+                self.last_frame = now;
+                let time_ms = self.start.elapsed().as_millis() as i32;
+                let float_time = self.start.elapsed().as_secs_f32();
+                (dt, time_ms, float_time)
+            }
+        };
+        self.frame_index += 1;
 
         if self.replaying {
             self.advance_replay(dt);
         } else {
             self.update_camera(dt);
         }
-        let time_ms = self.start.elapsed().as_millis() as i32;
-        let float_time = self.start.elapsed().as_secs_f32();
         let refdef = self.build_refdef(time_ms);
         let frame_data = self.record_scene(&refdef);
         self.draw_world_frame(&frame_data, float_time);
@@ -1121,9 +1169,7 @@ fn init_ghoul2(host: &mut UiHost, name: &str) -> Option<(Ghoul2System, Ghoul2Han
     info.alloc(&mut g2);
 
     let model_index = {
-        let UiHost {
-            engine, models, ..
-        } = &mut *host;
+        let UiHost { engine, models, .. } = &mut *host;
         let models_ptr: *mut RenderModels = &mut *models;
         let Engine { common, cm, sv, .. } = &mut **engine;
         let sv_ptr: *mut () = sv as *mut Server as *mut ();
@@ -1146,14 +1192,32 @@ fn main() {
     let mut map: Option<String> = None;
     let mut flythrough_flag = false;
     let mut pbr_flag = false;
+    let mut fixed_dt: Option<f32> = None;
     for arg in std::env::args().skip(1) {
         if arg == "--flythrough" {
             flythrough_flag = true;
         } else if arg == "--pbr" {
             pbr_flag = true;
+        } else if arg == "--fixed-dt" {
+            fixed_dt = Some(DEFAULT_FIXED_DT);
+        } else if let Some(ms_tok) = arg.strip_prefix("--fixed-dt=") {
+            let ms: f32 = match ms_tok.parse() {
+                Ok(ms) => ms,
+                Err(_) => {
+                    eprintln!("world_harness: bad fixed-dt value {ms_tok}");
+                    std::process::exit(2);
+                }
+            };
+            if !ms.is_finite() || ms <= 0.0 {
+                eprintln!("world_harness: fixed-dt must be a positive finite number of milliseconds, found {ms_tok}");
+                std::process::exit(2);
+            }
+            fixed_dt = Some(ms / 1000.0);
         } else if arg.starts_with("--") {
             eprintln!("world_harness: unknown flag {arg}");
-            eprintln!("usage: world_harness [--flythrough] [--pbr] [basepath] [map]");
+            eprintln!(
+                "usage: world_harness [--flythrough] [--pbr] [--fixed-dt[=<ms>]] [basepath] [map]"
+            );
             std::process::exit(2);
         } else if basepath.is_none() {
             basepath = Some(arg);
@@ -1161,7 +1225,9 @@ fn main() {
             map = Some(arg);
         } else {
             eprintln!("world_harness: unexpected argument {arg}");
-            eprintln!("usage: world_harness [--flythrough] [--pbr] [basepath] [map]");
+            eprintln!(
+                "usage: world_harness [--flythrough] [--pbr] [--fixed-dt[=<ms>]] [basepath] [map]"
+            );
             std::process::exit(2);
         }
     }
@@ -1330,6 +1396,10 @@ fn main() {
     app.map_stem = map_stem;
     app.cvars.pbr = if pbr_flag { 1 } else { 0 };
     println!("world_harness: backend {}", backend_name(app.cvars.pbr));
+    app.fixed_dt = fixed_dt;
+    if let Some(fdt) = fixed_dt {
+        println!("world_harness: fixed dt {} ms", fdt * 1000.0);
+    }
     app.replaying = flythrough_flag && flythrough.is_some();
     if app.replaying {
         println!("world_harness: replay started");
@@ -1348,7 +1418,8 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::{
-        parse_flythrough, serialize_flythrough, shortest_arc_delta, Flythrough, Waypoint,
+        fixed_timeline, parse_flythrough, serialize_flythrough, shortest_arc_delta, Flythrough,
+        Waypoint,
     };
 
     fn sample_waypoints() -> Vec<Waypoint> {
@@ -1414,6 +1485,22 @@ mod tests {
         assert!((shortest_arc_delta(350.0, 10.0) - 20.0).abs() < 1e-4);
         // 10 to 350 is -20.
         assert!((shortest_arc_delta(10.0, 350.0) + 20.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn fixed_timeline_depends_on_the_index_alone() {
+        // Frame zero starts the clock at zero.
+        assert_eq!(fixed_timeline(0, 0.25), (0, 0.0));
+        // Four frames of 250 ms land exactly on one second.
+        assert_eq!(fixed_timeline(4, 0.25), (1000, 1.0));
+        // The same index always gives the same clock.
+        assert_eq!(
+            fixed_timeline(12345, 1.0 / 60.0),
+            fixed_timeline(12345, 1.0 / 60.0)
+        );
+        // A product clock never drifts: frame 3200 of a binary-exact 31.25 ms
+        // delta lands exactly on 100 seconds.
+        assert_eq!(fixed_timeline(3200, 0.03125), (100_000, 100.0));
     }
 
     #[test]
