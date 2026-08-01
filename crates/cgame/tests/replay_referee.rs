@@ -261,3 +261,99 @@ fn replay_rust_cgame() {
         "rust replay consumed no records - the recording never opened"
     );
 }
+
+/// Formats one blob preview: length, then hex of the first bytes, then floats
+/// when the length is word-aligned and small.
+fn blob_preview(kind: u8, bytes: &[u8]) -> String {
+    let hex: String = bytes
+        .iter()
+        .take(16)
+        .map(|b| format!("{b:02x} "))
+        .collect();
+    let mut out = format!("kind={kind} len={} [{}]", bytes.len(), hex.trim_end());
+    if bytes.len() % 4 == 0 && bytes.len() <= 48 {
+        let floats: Vec<String> = bytes
+            .chunks_exact(4)
+            .map(|c| format!("{:.9}", f32::from_le_bytes(c.try_into().unwrap())))
+            .collect();
+        out.push_str(&format!(" f32[{}]", floats.join(", ")));
+    }
+    out
+}
+
+/// Trace inspector for divergence hunts and census spikes.
+/// `JKA_DUMP=<lo>:<hi>` prints every journal record with seq in `[lo, hi]`,
+/// plus the last vmMain enter before the window for frame context.
+#[test]
+#[ignore = "inspection tool - set JKA_TRACE and JKA_DUMP=<lo>:<hi>, run with --ignored"]
+fn dump_trace_window() {
+    use replay_support::{REC_SYSCALL_ENTER, REC_SYSCALL_EXIT, REC_VMCALL_ENTER, REC_VMCALL_EXIT};
+
+    let Ok(spec) = std::env::var("JKA_DUMP") else {
+        eprintln!("SKIP: set JKA_DUMP=<lo>:<hi>");
+        return;
+    };
+    let (lo, hi) = spec
+        .split_once(':')
+        .and_then(|(a, b)| Some((a.parse::<u64>().ok()?, b.parse::<u64>().ok()?)))
+        .expect("JKA_DUMP must be <lo>:<hi>");
+
+    let trace = trace_path();
+    if skip_if_no_trace(&trace) {
+        return;
+    }
+    let manifests = Manifests::load(&referee_dir()).expect("load shape manifests");
+    let mut reader = Reader::open(&trace).expect("open trace");
+
+    let mut last_vm: Option<String> = None;
+    let mut context_shown = false;
+    while let Some(r) = reader.take() {
+        if r.seq > hi {
+            break;
+        }
+        let line = |name: &str, tag: &str| {
+            let words: Vec<String> = r.words.iter().map(|w| w.to_string()).collect();
+            let mut s = format!("seq {:>9} {tag:<8} {name} words[{}]", r.seq, words.join(", "));
+            for b in &r.blobs {
+                s.push_str(&format!("\n              arg{} {}", b.arg_index, blob_preview(b.kind, &b.bytes)));
+            }
+            s
+        };
+        match r.rec_type {
+            REC_VMCALL_ENTER => {
+                let name = manifests
+                    .export(r.cmd)
+                    .map(|e| e.name.clone())
+                    .unwrap_or_else(|| format!("vm#{}", r.cmd));
+                let s = line(&name, "VM>");
+                if r.seq < lo {
+                    last_vm = Some(s);
+                } else {
+                    eprintln!("{s}");
+                }
+            }
+            REC_VMCALL_EXIT if r.seq >= lo => {
+                eprintln!("seq {:>9} VM<      ret={}", r.seq, r.ret);
+            }
+            REC_SYSCALL_ENTER | REC_SYSCALL_EXIT if r.seq >= lo => {
+                if !context_shown {
+                    context_shown = true;
+                    if let Some(vm) = last_vm.take() {
+                        eprintln!("(last vmMain before window)\n{vm}");
+                    }
+                }
+                let name = manifests
+                    .trap(r.cmd)
+                    .map(|t| t.name.clone())
+                    .unwrap_or_else(|| format!("trap#{}", r.cmd));
+                let tag = if r.rec_type == REC_SYSCALL_ENTER { "SYS>" } else { "SYS<" };
+                let mut s = line(&name, tag);
+                if r.rec_type == REC_SYSCALL_EXIT {
+                    s.push_str(&format!(" ret={}", r.ret));
+                }
+                eprintln!("{s}");
+            }
+            _ => {}
+        }
+    }
+}
