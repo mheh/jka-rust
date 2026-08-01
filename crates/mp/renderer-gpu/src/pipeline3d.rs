@@ -131,6 +131,12 @@ impl WorldVertex {
             color: v.color[0],
         }
     }
+
+    /// This returns the vertex position in the surface's own space. The
+    /// differential vertex golden reads it to serialize the ghoul2 stream.
+    pub fn position(&self) -> [f32; 3] {
+        self.position
+    }
 }
 
 const VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
@@ -761,7 +767,20 @@ pub struct Pipeline3d {
     /// The dedup log the shared `stage2d` evaluators write their own rgbGen,
     /// alphaGen, and tcMod fallbacks into.
     stage_warnings: Stage2dWarnings,
+    /// The test-only Ghoul2 vertex-stream capture sink. It stays `None` in normal
+    /// use, so the Ghoul2 collect path pays only a null check. A test arms it
+    /// through [`FrameExecutor::set_ghoul2_capture`], and the collect path pushes
+    /// each decoded surface stream in draw-surf order.
+    ///
+    /// [`FrameExecutor::set_ghoul2_capture`]: crate::FrameExecutor::set_ghoul2_capture
+    ghoul2_capture: Option<Vec<Ghoul2SurfaceCapture>>,
 }
+
+/// One captured Ghoul2 surface vertex stream: the decoded vertices, the triangle
+/// indices, and the parallel bone-0 normals.
+///
+/// The differential vertex golden reads this to serialize a committed fixture.
+pub type Ghoul2SurfaceCapture = (Vec<WorldVertex>, Vec<u32>, Vec<[f32; 4]>);
 
 impl Pipeline3d {
     /// Builds the pipeline's fixed resources against `gpu`'s device.
@@ -865,7 +884,21 @@ impl Pipeline3d {
             depth: DepthTexture::new(gpu, width, height),
             warned: [false; Warned::COUNT],
             stage_warnings: Stage2dWarnings::default(),
+            ghoul2_capture: None,
         }
+    }
+
+    /// Arms or disarms the Ghoul2 vertex-stream capture sink. A true `on` starts
+    /// a fresh capture, so the next frame records each decoded Ghoul2 surface
+    /// stream. The differential vertex golden uses it to bake a fixture.
+    pub fn set_ghoul2_capture(&mut self, on: bool) {
+        self.ghoul2_capture = if on { Some(Vec::new()) } else { None };
+    }
+
+    /// Takes the captured Ghoul2 vertex streams and disarms the sink. The result
+    /// is empty when the sink was never armed.
+    pub fn take_ghoul2_capture(&mut self) -> Vec<Ghoul2SurfaceCapture> {
+        self.ghoul2_capture.take().unwrap_or_default()
     }
 
     /// Recreates the depth texture on a target resize.
@@ -1651,6 +1684,17 @@ impl Pipeline3d {
             stats.ghoul2_decode_failed += 1;
             return;
         };
+
+        // Test-only capture: record the decoded stream in draw-surf order for the
+        // differential vertex golden. The sink stays `None` in normal use.
+        if let Some(capture) = self.ghoul2_capture.as_mut() {
+            capture.push((
+                g2_vertices.clone(),
+                g2_index_block.clone(),
+                g2_normals.clone(),
+            ));
+        }
+
         if g2_index_block.is_empty() {
             stats.empty_surfaces += 1;
             return;

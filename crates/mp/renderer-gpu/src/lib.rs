@@ -62,7 +62,7 @@ pub use gpu::{read_target_rgba, FrameError, Gpu};
 pub use gpu_images::{GpuImage, GpuImages};
 pub use pipeline2d::{Pipeline2d, QuadBatch, Rect, UvRect, SCREEN_HEIGHT, SCREEN_WIDTH};
 pub use pipeline3d::{
-    build_world_mesh, grid_indices, world_clip_matrix, DepthTexture, Pipeline3d, SurfaceRange,
-    WorldGeometry, WorldStats, WorldVertex,
+    build_world_mesh, grid_indices, world_clip_matrix, DepthTexture, Ghoul2SurfaceCapture,
+    Pipeline3d, SurfaceRange, WorldGeometry, WorldStats, WorldVertex,
 };
 pub use stage2d::{stage_color, stage_image, stage_texcoords, Stage2dWarnings, StageTime};

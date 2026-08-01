@@ -4,3 +4,4 @@ __pycache__/
 .claude/worktrees/
 tools/closure-prototype/out/
 crates/mp/renderer-gpu/tests/goldens/*.actual.png
+crates/mp/renderer-gpu/tests/goldens/*.actual.bin

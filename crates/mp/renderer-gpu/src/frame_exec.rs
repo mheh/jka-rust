@@ -75,7 +75,7 @@ use crate::blend::{blend_state_from_gls, GLS_2D_DEFAULT};
 use crate::gpu::Gpu;
 use crate::gpu_images::GpuImages;
 use crate::pipeline2d::{Pipeline2d, QuadBatch, Rect, UvRect};
-use crate::pipeline3d::{Pipeline3d, WorldGeometry, WorldStats};
+use crate::pipeline3d::{Ghoul2SurfaceCapture, Pipeline3d, WorldGeometry, WorldStats};
 use crate::stage2d::{stage_color, stage_image, stage_texcoords, Stage2dWarnings, StageTime};
 
 /// `tr.identityLight` at its default (no overbright) — the colour a frame
@@ -282,6 +282,19 @@ impl FrameExecutor {
     /// Recreates the world depth texture on a window resize.
     pub fn resize(&mut self, gpu: &Gpu, width: u32, height: u32) {
         self.pipeline3d.resize(gpu, width, height);
+    }
+
+    /// Arms or disarms the Ghoul2 vertex-stream capture sink on the 3D pipeline.
+    /// The differential vertex golden arms it before a frame and reads the result
+    /// after. Normal frames leave it disarmed, so the cost is one null check.
+    pub fn set_ghoul2_capture(&mut self, on: bool) {
+        self.pipeline3d.set_ghoul2_capture(on);
+    }
+
+    /// Takes the captured Ghoul2 vertex streams from the 3D pipeline. The result
+    /// is empty when the sink was never armed.
+    pub fn take_ghoul2_capture(&mut self) -> Vec<Ghoul2SurfaceCapture> {
+        self.pipeline3d.take_ghoul2_capture()
     }
 
     /// Replays `frame_data`'s events in order into `target`.
