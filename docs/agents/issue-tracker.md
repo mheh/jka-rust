@@ -36,6 +36,16 @@ Used by `/wayfinder`. The **map** is a single issue with **child** issues as tic
 - **Claim**: `gh issue edit <n> --add-assignee @me`. This is the session's first write.
 - **Resolve**: `gh issue comment <n> --body "<answer>"`, then `gh issue close <n>`, then append a context pointer (gist + link) to the map's Decisions-so-far.
 
+## Branch pattern (ruled 2026-08-01)
+
+Work branches from `master` and is named by the issue that drives it:
+
+- `wf/<ticket>-<slug>` for wayfinder ticket work, for example `wf/6-renderer-surface`.
+- `issue/<n>-<slug>` for plain-issue work.
+- `research/<name>` for research-agent output branches (the agent commits, the architect reviews and merges).
+
+A branch merges to `master` only green (build + gates) and is deleted after the merge. Long-lived phase branches (the old `ui-port` pattern) are retired.
+
 ## Repo ruling (DEC-52)
 
 The DEC ledger in `docs/decisions.md` stays the single decision store. A wayfinder ticket resolves INTO a DEC entry. The resolution comment and the map gist and link the entry. They never hold the canonical text. This inverts wayfinder's detail-in-ticket rule on purpose.
