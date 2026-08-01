@@ -3,6 +3,23 @@
 //! replacing the per-file `const RDF_NOWORLDMODEL: i32 = 1;` duplicates the
 //! R3 waves each landed independently.
 
+/// Raven `RF_MINLIGHT` — allways have some light (viewmodel, some items).
+///
+/// Source: `oracle/codemp/cgame/tr_types.h:18`
+pub const RF_MINLIGHT: i32 = 0x00001;
+
+/// Raven `RF_FIRST_PERSON` — only draw through eyes (view weapon, damage
+/// blood blob).
+///
+/// Source: `oracle/codemp/cgame/tr_types.h:20`
+pub const RF_FIRST_PERSON: i32 = 0x00004;
+
+/// Raven `RF_LIGHTING_ORIGIN` — use `refEntity->lightingOrigin` instead of
+/// `refEntity->origin` for lighting.
+///
+/// Source: `oracle/codemp/cgame/tr_types.h:28`
+pub const RF_LIGHTING_ORIGIN: i32 = 0x00080;
+
 /// Raven `RF_FORKED` — override lightning to have forks.
 ///
 /// Source: `oracle/codemp/cgame/tr_types.h:43`
@@ -22,6 +39,11 @@ pub const RF_GROW: i32 = 0x10000;
 ///
 /// Source: `oracle/codemp/cgame/tr_types.h:57`
 pub const RDF_NOWORLDMODEL: i32 = 1;
+
+/// Raven `RDF_AUTOMAP` — Raven: means this scene is to draw the automap.
+///
+/// Source: `oracle/codemp/cgame/tr_types.h:63`
+pub const RDF_AUTOMAP: i32 = 32;
 
 /// Raven `RDF_NOFOG` — Raven: "no global fog in this scene (but still brush
 /// fog)".

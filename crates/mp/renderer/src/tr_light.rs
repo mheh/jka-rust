@@ -25,7 +25,9 @@ use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_local::dlight_s::dlight_t;
 use crate::tr_local::mgrid_t::mgrid_t;
 use crate::tr_local::orientationr_t::orientationr_t;
-use crate::tr_public::ref_flags::RDF_NOWORLDMODEL;
+use crate::tr_public::ref_flags::{
+    RDF_NOWORLDMODEL, RF_FIRST_PERSON, RF_LIGHTING_ORIGIN, RF_MINLIGHT,
+};
 use crate::tr_shade_calc::myftol;
 
 // This wave threads `RenderAssets`, `FrameState`, `RendererCvars` (the R2
@@ -57,23 +59,6 @@ use crate::tr_shade_calc::myftol;
 //   file touches, flattened directly onto `RefEntity` rather than nested
 //   under an `.e` sub-field (no other wave has established that nesting
 //   yet).
-
-/// Raven `RF_MINLIGHT` — allways have some light (viewmodel, some items).
-///
-/// Source: `oracle/codemp/cgame/tr_types.h:18`
-const RF_MINLIGHT: i32 = 0x00001;
-
-/// Raven `RF_FIRST_PERSON` — only draw through eyes (view weapon, damage
-/// blood blob).
-///
-/// Source: `oracle/codemp/cgame/tr_types.h:20`
-const RF_FIRST_PERSON: i32 = 0x00004;
-
-/// Raven `RF_LIGHTING_ORIGIN` — use `refEntity->lightingOrigin` instead of
-/// `refEntity->origin` for lighting.
-///
-/// Source: `oracle/codemp/cgame/tr_types.h:28`
-const RF_LIGHTING_ORIGIN: i32 = 0x00080;
 
 /// `FUNCTABLE_MASK` (`FUNCTABLE_SIZE - 1`).
 ///

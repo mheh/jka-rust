@@ -2,9 +2,7 @@
 
 pub mod acff_t;
 pub mod alpha_gen_t;
-pub mod bmodel_t;
 pub mod color_gen_t;
-pub mod crenderable_surface;
 pub mod cull_type_t;
 pub mod decal_poly_s;
 pub mod deform_stage_t;
@@ -22,7 +20,6 @@ pub mod image_s;
 pub mod mgrid_t;
 pub mod model_s;
 pub mod modtype_t;
-pub mod msurface_s;
 pub mod orientationr_t;
 pub mod shader_s;
 pub mod shader_sort_t;

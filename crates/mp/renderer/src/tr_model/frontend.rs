@@ -287,23 +287,35 @@ pub unsafe fn r_lerp_tag(
 }
 
 /// Raven `R_ModelBounds` — a model's bounding box: an inline (brush)
-/// model's own `bmodel_t::bounds`, else its MD3 LOD-0 first frame's bounds,
+/// model's own `BModel::bounds`, else its MD3 LOD-0 first frame's bounds,
 /// else a cleared box if the model has no MD3 LOD 0. Out-params `mins`/
 /// `maxs` become the return tuple (porting-rules §C7).
 ///
+/// The brush arm reads the owned world: `RenderModels::bmodel_index` maps the
+/// handle to a `WorldAsset::bmodels` row, which replaces `model_t::bmodel`.
+///
 /// # Safety
-/// `handle` must resolve (through [`RenderModels::get_model`]) to a
-/// `model_t` whose `bmodel`/`md3[0]`, if non-null, satisfy the tier-2
-/// raw-pointer read contract those fields already carry (`_PREAMBLE.md`
-/// Group 1/6).
+/// The MD3 arm reads `model_t::md3[0]` raw. `handle` must resolve (through
+/// [`RenderModels::get_model`]) to a `model_t` whose `md3[0]`, if non-null,
+/// satisfies the tier-2 raw-pointer read contract that field already carries
+/// (`_PREAMBLE.md` Group 6).
 ///
 /// Source: `oracle/codemp/renderer/tr_model.cpp:1811-1836`
-pub unsafe fn r_model_bounds(rm: &RenderModels, handle: qhandle_t) -> (vec3_t, vec3_t) {
-    let model = rm.get_model(handle);
-
-    if !model.bmodel.is_null() {
-        return ((*model.bmodel).bounds[0], (*model.bmodel).bounds[1]);
+pub unsafe fn r_model_bounds(
+    rm: &RenderModels,
+    assets: &RenderAssets,
+    handle: qhandle_t,
+) -> (vec3_t, vec3_t) {
+    if let Some(idx) = rm.bmodel_index(handle) {
+        let world = assets
+            .world
+            .as_ref()
+            .expect("r_model_bounds needs the loaded world for a brush model");
+        let bmodel = &world.bmodels[idx];
+        return (bmodel.bounds[0], bmodel.bounds[1]);
     }
+
+    let model = rm.get_model(handle);
 
     if model.md3[0].is_null() {
         return ([0.0; 3], [0.0; 3]);

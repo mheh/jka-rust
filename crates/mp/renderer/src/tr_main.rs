@@ -47,7 +47,7 @@ use crate::tr_local::tr_refdef_t::trRefdef_t;
 use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_mesh::r_add_md3_surfaces;
 use crate::tr_model::render_models::RenderModels;
-use crate::tr_public::ref_flags::RDF_NOWORLDMODEL;
+use crate::tr_public::ref_flags::{RDF_AUTOMAP, RDF_NOFOG, RDF_NOWORLDMODEL, RF_FIRST_PERSON};
 use crate::tr_scene::{ghoul2_token_decode, ghoul2_token_encode, R_AddPolygonSurfaces};
 use crate::tr_shader::R_GetShaderByHandle;
 use crate::tr_terrain::R_AddTerrainSurfaces;
@@ -99,28 +99,6 @@ pub const CULL_OUT: i32 = 2;
 ///
 /// Source: `oracle/codemp/game/q_shared.h`
 const PLANE_NON_AXIAL: u8 = 3;
-
-/// Raven `RDF_AUTOMAP`.
-///
-/// Raven: means this scene is to draw the automap -rww.
-///
-/// Source: `oracle/codemp/cgame/tr_types.h:63`
-const RDF_AUTOMAP: i32 = 32;
-
-/// Raven `RDF_NOFOG`.
-///
-/// Raven: no global fog in this scene (but still brush fog) -rww.
-///
-/// Source: `oracle/codemp/cgame/tr_types.h:64`
-const RDF_NOFOG: i32 = 64;
-
-/// Raven `RF_FIRST_PERSON` — only draw through eyes (view weapon, damage
-/// blood blob). Local copy of the private const already ported at
-/// `tr_light.rs` (not `pub` there, so not reachable from here); same value,
-/// same oracle line.
-///
-/// Source: `oracle/codemp/cgame/tr_types.h:20`
-const RF_FIRST_PERSON: i32 = 0x00004;
 
 /// Raven `MAX_SHADERS` (non-`_XBOX` branch).
 ///
