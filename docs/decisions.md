@@ -1386,6 +1386,8 @@ shrinks to operational lessons plus a map pointer). Localized scope
 tracking moves into maps. The DEC ledger remains the decision store per
 the conditions above unless a later ruling changes that.
 
+Amended 2026-08-01 (adoption executed): the user ruled GO and chose GitHub issues as the tracker, which supersedes the local-markdown choice above. The map is [Map: the jamp client](https://github.com/mheh/jka-rust/issues/2), with tickets as native sub-issues and blocking as native issue dependencies (`docs/agents/issue-tracker.md` holds the operations). The charted destination: a `jamp` client that boots, joins a live stock-protocol server (our `jampded` and stock OpenJK/retail both), and completes a real match with rendering, input, and sound. The enhancement track (sidecar D1-D21, ladder T1-T5, mesh-swap) is out of this map's scope and becomes its own future map. Off-island work migrated as plain issues (#13-#15). All other DEC-52 conditions stand, including the ticket-resolves-into-DEC inversion.
+
 ## DEC-53 — collapsed multitexture stays lightmap-only (ruled 2026-07-31)
 
 The backend draws a `GL_MODULATE` collapse only when bundle 1 holds the
