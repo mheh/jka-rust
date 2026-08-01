@@ -1388,6 +1388,8 @@ the conditions above unless a later ruling changes that.
 
 Amended 2026-08-01 (adoption executed): the user ruled GO and chose GitHub issues as the tracker, which supersedes the local-markdown choice above. The map is [Map: the jamp client](https://github.com/mheh/jka-rust/issues/2), with tickets as native sub-issues and blocking as native issue dependencies (`docs/agents/issue-tracker.md` holds the operations). The charted destination: a `jamp` client that boots, joins a live stock-protocol server (our `jampded` and stock OpenJK/retail both), and completes a real match with rendering, input, and sound. The enhancement track (sidecar D1-D21, ladder T1-T5, mesh-swap) is out of this map's scope and becomes its own future map. Off-island work migrated as plain issues (#13-#15). All other DEC-52 conditions stand, including the ticket-resolves-into-DEC inversion.
 
+Amended 2026-08-01 (process pass executed, ticket [#12](https://github.com/mheh/jka-rust/issues/12)): CLAUDE.md points its active track and open-work lines at the map. `docs/doc-standards.md` maps the interactive pipeline onto the ticket types. `docs/agents/issue-tracker.md` gains the session-state and parked-item conventions: in-progress state lives in ticket comments, `docs/handoffs/` is legacy, and a parked idea goes to the fog or a plain issue. The agent memory shrank to operational lessons plus the map pointer.
+
 ## DEC-53 — collapsed multitexture stays lightmap-only (ruled 2026-07-31)
 
 The backend draws a `GL_MODULATE` collapse only when bundle 1 holds the

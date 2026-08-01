@@ -46,6 +46,14 @@ Work branches from `master` and is named by the issue that drives it:
 
 A branch merges to `master` only green (build + gates) and is deleted after the merge. Long-lived phase branches (the old `ui-port` pattern) are retired.
 
+## Session state and handoffs (DEC-52 process pass, 2026-08-01)
+
+In-progress state for claimed work goes into a comment on the claimed ticket: what is done, what is open, and the next step. A later session reads the ticket and continues. Do not write new files under `docs/handoffs/` - that directory is legacy and stays for history only. A deep investigation that outgrows a comment gets a doc under `docs/plans/` or `docs/audits/`, and the ticket links it.
+
+## Parked items (DEC-52 process pass, 2026-08-01)
+
+A parked idea has exactly two homes. An idea inside the active map's scope goes into the map's "Not yet specified" section (the fog). An idea outside the map's scope becomes a plain GitHub issue. Do not park work in memory files, handoff docs, or plan docs. A plan doc records settled design, never open work.
+
 ## Repo ruling (DEC-52)
 
 The DEC ledger in `docs/decisions.md` stays the single decision store. A wayfinder ticket resolves INTO a DEC entry. The resolution comment and the map gist and link the entry. They never hold the canonical text. This inverts wayfinder's detail-in-ticket rule on purpose.
