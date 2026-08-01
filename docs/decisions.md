@@ -1385,3 +1385,21 @@ parked-item and plan-doc conventions, and the agent memory usage (which
 shrinks to operational lessons plus a map pointer). Localized scope
 tracking moves into maps. The DEC ledger remains the decision store per
 the conditions above unless a later ruling changes that.
+
+## DEC-53 — collapsed multitexture stays lightmap-only (ruled 2026-07-31)
+
+The backend draws a `GL_MODULATE` collapse only when bundle 1 holds the
+lightmap. Any other second bundle draws bundle 0 alone with a one-time
+warning. The user ruled to document this limit rather than extend the
+two-texture path now.
+
+A census of the retail assets sizes the gap. Of 864 collapsible stage
+pairs, all but six put the lightmap in one stage, and those six are
+SP-side content: five factory crane shaders on MD3 map objects
+(`models/map_objects/factory/s_crane_*`) and
+`models/map_objects/factory/terrain`, whose only BSP consumer is
+`maps/t1_fatal.bsp`. No MP-shipped map hits the limit, so the `jamp`
+client scope never sees it. The any-second-bundle extension (a second
+texture slot that samples bundle 1's own texcoords) belongs to the SP
+renderer tail, where its only consumers live. `t1_fatal` is the test
+map when that work lands.
