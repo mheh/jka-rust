@@ -1703,6 +1703,7 @@ pub(crate) fn ref_entity_from_tr(ent: &trRefEntity_t) -> RefEntity {
         old_origin: ent.e.oldorigin,
         custom_shader: ent.e.customShader,
         shader_rgba: ent.e.shaderRGBA,
+        shader_tex_coord: ent.e.shaderTexCoord,
         radius: ent.e.radius,
         rotation: ent.e.rotation,
         shader_time: ent.e.shaderTime,
@@ -1759,19 +1760,15 @@ pub(crate) fn write_back_lighting(ent: &mut trRefEntity_t, re: &RefEntity) {
 /// pointer stays null, matching a scene payload that carries only the
 /// `has_ghoul2` presence flag.
 ///
-/// `shaderTexCoord` is the one draw-path field still uncarried. The
-/// `TMOD_ENTITY_TRANSLATE` texmod reads it, so an entity-translate tcMod draws
-/// from the wrong offset until the payload carries it and the draw path applies
-/// it. No harness entity uses that texmod, so the current gates pass.
+/// The `RefEntity` payload now carries `shaderTexCoord`, so this copies it back
+/// onto `refEntity_t`. The `TMOD_ENTITY_TRANSLATE` texmod reads it as a scroll
+/// speed on the draw path.
 ///
 /// The `ghoul2` field re-encodes the [`RefEntity`] handle back into the pointer
 /// token (`ghoul2_token_encode`), so `R_AddEntitySurfaces` recovers the same
 /// `Ghoul2Handle` the scene payload carried.
 ///
 /// Source: `oracle/codemp/renderer/tr_scene.cpp:249` (`entities[n].e = *ent`)
-//TODO: Port refEntity_t shaderTexCoord into the scene payload and draw path
-// Source: oracle/codemp/renderer/tr_shade.cpp:1891-1893 (shaderTexCoord read),
-// oracle/codemp/cgame/tr_types.h:155 (the field)
 pub fn tr_ref_entity_from_ref_entity(re: &RefEntity) -> trRefEntity_t {
     let mut e = refEntity_t::zeroed();
     e.reType = re.re_type;
@@ -1783,6 +1780,7 @@ pub fn tr_ref_entity_from_ref_entity(re: &RefEntity) -> trRefEntity_t {
     e.oldorigin = re.old_origin;
     e.customShader = re.custom_shader;
     e.shaderRGBA = re.shader_rgba;
+    e.shaderTexCoord = re.shader_tex_coord;
     e.radius = re.radius;
     e.rotation = re.rotation;
     e.shaderTime = re.shader_time;
@@ -2027,10 +2025,14 @@ pub fn R_AddEntitySurfaces<'a>(
 
                     // g2r
                     modtype_t::MOD_MDXM => {
-                        let re = ref_entity_from_tr(ent);
+                        // `r_add_ghoul_surfaces` lights the `&mut RefEntity` it
+                        // takes, matching the MD3 sibling. The lit fields fold
+                        // back onto `entities[n]` so the backend reads them by
+                        // entity index.
+                        let mut re = ref_entity_from_tr(ent);
                         if let Some(handle) = re.ghoul2 {
                             r_add_ghoul_surfaces(
-                                &re,
+                                &mut re,
                                 handle,
                                 engine_view,
                                 assets,
@@ -2043,8 +2045,10 @@ pub fn R_AddEntitySurfaces<'a>(
                                 fogs,
                                 refdef_rdflags,
                                 shifted_entity_num,
+                                dlights,
                                 draw_surfs,
                             );
+                            write_back_lighting(ent, &re);
                         }
                     }
 
@@ -2856,10 +2860,17 @@ mod tests {
     #[test]
     fn tr_ref_entity_from_ref_entity_zeroes_the_uncarried_tail() {
         // A default payload leaves the fields `RefEntity` still omits at zero:
-        // `shaderTexCoord`, `shadowPlane`, and `axisLength`.
+        // `shadowPlane` and `axisLength`.
         let tr = tr_ref_entity_from_ref_entity(&RefEntity::default());
-        assert_eq!(tr.e.shaderTexCoord, [0.0, 0.0]);
         assert_eq!(tr.e.shadowPlane, 0.0);
         assert_eq!(tr.axisLength, 0.0);
+    }
+
+    #[test]
+    fn tr_ref_entity_from_ref_entity_carries_shader_tex_coord() {
+        let mut re = RefEntity::default();
+        re.shader_tex_coord = [1.5, -2.5];
+        let tr = tr_ref_entity_from_ref_entity(&re);
+        assert_eq!(tr.e.shaderTexCoord, [1.5, -2.5]);
     }
 }

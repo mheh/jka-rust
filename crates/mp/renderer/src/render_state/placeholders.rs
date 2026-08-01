@@ -30,7 +30,7 @@ use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::refdef_t::MAX_MAP_AREA_BYTES;
 use mp_qshared::common::mp::cgame::texture_compression_t::textureCompression_t;
-use mp_qshared::shared::{cplane_t, qhandle_t, vec3_t};
+use mp_qshared::shared::{cplane_t, qhandle_t, vec2_t, vec3_t};
 
 use crate::render_state::image_asset::ImageHandle;
 use crate::tr_bsp::{BModel, DShader, Fog, Node, Surface};
@@ -110,6 +110,11 @@ pub struct RefEntity {
     pub custom_shader: qhandle_t,
     /// `e.shaderRGBA`.
     pub shader_rgba: [u8; 4],
+    /// `e.shaderTexCoord` — Raven: texture coordinates used by tcMod entity
+    /// modifiers. The `TMOD_ENTITY_TRANSLATE` texmod reads it as a scroll speed.
+    ///
+    /// Source: `oracle/codemp/cgame/tr_types.h:120,155`
+    pub shader_tex_coord: vec2_t,
     /// `e.radius` — extra sprite information.
     ///
     /// Source: `oracle/codemp/cgame/tr_types.h:158`
@@ -208,6 +213,7 @@ impl Default for RefEntity {
             old_origin: [0.0; 3],
             custom_shader: 0,
             shader_rgba: [0; 4],
+            shader_tex_coord: [0.0; 2],
             radius: 0.0,
             rotation: 0.0,
             shader_time: 0.0,

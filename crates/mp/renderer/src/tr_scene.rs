@@ -403,6 +403,7 @@ pub fn RE_AddRefEntityToScene(
         old_origin: ent.oldorigin,
         custom_shader: ent.customShader,
         shader_rgba: ent.shaderRGBA,
+        shader_tex_coord: ent.shaderTexCoord,
         radius: ent.radius,
         rotation: ent.rotation,
         shader_time: ent.shaderTime,

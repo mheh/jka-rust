@@ -493,12 +493,10 @@ pub fn RB_EndSurface(_gpu: &mut GpuResources) {
 /// `pStage->bundle[b]` (`tcGen`/`tcGenVectors`/`numTexMods`/`texMods`) is no
 /// longer a field gap — `ShaderStage::bundle` landed complete with the
 /// R4a-prep wave — but has nothing to write into while `tess` is dissolved.
-/// The `TMOD_ENTITY_TRANSLATE` leg additionally needs
-/// `backEnd.currentEntity->e.shaderTexCoord`, a `RefEntity` field no prior
-/// wave landed (`render_state::placeholders::RefEntity`'s doc comment: real
-/// fields land "field-by-field as call sites need them" — `shaderTexCoord`
-/// is not among them, and this file may not add one out of the wave that
-/// actually reads it downstream). No computation survives once every input
+/// The `TMOD_ENTITY_TRANSLATE` leg reads
+/// `backEnd.currentEntity->e.shaderTexCoord`, which now lands on
+/// `RefEntity` as `shader_tex_coord` and scrolls for real through the
+/// backend's `apply_tex_mods` arm. No computation survives once every input
 /// above is removed — this includes the entire per-bundle `TCGEN_*`
 /// dispatch and the `TMOD_*` modifier loop, since their sole inputs are the
 /// dissolved `tess` and the un-landed `pStage`/`backEnd.currentEntity`

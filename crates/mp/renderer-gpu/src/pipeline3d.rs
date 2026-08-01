@@ -39,7 +39,7 @@ use mp_engine_qcommon::qfiles::md3_surface_t::md3Surface_t;
 use mp_qshared::shared::vec3_t;
 use mp_renderer::render_state::frame_state::FrameState;
 use mp_renderer::render_state::image_asset::ImageHandle;
-use mp_renderer::render_state::placeholders::{SkyParms, WorldAsset};
+use mp_renderer::render_state::placeholders::{RefEntity, SkyParms, WorldAsset, FUNCTABLE_SIZE};
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::shader_asset::ShaderAsset;
 use mp_renderer::render_state::shader_stage::ShaderStage;
@@ -62,7 +62,8 @@ use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_noise::NoiseState;
 use mp_renderer::tr_shade::RB_FogPass;
 use mp_renderer::tr_shade_calc::{
-    RB_CalcModulateAlphasByFog, RB_CalcModulateColorsByFog, RB_CalcModulateRGBAsByFog,
+    RB_CalcDiffuseColor, RB_CalcDiffuseEntityColor, RB_CalcModulateAlphasByFog,
+    RB_CalcModulateColorsByFog, RB_CalcModulateRGBAsByFog,
 };
 use mp_renderer::tr_shader::{
     FogPass, GLS_ATEST_GE_80, GLS_ATEST_GE_C0, GLS_ATEST_GT_0, GLS_ATEST_LT_80,
@@ -75,8 +76,11 @@ use wgpu::{BlendState, RenderPipeline, TextureView};
 use crate::blend::blend_state_from_gls;
 use crate::gpu::Gpu;
 use crate::gpu_images::GpuImages;
+use native_math::qmath::Q_rsqrt;
+
 use crate::stage2d::{
-    apply_tex_mods, stage_colors_into, stage_image, Stage2dWarnings, StageTime, IDENTITY_LIGHT,
+    apply_alpha_gen, apply_tex_mods, stage_colors_into, stage_image, Stage2dWarnings, StageTime,
+    IDENTITY_LIGHT,
 };
 
 /// The GPU vertex the three CPU surface shapes converge on. `FaceVertex`
@@ -499,14 +503,12 @@ enum Warned {
     SurfaceSprite,
     Glow,
     VideoMap,
-    Md3Lighting,
-    Ghoul2Lighting,
     /// A fog pass was due but the fog image is not registered.
     FogImageMissing,
 }
 
 impl Warned {
-    const COUNT: usize = 8;
+    const COUNT: usize = 6;
 
     fn slot(self) -> usize {
         match self {
@@ -515,9 +517,7 @@ impl Warned {
             Warned::SurfaceSprite => 2,
             Warned::Glow => 3,
             Warned::VideoMap => 4,
-            Warned::Md3Lighting => 5,
-            Warned::Ghoul2Lighting => 6,
-            Warned::FogImageMissing => 7,
+            Warned::FogImageMissing => 5,
         }
     }
 
@@ -530,12 +530,6 @@ impl Warned {
             Warned::SurfaceSprite => "skips a surface-sprite world stage, drawn in a later wave",
             Warned::Glow => "draws a glow world stage as a plain stage",
             Warned::VideoMap => "draws a videoMap world stage as a plain stage — no cinematic yet",
-            Warned::Md3Lighting => {
-                "draws an MD3 lighting-diffuse stage with the entity color — the vertex normal is dropped"
-            }
-            Warned::Ghoul2Lighting => {
-                "draws a Ghoul2 lighting-diffuse stage with the entity color — the vertex normal is dropped"
-            }
             Warned::FogImageMissing => "skips a fog pass because the fog image is not registered",
         }
     }
@@ -1233,6 +1227,7 @@ impl Pipeline3d {
                 noise,
                 entity_float_time,
                 surface_fog,
+                entities.get(entity_num as usize),
                 dynamic_vertices,
                 globals_offset,
             );
@@ -1327,12 +1322,14 @@ impl Pipeline3d {
             .map(|ent| ent.e.shaderRGBA)
             .unwrap_or([255, 255, 255, 255]);
 
-        // Decode the keyframe-lerped vertices and the triangle indices.
-        let Some((md3_vertices, md3_index_block)) = decode_md3_surface(models, md3_ref, rgba)
+        // Decode the keyframe-lerped vertices, normals, and triangle indices.
+        let Some((md3_vertices, md3_index_block, md3_normals)) =
+            decode_md3_surface(models, md3_ref, rgba, &assets.function_tables.sin_table)
         else {
             stats.md3_decode_failed += 1;
             return;
         };
+        let entity = entities.get(entity_num as usize);
         if md3_index_block.is_empty() {
             stats.empty_surfaces += 1;
             return;
@@ -1373,11 +1370,6 @@ impl Pipeline3d {
 
         let before = items.len();
         for stage in shader.stages.iter().filter(|stage| stage.active) {
-            // CGEN_LIGHTING_DIFFUSE needs the vertex normal, which this wave
-            // drops, so the stage draws with the entity colour instead.
-            if stage.rgb_gen == colorGen_t::CGEN_LIGHTING_DIFFUSE {
-                self.warn_once(Warned::Md3Lighting);
-            }
             let item = self.build_cpu_surface_stage_item(
                 shader,
                 stage,
@@ -1388,6 +1380,8 @@ impl Pipeline3d {
                 noise,
                 assets,
                 surface_fog,
+                entity,
+                Some(&md3_normals),
                 dynamic_vertices,
                 globals_offset,
             );
@@ -1485,8 +1479,9 @@ impl Pipeline3d {
             .map(|ent| ent.e.shaderRGBA)
             .unwrap_or([255, 255, 255, 255]);
 
-        // Deform the surface by the lerped bones and read the triangle indices.
-        let Some((g2_vertices, g2_index_block)) =
+        // Deform the surface by the lerped bones, decode the bone-0 normals, and
+        // read the triangle indices.
+        let Some((g2_vertices, g2_index_block, g2_normals)) =
             decode_ghoul2_surface(models, g2, g2_ref, rgba)
         else {
             stats.ghoul2_decode_failed += 1;
@@ -1529,13 +1524,9 @@ impl Pipeline3d {
         let index_count = g2_index_block.len() as u32;
         dynamic_indices.extend_from_slice(&g2_index_block);
 
+        let entity = entities.get(entity_num as usize);
         let before = items.len();
         for stage in shader.stages.iter().filter(|stage| stage.active) {
-            // CGEN_LIGHTING_DIFFUSE needs the vertex normal, which this wave
-            // drops, so the stage draws with the entity colour instead.
-            if stage.rgb_gen == colorGen_t::CGEN_LIGHTING_DIFFUSE {
-                self.warn_once(Warned::Ghoul2Lighting);
-            }
             let item = self.build_cpu_surface_stage_item(
                 shader,
                 stage,
@@ -1546,6 +1537,8 @@ impl Pipeline3d {
                 noise,
                 assets,
                 surface_fog,
+                entity,
+                Some(&g2_normals),
                 dynamic_vertices,
                 globals_offset,
             );
@@ -1727,6 +1720,9 @@ impl Pipeline3d {
                     assets,
                     // The sky box and clouds draw at the far plane, never fogged.
                     None,
+                    // The sky path carries no entity and no per-vertex normal.
+                    None,
+                    None,
                     dynamic_vertices,
                     globals_offset,
                 );
@@ -1768,6 +1764,7 @@ impl Pipeline3d {
         noise: &NoiseState,
         float_time: f32,
         surface_fog: Option<SurfaceFog>,
+        entity: Option<&trRefEntity_t>,
         dynamic_vertices: &mut Vec<WorldVertex>,
         globals_offset: u32,
     ) -> Option<StageDrawItem> {
@@ -1841,6 +1838,10 @@ impl Pipeline3d {
                     assets,
                     &shader.name,
                     None,
+                    entity,
+                    // The world path drops the BSP normal this wave, so a
+                    // lighting-diffuse stage here keeps the input colour.
+                    None,
                     &mut self.stage_warnings,
                     dynamic_vertices,
                 )
@@ -1885,6 +1886,10 @@ impl Pipeline3d {
                 assets,
                 &shader.name,
                 fog_mod,
+                entity,
+                // The world path drops the BSP normal this wave, so a
+                // lighting-diffuse stage here keeps the input colour.
+                None,
                 &mut self.stage_warnings,
                 dynamic_vertices,
             );
@@ -1949,6 +1954,8 @@ impl Pipeline3d {
         noise: &NoiseState,
         assets: &RenderAssets,
         surface_fog: Option<SurfaceFog>,
+        entity: Option<&trRefEntity_t>,
+        normals: Option<&[[f32; 4]]>,
         dynamic_vertices: &mut Vec<WorldVertex>,
         globals_offset: u32,
     ) -> Option<StageDrawItem> {
@@ -2002,6 +2009,8 @@ impl Pipeline3d {
             assets,
             &shader.name,
             fog_mod,
+            entity,
+            normals,
             &mut self.stage_warnings,
             dynamic_vertices,
         );
@@ -2521,10 +2530,30 @@ fn is_modulate_collapse(shader: &ShaderAsset, stage: &ShaderStage) -> bool {
         && stage.bundle[1].is_lightmap
 }
 
+/// Builds the small [`RefEntity`] the diffuse-lighting evaluators read from a
+/// `trRefEntity_t`. `R_SetupEntityLighting` folded the entity light into
+/// `lightDir`/`ambientLight`/`directedLight`, and the evaluators read only
+/// those plus `shaderRGBA`, so the rest stays at its default.
+fn lighting_ref_entity(ent: &trRefEntity_t) -> RefEntity {
+    RefEntity {
+        light_dir: ent.lightDir,
+        ambient_light: ent.ambientLight,
+        directed_light: ent.directedLight,
+        shader_rgba: ent.e.shaderRGBA,
+        ..Default::default()
+    }
+}
+
 /// Evaluates one stage's per-vertex texcoords and colours for `cpu` and appends
 /// the result to `out`, returning the block's base vertex in the dynamic buffer.
 /// A two-texture collapse copies the vertex colour through unchanged, since its
 /// shader path ignores it.
+///
+/// `entity` and `normals` are the CPU-surface lighting context. A
+/// lighting-diffuse stage reads them: `normals` is the parallel decoded normal
+/// slice, and `entity` carries the light `R_SetupEntityLighting` folded in.
+/// The world and sky paths pass `None`, so a lighting-diffuse stage on a
+/// surface kind with no normals keeps the input colour.
 ///
 /// Source: `oracle/codemp/renderer/tr_shade.cpp:2117-2118` (`ComputeColors`
 /// then `ComputeTexCoords` per stage)
@@ -2539,13 +2568,16 @@ fn build_dynamic_block(
     assets: &RenderAssets,
     shader_name: &str,
     fog_mod: Option<SurfaceFog>,
+    entity: Option<&trRefEntity_t>,
+    normals: Option<&[[f32; 4]]>,
     warnings: &mut Stage2dWarnings,
     out: &mut Vec<WorldVertex>,
 ) -> i32 {
     let base_vertex = out.len() as i32;
     let count = cpu.len();
 
-    // Seed the texcoords from the chosen source, then run the tcMod loop.
+    // Seed the texcoords from the chosen source, then run the tcMod loop. The
+    // `TMOD_ENTITY_TRANSLATE` arm scrolls by the entity's `shaderTexCoord`.
     let mut st: Vec<[f32; 2]> = cpu
         .iter()
         .map(|v| match source {
@@ -2560,6 +2592,7 @@ fn build_dynamic_block(
         noise,
         assets,
         shader_name,
+        entity.map(|ent| ent.e.shaderTexCoord),
         warnings,
     );
 
@@ -2570,16 +2603,53 @@ fn build_dynamic_block(
     } else {
         let input: Vec<[u8; 4]> = cpu.iter().map(|v| v.color).collect();
         let mut evaluated = vec![[0u8; 4]; count];
-        stage_colors_into(
-            stage,
-            &input,
-            &mut evaluated,
-            time,
-            noise,
-            assets,
-            shader_name,
-            warnings,
-        );
+        match (stage.rgb_gen, normals, entity) {
+            // The lighting-diffuse rgbGen runs first, then the alphaGen switch,
+            // the same order the oracle's `ComputeColors` keeps.
+            (colorGen_t::CGEN_LIGHTING_DIFFUSE, Some(n), Some(ent)) => {
+                let re = lighting_ref_entity(ent);
+                RB_CalcDiffuseColor(&mut evaluated, n, &re, ent.ambientLightInt);
+                apply_alpha_gen(
+                    stage,
+                    &input,
+                    &mut evaluated,
+                    time,
+                    noise,
+                    assets,
+                    shader_name,
+                    warnings,
+                );
+            }
+            (colorGen_t::CGEN_LIGHTING_DIFFUSE_ENTITY, Some(n), Some(ent)) => {
+                let re = lighting_ref_entity(ent);
+                RB_CalcDiffuseEntityColor(&mut evaluated, n, &re);
+                apply_alpha_gen(
+                    stage,
+                    &input,
+                    &mut evaluated,
+                    time,
+                    noise,
+                    assets,
+                    shader_name,
+                    warnings,
+                );
+            }
+            // Every other rgbGen, and a lighting-diffuse stage on a surface with
+            // no decoded normals (world and sky), runs the shared switch. That
+            // switch warns once for a lighting-diffuse rgbGen it cannot light.
+            _ => {
+                stage_colors_into(
+                    stage,
+                    &input,
+                    &mut evaluated,
+                    time,
+                    noise,
+                    assets,
+                    shader_name,
+                    warnings,
+                );
+            }
+        }
         evaluated
     };
 
@@ -2696,8 +2766,8 @@ fn entity_shader_time(entities: &[trRefEntity_t], entity_num: i32) -> f32 {
 /// shorts scale by `MD3_XYZ_SCALE`, blended by `backlerp` between the old and
 /// new frame blocks. The texcoords come from `ofsSt`, the indices from
 /// `ofsTriangles`, and the vertex colour is the entity's `shaderRGBA`. The
-/// packed normal is dropped this wave, the same way [`WorldVertex`] drops the
-/// BSP normal.
+/// decoded per-vertex normal rides a parallel `[f32; 4]` slice, so the CPU
+/// lighting evaluators can read it without changing [`WorldVertex`].
 ///
 /// Returns `None` when the model handle resolves to no MD3 header (a bad handle
 /// or a purged model), so the caller skips the surface.
@@ -2707,7 +2777,8 @@ fn decode_md3_surface(
     models: &RenderModels,
     md3_ref: Md3SurfaceRef,
     rgba: [u8; 4],
-) -> Option<(Vec<WorldVertex>, Vec<u32>)> {
+    sin_table: &[f32; FUNCTABLE_SIZE],
+) -> Option<(Vec<WorldVertex>, Vec<u32>, Vec<[f32; 4]>)> {
     let model = models.get_model(md3_ref.h_model);
     let header = *model.md3.get(md3_ref.lod as usize)?;
     if header.is_null() {
@@ -2737,7 +2808,15 @@ fn decode_md3_surface(
             surf = (surf as *const u8).add((*surf).ofsEnd as usize) as *const md3Surface_t;
         }
 
-        let vertices = lerp_md3_vertexes(surf, md3_ref.frame, md3_ref.old_frame, backlerp, rgba);
+        let (vertices, normals) =
+            lerp_md3_vertexes(
+                surf,
+                md3_ref.frame,
+                md3_ref.old_frame,
+                backlerp,
+                rgba,
+                sin_table,
+            );
 
         let num_indexes = ((*surf).numTriangles * 3) as usize;
         let triangles = (surf as *const u8).add((*surf).ofsTriangles as usize) as *const i32;
@@ -2746,16 +2825,17 @@ fn decode_md3_surface(
             indices.push(*triangles.add(j) as u32);
         }
 
-        Some((vertices, indices))
+        Some((vertices, indices, normals))
     }
 }
 
 /// Deforms one Ghoul2 (`MOD_MDXM`) surface into GPU vertices and triangle
 /// indices. Each vertex sums its weighted bones (`RB_SurfaceGhoul`, the non-gore
 /// main arm): the bone matrix per weight comes from the surface's bone-cache
-/// `EvalRender`, and the packed normal is dropped this wave, the same way
-/// [`WorldVertex`] drops the BSP normal. The texcoords come from the parallel
-/// texcoord array, and the vertex colour is the entity's `shaderRGBA`.
+/// `EvalRender`. The decoded per-vertex normal rides a parallel `[f32; 4]`
+/// slice, so the CPU lighting evaluators can read it without changing
+/// [`WorldVertex`]. The texcoords come from the parallel texcoord array, and
+/// the vertex colour is the entity's `shaderRGBA`.
 ///
 /// Returns `None` when the model has no mdxm block or the bone-cache handle is
 /// stale, so the caller skips the surface.
@@ -2767,7 +2847,7 @@ fn decode_ghoul2_surface(
     g2: &mut Ghoul2System,
     g2_ref: G2SurfaceRef,
     rgba: [u8; 4],
-) -> Option<(Vec<WorldVertex>, Vec<u32>)> {
+) -> Option<(Vec<WorldVertex>, Vec<u32>, Vec<[f32; 4]>)> {
     let model = models.get_model(g2_ref.model);
     // The render surface only reaches here for a live `MOD_MDXM` model whose
     // `mdxm` block the loader filled. A null block is not renderable, so it
@@ -2804,11 +2884,25 @@ fn decode_ghoul2_surface(
     // byte-faithful shipped arm waits for that harness (porting-rules A2/F18).
     // Source: oracle/codemp/renderer/tr_ghoul2.cpp:4313-4374
     let mut vertices: Vec<WorldVertex> = Vec::with_capacity(num_verts as usize);
+    let mut normals: Vec<[f32; 4]> = Vec::with_capacity(num_verts as usize);
     for j in 0..num_verts {
         let vert = surface.vert(j);
         let num_weights = vert.num_weights();
         let mut total_weight = 0.0f32;
         let vert_coords = vert.vert_coords();
+
+        // The normal transforms by bone 0 only, a genuine Raven asymmetry: the
+        // position blends every weight, the normal does not.
+        // Source: oracle/codemp/renderer/tr_ghoul2.cpp:4314-4318
+        let bone0 = cache.eval_render(surface.bone_ref(vert.bone_index(0)));
+        let vn = vert.normal();
+        let normal = [
+            bone0.matrix[0][0] * vn[0] + bone0.matrix[0][1] * vn[1] + bone0.matrix[0][2] * vn[2],
+            bone0.matrix[1][0] * vn[0] + bone0.matrix[1][1] * vn[1] + bone0.matrix[1][2] * vn[2],
+            bone0.matrix[2][0] * vn[0] + bone0.matrix[2][1] * vn[1] + bone0.matrix[2][2] * vn[2],
+            0.0,
+        ];
+
         let mut p = [0.0f32; 3];
         for k in 0..num_weights {
             let bone_index = vert.bone_index(k);
@@ -2826,11 +2920,6 @@ fn decode_ghoul2_surface(
             }
         }
 
-        // DEFERRED: RB_SurfaceGhoul normal deform — the oracle transforms
-        // `v->normal` by bone 0 into `tess.normal`. This wave drops it, the same
-        // way `WorldVertex` drops the BSP normal, so lit Ghoul2 stages fall back
-        // to the entity colour.
-        // Source: oracle/codemp/renderer/tr_ghoul2.cpp:4308-4310
         let st = surface.texcoord(j);
         vertices.push(WorldVertex {
             position: p,
@@ -2838,15 +2927,24 @@ fn decode_ghoul2_surface(
             lightmap_st: st,
             color: rgba,
         });
+        normals.push(normal);
     }
 
-    Some((vertices, indices))
+    Some((vertices, indices, normals))
 }
 
 /// The CPU keyframe lerp of one MD3 surface's vertices (`LerpMeshVertexes`),
-/// producing one [`WorldVertex`] per vertex. Each MD3 vertex is four shorts
-/// (xyz plus a packed normal), so a frame block is `numVerts * 4` shorts. The
-/// `st` texcoords are shared across frames.
+/// producing one [`WorldVertex`] per vertex and, alongside it, one decoded
+/// normal per vertex. Each MD3 vertex is four shorts (xyz plus a packed
+/// lat/lng normal), so a frame block is `numVerts * 4` shorts. The `st`
+/// texcoords are shared across frames.
+///
+/// The normal rides a parallel `[f32; 4]` slice (`w` unused), so it never
+/// enters the GPU [`WorldVertex`]. The CPU lighting evaluators read it during
+/// stage colour evaluation. `sin_table` is `tr.sinTable`, which decodes the
+/// packed lat/lng into a unit vector. The `backlerp == 0` frame is already a
+/// unit vector, so it needs no normalize. The two-frame blend renormalizes with
+/// `VectorArrayNormalize`.
 ///
 /// SAFETY: the caller ([`decode_md3_surface`]) guarantees `surf` is a live,
 /// range-checked surface header inside an aligned MD3 block.
@@ -2858,7 +2956,8 @@ unsafe fn lerp_md3_vertexes(
     old_frame: i32,
     backlerp: f32,
     rgba: [u8; 4],
-) -> Vec<WorldVertex> {
+    sin_table: &[f32; FUNCTABLE_SIZE],
+) -> (Vec<WorldVertex>, Vec<[f32; 4]>) {
     let num_verts = (*surf).numVerts as usize;
     let xyz_base = (surf as *const u8).add((*surf).ofsXyzNormals as usize) as *const i16;
     let st_base = (surf as *const u8).add((*surf).ofsSt as usize) as *const f32;
@@ -2869,28 +2968,41 @@ unsafe fn lerp_md3_vertexes(
 
     let new_scale = MD3_XYZ_SCALE * (1.0 - backlerp);
     let old_scale = MD3_XYZ_SCALE * backlerp;
+    let new_normal_scale = 1.0 - backlerp;
+    let old_normal_scale = backlerp;
 
-    // DEFERRED: LerpMeshVertexes normal unpack — the fourth short is a packed
-    // lat/lng normal the oracle unpacks through `sinTable` and blends with
-    // `VectorArrayNormalize`. This wave drops it, the same way `WorldVertex`
-    // drops the BSP normal, so lit MD3 stages fall back to the entity colour.
-    // Source: oracle/codemp/renderer/tr_surface.cpp:1258-1341
     let mut out: Vec<WorldVertex> = Vec::with_capacity(num_verts);
+    let mut normals: Vec<[f32; 4]> = Vec::with_capacity(num_verts);
     for v in 0..num_verts {
         let n = new_base.add(v * 4);
-        let position = if backlerp == 0.0 {
-            [
+        let (position, normal) = if backlerp == 0.0 {
+            let position = [
                 *n as f32 * new_scale,
                 *n.add(1) as f32 * new_scale,
                 *n.add(2) as f32 * new_scale,
-            ]
+            ];
+            // The single-frame normal is already a unit vector from the sin
+            // table, so the oracle copies it without a normalize.
+            let normal = decode_md3_normal(*n.add(3), sin_table);
+            (position, [normal[0], normal[1], normal[2], 0.0])
         } else {
             let o = old_base.add(v * 4);
-            [
+            let position = [
                 *o as f32 * old_scale + *n as f32 * new_scale,
                 *o.add(1) as f32 * old_scale + *n.add(1) as f32 * new_scale,
                 *o.add(2) as f32 * old_scale + *n.add(2) as f32 * new_scale,
-            ]
+            ];
+            let new_normal = decode_md3_normal(*n.add(3), sin_table);
+            let old_normal = decode_md3_normal(*o.add(3), sin_table);
+            let mut normal = [
+                old_normal[0] * old_normal_scale + new_normal[0] * new_normal_scale,
+                old_normal[1] * old_normal_scale + new_normal[1] * new_normal_scale,
+                old_normal[2] * old_normal_scale + new_normal[2] * new_normal_scale,
+                0.0,
+            ];
+            // VectorArrayNormalize renormalizes every blended normal.
+            vector_normalize_fast(&mut normal);
+            (position, normal)
         };
         let st = [*st_base.add(v * 2), *st_base.add(v * 2 + 1)];
         out.push(WorldVertex {
@@ -2899,8 +3011,43 @@ unsafe fn lerp_md3_vertexes(
             lightmap_st: st,
             color: rgba,
         });
+        normals.push(normal);
     }
-    out
+    (out, normals)
+}
+
+/// `FUNCTABLE_MASK` (`FUNCTABLE_SIZE - 1`) — the sin-table index wrap.
+const FUNCTABLE_MASK: usize = FUNCTABLE_SIZE - 1;
+
+/// Decodes one MD3 packed lat/lng normal into a unit vector through `tr.sinTable`.
+/// The packed short holds `lat` in the high byte and `lng` in the low byte,
+/// each scaled by `FUNCTABLE_SIZE / 256` into a table index.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:1268-1287`
+fn decode_md3_normal(packed: i16, sin_table: &[f32; FUNCTABLE_SIZE]) -> [f32; 3] {
+    let packed = packed as i32;
+    let lat = ((packed >> 8) & 0xff) * (FUNCTABLE_SIZE as i32 / 256);
+    let lng = (packed & 0xff) * (FUNCTABLE_SIZE as i32 / 256);
+    // decode X as cos( lat ) * sin( long )
+    // decode Y as sin( lat ) * sin( long )
+    // decode Z as cos( long )
+    [
+        sin_table[((lat + (FUNCTABLE_SIZE as i32 / 4)) as usize) & FUNCTABLE_MASK]
+            * sin_table[lng as usize],
+        sin_table[lat as usize] * sin_table[lng as usize],
+        sin_table[((lng + (FUNCTABLE_SIZE as i32 / 4)) as usize) & FUNCTABLE_MASK],
+    ]
+}
+
+/// `VectorNormalizeFast` — the fast inverse-square-root normalize
+/// `VectorArrayNormalize` runs over each blended normal.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:1180-1227`
+fn vector_normalize_fast(v: &mut [f32; 4]) {
+    let ilength = Q_rsqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+    v[0] *= ilength;
+    v[1] *= ilength;
+    v[2] *= ilength;
 }
 
 fn create_globals_buffer(device: &wgpu::Device, capacity: usize) -> wgpu::Buffer {
@@ -3277,6 +3424,8 @@ mod tests {
             &assets,
             "test",
             None,
+            None,
+            None,
             &mut warnings,
             &mut out,
         );
@@ -3319,6 +3468,8 @@ mod tests {
             &noise,
             &assets,
             "test",
+            None,
+            None,
             None,
             &mut warnings,
             &mut out,
@@ -3475,14 +3626,16 @@ mod tests {
     #[test]
     fn lerp_md3_at_backlerp_zero_takes_the_current_frame() {
         let buf = build_two_frame_surface();
+        let sin_table = [0.0f32; FUNCTABLE_SIZE];
         // SAFETY: the buffer head is a valid `md3Surface_t` from the builder.
-        let verts = unsafe {
+        let (verts, _normals) = unsafe {
             lerp_md3_vertexes(
                 buf.as_ptr() as *const md3Surface_t,
                 1,
                 0,
                 0.0,
                 [10, 20, 30, 40],
+                &sin_table,
             )
         };
         assert_eq!(verts.len(), 1);
@@ -3498,14 +3651,16 @@ mod tests {
     #[test]
     fn lerp_md3_at_backlerp_one_takes_the_old_frame() {
         let buf = build_two_frame_surface();
+        let sin_table = [0.0f32; FUNCTABLE_SIZE];
         // SAFETY: see above.
-        let verts = unsafe {
+        let (verts, _normals) = unsafe {
             lerp_md3_vertexes(
                 buf.as_ptr() as *const md3Surface_t,
                 1,
                 0,
                 1.0,
                 [255, 255, 255, 255],
+                &sin_table,
             )
         };
         // frame 0 (100, 200, 300) times MD3_XYZ_SCALE
@@ -3518,14 +3673,16 @@ mod tests {
     #[test]
     fn lerp_md3_at_backlerp_half_blends_the_two_frames() {
         let buf = build_two_frame_surface();
+        let sin_table = [0.0f32; FUNCTABLE_SIZE];
         // SAFETY: see above.
-        let verts = unsafe {
+        let (verts, _normals) = unsafe {
             lerp_md3_vertexes(
                 buf.as_ptr() as *const md3Surface_t,
                 1,
                 0,
                 0.5,
                 [255, 255, 255, 255],
+                &sin_table,
             )
         };
         // half of each frame: (100+200)/2, (200+400)/2, (300+600)/2, all /64

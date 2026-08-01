@@ -67,7 +67,9 @@ use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::render_state::skin_asset::SkinHandle;
 use crate::tr_image::{TrImageState, R_GetSkinByHandle};
+use crate::tr_light::R_SetupEntityLighting;
 use crate::tr_local::crenderable_surface::CRenderableSurface;
+use crate::tr_local::dlight_s::dlight_t;
 use crate::tr_local::fog_t::fog_t;
 use crate::tr_local::model_s::model_t;
 use crate::tr_local::modtype_t::modtype_t;
@@ -2334,9 +2336,11 @@ const GHOUL2_NOMODEL: i32 = 0x004;
 /// oracle body does before it renders. It returns the sorted model list, so the
 /// render loop reads the built caches in the same order with no second sort.
 ///
+/// This body calls `R_SetupEntityLighting` (`:3438-3443`) and the caller folds
+/// the lit fields onto `entities[n]` through `write_back_lighting`. The backend
+/// deform that reads the lit color is a later wave.
+///
 /// DEFERRED in this body:
-/// - Entity lighting (`R_SetupEntityLighting`, `:3438-3443`) — the deform that
-///   consumes it is a later backend wave, so the result is unread now.
 /// - The `bInShadowRange` shadow-plane adjust (`:3525-3528`) — `bInShadowRange`
 ///   is still a marked stub in this file (needs `r_shadowRange` plus the shadow
 ///   backend).
@@ -2346,7 +2350,7 @@ const GHOUL2_NOMODEL: i32 = 0x004;
 #[doc(alias = "R_AddGhoulSurfaces")]
 #[allow(clippy::too_many_arguments)]
 pub fn r_add_ghoul_surfaces<'a>(
-    ent: &RefEntity,
+    ent: &mut RefEntity,
     handle: Ghoul2Handle,
     host: &mut EngineHostView,
     assets: &RenderAssets,
@@ -2359,6 +2363,7 @@ pub fn r_add_ghoul_surfaces<'a>(
     fogs: &[fog_t],
     refdef_rdflags: i32,
     shifted_entity_num: i32,
+    dlights: &[dlight_t],
     draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
 ) {
     let mut ghoul2 = CGhoul2Info_v { mItem: handle.0 };
@@ -2401,9 +2406,22 @@ pub fn r_add_ghoul_surfaces<'a>(
     // don't add third_person objects if not in a portal
     let personal_model = (ent.renderfx & RF_THIRD_PERSON) != 0 && view.isPortal == 0;
 
-    // DEFERRED: R_SetupEntityLighting (`:3438-3443`) — the deform that reads the
-    // lighting output is a later backend wave, so the call is not made yet.
+    // set up lighting now that we know we aren't culled. The oracle guards the
+    // call with the non-`VV_LIGHTING` arm `!personalModel || r_shadows->integer
+    // > 1`. The caller folds the lit fields back onto `entities[n]`.
     // Source: oracle/codemp/renderer/tr_ghoul2.cpp:3438-3443
+    let r_shadows_integer = host.common.cvar(cvars.r_shadows).integer;
+    if !personal_model || r_shadows_integer > 1 {
+        R_SetupEntityLighting(
+            host.common,
+            cvars,
+            assets,
+            frame,
+            refdef_rdflags,
+            dlights,
+            ent,
+        );
+    }
 
     // see if we are in a fog volume
     let fog_num = r_g_compute_fog_num(ent, fogs, refdef_rdflags);

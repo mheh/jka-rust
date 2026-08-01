@@ -255,9 +255,39 @@ pub fn stage_colors_into(
         other => warnings.once("rgbGen", other as i32, shader_name),
     }
 
-    //
-    // alphaGen
-    //
+    apply_alpha_gen(
+        stage,
+        input_colors,
+        out,
+        time,
+        noise,
+        assets,
+        shader_name,
+        warnings,
+    );
+}
+
+/// `ComputeColors`' `alphaGen` switch over a whole vertex run: it rewrites the
+/// alpha byte of `out` in place after the `rgbGen` switch already filled the
+/// rgb. The 3D lighting-diffuse path calls it after `RB_CalcDiffuseColor` fills
+/// the rgb, the same order the oracle keeps (`rgbGen` first, then `alphaGen`).
+/// `force_rgb_gen` reads the stage's own `rgbGen`, so the `AGEN_IDENTITY` and
+/// `AGEN_CONST` guards see the real generator.
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:1745-1779`
+#[allow(clippy::too_many_arguments)]
+pub fn apply_alpha_gen(
+    stage: &ShaderStage,
+    input_colors: &[[u8; 4]],
+    out: &mut [[u8; 4]],
+    time: StageTime,
+    noise: &NoiseState,
+    assets: &RenderAssets,
+    shader_name: &str,
+    warnings: &mut Stage2dWarnings,
+) {
+    let force_rgb_gen = stage.rgb_gen;
+
     match stage.alpha_gen {
         alphaGen_t::AGEN_SKIP => {}
         alphaGen_t::AGEN_IDENTITY => {
@@ -314,8 +344,9 @@ pub fn stage_colors_into(
 /// and is the identity here (the corners already *are* `tess.texCoords[i][0]`).
 /// `TCGEN_IDENTITY` zeroes them, as the oracle does. The world-geometry gens
 /// (lightmap, vector, fog, environment) have no 2D meaning and are logged once
-/// and left alone. `TMOD_TURBULENT`/`TMOD_ENTITY_TRANSLATE` read `tess.xyz` /
-/// `backEnd.currentEntity` and are logged once and skipped.
+/// and left alone. `TMOD_TURBULENT` reads `tess.xyz` and is logged once and
+/// skipped. `TMOD_ENTITY_TRANSLATE` reads the entity scroll speed, which the
+/// 2D path leaves as `None`, so it makes no change here.
 ///
 /// Source: `oracle/codemp/renderer/tr_shade.cpp:1814-1925`
 #[allow(clippy::too_many_arguments)]
@@ -342,13 +373,18 @@ pub fn stage_texcoords(
         other => warnings.once("tcGen", other as i32, shader_name),
     }
 
-    apply_tex_mods(bundle, st, time, noise, assets, shader_name, warnings);
+    apply_tex_mods(bundle, st, time, noise, assets, shader_name, None, warnings);
 }
 
 /// `ComputeTexCoords`' `tcMod` loop over a whole vertex run: each `texMod`
 /// rewrites `st` in place. The generator switch is the caller's — the 2D path
 /// runs it through [`stage_texcoords`], and the world path picks the base or
 /// lightmap source itself before it calls this.
+///
+/// `entity_scroll` is the current entity's `shaderTexCoord`, the scroll speed
+/// `TMOD_ENTITY_TRANSLATE` reads. `None` means no current entity. Only the 2D
+/// path passes `None` (`backEnd.entity2D` is zeroed, so its scroll is identity).
+/// The world and CPU-entity paths pass the surface's real entity.
 ///
 /// Source: `oracle/codemp/renderer/tr_shade.cpp:1855-1925`
 #[allow(clippy::too_many_arguments)]
@@ -359,6 +395,7 @@ pub fn apply_tex_mods(
     noise: &NoiseState,
     assets: &RenderAssets,
     shader_name: &str,
+    entity_scroll: Option<[f32; 2]>,
     warnings: &mut Stage2dWarnings,
 ) {
     //
@@ -368,6 +405,14 @@ pub fn apply_tex_mods(
         match tmi.r#type {
             // break out of for loop
             texMod_t::TMOD_NONE => break,
+            texMod_t::TMOD_ENTITY_TRANSLATE => {
+                // The scroll speed is the current entity's `shaderTexCoord`. The
+                // 2D path has no current entity, so a zero scroll leaves `st`
+                // unchanged, the same as the oracle's zeroed `backEnd.entity2D`.
+                if let Some(scroll) = entity_scroll {
+                    RB_CalcScrollTexCoords(scroll, st, time.shader_time)
+                }
+            }
             texMod_t::TMOD_SCROLL => {
                 // scroll unioned
                 RB_CalcScrollTexCoords(tmi.translate, st, time.shader_time)
