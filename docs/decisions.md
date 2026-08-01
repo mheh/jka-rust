@@ -1431,3 +1431,17 @@ Ruled at the ticket [#10](https://github.com/mheh/jka-rust/issues/10) sit-down. 
 5. **Boundary against #9.** This ruling owns everything from `EngineHooks` inward: the dispatchers, VM lifecycle and restart semantics, the `cl`/`clc`/`cls` carriers, the copy-out seams, console/screen orchestration, CIN, and terrain/automap. The event pump, window/surface creation, main-thread ownership, and joystick policy sit outside the frozen `Sys_QueEvent` ring and belong to ticket #9, under the DEC-37 two-thread topology.
 
 Deliberately not decided here: the interior shapes of `clientActive_t`/`clientConnection_t`/`clientStatic_t` (Class C, free at port time under the existing idiom rules), and the FX design (its own ruling).
+
+## DEC-56 — windowing + input platform: the harness stack graduates (ruled 2026-08-01)
+
+Ruled at the ticket [#9](https://github.com/mheh/jka-rust/issues/9) sit-down.
+
+1. **Stack.** The world harness's winit + wgpu stack graduates to the client as the platform layer. Every `win32/` windowing, GL, and input TU (`win_wndproc`, `win_glimp`, `win_qgl`, `win_input`, `win_gamma`, the `win_syscon` GUI console) is superseded, per the survey disposition table. No SDL dependency.
+
+2. **Thread placement.** The main thread owns the winit event loop (macOS law) and runs only the pump. The sim/VM thread runs the com loop and the client frame. The render thread owns the GPU. This instantiates DEC-37's two-thread topology for the client binary.
+
+3. **Event crossing.** The pump translates winit events to `sysEvent_t` and sends them over a bounded channel. The sim thread drains the channel into the frozen `SysEventQueue` ring at the top of `Sys_GetEvent` - the exact place Raven pumped window messages. The ring stays single-threaded and LIFE-frozen.
+
+4. **Input vocabulary.** Raw `device_event` mouse deltas feed `SE_MOUSE`, `window_event` keys feed `SE_KEY`/`SE_CHAR` through a winit-to-`keycodes.h` map, terminal stdin feeds `SE_CONSOLE` (already ported), and net packets feed `SE_PACKET` (already ported).
+
+5. **Joystick dropped, graduates on demand.** The `SE_JOYSTICK_AXIS` arm and the `CL_JoystickEvent` hook stay as ported, with no device backend - retail defaulted `in_joystick` to off. A gamepad ticket graduates from the fog when someone wants it (gilrs is the natural crate then).
