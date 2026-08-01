@@ -3172,7 +3172,7 @@ pub fn CG_DrawZoomMask(ctx: &mut CgContext) {
             color1[0] = 1.0;
             color1[1] = 1.0;
             color1[2] = 1.0;
-            color1[3] = (0.7 + ((ctx.world.cg.time as f32 * 0.01) as f64).sin() * 0.3) as f32;
+            color1[3] = (0.7f32 as f64 + ((ctx.world.cg.time as f32 * 0.01) as f64).sin() * 0.3f32 as f64) as f32;
 
             trap::R_SetColor(ctx.engine, Some(&color1));
         }
@@ -6341,7 +6341,7 @@ pub fn CG_DrawCrosshair(ctx: &mut CgContext, worldPoint: Option<vec3_t>, chEntVa
         ecolor[3] = 0.5;
         // don't draw full color
         let v = ((1.0 - ecolor[3]) as f64
-            * (((ctx.world.cg.time as f32 * 0.001) as f64).sin() * 0.08 + 0.35))
+            * (((ctx.world.cg.time as f32 * 0.001) as f64).sin() * 0.08f32 as f64 + 0.35f32 as f64))
             as f32;
         ecolor[0] = v;
         ecolor[1] = v;

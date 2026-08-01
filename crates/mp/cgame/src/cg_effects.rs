@@ -1073,7 +1073,14 @@ pub fn CG_Chunks(
                 le.refEntity.origin[j] = r * mins[j] + (1.0 - r) * maxs[j];
             }
 
-            let scatter = ctx.world.bg_state.rng.flrand(speed * 0.5, speed * 1.25) * speedMod;
+            // Raven's `VectorScale` is a macro, so the `flrand(...) * speedMod`
+            // scale argument is evaluated once per component - three draws.
+            // Source: `oracle/codemp/game/q_shared.h:1361`, `cg_effects.c:1218`
+            let scatter = [
+                ctx.world.bg_state.rng.flrand(speed * 0.5, speed * 1.25) * speedMod,
+                ctx.world.bg_state.rng.flrand(speed * 0.5, speed * 1.25) * speedMod,
+                ctx.world.bg_state.rng.flrand(speed * 0.5, speed * 1.25) * speedMod,
+            ];
             let angBase = [
                 ctx.world.bg_state.rng.random() * 360.0,
                 ctx.world.bg_state.rng.random() * 360.0,
@@ -1084,7 +1091,14 @@ pub fn CG_Chunks(
                 ctx.world.bg_state.rng.crandom() as f32,
                 0.0, // don't do roll
             ];
-            let angScale = ctx.world.bg_state.rng.random() * 600.0 + 200.0;
+            // Raven's `VectorScale` is a macro here too, so the angular scale
+            // draws once per component.
+            // Source: `oracle/codemp/cgame/cg_effects.c:1227`
+            let angScale = [
+                ctx.world.bg_state.rng.random() * 600.0 + 200.0,
+                ctx.world.bg_state.rng.random() * 600.0 + 200.0,
+                ctx.world.bg_state.rng.random() * 600.0 + 200.0,
+            ];
             let bounceFactor = 0.2 + ctx.world.bg_state.rng.random() * 0.2;
             let radius = ctx
                 .world
@@ -1104,14 +1118,18 @@ pub fn CG_Chunks(
             let mut dir: vec3_t = [0.0; 3];
             _VectorSubtract(le.refEntity.origin, *origin, &mut dir);
             VectorNormalize(&mut dir);
-            _VectorScale(dir, scatter, &mut le.pos.trDelta);
+            for k in 0..3 {
+                le.pos.trDelta[k] = dir[k] * scatter[k];
+            }
 
             // Angular Velocity
             VectorSet(&mut le.angles.trBase, angBase[0], angBase[1], angBase[2]);
 
             le.angles.trDelta = angDelta;
 
-            _VectorScale(le.angles.trDelta, angScale, &mut le.angles.trDelta);
+            for k in 0..3 {
+                le.angles.trDelta[k] *= angScale[k];
+            }
 
             le.pos.trType = trType_t::TR_GRAVITY;
             le.angles.trType = trType_t::TR_LINEAR;

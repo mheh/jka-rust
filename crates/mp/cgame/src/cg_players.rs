@@ -7375,8 +7375,13 @@ pub fn CG_ForceElectrocution(
         }
     }
 
-    let reach = ctx.world.bg_state.rng.random() * 40.0 + 40.0;
-    _VectorMA(fxOrg, reach, dir, &mut fxOrg2);
+    // Raven's `VectorMA` is a macro, so the `random() * 40 + 40` scale argument
+    // is evaluated once per component - three draws, a different reach per axis.
+    // Source: `oracle/codemp/game/q_shared.h:1365`, `cg_players.c:7850`
+    for k in 0..3 {
+        let reach = ctx.world.bg_state.rng.random() * 40.0 + 40.0;
+        fxOrg2[k] = fxOrg[k] + dir[k] * reach;
+    }
 
     CG_Trace(
         ctx,
@@ -12058,7 +12063,7 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
                         holoCenter[2] = holoRef.origin[2] + holoRef.axis[2][2] * 18.0;
 
                         let wv: f32 =
-                            (((cgTime as f32 * 0.004f32) as f64).sin() * 0.08 + 0.1) as f32;
+                            (((cgTime as f32 * 0.004f32) as f64).sin() * 0.08f32 as f64 + 0.1f32 as f64) as f32;
 
                         _VectorCopy(holoCenter, &mut fxSArgs.origin);
                         VectorClear(&mut fxSArgs.vel);
@@ -12626,7 +12631,7 @@ pub fn CG_Player(ctx: &mut CgContext, centNum: usize) {
                 efOrg[1] = boltMatrix.matrix[1][3];
                 efOrg[2] = boltMatrix.matrix[2][3];
 
-                wv = (((cgTime as f32 * 0.003f32) as f64).sin() * 0.08 + 0.1) as f32;
+                wv = (((cgTime as f32 * 0.003f32) as f64).sin() * 0.08f32 as f64 + 0.1f32 as f64) as f32;
 
                 let mut fxSArgs: addspriteArgStruct_t = unsafe { core::mem::zeroed() };
                 _VectorCopy(efOrg, &mut fxSArgs.origin);
