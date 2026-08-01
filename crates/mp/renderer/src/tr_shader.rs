@@ -388,7 +388,7 @@ impl Default for Deform {
 /// Raven `waveForm_t`.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:287-294`
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, PartialEq)]
 pub struct WaveForm {
     pub func: GenFunc,
     pub base: f32,
@@ -2383,21 +2383,182 @@ pub fn ParseSurfaceParm(
     }
 }
 
+/// Raven `collapse_t` — one blend-mode pair the multitexture collapse accepts.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:2564-2570`
+struct Collapse {
+    blend_a: i32,
+    blend_b: i32,
+    multitexture_env: i32,
+    multitexture_blend: i32,
+}
+
+/// Raven `collapse[]` — six `GL_MODULATE` rows and two `GL_ADD` rows. The
+/// oracle's trailing `{ -1 }` sentinel row is only the loop terminator, so the
+/// idiomatic `find` over the real rows drops it. The `#if 0` `GL_DECAL` row is
+/// compiled out in the oracle and stays out here.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:2573-2602`
+static COLLAPSE: [Collapse; 8] = [
+    Collapse {
+        blend_a: 0,
+        blend_b: GLS_DSTBLEND_SRC_COLOR | GLS_SRCBLEND_ZERO,
+        multitexture_env: GL_MODULATE,
+        multitexture_blend: 0,
+    },
+    Collapse {
+        blend_a: 0,
+        blend_b: GLS_DSTBLEND_ZERO | GLS_SRCBLEND_DST_COLOR,
+        multitexture_env: GL_MODULATE,
+        multitexture_blend: 0,
+    },
+    Collapse {
+        blend_a: GLS_DSTBLEND_ZERO | GLS_SRCBLEND_DST_COLOR,
+        blend_b: GLS_DSTBLEND_ZERO | GLS_SRCBLEND_DST_COLOR,
+        multitexture_env: GL_MODULATE,
+        multitexture_blend: GLS_DSTBLEND_ZERO | GLS_SRCBLEND_DST_COLOR,
+    },
+    Collapse {
+        blend_a: GLS_DSTBLEND_SRC_COLOR | GLS_SRCBLEND_ZERO,
+        blend_b: GLS_DSTBLEND_ZERO | GLS_SRCBLEND_DST_COLOR,
+        multitexture_env: GL_MODULATE,
+        multitexture_blend: GLS_DSTBLEND_ZERO | GLS_SRCBLEND_DST_COLOR,
+    },
+    Collapse {
+        blend_a: GLS_DSTBLEND_ZERO | GLS_SRCBLEND_DST_COLOR,
+        blend_b: GLS_DSTBLEND_SRC_COLOR | GLS_SRCBLEND_ZERO,
+        multitexture_env: GL_MODULATE,
+        multitexture_blend: GLS_DSTBLEND_ZERO | GLS_SRCBLEND_DST_COLOR,
+    },
+    Collapse {
+        blend_a: GLS_DSTBLEND_SRC_COLOR | GLS_SRCBLEND_ZERO,
+        blend_b: GLS_DSTBLEND_SRC_COLOR | GLS_SRCBLEND_ZERO,
+        multitexture_env: GL_MODULATE,
+        multitexture_blend: GLS_DSTBLEND_ZERO | GLS_SRCBLEND_DST_COLOR,
+    },
+    Collapse {
+        blend_a: 0,
+        blend_b: GLS_DSTBLEND_ONE | GLS_SRCBLEND_ONE,
+        multitexture_env: GL_ADD,
+        multitexture_blend: 0,
+    },
+    Collapse {
+        blend_a: GLS_DSTBLEND_ONE | GLS_SRCBLEND_ONE,
+        blend_b: GLS_DSTBLEND_ONE | GLS_SRCBLEND_ONE,
+        multitexture_env: GL_ADD,
+        multitexture_blend: GLS_DSTBLEND_ONE | GLS_SRCBLEND_ONE,
+    },
+];
+
 /// Raven `CollapseMultitexture`.
 ///
-/// DEFERRED: R4 — the oracle's `#ifdef DEDICATED` leg takes exactly this path
-/// (`return qfalse`) without touching GL at all; matched here rather than
-/// transcribing the fixed-function multitexture collapse (`qglActiveTextureARB`
-/// gate, the static `collapse[]` blend-mode table — a literal data table not
-/// in this wave's packet slice, `GL_ADD`/`GL_MODULATE` texture-env fixed-
-/// function state), which has no R4 wgpu-backend equivalent (DEC-01/DEC-37
-/// A13.2) and no oracle-cited table to transcribe faithfully. A frontend fn
-/// must not grow a GL dependency.
+/// This tries to combine stage 0 and stage 1 into one multitexture stage.
+/// A match writes the blend into `stage 0`, records the texture-env on the
+/// shader, and shifts the later stages down one slot.
+///
+/// The backend draws the `GL_MODULATE` collapse only when bundle 1 is a
+/// lightmap. `is_modulate_collapse` in `pipeline3d.rs` reads
+/// `multitexture_env == GL_MODULATE` with a lightmap in bundle 1. Any other
+/// bundle 1 draws bundle 0 alone with a `warn_once`.
 ///
 /// Source: `oracle/codemp/renderer/tr_shader.cpp:2612-2713`
-pub fn CollapseMultitexture(state: &mut ShaderParseState) -> bool {
-    let _ = state;
-    false
+pub fn CollapseMultitexture(
+    state: &mut ShaderParseState,
+    texture_env_add_available: bool,
+) -> bool {
+    // The oracle gates on `qglActiveTextureARB`. The wgpu backend has a real
+    // two-texture path, so multitexture is always available and the gate is
+    // dropped.
+
+    // make sure both stages are active
+    if !state.stages[0].active || !state.stages[1].active {
+        return false;
+    }
+
+    let mut abits = state.stages[0].state_bits as i32;
+    let mut bbits = state.stages[1].state_bits as i32;
+
+    // make sure that both stages have identical state other than blend modes
+    let non_blend_mask = !(GLS_DSTBLEND_BITS | GLS_SRCBLEND_BITS | GLS_DEPTHMASK_TRUE);
+    if (abits & non_blend_mask) != (bbits & non_blend_mask) {
+        return false;
+    }
+
+    abits &= GLS_DSTBLEND_BITS | GLS_SRCBLEND_BITS;
+    bbits &= GLS_DSTBLEND_BITS | GLS_SRCBLEND_BITS;
+
+    // search for a valid multitexture blend function
+    // nothing found
+    let Some(collapse) = COLLAPSE
+        .iter()
+        .find(|c| c.blend_a == abits && c.blend_b == bbits)
+    else {
+        return false;
+    };
+
+    // GL_ADD is a separate extension. Our synthesized `GlConfig` reports it
+    // disabled (`texture_env_add_available == false`), so GL_ADD collapses do
+    // not fire today.
+    if collapse.multitexture_env == GL_ADD && !texture_env_add_available {
+        return false;
+    }
+
+    // make sure waveforms have identical parameters
+    if state.stages[0].rgb_gen != state.stages[1].rgb_gen
+        || state.stages[0].alpha_gen != state.stages[1].alpha_gen
+    {
+        return false;
+    }
+
+    // an add collapse can only have identity colors
+    if collapse.multitexture_env == GL_ADD && state.stages[0].rgb_gen != ColorGen::Identity {
+        return false;
+    }
+
+    // The oracle uses `memcmp` on the wave structs. Rust value equality and the
+    // memcmp differ only for a negative zero in a wave field. No retail shader
+    // writes one.
+    if state.stages[0].rgb_gen == ColorGen::Waveform
+        && state.stages[0].rgb_wave != state.stages[1].rgb_wave
+    {
+        return false;
+    }
+    // Raven compares `alphaGen` against `CGEN_WAVEFORM`, a colorGen_t value.
+    // `CGEN_WAVEFORM` is 8, and alphaGen_t value 8 is `AGEN_PORTAL`, not
+    // `AGEN_WAVEFORM`. The port keeps this cross-enum bug and gates on Portal.
+    // Source: oracle/codemp/renderer/tr_shader.cpp:2678, tr_local.h:226-256
+    if state.stages[0].alpha_gen == AlphaGen::Portal
+        && state.stages[0].alpha_wave != state.stages[1].alpha_wave
+    {
+        return false;
+    }
+
+    // make sure that lightmaps are in bundle 1 for 3dfx
+    if state.stages[0].bundle[0].is_lightmap {
+        let tmp_bundle = state.stages[0].bundle[0].clone();
+        state.stages[0].bundle[0] = state.stages[1].bundle[0].clone();
+        state.stages[0].bundle[1] = tmp_bundle;
+    } else {
+        state.stages[0].bundle[1] = state.stages[1].bundle[0].clone();
+    }
+
+    // set the new blend state bits
+    state.multitexture_env = collapse.multitexture_env;
+    let mut new_bits = state.stages[0].state_bits as i32;
+    new_bits &= !(GLS_DSTBLEND_BITS | GLS_SRCBLEND_BITS);
+    new_bits |= collapse.multitexture_blend;
+    state.stages[0].state_bits = new_bits as u32;
+
+    // move down subsequent shaders
+    // The oracle memmoves `stages[2..]` into `stages[1..]` and zeroes the last
+    // slot. `state.stages` is always `MAX_SHADER_STAGES` long, so the shift
+    // reads slot `i + 1` before it overwrites slot `i`.
+    for i in 1..MAX_SHADER_STAGES - 1 {
+        state.stages[i] = state.stages[i + 1].clone();
+    }
+    state.stages[MAX_SHADER_STAGES - 1] = ShaderStageParse::default();
+
+    true
 }
 
 /// Raven `SortNewShader`.
@@ -3878,7 +4039,7 @@ pub fn FinishShader(
     //
     // look for multitexture potential
     //
-    if stage > 1 && CollapseMultitexture(state) {
+    if stage > 1 && CollapseMultitexture(state, assets.glconfig.texture_env_add_available) {
         stage -= 1;
     }
 
@@ -5738,15 +5899,9 @@ pub fn RE_RegisterShaderNoMip(
 
 /// Raven `CreateExternalShaders` — wave 8.
 ///
-/// DEFERRED, whole-fn loud stub. The `lightmapsNone`/`stylesDefault`
-/// arguments are now real (landed as file-scope consts above); what stands is
-/// that both handles this fn computes are unhomed:
-/// `tr.projectionShadowShader`/`tr.sunShader` have no `RenderAssets`/
-/// `FrameState` carrier — `## State ownership` names none for either, and
-/// `RB_DrawSun`'s doc comment (`tr_sky.rs`) already escalates the identical
-/// `tr.sunShader` gap. `tr.projectionShadowShader->sort = SS_STENCIL_SHADOW`
-/// (`:4255`) has nothing to write through either, so the whole 3-line body
-/// stays a loud stub.
+/// This finds the `projectionShadow` and `sun` shaders and homes both handles
+/// on `RenderAssets` (`projection_shadow_shader`, `sun_shader`). It also sets
+/// the projection-shadow shader's sort to `SS_STENCIL_SHADOW`.
 ///
 /// Source: `oracle/codemp/renderer/tr_shader.cpp:4253-4257`
 #[allow(clippy::too_many_arguments)]

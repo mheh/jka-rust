@@ -483,10 +483,11 @@ const MODE_SINGLE: u32 = 0;
 /// The two-texture pass: sample bundle 0 times the lightmap
 /// (`DrawMultitextured` under `GL_MODULATE`).
 ///
-/// `CollapseMultitexture` is a deferred R4 stub (`tr_shader.rs`, returns false),
-/// so `ShaderAsset::multitexture_env` stays 0 and this path stays unreached
-/// until that fn lands. A lightmapped world surface draws its lightmap as its
-/// own single-texture stage instead, through the `tex_from_lightmap` flag.
+/// `CollapseMultitexture` in `tr_shader.rs` now lands the collapse, so
+/// `ShaderAsset::multitexture_env` carries `GL_MODULATE`. This two-texture path
+/// is live when bundle 1 is a lightmap. A lightmapped world surface can still
+/// draw its lightmap as its own single-texture stage through the
+/// `tex_from_lightmap` flag.
 const MODE_MULTITEXTURE: u32 = 1;
 
 /// The shader features the world backend cannot render yet, tracked so each one
@@ -1643,8 +1644,10 @@ impl Pipeline3d {
             return;
         };
 
-        // DEFERRED: R4 - RB_DrawSun waits on frame.sky_rendered_this_view, which
-        // RB_StageIteratorSky set above. The sun draw is a later wave.
+        // RB_DrawSun draws nothing here, to match the oracle. The oracle's only
+        // RB_DrawSun call site sits inside an `#if 0` block
+        // (tr_backend.cpp:1222-1224), so retail Jedi Academy never draws the sun.
+        // Parity is no live draw.
         // Source: oracle/codemp/renderer/tr_sky.cpp:846-847
 
         let before = items.len();

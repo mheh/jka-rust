@@ -984,15 +984,12 @@ pub fn R_BuildCloudData(
 /// depends on a GL call's result.
 ///
 /// `RB_BeginSurface( tr.sunShader, tess.fogNum )` through `RB_EndSurface()`
-/// (the whole quad-stamp body building the sun's four tess vertices) is
-/// DEFERRED whole: every write inside targets the dissolved `tess`/
-/// `shaderCommands_t` global (R2 `## State ownership` row `tess` — "no
-/// single global scratch buffer survives the new topology"), and
-/// `tr.sunShader` itself has no R3 carrier — R2's `## State ownership` names
-/// `tr.sunDirection`'s home on `FrameState` but no home for `sunShader`, so
-/// even `RB_BeginSurface`'s `shader: ShaderHandle` argument cannot be
-/// produced without inventing a handle. Escalate: a `tr.sunShader` carrier
-/// row is needed before this leg can port for real.
+/// (the whole quad-stamp body building the sun's four tess vertices) draws
+/// nothing here, to match the oracle. The oracle's only `RB_DrawSun` call
+/// site sits inside an `#if 0` block (`tr_backend.cpp:1222-1224`), so retail
+/// Jedi Academy never draws the sun. Parity is no live draw. The carriers
+/// both exist now (`RenderAssets::sun_shader`, `FrameState::sun_direction`),
+/// so the quad body can port whenever the `#if 0` guard is lifted.
 ///
 /// Source: `oracle/codemp/renderer/tr_sky.cpp:687-772`
 pub fn RB_DrawSun(frame: &FrameState, common: &Common, cvars: &RendererCvars, view: &viewParms_t) {
@@ -1027,8 +1024,8 @@ pub fn RB_DrawSun(frame: &FrameState, common: &Common, cvars: &RendererCvars, vi
 
     // FIXME: use quad stamp
     // DEFERRED: R4 — RB_BeginSurface(tr.sunShader, tess.fogNum) through
-    // RB_EndSurface() (see doc comment above: dissolved `tess`, unhomed
-    // `tr.sunShader`)
+    // RB_EndSurface(). The oracle's only RB_DrawSun call site is inside an
+    // `#if 0` block (tr_backend.cpp:1222-1224), so parity is no live draw.
     // Source: oracle/codemp/renderer/tr_sky.cpp:716-768
     let _ = origin; // consumed only by the deferred tess-quad block above
 
