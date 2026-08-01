@@ -1405,3 +1405,9 @@ client scope never sees it. The any-second-bundle extension (a second
 texture slot that samples bundle 1's own texcoords) belongs to the SP
 renderer tail, where its only consumers live. `t1_fatal` is the test
 map when that work lands.
+
+## DEC-54 — renderer live-play surface is the empirical trace census (ruled 2026-08-01)
+
+The live-play renderer gate (wayfinder ticket [#6](https://github.com/mheh/jka-rust/issues/6)) is defined empirically, not a priori. The gate list is the census of every scene, 2D, and light submission across four cgame replay traces: the three committed fixtures (swoop1, sabers1, spectator) plus one wide ffa-with-bots round the user records to cover the ordinary weapon, force, and effect vocabulary. The census counts refEntity types, poly and mark submissions, dynamic lights, 2D calls, and the shader features each submission touches. Whatever the census lists gates live play and seeds the wave plan.
+
+Verification is image goldens on fixed scenes once the fixed-dt harness mode lands. The census complement (portals, mirrors, weather, flares, dynamic glow, videoMap, unexercised shader features) stays fog with `//TODO: Port` markers at the code sites. The complement is map-dependent, so a feature graduates to a ticket when live play on some map hits it. The complement is not out of scope.
