@@ -6,6 +6,7 @@
 
 use core::f64::consts::PI;
 use core::ffi::c_int;
+use std::sync::Arc;
 
 use mp_engine_qcommon::cmd_common::{Cmd_Argc, Cmd_Argv};
 use mp_engine_qcommon::cmd_pc::Cmd_RemoveCommand;
@@ -1694,6 +1695,12 @@ pub fn R_Init(
     }
 
     R_InitFogTable(assets);
+    // `R_CreateFogImage` reads the fog table through `sim.published` (the A9
+    // duality), so the table mirrors across, as the four internal image
+    // handles do below. Without this the baked fog image has zero alpha in
+    // every texel.
+    Arc::make_mut(&mut sim.published).function_tables.fog_table =
+        assets.function_tables.fog_table;
 
     R_NoiseInit(noise, rng);
 
@@ -1733,7 +1740,7 @@ pub fn R_Init(
         &*models,
         state,
         gpu,
-        &*frame,
+        &mut *frame,
     );
     // PORT-NOTE: Raven has one `tr`, so `R_InitImages`' internal-image handles
     // (`tr.defaultImage`/`whiteImage`/`fogImage`/`dlightImage`) are already

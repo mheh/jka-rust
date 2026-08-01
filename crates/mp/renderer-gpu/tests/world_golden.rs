@@ -4,12 +4,15 @@
 //! The world draw runs the whole render chain (`RE_RenderScene` record ->
 //! `FrameExecutor::execute_frame` -> `R_RenderView` -> sorted world surfaces),
 //! the same chain `bin/world_harness` drives in a window, but into an offscreen
-//! target instead of a surface. The test then reads the pixels back and
-//! compares them to `tests/goldens/world_duel1.png`.
+//! target instead of a surface. Each test reads the pixels back and compares
+//! them to its committed PNG under `tests/goldens/`. Two fixtures run: the
+//! enclosed duel1 room, and the fogged open-sky ffa2 courtyard.
 //!
-//! The test is `#[ignore]`d, matching the demo-replay rig: it needs the retail
-//! assets and a GPU, so it runs locally, not in CI. Run it with
-//! `cargo test -p mp_renderer_gpu --test world_golden -- --ignored`.
+//! The tests are `#[ignore]`d, matching the demo-replay rig: they need the
+//! retail assets and a GPU, so they run locally, not in CI. Run them with
+//! `cargo test -p mp_renderer_gpu --test world_golden -- --ignored
+//! --test-threads=1`. Serial only: two engine boots in parallel threads crash
+//! in the GPU init.
 //!
 //! Bless flow: set `JKA_GOLDEN_BLESS=1` to write the golden and pass. On a
 //! mismatch without that env var, the test writes the actual image next to the
@@ -28,7 +31,6 @@ use mp_engine_server::Server;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::tr_local::dlight_s::dlight_t;
-use mp_renderer::tr_local::fog_t::fog_t;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
 use mp_renderer::tr_main::TrMainScratch;
 use mp_renderer::tr_model::render_models::RenderModels;
@@ -102,14 +104,14 @@ fn record_scene(host: &mut UiHost, refdef: &refdef_t) -> FrameData {
     frame_data
 }
 
-/// The absolute path of the committed golden.
-fn golden_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/goldens/world_duel1.png")
+/// The absolute path of the committed golden for `stem`.
+fn golden_path(stem: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("tests/goldens/{stem}.png"))
 }
 
 /// The absolute path the actual image lands at on a mismatch.
-fn actual_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/goldens/world_duel1.actual.png")
+fn actual_path(stem: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("tests/goldens/{stem}.actual.png"))
 }
 
 /// Writes RGBA8 pixels to `path` as an 8-bit PNG.
@@ -162,9 +164,11 @@ fn compare(golden: &[u8], actual: &[u8]) -> (usize, u8) {
     (differing_pixels, max_delta)
 }
 
-#[test]
-#[ignore = "needs retail assets and a GPU; run locally with --ignored"]
-fn golden_world_duel1() {
+/// Renders `map` through the whole chain at the frozen clock and compares the
+/// pixels to the committed golden named `stem`. `require_sky_and_fog` adds the
+/// two stat gates a fogged open-sky fixture must clear, so an inert sky or fog
+/// chain cannot silently bless.
+fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
     // ---- boot and load the world ---------------------------------------
     // The default basepath points at one user's home. Read `JKA_BASEPATH` so
     // another machine can re-bless the golden without editing the default.
@@ -173,9 +177,8 @@ fn golden_world_duel1() {
         cfg.basepath = basepath;
     }
     let mut host = boot::boot(&cfg);
-    let (loaded, land_scape): (bool, srfTerrain_t) =
-        boot::load_world(&mut host, "maps/mp/duel1.bsp");
-    assert!(loaded, "duel1.bsp did not load");
+    let (loaded, land_scape): (bool, srfTerrain_t) = boot::load_world(&mut host, map);
+    assert!(loaded, "{map} did not load");
 
     // Force the first `R_MarkLeaves` to re-mark, and set the registered flag
     // the ui boot path never sets, the same two settings `world_harness` makes.
@@ -205,7 +208,6 @@ fn golden_world_duel1() {
     let dummy_assets = boot::empty_assets();
     let land = CmLandScape::empty();
     let mut dlights: Vec<dlight_t> = Vec::new();
-    let fogs: Vec<fog_t> = Vec::new();
     let mut scratch = TrMainScratch {
         pre_trans_ent_matrix: [0.0; 16],
     };
@@ -259,7 +261,6 @@ fn golden_world_duel1() {
             land_scape: &land_scape,
             land: &land,
             dlights: dlights.as_mut_slice(),
-            fogs: fogs.as_slice(),
             scratch: &mut scratch,
         };
 
@@ -278,7 +279,7 @@ fn golden_world_duel1() {
         );
 
         // The chain must draw the world, or a blank render blesses as the
-        // golden. `world_spike` reports 57 drawSurfs for this scene.
+        // golden. `world_spike` reports 57 drawSurfs for the duel1 scene.
         assert!(
             stats.world.surfaces_drawn > 0,
             "no world surface drawn: stats.world = {:?}",
@@ -289,6 +290,18 @@ fn golden_world_duel1() {
             "no world draw call issued: stats.world = {:?}",
             stats.world,
         );
+        if require_sky_and_fog {
+            assert!(
+                stats.world.sky_surfaces_drawn > 0,
+                "no sky surface drawn: stats.world = {:?}",
+                stats.world,
+            );
+            assert!(
+                stats.world.fog_passes_drawn > 0,
+                "no fog pass drawn: stats.world = {:?}",
+                stats.world,
+            );
+        }
     }
 
     // ---- read the pixels back ------------------------------------------
@@ -296,13 +309,13 @@ fn golden_world_duel1() {
     assert_eq!(width, GOLDEN_WIDTH);
     assert_eq!(height, GOLDEN_HEIGHT);
 
-    let golden = golden_path();
+    let golden = golden_path(stem);
 
     // Bless: write the golden and pass.
     if std::env::var("JKA_GOLDEN_BLESS").as_deref() == Ok("1") {
         write_png(&golden, width, height, &actual);
         println!(
-            "golden_world_duel1: blessed {} ({} bytes)",
+            "{stem}: blessed {} ({} bytes)",
             golden.display(),
             std::fs::metadata(&golden).map(|m| m.len()).unwrap_or(0),
         );
@@ -332,7 +345,7 @@ fn golden_world_duel1() {
 
     let (differing_pixels, max_delta) = compare(&golden_bytes, &actual);
     if differing_pixels > 0 {
-        let actual_out = actual_path();
+        let actual_out = actual_path(stem);
         write_png(&actual_out, width, height, &actual);
         panic!(
             "world golden mismatch: {} pixels differ, max channel delta {}; \
@@ -342,4 +355,19 @@ fn golden_world_duel1() {
             actual_out.display(),
         );
     }
+}
+
+#[test]
+#[ignore = "needs retail assets and a GPU; run locally with --ignored"]
+fn golden_world_duel1() {
+    run_golden("maps/mp/duel1.bsp", "world_duel1", false);
+}
+
+/// The fogged open-sky fixture: ffa2 carries two brush fogs, one global fog,
+/// and a visible sky from the spawn view, so this golden covers the sky and
+/// fog chains the enclosed duel1 view never exercises.
+#[test]
+#[ignore = "needs retail assets and a GPU; run locally with --ignored"]
+fn golden_world_ffa2() {
+    run_golden("maps/mp/ffa2.bsp", "world_ffa2", true);
 }

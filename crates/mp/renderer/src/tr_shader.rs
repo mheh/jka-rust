@@ -979,10 +979,9 @@ impl Default for CullType {
 }
 
 /// Raven `fogPass_t`, reproduced locally — same rationale as `CullType`
-/// above (`shader.fogPass` write site has no `ShaderAsset` carrier yet either
-/// — `GeneratePermanentShader`'s existing `DEFERRED` note — but the scratch
-/// value is still captured here, matching every other `ShaderParseState`
-/// field this file adds ahead of its `ShaderAsset` sync).
+/// above. `ParseShader`'s `noglfog` keyword seeds `ShaderParseState::fog_pass`,
+/// and `GeneratePermanentShader` copies it onto `ShaderAsset::fog_pass` and
+/// then overrides it from the sort order and `CONTENTS_FOG` flag.
 ///
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:442-447`
 /// (write site `oracle/codemp/renderer/tr_shader.cpp:2444-2448`)
@@ -3193,10 +3192,10 @@ pub fn ParseTexMod(
 /// after registering it. Unobservable — nothing between the two reads the
 /// registry, and `SortNewShader` (which does) still runs after both.
 ///
-/// DEFERRED: the `fogPass` assignment (`:2768-2772`) needs
-/// `ShaderAsset::fog_pass`, which doesn't exist yet (`shader_asset.rs`'s own
-/// doc comment: lands "with the later tr_shader waves that read
-/// them"). Every other field of the whole-struct copy (`:2766`), the arena
+/// The `fogPass` assignment (`:2768-2772`) lands on `ShaderAsset::fog_pass`
+/// (the fog wave added the field): the whole-struct copy carries the scratch
+/// `noglfog` value, then the sort-order/`CONTENTS_FOG` rule overrides it.
+/// Every other field of the whole-struct copy (`:2766`), the arena
 /// registration + capacity guard (`Arena::insert`'s existing `MAX_SHADERS`
 /// soft cap returning `Handle{0,0}` — A5/A12), `SortNewShader`, and the
 /// `hashTable` chain (`:2807-2809`, folded into `RenderAssets::shader_lookup`
@@ -3231,7 +3230,7 @@ pub fn GeneratePermanentShader(
     // *newShader = shader; — whole-struct copy of every field `ShaderAsset`
     // currently declares (interior-safety law: no `..Default::default()`
     // masking payload).
-    let new_shader = ShaderAsset {
+    let mut new_shader = ShaderAsset {
         name: state.name.clone(),
         lightmap_index: state.lightmap_index,
         styles: state.styles,
@@ -3246,6 +3245,7 @@ pub fn GeneratePermanentShader(
         num_unfogged_passes: state.num_unfogged_passes,
         sky: state.sky.clone(),
         fog_parms: state.fog_parms,
+        fog_pass: state.fog_pass,
         // `newShader->stages` — filled by the per-stage copy loop above.
         stages,
         // `shader.timeOffset`/`shader.remappedShader` are never written by
@@ -3259,8 +3259,11 @@ pub fn GeneratePermanentShader(
 
     // if ( shader.sort <= SS_SEE_THROUGH ) newShader->fogPass = FP_EQUAL;
     // else if ( shader.contentFlags & CONTENTS_FOG ) newShader->fogPass = FP_LE;
-    // DEFERRED: `ShaderAsset::fog_pass` has no home yet — see fn doc above
-    // (`docs/subsystems/renderer-r2-design.md` Group 2 `shader_t` row).
+    if new_shader.sort <= shaderSort_t::SS_SEE_THROUGH as i32 as f32 {
+        new_shader.fog_pass = FogPass::Equal;
+    } else if new_shader.content_flags & CONTENTS_FOG != 0 {
+        new_shader.fog_pass = FogPass::Le;
+    }
 
     // tr.shaders[tr.numShaders] = newShader; newShader->index = tr.numShaders;
     // tr.sortedShaders[tr.numShaders] = newShader; newShader->sortedIndex = tr.numShaders;

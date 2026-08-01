@@ -39,7 +39,7 @@ use mp_renderer::render_state::placeholders::{AutomapWireframe, FunctionTables, 
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::shader_asset::{ShaderAsset, ShaderHandle};
 use mp_renderer::render_state::shader_stage::ShaderStage;
-use mp_renderer::tr_shader::CullType;
+use mp_renderer::tr_shader::{CullType, FogPass};
 use mp_renderer::tr_font::FontState;
 use mp_renderer::tr_image::{PendingUpload, TrImageState};
 use mp_renderer::tr_noise::NoiseState;
@@ -410,6 +410,7 @@ fn shader_asset(name: &str, stages: Vec<ShaderStage>) -> ShaderAsset {
         num_unfogged_passes: stages.len() as i32,
         sky: None,
         fog_parms: None,
+        fog_pass: FogPass::None,
         stages,
         time_offset: 0.0,
         remapped_shader: None,

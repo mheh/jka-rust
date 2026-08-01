@@ -768,7 +768,15 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
         let frame_data = FrameData { events: Vec::new() };
         let mut entities: Vec<trRefEntity_t> = Vec::new();
         let mut dlights: Vec<dlight_t> = Vec::new();
-        let fogs: Vec<fog_t> = Vec::new();
+        // The loaded world's fog volumes, copied into the ABI `fog_t` the
+        // frontend fog-num math reads. The spike adds no entities, so the list
+        // only feeds `R_RenderView`'s fog tagging.
+        let fogs: Vec<fog_t> = host
+            .assets
+            .world
+            .as_ref()
+            .map(|w| w.fogs.iter().map(|f| f.to_fog_t()).collect())
+            .unwrap_or_default();
         let mut scratch = TrMainScratch {
             pre_trans_ent_matrix: [0.0; 16],
         };

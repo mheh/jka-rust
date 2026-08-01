@@ -16,7 +16,10 @@ use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::render_state::shader_stage::ShaderStage;
+use crate::tr_local::fog_t::fog_t;
 use crate::tr_local::gl_index_t::glIndex_t;
+use crate::tr_local::orientationr_t::orientationr_t;
+use crate::tr_shade_calc::RB_CalcFogTexCoords;
 use crate::tr_shader::TextureBundleParse;
 
 /// Per-subsystem render-thread counters `R_DrawStripElements` accumulates
@@ -386,28 +389,50 @@ pub fn ProjectDlightTexture(_gpu: &mut GpuResources) {
     // Source: oracle/codemp/renderer/tr_shade.cpp:840-1170
 }
 
-/// Raven `RB_FogPass` — draws a fog pass over the current tessellated
-/// surface: writes the fog volume's packed color into every vertex,
-/// computes fog texture coordinates via `RB_CalcFogTexCoords`, binds the fog
-/// image, and draws.
+/// The render-side product of Raven `RB_FogPass` — the per-vertex packed fog
+/// color plus the fog texture coordinates for one tessellated surface.
 ///
-/// DEFERRED: R4 — every input is unavailable at this R3 wave:
-/// `tess.svars.colors`/`.svars.texcoords`/`.numVertexes`/`.numIndexes`/
-/// `.indexes`/`.shader`/`.fogNum` are the dissolved `tess` (R2 `## State
-/// ownership` row `tess`, no R3 carrier ever); `tr.world->fogs` needs a
-/// `WorldAsset::fogs` field not landed by any prior wave (only `name`/
-/// `shaders`/`bmodels`/`planes`/`nodes`/`mark_surfaces`/light-grid/`vis`/
-/// `novis`/entity-string are real); the wave-0 in-module callee
-/// `RB_CalcFogTexCoords` takes the same dissolved `tess.svars.texcoords`
-/// buffer as its sole argument, so it has no value to call with; every
-/// terminal action is a GL call or a deferred in-module callee (`GL_Bind`/
-/// `GL_State`/`R_DrawElements`, DEC-37 A13.2). No computation survives once
-/// both are removed.
+/// DEC-50: the backend calls [`RB_FogPass`] with the batch vertices, binds
+/// `tr.fogImage` (`RenderAssets::fog_image`), and draws this data with the fog
+/// blend state.
+pub struct FogPassData {
+    /// `tess.svars.colors` — the fog volume's packed `colorInt`, one copy per
+    /// vertex.
+    pub colors: Vec<[u8; 4]>,
+    /// `tess.svars.texcoords[0]` — the fog lookup coordinates from
+    /// `RB_CalcFogTexCoords`.
+    pub tex_coords: Vec<[f32; 2]>,
+}
+
+/// Raven `RB_FogPass` — builds the fog pass over the current tessellated
+/// surface: the fog volume's packed color on every vertex plus the fog
+/// texture coordinates.
+///
+/// DEC-50: the draw itself is the backend's. This returns the per-vertex data
+/// only. The backend binds `tr.fogImage` (`RenderAssets::fog_image`), sets the
+/// fog blend state (`GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA`,
+/// plus `GLS_DEPTHFUNC_EQUAL` when `shader.fog_pass == FogPass::Equal`), and
+/// draws. `tess.svars.colors`/`.texcoords[0]`/`.numVertexes`/`.xyz` collapse to
+/// the `xyz` slice and the returned `Vec`s. `tr.world->fogs + tess.fogNum` is
+/// the resolved `fog` the caller hands in.
 ///
 /// Source: `oracle/codemp/renderer/tr_shade.cpp:1182-1209`
-pub fn RB_FogPass(_gpu: &mut GpuResources) {
-    // DEFERRED: R4 — RB_FogPass (see doc comment above)
-    // Source: oracle/codemp/renderer/tr_shade.cpp:1182-1209
+pub fn RB_FogPass(
+    xyz: &[[f32; 4]],
+    fog: &fog_t,
+    ori: &orientationr_t,
+    view_ori: &orientationr_t,
+) -> FogPassData {
+    // *(int*)&tess.svars.colors[i] = fog->colorInt — the same packed color on
+    // every vertex. `to_ne_bytes` matches the oracle reinterpret cast, and
+    // `ColorBytes4` packs `colorInt` with that same native-endian order.
+    let color = fog.colorInt.to_ne_bytes();
+    let colors = vec![color; xyz.len()];
+
+    let mut tex_coords = vec![[0.0f32; 2]; xyz.len()];
+    RB_CalcFogTexCoords(&mut tex_coords, xyz, fog, ori, view_ori);
+
+    FogPassData { colors, tex_coords }
 }
 
 /// Raven `RB_EndSurface` — closes out the current tessellated surface batch:
@@ -515,10 +540,9 @@ pub fn ComputeTexCoords(_stage: &ShaderStage) {
 /// volumetric short-circuit's), `tess.vertexColors`, `tess.xyz`,
 /// `tess.vertexAlphas`, `tess.fogNum`, `tess.shader` (both the
 /// `!= tr.projectionShadowShader/shadowShader` guard and `->portalRange` in
-/// `AGEN_PORTAL`). `tr.world->fogs` needs a `WorldAsset::fogs` field not
-/// landed by any prior wave (`RB_FogPass`'s doc comment above: only `name`/
-/// `shaders`/`bmodels`/`planes`/`nodes`/`mark_surfaces`/light-grid/`vis`/
-/// `novis`/entity-string are real). `tr.shadowShader`/`projectionShadowShader`
+/// `AGEN_PORTAL`). `tr.world->fogs` is landed (`WorldAsset::fogs`) but is
+/// reachable only through the dissolved `tess.fogNum`, so it has no value to
+/// select here. `tr.shadowShader`/`projectionShadowShader`
 /// have no `RenderAssets` field landed (`RB_EndSurface`'s doc comment above:
 /// only the tier-2 `tr_globals_t::shadowShader` raw pointer exists,
 /// scaffolding this wave may not extend). `tr.identityLight`/
@@ -581,10 +605,8 @@ pub fn ComputeColors(
 /// `bundle[0].isLightmap`/`bundle[0].vertexLightmap`/`bundle[1].isLightmap`/
 /// `bundle[1].image`) are all real since the R4a-prep wave completed
 /// `ShaderStage`, but remain unreachable through it. `tr.world->fogs`/
-/// `globalFog`/`numfogs` need a
-/// `WorldAsset::fogs` field not landed by any prior wave (`RB_FogPass`'s doc
-/// comment above: only `name`/`shaders`/`bmodels`/`planes`/`nodes`/
-/// `mark_surfaces`/light-grid/`vis`/`novis`/entity-string are real).
+/// `globalFog`/`numfogs` are landed (`WorldAsset::fogs`/`::global_fog`) but
+/// reachable only through the dissolved `tess`, so they have no value here.
 /// `tr.rangedFog`/`tr.distanceCull` — `RenderAssets` carries
 /// `distance_cull`/`distance_cull_squared` but no `ranged_fog` field.
 /// `tr.distortionShader`/`tr.screenImage` have no `RenderAssets` field landed
@@ -675,9 +697,11 @@ pub fn RB_IterateStagesGeneric(_gpu: &mut GpuResources) {
 /// `indexes`/`vertex_colors`/... parameters sourced from `tess` fields this
 /// fn has no carrier for and no parameter list to receive them through;
 /// `RB_IterateStagesGeneric` is itself a whole-fn `todo!()` stub on this same
-/// file; `ProjectDlightTexture`/`ProjectDlightTexture2`/`RB_FogPass` are
-/// DEFERRED-R4 no-ops needing the same unavailable `tess`/cvar inputs to even
-/// select which one to call; `RB_DrawSurfaceSprites`'s wave-2 port takes
+/// file; `ProjectDlightTexture`/`ProjectDlightTexture2` are DEFERRED-R4
+/// no-ops, and `RB_FogPass` now takes explicit `xyz`/`fog_t`/`orientationr_t`
+/// arguments this fn has no dissolved-`tess` carrier to source, needing the
+/// same unavailable inputs to even select which one to call;
+/// `RB_DrawSurfaceSprites`'s wave-2 port takes
 /// `&shaderStage_t`/`&mut CQuickSpriteSystem`/`&mut SurfaceSpriteState`/...
 /// sourced from `tess.xstages[stage]`, the same dissolved receiver;
 /// `GL_Cull`'s wave-0 port takes a `cullType_t` sourced from

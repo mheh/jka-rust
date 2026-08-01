@@ -45,8 +45,11 @@ use mp_renderer::render_state::shader_asset::ShaderAsset;
 use mp_renderer::render_state::shader_stage::ShaderStage;
 use mp_renderer::render_state::texture_bundle::TextureBundle;
 use mp_renderer::tr_bsp::{FaceVertex, SurfaceData};
+use mp_renderer::tr_local::acff_t::acff_t;
 use mp_renderer::tr_local::alpha_gen_t::alphaGen_t;
 use mp_renderer::tr_local::color_gen_t::colorGen_t;
+use mp_renderer::tr_local::fog_t::fog_t;
+use mp_renderer::tr_local::orientationr_t::orientationr_t;
 use mp_renderer::tr_local::tex_coord_gen_t::texCoordGen_t;
 use mp_renderer::tr_local::tr_ref_entity_t::trRefEntity_t;
 use mp_renderer::tr_local::view_parms_t::viewParms_t;
@@ -57,9 +60,14 @@ use mp_renderer::tr_main::{
 use mp_renderer::tr_model::frontend::mdxm_view_of;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_noise::NoiseState;
+use mp_renderer::tr_shade::RB_FogPass;
+use mp_renderer::tr_shade_calc::{
+    RB_CalcModulateAlphasByFog, RB_CalcModulateColorsByFog, RB_CalcModulateRGBAsByFog,
+};
 use mp_renderer::tr_shader::{
-    GLS_ATEST_GE_80, GLS_ATEST_GE_C0, GLS_ATEST_GT_0, GLS_ATEST_LT_80, GLS_DEPTHFUNC_EQUAL,
-    GLS_DEPTHMASK_TRUE, GL_MODULATE,
+    FogPass, GLS_ATEST_GE_80, GLS_ATEST_GE_C0, GLS_ATEST_GT_0, GLS_ATEST_LT_80,
+    GLS_DEPTHFUNC_EQUAL, GLS_DEPTHMASK_TRUE, GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA,
+    GLS_SRCBLEND_SRC_ALPHA, GL_MODULATE,
 };
 use mp_renderer::tr_sky::{RB_StageIteratorSky, SkyBoxFace, SkyState, HALF_SKY_SUBDIVISIONS};
 use wgpu::{BlendState, RenderPipeline, TextureView};
@@ -485,7 +493,6 @@ const MODE_MULTITEXTURE: u32 = 1;
 /// logs once per process rather than once per surface.
 #[derive(Clone, Copy, Debug)]
 enum Warned {
-    Fog,
     TcGen,
     MultitexEnv,
     SurfaceSprite,
@@ -493,6 +500,8 @@ enum Warned {
     VideoMap,
     Md3Lighting,
     Ghoul2Lighting,
+    /// A fog pass was due but the fog image is not registered.
+    FogImageMissing,
 }
 
 impl Warned {
@@ -500,20 +509,19 @@ impl Warned {
 
     fn slot(self) -> usize {
         match self {
-            Warned::Fog => 0,
-            Warned::TcGen => 1,
-            Warned::MultitexEnv => 2,
-            Warned::SurfaceSprite => 3,
-            Warned::Glow => 4,
-            Warned::VideoMap => 5,
-            Warned::Md3Lighting => 6,
-            Warned::Ghoul2Lighting => 7,
+            Warned::TcGen => 0,
+            Warned::MultitexEnv => 1,
+            Warned::SurfaceSprite => 2,
+            Warned::Glow => 3,
+            Warned::VideoMap => 4,
+            Warned::Md3Lighting => 5,
+            Warned::Ghoul2Lighting => 6,
+            Warned::FogImageMissing => 7,
         }
     }
 
     fn describe(self) -> &'static str {
         match self {
-            Warned::Fog => "skips fog on a world shader — not applied yet",
             Warned::TcGen => "reads base texcoords for an unsupported tcGen on a world stage",
             Warned::MultitexEnv => {
                 "draws bundle 0 only for a non-modulate multitexture world shader"
@@ -527,6 +535,7 @@ impl Warned {
             Warned::Ghoul2Lighting => {
                 "draws a Ghoul2 lighting-diffuse stage with the entity color — the vertex normal is dropped"
             }
+            Warned::FogImageMissing => "skips a fog pass because the fog image is not registered",
         }
     }
 }
@@ -565,6 +574,9 @@ pub struct WorldStats {
     /// mdxm block, or an empty surface). Separate from `skipped_non_world` so the
     /// causes read apart.
     pub ghoul2_decode_failed: u32,
+    /// Fog passes drawn — one extra pass per fogged surface whose shader
+    /// declares a `fogPass` (`RB_FogPass` at the tail of `RB_StageIteratorGeneric`).
+    pub fog_passes_drawn: u32,
 }
 
 /// The pipeline cache key: one pipeline per distinct blend state and depth
@@ -608,6 +620,23 @@ struct StageDrawItem {
     ///
     /// Source: `oracle/codemp/renderer/tr_sky.cpp:814`
     depth_far: bool,
+}
+
+/// The fog inputs one surface's stages read: the resolved fog volume and the
+/// two orientations `RB_CalcFogTexCoords` needs. The frontend tags a nonzero
+/// fog number on a fogged surface, so a surface with fog number 0 gets `None`
+/// and runs no fog work.
+///
+/// `ori` is the surface's model orientation (`backEnd.ori`), the world
+/// orientation for a world surface or `R_RotateForEntity`'s result for an
+/// entity. `view_ori` is the camera orientation (`backEnd.viewParms.ori`).
+///
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:983-1068` (`RB_CalcFogTexCoords`)
+#[derive(Clone, Copy)]
+struct SurfaceFog<'a> {
+    fog: &'a fog_t,
+    ori: &'a orientationr_t,
+    view_ori: &'a orientationr_t,
 }
 
 /// The world pipeline's GPU-side resources: shader module, layouts, the clip
@@ -804,13 +833,16 @@ impl Pipeline3d {
         g2: &mut Ghoul2System,
         frame: &mut FrameState,
         sky: &mut SkyState,
+        fogs: &[fog_t],
     ) -> WorldStats {
         let mut stats = WorldStats::default();
 
         // Build one clip matrix per distinct entity number this scene draws,
         // slot 0 the world, then upload them to the dynamic-offset globals
-        // buffer. The slot map tags each draw item with its own offset.
-        let (clips, slot_map) = build_entity_slots(draw_surfs, assets, view, entities, scratch);
+        // buffer. The slot map tags each draw item with its own offset. The
+        // per-slot orientations feed the fog tex-coord math.
+        let (clips, oris, slot_map) =
+            build_entity_slots(draw_surfs, assets, view, entities, scratch);
         self.reserve_globals(gpu, clips.len());
         self.write_globals(gpu, &clips);
 
@@ -832,6 +864,8 @@ impl Pipeline3d {
             frame,
             sky,
             view,
+            fogs,
+            &oris,
         );
 
         if items.is_empty() {
@@ -1018,6 +1052,8 @@ impl Pipeline3d {
         frame: &mut FrameState,
         sky: &mut SkyState,
         view: &viewParms_t,
+        fogs: &[fog_t],
+        oris: &[orientationr_t],
     ) -> Vec<StageDrawItem> {
         let mut items: Vec<StageDrawItem> = Vec::new();
 
@@ -1039,6 +1075,8 @@ impl Pipeline3d {
                         frame,
                         sky,
                         view,
+                        fogs,
+                        oris,
                         &mut items,
                     );
                 }
@@ -1058,6 +1096,8 @@ impl Pipeline3d {
                         frame,
                         sky,
                         view,
+                        fogs,
+                        oris,
                         &mut items,
                     );
                 }
@@ -1078,6 +1118,8 @@ impl Pipeline3d {
                         frame,
                         sky,
                         view,
+                        fogs,
+                        oris,
                         &mut items,
                     );
                 }
@@ -1111,6 +1153,8 @@ impl Pipeline3d {
         frame: &mut FrameState,
         sky: &mut SkyState,
         view: &viewParms_t,
+        fogs: &[fog_t],
+        oris: &[orientationr_t],
         items: &mut Vec<StageDrawItem>,
     ) {
         let index = world_ref_index(world_ref);
@@ -1120,7 +1164,7 @@ impl Pipeline3d {
             return;
         }
 
-        let (entity_num, shader_handle, _fog_num, _dlight_map) =
+        let (entity_num, shader_handle, fog_num, _dlight_map) =
             R_DecomposeSort(sort, &assets.sorted_shaders);
         let Some(shader) = assets.shaders.get(shader_handle) else {
             return;
@@ -1132,6 +1176,7 @@ impl Pipeline3d {
         let slot = slot_map.get(&entity_num).copied().unwrap_or(0);
         let globals_offset = (slot as u64 * GLOBALS_STRIDE) as u32;
         let entity_float_time = float_time - entity_shader_time(entities, entity_num);
+        let surface_fog = resolve_surface_fog(fog_num, fogs, oris, slot, view);
 
         let cpu_start = range.base_vertex as usize;
         let cpu = &geometry.cpu_vertices[cpu_start..cpu_start + range.vertex_count as usize];
@@ -1175,9 +1220,6 @@ impl Pipeline3d {
             );
             return;
         }
-        if shader.fog_parms.is_some() {
-            self.warn_once(Warned::Fog);
-        }
 
         let before = items.len();
         for stage in shader.stages.iter().filter(|stage| stage.active) {
@@ -1189,6 +1231,7 @@ impl Pipeline3d {
                 assets,
                 noise,
                 entity_float_time,
+                surface_fog,
                 dynamic_vertices,
                 globals_offset,
             );
@@ -1197,7 +1240,41 @@ impl Pipeline3d {
                 items.push(item);
             }
         }
-        if items.len() > before {
+
+        // The fog pass draws at the tail of the stage list when the surface is
+        // fogged and the shader declares a fogPass, over the static world index
+        // block. `RB_StageIteratorGeneric` runs it once after every stage.
+        // DEFERRED: R4 - the oracle gate drops two sub-conditions here:
+        // `tess.fogNum != tr.world->globalFog` and `r_drawfog->value != 2`.
+        // r_drawfog ships at 2, so at the default the oracle fogs a global-fog
+        // surface with hardware GL fog, not this image pass. This pass stands in
+        // for GL fog until GLFog lands, which is the `r_drawfog 1` look.
+        // Source: oracle/codemp/renderer/tr_shade.cpp:2344, 1960-1961
+        // The tally counts stage draws only, so a fog-only tail cannot mark
+        // the surface as drawn.
+        let stages_end = items.len();
+
+        if let Some(sf) = surface_fog {
+            if shader.fog_pass != FogPass::None {
+                let item = self.build_fog_stage_item(
+                    cpu,
+                    sf,
+                    shader.fog_pass,
+                    assets.fog_image,
+                    range.first_index,
+                    range.index_count,
+                    false,
+                    globals_offset,
+                    dynamic_vertices,
+                );
+                if let Some(item) = item {
+                    items.push(item);
+                    stats.fog_passes_drawn += 1;
+                }
+            }
+        }
+
+        if stages_end > before {
             stats.surfaces_drawn += 1;
             if entity_num != TR_WORLDENT {
                 stats.entity_surfaces_drawn += 1;
@@ -1229,9 +1306,11 @@ impl Pipeline3d {
         frame: &mut FrameState,
         sky: &mut SkyState,
         view: &viewParms_t,
+        fogs: &[fog_t],
+        oris: &[orientationr_t],
         items: &mut Vec<StageDrawItem>,
     ) {
-        let (entity_num, shader_handle, _fog_num, _dlight_map) =
+        let (entity_num, shader_handle, fog_num, _dlight_map) =
             R_DecomposeSort(sort, &assets.sorted_shaders);
         let Some(shader) = assets.shaders.get(shader_handle) else {
             return;
@@ -1240,6 +1319,7 @@ impl Pipeline3d {
         let slot = slot_map.get(&entity_num).copied().unwrap_or(0);
         let globals_offset = (slot as u64 * GLOBALS_STRIDE) as u32;
         let entity_float_time = float_time - entity_shader_time(entities, entity_num);
+        let surface_fog = resolve_surface_fog(fog_num, fogs, oris, slot, view);
         // The identity-light default vertex colour is the entity's shaderRGBA.
         let rgba = entities
             .get(entity_num as usize)
@@ -1284,9 +1364,6 @@ impl Pipeline3d {
             );
             return;
         }
-        if shader.fog_parms.is_some() {
-            self.warn_once(Warned::Fog);
-        }
 
         // One shared index block per surface, in the per-frame index buffer.
         let first_index = dynamic_indices.len() as u32;
@@ -1309,6 +1386,7 @@ impl Pipeline3d {
                 entity_float_time,
                 noise,
                 assets,
+                surface_fog,
                 dynamic_vertices,
                 globals_offset,
             );
@@ -1316,7 +1394,39 @@ impl Pipeline3d {
                 items.push(item);
             }
         }
-        if items.len() > before {
+
+        // The fog pass draws at the tail, over the same per-frame index block.
+        // DEFERRED: R4 - the oracle gate drops two sub-conditions here:
+        // `tess.fogNum != tr.world->globalFog` and `r_drawfog->value != 2`.
+        // r_drawfog ships at 2, so at the default the oracle fogs a global-fog
+        // surface with hardware GL fog, not this image pass. This pass stands in
+        // for GL fog until GLFog lands, which is the `r_drawfog 1` look.
+        // Source: oracle/codemp/renderer/tr_shade.cpp:2344, 1960-1961
+        // The tally counts stage draws only, so a fog-only tail cannot mark
+        // the surface as drawn.
+        let stages_end = items.len();
+
+        if let Some(sf) = surface_fog {
+            if shader.fog_pass != FogPass::None {
+                let item = self.build_fog_stage_item(
+                    &md3_vertices,
+                    sf,
+                    shader.fog_pass,
+                    assets.fog_image,
+                    first_index,
+                    index_count,
+                    true,
+                    globals_offset,
+                    dynamic_vertices,
+                );
+                if let Some(item) = item {
+                    items.push(item);
+                    stats.fog_passes_drawn += 1;
+                }
+            }
+        }
+
+        if stages_end > before {
             stats.surfaces_drawn += 1;
             stats.md3_surfaces_drawn += 1;
             if entity_num != TR_WORLDENT {
@@ -1354,9 +1464,11 @@ impl Pipeline3d {
         frame: &mut FrameState,
         sky: &mut SkyState,
         view: &viewParms_t,
+        fogs: &[fog_t],
+        oris: &[orientationr_t],
         items: &mut Vec<StageDrawItem>,
     ) {
-        let (entity_num, shader_handle, _fog_num, _dlight_map) =
+        let (entity_num, shader_handle, fog_num, _dlight_map) =
             R_DecomposeSort(sort, &assets.sorted_shaders);
         let Some(shader) = assets.shaders.get(shader_handle) else {
             return;
@@ -1365,6 +1477,7 @@ impl Pipeline3d {
         let slot = slot_map.get(&entity_num).copied().unwrap_or(0);
         let globals_offset = (slot as u64 * GLOBALS_STRIDE) as u32;
         let entity_float_time = float_time - entity_shader_time(entities, entity_num);
+        let surface_fog = resolve_surface_fog(fog_num, fogs, oris, slot, view);
         // The identity-light default vertex colour is the entity's shaderRGBA.
         let rgba = entities
             .get(entity_num as usize)
@@ -1409,9 +1522,6 @@ impl Pipeline3d {
             );
             return;
         }
-        if shader.fog_parms.is_some() {
-            self.warn_once(Warned::Fog);
-        }
 
         // One shared index block per surface, in the per-frame index buffer.
         let first_index = dynamic_indices.len() as u32;
@@ -1434,6 +1544,7 @@ impl Pipeline3d {
                 entity_float_time,
                 noise,
                 assets,
+                surface_fog,
                 dynamic_vertices,
                 globals_offset,
             );
@@ -1441,7 +1552,39 @@ impl Pipeline3d {
                 items.push(item);
             }
         }
-        if items.len() > before {
+
+        // The fog pass draws at the tail, over the same per-frame index block.
+        // DEFERRED: R4 - the oracle gate drops two sub-conditions here:
+        // `tess.fogNum != tr.world->globalFog` and `r_drawfog->value != 2`.
+        // r_drawfog ships at 2, so at the default the oracle fogs a global-fog
+        // surface with hardware GL fog, not this image pass. This pass stands in
+        // for GL fog until GLFog lands, which is the `r_drawfog 1` look.
+        // Source: oracle/codemp/renderer/tr_shade.cpp:2344, 1960-1961
+        // The tally counts stage draws only, so a fog-only tail cannot mark
+        // the surface as drawn.
+        let stages_end = items.len();
+
+        if let Some(sf) = surface_fog {
+            if shader.fog_pass != FogPass::None {
+                let item = self.build_fog_stage_item(
+                    &g2_vertices,
+                    sf,
+                    shader.fog_pass,
+                    assets.fog_image,
+                    first_index,
+                    index_count,
+                    true,
+                    globals_offset,
+                    dynamic_vertices,
+                );
+                if let Some(item) = item {
+                    items.push(item);
+                    stats.fog_passes_drawn += 1;
+                }
+            }
+        }
+
+        if stages_end > before {
             stats.surfaces_drawn += 1;
             stats.ghoul2_surfaces_drawn += 1;
             if entity_num != TR_WORLDENT {
@@ -1579,6 +1722,8 @@ impl Pipeline3d {
                     float_time,
                     noise,
                     assets,
+                    // The sky box and clouds draw at the far plane, never fogged.
+                    None,
                     dynamic_vertices,
                     globals_offset,
                 );
@@ -1619,6 +1764,7 @@ impl Pipeline3d {
         assets: &RenderAssets,
         noise: &NoiseState,
         float_time: f32,
+        surface_fog: Option<SurfaceFog>,
         dynamic_vertices: &mut Vec<WorldVertex>,
         globals_offset: u32,
     ) -> Option<StageDrawItem> {
@@ -1638,6 +1784,13 @@ impl Pipeline3d {
             depth_equal: (stage.state_bits & GLS_DEPTHFUNC_EQUAL as u32) != 0,
             depth_write: (stage.state_bits & GLS_DEPTHMASK_TRUE as u32) != 0,
         };
+
+        // The `ComputeColors` tail modulates the stage colours by fog density
+        // when the surface is fogged and the stage sets `adjustColorsForFog`.
+        // That per-frame math cannot bake into the static buffer, so a fogged
+        // modulating stage always routes through the dynamic path.
+        // Source: oracle/codemp/renderer/tr_shade.cpp:1509-1526 (the ACFF switch)
+        let fog_mod = surface_fog.filter(|_| stage.adjust_colors_for_fog != acff_t::ACFF_NONE);
 
         // These stage kinds still draw as a plain stage, but each logs once so
         // the missing behavior stays visible.
@@ -1668,6 +1821,10 @@ impl Pipeline3d {
             }
             let diffuse = stage_image(bundle0, time.shader_time);
             let lightmap = stage_image(&stage.bundle[1], time.shader_time);
+            // The collapsed two-texture shader ignores the vertex color, so
+            // fog modulation cannot reach the screen here and is dropped.
+            // ACFF needs blend bits a collapsed stage does not carry, so this
+            // arm is near unreachable with fog.
             let dynamic = !bundle0.tex_mods.is_empty();
             let base_vertex = if dynamic {
                 let (source, _) = st_source(bundle0);
@@ -1680,6 +1837,7 @@ impl Pipeline3d {
                     noise,
                     assets,
                     &shader.name,
+                    None,
                     &mut self.stage_warnings,
                     dynamic_vertices,
                 )
@@ -1711,7 +1869,7 @@ impl Pipeline3d {
         }
         let reads_lightmap = source == StSource::Lightmap;
         let diffuse = stage_image(bundle0, time.shader_time);
-        let dynamic = stage_is_dynamic(stage, false);
+        let dynamic = stage_is_dynamic(stage, false) || fog_mod.is_some();
 
         if dynamic {
             let base_vertex = build_dynamic_block(
@@ -1723,6 +1881,7 @@ impl Pipeline3d {
                 noise,
                 assets,
                 &shader.name,
+                fog_mod,
                 &mut self.stage_warnings,
                 dynamic_vertices,
             );
@@ -1786,6 +1945,7 @@ impl Pipeline3d {
         float_time: f32,
         noise: &NoiseState,
         assets: &RenderAssets,
+        surface_fog: Option<SurfaceFog>,
         dynamic_vertices: &mut Vec<WorldVertex>,
         globals_offset: u32,
     ) -> Option<StageDrawItem> {
@@ -1804,6 +1964,11 @@ impl Pipeline3d {
             depth_equal: (stage.state_bits & GLS_DEPTHFUNC_EQUAL as u32) != 0,
             depth_write: (stage.state_bits & GLS_DEPTHMASK_TRUE as u32) != 0,
         };
+
+        // The fog-density colour modulation runs on the per-frame block when the
+        // surface is fogged and the stage sets `adjustColorsForFog`.
+        // Source: oracle/codemp/renderer/tr_shade.cpp:1783-1800 (the ACFF switch)
+        let fog_mod = surface_fog.filter(|_| stage.adjust_colors_for_fog != acff_t::ACFF_NONE);
 
         if stage.glow {
             self.warn_once(Warned::Glow);
@@ -1833,6 +1998,7 @@ impl Pipeline3d {
             noise,
             assets,
             &shader.name,
+            fog_mod,
             &mut self.stage_warnings,
             dynamic_vertices,
         );
@@ -1850,6 +2016,82 @@ impl Pipeline3d {
             base_vertex,
             dynamic: true,
             index_dynamic: true,
+            globals_offset,
+            depth_far: false,
+        })
+    }
+
+    /// Builds the fog pass over one surface's geometry (`RB_FogPass`): every
+    /// vertex takes the fog volume's packed colour and the fog texcoords, and
+    /// the pass draws the fog image with the fog blend state. The vertices go
+    /// into the per-frame dynamic buffer, since the fog colour and texcoords
+    /// are per-frame. The indices come from the caller's own block - the static
+    /// world index buffer for a world surface, or the per-frame index buffer
+    /// for an MD3 or Ghoul2 surface.
+    ///
+    /// The blend is `GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA`,
+    /// with `GLS_DEPTHFUNC_EQUAL` when the shader's `fogPass` is `FP_EQUAL`.
+    /// Depth writes stay off, the same as the oracle's fog `GL_State`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shade.cpp:1182-1209`
+    #[allow(clippy::too_many_arguments)]
+    fn build_fog_stage_item(
+        &mut self,
+        cpu: &[WorldVertex],
+        surface_fog: SurfaceFog,
+        fog_pass: FogPass,
+        fog_image: Option<ImageHandle>,
+        first_index: u32,
+        index_count: u32,
+        index_dynamic: bool,
+        globals_offset: u32,
+        dynamic_vertices: &mut Vec<WorldVertex>,
+    ) -> Option<StageDrawItem> {
+        // A missing fog image would bind the white fallback and paint the
+        // surface at full fog density, so the pass skips instead.
+        if fog_image.is_none() {
+            self.warn_once(Warned::FogImageMissing);
+            return None;
+        }
+
+        // `RB_CalcFogTexCoords` reads `tess.xyz`, a vec4 whose w is unused, so
+        // the position widens to `[x, y, z, 0]`.
+        let xyz: Vec<[f32; 4]> = cpu
+            .iter()
+            .map(|v| [v.position[0], v.position[1], v.position[2], 0.0])
+            .collect();
+        let data = RB_FogPass(&xyz, surface_fog.fog, surface_fog.ori, surface_fog.view_ori);
+
+        let base_vertex = dynamic_vertices.len() as i32;
+        for (i, v) in cpu.iter().enumerate() {
+            dynamic_vertices.push(WorldVertex {
+                position: v.position,
+                st: data.tex_coords[i],
+                lightmap_st: data.tex_coords[i],
+                color: data.colors[i],
+            });
+        }
+
+        let state_bits = (GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA) as u32;
+        let key = PipelineKey {
+            blend: blend_state_from_gls(state_bits),
+            depth_equal: fog_pass == FogPass::Equal,
+            depth_write: false,
+        };
+
+        Some(StageDrawItem {
+            key,
+            diffuse: fog_image,
+            lightmap: None,
+            mode: MODE_SINGLE,
+            tex_from_lightmap: false,
+            alpha_func: 0,
+            reads_lightmap: false,
+            first_index,
+            index_count,
+            base_vertex,
+            dynamic: true,
+            index_dynamic,
             globals_offset,
             depth_far: false,
         })
@@ -2016,14 +2258,15 @@ impl Pipeline3d {
 }
 
 /// Builds one clip matrix per distinct entity number the draw list carries,
-/// plus the entity-number-to-slot map. Slot 0 is always the world matrix
-/// (`view.world.modelMatrix`). Each real entity's matrix comes from
+/// the matching model orientation, and the entity-number-to-slot map. Slot 0 is
+/// always the world (`view.world`). Each real entity's orientation comes from
 /// `R_RotateForEntity` against its `trRefEntity_t` row and the view. The clip
-/// matrix is `correction * projection * model` in every slot.
+/// matrix is `correction * projection * model` in every slot, and the fog pass
+/// reads the orientation for `RB_CalcFogTexCoords`.
 ///
 /// A draw surf whose decoded entity number is out of the `entities` slice falls
-/// back to the world matrix, so a stale sort key can never index past the row
-/// list.
+/// back to the world orientation, so a stale sort key can never index past the
+/// row list.
 ///
 /// Source: `oracle/codemp/renderer/tr_main.cpp:302-360` (`R_RotateForEntity`)
 fn build_entity_slots(
@@ -2032,14 +2275,16 @@ fn build_entity_slots(
     view: &viewParms_t,
     entities: &[trRefEntity_t],
     scratch: &mut TrMainScratch,
-) -> (Vec<[f32; 16]>, HashMap<i32, u32>) {
+) -> (Vec<[f32; 16]>, Vec<orientationr_t>, HashMap<i32, u32>) {
     let projection = &view.projectionMatrix;
     let mut clips: Vec<[f32; 16]> = Vec::new();
+    let mut oris: Vec<orientationr_t> = Vec::new();
     let mut slot_map: HashMap<i32, u32> = HashMap::new();
 
     // Slot 0 is the world, so the entity-free path keeps one aligned slot at
-    // offset 0 with the plain view clip matrix.
+    // offset 0 with the plain view clip matrix and the world orientation.
     clips.push(world_clip_matrix(&view.world.modelMatrix, projection));
+    oris.push(world_orientation(view));
     slot_map.insert(TR_WORLDENT, 0);
 
     for surf in draw_surfs {
@@ -2049,16 +2294,55 @@ fn build_entity_slots(
             continue;
         }
 
-        let model = match entities.get(entity_num as usize) {
-            Some(ent) => R_RotateForEntity(ent, view, scratch).modelMatrix,
-            None => view.world.modelMatrix,
+        let ori = match entities.get(entity_num as usize) {
+            Some(ent) => R_RotateForEntity(ent, view, scratch),
+            None => world_orientation(view),
         };
         let slot = clips.len() as u32;
-        clips.push(world_clip_matrix(&model, projection));
+        clips.push(world_clip_matrix(&ori.modelMatrix, projection));
+        oris.push(ori);
         slot_map.insert(entity_num, slot);
     }
 
-    (clips, slot_map)
+    (clips, oris, slot_map)
+}
+
+/// The world model orientation (`viewParms->world`), the value the backend
+/// leaves in `backEnd.ori` for a world surface. `orientationr_t` carries no
+/// `Clone`, so this copies its fields explicitly.
+fn world_orientation(view: &viewParms_t) -> orientationr_t {
+    orientationr_t {
+        origin: view.world.origin,
+        axis: view.world.axis,
+        viewOrigin: view.world.viewOrigin,
+        modelMatrix: view.world.modelMatrix,
+    }
+}
+
+/// The fog inputs for a surface whose sort key decoded to `fog_num`. Fog number
+/// 0 means no fog, so this returns `None`. Otherwise it resolves the fog volume
+/// from `world.fogs`, pairs it with the surface's slot orientation and the
+/// camera orientation, and hands back the [`SurfaceFog`] the stage build reads.
+///
+/// An out-of-range fog number drops to `None` rather than index past the fog
+/// list, the same defensive skip a stale sort key gets elsewhere.
+fn resolve_surface_fog<'a>(
+    fog_num: i32,
+    fogs: &'a [fog_t],
+    oris: &'a [orientationr_t],
+    slot: u32,
+    view: &'a viewParms_t,
+) -> Option<SurfaceFog<'a>> {
+    if fog_num == 0 {
+        return None;
+    }
+    let fog = fogs.get(fog_num as usize)?;
+    let ori = oris.get(slot as usize)?;
+    Some(SurfaceFog {
+        fog,
+        ori,
+        view_ori: &view.ori,
+    })
 }
 
 /// The `WorldSurfaceRef` flat surface index, regardless of kind.
@@ -2251,6 +2535,7 @@ fn build_dynamic_block(
     noise: &NoiseState,
     assets: &RenderAssets,
     shader_name: &str,
+    fog_mod: Option<SurfaceFog>,
     warnings: &mut Stage2dWarnings,
     out: &mut Vec<WorldVertex>,
 ) -> i32 {
@@ -2277,7 +2562,7 @@ fn build_dynamic_block(
 
     // A single-texture stage runs the full rgbGen/alphaGen. A two-texture
     // collapse keeps the input colour, which its shader path never reads.
-    let colors: Vec<[u8; 4]> = if two_texture {
+    let mut colors: Vec<[u8; 4]> = if two_texture {
         cpu.iter().map(|v| v.color).collect()
     } else {
         let input: Vec<[u8; 4]> = cpu.iter().map(|v| v.color).collect();
@@ -2294,6 +2579,29 @@ fn build_dynamic_block(
         );
         evaluated
     };
+
+    // The `ComputeColors` fog tail: when the surface is fogged and the stage
+    // sets `adjustColorsForFog`, fade the colours by fog density. The caller
+    // hands `fog_mod` only when the stage's ACFF is not `ACFF_NONE`.
+    // Source: oracle/codemp/renderer/tr_shade.cpp:1509-1526
+    if let Some(sf) = fog_mod {
+        let xyz: Vec<[f32; 4]> = cpu
+            .iter()
+            .map(|v| [v.position[0], v.position[1], v.position[2], 0.0])
+            .collect();
+        match stage.adjust_colors_for_fog {
+            acff_t::ACFF_MODULATE_RGB => {
+                RB_CalcModulateColorsByFog(&mut colors, &xyz, sf.fog, sf.ori, sf.view_ori, assets)
+            }
+            acff_t::ACFF_MODULATE_ALPHA => {
+                RB_CalcModulateAlphasByFog(&mut colors, &xyz, sf.fog, sf.ori, sf.view_ori, assets)
+            }
+            acff_t::ACFF_MODULATE_RGBA => {
+                RB_CalcModulateRGBAsByFog(&mut colors, &xyz, sf.fog, sf.ori, sf.view_ori, assets)
+            }
+            acff_t::ACFF_NONE => {}
+        }
+    }
 
     for i in 0..count {
         out.push(WorldVertex {
@@ -2965,6 +3273,7 @@ mod tests {
             &noise,
             &assets,
             "test",
+            None,
             &mut warnings,
             &mut out,
         );
@@ -3007,6 +3316,7 @@ mod tests {
             &noise,
             &assets,
             "test",
+            None,
             &mut warnings,
             &mut out,
         );
@@ -3056,7 +3366,7 @@ mod tests {
             surface: SurfaceGeometry::Other,
         }];
 
-        let (clips, slot_map) =
+        let (clips, _oris, slot_map) =
             build_entity_slots(&draw_surfs, &assets, &view, &entities, &mut scratch);
 
         assert_eq!(clips.len(), 1);
@@ -3093,7 +3403,7 @@ mod tests {
             },
         ];
 
-        let (clips, slot_map) =
+        let (clips, _oris, slot_map) =
             build_entity_slots(&draw_surfs, &assets, &view, &entities, &mut scratch);
 
         // World plus entity 1 plus entity 0 is three distinct slots.

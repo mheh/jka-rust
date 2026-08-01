@@ -953,6 +953,7 @@ pub fn R_SetColorMappings(
     cvars: &RendererCvars,
     glconfig: &GlConfig,
     state: &mut TrImageState,
+    frame: &mut FrameState,
 ) {
     // setup the overbright lighting
     let mut overbright_bits = view.common.cvar(cvars.r_overBrightBits).integer;
@@ -970,17 +971,13 @@ pub fn R_SetColorMappings(
         overbright_bits = 0;
     }
 
-    // DEFERRED: `tr.overbrightBits`/`identityLight`/`identityLightByte` are
-    // `trGlobals_t` frontend scratch -> `RenderWorld::frame: FrameState`
-    // (`## State ownership` "tr frontend scratch/counters" row); the fields
-    // are not yet landed on `FrameState` and this wave does not own that
-    // struct (same gap `tr_init.rs`'s `GfxInfo_f` hit and deferred whole) —
-    // `identityLight = 1/(1<<overbrightBits)`/`identityLightByte =
-    // 255*identityLight` are skipped rather than computed with nowhere to
-    // land (porting-rules §A2, no speculative behavior). `overbright_bits`
-    // itself is still used locally below for the gamma-table shift, matching
-    // Raven's own reuse of the local.
+    // The three `FrameState` fields landed after this fn's first wave, so the
+    // writes deferred then run for real now. A zero `identity_light` bakes
+    // every fog volume's `colorInt` black at world load.
     // Source: oracle/codemp/renderer/tr_image.cpp:2873-2874
+    frame.overbright_bits = overbright_bits;
+    frame.identity_light = 1.0 / (1 << overbright_bits) as f32;
+    frame.identity_light_byte = (255.0 * frame.identity_light) as i32;
 
     if view.common.cvar(cvars.r_intensity).value < 1.0 {
         Cvar_Set(view, "r_intensity", "1");
@@ -2830,13 +2827,13 @@ pub fn R_InitImages(
     models: &RenderModels,
     state: &mut TrImageState,
     gpu: &mut GpuResources,
-    frame: &FrameState,
+    frame: &mut FrameState,
 ) {
     // build brightness translation tables
-    R_SetColorMappings(view, cvars, glconfig, state);
+    R_SetColorMappings(view, cvars, glconfig, state, frame);
 
     // create default texture and white texture
-    R_CreateBuiltinImages(view, cvars, sim, models, state, gpu, frame);
+    R_CreateBuiltinImages(view, cvars, sim, models, state, gpu, &*frame);
 }
 
 // ============================================================================

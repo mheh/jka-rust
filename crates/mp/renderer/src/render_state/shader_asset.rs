@@ -5,7 +5,7 @@ use mp_engine_qcommon::qfiles::draw_vert_t::MAXLIGHTMAPS;
 use crate::render_state::handle::Handle;
 use crate::render_state::placeholders::SkyParms;
 use crate::render_state::shader_stage::ShaderStage;
-use crate::tr_shader::{CullType, FogParms};
+use crate::tr_shader::{CullType, FogParms, FogPass};
 
 /// The owned form of Raven `shader_t` — `RenderAssets::shaders`' element
 /// (`R2-D3`), in the shape the tier-2 transition audit assigns (`name` →
@@ -66,6 +66,15 @@ pub struct ShaderAsset {
     ///
     /// Type definition source: `oracle/codemp/renderer/tr_local.h:488`
     pub fog_parms: Option<FogParms>,
+    /// `fogPass` — which fog pass the backend runs for this shader
+    /// (`FP_NONE`/`FP_EQUAL`/`FP_LE`/`FP_GLFOG`). `ParseShader`'s `noglfog`
+    /// keyword seeds the scratch value, and `GeneratePermanentShader` sets the
+    /// final value from the sort order and `CONTENTS_FOG` content flag. The
+    /// backend reads it to gate `RB_FogPass` and to pick the fog blend state.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shader.cpp:2768-2772` (finish),
+    /// `oracle/codemp/renderer/tr_shade.cpp:1960,2344` (read)
+    pub fog_pass: FogPass,
     /// `stages[MAX_SHADER_STAGES]` (`shaderStage_t *`, `Hunk_Alloc`ed to
     /// `numUnfoggedPasses` entries) — owned inline as `Vec<ShaderStage>`.
     pub stages: Vec<ShaderStage>,

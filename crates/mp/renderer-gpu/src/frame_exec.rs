@@ -152,10 +152,15 @@ enum Warned {
     NoGlyphImage,
     /// A `RenderScene` arrived before the world geometry was uploaded.
     NoWorldGeometry,
+    /// The loaded world carried fog volumes, so the fog pass is live. This is a
+    /// positive one-time signal, not a skip: it proves the `Fog` -> `fog_t`
+    /// bridge fed the render pass, so a regression back to an empty fog list
+    /// stays visible.
+    Fog,
 }
 
 impl Warned {
-    const COUNT: usize = 8;
+    const COUNT: usize = 9;
 
     fn slot(self) -> usize {
         match self {
@@ -167,6 +172,7 @@ impl Warned {
             Warned::UnknownFont => 5,
             Warned::NoGlyphImage => 6,
             Warned::NoWorldGeometry => 7,
+            Warned::Fog => 8,
         }
     }
 
@@ -182,6 +188,7 @@ impl Warned {
             Warned::UnknownFont => "drew a string with an unloaded font handle — nothing drawn",
             Warned::NoGlyphImage => "drew a glyph whose page shader has no image — white",
             Warned::NoWorldGeometry => "got a RenderScene before the world geometry uploaded",
+            Warned::Fog => "world carries fog volumes — fog pass is live",
         }
     }
 }
@@ -191,10 +198,13 @@ impl Warned {
 /// this bundle each frame, the same borrows `load_world_and_render` builds.
 ///
 /// The scratch buffers are empty this wave. Polys and lights are later waves,
-/// so `dlights`/`fogs` stay empty and the terrain surface is the null-landscape
-/// one. The entity list is not passed in: the executor accumulates
-/// `AddRefEntityToScene` payloads itself and rebuilds `tr.refdef.entities` from
-/// them at `RenderScene` (DEC-50).
+/// so `dlights` stays empty and the terrain surface is the null-landscape one.
+/// The fog list is not passed in: [`FrameExecutor::render_world`] copies the
+/// loaded world's own `Fog` volumes into a per-frame `Vec<fog_t>`, since the
+/// `assets` borrow cannot also lend the fog list out. The entity list is not
+/// passed in either: the executor accumulates `AddRefEntityToScene` payloads
+/// itself and rebuilds `tr.refdef.entities` from them at `RenderScene`
+/// (DEC-50).
 pub struct WorldFrame<'a, 'e> {
     pub engine_view: &'a mut EngineHostView<'e>,
     pub assets: &'a mut RenderAssets,
@@ -213,7 +223,6 @@ pub struct WorldFrame<'a, 'e> {
     pub land_scape: &'a srfTerrain_t,
     pub land: &'a CmLandScape,
     pub dlights: &'a mut [dlight_t],
-    pub fogs: &'a [fog_t],
     pub scratch: &'a mut TrMainScratch,
 }
 
@@ -506,6 +515,26 @@ impl FrameExecutor {
         gpu_images: &GpuImages,
         noise: &NoiseState,
     ) -> WorldStats {
+        // Copy the loaded world's fog volumes into a per-frame `Vec<fog_t>`. The
+        // frontend fog-num math (`r_compute_fog_num`, `R_SpriteFogNum`) and the
+        // backend fog pass (`RB_FogPass`, `RB_CalcModulate*ByFog`) all read the
+        // ABI `fog_t`, so the `Fog` list is copied once here. This read of
+        // `world.assets` ends before the mutable borrows below, since the `Vec`
+        // owns its elements. An empty list keeps every surface unfogged. The
+        // copy and its warn run before the `geometry` borrow, so the warn-once
+        // `&mut self` does not clash with that shared borrow.
+        let abi_fogs: Vec<fog_t> = world
+            .assets
+            .world
+            .as_ref()
+            .map(|w| w.fogs.iter().map(|f| f.to_fog_t()).collect())
+            .unwrap_or_default();
+        // The world carries real fog volumes (slot 0 is the always-dummy "no
+        // fog" entry), so log once that the fog pass is live.
+        if abi_fogs.len() > 1 {
+            self.warn_once(Warned::Fog);
+        }
+
         let Some(geometry) = self.world_geometry.as_ref() else {
             self.warn_once(Warned::NoWorldGeometry);
             return WorldStats::default();
@@ -595,7 +624,7 @@ impl FrameExecutor {
             fov_y,
             refdef_num_dlights,
             world.dlights,
-            world.fogs,
+            &abi_fogs,
             distance_cull,
             world.land_scape,
             world.land,
@@ -627,6 +656,7 @@ impl FrameExecutor {
             world.g2,
             world.frame,
             world.sky,
+            &abi_fogs,
         )
     }
 

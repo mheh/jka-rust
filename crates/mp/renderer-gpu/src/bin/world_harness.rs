@@ -33,7 +33,6 @@ use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::tr_local::dlight_s::dlight_t;
-use mp_renderer::tr_local::fog_t::fog_t;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
 use mp_renderer::tr_main::TrMainScratch;
 use mp_renderer::tr_model::render_models::RenderModels;
@@ -115,10 +114,10 @@ struct App {
     /// frame.
     land_scape: srfTerrain_t,
     land: CmLandScape,
-    /// Empty per-frame scratch buffers. Dlights, fogs, and entities are later
-    /// waves.
+    /// Empty per-frame scratch buffers. Dlights and entities are later waves.
+    /// The fog list is not held here: `render_world` copies it from the loaded
+    /// world each frame.
     dlights: Vec<dlight_t>,
-    fogs: Vec<fog_t>,
     scratch: TrMainScratch,
     camera: Camera,
     /// The brush submodel handle the one test entity draws (`*1`), computed
@@ -148,6 +147,9 @@ struct App {
     /// The last window size, so the refdef viewport tracks the window.
     surface: (f32, f32),
     reported: bool,
+    /// One log line for a failed surface acquire, so an occluded window
+    /// cannot flood stderr.
+    surface_warned: bool,
 }
 
 impl App {
@@ -174,7 +176,6 @@ impl App {
             land_scape,
             land: CmLandScape::empty(),
             dlights: Vec::new(),
-            fogs: Vec::new(),
             scratch: TrMainScratch {
                 pre_trans_ent_matrix: [0.0; 16],
             },
@@ -194,6 +195,7 @@ impl App {
             last_frame: Instant::now(),
             surface: (1280.0, 720.0),
             reported: false,
+            surface_warned: false,
         }
     }
 
@@ -420,9 +422,9 @@ impl App {
             land_scape,
             land,
             dlights,
-            fogs,
             scratch,
             reported,
+            surface_warned,
             md3_model,
             g2,
             ghoul2_handle,
@@ -489,7 +491,6 @@ impl App {
                         land_scape: &*land_scape,
                         land: &*land,
                         dlights: dlights.as_mut_slice(),
-                        fogs: fogs.as_slice(),
                         scratch,
                     };
 
@@ -516,10 +517,16 @@ impl App {
                 }
                 gpu.present(frame);
             }
-            Err(_) => {
+            Err(error) => {
                 // The surface reconfigure must resize the executor too. The
                 // world pass needs a depth texture that matches the color
                 // target size, or wgpu rejects the pass.
+                if !*surface_warned {
+                    *surface_warned = true;
+                    eprintln!(
+                        "world_harness: begin_frame failed ({error:?}) - an occluded window skips frames until it is visible",
+                    );
+                }
                 let size = window.inner_size();
                 gpu.resize(size.width, size.height);
                 executor.resize(gpu, size.width, size.height);
@@ -624,7 +631,7 @@ fn report(stats: &FrameStats, md3_model: qhandle_t, ghoul2_handle: Option<Ghoul2
          {} entities ({} entity surfaces drawn), {} sky surfaces drawn, \
          md3 handle {} ({} md3 entity surfaces, \
          {} md3 decode failed), ghoul2 handle {} ({} ghoul2 surfaces drawn, \
-         {} ghoul2 decode failed)",
+         {} ghoul2 decode failed), {} fog passes drawn",
         stats.images_uploaded,
         stats.world.surfaces_drawn,
         stats.world.lightmapped,
@@ -640,6 +647,7 @@ fn report(stats: &FrameStats, md3_model: qhandle_t, ghoul2_handle: Option<Ghoul2
         ghoul2_handle,
         stats.world.ghoul2_surfaces_drawn,
         stats.world.ghoul2_decode_failed,
+        stats.world.fog_passes_drawn,
     );
 }
 

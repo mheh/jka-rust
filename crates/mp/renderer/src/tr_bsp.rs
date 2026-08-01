@@ -63,6 +63,8 @@ use crate::tr_curve::{
     MAX_GRID_SIZE,
 };
 use crate::tr_image::{R_CreateImage, TrImageState};
+use crate::tr_local::fog_parms_t::fogParms_t;
+use crate::tr_local::fog_t::fog_t;
 use crate::tr_local::mgrid_t::mgrid_t;
 use crate::tr_local::srf_flare_s::srfFlare_t;
 use crate::tr_local::surface_type_t::surfaceType_t;
@@ -250,6 +252,31 @@ pub struct Fog {
     /// `surface` — the gradient vector/plane (`[normal.x, normal.y,
     /// normal.z, -dist]`).
     pub surface: [f32; 4],
+}
+
+impl Fog {
+    /// The ABI `fog_t` copy of this fog volume, for the render pass.
+    ///
+    /// `R_RenderView`, `RB_FogPass`, and the `RB_CalcModulate*ByFog` family read
+    /// `fog_t`, so the render side copies each `Fog` into one before the frame.
+    /// The `Fog` list is 1-indexed (slot 0 is a dummy), so a per-element copy
+    /// keeps `fogNum` addressing intact.
+    ///
+    /// Type definition source: `oracle/codemp/renderer/tr_local.h:616-627`
+    pub fn to_fog_t(&self) -> fog_t {
+        fog_t {
+            originalBrushNumber: self.original_brush_number,
+            bounds: self.bounds,
+            colorInt: self.color_int,
+            tcScale: self.tc_scale,
+            parms: fogParms_t {
+                color: self.parms.color,
+                depthForOpaque: self.parms.depth_for_opaque,
+            },
+            hasSurface: if self.has_surface { qtrue } else { qfalse },
+            surface: self.surface,
+        }
+    }
 }
 
 /// Raven `MAX_FACE_POINTS`.

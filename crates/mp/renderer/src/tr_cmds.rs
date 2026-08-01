@@ -465,7 +465,7 @@ pub fn RE_BeginFrame(
         view.common.cvar_mut(cvars.r_gamma).modified = false;
 
         R_SyncRenderThread(assets, view.common, cvars);
-        R_SetColorMappings(view, cvars, &assets.glconfig, image_state);
+        R_SetColorMappings(view, cvars, &assets.glconfig, image_state, frame);
     }
 
     // check for errors
