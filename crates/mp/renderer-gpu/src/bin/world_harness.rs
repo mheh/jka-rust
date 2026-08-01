@@ -12,10 +12,32 @@
 //! Controls: WASD moves, the mouse looks, Space and Left-Control move up and
 //! down, Escape quits.
 //!
+//! Recorder controls: F5 drops a waypoint at the current camera pose. F6 saves
+//! the recorded waypoints to the map's path file. F7 toggles replay when a path
+//! file exists for the current map. F8 clears the recording.
+//!
+//! Path file: the harness reads and writes one file per map at
+//! `crates/mp/renderer-gpu/flythroughs/<mapstem>.fly`, where `<mapstem>` is the
+//! bsp base name (`duel1` for `maps/mp/duel1.bsp`). The format is plain text:
+//! - line 1: `fly 1 <speed>` - the format version and the replay speed in world
+//!   units per second (default 300).
+//! - each later line: `x y z pitch yaw` - one waypoint as five floats, space
+//!   separated. `pitch`/`yaw` are Raven view angles in degrees.
+//!
+//! The loader rejects a malformed file with a clear message and stays in
+//! free-fly. The replay follows a closed-loop Catmull-Rom spline through the
+//! waypoints at constant parameter speed. It falls back to linear interpolation
+//! for fewer than four waypoints. Replay time advances from the per-frame delta
+//! the harness already tracks. That delta is real elapsed time, so poses vary
+//! across runs with GPU load. An image gate needs a fixed-dt mode first.
+//!
 //! Usage: `cargo run --release -p mp_renderer_gpu --bin world_harness
-//! [-- <basepath> [map]]`.
+//! [-- [--flythrough] <basepath> [map]]`. The `--flythrough` flag starts replay
+//! at boot when the map has a path file.
 
 use std::collections::HashSet;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -91,6 +113,267 @@ const GHOUL2_LIFT: f32 = 64.0;
 /// not overlap.
 const GHOUL2_SIDE_OFFSET: f32 = 96.0;
 
+/// The default replay speed in world units per second. The recorder writes this
+/// into a saved path file's header.
+const DEFAULT_REPLAY_SPEED: f32 = 300.0;
+
+/// One recorded camera pose. `pitch`/`yaw` are Raven view angles in degrees.
+/// The recorder captures these while free-flying, and the replay walks a spline
+/// through them.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Waypoint {
+    pos: [f32; 3],
+    pitch: f32,
+    yaw: f32,
+}
+
+/// Returns the signed shortest-arc angle from `a` to `b` in degrees. The result
+/// stays in `[-180, 180]`, and 359 to 1 gives +2. Both signs are a valid
+/// shortest arc at exactly a half turn.
+fn shortest_arc_delta(a: f32, b: f32) -> f32 {
+    let mut d = (b - a) % 360.0;
+    if d > 180.0 {
+        d -= 360.0;
+    } else if d < -180.0 {
+        d += 360.0;
+    }
+    d
+}
+
+/// Returns the copy of `y` that sits within a half turn of `prev`. This unwraps
+/// a yaw sequence so the spline interpolates over the shortest arc.
+fn unwrap_yaw(prev: f32, y: f32) -> f32 {
+    prev + shortest_arc_delta(prev, y)
+}
+
+/// Evaluates one uniform Catmull-Rom segment between `p1` and `p2` at `u` in
+/// `[0, 1]`. The curve passes through `p1` at `u = 0` and `p2` at `u = 1`.
+fn catmull(p0: f32, p1: f32, p2: f32, p3: f32, u: f32) -> f32 {
+    let u2 = u * u;
+    let u3 = u2 * u;
+    0.5 * ((2.0 * p1)
+        + (-p0 + p2) * u
+        + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * u2
+        + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * u3)
+}
+
+/// Applies `catmull` to each component of a `vec3`.
+fn catmull3(p0: [f32; 3], p1: [f32; 3], p2: [f32; 3], p3: [f32; 3], u: f32) -> [f32; 3] {
+    let mut out = [0.0f32; 3];
+    for k in 0..3 {
+        out[k] = catmull(p0[k], p1[k], p2[k], p3[k], u);
+    }
+    out
+}
+
+/// Returns the distance between two points.
+fn point_distance(a: [f32; 3], b: [f32; 3]) -> f32 {
+    let mut sum = 0.0f32;
+    for k in 0..3 {
+        let d = a[k] - b[k];
+        sum += d * d;
+    }
+    sum.sqrt()
+}
+
+/// Serializes a recording into the `.fly` path-file text. Line 1 is the header
+/// `fly 1 <speed>`. Each later line is `x y z pitch yaw`. The default float
+/// format round-trips, so a parse of this text gives back the same waypoints.
+fn serialize_flythrough(speed: f32, waypoints: &[Waypoint]) -> String {
+    let mut out = format!("fly 1 {speed}\n");
+    for w in waypoints {
+        out.push_str(&format!(
+            "{} {} {} {} {}\n",
+            w.pos[0], w.pos[1], w.pos[2], w.pitch, w.yaw
+        ));
+    }
+    out
+}
+
+/// Parses `.fly` path-file text into the replay speed and the waypoints. Blank
+/// lines are skipped. The first content line must be the header `fly 1 <speed>`.
+/// Each later line must hold five floats. A bad line returns an error with the
+/// line number, so the caller can print it and stay in free-fly.
+fn parse_flythrough(text: &str) -> Result<(f32, Vec<Waypoint>), String> {
+    let mut lines = text
+        .lines()
+        .enumerate()
+        .filter(|(_, line)| !line.trim().is_empty());
+
+    let (hdr_no, header) = lines.next().ok_or_else(|| String::from("empty file"))?;
+    let mut htok = header.split_whitespace();
+    if htok.next() != Some("fly") {
+        return Err(format!("line {}: expected the \"fly\" header", hdr_no + 1));
+    }
+    let version = htok
+        .next()
+        .ok_or_else(|| format!("line {}: missing version", hdr_no + 1))?;
+    if version != "1" {
+        return Err(format!("line {}: unsupported version {version}", hdr_no + 1));
+    }
+    let speed_tok = htok
+        .next()
+        .ok_or_else(|| format!("line {}: missing speed", hdr_no + 1))?;
+    let speed: f32 = speed_tok
+        .parse()
+        .map_err(|_| format!("line {}: bad speed {speed_tok}", hdr_no + 1))?;
+    if !speed.is_finite() || speed <= 0.0 {
+        return Err(format!(
+            "line {}: speed must be a positive finite number, found {speed_tok}",
+            hdr_no + 1
+        ));
+    }
+
+    let mut waypoints = Vec::new();
+    for (no, line) in lines {
+        let vals: Vec<&str> = line.split_whitespace().collect();
+        if vals.len() != 5 {
+            return Err(format!(
+                "line {}: expected 5 floats, found {}",
+                no + 1,
+                vals.len()
+            ));
+        }
+        let mut f = [0.0f32; 5];
+        for (k, v) in vals.iter().enumerate() {
+            f[k] = v
+                .parse()
+                .map_err(|_| format!("line {}: bad float {v}", no + 1))?;
+            if !f[k].is_finite() {
+                return Err(format!("line {}: non-finite float {v}", no + 1));
+            }
+        }
+        waypoints.push(Waypoint {
+            pos: [f[0], f[1], f[2]],
+            pitch: f[3],
+            yaw: f[4],
+        });
+    }
+    Ok((speed, waypoints))
+}
+
+/// A loaded flythrough path. The replay samples a closed-loop spline through the
+/// waypoints at constant parameter speed, derived from `speed` and the segment
+/// lengths.
+struct Flythrough {
+    waypoints: Vec<Waypoint>,
+    /// The replay speed in world units per second.
+    speed: f32,
+    /// The chord length of each closed-loop segment. Segment `i` runs from
+    /// waypoint `i` to waypoint `(i + 1) % n`, so this holds `n` entries.
+    seg_len: Vec<f32>,
+    /// The sum of the segment lengths, the full loop distance.
+    total: f32,
+}
+
+impl Flythrough {
+    /// Builds a flythrough from a parsed speed and waypoints. The constructor
+    /// computes the closed-loop segment lengths once.
+    fn new(speed: f32, waypoints: Vec<Waypoint>) -> Flythrough {
+        let n = waypoints.len();
+        let mut seg_len = Vec::with_capacity(n);
+        if n >= 2 {
+            for i in 0..n {
+                seg_len.push(point_distance(waypoints[i].pos, waypoints[(i + 1) % n].pos));
+            }
+        }
+        let total = seg_len.iter().sum();
+        Flythrough {
+            waypoints,
+            speed,
+            seg_len,
+            total,
+        }
+    }
+
+    /// Samples the camera pose at a replay time in seconds. The time maps to a
+    /// distance along the loop by `speed`, wrapped over the loop length.
+    fn sample(&self, time: f32) -> Waypoint {
+        if self.waypoints.is_empty() {
+            return Waypoint {
+                pos: [0.0; 3],
+                pitch: 0.0,
+                yaw: 0.0,
+            };
+        }
+        if self.total <= 0.0 {
+            return self.waypoints[0];
+        }
+        let d = (time * self.speed).rem_euclid(self.total);
+        self.eval_at(d)
+    }
+
+    /// Evaluates the pose at a distance `d` along the loop, `d` in `[0, total)`.
+    fn eval_at(&self, d: f32) -> Waypoint {
+        let n = self.waypoints.len();
+
+        // Locate the segment that holds this distance.
+        let mut i = 0;
+        let mut acc = 0.0f32;
+        while i < n {
+            if d < acc + self.seg_len[i] || i == n - 1 {
+                break;
+            }
+            acc += self.seg_len[i];
+            i += 1;
+        }
+        let seg = self.seg_len[i];
+        let u = if seg > 0.0 { (d - acc) / seg } else { 0.0 };
+        let next = (i + 1) % n;
+
+        // A short recording cannot support the four-point spline.
+        if n < 4 {
+            return self.eval_linear(i, next, u);
+        }
+        let prev = (i + n - 1) % n;
+        let after = (i + 2) % n;
+        self.eval_catmull(prev, i, next, after, u)
+    }
+
+    /// Interpolates linearly between two waypoints. Yaw follows the shortest arc.
+    fn eval_linear(&self, i: usize, next: usize, u: f32) -> Waypoint {
+        let a = &self.waypoints[i];
+        let b = &self.waypoints[next];
+        let mut pos = [0.0f32; 3];
+        for k in 0..3 {
+            pos[k] = a.pos[k] + (b.pos[k] - a.pos[k]) * u;
+        }
+        let pitch = a.pitch + (b.pitch - a.pitch) * u;
+        let yaw = a.yaw + shortest_arc_delta(a.yaw, b.yaw) * u;
+        Waypoint { pos, pitch, yaw }
+    }
+
+    /// Evaluates the Catmull-Rom spline for one segment. Yaw uses the same
+    /// spline weights on the four yaw values, unwrapped over the shortest arc.
+    fn eval_catmull(&self, p0: usize, p1: usize, p2: usize, p3: usize, u: f32) -> Waypoint {
+        let w0 = &self.waypoints[p0];
+        let w1 = &self.waypoints[p1];
+        let w2 = &self.waypoints[p2];
+        let w3 = &self.waypoints[p3];
+
+        let pos = catmull3(w0.pos, w1.pos, w2.pos, w3.pos, u);
+        let pitch = catmull(w0.pitch, w1.pitch, w2.pitch, w3.pitch, u);
+
+        // Unwrap the yaw run around the anchor `w1`, so the spline never turns
+        // the long way. 359 to 1 crosses 0.
+        let y1 = w1.yaw;
+        let y0 = unwrap_yaw(y1, w0.yaw);
+        let y2 = unwrap_yaw(y1, w2.yaw);
+        let y3 = unwrap_yaw(y2, w3.yaw);
+        let yaw = catmull(y0, y1, y2, y3, u);
+
+        Waypoint { pos, pitch, yaw }
+    }
+}
+
+/// Returns the path-file location for a map stem. The path is fixed under the
+/// crate directory, so the harness finds it from any working directory.
+fn flythrough_file_path(stem: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("flythroughs")
+        .join(format!("{stem}.fly"))
+}
+
 /// The free-fly camera. `pitch`/`yaw` are Raven view angles in degrees.
 struct Camera {
     pos: [f32; 3],
@@ -151,6 +434,20 @@ struct App {
     /// One log line for a failed surface acquire, so an occluded window
     /// cannot flood stderr.
     surface_warned: bool,
+    /// The bsp base name of the loaded map. The recorder saves to this map's
+    /// path file.
+    map_stem: String,
+    /// The waypoints the recorder has dropped this session.
+    recorded: Vec<Waypoint>,
+    /// The loaded path file for the current map, `None` when no valid file
+    /// exists. F7 replay needs this.
+    flythrough: Option<Flythrough>,
+    /// The camera follows the flythrough spline while this is true. Free-fly
+    /// input is ignored then, except F7 and Escape.
+    replaying: bool,
+    /// The replay clock in seconds. It advances by the per-frame delta, so a
+    /// fixed frame sequence gives a fixed camera path.
+    replay_time: f32,
 }
 
 impl App {
@@ -197,6 +494,11 @@ impl App {
             surface: (1280.0, 720.0),
             reported: false,
             surface_warned: false,
+            map_stem: String::new(),
+            recorded: Vec::new(),
+            flythrough: None,
+            replaying: false,
+            replay_time: 0.0,
         }
     }
 
@@ -244,9 +546,103 @@ impl App {
     /// Turns the raw mouse motion into a yaw/pitch change, clamping pitch so the
     /// camera never flips over.
     fn look(&mut self, dx: f32, dy: f32) {
+        // Replay drives the camera, so it ignores the mouse.
+        if self.replaying {
+            return;
+        }
         self.camera.yaw -= dx * MOUSE_SENS;
         self.camera.pitch += dy * MOUSE_SENS;
         self.camera.pitch = self.camera.pitch.clamp(-89.0, 89.0);
+    }
+
+    /// Drops one waypoint at the current camera pose and prints the count.
+    fn drop_waypoint(&mut self) {
+        // The recorder captures hand-flown poses only, so replay ignores F5.
+        if self.replaying {
+            println!("world_harness: replay active, the recorder ignores F5");
+            return;
+        }
+        self.recorded.push(Waypoint {
+            pos: self.camera.pos,
+            pitch: self.camera.pitch,
+            yaw: self.camera.yaw,
+        });
+        println!("world_harness: waypoint {} dropped", self.recorded.len());
+    }
+
+    /// Saves the recorded waypoints to the map's path file. An empty recording
+    /// prints a note and writes nothing.
+    fn save_recording(&mut self) {
+        if self.recorded.is_empty() {
+            println!("world_harness: no waypoints recorded, nothing saved");
+            return;
+        }
+        let path = flythrough_file_path(&self.map_stem);
+        if let Some(dir) = path.parent() {
+            if let Err(error) = fs::create_dir_all(dir) {
+                println!("world_harness: could not create {} ({error})", dir.display());
+                return;
+            }
+        }
+        let text = serialize_flythrough(DEFAULT_REPLAY_SPEED, &self.recorded);
+        if path.exists() {
+            println!("world_harness: overwriting {}", path.display());
+        }
+        match fs::write(&path, text) {
+            Ok(()) => {
+                println!(
+                    "world_harness: saved {} waypoints to {}",
+                    self.recorded.len(),
+                    path.display()
+                );
+                // Install the saved path so F7 replays it without a restart.
+                self.flythrough =
+                    Some(Flythrough::new(DEFAULT_REPLAY_SPEED, self.recorded.clone()));
+                println!("world_harness: F7 now replays the saved path");
+            }
+            Err(error) => {
+                println!("world_harness: could not write {} ({error})", path.display())
+            }
+        }
+    }
+
+    /// Clears the recording and prints a note.
+    fn clear_recording(&mut self) {
+        self.recorded.clear();
+        println!("world_harness: recording cleared");
+    }
+
+    /// Toggles replay when a path file exists for the current map. The camera
+    /// starts the loop from the top each time replay begins.
+    fn toggle_replay(&mut self) {
+        if self.flythrough.is_none() {
+            println!("world_harness: no flythrough for this map, staying in free-fly");
+            return;
+        }
+        if self.replaying {
+            self.replaying = false;
+            println!("world_harness: replay stopped, free-fly resumed");
+        } else {
+            self.replaying = true;
+            self.replay_time = 0.0;
+            println!("world_harness: replay started");
+        }
+    }
+
+    /// Advances the replay clock and moves the camera onto the spline. The clock
+    /// grows by the per-frame delta, so a fixed frame sequence is deterministic.
+    fn advance_replay(&mut self, dt: f32) {
+        let Some(fly) = self.flythrough.as_ref() else {
+            self.replaying = false;
+            return;
+        };
+        self.replay_time += dt;
+        let wp = fly.sample(self.replay_time);
+        self.camera.pos = wp.pos;
+        // The spline can overshoot past a control point, so clamp pitch to the
+        // same bound free-fly uses, or the view rolls over past 90 degrees.
+        self.camera.pitch = wp.pitch.clamp(-89.0, 89.0);
+        self.camera.yaw = wp.yaw;
     }
 
     /// Builds this frame's scene definition from the camera and window size.
@@ -402,7 +798,11 @@ impl App {
         let dt = (now - self.last_frame).as_secs_f32();
         self.last_frame = now;
 
-        self.update_camera(dt);
+        if self.replaying {
+            self.advance_replay(dt);
+        } else {
+            self.update_camera(dt);
+        }
         let time_ms = self.start.elapsed().as_millis() as i32;
         let float_time = self.start.elapsed().as_secs_f32();
         let refdef = self.build_refdef(time_ms);
@@ -603,9 +1003,30 @@ impl ApplicationHandler for App {
                     },
                 ..
             } => {
-                if code == KeyCode::Escape && state == ElementState::Pressed {
-                    event_loop.exit();
-                    return;
+                if state == ElementState::Pressed {
+                    match code {
+                        KeyCode::Escape => {
+                            event_loop.exit();
+                            return;
+                        }
+                        KeyCode::F5 => {
+                            self.drop_waypoint();
+                            return;
+                        }
+                        KeyCode::F6 => {
+                            self.save_recording();
+                            return;
+                        }
+                        KeyCode::F7 => {
+                            self.toggle_replay();
+                            return;
+                        }
+                        KeyCode::F8 => {
+                            self.clear_recording();
+                            return;
+                        }
+                        _ => {}
+                    }
                 }
                 match state {
                     ElementState::Pressed => {
@@ -686,14 +1107,35 @@ fn init_ghoul2(host: &mut UiHost, name: &str) -> Option<(Ghoul2System, Ghoul2Han
 }
 
 fn main() {
-    let mut args = std::env::args().skip(1);
-    let mut cfg = BootConfig::default();
-    if let Some(basepath) = args.next() {
-        cfg.basepath = basepath;
+    // The `--flythrough` flag may sit anywhere. The two positionals stay
+    // `[basepath] [map]`, in order. An unknown flag or a third positional
+    // exits with a usage line, so a typo never lands in the wrong slot.
+    let mut basepath: Option<String> = None;
+    let mut map: Option<String> = None;
+    let mut flythrough_flag = false;
+    for arg in std::env::args().skip(1) {
+        if arg == "--flythrough" {
+            flythrough_flag = true;
+        } else if arg.starts_with("--") {
+            eprintln!("world_harness: unknown flag {arg}");
+            eprintln!("usage: world_harness [--flythrough] [basepath] [map]");
+            std::process::exit(2);
+        } else if basepath.is_none() {
+            basepath = Some(arg);
+        } else if map.is_none() {
+            map = Some(arg);
+        } else {
+            eprintln!("world_harness: unexpected argument {arg}");
+            eprintln!("usage: world_harness [--flythrough] [basepath] [map]");
+            std::process::exit(2);
+        }
     }
-    let map = args
-        .next()
-        .unwrap_or_else(|| String::from("maps/mp/duel1.bsp"));
+
+    let mut cfg = BootConfig::default();
+    if let Some(bp) = basepath {
+        cfg.basepath = bp;
+    }
+    let map = map.unwrap_or_else(|| String::from("maps/mp/duel1.bsp"));
 
     let mut host = boot::boot(&cfg);
     let (loaded, land_scape) = boot::load_world(&mut host, &map);
@@ -802,9 +1244,161 @@ fn main() {
         app.camera.pitch = (-d[2].atan2(flat)).to_degrees();
     }
 
+    // Load the map's path file if one exists. A malformed file prints a note
+    // and leaves the harness in free-fly.
+    let map_stem = Path::new(&map)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("world")
+        .to_string();
+    let fly_path = flythrough_file_path(&map_stem);
+    let flythrough = match fs::read_to_string(&fly_path) {
+        Ok(text) => match parse_flythrough(&text) {
+            Ok((speed, waypoints)) if !waypoints.is_empty() => {
+                let count = waypoints.len();
+                if count == 1 {
+                    println!(
+                        "world_harness: flythrough {} has 1 waypoint, replay holds a single pose",
+                        fly_path.display()
+                    );
+                } else if count < 4 {
+                    println!(
+                        "world_harness: flythrough {} has {count} waypoints, replay uses linear interpolation",
+                        fly_path.display()
+                    );
+                } else {
+                    println!(
+                        "world_harness: loaded flythrough {} ({count} waypoints, speed {speed})",
+                        fly_path.display()
+                    );
+                }
+                Some(Flythrough::new(speed, waypoints))
+            }
+            Ok(_) => {
+                println!(
+                    "world_harness: flythrough {} has no waypoints, staying in free-fly",
+                    fly_path.display()
+                );
+                None
+            }
+            Err(error) => {
+                println!(
+                    "world_harness: flythrough {} is malformed ({error}), staying in free-fly",
+                    fly_path.display()
+                );
+                None
+            }
+        },
+        Err(_) => None,
+    };
+
+    app.map_stem = map_stem;
+    app.replaying = flythrough_flag && flythrough.is_some();
+    if app.replaying {
+        println!("world_harness: replay started");
+    } else if flythrough_flag {
+        println!("world_harness: --flythrough given but no path file loaded, staying in free-fly");
+    }
+    app.flythrough = flythrough;
+
     let event_loop = EventLoop::new().expect("EventLoop::new: failed to create the event loop");
     event_loop.set_control_flow(ControlFlow::Poll);
     event_loop
         .run_app(&mut app)
         .expect("run_app: world harness event loop exited with an error");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        parse_flythrough, serialize_flythrough, shortest_arc_delta, Flythrough, Waypoint,
+    };
+
+    fn sample_waypoints() -> Vec<Waypoint> {
+        vec![
+            Waypoint {
+                pos: [0.0, 0.0, 0.0],
+                pitch: -10.0,
+                yaw: 0.0,
+            },
+            Waypoint {
+                pos: [100.0, 0.0, 20.0],
+                pitch: -5.0,
+                yaw: 90.0,
+            },
+            Waypoint {
+                pos: [100.0, 100.0, 40.0],
+                pitch: 0.0,
+                yaw: 180.0,
+            },
+            Waypoint {
+                pos: [0.0, 100.0, 20.0],
+                pitch: 5.0,
+                yaw: 270.0,
+            },
+            Waypoint {
+                pos: [-50.0, 50.0, 10.0],
+                pitch: 12.5,
+                yaw: 350.0,
+            },
+        ]
+    }
+
+    #[test]
+    fn path_file_round_trips() {
+        let waypoints = sample_waypoints();
+        let text = serialize_flythrough(300.0, &waypoints);
+        let (speed, parsed) = parse_flythrough(&text).expect("valid text must parse");
+        assert_eq!(speed, 300.0);
+        assert_eq!(parsed, waypoints);
+    }
+
+    #[test]
+    fn malformed_file_is_rejected() {
+        // No header.
+        assert!(parse_flythrough("garbage line here\n").is_err());
+        // Wrong version.
+        assert!(parse_flythrough("fly 2 300\n0 0 0 0 0\n").is_err());
+        // A waypoint line with the wrong float count.
+        assert!(parse_flythrough("fly 1 300\n1 2 3\n").is_err());
+        // A waypoint line with a non-numeric field.
+        assert!(parse_flythrough("fly 1 300\n0 0 0 0 north\n").is_err());
+        // The empty string.
+        assert!(parse_flythrough("").is_err());
+    }
+
+    #[test]
+    fn yaw_wraps_over_the_shortest_arc() {
+        // 359 to 1 is +2.
+        assert!((shortest_arc_delta(359.0, 1.0) - 2.0).abs() < 1e-4);
+        // 1 to 359 is -2.
+        assert!((shortest_arc_delta(1.0, 359.0) + 2.0).abs() < 1e-4);
+        // 350 to 10 is +20.
+        assert!((shortest_arc_delta(350.0, 10.0) - 20.0).abs() < 1e-4);
+        // 10 to 350 is -20.
+        assert!((shortest_arc_delta(10.0, 350.0) + 20.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn closed_loop_spline_passes_through_each_waypoint() {
+        let waypoints = sample_waypoints();
+        let n = waypoints.len();
+        let fly = Flythrough::new(300.0, waypoints.clone());
+
+        // The cumulative distance to waypoint `i` is the sum of the segments
+        // before it. The spline must return that waypoint's pose there.
+        let mut acc = 0.0f32;
+        for i in 0..n {
+            let wp = fly.eval_at(acc);
+            for k in 0..3 {
+                assert!(
+                    (wp.pos[k] - waypoints[i].pos[k]).abs() < 1e-3,
+                    "waypoint {i} axis {k}: got {}, want {}",
+                    wp.pos[k],
+                    waypoints[i].pos[k]
+                );
+            }
+            acc += fly.seg_len[i];
+        }
+    }
 }
