@@ -12,6 +12,12 @@ brief → **user-settled decisions** → delegated draft → adversarial review 
 dry-run gate → user sign-off. Drafting agents make **no** design decisions; they
 render settled ones.
 
+The pipeline's tracking layer is the wayfinder map (DEC-52,
+`docs/agents/issue-tracker.md`). A survey dossier runs as a research ticket. A
+decision session runs as a grilling ticket. A delegated draft with its gates
+runs as a task ticket. A settled decision resolves into a DEC entry, and the
+ticket links it.
+
 ## Required skeleton
 
 Fixed H2 names, in order, so agents can `grep -A` into any doc blind:

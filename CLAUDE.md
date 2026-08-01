@@ -40,11 +40,12 @@ rust-analyzer is stale in this workspace — **always confirm compilation with
   (`docs/architecture/`, `docs/modules/`, `docs/subsystems/`).
 - `docs/GOAL.md` — project goal (drop-in ABI compatibility checklists).
 - `docs/abi-traps.md` — generated trap_* signature reference.
-- `docs/audits/marker-inventory-2026-07-08.md` — validated open-work inventory
-  (`TODO: Port` by verdict + PORT-NOTE re-grep); regenerated, never hand-edited.
+- `docs/audits/marker-inventory-2026-07-08.md` — historical marker inventory
+  (`TODO: Port` by verdict + PORT-NOTE re-grep). Open work now lives on the
+  GitHub tracker (DEC-52), not in audit inventories.
 - `docs/roadmap-final-stages.md` — ordered post-parity roadmap (referee gates
   everything). Stage 1 safe-state is frozen by DEC-31; the active track is the
-  client port, planned in `docs/plans/2026-07-24-client-port/`.
+  `jamp` client map, `github.com/mheh/jka-rust/issues/2`.
 - The completed type-port campaign docs (plan/scope/todo/oracle-types index)
   were removed 2026-07-06; history lives in git.
 
@@ -94,9 +95,11 @@ deliberate safe-state readers). The safe-state mechanical migration was frozen
 by DEC-31 (2026-07-16); the idiom era superseded it. Typed entity-view refactors
 are deferred to the post-full-port "great refactor."
 
-**Next track (ruled):** the `ui` module first, then `cgame` + renderer, toward a
-full `jamp` client — plans in
-`docs/plans/2026-07-24-client-port/{scoping,ui-plan,renderer-plan}.md`.
+**Active track:** the full `jamp` client. The `ui` module port is done (U6
+closed 2026-08-01). The work plan lives on the wayfinder map,
+`github.com/mheh/jka-rust/issues/2` — read the map, not a plan doc, for the
+frontier. `docs/plans/2026-07-24-client-port/` holds the design groundwork
+(scoping, ui-plan, renderer-plan, client-engine-survey).
 Threading is permanently out of scope for this repo (fork-only).
 
 - **MP** (`jamp` engine) ships 3 loadable DLLs: `jampgame`, `cgame`, `ui`.
