@@ -81,7 +81,11 @@ pub fn R_IssueRenderCommands(
     // render-side executor (`FrameExecutor::execute_frame` in
     // `mp_renderer_gpu`) is the ported dispatch. Ruling 3 keeps that
     // dispatch off this trap-time fn, so nothing starts here.
-    // DEFERRED: the `r_skipBackEnd` guard belongs to the executor's replay.
+    //
+    // The `r_skipBackEnd` guard moved to the executor. The caller resolves the
+    // handle into `RenderCvarSnapshot::skip_back_end` and passes the snapshot
+    // to `execute_frame`, which gates the whole replay at its top under the
+    // same `!r_skipBackEnd` test.
     // Source: oracle/codemp/renderer/tr_cmds.cpp:105-109
     let _ = (common, cvars);
 }

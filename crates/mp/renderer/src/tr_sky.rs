@@ -1079,9 +1079,11 @@ pub fn RB_StageIteratorSky(
         return None;
     }
 
-    // DEFERRED: R4 — the `r_fastsky` early-out is an executor concern (the
-    // backend owns whether the sky draws at all, same as the `r_showsky`
-    // depth-range trick below).
+    // The `r_fastsky` early-out is an executor concern (the backend owns
+    // whether the sky draws at all, same as the `r_showsky` depth-range trick
+    // below). The executor gate lives in `Pipeline3d::collect_sky_surface`
+    // (`mp_renderer_gpu`), which returns before this fn runs, so
+    // `skyRenderedThisView` stays unwritten under `r_fastsky`.
     // Source: oracle/codemp/renderer/tr_sky.cpp:791-793
 
     if frame.skyboxportal != 0 && (frame.refdef.rdflags & RDF_SKYBOXPORTAL) == 0 {

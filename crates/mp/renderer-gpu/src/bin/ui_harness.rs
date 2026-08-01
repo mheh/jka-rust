@@ -19,6 +19,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use mp_renderer::render_state::frame_data::FrameData;
+use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer_gpu::ui_host::boot::with_dc;
 use mp_renderer_gpu::ui_host::{boot, BootConfig, UiHost};
 use mp_renderer_gpu::{FrameExecutor, FrameStats, Gpu, GpuImages, SCREEN_HEIGHT, SCREEN_WIDTH};
@@ -252,6 +253,9 @@ impl App {
                     &mut self.host.font,
                     &self.host.noise,
                     float_time,
+                    // No live cvar table in the harness, so the retail defaults
+                    // apply.
+                    RenderCvarSnapshot::default(),
                     // Menu frames draw 2D only; no world scene.
                     None,
                 );

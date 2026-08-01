@@ -137,26 +137,57 @@ pub fn VectorArrayNormalize(normals: &mut [vec4_t]) {
 
 /// Raven `LodErrorForVolume` — the LOD error metric for a bounding volume of
 /// `radius` centered at local-space `local`: transforms it to world space,
-/// projects onto the view axis, and divides `r_lodCurveError` by the
+/// projects onto the view axis, and divides the LOD curve error by the
 /// (clamped) view-relative distance.
-// DEFERRED: LodErrorForVolume — depends on `FrameState::ori`/`FrameState::
-// view` (`OrientationR`/`ViewParms`, both empty placeholder structs pending
-// the `tr_main` wave's `ori.axis`/`ori.origin`/`view.ori.axis`/
-// `view.ori.origin` fields) — see
-// `crates/mp/renderer/src/render_state/placeholders.rs`, out of this file's
-// edit scope. A state home this packet marks mapped-but-not-yet-populated is
-// an escalation, not an invention (preamble "state home ... ESCALATION").
-// `RendererCvars::r_lodCurveError` is available and threaded below.
-// Source: `oracle/codemp/renderer/tr_surface.cpp:1535-1563`
+///
+/// `ori`/`view` are `backEnd.ori`/`backEnd.viewParms`, threaded as the
+/// already-ported tier-2 `orientationr_t`/`viewParms_t` directly rather than
+/// through `FrameState::ori`/`::view` — the `RB_TestZFlare` precedent (this
+/// file). `lod_curve_error` is `r_lodCurveError->value`, read once per frame
+/// into the render cvar snapshot the backend passes down
+/// (`RenderCvarSnapshot::lod_curve_error`, `render_state/
+/// render_cvar_snapshot.rs`).
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:1535-1563`
 pub fn LodErrorForVolume(
     local: vec3_t,
     radius: f32,
-    frame: &FrameState,
-    cvars: &RendererCvars,
-    common: &Common,
+    ori: &orientationr_t,
+    view: &viewParms_t,
+    lod_curve_error: f32,
 ) -> f32 {
-    let _ = (local, radius, frame, cvars, common);
-    todo!("Port LodErrorForVolume — oracle/codemp/renderer/tr_surface.cpp:1535-1563")
+    // never let it go negative
+    if lod_curve_error < 0.0 {
+        return 0.0;
+    }
+
+    let mut world: vec3_t = [
+        local[0] * ori.axis[0][0]
+            + local[1] * ori.axis[1][0]
+            + local[2] * ori.axis[2][0]
+            + ori.origin[0],
+        local[0] * ori.axis[0][1]
+            + local[1] * ori.axis[1][1]
+            + local[2] * ori.axis[2][1]
+            + ori.origin[1],
+        local[0] * ori.axis[0][2]
+            + local[1] * ori.axis[1][2]
+            + local[2] * ori.axis[2][2]
+            + ori.origin[2],
+    ];
+
+    VectorSubtract(world, view.ori.origin, &mut world);
+    let mut d = DotProduct(world, view.ori.axis[0]);
+
+    if d < 0.0 {
+        d = -d;
+    }
+    d -= radius;
+    if d < 1.0 {
+        d = 1.0;
+    }
+
+    lod_curve_error / d
 }
 
 /// Raven `RB_SurfaceBad` — the `SF_BAD` dispatch-table entry: logs a warning
@@ -429,35 +460,23 @@ pub fn RB_CheckOverflow(verts: i32, indexes: i32, frame: &mut FrameState) {
 /// `RB_EndSurface`/`RB_BeginSurface` flush passes if a single pass would
 /// overflow the buffer.
 ///
-/// DEFERRED: R4/escalation — every write target is `tess`
-/// (`shaderCommands_t`: `.xyz`, `.normal`, `.texCoords`, `.vertexColors`,
-/// `.vertexDlightBits`, `.dlightBits`, `.indexes`, `.numVertexes`,
-/// `.numIndexes`), which dissolves entirely into R4's tessellation/
-/// vertex-building pipeline with no replacement scratch carrier at R3
-/// (packet STATE HOMES row `RB_SurfaceGrid` / `tess`; R2 `## State ownership`
-/// row `tess`). Even the read side is blocked independently: `cv`'s
-/// `widthLodError`/`heightLodError`/`verts` fields are raw pointers on the
-/// tier-2 `srfGridMesh_t` (`tr_local/srf_grid_mesh_s.rs`) with no quarantine
-/// accessor in this wave's licensed list (`SurfaceRef`/`surface_kind`,
-/// `srf_surface_face_t` point/indices, `bmodel_t::surfaces`, `model_s::
-/// bmodel`, `srf_terrain_s::landscape`, `ctrland_scape` accessors,
-/// `mdxm_view_of`) — dereferencing them here would be new unsafe, banned by
-/// this wave's law. The two in-module callees this fn flushes through
-/// (`RB_EndSurface`, `RB_BeginSurface`) are themselves still `todo!()`/
-/// DEFERRED tess-dependent stubs (`tr_shade.rs:156-159,448-450`); the other
-/// two callees (`ComputeFinalVertexColor`, `LodErrorForVolume`) are
-/// themselves `todo!()` stubs in this same file pending the same `tess`/
-/// `FrameState::ori`/`::view` gaps. No partial CPU logic survives dropping
-/// both the write target and the read source.
+/// PORT-NOTE: the live grid draw lands in the R4 backend, not here. The grid
+/// verts upload to the shared world vertex buffer once at level load, and the
+/// per-frame LOD subsample runs at draw time in
+/// `mp_renderer_gpu::pipeline3d::grid_lod_indices` (the `widthTable`/
+/// `heightTable` walk driven by `LodErrorForVolume`). A patch whose LOD keeps
+/// every row and column uses the static full-res `pipeline3d::grid_indices`
+/// path, which emits the identical index set. This `tess`-shaped entry point
+/// stays dead: `shaderCommands_t` (`tess.xyz`/`tess.indexes`/…) dissolved into
+/// the wgpu vertex pipeline with no replacement carrier here.
 ///
-/// Whole-body deferral: no partial body survives, so this lands as a loud
-/// `todo!()` rather than a silent no-op (whole-fn-deferral convention —
-/// partial-body fns keep DEFERRED comments instead).
+/// Whole-body deferral: no partial body survives here, so this lands as a loud
+/// `todo!()` rather than a silent no-op.
 ///
 /// Source: `oracle/codemp/renderer/tr_surface.cpp:1572-1764`
 pub fn RB_SurfaceGrid(cv: &srfGridMesh_t, frame: &mut FrameState) {
     let _ = (cv, frame);
-    todo!("Port RB_SurfaceGrid — oracle/codemp/renderer/tr_surface.cpp:1572-1764")
+    todo!("Port RB_SurfaceGrid — the live decode is pipeline3d::grid_lod_indices; oracle/codemp/renderer/tr_surface.cpp:1572-1764")
 }
 
 /// Raven `RB_AddQuadStampExt` — appends a screen-facing quad (4 verts / 6

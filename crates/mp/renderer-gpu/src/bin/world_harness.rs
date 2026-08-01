@@ -32,6 +32,7 @@ use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::render_assets::RenderAssets;
+use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::tr_local::dlight_s::dlight_t;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
 use mp_renderer::tr_main::TrMainScratch;
@@ -505,6 +506,9 @@ impl App {
                         font,
                         noise,
                         float_time,
+                        // No live cvar table in the harness, so the retail
+                        // defaults keep the goldens byte-exact.
+                        RenderCvarSnapshot::default(),
                         Some(&mut world),
                     )
                 };

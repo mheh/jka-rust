@@ -41,10 +41,12 @@ use mp_renderer::render_state::frame_state::FrameState;
 use mp_renderer::render_state::image_asset::ImageHandle;
 use mp_renderer::render_state::placeholders::{RefEntity, SkyParms, WorldAsset, FUNCTABLE_SIZE};
 use mp_renderer::render_state::render_assets::RenderAssets;
+use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::render_state::shader_asset::ShaderAsset;
 use mp_renderer::render_state::shader_stage::ShaderStage;
 use mp_renderer::render_state::texture_bundle::TextureBundle;
 use mp_renderer::tr_bsp::{FaceVertex, SurfaceData};
+use mp_renderer::tr_curve::GridMesh;
 use mp_renderer::tr_local::acff_t::acff_t;
 use mp_renderer::tr_local::alpha_gen_t::alphaGen_t;
 use mp_renderer::tr_local::color_gen_t::colorGen_t;
@@ -60,6 +62,7 @@ use mp_renderer::tr_main::{
 use mp_renderer::tr_model::frontend::mdxm_view_of;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_noise::NoiseState;
+use mp_renderer::tr_public::ref_flags::{RDF_NOWORLDMODEL, RDF_SKYBOXPORTAL};
 use mp_renderer::tr_shade::RB_FogPass;
 use mp_renderer::tr_shade_calc::{
     RB_CalcDiffuseColor, RB_CalcDiffuseEntityColor, RB_CalcModulateAlphasByFog,
@@ -71,6 +74,7 @@ use mp_renderer::tr_shader::{
     GLS_SRCBLEND_SRC_ALPHA, GL_MODULATE,
 };
 use mp_renderer::tr_sky::{RB_StageIteratorSky, SkyBoxFace, SkyState, HALF_SKY_SUBDIVISIONS};
+use mp_renderer::tr_surface::LodErrorForVolume;
 use wgpu::{BlendState, RenderPipeline, TextureView};
 
 use crate::blend::blend_state_from_gls;
@@ -300,12 +304,15 @@ pub fn build_world_mesh(world: &WorldAsset) -> (Vec<WorldVertex>, Vec<u32>, Vec<
 /// block. A grid narrower or shorter than two verts has no cell, so no
 /// triangle.
 ///
-/// This v0 emits the full `width` by `height` lattice. `RB_SurfaceGrid`
-/// subsamples the lattice through `widthTable`/`heightTable` from the surface
-/// LOD error and splits a run at `SHADER_MAX_VERTEXES`. We drop LOD for now.
+/// This is the "keep every row and column" fast path of `RB_SurfaceGrid`. When
+/// the surface LOD keeps the full lattice, [`grid_lod_indices`] emits the
+/// identical index set (its `widthTable`/`heightTable` become `0..width`/
+/// `0..height`), so the grid uploads these static indices once at level load
+/// and skips the per-frame subsample. The oracle's `SHADER_MAX_VERTEXES` split
+/// (the multi-pass flush at `:1622-1638`) has no wgpu target: the shared world
+/// buffer holds the whole map, so one draw covers any patch.
+///
 /// Source: `oracle/codemp/renderer/tr_surface.cpp:1572` (indices at `:1736-1755`)
-//TODO: Port RB_SurfaceGrid LOD subsample (widthTable/heightTable + SHADER_MAX_VERTEXES split)
-// Source: oracle/codemp/renderer/tr_surface.cpp:1597-1755
 pub fn grid_indices(width: i32, height: i32) -> Vec<u32> {
     if width < 2 || height < 2 {
         return Vec::new();
@@ -320,6 +327,87 @@ pub fn grid_indices(width: i32, height: i32) -> Vec<u32> {
             let top_right = top_left + 1;
             let bottom_left = (y + 1) * w + x;
             let bottom_right = bottom_left + 1;
+
+            indices.push(top_left);
+            indices.push(bottom_left);
+            indices.push(top_right);
+
+            indices.push(top_right);
+            indices.push(bottom_left);
+            indices.push(bottom_right);
+        }
+    }
+    indices
+}
+
+/// The per-frame LOD-subsampled triangle indices for a bezier-patch grid,
+/// 0-based within the grid's own full vertex block. `RB_SurfaceGrid` builds
+/// `widthTable`/`heightTable` by keeping the two edge rows/columns plus every
+/// interior row/column whose stored LOD error is within `lodError`, then walks
+/// the reduced lattice. The vertex it fetches for reduced cell corner `(h, w)`
+/// is `verts + heightTable[h] * width + widthTable[w]`, so the emitted index is
+/// that same offset into the full vertex block (the shared world buffer already
+/// holds every vert). The two triangles per cell keep the oracle's tristrip
+/// winding (`v2,v3,v1` then `v1,v3,v4`), which is the same winding
+/// [`grid_indices`] uses.
+///
+/// When the LOD keeps every row and column, `widthTable`/`heightTable` become
+/// the dense `0..width`/`0..height`, so this returns the exact index set
+/// [`grid_indices`] builds. The caller compares the reduced lattice size
+/// against the full size and keeps the static path in that case.
+///
+/// The oracle's `SHADER_MAX_VERTEXES` multi-pass split is dropped: the shared
+/// world buffer holds the whole map, so one draw covers any patch.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:1594-1638` (LOD tables),
+/// `:1740-1755` (index winding)
+fn grid_lod_indices(
+    grid: &GridMesh,
+    ori: &orientationr_t,
+    view: &viewParms_t,
+    lod_curve_error: f32,
+) -> Vec<u32> {
+    let width = grid.width;
+    let height = grid.height;
+    if width < 2 || height < 2 {
+        return Vec::new();
+    }
+
+    let lod_error =
+        LodErrorForVolume(grid.lod_origin, grid.lod_radius, ori, view, lod_curve_error);
+
+    // Keep the two edge columns, plus every interior column within tolerance.
+    let mut width_table: Vec<i32> = Vec::with_capacity(width as usize);
+    width_table.push(0);
+    for i in 1..width - 1 {
+        if grid.width_lod_error[i as usize] <= lod_error {
+            width_table.push(i);
+        }
+    }
+    width_table.push(width - 1);
+
+    // Keep the two edge rows, plus every interior row within tolerance.
+    let mut height_table: Vec<i32> = Vec::with_capacity(height as usize);
+    height_table.push(0);
+    for i in 1..height - 1 {
+        if grid.height_lod_error[i as usize] <= lod_error {
+            height_table.push(i);
+        }
+    }
+    height_table.push(height - 1);
+
+    let lod_width = width_table.len();
+    let lod_height = height_table.len();
+
+    let mut indices: Vec<u32> = Vec::with_capacity((lod_width - 1) * (lod_height - 1) * 6);
+    for h in 0..lod_height - 1 {
+        for w in 0..lod_width - 1 {
+            // Corner offsets in the grid's own full vertex block, the same
+            // `heightTable[..] * width + widthTable[..]` fetch the oracle uses.
+            let top_left = (height_table[h] * width + width_table[w]) as u32;
+            let top_right = (height_table[h] * width + width_table[w + 1]) as u32;
+            let bottom_left = (height_table[h + 1] * width + width_table[w]) as u32;
+            let bottom_right = (height_table[h + 1] * width + width_table[w + 1]) as u32;
 
             indices.push(top_left);
             indices.push(bottom_left);
@@ -829,6 +917,7 @@ impl Pipeline3d {
         frame: &mut FrameState,
         sky: &mut SkyState,
         fogs: &[fog_t],
+        cvars: RenderCvarSnapshot,
     ) -> WorldStats {
         let mut stats = WorldStats::default();
 
@@ -861,6 +950,7 @@ impl Pipeline3d {
             view,
             fogs,
             &oris,
+            cvars,
         );
 
         if items.is_empty() {
@@ -920,6 +1010,44 @@ impl Pipeline3d {
             item_group.push(group_index);
         }
 
+        // `RB_BeginDrawingView` decides whether the world pass clears the color
+        // target. `Gpu::begin_frame` already cleared it once, and a second scene
+        // in the same frame (for example MP cgame's `CG_Draw3DModel`) must draw
+        // over the first, so the default is `Load`. Under `r_fastsky` the oracle
+        // clears the color instead. The portal-sky arm clears to gray only for
+        // the portal-sky refdef. The world arm clears to black when the refdef
+        // draws a world and the frame is not the glow pass. The `_DEBUG` tan
+        // clear color is dead for the retail build. The oracle sets the scene
+        // viewport and scissor before the clear, so its clear covers the scene
+        // rect only. This clear covers the whole target, so a sub-viewport scene
+        // under `r_fastsky` is the one case that differs.
+        // Source: oracle/codemp/renderer/tr_backend.cpp:508-531
+        let clear_color: Option<wgpu::Color> = if frame.skyboxportal != 0 {
+            let portal_sky = frame.refdef.rdflags & RDF_SKYBOXPORTAL != 0;
+            let want_clear = cvars.fastsky != 0 || frame.refdef.rdflags & RDF_NOWORLDMODEL != 0;
+            if portal_sky && want_clear {
+                Some(wgpu::Color {
+                    r: 0.5,
+                    g: 0.5,
+                    b: 0.5,
+                    a: 1.0,
+                })
+            } else {
+                None
+            }
+        } else if cvars.fastsky != 0
+            && frame.refdef.rdflags & RDF_NOWORLDMODEL == 0
+            && !frame.render_glowing_objects
+        {
+            Some(wgpu::Color::BLACK)
+        } else {
+            None
+        };
+        let color_load = match clear_color {
+            Some(color) => wgpu::LoadOp::Clear(color),
+            None => wgpu::LoadOp::Load,
+        };
+
         let mut encoder = gpu
             .device()
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -933,14 +1061,7 @@ impl Pipeline3d {
                     resolve_target: None,
                     depth_slice: None,
                     ops: wgpu::Operations {
-                        // `Gpu::begin_frame` already cleared the color target.
-                        // A second scene in the same frame, for example MP
-                        // cgame's `CG_Draw3DModel`, must draw over the first,
-                        // so the world pass loads the color target, it does not
-                        // clear it. `RB_BeginDrawingView` clears color only
-                        // under `r_fastsky`.
-                        // Source: oracle/codemp/renderer/tr_scene.cpp:823-826
-                        load: wgpu::LoadOp::Load,
+                        load: color_load,
                         store: wgpu::StoreOp::Store,
                     },
                 })],
@@ -967,9 +1088,15 @@ impl Pipeline3d {
             // Source: oracle/codemp/renderer/tr_sky.cpp:808-816,843-844
             // Source: oracle/codemp/renderer/tr_backend.cpp:463-464
             let vp_x = view.viewportX as f32;
-            let vp_y = view.viewportY as f32;
             let vp_w = view.viewportWidth as f32;
             let vp_h = view.viewportHeight as f32;
+            // `viewParms_t::viewportY` carries the unflipped, 0-at-the-top y that
+            // `R_RenderView` stores from `tr.refdef.y`. GL puts 0 at the bottom,
+            // so the oracle flips y when it sets the viewport. wgpu puts viewport
+            // y at the top like the refdef, so the oracle's GL flip has no
+            // counterpart here. We use the stored value straight.
+            // Source: oracle/codemp/renderer/tr_scene.cpp:838
+            let vp_y = view.viewportY as f32;
             let mut depth_far = false;
 
             for (draw_index, item) in items.iter().enumerate() {
@@ -1049,6 +1176,7 @@ impl Pipeline3d {
         view: &viewParms_t,
         fogs: &[fog_t],
         oris: &[orientationr_t],
+        cvars: RenderCvarSnapshot,
     ) -> Vec<StageDrawItem> {
         let mut items: Vec<StageDrawItem> = Vec::new();
 
@@ -1072,6 +1200,7 @@ impl Pipeline3d {
                         view,
                         fogs,
                         oris,
+                        cvars,
                         &mut items,
                     );
                 }
@@ -1093,6 +1222,7 @@ impl Pipeline3d {
                         view,
                         fogs,
                         oris,
+                        cvars,
                         &mut items,
                     );
                 }
@@ -1115,6 +1245,7 @@ impl Pipeline3d {
                         view,
                         fogs,
                         oris,
+                        cvars,
                         &mut items,
                     );
                 }
@@ -1150,6 +1281,7 @@ impl Pipeline3d {
         view: &viewParms_t,
         fogs: &[fog_t],
         oris: &[orientationr_t],
+        cvars: RenderCvarSnapshot,
         items: &mut Vec<StageDrawItem>,
     ) {
         let index = world_ref_index(world_ref);
@@ -1211,9 +1343,37 @@ impl Pipeline3d {
                 dynamic_vertices,
                 dynamic_indices,
                 stats,
+                cvars,
                 items,
             );
             return;
+        }
+
+        // A bezier-patch grid subsamples its lattice per frame by the
+        // view-relative LOD error (RB_SurfaceGrid). The grid verts already sit
+        // in the shared world buffer, so the subsample only picks which of them
+        // the indices reference. A patch whose LOD keeps every row and column
+        // produces the identical index set the static full-res path uploaded at
+        // level load, so that case keeps the static range and emits nothing.
+        // The reduced indices are relative offsets into the surface's full
+        // vertex block, so they address the static block, a per-stage dynamic
+        // block, or the fog block alike (every vertex path copies the block in
+        // full order).
+        // Source: oracle/codemp/renderer/tr_surface.cpp:1594-1638,1740-1755
+        let mut draw_range = range;
+        let mut index_dynamic = false;
+        if let (Some(grid), Some(ori)) =
+            (world_surface_grid(assets, index), oris.get(slot as usize))
+        {
+            let lod_indices = grid_lod_indices(grid, ori, view, cvars.lod_curve_error);
+            // A reduced lattice has strictly fewer indices. An equal count is
+            // the keep-everything case, which the static path draws identically.
+            if (lod_indices.len() as u32) < range.index_count {
+                draw_range.first_index = dynamic_indices.len() as u32;
+                draw_range.index_count = lod_indices.len() as u32;
+                dynamic_indices.extend_from_slice(&lod_indices);
+                index_dynamic = true;
+            }
         }
 
         let before = items.len();
@@ -1221,7 +1381,8 @@ impl Pipeline3d {
             let item = self.build_stage_item(
                 shader,
                 stage,
-                &range,
+                &draw_range,
+                index_dynamic,
                 cpu,
                 assets,
                 noise,
@@ -1257,9 +1418,9 @@ impl Pipeline3d {
                     sf,
                     shader.fog_pass,
                     assets.fog_image,
-                    range.first_index,
-                    range.index_count,
-                    false,
+                    draw_range.first_index,
+                    draw_range.index_count,
+                    index_dynamic,
                     globals_offset,
                     dynamic_vertices,
                 );
@@ -1304,6 +1465,7 @@ impl Pipeline3d {
         view: &viewParms_t,
         fogs: &[fog_t],
         oris: &[orientationr_t],
+        cvars: RenderCvarSnapshot,
         items: &mut Vec<StageDrawItem>,
     ) {
         let (entity_num, shader_handle, fog_num, _dlight_map) =
@@ -1358,6 +1520,7 @@ impl Pipeline3d {
                 dynamic_vertices,
                 dynamic_indices,
                 stats,
+                cvars,
                 items,
             );
             return;
@@ -1461,6 +1624,7 @@ impl Pipeline3d {
         view: &viewParms_t,
         fogs: &[fog_t],
         oris: &[orientationr_t],
+        cvars: RenderCvarSnapshot,
         items: &mut Vec<StageDrawItem>,
     ) {
         let (entity_num, shader_handle, fog_num, _dlight_map) =
@@ -1514,6 +1678,7 @@ impl Pipeline3d {
                 dynamic_vertices,
                 dynamic_indices,
                 stats,
+                cvars,
                 items,
             );
             return;
@@ -1615,15 +1780,22 @@ impl Pipeline3d {
         dynamic_vertices: &mut Vec<WorldVertex>,
         dynamic_indices: &mut Vec<u32>,
         stats: &mut WorldStats,
+        cvars: RenderCvarSnapshot,
         items: &mut Vec<StageDrawItem>,
     ) {
         // Project the surface onto the sky box and build the cloud geometry. A
         // tripped guard (glow pass, sky-box portal) draws no sky.
-        // DEFERRED: R4 - the `r_fastsky` early-out is not ported because the
-        // cvar does not reach the backend. The oracle returns before the
-        // `skyRenderedThisView` write, so the port must keep that order when
-        // the cvar lands.
+        //
+        // `r_fastsky` returns before `RB_StageIteratorSky` runs, so the sky
+        // never draws and `skyRenderedThisView` stays unwritten. The oracle
+        // gate sits between the glow-pass check and the sky-box-portal check
+        // inside `RB_StageIteratorSky`. This guard runs before the call, which
+        // keeps the same order against the `skyRenderedThisView` write.
         // Source: oracle/codemp/renderer/tr_sky.cpp:791-793
+        if cvars.fastsky != 0 {
+            return;
+        }
+
         let Some(data) = RB_StageIteratorSky(
             frame,
             sky,
@@ -1750,6 +1922,12 @@ impl Pipeline3d {
     /// with a `continue` because `RB_DrawSurfaceSprites` handles sprites after
     /// every other stage.
     ///
+    /// `index_dynamic` selects the per-frame index buffer over the static world
+    /// index buffer. A LOD-subsampled grid sets it: its reduced indices are
+    /// relative offsets into the surface's full vertex block, so a static-vertex
+    /// stage still points `base_vertex` at that block and the reduced indices
+    /// address it.
+    ///
     /// Source: `oracle/codemp/renderer/tr_shade.cpp:2136-2158` (multitexture vs
     /// single), `oracle/codemp/renderer/tr_shade.cpp:394-441` (`DrawMultitextured`),
     /// `oracle/codemp/renderer/tr_shade.cpp:2055-2059` (surface-sprite skip)
@@ -1759,6 +1937,7 @@ impl Pipeline3d {
         shader: &ShaderAsset,
         stage: &ShaderStage,
         range: &SurfaceRange,
+        index_dynamic: bool,
         cpu: &[WorldVertex],
         assets: &RenderAssets,
         noise: &NoiseState,
@@ -1860,7 +2039,7 @@ impl Pipeline3d {
                 index_count: range.index_count,
                 base_vertex,
                 dynamic,
-                index_dynamic: false,
+                index_dynamic,
                 globals_offset,
                 depth_far: false,
             });
@@ -1907,7 +2086,7 @@ impl Pipeline3d {
                 index_count: range.index_count,
                 base_vertex,
                 dynamic: true,
-                index_dynamic: false,
+                index_dynamic,
                 globals_offset,
                 depth_far: false,
             })
@@ -1924,7 +2103,7 @@ impl Pipeline3d {
                 index_count: range.index_count,
                 base_vertex: range.base_vertex,
                 dynamic: false,
-                index_dynamic: false,
+                index_dynamic,
                 globals_offset,
                 depth_far: false,
             })
@@ -2365,6 +2544,16 @@ fn world_ref_index(world_ref: WorldSurfaceRef) -> u32 {
         | WorldSurfaceRef::Grid(index)
         | WorldSurfaceRef::Triangles(index)
         | WorldSurfaceRef::Flare(index) => index,
+    }
+}
+
+/// The bezier-patch grid at flat surface `index`, or `None` when the surface is
+/// another kind or no world is loaded. The surface array is in the same lump
+/// order the geometry ranges were built from, so `index` addresses both.
+fn world_surface_grid(assets: &RenderAssets, index: u32) -> Option<&GridMesh> {
+    match &assets.world.as_ref()?.surfaces.get(index as usize)?.data {
+        SurfaceData::Grid(grid) => Some(grid),
+        _ => None,
     }
 }
 
@@ -3110,6 +3299,7 @@ fn create_flags_bind_group(
 mod tests {
     use super::*;
     use mp_engine_qcommon::qfiles::draw_vert_t::MAXLIGHTMAPS;
+    use mp_renderer::tr_curve::empty_grid_mesh;
     use mp_renderer::tr_local::acff_t::acff_t;
     use mp_renderer::tr_local::eglfog_override::EGLFogOverride;
     use mp_renderer::tr_local::gen_func_t::genFunc_t;
@@ -3186,6 +3376,27 @@ mod tests {
         assert!(grid_indices(1, 5).is_empty());
         assert!(grid_indices(5, 1).is_empty());
         assert!(grid_indices(0, 0).is_empty());
+    }
+
+    #[test]
+    fn grid_lod_indices_with_zero_stored_error_equal_the_static_set() {
+        // A zero stored error keeps every interior row and column, so the
+        // reduced set must equal the static keep-all set the goldens use.
+        let mut grid = empty_grid_mesh();
+        grid.width = 3;
+        grid.height = 2;
+        grid.width_lod_error = vec![0.0; 3];
+        grid.height_lod_error = vec![0.0; 2];
+        let ori = orientationr_t {
+            origin: [0.0; 3],
+            axis: [[0.0; 3]; 3],
+            viewOrigin: [0.0; 3],
+            modelMatrix: [0.0; 16],
+        };
+        let view = zeroed_view();
+
+        let lod = grid_lod_indices(&grid, &ori, &view, 250.0);
+        assert_eq!(lod, grid_indices(3, 2));
     }
 
     // z remap

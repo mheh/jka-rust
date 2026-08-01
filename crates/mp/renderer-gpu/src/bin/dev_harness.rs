@@ -37,6 +37,7 @@ use mp_renderer::render_state::frame_event::FrameEvent;
 use mp_renderer::render_state::image_asset::ImageAsset;
 use mp_renderer::render_state::placeholders::{AutomapWireframe, FunctionTables, GlConfig};
 use mp_renderer::render_state::render_assets::RenderAssets;
+use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::render_state::shader_asset::{ShaderAsset, ShaderHandle};
 use mp_renderer::render_state::shader_stage::ShaderStage;
 use mp_renderer::tr_shader::{CullType, FogPass};
@@ -162,6 +163,9 @@ impl ApplicationHandler for App {
                             &mut self.fonts,
                             &NoiseState::default(),
                             self.start.elapsed().as_secs_f32(),
+                            // No live cvar table in the harness, so the retail
+                            // defaults apply.
+                            RenderCvarSnapshot::default(),
                             // 2D-only harness: no world scene to render.
                             None,
                         );

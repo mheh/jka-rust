@@ -52,6 +52,7 @@ use mp_renderer::render_state::gpu_resources::GpuResources;
 use mp_renderer::render_state::image_asset::ImageHandle;
 use mp_renderer::render_state::placeholders::{RefEntity, TrRefdef, WorldAsset};
 use mp_renderer::render_state::render_assets::RenderAssets;
+use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::render_state::renderer_cvars::RendererCvars;
 use mp_renderer::render_state::shader_asset::ShaderHandle;
 use mp_renderer::tr_font::{layout_font_string, FontDrawItem, FontState, Language_e};
@@ -309,8 +310,16 @@ impl FrameExecutor {
         fonts: &mut FontState,
         noise: &NoiseState,
         float_time: f32,
+        cvars: RenderCvarSnapshot,
         mut world: Option<&mut WorldFrame>,
     ) -> FrameStats {
+        // `r_skipBackEnd` gates only the backend draw replay, like the oracle's
+        // guard around `RB_ExecuteRenderCommands`. The frontend work runs either
+        // way: the texture upload, the scene-entity reset, and the DEC-50 world
+        // traversal below. The two GPU submits gate at their own sites, the
+        // `render_world` backend draw and the final 2D `self.pipeline.draw`.
+        // Source: oracle/codemp/renderer/tr_cmds.cpp:105-109
+
         // Two registries by design (A9): shader registration writes the direct
         // `assets` instance, image registration writes the sim-published Arc
         // master (`Arc::make_mut(&mut sim.published)` in `tr_image.rs`), so
@@ -438,6 +447,7 @@ impl FrameExecutor {
                                 *disable_dynamic_light,
                                 gpu_images,
                                 noise,
+                                cvars,
                             );
                         }
                         // No world context, so this frame cannot draw a scene.
@@ -489,7 +499,14 @@ impl FrameExecutor {
             }
         }
 
-        stats.draw_calls = self.pipeline.draw(gpu, target, &self.batch, gpu_images);
+        // The 2D batch draw is backend work, so `r_skipBackEnd` drops the
+        // submit and reports zero draw calls.
+        // Source: oracle/codemp/renderer/tr_cmds.cpp:105-109
+        stats.draw_calls = if cvars.skip_back_end != 0 {
+            0
+        } else {
+            self.pipeline.draw(gpu, target, &self.batch, gpu_images)
+        };
         stats
     }
 
@@ -514,6 +531,7 @@ impl FrameExecutor {
         disable_dynamic_light: bool,
         gpu_images: &GpuImages,
         noise: &NoiseState,
+        cvars: RenderCvarSnapshot,
     ) -> WorldStats {
         // Copy the loaded world's fog volumes into a per-frame `Vec<fog_t>`. The
         // frontend fog-num math (`r_compute_fog_num`, `R_SpriteFogNum`) and the
@@ -555,10 +573,10 @@ impl FrameExecutor {
         let mut parms = zeroed_view_parms();
         parms.viewportX = refdef.x;
         // The oracle flips y into GL's 0-at-the-bottom space here:
-        // `viewportY = glConfig.vidHeight - (refdef.y + refdef.height)`.
-        // Nothing reads `viewportY` yet, so we carry the unflipped value until
-        // the backend calls `set_viewport` for a sub-viewport.
-        //TODO: Port viewportY GL flip
+        // `viewportY = glConfig.vidHeight - (refdef.y + refdef.height)`. wgpu
+        // puts 0 at the top like the refdef, so this carries the unflipped
+        // 0-at-the-top y. The backend flips it back against the target height
+        // when it calls `set_viewport` (`Pipeline3d::draw`).
         // Source: oracle/codemp/renderer/tr_scene.cpp:838
         parms.viewportY = refdef.y;
         parms.viewportWidth = refdef.width;
@@ -640,6 +658,14 @@ impl FrameExecutor {
         // Source: oracle/codemp/renderer/tr_backend.cpp:570
         world.frame.sky_rendered_this_view = false;
 
+        // The world walk above is frontend work and ran already. The draw below
+        // is the backend submit, so `r_skipBackEnd` drops it and reports empty
+        // world stats.
+        // Source: oracle/codemp/renderer/tr_cmds.cpp:105-109
+        if cvars.skip_back_end != 0 {
+            return WorldStats::default();
+        }
+
         self.pipeline3d.draw(
             gpu,
             target,
@@ -657,6 +683,7 @@ impl FrameExecutor {
             world.frame,
             world.sky,
             &abi_fogs,
+            cvars,
         )
     }
 

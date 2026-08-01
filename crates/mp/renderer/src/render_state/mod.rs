@@ -36,6 +36,7 @@ pub mod light_style_table;
 pub mod placeholders;
 pub mod render_assets;
 pub mod render_assets_sim;
+pub mod render_cvar_snapshot;
 pub mod render_world;
 pub mod renderer_cvars;
 pub mod shader_asset;

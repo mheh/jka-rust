@@ -30,6 +30,7 @@ use mp_engine_qcommon::cm_terrain::CmLandScape;
 use mp_engine_server::Server;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_renderer::render_state::frame_data::FrameData;
+use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::tr_local::dlight_s::dlight_t;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
 use mp_renderer::tr_main::TrMainScratch;
@@ -275,6 +276,9 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
             font,
             noise,
             float_time,
+            // No live cvar table in the test, so the retail defaults keep the
+            // golden byte-exact.
+            RenderCvarSnapshot::default(),
             Some(&mut world),
         );
 
