@@ -102,3 +102,13 @@ Threading is permanently out of scope for this repo (fork-only).
 - **MP** (`jamp` engine) ships 3 loadable DLLs: `jampgame`, `cgame`, `ui`.
 - **SP** (`jasp` engine) ships **only** `jagame`; SP cgame/ui are statically
   linked into the engine binary, not separate modules.
+
+## Agent skills
+
+### Issue tracker
+
+Open work lives as GitHub issues on `mheh/jka-rust` (`gh` CLI). The wayfinder map and its tickets live there too (DEC-52). See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+No `CONTEXT.md` / ADR layout. The DEC ledger (`docs/decisions.md`) is the single decision store, and tickets resolve into it. See `docs/agents/domain.md`.
