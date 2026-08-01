@@ -94,8 +94,10 @@ pub fn blend_state_from_gls(state_bits: u32) -> BlendState {
     }
 }
 
-/// Blending disabled — `GL_State`'s `qglDisable(GL_BLEND)` path.
-const OPAQUE: BlendState = BlendState {
+/// Blending disabled — `GL_State`'s `qglDisable(GL_BLEND)` path. The PBR
+/// backend reads this to route an opaque stage into the lit path and pass a
+/// blended stage through unchanged.
+pub const OPAQUE: BlendState = BlendState {
     color: BlendComponent {
         src_factor: BlendFactor::One,
         dst_factor: BlendFactor::Zero,

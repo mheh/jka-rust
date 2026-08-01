@@ -10,7 +10,8 @@
 //! the camera: the harness never touches `viewParms_t` directly.
 //!
 //! Controls: WASD moves, the mouse looks, Space and Left-Control move up and
-//! down, Escape quits.
+//! down, Escape quits. F9 toggles the shader backend between the faithful path
+//! and the PBR path (DEC-37 ruling 5) and prints the new mode.
 //!
 //! Recorder controls: F5 drops a waypoint at the current camera pose. F6 saves
 //! the recorded waypoints to the map's path file. F7 toggles replay when a path
@@ -32,8 +33,9 @@
 //! across runs with GPU load. An image gate needs a fixed-dt mode first.
 //!
 //! Usage: `cargo run --release -p mp_renderer_gpu --bin world_harness
-//! [-- [--flythrough] <basepath> [map]]`. The `--flythrough` flag starts replay
-//! at boot when the map has a path file.
+//! [-- [--flythrough] [--pbr] <basepath> [map]]`. The `--flythrough` flag starts
+//! replay at boot when the map has a path file. The `--pbr` flag boots on the
+//! PBR backend instead of the faithful one.
 
 use std::collections::HashSet;
 use std::fs;
@@ -448,6 +450,10 @@ struct App {
     /// The replay clock in seconds. It advances by the per-frame delta, so a
     /// fixed frame sequence gives a fixed camera path.
     replay_time: f32,
+    /// The render cvar snapshot the executor reads each frame. F9 flips its
+    /// `pbr` field, and `--pbr` sets it at boot. Every other field keeps the
+    /// retail default, so the faithful path stays byte-exact.
+    cvars: RenderCvarSnapshot,
 }
 
 impl App {
@@ -499,7 +505,14 @@ impl App {
             flythrough: None,
             replaying: false,
             replay_time: 0.0,
+            cvars: RenderCvarSnapshot::default(),
         }
+    }
+
+    /// Flips the shader backend and prints the new mode. F9 calls it.
+    fn toggle_backend(&mut self) {
+        self.cvars.pbr = if self.cvars.pbr != 0 { 0 } else { 1 };
+        println!("world_harness: backend now {}", backend_name(self.cvars.pbr));
     }
 
     /// Moves the camera along its forward and right vectors from the held keys.
@@ -813,6 +826,11 @@ impl App {
     /// Acquires the frame target, builds the world context, and drives the
     /// executor. The executor runs the whole world chain and presents.
     fn draw_world_frame(&mut self, frame_data: &FrameData, float_time: f32) {
+        // Read the render cvar snapshot before the split borrow below takes
+        // `self`. It is `Copy`, so the F9-driven `pbr` field rides into the
+        // executor by value. The name stays clear of the `UiHost::cvars` the
+        // inner block destructures.
+        let cvar_snapshot = self.cvars;
         let App {
             host,
             gpu,
@@ -906,9 +924,9 @@ impl App {
                         font,
                         noise,
                         float_time,
-                        // No live cvar table in the harness, so the retail
-                        // defaults keep the goldens byte-exact.
-                        RenderCvarSnapshot::default(),
+                        // The harness rides the F9-driven snapshot. Every field
+                        // but `pbr` keeps the retail default.
+                        cvar_snapshot,
                         Some(&mut world),
                     )
                 };
@@ -1025,6 +1043,10 @@ impl ApplicationHandler for App {
                             self.clear_recording();
                             return;
                         }
+                        KeyCode::F9 => {
+                            self.toggle_backend();
+                            return;
+                        }
                         _ => {}
                     }
                 }
@@ -1045,6 +1067,16 @@ impl ApplicationHandler for App {
             }
             _ => {}
         }
+    }
+}
+
+/// The human name of the shader backend a `pbr` snapshot value selects. Zero is
+/// the faithful reference backend, non-zero is the PBR backend.
+fn backend_name(pbr: i32) -> &'static str {
+    if pbr != 0 {
+        "PBR"
+    } else {
+        "faithful"
     }
 }
 
@@ -1113,12 +1145,15 @@ fn main() {
     let mut basepath: Option<String> = None;
     let mut map: Option<String> = None;
     let mut flythrough_flag = false;
+    let mut pbr_flag = false;
     for arg in std::env::args().skip(1) {
         if arg == "--flythrough" {
             flythrough_flag = true;
+        } else if arg == "--pbr" {
+            pbr_flag = true;
         } else if arg.starts_with("--") {
             eprintln!("world_harness: unknown flag {arg}");
-            eprintln!("usage: world_harness [--flythrough] [basepath] [map]");
+            eprintln!("usage: world_harness [--flythrough] [--pbr] [basepath] [map]");
             std::process::exit(2);
         } else if basepath.is_none() {
             basepath = Some(arg);
@@ -1126,7 +1161,7 @@ fn main() {
             map = Some(arg);
         } else {
             eprintln!("world_harness: unexpected argument {arg}");
-            eprintln!("usage: world_harness [--flythrough] [basepath] [map]");
+            eprintln!("usage: world_harness [--flythrough] [--pbr] [basepath] [map]");
             std::process::exit(2);
         }
     }
@@ -1293,6 +1328,8 @@ fn main() {
     };
 
     app.map_stem = map_stem;
+    app.cvars.pbr = if pbr_flag { 1 } else { 0 };
+    println!("world_harness: backend {}", backend_name(app.cvars.pbr));
     app.replaying = flythrough_flag && flythrough.is_some();
     if app.replaying {
         println!("world_harness: replay started");

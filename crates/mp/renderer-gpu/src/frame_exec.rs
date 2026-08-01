@@ -542,7 +542,7 @@ impl FrameExecutor {
         refdef: &TrRefdef,
         light_styles: &[[u8; 4]; MAX_LIGHT_STYLES],
         disable_dynamic_light: bool,
-        gpu_images: &GpuImages,
+        gpu_images: &mut GpuImages,
         noise: &NoiseState,
         cvars: RenderCvarSnapshot,
     ) -> WorldStats {

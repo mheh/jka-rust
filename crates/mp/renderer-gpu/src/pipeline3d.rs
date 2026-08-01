@@ -78,7 +78,7 @@ use mp_renderer::tr_sky::{RB_StageIteratorSky, SkyBoxFace, SkyState, HALF_SKY_SU
 use mp_renderer::tr_surface::LodErrorForVolume;
 use wgpu::{BlendState, RenderPipeline, TextureView};
 
-use crate::blend::blend_state_from_gls;
+use crate::blend::{blend_state_from_gls, OPAQUE};
 use crate::gpu::Gpu;
 use crate::gpu_images::GpuImages;
 use native_math::qmath::Q_rsqrt;
@@ -565,15 +565,20 @@ const TR_WORLDENT: i32 = MAX_ENTITIES - 1;
 /// The per-pass uniform the fragment shader reads through group 2. `mode`
 /// picks the single-texture or two-texture path, `tex_from_lightmap` selects
 /// the lightmap texcoord for a single-texture lightmap stage, and `alpha_func`
-/// tells the shader which `GLS_ATEST` compare to discard by. The padding rounds
-/// the write size to 16 bytes.
+/// tells the shader which `GLS_ATEST` compare to discard by. `pbr_lit` marks a
+/// stage the PBR backend shades. The fourth word also rounds the write size to
+/// 16 bytes.
+///
+/// The faithful `world.wgsl` declares only the first three fields, so it ignores
+/// `pbr_lit` and a default frame stays byte-for-byte unchanged. The PBR
+/// `world_pbr.wgsl` reads `pbr_lit` to route the stage.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Pod, Zeroable)]
 struct SurfaceFlagsGpu {
     mode: u32,
     tex_from_lightmap: u32,
     alpha_func: u32,
-    _pad: [u32; 1],
+    pbr_lit: u32,
 }
 
 /// The single-texture pass: sample bundle 0 and multiply by the per-vertex
@@ -669,6 +674,33 @@ pub struct WorldStats {
     pub fog_passes_drawn: u32,
 }
 
+/// The shader backend the world pass draws one frame with (DEC-37 ruling 5).
+/// The draw derives it once per call from `RenderCvarSnapshot::pbr`, then reads
+/// it at the two seams that pick per-draw state: the pipeline the draw binds,
+/// and the texture bind group it builds. A `Faithful` frame runs the existing
+/// path with no change. A `Pbr` frame runs the PBR pipeline and the
+/// four-texture PBR bind group.
+///
+/// - `Faithful`: backend #1, the parity reference, `pbr == 0`.
+/// - `Pbr`: backend #2, the PBR uber-shader, `pbr != 0`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BackendMode {
+    Faithful,
+    Pbr,
+}
+
+impl BackendMode {
+    /// Reads the backend the snapshot selects. Zero is the retail default and
+    /// the parity reference.
+    fn from_snapshot(cvars: RenderCvarSnapshot) -> BackendMode {
+        if cvars.pbr != 0 {
+            BackendMode::Pbr
+        } else {
+            BackendMode::Faithful
+        }
+    }
+}
+
 /// The pipeline cache key: one pipeline per distinct blend state and depth
 /// state. `BlendState` is `Hash`; the two depth choices are booleans.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -741,6 +773,14 @@ pub struct Pipeline3d {
     pipeline_layout: wgpu::PipelineLayout,
     texture_layout: wgpu::BindGroupLayout,
     pipelines: HashMap<PipelineKey, RenderPipeline>,
+    /// The PBR backend's shader, its four-texture group-1 layout, its pipeline
+    /// layout, and its own per-state pipeline cache (DEC-37 ruling 5, backend
+    /// #2). These sit beside the faithful resources and are built once. A
+    /// `Faithful` frame never reads them.
+    pbr_shader: wgpu::ShaderModule,
+    pbr_texture_layout: wgpu::BindGroupLayout,
+    pbr_pipeline_layout: wgpu::PipelineLayout,
+    pbr_pipelines: HashMap<PipelineKey, RenderPipeline>,
     surface_format: wgpu::TextureFormat,
     globals_layout: wgpu::BindGroupLayout,
     globals_buffer: wgpu::Buffer,
@@ -845,6 +885,40 @@ impl Pipeline3d {
             immediate_size: 0,
         });
 
+        // The PBR backend (DEC-37 ruling 5). Its shader shares group 0 and group
+        // 2 with the faithful path. Group 1 grows to the four-texture material
+        // set: diffuse and lightmap in 0-3, normal and roughness in 4-7. The
+        // stage A shader reads only 0-3, so the extra layout entries are unused
+        // for now, which wgpu allows. Stage B reads the normal and roughness.
+        let pbr_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("mp_renderer_gpu pbr world shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/world_pbr.wgsl").into()),
+        });
+
+        let pbr_texture_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("mp_renderer_gpu pbr world texture layout"),
+            entries: &[
+                texture_entry(0),
+                sampler_entry(1),
+                texture_entry(2),
+                sampler_entry(3),
+                texture_entry(4),
+                sampler_entry(5),
+                texture_entry(6),
+                sampler_entry(7),
+            ],
+        });
+
+        let pbr_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("mp_renderer_gpu pbr world pipeline layout"),
+            bind_group_layouts: &[
+                Some(&globals_layout),
+                Some(&pbr_texture_layout),
+                Some(&flags_layout),
+            ],
+            immediate_size: 0,
+        });
+
         // `draw` calls `write_globals` before the pass reads the buffer, and
         // `build_entity_slots` always fills slot 0 with the world matrix, so the
         // buffer needs no construction-time default.
@@ -869,6 +943,10 @@ impl Pipeline3d {
             pipeline_layout,
             texture_layout,
             pipelines: HashMap::new(),
+            pbr_shader,
+            pbr_texture_layout,
+            pbr_pipeline_layout,
+            pbr_pipelines: HashMap::new(),
             surface_format: gpu.surface_format(),
             globals_layout,
             globals_buffer,
@@ -940,7 +1018,7 @@ impl Pipeline3d {
         draw_surfs: &[DrawSurf<SurfaceGeometry>],
         geometry: &WorldGeometry,
         assets: &RenderAssets,
-        gpu_images: &GpuImages,
+        gpu_images: &mut GpuImages,
         noise: &NoiseState,
         float_time: f32,
         view: &viewParms_t,
@@ -954,6 +1032,12 @@ impl Pipeline3d {
         cvars: RenderCvarSnapshot,
     ) -> WorldStats {
         let mut stats = WorldStats::default();
+
+        // The backend this frame draws with, read once (DEC-37 ruling 5). The
+        // `Faithful` arm at every seam below is the exact pre-seam path, so a
+        // default frame is byte-for-byte unchanged. The `Pbr` arm swaps the
+        // pipeline and the texture bind group at those same seams.
+        let mode = BackendMode::from_snapshot(cvars);
 
         // Build one clip matrix per distinct entity number this scene draws,
         // slot 0 the world, then upload them to the dynamic-offset globals
@@ -992,13 +1076,16 @@ impl Pipeline3d {
         }
 
         // Every pipeline the batch uses must exist before the pass borrows
-        // `self` immutably.
+        // `self` immutably. The mode picks which backend's cache is filled.
         for item in &items {
-            self.ensure_pipeline(gpu, item.key);
+            match mode {
+                BackendMode::Faithful => self.ensure_pipeline(gpu, item.key),
+                BackendMode::Pbr => self.ensure_pbr_pipeline(gpu, item.key),
+            }
         }
 
         self.reserve_flags(gpu, items.len());
-        self.write_flags(gpu, &items);
+        self.write_flags(gpu, &items, mode);
 
         // The dynamic buffer holds every dynamic stage's evaluated vertices for
         // this frame, addressed by each item's `base_vertex`.
@@ -1032,12 +1119,23 @@ impl Pipeline3d {
         for item in &items {
             let cache_key = (item.diffuse, item.lightmap);
             let group_index = *group_cache.entry(cache_key).or_insert_with(|| {
-                let group = gpu_images.world_bind_group(
-                    gpu,
-                    &self.texture_layout,
-                    item.diffuse,
-                    item.lightmap,
-                );
+                // The `Faithful` arm builds the exact two-texture group the
+                // pre-seam path built. The `Pbr` arm builds the four-texture
+                // group and resolves sidecar-or-neutral (D21).
+                let group = match mode {
+                    BackendMode::Faithful => gpu_images.world_bind_group(
+                        gpu,
+                        &self.texture_layout,
+                        item.diffuse,
+                        item.lightmap,
+                    ),
+                    BackendMode::Pbr => gpu_images.pbr_world_bind_group(
+                        gpu,
+                        &self.pbr_texture_layout,
+                        item.diffuse,
+                        item.lightmap,
+                    ),
+                };
                 bind_groups.push(group);
                 bind_groups.len() - 1
             });
@@ -1140,10 +1238,12 @@ impl Pipeline3d {
                     pass.set_viewport(vp_x, vp_y, vp_w, vp_h, min_depth, max_depth);
                 }
 
-                let pipeline = self
-                    .pipelines
-                    .get(&item.key)
-                    .expect("world pipeline was created for every item's key above");
+                let pipeline = match mode {
+                    BackendMode::Faithful => &self.pipelines,
+                    BackendMode::Pbr => &self.pbr_pipelines,
+                }
+                .get(&item.key)
+                .expect("world pipeline was created for every item's key above");
                 let offset = (draw_index as u64 * SURFACE_FLAGS_STRIDE) as u32;
 
                 // A dynamic stage draws from the per-frame buffer, a static
@@ -2338,19 +2438,60 @@ impl Pipeline3d {
         if self.pipelines.contains_key(&key) {
             return;
         }
+        let pipeline = self.build_world_pipeline(
+            gpu,
+            key,
+            &self.pipeline_layout,
+            &self.shader,
+            "mp_renderer_gpu world pipeline",
+        );
+        self.pipelines.insert(key, pipeline);
+    }
+
+    /// Builds the PBR pipeline for `key` into the PBR cache if it is not there
+    /// yet (DEC-37 ruling 5, backend #2). It uses the same key, blend, and depth
+    /// state the faithful pipeline uses, so a `Pbr` frame draws the same
+    /// surfaces with the same pass order. Only the shader and the group-1 layout
+    /// differ.
+    fn ensure_pbr_pipeline(&mut self, gpu: &Gpu, key: PipelineKey) {
+        if self.pbr_pipelines.contains_key(&key) {
+            return;
+        }
+        let pipeline = self.build_world_pipeline(
+            gpu,
+            key,
+            &self.pbr_pipeline_layout,
+            &self.pbr_shader,
+            "mp_renderer_gpu pbr world pipeline",
+        );
+        self.pbr_pipelines.insert(key, pipeline);
+    }
+
+    /// Builds one world render pipeline for `key` against `layout` and `shader`.
+    /// The faithful and PBR backends share this builder, so the two pipelines
+    /// agree on blend, depth, cull, and vertex layout by construction. The
+    /// faithful path passes the faithful layout and shader, so its pipeline is
+    /// bit-identical to the pre-seam pipeline.
+    fn build_world_pipeline(
+        &self,
+        gpu: &Gpu,
+        key: PipelineKey,
+        layout: &wgpu::PipelineLayout,
+        shader: &wgpu::ShaderModule,
+        label: &str,
+    ) -> RenderPipeline {
         let depth_compare = if key.depth_equal {
             wgpu::CompareFunction::Equal
         } else {
             wgpu::CompareFunction::LessEqual
         };
 
-        let pipeline = gpu
-            .device()
+        gpu.device()
             .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("mp_renderer_gpu world pipeline"),
-                layout: Some(&self.pipeline_layout),
+                label: Some(label),
+                layout: Some(layout),
                 vertex: wgpu::VertexState {
-                    module: &self.shader,
+                    module: shader,
                     entry_point: Some("vs_main"),
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
                     buffers: &[Some(wgpu::VertexBufferLayout {
@@ -2376,7 +2517,7 @@ impl Pipeline3d {
                 }),
                 multisample: wgpu::MultisampleState::default(),
                 fragment: Some(wgpu::FragmentState {
-                    module: &self.shader,
+                    module: shader,
                     entry_point: Some("fs_main"),
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
                     targets: &[Some(wgpu::ColorTargetState {
@@ -2387,8 +2528,7 @@ impl Pipeline3d {
                 }),
                 multiview_mask: None,
                 cache: None,
-            });
-        self.pipelines.insert(key, pipeline);
+            })
     }
 
     /// Grows the per-surface flags buffer (and its bind group) when `needed`
@@ -2465,15 +2605,20 @@ impl Pipeline3d {
     }
 
     /// Writes one flags block per draw item into the flags buffer, each at its
-    /// own stride slot so the dynamic offset lands on it.
-    fn write_flags(&self, gpu: &Gpu, items: &[StageDrawItem]) {
+    /// own stride slot so the dynamic offset lands on it. A `Faithful` frame
+    /// writes `pbr_lit` as zero, so its uniform bytes match the pre-seam bytes.
+    fn write_flags(&self, gpu: &Gpu, items: &[StageDrawItem], mode: BackendMode) {
         let mut bytes = vec![0u8; items.len() * SURFACE_FLAGS_STRIDE as usize];
         for (draw_index, item) in items.iter().enumerate() {
+            let pbr_lit = match mode {
+                BackendMode::Faithful => 0,
+                BackendMode::Pbr => pbr_lit_flag(item) as u32,
+            };
             let flags = SurfaceFlagsGpu {
                 mode: item.mode,
                 tex_from_lightmap: item.tex_from_lightmap as u32,
                 alpha_func: item.alpha_func,
-                _pad: [0; 1],
+                pbr_lit,
             };
             let offset = draw_index * SURFACE_FLAGS_STRIDE as usize;
             let src = bytemuck::bytes_of(&flags);
@@ -2491,6 +2636,18 @@ impl Pipeline3d {
         self.warned[slot] = true;
         eprintln!("mp_renderer_gpu: pipeline3d {}", kind.describe());
     }
+}
+
+/// Whether the PBR backend shades this stage (the routing rule). A stage takes
+/// the lit path only when it draws opaque. The collapsed lightmapped base pass
+/// is opaque, so every lit world stage on duel1 and ffa2 qualifies through this
+/// test alone. An additive or blended effect stage (glow, sprite, blood, an
+/// uncollapsed `$lightmap` multiply pass) draws through the faithful colour
+/// path unchanged, since lighting an effect texture breaks it. A sky pass
+/// (`depth_far`) always stays faithful, even though the sky box draws opaque,
+/// because the sky is an effect surface, not a lit one.
+fn pbr_lit_flag(item: &StageDrawItem) -> bool {
+    !item.depth_far && item.key.blend == OPAQUE
 }
 
 /// Builds one clip matrix per distinct entity number the draw list carries,

@@ -28,6 +28,11 @@ pub struct RenderCvarSnapshot {
     /// `r_lodCurveError->value`. The grid LOD arm divides the view-space error
     /// by this to pick the row and column step. Retail default `250`.
     pub lod_curve_error: f32,
+    /// The shader backend the world pass draws with (DEC-37 ruling 5). A zero
+    /// value picks the faithful backend, the parity reference. A non-zero value
+    /// picks the PBR uber-shader. Retail default `0`. The harness rides an F9
+    /// toggle and a `--pbr` boot flag on this field.
+    pub pbr: i32,
 }
 
 impl Default for RenderCvarSnapshot {
@@ -37,6 +42,7 @@ impl Default for RenderCvarSnapshot {
             skip_back_end: 0,
             fastsky: 0,
             lod_curve_error: 250.0,
+            pbr: 0,
         }
     }
 }
