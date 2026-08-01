@@ -25,6 +25,7 @@
 
 use std::ffi::c_void;
 use std::path::PathBuf;
+use std::sync::Mutex;
 
 use mp_engine_qcommon::vm::{arm_game_slot, game_syscall_trampoline};
 use native_platform::entrypoints::RawSyscall;
@@ -33,6 +34,11 @@ use native_platform::module_loader::{sys_load_dll, ModuleNaming, ModuleSearchPol
 mod replay_support;
 use replay_support::shapes::Manifests;
 use replay_support::{referee_dir, replay_syscall, Reader, ReplayState, RunOutcome};
+
+/// Both replay tests arm the one process-global game slot, so parallel runs corrupt each other.
+/// This lock serializes them regardless of the cargo test-thread count.
+/// A poisoned lock stays usable: the other test still runs after one panics.
+static REPLAY_LOCK: Mutex<()> = Mutex::new(());
 
 /// Trace path: `JKA_TRACE`, else the local-disk default (DEC-48.4).
 fn trace_path() -> PathBuf {
@@ -187,6 +193,7 @@ fn skip_if_no_trace(trace: &PathBuf) -> bool {
 #[test]
 #[ignore = "needs a recorded trace on local disk (DEC-48.4); run with --ignored"]
 fn replay_oracle_self_check() {
+    let _serial = REPLAY_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let trace = trace_path();
     if skip_if_no_trace(&trace) {
         return;
@@ -223,6 +230,7 @@ fn replay_oracle_self_check() {
 #[test]
 #[ignore = "needs a recorded trace on local disk (DEC-48.4); run with --ignored"]
 fn replay_rust_cgame() {
+    let _serial = REPLAY_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let trace = trace_path();
     if skip_if_no_trace(&trace) {
         return;
