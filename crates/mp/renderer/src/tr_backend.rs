@@ -1110,8 +1110,10 @@ pub fn RE_StretchRaw(
     if !sim.published.registered {
         return;
     }
-    let assets = Arc::clone(&sim.published);
-    R_SyncRenderThread(&assets, common, cvars);
+    // Every read below borrows `sim.published` for the length of one call and
+    // no longer. A second live `Arc` handle would make `Arc::make_mut` inside
+    // `R_UploadScratchFrame` deep-clone the whole registry once per frame.
+    R_SyncRenderThread(&sim.published, common, cvars);
 
     // DEFERRED: R4 — qglFinish() (see doc comment above) (DEC-37 A13.2)
     // Source: oracle/codemp/renderer/tr_backend.cpp:1313-1314
@@ -1144,7 +1146,7 @@ pub fn RE_StretchRaw(
         );
     }
 
-    RB_SetGL2D(frame, gpu, &assets);
+    RB_SetGL2D(frame, gpu, &sim.published);
 
     // DEFERRED: R4. qglColor3f(tr.identityLight x 3) (see doc comment above)
     // Source: oracle/codemp/renderer/tr_backend.cpp:1353
