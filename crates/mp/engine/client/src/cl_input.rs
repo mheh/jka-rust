@@ -521,7 +521,9 @@ pub fn CL_KeyState(common: &mut Common, cl: &mut Client, key: *mut kbutton_t) ->
             (*key).downtime = common.com_frameTime as u32;
         }
 
-        let mut val = msec as f32 / cl.frame_msec as f32;
+        // Raven's local `msec` is a signed `int`, so a wrapped hold time reads
+        // negative and the clamp below takes it to zero, not to a full frame.
+        let mut val = msec as i32 as f32 / cl.frame_msec as f32;
         if val < 0.0 {
             val = 0.0;
         }

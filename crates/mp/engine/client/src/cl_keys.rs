@@ -1102,18 +1102,13 @@ pub fn Console_Key(view: &mut EngineHostView, cl: &mut Client, key: c_int) {
                 && cl.kg.g_consoleField.buffer[0] != b'\\' as c_char
                 && cl.kg.g_consoleField.buffer[0] != b'/' as c_char
             {
-                let temp = core::ffi::CStr::from_ptr(cl.kg.g_consoleField.buffer.as_ptr())
-                    .to_string_lossy()
-                    .into_owned();
-                let mut temp_buf = [0 as c_char; MAX_STRING_CHARS];
-                Q_strncpyz(&mut temp_buf, &temp, MAX_STRING_CHARS);
-                let out = format!("\\{}", temp);
-                let out_c = std::ffi::CString::new(out).unwrap();
-                for (i, b) in out_c.as_bytes_with_nul().iter().enumerate() {
-                    if i < cl.kg.g_consoleField.buffer.len() {
-                        cl.kg.g_consoleField.buffer[i] = *b as c_char;
-                    }
-                }
+                let temp = field_text(&cl.kg.g_consoleField);
+                let size = cl.kg.g_consoleField.buffer.len();
+                Q_strncpyz(
+                    &mut cl.kg.g_consoleField.buffer,
+                    &format!("\\{}", temp),
+                    size,
+                );
                 cl.kg.g_consoleField.cursor += 1;
             } else {
                 // Explicit commands do not need a leading slash.
@@ -1298,7 +1293,9 @@ pub fn CL_KeyEvent(
             }
         }
 
-        // The console key is hardcoded, so the user can never unbind it.
+        // The console key is hardcoded, so the user can never unbind it. The
+        // oracle's `#ifdef FINAL_BUILD` shift requirement stays out, because
+        // this port leaves `FINAL_BUILD` undefined.
         if key == fakeAscii_t::A_CONSOLE as c_int {
             if down != qtrue {
                 return;
@@ -1371,7 +1368,9 @@ pub fn CL_KeyEvent(
         // to keep the character from continuing an action started before a
         // mode switch.
         if down != qtrue {
-            let kb = cl.kg.keys[upper].binding;
+            // Raven re-reads the row here, after the cinematic arm may have
+            // swapped `key` for escape.
+            let kb = cl.kg.keys[cl.keynames[key as usize].upper as usize].binding;
 
             CL_AddKeyUpCommands(view.common, key, kb);
 
@@ -1421,7 +1420,7 @@ pub fn CL_KeyEvent(
             Console_Key(view, cl, key);
         } else {
             // Send the bound action.
-            let kb = cl.kg.keys[upper].binding;
+            let kb = cl.kg.keys[cl.keynames[key as usize].upper as usize].binding;
             if !kb.is_null() {
                 if *kb == b'+' as c_char {
                     let mut button = [0 as c_char; 1024];
