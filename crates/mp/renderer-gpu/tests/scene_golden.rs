@@ -22,11 +22,14 @@
 //! Bless flow: `JKA_GOLDEN_BLESS=1` writes the golden and passes. A mismatch
 //! writes `<stem>.actual.png` beside the golden and fails.
 
+use std::collections::hash_map::DefaultHasher;
 use std::fs::File;
+use std::hash::{Hash, Hasher};
 use std::io::BufReader;
 use std::io::BufWriter;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use mp_engine_core::Engine;
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
@@ -38,6 +41,7 @@ use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
+use mp_qshared::common::mp::cgame::tr_types::{RF_FORCE_ENT_ALPHA, RF_RGB_TINT};
 use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
@@ -157,35 +161,64 @@ gfx/golden/vertex
 \t\talphaGen vertex
 \t}
 }
+
+gfx/golden/constant
+{
+\t{
+\t\tmap $whiteimage
+\t\tblendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+\t\trgbGen const ( 0.2 0.35 0.9 )
+\t\talphaGen const 1.0
+\t}
+}
 ";
+
+/// The per-call counter [`write_atomic`] puts in its temporary file names.
+static TEMP_SERIAL: AtomicU64 = AtomicU64::new(0);
+
+/// Writes `data` to `path` through a uniquely named temporary file and a
+/// rename, so a concurrent reader never sees a half-written file.
+fn write_atomic(path: &Path, data: &[u8]) {
+    // The tests share one process, so the temporary name needs a per-call
+    // counter, not just the pid.
+    let serial = TEMP_SERIAL.fetch_add(1, Ordering::Relaxed);
+    let temp = path.with_extension(format!("{}.{serial}.tmp", std::process::id()));
+    std::fs::write(&temp, data).expect("write: synthetic fixture");
+    std::fs::rename(&temp, path).expect("rename: synthetic fixture");
+}
 
 /// Builds the synthetic game tree in a temp directory and boots a
 /// renderer-only host against it. Nothing retail is reachable: `fs_basepath`
 /// and `fs_homepath` both point here, and the only files present are the three
 /// this function writes.
 fn boot_synthetic() -> UiHost {
-    let basepath = std::env::temp_dir().join("jka-rust-scene-golden-base");
+    // The directory name carries the fixture content's hash. A tree left by an
+    // older build of this file is then simply unused, instead of feeding a
+    // stale shader script to a fresh run - which renders the wrong image and
+    // blesses it.
+    let mut hasher = DefaultHasher::new();
+    SYNTHETIC_SHADER_SCRIPT.hash(&mut hasher);
+    let basepath =
+        std::env::temp_dir().join(format!("jka-rust-scene-golden-{:016x}", hasher.finish()));
     let base = basepath.join("base");
     std::fs::create_dir_all(base.join("shaders")).expect("create_dir_all: synthetic basepath");
 
-    // `FS_InitFilesystem` errors out when `mpdefault.cfg` reads as zero bytes.
-    // The renderer never executes the file, so one comment line is enough.
-    // Source: oracle/codemp/qcommon/files_pc.cpp:2700-2712
-    std::fs::write(base.join("mpdefault.cfg"), b"// synthetic scene golden\n")
-        .expect("write: synthetic mpdefault.cfg");
-    // Without this, `FS_SetRestrictions` drops the filesystem to demo mode,
-    // where loose directories are never scanned and the shader script below
-    // would be invisible.
-    std::fs::write(base.join("productid.txt"), FS_ProductIdFile())
-        .expect("write: synthetic productid.txt");
+    // Every file lands atomically: the tests run in parallel and all build the
+    // same tree, so a plain write lets one test read another's half-written
+    // file. A rename is atomic, and the content is identical either way.
+    write_atomic(&base.join("mpdefault.cfg"), b"// synthetic scene golden\n");
+    // Without `productid.txt`, `FS_SetRestrictions` drops the filesystem to
+    // demo mode, where loose directories are never scanned and the shader
+    // script below would be invisible.
+    // Source: oracle/codemp/qcommon/files_pc.cpp:2587-2637
+    write_atomic(&base.join("productid.txt"), &FS_ProductIdFile());
     // `ScanAndLoadShaderFiles` is a fatal error when it finds no `.shader`
     // file, so the tree needs at least this one.
     // Source: oracle/codemp/renderer/tr_shader.cpp:3895-3900
-    std::fs::write(
-        base.join("shaders/synthetic.shader"),
-        SYNTHETIC_SHADER_SCRIPT,
-    )
-    .expect("write: synthetic shader script");
+    write_atomic(
+        &base.join("shaders/synthetic.shader"),
+        SYNTHETIC_SHADER_SCRIPT.as_bytes(),
+    );
 
     let cfg = BootConfig {
         basepath: basepath.to_string_lossy().into_owned(),
@@ -646,6 +679,37 @@ fn scene_dlights(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_
     }
 }
 
+/// Census renderfx rows `RF_RGB_TINT` (8,679) and `RF_FORCE_ENT_ALPHA` (6,586):
+/// four sprites drawn through a shader whose rgbGen is a fixed constant, so the
+/// only way a corner shows the entity colour is the tint override, and the only
+/// way it shows a partial alpha is the force override.
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:2049-2053,2190-2202`
+fn scene_renderfx_tint(host: &mut UiHost, frame_data: &mut FrameData, _shader: qhandle_t) {
+    let constant = register_shader(host, "gfx/golden/constant");
+    let mut out = Vec::new();
+    for (index, (z, renderfx, rgba)) in [
+        (45.0f32, 0i32, [255u8, 64, 64, 255]),
+        (15.0, RF_RGB_TINT, [255, 64, 64, 255]),
+        (-15.0, RF_FORCE_ENT_ALPHA, [255, 64, 64, 96]),
+        (-45.0, RF_RGB_TINT | RF_FORCE_ENT_ALPHA, [64, 255, 96, 128]),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let mut re = base_ref_entity();
+        re.reType = refEntityType_t::RT_SPRITE;
+        re.customShader = constant;
+        re.renderfx = renderfx;
+        re.origin = [200.0, 0.0, z];
+        re.radius = 14.0;
+        re.shaderRGBA = rgba;
+        let _ = index;
+        out.push(re);
+    }
+    record_entities(host, frame_data, &out);
+}
+
 #[test]
 fn golden_scene_sprites() {
     run_scene(&Scene {
@@ -682,6 +746,16 @@ fn golden_scene_polys() {
         stem: "scene_polys",
         eye: [0.0, 0.0, 0.0],
         record: scene_polys,
+        expect_dlights: 0,
+    });
+}
+
+#[test]
+fn golden_scene_renderfx_tint() {
+    run_scene(&Scene {
+        stem: "scene_renderfx_tint",
+        eye: [0.0, 0.0, 0.0],
+        record: scene_renderfx_tint,
         expect_dlights: 0,
     });
 }

@@ -40,6 +40,10 @@ use mp_engine_qcommon::qfiles::md3_surface_t::md3Surface_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
+use mp_qshared::common::mp::cgame::tr_types::{
+    RF_ALPHA_DEPTH, RF_DISINTEGRATE1, RF_DISINTEGRATE2, RF_DISTORTION, RF_FORCE_ENT_ALPHA,
+    RF_RGB_TINT, RF_VOLUMETRIC,
+};
 use mp_qshared::shared::mdxaBone_t;
 use mp_qshared::shared::q_math::{
     _VectorMA as VectorMA, _VectorScale as VectorScale, _VectorSubtract as VectorSubtract,
@@ -74,8 +78,9 @@ use mp_renderer::tr_noise::NoiseState;
 use mp_renderer::tr_public::ref_flags::{RDF_NOWORLDMODEL, RDF_SKYBOXPORTAL};
 use mp_renderer::tr_shade::RB_FogPass;
 use mp_renderer::tr_shade_calc::{
-    RB_CalcDiffuseColor, RB_CalcDiffuseEntityColor, RB_CalcModulateAlphasByFog,
-    RB_CalcModulateColorsByFog, RB_CalcModulateRGBAsByFog,
+    myftol, RB_CalcDiffuseColor, RB_CalcDiffuseEntityColor, RB_CalcDisintegrateColors,
+    RB_CalcDisintegrateVertDeform, RB_CalcModulateAlphasByFog, RB_CalcModulateColorsByFog,
+    RB_CalcModulateRGBAsByFog,
 };
 use mp_renderer::tr_shader::{
     FogPass, GLS_ATEST_GE_80, GLS_ATEST_GE_C0, GLS_ATEST_GT_0, GLS_ATEST_LT_80,
@@ -646,10 +651,13 @@ enum Warned {
     FogImageMissing,
     /// An `SF_ENTITY` draw surf whose `reType` builds no geometry yet.
     EntitySurface,
+    /// An `RF_DISTORTION` entity, which needs the screen-capture refraction
+    /// pass.
+    Distortion,
 }
 
 impl Warned {
-    const COUNT: usize = 7;
+    const COUNT: usize = 8;
 
     fn slot(self) -> usize {
         match self {
@@ -660,6 +668,7 @@ impl Warned {
             Warned::VideoMap => 4,
             Warned::FogImageMissing => 5,
             Warned::EntitySurface => 6,
+            Warned::Distortion => 7,
         }
     }
 
@@ -674,6 +683,7 @@ impl Warned {
             Warned::VideoMap => "draws a videoMap world stage as a plain stage — no cinematic yet",
             Warned::FogImageMissing => "skips a fog pass because the fog image is not registered",
             Warned::EntitySurface => "skips a generated entity surface whose reType is not ported",
+            Warned::Distortion => "draws an RF_DISTORTION entity plain - no screen capture yet",
         }
     }
 }
@@ -1359,6 +1369,11 @@ impl Pipeline3d {
         cvars: RenderCvarSnapshot,
     ) -> Vec<StageDrawItem> {
         let mut items: Vec<StageDrawItem> = Vec::new();
+        // The two scene-wide inputs the renderfx colour overrides read: the
+        // disintegrate threshold clock and the volumetric fade axis.
+        // Source: oracle/codemp/renderer/tr_shade.cpp:1568,1596
+        let refdef_time = frame.refdef.time;
+        let view_axis = view.ori.axis[0];
 
         for surf in draw_surfs {
             match surf.surface {
@@ -1381,6 +1396,8 @@ impl Pipeline3d {
                         fogs,
                         oris,
                         cvars,
+                        refdef_time,
+                        view_axis,
                         &mut items,
                     );
                 }
@@ -1403,6 +1420,8 @@ impl Pipeline3d {
                         fogs,
                         oris,
                         cvars,
+                        refdef_time,
+                        view_axis,
                         &mut items,
                     );
                 }
@@ -1426,6 +1445,8 @@ impl Pipeline3d {
                         fogs,
                         oris,
                         cvars,
+                        refdef_time,
+                        view_axis,
                         &mut items,
                     );
                 }
@@ -1444,6 +1465,8 @@ impl Pipeline3d {
                         view,
                         fogs,
                         oris,
+                        refdef_time,
+                        view_axis,
                         &mut items,
                     );
                 }
@@ -1461,6 +1484,8 @@ impl Pipeline3d {
                         view,
                         fogs,
                         oris,
+                        refdef_time,
+                        view_axis,
                         &mut items,
                     );
                 }
@@ -1499,6 +1524,8 @@ impl Pipeline3d {
         view: &viewParms_t,
         fogs: &[fog_t],
         oris: &[orientationr_t],
+        refdef_time: i32,
+        view_axis: [f32; 3],
         items: &mut Vec<StageDrawItem>,
     ) {
         let (entity_num, shader_handle, fog_num, _dlight_map) =
@@ -1552,6 +1579,8 @@ impl Pipeline3d {
                 None,
                 dynamic_vertices,
                 globals_offset,
+                refdef_time,
+                view_axis,
             );
             if let Some(item) = item {
                 items.push(item);
@@ -1613,6 +1642,8 @@ impl Pipeline3d {
         view: &viewParms_t,
         fogs: &[fog_t],
         oris: &[orientationr_t],
+        refdef_time: i32,
+        view_axis: [f32; 3],
         items: &mut Vec<StageDrawItem>,
     ) {
         let (entity_num, shader_handle, fog_num, _dlight_map) =
@@ -1657,6 +1688,8 @@ impl Pipeline3d {
                 None,
                 dynamic_vertices,
                 globals_offset,
+                refdef_time,
+                view_axis,
             );
             if let Some(item) = item {
                 items.push(item);
@@ -1714,6 +1747,8 @@ impl Pipeline3d {
         fogs: &[fog_t],
         oris: &[orientationr_t],
         cvars: RenderCvarSnapshot,
+        refdef_time: i32,
+        view_axis: [f32; 3],
         items: &mut Vec<StageDrawItem>,
     ) {
         let index = world_ref_index(world_ref);
@@ -1776,6 +1811,8 @@ impl Pipeline3d {
                 dynamic_indices,
                 stats,
                 cvars,
+                refdef_time,
+                view_axis,
                 items,
             );
             return;
@@ -1823,6 +1860,8 @@ impl Pipeline3d {
                 entities.get(entity_num as usize),
                 dynamic_vertices,
                 globals_offset,
+                refdef_time,
+                view_axis,
             );
             // A surface-sprite stage draws nothing here, so it yields no item.
             if let Some(item) = item {
@@ -1898,6 +1937,8 @@ impl Pipeline3d {
         fogs: &[fog_t],
         oris: &[orientationr_t],
         cvars: RenderCvarSnapshot,
+        refdef_time: i32,
+        view_axis: [f32; 3],
         items: &mut Vec<StageDrawItem>,
     ) {
         let (entity_num, shader_handle, fog_num, _dlight_map) =
@@ -1953,6 +1994,8 @@ impl Pipeline3d {
                 dynamic_indices,
                 stats,
                 cvars,
+                refdef_time,
+                view_axis,
                 items,
             );
             return;
@@ -1979,6 +2022,8 @@ impl Pipeline3d {
                 Some(&md3_normals),
                 dynamic_vertices,
                 globals_offset,
+                refdef_time,
+                view_axis,
             );
             if let Some(item) = item {
                 items.push(item);
@@ -2057,6 +2102,8 @@ impl Pipeline3d {
         fogs: &[fog_t],
         oris: &[orientationr_t],
         cvars: RenderCvarSnapshot,
+        refdef_time: i32,
+        view_axis: [f32; 3],
         items: &mut Vec<StageDrawItem>,
     ) {
         let (entity_num, shader_handle, fog_num, _dlight_map) =
@@ -2122,6 +2169,8 @@ impl Pipeline3d {
                 dynamic_indices,
                 stats,
                 cvars,
+                refdef_time,
+                view_axis,
                 items,
             );
             return;
@@ -2149,6 +2198,8 @@ impl Pipeline3d {
                 Some(&g2_normals),
                 dynamic_vertices,
                 globals_offset,
+                refdef_time,
+                view_axis,
             );
             if let Some(item) = item {
                 items.push(item);
@@ -2224,6 +2275,8 @@ impl Pipeline3d {
         dynamic_indices: &mut Vec<u32>,
         stats: &mut WorldStats,
         cvars: RenderCvarSnapshot,
+        refdef_time: i32,
+        view_axis: [f32; 3],
         items: &mut Vec<StageDrawItem>,
     ) {
         // Project the surface onto the sky box and build the cloud geometry. A
@@ -2340,6 +2393,8 @@ impl Pipeline3d {
                     None,
                     dynamic_vertices,
                     globals_offset,
+                    refdef_time,
+                    view_axis,
                 );
                 if let Some(mut item) = item {
                     item.depth_far = true;
@@ -2389,6 +2444,8 @@ impl Pipeline3d {
         entity: Option<&trRefEntity_t>,
         dynamic_vertices: &mut Vec<WorldVertex>,
         globals_offset: u32,
+        refdef_time: i32,
+        view_axis: [f32; 3],
     ) -> Option<StageDrawItem> {
         // A surface-sprite stage draws no plain geometry. The sprite chain is a
         // later wave, so the stage is skipped whole, as the oracle does.
@@ -2400,11 +2457,17 @@ impl Pipeline3d {
         }
 
         let time = StageTime::new(float_time, shader.time_offset);
-        let alpha_func = alpha_func_code(stage.state_bits);
+
+        // The current entity's renderfx overrides for this stage. Two of them
+        // change the state bits, so they resolve before the pipeline key.
+        // Source: oracle/codemp/renderer/tr_shade.cpp:2039-2054,2190-2202
+        let fx = EntityFx::resolve(entity);
+        let state_bits = fx.state_bits(stage.state_bits);
+        let alpha_func = alpha_func_code(state_bits);
         let key = PipelineKey {
-            blend: blend_state_from_gls(stage.state_bits),
-            depth_equal: (stage.state_bits & GLS_DEPTHFUNC_EQUAL as u32) != 0,
-            depth_write: (stage.state_bits & GLS_DEPTHMASK_TRUE as u32) != 0,
+            blend: blend_state_from_gls(state_bits),
+            depth_equal: (state_bits & GLS_DEPTHFUNC_EQUAL as u32) != 0,
+            depth_write: (state_bits & GLS_DEPTHMASK_TRUE as u32) != 0,
         };
 
         // The `ComputeColors` tail modulates the stage colours by fog density
@@ -2416,6 +2479,9 @@ impl Pipeline3d {
 
         // These stage kinds still draw as a plain stage, but each logs once so
         // the missing behavior stays visible.
+        if fx.distortion {
+            self.warn_once(Warned::Distortion);
+        }
         if stage.glow {
             self.warn_once(Warned::Glow);
         }
@@ -2447,7 +2513,7 @@ impl Pipeline3d {
             // fog modulation cannot reach the screen here and is dropped.
             // ACFF needs blend bits a collapsed stage does not carry, so this
             // arm is near unreachable with fog.
-            let dynamic = !bundle0.tex_mods.is_empty();
+            let dynamic = !bundle0.tex_mods.is_empty() || fx.rewrites_colors();
             let base_vertex = if dynamic {
                 let (source, _) = st_source(bundle0);
                 build_dynamic_block(
@@ -2466,6 +2532,9 @@ impl Pipeline3d {
                     None,
                     &mut self.stage_warnings,
                     dynamic_vertices,
+                    fx,
+                    refdef_time,
+                    view_axis,
                 )
             } else {
                 range.base_vertex
@@ -2495,7 +2564,7 @@ impl Pipeline3d {
         }
         let reads_lightmap = source == StSource::Lightmap;
         let diffuse = stage_image(bundle0, time.shader_time);
-        let dynamic = stage_is_dynamic(stage, false) || fog_mod.is_some();
+        let dynamic = stage_is_dynamic(stage, false) || fog_mod.is_some() || fx.rewrites_colors();
 
         if dynamic {
             let base_vertex = build_dynamic_block(
@@ -2514,6 +2583,9 @@ impl Pipeline3d {
                 None,
                 &mut self.stage_warnings,
                 dynamic_vertices,
+                fx,
+                refdef_time,
+                view_axis,
             );
             Some(StageDrawItem {
                 key,
@@ -2580,6 +2652,8 @@ impl Pipeline3d {
         normals: Option<&[[f32; 4]]>,
         dynamic_vertices: &mut Vec<WorldVertex>,
         globals_offset: u32,
+        refdef_time: i32,
+        view_axis: [f32; 3],
     ) -> Option<StageDrawItem> {
         // A surface-sprite stage draws no plain geometry.
         if let Some(ss) = &stage.ss {
@@ -2590,11 +2664,20 @@ impl Pipeline3d {
         }
 
         let time = StageTime::new(float_time, shader.time_offset);
-        let alpha_func = alpha_func_code(stage.state_bits);
+
+        // The current entity's renderfx overrides for this stage. Two of them
+        // change the state bits, so they resolve before the pipeline key.
+        // Source: oracle/codemp/renderer/tr_shade.cpp:2039-2054,2190-2202
+        let fx = EntityFx::resolve(entity);
+        if fx.distortion {
+            self.warn_once(Warned::Distortion);
+        }
+        let state_bits = fx.state_bits(stage.state_bits);
+        let alpha_func = alpha_func_code(state_bits);
         let key = PipelineKey {
-            blend: blend_state_from_gls(stage.state_bits),
-            depth_equal: (stage.state_bits & GLS_DEPTHFUNC_EQUAL as u32) != 0,
-            depth_write: (stage.state_bits & GLS_DEPTHMASK_TRUE as u32) != 0,
+            blend: blend_state_from_gls(state_bits),
+            depth_equal: (state_bits & GLS_DEPTHFUNC_EQUAL as u32) != 0,
+            depth_write: (state_bits & GLS_DEPTHMASK_TRUE as u32) != 0,
         };
 
         // The fog-density colour modulation runs on the per-frame block when the
@@ -2635,6 +2718,9 @@ impl Pipeline3d {
             normals,
             &mut self.stage_warnings,
             dynamic_vertices,
+            fx,
+            refdef_time,
+            view_axis,
         );
 
         Some(StageDrawItem {
@@ -3261,6 +3347,9 @@ fn build_dynamic_block(
     normals: Option<&[[f32; 4]]>,
     warnings: &mut Stage2dWarnings,
     out: &mut Vec<WorldVertex>,
+    fx: EntityFx,
+    refdef_time: i32,
+    view_axis: [f32; 3],
 ) -> i32 {
     let base_vertex = out.len() as i32;
     let count = cpu.len();
@@ -3285,14 +3374,52 @@ fn build_dynamic_block(
         warnings,
     );
 
+    // The `xyz` block the disintegrate and volumetric arms read, and the one
+    // `RB_CalcDisintegrateVertDeform` moves.
+    let mut xyz: Vec<[f32; 4]> = cpu
+        .iter()
+        .map(|v| [v.position[0], v.position[1], v.position[2], 0.0])
+        .collect();
+
+    // `ComputeColors`'s two short-circuits: either one produces the whole
+    // colour block and skips both generator switches, and the disintegrate arm
+    // additionally moves the vertices.
+    // Source: oracle/codemp/renderer/tr_shade.cpp:1535-1581
+    let short_circuit = (fx.disintegrate1 || fx.disintegrate2 || fx.volumetric)
+        .then(|| entity.map(lighting_ref_entity))
+        .flatten();
+
     // A single-texture stage runs the full rgbGen/alphaGen. A two-texture
     // collapse keeps the input colour, which its shader path never reads.
-    let mut colors: Vec<[u8; 4]> = if two_texture {
+    let mut colors: Vec<[u8; 4]> = if let Some(re) = short_circuit {
+        let mut evaluated = vec![[0u8; 4]; count];
+        if fx.disintegrate1 || fx.disintegrate2 {
+            RB_CalcDisintegrateColors(&mut evaluated, &xyz, &re, refdef_time);
+            // The vert deform only fires under `RF_DISINTEGRATE2`, and it needs
+            // the surface normals. A world surface has none, so it keeps its
+            // vertices.
+            if let Some(n) = normals {
+                RB_CalcDisintegrateVertDeform(&mut xyz, n, &re, refdef_time);
+            }
+        } else {
+            volumetric_colors(&mut evaluated, normals, &re, view_axis);
+        }
+        evaluated
+    } else if two_texture {
         cpu.iter().map(|v| v.color).collect()
     } else {
         let input: Vec<[u8; 4]> = cpu.iter().map(|v| v.color).collect();
         let mut evaluated = vec![[0u8; 4]; count];
-        match (stage.rgb_gen, normals, entity) {
+        // `RF_RGB_TINT` forces `CGEN_ENTITY`, so the stage takes the entity's
+        // own colour instead of its shader's rgbGen.
+        // Source: oracle/codemp/renderer/tr_shade.cpp:2049-2053
+        let rgb_gen = if fx.rgb_tint {
+            colorGen_t::CGEN_ENTITY
+        } else {
+            stage.rgb_gen
+        };
+        let entity_view = entity.map(lighting_ref_entity);
+        match (rgb_gen, normals, entity) {
             // The lighting-diffuse rgbGen runs first, then the alphaGen switch,
             // the same order the oracle's `ComputeColors` keeps.
             (colorGen_t::CGEN_LIGHTING_DIFFUSE, Some(n), Some(ent)) => {
@@ -3329,6 +3456,8 @@ fn build_dynamic_block(
             _ => {
                 stage_colors_into(
                     stage,
+                    rgb_gen,
+                    entity_view.as_ref(),
                     &input,
                     &mut evaluated,
                     time,
@@ -3342,15 +3471,21 @@ fn build_dynamic_block(
         evaluated
     };
 
+    // `ForceAlpha`: every vertex takes the entity's own alpha. It runs after
+    // the generators and before the fog tail, the same place the oracle's
+    // `else if` arm sits in the stage loop.
+    // Source: oracle/codemp/renderer/tr_shade.cpp:2190-2192
+    if fx.force_ent_alpha {
+        for color in colors.iter_mut() {
+            color[3] = fx.ent_alpha;
+        }
+    }
+
     // The `ComputeColors` fog tail: when the surface is fogged and the stage
     // sets `adjustColorsForFog`, fade the colours by fog density. The caller
     // hands `fog_mod` only when the stage's ACFF is not `ACFF_NONE`.
     // Source: oracle/codemp/renderer/tr_shade.cpp:1509-1526
     if let Some(sf) = fog_mod {
-        let xyz: Vec<[f32; 4]> = cpu
-            .iter()
-            .map(|v| [v.position[0], v.position[1], v.position[2], 0.0])
-            .collect();
         match stage.adjust_colors_for_fog {
             acff_t::ACFF_MODULATE_RGB => {
                 RB_CalcModulateColorsByFog(&mut colors, &xyz, sf.fog, sf.ori, sf.view_ori, assets)
@@ -3367,7 +3502,7 @@ fn build_dynamic_block(
 
     for i in 0..count {
         out.push(WorldVertex {
-            position: cpu[i].position,
+            position: [xyz[i][0], xyz[i][1], xyz[i][2]],
             st: st[i],
             lightmap_st: cpu[i].lightmap_st,
             color: colors[i],
@@ -3375,6 +3510,40 @@ fn build_dynamic_block(
     }
 
     base_vertex
+}
+
+/// Raven's `RF_VOLUMETRIC` short-circuit in `ComputeColors`: every channel,
+/// alpha included, takes the entity's red channel faded by the fourth power of
+/// the vertex normal's dot with the view axis.
+///
+/// A surface with no decoded normals (world and sky) has nothing to fade by, so
+/// it takes the entity colour flat.
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:1554-1581`
+fn volumetric_colors(
+    colors: &mut [[u8; 4]],
+    normals: Option<&[[f32; 4]]>,
+    ent: &RefEntity,
+    view_axis: [f32; 3],
+) {
+    let base = ent.shader_rgba[0] as f32;
+    for (i, color) in colors.iter_mut().enumerate() {
+        let dot = match normals.and_then(|n| n.get(i)) {
+            Some(n) => {
+                let mut dot = n[0] * view_axis[0] + n[1] * view_axis[1] + n[2] * view_axis[2];
+                dot *= dot * dot * dot;
+                // so low, so just clamp it
+                if dot < 0.2 {
+                    0.0
+                } else {
+                    dot
+                }
+            }
+            None => 0.0,
+        };
+        let value = myftol(base * (1.0 - dot)) as u8;
+        *color = [value, value, value, value];
+    }
 }
 
 fn texture_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
@@ -3448,6 +3617,94 @@ fn entity_shader_time(entities: &[trRefEntity_t], entity_num: i32) -> f32 {
         .get(entity_num as usize)
         .map(|ent| ent.e.shaderTime)
         .unwrap_or(0.0)
+}
+
+/// The renderfx overrides the current entity applies to every stage of its
+/// surface, resolved once per stage build.
+///
+/// Raven spreads these across `RB_IterateStagesGeneric` (the state-bit and
+/// `forceRGBGen` overrides) and `ComputeColors` (the colour short-circuits).
+/// They are collected here because two of them change the pipeline key, which
+/// is decided before any colour work.
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:2039-2054,2190-2202`
+/// (`RB_IterateStagesGeneric`), `oracle/codemp/renderer/tr_shade.cpp:1535-1581`
+/// (`ComputeColors`)
+#[derive(Clone, Copy, Default)]
+struct EntityFx {
+    /// `RF_DISINTEGRATE1`: the procedural hole-ripping colours, plus a fixed
+    /// state-bit set that depth-writes and alpha-tests the hole.
+    disintegrate1: bool,
+    /// `RF_DISINTEGRATE2`: the same colour short-circuit, no state override.
+    disintegrate2: bool,
+    /// `RF_RGB_TINT`: force `CGEN_ENTITY`, so the stage takes the entity's own
+    /// `shaderRGBA` instead of the shader's rgbGen.
+    rgb_tint: bool,
+    /// `RF_FORCE_ENT_ALPHA`: overwrite every vertex alpha with the entity's,
+    /// and force the alpha-blend state.
+    force_ent_alpha: bool,
+    /// `RF_ALPHA_DEPTH`: the force-alpha state additionally depth-writes.
+    alpha_depth: bool,
+    /// `RF_VOLUMETRIC`: the fake volumetric shading short-circuit.
+    volumetric: bool,
+    /// `RF_DISTORTION`: the screen-capture refraction pass.
+    ///
+    //TODO: Port RB_IterateStagesGeneric's RF_DISTORTION arm
+    // Source: oracle/codemp/renderer/tr_shade.cpp:2162-2168
+    // The arm binds `tr.screenImage` and switches to two-sided culling, so it
+    // needs a screen-capture pass (`RB_CaptureScreenImage`) that no wave has
+    // built. The flag is read only to log once, and the stage draws plain.
+    distortion: bool,
+    /// The entity's `shaderRGBA[3]`, the alpha `RF_FORCE_ENT_ALPHA` writes.
+    ent_alpha: u8,
+}
+
+impl EntityFx {
+    /// Reads the flags off the surface's entity. A surface with no entity (the
+    /// world) applies nothing.
+    fn resolve(entity: Option<&trRefEntity_t>) -> EntityFx {
+        let Some(ent) = entity else {
+            return EntityFx::default();
+        };
+        let fx = ent.e.renderfx;
+        EntityFx {
+            disintegrate1: fx & RF_DISINTEGRATE1 != 0,
+            disintegrate2: fx & RF_DISINTEGRATE2 != 0,
+            rgb_tint: fx & RF_RGB_TINT != 0,
+            force_ent_alpha: fx & RF_FORCE_ENT_ALPHA != 0,
+            alpha_depth: fx & RF_ALPHA_DEPTH != 0,
+            volumetric: fx & RF_VOLUMETRIC != 0,
+            distortion: fx & RF_DISTORTION != 0,
+            ent_alpha: ent.e.shaderRGBA[3],
+        }
+    }
+
+    /// The stage's state bits after the two overrides that replace them
+    /// outright. `RF_DISINTEGRATE1` wins where both apply, matching the
+    /// oracle's order: it rewrites `stateBits` at the top of the stage loop,
+    /// and the force-alpha arm is an `else if` chain below that never sees it.
+    fn state_bits(&self, stage_bits: u32) -> u32 {
+        if self.disintegrate1 {
+            return (GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA
+                | GLS_DEPTHMASK_TRUE) as u32
+                | GLS_ATEST_GE_C0;
+        }
+        if self.force_ent_alpha {
+            let mut bits = (GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA) as u32;
+            if self.alpha_depth {
+                bits |= GLS_DEPTHMASK_TRUE as u32;
+            }
+            return bits;
+        }
+        stage_bits
+    }
+
+    /// Whether any override rewrites the per-vertex colours, which forces the
+    /// stage onto the per-frame dynamic block.
+    fn rewrites_colors(&self) -> bool {
+        self.disintegrate1 || self.disintegrate2 || self.rgb_tint || self.force_ent_alpha
+            || self.volumetric
+    }
 }
 
 /// Appends `RB_AddQuadStampExt`'s four corners and six indices for a quad
@@ -4404,6 +4661,9 @@ mod tests {
             None,
             &mut warnings,
             &mut out,
+            EntityFx::default(),
+            0,
+            [1.0, 0.0, 0.0],
         );
 
         assert_eq!(base, 0);
@@ -4449,6 +4709,9 @@ mod tests {
             None,
             &mut warnings,
             &mut out,
+            EntityFx::default(),
+            0,
+            [1.0, 0.0, 0.0],
         );
 
         assert_eq!(out[0].st, [0.8, 0.9]);
