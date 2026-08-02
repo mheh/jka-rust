@@ -28,13 +28,19 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use mp_engine_client::client_host::snd_from_view;
+use mp_engine_client::snd_ambient::{
+    AS_AddPrecacheEntry, AS_GetBModelSound, AS_ParseSets, S_AddLocalSet, S_UpdateAmbientSet,
+};
 use mp_engine_client::snd_dma::{
     sfxHandle_t, S_AddAmbientLoopingSound, S_AddLoopingSound, S_BeginRegistration,
     S_ClearLoopingSounds, S_DisableSounds, S_GetSampleLengthInMilliSeconds, S_Init, S_MuteSound,
-    S_RawSamples, S_RegisterSound, S_Respatialize, S_Shutdown, S_StartAmbientSound,
-    S_StartLocalLoopingSound, S_StartLocalSound, S_StartSound, S_StopAllSounds, S_StopLoopingSound,
-    S_StopSounds, S_Update, S_UpdateEntityPosition,
+    S_RawSamples, S_RegisterSound, S_Respatialize, S_RestartMusic, S_Shutdown, S_StartAmbientSound,
+    S_StartBackgroundTrack, S_StartLocalLoopingSound, S_StartLocalSound, S_StartSound,
+    S_StopAllSounds, S_StopBackgroundTrack, S_StopLoopingSound, S_StopSounds, S_Update,
+    S_UpdateEntityPosition,
 };
+use mp_engine_client::snd::music_state_e::MusicState_e;
+use mp_engine_client::snd::sfx_sample_data::SfxSampleData;
 use mp_engine_client::snd::sound_system::{SoundSystem, MAX_CHANNELS};
 use mp_engine_client::{Client, SoundSystem as ClientSoundSystem};
 use mp_engine_core::{com_init, engine_host_view, install_engine_hooks, Engine};
@@ -254,13 +260,22 @@ impl Rig {
         let snd = self.engine.snd.as_ref().expect("sound system seated");
         let mut out = format!("SFX {tag} count {}\n", snd.s_knownSfx.len());
         for (i, sfx) in snd.s_knownSfx.iter().enumerate() {
-            let digest = match &sfx.pSoundData {
+            // The harness digests `iSoundLengthInSamples * 2` bytes off
+            // `pSoundData`, which is the PCM block for a `ct_16` sound and the
+            // raw MP3 image for a `ct_MP3` one.
+            let digest = match sfx.pSoundData.as_ref() {
                 Some(data) if sfx.iSoundLengthInSamples > 0 => {
-                    let bytes: Vec<u8> = data[..sfx.iSoundLengthInSamples as usize]
-                        .iter()
-                        .flat_map(|s| s.to_le_bytes())
-                        .collect();
-                    fnv1a(&bytes)
+                    let want = (sfx.iSoundLengthInSamples as usize) * 2;
+                    match data {
+                        SfxSampleData::Pcm(pcm) => {
+                            let bytes: Vec<u8> = pcm[..(want / 2).min(pcm.len())]
+                                .iter()
+                                .flat_map(|s| s.to_le_bytes())
+                                .collect();
+                            fnv1a(&bytes)
+                        }
+                        SfxSampleData::Mp3(raw) => fnv1a(&raw[..want.min(raw.len())]),
+                    }
                 }
                 _ => 0,
             };
@@ -272,6 +287,36 @@ impl Rig {
                 sfx.eSoundCompressionMethod as i32,
                 i32::from(sfx.bDefaultSound),
                 i32::from(sfx.bInMemory),
+            ));
+        }
+        self.out.push_str(&out);
+    }
+
+    /// Source: `tools/snd-oracle/main.cpp` `snd_oracle_dump_music`
+    fn dump_music(&mut self, tag: &str) {
+        let snd = self.engine.snd.as_ref().expect("sound system seated");
+        let mut out = format!("MUSIC {tag}\n");
+        out.push_str(&format!(
+            "  dynamic {} actual {} request {} loop {}\n",
+            i32::from(snd.bMusic_IsDynamic),
+            snd.eMusic_StateActual as i32,
+            snd.eMusic_StateRequest as i32,
+            snd.sMusic_BackgroundLoop
+        ));
+        out.push_str(&format!("  set {}\n", snd.sInfoOnly_CurrentDynamicMusicSet));
+        for track in 0..MusicState_e::eBGRNDTRACK_NUMBEROF as usize {
+            let info = &snd.tMusic_Info[track];
+            out.push_str(&format!(
+                "  track {track} mp3 {} file {} active {} exists {} xfade {} samples {} rate {} chans {} width {}\n",
+                i32::from(info.bIsMP3),
+                info.s_backgroundFile,
+                i32::from(info.bActive),
+                i32::from(info.bExists),
+                info.iXFadeVolume,
+                info.s_backgroundSamples,
+                info.s_backgroundInfo.rate,
+                info.s_backgroundInfo.channels,
+                info.s_backgroundInfo.width
             ));
         }
         self.out.push_str(&out);
@@ -436,6 +481,46 @@ fn run_scenario(name: &str) -> (String, Vec<u8>) {
                 rig.with(|view, snd| S_AddAmbientLoopingSound(view, snd, org, volume, h));
             }
             "clearloops" => rig.with(|_, snd| S_ClearLoopingSounds(snd)),
+            "music" => {
+                let intro = words[1].to_string();
+                let loop_name = if words.len() > 2 {
+                    words[2].to_string()
+                } else {
+                    String::new()
+                };
+                let called_by_cgame = words.len() > 3 && int(3) != 0;
+                rig.with(|view, snd| {
+                    S_StartBackgroundTrack(view, snd, &intro, &loop_name, called_by_cgame)
+                });
+            }
+            "restartmusic" => rig.with(|view, snd| S_RestartMusic(view, snd)),
+            "stopmusic" => rig.with(|view, snd| S_StopBackgroundTrack(view.common, snd)),
+            "asprecache" => {
+                let name = words[1].to_string();
+                rig.with(|_, snd| AS_AddPrecacheEntry(&mut snd.ambient, &name));
+            }
+            "asparse" => rig.with(|view, snd| AS_ParseSets(view, snd)),
+            "asupdate" => {
+                let (name, origin, realtime) = (words[1].to_string(), vec(2), int(5));
+                rig.with(|view, snd| S_UpdateAmbientSet(view, snd, &name, origin, realtime));
+            }
+            "aslocal" => {
+                let name = words[1].to_string();
+                let (listener, origin) = (vec(2), vec(5));
+                let (entID, time, realtime) = (int(8), int(9), int(10));
+                let answer = rig.with(|view, snd| {
+                    S_AddLocalSet(view, snd, &name, listener, origin, entID, time, realtime)
+                });
+                rig.out
+                    .push_str(&format!("LOCALSET name {name} time {answer}\n"));
+            }
+            "asbmodel" => {
+                let (name, stage) = (words[1].to_string(), int(2));
+                let handle = rig.with(|_, snd| AS_GetBModelSound(&snd.ambient, &name, stage));
+                rig.out
+                    .push_str(&format!("BMODELSOUND name {name} stage {stage} handle {handle}\n"));
+            }
+            "dumpmusic" => rig.dump_music(words[1]),
             "addloop" => {
                 let (ent, org, vel, h) = (int(1), vec(2), vec(5), slot(&rig, 8));
                 rig.with(|view, snd| S_AddLoopingSound(view, snd, ent, org, vel, h));
@@ -449,8 +534,8 @@ fn run_scenario(name: &str) -> (String, Vec<u8>) {
                 rig.with(|view, snd| S_MuteSound(view.common, snd, ent, chan));
             }
             "stopsounds" => rig.with(|_, snd| S_StopSounds(snd)),
-            "stopall" => rig.with(|_, snd| S_StopAllSounds(snd)),
-            "disable" => rig.with(|_, snd| S_DisableSounds(snd)),
+            "stopall" => rig.with(|view, snd| S_StopAllSounds(view.common, snd)),
+            "disable" => rig.with(|view, snd| S_DisableSounds(view.common, snd)),
             "rawsamples" => {
                 // A scripted stereo ramp, so the raw path has deterministic content.
                 let (frames, rate, amplitude) = (int(1), int(2), int(3));
@@ -465,7 +550,7 @@ fn run_scenario(name: &str) -> (String, Vec<u8>) {
                 });
             }
             "advance" => rig.advance(int(1)),
-            "update" => rig.with(|view, snd| S_Update(view.common, snd)),
+            "update" => rig.with(|view, snd| S_Update(view, snd)),
             "dumpstate" => rig.dump_state(words[1]),
             "dumpsfx" => rig.dump_sfx(words[1]),
             "dumpring" => rig.dump_ring(words[1]),

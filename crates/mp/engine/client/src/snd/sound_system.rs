@@ -15,13 +15,16 @@ use mp_qshared::shared::cvar::CvarHandle;
 use mp_qshared::shared::limits::MAX_GENTITIES;
 use mp_qshared::shared::vec3_t;
 
+use crate::snd::channel_mp3_state::ChannelMp3State;
 use crate::snd::channel_t::channel_t;
 use crate::snd::dma_t::dma_t;
 use crate::snd::loop_sound_t::{loopSound_t, MAX_LOOP_SOUNDS};
+use crate::snd::music_data_t::MusicData_t;
 use crate::snd::music_info_t::MusicInfo_t;
 use crate::snd::music_state_e::MusicState_e;
 use crate::snd::portable_samplepair_t::portable_samplepair_t;
 use crate::snd::sfx_s::sfx_t;
+use crate::snd_ambient::ambient_system::AmbientSystem;
 
 /// Raven `MAX_CHANNELS` — mixer channels.
 ///
@@ -94,6 +97,10 @@ pub struct SoundSystem {
     /// Raven `s_channels`.
     /// Source: `oracle/codemp/client/snd_dma.cpp:127`
     pub s_channels: Box<[channel_t; MAX_CHANNELS]>,
+    /// Raven's per-channel MP3 block, which the port keeps beside `s_channels`
+    /// rather than inside `channel_t`, so the channel stays `Copy`.
+    /// Source: `oracle/codemp/client/snd_local.h:110-114`
+    pub s_channelsMp3: Vec<ChannelMp3State>,
     /// Raven `s_knownSfx` plus `s_numSfx`: the vector length is the count, and a
     /// slot index is Raven's `sfxHandle_t`.
     /// Source: `oracle/codemp/client/snd_dma.cpp:144-145`
@@ -148,7 +155,7 @@ pub struct SoundSystem {
     /// Source: `oracle/codemp/client/snd_mem.cpp:720`
     pub gbInsideLoadSound: bool,
 
-    // ---- background music (gh#25 fills the loading half) ----
+    // ---- background music ----
     /// Raven `tMusic_Info` and the four music state globals beside it.
     /// Source: `oracle/codemp/client/snd_dma.cpp:104-109`
     pub tMusic_Info: Vec<MusicInfo_t>,
@@ -158,6 +165,15 @@ pub struct SoundSystem {
     /// only valid for non-dynamic music
     pub sMusic_BackgroundLoop: String,
     pub sInfoOnly_CurrentDynamicMusicSet: String,
+    /// Raven's `S_StartBackgroundTrack` file statics `gsIntroMusic` and
+    /// `gsLoopMusic`, which `S_RestartMusic` replays.
+    /// Source: `oracle/codemp/client/snd_dma.cpp:4476-4477`
+    pub gsIntroMusic: String,
+    pub gsLoopMusic: String,
+    /// The `snd_music.cpp` globals.
+    pub music: MusicData_t,
+    /// The `snd_ambient.cpp` globals.
+    pub ambient: AmbientSystem,
 
     // ---- cvar handles ----
     /// Raven's cached `cvar_t*` sound cvars (§B5 index-not-pointer).
@@ -196,6 +212,7 @@ impl Default for SoundSystem {
             listener_origin: [0.0; 3],
             listener_axis: [[0.0; 3]; 3],
             s_channels: Box::new([channel_t::default(); MAX_CHANNELS]),
+            s_channelsMp3: (0..MAX_CHANNELS).map(|_| ChannelMp3State::default()).collect(),
             s_knownSfx: Vec::new(),
             sfxHash: Box::new([None; LOOP_HASH]),
             numLoopSounds: 0,
@@ -239,6 +256,10 @@ impl Default for SoundSystem {
             eMusic_StateRequest: MusicState_e::eBGRNDTRACK_EXPLORE,
             sMusic_BackgroundLoop: String::new(),
             sInfoOnly_CurrentDynamicMusicSet: String::new(),
+            gsIntroMusic: String::new(),
+            gsLoopMusic: String::new(),
+            music: MusicData_t::new(),
+            ambient: AmbientSystem::new(),
             s_volume: None,
             s_volumeVoice: None,
             s_testsound: None,

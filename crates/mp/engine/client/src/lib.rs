@@ -32,7 +32,8 @@ pub mod snd_ambient;
 pub mod snd_dma;
 pub mod snd_mem;
 pub mod snd_mix;
-pub mod snd_stubs;
+pub mod snd_mp3;
+pub mod snd_music;
 pub mod svc_strings;
 
 pub use client_dispatch_ctx::ClientDispatchCtx;

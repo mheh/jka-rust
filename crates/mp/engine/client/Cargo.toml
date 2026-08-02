@@ -8,6 +8,11 @@ name = "mp_engine_client"
 
 [dependencies]
 libc = "0.2"
+# The replaced MP3 decoder (DEC-03, DEC-57.3). Raven's `codemp/mp3code` C decoder
+# does not port; `snd_mp3` keeps Raven's wrap logic and calls this crate for the
+# granule decode. Pure Rust, the zune-jpeg posture of DEC-49.
+symphonia-bundle-mp3 = { version = "0.6", default-features = false, features = ["mp3"] }
+symphonia-core = { version = "0.6", default-features = false }
 native_math = { path = "../../../native/math" }
 native_platform = { path = "../../../native/platform" }
 native_string = { path = "../../../native/string" }

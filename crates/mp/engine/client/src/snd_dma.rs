@@ -4,8 +4,6 @@
 //! and only the software mixer is ported. DEC-57.1 dissolves the five `SNDDMA_*`
 //! functions into the device end: `SoundSystem` owns the ring and the read
 //! cursor, and the device end writes the cursor.
-//! The background-music loader is gh#25 (DEC-57.3), so this file carries only
-//! the music paths the mixer itself runs.
 //!
 //! Source: `oracle/codemp/client/snd_dma.cpp`
 
@@ -21,8 +19,13 @@ use mp_engine_qcommon::common::error::com_error;
 use mp_engine_qcommon::common::Common;
 use mp_engine_qcommon::common_fns::{Com_DPrintf, Com_Milliseconds};
 use mp_engine_qcommon::cvar_fns::{Cvar_Get, Cvar_Set};
-use mp_qshared::shared::cvar::{CVAR_ARCHIVE, CVAR_CHEAT, CVAR_LATCH, CVAR_NORESTART, CVAR_ROM};
+use mp_engine_qcommon::files_common::{FS_FCloseFile, FS_FOpenFileRead, FS_Read};
+use mp_engine_qcommon::sys_engine::Sys_StreamedRead;
+use mp_qshared::shared::cvar::{
+    CVAR_ARCHIVE, CVAR_CHEAT, CVAR_LATCH, CVAR_NORESTART, CVAR_ROM,
+};
 use mp_qshared::shared::error_parm::errorParm_t;
+use mp_qshared::shared::fileHandle_t;
 use mp_qshared::shared::limits::MAX_GENTITIES;
 use mp_qshared::shared::q_string::COM_StripExtension;
 use mp_qshared::shared::sound_channel::{
@@ -33,19 +36,37 @@ use mp_qshared::shared::vec3_t;
 use mp_qshared::shared::MAX_QPATH;
 use mp_renderer::hook_install::rm_from_view;
 use native_math::qmath::{_DotProduct, _VectorCopy, _VectorSubtract, VectorNormalize};
-use native_platform::sys_main::Sys_LowPhysicalMemory;
+use native_platform::sys_main::{Sys_BeginStreamedFile, Sys_EndStreamedFile, Sys_LowPhysicalMemory};
 use native_string::q_string::Q_stricmp;
 
 use crate::client_host::snd_from_view;
 use crate::mp3::mp3_stream::MP3STREAM;
 use crate::snd::channel_t::{channel_t, START_SAMPLE_IMMEDIATE};
 use crate::snd::loop_sound_t::MAX_LOOP_SOUNDS;
+use crate::snd::music_info_t::{
+    iMP3MusicStream_DiskBufferSize, iMP3MusicStream_DiskBytesToRead, MusicInfo_t,
+};
 use crate::snd::music_state_e::MusicState_e;
+use crate::snd::sfx_sample_data::SfxSampleData;
+use crate::snd::sound_compression_method_t::SoundCompressionMethod_t;
 use crate::snd::sound_system::{
     SoundSystem, BGRNDTRACK_NUMBEROF, LOOP_HASH, MAX_CHANNELS, MAX_RAW_SAMPLES, MAX_SFX,
 };
-use crate::snd_mem::S_LoadSound;
+use crate::snd_ambient::{AS_Free, AS_Init};
+use crate::mp3::mp3_stream_state::MP3StreamState;
+use crate::snd::channel_mp3_state::ChannelMp3State;
+use crate::snd::sfx_s::sfx_t;
+use crate::snd_mem::{COM_DefaultExtension_str, S_LoadSound, S_MP3_CalcVols_f_body};
 use crate::snd_mix::S_PaintChannels;
+use crate::snd_mp3::{
+    MP3Stream_GetPlayingTimeInSeconds, MP3Stream_GetRemainingTimeInSeconds, MP3Stream_GetSamples,
+    MP3Stream_InitPlayingTimeFields, MP3Stream_SeekTo, MP3_IsValid,
+};
+use crate::snd_music::{
+    Music_AllowedToTransition, Music_BaseStateToString, Music_DynamicDataAvailable,
+    Music_GetFileNameForState, Music_GetLevelSetName, Music_GetRandomEntryTime,
+    Music_StateCanBeInterrupted,
+};
 
 /// Raven `sfxHandle_t` — the `s_knownSfx` slot a registered sound answers with.
 ///
@@ -81,6 +102,19 @@ const DMA_BUFFER_BYTES: usize = 0x10000;
 /// Raven: so it has to be significantly over, not just break even.
 /// Source: `oracle/codemp/client/snd_mp3.cpp:222`
 const FUZZY_AMOUNT: usize = 5 * 1024;
+
+/// Raven `WAV_FORMAT_PCM` / `WAV_FORMAT_MP3`.
+///
+/// `WAV_FORMAT_MP3` is never a real wav format; it only keeps an MP3 track from
+/// matching one of the legitimate values.
+/// Source: `oracle/codemp/client/snd_local.h:132-134`
+const WAV_FORMAT_PCM: c_int = 1;
+const WAV_FORMAT_MP3: c_int = 3;
+
+/// Raven `fDYNAMIC_XFADE_SECONDS` — the dynamic-music cross-fade length.
+///
+/// Source: `oracle/codemp/client/snd_dma.cpp:102`
+const fDYNAMIC_XFADE_SECONDS: f32 = 1.0;
 
 // ===========================================================================
 // The device end (DEC-57.1)
@@ -134,11 +168,12 @@ fn SNDDMA_GetDMAPos(snd: &SoundSystem) -> c_int {
 
 /// Raven `Channel_Clear` — reset one channel.
 ///
-/// Raven skips the MP3 sliding-decode buffer in the middle of the struct. That
-/// buffer is gh#25 and no field carries it yet, so the whole channel resets.
+/// Raven zeroes everything except the MP3 sliding-decode buffer in the middle of
+/// the struct, so the window allocation survives the clear.
 /// Source: `oracle/codemp/client/snd_dma.cpp:321-330`
 fn Channel_Clear(snd: &mut SoundSystem, channel: usize) {
     snd.s_channels[channel] = channel_t::default();
+    snd.s_channelsMp3[channel].clear();
 }
 
 /// Raven `S_HashSFXName` — the sound-name hash, extension excluded.
@@ -234,6 +269,7 @@ pub fn S_DefaultSound(view: &mut EngineHostView, snd: &mut SoundSystem, sfx: usi
     let data = snd.s_knownSfx[sfx]
         .pSoundData
         .as_mut()
+        .and_then(SfxSampleData::pcm_mut)
         .expect("SND_malloc seated the default sound's block");
     for i in 0..data.len() {
         data[i] = i as i16;
@@ -244,8 +280,8 @@ pub fn S_DefaultSound(view: &mut EngineHostView, snd: &mut SoundSystem, sfx: usi
 ///
 /// Raven: this is called when the hunk is cleared and the sounds are no longer valid.
 /// Source: `oracle/codemp/client/snd_dma.cpp:890-893`
-pub fn S_DisableSounds(snd: &mut SoundSystem) {
-    S_StopAllSounds(snd);
+pub fn S_DisableSounds(common: &mut Common, snd: &mut SoundSystem) {
+    S_StopAllSounds(common, snd);
     snd.s_soundMuted = true;
 }
 
@@ -798,12 +834,12 @@ pub fn S_StopSounds(snd: &mut SoundSystem) {
 /// Raven `S_StopAllSounds` — `S_StopSounds` plus the background track.
 ///
 /// Source: `oracle/codemp/client/snd_dma.cpp:1839-1847`
-pub fn S_StopAllSounds(snd: &mut SoundSystem) {
+pub fn S_StopAllSounds(common: &mut Common, snd: &mut SoundSystem) {
     if snd.s_soundStarted == 0 {
         return;
     }
     // stop the background music
-    S_StopBackgroundTrack(snd);
+    S_StopBackgroundTrack(common, snd);
 
     S_StopSounds(snd);
 }
@@ -982,10 +1018,10 @@ fn S_AddLoopSounds(common: &mut Common, snd: &mut SoundSystem) {
     }
 }
 
-//TODO: Port S_ByteSwapRawSamples
-// Source: oracle/codemp/client/snd_dma.cpp:2071. Only the streamed-WAV music
-// path calls it, and that path is gh#25. The body is a no-op on a little-endian
-// host, which is every target this tree builds for.
+// Raven's `S_ByteSwapRawSamples` returns at once where `LittleShort(256) == 256`,
+// which is every target this tree builds for, so the streamed-WAV call site
+// drops it.
+// Source: `oracle/codemp/client/snd_dma.cpp:2071-2087`
 
 // Raven's `S_GetRawSamplePointer` hands `s_rawsamples` back to a caller that no
 // tree has (porting-rules §20 drops a zero-caller API). `SoundSystem` owns the
@@ -1191,7 +1227,12 @@ fn S_CheckAmplitude(common: &Common, snd: &mut SoundSystem, channel: usize, s_ol
                 usize::try_from(index)
                     .ok()
                     .and_then(|index| {
-                        snd.s_knownSfx[sfx].pSoundData.as_ref()?.get(index).copied()
+                        snd.s_knownSfx[sfx]
+                            .pSoundData
+                            .as_ref()?
+                            .pcm()?
+                            .get(index)
+                            .copied()
                     })
                     .unwrap_or(0),
             );
@@ -1385,10 +1426,12 @@ fn S_DoLipSynchs(common: &mut Common, snd: &mut SoundSystem, s_oldpaintedtime: u
 /// Raven `S_Update` — the once-per-frame driver.
 ///
 /// Source: `oracle/codemp/client/snd_dma.cpp:2700-2741`
-pub fn S_Update(common: &mut Common, snd: &mut SoundSystem) {
+pub fn S_Update(view: &mut EngineHostView, snd: &mut SoundSystem) {
     if snd.s_soundStarted == 0 || snd.s_soundMuted {
         return;
     }
+
+    let common = &mut *view.common;
 
     // debugging output
     if common.cvar(snd.s_show).integer == 2 {
@@ -1422,16 +1465,16 @@ pub fn S_Update(common: &mut Common, snd: &mut SoundSystem) {
     }
 
     // add raw data from streamed samples
-    S_UpdateBackgroundTrack(common, snd);
+    S_UpdateBackgroundTrack(view, snd);
 
     // mix some sound
-    S_Update_(common, snd);
+    S_Update_(view, snd);
 }
 
 /// Raven `S_GetSoundtime` — read the device cursor and set the mix window.
 ///
 /// Source: `oracle/codemp/client/snd_dma.cpp:2743-2784`
-fn S_GetSoundtime(common: &Common, snd: &mut SoundSystem) {
+fn S_GetSoundtime(common: &mut Common, snd: &mut SoundSystem) {
     let fullsamples = snd.dma.samples / snd.dma.channels;
 
     // it is possible to miscount buffers if it has wrapped twice between
@@ -1444,7 +1487,7 @@ fn S_GetSoundtime(common: &Common, snd: &mut SoundSystem) {
             // time to chop things off to avoid 32 bit limits
             snd.buffers = 0;
             snd.s_paintedtime = fullsamples;
-            S_StopAllSounds(snd);
+            S_StopAllSounds(common, snd);
         }
     }
     snd.oldsamplepos = samplepos;
@@ -1463,10 +1506,12 @@ fn S_GetSoundtime(common: &Common, snd: &mut SoundSystem) {
 /// Raven `S_Update_` — paint the mix window and refresh the lip-sync table.
 ///
 /// Source: `oracle/codemp/client/snd_dma.cpp:2787-3072`
-pub fn S_Update_(common: &mut Common, snd: &mut SoundSystem) {
+pub fn S_Update_(view: &mut EngineHostView, snd: &mut SoundSystem) {
     if snd.s_soundStarted == 0 || snd.s_soundMuted {
         return;
     }
+
+    let common = &mut *view.common;
 
     // Updates s_soundtime
     S_GetSoundtime(common, snd);
@@ -1511,7 +1556,14 @@ pub fn S_Update_(common: &mut Common, snd: &mut SoundSystem) {
 /// Source: `oracle/codemp/client/snd_dma.cpp:5017-5034`
 pub fn SND_malloc(view: &mut EngineHostView, snd: &mut SoundSystem, iSize: c_int, sfx: usize) {
     // don't bother asking for zeroed mem
-    snd.s_knownSfx[sfx].pSoundData = Some(vec![0i16; (iSize / 2).max(0) as usize]);
+    let bytes = iSize.max(0) as usize;
+    snd.s_knownSfx[sfx].pSoundData = Some(
+        match snd.s_knownSfx[sfx].eSoundCompressionMethod {
+            // The MP3 arm keeps the raw file image, which is byte sized.
+            SoundCompressionMethod_t::ct_MP3 => SfxSampleData::Mp3(vec![0u8; bytes]),
+            _ => SfxSampleData::Pcm(vec![0i16; bytes / 2]),
+        },
+    );
     snd.sndRawDataBytes += iSize;
 
     // if "s_soundpoolmegs" is < 0, then the -ve of the value is the maximum
@@ -1542,9 +1594,9 @@ fn SND_setup(view: &mut EngineHostView, snd: &mut SoundSystem) {
 /// Raven `SND_MemUsed` — the bytes one sfx holds.
 ///
 /// Source: `oracle/codemp/client/snd_dma.cpp:5053-5065`
-fn SND_MemUsed(snd: &SoundSystem, sfx: usize) -> c_int {
+pub fn SND_MemUsed(snd: &SoundSystem, sfx: usize) -> c_int {
     match &snd.s_knownSfx[sfx].pSoundData {
-        Some(data) => (data.len() * 2) as c_int,
+        Some(data) => data.byte_len() as c_int,
         None => 0,
     }
 }
@@ -1557,6 +1609,9 @@ fn SND_FreeSFXMem(snd: &mut SoundSystem, sfx: usize) -> c_int {
     snd.s_knownSfx[sfx].pSoundData = None;
     snd.sndRawDataBytes -= iBytesFreed;
 
+    // Raven frees the MP3 stream header with the samples.
+    snd.s_knownSfx[sfx].pMP3StreamHeader = None;
+
     snd.s_knownSfx[sfx].bInMemory = false;
 
     iBytesFreed
@@ -1568,8 +1623,12 @@ fn SND_FreeSFXMem(snd: &mut SoundSystem, sfx: usize) -> c_int {
 /// Source: `oracle/codemp/client/snd_dma.cpp:5117-5144`
 fn S_DisplayFreeMemory(view: &mut EngineHostView, snd: &SoundSystem) {
     let iSoundDataSize = snd.sndRawDataBytes;
-    // The dynamic-music tag is gh#25, so its total is zero here.
-    let iMusicDataSize = 0;
+    // Raven's `Z_MemSize(TAG_SND_DYNAMICMUSIC)`: the loaded dynamic-music blocks.
+    let iMusicDataSize: c_int = snd
+        .tMusic_Info
+        .iter()
+        .map(|track| track.pLoadedData.len() as c_int)
+        .sum();
 
     if iSoundDataSize != 0 || iMusicDataSize != 0 {
         let total = (iSoundDataSize + iMusicDataSize) as f32 / 1024.0 / 1024.0;
@@ -1747,16 +1806,140 @@ pub fn S_ReloadAllUsedSounds(view: &mut EngineHostView, snd: &mut SoundSystem) {
 // Background music
 // ===========================================================================
 
+/// Raven `S_FileExists` — does this pak path resolve to a readable file?
+///
+/// Raven: do NOT replace this with a call to `FS_FileExists`, that is for
+/// checking about writing out, and does not work for this.
+/// Source: `oracle/codemp/client/snd_dma.cpp:3963-3973`
+pub fn S_FileExists(view: &mut EngineHostView, psFilename: &str) -> bool {
+    let mut fhTemp: fileHandle_t = 0;
+    // `true` so the handle can be closed without closing a PAK.
+    FS_FOpenFileRead(view, psFilename, &mut fhTemp, true);
+    if fhTemp == 0 {
+        return false;
+    }
+
+    FS_FCloseFile(view.common, fhTemp);
+    true
+}
+
+/// Raven `FGetLittleLong` / `FGetLittleShort` — read one little-endian value off
+/// an open file.
+///
+/// Source: `oracle/codemp/client/snd_dma.cpp:3916-3930`
+fn FGetLittleLong(common: &mut Common, f: fileHandle_t) -> c_int {
+    let mut v = [0u8; 4];
+    FS_Read(common, v.as_mut_ptr() as *mut (), 4, f);
+    c_int::from_le_bytes(v)
+}
+
+fn FGetLittleShort(common: &mut Common, f: fileHandle_t) -> c_int {
+    let mut v = [0u8; 2];
+    FS_Read(common, v.as_mut_ptr() as *mut (), 2, f);
+    c_int::from(i16::from_le_bytes(v))
+}
+
+/// Raven `S_FindWavChunk` — the length of the named chunk, or 0 where the next
+/// chunk is a different one.
+///
+/// Source: `oracle/codemp/client/snd_dma.cpp:3933-3956`
+fn S_FindWavChunk(common: &mut Common, f: fileHandle_t, chunk: &str) -> c_int {
+    let mut name = [0u8; 4];
+    let r = FS_Read(common, name.as_mut_ptr() as *mut (), 4, f);
+    if r != 4 {
+        return 0;
+    }
+    let mut len = FGetLittleLong(common, f);
+    if !(0..=0xfff_ffff).contains(&len) {
+        return 0;
+    }
+    len = (len + 1) & !1; // pad to word boundary
+
+    if name != chunk.as_bytes()[..4] {
+        return 0;
+    }
+    len
+}
+
+/// Raven `MP3MusicStream_Reset` — put the disk window back on the file head.
+///
+/// Source: `oracle/codemp/client/snd_dma.cpp:3977-3981`
+fn MP3MusicStream_Reset(pMusicInfo: &mut MusicInfo_t) {
+    pMusicInfo.iMP3MusicStream_DiskReadPos = 0;
+    pMusicInfo.iMP3MusicStream_DiskWindowPos = 0;
+}
+
+/// Raven `MP3MusicStream_ReadFromDisk` — pull enough of the file into the window
+/// that the decoder can read `iReadBytesNeeded` bytes at `iReadOffset`.
+///
+/// Raven answers the pointer the decoder should read from; the port leaves the
+/// window on `pMusicInfo` and the caller reads it at
+/// `iReadOffset - iMP3MusicStream_DiskWindowPos`.
+/// Source: `oracle/codemp/client/snd_dma.cpp:3986-4018`
+fn MP3MusicStream_ReadFromDisk(
+    common: &mut Common,
+    pMusicInfo: &mut MusicInfo_t,
+    iReadOffset: c_int,
+    iReadBytesNeeded: c_int,
+) {
+    if iReadOffset < pMusicInfo.iMP3MusicStream_DiskWindowPos {
+        // Raven asserts here and returns the window base anyway.
+        return;
+    }
+
+    while iReadOffset + iReadBytesNeeded > pMusicInfo.iMP3MusicStream_DiskReadPos {
+        let at =
+            (pMusicInfo.iMP3MusicStream_DiskReadPos - pMusicInfo.iMP3MusicStream_DiskWindowPos)
+                .max(0) as usize;
+        let room = pMusicInfo.byMP3MusicStream_DiskBuffer.len().saturating_sub(at);
+        let want = (iMP3MusicStream_DiskBytesToRead as usize).min(room);
+        if want == 0 {
+            break;
+        }
+        let handle = pMusicInfo.s_backgroundFile;
+        let iBytesRead = FS_Read(
+            common,
+            pMusicInfo.byMP3MusicStream_DiskBuffer[at..].as_mut_ptr() as *mut (),
+            want as c_int,
+            handle,
+        );
+
+        pMusicInfo.iMP3MusicStream_DiskReadPos += iBytesRead;
+
+        // Quietly ignore any request to read past the file end: the disk code
+        // cannot know how much source a given output size needs, so it always
+        // asks for too much.
+        if iBytesRead != iMP3MusicStream_DiskBytesToRead {
+            break;
+        }
+    }
+
+    // Once past the halfway point of the window, backscroll it.
+    if pMusicInfo.iMP3MusicStream_DiskReadPos - pMusicInfo.iMP3MusicStream_DiskWindowPos
+        > iMP3MusicStream_DiskBufferSize / 2
+    {
+        let iMoveSrcOffset = (iReadOffset - pMusicInfo.iMP3MusicStream_DiskWindowPos).max(0) as usize;
+        let iMoveCount = ((pMusicInfo.iMP3MusicStream_DiskReadPos
+            - pMusicInfo.iMP3MusicStream_DiskWindowPos)
+            .max(0) as usize)
+            .saturating_sub(iMoveSrcOffset);
+        pMusicInfo
+            .byMP3MusicStream_DiskBuffer
+            .copy_within(iMoveSrcOffset..iMoveSrcOffset + iMoveCount, 0);
+        pMusicInfo.iMP3MusicStream_DiskWindowPos += iMoveSrcOffset as c_int;
+    }
+}
+
 /// Raven `S_StopBackgroundTrack_Actual` — close one music track's file.
 ///
+/// Raven notes this does NOT reset `s_rawend`.
 /// Source: `oracle/codemp/client/snd_dma.cpp:4023-4034`
-fn S_StopBackgroundTrack_Actual(snd: &mut SoundSystem, track: usize) {
+fn S_StopBackgroundTrack_Actual(common: &mut Common, snd: &mut SoundSystem, track: usize) {
     if snd.tMusic_Info[track].s_backgroundFile != 0 {
         if snd.tMusic_Info[track].s_backgroundFile != -1 {
-            //TODO: Port S_StopBackgroundTrack_Actual streamed-file close
-            // Source: oracle/codemp/client/snd_dma.cpp:4029. The streamed-file
-            // seam arrives with gh#25, and no gh#24 path opens a track.
-            todo!("Port Sys_EndStreamedFile — oracle/codemp/client/snd_dma.cpp:4029 (gh#25)")
+            let handle = snd.tMusic_Info[track].s_backgroundFile;
+            Sys_EndStreamedFile(handle);
+            FS_FCloseFile(common, handle);
         }
         snd.tMusic_Info[track].s_backgroundFile = 0;
     }
@@ -1778,23 +1961,704 @@ pub fn S_UnCacheDynamicMusic(snd: &mut SoundSystem) {
 /// Raven `S_StopBackgroundTrack` — close every track and reset the raw cursor.
 ///
 /// Source: `oracle/codemp/client/snd_dma.cpp:4624-4632`
-pub fn S_StopBackgroundTrack(snd: &mut SoundSystem) {
+pub fn S_StopBackgroundTrack(common: &mut Common, snd: &mut SoundSystem) {
     for track in 0..BGRNDTRACK_NUMBEROF {
-        S_StopBackgroundTrack_Actual(snd, track);
+        S_StopBackgroundTrack_Actual(common, snd, track);
     }
 
     snd.s_rawend = 0;
 }
 
+/// Raven `FreeMusic` — drop one track's loaded file image.
+///
+/// The block and its name stay valid or invalid together.
+/// Source: `oracle/codemp/client/snd_dma.cpp:4036-4045`
+fn FreeMusic(pMusicInfo: &mut MusicInfo_t) {
+    if !pMusicInfo.pLoadedData.is_empty() {
+        pMusicInfo.pLoadedData = Vec::new();
+        pMusicInfo.sLoadedDataName = String::new();
+        pMusicInfo.iLoadedDataLen = 0;
+    }
+}
+
+/// Raven `MusicInfo_t::SeekTo` — restart the track at one play time.
+///
+/// The port takes the source and the mixer rate the seek needs, which Raven
+/// reads out of file scope.
+/// Source: `oracle/codemp/client/snd_dma.cpp:90-96`
+fn MusicInfo_SeekTo(pMusicInfo: &mut MusicInfo_t, dmaSpeed: c_int, fTime: f32) {
+    pMusicInfo.chMP3_Bgrnd.iMP3SlidingDecodeWindowPos = 0;
+    pMusicInfo.chMP3_Bgrnd.iMP3SlidingDecodeWritePos = 0;
+    let pristine = pMusicInfo.streamMP3_Bgrnd.clone();
+    let source = core::mem::take(&mut pMusicInfo.pLoadedData);
+    MP3Stream_SeekTo(
+        &mut pMusicInfo.chMP3_Bgrnd,
+        &pristine,
+        &source,
+        0,
+        dmaSpeed,
+        fTime,
+    );
+    pMusicInfo.pLoadedData = source;
+    pMusicInfo.s_backgroundSamples = pMusicInfo.sfxMP3_Bgrnd.iSoundLengthInSamples;
+}
+
+/// Raven `S_StartBackgroundTrack_Actual` — open one music track, MP3 or WAV.
+///
+/// A dynamic track is read whole into memory and its file handle drops to -1,
+/// the special "valid, but not a real file" value. A non-dynamic MP3 streams off
+/// disk through the window, and a WAV streams through `Sys_StreamedRead`.
+/// Source: `oracle/codemp/client/snd_dma.cpp:4057-4265`
+fn S_StartBackgroundTrack_Actual(
+    view: &mut EngineHostView,
+    snd: &mut SoundSystem,
+    track: usize,
+    qbDynamic: bool,
+    intro: &str,
+    loop_name: &str,
+) -> bool {
+    snd.sMusic_BackgroundLoop = loop_name.to_string();
+    snd.sMusic_BackgroundLoop.truncate(MAX_QPATH - 1);
+
+    // Raven trims to `sizeof(name) - 4` so a name with no room for an extension
+    // takes the soft fopen error rather than `COM_DefaultExtension`'s ERR_DROP.
+    let mut name = intro.to_string();
+    name.truncate(MAX_QPATH - 4);
+    COM_DefaultExtension_str(&mut name, ".mp3");
+
+    // Close the background track, but do NOT reset `s_rawend`, or the music
+    // still in the ring gets cut off.
+    S_StopBackgroundTrack_Actual(view.common, snd, track);
+
+    let dmaSpeed = snd.dma.speed;
+    let mut pMusicInfo = core::mem::take(&mut snd.tMusic_Info[track]);
+    pMusicInfo.bIsMP3 = false;
+
+    if intro.is_empty() {
+        snd.tMusic_Info[track] = pMusicInfo;
+        return false;
+    }
+
+    // If the file requested is not the one already loaded, ditch that one.
+    if Q_stricmp(&name, &pMusicInfo.sLoadedDataName) != 0 {
+        FreeMusic(&mut pMusicInfo);
+    }
+
+    if name.len() >= 4 && name[name.len() - 4..].eq_ignore_ascii_case(".mp3") {
+        let ok = S_StartBackgroundTrack_Mp3(view, snd, &mut pMusicInfo, &name, qbDynamic, dmaSpeed);
+        snd.tMusic_Info[track] = pMusicInfo;
+        return ok;
+    }
+
+    // Not an MP3 file: open a wav and read the header.
+    let mut handle: fileHandle_t = 0;
+    FS_FOpenFileRead(view, &name, &mut handle, true);
+    pMusicInfo.s_backgroundFile = handle;
+    if pMusicInfo.s_backgroundFile == 0 {
+        com_printf(
+            view.common,
+            &format!("^3WARNING: couldn't open music file {name}\n"),
+        );
+        snd.tMusic_Info[track] = pMusicInfo;
+        return false;
+    }
+
+    // Skip the riff wav header.
+    let mut dump = [0u8; 12];
+    FS_Read(view.common, dump.as_mut_ptr() as *mut (), 12, handle);
+
+    if S_FindWavChunk(view.common, handle, "fmt ") == 0 {
+        com_printf(view.common, &format!("^3WARNING: No fmt chunk in {name}\n"));
+        FS_FCloseFile(view.common, handle);
+        pMusicInfo.s_backgroundFile = 0;
+        snd.tMusic_Info[track] = pMusicInfo;
+        return false;
+    }
+
+    // Save name for soundinfo.
+    pMusicInfo.s_backgroundInfo.format = FGetLittleShort(view.common, handle);
+    pMusicInfo.s_backgroundInfo.channels = FGetLittleShort(view.common, handle);
+    pMusicInfo.s_backgroundInfo.rate = FGetLittleLong(view.common, handle);
+    FGetLittleLong(view.common, handle);
+    FGetLittleShort(view.common, handle);
+    pMusicInfo.s_backgroundInfo.width = FGetLittleShort(view.common, handle) / 8;
+
+    if pMusicInfo.s_backgroundInfo.format != WAV_FORMAT_PCM {
+        FS_FCloseFile(view.common, handle);
+        pMusicInfo.s_backgroundFile = 0;
+        com_printf(
+            view.common,
+            &format!("^3WARNING: Not a microsoft PCM format wav: {name}\n"),
+        );
+        snd.tMusic_Info[track] = pMusicInfo;
+        return false;
+    }
+
+    if pMusicInfo.s_backgroundInfo.channels != 2 || pMusicInfo.s_backgroundInfo.rate != 22050 {
+        com_printf(
+            view.common,
+            &format!("^3WARNING: music file {name} is not 22k stereo\n"),
+        );
+    }
+
+    let len = S_FindWavChunk(view.common, handle, "data");
+    if len == 0 {
+        FS_FCloseFile(view.common, handle);
+        pMusicInfo.s_backgroundFile = 0;
+        com_printf(view.common, &format!("^3WARNING: No data chunk in {name}\n"));
+        snd.tMusic_Info[track] = pMusicInfo;
+        return false;
+    }
+
+    pMusicInfo.s_backgroundInfo.samples =
+        len / (pMusicInfo.s_backgroundInfo.width * pMusicInfo.s_backgroundInfo.channels).max(1);
+    pMusicInfo.s_backgroundSamples = pMusicInfo.s_backgroundInfo.samples;
+
+    // Start the background streaming.
+    Sys_BeginStreamedFile(handle, 0x10000);
+
+    snd.tMusic_Info[track] = pMusicInfo;
+    true
+}
+
+/// The MP3 half of `S_StartBackgroundTrack_Actual`.
+///
+/// Source: `oracle/codemp/client/snd_dma.cpp:4088-4205`
+fn S_StartBackgroundTrack_Mp3(
+    view: &mut EngineHostView,
+    snd: &mut SoundSystem,
+    pMusicInfo: &mut MusicInfo_t,
+    name: &str,
+    qbDynamic: bool,
+    dmaSpeed: c_int,
+) -> bool {
+    if !pMusicInfo.pLoadedData.is_empty() {
+        pMusicInfo.s_backgroundFile = -1;
+    } else {
+        let mut handle: fileHandle_t = 0;
+        pMusicInfo.iLoadedDataLen = FS_FOpenFileRead(view, name, &mut handle, true);
+        pMusicInfo.s_backgroundFile = handle;
+    }
+
+    if pMusicInfo.s_backgroundFile == 0 {
+        com_printf(
+            view.common,
+            &format!("^1Couldn't open music file {name}\n"),
+        );
+        return false;
+    }
+
+    MP3MusicStream_Reset(pMusicInfo);
+
+    // Raven: fairly arbitrary. The decoder may scan up to halfway through this
+    // block looking for a floating header, so it must not be too small.
+    let mut iInitialMP3ReadSize: c_int = 8192;
+
+    if qbDynamic {
+        if pMusicInfo.pLoadedData.is_empty() {
+            let want = pMusicInfo.iLoadedDataLen.max(0) as usize;
+            let mut data = vec![0u8; want];
+            S_ClearSoundBuffer(snd);
+            let handle = pMusicInfo.s_backgroundFile;
+            FS_Read(
+                view.common,
+                data.as_mut_ptr() as *mut (),
+                pMusicInfo.iLoadedDataLen,
+                handle,
+            );
+            pMusicInfo.pLoadedData = data;
+            pMusicInfo.sLoadedDataName = name.to_string();
+            pMusicInfo.sLoadedDataName.truncate(MAX_QPATH - 1);
+        }
+        iInitialMP3ReadSize = pMusicInfo.iLoadedDataLen;
+    } else {
+        MP3MusicStream_ReadFromDisk(view.common, pMusicInfo, 0, iInitialMP3ReadSize);
+    }
+
+    // The decoder reads the loaded block for a dynamic track, and the disk
+    // window for a streamed one.
+    let segment: Vec<u8> = if qbDynamic {
+        pMusicInfo.pLoadedData.clone()
+    } else {
+        pMusicInfo.byMP3MusicStream_DiskBuffer.clone()
+    };
+
+    if !MP3_IsValid(view.common, name, &segment, iInitialMP3ReadSize, true) {
+        // `MP3_IsValid` has already printed the reason.
+        if pMusicInfo.s_backgroundFile != -1 {
+            FS_FCloseFile(view.common, pMusicInfo.s_backgroundFile);
+        }
+        pMusicInfo.s_backgroundFile = 0;
+        return false;
+    }
+
+    // Init the stream struct.
+    pMusicInfo.streamMP3_Bgrnd = MP3StreamState::default();
+    let psError = pMusicInfo.streamMP3_Bgrnd.DecodeInit(
+        &segment,
+        pMusicInfo.iLoadedDataLen,
+        dmaSpeed,
+        true,
+    );
+
+    let Some(error) = psError else {
+        // Init the sfx struct and set up the few fields actually needed.
+        pMusicInfo.sfxMP3_Bgrnd = sfx_t::default();
+        // Max possible positive int: music finishes when the decoder stops.
+        pMusicInfo.sfxMP3_Bgrnd.iSoundLengthInSamples = 0x7fff_ffff;
+        pMusicInfo.sfxMP3_Bgrnd.sSoundName = name.to_string();
+        pMusicInfo.sfxMP3_Bgrnd.sSoundName.truncate(MAX_QPATH - 1);
+        pMusicInfo.sfxMP3_Bgrnd.pMP3StreamHeader =
+            Some(Box::new(pMusicInfo.streamMP3_Bgrnd.clone()));
+
+        if qbDynamic {
+            MP3Stream_InitPlayingTimeFields(
+                view.common,
+                &mut pMusicInfo.streamMP3_Bgrnd,
+                name,
+                &segment,
+                pMusicInfo.iLoadedDataLen,
+                true,
+            );
+        }
+
+        // Not actually used as a format, but it cannot collide with a real one.
+        pMusicInfo.s_backgroundInfo.format = WAV_FORMAT_MP3;
+        // Always two channels for our MP3s when used for music, one for effects.
+        pMusicInfo.s_backgroundInfo.channels = 2;
+        pMusicInfo.s_backgroundInfo.rate = dmaSpeed;
+        pMusicInfo.s_backgroundInfo.width = 2;
+        pMusicInfo.s_backgroundInfo.samples = pMusicInfo.sfxMP3_Bgrnd.iSoundLengthInSamples;
+        pMusicInfo.s_backgroundSamples = pMusicInfo.sfxMP3_Bgrnd.iSoundLengthInSamples;
+
+        pMusicInfo.chMP3_Bgrnd = ChannelMp3State::default();
+        pMusicInfo.chMP3_Bgrnd.MP3StreamHeader = pMusicInfo.streamMP3_Bgrnd.clone();
+
+        if qbDynamic && pMusicInfo.s_backgroundFile != -1 {
+            FS_FCloseFile(view.common, pMusicInfo.s_backgroundFile);
+            // The special MP3 value for "valid, but not a real file".
+            pMusicInfo.s_backgroundFile = -1;
+        }
+
+        pMusicInfo.bIsMP3 = true;
+        return true;
+    };
+
+    com_printf(
+        view.common,
+        &format!("^1Error streaming file {name}: {error}\n"),
+    );
+    if pMusicInfo.s_backgroundFile != -1 {
+        FS_FCloseFile(view.common, pMusicInfo.s_backgroundFile);
+    }
+    pMusicInfo.s_backgroundFile = 0;
+    false
+}
+
+/// Raven `S_SwitchDynamicTracks` — move the old track into the fader and bring
+/// the new one up.
+///
+/// Source: `oracle/codemp/client/snd_dma.cpp:4268-4299`
+fn S_SwitchDynamicTracks(
+    view: &mut EngineHostView,
+    snd: &mut SoundSystem,
+    eOldState: MusicState_e,
+    eNewState: MusicState_e,
+    bNewTrackStartsFullVolume: bool,
+) {
+    let now = Com_Milliseconds(view);
+
+    // Copy the old track into the fader. `bActive` and `bExists` come with it.
+    snd.tMusic_Info[MusicState_e::eBGRNDTRACK_FADE as usize] =
+        snd.tMusic_Info[eOldState as usize].clone();
+    let fade = MusicState_e::eBGRNDTRACK_FADE as usize;
+    snd.tMusic_Info[fade].iXFadeVolumeSeekTime = now;
+    snd.tMusic_Info[fade].iXFadeVolumeSeekTo = 0;
+
+    // ... and deactivate.
+    snd.tMusic_Info[eOldState as usize].bActive = false;
+
+    // Set the new track to either full volume or a fade up.
+    let new = eNewState as usize;
+    snd.tMusic_Info[new].bActive = true;
+    snd.tMusic_Info[new].iXFadeVolumeSeekTime = now;
+    snd.tMusic_Info[new].iXFadeVolumeSeekTo = 255;
+    snd.tMusic_Info[new].iXFadeVolume = if bNewTrackStartsFullVolume { 255 } else { 0 };
+
+    snd.eMusic_StateActual = eNewState;
+
+    if view.common.cvar(snd.s_debugdynamic).integer != 0 {
+        let psNewStateString = Music_BaseStateToString(eNewState, true).unwrap_or("<unknown>");
+        com_printf(
+            view.common,
+            &format!("^6S_SwitchDynamicTracks( \"{psNewStateString}\" )\n"),
+        );
+    }
+}
+
+/// Raven `S_SetDynamicMusicState` — record the state the game asked for.
+///
+/// The change is applied later, because a transition may not be interruptible.
+/// Source: `oracle/codemp/client/snd_dma.cpp:4306-4320`
+fn S_SetDynamicMusicState(
+    view: &mut EngineHostView,
+    snd: &mut SoundSystem,
+    eNewState: MusicState_e,
+) {
+    if snd.eMusic_StateRequest != eNewState {
+        snd.eMusic_StateRequest = eNewState;
+
+        if view.common.cvar(snd.s_debugdynamic).integer != 0 {
+            let psNewStateString = Music_BaseStateToString(eNewState, true).unwrap_or("<unknown>");
+            com_printf(
+                view.common,
+                &format!("^6S_SetDynamicMusicState( Request: \"{psNewStateString}\" )\n"),
+            );
+        }
+    }
+}
+
+/// Raven `S_HandleDynamicMusicStateChange` — apply a pending state change where
+/// the playing track allows it.
+///
+/// Source: `oracle/codemp/client/snd_dma.cpp:4323-4472`
+fn S_HandleDynamicMusicStateChange(view: &mut EngineHostView, snd: &mut SoundSystem) {
+    if snd.eMusic_StateRequest == snd.eMusic_StateActual {
+        return;
+    }
+    if !Music_StateCanBeInterrupted(snd.eMusic_StateActual, snd.eMusic_StateRequest) {
+        return;
+    }
+
+    let dmaSpeed = snd.dma.speed;
+    let actual = snd.eMusic_StateActual;
+    let request = snd.eMusic_StateRequest;
+    let fPlayingTimeElapsed = playing_time_elapsed(snd, actual, dmaSpeed);
+
+    match request {
+        // From action or silence.
+        MusicState_e::eBGRNDTRACK_EXPLORE => match actual {
+            MusicState_e::eBGRNDTRACK_ACTION => {
+                // Find the transition track to play, the entry point for explore
+                // when it gets there, and whether this is a permitted exit at all.
+                if let Some((eTransition, fNewTrackEntryTime)) = Music_AllowedToTransition(
+                    view,
+                    &snd.music,
+                    fPlayingTimeElapsed,
+                    MusicState_e::eBGRNDTRACK_ACTION,
+                ) {
+                    S_SwitchDynamicTracks(view, snd, actual, eTransition, false);
+
+                    snd.tMusic_Info[eTransition as usize].Rewind();
+                    snd.tMusic_Info[eTransition as usize].bTrackSwitchPending = true;
+                    snd.tMusic_Info[eTransition as usize].eTS_NewState = request;
+                    snd.tMusic_Info[eTransition as usize].fTS_NewTime = fNewTrackEntryTime;
+                }
+            }
+            MusicState_e::eBGRNDTRACK_SILENCE => {
+                S_SwitchDynamicTracks(view, snd, actual, request, false);
+                snd.tMusic_Info[request as usize].Rewind();
+            }
+            // Raven asserts here: a state he did not expect to transition from.
+            _ => {
+                S_SwitchDynamicTracks(view, snd, actual, MusicState_e::eBGRNDTRACK_SILENCE, false);
+            }
+        },
+
+        // From explore or action.
+        MusicState_e::eBGRNDTRACK_SILENCE => match actual {
+            MusicState_e::eBGRNDTRACK_ACTION | MusicState_e::eBGRNDTRACK_EXPLORE => {
+                if let Some((eTransition, _)) =
+                    Music_AllowedToTransition(view, &snd.music, fPlayingTimeElapsed, actual)
+                {
+                    S_SwitchDynamicTracks(view, snd, actual, eTransition, false);
+
+                    snd.tMusic_Info[eTransition as usize].Rewind();
+                    snd.tMusic_Info[eTransition as usize].bTrackSwitchPending = true;
+                    snd.tMusic_Info[eTransition as usize].eTS_NewState = request;
+                    // The entry time is irrelevant when switching to silence.
+                    snd.tMusic_Info[eTransition as usize].fTS_NewTime = 0.0;
+                }
+            }
+            // Raven asserts on an unhandled type and falls through to the boss
+            // case, which just switches to silence.
+            _ => {
+                S_SwitchDynamicTracks(view, snd, actual, MusicState_e::eBGRNDTRACK_SILENCE, false);
+            }
+        },
+
+        // Anything to action.
+        MusicState_e::eBGRNDTRACK_ACTION => match actual {
+            MusicState_e::eBGRNDTRACK_SILENCE => {
+                S_SwitchDynamicTracks(view, snd, actual, request, false);
+                snd.tMusic_Info[request as usize].Rewind();
+            }
+            _ => {
+                S_SwitchDynamicTracks(view, snd, actual, request, true);
+                let rand = view.common.qrand.rand();
+                let fEntryTime = Music_GetRandomEntryTime(&mut snd.music, rand, request);
+                MusicInfo_SeekTo(&mut snd.tMusic_Info[request as usize], dmaSpeed, fEntryTime);
+            }
+        },
+
+        // Boss and death are each entered once, at the start, and cannot exit,
+        // so neither needs a rewind or a fast forward.
+        MusicState_e::eBGRNDTRACK_BOSS => {
+            S_SwitchDynamicTracks(view, snd, actual, request, false);
+        }
+        MusicState_e::eBGRNDTRACK_DEATH => {
+            S_SwitchDynamicTracks(view, snd, actual, request, true);
+        }
+
+        // Raven asserts on an unknown request and ignores it.
+        _ => {}
+    }
+}
+
+/// The play position of one dynamic track, in seconds.
+///
+/// Source: `oracle/codemp/client/snd_dma.cpp:4344,4400`
+fn playing_time_elapsed(snd: &SoundSystem, state: MusicState_e, dmaSpeed: c_int) -> f32 {
+    let stream = &snd.tMusic_Info[state as usize].chMP3_Bgrnd.MP3StreamHeader;
+    MP3Stream_GetPlayingTimeInSeconds(stream)
+        - MP3Stream_GetRemainingTimeInSeconds(stream, dmaSpeed)
+}
+
+/// Raven `S_RestartMusic` — replay the track the last `S_StartBackgroundTrack`
+/// asked for, and put the dynamic state back.
+///
+/// Raven no longer tests the two saved names, because they are blank for a
+/// dynamic-music level, but he still uses them.
+/// Source: `oracle/codemp/client/snd_dma.cpp:4479-4490`
+pub fn S_RestartMusic(view: &mut EngineHostView, snd: &mut SoundSystem) {
+    if snd.s_soundStarted != 0 && !snd.s_soundMuted {
+        let ePrevState = snd.eMusic_StateRequest;
+        let intro = snd.gsIntroMusic.clone();
+        let loop_name = snd.gsLoopMusic.clone();
+        // The default music start sets the state to EXPLORE.
+        S_StartBackgroundTrack(view, snd, &intro, &loop_name, false);
+        // Restore the previous state.
+        S_SetDynamicMusicState(view, snd, ePrevState);
+    }
+}
+
+/// Raven `S_StartBackgroundTrack` — start the music one level asked for.
+///
+/// A literal file name streams as one track. A name with no file behind it is a
+/// dynamic-music label, so every data track loads and the explore piece starts.
+/// Raven notes that some of the file-check logic only works for MP3s.
+/// Source: `oracle/codemp/client/snd_dma.cpp:4499-4622`
+pub fn S_StartBackgroundTrack(
+    view: &mut EngineHostView,
+    snd: &mut SoundSystem,
+    intro: &str,
+    loop_name: &str,
+    bCalledByCGameStart: bool,
+) {
+    snd.bMusic_IsDynamic = false;
+
+    if snd.s_soundStarted == 0 {
+        // We have no sound, so don't even bother trying.
+        return;
+    }
+
+    let loop_name = if loop_name.is_empty() { intro } else { loop_name };
+
+    snd.gsIntroMusic = intro.to_string();
+    snd.gsIntroMusic.truncate(MAX_QPATH - 1);
+    snd.gsLoopMusic = loop_name.to_string();
+    snd.gsLoopMusic.truncate(MAX_QPATH - 1);
+
+    let mut sNameIntro = snd.gsIntroMusic.clone();
+    let mut sNameLoop = snd.gsLoopMusic.clone();
+
+    COM_DefaultExtension_str(&mut sNameIntro, ".mp3");
+    COM_DefaultExtension_str(&mut sNameLoop, ".mp3");
+
+    // Where dynamic music is not allowed, stream the explore piece instead of
+    // playing dynamic. Raven names `intro` here, not the ".mp3" version.
+    if view.common.cvar(snd.s_allowDynamicMusic).integer == 0
+        && Music_DynamicDataAvailable(view, snd, intro)
+    {
+        let psMusicName =
+            Music_GetFileNameForState(&snd.music, MusicState_e::eBGRNDTRACK_EXPLORE);
+        if let Some(psMusicName) = psMusicName {
+            if S_FileExists(view, &psMusicName) {
+                sNameIntro = psMusicName.clone();
+                sNameLoop = psMusicName;
+            }
+        }
+    }
+
+    // The 'intro' track always plays; the intro-to-loop switch happens in
+    // `S_UpdateBackgroundTrack`. Raven's `strstr("/")` test avoids an extra
+    // file check at runtime, because a literal music name always has a slash.
+    if sNameIntro.contains('/') && S_FileExists(view, &sNameIntro) {
+        let psLoopName = if S_FileExists(view, &sNameLoop) {
+            sNameLoop.clone()
+        } else {
+            sNameIntro.clone()
+        };
+        Com_DPrintf(
+            view.common,
+            &format!(
+                "S_StartBackgroundTrack: Found/using non-dynamic music track '{sNameIntro}' (loop: '{psLoopName}')\n"
+            ),
+        );
+        let dynamic = snd.bMusic_IsDynamic;
+        S_StartBackgroundTrack_Actual(
+            view,
+            snd,
+            MusicState_e::eBGRNDTRACK_NONDYNAMIC as usize,
+            dynamic,
+            &sNameIntro,
+            &psLoopName,
+        );
+    } else if Music_DynamicDataAvailable(view, snd, intro) {
+        snd.sInfoOnly_CurrentDynamicMusicSet = Music_GetLevelSetName(&snd.music);
+        snd.sInfoOnly_CurrentDynamicMusicSet.truncate(63);
+
+        for i in 0..MusicState_e::eBGRNDTRACK_NONDYNAMIC as usize {
+            let mut bOk = false;
+            let state = music_state_from_index(i);
+            let psMusicName = Music_GetFileNameForState(&snd.music, state);
+            if let Some(psMusicName) = psMusicName {
+                let loaded = Q_stricmp(&snd.tMusic_Info[i].sLoadedDataName, &psMusicName) == 0;
+                if loaded || S_FileExists(view, &psMusicName) {
+                    bOk = S_StartBackgroundTrack_Actual(
+                        view,
+                        snd,
+                        i,
+                        true,
+                        &psMusicName,
+                        loop_name,
+                    );
+                }
+            }
+
+            snd.tMusic_Info[i].bExists = bOk;
+
+            if !snd.tMusic_Info[i].bExists {
+                FreeMusic(&mut snd.tMusic_Info[i]);
+            }
+        }
+
+        // Default all tracks to OFF first, and set the other vars.
+        for i in 0..BGRNDTRACK_NUMBEROF {
+            snd.tMusic_Info[i].bActive = false;
+            snd.tMusic_Info[i].bTrackSwitchPending = false;
+            snd.tMusic_Info[i].fSmoothedOutVolume = 0.25;
+        }
+
+        if snd.tMusic_Info[MusicState_e::eBGRNDTRACK_EXPLORE as usize].bExists
+            && snd.tMusic_Info[MusicState_e::eBGRNDTRACK_ACTION as usize].bExists
+        {
+            Com_DPrintf(
+                view.common,
+                "S_StartBackgroundTrack: Found dynamic music tracks\n",
+            );
+            snd.bMusic_IsDynamic = true;
+
+            // ... then start the default music state.
+            snd.eMusic_StateActual = MusicState_e::eBGRNDTRACK_EXPLORE;
+            snd.eMusic_StateRequest = MusicState_e::eBGRNDTRACK_EXPLORE;
+
+            let now = Com_Milliseconds(view);
+            let track = snd.eMusic_StateActual as usize;
+            snd.tMusic_Info[track].bActive = true;
+            snd.tMusic_Info[track].iXFadeVolumeSeekTime = now;
+            snd.tMusic_Info[track].iXFadeVolumeSeekTo = 255;
+            snd.tMusic_Info[track].iXFadeVolume = 0;
+        } else {
+            com_printf(
+                view.common,
+                "^1Dynamic music did not have both 'action' and 'explore' versions, inhibiting...\n",
+            );
+            S_StopBackgroundTrack(view.common, snd);
+        }
+    } else if !sNameIntro.starts_with('.') {
+        // A blank name with ".mp3" attached prints nothing.
+        com_printf(
+            view.common,
+            &format!(
+                "^1Unable to find music \"{sNameIntro}\" as explicit track or dynamic music entry!\n"
+            ),
+        );
+        S_StopBackgroundTrack(view.common, snd);
+    }
+
+    if bCalledByCGameStart {
+        S_StopBackgroundTrack(view.common, snd);
+    }
+}
+
+/// The `MusicState_e` one track index names.
+///
+/// Raven casts the loop counter, and the twelve data tracks are the first twelve
+/// enumerators.
+fn music_state_from_index(i: usize) -> MusicState_e {
+    match i {
+        0 => MusicState_e::eBGRNDTRACK_EXPLORE,
+        1 => MusicState_e::eBGRNDTRACK_ACTION,
+        2 => MusicState_e::eBGRNDTRACK_BOSS,
+        3 => MusicState_e::eBGRNDTRACK_DEATH,
+        4 => MusicState_e::eBGRNDTRACK_ACTIONTRANS0,
+        5 => MusicState_e::eBGRNDTRACK_ACTIONTRANS1,
+        6 => MusicState_e::eBGRNDTRACK_ACTIONTRANS2,
+        7 => MusicState_e::eBGRNDTRACK_ACTIONTRANS3,
+        8 => MusicState_e::eBGRNDTRACK_EXPLORETRANS0,
+        9 => MusicState_e::eBGRNDTRACK_EXPLORETRANS1,
+        10 => MusicState_e::eBGRNDTRACK_EXPLORETRANS2,
+        11 => MusicState_e::eBGRNDTRACK_EXPLORETRANS3,
+        12 => MusicState_e::eBGRNDTRACK_NONDYNAMIC,
+        13 => MusicState_e::eBGRNDTRACK_SILENCE,
+        _ => MusicState_e::eBGRNDTRACK_FADE,
+    }
+}
+
+/// Raven `SIZEOF_RAW_BUFFER_FOR_MP3` and the `raw[30000]` stack block.
+///
+/// Raven: 30000 is far too big for the window decoder to handle in one request,
+/// because of the time-travel issue that normal sfx buffer painting brings, so
+/// the MP3 arm asks for 4096 instead.
+/// Source: `oracle/codemp/client/snd_dma.cpp:4642,4675-4676`
+const RAW_BUFFER_BYTES: usize = 30000;
+const SIZEOF_RAW_BUFFER_FOR_MP3: usize = 4096;
+
 /// Raven `S_UpdateBackgroundTrack_Actual` — feed the raw ring from one music track.
 ///
-/// A track with no open file returns at once, which is every gh#24 path.
+/// Returns true only where a streamed intro wants to hand over to a dynamic loop.
 /// Source: `oracle/codemp/client/snd_dma.cpp:4638-4807`
-fn S_UpdateBackgroundTrack_Actual(snd: &mut SoundSystem, track: usize, fDefaultVolume: f32) -> bool {
-    let fMasterVol = fDefaultVolume;
+fn S_UpdateBackgroundTrack_Actual(
+    view: &mut EngineHostView,
+    snd: &mut SoundSystem,
+    track: usize,
+    bFirstOrOnlyMusicTrack: bool,
+    fDefaultVolume: f32,
+) -> bool {
+    let mut raw = vec![0u8; RAW_BUFFER_BYTES];
+    let mut fMasterVol = fDefaultVolume;
 
-    // The dynamic cross-fade step above this line runs only under
-    // `bMusic_IsDynamic`, which gh#24 never sets.
+    if snd.bMusic_IsDynamic {
+        // Step the cross-fade volume.
+        if snd.tMusic_Info[track].iXFadeVolume != snd.tMusic_Info[track].iXFadeVolumeSeekTo {
+            let iFadeMillisecondsElapsed =
+                Com_Milliseconds(view) - snd.tMusic_Info[track].iXFadeVolumeSeekTime;
+
+            if iFadeMillisecondsElapsed as f32 > fDYNAMIC_XFADE_SECONDS * 1000.0 {
+                snd.tMusic_Info[track].iXFadeVolume = snd.tMusic_Info[track].iXFadeVolumeSeekTo;
+            } else {
+                snd.tMusic_Info[track].iXFadeVolume = (255.0
+                    * (iFadeMillisecondsElapsed as f32 / (fDYNAMIC_XFADE_SECONDS * 1000.0)))
+                    as c_int;
+                if snd.tMusic_Info[track].iXFadeVolumeSeekTo == 0 {
+                    // bleurgh
+                    snd.tMusic_Info[track].iXFadeVolume = 255 - snd.tMusic_Info[track].iXFadeVolume;
+                }
+            }
+        }
+        fMasterVol *= snd.tMusic_Info[track].iXFadeVolume as f32 / 255.0;
+    }
 
     if snd.tMusic_Info[track].s_backgroundFile == 0 {
         return false;
@@ -1808,46 +2672,360 @@ fn S_UpdateBackgroundTrack_Actual(snd: &mut SoundSystem, track: usize, fDefaultV
         return false;
     }
 
-    //TODO: Port S_UpdateBackgroundTrack_Actual streaming body
-    // Source: oracle/codemp/client/snd_dma.cpp:4686-4801. The streamed-file and
-    // MP3 reads arrive with gh#25, and no gh#24 path opens a track.
-    todo!("Port S_UpdateBackgroundTrack_Actual — oracle/codemp/client/snd_dma.cpp:4686 (gh#25)")
+    let RAWSIZE = if snd.tMusic_Info[track].bIsMP3 {
+        SIZEOF_RAW_BUFFER_FOR_MP3
+    } else {
+        RAW_BUFFER_BYTES
+    } as c_int;
+
+    // see how many samples should be copied into the raw buffer
+    if snd.s_rawend < snd.s_soundtime {
+        snd.s_rawend = snd.s_soundtime;
+    }
+
+    while snd.s_rawend < snd.s_soundtime + MAX_RAW_SAMPLES as c_int {
+        let bufferSamples = MAX_RAW_SAMPLES as c_int - (snd.s_rawend - snd.s_soundtime);
+
+        // decide how much data needs to be read from the file
+        let mut fileSamples =
+            bufferSamples * snd.tMusic_Info[track].s_backgroundInfo.rate / snd.dma.speed;
+
+        // don't try and read past the end of the file
+        if fileSamples > snd.tMusic_Info[track].s_backgroundSamples {
+            fileSamples = snd.tMusic_Info[track].s_backgroundSamples;
+        }
+
+        // our max buffer size
+        let frameBytes = (snd.tMusic_Info[track].s_backgroundInfo.width
+            * snd.tMusic_Info[track].s_backgroundInfo.channels)
+            .max(1);
+        let mut fileBytes = fileSamples * frameBytes;
+        if fileBytes > RAWSIZE {
+            fileBytes = RAWSIZE;
+            fileSamples = fileBytes / frameBytes;
+        }
+
+        let mut qbForceFinish = false;
+        if snd.tMusic_Info[track].bIsMP3 {
+            // This one IS relevant.
+            let iStartingSampleNum = snd.tMusic_Info[track].sfxMP3_Bgrnd.iSoundLengthInSamples
+                - snd.tMusic_Info[track].s_backgroundSamples;
+
+            let mut pcm = vec![0i16; (fileBytes / 2).max(0) as usize];
+            let mut pMusicInfo = core::mem::take(&mut snd.tMusic_Info[track]);
+
+            let stillGoing = if pMusicInfo.s_backgroundFile == -1 {
+                // in-mem...
+                let source = core::mem::take(&mut pMusicInfo.pLoadedData);
+                let going = MP3Stream_GetSamples(
+                    &mut pMusicInfo.chMP3_Bgrnd,
+                    &source,
+                    0,
+                    iStartingSampleNum,
+                    fileBytes / 2,
+                    &mut pcm,
+                    true,
+                );
+                pMusicInfo.pLoadedData = source;
+                going
+            } else {
+                // Streaming an MP3 off disk. The `fileBytes` request size is not
+                // that relevant for an MP3, because the code here cannot know
+                // how much source the decoder needs.
+                let readIndex = pMusicInfo.chMP3_Bgrnd.MP3StreamHeader.iSourceReadIndex;
+                MP3MusicStream_ReadFromDisk(view.common, &mut pMusicInfo, readIndex, fileBytes);
+                let origin = pMusicInfo.iMP3MusicStream_DiskWindowPos;
+                let source = core::mem::take(&mut pMusicInfo.byMP3MusicStream_DiskBuffer);
+                let going = MP3Stream_GetSamples(
+                    &mut pMusicInfo.chMP3_Bgrnd,
+                    &source,
+                    origin,
+                    iStartingSampleNum,
+                    fileBytes / 2,
+                    &mut pcm,
+                    true,
+                );
+                pMusicInfo.byMP3MusicStream_DiskBuffer = source;
+                going
+            };
+            snd.tMusic_Info[track] = pMusicInfo;
+            qbForceFinish = !stillGoing;
+
+            for (i, sample) in pcm.iter().enumerate() {
+                raw[i * 2..i * 2 + 2].copy_from_slice(&sample.to_le_bytes());
+            }
+        } else {
+            // Streaming a WAV off disk.
+            let handle = snd.tMusic_Info[track].s_backgroundFile;
+            let r = Sys_StreamedRead(
+                view.common,
+                raw.as_mut_ptr() as *mut (),
+                1,
+                fileBytes,
+                handle,
+            );
+            if r != fileBytes {
+                com_printf(view.common, "^1StreamedRead failure on music track\n");
+                S_StopBackgroundTrack(view.common, snd);
+                return false;
+            }
+
+            // Raven byte-swaps here on a big-endian host. `S_ByteSwapRawSamples`
+            // returns at once on every target this tree builds for.
+        }
+
+        // add to raw buffer
+        let (rate, width, channels) = (
+            snd.tMusic_Info[track].s_backgroundInfo.rate,
+            snd.tMusic_Info[track].s_backgroundInfo.width,
+            snd.tMusic_Info[track].s_backgroundInfo.channels,
+        );
+        let volume = snd.tMusic_Info[track].fSmoothedOutVolume;
+        S_RawSamples(
+            view.common,
+            snd,
+            fileSamples,
+            rate,
+            width,
+            channels,
+            &raw,
+            volume,
+            bFirstOrOnlyMusicTrack,
+        );
+
+        snd.tMusic_Info[track].s_backgroundSamples -= fileSamples;
+        if snd.tMusic_Info[track].s_backgroundSamples == 0 || qbForceFinish {
+            // Loop the music, or play the next piece if we were on the intro.
+            // Dynamic music can only be used for loop music, so it needs the
+            // special call instead.
+            if snd.bMusic_IsDynamic {
+                snd.tMusic_Info[track].Rewind();
+            } else {
+                // For non-dynamic music, check whether `sMusic_BackgroundLoop`
+                // is a real file or a dynamic-music specifier, which cannot
+                // literally exist. Raven sizes the test name at `MAX_QPATH * 2`
+                // so `COM_DefaultExtension` never runs out of room on this
+                // "soft" test.
+                let mut sTestName = snd.sMusic_BackgroundLoop.clone();
+                COM_DefaultExtension_str(&mut sTestName, ".mp3");
+
+                if S_FileExists(view, &sTestName) {
+                    let loop_name = snd.sMusic_BackgroundLoop.clone();
+                    S_StartBackgroundTrack_Actual(
+                        view, snd, track, false, &loop_name, &loop_name,
+                    );
+                } else {
+                    // The proposed file does not exist, but this may be a
+                    // dynamic track we want to loop, so exit with the flag.
+                    return true;
+                }
+            }
+            if snd.tMusic_Info[track].s_backgroundFile == 0 {
+                return false; // loop failed to restart
+            }
+        }
+    }
+
+    false
+}
+
+/// Raven `S_Music_GetRequestedState` — the dynamic-music state the game asked
+/// for through a config string.
+///
+/// Raven's MP body reads no config string and answers NULL, with his own
+/// "rwwFIXMEFIXME: Maybe use the above for something in MP?".
+/// Source: `oracle/codemp/client/snd_dma.cpp:4812-4826`
+fn S_Music_GetRequestedState() -> Option<&'static str> {
+    None
+}
+
+/// Raven `S_CheckDynamicMusicState` — apply any requested state change, then run
+/// the transition handling.
+///
+/// Source: `oracle/codemp/client/snd_dma.cpp:4834-4891`
+fn S_CheckDynamicMusicState(view: &mut EngineHostView, snd: &mut SoundSystem) {
+    if let Some(psCommand) = S_Music_GetRequestedState() {
+        let eNewState = if psCommand.starts_with("silence") {
+            MusicState_e::eBGRNDTRACK_SILENCE
+        } else if psCommand.starts_with("action") {
+            MusicState_e::eBGRNDTRACK_ACTION
+        } else if psCommand.starts_with("boss") {
+            // Boss music is optional and may not be defined; leave the current
+            // track playing where it is missing.
+            if snd.tMusic_Info[MusicState_e::eBGRNDTRACK_BOSS as usize].bExists {
+                MusicState_e::eBGRNDTRACK_BOSS
+            } else {
+                snd.eMusic_StateActual
+            }
+        } else if psCommand.starts_with("death") {
+            // Death music is optional too, and the current track is typically
+            // boss or action.
+            if snd.tMusic_Info[MusicState_e::eBGRNDTRACK_DEATH as usize].bExists {
+                MusicState_e::eBGRNDTRACK_DEATH
+            } else {
+                snd.eMusic_StateActual
+            }
+        } else {
+            // Seems a reasonable default.
+            MusicState_e::eBGRNDTRACK_EXPLORE
+        };
+
+        S_SetDynamicMusicState(view, snd, eNewState);
+    }
+
+    S_HandleDynamicMusicStateChange(view, snd);
 }
 
 /// Raven `S_UpdateBackgroundTrack` — the per-frame music step.
 ///
-/// MP's `S_Music_GetRequestedState` always answers NULL, so the non-dynamic arm
-/// runs at the plain music volume.
 /// Source: `oracle/codemp/client/snd_dma.cpp:4893-5009`
-fn S_UpdateBackgroundTrack(common: &mut Common, snd: &mut SoundSystem) {
+fn S_UpdateBackgroundTrack(view: &mut EngineHostView, snd: &mut SoundSystem) {
     if snd.bMusic_IsDynamic {
-        //TODO: Port S_CheckDynamicMusicState
-        // Source: oracle/codemp/client/snd_dma.cpp:4895-4991. Dynamic music is
-        // gh#25, and no gh#24 path sets `bMusic_IsDynamic`.
-        todo!("Port dynamic S_UpdateBackgroundTrack — oracle/codemp/client/snd_dma.cpp:4895 (gh#25)")
+        if view.common.cvar(snd.s_debugdynamic).integer == 2 {
+            DynamicMusicInfoPrint(view, snd);
+        }
+
+        S_CheckDynamicMusicState(view, snd);
+
+        let fade = MusicState_e::eBGRNDTRACK_FADE as usize;
+        if snd.eMusic_StateActual == MusicState_e::eBGRNDTRACK_SILENCE {
+            // Special case: the foreground music is off but the fader is still
+            // running out the previous track.
+            if snd.tMusic_Info[fade].bActive {
+                let volume = view.common.cvar(snd.s_musicVolume).value;
+                S_UpdateBackgroundTrack_Actual(view, snd, fade, true, volume);
+                if snd.tMusic_Info[fade].iXFadeVolume == 0 {
+                    snd.tMusic_Info[fade].bActive = false;
+                }
+            }
+            return;
+        }
+
+        let current = if snd.eMusic_StateActual == MusicState_e::eBGRNDTRACK_FADE {
+            MusicState_e::eBGRNDTRACK_EXPLORE as usize
+        } else {
+            snd.eMusic_StateActual as usize
+        };
+
+        if snd.tMusic_Info[current].s_backgroundFile != -1 {
+            return;
+        }
+
+        let iRawEnd = snd.s_rawend;
+        let volume = view.common.cvar(snd.s_musicVolume).value;
+        S_UpdateBackgroundTrack_Actual(view, snd, current, true, volume);
+
+        if snd.tMusic_Info[fade].bActive {
+            snd.s_rawend = iRawEnd;
+            // The inactive check is internal to the call.
+            S_UpdateBackgroundTrack_Actual(view, snd, fade, false, volume);
+
+            // Only do this for the fader.
+            if snd.tMusic_Info[fade].iXFadeVolume == 0 {
+                snd.tMusic_Info[fade].bActive = false;
+            }
+        }
+
+        let dmaSpeed = snd.dma.speed;
+        let fRemainingTimeInSeconds = MP3Stream_GetRemainingTimeInSeconds(
+            &snd.tMusic_Info[current].chMP3_Bgrnd.MP3StreamHeader,
+            dmaSpeed,
+        );
+
+        if fRemainingTimeInSeconds >= fDYNAMIC_XFADE_SECONDS * 2.0 {
+            return;
+        }
+
+        // Now either loop the current track, switch if a transition is
+        // finishing, or stop if a death piece has finished.
+        if snd.tMusic_Info[current].bTrackSwitchPending {
+            snd.tMusic_Info[current].bTrackSwitchPending = false; // ack
+            let eTS_NewState = snd.tMusic_Info[current].eTS_NewState;
+            let fTS_NewTime = snd.tMusic_Info[current].fTS_NewTime;
+            let actual = snd.eMusic_StateActual;
+            S_SwitchDynamicTracks(view, snd, actual, eTS_NewState, false);
+            // Don't do this if switching to silence.
+            if snd.tMusic_Info[eTS_NewState as usize].bExists {
+                MusicInfo_SeekTo(
+                    &mut snd.tMusic_Info[eTS_NewState as usize],
+                    dmaSpeed,
+                    fTS_NewTime,
+                );
+            }
+        } else {
+            // Normal looping: rewind the current track, set its volume to 0 and
+            // fade up to full, while the fader copy of the end section fades
+            // down. A death track stays quiet instead.
+            snd.tMusic_Info[fade] = snd.tMusic_Info[current].clone();
+            let now = Com_Milliseconds(view);
+            snd.tMusic_Info[fade].iXFadeVolumeSeekTime = now;
+            snd.tMusic_Info[fade].iXFadeVolumeSeekTo = 0;
+
+            snd.tMusic_Info[current].Rewind();
+            snd.tMusic_Info[current].iXFadeVolumeSeekTime = now;
+            snd.tMusic_Info[current].iXFadeVolumeSeekTo =
+                if snd.eMusic_StateActual == MusicState_e::eBGRNDTRACK_DEATH {
+                    0
+                } else {
+                    255
+                };
+            snd.tMusic_Info[current].iXFadeVolume = 0;
+        }
+        return;
     }
 
     // standard / non-dynamic one-track music...
     // MP's `S_Music_GetRequestedState` returns NULL, so the silence check never fires.
-    let fDesiredVolume = common.cvar(snd.s_musicVolume).value;
+    let bShouldBeSilent = S_Music_GetRequestedState().is_some_and(|c| c.eq_ignore_ascii_case("silence"));
+    let fDesiredVolume = if bShouldBeSilent {
+        0.0
+    } else {
+        view.common.cvar(snd.s_musicVolume).value
+    };
 
     // internal to this code is a volume-smoother...
     let bNewTrackDesired = S_UpdateBackgroundTrack_Actual(
+        view,
         snd,
         MusicState_e::eBGRNDTRACK_NONDYNAMIC as usize,
+        true,
         fDesiredVolume,
     );
 
     if bNewTrackDesired {
-        //TODO: Port S_StartBackgroundTrack
-        // Source: oracle/codemp/client/snd_dma.cpp:4499. gh#25 owns the loader.
-        todo!("Port S_StartBackgroundTrack — oracle/codemp/client/snd_dma.cpp:4499 (gh#25)")
+        let loop_name = snd.sMusic_BackgroundLoop.clone();
+        S_StartBackgroundTrack(view, snd, &loop_name, &loop_name, false);
     }
 }
 
 // ===========================================================================
 // Init and shutdown
 // ===========================================================================
+
+/// Raven `DynamicMusicInfoPrint` — the one-line dynamic-music state report.
+///
+/// Source: `oracle/codemp/client/snd_dma.cpp:335-358`
+fn DynamicMusicInfoPrint(view: &mut EngineHostView, snd: &SoundSystem) {
+    if !snd.bMusic_IsDynamic {
+        com_printf(view.common, "( Dynamic music OFF )\n");
+        return;
+    }
+
+    // Raven calls this horribly lazy.
+    let psRequestMusicState =
+        Music_BaseStateToString(snd.eMusic_StateRequest, false).unwrap_or("<unknown>");
+    let psActualMusicState =
+        Music_BaseStateToString(snd.eMusic_StateActual, true).unwrap_or("<unknown>");
+
+    let request = snd.eMusic_StateRequest as c_int;
+    let actual = snd.eMusic_StateActual as c_int;
+    com_printf(
+        view.common,
+        &format!(
+            "( Dynamic music ON, request state: '{psRequestMusicState}'({request}), actual: '{psActualMusicState}' ({actual}) )\n"
+        ),
+    );
+}
 
 /// Raven `S_SoundInfo_f` — the `soundinfo` command.
 ///
@@ -1878,9 +3056,12 @@ pub fn S_SoundInfo_f(view: &mut EngineHostView, snd: &SoundSystem) {
         com_printf(view.common, &format!("0x{bytes:x} dma buffer bytes\n"));
 
         if snd.bMusic_IsDynamic {
-            //TODO: Port DynamicMusicInfoPrint
-            // Source: oracle/codemp/client/snd_dma.cpp:335. Dynamic music is gh#25.
-            todo!("Port DynamicMusicInfoPrint — oracle/codemp/client/snd_dma.cpp:335 (gh#25)")
+            DynamicMusicInfoPrint(view, snd);
+            let set = snd.sInfoOnly_CurrentDynamicMusicSet.clone();
+            com_printf(
+                view.common,
+                &format!("( Dynamic music set name: \"{set}\" )\n"),
+            );
         } else {
             if view.common.cvar(snd.s_allowDynamicMusic).integer == 0 {
                 com_printf(
@@ -1971,7 +3152,7 @@ pub fn S_Init(view: &mut EngineHostView, snd: &mut SoundSystem) {
         snd.s_soundtime = 0;
         snd.s_paintedtime = 0;
 
-        S_StopAllSounds(snd);
+        S_StopAllSounds(view.common, snd);
 
         S_SoundInfo_f(view, snd);
     }
@@ -1980,18 +3161,7 @@ pub fn S_Init(view: &mut EngineHostView, snd: &mut SoundSystem) {
 
     com_printf(view.common, "\n--- ambient sound initialization ---\n");
 
-    AS_Init();
-}
-
-/// Raven `AS_Init` — seat the ambient-set container.
-///
-/// The container has no observable effect until a set file parses, and the
-/// parser is gh#25.
-/// Source: `oracle/codemp/client/snd_ambient.cpp:752-764`
-fn AS_Init() {
-    //TODO: Port AS_Init
-    // Source: oracle/codemp/client/snd_ambient.cpp:752. The ambient-set parser is
-    // gh#25; the allocation Raven does here has no other observable effect.
+    AS_Init(&mut snd.ambient);
 }
 
 /// Raven `S_Shutdown` — release every sound, close the device, and drop the commands.
@@ -2017,7 +3187,8 @@ pub fn S_Shutdown(view: &mut EngineHostView, snd: &mut SoundSystem) {
     Cmd_RemoveCommand(view.common, "soundstop");
     Cmd_RemoveCommand(view.common, "mp3_calcvols");
     Cmd_RemoveCommand(view.common, "s_dynamic");
-    // Raven `AS_Free`, which frees the ambient-set container gh#25 fills.
+
+    AS_Free(&mut snd.ambient);
 }
 
 // ===========================================================================
@@ -2063,38 +3234,230 @@ fn S_SoundInfo_f_cmd(view: &mut EngineHostView) {
 fn S_StopAllSounds_f(view: &mut EngineHostView) {
     // SAFETY: view-constructor slot, single-threaded, no other live cast.
     let snd = unsafe { snd_from_view(view) };
-    S_StopAllSounds(snd);
+    S_StopAllSounds(view.common, snd);
 }
+
+/// Raven `sSoundCompressionMethodStrings` — the `soundlist` type column.
+///
+/// Raven: this table needs to be in sync with `SoundCompressionMethod_t`.
+/// Source: `oracle/codemp/client/snd_dma.cpp:3775-3779`
+const sSoundCompressionMethodStrings: [&str; 2] = ["16b", "mp3"];
 
 /// Raven `S_SoundList_f` — the `soundlist` command.
 ///
-//TODO: Port S_SoundList_f
-// Source: oracle/codemp/client/snd_dma.cpp:3780. The listing reads the MP3
-// overhead cvar and the MP3 header sizes, which arrive with gh#25.
-fn S_SoundList_f(_view: &mut EngineHostView) {
-    todo!("Port S_SoundList_f — oracle/codemp/client/snd_dma.cpp:3780 (gh#25)")
+/// The three mutually exclusive options are `wavonly`, `ShouldBeMP3`, and a
+/// `1`/`2`/`3` cap on the `%d`-variant suffix a sound name may carry.
+/// Source: `oracle/codemp/client/snd_dma.cpp:3780-3905`
+fn S_SoundList_f(view: &mut EngineHostView) {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let snd = unsafe { snd_from_view(view) };
+
+    let mut iVariantCap: c_int = -1; // for %d-inquiry stuff
+    let mut iTotalBytes = 0;
+    let mut bWavOnly = false;
+    let mut bShouldBeMP3 = false;
+
+    if Cmd_Argc(view.common) == 2 {
+        let arg = Cmd_Argv(view.common, 1).to_string();
+        if arg.eq_ignore_ascii_case("shouldbeMP3") {
+            bShouldBeMP3 = true;
+        } else if arg.eq_ignore_ascii_case("wavonly") {
+            bWavOnly = true;
+        } else if arg == "1" || arg == "2" || arg == "3" {
+            iVariantCap = arg.parse().unwrap_or(-1);
+        }
+    } else {
+        com_printf(
+            view.common,
+            "( additional (mutually exclusive) options available:\n'wavonly', 'ShouldBeMP3', '1'/'2'/'3' for %d-variant capping )\n",
+        );
+    }
+
+    let mut total = 0;
+
+    com_printf(view.common, "\n");
+    com_printf(view.common, "                    InMemory?\n");
+    com_printf(view.common, "                    |\n");
+    com_printf(view.common, "                    |  LevelLastUsedOn\n");
+    com_printf(view.common, "                    |  |\n");
+    com_printf(view.common, "                    |  |\n");
+    com_printf(view.common, " Slot   Smpls Type  |  |   Name\n");
+
+    let mp3Overhead = Cvar_Get(view, "s_mp3overhead", "0", CVAR_ARCHIVE);
+    let mp3OverheadValue = view.common.cvar(mp3Overhead).integer;
+
+    for i in 0..snd.s_knownSfx.len() {
+        let bMP3DumpOverride = bShouldBeMP3
+            && !snd.s_knownSfx[i].bDefaultSound
+            && snd.s_knownSfx[i].pMP3StreamHeader.is_none()
+            && snd.s_knownSfx[i].pSoundData.is_some()
+            && SND_MemUsed(snd, i) > mp3OverheadValue;
+
+        if !bMP3DumpOverride
+            && (bShouldBeMP3
+                || (bWavOnly
+                    && snd.s_knownSfx[i].eSoundCompressionMethod
+                        != SoundCompressionMethod_t::ct_16))
+        {
+            continue;
+        }
+
+        let mut bDumpThisOne = true;
+        if (1..=3).contains(&iVariantCap) {
+            let name = snd.s_knownSfx[i].sSoundName.clone();
+            let bytes = name.as_bytes();
+            if bytes.len() > 2 {
+                let c = bytes[bytes.len() - 1];
+                let c2 = bytes[bytes.len() - 2];
+                // A quick way to avoid names like "pain75".
+                if !c2.is_ascii_digit()
+                    && c.is_ascii_digit()
+                    && c_int::from(c - b'0') > iVariantCap
+                {
+                    // Skip this one where a %1 variant of it exists.
+                    let mut sFindName = name.clone();
+                    sFindName.replace_range(sFindName.len() - 1.., "1");
+                    bDumpThisOne = !snd
+                        .s_knownSfx
+                        .iter()
+                        .any(|sfx2| sfx2.sSoundName.eq_ignore_ascii_case(&sFindName));
+                }
+            }
+        }
+
+        let size = snd.s_knownSfx[i].iSoundLengthInSamples;
+        if snd.s_knownSfx[i].bDefaultSound {
+            let name = snd.s_knownSfx[i].sSoundName.clone();
+            com_printf(view.common, &format!("{i:5} Missing file: \"{name}\"\n"));
+            continue;
+        }
+
+        if bDumpThisOne {
+            if snd.s_knownSfx[i].bInMemory {
+                iTotalBytes += SND_MemUsed(snd, i);
+                if snd.s_knownSfx[i].pMP3StreamHeader.is_some() {
+                    iTotalBytes += core::mem::size_of::<MP3STREAM>() as c_int;
+                }
+                total += size;
+            }
+        }
+
+        let method = snd.s_knownSfx[i].eSoundCompressionMethod as usize;
+        let type_name = sSoundCompressionMethodStrings
+            .get(method)
+            .copied()
+            .unwrap_or("???");
+        let inMemory = if snd.s_knownSfx[i].bInMemory { "y" } else { "n" };
+        let level = snd.s_knownSfx[i].iLastLevelUsedOn;
+        let name = snd.s_knownSfx[i].sSoundName.clone();
+        com_printf(
+            view.common,
+            &format!("{i:5} {size:7} [{type_name}] {inMemory} {level:2} {name}"),
+        );
+
+        if !bDumpThisOne {
+            com_printf(view.common, "   ( Skipping, variant capped )");
+        }
+        com_printf(view.common, "\n");
+    }
+    com_printf(view.common, " Slot   Smpls Type  In? Lev  Name\n");
+
+    let wavOnlyNote = if bWavOnly { "(WAV only)" } else { "" };
+    com_printf(
+        view.common,
+        &format!("Total resident samples: {total} {wavOnlyNote} ( not mem usage, see 'meminfo' ).\n"),
+    );
+    let used = snd.s_knownSfx.len();
+    com_printf(
+        view.common,
+        &format!("{used} out of {MAX_SFX} sfx_t slots used\n"),
+    );
+    let megs = iTotalBytes as f32 / 1024.0 / 1024.0;
+    com_printf(
+        view.common,
+        &format!("{megs:.2}MB bytes used when counting sfx_t->pSoundData + MP3 headers (if any)\n"),
+    );
+    S_DisplayFreeMemory(view, snd);
 }
 
 /// Raven `S_Music_f` — the `music` command.
 ///
-//TODO: Port S_Music_f
-// Source: oracle/codemp/client/snd_dma.cpp:3687. gh#25 owns the music loader.
-fn S_Music_f(_view: &mut EngineHostView) {
-    todo!("Port S_Music_f — oracle/codemp/client/snd_dma.cpp:3687 (gh#25)")
+/// Source: `oracle/codemp/client/snd_dma.cpp:3687-3700`
+fn S_Music_f(view: &mut EngineHostView) {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let snd = unsafe { snd_from_view(view) };
+
+    let c = Cmd_Argc(view.common);
+
+    if c == 2 {
+        let name = Cmd_Argv(view.common, 1).to_string();
+        S_StartBackgroundTrack(view, snd, &name, &name, false);
+    } else if c == 3 {
+        let intro = Cmd_Argv(view.common, 1).to_string();
+        let loop_name = Cmd_Argv(view.common, 2).to_string();
+        S_StartBackgroundTrack(view, snd, &intro, &loop_name, false);
+    } else {
+        com_printf(view.common, "music <musicfile> [loopfile]\n");
+    }
 }
 
 /// Raven `S_SetDynamicMusic_f` — the `s_dynamic` command.
 ///
-//TODO: Port S_SetDynamicMusic_f
-// Source: oracle/codemp/client/snd_dma.cpp:3704. gh#25 owns dynamic music.
-fn S_SetDynamicMusic_f(_view: &mut EngineHostView) {
-    todo!("Port S_SetDynamicMusic_f — oracle/codemp/client/snd_dma.cpp:3704 (gh#25)")
+/// Raven calls it a debug function that does no harm left in. Explore, action,
+/// and silence always exist where music is dynamic; boss and death are optional.
+/// Source: `oracle/codemp/client/snd_dma.cpp:3704-3770`
+fn S_SetDynamicMusic_f(view: &mut EngineHostView) {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let snd = unsafe { snd_from_view(view) };
+
+    if Cmd_Argc(view.common) == 2 {
+        if !snd.bMusic_IsDynamic {
+            DynamicMusicInfoPrint(view, snd); // print "inactive" string
+            return;
+        }
+
+        let arg = Cmd_Argv(view.common, 1).to_string();
+        if arg.eq_ignore_ascii_case("explore") {
+            S_SetDynamicMusicState(view, snd, MusicState_e::eBGRNDTRACK_EXPLORE);
+            return;
+        }
+        if arg.eq_ignore_ascii_case("action") {
+            S_SetDynamicMusicState(view, snd, MusicState_e::eBGRNDTRACK_ACTION);
+            return;
+        }
+        if arg.eq_ignore_ascii_case("silence") {
+            S_SetDynamicMusicState(view, snd, MusicState_e::eBGRNDTRACK_SILENCE);
+            return;
+        }
+        if arg.eq_ignore_ascii_case("boss") {
+            if snd.tMusic_Info[MusicState_e::eBGRNDTRACK_BOSS as usize].bExists {
+                S_SetDynamicMusicState(view, snd, MusicState_e::eBGRNDTRACK_BOSS);
+            } else {
+                com_printf(view.common, "No 'boss' music defined in current dynamic set\n");
+            }
+            return;
+        }
+        if arg.eq_ignore_ascii_case("death") {
+            if snd.tMusic_Info[MusicState_e::eBGRNDTRACK_DEATH as usize].bExists {
+                S_SetDynamicMusicState(view, snd, MusicState_e::eBGRNDTRACK_DEATH);
+            } else {
+                com_printf(view.common, "No 'death' music defined in current dynamic set\n");
+            }
+            return;
+        }
+    }
+
+    // show usage...
+    com_printf(
+        view.common,
+        "Usage: s_dynamic <explore/action/silence/boss/death>\n",
+    );
+    DynamicMusicInfoPrint(view, snd);
 }
 
 /// Raven `S_MP3_CalcVols_f` — the `mp3_calcvols` development command.
 ///
-//TODO: Port S_MP3_CalcVols_f
-// Source: oracle/codemp/client/snd_mem.cpp:495. The MP3 re-tag pass is gh#25.
-fn S_MP3_CalcVols_f(_view: &mut EngineHostView) {
-    todo!("Port S_MP3_CalcVols_f — oracle/codemp/client/snd_mem.cpp:495 (gh#25)")
+/// Source: `oracle/codemp/client/snd_mem.cpp:495-545`
+fn S_MP3_CalcVols_f(view: &mut EngineHostView) {
+    S_MP3_CalcVols_f_body(view);
 }

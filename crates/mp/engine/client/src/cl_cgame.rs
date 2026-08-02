@@ -169,16 +169,16 @@ use crate::fx_stubs::{
     FX_InitSystem, FX_PlayBoltedEffectID, FX_PlayEffect, FX_PlayEffectID, FX_PlayEntityEffectID,
     FX_RegisterEffect, FX_SetRefDefFromCGame,
 };
-use crate::client_host::snd_from_view;
+use crate::client_host::{cl_from_view, snd_from_view};
 use crate::snd_dma::{
     S_AddLoopingSound, S_ClearLoopingSounds, S_MuteSound, S_RegisterSound, S_Respatialize,
     S_StartLocalSound, S_StartSound, S_StopBackgroundTrack, S_StopLoopingSound,
     S_UpdateEntityPosition,
 };
-use crate::snd_stubs::{
-    AS_AddPrecacheEntry, AS_GetBModelSound, AS_ParseSets, S_AddLocalSet, S_RestartMusic,
-    S_StartBackgroundTrack, S_UpdateAmbientSet,
+use crate::snd_ambient::{
+    AS_AddPrecacheEntry, AS_GetBModelSound, AS_ParseSets, S_AddLocalSet, S_UpdateAmbientSet,
 };
+use crate::snd_dma::{S_RestartMusic, S_StartBackgroundTrack};
 
 /// The `VMA(x)` macro: the module-space pointer the syscall word at `x` names.
 ///
@@ -1734,32 +1734,51 @@ pub fn CL_CgameSystemCalls(
         let b = cstr_to_string(vma(vc, args, 2) as *const c_char);
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let snd = unsafe { snd_from_view(view) };
-        S_StartBackgroundTrack(view, snd, &a, &b, if arg(3) != 0 { qtrue } else { qfalse });
+        S_StartBackgroundTrack(view, snd, &a, &b, arg(3) != 0);
         0
     } else if op == MpCgameImport::CG_S_UPDATEAMBIENTSET as c_int {
         let name = cstr_to_string(vma(vc, args, 1) as *const c_char);
-        S_UpdateAmbientSet(view, &name, vma(vc, args, 2) as *mut f32);
+        let origin = unsafe { *(vma(vc, args, 2) as *const vec3_t) };
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let realtime = unsafe { cl_from_view(view) }.cls.realtime;
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let snd = unsafe { snd_from_view(view) };
+        S_UpdateAmbientSet(view, snd, &name, origin, realtime);
         0
     } else if op == MpCgameImport::CG_AS_PARSESETS as c_int {
-        AS_ParseSets(view);
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let snd = unsafe { snd_from_view(view) };
+        AS_ParseSets(view, snd);
         0
     } else if op == MpCgameImport::CG_AS_ADDPRECACHEENTRY as c_int {
         let name = cstr_to_string(vma(vc, args, 1) as *const c_char);
-        AS_AddPrecacheEntry(view, &name);
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let snd = unsafe { snd_from_view(view) };
+        AS_AddPrecacheEntry(&mut snd.ambient, &name);
         0
     } else if op == MpCgameImport::CG_S_ADDLOCALSET as c_int {
         let name = cstr_to_string(vma(vc, args, 1) as *const c_char);
+        let listener_origin = unsafe { *(vma(vc, args, 2) as *const vec3_t) };
+        let origin = unsafe { *(vma(vc, args, 3) as *const vec3_t) };
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let realtime = unsafe { cl_from_view(view) }.cls.realtime;
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let snd = unsafe { snd_from_view(view) };
         S_AddLocalSet(
             view,
+            snd,
             &name,
-            vma(vc, args, 2) as *mut f32,
-            vma(vc, args, 3) as *mut f32,
+            listener_origin,
+            origin,
             arg(4),
             arg(5),
+            realtime,
         )
     } else if op == MpCgameImport::CG_AS_GETBMODELSOUND as c_int {
         let name = cstr_to_string(vma(vc, args, 1) as *const c_char);
-        AS_GetBModelSound(view, &name, arg(2))
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let snd = unsafe { snd_from_view(view) };
+        AS_GetBModelSound(&snd.ambient, &name, arg(2))
     } else if op == MpCgameImport::CG_R_LOADWORLDMAP as c_int {
         let name = cstr_to_string(vma(vc, args, 1) as *const c_char);
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
@@ -2353,7 +2372,7 @@ pub fn CL_CgameSystemCalls(
     } else if op == MpCgameImport::CG_S_STOPBACKGROUNDTRACK as c_int {
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let snd = unsafe { snd_from_view(view) };
-        S_StopBackgroundTrack(snd);
+        S_StopBackgroundTrack(view.common, snd);
         0
     } else if op == MpCgameImport::CG_REAL_TIME as c_int {
         Com_RealTime(vma(vc, args, 1) as *mut qtime_t)

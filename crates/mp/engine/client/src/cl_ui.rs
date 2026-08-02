@@ -73,7 +73,7 @@ use crate::client::server_info_t::serverInfo_t;
 use crate::client_host::{bot_from_view, client_legacy_syscall, sv_from_view};
 use crate::client_host::snd_from_view;
 use crate::snd_dma::{S_RegisterSound, S_StartLocalSound, S_StopBackgroundTrack};
-use crate::snd_stubs::S_StartBackgroundTrack;
+use crate::snd_dma::S_StartBackgroundTrack;
 use crate::Client;
 
 /// Raven's `AS_LOCAL`/`AS_MPLAYER`/`AS_GLOBAL`/`AS_FAVORITES` server-source
@@ -1880,14 +1880,15 @@ pub fn CL_UISystemCalls(
         0
     } else if trap == MpUiImport::UI_S_STOPBACKGROUNDTRACK as c_int {
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
-        S_StopBackgroundTrack(unsafe { snd_from_view(view) });
+        let snd = unsafe { snd_from_view(view) };
+        S_StopBackgroundTrack(view.common, snd);
         0
     } else if trap == MpUiImport::UI_S_STARTBACKGROUNDTRACK as c_int {
         let intro = unsafe { cstr_to_string(vma(view.common, args, 1) as *const c_char) };
         let loop_track = unsafe { cstr_to_string(vma(view.common, args, 2) as *const c_char) };
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let snd = unsafe { snd_from_view(view) };
-        S_StartBackgroundTrack(view, snd, &intro, &loop_track, qfalse);
+        S_StartBackgroundTrack(view, snd, &intro, &loop_track, false);
         0
     } else if trap == MpUiImport::UI_REAL_TIME as c_int {
         unsafe {

@@ -769,7 +769,8 @@ pub fn SCR_DrawScreenField(view: &mut EngineHostView, cl: &mut Client, stereoFra
             connstate_t::CA_DISCONNECTED => {
                 // force menu up
                 // SAFETY: view-constructor slot, single-threaded, no other live cast.
-                S_StopAllSounds(unsafe { snd_from_view(view) });
+                let snd = unsafe { snd_from_view(view) };
+                S_StopAllSounds(view.common, snd);
                 VM_Call(
                     view.common,
                     cl.uivm,

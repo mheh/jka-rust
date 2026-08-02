@@ -14,8 +14,10 @@ use core::ffi::c_int;
 use mp_engine_qcommon::common::Common;
 use mp_qshared::shared::sound_channel::{CHAN_VOICE, CHAN_VOICE_ATTEN, CHAN_VOICE_GLOBAL};
 
+use crate::snd::sfx_sample_data::SfxSampleData;
 use crate::snd::sound_compression_method_t::SoundCompressionMethod_t;
 use crate::snd::sound_system::{SoundSystem, MAX_CHANNELS, MAX_RAW_SAMPLES, PAINTBUFFER_SIZE};
+use crate::snd_mp3::MP3Stream_GetSamples;
 
 /// Raven `S_WriteLinearBlastStereo16` — shift down by 8, clamp to 16 bits, and
 /// write `count` interleaved samples into the ring.
@@ -169,6 +171,7 @@ fn S_PaintChannelFrom16(
     let data = snd.s_knownSfx[sfx]
         .pSoundData
         .as_ref()
+        .and_then(SfxSampleData::pcm)
         .expect("a painting channel holds a loaded sound");
     let dest = &mut snd.paintbuffer;
 
@@ -180,6 +183,53 @@ fn S_PaintChannelFrom16(
 
         dest[bufferOffset + i].left += (iData * iLeftVol) >> 8;
         dest[bufferOffset + i].right += (iData * iRightVol) >> 8;
+    }
+}
+
+/// Raven `S_PaintChannelFromMP3` — pull `count` samples out of the channel's
+/// sliding MP3 window and add them into the paint buffer.
+///
+/// Raven's unrolled-by-four loop and the portable one add the same values, so
+/// the port keeps one loop. The source bytes come out of the sfx block, which
+/// holds the raw MP3 file image for a `ct_MP3` sound.
+/// Source: `oracle/codemp/client/snd_mix.cpp:270-315`
+fn S_PaintChannelFromMP3(
+    snd: &mut SoundSystem,
+    channel: usize,
+    sfx: usize,
+    count: c_int,
+    sampleOffset: c_int,
+    bufferOffset: c_int,
+) {
+    let mut tempMP3Buffer = vec![0i16; PAINTBUFFER_SIZE];
+
+    let source = snd.s_knownSfx[sfx]
+        .pSoundData
+        .as_ref()
+        .and_then(SfxSampleData::mp3)
+        .map(|data| data.to_vec())
+        .unwrap_or_default();
+
+    // `false` = not stereo, which every sound effect is.
+    MP3Stream_GetSamples(
+        &mut snd.s_channelsMp3[channel],
+        &source,
+        0,
+        sampleOffset,
+        count.min(PAINTBUFFER_SIZE as c_int),
+        &mut tempMP3Buffer,
+        false,
+    );
+
+    let leftvol = snd.s_channels[channel].leftvol * snd.snd_vol;
+    let rightvol = snd.s_channels[channel].rightvol * snd.snd_vol;
+
+    let dest = &mut snd.paintbuffer;
+    let bufferOffset = bufferOffset as usize;
+    for i in 0..count as usize {
+        let data = c_int::from(tempMP3Buffer[i.min(PAINTBUFFER_SIZE - 1)]);
+        dest[bufferOffset + i].left += (data * leftvol) >> 8;
+        dest[bufferOffset + i].right += (data * rightvol) >> 8;
     }
 }
 
@@ -199,10 +249,7 @@ fn ChannelPaint(
             S_PaintChannelFrom16(snd, channel, sfx, count, sampleOffset, bufferOffset);
         }
         SoundCompressionMethod_t::ct_MP3 => {
-            //TODO: Port S_PaintChannelFromMP3
-            // Source: oracle/codemp/client/snd_mix.cpp:270. The decoder is gh#25 under
-            // DEC-57.3, and no gh#24 load path produces a `ct_MP3` sfx.
-            todo!("Port S_PaintChannelFromMP3 — oracle/codemp/client/snd_mix.cpp:270 (gh#25)")
+            S_PaintChannelFromMP3(snd, channel, sfx, count, sampleOffset, bufferOffset);
         }
         // Raven's `default` arm is an `assert(0)` that the release build drops,
         // so a method outside the two above paints nothing.
