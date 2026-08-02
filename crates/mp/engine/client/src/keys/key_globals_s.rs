@@ -7,9 +7,9 @@ use super::field_t::field_t;
 use super::qkey_t::qkey_t;
 
 // Raven's `#define COMMAND_HISTORY 32` (oracle/codemp/client/keys.h:10).
-const COMMAND_HISTORY: usize = 32;
+pub const COMMAND_HISTORY: usize = 32;
 // Raven's `MAX_KEYS` enumerator (oracle/codemp/client/keycodes.h:338).
-const MAX_KEYS: usize = 320;
+pub const MAX_KEYS: usize = 320;
 
 /// Raven `keyGlobals_t` — global key/console-field input state.
 ///

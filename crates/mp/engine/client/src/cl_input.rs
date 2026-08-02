@@ -567,23 +567,17 @@ pub fn CL_AutoMapKey(common: &mut Common, cl: &mut Client, autoMapKey: c_int, up
     cl.g_clAutoMapInput.goToDefaults = false;
 }
 
-// AUTOMAP_KEY_* are unresolved escalations (no rosetta row yet); the enum lives
-// in `oracle/codemp/client/cl_input.cpp`'s automap key command block.
-//TODO: Port AUTOMAP_KEY_FORWARD
-//TODO: Port AUTOMAP_KEY_BACK
-//TODO: Port AUTOMAP_KEY_YAWLEFT
-//TODO: Port AUTOMAP_KEY_YAWRIGHT
-//TODO: Port AUTOMAP_KEY_PITCHUP
-//TODO: Port AUTOMAP_KEY_PITCHDOWN
-//TODO: Port AUTOMAP_KEY_DEFAULTVIEW
-// Source: oracle/codemp/client/cl_input.cpp:567-630
-const AUTOMAP_KEY_FORWARD: c_int = 0;
-const AUTOMAP_KEY_BACK: c_int = 1;
-const AUTOMAP_KEY_YAWLEFT: c_int = 2;
-const AUTOMAP_KEY_YAWRIGHT: c_int = 3;
-const AUTOMAP_KEY_PITCHUP: c_int = 4;
-const AUTOMAP_KEY_PITCHDOWN: c_int = 5;
-const AUTOMAP_KEY_DEFAULTVIEW: c_int = 6;
+/// Raven `AUTOMAP_KEY_*` — the automap key codes that `CL_AutoMapKey` switches on.
+/// The numbering starts at 1, so a zero-filled slot never selects a key.
+///
+/// Source: `oracle/codemp/client/cl_input.cpp:552-558`
+const AUTOMAP_KEY_FORWARD: c_int = 1;
+const AUTOMAP_KEY_BACK: c_int = 2;
+const AUTOMAP_KEY_YAWLEFT: c_int = 3;
+const AUTOMAP_KEY_YAWRIGHT: c_int = 4;
+const AUTOMAP_KEY_PITCHUP: c_int = 5;
+const AUTOMAP_KEY_PITCHDOWN: c_int = 6;
+const AUTOMAP_KEY_DEFAULTVIEW: c_int = 7;
 
 /// Raven `IN_CenterView`.
 ///

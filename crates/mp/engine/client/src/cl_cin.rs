@@ -6,7 +6,7 @@ use core::ffi::{c_char, c_int, c_long, c_short, c_uchar, c_uint, c_ushort};
 
 use mp_qshared::shared::cbuf_exec::cbufExec_t;
 use mp_qshared::shared::connstate::connstate_t;
-use mp_qshared::shared::e_status::{e_status, FMV_EOF, FMV_IDLE, FMV_LOOPED, FMV_PLAY};
+use mp_qshared::shared::cinematic_status::{e_status, FMV_EOF, FMV_IDLE, FMV_LOOPED, FMV_PLAY};
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::fs_origin::fsOrigin_t;
 use mp_qshared::shared::swap::LittleLong;
@@ -24,6 +24,16 @@ use mp_engine_qcommon::vm_fns::VM_Call;
 use mp_engine_qcommon::z_memman_pc::{Hunk_AllocateTempMemory, Hunk_FreeTempMemory};
 use native_string::q_string::Q_stricmp;
 
+use mp_abi::ui::exports::MpUiExport;
+use mp_abi::ui::public::ui_menu_command_t::UIMENU_NONE;
+use mp_engine_icarus::q3_interface::S_COLOR_RED;
+use mp_qshared::shared::screen::{SCREEN_HEIGHT, SCREEN_WIDTH};
+
+use crate::cin::cin_consts::{
+    DEFAULT_CIN_HEIGHT, DEFAULT_CIN_WIDTH, MAXSIZE, MAX_VIDEO_HANDLES, MINSIZE, ROQ_CODEBOOK,
+    ROQ_PACKET, ROQ_QUAD_HANG, ROQ_QUAD_INFO, ROQ_QUAD_JPEG, ROQ_QUAD_VQ, ZA_SOUND_MONO,
+    ZA_SOUND_STEREO,
+};
 use crate::client_host::Client;
 
 // PORT-NOTE(deps): `mp_qshared::shared::cbuf_exec::cbufExec_t`, `native_string`,

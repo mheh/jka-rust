@@ -12,6 +12,7 @@ use mp_engine_qcommon::net_chan::Netchan_TransmitNextFragment;
 use mp_engine_qcommon::qcommon::huffman_consts::CL_DECODE_START;
 use mp_engine_qcommon::qcommon::huffman_consts::CL_ENCODE_START;
 use mp_engine_qcommon::qcommon::net_limits::MAX_RELIABLE_COMMANDS;
+use mp_engine_qcommon::qcommon::clc_ops_e::clc_ops_e::clc_EOF;
 use mp_engine_qcommon::qcommon::netchan_t::netchan_t;
 use mp_game::prelude::byte;
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;

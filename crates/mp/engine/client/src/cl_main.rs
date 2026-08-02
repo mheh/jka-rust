@@ -86,10 +86,17 @@ use mp_qshared::shared::limits::{
 };
 use mp_qshared::shared::print_parm::printParm_t;
 use mp_qshared::shared::q_string::Com_sprintf;
-use mp_renderer::tr_public::refexport_t::refexport_t;
-use mp_ui::local::pending_server_status_t::MAX_SERVERSTATUSREQUESTS;
-use mp_ui::local::server_status_s::{serverStatus_t, MAX_PINGREQUESTS};
+use mp_qshared::shared::char_sizes::SMALLCHAR_WIDTH;
+use mp_qshared::shared::keycatch::KEYCATCH_UI;
+use mp_qshared::shared::limits::{MAX_PINGREQUESTS, MAX_SERVERSTATUSREQUESTS};
+use mp_qshared::shared::server_address::{AS_FAVORITES, AS_GLOBAL, AS_LOCAL, AS_MPLAYER};
+use mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::{
+    svc_baseline, svc_configstring, svc_gamestate, svc_EOF,
+};
+use mp_engine_icarus::q3_interface::{S_COLOR_RED, S_COLOR_YELLOW};
 
+use crate::client::client_consts::RETRANSMIT_TIMEOUT;
+use crate::client::server_status_t::serverStatus_t;
 use crate::client::cl_main_consts::{
     G2_VERT_SPACE_CLIENT_SIZE, MAXPRINTMSG, MAX_SERVERSPERPACKET, MAX_STRINGED_SV_STRING,
     MODEL_CHANGE_DELAY,

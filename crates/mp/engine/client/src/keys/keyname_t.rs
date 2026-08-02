@@ -23,6 +23,11 @@ const _: () = {
     assert!(core::mem::offset_of!(keyname_t, keynum) == 16);
     assert!(core::mem::offset_of!(keyname_t, menukey) == 20);
 };
+// The `name` pointer is null-valid and every other field is a scalar, so the
+// all-zero image is a valid inhabitant. `keynames` builds heap-first through
+// `zeroed_box` (STATE-D9) and `Key_Init` then fills it.
+unsafe impl native_platform::ZeroValid for keyname_t {}
+
 // ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
 #[cfg(target_pointer_width = "32")]
 const _: () = {

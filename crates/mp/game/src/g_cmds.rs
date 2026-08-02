@@ -32,7 +32,7 @@ use native_string::{Q_CleanStr, Q_stricmp};
 ///
 /// Source: `oracle/codemp/game/q_shared.h:3064-3066`
 const SAY_ALL: c_int = 0;
-const SAY_TEAM: c_int = 1;
+pub const SAY_TEAM: c_int = 1;
 const SAY_TELL: c_int = 2;
 
 /// Raven `LAST_USEABLE_WEAPON` — `WP_BRYAR_OLD`.

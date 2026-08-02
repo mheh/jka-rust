@@ -19,13 +19,15 @@ use mp_engine_qcommon::vm_fns::VM_Call;
 use mp_qshared::common::mp::cgame::stereo_frame_t::{
     stereoFrame_t, STEREO_CENTER, STEREO_LEFT, STEREO_RIGHT,
 };
+use mp_qshared::shared::char_sizes::{BIGCHAR_WIDTH, SMALLCHAR_HEIGHT, SMALLCHAR_WIDTH};
 use mp_qshared::shared::connstate::connstate_t;
 use mp_qshared::shared::cvar::CVAR_CHEAT;
+use mp_qshared::shared::keycatch::KEYCATCH_UI;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::q_color::{g_color_table, Q_IsColorString};
 use native_types::qhandle_t;
 
-use crate::client_host::Client;
+use crate::client_host::{Client, MAX_SCR_LINES};
 
 /// Raven `SCR_DrawNamedPic`.
 ///

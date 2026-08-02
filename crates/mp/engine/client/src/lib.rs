@@ -14,6 +14,7 @@ pub mod cl_net_chan;
 pub mod cl_parse;
 pub mod cl_scrn;
 pub mod cl_ui;
+pub mod cin;
 pub mod client;
 pub mod client_host;
 pub mod fffx;

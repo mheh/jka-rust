@@ -21,3 +21,8 @@ const _: () = assert!(core::mem::offset_of!(ping_t, adr) == 0);
 const _: () = assert!(core::mem::offset_of!(ping_t, start) == 20);
 const _: () = assert!(core::mem::offset_of!(ping_t, time) == 24);
 const _: () = assert!(core::mem::offset_of!(ping_t, info) == 28);
+
+// Every field is a scalar or a scalar array, and `netadr_t`'s zero discriminant
+// is `NA_BOT`, so the all-zero image is a valid inhabitant. Raven's `cl_pinglist`
+// is a zero-filled file static.
+unsafe impl native_platform::ZeroValid for ping_t {}

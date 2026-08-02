@@ -7,7 +7,7 @@
 
 use core::ffi::{c_char, c_int};
 
-use mp_bg::public::configstring::{CS_G2BONES, CS_PLAYERS};
+use mp_bg::public::configstring::{CS_G2BONES, CS_PLAYERS, CS_SERVERINFO, CS_SYSTEMINFO};
 use mp_bg::public::entity_flags::EF_PERMANENT;
 use mp_engine_core::lifecycle::sys_milliseconds;
 use mp_qshared::common::mp::cgame::glconfig_t::glconfig_t;
@@ -30,14 +30,17 @@ use mp_qshared::shared::connstate::connstate_t;
 use mp_qshared::shared::cvar::vmCvar_t;
 use mp_qshared::shared::effect_trail_arg::effectTrailArgStruct_t;
 use mp_qshared::shared::error_parm::errorParm_t;
-use mp_qshared::shared::fsMode_t::fsMode_t;
+use mp_qshared::shared::file_mode::fsMode_t;
 use mp_qshared::shared::game_state::{gameState_t, MAX_CONFIGSTRINGS, MAX_GAMESTATE_CHARS};
 use mp_qshared::shared::limits::{BIG_INFO_STRING, MAX_GENTITIES};
 use mp_qshared::shared::q_string::Com_sprintf;
-use mp_qshared::shared::sharedIKMoveParams_t::sharedIKMoveParams_t;
+use mp_qshared::shared::shared_ik_move_params::sharedIKMoveParams_t;
 use native_string::atoi::atoi;
 
 use crate::client::cl_main_consts::MAX_STRINGED_SV_STRING;
+use crate::client::client_consts::{CMD_BACKUP, CMD_MASK, MAX_PARSE_ENTITIES, RESET_TIME};
+use mp_qshared::shared::keycatch::KEYCATCH_CGAME;
+use native_math::qmath::vec3_origin;
 
 // PORT-NOTE(cross-shard): `Con_Close`, `Con_ClearNotify`, `CL_ReadDemoMessage`,
 // `CL_FirstSnapshot`, and `CL_SystemInfoChanged` are in-engine callees this

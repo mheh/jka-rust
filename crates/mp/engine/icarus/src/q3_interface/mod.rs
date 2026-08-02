@@ -70,9 +70,9 @@ pub mod set_type_t;
 const Q3_SCRIPT_DIR: &str = "scripts";
 
 /// Raven console color escapes. Source: `oracle/codemp/game/q_shared.h:1161-1164`
-const S_COLOR_RED: &str = "^1";
+pub const S_COLOR_RED: &str = "^1";
 const S_COLOR_GREEN: &str = "^2";
-const S_COLOR_YELLOW: &str = "^3";
+pub const S_COLOR_YELLOW: &str = "^3";
 const S_COLOR_BLUE: &str = "^4";
 
 /// Raven `WL_e` print levels as `i32` (mirrors `mp_qshared` `WL_e`); the many

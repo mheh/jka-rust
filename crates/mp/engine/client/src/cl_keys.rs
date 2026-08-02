@@ -41,7 +41,7 @@ use native_types::field_t;
 use native_types::fileHandle_t;
 
 use crate::client_host::Client;
-use crate::keys::key_globals_s::MAX_KEYS;
+use crate::keys::key_globals_s::{COMMAND_HISTORY, MAX_KEYS};
 
 /// Raven `Field_Clear`.
 ///

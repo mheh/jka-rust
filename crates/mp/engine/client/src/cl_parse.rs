@@ -6,9 +6,17 @@ use core::ffi::{c_char, c_int, CStr};
 
 use mp_engine_qcommon::common::common::{com_printf, Common};
 use mp_engine_qcommon::common::error::com_error;
+use mp_engine_qcommon::qcommon::net_limits::{
+    MAX_MSGLEN, MAX_RELIABLE_COMMANDS, PACKET_BACKUP, PACKET_MASK,
+};
+use mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::{
+    svc_baseline, svc_configstring, svc_gamestate, svc_EOF,
+};
+use mp_bg::public::configstring::{CS_SERVERINFO, CS_SYSTEMINFO};
 use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;
 use mp_qshared::shared::error_parm::errorParm_t;
+use mp_qshared::shared::game_state::{MAX_CONFIGSTRINGS, MAX_GAMESTATE_CHARS};
 use mp_qshared::shared::limits::{GENTITYNUM_BITS, MAX_GENTITIES};
 use native_string::atoi::atoi;
 use native_string::info::Info_ValueForKey;
@@ -17,6 +25,8 @@ use native_string::q_strncpyz::Q_strncpyz;
 use native_types::{qboolean, qfalse, qtrue, MAX_QPATH};
 
 use crate::client::cl_snapshot_t::clSnapshot_t;
+use crate::client::client_connection_t::MAX_HEIGHTMAP_SIZE;
+use crate::client::client_consts::MAX_PARSE_ENTITIES;
 use crate::client_host::Client;
 
 /// Raven `SHOWNET` - the debug trace line for one read op at `cl_shownet >= 2`.
