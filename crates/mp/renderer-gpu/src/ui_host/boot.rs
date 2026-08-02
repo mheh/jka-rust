@@ -22,7 +22,8 @@ use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::opaque_slots::{
-    BotLib as SlotBotLib, Client as SlotClient, Ghoul2System as SlotGhoul2,
+    BotLib as SlotBotLib, Client as SlotClient, FxSystem as SlotFxSystem,
+    Ghoul2System as SlotGhoul2,
     RenderModels as SlotRenderModels, Renderer as SlotRenderer, RmManager as SlotRmManager,
     Server as SlotServer,
 };
@@ -427,6 +428,7 @@ pub fn host_view<'a>(
         re: SlotRenderer::from_raw(null_mut()),
         rmg: SlotRmManager::from_raw(null_mut()),
         g2: SlotGhoul2::from_raw(null_mut()),
+        fx: SlotFxSystem::from_raw(null_mut()),
     }
 }
 

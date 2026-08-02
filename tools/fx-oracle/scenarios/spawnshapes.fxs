@@ -1,0 +1,30 @@
+# fx-oracle: the spawn-volume arms. Each one consumes a fixed pattern of RNG
+# draws inside CreateEffect, so the golden pins both the placement and the draw
+# order.
+seed 5150
+cvar fx_debug 0
+cvar fx_countScale 1
+cvar fx_nearCull 16
+refdef 0 0 0   0 0 0   1 0 0   0 1 0   0 0 1   90 73.739792
+init
+register spawnshapes
+register rgbinterp
+advance 50
+playid 1 140 0 0 1 0 0 -1 -1 0
+addscheduled 0
+dumpstate
+advance 100
+addscheduled 0
+dumpstate
+# The component-interpolated colour picks one point on the line between the two
+# colour bounds instead of one point in the cube.
+advance 100
+playid 2 140 0 0 1 0 0 -1 -1 0
+addscheduled 0
+advance 100
+addscheduled 0
+dumpstate
+advance 400
+addscheduled 0
+dumpstate
+free

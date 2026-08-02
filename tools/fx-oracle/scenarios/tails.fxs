@@ -1,0 +1,26 @@
+# fx-oracle: the tail and cylinder pair, the two types that read the length
+# group. The cylinder also reads size2.
+seed 4242
+cvar fx_debug 0
+cvar fx_countScale 1
+cvar fx_nearCull 16
+refdef 0 0 0   0 0 0   1 0 0   0 1 0   0 0 1   90 73.739792
+init
+register tail
+register cylinder
+advance 50
+playid 1 120 0 0 1 0 0 -1 -1 0
+playid 2 120 0 48 1 0 0 -1 -1 0
+addscheduled 0
+dumpstate
+advance 100
+addscheduled 0
+advance 200
+addscheduled 0
+advance 300
+addscheduled 0
+dumpstate
+advance 500
+addscheduled 0
+dumpstate
+free

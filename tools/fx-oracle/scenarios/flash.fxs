@@ -1,0 +1,28 @@
+# fx-oracle: the screen flash. The plain flash rides the view origin into the
+# scene; the localizedFlash component goes into the 2D list, which draw2d then
+# flushes as stretch pics.
+# Source: `oracle/codemp/client/FxPrimitives.cpp:2287-2312`
+seed 88
+cvar fx_debug 0
+cvar fx_countScale 1
+cvar fx_nearCull 16
+refdef 16 32 48   0 0 0   1 0 0   0 1 0   0 0 1   90 73.739792
+init
+register flash
+advance 50
+playid 1 80 20 40 1 0 0 -1 -1 0
+addscheduled 0
+dumpstate
+draw2d 1 1
+dumpstate
+advance 100
+addscheduled 0
+draw2d 0.8 1.25
+advance 200
+addscheduled 0
+draw2d 1 1
+dumpstate
+advance 400
+addscheduled 0
+dumpstate
+free

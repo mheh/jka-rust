@@ -1,0 +1,10 @@
+// fx-oracle fixture: the sound primitive with a single sound.
+// Hand-authored. No retail content.
+sound
+{
+	name		blast
+	count		1
+	life		1
+	sound		sound/fx/blast.wav
+	origin		0 0 0
+}

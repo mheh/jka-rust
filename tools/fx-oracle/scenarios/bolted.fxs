@@ -1,0 +1,59 @@
+# fx-oracle: the bolted and looped scheduling arms.
+#
+# boltInfo packs bolt, model and entity: bolt | (model << 10) | (entity << 20).
+# 7341059 is bolt 3, model 1, entity 7.
+# Source: `oracle/codemp/ghoul2/G2.h:29-40`
+#
+# A bolted effect always schedules, and its start time moves one millisecond
+# later so the bolt has a frame to appear.
+# Source: `oracle/codemp/client/FxScheduler.cpp:832-846,984-992`
+seed 2024
+cvar fx_debug 0
+cvar fx_countScale 1
+cvar fx_nearCull 16
+refdef 0 0 0   0 0 0   1 0 0   0 1 0   0 0 1   90 73.739792
+init
+register relative
+# The bolt queue: the first two replies place the bolt, the last says it is gone
+# and repeats from then on.
+bolt 1 200 0 0   1 0 0   0 1 0   0 0 1
+bolt 1 210 0 8   1 0 0   0 1 0   0 0 1
+bolt 0 0 0 0   0 0 0   0 0 0   0 0 0
+lerporigin 200 0 0
+advance 50
+playbolted 1 200 0 0 7341059 5 200 1
+addscheduled 0
+dumpstate
+advance 50
+addscheduled 0
+dumpstate
+advance 60
+addscheduled 0
+advance 60
+addscheduled 0
+dumpstate
+# Stopping the loop clears the slot, so nothing reschedules after this.
+stop relative 7341059 0
+advance 60
+addscheduled 0
+dumpstate
+# Stopping an effect that never looped takes the not-looping arm.
+stop relative 7341059 0
+# AddLoopedEffects hands its arguments to the wrong parameters: the portal flag
+# lands in `vol` and the relative flag lands in `isPortal`. Every reschedule
+# from this loop therefore belongs to the portal pass, and only a portal pass
+# drains it.
+# Source: `oracle/codemp/client/FxScheduler.cpp:135`
+advance 60
+addscheduled 1
+addscheduled 0
+dumpstate
+# The entity-effect arm drops its entNum argument and reads the entity out of
+# boltInfo instead, so a boltInfo of -1 leaves the effect unbolted.
+# Source: `oracle/codemp/client/FXExport.cpp:64-75`
+register particle
+advance 50
+playentity 2 220 0 0   1 0 0   0 1 0   0 0 1   -1 7 -1 -1
+addscheduled 0
+dumpstate
+free

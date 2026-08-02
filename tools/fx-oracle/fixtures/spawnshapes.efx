@@ -1,0 +1,71 @@
+// fx-oracle fixture: the two spawn-volume arms plus the random rotation around
+// forward. All three consume RNG draws inside CreateEffect.
+// Source: `oracle/codemp/client/FxScheduler.cpp:1258-1333`
+// Hand-authored. No retail content.
+particle
+{
+	name		onsphere
+	count		2
+	life		400
+	shader		fx/shape/sphere
+	origin		0 0 0
+	radius		24
+	height		12
+	spawnFlags	orgOnSphere axisFromSphere
+	rgb
+	{
+		start	1 1 1
+	}
+	alpha
+	{
+		start	1
+	}
+	size
+	{
+		start	3
+	}
+}
+particle
+{
+	name		oncylinder
+	count		2
+	life		400
+	shader		fx/shape/cylinder
+	origin		0 0 0
+	radius		16
+	height		48
+	spawnFlags	orgOnCylinder axisFromSphere
+	rgb
+	{
+		start	1 1 1
+	}
+	alpha
+	{
+		start	1
+	}
+	size
+	{
+		start	3
+	}
+}
+particle
+{
+	name		randrot
+	count		1
+	life		400
+	shader		fx/shape/randrot
+	origin		1 2 3
+	spawnFlags	randrotaroundfwd
+	rgb
+	{
+		start	1 1 1
+	}
+	alpha
+	{
+		start	1
+	}
+	size
+	{
+		start	3
+	}
+}

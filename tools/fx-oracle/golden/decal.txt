@@ -1,0 +1,20 @@
+== fx-oracle decal ==
+PRINT Registering effect : decal
+REGSHADER fx/decal/scorch -> 1
+REGISTER decal -> 1
+PRINT Registering effect : orientedparticle
+REGSHADER fx/oriented/mark -> 2
+REGISTER orientedparticle -> 2
+TIME 50
+DECAL shader 1 origin 42b40000 00000000 00000000 dir 3f800000 00000000 00000000 orientation 42340000 rgba 3e4ccccd 3e4ccccd 3e4ccccd 3f666666 alphaFade 1 radius 41800000 temporary 0
+G2DECAL shader 1 start 42b40000 00000000 00000000 dir 3f800000 00000000 00000000 size 41800000
+MINIREFENT reType 3 renderfx 0 hModel 0 origin 42b40000 00000000 41c00000 oldorigin 00000000 00000000 00000000 axis 3f800000 00000000 00000000 00000000 bf800000 00000000 80000000 00000000 3f800000 nonNormalizedAxes 0 radius 41000000 rotation 41f40000 shaderTime 00000000 customShader 2 shaderRGBA 254 254 254 255 shaderTexCoord 00000000 00000000 frame 0
+STATE activeFx 1 drawnFx 1 scheduledFx 0 nextFree2DEffect 0
+TIME 250
+MINIREFENT reType 3 renderfx 0 hModel 0 origin 42b40000 00000000 41c33333 oldorigin 00000000 00000000 00000000 axis 3f800000 00000000 00000000 00000000 bf800000 00000000 80000000 00000000 3f800000 nonNormalizedAxes 0 radius 410aaaab rotation 4201b852 shaderTime 00000000 customShader 2 shaderRGBA 233 233 233 255 shaderTexCoord 00000000 00000000 frame 0
+TIME 650
+MINIREFENT reType 3 renderfx 0 hModel 0 origin 42b40000 00000000 41c99999 oldorigin 00000000 00000000 00000000 axis 3f800000 00000000 00000000 00000000 bf800000 00000000 80000000 00000000 3f800000 nonNormalizedAxes 0 radius 41200000 rotation 420eff97 shaderTime 00000000 customShader 2 shaderRGBA 190 190 190 255 shaderTexCoord 00000000 00000000 frame 0
+STATE activeFx 1 drawnFx 1 scheduledFx 0 nextFree2DEffect 0
+TIME 1450
+STATE activeFx 0 drawnFx 0 scheduledFx 0 nextFree2DEffect 0
+== end ==

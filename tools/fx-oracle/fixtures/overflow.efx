@@ -1,0 +1,304 @@
+// fx-oracle fixture: 25 primitives, one more than FX_MAX_EFFECT_COMPONENTS.
+// The 25th trips the overflow arm in AddPrimitiveToEffect and is dropped.
+// Source: `oracle/codemp/client/FxScheduler.cpp:492-505`
+// Hand-authored. No retail content.
+particle
+{
+	name		p00
+	count		1
+	life		100
+	shader		fx/overflow/p00
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p01
+	count		1
+	life		100
+	shader		fx/overflow/p01
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p02
+	count		1
+	life		100
+	shader		fx/overflow/p02
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p03
+	count		1
+	life		100
+	shader		fx/overflow/p03
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p04
+	count		1
+	life		100
+	shader		fx/overflow/p04
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p05
+	count		1
+	life		100
+	shader		fx/overflow/p05
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p06
+	count		1
+	life		100
+	shader		fx/overflow/p06
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p07
+	count		1
+	life		100
+	shader		fx/overflow/p07
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p08
+	count		1
+	life		100
+	shader		fx/overflow/p08
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p09
+	count		1
+	life		100
+	shader		fx/overflow/p09
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p10
+	count		1
+	life		100
+	shader		fx/overflow/p10
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p11
+	count		1
+	life		100
+	shader		fx/overflow/p11
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p12
+	count		1
+	life		100
+	shader		fx/overflow/p12
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p13
+	count		1
+	life		100
+	shader		fx/overflow/p13
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p14
+	count		1
+	life		100
+	shader		fx/overflow/p14
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p15
+	count		1
+	life		100
+	shader		fx/overflow/p15
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p16
+	count		1
+	life		100
+	shader		fx/overflow/p16
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p17
+	count		1
+	life		100
+	shader		fx/overflow/p17
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p18
+	count		1
+	life		100
+	shader		fx/overflow/p18
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p19
+	count		1
+	life		100
+	shader		fx/overflow/p19
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p20
+	count		1
+	life		100
+	shader		fx/overflow/p20
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p21
+	count		1
+	life		100
+	shader		fx/overflow/p21
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p22
+	count		1
+	life		100
+	shader		fx/overflow/p22
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p23
+	count		1
+	life		100
+	shader		fx/overflow/p23
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}
+particle
+{
+	name		p24
+	count		1
+	life		100
+	shader		fx/overflow/p24
+	origin		0 0 0
+	size
+	{
+		start	1
+	}
+}

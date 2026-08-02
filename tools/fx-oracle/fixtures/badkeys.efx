@@ -1,0 +1,40 @@
+// fx-oracle fixture: every parse-diagnostic arm.
+//   - an unknown primitive key prints "Unknown key parsing an effect primitive"
+//   - an unknown sub-group prints "Unknown group key parsing a particle"
+//   - an unknown key inside a group prints "Unknown key parsing an RGB group"
+//   - an unknown materialImpact prints the ParseMaterialImpact complaint
+//   - an unknown flag token is dropped in silence, with no print at all
+//   - an unknown top-level group name yields type None and is skipped whole
+// Source: `oracle/codemp/client/FxTemplate.cpp:894-907,2342-2380`
+// Hand-authored. No retail content.
+particle
+{
+	name			diagnostics
+	count			1
+	life			200
+	shader			fx/bad/keys
+	origin			0 0 0
+	nosuchkey		12
+	materialImpact	notashellsound
+	flags			usePhysics nosuchflag
+	spawnFlags		cheapOrgCalc nosuchspawnflag
+	rgb
+	{
+		start		1 1 1
+		nosuchrgbkey	3
+	}
+	nosuchgroup
+	{
+		start		1
+	}
+	size
+	{
+		start		4
+	}
+}
+nosuchprimitive
+{
+	name		ignored
+	count		1
+	life		200
+}

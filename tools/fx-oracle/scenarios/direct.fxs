@@ -1,0 +1,27 @@
+# fx-oracle: the direct FX_Add* trap arms. cgame calls these without a template
+# and without the scheduler, so this scenario drives every one of them.
+# Source: `oracle/codemp/client/cl_cgame.cpp:1099-1243`
+seed 1001
+cvar fx_debug 0
+cvar fx_countScale 1
+cvar fx_nearCull 16
+refdef 0 0 0   0 0 0   1 0 0   0 1 0   0 0 1   90 73.739792
+init
+advance 50
+addline 100 0 0   160 0 0   2 6 0   1 0 0   1 1 1   0.2 0.2 1   0   500 1 1
+addelectricity 100 0 32   180 0 40   3 1 0   1 0 0   0.5 0.5 1   0 0 0.5   0   4 500 2 1
+addbezier 100 0 64   200 0 64   130 20 70   0 0 0   170 -20 60   0 0 0   4 1 0   1 0 0   1 1 0   1 0 0   0   600 3 1
+addpoly 3   100 -8 96   100 8 96   100 0 110   0 0   1 0   0.5 1   0 0 4   0 0 -2   1 0 0   1 1 1   0.5 0.5 0.5   0   0 0 10   0.4 0   700 4 1
+addsprite 100 0 130   0 0 6   0 0 -1   5 9   1 0   20 0.3   800 5 1
+addtrail 100 -6 150   100 6 150   112 6 158   112 -6 158   6 0 400
+addscheduled 0
+dumpstate
+advance 100
+addscheduled 0
+advance 200
+addscheduled 0
+dumpstate
+advance 500
+addscheduled 0
+dumpstate
+free

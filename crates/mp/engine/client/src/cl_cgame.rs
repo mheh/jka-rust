@@ -35,8 +35,8 @@ use mp_engine_ghoul2::api_models::{
 use mp_engine_ghoul2::api_ragdoll::{
     g2api_absurd_smoothing, g2api_animate_g2_models_rag, g2api_get_rag_bone_pos, g2api_ik_move,
     g2api_rag_effector_goal, g2api_rag_effector_kick, g2api_rag_force_solve,
-    g2api_rag_pcj_constraint, g2api_rag_pcj_gradient_speed, g2api_reset_ragdoll, g2api_set_bone_ik_state,
-    g2api_set_ragdoll,
+    g2api_rag_pcj_constraint, g2api_rag_pcj_gradient_speed, g2api_reset_ragdoll,
+    g2api_set_bone_ik_state, g2api_set_ragdoll,
 };
 use mp_engine_ghoul2::api_saveload::g2api_get_gla_name;
 use mp_engine_ghoul2::api_surfaces::{
@@ -52,7 +52,6 @@ use mp_engine_qcommon::cm_load::{
     CM_InlineModel, CM_LoadMap, CM_LoadSubBSP, CM_NumInlineModels, CM_TempBoxModel,
 };
 use mp_engine_qcommon::cm_terrain::register_terrain;
-use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::cm_test::{CM_PointContents, CM_TransformedPointContents};
 use mp_engine_qcommon::cm_trace::{CM_BoxTrace, CM_TransformedBoxTrace};
 use mp_engine_qcommon::cmd_common::{
@@ -60,6 +59,7 @@ use mp_engine_qcommon::cmd_common::{
     Cmd_TokenizeString,
 };
 use mp_engine_qcommon::cmd_pc::{Cmd_AddCommand, Cmd_RemoveCommand};
+use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::{com_printf, Common};
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::error::com_error;
@@ -73,8 +73,8 @@ use mp_engine_qcommon::files_common::{FS_FCloseFile, FS_Write};
 use mp_engine_qcommon::files_pc::{FS_FOpenFileByMode, FS_GetFileList, FS_Read2};
 use mp_engine_qcommon::qcommon::net_limits::{MAX_RELIABLE_COMMANDS, PACKET_BACKUP, PACKET_MASK};
 use mp_engine_qcommon::qcommon::shared_traps_t::sharedTraps_t;
-use mp_engine_qcommon::roff::RoffSystem;
 use mp_engine_qcommon::qcommon::vm_interpret_t::vmInterpret_t;
+use mp_engine_qcommon::roff::RoffSystem;
 use mp_engine_qcommon::stringed::api::{SE_GetString, SE_GetString2};
 use mp_engine_qcommon::terrain_handle::TerrainHandle;
 use mp_engine_qcommon::timing::sys_milliseconds;
@@ -90,6 +90,7 @@ use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_qshared::common::mp::cgame::stereo_frame_t::stereoFrame_t;
+use mp_qshared::common::mp::qcommon::collision_record::{CollisionRecord_t, MAX_G2_COLLISIONS};
 use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
 use mp_qshared::common::mp::qcommon::qtime::qtime_t;
 use mp_qshared::common::mp::qcommon::shared_ragdoll_params::sharedRagDollParams_t;
@@ -97,7 +98,6 @@ use mp_qshared::common::mp::qcommon::shared_ragdoll_update_params::sharedRagDoll
 use mp_qshared::common::mp::qcommon::shared_set_bone_ik_state_params::sharedSetBoneIKStateParams_t;
 use mp_qshared::common::mp::qcommon::usercmd::usercmd_t;
 use mp_qshared::common::mp::trace_t::trace_t;
-use mp_qshared::common::mp::qcommon::collision_record::{CollisionRecord_t, MAX_G2_COLLISIONS};
 use mp_qshared::shared::add_electricity_arg::addElectricityArgStruct_t;
 use mp_qshared::shared::addbezier_arg::addbezierArgStruct_t;
 use mp_qshared::shared::addpoly_arg::addpolyArgStruct_t;
@@ -119,9 +119,9 @@ use mp_renderer::render_state::frame_event::FrameEvent;
 use mp_renderer::tr_bsp::{RE_LoadWorldMap, R_GetEntityToken};
 use mp_renderer::tr_cmds::{RE_RotatePic, RE_RotatePic2, RE_SetColor, RE_StretchPic};
 use mp_renderer::tr_font::{
-    GetLanguageEnum, Language_IsAsian, Language_UsesSpaces, RE_Font_DrawString,
-    RE_Font_HeightPixels, RE_Font_StrLenChars, RE_Font_StrLenPixels, RE_RegisterFont,
-    AnyLanguage_ReadCharFromString,
+    AnyLanguage_ReadCharFromString, GetLanguageEnum, Language_IsAsian, Language_UsesSpaces,
+    RE_Font_DrawString, RE_Font_HeightPixels, RE_Font_StrLenChars, RE_Font_StrLenPixels,
+    RE_RegisterFont,
 };
 use mp_renderer::tr_image::{RE_RegisterImages_LevelLoadEnd, RE_RegisterSkin};
 use mp_renderer::tr_init::{RE_EndRegistration, RE_GetLightStyle, RE_SetLightStyle};
@@ -160,14 +160,20 @@ use crate::cl_ui::{Key_GetCatcher, Key_SetCatcher};
 use crate::client::cl_main_consts::MAX_STRINGED_SV_STRING;
 use crate::client::cl_snapshot_t::clSnapshot_t;
 use crate::client::client_consts::{CMD_BACKUP, CMD_MASK, MAX_PARSE_ENTITIES, RESET_TIME};
+use crate::client_host::fx_from_view;
 use crate::client_host::{
     bot_from_view, client_legacy_syscall, g2_from_view, sv_from_view, Client,
 };
-use crate::fx_stubs::{
-    FX_AddBezier, FX_AddElectricity, FX_AddLine, FX_AddParticle, FX_AddPoly,
-    FX_AddScheduledEffects, FX_AdjustTime, FX_Draw2DEffects, FX_FeedTrail, FX_Free, FX_FreeSystem,
-    FX_InitSystem, FX_PlayBoltedEffectID, FX_PlayEffect, FX_PlayEffectID, FX_PlayEntityEffectID,
+use crate::fx::ctrail::FX_FeedTrail;
+use crate::fx::emat_impact_effect::EMatImpactEffect;
+use crate::fx::fx_export::{
+    FX_AddScheduledEffects, FX_AdjustTime, FX_Draw2DEffects, FX_FreeSystem, FX_InitSystem,
+    FX_PlayBoltedEffectID, FX_PlayEffect, FX_PlayEffectID, FX_PlayEntityEffectID,
     FX_RegisterEffect, FX_SetRefDefFromCGame,
+};
+use crate::fx::fx_host::FxHost;
+use crate::fx::fx_util::{
+    FX_AddBezier, FX_AddElectricity, FX_AddLine, FX_AddParticle, FX_AddPoly, FX_Free,
 };
 use crate::snd_stubs::{
     AS_AddPrecacheEntry, AS_GetBModelSound, AS_ParseSets, S_AddLocalSet, S_AddLoopingSound,
@@ -923,7 +929,8 @@ pub fn CL_GetServerCommand(
     }
 
     let mut s = cstr_to_string(
-        cl.clc.serverCommands[(serverCommandNumber & (MAX_RELIABLE_COMMANDS as c_int - 1)) as usize]
+        cl.clc.serverCommands
+            [(serverCommandNumber & (MAX_RELIABLE_COMMANDS as c_int - 1)) as usize]
             .as_ptr(),
     );
     cl.clc.lastExecutedServerCommand = serverCommandNumber;
@@ -1093,7 +1100,7 @@ pub fn CL_InitCGame(view: &mut EngineHostView, cl: &mut Client) {
     } else {
         interpret = unsafe {
             core::mem::transmute::<c_int, vmInterpret_t>(
-                Cvar_VariableValue(view.common, "vm_cgame") as c_int
+                Cvar_VariableValue(view.common, "vm_cgame") as c_int,
             )
         };
     }
@@ -1370,7 +1377,13 @@ pub fn CL_CgameSystemCalls(
         unsafe { Com_Memset(vma(vc, args, 1), arg(2), arg(3) as usize) };
         0
     } else if op == sharedTraps_t::TRAP_MEMCPY as c_int {
-        unsafe { Com_Memcpy(vma(vc, args, 1), vma(vc, args, 2) as *const (), arg(3) as usize) };
+        unsafe {
+            Com_Memcpy(
+                vma(vc, args, 1),
+                vma(vc, args, 2) as *const (),
+                arg(3) as usize,
+            )
+        };
         0
     } else if op == sharedTraps_t::TRAP_STRNCPY as c_int {
         unsafe {
@@ -1492,7 +1505,12 @@ pub fn CL_CgameSystemCalls(
         let mode = unsafe { core::mem::transmute::<c_int, fsMode_t>(arg(3)) };
         FS_FOpenFileByMode(view, &path, handle, mode)
     } else if op == MpCgameImport::CG_FS_READ as c_int {
-        FS_Read2(view.common, vma(vc, args, 1), arg(2), arg(3) as fileHandle_t);
+        FS_Read2(
+            view.common,
+            vma(vc, args, 1),
+            arg(2),
+            arg(3) as fileHandle_t,
+        );
         0
     } else if op == MpCgameImport::CG_FS_WRITE as c_int {
         FS_Write(
@@ -1558,7 +1576,11 @@ pub fn CL_CgameSystemCalls(
             qtrue,
         )
     } else if op == MpCgameImport::CG_CM_POINTCONTENTS as c_int {
-        CM_PointContents(view.cm, unsafe { *(vma(vc, args, 1) as *const vec3_t) }, arg(2))
+        CM_PointContents(
+            view.cm,
+            unsafe { *(vma(vc, args, 1) as *const vec3_t) },
+            arg(2),
+        )
     } else if op == MpCgameImport::CG_CM_TRANSFORMEDPOINTCONTENTS as c_int {
         CM_TransformedPointContents(
             view.cm,
@@ -1967,13 +1989,16 @@ pub fn CL_CgameSystemCalls(
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let re = unsafe { re_from_view(view) };
         // SAFETY: `VMA(1)` is the module's `refEntity_t` (porting-rules §D11).
-        RE_AddRefEntityToScene(&mut re.frame_data, &re.assets, &mut re.scene, unsafe { &*ent });
+        RE_AddRefEntityToScene(&mut re.frame_data, &re.assets, &mut re.scene, unsafe {
+            &*ent
+        });
         0
     } else if op == MpCgameImport::CG_R_ADDPOLYTOSCENE as c_int {
         let num_verts = arg(2) as usize;
         // SAFETY: `VMA(3)` is the module's `polyVert_t` run (porting-rules §D11).
-        let verts =
-            unsafe { core::slice::from_raw_parts(vma(vc, args, 3) as *const polyVert_t, num_verts) };
+        let verts = unsafe {
+            core::slice::from_raw_parts(vma(vc, args, 3) as *const polyVert_t, num_verts)
+        };
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let re = unsafe { re_from_view(view) };
         RE_AddPolyToScene(
@@ -2195,7 +2220,11 @@ pub fn CL_CgameSystemCalls(
         CL_GetGameState(cl, vma(vc, args, 1) as *mut gameState_t);
         0
     } else if op == MpCgameImport::CG_GETCURRENTSNAPSHOTNUMBER as c_int {
-        CL_GetCurrentSnapshotNumber(cl, vma(vc, args, 1) as *mut c_int, vma(vc, args, 2) as *mut c_int);
+        CL_GetCurrentSnapshotNumber(
+            cl,
+            vma(vc, args, 1) as *mut c_int,
+            vma(vc, args, 2) as *mut c_int,
+        );
         0
     } else if op == MpCgameImport::CG_GETSNAPSHOT as c_int {
         CL_GetSnapshot(view.common, cl, arg(1), vma(vc, args, 2) as *mut snapshot_t) as c_int
@@ -2419,81 +2448,118 @@ pub fn CL_CgameSystemCalls(
         let p2 = unsafe { *(vma(vc, args, 2) as *const vec3_t) };
         R_inPVS(view.cm, p1, p2) as c_int
     } else if op == MpCgameImport::CG_FX_ADDLINE as c_int {
-        // The whole `FX_*` block calls the pending-lane stubs in `fx_stubs.rs`
-        // (gh#26/gh#27), which carry the Raven names and signatures.
-        unsafe {
-            FX_AddLine(
-                vma(vc, args, 1) as *mut f32,
-                vma(vc, args, 2) as *mut f32,
-                vmf(vc, args, 3),
-                vmf(vc, args, 4),
-                vmf(vc, args, 5),
-                vmf(vc, args, 6),
-                vmf(vc, args, 7),
-                vmf(vc, args, 8),
-                vma(vc, args, 9) as *mut f32,
-                vma(vc, args, 10) as *mut f32,
-                vmf(vc, args, 11),
-                arg(12),
-                arg(13),
-                arg(14),
-            );
-        }
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let fx = unsafe { fx_from_view(view) };
+        // SAFETY: `VMA(1)`, `VMA(2)`, `VMA(9)`, and `VMA(10)` are the module's
+        // three-float vectors (porting-rules §D11).
+        let (start, end, s_rgb, e_rgb) = unsafe {
+            (
+                *(vma(vc, args, 1) as *const vec3_t),
+                *(vma(vc, args, 2) as *const vec3_t),
+                *(vma(vc, args, 9) as *const vec3_t),
+                *(vma(vc, args, 10) as *const vec3_t),
+            )
+        };
+        let (size1, size2, size_parm, alpha1, alpha2, alpha_parm, rgb_parm) = (
+            vmf(vc, args, 3),
+            vmf(vc, args, 4),
+            vmf(vc, args, 5),
+            vmf(vc, args, 6),
+            vmf(vc, args, 7),
+            vmf(vc, args, 8),
+            vmf(vc, args, 11),
+        );
+        let mut host = FxHost::Engine { view, cl };
+        FX_AddLine(
+            fx,
+            &mut host,
+            start,
+            end,
+            size1,
+            size2,
+            size_parm,
+            alpha1,
+            alpha2,
+            alpha_parm,
+            s_rgb,
+            e_rgb,
+            rgb_parm,
+            arg(12),
+            arg(13),
+            arg(14),
+            EMatImpactEffect::MATIMPACTFX_NONE,
+            -1,
+            0,
+            -1,
+            -1,
+            -1,
+        );
         0
     } else if op == MpCgameImport::CG_FX_REGISTER_EFFECT as c_int {
         let name = cstr_to_string(vma(vc, args, 1) as *const c_char);
-        unsafe { FX_RegisterEffect(&name) }
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let fx = unsafe { fx_from_view(view) };
+        let mut host = FxHost::Engine { view, cl };
+        FX_RegisterEffect(fx, &mut host, &name)
     } else if op == MpCgameImport::CG_FX_PLAY_EFFECT as c_int {
         let name = cstr_to_string(vma(vc, args, 1) as *const c_char);
-        unsafe {
-            FX_PlayEffect(
-                &name,
-                vma(vc, args, 2) as *mut f32,
-                vma(vc, args, 3) as *mut f32,
-                arg(4),
-                arg(5),
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let fx = unsafe { fx_from_view(view) };
+        // SAFETY: `VMA(2)` and `VMA(3)` are the module's three-float vectors.
+        let (org, fwd) = unsafe {
+            (
+                *(vma(vc, args, 2) as *const vec3_t),
+                *(vma(vc, args, 3) as *const vec3_t),
             )
         };
+        let (vol, rad) = (arg(4), arg(5));
+        let mut host = FxHost::Engine { view, cl };
+        FX_PlayEffect(fx, &mut host, &name, org, fwd, vol, rad);
         0
     } else if op == MpCgameImport::CG_FX_PLAY_ENTITY_EFFECT as c_int {
         // Raven: assert(0);//gone! — the entity-effect entry point was removed upstream.
         unreachable!("CG_FX_PLAY_ENTITY_EFFECT — gone in the oracle (cl_cgame.cpp:1112-1115)")
     } else if op == MpCgameImport::CG_FX_PLAY_EFFECT_ID as c_int {
-        unsafe {
-            FX_PlayEffectID(
-                arg(1),
-                vma(vc, args, 2) as *mut f32,
-                vma(vc, args, 3) as *mut f32,
-                arg(4),
-                arg(5),
-                qfalse,
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let fx = unsafe { fx_from_view(view) };
+        // SAFETY: `VMA(2)` and `VMA(3)` are the module's three-float vectors.
+        let (org, fwd) = unsafe {
+            (
+                *(vma(vc, args, 2) as *const vec3_t),
+                *(vma(vc, args, 3) as *const vec3_t),
             )
         };
+        let (id, vol, rad) = (arg(1), arg(4), arg(5));
+        let mut host = FxHost::Engine { view, cl };
+        FX_PlayEffectID(fx, &mut host, id, org, fwd, vol, rad, false);
         0
     } else if op == MpCgameImport::CG_FX_PLAY_PORTAL_EFFECT_ID as c_int {
-        unsafe {
-            FX_PlayEffectID(
-                arg(1),
-                vma(vc, args, 2) as *mut f32,
-                vma(vc, args, 3) as *mut f32,
-                arg(4),
-                arg(5),
-                qtrue,
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let fx = unsafe { fx_from_view(view) };
+        // SAFETY: `VMA(2)` and `VMA(3)` are the module's three-float vectors.
+        let (org, fwd) = unsafe {
+            (
+                *(vma(vc, args, 2) as *const vec3_t),
+                *(vma(vc, args, 3) as *const vec3_t),
             )
         };
+        let (id, vol, rad) = (arg(1), arg(4), arg(5));
+        let mut host = FxHost::Engine { view, cl };
+        FX_PlayEffectID(fx, &mut host, id, org, fwd, vol, rad, true);
         0
     } else if op == MpCgameImport::CG_FX_PLAY_ENTITY_EFFECT_ID as c_int {
-        unsafe {
-            FX_PlayEntityEffectID(
-                arg(1),
-                vma(vc, args, 2) as *mut f32,
-                vma(vc, args, 3) as *mut vec3_t,
-                arg(4),
-                arg(5),
-                arg(6),
-                arg(7),
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let fx = unsafe { fx_from_view(view) };
+        // SAFETY: `VMA(2)` is the module's origin and `VMA(3)` its three-vector axis.
+        let (org, axis) = unsafe {
+            (
+                *(vma(vc, args, 2) as *const vec3_t),
+                *(vma(vc, args, 3) as *const [vec3_t; 3]),
             )
         };
+        let (id, bolt_info, ent_num, vol, rad) = (arg(1), arg(4), arg(5), arg(6), arg(7));
+        let mut host = FxHost::Engine { view, cl };
+        FX_PlayEntityEffectID(fx, &mut host, id, org, axis, bolt_info, ent_num, vol, rad);
         0
     } else if op == MpCgameImport::CG_FX_PLAY_BOLTED_EFFECT_ID as c_int {
         // SAFETY: `args[3]` is the module's `CGhoul2Info_v` handle (§D11).
@@ -2502,13 +2568,14 @@ pub fn CL_CgameSystemCalls(
             let ghl_info = g2_info(g2, g2v, arg(6));
             match g2api_attach_ent(g2, view, ghl_info, arg(4), arg(5), arg(6)) {
                 Some(boltInfo) => {
+                    let org = *(vma(vc, args, 2) as *const vec3_t);
+                    let item = g2v.mItem;
+                    let (id, loop_time, relative) = (arg(1), arg(7), arg(8) != 0);
+                    // SAFETY: view-constructor slot, no other live cast.
+                    let fx = fx_from_view(view);
+                    let mut host = FxHost::Engine { view, cl };
                     FX_PlayBoltedEffectID(
-                        arg(1),
-                        vma(vc, args, 2) as *mut f32,
-                        boltInfo,
-                        g2v.mItem as *mut core::ffi::c_void,
-                        arg(7),
-                        arg(8) as qboolean,
+                        fx, &mut host, id, org, boltInfo, item, loop_time, relative,
                     );
                     1
                 }
@@ -2516,88 +2583,198 @@ pub fn CL_CgameSystemCalls(
             }
         }
     } else if op == MpCgameImport::CG_FX_ADD_SCHEDULED_EFFECTS as c_int {
-        unsafe { FX_AddScheduledEffects(arg(1) as qboolean) };
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let fx = unsafe { fx_from_view(view) };
+        let portal = arg(1) != 0;
+        let mut host = FxHost::Engine { view, cl };
+        FX_AddScheduledEffects(fx, &mut host, portal);
         0
     } else if op == MpCgameImport::CG_FX_DRAW_2D_EFFECTS as c_int {
-        unsafe { FX_Draw2DEffects(vmf(vc, args, 1), vmf(vc, args, 2)) };
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let fx = unsafe { fx_from_view(view) };
+        let (x_scale, y_scale) = (vmf(vc, args, 1), vmf(vc, args, 2));
+        let mut host = FxHost::Engine { view, cl };
+        FX_Draw2DEffects(fx, &mut host, x_scale, y_scale);
         0
     } else if op == MpCgameImport::CG_FX_INIT_SYSTEM as c_int {
-        unsafe { FX_InitSystem(vma(vc, args, 1) as *mut refdef_t) }
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let fx = unsafe { fx_from_view(view) };
+        let refdef = vma(vc, args, 1) as *mut refdef_t;
+        let mut host = FxHost::Engine { view, cl };
+        FX_InitSystem(fx, &mut host, refdef)
     } else if op == MpCgameImport::CG_FX_SET_REFDEF as c_int {
-        unsafe { FX_SetRefDefFromCGame(vma(vc, args, 1) as *mut refdef_t) };
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let fx = unsafe { fx_from_view(view) };
+        FX_SetRefDefFromCGame(fx, vma(vc, args, 1) as *mut refdef_t);
         0
     } else if op == MpCgameImport::CG_FX_FREE_SYSTEM as c_int {
-        unsafe { FX_FreeSystem() }
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let fx = unsafe { fx_from_view(view) };
+        let mut host = FxHost::Engine { view, cl };
+        FX_FreeSystem(fx, &mut host)
     } else if op == MpCgameImport::CG_FX_ADJUST_TIME as c_int {
-        unsafe { FX_AdjustTime(arg(1)) };
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let fx = unsafe { fx_from_view(view) };
+        FX_AdjustTime(fx, arg(1));
         0
     } else if op == MpCgameImport::CG_FX_RESET as c_int {
-        unsafe { FX_Free(false) };
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let fx = unsafe { fx_from_view(view) };
+        let mut host = FxHost::Engine { view, cl };
+        FX_Free(fx, &mut host, false);
         0
     } else if op == MpCgameImport::CG_FX_ADDPOLY as c_int {
-        unsafe {
-            let p = vma(vc, args, 1) as *mut addpolyArgStruct_t;
-            if !p.is_null() {
-                FX_AddPoly(*p);
-            }
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let fx = unsafe { fx_from_view(view) };
+        // SAFETY: `VMA(1)` is the module's `addpolyArgStruct_t` (§D11).
+        let p = unsafe { (vma(vc, args, 1) as *mut addpolyArgStruct_t).as_ref() };
+        if let Some(p) = p {
+            let a = *p;
+            let mut host = FxHost::Engine { view, cl };
+            FX_AddPoly(
+                fx,
+                &mut host,
+                &a.p,
+                &a.ev,
+                a.numVerts,
+                a.vel,
+                a.accel,
+                a.alpha1,
+                a.alpha2,
+                a.alphaParm,
+                a.rgb1,
+                a.rgb2,
+                a.rgbParm,
+                a.rotationDelta,
+                a.bounce,
+                a.motionDelay,
+                a.killTime,
+                a.shader,
+                a.flags,
+            );
         }
         0
     } else if op == MpCgameImport::CG_FX_ADDBEZIER as c_int {
-        unsafe {
-            let b = vma(vc, args, 1) as *mut addbezierArgStruct_t;
-            if !b.is_null() {
-                FX_AddBezier(*b);
-            }
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let fx = unsafe { fx_from_view(view) };
+        // SAFETY: `VMA(1)` is the module's `addbezierArgStruct_t` (§D11).
+        let b = unsafe { (vma(vc, args, 1) as *mut addbezierArgStruct_t).as_ref() };
+        if let Some(b) = b {
+            let a = *b;
+            let mut host = FxHost::Engine { view, cl };
+            FX_AddBezier(
+                fx,
+                &mut host,
+                a.start,
+                a.end,
+                a.control1,
+                a.control1Vel,
+                a.control2,
+                a.control2Vel,
+                a.size1,
+                a.size2,
+                a.sizeParm,
+                a.alpha1,
+                a.alpha2,
+                a.alphaParm,
+                a.sRGB,
+                a.eRGB,
+                a.rgbParm,
+                a.killTime,
+                a.shader,
+                a.flags,
+            );
         }
         0
     } else if op == MpCgameImport::CG_FX_ADDPRIMITIVE as c_int {
-        unsafe {
-            let a = vma(vc, args, 1) as *mut effectTrailArgStruct_t;
-            if !a.is_null() {
-                FX_FeedTrail(a);
-            }
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let fx = unsafe { fx_from_view(view) };
+        // SAFETY: `VMA(1)` is the module's `effectTrailArgStruct_t` (§D11).
+        let a = unsafe { (vma(vc, args, 1) as *mut effectTrailArgStruct_t).as_ref() };
+        if let Some(a) = a {
+            let trail = *a;
+            let mut host = FxHost::Engine { view, cl };
+            FX_FeedTrail(fx, &mut host, &trail);
         }
         0
     } else if op == MpCgameImport::CG_FX_ADDSPRITE as c_int {
-        unsafe {
-            let s = vma(vc, args, 1) as *mut addspriteArgStruct_t;
-            if !s.is_null() {
-                let rgb: vec3_t = [1.0, 1.0, 1.0];
-                // FX_AddSprite(NULL, s->origin, s->vel, s->accel, s->scale, s->dscale, s->sAlpha,
-                //   s->eAlpha, s->rotation, s->bounce, s->life, s->shader, s->flags);
-                FX_AddParticle(
-                    (*s).origin,
-                    (*s).vel,
-                    (*s).accel,
-                    (*s).scale,
-                    (*s).dscale,
-                    0.0,
-                    (*s).sAlpha,
-                    (*s).eAlpha,
-                    0.0,
-                    rgb,
-                    rgb,
-                    0.0,
-                    (*s).rotation,
-                    0.0,
-                    vec3_origin,
-                    vec3_origin,
-                    (*s).bounce,
-                    0,
-                    0,
-                    (*s).life,
-                    (*s).shader,
-                    (*s).flags,
-                );
-            }
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let fx = unsafe { fx_from_view(view) };
+        // SAFETY: `VMA(1)` is the module's `addspriteArgStruct_t` (§D11).
+        let s = unsafe { (vma(vc, args, 1) as *mut addspriteArgStruct_t).as_ref() };
+        if let Some(s) = s {
+            let a = *s;
+            let rgb: vec3_t = [1.0, 1.0, 1.0];
+            let mut host = FxHost::Engine { view, cl };
+            // Raven's commented-out `FX_AddSprite` call sits above this one, and
+            // the shipped arm builds a particle instead.
+            FX_AddParticle(
+                fx,
+                &mut host,
+                a.origin,
+                a.vel,
+                a.accel,
+                a.scale,
+                a.dscale,
+                0.0,
+                a.sAlpha,
+                a.eAlpha,
+                0.0,
+                rgb,
+                rgb,
+                0.0,
+                a.rotation,
+                0.0,
+                vec3_origin,
+                vec3_origin,
+                a.bounce,
+                0,
+                0,
+                a.life,
+                a.shader,
+                a.flags,
+                EMatImpactEffect::MATIMPACTFX_NONE,
+                -1,
+                0,
+                -1,
+                -1,
+                -1,
+            );
         }
         0
     } else if op == MpCgameImport::CG_FX_ADDELECTRICITY as c_int {
-        unsafe {
-            let p = vma(vc, args, 1) as *mut addElectricityArgStruct_t;
-            if !p.is_null() {
-                FX_AddElectricity(*p);
-            }
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let fx = unsafe { fx_from_view(view) };
+        // SAFETY: `VMA(1)` is the module's `addElectricityArgStruct_t` (§D11).
+        let p = unsafe { (vma(vc, args, 1) as *mut addElectricityArgStruct_t).as_ref() };
+        if let Some(p) = p {
+            let a = *p;
+            let mut host = FxHost::Engine { view, cl };
+            FX_AddElectricity(
+                fx,
+                &mut host,
+                a.start,
+                a.end,
+                a.size1,
+                a.size2,
+                a.sizeParm,
+                a.alpha1,
+                a.alpha2,
+                a.alphaParm,
+                a.sRGB,
+                a.eRGB,
+                a.rgbParm,
+                a.chaos,
+                a.killTime,
+                a.shader,
+                a.flags,
+                EMatImpactEffect::MATIMPACTFX_NONE,
+                -1,
+                0,
+                -1,
+                -1,
+                -1,
+            );
         }
         0
     } else if op == MpCgameImport::CG_ROFF_CLEAN as c_int {
@@ -3047,12 +3224,8 @@ pub fn CL_CgameSystemCalls(
         // SAFETY: the handle and the velocity are module-space (§D11).
         unsafe {
             let ghoul2 = &mut *(argw(1) as *mut CGhoul2Info_v);
-            g2api_rag_effector_kick(
-                g2,
-                ghoul2,
-                &bone_name,
-                *(vma(vc, args, 3) as *const vec3_t),
-            ) as c_int
+            g2api_rag_effector_kick(g2, ghoul2, &bone_name, *(vma(vc, args, 3) as *const vec3_t))
+                as c_int
         }
     } else if op == MpCgameImport::CG_G2_RAGFORCESOLVE as c_int {
         // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
@@ -3074,8 +3247,15 @@ pub fn CL_CgameSystemCalls(
             } else {
                 Some(&mut *params_ptr)
             };
-            g2api_set_bone_ik_state(g2, view, ghoul2, arg(2), bone_name.as_deref(), arg(4), params)
-                as c_int
+            g2api_set_bone_ik_state(
+                g2,
+                view,
+                ghoul2,
+                arg(2),
+                bone_name.as_deref(),
+                arg(4),
+                params,
+            ) as c_int
         }
     } else if op == MpCgameImport::CG_G2_IKMOVE as c_int {
         // SAFETY: the handle and `VMA(3)` are module-space (porting-rules §D11).

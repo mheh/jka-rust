@@ -1,0 +1,28 @@
+// fx-oracle fixture: a bolt-relative effect with a short repeat delay, for the
+// looped and bolted scheduling arms.
+// Hand-authored. No retail content.
+repeatDelay		50
+particle
+{
+	name		bolted
+	count		1
+	life		400
+	shader		fx/relative/spark
+	origin		2 0 0
+	velocity	0 0 4
+	flags		relative
+	rgb
+	{
+		start	1 1 1
+	}
+	alpha
+	{
+		start	1
+		end		0
+		flags	linear
+	}
+	size
+	{
+		start	3
+	}
+}

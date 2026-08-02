@@ -1,0 +1,20 @@
+== fx-oracle flash ==
+PRINT Registering effect : flash
+REGSHADER fx/flash/white -> 1
+REGSHADER fx/flash/spot -> 2
+REGISTER flash -> 1
+TIME 50
+MINIREFENT reType 2 renderfx 0 hModel 0 origin 41e00000 42000000 42400000 oldorigin 00000000 00000000 00000000 axis 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 nonNormalizedAxes 0 radius 41300000 rotation 00000000 shaderTime 00000000 customShader 1 shaderRGBA 246 246 246 255 shaderTexCoord 00000000 00000000 frame 0
+STATE activeFx 2 drawnFx 2 scheduledFx 0 nextFree2DEffect 1
+STRETCHPIC x 43820000 y 431c9d80 w 43700000 h 43700000 shader 2
+STATE activeFx 2 drawnFx 2 scheduledFx 0 nextFree2DEffect 0
+TIME 150
+MINIREFENT reType 2 renderfx 0 hModel 0 origin 41e00000 42000000 42400000 oldorigin 00000000 00000000 00000000 axis 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 nonNormalizedAxes 0 radius 41300000 rotation 00000000 shaderTime 00000000 customShader 1 shaderRGBA 108 108 108 255 shaderTexCoord 00000000 00000000 frame 0
+STRETCHPIC x 436aaaab y 436d6f8c w 430aaaaa h 4358aaa9 shader 2
+TIME 350
+MINIREFENT reType 2 renderfx 0 hModel 0 origin 41e00000 42000000 42400000 oldorigin 00000000 00000000 00000000 axis 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 nonNormalizedAxes 0 radius 41300000 rotation 00000000 shaderTime 00000000 customShader 1 shaderRGBA 0 0 0 255 shaderTexCoord 00000000 00000000 frame 0
+STRETCHPIC x 43b40000 y 43804ec0 w 42200000 h 42200000 shader 2
+STATE activeFx 2 drawnFx 2 scheduledFx 0 nextFree2DEffect 0
+TIME 750
+STATE activeFx 0 drawnFx 0 scheduledFx 0 nextFree2DEffect 0
+== end ==

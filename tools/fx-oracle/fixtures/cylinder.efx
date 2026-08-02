@@ -1,0 +1,40 @@
+// fx-oracle fixture: the cylinder primitive, the one type that reads size2.
+// Hand-authored. No retail content.
+cylinder
+{
+	name		cone
+	count		1
+	life		900
+	shader		fx/cylinder/cone
+	origin		0 0 0
+	rgb
+	{
+		start	0.5 0.5 1
+		end		0 0 0.25
+		flags	linear
+	}
+	alpha
+	{
+		start	0.8
+		end		0
+		flags	linear
+	}
+	size
+	{
+		start	2
+		end		12
+		flags	linear
+	}
+	size2
+	{
+		start	16
+		end		2
+		flags	linear
+	}
+	length
+	{
+		start	48
+		end		96
+		flags	linear
+	}
+}

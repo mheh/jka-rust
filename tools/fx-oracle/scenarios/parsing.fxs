@@ -1,0 +1,32 @@
+# fx-oracle: the parse detail gate. Every flag token, every spawn-flag token,
+# every transition token, the list-valued media keys and every cross-reference
+# key. Nothing plays.
+seed 2
+cvar fx_debug 0
+cvar fx_countScale 1
+cvar fx_nearCull 16
+init
+register allflags
+register allspawnflags
+register transitions
+register lists
+register crossref
+register spawnshapes
+register scheduling
+register rgbinterp
+register relative
+register traceline
+dumptemplate 1
+dumptemplate 2
+dumptemplate 3
+dumptemplate 4
+dumptemplate 5
+dumptemplate 6
+dumptemplate 7
+dumptemplate 8
+dumptemplate 9
+dumptemplate 10
+dumptemplate 11
+dumptemplate 12
+dumpstate
+free

@@ -1,0 +1,27 @@
+# fx-oracle: the particle chain. Plays one particle effect and runs six frames,
+# so the golden carries the whole size, colour, alpha and rotation ramp plus the
+# physics probe.
+seed 12345
+cvar fx_debug 0
+cvar fx_countScale 1
+cvar fx_nearCull 16
+refdef 0 0 0   0 0 0   1 0 0   0 1 0   0 0 1   90 73.739792
+init
+register particle
+advance 50
+playid 1 100 0 0 1 0 0 -1 -1 0
+addscheduled 0
+dumpstate
+advance 50
+addscheduled 0
+advance 100
+addscheduled 0
+advance 200
+addscheduled 0
+advance 400
+addscheduled 0
+dumpstate
+advance 200
+addscheduled 0
+dumpstate
+free

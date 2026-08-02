@@ -33,7 +33,7 @@ use crate::collision_world::CollisionWorld;
 use crate::common::common::{com_printf, Common};
 use crate::common::error::com_error;
 use crate::common::opaque_slots::{
-    BotLib, Client, Ghoul2System, RenderModels, Renderer, RmManager, Server,
+    BotLib, Client, FxSystem, Ghoul2System, RenderModels, Renderer, RmManager, Server,
 };
 use crate::cvar_fns::{
     Cvar_FindVar, Cvar_Get, Cvar_VariableIntegerValue, Cvar_VariableString, Cvar_VariableValue,
@@ -92,6 +92,9 @@ pub struct EngineHostView<'a> {
     pub rmg: RmManager,
     /// Type-erased `Engine.g2` (`mp_engine_ghoul2::Ghoul2System`).
     pub g2: Ghoul2System,
+    /// Type-erased `Engine.fx` (`mp_engine_client` `FxSystem`; null on
+    /// dedicated, where no FX trap arrives). DEC-61.2.
+    pub fx: FxSystem,
 }
 
 impl EngineHost for EngineHostView<'_> {

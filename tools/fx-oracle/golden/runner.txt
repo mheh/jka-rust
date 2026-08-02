@@ -1,0 +1,23 @@
+== fx-oracle runner ==
+PRINT Registering effect : fxrunner
+PRINT Registering effect : target
+REGSHADER fx/particle/hit -> 1
+REGISTER fxrunner -> 1
+PRINT Registering effect : light
+REGISTER light -> 3
+PRINT Registering effect : camerashake
+REGISTER camerashake -> 4
+TIME 50
+SHAKE origin 42dc0000 00000000 42000000 intensity 3fc00000 radius 512 time 450
+MINIREFENT reType 2 renderfx 0 hModel 0 origin 42dc0000 00000000 00000000 oldorigin 00000000 00000000 00000000 axis 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 nonNormalizedAxes 0 radius 40400000 rotation 00000000 shaderTime 00000000 customShader 1 shaderRGBA 254 254 254 255 shaderTexCoord 00000000 00000000 frame 0
+LIGHT origin 42dc0000 00000000 41800000 radius 42800000 rgb 3f800000 3f4ccccd 3ecccccd
+STATE activeFx 2 drawnFx 2 scheduledFx 0 nextFree2DEffect 0
+TIME 200
+MINIREFENT reType 2 renderfx 0 hModel 0 origin 42dc0000 00000000 3f400000 oldorigin 00000000 00000000 00000000 axis 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 nonNormalizedAxes 0 radius 40400000 rotation 00000000 shaderTime 00000000 customShader 1 shaderRGBA 62 62 62 255 shaderTexCoord 00000000 00000000 frame 0
+LIGHT origin 42dc0000 00000000 41800000 radius 425e6667 rgb 3f59999a 3f2e147b 3eae147b
+TIME 500
+LIGHT origin 42dc0000 00000000 41800000 radius 421b3333 rgb 3f0ccccd 3ee147af 3e6147af
+STATE activeFx 1 drawnFx 1 scheduledFx 0 nextFree2DEffect 0
+TIME 1200
+STATE activeFx 0 drawnFx 0 scheduledFx 0 nextFree2DEffect 0
+== end ==

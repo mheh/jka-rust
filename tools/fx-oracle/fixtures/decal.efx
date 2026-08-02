@@ -1,0 +1,25 @@
+// fx-oracle fixture: the decal primitive. The ghoul2Decals flag adds the
+// CG_G2MARK call on top of the world decal.
+// Hand-authored. No retail content.
+decal
+{
+	name		scorch
+	count		1
+	life		4000
+	shader		fx/decal/scorch
+	origin		0 0 0
+	rotation	45
+	flags		ghoul2Decals
+	rgb
+	{
+		start	0.2 0.2 0.2
+	}
+	alpha
+	{
+		start	0.9
+	}
+	size
+	{
+		start	16
+	}
+}

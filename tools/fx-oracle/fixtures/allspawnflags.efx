@@ -1,0 +1,18 @@
+// fx-oracle fixture: every token ParseSpawnFlags accepts, spread over two
+// `spawnFlags` pairs for the same seven-token `sscanf` limit.
+// Source: `oracle/codemp/client/FxTemplate.cpp:812-890`
+// Hand-authored. No retail content.
+particle
+{
+	name		everyspawnflag
+	count		1
+	life		500
+	shader		fx/spawnflags/all
+	origin		0 0 0
+	spawnFlags	org2fromTrace traceImpactFx org2isOffset cheapOrgCalc cheapOrg2Calc absoluteVel absoluteAccel
+	spawnFlags	orgOnSphere orgOnCylinder axisFromSphere randrotaroundfwd evenDistribution rgbComponentInterpolation affectedByWind
+	size
+	{
+		start	4
+	}
+}

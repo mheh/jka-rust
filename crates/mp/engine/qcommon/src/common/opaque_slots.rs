@@ -148,3 +148,23 @@ impl Ghoul2System {
         self.0
     }
 }
+
+/// Type-erased slot for the `mp_engine_client` `FxSystem` state (DEC-61.2);
+/// qcommon is pass-through only — never dereferences it. Cast back to the real
+/// `mp_engine_client::fx::fx_system::FxSystem` at the client-crate boundary
+/// (`mp_engine_client::client_host::fx_from_view`). NULL on dedicated, where
+/// `Engine.fx` is `None` and no FX trap ever arrives.
+///
+/// Ruling: opaque-slot (user, 2026-07-12, option A); DEC-61.2 for the FX reach.
+#[repr(transparent)]
+pub struct FxSystem(*mut ());
+
+impl FxSystem {
+    pub fn from_raw(p: *mut ()) -> FxSystem {
+        FxSystem(p)
+    }
+
+    pub fn as_raw(&mut self) -> *mut () {
+        self.0
+    }
+}

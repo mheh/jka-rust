@@ -1,0 +1,11 @@
+// fx-oracle fixture: the fxrunner primitive, which plays another effect at its
+// own spawn point.
+// Hand-authored. No retail content.
+fxrunner
+{
+	name		runner
+	count		1
+	life		100
+	playfx		target
+	origin		0 0 0
+}

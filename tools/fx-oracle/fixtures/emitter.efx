@@ -1,0 +1,36 @@
+// fx-oracle fixture: the emitter primitive with an attached model and an
+// emitted effect.
+// Hand-authored. No retail content.
+emitter
+{
+	name		chunk
+	count		1
+	life		900
+	model		models/fx/chunk.md3
+	emitfx		target
+	deathfx		target
+	origin		0 0 0
+	velocity	40 0 20
+	acceleration	0 0 -10
+	angle		0 0 0
+	angleDelta	5 5 5
+	density		12
+	variance	2
+	spawnFlags	absoluteVel absoluteAccel
+	flags		useModel emitFx deathFx
+	rgb
+	{
+		start	1 1 1
+	}
+	alpha
+	{
+		start	1
+		end		0
+		flags	linear
+	}
+	size
+	{
+		start	5
+		end		5
+	}
+}

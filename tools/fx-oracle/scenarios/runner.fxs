@@ -1,0 +1,27 @@
+# fx-oracle: the three primitives that emit through their own seam rather than
+# a ref entity. The fxrunner plays another effect, the light goes to
+# AddLightToScene, and cameraShake goes to the CG_FX_CAMERASHAKE trap.
+seed 606
+cvar fx_debug 0
+cvar fx_countScale 1
+cvar fx_nearCull 16
+refdef 0 0 0   0 0 0   1 0 0   0 1 0   0 0 1   90 73.739792
+init
+register fxrunner
+register light
+register camerashake
+advance 50
+playid 1 110 0 0 1 0 0 -1 -1 0
+playid 3 110 0 16 1 0 0 -1 -1 0
+playid 4 110 0 32 1 0 0 -1 -1 0
+addscheduled 0
+dumpstate
+advance 150
+addscheduled 0
+advance 300
+addscheduled 0
+dumpstate
+advance 700
+addscheduled 0
+dumpstate
+free

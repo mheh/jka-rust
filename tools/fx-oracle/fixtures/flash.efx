@@ -1,0 +1,53 @@
+// fx-oracle fixture: the flash primitive. The second component carries
+// localizedFlash, which routes the flash into the 2D list instead of the scene.
+// Hand-authored. No retail content.
+flash
+{
+	name		fullscreen
+	count		1
+	life		300
+	shader		fx/flash/white
+	origin		0 0 0
+	rgb
+	{
+		start	1 1 1
+		end		0 0 0
+		flags	linear
+	}
+	alpha
+	{
+		start	1
+		end		0
+		flags	linear
+	}
+	size
+	{
+		start	1
+		end		1
+	}
+}
+flash
+{
+	name		localized
+	count		1
+	life		300
+	shader		fx/flash/spot
+	origin		0 0 0
+	flags		localizedFlash
+	rgb
+	{
+		start	1 0.5 0
+	}
+	alpha
+	{
+		start	1
+		end		0
+		flags	linear
+	}
+	size
+	{
+		start	24
+		end		4
+		flags	linear
+	}
+}

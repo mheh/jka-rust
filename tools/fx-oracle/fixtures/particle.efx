@@ -1,0 +1,42 @@
+// fx-oracle fixture: the particle primitive with every transition group set.
+// Hand-authored. No retail content.
+repeatDelay		500
+particle
+{
+	name			spark
+	count			2
+	life			800
+	delay			0
+	shader			fx/particle/spark
+	origin			0 0 0
+	velocity		10 20 30
+	acceleration	0 0 -2
+	gravity			-40
+	bounce			0.5
+	rotation		15
+	rotationDelta	3
+	min				-2 -2 -2
+	max				2 2 2
+	flags			usePhysics
+	rgb
+	{
+		start		1 0.5 0.25
+		end			0 0 0
+		parm		50
+		flags		linear
+	}
+	alpha
+	{
+		start		1
+		end			0
+		parm		60
+		flags		linear nonlinear
+	}
+	size
+	{
+		start		4
+		end			8
+		parm		30
+		flags		linear
+	}
+}

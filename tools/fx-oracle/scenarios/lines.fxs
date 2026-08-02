@@ -1,0 +1,28 @@
+# fx-oracle: the line family. A plain line, an electricity arc, and a line that
+# finds its endpoint with a scripted trace and plays an impact effect there.
+seed 777
+cvar fx_debug 0
+cvar fx_countScale 1
+cvar fx_nearCull 16
+refdef 0 0 0   0 0 0   1 0 0   0 1 0   0 0 1   90 73.739792
+init
+register line
+register electricity
+register traceline
+# The trace queue: the first reply lands short, the rest repeat it.
+trace 0.25 160 0 8   0 0 1   0 0 0 1023
+advance 50
+playid 1 100 0 0 1 0 0 -1 -1 0
+playid 2 100 0 32 1 0 0 -1 -1 0
+playid 3 100 0 64 1 0 0 -1 -1 0
+addscheduled 0
+dumpstate
+advance 100
+addscheduled 0
+advance 200
+addscheduled 0
+dumpstate
+advance 400
+addscheduled 0
+dumpstate
+free
