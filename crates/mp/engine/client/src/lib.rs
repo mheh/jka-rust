@@ -30,6 +30,7 @@ pub mod mp3;
 pub mod null;
 pub mod snd;
 pub mod snd_ambient;
+pub mod snd_device;
 pub mod snd_dma;
 pub mod snd_mem;
 pub mod snd_mix;
