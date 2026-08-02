@@ -489,11 +489,12 @@ fn R_UploadScratchFrame(
         return Some(handle);
     }
 
-    //TODO: Port the qglTexSubImage2D in-place update
+    // DEFERRED: R4. Raven splits the two branches at the GL call, using
+    // `qglTexImage2D` to re-specify and `qglTexSubImage2D` to update in place.
+    // `GpuImages::upload_pending` has one path and it recreates the texture, so
+    // a same-size dirty frame pays a full re-specify until that crate grows a
+    // write-only update. The pixels that reach the GPU are the same either way.
     // Source: oracle/codemp/renderer/tr_backend.cpp:1341-1343
-    // `GpuImages::upload_pending` has one path, and it recreates the texture.
-    // The same-size dirty frame therefore costs a full re-specify until that
-    // crate grows a write-only update. The pixels reaching the GPU are the same.
     img_state.pending_uploads.insert(
         handle,
         PendingUpload {
