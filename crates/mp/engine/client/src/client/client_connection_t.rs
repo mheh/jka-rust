@@ -144,3 +144,8 @@ const _: () = assert!(core::mem::offset_of!(clientConnection_t, rmgHeightMap) ==
 const _: () = assert!(core::mem::offset_of!(clientConnection_t, rmgFlattenMap) == 380804);
 const _: () = assert!(core::mem::offset_of!(clientConnection_t, rmgAutomapSymbols) == 396804);
 const _: () = assert!(core::mem::offset_of!(clientConnection_t, rmgAutomapSymbolCount) == 407044);
+
+// Every field is a C scalar, an array, or a `#[repr(C)]` struct of those.
+// The all-zero image is therefore a valid inhabitant, and Raven's `clc` global starts zeroed.
+// The 397 KB mass builds heap-first through `zeroed_box` (STATE-D9).
+unsafe impl native_platform::ZeroValid for clientConnection_t {}

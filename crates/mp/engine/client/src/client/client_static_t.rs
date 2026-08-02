@@ -164,3 +164,9 @@ const _: () = assert!(core::mem::offset_of!(clientStatic_t, charSetShader) == 41
 const _: () = assert!(core::mem::offset_of!(clientStatic_t, whiteShader) == 414420);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(clientStatic_t, consoleShader) == 414424);
+
+// Every field is a C scalar, an array, a null-valid raw pointer, or a `#[repr(C)]` struct of those.
+// Every embedded enum has a zero discriminant, for example `CA_UNINITIALIZED`, `NA_BOT`, and `TC_NONE`.
+// The all-zero image is therefore a valid inhabitant, and Raven's `cls` global starts zeroed.
+// The 405 KB mass builds heap-first through `zeroed_box` (STATE-D9).
+unsafe impl native_platform::ZeroValid for clientStatic_t {}

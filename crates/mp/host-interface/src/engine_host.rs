@@ -75,7 +75,7 @@ pub trait EngineHost {
     fn error(&mut self, code: errorParm_t, msg: &str) -> !;
 
     /// Raven `VM_Call( vm, callnum, ... )` — invoke a loaded module. `vm`
-    /// mirrors Raven's first parameter ([`VmSlot::Gvm`]/[`VmSlot::Cgvm`],
+    /// mirrors Raven's first parameter ([`VmSlot::Gvm`]/[`VmSlot::Cgvm`]/[`VmSlot::Uivm`],
     /// ruling 33b); args are `intptr_t`-width slots (ruling 6); the return is
     /// `intptr_t` too, since ROFF casts it straight to a pointer
     /// (`RoffSystem.cpp:837`). The icarus arms pass no args (their request

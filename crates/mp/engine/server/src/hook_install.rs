@@ -134,8 +134,8 @@ fn sv_shownet_entity_classname_hook(view: &mut EngineHostView, number: c_int) ->
 }
 
 /// `EngineHost::vm_call` backing — Raven `VM_Call( vm, … )` with the slot
-/// resolution: `Gvm` -> `sv.gvm`; `Cgvm` is NULL under DEDICATED and takes
-/// Raven's own NULL-vm fatal path inside `VM_Call` (ruling 33b). The words
+/// resolution: `Gvm` -> `sv.gvm`; `Cgvm` and `Uivm` are NULL under DEDICATED
+/// and take Raven's own NULL-vm fatal path inside `VM_Call` (ruling 33b). The words
 /// stay `isize` end-to-end (plan §5.4 widening — pointer-carrying args and
 /// returns must survive LP64).
 /// Source: `oracle/codemp/qcommon/vm.cpp:787`
@@ -152,8 +152,8 @@ fn vm_call_slot_hook(
             let sv = unsafe { sv_from_view(view) };
             sv.gvm
         }
-        // NULL cgvm (DEDICATED): VM_Call's own guard raises Raven's fatal.
-        VmSlot::Cgvm => core::ptr::null_mut(),
+        // NULL cgvm and uivm (DEDICATED): VM_Call's own guard raises Raven's fatal.
+        VmSlot::Cgvm | VmSlot::Uivm => core::ptr::null_mut(),
     };
     VM_Call(view.common, gvm, callnum, args)
 }

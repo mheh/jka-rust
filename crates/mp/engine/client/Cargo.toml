@@ -7,6 +7,7 @@ edition = "2021"
 name = "mp_engine_client"
 
 [dependencies]
+native_platform = { path = "../../../native/platform" }
 native_types = { path = "../../../native/types" }
 mp_qshared = { path = "../../qshared" }
 mp_engine_qcommon = { path = "../qcommon" }

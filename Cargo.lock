@@ -915,6 +915,7 @@ dependencies = [
  "mp_abi",
  "mp_engine_qcommon",
  "mp_qshared",
+ "native_platform",
  "native_types",
 ]
 
