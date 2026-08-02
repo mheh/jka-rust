@@ -413,6 +413,11 @@ pub struct Client {
     ///
     /// Source: `oracle/codemp/client/cl_main.cpp:1310-1316`
     pub g_nOverrideChecked: bool,
+
+    /// The client referee state (`cl_referee.rs`), which is new engine tooling
+    /// and not a Raven field. `Default` is `Off`, so a retail boot carries an
+    /// inactive referee the same way `Server.referee` does.
+    pub referee: crate::cl_referee::ClientReferee,
 }
 
 impl Default for Client {
@@ -562,6 +567,8 @@ impl Default for Client {
             s_soundtime: 0,
 
             g_nOverrideChecked: false,
+
+            referee: Default::default(),
         }
     }
 }
@@ -650,17 +657,40 @@ unsafe fn client_dispatch_note<'a>(
     (c, cl)
 }
 
-/// Narrow the trampoline's 16 `isize` words back to Raven's `int args[16]`,
-/// which is the frame both client dispatchers declare (`args: *mut c_int`) and
-/// the width `VM_ArgPtr` reads. The qcommon shim widens to `intptr_t` because
-/// that is what a 64-bit `va_arg` yields; the module set is the ILP32 i386
-/// build, where the two widths are the same value.
+/// Copy the trampoline's 16 words into the frame both client dispatchers
+/// declare (`args: *mut isize`), at the width the shim delivered them.
+///
+/// Raven's `int args[16]` is the ILP32 shape, and the server dispatcher already
+/// reads the widened `isize` word (`sv_game.rs`'s `vma`, `VM_ArgPtrWord`). The
+/// client pair follows it: this engine hosts a 64-bit cgame and a 64-bit ui
+/// module, so a pointer argument does not fit in a `c_int`, and macOS arm64
+/// maps nothing below 4 GB for it to fit into. Value arguments are still read
+/// as `c_int` inside the dispatchers, which is Raven's own width for them.
 ///
 /// Source: `oracle/codemp/qcommon/vm.cpp:366` (`int args[16]`).
 ///
 /// # Safety
 /// `args` must point at a shim's 16-word frame.
-unsafe fn client_dispatch_frame(args: *const isize) -> [c_int; 16] {
+unsafe fn client_dispatch_frame(args: *const isize) -> [isize; 16] {
+    let mut frame = [0isize; 16];
+    for (i, w) in frame.iter_mut().enumerate() {
+        *w = *args.add(i);
+    }
+    frame
+}
+
+/// The narrowed `int args[16]` frame the ui dispatcher still declares.
+///
+/// `CL_UISystemCalls` reads every word as a `c_int` value, so it keeps the
+/// ILP32 shape until it takes the same widening the cgame dispatcher just did.
+/// A ui trap that carries a host pointer truncates here, which is the open half
+/// of the width finding recorded on ticket gh#30.
+///
+/// Source: `oracle/codemp/qcommon/vm.cpp:366` (`int args[16]`).
+///
+/// # Safety
+/// `args` must point at a shim's 16-word frame.
+unsafe fn client_dispatch_frame_narrow(args: *const isize) -> [c_int; 16] {
     let mut frame = [0 as c_int; 16];
     for (i, w) in frame.iter_mut().enumerate() {
         *w = *args.add(i) as c_int;
@@ -745,7 +775,7 @@ pub extern "C-unwind" fn ui_system_calls_shim(
     unsafe {
         let (c, cl) = client_dispatch_note(ctx, "ui");
         let mut view = client_dispatch_view(c);
-        let mut frame = client_dispatch_frame(args);
+        let mut frame = client_dispatch_frame_narrow(args);
         CL_UISystemCalls(&mut view, cl, &mut *c.g2, frame.as_mut_ptr()) as isize
     }
 }

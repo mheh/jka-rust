@@ -936,6 +936,8 @@ dependencies = [
 name = "mp_engine_core"
 version = "0.1.0"
 dependencies = [
+ "flate2",
+ "mp_abi",
  "mp_engine_botlib",
  "mp_engine_client",
  "mp_engine_ghoul2",
@@ -946,6 +948,8 @@ dependencies = [
  "mp_qshared",
  "mp_renderer",
  "native_platform",
+ "native_types",
+ "serde_json",
 ]
 
 [[package]]

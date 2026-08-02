@@ -756,7 +756,10 @@ pub fn Com_TouchMemory(common: &mut Common) {
             let j = (*pMemory).iSize >> 2;
             let mut i = 0;
             while i < j {
-                sum += *((pMem as *const i32).add(i as usize));
+                // The sum is a paging touch and its value is discarded, so the
+                // add wraps the way the C `sum +=` does. A checked add panics
+                // here on a debug build as soon as the heap holds real data.
+                sum = sum.wrapping_add(*((pMem as *const i32).add(i as usize)));
                 i += 64;
             }
 

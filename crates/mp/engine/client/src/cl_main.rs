@@ -111,6 +111,7 @@ use crate::cl_console::{Con_Close, Con_Init, Con_RunConsole};
 use crate::cl_input::{CL_InitInput, CL_SendCmd, CL_WritePacket};
 use crate::cl_net_chan::CL_Netchan_Process;
 use crate::cl_parse::CL_ParseServerMessage;
+use crate::cl_referee::ref_headless;
 use crate::cl_scrn::{SCR_DebugGraph, SCR_Init, SCR_UpdateScreen};
 use crate::cl_ui::{CL_InitUI, CL_ShutdownUI};
 use crate::client::server_status_t::serverStatus_t;
@@ -3348,7 +3349,14 @@ pub fn CL_DownloadsComplete(view: &mut EngineHostView, cl: &mut Client) {
     // this will also (re)load the UI
     // if this is a local client then only the client part of the hunk
     // will be cleared, note that this is done after the hunk mark has been set
-    CL_FlushMemory(view, cl);
+    //
+    // Demo referee seam (`cl_referee.rs`): `CL_FlushMemory` restarts the sound
+    // stack (gh#24 and gh#25) and the renderer and ui stacks (gh#22), and none
+    // of those lanes is ported. The headless rig keeps the stack it booted with,
+    // and this gate goes away when the lanes land.
+    if !ref_headless(cl) {
+        CL_FlushMemory(view, cl);
+    }
 
     // initialize the CGame
     cl.cls.cgameStarted = qtrue;

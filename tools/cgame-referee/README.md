@@ -529,3 +529,60 @@ The harness reads and writes module memory through mach `vm_read_overwrite` /
 
 Bar proven 2026-07-30: the oracle dylib replayed against its own swoop1
 recording - 33.5M records, 16.77M syscalls, 2,148 vmcalls - with ZERO findings.
+
+## The demo-driven seam referee (DEC-58.1, ticket gh#30)
+
+The replay referee above judges the MODULE. The demo referee judges the
+ENGINE: a committed demo from `fixtures/` drives our client engine, and the
+engine-to-module journal it writes is compared against a golden recorded from
+the oracle engine playing the same demo.
+
+Our half lives in `crates/mp/engine/core/tests/demo_referee.rs` and runs today:
+
+```sh
+cargo test -p mp_engine_core --test demo_referee -- --test-threads=1
+```
+
+- **Boot.** `Engine::new` -> `install_engine_hooks` -> `com_init` -> `Engine.cl =
+  Some(Client::default())` -> `CL_Init`. The command line carries a `+echo`
+  startup command, so `Com_AddStartupCommands` reports one and the boot never
+  queues Raven's `cinematic openinglogos.roq` default action, which would enter
+  the unported sound stack.
+- **Assets.** The gamestate parse needs the retail paks. `JKA_REF_BASEPATH`
+  names the install and defaults to `~/Developer/jka/jka_server`, the jampgame
+  referee's own convention. The demo is staged into a private `fs_homepath`, so
+  the install is never written to. The test skips with a printed message when
+  the paks are absent.
+- **Module seat.** `VM_Create` returns an existing `vmTable` slot when the name
+  matches, so the rig registers a slot named `cgame` before playback and
+  `CL_InitCGame` adopts it. The seat holds a probe module: it answers `CG_INIT`
+  and `CG_DRAW_ACTIVE_FRAME`, calls the snapshot and server-command traps, and
+  calls no renderer or sound trap.
+- **Clock.** The rig writes `cls.realtime` in fixed 50 ms steps and reads one
+  demo message per step, so a run is a pure function of the demo bytes.
+- **Journal.** The probe writes the C6b records from the module side, where the
+  recorder shim sits, so a call the engine starts on its own lands in the
+  journal too. The blob serializers mirror `shim/src/serialize.rs` and read the
+  same two manifests through `shapes.rs`.
+- **Headless seam.** `mp_engine_client::cl_referee` holds the mode. Two call
+  sites are gated: `CL_DownloadsComplete`'s `CL_FlushMemory` (it restarts the
+  sound, renderer, and ui stacks) and `CL_InitCGame`'s `RE_EndRegistration` (the
+  renderer slot is NULL until the platform shell lands). Both gates are inactive
+  in the default `Off` mode and go away when gh#24, gh#25, and gh#22 close.
+
+### The oracle half, still to build
+
+1. Build the probe as a standalone cdylib under `probe/`, exporting `dllEntry`
+   and `vmMain`, with the same trap order the in-process probe uses. Both
+   engines then drive the SAME module, which is what makes the two journals
+   comparable.
+2. Stage the probe as `cgame<arch>.dylib` beside the recorder shim, point
+   `JKA_SHIM_REAL_CGAME` at it, and play the demo on the oracle engine with
+   `+demo ffa1`. The shim writes the golden.
+3. Pin the oracle engine's clock the same way the rig pins ours, or record the
+   engine's own time reads so the comparison never fails on wall-clock drift.
+4. Commit the golden under `goldens/`, and add the diff test: walk both
+   journals record by record and compare the vmcall arms, the trap numbers, and
+   every blob. Pointer words are host state and are excluded, the same three
+   exclusions the replay referee lists.
+5. Extend to the other three demos once ffa1 is byte-identical.

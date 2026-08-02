@@ -13,6 +13,7 @@ pub mod cl_keys;
 pub mod cl_main;
 pub mod cl_net_chan;
 pub mod cl_parse;
+pub mod cl_referee;
 pub mod cl_scrn;
 pub mod cl_ui;
 pub mod cin;
