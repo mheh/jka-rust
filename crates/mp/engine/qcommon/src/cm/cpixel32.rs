@@ -4,7 +4,7 @@ use core::ffi::c_long;
 
 use native_types::byte;
 
-/// Raven `CPixel32` — one RGBA pixel of a 32-bit-per-pixel image buffer.
+/// Raven `CPixel32` - one RGBA pixel of a 32-bit-per-pixel image buffer.
 ///
 /// Type definition source: `oracle/codemp/qcommon/cm_draw.h:42-55`
 #[repr(C)]
@@ -35,7 +35,7 @@ impl CPixel32 {
 // Raven's second constructor `CPixel32(long l)` (`cm_draw.h:51`) has no caller
 // in either tree, so it is dropped (porting-rules §20).
 
-/// Raven `AVE_PIX` — the per-component 50 percent average of two pixels.
+/// Raven `AVE_PIX` - the per-component 50 percent average of two pixels.
 ///
 /// Source: `oracle/codemp/qcommon/cm_draw.h:63-67`
 pub fn AVE_PIX(x: CPixel32, y: CPixel32) -> CPixel32 {
@@ -47,7 +47,7 @@ pub fn AVE_PIX(x: CPixel32, y: CPixel32) -> CPixel32 {
     }
 }
 
-/// Raven `ALPHA_PIX` — blend `x` over `y` at the given 8.8 fixed-point weights.
+/// Raven `ALPHA_PIX` - blend `x` over `y` at the given 8.8 fixed-point weights.
 ///
 /// Raven keeps the destination alpha (`t.a = y.a`); the commented-out blended
 /// alpha stays commented out.
@@ -61,7 +61,7 @@ pub fn ALPHA_PIX(x: CPixel32, y: CPixel32, alpha: c_long, inv_alpha: c_long) -> 
     }
 }
 
-/// Raven `LIGHT_PIX` — brighten or darken a pixel by a signed 10-bit gain.
+/// Raven `LIGHT_PIX` - brighten or darken a pixel by a signed 10-bit gain.
 ///
 /// Source: `oracle/codemp/qcommon/cm_draw.h:76-81`
 pub fn LIGHT_PIX(p: CPixel32, light: c_long) -> CPixel32 {
@@ -73,7 +73,7 @@ pub fn LIGHT_PIX(p: CPixel32, light: c_long) -> CPixel32 {
     }
 }
 
-/// Raven `CLAMP(v, 0, 255)` — the one instantiation the pixel helpers use.
+/// Raven `CLAMP(v, 0, 255)` - the one instantiation the pixel helpers use.
 ///
 /// Source: `oracle/codemp/qcommon/cm_draw.h:29`
 fn CLAMP_255(v: c_long) -> c_long {

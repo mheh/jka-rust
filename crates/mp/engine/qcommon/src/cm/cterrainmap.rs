@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-//! `CTerrainMap` — the RMG automap image.
+//! `CTerrainMap` - the RMG automap image.
 //!
 //! Two deliberate divergences from Raven, both forced by the crate graph and by
 //! porting-rules §B3 (no globals):
@@ -32,13 +32,13 @@ use crate::cm::cm_terrainmap_consts::{
 use crate::cm::cpixel32::{CPixel32, ALPHA_PIX};
 use crate::cm::point::POINT;
 use crate::cm::terrain_map_images::TerrainMapImages;
-use crate::cm_terrain::CmLandScape;
+use crate::cm::terrain_map_landscape::TerrainMapLandscape;
 use crate::cm_terrainmap::SideColor;
 
 /// The pixel count of one automap buffer.
 const TM_PIXELS: usize = (TM_WIDTH * TM_HEIGHT) as usize;
 
-/// Raven `CTerrainMap` — the automap image for the current landscape.
+/// Raven `CTerrainMap` - the automap image for the current landscape.
 ///
 /// Type definition source: `oracle/codemp/qcommon/cm_terrainmap.h:17-60`
 pub struct CTerrainMap {
@@ -66,7 +66,7 @@ impl CTerrainMap {
     /// landscape: background, heightmap shading, then the land and water blend.
     ///
     /// Source: `oracle/codemp/qcommon/cm_terrainmap.cpp:46-97`
-    pub fn new(landscape: &CmLandScape, images: TerrainMapImages) -> Self {
+    pub fn new(landscape: TerrainMapLandscape, images: TerrainMapImages) -> Self {
         let mut map = CTerrainMap {
             mImage: vec![CPixel32::default(); TM_PIXELS],
             // Raven never initializes `mBufImage`'s alpha outside the heightmap
@@ -78,26 +78,23 @@ impl CTerrainMap {
             mSymStart: images.start,
             mSymEnd: images.end,
             mSymObjective: images.objective,
-            mins: landscape.mins(),
-            size: landscape.size(),
+            mins: landscape.mins,
+            size: landscape.size,
             draw: CDraw32::new(),
         };
 
         map.ApplyBackground(&images.background);
         map.ApplyHeightmap(landscape);
 
-        map.draw.SetBufferSize(
-            TM_WIDTH as c_long,
-            TM_HEIGHT as c_long,
-            TM_WIDTH as c_long,
-        );
+        map.draw
+            .SetBufferSize(TM_WIDTH as c_long, TM_HEIGHT as c_long, TM_WIDTH as c_long);
 
         // create version with paths and water shown
         for y in 0..TM_HEIGHT {
             for x in 0..TM_WIDTH {
                 let mut cp = map.mBufImage[(y * TM_WIDTH + x) as usize];
                 let land = CLAMP_BYTE(((255 - cp.a as c_int) * 2) / 3);
-                let water = CLAMP_BYTE((landscape.base_water_height() - cp.a as c_int) * 4);
+                let water = CLAMP_BYTE((landscape.base_water_height - cp.a as c_int) * 4);
                 cp.a = 255;
 
                 if x > TM_BORDER
@@ -170,10 +167,10 @@ impl CTerrainMap {
     /// x axis flipped.
     ///
     /// Source: `oracle/codemp/qcommon/cm_terrainmap.cpp:175-233`
-    fn ApplyHeightmap(&mut self, landscape: &CmLandScape) {
-        let inPos = landscape.height_map();
-        let width = landscape.real_width();
-        let height = landscape.real_height();
+    fn ApplyHeightmap(&mut self, landscape: TerrainMapLandscape) {
+        let inPos = landscape.height_map;
+        let width = landscape.real_width;
+        let height = landscape.real_height;
 
         let mut outPos = ((TM_BORDER * TM_WIDTH) + TM_BORDER) as usize;
         let xInc = width as f32 / TM_REAL_WIDTH as f32;
@@ -474,11 +471,8 @@ impl CTerrainMap {
     /// Source: `oracle/codemp/qcommon/cm_terrainmap.cpp:365-387`
     pub fn Upload(&mut self, player_origin: Option<vec3_t>, player_angles: vec3_t) -> Vec<u8> {
         // copy completed map to mBufImage
-        self.draw.SetBufferSize(
-            TM_WIDTH as c_long,
-            TM_HEIGHT as c_long,
-            TM_WIDTH as c_long,
-        );
+        self.draw
+            .SetBufferSize(TM_WIDTH as c_long, TM_HEIGHT as c_long, TM_WIDTH as c_long);
 
         {
             let CTerrainMap {
@@ -515,12 +509,20 @@ impl CTerrainMap {
     ///
     /// Source: `oracle/codemp/qcommon/cm_terrainmap.cpp:389-395`
     pub fn SaveImageToDisk(&self, terrainName: &str, missionName: &str, seed: &str) {
-        let _name = format!("save/{terrainName}_{missionName}_{seed}.png");
+        let _name = Self::SaveImagePath(terrainName, missionName, seed);
         //TODO: Port PNG_Save
         // Source: oracle/codemp/png/png.cpp:582-645
         // Deliberate no-op: the encoder is a whole unported TU (`codemp/png/`)
         // outside this file's port, and the only Raven caller is the
         // `rmg_saveautomap` debug arm.
+    }
+
+    /// Raven's `va("save/%s_%s_%s.png", …)` target, the one observable of
+    /// `SaveImageToDisk` while `PNG_Save` stays unported.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_terrainmap.cpp:393`
+    pub fn SaveImagePath(terrainName: &str, missionName: &str, seed: &str) -> String {
+        format!("save/{terrainName}_{missionName}_{seed}.png")
     }
 
     /// The finished automap raster, as the renderer wants it.

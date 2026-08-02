@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-//! `CDraw32` — the 32-bit-per-pixel raster.
+//! `CDraw32` - the 32-bit-per-pixel raster.
 //!
 //! Two deliberate divergences from Raven, both forced by porting-rules §B3
 //! (no globals):
@@ -28,14 +28,14 @@ use crate::cm::point::POINT;
 use crate::cm::poly_scan::PolyScan;
 use crate::cm_draw::{code, compare_active, compare_ind, del_edge, ins_edge, shell_sort};
 
-/// Raven `PIXPOS` — the buffer offset of the pixel at `(x, y)`.
+/// Raven `PIXPOS` - the buffer offset of the pixel at `(x, y)`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_draw.h:16`
 fn PIXPOS(x: c_long, y: c_long, stride: c_long) -> c_long {
     (y * stride) + x
 }
 
-/// Raven `SIGN` — `-1`, `0`, or `1`.
+/// Raven `SIGN` - `-1`, `0`, or `1`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_draw.h:23`
 fn SIGN(x: c_long) -> c_long {
@@ -61,7 +61,7 @@ fn CLAMP(v: c_long, l: c_long, h: c_long) -> c_long {
     }
 }
 
-/// Raven `CDraw32` — the 32-bit-per-pixel drawing class.
+/// Raven `CDraw32` - the 32-bit-per-pixel drawing class.
 ///
 /// Raven keeps the drawing context in class statics so that a caller sets it
 /// once for many draw calls.
@@ -91,7 +91,7 @@ pub struct CDraw32 {
 }
 
 impl CDraw32 {
-    /// Raven `CDraw32::CDraw32` — an unset context. Raven's constructor is
+    /// Raven `CDraw32::CDraw32` - an unset context. Raven's constructor is
     /// empty because the context lives in statics.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.cpp:26-29`
@@ -99,7 +99,7 @@ impl CDraw32 {
         CDraw32::default()
     }
 
-    /// Raven `CDraw32::SetClip` — set the rect to clip drawing functions to.
+    /// Raven `CDraw32::SetClip` - set the rect to clip drawing functions to.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.h:110-112`
     pub fn SetClip(&mut self, min_x: c_long, min_y: c_long, max_x: c_long, max_y: c_long) {
@@ -109,7 +109,7 @@ impl CDraw32 {
         self.clip_max_y = max_y.min(self.buf_height - 1);
     }
 
-    /// Raven `CDraw32::GetClip` — the clip rect, as `(min_x, min_y, max_x,
+    /// Raven `CDraw32::GetClip` - the clip rect, as `(min_x, min_y, max_x,
     /// max_y)`. Raven's four out-params collapse to a tuple (§C7).
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.h:114-116`
@@ -122,7 +122,7 @@ impl CDraw32 {
         )
     }
 
-    /// Raven `CDraw32::SetBufferSize` — set up for a buffer of this size, and
+    /// Raven `CDraw32::SetBufferSize` - set up for a buffer of this size, and
     /// rebuild the row-offset table when the size changed. Always resets the
     /// clip rect to the whole buffer.
     ///
@@ -147,7 +147,7 @@ impl CDraw32 {
         true
     }
 
-    /// Raven `CDraw32::CleanUp` — drop the row-offset table before the program
+    /// Raven `CDraw32::CleanUp` - drop the row-offset table before the program
     /// ends. Raven leaves `stride` at its last value; the port keeps that.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.h:125-126`
@@ -157,36 +157,33 @@ impl CDraw32 {
         self.buf_height = 0;
     }
 
-    /// Raven `CDraw32::PutPixNC` — set a pixel at (x,y) to color (no clipping).
+    /// Raven `CDraw32::PutPixNC` - set a pixel at (x,y) to color (no clipping).
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.h:129-130`
     pub fn PutPixNC(&self, buf: &mut [CPixel32], x: c_long, y: c_long, color: CPixel32) {
         buf[(self.row_off[y as usize] + x) as usize] = color;
     }
 
-    /// Raven `CDraw32::PutPix` — set a pixel at (x,y) to color.
+    /// Raven `CDraw32::PutPix` - set a pixel at (x,y) to color.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.h:133-139`
     pub fn PutPix(&self, buf: &mut [CPixel32], x: c_long, y: c_long, color: CPixel32) {
         // clipping check
-        if x < self.clip_min_x
-            || x > self.clip_max_x
-            || y < self.clip_min_y
-            || y > self.clip_max_y
+        if x < self.clip_min_x || x > self.clip_max_x || y < self.clip_min_y || y > self.clip_max_y
         {
             return;
         }
         self.PutPixNC(buf, x, y, color);
     }
 
-    /// Raven `CDraw32::GetPix` — get the color of a pixel at (x,y).
+    /// Raven `CDraw32::GetPix` - get the color of a pixel at (x,y).
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.h:142-143`
     pub fn GetPix(&self, buf: &[CPixel32], x: c_long, y: c_long) -> CPixel32 {
         buf[(self.row_off[y as usize] + x) as usize]
     }
 
-    /// Raven `CDraw32::PutPixAveNC` — set a pixel at (x,y) with 50 percent
+    /// Raven `CDraw32::PutPixAveNC` - set a pixel at (x,y) with 50 percent
     /// translucency (no clip).
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.h:146-147`
@@ -195,23 +192,20 @@ impl CDraw32 {
         self.PutPixNC(buf, x, y, blended);
     }
 
-    /// Raven `CDraw32::PutPixAve` — set a pixel at (x,y) with 50 percent
+    /// Raven `CDraw32::PutPixAve` - set a pixel at (x,y) with 50 percent
     /// translucency.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.h:150-156`
     pub fn PutPixAve(&self, buf: &mut [CPixel32], x: c_long, y: c_long, color: CPixel32) {
         // clipping check
-        if x < self.clip_min_x
-            || x > self.clip_max_x
-            || y < self.clip_min_y
-            || y > self.clip_max_y
+        if x < self.clip_min_x || x > self.clip_max_x || y < self.clip_min_y || y > self.clip_max_y
         {
             return;
         }
         self.PutPixAveNC(buf, x, y, color);
     }
 
-    /// Raven `CDraw32::PutPixAlphaNC` — set a pixel at (x,y) with translucency
+    /// Raven `CDraw32::PutPixAlphaNC` - set a pixel at (x,y) with translucency
     /// level (no clip).
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.h:159-160`
@@ -221,23 +215,20 @@ impl CDraw32 {
         self.PutPixNC(buf, x, y, blended);
     }
 
-    /// Raven `CDraw32::PutPixAlpha` — set a pixel at (x,y) with translucency
+    /// Raven `CDraw32::PutPixAlpha` - set a pixel at (x,y) with translucency
     /// level.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.h:163-168`
     pub fn PutPixAlpha(&self, buf: &mut [CPixel32], x: c_long, y: c_long, color: CPixel32) {
         // clipping check
-        if x < self.clip_min_x
-            || x > self.clip_max_x
-            || y < self.clip_min_y
-            || y > self.clip_max_y
+        if x < self.clip_min_x || x > self.clip_max_x || y < self.clip_min_y || y > self.clip_max_y
         {
             return;
         }
         self.PutPixAlphaNC(buf, x, y, color);
     }
 
-    /// Raven `CDraw32::ClearLines` — clear lines `start` through `end` to
+    /// Raven `CDraw32::ClearLines` - clear lines `start` through `end` to
     /// `color`.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.cpp:133-158`
@@ -260,14 +251,14 @@ impl CDraw32 {
         }
     }
 
-    /// Raven `CDraw32::ClearBuffer` — clear the whole buffer to `color`.
+    /// Raven `CDraw32::ClearBuffer` - clear the whole buffer to `color`.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.h:174-175`
     pub fn ClearBuffer(&self, buf: &mut [CPixel32], color: CPixel32) {
         self.ClearLines(buf, color, 0, self.buf_height - 1);
     }
 
-    /// Raven `CDraw32::SetAlphaLines` — set the alpha value only, on lines
+    /// Raven `CDraw32::SetAlphaLines` - set the alpha value only, on lines
     /// `start` through `end`.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.cpp:160-188`
@@ -290,14 +281,14 @@ impl CDraw32 {
         }
     }
 
-    /// Raven `CDraw32::SetAlphaBuffer` — set the alpha of the whole buffer.
+    /// Raven `CDraw32::SetAlphaBuffer` - set the alpha of the whole buffer.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.h:181-182`
     pub fn SetAlphaBuffer(&self, buf: &mut [CPixel32], alpha: byte) {
         self.SetAlphaLines(buf, alpha, 0, self.buf_height - 1);
     }
 
-    /// Raven `CDraw32::ClipLine` — clip a line to the clip rect. Returns `true`
+    /// Raven `CDraw32::ClipLine` - clip a line to the clip rect. Returns `true`
     /// when something is left to draw.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.cpp:211-277`
@@ -363,7 +354,7 @@ impl CDraw32 {
         true
     }
 
-    /// Raven `CDraw32::DrawLineNC` — draw a solid colored line, no clipping.
+    /// Raven `CDraw32::DrawLineNC` - draw a solid colored line, no clipping.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.cpp:279-374`
     pub fn DrawLineNC(
@@ -449,7 +440,7 @@ impl CDraw32 {
         self.PutPixAlphaNC(buf, x1, y1, color);
     }
 
-    /// Raven `CDraw32::DrawLine` — draw a solid color line.
+    /// Raven `CDraw32::DrawLine` - draw a solid color line.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.h:191-192`
     pub fn DrawLine(
@@ -467,7 +458,7 @@ impl CDraw32 {
         }
     }
 
-    /// Raven `CDraw32::DrawLineAveNC` — draw a translucent line, no clipping.
+    /// Raven `CDraw32::DrawLineAveNC` - draw a translucent line, no clipping.
     ///
     /// Raven's horizontal and vertical fast paths write `*dest++ =
     /// AVE_PIX(*dest, color)`, where the read and the pointer bump are
@@ -556,7 +547,7 @@ impl CDraw32 {
         self.PutPixAveNC(buf, x1, y1, color);
     }
 
-    /// Raven `CDraw32::DrawLineAve` — draw a translucent solid color line.
+    /// Raven `CDraw32::DrawLineAve` - draw a translucent solid color line.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.h:197-198`
     pub fn DrawLineAve(
@@ -574,7 +565,7 @@ impl CDraw32 {
         }
     }
 
-    /// Raven `CDraw32::DrawLineAANC` — Xiaolin Wu antialiased line, no
+    /// Raven `CDraw32::DrawLineAANC` - Xiaolin Wu antialiased line, no
     /// clipping.
     ///
     /// The two paired writes go through `PutPixAlphaNC`, so each already-blended
@@ -726,7 +717,7 @@ impl CDraw32 {
         self.PutPixAlphaNC(buf, x1, y1, color);
     }
 
-    /// Raven `CDraw32::DrawLineAA` — draw an anti-aliased line.
+    /// Raven `CDraw32::DrawLineAA` - draw an anti-aliased line.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.h:204-205`
     pub fn DrawLineAA(
@@ -744,7 +735,7 @@ impl CDraw32 {
         }
     }
 
-    /// Raven `CDraw32::DrawRectNC` — draw a filled rectangle, no clipping.
+    /// Raven `CDraw32::DrawRectNC` - draw a filled rectangle, no clipping.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.cpp:612-634`
     pub fn DrawRectNC(
@@ -768,7 +759,7 @@ impl CDraw32 {
         }
     }
 
-    /// Raven `CDraw32::DrawRect` — draw a filled rectangle.
+    /// Raven `CDraw32::DrawRect` - draw a filled rectangle.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.cpp:636-653`
     pub fn DrawRect(
@@ -792,7 +783,7 @@ impl CDraw32 {
         }
     }
 
-    /// Raven `CDraw32::DrawRectAve` — draw a translucent filled rectangle.
+    /// Raven `CDraw32::DrawRectAve` - draw a translucent filled rectangle.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.cpp:655-672`
     pub fn DrawRectAve(
@@ -816,7 +807,7 @@ impl CDraw32 {
         }
     }
 
-    /// Raven `CDraw32::DrawBoxNC` — draw an unfilled rectangle, no clipping.
+    /// Raven `CDraw32::DrawBoxNC` - draw an unfilled rectangle, no clipping.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.cpp:674-690`
     pub fn DrawBoxNC(
@@ -852,7 +843,7 @@ impl CDraw32 {
         );
     }
 
-    /// Raven `CDraw32::DrawBox` — draw an unfilled rectangle.
+    /// Raven `CDraw32::DrawBox` - draw an unfilled rectangle.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.cpp:692-708`
     pub fn DrawBox(
@@ -888,7 +879,7 @@ impl CDraw32 {
         );
     }
 
-    /// Raven `CDraw32::DrawBoxAve` — draw a translucent unfilled rectangle.
+    /// Raven `CDraw32::DrawBoxAve` - draw a translucent unfilled rectangle.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.cpp:710-726`
     pub fn DrawBoxAve(
@@ -924,7 +915,7 @@ impl CDraw32 {
         );
     }
 
-    /// Raven `CDraw32::DrawCircle` — Bresenham circle with fill and edge
+    /// Raven `CDraw32::DrawCircle` - Bresenham circle with fill and edge
     /// colors. An alpha of zero on either color skips that pass.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.cpp:728-882`
@@ -990,9 +981,23 @@ impl CDraw32 {
 
                 if y != last_y {
                     // circle fill
-                    self.DrawLine(buf, xc - last_x, yc + last_y, xc + last_x, yc + last_y, fill);
+                    self.DrawLine(
+                        buf,
+                        xc - last_x,
+                        yc + last_y,
+                        xc + last_x,
+                        yc + last_y,
+                        fill,
+                    );
                     if last_y > limit {
-                        self.DrawLine(buf, xc - last_x, yc - last_y, xc + last_x, yc - last_y, fill);
+                        self.DrawLine(
+                            buf,
+                            xc - last_x,
+                            yc - last_y,
+                            xc + last_x,
+                            yc - last_y,
+                            fill,
+                        );
                     }
                     last_y = y;
                 }
@@ -1059,7 +1064,7 @@ impl CDraw32 {
         }
     }
 
-    /// Raven `CDraw32::DrawCircleAve` — the `DrawCircle` walk with every write
+    /// Raven `CDraw32::DrawCircleAve` - the `DrawCircle` walk with every write
     /// averaged against the destination.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.cpp:884-1041`
@@ -1201,7 +1206,7 @@ impl CDraw32 {
         }
     }
 
-    /// Raven `CDraw32::DrawPolygon` — even-odd scan conversion of a concave
+    /// Raven `CDraw32::DrawPolygon` - even-odd scan conversion of a concave
     /// polygon, then an antialiased edge pass.
     ///
     /// Raven's brace placement closes the scanline loop one line early
@@ -1319,13 +1324,7 @@ impl CDraw32 {
     /// leaves at whatever the previous polygon wrote. The port reads its own
     /// zeroed slot instead (porting-rules §F19); a closed polygon always has an
     /// even active count.
-    fn fill_spans(
-        &self,
-        buf: &mut [CPixel32],
-        scan: &mut PolyScan,
-        y: c_long,
-        fill: CPixel32,
-    ) {
+    fn fill_spans(&self, buf: &mut [CPixel32], scan: &mut PolyScan, y: c_long, fill: CPixel32) {
         // sort active edge list by active[j].x
         let nact = scan.nact;
         shell_sort(&mut scan.active, nact, compare_active);
@@ -1363,7 +1362,7 @@ impl CDraw32 {
         }
     }
 
-    /// Raven `CDraw32::BlitClip` — trim a blit rectangle to the clip rect.
+    /// Raven `CDraw32::BlitClip` - trim a blit rectangle to the clip rect.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.cpp:1409-1445`
     fn BlitClip(
@@ -1399,7 +1398,7 @@ impl CDraw32 {
         }
     }
 
-    /// Raven `CDraw32::Blit` — alpha-composite `srcImage` into the buffer,
+    /// Raven `CDraw32::Blit` - alpha-composite `srcImage` into the buffer,
     /// keeping the destination alpha.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.cpp:1368-1407`
@@ -1452,7 +1451,7 @@ impl CDraw32 {
         }
     }
 
-    /// Raven `CDraw32::BlitColor` — blit `color` through `srcImage`'s alpha as
+    /// Raven `CDraw32::BlitColor` - blit `color` through `srcImage`'s alpha as
     /// a mask.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.cpp:1447-1489`
@@ -1495,8 +1494,7 @@ impl CDraw32 {
         for _y in 0..height {
             for _x in 0..width {
                 let alpha = srcImage[src as usize].a as c_long;
-                buf[dst as usize] =
-                    ALPHA_PIX(color, buf[dst as usize], alpha, 256 - alpha);
+                buf[dst as usize] = ALPHA_PIX(color, buf[dst as usize], alpha, 256 - alpha);
                 dst += 1;
                 src += 1;
             }
@@ -1505,7 +1503,7 @@ impl CDraw32 {
         }
     }
 
-    /// Raven `CDraw32::Emboss` — light `clrImage` by the diagonal gradient of
+    /// Raven `CDraw32::Emboss` - light `clrImage` by the diagonal gradient of
     /// its own alpha channel.
     ///
     /// Source: `oracle/codemp/qcommon/cm_draw.cpp:47-91`

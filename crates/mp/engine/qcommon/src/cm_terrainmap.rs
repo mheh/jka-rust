@@ -1,4 +1,4 @@
-//! `cm_terrainmap.cpp` — the automap terrain overlay.
+//! `cm_terrainmap.cpp` - the automap terrain overlay.
 //!
 //! Raven keeps one file-scope `CTerrainMap *TerrainMap` pointer (ruling 2);
 //! it threads here as `cm.terrain_map` on `CollisionWorld`.
@@ -25,6 +25,7 @@ use crate::cm::cm_terrainmap_consts::{SIDE_BLUE, SIDE_RED, TM_HEIGHT, TM_WIDTH};
 use crate::cm::cpixel32::CPixel32;
 use crate::cm::cterrainmap::CTerrainMap;
 use crate::cm::terrain_map_images::TerrainMapImages;
+use crate::cm::terrain_map_landscape::TerrainMapLandscape;
 use crate::collision_world::CollisionWorld;
 
 /// Raven `SideColor` picks the automap symbol color for a team side flag.
@@ -69,7 +70,7 @@ pub fn CM_TM_Create(cm: &mut CollisionWorld, images: TerrainMapImages) {
     let Some(landscape) = cm.land_scape.as_ref() else {
         return;
     };
-    let map = CTerrainMap::new(landscape, images);
+    let map = CTerrainMap::new(TerrainMapLandscape::from(landscape), images);
     cm.terrain_map = Some(Box::new(map));
 }
 

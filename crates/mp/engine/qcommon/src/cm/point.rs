@@ -2,7 +2,7 @@
 
 use core::ffi::c_long;
 
-/// Raven `POINT` (`windows.h` `tagPOINT`) — a 2D vertex, `x`/`y` as 32-bit
+/// Raven `POINT` (`windows.h` `tagPOINT`) - a 2D vertex, `x`/`y` as 32-bit
 /// signed longs. `cm_draw.cpp`'s scan converter is the only qcommon consumer,
 /// so this is a local stand-in rather than a shared windows-typedef module.
 ///

@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-//! `cm_draw.cpp` — the file-scope helpers of the `CDraw32` raster.
+//! `cm_draw.cpp` - the file-scope helpers of the `CDraw32` raster.
 //!
 //! The class itself lives in `cm/cdraw32.rs` (one Raven class per file,
 //! porting-rules §F21). This module holds the four static helpers and the
