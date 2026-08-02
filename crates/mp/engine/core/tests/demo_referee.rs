@@ -1,5 +1,4 @@
-//! The demo-driven seam referee, first vertical pass (DEC-58.1 and DEC-58.2,
-//! ticket gh#30).
+//! The demo-driven seam referee (DEC-58.1 and DEC-58.2, ticket gh#30).
 //!
 //! # What this drives
 //! A committed `.dm_26` demo drives the real client engine. The rig boots the
@@ -13,29 +12,26 @@
 //! `VM_Create` returns an existing `vmTable` slot when the name matches
 //! (`vm.cpp`, transcribed at `vm_fns.rs`), so the rig registers a slot named
 //! `cgame` before playback and `CL_InitCGame` adopts it instead of loading a
-//! dylib. The slot's entry point is the probe module below. The probe stands in
-//! for the real cgame: it calls the traps that read snapshots and server
-//! commands, and it never calls the renderer or the sound stack, so the whole
-//! run stays headless.
+//! dylib. The slot's entry point is the probe module
+//! (`tools/cgame-referee/probe/src/probe.rs`), the same body the standalone
+//! cdylib runs inside the oracle engine.
 //!
-//! # The journal
-//! Every engine-to-module call and every module-to-engine trap is written to a
-//! C6b journal (`CGSHIMJ1`), the same format the recorder shim writes
-//! (`tools/cgame-referee/README.md`). The rig sits where the shim sits, so the
-//! two journals are comparable record for record. The oracle half of the gate
-//! (a golden journal recorded from the oracle engine playing the same demo) is
-//! designed but not built in this pass.
+//! # The gate
+//! The probe writes a C6b journal (`CGSHIMJ1`, `tools/cgame-referee/README.md`).
+//! `tools/cgame-referee/goldens/` holds the twin journal recorded from the
+//! oracle engine over the same demo, and the gate walks both record by record
+//! and compares them byte for byte. `journal_diff.rs` lists the four host-state
+//! exclusions.
 //!
 //! # Assets
 //! The demo parse needs the retail paks, the same way the jampgame referee's
 //! real-map scenarios do. `JKA_REF_BASEPATH` names the install (default
-//! `~/Developer/jka/jka_server`), and the playback test skips with a printed
-//! message when it is absent. The two seam fixtures below need no assets and
-//! always run.
+//! `~/Developer/jka/jka_server`), and the playback tests skip with a printed
+//! message when it is absent (DEC-62.1). The golden-shape test and the seam
+//! fixtures need no assets and always run.
 
 #![allow(non_snake_case)]
 
-use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -48,6 +44,7 @@ use mp_engine_client::cl_referee::ClientRefMode;
 use mp_engine_client::client_host::cl_from_view;
 use mp_engine_client::Client;
 use mp_engine_core::{com_init, engine_host_view, install_engine_hooks, Engine};
+use mp_engine_qcommon::cmd_common::{Cmd_Argc, Cmd_Argv};
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::files_common::FS_FOpenFileRead;
 use mp_engine_qcommon::qcommon::net_limits::MAX_RELIABLE_COMMANDS;
@@ -64,254 +61,40 @@ mod shapes;
 #[path = "../../../../../tools/cgame-referee/shim/src/journal.rs"]
 mod journal;
 
-use journal::{
-    BlobKind, BlobSink, Journal, Record, REC_SYSCALL_ENTER, REC_SYSCALL_EXIT, REC_VMCALL_ENTER,
-    REC_VMCALL_EXIT,
-};
-use shapes::{ArgKind, ExportRet, Manifests};
+#[path = "../../../../../tools/cgame-referee/probe/src/probe.rs"]
+mod probe;
+
+#[path = "../../../../../tools/cgame-referee/journal_diff.rs"]
+mod journal_diff;
+
+use journal_diff::{bracket_snapshots, census, diff, exclusions, read_journal, JournalRecord};
+use journal::{REC_SYSCALL_ENTER, REC_SYSCALL_EXIT, REC_VMCALL_ENTER, REC_VMCALL_EXIT};
+use probe::{Probe, DEFAULT_BRACKET_CAP};
+use shapes::Manifests;
 
 // ===========================================================================
-// The recorder
+// The probe seat
 // ===========================================================================
 
-/// Cap on one serialized blob, the same bound `shim/src/serialize.rs` uses.
-const MAX_BLOB: u64 = 1 << 20;
+/// The one live probe. A `vm_t` entry point is a bare function pointer with no
+/// context word, so the probe lives in a static the way the recorder shim's
+/// does. The playback tests run one at a time behind `RIG`.
+static PROBE: Mutex<Option<Probe>> = Mutex::new(None);
 
-/// The journal writer plus the shape tables, shared by the rig and the probe.
-/// The probe module is a bare function pointer with no context word, so the
-/// recorder lives in a static the way the shim's does.
-struct Recorder {
-    journal: Journal,
-    manifests: Manifests,
-    seq: u64,
-    /// Trap numbers seen, in order, for the assertions below.
-    traps: Vec<i64>,
-    /// vmMain commands seen, in order.
-    vmcalls: Vec<i64>,
-}
+/// Serializes the playback tests. They share `PROBE`, the engine boot, and the
+/// staged home directory, so only one may run at a time.
+static RIG: Mutex<()> = Mutex::new(());
 
-static RECORDER: Mutex<Option<Recorder>> = Mutex::new(None);
-
-/// Reads a NUL-terminated string at `ptr`, capped. Empty on null.
-/// This mirrors `shim/src/serialize.rs`, because the two writers must produce
-/// the same bytes.
-fn read_cstr(ptr: isize) -> Vec<u8> {
-    if ptr == 0 {
-        return Vec::new();
-    }
-    let base = ptr as *const u8;
-    let mut out = Vec::new();
-    // SAFETY: an engine buffer named by the manifest shape, capped so a missing
-    // NUL never runs away.
-    unsafe {
-        let mut i = 0usize;
-        while i < MAX_BLOB as usize {
-            let b = *base.add(i);
-            if b == 0 {
-                break;
-            }
-            out.push(b);
-            i += 1;
-        }
-    }
-    out
-}
-
-/// Reads `len` bytes at `ptr`. Empty on null or an absurd length.
-fn read_bytes(ptr: isize, len: u64) -> Vec<u8> {
-    if ptr == 0 || len == 0 || len > MAX_BLOB {
-        return Vec::new();
-    }
-    // SAFETY: an engine buffer sized by the manifest shape, capped above.
-    unsafe { std::slice::from_raw_parts(ptr as *const u8, len as usize).to_vec() }
-}
-
-/// The 8-byte host pointer a `double_ptr` slot holds.
-fn read_slot(ptr: isize) -> Vec<u8> {
-    read_bytes(ptr, 8)
-}
-
-/// Serializes a trap's in-args at `SYSCALL_ENTER`. Arg shape index `i`
-/// addresses `args[i + 1]`, the dispatch-index convention the manifest states.
-fn trap_enter_blobs(m: &Manifests, num: i64, args: &[isize], rec: &mut Record) {
-    let Some(shape) = m.trap(num) else {
-        return;
-    };
-    let words: Vec<i64> = args.iter().map(|w| *w as i64).collect();
-    for (i, a) in shape.args.iter().enumerate() {
-        let ptr = args[i + 1];
-        match a.kind {
-            ArgKind::InStr => rec.blob(i as u8, BlobKind::InStr, &read_cstr(ptr)),
-            ArgKind::InBuf => {
-                let len = shapes::arg_len(a, num, i, &words);
-                rec.blob(i as u8, BlobKind::InBuf, &read_bytes(ptr, len));
-            }
-            ArgKind::InoutBuf => {
-                let len = shapes::arg_len(a, num, i, &words);
-                rec.blob(i as u8, BlobKind::InoutBuf, &read_bytes(ptr, len));
-            }
-            ArgKind::DoublePtr => rec.blob(i as u8, BlobKind::DoublePtrSlot, &read_slot(ptr)),
-            ArgKind::Scalar | ArgKind::OutBuf | ArgKind::OutStr | ArgKind::RetainedPtr => {}
-        }
-    }
-}
-
-/// Serializes a trap's out-args at `SYSCALL_EXIT`, after the engine wrote them.
-fn trap_exit_blobs(m: &Manifests, num: i64, args: &[isize], rec: &mut Record) {
-    let Some(shape) = m.trap(num) else {
-        return;
-    };
-    let words: Vec<i64> = args.iter().map(|w| *w as i64).collect();
-    for (i, a) in shape.args.iter().enumerate() {
-        let ptr = args[i + 1];
-        match a.kind {
-            ArgKind::OutBuf => {
-                let len = shapes::arg_len(a, num, i, &words);
-                rec.blob(i as u8, BlobKind::OutBuf, &read_bytes(ptr, len));
-            }
-            ArgKind::InoutBuf => {
-                let len = shapes::arg_len(a, num, i, &words);
-                rec.blob(i as u8, BlobKind::InoutBuf, &read_bytes(ptr, len));
-            }
-            ArgKind::OutStr => rec.blob(i as u8, BlobKind::OutStr, &read_cstr(ptr)),
-            ArgKind::DoublePtr => rec.blob(i as u8, BlobKind::DoublePtrSlot, &read_slot(ptr)),
-            ArgKind::Scalar | ArgKind::InStr | ArgKind::InBuf | ArgKind::RetainedPtr => {}
-        }
-    }
-}
-
-/// Serializes a vmMain arm's in-args at `VMCALL_ENTER`. Export arg index N is
-/// the raw word `argN`, with no trap-number prefix.
-fn export_enter_blobs(m: &Manifests, num: i64, words: &[isize], rec: &mut Record) {
-    let Some(shape) = m.export(num) else {
-        return;
-    };
-    for (i, a) in shape.args.iter().enumerate() {
-        let ptr = words[i];
-        match a.kind {
-            ArgKind::InStr => rec.blob(i as u8, BlobKind::InStr, &read_cstr(ptr)),
-            ArgKind::InBuf => rec.blob(i as u8, BlobKind::InBuf, &read_bytes(ptr, a.size_of as u64)),
-            _ => {}
-        }
-    }
-}
-
-/// Serializes a vmMain arm's out-args and its pointer-return deref at
-/// `VMCALL_EXIT`.
-fn export_exit_blobs(m: &Manifests, num: i64, words: &[isize], ret: isize, rec: &mut Record) {
-    let Some(shape) = m.export(num) else {
-        return;
-    };
-    for (i, a) in shape.args.iter().enumerate() {
-        let ptr = words[i];
-        match a.kind {
-            ArgKind::OutBuf => {
-                rec.blob(i as u8, BlobKind::OutBuf, &read_bytes(ptr, a.size_of as u64))
-            }
-            ArgKind::InoutBuf => rec.blob(
-                i as u8,
-                BlobKind::InoutBuf,
-                &read_bytes(ptr, a.size_of as u64),
-            ),
-            _ => {}
-        }
-    }
-    if let ExportRet::PtrDeref = shape.ret {
-        rec.blob(
-            shapes::ARG_RET_DEREF,
-            BlobKind::RetDeref,
-            &read_bytes(ret, shape.ret_size_of as u64),
-        );
-    }
-}
-
-/// Writes the `SYSCALL_ENTER` record and returns its sequence number.
-/// The lock is released before the caller forwards into the engine, so a trap
-/// that re-enters the module never deadlocks.
-fn rec_syscall_enter(args: &[isize; 16]) -> u64 {
-    let mut guard = RECORDER.lock().unwrap();
-    let r = guard.as_mut().expect("recorder armed");
-    r.seq += 1;
-    let seq = r.seq;
-    let num = args[0] as i64;
-    r.traps.push(num);
-    let mut rec = Record::new(REC_SYSCALL_ENTER, seq);
-    rec.push_i64(num);
-    rec.push_words(args);
-    trap_enter_blobs(&r.manifests, num, args, &mut rec);
-    r.journal.write(&rec);
-    seq
-}
-
-/// Writes the `SYSCALL_EXIT` record that closes `seq`.
-fn rec_syscall_exit(seq: u64, args: &[isize; 16], ret: isize) {
-    let mut guard = RECORDER.lock().unwrap();
-    let r = guard.as_mut().expect("recorder armed");
-    let num = args[0] as i64;
-    let mut rec = Record::new(REC_SYSCALL_EXIT, seq);
-    rec.push_i64(num);
-    rec.push_i64(ret as i64);
-    trap_exit_blobs(&r.manifests, num, args, &mut rec);
-    r.journal.write(&rec);
-}
-
-/// Writes the `VMCALL_ENTER` record and returns its sequence number.
-fn rec_vmcall_enter(cmd: i64, words: &[isize; 12]) -> u64 {
-    let mut guard = RECORDER.lock().unwrap();
-    let r = guard.as_mut().expect("recorder armed");
-    r.seq += 1;
-    let seq = r.seq;
-    r.vmcalls.push(cmd);
-    let mut rec = Record::new(REC_VMCALL_ENTER, seq);
-    rec.push_i64(cmd);
-    rec.push_words(words);
-    export_enter_blobs(&r.manifests, cmd, words, &mut rec);
-    r.journal.write(&rec);
-    seq
-}
-
-/// Writes the `VMCALL_EXIT` record that closes `seq`.
-fn rec_vmcall_exit(seq: u64, cmd: i64, words: &[isize; 12], ret: isize) {
-    let mut guard = RECORDER.lock().unwrap();
-    let r = guard.as_mut().expect("recorder armed");
-    let mut rec = Record::new(REC_VMCALL_EXIT, seq);
-    rec.push_i64(cmd);
-    rec.push_i64(ret as i64);
-    export_exit_blobs(&r.manifests, cmd, words, ret, &mut rec);
-    r.journal.write(&rec);
-}
-
-// ===========================================================================
-// The probe module
-// ===========================================================================
-
-/// Calls one trap through the armed cgame slot and journals both ends.
+/// Forwards one trap frame into the armed cgame slot.
+///
 /// The probe reaches the trampoline's Rust target directly, because a C-variadic
 /// call cannot be written in stable Rust and the two entries dispatch through
 /// the same armed cell.
-fn probe_trap(args: &mut [isize; 16]) -> isize {
-    let seq = rec_syscall_enter(args);
-    let ret = cgame_syscall_trampoline_words(args.as_ptr());
-    rec_syscall_exit(seq, args, ret);
-    ret
+fn forward(args: &mut [isize; 16]) -> isize {
+    cgame_syscall_trampoline_words(args.as_ptr())
 }
 
-/// Builds a 16-word trap frame from a trap number and its arguments.
-fn frame(num: MpCgameImport, args: &[isize]) -> [isize; 16] {
-    let mut f = [0isize; 16];
-    f[0] = num as isize;
-    for (i, a) in args.iter().enumerate() {
-        f[i + 1] = *a;
-    }
-    f
-}
-
-/// The probe module's `vmMain`. It answers the two arms the rig drives and
-/// pulls the engine state DEC-58.2 names: the truncated snapshot and the
-/// reliable-command copy-out.
-///
-/// The probe deliberately calls no renderer and no sound trap, so the whole
-/// playback runs with a NULL renderer slot and an unported sound stack.
+/// The probe module's `vmMain`, seated in the `cgame` slot.
 #[allow(clippy::too_many_arguments)]
 extern "C-unwind" fn probe_vm_main(
     command: core::ffi::c_int,
@@ -328,112 +111,14 @@ extern "C-unwind" fn probe_vm_main(
     arg10: isize,
     arg11: isize,
 ) -> isize {
-    // The probe journals the engine-to-module direction from the module side,
-    // exactly where the recorder shim sits, so a call the engine starts on its
-    // own (CG_INIT inside `CL_InitCGame`) lands in the journal too.
     let words = [
         arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11,
     ];
-    let seq = rec_vmcall_enter(command as i64, &words);
-    let ret = probe_dispatch(command, &words);
-    rec_vmcall_exit(seq, command as i64, &words, ret);
-    ret
-}
-
-/// The probe's own dispatch, split out so the journal brackets every arm.
-fn probe_dispatch(command: core::ffi::c_int, words: &[isize; 12]) -> isize {
-    if command == MpCgameExport::CG_INIT as core::ffi::c_int {
-        // The engine hands CG_INIT the message sequence, the last executed
-        // server command, and our client number. Read the game state back, the
-        // way `CG_Init` does.
-        let mut gs = [0u8; 32768];
-        let mut f = frame(
-            MpCgameImport::CG_GETGAMESTATE,
-            &[gs.as_mut_ptr() as isize],
-        );
-        probe_trap(&mut f);
-        return 0;
+    let mut guard = PROBE.lock().unwrap();
+    match guard.as_mut() {
+        Some(p) => p.vm_main(command as i64, &words),
+        None => 0,
     }
-
-    if command == MpCgameExport::CG_DRAW_ACTIVE_FRAME as core::ffi::c_int {
-        let mut snap_num: core::ffi::c_int = 0;
-        let mut server_time: core::ffi::c_int = 0;
-        let mut f = frame(
-            MpCgameImport::CG_GETCURRENTSNAPSHOTNUMBER,
-            &[
-                &mut snap_num as *mut _ as isize,
-                &mut server_time as *mut _ as isize,
-            ],
-        );
-        probe_trap(&mut f);
-
-        // The truncation seam: `CL_GetSnapshot` copies at most
-        // MAX_ENTITIES_IN_SNAPSHOT entities into this buffer.
-        let mut snap: Box<snapshot_t> = Box::new(unsafe { core::mem::zeroed() });
-        let mut f = frame(
-            MpCgameImport::CG_GETSNAPSHOT,
-            &[snap_num as isize, &mut *snap as *mut _ as isize],
-        );
-        let ok = probe_trap(&mut f);
-
-        // The reliable-command seam: drain every command the snapshot names.
-        if ok != 0 {
-            let mut n = snap.serverCommandSequence;
-            // One call per frame keeps the journal readable and still exercises
-            // the copy-out. `CG_GETSERVERCOMMAND` tokenizes into the engine's
-            // argument vector, which `CG_ARGC` then reports.
-            let mut f = frame(MpCgameImport::CG_GETSERVERCOMMAND, &[n as isize]);
-            if probe_trap(&mut f) != 0 {
-                let mut f = frame(MpCgameImport::CG_ARGC, &[]);
-                probe_trap(&mut f);
-            }
-            n += 1;
-            let _ = n;
-        }
-        return 0;
-    }
-
-    let _ = words;
-    0
-}
-
-// ===========================================================================
-// The rig
-// ===========================================================================
-
-/// The demo the first pass drives.
-const DEMO: &str = "ffa1.dm_26";
-
-/// One fixed clock step, in milliseconds. Raven's client reads
-/// `Sys_Milliseconds` for `cls.realtime`, and the rig writes the field instead,
-/// so a run is a pure function of the demo bytes.
-const FIXED_DT_MS: i32 = 50;
-
-/// The repository root, derived from this crate's manifest directory.
-fn repo_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../..")
-        .canonicalize()
-        .expect("repo root")
-}
-
-/// The retail install the demo parse reads its paks from.
-fn assets_path() -> PathBuf {
-    match std::env::var("JKA_REF_BASEPATH") {
-        Ok(p) => PathBuf::from(p),
-        Err(_) => PathBuf::from(std::env::var("HOME").unwrap_or_default())
-            .join("Developer/jka/jka_server"),
-    }
-}
-
-/// Stages the committed demo under a private home path and returns it.
-fn stage_home(name: &str) -> PathBuf {
-    let home = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("demo-referee-{name}"));
-    let demos = home.join("base/demos");
-    std::fs::create_dir_all(&demos).expect("stage demo dir");
-    let src = repo_root().join("tools/cgame-referee/fixtures").join(name);
-    std::fs::copy(&src, demos.join(name)).expect("stage demo file");
-    home
 }
 
 /// Registers the probe under the name `cgame`, so `CL_InitCGame`'s `VM_Create`
@@ -452,9 +137,66 @@ fn seat_probe_module(view: &mut EngineHostView) {
     view.common.vmTable[i].entryPoint = Some(entry);
 }
 
-/// Drives one engine-to-module call. The probe journals both ends.
-fn drive_vm_call(view: &mut EngineHostView, cl: &mut Client, cmd: MpCgameExport, args: &[isize]) {
-    VM_Call(view.common, cl.cgvm, cmd as core::ffi::c_int, args);
+// ===========================================================================
+// The rig
+// ===========================================================================
+
+/// The four committed demos the referee covers.
+const DEMOS: &[&str] = &["ffa1", "sabers1", "spectator", "swoop1"];
+
+/// One fixed clock step, in milliseconds. Raven's client reads
+/// `Sys_Milliseconds` for `cls.realtime`, and the rig writes the field instead,
+/// so a run is a pure function of the demo bytes.
+const FIXED_DT_MS: i32 = 50;
+
+/// Hard bound on demo messages one playback reads. The bracket cap normally
+/// ends the run, and this stops a demo that yields no snapshots from hanging.
+const MAX_MESSAGES: u32 = 200_000;
+
+/// Brackets the gate lets the snapshot alignment drop off the front. The oracle
+/// engine reaches `CA_ACTIVE` one snapshot later than our rig, so the real
+/// number is 1. A wider allowance would let a broken run pass on a short
+/// aligned range.
+const MAX_ALIGNMENT_SKIP: usize = 4;
+
+/// The repository root, derived from this crate's manifest directory.
+fn repo_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../..")
+        .canonicalize()
+        .expect("repo root")
+}
+
+/// The `tools/cgame-referee` directory, which holds both manifests, the
+/// fixtures, and the goldens.
+fn referee_dir() -> PathBuf {
+    repo_root().join("tools/cgame-referee")
+}
+
+/// The retail install the demo parse reads its paks from.
+fn assets_path() -> PathBuf {
+    match std::env::var("JKA_REF_BASEPATH") {
+        Ok(p) => PathBuf::from(p),
+        Err(_) => PathBuf::from(std::env::var("HOME").unwrap_or_default())
+            .join("Developer/jka/jka_server"),
+    }
+}
+
+/// True when the retail paks are present. DEC-62.1 keeps the playback tests
+/// gated on this and never bypasses `FS_CheckPak0`.
+fn assets_present() -> bool {
+    assets_path().join("base/assets0.pk3").exists()
+}
+
+/// Stages the committed demo under a private home path and returns it.
+fn stage_home(demo: &str) -> PathBuf {
+    let home = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("demo-referee-{demo}"));
+    let demos = home.join("base/demos");
+    std::fs::create_dir_all(&demos).expect("stage demo dir");
+    let name = format!("{demo}.dm_26");
+    let src = referee_dir().join("fixtures").join(&name);
+    std::fs::copy(&src, demos.join(&name)).expect("stage demo file");
+    home
 }
 
 /// Boots the engine island headless and returns it with `Engine.cl` seated.
@@ -473,70 +215,28 @@ fn boot(home: &Path) -> Box<Engine> {
     engine
 }
 
-/// Walks a written journal and returns the record count, the vmcall-record
-/// count, and the syscall-record count. This is the reader side of the format
-/// contract, and the oracle-side golden is walked the same way.
-fn walk_journal(path: &Path) -> (usize, usize, usize) {
-    let raw = std::fs::read(path).expect("journal readable");
-    let mut buf = Vec::new();
-    flate2::read::GzDecoder::new(&raw[..])
-        .read_to_end(&mut buf)
-        .expect("journal is one gzip stream");
-    assert_eq!(&buf[0..8], journal::MAGIC, "journal magic");
-    assert_eq!(
-        u32::from_le_bytes(buf[8..12].try_into().unwrap()),
-        journal::FORMAT_VERSION,
-        "journal format version"
-    );
-
-    let (mut records, mut vmcalls, mut syscalls) = (0usize, 0usize, 0usize);
-    let mut at = 12usize;
-    while at + 4 <= buf.len() {
-        let len = u32::from_le_bytes(buf[at..at + 4].try_into().unwrap()) as usize;
-        at += 4;
-        assert!(at + len <= buf.len(), "record runs past the end");
-        let rec_type = buf[at];
-        match rec_type {
-            REC_VMCALL_ENTER | REC_VMCALL_EXIT => vmcalls += 1,
-            REC_SYSCALL_ENTER | REC_SYSCALL_EXIT => syscalls += 1,
-            _ => {}
-        }
-        records += 1;
-        at += len;
-    }
-    (records, vmcalls, syscalls)
+/// What one playback produced.
+struct Playback {
+    journal: PathBuf,
+    messages: u32,
+    brackets: u32,
+    traps: Vec<i64>,
+    vmcalls: Vec<i64>,
 }
 
-// ===========================================================================
-// Tests
-// ===========================================================================
+/// Plays one demo through the real parse chain and writes the probe's journal.
+/// `cap` bounds the journaled snapshots.
+fn play(demo: &str, cap: u32) -> Playback {
+    let home = stage_home(demo);
+    let journal_path = home.join(format!("{demo}.journal.gz"));
+    *PROBE.lock().unwrap() = Some(
+        Probe::new(&journal_path, &referee_dir(), cap, forward as probe::TrapFn)
+            .expect("probe recording opens"),
+    );
 
-/// Plays `ffa1.dm_26` through the real parse chain and writes the C6b journal.
-#[test]
-fn demo_ffa1_drives_the_client_engine() {
-    let assets = assets_path();
-    if !assets.join("base/assets0.pk3").exists() {
-        println!(
-            "SKIP demo_ffa1_drives_the_client_engine: no retail assets at {} (set JKA_REF_BASEPATH)",
-            assets.display()
-        );
-        return;
-    }
-
-    let home = stage_home(DEMO);
-    let manifests = Manifests::load(&repo_root().join("tools/cgame-referee")).expect("manifests");
-    let journal_path = home.join("ffa1-journal.bin.gz");
-    *RECORDER.lock().unwrap() = Some(Recorder {
-        journal: Journal::create(&journal_path).expect("journal"),
-        manifests,
-        seq: 0,
-        traps: Vec::new(),
-        vmcalls: Vec::new(),
-    });
-
+    let name = format!("{demo}.dm_26");
     let mut engine = boot(&home);
-    let mut frames = 0;
-    let mut snapshots = 0;
+    let mut messages = 0u32;
     {
         let mut view = engine_host_view(&mut engine);
         // SAFETY: the view's `cl` slot came from the live `Engine.cl` seated
@@ -548,13 +248,8 @@ fn demo_ffa1_drives_the_client_engine() {
 
         // `CL_PlayDemo_f` without the console command: the rig opens the file
         // and primes playback, then reads until the gamestate has landed.
-        FS_FOpenFileRead(
-            &mut view,
-            &format!("demos/{DEMO}"),
-            &mut cl.clc.demofile,
-            true,
-        );
-        assert!(cl.clc.demofile != 0, "demo file did not open");
+        FS_FOpenFileRead(&mut view, &format!("demos/{name}"), &mut cl.clc.demofile, true);
+        assert!(cl.clc.demofile != 0, "demo file {name} did not open");
         cl.cls.state = connstate_t::CA_CONNECTED;
         cl.clc.demoplaying = 1;
         // The gamestate arrives inside this loop, and the engine's own
@@ -563,71 +258,277 @@ fn demo_ffa1_drives_the_client_engine() {
         // records the module load the way a live client performs it.
         while (cl.cls.state as i32) < (connstate_t::CA_PRIMED as i32) {
             CL_ReadDemoMessage(&mut view, cl);
+            assert!(cl.clc.demofile != 0, "{name} ended before the gamestate");
         }
         assert!(!cl.cgvm.is_null(), "the probe module was never adopted");
 
         // Playback under the fixed clock: one demo message and one module frame
-        // per step, so the run is a pure function of the demo bytes.
-        while cl.clc.demofile != 0 && frames < 400 {
+        // per step, so the run is a pure function of the demo bytes. The probe
+        // journals only the frames that carried a new snapshot, so the record
+        // stream never depends on this cadence.
+        while cl.clc.demofile != 0 && messages < MAX_MESSAGES && !probe_done() {
             cl.cls.realtime += FIXED_DT_MS;
-            let before = cl.cl.snap.messageNum;
             CL_ReadDemoMessage(&mut view, cl);
-            if cl.cl.snap.messageNum != before {
-                snapshots += 1;
-            }
             cl.cl.serverTime = cl.cl.snap.serverTime;
-            drive_vm_call(
-                &mut view,
-                cl,
-                MpCgameExport::CG_DRAW_ACTIVE_FRAME,
+            VM_Call(
+                view.common,
+                cl.cgvm,
+                MpCgameExport::CG_DRAW_ACTIVE_FRAME as core::ffi::c_int,
                 &[cl.cl.serverTime as isize, 0, 1],
             );
-            frames += 1;
+            messages += 1;
         }
 
         // The gamestate the demo carried must have landed.
         assert!(
             cl.cl.gameState.dataCount > 1,
-            "no configstrings parsed from the demo"
+            "no configstrings parsed from {name}"
         );
-        assert!(cl.clc.clientNum >= 0, "no client number in the gamestate");
+        assert!(cl.clc.clientNum >= 0, "no client number in {name}");
     }
 
-    let rec = RECORDER.lock().unwrap().take().expect("recorder armed");
-    let traps = rec.traps.clone();
-    let vmcalls = rec.vmcalls.clone();
-    rec.journal.finish();
+    let mut probe = PROBE.lock().unwrap().take().expect("recorder armed");
+    probe.finish();
+    Playback {
+        journal: journal_path,
+        messages,
+        brackets: probe.brackets(),
+        traps: probe.traps.clone(),
+        vmcalls: probe.vmcalls.clone(),
+    }
+}
 
-    assert!(snapshots > 0, "no snapshots assembled from the demo");
-    assert!(
-        vmcalls.contains(&(MpCgameExport::CG_INIT as i64)),
-        "CG_INIT never reached the module"
-    );
-    assert!(
-        traps.contains(&(MpCgameImport::CG_GETSNAPSHOT as i64)),
-        "the module never asked for a snapshot"
-    );
-    let bytes = std::fs::metadata(&journal_path).expect("journal written").len();
-    assert!(bytes > 0, "journal is empty");
+/// True once the probe closed its journal at the bracket cap.
+fn probe_done() -> bool {
+    PROBE
+        .lock()
+        .unwrap()
+        .as_ref()
+        .map(|p| p.done())
+        .unwrap_or(true)
+}
 
-    // The journal must read back as a well-formed C6b stream, because the
-    // oracle-side golden is read by the same walk.
-    let (records, vmcall_recs, syscall_recs) = walk_journal(&journal_path);
-    assert_eq!(
-        records,
-        2 * (vmcalls.len() + traps.len()),
-        "every call must carry an ENTER and an EXIT record"
-    );
-    assert_eq!(vmcall_recs, 2 * vmcalls.len());
-    assert_eq!(syscall_recs, 2 * traps.len());
+/// The committed golden for one demo.
+fn golden_path(demo: &str) -> PathBuf {
+    referee_dir().join("goldens").join(format!("{demo}.journal.gz"))
+}
+
+/// Prints the record census of one journal.
+fn print_census(label: &str, records: &[JournalRecord]) {
+    let c = census(records);
     println!(
-        "demo {DEMO}: {frames} frames, {snapshots} snapshots, {} vmcalls, {} traps, journal {} bytes at {}",
-        vmcalls.len(),
-        traps.len(),
-        bytes,
-        journal_path.display()
+        "  {label}: {} records ({} vmcall, {} syscall)",
+        records.len(),
+        c.get(&REC_VMCALL_ENTER).unwrap_or(&0) + c.get(&REC_VMCALL_EXIT).unwrap_or(&0),
+        c.get(&REC_SYSCALL_ENTER).unwrap_or(&0) + c.get(&REC_SYSCALL_EXIT).unwrap_or(&0),
     );
 }
+
+/// Diffs one playback against its golden and returns the finding lines.
+///
+/// A run that compares almost no brackets would pass on nothing, so the gate
+/// also fails when the aligned range is short.
+fn gate(demo: &str, manifests: &Manifests, play: &Playback, golden: &Path) -> Vec<String> {
+    let ours = read_journal(&play.journal).expect("our journal reads back");
+    let theirs = read_journal(golden).expect("golden reads back");
+    println!(
+        "demo {demo}: {} messages, {} brackets",
+        play.messages, play.brackets
+    );
+    print_census("ours  ", &ours);
+    print_census("golden", &theirs);
+
+    let report = diff(manifests, &ours, &theirs, 20);
+    println!(
+        "  compared {} brackets (skipped {} ours, {} golden before the first common snapshot)",
+        report.compared, report.skipped_ours, report.skipped_golden
+    );
+    let mut lines: Vec<String> = report
+        .findings
+        .into_iter()
+        .map(|f| format!("  {demo} record {}: {}", f.index, f.what))
+        .collect();
+    let want = (play.brackets as usize).saturating_sub(MAX_ALIGNMENT_SKIP);
+    if report.compared < want {
+        lines.push(format!(
+            "  {demo}: only {} brackets aligned, wanted at least {want}",
+            report.compared
+        ));
+    }
+    lines
+}
+
+// ===========================================================================
+// The golden-shape check - no assets needed
+// ===========================================================================
+
+/// The goldens are committed, so this runs everywhere and needs no assets.
+/// A recording that skipped a snapshot would make the byte gate report a
+/// difference our engine did not cause, so the density check guards the
+/// goldens themselves.
+#[test]
+fn goldens_are_well_formed_and_skip_no_snapshot() {
+    for demo in DEMOS {
+        let path = golden_path(demo);
+        assert!(
+            path.exists(),
+            "missing golden {}. Record it with tools/cgame-referee/record-golden.sh {demo}",
+            path.display()
+        );
+        let records = read_journal(&path).expect("golden reads back");
+        assert!(!records.is_empty(), "{demo}: golden holds no records");
+
+        let opens = records
+            .iter()
+            .filter(|r| r.rec_type == REC_VMCALL_ENTER || r.rec_type == REC_SYSCALL_ENTER)
+            .count();
+        let closes = records
+            .iter()
+            .filter(|r| r.rec_type == REC_VMCALL_EXIT || r.rec_type == REC_SYSCALL_EXIT)
+            .count();
+        assert_eq!(opens, closes, "{demo}: golden has an unbalanced bracket");
+
+        let vmcalls = records
+            .iter()
+            .filter(|r| r.rec_type == REC_VMCALL_ENTER)
+            .count();
+        assert!(
+            vmcalls >= 2,
+            "{demo}: golden holds {vmcalls} vmcalls, so playback never started"
+        );
+
+        let numbers = bracket_snapshots(&records);
+        assert!(!numbers.is_empty(), "{demo}: golden read no snapshot number");
+        for pair in numbers.windows(2) {
+            assert_eq!(
+                pair[1],
+                pair[0] + 1,
+                "{demo}: golden jumped from snapshot {} to {}, so the recording dropped a frame",
+                pair[0],
+                pair[1]
+            );
+        }
+        println!(
+            "golden {demo}: {} records, {} brackets, snapshots {}..{}",
+            records.len(),
+            vmcalls,
+            numbers[0],
+            numbers[numbers.len() - 1]
+        );
+    }
+}
+
+/// The probe's compile-time sizes must be the ones the seam really carries, or
+/// every blob would be the wrong length.
+#[test]
+fn probe_buffer_sizes_match_the_seam_types() {
+    assert_eq!(
+        core::mem::size_of::<snapshot_t>(),
+        probe::SNAPSHOT_SIZE,
+        "the probe's snapshot buffer is not sizeof(snapshot_t)"
+    );
+    assert_eq!(probe::CG_INIT, MpCgameExport::CG_INIT as i64);
+    assert_eq!(probe::CG_SHUTDOWN, MpCgameExport::CG_SHUTDOWN as i64);
+    assert_eq!(
+        probe::CG_DRAW_ACTIVE_FRAME,
+        MpCgameExport::CG_DRAW_ACTIVE_FRAME as i64
+    );
+    assert_eq!(probe::CG_ARGC, MpCgameImport::CG_ARGC as i64);
+    assert_eq!(probe::CG_ARGV, MpCgameImport::CG_ARGV as i64);
+    assert_eq!(
+        probe::CG_SENDCONSOLECOMMAND,
+        MpCgameImport::CG_SENDCONSOLECOMMAND as i64
+    );
+    assert_eq!(probe::CG_GETGAMESTATE, MpCgameImport::CG_GETGAMESTATE as i64);
+    assert_eq!(
+        probe::CG_GETCURRENTSNAPSHOTNUMBER,
+        MpCgameImport::CG_GETCURRENTSNAPSHOTNUMBER as i64
+    );
+    assert_eq!(probe::CG_GETSNAPSHOT, MpCgameImport::CG_GETSNAPSHOT as i64);
+    assert_eq!(
+        probe::CG_GETSERVERCOMMAND,
+        MpCgameImport::CG_GETSERVERCOMMAND as i64
+    );
+}
+
+// ===========================================================================
+// The byte gate - asset-gated (DEC-62.1)
+// ===========================================================================
+
+/// Every demo plays through our engine and its journal must equal the oracle
+/// golden byte for byte, outside the named exclusions.
+#[test]
+fn demos_match_the_oracle_goldens() {
+    let _rig = RIG.lock().unwrap_or_else(|e| e.into_inner());
+    if !assets_present() {
+        println!(
+            "SKIP demos_match_the_oracle_goldens: no retail assets at {} (set JKA_REF_BASEPATH)",
+            assets_path().display()
+        );
+        return;
+    }
+    println!("gate exclusions: {}", exclusions().join("; "));
+
+    let manifests = Manifests::load(&referee_dir()).expect("manifests");
+    let mut findings: Vec<String> = Vec::new();
+    for demo in DEMOS {
+        let run = play(demo, DEFAULT_BRACKET_CAP);
+        assert!(run.brackets > 0, "{demo}: no snapshot ever reached the module");
+        assert!(
+            run.vmcalls.contains(&(MpCgameExport::CG_INIT as i64)),
+            "{demo}: CG_INIT never reached the module"
+        );
+        assert!(
+            run.traps.contains(&(MpCgameImport::CG_GETSNAPSHOT as i64)),
+            "{demo}: the module never asked for a snapshot"
+        );
+        findings.extend(gate(demo, &manifests, &run, &golden_path(demo)));
+    }
+    assert!(
+        findings.is_empty(),
+        "the demo referee found {} differences:\n{}",
+        findings.len(),
+        findings.join("\n")
+    );
+}
+
+/// The DEC-62.2 extended check: the same gate over the whole demo rather than
+/// the committed 400-bracket bound. `JKA_REF_FULL_GOLDENS` names a directory of
+/// locally recorded full-length goldens, which stay out of git for size.
+#[test]
+fn full_demos_match_local_goldens() {
+    let _rig = RIG.lock().unwrap_or_else(|e| e.into_inner());
+    let Ok(dir) = std::env::var("JKA_REF_FULL_GOLDENS") else {
+        println!("SKIP full_demos_match_local_goldens: JKA_REF_FULL_GOLDENS is not set");
+        return;
+    };
+    if !assets_present() {
+        println!("SKIP full_demos_match_local_goldens: no retail assets");
+        return;
+    }
+    let dir = PathBuf::from(dir);
+    let manifests = Manifests::load(&referee_dir()).expect("manifests");
+    let mut findings: Vec<String> = Vec::new();
+    for demo in DEMOS {
+        let golden = dir.join(format!("{demo}.journal.gz"));
+        if !golden.exists() {
+            println!("  skip {demo}: no full golden at {}", golden.display());
+            continue;
+        }
+        let run = play(demo, u32::MAX);
+        findings.extend(gate(demo, &manifests, &run, &golden));
+    }
+    assert!(
+        findings.is_empty(),
+        "the full-demo check found {} differences:\n{}",
+        findings.len(),
+        findings.join("\n")
+    );
+}
+
+// ===========================================================================
+// The seam fixtures - no assets needed
+// ===========================================================================
 
 /// DEC-58.2, seam one: `clSnapshot_t` holds more entities than `snapshot_t`
 /// carries, so `CL_GetSnapshot` truncates the copy at
@@ -731,15 +632,12 @@ fn reliable_command_copy_out_tokenizes_and_marks_executed() {
         "the executed sequence was not recorded"
     );
     assert_eq!(
-        mp_engine_qcommon::cmd_common::Cmd_Argc(view.common),
+        Cmd_Argc(view.common),
         2,
         "the command was not tokenized"
     );
-    assert_eq!(mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, 0), "chat");
-    assert_eq!(
-        mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, 1),
-        "hello there"
-    );
+    assert_eq!(Cmd_Argv(view.common, 0), "chat");
+    assert_eq!(Cmd_Argv(view.common, 1), "hello there");
 }
 
 /// DEC-58.2, seam two, second half: a demo whose recording started late has no

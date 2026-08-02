@@ -22,7 +22,9 @@ HERE="$(pwd -P)"
 ENGINE="${JKA_ORACLE_CLIENT:-$HOME/Developer/jka/seam-test/client/openjk.arm64.app/Contents/MacOS/openjk.arm64}"
 ASSETS="${JKA_REF_BASEPATH:-$HOME/Developer/jka/jka_server}"
 UI_DYLIB="${JKA_PROBE_UI_DYLIB:-$HOME/Developer/jka/seam-test/client/base/uiarm64.dylib}"
-HOME_DIR="${JKA_PROBE_HOME:-${TMPDIR:-/tmp}/cgame-probe-home}"
+# A path with a double slash in it loses everything after the `//`, because the
+# engine tokenizes its command line with COM_Parse and `//` starts a comment.
+HOME_DIR="${JKA_PROBE_HOME:-$HOME/Developer/jka/cgame-probe-home}"
 OUT_DIR="${JKA_PROBE_OUT:-$HERE/goldens}"
 CAP="${JKA_PROBE_BRACKET_CAP:-400}"
 
@@ -55,8 +57,10 @@ record_one() {
 		+set s_initsound 0 \
 		+set r_fullscreen 0 \
 		+set r_mode 3 \
+		+set r_swapInterval 0 \
 		+demo "$demo" \
-		2>&1 | tee "$HOME_DIR/$demo-console.log"
+		> "$HOME_DIR/$demo-console.log" 2>&1
+	grep -E "cgame-probe|ERROR|Error" "$HOME_DIR/$demo-console.log" || true
 	ls -l "$OUT_DIR/$demo.journal.gz"
 }
 

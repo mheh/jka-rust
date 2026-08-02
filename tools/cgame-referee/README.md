@@ -555,9 +555,7 @@ cargo test -p mp_engine_core --test demo_referee -- --test-threads=1
   the paks are absent.
 - **Module seat.** `VM_Create` returns an existing `vmTable` slot when the name
   matches, so the rig registers a slot named `cgame` before playback and
-  `CL_InitCGame` adopts it. The seat holds a probe module: it answers `CG_INIT`
-  and `CG_DRAW_ACTIVE_FRAME`, calls the snapshot and server-command traps, and
-  calls no renderer or sound trap.
+  `CL_InitCGame` adopts it. The seat holds the probe module below.
 - **Clock.** The rig writes `cls.realtime` in fixed 50 ms steps and reads one
   demo message per step, so a run is a pure function of the demo bytes.
 - **Journal.** The probe writes the C6b records from the module side, where the
@@ -570,19 +568,89 @@ cargo test -p mp_engine_core --test demo_referee -- --test-threads=1
   renderer slot is NULL until the platform shell lands). Both gates are inactive
   in the default `Off` mode and go away when gh#24, gh#25, and gh#22 close.
 
-### The oracle half, still to build
+### The probe module (`probe/`)
 
-1. Build the probe as a standalone cdylib under `probe/`, exporting `dllEntry`
-   and `vmMain`, with the same trap order the in-process probe uses. Both
-   engines then drive the SAME module, which is what makes the two journals
-   comparable.
-2. Stage the probe as `cgame<arch>.dylib` beside the recorder shim, point
-   `JKA_SHIM_REAL_CGAME` at it, and play the demo on the oracle engine with
-   `+demo ffa1`. The shim writes the golden.
-3. Pin the oracle engine's clock the same way the rig pins ours, or record the
-   engine's own time reads so the comparison never fails on wall-clock drift.
-4. Commit the golden under `goldens/`, and add the diff test: walk both
-   journals record by record and compare the vmcall arms, the trap numbers, and
-   every blob. Pointer words are host state and are excluded, the same three
-   exclusions the replay referee lists.
-5. Extend to the other three demos once ffa1 is byte-identical.
+One module body serves both engines, which is what makes the two journals
+comparable. `probe/src/probe.rs` holds it. `probe/src/lib.rs` builds it as a
+standalone cdylib the oracle engine dlopens, and `demo_referee.rs` includes the
+same file by `#[path]` for the in-process run. The cdylib sends its traps
+through `probe/src/syscall.c`, for the arm64 va-arg reason `shim/trampoline.c`
+states.
+
+The probe answers `CG_INIT`, `CG_DRAW_ACTIVE_FRAME` and `CG_SHUTDOWN` only.
+Every other arm returns 0 with no record, because the oracle engine drives arms
+(console command, key event, crosshair player) that the headless rig has no path
+to. It calls no renderer trap and no sound trap.
+
+**The snapshot bracket.** Frame cadence is host-clock state: the oracle engine
+draws at its own rate and our rig steps a fixed clock, so a per-frame journal
+would never align. The probe reads the current snapshot number on every
+`CG_DRAW_ACTIVE_FRAME` with no record, and opens a journal bracket only when
+that number moved. One bracket holds a second, journaled read of the snapshot
+number, the `CG_GETSNAPSHOT` copy-out, and the reliable-command drain with its
+`CG_ARGC`/`CG_ARGV` tokens. The scratch buffers are cleared before each trap, so
+a blob never carries a byte from an earlier frame.
+
+**The cursor seed.** The first bracket only seats the reliable-command cursor
+from the snapshot it read. The backlog between `CG_INIT` and the first drawn
+snapshot depends on how long each engine took to reach `CA_ACTIVE`, which is host
+timing, so seating from `CG_INIT`'s arg 1 would put that timing in the journal.
+Every journaled drain is therefore a per-snapshot delta.
+
+**The cap.** `JKA_PROBE_BRACKET_CAP` (400 by default, the DEC-62.2 golden bound)
+closes the journal and sends `quit` to the engine, so a golden run needs no
+operator.
+
+### Recording a golden
+
+```sh
+./record-golden.sh                    # all four demos
+./record-golden.sh ffa1
+JKA_PROBE_BRACKET_CAP=0 JKA_PROBE_OUT=/tmp/full ./record-golden.sh swoop1
+```
+
+The script builds the probe, stages it plus a stock ui module under a private
+`fs_homepath`, copies the fixture demo in, and runs the oracle client. Nothing
+writes to the retail install or to the operator's own OpenJK home. A cap of 0
+mints the DEC-62.2 extended-check goldens, which stay out of git for size: point
+`JKA_REF_FULL_GOLDENS` at their directory and run
+`full_demos_match_local_goldens`.
+
+Two engine flags matter. `r_swapInterval 0` keeps the frame rate off the vsync
+clock, because a frame longer than one snapshot interval makes the engine skip a
+snapshot and the golden is then unusable. A path holding `//` loses everything
+after it, because the engine tokenizes its command line with `COM_Parse` and
+`//` starts a comment.
+
+### The byte gate
+
+`journal_diff.rs` reads both journals and walks them. `CG_INIT` records compare
+position for position. The snapshot brackets align on their snapshot numbers
+first, then compare record for record: the arm or trap number, the return, the
+scalar arg words, and every blob byte.
+
+Five exclusions, each host state that no engine derives from the demo:
+
+1. **Pointer arg words.** The probe's own buffer addresses. The blob is the
+   witness.
+2. **Scalar words compare on the low 32 bits.** The high half of a grabbed
+   64-bit word is caller stack, which the engine dispatch also throws away.
+3. **`CG_DRAW_ACTIVE_FRAME` arg 0.** The render `serverTime` that
+   `CL_SetCGameTime` interpolates from `cls.realtime`.
+4. **`snapshot_t.ping`.** `CL_ParseSnapshot` computes it from `cls.realtime`, and
+   a demo sends no packets, so the field is pure wall clock.
+5. **The leading brackets before the aligned start.** The oracle engine consumes
+   one snapshot inside `CL_SetCGameTime` on the way to `CA_ACTIVE`, and each side
+   spends its first bracket seating the cursor. The gate starts one snapshot past
+   the later of the two first brackets, and the compared range must stay
+   snapshot-consecutive on both sides, so nothing is dropped in the middle.
+
+`goldens_are_well_formed_and_skip_no_snapshot` guards the goldens themselves. It
+runs with no assets, because the goldens are committed, and it fails a golden
+whose snapshot numbers are not consecutive.
+
+Bar proven 2026-08-02: all four demos, 398 aligned brackets each, ZERO
+differences. The gate found and closed a real defect on the way in:
+`CL_ParseGamestate` and `CL_ConfigstringModified` copied `len + 1` bytes out of a
+Rust `String`, which has no NUL terminator, so five configstrings per demo
+carried a heap byte where the terminator belonged.

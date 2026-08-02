@@ -245,6 +245,8 @@ pub struct Probe {
     last_snapshot: i32,
     /// Next reliable command to drain, the `cgs.serverCommandSequence` rule.
     next_command: i32,
+    /// True once the first bracket seated `next_command`.
+    seeded: bool,
     /// Journaled brackets so far.
     brackets: u32,
     cap: u32,
@@ -278,6 +280,7 @@ impl Probe {
             seq: 0,
             last_snapshot: -1,
             next_command: 0,
+            seeded: false,
             brackets: 0,
             cap,
             done: false,
@@ -384,13 +387,16 @@ impl Probe {
     }
 
     /// `CG_INIT(serverMessageNum, serverCommandSequence, clientNum)`. The probe
-    /// reads the game state back the way `CG_Init` does, and it seats the
-    /// reliable-command cursor from arg 1.
+    /// reads the game state back the way `CG_Init` does.
+    ///
+    /// The reliable-command cursor is NOT seated from arg 1. The backlog between
+    /// `CG_INIT` and the first drawn snapshot depends on how long each engine
+    /// took to reach `CA_ACTIVE`, which is host timing. The first bracket seats
+    /// the cursor instead, so every journaled drain is a per-snapshot delta.
     fn init(&mut self, words: &[isize; 12]) -> isize {
         if self.done {
             return 0;
         }
-        self.next_command = words[1] as i32;
         let seq = self.vmcall_enter(CG_INIT, words);
         self.gamestate.fill(0);
         let ptr = self.gamestate.as_mut_ptr() as isize;
@@ -420,7 +426,10 @@ impl Probe {
             ],
         );
         self.silent_trap(&mut f);
-        if number == self.last_snapshot {
+        // A number of 0 means no snapshot has landed yet. The oracle engine
+        // draws such a frame during its load screen, and the real cgame skips
+        // it too, because `cg.snap` is still NULL there.
+        if number <= 0 || number == self.last_snapshot {
             return 0;
         }
         self.last_snapshot = number;
@@ -447,7 +456,13 @@ impl Probe {
         let got = self.journaled_trap(&mut f);
         if got != 0 {
             let latest = self.snapshot_command_sequence();
-            self.drain_server_commands(latest);
+            if self.seeded {
+                self.drain_server_commands(latest);
+            } else {
+                // The first bracket only seats the cursor. See `init`.
+                self.next_command = latest;
+                self.seeded = true;
+            }
         }
 
         self.vmcall_exit(seq, CG_DRAW_ACTIVE_FRAME, words, 0);
