@@ -1,0 +1,40 @@
+== cin-oracle sound_mono ==
+TABLES
+  yy crc 8ae8ea45
+  ub crc 98169408
+  ug crc 93ce57d8
+  vg crc 40617ffd
+  vr crc 4e1abe2d
+  yy 0 64 4112 5461 8224 10922 16319 16383
+  ub -14555 -14440 -7232 -4830 89 4894 14504 14619
+  ug 2935 2912 1462 978 -11 -978 -2912 -2935
+  vg 5986 5940 2997 2016 8 -1952 -5876 -5922
+  vr -11535 -11445 -5729 -3823 77 3887 11509 11599
+SQR crc a973ca79
+  sqr 0 1 4096 16129 0 -1 -4096 -16129
+YUV crc 10b81cdb
+  yuv 0 0 0 ff008b00
+  yuv 255 255 255 ffff75ff
+  yuv 0 255 0 ffe42f00
+  yuv 255 0 255 ff1cd1ff
+  yuv 128 128 128 ff818081
+  yuv 16 128 128 ff111011
+  yuv 235 128 128 ffedebed
+  yuv 81 90 240 ff0e0df1
+  yuv 145 54 34 ff0ef00d
+  yuv 41 240 110 fff20d10
+STREAM sound_mono bytes 1576 fps 30 roqid 1020
+CHUNK 0 id 1020 size 512 flags 0000 f0 0 f1 0
+AUDIO mono2stereo size 512 signed 0 flag 0000 ret 512 out 1024
+  crc e316c205
+  s 0 0 1 1 0 16129 0 0
+CHUNK 1 id 1020 size 512 flags 8000 f0 -128 f1 0
+AUDIO mono2stereo size 512 signed 0 flag 8000 ret 512 out 1024
+  crc 0b8d8305
+  s -32768 -32768 -32767 -32767 -32768 -16639 -32768 -32768
+CHUNK 2 id 1020 size 512 flags 1234 f0 18 f1 52
+AUDIO mono2stereo size 512 signed 0 flag 1234 ret 512 out 1024
+  crc 485f8abd
+  s 4660 4660 4661 4661 4660 20789 4660 4660
+STREAMEND chunks 3 frames 0
+== end ==

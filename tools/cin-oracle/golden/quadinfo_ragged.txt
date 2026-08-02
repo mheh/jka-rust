@@ -1,0 +1,39 @@
+== cin-oracle quadinfo_ragged ==
+TABLES
+  yy crc 8ae8ea45
+  ub crc 98169408
+  ug crc 93ce57d8
+  vg crc 40617ffd
+  vr crc 4e1abe2d
+  yy 0 64 4112 5461 8224 10922 16319 16383
+  ub -14555 -14440 -7232 -4830 89 4894 14504 14619
+  ug 2935 2912 1462 978 -11 -978 -2912 -2935
+  vg 5986 5940 2997 2016 8 -1952 -5876 -5922
+  vr -11535 -11445 -5729 -3823 77 3887 11509 11599
+SQR crc a973ca79
+  sqr 0 1 4096 16129 0 -1 -4096 -16129
+YUV crc 10b81cdb
+  yuv 0 0 0 ff008b00
+  yuv 255 255 255 ffff75ff
+  yuv 0 255 0 ffe42f00
+  yuv 255 0 255 ff1cd1ff
+  yuv 128 128 128 ff818081
+  yuv 16 128 128 ff111011
+  yuv 235 128 128 ffedebed
+  yuv 81 90 240 ff0e0df1
+  yuv 145 54 34 ff0ef00d
+  yuv 41 240 110 fff20d10
+STREAM quadinfo_ragged bytes 32 fps 30 roqid 1001
+CHUNK 0 id 1001 size 8 flags 0000 f0 0 f1 0
+QUADINFO readquadinfo
+  xsize 40 ysize 24 maxsize 8 minsize 4
+  cinw 40 cinh 24 spl 160 screendelta 3840
+  t0 3840 t1 -3840 drawx 40 drawy 24 vq0 1 vq1 1
+QUADS setupquad onquad 75 cels 139
+  q0 crc 42bb7fb0
+  q1 crc 2433facf
+  q0 0 0 16 640 656 32 1968 64
+  q1 3840 3840 3856 4480 4496 3872 5808 3904
+  qend 3344 -1 7184 -1
+STREAMEND chunks 1 frames 0
+== end ==

@@ -1,0 +1,147 @@
+== cin-oracle rll_direct ==
+TABLES
+  yy crc 8ae8ea45
+  ub crc 98169408
+  ug crc 93ce57d8
+  vg crc 40617ffd
+  vr crc 4e1abe2d
+  yy 0 64 4112 5461 8224 10922 16319 16383
+  ub -14555 -14440 -7232 -4830 89 4894 14504 14619
+  ug 2935 2912 1462 978 -11 -978 -2912 -2935
+  vg 5986 5940 2997 2016 8 -1952 -5876 -5922
+  vr -11535 -11445 -5729 -3823 77 3887 11509 11599
+SQR crc a973ca79
+  sqr 0 1 4096 16129 0 -1 -4096 -16129
+YUV crc 10b81cdb
+  yuv 0 0 0 ff008b00
+  yuv 255 255 255 ffff75ff
+  yuv 0 255 0 ffe42f00
+  yuv 255 0 255 ff1cd1ff
+  yuv 128 128 128 ff818081
+  yuv 16 128 128 ff111011
+  yuv 235 128 128 ffedebed
+  yuv 81 90 240 ff0e0df1
+  yuv 145 54 34 ff0ef00d
+  yuv 41 240 110 fff20d10
+RLL sweep crc 840389c5
+AUDIO mono2mono size 256 signed 0 flag 0000 ret 256 out 256
+  crc e598476d
+  s 0 1 5 14 -30016 32005 16129 0
+AUDIO mono2stereo size 256 signed 0 flag 0000 ret 256 out 512
+  crc 8adc28e5
+  s 0 0 1 1 -30016 16129 0 0
+AUDIO stereo2stereo size 256 signed 0 flag 0000 ret 128 out 256
+  crc ccb75a4a
+  s 0 1 4 10 13696 16129 0 0
+AUDIO stereo2mono size 128 signed 0 flag 0000 ret 128 out 128
+  crc 211c5b43
+  s 0 7 27 70 17759 31503 16002 0
+AUDIO mono2mono size 256 signed 1 flag 0000 ret 256 out 256
+  crc ac14786d
+  s -32768 -32767 -32763 -32754 2752 -763 -16639 -32768
+AUDIO mono2stereo size 256 signed 1 flag 0000 ret 256 out 512
+  crc 8f38d4e5
+  s -32768 -32768 -32767 -32767 2752 -16639 -32768 -32768
+AUDIO stereo2stereo size 256 signed 1 flag 0000 ret 128 out 256
+  crc f313e94a
+  s -32768 -32767 -32764 -32758 -19072 -16639 -32768 -32768
+AUDIO stereo2mono size 128 signed 1 flag 0000 ret 128 out 128
+  crc dcc8dba5
+  s -32767 -32761 -32740 -32698 -15009 -1265 -16765 -32768
+AUDIO mono2mono size 256 signed 0 flag 8000 ret 256 out 256
+  crc ac14786d
+  s -32768 -32767 -32763 -32754 2752 -763 -16639 -32768
+AUDIO mono2stereo size 256 signed 0 flag 8000 ret 256 out 512
+  crc 8f38d4e5
+  s -32768 -32768 -32767 -32767 2752 -16639 -32768 -32768
+AUDIO stereo2stereo size 256 signed 0 flag 8000 ret 128 out 256
+  crc e3d80a4a
+  s -32768 1 -32764 10 -19072 16129 -32768 0
+AUDIO stereo2mono size 128 signed 0 flag 8000 ret 128 out 128
+  crc a87412c3
+  s 16384 16391 16411 16454 -31393 -17649 32386 16384
+AUDIO mono2mono size 256 signed 1 flag 8000 ret 256 out 256
+  crc e598476d
+  s 0 1 5 14 -30016 32005 16129 0
+AUDIO mono2stereo size 256 signed 1 flag 8000 ret 256 out 512
+  crc 8adc28e5
+  s 0 0 1 1 -30016 16129 0 0
+AUDIO stereo2stereo size 256 signed 1 flag 8000 ret 128 out 256
+  crc d02b274a
+  s 0 -32767 4 -32758 13696 -16639 0 -32768
+AUDIO stereo2mono size 128 signed 1 flag 8000 ret 128 out 128
+  crc 66bbbe5e
+  s -16383 -16377 -16356 -16314 1375 15119 -381 -16384
+AUDIO mono2mono size 256 signed 0 flag 1234 ret 256 out 256
+  crc fbb1632b
+  s 4660 4661 4665 4674 -25356 -28871 20789 4660
+AUDIO mono2stereo size 256 signed 0 flag 1234 ret 256 out 512
+  crc 475c8271
+  s 4660 4660 4661 4661 -25356 20789 4660 4660
+AUDIO stereo2stereo size 256 signed 0 flag 1234 ret 128 out 256
+  crc 93211072
+  s 4608 13313 4612 13322 18304 29441 4608 13312
+AUDIO stereo2mono size 128 signed 0 flag 1234 ret 128 out 128
+  crc ce0b41ff
+  s 8960 8967 8987 9030 26719 -25073 24962 8960
+AUDIO mono2mono size 256 signed 1 flag 1234 ret 256 out 256
+  crc 93b8b02b
+  s -28108 -28107 -28103 -28094 7412 3897 -11979 -28108
+AUDIO mono2stereo size 256 signed 1 flag 1234 ret 256 out 512
+  crc 5f57b271
+  s -28108 -28108 -28107 -28107 7412 -11979 -28108 -28108
+AUDIO stereo2stereo size 256 signed 1 flag 1234 ret 128 out 256
+  crc 731fae72
+  s -28160 -19455 -28156 -19446 -14464 -3327 -28160 -19456
+AUDIO stereo2mono size 128 signed 1 flag 1234 ret 128 out 128
+  crc 1d9031a7
+  s -23807 -23801 -23780 -23738 -6049 7695 -7805 -23808
+AUDIO mono2mono size 256 signed 0 flag ff00 ret 256 out 256
+  crc 1e9f1169
+  s -256 -255 -251 -242 -30272 31749 15873 -256
+AUDIO mono2stereo size 256 signed 0 flag ff00 ret 256 out 512
+  crc 1ee0fcf5
+  s -256 -256 -255 -255 -30272 15873 -256 -256
+AUDIO stereo2stereo size 256 signed 0 flag ff00 ret 128 out 256
+  crc 108b09be
+  s -256 1 -252 10 13440 16129 -256 0
+AUDIO stereo2mono size 128 signed 0 flag ff00 ret 128 out 128
+  crc 22ca928c
+  s 32640 32647 32667 32710 -15137 -1393 -16894 32640
+AUDIO mono2mono size 256 signed 1 flag ff00 ret 256 out 256
+  crc 6b82ac69
+  s 32512 32513 32517 32526 2496 -1019 -16895 32512
+AUDIO mono2stereo size 256 signed 1 flag ff00 ret 256 out 512
+  crc bacc61f5
+  s 32512 32512 32513 32513 2496 -16895 32512 32512
+AUDIO stereo2stereo size 256 signed 1 flag ff00 ret 128 out 256
+  crc 01fae6be
+  s 32512 -32767 32516 -32758 -19328 -16639 32512 -32768
+AUDIO stereo2mono size 128 signed 1 flag ff00 ret 128 out 128
+  crc 470d9bee
+  s -127 -121 -100 -58 17631 31375 15874 -128
+AUDIO mono2mono size 256 signed 0 flag 00ff ret 256 out 256
+  crc f61c30a5
+  s 255 256 260 269 -29761 32260 16384 255
+AUDIO mono2stereo size 256 signed 0 flag 00ff ret 256 out 512
+  crc 60a390e5
+  s 255 255 256 256 -29761 16384 255 255
+AUDIO stereo2stereo size 256 signed 0 flag 00ff ret 128 out 256
+  crc 2f580014
+  s 0 -255 4 -246 13696 15873 0 -256
+AUDIO stereo2mono size 128 signed 0 flag 00ff ret 128 out 128
+  crc 22ca928c
+  s 32640 32647 32667 32710 -15137 -1393 -16894 32640
+AUDIO mono2mono size 256 signed 1 flag 00ff ret 256 out 256
+  crc b38538a5
+  s -32513 -32512 -32508 -32499 3007 -508 -16384 -32513
+AUDIO mono2stereo size 256 signed 1 flag 00ff ret 256 out 512
+  crc ebf2c6e5
+  s -32513 -32513 -32512 -32512 3007 -16384 -32513 -32513
+AUDIO stereo2stereo size 256 signed 1 flag 00ff ret 128 out 256
+  crc 05150714
+  s -32768 32513 -32764 32522 -19072 -16895 -32768 32512
+AUDIO stereo2mono size 128 signed 1 flag 00ff ret 128 out 128
+  crc 470d9bee
+  s -127 -121 -100 -58 17631 31375 15874 -128
+== end ==
