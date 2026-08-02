@@ -23,6 +23,7 @@ pub mod client_host;
 pub mod fffx;
 pub mod fx;
 pub mod fx_stubs;
+pub mod hook_install;
 pub mod keys;
 pub mod mp3;
 pub mod null;

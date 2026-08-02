@@ -61,6 +61,9 @@ pub fn engine_host_view(engine: &mut Engine) -> EngineHostView<'_> {
 pub fn install_engine_hooks(engine: &mut Engine) {
     mp_engine_server::hook_install::install_engine_hooks(&mut engine.common.hooks);
     mp_renderer::hook_install::install_engine_hooks(&mut engine.common.hooks);
+    // The sound tier replaces its two null-build defaults. Each installed hook
+    // answers the null-build value while `Engine.snd` is `None` (DEC-57).
+    mp_engine_client::hook_install::install_engine_hooks(&mut engine.common.hooks);
 
     let cl_raw = match engine.cl.as_mut() {
         Some(cl) => cl as *mut _ as *mut (),

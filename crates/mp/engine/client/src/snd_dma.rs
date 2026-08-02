@@ -969,6 +969,16 @@ fn S_AddLoopSounds(common: &mut Common, snd: &mut SoundSystem) {
     }
 }
 
+//TODO: Port S_ByteSwapRawSamples
+// Source: oracle/codemp/client/snd_dma.cpp:2071. Only the streamed-WAV music
+// path calls it, and that path is gh#25. The body is a no-op on a little-endian
+// host, which is every target this tree builds for.
+
+// Raven's `S_GetRawSamplePointer` hands `s_rawsamples` back to a caller that no
+// tree has (porting-rules §20 drops a zero-caller API). `SoundSystem` owns the
+// ring, so a reader takes it by field.
+// Source: `oracle/codemp/client/snd_dma.cpp:2090-2092`
+
 /// Raven `S_RawSamples` — write a streamed block into the raw ring the paint
 /// chain reads ahead of the channels.
 ///
