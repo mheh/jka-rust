@@ -138,8 +138,8 @@ impl EngineHost for EngineHostView<'_> {
     }
 
     /// Raven `VM_Call( vm, callnum, … )` — server-installed accessor: the
-    /// adapter resolves `VmSlot::Gvm` to `sv.gvm` (`Cgvm` is NULL under
-    /// DEDICATED and takes Raven's own NULL-vm fatal path, ruling 33b).
+    /// adapter resolves `VmSlot::Gvm` to `sv.gvm` (`Cgvm` and `Uivm` are NULL
+    /// under DEDICATED and take Raven's own NULL-vm fatal path, ruling 33b).
     /// Source: `oracle/codemp/qcommon/vm.cpp:787`
     fn vm_call(&mut self, vm: VmSlot, callnum: i32, args: &[isize]) -> isize {
         let f = self

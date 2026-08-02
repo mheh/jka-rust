@@ -66,3 +66,8 @@ const _: () = assert!(core::mem::offset_of!(console_t, finalFrac) == 65572);
 const _: () = assert!(core::mem::offset_of!(console_t, vislines) == 65576);
 const _: () = assert!(core::mem::offset_of!(console_t, times) == 65580);
 const _: () = assert!(core::mem::offset_of!(console_t, color) == 65596);
+
+// Every field is a C scalar or an array of scalars.
+// The all-zero image is therefore a valid inhabitant, and Raven's `con` global starts zeroed.
+// The 64 KB mass builds heap-first through `zeroed_box` (STATE-D9).
+unsafe impl native_platform::ZeroValid for console_t {}

@@ -60,3 +60,8 @@ const _: () = {
     assert!(core::mem::offset_of!(keyGlobals_t, keyDownCount) == 8860);
     assert!(core::mem::offset_of!(keyGlobals_t, keys) == 8864);
 };
+
+// Every field is a C scalar, an array, or a `#[repr(C)]` struct with a null-valid `binding` pointer.
+// The all-zero image is therefore a valid inhabitant, and Raven's `kg` global starts zeroed.
+// The 14 KB mass builds heap-first through `zeroed_box` (STATE-D9).
+unsafe impl native_platform::ZeroValid for keyGlobals_s {}

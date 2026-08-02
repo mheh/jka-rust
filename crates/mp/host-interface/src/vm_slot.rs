@@ -8,8 +8,12 @@
 /// transcribe 1:1 (`RoffSystem.cpp:837-841,952,983-985`) — a host impl answers
 /// for the NULL slot exactly as Raven would (ruling 33b).
 ///
+/// `Uivm` (ui) is NULL under DEDICATED for the same reason.
+/// A host impl answers for it exactly as it answers for `Cgvm`.
+///
 /// Source: `oracle/codemp/server/server.h:234` (`gvm`),
-/// `oracle/codemp/client/client.h:386` (`cgvm`)
+/// `oracle/codemp/client/client.h:386` (`cgvm`),
+/// `oracle/codemp/client/client.h:387` (`uivm`)
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VmSlot {
@@ -17,4 +21,6 @@ pub enum VmSlot {
     Gvm,
     /// Raven `cgvm` — the cgame virtual machine (NULL under DEDICATED).
     Cgvm,
+    /// Raven `uivm` - the ui virtual machine (NULL under DEDICATED).
+    Uivm,
 }

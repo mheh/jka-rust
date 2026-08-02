@@ -133,3 +133,8 @@ const _: () = assert!(core::mem::offset_of!(clientActive_t, entityBaselines) == 
 const _: () = assert!(core::mem::offset_of!(clientActive_t, parseEntities) == 674760);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(clientActive_t, mSharedMemory) == 1764296);
+
+// Every field is a C scalar, an array, a null-valid raw pointer, or a `#[repr(C)]` struct of those.
+// The all-zero image is therefore a valid inhabitant, and Raven's `cl` global starts zeroed.
+// The 1.7 MB mass builds heap-first through `zeroed_box` (STATE-D9).
+unsafe impl native_platform::ZeroValid for clientActive_t {}
