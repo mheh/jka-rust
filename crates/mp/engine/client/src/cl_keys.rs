@@ -34,8 +34,6 @@ use mp_qshared::shared::keycatch::{
 };
 use mp_qshared::shared::limits::{MAX_STRING_CHARS, MAX_TOKEN_CHARS};
 use mp_qshared::shared::{qboolean, qfalse, qtrue};
-use mp_ui::keycodes::fake_ascii_t::fakeAscii_t;
-use mp_ui::keycodes::K_CHAR_FLAG;
 use native_platform::sys_main::Sys_GetClipboardData;
 use native_string::ctype::tolower;
 use native_string::q_string::Q_strcat;
@@ -50,6 +48,7 @@ use crate::cl_scrn::{
     SCR_DrawBigString, SCR_DrawSmallChar, SCR_DrawSmallStringExt, SCR_UpdateScreen,
 };
 use crate::client_host::{cl_from_view, Client};
+use crate::keycodes::{fakeAscii_t, K_CHAR_FLAG};
 use crate::keys::key_globals_s::{COMMAND_HISTORY, MAX_KEYS};
 use crate::client_host::snd_from_view;
 use crate::snd_dma::S_StopAllSounds;

@@ -44,6 +44,7 @@ use crate::snd::music_state_e::MusicState_e;
 use crate::snd::sound_system::{
     SoundSystem, BGRNDTRACK_NUMBEROF, LOOP_HASH, MAX_CHANNELS, MAX_RAW_SAMPLES, MAX_SFX,
 };
+use crate::snd_device::SoundDevice;
 use crate::snd_mem::S_LoadSound;
 use crate::snd_mix::S_PaintChannels;
 
@@ -86,14 +87,20 @@ const FUZZY_AMOUNT: usize = 5 * 1024;
 // The device end (DEC-57.1)
 // ===========================================================================
 
-/// Raven `SNDDMA_Init` — pick the output format and allocate the ring.
+/// Raven `SNDDMA_Init` - pick the output format, allocate the ring, and open
+/// the output device.
 ///
 /// The port keeps the retail secondary-buffer shape and owns the ring outright.
-//TODO: Port SNDDMA_Init device open
-// Source: oracle/codemp/win32/win_snd.cpp:183. DEC-57.1 puts the real device
-// behind the cpal callback, which the platform shell (gh#22) seats.
-/// Source: `oracle/codemp/win32/win_snd.cpp:183-250`
-fn SNDDMA_Init(common: &Common, snd: &mut SoundSystem) -> bool {
+/// The device is cpal (DEC-57.1).
+///
+/// A client that asked for a device and got none returns `false`, Raven's own
+/// failure answer: `S_Init` then leaves `s_soundStarted` at 0 and the mixer
+/// never runs. Without that, `SNDDMA_GetDMAPos` would return a frozen cursor,
+/// `s_soundtime` would never advance, and channels would leak until the mixer
+/// wedged. A host that never asked for a device (the dedicated build, the parity
+/// rig) still gets `true` and drives `dma_pos` itself.
+/// Source: `oracle/codemp/win32/win_snd.cpp:105-257`
+fn SNDDMA_Init(common: &mut Common, snd: &mut SoundSystem) -> bool {
     snd.dma.channels = 2;
     snd.dma.samplebits = 16;
 
@@ -107,26 +114,63 @@ fn SNDDMA_Init(common: &Common, snd: &mut SoundSystem) -> bool {
     snd.dma.submission_chunk = 1;
     snd.dma.buffer = vec![0u8; DMA_BUFFER_BYTES];
     snd.dma_pos = 0;
-    true
+
+    snd.device = None;
+    if !snd.device_enabled {
+        return true;
+    }
+
+    match SoundDevice::open(snd.dma.speed, snd.dma.channels, DMA_BUFFER_BYTES) {
+        Ok(device) => {
+            com_printf(common, &format!("sound device: {}\n", device.description()));
+            snd.device = Some(device);
+            true
+        }
+        Err(reason) => {
+            com_printf(common, &format!("sound device unavailable: {reason}\n"));
+            snd.dma.buffer = Vec::new();
+            false
+        }
+    }
 }
 
-/// Raven `SNDDMA_Shutdown` — release the ring.
+/// Raven `SNDDMA_Shutdown` - release the ring and close the device.
 ///
-/// Source: `oracle/codemp/win32/win_snd.cpp:257-265`
+/// Source: `oracle/codemp/win32/win_snd.cpp:51-95`
 fn SNDDMA_Shutdown(snd: &mut SoundSystem) {
+    // Dropping the stream stops playback, the whole of Raven's teardown.
+    snd.device = None;
     snd.dma.buffer = Vec::new();
 }
 
 /// Raven `SNDDMA_GetDMAPos` — the device read cursor, masked to the ring.
 ///
-/// Source: `oracle/codemp/win32/win_snd.cpp:274-289`
-fn SNDDMA_GetDMAPos(snd: &SoundSystem) -> c_int {
+/// The device's callback advances the cursor in device blocks, so it steps
+/// rather than sliding. That is invisible against Raven's own `s_mixahead`
+/// window. With no device the cursor is whatever last wrote `dma_pos`, which is
+/// the headless rig driving the mix clock itself.
+/// Source: `oracle/codemp/win32/win_snd.cpp:267-286`
+fn SNDDMA_GetDMAPos(snd: &mut SoundSystem) -> c_int {
+    if let Some(device) = snd.device.as_ref() {
+        snd.dma_pos = device.play_cursor();
+    }
     snd.dma_pos & (snd.dma.samples - 1)
 }
 
-// Raven's `SNDDMA_BeginPainting` and `SNDDMA_Submit` lock and unlock the
-// DirectSound secondary buffer. The port owns the ring outright, so both calls
-// have no body and their call sites drop them (DEC-57.1).
+// Raven's `SNDDMA_BeginPainting` locks the DirectSound secondary buffer. The
+// port owns the ring outright, so it has no body and its call sites drop it.
+
+/// Raven `SNDDMA_Submit` - hand the painted ring to the device.
+///
+/// Raven only unlocked the buffer here, because DirectSound played the very
+/// memory the paint chain wrote. The engine owns its ring now, so this is where
+/// the device gets the bytes.
+/// Source: `oracle/codemp/win32/win_snd.cpp:350-355`
+fn SNDDMA_Submit(snd: &SoundSystem) {
+    if let Some(device) = snd.device.as_ref() {
+        device.publish(&snd.dma.buffer);
+    }
+}
 
 // ===========================================================================
 // Channels and the sfx cache
@@ -746,6 +790,7 @@ pub fn S_ClearSoundBuffer(snd: &mut SoundSystem) {
         let bytes = (snd.dma.samples * snd.dma.samplebits / 8) as usize;
         snd.dma.buffer[..bytes].fill(clear);
     }
+    SNDDMA_Submit(snd);
 }
 
 /// Raven `S_CIN_StopSound` — drop the cinematic sound off whichever channel holds it.
@@ -1495,6 +1540,8 @@ pub fn S_Update_(common: &mut Common, snd: &mut SoundSystem) {
     }
 
     S_PaintChannels(common, snd, endtime as c_int);
+
+    SNDDMA_Submit(snd);
 
     S_DoLipSynchs(common, snd, s_oldpaintedtime);
 }

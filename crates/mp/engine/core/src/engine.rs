@@ -121,6 +121,9 @@ impl Engine {
             // The empty ModuleRegistry (step-30 VM_Init's default-shaped build);
             // a zeroed Option<ModuleSlot> is NOT guaranteed None.
             addr_of_mut!((*p).common.modules).write(ModuleRegistry::default());
+            // Option<PlatformEventSource>: the pump seats it after boot, and a
+            // zeroed Option is not guaranteed None.
+            addr_of_mut!((*p).common.platform_events).write(None);
             // Option<Client>/Option<SoundSystem>/Option<RendererFrontend>: same
             // niche non-guarantee.
             addr_of_mut!((*p).cl).write(None);

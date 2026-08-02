@@ -22,6 +22,7 @@ use crate::snd::music_info_t::MusicInfo_t;
 use crate::snd::music_state_e::MusicState_e;
 use crate::snd::portable_samplepair_t::portable_samplepair_t;
 use crate::snd::sfx_s::sfx_t;
+use crate::snd_device::SoundDevice;
 
 /// Raven `MAX_CHANNELS` — mixer channels.
 ///
@@ -69,6 +70,13 @@ pub struct SoundSystem {
     /// (`dma.channels` per stereo frame). DEC-57.1 dissolves the five `SNDDMA_*`
     /// functions into the device end, so the device end writes this field.
     pub dma_pos: c_int,
+    /// The open cpal output stream, `None` until `SNDDMA_Init` opens one.
+    /// Raven's link-time device arm, made explicit.
+    pub device: Option<SoundDevice>,
+    /// Whether `SNDDMA_Init` may open a device at all. The platform shell sets
+    /// this at client boot (DEC-56); `jampded` and every headless rig leave it
+    /// false and keep the silent ring.
+    pub device_enabled: bool,
     /// Raven `s_soundStarted` — non-zero between `S_Init` and `S_Shutdown`.
     /// Source: `oracle/codemp/client/snd_dma.cpp:129`
     pub s_soundStarted: c_int,
@@ -187,6 +195,8 @@ impl Default for SoundSystem {
         SoundSystem {
             dma: dma_t::default(),
             dma_pos: 0,
+            device: None,
+            device_enabled: false,
             s_soundStarted: 0,
             s_soundMuted: false,
             s_shutUp: false,

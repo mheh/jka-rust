@@ -200,7 +200,14 @@ facade: it depends on the other `mp/engine/*` subcrates, defines the aggregate
 `com_error`'s recovery; `com_error` itself is defined one tier lower in
 `mp/engine/qcommon` — state-ownership.md STATE-D7).
 `mp/app` is a thin bin shell depending only on `mp/engine/core` and hosts the
-module cdylib shells. SP mirrors the same edges via `sp/engine/core` (package
+module cdylib shells; it is the `jampded` dedicated server.
+`mp/client-app` (package `mp_client_app`) is its client twin, the `jamp`
+platform shell (DEC-56): the main thread runs the winit event loop, the sim
+thread runs the com loop, and the render thread owns the wgpu device it takes
+from `mp/renderer-gpu`. It is the only crate that turns on `mp_engine_client`'s
+`sound_device` feature, so the cpal edge never reaches the `-p mp_app`
+dedicated-server or ILP32 lanes.
+SP mirrors the same edges via `sp/engine/core` (package
 `sp_engine_core`); SP `game` uses the `GetGameAPI` table half of
 `abi-transport` instead of `dllEntry`/`vmMain`.
 
