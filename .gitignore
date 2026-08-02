@@ -5,3 +5,6 @@ __pycache__/
 tools/closure-prototype/out/
 crates/mp/renderer-gpu/tests/goldens/*.actual.png
 crates/mp/renderer-gpu/tests/goldens/*.actual.bin
+
+# The graphify knowledge graph is a generated, machine-local artifact.
+/graphify-out/
