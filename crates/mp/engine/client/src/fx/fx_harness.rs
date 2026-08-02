@@ -15,9 +15,14 @@ use std::collections::VecDeque;
 use mp_qshared::common::mp::cgame::mini_ref_entity_s::miniRefEntity_t;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::trace_t::trace_t;
-use mp_qshared::shared::cplane_t;
+use mp_qshared::shared::{cplane_t, ENTITYNUM_NONE};
 use native_math::rng::QRand;
 use native_math::vector::vec3_t;
+
+/// One scripted `G2API_GetBoltMatrix` reply: whether the bolt exists, its origin, its axis.
+///
+/// Source: `tools/fx-oracle/host.cpp:453-457`
+pub type FxBoltReply = (bool, vec3_t, [vec3_t; 3]);
 
 /// An all-zero `trace_t`, which `trace_t` itself cannot derive.
 pub fn fx_zero_trace() -> trace_t {
@@ -66,10 +71,10 @@ pub struct FxHarness {
     pub traces: VecDeque<trace_t>,
     /// Scripted `CG_POINT_CONTENTS` replies. The last entry repeats.
     pub point_contents: VecDeque<i32>,
-    /// Scripted `GetOriginAxisFromBolt` reply: exists, origin, axis.
-    pub bolt: (bool, vec3_t, [vec3_t; 3]),
-    /// Scripted `CG_GET_LERP_ORIGIN` reply.
-    pub lerp_origin: vec3_t,
+    /// Scripted `GetOriginAxisFromBolt` replies. The last entry repeats.
+    pub bolts: VecDeque<FxBoltReply>,
+    /// Scripted `CG_GET_LERP_ORIGIN` replies. The last entry repeats.
+    pub lerp_origins: VecDeque<vec3_t>,
 
     /// Registered shader names, in first-registration order. The handle is the index plus one.
     pub shaders: Vec<String>,
@@ -93,8 +98,8 @@ impl Default for FxHarness {
             out: Vec::new(),
             traces: VecDeque::new(),
             point_contents: VecDeque::new(),
-            bolt: (false, [0.0; 3], [[0.0; 3]; 3]),
-            lerp_origin: [0.0; 3],
+            bolts: VecDeque::new(),
+            lerp_origins: VecDeque::new(),
             shaders: Vec::new(),
             models: Vec::new(),
             sounds: Vec::new(),
@@ -128,21 +133,62 @@ impl FxHarness {
     }
 
     /// Pop the next scripted trace reply. The last entry repeats once the queue drains.
-    pub fn next_trace(&mut self) -> trace_t {
-        if self.traces.len() > 1 {
-            self.traces.pop_front().unwrap_or_else(fx_zero_trace)
+    ///
+    /// An empty queue answers with the miss reply: the trace ran clean to `end`.
+    ///
+    /// Source: `tools/fx-oracle/host.cpp:554-562`
+    pub fn next_trace(&mut self, end: vec3_t) -> trace_t {
+        let reply = if self.traces.len() > 1 {
+            self.traces.pop_front()
         } else {
-            self.traces.front().copied().unwrap_or_else(fx_zero_trace)
+            self.traces.front().copied()
+        };
+        match reply {
+            Some(tr) => tr,
+            None => {
+                let mut tr = fx_zero_trace();
+                tr.fraction = 1.0;
+                tr.endpos = end;
+                tr.plane.normal = [0.0, 0.0, 1.0];
+                tr.entityNum = ENTITYNUM_NONE as _;
+                tr
+            }
         }
     }
 
-    /// Pop the next scripted point-contents reply. The last entry repeats.
+    /// Pop the next scripted point-contents reply. The last entry repeats, and a miss answers `0`.
+    ///
+    /// Source: `tools/fx-oracle/host.cpp:573-584`
     pub fn next_point_contents(&mut self) -> i32 {
         if self.point_contents.len() > 1 {
             self.point_contents.pop_front().unwrap_or(0)
         } else {
             self.point_contents.front().copied().unwrap_or(0)
         }
+    }
+
+    /// Pop the next scripted bolt reply. A miss means the bolt does not exist.
+    ///
+    /// Source: `tools/fx-oracle/host.cpp:672-703`
+    pub fn next_bolt(&mut self) -> FxBoltReply {
+        let reply = if self.bolts.len() > 1 {
+            self.bolts.pop_front()
+        } else {
+            self.bolts.front().copied()
+        };
+        reply.unwrap_or((false, [0.0; 3], [[0.0; 3]; 3]))
+    }
+
+    /// Pop the next scripted lerp-origin reply. A miss answers the origin.
+    ///
+    /// Source: `tools/fx-oracle/host.cpp:586-599`
+    pub fn next_lerp_origin(&mut self) -> vec3_t {
+        let reply = if self.lerp_origins.len() > 1 {
+            self.lerp_origins.pop_front()
+        } else {
+            self.lerp_origins.front().copied()
+        };
+        reply.unwrap_or([0.0; 3])
     }
 
     /// Format one `miniRefEntity_t` the way the C++ dumper prints `REFENT`/`MINIREFENT`.

@@ -339,6 +339,8 @@ impl RealWorld {
             re: opaque_slots::Renderer::from_raw(core::ptr::null_mut()),
             rmg: opaque_slots::RmManager::from_raw(&mut engine.rmg as *mut _ as *mut ()),
             g2: opaque_slots::Ghoul2System::from_raw(&mut engine.g2 as *mut _ as *mut ()),
+            // The game module never reaches the client FX system.
+            fx: opaque_slots::FxSystem::from_raw(core::ptr::null_mut()),
             common: &mut engine.common,
             cm: &mut engine.cm,
         };

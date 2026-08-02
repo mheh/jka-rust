@@ -1105,12 +1105,8 @@ impl CPrimitiveTemplate {
     /// An unknown key just prints and moves on. This always returns `true`,
     /// matching Raven.
     ///
-    /// The mandated signature (see module header) carries no `FxHost`, so the
-    /// unknown-key print Raven makes here has no receiver and is dropped
-    /// (porting-rules §19: the one defined behavior under this constraint).
-    ///
     /// Source: `oracle/codemp/client/FxTemplate.cpp:1929-1970`
-    pub fn ParseRGB(&mut self, grp: &GpGroup<'_>) -> bool {
+    pub fn ParseRGB(&mut self, host: &mut FxHost<'_, '_>, grp: &GpGroup<'_>) -> bool {
         for pair in grp.pairs() {
             let key = pair.name();
             let val = pair.top_value().unwrap_or("");
@@ -1123,6 +1119,8 @@ impl CPrimitiveTemplate {
                 self.ParseRGBParm(val);
             } else if key.eq_ignore_ascii_case("flags") || key.eq_ignore_ascii_case("flag") {
                 self.ParseRGBFlags(val);
+            } else {
+                host.Print(&format!("Unknown key parsing an RGB group: {key}\n"));
             }
         }
 
@@ -1134,12 +1132,8 @@ impl CPrimitiveTemplate {
     /// An unknown key just prints and moves on. This always returns `true`,
     /// matching Raven.
     ///
-    /// The mandated signature (see module header) carries no `FxHost`, so the
-    /// unknown-key print Raven makes here has no receiver and is dropped
-    /// (porting-rules §19: the one defined behavior under this constraint).
-    ///
     /// Source: `oracle/codemp/client/FxTemplate.cpp:1983-2024`
-    pub fn ParseAlpha(&mut self, grp: &GpGroup<'_>) -> bool {
+    pub fn ParseAlpha(&mut self, host: &mut FxHost<'_, '_>, grp: &GpGroup<'_>) -> bool {
         for pair in grp.pairs() {
             let key = pair.name();
             let val = pair.top_value().unwrap_or("");
@@ -1152,6 +1146,8 @@ impl CPrimitiveTemplate {
                 self.ParseAlphaParm(val);
             } else if key.eq_ignore_ascii_case("flags") || key.eq_ignore_ascii_case("flag") {
                 self.ParseAlphaFlags(val);
+            } else {
+                host.Print(&format!("Unknown key parsing an Alpha group: {key}\n"));
             }
         }
 
@@ -1163,12 +1159,8 @@ impl CPrimitiveTemplate {
     /// An unknown key just prints and moves on. This always returns `true`,
     /// matching Raven.
     ///
-    /// The mandated signature (see module header) carries no `FxHost`, so the
-    /// unknown-key print Raven makes here has no receiver and is dropped
-    /// (porting-rules §19: the one defined behavior under this constraint).
-    ///
     /// Source: `oracle/codemp/client/FxTemplate.cpp:2037-2078`
-    pub fn ParseSize(&mut self, grp: &GpGroup<'_>) -> bool {
+    pub fn ParseSize(&mut self, host: &mut FxHost<'_, '_>, grp: &GpGroup<'_>) -> bool {
         for pair in grp.pairs() {
             let key = pair.name();
             let val = pair.top_value().unwrap_or("");
@@ -1181,6 +1173,8 @@ impl CPrimitiveTemplate {
                 self.ParseSizeParm(val);
             } else if key.eq_ignore_ascii_case("flags") || key.eq_ignore_ascii_case("flag") {
                 self.ParseSizeFlags(val);
+            } else {
+                host.Print(&format!("Unknown key parsing a Size group: {key}\n"));
             }
         }
 
@@ -1192,12 +1186,8 @@ impl CPrimitiveTemplate {
     /// An unknown key just prints and moves on. This always returns `true`,
     /// matching Raven.
     ///
-    /// The mandated signature (see module header) carries no `FxHost`, so the
-    /// unknown-key print Raven makes here has no receiver and is dropped
-    /// (porting-rules §19: the one defined behavior under this constraint).
-    ///
     /// Source: `oracle/codemp/client/FxTemplate.cpp:2091-2132`
-    pub fn ParseSize2(&mut self, grp: &GpGroup<'_>) -> bool {
+    pub fn ParseSize2(&mut self, host: &mut FxHost<'_, '_>, grp: &GpGroup<'_>) -> bool {
         for pair in grp.pairs() {
             let key = pair.name();
             let val = pair.top_value().unwrap_or("");
@@ -1210,6 +1200,8 @@ impl CPrimitiveTemplate {
                 self.ParseSize2Parm(val);
             } else if key.eq_ignore_ascii_case("flags") || key.eq_ignore_ascii_case("flag") {
                 self.ParseSize2Flags(val);
+            } else {
+                host.Print(&format!("Unknown key parsing a Size2 group: {key}\n"));
             }
         }
 
@@ -1221,12 +1213,8 @@ impl CPrimitiveTemplate {
     /// An unknown key just prints and moves on. This always returns `true`,
     /// matching Raven.
     ///
-    /// The mandated signature (see module header) carries no `FxHost`, so the
-    /// unknown-key print Raven makes here has no receiver and is dropped
-    /// (porting-rules §19: the one defined behavior under this constraint).
-    ///
     /// Source: `oracle/codemp/client/FxTemplate.cpp:2145-2186`
-    pub fn ParseLength(&mut self, grp: &GpGroup<'_>) -> bool {
+    pub fn ParseLength(&mut self, host: &mut FxHost<'_, '_>, grp: &GpGroup<'_>) -> bool {
         for pair in grp.pairs() {
             let key = pair.name();
             let val = pair.top_value().unwrap_or("");
@@ -1239,6 +1227,8 @@ impl CPrimitiveTemplate {
                 self.ParseLengthParm(val);
             } else if key.eq_ignore_ascii_case("flags") || key.eq_ignore_ascii_case("flag") {
                 self.ParseLengthFlags(val);
+            } else {
+                host.Print(&format!("Unknown key parsing a Length group: {key}\n"));
             }
         }
 
@@ -1343,15 +1333,15 @@ impl CPrimitiveTemplate {
             let key = sub_grp.name();
 
             if key.eq_ignore_ascii_case("rgb") {
-                self.ParseRGB(&sub_grp);
+                self.ParseRGB(host, &sub_grp);
             } else if key.eq_ignore_ascii_case("alpha") {
-                self.ParseAlpha(&sub_grp);
+                self.ParseAlpha(host, &sub_grp);
             } else if key.eq_ignore_ascii_case("size") || key.eq_ignore_ascii_case("width") {
-                self.ParseSize(&sub_grp);
+                self.ParseSize(host, &sub_grp);
             } else if key.eq_ignore_ascii_case("size2") || key.eq_ignore_ascii_case("width2") {
-                self.ParseSize2(&sub_grp);
+                self.ParseSize2(host, &sub_grp);
             } else if key.eq_ignore_ascii_case("length") || key.eq_ignore_ascii_case("height") {
-                self.ParseLength(&sub_grp);
+                self.ParseLength(host, &sub_grp);
             } else {
                 host.Print(&format!("Unknown group key parsing a particle: {key}\n"));
             }

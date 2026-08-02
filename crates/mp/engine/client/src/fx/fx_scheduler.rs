@@ -339,6 +339,8 @@ pub fn fx_parse_effect(
 pub fn fx_register_effect(fx: &mut FxSystem, host: &mut FxHost<'_, '_>, file: &str) -> i32 {
     let sfile = COM_StripExtension(file).to_ascii_lowercase();
 
+    host.Print(&format!("Registering effect : {sfile}\n"));
+
     // see if the specified file is already registered. If it is, just return the id of that file
     if let Some(id) = fx.scheduler.mEffectIDs.get(&sfile) {
         return *id;
@@ -571,6 +573,14 @@ pub fn fx_add_looped_effects(fx: &mut FxSystem, host: &mut FxHost<'_, '_>) {
             let point = host.GetLerpOrigin(ent_num);
 
             // very important to send FALSE to not recursively add me!
+            //
+            // Raven hands nine arguments to an eleven-parameter signature whose
+            // sixth is `fxParm`, so every later argument lands one place early:
+            // the portal flag reaches `vol`, `false` reaches `rad`, and the
+            // relative flag reaches `isPortal`. Every reschedule from a relative
+            // loop therefore belongs to the portal pass, and only a portal pass
+            // drains it.
+            // Source: `oracle/codemp/client/FxScheduler.cpp:135`
             fx_play_effect_axis(
                 fx,
                 host,
@@ -580,11 +590,11 @@ pub fn fx_add_looped_effects(fx: &mut FxSystem, host: &mut FxHost<'_, '_>) {
                 e.mBoltInfo,
                 e.mGhoul2,
                 -1,
-                -1,
-                -1,
-                e.mPortalEffect,
+                e.mPortalEffect as i32,
                 0,
                 e.mIsRelative,
+                0,
+                false,
             );
             let repeat = fx.scheduler.mEffectTemplates[e.mId as usize].mRepeatDelay;
             fx.scheduler.mLoopedEffectArray[i].mNextTime = fx.clock.mTime + repeat;
@@ -797,12 +807,9 @@ pub fn fx_play_effect_axis(
         }
     }
 
-    if fx.fx_debug == 2 {
-        let name = fx.scheduler.mEffectTemplates[id as usize]
-            .mEffectName
-            .clone();
-        host.Printf(&format!("> {name}\n"));
-    }
+    // The `fx_debug 2` effect-name print sits under `#ifndef FINAL_BUILD`, so
+    // the retail build the FX goldens pin compiles it out.
+    // Source: `oracle/codemp/client/FxScheduler.cpp:851-856`
 
     let prim_count = fx.scheduler.mEffectTemplates[id as usize].mPrimitiveCount as usize;
 
@@ -1192,11 +1199,20 @@ pub fn fx_create_effect(
         ];
     } else {
         // time for some extra work
-        org = vector_scale(&ax[0], t.mOrigin1X.GetVal(host.rng()));
-        let y = t.mOrigin1Y.GetVal(host.rng());
-        vector_ma_in_place(&mut org, y, &ax[1]);
-        let z = t.mOrigin1Z.GetVal(host.rng());
-        vector_ma_in_place(&mut org, z, &ax[2]);
+        //
+        // `VectorScale` and `VectorMA` are macros, so each `GetVal` below runs
+        // once per component. A ranged origin draws three times per axis.
+        // Source: `oracle/codemp/game/q_shared.h:1361,1365`
+        org = [0.0; 3];
+        for i in 0..3 {
+            org[i] = ax[0][i] * t.mOrigin1X.GetVal(host.rng());
+        }
+        for i in 0..3 {
+            org[i] += ax[1][i] * t.mOrigin1Y.GetVal(host.rng());
+        }
+        for i in 0..3 {
+            org[i] += ax[2][i] * t.mOrigin1Z.GetVal(host.rng());
+        }
     }
 
     // We always add our calculated offset to the passed in origin, unless relative!
@@ -1233,9 +1249,19 @@ pub fn fx_create_effect(
     } else if t.mSpawnFlags & FX_ORG_ON_CYLINDER != 0 {
         // set up our point, then rotate around the current direction to.
         // Make unrotated cylinder centered around 0,0,0
-        let mut pt = vector_scale(&ax[1], t.mRadius.GetVal(host.rng()));
-        let scale = host.rng().flrand(-1.0, 1.0) * 0.5 * t.mHeight.GetVal(host.rng());
-        vector_ma_in_place(&mut pt, scale, &ax[0]);
+        //
+        // Raven's `VectorScale` and `VectorMA` are macros that expand their
+        // scale argument once per component, so each draw below happens three
+        // times. Hoisting either one changes the generator stream.
+        // Source: `oracle/codemp/game/q_shared.h:1361,1365`
+        let mut pt: vec3_t = [0.0; 3];
+        for i in 0..3 {
+            pt[i] = ax[1][i] * t.mRadius.GetVal(host.rng());
+        }
+        for i in 0..3 {
+            let scale = host.rng().flrand(-1.0, 1.0) * 0.5 * t.mHeight.GetVal(host.rng());
+            pt[i] += ax[0][i] * scale;
+        }
         let degrees = host.rng().flrand(0.0, 360.0);
         let mut temp = [0.0f32; 3];
         RotatePointAroundVector(&mut temp, ax[0], pt, degrees);
@@ -1287,12 +1313,19 @@ pub fn fx_create_effect(
                 t.mVelZ.GetVal(host.rng()),
             ];
         } else {
-            // bah, do some extra work to coerce it
-            vel = vector_scale(&ax[0], t.mVelX.GetVal(host.rng()));
-            let y = t.mVelY.GetVal(host.rng());
-            vector_ma_in_place(&mut vel, y, &ax[1]);
-            let z = t.mVelZ.GetVal(host.rng());
-            vector_ma_in_place(&mut vel, z, &ax[2]);
+            // bah, do some extra work to coerce it. The two macros expand their
+            // scale argument once per component, so a ranged velocity draws
+            // three times per axis.
+            // Source: `oracle/codemp/game/q_shared.h:1361,1365`
+            for i in 0..3 {
+                vel[i] = ax[0][i] * t.mVelX.GetVal(host.rng());
+            }
+            for i in 0..3 {
+                vel[i] += ax[1][i] * t.mVelY.GetVal(host.rng());
+            }
+            for i in 0..3 {
+                vel[i] += ax[2][i] * t.mVelZ.GetVal(host.rng());
+            }
         }
 
         // Raven's wind query is commented out in the oracle, so `FX_AFFECTED_BY_WIND`
@@ -1305,11 +1338,17 @@ pub fn fx_create_effect(
                 t.mAccelZ.GetVal(host.rng()),
             ];
         } else {
-            accel = vector_scale(&ax[0], t.mAccelX.GetVal(host.rng()));
-            let y = t.mAccelY.GetVal(host.rng());
-            vector_ma_in_place(&mut accel, y, &ax[1]);
-            let z = t.mAccelZ.GetVal(host.rng());
-            vector_ma_in_place(&mut accel, z, &ax[2]);
+            // The same macro expansion applies here.
+            // Source: `oracle/codemp/game/q_shared.h:1361,1365`
+            for i in 0..3 {
+                accel[i] = ax[0][i] * t.mAccelX.GetVal(host.rng());
+            }
+            for i in 0..3 {
+                accel[i] += ax[1][i] * t.mAccelY.GetVal(host.rng());
+            }
+            for i in 0..3 {
+                accel[i] += ax[2][i] * t.mAccelZ.GetVal(host.rng());
+            }
         }
 
         // Gravity is completely decoupled from acceleration since it is __always__
@@ -1967,5 +2006,7 @@ pub fn fx_create_effect(
 
 /// Raven's `DEG2RAD` macro.
 fn deg2rad(degrees: f32) -> f32 {
-    degrees * (core::f32::consts::PI / 180.0)
+    // Raven's `M_PI` is a double, so the multiply and the divide both happen at
+    // double width and round to float once, at the store.
+    ((degrees as f64 * core::f64::consts::PI) / 180.0) as f32
 }

@@ -249,11 +249,11 @@ impl FxHost<'_, '_> {
     pub fn PlaySound(
         &mut self,
         origin: &mut vec3_t,
-        entity_num: c_int,
-        entchannel: c_int,
+        _entity_num: c_int,
+        _entchannel: c_int,
         sfx_handle: c_int,
-        volume: c_int,
-        radius: c_int,
+        _volume: c_int,
+        _radius: c_int,
     ) {
         match self {
             FxHost::Engine { cl, .. } => S_StartSound(
@@ -263,14 +263,16 @@ impl FxHost<'_, '_> {
                 CHAN_AUTO,
                 sfx_handle,
             ),
+            // The four dropped arguments reach the record as the values Raven's
+            // call actually carries: the rig declares `S_StartSound` with the
+            // volume and radius defaulted to -1, so the loss stays visible.
+            // Source: `tools/fx-oracle/host.cpp:317-326`
             FxHost::Harness(h) => h.emit(format!(
-                "SOUND origin {} entnum {} entchannel {} sfx {} volume {} radius {}",
+                "SOUND origin {} entnum {} entchannel {} sfx {} volume -1 radius -1",
                 fx_v3(origin),
-                entity_num,
-                entchannel,
+                ENTITYNUM_NONE,
+                CHAN_AUTO,
                 sfx_handle,
-                volume,
-                radius
             )),
         }
     }
@@ -558,7 +560,7 @@ impl FxHost<'_, '_> {
                     ghoul2 as i32
                 );
                 h.emit(record);
-                h.next_trace()
+                h.next_trace(end)
             }
         }
     }
@@ -617,7 +619,7 @@ impl FxHost<'_, '_> {
                 data.mPoint
             }
             FxHost::Harness(h) => {
-                let point = h.lerp_origin;
+                let point = h.next_lerp_origin();
                 h.emit(format!(
                     "LERPORIGIN ent {} -> {}",
                     entity_num,
@@ -638,7 +640,10 @@ impl FxHost<'_, '_> {
                 let g2 = unsafe { g2_from_view(view) };
                 g2.info_array.is_valid(ghoul2)
             }
-            FxHost::Harness(h) => h.bolt.0,
+            // The rig's `CGhoul2Info_v` stub answers from the handle alone, and
+            // never from the scripted bolt queue.
+            // Source: `tools/fx-oracle/stubs/G2_local.h:30`
+            FxHost::Harness(_) => ghoul2 != 0,
         }
     }
 
@@ -699,7 +704,7 @@ impl FxHost<'_, '_> {
                 Some(bolt_matrix_to_origin_axis(&bolt_matrix))
             }
             FxHost::Harness(h) => {
-                let (exists, origin, axis) = h.bolt;
+                let (exists, origin, axis) = h.next_bolt();
                 h.emit(format!(
                     "BOLT ent {} model {} bolt {} -> {}",
                     ent_num, model_num, bolt_num, exists as i32
