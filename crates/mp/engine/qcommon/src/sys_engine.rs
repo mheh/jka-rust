@@ -22,6 +22,7 @@ use mp_qshared::shared::qfalse;
 use native_types::fileHandle_t;
 
 use crate::common::engine_host_view::EngineHostView;
+use crate::common::platform_events::PlatformEvent;
 use crate::common::{com_error, com_printf, Common, MASK_QUED_EVENTS, MAX_QUED_EVENTS};
 use crate::cvar_fns::{Cvar_Set, Cvar_VariableString};
 use crate::files_common::{FS_BuildOSPath4, FS_Read};
@@ -247,8 +248,89 @@ pub unsafe fn Sys_QueEvent(
 /// `Sys_ConsoleInput` (queued as `SE_CONSOLE`) and `Sys_GetPacket` (queued as
 /// `SE_PACKET`), returning the next queued event or an empty timestamped one.
 ///
-/// `Sys_SendKeyEvents`/`IN_Frame` are X11 window/input pumps with no window in
-/// the headless module host, so they queue nothing and are elided.
+/// Raven `Sys_SendKeyEvents` — the window-message pump slot.
+///
+/// Raven dispatched `WM_KEYDOWN`/`WM_KEYUP`/`WM_CHAR` here and let the window
+/// procedure call `Sys_QueEvent` on the same thread. The pump now runs on the
+/// main thread, so this slot moves the queued events across the bus into the
+/// ring. Raven stamped these with the window-message time; a winit event has no
+/// message clock, so the port passes 0 and `Sys_QueEvent` stamps at queue time,
+/// the same contract the console and packet paths already use.
+///
+/// Source: `oracle/codemp/unix/unix_main.c:1007-1009`,
+/// `oracle/codemp/win32/win_main.cpp:1224-1235`,
+/// `oracle/codemp/win32/win_wndproc.cpp:509,518,525`
+fn Sys_SendKeyEvents(common: &mut Common) {
+    let (overflowed, pending): (bool, Vec<PlatformEvent>) = match common.platform_events.as_ref() {
+        Some(source) => {
+            let overflowed = source.take_overflow();
+            let mut pending = Vec::new();
+            while let Some(event) = source.next_event() {
+                pending.push(event);
+            }
+            (overflowed, pending)
+        }
+        None => return,
+    };
+
+    if overflowed {
+        com_printf(common, "Sys_SendKeyEvents: platform event overflow\n");
+    }
+
+    for event in pending {
+        // SAFETY: a window event carries no payload, so the ring owns nothing
+        // to free and the NULL pointer matches Raven's own call.
+        unsafe {
+            Sys_QueEvent(
+                common,
+                0,
+                event.evType,
+                event.evValue,
+                event.evValue2,
+                0,
+                core::ptr::null_mut(),
+            );
+        }
+    }
+}
+
+/// Raven `IN_Frame` — the input-device poll slot, reduced to the mouse.
+///
+/// Raven summed the frame's mouse motion and queued one `SE_MOUSE`, returning
+/// early on a zero delta. The pump accumulates and this slot queues the sum.
+/// The joystick backend is dropped (DEC-56.5), so nothing polls an axis.
+///
+/// Source: `oracle/codemp/unix/unix_main.c:1027-1028`,
+/// `oracle/codemp/win32/win_input.cpp:604-618`
+fn IN_Frame(common: &mut Common) {
+    let (dx, dy) = match common.platform_events.as_ref() {
+        Some(source) => source.take_mouse_delta(),
+        None => return,
+    };
+
+    if dx == 0 && dy == 0 {
+        return;
+    }
+
+    // SAFETY: `SE_MOUSE` carries no payload, matching Raven's NULL argument.
+    unsafe {
+        Sys_QueEvent(
+            common,
+            0,
+            sysEventType_t::SE_MOUSE,
+            dx,
+            dy,
+            0,
+            core::ptr::null_mut(),
+        );
+    }
+}
+
+/// `Sys_SendKeyEvents` and `IN_Frame` are the window and input pumps. The
+/// platform shell runs the window on the main thread (DEC-56.2), so both slots
+/// drain the `PlatformEventSource` bus instead of touching a window here. A
+/// host with no window (the dedicated build, every test rig) leaves the bus
+/// `None` and both slots queue nothing, exactly as before.
 ///
 /// Source: `oracle/codemp/unix/unix_main.c:995-1051`
 pub fn Sys_GetEvent(view: &mut EngineHostView) -> sysEvent_t {
@@ -258,6 +340,9 @@ pub fn Sys_GetEvent(view: &mut EngineHostView) -> sysEvent_t {
         return view.common.sys_events.que
             [((view.common.sys_events.tail - 1) as usize) & MASK_QUED_EVENTS];
     }
+
+    // pump the message loop
+    Sys_SendKeyEvents(view.common);
 
     // check for console commands
     if let Some(s) = native_platform::net::sys_console_input() {
@@ -279,6 +364,9 @@ pub fn Sys_GetEvent(view: &mut EngineHostView) -> sysEvent_t {
             );
         }
     }
+
+    // check for other input devices
+    IN_Frame(view.common);
 
     // check for network packets
     let mut netmsg: msg_t = unsafe { core::mem::zeroed() };

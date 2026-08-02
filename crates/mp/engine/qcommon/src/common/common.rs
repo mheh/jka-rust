@@ -23,6 +23,7 @@ use crate::z_memman::zone_header_s::zoneHeader_t;
 
 use super::error::ErrorState;
 use super::journal::Journal;
+use super::platform_events::PlatformEventSource;
 use super::qrand::QRand;
 use super::sys_event_queue::SysEventQueue;
 use crate::cmd::cmd_consts::MAX_CMD_BUFFER;
@@ -122,6 +123,10 @@ pub struct Common {
     pub journal: Journal,
     /// `eventQue[256]` (`Sys_QueEvent` ring; distinct from `com_pushedEvents`).
     pub sys_events: SysEventQueue,
+    /// The window pump's half of the event crossing (DEC-56.3), `None` on a
+    /// dedicated build and on any host with no window. `Sys_GetEvent` drains it
+    /// into the ring above at the two slots Raven pumped the window.
+    pub platform_events: Option<PlatformEventSource>,
     /// Raven `sys_packetReceived[MAX_MSGLEN]` (unix) — the fixed receive buffer
     /// `Sys_GetEvent` wires into a `msg_t` before `Sys_GetPacket`.
     /// Source: `oracle/codemp/unix/unix_main.c:949`
