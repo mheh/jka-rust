@@ -120,6 +120,13 @@ impl Gpu {
     /// The offscreen texture is `RENDER_ATTACHMENT | COPY_SRC` so a render pass
     /// draws into it and [`read_target_rgba`] copies it out.
     pub fn new_headless(width: u32, height: u32) -> Gpu {
+        Gpu::try_new_headless(width, height).expect("request_adapter: no compatible GPU adapter")
+    }
+
+    /// [`Gpu::new_headless`], but returns `None` where the platform offers no
+    /// adapter at all. The image-golden gate calls this so a machine with no
+    /// GPU skips its scenes instead of failing them.
+    pub fn try_new_headless(width: u32, height: u32) -> Option<Gpu> {
         let width = width.max(1);
         let height = height.max(1);
 
@@ -129,13 +136,13 @@ impl Gpu {
             compatible_surface: None,
             ..Default::default()
         }))
-        .expect("request_adapter: no compatible GPU adapter found");
+        .ok()?;
 
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
             label: Some("mp_renderer_gpu headless device"),
             ..Default::default()
         }))
-        .expect("request_device: adapter refused the device request");
+        .ok()?;
 
         // The config stands in for a windowed surface's configuration. Only the
         // format and size are read (through `surface_format`/`surface_size`), so
@@ -153,12 +160,12 @@ impl Gpu {
         };
         let texture = create_offscreen_texture(&device, &config);
 
-        Gpu {
+        Some(Gpu {
             target: RenderTarget::Headless(texture),
             device,
             queue,
             config,
-        }
+        })
     }
 
     /// The device every render-thread resource is created against.

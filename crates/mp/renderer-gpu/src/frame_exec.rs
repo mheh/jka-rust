@@ -68,6 +68,7 @@ use mp_renderer::tr_main::{
 };
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_noise::NoiseState;
+use mp_renderer::tr_public::ref_flags::RDF_NOWORLDMODEL;
 use mp_renderer::tr_sky::SkyState;
 use wgpu::TextureView;
 
@@ -120,6 +121,9 @@ pub struct FrameStats {
     /// Ref-entities the last `RenderScene` rebuilt into `tr.refdef.entities`
     /// from the accumulated `AddRefEntityToScene` payloads.
     pub entities: u32,
+    /// Dynamic lights the last `RenderScene` rebuilt into `tr.refdef.dlights`.
+    /// Stays at zero when the scene disabled dynamic light.
+    pub dlights: u32,
     /// The last `RenderScene` event's world pass result. Stays at its default
     /// when no world context was supplied or no world was drawn.
     pub world: WorldStats,
@@ -198,8 +202,10 @@ impl Warned {
 /// `R_RenderView` and draw. The harness split-borrows its host and engine into
 /// this bundle each frame, the same borrows `load_world_and_render` builds.
 ///
-/// The scratch buffers are empty this wave. Polys and lights are later waves,
-/// so `dlights` stays empty and the terrain surface is the null-landscape one.
+/// The terrain surface is the null-landscape one. The dlight list is not passed
+/// in either: the executor accumulates `AddLightToScene` payloads itself and
+/// rebuilds `tr.refdef.dlights` from them at `RenderScene`, the same window rule
+/// the entity list follows.
 /// The fog list is not passed in: [`FrameExecutor::render_world`] copies the
 /// loaded world's own `Fog` volumes into a per-frame `Vec<fog_t>`, since the
 /// `assets` borrow cannot also lend the fog list out. The entity list is not
@@ -223,7 +229,6 @@ pub struct WorldFrame<'a, 'e> {
     pub models: &'a RenderModels,
     pub land_scape: &'a srfTerrain_t,
     pub land: &'a CmLandScape,
-    pub dlights: &'a mut [dlight_t],
     pub scratch: &'a mut TrMainScratch,
 }
 
@@ -236,6 +241,10 @@ pub struct FrameExecutor {
     /// The uploaded world mesh, `None` until [`FrameExecutor::set_world`] runs
     /// after a map load.
     world_geometry: Option<WorldGeometry>,
+    /// The stand-in a `RDF_NOWORLDMODEL` scene binds when no map is loaded. Its
+    /// buffers are never read: every surface such a scene draws is entity-side
+    /// and builds its own per-frame vertices.
+    empty_geometry: WorldGeometry,
     batch: QuadBatch,
     /// The frame's accumulated ref-entities, in trap-call order, the render
     /// -side stand-in for `backEndData->entities`. `AddRefEntityToScene`
@@ -251,6 +260,18 @@ pub struct FrameExecutor {
     ///
     /// Source: `oracle/codemp/renderer/tr_scene.cpp:56,76,859`
     first_scene_entity: usize,
+    /// The frame's accumulated dynamic lights, in trap-call order, the
+    /// render-side stand-in for `backEndData->dlights`. The trap caps the count
+    /// at `MAX_DLIGHTS`, so this list never overflows the oracle bound.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_scene.cpp:326-345`
+    scene_dlights: Vec<SceneDlight>,
+    /// The start of the current scene's window into `scene_dlights`, the
+    /// render-side `r_numdlights` base. It moves the same way
+    /// `first_scene_entity` does.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_scene.cpp:57,77,860`
+    first_scene_dlight: usize,
     warned: [bool; Warned::COUNT],
     stage_warnings: Stage2dWarnings,
 }
@@ -264,9 +285,12 @@ impl FrameExecutor {
             pipeline: Pipeline2d::new(gpu, images),
             pipeline3d: Pipeline3d::new(gpu),
             world_geometry: None,
+            empty_geometry: WorldGeometry::empty(gpu),
             batch: QuadBatch::new(),
             scene_entities: Vec::new(),
             first_scene_entity: 0,
+            scene_dlights: Vec::new(),
+            first_scene_dlight: 0,
             warned: [false; Warned::COUNT],
             stage_warnings: Stage2dWarnings::default(),
         }
@@ -360,6 +384,8 @@ impl FrameExecutor {
         // Source: oracle/codemp/renderer/tr_scene.cpp:55-56
         self.scene_entities.clear();
         self.first_scene_entity = 0;
+        self.scene_dlights.clear();
+        self.first_scene_dlight = 0;
 
         for event in &frame_data.events {
             match event {
@@ -485,6 +511,11 @@ impl FrameExecutor {
                         Some(w) => {
                             stats.entities =
                                 (self.scene_entities.len() - self.first_scene_entity) as u32;
+                            stats.dlights = if *disable_dynamic_light {
+                                0
+                            } else {
+                                (self.scene_dlights.len() - self.first_scene_dlight) as u32
+                            };
                             stats.world = self.render_world(
                                 gpu,
                                 target,
@@ -506,9 +537,10 @@ impl FrameExecutor {
                     }
 
                     // The next scene in this frame tacks on after this one, so
-                    // the window start moves to the current list end.
-                    // Source: oracle/codemp/renderer/tr_scene.cpp:859
+                    // the window starts move to the current list ends.
+                    // Source: oracle/codemp/renderer/tr_scene.cpp:859-860
                     self.first_scene_entity = self.scene_entities.len();
+                    self.first_scene_dlight = self.scene_dlights.len();
                 }
 
                 FrameEvent::AddRefEntityToScene(re) => {
@@ -524,15 +556,47 @@ impl FrameExecutor {
                     // without drawing. The oracle keeps the buffer and only
                     // advances `r_firstSceneEntity`, so a following scene starts
                     // empty. Polys and lights are later waves.
-                    // Source: oracle/codemp/renderer/tr_scene.cpp:76
+                    // Source: oracle/codemp/renderer/tr_scene.cpp:76-77
                     self.first_scene_entity = self.scene_entities.len();
+                    self.first_scene_dlight = self.scene_dlights.len();
+                }
+
+                // A scene polygon needs no work here: `R_AddPolygonSurfaces`
+                // reads the recorded events straight off `frame_data` at
+                // `RenderScene`, so the poly is already on the draw-surf list by
+                // the time the world pass runs. Without a world context there is
+                // no such pass, so it counts as a skip.
+                // Source: oracle/codemp/renderer/tr_scene.cpp:97-109
+                FrameEvent::AddPolyToScene { .. } => {
+                    if world.is_none() {
+                        stats.skipped_scene_events += 1;
+                        self.warn_once(Warned::SceneEvent);
+                    }
+                }
+
+                // `RE_AddDynamicLightToScene` already dropped a zero-intensity
+                // light and anything past `MAX_DLIGHTS`, so the payload lands
+                // straight in the list.
+                // Source: oracle/codemp/renderer/tr_scene.cpp:326-345
+                FrameEvent::AddLightToScene { org, intensity, r, g, b } => {
+                    self.scene_dlights.push(SceneDlight {
+                        org: *org,
+                        intensity: *intensity,
+                        color: [*r, *g, *b],
+                        additive: false,
+                    });
+                }
+                FrameEvent::AddAdditiveLightToScene { org, intensity, r, g, b } => {
+                    self.scene_dlights.push(SceneDlight {
+                        org: *org,
+                        intensity: *intensity,
+                        color: [*r, *g, *b],
+                        additive: true,
+                    });
                 }
 
                 FrameEvent::ClearDecals
-                | FrameEvent::AddPolyToScene { .. }
                 | FrameEvent::AddPolysToScene { .. }
-                | FrameEvent::AddLightToScene { .. }
-                | FrameEvent::AddAdditiveLightToScene { .. }
                 | FrameEvent::AddDecalToScene { .. }
                 | FrameEvent::SetRangeFog(_)
                 | FrameEvent::SetRefractionProp { .. } => {
@@ -601,10 +665,20 @@ impl FrameExecutor {
             self.warn_once(Warned::Fog);
         }
 
-        let Some(geometry) = self.world_geometry.as_ref() else {
+        // A scene that draws a world needs its uploaded mesh. A
+        // `RDF_NOWORLDMODEL` scene binds the empty stand-in instead, since
+        // `R_AddWorldSurfaces` returns before touching the BSP for that flag and
+        // every surface left is entity-side.
+        // Source: oracle/codemp/renderer/tr_world.cpp:1936-1940
+        let no_world_model = refdef.rdflags & RDF_NOWORLDMODEL != 0;
+        if self.world_geometry.is_none() && !no_world_model {
             self.warn_once(Warned::NoWorldGeometry);
             return WorldStats::default();
-        };
+        }
+        let geometry = self
+            .world_geometry
+            .as_ref()
+            .unwrap_or(&self.empty_geometry);
 
         // Rebuild `tr.refdef.entities` from this scene's window into the
         // accumulated payloads (DEC-50). The window starts at
@@ -654,13 +728,20 @@ impl FrameExecutor {
         let fov_x = refdef.fov_x;
         let fov_y = refdef.fov_y;
         let refdef_time = refdef.time;
-        // Dlights replay from `AddLightToScene` events in a later wave. None
-        // land yet, so the disable decision drops an already-empty set.
-        let refdef_num_dlights = if disable_dynamic_light {
-            0
+        // This scene's window into the accumulated dlight payloads, the same
+        // window rule the entity list follows. `disable_dynamic_light` is the
+        // trap-time `RDF_NOWORLDMODEL`/`r_dynamiclight` decision, and it drops
+        // the whole set for this scene.
+        // Source: oracle/codemp/renderer/tr_scene.cpp:817-822
+        let mut dlights: Vec<dlight_t> = if disable_dynamic_light {
+            Vec::new()
         } else {
-            world.dlights.len() as i32
+            self.scene_dlights[self.first_scene_dlight..]
+                .iter()
+                .map(SceneDlight::to_dlight_t)
+                .collect()
         };
+        let refdef_num_dlights = dlights.len() as i32;
         let distance_cull = world.assets.distance_cull;
 
         // SAFETY: `trRefdef_t` is a frozen `#[repr(C)]` POD (scalars, fixed
@@ -689,7 +770,7 @@ impl FrameExecutor {
             fov_x,
             fov_y,
             refdef_num_dlights,
-            world.dlights,
+            dlights.as_mut_slice(),
             &abi_fogs,
             distance_cull,
             world.land_scape,
@@ -962,6 +1043,38 @@ fn latin1_bytes(text: &str) -> Vec<u8> {
     text.chars()
         .map(|c| if (c as u32) < 0x100 { c as u8 } else { b'?' })
         .collect()
+}
+
+/// One `RE_AddDynamicLightToScene` payload, held between the event replay and
+/// the `RenderScene` that consumes it. `dlight_t` is an ABI-frozen type with no
+/// `Clone`, so the accumulator holds the five payload fields and builds the ABI
+/// value per scene.
+///
+/// Source: `oracle/codemp/renderer/tr_scene.cpp:326-345`
+#[derive(Clone, Copy)]
+struct SceneDlight {
+    org: [f32; 3],
+    intensity: f32,
+    color: [f32; 3],
+    additive: bool,
+}
+
+impl SceneDlight {
+    /// The `dlight_t` `backEndData->dlights` holds. The oracle writes five
+    /// fields and leaves the rest at the zero the frame buffer started at, so
+    /// this builds a zeroed value and writes the same five. `mType` stays
+    /// `DLIGHT_POINT`, the zero discriminant, since the trap the census counts
+    /// never sets a projected light.
+    fn to_dlight_t(&self) -> dlight_t {
+        // SAFETY: `dlight_t` is a `#[repr(C)]` POD of `vec3_t`, `f32`, `i32`,
+        // and a `#[repr(i32)]` enum whose zero discriminant is a valid variant.
+        let mut dl: dlight_t = unsafe { core::mem::zeroed() };
+        dl.origin = self.org;
+        dl.radius = self.intensity;
+        dl.color = self.color;
+        dl.additive = self.additive as i32;
+        dl
+    }
 }
 
 /// A zeroed `viewParms_t`, the value `Com_Memset(&tr.viewParms, 0, ...)` gives

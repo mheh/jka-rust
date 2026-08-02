@@ -28,6 +28,7 @@
 //!
 //! Source: `oracle/codemp/renderer/tr_shade.cpp:1953-2231` (`RB_IterateStagesGeneric`)
 
+use core::f64::consts::PI;
 use std::collections::HashMap;
 use std::mem::size_of;
 
@@ -36,7 +37,18 @@ use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::qfiles::draw_vert_t::drawVert_t;
 use mp_engine_qcommon::qfiles::md3_limits::MD3_XYZ_SCALE;
 use mp_engine_qcommon::qfiles::md3_surface_t::md3Surface_t;
+use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
+use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
+use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
+use mp_qshared::common::mp::cgame::tr_types::{
+    RF_ALPHA_DEPTH, RF_DEPTHHACK, RF_DISINTEGRATE1, RF_DISINTEGRATE2, RF_DISTORTION,
+    RF_FORCE_ENT_ALPHA, RF_NODEPTH, RF_RGB_TINT, RF_VOLUMETRIC,
+};
 use mp_qshared::shared::mdxaBone_t;
+use mp_qshared::shared::q_math::{
+    _VectorMA as VectorMA, _VectorScale as VectorScale, _VectorSubtract as VectorSubtract,
+    vec3_origin, CrossProduct, VectorNormalize,
+};
 use mp_qshared::shared::vec3_t;
 use mp_renderer::render_state::frame_state::FrameState;
 use mp_renderer::render_state::image_asset::ImageHandle;
@@ -66,8 +78,9 @@ use mp_renderer::tr_noise::NoiseState;
 use mp_renderer::tr_public::ref_flags::{RDF_NOWORLDMODEL, RDF_SKYBOXPORTAL};
 use mp_renderer::tr_shade::RB_FogPass;
 use mp_renderer::tr_shade_calc::{
-    RB_CalcDiffuseColor, RB_CalcDiffuseEntityColor, RB_CalcModulateAlphasByFog,
-    RB_CalcModulateColorsByFog, RB_CalcModulateRGBAsByFog,
+    myftol, RB_CalcDiffuseColor, RB_CalcDiffuseEntityColor, RB_CalcDisintegrateColors,
+    RB_CalcDisintegrateVertDeform, RB_CalcModulateAlphasByFog, RB_CalcModulateColorsByFog,
+    RB_CalcModulateRGBAsByFog,
 };
 use mp_renderer::tr_shader::{
     FogPass, GLS_ATEST_GE_80, GLS_ATEST_GE_C0, GLS_ATEST_GT_0, GLS_ATEST_LT_80,
@@ -229,6 +242,37 @@ impl WorldGeometry {
             ranges,
             cpu_vertices: vertices,
             cpu_indices: indices,
+        }
+    }
+
+    /// The world-less geometry a `RDF_NOWORLDMODEL` scene draws against: valid
+    /// but empty buffers and no surface ranges. Entity, poly, and sprite
+    /// surfaces all build their own per-frame vertices, so a scene with no BSP
+    /// never reads these buffers. It still needs the handles to bind.
+    pub fn empty(gpu: &Gpu) -> WorldGeometry {
+        // wgpu rejects a zero-size buffer, so both buffers hold one zeroed
+        // element, the same fallback `upload` makes for an empty world.
+        let vertex_fallback = [WorldVertex::zeroed()];
+        let index_fallback = [0u32];
+        let vertex_buffer = create_buffer(
+            gpu.device(),
+            "mp_renderer_gpu empty world vertex buffer",
+            bytemuck::cast_slice(&vertex_fallback),
+            wgpu::BufferUsages::VERTEX,
+        );
+        let index_buffer = create_buffer(
+            gpu.device(),
+            "mp_renderer_gpu empty world index buffer",
+            bytemuck::cast_slice(&index_fallback),
+            wgpu::BufferUsages::INDEX,
+        );
+
+        WorldGeometry {
+            vertex_buffer,
+            index_buffer,
+            ranges: Vec::new(),
+            cpu_vertices: Vec::new(),
+            cpu_indices: Vec::new(),
         }
     }
 
@@ -605,10 +649,15 @@ enum Warned {
     VideoMap,
     /// A fog pass was due but the fog image is not registered.
     FogImageMissing,
+    /// An `SF_ENTITY` draw surf whose `reType` builds no geometry yet.
+    EntitySurface,
+    /// An `RF_DISTORTION` entity, which needs the screen-capture refraction
+    /// pass.
+    Distortion,
 }
 
 impl Warned {
-    const COUNT: usize = 6;
+    const COUNT: usize = 8;
 
     fn slot(self) -> usize {
         match self {
@@ -618,6 +667,8 @@ impl Warned {
             Warned::Glow => 3,
             Warned::VideoMap => 4,
             Warned::FogImageMissing => 5,
+            Warned::EntitySurface => 6,
+            Warned::Distortion => 7,
         }
     }
 
@@ -631,6 +682,8 @@ impl Warned {
             Warned::Glow => "draws a glow world stage as a plain stage",
             Warned::VideoMap => "draws a videoMap world stage as a plain stage — no cinematic yet",
             Warned::FogImageMissing => "skips a fog pass because the fog image is not registered",
+            Warned::EntitySurface => "skips a generated entity surface whose reType is not ported",
+            Warned::Distortion => "draws an RF_DISTORTION entity plain - no screen capture yet",
         }
     }
 }
@@ -654,6 +707,9 @@ pub struct WorldStats {
     pub skipped_non_world: u32,
     /// World surfaces whose range was empty (`Skip`/`Flare`), so nothing drew.
     pub empty_surfaces: u32,
+    /// Scene polygons (`SF_POLY`) that drew at least one stage pass. The census
+    /// mark path.
+    pub poly_surfaces_drawn: u32,
     /// Sky-shader surfaces that drew their sky box, clouds, or both. The oracle
     /// forks a sky shader into `RB_StageIteratorSky`. A surface counts here when
     /// that chain drew at least one face or cloud pass.
@@ -742,6 +798,53 @@ struct StageDrawItem {
     ///
     /// Source: `oracle/codemp/renderer/tr_sky.cpp:814`
     depth_far: bool,
+    /// The entity's depth-range hack, `backEnd`'s `depthRange` switch. The draw
+    /// loop applies it the same way it applies `depth_far`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_backend.cpp:930-938,957-973`
+    depth_range: DepthRange,
+}
+
+/// Raven's `depthRange` switch in `RB_RenderDrawSurfList`: the depth window a
+/// surface's entity draws into.
+///
+/// - `Normal`: `qglDepthRange(0, 1)`, every ordinary surface.
+/// - `Hack`: `qglDepthRange(0, 0.3)`, `RF_DEPTHHACK`, which keeps a view model
+///   from poking into walls.
+/// - `None`: `qglDepthRange(0, 0)`, `RF_NODEPTH`, for seeing through walls.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:930-938,957-973`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DepthRange {
+    Normal,
+    Hack,
+    None,
+}
+
+impl DepthRange {
+    /// The entity's range. `RF_NODEPTH` wins, matching the oracle's `if`/`else
+    /// if` order.
+    fn resolve(entity: Option<&trRefEntity_t>) -> DepthRange {
+        let Some(ent) = entity else {
+            return DepthRange::Normal;
+        };
+        if ent.e.renderfx & RF_NODEPTH != 0 {
+            DepthRange::None
+        } else if ent.e.renderfx & RF_DEPTHHACK != 0 {
+            DepthRange::Hack
+        } else {
+            DepthRange::Normal
+        }
+    }
+
+    /// The `min_depth`, `max_depth` pair `set_viewport` takes.
+    fn window(self) -> (f32, f32) {
+        match self {
+            DepthRange::Normal => (0.0, 1.0),
+            DepthRange::Hack => (0.0, 0.3),
+            DepthRange::None => (0.0, 0.0),
+        }
+    }
 }
 
 /// The fog inputs one surface's stages read: the resolved fog volume and the
@@ -1230,11 +1333,19 @@ impl Pipeline3d {
             // Source: oracle/codemp/renderer/tr_scene.cpp:838
             let vp_y = view.viewportY as f32;
             let mut depth_far = false;
+            let mut depth_range = DepthRange::Normal;
 
             for (draw_index, item) in items.iter().enumerate() {
-                if item.depth_far != depth_far {
+                if item.depth_far != depth_far || item.depth_range != depth_range {
                     depth_far = item.depth_far;
-                    let (min_depth, max_depth) = if depth_far { (1.0, 1.0) } else { (0.0, 1.0) };
+                    depth_range = item.depth_range;
+                    // The sky's far-plane window overrides the entity hack: a
+                    // sky surface never belongs to a view-model entity.
+                    let (min_depth, max_depth) = if depth_far {
+                        (1.0, 1.0)
+                    } else {
+                        depth_range.window()
+                    };
                     pass.set_viewport(vp_x, vp_y, vp_w, vp_h, min_depth, max_depth);
                 }
 
@@ -1290,6 +1401,16 @@ impl Pipeline3d {
     /// passes, in stage order, and builds any dynamic vertex blocks. Non-world
     /// and empty entries are counted into `stats`, and a sky-parms entry forks
     /// into the sky-box and cloud chain (`collect_sky_surface`).
+    ///
+    //TODO: Port ProjectDlightTexture
+    // Source: oracle/codemp/renderer/tr_shade.cpp:840-1010
+    // `RB_StageIteratorGeneric` appends one additive pass per dynamic light
+    // that the surface's `dlightBits` marks. The scene's dlights reach
+    // `tr.refdef.dlights` and the sort keys carry the dlight map, so the
+    // frontend half is live; the pass itself picks a texcoord axis from
+    // `tess.normal[i]`, and `WorldVertex` carries no normal, so a world surface
+    // has nothing to project along. Landing the pass means widening the vertex
+    // format first.
     #[allow(clippy::too_many_arguments)]
     fn collect_stage_items(
         &mut self,
@@ -1313,6 +1434,11 @@ impl Pipeline3d {
         cvars: RenderCvarSnapshot,
     ) -> Vec<StageDrawItem> {
         let mut items: Vec<StageDrawItem> = Vec::new();
+        // The two scene-wide inputs the renderfx colour overrides read: the
+        // disintegrate threshold clock and the volumetric fade axis.
+        // Source: oracle/codemp/renderer/tr_shade.cpp:1568,1596
+        let refdef_time = frame.refdef.time;
+        let view_axis = view.ori.axis[0];
 
         for surf in draw_surfs {
             match surf.surface {
@@ -1335,6 +1461,8 @@ impl Pipeline3d {
                         fogs,
                         oris,
                         cvars,
+                        refdef_time,
+                        view_axis,
                         &mut items,
                     );
                 }
@@ -1357,6 +1485,8 @@ impl Pipeline3d {
                         fogs,
                         oris,
                         cvars,
+                        refdef_time,
+                        view_axis,
                         &mut items,
                     );
                 }
@@ -1380,6 +1510,47 @@ impl Pipeline3d {
                         fogs,
                         oris,
                         cvars,
+                        refdef_time,
+                        view_axis,
+                        &mut items,
+                    );
+                }
+                SurfaceGeometry::Poly { verts } => {
+                    self.collect_poly_surface(
+                        surf.sort,
+                        verts,
+                        assets,
+                        noise,
+                        float_time,
+                        dynamic_vertices,
+                        dynamic_indices,
+                        stats,
+                        slot_map,
+                        entities,
+                        view,
+                        fogs,
+                        oris,
+                        refdef_time,
+                        view_axis,
+                        &mut items,
+                    );
+                }
+                SurfaceGeometry::Other => {
+                    self.collect_entity_surface(
+                        surf.sort,
+                        assets,
+                        noise,
+                        float_time,
+                        dynamic_vertices,
+                        dynamic_indices,
+                        stats,
+                        slot_map,
+                        entities,
+                        view,
+                        fogs,
+                        oris,
+                        refdef_time,
+                        view_axis,
                         &mut items,
                     );
                 }
@@ -1390,6 +1561,233 @@ impl Pipeline3d {
         }
 
         items
+    }
+
+    /// Resolves one `SF_POLY` draw surf: the scene polygon `RE_AddPolyToScene`
+    /// recorded, fan-triangulated into the per-frame buffers and drawn one pass
+    /// per active stage.
+    ///
+    /// This is the census's mark path. All 443,515 poly submissions across the
+    /// four traces carry world-space vertices under the world entity, so the
+    /// slot lookup lands on the world clip matrix.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_surface.cpp:220-254`
+    /// (`RB_SurfacePolychain`)
+    #[allow(clippy::too_many_arguments)]
+    fn collect_poly_surface(
+        &mut self,
+        sort: u32,
+        poly_verts: &[polyVert_t],
+        assets: &RenderAssets,
+        noise: &NoiseState,
+        float_time: f32,
+        dynamic_vertices: &mut Vec<WorldVertex>,
+        dynamic_indices: &mut Vec<u32>,
+        stats: &mut WorldStats,
+        slot_map: &HashMap<i32, u32>,
+        entities: &[trRefEntity_t],
+        view: &viewParms_t,
+        fogs: &[fog_t],
+        oris: &[orientationr_t],
+        refdef_time: i32,
+        view_axis: [f32; 3],
+        items: &mut Vec<StageDrawItem>,
+    ) {
+        let (entity_num, shader_handle, fog_num, _dlight_map) =
+            R_DecomposeSort(sort, &assets.sorted_shaders);
+        let Some(shader) = assets.shaders.get(shader_handle) else {
+            return;
+        };
+        if poly_verts.len() < 3 {
+            stats.empty_surfaces += 1;
+            return;
+        }
+
+        // The fan: vertex 0 anchors every triangle.
+        let verts: Vec<WorldVertex> = poly_verts
+            .iter()
+            .map(|v| WorldVertex {
+                position: v.xyz,
+                st: v.st,
+                lightmap_st: [0.0, 0.0],
+                color: v.modulate,
+            })
+            .collect();
+        let mut index_block: Vec<u32> = Vec::with_capacity((poly_verts.len() - 2) * 3);
+        for i in 0..poly_verts.len() as u32 - 2 {
+            index_block.extend_from_slice(&[0, i + 1, i + 2]);
+        }
+
+        let slot = slot_map.get(&entity_num).copied().unwrap_or(0);
+        let globals_offset = (slot as u64 * GLOBALS_STRIDE) as u32;
+        let entity_float_time = float_time - entity_shader_time(entities, entity_num);
+        let surface_fog = resolve_surface_fog(fog_num, fogs, oris, slot, view);
+        let entity = entities.get(entity_num as usize);
+
+        let first_index = dynamic_indices.len() as u32;
+        let index_count = index_block.len() as u32;
+        dynamic_indices.extend_from_slice(&index_block);
+
+        let before = items.len();
+        for stage in shader.stages.iter().filter(|stage| stage.active) {
+            let item = self.build_cpu_surface_stage_item(
+                shader,
+                stage,
+                &verts,
+                first_index,
+                index_count,
+                entity_float_time,
+                noise,
+                assets,
+                surface_fog,
+                entity,
+                None,
+                dynamic_vertices,
+                globals_offset,
+                refdef_time,
+                view_axis,
+            );
+            if let Some(item) = item {
+                items.push(item);
+            }
+        }
+        let stages_end = items.len();
+
+        if let Some(sf) = surface_fog {
+            if shader.fog_pass != FogPass::None {
+                let item = self.build_fog_stage_item(
+                    &verts,
+                    sf,
+                    shader.fog_pass,
+                    assets.fog_image,
+                    first_index,
+                    index_count,
+                    true,
+                    globals_offset,
+                    dynamic_vertices,
+                    DepthRange::resolve(entity),
+                );
+                if let Some(item) = item {
+                    items.push(item);
+                    stats.fog_passes_drawn += 1;
+                }
+            }
+        }
+
+        if stages_end > before {
+            stats.surfaces_drawn += 1;
+            stats.poly_surfaces_drawn += 1;
+        }
+    }
+
+    /// Resolves one `SF_ENTITY` draw surf: the generated-geometry family
+    /// `RB_SurfaceEntity` dispatches on `reType`. The vertices are built on the
+    /// CPU in world space, since `R_RotateForEntity` hands every non-`RT_MODEL`
+    /// entity the world orientation, then drawn one dynamic-buffer pass per
+    /// active stage.
+    ///
+    /// A `reType` outside the census set builds no geometry and counts as a
+    /// skip, so the remaining generated kinds stay visible in the stats rather
+    /// than silently drawing nothing.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_surface.cpp:1798-1870`
+    /// (`RB_SurfaceEntity`), `oracle/codemp/renderer/tr_main.cpp:302-311`
+    /// (`R_RotateForEntity`'s non-`RT_MODEL` arm)
+    #[allow(clippy::too_many_arguments)]
+    fn collect_entity_surface(
+        &mut self,
+        sort: u32,
+        assets: &RenderAssets,
+        noise: &NoiseState,
+        float_time: f32,
+        dynamic_vertices: &mut Vec<WorldVertex>,
+        dynamic_indices: &mut Vec<u32>,
+        stats: &mut WorldStats,
+        slot_map: &HashMap<i32, u32>,
+        entities: &[trRefEntity_t],
+        view: &viewParms_t,
+        fogs: &[fog_t],
+        oris: &[orientationr_t],
+        refdef_time: i32,
+        view_axis: [f32; 3],
+        items: &mut Vec<StageDrawItem>,
+    ) {
+        let (entity_num, shader_handle, fog_num, _dlight_map) =
+            R_DecomposeSort(sort, &assets.sorted_shaders);
+        let Some(shader) = assets.shaders.get(shader_handle) else {
+            return;
+        };
+        let Some(entity) = entities.get(entity_num as usize) else {
+            stats.skipped_non_world += 1;
+            return;
+        };
+
+        let (verts, index_block) = build_entity_geometry(&entity.e, view);
+        if index_block.is_empty() {
+            self.warn_once(Warned::EntitySurface);
+            stats.skipped_non_world += 1;
+            return;
+        }
+
+        let slot = slot_map.get(&entity_num).copied().unwrap_or(0);
+        let globals_offset = (slot as u64 * GLOBALS_STRIDE) as u32;
+        let entity_float_time = float_time - entity_shader_time(entities, entity_num);
+        let surface_fog = resolve_surface_fog(fog_num, fogs, oris, slot, view);
+
+        let first_index = dynamic_indices.len() as u32;
+        let index_count = index_block.len() as u32;
+        dynamic_indices.extend_from_slice(&index_block);
+
+        let before = items.len();
+        for stage in shader.stages.iter().filter(|stage| stage.active) {
+            let item = self.build_cpu_surface_stage_item(
+                shader,
+                stage,
+                &verts,
+                first_index,
+                index_count,
+                entity_float_time,
+                noise,
+                assets,
+                surface_fog,
+                Some(entity),
+                None,
+                dynamic_vertices,
+                globals_offset,
+                refdef_time,
+                view_axis,
+            );
+            if let Some(item) = item {
+                items.push(item);
+            }
+        }
+        let stages_end = items.len();
+
+        if let Some(sf) = surface_fog {
+            if shader.fog_pass != FogPass::None {
+                let item = self.build_fog_stage_item(
+                    &verts,
+                    sf,
+                    shader.fog_pass,
+                    assets.fog_image,
+                    first_index,
+                    index_count,
+                    true,
+                    globals_offset,
+                    dynamic_vertices,
+                    DepthRange::resolve(Some(entity)),
+                );
+                if let Some(item) = item {
+                    items.push(item);
+                    stats.fog_passes_drawn += 1;
+                }
+            }
+        }
+
+        if stages_end > before {
+            stats.surfaces_drawn += 1;
+            stats.entity_surfaces_drawn += 1;
+        }
     }
 
     /// Resolves one world (BSP) draw surf into its per-stage passes, appending
@@ -1416,6 +1814,8 @@ impl Pipeline3d {
         fogs: &[fog_t],
         oris: &[orientationr_t],
         cvars: RenderCvarSnapshot,
+        refdef_time: i32,
+        view_axis: [f32; 3],
         items: &mut Vec<StageDrawItem>,
     ) {
         let index = world_ref_index(world_ref);
@@ -1478,6 +1878,8 @@ impl Pipeline3d {
                 dynamic_indices,
                 stats,
                 cvars,
+                refdef_time,
+                view_axis,
                 items,
             );
             return;
@@ -1525,6 +1927,8 @@ impl Pipeline3d {
                 entities.get(entity_num as usize),
                 dynamic_vertices,
                 globals_offset,
+                refdef_time,
+                view_axis,
             );
             // A surface-sprite stage draws nothing here, so it yields no item.
             if let Some(item) = item {
@@ -1557,6 +1961,7 @@ impl Pipeline3d {
                     index_dynamic,
                     globals_offset,
                     dynamic_vertices,
+                    DepthRange::resolve(entities.get(entity_num as usize)),
                 );
                 if let Some(item) = item {
                     items.push(item);
@@ -1600,6 +2005,8 @@ impl Pipeline3d {
         fogs: &[fog_t],
         oris: &[orientationr_t],
         cvars: RenderCvarSnapshot,
+        refdef_time: i32,
+        view_axis: [f32; 3],
         items: &mut Vec<StageDrawItem>,
     ) {
         let (entity_num, shader_handle, fog_num, _dlight_map) =
@@ -1655,6 +2062,8 @@ impl Pipeline3d {
                 dynamic_indices,
                 stats,
                 cvars,
+                refdef_time,
+                view_axis,
                 items,
             );
             return;
@@ -1681,6 +2090,8 @@ impl Pipeline3d {
                 Some(&md3_normals),
                 dynamic_vertices,
                 globals_offset,
+                refdef_time,
+                view_axis,
             );
             if let Some(item) = item {
                 items.push(item);
@@ -1710,6 +2121,7 @@ impl Pipeline3d {
                     true,
                     globals_offset,
                     dynamic_vertices,
+                    DepthRange::resolve(entity),
                 );
                 if let Some(item) = item {
                     items.push(item);
@@ -1759,6 +2171,8 @@ impl Pipeline3d {
         fogs: &[fog_t],
         oris: &[orientationr_t],
         cvars: RenderCvarSnapshot,
+        refdef_time: i32,
+        view_axis: [f32; 3],
         items: &mut Vec<StageDrawItem>,
     ) {
         let (entity_num, shader_handle, fog_num, _dlight_map) =
@@ -1824,6 +2238,8 @@ impl Pipeline3d {
                 dynamic_indices,
                 stats,
                 cvars,
+                refdef_time,
+                view_axis,
                 items,
             );
             return;
@@ -1851,6 +2267,8 @@ impl Pipeline3d {
                 Some(&g2_normals),
                 dynamic_vertices,
                 globals_offset,
+                refdef_time,
+                view_axis,
             );
             if let Some(item) = item {
                 items.push(item);
@@ -1880,6 +2298,7 @@ impl Pipeline3d {
                     true,
                     globals_offset,
                     dynamic_vertices,
+                    DepthRange::resolve(entity),
                 );
                 if let Some(item) = item {
                     items.push(item);
@@ -1926,6 +2345,8 @@ impl Pipeline3d {
         dynamic_indices: &mut Vec<u32>,
         stats: &mut WorldStats,
         cvars: RenderCvarSnapshot,
+        refdef_time: i32,
+        view_axis: [f32; 3],
         items: &mut Vec<StageDrawItem>,
     ) {
         // Project the surface onto the sky box and build the cloud geometry. A
@@ -1998,6 +2419,7 @@ impl Pipeline3d {
                 index_dynamic: true,
                 globals_offset,
                 depth_far: true,
+                depth_range: DepthRange::Normal,
             });
         }
 
@@ -2042,6 +2464,8 @@ impl Pipeline3d {
                     None,
                     dynamic_vertices,
                     globals_offset,
+                    refdef_time,
+                    view_axis,
                 );
                 if let Some(mut item) = item {
                     item.depth_far = true;
@@ -2091,6 +2515,8 @@ impl Pipeline3d {
         entity: Option<&trRefEntity_t>,
         dynamic_vertices: &mut Vec<WorldVertex>,
         globals_offset: u32,
+        refdef_time: i32,
+        view_axis: [f32; 3],
     ) -> Option<StageDrawItem> {
         // A surface-sprite stage draws no plain geometry. The sprite chain is a
         // later wave, so the stage is skipped whole, as the oracle does.
@@ -2102,11 +2528,18 @@ impl Pipeline3d {
         }
 
         let time = StageTime::new(float_time, shader.time_offset);
-        let alpha_func = alpha_func_code(stage.state_bits);
+
+        // The current entity's renderfx overrides for this stage. Two of them
+        // change the state bits, so they resolve before the pipeline key.
+        // Source: oracle/codemp/renderer/tr_shade.cpp:2039-2054,2190-2202
+        let fx = EntityFx::resolve(entity);
+        let depth_range = DepthRange::resolve(entity);
+        let state_bits = fx.state_bits(stage.state_bits);
+        let alpha_func = alpha_func_code(state_bits);
         let key = PipelineKey {
-            blend: blend_state_from_gls(stage.state_bits),
-            depth_equal: (stage.state_bits & GLS_DEPTHFUNC_EQUAL as u32) != 0,
-            depth_write: (stage.state_bits & GLS_DEPTHMASK_TRUE as u32) != 0,
+            blend: blend_state_from_gls(state_bits),
+            depth_equal: (state_bits & GLS_DEPTHFUNC_EQUAL as u32) != 0,
+            depth_write: (state_bits & GLS_DEPTHMASK_TRUE as u32) != 0,
         };
 
         // The `ComputeColors` tail modulates the stage colours by fog density
@@ -2118,6 +2551,9 @@ impl Pipeline3d {
 
         // These stage kinds still draw as a plain stage, but each logs once so
         // the missing behavior stays visible.
+        if fx.distortion {
+            self.warn_once(Warned::Distortion);
+        }
         if stage.glow {
             self.warn_once(Warned::Glow);
         }
@@ -2149,7 +2585,7 @@ impl Pipeline3d {
             // fog modulation cannot reach the screen here and is dropped.
             // ACFF needs blend bits a collapsed stage does not carry, so this
             // arm is near unreachable with fog.
-            let dynamic = !bundle0.tex_mods.is_empty();
+            let dynamic = !bundle0.tex_mods.is_empty() || fx.rewrites_colors();
             let base_vertex = if dynamic {
                 let (source, _) = st_source(bundle0);
                 build_dynamic_block(
@@ -2168,6 +2604,9 @@ impl Pipeline3d {
                     None,
                     &mut self.stage_warnings,
                     dynamic_vertices,
+                    fx,
+                    refdef_time,
+                    view_axis,
                 )
             } else {
                 range.base_vertex
@@ -2187,6 +2626,7 @@ impl Pipeline3d {
                 index_dynamic,
                 globals_offset,
                 depth_far: false,
+                depth_range,
             });
         }
 
@@ -2197,7 +2637,7 @@ impl Pipeline3d {
         }
         let reads_lightmap = source == StSource::Lightmap;
         let diffuse = stage_image(bundle0, time.shader_time);
-        let dynamic = stage_is_dynamic(stage, false) || fog_mod.is_some();
+        let dynamic = stage_is_dynamic(stage, false) || fog_mod.is_some() || fx.rewrites_colors();
 
         if dynamic {
             let base_vertex = build_dynamic_block(
@@ -2216,6 +2656,9 @@ impl Pipeline3d {
                 None,
                 &mut self.stage_warnings,
                 dynamic_vertices,
+                fx,
+                refdef_time,
+                view_axis,
             );
             Some(StageDrawItem {
                 key,
@@ -2234,6 +2677,7 @@ impl Pipeline3d {
                 index_dynamic,
                 globals_offset,
                 depth_far: false,
+                depth_range,
             })
         } else {
             Some(StageDrawItem {
@@ -2251,6 +2695,7 @@ impl Pipeline3d {
                 index_dynamic,
                 globals_offset,
                 depth_far: false,
+                depth_range,
             })
         }
     }
@@ -2282,6 +2727,8 @@ impl Pipeline3d {
         normals: Option<&[[f32; 4]]>,
         dynamic_vertices: &mut Vec<WorldVertex>,
         globals_offset: u32,
+        refdef_time: i32,
+        view_axis: [f32; 3],
     ) -> Option<StageDrawItem> {
         // A surface-sprite stage draws no plain geometry.
         if let Some(ss) = &stage.ss {
@@ -2292,11 +2739,21 @@ impl Pipeline3d {
         }
 
         let time = StageTime::new(float_time, shader.time_offset);
-        let alpha_func = alpha_func_code(stage.state_bits);
+
+        // The current entity's renderfx overrides for this stage. Two of them
+        // change the state bits, so they resolve before the pipeline key.
+        // Source: oracle/codemp/renderer/tr_shade.cpp:2039-2054,2190-2202
+        let fx = EntityFx::resolve(entity);
+        let depth_range = DepthRange::resolve(entity);
+        if fx.distortion {
+            self.warn_once(Warned::Distortion);
+        }
+        let state_bits = fx.state_bits(stage.state_bits);
+        let alpha_func = alpha_func_code(state_bits);
         let key = PipelineKey {
-            blend: blend_state_from_gls(stage.state_bits),
-            depth_equal: (stage.state_bits & GLS_DEPTHFUNC_EQUAL as u32) != 0,
-            depth_write: (stage.state_bits & GLS_DEPTHMASK_TRUE as u32) != 0,
+            blend: blend_state_from_gls(state_bits),
+            depth_equal: (state_bits & GLS_DEPTHFUNC_EQUAL as u32) != 0,
+            depth_write: (state_bits & GLS_DEPTHMASK_TRUE as u32) != 0,
         };
 
         // The fog-density colour modulation runs on the per-frame block when the
@@ -2337,6 +2794,9 @@ impl Pipeline3d {
             normals,
             &mut self.stage_warnings,
             dynamic_vertices,
+            fx,
+            refdef_time,
+            view_axis,
         );
 
         Some(StageDrawItem {
@@ -2354,6 +2814,7 @@ impl Pipeline3d {
             index_dynamic: true,
             globals_offset,
             depth_far: false,
+            depth_range,
         })
     }
 
@@ -2382,6 +2843,7 @@ impl Pipeline3d {
         index_dynamic: bool,
         globals_offset: u32,
         dynamic_vertices: &mut Vec<WorldVertex>,
+        depth_range: DepthRange,
     ) -> Option<StageDrawItem> {
         // A missing fog image would bind the white fallback and paint the
         // surface at full fog density, so the pass skips instead.
@@ -2430,6 +2892,7 @@ impl Pipeline3d {
             index_dynamic,
             globals_offset,
             depth_far: false,
+            depth_range,
         })
     }
 
@@ -2963,6 +3426,9 @@ fn build_dynamic_block(
     normals: Option<&[[f32; 4]]>,
     warnings: &mut Stage2dWarnings,
     out: &mut Vec<WorldVertex>,
+    fx: EntityFx,
+    refdef_time: i32,
+    view_axis: [f32; 3],
 ) -> i32 {
     let base_vertex = out.len() as i32;
     let count = cpu.len();
@@ -2987,14 +3453,52 @@ fn build_dynamic_block(
         warnings,
     );
 
+    // The `xyz` block the disintegrate and volumetric arms read, and the one
+    // `RB_CalcDisintegrateVertDeform` moves.
+    let mut xyz: Vec<[f32; 4]> = cpu
+        .iter()
+        .map(|v| [v.position[0], v.position[1], v.position[2], 0.0])
+        .collect();
+
+    // `ComputeColors`'s two short-circuits: either one produces the whole
+    // colour block and skips both generator switches, and the disintegrate arm
+    // additionally moves the vertices.
+    // Source: oracle/codemp/renderer/tr_shade.cpp:1535-1581
+    let short_circuit = (fx.disintegrate1 || fx.disintegrate2 || fx.volumetric)
+        .then(|| entity.map(lighting_ref_entity))
+        .flatten();
+
     // A single-texture stage runs the full rgbGen/alphaGen. A two-texture
     // collapse keeps the input colour, which its shader path never reads.
-    let mut colors: Vec<[u8; 4]> = if two_texture {
+    let mut colors: Vec<[u8; 4]> = if let Some(re) = short_circuit {
+        let mut evaluated = vec![[0u8; 4]; count];
+        if fx.disintegrate1 || fx.disintegrate2 {
+            RB_CalcDisintegrateColors(&mut evaluated, &xyz, &re, refdef_time);
+            // The vert deform only fires under `RF_DISINTEGRATE2`, and it needs
+            // the surface normals. A world surface has none, so it keeps its
+            // vertices.
+            if let Some(n) = normals {
+                RB_CalcDisintegrateVertDeform(&mut xyz, n, &re, refdef_time);
+            }
+        } else {
+            volumetric_colors(&mut evaluated, normals, &re, view_axis);
+        }
+        evaluated
+    } else if two_texture {
         cpu.iter().map(|v| v.color).collect()
     } else {
         let input: Vec<[u8; 4]> = cpu.iter().map(|v| v.color).collect();
         let mut evaluated = vec![[0u8; 4]; count];
-        match (stage.rgb_gen, normals, entity) {
+        // `RF_RGB_TINT` forces `CGEN_ENTITY`, so the stage takes the entity's
+        // own colour instead of its shader's rgbGen.
+        // Source: oracle/codemp/renderer/tr_shade.cpp:2049-2053
+        let rgb_gen = if fx.rgb_tint {
+            colorGen_t::CGEN_ENTITY
+        } else {
+            stage.rgb_gen
+        };
+        let entity_view = entity.map(lighting_ref_entity);
+        match (rgb_gen, normals, entity) {
             // The lighting-diffuse rgbGen runs first, then the alphaGen switch,
             // the same order the oracle's `ComputeColors` keeps.
             (colorGen_t::CGEN_LIGHTING_DIFFUSE, Some(n), Some(ent)) => {
@@ -3031,6 +3535,8 @@ fn build_dynamic_block(
             _ => {
                 stage_colors_into(
                     stage,
+                    rgb_gen,
+                    entity_view.as_ref(),
                     &input,
                     &mut evaluated,
                     time,
@@ -3044,15 +3550,21 @@ fn build_dynamic_block(
         evaluated
     };
 
+    // `ForceAlpha`: every vertex takes the entity's own alpha. It runs after
+    // the generators and before the fog tail, the same place the oracle's
+    // `else if` arm sits in the stage loop.
+    // Source: oracle/codemp/renderer/tr_shade.cpp:2190-2192
+    if fx.force_ent_alpha {
+        for color in colors.iter_mut() {
+            color[3] = fx.ent_alpha;
+        }
+    }
+
     // The `ComputeColors` fog tail: when the surface is fogged and the stage
     // sets `adjustColorsForFog`, fade the colours by fog density. The caller
     // hands `fog_mod` only when the stage's ACFF is not `ACFF_NONE`.
     // Source: oracle/codemp/renderer/tr_shade.cpp:1509-1526
     if let Some(sf) = fog_mod {
-        let xyz: Vec<[f32; 4]> = cpu
-            .iter()
-            .map(|v| [v.position[0], v.position[1], v.position[2], 0.0])
-            .collect();
         match stage.adjust_colors_for_fog {
             acff_t::ACFF_MODULATE_RGB => {
                 RB_CalcModulateColorsByFog(&mut colors, &xyz, sf.fog, sf.ori, sf.view_ori, assets)
@@ -3069,7 +3581,7 @@ fn build_dynamic_block(
 
     for i in 0..count {
         out.push(WorldVertex {
-            position: cpu[i].position,
+            position: [xyz[i][0], xyz[i][1], xyz[i][2]],
             st: st[i],
             lightmap_st: cpu[i].lightmap_st,
             color: colors[i],
@@ -3077,6 +3589,40 @@ fn build_dynamic_block(
     }
 
     base_vertex
+}
+
+/// Raven's `RF_VOLUMETRIC` short-circuit in `ComputeColors`: every channel,
+/// alpha included, takes the entity's red channel faded by the fourth power of
+/// the vertex normal's dot with the view axis.
+///
+/// A surface with no decoded normals (world and sky) has nothing to fade by, so
+/// it takes the entity colour flat.
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:1554-1581`
+fn volumetric_colors(
+    colors: &mut [[u8; 4]],
+    normals: Option<&[[f32; 4]]>,
+    ent: &RefEntity,
+    view_axis: [f32; 3],
+) {
+    let base = ent.shader_rgba[0] as f32;
+    for (i, color) in colors.iter_mut().enumerate() {
+        let dot = match normals.and_then(|n| n.get(i)) {
+            Some(n) => {
+                let mut dot = n[0] * view_axis[0] + n[1] * view_axis[1] + n[2] * view_axis[2];
+                dot *= dot * dot * dot;
+                // so low, so just clamp it
+                if dot < 0.2 {
+                    0.0
+                } else {
+                    dot
+                }
+            }
+            None => 0.0,
+        };
+        let value = myftol(base * (1.0 - dot)) as u8;
+        *color = [value, value, value, value];
+    }
 }
 
 fn texture_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
@@ -3150,6 +3696,330 @@ fn entity_shader_time(entities: &[trRefEntity_t], entity_num: i32) -> f32 {
         .get(entity_num as usize)
         .map(|ent| ent.e.shaderTime)
         .unwrap_or(0.0)
+}
+
+/// The renderfx overrides the current entity applies to every stage of its
+/// surface, resolved once per stage build.
+///
+/// Raven spreads these across `RB_IterateStagesGeneric` (the state-bit and
+/// `forceRGBGen` overrides) and `ComputeColors` (the colour short-circuits).
+/// They are collected here because two of them change the pipeline key, which
+/// is decided before any colour work.
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:2039-2054,2190-2202`
+/// (`RB_IterateStagesGeneric`), `oracle/codemp/renderer/tr_shade.cpp:1535-1581`
+/// (`ComputeColors`)
+#[derive(Clone, Copy, Default)]
+struct EntityFx {
+    /// `RF_DISINTEGRATE1`: the procedural hole-ripping colours, plus a fixed
+    /// state-bit set that depth-writes and alpha-tests the hole.
+    disintegrate1: bool,
+    /// `RF_DISINTEGRATE2`: the same colour short-circuit, no state override.
+    disintegrate2: bool,
+    /// `RF_RGB_TINT`: force `CGEN_ENTITY`, so the stage takes the entity's own
+    /// `shaderRGBA` instead of the shader's rgbGen.
+    rgb_tint: bool,
+    /// `RF_FORCE_ENT_ALPHA`: overwrite every vertex alpha with the entity's,
+    /// and force the alpha-blend state.
+    force_ent_alpha: bool,
+    /// `RF_ALPHA_DEPTH`: the force-alpha state additionally depth-writes.
+    alpha_depth: bool,
+    /// `RF_VOLUMETRIC`: the fake volumetric shading short-circuit.
+    volumetric: bool,
+    /// `RF_DISTORTION`: the screen-capture refraction pass.
+    ///
+    //TODO: Port RB_IterateStagesGeneric's RF_DISTORTION arm
+    // Source: oracle/codemp/renderer/tr_shade.cpp:2162-2168
+    // The arm binds `tr.screenImage` and switches to two-sided culling, so it
+    // needs a screen-capture pass (`RB_CaptureScreenImage`) that no wave has
+    // built. The flag is read only to log once, and the stage draws plain.
+    distortion: bool,
+    /// The entity's `shaderRGBA[3]`, the alpha `RF_FORCE_ENT_ALPHA` writes.
+    ent_alpha: u8,
+}
+
+impl EntityFx {
+    /// Reads the flags off the surface's entity. A surface with no entity (the
+    /// world) applies nothing.
+    fn resolve(entity: Option<&trRefEntity_t>) -> EntityFx {
+        let Some(ent) = entity else {
+            return EntityFx::default();
+        };
+        let fx = ent.e.renderfx;
+        EntityFx {
+            disintegrate1: fx & RF_DISINTEGRATE1 != 0,
+            disintegrate2: fx & RF_DISINTEGRATE2 != 0,
+            rgb_tint: fx & RF_RGB_TINT != 0,
+            force_ent_alpha: fx & RF_FORCE_ENT_ALPHA != 0,
+            alpha_depth: fx & RF_ALPHA_DEPTH != 0,
+            volumetric: fx & RF_VOLUMETRIC != 0,
+            distortion: fx & RF_DISTORTION != 0,
+            ent_alpha: ent.e.shaderRGBA[3],
+        }
+    }
+
+    /// The stage's state bits after the two overrides that replace them
+    /// outright. `RF_DISINTEGRATE1` wins where both apply, matching the
+    /// oracle's order: it rewrites `stateBits` at the top of the stage loop,
+    /// and the force-alpha arm is an `else if` chain below that never sees it.
+    fn state_bits(&self, stage_bits: u32) -> u32 {
+        if self.disintegrate1 {
+            return (GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA
+                | GLS_DEPTHMASK_TRUE) as u32
+                | GLS_ATEST_GE_C0;
+        }
+        if self.force_ent_alpha {
+            let mut bits = (GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA) as u32;
+            if self.alpha_depth {
+                bits |= GLS_DEPTHMASK_TRUE as u32;
+            }
+            return bits;
+        }
+        stage_bits
+    }
+
+    /// Whether any override rewrites the per-vertex colours, which forces the
+    /// stage onto the per-frame dynamic block.
+    fn rewrites_colors(&self) -> bool {
+        self.disintegrate1 || self.disintegrate2 || self.rgb_tint || self.force_ent_alpha
+            || self.volumetric
+    }
+}
+
+/// Appends `RB_AddQuadStampExt`'s four corners and six indices for a quad
+/// centred at `origin` and spanned by `left` and `up`.
+///
+/// The oracle writes the same constant colour into all four vertices and the
+/// same view-facing normal; the normal is dropped here, as it is for every
+/// other CPU-built surface in this module.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:60-124`
+fn add_quad_stamp_ext(
+    verts: &mut Vec<WorldVertex>,
+    indices: &mut Vec<u32>,
+    origin: vec3_t,
+    left: vec3_t,
+    up: vec3_t,
+    color: [u8; 4],
+    s1: f32,
+    t1: f32,
+    s2: f32,
+    t2: f32,
+) {
+    let ndx = verts.len() as u32;
+    indices.extend_from_slice(&[ndx, ndx + 1, ndx + 3, ndx + 3, ndx + 1, ndx + 2]);
+
+    let corners = [
+        ([1.0f32, 1.0f32], [s1, t1]),
+        ([-1.0, 1.0], [s2, t1]),
+        ([-1.0, -1.0], [s2, t2]),
+        ([1.0, -1.0], [s1, t2]),
+    ];
+    for ([left_sign, up_sign], st) in corners {
+        verts.push(WorldVertex {
+            position: [
+                origin[0] + left_sign * left[0] + up_sign * up[0],
+                origin[1] + left_sign * left[1] + up_sign * up[1],
+                origin[2] + left_sign * left[2] + up_sign * up[2],
+            ],
+            st,
+            lightmap_st: [0.0, 0.0],
+            color,
+        });
+    }
+}
+
+/// Raven `DoSprite` - a screen-oriented quad of half-size `radius`, rotated by
+/// `rotation` degrees around the view axis.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:533-555`
+fn do_sprite(
+    verts: &mut Vec<WorldVertex>,
+    indices: &mut Vec<u32>,
+    origin: vec3_t,
+    radius: f32,
+    rotation: f32,
+    color: [u8; 4],
+    view: &viewParms_t,
+) {
+    // `M_PI * rotation / 180.0f` promotes to `f64` through the unsuffixed
+    // `M_PI`, then truncates back at the assignment.
+    let ang = (PI * rotation as f64 / 180.0) as f32;
+    let s = ang.sin();
+    let c = ang.cos();
+
+    let mut left: vec3_t = [0.0; 3];
+    VectorScale(view.ori.axis[1], c * radius, &mut left);
+    VectorMA(left, -s * radius, view.ori.axis[2], &mut left);
+
+    let mut up: vec3_t = [0.0; 3];
+    VectorScale(view.ori.axis[2], c * radius, &mut up);
+    VectorMA(up, s * radius, view.ori.axis[1], &mut up);
+
+    if view.isMirror != 0 {
+        VectorSubtract(vec3_origin, left, &mut left);
+    }
+
+    add_quad_stamp_ext(verts, indices, origin, left, up, color, 0.0, 0.0, 1.0, 1.0);
+}
+
+/// Raven `DoLine` - a view-facing quad spanning `start` to `end`, `spanWidth`
+/// wide either side of `up`.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:601-660`
+fn do_line(
+    verts: &mut Vec<WorldVertex>,
+    indices: &mut Vec<u32>,
+    start: vec3_t,
+    end: vec3_t,
+    up: vec3_t,
+    span_width: f32,
+    color: [u8; 4],
+) {
+    let vbase = verts.len() as u32;
+    let span_width2 = -span_width;
+
+    for (base, width, st) in [
+        (start, span_width, [0.0f32, 0.0f32]),
+        (start, span_width2, [1.0, 0.0]),
+        (end, span_width, [0.0, 1.0]),
+        (end, span_width2, [1.0, 1.0]),
+    ] {
+        let mut xyz: vec3_t = [0.0; 3];
+        VectorMA(base, width, up, &mut xyz);
+        verts.push(WorldVertex {
+            position: xyz,
+            st,
+            lightmap_st: [0.0, 0.0],
+            color,
+        });
+    }
+
+    indices.extend_from_slice(&[vbase, vbase + 1, vbase + 2, vbase + 2, vbase + 1, vbase + 3]);
+}
+
+/// Builds one generated entity surface's world-space vertices and triangle
+/// indices, the `RB_SurfaceEntity` dispatch restricted to the DEC-54 census
+/// set: `RT_SPRITE`, `RT_LINE`, and `RT_SABER_GLOW`.
+///
+/// Every other `reType` returns empty, which the caller counts as a skip.
+/// `RT_BEAM`, `RT_ORIENTED_QUAD`, `RT_ORIENTEDLINE`, `RT_ELECTRICITY`, and
+/// `RT_CYLINDER` are census-complement fog, so they stay unbuilt rather than
+/// guessed at.
+//TODO: Port RB_SurfaceBeam
+// Source: oracle/codemp/renderer/tr_surface.cpp:226-283
+//TODO: Port RB_SurfaceOrientedQuad
+// Source: oracle/codemp/renderer/tr_surface.cpp:173-215
+//TODO: Port RB_SurfaceOrientedLine
+// Source: oracle/codemp/renderer/tr_surface.cpp:786-806
+//TODO: Port RB_SurfaceElectricity
+// Source: oracle/codemp/renderer/tr_surface.cpp:1038-1090
+//TODO: Port RB_SurfaceCylinder
+// Source: oracle/codemp/renderer/tr_surface.cpp:854-985
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:1798-1870`
+fn build_entity_geometry(e: &refEntity_t, view: &viewParms_t) -> (Vec<WorldVertex>, Vec<u32>) {
+    let mut verts: Vec<WorldVertex> = Vec::new();
+    let mut indices: Vec<u32> = Vec::new();
+    let color = e.shaderRGBA;
+
+    match e.reType {
+        // `RB_SurfaceSprite`: the screen-oriented quad, with the rotation
+        // branch the oracle splits out for `rotation == 0`.
+        // Source: oracle/codemp/renderer/tr_surface.cpp:141-169
+        refEntityType_t::RT_SPRITE => {
+            let radius = e.radius;
+            let (mut left, mut up): (vec3_t, vec3_t) = ([0.0; 3], [0.0; 3]);
+            if e.rotation == 0.0 {
+                VectorScale(view.ori.axis[1], radius, &mut left);
+                VectorScale(view.ori.axis[2], radius, &mut up);
+            } else {
+                let ang = (PI * e.rotation as f64 / 180.0) as f32;
+                let s = ang.sin();
+                let c = ang.cos();
+
+                VectorScale(view.ori.axis[1], c * radius, &mut left);
+                VectorMA(left, -s * radius, view.ori.axis[2], &mut left);
+
+                VectorScale(view.ori.axis[2], c * radius, &mut up);
+                VectorMA(up, s * radius, view.ori.axis[1], &mut up);
+            }
+            if view.isMirror != 0 {
+                VectorSubtract(vec3_origin, left, &mut left);
+            }
+            add_quad_stamp_ext(
+                &mut verts,
+                &mut indices,
+                e.origin,
+                left,
+                up,
+                color,
+                0.0,
+                0.0,
+                1.0,
+                1.0,
+            );
+        }
+
+        // `RB_SurfaceLine`: the side vector is the cross product of the two
+        // eye-to-endpoint vectors, so the quad always faces the camera.
+        // Source: oracle/codemp/renderer/tr_surface.cpp:667-690
+        refEntityType_t::RT_LINE => {
+            let end = e.oldorigin;
+            let start = e.origin;
+
+            let mut v1: vec3_t = [0.0; 3];
+            let mut v2: vec3_t = [0.0; 3];
+            VectorSubtract(start, view.ori.origin, &mut v1);
+            VectorSubtract(end, view.ori.origin, &mut v2);
+            let mut right: vec3_t = [0.0; 3];
+            CrossProduct(v1, v2, &mut right);
+            VectorNormalize(&mut right);
+
+            do_line(&mut verts, &mut indices, start, end, right, e.radius, color);
+        }
+
+        // `RB_SurfaceSaberGlow`: a run of sprites stepped up the blade, then
+        // the hilt blob.
+        //
+        // The oracle's `e->radius += 0.017f` walks the *live* entity, so each
+        // sprite is a step wider than the last, and the widened radius persists
+        // into the next frame's submission. This build works on the local copy
+        // the loop carries, so the widening inside one blade is reproduced and
+        // the cross-frame leak is not: the frontend hands the backend a
+        // by-value entity list per scene (DEC-50), so there is no shared object
+        // to write back through.
+        //
+        // Source: oracle/codemp/renderer/tr_surface.cpp:560-580
+        refEntityType_t::RT_SABER_GLOW => {
+            let mut radius = e.radius;
+            let mut i = e.saberLength;
+            while i > 0.0 {
+                let mut end: vec3_t = [0.0; 3];
+                VectorMA(e.origin, i, e.axis[0], &mut end);
+                do_sprite(&mut verts, &mut indices, end, radius, 0.0, color, view);
+                // The oracle widens the radius inside the body, so the loop
+                // step below reads the already-widened value.
+                radius += 0.017;
+                i -= radius * 0.65;
+            }
+
+            // Big hilt sprite
+            //
+            //TODO: Port RB_SurfaceSaberGlow's random hilt radius
+            // Source: oracle/codemp/renderer/tr_surface.cpp:579
+            // The oracle radius is `5.5f + random() * 0.25f`. `random()` is
+            // `rand()/32768` off the ambient C generator, which the render
+            // thread does not own and which no image golden can pin. The low
+            // end of the same quarter-unit span stands in until a render-side
+            // generator lands.
+            do_sprite(&mut verts, &mut indices, e.origin, 5.5, 0.0, color, view);
+        }
+
+        _ => {}
+    }
+
+    (verts, indices)
 }
 
 /// Decodes one MD3 (`MOD_MESH`) surface into GPU vertices and triangle indices.
@@ -3870,6 +4740,9 @@ mod tests {
             None,
             &mut warnings,
             &mut out,
+            EntityFx::default(),
+            0,
+            [1.0, 0.0, 0.0],
         );
 
         assert_eq!(base, 0);
@@ -3915,6 +4788,9 @@ mod tests {
             None,
             &mut warnings,
             &mut out,
+            EntityFx::default(),
+            0,
+            [1.0, 0.0, 0.0],
         );
 
         assert_eq!(out[0].st, [0.8, 0.9]);

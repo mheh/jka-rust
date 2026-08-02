@@ -55,7 +55,9 @@ use crate::tr_world::{R_AddBrushModelSurfaces, R_AddWorldSurfaces};
 
 use core::f64::consts::PI;
 
+use mp_engine_ghoul2::api_models::g2api_have_we_ghoul2_models;
 use mp_engine_ghoul2::ghoul2_system::{BoneCacheId, Ghoul2System};
+use mp_engine_ghoul2::shared::cghoul2_info_v::CGhoul2Info_v;
 use mp_engine_qcommon::cm_terrain::CmLandScape;
 use mp_engine_qcommon::common::{com_error, Common, EngineHostView};
 use mp_engine_qcommon::common_fns::Com_DPrintf;
@@ -63,6 +65,7 @@ use mp_engine_qcommon::qfiles::draw_vert_t::drawVert_t;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
+use mp_qshared::common::mp::cgame::tr_types::{RF_SHADOW_ONLY, RF_THIRD_PERSON};
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::q_color::S_COLOR_RED;
 use mp_qshared::shared::q_math::{
@@ -1908,18 +1911,25 @@ pub fn R_AddEntitySurfaces<'a>(
                 // in the primary view. We can't just do this check for all
                 // entities, because md3 entities may still want to cast
                 // shadows from them
-                //
-                // DEFERRED: RF_THIRD_PERSON — never-guess-a-constant: not in
-                // this packet's FILE-SCOPE CONSTANTS section and not ported
-                // anywhere else in the crate (the identical absence
-                // `tr_mesh.rs::r_add_md3_surfaces`'s own DEFERRED note
-                // already records for this same flag). The oracle's very
-                // first statement in this arm reads it, so nothing past it
-                // is reachable without guessing the bitmask.
-                // Source: oracle/codemp/renderer/tr_main.cpp:1410-1417
-                todo!(
-                    "Port R_AddEntitySurfaces RT_SPRITE-family arm — RF_THIRD_PERSON unported, oracle/codemp/renderer/tr_main.cpp:1399-1418"
-                )
+                if (ent.e.renderfx & RF_THIRD_PERSON) != 0 && view.isPortal == 0 {
+                    continue;
+                }
+                let shader = R_GetShaderByHandle(assets, engine_view.common, ent.e.customShader);
+                let shader_sorted_index = assets
+                    .shaders
+                    .get(shader)
+                    .map(|s| s.sorted_index)
+                    .unwrap_or(0);
+                let fog_index = R_SpriteFogNum(refdef_rdflags, fogs, ent.e.origin, ent.e.radius);
+                R_AddDrawSurf(
+                    SurfaceGeometry::Other,
+                    shader_sorted_index,
+                    shifted_entity_num,
+                    rdf_nofog,
+                    fog_index,
+                    0,
+                    draw_surfs,
+                );
             }
 
             refEntityType_t::RT_MODEL => {
@@ -2032,26 +2042,58 @@ pub fn R_AddEntitySurfaces<'a>(
 
                     // null model axis
                     modtype_t::MOD_BAD => {
-                        // DEFERRED: RF_THIRD_PERSON/RF_SHADOW_ONLY — same
-                        // never-guess-a-constant absence as the
-                        // RT_SPRITE-family arm above; this arm's own
-                        // first statement reads RF_THIRD_PERSON before
-                        // anything else. The trailing
-                        // `G2API_HaveWeGhoul2Models` check (once
-                        // reachable) resolves to
-                        // `mp_engine_ghoul2::api_models::
-                        // g2api_have_we_ghoul2_models` (contra this
-                        // packet's resolved-call-surface note marking it
-                        // "NOT RESOLVED" — it exists, ported at wave-9
-                        // adjacent work) but reaching it still needs a
-                        // `&CGhoul2Info_v` for this entity, the same
-                        // per-entity Ghoul2System threading gap
-                        // `r_add_ghoul_surfaces`'s own doc comment
-                        // (`tr_ghoul2.rs`) already blocks on.
-                        // Source: oracle/codemp/renderer/tr_main.cpp:1445-1461
-                        todo!(
-                            "Port R_AddEntitySurfaces MOD_BAD arm — RF_THIRD_PERSON/RF_SHADOW_ONLY unported, oracle/codemp/renderer/tr_main.cpp:1445-1461"
-                        )
+                        let mut re = ref_entity_from_tr(ent);
+                        if (re.renderfx & RF_THIRD_PERSON) != 0
+                            && view.isPortal == 0
+                            && (re.renderfx & RF_SHADOW_ONLY) == 0
+                        {
+                            continue;
+                        }
+
+                        // The oracle's `ent->e.ghoul2 &&
+                        // G2API_HaveWeGhoul2Models(...)` pair: the handle is
+                        // the decoded token, and the instance list is rebuilt
+                        // around it the same way `r_add_ghoul_surfaces` does.
+                        if let Some(handle) = re.ghoul2 {
+                            let ghoul2 = CGhoul2Info_v { mItem: handle.0 };
+                            if g2api_have_we_ghoul2_models(g2, &ghoul2) {
+                                r_add_ghoul_surfaces(
+                                    &mut re,
+                                    handle,
+                                    engine_view,
+                                    assets,
+                                    models,
+                                    view,
+                                    &ori,
+                                    cvars,
+                                    frame,
+                                    g2,
+                                    fogs,
+                                    refdef_rdflags,
+                                    shifted_entity_num,
+                                    dlights,
+                                    draw_surfs,
+                                );
+                                write_back_lighting(ent, &re);
+                                continue;
+                            }
+                        }
+
+                        // `tr.defaultShader` is slot zero (`tr_shader.rs`).
+                        let shader_sorted_index = assets
+                            .shaders
+                            .get(ShaderHandle::slot_zero())
+                            .map(|s| s.sorted_index)
+                            .unwrap_or(0);
+                        R_AddDrawSurf(
+                            SurfaceGeometry::Other,
+                            shader_sorted_index,
+                            shifted_entity_num,
+                            rdf_nofog,
+                            0,
+                            0,
+                            draw_surfs,
+                        );
                     }
 
                     modtype_t::MOD_MDXA => {

@@ -332,6 +332,26 @@ static FS_SCRAMBLED_PRODUCT_ID: [u8; 165] = [
     115,
 ];
 
+/// The `productid.txt` body [`FS_SetRestrictions`] accepts, unscrambled from
+/// the table above with the same seed walk the check runs.
+///
+/// A full retail install ships this file, so retail always boots with
+/// `fs_restrict` off and scans loose directories. A harness that boots against
+/// a synthetic game tree writes this file to reach the same state; without it
+/// the filesystem drops to demo mode, where only paks are visible.
+///
+/// Source: `oracle/codemp/qcommon/files_pc.cpp:2587-2637`
+pub fn FS_ProductIdFile() -> Vec<u8> {
+    let mut seed: c_int = 102270;
+    let mut out: Vec<u8> = Vec::with_capacity(FS_SCRAMBLED_PRODUCT_ID.len());
+    for byte in FS_SCRAMBLED_PRODUCT_ID.iter() {
+        out.push((*byte as c_int ^ (seed & 255)) as u8);
+        // C `69069*seed+1` wraps on overflow.
+        seed = seed.wrapping_mul(69069).wrapping_add(1);
+    }
+    out
+}
+
 /// Raven `FS_HandleForFile`.
 ///
 /// Source: `oracle/codemp/qcommon/files_common.cpp:258-268`

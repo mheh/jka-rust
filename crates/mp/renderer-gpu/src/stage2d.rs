@@ -30,9 +30,11 @@ use mp_renderer::tr_local::color_gen_t::colorGen_t;
 use mp_renderer::tr_local::tex_coord_gen_t::texCoordGen_t;
 use mp_renderer::tr_local::tex_mod_t::texMod_t;
 use mp_renderer::tr_noise::NoiseState;
+use mp_renderer::render_state::placeholders::RefEntity;
 use mp_renderer::tr_shade_calc::{
-    myftol, RB_CalcRotateTexCoords, RB_CalcScaleTexCoords, RB_CalcScrollTexCoords,
-    RB_CalcStretchTexCoords, RB_CalcTransformTexCoords, RB_CalcWaveAlpha, RB_CalcWaveColor,
+    myftol, RB_CalcColorFromEntity, RB_CalcColorFromOneMinusEntity, RB_CalcRotateTexCoords,
+    RB_CalcScaleTexCoords, RB_CalcScrollTexCoords, RB_CalcStretchTexCoords,
+    RB_CalcTransformTexCoords, RB_CalcWaveAlpha, RB_CalcWaveColor,
 };
 
 /// `tr.identityLight`.
@@ -147,6 +149,10 @@ pub fn stage_color(
     let mut colors = [[0u8; 4]; QUAD_VERTS];
     stage_colors_into(
         stage,
+        stage.rgb_gen,
+        // The 2D pass has no current entity, so the entity rgbGen arms keep the
+        // colour the switch started with.
+        None,
         &input,
         &mut colors,
         time,
@@ -179,6 +185,8 @@ pub fn stage_color(
 #[allow(clippy::too_many_arguments)]
 pub fn stage_colors_into(
     stage: &ShaderStage,
+    force_rgb_gen: colorGen_t,
+    entity: Option<&RefEntity>,
     input_colors: &[[u8; 4]],
     out: &mut [[u8; 4]],
     time: StageTime,
@@ -189,11 +197,6 @@ pub fn stage_colors_into(
 ) {
     // The `default:`/unimplemented arms keep the input colour, so start there.
     out.copy_from_slice(input_colors);
-
-    // `forceRGBGen` is 0 (`CGEN_BAD`) for every pass this port drives —
-    // `RB_StageIteratorGeneric` passes it only for the entity-forced paths — so
-    // it always falls back to the stage's own `rgbGen`.
-    let force_rgb_gen = stage.rgb_gen;
 
     //
     // rgbGen
@@ -252,6 +255,10 @@ pub fn stage_colors_into(
             assets,
             shader_name,
         ),
+        // `RF_RGB_TINT` forces this arm, and a shader may ask for it directly.
+        // Source: oracle/codemp/renderer/tr_shade.cpp:1662-1668
+        colorGen_t::CGEN_ENTITY => RB_CalcColorFromEntity(out, entity),
+        colorGen_t::CGEN_ONE_MINUS_ENTITY => RB_CalcColorFromOneMinusEntity(out, entity),
         other => warnings.once("rgbGen", other as i32, shader_name),
     }
 
