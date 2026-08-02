@@ -11,8 +11,9 @@
 //!
 //! Source: `oracle/codemp/win32/win_wndproc.cpp:301-540`
 
-use std::sync::mpsc::SyncSender;
+use std::sync::mpsc::{sync_channel, SyncSender};
 use std::sync::Arc;
+use std::thread::Builder;
 
 use mp_engine_qcommon::common::platform_events::{PlatformEvent, PlatformEventSink};
 use mp_engine_qcommon::qcommon::sys_event_type_t::sysEventType_t;
@@ -20,7 +21,7 @@ use mp_renderer_gpu::Gpu;
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, ElementState, KeyEvent, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow};
-use winit::keyboard::PhysicalKey;
+use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{CursorGrabMode, Window, WindowId};
 
 use crate::keymap::{map_char, map_key, map_mouse_button, wheel_key};
@@ -98,8 +99,8 @@ impl ApplicationHandler for Pump {
         // The surface is built here, on the thread that owns the window, and
         // then the whole GPU moves to the render thread for good.
         let gpu = Gpu::new(Arc::clone(&window));
-        let (tx, rx) = std::sync::mpsc::sync_channel(RENDER_QUEUE);
-        std::thread::Builder::new()
+        let (tx, rx) = sync_channel(RENDER_QUEUE);
+        Builder::new()
             .name("jamp-render".to_string())
             .spawn(move || render_thread::run(gpu, rx))
             .expect("spawn: the client could not start its render thread");
@@ -114,8 +115,7 @@ impl ApplicationHandler for Pump {
         // positions. The sim thread sums it into one `SE_MOUSE` per frame.
         // Source: `oracle/codemp/win32/win_input.cpp:410-447`
         if let DeviceEvent::MouseMotion { delta } = event {
-            self.events
-                .add_mouse_delta(delta.0 as i32, delta.1 as i32);
+            self.events.add_mouse_delta(delta.0 as i32, delta.1 as i32);
         }
     }
 
@@ -168,7 +168,7 @@ impl ApplicationHandler for Pump {
                     }
                     // The console key never produces a character, so the
                     // console open stroke does not type a backquote.
-                    if code == winit::keyboard::KeyCode::Backquote {
+                    if code == KeyCode::Backquote {
                         return;
                     }
                 }

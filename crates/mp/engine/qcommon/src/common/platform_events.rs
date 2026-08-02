@@ -85,10 +85,7 @@ pub fn platform_event_bus() -> (PlatformEventSink, PlatformEventSource) {
         events: tx,
         shared: Arc::clone(&shared),
     };
-    let source = PlatformEventSource {
-        events: rx,
-        shared,
-    };
+    let source = PlatformEventSource { events: rx, shared };
     (sink, source)
 }
 

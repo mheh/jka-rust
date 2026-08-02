@@ -109,11 +109,21 @@ impl SoundDevice {
         let frames = (ring_bytes / RING_BYTES_PER_FRAME).max(1) as u64;
 
         let stream = match format {
-            SampleFormat::F32 => build_stream::<f32>(&device, &config, &ring, step, frames, device_channels),
-            SampleFormat::I16 => build_stream::<i16>(&device, &config, &ring, step, frames, device_channels),
-            SampleFormat::U16 => build_stream::<u16>(&device, &config, &ring, step, frames, device_channels),
-            SampleFormat::I32 => build_stream::<i32>(&device, &config, &ring, step, frames, device_channels),
-            SampleFormat::F64 => build_stream::<f64>(&device, &config, &ring, step, frames, device_channels),
+            SampleFormat::F32 => {
+                build_stream::<f32>(&device, &config, &ring, step, frames, device_channels)
+            }
+            SampleFormat::I16 => {
+                build_stream::<i16>(&device, &config, &ring, step, frames, device_channels)
+            }
+            SampleFormat::U16 => {
+                build_stream::<u16>(&device, &config, &ring, step, frames, device_channels)
+            }
+            SampleFormat::I32 => {
+                build_stream::<i32>(&device, &config, &ring, step, frames, device_channels)
+            }
+            SampleFormat::F64 => {
+                build_stream::<f64>(&device, &config, &ring, step, frames, device_channels)
+            }
             other => return Err(format!("unsupported sample format {other:?}")),
         }
         .map_err(|error| format!("could not build the output stream ({error})"))?;
@@ -225,7 +235,11 @@ fn write_frame<T: cpal::SizedSample + cpal::FromSample<f32>>(
 #[cfg(not(feature = "sound_device"))]
 impl SoundDevice {
     /// The no-device arm: Raven's dedicated build had no `win_snd.cpp` linked.
-    pub fn open(_speed: c_int, _channels: c_int, _ring_bytes: usize) -> Result<SoundDevice, String> {
+    pub fn open(
+        _speed: c_int,
+        _channels: c_int,
+        _ring_bytes: usize,
+    ) -> Result<SoundDevice, String> {
         Err("built without the sound_device feature".to_string())
     }
 

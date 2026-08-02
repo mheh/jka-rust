@@ -20,6 +20,8 @@ mod pump;
 mod render_thread;
 mod sim;
 
+use std::thread::Builder;
+
 use mp_engine_qcommon::common::platform_events::platform_event_bus;
 use mp_engine_qcommon::common::ComError;
 use winit::event_loop::EventLoop;
@@ -50,7 +52,7 @@ fn main() {
 
     let (sink, source) = platform_event_bus();
     let arguments = command_line();
-    std::thread::Builder::new()
+    Builder::new()
         .name("jamp-sim".to_string())
         .spawn(move || sim::run(source, arguments))
         .expect("spawn: the client could not start its sim thread");
