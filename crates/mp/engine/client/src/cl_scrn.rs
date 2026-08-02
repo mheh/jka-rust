@@ -27,7 +27,11 @@ use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::q_color::{g_color_table, Q_IsColorString};
 use native_types::qhandle_t;
 
+use crate::cl_cgame::CL_CGameRendering;
+use crate::cl_cin::SCR_DrawCinematic;
+use crate::cl_console::Con_DrawConsole;
 use crate::client_host::{Client, MAX_SCR_LINES};
+use crate::snd_stubs::S_StopAllSounds;
 
 /// Raven `SCR_DrawNamedPic`.
 ///

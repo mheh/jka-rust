@@ -34,7 +34,9 @@ use crate::cin::cin_consts::{
     ROQ_PACKET, ROQ_QUAD_HANG, ROQ_QUAD_INFO, ROQ_QUAD_JPEG, ROQ_QUAD_VQ, ZA_SOUND_MONO,
     ZA_SOUND_STEREO,
 };
+use crate::cl_console::Con_Close;
 use crate::client_host::Client;
+use crate::snd_stubs::{S_RawSamples, S_StopAllSounds, S_Update};
 
 // PORT-NOTE(deps): `mp_qshared::shared::cbuf_exec::cbufExec_t`, `native_string`,
 // and `mp_engine_icarus` (for `S_COLOR_RED`) are referenced per the packet

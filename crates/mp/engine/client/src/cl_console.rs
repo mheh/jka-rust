@@ -24,9 +24,12 @@ use mp_game::g_cmds::SAY_TEAM;
 use mp_game::g_team::{COLOR_RED, COLOR_WHITE};
 use mp_qshared::shared::connstate_t;
 use mp_qshared::shared::limits::MAX_CLIENTS;
+use mp_qshared::shared::q_color::Q_IsColorString;
 use mp_qshared::shared::qboolean;
 use native_types::fileHandle_t;
 
+use crate::cl_keys::Field_Clear;
+use crate::cl_scrn::{SCR_DrawBigString, SCR_DrawPic, SCR_DrawSmallChar};
 use crate::client::console_t::NUM_CON_TIMES;
 use crate::client_host::Client;
 use crate::keys::key_globals_s::COMMAND_HISTORY;

@@ -10,23 +10,19 @@ use core::ffi::c_int;
 use native_math::vector::vec3_t;
 
 use crate::cm::cm_terrainmap_consts::{SIDE_BLUE, SIDE_RED, TM_HEIGHT, TM_WIDTH};
+use crate::cm::cpixel32::CPixel32;
+use crate::cm::cterrainmap::CTerrainMap;
 use crate::cm_terrain::CmLandScape;
 use crate::collision_world::CollisionWorld;
-
-//TODO: Port CPixel32
-// Source: oracle/codemp/qcommon/cm_draw.h:24-60
-//TODO: Port CTerrainMap
-// Source: oracle/codemp/qcommon/cm_terrainmap.h:17-60
-// Both classes belong to the automap raster lane (gh#29).
 
 /// Raven `SideColor` picks the automap wall color for a terrain side flag.
 ///
 /// Source: `oracle/codemp/qcommon/cm_terrainmap.cpp:29-44`
 pub fn SideColor(side: c_int) -> CPixel32 {
-    let mut col = CPixel32::new(255, 255, 255);
+    let mut col = CPixel32::new(255, 255, 255, 255);
     match side {
-        SIDE_BLUE => col = CPixel32::new(0, 0, 192),
-        SIDE_RED => col = CPixel32::new(192, 0, 0),
+        SIDE_BLUE => col = CPixel32::new(0, 0, 192, 255),
+        SIDE_RED => col = CPixel32::new(192, 0, 0, 255),
         _ => {}
     }
     col
@@ -52,7 +48,7 @@ pub fn CM_TM_Create(cm: &mut CollisionWorld, landscape: *mut CmLandScape) {
         CM_TM_Free(cm);
     }
 
-    cm.terrain_map = Some(CTerrainMap::new(landscape));
+    cm.terrain_map = Some(Box::new(CTerrainMap::new(landscape)));
 }
 
 /// Raven `CM_TM_AddNPC` records an NPC marker on the active terrain map.

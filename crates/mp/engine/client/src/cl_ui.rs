@@ -45,6 +45,9 @@ use native_string::{latin1_to_string, string_to_latin1};
 
 use crate::client::client_static_t::{MAX_GLOBAL_SERVERS, MAX_OTHER_SERVERS};
 use crate::client::server_info_t::serverInfo_t;
+use crate::snd_stubs::{
+    S_RegisterSound, S_StartBackgroundTrack, S_StartLocalSound, S_StopBackgroundTrack,
+};
 use crate::Client;
 
 /// Raven's `AS_LOCAL`/`AS_MPLAYER`/`AS_GLOBAL`/`AS_FAVORITES` server-source
@@ -1279,10 +1282,10 @@ pub fn CL_UISystemCalls(
         0
     } else if trap == MpUiImport::UI_S_REGISTERSOUND as c_int {
         unsafe {
-            crate::snd::S_RegisterSound(cl, &cstr_to_string(vma(common, args, 1) as *const c_char))
+            S_RegisterSound(cl, &cstr_to_string(vma(common, args, 1) as *const c_char))
         }
     } else if trap == MpUiImport::UI_S_STARTLOCALSOUND as c_int {
-        unsafe { crate::snd::S_StartLocalSound(cl, *args.offset(1), *args.offset(2)) };
+        unsafe { S_StartLocalSound(cl, *args.offset(1), *args.offset(2)) };
         0
     } else if trap == MpUiImport::UI_KEY_KEYNUMTOSTRINGBUF as c_int {
         unsafe {
@@ -1530,11 +1533,11 @@ pub fn CL_UISystemCalls(
         unsafe { (*common.botlib_export).PC_RemoveAllGlobalDefines() };
         0
     } else if trap == MpUiImport::UI_S_STOPBACKGROUNDTRACK as c_int {
-        crate::snd::S_StopBackgroundTrack(cl);
+        S_StopBackgroundTrack(cl);
         0
     } else if trap == MpUiImport::UI_S_STARTBACKGROUNDTRACK as c_int {
         unsafe {
-            crate::snd::S_StartBackgroundTrack(
+            S_StartBackgroundTrack(
                 cl,
                 &cstr_to_string(vma(common, args, 1) as *const c_char),
                 &cstr_to_string(vma(common, args, 2) as *const c_char),

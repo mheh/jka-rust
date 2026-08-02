@@ -4,31 +4,31 @@ use core::ffi::{c_int, c_long, c_void};
 
 use native_types::byte;
 
+use crate::cm::cdraw32::CDraw32;
 use crate::cm::cm_draw_cpp_consts::{BOTTOM, INT_SHIFT, LEFT, RIGHT, TOP};
 use crate::cm::polyedge::POLYEDGE;
 use crate::collision_world::CollisionWorld;
 
 /// Raven `code` determines where a point sits relative to the debug clip box.
 ///
+/// Raven reads the clip bounds from `CDraw32` class statics.
+/// This port takes the drawing context as a parameter, because the codebase
+/// allows no globals.
+///
 /// Source: `oracle/codemp/qcommon/cm_draw.cpp:195-209`
-pub fn code(x: c_long, y: c_long) -> c_long {
+pub fn code(draw: &CDraw32, x: c_long, y: c_long) -> c_long {
     let mut c: c_long = 0;
 
-    //TODO: Port CDraw32
-    // Source: oracle/codemp/qcommon/cm_draw.h:78-180
-    // The four `clip_min_x`/`clip_max_x`/`clip_min_y`/`clip_max_y` reads below
-    // are static members of the automap raster class.
-    // That class needs a state home, so the automap lane (gh#29) owns it.
-    if x < CDraw32::clip_min_x {
+    if x < draw.clip_min_x {
         c |= LEFT;
     }
-    if x > CDraw32::clip_max_x {
+    if x > draw.clip_max_x {
         c |= RIGHT;
     }
-    if y < CDraw32::clip_min_y {
+    if y < draw.clip_min_y {
         c |= BOTTOM;
     }
-    if y > CDraw32::clip_max_y {
+    if y > draw.clip_max_y {
         c |= TOP;
     }
 

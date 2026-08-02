@@ -21,6 +21,7 @@ use crate::cm::ccmshader::CCMShader;
 use crate::cm::clip_map_t::clipMap_t;
 use crate::cm::cm_patch_h_consts::MAX_PATCH_PLANES;
 use crate::cm::cmodel_s::cmodel_t;
+use crate::cm::cterrainmap::CTerrainMap;
 use crate::cm::patch_plane_t::patchPlane_t;
 use crate::cm::polyedge::POLYEDGE;
 use crate::cm_load::CRMManager;
@@ -277,6 +278,14 @@ pub struct CollisionWorld {
     /// Source: `oracle/codemp/qcommon/cm_draw.cpp:1084-1085`
     pub nact: c_long,
     pub active: [POLYEDGE; 256],
+
+    /// Raven `CTerrainMap *TerrainMap` — the automap image for the current
+    /// landscape, `Some` only between `CM_TM_Create` and `CM_TM_Free`.
+    /// The `Box` keeps Raven's pointer indirection, so the null-pointer state is
+    /// `None` and the field stays zero-valid under the `alloc_zeroed` mass.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_terrainmap.cpp:14`
+    pub terrain_map: Option<Box<CTerrainMap>>,
 }
 
 impl CollisionWorld {

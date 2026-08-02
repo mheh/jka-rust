@@ -14,6 +14,8 @@ use mp_qshared::common::mp::cgame::glconfig_t::glconfig_t;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
+use mp_qshared::common::mp::qcommon::qtime::qtime_t;
+use mp_qshared::shared::q_math::Sys_SnapVector;
 use mp_qshared::common::mp::cgame::stereo_frame_t::stereoFrame_t;
 use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
 use mp_qshared::common::mp::qcommon::shared_ragdoll_params::sharedRagDollParams_t;
@@ -40,7 +42,7 @@ use native_string::atoi::atoi;
 use crate::client::cl_main_consts::MAX_STRINGED_SV_STRING;
 use crate::client::client_consts::{CMD_BACKUP, CMD_MASK, MAX_PARSE_ENTITIES, RESET_TIME};
 use mp_qshared::shared::keycatch::KEYCATCH_CGAME;
-use native_math::qmath::vec3_origin;
+use native_math::qmath::{vec3_origin, AngleVectors, MatrixMultiply};
 
 // PORT-NOTE(cross-shard): `Con_Close`, `Con_ClearNotify`, `CL_ReadDemoMessage`,
 // `CL_FirstSnapshot`, and `CL_SystemInfoChanged` are in-engine callees this
@@ -60,12 +62,13 @@ use mp_abi::ui::exports::MpUiExport;
 
 use mp_abi::cgame::syscalls::CG_CM_MARKFRAGMENTS::markFragment_t;
 use mp_engine_qcommon::cm_load::{
-    CM_InlineModel, CM_LoadMap, CM_LoadSubBSP, CM_NumInlineModels, CM_TempBoxModel,
+    CM_InlineModel, CM_LoadMap, CM_LoadSubBSP, CM_NumInlineModels, CM_TempBoxModel, CRMManager,
 };
 use mp_engine_qcommon::cm_test::{CM_PointContents, CM_TransformedPointContents};
 use mp_engine_qcommon::cm_trace::{CM_BoxTrace, CM_TransformedBoxTrace};
 use mp_engine_qcommon::cmd_common::{
-    Cbuf_AddText, Cmd_Argc, Cmd_ArgsBuffer, Cmd_ArgsFrom, Cmd_Argv, Cmd_TokenizeString,
+    Cbuf_AddText, Cmd_Argc, Cmd_ArgsBuffer, Cmd_ArgsFrom, Cmd_Argv, Cmd_ArgvBuffer,
+    Cmd_TokenizeString,
 };
 use mp_engine_qcommon::cmd_pc::{Cmd_AddCommand, Cmd_RemoveCommand};
 use mp_engine_qcommon::collision_world::CollisionWorld;
@@ -89,11 +92,13 @@ use mp_engine_qcommon::vm_fns::{
 };
 use mp_engine_qcommon::z_memman_pc::{Com_TouchMemory, Hunk_MemoryRemaining};
 use native_types::mdxaBone_t;
+use native_types::fileHandle_t;
 use native_types::qhandle_t;
 
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_ghoul2::gore::crag_doll_params::CRagDollParams;
 use mp_engine_ghoul2::gore::sskin_gore_data::SSkinGoreData;
+use mp_engine_ghoul2::shared::cghoul2_info::CGhoul2Info;
 use mp_engine_ghoul2::shared::cghoul2_info_v::CGhoul2Info_v;
 
 use mp_engine_rmg::rm_manager::RmManager;
@@ -103,8 +108,29 @@ use native_string::info::Info_ValueForKey;
 use native_string::q_string::Q_strcat;
 use native_string::q_strncpyz::Q_strncpyz;
 
+use crate::cl_cin::{
+    CIN_DrawCinematic, CIN_PlayCinematic, CIN_RunCinematic, CIN_SetExtents, CIN_StopCinematic,
+};
+use crate::cl_console::{Con_ClearNotify, Con_Close};
+use crate::cl_keys::{Key_GetKey, Key_IsDown};
+use crate::cl_main::{CL_AddReliableCommand, CL_ReadDemoMessage};
+use crate::cl_parse::{CL_GetValueForHidden, CL_SystemInfoChanged};
+use crate::cl_scrn::SCR_UpdateScreen;
+use crate::cl_ui::{Key_GetCatcher, Key_SetCatcher};
 use crate::client::cl_snapshot_t::clSnapshot_t;
 use crate::client_host::Client;
+use crate::fx_stubs::{
+    FX_AddBezier, FX_AddElectricity, FX_AddLine, FX_AddParticle, FX_AddPoly,
+    FX_AddScheduledEffects, FX_AdjustTime, FX_Draw2DEffects, FX_FeedTrail, FX_Free, FX_FreeSystem,
+    FX_InitSystem, FX_PlayBoltedEffectID, FX_PlayEffect, FX_PlayEffectID, FX_PlayEntityEffectID,
+    FX_RegisterEffect, FX_SetRefDefFromCGame,
+};
+use crate::snd_stubs::{
+    AS_AddPrecacheEntry, AS_GetBModelSound, AS_ParseSets, S_AddLocalSet, S_AddLoopingSound,
+    S_ClearLoopingSounds, S_MuteSound, S_RegisterSound, S_Respatialize, S_StartBackgroundTrack,
+    S_StartLocalSound, S_StartSound, S_StopBackgroundTrack, S_StopLoopingSound, S_UpdateAmbientSet,
+    S_UpdateEntityPosition,
+};
 
 // PORT-NOTE(rosetta-gap): `byte` did not carry a rosetta path this porter could
 // resolve without an upward `mp_game` dependency from an engine-tier crate

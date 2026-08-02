@@ -4,8 +4,27 @@
 
 use core::ffi::{c_char, c_int, CStr};
 
+use mp_abi::cgame::exports::MpCgameExport;
 use mp_engine_qcommon::common::common::{com_printf, Common};
 use mp_engine_qcommon::common::error::com_error;
+use mp_engine_qcommon::common_fns::{Com_DPrintf, Com_Memcpy, Com_Memset};
+use mp_engine_qcommon::cvar_fns::{
+    Cvar_Set, Cvar_SetCheatState, Cvar_SetValue, Cvar_VariableString, Cvar_VariableValue,
+};
+use mp_engine_qcommon::files::unz_types::z_stream;
+use mp_engine_qcommon::files_common::{
+    FS_FCloseFile, FS_PureServerSetLoadedPaks, FS_Write,
+};
+use mp_engine_qcommon::files_pc::{
+    FS_ConditionalRestart, FS_PureServerSetReferencedPaks, FS_SV_FOpenFileWrite, FS_SV_Rename,
+    FS_UpdateGamedir,
+};
+use mp_engine_qcommon::msg::{
+    MSG_Bitstream, MSG_CheckNETFPSFOverrides, MSG_ReadBigString, MSG_ReadBits, MSG_ReadByte,
+    MSG_ReadData, MSG_ReadDeltaEntity, MSG_ReadDeltaPlayerstate, MSG_ReadLong, MSG_ReadShort,
+    MSG_ReadString,
+};
+use mp_engine_qcommon::vm_fns::VM_Call;
 use mp_engine_qcommon::qcommon::net_limits::{
     MAX_MSGLEN, MAX_RELIABLE_COMMANDS, PACKET_BACKUP, PACKET_MASK,
 };
@@ -24,6 +43,9 @@ use native_string::q_string::Q_stricmp;
 use native_string::q_strncpyz::Q_strncpyz;
 use native_types::{qboolean, qfalse, qtrue, MAX_QPATH};
 
+use crate::cl_console::Con_Close;
+use crate::cl_input::CL_WritePacket;
+use crate::cl_main::{CL_AddReliableCommand, CL_ClearState, CL_InitDownloads, CL_NextDownload};
 use crate::client::cl_snapshot_t::clSnapshot_t;
 use crate::client::client_connection_t::MAX_HEIGHTMAP_SIZE;
 use crate::client::client_consts::MAX_PARSE_ENTITIES;

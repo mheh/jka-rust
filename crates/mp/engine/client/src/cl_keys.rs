@@ -40,8 +40,14 @@ use native_string::q_strncpyz::Q_strncpyz;
 use native_types::field_t;
 use native_types::fileHandle_t;
 
+use crate::cl_console::{Con_Bottom, Con_PageDown, Con_PageUp, Con_ToggleConsole_f, Con_Top};
+use crate::cl_main::{CL_AddReliableCommand, CL_Disconnect_f};
+use crate::cl_scrn::{
+    SCR_DrawBigString, SCR_DrawSmallChar, SCR_DrawSmallStringExt, SCR_UpdateScreen,
+};
 use crate::client_host::Client;
 use crate::keys::key_globals_s::{COMMAND_HISTORY, MAX_KEYS};
+use crate::snd_stubs::S_StopAllSounds;
 
 /// Raven `Field_Clear`.
 ///

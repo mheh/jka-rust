@@ -96,6 +96,14 @@ use mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::{
 use mp_engine_icarus::q3_interface::{S_COLOR_RED, S_COLOR_YELLOW};
 
 use crate::client::client_consts::RETRANSMIT_TIMEOUT;
+use crate::cl_cgame::{CL_InitCGame, CL_SetCGameTime, CL_ShutdownCGame};
+use crate::cl_cin::{CL_PlayCinematic_f, SCR_RunCinematic, SCR_StopCinematic};
+use crate::cl_console::{Con_Close, Con_Init, Con_RunConsole};
+use crate::cl_input::{CL_InitInput, CL_SendCmd, CL_WritePacket};
+use crate::cl_net_chan::CL_Netchan_Process;
+use crate::cl_parse::CL_ParseServerMessage;
+use crate::cl_scrn::{SCR_DebugGraph, SCR_Init, SCR_UpdateScreen};
+use crate::cl_ui::{CL_InitUI, CL_ShutdownUI};
 use crate::client::server_status_t::serverStatus_t;
 use crate::client::cl_main_consts::{
     G2_VERT_SPACE_CLIENT_SIZE, MAXPRINTMSG, MAX_SERVERSPERPACKET, MAX_STRINGED_SV_STRING,
@@ -107,6 +115,10 @@ use crate::client::ping_t::ping_t;
 use crate::client::server_address_t::serverAddress_t;
 use crate::client::server_info_t::serverInfo_t;
 use crate::client_host::Client;
+use crate::snd_stubs::{
+    S_BeginRegistration, S_ClearSoundBuffer, S_DisableSounds, S_Init, S_RestartMusic, S_Shutdown,
+    S_StopAllSounds, S_Update,
+};
 
 // PORT-NOTE(latin1-scratch): Raven passes `char[]` scratch buffers straight into
 // `strlen`/`strcmp`/printf. The ported callees take `&str`, so each site reads

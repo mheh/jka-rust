@@ -60,6 +60,8 @@ use native_math::qmath::{AngleNormalize180, AngleNormalize360, AngleSubtract, Cl
 use native_math::vector::vec3_t;
 use native_string::atoi::atoi;
 
+use crate::cl_net_chan::{CL_Netchan_Transmit, CL_Netchan_TransmitNextFragment};
+use crate::cl_scrn::SCR_DebugGraph;
 use crate::client::kbutton_t::kbutton_t;
 use crate::client_host::Client;
 
