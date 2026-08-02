@@ -6,6 +6,7 @@ use core::ffi::{c_char, c_int, CStr};
 
 use mp_abi::cgame::exports::MpCgameExport;
 use mp_engine_qcommon::common::common::{com_printf, Common};
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::error::com_error;
 use mp_engine_qcommon::common_fns::{Com_DPrintf, Com_Memcpy, Com_Memset};
 use mp_engine_qcommon::cvar_fns::{
@@ -106,12 +107,12 @@ pub fn CL_DeltaEntity(
 /// directly below and must be threaded in at integration.
 ///
 /// Source: `oracle/codemp/client/cl_parse.cpp:341-373`
-pub fn CL_ParseSetGame(msg: *mut msg_t) {
+pub fn CL_ParseSetGame(view: &mut EngineHostView, msg: *mut msg_t) {
     let mut new_game_dir = [0 as c_char; MAX_QPATH];
     let mut i: usize = 0;
 
     while i < MAX_QPATH {
-        let next = MSG_ReadByte(common, msg) as u8 as c_char;
+        let next = MSG_ReadByte(view.common, msg) as u8 as c_char;
 
         if next != 0 {
             // if next is 0 then we have finished reading to the end of the message
@@ -848,17 +849,17 @@ pub fn CL_ParseGamestate(common: &mut Common, cl: &mut Client, msg: *mut msg_t) 
 /// own note); the call here passes `cl` only, matching its resolved signature.
 ///
 /// Source: `oracle/codemp/client/cl_parse.cpp:854-1029`
-pub fn CL_ParseServerMessage(common: &mut Common, cl: &mut Client, msg: *mut msg_t) {
+pub fn CL_ParseServerMessage(view: &mut EngineHostView, cl: &mut Client, msg: *mut msg_t) {
     if cl.cl_shownet == 1 {
-        com_printf(common, &format!("{} ", unsafe { (*msg).cursize }));
+        com_printf(view.common, &format!("{} ", unsafe { (*msg).cursize }));
     } else if cl.cl_shownet >= 2 {
-        com_printf(common, "------------------\n");
+        com_printf(view.common, "------------------\n");
     }
 
     MSG_Bitstream(msg);
 
     // get the reliable sequence acknowledge number
-    cl.clc.reliableAcknowledge = MSG_ReadLong(common, msg);
+    cl.clc.reliableAcknowledge = MSG_ReadLong(view.common, msg);
     //
     if cl.clc.reliableAcknowledge < cl.clc.reliableSequence - MAX_RELIABLE_COMMANDS as c_int {
         cl.clc.reliableAcknowledge = cl.clc.reliableSequence;
@@ -876,7 +877,7 @@ pub fn CL_ParseServerMessage(common: &mut Common, cl: &mut Client, msg: *mut msg
             break;
         }
 
-        let cmd = MSG_ReadByte(common, msg);
+        let cmd = MSG_ReadByte(view.common, msg);
 
         if cmd == mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::svc_EOF as c_int {
             SHOWNET(cl, msg, c"END OF MESSAGE".as_ptr() as *mut c_char);
@@ -887,7 +888,7 @@ pub fn CL_ParseServerMessage(common: &mut Common, cl: &mut Client, msg: *mut msg
             //TODO: Port svc_strings
             if svc_strings[cmd as usize].is_empty() {
                 com_printf(
-                    common,
+                    view.common,
                     &format!("{:3}:BAD CMD {}\n", unsafe { (*msg).readcount - 1 }, cmd),
                 );
             } else {
@@ -903,16 +904,16 @@ pub fn CL_ParseServerMessage(common: &mut Common, cl: &mut Client, msg: *mut msg
         {
             CL_ParseCommandString(cl, msg);
         } else if cmd == mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::svc_gamestate as c_int {
-            CL_ParseGamestate(common, cl, msg);
+            CL_ParseGamestate(view.common, cl, msg);
         } else if cmd == mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::svc_snapshot as c_int {
             CL_ParseSnapshot(cl, msg);
         } else if cmd == mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::svc_setgame as c_int {
-            CL_ParseSetGame(msg);
+            CL_ParseSetGame(view, msg);
         } else if cmd == mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::svc_download as c_int {
-            CL_ParseDownload(common, cl, msg);
+            CL_ParseDownload(view.common, cl, msg);
         } else if cmd == mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::svc_mapchange as c_int {
             if !cl.cgvm.is_null() {
-                VM_Call(common, cl.cgvm, MpCgameExport::CG_MAP_CHANGE as c_int, &[]);
+                VM_Call(view.common, cl.cgvm, MpCgameExport::CG_MAP_CHANGE as c_int, &[]);
             }
         } else {
             com_error(

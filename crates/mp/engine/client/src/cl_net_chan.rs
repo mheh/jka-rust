@@ -4,6 +4,8 @@
 
 use core::ffi::c_int;
 
+use mp_engine_qcommon::common::common::Common;
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::msg::MSG_ReadLong;
 use mp_engine_qcommon::msg::MSG_WriteByte;
 use mp_engine_qcommon::net_chan::Netchan_Process;
@@ -21,20 +23,13 @@ use native_types::qboolean;
 
 use crate::client_host::Client;
 
-/// Msg id for the client end-of-frame marker.
-///
-/// PORT-NOTE(clc_EOF): the `clc_EOF` client-to-server message id is not in
-/// this packet's rosetta. Referenced exactly as the oracle names it below.
-/// Source: `oracle/codemp/client/cl_net_chan.cpp:139`
-// missing_symbols: clc_EOF
-
 /// Raven `CL_Netchan_Encode`.
 ///
 /// This xors the outgoing message body with a key derived from the last
 /// acknowledged server command, restoring the read cursor afterward.
 ///
 /// Source: `oracle/codemp/client/cl_net_chan.cpp:19-67`
-pub fn CL_Netchan_Encode(cl: &mut Client, msg: *mut msg_t) {
+pub fn CL_Netchan_Encode(common: &mut Common, cl: &mut Client, msg: *mut msg_t) {
     unsafe {
         if (*msg).cursize <= CL_ENCODE_START {
             return;
@@ -48,8 +43,6 @@ pub fn CL_Netchan_Encode(cl: &mut Client, msg: *mut msg_t) {
         (*msg).readcount = 0;
         (*msg).oob = qboolean::qfalse;
 
-        // PORT-NOTE(msg-receiver): `MSG_ReadLong` takes `common: &mut Common`,
-        // a receiver this fn's LAW signature does not carry.
         let serverId: c_int = MSG_ReadLong(common, msg);
         let messageAcknowledge: c_int = MSG_ReadLong(common, msg);
         let reliableAcknowledge: c_int = MSG_ReadLong(common, msg);
@@ -89,7 +82,7 @@ pub fn CL_Netchan_Encode(cl: &mut Client, msg: *mut msg_t) {
 /// the netchan sequence number, restoring the read cursor afterward.
 ///
 /// Source: `oracle/codemp/client/cl_net_chan.cpp:78-118`
-pub fn CL_Netchan_Decode(cl: &mut Client, msg: *mut msg_t) {
+pub fn CL_Netchan_Decode(common: &mut Common, cl: &mut Client, msg: *mut msg_t) {
     unsafe {
         let srdc = (*msg).readcount;
         let sbit = (*msg).bit;
@@ -97,8 +90,6 @@ pub fn CL_Netchan_Decode(cl: &mut Client, msg: *mut msg_t) {
 
         (*msg).oob = qboolean::qfalse;
 
-        // PORT-NOTE(msg-receiver): `MSG_ReadLong` takes `common: &mut Common`,
-        // a receiver this fn's LAW signature does not carry.
         let reliableAcknowledge: c_int = MSG_ReadLong(common, msg);
 
         (*msg).oob = soob;
@@ -137,10 +128,7 @@ pub fn CL_Netchan_Decode(cl: &mut Client, msg: *mut msg_t) {
 /// Raven `CL_Netchan_TransmitNextFragment`.
 ///
 /// Source: `oracle/codemp/client/cl_net_chan.cpp:126-128`
-pub fn CL_Netchan_TransmitNextFragment(chan: *mut netchan_t) {
-    // PORT-NOTE(view-receiver): `Netchan_TransmitNextFragment` takes
-    // `view: &mut EngineHostView`, a receiver this fn's LAW signature does
-    // not carry.
+pub fn CL_Netchan_TransmitNextFragment(view: &mut EngineHostView, chan: *mut netchan_t) {
     Netchan_TransmitNextFragment(view, chan);
 }
 
@@ -150,15 +138,15 @@ pub fn CL_Netchan_TransmitNextFragment(chan: *mut netchan_t) {
 /// the netchan for send.
 ///
 /// Source: `oracle/codemp/client/cl_net_chan.cpp:137-147`
-pub fn CL_Netchan_Transmit(cl: &mut Client, chan: *mut netchan_t, msg: *mut msg_t) {
+pub fn CL_Netchan_Transmit(
+    view: &mut EngineHostView,
+    cl: &mut Client,
+    chan: *mut netchan_t,
+    msg: *mut msg_t,
+) {
     unsafe {
-        // PORT-NOTE(msg-receiver): `MSG_WriteByte` takes `common: &mut Common`,
-        // a receiver this fn's LAW signature does not carry.
-        MSG_WriteByte(common, msg, clc_EOF as c_int);
-        CL_Netchan_Encode(cl, msg);
-        // PORT-NOTE(view-receiver): `Netchan_Transmit` takes
-        // `view: &mut EngineHostView`, a receiver this fn's LAW signature
-        // does not carry.
+        MSG_WriteByte(view.common, msg, clc_EOF as c_int);
+        CL_Netchan_Encode(view.common, cl, msg);
         Netchan_Transmit(view, chan, (*msg).cursize, (*msg).data as *const byte);
     }
 }
@@ -169,18 +157,21 @@ pub fn CL_Netchan_Transmit(cl: &mut Client, chan: *mut netchan_t, msg: *mut msg_
 /// the payload and accumulates the running saved-byte counter.
 ///
 /// Source: `oracle/codemp/client/cl_net_chan.cpp:157-175`
-pub fn CL_Netchan_Process(cl: &mut Client, chan: *mut netchan_t, msg: *mut msg_t) -> qboolean {
+pub fn CL_Netchan_Process(
+    common: &mut Common,
+    cl: &mut Client,
+    chan: *mut netchan_t,
+    msg: *mut msg_t,
+) -> qboolean {
     // PORT-NOTE(newsize): Raven's commented-out `static int newsize` (three-kind
     // rule kind 3, genuine cross-frame state) has no field on `Client` in this
     // packet's state table beyond the write access. Threaded as a Client field
     // pending integration wiring.
-    // PORT-NOTE(common-receiver): `Netchan_Process` takes `common: &mut Common`,
-    // a receiver this fn's LAW signature does not carry.
     let ret = Netchan_Process(common, chan, msg);
     if ret == qboolean::qfalse {
         return qboolean::qfalse;
     }
-    CL_Netchan_Decode(cl, msg);
+    CL_Netchan_Decode(common, cl, msg);
     cl.newsize += unsafe { (*msg).cursize };
     qboolean::qtrue
 }
