@@ -54,6 +54,14 @@ pub struct RenderAssets {
     ///
     /// Source: `oracle/codemp/renderer/tr_local.h:1334`
     pub white_image: Option<ImageHandle>,
+    /// `tr.scratchImage[NUM_SCRATCH_IMAGES]`, the 16 per-client cinematic
+    /// upload targets `R_CreateBuiltinImages` builds at init. `RE_StretchRaw`
+    /// and `RE_UploadCinematic` re-specify one of these in place every frame, so
+    /// the handle set is fixed for the session and indexed positionally by the
+    /// cinematic client number, not looked up by name.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1300-1307,1336`
+    pub scratch_images: Vec<ImageHandle>,
     /// `tr.lightmaps[MAX_LIGHTMAPS]` — `image_t*` in the oracle, folded into
     /// `images` rather than a fifth arena; this is the **positional** index
     /// `R_FindShader` reads by small integer

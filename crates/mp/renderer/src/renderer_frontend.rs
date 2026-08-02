@@ -133,6 +133,7 @@ pub fn empty_render_assets() -> RenderAssets {
         fog_image: None,
         dlight_image: None,
         white_image: None,
+        scratch_images: Vec::new(),
         lightmaps: Vec::new(),
         shaders: Arena::new_with_slot0(MAX_SHADERS, ShaderAsset::default()),
         shader_lookup: Default::default(),

@@ -2,6 +2,7 @@
 
 use mp_engine_qcommon::qfiles::light_style_limits::MAX_LIGHT_STYLES;
 
+use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::placeholders::{Poly, PolyVert, RefEntity, TrRefdef, Vec3};
 use crate::render_state::shader_asset::ShaderHandle;
 
@@ -123,6 +124,27 @@ pub enum FrameEvent {
         s2: f32,
         t2: f32,
         shader: ShaderHandle,
+    },
+    /// `RE_StretchRaw`'s screen quad. This is the cinematic frame the client
+    /// just decoded, drawn straight from `tr.scratchImage[client]` with no
+    /// shader.
+    ///
+    /// `image` is the scratch handle, already re-specified for this frame by
+    /// `RE_StretchRaw`'s upload half. The `s`/`t` pairs carry Raven's half-texel
+    /// inset (`0.5 / cols` .. `(cols - 0.5) / cols`), which stops the linear
+    /// filter from sampling past the edge.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_backend.cpp:1346-1364`
+    DrawStretchRaw {
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        s1: f32,
+        t1: f32,
+        s2: f32,
+        t2: f32,
+        image: ImageHandle,
     },
     /// `CG_R_DRAWROTATEPIC` — cgame-only.
     ///

@@ -6,12 +6,13 @@ use mp_qshared::shared::cinematic_status::e_status;
 use mp_qshared::shared::limits::MAX_OSPATH;
 use native_types::{byte, fileHandle_t, qboolean};
 
+use super::vq_blitter::VqBlitter;
+
 /// Raven `cin_cache` — one cinematic playback slot of `cinTable`. Internal to
 /// the client, so it never crosses the ABI seam and carries no layout asserts.
 ///
 /// The four `VQ*` blitter slots are Raven `void (*)(byte *status, void *qdata)`
-/// pointers. They stay untyped `*const ()` because `readQuadInfo` copies them
-/// between slots and the call sites cast back at the point of use.
+/// pointers over a closed one-entry set, so they carry [`VqBlitter`] instead.
 ///
 /// Type definition source: `oracle/codemp/client/cl_cin.cpp:78-118`
 #[repr(C)]
@@ -43,10 +44,10 @@ pub struct cin_cache {
     pub roq_id: c_uint,
     pub screenDelta: c_long,
 
-    pub VQ0: *const (),
-    pub VQ1: *const (),
-    pub VQNormal: *const (),
-    pub VQBuffer: *const (),
+    pub VQ0: VqBlitter,
+    pub VQ1: VqBlitter,
+    pub VQNormal: VqBlitter,
+    pub VQBuffer: VqBlitter,
 
     pub gray: *mut byte,
     pub xsize: c_uint,
@@ -67,6 +68,7 @@ pub struct cin_cache {
     pub drawY: c_long,
 }
 
-// Every field is a scalar or a null-valid pointer, and Raven's `cinTable` is a
-// zero-filled file static, so the all-zero image is a valid inhabitant.
+// Every field is a scalar, a null-valid pointer, or `VqBlitter` (whose zero
+// discriminant is `None`), and Raven's `cinTable` is a zero-filled file static,
+// so the all-zero image is a valid inhabitant.
 unsafe impl native_platform::ZeroValid for cin_cache {}

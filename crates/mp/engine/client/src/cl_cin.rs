@@ -1,5 +1,11 @@
 //! `cl_cin.cpp` — the RoQ cinematic decoder and playback pipeline.
 //!
+//! Raven's sibling `cl_cin_console.cpp` is dropped, not ported (porting-rules
+//! §20). It is the Xbox console replacement for this file: it plays Bink video
+//! through a `BinkVideo` object out of `d:\base\video\`, and only
+//! `oracle/codemp/x_exe/x_exe.vcproj` compiles it. The PC MP link set
+//! (`oracle/codemp/jk2mp.vcproj:627`) takes `cl_cin.cpp` alone.
+//!
 //! Source: `oracle/codemp/client/cl_cin.cpp`
 
 use core::ffi::{c_char, c_int, c_long, c_short, c_uchar, c_uint, c_ushort};
@@ -10,6 +16,8 @@ use mp_qshared::shared::cinematic_status::{e_status, FMV_EOF, FMV_IDLE, FMV_LOOP
 use mp_qshared::shared::connstate::connstate_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::fs_origin::fsOrigin_t;
+use mp_qshared::shared::limits::MAX_OSPATH;
+use mp_qshared::shared::q_string::COM_DefaultExtension;
 use mp_qshared::shared::swap::LittleLong;
 use native_types::{byte, qboolean, qfalse, qtrue};
 
@@ -41,6 +49,7 @@ use crate::cin::cin_consts::{
     ROQ_PACKET, ROQ_QUAD_HANG, ROQ_QUAD_INFO, ROQ_QUAD_JPEG, ROQ_QUAD_VQ, ZA_SOUND_MONO,
     ZA_SOUND_STEREO,
 };
+use crate::cin::vq_blitter::VqBlitter;
 use crate::cl_console::Con_Close;
 use crate::client_host::Client;
 use crate::client_host::snd_from_view;
@@ -56,6 +65,11 @@ use crate::snd_dma::{S_RawSamples, S_StopAllSounds, S_Update};
 // `crates/mp/game/src/prelude.rs`, but `mp_game` is not a dependency of
 // `mp_engine_client`; escalate the rosetta row rather than adding the
 // dependency here.
+
+/// Raven `RoQInterrupt`'s local `short sbuf[32768]` audio scratch.
+///
+/// Source: `oracle/codemp/client/cl_cin.cpp:925`
+const SBUF_LEN: usize = 32768;
 
 /// Raven's `VQ2TO4(a,b,c,d)` macro — expands one 2x2 codebook pair into the 4x4
 /// and 8x8 books. The four pointer arguments are read-and-advance in the macro,
@@ -268,6 +282,18 @@ pub fn RllDecodeStereoToMono(
     size as c_long
 }
 
+/// Copies one `f64` lane, the way Raven's `ddst[i] = dsrc[i]` does.
+///
+/// Every blitter below reaches an `f64` lane that is only 4-byte aligned. The
+/// source is a `c_ushort` codebook, and `RoQPrepMcomp` builds motion deltas as
+/// `(x + xoff - 8) * 4`, so an odd horizontal vector lands the row on a 4-byte
+/// boundary. x86 tolerates that and Raven relies on it; in Rust an aligned
+/// dereference there is undefined behavior and aborts a debug build.
+#[inline]
+unsafe fn copy_lane(dst: *mut f64, src: *mut f64, i: usize) {
+    dst.add(i).write_unaligned(src.add(i).read_unaligned());
+}
+
 /// Raven `move8_32`.
 ///
 /// This copies eight 4-byte pixels per scanline across `spl` scanlines, eight
@@ -281,17 +307,15 @@ pub fn move8_32(src: *mut byte, dst: *mut byte, spl: c_int) {
         let dspl = (spl >> 3) as isize;
 
         for _ in 0..7 {
-            *ddst = *dsrc;
-            *ddst.add(1) = *dsrc.add(1);
-            *ddst.add(2) = *dsrc.add(2);
-            *ddst.add(3) = *dsrc.add(3);
+            for i in 0..4 {
+                copy_lane(ddst, dsrc, i);
+            }
             dsrc = dsrc.offset(dspl);
             ddst = ddst.offset(dspl);
         }
-        *ddst = *dsrc;
-        *ddst.add(1) = *dsrc.add(1);
-        *ddst.add(2) = *dsrc.add(2);
-        *ddst.add(3) = *dsrc.add(3);
+        for i in 0..4 {
+            copy_lane(ddst, dsrc, i);
+        }
     }
 }
 
@@ -305,13 +329,15 @@ pub fn move4_32(src: *mut byte, dst: *mut byte, spl: c_int) {
         let dspl = (spl >> 3) as isize;
 
         for _ in 0..3 {
-            *ddst = *dsrc;
-            *ddst.add(1) = *dsrc.add(1);
+            for i in 0..2 {
+                copy_lane(ddst, dsrc, i);
+            }
             dsrc = dsrc.offset(dspl);
             ddst = ddst.offset(dspl);
         }
-        *ddst = *dsrc;
-        *ddst.add(1) = *dsrc.add(1);
+        for i in 0..2 {
+            copy_lane(ddst, dsrc, i);
+        }
     }
 }
 
@@ -328,17 +354,15 @@ pub fn blit8_32(src: *mut byte, dst: *mut byte, spl: c_int) {
         let dspl = (spl >> 3) as isize;
 
         for _ in 0..7 {
-            *ddst = *dsrc;
-            *ddst.add(1) = *dsrc.add(1);
-            *ddst.add(2) = *dsrc.add(2);
-            *ddst.add(3) = *dsrc.add(3);
+            for i in 0..4 {
+                copy_lane(ddst, dsrc, i);
+            }
             dsrc = dsrc.offset(4);
             ddst = ddst.offset(dspl);
         }
-        *ddst = *dsrc;
-        *ddst.add(1) = *dsrc.add(1);
-        *ddst.add(2) = *dsrc.add(2);
-        *ddst.add(3) = *dsrc.add(3);
+        for i in 0..4 {
+            copy_lane(ddst, dsrc, i);
+        }
     }
 }
 
@@ -354,13 +378,15 @@ pub fn blit4_32(src: *mut byte, dst: *mut byte, spl: c_int) {
         let dspl = (spl >> 3) as isize;
 
         for _ in 0..3 {
-            *ddst = *dsrc;
-            *ddst.add(1) = *dsrc.add(1);
+            for i in 0..2 {
+                copy_lane(ddst, dsrc, i);
+            }
             dsrc = dsrc.offset(2);
             ddst = ddst.offset(dspl);
         }
-        *ddst = *dsrc;
-        *ddst.add(1) = *dsrc.add(1);
+        for i in 0..2 {
+            copy_lane(ddst, dsrc, i);
+        }
     }
 }
 
@@ -373,8 +399,8 @@ pub fn blit2_32(src: *mut byte, dst: *mut byte, spl: c_int) {
         let ddst = dst as *mut f64;
         let dspl = (spl >> 3) as isize;
 
-        *ddst = *dsrc;
-        *ddst.offset(dspl) = *dsrc.add(1);
+        copy_lane(ddst, dsrc, 0);
+        ddst.offset(dspl).write_unaligned(dsrc.add(1).read_unaligned());
     }
 }
 
@@ -462,17 +488,28 @@ pub fn recurseQuad(
         && quadSize <= MAXSIZE
     {
         let useY = startY;
-        unsafe {
-            let scroff = cl.cin.linbuf.as_mut_ptr().offset(
-                ((useY + ((cl.cinTable[handle].CIN_HEIGHT as c_long - bigy) >> 1) + yOff)
-                    * cl.cinTable[handle].samplesPerLine
-                    + (startX + xOff) * 4) as isize,
-            );
+        let byte_off = (useY + ((cl.cinTable[handle].CIN_HEIGHT as c_long - bigy) >> 1) + yOff)
+            * cl.cinTable[handle].samplesPerLine
+            + (startX + xOff) * 4;
 
-            let onquad = cl.cinTable[handle].onQuad as usize;
-            cl.cin.qStatus[0][onquad] = scroff;
-            cl.cin.qStatus[1][onquad] = scroff.offset(offset as isize);
-            cl.cinTable[handle].onQuad += 1;
+        // §19: Raven bounds the quad against the stream's own `xsize`/`ysize`,
+        // never against `linbuf` or `qStatus`, so a header claiming more than
+        // 512x512 walks off both. A quad that does not fit is skipped.
+        let linbuf_len = cl.cin.linbuf.len() as c_long;
+        let in_bounds = byte_off >= 0
+            && byte_off < linbuf_len
+            && byte_off + offset >= 0
+            && byte_off + offset < linbuf_len
+            && (cl.cinTable[handle].onQuad as usize) < cl.cin.qStatus[0].len();
+
+        if in_bounds {
+            unsafe {
+                let scroff = cl.cin.linbuf.as_mut_ptr().offset(byte_off as isize);
+                let onquad = cl.cinTable[handle].onQuad as usize;
+                cl.cin.qStatus[0][onquad] = scroff;
+                cl.cin.qStatus[1][onquad] = scroff.offset(offset as isize);
+                cl.cinTable[handle].onQuad += 1;
+            }
         }
     }
 
@@ -755,8 +792,10 @@ pub fn CIN_DrawCinematic(view: &mut EngineHostView, cl: &mut Client, handle: c_i
             let re = re_from_view(view);
             RE_StretchRaw(
                 &mut re.frame,
+                &mut re.frame_data,
+                &mut re.sim,
+                &mut re.img_state,
                 &mut re.gpu_res,
-                &re.assets,
                 &re.cvars,
                 view.common,
                 x as i32,
@@ -789,8 +828,10 @@ pub fn CIN_DrawCinematic(view: &mut EngineHostView, cl: &mut Client, handle: c_i
     let re = unsafe { re_from_view(view) };
     RE_StretchRaw(
         &mut re.frame,
+        &mut re.frame_data,
+        &mut re.sim,
+        &mut re.img_state,
         &mut re.gpu_res,
-        &re.assets,
         &re.cvars,
         view.common,
         x as i32,
@@ -837,15 +878,7 @@ pub fn CIN_UploadCinematic(view: &mut EngineHostView, cl: &mut Client, handle: c
         };
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let re = unsafe { re_from_view(view) };
-        RE_UploadCinematic(
-            &mut re.gpu_res,
-            &mut re.assets,
-            cols,
-            rows,
-            data,
-            handle,
-            dirty,
-        );
+        RE_UploadCinematic(&mut re.sim, &mut re.img_state, cols, rows, data, handle, dirty);
 
         if view.common.cvar(cl.cl_inGameVideo).integer == 0
             && cl.cinTable[handle as usize].playonwalls == 1
@@ -911,15 +944,11 @@ pub fn blitVQQuad32fs(cl: &mut Client, status: *mut *mut byte, data: *mut c_ucha
                             0x8000 => {
                                 // 4x4 vq code
                                 let cell = *data as usize;
-                                move4_32(
+                                blit4_32(
                                     (&mut cl.vq4[cell * 32] as *mut c_ushort) as *mut byte,
                                     *status.add(index),
                                     spl,
                                 );
-                                // §19-PORT-NOTE: Raven calls `blit4_32` here for
-                                // the 4x4 vq code arm; the line above is a
-                                // literal transcription slip risk, kept
-                                // faithful below with the correct callee.
                                 data = data.add(1);
                             }
                             0xc000 => {
@@ -956,8 +985,10 @@ pub fn blitVQQuad32fs(cl: &mut Client, status: *mut *mut byte, data: *mut c_ucha
                             0x4000 => {
                                 // motion compensation
                                 let mc = *data as usize;
-                                let src =
-                                    status.add(index).read().offset(cl.cin.mcomp[mc] as isize);
+                                let src = status
+                                    .add(index)
+                                    .read()
+                                    .offset(cl.cin.mcomp[mc] as i32 as isize);
                                 move4_32(src, *status.add(index), spl);
                                 data = data.add(1);
                             }
@@ -969,7 +1000,11 @@ pub fn blitVQQuad32fs(cl: &mut Client, status: *mut *mut byte, data: *mut c_ucha
                 0x4000 => {
                     // motion compensation
                     let mc = *data as usize;
-                    let src = status.add(index).read().offset(cl.cin.mcomp[mc] as isize);
+                    // `mcomp` holds a signed byte delta that Raven stores in an
+                    // `unsigned int` and adds to a 32-bit `byte *`; the `i32`
+                    // step restores that wrap on a 64-bit pointer.
+                    let mc_delta = cl.cin.mcomp[mc] as i32 as isize;
+                    let src = status.add(index).read().offset(mc_delta);
                     move8_32(src, *status.add(index), spl);
                     data = data.add(1);
                     index += 5;
@@ -1067,11 +1102,11 @@ pub fn setupQuad(cl: &mut Client, xOff: c_long, yOff: c_long) {
     cl.cin.oldysize = cl.cinTable[handle].ysize;
     cl.cin.oldxsize = cl.cinTable[handle].xsize;
 
-    let mut numQuadCels = (cl.cinTable[handle].CIN_WIDTH * cl.cinTable[handle].CIN_HEIGHT) / 16;
-    numQuadCels += numQuadCels / 4 + numQuadCels / 16;
-    numQuadCels += 64; // for overflow
-
-    let mut numQuadCels = (cl.cinTable[handle].xsize * cl.cinTable[handle].ysize) / 16;
+    // Raven computes `numQuadCels` twice. The first pass (over `CIN_WIDTH` /
+    // `CIN_HEIGHT`) is overwritten before any read, so only the `xsize`/`ysize`
+    // pass below survives.
+    let mut numQuadCels =
+        (cl.cinTable[handle].xsize as c_long * cl.cinTable[handle].ysize as c_long) / 16;
     numQuadCels += numQuadCels / 4;
     numQuadCels += 64; // for overflow
 
@@ -1089,7 +1124,10 @@ pub fn setupQuad(cl: &mut Client, xOff: c_long, yOff: c_long) {
 
     let temp: *mut byte = std::ptr::null_mut();
 
-    for i in (numQuadCels - 64)..numQuadCels {
+    // §19: the terminator block takes the same `qStatus` bound `recurseQuad`
+    // now applies, because `numQuadCels` scales with the stream's own header.
+    let last = numQuadCels.min(cl.cin.qStatus[0].len() as c_long);
+    for i in (numQuadCels - 64).max(0)..last {
         cl.cin.qStatus[0][i as usize] = temp; // eoq
         cl.cin.qStatus[1][i as usize] = temp; // eoq
     }
@@ -1191,8 +1229,8 @@ pub fn initRoQ(cl: &mut Client) {
     }
     let handle = cl.currentHandle as usize;
 
-    cl.cinTable[handle].VQNormal = blitVQQuad32fs as *const ();
-    cl.cinTable[handle].VQBuffer = blitVQQuad32fs as *const ();
+    cl.cinTable[handle].VQNormal = VqBlitter::BlitVQQuad32fs;
+    cl.cinTable[handle].VQBuffer = VqBlitter::BlitVQQuad32fs;
     ROQ_GenYUVTables(cl);
     RllSetupTable(cl);
 }
@@ -1212,17 +1250,29 @@ pub fn CIN_PlayCinematic(
 ) -> c_int {
     let arg_str = unsafe { std::ffi::CStr::from_ptr(arg).to_string_lossy().into_owned() };
 
-    let name = if arg_str.contains('/') || arg_str.contains('\\') {
+    // Raven's `char name[MAX_OSPATH]`. The buffer is real, not cosmetic: both
+    // `Com_sprintf` and `COM_DefaultExtension` truncate against its size, and
+    // `COM_DefaultExtension` only appends when the last path component holds no
+    // `.` at all.
+    let mut name_buf = [0 as c_char; MAX_OSPATH];
+    let composed = if arg_str.contains('/') || arg_str.contains('\\') {
         arg_str.clone()
     } else {
         format!("video/{}", arg_str)
     };
-    // COM_DefaultExtension(name, sizeof(name), ".roq") - appended below if missing.
-    let name = if name.to_lowercase().ends_with(".roq") {
-        name
-    } else {
-        format!("{}.roq", name)
-    };
+    let composed = composed.as_bytes();
+    let copied = composed.len().min(name_buf.len() - 1);
+    for (slot, &b) in name_buf.iter_mut().zip(&composed[..copied]) {
+        *slot = b as c_char;
+    }
+    unsafe {
+        COM_DefaultExtension(
+            name_buf.as_mut_ptr(),
+            name_buf.len() as c_int,
+            c".roq".as_ptr(),
+        );
+    }
+    let name = file_name_to_string(&name_buf);
 
     if systemBits & CIN_SYSTEM == 0 {
         for i in 0..MAX_VIDEO_HANDLES {
@@ -1235,11 +1285,11 @@ pub fn CIN_PlayCinematic(
 
     Com_DPrintf(view.common, &format!("SCR_PlayCinematic( {} )\n", arg_str));
 
-    Com_Memset(
-        &mut cl.cin as *mut _ as *mut (),
-        0,
-        std::mem::size_of_val(&cl.cin),
-    );
+    // `cl.cin` is a `Box`, so both the pointer and the length must go through
+    // the deref. Without it this clears the 8-byte box pointer, not the 2.6 MB
+    // decode surface Raven clears.
+    let cin_size = core::mem::size_of_val(&*cl.cin);
+    Com_Memset(&mut *cl.cin as *mut _ as *mut (), 0, cin_size);
     cl.currentHandle = CIN_HandleForVideo(cl);
     let handle = cl.currentHandle as usize;
 
@@ -1389,7 +1439,7 @@ pub fn RoQInterrupt(view: &mut EngineHostView, cl: &mut Client) {
     }
     let handle = cl.currentHandle as usize;
 
-    let mut sbuf = [0i16; 32768];
+    let mut sbuf = [0i16; SBUF_LEN];
 
     unsafe {
         Sys_StreamedRead(
@@ -1422,12 +1472,11 @@ pub fn RoQInterrupt(view: &mut EngineHostView, cl: &mut Client) {
                 if (cl.cinTable[handle].numQuads & 1) != 0 {
                     cl.cinTable[handle].normalBuffer0 = cl.cinTable[handle].t[1];
                     RoQPrepMcomp(cl, cl.cinTable[handle].roqF0, cl.cinTable[handle].roqF1);
+                    let status = cl.cin.qStatus[1].as_mut_ptr();
+                    if cl.cinTable[handle].VQ1 == VqBlitter::BlitVQQuad32fs {
+                        blitVQQuad32fs(cl, status, framedata);
+                    }
                     unsafe {
-                        let vq1 = cl.cinTable[handle].VQ1;
-                        // Raven: `cinTable[currentHandle].VQ1( (byte *)cin.qStatus[1], framedata)`.
-                        let f: fn(*mut byte, *mut byte) =
-                            std::mem::transmute::<*const (), fn(*mut byte, *mut byte)>(vq1);
-                        f(cl.cin.qStatus[1].as_mut_ptr() as *mut byte, framedata);
                         cl.cinTable[handle].buf = cl
                             .cin
                             .linbuf
@@ -1437,13 +1486,11 @@ pub fn RoQInterrupt(view: &mut EngineHostView, cl: &mut Client) {
                 } else {
                     cl.cinTable[handle].normalBuffer0 = cl.cinTable[handle].t[0];
                     RoQPrepMcomp(cl, cl.cinTable[handle].roqF0, cl.cinTable[handle].roqF1);
-                    unsafe {
-                        let vq0 = cl.cinTable[handle].VQ0;
-                        let f: fn(*mut byte, *mut byte) =
-                            std::mem::transmute::<*const (), fn(*mut byte, *mut byte)>(vq0);
-                        f(cl.cin.qStatus[0].as_mut_ptr() as *mut byte, framedata);
-                        cl.cinTable[handle].buf = cl.cin.linbuf.as_mut_ptr();
+                    let status = cl.cin.qStatus[0].as_mut_ptr();
+                    if cl.cinTable[handle].VQ0 == VqBlitter::BlitVQQuad32fs {
+                        blitVQQuad32fs(cl, status, framedata);
                     }
+                    cl.cinTable[handle].buf = cl.cin.linbuf.as_mut_ptr();
                 }
                 if cl.cinTable[handle].numQuads == 0 {
                     // first frame
@@ -1469,11 +1516,14 @@ pub fn RoQInterrupt(view: &mut EngineHostView, cl: &mut Client) {
             }
             ZA_SOUND_MONO => {
                 if cl.cinTable[handle].silent == qfalse {
+                    // §19: Raven lets a mono chunk over 16384 bytes run off the
+                    // end of `sbuf`; the clamp picks the one defined behavior.
+                    let size = cl.cinTable[handle].RoQFrameSize.min(SBUF_LEN as c_uint / 2);
                     let ssize = RllDecodeMonoToStereo(
                         cl,
                         framedata,
                         sbuf.as_mut_ptr(),
-                        cl.cinTable[handle].RoQFrameSize as c_uint,
+                        size,
                         0,
                         cl.cinTable[handle].roq_flags as c_ushort,
                     );
@@ -1501,11 +1551,14 @@ pub fn RoQInterrupt(view: &mut EngineHostView, cl: &mut Client) {
                         S_Update(view, snd);
                         snd.s_rawend = snd.s_soundtime;
                     }
+                    // §19: same `sbuf` overrun guard as the mono arm, one
+                    // sample per input byte here.
+                    let size = cl.cinTable[handle].RoQFrameSize.min(SBUF_LEN as c_uint);
                     let ssize = RllDecodeStereoToStereo(
                         cl,
                         framedata,
                         sbuf.as_mut_ptr(),
-                        cl.cinTable[handle].RoQFrameSize as c_uint,
+                        size,
                         0,
                         cl.cinTable[handle].roq_flags as c_ushort,
                     );
@@ -1574,8 +1627,10 @@ pub fn RoQInterrupt(view: &mut EngineHostView, cl: &mut Client) {
                 + *framedata.add(4) as c_uint * 65536;
             cl.cinTable[handle].roq_flags =
                 *framedata.add(6) as c_long + *framedata.add(7) as c_long * 256;
-            cl.cinTable[handle].roqF0 = *framedata.add(7) as c_long;
-            cl.cinTable[handle].roqF1 = *framedata.add(6) as c_long;
+            // Raven casts both through `(char)`, so the motion vectors are
+            // signed byte offsets, not the raw 0..255 header bytes.
+            cl.cinTable[handle].roqF0 = *framedata.add(7) as i8 as c_long;
+            cl.cinTable[handle].roqF1 = *framedata.add(6) as i8 as c_long;
         }
 
         if cl.cinTable[handle].RoQFrameSize > 65536 || cl.cinTable[handle].roq_id == 0x1084 {
@@ -1639,7 +1694,11 @@ pub fn CIN_RunCinematic(view: &mut EngineHostView, cl: &mut Client, handle: c_in
     if cl.cinTable[ch].shader != qfalse
         && (thisTime as i64 - cl.cinTable[ch].lastTime as i64).abs() > 100
     {
-        cl.cinTable[ch].startTime += thisTime - cl.cinTable[ch].lastTime;
+        // Raven does this in wrapping 32-bit unsigned arithmetic, so a clock
+        // that steps backwards must wrap here too, not panic in a debug build.
+        cl.cinTable[ch].startTime = cl.cinTable[ch]
+            .startTime
+            .wrapping_add(thisTime.wrapping_sub(cl.cinTable[ch].lastTime));
     }
     cl.cinTable[ch].tfps = (((sys_milliseconds(view.common) as f32
         * view.common.cvar(view.common.com_timescale).value) as c_uint
@@ -1745,5 +1804,60 @@ pub fn CL_PlayCinematic_f(view: &mut EngineHostView, cl: &mut Client) {
                 S_COLOR_RED, arg
             ),
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{blit2_32, blit4_32, blit8_32, move4_32, move8_32};
+    use native_types::byte;
+
+    /// Raven's motion vectors put a blitter row on a 4-byte boundary whenever
+    /// the horizontal displacement is odd, because `RoQPrepMcomp` scales by 4.
+    /// The shared cin-oracle fixtures round every displacement to an even texel
+    /// count (porting-rules §19), so this is the only cover for the odd case. An
+    /// aligned `f64` dereference aborts a debug build here.
+    ///
+    /// Source: `oracle/codemp/client/cl_cin.cpp:315-446,852`
+    #[test]
+    fn blitters_take_a_four_byte_aligned_row() {
+        // The backing stores are 8-byte aligned, so the `+ 4` below is the only
+        // misalignment under test.
+        let mut src_store = vec![0f64; 1024];
+        let mut dst_store = vec![0f64; 1024];
+
+        let src_base = src_store.as_mut_ptr() as *mut byte;
+        let dst_base = dst_store.as_mut_ptr() as *mut byte;
+        // SAFETY: both stores hold 8192 bytes, past every offset used below.
+        let src = unsafe { src_base.add(4) };
+        let dst = unsafe { dst_base.add(4) };
+
+        // SAFETY: filling the source rows the blitters read.
+        unsafe {
+            for i in 0..4096 {
+                *src.add(i) = (i % 251) as byte;
+            }
+        }
+
+        // `spl` is Raven's `samplesPerLine`: 64 texels of 4 bytes.
+        let spl = 256;
+        move8_32(src, dst, spl);
+        move4_32(src, dst, spl);
+        blit8_32(src, dst, spl);
+        blit4_32(src, dst, spl);
+        blit2_32(src, dst, spl);
+
+        // `blit2_32` ran last: lane 0 lands at `dst`, lane 1 one scanline down.
+        // SAFETY: every write above landed inside `dst_store`.
+        unsafe {
+            for i in 0..8 {
+                assert_eq!(*dst.add(i), *src.add(i), "lane 0 byte {i}");
+                assert_eq!(
+                    *dst.add(spl as usize + i),
+                    *src.add(8 + i),
+                    "lane 1 byte {i}"
+                );
+            }
+        }
     }
 }

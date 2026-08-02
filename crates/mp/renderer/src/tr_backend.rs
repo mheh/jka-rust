@@ -6,6 +6,8 @@
 // transcription, matching the rest of the renderer/engine crates.
 #![allow(non_snake_case)]
 
+use std::sync::Arc;
+
 use mp_engine_qcommon::common::com_error;
 use mp_engine_qcommon::common::com_printf;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
@@ -14,15 +16,20 @@ use mp_engine_qcommon::timing::sys_milliseconds;
 use mp_qshared::shared::error_parm::errorParm_t;
 use native_math::rng::Rng;
 
+use crate::render_state::frame_data::FrameData;
+use crate::render_state::frame_event::FrameEvent;
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::placeholders::Vec3;
 use crate::render_state::render_assets::RenderAssets;
+use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::tr_cmds::R_SyncRenderThread;
-use crate::tr_image::{R_Images_GetNextIteration, R_Images_StartIteration};
+use crate::tr_image::{
+    PendingUpload, R_Images_GetNextIteration, R_Images_StartIteration, TrImageState,
+};
 use crate::tr_local::cull_type_t::cullType_t;
 use crate::tr_main::{DrawSurf, SurfaceGeometry};
 use crate::tr_public::ref_flags::RDF_NOWORLDMODEL;
@@ -448,31 +455,71 @@ pub fn RB_SetGL2D(frame: &mut FrameState, _gpu: &mut GpuResources, _assets: &Ren
     // Source: oracle/codemp/renderer/tr_backend.cpp:1269-1291
 }
 
-/// Raven `RE_UploadCinematic` — (re)uploads a cinematic video frame into the
-/// per-client scratch texture `tr.scratchImage[client]`, either as a fresh
-/// `qglTexImage2D` when the frame size changed or a `qglTexSubImage2D` when
-/// `dirty`.
+/// Re-specifies `tr.scratchImage[client]` from a decoded cinematic frame, and
+/// returns the scratch handle so a caller that also draws can name it.
 ///
-/// DEFERRED: R4 — `tr.scratchImage[MAX_VIDEO_CLIENTS]` has no R2-assigned
-/// carrier (not one of the named `## State ownership` `tr` sub-fields, and
-/// not a `RenderAssets::images` registry entry — a fixed per-client scratch
-/// slot, not a registered/named image); `GL_Bind`'s own body is itself
-/// deferred pending that same registry wiring. Every `qgl*` call
-/// (`qglTexImage2D`/`qglTexSubImage2D`/`qglTexParameterf`) is GL-only
-/// (DEC-37 A13.2).
+/// This is the upload half both `RE_StretchRaw` and `RE_UploadCinematic` run.
+/// Raven branches on whether `(cols, rows)` still match the texture it built
+/// last time: a size change re-specifies the whole texture with
+/// `qglTexImage2D`, and a same-size `dirty` frame goes in with
+/// `qglTexSubImage2D`. Both branches stage one `PendingUpload`, because
+/// `GpuImages::upload_pending` rebuilds the wgpu texture either way.
+///
+/// A clean same-size frame stages nothing, exactly as Raven uploads nothing.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1327-1344,1367-1395`
+fn R_UploadScratchFrame(
+    sim: &mut RenderAssetsSim,
+    img_state: &mut TrImageState,
+    cols: i32,
+    rows: i32,
+    data: &[u8],
+    client: i32,
+    dirty: bool,
+) -> Option<ImageHandle> {
+    let handle = *sim.published.scratch_images.get(client as usize)?;
+    let assets = Arc::make_mut(&mut sim.published);
+    let asset = assets.images.get_mut(handle)?;
+
+    let resized = cols != asset.width || rows != asset.height;
+    if resized {
+        asset.width = cols;
+        asset.height = rows;
+    } else if !dirty {
+        return Some(handle);
+    }
+
+    // DEFERRED: R4. Raven splits the two branches at the GL call, using
+    // `qglTexImage2D` to re-specify and `qglTexSubImage2D` to update in place.
+    // `GpuImages::upload_pending` has one path and it recreates the texture, so
+    // a same-size dirty frame pays a full re-specify until that crate grows a
+    // write-only update. The pixels that reach the GPU are the same either way.
+    // Source: oracle/codemp/renderer/tr_backend.cpp:1341-1343
+    img_state.pending_uploads.insert(
+        handle,
+        PendingUpload {
+            pixels: data.to_vec(),
+            width: cols,
+            height: rows,
+        },
+    );
+    Some(handle)
+}
+
+/// Raven `RE_UploadCinematic` — (re)uploads a cinematic video frame into the
+/// per-client scratch texture `tr.scratchImage[client]` and draws nothing.
 ///
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:1367-1395`
 pub fn RE_UploadCinematic(
-    _gpu: &mut GpuResources,
-    _assets: &mut RenderAssets,
-    _cols: i32,
-    _rows: i32,
-    _data: &[u8],
-    _client: i32,
-    _dirty: bool,
+    sim: &mut RenderAssetsSim,
+    img_state: &mut TrImageState,
+    cols: i32,
+    rows: i32,
+    data: &[u8],
+    client: i32,
+    dirty: bool,
 ) {
-    // DEFERRED: R4 — RE_UploadCinematic (see doc comment above) (DEC-37 A13.2)
-    // Source: oracle/codemp/renderer/tr_backend.cpp:1367-1395
+    R_UploadScratchFrame(sim, img_state, cols, rows, data, client, dirty);
 }
 
 /// Raven `RB_BlurGlowTexture` — the dynamic-glow blur pass: N iterations
@@ -1037,30 +1084,18 @@ pub fn RB_DrawSurfs(
 /// the cinematics") is GL-only (DEC-37 A13.2).
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:1313-1314`
 ///
-/// DEFERRED: R4 — `GL_Bind(tr.scratchImage[client])` and the
-/// format-change/dirty-subimage `qgl*` texture upload
-/// (`qglTexImage2D`/`qglTexParameterf`×4/`qglTexSubImage2D`) are GL-only, and
-/// `tr.scratchImage[NUM_SCRATCH_IMAGES]` has no R2-assigned carrier — the
-/// same ESCALATION `RE_UploadCinematic`'s port and `tr_image.rs`'s
-/// `R_CreateBuiltinImages` both cite (DEC-37 A13.2).
-/// Source: `oracle/codemp/renderer/tr_backend.cpp:1327-1344`
-///
-/// DEFERRED: R4 — `qglColor3f(tr.identityLight×3)` and the
-/// `qglBegin(GL_QUADS)`/`qglTexCoord2f`/`qglVertex2f`×4/`qglEnd` quad draw
-/// are GL-only (DEC-37 A13.2).
-/// Source: `oracle/codemp/renderer/tr_backend.cpp:1353-1364`
-///
-/// Landed: the `tr.registered` early-out, [`R_SyncRenderThread`], both
-/// `r_speeds`-gated timing/`Com_Printf` measurements (real `Common::cvar`
-/// reads, no GL/scratch-image dependency), the power-of-2 `Com_Error` guard,
-/// and the unconditional [`RB_SetGL2D`] call.
+/// DEFERRED: R4. `qglColor3f(tr.identityLight x 3)` is GL-only, and the 2D
+/// batch has no per-quad color channel of its own yet (DEC-37 A13.2).
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1353`
 ///
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:1304-1365`
 #[allow(clippy::too_many_arguments)]
 pub fn RE_StretchRaw(
     frame: &mut FrameState,
+    frame_data: &mut FrameData,
+    sim: &mut RenderAssetsSim,
+    img_state: &mut TrImageState,
     gpu: &mut GpuResources,
-    assets: &RenderAssets,
     cvars: &RendererCvars,
     common: &mut Common,
     x: i32,
@@ -1073,10 +1108,13 @@ pub fn RE_StretchRaw(
     client: i32,
     dirty: bool,
 ) {
-    if !assets.registered {
+    if !sim.published.registered {
         return;
     }
-    R_SyncRenderThread(assets, common, cvars);
+    // Every read below borrows `sim.published` for the length of one call and
+    // no longer. A second live `Arc` handle would make `Arc::make_mut` inside
+    // `R_UploadScratchFrame` deep-clone the whole registry once per frame.
+    R_SyncRenderThread(&sim.published, common, cvars);
 
     // DEFERRED: R4 — qglFinish() (see doc comment above) (DEC-37 A13.2)
     // Source: oracle/codemp/renderer/tr_backend.cpp:1313-1314
@@ -1095,10 +1133,7 @@ pub fn RE_StretchRaw(
         );
     }
 
-    // DEFERRED: R4 — GL_Bind(tr.scratchImage[client]) + the format-change/
-    // dirty-subimage qgl* texture upload (see doc comment above) (DEC-37 A13.2)
-    // Source: oracle/codemp/renderer/tr_backend.cpp:1327-1344
-    let _ = (x, y, w, h, data, client, dirty);
+    let image = R_UploadScratchFrame(sim, img_state, cols, rows, data, client, dirty);
 
     // `r_speeds->integer` can't change between the two oracle checks (nothing
     // in between re-enters cvar code), so `start.is_some()` stands in for the
@@ -1112,10 +1147,26 @@ pub fn RE_StretchRaw(
         );
     }
 
-    RB_SetGL2D(frame, gpu, assets);
+    RB_SetGL2D(frame, gpu, &sim.published);
 
-    // DEFERRED: R4 — qglColor3f(tr.identityLight x3) + the
-    // qglBegin(GL_QUADS)/qglTexCoord2f/qglVertex2f x4/qglEnd quad draw (see
-    // doc comment above) (DEC-37 A13.2)
-    // Source: oracle/codemp/renderer/tr_backend.cpp:1353-1364
+    // DEFERRED: R4. qglColor3f(tr.identityLight x 3) (see doc comment above)
+    // Source: oracle/codemp/renderer/tr_backend.cpp:1353
+
+    // A client number outside the scratch set has no texture to draw, so the
+    // quad is dropped rather than pointed at another client's frame.
+    let Some(image) = image else {
+        return;
+    };
+    let (cols, rows) = (cols as f32, rows as f32);
+    frame_data.events.push(FrameEvent::DrawStretchRaw {
+        x: x as f32,
+        y: y as f32,
+        w: w as f32,
+        h: h as f32,
+        s1: 0.5 / cols,
+        t1: 0.5 / rows,
+        s2: (cols - 0.5) / cols,
+        t2: (rows - 0.5) / rows,
+        image,
+    });
 }

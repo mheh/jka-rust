@@ -2636,20 +2636,20 @@ pub fn R_CreateDefaultImage(
 /// the same oracle citation.
 ///
 /// Source: oracle/codemp/renderer/tr_local.h:1300-1307
-const NUM_SCRATCH_IMAGES: usize = 16;
+pub const NUM_SCRATCH_IMAGES: usize = 16;
 
 /// Raven `R_CreateBuiltinImages`.
 ///
-/// ESCALATION: `tr.screenImage`/`tr.identityLightImage`/
-/// `tr.scratchImage[NUM_SCRATCH_IMAGES]` have no `RenderAssets` field of
-/// their own — this packet's STATE HOMES table's "tr" write row names only
-/// `RenderAssets::white_image` as a landed sub-field. Adding the missing
-/// fields means editing `render_state::render_assets::RenderAssets`, outside
-/// this wave's file scope (`tr_image.rs` only), so per the preamble ("A state
-/// home this packet marks UNMAPPED is an ESCALATION, never an invention")
-/// they stay unhomed. The `R_CreateImage` calls that build them are still
-/// made — their registry side effects (`images`/`image_names` under the
-/// mapped name) and `state.gi_texture_bind_num`'s advance (`R_CreateImage`'s
+/// `tr.scratchImage[NUM_SCRATCH_IMAGES]` now lands in
+/// `RenderAssets::scratch_images`, which `RE_StretchRaw` and
+/// `RE_UploadCinematic` index positionally by cinematic client number.
+///
+/// ESCALATION: `tr.screenImage`/`tr.identityLightImage` still have no
+/// `RenderAssets` field of their own. This packet's STATE HOMES table's "tr"
+/// write row names only `RenderAssets::white_image` as a landed sub-field, and
+/// no ported caller reads either one. The `R_CreateImage` calls that build them
+/// are still made, so their registry side effects (`images`/`image_names` under
+/// the mapped name) and `state.gi_texture_bind_num`'s advance (`R_CreateImage`'s
 /// own doc comment: "the ++ is of course staggeringly important... later
 /// images depend on it having advanced") are real and preserved; only the
 /// returned `ImageHandle` has nowhere typed to land and is dropped. A later
@@ -2777,12 +2777,12 @@ pub fn R_CreateBuiltinImages(
         false,
     );
 
-    // ESCALATION: `tr.scratchImage[NUM_SCRATCH_IMAGES]` — see the doc comment
-    // above. `data` still holds the identityLight fill from just above, per
-    // the oracle's own buffer reuse.
+    // `data` still holds the identityLight fill from just above, per the
+    // oracle's own buffer reuse.
+    let mut scratch = Vec::with_capacity(NUM_SCRATCH_IMAGES);
     for x in 0..NUM_SCRATCH_IMAGES {
         // scratchimage is usually used for cinematic drawing
-        let _ = R_CreateImage(
+        let handle = R_CreateImage(
             view,
             cvars,
             sim,
@@ -2800,7 +2800,9 @@ pub fn R_CreateBuiltinImages(
             GL_CLAMP,
             false,
         );
+        scratch.push(handle);
     }
+    Arc::make_mut(&mut sim.published).scratch_images = scratch;
 
     R_CreateDlightImage(view, cvars, sim, models, state, gpu);
     R_CreateFogImage(view, cvars, sim, models, state, gpu);
