@@ -41,8 +41,8 @@ use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::tr_types::{
-    RF_ALPHA_DEPTH, RF_DISINTEGRATE1, RF_DISINTEGRATE2, RF_DISTORTION, RF_FORCE_ENT_ALPHA,
-    RF_RGB_TINT, RF_VOLUMETRIC,
+    RF_ALPHA_DEPTH, RF_DEPTHHACK, RF_DISINTEGRATE1, RF_DISINTEGRATE2, RF_DISTORTION,
+    RF_FORCE_ENT_ALPHA, RF_NODEPTH, RF_RGB_TINT, RF_VOLUMETRIC,
 };
 use mp_qshared::shared::mdxaBone_t;
 use mp_qshared::shared::q_math::{
@@ -798,6 +798,53 @@ struct StageDrawItem {
     ///
     /// Source: `oracle/codemp/renderer/tr_sky.cpp:814`
     depth_far: bool,
+    /// The entity's depth-range hack, `backEnd`'s `depthRange` switch. The draw
+    /// loop applies it the same way it applies `depth_far`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_backend.cpp:930-938,957-973`
+    depth_range: DepthRange,
+}
+
+/// Raven's `depthRange` switch in `RB_RenderDrawSurfList`: the depth window a
+/// surface's entity draws into.
+///
+/// - `Normal`: `qglDepthRange(0, 1)`, every ordinary surface.
+/// - `Hack`: `qglDepthRange(0, 0.3)`, `RF_DEPTHHACK`, which keeps a view model
+///   from poking into walls.
+/// - `None`: `qglDepthRange(0, 0)`, `RF_NODEPTH`, for seeing through walls.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:930-938,957-973`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DepthRange {
+    Normal,
+    Hack,
+    None,
+}
+
+impl DepthRange {
+    /// The entity's range. `RF_NODEPTH` wins, matching the oracle's `if`/`else
+    /// if` order.
+    fn resolve(entity: Option<&trRefEntity_t>) -> DepthRange {
+        let Some(ent) = entity else {
+            return DepthRange::Normal;
+        };
+        if ent.e.renderfx & RF_NODEPTH != 0 {
+            DepthRange::None
+        } else if ent.e.renderfx & RF_DEPTHHACK != 0 {
+            DepthRange::Hack
+        } else {
+            DepthRange::Normal
+        }
+    }
+
+    /// The `min_depth`, `max_depth` pair `set_viewport` takes.
+    fn window(self) -> (f32, f32) {
+        match self {
+            DepthRange::Normal => (0.0, 1.0),
+            DepthRange::Hack => (0.0, 0.3),
+            DepthRange::None => (0.0, 0.0),
+        }
+    }
 }
 
 /// The fog inputs one surface's stages read: the resolved fog volume and the
@@ -1286,11 +1333,19 @@ impl Pipeline3d {
             // Source: oracle/codemp/renderer/tr_scene.cpp:838
             let vp_y = view.viewportY as f32;
             let mut depth_far = false;
+            let mut depth_range = DepthRange::Normal;
 
             for (draw_index, item) in items.iter().enumerate() {
-                if item.depth_far != depth_far {
+                if item.depth_far != depth_far || item.depth_range != depth_range {
                     depth_far = item.depth_far;
-                    let (min_depth, max_depth) = if depth_far { (1.0, 1.0) } else { (0.0, 1.0) };
+                    depth_range = item.depth_range;
+                    // The sky's far-plane window overrides the entity hack: a
+                    // sky surface never belongs to a view-model entity.
+                    let (min_depth, max_depth) = if depth_far {
+                        (1.0, 1.0)
+                    } else {
+                        depth_range.window()
+                    };
                     pass.set_viewport(vp_x, vp_y, vp_w, vp_h, min_depth, max_depth);
                 }
 
@@ -1600,6 +1655,7 @@ impl Pipeline3d {
                     true,
                     globals_offset,
                     dynamic_vertices,
+                    DepthRange::resolve(entity),
                 );
                 if let Some(item) = item {
                     items.push(item);
@@ -1709,6 +1765,7 @@ impl Pipeline3d {
                     true,
                     globals_offset,
                     dynamic_vertices,
+                    DepthRange::resolve(Some(entity)),
                 );
                 if let Some(item) = item {
                     items.push(item);
@@ -1894,6 +1951,7 @@ impl Pipeline3d {
                     index_dynamic,
                     globals_offset,
                     dynamic_vertices,
+                    DepthRange::resolve(entities.get(entity_num as usize)),
                 );
                 if let Some(item) = item {
                     items.push(item);
@@ -2053,6 +2111,7 @@ impl Pipeline3d {
                     true,
                     globals_offset,
                     dynamic_vertices,
+                    DepthRange::resolve(entity),
                 );
                 if let Some(item) = item {
                     items.push(item);
@@ -2229,6 +2288,7 @@ impl Pipeline3d {
                     true,
                     globals_offset,
                     dynamic_vertices,
+                    DepthRange::resolve(entity),
                 );
                 if let Some(item) = item {
                     items.push(item);
@@ -2349,6 +2409,7 @@ impl Pipeline3d {
                 index_dynamic: true,
                 globals_offset,
                 depth_far: true,
+                depth_range: DepthRange::Normal,
             });
         }
 
@@ -2462,6 +2523,7 @@ impl Pipeline3d {
         // change the state bits, so they resolve before the pipeline key.
         // Source: oracle/codemp/renderer/tr_shade.cpp:2039-2054,2190-2202
         let fx = EntityFx::resolve(entity);
+        let depth_range = DepthRange::resolve(entity);
         let state_bits = fx.state_bits(stage.state_bits);
         let alpha_func = alpha_func_code(state_bits);
         let key = PipelineKey {
@@ -2554,6 +2616,7 @@ impl Pipeline3d {
                 index_dynamic,
                 globals_offset,
                 depth_far: false,
+                depth_range,
             });
         }
 
@@ -2604,6 +2667,7 @@ impl Pipeline3d {
                 index_dynamic,
                 globals_offset,
                 depth_far: false,
+                depth_range,
             })
         } else {
             Some(StageDrawItem {
@@ -2621,6 +2685,7 @@ impl Pipeline3d {
                 index_dynamic,
                 globals_offset,
                 depth_far: false,
+                depth_range,
             })
         }
     }
@@ -2669,6 +2734,7 @@ impl Pipeline3d {
         // change the state bits, so they resolve before the pipeline key.
         // Source: oracle/codemp/renderer/tr_shade.cpp:2039-2054,2190-2202
         let fx = EntityFx::resolve(entity);
+        let depth_range = DepthRange::resolve(entity);
         if fx.distortion {
             self.warn_once(Warned::Distortion);
         }
@@ -2738,6 +2804,7 @@ impl Pipeline3d {
             index_dynamic: true,
             globals_offset,
             depth_far: false,
+            depth_range,
         })
     }
 
@@ -2766,6 +2833,7 @@ impl Pipeline3d {
         index_dynamic: bool,
         globals_offset: u32,
         dynamic_vertices: &mut Vec<WorldVertex>,
+        depth_range: DepthRange,
     ) -> Option<StageDrawItem> {
         // A missing fog image would bind the white fallback and paint the
         // surface at full fog density, so the pass skips instead.
@@ -2814,6 +2882,7 @@ impl Pipeline3d {
             index_dynamic,
             globals_offset,
             depth_far: false,
+            depth_range,
         })
     }
 

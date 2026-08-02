@@ -41,7 +41,7 @@ use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
-use mp_qshared::common::mp::cgame::tr_types::{RF_FORCE_ENT_ALPHA, RF_RGB_TINT};
+use mp_qshared::common::mp::cgame::tr_types::{RF_DEPTHHACK, RF_FORCE_ENT_ALPHA, RF_RGB_TINT};
 use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
@@ -169,6 +169,14 @@ gfx/golden/constant
 \t\tblendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
 \t\trgbGen const ( 0.2 0.35 0.9 )
 \t\talphaGen const 1.0
+\t}
+}
+
+gfx/golden/opaque
+{
+\t{
+\t\tmap $whiteimage
+\t\trgbGen vertex
 \t}
 }
 ";
@@ -710,6 +718,44 @@ fn scene_renderfx_tint(host: &mut UiHost, frame_data: &mut FrameData, _shader: q
     record_entities(host, frame_data, &out);
 }
 
+/// Census renderfx row `RF_DEPTHHACK` (188): a wall quad with a sprite behind
+/// it, drawn twice. The plain sprite fails the depth test and stays hidden; the
+/// hacked one is squeezed into the front 30 per cent of the depth window, so it
+/// passes and draws over the wall. That is exactly what the flag is for, to keep
+/// a view model out of the geometry it would otherwise poke into.
+///
+/// The scene uses the opaque shader: an alpha-blended stage writes no depth, so
+/// nothing would occlude anything and the flag would leave no trace.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:930-938,957-973`
+fn scene_depthhack(host: &mut UiHost, frame_data: &mut FrameData, _shader: qhandle_t) {
+    let opaque = register_shader(host, "gfx/golden/opaque");
+    let mut out = Vec::new();
+    for (index, renderfx) in [0i32, RF_DEPTHHACK].into_iter().enumerate() {
+        let y = 30.0 - index as f32 * 60.0;
+
+        // The wall draws first and writes depth.
+        let mut wall = base_ref_entity();
+        wall.reType = refEntityType_t::RT_SPRITE;
+        wall.customShader = opaque;
+        wall.origin = [200.0, y, 0.0];
+        wall.radius = 26.0;
+        wall.shaderRGBA = [64, 200, 255, 255];
+        out.push(wall);
+
+        // The sprite sits behind it, so only the depth hack can show it.
+        let mut behind = base_ref_entity();
+        behind.reType = refEntityType_t::RT_SPRITE;
+        behind.customShader = opaque;
+        behind.renderfx = renderfx;
+        behind.origin = [400.0, y, 0.0];
+        behind.radius = 30.0;
+        behind.shaderRGBA = [255, 128, 32, 255];
+        out.push(behind);
+    }
+    record_entities(host, frame_data, &out);
+}
+
 #[test]
 fn golden_scene_sprites() {
     run_scene(&Scene {
@@ -756,6 +802,16 @@ fn golden_scene_renderfx_tint() {
         stem: "scene_renderfx_tint",
         eye: [0.0, 0.0, 0.0],
         record: scene_renderfx_tint,
+        expect_dlights: 0,
+    });
+}
+
+#[test]
+fn golden_scene_depthhack() {
+    run_scene(&Scene {
+        stem: "scene_depthhack",
+        eye: [0.0, 0.0, 0.0],
+        record: scene_depthhack,
         expect_dlights: 0,
     });
 }
