@@ -35,8 +35,10 @@ mp_game = { path = "../../game" }
 mp_ui = { path = "../../ui" }
 # The DEC-57.1 device end. Raven picked the sound device at link time
 # (`win_snd.cpp` for the client, `null_snddma.cpp` for the dedicated server);
-# the `sound_device` feature is that same arm. `jampded` and the ILP32 CI lane
-# build without it and keep the silent ring.
+# the `sound_device` feature is that same arm. The `-p mp_app` lanes (the
+# `jampded` release build and the ILP32 cross-check) never enable it. A
+# `--workspace` build does enable it everywhere, because cargo unifies features,
+# but `device_enabled` stays false on dedicated so the arm is inert there anyway.
 cpal = { version = "0.18.1", optional = true }
 
 [features]
