@@ -1272,11 +1272,11 @@ pub fn CIN_PlayCinematic(
 
     Com_DPrintf(view.common, &format!("SCR_PlayCinematic( {} )\n", arg_str));
 
-    Com_Memset(
-        &mut cl.cin as *mut _ as *mut (),
-        0,
-        std::mem::size_of_val(&cl.cin),
-    );
+    // `cl.cin` is a `Box`, so both the pointer and the length must go through
+    // the deref. Without it this clears the 8-byte box pointer, not the 2.6 MB
+    // decode surface Raven clears.
+    let cin_size = core::mem::size_of_val(&*cl.cin);
+    Com_Memset(&mut *cl.cin as *mut _ as *mut (), 0, cin_size);
     cl.currentHandle = CIN_HandleForVideo(cl);
     let handle = cl.currentHandle as usize;
 
