@@ -1,0 +1,28 @@
+# The demo-referee probe module (ticket gh#30). Standalone: the empty
+# [workspace] table keeps it OUT of the main jka-rust workspace, the same rule
+# the recorder shim follows, so building it never drags the client tree in.
+[package]
+name = "cgame-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# cdylib only: the oracle engine dlopens this as its cgame module (stage it as
+# cgamearm64.dylib). The in-process host includes `src/probe.rs` by #[path]
+# instead of linking this crate.
+[lib]
+name = "cgamearm64"
+crate-type = ["cdylib"]
+
+[dependencies]
+# rust backend, no C zlib; fast level keeps up with the record rate.
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+# the shape tables are parsed from the two committed manifests at dllEntry, so
+# the probe can never serialize a shape the manifests do not state.
+serde_json = "1"
+
+[build-dependencies]
+cc = "1"
+
+# out-of-workspace: own lockfile, own target dir under this folder.
+[workspace]
