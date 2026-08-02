@@ -1,0 +1,18 @@
+[package]
+name = "mp_client_app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# The thin bin shell over the aggregate facade, the twin of `mp/app`.
+mp_engine_core = { path = "../engine/core" }
+mp_engine_qcommon = { path = "../engine/qcommon" }
+# The client island: the `Client` carrier, the sound system, and the key numbers
+# the winit map translates into.
+mp_engine_client = { path = "../engine/client", features = ["sound_device"] }
+# `Engine.re` holds the renderer frontend, and this bin seats it.
+mp_renderer = { path = "../renderer" }
+# The graduating platform stack (DEC-56.1): the wgpu device the render thread
+# owns is built by the same `Gpu` the world harness proved.
+mp_renderer_gpu = { path = "../renderer-gpu" }
+winit = "0.30.13"

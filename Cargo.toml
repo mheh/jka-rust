@@ -31,6 +31,7 @@ members = [
     "crates/mp/renderer",
     "crates/mp/renderer-gpu",
     "crates/mp/app",
+    "crates/mp/client-app",
     "crates/sp/qshared",
     "crates/sp/bg",
     "crates/sp/uishared",

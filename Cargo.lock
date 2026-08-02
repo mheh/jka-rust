@@ -974,6 +974,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "mp_client_app"
+version = "0.1.0"
+dependencies = [
+ "mp_engine_client",
+ "mp_engine_core",
+ "mp_engine_qcommon",
+ "mp_renderer",
+ "mp_renderer_gpu",
+ "winit",
+]
+
+[[package]]
 name = "mp_engine_botlib"
 version = "0.1.0"
 dependencies = [
