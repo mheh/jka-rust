@@ -24,6 +24,7 @@ pub mod fffx;
 pub mod fx;
 pub mod fx_stubs;
 pub mod hook_install;
+pub mod keycodes;
 pub mod keys;
 pub mod mp3;
 pub mod null;

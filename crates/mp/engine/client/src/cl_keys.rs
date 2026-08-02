@@ -35,7 +35,7 @@ use mp_qshared::shared::keycatch::{
 use mp_qshared::shared::limits::{MAX_STRING_CHARS, MAX_TOKEN_CHARS};
 use mp_qshared::shared::{qboolean, qfalse, qtrue};
 use mp_ui::keycodes::fake_ascii_t::fakeAscii_t;
-use mp_ui::keycodes::K_CHAR_FLAG;
+use crate::keycodes::K_CHAR_FLAG;
 use native_platform::sys_main::Sys_GetClipboardData;
 use native_string::ctype::tolower;
 use native_string::q_string::Q_strcat;
