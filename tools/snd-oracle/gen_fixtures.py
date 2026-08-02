@@ -37,6 +37,7 @@ def write_wav(name, rate, width, channels, frames):
     blob = b"RIFF" + struct.pack("<I", len(riff)) + riff
 
     path = os.path.join(FIXTURE_DIR, name)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "wb") as handle:
         handle.write(blob)
     print("wrote %s (%d bytes)" % (path, len(blob)))
@@ -92,6 +93,17 @@ def main():
 
     # A short ramp. The channel ends inside the first paint window.
     write_wav("ramp64.wav", 22050, 2, 1, [(i - 32) * 512 for i in range(64)])
+
+    # A voice line for the lip-sync path. It sits under sound/chars, which is the
+    # directory S_LoadSound_FileLoadAndNameAdjuster tests for a language pack.
+    # Four equal blocks step the amplitude down and back up, so S_CheckAmplitude
+    # reports a different bucket in each paint frame.
+    steps = [30000, 3000, 300, 6000]
+    voice = []
+    for level in steps:
+        for i in range(1102):
+            voice.append(level if (i // 2) % 2 == 0 else -level)
+    write_wav(os.path.join("chars", "voice1.wav"), 22050, 2, 1, voice)
 
     # Stereo. S_LoadSound rejects it and the handle falls back to the default
     # sound, which is the buzz S_DefaultSound builds.

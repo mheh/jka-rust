@@ -6,8 +6,9 @@
 //! checks that the set is complete and self-consistent, so a truncated or
 //! half-regenerated golden fails here rather than inside the mixer comparison.
 //!
-//! The mixer comparison itself lands with the Rust paint chain on wayfinder
-//! ticket gh#24. Nothing here needs a C++ toolchain.
+//! The mixer comparison itself is `mp_engine_core`'s `snd_oracle_parity` test,
+//! which replays every scenario through the Rust port (gh#24). Nothing in either
+//! test needs a C++ toolchain.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -16,12 +17,13 @@ use std::path::PathBuf;
 /// The scenarios the harness ships. A new scenario must be added here, or the
 /// completeness check fails.
 /// Source: `tools/snd-oracle/scenarios/`
-const SCENARIOS: [&str; 10] = [
+const SCENARIOS: [&str; 11] = [
     "badfiles",
     "basic",
     "channels",
     "khz11",
     "khz44",
+    "lipsync",
     "loops",
     "rawstream",
     "resample",

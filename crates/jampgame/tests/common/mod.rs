@@ -332,6 +332,8 @@ impl RealWorld {
         let mut view = EngineHostView {
             sv: opaque_slots::Server::from_raw(&mut engine.sv as *mut _ as *mut ()),
             cl: opaque_slots::Client::from_raw(cl_raw),
+            // The game module never reaches the mixer, so the sound slot is NULL.
+            snd: opaque_slots::SoundSystem::from_raw(core::ptr::null_mut()),
             bot: opaque_slots::BotLib::from_raw(&mut engine.bot as *mut _ as *mut ()),
             rm: opaque_slots::RenderModels::from_raw(
                 &mut engine.render_models as *mut _ as *mut (),

@@ -68,6 +68,8 @@ use mp_qshared::common::mp::qcommon::tags::memtag_t;
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:210-224`
 pub fn Com_DPrintf(common: &mut Common, msg: &str) {
+    common.com_dprintCount += 1;
+
     // don't confuse non-developers with techie stuff...
     if common.com_developer.is_none() || common.cvar(common.com_developer).integer == 0 {
         return;

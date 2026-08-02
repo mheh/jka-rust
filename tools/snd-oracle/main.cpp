@@ -26,6 +26,8 @@ extern vec3_t listener_axis[3];
 extern sfx_t s_knownSfx[];
 extern int s_numSfx;
 extern int numLoopSounds;
+extern int s_entityWavVol[];
+extern int s_entityWavVol_back[];
 
 #define SND_ORACLE_MAX_SLOTS 16
 static sfxHandle_t s_slotHandles[SND_ORACLE_MAX_SLOTS];
@@ -88,6 +90,21 @@ static void snd_oracle_dump_sfx(const char *tag)
 		printf("  sfx %d name %s samples %d volrange %.6f method %d default %d inmem %d data %08x\n",
 			i, sfx->sSoundName, sfx->iSoundLengthInSamples, sfx->fVolRange,
 			(int)sfx->eSoundCompressionMethod, sfx->bDefaultSound, sfx->bInMemory, digest);
+	}
+}
+
+// The lip-sync dump covers the low entity slots only. A scenario that wants a
+// higher entity number raises this and re-records.
+#define SND_ORACLE_LIPSYNC_ENTS 8
+
+// S_DoLipSynchs writes the amplitude bucket of every voice channel into
+// s_entityWavVol, and S_CheckAmplitude keeps the previous value in the backup
+// table. Both are the only observable output of the lip-sync path.
+static void snd_oracle_dump_lipsync(const char *tag)
+{
+	printf("LIPSYNC %s\n", tag);
+	for (int i = 0; i < SND_ORACLE_LIPSYNC_ENTS; i++) {
+		printf("  ent %d vol %d back %d\n", i, s_entityWavVol[i], s_entityWavVol_back[i]);
 	}
 }
 
@@ -213,6 +230,8 @@ int main(int argc, char **argv)
 		fprintf(stderr, "snd-oracle: cannot open %s\n", argv[1]);
 		return 2;
 	}
+
+	snd_oracle_host_init();
 
 	printf("== snd-oracle %s ==\n", argv[1]);
 
@@ -366,6 +385,9 @@ int main(int argc, char **argv)
 
 		} else if (strcmp(cmd, "dumpring") == 0) {
 			snd_oracle_dump_ring(snd_oracle_word(&cursor, cmd));
+
+		} else if (strcmp(cmd, "dumplipsync") == 0) {
+			snd_oracle_dump_lipsync(snd_oracle_word(&cursor, cmd));
 
 		} else if (strcmp(cmd, "shutdown") == 0) {
 			if (dma.buffer && dma.samples > 0) {
