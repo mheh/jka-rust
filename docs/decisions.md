@@ -1483,3 +1483,17 @@ Ruled at the [#18](https://github.com/mheh/jka-rust/issues/18) wave-2 sit-down.
 1. **Scope of the DEC-55.2 partition.** The state-partition law ("a synchronous trap reads CPU `RenderAssets` only") binds module trap arms. Engine-interior frame-draw code (the console and screen chain) may use the full `RendererFrontend` bundle, `gpu_res` included, for now. The gh#22 platform-shell work (DEC-56 thread split) must re-audit every `gpu_res` toucher on the frame path when the render thread becomes real - the debt is recorded on that ticket.
 
 2. **`CL_AddKeyUpCommands` time UB.** Raven's `%i` argument at `cl_keys.cpp:1433` is the bare identifier `time`, the libc function address - shipping UB. The port pins `KEYUP_TIME_UB_SUBSTITUTE` (a fixed large positive int) as the one defined behavior per porting-rules §19. Retail's printed address was always a large positive int, so retail always credited a released key for the full frame, and the pinned constant keeps that behavior class deterministically. OpenJK's passed-time fix is rejected as a behavior divergence on the wire path (the netchan-frag precedent).
+
+## DEC-61 — FX subsystem design (ruled 2026-08-02)
+
+Ruled at the ticket [#26](https://github.com/mheh/jka-rust/issues/26) sit-down. Executes porting-rules §17 for the client FX subsystem (DEC-55.2). Transcription (gh#27) follows this shape.
+
+1. **Primitive shape.** The closed 13-class hierarchy under `CEffect` becomes one `FxPrimitive` enum. The inheritance chain becomes composed core blocks (the `CEffect` fields in an effect core, the `CParticle` fields in a particle core, each variant embeds what its class inherited). `Update`/`Draw` dispatch by `match`. The scheduler's active list is one `Vec<FxPrimitive>`.
+
+2. **State home.** `Engine.fx: Option<FxSystem>` - the §F singleton pattern (rule B6), `None` on dedicated. `FxSystem` owns the scheduler (templates plus scheduled slots), the live pool, and the FX clock. It threads as `fx: &mut FxSystem` in pinned receiver order and gets a view slot plus `fx_from_view`, the same as `g2` and `re`.
+
+3. **`SFxHelper` dissolves.** The wrapper's time block ports as an FX clock struct inside `FxSystem` (`AdjustTime` logic intact). Every inline forwarder call site becomes the direct call it wraps: FS via the threaded receivers, sound via the `S_*` surface, CM via `cm`, renderer emission via the `re` bundle under DEC-59.1/DEC-60.1. No service trait, no function table. Raven's `PlaySound` quirk (the ignored origin/volume/radius params) transcribes at the call sites.
+
+4. **Containers.** Idiomatic owned containers with the observable seam semantics pinned: handle-as-index allocation order and the same-name check on the template store, the 256/64/32/24 caps with their exact overflow arms, `BTreeMap<String, i32>` for the name map, stable order in the schedule and live pool. Effect handles cross the trap seam, so their arithmetic is parity surface.
+
+5. **Parity gate.** `tools/fx-oracle` on the §18 recipe: the unmodified FX TUs standalone, scripted clock, pinned `Q_flrand` LCG seed, scripted trace responses, capture-everything emission stubs. Fixtures are synthetic committed `.efx` files covering the 13-primitive matrix (retail `.efx` is Raven content and stays out of git, available as an uncommitted `JKA_REF_BASEPATH` spot check). Goldens: template-parse dumps plus per-frame emission streams. The demo referee masks `CG_FX_ADDPRIMITIVE`, so this rig is the FX port's one behavioral gate.
