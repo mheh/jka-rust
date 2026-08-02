@@ -281,6 +281,18 @@ pub fn RllDecodeStereoToMono(
     size as c_long
 }
 
+/// Copies one `f64` lane, the way Raven's `ddst[i] = dsrc[i]` does.
+///
+/// Every blitter below reaches an `f64` lane that is only 4-byte aligned. The
+/// source is a `c_ushort` codebook, and `RoQPrepMcomp` builds motion deltas as
+/// `(x + xoff - 8) * 4`, so an odd horizontal vector lands the row on a 4-byte
+/// boundary. x86 tolerates that and Raven relies on it; in Rust an aligned
+/// dereference there is undefined behavior and aborts a debug build.
+#[inline]
+unsafe fn copy_lane(dst: *mut f64, src: *mut f64, i: usize) {
+    dst.add(i).write_unaligned(src.add(i).read_unaligned());
+}
+
 /// Raven `move8_32`.
 ///
 /// This copies eight 4-byte pixels per scanline across `spl` scanlines, eight
@@ -294,17 +306,15 @@ pub fn move8_32(src: *mut byte, dst: *mut byte, spl: c_int) {
         let dspl = (spl >> 3) as isize;
 
         for _ in 0..7 {
-            *ddst = *dsrc;
-            *ddst.add(1) = *dsrc.add(1);
-            *ddst.add(2) = *dsrc.add(2);
-            *ddst.add(3) = *dsrc.add(3);
+            for i in 0..4 {
+                copy_lane(ddst, dsrc, i);
+            }
             dsrc = dsrc.offset(dspl);
             ddst = ddst.offset(dspl);
         }
-        *ddst = *dsrc;
-        *ddst.add(1) = *dsrc.add(1);
-        *ddst.add(2) = *dsrc.add(2);
-        *ddst.add(3) = *dsrc.add(3);
+        for i in 0..4 {
+            copy_lane(ddst, dsrc, i);
+        }
     }
 }
 
@@ -318,13 +328,15 @@ pub fn move4_32(src: *mut byte, dst: *mut byte, spl: c_int) {
         let dspl = (spl >> 3) as isize;
 
         for _ in 0..3 {
-            *ddst = *dsrc;
-            *ddst.add(1) = *dsrc.add(1);
+            for i in 0..2 {
+                copy_lane(ddst, dsrc, i);
+            }
             dsrc = dsrc.offset(dspl);
             ddst = ddst.offset(dspl);
         }
-        *ddst = *dsrc;
-        *ddst.add(1) = *dsrc.add(1);
+        for i in 0..2 {
+            copy_lane(ddst, dsrc, i);
+        }
     }
 }
 
@@ -341,17 +353,15 @@ pub fn blit8_32(src: *mut byte, dst: *mut byte, spl: c_int) {
         let dspl = (spl >> 3) as isize;
 
         for _ in 0..7 {
-            *ddst = *dsrc;
-            *ddst.add(1) = *dsrc.add(1);
-            *ddst.add(2) = *dsrc.add(2);
-            *ddst.add(3) = *dsrc.add(3);
+            for i in 0..4 {
+                copy_lane(ddst, dsrc, i);
+            }
             dsrc = dsrc.offset(4);
             ddst = ddst.offset(dspl);
         }
-        *ddst = *dsrc;
-        *ddst.add(1) = *dsrc.add(1);
-        *ddst.add(2) = *dsrc.add(2);
-        *ddst.add(3) = *dsrc.add(3);
+        for i in 0..4 {
+            copy_lane(ddst, dsrc, i);
+        }
     }
 }
 
@@ -367,13 +377,15 @@ pub fn blit4_32(src: *mut byte, dst: *mut byte, spl: c_int) {
         let dspl = (spl >> 3) as isize;
 
         for _ in 0..3 {
-            *ddst = *dsrc;
-            *ddst.add(1) = *dsrc.add(1);
+            for i in 0..2 {
+                copy_lane(ddst, dsrc, i);
+            }
             dsrc = dsrc.offset(2);
             ddst = ddst.offset(dspl);
         }
-        *ddst = *dsrc;
-        *ddst.add(1) = *dsrc.add(1);
+        for i in 0..2 {
+            copy_lane(ddst, dsrc, i);
+        }
     }
 }
 
@@ -386,8 +398,8 @@ pub fn blit2_32(src: *mut byte, dst: *mut byte, spl: c_int) {
         let ddst = dst as *mut f64;
         let dspl = (spl >> 3) as isize;
 
-        *ddst = *dsrc;
-        *ddst.offset(dspl) = *dsrc.add(1);
+        copy_lane(ddst, dsrc, 0);
+        ddst.offset(dspl).write_unaligned(dsrc.add(1).read_unaligned());
     }
 }
 
@@ -1760,5 +1772,60 @@ pub fn CL_PlayCinematic_f(view: &mut EngineHostView, cl: &mut Client) {
                 S_COLOR_RED, arg
             ),
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{blit2_32, blit4_32, blit8_32, move4_32, move8_32};
+    use native_types::byte;
+
+    /// Raven's motion vectors put a blitter row on a 4-byte boundary whenever
+    /// the horizontal displacement is odd, because `RoQPrepMcomp` scales by 4.
+    /// The shared cin-oracle fixtures round every displacement to an even texel
+    /// count (porting-rules §19), so this is the only cover for the odd case. An
+    /// aligned `f64` dereference aborts a debug build here.
+    ///
+    /// Source: `oracle/codemp/client/cl_cin.cpp:315-446,852`
+    #[test]
+    fn blitters_take_a_four_byte_aligned_row() {
+        // The backing stores are 8-byte aligned, so the `+ 4` below is the only
+        // misalignment under test.
+        let mut src_store = vec![0f64; 1024];
+        let mut dst_store = vec![0f64; 1024];
+
+        let src_base = src_store.as_mut_ptr() as *mut byte;
+        let dst_base = dst_store.as_mut_ptr() as *mut byte;
+        // SAFETY: both stores hold 8192 bytes, past every offset used below.
+        let src = unsafe { src_base.add(4) };
+        let dst = unsafe { dst_base.add(4) };
+
+        // SAFETY: filling the source rows the blitters read.
+        unsafe {
+            for i in 0..4096 {
+                *src.add(i) = (i % 251) as byte;
+            }
+        }
+
+        // `spl` is Raven's `samplesPerLine`: 64 texels of 4 bytes.
+        let spl = 256;
+        move8_32(src, dst, spl);
+        move4_32(src, dst, spl);
+        blit8_32(src, dst, spl);
+        blit4_32(src, dst, spl);
+        blit2_32(src, dst, spl);
+
+        // `blit2_32` ran last: lane 0 lands at `dst`, lane 1 one scanline down.
+        // SAFETY: every write above landed inside `dst_store`.
+        unsafe {
+            for i in 0..8 {
+                assert_eq!(*dst.add(i), *src.add(i), "lane 0 byte {i}");
+                assert_eq!(
+                    *dst.add(spl as usize + i),
+                    *src.add(8 + i),
+                    "lane 1 byte {i}"
+                );
+            }
+        }
     }
 }
