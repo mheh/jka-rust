@@ -9,14 +9,15 @@ use core::ffi::c_int;
 
 use native_math::vector::vec3_t;
 
+use crate::cm::cm_terrainmap_consts::{SIDE_BLUE, SIDE_RED, TM_HEIGHT, TM_WIDTH};
+use crate::cm_terrain::CmLandScape;
 use crate::collision_world::CollisionWorld;
 
 //TODO: Port CPixel32
-// Source: oracle/codemp/qcommon/cm_terrainmap.cpp (rosetta escalation)
-//TODO: Port SIDE_BLUE
-// Source: oracle/codemp/qcommon/cm_terrainmap.cpp:36 (rosetta escalation)
-//TODO: Port SIDE_RED
-// Source: oracle/codemp/qcommon/cm_terrainmap.cpp:39 (rosetta escalation)
+// Source: oracle/codemp/qcommon/cm_draw.h:24-60
+//TODO: Port CTerrainMap
+// Source: oracle/codemp/qcommon/cm_terrainmap.h:17-60
+// Both classes belong to the automap raster lane (gh#29).
 
 /// Raven `SideColor` picks the automap wall color for a terrain side flag.
 ///
@@ -44,7 +45,9 @@ pub fn CM_TM_Free(cm: &mut CollisionWorld) {
 /// from the landscape.
 ///
 /// Source: `oracle/codemp/qcommon/cm_terrainmap.cpp:397-405`
-pub fn CM_TM_Create(cm: &mut CollisionWorld, landscape: *mut CCMLandScape) {
+/// Raven names the parameter type `CCMLandScape`. This crate ports that class
+/// as `CmLandScape`, so the parameter takes the ported name.
+pub fn CM_TM_Create(cm: &mut CollisionWorld, landscape: *mut CmLandScape) {
     if cm.terrain_map.is_some() {
         CM_TM_Free(cm);
     }

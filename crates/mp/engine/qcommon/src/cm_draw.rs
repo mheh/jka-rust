@@ -2,9 +2,11 @@
 
 use core::ffi::{c_int, c_long, c_void};
 
+use native_types::byte;
+
+use crate::cm::cm_draw_cpp_consts::{BOTTOM, INT_SHIFT, LEFT, RIGHT, TOP};
 use crate::cm::polyedge::POLYEDGE;
 use crate::collision_world::CollisionWorld;
-use mp_game::prelude::byte;
 
 /// Raven `code` determines where a point sits relative to the debug clip box.
 ///
@@ -12,9 +14,11 @@ use mp_game::prelude::byte;
 pub fn code(x: c_long, y: c_long) -> c_long {
     let mut c: c_long = 0;
 
-    // PORT-NOTE(cm_draw): CDraw32::clip_min_x/max_x/min_y/max_y and the
-    // LEFT/RIGHT/BOTTOM/TOP flags have no rosetta row yet; referenced exactly
-    // as the oracle names them per missing_symbols.
+    //TODO: Port CDraw32
+    // Source: oracle/codemp/qcommon/cm_draw.h:78-180
+    // The four `clip_min_x`/`clip_max_x`/`clip_min_y`/`clip_max_y` reads below
+    // are static members of the automap raster class.
+    // That class needs a state home, so the automap lane (gh#29) owns it.
     if x < CDraw32::clip_min_x {
         c |= LEFT;
     }

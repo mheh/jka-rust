@@ -1,6 +1,6 @@
 //! `CollisionWorld` — the `cmg` + `SubBSP` collision state (state-ownership STATE-D2).
 
-use core::ffi::{c_char, c_int, c_uint};
+use core::ffi::{c_char, c_int, c_long, c_uint};
 
 use mp_qshared::shared::collision::cplane_t;
 use mp_qshared::shared::cvar::CvarHandle;
@@ -22,8 +22,21 @@ use crate::cm::clip_map_t::clipMap_t;
 use crate::cm::cm_patch_h_consts::MAX_PATCH_PLANES;
 use crate::cm::cmodel_s::cmodel_t;
 use crate::cm::patch_plane_t::patchPlane_t;
+use crate::cm::polyedge::POLYEDGE;
 use crate::cm_load::CRMManager;
 use crate::cm_terrain::CmLandScape;
+
+/// Raven `POINT` (`windows.h` `tagPOINT`) — a 2D vertex, `x`/`y` as 32-bit
+/// signed longs. `cm_draw.cpp`'s scan converter is the only qcommon consumer,
+/// so this is a local stand-in rather than a shared windows-typedef module.
+///
+/// Source: `oracle/codemp/qcommon/cm_draw.cpp:1082` (declaration site);
+/// the type itself is the Win32 `POINT` (`{ LONG x, y; }`).
+#[repr(C)]
+pub struct POINT {
+    pub x: c_long,
+    pub y: c_long,
+}
 
 /// Raven `infoParm_t` — a `svInfoParms` row: keyword name plus the
 /// surface/content flag bits it ORs (and the solid-clearing mask it ANDs) into
@@ -249,6 +262,21 @@ pub struct CollisionWorld {
     ///
     /// Source: `oracle/codemp/qcommon/cm_landscape.h:135`; `cm_local.h:155`
     pub land_scape: Option<CmLandScape>,
+
+    /// Raven `static long n` / `static POINT *pt` — `cm_draw.cpp`'s hoisted
+    /// scan-converter statics: the vertex count and the vertex array pointer
+    /// for the polygon currently being scan-converted.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_draw.cpp:1080-1082`
+    pub n: c_long,
+    pub pt: *mut POINT,
+
+    /// Raven `static long nact` / `static POLYEDGE active[256]` — the active
+    /// edge list for the current scanline, and its live count.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_draw.cpp:1084-1085`
+    pub nact: c_long,
+    pub active: [POLYEDGE; 256],
 }
 
 impl CollisionWorld {
