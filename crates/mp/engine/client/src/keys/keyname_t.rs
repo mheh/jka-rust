@@ -84,7 +84,7 @@ const fn menu(upper: u16, lower: u16, name: &'static [u8], keynum: fakeAscii_t) 
     }
 }
 
-/// Raven `keynames[MAX_KEYS]` — the key name/keynum table.
+/// Raven `keynames[MAX_KEYS]`, the key name and keynum table.
 ///
 /// Raven: do NOT blithely change any of the key names (3rd field) here, since
 /// they have to match the key binds in the CFG files, they're also prepended

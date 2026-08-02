@@ -734,7 +734,7 @@ fn field_len(edit: &field_t) -> c_int {
     edit.buffer.iter().position(|&c| c == 0).unwrap_or(0) as c_int
 }
 
-/// Raven `CompleteCommand` — tab expansion.
+/// Raven `CompleteCommand`, the console tab expansion.
 ///
 /// Raven passes `FindMatches`/`PrintMatches` as C callbacks. The port takes the
 /// two name lists back instead and runs the same two visits here, so both
