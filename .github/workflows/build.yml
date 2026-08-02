@@ -66,6 +66,14 @@ jobs:
           key: test-cargo-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
           restore-keys: test-cargo-
 
+      # `mp_client_app` turns on `mp_engine_client`'s `sound_device` feature, so
+      # the workspace build reaches cpal, whose ALSA backend needs the headers.
+      # The `jampded` lane never enables the feature and never needs this.
+      - name: Install the ALSA headers (cpal, DEC-57.1)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev
+
       - name: workspace build (layout asserts are compile-time)
         run: cargo build --workspace
 
