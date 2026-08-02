@@ -200,11 +200,16 @@ impl ApplicationHandler for Pump {
             }
             WindowEvent::RedrawRequested => {
                 self.send_render(RenderCommand::Present);
-                if let Some(window) = self.window.as_ref() {
-                    window.request_redraw();
-                }
             }
             _ => {}
+        }
+    }
+
+    /// Ask for the next frame here rather than inside `RedrawRequested`: winit
+    /// only guarantees a request made outside the redraw itself.
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        if let Some(window) = self.window.as_ref() {
+            window.request_redraw();
         }
     }
 

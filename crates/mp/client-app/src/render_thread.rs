@@ -39,6 +39,7 @@ pub fn run(mut gpu: Gpu, commands: Receiver<RenderCommand>) {
     let mut executor = FrameExecutor::new(&gpu, &images);
     let (mut width, mut height) = gpu.surface_size();
     let mut surface_warned = false;
+    let mut presented = false;
 
     while let Ok(command) = commands.recv() {
         match command {
@@ -52,13 +53,18 @@ pub fn run(mut gpu: Gpu, commands: Receiver<RenderCommand>) {
                 executor.resize(&gpu, width, height);
             }
             RenderCommand::Present => match gpu.begin_frame() {
-                Ok(frame) => gpu.present(frame),
+                Ok(frame) => {
+                    presented = true;
+                    gpu.present(frame);
+                }
                 Err(FrameError::NeedsReconfigure) => {
                     gpu.resize(width, height);
                     executor.resize(&gpu, width, height);
                 }
                 Err(FrameError::Skip) => {
-                    if !surface_warned {
+                    // The first frames before the window is mapped skip by
+                    // design, so only a later gap is worth a line.
+                    if presented && !surface_warned {
                         surface_warned = true;
                         eprintln!("jamp: the surface is not visible, so frames are skipped");
                     }
