@@ -269,6 +269,15 @@ pub fn net_add_local_address(ip: [u8; 4]) {
     }
 }
 
+/// A snapshot of the recorded local interface addresses, for `Sys_ShowIP`'s
+/// printer. Printing needs `Com_Printf`, which lives above this tier, so
+/// `Sys_ShowIP` itself is hosted one tier up and reads the table through here.
+///
+/// Source: `oracle/codemp/unix/unix_net.c:35-36`
+pub fn net_local_addresses() -> Vec<[u8; 4]> {
+    LOCAL_IP.lock().unwrap().clone()
+}
+
 /// The `NA_IP` arm of Raven `Sys_IsLANAddress` (unix): the class-C octet
 /// comparison against `localIP[]` plus the RFC1918 192.168 block check. (The
 /// class-A/B comparisons are commented out in the oracle; the loopback/IPX

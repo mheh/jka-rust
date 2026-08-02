@@ -149,3 +149,15 @@ pub const SNAPFLAG_SERVERCOUNT: c_int = 4;
 ///
 /// Source: `oracle/codemp/game/q_shared.h:395`
 pub const MAX_OSPATH: usize = 1024;
+
+/// Raven `MAX_PINGREQUESTS` — slots in the client's outstanding server-ping list.
+///
+/// Source: `oracle/codemp/game/q_shared.h:3061`
+pub const MAX_PINGREQUESTS: usize = 32;
+
+/// Raven `MAX_SERVERSTATUSREQUESTS` — slots in the client's server-status cache.
+/// `CL_GetServerStatus` masks with `MAX_SERVERSTATUSREQUESTS - 1`, so the value
+/// must stay a power of two.
+///
+/// Source: `oracle/codemp/game/q_shared.h:3062`
+pub const MAX_SERVERSTATUSREQUESTS: usize = 16;

@@ -16,18 +16,39 @@ use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::EngineHooks;
 use mp_qshared::shared::{qboolean, qfalse, qhandle_t};
 
+use crate::renderer_frontend::RendererFrontend;
 use crate::tr_model::render_models::RenderModels;
 
 /// Cast the view's type-erased `rm` slot back to the live `RenderModels`. The
 /// raw pointer is copied out first (`as_raw`), so the returned borrow is NOT
 /// tied to the view — the per-slot rule above governs its use.
 ///
+/// This is the renderer-reach half that serves every `RE_*` receiver named
+/// `rm`/`models` (the view's doc records the whole reach).
+///
 /// SAFETY (caller): the slot was built by `mp_engine_core`'s view constructor
 /// from the live, unique `&mut Engine.render_models`; the engine is
 /// single-threaded and no other cast of this slot is live for the returned
 /// borrow's duration.
-unsafe fn rm_from_view<'a>(view: &mut EngineHostView) -> &'a mut RenderModels {
+pub unsafe fn rm_from_view<'a>(view: &mut EngineHostView) -> &'a mut RenderModels {
     &mut *(view.rm.as_raw() as *mut RenderModels)
+}
+
+/// Cast the view's type-erased `re` slot back to the live [`RendererFrontend`]
+/// carrier bundle — the client's one reach to the `RE_*` receivers (DEC-59.1).
+/// A call site splits the returned bundle into the individual receivers its
+/// `RE_*` function declares. The DEC-55.2 partition binds module trap arms:
+/// `assets` and `frame_data` on a synchronous trap, never `gpu_res`.
+/// Engine-interior frame code may use the full bundle for now (DEC-60.1), and
+/// the gh#22 thread split re-audits every `gpu_res` toucher on the frame path.
+///
+/// SAFETY (caller): the slot was built by `mp_engine_core`'s view constructor
+/// from the live, unique `&mut Engine.re`; the engine is single-threaded and no
+/// other cast of this slot is live for the returned borrow's duration. The slot
+/// is NULL on dedicated (`Engine.re` is `None`), so a dedicated build must
+/// never reach this — the client tier is the only caller.
+pub unsafe fn re_from_view<'a>(view: &mut EngineHostView) -> &'a mut RendererFrontend {
+    &mut *(view.re.as_raw() as *mut RendererFrontend)
 }
 
 /// Install the renderer-model tier's hook fields.

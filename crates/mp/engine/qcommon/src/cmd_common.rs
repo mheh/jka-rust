@@ -13,6 +13,7 @@ use mp_qshared::shared::limits::MAX_STRING_TOKENS;
 
 use mp_qshared::shared::cbuf_exec::cbufExec_t;
 use mp_qshared::shared::error_parm::errorParm_t;
+use native_string::q_strncpyz::Q_strncpyz;
 
 use crate::cmd::cmd_consts::{MAX_CMD_BUFFER, MAX_CMD_LINE};
 use crate::cmd_pc::{Cmd_ExecuteString, Cmd_List_f};
@@ -49,6 +50,24 @@ pub fn Cmd_Argc(common: &Common) -> c_int {
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:309-314`
 pub fn Cmd_Argv(common: &Common, arg: c_int) -> &str {
     common.cmd_argv.get(arg as usize).map_or("", |s| s.as_str())
+}
+
+/// `Cmd_ArgvBuffer` — copy one argument into a caller buffer, truncated to
+/// `bufferLength`. The VM trap seam owns the buffer, so it arrives as a raw
+/// pointer the same way `Cvar_VariableStringBuffer`'s does.
+///
+/// # Safety
+/// `buffer` must point to at least `bufferLength` writable bytes.
+///
+/// Source: `oracle/codemp/qcommon/cmd_common.cpp:324-326`
+pub unsafe fn Cmd_ArgvBuffer(
+    common: &Common,
+    arg: c_int,
+    buffer: *mut c_char,
+    bufferLength: c_int,
+) {
+    let dest = core::slice::from_raw_parts_mut(buffer, bufferLength as usize);
+    Q_strncpyz(dest, Cmd_Argv(common, arg), bufferLength as usize);
 }
 
 /// `Cmd_Args` — args 1.. space-joined. Raven's `static char

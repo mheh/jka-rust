@@ -20,8 +20,8 @@ use core::ffi::c_int;
 use native_string::latin1_to_string;
 
 use native_platform::net::{
-    ip_socket, ipx_socket, net_collect_local_addresses, net_ip_socket, net_is_lan_ip, net_recvfrom,
-    net_select_sleep, net_sendto, set_ip_socket, NetRecvResult,
+    ip_socket, ipx_socket, net_collect_local_addresses, net_ip_socket, net_is_lan_ip,
+    net_local_addresses, net_recvfrom, net_select_sleep, net_sendto, set_ip_socket, NetRecvResult,
 };
 
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;
@@ -179,6 +179,15 @@ pub fn Sys_IsLANAddress(adr: &netadr_t) -> bool {
         return false;
     }
     net_is_lan_ip(adr.ip)
+}
+
+/// Raven `Sys_ShowIP` (unix) — print each recorded local interface address.
+///
+/// Source: `oracle/codemp/unix/unix_net.c:299-308`
+pub fn Sys_ShowIP(common: &mut Common) {
+    for ip in net_local_addresses() {
+        com_printf(common, &format!("IP: {}.{}.{}.{}\n", ip[0], ip[1], ip[2], ip[3]));
+    }
 }
 
 /// Raven `NET_OpenIP` — register `net_ip`/`net_port`, then try

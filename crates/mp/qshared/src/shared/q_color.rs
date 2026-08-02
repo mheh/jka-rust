@@ -4,7 +4,7 @@
 
 #![allow(non_upper_case_globals, non_snake_case)]
 
-use core::ffi::CStr;
+use core::ffi::{c_int, CStr};
 
 use crate::shared::vec4_t;
 
@@ -80,4 +80,12 @@ pub const S_COLOR_WHITE: &CStr = c"^7";
 pub fn Q_IsColorString(p: &[u8]) -> bool {
     p.first() == Some(&Q_COLOR_ESCAPE)
         && matches!(p.get(1), Some(&c) if c != Q_COLOR_ESCAPE && (b'0'..=b'7').contains(&c))
+}
+
+/// Raven `ColorIndex(c)` — masks a `^N` color digit down to the
+/// `g_color_table` index range (0-7).
+///
+/// Source: `oracle/codemp/game/q_shared.h:1158`
+pub fn ColorIndex(c: c_int) -> c_int {
+    (c - '0' as c_int) & 7
 }

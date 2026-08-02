@@ -4,8 +4,6 @@
 //!
 //! Source: `oracle/codemp/qcommon/cmd_pc.cpp`
 
-use core::ffi::c_char;
-use std::ffi::CString;
 
 use native_string::filter::Com_Filter;
 
@@ -62,16 +60,13 @@ pub fn Cmd_RemoveCommand(common: &mut Common, cmd_name: &str) {
 
 /// `Cmd_CommandCompletion`.
 ///
-/// Raven walks the registered-command list, invoking `callback` with each
-/// command's name. The callback is a C seam: each name crosses as a
-/// NUL-terminated `CString` for the call's duration.
+/// Raven walks the registered-command list and invokes a callback per name. The
+/// port returns the names in that same order instead, so the caller keeps its
+/// own receivers (porting-rules §B4, §C7).
 ///
 /// Source: `oracle/codemp/qcommon/cmd_pc.cpp:75-81`
-pub fn Cmd_CommandCompletion(common: &mut Common, callback: extern "C" fn(*const c_char)) {
-    for cmd in &common.cmd_functions {
-        let name = CString::new(cmd.name.as_str()).unwrap_or_default();
-        callback(name.as_ptr());
-    }
+pub fn Cmd_CommandCompletion(common: &Common) -> Vec<String> {
+    common.cmd_functions.iter().map(|c| c.name.clone()).collect()
 }
 
 /// `Cmd_List_f`.

@@ -7,8 +7,29 @@ edition = "2021"
 name = "mp_engine_client"
 
 [dependencies]
+libc = "0.2"
+native_math = { path = "../../../native/math" }
 native_platform = { path = "../../../native/platform" }
+native_string = { path = "../../../native/string" }
 native_types = { path = "../../../native/types" }
 mp_qshared = { path = "../../qshared" }
+mp_bg = { path = "../../bg" }
 mp_engine_qcommon = { path = "../qcommon" }
 mp_abi = { path = "../../abi" }
+mp_host_interface = { path = "../../host-interface" }
+# The client calls the ghoul2, ICARUS, and RMG subsystems directly, the same way
+# the server does (`cl_cgame`'s G2 trap block, `S_COLOR_RED`, `RmManager`).
+mp_engine_ghoul2 = { path = "../ghoul2" }
+mp_engine_icarus = { path = "../icarus" }
+mp_engine_rmg = { path = "../rmg" }
+# `CL_Disconnect` and `CL_ShutdownAll` drive the listen server through `SV_Frame`
+# and `SV_Shutdown`. The seven `PC_*` trap arms call the same `botlib_export`
+# table the server owns, so the client names `BotLib` as its receiver too.
+mp_engine_server = { path = "../server" }
+mp_engine_botlib = { path = "../botlib" }
+# `cl_scrn`/`cl_cgame` reach the renderer export table (`refexport_t`, `RenderModels`).
+mp_renderer = { path = "../../renderer" }
+# The client shares the module-side helpers that `mp_game` and `mp_ui` own
+# (`Q_PrintStrlen`, the cvar-flag consts, `fakeAscii_t`, the server-status table).
+mp_game = { path = "../../game" }
+mp_ui = { path = "../../ui" }

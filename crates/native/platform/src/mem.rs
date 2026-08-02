@@ -25,6 +25,16 @@ unsafe impl<T: ZeroValid, const N: usize> ZeroValid for [T; N] {}
 unsafe impl ZeroValid for u8 {}
 unsafe impl ZeroValid for i8 {}
 
+// The wider integer widths follow the same byte-pattern rule. `u16` backs the
+// RoQ `vq2`/`vq4`/`vq8` codebooks and `i32`/`i64` back the `c_long` lookup
+// tables beside them, so those megabyte arrays build on the heap too.
+unsafe impl ZeroValid for u16 {}
+unsafe impl ZeroValid for i16 {}
+unsafe impl ZeroValid for u32 {}
+unsafe impl ZeroValid for i32 {}
+unsafe impl ZeroValid for u64 {}
+unsafe impl ZeroValid for i64 {}
+
 /// THE sanctioned construction idiom for large `#[repr(C)]` all-zeroes-valid
 /// types: `alloc_zeroed` the storage and `Box::from_raw` it, so a large array is
 /// built directly on the heap and never transits the stack (naive

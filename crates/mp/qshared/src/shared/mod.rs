@@ -124,7 +124,8 @@ pub use pc_token::{
 pub use print_parm::printParm_t;
 pub use q_color::{
     colorBlack, colorBlue, colorCyan, colorDkGrey, colorGreen, colorLtGrey, colorMagenta,
-    colorMdGrey, colorRed, colorWhite, colorYellow, g_color_table, Q_IsColorString, Q_COLOR_ESCAPE,
+    colorMdGrey, colorRed, colorWhite, colorYellow, g_color_table, ColorIndex, Q_IsColorString,
+    Q_COLOR_ESCAPE,
 };
 pub use q_math::{
     _DotProduct, _VectorCopy, _VectorSubtract, VectorLength, VectorNormalize, VectorNormalizeRow,

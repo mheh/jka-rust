@@ -912,10 +912,23 @@ dependencies = [
 name = "mp_engine_client"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "mp_abi",
+ "mp_bg",
+ "mp_engine_botlib",
+ "mp_engine_ghoul2",
+ "mp_engine_icarus",
  "mp_engine_qcommon",
+ "mp_engine_rmg",
+ "mp_engine_server",
+ "mp_game",
+ "mp_host_interface",
  "mp_qshared",
+ "mp_renderer",
+ "mp_ui",
+ "native_math",
  "native_platform",
+ "native_string",
  "native_types",
 ]
 

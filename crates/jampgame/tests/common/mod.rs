@@ -336,6 +336,7 @@ impl RealWorld {
             rm: opaque_slots::RenderModels::from_raw(
                 &mut engine.render_models as *mut _ as *mut (),
             ),
+            re: opaque_slots::Renderer::from_raw(core::ptr::null_mut()),
             rmg: opaque_slots::RmManager::from_raw(&mut engine.rmg as *mut _ as *mut ()),
             g2: opaque_slots::Ghoul2System::from_raw(&mut engine.g2 as *mut _ as *mut ()),
             common: &mut engine.common,

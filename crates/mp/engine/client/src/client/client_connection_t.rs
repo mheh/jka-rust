@@ -12,7 +12,7 @@ use mp_qshared::RmAutomapSymbol;
 
 // Raven `#define MAX_OSPATH PATH_MAX` (1024 here, matching other ports of this const).
 // Source: oracle/codemp/game/q_shared.h:395
-const MAX_OSPATH: usize = 1024;
+pub const MAX_OSPATH: usize = 1024;
 
 // `MAX_INFO_STRING` (`q_shared.h:384`) imported from its canonical home in
 // `mp_qshared::shared`.
@@ -20,7 +20,7 @@ const MAX_OSPATH: usize = 1024;
 /// Raven `MAX_HEIGHTMAP_SIZE`.
 ///
 /// Source: `oracle/codemp/client/client.h:141`
-const MAX_HEIGHTMAP_SIZE: usize = 16000;
+pub const MAX_HEIGHTMAP_SIZE: usize = 16000;
 
 /// Raven `MAX_AUTOMAP_SYMBOLS`.
 ///

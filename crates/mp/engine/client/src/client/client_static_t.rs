@@ -21,12 +21,12 @@ const MAX_OSPATH: usize = 1024;
 /// lists.
 ///
 /// Source: `oracle/codemp/client/client.h`
-const MAX_OTHER_SERVERS: usize = 128;
+pub const MAX_OTHER_SERVERS: usize = 128;
 
 /// Raven `MAX_GLOBAL_SERVERS` — max entries in the global server list.
 ///
 /// Source: `oracle/codemp/client/client.h`
-const MAX_GLOBAL_SERVERS: usize = 2048;
+pub const MAX_GLOBAL_SERVERS: usize = 2048;
 
 // `MAX_INFO_STRING` (`q_shared.h`) imported from its canonical home in
 // `mp_qshared::shared`.

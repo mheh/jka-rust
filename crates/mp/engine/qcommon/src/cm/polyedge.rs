@@ -7,6 +7,7 @@ use core::ffi::c_long;
 ///
 /// Type definition source: `oracle/codemp/qcommon/cm_draw.cpp:1070-1076`
 #[repr(C)]
+#[derive(Clone, Copy, Default)]
 pub struct POLYEDGE {
     /// x coordinate of edge's intersection with current scanline
     pub x: c_long,

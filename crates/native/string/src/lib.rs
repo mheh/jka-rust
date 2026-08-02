@@ -32,8 +32,9 @@ pub use filter::{
 };
 pub use gp2_tokenizer::{Tokenizer, MAX_TOKEN_SIZE};
 pub use info::{
-    Info_RemoveKey, Info_RemoveKey_Big, Info_SetValueForKey, Info_SetValueForKey_Big,
-    Info_Validate, Info_ValueForKey, InfoSetResult, BIG_INFO_STRING, MAX_INFO_STRING,
+    Info_NextPair, Info_RemoveKey, Info_RemoveKey_Big, Info_SetValueForKey,
+    Info_SetValueForKey_Big, Info_Validate, Info_ValueForKey, InfoSetResult, BIG_INFO_STRING,
+    MAX_INFO_STRING,
 };
 pub use q_string::{
     strcat_string, Q_stricmp, Q_stricmpBytes, Q_stricmpn, Q_stricmpnBytes, Q_strcat, Q_strcmp,
