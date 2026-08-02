@@ -33,6 +33,7 @@ use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_noise::NoiseState;
 use crate::tr_scene::SceneState;
 use crate::tr_sky::SkyState;
+use crate::tr_world::WireframeAutomap;
 use crate::tr_worldeffects::world_effects::WorldEffectsState;
 
 /// Every `RE_*` receiver except the model registry, which stays the one
@@ -79,4 +80,6 @@ pub struct RendererFrontend {
     pub sky_view: viewParms_t,
     /// `tr_sky.cpp`'s cloud and sky-box state.
     pub sky: SkyState,
+    /// `tr_world.cpp`'s wireframe-automap generator state.
+    pub automap: WireframeAutomap,
 }

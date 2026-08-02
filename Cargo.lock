@@ -915,6 +915,7 @@ dependencies = [
  "libc",
  "mp_abi",
  "mp_bg",
+ "mp_engine_botlib",
  "mp_engine_ghoul2",
  "mp_engine_icarus",
  "mp_engine_qcommon",

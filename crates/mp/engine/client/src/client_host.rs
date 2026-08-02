@@ -3,16 +3,21 @@
 //! `ui_system_calls_shim`), which read the boot-built `ClientDispatchCtx` note.
 
 use core::ffi::{c_char, c_int, c_long, c_uint, c_ushort};
+use std::ffi::CString;
 
 use mp_abi::cgame::shared_buffer::autoMapInput_t;
+use mp_engine_botlib::BotLib;
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::common::com_error;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
-use mp_engine_qcommon::miniheap::cmini_heap::CMiniHeap;
+use mp_engine_qcommon::common::opaque_slots;
 use mp_engine_qcommon::vm::vm_s::vm_t;
+use mp_engine_server::Server;
 use mp_qshared::shared::cvar::CvarHandle;
 use mp_qshared::shared::error_parm::errorParm_t;
-use mp_qshared::shared::limits::{MAX_PINGREQUESTS, MAX_SERVERSTATUSREQUESTS, MAX_TOKEN_CHARS};
+use mp_qshared::shared::limits::{
+    MAX_GENTITIES, MAX_PINGREQUESTS, MAX_SERVERSTATUSREQUESTS, MAX_TOKEN_CHARS,
+};
 use mp_qshared::shared::{qboolean, qfalse};
 use native_math::vector::vec3_t;
 use native_platform::zeroed_box;
@@ -116,12 +121,6 @@ pub struct Client {
     /// Source: `oracle/codemp/client/cl_main.cpp:125-126`
     pub cl_serverStatusList: Box<[serverStatus_t; MAX_SERVERSTATUSREQUESTS]>,
     pub serverStatusCount: c_int,
-    /// Raven `G2VertSpaceClient` — the bump heap that `CL_InitCGame` allocates
-    /// for the cgame-side Ghoul2 vertex transforms and `CL_ShutdownCGame` frees.
-    /// `None` matches Raven's `= 0` initializer.
-    ///
-    /// Source: `oracle/codemp/client/cl_main.cpp:128,2701,2732-2733`
-    pub G2VertSpaceClient: Option<Box<CMiniHeap>>,
     /// Raven `CL_Record_f::demoName` (`static char[MAX_QPATH]`) — the record
     /// command's name buffer, a function-scope static that outlives the call.
     ///
@@ -133,6 +132,12 @@ pub struct Client {
     /// Source: `oracle/codemp/client/cl_main.cpp:2265-2266`
     pub frameCount: c_uint,
     pub avgFrametime: f32,
+    /// The four strings `cls.glconfig`'s `const char *` fields point at. Raven
+    /// points them at the renderer's own static buffers, which the port's
+    /// renderer owns as `String`s, so the client keeps the NUL-terminated copies.
+    ///
+    /// Source: `oracle/codemp/cgame/tr_types.h:299-303`
+    pub glconfigStrings: [CString; 4],
     /// Raven `CL_Shutdown::recursive` — the re-entry guard, a function-scope
     /// static that persists across the call.
     ///
@@ -374,6 +379,40 @@ pub struct Client {
     /// Source: `oracle/codemp/client/cl_cin.cpp:119-120`
     pub currentHandle: c_int,
     pub CL_handle: c_int,
+
+    // ---- `snd_dma.cpp` file-scope globals ----
+    // The sound stack itself is a pending lane (gh#24/gh#25, DEC-57). These are
+    // the globals the already-ported client files read and write, so they take
+    // their carrier home now and the lane fills in the behavior around them.
+    /// Raven `s_shutUp` — silences the per-frame sound spam when set.
+    ///
+    /// Source: `oracle/codemp/client/snd_dma.cpp:16`
+    pub s_shutUp: qboolean,
+    /// Raven `s_soundMuted` — true between `S_DisableSounds` and the next restart.
+    ///
+    /// Source: `oracle/codemp/client/snd_dma.cpp:130`
+    pub s_soundMuted: qboolean,
+    /// Raven `s_volume` cvar handle.
+    ///
+    /// Source: `oracle/codemp/client/snd_dma.cpp:151`
+    pub s_volume: Option<CvarHandle>,
+    /// Raven `s_entityWavVol[MAX_GENTITIES]` — the per-entity lipsync volume
+    /// the cgame reads through `CG_S_GETVOICEVOLUME`.
+    ///
+    /// Source: `oracle/codemp/client/snd_dma.cpp:193`
+    pub s_entityWavVol: Box<[c_int; MAX_GENTITIES]>,
+    /// Raven `s_rawend` / `s_soundtime` — the raw-sample write cursor and the
+    /// mixer's current sample time, which the RoQ audio path advances.
+    ///
+    /// Source: `oracle/codemp/client/snd_dma.cpp:504,1731`
+    pub s_rawend: c_int,
+    pub s_soundtime: c_int,
+
+    /// Raven `g_nOverrideChecked` (`cl_input.cpp`) — false again after a
+    /// `vid_restart`, so the net overrides are re-read for the new mod.
+    ///
+    /// Source: `oracle/codemp/client/cl_main.cpp:1310-1316`
+    pub g_nOverrideChecked: bool,
 }
 
 impl Default for Client {
@@ -393,10 +432,10 @@ impl Default for Client {
             cl_pinglist: zeroed_box(),
             cl_serverStatusList: zeroed_box(),
             serverStatusCount: 0,
-            G2VertSpaceClient: None,
             demoName: [0; MAX_QPATH],
             frameCount: 0,
             avgFrametime: 0.0,
+            glconfigStrings: Default::default(),
             recursive: qfalse,
             cl_nodelta: None,
             cl_debugMove: None,
@@ -514,6 +553,15 @@ impl Default for Client {
             newsize: 0,
             currentHandle: -1,
             CL_handle: -1,
+
+            s_shutUp: qfalse,
+            s_soundMuted: qfalse,
+            s_volume: None,
+            s_entityWavVol: zeroed_box(),
+            s_rawend: 0,
+            s_soundtime: 0,
+
+            g_nOverrideChecked: false,
         }
     }
 }
@@ -545,6 +593,27 @@ pub unsafe fn cl_from_view<'a>(view: &mut EngineHostView) -> &'a mut Client {
 /// of this slot is live for the returned borrow's duration.
 pub unsafe fn g2_from_view<'a>(view: &mut EngineHostView) -> &'a mut Ghoul2System {
     &mut *(view.g2.as_raw() as *mut Ghoul2System)
+}
+
+/// Cast the view's type-erased `sv` slot back to the live `Server`. Raven keeps
+/// one process-wide `botlib_export`, and the port gives it one home on `Server`
+/// (DEC-32), so the client's seven `PC_*` trap arms read it through here.
+///
+/// SAFETY (caller): the slot was built by `mp_engine_core`'s view constructor
+/// from the live, unique `&mut Engine.sv`; single-threaded, and no other cast
+/// of this slot is live for the returned borrow's duration.
+pub unsafe fn sv_from_view<'a>(view: &mut EngineHostView) -> &'a mut Server {
+    &mut *(view.sv.as_raw() as *mut Server)
+}
+
+/// Cast the view's type-erased `bot` slot back to the live `BotLib`, the
+/// receiver every `botlib_export_t` entry except `PC_AddGlobalDefine` takes.
+///
+/// SAFETY (caller): the slot was built by `mp_engine_core`'s view constructor
+/// from the live, unique `&mut Engine.bot`; single-threaded, and no other cast
+/// of this slot is live for the returned borrow's duration.
+pub unsafe fn bot_from_view<'a>(view: &mut EngineHostView) -> &'a mut BotLib {
+    &mut *(view.bot.as_raw() as *mut BotLib)
 }
 
 /// Rebuild the dispatcher receivers from the boot-built note, the shared body
@@ -599,6 +668,37 @@ unsafe fn client_dispatch_frame(args: *const isize) -> [c_int; 16] {
     frame
 }
 
+/// Rebuild the live world view from the dispatch note, the shape both client
+/// dispatchers declare. This is the shim-side twin of
+/// `mp_engine_core::engine_host_view`, which cannot run here because the note
+/// holds raw pointers rather than the one `&mut Engine`.
+///
+/// # Safety
+/// `c` must be the boot-built note, whose pointers are fields of the one boxed
+/// `Engine` and therefore stable for the process. The engine caller sits
+/// suspended in `VM_Call` for the whole dispatch, so its borrows are dormant.
+unsafe fn client_dispatch_view<'a>(c: &ClientDispatchCtx) -> EngineHostView<'a> {
+    let cl_raw = match (*c.cl).as_mut() {
+        Some(cl) => cl as *mut _ as *mut (),
+        None => core::ptr::null_mut(),
+    };
+    let re_raw = match (*c.re).as_mut() {
+        Some(re) => re as *mut _ as *mut (),
+        None => core::ptr::null_mut(),
+    };
+    EngineHostView {
+        sv: opaque_slots::Server::from_raw(c.sv),
+        cl: opaque_slots::Client::from_raw(cl_raw),
+        bot: opaque_slots::BotLib::from_raw(c.bot),
+        rm: opaque_slots::RenderModels::from_raw(c.rm as *mut ()),
+        re: opaque_slots::Renderer::from_raw(re_raw),
+        rmg: opaque_slots::RmManager::from_raw(c.rmg as *mut ()),
+        g2: opaque_slots::Ghoul2System::from_raw(c.g2 as *mut ()),
+        common: &mut *c.common,
+        cm: &mut *c.cm,
+    }
+}
+
 /// The injected `SlotSyscall` target for the cgame slot (LOAD-D8 injection):
 /// the module's variadic syscall lands here (through
 /// `cgame_syscall_trampoline`'s 16-word frame) with the slot's armed `ctx` —
@@ -617,14 +717,15 @@ pub extern "C-unwind" fn cgame_system_calls_shim(
     // is the trampoline's 16-word frame.
     unsafe {
         let (c, cl) = client_dispatch_note(ctx, "cgame");
+        let mut view = client_dispatch_view(c);
         let mut frame = client_dispatch_frame(args);
         CL_CgameSystemCalls(
-            &mut *c.common,
-            &mut *c.cm,
+            &mut view,
             cl,
             &mut *c.rm,
             &mut *c.rmg,
             &mut *c.g2,
+            &mut *c.roff,
             frame.as_mut_ptr(),
         ) as isize
     }
@@ -643,8 +744,9 @@ pub extern "C-unwind" fn ui_system_calls_shim(
     // is the trampoline's 16-word frame.
     unsafe {
         let (c, cl) = client_dispatch_note(ctx, "ui");
+        let mut view = client_dispatch_view(c);
         let mut frame = client_dispatch_frame(args);
-        CL_UISystemCalls(&mut *c.common, cl, &mut *c.g2, frame.as_mut_ptr()) as isize
+        CL_UISystemCalls(&mut view, cl, &mut *c.g2, frame.as_mut_ptr()) as isize
     }
 }
 

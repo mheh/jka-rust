@@ -32,7 +32,7 @@
 
 use core::ffi::{c_char, c_void};
 
-use mp_engine_qcommon::common::{com_error, com_printf, Common, EngineHostView};
+use mp_engine_qcommon::common::{com_error, com_printf, EngineHostView};
 use mp_engine_qcommon::common_fns::Com_DPrintf;
 use mp_engine_qcommon::qfiles::md3_frame_s::md3Frame_t;
 use mp_engine_qcommon::qfiles::md3_header_t::md3Header_t;
@@ -769,7 +769,6 @@ pub fn RE_BeginRegistration(
     qs: &mut QSharedScratch,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
-    common: &mut Common,
 ) -> GlConfig {
     R_Init(
         view,
@@ -793,7 +792,7 @@ pub fn RE_BeginRegistration(
 
     let glconfig_out = assets.glconfig.clone();
 
-    R_SyncRenderThread(assets, common, cvars);
+    R_SyncRenderThread(assets, view.common, cvars);
 
     // tr.viewCluster = -1;
     frame.view_cluster = -1;
@@ -806,7 +805,18 @@ pub fn RE_BeginRegistration(
     // without this we'd see a white flash on a level load because the very
     // first time the level shot would not be drawn
     RE_StretchPic(
-        frame_data, assets, common, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0,
+        frame_data,
+        assets,
+        view.common,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        0,
     );
 
     glconfig_out

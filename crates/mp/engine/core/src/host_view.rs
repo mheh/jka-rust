@@ -98,6 +98,7 @@ pub fn install_engine_hooks(engine: &mut Engine) {
         re: &mut engine.re as *mut _,
         rmg: &mut engine.rmg as *mut _,
         g2: &mut engine.g2 as *mut _,
+        roff: &mut engine.roff as *mut _,
     }));
     let client_ctx = client_note as *mut ClientDispatchCtx as *mut core::ffi::c_void;
     arm_cgame_slot(client_ctx, cgame_system_calls_shim);

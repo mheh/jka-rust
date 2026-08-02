@@ -34,6 +34,7 @@
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::Common;
+use mp_engine_qcommon::roff::RoffSystem;
 use mp_engine_rmg::rm_manager::RmManager;
 use mp_renderer::renderer_frontend::RendererFrontend;
 use mp_renderer::tr_model::render_models::RenderModels;
@@ -67,4 +68,7 @@ pub struct ClientDispatchCtx {
     pub rmg: *mut RmManager,
     /// `Engine.g2` — the ghoul2 system the G2 trap block reaches.
     pub g2: *mut Ghoul2System,
+    /// `Engine.roff` — Raven's one `theROFFSystem`, which the five `CG_ROFF_*`
+    /// arms drive the same way the server's `G_ROFF_*` arms do.
+    pub roff: *mut RoffSystem,
 }

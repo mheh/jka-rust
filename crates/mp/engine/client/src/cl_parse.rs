@@ -76,7 +76,7 @@ pub fn CL_DeltaEntity(
 ) {
     // save the parsed entity state into the big circular buffer so
     // it can be used as the source for a later delta
-    let index = (cl.cl.parseEntitiesNum & (MAX_PARSE_ENTITIES - 1)) as usize;
+    let index = (cl.cl.parseEntitiesNum as usize) & (MAX_PARSE_ENTITIES - 1);
     let state: *mut entityState_t = &mut cl.cl.parseEntities[index];
 
     if unchanged != qfalse {
@@ -262,8 +262,8 @@ pub fn CL_ParsePacketEntities(
     } else if oldindex >= unsafe { (*oldframe).numEntities } {
         oldnum = 99999;
     } else {
-        let idx = ((unsafe { (*oldframe).parseEntitiesNum } + oldindex) & (MAX_PARSE_ENTITIES - 1))
-            as usize;
+        let idx =
+            ((unsafe { (*oldframe).parseEntitiesNum } + oldindex) as usize) & (MAX_PARSE_ENTITIES - 1);
         oldstate = &mut cl.cl.parseEntities[idx];
         oldnum = unsafe { (*oldstate).number };
     }
@@ -302,8 +302,8 @@ pub fn CL_ParsePacketEntities(
             if oldindex >= unsafe { (*oldframe).numEntities } {
                 oldnum = 99999;
             } else {
-                let idx = ((unsafe { (*oldframe).parseEntitiesNum } + oldindex)
-                    & (MAX_PARSE_ENTITIES - 1)) as usize;
+                let idx = ((unsafe { (*oldframe).parseEntitiesNum } + oldindex) as usize)
+                    & (MAX_PARSE_ENTITIES - 1);
                 oldstate = &mut cl.cl.parseEntities[idx];
                 oldnum = unsafe { (*oldstate).number };
             }
@@ -323,8 +323,8 @@ pub fn CL_ParsePacketEntities(
             if oldindex >= unsafe { (*oldframe).numEntities } {
                 oldnum = 99999;
             } else {
-                let idx = ((unsafe { (*oldframe).parseEntitiesNum } + oldindex)
-                    & (MAX_PARSE_ENTITIES - 1)) as usize;
+                let idx = ((unsafe { (*oldframe).parseEntitiesNum } + oldindex) as usize)
+                    & (MAX_PARSE_ENTITIES - 1);
                 oldstate = &mut cl.cl.parseEntities[idx];
                 oldnum = unsafe { (*oldstate).number };
             }
@@ -365,8 +365,8 @@ pub fn CL_ParsePacketEntities(
         if oldindex >= unsafe { (*oldframe).numEntities } {
             oldnum = 99999;
         } else {
-            let idx = ((unsafe { (*oldframe).parseEntitiesNum } + oldindex)
-                & (MAX_PARSE_ENTITIES - 1)) as usize;
+            let idx = ((unsafe { (*oldframe).parseEntitiesNum } + oldindex) as usize)
+                & (MAX_PARSE_ENTITIES - 1);
             oldstate = &mut cl.cl.parseEntities[idx];
             oldnum = unsafe { (*oldstate).number };
         }
@@ -492,7 +492,7 @@ pub fn CL_ParseSnapshot(view: &mut EngineHostView, cl: &mut Client, msg: *mut ms
             // is too old, so we can't reconstruct it properly.
             com_printf(view.common, "Delta frame too old.\n");
         } else if cl.cl.parseEntitiesNum - unsafe { (*old).parseEntitiesNum }
-            > MAX_PARSE_ENTITIES - 128
+            > MAX_PARSE_ENTITIES as c_int - 128
         {
             Com_DPrintf(view.common, "Delta parseEntitiesNum too old.\n");
         } else {
@@ -591,7 +591,13 @@ pub fn CL_ParseSnapshot(view: &mut EngineHostView, cl: &mut Client, msg: *mut ms
     }
     // save the frame off in the backup array for later delta comparisons
     let idx = (cl.cl.snap.messageNum as usize) & PACKET_MASK;
-    cl.cl.snapshots[idx] = cl.cl.snap;
+    // `clSnapshot_t` is an ABI-frozen `#[repr(C)]` block with no `Copy`, so the
+    // ring write is the raw structure copy Raven's `cl.snapshots[i] = cl.snap` is.
+    // SAFETY: both sides are distinct fields of the same live `clientActive_t`.
+    unsafe {
+        let src: *const clSnapshot_t = &cl.cl.snap;
+        core::ptr::copy_nonoverlapping(src, &mut cl.cl.snapshots[idx], 1);
+    }
 
     if view.common.cvar(cl.cl_shownet).integer == 3 {
         com_printf(
@@ -662,7 +668,7 @@ pub fn CL_ParseDownload(view: &mut EngineHostView, cl: &mut Client, msg: *mut ms
         if cl.clc.download == 0 {
             com_printf(view.common, &format!("Could not create {}\n", temp_name));
             CL_AddReliableCommand(cl, c"stopdl".as_ptr());
-            CL_NextDownload(view.common, cl);
+            CL_NextDownload(view, cl);
             return;
         }
     }
@@ -709,11 +715,11 @@ pub fn CL_ParseDownload(view: &mut EngineHostView, cl: &mut Client, msg: *mut ms
         // loading right away.  If we take a while to load, the server is happily trying
         // to send us that last block over and over.
         // Write it twice to help make sure we acknowledge the download
-        CL_WritePacket(view.common, cl);
-        CL_WritePacket(view.common, cl);
+        CL_WritePacket(view, cl);
+        CL_WritePacket(view, cl);
 
         // get another file if needed
-        CL_NextDownload(view.common, cl);
+        CL_NextDownload(view, cl);
     }
 }
 
@@ -817,7 +823,7 @@ pub fn CL_ParseGamestate(view: &mut EngineHostView, cl: &mut Client, msg: *mut m
 
     // This used to call CL_StartHunkUsers, but now we enter the download state before loading the
     // cgame
-    CL_InitDownloads(view.common, cl);
+    CL_InitDownloads(view, cl);
 
     // make sure the game starts
     Cvar_Set(view, "cl_paused", "0");

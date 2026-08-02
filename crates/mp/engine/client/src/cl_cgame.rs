@@ -10,7 +10,6 @@ use core::ffi::{c_char, c_int};
 use mp_abi::cgame::exports::MpCgameExport;
 use mp_abi::cgame::imports::MpCgameImport;
 use mp_abi::cgame::public::snapshot_t::{snapshot_t, MAX_ENTITIES_IN_SNAPSHOT};
-use mp_abi::cgame::syscalls::CG_CM_MARKFRAGMENTS::markFragment_t;
 use mp_abi::ui::exports::MpUiExport;
 use mp_bg::public::configstring::{CS_G2BONES, CS_PLAYERS, CS_SERVERINFO, CS_SYSTEMINFO};
 use mp_bg::public::entity_flags::EF_PERMANENT;
@@ -74,6 +73,7 @@ use mp_engine_qcommon::files_common::{FS_FCloseFile, FS_Write};
 use mp_engine_qcommon::files_pc::{FS_FOpenFileByMode, FS_GetFileList, FS_Read2};
 use mp_engine_qcommon::qcommon::net_limits::{MAX_RELIABLE_COMMANDS, PACKET_BACKUP, PACKET_MASK};
 use mp_engine_qcommon::qcommon::shared_traps_t::sharedTraps_t;
+use mp_engine_qcommon::roff::RoffSystem;
 use mp_engine_qcommon::qcommon::vm_interpret_t::vmInterpret_t;
 use mp_engine_qcommon::stringed::api::{SE_GetString, SE_GetString2};
 use mp_engine_qcommon::terrain_handle::TerrainHandle;
@@ -109,12 +109,12 @@ use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::file_mode::fsMode_t;
 use mp_qshared::shared::game_state::{gameState_t, MAX_CONFIGSTRINGS, MAX_GAMESTATE_CHARS};
 use mp_qshared::shared::keycatch::KEYCATCH_CGAME;
-use mp_qshared::shared::limits::{BIG_INFO_STRING, MAX_GENTITIES};
+use mp_qshared::shared::limits::{BIG_INFO_STRING, MAX_GENTITIES, SNAPFLAG_NOT_ACTIVE};
 use mp_qshared::shared::q_math::Sys_SnapVector;
 use mp_qshared::shared::q_string::Com_sprintf;
 use mp_qshared::shared::shared_ik_move_params::sharedIKMoveParams_t;
 use mp_qshared::shared::{pc_token_t, sharedERagEffector, sharedERagPhase};
-use mp_renderer::hook_install::re_from_view;
+use mp_renderer::hook_install::{re_from_view, rm_from_view};
 use mp_renderer::render_state::frame_event::FrameEvent;
 use mp_renderer::tr_bsp::{RE_LoadWorldMap, R_GetEntityToken};
 use mp_renderer::tr_cmds::{RE_RotatePic, RE_RotatePic2, RE_SetColor, RE_StretchPic};
@@ -123,7 +123,7 @@ use mp_renderer::tr_font::{
     RE_Font_HeightPixels, RE_Font_StrLenChars, RE_Font_StrLenPixels, RE_RegisterFont,
     AnyLanguage_ReadCharFromString,
 };
-use mp_renderer::tr_image::RE_RegisterSkin;
+use mp_renderer::tr_image::{RE_RegisterImages_LevelLoadEnd, RE_RegisterSkin};
 use mp_renderer::tr_init::{RE_EndRegistration, RE_GetLightStyle, RE_SetLightStyle};
 use mp_renderer::tr_light::R_LightForPoint;
 use mp_renderer::tr_model::frontend::{r_lerp_tag, r_model_bounds, RE_RegisterModel};
@@ -134,7 +134,9 @@ use mp_renderer::tr_scene::{
 };
 use mp_renderer::tr_shader::{RE_RegisterShader, RE_RegisterShaderNoMip, R_RemapShader};
 use mp_renderer::tr_terrain::RE_InitRendererTerrain;
-use mp_renderer::tr_world::{RE_GetBModelVerts, R_AutomapElevationAdjustment, R_inPVS};
+use mp_renderer::tr_world::{
+    RE_GetBModelVerts, R_AutomapElevationAdjustment, R_InitializeWireframeAutomap, R_inPVS,
+};
 use native_math::eorientations::Eorientations;
 use native_math::orientation::orientation_t;
 use native_math::qmath::{vec3_origin, AngleVectors, MatrixMultiply, PerpendicularVectorMP};
@@ -157,7 +159,9 @@ use crate::cl_ui::{Key_GetCatcher, Key_SetCatcher};
 use crate::client::cl_main_consts::MAX_STRINGED_SV_STRING;
 use crate::client::cl_snapshot_t::clSnapshot_t;
 use crate::client::client_consts::{CMD_BACKUP, CMD_MASK, MAX_PARSE_ENTITIES, RESET_TIME};
-use crate::client_host::{client_legacy_syscall, g2_from_view, Client};
+use crate::client_host::{
+    bot_from_view, client_legacy_syscall, g2_from_view, sv_from_view, Client,
+};
 use crate::fx_stubs::{
     FX_AddBezier, FX_AddElectricity, FX_AddLine, FX_AddParticle, FX_AddPoly,
     FX_AddScheduledEffects, FX_AdjustTime, FX_Draw2DEffects, FX_FeedTrail, FX_Free, FX_FreeSystem,
@@ -166,9 +170,9 @@ use crate::fx_stubs::{
 };
 use crate::snd_stubs::{
     AS_AddPrecacheEntry, AS_GetBModelSound, AS_ParseSets, S_AddLocalSet, S_AddLoopingSound,
-    S_ClearLoopingSounds, S_MuteSound, S_RegisterSound, S_Respatialize, S_StartBackgroundTrack,
-    S_StartLocalSound, S_StartSound, S_StopBackgroundTrack, S_StopLoopingSound, S_UpdateAmbientSet,
-    S_UpdateEntityPosition,
+    S_ClearLoopingSounds, S_MuteSound, S_RegisterSound, S_Respatialize, S_RestartMusic,
+    S_StartBackgroundTrack, S_StartLocalSound, S_StartSound, S_StopBackgroundTrack,
+    S_StopLoopingSound, S_UpdateAmbientSet, S_UpdateEntityPosition,
 };
 
 /// The `VMA(x)` macro: the module-space pointer the syscall word at `x` names.
@@ -1142,6 +1146,48 @@ pub fn CL_InitCGame(view: &mut EngineHostView, cl: &mut Client) {
     Con_ClearNotify(cl);
 }
 
+/// Raven `CL_FirstSnapshot` — the connection process ends here, on the first
+/// snapshot that carries entities.
+///
+/// Raven's `RE_RegisterMedia_LevelLoadEnd` is inlined as its three live calls.
+/// `SND_RegisterAudio_LevelLoadEnd` waits on the sound lane (gh#24), and
+/// `Sys_BeginProfiling` is empty outside the Mac build.
+///
+/// Source: `oracle/codemp/client/cl_cgame.cpp:1936-1972`;
+/// `oracle/codemp/renderer/tr_model.cpp:577-587`
+pub fn CL_FirstSnapshot(view: &mut EngineHostView, cl: &mut Client) {
+    // ignore snapshots that don't have entities
+    if cl.cl.snap.snapFlags & SNAPFLAG_NOT_ACTIVE != 0 {
+        return;
+    }
+
+    // SAFETY (both casts): view-constructor slots, single-threaded, no other
+    // cast of the same slot is live across the calls.
+    let re = unsafe { re_from_view(view) };
+    let rm = unsafe { rm_from_view(view) };
+    rm.models_level_load_end(view, false);
+    RE_RegisterImages_LevelLoadEnd(&mut re.sim, &mut re.img_state, &mut re.gpu_res, view, rm);
+    S_RestartMusic(cl);
+
+    cl.cls.state = connstate_t::CA_ACTIVE;
+
+    // set the timedelta so we are exactly on this first frame
+    cl.cl.serverTimeDelta = cl.cl.snap.serverTime - cl.cls.realtime;
+    cl.cl.oldServerTime = cl.cl.snap.serverTime;
+
+    cl.clc.timeDemoBaseTime = cl.cl.snap.serverTime;
+
+    // if this is the first frame of active play,
+    // execute the contents of activeAction now
+    // this is to allow scripting a timedemo to start right
+    // after loading
+    if !view.common.cvar(cl.cl_activeAction).string.is_empty() {
+        let active_action = view.common.cvar(cl.cl_activeAction).string.clone();
+        Cbuf_AddText(view.common, &active_action);
+        Cvar_Set(view, "activeAction", "");
+    }
+}
+
 /// Raven `CL_SetCGameTime`.
 /// Derives `cl.serverTime` from `serverTimeDelta`, clamped so it never flows
 /// backwards, then drains queued demo messages until caught up.
@@ -1164,9 +1210,7 @@ pub fn CL_SetCGameTime(view: &mut EngineHostView, cl: &mut Client) {
         }
         if cl.cl.newSnapshots != qfalse {
             cl.cl.newSnapshots = qfalse;
-            //TODO: Port CL_FirstSnapshot
-            // Source: oracle/codemp/client/cl_parse.cpp (no Rust twin exists yet)
-            CL_FirstSnapshot(cl);
+            CL_FirstSnapshot(view, cl);
         }
         if cl.cls.state != connstate_t::CA_ACTIVE {
             return;
@@ -1291,6 +1335,7 @@ pub fn CL_CgameSystemCalls(
     rm: &mut RenderModels,
     rmg: &mut RmManager,
     g2: &mut Ghoul2System,
+    roff: &mut RoffSystem,
     args: *mut c_int,
 ) -> c_int {
     // The raw `Common` copy the `VMA`/`VMF` helpers read. It is never used as a
@@ -1413,8 +1458,7 @@ pub fn CL_CgameSystemCalls(
         Cvar_VariableStringBuffer(view.common, &name, vma(vc, args, 2) as *mut c_char, arg(3));
         0
     } else if op == MpCgameImport::CG_CVAR_GETHIDDENVALUE as c_int {
-        let name = cstr_to_string(vma(vc, args, 1) as *const c_char);
-        CL_GetValueForHidden(cl, &name)
+        CL_GetValueForHidden(cl, vma(vc, args, 1) as *const c_char)
     } else if op == MpCgameImport::CG_ARGC as c_int {
         Cmd_Argc(view.common)
     } else if op == MpCgameImport::CG_ARGV as c_int {
@@ -1564,22 +1608,13 @@ pub fn CL_CgameSystemCalls(
         );
         0
     } else if op == MpCgameImport::CG_CM_MARKFRAGMENTS as c_int {
-        //TODO: Port re.MarkFragments
+        //TODO: Port R_MarkFragments world root
         // Source: oracle/codemp/client/cl_cgame.cpp:719 (`re.MarkFragments`)
-        // `R_MarkFragments` (crates/mp/renderer/src/tr_marks.rs:389) takes a
-        // `world_root: &mut MarkNode` no carrier field homes yet, so the call
-        // stays in Raven shape until that owner is settled.
-        unsafe {
-            ((*cl.re).MarkFragments)(
-                arg(1),
-                vma(vc, args, 2) as *const vec3_t,
-                vma(vc, args, 3) as *const f32,
-                arg(4),
-                vma(vc, args, 5) as *mut f32,
-                arg(6),
-                vma(vc, args, 7) as *mut markFragment_t,
-            )
-        }
+        // `R_MarkFragments` takes a `world_root: &mut MarkNode`, and `MarkNode`
+        // is still the scoped-local stand-in `tr_marks.rs` declares. No carrier
+        // owns a root, so the arm reports zero fragments until the renderer
+        // census merges that node arena into `RenderAssets::world` (gh#31).
+        0
     } else if op == MpCgameImport::CG_S_GETVOICEVOLUME as c_int {
         // `s_entityWavVol` is a `snd_dma.cpp` file-scope global; the merge lane
         // homes it on `Client` (CLIENT CARRIER RULE).
@@ -1845,6 +1880,7 @@ pub fn CL_CgameSystemCalls(
         let re = unsafe { re_from_view(view) };
         let language = GetLanguageEnum(view.common, &mut re.font);
         let mod_count = re.font.iSE_Language_ModificationCount.unwrap_or(-1234);
+        let millis = sys_milliseconds(view.common);
         RE_Font_DrawString(
             &mut re.qs,
             &mut re.frame,
@@ -1866,6 +1902,9 @@ pub fn CL_CgameSystemCalls(
             text,
             rgba,
             arg(5),
+            arg(6),
+            vmf(vc, args, 7),
+            millis,
         );
         0
     } else if op == MpCgameImport::CG_LANGUAGE_ISASIAN as c_int {
@@ -1954,26 +1993,12 @@ pub fn CL_CgameSystemCalls(
         );
         0
     } else if op == MpCgameImport::CG_R_ADDDECALTOSCENE as c_int {
-        //TODO: Port re.AddDecalToScene
+        //TODO: Port RE_AddDecalToScene world root
         // Source: oracle/codemp/client/cl_cgame.cpp:1027 (`re.AddDecalToScene`)
-        // `RE_AddDecalToScene` (crates/mp/renderer/src/tr_scene.rs:1019) takes a
-        // `world_root: &mut MarkNode` no carrier field homes yet, so the call
-        // stays in Raven shape until that owner is settled.
-        unsafe {
-            ((*cl.re).AddDecalToScene)(
-                arg(1),
-                vma(vc, args, 2) as *const f32,
-                vma(vc, args, 3) as *const f32,
-                vmf(vc, args, 4),
-                vmf(vc, args, 5),
-                vmf(vc, args, 6),
-                vmf(vc, args, 7),
-                vmf(vc, args, 8),
-                core::mem::transmute(arg(9)),
-                vmf(vc, args, 10),
-                core::mem::transmute(arg(11)),
-            );
-        }
+        // Same open owner as `CG_CM_MARKFRAGMENTS` above: `RE_AddDecalToScene`
+        // takes a `world_root: &mut MarkNode`, and no carrier owns a root until
+        // the renderer census merges that node arena (gh#31). The arm adds no
+        // decal until then.
         0
     } else if op == MpCgameImport::CG_R_LIGHTFORPOINT as c_int {
         let point = unsafe { *(vma(vc, args, 1) as *const vec3_t) };
@@ -2202,37 +2227,71 @@ pub fn CL_CgameSystemCalls(
         Key_SetCatcher(cl, arg(1));
         0
     } else if op == MpCgameImport::CG_KEY_GETKEY as c_int {
-        let name = cstr_to_string(vma(vc, args, 1) as *const c_char);
-        Key_GetKey(cl, &name)
+        Key_GetKey(cl, vma(vc, args, 1) as *const c_char)
     } else if op == MpCgameImport::CG_PC_ADD_GLOBAL_DEFINE as c_int {
-        //TODO: Port botlib_export
+        // Raven keeps one process-wide `botlib_export`, and the port gives it
+        // one home on `Server` (DEC-32), so the client reads it through the
+        // view's `sv` slot.
         // Source: oracle/codemp/client/cl_cgame.cpp:61 (`botlib_export`)
-        // The ported `botlib_export_t` entries take a `bot: &mut BotLib`
-        // receiver. `mp_engine_client` has no `mp_engine_botlib` dependency and
-        // no `bot_from_view` cast, so the seven `PC_*` arms stay in Raven shape
-        // until that reach is settled.
-        unsafe { ((*cl.botlib_export).PC_AddGlobalDefine)(vma(vc, args, 1) as *mut c_char) }
-    } else if op == MpCgameImport::CG_PC_LOAD_SOURCE as c_int {
-        let name = cstr_to_string(vma(vc, args, 1) as *const c_char);
-        unsafe { ((*cl.botlib_export).PC_LoadSourceHandle)(&name) }
-    } else if op == MpCgameImport::CG_PC_FREE_SOURCE as c_int {
-        unsafe { ((*cl.botlib_export).PC_FreeSourceHandle)(arg(1)) }
-    } else if op == MpCgameImport::CG_PC_READ_TOKEN as c_int {
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let sv = unsafe { sv_from_view(view) };
+        // SAFETY: the seam pointer is the module's string (porting-rules §D11).
         unsafe {
-            ((*cl.botlib_export).PC_ReadTokenHandle)(arg(1), vma(vc, args, 2) as *mut pc_token_t)
+            ((*sv.botlib_export).PC_AddGlobalDefine.unwrap())(vma(vc, args, 1) as *mut c_char)
+        }
+    } else if op == MpCgameImport::CG_PC_LOAD_SOURCE as c_int {
+        // SAFETY: view-constructor slots, single-threaded, no other live cast.
+        let (sv, bot) = unsafe { (sv_from_view(view), bot_from_view(view)) };
+        // SAFETY: the seam pointer is the module's string (porting-rules §D11).
+        unsafe {
+            ((*sv.botlib_export).PC_LoadSourceHandle.unwrap())(
+                bot,
+                vma(vc, args, 1) as *const c_char,
+            )
+        }
+    } else if op == MpCgameImport::CG_PC_FREE_SOURCE as c_int {
+        // SAFETY: view-constructor slots, single-threaded, no other live cast.
+        let (sv, bot) = unsafe { (sv_from_view(view), bot_from_view(view)) };
+        // SAFETY: `sv.botlib_export` is the table `SV_BotInitBotLib` installed.
+        unsafe { ((*sv.botlib_export).PC_FreeSourceHandle.unwrap())(bot, arg(1)) }
+    } else if op == MpCgameImport::CG_PC_READ_TOKEN as c_int {
+        // SAFETY: view-constructor slots, single-threaded, no other live cast.
+        let (sv, bot) = unsafe { (sv_from_view(view), bot_from_view(view)) };
+        // SAFETY: the seam pointer is the module's out-param (porting-rules §D11).
+        unsafe {
+            ((*sv.botlib_export).PC_ReadTokenHandle.unwrap())(
+                bot,
+                arg(1),
+                vma(vc, args, 2) as *mut pc_token_t,
+            )
         }
     } else if op == MpCgameImport::CG_PC_SOURCE_FILE_AND_LINE as c_int {
+        // SAFETY: view-constructor slots, single-threaded, no other live cast.
+        let (sv, bot) = unsafe { (sv_from_view(view), bot_from_view(view)) };
+        // SAFETY: the seam pointers are the module's out-params (porting-rules §D11).
         unsafe {
-            ((*cl.botlib_export).PC_SourceFileAndLine)(
+            ((*sv.botlib_export).PC_SourceFileAndLine.unwrap())(
+                bot,
                 arg(1),
                 vma(vc, args, 2) as *mut c_char,
                 vma(vc, args, 3) as *mut c_int,
             )
         }
     } else if op == MpCgameImport::CG_PC_LOAD_GLOBAL_DEFINES as c_int {
-        unsafe { ((*cl.botlib_export).PC_LoadGlobalDefines)(vma(vc, args, 1) as *mut c_char) }
+        // SAFETY: view-constructor slots, single-threaded, no other live cast.
+        let (sv, bot) = unsafe { (sv_from_view(view), bot_from_view(view)) };
+        // SAFETY: the seam pointer is the module's string (porting-rules §D11).
+        unsafe {
+            ((*sv.botlib_export).PC_LoadGlobalDefines.unwrap())(
+                bot,
+                vma(vc, args, 1) as *const c_char,
+            )
+        }
     } else if op == MpCgameImport::CG_PC_REMOVE_ALL_GLOBAL_DEFINES as c_int {
-        unsafe { ((*cl.botlib_export).PC_RemoveAllGlobalDefines)() };
+        // SAFETY: view-constructor slots, single-threaded, no other live cast.
+        let (sv, bot) = unsafe { (sv_from_view(view), bot_from_view(view)) };
+        // SAFETY: `sv.botlib_export` is the table `SV_BotInitBotLib` installed.
+        unsafe { ((*sv.botlib_export).PC_RemoveAllGlobalDefines.unwrap())(bot) };
         0
     } else if op == MpCgameImport::CG_S_STOPBACKGROUNDTRACK as c_int {
         S_StopBackgroundTrack(cl);
@@ -2323,12 +2382,10 @@ pub fn CL_CgameSystemCalls(
         R_AutomapElevationAdjustment(&mut re.frame_data, vmf(vc, args, 1));
         0
     } else if op == MpCgameImport::CG_R_INITWIREFRAMEAUTO as c_int {
-        //TODO: Port R_InitializeWireframeAutomap
-        // Source: oracle/codemp/client/cl_cgame.cpp:1148
-        // `R_InitializeWireframeAutomap` (crates/mp/renderer/src/tr_world.rs:1557)
-        // takes an `automap: &mut WireframeAutomap` no carrier field homes yet,
-        // so the call stays in Raven shape until that owner is settled.
-        R_InitializeWireframeAutomap(rm) as c_int
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let re = unsafe { re_from_view(view) };
+        let disable = view.common.cvar(re.cvars.r_autoMapDisable).integer;
+        R_InitializeWireframeAutomap(&mut re.automap, &re.assets, disable) as c_int
     } else if op == MpCgameImport::CG_GET_ENTITY_TOKEN as c_int {
         let buffer = vma(vc, args, 1) as *mut c_char;
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
@@ -2528,20 +2585,17 @@ pub fn CL_CgameSystemCalls(
         }
         0
     } else if op == MpCgameImport::CG_ROFF_CLEAN as c_int {
-        // `theROFFSystem` is a `ROFFSystem.cpp` file-scope global; the merge
-        // lane homes it on `Client` (CLIENT CARRIER RULE).
-        cl.theROFFSystem.clean(true) as c_int
+        roff.clean(true) as c_int
     } else if op == MpCgameImport::CG_ROFF_UPDATE_ENTITIES as c_int {
-        cl.theROFFSystem.update_entities(true, view);
+        roff.update_entities(true, view);
         0
     } else if op == MpCgameImport::CG_ROFF_CACHE as c_int {
         let file = cstr_to_string(vma(vc, args, 1) as *const c_char);
-        cl.theROFFSystem.cache(&file, true, view)
+        roff.cache(&file, true, view)
     } else if op == MpCgameImport::CG_ROFF_PLAY as c_int {
-        cl.theROFFSystem
-            .play(arg(1), arg(2), arg(3) != 0, true, view) as c_int
+        roff.play(arg(1), arg(2), arg(3) != 0, true, view) as c_int
     } else if op == MpCgameImport::CG_ROFF_PURGE_ENT as c_int {
-        cl.theROFFSystem.purge_ent(arg(1), true, view) as c_int
+        roff.purge_ent(arg(1), true, view) as c_int
     } else if op == MpCgameImport::CG_TRUEMALLOC as c_int {
         VM_Shifted_Alloc(view, vma(vc, args, 1) as *mut *mut (), arg(2));
         0
@@ -3091,10 +3145,12 @@ pub fn CL_CgameSystemCalls(
             let cm = unsafe { &mut *(view.cm as *mut CollisionWorld) };
             rmg.load_mission(cm, view, false);
         }
-        let name = cstr_to_string(vma(vc, args, 2) as *const c_char);
         //TODO: Port RM_CreateRandomModels
-        // Source: oracle/codemp/RMG/RM_Terrain.cpp:482 (no Rust twin exists yet)
-        RM_CreateRandomModels(rmg, arg(1), &name);
+        // Source: oracle/codemp/RMG/RM_Terrain.cpp:482-495
+        // The body needs `CRMLandScape`'s client half (`LoadMiscentDef`,
+        // `LoadDensityMap`, `SpawnPatchModels`) plus `CM_TerrainPatchIterate`.
+        // None of that is ported, and the terrain lane (gh#29) owns it, so the
+        // arm spawns no random models yet.
         0
     } else if op == MpCgameImport::CG_RE_INIT_RENDERER_TERRAIN as c_int {
         let name = cstr_to_string(vma(vc, args, 1) as *const c_char);

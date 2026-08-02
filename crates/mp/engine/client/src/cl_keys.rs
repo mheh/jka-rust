@@ -5,6 +5,7 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
 use core::ffi::{c_char, c_int, c_uint};
+use std::ffi::CString;
 
 use libc::{memmove, strcasecmp, strcat, strcpy, strlen, strstr};
 
@@ -12,7 +13,6 @@ use mp_abi::cgame::exports::MpCgameExport;
 use mp_abi::cgame::public::tcgincoming_console_command::TCGIncomingConsoleCommand;
 use mp_abi::ui::exports::MpUiExport;
 use mp_abi::ui::public::ui_menu_command_t::{UIMENU_INGAME, UIMENU_MAIN};
-use mp_engine_qcommon::cmd::cmd_function_t::CmdFunction;
 use mp_engine_qcommon::cmd_common::{Cbuf_AddText, Cmd_Argc, Cmd_Argv, Cmd_TokenizeString};
 use mp_engine_qcommon::cmd_pc::{Cmd_AddCommand, Cmd_CommandCompletion};
 use mp_engine_qcommon::common::common::com_printf;
@@ -130,31 +130,17 @@ pub fn PrintMatches(common: &mut Common, cl: &mut Client, s: *const c_char) {
 pub fn keyConcatArgs(common: &mut Common, cl: &mut Client) {
     unsafe {
         let argc = Cmd_Argc(common);
+        // The buffer length is read once, so each `Q_strcat` holds the only borrow.
+        let size = cl.kg.g_consoleField.buffer.len();
         for i in 1..argc {
-            Q_strcat(
-                &mut cl.kg.g_consoleField.buffer,
-                cl.kg.g_consoleField.buffer.len(),
-                " ",
-            );
+            Q_strcat(&mut cl.kg.g_consoleField.buffer, size, " ");
             let arg = Cmd_Argv(common, i);
             if arg.contains(' ') {
-                Q_strcat(
-                    &mut cl.kg.g_consoleField.buffer,
-                    cl.kg.g_consoleField.buffer.len(),
-                    "\"",
-                );
+                Q_strcat(&mut cl.kg.g_consoleField.buffer, size, "\"");
             }
-            Q_strcat(
-                &mut cl.kg.g_consoleField.buffer,
-                cl.kg.g_consoleField.buffer.len(),
-                arg,
-            );
+            Q_strcat(&mut cl.kg.g_consoleField.buffer, size, arg);
             if arg.contains(' ') {
-                Q_strcat(
-                    &mut cl.kg.g_consoleField.buffer,
-                    cl.kg.g_consoleField.buffer.len(),
-                    "\"",
-                );
+                Q_strcat(&mut cl.kg.g_consoleField.buffer, size, "\"");
             }
         }
     }
@@ -358,12 +344,11 @@ pub fn Key_GetKey(cl: &mut Client, binding: *const c_char) -> c_int {
 
 /// Raven `CL_AddKeyUpCommands`.
 ///
-/// PORT-NOTE(blocked): Raven's body references a bare `time` identifier that
-/// is not one of its own parameters (`oracle/codemp/client/cl_keys.cpp:1433`).
-/// In the oracle TU this resolves to the libc `time` function decayed to an
-/// int, apparent Raven UB. Porting rule §F.19 requires a ruling on the one
-/// defined behavior to substitute, not a mechanical fix, so `time` stays
-/// unresolved here.
+/// Raven's `%i` argument at `cl_keys.cpp:1433` is the bare identifier `time`,
+/// which is the libc `time` function, not this function's own parameter. The
+/// port prints the same value the oracle prints, the function address narrowed
+/// to an int (porting-rules §19). The concrete number differs per binary in the
+/// oracle too, so no lockstep run can depend on it.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:1416-1453`
 pub fn CL_AddKeyUpCommands(common: &mut Common, key: c_int, kb: *mut c_char) {
@@ -382,6 +367,7 @@ pub fn CL_AddKeyUpCommands(common: &mut Common, key: c_int, kb: *mut c_char) {
                     // Button commands add the keynum and time as parms, so multiple
                     // sources can be discriminated and subframe corrected.
                     let button_str = core::ffi::CStr::from_ptr(button.as_ptr()).to_string_lossy();
+                    let time = libc::time as usize as c_int;
                     let cmd = format!("-{} {} {}\n", &button_str[1..], key, time);
                     Cbuf_AddText(common, &cmd);
                     keyevent = qtrue;
@@ -751,11 +737,9 @@ pub fn Field_KeyDownEvent(common: &mut Common, cl: &mut Client, edit: *mut field
 
 /// Raven `CompleteCommand`.
 ///
-/// PORT-NOTE(blocked): `Cmd_CommandCompletion`/`Cvar_CommandCompletion` take an
-/// `extern "C" fn(*const c_char)` callback, but `FindMatches` takes `(cl, s)`
-/// and `PrintMatches` takes `(common, cl, s)`. Neither shape matches the
-/// callback type, so both call sites need trampoline adapters. That adapter
-/// shape is a design decision, not a mechanical fix, so it stays unresolved.
+/// Raven passes `FindMatches`/`PrintMatches` as C callbacks. The port takes the
+/// two name lists back instead and runs the same two visits here, so both
+/// helpers keep their `cl` and `common` receivers.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:747-800`
 pub fn CompleteCommand(common: &mut Common, cl: &mut Client) {
@@ -782,8 +766,12 @@ pub fn CompleteCommand(common: &mut Common, cl: &mut Client) {
             return;
         }
 
-        Cmd_CommandCompletion(common, FindMatches);
-        Cvar_CommandCompletion(common, FindMatches);
+        let mut names = Cmd_CommandCompletion(common);
+        names.extend(Cvar_CommandCompletion(common));
+        for name in &names {
+            let name_c = CString::new(name.as_str()).unwrap_or_default();
+            FindMatches(cl, name_c.as_ptr());
+        }
 
         if cl.matchCount == 0 {
             return; // no matches
@@ -809,11 +797,9 @@ pub fn CompleteCommand(common: &mut Common, cl: &mut Client) {
                     }
                 });
             if Cmd_Argc(common) == 1 {
-                Q_strcat(
-                    &mut cl.kg.g_consoleField.buffer,
-                    cl.kg.g_consoleField.buffer.len(),
-                    " ",
-                );
+                // The buffer length is read first, so `Q_strcat` holds the only borrow.
+                let size = cl.kg.g_consoleField.buffer.len();
+                Q_strcat(&mut cl.kg.g_consoleField.buffer, size, " ");
             } else {
                 let completion_str = core::ffi::CStr::from_ptr(cl.completionString)
                     .to_string_lossy()
@@ -862,8 +848,12 @@ pub fn CompleteCommand(common: &mut Common, cl: &mut Client) {
         );
 
         // Run through again, printing matches.
-        Cmd_CommandCompletion(common, PrintMatches);
-        Cvar_CommandCompletion(common, PrintMatches);
+        let mut names = Cmd_CommandCompletion(common);
+        names.extend(Cvar_CommandCompletion(common));
+        for name in &names {
+            let name_c = CString::new(name.as_str()).unwrap_or_default();
+            PrintMatches(common, cl, name_c.as_ptr());
+        }
     }
 }
 
@@ -938,7 +928,7 @@ pub fn CL_CharEvent(common: &mut Common, cl: &mut Client, key: c_int) {
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:374-454`
 pub fn Field_VariableSizeDraw(
-    common: &mut Common,
+    view: &mut EngineHostView,
     cl: &mut Client,
     edit: *mut field_t,
     x: c_int,
@@ -988,18 +978,10 @@ pub fn Field_VariableSizeDraw(
         // Draw the field text.
         if size == SMALLCHAR_WIDTH {
             let mut color = [1.0f32, 1.0, 1.0, 1.0];
-            SCR_DrawSmallStringExt(
-                common,
-                cl,
-                x,
-                y,
-                str_buf.as_ptr(),
-                color.as_mut_ptr(),
-                false,
-            );
+            SCR_DrawSmallStringExt(view, cl, x, y, str_buf.as_ptr(), color.as_mut_ptr(), false);
         } else {
             // Draw the big string with a drop shadow.
-            SCR_DrawBigString(common, cl, x, y, str_buf.as_ptr(), 1.0);
+            SCR_DrawBigString(view, cl, x, y, str_buf.as_ptr(), 1.0);
         }
 
         // Draw the cursor.
@@ -1021,6 +1003,7 @@ pub fn Field_VariableSizeDraw(
 
         if size == SMALLCHAR_WIDTH {
             SCR_DrawSmallChar(
+                view,
                 cl,
                 x + ((*edit).cursor - prestep - i) * size,
                 y,
@@ -1030,7 +1013,7 @@ pub fn Field_VariableSizeDraw(
             str_buf[0] = cursor_char as c_char;
             str_buf[1] = 0;
             SCR_DrawBigString(
-                common,
+                view,
                 cl,
                 x + ((*edit).cursor - prestep - i) * size,
                 y,
@@ -1045,7 +1028,7 @@ pub fn Field_VariableSizeDraw(
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:456-459`
 pub fn Field_Draw(
-    common: &mut Common,
+    view: &mut EngineHostView,
     cl: &mut Client,
     edit: *mut field_t,
     x: c_int,
@@ -1053,14 +1036,14 @@ pub fn Field_Draw(
     width: c_int,
     showCursor: qboolean,
 ) {
-    Field_VariableSizeDraw(common, cl, edit, x, y, width, SMALLCHAR_WIDTH, showCursor);
+    Field_VariableSizeDraw(view, cl, edit, x, y, width, SMALLCHAR_WIDTH, showCursor);
 }
 
 /// Raven `Field_BigDraw`.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:461-464`
 pub fn Field_BigDraw(
-    common: &mut Common,
+    view: &mut EngineHostView,
     cl: &mut Client,
     edit: *mut field_t,
     x: c_int,
@@ -1068,7 +1051,7 @@ pub fn Field_BigDraw(
     width: c_int,
     showCursor: qboolean,
 ) {
-    Field_VariableSizeDraw(common, cl, edit, x, y, width, BIGCHAR_WIDTH, showCursor);
+    Field_VariableSizeDraw(view, cl, edit, x, y, width, BIGCHAR_WIDTH, showCursor);
 }
 
 /// Raven `Message_Key`.
@@ -1163,13 +1146,13 @@ pub fn CL_InitKeyCommands(view: &mut EngineHostView) {
 /// Raven `Console_Key`.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:810-939`
-pub fn Console_Key(common: &mut Common, cl: &mut Client, key: c_int) {
+pub fn Console_Key(view: &mut EngineHostView, cl: &mut Client, key: c_int) {
     unsafe {
         // ctrl-L clears the screen
         if cl.keynames[key as usize].lower == b'l' as u16
             && cl.kg.keys[fakeAscii_t::A_CTRL as usize].down == qtrue
         {
-            Cbuf_AddText(common, "clear\n");
+            Cbuf_AddText(view.common, "clear\n");
             return;
         }
 
@@ -1195,11 +1178,11 @@ pub fn Console_Key(common: &mut Common, cl: &mut Client, key: c_int) {
                 cl.kg.g_consoleField.cursor += 1;
             } else {
                 // Explicit commands do not need a leading slash.
-                CompleteCommand(common, cl);
+                CompleteCommand(view.common, cl);
             }
 
             com_printf(
-                common,
+                view.common,
                 &format!(
                     "]{}\n",
                     core::ffi::CStr::from_ptr(cl.kg.g_consoleField.buffer.as_ptr())
@@ -1224,7 +1207,7 @@ pub fn Console_Key(common: &mut Common, cl: &mut Client, key: c_int) {
                     );
 
                     if VM_Call(
-                        common,
+                        view.common,
                         cl.cgvm,
                         MpCgameExport::CG_INCOMING_CONSOLE_COMMAND as c_int,
                         &[],
@@ -1234,34 +1217,34 @@ pub fn Console_Key(common: &mut Common, cl: &mut Client, key: c_int) {
                         let text =
                             core::ffi::CStr::from_ptr(cl.kg.g_consoleField.buffer.as_ptr().add(1))
                                 .to_string_lossy();
-                        Cbuf_AddText(common, &text);
-                        Cbuf_AddText(common, "\n");
+                        Cbuf_AddText(view.common, &text);
+                        Cbuf_AddText(view.common, "\n");
                     } else if (*icc).conCommand[0] != 0 {
                         // The VM call says to execute this command in place.
                         let text =
                             core::ffi::CStr::from_ptr((*icc).conCommand.as_ptr() as *const c_char)
                                 .to_string_lossy();
-                        Cbuf_AddText(common, &text);
-                        Cbuf_AddText(common, "\n");
+                        Cbuf_AddText(view.common, &text);
+                        Cbuf_AddText(view.common, "\n");
                     }
                 } else {
                     // Just execute it.
                     let text =
                         core::ffi::CStr::from_ptr(cl.kg.g_consoleField.buffer.as_ptr().add(1))
                             .to_string_lossy();
-                    Cbuf_AddText(common, &text);
-                    Cbuf_AddText(common, "\n");
+                    Cbuf_AddText(view.common, &text);
+                    Cbuf_AddText(view.common, "\n");
                 }
             } else {
                 // Other text is a chat message.
                 if cl.kg.g_consoleField.buffer[0] == 0 {
                     return; // empty lines just scroll the console without adding to history
                 }
-                Cbuf_AddText(common, "cmd say ");
+                Cbuf_AddText(view.common, "cmd say ");
                 let text = core::ffi::CStr::from_ptr(cl.kg.g_consoleField.buffer.as_ptr())
                     .to_string_lossy();
-                Cbuf_AddText(common, &text);
-                Cbuf_AddText(common, "\n");
+                Cbuf_AddText(view.common, &text);
+                Cbuf_AddText(view.common, "\n");
             }
 
             // Copy the line to the history buffer.
@@ -1275,14 +1258,14 @@ pub fn Console_Key(common: &mut Common, cl: &mut Client, key: c_int) {
             cl.kg.g_consoleField.widthInChars = cl.g_console_field_width;
 
             if cl.cls.state == connstate_t::CA_DISCONNECTED {
-                SCR_UpdateScreen(common, cl); // force an update, because the command may take some time
+                SCR_UpdateScreen(view, cl); // force an update, because the command may take some time
             }
             return;
         }
 
         // Command completion.
         if key == fakeAscii_t::A_TAB as c_int {
-            CompleteCommand(common, cl);
+            CompleteCommand(view.common, cl);
             return;
         }
 
@@ -1343,7 +1326,7 @@ pub fn Console_Key(common: &mut Common, cl: &mut Client, key: c_int) {
 
         // Pass to the normal editline routine.
         let edit: *mut field_t = &mut cl.kg.g_consoleField;
-        Field_KeyDownEvent(common, cl, edit, key);
+        Field_KeyDownEvent(view.common, cl, edit, key);
     }
 }
 
@@ -1381,7 +1364,7 @@ pub fn CL_KeyEvent(
             if down != qtrue {
                 return;
             }
-            Con_ToggleConsole_f(cl);
+            Con_ToggleConsole_f(view.common, cl);
             return;
         }
 
@@ -1423,7 +1406,7 @@ pub fn CL_KeyEvent(
                         &[UIMENU_INGAME as isize],
                     );
                 } else {
-                    CL_Disconnect_f(cl);
+                    CL_Disconnect_f(view, cl);
                     S_StopAllSounds(cl);
                     VM_Call(
                         view.common,
@@ -1474,7 +1457,7 @@ pub fn CL_KeyEvent(
 
         // Distribute the key-down event to the appropriate handler.
         if cl.cls.keyCatchers & KEYCATCH_CONSOLE != 0 {
-            Console_Key(view.common, cl, key);
+            Console_Key(view, cl, key);
         } else if cl.cls.keyCatchers & KEYCATCH_UI != 0 {
             if !cl.uivm.is_null() {
                 VM_Call(
@@ -1496,7 +1479,7 @@ pub fn CL_KeyEvent(
         } else if cl.cls.keyCatchers & KEYCATCH_MESSAGE != 0 {
             Message_Key(view.common, cl, key);
         } else if cl.cls.state == connstate_t::CA_DISCONNECTED {
-            Console_Key(view.common, cl, key);
+            Console_Key(view, cl, key);
         } else {
             // Send the bound action.
             let kb = cl.kg.keys[upper].binding;

@@ -1,4 +1,5 @@
-//! `mp_engine_client` crate. //TODO: Port module mp_engine_client
+//! `mp_engine_client` crate — the client island: `cl_main`, the two module
+//! dispatchers, input, keys, console, screen, cinematics, and the carriers.
 
 // Raven-named functions/types (`CL_Init`, `Con_DrawConsole`, `cl_paused`, …) keep
 // their original casing across the ABI seam, matching `mp_game`'s crate policy.

@@ -13,7 +13,7 @@
     unused_unsafe
 )]
 
-use std::ffi::CStr;
+use std::ffi::{CStr, CString};
 use std::mem::take;
 use std::os::raw::{c_char, c_int};
 
@@ -48,7 +48,6 @@ use mp_engine_qcommon::files_pc::{
     FS_ClearPakReferences, FS_ComparePaks, FS_ConditionalRestart, FS_LoadedPakNames,
     FS_ReferencedPakNames, FS_ReferencedPakPureChecksums,
 };
-use mp_engine_qcommon::miniheap::cmini_heap::CMiniHeap;
 use mp_engine_qcommon::msg::{
     MSG_BeginReadingOOB, MSG_Bitstream, MSG_Init, MSG_ReadLong, MSG_ReadString, MSG_ReadStringLine,
     MSG_WriteBigString, MSG_WriteBits, MSG_WriteByte, MSG_WriteData, MSG_WriteDeltaEntity,
@@ -76,6 +75,7 @@ use mp_game::prelude::byte as game_byte;
 use mp_game::q_shared_cvar_flags::{
     CVAR_ARCHIVE, CVAR_ROM, CVAR_SERVERINFO, CVAR_TEMP, CVAR_USERINFO,
 };
+use mp_qshared::common::mp::cgame::glconfig_t::glconfig_t;
 use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;
 use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
@@ -99,7 +99,9 @@ use mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::{
 };
 use mp_engine_icarus::q3_interface::{S_COLOR_RED, S_COLOR_YELLOW};
 use mp_renderer::hook_install::{re_from_view, rm_from_view};
+use mp_renderer::render_state::placeholders::GlConfig;
 use mp_renderer::tr_init::RE_Shutdown;
+use mp_renderer::tr_model::frontend::RE_BeginRegistration;
 use mp_renderer::tr_shader::{RE_RegisterShader, RE_RegisterShaderNoMip};
 
 use crate::client::client_consts::RETRANSMIT_TIMEOUT;
@@ -871,25 +873,75 @@ pub fn CL_ShutdownRef(view: &mut EngineHostView, cl: &mut Client) {
     );
 }
 
+/// Copy the renderer's owned `GlConfig` into the ABI-frozen `cls.glconfig` that
+/// the cgame and ui modules read through `CG_GETGLCONFIG`/`UI_GETGLCONFIG`.
+///
+/// Raven points the four `const char *` fields at the renderer's own static
+/// buffers. The port owns the same four strings on `Client`, so the pointers
+/// stay valid for as long as `cls.glconfig` does.
+///
+/// Source: `oracle/codemp/cgame/tr_types.h:299-325`
+fn cl_set_glconfig(cl: &mut Client, glconfig: &GlConfig) {
+    cl.glconfigStrings = [
+        CString::new(glconfig.renderer_string.as_str()).unwrap_or_default(),
+        CString::new(glconfig.vendor_string.as_str()).unwrap_or_default(),
+        CString::new(glconfig.version_string.as_str()).unwrap_or_default(),
+        CString::new(glconfig.extensions_string.as_str()).unwrap_or_default(),
+    ];
+    cl.cls.glconfig = glconfig_t {
+        renderer_string: cl.glconfigStrings[0].as_ptr(),
+        vendor_string: cl.glconfigStrings[1].as_ptr(),
+        version_string: cl.glconfigStrings[2].as_ptr(),
+        extensions_string: cl.glconfigStrings[3].as_ptr(),
+        maxTextureSize: glconfig.max_texture_size,
+        maxActiveTextures: glconfig.max_active_textures,
+        maxTextureFilterAnisotropy: glconfig.max_texture_filter_anisotropy,
+        colorBits: glconfig.color_bits,
+        depthBits: glconfig.depth_bits,
+        stencilBits: glconfig.stencil_bits,
+        deviceSupportsGamma: glconfig.device_supports_gamma as qboolean,
+        textureCompression: glconfig.texture_compression,
+        textureEnvAddAvailable: glconfig.texture_env_add_available as qboolean,
+        clampToEdgeAvailable: glconfig.clamp_to_edge_available as qboolean,
+        vidWidth: glconfig.vid_width,
+        vidHeight: glconfig.vid_height,
+        displayFrequency: glconfig.display_frequency,
+        isFullscreen: glconfig.is_fullscreen as qboolean,
+        stereoEnabled: glconfig.stereo_enabled as qboolean,
+    };
+}
+
 /// `CL_InitRenderer` — starts the renderer and registers the console assets.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:2424-2435`
 pub fn CL_InitRenderer(view: &mut EngineHostView, cl: &mut Client) {
     // this sets up the renderer and calls R_Init
-    //TODO: Port RE_BeginRegistration
-    // Source: oracle/codemp/client/cl_main.cpp:2424-2435
-    // `RE_BeginRegistration` declares both `view: &mut EngineHostView` and a
-    // second `common: &mut Common`, which one view holder cannot supply, and it
-    // returns `GlConfig` where `clientStatic_t.glconfig` is the layout-frozen
-    // `glconfig_t`. The call stays in Raven shape until a ruling settles both.
-    let beginRegistration = cl.re.BeginRegistration.unwrap();
-    beginRegistration(&mut *cl.cls.glconfig);
-
-    // load character sets
     // SAFETY (both casts): view-constructor slots, single-threaded, no other
     // cast of the same slot is live across the calls.
     let re = unsafe { re_from_view(view) };
     let rm = unsafe { rm_from_view(view) };
+    let glconfig = RE_BeginRegistration(
+        view,
+        &mut re.cvars,
+        &mut re.assets,
+        &mut re.sim,
+        &mut re.img_state,
+        &mut re.gpu_res,
+        rm,
+        &mut re.frame,
+        &mut re.scene,
+        &mut re.frame_data,
+        &mut re.noise,
+        &mut re.rng,
+        &mut re.font,
+        &mut re.world_effects,
+        &mut re.qs,
+        &mut re.sky_view,
+        &mut re.sky,
+    );
+    cl_set_glconfig(cl, &glconfig);
+
+    // load character sets
     cl.cls.charSetShader = RE_RegisterShaderNoMip(
         "gfx/2d/charsgrid_med",
         &mut re.qs,
@@ -937,31 +989,15 @@ pub fn CL_InitRenderer(view: &mut EngineHostView, cl: &mut Client) {
     cl.kg.g_consoleField.widthInChars = cl.g_console_field_width;
 }
 
-/// `CL_InitRef` — binds the renderer export table into the client.
+/// `CL_InitRef` — unpauses the client once the renderer is up.
+///
+/// DEC-59.1 dropped `refexport_t`, `GetRefAPI`, and `REF_API_VERSION`, so the
+/// table fetch and the `re = *ret` copy have no counterpart. The platform shell
+/// seats `Engine.re`, and every engine-interior call names an `RE_*` frontend
+/// function directly. The unpause is the whole remaining body.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:2480-2499`
-pub fn CL_InitRef(view: &mut EngineHostView, cl: &mut Client) {
-    //TODO: Port GetRefAPI
-    // Source: oracle/codemp/client/cl_main.cpp:2480-2499
-    // DEC-59.1 removed `refexport_t`, `GetRefAPI`, and `REF_API_VERSION`. What
-    // seats `Engine.re` in place of the table fetch is a spine question (the
-    // DEC-56 platform shell), so the fetch stays in Raven shape until it is
-    // ruled.
-    let ret: *mut refexport_t;
-
-    ret = GetRefAPI(REF_API_VERSION);
-
-    //	Com_Printf( "-------------------------------\n");
-
-    if ret.is_null() {
-        com_error(
-            errorParm_t::ERR_FATAL,
-            "Couldn't initialize refresh".to_string(),
-        );
-    }
-
-    cl.re = unsafe { core::ptr::read(ret) };
-
+pub fn CL_InitRef(view: &mut EngineHostView) {
     // unpause so the cgame definately gets a snapshot and renders a frame
     Cvar_Set(view, "cl_paused", "0");
 }
@@ -2892,9 +2928,8 @@ pub fn CL_Shutdown(view: &mut EngineHostView, cl: &mut Client) {
     }
     cl.recursive = qtrue;
 
-    if cl.G2VertSpaceClient.is_some() {
-        cl.G2VertSpaceClient = None;
-    }
+    // Raven deletes `G2VertSpaceClient` here. The heap is dropped by the ghoul2
+    // design, so there is nothing to free.
 
     CL_Disconnect(view, cl, qtrue);
 
@@ -3258,7 +3293,7 @@ pub fn CL_Vid_Restart_f(view: &mut EngineHostView, cl: &mut Client) {
     }
 
     // initialize the renderer interface
-    CL_InitRef(view, cl);
+    CL_InitRef(view);
 
     // startup all the client stuff
     CL_StartHunkUsers(view, cl);
@@ -3796,13 +3831,9 @@ pub fn CL_Frame(view: &mut EngineHostView, cl: &mut Client, msec: c_int) {
 
     Con_RunConsole(view.common, cl);
 
-    // reset the heap for Ghoul2 vert transform space gameside
-    //TODO: Port CMiniHeap::ResetHeap
-    // Source: oracle/codemp/qcommon/MiniHeap.h:5-51
-    // `native_types`'s `CMiniHeap` is a layout-only port with no methods yet.
-    if cl.G2VertSpaceServer.is_some() {
-        cl.G2VertSpaceServer.as_mut().unwrap().ResetHeap();
-    }
+    // Raven resets `G2VertSpaceServer` here for the game-side ghoul2 vertex
+    // transforms. The heap is dropped by the ghoul2 design, so there is nothing
+    // to reset.
 
     cl.cls.framecount += 1;
 }
@@ -3948,7 +3979,7 @@ pub fn CL_Init(view: &mut EngineHostView, cl: &mut Client) {
     Cmd_AddCommand(view, "model", Some(CL_SetModel_f_cmd));
     Cmd_AddCommand(view, "forcepowers", Some(CL_SetForcePowers_f_cmd));
 
-    CL_InitRef(view, cl);
+    CL_InitRef(view);
 
     SCR_Init(view, cl);
 
@@ -3956,11 +3987,10 @@ pub fn CL_Init(view: &mut EngineHostView, cl: &mut Client) {
 
     Cvar_Set(view, "cl_running", "1");
 
-    //TODO: Port CMiniHeap::CMiniHeap
-    // Source: oracle/codemp/qcommon/MiniHeap.h:5-51
-    // `native_types`'s `CMiniHeap` is a layout-only port, so the constructor has
-    // no home yet.
-    cl.G2VertSpaceClient = Some(Box::new(CMiniHeap::new(G2_VERT_SPACE_CLIENT_SIZE * 1024)));
+    // Raven allocates `G2VertSpaceClient = new CMiniHeap(...)` here for the
+    // cgame-side model vertex transforms (cl_main.cpp:2703). `CMiniHeap` is
+    // dropped by the ghoul2 design, the same disposition `SV_Init` records for
+    // `G2VertSpaceServer`, so this allocation drops too.
 
     //	Com_Printf( "----- Client Initialization Complete -----\n" );
 }

@@ -21,13 +21,14 @@ use mp_engine_qcommon::common_fns::Com_Memcpy;
 use mp_engine_qcommon::cvar_fns::Cvar_Get;
 use mp_engine_qcommon::files_common::{FS_FCloseFile, FS_FOpenFileWrite, FS_Write};
 use mp_engine_qcommon::stringed::api::{SE_GetString, SE_GetString2};
+use mp_engine_qcommon::timing::sys_milliseconds;
 use mp_engine_qcommon::vm_fns::VM_Call;
 use mp_game::g_cmds::SAY_TEAM;
 use mp_game::g_team::{COLOR_RED, COLOR_WHITE};
 use mp_qshared::shared::connstate_t;
 use mp_qshared::shared::limits::MAX_CLIENTS;
 use mp_qshared::shared::q_color::Q_IsColorString;
-use mp_qshared::shared::qboolean;
+use mp_qshared::shared::{qboolean, qfalse, qtrue};
 use mp_renderer::hook_install::{re_from_view, rm_from_view};
 use mp_renderer::tr_cmds::{RE_SetColor, RE_StretchPic};
 use mp_renderer::tr_font::{
@@ -35,7 +36,8 @@ use mp_renderer::tr_font::{
 };
 use native_types::fileHandle_t;
 
-use crate::cl_keys::Field_Clear;
+use crate::cl_keys::{Field_BigDraw, Field_Clear, Field_Draw};
+use crate::cl_main::CL_StartDemoLoop;
 use crate::cl_scrn::{SCR_DrawBigString, SCR_DrawPic, SCR_DrawSmallChar};
 use crate::client::console_t::NUM_CON_TIMES;
 use crate::client_host::{cl_from_view, Client};
@@ -98,12 +100,15 @@ pub fn Con_Dump_f(view: &mut EngineHostView, cl: &mut Client) {
         return;
     }
 
+    // The file name is read once, so the print and the open each hold the only
+    // borrow of `view.common`.
+    let file_name = Cmd_Argv(view.common, 1).to_string();
     com_printf(
         view.common,
-        &format!("Dumped console text to {}.\n", Cmd_Argv(view.common, 1)),
+        &format!("Dumped console text to {}.\n", file_name),
     );
 
-    let f: fileHandle_t = FS_FOpenFileWrite(view.common, Cmd_Argv(view.common, 1));
+    let f: fileHandle_t = FS_FOpenFileWrite(view.common, &file_name);
     if f == 0 {
         com_printf(
             view.common,
@@ -187,7 +192,7 @@ pub fn Con_ClearNotify(cl: &mut Client) {
 /// Source: `oracle/codemp/client/cl_console.cpp:325-345`
 pub fn Con_Linefeed(cl: &mut Client, silent: qboolean) {
     // mark time for transparent overlay
-    if cl.con.current >= 0 && silent == qboolean::qfalse {
+    if cl.con.current >= 0 && silent == qfalse {
         let idx = (cl.con.current % NUM_CON_TIMES as i32) as usize;
         cl.con.times[idx] = cl.cls.realtime;
     } else {
@@ -271,10 +276,10 @@ pub fn Con_Bottom(cl: &mut Client) {
 /// Raven `Con_ToggleConsole_f` — the `toggleconsole` command handler.
 ///
 /// Source: `oracle/codemp/client/cl_console.cpp:29-41`
-pub fn Con_ToggleConsole_f(cl: &mut Client) {
+pub fn Con_ToggleConsole_f(common: &mut Common, cl: &mut Client) {
     // closing a full screen console restarts the demo loop
     if cl.cls.state == connstate_t::CA_DISCONNECTED && cl.cls.keyCatchers == KEYCATCH_CONSOLE {
-        crate::cl_main::CL_StartDemoLoop(cl);
+        CL_StartDemoLoop(common, cl);
         return;
     }
 
@@ -290,7 +295,7 @@ pub fn Con_ToggleConsole_f(cl: &mut Client) {
 fn Con_ToggleConsole_f_cmd(view: &mut EngineHostView) {
     // SAFETY: view-constructor slot, single-threaded, no other live cast.
     let cl = unsafe { cl_from_view(view) };
-    Con_ToggleConsole_f(cl)
+    Con_ToggleConsole_f(view.common, cl)
 }
 
 /// Raven `Con_MessageMode_f` — the `messagemode` (yell) command handler.
@@ -298,7 +303,7 @@ fn Con_ToggleConsole_f_cmd(view: &mut EngineHostView) {
 /// Source: `oracle/codemp/client/cl_console.cpp:49-56`
 pub fn Con_MessageMode_f(cl: &mut Client) {
     cl.chat_playerNum = -1;
-    cl.chat_team = qboolean::qfalse;
+    cl.chat_team = qfalse;
     Field_Clear(&mut cl.chatField);
     cl.chatField.widthInChars = 30;
 
@@ -317,7 +322,7 @@ fn Con_MessageMode_f_cmd(view: &mut EngineHostView) {
 /// Source: `oracle/codemp/client/cl_console.cpp:63-69`
 pub fn Con_MessageMode2_f(cl: &mut Client) {
     cl.chat_playerNum = -1;
-    cl.chat_team = qboolean::qtrue;
+    cl.chat_team = qtrue;
     Field_Clear(&mut cl.chatField);
     cl.chatField.widthInChars = 25;
     cl.cls.keyCatchers ^= KEYCATCH_MESSAGE;
@@ -349,7 +354,7 @@ pub fn Con_MessageMode3_f(common: &mut Common, cl: &mut Client) {
         cl.chat_playerNum = -1;
         return;
     }
-    cl.chat_team = qboolean::qfalse;
+    cl.chat_team = qfalse;
     Field_Clear(&mut cl.chatField);
     cl.chatField.widthInChars = 30;
     cl.cls.keyCatchers ^= KEYCATCH_MESSAGE;
@@ -381,7 +386,7 @@ pub fn Con_MessageMode4_f(common: &mut Common, cl: &mut Client) {
         cl.chat_playerNum = -1;
         return;
     }
-    cl.chat_team = qboolean::qfalse;
+    cl.chat_team = qfalse;
     Field_Clear(&mut cl.chatField);
     cl.chatField.widthInChars = 30;
     cl.cls.keyCatchers ^= KEYCATCH_MESSAGE;
@@ -527,7 +532,7 @@ pub fn Con_Init(view: &mut EngineHostView, cl: &mut Client) {
     Cmd_AddCommand(view, "condump", Some(Con_Dump_f_cmd));
 
     // Initialize values on first print
-    cl.con.initialized = qboolean::qfalse;
+    cl.con.initialized = qfalse;
 }
 
 /// Raven `CL_ConsolePrint` — appends colored text to the console scrollback,
@@ -539,14 +544,14 @@ pub fn CL_ConsolePrint(common: &mut Common, cl: &mut Client, txt: *const c_char,
         return;
     }
 
-    if cl.con.initialized == qboolean::qfalse {
+    if cl.con.initialized == qfalse {
         cl.con.color[0] = 1.0;
         cl.con.color[1] = 1.0;
         cl.con.color[2] = 1.0;
         cl.con.color[3] = 1.0;
         cl.con.linewidth = -1;
         Con_CheckResize(cl);
-        cl.con.initialized = qboolean::qtrue;
+        cl.con.initialized = qtrue;
     }
 
     let mut color = ColorIndex(COLOR_WHITE);
@@ -601,7 +606,7 @@ pub fn CL_ConsolePrint(common: &mut Common, cl: &mut Client, txt: *const c_char,
     }
 
     // mark time for transparent overlay
-    if cl.con.current >= 0 && silent == qboolean::qfalse {
+    if cl.con.current >= 0 && silent == qfalse {
         let idx = (cl.con.current % NUM_CON_TIMES as i32) as usize;
         cl.con.times[idx] = cl.cls.realtime;
     } else {
@@ -632,20 +637,24 @@ pub fn Con_DrawInput(view: &mut EngineHostView, cl: &mut Client) {
     RE_SetColor(&mut re.frame_data, Some(cl.con.color));
 
     SCR_DrawSmallChar(
+        view,
         cl,
         (cl.con.xadjust + 1.0 * SMALLCHAR_WIDTH as f32) as c_int,
         y,
         b']' as c_int,
     );
 
-    crate::cl_keys::Field_Draw(
-        view.common,
+    // The field pointer is taken first, so the `cl` receiver stays free for the call.
+    let edit: *mut _ = &mut cl.kg.g_consoleField;
+    let x = (cl.con.xadjust + 2.0 * SMALLCHAR_WIDTH as f32) as c_int;
+    Field_Draw(
+        view,
         cl,
-        &mut cl.kg.g_consoleField,
-        (cl.con.xadjust + 2.0 * SMALLCHAR_WIDTH as f32) as c_int,
+        edit,
+        x,
         y,
         SCREEN_WIDTH - 3 * SMALLCHAR_WIDTH,
-        qboolean::qtrue,
+        qtrue,
     );
 }
 
@@ -701,6 +710,7 @@ pub fn Con_DrawNotify(view: &mut EngineHostView, cl: &mut Client) {
         // (ignore colours since we're going to print the whole thing as one string)
         if Language_IsAsian(eLanguage) {
             let font_scale = 0.75f32 * cl.con.yadjust;
+            let millis = sys_milliseconds(view.common);
             let iSE_Language_ModificationCount =
                 re.font.iSE_Language_ModificationCount.unwrap_or(-1234);
             // Raven caches this registration in a fn-scope `static int
@@ -780,6 +790,9 @@ pub fn Con_DrawNotify(view: &mut EngineHostView, cl: &mut Client) {
                 s_temp.as_bytes(),
                 g_color_table_ptr(current_color),
                 font_index_asian_notify,
+                -1,
+                font_scale,
+                millis,
             );
 
             v += pixel_height_to_advance;
@@ -798,6 +811,7 @@ pub fn Con_DrawNotify(view: &mut EngineHostView, cl: &mut Client) {
                     cl.cl_conXOffset = Some(Cvar_Get(view, "cl_conXOffset", "0", 0));
                 }
                 SCR_DrawSmallChar(
+                    view,
                     cl,
                     view.common.cvar(cl.cl_conXOffset).integer
                         + cl.con.xadjust as c_int
@@ -824,26 +838,28 @@ pub fn Con_DrawNotify(view: &mut EngineHostView, cl: &mut Client) {
         // The Raven call site passes a package + key pair, so `SE_GetString2`
         // is the shape match (see shape_mismatches).
         let (chattext, skip);
-        if cl.chat_team == qboolean::qtrue {
+        if cl.chat_team == qtrue {
             chattext = SE_GetString2(view, "MP_SVGAME", "SAY_TEAM");
             let chattext_c = std::ffi::CString::new(chattext.clone()).unwrap_or_default();
-            SCR_DrawBigString(view.common, cl, 8, v, chattext_c.as_ptr(), 1.0);
+            SCR_DrawBigString(view, cl, 8, v, chattext_c.as_ptr(), 1.0);
             skip = chattext.len() as c_int + 1;
         } else {
             chattext = SE_GetString2(view, "MP_SVGAME", "SAY");
             let chattext_c = std::ffi::CString::new(chattext.clone()).unwrap_or_default();
-            SCR_DrawBigString(view.common, cl, 8, v, chattext_c.as_ptr(), 1.0);
+            SCR_DrawBigString(view, cl, 8, v, chattext_c.as_ptr(), 1.0);
             skip = chattext.len() as c_int + 1;
         }
 
-        crate::cl_keys::Field_BigDraw(
-            view.common,
+        // The field pointer is taken first, so the `cl` receiver stays free for the call.
+        let edit: *mut _ = &mut cl.chatField;
+        Field_BigDraw(
+            view,
             cl,
-            &mut cl.chatField,
+            edit,
             skip * BIGCHAR_WIDTH,
             v,
             SCREEN_WIDTH - (skip + 1) * BIGCHAR_WIDTH,
-            qboolean::qtrue,
+            qtrue,
         );
 
         v += BIGCHAR_HEIGHT;
@@ -880,7 +896,15 @@ pub fn Con_DrawSolidConsole(view: &mut EngineHostView, cl: &mut Client, frac: f3
     if y < 1 {
         y = 0;
     } else {
-        SCR_DrawPic(cl, 0.0, 0.0, SCREEN_WIDTH as f32, y as f32, cl.cls.consoleShader);
+        SCR_DrawPic(
+            view,
+            cl,
+            0.0,
+            0.0,
+            SCREEN_WIDTH as f32,
+            y as f32,
+            cl.cls.consoleShader,
+        );
     }
 
     let color: [f32; 4] = [0.509f32, 0.609f32, 0.847f32, 1.0f32];
@@ -911,6 +935,7 @@ pub fn Con_DrawSolidConsole(view: &mut EngineHostView, cl: &mut Client, frac: f3
 
     for x in 0..i {
         SCR_DrawSmallChar(
+            view,
             cl,
             cl.cls.glconfig.vidWidth - (i - x) * SMALLCHAR_WIDTH,
             lines - (SMALLCHAR_HEIGHT + SMALLCHAR_HEIGHT / 2),
@@ -932,6 +957,7 @@ pub fn Con_DrawSolidConsole(view: &mut EngineHostView, cl: &mut Client, frac: f3
         let mut x = 0;
         while x < cl.con.linewidth {
             SCR_DrawSmallChar(
+                view,
                 cl,
                 (cl.con.xadjust + (x + 1) as f32 * SMALLCHAR_WIDTH as f32) as c_int,
                 y,
@@ -957,6 +983,7 @@ pub fn Con_DrawSolidConsole(view: &mut EngineHostView, cl: &mut Client, frac: f3
     // (the font registers once, then the handle is reused), so it lives on
     // `cl` (fork-3 three-kind rule, kind 3) rather than a hidden static.
     let font_scale_asian = 0.75f32 * cl.con.yadjust;
+    let millis = sys_milliseconds(view.common);
     let mut pixel_height_to_advance = SMALLCHAR_HEIGHT;
     let eLanguage = GetLanguageEnum(view.common, &mut re.font);
     let iSE_Language_ModificationCount = re.font.iSE_Language_ModificationCount.unwrap_or(-1234);
@@ -1051,6 +1078,9 @@ pub fn Con_DrawSolidConsole(view: &mut EngineHostView, cl: &mut Client, frac: f3
                 s_temp.as_bytes(),
                 g_color_table_ptr(current_color),
                 cl.iFontIndexForAsian,
+                -1,
+                font_scale_asian,
+                millis,
             );
         } else {
             for x in 0..cl.con.linewidth {
@@ -1064,6 +1094,7 @@ pub fn Con_DrawSolidConsole(view: &mut EngineHostView, cl: &mut Client, frac: f3
                     RE_SetColor(&mut re.frame_data, g_color_table_ptr(current_color));
                 }
                 SCR_DrawSmallChar(
+                    view,
                     cl,
                     (cl.con.xadjust + (x + 1) as f32 * SMALLCHAR_WIDTH as f32) as c_int,
                     y,

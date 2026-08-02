@@ -26,6 +26,9 @@ use mp_engine_qcommon::timing::sys_milliseconds;
 use mp_engine_qcommon::vm_fns::VM_Call;
 use mp_engine_qcommon::z_memman_pc::{Hunk_AllocateTempMemory, Hunk_FreeTempMemory};
 use native_platform::{Sys_BeginStreamedFile, Sys_EndStreamedFile};
+use mp_renderer::hook_install::re_from_view;
+use mp_renderer::tr_backend::{RE_StretchRaw, RE_UploadCinematic};
+use native_string::latin1_to_string;
 use native_string::q_string::Q_stricmp;
 
 use mp_abi::ui::exports::MpUiExport;
@@ -52,6 +55,54 @@ use crate::snd_stubs::{S_RawSamples, S_StopAllSounds, S_Update};
 // `crates/mp/game/src/prelude.rs`, but `mp_game` is not a dependency of
 // `mp_engine_client`; escalate the rosetta row rather than adding the
 // dependency here.
+
+/// Raven's `VQ2TO4(a,b,c,d)` macro — expands one 2x2 codebook pair into the 4x4
+/// and 8x8 books. The four pointer arguments are read-and-advance in the macro,
+/// so each one crosses as `&mut *mut c_uint` here.
+///
+/// # Safety
+/// `a` and `b` must each address at least two entries, `c` four, and `d`
+/// sixteen, exactly as the oracle's `vq2`/`vq4`/`vq8` cursors do.
+///
+/// Source: `oracle/codemp/client/cl_cin.cpp:562-583`
+#[allow(non_snake_case)]
+unsafe fn VQ2TO4(
+    a: &mut *mut c_uint,
+    b: &mut *mut c_uint,
+    c: &mut *mut c_uint,
+    d: &mut *mut c_uint,
+) {
+    let a0 = *(*a);
+    let a1 = *(*a).add(1);
+    let b0 = *(*b);
+    let b1 = *(*b).add(1);
+
+    // The 4x4 book takes the four source texels once.
+    for v in [a0, a1, b0, b1] {
+        **c = v;
+        *c = (*c).add(1);
+    }
+    // The 8x8 book takes the oracle's exact 16-texel order.
+    for v in [
+        a0, a0, a1, a1, b0, b0, b1, b1, a0, a0, a1, a1, b0, b0, b1, b1,
+    ] {
+        **d = v;
+        *d = (*d).add(1);
+    }
+
+    *a = (*a).add(2);
+    *b = (*b).add(2);
+}
+
+/// Reads a `cin_cache::fileName` buffer as a Latin-1 `String`, stopping at the
+/// first NUL. The seam keeps the buffer as `[c_char; MAX_OSPATH]`, so the two
+/// print and compare sites need this narrowing.
+fn file_name_to_string(buf: &[c_char]) -> String {
+    // SAFETY: the reinterpretation is byte-for-byte; `c_char` and `u8` share a layout.
+    let bytes: &[u8] = unsafe { core::slice::from_raw_parts(buf.as_ptr() as *const u8, buf.len()) };
+    let len = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
+    latin1_to_string(&bytes[..len])
+}
 
 /// Raven `CIN_HandleForVideo`.
 ///
@@ -412,9 +463,9 @@ pub fn recurseQuad(
         let useY = startY;
         unsafe {
             let scroff = cl.cin.linbuf.as_mut_ptr().offset(
-                (useY + ((cl.cinTable[handle].CIN_HEIGHT as c_long - bigy) >> 1) + yOff)
+                ((useY + ((cl.cinTable[handle].CIN_HEIGHT as c_long - bigy) >> 1) + yOff)
                     * cl.cinTable[handle].samplesPerLine
-                    + (startX + xOff) * 4,
+                    + (startX + xOff) * 4) as isize,
             );
 
             let onquad = cl.cinTable[handle].onQuad as usize;
@@ -477,7 +528,7 @@ pub fn readQuadInfo(common: &mut Common, cl: &mut Client, qData: *mut byte) {
     cl.cinTable[handle].drawX = cl.cinTable[handle].CIN_WIDTH as c_long;
     cl.cinTable[handle].drawY = cl.cinTable[handle].CIN_HEIGHT as c_long;
     // jic the card sucks
-    if cl.glConfig.maxTextureSize <= 256 {
+    if cl.cls.glconfig.maxTextureSize <= 256 {
         if cl.cinTable[handle].drawX > 256 {
             cl.cinTable[handle].drawX = 256;
         }
@@ -638,9 +689,11 @@ pub fn CIN_DrawCinematic(view: &mut EngineHostView, cl: &mut Client, handle: c_i
     let w = cl.cinTable[handle as usize].width as f32;
     let h = cl.cinTable[handle as usize].height as f32;
 
-    if cl.cinTable[handle as usize].dirty
-        && (cl.cinTable[handle as usize].CIN_WIDTH != cl.cinTable[handle as usize].drawX
-            || cl.cinTable[handle as usize].CIN_HEIGHT != cl.cinTable[handle as usize].drawY)
+    if cl.cinTable[handle as usize].dirty != qfalse
+        && (cl.cinTable[handle as usize].CIN_WIDTH as c_long
+            != cl.cinTable[handle as usize].drawX
+            || cl.cinTable[handle as usize].CIN_HEIGHT as c_long
+                != cl.cinTable[handle as usize].drawY)
     {
         let xm = cl.cinTable[handle as usize].CIN_WIDTH / 256;
         let ym = cl.cinTable[handle as usize].CIN_HEIGHT / 256;
@@ -695,27 +748,60 @@ pub fn CIN_DrawCinematic(view: &mut EngineHostView, cl: &mut Client, handle: c_i
                     }
                 }
             }
-            //TODO: Port DrawStretchRaw
-            // Source: oracle/codemp/client/cl_cin.cpp:1397 (refexport_t::DrawStretchRaw)
-            // DEC-59.1 has no mapping row for this receiver yet; the RE_StretchRaw
-            // frontend fn exists (crates/mp/renderer/src/tr_backend.rs) but is not
-            // wired through mappings.json, so the call stays in Raven shape:
-            // cl.re.DrawStretchRaw(x, y, w, h, 256, 256, buf2 as *mut byte, handle, qtrue);
-            let _ = (x, y, w, h, buf2);
+            // SAFETY: `buf2` is the temp-memory image this block just filled.
+            let data = core::slice::from_raw_parts(buf2 as *const u8, 256 * 256 * 4);
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let re = re_from_view(view);
+            RE_StretchRaw(
+                &mut re.frame,
+                &mut re.gpu_res,
+                &re.assets,
+                &re.cvars,
+                view.common,
+                x as i32,
+                y as i32,
+                w as i32,
+                h as i32,
+                256,
+                256,
+                data,
+                handle,
+                true,
+            );
             cl.cinTable[handle as usize].dirty = qfalse;
             Hunk_FreeTempMemory(view.common, buf2 as *mut ());
             return;
         }
     }
 
-    //TODO: Port DrawStretchRaw
-    // Source: oracle/codemp/client/cl_cin.cpp:1409 (refexport_t::DrawStretchRaw)
-    // DEC-59.1 has no mapping row for this receiver yet; the call stays in Raven
-    // shape:
-    // cl.re.DrawStretchRaw(x, y, w, h, cl.cinTable[handle as usize].drawX,
-    //     cl.cinTable[handle as usize].drawY, cl.cinTable[handle as usize].buf,
-    //     handle, cl.cinTable[handle as usize].dirty);
-    let _ = (x, y, w, h);
+    let cols = cl.cinTable[handle as usize].drawX as i32;
+    let rows = cl.cinTable[handle as usize].drawY as i32;
+    let dirty = cl.cinTable[handle as usize].dirty != qfalse;
+    // SAFETY: `buf` is the decoder's own surface, `cols * rows` RGBA texels.
+    let data = unsafe {
+        core::slice::from_raw_parts(
+            cl.cinTable[handle as usize].buf as *const u8,
+            (cols * rows * 4) as usize,
+        )
+    };
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let re = unsafe { re_from_view(view) };
+    RE_StretchRaw(
+        &mut re.frame,
+        &mut re.gpu_res,
+        &re.assets,
+        &re.cvars,
+        view.common,
+        x as i32,
+        y as i32,
+        w as i32,
+        h as i32,
+        cols,
+        rows,
+        data,
+        handle,
+        dirty,
+    );
     cl.cinTable[handle as usize].dirty = qfalse;
 }
 
@@ -738,14 +824,28 @@ pub fn CIN_UploadCinematic(view: &mut EngineHostView, cl: &mut Client, handle: c
                 cl.cinTable[handle as usize].dirty = qfalse;
             }
         }
-        //TODO: Port UploadCinematic
-        // Source: oracle/codemp/client/cl_cin.cpp:1489 (refexport_t::UploadCinematic)
-        // DEC-59.1 has no mapping row for this receiver yet; the RE_UploadCinematic
-        // frontend fn exists (crates/mp/renderer/src/tr_backend.rs) but is not wired
-        // through mappings.json, so the call stays in Raven shape:
-        // cl.re.UploadCinematic(cl.cinTable[handle as usize].drawX,
-        //     cl.cinTable[handle as usize].drawY, cl.cinTable[handle as usize].buf,
-        //     handle, cl.cinTable[handle as usize].dirty);
+        let cols = cl.cinTable[handle as usize].drawX as i32;
+        let rows = cl.cinTable[handle as usize].drawY as i32;
+        let dirty = cl.cinTable[handle as usize].dirty != qfalse;
+        // SAFETY: `buf` is the decoder's own surface, `cols * rows` RGBA texels.
+        let data = unsafe {
+            core::slice::from_raw_parts(
+                cl.cinTable[handle as usize].buf as *const u8,
+                (cols * rows * 4) as usize,
+            )
+        };
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let re = unsafe { re_from_view(view) };
+        RE_UploadCinematic(
+            &mut re.gpu_res,
+            &mut re.assets,
+            cols,
+            rows,
+            data,
+            handle,
+            dirty,
+        );
+
         if view.common.cvar(cl.cl_inGameVideo).integer == 0
             && cl.cinTable[handle as usize].playonwalls == 1
         {
@@ -931,20 +1031,18 @@ pub fn decodeCodeBook(cl: &mut Client, input: *mut byte, roq_flags: c_ushort) {
             ibptr = ibptr.add(1);
         }
 
-        let icptr = cl.vq4.as_mut_ptr() as *mut c_uint;
-        let idptr = cl.vq8.as_mut_ptr() as *mut c_uint;
+        let mut icptr = cl.vq4.as_mut_ptr() as *mut c_uint;
+        let mut idptr = cl.vq8.as_mut_ptr() as *mut c_uint;
 
         for _ in 0..four {
             let a_off = *input as usize;
             input = input.add(1);
             let b_off = *input as usize;
             input = input.add(1);
-            let iaptr = (cl.vq2.as_mut_ptr() as *mut c_uint).add(a_off * 4);
-            let ibptr2 = (cl.vq2.as_mut_ptr() as *mut c_uint).add(b_off * 4);
+            let mut iaptr = (cl.vq2.as_mut_ptr() as *mut c_uint).add(a_off * 4);
+            let mut ibptr2 = (cl.vq2.as_mut_ptr() as *mut c_uint).add(b_off * 4);
             for _ in 0..2 {
-                // PORT-NOTE(macro): `VQ2TO4` is an unresolved function-like
-                // macro (no rosetta row); escalated per zero-park discipline.
-                VQ2TO4(iaptr, ibptr2, icptr, idptr);
+                VQ2TO4(&mut iaptr, &mut ibptr2, &mut icptr, &mut idptr);
             }
         }
     }
@@ -1044,7 +1142,7 @@ pub fn CIN_StopCinematic(view: &mut EngineHostView, cl: &mut Client, handle: c_i
         view.common,
         &format!(
             "trFMV::stop(), closing {}\n",
-            String::from_utf8_lossy(&cl.cinTable[cl.currentHandle as usize].fileName)
+            file_name_to_string(&cl.cinTable[cl.currentHandle as usize].fileName)
         ),
     );
 
@@ -1127,8 +1225,7 @@ pub fn CIN_PlayCinematic(
 
     if systemBits & CIN_SYSTEM == 0 {
         for i in 0..MAX_VIDEO_HANDLES {
-            if String::from_utf8_lossy(&cl.cinTable[i as usize].fileName).trim_end_matches('\0')
-                == name
+            if file_name_to_string(&cl.cinTable[i as usize].fileName) == name
             {
                 return i as c_int;
             }
@@ -1156,7 +1253,7 @@ pub fn CIN_PlayCinematic(
 
     cl.cinTable[handle].ROQSize = 0;
     cl.cinTable[handle].ROQSize =
-        FS_FOpenFileRead(view, &name, &mut cl.cinTable[handle].iFile, true);
+        FS_FOpenFileRead(view, &name, &mut cl.cinTable[handle].iFile, true) as c_long;
 
     if cl.cinTable[handle].ROQSize <= 0 {
         Com_DPrintf(
@@ -1370,7 +1467,7 @@ pub fn RoQInterrupt(view: &mut EngineHostView, cl: &mut Client) {
                         2,
                         1,
                         sbuf.as_mut_ptr() as *mut byte,
-                        view.common.s_volume.value,
+                        view.common.cvar(cl.s_volume).value,
                         1,
                     );
                 }
@@ -1396,7 +1493,7 @@ pub fn RoQInterrupt(view: &mut EngineHostView, cl: &mut Client) {
                         2,
                         2,
                         sbuf.as_mut_ptr() as *mut byte,
-                        view.common.s_volume.value,
+                        view.common.cvar(cl.s_volume).value,
                         1,
                     );
                 }

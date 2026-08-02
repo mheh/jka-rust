@@ -17,7 +17,6 @@
 //! Source: `oracle/codemp/qcommon/cvar.cpp`
 
 use core::ffi::{c_char, c_float, c_int, c_uint};
-use std::ffi::CString;
 
 use native_types::fileHandle_t;
 
@@ -120,18 +119,21 @@ pub fn Cvar_VariableStringBuffer(
 
 /// Raven `Cvar_CommandCompletion`.
 ///
+/// Raven invokes a callback per name. The port returns the names in that same
+/// order instead, so the caller keeps its own receivers (porting-rules §B4, §C7).
+///
 /// Source: `oracle/codemp/qcommon/cvar.cpp:166-177`
-pub fn Cvar_CommandCompletion(common: &Common, callback: fn(*const c_char)) {
+pub fn Cvar_CommandCompletion(common: &Common) -> Vec<String> {
+    let mut names = Vec::new();
     for &h in &common.cvar_vars {
         let cvar = common.cvar(h);
         // Dont show internal cvars
         if cvar.flags & CVAR_INTERNAL != 0 {
             continue;
         }
-        // C-callback seam: the completion sink consumes C strings.
-        let name = CString::new(cvar.name.as_str()).unwrap();
-        callback(name.as_ptr());
+        names.push(cvar.name.clone());
     }
+    names
 }
 
 /// Raven `Cvar_Get`.

@@ -8,7 +8,11 @@ use core::ffi::{c_char, c_int};
 use mp_abi::ui::exports::MpUiExport;
 use mp_abi::ui::imports::MpUiImport;
 use mp_abi::ui::public::ui_client_state_t::uiClientState_t;
+use mp_engine_ghoul2::api_bolts::g2api_get_bolt_matrix;
+use mp_engine_ghoul2::api_bones::g2api_set_bone_angles;
+use mp_engine_ghoul2::api_models::{g2api_clean_ghoul2_models, g2api_init_ghoul2_model};
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
+use mp_engine_ghoul2::shared::cghoul2_info::CGhoul2Info;
 use mp_engine_ghoul2::shared::cghoul2_info_v::CGhoul2Info_v;
 use mp_engine_qcommon::cmd_common::{Cbuf_ExecuteText, Cmd_Argc, Cmd_ArgvBuffer};
 use mp_engine_qcommon::common::common::{com_printf, Common};
@@ -32,6 +36,8 @@ use mp_engine_qcommon::timing::sys_milliseconds;
 use mp_engine_qcommon::vm::ui_syscall_trampoline_words;
 use mp_engine_qcommon::vm_fns::{VM_ArgPtr, VM_Call, VM_Create, VM_Free};
 use mp_engine_qcommon::z_memman_pc::{Hunk_MemoryRemaining, Z_Free};
+use mp_qshared::common::mp::cgame::glconfig_t::glconfig_t;
+use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
 use mp_qshared::common::mp::qcommon::shared_set_bone_ik_state_params::sharedSetBoneIKStateParams_t;
@@ -42,21 +48,29 @@ use mp_qshared::shared::shared_ik_move_params::sharedIKMoveParams_t;
 use mp_qshared::shared::{qboolean, qfalse, qtrue};
 use mp_renderer::hook_install::{re_from_view, rm_from_view};
 use mp_renderer::tr_cmds::{RE_SetColor, RE_StretchPic};
+use mp_renderer::tr_font::{
+    AnyLanguage_ReadCharFromString, GetLanguageEnum, Language_IsAsian, Language_UsesSpaces,
+    RE_Font_DrawString, RE_Font_HeightPixels, RE_Font_StrLenChars, RE_Font_StrLenPixels,
+    RE_RegisterFont,
+};
 use mp_renderer::tr_image::RE_RegisterSkin;
 use mp_renderer::tr_model::frontend::{r_lerp_tag, r_model_bounds, RE_RegisterModel};
 use mp_renderer::tr_scene::{
-    RE_AddLightToScene, RE_AddPolyToScene, RE_AddRefEntityToScene, RE_ClearScene,
+    RE_AddLightToScene, RE_AddPolyToScene, RE_AddRefEntityToScene, RE_ClearScene, RE_RenderScene,
 };
 use mp_renderer::tr_shader::{RE_RegisterShaderNoMip, RE_ShaderNameFromIndex, R_RemapShader};
+use native_math::eorientations::Eorientations;
 use native_math::qmath::{AngleVectors, MatrixMultiply, PerpendicularVectorMP};
 use native_math::vector::vec3_t;
+use native_types::{mdxaBone_t, qhandle_t};
 use native_string::info::Info_SetValueForKey;
 use native_string::q_strncpyz::Q_strncpyz;
 use native_string::{latin1_to_string, string_to_latin1};
 
+use crate::cl_keys::{Key_KeynumToString, Key_SetBinding};
 use crate::client::client_static_t::{MAX_GLOBAL_SERVERS, MAX_OTHER_SERVERS};
 use crate::client::server_info_t::serverInfo_t;
-use crate::client_host::client_legacy_syscall;
+use crate::client_host::{bot_from_view, client_legacy_syscall, sv_from_view};
 use crate::snd_stubs::{
     S_RegisterSound, S_StartBackgroundTrack, S_StartLocalSound, S_StopBackgroundTrack,
 };
@@ -103,6 +117,64 @@ const UI_API_VERSION: c_int = 4;
 /// `p` must point at a NUL-terminated buffer, exactly like the C string it replaces.
 unsafe fn cstr_to_string(p: *const c_char) -> String {
     latin1_to_string(core::ffi::CStr::from_ptr(p).to_bytes())
+}
+
+/// Borrows a module-space C string as its Latin-1 bytes, the shape the `RE_Font_*`
+/// signatures take. The bytes stay in module memory for the whole dispatch.
+fn cstr_bytes<'a>(p: *const c_char) -> &'a [u8] {
+    // SAFETY: the module passed a NUL-terminated string across the seam.
+    unsafe { core::ffi::CStr::from_ptr(p).to_bytes() }
+}
+
+/// Reads a module-space `const float *rgba` as the port's nullable-color model.
+/// Raven passes NULL for "keep the current colour".
+fn rgba_arg(p: *const f32) -> Option<[f32; 4]> {
+    if p.is_null() {
+        None
+    } else {
+        // SAFETY: the module passed a four-float colour across the seam.
+        Some(unsafe { *(p as *const [f32; 4]) })
+    }
+}
+
+/// Reborrow one `CGhoul2Info` out of the handle's arena without keeping the
+/// `Ghoul2System` borrow, so the same call can still pass `g2` as its own
+/// receiver. This is the arena twin of the view's slot-cast discipline.
+fn g2_info<'a>(g2: &mut Ghoul2System, ghoul2: &CGhoul2Info_v, index: c_int) -> &'a mut CGhoul2Info {
+    let p = ghoul2.get_mut(g2, index) as *mut CGhoul2Info;
+    // SAFETY: the arena slot outlives the dispatch, and no other borrow of the
+    // same slot is live (single-threaded synchronous traps).
+    unsafe { &mut *p }
+}
+
+/// The shared body of the three `UI_G2_GETBOLT*` arms, which differ only in the
+/// two mode flags they set first.
+///
+/// Source: `oracle/codemp/client/cl_ui.cpp:1252-1262`
+fn get_bolt_matrix_arm(view: &mut EngineHostView, g2: &mut Ghoul2System, args: *mut c_int) -> bool {
+    // SAFETY: the handle, the model list, and the matrix out-param are all
+    // module-space (porting-rules §D11).
+    unsafe {
+        let common: *const Common = view.common;
+        let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+        let bolt_matrix = &mut *(VM_ArgPtr(&*common, *args.offset(4)) as *mut mdxaBone_t);
+        g2api_get_bolt_matrix(
+            g2,
+            view,
+            ghoul2,
+            *args.offset(2),
+            *args.offset(3),
+            *(VM_ArgPtr(&*common, *args.offset(5)) as *const vec3_t),
+            *(VM_ArgPtr(&*common, *args.offset(6)) as *const vec3_t),
+            *args.offset(7),
+            core::slice::from_raw_parts(
+                VM_ArgPtr(&*common, *args.offset(8)) as *const qhandle_t,
+                0,
+            ),
+            *(VM_ArgPtr(&*common, *args.offset(9)) as *const vec3_t),
+            bolt_matrix,
+        )
+    }
 }
 
 /// Reads a fixed `[c_char; N]` field as a Latin-1 `String`.
@@ -603,13 +675,12 @@ pub fn LAN_ServerIsVisible(cl: &mut Client, source: c_int, n: c_int) -> c_int {
 /// Raven `static void CL_GetGlconfig( glconfig_t *config )`.
 ///
 /// Source: `oracle/codemp/client/cl_ui.cpp:642-644`
-pub fn CL_GetGlconfig(
-    cl: &mut Client,
-    config: *mut mp_qshared::common::mp::cgame::glconfig_t::glconfig_t,
-) {
+pub fn CL_GetGlconfig(cl: &mut Client, config: *mut glconfig_t) {
+    // `glconfig_t` is an ABI-frozen `#[repr(C)]` block with no `Copy`, so the
+    // seam copy is the raw structure copy Raven's `*config = cls.glconfig` is.
     // SAFETY: `config` is the VM's seam out-param pointer (porting-rules §D11).
     unsafe {
-        *config = cl.cls.glconfig;
+        core::ptr::copy_nonoverlapping(&cl.cls.glconfig as *const glconfig_t, config, 1);
     }
 }
 
@@ -879,7 +950,8 @@ pub fn Key_KeynumToStringBuf(
     buf: *mut c_char,
     buflen: c_int,
 ) {
-    let ps_key_name = crate::cl_keys::Key_KeynumToString(cl, keynum);
+    // SAFETY: `Key_KeynumToString` answers with a NUL-terminated name buffer.
+    let ps_key_name = unsafe { cstr_to_string(Key_KeynumToString(cl, keynum)) };
     let ps_key_name_friendly = SE_GetString(view, &format!("KEYNAMES_KEYNAME_{ps_key_name}"));
     let chosen = if !ps_key_name_friendly.is_empty() {
         ps_key_name_friendly
@@ -1296,13 +1368,20 @@ pub fn CL_UISystemCalls(
         };
         0
     } else if trap == MpUiImport::UI_R_RENDERSCENE as c_int {
-        //TODO: Port RE_RenderScene light_styles receiver
-        // `RE_RenderScene` needs a `&LightStyleTable`, and no `RendererFrontend`/
-        // `Client` field carries one yet (genuine receiver gap, not mechanical).
-        // Source: oracle/codemp/renderer/tr_scene.cpp:706-874
-        unsafe {
-            crate::cl_renderer::re(view.common).RenderScene(vma(view.common, args, 1) as *const _)
-        };
+        // SAFETY: `args` is the trampoline's 16-word frame (porting-rules §D11).
+        let fd = unsafe { vma(view.common, args, 1) } as *const refdef_t;
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let re = unsafe { re_from_view(view) };
+        // SAFETY: `VMA(1)` is the module's `refdef_t` (porting-rules §D11).
+        RE_RenderScene(
+            unsafe { &*fd },
+            &mut re.frame_data,
+            &re.assets,
+            &re.cvars,
+            &mut re.scene,
+            view.common,
+            &re.sim.light_styles,
+        );
         0
     } else if trap == MpUiImport::UI_R_SETCOLOR as c_int {
         unsafe {
@@ -1414,11 +1493,11 @@ pub fn CL_UISystemCalls(
         0
     } else if trap == MpUiImport::UI_KEY_SETBINDING as c_int {
         unsafe {
-            crate::cl_keys::Key_SetBinding(
+            Key_SetBinding(
                 view,
                 cl,
                 *args.offset(1),
-                &cstr_to_string(vma(view.common, args, 2) as *const c_char),
+                vma(view.common, args, 2) as *const c_char,
             )
         };
         0
@@ -1451,11 +1530,7 @@ pub fn CL_UISystemCalls(
         0
     } else if trap == MpUiImport::UI_GETGLCONFIG as c_int {
         unsafe {
-            CL_GetGlconfig(
-                cl,
-                vma(view.common, args, 1)
-                    as *mut mp_qshared::common::mp::cgame::glconfig_t::glconfig_t,
-            )
+            CL_GetGlconfig(cl, vma(view.common, args, 1) as *mut glconfig_t)
         };
         0
     } else if trap == MpUiImport::UI_GETCONFIGSTRING as c_int {
@@ -1582,112 +1657,226 @@ pub fn CL_UISystemCalls(
     } else if trap == MpUiImport::UI_MEMORY_REMAINING as c_int {
         Hunk_MemoryRemaining(view.common)
     } else if trap == MpUiImport::UI_R_REGISTERFONT as c_int {
-        //TODO: Port RE_RegisterFont eLanguage/iSE_Language_ModificationCount receiver
-        // `RE_RegisterFont` needs `Language_e` and the cvar mod-count int, and no
-        // `FontState`/`Client` accessor exposes them as the plain `i32` the RE_*
-        // font signatures want (genuine receiver gap, not mechanical).
-        // Source: oracle/codemp/renderer/tr_font.cpp:1229-1233
-        unsafe {
-            crate::cl_renderer::re(view.common).RegisterFont(&cstr_to_string(vma(
-                view.common,
-                args,
-                1,
-            )
-                as *const c_char))
-        }
+        let name = unsafe { cstr_to_string(vma(view.common, args, 1) as *const c_char) };
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let re = unsafe { re_from_view(view) };
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let rm = unsafe { rm_from_view(view) };
+        let language = GetLanguageEnum(view.common, &mut re.font);
+        let mod_count = re.font.iSE_Language_ModificationCount.unwrap_or(-1234);
+        RE_RegisterFont(
+            &mut re.qs,
+            &mut re.frame,
+            &mut re.assets,
+            view,
+            &re.cvars,
+            &mut re.sim,
+            rm,
+            &mut re.img_state,
+            &mut re.gpu_res,
+            &mut re.sky_view,
+            &mut re.sky,
+            &mut re.font,
+            language,
+            mod_count,
+            &name,
+        )
     } else if trap == MpUiImport::UI_R_FONT_STRLENPIXELS as c_int {
-        //TODO: Port RE_Font_StrLenPixels eLanguage/iSE_Language_ModificationCount receiver
-        // Source: oracle/codemp/renderer/tr_font.cpp:1229-1233
-        unsafe {
-            crate::cl_renderer::re(view.common).Font_StrLenPixels(
-                &cstr_to_string(vma(view.common, args, 1) as *const c_char),
-                *args.offset(2),
-                vmf(args, 3),
-            )
-        }
+        let text = cstr_bytes(unsafe { vma(view.common, args, 1) } as *const c_char);
+        let (handle, scale) = unsafe { (*args.offset(2), vmf(args, 3)) };
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let re = unsafe { re_from_view(view) };
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let rm = unsafe { rm_from_view(view) };
+        let language = GetLanguageEnum(view.common, &mut re.font);
+        let mod_count = re.font.iSE_Language_ModificationCount.unwrap_or(-1234);
+        RE_Font_StrLenPixels(
+            &mut re.qs,
+            &mut re.frame,
+            &mut re.assets,
+            view,
+            &re.cvars,
+            &mut re.sim,
+            rm,
+            &mut re.img_state,
+            &mut re.gpu_res,
+            &mut re.sky_view,
+            &mut re.sky,
+            &mut re.font,
+            language,
+            mod_count,
+            text,
+            handle,
+            scale,
+        )
     } else if trap == MpUiImport::UI_R_FONT_STRLENCHARS as c_int {
-        //TODO: Port RE_Font_StrLenChars eLanguage receiver
-        // Source: oracle/codemp/renderer/tr_font.cpp:1229-1233
-        unsafe {
-            crate::cl_renderer::re(view.common).Font_StrLenChars(&cstr_to_string(vma(
-                view.common,
-                args,
-                1,
-            )
-                as *const c_char))
-        }
+        let text = cstr_bytes(unsafe { vma(view.common, args, 1) } as *const c_char);
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let re = unsafe { re_from_view(view) };
+        let language = GetLanguageEnum(view.common, &mut re.font);
+        RE_Font_StrLenChars(&re.font, language, text)
     } else if trap == MpUiImport::UI_R_FONT_STRHEIGHTPIXELS as c_int {
-        //TODO: Port RE_Font_HeightPixels eLanguage/iSE_Language_ModificationCount receiver
-        // Source: oracle/codemp/renderer/tr_font.cpp:1229-1233
-        unsafe {
-            crate::cl_renderer::re(view.common).Font_HeightPixels(*args.offset(1), vmf(args, 2))
-        }
+        let (handle, scale) = unsafe { (*args.offset(1), vmf(args, 2)) };
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let re = unsafe { re_from_view(view) };
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let rm = unsafe { rm_from_view(view) };
+        let language = GetLanguageEnum(view.common, &mut re.font);
+        let mod_count = re.font.iSE_Language_ModificationCount.unwrap_or(-1234);
+        RE_Font_HeightPixels(
+            &mut re.qs,
+            &mut re.frame,
+            &mut re.assets,
+            view,
+            &re.cvars,
+            &mut re.sim,
+            rm,
+            &mut re.img_state,
+            &mut re.gpu_res,
+            &mut re.sky_view,
+            &mut re.sky,
+            &mut re.font,
+            language,
+            mod_count,
+            handle,
+            scale,
+        )
     } else if trap == MpUiImport::UI_R_FONT_DRAWSTRING as c_int {
-        //TODO: Port RE_Font_DrawString eLanguage/iSE_Language_ModificationCount receiver
-        // Source: oracle/codemp/renderer/tr_font.cpp:1229-1233
-        unsafe {
-            crate::cl_renderer::re(view.common).Font_DrawString(
+        let text = cstr_bytes(unsafe { vma(view.common, args, 3) } as *const c_char);
+        let rgba = rgba_arg(unsafe { vma(view.common, args, 4) } as *const f32);
+        let (ox, oy, handle, max_pixel_width, scale) = unsafe {
+            (
                 *args.offset(1),
                 *args.offset(2),
-                &cstr_to_string(vma(view.common, args, 3) as *const c_char),
-                vma(view.common, args, 4) as *const f32,
                 *args.offset(5),
                 *args.offset(6),
                 vmf(args, 7),
             )
         };
+        let millis = sys_milliseconds(view.common);
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let re = unsafe { re_from_view(view) };
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let rm = unsafe { rm_from_view(view) };
+        let language = GetLanguageEnum(view.common, &mut re.font);
+        let mod_count = re.font.iSE_Language_ModificationCount.unwrap_or(-1234);
+        RE_Font_DrawString(
+            &mut re.qs,
+            &mut re.frame,
+            &mut re.assets,
+            view,
+            &re.cvars,
+            &mut re.sim,
+            rm,
+            &mut re.img_state,
+            &mut re.gpu_res,
+            &mut re.sky_view,
+            &mut re.sky,
+            &mut re.font,
+            language,
+            mod_count,
+            &mut re.frame_data,
+            ox,
+            oy,
+            text,
+            rgba,
+            handle,
+            max_pixel_width,
+            scale,
+            millis,
+        );
         0
     } else if trap == MpUiImport::UI_LANGUAGE_ISASIAN as c_int {
-        //TODO: Port Language_IsAsian eLanguage receiver
-        // Source: oracle/codemp/renderer/tr_font.cpp:1229-1233
-        crate::cl_renderer::re(view.common).Language_IsAsian()
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let re = unsafe { re_from_view(view) };
+        let language = GetLanguageEnum(view.common, &mut re.font);
+        Language_IsAsian(language) as c_int
     } else if trap == MpUiImport::UI_LANGUAGE_USESSPACES as c_int {
-        //TODO: Port Language_UsesSpaces eLanguage receiver
-        // Source: oracle/codemp/renderer/tr_font.cpp:1229-1233
-        crate::cl_renderer::re(view.common).Language_UsesSpaces()
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let re = unsafe { re_from_view(view) };
+        let language = GetLanguageEnum(view.common, &mut re.font);
+        Language_UsesSpaces(language) as c_int
     } else if trap == MpUiImport::UI_ANYLANGUAGE_READCHARFROMSTRING as c_int {
-        //TODO: Port AnyLanguage_ReadCharFromString eLanguage receiver
-        // Source: oracle/codemp/renderer/tr_font.cpp:1229-1233
+        let text = cstr_bytes(unsafe { vma(view.common, args, 1) } as *const c_char);
+        let advance_out = unsafe { vma(view.common, args, 2) } as *mut c_int;
+        let punctuation_out = unsafe { vma(view.common, args, 3) } as *mut qboolean;
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let re = unsafe { re_from_view(view) };
+        let language = GetLanguageEnum(view.common, &mut re.font);
+        let (uiLetter, advance, trailing) =
+            AnyLanguage_ReadCharFromString(&re.font, language, text, !punctuation_out.is_null());
+        // SAFETY: both are the module's seam out-params (porting-rules §D11).
         unsafe {
-            crate::cl_renderer::re(view.common).AnyLanguage_ReadCharFromString(
-                vma(view.common, args, 1) as *const c_char,
-                vma(view.common, args, 2) as *mut c_int,
-                vma(view.common, args, 3) as *mut qboolean,
+            if !advance_out.is_null() {
+                *advance_out = advance;
+            }
+            if !punctuation_out.is_null() {
+                *punctuation_out = trailing.unwrap_or(false) as qboolean;
+            }
+        }
+        uiLetter as c_int
+    } else if trap == MpUiImport::UI_PC_ADD_GLOBAL_DEFINE as c_int {
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let sv = unsafe { sv_from_view(view) };
+        // SAFETY: the seam pointer is the module's string (porting-rules §D11).
+        unsafe {
+            ((*sv.botlib_export).PC_AddGlobalDefine.unwrap())(
+                vma(view.common, args, 1) as *mut c_char
             )
         }
-    } else if trap == MpUiImport::UI_PC_ADD_GLOBAL_DEFINE as c_int {
-        //TODO: Port botlib_export
-        // Source: oracle/codemp/client/cl_ui.cpp:1173
-        unsafe {
-            ((*cl.botlib_export).PC_AddGlobalDefine)(vma(view.common, args, 1) as *mut c_char)
-        }
     } else if trap == MpUiImport::UI_PC_LOAD_SOURCE as c_int {
+        // SAFETY: view-constructor slots, single-threaded, no other live cast.
+        let (sv, bot) = unsafe { (sv_from_view(view), bot_from_view(view)) };
+        // SAFETY: the seam pointer is the module's string (porting-rules §D11).
         unsafe {
-            ((*cl.botlib_export).PC_LoadSourceHandle)(vma(view.common, args, 1) as *const c_char)
+            ((*sv.botlib_export).PC_LoadSourceHandle.unwrap())(
+                bot,
+                vma(view.common, args, 1) as *const c_char,
+            )
         }
     } else if trap == MpUiImport::UI_PC_FREE_SOURCE as c_int {
-        unsafe { ((*cl.botlib_export).PC_FreeSourceHandle)(*args.offset(1)) }
+        // SAFETY: view-constructor slots, single-threaded, no other live cast.
+        let (sv, bot) = unsafe { (sv_from_view(view), bot_from_view(view)) };
+        // SAFETY: `args` is the trampoline's 16-word frame (porting-rules §D11).
+        unsafe { ((*sv.botlib_export).PC_FreeSourceHandle.unwrap())(bot, *args.offset(1)) }
     } else if trap == MpUiImport::UI_PC_READ_TOKEN as c_int {
+        // SAFETY: view-constructor slots, single-threaded, no other live cast.
+        let (sv, bot) = unsafe { (sv_from_view(view), bot_from_view(view)) };
+        // SAFETY: the seam pointers are the module's out-params (porting-rules §D11).
         unsafe {
-            ((*cl.botlib_export).PC_ReadTokenHandle)(
+            ((*sv.botlib_export).PC_ReadTokenHandle.unwrap())(
+                bot,
                 *args.offset(1),
                 vma(view.common, args, 2) as *mut _,
             )
         }
     } else if trap == MpUiImport::UI_PC_SOURCE_FILE_AND_LINE as c_int {
+        // SAFETY: view-constructor slots, single-threaded, no other live cast.
+        let (sv, bot) = unsafe { (sv_from_view(view), bot_from_view(view)) };
+        // SAFETY: the seam pointers are the module's out-params (porting-rules §D11).
         unsafe {
-            ((*cl.botlib_export).PC_SourceFileAndLine)(
+            ((*sv.botlib_export).PC_SourceFileAndLine.unwrap())(
+                bot,
                 *args.offset(1),
                 vma(view.common, args, 2) as *mut c_char,
                 vma(view.common, args, 3) as *mut c_int,
             )
         }
     } else if trap == MpUiImport::UI_PC_LOAD_GLOBAL_DEFINES as c_int {
+        // SAFETY: view-constructor slots, single-threaded, no other live cast.
+        let (sv, bot) = unsafe { (sv_from_view(view), bot_from_view(view)) };
+        // SAFETY: the seam pointer is the module's string (porting-rules §D11).
         unsafe {
-            ((*cl.botlib_export).PC_LoadGlobalDefines)(vma(view.common, args, 1) as *mut c_char)
+            ((*sv.botlib_export).PC_LoadGlobalDefines.unwrap())(
+                bot,
+                vma(view.common, args, 1) as *const c_char,
+            )
         }
     } else if trap == MpUiImport::UI_PC_REMOVE_ALL_GLOBAL_DEFINES as c_int {
-        unsafe { ((*cl.botlib_export).PC_RemoveAllGlobalDefines)() };
+        // SAFETY: view-constructor slots, single-threaded, no other live cast.
+        let (sv, bot) = unsafe { (sv_from_view(view), bot_from_view(view)) };
+        // SAFETY: `sv.botlib_export` is the table `SV_BotInitBotLib` installed.
+        unsafe { ((*sv.botlib_export).PC_RemoveAllGlobalDefines.unwrap())(bot) };
         0
     } else if trap == MpUiImport::UI_S_STOPBACKGROUNDTRACK as c_int {
         S_StopBackgroundTrack(cl);
@@ -1713,7 +1902,7 @@ pub fn CL_UISystemCalls(
             crate::cl_cin::CIN_PlayCinematic(
                 view,
                 cl,
-                &cstr_to_string(vma(view.common, args, 1) as *const c_char),
+                vma(view.common, args, 1) as *const c_char,
                 *args.offset(2),
                 *args.offset(3),
                 *args.offset(4),
@@ -1834,84 +2023,21 @@ pub fn CL_UISystemCalls(
         };
         0
     } else if trap == MpUiImport::UI_G2_GETBOLT as c_int {
-        unsafe {
-            let angles = *(vma(view.common, args, 4) as *const _);
-            let position = *(vma(view.common, args, 5) as *const vec3_t);
-            let scale = *(vma(view.common, args, 6) as *const vec3_t);
-            let model_list = vma(view.common, args, 8) as *const _;
-            let bolt_matrix = vma(view.common, args, 9) as *mut f32;
-            mp_engine_ghoul2::api_bolts::g2api_get_bolt_matrix(
-                g2,
-                view,
-                &mut *(*args.offset(1) as *mut CGhoul2Info_v),
-                *args.offset(2),
-                *args.offset(3),
-                angles,
-                position,
-                scale,
-                *args.offset(7),
-                model_list,
-                bolt_matrix,
-            )
-        };
-        0
+        get_bolt_matrix_arm(view, g2, args) as c_int
     } else if trap == MpUiImport::UI_G2_GETBOLT_NOREC as c_int {
-        g2.gG2_GBMNoReconstruct = qtrue;
-        unsafe {
-            let angles = *(vma(view.common, args, 4) as *const _);
-            let position = *(vma(view.common, args, 5) as *const vec3_t);
-            let scale = *(vma(view.common, args, 6) as *const vec3_t);
-            let model_list = vma(view.common, args, 8) as *const _;
-            let bolt_matrix = vma(view.common, args, 9) as *mut f32;
-            mp_engine_ghoul2::api_bolts::g2api_get_bolt_matrix(
-                g2,
-                view,
-                &mut *(*args.offset(1) as *mut CGhoul2Info_v),
-                *args.offset(2),
-                *args.offset(3),
-                angles,
-                position,
-                scale,
-                *args.offset(7),
-                model_list,
-                bolt_matrix,
-            )
-        };
-        0
+        g2.gbm_no_reconstruct = true;
+        get_bolt_matrix_arm(view, g2, args) as c_int
     } else if trap == MpUiImport::UI_G2_GETBOLT_NOREC_NOROT as c_int {
-        g2.gG2_GBMNoReconstruct = qtrue;
-        g2.gG2_GBMUseSPMethod = qtrue;
-        unsafe {
-            let angles = *(vma(view.common, args, 4) as *const _);
-            let position = *(vma(view.common, args, 5) as *const vec3_t);
-            let scale = *(vma(view.common, args, 6) as *const vec3_t);
-            let model_list = vma(view.common, args, 8) as *const _;
-            let bolt_matrix = vma(view.common, args, 9) as *mut f32;
-            mp_engine_ghoul2::api_bolts::g2api_get_bolt_matrix(
-                g2,
-                view,
-                &mut *(*args.offset(1) as *mut CGhoul2Info_v),
-                *args.offset(2),
-                *args.offset(3),
-                angles,
-                position,
-                scale,
-                *args.offset(7),
-                model_list,
-                bolt_matrix,
-            )
-        };
-        0
+        g2.gbm_no_reconstruct = true;
+        g2.gbm_use_sp_method = true;
+        get_bolt_matrix_arm(view, g2, args) as c_int
     } else if trap == MpUiImport::UI_G2_INITGHOUL2MODEL as c_int {
-        g2.g_G2AllocServer = 0;
-        unsafe {
-            let dest = vma(view.common, args, 1) as *mut *mut CGhoul2Info_v;
-            let file_name = cstr_to_string(vma(view.common, args, 2) as *const c_char);
-            mp_engine_ghoul2::api_models::g2api_init_ghoul2_model(
-                g2,
-                view,
-                &mut *dest,
-                &file_name,
+        let file_name = unsafe { cstr_to_string(vma(view.common, args, 2) as *const c_char) };
+        // SAFETY: `VMA(1)` is the module's `CGhoul2Info_v *` slot (§D11).
+        let ghoul2 = unsafe { &mut **(vma(view.common, args, 1) as *mut *mut CGhoul2Info_v) };
+        // SAFETY: `args` is the trampoline's 16-word frame (§D11).
+        let (model_index, custom_skin, custom_shader, model_flags, lod_bias) = unsafe {
+            (
                 *args.offset(3),
                 *args.offset(4),
                 *args.offset(5),
@@ -1919,18 +2045,31 @@ pub fn CL_UISystemCalls(
                 *args.offset(7),
             )
         };
-        0
+        g2api_init_ghoul2_model(
+            g2,
+            view,
+            ghoul2,
+            &file_name,
+            model_index,
+            custom_skin,
+            custom_shader,
+            model_flags,
+            lod_bias,
+        )
     } else if trap == MpUiImport::UI_G2_COLLISIONDETECT as c_int
         || trap == MpUiImport::UI_G2_COLLISIONDETECTCACHE as c_int
     {
         // Raven: "not supported for ui" — both arms return 0.
         0
     } else if trap == MpUiImport::UI_G2_ANGLEOVERRIDE as c_int {
+        // SAFETY: every pointer here is module-space (porting-rules §D11), and
+        // `args` is the trampoline's 16-word frame.
         unsafe {
             let bone_name = cstr_to_string(vma(view.common, args, 3) as *const c_char);
             let angles = *(vma(view.common, args, 4) as *const vec3_t);
-            let model_list = vma(view.common, args, 9) as *const _;
-            mp_engine_ghoul2::api_bones::g2api_set_bone_angles(
+            let model_list =
+                core::slice::from_raw_parts(vma(view.common, args, 9) as *const qhandle_t, 0);
+            g2api_set_bone_angles(
                 g2,
                 view,
                 &mut *(*args.offset(1) as *mut CGhoul2Info_v),
@@ -1938,25 +2077,18 @@ pub fn CL_UISystemCalls(
                 &bone_name,
                 angles,
                 *args.offset(5),
-                core::mem::transmute::<c_int, native_math::eorientations::Eorientations>(
-                    *args.offset(6),
-                ),
-                core::mem::transmute::<c_int, native_math::eorientations::Eorientations>(
-                    *args.offset(7),
-                ),
-                core::mem::transmute::<c_int, native_math::eorientations::Eorientations>(
-                    *args.offset(8),
-                ),
+                core::mem::transmute::<c_int, Eorientations>(*args.offset(6)),
+                core::mem::transmute::<c_int, Eorientations>(*args.offset(7)),
+                core::mem::transmute::<c_int, Eorientations>(*args.offset(8)),
                 model_list,
                 *args.offset(10),
                 *args.offset(11),
-            )
-        };
-        0
+            ) as c_int
+        }
     } else if trap == MpUiImport::UI_G2_CLEANMODELS as c_int {
-        g2.g_G2AllocServer = 0;
+        // SAFETY: `VMA(1)` is the module's `CGhoul2Info_v *` slot (§D11).
         unsafe {
-            mp_engine_ghoul2::api_models::g2api_clean_ghoul2_models(
+            g2api_clean_ghoul2_models(
                 g2,
                 &mut **(vma(view.common, args, 1) as *mut *mut CGhoul2Info_v),
             )
@@ -1976,13 +2108,13 @@ pub fn CL_UISystemCalls(
                 *args.offset(8),
                 vmf(args, 9),
                 *args.offset(10),
-            )
+            ) as c_int
         }
     } else if trap == MpUiImport::UI_G2_GETBONEANIM as c_int {
         unsafe {
             let model_index = *args.offset(10);
             let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
-            let ghl_info = ghoul2.get_mut(g2, model_index);
+            let ghl_info = g2_info(g2, ghoul2, model_index);
             let bone_name = cstr_to_string(vma(view.common, args, 2) as *const c_char);
             let model_list = core::slice::from_raw_parts(vma(view.common, args, 9) as *const _, 0);
             match mp_engine_ghoul2::api_bones::g2api_get_bone_anim(
@@ -2008,7 +2140,7 @@ pub fn CL_UISystemCalls(
         unsafe {
             let model_index = *args.offset(6);
             let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
-            let ghl_info = ghoul2.get_mut(g2, model_index);
+            let ghl_info = g2_info(g2, ghoul2, model_index);
             let bone_name = cstr_to_string(vma(view.common, args, 2) as *const c_char);
             let model_list = core::slice::from_raw_parts(vma(view.common, args, 5) as *const _, 0);
             match mp_engine_ghoul2::api_bones::g2api_get_bone_anim(
@@ -2062,7 +2194,6 @@ pub fn CL_UISystemCalls(
         };
         0
     } else if trap == MpUiImport::UI_G2_DUPLICATEGHOUL2INSTANCE as c_int {
-        g2.g_G2AllocServer = 0;
         unsafe {
             mp_engine_ghoul2::api_models::g2api_duplicate_ghoul2_instance(
                 g2,
@@ -2080,7 +2211,6 @@ pub fn CL_UISystemCalls(
             ) as c_int
         }
     } else if trap == MpUiImport::UI_G2_REMOVEGHOUL2MODEL as c_int {
-        g2.g_G2AllocServer = 0;
         unsafe {
             mp_engine_ghoul2::api_models::g2api_remove_ghoul2_model(
                 g2,
@@ -2182,7 +2312,7 @@ pub fn CL_UISystemCalls(
             let point = vma(view.common, args, 4) as *mut c_char;
             let model_index = *args.offset(3);
             let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
-            let ghl_info = ghoul2.get_mut(g2, model_index);
+            let ghl_info = g2_info(g2, ghoul2, model_index);
             let local = mp_engine_ghoul2::api_surfaces::g2api_get_surface_name(
                 g2,
                 view,
@@ -2200,7 +2330,7 @@ pub fn CL_UISystemCalls(
         unsafe {
             let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
             let model_index = *args.offset(2);
-            let ghl_info = ghoul2.get_mut(g2, model_index);
+            let ghl_info = g2_info(g2, ghoul2, model_index);
             mp_engine_ghoul2::api_models::g2api_set_skin(
                 g2,
                 view,
@@ -2243,12 +2373,7 @@ pub fn CL_InitUI(view: &mut EngineHostView, cl: &mut Client) {
             )
         }
     };
-    cl.uivm = VM_Create(
-        view.common,
-        "ui",
-        Some(CL_UISystemCalls_trampoline),
-        interpret,
-    );
+    cl.uivm = VM_Create(view, "ui", Some(CL_UISystemCalls_trampoline), interpret);
     if cl.uivm.is_null() {
         com_error(errorParm_t::ERR_FATAL, "VM_Create on UI failed".to_string());
     }
@@ -2270,8 +2395,8 @@ pub fn CL_InitUI(view: &mut EngineHostView, cl: &mut Client) {
         // did a vid_restart ingame (was just < CA_ACTIVE before, resulting in
         // ingame menus getting wiped and not reloaded on vid restart from
         // ingame menu).
-        let ingame =
-            cl.cls.state >= connstate_t::CA_AUTHORIZING && cl.cls.state <= connstate_t::CA_ACTIVE;
+        let ingame = cl.cls.state as c_int >= connstate_t::CA_AUTHORIZING as c_int
+            && cl.cls.state as c_int <= connstate_t::CA_ACTIVE as c_int;
         VM_Call(
             view.common,
             cl.uivm,
