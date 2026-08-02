@@ -7,7 +7,7 @@
 
 #![allow(non_snake_case)]
 
-use core::ffi::{c_int, c_void};
+use core::ffi::{c_char, c_int, c_void};
 
 use native_types::{fileHandle_t, qboolean, qfalse, qtrue};
 
@@ -62,6 +62,22 @@ pub fn Sys_Exit_restore_stdin(ex: c_int) -> ! {
         libc::fcntl(0, libc::F_SETFL, fl & !libc::O_NDELAY);
         libc::_exit(ex);
     }
+}
+
+/// Raven `Sys_GetClipboardData` (unix): the oracle's unix build never wires up
+/// an X11 clipboard, so the body always returns `NULL`.
+///
+/// Source: `oracle/codemp/unix/unix_main.c:1063-1066`
+pub fn Sys_GetClipboardData() -> *mut c_char {
+    core::ptr::null_mut()
+}
+
+/// Raven `Sys_MonkeyShouldBeSpanked` (unix): the "monkey test" packet-fuzzer
+/// gate always reports off.
+///
+/// Source: `oracle/codemp/unix/unix_main.c:83-87`
+pub fn Sys_MonkeyShouldBeSpanked() -> c_int {
+    0
 }
 
 /// Raven unix `Sys_GetCurrentUser` — `getpwuid(getuid())->pw_name`, or

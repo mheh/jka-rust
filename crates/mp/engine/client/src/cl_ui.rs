@@ -27,6 +27,7 @@ use mp_engine_qcommon::net_chan::{NET_AdrToString, NET_CompareAdr, NET_StringToA
 use mp_engine_qcommon::qcommon::shared_traps_t::sharedTraps_t;
 use mp_engine_qcommon::qcommon::vm_interpret_t::vmInterpret_t;
 use mp_engine_qcommon::stringed::SE_GetString;
+use mp_engine_qcommon::vm::ui_syscall_trampoline_words;
 use mp_engine_qcommon::vm_fns::{VM_ArgPtr, VM_Call, VM_Create, VM_Free};
 use mp_engine_qcommon::z_memman_pc::{Hunk_MemoryRemaining, Z_Free};
 use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
@@ -45,6 +46,7 @@ use native_string::{latin1_to_string, string_to_latin1};
 
 use crate::client::client_static_t::{MAX_GLOBAL_SERVERS, MAX_OTHER_SERVERS};
 use crate::client::server_info_t::serverInfo_t;
+use crate::client_host::client_legacy_syscall;
 use crate::snd_stubs::{
     S_RegisterSound, S_StartBackgroundTrack, S_StartLocalSound, S_StopBackgroundTrack,
 };
@@ -2068,14 +2070,19 @@ pub fn CL_InitUI(common: &mut Common, cl: &mut Client) {
     }
 }
 
-/// Trampoline matching `VM_Create`'s `extern "C" fn(*mut c_int) -> c_int`
-/// systemCalls slot; `CL_UISystemCalls` itself needs its receiver params, so
-/// this is the fixed-signature seam the native-module loader calls through.
+/// The `int (*)(int*)` C-ABI adapter handed to `VM_Create` as `systemCalls`
+/// (`vm.cpp:471-472`, stored `vm->systemCall`). On the SEAM-D11 native path the
+/// module reaches the engine through `ui_syscall_trampoline` → the armed ui
+/// slot, so `vm->systemCall` (the legacy `VM_DllSyscall` target,
+/// `vm.cpp:363-380`) is vestigial; this adapter widens the legacy contiguous
+/// int arg block to the trampoline's `isize` words and forwards to the same
+/// armed slot for parity if ever invoked. The `common`/`cl`/`g2` receivers come
+/// from the boot-armed `ClientDispatchCtx` note, which `ui_system_calls_shim`
+/// reads (DEC-55.1) — the twin of the server's `sv_game_system_call`.
 ///
-/// PORT-NOTE(receiver): the trampoline has no way to recover
-/// `common`/`cl`/`g2` from the raw `args` pointer alone (receiver-gap, see
-/// shape_mismatches) — genuinely needs the same host-seam plumbing
-/// `SV_GameSystemCalls`'s trampoline uses.
+/// Source: `oracle/codemp/client/cl_ui.cpp:813`
 extern "C" fn CL_UISystemCalls_trampoline(args: *mut c_int) -> c_int {
-    CL_UISystemCalls(common, cl, g2, args)
+    // SAFETY: the legacy `VM_DllSyscall` convention passes a contiguous 16-int
+    // arg block (`args[i] = va_arg(...)`, vm.cpp:366).
+    unsafe { client_legacy_syscall(args, ui_syscall_trampoline_words) }
 }

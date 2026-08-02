@@ -674,6 +674,25 @@ pub fn VM_LoadSymbols(view: &mut EngineHostView, vm: *mut vm_t) {
     }
 }
 
+/// The raw C-variadic entry `Sys_LoadDll` hands to a module's `dllEntry`.
+///
+/// The oracle passes one `VM_DllSyscall` to every module and picks the
+/// dispatcher from the `currentVM` global. SEAM-D11 gives each slot its own
+/// monomorphic trampoline instead, so the entry address a module receives is
+/// the slot it belongs to. Any name outside the client's two dylibs is the
+/// game slot, which keeps `jampded` on the address it already used.
+///
+/// Source: `oracle/codemp/qcommon/vm.cpp:515-518`
+fn syscall_trampoline_for(module: &str) -> unsafe extern "C-unwind" fn(isize, ...) -> isize {
+    if module.eq_ignore_ascii_case("cgame") {
+        crate::vm::trampoline::cgame_syscall_trampoline
+    } else if module.eq_ignore_ascii_case("ui") {
+        crate::vm::trampoline::ui_syscall_trampoline
+    } else {
+        crate::vm::trampoline::game_syscall_trampoline
+    }
+}
+
 /// `VM_Create`.
 ///
 /// Raven: `systemCalls`'s C fn-pointer type isn't in the rosetta
@@ -729,14 +748,17 @@ pub fn VM_Create(
             // try to load as a system dll
             let vm_name = (*vm).name.clone();
             view.print(&format!("Loading dll file {vm_name}.\n"));
-            // SEAM-D11: `game_syscall_trampoline` is the C-variadic entry that
-            // unpacks the va_list and dispatches to the armed engine slot; the
-            // Rust `VM_DllSyscall` is reached through slot arming, not directly.
+            // SEAM-D11: the trampoline is the C-variadic entry that unpacks the
+            // va_list and dispatches to the armed engine slot; the Rust
+            // `VM_DllSyscall` is reached through slot arming, not directly.
+            // One entry address per slot replaces the oracle's `currentVM`
+            // read, so the address a module receives names the slot it belongs
+            // to (DEC-55).
             (*vm).dllHandle = Sys_LoadDll(
                 view.common,
                 module,
                 &mut (*vm).entryPoint,
-                Some(crate::vm::trampoline::game_syscall_trampoline),
+                Some(syscall_trampoline_for(module)),
             );
             if !(*vm).dllHandle.is_null() {
                 return vm;

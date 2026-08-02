@@ -1,10 +1,16 @@
-//! `Client` (the `Engine.cl` island host) + `SoundSystem` (`Engine.snd`).
+//! `Client` (the `Engine.cl` island host) + `SoundSystem` (`Engine.snd`) +
+//! the two armed client-slot syscall targets (`cgame_system_calls_shim`,
+//! `ui_system_calls_shim`), which read the boot-built `ClientDispatchCtx` note.
 
 use core::ffi::{c_char, c_int, c_long, c_uint, c_ushort};
 
 use mp_abi::cgame::shared_buffer::autoMapInput_t;
+use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
+use mp_engine_qcommon::common::com_error;
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::vm::vm_s::vm_t;
 use mp_qshared::shared::cvar::CvarHandle;
+use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::limits::{MAX_PINGREQUESTS, MAX_SERVERSTATUSREQUESTS, MAX_TOKEN_CHARS};
 use mp_qshared::shared::{qboolean, qfalse};
 use native_math::vector::vec3_t;
@@ -14,6 +20,8 @@ use native_types::{field_t, MAX_QPATH};
 use crate::cin::cin_cache::cin_cache;
 use crate::cin::cin_consts::MAX_VIDEO_HANDLES;
 use crate::cin::cinematics_t::cinematics_t;
+use crate::cl_cgame::CL_CgameSystemCalls;
+use crate::cl_ui::CL_UISystemCalls;
 use crate::client::client_active_t::clientActive_t;
 use crate::client::client_connection_t::clientConnection_t;
 use crate::client::client_static_t::clientStatic_t;
@@ -22,6 +30,7 @@ use crate::client::graphsamp_t::graphsamp_t;
 use crate::client::kbutton_t::kbutton_t;
 use crate::client::ping_t::ping_t;
 use crate::client::server_status_t::serverStatus_t;
+use crate::client_dispatch_ctx::ClientDispatchCtx;
 use crate::keys::key_globals_s::{keyGlobals_t, MAX_KEYS};
 use crate::keys::keyname_t::keyname_t;
 
@@ -499,6 +508,155 @@ impl Default for Client {
             CL_handle: -1,
         }
     }
+}
+
+/// Cast the view's type-erased `cl` slot back to the live `Client` — the twin
+/// of `mp_engine_server`'s `sv_from_view`. The raw pointer is copied out first
+/// (`as_raw`), so the returned borrow is NOT tied to the view, and the per-slot
+/// rule governs its use: nothing called while this borrow is live may cast the
+/// SAME slot again.
+///
+/// Every client-tier hook body, every `Cmd_AddCommand` adapter, and every
+/// client function that holds a view reaches `Client` through here.
+///
+/// SAFETY (caller): the slot was built by `mp_engine_core`'s view constructor
+/// from the live, unique `&mut Engine.cl`; the engine is single-threaded and no
+/// other cast of this slot is live for the returned borrow's duration. The slot
+/// is NULL on dedicated (`Engine.cl` is `None`), where the null-build client
+/// hooks run instead and never call this.
+pub unsafe fn cl_from_view<'a>(view: &mut EngineHostView) -> &'a mut Client {
+    &mut *(view.cl.as_raw() as *mut Client)
+}
+
+/// Cast the view's type-erased `g2` slot back to the live `Ghoul2System` — the
+/// client's own boundary cast, since the cgame and ui dispatchers take `g2` as
+/// a declared receiver (DEC-55.2's G2 trap block).
+///
+/// SAFETY (caller): the slot was built by `mp_engine_core`'s view constructor
+/// from the live, unique `&mut Engine.g2`; single-threaded, and no other cast
+/// of this slot is live for the returned borrow's duration.
+pub unsafe fn g2_from_view<'a>(view: &mut EngineHostView) -> &'a mut Ghoul2System {
+    &mut *(view.g2.as_raw() as *mut Ghoul2System)
+}
+
+/// Rebuild the dispatcher receivers from the boot-built note, the shared body
+/// of the two shims below.
+///
+/// # Safety
+/// `ctx` must be the boot-built [`ClientDispatchCtx`] (leaked, process
+/// lifetime; every pointer is a field of the one boxed `Engine`, so the
+/// addresses are stable). The engine caller that entered the module sits
+/// suspended in `VM_Call` for this whole dispatch (single-threaded synchronous
+/// traps), so its borrows of these same objects are dormant — the DEC-23
+/// slot-cast discipline at the module seam.
+unsafe fn client_dispatch_note<'a>(
+    ctx: *mut core::ffi::c_void,
+    who: &str,
+) -> (&'a ClientDispatchCtx, &'a mut Client) {
+    if ctx.is_null() {
+        // A syscall before the boot arming would read a fabricated world — a
+        // silent fake (porting-rules #14); die loudly instead.
+        com_error(
+            errorParm_t::ERR_FATAL,
+            format!("{who} syscall with no dispatch context armed"),
+        );
+    }
+    let c = &*(ctx as *const ClientDispatchCtx);
+    let Some(cl) = (*c.cl).as_mut() else {
+        // The module loaded before the client island was seated, so there is no
+        // `cl`/`clc`/`cls` to answer with. Same loud disposition as above.
+        com_error(
+            errorParm_t::ERR_FATAL,
+            format!("{who} syscall with no client island seated"),
+        );
+    };
+    (c, cl)
+}
+
+/// Narrow the trampoline's 16 `isize` words back to Raven's `int args[16]`,
+/// which is the frame both client dispatchers declare (`args: *mut c_int`) and
+/// the width `VM_ArgPtr` reads. The qcommon shim widens to `intptr_t` because
+/// that is what a 64-bit `va_arg` yields; the module set is the ILP32 i386
+/// build, where the two widths are the same value.
+///
+/// Source: `oracle/codemp/qcommon/vm.cpp:366` (`int args[16]`).
+///
+/// # Safety
+/// `args` must point at a shim's 16-word frame.
+unsafe fn client_dispatch_frame(args: *const isize) -> [c_int; 16] {
+    let mut frame = [0 as c_int; 16];
+    for (i, w) in frame.iter_mut().enumerate() {
+        *w = *args.add(i) as c_int;
+    }
+    frame
+}
+
+/// The injected `SlotSyscall` target for the cgame slot (LOAD-D8 injection):
+/// the module's variadic syscall lands here (through
+/// `cgame_syscall_trampoline`'s 16-word frame) with the slot's armed `ctx` —
+/// the [`ClientDispatchCtx`] note `mp_engine_core::install_engine_hooks` built
+/// at boot. Rebuild the dispatcher's receivers from the note and enter
+/// `cl_cgame.rs::CL_CgameSystemCalls`, our routing dual of Raven's
+/// `currentVM->systemCall( args )`.
+///
+/// Source: `oracle/codemp/qcommon/vm.cpp:377`;
+/// `oracle/codemp/client/cl_cgame.cpp:644` (the dispatcher itself).
+pub extern "C-unwind" fn cgame_system_calls_shim(
+    ctx: *mut core::ffi::c_void,
+    args: *const isize,
+) -> isize {
+    // SAFETY: the note's contract, restated on `client_dispatch_note`. `args`
+    // is the trampoline's 16-word frame.
+    unsafe {
+        let (c, cl) = client_dispatch_note(ctx, "cgame");
+        let mut frame = client_dispatch_frame(args);
+        CL_CgameSystemCalls(
+            &mut *c.common,
+            &mut *c.cm,
+            cl,
+            &mut *c.rm,
+            &mut *c.rmg,
+            &mut *c.g2,
+            frame.as_mut_ptr(),
+        ) as isize
+    }
+}
+
+/// The ui slot's twin of [`cgame_system_calls_shim`], entering
+/// `cl_ui.rs::CL_UISystemCalls`.
+///
+/// Source: `oracle/codemp/qcommon/vm.cpp:377`;
+/// `oracle/codemp/client/cl_ui.cpp:813` (the dispatcher itself).
+pub extern "C-unwind" fn ui_system_calls_shim(
+    ctx: *mut core::ffi::c_void,
+    args: *const isize,
+) -> isize {
+    // SAFETY: the note's contract, restated on `client_dispatch_note`. `args`
+    // is the trampoline's 16-word frame.
+    unsafe {
+        let (c, cl) = client_dispatch_note(ctx, "ui");
+        let mut frame = client_dispatch_frame(args);
+        CL_UISystemCalls(&mut *c.common, cl, &mut *c.g2, frame.as_mut_ptr()) as isize
+    }
+}
+
+/// Widen the legacy `VM_DllSyscall` int arg block to the trampoline's `isize`
+/// words and dispatch through an armed client slot — the shared body of the
+/// two `vm->systemCall` adapters (`cl_cgame.rs`/`cl_ui.rs`), the twin of
+/// `sv_game_system_call`.
+///
+/// # Safety
+/// `args` must be the legacy convention's contiguous 16-int arg block
+/// (`args[i] = va_arg(...)`, `vm.cpp:366`).
+pub unsafe fn client_legacy_syscall(
+    args: *mut c_int,
+    dispatch: extern "C-unwind" fn(*const isize) -> isize,
+) -> c_int {
+    let mut frame = [0isize; 16];
+    for (i, w) in frame.iter_mut().enumerate() {
+        *w = *args.add(i) as isize;
+    }
+    dispatch(frame.as_ptr()) as c_int
 }
 
 /// The `Engine.snd` faithful mixer (DEC-03; EAX/force-feedback dropped). `None`

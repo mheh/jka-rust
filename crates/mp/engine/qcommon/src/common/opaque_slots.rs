@@ -110,6 +110,28 @@ impl RenderModels {
     }
 }
 
+/// Type-erased slot for the `mp_renderer` `RendererFrontend` carrier bundle
+/// (the DEC-42.3 receivers the `RE_*` frontend takes, owned by `Engine.re`);
+/// qcommon is pass-through only — never dereferences it. Cast back to the real
+/// `mp_renderer::renderer_frontend::RendererFrontend` at the renderer-crate
+/// boundary (`mp_renderer::hook_install::re_from_view`). NULL on dedicated,
+/// where `Engine.re` is `None` and no path reads it.
+///
+/// Ruling: opaque-slot (user, 2026-07-12, option A); DEC-55.2 / DEC-59.1 for
+/// the client's direct `RE_*` reach.
+#[repr(transparent)]
+pub struct Renderer(*mut ());
+
+impl Renderer {
+    pub fn from_raw(p: *mut ()) -> Renderer {
+        Renderer(p)
+    }
+
+    pub fn as_raw(&mut self) -> *mut () {
+        self.0
+    }
+}
+
 /// Type-erased slot for the `mp_engine_ghoul2` `Ghoul2System` state; qcommon is
 /// pass-through only — never dereferences it.
 ///

@@ -32,6 +32,7 @@ use mp_engine_qcommon::cmd_common::{
 };
 use mp_engine_qcommon::cmd_pc::{Cmd_AddCommand, Cmd_RemoveCommand};
 use mp_engine_qcommon::common::common::{com_printf, Common};
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::error::com_error;
 use mp_engine_qcommon::common_fns::{
     Com_DPrintf, Com_EventLoop, Com_Memset, Com_Milliseconds, Info_Print,
@@ -114,7 +115,7 @@ use crate::client::client_static_t::{MAX_GLOBAL_SERVERS, MAX_OTHER_SERVERS};
 use crate::client::ping_t::ping_t;
 use crate::client::server_address_t::serverAddress_t;
 use crate::client::server_info_t::serverInfo_t;
-use crate::client_host::Client;
+use crate::client_host::{cl_from_view, Client};
 use crate::snd_stubs::{
     S_BeginRegistration, S_ClearSoundBuffer, S_DisableSounds, S_Init, S_RestartMusic, S_Shutdown,
     S_StopAllSounds, S_Update,
@@ -3771,28 +3772,28 @@ pub fn CL_Init(cl: &mut Client) {
     //
     // register our commands
     //
-    Cmd_AddCommand(view, "cmd", Some(CL_ForwardToServer_f));
-    Cmd_AddCommand(view, "globalservers", Some(CL_GlobalServers_f));
-    Cmd_AddCommand(view, "record", Some(CL_Record_f));
-    Cmd_AddCommand(view, "demo", Some(CL_PlayDemo_f));
-    Cmd_AddCommand(view, "stoprecord", Some(CL_StopRecord_f));
-    Cmd_AddCommand(view, "configstrings", Some(CL_Configstrings_f));
-    Cmd_AddCommand(view, "clientinfo", Some(CL_Clientinfo_f));
-    Cmd_AddCommand(view, "snd_restart", Some(CL_Snd_Restart_f));
-    Cmd_AddCommand(view, "vid_restart", Some(CL_Vid_Restart_f));
-    Cmd_AddCommand(view, "disconnect", Some(CL_Disconnect_f));
-    Cmd_AddCommand(view, "cinematic", Some(CL_PlayCinematic_f));
-    Cmd_AddCommand(view, "connect", Some(CL_Connect_f));
-    Cmd_AddCommand(view, "reconnect", Some(CL_Reconnect_f));
-    Cmd_AddCommand(view, "localservers", Some(CL_LocalServers_f));
-    Cmd_AddCommand(view, "rcon", Some(CL_Rcon_f));
-    Cmd_AddCommand(view, "ping", Some(CL_Ping_f));
-    Cmd_AddCommand(view, "serverstatus", Some(CL_ServerStatus_f));
-    Cmd_AddCommand(view, "showip", Some(CL_ShowIP_f));
-    Cmd_AddCommand(view, "fs_openedList", Some(CL_OpenedPK3List_f));
-    Cmd_AddCommand(view, "fs_referencedList", Some(CL_ReferencedPK3List_f));
-    Cmd_AddCommand(view, "model", Some(CL_SetModel_f));
-    Cmd_AddCommand(view, "forcepowers", Some(CL_SetForcePowers_f));
+    Cmd_AddCommand(view, "cmd", Some(CL_ForwardToServer_f_cmd));
+    Cmd_AddCommand(view, "globalservers", Some(CL_GlobalServers_f_cmd));
+    Cmd_AddCommand(view, "record", Some(CL_Record_f_cmd));
+    Cmd_AddCommand(view, "demo", Some(CL_PlayDemo_f_cmd));
+    Cmd_AddCommand(view, "stoprecord", Some(CL_StopRecord_f_cmd));
+    Cmd_AddCommand(view, "configstrings", Some(CL_Configstrings_f_cmd));
+    Cmd_AddCommand(view, "clientinfo", Some(CL_Clientinfo_f_cmd));
+    Cmd_AddCommand(view, "snd_restart", Some(CL_Snd_Restart_f_cmd));
+    Cmd_AddCommand(view, "vid_restart", Some(CL_Vid_Restart_f_cmd));
+    Cmd_AddCommand(view, "disconnect", Some(CL_Disconnect_f_cmd));
+    Cmd_AddCommand(view, "cinematic", Some(CL_PlayCinematic_f_cmd));
+    Cmd_AddCommand(view, "connect", Some(CL_Connect_f_cmd));
+    Cmd_AddCommand(view, "reconnect", Some(CL_Reconnect_f_cmd));
+    Cmd_AddCommand(view, "localservers", Some(CL_LocalServers_f_cmd));
+    Cmd_AddCommand(view, "rcon", Some(CL_Rcon_f_cmd));
+    Cmd_AddCommand(view, "ping", Some(CL_Ping_f_cmd));
+    Cmd_AddCommand(view, "serverstatus", Some(CL_ServerStatus_f_cmd));
+    Cmd_AddCommand(view, "showip", Some(CL_ShowIP_f_cmd));
+    Cmd_AddCommand(view, "fs_openedList", Some(CL_OpenedPK3List_f_cmd));
+    Cmd_AddCommand(view, "fs_referencedList", Some(CL_ReferencedPK3List_f_cmd));
+    Cmd_AddCommand(view, "model", Some(CL_SetModel_f_cmd));
+    Cmd_AddCommand(view, "forcepowers", Some(CL_SetForcePowers_f_cmd));
 
     CL_InitRef(cl);
 
@@ -3805,4 +3806,119 @@ pub fn CL_Init(cl: &mut Client) {
     cl.G2VertSpaceClient = Some(Box::new(CMiniHeap::new(G2_VERT_SPACE_CLIENT_SIZE * 1024)));
 
     //	Com_Printf( "----- Client Initialization Complete -----\n" );
+}
+
+// The `CmdFunction` adapters `CL_Init` registers above. `CmdFunction` is
+// `fn(&mut EngineHostView)`, and each `CL_*_f` handler takes its own receivers,
+// so a forwarder casts the view's `cl` slot back and calls the handler
+// (`sv_ccmds.rs`'s `SV_Map_f_cmd` idiom). They sit together beside the one
+// function that registers them, exactly as the server's forwarders sit beside
+// `SV_AddOperatorCommands`.
+//
+// SAFETY (every `cl_from_view` below): view-constructor slot, single-threaded,
+// no other cast of the same slot live across the handler call.
+
+fn CL_ForwardToServer_f_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    CL_ForwardToServer_f(cl)
+}
+
+fn CL_GlobalServers_f_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    CL_GlobalServers_f(cl)
+}
+
+fn CL_Record_f_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    CL_Record_f(cl)
+}
+
+fn CL_PlayDemo_f_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    CL_PlayDemo_f(view.common, cl)
+}
+
+fn CL_StopRecord_f_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    CL_StopRecord_f(cl)
+}
+
+fn CL_Configstrings_f_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    CL_Configstrings_f(cl)
+}
+
+fn CL_Clientinfo_f_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    CL_Clientinfo_f(cl)
+}
+
+fn CL_Snd_Restart_f_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    CL_Snd_Restart_f(cl)
+}
+
+fn CL_Vid_Restart_f_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    CL_Vid_Restart_f(view.common, cl)
+}
+
+fn CL_Disconnect_f_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    CL_Disconnect_f(cl)
+}
+
+fn CL_PlayCinematic_f_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    CL_PlayCinematic_f(view.common, cl)
+}
+
+fn CL_Connect_f_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    CL_Connect_f(view.common, cl)
+}
+
+fn CL_Reconnect_f_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    CL_Reconnect_f(cl)
+}
+
+fn CL_LocalServers_f_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    CL_LocalServers_f(cl)
+}
+
+fn CL_Rcon_f_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    CL_Rcon_f(cl)
+}
+
+fn CL_Ping_f_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    CL_Ping_f(cl)
+}
+
+fn CL_ServerStatus_f_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    CL_ServerStatus_f(cl)
+}
+
+fn CL_ShowIP_f_cmd(_view: &mut EngineHostView) {
+    CL_ShowIP_f()
+}
+
+fn CL_OpenedPK3List_f_cmd(_view: &mut EngineHostView) {
+    CL_OpenedPK3List_f()
+}
+
+fn CL_ReferencedPK3List_f_cmd(_view: &mut EngineHostView) {
+    CL_ReferencedPK3List_f()
+}
+
+fn CL_SetModel_f_cmd(_view: &mut EngineHostView) {
+    CL_SetModel_f()
+}
+
+fn CL_SetForcePowers_f_cmd(_view: &mut EngineHostView) {
+    CL_SetForcePowers_f()
 }

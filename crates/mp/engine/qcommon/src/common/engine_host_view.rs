@@ -32,7 +32,9 @@ use mp_qshared::shared::{fileHandle_t, qboolean, qhandle_t, vec3_t, FS_WRITE};
 use crate::collision_world::CollisionWorld;
 use crate::common::common::{com_printf, Common};
 use crate::common::error::com_error;
-use crate::common::opaque_slots::{BotLib, Client, Ghoul2System, RenderModels, RmManager, Server};
+use crate::common::opaque_slots::{
+    BotLib, Client, Ghoul2System, RenderModels, Renderer, RmManager, Server,
+};
 use crate::cvar_fns::{
     Cvar_FindVar, Cvar_Get, Cvar_VariableIntegerValue, Cvar_VariableString, Cvar_VariableValue,
 };
@@ -49,6 +51,26 @@ use crate::sys_net::Sys_IsLANAddress;
 /// Slot discipline (unchanged, restated): a slot cast (`server_from_slot`
 /// et al.) is scoped — cast, use, drop — and never held across a call that
 /// takes the view.
+///
+/// # Renderer reach (DEC-55.2 / DEC-59.1)
+///
+/// Engine-interior code calls the `mp_renderer` `RE_*` frontend directly with
+/// that function's declared receivers. There is no `refexport_t` table and no
+/// `GetRefAPI`. A function that holds this view obtains those receivers from
+/// two slots, and from nothing else:
+///
+/// - `re` — the `RendererFrontend` carrier bundle (`Engine.re`), cast back by
+///   `mp_renderer::hook_install::re_from_view`. Its fields ARE the receiver
+///   names the `RE_*` signatures use: `frame_data`, `assets`, `sim`, `cvars`,
+///   `frame`, `scene`, `img_state`, `gpu_res`, `font`, `noise`, `rng`, `qs`,
+///   `sky_view`, `sky`, `world_effects`.
+/// - `rm` — the one `RenderModels` registry (`Engine.render_models`), cast back
+///   by `mp_renderer::hook_install::rm_from_view`.
+///
+/// State-partition law (DEC-55.2): a synchronous path — a cgame or ui trap arm,
+/// a `cl_scrn`/`cl_console` draw — reads the CPU-side `re.assets` and appends to
+/// `re.frame_data`. It never reaches `re.gpu_res`, which the render thread
+/// owns. `re` is NULL on dedicated, where `Engine.re` is `None`.
 #[allow(non_snake_case)]
 pub struct EngineHostView<'a> {
     /// cvars, cmd, cbuf, fs, net, modules, hooks — `Engine.common`.
@@ -63,6 +85,9 @@ pub struct EngineHostView<'a> {
     pub bot: BotLib,
     /// Type-erased `Engine.render_models` (`mp_renderer` `RenderModels`).
     pub rm: RenderModels,
+    /// Type-erased `Engine.re` (`mp_renderer` `RendererFrontend`; null on
+    /// dedicated). See the renderer-reach section of this type's doc.
+    pub re: Renderer,
     /// Type-erased `Engine.rmg` (`mp_engine_rmg::RmManager`).
     pub rmg: RmManager,
     /// Type-erased `Engine.g2` (`mp_engine_ghoul2::Ghoul2System`).

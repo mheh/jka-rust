@@ -16,6 +16,7 @@ pub mod cl_scrn;
 pub mod cl_ui;
 pub mod cin;
 pub mod client;
+pub mod client_dispatch_ctx;
 pub mod client_host;
 pub mod fffx;
 pub mod fx;
@@ -26,5 +27,10 @@ pub mod null;
 pub mod snd;
 pub mod snd_ambient;
 pub mod snd_stubs;
+pub mod svc_strings;
 
-pub use client_host::{Client, SoundSystem};
+pub use client_dispatch_ctx::ClientDispatchCtx;
+pub use client_host::{
+    cgame_system_calls_shim, cl_from_view, client_legacy_syscall, g2_from_view,
+    ui_system_calls_shim, Client, SoundSystem,
+};

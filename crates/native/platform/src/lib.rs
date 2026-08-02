@@ -22,7 +22,8 @@ pub use mem::{zeroed_box, ZeroValid};
 // re-exported at the crate root where qcommon call sites import them.
 #[cfg(unix)]
 pub use sys_main::{
-    Sys_BeginStreamedFile, Sys_CheckCD, Sys_EndStreamedFile, Sys_LowPhysicalMemory, Sys_UnloadDll,
+    Sys_BeginStreamedFile, Sys_CheckCD, Sys_EndStreamedFile, Sys_GetClipboardData,
+    Sys_LowPhysicalMemory, Sys_MonkeyShouldBeSpanked, Sys_UnloadDll,
 };
 #[cfg(unix)]
 pub use sys_shared::{

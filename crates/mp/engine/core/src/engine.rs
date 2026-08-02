@@ -50,6 +50,11 @@ pub struct Engine {
     /// Headless model registry/cache (`tr.models` + CachedModels) — reached by
     /// ghoul2 only through `EngineHost::model_*` (rulings 52/53; `mp_renderer`).
     pub render_models: mp_renderer::tr_model::render_models::RenderModels,
+    /// The renderer frontend's carrier bundle (DEC-42.3) — every `RE_*`
+    /// receiver except the model registry above. `Some` on a client build and
+    /// `None` on dedicated, the same shape `cl`/`snd` use; the platform shell
+    /// seats it (DEC-56). Reached through the view's `re` slot (DEC-59.1).
+    pub re: Option<mp_renderer::renderer_frontend::RendererFrontend>,
     /// Engine-side nav graph (`CNavigator` twin) — plain `Default` field per
     /// rulings 12/30 (`mp_engine_server::npcnav`).
     pub nav: mp_engine_server::npcnav::navigator::Navigator,
@@ -116,9 +121,11 @@ impl Engine {
             // The empty ModuleRegistry (step-30 VM_Init's default-shaped build);
             // a zeroed Option<ModuleSlot> is NOT guaranteed None.
             addr_of_mut!((*p).common.modules).write(ModuleRegistry::default());
-            // Option<Client>/Option<SoundSystem>: same niche non-guarantee.
+            // Option<Client>/Option<SoundSystem>/Option<RendererFrontend>: same
+            // niche non-guarantee.
             addr_of_mut!((*p).cl).write(None);
             addr_of_mut!((*p).snd).write(None);
+            addr_of_mut!((*p).re).write(None);
             // Icarus holds Box slot-arrays, HashMaps, and a fn-item table — NONE
             // all-zero-valid — so it is written in place through its hand-written
             // Default before the Box is exposed (rulings 12/27; the modules /

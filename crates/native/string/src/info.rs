@@ -81,6 +81,41 @@ pub fn Info_ValueForKey(s: &str, key: &str) -> String {
     }
 }
 
+/// Raven `Info_NextPair` — walks one `\key\value` pair off the front of
+/// `*head`, advancing `*head` past it. An exhausted string clears `key` and
+/// leaves `value` untouched, matching the oracle's early return.
+///
+/// Source: `oracle/codemp/game/q_shared.c:1108-1139`
+pub fn Info_NextPair<'a>(head: &mut &'a str, key: &mut String, value: &mut String) {
+    let mut s = *head;
+    if let Some(rest) = s.strip_prefix('\\') {
+        s = rest;
+    }
+
+    key.clear();
+    value.clear();
+
+    let b = s.as_bytes();
+    let mut p = 0usize;
+    while p < b.len() && b[p] != b'\\' {
+        p += 1;
+    }
+    if p >= b.len() {
+        *head = s;
+        return;
+    }
+    key.push_str(&latin1_to_string(&b[..p]));
+    p += 1;
+
+    let vstart = p;
+    while p < b.len() && b[p] != b'\\' {
+        p += 1;
+    }
+    value.push_str(&latin1_to_string(&b[vstart..p]));
+
+    *head = &s[p..];
+}
+
 /// Shared walk for `Info_RemoveKey`/`Info_RemoveKey_Big` (identical bodies in
 /// Raven apart from the length guard): key match is case-SENSITIVE (`strcmp`,
 /// unlike `Info_ValueForKey`'s `Q_stricmp`).

@@ -12,7 +12,6 @@ use mp_engine_qcommon::common_fns::{Com_DPrintf, Com_Memcpy, Com_Memset};
 use mp_engine_qcommon::cvar_fns::{
     Cvar_Set, Cvar_SetCheatState, Cvar_SetValue, Cvar_VariableString, Cvar_VariableValue,
 };
-use mp_engine_qcommon::files::unz_types::z_stream;
 use mp_engine_qcommon::files_common::{
     FS_FCloseFile, FS_PureServerSetLoadedPaks, FS_Write,
 };
@@ -26,6 +25,7 @@ use mp_engine_qcommon::msg::{
     MSG_ReadString,
 };
 use mp_engine_qcommon::vm_fns::VM_Call;
+use mp_engine_qcommon::zlib_seam::inflate_sync_flush;
 use mp_engine_qcommon::qcommon::net_limits::{
     MAX_MSGLEN, MAX_RELIABLE_COMMANDS, PACKET_BACKUP, PACKET_MASK,
 };
@@ -48,7 +48,6 @@ use crate::cl_console::Con_Close;
 use crate::cl_input::CL_WritePacket;
 use crate::cl_main::{CL_AddReliableCommand, CL_ClearState, CL_InitDownloads, CL_NextDownload};
 use crate::client::cl_snapshot_t::clSnapshot_t;
-use crate::client::client_connection_t::MAX_HEIGHTMAP_SIZE;
 use crate::client::client_consts::MAX_PARSE_ENTITIES;
 use crate::client_host::Client;
 
@@ -405,10 +404,7 @@ pub fn CL_ParsePacketEntities(
 /// Raven `CL_ParseRMG` - unpacks the streamed RMG heightmap/flattenmap blocks.
 ///
 /// PORT-NOTE(shape): `MSG_Read*` need `common: &mut Common`, absent from this
-/// packet's resolved signature. `cl` stands in. `inflate`/`inflateInit`/
-/// `inflateEnd`/`z_stream` are the vendored zlib seam (plan §1); no matching
-/// wrapper exists yet, so the calls below are literal placeholders for the
-/// seam module integration must supply.
+/// packet's resolved signature. `cl` stands in.
 ///
 /// Source: `oracle/codemp/client/cl_parse.cpp:465-526`
 pub fn CL_ParseRMG(cl: &mut Client, msg: *mut msg_t) {
@@ -417,7 +413,6 @@ pub fn CL_ParseRMG(cl: &mut Client, msg: *mut msg_t) {
         return;
     }
 
-    let mut zdata: z_stream = unsafe { core::mem::zeroed() };
     let size: c_int;
     // §19: Raven leaves `heightmap1` uninitialized; every read path below
     // fills it from the wire before `inflate` consumes it, so a zero-init
@@ -426,13 +421,6 @@ pub fn CL_ParseRMG(cl: &mut Client, msg: *mut msg_t) {
 
     if MSG_ReadBits(cl, msg, 1) != 0 {
         // Read the heightmap
-        Com_Memset(
-            &mut zdata as *mut z_stream as *mut (),
-            0,
-            core::mem::size_of::<z_stream>(),
-        );
-        inflateInit(&mut zdata, Z_SYNC_FLUSH);
-
         MSG_ReadData(
             cl,
             msg,
@@ -440,15 +428,13 @@ pub fn CL_ParseRMG(cl: &mut Client, msg: *mut msg_t) {
             cl.clc.rmgHeightMapSize,
         );
 
-        zdata.next_in = heightmap1.as_mut_ptr();
-        zdata.avail_in = cl.clc.rmgHeightMapSize as u32;
-        zdata.next_out = cl.clc.rmgHeightMap.as_mut_ptr();
-        zdata.avail_out = MAX_HEIGHTMAP_SIZE as u32;
-        inflate(&mut zdata);
+        let total_out = inflate_sync_flush(
+            heightmap1.as_ptr(),
+            cl.clc.rmgHeightMapSize,
+            &mut cl.clc.rmgHeightMap,
+        );
 
-        cl.clc.rmgHeightMapSize = zdata.total_out as c_int;
-
-        inflateEnd(&mut zdata);
+        cl.clc.rmgHeightMapSize = total_out;
     } else {
         MSG_ReadData(
             cl,
@@ -462,21 +448,15 @@ pub fn CL_ParseRMG(cl: &mut Client, msg: *mut msg_t) {
 
     if MSG_ReadBits(cl, msg, 1) != 0 {
         // Read the flatten map
-        Com_Memset(
-            &mut zdata as *mut z_stream as *mut (),
-            0,
-            core::mem::size_of::<z_stream>(),
-        );
-        inflateInit(&mut zdata, Z_SYNC_FLUSH);
-
         MSG_ReadData(cl, msg, heightmap1.as_mut_ptr() as *mut (), size);
 
-        zdata.next_in = heightmap1.as_mut_ptr();
-        zdata.avail_in = cl.clc.rmgHeightMapSize as u32;
-        zdata.next_out = cl.clc.rmgFlattenMap.as_mut_ptr();
-        zdata.avail_out = MAX_HEIGHTMAP_SIZE as u32;
-        inflate(&mut zdata);
-        inflateEnd(&mut zdata);
+        // Raven passes `clc.rmgHeightMapSize`, not `size`, as `zdata.avail_in`
+        // here (`cl_parse.cpp:511`). We preserve that mismatch faithfully.
+        let _total_out = inflate_sync_flush(
+            heightmap1.as_ptr(),
+            cl.clc.rmgHeightMapSize,
+            &mut cl.clc.rmgFlattenMap,
+        );
     } else {
         MSG_ReadData(cl, msg, cl.clc.rmgFlattenMap.as_mut_ptr() as *mut (), size);
     }

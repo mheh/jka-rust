@@ -44,6 +44,9 @@ pub struct GameDispatchCtx {
     pub bot: *mut (),
     /// `Engine.render_models` (erased; becomes the view's `rm` slot).
     pub rm: *mut (),
+    /// `Engine.re` (erased; becomes the view's `re` slot; NULL on dedicated —
+    /// the game dispatcher's arms never read the renderer frontend).
+    pub re: *mut (),
     /// `Engine.rmg` (erased; becomes the view's `rmg` slot).
     pub rmg: *mut (),
     /// `Engine.g2` (erased; becomes the view's `g2` slot).

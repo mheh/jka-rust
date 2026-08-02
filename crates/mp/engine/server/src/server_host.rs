@@ -361,6 +361,7 @@ pub extern "C-unwind" fn game_system_calls_shim(
             cl: opaque_slots::Client::from_raw(c.cl),
             bot: opaque_slots::BotLib::from_raw(c.bot),
             rm: opaque_slots::RenderModels::from_raw(c.rm),
+            re: opaque_slots::Renderer::from_raw(c.re),
             rmg: opaque_slots::RmManager::from_raw(c.rmg),
             g2: opaque_slots::Ghoul2System::from_raw(c.g2),
         };

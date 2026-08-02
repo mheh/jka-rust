@@ -87,6 +87,7 @@ use mp_engine_qcommon::qcommon::shared_traps_t::sharedTraps_t;
 use mp_engine_qcommon::qcommon::vm_interpret_t::vmInterpret_t;
 use mp_engine_qcommon::stringed::api::SE_GetString;
 use mp_engine_qcommon::timing::timing_c::timing_c;
+use mp_engine_qcommon::vm::cgame_syscall_trampoline_words;
 use mp_engine_qcommon::vm_fns::{
     VM_ArgPtr, VM_Call, VM_Create, VM_Debug, VM_Free, VM_Shifted_Alloc, VM_Shifted_Free,
 };
@@ -118,7 +119,7 @@ use crate::cl_parse::{CL_GetValueForHidden, CL_SystemInfoChanged};
 use crate::cl_scrn::SCR_UpdateScreen;
 use crate::cl_ui::{Key_GetCatcher, Key_SetCatcher};
 use crate::client::cl_snapshot_t::clSnapshot_t;
-use crate::client_host::Client;
+use crate::client_host::{client_legacy_syscall, Client};
 use crate::fx_stubs::{
     FX_AddBezier, FX_AddElectricity, FX_AddLine, FX_AddParticle, FX_AddPoly,
     FX_AddScheduledEffects, FX_AdjustTime, FX_Draw2DEffects, FX_FeedTrail, FX_Free, FX_FreeSystem,
@@ -1193,16 +1194,21 @@ pub fn CL_SetCGameTime(common: &mut Common, cl: &mut Client) {
     }
 }
 
-/// The `extern "C"` trampoline `VM_Create` calls into. The VM only knows a
-/// bare `fn(*mut c_int) -> c_int`; the real state receivers get threaded
-/// through the one retained `Engine` instance at the call site (integration
-/// wires this the same way the other module hosts do).
+/// The `int (*)(int*)` C-ABI adapter handed to `VM_Create` as `systemCalls`
+/// (`vm.cpp:471-472`, stored `vm->systemCall`). On the SEAM-D11 native path the
+/// module reaches the engine through `cgame_syscall_trampoline` → the armed
+/// cgame slot, so `vm->systemCall` (the legacy `VM_DllSyscall` target,
+/// `vm.cpp:363-380`) is vestigial; this adapter widens the legacy contiguous
+/// int arg block to the trampoline's `isize` words and forwards to the same
+/// armed slot for parity if ever invoked. The real receivers come from the
+/// boot-armed `ClientDispatchCtx` note, which `cgame_system_calls_shim` reads
+/// (DEC-55.1) — the twin of the server's `sv_game_system_call`.
 ///
-/// Source: `oracle/codemp/client/cl_cgame.cpp:644` (call-site shape only)
+/// Source: `oracle/codemp/client/cl_cgame.cpp:644`
 extern "C" fn CL_CgameSystemCalls_trampoline(args: *mut c_int) -> c_int {
-    //TODO: Port CL_CgameSystemCalls_trampoline
-    // Source: oracle/codemp/client/cl_cgame.cpp:644-1733 (needs the retained Engine instance)
-    todo!("Port CL_CgameSystemCalls_trampoline — oracle/codemp/client/cl_cgame.cpp:644")
+    // SAFETY: the legacy `VM_DllSyscall` convention passes a contiguous 16-int
+    // arg block (`args[i] = va_arg(...)`, vm.cpp:366).
+    unsafe { client_legacy_syscall(args, cgame_syscall_trampoline_words) }
 }
 
 /// Raven `CL_CgameSystemCalls`.

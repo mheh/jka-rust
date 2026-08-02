@@ -13,7 +13,9 @@ use mp_abi::cgame::exports::MpCgameExport;
 use mp_bg::public::pmtype::pmtype_t;
 use mp_engine_icarus::q3_interface::S_COLOR_RED;
 use mp_engine_qcommon::cmd_common::{Cmd_Argc, Cmd_Argv};
+use mp_engine_qcommon::cmd_pc::Cmd_AddCommand;
 use mp_engine_qcommon::common::common::com_printf;
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::Common;
 use mp_engine_qcommon::common_fns::Com_Memcpy;
 use mp_engine_qcommon::cvar_fns::Cvar_Get;
@@ -31,7 +33,7 @@ use native_types::fileHandle_t;
 use crate::cl_keys::Field_Clear;
 use crate::cl_scrn::{SCR_DrawBigString, SCR_DrawPic, SCR_DrawSmallChar};
 use crate::client::console_t::NUM_CON_TIMES;
-use crate::client_host::Client;
+use crate::client_host::{cl_from_view, Client};
 use crate::keys::key_globals_s::COMMAND_HISTORY;
 
 /// Raven `#define KEYCATCH_CONSOLE 0x0001`.
@@ -155,6 +157,13 @@ pub fn Con_Dump_f(cl: &mut Client) {
     FS_FCloseFile(common, f);
 }
 
+/// The `CmdFunction` adapter `Con_Init` registers for `Con_Dump_f`.
+fn Con_Dump_f_cmd(view: &mut EngineHostView) {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let cl = unsafe { cl_from_view(view) };
+    Con_Dump_f(cl)
+}
+
 /// Raven `Con_ClearNotify` — zeroes the notify-line timestamps.
 ///
 /// Source: `oracle/codemp/client/cl_console.cpp:202-208`
@@ -270,6 +279,14 @@ pub fn Con_ToggleConsole_f(cl: &mut Client) {
     cl.cls.keyCatchers ^= KEYCATCH_CONSOLE;
 }
 
+/// The `CmdFunction` adapter `Con_Init` registers, which casts the view's `cl`
+/// slot back to the handler's real receiver (`sv_ccmds.rs` forwarder idiom).
+fn Con_ToggleConsole_f_cmd(view: &mut EngineHostView) {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let cl = unsafe { cl_from_view(view) };
+    Con_ToggleConsole_f(cl)
+}
+
 /// Raven `Con_MessageMode_f` — the `messagemode` (yell) command handler.
 ///
 /// Source: `oracle/codemp/client/cl_console.cpp:49-56`
@@ -282,6 +299,13 @@ pub fn Con_MessageMode_f(cl: &mut Client) {
     cl.cls.keyCatchers ^= KEYCATCH_MESSAGE;
 }
 
+/// The `CmdFunction` adapter `Con_Init` registers for `Con_MessageMode_f`.
+fn Con_MessageMode_f_cmd(view: &mut EngineHostView) {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let cl = unsafe { cl_from_view(view) };
+    Con_MessageMode_f(cl)
+}
+
 /// Raven `Con_MessageMode2_f` — the `messagemode2` (team chat) command handler.
 ///
 /// Source: `oracle/codemp/client/cl_console.cpp:63-69`
@@ -291,6 +315,13 @@ pub fn Con_MessageMode2_f(cl: &mut Client) {
     Field_Clear(&mut cl.chatField);
     cl.chatField.widthInChars = 25;
     cl.cls.keyCatchers ^= KEYCATCH_MESSAGE;
+}
+
+/// The `CmdFunction` adapter `Con_Init` registers for `Con_MessageMode2_f`.
+fn Con_MessageMode2_f_cmd(view: &mut EngineHostView) {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let cl = unsafe { cl_from_view(view) };
+    Con_MessageMode2_f(cl)
 }
 
 /// Raven `Con_MessageMode3_f` — the `messagemode3` (target chat) command handler.
@@ -318,6 +349,13 @@ pub fn Con_MessageMode3_f(cl: &mut Client) {
     cl.cls.keyCatchers ^= KEYCATCH_MESSAGE;
 }
 
+/// The `CmdFunction` adapter `Con_Init` registers for `Con_MessageMode3_f`.
+fn Con_MessageMode3_f_cmd(view: &mut EngineHostView) {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let cl = unsafe { cl_from_view(view) };
+    Con_MessageMode3_f(cl)
+}
+
 /// Raven `Con_MessageMode4_f` — the `messagemode4` (attacker chat) command handler.
 ///
 /// Source: `oracle/codemp/client/cl_console.cpp:100-117`
@@ -343,6 +381,13 @@ pub fn Con_MessageMode4_f(cl: &mut Client) {
     cl.cls.keyCatchers ^= KEYCATCH_MESSAGE;
 }
 
+/// The `CmdFunction` adapter `Con_Init` registers for `Con_MessageMode4_f`.
+fn Con_MessageMode4_f_cmd(view: &mut EngineHostView) {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let cl = unsafe { cl_from_view(view) };
+    Con_MessageMode4_f(cl)
+}
+
 /// Raven `Con_Clear_f` — the `clear` command handler.
 ///
 /// Source: `oracle/codemp/client/cl_console.cpp:124-132`
@@ -352,6 +397,13 @@ pub fn Con_Clear_f(cl: &mut Client) {
     }
 
     Con_Bottom(cl);
+}
+
+/// The `CmdFunction` adapter `Con_Init` registers for `Con_Clear_f`.
+fn Con_Clear_f_cmd(view: &mut EngineHostView) {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let cl = unsafe { cl_from_view(view) };
+    Con_Clear_f(cl)
 }
 
 /// Raven `Con_CheckResize` — resizes the scrollback buffer for the current
@@ -461,13 +513,13 @@ pub fn Con_Init(cl: &mut Client) {
     }
 
     // No console on Xbox is not modeled here (`_XBOX` never defined for this port).
-    Cmd_AddCommand(view, "toggleconsole", Some(Con_ToggleConsole_f));
-    Cmd_AddCommand(view, "messagemode", Some(Con_MessageMode_f));
-    Cmd_AddCommand(view, "messagemode2", Some(Con_MessageMode2_f));
-    Cmd_AddCommand(view, "messagemode3", Some(Con_MessageMode3_f));
-    Cmd_AddCommand(view, "messagemode4", Some(Con_MessageMode4_f));
-    Cmd_AddCommand(view, "clear", Some(Con_Clear_f));
-    Cmd_AddCommand(view, "condump", Some(Con_Dump_f));
+    Cmd_AddCommand(view, "toggleconsole", Some(Con_ToggleConsole_f_cmd));
+    Cmd_AddCommand(view, "messagemode", Some(Con_MessageMode_f_cmd));
+    Cmd_AddCommand(view, "messagemode2", Some(Con_MessageMode2_f_cmd));
+    Cmd_AddCommand(view, "messagemode3", Some(Con_MessageMode3_f_cmd));
+    Cmd_AddCommand(view, "messagemode4", Some(Con_MessageMode4_f_cmd));
+    Cmd_AddCommand(view, "clear", Some(Con_Clear_f_cmd));
+    Cmd_AddCommand(view, "condump", Some(Con_Dump_f_cmd));
 
     // Initialize values on first print
     cl.con.initialized = qboolean::qfalse;
