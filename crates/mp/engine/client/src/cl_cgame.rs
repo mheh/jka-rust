@@ -200,12 +200,14 @@ fn vma(common: *const Common, args: *mut isize, i: isize) -> *mut () {
     unsafe { VM_ArgPtrWord(&*common, *args.offset(i)) }
 }
 
-/// The `VMF(x)` macro: the float the syscall word at `x` points at.
+/// The `VMF(x)` macro: the float bits the syscall word at `x` carries.
+/// Raven indexes the arg block as floats (`((float *)args)[x]`), so the word
+/// holds the bits themselves - it is never a pointer to translate.
 ///
-/// Source: `oracle/codemp/qcommon/vm_local.h` (`VMF`)
-fn vmf(common: *const Common, args: *mut isize, i: isize) -> f32 {
-    // SAFETY: `VMA(i)` resolved a module-space float, same as Raven's cast.
-    unsafe { *(vma(common, args, i) as *const f32) }
+/// Source: `oracle/codemp/client/cl_cgame.cpp:625` (`VMF`)
+fn vmf(_common: *const Common, args: *mut isize, i: isize) -> f32 {
+    // SAFETY: `args` is the trampoline's 16-word frame (porting-rules §D11).
+    f32::from_bits(unsafe { *args.offset(i) } as u32)
 }
 
 /// Read a module-space origin, where a NULL pointer is Raven's "no origin".

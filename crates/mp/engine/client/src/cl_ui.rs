@@ -8,6 +8,7 @@ use core::ffi::{c_char, c_int};
 use mp_abi::ui::exports::MpUiExport;
 use mp_abi::ui::imports::MpUiImport;
 use mp_abi::ui::public::ui_client_state_t::uiClientState_t;
+use mp_abi::ui::public::UI_API_VERSION;
 use mp_engine_ghoul2::api_bolts::g2api_get_bolt_matrix;
 use mp_engine_ghoul2::api_bones::g2api_set_bone_angles;
 use mp_engine_ghoul2::api_models::{g2api_clean_ghoul2_models, g2api_init_ghoul2_model};
@@ -36,7 +37,7 @@ use mp_engine_qcommon::stringed::api::{se_get_language_name, se_get_num_language
 use mp_engine_qcommon::stringed::SE_GetString;
 use mp_engine_qcommon::timing::sys_milliseconds;
 use mp_engine_qcommon::vm::ui_syscall_trampoline_words;
-use mp_engine_qcommon::vm_fns::{VM_ArgPtr, VM_Call, VM_Create, VM_Free};
+use mp_engine_qcommon::vm_fns::{VM_ArgPtrWord, VM_Call, VM_Create, VM_Free};
 use mp_engine_qcommon::z_memman_pc::{Hunk_MemoryRemaining, Z_Free};
 use mp_qshared::common::mp::cgame::glconfig_t::glconfig_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
@@ -106,12 +107,6 @@ const SORT_CLIENTS: c_int = 2;
 const SORT_GAME: c_int = 3;
 const SORT_PING: c_int = 4;
 
-/// Raven `UI_API_VERSION`. No rosetta row exists yet.
-///
-/// PORT-NOTE(consts): transcribed from `ui_public.h`.
-/// Source: `oracle/codemp/ui/ui_public.h`
-const UI_API_VERSION: c_int = 4;
-
 /// Reads a NUL-terminated seam `c_char*` as a Latin-1 `String` (the #13
 /// string-campaign discipline) for `Q_strncpyz`'s `&str` source parameter.
 ///
@@ -153,27 +148,27 @@ fn g2_info<'a>(g2: &mut Ghoul2System, ghoul2: &CGhoul2Info_v, index: c_int) -> &
 /// two mode flags they set first.
 ///
 /// Source: `oracle/codemp/client/cl_ui.cpp:1252-1262`
-fn get_bolt_matrix_arm(view: &mut EngineHostView, g2: &mut Ghoul2System, args: *mut c_int) -> bool {
+fn get_bolt_matrix_arm(view: &mut EngineHostView, g2: &mut Ghoul2System, args: *mut isize) -> bool {
     // SAFETY: the handle, the model list, and the matrix out-param are all
     // module-space (porting-rules §D11).
     unsafe {
         let common: *const Common = view.common;
         let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
-        let bolt_matrix = &mut *(VM_ArgPtr(&*common, *args.offset(4)) as *mut mdxaBone_t);
+        let bolt_matrix = &mut *(VM_ArgPtrWord(&*common, *args.offset(4)) as *mut mdxaBone_t);
         g2api_get_bolt_matrix(
             g2,
             view,
             ghoul2,
-            *args.offset(2),
-            *args.offset(3),
-            *(VM_ArgPtr(&*common, *args.offset(5)) as *const vec3_t),
-            *(VM_ArgPtr(&*common, *args.offset(6)) as *const vec3_t),
-            *args.offset(7),
+            *args.offset(2) as c_int,
+            *args.offset(3) as c_int,
+            *(VM_ArgPtrWord(&*common, *args.offset(5)) as *const vec3_t),
+            *(VM_ArgPtrWord(&*common, *args.offset(6)) as *const vec3_t),
+            *args.offset(7) as c_int,
             core::slice::from_raw_parts(
-                VM_ArgPtr(&*common, *args.offset(8)) as *const qhandle_t,
+                VM_ArgPtrWord(&*common, *args.offset(8)) as *const qhandle_t,
                 0,
             ),
-            *(VM_ArgPtr(&*common, *args.offset(9)) as *const vec3_t),
+            *(VM_ArgPtrWord(&*common, *args.offset(9)) as *const vec3_t),
             bolt_matrix,
         )
     }
@@ -1004,25 +999,28 @@ pub fn CL_UISystemCalls(
     view: &mut EngineHostView,
     cl: &mut Client,
     g2: &mut Ghoul2System,
-    args: *mut c_int,
+    args: *mut isize,
 ) -> c_int {
     // SAFETY: `args` is the trampoline's raw syscall word array (seam
     // pointer, porting-rules §D11); every arm reads only the words its trap
-    // number defines, exactly as Raven's `int *args` does.
-    unsafe fn vma(common: &Common, args: *mut c_int, n: isize) -> *mut () {
-        VM_ArgPtr(common, *args.offset(n))
+    // number defines, exactly as Raven's `int *args` does. The word is full
+    // width, because a 64-bit module hands the engine a 64-bit pointer. A value
+    // argument narrows to `c_int` at its read site, which is Raven's own width.
+    unsafe fn vma(common: &Common, args: *mut isize, n: isize) -> *mut () {
+        VM_ArgPtrWord(common, *args.offset(n))
     }
-    unsafe fn vmf(args: *mut c_int, n: isize) -> f32 {
+    unsafe fn vmf(args: *mut isize, n: isize) -> f32 {
+        // A float travels in the low half of the word.
         f32::from_bits(*args.offset(n) as u32)
     }
 
-    let trap = unsafe { *args.offset(0) };
+    let trap = unsafe { *args.offset(0) as c_int };
 
     if trap == sharedTraps_t::TRAP_MEMSET as c_int {
         unsafe {
             Com_Memset(
                 vma(view.common, args, 1),
-                *args.offset(2),
+                *args.offset(2) as c_int,
                 *args.offset(3) as usize,
             )
         };
@@ -1110,7 +1108,7 @@ pub fn CL_UISystemCalls(
                 vma(view.common, args, 1) as *mut mp_qshared::shared::cvar::vmCvar_t,
                 &cstr_to_string(vma(view.common, args, 2) as *const c_char),
                 &cstr_to_string(vma(view.common, args, 3) as *const c_char),
-                *args.offset(4),
+                *args.offset(4) as c_int,
             );
         }
         0
@@ -1144,7 +1142,7 @@ pub fn CL_UISystemCalls(
                 view.common,
                 &cstr_to_string(vma(view.common, args, 1) as *const c_char),
                 vma(view.common, args, 2) as *mut c_char,
-                *args.offset(3),
+                *args.offset(3) as c_int,
             );
         }
         0
@@ -1171,7 +1169,7 @@ pub fn CL_UISystemCalls(
                 view,
                 &cstr_to_string(vma(view.common, args, 1) as *const c_char),
                 &cstr_to_string(vma(view.common, args, 2) as *const c_char),
-                *args.offset(3),
+                *args.offset(3) as c_int,
             );
         }
         0
@@ -1179,9 +1177,9 @@ pub fn CL_UISystemCalls(
         unsafe {
             Cvar_InfoStringBuffer(
                 view.common,
-                *args.offset(1),
+                *args.offset(1) as c_int,
                 vma(view.common, args, 2) as *mut c_char,
-                *args.offset(3),
+                *args.offset(3) as c_int,
             );
         }
         0
@@ -1191,9 +1189,9 @@ pub fn CL_UISystemCalls(
         unsafe {
             Cmd_ArgvBuffer(
                 view.common,
-                *args.offset(1),
+                *args.offset(1) as c_int,
                 vma(view.common, args, 2) as *mut c_char,
-                *args.offset(3),
+                *args.offset(3) as c_int,
             )
         };
         0
@@ -1201,7 +1199,7 @@ pub fn CL_UISystemCalls(
         unsafe {
             Cbuf_ExecuteText(
                 view,
-                *args.offset(1),
+                *args.offset(1) as c_int,
                 &cstr_to_string(vma(view.common, args, 2) as *const c_char),
             )
         };
@@ -1212,7 +1210,7 @@ pub fn CL_UISystemCalls(
                 view,
                 &cstr_to_string(vma(view.common, args, 1) as *const c_char),
                 vma(view.common, args, 2) as *mut native_types::fileHandle_t,
-                core::mem::transmute::<c_int, fsMode_t>(*args.offset(3)),
+                core::mem::transmute::<c_int, fsMode_t>(*args.offset(3) as c_int),
             )
         }
     } else if trap == MpUiImport::UI_FS_READ as c_int {
@@ -1220,8 +1218,8 @@ pub fn CL_UISystemCalls(
             FS_Read2(
                 view.common,
                 vma(view.common, args, 1),
-                *args.offset(2),
-                *args.offset(3),
+                *args.offset(2) as c_int,
+                *args.offset(3) as c_int,
             )
         };
         0
@@ -1230,13 +1228,13 @@ pub fn CL_UISystemCalls(
             FS_Write(
                 view.common,
                 vma(view.common, args, 1) as *const (),
-                *args.offset(2),
-                *args.offset(3),
+                *args.offset(2) as c_int,
+                *args.offset(3) as c_int,
             )
         };
         0
     } else if trap == MpUiImport::UI_FS_FCLOSEFILE as c_int {
-        unsafe { FS_FCloseFile(view.common, *args.offset(1)) };
+        unsafe { FS_FCloseFile(view.common, *args.offset(1) as c_int) };
         0
     } else if trap == MpUiImport::UI_FS_GETFILELIST as c_int {
         unsafe {
@@ -1245,7 +1243,7 @@ pub fn CL_UISystemCalls(
                 &cstr_to_string(vma(view.common, args, 1) as *const c_char),
                 &cstr_to_string(vma(view.common, args, 2) as *const c_char),
                 vma(view.common, args, 3) as *mut c_char,
-                *args.offset(4),
+                *args.offset(4) as c_int,
             )
         }
     } else if trap == MpUiImport::UI_R_REGISTERMODEL as c_int {
@@ -1315,7 +1313,7 @@ pub fn CL_UISystemCalls(
         unsafe {
             let game_mem = vma(view.common, args, 1) as *mut c_char;
             let re = re_from_view(view);
-            let ret_mem = RE_ShaderNameFromIndex(&re.assets, *args.offset(2));
+            let ret_mem = RE_ShaderNameFromIndex(&re.assets, *args.offset(2) as c_int);
             if !ret_mem.is_empty() {
                 let s = string_to_latin1(ret_mem);
                 core::ptr::copy_nonoverlapping(s.as_ptr(), game_mem as *mut u8, s.len());
@@ -1338,7 +1336,7 @@ pub fn CL_UISystemCalls(
         0
     } else if trap == MpUiImport::UI_R_ADDPOLYTOSCENE as c_int {
         unsafe {
-            let hshader = *args.offset(1);
+            let hshader = *args.offset(1) as c_int;
             let num_verts = *args.offset(2) as usize;
             let verts =
                 core::slice::from_raw_parts(vma(view.common, args, 3) as *const _, num_verts);
@@ -1409,7 +1407,7 @@ pub fn CL_UISystemCalls(
                 vmf(args, 7),
                 vmf(args, 8),
             );
-            let h_shader = *args.offset(9);
+            let h_shader = *args.offset(9) as c_int;
             let re = re_from_view(view);
             RE_StretchPic(
                 &mut re.frame_data,
@@ -1429,7 +1427,7 @@ pub fn CL_UISystemCalls(
         0
     } else if trap == MpUiImport::UI_R_MODELBOUNDS as c_int {
         unsafe {
-            let handle = *args.offset(1);
+            let handle = *args.offset(1) as c_int;
             let mins_ptr = vma(view.common, args, 2) as *mut f32;
             let maxs_ptr = vma(view.common, args, 3) as *mut f32;
             let rm = rm_from_view(view);
@@ -1445,9 +1443,9 @@ pub fn CL_UISystemCalls(
     } else if trap == MpUiImport::UI_CM_LERPTAG as c_int {
         unsafe {
             let tag_ptr = vma(view.common, args, 1) as *mut _;
-            let handle = *args.offset(2);
-            let start_frame = *args.offset(3);
-            let end_frame = *args.offset(4);
+            let handle = *args.offset(2) as c_int;
+            let start_frame = *args.offset(3) as c_int;
+            let end_frame = *args.offset(4) as c_int;
             let frac = vmf(args, 5);
             let tag_name = cstr_to_string(vma(view.common, args, 6) as *const c_char);
             let rm = rm_from_view(view);
@@ -1470,16 +1468,23 @@ pub fn CL_UISystemCalls(
     } else if trap == MpUiImport::UI_S_STARTLOCALSOUND as c_int {
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let snd = unsafe { snd_from_view(view) };
-        unsafe { S_StartLocalSound(view, snd, *args.offset(1), *args.offset(2)) };
+        unsafe {
+            S_StartLocalSound(
+                view,
+                snd,
+                *args.offset(1) as c_int,
+                *args.offset(2) as c_int,
+            )
+        };
         0
     } else if trap == MpUiImport::UI_KEY_KEYNUMTOSTRINGBUF as c_int {
         unsafe {
             Key_KeynumToStringBuf(
                 view,
                 cl,
-                *args.offset(1),
+                *args.offset(1) as c_int,
                 vma(view.common, args, 2) as *mut c_char,
-                *args.offset(3),
+                *args.offset(3) as c_int,
             )
         };
         0
@@ -1487,9 +1492,9 @@ pub fn CL_UISystemCalls(
         unsafe {
             Key_GetBindingBuf(
                 cl,
-                *args.offset(1),
+                *args.offset(1) as c_int,
                 vma(view.common, args, 2) as *mut c_char,
-                *args.offset(3),
+                *args.offset(3) as c_int,
             )
         };
         0
@@ -1498,17 +1503,17 @@ pub fn CL_UISystemCalls(
             Key_SetBinding(
                 view,
                 cl,
-                *args.offset(1),
+                *args.offset(1) as c_int,
                 vma(view.common, args, 2) as *const c_char,
             )
         };
         0
     } else if trap == MpUiImport::UI_KEY_ISDOWN as c_int {
-        unsafe { crate::cl_keys::Key_IsDown(cl, *args.offset(1)) }
+        unsafe { crate::cl_keys::Key_IsDown(cl, *args.offset(1) as c_int) }
     } else if trap == MpUiImport::UI_KEY_GETOVERSTRIKEMODE as c_int {
         crate::cl_keys::Key_GetOverstrikeMode(cl)
     } else if trap == MpUiImport::UI_KEY_SETOVERSTRIKEMODE as c_int {
-        unsafe { crate::cl_keys::Key_SetOverstrikeMode(cl, *args.offset(1)) };
+        unsafe { crate::cl_keys::Key_SetOverstrikeMode(cl, *args.offset(1) as c_int) };
         0
     } else if trap == MpUiImport::UI_KEY_CLEARSTATES as c_int {
         crate::cl_keys::Key_ClearStates(view, cl);
@@ -1516,14 +1521,14 @@ pub fn CL_UISystemCalls(
     } else if trap == MpUiImport::UI_KEY_GETCATCHER as c_int {
         Key_GetCatcher(cl)
     } else if trap == MpUiImport::UI_KEY_SETCATCHER as c_int {
-        unsafe { Key_SetCatcher(cl, *args.offset(1)) };
+        unsafe { Key_SetCatcher(cl, *args.offset(1) as c_int) };
         0
     } else if trap == MpUiImport::UI_GETCLIPBOARDDATA as c_int {
         unsafe {
             GetClipboardData(
                 view.common,
                 vma(view.common, args, 1) as *mut c_char,
-                *args.offset(2),
+                *args.offset(2) as c_int,
             )
         };
         0
@@ -1539,9 +1544,9 @@ pub fn CL_UISystemCalls(
         unsafe {
             GetConfigString(
                 cl,
-                *args.offset(1),
+                *args.offset(1) as c_int,
                 vma(view.common, args, 2) as *mut c_char,
-                *args.offset(3),
+                *args.offset(3) as c_int,
             )
         }
     } else if trap == MpUiImport::UI_LAN_LOADCACHEDSERVERS as c_int {
@@ -1555,7 +1560,7 @@ pub fn CL_UISystemCalls(
             LAN_AddServer(
                 view.common,
                 cl,
-                *args.offset(1),
+                *args.offset(1) as c_int,
                 vma(view.common, args, 2) as *const c_char,
                 vma(view.common, args, 3) as *const c_char,
             )
@@ -1565,7 +1570,7 @@ pub fn CL_UISystemCalls(
             LAN_RemoveServer(
                 view.common,
                 cl,
-                *args.offset(1),
+                *args.offset(1) as c_int,
                 vma(view.common, args, 2) as *const c_char,
             )
         };
@@ -1573,16 +1578,16 @@ pub fn CL_UISystemCalls(
     } else if trap == MpUiImport::UI_LAN_GETPINGQUEUECOUNT as c_int {
         LAN_GetPingQueueCount(cl)
     } else if trap == MpUiImport::UI_LAN_CLEARPING as c_int {
-        unsafe { LAN_ClearPing(cl, *args.offset(1)) };
+        unsafe { LAN_ClearPing(cl, *args.offset(1) as c_int) };
         0
     } else if trap == MpUiImport::UI_LAN_GETPING as c_int {
         unsafe {
             LAN_GetPing(
                 view.common,
                 cl,
-                *args.offset(1),
+                *args.offset(1) as c_int,
                 vma(view.common, args, 2) as *mut c_char,
-                *args.offset(3),
+                *args.offset(3) as c_int,
                 vma(view.common, args, 4) as *mut c_int,
             )
         };
@@ -1591,23 +1596,23 @@ pub fn CL_UISystemCalls(
         unsafe {
             LAN_GetPingInfo(
                 cl,
-                *args.offset(1),
+                *args.offset(1) as c_int,
                 vma(view.common, args, 2) as *mut c_char,
-                *args.offset(3),
+                *args.offset(3) as c_int,
             )
         };
         0
     } else if trap == MpUiImport::UI_LAN_GETSERVERCOUNT as c_int {
-        unsafe { LAN_GetServerCount(cl, *args.offset(1)) }
+        unsafe { LAN_GetServerCount(cl, *args.offset(1) as c_int) }
     } else if trap == MpUiImport::UI_LAN_GETSERVERADDRESSSTRING as c_int {
         unsafe {
             LAN_GetServerAddressString(
                 view.common,
                 cl,
-                *args.offset(1),
-                *args.offset(2),
+                *args.offset(1) as c_int,
+                *args.offset(2) as c_int,
                 vma(view.common, args, 3) as *mut c_char,
-                *args.offset(4),
+                *args.offset(4) as c_int,
             )
         };
         0
@@ -1616,24 +1621,31 @@ pub fn CL_UISystemCalls(
             LAN_GetServerInfo(
                 view.common,
                 cl,
-                *args.offset(1),
-                *args.offset(2),
+                *args.offset(1) as c_int,
+                *args.offset(2) as c_int,
                 vma(view.common, args, 3) as *mut c_char,
-                *args.offset(4),
+                *args.offset(4) as c_int,
             )
         };
         0
     } else if trap == MpUiImport::UI_LAN_GETSERVERPING as c_int {
-        unsafe { LAN_GetServerPing(cl, *args.offset(1), *args.offset(2)) }
+        unsafe { LAN_GetServerPing(cl, *args.offset(1) as c_int, *args.offset(2) as c_int) }
     } else if trap == MpUiImport::UI_LAN_MARKSERVERVISIBLE as c_int {
-        unsafe { LAN_MarkServerVisible(cl, *args.offset(1), *args.offset(2), *args.offset(3)) };
+        unsafe {
+            LAN_MarkServerVisible(
+                cl,
+                *args.offset(1) as c_int,
+                *args.offset(2) as c_int,
+                *args.offset(3) as c_int,
+            )
+        };
         0
     } else if trap == MpUiImport::UI_LAN_SERVERISVISIBLE as c_int {
-        unsafe { LAN_ServerIsVisible(cl, *args.offset(1), *args.offset(2)) }
+        unsafe { LAN_ServerIsVisible(cl, *args.offset(1) as c_int, *args.offset(2) as c_int) }
     } else if trap == MpUiImport::UI_LAN_UPDATEVISIBLEPINGS as c_int {
-        unsafe { LAN_UpdateVisiblePings(view.common, cl, *args.offset(1)) }
+        unsafe { LAN_UpdateVisiblePings(view.common, cl, *args.offset(1) as c_int) }
     } else if trap == MpUiImport::UI_LAN_RESETPINGS as c_int {
-        unsafe { LAN_ResetPings(cl, *args.offset(1)) };
+        unsafe { LAN_ResetPings(cl, *args.offset(1) as c_int) };
         0
     } else if trap == MpUiImport::UI_LAN_SERVERSTATUS as c_int {
         unsafe {
@@ -1642,18 +1654,18 @@ pub fn CL_UISystemCalls(
                 cl,
                 vma(view.common, args, 1) as *mut c_char,
                 vma(view.common, args, 2) as *mut c_char,
-                *args.offset(3),
+                *args.offset(3) as c_int,
             )
         }
     } else if trap == MpUiImport::UI_LAN_COMPARESERVERS as c_int {
         unsafe {
             LAN_CompareServers(
                 cl,
-                *args.offset(1),
-                *args.offset(2),
-                *args.offset(3),
-                *args.offset(4),
-                *args.offset(5),
+                *args.offset(1) as c_int,
+                *args.offset(2) as c_int,
+                *args.offset(3) as c_int,
+                *args.offset(4) as c_int,
+                *args.offset(5) as c_int,
             )
         }
     } else if trap == MpUiImport::UI_MEMORY_REMAINING as c_int {
@@ -1685,7 +1697,7 @@ pub fn CL_UISystemCalls(
         )
     } else if trap == MpUiImport::UI_R_FONT_STRLENPIXELS as c_int {
         let text = cstr_bytes(unsafe { vma(view.common, args, 1) } as *const c_char);
-        let (handle, scale) = unsafe { (*args.offset(2), vmf(args, 3)) };
+        let (handle, scale) = unsafe { (*args.offset(2) as c_int, vmf(args, 3)) };
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let re = unsafe { re_from_view(view) };
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
@@ -1718,7 +1730,7 @@ pub fn CL_UISystemCalls(
         let language = GetLanguageEnum(view.common, &mut re.font);
         RE_Font_StrLenChars(&re.font, language, text)
     } else if trap == MpUiImport::UI_R_FONT_STRHEIGHTPIXELS as c_int {
-        let (handle, scale) = unsafe { (*args.offset(1), vmf(args, 2)) };
+        let (handle, scale) = unsafe { (*args.offset(1) as c_int, vmf(args, 2)) };
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let re = unsafe { re_from_view(view) };
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
@@ -1748,10 +1760,10 @@ pub fn CL_UISystemCalls(
         let rgba = rgba_arg(unsafe { vma(view.common, args, 4) } as *const f32);
         let (ox, oy, handle, max_pixel_width, scale) = unsafe {
             (
-                *args.offset(1),
-                *args.offset(2),
-                *args.offset(5),
-                *args.offset(6),
+                *args.offset(1) as c_int,
+                *args.offset(2) as c_int,
+                *args.offset(5) as c_int,
+                *args.offset(6) as c_int,
                 vmf(args, 7),
             )
         };
@@ -1840,7 +1852,7 @@ pub fn CL_UISystemCalls(
         // SAFETY: view-constructor slots, single-threaded, no other live cast.
         let (sv, bot) = unsafe { (sv_from_view(view), bot_from_view(view)) };
         // SAFETY: `args` is the trampoline's 16-word frame (porting-rules §D11).
-        unsafe { ((*sv.botlib_export).PC_FreeSourceHandle.unwrap())(bot, *args.offset(1)) }
+        unsafe { ((*sv.botlib_export).PC_FreeSourceHandle.unwrap())(bot, *args.offset(1) as c_int) }
     } else if trap == MpUiImport::UI_PC_READ_TOKEN as c_int {
         // SAFETY: view-constructor slots, single-threaded, no other live cast.
         let (sv, bot) = unsafe { (sv_from_view(view), bot_from_view(view)) };
@@ -1848,7 +1860,7 @@ pub fn CL_UISystemCalls(
         unsafe {
             ((*sv.botlib_export).PC_ReadTokenHandle.unwrap())(
                 bot,
-                *args.offset(1),
+                *args.offset(1) as c_int,
                 vma(view.common, args, 2) as *mut _,
             )
         }
@@ -1859,7 +1871,7 @@ pub fn CL_UISystemCalls(
         unsafe {
             ((*sv.botlib_export).PC_SourceFileAndLine.unwrap())(
                 bot,
-                *args.offset(1),
+                *args.offset(1) as c_int,
                 vma(view.common, args, 2) as *mut c_char,
                 vma(view.common, args, 3) as *mut c_int,
             )
@@ -1905,29 +1917,29 @@ pub fn CL_UISystemCalls(
                 view,
                 cl,
                 vma(view.common, args, 1) as *const c_char,
-                *args.offset(2),
-                *args.offset(3),
-                *args.offset(4),
-                *args.offset(5),
-                *args.offset(6),
+                *args.offset(2) as c_int,
+                *args.offset(3) as c_int,
+                *args.offset(4) as c_int,
+                *args.offset(5) as c_int,
+                *args.offset(6) as c_int,
             )
         }
     } else if trap == MpUiImport::UI_CIN_STOPCINEMATIC as c_int {
-        unsafe { crate::cl_cin::CIN_StopCinematic(view, cl, *args.offset(1)) }
+        unsafe { crate::cl_cin::CIN_StopCinematic(view, cl, *args.offset(1) as c_int) }
     } else if trap == MpUiImport::UI_CIN_RUNCINEMATIC as c_int {
-        unsafe { crate::cl_cin::CIN_RunCinematic(view, cl, *args.offset(1)) }
+        unsafe { crate::cl_cin::CIN_RunCinematic(view, cl, *args.offset(1) as c_int) }
     } else if trap == MpUiImport::UI_CIN_DRAWCINEMATIC as c_int {
-        unsafe { crate::cl_cin::CIN_DrawCinematic(view, cl, *args.offset(1)) };
+        unsafe { crate::cl_cin::CIN_DrawCinematic(view, cl, *args.offset(1) as c_int) };
         0
     } else if trap == MpUiImport::UI_CIN_SETEXTENTS as c_int {
         unsafe {
             crate::cl_cin::CIN_SetExtents(
                 cl,
-                *args.offset(1),
-                *args.offset(2),
-                *args.offset(3),
-                *args.offset(4),
-                *args.offset(5),
+                *args.offset(1) as c_int,
+                *args.offset(2) as c_int,
+                *args.offset(3) as c_int,
+                *args.offset(4) as c_int,
+                *args.offset(5) as c_int,
             )
         };
         0
@@ -1965,7 +1977,7 @@ pub fn CL_UISystemCalls(
         unsafe {
             let hold_name = vma(view.common, args, 2) as *mut c_char;
             let language_name =
-                se_get_language_name(&view.common.stringed, *args.offset(1)).to_string();
+                se_get_language_name(&view.common.stringed, *args.offset(1) as c_int).to_string();
             Q_strncpyz(
                 core::slice::from_raw_parts_mut(hold_name, 128),
                 &language_name,
@@ -2003,7 +2015,7 @@ pub fn CL_UISystemCalls(
                 g2,
                 view,
                 &mut *(*args.offset(1) as *mut mp_engine_ghoul2::shared::cghoul2_info::CGhoul2Info),
-                *args.offset(2),
+                *args.offset(2) as c_int,
             )
         };
         0
@@ -2040,11 +2052,11 @@ pub fn CL_UISystemCalls(
         // SAFETY: `args` is the trampoline's 16-word frame (§D11).
         let (model_index, custom_skin, custom_shader, model_flags, lod_bias) = unsafe {
             (
-                *args.offset(3),
-                *args.offset(4),
-                *args.offset(5),
-                *args.offset(6),
-                *args.offset(7),
+                *args.offset(3) as c_int,
+                *args.offset(4) as c_int,
+                *args.offset(5) as c_int,
+                *args.offset(6) as c_int,
+                *args.offset(7) as c_int,
             )
         };
         g2api_init_ghoul2_model(
@@ -2075,16 +2087,16 @@ pub fn CL_UISystemCalls(
                 g2,
                 view,
                 &mut *(*args.offset(1) as *mut CGhoul2Info_v),
-                *args.offset(2),
+                *args.offset(2) as c_int,
                 &bone_name,
                 angles,
-                *args.offset(5),
-                core::mem::transmute::<c_int, Eorientations>(*args.offset(6)),
-                core::mem::transmute::<c_int, Eorientations>(*args.offset(7)),
-                core::mem::transmute::<c_int, Eorientations>(*args.offset(8)),
+                *args.offset(5) as c_int,
+                core::mem::transmute::<c_int, Eorientations>(*args.offset(6) as c_int),
+                core::mem::transmute::<c_int, Eorientations>(*args.offset(7) as c_int),
+                core::mem::transmute::<c_int, Eorientations>(*args.offset(8) as c_int),
                 model_list,
-                *args.offset(10),
-                *args.offset(11),
+                *args.offset(10) as c_int,
+                *args.offset(11) as c_int,
             ) as c_int
         }
     } else if trap == MpUiImport::UI_G2_CLEANMODELS as c_int {
@@ -2101,20 +2113,20 @@ pub fn CL_UISystemCalls(
             mp_engine_ghoul2::api_bones::g2api_set_bone_anim(
                 g2,
                 &mut *(*args.offset(1) as *mut CGhoul2Info_v),
-                *args.offset(2),
+                *args.offset(2) as c_int,
                 &cstr_to_string(vma(view.common, args, 3) as *const c_char),
-                *args.offset(4),
-                *args.offset(5),
-                *args.offset(6),
+                *args.offset(4) as c_int,
+                *args.offset(5) as c_int,
+                *args.offset(6) as c_int,
                 vmf(args, 7),
-                *args.offset(8),
+                *args.offset(8) as c_int,
                 vmf(args, 9),
-                *args.offset(10),
+                *args.offset(10) as c_int,
             ) as c_int
         }
     } else if trap == MpUiImport::UI_G2_GETBONEANIM as c_int {
         unsafe {
-            let model_index = *args.offset(10);
+            let model_index = *args.offset(10) as c_int;
             let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
             let ghl_info = g2_info(g2, ghoul2, model_index);
             let bone_name = cstr_to_string(vma(view.common, args, 2) as *const c_char);
@@ -2124,7 +2136,7 @@ pub fn CL_UISystemCalls(
                 view,
                 ghl_info,
                 &bone_name,
-                *args.offset(3),
+                *args.offset(3) as c_int,
                 model_list,
             ) {
                 Some((current_frame, start_frame, end_frame, flags, anim_speed)) => {
@@ -2140,7 +2152,7 @@ pub fn CL_UISystemCalls(
         }
     } else if trap == MpUiImport::UI_G2_GETBONEFRAME as c_int {
         unsafe {
-            let model_index = *args.offset(6);
+            let model_index = *args.offset(6) as c_int;
             let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
             let ghl_info = g2_info(g2, ghoul2, model_index);
             let bone_name = cstr_to_string(vma(view.common, args, 2) as *const c_char);
@@ -2150,7 +2162,7 @@ pub fn CL_UISystemCalls(
                 view,
                 ghl_info,
                 &bone_name,
-                *args.offset(3),
+                *args.offset(3) as c_int,
                 model_list,
             ) {
                 Some((current_frame, ..)) => {
@@ -2167,7 +2179,7 @@ pub fn CL_UISystemCalls(
                 g2,
                 view,
                 &*(*args.offset(1) as *const CGhoul2Info_v),
-                *args.offset(2),
+                *args.offset(2) as c_int,
             ) {
                 let s = string_to_latin1(&local);
                 core::ptr::copy_nonoverlapping(s.as_ptr(), point as *mut u8, s.len());
@@ -2181,7 +2193,7 @@ pub fn CL_UISystemCalls(
                 g2,
                 &mut *(*args.offset(1) as *mut CGhoul2Info_v),
                 &mut *(*args.offset(2) as *mut CGhoul2Info_v),
-                *args.offset(3),
+                *args.offset(3) as c_int,
             )
         }
     } else if trap == MpUiImport::UI_G2_COPYSPECIFICGHOUL2MODEL as c_int {
@@ -2189,9 +2201,9 @@ pub fn CL_UISystemCalls(
             mp_engine_ghoul2::api_models::g2api_copy_specific_g2_model(
                 g2,
                 &mut *(*args.offset(1) as *mut CGhoul2Info_v),
-                *args.offset(2),
+                *args.offset(2) as c_int,
                 &mut *(*args.offset(3) as *mut CGhoul2Info_v),
-                *args.offset(4),
+                *args.offset(4) as c_int,
             )
         };
         0
@@ -2209,7 +2221,7 @@ pub fn CL_UISystemCalls(
             mp_engine_ghoul2::api_models::g2api_has_ghoul2_model_on_index(
                 g2,
                 &**(vma(view.common, args, 1) as *mut *mut CGhoul2Info_v),
-                *args.offset(2),
+                *args.offset(2) as c_int,
             ) as c_int
         }
     } else if trap == MpUiImport::UI_G2_REMOVEGHOUL2MODEL as c_int {
@@ -2217,7 +2229,7 @@ pub fn CL_UISystemCalls(
             mp_engine_ghoul2::api_models::g2api_remove_ghoul2_model(
                 g2,
                 &mut **(vma(view.common, args, 1) as *mut *mut CGhoul2Info_v),
-                *args.offset(2),
+                *args.offset(2) as c_int,
             ) as c_int
         }
     } else if trap == MpUiImport::UI_G2_ADDBOLT as c_int {
@@ -2227,7 +2239,7 @@ pub fn CL_UISystemCalls(
                 g2,
                 view,
                 &mut *(*args.offset(1) as *mut CGhoul2Info_v),
-                *args.offset(2),
+                *args.offset(2) as c_int,
                 &bone_name,
             )
         }
@@ -2236,8 +2248,8 @@ pub fn CL_UISystemCalls(
             mp_engine_ghoul2::api_bolts::g2api_set_bolt_info(
                 g2,
                 &mut *(*args.offset(1) as *mut CGhoul2Info_v),
-                *args.offset(2),
-                *args.offset(3),
+                *args.offset(2) as c_int,
+                *args.offset(3) as c_int,
             )
         };
         0
@@ -2248,7 +2260,7 @@ pub fn CL_UISystemCalls(
                 g2,
                 view,
                 &mut *(*args.offset(1) as *mut CGhoul2Info_v),
-                *args.offset(2),
+                *args.offset(2) as c_int,
                 &surface_name,
             ) as c_int
         }
@@ -2260,7 +2272,7 @@ pub fn CL_UISystemCalls(
                 view,
                 &mut *(*args.offset(1) as *mut CGhoul2Info_v),
                 &surface_name,
-                *args.offset(3),
+                *args.offset(3) as c_int,
             ) as c_int
         }
     } else if trap == MpUiImport::UI_G2_SETNEWORIGIN as c_int {
@@ -2269,14 +2281,18 @@ pub fn CL_UISystemCalls(
                 g2,
                 view,
                 &mut *(*args.offset(1) as *mut CGhoul2Info_v),
-                *args.offset(2),
+                *args.offset(2) as c_int,
             ) as c_int
         }
     } else if trap == MpUiImport::UI_G2_GETTIME as c_int {
         mp_engine_ghoul2::api_collision::g2api_get_time(g2, 0)
     } else if trap == MpUiImport::UI_G2_SETTIME as c_int {
         unsafe {
-            mp_engine_ghoul2::api_collision::g2api_set_time(g2, *args.offset(1), *args.offset(2))
+            mp_engine_ghoul2::api_collision::g2api_set_time(
+                g2,
+                *args.offset(1) as c_int,
+                *args.offset(2) as c_int,
+            )
         };
         0
     } else if trap == MpUiImport::UI_G2_SETRAGDOLL as c_int
@@ -2292,9 +2308,9 @@ pub fn CL_UISystemCalls(
                 g2,
                 view,
                 &mut *(*args.offset(1) as *mut CGhoul2Info_v),
-                *args.offset(2),
+                *args.offset(2) as c_int,
                 Some(&bone_name),
-                *args.offset(4),
+                *args.offset(4) as c_int,
                 params,
             ) as c_int
         }
@@ -2305,21 +2321,21 @@ pub fn CL_UISystemCalls(
                 g2,
                 view,
                 &mut *(*args.offset(1) as *mut CGhoul2Info_v),
-                *args.offset(2),
+                *args.offset(2) as c_int,
                 &mut *params,
             ) as c_int
         }
     } else if trap == MpUiImport::UI_G2_GETSURFACENAME as c_int {
         unsafe {
             let point = vma(view.common, args, 4) as *mut c_char;
-            let model_index = *args.offset(3);
+            let model_index = *args.offset(3) as c_int;
             let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
             let ghl_info = g2_info(g2, ghoul2, model_index);
             let local = mp_engine_ghoul2::api_surfaces::g2api_get_surface_name(
                 g2,
                 view,
                 ghl_info,
-                *args.offset(2),
+                *args.offset(2) as c_int,
             );
             if !local.is_empty() {
                 let s = string_to_latin1(&local);
@@ -2331,14 +2347,14 @@ pub fn CL_UISystemCalls(
     } else if trap == MpUiImport::UI_G2_SETSKIN as c_int {
         unsafe {
             let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
-            let model_index = *args.offset(2);
+            let model_index = *args.offset(2) as c_int;
             let ghl_info = g2_info(g2, ghoul2, model_index);
             mp_engine_ghoul2::api_models::g2api_set_skin(
                 g2,
                 view,
                 ghl_info,
-                *args.offset(3),
-                *args.offset(4),
+                *args.offset(3) as c_int,
+                *args.offset(4) as c_int,
             ) as c_int
         }
     } else if trap == MpUiImport::UI_G2_ATTACHG2MODEL as c_int {
@@ -2349,10 +2365,10 @@ pub fn CL_UISystemCalls(
                 g2,
                 view,
                 g2_from,
-                *args.offset(2),
+                *args.offset(2) as c_int,
                 g2_to,
-                *args.offset(4),
-                *args.offset(5),
+                *args.offset(4) as c_int,
+                *args.offset(5) as c_int,
             ) as c_int
         }
     } else {

@@ -662,25 +662,6 @@ unsafe fn client_dispatch_frame(args: *const isize) -> [isize; 16] {
     frame
 }
 
-/// The narrowed `int args[16]` frame the ui dispatcher still declares.
-///
-/// `CL_UISystemCalls` reads every word as a `c_int` value, so it keeps the
-/// ILP32 shape until it takes the same widening the cgame dispatcher just did.
-/// A ui trap that carries a host pointer truncates here, which is the open half
-/// of the width finding recorded on ticket gh#30.
-///
-/// Source: `oracle/codemp/qcommon/vm.cpp:366` (`int args[16]`).
-///
-/// # Safety
-/// `args` must point at a shim's 16-word frame.
-unsafe fn client_dispatch_frame_narrow(args: *const isize) -> [c_int; 16] {
-    let mut frame = [0 as c_int; 16];
-    for (i, w) in frame.iter_mut().enumerate() {
-        *w = *args.add(i) as c_int;
-    }
-    frame
-}
-
 /// Rebuild the live world view from the dispatch note, the shape both client
 /// dispatchers declare. This is the shim-side twin of
 /// `mp_engine_core::engine_host_view`, which cannot run here because the note
@@ -766,7 +747,7 @@ pub extern "C-unwind" fn ui_system_calls_shim(
     unsafe {
         let (c, cl) = client_dispatch_note(ctx, "ui");
         let mut view = client_dispatch_view(c);
-        let mut frame = client_dispatch_frame_narrow(args);
+        let mut frame = client_dispatch_frame(args);
         CL_UISystemCalls(&mut view, cl, &mut *c.g2, frame.as_mut_ptr()) as isize
     }
 }
