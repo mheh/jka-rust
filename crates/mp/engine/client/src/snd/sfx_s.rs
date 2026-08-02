@@ -14,8 +14,9 @@ use crate::snd::sound_compression_method_t::SoundCompressionMethod_t;
 /// (DEC-57.4).
 /// Type definition source: `oracle/codemp/client/snd_local.h:48-65`
 pub struct sfx_t {
-    /// The resampled 16-bit samples. Empty reads as Raven's NULL `pSoundData`.
-    pub pSoundData: Vec<i16>,
+    /// The resampled 16-bit samples. `None` is Raven's NULL `pSoundData`, which
+    /// it tells apart from a zero-length block that `Z_Malloc(0)` still returns.
+    pub pSoundData: Option<Vec<i16>>,
     /// couldn't be loaded, so use buzz
     pub bDefaultSound: bool,
     /// not in Memory, set qtrue when loaded, and qfalse when its buffers are freed up because of
@@ -42,7 +43,7 @@ impl Default for sfx_t {
     /// Source: `oracle/codemp/client/snd_dma.cpp:851`
     fn default() -> sfx_t {
         sfx_t {
-            pSoundData: Vec::new(),
+            pSoundData: None,
             bDefaultSound: false,
             bInMemory: false,
             eSoundCompressionMethod: SoundCompressionMethod_t::ct_16,

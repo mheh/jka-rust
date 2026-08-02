@@ -37,6 +37,7 @@ use native_platform::sys_main::Sys_LowPhysicalMemory;
 use native_string::q_string::Q_stricmp;
 
 use crate::client_host::snd_from_view;
+use crate::mp3::mp3_stream::MP3STREAM;
 use crate::snd::channel_t::{channel_t, START_SAMPLE_IMMEDIATE};
 use crate::snd::loop_sound_t::MAX_LOOP_SOUNDS;
 use crate::snd::music_state_e::MusicState_e;
@@ -69,11 +70,17 @@ const VOICE_ATTENUATE: f32 = 0.004;
 const SOUND_FMAXVOL: f32 = 0.75;
 const SOUND_MAXVOL: c_int = 255;
 
-/// Raven `SND_ORACLE` device model — the retail DirectSound secondary buffer is
-/// 65536 bytes at every `s_khz` rate.
+/// The retail DirectSound secondary buffer is 65536 bytes at every `s_khz` rate.
 ///
 /// Source: `oracle/codemp/win32/win_snd.cpp:12,246`
 const DMA_BUFFER_BYTES: usize = 0x10000;
+
+/// Raven `FUZZY_AMOUNT` — the slack the `s_mp3overhead` default adds on top of
+/// one `MP3STREAM`.
+///
+/// Raven: so it has to be significantly over, not just break even.
+/// Source: `oracle/codemp/client/snd_mp3.cpp:222`
+const FUZZY_AMOUNT: usize = 5 * 1024;
 
 // ===========================================================================
 // The device end (DEC-57.1)
@@ -136,6 +143,8 @@ fn Channel_Clear(snd: &mut SoundSystem, channel: usize) {
 
 /// Raven `S_HashSFXName` — the sound-name hash, extension excluded.
 ///
+/// Raven holds each letter in a signed `char`, so a byte of 0x80 or above adds a
+/// negative term. The cast below keeps that sign.
 /// Source: `oracle/codemp/client/snd_dma.cpp:756-772`
 fn S_HashSFXName(name: &str) -> usize {
     let mut hash: i64 = 0;
@@ -147,7 +156,7 @@ fn S_HashSFXName(name: &str) -> usize {
         if letter == b'\\' {
             letter = b'/'; // damn path names
         }
-        hash += i64::from(letter) * (i as i64 + 119);
+        hash += i64::from(letter as i8) * (i as i64 + 119);
     }
     (hash as usize) & (LOOP_HASH - 1)
 }
@@ -222,8 +231,12 @@ pub fn S_DefaultSound(view: &mut EngineHostView, snd: &mut SoundSystem, sfx: usi
     SND_malloc(view, snd, 512 * 2, sfx);
     snd.s_knownSfx[sfx].bInMemory = true;
 
-    for i in 0..snd.s_knownSfx[sfx].iSoundLengthInSamples as usize {
-        snd.s_knownSfx[sfx].pSoundData[i] = i as i16;
+    let data = snd.s_knownSfx[sfx]
+        .pSoundData
+        .as_mut()
+        .expect("SND_malloc seated the default sound's block");
+    for i in 0..data.len() {
+        data[i] = i as i16;
     }
 }
 
@@ -284,7 +297,7 @@ pub fn S_RegisterSound(
         return 0;
     }
 
-    if !snd.s_knownSfx[sfx].pSoundData.is_empty() {
+    if snd.s_knownSfx[sfx].pSoundData.is_some() {
         return sfx as sfxHandle_t;
     }
 
@@ -1146,9 +1159,9 @@ pub fn S_UpdateEntityPosition(snd: &mut SoundSystem, entityNum: c_int, origin: v
 /// plays right now.
 ///
 /// The scan reads ten samples 100 apart, squares them, and buckets the mean
-/// against the four `s_threshold` cvars. Raven's guard lets the last read run one
-/// sample past the block, and the port answers 0 for that read instead
-/// (porting-rules §19).
+/// against the four `s_threshold` cvars. Raven reads outside the sample block in
+/// two cases: its guard lets the last read run one sample past the end, and a
+/// negative `offset` reads below the start. The port answers 0 for both (§19).
 /// Source: `oracle/codemp/client/snd_dma.cpp:2338-2456`
 fn S_CheckAmplitude(common: &Common, snd: &mut SoundSystem, channel: usize, s_oldpaintedtime: u32) -> c_int {
     let ch = snd.s_channels[channel];
@@ -1173,12 +1186,13 @@ fn S_CheckAmplitude(common: &Common, snd: &mut SoundSystem, channel: usize, s_ol
                 break;
             }
 
-            let index = (offset + i * 100) as usize;
+            let index = offset + i * 100;
             sample = c_int::from(
-                snd.s_knownSfx[sfx]
-                    .pSoundData
-                    .get(index)
-                    .copied()
+                usize::try_from(index)
+                    .ok()
+                    .and_then(|index| {
+                        snd.s_knownSfx[sfx].pSoundData.as_ref()?.get(index).copied()
+                    })
                     .unwrap_or(0),
             );
             sample >>= 8;
@@ -1464,19 +1478,23 @@ pub fn S_Update_(common: &mut Common, snd: &mut SoundSystem) {
     S_ScanChannelStarts(snd);
 
     // mix ahead of current position
+    // Raven declares `endtime` unsigned, so the block rounding and the
+    // buffer-length clamp below both run in unsigned arithmetic.
     let mut endtime =
-        (snd.s_soundtime as f32 + common.cvar(snd.s_mixahead).value * snd.dma.speed as f32) as c_int;
+        (snd.s_soundtime as f32 + common.cvar(snd.s_mixahead).value * snd.dma.speed as f32) as c_int
+            as u32;
 
     // mix to an even submission block size
-    endtime = (endtime + snd.dma.submission_chunk - 1) & !(snd.dma.submission_chunk - 1);
+    let chunk = snd.dma.submission_chunk as u32;
+    endtime = endtime.wrapping_add(chunk).wrapping_sub(1) & !chunk.wrapping_sub(1);
 
     // never mix more than the complete buffer
     let samps = snd.dma.samples >> (snd.dma.channels - 1);
-    if endtime - snd.s_soundtime > samps {
-        endtime = snd.s_soundtime + samps;
+    if endtime.wrapping_sub(snd.s_soundtime as u32) > samps as u32 {
+        endtime = (snd.s_soundtime + samps) as u32;
     }
 
-    S_PaintChannels(common, snd, endtime);
+    S_PaintChannels(common, snd, endtime as c_int);
 
     S_DoLipSynchs(common, snd, s_oldpaintedtime);
 }
@@ -1493,7 +1511,7 @@ pub fn S_Update_(common: &mut Common, snd: &mut SoundSystem) {
 /// Source: `oracle/codemp/client/snd_dma.cpp:5017-5034`
 pub fn SND_malloc(view: &mut EngineHostView, snd: &mut SoundSystem, iSize: c_int, sfx: usize) {
     // don't bother asking for zeroed mem
-    snd.s_knownSfx[sfx].pSoundData = vec![0i16; (iSize / 2).max(0) as usize];
+    snd.s_knownSfx[sfx].pSoundData = Some(vec![0i16; (iSize / 2).max(0) as usize]);
     snd.sndRawDataBytes += iSize;
 
     // if "s_soundpoolmegs" is < 0, then the -ve of the value is the maximum
@@ -1525,7 +1543,10 @@ fn SND_setup(view: &mut EngineHostView, snd: &mut SoundSystem) {
 ///
 /// Source: `oracle/codemp/client/snd_dma.cpp:5053-5065`
 fn SND_MemUsed(snd: &SoundSystem, sfx: usize) -> c_int {
-    (snd.s_knownSfx[sfx].pSoundData.len() * 2) as c_int
+    match &snd.s_knownSfx[sfx].pSoundData {
+        Some(data) => (data.len() * 2) as c_int,
+        None => 0,
+    }
 }
 
 /// Raven `SND_FreeSFXMem` — release one sfx's samples and report the bytes freed.
@@ -1533,7 +1554,7 @@ fn SND_MemUsed(snd: &SoundSystem, sfx: usize) -> c_int {
 /// Source: `oracle/codemp/client/snd_dma.cpp:5071-5115`
 fn SND_FreeSFXMem(snd: &mut SoundSystem, sfx: usize) -> c_int {
     let iBytesFreed = SND_MemUsed(snd, sfx);
-    snd.s_knownSfx[sfx].pSoundData = Vec::new();
+    snd.s_knownSfx[sfx].pSoundData = None;
     snd.sndRawDataBytes -= iBytesFreed;
 
     snd.s_knownSfx[sfx].bInMemory = false;
@@ -1782,6 +1803,11 @@ fn S_UpdateBackgroundTrack_Actual(snd: &mut SoundSystem, track: usize, fDefaultV
     snd.tMusic_Info[track].fSmoothedOutVolume =
         (snd.tMusic_Info[track].fSmoothedOutVolume + fMasterVol) / 2.0;
 
+    // don't bother playing anything if musicvolume is 0
+    if snd.tMusic_Info[track].fSmoothedOutVolume <= 0.0 {
+        return false;
+    }
+
     //TODO: Port S_UpdateBackgroundTrack_Actual streaming body
     // Source: oracle/codemp/client/snd_dma.cpp:4686-4801. The streamed-file and
     // MP3 reads arrive with gh#25, and no gh#24 path opens a track.
@@ -1908,7 +1934,10 @@ pub fn S_Init(view: &mut EngineHostView, snd: &mut SoundSystem) {
     ));
 
     // Raven `MP3_InitCvars`, which registers the one MP3 cvar (gh#25 uses it).
-    Cvar_Get(view, "s_mp3overhead", "0", 0);
+    // The default is `sizeof(MP3STREAM) + FUZZY_AMOUNT`, so it tracks the struct.
+    // Source: `oracle/codemp/client/snd_mp3.cpp:226-229`
+    let overhead = core::mem::size_of::<MP3STREAM>() + FUZZY_AMOUNT;
+    Cvar_Get(view, "s_mp3overhead", &format!("{overhead}"), CVAR_ARCHIVE);
 
     // Raven caches `sys_cpuid` for the MMX blast arm, which the port does not carry.
     Cvar_Get(view, "sys_cpuid", "", 0);

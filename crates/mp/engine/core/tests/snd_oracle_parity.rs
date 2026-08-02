@@ -254,14 +254,15 @@ impl Rig {
         let snd = self.engine.snd.as_ref().expect("sound system seated");
         let mut out = format!("SFX {tag} count {}\n", snd.s_knownSfx.len());
         for (i, sfx) in snd.s_knownSfx.iter().enumerate() {
-            let digest = if !sfx.pSoundData.is_empty() && sfx.iSoundLengthInSamples > 0 {
-                let bytes: Vec<u8> = sfx.pSoundData[..sfx.iSoundLengthInSamples as usize]
-                    .iter()
-                    .flat_map(|s| s.to_le_bytes())
-                    .collect();
-                fnv1a(&bytes)
-            } else {
-                0
+            let digest = match &sfx.pSoundData {
+                Some(data) if sfx.iSoundLengthInSamples > 0 => {
+                    let bytes: Vec<u8> = data[..sfx.iSoundLengthInSamples as usize]
+                        .iter()
+                        .flat_map(|s| s.to_le_bytes())
+                        .collect();
+                    fnv1a(&bytes)
+                }
+                _ => 0,
             };
             out.push_str(&format!(
                 "  sfx {i} name {} samples {} volrange {:.6} method {} default {} inmem {} data {digest:08x}\n",

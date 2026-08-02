@@ -166,7 +166,10 @@ fn S_PaintChannelFrom16(
     let iLeftVol = snd.s_channels[channel].leftvol * snd.snd_vol;
     let iRightVol = snd.s_channels[channel].rightvol * snd.snd_vol;
 
-    let data = &snd.s_knownSfx[sfx].pSoundData;
+    let data = snd.s_knownSfx[sfx]
+        .pSoundData
+        .as_ref()
+        .expect("a painting channel holds a loaded sound");
     let dest = &mut snd.paintbuffer;
 
     let mut sampleOffset = sampleOffset as usize;

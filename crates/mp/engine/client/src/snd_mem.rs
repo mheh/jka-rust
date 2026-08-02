@@ -116,13 +116,13 @@ impl<'a> IffCursor<'a> {
 ///
 /// A header the walker cannot follow leaves the returned info all zero, and the
 /// caller treats a zero `channels` as a load failure.
+///
+/// Raven's `if (!wav)` guard is a null-pointer test. A slice cannot be null, and
+/// the one caller already returns before a missing file reaches here, so a
+/// zero-byte file walks the chunk reader and prints the way Raven does.
 /// Source: `oracle/codemp/client/snd_mem.cpp:108-176`
 pub fn GetWavinfo(view: &mut EngineHostView, name: &str, wav: &[u8]) -> wavinfo_t {
     let mut info = wavinfo_t::default();
-
-    if wav.is_empty() {
-        return info;
-    }
 
     let mut cursor = IffCursor::new(wav);
 
@@ -220,7 +220,10 @@ pub fn ResampleSfx(
             (c_int::from(pData[iSrcSample]) - 128) << 8
         };
 
-        snd.s_knownSfx[sfx].pSoundData[i] = iSample as i16;
+        snd.s_knownSfx[sfx]
+            .pSoundData
+            .as_mut()
+            .expect("SND_malloc seated the sample block")[i] = iSample as i16;
 
         // work out max vol for this sample...
         if iSample < 0 {
@@ -391,7 +394,7 @@ fn S_LoadSound_Actual(view: &mut EngineHostView, snd: &mut SoundSystem, sfx: usi
 
     snd.s_knownSfx[sfx].eSoundCompressionMethod = SoundCompressionMethod_t::ct_16;
     snd.s_knownSfx[sfx].iSoundLengthInSamples = info.samples;
-    snd.s_knownSfx[sfx].pSoundData = Vec::new();
+    snd.s_knownSfx[sfx].pSoundData = None;
     ResampleSfx(
         view,
         snd,
