@@ -1,0 +1,36 @@
+# resample — ResampleSfx over every fixture rate and width at 22050 Hz output.
+# The sfx dump pins the resampled sample count, the peak (fVolRange) and the
+# digest of the resampled data, which is what S_PaintChannelFrom16 reads.
+cvar s_khz 22
+init
+beginreg
+register 0 sound/sine440.wav
+register 1 sound/sweep11k.wav
+register 2 sound/sine44k.wav
+register 3 sound/impulse8.wav
+register 4 sound/silence.wav
+register 5 sound/ramp64.wav
+dumpsfx loaded
+length 0
+length 1
+length 2
+length 3
+length 4
+length 5
+respatialize 0 0 0 0 0
+startsound 0 0 0 1 0 1
+startsound 0 0 0 2 0 2
+startsound 0 0 0 3 0 3
+startsound 0 0 0 4 0 5
+dumpstate placed
+respatialize 0 0 0 0 0
+advance 1102
+update
+dumpstate frame1
+dumpring frame1
+respatialize 0 0 0 0 0
+advance 2205
+update
+dumpstate frame2
+dumpring frame2
+shutdown

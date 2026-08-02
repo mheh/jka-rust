@@ -1,0 +1,32 @@
+# rawstream — S_RawSamples feeds the raw ring that S_PaintChannels copies in
+# ahead of the channels. One frame runs raw only, the next mixes a channel on
+# top, and the last lets the raw stream run dry so the underrun path shows.
+cvar s_khz 22
+init
+beginreg
+register 0 sound/sine440.wav
+respatialize 0 0 0 0 0
+
+rawsamples 4410 22050 12000
+respatialize 0 0 0 0 0
+advance 1102
+update
+dumpstate raw-only
+dumpring raw-only
+
+rawsamples 4410 22050 12000
+startsound 0 0 0 1 0 0
+respatialize 0 0 0 0 0
+advance 1102
+update
+dumpstate raw-plus-channel
+dumpring raw-plus-channel
+
+# No new raw block. s_rawend falls behind s_paintedtime and the paint buffer
+# clears to silence before the channels paint.
+respatialize 0 0 0 0 0
+advance 4410
+update
+dumpstate raw-underrun
+dumpring raw-underrun
+shutdown

@@ -1,0 +1,42 @@
+# channels — S_PickChannel priority, the entity/channel stomp rule, the muted
+# channel, and the two stop-all doors. Sixteen entities take channels first, so
+# the golden pins the oldest-channel eviction as well.
+cvar s_khz 22
+init
+beginreg
+register 0 sound/sine440.wav
+register 1 sound/sweep11k.wav
+respatialize 0 0 0 0 0
+
+# The same entity and channel twice: the second call stomps the first.
+startsound 100 0 0 7 2 0
+startsound 100 0 0 7 2 1
+dumpstate stomped
+
+# A local sound and a global voice line take reserved paths.
+startlocal 0 3
+startsound 0 0 0 9 3 0
+startsound 0 0 0 10 12 1
+dumpstate voices
+
+respatialize 0 0 0 0 0
+advance 1102
+update
+dumpstate frame1
+dumpring frame1
+
+# The mute door silences one entity channel without freeing it.
+mute 7 2
+respatialize 0 0 0 0 0
+advance 1102
+update
+dumpstate muted
+dumpring muted
+
+# S_StopSounds keeps the music, S_StopAllSounds clears the ring as well.
+stopsounds
+dumpstate stopsounds
+stopall
+dumpstate stopall
+dumpring stopall
+shutdown

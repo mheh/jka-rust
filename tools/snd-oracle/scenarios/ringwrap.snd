@@ -1,0 +1,77 @@
+# ringwrap — a long run that carries the ring past its 16384-frame wrap twice.
+# A local looping sound re-registers every frame, the way the client does, so
+# the paint never stops. The golden pins S_GetSoundtime's buffer counter and the
+# modulo write in S_TransferStereo16.
+cvar s_khz 22
+init
+beginreg
+register 0 sound/sine440.wav
+
+clearloops
+startlocalloop 0
+respatialize 0 0 0 0 0
+advance 4410
+update
+dumpstate frame1
+dumpring frame1
+
+clearloops
+startlocalloop 0
+respatialize 0 0 0 0 0
+advance 4410
+update
+
+clearloops
+startlocalloop 0
+respatialize 0 0 0 0 0
+advance 4410
+update
+
+clearloops
+startlocalloop 0
+respatialize 0 0 0 0 0
+advance 4410
+update
+dumpstate wrap1
+dumpring wrap1
+
+clearloops
+startlocalloop 0
+respatialize 0 0 0 0 0
+advance 4410
+update
+
+clearloops
+startlocalloop 0
+respatialize 0 0 0 0 0
+advance 4410
+update
+
+clearloops
+startlocalloop 0
+respatialize 0 0 0 0 0
+advance 4410
+update
+
+clearloops
+startlocalloop 0
+respatialize 0 0 0 0 0
+advance 4410
+update
+dumpstate wrap2
+dumpring wrap2
+
+clearloops
+startlocalloop 0
+respatialize 0 0 0 0 0
+advance 4410
+update
+
+clearloops
+startlocalloop 0
+respatialize 0 0 0 0 0
+advance 4410
+update
+dumpstate wrap3
+dumpring wrap3
+shutdown

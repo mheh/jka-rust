@@ -1,0 +1,83 @@
+== snd-oracle scenarios/rawstream.snd ==
+REGISTER slot 0 handle 1 path sound/sine440.wav
+STATE raw-only
+  clock 49 dmapos 2204 frames 1102
+  started 1 muted 0 soundtime 1102 paintedtime 5512 rawend 4410
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 0 prints 14 dprints 0
+RING raw-only bytes 65536 whole 90dac7ff
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 2 crc c1001f4c min -11812 max 11812 nonzero 1710
+  blk 3 crc 4365c3c5 min -11812 max 11812 nonzero 2016
+  blk 4 crc 4e32ffde min -11812 max 11812 nonzero 618
+  blk 5 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 6 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 7 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 8 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 9 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 10 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 11 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+STATE raw-plus-channel
+  clock 99 dmapos 4408 frames 2204
+  started 1 muted 0 soundtime 2204 paintedtime 6614 rawend 8820
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 0 prints 14 dprints 0
+  ch 0 ent 1 chan 0 lv 127 rv 127 mv 255 start 3306 fixed 1 loop 0 org 0.000000 0.000000 0.000000 sfx sound/sine440
+RING raw-plus-channel bytes 65536 whole 0de42558
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 2 crc c1001f4c min -11812 max 11812 nonzero 1710
+  blk 3 crc bec069b0 min -16770 max 16772 nonzero 2040
+  blk 4 crc 2ce444d5 min -16680 max 16720 nonzero 2048
+  blk 5 crc 18903b40 min -16689 max 16712 nonzero 2048
+  blk 6 crc 8ee63085 min -16739 max 16313 nonzero 940
+  blk 7 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 8 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 9 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 10 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 11 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+STATE raw-underrun
+  clock 299 dmapos 13228 frames 6614
+  started 1 muted 0 soundtime 6614 paintedtime 11024 rawend 8820
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 0 prints 14 dprints 0
+  ch 0 ent 1 chan 0 lv 127 rv 127 mv 255 start 3306 fixed 1 loop 0 org 0.000000 0.000000 0.000000 sfx sound/sine440
+RING raw-underrun bytes 65536 whole bbd89429
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 2 crc c1001f4c min -11812 max 11812 nonzero 1710
+  blk 3 crc bec069b0 min -16770 max 16772 nonzero 2040
+  blk 4 crc 2ce444d5 min -16680 max 16720 nonzero 2048
+  blk 5 crc 18903b40 min -16689 max 16712 nonzero 2048
+  blk 6 crc 8ee63085 min -16739 max 16313 nonzero 940
+  blk 7 crc 0741c81e min -16492 max 16772 nonzero 952
+  blk 8 crc 0e22b6eb min -16770 max 16545 nonzero 1256
+  blk 9 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 10 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 11 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+== end ==

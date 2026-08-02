@@ -1,0 +1,98 @@
+== snd-oracle scenarios/basic.snd ==
+REGISTER slot 0 handle 1 path sound/sine440.wav
+SFX after-register count 2
+  sfx 0 name sound/null samples 128 volrange 0.000000 method 0 default 0 inmem 1 data e6a1d1c5
+  sfx 1 name sound/sine440 samples 5512 volrange 78.000000 method 0 default 0 inmem 1 data f8149e00
+LENGTH handle 1 ms 249.977325
+STATE after-start
+  clock 0 dmapos 0 frames 0
+  started 1 muted 0 soundtime 0 paintedtime 0 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 0 prints 14 dprints 0
+  ch 0 ent 1 chan 0 lv 255 rv 255 mv 255 start 2147483647 fixed 1 loop 0 org 0.000000 0.000000 0.000000 sfx sound/sine440
+STATE frame1
+  clock 49 dmapos 2204 frames 1102
+  started 1 muted 0 soundtime 1102 paintedtime 5512 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 0 prints 14 dprints 0
+  ch 0 ent 1 chan 0 lv 255 rv 255 mv 255 start 2204 fixed 1 loop 0 org 0.000000 0.000000 0.000000 sfx sound/sine440
+RING frame1 bytes 65536 whole 9fbf5f21
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 2 crc ef41102d min -9961 max 9960 nonzero 1734
+  blk 3 crc cc97e389 min -9961 max 9960 nonzero 2048
+  blk 4 crc 64543725 min -9961 max 9960 nonzero 2046
+  blk 5 crc e72323b5 min -9961 max 9960 nonzero 784
+  blk 6 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 7 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 8 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 9 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 10 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 11 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+STATE frame2
+  clock 99 dmapos 4408 frames 2204
+  started 1 muted 0 soundtime 2204 paintedtime 6614 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 0 prints 14 dprints 0
+  ch 0 ent 1 chan 0 lv 255 rv 255 mv 255 start 2204 fixed 1 loop 0 org 0.000000 0.000000 0.000000 sfx sound/sine440
+RING frame2 bytes 65536 whole c78848a5
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 2 crc ef41102d min -9961 max 9960 nonzero 1734
+  blk 3 crc cc97e389 min -9961 max 9960 nonzero 2048
+  blk 4 crc 64543725 min -9961 max 9960 nonzero 2046
+  blk 5 crc 183216c1 min -9961 max 9960 nonzero 2048
+  blk 6 crc 3977d09d min -9961 max 9960 nonzero 940
+  blk 7 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 8 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 9 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 10 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 11 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+STATE frame3
+  clock 149 dmapos 6612 frames 3306
+  started 1 muted 0 soundtime 3306 paintedtime 7716 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 0 prints 14 dprints 0
+  ch 0 ent 1 chan 0 lv 255 rv 255 mv 255 start 2204 fixed 1 loop 0 org 0.000000 0.000000 0.000000 sfx sound/sine440
+RING frame3 bytes 65536 whole 32f8b839
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 2 crc ef41102d min -9961 max 9960 nonzero 1734
+  blk 3 crc cc97e389 min -9961 max 9960 nonzero 2048
+  blk 4 crc 64543725 min -9961 max 9960 nonzero 2046
+  blk 5 crc 183216c1 min -9961 max 9960 nonzero 2048
+  blk 6 crc 8f8eda2d min -9961 max 9960 nonzero 2046
+  blk 7 crc ec78b0a9 min -9961 max 9960 nonzero 1096
+  blk 8 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 9 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 10 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 11 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+== end ==

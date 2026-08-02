@@ -1,0 +1,25 @@
+# khz44 — S_Init at 44100 Hz, the high half of the s_khz variants. DEC-57.1
+# names 22050 Hz as the port's internal rate, so this scenario exists to prove
+# the rate is a parameter rather than a constant.
+cvar s_khz 44
+init
+beginreg
+register 0 sound/sine440.wav
+register 1 sound/sweep11k.wav
+register 2 sound/sine44k.wav
+dumpsfx loaded
+respatialize 0 0 0 0 0
+startsound 0 0 0 1 0 0
+startsound 0 0 0 2 0 1
+startsound 0 0 0 3 0 2
+respatialize 0 0 0 0 0
+advance 2205
+update
+dumpstate frame1
+dumpring frame1
+respatialize 0 0 0 0 0
+advance 2205
+update
+dumpstate frame2
+dumpring frame2
+shutdown

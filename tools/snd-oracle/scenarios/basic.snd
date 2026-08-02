@@ -1,0 +1,26 @@
+# basic — the shortest path through the chain: init, register, start, paint.
+# The scenario never respatializes after the start, so the channel keeps the
+# full volume S_StartSound set. The golden then pins S_ScanChannelStarts and the
+# three paint windows on their own, with no spatialization in the way.
+cvar s_khz 22
+init
+beginreg
+register 0 sound/sine440.wav
+dumpsfx after-register
+length 0
+respatialize 0 0 0 0 0
+startsound 0 0 0 1 0 0
+dumpstate after-start
+advance 1102
+update
+dumpstate frame1
+dumpring frame1
+advance 1102
+update
+dumpstate frame2
+dumpring frame2
+advance 1102
+update
+dumpstate frame3
+dumpring frame3
+shutdown

@@ -1,0 +1,23 @@
+# badfiles — the load failures. A missing file and a stereo file both fall back
+# to the buzz that S_DefaultSound builds, and a repeat registration returns the
+# handle the hash table already holds.
+cvar s_khz 22
+init
+beginreg
+register 0 sound/missing.wav
+register 1 sound/stereo.wav
+register 2 sound/sine440.wav
+register 3 sound/sine440.wav
+dumpsfx loaded
+respatialize 0 0 0 0 0
+startsound 0 0 0 1 0 0
+startsound 0 0 0 2 0 1
+# A sound that did load, so the golden shows the ring painting past the two
+# failures rather than only proving the fallback is silent.
+startsound 0 0 0 3 0 2
+respatialize 0 0 0 0 0
+advance 1102
+update
+dumpstate frame1
+dumpring frame1
+shutdown
