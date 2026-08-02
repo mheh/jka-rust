@@ -826,17 +826,15 @@ pub fn CL_ConfigstringModified(view: &mut EngineHostView, cl: &mut Client) {
 
         // Append it to the gameState string buffer.
         cl.cl.gameState.stringOffsets[i as usize] = cl.cl.gameState.dataCount;
-        unsafe {
-            Com_Memcpy(
-                cl.cl
-                    .gameState
-                    .stringData
-                    .as_mut_ptr()
-                    .offset(cl.cl.gameState.dataCount as isize) as *mut (),
-                dup.as_ptr() as *const (),
-                len as usize + 1,
-            );
+        // Raven copies `len + 1` bytes out of a NUL-terminated C buffer. A Rust
+        // `String` carries no terminator, so the bytes and the NUL are written
+        // separately. This is the `CL_ParseGamestate` fix at its twin site.
+        let at = cl.cl.gameState.dataCount as usize;
+        let dst = &mut cl.cl.gameState.stringData[at..at + len as usize + 1];
+        for (slot, b) in dst.iter_mut().zip(dup.as_bytes()) {
+            *slot = *b as c_char;
         }
+        dst[len as usize] = 0;
         cl.cl.gameState.dataCount += len + 1;
     }
 

@@ -9,7 +9,7 @@ use mp_bg::public::configstring::CS_SYSTEMINFO;
 use mp_engine_qcommon::common::common::{com_printf, Common};
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::error::com_error;
-use mp_engine_qcommon::common_fns::{Com_DPrintf, Com_Memcpy, Com_Memset};
+use mp_engine_qcommon::common_fns::{Com_DPrintf, Com_Memset};
 use mp_engine_qcommon::cvar_fns::{
     Cvar_Set, Cvar_SetCheatState, Cvar_SetValue, Cvar_VariableString, Cvar_VariableValue,
 };
@@ -774,11 +774,14 @@ pub fn CL_ParseGamestate(view: &mut EngineHostView, cl: &mut Client, msg: *mut m
             // append it to the gameState string buffer
             cl.cl.gameState.stringOffsets[i as usize] = cl.cl.gameState.dataCount;
             let data_count = cl.cl.gameState.dataCount as usize;
-            Com_Memcpy(
-                unsafe { cl.cl.gameState.stringData.as_mut_ptr().add(data_count) as *mut () },
-                s.as_ptr() as *const (),
-                len + 1,
-            );
+            // Raven copies `len + 1` bytes out of a NUL-terminated C buffer. A
+            // Rust `String` carries no terminator, so the bytes and the NUL are
+            // written separately. The demo referee caught the one-past read.
+            let dst = &mut cl.cl.gameState.stringData[data_count..data_count + len + 1];
+            for (slot, b) in dst.iter_mut().zip(s.as_bytes()) {
+                *slot = *b as c_char;
+            }
+            dst[len] = 0;
             cl.cl.gameState.dataCount += (len + 1) as c_int;
         } else if cmd == svc_baseline as c_int {
             let newnum = MSG_ReadBits(view.common, msg, GENTITYNUM_BITS);
