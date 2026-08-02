@@ -1497,3 +1497,15 @@ Ruled at the ticket [#26](https://github.com/mheh/jka-rust/issues/26) sit-down. 
 4. **Containers.** Idiomatic owned containers with the observable seam semantics pinned: handle-as-index allocation order and the same-name check on the template store, the 256/64/32/24 caps with their exact overflow arms, `BTreeMap<String, i32>` for the name map, stable order in the schedule and live pool. Effect handles cross the trap seam, so their arithmetic is parity surface.
 
 5. **Parity gate.** `tools/fx-oracle` on the §18 recipe: the unmodified FX TUs standalone, scripted clock, pinned `Q_flrand` LCG seed, scripted trace responses, capture-everything emission stubs. Fixtures are synthetic committed `.efx` files covering the 13-primitive matrix (retail `.efx` is Raven content and stays out of git, available as an uncommitted `JKA_REF_BASEPATH` spot check). Goldens: template-parse dumps plus per-frame emission streams. The demo referee masks `CG_FX_ADDPRIMITIVE`, so this rig is the FX port's one behavioral gate.
+
+## DEC-62 — referee and harness operations batch (ruled 2026-08-02)
+
+Seven operational rulings from the gh#23/gh#30 landing sit-down.
+
+1. **Demo-referee CI posture.** The demo playback test stays asset-gated on `JKA_REF_BASEPATH` and self-skips without it, the lockstep-suite posture. No committed pak content, no `FS_CheckPak0` test bypass. The review process runs it at merge gates.
+2. **Golden size.** The committed demo goldens are bounded (the 400-frame cap, ~1.2 MB gzipped per demo). The full-demo diff is an asset-gated extended check against a locally-recorded golden.
+3. **`cl_referee` gate posture confirmed.** The `sv_referee` twin pattern stands: mode on `Client`, `Off` by default, gated call sites name their seam module and owning ticket, each gate deletes when its lane lands. No cvar.
+4. **Snd goldens keep both forms.** The ring bins are the byte gate and the diagnosis material, the text digests are the localizer.
+5. **No CI wiring for oracle harness builds.** The toolchain-free cargo gates guard the committed goldens in CI. The C++ harnesses run at golden-minting time under review, the six-harness precedent.
+6. **Retail macro set for the snd oracle.** `FINAL_BUILD` + `NDEBUG`, the `sound/null.wav` registration path. Retail, OpenJK release (`CMakeLists.txt:324`), and the pipeline's Release-defines precedent all agree. The debug buzz never shipped.
+7. **Second-pass snd scenarios join with their owning tickets.** gh#24 starts against the ten committed scenarios and adds lip sync at `S_DoLipSynchs`. gh#25 brings music, ambient, the streamed-file seam, and the DEC-57.3 decode fixtures. The harness README's uncovered-list is the tracking artifact.
