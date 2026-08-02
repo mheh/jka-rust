@@ -22,7 +22,7 @@ use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, ElementState, KeyEvent, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow};
 use winit::keyboard::{KeyCode, PhysicalKey};
-use winit::window::{CursorGrabMode, Window, WindowId};
+use winit::window::{Window, WindowId};
 
 use crate::keymap::{map_char, map_key, map_mouse_button, wheel_key};
 use crate::render_thread::{self, RenderCommand};
@@ -42,8 +42,6 @@ pub struct Pump {
     events: PlatformEventSink,
     window: Option<Arc<Window>>,
     render: Option<SyncSender<RenderCommand>>,
-    /// Set once the pointer is locked, so the mouse-look grab is tried once.
-    grabbed: bool,
 }
 
 impl Pump {
@@ -52,7 +50,6 @@ impl Pump {
             events,
             window: None,
             render: None,
-            grabbed: false,
         }
     }
 
@@ -131,25 +128,15 @@ impl ApplicationHandler for Pump {
                     height: size.height,
                 });
             }
-            WindowEvent::Focused(focused) => {
-                // Raven grabbed the mouse while the app was active and let it go
-                // otherwise (`IN_ActivateMouse`/`IN_DeactivateMouse`).
-                // Source: `oracle/codemp/win32/win_input.cpp:498-560`
-                let Some(window) = self.window.as_ref() else {
-                    return;
-                };
-                if focused && !self.grabbed {
-                    window.set_cursor_visible(false);
-                    let locked = window
-                        .set_cursor_grab(CursorGrabMode::Locked)
-                        .or_else(|_| window.set_cursor_grab(CursorGrabMode::Confined));
-                    self.grabbed = locked.is_ok();
-                } else if !focused && self.grabbed {
-                    window.set_cursor_visible(true);
-                    let _ = window.set_cursor_grab(CursorGrabMode::None);
-                    self.grabbed = false;
-                }
-            }
+            //TODO: Port IN_ActivateMouse
+            // Source: oracle/codemp/win32/win_input.cpp:498-560. Raven grabbed
+            // the pointer while the app was active and released it for the
+            // console and the menus, which it read from `Key_GetCatcher`. The
+            // pump has no key catcher to read until the client hooks are live,
+            // and a grab with no release path traps the user, so the grab lands
+            // with first light. Raw motion already reaches `SE_MOUSE` without
+            // it.
+            WindowEvent::Focused(_) => {}
             WindowEvent::KeyboardInput {
                 event:
                     KeyEvent {
