@@ -1445,3 +1445,15 @@ Ruled at the ticket [#9](https://github.com/mheh/jka-rust/issues/9) sit-down.
 4. **Input vocabulary.** Raw `device_event` mouse deltas feed `SE_MOUSE`, `window_event` keys feed `SE_KEY`/`SE_CHAR` through a winit-to-`keycodes.h` map, terminal stdin feeds `SE_CONSOLE` (already ported), and net packets feed `SE_PACKET` (already ported).
 
 5. **Joystick dropped, graduates on demand.** The `SE_JOYSTICK_AXIS` arm and the `CL_JoystickEvent` hook stay as ported, with no device backend - retail defaulted `in_joystick` to off. A gamepad ticket graduates from the fog when someone wants it (gilrs is the natural crate then).
+
+## DEC-57 — sound backend: faithful through the ring, cpal pulls (ruled 2026-08-01)
+
+Refines DEC-03 at the ticket [#8](https://github.com/mheh/jka-rust/issues/8) sit-down.
+
+1. **Seam.** The whole paint pipeline ports faithfully: channels, spatialization, and the `snd_mix` paint chain write a `dma_t`-shaped ring at Raven's internal format (22050 Hz, `s_khz` default). The idiomatic device end is the cpal callback, which pulls from the ring and converts rate and format to the negotiated device. The five `SNDDMA_*` functions dissolve into the cpal wrapper.
+
+2. **Parity.** A standalone-oracle harness (`tools/snd-oracle`, the gp2/ghoul2 recipe) compiles Raven's snd TUs, drives scripted sound commands over committed PCM fixtures, and dumps the ring. The Rust mixer reproduces the dumps byte for byte, and the goldens commit so `cargo test` needs no C++ toolchain.
+
+3. **MP3.** minimp3 stays a replaced dependency (DEC-03) outside the byte gate: MP3 content enters the rig as decoded PCM fixtures, and the decoder itself gets pinned decode fixtures of its own.
+
+4. **Scope.** `snd_dma` (minus the dropped OpenAL/EAX arm), `snd_mem`, `snd_mix`, `snd_mp3` (as the minimp3 wrap), `snd_music`, and `snd_ambient` transcribe with the island. EAX and force feedback stay dropped.
