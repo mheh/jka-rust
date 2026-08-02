@@ -244,10 +244,6 @@ pub unsafe fn Sys_QueEvent(
     ev.evPtr = ptr;
 }
 
-/// Raven `Sys_GetEvent` (unix) — drain the `eventQue`, else pump the system:
-/// `Sys_ConsoleInput` (queued as `SE_CONSOLE`) and `Sys_GetPacket` (queued as
-/// `SE_PACKET`), returning the next queued event or an empty timestamped one.
-///
 /// Raven `Sys_SendKeyEvents` - the window-message pump slot.
 ///
 /// Raven dispatched `WM_KEYDOWN`/`WM_KEYUP`/`WM_CHAR` here and let the window
@@ -326,11 +322,15 @@ fn IN_Frame(common: &mut Common) {
     }
 }
 
-/// `Sys_SendKeyEvents` and `IN_Frame` are the window and input pumps. The
-/// platform shell runs the window on the main thread (DEC-56.2), so both slots
-/// drain the `PlatformEventSource` bus instead of touching a window here. A
-/// host with no window (the dedicated build, every test rig) leaves the bus
-/// `None` and both slots queue nothing, exactly as before.
+/// Raven `Sys_GetEvent` (unix) - drain the `eventQue`, else pump the system:
+/// `Sys_SendKeyEvents` (the window), `Sys_ConsoleInput` (queued as
+/// `SE_CONSOLE`), `IN_Frame` (the mouse), and `Sys_GetPacket` (queued as
+/// `SE_PACKET`), returning the next queued event or an empty timestamped one.
+///
+/// The platform shell runs the window on the main thread (DEC-56.2), so the two
+/// pump slots drain the `PlatformEventSource` bus instead of touching a window
+/// here. A host with no window (the dedicated build, every test rig) leaves the
+/// bus `None` and both slots queue nothing, exactly as before.
 ///
 /// Source: `oracle/codemp/unix/unix_main.c:995-1051`
 pub fn Sys_GetEvent(view: &mut EngineHostView) -> sysEvent_t {
