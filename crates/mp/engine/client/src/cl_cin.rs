@@ -475,17 +475,28 @@ pub fn recurseQuad(
         && quadSize <= MAXSIZE
     {
         let useY = startY;
-        unsafe {
-            let scroff = cl.cin.linbuf.as_mut_ptr().offset(
-                ((useY + ((cl.cinTable[handle].CIN_HEIGHT as c_long - bigy) >> 1) + yOff)
-                    * cl.cinTable[handle].samplesPerLine
-                    + (startX + xOff) * 4) as isize,
-            );
+        let byte_off = (useY + ((cl.cinTable[handle].CIN_HEIGHT as c_long - bigy) >> 1) + yOff)
+            * cl.cinTable[handle].samplesPerLine
+            + (startX + xOff) * 4;
 
-            let onquad = cl.cinTable[handle].onQuad as usize;
-            cl.cin.qStatus[0][onquad] = scroff;
-            cl.cin.qStatus[1][onquad] = scroff.offset(offset as isize);
-            cl.cinTable[handle].onQuad += 1;
+        // §19: Raven bounds the quad against the stream's own `xsize`/`ysize`,
+        // never against `linbuf` or `qStatus`, so a header claiming more than
+        // 512x512 walks off both. A quad that does not fit is skipped.
+        let linbuf_len = cl.cin.linbuf.len() as c_long;
+        let in_bounds = byte_off >= 0
+            && byte_off < linbuf_len
+            && byte_off + offset >= 0
+            && byte_off + offset < linbuf_len
+            && (cl.cinTable[handle].onQuad as usize) < cl.cin.qStatus[0].len();
+
+        if in_bounds {
+            unsafe {
+                let scroff = cl.cin.linbuf.as_mut_ptr().offset(byte_off as isize);
+                let onquad = cl.cinTable[handle].onQuad as usize;
+                cl.cin.qStatus[0][onquad] = scroff;
+                cl.cin.qStatus[1][onquad] = scroff.offset(offset as isize);
+                cl.cinTable[handle].onQuad += 1;
+            }
         }
     }
 
@@ -1100,7 +1111,10 @@ pub fn setupQuad(cl: &mut Client, xOff: c_long, yOff: c_long) {
 
     let temp: *mut byte = std::ptr::null_mut();
 
-    for i in (numQuadCels - 64)..numQuadCels {
+    // §19: the terminator block takes the same `qStatus` bound `recurseQuad`
+    // now applies, because `numQuadCels` scales with the stream's own header.
+    let last = numQuadCels.min(cl.cin.qStatus[0].len() as c_long);
+    for i in (numQuadCels - 64).max(0)..last {
         cl.cin.qStatus[0][i as usize] = temp; // eoq
         cl.cin.qStatus[1][i as usize] = temp; // eoq
     }
