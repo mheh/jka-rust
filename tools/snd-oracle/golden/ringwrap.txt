@@ -1,0 +1,111 @@
+== snd-oracle scenarios/ringwrap.snd ==
+REGISTER slot 0 handle 1 path sound/sine440.wav
+STATE frame1
+  clock 200 dmapos 8820 frames 4410
+  started 1 muted 0 soundtime 4410 paintedtime 8820 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 1 prints 14 dprints 0
+  ch 0 ent 0 chan 0 lv 127 rv 127 mv 0 start 0 fixed 0 loop 1 org 0.000000 0.000000 0.000000 sfx sound/sine440
+RING frame1 bytes 65536 whole 98c41cb1
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 2 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 3 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 4 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 5 crc b03d63b1 min -4961 max 4960 nonzero 1262
+  blk 6 crc e1ef2251 min -4961 max 4960 nonzero 2048
+  blk 7 crc f5865b8d min -4961 max 4960 nonzero 2046
+  blk 8 crc 59b2df71 min -4961 max 4960 nonzero 1256
+  blk 9 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 10 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 11 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+STATE wrap1
+  clock 800 dmapos 35280 frames 17640
+  started 1 muted 0 soundtime 17640 paintedtime 22050 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 1 prints 14 dprints 0
+  ch 0 ent 0 chan 0 lv 127 rv 127 mv 0 start 0 fixed 0 loop 1 org 0.000000 0.000000 0.000000 sfx sound/sine440
+RING wrap1 bytes 65536 whole d089b9f1
+  blk 0 crc 3a9bb161 min -4961 max 4960 nonzero 2046
+  blk 1 crc 6b9df315 min -4961 max 4960 nonzero 464
+  blk 2 crc 91baf409 min -4961 max 4960 nonzero 1428
+  blk 3 crc bbc037ed min -4961 max 4960 nonzero 2048
+  blk 4 crc 27b58139 min -4961 max 4960 nonzero 2046
+  blk 5 crc 36e9f365 min -4961 max 4960 nonzero 2046
+  blk 6 crc e1ef2251 min -4961 max 4960 nonzero 2048
+  blk 7 crc f5865b8d min -4961 max 4960 nonzero 2046
+  blk 8 crc 59b2df71 min -4961 max 4960 nonzero 1256
+  blk 9 crc 595f68bd min -4961 max 4960 nonzero 634
+  blk 10 crc 7f29a2e5 min -4961 max 4960 nonzero 2046
+  blk 11 crc c66a945d min -4961 max 4960 nonzero 2048
+  blk 12 crc 2c85f565 min -4961 max 4960 nonzero 1882
+  blk 13 crc a16ec7f1 min 0 max 2107 nonzero 8
+  blk 14 crc 0a06b375 min -4961 max 4960 nonzero 2048
+  blk 15 crc 26bfae59 min -4961 max 4960 nonzero 2046
+STATE wrap2
+  clock 1600 dmapos 70560 frames 35280
+  started 1 muted 0 soundtime 35280 paintedtime 39690 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 1 prints 14 dprints 0
+  ch 0 ent 0 chan 0 lv 127 rv 127 mv 0 start 0 fixed 0 loop 1 org 0.000000 0.000000 0.000000 sfx sound/sine440
+RING wrap2 bytes 65536 whole 70948505
+  blk 0 crc 181545e1 min -4961 max 4960 nonzero 2046
+  blk 1 crc 978df97d min -4961 max 4960 nonzero 2048
+  blk 2 crc 351b16c9 min -4961 max 4960 nonzero 2046
+  blk 3 crc 6fdb74f1 min -4961 max 4960 nonzero 2048
+  blk 4 crc 2eb35d19 min -4961 max 4960 nonzero 2046
+  blk 5 crc 3c5344e9 min -4961 max 4960 nonzero 2046
+  blk 6 crc 5ebeabe5 min -4961 max 4960 nonzero 2048
+  blk 7 crc af4fc251 min -4961 max 4960 nonzero 2046
+  blk 8 crc 048a1b89 min -4961 max 4960 nonzero 2048
+  blk 9 crc 32f1f9ed min -4961 max 4960 nonzero 2046
+  blk 10 crc 92995ae5 min -4961 max 4960 nonzero 2046
+  blk 11 crc 0c4b298d min -4961 max 4960 nonzero 2048
+  blk 12 crc 88af24fd min -4961 max 4960 nonzero 2048
+  blk 13 crc bc0a39dd min -4961 max 4960 nonzero 2046
+  blk 14 crc 09397c6d min -4961 max 4960 nonzero 2048
+  blk 15 crc 42b550b1 min -4961 max 4960 nonzero 2046
+STATE wrap3
+  clock 2000 dmapos 88200 frames 44100
+  started 1 muted 0 soundtime 44100 paintedtime 48510 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 1 prints 14 dprints 0
+  ch 0 ent 0 chan 0 lv 127 rv 127 mv 0 start 0 fixed 0 loop 1 org 0.000000 0.000000 0.000000 sfx sound/sine440
+RING wrap3 bytes 65536 whole c2081481
+  blk 0 crc 181545e1 min -4961 max 4960 nonzero 2046
+  blk 1 crc 978df97d min -4961 max 4960 nonzero 2048
+  blk 2 crc 351b16c9 min -4961 max 4960 nonzero 2046
+  blk 3 crc 6fdb74f1 min -4961 max 4960 nonzero 2048
+  blk 4 crc 2eb35d19 min -4961 max 4960 nonzero 2046
+  blk 5 crc 3c5344e9 min -4961 max 4960 nonzero 2046
+  blk 6 crc 5ebeabe5 min -4961 max 4960 nonzero 2048
+  blk 7 crc e9c8fb5d min -4961 max 4960 nonzero 2046
+  blk 8 crc b781458d min -4961 max 4960 nonzero 2048
+  blk 9 crc 535c912d min -4961 max 4960 nonzero 2046
+  blk 10 crc e3b0e491 min -4961 max 4960 nonzero 2048
+  blk 11 crc 2046fc91 min -4961 max 4960 nonzero 2046
+  blk 12 crc 2ded4101 min -4961 max 4960 nonzero 2048
+  blk 13 crc 4b3cfa81 min -4961 max 4960 nonzero 2046
+  blk 14 crc 3052c995 min -4961 max 4960 nonzero 2048
+  blk 15 crc 626db1ad min -4961 max 4960 nonzero 2046
+== end ==

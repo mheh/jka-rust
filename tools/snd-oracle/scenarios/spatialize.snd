@@ -1,0 +1,40 @@
+# spatialize — S_SpatializeOrigin over a moving listener and four fixed sources.
+# S_Respatialize is what recomputes the per-channel volumes, so every frame runs
+# in the client order: place the sources, respatialize, then update.
+# The four sources sit left, right, front and far, so the golden pins the
+# distance attenuation and the s_separation stereo split.
+cvar s_khz 22
+cvar s_separation 0.5
+init
+beginreg
+register 0 sound/sine440.wav
+register 1 sound/sweep11k.wav
+respatializeaxis 0  0 0 0  1 0 0  0 1 0  0 0 1  0
+startsound -400 0 0 1 0 0
+startsound 400 0 0 2 0 0
+startsound 0 800 0 3 0 1
+startsound 0 0 4000 4 0 1
+dumpstate placed
+
+respatializeaxis 0  0 0 0  1 0 0  0 1 0  0 0 1  0
+dumpstate spatialized
+advance 1102
+update
+dumpstate frame1
+dumpring frame1
+
+# The listener turns a quarter turn to the left and steps forward.
+respatializeaxis 0  200 0 0  0 1 0  -1 0 0  0 0 1  0
+advance 1102
+update
+dumpstate turned
+dumpring turned
+
+# The inwater flag only drives the dropped EAX arm, so the software mixer must
+# paint the same way. The golden pins that.
+respatializeaxis 0  200 0 0  0 1 0  -1 0 0  0 0 1  1
+advance 1102
+update
+dumpstate underwater
+dumpring underwater
+shutdown

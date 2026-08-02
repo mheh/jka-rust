@@ -1,0 +1,116 @@
+== snd-oracle scenarios/spatialize.snd ==
+REGISTER slot 0 handle 1 path sound/sine440.wav
+REGISTER slot 1 handle 2 path sound/sweep11k.wav
+STATE placed
+  clock 0 dmapos 0 frames 0
+  started 1 muted 0 soundtime 0 paintedtime 0 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 0 prints 14 dprints 0
+  ch 0 ent 1 chan 0 lv 255 rv 255 mv 255 start 2147483647 fixed 1 loop 0 org -400.000000 0.000000 0.000000 sfx sound/sine440
+  ch 1 ent 2 chan 0 lv 255 rv 255 mv 255 start 2147483647 fixed 1 loop 0 org 400.000000 0.000000 0.000000 sfx sound/sine440
+  ch 2 ent 3 chan 0 lv 255 rv 255 mv 255 start 2147483647 fixed 1 loop 0 org 0.000000 800.000000 0.000000 sfx sound/sweep11k
+  ch 3 ent 4 chan 0 lv 255 rv 255 mv 255 start 2147483647 fixed 1 loop 0 org 0.000000 0.000000 4000.000000 sfx sound/sweep11k
+STATE spatialized
+  clock 0 dmapos 0 frames 0
+  started 1 muted 0 soundtime 0 paintedtime 0 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 0 prints 14 dprints 0
+  ch 0 ent 1 chan 0 lv 112 rv 112 mv 255 start 2147483647 fixed 1 loop 0 org -400.000000 0.000000 0.000000 sfx sound/sine440
+  ch 1 ent 2 chan 0 lv 112 rv 112 mv 255 start 2147483647 fixed 1 loop 0 org 400.000000 0.000000 0.000000 sfx sound/sine440
+  ch 2 ent 3 chan 0 lv 144 rv 0 mv 255 start 2147483647 fixed 1 loop 0 org 0.000000 800.000000 0.000000 sfx sound/sweep11k
+STATE frame1
+  clock 49 dmapos 2204 frames 1102
+  started 1 muted 0 soundtime 1102 paintedtime 5512 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 0 prints 14 dprints 0
+  ch 0 ent 1 chan 0 lv 112 rv 112 mv 255 start 2204 fixed 1 loop 0 org -400.000000 0.000000 0.000000 sfx sound/sine440
+  ch 1 ent 2 chan 0 lv 112 rv 112 mv 255 start 2204 fixed 1 loop 0 org 400.000000 0.000000 0.000000 sfx sound/sine440
+  ch 2 ent 3 chan 0 lv 144 rv 0 mv 255 start 2204 fixed 1 loop 0 org 0.000000 800.000000 0.000000 sfx sound/sweep11k
+RING frame1 bytes 65536 whole a2e9be4b
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 2 crc c9483bfb min -13759 max 13676 nonzero 1735
+  blk 3 crc 8cf8cb43 min -13800 max 13739 nonzero 2048
+  blk 4 crc 8c6b3451 min -13701 max 13745 nonzero 2047
+  blk 5 crc 531067b7 min -13793 max 13360 nonzero 784
+  blk 6 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 7 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 8 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 9 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 10 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 11 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+STATE turned
+  clock 99 dmapos 4408 frames 2204
+  started 1 muted 0 soundtime 2204 paintedtime 6614 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 200.000000 0.000000 0.000000
+  axis0 0.000000 1.000000 0.000000
+  axis1 -1.000000 0.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 0 prints 14 dprints 0
+  ch 0 ent 1 chan 0 lv 184 rv 0 mv 255 start 2204 fixed 1 loop 0 org -400.000000 0.000000 0.000000 sfx sound/sine440
+  ch 1 ent 2 chan 0 lv 0 rv 255 mv 255 start 2204 fixed 1 loop 0 org 400.000000 0.000000 0.000000 sfx sound/sine440
+  ch 2 ent 3 chan 0 lv 86 rv 52 mv 255 start 2204 fixed 1 loop 0 org 0.000000 800.000000 0.000000 sfx sound/sweep11k
+RING turned bytes 65536 whole 5afc1259
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 2 crc c9483bfb min -13759 max 13676 nonzero 1735
+  blk 3 crc 64cc4eb0 min -13800 max 12977 nonzero 2048
+  blk 4 crc 14788cb6 min -11701 max 11753 nonzero 2048
+  blk 5 crc f76d4f09 min -11781 max 11788 nonzero 2048
+  blk 6 crc c02b85e9 min -11758 max 11747 nonzero 940
+  blk 7 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 8 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 9 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 10 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 11 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+STATE underwater
+  clock 149 dmapos 6612 frames 3306
+  started 1 muted 0 soundtime 3306 paintedtime 7716 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 200.000000 0.000000 0.000000
+  axis0 0.000000 1.000000 0.000000
+  axis1 -1.000000 0.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 0 prints 14 dprints 0
+  ch 0 ent 1 chan 0 lv 184 rv 0 mv 255 start 2204 fixed 1 loop 0 org -400.000000 0.000000 0.000000 sfx sound/sine440
+  ch 1 ent 2 chan 0 lv 0 rv 255 mv 255 start 2204 fixed 1 loop 0 org 400.000000 0.000000 0.000000 sfx sound/sine440
+  ch 2 ent 3 chan 0 lv 86 rv 52 mv 255 start 2204 fixed 1 loop 0 org 0.000000 800.000000 0.000000 sfx sound/sweep11k
+RING underwater bytes 65536 whole b0830434
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 2 crc c9483bfb min -13759 max 13676 nonzero 1735
+  blk 3 crc 64cc4eb0 min -13800 max 12977 nonzero 2048
+  blk 4 crc 14788cb6 min -11701 max 11753 nonzero 2048
+  blk 5 crc f76d4f09 min -11781 max 11788 nonzero 2048
+  blk 6 crc 2f9dd8a9 min -11758 max 11747 nonzero 2048
+  blk 7 crc e1e08e28 min -11789 max 11774 nonzero 1096
+  blk 8 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 9 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 10 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 11 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+== end ==

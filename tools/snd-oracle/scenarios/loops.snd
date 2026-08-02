@@ -1,0 +1,49 @@
+# loops — S_AddLoopingSound, S_AddAmbientLoopingSound and S_StopLoopingSound
+# across frames. S_Respatialize is the call that merges the loop list into
+# channels, so each frame re-adds the loops it still wants and then
+# respatializes. The golden pins S_AddLoopSounds and the wrap-around paint of a
+# looping channel in S_PaintChannels.
+cvar s_khz 22
+init
+beginreg
+register 0 sound/sine440.wav
+register 1 sound/ramp64.wav
+
+clearloops
+addloop 5 100 0 0 0 0 0 0
+addloop 6 -100 0 0 0 0 0 1
+respatialize 0 0 0 0 0
+advance 1102
+update
+dumpstate frame1
+dumpring frame1
+
+# The same two loops persist, and a head-relative ambient loop joins them.
+clearloops
+addloop 5 100 0 0 0 0 0 0
+addloop 6 -100 0 0 0 0 0 1
+ambientloop 0 0 0 255 0
+respatialize 0 0 0 0 0
+advance 1102
+update
+dumpstate frame2
+dumpring frame2
+
+# Entity 6 stops. Its channel must drop out of the paint.
+clearloops
+addloop 5 100 0 0 0 0 0 0
+stoploop 6
+respatialize 0 0 0 0 0
+advance 1102
+update
+dumpstate frame3
+dumpring frame3
+
+# Every loop stops.
+clearloops
+respatialize 0 0 0 0 0
+advance 1102
+update
+dumpstate frame4
+dumpring frame4
+shutdown

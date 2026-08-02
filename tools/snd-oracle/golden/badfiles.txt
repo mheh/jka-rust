@@ -1,0 +1,40 @@
+== snd-oracle scenarios/badfiles.snd ==
+REGISTER slot 0 handle 0 path sound/missing.wav
+REGISTER slot 1 handle 0 path sound/stereo.wav
+REGISTER slot 2 handle 3 path sound/sine440.wav
+REGISTER slot 3 handle 3 path sound/sine440.wav
+SFX loaded count 4
+  sfx 0 name sound/null samples 128 volrange 0.000000 method 0 default 0 inmem 1 data e6a1d1c5
+  sfx 1 name sound/missing samples 0 volrange 0.000000 method 0 default 1 inmem 1 data 00000000
+  sfx 2 name sound/stereo samples 0 volrange 0.000000 method 0 default 1 inmem 1 data 00000000
+  sfx 3 name sound/sine440 samples 5512 volrange 78.000000 method 0 default 0 inmem 1 data f8149e00
+STATE frame1
+  clock 49 dmapos 2204 frames 1102
+  started 1 muted 0 soundtime 1102 paintedtime 5512 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 0 prints 15 dprints 0
+  ch 0 ent 1 chan 0 lv 127 rv 127 mv 255 start 2204 fixed 1 loop 0 org 0.000000 0.000000 0.000000 sfx sound/null
+  ch 1 ent 2 chan 0 lv 127 rv 127 mv 255 start 2204 fixed 1 loop 0 org 0.000000 0.000000 0.000000 sfx sound/null
+  ch 2 ent 3 chan 0 lv 127 rv 127 mv 255 start 2204 fixed 1 loop 0 org 0.000000 0.000000 0.000000 sfx sound/sine440
+RING frame1 bytes 65536 whole 2bea50b1
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 2 crc af2095b5 min -4961 max 4960 nonzero 1734
+  blk 3 crc cf004cb9 min -4961 max 4960 nonzero 2048
+  blk 4 crc 5af2a855 min -4961 max 4960 nonzero 2046
+  blk 5 crc bcb583fd min -4961 max 4960 nonzero 784
+  blk 6 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 7 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 8 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 9 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 10 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 11 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+== end ==

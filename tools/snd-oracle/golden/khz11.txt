@@ -1,0 +1,68 @@
+== snd-oracle scenarios/khz11.snd ==
+REGISTER slot 0 handle 1 path sound/sine440.wav
+REGISTER slot 1 handle 2 path sound/sweep11k.wav
+REGISTER slot 2 handle 3 path sound/sine44k.wav
+SFX loaded count 4
+  sfx 0 name sound/null samples 64 volrange 0.000000 method 0 default 0 inmem 1 data a7b537c5
+  sfx 1 name sound/sine440 samples 2756 volrange 78.000000 method 0 default 0 inmem 1 data 9fb38aca
+  sfx 2 name sound/sweep11k samples 2756 volrange 70.000000 method 0 default 0 inmem 1 data 610d56ff
+  sfx 3 name sound/sine44k samples 2756 volrange 93.000000 method 0 default 0 inmem 1 data ed27be14
+STATE frame1
+  clock 49 dmapos 1102 frames 551
+  started 1 muted 0 soundtime 551 paintedtime 2756 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 11025 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 0 prints 14 dprints 0
+  ch 0 ent 1 chan 0 lv 127 rv 127 mv 255 start 1102 fixed 1 loop 0 org 0.000000 0.000000 0.000000 sfx sound/sine440
+  ch 1 ent 2 chan 0 lv 127 rv 127 mv 255 start 1102 fixed 1 loop 0 org 0.000000 0.000000 0.000000 sfx sound/sweep11k
+  ch 2 ent 3 chan 0 lv 127 rv 127 mv 255 start 1102 fixed 1 loop 0 org 0.000000 0.000000 0.000000 sfx sound/sine44k
+RING frame1 bytes 65536 whole 00d97d91
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc e3d2f629 min -14796 max 14917 nonzero 1892
+  blk 2 crc 4010d14d min -14899 max 14315 nonzero 1416
+  blk 3 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 4 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 5 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 6 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 7 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 8 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 9 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 10 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 11 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+STATE frame2
+  clock 99 dmapos 2204 frames 1102
+  started 1 muted 0 soundtime 1102 paintedtime 3307 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 11025 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 0 prints 14 dprints 0
+  ch 0 ent 1 chan 0 lv 127 rv 127 mv 255 start 1102 fixed 1 loop 0 org 0.000000 0.000000 0.000000 sfx sound/sine440
+  ch 1 ent 2 chan 0 lv 127 rv 127 mv 255 start 1102 fixed 1 loop 0 org 0.000000 0.000000 0.000000 sfx sound/sweep11k
+  ch 2 ent 3 chan 0 lv 127 rv 127 mv 255 start 1102 fixed 1 loop 0 org 0.000000 0.000000 0.000000 sfx sound/sine44k
+RING frame2 bytes 65536 whole c70b9cb9
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc e3d2f629 min -14796 max 14917 nonzero 1892
+  blk 2 crc bb8d670d min -14899 max 14479 nonzero 2048
+  blk 3 crc f66ca41d min -15001 max 14197 nonzero 470
+  blk 4 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 5 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 6 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 7 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 8 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 9 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 10 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 11 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+== end ==
