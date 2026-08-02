@@ -67,6 +67,12 @@ pub fn install_engine_hooks(engine: &mut Engine) {
     // The sound tier replaces its two null-build defaults. Each installed hook
     // answers the null-build value while `Engine.snd` is `None` (DEC-57).
     mp_engine_client::hook_install::install_engine_hooks(&mut engine.common.hooks);
+    // Raven picks the client tier at link time: `jamp` links `cl_main.cpp`,
+    // the dedicated build links `null_client.cpp`. A seated `Engine.cl` is the
+    // client build, so only that arm swaps the real `CL_*` bodies in.
+    if engine.cl.is_some() {
+        mp_engine_client::hook_install::install_client_engine_hooks(&mut engine.common.hooks);
+    }
 
     let cl_raw = match engine.cl.as_mut() {
         Some(cl) => cl as *mut _ as *mut (),
