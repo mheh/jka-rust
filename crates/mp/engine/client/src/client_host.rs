@@ -38,7 +38,7 @@ use crate::client::ping_t::ping_t;
 use crate::client::server_status_t::serverStatus_t;
 use crate::client_dispatch_ctx::ClientDispatchCtx;
 use crate::keys::key_globals_s::{keyGlobals_t, MAX_KEYS};
-use crate::keys::keyname_t::keyname_t;
+use crate::keys::keyname_t::{keyname_t, KEYNAMES};
 
 /// Raven `MAX_SCR_LINES` — lines the center-print string may wrap to.
 ///
@@ -261,6 +261,7 @@ pub struct Client {
     pub chat_playerNum: c_int,
     /// Raven `keynames[MAX_KEYS]` — the key name/keynum table that
     /// `Key_StringToKeynum` and `Key_KeynumToString` walk.
+    /// The rows come from the `KEYNAMES` const and nothing writes them back.
     ///
     /// Source: `oracle/codemp/client/keys.h:46`; `oracle/codemp/client/cl_keys.cpp:22-353`
     pub keynames: Box<[keyname_t; MAX_KEYS]>,
@@ -513,7 +514,7 @@ impl Default for Client {
             chatField: FIELD_ZERO,
             chat_team: qfalse,
             chat_playerNum: 0,
-            keynames: zeroed_box(),
+            keynames: Box::new(KEYNAMES),
             completionString: core::ptr::null(),
             shortestMatch: [0; MAX_TOKEN_CHARS],
             matchCount: 0,
