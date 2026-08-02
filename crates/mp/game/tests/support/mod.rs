@@ -738,6 +738,18 @@ impl GameCallbacks for TestCallbacks {
     fn siege_class_shader(&mut self, _s: &str, _c: &str) -> (c_int, bool) {
         unreachable!()
     }
+    fn entity_sound(&mut self, _e: c_int, _c: c_int, _s: c_int) {
+        unreachable!()
+    }
+    fn fighter_is_in_space(&mut self, _e: c_int) -> qboolean {
+        unreachable!()
+    }
+    fn veh_turbo_start_fx(&mut self, _v: c_int) {
+        unreachable!()
+    }
+    fn veh_fighter_crash_suicide(&mut self, _p: c_int) {
+        unreachable!()
+    }
 }
 
 // =================================== dump ====================================
