@@ -18,7 +18,9 @@ use mp_engine_qcommon::cmd_common::{Cbuf_ExecuteText, Cmd_Argc, Cmd_ArgvBuffer};
 use mp_engine_qcommon::common::common::{com_printf, Common};
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::error::com_error;
-use mp_engine_qcommon::common_fns::{Com_Memcpy, Com_Memset, Com_RealTime, Q_acos, Q_asin};
+use mp_engine_qcommon::common_fns::{
+    Com_DPrintf, Com_Memcpy, Com_Memset, Com_RealTime, Q_acos, Q_asin,
+};
 use mp_engine_qcommon::cvar_fns::{
     Cvar_Get, Cvar_InfoStringBuffer, Cvar_Register, Cvar_Reset, Cvar_Set, Cvar_SetValue,
     Cvar_Update, Cvar_VariableStringBuffer, Cvar_VariableValue,
@@ -1898,6 +1900,7 @@ pub fn CL_UISystemCalls(
             )
         }
     } else if trap == MpUiImport::UI_CIN_PLAYCINEMATIC as c_int {
+        Com_DPrintf(view.common, "UI_CIN_PlayCinematic\n");
         unsafe {
             crate::cl_cin::CIN_PlayCinematic(
                 view,
