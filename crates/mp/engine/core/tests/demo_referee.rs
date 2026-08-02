@@ -515,7 +515,11 @@ fn full_demos_match_local_goldens() {
             println!("  skip {demo}: no full golden at {}", golden.display());
             continue;
         }
-        let run = play(demo, u32::MAX);
+        // Our rig stops where the golden stopped. Reading past the last demo
+        // message reaches `CL_DemoCompleted`, whose `CL_Disconnect_f` raises
+        // `ERR_DISCONNECT` the way the real engine does.
+        let cap = bracket_snapshots(&read_journal(&golden).expect("golden reads back")).len();
+        let run = play(demo, cap as u32);
         findings.extend(gate(demo, &manifests, &run, &golden));
     }
     assert!(

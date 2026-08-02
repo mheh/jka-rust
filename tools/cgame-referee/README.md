@@ -612,9 +612,13 @@ JKA_PROBE_BRACKET_CAP=0 JKA_PROBE_OUT=/tmp/full ./record-golden.sh swoop1
 The script builds the probe, stages it plus a stock ui module under a private
 `fs_homepath`, copies the fixture demo in, and runs the oracle client. Nothing
 writes to the retail install or to the operator's own OpenJK home. A cap of 0
-mints the DEC-62.2 extended-check goldens, which stay out of git for size: point
-`JKA_REF_FULL_GOLDENS` at their directory and run
-`full_demos_match_local_goldens`.
+runs to the end of the demo and mints the DEC-62.2 extended-check goldens, which
+stay out of git for size: point `JKA_REF_FULL_GOLDENS` at their directory and run
+`full_demos_match_local_goldens`. That check caps our rig at the golden's own
+bracket count, because reading past the last demo message reaches
+`CL_DemoCompleted`, whose `CL_Disconnect_f` raises `ERR_DISCONNECT` the way the
+real engine does. Proven 2026-08-02 on the whole `spectator` demo: 418 brackets
+compared, zero differences.
 
 Two engine flags matter. `r_swapInterval 0` keeps the frame rate off the vsync
 clock, because a frame longer than one snapshot interval makes the engine skip a

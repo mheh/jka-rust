@@ -72,10 +72,13 @@ pub extern "C-unwind" fn dllEntry(syscall: *mut c_void) {
 
     let journal_path = PathBuf::from(required_env("JKA_PROBE_JOURNAL"));
     let manifest_dir = PathBuf::from(required_env("JKA_PROBE_MANIFESTS"));
-    let cap = std::env::var("JKA_PROBE_BRACKET_CAP")
-        .ok()
-        .and_then(|v| v.parse::<u32>().ok())
-        .unwrap_or(DEFAULT_BRACKET_CAP);
+    // A cap of 0 means no cap: the run ends at the end of the demo. That is how
+    // the DEC-62.2 extended check mints its local full-length goldens.
+    let cap = match std::env::var("JKA_PROBE_BRACKET_CAP").ok().and_then(|v| v.parse::<u32>().ok()) {
+        Some(0) => u32::MAX,
+        Some(n) => n,
+        None => DEFAULT_BRACKET_CAP,
+    };
     *QUIT_AT_CAP.lock().unwrap() = std::env::var("JKA_PROBE_QUIT_AT_CAP").as_deref() != Ok("0");
 
     match Probe::new(&journal_path, &manifest_dir, cap, forward as probe::TrapFn) {
@@ -121,11 +124,12 @@ pub extern "C-unwind" fn vmMain(
     };
     let was_done = p.done();
     let ret = p.vm_main(command as i64, &words);
-    let capped = !was_done && p.done() && command as i64 == probe::CG_DRAW_ACTIVE_FRAME;
-    if capped && *QUIT_AT_CAP.lock().unwrap() {
-        // The cap closed the journal, so the recording is complete. Ending the
-        // engine here keeps a golden run free of operator input.
-        eprintln!("cgame-probe: bracket cap reached, quitting the engine");
+    // The journal closes at the bracket cap, or at CG_SHUTDOWN when the demo
+    // ended first. Either way the recording is complete, so ending the engine
+    // here keeps a golden run free of operator input.
+    let finished = !was_done && p.done();
+    if finished && *QUIT_AT_CAP.lock().unwrap() {
+        eprintln!("cgame-probe: recording complete, quitting the engine");
         p.send_console_command("quit\n");
     }
     ret
