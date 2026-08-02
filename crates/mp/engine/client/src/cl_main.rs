@@ -878,8 +878,8 @@ pub fn CL_InitRef(cl: &mut Client) {
 
 /// `CL_SetModel_f` — sets or reports the `model` userinfo cvar.
 ///
-/// Raven: "rwwFIXMEFIXME: This is currently broken and doesn't seem to work for
-/// connecting clients."
+/// Raven (rww): this is currently broken and does not seem to work for
+/// connecting clients.
 /// Source: `oracle/codemp/client/cl_main.cpp:2507-2536`
 pub fn CL_SetModel_f() {
     let mut name = [0 as c_char; 256];
@@ -900,7 +900,7 @@ pub fn CL_SetModel_f() {
 
         gCLModelDelay = curTime + MODEL_CHANGE_DELAY;
         */
-        //rwwFIXMEFIXME: This is currently broken and doesn't seem to work for connecting clients
+        //rww: this is currently broken and does not seem to work for connecting clients
         Cvar_Set(view, "model", &arg);
     } else {
         Cvar_VariableStringBuffer(common, "model", name.as_mut_ptr(), name.len() as c_int);
@@ -2729,7 +2729,7 @@ pub fn CL_DisconnectPacket(common: &mut Common, cl: &mut Client, from: netadr_t)
         return;
     }
 
-    // drop the connection (FIXME: connection dropped dialog)
+    // drop the connection (Raven: a connection-dropped dialog is unimplemented)
     com_printf(common, "Server disconnected for unknown reason\n");
 
     CL_Disconnect(common, cl, qtrue);
@@ -3400,7 +3400,7 @@ pub fn CL_PacketEvent(common: &mut Common, cl: &mut Client, from: netadr_t, msg:
             common,
             &format!("{}:sequenced packet without connection\n", adrstr),
         );
-        // FIXME: send a client disconnect?
+        // Raven asks here whether to send a client disconnect. It does not.
         return;
     }
 

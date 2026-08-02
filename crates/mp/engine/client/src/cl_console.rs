@@ -1,3 +1,5 @@
+/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/client-cpass/crates/mp/engine/client/src/cl_console.rs:
+
 //! `cl_console.cpp` — the client console: scrollback buffer, notify lines,
 //! and the drop-down/solid console draw path.
 //!
@@ -88,7 +90,10 @@ pub fn Con_Dump_f(cl: &mut Client) {
         return;
     }
 
-    com_printf(common, &format!("Dumped console text to {}.\n", Cmd_Argv(common, 1)));
+    com_printf(
+        common,
+        &format!("Dumped console text to {}.\n", Cmd_Argv(common, 1)),
+    );
 
     let f: fileHandle_t = FS_FOpenFileWrite(common, Cmd_Argv(common, 1));
     if f == 0 {
@@ -133,7 +138,10 @@ pub fn Con_Dump_f(cl: &mut Client) {
             x -= 1;
         }
         unsafe {
-            strcat(buffer.as_mut_ptr() as *mut c_char, b"\n\0".as_ptr() as *const c_char);
+            strcat(
+                buffer.as_mut_ptr() as *mut c_char,
+                b"\n\0".as_ptr() as *const c_char,
+            );
             FS_Write(
                 buffer.as_ptr() as *const (),
                 strlen(buffer.as_ptr() as *const c_char) as c_int,
@@ -293,8 +301,12 @@ pub fn Con_MessageMode3_f(cl: &mut Client) {
         return;
     }
 
-    cl.chat_playerNum =
-        VM_Call(common, cl.cgvm, MpCgameExport::CG_CROSSHAIR_PLAYER as c_int, &[]) as c_int;
+    cl.chat_playerNum = VM_Call(
+        common,
+        cl.cgvm,
+        MpCgameExport::CG_CROSSHAIR_PLAYER as c_int,
+        &[],
+    ) as c_int;
     if cl.chat_playerNum < 0 || cl.chat_playerNum >= MAX_CLIENTS as c_int {
         cl.chat_playerNum = -1;
         return;
@@ -314,8 +326,12 @@ pub fn Con_MessageMode4_f(cl: &mut Client) {
         return;
     }
 
-    cl.chat_playerNum =
-        VM_Call(common, cl.cgvm, MpCgameExport::CG_LAST_ATTACKER as c_int, &[]) as c_int;
+    cl.chat_playerNum = VM_Call(
+        common,
+        cl.cgvm,
+        MpCgameExport::CG_LAST_ATTACKER as c_int,
+        &[],
+    ) as c_int;
     if cl.chat_playerNum < 0 || cl.chat_playerNum >= MAX_CLIENTS as c_int {
         cl.chat_playerNum = -1;
         return;
@@ -625,8 +641,8 @@ pub fn Con_DrawNotify(common: &mut Common, cl: &mut Client) {
             let pixel_height_to_advance = 2
                 + ((1.3f32 / cl.con.yadjust)
                     * crate::cl_renderer::re(common)
-                        .Font_HeightPixels(FONT_INDEX_ASIAN_NOTIFY, font_scale) as f32)
-                    as c_int;
+                        .Font_HeightPixels(FONT_INDEX_ASIAN_NOTIFY, font_scale)
+                        as f32) as c_int;
 
             // concat the text to be printed...
             let mut s_temp = String::new();
@@ -695,7 +711,8 @@ pub fn Con_DrawNotify(common: &mut Common, cl: &mut Client) {
         // (see shape_mismatches).
         let (chattext, skip);
         if cl.chat_team == qboolean::qtrue {
-            chattext = mp_engine_qcommon::stringed::api::SE_GetString2(view, "MP_SVGAME", "SAY_TEAM");
+            chattext =
+                mp_engine_qcommon::stringed::api::SE_GetString2(view, "MP_SVGAME", "SAY_TEAM");
             crate::SCR_DrawBigString(common, cl, 8, v, &chattext, 1.0);
             skip = chattext.len() as c_int + 1;
         } else {
