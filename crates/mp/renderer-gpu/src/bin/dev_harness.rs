@@ -346,6 +346,7 @@ fn dev_registries() -> DevRegistries {
         fog_image: None,
         dlight_image: None,
         white_image: None,
+        scratch_images: Vec::new(),
         lightmaps: Vec::new(),
         shaders,
         shader_lookup,

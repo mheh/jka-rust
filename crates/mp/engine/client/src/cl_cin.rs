@@ -768,8 +768,10 @@ pub fn CIN_DrawCinematic(view: &mut EngineHostView, cl: &mut Client, handle: c_i
             let re = re_from_view(view);
             RE_StretchRaw(
                 &mut re.frame,
+                &mut re.frame_data,
+                &mut re.sim,
+                &mut re.img_state,
                 &mut re.gpu_res,
-                &re.assets,
                 &re.cvars,
                 view.common,
                 x as i32,
@@ -802,8 +804,10 @@ pub fn CIN_DrawCinematic(view: &mut EngineHostView, cl: &mut Client, handle: c_i
     let re = unsafe { re_from_view(view) };
     RE_StretchRaw(
         &mut re.frame,
+        &mut re.frame_data,
+        &mut re.sim,
+        &mut re.img_state,
         &mut re.gpu_res,
-        &re.assets,
         &re.cvars,
         view.common,
         x as i32,
@@ -850,15 +854,7 @@ pub fn CIN_UploadCinematic(view: &mut EngineHostView, cl: &mut Client, handle: c
         };
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let re = unsafe { re_from_view(view) };
-        RE_UploadCinematic(
-            &mut re.gpu_res,
-            &mut re.assets,
-            cols,
-            rows,
-            data,
-            handle,
-            dirty,
-        );
+        RE_UploadCinematic(&mut re.sim, &mut re.img_state, cols, rows, data, handle, dirty);
 
         if view.common.cvar(cl.cl_inGameVideo).integer == 0
             && cl.cinTable[handle as usize].playonwalls == 1

@@ -404,6 +404,41 @@ impl FrameExecutor {
                     }
                 }
 
+                FrameEvent::DrawStretchRaw {
+                    x,
+                    y,
+                    w,
+                    h,
+                    s1,
+                    t1,
+                    s2,
+                    t2,
+                    image,
+                } => {
+                    // The cinematic quad carries no shader, so it takes
+                    // `RB_SetGL2D`'s state and the scratch texture directly. A
+                    // scratch image that never uploaded falls back to white,
+                    // which `bind_group` already does for an unknown handle.
+                    self.batch.push_quad(
+                        Rect {
+                            x: *x,
+                            y: *y,
+                            w: *w,
+                            h: *h,
+                        },
+                        UvRect {
+                            s1: *s1,
+                            t1: *t1,
+                            s2: *s2,
+                            t2: *t2,
+                        },
+                        color,
+                        blend_state_from_gls(GLS_2D_DEFAULT),
+                        Some(*image),
+                    );
+                    stats.quads += 1;
+                }
+
                 FrameEvent::DrawString {
                     ox,
                     oy,
