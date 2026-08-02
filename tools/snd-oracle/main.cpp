@@ -9,6 +9,8 @@
 // The Rust mixer port (wayfinder ticket gh#24) must reproduce both goldens.
 #include "../qcommon/exe_headers.h"
 #include "snd_local.h"
+#include "snd_music.h"
+#include "snd_ambient.h"
 #include "host.h"
 
 #include <cstdio>
@@ -28,6 +30,22 @@ extern int s_numSfx;
 extern int numLoopSounds;
 extern int s_entityWavVol[];
 extern int s_entityWavVol_back[];
+
+// The background-music state. `MusicInfo_t` and the four state globals are
+// file-local to snd_dma.cpp, so the driver reads them through the two
+// accessors build.sh appends to that copy.
+// Source: `oracle/codemp/client/snd_dma.cpp:38-109`
+extern "C" void snd_oracle_music_track(int track, int *out);
+extern "C" void snd_oracle_music_state(int *out, const char **loop, const char **set);
+
+// `Music_GetLevelSetName` is declared inside snd_dma.cpp, not in snd_music.h.
+// Source: `oracle/codemp/client/snd_music.cpp:1140`
+extern const char *Music_GetLevelSetName(void);
+
+// `S_StartBackgroundTrack` and `S_RestartMusic` live in snd_public.h.
+extern void S_StartBackgroundTrack(const char *intro, const char *loop, int bCalledByCGameStart);
+extern void S_RestartMusic(void);
+extern void S_StopBackgroundTrack(void);
 
 #define SND_ORACLE_MAX_SLOTS 16
 static sfxHandle_t s_slotHandles[SND_ORACLE_MAX_SLOTS];
@@ -105,6 +123,26 @@ static void snd_oracle_dump_lipsync(const char *tag)
 	printf("LIPSYNC %s\n", tag);
 	for (int i = 0; i < SND_ORACLE_LIPSYNC_ENTS; i++) {
 		printf("  ent %d vol %d back %d\n", i, s_entityWavVol[i], s_entityWavVol_back[i]);
+	}
+}
+
+// The background-music state block. The nine per-track fields come through the
+// accessor build.sh appends to snd_dma.cpp, because MusicInfo_t has no header.
+static void snd_oracle_dump_music(const char *tag)
+{
+	int state[3];
+	const char *loop = NULL;
+	const char *set = NULL;
+	snd_oracle_music_state(state, &loop, &set);
+
+	printf("MUSIC %s\n", tag);
+	printf("  dynamic %d actual %d request %d loop %s\n", state[0], state[1], state[2], loop);
+	printf("  set %s\n", set);
+	for (int track = 0; track < eBGRNDTRACK_NUMBEROF; track++) {
+		int f[9];
+		snd_oracle_music_track(track, f);
+		printf("  track %d mp3 %d file %d active %d exists %d xfade %d samples %d rate %d chans %d width %d\n",
+			track, f[0], f[1], f[2], f[3], f[4], f[5], f[6], f[7], f[8]);
 	}
 }
 
@@ -329,6 +367,81 @@ int main(int argc, char **argv)
 			snd_oracle_vec(&cursor, cmd, org);
 			int volume = snd_oracle_int(&cursor, cmd);
 			S_AddAmbientLoopingSound(org, (unsigned char)volume, snd_oracle_slot(&cursor, cmd));
+
+		} else if (strcmp(cmd, "music") == 0) {
+			const char *intro = snd_oracle_word(&cursor, cmd);
+			const char *loop = snd_oracle_next(&cursor);
+			const char *cgameStart = loop ? snd_oracle_next(&cursor) : NULL;
+			S_StartBackgroundTrack(intro, loop ? loop : "", cgameStart ? atoi(cgameStart) : 0);
+
+		} else if (strcmp(cmd, "restartmusic") == 0) {
+			S_RestartMusic();
+
+		} else if (strcmp(cmd, "stopmusic") == 0) {
+			S_StopBackgroundTrack();
+
+		} else if (strcmp(cmd, "musicdata") == 0) {
+			const char *label = snd_oracle_word(&cursor, cmd);
+			printf("MUSICDATA label %s available %d\n", label, (int)Music_DynamicDataAvailable(label));
+
+		} else if (strcmp(cmd, "musicfile") == 0) {
+			int state = snd_oracle_int(&cursor, cmd);
+			const char *name = Music_GetFileNameForState((MusicState_e)state);
+			printf("MUSICFILE state %d name %s\n", state, name ? name : "<none>");
+
+		} else if (strcmp(cmd, "musicinterrupt") == 0) {
+			int a = snd_oracle_int(&cursor, cmd);
+			int b = snd_oracle_int(&cursor, cmd);
+			printf("MUSICINTERRUPT from %d to %d allowed %d\n",
+				a, b, (int)Music_StateCanBeInterrupted((MusicState_e)a, (MusicState_e)b));
+
+		} else if (strcmp(cmd, "musictransition") == 0) {
+			float elapsed = snd_oracle_float(&cursor, cmd);
+			int state = snd_oracle_int(&cursor, cmd);
+			MusicState_e transition = eBGRNDTRACK_EXPLORE;
+			float entry = 0.0f;
+			int allowed = (int)Music_AllowedToTransition(elapsed, (MusicState_e)state, &transition, &entry);
+			printf("MUSICTRANSITION at %.6f state %d allowed %d to %d entry %.6f\n",
+				elapsed, state, allowed, allowed ? (int)transition : -1, allowed ? entry : 0.0f);
+
+		} else if (strcmp(cmd, "musicentrytime") == 0) {
+			int state = snd_oracle_int(&cursor, cmd);
+			printf("MUSICENTRYTIME state %d time %.6f\n", state, Music_GetRandomEntryTime((MusicState_e)state));
+
+		} else if (strcmp(cmd, "musicsetname") == 0) {
+			printf("MUSICSETNAME %s\n", Music_GetLevelSetName());
+
+		} else if (strcmp(cmd, "asprecache") == 0) {
+			AS_AddPrecacheEntry(snd_oracle_word(&cursor, cmd));
+
+		} else if (strcmp(cmd, "asparse") == 0) {
+			AS_ParseSets();
+
+		} else if (strcmp(cmd, "asupdate") == 0) {
+			const char *name = snd_oracle_word(&cursor, cmd);
+			vec3_t org;
+			snd_oracle_vec(&cursor, cmd, org);
+			snd_oracle_realtime = snd_oracle_int(&cursor, cmd);
+			S_UpdateAmbientSet(name, org);
+
+		} else if (strcmp(cmd, "aslocal") == 0) {
+			const char *name = snd_oracle_word(&cursor, cmd);
+			vec3_t listener;
+			vec3_t org;
+			snd_oracle_vec(&cursor, cmd, listener);
+			snd_oracle_vec(&cursor, cmd, org);
+			int entID = snd_oracle_int(&cursor, cmd);
+			int time = snd_oracle_int(&cursor, cmd);
+			snd_oracle_realtime = snd_oracle_int(&cursor, cmd);
+			printf("LOCALSET name %s time %d\n", name, S_AddLocalSet(name, listener, org, entID, time));
+
+		} else if (strcmp(cmd, "asbmodel") == 0) {
+			const char *name = snd_oracle_word(&cursor, cmd);
+			int stage = snd_oracle_int(&cursor, cmd);
+			printf("BMODELSOUND name %s stage %d handle %d\n", name, stage, AS_GetBModelSound(name, stage));
+
+		} else if (strcmp(cmd, "dumpmusic") == 0) {
+			snd_oracle_dump_music(snd_oracle_word(&cursor, cmd));
 
 		} else if (strcmp(cmd, "clearloops") == 0) {
 			S_ClearLoopingSounds();

@@ -19,6 +19,7 @@ use std::collections::BTreeMap;
 
 use mp_engine_qcommon::common::common::com_printf;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
+use mp_engine_qcommon::common::QRand;
 use mp_engine_qcommon::files_common::FS_ReadFileVec;
 use mp_engine_qcommon::gp2::generic_parser2::GenericParser2;
 use mp_engine_qcommon::gp2::gp_group::GpGroup;
@@ -910,7 +911,7 @@ fn transition_state(value: c_int) -> MusicState_e {
 /// Source: `oracle/codemp/client/snd_music.cpp:1097-1136`
 pub fn Music_GetRandomEntryTime(
     music: &mut MusicData_t,
-    rand: c_int,
+    qrand: &mut QRand,
     eMusicState: MusicState_e,
 ) -> f32 {
     let Some(key) = Music_BaseStateToString(eMusicState, false) else {
@@ -925,8 +926,10 @@ pub fn Music_GetRandomEntryTime(
         return 0.0;
     }
 
+    // The draw happens here and nowhere earlier: a state with no entry times
+    // never touches the generator.
     music.iCallCount += 1;
-    let mut iRandomEntryNum = (rand + music.iCallCount) as usize % count;
+    let mut iRandomEntryNum = (qrand.rand() + music.iCallCount) as usize % count;
     if iRandomEntryNum == music.iPrevRandomNumber.max(0) as usize
         && music.iPrevRandomNumber >= 0
         && count > 1

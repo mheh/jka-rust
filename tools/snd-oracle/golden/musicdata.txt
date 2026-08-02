@@ -1,0 +1,50 @@
+== snd-oracle scenarios/musicdata.snd ==
+STATE after-init
+  clock 0 dmapos 0 frames 0
+  started 1 muted 0 soundtime 0 paintedtime 0 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 0.000000 0.000000 0.000000
+  axis1 0.000000 0.000000 0.000000
+  axis2 0.000000 0.000000 0.000000
+  loops 0 prints 14 dprints 0
+MUSICDATA label testmap available 1
+MUSICSETNAME testmap
+MUSICDATA label nolevel available 0
+MUSICDATA label usesmap available 1
+MUSICSETNAME usesmap -> testmap
+MUSICDATA label testmap available 1
+MUSICFILE state 0 name music/testmap/explore_piece.mp3
+MUSICFILE state 1 name music/testmap/action_piece.mp3
+MUSICFILE state 2 name music/testmap/boss_piece.mp3
+MUSICFILE state 3 name music/death_music.mp3
+MUSICFILE state 4 name music/testmap/action_tr0.mp3
+MUSICFILE state 5 name <none>
+MUSICFILE state 8 name music/testmap/explore_tr0.mp3
+MUSICFILE state 9 name <none>
+MUSICFILE state 13 name <none>
+MUSICINTERRUPT from 0 to 1 allowed 1
+MUSICINTERRUPT from 1 to 0 allowed 1
+MUSICINTERRUPT from 0 to 2 allowed 1
+MUSICINTERRUPT from 2 to 0 allowed 0
+MUSICINTERRUPT from 2 to 13 allowed 1
+MUSICINTERRUPT from 3 to 1 allowed 0
+MUSICINTERRUPT from 1 to 3 allowed 1
+MUSICINTERRUPT from 4 to 0 allowed 0
+MUSICINTERRUPT from 4 to 1 allowed 1
+MUSICINTERRUPT from 4 to 13 allowed 0
+MUSICTRANSITION at 0.000000 state 0 allowed 0 to -1 entry 0.000000
+MUSICTRANSITION at 7.800000 state 0 allowed 1 to 8 entry 0.000000
+MUSICTRANSITION at 8.000000 state 0 allowed 1 to 8 entry 0.000000
+MUSICTRANSITION at 8.400000 state 0 allowed 0 to -1 entry 0.000000
+MUSICTRANSITION at 6.100000 state 1 allowed 1 to 4 entry 4.000000
+MUSICTRANSITION at 11.900000 state 1 allowed 1 to 4 entry 4.000000
+MUSICTRANSITION at 12.000000 state 1 allowed 1 to 4 entry 4.000000
+MUSICTRANSITION at 20.000000 state 1 allowed 0 to -1 entry 0.000000
+MUSICTRANSITION at 5.000000 state 2 allowed 0 to -1 entry 0.000000
+MUSICENTRYTIME state 0 time 0.000000
+MUSICENTRYTIME state 0 time 4.000000
+MUSICENTRYTIME state 0 time 0.000000
+MUSICENTRYTIME state 1 time 0.000000
+MUSICENTRYTIME state 2 time 0.000000
+== end ==

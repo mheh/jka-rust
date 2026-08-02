@@ -2395,8 +2395,8 @@ fn S_HandleDynamicMusicStateChange(view: &mut EngineHostView, snd: &mut SoundSys
             }
             _ => {
                 S_SwitchDynamicTracks(view, snd, actual, request, true);
-                let rand = view.common.qrand.rand();
-                let fEntryTime = Music_GetRandomEntryTime(&mut snd.music, rand, request);
+                let fEntryTime =
+                    Music_GetRandomEntryTime(&mut snd.music, &mut view.common.qrand, request);
                 MusicInfo_SeekTo(&mut snd.tMusic_Info[request as usize], dmaSpeed, fEntryTime);
             }
         },

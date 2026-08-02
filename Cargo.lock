@@ -955,6 +955,7 @@ dependencies = [
  "mp_engine_server",
  "mp_qshared",
  "mp_renderer",
+ "native_math",
  "native_platform",
  "native_types",
  "serde_json",

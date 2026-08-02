@@ -70,6 +70,63 @@ perl -i -pe 's/for \(int iChannel=0; iChannel<MAX_CHANNELS; iChannel\+\+\)/int i
 # only runs under `s_show`, and no golden ever prints an address.
 perl -i -pe 's/\(int\)\(data_p - 4\)/(int)(size_t)(data_p - 4)/' build/codemp/client/snd_mem.cpp
 
+# retail-win32 holdrand width, the 2026-07-17 ruling that tools/referee-oracle
+# already applies. `unsigned long` is 32-bit on win32 and 64-bit here, and at
+# LP64 width `(int)(holdrand >> 17)` spans the full register, so Q_irand returns
+# garbage. The ambient system draws every subwave and every gap through Q_irand.
+perl -i -pe 's/static unsigned long\tholdrand = 0x89abcdef;/static unsigned int\tholdrand = 0x89abcdef; \/* snd-oracle: retail-win32 32-bit width *\//' build/codemp/game/q_math.c
+grep -q 'snd-oracle: retail-win32 32-bit width' build/codemp/game/q_math.c || {
+	echo "snd-oracle: q_math.c holdrand decl not found — oracle changed?" >&2
+	exit 1
+}
+
+# snd_ambient.cpp reads `cls.realtime`, the client global. The harness has no
+# client, so the copy reads the scripted clock instead. Harness policy, the
+# SNDDMA_GetDMAPos precedent.
+perl -i -pe 's/\bcls\.realtime\b/snd_oracle_realtime/g' build/codemp/client/snd_ambient.cpp
+perl -i -pe 's/#include "snd_ambient.h"/#include "snd_ambient.h"\nextern int snd_oracle_realtime;/' build/codemp/client/snd_ambient.cpp
+
+# snd_music.cpp calls the C runtime `rand()` in Music_GetRandomEntryTime. This
+# host's libc is a different generator from the engine tier's `Common.qrand`,
+# so the copy draws from the harness generator and both sides agree.
+perl -i -pe 's/\(rand\(\)\+iCallCount\)/(snd_oracle_rand()+iCallCount)/' build/codemp/client/snd_music.cpp
+perl -i -pe 's/#include "snd_music.h"/#include "snd_music.h"\nextern int snd_oracle_rand(void);/' build/codemp/client/snd_music.cpp
+grep -q 'snd_oracle_rand()+iCallCount' build/codemp/client/snd_music.cpp || {
+	echo "snd-oracle: snd_music.c rand() call not found — oracle changed?" >&2
+	exit 1
+}
+
+# `MusicInfo_t` and the four music-state globals are file-local to snd_dma.cpp,
+# so the driver cannot name them. Append two read-only accessors. They add no
+# behaviour: the golden dump asks through them.
+cat >> build/codemp/client/snd_dma.cpp <<'MUSICACCESSOR'
+
+/* snd-oracle: read one tMusic_Info track for the golden dump. */
+extern "C" void snd_oracle_music_track(int track, int *out)
+{
+	MusicInfo_t *p = &tMusic_Info[track];
+	out[0] = p->bIsMP3 ? 1 : 0;
+	out[1] = p->s_backgroundFile;
+	out[2] = p->bActive ? 1 : 0;
+	out[3] = p->bExists ? 1 : 0;
+	out[4] = p->iXFadeVolume;
+	out[5] = p->s_backgroundSamples;
+	out[6] = p->s_backgroundInfo.rate;
+	out[7] = p->s_backgroundInfo.channels;
+	out[8] = p->s_backgroundInfo.width;
+}
+
+/* snd-oracle: read the four file-static music-state globals. */
+extern "C" void snd_oracle_music_state(int *out, const char **loop, const char **set)
+{
+	out[0] = bMusic_IsDynamic ? 1 : 0;
+	out[1] = (int)eMusic_StateActual;
+	out[2] = (int)eMusic_StateRequest;
+	*loop = sMusic_BackgroundLoop;
+	*set  = sInfoOnly_CurrentDynamicMusicSet;
+}
+MUSICACCESSOR
+
 INC="-Ibuild/inc -Ibuild/codemp/client -Ibuild/codemp/qcommon -Ibuild/codemp/game -I."
 # The Win32 shim leads every translation unit, the way MSVC's forced include did.
 FLAGS="$FLAGS -include build/inc/win_shim.h"

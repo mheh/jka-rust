@@ -1,0 +1,232 @@
+== snd-oracle scenarios/music.snd ==
+MUSIC before-start
+  dynamic 0 actual 0 request 0 loop 
+  set 
+  track 0 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 1 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 2 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 3 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 4 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 5 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 6 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 7 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 8 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 9 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 10 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 11 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 12 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 13 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 14 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+MUSIC after-start
+  dynamic 0 actual 0 request 0 loop music/loop.wav
+  set 
+  track 0 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 1 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 2 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 3 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 4 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 5 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 6 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 7 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 8 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 9 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 10 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 11 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 12 mp3 0 file 1 active 0 exists 0 xfade 0 samples 4096 rate 22050 chans 2 width 2
+  track 13 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 14 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+STATE after-start
+  clock 0 dmapos 0 frames 0
+  started 1 muted 0 soundtime 0 paintedtime 0 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 0.000000 0.000000 0.000000
+  axis1 0.000000 0.000000 0.000000
+  axis2 0.000000 0.000000 0.000000
+  loops 0 prints 14 dprints 1
+STATE frame1
+  clock 49 dmapos 2204 frames 1102
+  started 1 muted 0 soundtime 1102 paintedtime 5512 rawend 16384
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 0.000000 0.000000 0.000000
+  axis1 0.000000 0.000000 0.000000
+  axis2 0.000000 0.000000 0.000000
+  loops 0 prints 14 dprints 1
+RING frame1 bytes 65536 whole bb53191c
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 2 crc e2d1fb41 min -6000 max 5999 nonzero 1734
+  blk 3 crc 61c1e231 min -6000 max 5999 nonzero 2048
+  blk 4 crc 054ea533 min -4500 max 4499 nonzero 2044
+  blk 5 crc 66968c76 min -4500 max 4499 nonzero 782
+  blk 6 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 7 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 8 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 9 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 10 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 11 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+MUSIC frame1
+  dynamic 0 actual 0 request 0 loop music/loop.wav
+  set 
+  track 0 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 1 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 2 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 3 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 4 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 5 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 6 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 7 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 8 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 9 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 10 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 11 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 12 mp3 0 file 1 active 0 exists 0 xfade 0 samples 1024 rate 22050 chans 2 width 2
+  track 13 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 14 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+STATE frame2
+  clock 99 dmapos 4408 frames 2204
+  started 1 muted 0 soundtime 2204 paintedtime 6614 rawend 17486
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 0.000000 0.000000 0.000000
+  axis1 0.000000 0.000000 0.000000
+  axis2 0.000000 0.000000 0.000000
+  loops 0 prints 14 dprints 1
+RING frame2 bytes 65536 whole 132dd158
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 2 crc e2d1fb41 min -6000 max 5999 nonzero 1734
+  blk 3 crc 61c1e231 min -6000 max 5999 nonzero 2048
+  blk 4 crc 054ea533 min -4500 max 4499 nonzero 2044
+  blk 5 crc 054ea533 min -4500 max 4499 nonzero 2044
+  blk 6 crc 14776d68 min -4500 max 4499 nonzero 938
+  blk 7 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 8 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 9 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 10 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 11 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+STATE frame3
+  clock 299 dmapos 13228 frames 6614
+  started 1 muted 0 soundtime 6614 paintedtime 11024 rawend 18588
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 0.000000 0.000000 0.000000
+  axis1 0.000000 0.000000 0.000000
+  axis2 0.000000 0.000000 0.000000
+  loops 0 prints 14 dprints 1
+RING frame3 bytes 65536 whole 949e71ef
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 2 crc e2d1fb41 min -6000 max 5999 nonzero 1734
+  blk 3 crc 61c1e231 min -6000 max 5999 nonzero 2048
+  blk 4 crc 054ea533 min -4500 max 4499 nonzero 2044
+  blk 5 crc 054ea533 min -4500 max 4499 nonzero 2044
+  blk 6 crc 14776d68 min -4500 max 4499 nonzero 938
+  blk 7 crc 17818e1d min -4500 max 4499 nonzero 950
+  blk 8 crc 054ea533 min -4500 max 4499 nonzero 2044
+  blk 9 crc 054ea533 min -4500 max 4499 nonzero 2044
+  blk 10 crc fac27bd2 min -4500 max 4499 nonzero 1564
+  blk 11 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+MUSIC frame3
+  dynamic 0 actual 0 request 0 loop music/loop.wav
+  set 
+  track 0 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 1 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 2 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 3 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 4 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 5 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 6 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 7 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 8 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 9 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 10 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 11 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 12 mp3 0 file 1 active 0 exists 0 xfade 0 samples 868 rate 22050 chans 2 width 2
+  track 13 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 14 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+MUSIC after-stop
+  dynamic 0 actual 0 request 0 loop music/loop.wav
+  set 
+  track 0 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 1 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 2 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 3 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 4 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 5 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 6 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 7 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 8 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 9 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 10 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 11 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 12 mp3 0 file 0 active 0 exists 0 xfade 0 samples 868 rate 22050 chans 2 width 2
+  track 13 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 14 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+STATE after-stop
+  clock 299 dmapos 13228 frames 6614
+  started 1 muted 0 soundtime 6614 paintedtime 11024 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 0.000000 0.000000 0.000000
+  axis1 0.000000 0.000000 0.000000
+  axis2 0.000000 0.000000 0.000000
+  loops 0 prints 14 dprints 1
+MUSIC after-restart
+  dynamic 0 actual 0 request 0 loop music/loop.wav
+  set 
+  track 0 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 1 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 2 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 3 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 4 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 5 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 6 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 7 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 8 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 9 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 10 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 11 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 12 mp3 0 file 1 active 0 exists 0 xfade 0 samples 4096 rate 22050 chans 2 width 2
+  track 13 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+  track 14 mp3 0 file 0 active 0 exists 0 xfade 0 samples 0 rate 0 chans 0 width 0
+STATE after-restart
+  clock 349 dmapos 15432 frames 7716
+  started 1 muted 0 soundtime 7716 paintedtime 12126 rawend 22998
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 0.000000 0.000000 0.000000
+  axis1 0.000000 0.000000 0.000000
+  axis2 0.000000 0.000000 0.000000
+  loops 0 prints 14 dprints 2
+RING after-restart bytes 65536 whole 7dfc4348
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 2 crc e2d1fb41 min -6000 max 5999 nonzero 1734
+  blk 3 crc 61c1e231 min -6000 max 5999 nonzero 2048
+  blk 4 crc 054ea533 min -4500 max 4499 nonzero 2044
+  blk 5 crc 054ea533 min -4500 max 4499 nonzero 2044
+  blk 6 crc 14776d68 min -4500 max 4499 nonzero 938
+  blk 7 crc 17818e1d min -4500 max 4499 nonzero 950
+  blk 8 crc 2523844f min -11250 max 11249 nonzero 2044
+  blk 9 crc 2091c7af min -11250 max 11249 nonzero 2048
+  blk 10 crc f793bed0 min -11250 max 11249 nonzero 2046
+  blk 11 crc ce0d6520 min -8437 max 8436 nonzero 1720
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+== end ==

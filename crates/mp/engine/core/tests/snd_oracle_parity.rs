@@ -39,6 +39,10 @@ use mp_engine_client::snd_dma::{
     S_StopAllSounds, S_StopBackgroundTrack, S_StopLoopingSound, S_StopSounds, S_Update,
     S_UpdateEntityPosition,
 };
+use mp_engine_client::snd_music::{
+    Music_AllowedToTransition, Music_DynamicDataAvailable, Music_GetFileNameForState,
+    Music_GetLevelSetName, Music_GetRandomEntryTime, Music_StateCanBeInterrupted,
+};
 use mp_engine_client::snd::music_state_e::MusicState_e;
 use mp_engine_client::snd::sfx_sample_data::SfxSampleData;
 use mp_engine_client::snd::sound_system::{SoundSystem, MAX_CHANNELS};
@@ -50,10 +54,13 @@ use mp_engine_qcommon::cvar_fns::{Cvar_FindVar, Cvar_Set, Cvar_Set2};
 use mp_engine_qcommon::files::files_consts::BASEGAME;
 use mp_engine_qcommon::files_common::{FS_Shutdown, FS_Startup};
 use mp_qshared::shared::{qfalse, vec3_t};
+use native_math::rng::HoldrandLcg;
 
-/// The scenarios the harness ships (DEC-62.7 adds `lipsync` with gh#24).
+/// The scenarios the harness ships. DEC-62.7 adds `lipsync` with gh#24 and the
+/// `music`, `musicdata`, and `ambient` trio with gh#25.
 /// Source: `tools/snd-oracle/scenarios/`
-const SCENARIOS: [&str; 11] = [
+const SCENARIOS: [&str; 14] = [
+    "ambient",
     "badfiles",
     "basic",
     "channels",
@@ -61,6 +68,8 @@ const SCENARIOS: [&str; 11] = [
     "khz44",
     "lipsync",
     "loops",
+    "music",
+    "musicdata",
     "rawstream",
     "resample",
     "ringwrap",
@@ -139,6 +148,13 @@ impl Rig {
             FS_Shutdown(view.common, qfalse);
             FS_Startup(&mut view, BASEGAME);
         }
+
+        // `Com_Init` reseeds `holdrand` from the wall clock. The ambient system
+        // draws every subwave and every gap through `Q_irand`, and the oracle
+        // harness has no `Com_Init`, so its generator sits at the compile-time
+        // seed. Put ours back there. Harness policy, the scripted-clock posture.
+        engine.common.qrand.Rand_Init(HoldrandLcg::INIT as i32);
+        engine.common.qrand.srand(0);
 
         engine.cl = Some(Client::default());
         engine.snd = Some(ClientSoundSystem::default());
@@ -384,6 +400,28 @@ impl Rig {
     }
 }
 
+/// The `MusicState_e` a scripted state number names, the way the harness casts
+/// its integer argument.
+fn music_state(value: i32) -> MusicState_e {
+    match value {
+        0 => MusicState_e::eBGRNDTRACK_EXPLORE,
+        1 => MusicState_e::eBGRNDTRACK_ACTION,
+        2 => MusicState_e::eBGRNDTRACK_BOSS,
+        3 => MusicState_e::eBGRNDTRACK_DEATH,
+        4 => MusicState_e::eBGRNDTRACK_ACTIONTRANS0,
+        5 => MusicState_e::eBGRNDTRACK_ACTIONTRANS1,
+        6 => MusicState_e::eBGRNDTRACK_ACTIONTRANS2,
+        7 => MusicState_e::eBGRNDTRACK_ACTIONTRANS3,
+        8 => MusicState_e::eBGRNDTRACK_EXPLORETRANS0,
+        9 => MusicState_e::eBGRNDTRACK_EXPLORETRANS1,
+        10 => MusicState_e::eBGRNDTRACK_EXPLORETRANS2,
+        11 => MusicState_e::eBGRNDTRACK_EXPLORETRANS3,
+        12 => MusicState_e::eBGRNDTRACK_NONDYNAMIC,
+        13 => MusicState_e::eBGRNDTRACK_SILENCE,
+        _ => MusicState_e::eBGRNDTRACK_FADE,
+    }
+}
+
 /// `%.6f %.6f %.6f` over a vector, the shape every dump line uses.
 fn fmt_vec(v: vec3_t) -> String {
     format!(
@@ -494,6 +532,60 @@ fn run_scenario(name: &str) -> (String, Vec<u8>) {
                 });
             }
             "restartmusic" => rig.with(|view, snd| S_RestartMusic(view, snd)),
+            "musicdata" => {
+                let label = words[1].to_string();
+                let available =
+                    rig.with(|view, snd| Music_DynamicDataAvailable(view, snd, &label));
+                rig.out.push_str(&format!(
+                    "MUSICDATA label {label} available {}\n",
+                    i32::from(available)
+                ));
+            }
+            "musicsetname" => {
+                let name = rig.with(|_, snd| Music_GetLevelSetName(&snd.music));
+                rig.out.push_str(&format!("MUSICSETNAME {name}\n"));
+            }
+            "musicfile" => {
+                let state = int(1);
+                let name = rig
+                    .with(|_, snd| Music_GetFileNameForState(&snd.music, music_state(state)))
+                    .unwrap_or_else(|| "<none>".to_string());
+                rig.out
+                    .push_str(&format!("MUSICFILE state {state} name {name}\n"));
+            }
+            "musicinterrupt" => {
+                let (a, b) = (int(1), int(2));
+                let allowed = Music_StateCanBeInterrupted(music_state(a), music_state(b));
+                rig.out.push_str(&format!(
+                    "MUSICINTERRUPT from {a} to {b} allowed {}\n",
+                    i32::from(allowed)
+                ));
+            }
+            "musictransition" => {
+                let (elapsed, state) = (flt(1), int(2));
+                let answer = rig.with(|view, snd| {
+                    Music_AllowedToTransition(view, &snd.music, elapsed, music_state(state))
+                });
+                let (allowed, to, entry) = match answer {
+                    Some((transition, entry)) => (1, transition as i32, entry),
+                    None => (0, -1, 0.0),
+                };
+                rig.out.push_str(&format!(
+                    "MUSICTRANSITION at {:.6} state {state} allowed {allowed} to {to} entry {:.6}\n",
+                    f64::from(elapsed),
+                    f64::from(entry)
+                ));
+            }
+            "musicentrytime" => {
+                let state = int(1);
+                let time = rig.with(|view, snd| {
+                    Music_GetRandomEntryTime(&mut snd.music, &mut view.common.qrand, music_state(state))
+                });
+                rig.out.push_str(&format!(
+                    "MUSICENTRYTIME state {state} time {:.6}\n",
+                    f64::from(time)
+                ));
+            }
             "stopmusic" => rig.with(|view, snd| S_StopBackgroundTrack(view.common, snd)),
             "asprecache" => {
                 let name = words[1].to_string();
@@ -590,14 +682,16 @@ fn tempdir(tag: &str) -> PathBuf {
 /// and restarts the file system on the `demo` game directory. Both directories
 /// get the same pair, so the boot finds `mpdefault.cfg` either way.
 fn seat_fixture_tree(tool: &Path, assets: &Path) {
-    let src = tool.join("fixtures/sound");
-
+    // `fixtures/mp3` stays out: it belongs to the decoder pin
+    // (`crates/mp/engine/client/tests/mp3_decode_fixtures.rs`), not the game tree.
     for game in ["base", "demo"] {
         let dir = assets.join(game);
         fs::create_dir_all(&dir).expect("game dir");
         fs::write(dir.join("mpdefault.cfg"), b"// snd-oracle parity rig\n")
             .expect("mpdefault.cfg");
-        copy_tree(&src, &dir.join("sound"));
+        for tree in ["sound", "music", "ext_data"] {
+            copy_tree(&tool.join("fixtures").join(tree), &dir.join(tree));
+        }
     }
 }
 
