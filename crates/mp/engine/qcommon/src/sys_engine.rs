@@ -24,6 +24,7 @@ use native_types::fileHandle_t;
 use crate::common::engine_host_view::EngineHostView;
 use crate::common::platform_events::PlatformEvent;
 use crate::common::{com_error, com_printf, Common, MASK_QUED_EVENTS, MAX_QUED_EVENTS};
+use crate::common_fns::Com_Quit_f;
 use crate::cvar_fns::{Cvar_Set, Cvar_VariableString};
 use crate::files_common::{FS_BuildOSPath4, FS_Read};
 use crate::files_pc::FS_Seek;
@@ -253,24 +254,33 @@ pub unsafe fn Sys_QueEvent(
 /// message clock, so the port passes 0 and `Sys_QueEvent` stamps at queue time,
 /// the same contract the console and packet paths already use.
 ///
+/// A closed window arrives as the quit request and answers with `Com_Quit_f`,
+/// the same slot Raven answered its `WM_QUIT` in. That call never returns.
+///
 /// Source: `oracle/codemp/unix/unix_main.c:1007-1009`,
 /// `oracle/codemp/win32/win_main.cpp:1224-1235`,
-/// `oracle/codemp/win32/win_wndproc.cpp:509,518,525`
-fn Sys_SendKeyEvents(common: &mut Common) {
-    let (overflowed, pending): (bool, Vec<PlatformEvent>) = match common.platform_events.as_ref() {
-        Some(source) => {
-            let overflowed = source.take_overflow();
-            let mut pending = Vec::new();
-            while let Some(event) = source.next_event() {
-                pending.push(event);
+/// `oracle/codemp/win32/win_wndproc.cpp:521,531,537`
+fn Sys_SendKeyEvents(view: &mut EngineHostView) {
+    let (quit, overflowed, pending): (bool, bool, Vec<PlatformEvent>) =
+        match view.common.platform_events.as_ref() {
+            Some(source) => {
+                let quit = source.take_quit();
+                let overflowed = source.take_overflow();
+                let mut pending = Vec::new();
+                while let Some(event) = source.next_event() {
+                    pending.push(event);
+                }
+                (quit, overflowed, pending)
             }
-            (overflowed, pending)
-        }
-        None => return,
-    };
+            None => return,
+        };
+
+    if quit {
+        Com_Quit_f(view);
+    }
 
     if overflowed {
-        com_printf(common, "Sys_SendKeyEvents: platform event overflow\n");
+        com_printf(view.common, "Sys_SendKeyEvents: platform event overflow\n");
     }
 
     for event in pending {
@@ -278,7 +288,7 @@ fn Sys_SendKeyEvents(common: &mut Common) {
         // to free and the NULL pointer matches Raven's own call.
         unsafe {
             Sys_QueEvent(
-                common,
+                view.common,
                 0,
                 event.evType,
                 event.evValue,
@@ -342,7 +352,7 @@ pub fn Sys_GetEvent(view: &mut EngineHostView) -> sysEvent_t {
     }
 
     // pump the message loop
-    Sys_SendKeyEvents(view.common);
+    Sys_SendKeyEvents(view);
 
     // check for console commands
     if let Some(s) = native_platform::net::sys_console_input() {

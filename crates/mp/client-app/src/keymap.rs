@@ -107,6 +107,12 @@ pub fn map_key(code: KeyCode) -> Option<c_int> {
         KeyCode::Pause => fakeAscii_t::A_PAUSE,
         KeyCode::PrintScreen => fakeAscii_t::A_PRINTSCREEN,
 
+        //TODO: Port MapKey NumLock
+        // Source: oracle/codemp/win32/win_wndproc.cpp:283-290. Raven rewrote a
+        // numpad digit to `A_0`..`A_9` while NumLock was on, which is how a
+        // retail numpad bind reaches the same key number as the top row. winit
+        // 0.30 does not report NumLock state, so the rows below stay on the
+        // NumLock-off arm until the pump can read it.
         // The keypad, the `VK_NUMPAD*` rows.
         KeyCode::Numpad0 => fakeAscii_t::A_KP_0,
         KeyCode::Numpad1 => fakeAscii_t::A_KP_1,

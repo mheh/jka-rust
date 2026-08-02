@@ -91,8 +91,14 @@ const FUZZY_AMOUNT: usize = 5 * 1024;
 /// the output device.
 ///
 /// The port keeps the retail secondary-buffer shape and owns the ring outright.
-/// The device is cpal (DEC-57.1), and a host that offers none keeps the ring
-/// and paints in silence, exactly as before the device end landed.
+/// The device is cpal (DEC-57.1).
+///
+/// A client that asked for a device and got none returns `false`, Raven's own
+/// failure answer: `S_Init` then leaves `s_soundStarted` at 0 and the mixer
+/// never runs. Without that, `SNDDMA_GetDMAPos` would return a frozen cursor,
+/// `s_soundtime` would never advance, and channels would leak until the mixer
+/// wedged. A host that never asked for a device (the dedicated build, the parity
+/// rig) still gets `true` and drives `dma_pos` itself.
 /// Source: `oracle/codemp/win32/win_snd.cpp:105-257`
 fn SNDDMA_Init(common: &mut Common, snd: &mut SoundSystem) -> bool {
     snd.dma.channels = 2;
@@ -110,19 +116,22 @@ fn SNDDMA_Init(common: &mut Common, snd: &mut SoundSystem) -> bool {
     snd.dma_pos = 0;
 
     snd.device = None;
-    if snd.device_enabled {
-        match SoundDevice::open(snd.dma.speed, snd.dma.channels, DMA_BUFFER_BYTES) {
-            Ok(device) => {
-                com_printf(common, &format!("sound device: {}\n", device.description()));
-                snd.device = Some(device);
-            }
-            Err(reason) => {
-                com_printf(common, &format!("sound device unavailable: {reason}\n"));
-            }
-        }
+    if !snd.device_enabled {
+        return true;
     }
 
-    true
+    match SoundDevice::open(snd.dma.speed, snd.dma.channels, DMA_BUFFER_BYTES) {
+        Ok(device) => {
+            com_printf(common, &format!("sound device: {}\n", device.description()));
+            snd.device = Some(device);
+            true
+        }
+        Err(reason) => {
+            com_printf(common, &format!("sound device unavailable: {reason}\n"));
+            snd.dma.buffer = Vec::new();
+            false
+        }
+    }
 }
 
 /// Raven `SNDDMA_Shutdown` - release the ring and close the device.
@@ -136,8 +145,10 @@ fn SNDDMA_Shutdown(snd: &mut SoundSystem) {
 
 /// Raven `SNDDMA_GetDMAPos` — the device read cursor, masked to the ring.
 ///
-/// With no device open the cursor is whatever last wrote `dma_pos`, so a
-/// headless rig drives the mix clock itself.
+/// The device's callback advances the cursor in device blocks, so it steps
+/// rather than sliding. That is invisible against Raven's own `s_mixahead`
+/// window. With no device the cursor is whatever last wrote `dma_pos`, which is
+/// the headless rig driving the mix clock itself.
 /// Source: `oracle/codemp/win32/win_snd.cpp:267-286`
 fn SNDDMA_GetDMAPos(snd: &mut SoundSystem) -> c_int {
     if let Some(device) = snd.device.as_ref() {

@@ -162,7 +162,7 @@ impl SoundDevice {
         ((frames * self.channels) & CURSOR_MASK) as c_int
     }
 
-    /// The negotiated device format, for the `soundinfo` banner.
+    /// The negotiated device format, for the line `SNDDMA_Init` prints.
     pub fn description(&self) -> &str {
         &self.description
     }
@@ -185,13 +185,17 @@ where
     let ring = Arc::clone(ring);
     // Q32 read position, owned by the callback: only the audio thread runs it.
     let mut phase: u64 = 0;
+    // The callback's own copy of the ring. Blocking on the sim thread's lock
+    // inside a realtime callback inverts priority and drops audio, so the
+    // callback only refreshes the copy when the lock is free and plays the
+    // previous contents otherwise.
+    let mut pcm = vec![0u8; ring.pcm.lock().map(|g| g.len()).unwrap_or(0)];
     device.build_output_stream::<T, _, _>(
         config.clone(),
         move |out: &mut [T], _| {
-            let pcm = match ring.pcm.lock() {
-                Ok(guard) => guard,
-                Err(poisoned) => poisoned.into_inner(),
-            };
+            if let Ok(shared) = ring.pcm.try_lock() {
+                pcm.copy_from_slice(&shared);
+            }
             for out_frame in out.chunks_mut(device_channels) {
                 let source = ((phase >> 32) % frames) as usize * RING_BYTES_PER_FRAME;
                 let (left, right) = match pcm.get(source..source + RING_BYTES_PER_FRAME) {
