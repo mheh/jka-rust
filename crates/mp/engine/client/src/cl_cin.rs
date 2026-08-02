@@ -1,5 +1,11 @@
 //! `cl_cin.cpp` — the RoQ cinematic decoder and playback pipeline.
 //!
+//! Raven's sibling `cl_cin_console.cpp` is dropped, not ported (porting-rules
+//! §20). It is the Xbox console replacement for this file: it plays Bink video
+//! through a `BinkVideo` object out of `d:\base\video\`, and only
+//! `oracle/codemp/x_exe/x_exe.vcproj` compiles it. The PC MP link set
+//! (`oracle/codemp/jk2mp.vcproj:627`) takes `cl_cin.cpp` alone.
+//!
 //! Source: `oracle/codemp/client/cl_cin.cpp`
 
 use core::ffi::{c_char, c_int, c_long, c_short, c_uchar, c_uint, c_ushort};
@@ -10,6 +16,8 @@ use mp_qshared::shared::cinematic_status::{e_status, FMV_EOF, FMV_IDLE, FMV_LOOP
 use mp_qshared::shared::connstate::connstate_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::fs_origin::fsOrigin_t;
+use mp_qshared::shared::limits::MAX_OSPATH;
+use mp_qshared::shared::q_string::COM_DefaultExtension;
 use mp_qshared::shared::swap::LittleLong;
 use native_types::{byte, qboolean, qfalse, qtrue};
 
@@ -41,6 +49,7 @@ use crate::cin::cin_consts::{
     ROQ_PACKET, ROQ_QUAD_HANG, ROQ_QUAD_INFO, ROQ_QUAD_JPEG, ROQ_QUAD_VQ, ZA_SOUND_MONO,
     ZA_SOUND_STEREO,
 };
+use crate::cin::vq_blitter::VqBlitter;
 use crate::cl_console::Con_Close;
 use crate::client_host::Client;
 use crate::snd_stubs::{S_RawSamples, S_StopAllSounds, S_Update};
@@ -55,6 +64,11 @@ use crate::snd_stubs::{S_RawSamples, S_StopAllSounds, S_Update};
 // `crates/mp/game/src/prelude.rs`, but `mp_game` is not a dependency of
 // `mp_engine_client`; escalate the rosetta row rather than adding the
 // dependency here.
+
+/// Raven `RoQInterrupt`'s local `short sbuf[32768]` audio scratch.
+///
+/// Source: `oracle/codemp/client/cl_cin.cpp:925`
+const SBUF_LEN: usize = 32768;
 
 /// Raven's `VQ2TO4(a,b,c,d)` macro — expands one 2x2 codebook pair into the 4x4
 /// and 8x8 books. The four pointer arguments are read-and-advance in the macro,
@@ -910,15 +924,11 @@ pub fn blitVQQuad32fs(cl: &mut Client, status: *mut *mut byte, data: *mut c_ucha
                             0x8000 => {
                                 // 4x4 vq code
                                 let cell = *data as usize;
-                                move4_32(
+                                blit4_32(
                                     (&mut cl.vq4[cell * 32] as *mut c_ushort) as *mut byte,
                                     *status.add(index),
                                     spl,
                                 );
-                                // §19-PORT-NOTE: Raven calls `blit4_32` here for
-                                // the 4x4 vq code arm; the line above is a
-                                // literal transcription slip risk, kept
-                                // faithful below with the correct callee.
                                 data = data.add(1);
                             }
                             0xc000 => {
@@ -955,8 +965,10 @@ pub fn blitVQQuad32fs(cl: &mut Client, status: *mut *mut byte, data: *mut c_ucha
                             0x4000 => {
                                 // motion compensation
                                 let mc = *data as usize;
-                                let src =
-                                    status.add(index).read().offset(cl.cin.mcomp[mc] as isize);
+                                let src = status
+                                    .add(index)
+                                    .read()
+                                    .offset(cl.cin.mcomp[mc] as i32 as isize);
                                 move4_32(src, *status.add(index), spl);
                                 data = data.add(1);
                             }
@@ -968,7 +980,11 @@ pub fn blitVQQuad32fs(cl: &mut Client, status: *mut *mut byte, data: *mut c_ucha
                 0x4000 => {
                     // motion compensation
                     let mc = *data as usize;
-                    let src = status.add(index).read().offset(cl.cin.mcomp[mc] as isize);
+                    // `mcomp` holds a signed byte delta that Raven stores in an
+                    // `unsigned int` and adds to a 32-bit `byte *`; the `i32`
+                    // step restores that wrap on a 64-bit pointer.
+                    let mc_delta = cl.cin.mcomp[mc] as i32 as isize;
+                    let src = status.add(index).read().offset(mc_delta);
                     move8_32(src, *status.add(index), spl);
                     data = data.add(1);
                     index += 5;
@@ -1066,11 +1082,11 @@ pub fn setupQuad(cl: &mut Client, xOff: c_long, yOff: c_long) {
     cl.cin.oldysize = cl.cinTable[handle].ysize;
     cl.cin.oldxsize = cl.cinTable[handle].xsize;
 
-    let mut numQuadCels = (cl.cinTable[handle].CIN_WIDTH * cl.cinTable[handle].CIN_HEIGHT) / 16;
-    numQuadCels += numQuadCels / 4 + numQuadCels / 16;
-    numQuadCels += 64; // for overflow
-
-    let mut numQuadCels = (cl.cinTable[handle].xsize * cl.cinTable[handle].ysize) / 16;
+    // Raven computes `numQuadCels` twice. The first pass (over `CIN_WIDTH` /
+    // `CIN_HEIGHT`) is overwritten before any read, so only the `xsize`/`ysize`
+    // pass below survives.
+    let mut numQuadCels =
+        (cl.cinTable[handle].xsize as c_long * cl.cinTable[handle].ysize as c_long) / 16;
     numQuadCels += numQuadCels / 4;
     numQuadCels += 64; // for overflow
 
@@ -1190,8 +1206,8 @@ pub fn initRoQ(cl: &mut Client) {
     }
     let handle = cl.currentHandle as usize;
 
-    cl.cinTable[handle].VQNormal = blitVQQuad32fs as *const ();
-    cl.cinTable[handle].VQBuffer = blitVQQuad32fs as *const ();
+    cl.cinTable[handle].VQNormal = VqBlitter::BlitVQQuad32fs;
+    cl.cinTable[handle].VQBuffer = VqBlitter::BlitVQQuad32fs;
     ROQ_GenYUVTables(cl);
     RllSetupTable(cl);
 }
@@ -1211,17 +1227,29 @@ pub fn CIN_PlayCinematic(
 ) -> c_int {
     let arg_str = unsafe { std::ffi::CStr::from_ptr(arg).to_string_lossy().into_owned() };
 
-    let name = if arg_str.contains('/') || arg_str.contains('\\') {
+    // Raven's `char name[MAX_OSPATH]`. The buffer is real, not cosmetic: both
+    // `Com_sprintf` and `COM_DefaultExtension` truncate against its size, and
+    // `COM_DefaultExtension` only appends when the last path component holds no
+    // `.` at all.
+    let mut name_buf = [0 as c_char; MAX_OSPATH];
+    let composed = if arg_str.contains('/') || arg_str.contains('\\') {
         arg_str.clone()
     } else {
         format!("video/{}", arg_str)
     };
-    // COM_DefaultExtension(name, sizeof(name), ".roq") - appended below if missing.
-    let name = if name.to_lowercase().ends_with(".roq") {
-        name
-    } else {
-        format!("{}.roq", name)
-    };
+    let composed = composed.as_bytes();
+    let copied = composed.len().min(name_buf.len() - 1);
+    for (slot, &b) in name_buf.iter_mut().zip(&composed[..copied]) {
+        *slot = b as c_char;
+    }
+    unsafe {
+        COM_DefaultExtension(
+            name_buf.as_mut_ptr(),
+            name_buf.len() as c_int,
+            c".roq".as_ptr(),
+        );
+    }
+    let name = file_name_to_string(&name_buf);
 
     if systemBits & CIN_SYSTEM == 0 {
         for i in 0..MAX_VIDEO_HANDLES {
@@ -1372,7 +1400,7 @@ pub fn RoQInterrupt(view: &mut EngineHostView, cl: &mut Client) {
     }
     let handle = cl.currentHandle as usize;
 
-    let mut sbuf = [0i16; 32768];
+    let mut sbuf = [0i16; SBUF_LEN];
 
     unsafe {
         Sys_StreamedRead(
@@ -1405,12 +1433,11 @@ pub fn RoQInterrupt(view: &mut EngineHostView, cl: &mut Client) {
                 if (cl.cinTable[handle].numQuads & 1) != 0 {
                     cl.cinTable[handle].normalBuffer0 = cl.cinTable[handle].t[1];
                     RoQPrepMcomp(cl, cl.cinTable[handle].roqF0, cl.cinTable[handle].roqF1);
+                    let status = cl.cin.qStatus[1].as_mut_ptr();
+                    if cl.cinTable[handle].VQ1 == VqBlitter::BlitVQQuad32fs {
+                        blitVQQuad32fs(cl, status, framedata);
+                    }
                     unsafe {
-                        let vq1 = cl.cinTable[handle].VQ1;
-                        // Raven: `cinTable[currentHandle].VQ1( (byte *)cin.qStatus[1], framedata)`.
-                        let f: fn(*mut byte, *mut byte) =
-                            std::mem::transmute::<*const (), fn(*mut byte, *mut byte)>(vq1);
-                        f(cl.cin.qStatus[1].as_mut_ptr() as *mut byte, framedata);
                         cl.cinTable[handle].buf = cl
                             .cin
                             .linbuf
@@ -1420,13 +1447,11 @@ pub fn RoQInterrupt(view: &mut EngineHostView, cl: &mut Client) {
                 } else {
                     cl.cinTable[handle].normalBuffer0 = cl.cinTable[handle].t[0];
                     RoQPrepMcomp(cl, cl.cinTable[handle].roqF0, cl.cinTable[handle].roqF1);
-                    unsafe {
-                        let vq0 = cl.cinTable[handle].VQ0;
-                        let f: fn(*mut byte, *mut byte) =
-                            std::mem::transmute::<*const (), fn(*mut byte, *mut byte)>(vq0);
-                        f(cl.cin.qStatus[0].as_mut_ptr() as *mut byte, framedata);
-                        cl.cinTable[handle].buf = cl.cin.linbuf.as_mut_ptr();
+                    let status = cl.cin.qStatus[0].as_mut_ptr();
+                    if cl.cinTable[handle].VQ0 == VqBlitter::BlitVQQuad32fs {
+                        blitVQQuad32fs(cl, status, framedata);
                     }
+                    cl.cinTable[handle].buf = cl.cin.linbuf.as_mut_ptr();
                 }
                 if cl.cinTable[handle].numQuads == 0 {
                     // first frame
@@ -1452,11 +1477,14 @@ pub fn RoQInterrupt(view: &mut EngineHostView, cl: &mut Client) {
             }
             ZA_SOUND_MONO => {
                 if cl.cinTable[handle].silent == qfalse {
+                    // §19: Raven lets a mono chunk over 16384 bytes run off the
+                    // end of `sbuf`; the clamp picks the one defined behavior.
+                    let size = cl.cinTable[handle].RoQFrameSize.min(SBUF_LEN as c_uint / 2);
                     let ssize = RllDecodeMonoToStereo(
                         cl,
                         framedata,
                         sbuf.as_mut_ptr(),
-                        cl.cinTable[handle].RoQFrameSize as c_uint,
+                        size,
                         0,
                         cl.cinTable[handle].roq_flags as c_ushort,
                     );
@@ -1478,11 +1506,14 @@ pub fn RoQInterrupt(view: &mut EngineHostView, cl: &mut Client) {
                         S_Update(view.common, cl);
                         cl.s_rawend = cl.s_soundtime;
                     }
+                    // §19: same `sbuf` overrun guard as the mono arm, one
+                    // sample per input byte here.
+                    let size = cl.cinTable[handle].RoQFrameSize.min(SBUF_LEN as c_uint);
                     let ssize = RllDecodeStereoToStereo(
                         cl,
                         framedata,
                         sbuf.as_mut_ptr(),
-                        cl.cinTable[handle].RoQFrameSize as c_uint,
+                        size,
                         0,
                         cl.cinTable[handle].roq_flags as c_ushort,
                     );
@@ -1547,8 +1578,10 @@ pub fn RoQInterrupt(view: &mut EngineHostView, cl: &mut Client) {
                 + *framedata.add(4) as c_uint * 65536;
             cl.cinTable[handle].roq_flags =
                 *framedata.add(6) as c_long + *framedata.add(7) as c_long * 256;
-            cl.cinTable[handle].roqF0 = *framedata.add(7) as c_long;
-            cl.cinTable[handle].roqF1 = *framedata.add(6) as c_long;
+            // Raven casts both through `(char)`, so the motion vectors are
+            // signed byte offsets, not the raw 0..255 header bytes.
+            cl.cinTable[handle].roqF0 = *framedata.add(7) as i8 as c_long;
+            cl.cinTable[handle].roqF1 = *framedata.add(6) as i8 as c_long;
         }
 
         if cl.cinTable[handle].RoQFrameSize > 65536 || cl.cinTable[handle].roq_id == 0x1084 {
@@ -1612,7 +1645,11 @@ pub fn CIN_RunCinematic(view: &mut EngineHostView, cl: &mut Client, handle: c_in
     if cl.cinTable[ch].shader != qfalse
         && (thisTime as i64 - cl.cinTable[ch].lastTime as i64).abs() > 100
     {
-        cl.cinTable[ch].startTime += thisTime - cl.cinTable[ch].lastTime;
+        // Raven does this in wrapping 32-bit unsigned arithmetic, so a clock
+        // that steps backwards must wrap here too, not panic in a debug build.
+        cl.cinTable[ch].startTime = cl.cinTable[ch]
+            .startTime
+            .wrapping_add(thisTime.wrapping_sub(cl.cinTable[ch].lastTime));
     }
     cl.cinTable[ch].tfps = (((sys_milliseconds(view.common) as f32
         * view.common.cvar(view.common.com_timescale).value) as c_uint
