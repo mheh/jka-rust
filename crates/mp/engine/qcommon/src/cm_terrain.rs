@@ -985,6 +985,13 @@ impl CmLandScape {
         self.bounds[1]
     }
 
+    /// `CCMLandScape::GetSize` — `mSize`, read by `CTerrainMap::ConvertPos`.
+    ///
+    /// Source: `oracle/codemp/qcommon/cm_landscape.h:202`
+    pub fn size(&self) -> vec3_t {
+        self.size
+    }
+
     /// `CCMLandScape::GetTerxelSize`.
     ///
     /// Source: `oracle/codemp/qcommon/cm_landscape.h:203`

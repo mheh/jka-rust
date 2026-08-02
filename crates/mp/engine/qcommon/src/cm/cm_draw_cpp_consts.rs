@@ -4,24 +4,38 @@
 //!
 //! Source: `oracle/codemp/qcommon/cm_draw.cpp:190-193,1078`
 
-use core::ffi::c_long;
+use core::ffi::{c_int, c_long};
 
-/// Raven `LEFT` — the point sits left of the clip box.
+/// Raven `LEFT` - the point sits left of the clip box.
 /// Source: `oracle/codemp/qcommon/cm_draw.cpp:190`
 pub const LEFT: c_long = 1;
 
-/// Raven `RIGHT` — the point sits right of the clip box.
+/// Raven `RIGHT` - the point sits right of the clip box.
 /// Source: `oracle/codemp/qcommon/cm_draw.cpp:191`
 pub const RIGHT: c_long = 2;
 
-/// Raven `TOP` — the point sits above the clip box.
+/// Raven `TOP` - the point sits above the clip box.
 /// Source: `oracle/codemp/qcommon/cm_draw.cpp:192`
 pub const TOP: c_long = 4;
 
-/// Raven `BOTTOM` — the point sits below the clip box.
+/// Raven `BOTTOM` - the point sits below the clip box.
 /// Source: `oracle/codemp/qcommon/cm_draw.cpp:193`
 pub const BOTTOM: c_long = 8;
 
-/// Raven `INT_SHIFT` — the fixed-point fraction width of the active edge list.
+/// Raven `INT_SHIFT` - the fixed-point fraction width of the active edge list.
 /// Source: `oracle/codemp/qcommon/cm_draw.cpp:1078`
 pub const INT_SHIFT: c_long = 13;
+
+/// Raven `imgKernel` - the diagonal emboss convolution kernel.
+/// Source: `oracle/codemp/qcommon/cm_draw.cpp:36-43`
+pub const imgKernel: [[c_int; 5]; 5] = [
+    [-1, -1, -1, -1, 0],
+    [-1, -1, -1, 0, 1],
+    [-1, -1, 0, 1, 1],
+    [-1, 0, 1, 1, 1],
+    [0, 1, 1, 1, 1],
+];
+
+/// Raven `KWIDTH` - the emboss kernel radius.
+/// Source: `oracle/codemp/qcommon/cm_draw.cpp:45`
+pub const KWIDTH: c_int = 2;

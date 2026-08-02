@@ -1,5 +1,6 @@
 //! `cm` types.
 
+pub mod automap_image;
 pub mod c_area_t;
 pub mod c_grid_t;
 pub mod c_leaf_t;
@@ -31,7 +32,11 @@ pub mod facet_t;
 pub mod leaf_list_s;
 pub mod patch_collide_s;
 pub mod patch_plane_t;
+pub mod point;
+pub mod poly_scan;
 pub mod polyedge;
 pub mod sphere_t;
+pub mod terrain_map_images;
+pub mod terrain_map_landscape;
 pub mod trace_work_s;
 pub mod winding_t;
