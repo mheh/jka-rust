@@ -1,0 +1,213 @@
+// fx-oracle fixture: every transition token in every group. One cylinder per
+// token, because the cylinder is the one type that reads all five groups.
+// Hand-authored. No retail content.
+cylinder
+{
+	name		t_linear
+	count		1
+	life		400
+	shader		fx/trans/linear
+	origin		0 0 0
+	rgb
+	{
+		start	1 1 1
+		end		0 0 0
+		parm	50
+		flags	linear
+	}
+	alpha
+	{
+		start	1
+		end		0
+		parm	50
+		flags	linear
+	}
+	size
+	{
+		start	4
+		end		1
+		parm	50
+		flags	linear
+	}
+	size2
+	{
+		start	8
+		end		2
+		parm	50
+		flags	linear
+	}
+	length
+	{
+		start	32
+		end		8
+		parm	50
+		flags	linear
+	}
+}
+cylinder
+{
+	name		t_nonlinear
+	count		1
+	life		400
+	shader		fx/trans/nonlinear
+	origin		0 0 0
+	rgb
+	{
+		start	1 1 1
+		end		0 0 0
+		parm	50
+		flags	nonlinear
+	}
+	alpha
+	{
+		start	1
+		end		0
+		parm	50
+		flags	nonlinear
+	}
+	size
+	{
+		start	4
+		end		1
+		parm	50
+		flags	nonlinear
+	}
+	size2
+	{
+		start	8
+		end		2
+		parm	50
+		flags	nonlinear
+	}
+	length
+	{
+		start	32
+		end		8
+		parm	50
+		flags	nonlinear
+	}
+}
+cylinder
+{
+	name		t_wave
+	count		1
+	life		400
+	shader		fx/trans/wave
+	origin		0 0 0
+	rgb
+	{
+		start	1 1 1
+		end		0 0 0
+		parm	40
+		flags	wave
+	}
+	alpha
+	{
+		start	1
+		end		0
+		parm	40
+		flags	wave
+	}
+	size
+	{
+		start	4
+		end		1
+		parm	40
+		flags	wave
+	}
+	size2
+	{
+		start	8
+		end		2
+		parm	40
+		flags	wave
+	}
+	length
+	{
+		start	32
+		end		8
+		parm	40
+		flags	wave
+	}
+}
+cylinder
+{
+	name		t_random
+	count		1
+	life		400
+	shader		fx/trans/random
+	origin		0 0 0
+	rgb
+	{
+		start	1 1 1
+		end		0 0 0
+		flags	linear random
+	}
+	alpha
+	{
+		start	1
+		end		0
+		flags	linear random
+	}
+	size
+	{
+		start	4
+		end		1
+		flags	linear random
+	}
+	size2
+	{
+		start	8
+		end		2
+		flags	linear random
+	}
+	length
+	{
+		start	32
+		end		8
+		flags	linear random
+	}
+}
+cylinder
+{
+	name		t_clamp
+	count		1
+	life		400
+	shader		fx/trans/clamp
+	origin		0 0 0
+	rgb
+	{
+		start	1 1 1
+		end		0 0 0
+		parm	60
+		flags	clamp
+	}
+	alpha
+	{
+		start	1
+		end		0
+		parm	60
+		flags	clamp
+	}
+	size
+	{
+		start	4
+		end		1
+		parm	60
+		flags	clamp
+	}
+	size2
+	{
+		start	8
+		end		2
+		parm	60
+		flags	clamp
+	}
+	length
+	{
+		start	32
+		end		8
+		parm	60
+		flags	clamp
+	}
+}

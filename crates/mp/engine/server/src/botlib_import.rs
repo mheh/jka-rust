@@ -30,7 +30,8 @@ use mp_engine_qcommon::common::common::{com_printf, Common};
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::error::com_error;
 use mp_engine_qcommon::common::opaque_slots::{
-    BotLib as SlotBotLib, Client as SlotClient, Ghoul2System as SlotGhoul2,
+    BotLib as SlotBotLib, Client as SlotClient, FxSystem as SlotFxSystem,
+    Ghoul2System as SlotGhoul2,
     RenderModels as SlotRenderModels, Renderer as SlotRenderer, RmManager as SlotRmManager,
     Server as SlotServer, SoundSystem as SlotSoundSystem,
 };
@@ -101,6 +102,7 @@ unsafe fn ctx_view(ctx: &BotImportCtx) -> EngineHostView<'static> {
         re: SlotRenderer::from_raw(core::ptr::null_mut()),
         rmg: SlotRmManager::from_raw(core::ptr::null_mut()),
         g2: SlotGhoul2::from_raw(core::ptr::null_mut()),
+        fx: SlotFxSystem::from_raw(core::ptr::null_mut()),
     }
 }
 

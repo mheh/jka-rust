@@ -40,6 +40,7 @@ use mp_renderer::renderer_frontend::RendererFrontend;
 use mp_renderer::tr_model::render_models::RenderModels;
 
 use crate::client_host::Client;
+use crate::fx::fx_system::FxSystem;
 use crate::snd::sound_system::SoundSystem;
 
 /// The addresses the two client shims dereference on every module trap.
@@ -75,4 +76,8 @@ pub struct ClientDispatchCtx {
     /// `Engine.roff` — Raven's one `theROFFSystem`, which the five `CG_ROFF_*`
     /// arms drive the same way the server's `G_ROFF_*` arms do.
     pub roff: *mut RoffSystem,
+    /// `&mut Engine.fx` — the FX system's `Option` field. The first `CG_FX_*`
+    /// trap seats it, the way Raven's file-scope FX globals came alive on
+    /// `FX_Init` (DEC-61.2).
+    pub fx: *mut Option<FxSystem>,
 }

@@ -1,0 +1,12 @@
+// fx-oracle fixture: the cameraShake primitive. `intensity` shares the
+// elasticity field and `radius` is the falloff distance.
+// Hand-authored. No retail content.
+cameraShake
+{
+	name		rumble
+	count		1
+	life		450
+	origin		0 0 0
+	intensity	1.5
+	radius		512
+}

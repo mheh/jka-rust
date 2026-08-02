@@ -1,0 +1,30 @@
+// fx-oracle fixture: the line primitive with an explicit origin2.
+// Hand-authored. No retail content.
+line
+{
+	name		beam
+	count		1
+	life		600
+	shader		fx/line/beam
+	origin		0 0 0
+	origin2		64 0 0
+	spawnFlags	cheapOrg2Calc
+	rgb
+	{
+		start	0.2 0.4 1
+		end		1 1 1
+		flags	linear
+	}
+	alpha
+	{
+		start	1
+		end		0.25
+		flags	linear
+	}
+	size
+	{
+		start	2
+		end		6
+		flags	linear
+	}
+}

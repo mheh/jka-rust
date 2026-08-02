@@ -1,0 +1,71 @@
+// fx-oracle fixture: the scheduling arms. `wide` has a count range wider than
+// one, so fx_countScale scales it. `even` spreads its delays evenly, and
+// `narrow` keeps a count range of exactly one, which fx_countScale must leave
+// alone.
+// Source: `oracle/codemp/client/FxScheduler.cpp:876-921`
+// Hand-authored. No retail content.
+particle
+{
+	name		wide
+	count		4 12
+	life		300
+	shader		fx/sched/wide
+	origin		0 0 0
+	rgb
+	{
+		start	1 1 1
+	}
+	alpha
+	{
+		start	1
+	}
+	size
+	{
+		start	2
+	}
+}
+particle
+{
+	name		even
+	count		4
+	delay		0 200
+	life		300
+	shader		fx/sched/even
+	origin		0 0 0
+	spawnFlags	evenDistribution
+	rgb
+	{
+		start	1 1 1
+	}
+	alpha
+	{
+		start	1
+	}
+	size
+	{
+		start	2
+	}
+}
+particle
+{
+	name		narrow
+	count		2 2
+	delay		40 90
+	life		300
+	shader		fx/sched/narrow
+	origin		0 0 0
+	rgb
+	{
+		start	0.5 0.5 0.5
+		end		1 1 1
+		flags	linear
+	}
+	alpha
+	{
+		start	1
+	}
+	size
+	{
+		start	2
+	}
+}

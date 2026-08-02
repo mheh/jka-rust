@@ -1,0 +1,54 @@
+# fx-oracle: the cull doors and the debug prints.
+#
+# Cull has three arms: behind the view, closer than fx_nearCull, and the two
+# flags that skip the check.
+# Source: `oracle/codemp/client/FxPrimitives.cpp:70-102`
+#
+# fx_debug 1 prints the pool census once per world pass. fx_debug 2 would print
+# the effect name on every play, but FINAL_BUILD compiles that print out, so the
+# retail build this harness models stays silent at 2.
+# Source: `oracle/codemp/client/FxUtil.cpp:209-214`, `FxScheduler.cpp:851-856`
+seed 4004
+cvar fx_debug 0
+cvar fx_countScale 1
+cvar fx_nearCull 16
+refdef 0 0 0   0 0 0   1 0 0   0 1 0   0 0 1   90 73.739792
+init
+register particle
+register allflags
+# In front of the view and far enough away: drawn.
+advance 50
+playid 1 100 0 0 1 0 0 -1 -1 0
+addscheduled 0
+dumpstate
+# Behind the view: culled, so the ramp updates stop and nothing is drawn.
+advance 50
+playid 1 -100 0 0 -1 0 0 -1 -1 0
+addscheduled 0
+dumpstate
+# Closer than fx_nearCull: culled.
+advance 50
+playid 1 2 0 0 1 0 0 -1 -1 0
+addscheduled 0
+dumpstate
+# A wider near cull hides the far one too.
+cvar fx_nearCull 40000
+advance 50
+addscheduled 0
+dumpstate
+cvar fx_nearCull 16
+# depthHack and playerView both skip the near check. allflags carries both.
+advance 50
+playid 2 2 0 0 1 0 0 -1 -1 0
+addscheduled 0
+dumpstate
+# The debug prints.
+cvar fx_debug 2
+advance 50
+playid 1 100 0 0 1 0 0 -1 -1 0
+cvar fx_debug 1
+addscheduled 0
+addscheduled 1
+dumpstate
+cvar fx_debug 0
+free

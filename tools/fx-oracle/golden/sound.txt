@@ -1,0 +1,34 @@
+== fx-oracle sound ==
+PRINT Registering effect : sound
+REGSOUND sound/fx/blast.wav -> 1
+REGISTER sound -> 1
+PRINT Registering effect : lists
+REGSHADER fx/list/shader0 -> 1
+REGSHADER fx/list/shader1 -> 2
+REGSHADER fx/list/shader2 -> 3
+REGSOUND sound/list/one.wav -> 2
+REGSOUND sound/list/two.wav -> 3
+REGMODEL models/list/a.md3 -> 1
+REGMODEL models/list/b.md3 -> 2
+REGISTER lists -> 2
+TIME 50
+SOUND origin 43480000 00000000 00000000 entnum 1023 entchannel 0 sfx 1 volume -1 radius -1
+STATE activeFx 0 drawnFx 0 scheduledFx 0 nextFree2DEffect 0
+TIME 100
+LOCALSOUND sfx 1 entchannel 0
+STATE activeFx 0 drawnFx 0 scheduledFx 0 nextFree2DEffect 0
+TIME 150
+SOUND origin 43480000 00000000 00000000 entnum 1023 entchannel 0 sfx 3 volume -1 radius -1
+MINIREFENT reType 2 renderfx 0 hModel 0 origin 43480000 00000000 00000000 oldorigin 00000000 00000000 00000000 axis 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 nonNormalizedAxes 0 radius 40800000 rotation 00000000 shaderTime 00000000 customShader 1 shaderRGBA 254 254 254 255 shaderTexCoord 00000000 00000000 frame 0
+NULLREFENT
+MINIREFENT reType 0 renderfx 0 hModel 2 origin 43480000 00000000 00000000 oldorigin 00000000 00000000 00000000 axis 40800000 00000000 80000000 00000000 40800000 00000000 00000000 00000000 40800000 nonNormalizedAxes 1 radius 40800000 rotation 00000000 shaderTime 00000000 customShader 0 shaderRGBA 0 0 0 0 shaderTexCoord 00000000 00000000 frame 0
+TIME 200
+SOUND origin 43480000 00000000 00000000 entnum 1023 entchannel 0 sfx 3 volume -1 radius -1
+MINIREFENT reType 2 renderfx 0 hModel 0 origin 43480000 00000000 00000000 oldorigin 00000000 00000000 00000000 axis 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 nonNormalizedAxes 0 radius 40800000 rotation 00000000 shaderTime 00000000 customShader 1 shaderRGBA 254 254 254 255 shaderTexCoord 00000000 00000000 frame 0
+NULLREFENT
+MINIREFENT reType 0 renderfx 0 hModel 2 origin 43480000 00000000 00000000 oldorigin 00000000 00000000 00000000 axis 40800000 00000000 80000000 00000000 40800000 00000000 00000000 00000000 40800000 nonNormalizedAxes 1 radius 40800000 rotation 00000000 shaderTime 00000000 customShader 0 shaderRGBA 0 0 0 0 shaderTexCoord 00000000 00000000 frame 0
+MINIREFENT reType 2 renderfx 0 hModel 0 origin 43480000 00000000 00000000 oldorigin 00000000 00000000 00000000 axis 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 nonNormalizedAxes 0 radius 40800000 rotation 00000000 shaderTime 00000000 customShader 1 shaderRGBA 254 254 254 255 shaderTexCoord 00000000 00000000 frame 0
+NULLREFENT
+MINIREFENT reType 0 renderfx 0 hModel 1 origin 43480000 00000000 00000000 oldorigin 00000000 00000000 00000000 axis 40800000 00000000 80000000 00000000 40800000 00000000 00000000 00000000 40800000 nonNormalizedAxes 1 radius 40800000 rotation 00000000 shaderTime 00000000 customShader 0 shaderRGBA 0 0 0 0 shaderTexCoord 00000000 00000000 frame 0
+STATE activeFx 4 drawnFx 4 scheduledFx 0 nextFree2DEffect 0
+== end ==

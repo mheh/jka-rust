@@ -1,0 +1,22 @@
+# fx-oracle: the parse diagnostics. The overflow fixture holds 25 primitives,
+# one more than FX_MAX_EFFECT_COMPONENTS, and the badkeys fixture trips every
+# unknown-key arm. Both goldens are print streams plus the truncated template.
+seed 7
+cvar fx_debug 0
+cvar fx_countScale 1
+cvar fx_nearCull 16
+init
+register overflow
+register badkeys
+dumptemplate 1
+dumptemplate 2
+# An effect that was never registered takes the not-found door and returns 0.
+register nosuchfile
+# A play call on an out-of-range id reports the error and does nothing.
+advance 50
+playid 0 10 0 0 1 0 0 -1 -1 0
+playid 900 10 0 0 1 0 0 -1 -1 0
+play nosuchfile 10 0 0 1 0 0 -1 -1
+addscheduled 0
+dumpstate
+free

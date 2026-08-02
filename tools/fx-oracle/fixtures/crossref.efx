@@ -1,0 +1,52 @@
+// fx-oracle fixture: every cross-reference key. Each one registers the named
+// effect file as a side effect of parsing this one.
+// Hand-authored. No retail content.
+particle
+{
+	name		linked
+	count		1
+	life		500
+	shader		fx/cross/linked
+	origin		0 0 0
+	velocity	0 0 -60
+	impactfx	target
+	deathfx		target
+	flags		usePhysics impactKills deathFx
+	bounce		0.2
+	rgb
+	{
+		start	1 1 1
+	}
+	alpha
+	{
+		start	1
+	}
+	size
+	{
+		start	4
+	}
+}
+emitter
+{
+	name		linkedemitter
+	count		1
+	life		500
+	model		models/cross/emit.md3
+	emitfx		target
+	origin		0 0 0
+	density		4
+	variance	0
+	flags		emitFx
+	size
+	{
+		start	4
+	}
+}
+fxrunner
+{
+	name		linkedrunner
+	count		1
+	life		100
+	playfx		target
+	origin		0 0 0
+}

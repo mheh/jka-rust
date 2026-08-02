@@ -1,0 +1,25 @@
+== fx-oracle emitter ==
+PRINT Registering effect : emitter
+REGMODEL models/fx/chunk.md3 -> 1
+PRINT Registering effect : target
+REGSHADER fx/particle/hit -> 1
+PRINT Registering effect : target
+REGISTER emitter -> 1
+TIME 50
+NULLREFENT
+MINIREFENT reType 0 renderfx 0 hModel 1 origin 43160000 00000000 00000000 oldorigin 00000000 00000000 00000000 axis 409fd9cd 3e1c48c6 be1c5b71 be1782f6 409fdaf8 3e1c48c6 3e20fc7e be1782f6 409fd9cd nonNormalizedAxes 1 radius 40a00000 rotation 00000000 shaderTime 00000000 customShader 0 shaderRGBA 0 0 0 0 shaderTexCoord 00000000 00000000 frame 0
+STATE activeFx 1 drawnFx 1 scheduledFx 0 nextFree2DEffect 0
+TIME 150
+NULLREFENT
+MINIREFENT reType 0 renderfx 0 hModel 1 origin 431a0000 00000000 3ff33333 oldorigin 00000000 00000000 00000000 axis 409ea90f 3ee942f0 beea3e81 bed3eaec 409ec870 3ee942f0 3efdb776 bed3eaec 409ea90f nonNormalizedAxes 1 radius 40a00000 rotation 00000000 shaderTime 00000000 customShader 0 shaderRGBA 0 0 0 0 shaderTexCoord 00000000 00000000 frame 0
+TIME 350
+NULLREFENT
+MINIREFENT reType 0 renderfx 0 hModel 1 origin 43220000 00000000 40a9999a oldorigin 00000000 00000000 00000000 axis 4098cc02 3f84b3ab bf87cb30 bf511746 409a5343 3f84b3ab 3f9e7e24 bf511746 4098cc02 nonNormalizedAxes 1 radius 40a00000 rotation 00000000 shaderTime 00000000 customShader 0 shaderRGBA 0 0 0 0 shaderTexCoord 00000000 00000000 frame 0
+STATE activeFx 2 drawnFx 1 scheduledFx 0 nextFree2DEffect 0
+TIME 650
+NULLREFENT
+MINIREFENT reType 0 renderfx 0 hModel 1 origin 432e0000 00000000 41180000 oldorigin 00000000 00000000 00000000 axis 4088129f 3fe43d79 bff77eb8 bf8bfa28 4091535f 3fe43d79 4019189d bf8bfa28 4088129f nonNormalizedAxes 1 radius 40a00000 rotation 00000000 shaderTime 00000000 customShader 0 shaderRGBA 0 0 0 0 shaderTexCoord 00000000 00000000 frame 0
+TIME 1050
+MINIREFENT reType 2 renderfx 0 hModel 0 origin 432e0000 00000000 41180000 oldorigin 00000000 00000000 00000000 axis 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 nonNormalizedAxes 0 radius 40400000 rotation 00000000 shaderTime 00000000 customShader 1 shaderRGBA 254 254 254 255 shaderTexCoord 00000000 00000000 frame 0
+STATE activeFx 2 drawnFx 1 scheduledFx 0 nextFree2DEffect 0
+== end ==

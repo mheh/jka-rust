@@ -37,6 +37,7 @@ use crate::client::kbutton_t::kbutton_t;
 use crate::client::ping_t::ping_t;
 use crate::client::server_status_t::serverStatus_t;
 use crate::client_dispatch_ctx::ClientDispatchCtx;
+use crate::fx::fx_system::FxSystem;
 use crate::keys::key_globals_s::{keyGlobals_t, MAX_KEYS};
 use crate::keys::keyname_t::keyname_t;
 
@@ -569,6 +570,19 @@ pub unsafe fn g2_from_view<'a>(view: &mut EngineHostView) -> &'a mut Ghoul2Syste
     &mut *(view.g2.as_raw() as *mut Ghoul2System)
 }
 
+/// Cast the view's type-erased `fx` slot back to the live `FxSystem` (DEC-61.2).
+///
+/// The slot addresses `Engine.fx`, an `Option` the first `CG_FX_*` trap seats.
+/// A dedicated build never reaches here, because no cgame module loads.
+///
+/// SAFETY (caller): the slot was built by `mp_engine_core`'s view constructor
+/// from the live, unique `&mut Engine.fx`; single-threaded, and no other cast of
+/// this slot is live for the returned borrow's duration.
+pub unsafe fn fx_from_view<'a>(view: &mut EngineHostView) -> &'a mut FxSystem {
+    let slot = view.fx.as_raw() as *mut Option<FxSystem>;
+    (*slot).get_or_insert_with(FxSystem::default)
+}
+
 /// Cast the view's type-erased `sv` slot back to the live `Server`. Raven keeps
 /// one process-wide `botlib_export`, and the port gives it one home on `Server`
 /// (DEC-32), so the client's seven `PC_*` trap arms read it through here.
@@ -688,6 +702,9 @@ unsafe fn client_dispatch_view<'a>(c: &ClientDispatchCtx) -> EngineHostView<'a> 
         None => core::ptr::null_mut(),
     };
     EngineHostView {
+        // The slot carries the `Option` FIELD address, so `fx_from_view` can seat
+        // the system on the first FX trap.
+        fx: opaque_slots::FxSystem::from_raw(c.fx as *mut ()),
         sv: opaque_slots::Server::from_raw(c.sv),
         cl: opaque_slots::Client::from_raw(cl_raw),
         snd: opaque_slots::SoundSystem::from_raw(snd_raw),

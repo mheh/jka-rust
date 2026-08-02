@@ -1,0 +1,38 @@
+# fx-oracle: the parse gate. Registers one fixture per primitive group name and
+# dumps every parsed template. Nothing plays, so the golden is pure parse
+# output.
+seed 1
+cvar fx_debug 0
+cvar fx_countScale 1
+cvar fx_nearCull 16
+init
+register particle
+register line
+register tail
+register sound
+register cylinder
+register electricity
+register emitter
+register decal
+register orientedparticle
+register fxrunner
+register light
+register camerashake
+register flash
+dumptemplate 1
+dumptemplate 2
+dumptemplate 3
+dumptemplate 4
+dumptemplate 5
+dumptemplate 6
+dumptemplate 7
+dumptemplate 8
+dumptemplate 9
+dumptemplate 10
+dumptemplate 11
+dumptemplate 12
+dumptemplate 13
+dumptemplate 14
+dumptemplate 15
+dumpstate
+free

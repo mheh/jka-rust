@@ -1,0 +1,49 @@
+// fx-oracle fixture: list-valued media keys. Every list picks one entry per
+// spawn with irand, so this fixture also pins the RNG draw order.
+// Hand-authored. No retail content.
+particle
+{
+	name		shaderlist
+	count		1
+	life		300
+	shaders
+	[
+		fx/list/shader0
+		fx/list/shader1
+		fx/list/shader2
+	]
+	origin		0 0 0
+	size
+	{
+		start	4
+	}
+}
+sound
+{
+	name		soundlist
+	count		1
+	life		1
+	sounds
+	[
+		sound/list/one.wav
+		sound/list/two.wav
+	]
+	origin		0 0 0
+}
+emitter
+{
+	name		modellist
+	count		1
+	life		300
+	models
+	[
+		models/list/a.md3
+		models/list/b.md3
+	]
+	origin		0 0 0
+	flags		useModel
+	size
+	{
+		start	4
+	}
+}

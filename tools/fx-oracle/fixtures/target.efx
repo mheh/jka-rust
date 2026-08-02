@@ -1,0 +1,25 @@
+// fx-oracle fixture: the small effect every cross-reference points at.
+// Hand-authored. No retail content.
+particle
+{
+	name		hit
+	count		1
+	life		200
+	shader		fx/particle/hit
+	origin		0 0 0
+	velocity	0 0 5
+	rgb
+	{
+		start	1 1 1
+	}
+	alpha
+	{
+		start	1
+		end		0
+		flags	linear
+	}
+	size
+	{
+		start	3
+	}
+}

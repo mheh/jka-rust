@@ -1,0 +1,26 @@
+# fx-oracle: the decal and oriented-particle pair. The decal fixture carries
+# ghoul2Decals, so it emits the world decal and the CG_G2MARK call together.
+# A decal spawns nothing into the pool, so activeFx stays at the oriented
+# particle alone.
+seed 55
+cvar fx_debug 0
+cvar fx_countScale 1
+cvar fx_nearCull 16
+refdef 0 0 0   0 0 0   1 0 0   0 1 0   0 0 1   90 73.739792
+init
+register decal
+register orientedparticle
+advance 50
+playid 1 90 0 0 1 0 0 -1 -1 0
+playid 2 90 0 24 1 0 0 -1 -1 0
+addscheduled 0
+dumpstate
+advance 200
+addscheduled 0
+advance 400
+addscheduled 0
+dumpstate
+advance 800
+addscheduled 0
+dumpstate
+free

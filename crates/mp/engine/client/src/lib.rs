@@ -5,6 +5,7 @@
 // their original casing across the ABI seam, matching `mp_game`'s crate policy.
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 
+pub mod cin;
 pub mod cl_cgame;
 pub mod cl_cin;
 pub mod cl_console;
@@ -16,13 +17,11 @@ pub mod cl_parse;
 pub mod cl_referee;
 pub mod cl_scrn;
 pub mod cl_ui;
-pub mod cin;
 pub mod client;
 pub mod client_dispatch_ctx;
 pub mod client_host;
 pub mod fffx;
 pub mod fx;
-pub mod fx_stubs;
 pub mod hook_install;
 pub mod keycodes;
 pub mod keys;

@@ -1,0 +1,30 @@
+# fx-oracle: the sound primitive. The world pass hands the sound to
+# S_StartSound; the portal pass makes it a local sound instead.
+# Source: `oracle/codemp/client/FxScheduler.cpp:1664-1674`
+seed 31
+cvar fx_debug 0
+cvar fx_countScale 1
+cvar fx_nearCull 16
+refdef 0 0 0   0 0 0   1 0 0   0 1 0   0 0 1   90 73.739792
+init
+register sound
+register lists
+advance 50
+playid 1 200 0 0 1 0 0 -1 -1 0
+addscheduled 0
+dumpstate
+# The same effect scheduled into the portal pass takes the local-sound arm.
+advance 50
+playid 1 200 0 0 1 0 0 -1 -1 1
+addscheduled 1
+addscheduled 0
+dumpstate
+# The list-valued sound key picks one entry per spawn with irand.
+advance 50
+playid 2 200 0 0 1 0 0 5 400 0
+addscheduled 0
+advance 50
+playid 2 200 0 0 1 0 0 5 400 0
+addscheduled 0
+dumpstate
+free

@@ -1,0 +1,22 @@
+// fx-oracle fixture: the light primitive, which emits through AddLightToScene
+// rather than a ref entity.
+// Hand-authored. No retail content.
+light
+{
+	name		glow
+	count		1
+	life		1000
+	origin		0 0 0
+	rgb
+	{
+		start	1 0.8 0.4
+		end		0 0 0
+		flags	linear
+	}
+	size
+	{
+		start	64
+		end		8
+		flags	linear
+	}
+}

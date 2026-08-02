@@ -1,0 +1,21 @@
+// fx-oracle fixture: every token ParseFlags accepts. `sscanf` reads at most
+// seven tokens per line, so the tokens spread over three `flags` pairs and the
+// parser ORs them together.
+// Source: `oracle/codemp/client/FxTemplate.cpp:707-799`
+// Hand-authored. No retail content.
+particle
+{
+	name		everyflag
+	count		1
+	life		500
+	shader		fx/flags/all
+	origin		0 0 0
+	materialImpact	shellsound
+	flags		useModel useBBox usePhysics expensivePhysics ghoul2Collision ghoul2Decals impactKills
+	flags		impactFx deathFx useAlpha emitFx depthHack relative setShaderTime
+	flags		paperPhysics localizedFlash playerView
+	size
+	{
+		start	4
+	}
+}

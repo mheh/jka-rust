@@ -1,0 +1,34 @@
+// fx-oracle fixture: the oriented-particle primitive, which uses origin2 as an
+// angular offset when it is bolted.
+// Hand-authored. No retail content.
+orientedparticle
+{
+	name		mark
+	count		1
+	life		1200
+	shader		fx/oriented/mark
+	origin		0 0 0
+	origin2		0 0 90
+	velocity	0 0 2
+	rotation	30
+	rotationDelta	1
+	rgb
+	{
+		start	1 1 1
+		end		0.5 0.5 0.5
+		flags	linear
+	}
+	alpha
+	{
+		start	1
+		end		0
+		parm	70
+		flags	nonlinear
+	}
+	size
+	{
+		start	8
+		end		12
+		flags	linear
+	}
+}

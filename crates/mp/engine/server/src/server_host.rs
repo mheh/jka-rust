@@ -366,6 +366,8 @@ pub extern "C-unwind" fn game_system_calls_shim(
             re: opaque_slots::Renderer::from_raw(c.re),
             rmg: opaque_slots::RmManager::from_raw(c.rmg),
             g2: opaque_slots::Ghoul2System::from_raw(c.g2),
+            // The game module never reaches the client FX system.
+            fx: opaque_slots::FxSystem::from_raw(core::ptr::null_mut()),
         };
         SV_GameSystemCalls(
             &mut view,

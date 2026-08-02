@@ -29,6 +29,9 @@ pub fn engine_host_view(engine: &mut Engine) -> EngineHostView<'_> {
         None => core::ptr::null_mut(),
     };
     EngineHostView {
+        // The slot carries the `Option` FIELD address, so `fx_from_view` can seat
+        // the system on the first FX trap (DEC-61.2).
+        fx: opaque_slots::FxSystem::from_raw(&mut engine.fx as *mut _ as *mut ()),
         sv: opaque_slots::Server::from_raw(&mut engine.sv as *mut _ as *mut ()),
         cl: opaque_slots::Client::from_raw(cl_raw),
         snd: opaque_slots::SoundSystem::from_raw(snd_raw),
@@ -108,6 +111,7 @@ pub fn install_engine_hooks(engine: &mut Engine) {
         rmg: &mut engine.rmg as *mut _,
         g2: &mut engine.g2 as *mut _,
         roff: &mut engine.roff as *mut _,
+        fx: &mut engine.fx as *mut _,
     }));
     let client_ctx = client_note as *mut ClientDispatchCtx as *mut core::ffi::c_void;
     arm_cgame_slot(client_ctx, cgame_system_calls_shim);

@@ -55,6 +55,10 @@ pub struct Engine {
     /// `None` on dedicated, the same shape `cl`/`snd` use; the platform shell
     /// seats it (DEC-56). Reached through the view's `re` slot (DEC-59.1).
     pub re: Option<mp_renderer::renderer_frontend::RendererFrontend>,
+    /// The client effect engine (DEC-61.2) — templates, the schedule, the live
+    /// pool, and the FX clock. `Some` once the first `CG_FX_*` trap arrives on a
+    /// client build, and `None` on dedicated, where no FX trap ever arrives.
+    pub fx: Option<mp_engine_client::fx::fx_system::FxSystem>,
     /// Engine-side nav graph (`CNavigator` twin) — plain `Default` field per
     /// rulings 12/30 (`mp_engine_server::npcnav`).
     pub nav: mp_engine_server::npcnav::navigator::Navigator,
@@ -129,6 +133,7 @@ impl Engine {
             addr_of_mut!((*p).cl).write(None);
             addr_of_mut!((*p).snd).write(None);
             addr_of_mut!((*p).re).write(None);
+            addr_of_mut!((*p).fx).write(None);
             // Icarus holds Box slot-arrays, HashMaps, and a fn-item table — NONE
             // all-zero-valid — so it is written in place through its hand-written
             // Default before the Box is exposed (rulings 12/27; the modules /

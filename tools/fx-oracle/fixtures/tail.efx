@@ -1,0 +1,38 @@
+// fx-oracle fixture: the tail primitive, which is the one type that reads the
+// length group.
+// Hand-authored. No retail content.
+tail
+{
+	name		comet
+	count		1
+	life		700
+	shader		fx/tail/comet
+	origin		0 0 0
+	velocity	30 0 0
+	acceleration	0 0 -5
+	spawnFlags	absoluteVel absoluteAccel
+	rgb
+	{
+		start	1 0.75 0.5
+		end		0.25 0 0
+		flags	linear
+	}
+	alpha
+	{
+		start	1
+		end		0
+		flags	linear
+	}
+	size
+	{
+		start	3
+		end		1
+		flags	linear
+	}
+	length
+	{
+		start	20
+		end		4
+		flags	linear
+	}
+}

@@ -1,0 +1,31 @@
+// fx-oracle fixture: a line that finds its endpoint with a trace and plays an
+// impact effect where the trace lands.
+// Hand-authored. No retail content.
+line
+{
+	name		tracer
+	count		1
+	life		400
+	shader		fx/line/tracer
+	origin		0 0 0
+	origin2		4 4 4
+	impactfx	target
+	spawnFlags	org2fromTrace org2isOffset traceImpactFx cheapOrg2Calc
+	rgb
+	{
+		start	1 1 0.5
+		end		1 0 0
+		flags	linear
+	}
+	alpha
+	{
+		start	1
+		end		0
+		flags	linear
+	}
+	size
+	{
+		start	1
+		end		1
+	}
+}
