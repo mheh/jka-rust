@@ -342,13 +342,17 @@ pub fn Key_GetKey(cl: &mut Client, binding: *const c_char) -> c_int {
     }
 }
 
+/// The substitute for Raven's key-up time UB (DEC-60.2).
+/// Any large positive value keeps the retail behavior class, so `IN_KeyUp` credits a released key for the full frame.
+const KEYUP_TIME_UB_SUBSTITUTE: c_int = 0x0040_0000;
+
 /// Raven `CL_AddKeyUpCommands`.
 ///
 /// Raven's `%i` argument at `cl_keys.cpp:1433` is the bare identifier `time`,
-/// which is the libc `time` function, not this function's own parameter. The
-/// port prints the same value the oracle prints, the function address narrowed
-/// to an int (porting-rules §19). The concrete number differs per binary in the
-/// oracle too, so no lockstep run can depend on it.
+/// which is the libc `time` function address, not a variable - shipping UB.
+/// DEC-60.2 pins ``KEYUP_TIME_UB_SUBSTITUTE`` as the one defined behavior
+/// (porting-rules §19): retail's address was always a large positive int, so
+/// retail always filed a key release as held for the full frame.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:1416-1453`
 pub fn CL_AddKeyUpCommands(common: &mut Common, key: c_int, kb: *mut c_char) {
@@ -367,7 +371,8 @@ pub fn CL_AddKeyUpCommands(common: &mut Common, key: c_int, kb: *mut c_char) {
                     // Button commands add the keynum and time as parms, so multiple
                     // sources can be discriminated and subframe corrected.
                     let button_str = core::ffi::CStr::from_ptr(button.as_ptr()).to_string_lossy();
-                    let time = libc::time as usize as c_int;
+                    // DEC-60.2 replaces Raven's UB address print with the pinned constant.
+                    let time = KEYUP_TIME_UB_SUBSTITUTE;
                     let cmd = format!("-{} {} {}\n", &button_str[1..], key, time);
                     Cbuf_AddText(common, &cmd);
                     keyevent = qtrue;

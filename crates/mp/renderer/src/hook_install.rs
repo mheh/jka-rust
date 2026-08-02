@@ -37,8 +37,10 @@ pub unsafe fn rm_from_view<'a>(view: &mut EngineHostView) -> &'a mut RenderModel
 /// Cast the view's type-erased `re` slot back to the live [`RendererFrontend`]
 /// carrier bundle — the client's one reach to the `RE_*` receivers (DEC-59.1).
 /// A call site splits the returned bundle into the individual receivers its
-/// `RE_*` function declares, and respects the DEC-55.2 partition: `assets` and
-/// `frame_data` on a synchronous path, never `gpu_res`.
+/// `RE_*` function declares. The DEC-55.2 partition binds module trap arms:
+/// `assets` and `frame_data` on a synchronous trap, never `gpu_res`.
+/// Engine-interior frame code may use the full bundle for now (DEC-60.1), and
+/// the gh#22 thread split re-audits every `gpu_res` toucher on the frame path.
 ///
 /// SAFETY (caller): the slot was built by `mp_engine_core`'s view constructor
 /// from the live, unique `&mut Engine.re`; the engine is single-threaded and no
