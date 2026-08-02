@@ -35,5 +35,6 @@ pub mod tr_sky;
 pub mod tr_surface;
 pub mod tr_surfacesprites;
 pub mod tr_terrain;
+pub mod tr_terrainmap;
 pub mod tr_world;
 pub mod tr_worldeffects;
