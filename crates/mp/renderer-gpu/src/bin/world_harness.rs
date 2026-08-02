@@ -62,7 +62,6 @@ use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
-use mp_renderer::tr_local::dlight_s::dlight_t;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
 use mp_renderer::tr_main::TrMainScratch;
 use mp_renderer::tr_model::render_models::RenderModels;
@@ -419,10 +418,9 @@ struct App {
     /// frame.
     land_scape: srfTerrain_t,
     land: CmLandScape,
-    /// Empty per-frame scratch buffers. Dlights and entities are later waves.
-    /// The fog list is not held here: `render_world` copies it from the loaded
-    /// world each frame.
-    dlights: Vec<dlight_t>,
+    /// Empty per-frame scratch. Neither the fog list nor the dlight list is
+    /// held here: `render_world` copies the fogs from the loaded world and
+    /// rebuilds the dlights from this frame's events.
     scratch: TrMainScratch,
     camera: Camera,
     /// The brush submodel handle the one test entity draws (`*1`), computed
@@ -504,7 +502,6 @@ impl App {
             dummy_assets,
             land_scape,
             land: CmLandScape::empty(),
-            dlights: Vec::new(),
             scratch: TrMainScratch {
                 pre_trans_ent_matrix: [0.0; 16],
             },
@@ -888,7 +885,6 @@ impl App {
             dummy_assets,
             land_scape,
             land,
-            dlights,
             scratch,
             reported,
             surface_warned,
@@ -957,7 +953,6 @@ impl App {
                         models: &*models,
                         land_scape: &*land_scape,
                         land: &*land,
-                        dlights: dlights.as_mut_slice(),
                         scratch,
                     };
 

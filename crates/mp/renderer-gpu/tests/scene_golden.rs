@@ -41,11 +41,12 @@ use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
-use mp_renderer::tr_local::dlight_s::dlight_t;
 use mp_renderer::tr_main::TrMainScratch;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_public::ref_flags::{RDF_DRAWSKYBOX, RDF_NOWORLDMODEL};
-use mp_renderer::tr_scene::{RE_AddPolyToScene, RE_AddRefEntityToScene, RE_RenderScene};
+use mp_renderer::tr_scene::{
+    RE_AddDynamicLightToScene, RE_AddPolyToScene, RE_AddRefEntityToScene, RE_RenderScene,
+};
 use mp_renderer::tr_shader::RE_RegisterShader;
 use mp_renderer_gpu::ui_host::boot;
 use mp_renderer_gpu::ui_host::{BootConfig, UiHost};
@@ -80,6 +81,10 @@ struct Scene {
     /// scene records through the real `RE_Add*ToScene` traps, so the gate
     /// exercises the same seam a module frame does.
     record: fn(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_t),
+    /// How many dynamic lights the scene expects to reach `tr.refdef.dlights`.
+    /// The lights are not visible yet (`ProjectDlightTexture` is a later wave),
+    /// so this counter is what holds the replay chain in place.
+    expect_dlights: u32,
 }
 
 /// Records `entities` through `RE_AddRefEntityToScene`, the shape most scenes
@@ -337,7 +342,6 @@ fn run_scene(scene: &Scene) {
     let dummy_assets = boot::empty_assets();
     let land = CmLandScape::empty();
     let land_scape = boot::init_terrain(&mut host);
-    let mut dlights: Vec<dlight_t> = Vec::new();
     let mut scratch = TrMainScratch {
         pre_trans_ent_matrix: [0.0; 16],
     };
@@ -379,7 +383,6 @@ fn run_scene(scene: &Scene) {
             models: &*models,
             land_scape: &land_scape,
             land: &land,
-            dlights: dlights.as_mut_slice(),
             scratch: &mut scratch,
         };
 
@@ -418,6 +421,11 @@ fn run_scene(scene: &Scene) {
         "{}: nothing drawn - stats = {:?}",
         scene.stem,
         stats,
+    );
+    assert_eq!(
+        stats.dlights, scene.expect_dlights,
+        "{}: dynamic lights did not reach tr.refdef.dlights",
+        scene.stem,
     );
 
     let golden = golden_path(scene.stem);
@@ -609,12 +617,42 @@ fn scene_polys(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_t)
     }
 }
 
+/// Census row `dlight/calls` (112,514 submissions): three dynamic lights beside
+/// the sprite trio, one of them additive.
+///
+/// The lights change no pixel yet, so this scene's golden is the sprite image
+/// again and the light chain is held by the `expect_dlights` counter. That is
+/// the honest state: the replay reaches `tr.refdef.dlights`, and
+/// `ProjectDlightTexture` is the remaining piece.
+///
+/// Source: `oracle/codemp/renderer/tr_scene.cpp:326-345`
+fn scene_dlights(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_t) {
+    scene_sprites(host, frame_data, shader);
+    for (org, intensity, color, additive) in [
+        ([200.0f32, -40.0, 0.0], 60.0f32, [1.0f32, 0.9, 0.7], false),
+        ([200.0, 0.0, 0.0], 40.0, [0.4, 0.6, 1.0], false),
+        ([200.0, 40.0, 0.0], 25.0, [1.0, 0.3, 0.2], true),
+    ] {
+        RE_AddDynamicLightToScene(
+            frame_data,
+            &host.assets,
+            org,
+            intensity,
+            color[0],
+            color[1],
+            color[2],
+            additive,
+        );
+    }
+}
+
 #[test]
 fn golden_scene_sprites() {
     run_scene(&Scene {
         stem: "scene_sprites",
         eye: [0.0, 0.0, 0.0],
         record: scene_sprites,
+        expect_dlights: 0,
     });
 }
 
@@ -624,6 +662,7 @@ fn golden_scene_lines() {
         stem: "scene_lines",
         eye: [0.0, 0.0, 0.0],
         record: scene_lines,
+        expect_dlights: 0,
     });
 }
 
@@ -633,6 +672,7 @@ fn golden_scene_saber_glow() {
         stem: "scene_saber_glow",
         eye: [0.0, 0.0, 0.0],
         record: scene_saber_glow,
+        expect_dlights: 0,
     });
 }
 
@@ -642,5 +682,16 @@ fn golden_scene_polys() {
         stem: "scene_polys",
         eye: [0.0, 0.0, 0.0],
         record: scene_polys,
+        expect_dlights: 0,
+    });
+}
+
+#[test]
+fn golden_scene_dlights() {
+    run_scene(&Scene {
+        stem: "scene_dlights",
+        eye: [0.0, 0.0, 0.0],
+        record: scene_dlights,
+        expect_dlights: 3,
     });
 }

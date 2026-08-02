@@ -31,7 +31,6 @@ use mp_engine_server::Server;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
-use mp_renderer::tr_local::dlight_s::dlight_t;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
 use mp_renderer::tr_main::TrMainScratch;
 use mp_renderer::tr_model::render_models::RenderModels;
@@ -208,7 +207,6 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
 
     let dummy_assets = boot::empty_assets();
     let land = CmLandScape::empty();
-    let mut dlights: Vec<dlight_t> = Vec::new();
     let mut scratch = TrMainScratch {
         pre_trans_ent_matrix: [0.0; 16],
     };
@@ -261,7 +259,6 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
             models: &*models,
             land_scape: &land_scape,
             land: &land,
-            dlights: dlights.as_mut_slice(),
             scratch: &mut scratch,
         };
 
