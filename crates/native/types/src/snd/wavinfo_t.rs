@@ -7,6 +7,7 @@ use core::ffi::c_int;
 /// Type definition source: `oracle/codemp/client/snd_local.h:137-144`
 /// Type definition source: `oracle/code/client/snd_local.h:137-144`
 #[repr(C)]
+#[derive(Default, Clone, Copy)]
 pub struct wavinfo_t {
     pub format: c_int,
     pub rate: c_int,

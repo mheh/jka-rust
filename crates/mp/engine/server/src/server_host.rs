@@ -359,6 +359,8 @@ pub extern "C-unwind" fn game_system_calls_shim(
             cm: &mut *c.cm,
             sv: opaque_slots::Server::from_raw(c.sv),
             cl: opaque_slots::Client::from_raw(c.cl),
+            // The game module never reaches the mixer, so the sound slot is NULL.
+            snd: opaque_slots::SoundSystem::from_raw(core::ptr::null_mut()),
             bot: opaque_slots::BotLib::from_raw(c.bot),
             rm: opaque_slots::RenderModels::from_raw(c.rm),
             re: opaque_slots::Renderer::from_raw(c.re),

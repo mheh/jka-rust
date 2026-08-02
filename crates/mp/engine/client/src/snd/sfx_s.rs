@@ -1,79 +1,60 @@
+//! Raven `sfx_s` — one loaded or loadable sound effect.
+
 #![allow(non_camel_case_types, non_snake_case)]
 
-use std::os::raw::c_char;
+use core::ffi::c_int;
 
-use mp_qshared::shared::MAX_QPATH;
-
-use crate::mp3::mp3_stream::MP3STREAM;
 use crate::snd::sound_compression_method_t::SoundCompressionMethod_t;
 
-/// Raven `sfx_s` — a loaded/loadable sound effect (typedef'd as `sfx_t`).
+/// Raven `sfx_s` — a sound effect slot in `s_knownSfx` (typedef `sfx_t`).
 ///
+/// The sound stack is engine-internal, so the sample block becomes an owned
+/// `Vec<i16>` and the `sfx_s *next` hash chain becomes a slot index.
+/// The OpenAL `Buffer` and `lipSyncData` fields are dropped with the OpenAL arm
+/// (DEC-57.4).
 /// Type definition source: `oracle/codemp/client/snd_local.h:48-65`
-#[repr(C)]
 pub struct sfx_t {
-    pub pSoundData: *mut i16,
-    /// Couldn't be loaded, so use buzz
-    pub bDefaultSound: i32,
-    /// Not in Memory, set qtrue when loaded, and qfalse when its buffers are freed up because
-    /// of being old, so can be reloaded
-    pub bInMemory: i32,
+    /// The resampled 16-bit samples. Empty reads as Raven's NULL `pSoundData`.
+    pub pSoundData: Vec<i16>,
+    /// couldn't be loaded, so use buzz
+    pub bDefaultSound: bool,
+    /// not in Memory, set qtrue when loaded, and qfalse when its buffers are freed up because of
+    /// being old, so can be reloaded
+    pub bInMemory: bool,
     pub eSoundCompressionMethod: SoundCompressionMethod_t,
-    /// NULL ptr unless this sfx_t is an MP3. Use Z_Malloc and Z_Free
-    pub pMP3StreamHeader: *mut MP3STREAM,
-    /// Length in samples, always kept as 16bit now so this is #shorts (watch for stereo later
-    /// for music?)
-    pub iSoundLengthInSamples: i32,
-    pub sSoundName: [c_char; MAX_QPATH],
-    pub iLastTimeUsed: i32,
-    /// Used to set the highest volume this sample has at load time - used for lipsynching
+    /// length in samples, always kept as 16bit now so this is #shorts
+    pub iSoundLengthInSamples: c_int,
+    pub sSoundName: String,
+    pub iLastTimeUsed: c_int,
+    /// used to set the highest volume this sample has at load time - used for lipsynching
     pub fVolRange: f32,
-    /// Used for cacheing purposes
-    pub iLastLevelUsedOn: i32,
+    /// used for cacheing purposes
+    pub iLastLevelUsedOn: c_int,
+    /// only used because of hash table when registering
+    pub next: Option<usize>,
+    //TODO: Port sfx_t::pMP3StreamHeader
+    // Source: oracle/codemp/client/snd_local.h:53. The MP3 decoder is gh#25 under
+    // DEC-57.3, and no gh#24 path loads an MP3, so no field carries the header yet.
+}
 
-    // Open AL
-    pub Buffer: u32,
-    pub lipSyncData: *mut c_char,
-
-    /// Only used because of hash table when registering
-    pub next: *mut sfx_t,
+impl Default for sfx_t {
+    /// Raven zero-fills a fresh `sfx_t` in `S_FindName`, so every field starts empty.
+    /// Source: `oracle/codemp/client/snd_dma.cpp:851`
+    fn default() -> sfx_t {
+        sfx_t {
+            pSoundData: Vec::new(),
+            bDefaultSound: false,
+            bInMemory: false,
+            eSoundCompressionMethod: SoundCompressionMethod_t::ct_16,
+            iSoundLengthInSamples: 0,
+            sSoundName: String::new(),
+            iLastTimeUsed: 0,
+            fVolRange: 0.0,
+            iLastLevelUsedOn: 0,
+            next: None,
+        }
+    }
 }
 
 /// Raven typedef `sfx_s` (the tagged struct name) for `sfx_t`.
 pub type sfx_s = sfx_t;
-
-#[cfg(target_pointer_width = "64")]
-const _: () = {
-    assert!(core::mem::size_of::<sfx_t>() == 136);
-    assert!(core::mem::offset_of!(sfx_t, pSoundData) == 0);
-    assert!(core::mem::offset_of!(sfx_t, bDefaultSound) == 8);
-    assert!(core::mem::offset_of!(sfx_t, bInMemory) == 12);
-    assert!(core::mem::offset_of!(sfx_t, eSoundCompressionMethod) == 16);
-    assert!(core::mem::offset_of!(sfx_t, pMP3StreamHeader) == 24);
-    assert!(core::mem::offset_of!(sfx_t, iSoundLengthInSamples) == 32);
-    assert!(core::mem::offset_of!(sfx_t, sSoundName) == 36);
-    assert!(core::mem::offset_of!(sfx_t, iLastTimeUsed) == 100);
-    assert!(core::mem::offset_of!(sfx_t, fVolRange) == 104);
-    assert!(core::mem::offset_of!(sfx_t, iLastLevelUsedOn) == 108);
-    assert!(core::mem::offset_of!(sfx_t, Buffer) == 112);
-    assert!(core::mem::offset_of!(sfx_t, lipSyncData) == 120);
-    assert!(core::mem::offset_of!(sfx_t, next) == 128);
-};
-// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
-#[cfg(target_pointer_width = "32")]
-const _: () = {
-    assert!(core::mem::size_of::<sfx_t>() == 112);
-    assert!(core::mem::offset_of!(sfx_t, pSoundData) == 0);
-    assert!(core::mem::offset_of!(sfx_t, bDefaultSound) == 4);
-    assert!(core::mem::offset_of!(sfx_t, bInMemory) == 8);
-    assert!(core::mem::offset_of!(sfx_t, eSoundCompressionMethod) == 12);
-    assert!(core::mem::offset_of!(sfx_t, pMP3StreamHeader) == 16);
-    assert!(core::mem::offset_of!(sfx_t, iSoundLengthInSamples) == 20);
-    assert!(core::mem::offset_of!(sfx_t, sSoundName) == 24);
-    assert!(core::mem::offset_of!(sfx_t, iLastTimeUsed) == 88);
-    assert!(core::mem::offset_of!(sfx_t, fVolRange) == 92);
-    assert!(core::mem::offset_of!(sfx_t, iLastLevelUsedOn) == 96);
-    assert!(core::mem::offset_of!(sfx_t, Buffer) == 100);
-    assert!(core::mem::offset_of!(sfx_t, lipSyncData) == 104);
-    assert!(core::mem::offset_of!(sfx_t, next) == 108);
-};

@@ -28,11 +28,14 @@ pub mod mp3;
 pub mod null;
 pub mod snd;
 pub mod snd_ambient;
+pub mod snd_dma;
+pub mod snd_mem;
+pub mod snd_mix;
 pub mod snd_stubs;
 pub mod svc_strings;
 
 pub use client_dispatch_ctx::ClientDispatchCtx;
 pub use client_host::{
-    cgame_system_calls_shim, cl_from_view, client_legacy_syscall, g2_from_view,
+    cgame_system_calls_shim, cl_from_view, client_legacy_syscall, g2_from_view, snd_from_view,
     ui_system_calls_shim, Client, SoundSystem,
 };

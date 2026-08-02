@@ -16,7 +16,7 @@ use mp_engine_server::Server;
 use mp_qshared::shared::cvar::CvarHandle;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::limits::{
-    MAX_GENTITIES, MAX_PINGREQUESTS, MAX_SERVERSTATUSREQUESTS, MAX_TOKEN_CHARS,
+    MAX_PINGREQUESTS, MAX_SERVERSTATUSREQUESTS, MAX_TOKEN_CHARS,
 };
 use mp_qshared::shared::{qboolean, qfalse};
 use native_math::vector::vec3_t;
@@ -380,34 +380,8 @@ pub struct Client {
     pub currentHandle: c_int,
     pub CL_handle: c_int,
 
-    // ---- `snd_dma.cpp` file-scope globals ----
-    // The sound stack itself is a pending lane (gh#24/gh#25, DEC-57). These are
-    // the globals the already-ported client files read and write, so they take
-    // their carrier home now and the lane fills in the behavior around them.
-    /// Raven `s_shutUp` — silences the per-frame sound spam when set.
-    ///
-    /// Source: `oracle/codemp/client/snd_dma.cpp:16`
-    pub s_shutUp: qboolean,
-    /// Raven `s_soundMuted` — true between `S_DisableSounds` and the next restart.
-    ///
-    /// Source: `oracle/codemp/client/snd_dma.cpp:130`
-    pub s_soundMuted: qboolean,
-    /// Raven `s_volume` cvar handle.
-    ///
-    /// Source: `oracle/codemp/client/snd_dma.cpp:151`
-    pub s_volume: Option<CvarHandle>,
-    /// Raven `s_entityWavVol[MAX_GENTITIES]` — the per-entity lipsync volume
-    /// the cgame reads through `CG_S_GETVOICEVOLUME`.
-    ///
-    /// Source: `oracle/codemp/client/snd_dma.cpp:193`
-    pub s_entityWavVol: Box<[c_int; MAX_GENTITIES]>,
-    /// Raven `s_rawend` / `s_soundtime` — the raw-sample write cursor and the
-    /// mixer's current sample time, which the RoQ audio path advances.
-    ///
-    /// Source: `oracle/codemp/client/snd_dma.cpp:504,1731`
-    pub s_rawend: c_int,
-    pub s_soundtime: c_int,
-
+    // The `snd_dma.cpp` file-scope globals live on `SoundSystem` (`Engine.snd`),
+    // which the `S_*` surface takes as a receiver (DEC-57.1).
     /// Raven `g_nOverrideChecked` (`cl_input.cpp`) — false again after a
     /// `vid_restart`, so the net overrides are re-read for the new mod.
     ///
@@ -559,13 +533,6 @@ impl Default for Client {
             currentHandle: -1,
             CL_handle: -1,
 
-            s_shutUp: qfalse,
-            s_soundMuted: qfalse,
-            s_volume: None,
-            s_entityWavVol: zeroed_box(),
-            s_rawend: 0,
-            s_soundtime: 0,
-
             g_nOverrideChecked: false,
 
             referee: Default::default(),
@@ -716,9 +683,14 @@ unsafe fn client_dispatch_view<'a>(c: &ClientDispatchCtx) -> EngineHostView<'a> 
         Some(re) => re as *mut _ as *mut (),
         None => core::ptr::null_mut(),
     };
+    let snd_raw = match (*c.snd).as_mut() {
+        Some(snd) => snd as *mut _ as *mut (),
+        None => core::ptr::null_mut(),
+    };
     EngineHostView {
         sv: opaque_slots::Server::from_raw(c.sv),
         cl: opaque_slots::Client::from_raw(cl_raw),
+        snd: opaque_slots::SoundSystem::from_raw(snd_raw),
         bot: opaque_slots::BotLib::from_raw(c.bot),
         rm: opaque_slots::RenderModels::from_raw(c.rm as *mut ()),
         re: opaque_slots::Renderer::from_raw(re_raw),
@@ -799,12 +771,18 @@ pub unsafe fn client_legacy_syscall(
     dispatch(frame.as_ptr()) as c_int
 }
 
-/// The `Engine.snd` faithful mixer (DEC-03; EAX/force-feedback dropped). `None`
-/// on dedicated (`S_Init` gated `!com_dedicated`). Placeheld so `Engine` names it.
+/// The `Engine.snd` faithful mixer (DEC-57; OpenAL, EAX, and force feedback
+/// dropped). `None` on dedicated (`S_Init` gated `!com_dedicated`).
+pub use crate::snd::sound_system::SoundSystem;
+
+/// Cast the view's type-erased `snd` slot back to the live [`SoundSystem`] — the
+/// client's own boundary cast, since every `S_*` function takes the mixer as a
+/// declared receiver (DEC-57.1).
 ///
-/// Source: `oracle/codemp/client/snd_dma.cpp:127-268`
-pub struct SoundSystem {
-    //TODO: Port SoundSystem fields (channels, dma, listener, knownSfx)
-    // Source: oracle/codemp/client/snd_dma.cpp:127-268
-    _private: (),
+/// SAFETY (caller): the slot was built by `mp_engine_core`'s view constructor
+/// from the live, unique `&mut Engine.snd`; single-threaded, and no other cast
+/// of this slot is live for the returned borrow's duration. The slot is NULL on
+/// dedicated (`Engine.snd` is `None`), where no sound path runs.
+pub unsafe fn snd_from_view<'a>(view: &mut EngineHostView) -> &'a mut SoundSystem {
+    &mut *(view.snd.as_raw() as *mut SoundSystem)
 }
