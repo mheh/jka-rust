@@ -1401,6 +1401,16 @@ impl Pipeline3d {
     /// passes, in stage order, and builds any dynamic vertex blocks. Non-world
     /// and empty entries are counted into `stats`, and a sky-parms entry forks
     /// into the sky-box and cloud chain (`collect_sky_surface`).
+    ///
+    //TODO: Port ProjectDlightTexture
+    // Source: oracle/codemp/renderer/tr_shade.cpp:840-1010
+    // `RB_StageIteratorGeneric` appends one additive pass per dynamic light
+    // that the surface's `dlightBits` marks. The scene's dlights reach
+    // `tr.refdef.dlights` and the sort keys carry the dlight map, so the
+    // frontend half is live; the pass itself picks a texcoord axis from
+    // `tess.normal[i]`, and `WorldVertex` carries no normal, so a world surface
+    // has nothing to project along. Landing the pass means widening the vertex
+    // format first.
     #[allow(clippy::too_many_arguments)]
     fn collect_stage_items(
         &mut self,
