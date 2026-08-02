@@ -2645,10 +2645,10 @@ pub const NUM_SCRATCH_IMAGES: usize = 16;
 /// `RE_UploadCinematic` index positionally by cinematic client number.
 ///
 /// ESCALATION: `tr.screenImage`/`tr.identityLightImage` still have no
-/// `RenderAssets` field of their own — this packet's STATE HOMES table's "tr"
+/// `RenderAssets` field of their own. This packet's STATE HOMES table's "tr"
 /// write row names only `RenderAssets::white_image` as a landed sub-field, and
 /// no ported caller reads either one. The `R_CreateImage` calls that build them
-/// are still made — their registry side effects (`images`/`image_names` under
+/// are still made, so their registry side effects (`images`/`image_names` under
 /// the mapped name) and `state.gi_texture_bind_num`'s advance (`R_CreateImage`'s
 /// own doc comment: "the ++ is of course staggeringly important... later
 /// images depend on it having advanced") are real and preserved; only the

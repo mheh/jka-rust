@@ -1083,7 +1083,7 @@ pub fn RB_DrawSurfs(
 /// the cinematics") is GL-only (DEC-37 A13.2).
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:1313-1314`
 ///
-/// DEFERRED: R4 — `qglColor3f(tr.identityLight×3)` is GL-only, and the 2D
+/// DEFERRED: R4. `qglColor3f(tr.identityLight x 3)` is GL-only, and the 2D
 /// batch has no per-quad color channel of its own yet (DEC-37 A13.2).
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:1353`
 ///
@@ -1146,7 +1146,7 @@ pub fn RE_StretchRaw(
 
     RB_SetGL2D(frame, gpu, &assets);
 
-    // DEFERRED: R4 — qglColor3f(tr.identityLight x3) (see doc comment above)
+    // DEFERRED: R4. qglColor3f(tr.identityLight x 3) (see doc comment above)
     // Source: oracle/codemp/renderer/tr_backend.cpp:1353
 
     // A client number outside the scratch set has no texture to draw, so the

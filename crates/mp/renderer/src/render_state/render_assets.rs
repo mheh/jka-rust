@@ -54,7 +54,7 @@ pub struct RenderAssets {
     ///
     /// Source: `oracle/codemp/renderer/tr_local.h:1334`
     pub white_image: Option<ImageHandle>,
-    /// `tr.scratchImage[NUM_SCRATCH_IMAGES]` — the 16 per-client cinematic
+    /// `tr.scratchImage[NUM_SCRATCH_IMAGES]`, the 16 per-client cinematic
     /// upload targets `R_CreateBuiltinImages` builds at init. `RE_StretchRaw`
     /// and `RE_UploadCinematic` re-specify one of these in place every frame, so
     /// the handle set is fixed for the session and indexed positionally by the

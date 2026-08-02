@@ -125,8 +125,9 @@ pub enum FrameEvent {
         t2: f32,
         shader: ShaderHandle,
     },
-    /// `RE_StretchRaw`'s screen quad — the cinematic frame the client just
-    /// decoded, drawn straight from `tr.scratchImage[client]` with no shader.
+    /// `RE_StretchRaw`'s screen quad. This is the cinematic frame the client
+    /// just decoded, drawn straight from `tr.scratchImage[client]` with no
+    /// shader.
     ///
     /// `image` is the scratch handle, already re-specified for this frame by
     /// `RE_StretchRaw`'s upload half. The `s`/`t` pairs carry Raven's half-texel
