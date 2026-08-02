@@ -1475,3 +1475,11 @@ Ruled at the [#18](https://github.com/mheh/jka-rust/issues/18) integrate-wave-1 
 1. **Renderer import seam.** The engine's own `re.X(...)` call sites (Raven's `refexport_t` table, filled by `GetRefAPI`) become direct calls to the ported `mp_renderer` `RE_*` frontend functions with their declared receivers. This extends DEC-55.2 and DEC-37.4 from the module trap arms to the engine interior. Nothing ports `refexport_t`, `GetRefAPI`, or `REF_API_VERSION`, and the transcription placeholder module `cl_renderer` never gets built.
 
 2. **RMG inflate seam.** `CL_ParseRMG`'s `inflateInit`/`inflate`/`inflateEnd` blocks call a new `inflate_sync_flush` beside `deflate_sync_flush` in `mp_engine_qcommon::zlib_seam`, backed by flate2's `Decompress`. This extends the 2026-07-11 ruling (flate2 replaces zlib32 in `unzip.rs` and the server deflate arm) to the client arm, so one module owns both directions of the RMG pipe. Nothing ports `z_stream`.
+
+## DEC-60 — wave-2 residue: GPU-state exemption for engine draw code, key-up time UB pinned (ruled 2026-08-02)
+
+Ruled at the [#18](https://github.com/mheh/jka-rust/issues/18) wave-2 sit-down.
+
+1. **Scope of the DEC-55.2 partition.** The state-partition law ("a synchronous trap reads CPU `RenderAssets` only") binds module trap arms. Engine-interior frame-draw code (the console and screen chain) may use the full `RendererFrontend` bundle, `gpu_res` included, for now. The gh#22 platform-shell work (DEC-56 thread split) must re-audit every `gpu_res` toucher on the frame path when the render thread becomes real - the debt is recorded on that ticket.
+
+2. **`CL_AddKeyUpCommands` time UB.** Raven's `%i` argument at `cl_keys.cpp:1433` is the bare identifier `time`, the libc function address - shipping UB. The port pins `KEYUP_TIME_UB_SUBSTITUTE` (a fixed large positive int) as the one defined behavior per porting-rules §19. Retail's printed address was always a large positive int, so retail always credited a released key for the full frame, and the pinned constant keeps that behavior class deterministically. OpenJK's passed-time fix is rejected as a behavior divergence on the wire path (the netchan-frag precedent).
