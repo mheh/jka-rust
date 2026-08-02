@@ -1467,3 +1467,11 @@ Ruled at the ticket [#11](https://github.com/mheh/jka-rust/issues/11) sit-down.
 2. **Seam fixtures.** The snapshot truncation (`clSnapshot_t` to `snapshot_t`, entity cap) and the reliable-command copy-out get narrow committed-fixture tests of their own, since the survey names them directly observable.
 
 3. **Stock-server join gate.** A scripted run: a local stock OpenJK dedicated server with `sv_pure 1` and bots, our client connects, enters, sustains a timed session, and disconnects clean. Pass = the server log shows a normal client lifecycle (no unknown commands, no checksum rejects, no timeouts) and the client held snapshots for the whole session. The same recipe runs against our `jampded` for the destination's other half. A retail server stays a periodic manual spot check.
+
+## DEC-59 — client integration seams: direct renderer calls, flate2 inflate mirror (ruled 2026-08-02)
+
+Ruled at the [#18](https://github.com/mheh/jka-rust/issues/18) integrate-wave-1 sit-down.
+
+1. **Renderer import seam.** The engine's own `re.X(...)` call sites (Raven's `refexport_t` table, filled by `GetRefAPI`) become direct calls to the ported `mp_renderer` `RE_*` frontend functions with their declared receivers. This extends DEC-55.2 and DEC-37.4 from the module trap arms to the engine interior. Nothing ports `refexport_t`, `GetRefAPI`, or `REF_API_VERSION`, and the transcription placeholder module `cl_renderer` never gets built.
+
+2. **RMG inflate seam.** `CL_ParseRMG`'s `inflateInit`/`inflate`/`inflateEnd` blocks call a new `inflate_sync_flush` beside `deflate_sync_flush` in `mp_engine_qcommon::zlib_seam`, backed by flate2's `Decompress`. This extends the 2026-07-11 ruling (flate2 replaces zlib32 in `unzip.rs` and the server deflate arm) to the client arm, so one module owns both directions of the RMG pipe. Nothing ports `z_stream`.
