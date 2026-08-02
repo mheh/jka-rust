@@ -68,6 +68,7 @@ use mp_renderer::tr_main::{
 };
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_noise::NoiseState;
+use mp_renderer::tr_public::ref_flags::RDF_NOWORLDMODEL;
 use mp_renderer::tr_sky::SkyState;
 use wgpu::TextureView;
 
@@ -236,6 +237,10 @@ pub struct FrameExecutor {
     /// The uploaded world mesh, `None` until [`FrameExecutor::set_world`] runs
     /// after a map load.
     world_geometry: Option<WorldGeometry>,
+    /// The stand-in a `RDF_NOWORLDMODEL` scene binds when no map is loaded. Its
+    /// buffers are never read: every surface such a scene draws is entity-side
+    /// and builds its own per-frame vertices.
+    empty_geometry: WorldGeometry,
     batch: QuadBatch,
     /// The frame's accumulated ref-entities, in trap-call order, the render
     /// -side stand-in for `backEndData->entities`. `AddRefEntityToScene`
@@ -264,6 +269,7 @@ impl FrameExecutor {
             pipeline: Pipeline2d::new(gpu, images),
             pipeline3d: Pipeline3d::new(gpu),
             world_geometry: None,
+            empty_geometry: WorldGeometry::empty(gpu),
             batch: QuadBatch::new(),
             scene_entities: Vec::new(),
             first_scene_entity: 0,
@@ -601,10 +607,20 @@ impl FrameExecutor {
             self.warn_once(Warned::Fog);
         }
 
-        let Some(geometry) = self.world_geometry.as_ref() else {
+        // A scene that draws a world needs its uploaded mesh. A
+        // `RDF_NOWORLDMODEL` scene binds the empty stand-in instead, since
+        // `R_AddWorldSurfaces` returns before touching the BSP for that flag and
+        // every surface left is entity-side.
+        // Source: oracle/codemp/renderer/tr_world.cpp:1936-1940
+        let no_world_model = refdef.rdflags & RDF_NOWORLDMODEL != 0;
+        if self.world_geometry.is_none() && !no_world_model {
             self.warn_once(Warned::NoWorldGeometry);
             return WorldStats::default();
-        };
+        }
+        let geometry = self
+            .world_geometry
+            .as_ref()
+            .unwrap_or(&self.empty_geometry);
 
         // Rebuild `tr.refdef.entities` from this scene's window into the
         // accumulated payloads (DEC-50). The window starts at

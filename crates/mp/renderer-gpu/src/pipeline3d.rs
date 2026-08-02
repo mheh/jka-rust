@@ -28,6 +28,7 @@
 //!
 //! Source: `oracle/codemp/renderer/tr_shade.cpp:1953-2231` (`RB_IterateStagesGeneric`)
 
+use core::f64::consts::PI;
 use std::collections::HashMap;
 use std::mem::size_of;
 
@@ -36,7 +37,13 @@ use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::qfiles::draw_vert_t::drawVert_t;
 use mp_engine_qcommon::qfiles::md3_limits::MD3_XYZ_SCALE;
 use mp_engine_qcommon::qfiles::md3_surface_t::md3Surface_t;
+use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
+use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::shared::mdxaBone_t;
+use mp_qshared::shared::q_math::{
+    _VectorMA as VectorMA, _VectorScale as VectorScale, _VectorSubtract as VectorSubtract,
+    vec3_origin, CrossProduct, VectorNormalize,
+};
 use mp_qshared::shared::vec3_t;
 use mp_renderer::render_state::frame_state::FrameState;
 use mp_renderer::render_state::image_asset::ImageHandle;
@@ -229,6 +236,37 @@ impl WorldGeometry {
             ranges,
             cpu_vertices: vertices,
             cpu_indices: indices,
+        }
+    }
+
+    /// The world-less geometry a `RDF_NOWORLDMODEL` scene draws against: valid
+    /// but empty buffers and no surface ranges. Entity, poly, and sprite
+    /// surfaces all build their own per-frame vertices, so a scene with no BSP
+    /// never reads these buffers. It still needs the handles to bind.
+    pub fn empty(gpu: &Gpu) -> WorldGeometry {
+        // wgpu rejects a zero-size buffer, so both buffers hold one zeroed
+        // element, the same fallback `upload` makes for an empty world.
+        let vertex_fallback = [WorldVertex::zeroed()];
+        let index_fallback = [0u32];
+        let vertex_buffer = create_buffer(
+            gpu.device(),
+            "mp_renderer_gpu empty world vertex buffer",
+            bytemuck::cast_slice(&vertex_fallback),
+            wgpu::BufferUsages::VERTEX,
+        );
+        let index_buffer = create_buffer(
+            gpu.device(),
+            "mp_renderer_gpu empty world index buffer",
+            bytemuck::cast_slice(&index_fallback),
+            wgpu::BufferUsages::INDEX,
+        );
+
+        WorldGeometry {
+            vertex_buffer,
+            index_buffer,
+            ranges: Vec::new(),
+            cpu_vertices: Vec::new(),
+            cpu_indices: Vec::new(),
         }
     }
 
@@ -605,10 +643,12 @@ enum Warned {
     VideoMap,
     /// A fog pass was due but the fog image is not registered.
     FogImageMissing,
+    /// An `SF_ENTITY` draw surf whose `reType` builds no geometry yet.
+    EntitySurface,
 }
 
 impl Warned {
-    const COUNT: usize = 6;
+    const COUNT: usize = 7;
 
     fn slot(self) -> usize {
         match self {
@@ -618,6 +658,7 @@ impl Warned {
             Warned::Glow => 3,
             Warned::VideoMap => 4,
             Warned::FogImageMissing => 5,
+            Warned::EntitySurface => 6,
         }
     }
 
@@ -631,6 +672,7 @@ impl Warned {
             Warned::Glow => "draws a glow world stage as a plain stage",
             Warned::VideoMap => "draws a videoMap world stage as a plain stage — no cinematic yet",
             Warned::FogImageMissing => "skips a fog pass because the fog image is not registered",
+            Warned::EntitySurface => "skips a generated entity surface whose reType is not ported",
         }
     }
 }
@@ -1383,6 +1425,23 @@ impl Pipeline3d {
                         &mut items,
                     );
                 }
+                SurfaceGeometry::Other => {
+                    self.collect_entity_surface(
+                        surf.sort,
+                        assets,
+                        noise,
+                        float_time,
+                        dynamic_vertices,
+                        dynamic_indices,
+                        stats,
+                        slot_map,
+                        entities,
+                        view,
+                        fogs,
+                        oris,
+                        &mut items,
+                    );
+                }
                 _ => {
                     stats.skipped_non_world += 1;
                 }
@@ -1390,6 +1449,111 @@ impl Pipeline3d {
         }
 
         items
+    }
+
+    /// Resolves one `SF_ENTITY` draw surf: the generated-geometry family
+    /// `RB_SurfaceEntity` dispatches on `reType`. The vertices are built on the
+    /// CPU in world space, since `R_RotateForEntity` hands every non-`RT_MODEL`
+    /// entity the world orientation, then drawn one dynamic-buffer pass per
+    /// active stage.
+    ///
+    /// A `reType` outside the census set builds no geometry and counts as a
+    /// skip, so the remaining generated kinds stay visible in the stats rather
+    /// than silently drawing nothing.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_surface.cpp:1798-1870`
+    /// (`RB_SurfaceEntity`), `oracle/codemp/renderer/tr_main.cpp:302-311`
+    /// (`R_RotateForEntity`'s non-`RT_MODEL` arm)
+    #[allow(clippy::too_many_arguments)]
+    fn collect_entity_surface(
+        &mut self,
+        sort: u32,
+        assets: &RenderAssets,
+        noise: &NoiseState,
+        float_time: f32,
+        dynamic_vertices: &mut Vec<WorldVertex>,
+        dynamic_indices: &mut Vec<u32>,
+        stats: &mut WorldStats,
+        slot_map: &HashMap<i32, u32>,
+        entities: &[trRefEntity_t],
+        view: &viewParms_t,
+        fogs: &[fog_t],
+        oris: &[orientationr_t],
+        items: &mut Vec<StageDrawItem>,
+    ) {
+        let (entity_num, shader_handle, fog_num, _dlight_map) =
+            R_DecomposeSort(sort, &assets.sorted_shaders);
+        let Some(shader) = assets.shaders.get(shader_handle) else {
+            return;
+        };
+        let Some(entity) = entities.get(entity_num as usize) else {
+            stats.skipped_non_world += 1;
+            return;
+        };
+
+        let (verts, index_block) = build_entity_geometry(&entity.e, view);
+        if index_block.is_empty() {
+            self.warn_once(Warned::EntitySurface);
+            stats.skipped_non_world += 1;
+            return;
+        }
+
+        let slot = slot_map.get(&entity_num).copied().unwrap_or(0);
+        let globals_offset = (slot as u64 * GLOBALS_STRIDE) as u32;
+        let entity_float_time = float_time - entity_shader_time(entities, entity_num);
+        let surface_fog = resolve_surface_fog(fog_num, fogs, oris, slot, view);
+
+        let first_index = dynamic_indices.len() as u32;
+        let index_count = index_block.len() as u32;
+        dynamic_indices.extend_from_slice(&index_block);
+
+        let before = items.len();
+        for stage in shader.stages.iter().filter(|stage| stage.active) {
+            let item = self.build_cpu_surface_stage_item(
+                shader,
+                stage,
+                &verts,
+                first_index,
+                index_count,
+                entity_float_time,
+                noise,
+                assets,
+                surface_fog,
+                Some(entity),
+                None,
+                dynamic_vertices,
+                globals_offset,
+            );
+            if let Some(item) = item {
+                items.push(item);
+            }
+        }
+        let stages_end = items.len();
+
+        if let Some(sf) = surface_fog {
+            if shader.fog_pass != FogPass::None {
+                let item = self.build_fog_stage_item(
+                    &verts,
+                    sf,
+                    shader.fog_pass,
+                    assets.fog_image,
+                    first_index,
+                    index_count,
+                    true,
+                    globals_offset,
+                    dynamic_vertices,
+                );
+                if let Some(item) = item {
+                    items.push(item);
+                    stats.fog_passes_drawn += 1;
+                }
+            }
+        }
+
+        if stages_end > before {
+            stats.surfaces_drawn += 1;
+            stats.entity_surfaces_drawn += 1;
+        }
     }
 
     /// Resolves one world (BSP) draw surf into its per-stage passes, appending
@@ -3150,6 +3314,242 @@ fn entity_shader_time(entities: &[trRefEntity_t], entity_num: i32) -> f32 {
         .get(entity_num as usize)
         .map(|ent| ent.e.shaderTime)
         .unwrap_or(0.0)
+}
+
+/// Appends `RB_AddQuadStampExt`'s four corners and six indices for a quad
+/// centred at `origin` and spanned by `left` and `up`.
+///
+/// The oracle writes the same constant colour into all four vertices and the
+/// same view-facing normal; the normal is dropped here, as it is for every
+/// other CPU-built surface in this module.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:60-124`
+fn add_quad_stamp_ext(
+    verts: &mut Vec<WorldVertex>,
+    indices: &mut Vec<u32>,
+    origin: vec3_t,
+    left: vec3_t,
+    up: vec3_t,
+    color: [u8; 4],
+    s1: f32,
+    t1: f32,
+    s2: f32,
+    t2: f32,
+) {
+    let ndx = verts.len() as u32;
+    indices.extend_from_slice(&[ndx, ndx + 1, ndx + 3, ndx + 3, ndx + 1, ndx + 2]);
+
+    let corners = [
+        ([1.0f32, 1.0f32], [s1, t1]),
+        ([-1.0, 1.0], [s2, t1]),
+        ([-1.0, -1.0], [s2, t2]),
+        ([1.0, -1.0], [s1, t2]),
+    ];
+    for ([left_sign, up_sign], st) in corners {
+        verts.push(WorldVertex {
+            position: [
+                origin[0] + left_sign * left[0] + up_sign * up[0],
+                origin[1] + left_sign * left[1] + up_sign * up[1],
+                origin[2] + left_sign * left[2] + up_sign * up[2],
+            ],
+            st,
+            lightmap_st: [0.0, 0.0],
+            color,
+        });
+    }
+}
+
+/// Raven `DoSprite` - a screen-oriented quad of half-size `radius`, rotated by
+/// `rotation` degrees around the view axis.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:533-555`
+fn do_sprite(
+    verts: &mut Vec<WorldVertex>,
+    indices: &mut Vec<u32>,
+    origin: vec3_t,
+    radius: f32,
+    rotation: f32,
+    color: [u8; 4],
+    view: &viewParms_t,
+) {
+    // `M_PI * rotation / 180.0f` promotes to `f64` through the unsuffixed
+    // `M_PI`, then truncates back at the assignment.
+    let ang = (PI * rotation as f64 / 180.0) as f32;
+    let s = ang.sin();
+    let c = ang.cos();
+
+    let mut left: vec3_t = [0.0; 3];
+    VectorScale(view.ori.axis[1], c * radius, &mut left);
+    VectorMA(left, -s * radius, view.ori.axis[2], &mut left);
+
+    let mut up: vec3_t = [0.0; 3];
+    VectorScale(view.ori.axis[2], c * radius, &mut up);
+    VectorMA(up, s * radius, view.ori.axis[1], &mut up);
+
+    if view.isMirror != 0 {
+        VectorSubtract(vec3_origin, left, &mut left);
+    }
+
+    add_quad_stamp_ext(verts, indices, origin, left, up, color, 0.0, 0.0, 1.0, 1.0);
+}
+
+/// Raven `DoLine` - a view-facing quad spanning `start` to `end`, `spanWidth`
+/// wide either side of `up`.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:601-660`
+fn do_line(
+    verts: &mut Vec<WorldVertex>,
+    indices: &mut Vec<u32>,
+    start: vec3_t,
+    end: vec3_t,
+    up: vec3_t,
+    span_width: f32,
+    color: [u8; 4],
+) {
+    let vbase = verts.len() as u32;
+    let span_width2 = -span_width;
+
+    for (base, width, st) in [
+        (start, span_width, [0.0f32, 0.0f32]),
+        (start, span_width2, [1.0, 0.0]),
+        (end, span_width, [0.0, 1.0]),
+        (end, span_width2, [1.0, 1.0]),
+    ] {
+        let mut xyz: vec3_t = [0.0; 3];
+        VectorMA(base, width, up, &mut xyz);
+        verts.push(WorldVertex {
+            position: xyz,
+            st,
+            lightmap_st: [0.0, 0.0],
+            color,
+        });
+    }
+
+    indices.extend_from_slice(&[vbase, vbase + 1, vbase + 2, vbase + 2, vbase + 1, vbase + 3]);
+}
+
+/// Builds one generated entity surface's world-space vertices and triangle
+/// indices, the `RB_SurfaceEntity` dispatch restricted to the DEC-54 census
+/// set: `RT_SPRITE`, `RT_LINE`, and `RT_SABER_GLOW`.
+///
+/// Every other `reType` returns empty, which the caller counts as a skip.
+/// `RT_BEAM`, `RT_ORIENTED_QUAD`, `RT_ORIENTEDLINE`, `RT_ELECTRICITY`, and
+/// `RT_CYLINDER` are census-complement fog, so they stay unbuilt rather than
+/// guessed at.
+//TODO: Port RB_SurfaceBeam
+// Source: oracle/codemp/renderer/tr_surface.cpp:226-283
+//TODO: Port RB_SurfaceOrientedQuad
+// Source: oracle/codemp/renderer/tr_surface.cpp:173-215
+//TODO: Port RB_SurfaceOrientedLine
+// Source: oracle/codemp/renderer/tr_surface.cpp:786-806
+//TODO: Port RB_SurfaceElectricity
+// Source: oracle/codemp/renderer/tr_surface.cpp:1038-1090
+//TODO: Port RB_SurfaceCylinder
+// Source: oracle/codemp/renderer/tr_surface.cpp:854-985
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:1798-1870`
+fn build_entity_geometry(e: &refEntity_t, view: &viewParms_t) -> (Vec<WorldVertex>, Vec<u32>) {
+    let mut verts: Vec<WorldVertex> = Vec::new();
+    let mut indices: Vec<u32> = Vec::new();
+    let color = e.shaderRGBA;
+
+    match e.reType {
+        // `RB_SurfaceSprite`: the screen-oriented quad, with the rotation
+        // branch the oracle splits out for `rotation == 0`.
+        // Source: oracle/codemp/renderer/tr_surface.cpp:141-169
+        refEntityType_t::RT_SPRITE => {
+            let radius = e.radius;
+            let (mut left, mut up): (vec3_t, vec3_t) = ([0.0; 3], [0.0; 3]);
+            if e.rotation == 0.0 {
+                VectorScale(view.ori.axis[1], radius, &mut left);
+                VectorScale(view.ori.axis[2], radius, &mut up);
+            } else {
+                let ang = (PI * e.rotation as f64 / 180.0) as f32;
+                let s = ang.sin();
+                let c = ang.cos();
+
+                VectorScale(view.ori.axis[1], c * radius, &mut left);
+                VectorMA(left, -s * radius, view.ori.axis[2], &mut left);
+
+                VectorScale(view.ori.axis[2], c * radius, &mut up);
+                VectorMA(up, s * radius, view.ori.axis[1], &mut up);
+            }
+            if view.isMirror != 0 {
+                VectorSubtract(vec3_origin, left, &mut left);
+            }
+            add_quad_stamp_ext(
+                &mut verts,
+                &mut indices,
+                e.origin,
+                left,
+                up,
+                color,
+                0.0,
+                0.0,
+                1.0,
+                1.0,
+            );
+        }
+
+        // `RB_SurfaceLine`: the side vector is the cross product of the two
+        // eye-to-endpoint vectors, so the quad always faces the camera.
+        // Source: oracle/codemp/renderer/tr_surface.cpp:667-690
+        refEntityType_t::RT_LINE => {
+            let end = e.oldorigin;
+            let start = e.origin;
+
+            let mut v1: vec3_t = [0.0; 3];
+            let mut v2: vec3_t = [0.0; 3];
+            VectorSubtract(start, view.ori.origin, &mut v1);
+            VectorSubtract(end, view.ori.origin, &mut v2);
+            let mut right: vec3_t = [0.0; 3];
+            CrossProduct(v1, v2, &mut right);
+            VectorNormalize(&mut right);
+
+            do_line(&mut verts, &mut indices, start, end, right, e.radius, color);
+        }
+
+        // `RB_SurfaceSaberGlow`: a run of sprites stepped up the blade, then
+        // the hilt blob.
+        //
+        // The oracle's `e->radius += 0.017f` walks the *live* entity, so each
+        // sprite is a step wider than the last, and the widened radius persists
+        // into the next frame's submission. This build works on the local copy
+        // the loop carries, so the widening inside one blade is reproduced and
+        // the cross-frame leak is not: the frontend hands the backend a
+        // by-value entity list per scene (DEC-50), so there is no shared object
+        // to write back through.
+        //
+        // Source: oracle/codemp/renderer/tr_surface.cpp:560-580
+        refEntityType_t::RT_SABER_GLOW => {
+            let mut radius = e.radius;
+            let mut i = e.saberLength;
+            while i > 0.0 {
+                let mut end: vec3_t = [0.0; 3];
+                VectorMA(e.origin, i, e.axis[0], &mut end);
+                do_sprite(&mut verts, &mut indices, end, radius, 0.0, color, view);
+                // The oracle widens the radius inside the body, so the loop
+                // step below reads the already-widened value.
+                radius += 0.017;
+                i -= radius * 0.65;
+            }
+
+            // Big hilt sprite
+            //
+            //TODO: Port RB_SurfaceSaberGlow's random hilt radius
+            // Source: oracle/codemp/renderer/tr_surface.cpp:579
+            // The oracle radius is `5.5f + random() * 0.25f`. `random()` is
+            // `rand()/32768` off the ambient C generator, which the render
+            // thread does not own and which no image golden can pin. The low
+            // end of the same quarter-unit span stands in until a render-side
+            // generator lands.
+            do_sprite(&mut verts, &mut indices, e.origin, 5.5, 0.0, color, view);
+        }
+
+        _ => {}
+    }
+
+    (verts, indices)
 }
 
 /// Decodes one MD3 (`MOD_MESH`) surface into GPU vertices and triangle indices.

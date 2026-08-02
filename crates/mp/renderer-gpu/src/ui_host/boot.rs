@@ -79,6 +79,9 @@ use crate::ui_host::state::{InputState, StubLog, UiHost};
 pub struct BootConfig {
     /// `fs_basepath` — the directory holding `base/assets*.pk3`.
     pub basepath: String,
+    /// `fs_homepath` - empty keeps the platform default. A synthetic boot sets
+    /// it, or `FS_Startup` also mounts the user's real install directory.
+    pub homepath: String,
     /// `fs_game` — "" for stock `base`.
     pub fs_game: String,
     /// The menu-set file (`ui_menuFilesMP`'s default).
@@ -91,6 +94,7 @@ impl Default for BootConfig {
     fn default() -> Self {
         BootConfig {
             basepath: String::from("/Users/milohehmsoth/Developer/jka/jka_server"),
+            homepath: String::new(),
             fs_game: String::new(),
             menu_file: String::from("ui/jampmenus.txt"),
             start_menu: String::from("main"),
@@ -101,6 +105,18 @@ impl Default for BootConfig {
 /// Boots the engine subset, the renderer, and the menus; returns a host ready
 /// to be painted every frame.
 pub fn boot(cfg: &BootConfig) -> UiHost {
+    let mut host = boot_renderer(cfg);
+    ui_init_equivalent(&mut host, cfg);
+    host
+}
+
+/// Boots the engine subset and `R_Init`, and stops there. No menu set, no
+/// fonts, no cursor shaders.
+///
+/// This is what a renderer test needs: `R_Init` builds its own images and its
+/// default shader procedurally, so a host booted this way is usable against an
+/// empty `fs_basepath` and draws no retail content.
+pub fn boot_renderer(cfg: &BootConfig) -> UiHost {
     let mut engine = Engine::new();
 
     // The hook tables `Com_Init` would have installed — Raven's link-time
@@ -131,6 +147,9 @@ pub fn boot(cfg: &BootConfig) -> UiHost {
         // Seed before `FS_Startup` re-registers them with platform defaults:
         // `Cvar_Get` keeps an already-registered value (`cvar_fns.rs`).
         Cvar_Get(&mut view, "fs_basepath", &cfg.basepath, CVAR_INIT);
+        if !cfg.homepath.is_empty() {
+            Cvar_Get(&mut view, "fs_homepath", &cfg.homepath, CVAR_INIT);
+        }
         Cvar_Get(&mut view, "fs_game", &cfg.fs_game, CVAR_INIT);
         let ded = Cvar_Get(&mut view, "dedicated", "0", 0);
         view.common.com_dedicated = Some(ded);
@@ -237,7 +256,6 @@ pub fn boot(cfg: &BootConfig) -> UiHost {
         host.assets.images.iter().count()
     );
 
-    ui_init_equivalent(&mut host, cfg);
     host
 }
 
@@ -513,28 +531,34 @@ pub fn load_world(host: &mut UiHost, map: &str) -> (bool, srfTerrain_t) {
         if loaded { "loaded" } else { "NOT LOADED" }
     );
 
-    // ---- init the null-landscape terrain surface -----------------------
+    (loaded, init_terrain(host))
+}
+
+/// Runs `R_TerrainInit` and returns the null-landscape terrain surface every
+/// `WorldFrame` carries.
+///
+/// Every scene needs this, map or no map: `R_TerrainInit` registers the terrain
+/// cvars `R_AddTerrainSurfaces` reads on the world walk, and sets
+/// `RenderAssets::distance_cull`.
+pub fn init_terrain(host: &mut UiHost) -> srfTerrain_t {
     // SAFETY: `srfTerrain_t` is a frozen `#[repr(C)]` POD (scalars, fixed
     // arrays, and raw pointers whose all-zero value is null). `R_TerrainInit`
     // overwrites both its fields with the null-landscape terrain surface, which
     // makes `R_AddTerrainSurfaces` return early.
     let mut land_scape: srfTerrain_t = unsafe { core::mem::zeroed() };
-    {
-        let UiHost {
-            engine,
-            models,
-            cvars,
-            assets,
-            ..
-        } = &mut *host;
-        let models_ptr: *mut RenderModels = &mut *models;
-        let Engine { common, cm, sv, .. } = &mut **engine;
-        let sv_ptr: *mut () = sv as *mut Server as *mut ();
-        let mut view = host_view(common, cm, sv_ptr, models_ptr);
-        R_TerrainInit(&mut view, cvars, assets, &mut land_scape);
-    }
-
-    (loaded, land_scape)
+    let UiHost {
+        engine,
+        models,
+        cvars,
+        assets,
+        ..
+    } = &mut *host;
+    let models_ptr: *mut RenderModels = &mut *models;
+    let Engine { common, cm, sv, .. } = &mut **engine;
+    let sv_ptr: *mut () = sv as *mut Server as *mut ();
+    let mut view = host_view(common, cm, sv_ptr, models_ptr);
+    R_TerrainInit(&mut view, cvars, assets, &mut land_scape);
+    land_scape
 }
 
 /// Registers one model through the real `RE_RegisterModel` chain, split-borrowing
