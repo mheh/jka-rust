@@ -130,7 +130,7 @@ use crate::snd_dma::{
     S_BeginRegistration, S_ClearSoundBuffer, S_DisableSounds, S_Init, S_Shutdown, S_StopAllSounds,
     S_Update,
 };
-use crate::snd_stubs::S_RestartMusic;
+use crate::snd_dma::S_RestartMusic;
 
 // PORT-NOTE(latin1-scratch): Raven passes `char[]` scratch buffers straight into
 // `strlen`/`strcmp`/printf. The ported callees take `&str`, so each site reads
@@ -2640,7 +2640,11 @@ pub fn CL_UpdateVisiblePings_f(common: &mut Common, cl: &mut Client, source: c_i
 pub fn CL_ShutdownAll(view: &mut EngineHostView, cl: &mut Client) {
     // clear sounds
     // SAFETY: view-constructor slot, single-threaded, no other live cast.
-    S_DisableSounds(unsafe { snd_from_view(view) });
+    {
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let snd = unsafe { snd_from_view(view) };
+        S_DisableSounds(view.common, snd);
+    }
     // shutdown CGame
     CL_ShutdownCGame(view.common, cl);
     // shutdown UI
@@ -2786,7 +2790,11 @@ pub fn CL_DemoCompleted(view: &mut EngineHostView, cl: &mut Client) {
     //after a demo is finished playing instead.
     CL_Disconnect_f(view, cl);
     // SAFETY: view-constructor slot, single-threaded, no other live cast.
-    S_StopAllSounds(unsafe { snd_from_view(view) });
+    {
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let snd = unsafe { snd_from_view(view) };
+        S_StopAllSounds(view.common, snd);
+    }
     VM_Call(
         view.common,
         cl.uivm,
@@ -3275,7 +3283,11 @@ pub fn CL_Vid_Restart_f(view: &mut EngineHostView, cl: &mut Client) {
 
     // don't let them loop during the restart
     // SAFETY: view-constructor slot, single-threaded, no other live cast.
-    S_StopAllSounds(unsafe { snd_from_view(view) });
+    {
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let snd = unsafe { snd_from_view(view) };
+        S_StopAllSounds(view.common, snd);
+    }
     // shutdown the UI
     CL_ShutdownUI(view.common, cl);
     // shutdown the CGame
@@ -3365,10 +3377,9 @@ pub fn CL_DownloadsComplete(view: &mut EngineHostView, cl: &mut Client) {
     // will be cleared, note that this is done after the hunk mark has been set
     //
     // Demo referee seam (`cl_referee.rs`): `CL_FlushMemory` restarts the sound
-    // stack and the renderer and ui stacks. The mixer landed with gh#24, and the
-    // music and ambient half (gh#25) plus the platform shell (gh#22) have not.
-    // The headless rig keeps the stack it booted with, and this gate goes away
-    // when those two lanes land.
+    // stack and the renderer and ui stacks. The sound stack landed with gh#24
+    // and gh#25; the platform shell (gh#22) has not. The headless rig keeps the
+    // stack it booted with, and this gate goes away when that lane lands.
     if !ref_headless(cl) {
         CL_FlushMemory(view, cl);
     }
@@ -3767,7 +3778,11 @@ pub fn CL_Frame(view: &mut EngineHostView, cl: &mut Client, msec: c_int) {
     {
         // if disconnected, bring up the menu
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
-        S_StopAllSounds(unsafe { snd_from_view(view) });
+        {
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let snd = unsafe { snd_from_view(view) };
+        S_StopAllSounds(view.common, snd);
+    }
         VM_Call(
             view.common,
             cl.uivm,
@@ -3850,7 +3865,7 @@ pub fn CL_Frame(view: &mut EngineHostView, cl: &mut Client, msec: c_int) {
     // update audio
     // SAFETY: view-constructor slot, single-threaded, no other live cast.
     let snd = unsafe { snd_from_view(view) };
-    S_Update(view.common, snd);
+    S_Update(view, snd);
 
     // advance local effects for next frame
     SCR_RunCinematic(view, cl);

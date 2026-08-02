@@ -1,0 +1,84 @@
+# ambient — the ambient-set file, the cross-fade, and the three set kinds.
+#
+# `sound/sound.txt` carries four sets. Only the three the precache list names are
+# kept, so `unused` proves the precache filter. Every subwave and every gap comes
+# out of Q_irand, so the draw order is part of the golden.
+cvar s_khz 22
+init
+beginreg
+
+# Precache the three sets cgame would ask for, then parse.
+asprecache cave
+asprecache vent
+asprecache door
+asparse
+dumpsfx after-parse
+
+# The brush-model set answers a handle per stage, and -1 outside its range.
+asbmodel door 0
+asbmodel door 3
+asbmodel door 4
+asbmodel cave 0
+asbmodel missing 0
+
+# The first general set starts a cross-fade from nothing. `realtime` is the
+# scripted client clock the fade reads.
+respatialize 0 0 0 0 0
+asupdate cave 100 0 0 0
+dumpstate after-cave1
+advance 1102
+update
+dumpstate frame1
+dumpring frame1
+
+# Hold on the same set across the fade window, so masterVolume climbs.
+asupdate cave 100 0 0 500
+respatialize 0 0 0 0 0
+advance 1102
+update
+dumpstate frame2
+dumpring frame2
+
+# Naming a different set starts the cross-fade, so both play for a while.
+asupdate vent 100 0 0 1200
+respatialize 0 0 0 0 0
+advance 1102
+update
+dumpstate frame3
+dumpring frame3
+
+asupdate vent 100 0 0 2500
+respatialize 0 0 0 0 0
+advance 1102
+update
+dumpstate frame4
+dumpring frame4
+
+# A big clock jump makes the subwave gap elapse, so AS_PlayAmbientSet picks one
+# through Q_irand and starts it on CHAN_AMBIENT. Dump before the paint, while
+# the channel is still live.
+asupdate vent 100 0 0 12000
+dumpstate subwave
+respatialize 0 0 0 0 0
+advance 551
+update
+dumpstate frame5
+dumpring frame5
+
+# The local set attenuates by distance. Inside half the radius is full volume,
+# past the radius is silence, and a missing set answers the realtime it was
+# given. The three calls run at the same scripted clock, so only the distance
+# differs.
+aslocal vent 0 0 0 100 0 0 5 0 20000
+dumpstate local-near
+aslocal vent 0 0 0 380 0 0 5 0 20000
+dumpstate local-mid
+aslocal vent 0 0 0 900 0 0 5 0 20000
+dumpstate local-far
+aslocal missing 0 0 0 0 0 0 5 0 20000
+respatialize 0 0 0 0 0
+advance 1102
+update
+dumpstate frame6
+dumpring frame6
+shutdown

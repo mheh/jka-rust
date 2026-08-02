@@ -14,11 +14,22 @@ import math
 import os
 import struct
 
-FIXTURE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "sound")
+HERE = os.path.dirname(os.path.abspath(__file__))
+FIXTURE_ROOT = os.path.join(HERE, "fixtures")
+FIXTURE_DIR = os.path.join(FIXTURE_ROOT, "sound")
 
 
-def write_wav(name, rate, width, channels, frames):
-    """Write a RIFF/WAVE PCM file that Raven's GetWavinfo accepts.
+def write_file(relpath, blob):
+    """Write one fixture under fixtures/, creating the directory it needs."""
+    path = os.path.join(FIXTURE_ROOT, relpath)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as handle:
+        handle.write(blob)
+    print("wrote %s (%d bytes)" % (path, len(blob)))
+
+
+def wav_bytes(rate, width, channels, frames):
+    """Build a RIFF/WAVE PCM image that Raven's GetWavinfo accepts.
 
     `frames` holds one list per channel-interleaved sample, already clamped to
     the width. Raven reads the format chunk at a fixed offset, so the layout
@@ -34,13 +45,12 @@ def write_wav(name, rate, width, channels, frames):
     fmt = struct.pack("<HHIIHH", 1, channels, rate, byte_rate, block_align, width * 8)
     riff = b"WAVE" + b"fmt " + struct.pack("<I", len(fmt)) + fmt
     riff += b"data" + struct.pack("<I", len(payload)) + payload
-    blob = b"RIFF" + struct.pack("<I", len(riff)) + riff
+    return b"RIFF" + struct.pack("<I", len(riff)) + riff
 
-    path = os.path.join(FIXTURE_DIR, name)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "wb") as handle:
-        handle.write(blob)
-    print("wrote %s (%d bytes)" % (path, len(blob)))
+
+def write_wav(name, rate, width, channels, frames):
+    """Write one WAV under fixtures/sound/."""
+    write_file(os.path.join("sound", name), wav_bytes(rate, width, channels, frames))
 
 
 def sine16(rate, hz, count, peak):
@@ -112,6 +122,133 @@ def main():
         stereo.append(int(10000 * math.sin(2.0 * math.pi * 300.0 * i / 22050)))
         stereo.append(int(-10000 * math.sin(2.0 * math.pi * 300.0 * i / 22050)))
     write_wav("stereo.wav", 22050, 2, 2, stereo)
+
+    write_music_fixtures()
+    write_ambient_fixtures()
+
+
+def write_music_fixtures():
+    """The background-music tree: one streamed WAV track and one dynamic set."""
+    # The streamed track. S_StartBackgroundTrack_Actual reads the header off
+    # this and Sys_StreamedRead feeds the raw ring from it. 22 kHz stereo is what
+    # Raven warns about not getting, so the fixture is one.
+    track = []
+    for i in range(4096):
+        value = int(12000 * math.sin(2.0 * math.pi * 220.0 * i / 22050))
+        track.append(value)
+        track.append(-value)
+    write_file(os.path.join("music", "track.wav"), wav_bytes(22050, 2, 2, track))
+
+    # A second, shorter track, so the loop hand-over is observable.
+    loop = []
+    for i in range(1024):
+        value = int(9000 * math.sin(2.0 * math.pi * 660.0 * i / 22050))
+        loop.append(value)
+        loop.append(-value)
+    write_file(os.path.join("music", "loop.wav"), wav_bytes(22050, 2, 2, loop))
+
+    # The dynamic-music description. `Music_ParseLeveldata` checks that every
+    # file it names exists, so each one gets a one-frame MP3 beside it. Nothing
+    # in the covered scenarios decodes them (DEC-57.3).
+    dms = """musicfiles
+{
+	explore_piece
+	{
+		entry
+		{
+			marker0		0.000
+			marker1		4.000
+		}
+		exit
+		{
+			nextfile	explore_tr0
+			time0		8.000
+		}
+	}
+	action_piece
+	{
+		entry
+		{
+			marker0		0.000
+		}
+		exit
+		{
+			nextfile	action_tr0
+			nextmark	marker1
+			time0		6.000
+			time1		12.000
+		}
+	}
+	boss_piece
+	{
+	}
+}
+
+levelmusic
+{
+	testmap
+	{
+		explore		explore_piece
+		action		action_piece
+		boss		boss_piece
+	}
+	usesmap
+	{
+		uses		testmap
+	}
+}
+"""
+    write_file(os.path.join("ext_data", "dms.dat"), dms.encode("ascii"))
+
+    # One MPEG-1 Layer III silent frame, which is enough for S_FileExists.
+    frame = bytes([0xFF, 0xFB, 0x90, 0x00]) + bytes(417 - 4)
+    for name in ["explore_piece", "action_piece", "boss_piece", "explore_tr0", "action_tr0"]:
+        write_file(os.path.join("music", "testmap", name + ".mp3"), frame)
+    write_file(os.path.join("music", "death_music.mp3"), frame)
+
+
+def write_ambient_fixtures():
+    """The ambient-set file and the waves it names."""
+    # Four short waves the sets pick between, plus one looping bed.
+    for i, peak in enumerate([8000, 12000, 16000, 20000]):
+        wave = [peak if (n // 8) % 2 == 0 else -peak for n in range(512)]
+        write_wav(os.path.join("amb", "sub%d.wav" % (i + 1)), 22050, 2, 1, wave)
+    bed = [4000 if (n // 32) % 2 == 0 else -4000 for n in range(2048)]
+    write_wav(os.path.join("amb", "bed.wav"), 22050, 2, 1, bed)
+
+    # `AS_ParseHeader` demands the type line first. Only a set the precache list
+    # names is kept, so the file carries one the scenario never asks for.
+    #
+    # The file is written with CRLF, which is what the shipped `sound.txt` has,
+    # and `AS_GetSubWaves` depends on it: after the last wave of a line it steps
+    # one character past the name, and only a two-character line ending leaves
+    # the cursor on a newline for the break test. Under LF the parser walks
+    # straight into the next line and reads its keyword as a wave name.
+    text = """type ambientSet
+
+generalSet cave
+timeBetweenWaves 2 4
+subWaves amb sub1 sub2 sub3
+loopedWave amb/bed
+volRange 100 200
+
+generalSet unused
+timeBetweenWaves 1 1
+subWaves amb sub4
+
+localSet vent
+timeBetweenWaves 1 3
+subWaves amb sub2 sub4
+radius 400
+volRange 50 150
+
+bmodelSet door
+subWaves amb sub1 sub2 sub3 sub4
+"""
+    write_file(
+        os.path.join("sound", "sound.txt"),
+        text.replace("\n", "\r\n").encode("ascii"),
+    )
 
 
 if __name__ == "__main__":

@@ -1,0 +1,47 @@
+musicfiles
+{
+	explore_piece
+	{
+		entry
+		{
+			marker0		0.000
+			marker1		4.000
+		}
+		exit
+		{
+			nextfile	explore_tr0
+			time0		8.000
+		}
+	}
+	action_piece
+	{
+		entry
+		{
+			marker0		0.000
+		}
+		exit
+		{
+			nextfile	action_tr0
+			nextmark	marker1
+			time0		6.000
+			time1		12.000
+		}
+	}
+	boss_piece
+	{
+	}
+}
+
+levelmusic
+{
+	testmap
+	{
+		explore		explore_piece
+		action		action_piece
+		boss		boss_piece
+	}
+	usesmap
+	{
+		uses		testmap
+	}
+}

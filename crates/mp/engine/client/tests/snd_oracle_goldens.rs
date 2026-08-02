@@ -17,7 +17,8 @@ use std::path::PathBuf;
 /// The scenarios the harness ships. A new scenario must be added here, or the
 /// completeness check fails.
 /// Source: `tools/snd-oracle/scenarios/`
-const SCENARIOS: [&str; 11] = [
+const SCENARIOS: [&str; 14] = [
+    "ambient",
     "badfiles",
     "basic",
     "channels",
@@ -25,11 +26,18 @@ const SCENARIOS: [&str; 11] = [
     "khz44",
     "lipsync",
     "loops",
+    "music",
+    "musicdata",
     "rawstream",
     "resample",
     "ringwrap",
     "spatialize",
 ];
+
+/// The scenarios that never paint. `musicdata` drives the `snd_music` state
+/// machine alone: it starts no track and mixes nothing, so it dumps no ring and
+/// its `.bin` is the silent buffer `S_Init` allocated.
+const PAINTLESS: [&str; 1] = ["musicdata"];
 
 /// The retail DirectSound secondary buffer is 65536 bytes at every `s_khz`.
 /// Source: `oracle/codemp/win32/win_snd.cpp:12,246`
@@ -135,6 +143,10 @@ fn ring_dumps_cover_the_whole_buffer() {
     for name in SCENARIOS {
         let text = fs::read_to_string(dir.join(format!("{name}.txt"))).expect("text golden");
         let dumps = parse_ring_dumps(&text);
+        if PAINTLESS.contains(&name) {
+            assert!(dumps.is_empty(), "{name}: a paintless scenario dumped a ring");
+            continue;
+        }
         assert!(!dumps.is_empty(), "{name}: no ring dump in the golden");
 
         for dump in &dumps {
@@ -194,6 +206,9 @@ fn every_scenario_paints_something() {
         // The final ring can be silent, because `channels` ends on
         // S_StopAllSounds and that clears the buffer. At least one dump in the
         // run must carry audio, or the scenario proves nothing.
+        if PAINTLESS.contains(&name) {
+            continue;
+        }
         let painted = dumps
             .iter()
             .any(|dump| dump.blocks.iter().any(|block| block.4 > 0));
@@ -209,8 +224,13 @@ fn ring_goldens_match_their_digests() {
         let ring = fs::read(dir.join(format!("{name}.bin"))).expect("ring golden");
 
         // The .bin holds the last ring the scenario dumped, so it must match the
-        // last RING block in the text.
+        // last RING block in the text. A paintless scenario dumps none, and its
+        // .bin is the silent buffer `S_Init` allocated.
         let dumps = parse_ring_dumps(&text);
+        if PAINTLESS.contains(&name) {
+            assert!(ring.iter().all(|&b| b == 0), "{name}: the silent ring is not silent");
+            continue;
+        }
         let last = dumps.last().expect("a ring dump");
         assert_eq!(
             fnv1a(&ring),

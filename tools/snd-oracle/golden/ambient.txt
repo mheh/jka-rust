@@ -1,0 +1,236 @@
+== snd-oracle scenarios/ambient.snd ==
+SFX after-parse count 6
+  sfx 0 name sound/null samples 128 volrange 0.000000 method 0 default 0 inmem 1 data e6a1d1c5
+  sfx 1 name sound/amb/sub1 samples 512 volrange 31.000000 method 0 default 0 inmem 1 data 086e09c5
+  sfx 2 name sound/amb/sub2 samples 512 volrange 46.000000 method 0 default 0 inmem 1 data 69df51c5
+  sfx 3 name sound/amb/sub3 samples 512 volrange 62.000000 method 0 default 0 inmem 1 data e5fb51c5
+  sfx 4 name sound/amb/bed samples 2048 volrange 15.000000 method 0 default 0 inmem 1 data e2f84dc5
+  sfx 5 name sound/amb/sub4 samples 512 volrange 78.000000 method 0 default 0 inmem 1 data 14db51c5
+BMODELSOUND name door stage 0 handle 1
+BMODELSOUND name door stage 3 handle 5
+BMODELSOUND name door stage 4 handle -1
+BMODELSOUND name cave stage 0 handle 1
+BMODELSOUND name missing stage 0 handle -1
+STATE after-cave1
+  clock 0 dmapos 0 frames 0
+  started 1 muted 0 soundtime 0 paintedtime 0 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 1 prints 14 dprints 0
+STATE frame1
+  clock 49 dmapos 2204 frames 1102
+  started 1 muted 0 soundtime 1102 paintedtime 5512 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 1 prints 14 dprints 0
+RING frame1 bytes 65536 whole 5e509dc5
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 2 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 3 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 4 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 5 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 6 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 7 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 8 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 9 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 10 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 11 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+STATE frame2
+  clock 99 dmapos 4408 frames 2204
+  started 1 muted 0 soundtime 2204 paintedtime 6614 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 2 prints 14 dprints 0
+  ch 0 ent 0 chan 0 lv 63 rv 63 mv 0 start 0 fixed 0 loop 1 org 0.000000 0.000000 0.000000 sfx sound/amb/bed
+RING frame2 bytes 65536 whole 9c0370ad
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 2 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 3 crc 2bbc422d min -493 max 492 nonzero 1580
+  blk 4 crc e6d315c5 min -493 max 492 nonzero 2048
+  blk 5 crc e6d315c5 min -493 max 492 nonzero 2048
+  blk 6 crc 69306045 min -493 max 492 nonzero 940
+  blk 7 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 8 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 9 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 10 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 11 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+STATE frame3
+  clock 149 dmapos 6612 frames 3306
+  started 1 muted 0 soundtime 3306 paintedtime 7716 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 3 prints 14 dprints 0
+  ch 0 ent 0 chan 0 lv 190 rv 190 mv 0 start 0 fixed 0 loop 1 org 0.000000 0.000000 0.000000 sfx sound/amb/bed
+RING frame3 bytes 65536 whole 6a36f97d
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 2 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 3 crc 2bbc422d min -493 max 492 nonzero 1580
+  blk 4 crc 380c5585 min -1485 max 1484 nonzero 2048
+  blk 5 crc 303295c5 min -1485 max 1484 nonzero 2048
+  blk 6 crc 303295c5 min -1485 max 1484 nonzero 2048
+  blk 7 crc 8a3cc8d5 min -1485 max 1484 nonzero 1096
+  blk 8 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 9 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 10 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 11 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+STATE frame4
+  clock 199 dmapos 8816 frames 4408
+  started 1 muted 0 soundtime 4408 paintedtime 8818 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 3 prints 14 dprints 0
+  ch 0 ent 0 chan 0 lv 190 rv 190 mv 0 start 0 fixed 0 loop 1 org 0.000000 0.000000 0.000000 sfx sound/amb/bed
+RING frame4 bytes 65536 whole 25829725
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 2 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 3 crc 2bbc422d min -493 max 492 nonzero 1580
+  blk 4 crc 380c5585 min -1485 max 1484 nonzero 2048
+  blk 5 crc 303295c5 min -1485 max 1484 nonzero 2048
+  blk 6 crc 303295c5 min -1485 max 1484 nonzero 2048
+  blk 7 crc 303295c5 min -1485 max 1484 nonzero 2048
+  blk 8 crc c408879d min -1485 max 1484 nonzero 1252
+  blk 9 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 10 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 11 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+STATE subwave
+  clock 199 dmapos 8816 frames 4408
+  started 1 muted 0 soundtime 4408 paintedtime 8818 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 3 prints 14 dprints 0
+  ch 0 ent 0 chan 0 lv 190 rv 190 mv 0 start 0 fixed 0 loop 1 org 0.000000 0.000000 0.000000 sfx sound/amb/bed
+  ch 1 ent 0 chan 7 lv 50 rv 50 mv 50 start 2147483647 fixed 1 loop 0 org 100.000000 0.000000 0.000000 sfx sound/amb/sub2
+STATE frame5
+  clock 224 dmapos 9918 frames 4959
+  started 1 muted 0 soundtime 4959 paintedtime 9369 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 3 prints 14 dprints 0
+  ch 0 ent 0 chan 0 lv 190 rv 190 mv 0 start 0 fixed 0 loop 1 org 0.000000 0.000000 0.000000 sfx sound/amb/bed
+  ch 1 ent 0 chan 7 lv 50 rv 50 mv 50 start 6061 fixed 1 loop 0 org 100.000000 0.000000 0.000000 sfx sound/amb/sub2
+RING frame5 bytes 65536 whole 47878fcd
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 2 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 3 crc 2bbc422d min -493 max 492 nonzero 1580
+  blk 4 crc 380c5585 min -1485 max 1484 nonzero 2048
+  blk 5 crc 8322978d min -2657 max 2656 nonzero 2048
+  blk 6 crc b4a80bfd min -2657 max 2656 nonzero 2048
+  blk 7 crc 303295c5 min -1485 max 1484 nonzero 2048
+  blk 8 crc 303295c5 min -1485 max 1484 nonzero 2048
+  blk 9 crc 94b2f9a5 min -1485 max 1484 nonzero 306
+  blk 10 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 11 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+LOCALSET name vent time 20000
+STATE local-near
+  clock 224 dmapos 9918 frames 4959
+  started 1 muted 0 soundtime 4959 paintedtime 9369 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 3 prints 14 dprints 0
+  ch 0 ent 0 chan 0 lv 190 rv 190 mv 0 start 0 fixed 0 loop 1 org 0.000000 0.000000 0.000000 sfx sound/amb/bed
+  ch 1 ent 0 chan 7 lv 50 rv 50 mv 50 start 6061 fixed 1 loop 0 org 100.000000 0.000000 0.000000 sfx sound/amb/sub2
+  ch 2 ent 5 chan 7 lv 131 rv 131 mv 131 start 2147483647 fixed 1 loop 0 org 100.000000 0.000000 0.000000 sfx sound/amb/sub2
+LOCALSET name vent time 20000
+STATE local-mid
+  clock 224 dmapos 9918 frames 4959
+  started 1 muted 0 soundtime 4959 paintedtime 9369 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 3 prints 14 dprints 0
+  ch 0 ent 0 chan 0 lv 190 rv 190 mv 0 start 0 fixed 0 loop 1 org 0.000000 0.000000 0.000000 sfx sound/amb/bed
+  ch 1 ent 0 chan 7 lv 50 rv 50 mv 50 start 6061 fixed 1 loop 0 org 100.000000 0.000000 0.000000 sfx sound/amb/sub2
+  ch 2 ent 5 chan 7 lv 13 rv 13 mv 13 start 2147483647 fixed 1 loop 0 org 380.000000 0.000000 0.000000 sfx sound/amb/sub4
+LOCALSET name vent time 20000
+STATE local-far
+  clock 224 dmapos 9918 frames 4959
+  started 1 muted 0 soundtime 4959 paintedtime 9369 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 3 prints 14 dprints 0
+  ch 0 ent 0 chan 0 lv 190 rv 190 mv 0 start 0 fixed 0 loop 1 org 0.000000 0.000000 0.000000 sfx sound/amb/bed
+  ch 1 ent 0 chan 7 lv 50 rv 50 mv 50 start 6061 fixed 1 loop 0 org 100.000000 0.000000 0.000000 sfx sound/amb/sub2
+  ch 2 ent 5 chan 7 lv 0 rv 0 mv 0 start 2147483647 fixed 1 loop 0 org 900.000000 0.000000 0.000000 sfx sound/amb/sub4
+LOCALSET name missing time 20000
+STATE frame6
+  clock 274 dmapos 12122 frames 6061
+  started 1 muted 0 soundtime 6061 paintedtime 10471 rawend 0
+  dma channels 2 samples 32768 samplebits 16 speed 22050 chunk 1
+  listener 0 org 0.000000 0.000000 0.000000
+  axis0 1.000000 0.000000 0.000000
+  axis1 0.000000 1.000000 0.000000
+  axis2 0.000000 0.000000 1.000000
+  loops 3 prints 14 dprints 0
+  ch 0 ent 0 chan 0 lv 190 rv 190 mv 0 start 0 fixed 0 loop 1 org 0.000000 0.000000 0.000000 sfx sound/amb/bed
+RING frame6 bytes 65536 whole f5833d41
+  blk 0 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 1 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 2 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 3 crc 2bbc422d min -493 max 492 nonzero 1580
+  blk 4 crc 380c5585 min -1485 max 1484 nonzero 2048
+  blk 5 crc 8322978d min -2657 max 2656 nonzero 2048
+  blk 6 crc b4a80bfd min -2657 max 2656 nonzero 2048
+  blk 7 crc 303295c5 min -1485 max 1484 nonzero 2048
+  blk 8 crc 303295c5 min -1485 max 1484 nonzero 2048
+  blk 9 crc 303295c5 min -1485 max 1484 nonzero 2048
+  blk 10 crc 270d7cb9 min -1485 max 1484 nonzero 462
+  blk 11 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 12 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 13 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 14 crc 76efddc5 min 0 max 0 nonzero 0
+  blk 15 crc 76efddc5 min 0 max 0 nonzero 0
+== end ==

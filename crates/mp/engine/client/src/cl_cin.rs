@@ -1362,7 +1362,11 @@ pub fn SCR_StopCinematic(view: &mut EngineHostView, cl: &mut Client) {
     if cl.CL_handle >= 0 && cl.CL_handle < MAX_VIDEO_HANDLES as c_int {
         CIN_StopCinematic(view, cl, cl.CL_handle);
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
-        S_StopAllSounds(unsafe { snd_from_view(view) });
+        {
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let snd = unsafe { snd_from_view(view) };
+        S_StopAllSounds(view.common, snd);
+    }
         cl.CL_handle = -1;
     }
 }
@@ -1494,7 +1498,7 @@ pub fn RoQInterrupt(view: &mut EngineHostView, cl: &mut Client) {
                     if cl.cinTable[handle].numQuads == -1 {
                         // SAFETY: view-constructor slot, single-threaded, no other live cast.
                         let snd = unsafe { snd_from_view(view) };
-                        S_Update(view.common, snd);
+                        S_Update(view, snd);
                         snd.s_rawend = snd.s_soundtime;
                     }
                     let ssize = RllDecodeStereoToStereo(
@@ -1708,7 +1712,11 @@ pub fn CL_PlayCinematic_f(view: &mut EngineHostView, cl: &mut Client) {
     }
 
     // SAFETY: view-constructor slot, single-threaded, no other live cast.
-    S_StopAllSounds(unsafe { snd_from_view(view) });
+    {
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let snd = unsafe { snd_from_view(view) };
+        S_StopAllSounds(view.common, snd);
+    }
 
     let arg_c = std::ffi::CString::new(arg.clone()).unwrap_or_default();
     cl.CL_handle = CIN_PlayCinematic(

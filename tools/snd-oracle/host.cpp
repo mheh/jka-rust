@@ -34,6 +34,10 @@ int snd_oracle_dma_pos = 0;
 int snd_oracle_print_count = 0;
 int snd_oracle_dprint_count = 0;
 
+// The scripted `cls.realtime`. The ambient system reads the client clock, and
+// the harness has no client, so the script sets it.
+int snd_oracle_realtime = 0;
+
 extern "C" unsigned int timeGetTime(void) { return snd_oracle_clock_ms; }
 int Com_Milliseconds(void) { return (int)snd_oracle_clock_ms; }
 int Sys_Milliseconds(bool) { return (int)snd_oracle_clock_ms; }
@@ -333,11 +337,28 @@ void FS_FreeFileList(char **) {}
 
 // --- streamed reads ---------------------------------------------------------
 
-// Raven streams the background music track through these. The driver never
-// starts a background track, so a hit means the script left the covered set.
-void Sys_BeginStreamedFile(fileHandle_t, int) { snd_oracle_al_unreachable("Sys_BeginStreamedFile"); }
-int Sys_StreamedRead(void *, int, int, fileHandle_t) { snd_oracle_al_unreachable("Sys_StreamedRead"); return 0; }
-void Sys_EndStreamedFile(fileHandle_t) { snd_oracle_al_unreachable("Sys_EndStreamedFile"); }
+// Raven streams the background music track through these. The unix build's
+// non-async `#if 1` branch makes the begin and end calls no-ops and routes the
+// read straight at `FS_Read`, so the harness does the same.
+// Source: `oracle/codemp/unix/unix_main.c` (`Sys_BeginStreamedFile`)
+void Sys_BeginStreamedFile(fileHandle_t, int) {}
+int Sys_StreamedRead(void *buffer, int size, int count, fileHandle_t f) { return FS_Read(buffer, size * count, f); }
+void Sys_EndStreamedFile(fileHandle_t) {}
+
+// --- the C runtime generator ------------------------------------------------
+
+// `Music_GetRandomEntryTime` is the one snd path that calls `rand()`. This
+// host's libc is a different generator from the one the engine tier owns
+// (`Common.qrand`), so `build.sh` routes the call here and both sides draw from
+// the same sequence. Harness policy, the `SNDDMA_GetDMAPos` precedent.
+// Source: `oracle/codemp/game/bg_lib.c:763-772`
+static unsigned int s_oracleRandSeed = 0;
+
+int snd_oracle_rand(void)
+{
+	s_oracleRandSeed = 69069u * s_oracleRandSeed + 1u;
+	return (int)(s_oracleRandSeed & 0x7fff);
+}
 
 qboolean Sys_LowPhysicalMemory(void) { return qfalse; }
 

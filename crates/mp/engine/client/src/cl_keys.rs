@@ -1413,7 +1413,8 @@ pub fn CL_KeyEvent(
                 } else {
                     CL_Disconnect_f(view, cl);
                     // SAFETY: view-constructor slot, single-threaded, no other live cast.
-                    S_StopAllSounds(unsafe { snd_from_view(view) });
+                    let snd = snd_from_view(view);
+                    S_StopAllSounds(view.common, snd);
                     VM_Call(
                         view.common,
                         cl.uivm,

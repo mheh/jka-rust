@@ -1,0 +1,43 @@
+# music — the streamed background track.
+#
+# `music/track.wav` is a literal name with a slash, so S_StartBackgroundTrack
+# takes the non-dynamic branch and S_StartBackgroundTrack_Actual opens the wav.
+# Every frame then pulls Sys_StreamedRead into the raw ring, and S_PaintChannels
+# clears the paint buffer from that ring instead of from silence.
+#
+# The track runs out inside the fifth frame, so the loop hand-over runs too: the
+# loop name has no file behind it, which is the "may be a dynamic track" exit.
+cvar s_khz 22
+cvar s_musicvolume 1.0
+init
+beginreg
+dumpmusic before-start
+music music/track.wav music/loop.wav
+dumpmusic after-start
+dumpstate after-start
+advance 1102
+update
+dumpstate frame1
+dumpring frame1
+dumpmusic frame1
+advance 1102
+update
+dumpstate frame2
+dumpring frame2
+advance 4410
+update
+dumpstate frame3
+dumpring frame3
+dumpmusic frame3
+# Stop it, and prove the raw cursor resets and no track stays open.
+stopmusic
+dumpmusic after-stop
+dumpstate after-stop
+# Start it again through S_RestartMusic, which replays the saved names.
+restartmusic
+dumpmusic after-restart
+advance 1102
+update
+dumpstate after-restart
+dumpring after-restart
+shutdown
