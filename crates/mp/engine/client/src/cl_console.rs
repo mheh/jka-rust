@@ -1,5 +1,3 @@
-/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/client-cpass/crates/mp/engine/client/src/cl_console.rs:
-
 //! `cl_console.cpp` — the client console: scrollback buffer, notify lines,
 //! and the drop-down/solid console draw path.
 //!

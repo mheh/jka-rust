@@ -5,6 +5,7 @@
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 
 pub mod cm;
+pub mod cm_draw;
 pub mod cm_height_details;
 pub mod cm_load;
 pub mod cm_patch;
@@ -13,6 +14,7 @@ pub mod cm_polylib;
 pub mod cm_randomterrain;
 pub mod cm_shader;
 pub mod cm_terrain;
+pub mod cm_terrainmap;
 pub mod cm_test;
 pub mod cm_trace;
 pub mod cmd;
