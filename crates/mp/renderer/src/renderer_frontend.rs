@@ -69,6 +69,11 @@ pub struct RendererFrontend {
     pub img_state: TrImageState,
     /// The render thread's GPU objects. The state-partition law puts this off
     /// limits to every synchronous path.
+    ///
+    /// The struct is still empty (DEC-60.1 re-audit, 2026-08-02): every live GPU
+    /// object is `mp_renderer_gpu`'s, owned by the render thread. The R4 wave
+    /// that gives `GpuResources` real wgpu fields moves it there, out of this
+    /// bundle.
     pub gpu_res: GpuResources,
     /// The frontend's per-frame scratch — the oracle's `tr` fields that are
     /// neither registry nor GPU.

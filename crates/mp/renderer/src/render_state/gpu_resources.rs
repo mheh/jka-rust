@@ -4,6 +4,13 @@ use crate::render_state::placeholders::GlStatePlaceholder;
 
 /// Render-thread-only. Never touched by a trap query (ruling 3 invariant).
 ///
+/// The DEC-60.1 re-audit (2026-08-02, with the gh#22 thread split live) found
+/// this struct still empty and every one of its 104 parameter threads inert:
+/// nothing reads or writes `gl_state`. The real GPU objects are
+/// `mp_renderer_gpu`'s `Gpu`/`GpuImages`/`FrameExecutor`, owned by the render
+/// thread alone. The R4 wave that fills the fields below moves the struct out of
+/// `RendererFrontend` and onto that thread.
+///
 /// R2 freezes only `gl_state`: the wgpu-facing fields the design sketches
 /// (`device`, `queue`, `surface`, `gpu_images: SecondaryArena<ImageHandle,
 /// GpuImage>`, `pipelines: HashMap<PipelineKey, RenderPipeline>`) land with
