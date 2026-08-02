@@ -101,12 +101,12 @@ pub struct RendererFrontend {
     pub automap: WireframeAutomap,
 }
 
-/// `MAX_SHADERS` (non-`_XBOX`) — the shader arena's soft cap.
+/// `MAX_SHADERS` (non-`_XBOX`) - the shader arena's soft cap.
 ///
 /// Source: `oracle/codemp/renderer/tr_local.h` (`MAX_SHADERS`)
 const MAX_SHADERS: u32 = 16384;
 
-/// `MAX_SKINS` — the skin arena's soft cap.
+/// `MAX_SKINS` - the skin arena's soft cap.
 ///
 /// Source: `oracle/codemp/renderer/tr_local.h:1204`
 const MAX_SKINS: u32 = 1024;

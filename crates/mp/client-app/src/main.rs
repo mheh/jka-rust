@@ -1,4 +1,4 @@
-//! `mp_client_app` — the MP client host binary (the `jamp`-shaped thin bin
+//! `mp_client_app` - the MP client host binary (the `jamp`-shaped thin bin
 //! shell), the twin of `mp/app`'s dedicated server.
 //!
 //! Three threads, per DEC-56.2 and the DEC-37.2 topology:
@@ -37,7 +37,8 @@ fn command_line() -> String {
 }
 
 fn main() {
-    // `ComError` panics are Raven's `throw` — control flow, not bugs (DEC-08).
+    // `ComError` panics are Raven's `throw`, control flow rather than bugs
+    // (DEC-08).
     let default_hook = std::panic::take_hook();
     let debug_comerror = std::env::var_os("JKA_DEBUG_COMERROR").is_some();
     std::panic::set_hook(Box::new(move |info| {

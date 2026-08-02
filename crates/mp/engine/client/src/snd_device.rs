@@ -1,4 +1,4 @@
-//! The cpal device end (DEC-57.1) — Raven's `win_snd.cpp` replacement.
+//! The cpal device end (DEC-57.1), Raven's `win_snd.cpp` replacement.
 //!
 //! Raven mixed into a looping DirectSound secondary buffer and read the play
 //! cursor back with `SNDDMA_GetDMAPos`. The port keeps that whole model: the

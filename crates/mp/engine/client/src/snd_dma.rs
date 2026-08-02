@@ -87,7 +87,7 @@ const FUZZY_AMOUNT: usize = 5 * 1024;
 // The device end (DEC-57.1)
 // ===========================================================================
 
-/// Raven `SNDDMA_Init` — pick the output format, allocate the ring, and open
+/// Raven `SNDDMA_Init` - pick the output format, allocate the ring, and open
 /// the output device.
 ///
 /// The port keeps the retail secondary-buffer shape and owns the ring outright.
@@ -125,7 +125,7 @@ fn SNDDMA_Init(common: &mut Common, snd: &mut SoundSystem) -> bool {
     true
 }
 
-/// Raven `SNDDMA_Shutdown` — release the ring and close the device.
+/// Raven `SNDDMA_Shutdown` - release the ring and close the device.
 ///
 /// Source: `oracle/codemp/win32/win_snd.cpp:51-95`
 fn SNDDMA_Shutdown(snd: &mut SoundSystem) {
@@ -149,7 +149,7 @@ fn SNDDMA_GetDMAPos(snd: &mut SoundSystem) -> c_int {
 // Raven's `SNDDMA_BeginPainting` locks the DirectSound secondary buffer. The
 // port owns the ring outright, so it has no body and its call sites drop it.
 
-/// Raven `SNDDMA_Submit` — hand the painted ring to the device.
+/// Raven `SNDDMA_Submit` - hand the painted ring to the device.
 ///
 /// Raven only unlocked the buffer here, because DirectSound played the very
 /// memory the paint chain wrote. The engine owns its ring now, so this is where

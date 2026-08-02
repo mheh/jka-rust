@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-/// Raven `fakeAscii_t` — enumeration of keyboard character codes.
+/// Raven `fakeAscii_t` - enumeration of keyboard character codes.
 ///
 /// Type definition source: `oracle/codemp/client/keycodes.h:6-339`
 #[repr(i32)]

@@ -248,7 +248,7 @@ pub unsafe fn Sys_QueEvent(
 /// `Sys_ConsoleInput` (queued as `SE_CONSOLE`) and `Sys_GetPacket` (queued as
 /// `SE_PACKET`), returning the next queued event or an empty timestamped one.
 ///
-/// Raven `Sys_SendKeyEvents` — the window-message pump slot.
+/// Raven `Sys_SendKeyEvents` - the window-message pump slot.
 ///
 /// Raven dispatched `WM_KEYDOWN`/`WM_KEYUP`/`WM_CHAR` here and let the window
 /// procedure call `Sys_QueEvent` on the same thread. The pump now runs on the
@@ -294,7 +294,7 @@ fn Sys_SendKeyEvents(common: &mut Common) {
     }
 }
 
-/// Raven `IN_Frame` — the input-device poll slot, reduced to the mouse.
+/// Raven `IN_Frame` - the input-device poll slot, reduced to the mouse.
 ///
 /// Raven summed the frame's mouse motion and queued one `SE_MOUSE`, returning
 /// early on a zero delta. The pump accumulates and this slot queues the sum.
