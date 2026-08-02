@@ -10,8 +10,8 @@ use mp_abi::cgame::exports::MpCgameExport;
 use mp_abi::cgame::shared_buffer::autoMapInput_t;
 use mp_abi::ui::exports::MpUiExport;
 use mp_abi::ui::public::ui_menu_command_t::UIMENU_VOICECHAT;
-use mp_engine_qcommon::cmd::cmd_function_t::CmdFunction;
 use mp_engine_qcommon::cmd_common::Cmd_Argv;
+use mp_engine_qcommon::cmd_pc::Cmd_AddCommand;
 use mp_engine_qcommon::common::common::{com_printf, Common};
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::error::com_error;
@@ -63,7 +63,7 @@ use native_string::cstr::latin1_to_string;
 use crate::cl_net_chan::{CL_Netchan_Transmit, CL_Netchan_TransmitNextFragment};
 use crate::cl_scrn::SCR_DebugGraph;
 use crate::client::kbutton_t::kbutton_t;
-use crate::client_host::Client;
+use crate::client_host::{cl_from_view, Client};
 
 // `SHORT2ANGLE`/`ANGLE2SHORT`/`SQRTFAST` are Raven function-like macros with no rosetta row.
 // `SHORT2ANGLE(x)` expands to `(x) * (360.0 / 65536)`; `ANGLE2SHORT(x)` to
@@ -521,7 +521,9 @@ pub fn CL_KeyState(common: &mut Common, cl: &mut Client, key: *mut kbutton_t) ->
             (*key).downtime = common.com_frameTime as u32;
         }
 
-        let mut val = msec as f32 / cl.frame_msec as f32;
+        // Raven's local `msec` is a signed `int`, so a wrapped hold time reads
+        // negative and the clamp below takes it to zero, not to a full frame.
+        let mut val = msec as i32 as f32 / cl.frame_msec as f32;
         if val < 0.0 {
             val = 0.0;
         }
@@ -2095,23 +2097,774 @@ pub fn IN_ButtonUp(common: &mut Common, cl: &mut Client) {
     IN_KeyUp(common, cl, b);
 }
 
+// `Cmd_AddCommand` takes `CmdFunction`, which is `fn(&mut EngineHostView)`, but
+// every handler above takes `(common, cl)` or `(cl)`. Each adapter below casts
+// the client out of the view and calls its handler, the same way `cl_keys.rs`
+// bridges the bind commands. `IN_AutoMapToggle` already has the `CmdFunction`
+// shape, so it registers with no adapter.
+// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+
+/// `Cmd_AddCommand` adapter for `IN_CenterView`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_CenterView_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_CenterView(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_UpDown`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_UpDown_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_UpDown(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_UpUp`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_UpUp_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_UpUp(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_DownDown`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_DownDown_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_DownDown(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_DownUp`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_DownUp_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_DownUp(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_LeftDown`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_LeftDown_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_LeftDown(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_LeftUp`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_LeftUp_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_LeftUp(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_RightDown`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_RightDown_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_RightDown(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_RightUp`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_RightUp_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_RightUp(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_ForwardDown`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_ForwardDown_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_ForwardDown(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_ForwardUp`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_ForwardUp_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_ForwardUp(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_BackDown`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_BackDown_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_BackDown(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_BackUp`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_BackUp_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_BackUp(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_LookupDown`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_LookupDown_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_LookupDown(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_LookupUp`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_LookupUp_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_LookupUp(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_LookdownDown`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_LookdownDown_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_LookdownDown(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_LookdownUp`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_LookdownUp_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_LookdownUp(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_StrafeDown`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_StrafeDown_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_StrafeDown(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_StrafeUp`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_StrafeUp_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_StrafeUp(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_MoveleftDown`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_MoveleftDown_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_MoveleftDown(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_MoveleftUp`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_MoveleftUp_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_MoveleftUp(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_MoverightDown`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_MoverightDown_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_MoverightDown(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_MoverightUp`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_MoverightUp_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_MoverightUp(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_SpeedDown`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_SpeedDown_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_SpeedDown(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_SpeedUp`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_SpeedUp_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_SpeedUp(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button0Down`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button0Down_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button0Down(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button0Up`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button0Up_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button0Up(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button1Down`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button1Down_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button1Down(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button1Up`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button1Up_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button1Up(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button2Down`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button2Down_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button2Down(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button2Up`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button2Up_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button2Up(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button3Down`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button3Down_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button3Down(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button3Up`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button3Up_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button3Up(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button4Down`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button4Down_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button4Down(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button4Up`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button4Up_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button4Up(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button5Down`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button5Down_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button5Down(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button5Up`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button5Up_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button5Up(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button6Down`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button6Down_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button6Down(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button6Up`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button6Up_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button6Up(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button7Down`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button7Down_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button7Down(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button7Up`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button7Up_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button7Up(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button8Down`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button8Down_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button8Down(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button8Up`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button8Up_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button8Up(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button9Down`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button9Down_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button9Down(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button9Up`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button9Up_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button9Up(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button10Down`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button10Down_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button10Down(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button10Up`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button10Up_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button10Up(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button11Down`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button11Down_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button11Down(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button11Up`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button11Up_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button11Up(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button12Down`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button12Down_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button12Down(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button12Up`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button12Up_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button12Up(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button13Down`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button13Down_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button13Down(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button13Up`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button13Up_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button13Up(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button14Down`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button14Down_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button14Down(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_Button14Up`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_Button14Up_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_Button14Up(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_MLookDown`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_MLookDown_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_MLookDown(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_MLookUp`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_MLookUp_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_MLookUp(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD1`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD1_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD1(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD2`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD2_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD2(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD3`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD3_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD3(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD4`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD4_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD4(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD5`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD5_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD5(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD6`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD6_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD6(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD7`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD7_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD7(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD8`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD8_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD8(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD9`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD9_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD9(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD10`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD10_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD10(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD11`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD11_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD11(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD12`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD12_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD12(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD13`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD13_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD13(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD14`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD14_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD14(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD15`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD15_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD15(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD16`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD16_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD16(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD17`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD17_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD17(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD18`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD18_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD18(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD19`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD19_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD19(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD20`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD20_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD20(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD21`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD21_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD21(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD22`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD22_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD22(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD23`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD23_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD23(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD24`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD24_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD24(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD25`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD25_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD25(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD26`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD26_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD26(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD27`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD27_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD27(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD28`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD28_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD28(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD29`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD29_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD29(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD30`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD30_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD30(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_GenCMD31`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_GenCMD31_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_GenCMD31(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_UseGivenForce`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_UseGivenForce_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_UseGivenForce(view.common, cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_AutoMapButton`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_AutoMapButton_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_AutoMapButton(cl);
+}
+
+/// `Cmd_AddCommand` adapter for `IN_VoiceChatButton`.
+/// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
+fn IN_VoiceChatButton_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    IN_VoiceChatButton(view.common, cl);
+}
+
 /// Raven `CL_InitInput`.
 ///
 /// The packet's printed signature carries only `cl`, but `Cmd_AddCommand`/
 /// `Cvar_Get` both need `&mut EngineHostView`, so this adds `view`
-/// (shape_mismatch). The registered command handlers no longer match
-/// `CmdFunction`'s no-receiver shape once threaded state lands on them
-/// (shape_mismatch); the referee wires the adapter table at integration.
+/// (shape_mismatch).
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
 pub fn CL_InitInput(view: &mut EngineHostView, cl: &mut Client) {
-    let _ = cl;
-    //TODO: Port CL_InitInput Cmd_AddCommand table
-    // Source: oracle/codemp/client/cl_input.cpp:1769-1893
-    // Every `+`/`-` handler in this file takes `common, cl` or `view, cl`, and
-    // `CmdFunction` is `fn(&mut EngineHostView)`. The `*_cmd` adapters that bridge
-    // the two are not written yet, so the table stays unregistered.
-    let _: Option<CmdFunction> = None;
+    Cmd_AddCommand(view, "centerview", Some(IN_CenterView_cmd));
+
+    // Raven leaves the "+taunt"/"-taunt" gesture pair commented out.
+    Cmd_AddCommand(view, "+moveup", Some(IN_UpDown_cmd));
+    Cmd_AddCommand(view, "-moveup", Some(IN_UpUp_cmd));
+    Cmd_AddCommand(view, "+movedown", Some(IN_DownDown_cmd));
+    Cmd_AddCommand(view, "-movedown", Some(IN_DownUp_cmd));
+    Cmd_AddCommand(view, "+left", Some(IN_LeftDown_cmd));
+    Cmd_AddCommand(view, "-left", Some(IN_LeftUp_cmd));
+    Cmd_AddCommand(view, "+right", Some(IN_RightDown_cmd));
+    Cmd_AddCommand(view, "-right", Some(IN_RightUp_cmd));
+    Cmd_AddCommand(view, "+forward", Some(IN_ForwardDown_cmd));
+    Cmd_AddCommand(view, "-forward", Some(IN_ForwardUp_cmd));
+    Cmd_AddCommand(view, "+back", Some(IN_BackDown_cmd));
+    Cmd_AddCommand(view, "-back", Some(IN_BackUp_cmd));
+    Cmd_AddCommand(view, "+lookup", Some(IN_LookupDown_cmd));
+    Cmd_AddCommand(view, "-lookup", Some(IN_LookupUp_cmd));
+    Cmd_AddCommand(view, "+lookdown", Some(IN_LookdownDown_cmd));
+    Cmd_AddCommand(view, "-lookdown", Some(IN_LookdownUp_cmd));
+    Cmd_AddCommand(view, "+strafe", Some(IN_StrafeDown_cmd));
+    Cmd_AddCommand(view, "-strafe", Some(IN_StrafeUp_cmd));
+    Cmd_AddCommand(view, "+moveleft", Some(IN_MoveleftDown_cmd));
+    Cmd_AddCommand(view, "-moveleft", Some(IN_MoveleftUp_cmd));
+    Cmd_AddCommand(view, "+moveright", Some(IN_MoverightDown_cmd));
+    Cmd_AddCommand(view, "-moveright", Some(IN_MoverightUp_cmd));
+    Cmd_AddCommand(view, "+speed", Some(IN_SpeedDown_cmd));
+    Cmd_AddCommand(view, "-speed", Some(IN_SpeedUp_cmd));
+    Cmd_AddCommand(view, "+attack", Some(IN_Button0Down_cmd));
+    Cmd_AddCommand(view, "-attack", Some(IN_Button0Up_cmd));
+    // Raven leaves the "+force_jump"/"-force_jump" pair commented out.
+    Cmd_AddCommand(view, "+use", Some(IN_Button5Down_cmd));
+    Cmd_AddCommand(view, "-use", Some(IN_Button5Up_cmd));
+    Cmd_AddCommand(view, "+force_grip", Some(IN_Button6Down_cmd)); // force grip
+    Cmd_AddCommand(view, "-force_grip", Some(IN_Button6Up_cmd));
+    Cmd_AddCommand(view, "+altattack", Some(IN_Button7Down_cmd)); // altattack
+    Cmd_AddCommand(view, "-altattack", Some(IN_Button7Up_cmd));
+    Cmd_AddCommand(view, "+useforce", Some(IN_Button9Down_cmd)); // active force power
+    Cmd_AddCommand(view, "-useforce", Some(IN_Button9Up_cmd));
+    Cmd_AddCommand(view, "+force_lightning", Some(IN_Button10Down_cmd)); // active force power
+    Cmd_AddCommand(view, "-force_lightning", Some(IN_Button10Up_cmd));
+    Cmd_AddCommand(view, "+force_drain", Some(IN_Button11Down_cmd)); // active force power
+    Cmd_AddCommand(view, "-force_drain", Some(IN_Button11Up_cmd));
+
+    // buttons
+    Cmd_AddCommand(view, "+button0", Some(IN_Button0Down_cmd)); // attack
+    Cmd_AddCommand(view, "-button0", Some(IN_Button0Up_cmd));
+    Cmd_AddCommand(view, "+button1", Some(IN_Button1Down_cmd)); // force jump
+    Cmd_AddCommand(view, "-button1", Some(IN_Button1Up_cmd));
+    Cmd_AddCommand(view, "+button2", Some(IN_Button2Down_cmd)); // use holdable (not used - change to use jedi power?)
+    Cmd_AddCommand(view, "-button2", Some(IN_Button2Up_cmd));
+    Cmd_AddCommand(view, "+button3", Some(IN_Button3Down_cmd)); // gesture
+    Cmd_AddCommand(view, "-button3", Some(IN_Button3Up_cmd));
+    Cmd_AddCommand(view, "+button4", Some(IN_Button4Down_cmd)); // walking
+    Cmd_AddCommand(view, "-button4", Some(IN_Button4Up_cmd));
+    Cmd_AddCommand(view, "+button5", Some(IN_Button5Down_cmd)); // use object
+    Cmd_AddCommand(view, "-button5", Some(IN_Button5Up_cmd));
+    Cmd_AddCommand(view, "+button6", Some(IN_Button6Down_cmd)); // force grip
+    Cmd_AddCommand(view, "-button6", Some(IN_Button6Up_cmd));
+    Cmd_AddCommand(view, "+button7", Some(IN_Button7Down_cmd)); // altattack
+    Cmd_AddCommand(view, "-button7", Some(IN_Button7Up_cmd));
+    Cmd_AddCommand(view, "+button8", Some(IN_Button8Down_cmd));
+    Cmd_AddCommand(view, "-button8", Some(IN_Button8Up_cmd));
+    Cmd_AddCommand(view, "+button9", Some(IN_Button9Down_cmd)); // active force power
+    Cmd_AddCommand(view, "-button9", Some(IN_Button9Up_cmd));
+    Cmd_AddCommand(view, "+button10", Some(IN_Button10Down_cmd)); // force lightning
+    Cmd_AddCommand(view, "-button10", Some(IN_Button10Up_cmd));
+    Cmd_AddCommand(view, "+button11", Some(IN_Button11Down_cmd)); // force drain
+    Cmd_AddCommand(view, "-button11", Some(IN_Button11Up_cmd));
+    Cmd_AddCommand(view, "+button12", Some(IN_Button12Down_cmd));
+    Cmd_AddCommand(view, "-button12", Some(IN_Button12Up_cmd));
+    Cmd_AddCommand(view, "+button13", Some(IN_Button13Down_cmd));
+    Cmd_AddCommand(view, "-button13", Some(IN_Button13Up_cmd));
+    Cmd_AddCommand(view, "+button14", Some(IN_Button14Down_cmd));
+    Cmd_AddCommand(view, "-button14", Some(IN_Button14Up_cmd));
+    Cmd_AddCommand(view, "+mlook", Some(IN_MLookDown_cmd));
+    Cmd_AddCommand(view, "-mlook", Some(IN_MLookUp_cmd));
+
+    Cmd_AddCommand(view, "sv_saberswitch", Some(IN_GenCMD1_cmd));
+    Cmd_AddCommand(view, "engage_duel", Some(IN_GenCMD2_cmd));
+    Cmd_AddCommand(view, "force_heal", Some(IN_GenCMD3_cmd));
+    Cmd_AddCommand(view, "force_speed", Some(IN_GenCMD4_cmd));
+    Cmd_AddCommand(view, "force_pull", Some(IN_GenCMD5_cmd));
+    Cmd_AddCommand(view, "force_distract", Some(IN_GenCMD6_cmd));
+    Cmd_AddCommand(view, "force_rage", Some(IN_GenCMD7_cmd));
+    Cmd_AddCommand(view, "force_protect", Some(IN_GenCMD8_cmd));
+    Cmd_AddCommand(view, "force_absorb", Some(IN_GenCMD9_cmd));
+    Cmd_AddCommand(view, "force_healother", Some(IN_GenCMD10_cmd));
+    Cmd_AddCommand(view, "force_forcepowerother", Some(IN_GenCMD11_cmd));
+    Cmd_AddCommand(view, "force_seeing", Some(IN_GenCMD12_cmd));
+    Cmd_AddCommand(view, "use_seeker", Some(IN_GenCMD13_cmd));
+    Cmd_AddCommand(view, "use_field", Some(IN_GenCMD14_cmd));
+    Cmd_AddCommand(view, "use_bacta", Some(IN_GenCMD15_cmd));
+    Cmd_AddCommand(view, "use_electrobinoculars", Some(IN_GenCMD16_cmd));
+    Cmd_AddCommand(view, "zoom", Some(IN_GenCMD17_cmd));
+    Cmd_AddCommand(view, "use_sentry", Some(IN_GenCMD18_cmd));
+    Cmd_AddCommand(view, "use_jetpack", Some(IN_GenCMD21_cmd));
+    Cmd_AddCommand(view, "use_bactabig", Some(IN_GenCMD22_cmd));
+    Cmd_AddCommand(view, "use_healthdisp", Some(IN_GenCMD23_cmd));
+    Cmd_AddCommand(view, "use_ammodisp", Some(IN_GenCMD24_cmd));
+    Cmd_AddCommand(view, "use_eweb", Some(IN_GenCMD25_cmd));
+    Cmd_AddCommand(view, "use_cloak", Some(IN_GenCMD26_cmd));
+    Cmd_AddCommand(view, "taunt", Some(IN_GenCMD27_cmd));
+    Cmd_AddCommand(view, "bow", Some(IN_GenCMD28_cmd));
+    Cmd_AddCommand(view, "meditate", Some(IN_GenCMD29_cmd));
+    Cmd_AddCommand(view, "flourish", Some(IN_GenCMD30_cmd));
+    Cmd_AddCommand(view, "gloat", Some(IN_GenCMD31_cmd));
+    Cmd_AddCommand(view, "saberAttackCycle", Some(IN_GenCMD19_cmd));
+    Cmd_AddCommand(view, "force_throw", Some(IN_GenCMD20_cmd));
+
+    // The oracle's `_XBOX` arm (hotswap and voicetoggle) never compiles on this
+    // target, so it is dropped (rule 20).
+    Cmd_AddCommand(view, "useGivenForce", Some(IN_UseGivenForce_cmd));
+
+    Cmd_AddCommand(view, "automap_button", Some(IN_AutoMapButton_cmd));
+    Cmd_AddCommand(view, "automap_toggle", Some(IN_AutoMapToggle));
+    Cmd_AddCommand(view, "voicechat", Some(IN_VoiceChatButton_cmd));
 
     cl.cl_nodelta = Some(Cvar_Get(view, "cl_nodelta", "0", 0));
     cl.cl_debugMove = Some(Cvar_Get(view, "cl_debugMove", "0", 0));

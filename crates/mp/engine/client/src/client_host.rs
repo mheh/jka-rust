@@ -15,9 +15,7 @@ use mp_engine_qcommon::vm::vm_s::vm_t;
 use mp_engine_server::Server;
 use mp_qshared::shared::cvar::CvarHandle;
 use mp_qshared::shared::error_parm::errorParm_t;
-use mp_qshared::shared::limits::{
-    MAX_PINGREQUESTS, MAX_SERVERSTATUSREQUESTS, MAX_TOKEN_CHARS,
-};
+use mp_qshared::shared::limits::{MAX_PINGREQUESTS, MAX_SERVERSTATUSREQUESTS};
 use mp_qshared::shared::{qboolean, qfalse};
 use native_math::vector::vec3_t;
 use native_platform::zeroed_box;
@@ -39,7 +37,7 @@ use crate::client::server_status_t::serverStatus_t;
 use crate::client_dispatch_ctx::ClientDispatchCtx;
 use crate::fx::fx_system::FxSystem;
 use crate::keys::key_globals_s::{keyGlobals_t, MAX_KEYS};
-use crate::keys::keyname_t::keyname_t;
+use crate::keys::keyname_t::{keyname_t, KEYNAMES};
 
 /// Raven `MAX_SCR_LINES` — lines the center-print string may wrap to.
 ///
@@ -262,15 +260,19 @@ pub struct Client {
     pub chat_playerNum: c_int,
     /// Raven `keynames[MAX_KEYS]` — the key name/keynum table that
     /// `Key_StringToKeynum` and `Key_KeynumToString` walk.
+    /// The rows come from the `KEYNAMES` const and nothing writes them back.
     ///
     /// Source: `oracle/codemp/client/keys.h:46`; `oracle/codemp/client/cl_keys.cpp:22-353`
     pub keynames: Box<[keyname_t; MAX_KEYS]>,
     /// Raven `completionString` / `shortestMatch` / `matchCount` — the
     /// command-completion pass state that `FindMatches` accumulates.
+    /// Raven aims `completionString` at the tokenizer's own storage; the port
+    /// owns both strings, because `Cmd_Argv` hands back a `&str` that no
+    /// `strlen` may run off.
     ///
     /// Source: `oracle/codemp/client/cl_keys.cpp:658-660`
-    pub completionString: *const c_char,
-    pub shortestMatch: [c_char; MAX_TOKEN_CHARS],
+    pub completionString: String,
+    pub shortestMatch: String,
     pub matchCount: c_int,
     /// Raven `Key_WriteBindings::tinyString` — the `bind` line scratch buffer.
     ///
@@ -488,9 +490,9 @@ impl Default for Client {
             chatField: FIELD_ZERO,
             chat_team: qfalse,
             chat_playerNum: 0,
-            keynames: zeroed_box(),
-            completionString: core::ptr::null(),
-            shortestMatch: [0; MAX_TOKEN_CHARS],
+            keynames: Box::new(KEYNAMES),
+            completionString: String::new(),
+            shortestMatch: String::new(),
             matchCount: 0,
             tinyString: [0; 16],
 
