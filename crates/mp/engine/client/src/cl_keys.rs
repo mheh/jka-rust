@@ -5,9 +5,8 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
 use core::ffi::{c_char, c_int, c_uint};
-use std::ffi::CString;
 
-use libc::{memmove, strcasecmp, strcat, strcpy, strlen, strstr};
+use libc::{memmove, strcasecmp, strcat, strcpy, strlen};
 
 use mp_abi::cgame::exports::MpCgameExport;
 use mp_abi::cgame::public::tcgincoming_console_command::TCGIncomingConsoleCommand;
@@ -37,6 +36,7 @@ use mp_qshared::shared::{qboolean, qfalse, qtrue};
 use mp_ui::keycodes::fake_ascii_t::fakeAscii_t;
 use mp_ui::keycodes::K_CHAR_FLAG;
 use native_platform::sys_main::Sys_GetClipboardData;
+use native_string::cstr::{buf_to_string, latin1_to_string, string_to_latin1, strncpyz_string};
 use native_string::ctype::tolower;
 use native_string::q_string::Q_strcat;
 use native_string::q_string::{Q_stricmp, Q_stricmpn};
@@ -77,50 +77,36 @@ pub fn Field_Clear(edit: *mut field_t) {
 /// on the `Client` island across the completion pass.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:668-691`
-pub fn FindMatches(cl: &mut Client, s: *const c_char) {
-    unsafe {
-        let s_str = core::ffi::CStr::from_ptr(s).to_string_lossy();
-        let completion_len = strlen(cl.completionString);
-        if Q_stricmpn(
-            &s_str,
-            &core::ffi::CStr::from_ptr(cl.completionString).to_string_lossy(),
-            completion_len as usize,
-        ) != 0
-        {
-            return;
-        }
-        cl.matchCount += 1;
-        if cl.matchCount == 1 {
-            Q_strncpyz(&mut cl.shortestMatch, &s_str, MAX_TOKEN_CHARS);
-            return;
-        }
-
-        // Cut `shortestMatch` down to the amount common with `s`.
-        let mut i: usize = 0;
-        while *s.add(i) != 0 {
-            if tolower(cl.shortestMatch[i] as u8 as char) != tolower(*s.add(i) as u8 as char) {
-                cl.shortestMatch[i] = 0;
-                break;
-            }
-            i += 1;
-        }
-        if *s.add(i) == 0 {
-            cl.shortestMatch[i] = 0;
-        }
+pub fn FindMatches(cl: &mut Client, s: &str) {
+    if Q_stricmpn(s, &cl.completionString, cl.completionString.len()) != 0 {
+        return;
     }
+    cl.matchCount += 1;
+    if cl.matchCount == 1 {
+        cl.shortestMatch = strncpyz_string(&string_to_latin1(s), MAX_TOKEN_CHARS);
+        return;
+    }
+
+    // Cut `shortestMatch` down to the amount common with `s`. The cut runs in
+    // the Latin-1 byte domain, so it never lands inside a UTF-8 sequence.
+    let s_bytes = string_to_latin1(s);
+    let match_bytes = string_to_latin1(&cl.shortestMatch);
+    let mut i: usize = 0;
+    while i < s_bytes.len()
+        && i < match_bytes.len()
+        && tolower(match_bytes[i] as char) == tolower(s_bytes[i] as char)
+    {
+        i += 1;
+    }
+    cl.shortestMatch = latin1_to_string(&match_bytes[..i]);
 }
 
 /// Raven `PrintMatches` command-completion callback.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:699-703`
-pub fn PrintMatches(common: &mut Common, cl: &mut Client, s: *const c_char) {
-    unsafe {
-        let s_str = core::ffi::CStr::from_ptr(s).to_string_lossy();
-        let shortest_str = core::ffi::CStr::from_ptr(cl.shortestMatch.as_ptr()).to_string_lossy();
-        let shortest_len = strlen(cl.shortestMatch.as_ptr());
-        if Q_stricmpn(&s_str, &shortest_str, shortest_len as usize) == 0 {
-            com_printf(common, &format!("    {}\n", s_str));
-        }
+pub fn PrintMatches(common: &mut Common, cl: &mut Client, s: &str) {
+    if Q_stricmpn(s, &cl.shortestMatch, cl.shortestMatch.len()) == 0 {
+        com_printf(common, &format!("    {}\n", s));
     }
 }
 
@@ -508,24 +494,16 @@ pub fn Field_CharEvent(common: &mut Common, cl: &mut Client, edit: *mut field_t,
 /// Raven `ConcatRemaining`.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:726-737`
-pub fn ConcatRemaining(
-    common: &mut Common,
-    cl: &mut Client,
-    src: *const c_char,
-    start: *const c_char,
-) {
-    unsafe {
-        let found = strstr(src, start);
-        if found.is_null() {
-            keyConcatArgs(common, cl);
-            return;
-        }
-
-        let str_ptr = found.add(strlen(start));
-        let str_str = core::ffi::CStr::from_ptr(str_ptr).to_string_lossy();
-        let buffer_len = cl.kg.g_consoleField.buffer.len();
-        Q_strcat(&mut cl.kg.g_consoleField.buffer, buffer_len, &str_str);
+pub fn ConcatRemaining(common: &mut Common, cl: &mut Client, src: &str, start: &str) {
+    let found = src.find(start);
+    if found.is_none() {
+        keyConcatArgs(common, cl);
+        return;
     }
+
+    let rest = &src[found.unwrap() + start.len()..];
+    let buffer_len = cl.kg.g_consoleField.buffer.len();
+    Q_strcat(&mut cl.kg.g_consoleField.buffer, buffer_len, rest);
 }
 
 /// Raven `Key_KeynumToAscii`.
@@ -740,125 +718,81 @@ pub fn Field_KeyDownEvent(common: &mut Common, cl: &mut Client, edit: *mut field
     }
 }
 
-/// Raven `CompleteCommand`.
+/// The text an edit line holds, up to its terminating NUL.
+///
+/// Source: `oracle/codemp/client/keys.h:12-17`
+fn field_text(edit: &field_t) -> String {
+    let bytes: Vec<u8> = edit.buffer.iter().map(|&c| c as u8).collect();
+    buf_to_string(&bytes)
+}
+
+/// The character length of an edit line, which is where its cursor parks after
+/// a completion.
+///
+/// Source: `oracle/codemp/client/keys.h:12-17`
+fn field_len(edit: &field_t) -> c_int {
+    edit.buffer.iter().position(|&c| c == 0).unwrap_or(0) as c_int
+}
+
+/// Raven `CompleteCommand` — tab expansion.
 ///
 /// Raven passes `FindMatches`/`PrintMatches` as C callbacks. The port takes the
 /// two name lists back instead and runs the same two visits here, so both
-/// helpers keep their `cl` and `common` receivers.
+/// helpers keep their `cl` and `common` receivers. Raven's `temp` field copy
+/// only ever reads `temp.buffer`, so the port keeps the pre-edit line alone.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:747-800`
 pub fn CompleteCommand(common: &mut Common, cl: &mut Client) {
-    unsafe {
-        let edit: *mut field_t = &mut cl.kg.g_consoleField;
-        let mut temp: field_t = core::mem::zeroed();
+    // Only the first token matters for completion purposes.
+    let entered = field_text(&cl.kg.g_consoleField);
+    Cmd_TokenizeString(common, &entered);
 
-        // Only the first token matters for completion purposes.
-        Cmd_TokenizeString(
-            common,
-            core::ffi::CStr::from_ptr((*edit).buffer.as_ptr())
-                .to_string_lossy()
-                .as_ref(),
-        );
+    cl.completionString = Cmd_Argv(common, 0).to_owned();
+    if cl.completionString.starts_with('\\') || cl.completionString.starts_with('/') {
+        cl.completionString.remove(0);
+    }
+    cl.matchCount = 0;
+    cl.shortestMatch.clear();
 
-        cl.completionString = Cmd_Argv(common, 0).as_ptr() as *mut c_char;
-        if *cl.completionString == b'\\' as c_char || *cl.completionString == b'/' as c_char {
-            cl.completionString = cl.completionString.add(1);
+    if cl.completionString.is_empty() {
+        return;
+    }
+
+    let mut names = Cmd_CommandCompletion(common);
+    names.extend(Cvar_CommandCompletion(common));
+    for name in &names {
+        FindMatches(cl, name);
+    }
+
+    if cl.matchCount == 0 {
+        return; // no matches
+    }
+
+    let completed = format!("\\{}", cl.shortestMatch);
+    let size = cl.kg.g_consoleField.buffer.len();
+    Q_strncpyz(&mut cl.kg.g_consoleField.buffer, &completed, size);
+    let completion = cl.completionString.clone();
+
+    if cl.matchCount == 1 {
+        if Cmd_Argc(common) == 1 {
+            Q_strcat(&mut cl.kg.g_consoleField.buffer, size, " ");
+        } else {
+            ConcatRemaining(common, cl, &entered, &completion);
         }
-        cl.matchCount = 0;
-        cl.shortestMatch[0] = 0;
+        cl.kg.g_consoleField.cursor = field_len(&cl.kg.g_consoleField);
+        return;
+    }
 
-        if strlen(cl.completionString) == 0 {
-            return;
-        }
+    // Multiple matches, complete to the shortest. Raven parks the cursor before
+    // the rest of the line goes back on, so the cursor sits at the common prefix.
+    cl.kg.g_consoleField.cursor = field_len(&cl.kg.g_consoleField);
+    ConcatRemaining(common, cl, &entered, &completion);
 
-        let mut names = Cmd_CommandCompletion(common);
-        names.extend(Cvar_CommandCompletion(common));
-        for name in &names {
-            let name_c = CString::new(name.as_str()).unwrap_or_default();
-            FindMatches(cl, name_c.as_ptr());
-        }
+    com_printf(common, &format!("]{}\n", field_text(&cl.kg.g_consoleField)));
 
-        if cl.matchCount == 0 {
-            return; // no matches
-        }
-
-        Com_Memcpy(
-            &mut temp as *mut field_t as *mut (),
-            edit as *const (),
-            core::mem::size_of::<field_t>(),
-        );
-
-        if cl.matchCount == 1 {
-            let shortest = core::ffi::CStr::from_ptr(cl.shortestMatch.as_ptr()).to_string_lossy();
-            let out = format!("\\{}", shortest);
-            let out_c = std::ffi::CString::new(out).unwrap();
-            core::ffi::CStr::from_ptr(out_c.as_ptr())
-                .to_bytes_with_nul()
-                .iter()
-                .enumerate()
-                .for_each(|(i, b)| {
-                    if i < (*edit).buffer.len() {
-                        (*edit).buffer[i] = *b as c_char;
-                    }
-                });
-            if Cmd_Argc(common) == 1 {
-                // The buffer length is read first, so `Q_strcat` holds the only borrow.
-                let size = cl.kg.g_consoleField.buffer.len();
-                Q_strcat(&mut cl.kg.g_consoleField.buffer, size, " ");
-            } else {
-                let completion_str = core::ffi::CStr::from_ptr(cl.completionString)
-                    .to_string_lossy()
-                    .into_owned();
-                ConcatRemaining(
-                    common,
-                    cl,
-                    temp.buffer.as_ptr(),
-                    completion_str.as_ptr() as *const c_char,
-                );
-            }
-            (*edit).cursor = strlen((*edit).buffer.as_ptr()) as c_int;
-            return;
-        }
-
-        // Multiple matches, complete to the shortest.
-        let shortest = core::ffi::CStr::from_ptr(cl.shortestMatch.as_ptr()).to_string_lossy();
-        let out = format!("\\{}", shortest);
-        let out_c = std::ffi::CString::new(out).unwrap();
-        out_c
-            .as_bytes_with_nul()
-            .iter()
-            .enumerate()
-            .for_each(|(i, b)| {
-                if i < (*edit).buffer.len() {
-                    (*edit).buffer[i] = *b as c_char;
-                }
-            });
-        (*edit).cursor = strlen((*edit).buffer.as_ptr()) as c_int;
-        let completion_str = core::ffi::CStr::from_ptr(cl.completionString)
-            .to_string_lossy()
-            .into_owned();
-        ConcatRemaining(
-            common,
-            cl,
-            temp.buffer.as_ptr(),
-            completion_str.as_ptr() as *const c_char,
-        );
-
-        com_printf(
-            common,
-            &format!(
-                "]{}\n",
-                core::ffi::CStr::from_ptr((*edit).buffer.as_ptr()).to_string_lossy()
-            ),
-        );
-
-        // Run through again, printing matches.
-        let mut names = Cmd_CommandCompletion(common);
-        names.extend(Cvar_CommandCompletion(common));
-        for name in &names {
-            let name_c = CString::new(name.as_str()).unwrap_or_default();
-            PrintMatches(common, cl, name_c.as_ptr());
-        }
+    // Run through again, printing matches.
+    for name in &names {
+        PrintMatches(common, cl, name);
     }
 }
 
@@ -1572,5 +1506,52 @@ pub fn Key_ClearStates(view: &mut EngineHostView, cl: &mut Client) {
         }
         cl.kg.keys[i].down = qfalse;
         cl.kg.keys[i].repeats = 0;
+    }
+}
+
+#[cfg(test)]
+mod cl_keys_tests {
+    use super::*;
+
+    fn text(p: *const c_char) -> String {
+        unsafe { core::ffi::CStr::from_ptr(p).to_string_lossy().into_owned() }
+    }
+
+    #[test]
+    fn key_names_resolve_both_ways() {
+        let mut cl = Client::default();
+
+        let space = Key_StringToKeynum(&mut cl, c"SPACE".as_ptr() as *mut c_char);
+        assert_eq!(space, fakeAscii_t::A_SPACE as c_int);
+        assert_eq!(text(Key_KeynumToString(&mut cl, space)), "SPACE");
+
+        // A one character name is the key's own upper case code.
+        assert_eq!(
+            Key_StringToKeynum(&mut cl, c"a".as_ptr() as *mut c_char),
+            b'A' as c_int
+        );
+        // A hex name gives the raw code, and an unknown name gives -1.
+        assert_eq!(
+            Key_StringToKeynum(&mut cl, c"0x41".as_ptr() as *mut c_char),
+            0x41
+        );
+        assert_eq!(
+            Key_StringToKeynum(&mut cl, c"NOSUCHKEY".as_ptr() as *mut c_char),
+            -1
+        );
+        assert_eq!(text(Key_KeynumToString(&mut cl, -1)), "<KEY NOT FOUND>");
+    }
+
+    #[test]
+    fn find_matches_keeps_the_common_prefix() {
+        let mut cl = Client::default();
+        cl.completionString = "cl_".to_owned();
+
+        FindMatches(&mut cl, "cl_run");
+        FindMatches(&mut cl, "cl_rate");
+        FindMatches(&mut cl, "sv_fps");
+
+        assert_eq!(cl.matchCount, 2);
+        assert_eq!(cl.shortestMatch, "cl_r");
     }
 }

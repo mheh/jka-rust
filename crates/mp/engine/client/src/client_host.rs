@@ -15,9 +15,7 @@ use mp_engine_qcommon::vm::vm_s::vm_t;
 use mp_engine_server::Server;
 use mp_qshared::shared::cvar::CvarHandle;
 use mp_qshared::shared::error_parm::errorParm_t;
-use mp_qshared::shared::limits::{
-    MAX_GENTITIES, MAX_PINGREQUESTS, MAX_SERVERSTATUSREQUESTS, MAX_TOKEN_CHARS,
-};
+use mp_qshared::shared::limits::{MAX_GENTITIES, MAX_PINGREQUESTS, MAX_SERVERSTATUSREQUESTS};
 use mp_qshared::shared::{qboolean, qfalse};
 use native_math::vector::vec3_t;
 use native_platform::zeroed_box;
@@ -267,10 +265,13 @@ pub struct Client {
     pub keynames: Box<[keyname_t; MAX_KEYS]>,
     /// Raven `completionString` / `shortestMatch` / `matchCount` — the
     /// command-completion pass state that `FindMatches` accumulates.
+    /// Raven aims `completionString` at the tokenizer's own storage; the port
+    /// owns both strings, because `Cmd_Argv` hands back a `&str` that no
+    /// `strlen` may run off.
     ///
     /// Source: `oracle/codemp/client/cl_keys.cpp:658-660`
-    pub completionString: *const c_char,
-    pub shortestMatch: [c_char; MAX_TOKEN_CHARS],
+    pub completionString: String,
+    pub shortestMatch: String,
     pub matchCount: c_int,
     /// Raven `Key_WriteBindings::tinyString` — the `bind` line scratch buffer.
     ///
@@ -515,8 +516,8 @@ impl Default for Client {
             chat_team: qfalse,
             chat_playerNum: 0,
             keynames: Box::new(KEYNAMES),
-            completionString: core::ptr::null(),
-            shortestMatch: [0; MAX_TOKEN_CHARS],
+            completionString: String::new(),
+            shortestMatch: String::new(),
             matchCount: 0,
             tinyString: [0; 16],
 
