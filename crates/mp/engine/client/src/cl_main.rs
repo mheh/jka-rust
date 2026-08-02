@@ -3779,10 +3779,10 @@ pub fn CL_Frame(view: &mut EngineHostView, cl: &mut Client, msec: c_int) {
         // if disconnected, bring up the menu
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         {
-        // SAFETY: view-constructor slot, single-threaded, no other live cast.
-        let snd = unsafe { snd_from_view(view) };
-        S_StopAllSounds(view.common, snd);
-    }
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let snd = unsafe { snd_from_view(view) };
+            S_StopAllSounds(view.common, snd);
+        }
         VM_Call(
             view.common,
             cl.uivm,
