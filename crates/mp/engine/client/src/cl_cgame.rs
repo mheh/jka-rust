@@ -81,7 +81,7 @@ use mp_engine_qcommon::timing::sys_milliseconds;
 use mp_engine_qcommon::timing::timing_c::timing_c;
 use mp_engine_qcommon::vm::cgame_syscall_trampoline_words;
 use mp_engine_qcommon::vm_fns::{
-    VM_ArgPtr, VM_Call, VM_Create, VM_Debug, VM_Free, VM_Shifted_Alloc, VM_Shifted_Free,
+    VM_ArgPtrWord, VM_Call, VM_Create, VM_Debug, VM_Free, VM_Shifted_Alloc, VM_Shifted_Free,
 };
 use mp_engine_qcommon::z_memman_pc::{Com_TouchMemory, Hunk_MemoryRemaining};
 use mp_engine_rmg::rm_manager::RmManager;
@@ -154,6 +154,7 @@ use crate::cl_console::{Con_ClearNotify, Con_Close};
 use crate::cl_keys::{Key_GetKey, Key_IsDown};
 use crate::cl_main::{CL_AddReliableCommand, CL_ReadDemoMessage};
 use crate::cl_parse::{CL_GetValueForHidden, CL_SystemInfoChanged};
+use crate::cl_referee::ref_headless;
 use crate::cl_scrn::SCR_UpdateScreen;
 use crate::cl_ui::{Key_GetCatcher, Key_SetCatcher};
 use crate::client::cl_main_consts::MAX_STRINGED_SV_STRING;
@@ -179,19 +180,20 @@ use crate::snd_stubs::{
 ///
 /// The dispatcher hands this a raw `Common` copy, not a borrow, so a trap arm
 /// can hold `&mut EngineHostView` and read an argument in the same expression.
-/// `VM_ArgPtr` only reads the loaded module's data base.
+/// `VM_ArgPtrWord` only reads the loaded module's data base, and it takes the
+/// full-width word, because a 64-bit module hands us a 64-bit pointer.
 ///
 /// Source: `oracle/codemp/qcommon/vm_local.h` (`VMA`)
-fn vma(common: *const Common, args: *mut c_int, i: isize) -> *mut () {
+fn vma(common: *const Common, args: *mut isize, i: isize) -> *mut () {
     // SAFETY: `common` is the view's own `Common`, alive for the whole
     // dispatch; `args` is the trampoline's 16-word frame (porting-rules §D11).
-    unsafe { VM_ArgPtr(&*common, *args.offset(i)) }
+    unsafe { VM_ArgPtrWord(&*common, *args.offset(i)) }
 }
 
 /// The `VMF(x)` macro: the float the syscall word at `x` points at.
 ///
 /// Source: `oracle/codemp/qcommon/vm_local.h` (`VMF`)
-fn vmf(common: *const Common, args: *mut c_int, i: isize) -> f32 {
+fn vmf(common: *const Common, args: *mut isize, i: isize) -> f32 {
     // SAFETY: `VMA(i)` resolved a module-space float, same as Raven's cast.
     unsafe { *(vma(common, args, i) as *const f32) }
 }
@@ -228,13 +230,13 @@ fn get_bolt_matrix_arm(
     view: &mut EngineHostView,
     g2: &mut Ghoul2System,
     vc: *const Common,
-    args: *mut c_int,
+    args: *mut isize,
     arg: &dyn Fn(isize) -> c_int,
 ) -> bool {
     // SAFETY: the handle, the model list, and the matrix out-param are all
     // module-space (porting-rules §D11).
     unsafe {
-        let ghoul2 = &mut *(arg(1) as *mut CGhoul2Info_v);
+        let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
         let bolt_matrix = &mut *(vma(vc, args, 4) as *mut mdxaBone_t);
         g2api_get_bolt_matrix(
             g2,
@@ -1129,15 +1131,21 @@ pub fn CL_InitCGame(view: &mut EngineHostView, cl: &mut Client) {
 
     // Have the renderer touch all its images, so they are present on the card even if the
     // driver does deferred loading.
-    // SAFETY: view-constructor slot, single-threaded, no other live cast.
-    let re = unsafe { re_from_view(view) };
-    RE_EndRegistration(
-        view.common,
-        &re.cvars,
-        &re.assets,
-        &mut re.frame,
-        &mut re.gpu_res,
-    );
+    //
+    // Demo referee seam (`cl_referee.rs`): the platform shell that builds and
+    // seats `Engine.re` is not ported (gh#22, DEC-56), so the renderer slot is
+    // NULL under the headless rig. This gate goes away when the shell lands.
+    if !ref_headless(cl) {
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let re = unsafe { re_from_view(view) };
+        RE_EndRegistration(
+            view.common,
+            &re.cvars,
+            &re.assets,
+            &mut re.frame,
+            &mut re.gpu_res,
+        );
+    }
 
     // Make sure everything is paged in.
     Com_TouchMemory(view.common);
@@ -1336,13 +1344,21 @@ pub fn CL_CgameSystemCalls(
     rmg: &mut RmManager,
     g2: &mut Ghoul2System,
     roff: &mut RoffSystem,
-    args: *mut c_int,
+    args: *mut isize,
 ) -> c_int {
     // The raw `Common` copy the `VMA`/`VMF` helpers read. It is never used as a
     // receiver, so no arm holds a `Common` borrow beside the view.
     let vc: *const Common = view.common;
     let arg = |i: isize| -> c_int {
         // SAFETY: `args` is the trampoline's 16-word frame (porting-rules §D11).
+        // A value argument is `int`-wide on Raven's side, so the word narrows
+        // here the way the dispatch case would read it.
+        unsafe { *args.offset(i) as c_int }
+    };
+    // The full-width word, for the arms that carry a host handle rather than a
+    // value. The server dispatcher reads its handles the same way.
+    let argw = |i: isize| -> isize {
+        // SAFETY: same frame as `arg` above.
         unsafe { *args.offset(i) }
     };
     let op = arg(0);
@@ -1434,7 +1450,7 @@ pub fn CL_CgameSystemCalls(
         0
     } else if op == MpCgameImport::CG_PRECISIONTIMER_END as c_int {
         unsafe {
-            let timer = arg(1) as *mut timing_c;
+            let timer = argw(1) as *mut timing_c;
             let r = (*timer).End();
             drop(Box::from_raw(timer));
             r
@@ -2482,7 +2498,7 @@ pub fn CL_CgameSystemCalls(
     } else if op == MpCgameImport::CG_FX_PLAY_BOLTED_EFFECT_ID as c_int {
         // SAFETY: `args[3]` is the module's `CGhoul2Info_v` handle (§D11).
         unsafe {
-            let g2v = &mut *(arg(3) as *mut CGhoul2Info_v);
+            let g2v = &mut *(argw(3) as *mut CGhoul2Info_v);
             let ghl_info = g2_info(g2, g2v, arg(6));
             match g2api_attach_ent(g2, view, ghl_info, arg(4), arg(5), arg(6)) {
                 Some(boltInfo) => {
@@ -2604,22 +2620,22 @@ pub fn CL_CgameSystemCalls(
         0
     } else if op == MpCgameImport::CG_G2_LISTSURFACES as c_int {
         // SAFETY: `args[1]` is the module's `CGhoul2Info` handle (§D11).
-        let ghl_info = unsafe { &mut *(arg(1) as *mut CGhoul2Info) };
+        let ghl_info = unsafe { &mut *(argw(1) as *mut CGhoul2Info) };
         g2api_list_surfaces(g2, view, ghl_info);
         0
     } else if op == MpCgameImport::CG_G2_LISTBONES as c_int {
         // SAFETY: `args[1]` is the module's `CGhoul2Info` handle (§D11).
-        let ghl_info = unsafe { &mut *(arg(1) as *mut CGhoul2Info) };
+        let ghl_info = unsafe { &mut *(argw(1) as *mut CGhoul2Info) };
         g2api_list_bones(g2, view, ghl_info, arg(2));
         0
     } else if op == MpCgameImport::CG_G2_HAVEWEGHOULMODELS as c_int {
         // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &*(arg(1) as *const CGhoul2Info_v) };
+        let ghoul2 = unsafe { &*(argw(1) as *const CGhoul2Info_v) };
         g2api_have_we_ghoul2_models(g2, ghoul2) as c_int
     } else if op == MpCgameImport::CG_G2_SETMODELS as c_int {
         // SAFETY: the handle and the two lists are module-space (§D11).
         unsafe {
-            let ghoul2 = &mut *(arg(1) as *mut CGhoul2Info_v);
+            let ghoul2 = &mut *(argw(1) as *mut CGhoul2Info_v);
             g2api_set_ghoul2_model_indexes(
                 g2,
                 ghoul2,
@@ -2654,13 +2670,13 @@ pub fn CL_CgameSystemCalls(
         )
     } else if op == MpCgameImport::CG_G2_SETSKIN as c_int {
         // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let g2v = unsafe { &mut *(arg(1) as *mut CGhoul2Info_v) };
+        let g2v = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
         let ghl_info = g2_info(g2, g2v, arg(2));
         g2api_set_skin(g2, view, ghl_info, arg(3), arg(4)) as c_int
     } else if op == MpCgameImport::CG_G2_COLLISIONDETECT as c_int {
         let out = vma(vc, args, 1) as *mut CollisionRecord_t;
         // SAFETY: `args[2]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &mut *(arg(2) as *mut CGhoul2Info_v) };
+        let ghoul2 = unsafe { &mut *(argw(2) as *mut CGhoul2Info_v) };
         let hits = g2api_collision_detect(
             g2,
             view,
@@ -2681,7 +2697,7 @@ pub fn CL_CgameSystemCalls(
     } else if op == MpCgameImport::CG_G2_COLLISIONDETECTCACHE as c_int {
         let out = vma(vc, args, 1) as *mut CollisionRecord_t;
         // SAFETY: `args[2]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &mut *(arg(2) as *mut CGhoul2Info_v) };
+        let ghoul2 = unsafe { &mut *(argw(2) as *mut CGhoul2Info_v) };
         let hits = g2api_collision_detect_cache(
             g2,
             view,
@@ -2703,7 +2719,7 @@ pub fn CL_CgameSystemCalls(
         let bone_name = cstr_to_string(vma(vc, args, 3) as *const c_char);
         // SAFETY: the handle, the angles, and the model list are module-space.
         unsafe {
-            let ghoul2 = &mut *(arg(1) as *mut CGhoul2Info_v);
+            let ghoul2 = &mut *(argw(1) as *mut CGhoul2Info_v);
             g2api_set_bone_angles(
                 g2,
                 view,
@@ -2728,7 +2744,7 @@ pub fn CL_CgameSystemCalls(
     } else if op == MpCgameImport::CG_G2_PLAYANIM as c_int {
         let bone_name = cstr_to_string(vma(vc, args, 3) as *const c_char);
         // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &mut *(arg(1) as *mut CGhoul2Info_v) };
+        let ghoul2 = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
         g2api_set_bone_anim(
             g2,
             ghoul2,
@@ -2747,7 +2763,7 @@ pub fn CL_CgameSystemCalls(
         // SAFETY: the handle, the model list, and the five out-params are
         // module-space (porting-rules §D11).
         unsafe {
-            let g2v = &mut *(arg(1) as *mut CGhoul2Info_v);
+            let g2v = &mut *(argw(1) as *mut CGhoul2Info_v);
             let ghl_info = g2_info(g2, g2v, arg(10));
             match g2api_get_bone_anim(
                 g2,
@@ -2773,7 +2789,7 @@ pub fn CL_CgameSystemCalls(
         let bone_name = cstr_to_string(vma(vc, args, 2) as *const c_char);
         // SAFETY: the handle, the model list, and the out-param are module-space.
         unsafe {
-            let g2v = &mut *(arg(1) as *mut CGhoul2Info_v);
+            let g2v = &mut *(argw(1) as *mut CGhoul2Info_v);
             let ghl_info = g2_info(g2, g2v, arg(6));
             match g2api_get_bone_anim(
                 g2,
@@ -2794,7 +2810,7 @@ pub fn CL_CgameSystemCalls(
     } else if op == MpCgameImport::CG_G2_GETGLANAME as c_int {
         let point = vma(vc, args, 3) as *mut c_char;
         // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &*(arg(1) as *const CGhoul2Info_v) };
+        let ghoul2 = unsafe { &*(argw(1) as *const CGhoul2Info_v) };
         if let Some(local) = g2api_get_gla_name(g2, view, ghoul2, arg(2)) {
             let local_c = std::ffi::CString::new(local).unwrap_or_default();
             // SAFETY: `VMA(3)` is the module's seam out-buffer (§D11).
@@ -2804,22 +2820,22 @@ pub fn CL_CgameSystemCalls(
     } else if op == MpCgameImport::CG_G2_COPYGHOUL2INSTANCE as c_int {
         // SAFETY: both handles are module-space (porting-rules §D11).
         unsafe {
-            let g2_from = &mut *(arg(1) as *mut CGhoul2Info_v);
-            let g2_to = &mut *(arg(2) as *mut CGhoul2Info_v);
+            let g2_from = &mut *(argw(1) as *mut CGhoul2Info_v);
+            let g2_to = &mut *(argw(2) as *mut CGhoul2Info_v);
             g2api_copy_ghoul2_instance(g2, g2_from, g2_to, arg(3))
         }
     } else if op == MpCgameImport::CG_G2_COPYSPECIFICGHOUL2MODEL as c_int {
         // SAFETY: both handles are module-space (porting-rules §D11).
         unsafe {
-            let ghoul2_from = &mut *(arg(1) as *mut CGhoul2Info_v);
-            let ghoul2_to = &mut *(arg(3) as *mut CGhoul2Info_v);
+            let ghoul2_from = &mut *(argw(1) as *mut CGhoul2Info_v);
+            let ghoul2_to = &mut *(argw(3) as *mut CGhoul2Info_v);
             g2api_copy_specific_g2_model(g2, ghoul2_from, arg(2), ghoul2_to, arg(4));
         }
         0
     } else if op == MpCgameImport::CG_G2_DUPLICATEGHOUL2INSTANCE as c_int {
         // SAFETY: the handle and the `CGhoul2Info_v *` slot are module-space.
         unsafe {
-            let g2_from = &mut *(arg(1) as *mut CGhoul2Info_v);
+            let g2_from = &mut *(argw(1) as *mut CGhoul2Info_v);
             let g2_to = &mut **(vma(vc, args, 2) as *mut *mut CGhoul2Info_v);
             g2api_duplicate_ghoul2_instance(g2, g2_from, g2_to);
         }
@@ -2834,7 +2850,7 @@ pub fn CL_CgameSystemCalls(
         g2api_remove_ghoul2_model(g2, ghoul2, arg(2)) as c_int
     } else if op == MpCgameImport::CG_G2_SKINLESSMODEL as c_int {
         // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let g2v = unsafe { &mut *(arg(1) as *mut CGhoul2Info_v) };
+        let g2v = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
         let ghl_info = g2_info(g2, g2v, arg(2));
         g2api_skinless_model(g2, view, ghl_info) as c_int
     } else if op == MpCgameImport::CG_G2_GETNUMGOREMARKS as c_int {
@@ -2849,18 +2865,18 @@ pub fn CL_CgameSystemCalls(
         0
     } else if op == MpCgameImport::CG_G2_SIZE as c_int {
         // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &*(arg(1) as *const CGhoul2Info_v) };
+        let ghoul2 = unsafe { &*(argw(1) as *const CGhoul2Info_v) };
         g2api_ghoul2_size(g2, ghoul2)
     } else if op == MpCgameImport::CG_G2_ADDBOLT as c_int {
         let bone_name = cstr_to_string(vma(vc, args, 3) as *const c_char);
         // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &mut *(arg(1) as *mut CGhoul2Info_v) };
+        let ghoul2 = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
         g2api_add_bolt(g2, view, ghoul2, arg(2), &bone_name)
     } else if op == MpCgameImport::CG_G2_ATTACHENT as c_int {
         // G2API_AttachEnt(int *boltInfo, CGhoul2Info *ghlInfoTo, int toBoltIndex, int entNum, int toModelNum)
         let bolt_info_out = vma(vc, args, 1) as *mut c_int;
         // SAFETY: `args[2]` is the module's `CGhoul2Info_v` handle (§D11).
-        let g2v = unsafe { &mut *(arg(2) as *mut CGhoul2Info_v) };
+        let g2v = unsafe { &mut *(argw(2) as *mut CGhoul2Info_v) };
         let ghl_info = g2_info(g2, g2v, 0);
         match g2api_attach_ent(g2, view, ghl_info, arg(3), arg(4), arg(5)) {
             Some(bolt_info) => {
@@ -2872,33 +2888,33 @@ pub fn CL_CgameSystemCalls(
         }
     } else if op == MpCgameImport::CG_G2_SETBOLTON as c_int {
         // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &mut *(arg(1) as *mut CGhoul2Info_v) };
+        let ghoul2 = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
         g2api_set_bolt_info(g2, ghoul2, arg(2), arg(3));
         0
     } else if op == MpCgameImport::CG_G2_SETROOTSURFACE as c_int {
         let surface_name = cstr_to_string(vma(vc, args, 3) as *const c_char);
         // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &mut *(arg(1) as *mut CGhoul2Info_v) };
+        let ghoul2 = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
         g2api_set_root_surface(g2, view, ghoul2, arg(2), &surface_name) as c_int
     } else if op == MpCgameImport::CG_G2_SETSURFACEONOFF as c_int {
         let surface_name = cstr_to_string(vma(vc, args, 2) as *const c_char);
         // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &mut *(arg(1) as *mut CGhoul2Info_v) };
+        let ghoul2 = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
         g2api_set_surface_on_off(g2, view, ghoul2, &surface_name, arg(3)) as c_int
     } else if op == MpCgameImport::CG_G2_SETNEWORIGIN as c_int {
         // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &mut *(arg(1) as *mut CGhoul2Info_v) };
+        let ghoul2 = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
         g2api_set_new_origin(g2, view, ghoul2, arg(2)) as c_int
     } else if op == MpCgameImport::CG_G2_DOESBONEEXIST as c_int {
         let bone_name = cstr_to_string(vma(vc, args, 3) as *const c_char);
         // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let g2v = unsafe { &mut *(arg(1) as *mut CGhoul2Info_v) };
+        let g2v = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
         let ghl_info = g2_info(g2, g2v, arg(2));
         g2api_does_bone_exist(g2, view, ghl_info, &bone_name) as c_int
     } else if op == MpCgameImport::CG_G2_GETSURFACERENDERSTATUS as c_int {
         let surface_name = cstr_to_string(vma(vc, args, 3) as *const c_char);
         // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let g2v = unsafe { &mut *(arg(1) as *mut CGhoul2Info_v) };
+        let g2v = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
         let ghl_info = g2_info(g2, g2v, arg(2));
         g2api_get_surface_render_status(g2, view, ghl_info, &surface_name)
     } else if op == MpCgameImport::CG_G2_GETTIME as c_int {
@@ -2908,7 +2924,7 @@ pub fn CL_CgameSystemCalls(
         0
     } else if op == MpCgameImport::CG_G2_ABSURDSMOOTHING as c_int {
         // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &mut *(arg(1) as *mut CGhoul2Info_v) };
+        let ghoul2 = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
         g2api_absurd_smoothing(g2, ghoul2, arg(2) != 0);
         0
     } else if op == MpCgameImport::CG_G2_SETRAGDOLL as c_int {
@@ -2916,7 +2932,7 @@ pub fn CL_CgameSystemCalls(
         // SAFETY: the handle and `VMA(2)` are module-space (porting-rules §D11).
         unsafe {
             let rdParamst = vma(vc, args, 2) as *mut sharedRagDollParams_t;
-            let ghoul2 = &mut *(arg(1) as *mut CGhoul2Info_v);
+            let ghoul2 = &mut *(argw(1) as *mut CGhoul2Info_v);
             if rdParamst.is_null() {
                 g2api_reset_ragdoll(g2, ghoul2);
                 return 0;
@@ -2969,7 +2985,7 @@ pub fn CL_CgameSystemCalls(
                 kind: RagDollUpdateKind::Server,
             };
 
-            let ghoul2 = &mut *(arg(1) as *mut CGhoul2Info_v);
+            let ghoul2 = &mut *(argw(1) as *mut CGhoul2Info_v);
             g2api_animate_g2_models_rag(g2, view, ghoul2, arg(2), &mut rduParams);
         }
         0
@@ -2977,7 +2993,7 @@ pub fn CL_CgameSystemCalls(
         let bone_name = cstr_to_string(vma(vc, args, 2) as *const c_char);
         // SAFETY: the handle and the two vectors are module-space (§D11).
         unsafe {
-            let ghoul2 = &mut *(arg(1) as *mut CGhoul2Info_v);
+            let ghoul2 = &mut *(argw(1) as *mut CGhoul2Info_v);
             g2api_rag_pcj_constraint(
                 g2,
                 ghoul2,
@@ -2989,14 +3005,14 @@ pub fn CL_CgameSystemCalls(
     } else if op == MpCgameImport::CG_G2_RAGPCJGRADIENTSPEED as c_int {
         let bone_name = cstr_to_string(vma(vc, args, 2) as *const c_char);
         // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &mut *(arg(1) as *mut CGhoul2Info_v) };
+        let ghoul2 = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
         g2api_rag_pcj_gradient_speed(g2, ghoul2, &bone_name, vmf(vc, args, 3)) as c_int
     } else if op == MpCgameImport::CG_G2_RAGEFFECTORGOAL as c_int {
         let bone_name = cstr_to_string(vma(vc, args, 2) as *const c_char);
         let pos_ptr = vma(vc, args, 3) as *const vec3_t;
         // SAFETY: the handle and a non-NULL `VMA(3)` are module-space (§D11).
         unsafe {
-            let ghoul2 = &mut *(arg(1) as *mut CGhoul2Info_v);
+            let ghoul2 = &mut *(argw(1) as *mut CGhoul2Info_v);
             let pos = if pos_ptr.is_null() {
                 None
             } else {
@@ -3010,7 +3026,7 @@ pub fn CL_CgameSystemCalls(
         // SAFETY: the handle, the three inputs, and the out-param are all
         // module-space (porting-rules §D11).
         unsafe {
-            let ghoul2 = &mut *(arg(1) as *mut CGhoul2Info_v);
+            let ghoul2 = &mut *(argw(1) as *mut CGhoul2Info_v);
             match g2api_get_rag_bone_pos(
                 g2,
                 ghoul2,
@@ -3030,7 +3046,7 @@ pub fn CL_CgameSystemCalls(
         let bone_name = cstr_to_string(vma(vc, args, 2) as *const c_char);
         // SAFETY: the handle and the velocity are module-space (§D11).
         unsafe {
-            let ghoul2 = &mut *(arg(1) as *mut CGhoul2Info_v);
+            let ghoul2 = &mut *(argw(1) as *mut CGhoul2Info_v);
             g2api_rag_effector_kick(
                 g2,
                 ghoul2,
@@ -3040,7 +3056,7 @@ pub fn CL_CgameSystemCalls(
         }
     } else if op == MpCgameImport::CG_G2_RAGFORCESOLVE as c_int {
         // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &mut *(arg(1) as *mut CGhoul2Info_v) };
+        let ghoul2 = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
         g2api_rag_force_solve(g2, ghoul2, arg(2) != 0) as c_int
     } else if op == MpCgameImport::CG_G2_SETBONEIKSTATE as c_int {
         let bone_name_ptr = vma(vc, args, 3) as *const c_char;
@@ -3052,7 +3068,7 @@ pub fn CL_CgameSystemCalls(
         let params_ptr = vma(vc, args, 5) as *mut sharedSetBoneIKStateParams_t;
         // SAFETY: the handle and a non-NULL `VMA(5)` are module-space (§D11).
         unsafe {
-            let ghoul2 = &mut *(arg(1) as *mut CGhoul2Info_v);
+            let ghoul2 = &mut *(argw(1) as *mut CGhoul2Info_v);
             let params = if params_ptr.is_null() {
                 None
             } else {
@@ -3064,19 +3080,19 @@ pub fn CL_CgameSystemCalls(
     } else if op == MpCgameImport::CG_G2_IKMOVE as c_int {
         // SAFETY: the handle and `VMA(3)` are module-space (porting-rules §D11).
         unsafe {
-            let ghoul2 = &mut *(arg(1) as *mut CGhoul2Info_v);
+            let ghoul2 = &mut *(argw(1) as *mut CGhoul2Info_v);
             let params = &mut *(vma(vc, args, 3) as *mut sharedIKMoveParams_t);
             g2api_ik_move(g2, view, ghoul2, arg(2), params) as c_int
         }
     } else if op == MpCgameImport::CG_G2_REMOVEBONE as c_int {
         let bone_name = cstr_to_string(vma(vc, args, 2) as *const c_char);
         // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let g2v = unsafe { &mut *(arg(1) as *mut CGhoul2Info_v) };
+        let g2v = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
         let ghl_info = g2_info(g2, g2v, arg(3));
         g2api_remove_bone(g2, view, ghl_info, &bone_name) as c_int
     } else if op == MpCgameImport::CG_G2_ATTACHINSTANCETOENTNUM as c_int {
         // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &mut *(arg(1) as *mut CGhoul2Info_v) };
+        let ghoul2 = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
         g2api_attach_instance_to_ent_num(g2, ghoul2, arg(2), arg(3) != 0);
         0
     } else if op == MpCgameImport::CG_G2_CLEARATTACHEDINSTANCE as c_int {
@@ -3087,7 +3103,7 @@ pub fn CL_CgameSystemCalls(
         0
     } else if op == MpCgameImport::CG_G2_OVERRIDESERVER as c_int {
         // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let g2v = unsafe { &mut *(arg(1) as *mut CGhoul2Info_v) };
+        let g2v = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
         let ghl_info = g2_info(g2, g2v, 0);
         g2api_override_server_with_client_data(g2, ghl_info) as c_int
     } else if op == MpCgameImport::CG_G2_GETSURFACENAME as c_int {
@@ -3095,7 +3111,7 @@ pub fn CL_CgameSystemCalls(
         // problems, we shove data into the pointer the vm passes instead.
         let point = vma(vc, args, 4) as *mut c_char;
         // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let g2v = unsafe { &mut *(arg(1) as *mut CGhoul2Info_v) };
+        let g2v = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
         let ghl_info = g2_info(g2, g2v, arg(3));
         let local = g2api_get_surface_name(g2, view, ghl_info, arg(2));
         if !local.is_empty() {
