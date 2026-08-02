@@ -36,20 +36,16 @@ use mp_qshared::shared::com_parse::QSharedScratch;
 use mp_qshared::shared::cvar::CVAR_INIT;
 use mp_qshared::shared::qfalse;
 use mp_qshared::shared::qhandle_t;
-use mp_renderer::render_state::arena::Arena;
 use mp_renderer::render_state::frame_data::FrameData;
-use mp_renderer::render_state::frame_state::FrameState;
 use mp_renderer::render_state::gpu_resources::GpuResources;
 use mp_renderer::render_state::light_style_table::LightStyleTable;
-use mp_renderer::render_state::placeholders::{
-    AutomapWireframe, BackEndCounters, FunctionTables, GlConfig, GlStatePlaceholder, OrientationR,
-    RefEntity, TrRefdef, Vec3, ViewParms,
-};
+use mp_renderer::render_state::placeholders::GlStatePlaceholder;
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::render_assets_sim::RenderAssetsSim;
 use mp_renderer::render_state::renderer_cvars::RendererCvars;
-use mp_renderer::render_state::shader_asset::{ShaderAsset, ShaderHandle};
-use mp_renderer::render_state::skin_asset::SkinAsset;
+use mp_renderer::renderer_frontend::{
+    empty_render_assets, empty_sky_state, zeroed_frame_state, zeroed_view_parms,
+};
 use mp_renderer::tr_bsp::RE_LoadWorldMap;
 use mp_renderer::tr_font::FontState;
 use mp_renderer::tr_image::TrImageState;
@@ -59,7 +55,6 @@ use mp_renderer::tr_local::fog_t::fog_t;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
 use mp_renderer::tr_local::tr_ref_entity_t::trRefEntity_t;
 use mp_renderer::tr_local::tr_refdef_t::trRefdef_t;
-use mp_renderer::tr_local::view_parms_t::viewParms_t;
 use mp_renderer::tr_main::{
     DrawSurf, R_RenderView, SurfaceGeometry, TrMainScratch, WorldSurfaceRef,
 };
@@ -431,113 +426,9 @@ pub fn host_view<'a>(
     }
 }
 
-/// `MAX_SHADERS` (non-`_XBOX`) — the shader arena's A12 soft cap.
-/// Harness-local restatement (the canonical private const sits in
-/// `mp_renderer::tr_main`; #51 tracks flag/limit consolidation).
-///
-/// Source: `oracle/codemp/renderer/tr_local.h` (`MAX_SHADERS`)
-const MAX_SHADERS: u32 = 16384;
-
-/// `MAX_SKINS` — the skin arena's A12 soft cap (same restatement note).
-///
-/// Source: `oracle/codemp/renderer/tr_local.h:1204`
-const MAX_SKINS: u32 = 1024;
-
-/// A `RenderAssets` at the state `R_Init`'s partial clear leaves it — the
-/// arenas empty, the tables empty. `R_InitImages`/`R_InitShaders` fill it.
-///
-/// Arena shapes per A12/A5: `shaders`/`skins` are capped with slot 0
-/// pre-populated (a zeroed placeholder — `CreateInternalShaders`' and
-/// `R_InitSkins`' `Arena::reset` re-seat the real defaults during `R_Init`);
-/// `images` stays unbounded (A5 — its purge is `R_DeleteTextures`, never
-/// `reset`).
+/// The renderer's own seed for an empty `RenderAssets` (DEC-32: one home).
 pub fn empty_assets() -> RenderAssets {
-    RenderAssets {
-        images: Arena::new_unbounded(),
-        image_names: Default::default(),
-        default_image: None,
-        fog_image: None,
-        dlight_image: None,
-        white_image: None,
-        lightmaps: Vec::new(),
-        shaders: Arena::new_with_slot0(MAX_SHADERS, ShaderAsset::default()),
-        shader_lookup: Default::default(),
-        sorted_shaders: Vec::new(),
-        shader_text: String::new(),
-        shader_text_hash_table: Vec::new(),
-        defer_load: false,
-        skins: Arena::new_with_slot0(MAX_SKINS, SkinAsset::default()),
-        skin_lookup: Default::default(),
-        projection_shadow_shader: ShaderHandle::slot_zero(),
-        sun_shader: ShaderHandle::slot_zero(),
-        world: None,
-        bsp_models: Vec::new(),
-        function_tables: FunctionTables::default(),
-        distance_cull: 0.0,
-        distance_cull_squared: 0.0,
-        glconfig: GlConfig {
-            // Raven fills this from `qglGetIntegerv(GL_MAX_TEXTURE_SIZE, …)`
-            // during `GLimp_Init`, which the harness has no equivalent of.
-            // `Upload32`'s clamp loop (`while width > maxTextureSize`) would
-            // otherwise mip every image down to 0x0 against the zeroed
-            // default. 2048 is wgpu's `downlevel_defaults()`
-            // `max_texture_dimension_2d` — the smallest size any backend we
-            // can run on guarantees, and above every retail `base/` texture.
-            max_texture_size: 2048,
-            ..GlConfig::default()
-        },
-        registered: false,
-        world_map_loaded: false,
-        max_polys: 0,
-        max_polyverts: 0,
-        automap_wireframe: AutomapWireframe {},
-    }
-}
-
-/// A zeroed `FrameState` for `R_Init` to overwrite wholesale (its first act is
-/// `*frame = FrameState { .. }`).
-fn zeroed_frame_state() -> FrameState {
-    FrameState {
-        refdef: TrRefdef::default(),
-        view: ViewParms::default(),
-        ori: OrientationR::default(),
-        counters: BackEndCounters {},
-        is_hyperspace: false,
-        current_entity: None,
-        sky_rendered_this_view: false,
-        projection_2d: false,
-        color_2d: [0; 4],
-        vertexes_2d: false,
-        entity_2d: RefEntity::default(),
-        scene_light_styles: [[0u8; 4];
-            mp_engine_qcommon::qfiles::light_style_limits::MAX_LIGHT_STYLES],
-        frame_count: 0,
-        view_count: 0,
-        scene_count: 0,
-        frame_scene_num: 0,
-        vis_count: 0,
-        view_cluster: 0,
-        skyboxportal: 0,
-        drawskyboxportal: 0,
-        render_glowing_objects: false,
-        identity_light: 1.0,
-        identity_light_byte: 255,
-        overbright_bits: 0,
-        sun_direction: Vec3::default(),
-        sun_ambient: Vec3::default(),
-        external_vis_data: None,
-    }
-}
-
-/// A zeroed `viewParms_t` for the sky-shader parse carrier.
-///
-/// `viewParms_t` is a frozen `#[repr(C)]` ABI struct of scalars, fixed arrays
-/// and `#[repr(C)]` sub-structs — no pointers with validity invariants, no
-/// owning types — so an all-zero bit pattern is a valid value, and it is the
-/// value `Com_Memset(&tr.viewParms, 0, ...)` gives it in the oracle.
-fn zeroed_view_parms() -> viewParms_t {
-    // SAFETY: POD `#[repr(C)]`; see the doc comment.
-    unsafe { core::mem::zeroed() }
+    empty_render_assets()
 }
 
 /// What the world-render feasibility spike observed for one map load and one
@@ -943,15 +834,5 @@ pub fn find_spawn_origin(entities: &str) -> Option<[f32; 3]> {
 
 /// A `SkyState` at rest (`tr_sky`'s file-scope statics, zeroed).
 fn empty_sky() -> SkyState {
-    SkyState {
-        sky_mins: [[0.0; 6]; 2],
-        sky_maxs: [[0.0; 6]; 2],
-        sky_min: 0.0,
-        sky_max: 0.0,
-        sky_clip: [[0.0; 3]; 6],
-        sky_points: Vec::new(),
-        sky_tex_coords: Vec::new(),
-        cloud_tex_coords: Vec::new(),
-        cloud_tex_p: Vec::new(),
-    }
+    empty_sky_state()
 }
