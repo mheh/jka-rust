@@ -17,3 +17,9 @@ mp_engine_rmg = { path = "../rmg" }
 mp_renderer = { path = "../../renderer" }
 mp_engine_client = { path = "../client" }
 native_platform = { path = "../../../native/platform" }
+
+[dev-dependencies]
+mp_abi = { path = "../../abi" }
+native_types = { path = "../../../native/types" }
+flate2 = "1"
+serde_json = "1"
