@@ -1,0 +1,27 @@
+# fx-oracle: the retail FINAL_BUILD leg of the by-name doors (DEC-63.3).
+#
+# Retail defines FINAL_BUILD (OpenJK CMakeLists.txt:324), so the unregistered-
+# name guards in StopEffect and the axis PlayEffect compile out: no print, no
+# early return, and the mEffectIDs[] lookup inserts the name with id 0.
+# StopEffect then walks the looped array with id 0, and the axis PlayEffect
+# falls through to the id overload, which reports the out-of-range id.
+# Source: `oracle/codemp/client/FxScheduler.cpp:88-118,752-770`
+seed 99
+cvar fx_debug 2
+cvar fx_countScale 1
+cvar fx_nearCull 16
+refdef 0 0 0   0 0 0   1 0 0   0 1 0   0 0 1   90 73.739792
+init
+# Stop with an unregistered name: id 0 matches the first empty looped slot.
+stop bogus/none 0 0
+# Stop with a bolt that matches no slot: id 0 falls off the end of the array.
+stop bogus/none 7341059 0
+# The axis overload with an unregistered name reaches the id overload with 0.
+playaxis missing/none 10 0 0   1 0 0   0 1 0   0 0 1   0 0 -1 -1 -1 0 0
+# A real effect still registers and plays after the id-0 traffic.
+register particle
+play particle 0 0 0   1 0 0   -1 -1
+advance 50
+addscheduled 0
+dumpstate
+free

@@ -71,6 +71,9 @@ headers those pull in.
   (`FxScheduler.cpp:96-102`) and the `PlayEffect(file, ...)` unregistered guard
   (`FxScheduler.cpp:760-766`). `NDEBUG` drops the `assert(0)` in the
   `CreateEffect` default arm and the one in `CParticle::UpdateOrigin`.
+  DEC-63.3 rules this posture and the `unregistered` scenario pins the two
+  guard sites: both stops are silent and the axis play falls through to the
+  id overload's invalid-id print. The port takes the same retail leg.
 
 ## Normalisations on the copies
 

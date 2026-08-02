@@ -386,6 +386,23 @@ int main(int argc, char **argv)
 			int rad = fx_oracle_int(&cursor, cmd);
 			FX_PlayEntityEffectID(id, org, axis, boltInfo, entNum, vol, rad);
 
+		} else if (strcmp(cmd, "playaxis") == 0) {
+			// The by-name axis overload, the FINAL_BUILD guard site (DEC-63.3).
+			char path[MAX_QPATH];
+			Q_strncpyz(path, fx_oracle_word(&cursor, cmd), sizeof(path));
+			vec3_t org;
+			vec3_t axis[3];
+			fx_oracle_vec(&cursor, cmd, org);
+			fx_oracle_axis(&cursor, cmd, axis);
+			int boltInfo = fx_oracle_int(&cursor, cmd);
+			int iGhoul2 = fx_oracle_int(&cursor, cmd);
+			int fxParm = fx_oracle_int(&cursor, cmd);
+			int vol = fx_oracle_int(&cursor, cmd);
+			int rad = fx_oracle_int(&cursor, cmd);
+			int iLoopTime = fx_oracle_int(&cursor, cmd);
+			int isRelative = fx_oracle_int(&cursor, cmd);
+			theFxScheduler.PlayEffect(path, org, axis, boltInfo, iGhoul2, fxParm, vol, rad, iLoopTime, !!isRelative);
+
 		} else if (strcmp(cmd, "stop") == 0) {
 			char path[MAX_QPATH];
 			Q_strncpyz(path, fx_oracle_word(&cursor, cmd), sizeof(path));

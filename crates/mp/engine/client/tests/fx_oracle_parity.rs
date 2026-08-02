@@ -25,7 +25,9 @@ use mp_engine_client::fx::fx_export::{
 };
 use mp_engine_client::fx::fx_harness::{fx_zero_trace, FxHarness};
 use mp_engine_client::fx::fx_host::FxHost;
-use mp_engine_client::fx::fx_scheduler::{fx_stop_effect, FX_MAX_EFFECTS};
+use mp_engine_client::fx::fx_scheduler::{
+    fx_play_effect_file_axis, fx_stop_effect, FX_MAX_EFFECTS,
+};
 use mp_engine_client::fx::fx_system::{FxRefdef, FxSystem};
 use mp_engine_client::fx::fx_util::{
     FX_AddBezier, FX_AddElectricity, FX_AddLine, FX_AddParticle, FX_AddPoly, FX_Free,
@@ -437,11 +439,38 @@ fn run_scenario(stem: &str, script: &str, fixtures: &[(String, String)]) -> Stri
                 );
             }
 
+            "playaxis" => {
+                let path = a.word();
+                let org = a.v3();
+                let axis = a.axis();
+                let bolt_info = a.i();
+                let i_ghoul2 = a.i();
+                let fx_parm = a.i();
+                let vol = a.i();
+                let rad = a.i();
+                let i_loop_time = a.i();
+                let is_relative = a.b();
+                fx_play_effect_file_axis(
+                    &mut fx,
+                    &mut host,
+                    path,
+                    Some(org),
+                    axis,
+                    bolt_info,
+                    i_ghoul2,
+                    fx_parm,
+                    vol,
+                    rad,
+                    i_loop_time,
+                    is_relative,
+                );
+            }
+
             "stop" => {
                 let path = a.word();
                 let bolt_info = a.i();
                 let portal = a.b();
-                fx_stop_effect(&mut fx, &mut host, path, bolt_info, portal);
+                fx_stop_effect(&mut fx, path, bolt_info, portal);
             }
 
             "addline" => {

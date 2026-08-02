@@ -1,0 +1,11 @@
+== fx-oracle unregistered ==
+PRINT CFxScheduler::PlayEffect called with invalid effect ID: 0
+PRINT Registering effect : particle
+REGSHADER fx/particle/spark -> 1
+REGISTER particle -> 1
+TIME 50
+PRINT Active    FX: 0
+PRINT Drawn     FX: 0
+PRINT Scheduled FX: 0
+STATE activeFx 0 drawnFx 0 scheduledFx 0 nextFree2DEffect 0
+== end ==

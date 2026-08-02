@@ -534,22 +534,12 @@ pub fn fx_schedule_looped_effect(
 /// Raven `CFxScheduler::StopEffect` — drop a looped entry that matches.
 ///
 /// Source: `oracle/codemp/client/FxScheduler.cpp:88-118`
-pub fn fx_stop_effect(
-    fx: &mut FxSystem,
-    host: &mut FxHost<'_, '_>,
-    file: &str,
-    bolt_info: i32,
-    is_portal: bool,
-) {
+pub fn fx_stop_effect(fx: &mut FxSystem, file: &str, bolt_info: i32, is_portal: bool) {
     // Get an extenstion stripped version of the file
     let sfile = COM_StripExtension(file);
-    let id = *fx.scheduler.mEffectIDs.get(&sfile).unwrap_or(&0);
-    if id == 0 {
-        host.Print(&format!(
-            "CFxScheduler::StopEffect- unregistered/non-existent effect: {sfile}\n"
-        ));
-        return;
-    }
+    // Retail defines FINAL_BUILD, so the unregistered-name guard compiles out
+    // and the `mEffectIDs[sfile]` lookup inserts the name with id 0 (DEC-63.3).
+    let id = *fx.scheduler.mEffectIDs.entry(sfile).or_insert(0);
 
     for i in 0..MAX_LOOPED_FX {
         let e = &fx.scheduler.mLoopedEffectArray[i];
@@ -695,7 +685,8 @@ pub fn fx_play_effect_file_fwd(
 ) {
     // Get an extenstion stripped version of the file
     let sfile = COM_StripExtension(file);
-    let id = *fx.scheduler.mEffectIDs.get(&sfile).unwrap_or(&0);
+    // Raven's `mEffectIDs[sfile]` inserts an unregistered name with id 0.
+    let id = *fx.scheduler.mEffectIDs.entry(sfile).or_insert(0);
 
     fx_play_effect_fwd(fx, host, id, origin, forward, vol, rad, false);
 }
@@ -721,13 +712,9 @@ pub fn fx_play_effect_file_axis(
     // Get an extenstion stripped version of the file
     let sfile = COM_StripExtension(file);
 
-    let id = *fx.scheduler.mEffectIDs.get(&sfile).unwrap_or(&0);
-    if id == 0 {
-        host.Print(&format!(
-            "CFxScheduler::PlayEffect unregistered/non-existent effect: {sfile}\n"
-        ));
-        return;
-    }
+    // Retail defines FINAL_BUILD, so the guard compiles out and the id overload
+    // reports an unregistered name as id 0 (DEC-63.3).
+    let id = *fx.scheduler.mEffectIDs.entry(sfile).or_insert(0);
 
     fx_play_effect_axis(
         fx,
