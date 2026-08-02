@@ -188,6 +188,7 @@ pub fn GetWavinfo(view: &mut EngineHostView, name: &str, wav: &[u8]) -> wavinfo_
 ///
 /// Source: `oracle/codemp/client/snd_mem.cpp:186-229`
 pub fn ResampleSfx(
+    view: &mut EngineHostView,
     snd: &mut SoundSystem,
     sfx: usize,
     iInRate: c_int,
@@ -201,7 +202,7 @@ pub fn ResampleSfx(
     let iOutCount = (snd.s_knownSfx[sfx].iSoundLengthInSamples as f32 / fStepScale) as c_int;
     snd.s_knownSfx[sfx].iSoundLengthInSamples = iOutCount;
 
-    SND_malloc(snd, iOutCount * 2, sfx);
+    SND_malloc(view, snd, iOutCount * 2, sfx);
 
     snd.s_knownSfx[sfx].fVolRange = 0.0;
     let mut uiSampleFrac: u32 = 0;
@@ -391,7 +392,14 @@ fn S_LoadSound_Actual(view: &mut EngineHostView, snd: &mut SoundSystem, sfx: usi
     snd.s_knownSfx[sfx].eSoundCompressionMethod = SoundCompressionMethod_t::ct_16;
     snd.s_knownSfx[sfx].iSoundLengthInSamples = info.samples;
     snd.s_knownSfx[sfx].pSoundData = Vec::new();
-    ResampleSfx(snd, sfx, info.rate, info.width, &data[info.dataofs as usize..]);
+    ResampleSfx(
+        view,
+        snd,
+        sfx,
+        info.rate,
+        info.width,
+        &data[info.dataofs as usize..],
+    );
 
     true
 }

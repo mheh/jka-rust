@@ -41,7 +41,7 @@ use crate::snd::channel_t::{channel_t, START_SAMPLE_IMMEDIATE};
 use crate::snd::loop_sound_t::MAX_LOOP_SOUNDS;
 use crate::snd::music_state_e::MusicState_e;
 use crate::snd::sound_system::{
-    SoundSystem, BGRNDTRACK_NUMBEROF, MAX_CHANNELS, MAX_RAW_SAMPLES, MAX_SFX,
+    SoundSystem, BGRNDTRACK_NUMBEROF, LOOP_HASH, MAX_CHANNELS, MAX_RAW_SAMPLES, MAX_SFX,
 };
 use crate::snd_mem::S_LoadSound;
 use crate::snd_mix::S_PaintChannels;
@@ -149,7 +149,7 @@ fn S_HashSFXName(name: &str) -> usize {
         }
         hash += i64::from(letter) * (i as i64 + 119);
     }
-    (hash as usize) & (crate::snd::sound_system::LOOP_HASH - 1)
+    (hash as usize) & (LOOP_HASH - 1)
 }
 
 /// Raven `S_FindName` — find the sound by name, or take a fresh slot for it.
@@ -217,9 +217,9 @@ pub fn S_FindName(snd: &mut SoundSystem, name: &str) -> usize {
 /// Only the `_DEBUG` build calls it: the retail build registers `sound/null.wav`
 /// instead (DEC-62.6). It stays ported because `S_BeginRegistration` names it.
 /// Source: `oracle/codemp/client/snd_dma.cpp:866-878`
-pub fn S_DefaultSound(snd: &mut SoundSystem, sfx: usize) {
+pub fn S_DefaultSound(view: &mut EngineHostView, snd: &mut SoundSystem, sfx: usize) {
     snd.s_knownSfx[sfx].iSoundLengthInSamples = 512;
-    SND_malloc(snd, 512 * 2, sfx);
+    SND_malloc(view, snd, 512 * 2, sfx);
     snd.s_knownSfx[sfx].bInMemory = true;
 
     for i in 0..snd.s_knownSfx[sfx].iSoundLengthInSamples as usize {
@@ -572,6 +572,10 @@ pub fn S_MuteSound(
 ///
 /// Raven: if pos is NULL, the sound will be dynamically sourced from the entity.
 /// Entchannel 0 will never override a playing sound.
+///
+/// Raven's bound is `entityNum > MAX_GENTITIES`, and it skips the check outright
+/// for a fixed origin, so an out-of-range number writes past the per-entity
+/// tables. The port panics on that index instead (porting-rules §19).
 /// Source: `oracle/codemp/client/snd_dma.cpp:1541-1648`
 pub fn S_StartSound(
     view: &mut EngineHostView,
@@ -1114,6 +1118,8 @@ pub fn S_RawSamples(
 
 /// Raven `S_UpdateEntityPosition` — record where an entity is this frame.
 ///
+/// Raven's bound is `entityNum > MAX_GENTITIES`, so `MAX_GENTITIES` itself writes
+/// one entry past the table. The port panics on that index instead (§19).
 /// Source: `oracle/codemp/client/snd_dma.cpp:2284-2330`
 pub fn S_UpdateEntityPosition(snd: &mut SoundSystem, entityNum: c_int, origin: vec3_t) {
     if entityNum < 0 || entityNum > MAX_GENTITIES as c_int {
@@ -1475,14 +1481,22 @@ pub fn S_Update_(common: &mut Common, snd: &mut SoundSystem) {
 /// Raven returns the block and the caller stores it, so the port sizes the sfx's
 /// own `pSoundData` instead (porting-rules §C9). `iSize` stays Raven's byte count.
 /// Source: `oracle/codemp/client/snd_dma.cpp:5017-5034`
-pub fn SND_malloc(snd: &mut SoundSystem, iSize: c_int, sfx: usize) {
+pub fn SND_malloc(view: &mut EngineHostView, snd: &mut SoundSystem, iSize: c_int, sfx: usize) {
+    // don't bother asking for zeroed mem
     snd.s_knownSfx[sfx].pSoundData = vec![0i16; (iSize / 2).max(0) as usize];
     snd.sndRawDataBytes += iSize;
 
-    //TODO: Port SND_malloc pool eviction
-    // Source: oracle/codemp/client/snd_dma.cpp:5023-5031. The negative
-    // `s_soundpoolmegs` cap calls `SND_FreeOldestSound` in a loop, and that call
-    // needs the `Com_Milliseconds` clock this receiver list does not carry.
+    // if "s_soundpoolmegs" is < 0, then the -ve of the value is the maximum
+    // amount of sounds we're allowed to have loaded...
+    if snd.s_soundpoolmegs.is_some() && view.common.cvar(snd.s_soundpoolmegs).integer < 0 {
+        let cap = -view.common.cvar(snd.s_soundpoolmegs).integer * 1024 * 1024;
+        while snd.sndRawDataBytes > cap {
+            let iBytesFreed = SND_FreeOldestSound(view, snd, Some(sfx));
+            if iBytesFreed == 0 {
+                break; // sanity
+            }
+        }
+    }
 }
 
 /// Raven `SND_setup` — register the pool-size cvar once per process.
