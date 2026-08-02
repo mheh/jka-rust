@@ -1457,3 +1457,13 @@ Refines DEC-03 at the ticket [#8](https://github.com/mheh/jka-rust/issues/8) sit
 3. **MP3.** minimp3 stays a replaced dependency (DEC-03) outside the byte gate: MP3 content enters the rig as decoded PCM fixtures, and the decoder itself gets pinned decode fixtures of its own.
 
 4. **Scope.** `snd_dma` (minus the dropped OpenAL/EAX arm), `snd_mem`, `snd_mix`, `snd_mp3` (as the minimp3 wrap), `snd_music`, and `snd_ambient` transcribe with the island. EAX and force feedback stay dropped.
+
+## DEC-58 — client validation rig: demo-driven seam referee + scripted join gate (ruled 2026-08-01)
+
+Ruled at the ticket [#11](https://github.com/mheh/jka-rust/issues/11) sit-down.
+
+1. **Lockstep analog.** Committed `.dm_26` demos drive the full client engine - `cl_parse`, snapshot assembly, module hosting - under a deterministic clock (the fixed-dt precedent, a seam on the com clock). The gate compares the engine-to-module trap journal, in the existing C6b format with the existing reader and manifests, against goldens recorded from the oracle engine playing the same demo. Byte-identical or the gate fails.
+
+2. **Seam fixtures.** The snapshot truncation (`clSnapshot_t` to `snapshot_t`, entity cap) and the reliable-command copy-out get narrow committed-fixture tests of their own, since the survey names them directly observable.
+
+3. **Stock-server join gate.** A scripted run: a local stock OpenJK dedicated server with `sv_pure 1` and bots, our client connects, enters, sustains a timed session, and disconnects clean. Pass = the server log shows a normal client lifecycle (no unknown commands, no checksum rejects, no timeouts) and the client held snapshots for the whole session. The same recipe runs against our `jampded` for the destination's other half. A retail server stays a periodic manual spot check.
