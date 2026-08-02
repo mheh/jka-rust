@@ -134,6 +134,13 @@ def motion_byte(bx, by, size, xoff, yoff, want_dx, want_dy, xsize, ysize, scale)
         hi = min((limit - size - pos) // scale, 8 - off)
         assert lo <= hi, (pos, limit, off, lo, hi)
         d = max(lo, min(want // scale, hi))
+        # An odd texel displacement puts the source rows on a 4-byte boundary,
+        # which makes the blitters read a `double` off its natural alignment.
+        # That is Raven UB, so the shared fixtures stay off it. README.md holds
+        # the note.
+        if (d * scale) % 2 != 0:
+            d = d - 1 if d - 1 >= lo else d + 1
+        assert lo <= d <= hi, (pos, limit, off, lo, hi, d)
         return d, 8 - off - d
 
     dxu, mx = pick(bx, want_dx, xsize, xoff)

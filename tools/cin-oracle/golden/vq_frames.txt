@@ -59,8 +59,8 @@ CHUNK 3 id 1011 size 160 flags fc03 f0 -4 f1 3
 MCOMP bank1 crc e0f2e0f5
   mcomp -15056 -15312 -17104 -18896 -15060 -17136 -15116 -18956
 FRAME 1 numquads 2 roqf0 -4 roqf1 3 nbuf0 -16384 bufhalf 1
-  live crc c708a5e3
-  half0 crc ea502f8b half1 crc d67f6869
+  live crc dc796f40
+  half0 crc ea502f8b half1 crc 3a08adaa
   grid ff4db74b ff9f9500 ffcdd0a6 00000000 00000000 00000000 00000000 ff004502
   grid 00000000 00000000 00000000 ff003900 ff003f00 ff7922de ffa7ff51 00000000
   grid ff004b18 ff00512f ff018cff 00000000 00000000 00000000 00000000 ff00dad0
@@ -68,13 +68,13 @@ FRAME 1 numquads 2 roqf0 -4 roqf1 3 nbuf0 -16384 bufhalf 1
   grid ff1be0e6 ffd10097 ffffa70b 00000000 00000000 00000000 00000000 ffff129d
   grid 00000000 00000000 00000000 ffeb0570 ffff0c86 ffab0043 ffd934ff 00000000
   grid ffff18b3 ffffff95 ff336473 00000000 00000000 00000000 00000000 ffffa6ff
-  grid 00000000 00000000 00000000 ffff9aff ffffa0ff ff0000ab ff0dab1e ff00ce00
+  grid 00000000 00000000 00000000 ffff9aff ffffa0ff ff0000ab ff0dab1e ff00f600
 CHUNK 4 id 1011 size 160 flags 05fa f0 5 f1 -6
 MCOMP bank0 crc 17ad5e25
   mcomp 19980 19724 17932 16140 19976 17900 19920 16080
 FRAME 2 numquads 3 roqf0 5 roqf1 -6 nbuf0 16384 bufhalf 0
-  live crc a48c84b4
-  half0 crc 2c8ef7e8 half1 crc d67f6869
+  live crc dec1a04b
+  half0 crc 295a9848 half1 crc 3a08adaa
   grid ffff5f5f ff009900 ff00d4b9 00000000 ff003900 00000000 00000000 ff6b0015
   grid ff004b18 00000000 00000000 ffffe2e9 ffffe8ff ff0026f1 ffffbf65 00000000
   grid ff8b002c ffab0043 ffd934ff 00000000 ffff72a3 00000000 00000000 ffd382e3

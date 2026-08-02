@@ -1,4 +1,4 @@
-// cin-oracle — deterministic host / link stubs for the Raven RoQ decoder TU.
+// cin-oracle: deterministic host / link stubs for the Raven RoQ decoder TU.
 //
 // `main.cpp` compiles the unmodified `cl_cin.cpp` inside its own translation
 // unit, so the whole file's engine seam has to link. This file supplies it. The

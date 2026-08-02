@@ -1,5 +1,5 @@
 #!/bin/sh
-# cin-oracle — differential golden harness for the MP RoQ cinematic decoder
+# cin-oracle: differential golden harness for the MP RoQ cinematic decoder
 # (DEC-55.3, wayfinder ticket gh#28). Compiles the UNMODIFIED Raven TU
 # codemp/client/cl_cin.cpp against harness stubs, links it with a deterministic
 # host, and builds the `cin_dump` driver. run.sh drives the scenarios.

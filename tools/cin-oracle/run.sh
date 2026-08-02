@@ -1,5 +1,5 @@
 #!/bin/sh
-# cin-oracle — run every scenario and check (or regenerate) the committed
+# cin-oracle: run every scenario and check (or regenerate) the committed
 # goldens. build.sh must have built build/cin_dump first.
 #
 #   sh run.sh           run every scenario, diff against golden/

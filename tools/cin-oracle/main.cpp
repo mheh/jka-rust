@@ -1,4 +1,4 @@
-// cin-oracle — the scenario driver over the unmodified Raven RoQ decode core.
+// cin-oracle: the scenario driver over the unmodified Raven RoQ decode core.
 //
 //   cin_dump <scenario>
 //

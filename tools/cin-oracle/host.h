@@ -1,4 +1,4 @@
-// cin-oracle — the seam the driver shares with the host stubs.
+// cin-oracle: the seam the driver shares with the host stubs.
 #ifndef CIN_ORACLE_HOST_H
 #define CIN_ORACLE_HOST_H
 
