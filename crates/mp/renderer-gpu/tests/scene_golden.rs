@@ -34,6 +34,7 @@ use mp_engine_qcommon::cm_terrain::CmLandScape;
 use mp_engine_qcommon::common::error::ComError;
 use mp_engine_qcommon::files_common::FS_ProductIdFile;
 use mp_engine_server::Server;
+use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
@@ -44,7 +45,7 @@ use mp_renderer::tr_local::dlight_s::dlight_t;
 use mp_renderer::tr_main::TrMainScratch;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_public::ref_flags::{RDF_DRAWSKYBOX, RDF_NOWORLDMODEL};
-use mp_renderer::tr_scene::{RE_AddRefEntityToScene, RE_RenderScene};
+use mp_renderer::tr_scene::{RE_AddPolyToScene, RE_AddRefEntityToScene, RE_RenderScene};
 use mp_renderer::tr_shader::RE_RegisterShader;
 use mp_renderer_gpu::ui_host::boot;
 use mp_renderer_gpu::ui_host::{BootConfig, UiHost};
@@ -68,15 +69,25 @@ const CHANNEL_TOLERANCE: u8 = 0;
 /// The horizontal field of view in degrees.
 const FOV_X: f64 = 90.0;
 
-/// One synthetic scene: a name for its golden, the shader every entity draws
-/// with, and the entity list.
+/// One synthetic scene: a name for its golden, the eye point, and the recorder
+/// that submits its contents through the trap seam.
 struct Scene {
     /// The golden's file stem under `tests/goldens/`.
     stem: &'static str,
     /// The eye point, looking down +x.
     eye: [f32; 3],
-    /// Builds the scene's ref-entities against the registered shader handle.
-    build: fn(shader: qhandle_t) -> Vec<refEntity_t>,
+    /// Submits the scene's contents against the registered shader handle. Every
+    /// scene records through the real `RE_Add*ToScene` traps, so the gate
+    /// exercises the same seam a module frame does.
+    record: fn(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_t),
+}
+
+/// Records `entities` through `RE_AddRefEntityToScene`, the shape most scenes
+/// here use.
+fn record_entities(host: &mut UiHost, frame_data: &mut FrameData, entities: &[refEntity_t]) {
+    for ent in entities {
+        RE_AddRefEntityToScene(frame_data, &host.assets, &mut host.scene, ent);
+    }
 }
 
 /// A zeroed `refEntity_t` with the identity axis, the shape a caller fills in.
@@ -308,9 +319,7 @@ fn run_scene(scene: &Scene) {
     // ---- record the scene through the trap seam ------------------------
     let refdef = build_refdef(scene.eye);
     let mut frame_data = FrameData { events: Vec::new() };
-    for ent in (scene.build)(shader) {
-        RE_AddRefEntityToScene(&mut frame_data, &host.assets, &mut host.scene, &ent);
-    }
+    (scene.record)(&mut host, &mut frame_data, shader);
     RE_RenderScene(
         &refdef,
         &mut frame_data,
@@ -460,7 +469,7 @@ fn run_scene(scene: &Scene) {
 /// `RB_SurfaceSprite` is covered alongside the plain one.
 ///
 /// Source: `oracle/codemp/renderer/tr_surface.cpp:141-169`
-fn scene_sprites(shader: qhandle_t) -> Vec<refEntity_t> {
+fn scene_sprites(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_t) {
     let mut out = Vec::new();
     for (index, (y, rotation, rgba)) in [
         (-40.0f32, 0.0f32, [255u8, 255, 255, 255]),
@@ -479,7 +488,7 @@ fn scene_sprites(shader: qhandle_t) -> Vec<refEntity_t> {
         re.shaderRGBA = rgba;
         out.push(re);
     }
-    out
+    record_entities(host, frame_data, &out);
 }
 
 /// Census row `refent/RT_LINE` (94,346 submissions): three camera-facing
@@ -487,7 +496,7 @@ fn scene_sprites(shader: qhandle_t) -> Vec<refEntity_t> {
 /// the cross-product side vector is exercised off-axis as well as on.
 ///
 /// Source: `oracle/codemp/renderer/tr_surface.cpp:667-690`
-fn scene_lines(shader: qhandle_t) -> Vec<refEntity_t> {
+fn scene_lines(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_t) {
     let mut out = Vec::new();
     for (start, end, radius, rgba) in [
         (
@@ -518,7 +527,7 @@ fn scene_lines(shader: qhandle_t) -> Vec<refEntity_t> {
         re.shaderRGBA = rgba;
         out.push(re);
     }
-    out
+    record_entities(host, frame_data, &out);
 }
 
 /// Census row `refent/RT_SABER_GLOW` (94,346 submissions): two blades of
@@ -526,7 +535,7 @@ fn scene_lines(shader: qhandle_t) -> Vec<refEntity_t> {
 /// blob both draw.
 ///
 /// Source: `oracle/codemp/renderer/tr_surface.cpp:560-580`
-fn scene_saber_glow(shader: qhandle_t) -> Vec<refEntity_t> {
+fn scene_saber_glow(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_t) {
     let mut out = Vec::new();
     for (origin, blade_axis, length, radius, rgba) in [
         (
@@ -555,7 +564,49 @@ fn scene_saber_glow(shader: qhandle_t) -> Vec<refEntity_t> {
         re.shaderRGBA = rgba;
         out.push(re);
     }
-    out
+    record_entities(host, frame_data, &out);
+}
+
+/// Census rows `poly/calls` (443,515) and `marks/MarkFragments` (92,322): four
+/// scene polygons through `RE_AddPolyToScene`, a triangle, a quad, a pentagon,
+/// and a hexagon, so the fan triangulation is covered past its three-vertex
+/// base. Per-vertex `modulate` differs across the corners, which is what a
+/// faded mark carries.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:220-254`
+/// (`RB_SurfacePolychain`)
+fn scene_polys(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_t) {
+    for (index, corner_count) in [3usize, 4, 5, 6].into_iter().enumerate() {
+        // A regular polygon in the plane x = 210, centred on its own row.
+        let center_z = 45.0 - index as f32 * 30.0;
+        let radius = 13.0f32;
+        let verts: Vec<polyVert_t> = (0..corner_count)
+            .map(|corner| {
+                let angle = std::f32::consts::TAU * corner as f32 / corner_count as f32;
+                // The corners fade from opaque to a quarter alpha around the
+                // ring, so the per-vertex modulate is visible in the image.
+                let fade = 255 - (corner * 192 / corner_count) as u8;
+                polyVert_t {
+                    xyz: [210.0, radius * angle.cos(), center_z + radius * angle.sin()],
+                    st: [
+                        0.5 + 0.5 * angle.cos(),
+                        0.5 + 0.5 * angle.sin(),
+                    ],
+                    modulate: [255, fade, 64, 255],
+                }
+            })
+            .collect();
+
+        RE_AddPolyToScene(
+            frame_data,
+            &host.assets,
+            &mut host.engine.common,
+            shader,
+            &verts,
+            corner_count,
+            1,
+        );
+    }
 }
 
 #[test]
@@ -563,7 +614,7 @@ fn golden_scene_sprites() {
     run_scene(&Scene {
         stem: "scene_sprites",
         eye: [0.0, 0.0, 0.0],
-        build: scene_sprites,
+        record: scene_sprites,
     });
 }
 
@@ -572,7 +623,7 @@ fn golden_scene_lines() {
     run_scene(&Scene {
         stem: "scene_lines",
         eye: [0.0, 0.0, 0.0],
-        build: scene_lines,
+        record: scene_lines,
     });
 }
 
@@ -581,6 +632,15 @@ fn golden_scene_saber_glow() {
     run_scene(&Scene {
         stem: "scene_saber_glow",
         eye: [0.0, 0.0, 0.0],
-        build: scene_saber_glow,
+        record: scene_saber_glow,
+    });
+}
+
+#[test]
+fn golden_scene_polys() {
+    run_scene(&Scene {
+        stem: "scene_polys",
+        eye: [0.0, 0.0, 0.0],
+        record: scene_polys,
     });
 }

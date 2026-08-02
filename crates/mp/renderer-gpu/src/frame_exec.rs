@@ -534,8 +534,20 @@ impl FrameExecutor {
                     self.first_scene_entity = self.scene_entities.len();
                 }
 
+                // A scene polygon needs no work here: `R_AddPolygonSurfaces`
+                // reads the recorded events straight off `frame_data` at
+                // `RenderScene`, so the poly is already on the draw-surf list by
+                // the time the world pass runs. Without a world context there is
+                // no such pass, so it counts as a skip.
+                // Source: oracle/codemp/renderer/tr_scene.cpp:97-109
+                FrameEvent::AddPolyToScene { .. } => {
+                    if world.is_none() {
+                        stats.skipped_scene_events += 1;
+                        self.warn_once(Warned::SceneEvent);
+                    }
+                }
+
                 FrameEvent::ClearDecals
-                | FrameEvent::AddPolyToScene { .. }
                 | FrameEvent::AddPolysToScene { .. }
                 | FrameEvent::AddLightToScene { .. }
                 | FrameEvent::AddAdditiveLightToScene { .. }

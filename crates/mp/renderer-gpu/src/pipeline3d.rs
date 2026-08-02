@@ -38,6 +38,7 @@ use mp_engine_qcommon::qfiles::draw_vert_t::drawVert_t;
 use mp_engine_qcommon::qfiles::md3_limits::MD3_XYZ_SCALE;
 use mp_engine_qcommon::qfiles::md3_surface_t::md3Surface_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
+use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::shared::mdxaBone_t;
 use mp_qshared::shared::q_math::{
@@ -696,6 +697,9 @@ pub struct WorldStats {
     pub skipped_non_world: u32,
     /// World surfaces whose range was empty (`Skip`/`Flare`), so nothing drew.
     pub empty_surfaces: u32,
+    /// Scene polygons (`SF_POLY`) that drew at least one stage pass. The census
+    /// mark path.
+    pub poly_surfaces_drawn: u32,
     /// Sky-shader surfaces that drew their sky box, clouds, or both. The oracle
     /// forks a sky shader into `RB_StageIteratorSky`. A surface counts here when
     /// that chain drew at least one face or cloud pass.
@@ -1425,6 +1429,24 @@ impl Pipeline3d {
                         &mut items,
                     );
                 }
+                SurfaceGeometry::Poly { verts } => {
+                    self.collect_poly_surface(
+                        surf.sort,
+                        verts,
+                        assets,
+                        noise,
+                        float_time,
+                        dynamic_vertices,
+                        dynamic_indices,
+                        stats,
+                        slot_map,
+                        entities,
+                        view,
+                        fogs,
+                        oris,
+                        &mut items,
+                    );
+                }
                 SurfaceGeometry::Other => {
                     self.collect_entity_surface(
                         surf.sort,
@@ -1449,6 +1471,118 @@ impl Pipeline3d {
         }
 
         items
+    }
+
+    /// Resolves one `SF_POLY` draw surf: the scene polygon `RE_AddPolyToScene`
+    /// recorded, fan-triangulated into the per-frame buffers and drawn one pass
+    /// per active stage.
+    ///
+    /// This is the census's mark path. All 443,515 poly submissions across the
+    /// four traces carry world-space vertices under the world entity, so the
+    /// slot lookup lands on the world clip matrix.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_surface.cpp:220-254`
+    /// (`RB_SurfacePolychain`)
+    #[allow(clippy::too_many_arguments)]
+    fn collect_poly_surface(
+        &mut self,
+        sort: u32,
+        poly_verts: &[polyVert_t],
+        assets: &RenderAssets,
+        noise: &NoiseState,
+        float_time: f32,
+        dynamic_vertices: &mut Vec<WorldVertex>,
+        dynamic_indices: &mut Vec<u32>,
+        stats: &mut WorldStats,
+        slot_map: &HashMap<i32, u32>,
+        entities: &[trRefEntity_t],
+        view: &viewParms_t,
+        fogs: &[fog_t],
+        oris: &[orientationr_t],
+        items: &mut Vec<StageDrawItem>,
+    ) {
+        let (entity_num, shader_handle, fog_num, _dlight_map) =
+            R_DecomposeSort(sort, &assets.sorted_shaders);
+        let Some(shader) = assets.shaders.get(shader_handle) else {
+            return;
+        };
+        if poly_verts.len() < 3 {
+            stats.empty_surfaces += 1;
+            return;
+        }
+
+        // The fan: vertex 0 anchors every triangle.
+        let verts: Vec<WorldVertex> = poly_verts
+            .iter()
+            .map(|v| WorldVertex {
+                position: v.xyz,
+                st: v.st,
+                lightmap_st: [0.0, 0.0],
+                color: v.modulate,
+            })
+            .collect();
+        let mut index_block: Vec<u32> = Vec::with_capacity((poly_verts.len() - 2) * 3);
+        for i in 0..poly_verts.len() as u32 - 2 {
+            index_block.extend_from_slice(&[0, i + 1, i + 2]);
+        }
+
+        let slot = slot_map.get(&entity_num).copied().unwrap_or(0);
+        let globals_offset = (slot as u64 * GLOBALS_STRIDE) as u32;
+        let entity_float_time = float_time - entity_shader_time(entities, entity_num);
+        let surface_fog = resolve_surface_fog(fog_num, fogs, oris, slot, view);
+        let entity = entities.get(entity_num as usize);
+
+        let first_index = dynamic_indices.len() as u32;
+        let index_count = index_block.len() as u32;
+        dynamic_indices.extend_from_slice(&index_block);
+
+        let before = items.len();
+        for stage in shader.stages.iter().filter(|stage| stage.active) {
+            let item = self.build_cpu_surface_stage_item(
+                shader,
+                stage,
+                &verts,
+                first_index,
+                index_count,
+                entity_float_time,
+                noise,
+                assets,
+                surface_fog,
+                entity,
+                None,
+                dynamic_vertices,
+                globals_offset,
+            );
+            if let Some(item) = item {
+                items.push(item);
+            }
+        }
+        let stages_end = items.len();
+
+        if let Some(sf) = surface_fog {
+            if shader.fog_pass != FogPass::None {
+                let item = self.build_fog_stage_item(
+                    &verts,
+                    sf,
+                    shader.fog_pass,
+                    assets.fog_image,
+                    first_index,
+                    index_count,
+                    true,
+                    globals_offset,
+                    dynamic_vertices,
+                );
+                if let Some(item) = item {
+                    items.push(item);
+                    stats.fog_passes_drawn += 1;
+                }
+            }
+        }
+
+        if stages_end > before {
+            stats.surfaces_drawn += 1;
+            stats.poly_surfaces_drawn += 1;
+        }
     }
 
     /// Resolves one `SF_ENTITY` draw surf: the generated-geometry family
