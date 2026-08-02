@@ -3365,9 +3365,10 @@ pub fn CL_DownloadsComplete(view: &mut EngineHostView, cl: &mut Client) {
     // will be cleared, note that this is done after the hunk mark has been set
     //
     // Demo referee seam (`cl_referee.rs`): `CL_FlushMemory` restarts the sound
-    // stack (gh#24 and gh#25) and the renderer and ui stacks (gh#22), and none
-    // of those lanes is ported. The headless rig keeps the stack it booted with,
-    // and this gate goes away when the lanes land.
+    // stack and the renderer and ui stacks. The mixer landed with gh#24, and the
+    // music and ambient half (gh#25) plus the platform shell (gh#22) have not.
+    // The headless rig keeps the stack it booted with, and this gate goes away
+    // when those two lanes land.
     if !ref_headless(cl) {
         CL_FlushMemory(view, cl);
     }

@@ -4,9 +4,10 @@
 //! `mp_engine_server::sv_referee`. DEC-58.1 drives the full client engine from a
 //! committed `.dm_26` demo and compares the engine-to-module trap journal
 //! against an oracle recording. Two lanes the demo path crosses are not ported
-//! yet: the sound stack (gh#24 and gh#25, whose `snd_stubs` entries panic) and
-//! the platform shell that builds and seats `Engine.re` (gh#22, DEC-56, which
-//! leaves the renderer slot NULL).
+//! yet: the music and ambient half of the sound stack (gh#25, whose `snd_stubs`
+//! entries panic) and the platform shell that builds and seats `Engine.re`
+//! (gh#22, DEC-56, which leaves the renderer slot NULL). The mixer itself landed
+//! with gh#24.
 //!
 //! Headless mode is the documented seam around those two lanes. Every gated
 //! call site names this module, names its ticket, and runs unchanged in the
