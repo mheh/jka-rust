@@ -64,12 +64,11 @@ pub const sFILENAME_DMS: &str = "ext_data/dms.dat";
 const iMAX_ACTION_TRANSITIONS: usize = 4;
 const iMAX_EXPLORE_TRANSITIONS: usize = 4;
 
-/// Raven `Music_Free` — drop the parsed description.
-///
-/// Source: `oracle/codemp/client/snd_music.cpp:100-104`
-pub fn Music_Free(music: &mut MusicData_t) {
-    music.MusicData = None;
-}
+// Raven's `Music_Free` and `Music_SetLevelName` have no caller in either tree
+// (porting-rules §20), so neither ports. `gsLevelNameFromServer` therefore stays
+// empty in MP, and `Music_DynamicDataAvailable` always works off the label its
+// caller hands it.
+// Source: `oracle/codemp/client/snd_music.cpp:100-104,430-433`
 
 /// Raven `Music_Parse_Error` — report a broken description and throw it away.
 ///
@@ -327,14 +326,6 @@ fn StripTrailingWhiteSpaceOnEveryLine(pText: &str) -> String {
     }
 
     strNewText
-}
-
-/// Raven `Music_SetLevelName` — record the level the server is about to spawn.
-///
-/// Called from `SV_SpawnServer`, before the map load and the music start.
-/// Source: `oracle/codemp/client/snd_music.cpp:430-433`
-pub fn Music_SetLevelName(music: &mut MusicData_t, psLevelName: &str) {
-    music.gsLevelNameFromServer = psLevelName.to_string();
 }
 
 /// Raven `Music_ParseLeveldata` — read `dms.dat` and keep this level's pieces.

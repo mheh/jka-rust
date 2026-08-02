@@ -543,7 +543,8 @@ pub fn MP3Stream_SeekTo(
 
         // Raven fast-forwards until within 3 seconds, then slow-decodes. The
         // replaced decoder has one decode path, so both run the same call.
-        let iBytesDecodedThisPacket = chMp3.MP3StreamHeader.Decode(source, sourceOrigin);
+        let iBytesDecodedThisPacket =
+            MP3Stream_Decode(&mut chMp3.MP3StreamHeader, source, sourceOrigin);
         if iBytesDecodedThisPacket == 0 {
             break; // EOS
         }
@@ -592,7 +593,7 @@ pub fn MP3Stream_GetSamples(
     {
         // Raven passes `bStereo` as the "doing music" flag, which is safe
         // because only music decodes in stereo.
-        let iBytesDecoded = chMp3.MP3StreamHeader.Decode(source, sourceOrigin);
+        let iBytesDecoded = MP3Stream_Decode(&mut chMp3.MP3StreamHeader, source, sourceOrigin);
         if iBytesDecoded == 0 {
             // No more source data left, so clear the rest of the buffer.
             let from = chMp3.iMP3SlidingDecodeWritePos.max(0) as usize;

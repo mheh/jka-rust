@@ -586,23 +586,11 @@ pub fn AS_Free(ambient: &mut AmbientSystem) {
     }
 }
 
-/// Raven `AS_FreePartial` — drop the sets and the precache list, keep the group.
-///
-/// Source: `oracle/codemp/client/snd_ambient.cpp:853-869`
-pub fn AS_FreePartial(ambient: &mut AmbientSystem) {
-    if let Some(sets) = ambient.aSets.as_mut() {
-        sets.Free();
-        ambient.currentSet = -1;
-        ambient.oldSet = -1;
-
-        ambient.currentSetTime = 0;
-        ambient.oldSetTime = 0;
-
-        ambient.numSets = 0;
-
-        ambient.pMap.clear();
-    }
-}
+// Raven's `AS_FreePartial` has one caller, `CL_ClearLastLevel`, and that whole
+// function is `#ifdef _XBOX` (`oracle/codemp/client/cl_main.cpp:685-722`). It is
+// therefore zero-caller surface on every target this tree builds for, so it does
+// not port (porting-rules §20).
+// Source: `oracle/codemp/client/snd_ambient.cpp:853-869`
 
 // ===========================================================================
 // Sound code
