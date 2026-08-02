@@ -14,6 +14,7 @@ Modules supply the per-module compile flags (defines/includes/lang): the
 profile mirrors JACoders/OpenJK's CMakeLists. See NOTES.md for the verdict.
 """
 import argparse
+import importlib.util
 import re
 import subprocess
 import sys
@@ -26,360 +27,49 @@ REPO = Path(__file__).resolve().parents[2]
 ORACLE = REPO / "oracle"
 CRATES = REPO / "crates"
 SRC_ROOT = ORACLE  # reassigned by --root for non-oracle trees (e.g. OpenJK)
+MODULES_DIR = Path(__file__).resolve().parent / "modules"
+
+
+def _load_specs():
+    """Each module's variable surface lives in one spec file under modules/.
+    A spec carries the parse profile plus the chain fields the sweep, order,
+    and packets tools read. The historical inline dicts moved there verbatim."""
+    specs = {}
+    for p in sorted(MODULES_DIR.glob("*.py")):
+        if p.name.startswith("_"):
+            continue
+        loader = importlib.util.spec_from_file_location(f"modspec_{p.stem}", p)
+        mod = importlib.util.module_from_spec(loader)
+        loader.loader.exec_module(mod)
+        specs[mod.SPEC["name"]] = mod.SPEC
+    return specs
+
+
+MODULE_SPECS = _load_specs()
+
+
+def spec(module: str) -> dict:
+    """The full spec dict for one module (parse profile + chain fields)."""
+    return MODULE_SPECS[module]
+
+
+def freshness_stamp() -> dict:
+    """The generating tree state, recorded on every manifest for staleness
+    checks."""
+    commit = subprocess.run(["git", "-C", str(REPO), "rev-parse", "HEAD"],
+                            capture_output=True, text=True).stdout.strip()
+    dirty = bool(subprocess.run(["git", "-C", str(REPO), "status", "--porcelain"],
+                                capture_output=True, text=True).stdout.strip())
+    return {"generated_at_commit": commit, "generated_at_tree_dirty": dirty}
+
 
 # ---------------------------------------------------------------- module DB
 # Defines mirror the vcproj Release (non-FINAL_BUILD) configs; WIN32/_WINDOWS
 # omitted deliberately (they gate macros/inline asm, not layouts) so the parse
 # matches the 64-bit host layouts the existing Rust asserts were verified on.
-RAVEN_MODULES = {
-    # MP tree (codemp/) — plain C modules
-    "mp-game": dict(
-        lang="c", entry=["codemp/game/b_local.h", "codemp/game/ai_main.h",
-                         "codemp/game/w_saber.h", "codemp/game/bg_local.h",
-                         "codemp/game/botlib.h"],
-        includes=["codemp/game"],
-        defines=["NDEBUG", "MISSIONPACK", "QAGAME", "_JK2"],
-        srcglob=["codemp/game/*.c"]),
-    # bg_* compiles into game/cgame/ui; parse it through the game TU. Alias
-    # so tier-named callers (crate mp_bg) resolve without knowing that.
-    "mp-bg": dict(
-        lang="c", entry=["codemp/game/g_local.h", "codemp/game/bg_local.h",
-                         "codemp/game/bg_saga.h"],
-        includes=["codemp/game"],
-        defines=["NDEBUG", "MISSIONPACK", "QAGAME", "_JK2"],
-        srcglob=["codemp/game/bg_*.c"]),
-    "mp-cgame": dict(
-        lang="c", entry=["codemp/cgame/cg_local.h", "codemp/cgame/cg_lights.h"],
-        includes=["codemp/cgame", "codemp/game", "codemp/ui"],
-        defines=["NDEBUG", "MISSIONPACK", "CGAME", "_JK2"],
-        srcglob=["codemp/cgame/*.c", "codemp/game/bg_*.c", "codemp/ui/ui_shared.c"]),
-    # srcglob is the ui.vcproj compiled set EXACTLY, not codemp/ui/*.c:
-    # ui_players.c and ui_util.c are NOT in ui.vcproj or ui.q3asm (vestigial
-    # Q3/JK2 surface — ui_players.c refs symbols absent from MP: ANIM_TOGGLEBIT,
-    # playerInfo_t.headModel; its only would-be caller UI_DrawOpponent is inside
-    # a /* */ block in ui_main.c). Dropping them removes 26 dead port-target fns
-    # and the semantic parse errors they caused. The six live UI sources +
-    # ui_syscalls.c (seam) are listed; bg_*.c ride in as satisfied-dep callee
-    # bodies (already ported → mp_bg). Found 2026-07-24 during U0.
-    "mp-ui": dict(
-        lang="c", entry="codemp/ui/ui_local.h",
-        includes=["codemp/ui", "codemp/game"],
-        defines=["NDEBUG", "MISSIONPACK", "UI_EXPORTS", "_JK2"],
-        srcglob=["codemp/ui/ui_main.c", "codemp/ui/ui_atoms.c",
-                 "codemp/ui/ui_force.c", "codemp/ui/ui_shared.c",
-                 "codemp/ui/ui_gameinfo.c", "codemp/ui/ui_saber.c",
-                 "codemp/ui/ui_syscalls.c", "codemp/game/bg_*.c"]),
-    # Multi-entry: qcommon owns many headers unreachable from qcommon.h
-    # (qfiles/cm_*/files/vm_local/containers); server.h rides this TU too.
-    # Skipped on purpose: unzip.h (vendored minizip), platform.h/sparc.h
-    # (replaced), INetProfile.h/CNetProfile (win32 net profiling, C++ track).
-    "mp-engine": dict(
-        lang="c++", entry=["codemp/qcommon/qcommon.h", "codemp/qcommon/qfiles.h",
-                           "codemp/qcommon/cm_local.h", "codemp/qcommon/cm_patch.h",
-                           "codemp/qcommon/cm_landscape.h",
-                           "codemp/qcommon/cm_randomterrain.h",
-                           "codemp/qcommon/cm_terrainmap.h", "codemp/qcommon/files.h",
-                           "codemp/qcommon/vm_local.h", "codemp/qcommon/chash.h",
-                           "codemp/qcommon/fixedmap.h", "codemp/qcommon/hstring.h",
-                           "codemp/qcommon/sstring.h", "codemp/qcommon/MiniHeap.h",
-                           "codemp/qcommon/GenericParser2.h",
-                           "codemp/qcommon/RoffSystem.h",
-                           "codemp/qcommon/stringed_ingame.h",
-                           "codemp/qcommon/stringed_interface.h",
-                           "codemp/qcommon/timing.h", "codemp/server/server.h"],
-        includes=["codemp/qcommon", "codemp/game", "codemp/server", "codemp"],
-        defines=["NDEBUG", "MISSIONPACK", "_JK2"]),
-    # DEDICATED-SERVER function sweep (WinDed.vcproj Release). Unlike mp-engine
-    # (header-only type sweep), this carries a srcglob so fnsweep.py can unity-
-    # parse whole-subsystem .cpp bodies. Defines mirror WinDed Release exactly:
-    #   WIN32,NDEBUG,_CONSOLE,DEDICATED,BOTLIB,_WINDOWS
-    # WIN32/_CONSOLE/_WINDOWS dropped per NOTES decision #1 (gate macros/asm,
-    # not layouts/bodies); DEDICATED+BOTLIB kept — DEDICATED is the whole point
-    # (it #ifndef's out the client/GL/sound halves of qcommon/server/renderer,
-    # leaving exactly the headless host + server-side model/G2 loading). NB the
-    # WinDed *Release* config oddly omits _JK2/MISSIONPACK (its Debug config has
-    # _JK2); kept faithful. The whole engine is C++ (.cpp), so lang=c++.
-    # srcglob is the WinDed compile set minus win32/null-device/vendored:
-    #   qcommon+server+ghoul2+botlib+icarus+RMG in full, plus the 9 renderer
-    #   sources WinDed links for server-side G2/model/shader loading
-    #   (tr_model/mesh/ghoul2/image/shader/init/main/backend + matcomp), which
-    #   compile down to their non-DEDICATED remainder. null_renderer/null_*
-    #   are the stub device layer (our Rust host supplies its own) — excluded.
-    # Renderer files pull tr_local.h->qgl.h->GL, so the glshim include dir +
-    # GL/win32 scalar-typedef defines from mp-renderer are merged in; -fdeclspec
-    # for tr_local's __declspec(align), -fno-operator-names for its `or` fields.
-    "mp-engine-ded": dict(
-        lang="c++", entry="codemp/qcommon/qcommon.h",
-        includes=["codemp/qcommon", "codemp/server", "codemp/botlib",
-                  "codemp/ghoul2", "codemp/icarus", "codemp/RMG",
-                  "codemp/renderer", "codemp/cgame", "codemp/game", "codemp",
-                  "../tools/closure-prototype/glshim"],
-        defines=["NDEBUG", "DEDICATED", "BOTLIB",
-                 # win32 spellings the headers assume from an active platform
-                 # section (icarus tokenizer.h, RMG). Pointer-size handles keep
-                 # layout correct; only used where the sweep reads bodies.
-                 "LPCTSTR=const char *", "COLORREF=unsigned int",
-                 "DWORD=unsigned int", "WORD=unsigned short",
-                 "BYTE=unsigned char", "HANDLE=void *", "LPVOID=void *",
-                 # Raven leans on the MSVC case-insensitive str* spellings;
-                 # POSIX names them strcasecmp/strncasecmp (rescues RMG/icarus).
-                 "stricmp=strcasecmp", "strnicmp=strncasecmp",
-                 "USHORT=unsigned short", "BOOL=int", "UINT=unsigned int",
-                 "FLOAT=float", "HDC=void *", "HGLRC=void *",
-                 "DECLARE_HANDLE(name)=typedef void *name"],
-        # -fdeclspec for __declspec(align); -fno-operator-names for `or` fields.
-        # (q_shared SnapVector's MSVC __asm{} can't parse on an arm64 host —
-        # -fasm-blocks needs an x86 target which would break 64-bit layout
-        # parity — so clang drops that one header-inline and recovers; benign.)
-        flags=["-fdeclspec", "-fno-operator-names"],
-        srcglob=["codemp/qcommon/*.cpp", "codemp/server/*.cpp",
-                 "codemp/ghoul2/*.cpp", "codemp/botlib/*.cpp",
-                 "codemp/icarus/*.cpp", "codemp/RMG/*.cpp",
-                 "codemp/renderer/tr_model.cpp", "codemp/renderer/tr_mesh.cpp",
-                 "codemp/renderer/tr_ghoul2.cpp", "codemp/renderer/tr_image.cpp",
-                 "codemp/renderer/tr_shader.cpp", "codemp/renderer/tr_init.cpp",
-                 "codemp/renderer/tr_main.cpp", "codemp/renderer/tr_backend.cpp",
-                 "codemp/renderer/matcomp.c"]),
-    # botlib headers assume the classic Q3 include order (q_shared -> l_* ->
-    # aasfile -> botlib -> be_*); the entry list reproduces it.
-    # NB: the botlib interface header is codemp/game/botlib.h (there is no
-    # codemp/botlib/botlib.h) — Raven's be_* files include it cross-dir.
-    "mp-botlib": dict(
-        lang="c", entry=["codemp/game/q_shared.h", "codemp/botlib/l_crc.h",
-                         "codemp/botlib/l_libvar.h", "codemp/botlib/l_log.h",
-                         "codemp/botlib/l_memory.h", "codemp/botlib/l_script.h",
-                         "codemp/botlib/l_precomp.h", "codemp/botlib/l_struct.h",
-                         "codemp/botlib/l_utils.h", "codemp/botlib/aasfile.h",
-                         "codemp/game/botlib.h",
-                         # game-side interface headers must precede be_aas_def.h
-                         # (aas_entity_s embeds aas_entityinfo_t from be_aas.h)
-                         "codemp/game/be_aas.h", "codemp/game/be_ai_char.h",
-                         "codemp/game/be_ai_chat.h", "codemp/game/be_ai_gen.h",
-                         "codemp/game/be_ai_goal.h", "codemp/game/be_ai_move.h",
-                         "codemp/game/be_ai_weap.h", "codemp/game/be_ea.h",
-                         "codemp/botlib/be_aas_def.h",
-                         "codemp/botlib/be_aas_funcs.h", "codemp/botlib/be_aas_bsp.h",
-                         "codemp/botlib/be_aas_cluster.h", "codemp/botlib/be_aas_debug.h",
-                         "codemp/botlib/be_aas_entity.h", "codemp/botlib/be_aas_file.h",
-                         "codemp/botlib/be_aas_main.h", "codemp/botlib/be_aas_move.h",
-                         "codemp/botlib/be_aas_optimize.h", "codemp/botlib/be_aas_reach.h",
-                         "codemp/botlib/be_aas_route.h", "codemp/botlib/be_aas_routealt.h",
-                         "codemp/botlib/be_aas_sample.h", "codemp/botlib/be_ai_weight.h",
-                         "codemp/botlib/be_interface.h"],
-        includes=["codemp/botlib", "codemp/game", "codemp"],
-        defines=["NDEBUG", "MISSIONPACK", "BOTLIB", "_JK2"]),
-    "mp-ghoul2": dict(
-        lang="c++", entry=["codemp/game/q_shared.h", "codemp/qcommon/qcommon.h",
-                           "codemp/ghoul2/ghoul2_shared.h", "codemp/ghoul2/G2_local.h",
-                           "codemp/ghoul2/G2_gore.h", "codemp/ghoul2/G2.h"],
-        includes=["codemp/ghoul2", "codemp/game", "codemp/qcommon", "codemp"],
-        defines=["NDEBUG", "MISSIONPACK", "_JK2"]),
-    "mp-icarus": dict(
-        lang="c++", entry=["codemp/game/q_shared.h", "codemp/qcommon/qcommon.h",
-                           # interface.h fn tables reference sharedEntity_t
-                           "codemp/game/g_public.h",
-                           "codemp/icarus/tokenizer.h", "codemp/icarus/blockstream.h",
-                           "codemp/icarus/interpreter.h", "codemp/icarus/interface.h",
-                           "codemp/icarus/sequence.h", "codemp/icarus/taskmanager.h",
-                           "codemp/icarus/sequencer.h", "codemp/icarus/module.h",
-                           "codemp/icarus/instance.h",
-                           "codemp/icarus/icarus.h", "codemp/icarus/Q3_Interface.h",
-                           "codemp/icarus/Q3_Registers.h", "codemp/icarus/GameInterface.h"],
-        includes=["codemp/icarus", "codemp/game", "codemp/qcommon", "codemp"],
-        # tokenizer.h uses the win32 LPCTSTR spelling; platform.h only defines
-        # it under _WIN32, so supply it directly for layout purposes.
-        defines=["NDEBUG", "MISSIONPACK", "_JK2", "LPCTSTR=const char *"]),
-    "mp-rmg": dict(
-        lang="c++", entry=["codemp/game/q_shared.h", "codemp/qcommon/qcommon.h",
-                           "codemp/RMG/RM_Headers.h"],
-        includes=["codemp/RMG", "codemp/game", "codemp/qcommon", "codemp"],
-        defines=["NDEBUG", "MISSIONPACK", "_JK2"]),
-    # client.h pulls tr_public/ui_public/keys/snd_public/cg_public/bg_public.
-    # keys.h -> ../ui/keycodes.h (MP keycodes are ui-owned). snd_local.h pulls
-    # vendored-but-parseable OpenAL headers + mp3struct.h (channel_t embeds
-    # MP3STREAM by value); its eax includes are patched out at parse time
-    # (windows COM; nothing swept embeds EAX types). Skipped: BinkVideo.h
-    # (vendored Bink SDK, Xbox), snd_local_console.h (Xbox),
-    # client/keycodes.h (Xbox orphan; PC uses ui/keycodes.h).
-    "mp-client": dict(
-        lang="c++", entry=["codemp/game/q_shared.h", "codemp/qcommon/qcommon.h",
-                           "codemp/client/client.h", "codemp/client/snd_local.h",
-                           "codemp/client/snd_music.h", "codemp/client/snd_ambient.h",
-                           "codemp/client/fffx.h", "codemp/client/FxScheduler.h",
-                           "codemp/client/FXExport.h"],
-        includes=["codemp/client", "codemp/game", "codemp/qcommon", "codemp/renderer",
-                  "codemp/ui", "codemp/cgame", "codemp"],
-        defines=["NDEBUG", "MISSIONPACK", "_JK2"]),
-    # Multi-entry: tr_local.h pulls tr_public/qgl/ghoul2_shared/mdx_format.
-    # qgl.h/glext.h parse via the glshim include dir (GL scalar typedefs only);
-    # their own types are GL bindings — replaced, never swept. Skipped:
-    # qgl_console/glext_console (Xbox).
-    # cm_landscape.h precedes tr_landscape.h (HEIGHT_RESOLUTION array bound).
-    # The windows-type defines cover qgl.h's unguarded WGL pbuffer section and
-    # tr_local.h's HDC/HGLRC/USHORT fields (handles = pointer-size, layout-
-    # correct). -fdeclspec parses `__declspec(align(16))` on shaderCommands_t.
-    # srcglob is the jk2mp.vcproj client-renderer compiled set EXACTLY (R1,
-    # 2026-07-25), not `codemp/renderer/tr_*.cpp`: of the 32 tr_*.cpp files on
-    # disk, jk2mp.vcproj lists 28. Excluded (both confirmed absent from every
-    # oracle .vcproj — grep of tr_bsp_xbox/tr_curve_xbox/tr_image_xbox/
-    # tr_flares across every *.vcproj/*.vcxproj/*.mak in the oracle tree):
-    #   tr_bsp_xbox.cpp, tr_curve_xbox.cpp, tr_image_xbox.cpp — Xbox-platform
-    #     twins of tr_bsp/tr_curve/tr_image; PC MP never links them.
-    #   tr_flares.cpp — dead in MP: not in jk2mp.vcproj, and its only would-be
-    #     caller `RB_RenderFlares()` sits commented out at tr_backend.cpp:1244.
-    # matcomp.c also lives in codemp/renderer/ and IS in jk2mp.vcproj, but it
-    # is not a tr_* file and already has a srcglob home (mp-engine-ded); not
-    # duplicated here.
-    "mp-renderer": dict(
-        lang="c++", entry=["codemp/game/q_shared.h", "codemp/qcommon/qcommon.h",
-                           "codemp/qcommon/cm_landscape.h",
-                           "codemp/renderer/tr_local.h", "codemp/renderer/tr_font.h",
-                           "codemp/renderer/tr_quicksprite.h",
-                           "codemp/renderer/tr_WorldEffects.h",
-                           "codemp/renderer/tr_landscape.h",
-                           "codemp/renderer/matcomp.h"],
-        includes=["codemp/renderer", "codemp/game", "codemp/qcommon", "codemp",
-                  "../tools/closure-prototype/glshim"],
-        defines=["NDEBUG", "MISSIONPACK", "_JK2",
-                 "USHORT=unsigned short", "BOOL=int", "UINT=unsigned int",
-                 "FLOAT=float", "HDC=void *", "HGLRC=void *",
-                 "DECLARE_HANDLE(name)=typedef void *name",
-                 # R1 (2026-07-25): the srcglob addition sweeps real fn bodies
-                 # (tr_font.cpp GDI-flavored font loading, tr_shader.cpp path
-                 # building) that mp-renderer's header-only predecessor never
-                 # reached. Same win32-type-spoof + MSVC str* alias pattern
-                 # mp-engine-ded already established; PATH_SEP is a genuine
-                 # gap shared by every un-platformed profile (q_shared.h only
-                 # defines it inside _WIN32/__MACOS__/__linux__/__FreeBSD__
-                 # blocks, no catch-all) — pinned to '/' for parse purposes.
-                 "LPCTSTR=const char *", "LPCSTR=const char *",
-                 "COLORREF=unsigned int", "DWORD=unsigned int",
-                 "WORD=unsigned short", "BYTE=unsigned char",
-                 "HANDLE=void *", "LPVOID=void *", "__int64=long long",
-                 "stricmp=strcasecmp", "strnicmp=strncasecmp",
-                 "strcmpi=strcasecmp", "PATH_SEP='/'",
-                 # Raven gates dead PowerPC/big-endian byte-swap fallbacks
-                 # (stale pre-refactor mdxmVertex_t field names — real source
-                 # bit-rot, `tr_model.cpp`/`tr_ghoul2.cpp`) behind `#ifndef
-                 # _M_IX86`; MSVC always auto-defines `_M_IX86` for x86
-                 # targets, which is every retail MP client config Raven
-                 # shipped. Defining it (mirroring the vcproj Release configs,
-                 # same policy as the rest of this profile) takes the live
-                 # (non-dead) branch and drops ~200 diagnostics from code that
-                 # never compiled on retail either.
-                 "_M_IX86=600"],
-        flags=["-fdeclspec"],
-        srcglob=["codemp/renderer/tr_animation.cpp", "codemp/renderer/tr_arioche.cpp",
-                 "codemp/renderer/tr_backend.cpp", "codemp/renderer/tr_bsp.cpp",
-                 "codemp/renderer/tr_cmds.cpp", "codemp/renderer/tr_curve.cpp",
-                 "codemp/renderer/tr_font.cpp", "codemp/renderer/tr_ghoul2.cpp",
-                 "codemp/renderer/tr_image.cpp", "codemp/renderer/tr_init.cpp",
-                 "codemp/renderer/tr_light.cpp", "codemp/renderer/tr_main.cpp",
-                 "codemp/renderer/tr_marks.cpp", "codemp/renderer/tr_mesh.cpp",
-                 "codemp/renderer/tr_model.cpp", "codemp/renderer/tr_noise.cpp",
-                 "codemp/renderer/tr_quicksprite.cpp", "codemp/renderer/tr_scene.cpp",
-                 "codemp/renderer/tr_shade.cpp", "codemp/renderer/tr_shade_calc.cpp",
-                 "codemp/renderer/tr_shader.cpp", "codemp/renderer/tr_shadows.cpp",
-                 "codemp/renderer/tr_sky.cpp", "codemp/renderer/tr_surface.cpp",
-                 "codemp/renderer/tr_surfacesprites.cpp", "codemp/renderer/tr_terrain.cpp",
-                 "codemp/renderer/tr_world.cpp", "codemp/renderer/tr_WorldEffects.cpp"]),
-    # SP tree (code/) — C++ throughout
-    "sp-game": dict(
-        lang="c++", entry=["code/game/b_local.h", "code/game/wp_saber.h",
-                           "code/game/g_functions.h", "code/game/g_vehicles.h",
-                           "code/game/g_roff.h", "code/game/objectives.h",
-                           "code/game/g_items.h", "code/game/fields.h",
-                           "code/game/characters.h", "code/game/hitlocs.h",
-                           "code/game/events.h", "code/game/bg_local.h"],
-        includes=["code/game", "code"],
-        defines=["NDEBUG", "_IMMERSION"],
-        srcglob=["code/game/*.cpp"]),
-    "sp-bg": dict(
-        lang="c++", entry=["code/game/g_local.h", "code/game/bg_local.h"],
-        includes=["code/game", "code"],
-        defines=["NDEBUG", "_IMMERSION"],
-        srcglob=["code/game/bg_*.cpp"]),
-    "sp-cgame": dict(
-        lang="c++", entry=["code/cgame/cg_local.h", "code/cgame/cg_media.h",
-                           "code/cgame/cg_lights.h"],
-        includes=["code/cgame", "code/game", "code"],
-        defines=["NDEBUG", "_IMMERSION"]),
-    "sp-ui": dict(
-        lang="c++", entry=["code/ui/ui_local.h", "code/ui/gameinfo.h"],
-        includes=["code/ui", "code/game", "code"],
-        defines=["NDEBUG", "_IMMERSION"]),
-    # Same skip list as mp-engine; SP additionally has no vm_local (no QVM)
-    # and no GenericParser2/RoffSystem in qcommon (SP GP2 lives in game/).
-    "sp-engine": dict(
-        lang="c++", entry=["code/game/q_shared.h",
-                           "code/qcommon/qcommon.h", "code/qcommon/qfiles.h",
-                           "code/qcommon/cm_local.h", "code/qcommon/cm_patch.h",
-                           "code/qcommon/cm_landscape.h",
-                           "code/qcommon/cm_randomterrain.h",
-                           "code/qcommon/cm_terrainmap.h", "code/qcommon/files.h",
-                           "code/qcommon/chash.h", "code/qcommon/fixedmap.h",
-                           "code/qcommon/hstring.h", "code/qcommon/sstring.h",
-                           "code/qcommon/MiniHeap.h",
-                           "code/qcommon/stringed_ingame.h",
-                           "code/qcommon/stringed_interface.h",
-                           "code/qcommon/timing.h", "code/server/server.h"],
-        includes=["code/qcommon", "code/game", "code/server", "code"],
-        defines=["NDEBUG", "_IMMERSION"]),
-    # SP ghoul2_shared.h lives in code/game/ (engine-linked), not code/ghoul2/.
-    "sp-ghoul2": dict(
-        lang="c++", entry=["code/game/q_shared.h",
-                           "code/game/ghoul2_shared.h", "code/ghoul2/ghoul2_gore.h",
-                           "code/ghoul2/G2.h"],
-        includes=["code/ghoul2", "code/game", "code/qcommon", "code"],
-        defines=["NDEBUG", "_IMMERSION"]),
-    # Order mirrors Raven's Sequencer.cpp: StdAfx -> IcarusImplementation ->
-    # BlockStream -> Sequence -> TaskManager -> Sequencer.
-    "sp-icarus": dict(
-        lang="c++", entry=["code/icarus/StdAfx.h", "code/icarus/IcarusInterface.h",
-                           "code/icarus/IcarusImplementation.h",
-                           "code/icarus/blockstream.h", "code/icarus/sequence.h",
-                           "code/icarus/taskmanager.h", "code/icarus/sequencer.h"],
-        includes=["code/icarus", "code/game", "code/qcommon", "code"],
-        defines=["NDEBUG", "_IMMERSION"]),
-    "sp-rmg": dict(
-        lang="c++", entry="code/Rmg/RM_Headers.h",
-        includes=["code/Rmg", "code/game", "code/qcommon", "code"],
-        defines=["NDEBUG", "_IMMERSION"]),
-    # Same shape as mp-client; SP additionally has client_ui.h, vmachine.h
-    # (SP's vm_t), cl_mp3.h, cl_input_hotswap.h, and its keycodes.h lives in
-    # client/ (not ui/). Same eax patch + skips as MP.
-    "sp-client": dict(
-        lang="c++", entry=["code/game/q_shared.h", "code/qcommon/qcommon.h",
-                           "code/client/client.h", "code/client/client_ui.h",
-                           "code/client/vmachine.h", "code/client/snd_local.h",
-                           "code/client/cl_mp3.h", "code/client/snd_music.h",
-                           "code/client/snd_ambient.h", "code/client/fffx.h",
-                           "code/client/cl_input_hotswap.h"],
-        includes=["code/client", "code/game", "code/qcommon", "code/renderer",
-                  "code/ui", "code/cgame", "code"],
-        defines=["NDEBUG", "_IMMERSION"]),
-    # SP tr_local.h additionally includes glext.h directly. Skipped:
-    # tr_stl.h (C++ STL helpers), tr_jpeg_interface.h (vendored jpeg-6),
-    # amd3d.h (3DNow asm), qgl_linked.h (binding macros).
-    "sp-renderer": dict(
-        lang="c++", entry=["code/game/q_shared.h", "code/qcommon/qcommon.h",
-                           "code/qcommon/cm_landscape.h",
-                           "code/renderer/tr_local.h", "code/renderer/tr_font.h",
-                           "code/renderer/tr_quicksprite.h",
-                           "code/renderer/tr_WorldEffects.h",
-                           "code/renderer/tr_landscape.h",
-                           "code/renderer/matcomp.h"],
-        includes=["code/renderer", "code/game", "code/qcommon", "code",
-                  "../tools/closure-prototype/glshim"],
-        defines=["NDEBUG", "_IMMERSION",
-                 "USHORT=unsigned short", "BOOL=int", "UINT=unsigned int",
-                 "FLOAT=float", "HDC=void *", "HGLRC=void *",
-                 "DECLARE_HANDLE(name)=typedef void *name"],
-        # SP tr_local.h names fields `or` (orientationr_t or;) — MSVC treats
-        # `or` as an identifier; -fno-operator-names matches that, else clang
-        # silently drops the field from viewParms_t/trGlobals_t.
-        flags=["-fdeclspec", "-fno-operator-names"]),
-}
+# The per-module dicts live in modules/<name>.py now; the extra chain keys a
+# spec may carry (label, subsystems, order, packets) are ignored here.
+RAVEN_MODULES = MODULE_SPECS
 
 # JACoders/OpenJK profile — defines/includes mirror its CMakeLists:
 # MPGameDefines=_GAME, MPCGameDefines=_CGAME, MPUIDefines=UI_BUILD,

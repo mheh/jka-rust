@@ -46,8 +46,11 @@ Machine checks (built in, never silent):
     (undocumented-cpp = referee items).
 
 Usage:
-  .venv/bin/python enginepackets.py                 # full run (re-parses, ~50s)
+  .venv/bin/python enginepackets.py [--module mp-engine-ded]  # full run, ~50s
   .venv/bin/python enginepackets.py --cache X.pkl    # dev: load a pickled build
+
+The per-module surface (paths, classification sets, digest, drop list, LAW
+mode) comes from the spec `packets` block in modules/<name>.py.
 """
 import argparse
 import json
@@ -61,52 +64,74 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import engineorder as EO
+import enginesweep as ES
 import closure as C
 
 HERE = Path(__file__).resolve().parent
 REPO = C.REPO
-OUT = HERE / "out" / "engine" / "packets"
-ROSETTA_TSV = HERE / "out" / "engine" / "type-rosetta.tsv"
-RULINGS = REPO / "docs" / "handoffs" / "engine-fork-discovery.md"
 SHARD_TARGET_LOC = 450
 
-# ---------------------------------------------------------------- cpp-track
-# The five FROZEN §F design docs (ruling 7 + the doc-session rulings). A function
-# routed to a doc is NOT given a mechanical signature — the doc's Method-
-# transcription table IS its work order (porting-rules §F). Classification is by
-# the evidence in engine-port-order (subsystem dir / owning file / owner class),
-# confirmed against each doc's own class coverage.
-DOC = {
-    "icarus": "docs/subsystems/icarus.md",
-    "rmg": "docs/subsystems/rmg-terrain.md",
-    "ghoul2": "docs/subsystems/ghoul2-server.md",
-    "npcnav": "docs/subsystems/npcnav.md",
-    "roff": "docs/subsystems/roff.md",
-    # Rulings 50/51 (2026-07-09): the sixth and seventh §F docs.
-    "stringed": "docs/subsystems/stringed.md",
-    "trmodel": "docs/subsystems/tr-model.md",
-}
-# Ruling 49: CDraw32 (all of cm_draw.cpp) is §20-dropped — sole caller
-# CTerrainMap is header-only in the link set; addendum in rmg-terrain.md.
-S20_FILES = {"cm_draw.cpp"}
-# Ruling 50/51 file scopes: whole-TU doc routing (free fns included — the
-# docs' Method-transcription tables are their work orders).
-STRINGED_FILES = {"stringed_ingame.cpp", "stringed_interface.cpp"}
-# tr-model.md owns tr_model.cpp + matcomp.c live surface AND the §20/§C10
-# classification of the DEDICATED-dead renderer TUs (ruling 54).
-TRMODEL_FILES = {"tr_model.cpp", "matcomp.c", "tr_shader.cpp", "tr_image.cpp",
-                 "tr_init.cpp", "tr_main.cpp", "tr_mesh.cpp",
-                 "null_renderer.cpp"}
-# RMG qcommon terrain twins folded into rmg-terrain.md (ruling 16/28); class set
-# confirmed present in rmg-terrain.md.
-RMG_FOLDED = {"CCMLandScape", "CRandomTerrain", "CTerrainMap", "CPathInfo",
-              "CArea", "CCMPatch", "CCMHeightDetails", "CCMShaderText"}
-# ghoul2 render internals (G2SV) confirmed in ghoul2-server.md.
-GHOUL2_CLASSES = {"CBoneCache", "CTransformBone"}
-# GP2 is the DONE C++ pilot (porting-rules §F exemplar) — not a docs/subsystems
-# doc; its work order is the landed reimplementation.
-GP2_DIR = "crates/mp/engine/qcommon/src/gp2/"
-GP2_CLASSES = {"CGPGroup", "CGPValue", "CGPObject", "CGenericParser2", "CTextPool"}
+# ---------------------------------------------------- per-module configuration
+# configure() fills these from the spec `packets` block (modules/<name>.py).
+# The engine values moved there verbatim, comments included.
+MODULE: str = ""
+LABEL: str = ""
+OUT: Path = HERE / "out"
+ROSETTA_TSV: Path = HERE / "out"
+DIGEST: Path = REPO
+DIGEST_HEADING: str = ""
+PARSE_DESC: str = ""
+DOC: dict = {}
+DOC_KIND: dict = {}
+S20_FILES: set = set()
+STRINGED_FILES: set = set()
+TRMODEL_FILES: set = set()
+RMG_FOLDED: set = set()
+GHOUL2_CLASSES: set = set()
+GP2_DIR: str = ""
+GP2_CLASSES: set = set()
+CRATE_SRC: dict = {}
+DROP_LIST: Path | None = None
+LAW_FROM_TREE: bool = False
+LAW_CRATES: list = []
+
+
+def _data_path(rel):
+    """A spec data path resolves against the repo root first, then the tool
+    dir (digest and rosetta files live in either)."""
+    p = REPO / rel
+    return p if p.exists() else HERE / rel
+
+
+def configure(module):
+    """The module spec supplies every per-module surface this tool reads."""
+    global MODULE, LABEL, OUT, ROSETTA_TSV, DIGEST, DIGEST_HEADING, PARSE_DESC
+    global DOC, DOC_KIND, S20_FILES, STRINGED_FILES, TRMODEL_FILES
+    global RMG_FOLDED, GHOUL2_CLASSES, GP2_DIR, GP2_CLASSES, CRATE_SRC
+    global DROP_LIST, LAW_FROM_TREE, LAW_CRATES
+    pk = C.spec(module)["packets"]
+    MODULE = module
+    LABEL = ES.module_label(module)
+    OUT = HERE / "out" / LABEL / "packets"
+    ROSETTA_TSV = _data_path(pk["rosetta"])
+    DIGEST = _data_path(pk["digest"])
+    DIGEST_HEADING = pk["digest_heading"]
+    PARSE_DESC = pk["parse_desc"]
+    DOC = pk["doc"]
+    DOC_KIND = pk["doc_kind"]
+    S20_FILES = pk["s20_files"]
+    STRINGED_FILES = pk["stringed_files"]
+    TRMODEL_FILES = pk["trmodel_files"]
+    RMG_FOLDED = pk["rmg_folded"]
+    GHOUL2_CLASSES = pk["ghoul2_classes"]
+    GP2_DIR = pk["gp2_dir"]
+    GP2_CLASSES = pk["gp2_classes"]
+    CRATE_SRC = pk["crate_src"]
+    DROP_LIST = _data_path(pk["drop_list"]) if pk.get("drop_list") else None
+    LAW_FROM_TREE = pk.get("law_from_tree", False)
+    LAW_CRATES = pk.get("law_crates", [])
+    if LAW_FROM_TREE and not LAW_CRATES:
+        sys.exit(f"module '{module}' sets law_from_tree without law_crates")
 
 
 # ------------------------------------------------------- state receivers
@@ -147,20 +172,8 @@ RECEIVER_PARAM = {
 # signature in exactly this sequence (host always last; it is the §F seam trailer).
 RECEIVER_ORDER = ["common", "cm", "sv", "cl", "bot", "rm", "rmg",
                   "icarus", "nav", "g2", "roff", "host"]
-# A §F doc pointer → the receiver kind of the state it owns. A C-track fn that
-# CALLS a doc-routed fn gains that kind PLUS `host` (rulings 11/24: §F seam fns
-# take `(&mut <Subsystem>, &mut dyn EngineHost, …)`). GP2-routed callees (cpp-done)
-# need no receiver (the GP2 reimpl threads none). stringed folds into `common`
-# (ruling 50), trmodel into `rm` (ruling 51).
-DOC_KIND = {
-    DOC["icarus"]: "icarus",
-    DOC["rmg"]: "rmg",
-    DOC["ghoul2"]: "g2",
-    DOC["npcnav"]: "nav",
-    DOC["roff"]: "roff",
-    DOC["stringed"]: "common",
-    DOC["trmodel"]: "rm",
-}
+# The §F doc pointer → receiver kind map (DOC_KIND) also comes from the spec
+# `packets` block; configure() sets it above.
 
 
 def decl_kind(cite, unmapped):
@@ -224,18 +237,11 @@ RAND_FAMILY = {"rand", "srand", "Rand_Init", "irand", "flrand",
 
 
 # DESTINATION PATHS — one Rust module per oracle source file, at the owning
-# crate's src root, named by the oracle stem (`cm_load.cpp` → `<root>/cm_load.rs`).
+# crate's src root (CRATE_SRC, from the spec), named by the oracle stem.
 # COLLISION ESCAPE: if a stem equals an existing directory-module name in that
 # crate's src/ (e.g. `vm.cpp` vs `vm/`, `common.cpp` vs `common/`), the file
 # becomes `<stem>_fns.rs` — computed from the real on-disk dir listing at
 # generation time (see crate_src_dirs), applied escapes reported.
-CRATE_SRC = {
-    "qcommon": "crates/mp/engine/qcommon/src",
-    "botlib": "crates/mp/engine/botlib/src",
-    "server": "crates/mp/engine/server/src",
-    "renderer": "crates/mp/renderer/src",
-    "null": "crates/mp/engine/client/src/null",
-}
 
 
 def crate_src_dirs():
@@ -558,7 +564,7 @@ def resolved_signature(f, rosetta, miss, cpp_types=frozenset(), receivers=None):
 # --------------------------------------------------------------- oracle slice
 def build_name2path():
     idx = {}
-    for p in EO.winded_sources():
+    for p in EO.module_sources(MODULE):
         idx[p.name] = p
     return idx
 
@@ -594,13 +600,121 @@ def cite_line(cite):
 
 # ------------------------------------------------------------- rulings digest
 def extract_rulings():
-    return RULINGS.read_text().rstrip()
+    return DIGEST.read_text().rstrip()
+
+
+# ---------------------------------------------------------- rule-20 drop list
+def load_drop_list():
+    """The spec's rule-20 drop-list file (verified AL/EAX-only fns for the
+    client, DEC-57). Returns symbol -> {reason, cite, file}, empty when the
+    spec names no file."""
+    if DROP_LIST is None:
+        return {}
+    data = json.loads(DROP_LIST.read_text())
+    return {d["symbol"]: d for d in data["drops"]}
+
+
+# ------------------------------------------------- worktree LAW (out-of-set)
+# The packets3 worktree scanner (pass2lib.scan_rs_file) is bound to the game
+# worktree and carries no Source cites, so this is a fresh simple scan: every
+# `pub fn` under crates/mp + crates/native, with the nearest `Source:` cite of
+# its doc block. Out-of-set callees stamp the real tree signature as LAW.
+_LAW_FN_RE = re.compile(
+    r'(?m)^[ \t]*pub(?:\([\w: ]+\))?\s+(?:const\s+)?(?:unsafe\s+)?'
+    r'(?:extern\s+"C"\s+)?fn\s+([A-Za-z_]\w*)\s*[(<]')
+_LAW_CITE_RE = re.compile(r'Source:\s*`?([^`\n]+?)`?\s*$')
+
+
+def _law_signature(text, m):
+    """The one-line signature slice for a matched fn header (through the
+    return type, stopping at the body brace or a `;`)."""
+    i = text.find("(", m.end() - 1)
+    depth, j = 0, i
+    while j < len(text):
+        c = text[j]
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                break
+        j += 1
+    k = j + 1
+    while k < len(text) and text[k] not in "{;":
+        k += 1
+    sig = text[m.start():k]
+    sig = re.sub(r"\s+", " ", sig).strip().rstrip(",")
+    return sig
+
+
+def _law_cite(text, hdr_start):
+    """The `Source:` cite in the comment block directly above the fn."""
+    lines = text[:hdr_start].splitlines()
+    for ln in reversed(lines):
+        s = ln.strip()
+        if not (s.startswith("///") or s.startswith("//") or s.startswith("#[")
+                or s == ""):
+            break
+        cm = _LAW_CITE_RE.search(s)
+        if cm:
+            return cm.group(1).strip()
+    return None
+
+
+def scan_tree_law():
+    """name -> candidate list [{sig, path, cite}] over crates/mp + crates/native.
+    The SP tree is excluded (mode scoping, same stance as closure.scan_ported)."""
+    index = defaultdict(list)
+    for root in (REPO / "crates" / "mp", REPO / "crates" / "native"):
+        for rs in sorted(root.rglob("*.rs")):
+            if "target" in rs.parts:
+                continue
+            text = rs.read_text(errors="replace")
+            rel = str(rs.relative_to(REPO))
+            for m in _LAW_FN_RE.finditer(text):
+                index[m.group(1)].append({
+                    "sig": _law_signature(text, m),
+                    "path": rel,
+                    "cite": _law_cite(text, m.start()),
+                })
+    return index
+
+
+def _law_tier(path):
+    """The index of the first matching LAW_CRATES prefix, or None. Only a
+    crate the target island links may supply a LAW signature - a module-DLL
+    twin (cgame/ui/game local Com_Printf) never resolves an engine callee."""
+    for i, prefix in enumerate(LAW_CRATES):
+        if path.startswith(prefix):
+            return i
+    return None
+
+
+def law_lookup(name, law_index):
+    """(record, ambiguous_count) for one external name. On a name collision
+    the linkable-tier order decides (DEC-32 canonical home first), then a
+    codemp Source cite outranks an uncited or SP-cited candidate. A miss on
+    the exact name retries the lower-case spelling, which rescues the house
+    snake-case renames (Com_Printf to com_printf)."""
+    def rank(tc):
+        t, c = tc
+        cite = c["cite"] or ""
+        return (t, 0 if "codemp/" in cite else 1, c["path"])
+
+    probes = [name] + ([name.lower()] if name.lower() != name else [])
+    for probe in probes:
+        allowed = [(t, c) for c in law_index.get(probe, ())
+                   if (t := _law_tier(c["path"])) is not None]
+        if allowed:
+            best = sorted(allowed, key=rank)[0][1]
+            return best, len(allowed) - 1
+    return None, 0
 
 
 # ------------------------------------------------------------------ preamble
 def render_preamble(rulings):
     o = []
-    o.append("# ENGINE PORT — SHARED PACKET PREAMBLE")
+    o.append(f"# {LABEL.upper()} PORT — SHARED PACKET PREAMBLE")
     o.append("")
     o.append("Handed to every porter alongside a shard of per-function packets. "
              "The packet carries the fn-specific work order (source, signature, "
@@ -769,19 +883,20 @@ def render_preamble(rulings):
              "`&[(&str, fn(...))]` consts. No fn-ID enums (no address compares in "
              "the engine, unlike jampgame entity handlers).")
     o.append("")
-    o.append("## C++-track subsystems (porting-rules §F)")
-    o.append("")
-    o.append("Functions in the five frozen §F subsystems are NOT in your shard — "
-             "they are reimplemented idiomatically against a FROZEN design doc "
-             "whose Method-transcription table is the work order. If a callee "
-             "resolves to one of these, treat its doc-stated signature as settled:")
-    for k, v in DOC.items():
-        o.append(f"- **{k}** → `{v}`")
-    o.append(f"- **GP2** (done pilot exemplar) → `{GP2_DIR}`")
-    o.append("")
+    if DOC:
+        o.append("## C++-track subsystems (porting-rules §F)")
+        o.append("")
+        o.append("Functions in the five frozen §F subsystems are NOT in your shard — "
+                 "they are reimplemented idiomatically against a FROZEN design doc "
+                 "whose Method-transcription table is the work order. If a callee "
+                 "resolves to one of these, treat its doc-stated signature as settled:")
+        for k, v in DOC.items():
+            o.append(f"- **{k}** → `{v}`")
+        o.append(f"- **GP2** (done pilot exemplar) → `{GP2_DIR}`")
+        o.append("")
     o.append("---")
     o.append("")
-    o.append("## ENGINE FORK RULINGS (verbatim — all 48 settled)")
+    o.append(DIGEST_HEADING)
     o.append("")
     o.append(rulings)
     o.append("")
@@ -792,7 +907,7 @@ def render_preamble(rulings):
 def render_packet(unit_members, dest, rosetta, name2path, usr2dest, usr2name,
                   calls_of, refs_of, miss, cpp_class_doc, rosetta_keys,
                   receivers, track_of, ptr_of, const_rosetta, src_dirs,
-                  seam_names):
+                  seam_names, law_index=None):
     """One packet for a C-track unit (>1 member = a cyclic SCC, ported together).
     Returns (markdown, pkt_stats)."""
     cpp_types = frozenset(cpp_class_doc)
@@ -802,7 +917,7 @@ def render_packet(unit_members, dest, rosetta, name2path, usr2dest, usr2name,
     o = []
     title = first["qualname"] + (f"  (+{len(unit_members)-1} cyclic peers)"
                                  if cyclic else "")
-    o.append(f"# ENGINE PORT PACKET — `{title}`")
+    o.append(f"# {LABEL.upper()} PORT PACKET — `{title}`")
     o.append("")
     o.append(f"- seq **{seq0}**  ·  wave **{first['wave']}**  ·  unit "
              f"**{first['unit']}**  ·  subsystem **{first['subsystem']}**  ·  "
@@ -957,14 +1072,40 @@ def render_packet(unit_members, dest, rosetta, name2path, usr2dest, usr2name,
                 kinds = ([k, "host"] if k else ["host"])  # §F seam: subsystem+host
             elif d[0] == "cpp-done":
                 res, kinds = f"done (GP2) `{d[1]}`", []   # GP2 threads no receiver
+            elif d[0] == "s20-dropped":
+                # The call site sits in a dead constant-false arm; see the
+                # manifest drop entry for the reason and cite.
+                res, kinds = f"§20-DROPPED — `{d[1]}`", []
             else:
                 res, kinds = "undocumented C++ class — referee item", []
             rc = ", ".join(f"`{k}`" for k in kinds) if kinds else "—"
             o.append(f"| `{nm}` | {rc} | {res} |")
         o.append("")
+    law_rows, law_ambiguous = [], 0
     if externals:
         rand_ext = [e for e in externals if e in RAND_FAMILY]
         plain_ext = [e for e in externals if e not in RAND_FAMILY]
+        if law_index is not None:
+            # Dual-mode resolution: an out-of-set callee that exists in
+            # crates/ stamps its real tree signature as LAW.
+            law_left = []
+            for e in plain_ext:
+                rec, amb = law_lookup(e, law_index)
+                if rec is None:
+                    law_left.append(e)
+                else:
+                    law_rows.append((e, rec))
+                    law_ambiguous += 1 if amb else 0
+            plain_ext = law_left
+        if law_rows:
+            o.append("**Out-of-set callees, already ported — the tree "
+                     "signature is LAW (call it, do not change it):**")
+            o.append("")
+            o.append("| callee | resolved worktree signature (LAW) | path |")
+            o.append("| --- | --- | --- |")
+            for e, rec in law_rows:
+                o.append(f"| `{e}` | `{rec['sig']}` | `{rec['path']}` |")
+            o.append("")
         if plain_ext:
             o.append("**Externals** (supplied by Rust std/libc or the already-"
                      "ported qshared `q_shared`/`q_math` surface — do NOT port "
@@ -1076,6 +1217,10 @@ def render_packet(unit_members, dest, rosetta, name2path, usr2dest, usr2name,
         "consts_unresolved": set(unresolved),
         "macro_like": set(macro_like),
         "dest_escaped": [dp for dp, esc in dests.items() if esc],
+        "law_names": {e for e, _ in law_rows},
+        "law_ambiguous": law_ambiguous,
+        "ext_unresolved": set(externals) - {e for e, _ in law_rows},
+        "callees_in_set": set(callee_usrs),
     }
     return "\n".join(o), pkt_stats
 
@@ -1100,13 +1245,13 @@ def build_shards(packets):
 
 
 # ------------------------------------------------------------------ main
-def load_build(cache):
+def load_build(cache, module):
     if cache:
         b = pickle.load(open(cache, "rb"))
         return (b["funcs"], b["units"], b["edges"], b["calls_of"],
                 b["refs_of"], b["usr_to"], b["stats"])
     funcs, units, edges, calls_of, refs_of, ext_census, stats, usr_to = \
-        EO.build("mp-engine-ded")
+        EO.build(module)
     return (funcs, units, {k: list(v) for k, v in edges.items()},
             {k: list(v) for k, v in calls_of.items()},
             {k: list(v) for k, v in refs_of.items()}, usr_to, stats)
@@ -1114,17 +1259,20 @@ def load_build(cache):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--module", default="mp-engine-ded")
     ap.add_argument("--cache", help="pickled engineorder.build() blob (dev)")
-    ap.add_argument("--out", default=str(OUT))
+    ap.add_argument("--out", default=None,
+                    help="default: out/<label>/packets for the module")
     args = ap.parse_args()
     t0 = time.time()
+    configure(args.module)
 
     funcs, units, edges, calls_of, refs_of, usr_to, order_stats = \
-        load_build(args.cache)
+        load_build(args.cache, args.module)
     rosetta = load_rosetta()
     name2path = build_name2path()
     rulings = extract_rulings()
-    outdir = Path(args.out)
+    outdir = Path(args.out) if args.out else OUT
     outdir.mkdir(parents=True, exist_ok=True)
 
     usr2fn = {f["usr"]: f for f in funcs}
@@ -1136,6 +1284,19 @@ def main():
         tr, ptr = classify(f)
         track_of[f["usr"]] = tr
         ptr_of[f["usr"]] = ptr
+
+    # ---- rule-20 drop list (spec data): a listed symbol keeps no packet.
+    # The name must match inside its cited file, so a same-named fn in another
+    # TU never drops by accident.
+    drop_list = load_drop_list()
+    drop_info, drop_unmatched = {}, set(drop_list)
+    for f in funcs:
+        d = drop_list.get(f["name"])
+        if d and f["file"] == d["file"]:
+            track_of[f["usr"]] = "s20-dropped"
+            ptr_of[f["usr"]] = d["cite"]
+            drop_info[f["usr"]] = d
+            drop_unmatched.discard(f["name"])
 
     # cpp-track class name -> its design-doc pointer (None = undocumented). A
     # C-track signature/body naming one of these resolves to the DOC, not a
@@ -1200,20 +1361,28 @@ def main():
 
     # ---- render packets
     seam_names = seam_supplied_consts()
+    law_index = scan_tree_law() if LAW_FROM_TREE else None
     consts_resolved, consts_unresolved, macro_like = set(), set(), set()
     consts_seam = set()
     dest_escapes = set()
+    law_names, ext_unresolved, callees_in_set = set(), set(), set()
+    law_ambiguous = 0
     for u, cmembers, fname, rel in ctrack_units:
         text, pkt = render_packet(cmembers, rel, rosetta, name2path, usr2dest,
                                   usr2name, calls_of, refs_of, miss, cpp_class_doc,
                                   rosetta_keys, receivers, track_of, ptr_of,
-                                  const_rosetta, src_dirs, seam_names)
+                                  const_rosetta, src_dirs, seam_names,
+                                  law_index)
         (outdir / fname).write_text(text)
         consts_resolved |= pkt["consts_resolved"]
         consts_seam |= pkt["consts_seam"]
         consts_unresolved |= pkt["consts_unresolved"]
         macro_like |= pkt["macro_like"]
         dest_escapes.update(pkt["dest_escaped"])
+        law_names |= pkt["law_names"]
+        ext_unresolved |= pkt["ext_unresolved"]
+        callees_in_set |= pkt["callees_in_set"]
+        law_ambiguous += pkt["law_ambiguous"]
         packets_meta.append({
             "packet": rel,
             "seq": cmembers[0]["seq"],
@@ -1326,6 +1495,11 @@ def main():
             entry["packet"] = packet_of.get(u)
         elif tr in ("cpp", "cpp-done"):
             entry["doc"] = ptr_of[u]
+        elif u in drop_info:
+            # A rule-20 drop-list hit: no packet, no doc; reason + cite stay
+            # in the manifest as the drop record.
+            entry["dropped"] = {"reason": drop_info[u]["reason"],
+                                "cite": drop_info[u]["cite"]}
         else:  # cpp-undocumented
             entry["doc"] = None
             entry["needs_doc"] = True
@@ -1357,7 +1531,7 @@ def main():
 
     manifest = {
         "generated_by": "tools/closure-prototype/enginepackets.py",
-        "module": "mp-engine-ded",
+        "module": MODULE,
         "total_functions": len(funcs),
         "track_histogram": dict(track_hist),
         "doc_histogram": dict(sorted(doc_hist.items())),
@@ -1386,6 +1560,24 @@ def main():
         "functions": manifest_fns,
         "shard_bundles": shards,
     }
+    if DROP_LIST is not None:
+        manifest["rule20_drops"] = {
+            "source": str(DROP_LIST.relative_to(REPO)),
+            "dropped": [{"symbol": d["symbol"], "reason": d["reason"],
+                         "cite": d["cite"]} for d in drop_info.values()],
+            "unmatched_symbols": sorted(drop_unmatched),
+        }
+    if LAW_FROM_TREE:
+        manifest["callee_resolution"] = {
+            "mode": "dual: in-set derived (§C mechanical), out-of-set LAW "
+                    "from crates/",
+            "in_set_derived_callees": len(callees_in_set),
+            "law_from_tree_externals": len(law_names),
+            "law_ambiguous_picks": law_ambiguous,
+            "externals_unresolved_in_tree": len(ext_unresolved),
+            "externals_unresolved_names": sorted(ext_unresolved),
+        }
+    manifest.update(C.freshness_stamp())
     (outdir / "manifest.json").write_text(json.dumps(manifest, indent=1))
 
     runtime = time.time() - t0
@@ -1406,20 +1598,30 @@ def main():
           f"seam-supplied / {len(consts_unresolved)} unresolved / "
           f"{len(macro_like)} macro-like; "
           f"{len(dest_escapes)} dest collision-escapes")
+    if DROP_LIST is not None:
+        print(f"[enginepackets] rule-20 drops: {len(drop_info)} dropped, "
+              f"{len(drop_unmatched)} unmatched drop-list symbols"
+              + (f" ({sorted(drop_unmatched)})" if drop_unmatched else ""))
+    if LAW_FROM_TREE:
+        print(f"[enginepackets] callee LAW: {len(callees_in_set)} in-set "
+              f"derived, {len(law_names)} externals LAW-from-tree, "
+              f"{len(ext_unresolved)} externals unresolved in tree, "
+              f"{law_ambiguous} ambiguous picks")
 
 
 def render_report(outdir, manifest, packets, sig_miss, undoc, dangling,
                   order_stats, runtime):
+    total = manifest["total_functions"]
     o = []
-    o.append("# Engine signature-manifest — generation report")
+    o.append(f"# {LABEL.capitalize()} signature-manifest — generation report")
     o.append("")
     o.append(f"Generated by `tools/closure-prototype/enginepackets.py` in "
-             f"**{runtime:.1f}s**. Reuses `engineorder.build()` (the pinned "
-             "per-file WinDed-Release libclang parse). One work order per row of "
-             "the 2,481-fn engine port order.")
+             f"**{runtime:.1f}s**. Reuses `engineorder.build()` ({PARSE_DESC}). "
+             f"One work order per row of "
+             f"the {total:,}-fn {LABEL} port order.")
     o.append("")
     th = manifest["track_histogram"]
-    o.append("## Coverage (every one of the 2,481 fns is accounted for)")
+    o.append(f"## Coverage (every one of the {total:,} fns is accounted for)")
     o.append("")
     o.append("| track | fns | resolution |")
     o.append("| --- | ---: | --- |")
@@ -1428,11 +1630,41 @@ def render_report(outdir, manifest, packets, sig_miss, undoc, dangling,
              f"({manifest['c_track_cyclic_packets']} cyclic-unit) |")
     o.append(f"| C++ §F frozen doc | {th.get('cpp',0)} | doc pointer |")
     o.append(f"| C++ GP2 done pilot | {th.get('cpp-done',0)} | "
-             f"`crates/mp/engine/qcommon/src/gp2/` |")
+             f"`{GP2_DIR}` |")
     o.append(f"| C++ UNDOCUMENTED (referee) | {th.get('cpp-undocumented',0)} | "
              "no frozen doc — see below |")
+    if "rule20_drops" in manifest:
+        o.append(f"| §20-dropped (rule-20 drop list) | "
+                 f"{len(manifest['rule20_drops']['dropped'])} | "
+                 f"manifest drop record (reason + cite) |")
     o.append(f"| **total** | **{manifest['total_functions']}** | |")
     o.append("")
+    if "rule20_drops" in manifest:
+        rd = manifest["rule20_drops"]
+        o.append(f"### Rule-20 drops (`{rd['source']}`)")
+        o.append("")
+        o.append("| symbol | reason | cite |")
+        o.append("| --- | --- | --- |")
+        for d in rd["dropped"]:
+            o.append(f"| `{d['symbol']}` | {d['reason']} | `{d['cite']}` |")
+        if rd["unmatched_symbols"]:
+            o.append("")
+            o.append("**Unmatched drop-list symbols (referee items):** "
+                     + ", ".join(f"`{s}`" for s in rd["unmatched_symbols"]))
+        o.append("")
+    if "callee_resolution" in manifest:
+        cr = manifest["callee_resolution"]
+        o.append("## Callee resolution (dual mode)")
+        o.append("")
+        o.append(f"- **In-set callees (derived §C signatures):** "
+                 f"{cr['in_set_derived_callees']} distinct.")
+        o.append(f"- **Out-of-set callees resolved from crates/ (LAW):** "
+                 f"{cr['law_from_tree_externals']} distinct "
+                 f"({cr['law_ambiguous_picks']} ambiguous name picks).")
+        o.append(f"- **Externals with no tree match:** "
+                 f"{cr['externals_unresolved_in_tree']} distinct "
+                 "(std/libc or not yet ported).")
+        o.append("")
     o.append("### §F design-doc routing")
     o.append("")
     o.append("| doc | fns |")

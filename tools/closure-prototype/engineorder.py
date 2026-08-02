@@ -69,22 +69,15 @@ from clang.cindex import CursorKind
 
 FN_KINDS = E.FN_KINDS | {CursorKind.CONVERSION_FUNCTION}
 REF_KINDS = {CursorKind.DECL_REF_EXPR, CursorKind.MEMBER_REF_EXPR}
-SUBSYS = E.SUBSYSTEMS + ["null"]
-
-# The OS seam the Rust host implements natively (std::net, std::time, module
-# loader) — not ported 1:1, mirrors the existing Sys_* externals stance.
-PLATFORM_EXCLUDE = {"null/win_main.cpp", "win32/win_net.cpp",
-                    "win32/win_shared.cpp"}
-# Vendored third-party code — supplied by Rust crates (flate2/png), parity
-# gated by pk3/png golden fixtures, per the established vendored-code policy.
-VENDORED_EXCLUDE = {"png/png.cpp", "zlib32/deflate.cpp", "zlib32/inflate.cpp",
-                    "zlib32/zipcommon.cpp"}
+# The active module's subsystem order for sorting and matrix columns.
+# build() sets it from the spec (subsystems + order.extra_subsystems).
+SUBSYS: list = []
 
 
-def realcase(rel):
+def realcase(rel, base):
     """vcproj paths are case-sloppy (rmg/ vs RMG/); resolve each component
     against the on-disk name so subsystem_of's case-sensitive match works."""
-    p = C.SRC_ROOT / "codemp"
+    p = base
     for part in rel.split("/"):
         hit = next((c for c in p.iterdir() if c.name.lower() == part.lower()),
                    None)
@@ -94,19 +87,33 @@ def realcase(rel):
     return p
 
 
-def winded_sources():
-    """The actual WinDed.vcproj link set (repo paths, real case), minus the
-    platform seam and vendored third-party code."""
-    txt = (C.SRC_ROOT / "codemp" / "WinDed.vcproj").read_text(encoding="latin-1")
+def vcproj_sources(order):
+    """The actual vcproj link set (repo paths, real case), minus the
+    platform seam and vendored third-party code (spec exclude sets)."""
+    vcproj = C.SRC_ROOT / order["vcproj"]
+    excluded = order.get("exclude_platform", set()) \
+        | order.get("exclude_vendored", set())
+    txt = vcproj.read_text(encoding="latin-1")
     rels = re.findall(r'RelativePath="\.?\\?([^"]+\.(?:cpp|c))"', txt)
     out = []
     for r in sorted({p.replace("\\", "/") for p in rels}):
-        if r in PLATFORM_EXCLUDE or r in VENDORED_EXCLUDE:
+        if r in excluded:
             continue
-        p = realcase(r)
+        p = realcase(r, vcproj.parent)
         assert p is not None, f"vcproj source missing on disk: {r}"
         out.append(p.resolve())
     return out
+
+
+def module_sources(module):
+    """The per-file TU list: the spec's vcproj link set when the order block
+    names one (mp-engine-ded), else the profile srcglob."""
+    sp = C.spec(module)
+    order = sp.get("order", {})
+    if "vcproj" in order:
+        return vcproj_sources(order)
+    files = {p.resolve() for g in sp["srcglob"] for p in C.SRC_ROOT.glob(g)}
+    return sorted(files)
 
 
 def subsystem_of(path):
@@ -147,6 +154,10 @@ def collect_edges_raw(fn_cursor):
 
 
 def build(module):
+    global SUBSYS
+    E.configure(module)
+    SUBSYS = E.SUBSYSTEMS + list(
+        C.spec(module).get("order", {}).get("extra_subsystems", []))
     C.MODULES[module]["flags"] = list(C.MODULES[module].get("flags", [])) + \
         ["-fms-compatibility"]
     # q_shared.h only declares the byte-swap family inside platform sections
@@ -156,7 +167,7 @@ def build(module):
     # and its statement drops (be_aas_file, tr_model, cm_load).
     C.MODULES[module]["defines"] = list(C.MODULES[module]["defines"]) + \
         ["LittleShort=", "LittleLong=", "LittleFloat=", "LittleLong64="]
-    sources = winded_sources()
+    sources = module_sources(module)
     allowed = {str(p) for p in sources}
     rel_sources = sorted(str(p.relative_to(C.SRC_ROOT)) for p in sources)
 
@@ -284,6 +295,9 @@ def build(module):
 # ------------------------------------------------------------------ render
 def render(funcs, units, calls_of, refs_of, ext_census, stats, usr_to, outdir):
     name_of = {u: f["qualname"] for u, f in usr_to.items()}
+    module = stats["module"]
+    prefix = E.module_label(module)
+    title = C.spec(module).get("order", {}).get("md_title", module)
 
     # ---- JSON
     jwaves = defaultdict(list)
@@ -303,13 +317,14 @@ def render(funcs, units, calls_of, refs_of, ext_census, stats, usr_to, outdir):
                 "statics": f["statics"],
             } for f in u["members"]],
         })
-    (outdir / "engine-port-order.json").write_text(json.dumps({
+    (outdir / f"{prefix}-port-order.json").write_text(json.dumps({
         "stats": stats,
         "waves": [{"wave": w, "units": jwaves[w]} for w in sorted(jwaves)],
         "externals_census": {k: {"callers": v["count"],
                                  "subsystems": sorted(v["subsys"])}
                              for k, v in sorted(ext_census.items(),
                                                 key=lambda kv: -kv[1]["count"])},
+        **C.freshness_stamp(),
     }, indent=1))
 
     # ---- TSV (one row per function, in port order)
@@ -323,13 +338,13 @@ def render(funcs, units, calls_of, refs_of, ext_census, stats, usr_to, outdir):
                 "1" if u["cyclic"] else "0", f["subsystem"], f["file"],
                 str(f["line"]), str(f["loc"]), f["qualname"],
                 ";".join(deps), ";".join(f["externals"])]))
-    (outdir / "engine-port-order.tsv").write_text("\n".join(rows) + "\n")
+    (outdir / f"{prefix}-port-order.tsv").write_text("\n".join(rows) + "\n")
 
     # ---- MD
     o = []
-    o.append("# mp-engine (DEDICATED server) — total port progression\n")
+    o.append(f"# {title} — total port progression\n")
     o.append("Generated by `tools/closure-prototype/engineorder.py` (per-file "
-             "libclang TUs of the `mp-engine-ded` profile, merged by USR — the "
+             f"libclang TUs of the `{module}` profile, merged by USR — the "
              "unity TU used by `enginesweep.py` silently drops statements; see "
              "the script docstring). Every function/method of the engine in "
              "bottom-up dependency order: port in `seq` order and **no symbol "
@@ -395,23 +410,26 @@ def render(funcs, units, calls_of, refs_of, ext_census, stats, usr_to, outdir):
                          f"`{f['qualname']}`{mark} | {f['file']}:{f['line']} | "
                          f"{f['loc']} | {nd} | {len(f['externals'])} |")
         o.append("")
-    (outdir / "engine-port-order.md").write_text("\n".join(o))
+    (outdir / f"{prefix}-port-order.md").write_text("\n".join(o))
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--module", default="mp-engine-ded")
-    ap.add_argument("--out", default=str(Path(__file__).resolve().parent / "out" / "engine"))
+    ap.add_argument("--out", default=None,
+                    help="default: out/<label> for the module")
     args = ap.parse_args()
     funcs, units, edges, calls_of, refs_of, ext_census, stats, usr_to = build(args.module)
-    outdir = Path(args.out)
+    prefix = E.module_label(args.module)
+    outdir = Path(args.out) if args.out else (
+        Path(__file__).resolve().parent / "out" / prefix)
     outdir.mkdir(parents=True, exist_ok=True)
     render(funcs, units, calls_of, refs_of, ext_census, stats, usr_to, outdir)
     print(f"[engineorder] {stats['functions']} fns, {stats['edges_total']} edges "
           f"({stats['edges_call']} call + {stats['edges_ref']} ref), "
           f"{stats['wave_count']} waves, largest SCC {stats['largest_scc']}, "
           f"no-stub verified")
-    print(f"[engineorder] wrote {outdir}/engine-port-order.{{json,tsv,md}}")
+    print(f"[engineorder] wrote {outdir}/{prefix}-port-order.{{json,tsv,md}}")
 
 
 if __name__ == "__main__":
