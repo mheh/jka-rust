@@ -585,6 +585,13 @@ pub struct Common {
     /// The seed value the armed call actually returned, captured for the tape `H`
     /// header.
     pub ref_seed_used: c_int,
+
+    /// Console-call counters for the differential harnesses.
+    /// The snd-oracle goldens carry the `Com_Printf` and `Com_DPrintf` call
+    /// counts rather than the message text, because Raven's messages name files
+    /// and byte sizes that the port words differently (DEC-62.4).
+    pub com_printCount: u64,
+    pub com_dprintCount: u64,
 }
 
 impl Common {
@@ -615,6 +622,8 @@ impl Common {
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:128`
 pub fn com_printf(common: &mut Common, msg: &str) {
+    common.com_printCount += 1;
+
     // Raven's `vsprintf(msg, fmt, argptr)` is pre-rendered by callers into
     // `msg` (the &str reshape); the `MAXPRINTMSG` scratch cap is not modeled.
     unsafe {

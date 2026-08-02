@@ -51,7 +51,8 @@ use crate::cl_scrn::{
 };
 use crate::client_host::{cl_from_view, Client};
 use crate::keys::key_globals_s::{COMMAND_HISTORY, MAX_KEYS};
-use crate::snd_stubs::S_StopAllSounds;
+use crate::client_host::snd_from_view;
+use crate::snd_dma::S_StopAllSounds;
 
 /// Raven's anonymous `enum { CGAME_EVENT_NONE, ... }` first member.
 /// The client crate does not depend on `mp_cgame` (cgame is a loaded VM, not a
@@ -1412,7 +1413,8 @@ pub fn CL_KeyEvent(
                     );
                 } else {
                     CL_Disconnect_f(view, cl);
-                    S_StopAllSounds(cl);
+                    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+                    S_StopAllSounds(unsafe { snd_from_view(view) });
                     VM_Call(
                         view.common,
                         cl.uivm,

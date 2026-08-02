@@ -5,8 +5,10 @@
 /// Raven: None.
 /// Type definition source: `oracle/codemp/client/snd_music.h:11-36`
 #[repr(i32)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum MusicState_e {
     /// For normal walking around
+    #[default]
     eBGRNDTRACK_EXPLORE = 0,
     /// For excitement
     eBGRNDTRACK_ACTION = 1,

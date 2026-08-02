@@ -34,7 +34,8 @@ use crate::cl_cgame::CL_CGameRendering;
 use crate::cl_cin::SCR_DrawCinematic;
 use crate::cl_console::{Con_ClearNotify, Con_DrawConsole};
 use crate::client_host::{Client, MAX_SCR_LINES};
-use crate::snd_stubs::S_StopAllSounds;
+use crate::client_host::snd_from_view;
+use crate::snd_dma::S_StopAllSounds;
 
 /// Read a module-space C string as an owned `String`, the shape a shader-name
 /// pointer needs before it reaches the `&str`-taking `RE_RegisterShader`.
@@ -767,7 +768,8 @@ pub fn SCR_DrawScreenField(view: &mut EngineHostView, cl: &mut Client, stereoFra
             }
             connstate_t::CA_DISCONNECTED => {
                 // force menu up
-                S_StopAllSounds(cl);
+                // SAFETY: view-constructor slot, single-threaded, no other live cast.
+                S_StopAllSounds(unsafe { snd_from_view(view) });
                 VM_Call(
                     view.common,
                     cl.uivm,

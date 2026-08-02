@@ -33,7 +33,7 @@ use crate::collision_world::CollisionWorld;
 use crate::common::common::{com_printf, Common};
 use crate::common::error::com_error;
 use crate::common::opaque_slots::{
-    BotLib, Client, Ghoul2System, RenderModels, Renderer, RmManager, Server,
+    BotLib, Client, Ghoul2System, RenderModels, Renderer, RmManager, Server, SoundSystem,
 };
 use crate::cvar_fns::{
     Cvar_FindVar, Cvar_Get, Cvar_VariableIntegerValue, Cvar_VariableString, Cvar_VariableValue,
@@ -81,6 +81,9 @@ pub struct EngineHostView<'a> {
     pub sv: Server,
     /// Type-erased `Engine.cl` (`mp_engine_client::Client`; null on dedicated).
     pub cl: Client,
+    /// Type-erased `Engine.snd` (`mp_engine_client::SoundSystem`; null on
+    /// dedicated). The `S_*` surface takes it as a declared receiver (DEC-57.1).
+    pub snd: SoundSystem,
     /// Type-erased `Engine.bot` (`mp_engine_botlib::BotLib`).
     pub bot: BotLib,
     /// Type-erased `Engine.render_models` (`mp_renderer` `RenderModels`).

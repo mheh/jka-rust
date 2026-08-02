@@ -227,6 +227,10 @@ int FS_ReadFile(const char *qpath, void **buffer)
 
 	FILE *f = fopen(path, "rb");
 	if (!f) {
+		// Raven's FS_ReadFile reaches the file through FS_FOpenFileRead, which
+		// prints this on a miss (`qcommon/files.cpp:1387`). The count is part of
+		// the golden, so the stub prints it too.
+		Com_DPrintf("Can't find %s\n", qpath);
 		if (buffer) {
 			*buffer = NULL;
 		}
@@ -261,6 +265,8 @@ int FS_FOpenFileRead(const char *qpath, fileHandle_t *file, qboolean uniqueFILE)
 
 	FILE *f = fopen(path, "rb");
 	if (!f) {
+		// Source: `oracle/codemp/qcommon/files.cpp:1387`
+		Com_DPrintf("Can't find %s\n", qpath);
 		if (file) {
 			*file = 0;
 		}
@@ -422,5 +428,12 @@ extern "C" unsigned int C_MP3Stream_Decode(LP_MP3STREAM, int)
 
 // --- misc engine seam -------------------------------------------------------
 
-// Raven builds release pak files under this cvar. The harness never does.
+// Raven builds release pak files under this cvar. The harness never does, but
+// S_LoadSound_FileLoadAndNameAdjuster dereferences it for every name under
+// sound/chars, so it must be a real cvar rather than a null pointer.
 cvar_t *com_buildScript = NULL;
+
+void snd_oracle_host_init(void)
+{
+	com_buildScript = snd_oracle_cvar_set("com_buildScript", "0");
+}

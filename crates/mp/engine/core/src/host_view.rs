@@ -24,9 +24,14 @@ pub fn engine_host_view(engine: &mut Engine) -> EngineHostView<'_> {
         Some(re) => re as *mut _ as *mut (),
         None => core::ptr::null_mut(),
     };
+    let snd_raw = match engine.snd.as_mut() {
+        Some(snd) => snd as *mut _ as *mut (),
+        None => core::ptr::null_mut(),
+    };
     EngineHostView {
         sv: opaque_slots::Server::from_raw(&mut engine.sv as *mut _ as *mut ()),
         cl: opaque_slots::Client::from_raw(cl_raw),
+        snd: opaque_slots::SoundSystem::from_raw(snd_raw),
         bot: opaque_slots::BotLib::from_raw(&mut engine.bot as *mut _ as *mut ()),
         rm: opaque_slots::RenderModels::from_raw(&mut engine.render_models as *mut _ as *mut ()),
         re: opaque_slots::Renderer::from_raw(re_raw),
@@ -56,6 +61,9 @@ pub fn engine_host_view(engine: &mut Engine) -> EngineHostView<'_> {
 pub fn install_engine_hooks(engine: &mut Engine) {
     mp_engine_server::hook_install::install_engine_hooks(&mut engine.common.hooks);
     mp_renderer::hook_install::install_engine_hooks(&mut engine.common.hooks);
+    // The sound tier replaces its two null-build defaults. Each installed hook
+    // answers the null-build value while `Engine.snd` is `None` (DEC-57).
+    mp_engine_client::hook_install::install_engine_hooks(&mut engine.common.hooks);
 
     let cl_raw = match engine.cl.as_mut() {
         Some(cl) => cl as *mut _ as *mut (),
@@ -93,6 +101,7 @@ pub fn install_engine_hooks(engine: &mut Engine) {
         cm: &mut engine.cm as *mut _,
         sv: &mut engine.sv as *mut _ as *mut (),
         cl: &mut engine.cl as *mut _,
+        snd: &mut engine.snd as *mut _,
         bot: &mut engine.bot as *mut _ as *mut (),
         rm: &mut engine.render_models as *mut _,
         re: &mut engine.re as *mut _,

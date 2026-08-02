@@ -43,7 +43,8 @@ use crate::cin::cin_consts::{
 };
 use crate::cl_console::Con_Close;
 use crate::client_host::Client;
-use crate::snd_stubs::{S_RawSamples, S_StopAllSounds, S_Update};
+use crate::client_host::snd_from_view;
+use crate::snd_dma::{S_RawSamples, S_StopAllSounds, S_Update};
 
 // PORT-NOTE(deps): `mp_qshared::shared::cbuf_exec::cbufExec_t`, `native_string`,
 // and `mp_engine_icarus` (for `S_COLOR_RED`) are referenced per the packet
@@ -1342,7 +1343,9 @@ pub fn CIN_PlayCinematic(
 
         Con_Close(view.common, cl);
 
-        cl.s_rawend = cl.s_soundtime;
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let snd = unsafe { snd_from_view(view) };
+        snd.s_rawend = snd.s_soundtime;
 
         return cl.currentHandle;
     }
@@ -1358,7 +1361,8 @@ pub fn CIN_PlayCinematic(
 pub fn SCR_StopCinematic(view: &mut EngineHostView, cl: &mut Client) {
     if cl.CL_handle >= 0 && cl.CL_handle < MAX_VIDEO_HANDLES as c_int {
         CIN_StopCinematic(view, cl, cl.CL_handle);
-        S_StopAllSounds(cl);
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        S_StopAllSounds(unsafe { snd_from_view(view) });
         cl.CL_handle = -1;
     }
 }
@@ -1366,6 +1370,15 @@ pub fn SCR_StopCinematic(view: &mut EngineHostView, cl: &mut Client) {
 /// Raven `RoQInterrupt`.
 ///
 /// Source: `oracle/codemp/client/cl_cin.cpp:922-1052`
+/// Borrow the decoded RoQ block as the `S_RawSamples` byte slice.
+/// The RoQ decoders always write 16-bit samples, so `width` is 2 at both call sites.
+fn raw_sample_bytes(sbuf: &[i16], samples: usize, width: usize, channels: usize) -> &[u8] {
+    let bytes = samples * width * channels;
+    // SAFETY: the caller's `sbuf` is a live `i16` array, and the decoder wrote
+    // `samples * channels` of its entries; the byte view never outlives it.
+    unsafe { core::slice::from_raw_parts(sbuf.as_ptr() as *const u8, bytes.min(sbuf.len() * 2)) }
+}
+
 pub fn RoQInterrupt(view: &mut EngineHostView, cl: &mut Client) {
     if cl.currentHandle < 0 {
         return;
@@ -1460,23 +1473,29 @@ pub fn RoQInterrupt(view: &mut EngineHostView, cl: &mut Client) {
                         0,
                         cl.cinTable[handle].roq_flags as c_ushort,
                     );
+                    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+                    let snd = unsafe { snd_from_view(view) };
+                    let volume = view.common.cvar(snd.s_volume).value;
                     S_RawSamples(
-                        cl,
+                        view.common,
+                        snd,
                         ssize as c_int,
                         22050,
                         2,
                         1,
-                        sbuf.as_mut_ptr() as *mut byte,
-                        view.common.cvar(cl.s_volume).value,
-                        1,
+                        raw_sample_bytes(&sbuf, ssize as usize, 2, 1),
+                        volume,
+                        true,
                     );
                 }
             }
             ZA_SOUND_STEREO => {
                 if cl.cinTable[handle].silent == qfalse {
                     if cl.cinTable[handle].numQuads == -1 {
-                        S_Update(view.common, cl);
-                        cl.s_rawend = cl.s_soundtime;
+                        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+                        let snd = unsafe { snd_from_view(view) };
+                        S_Update(view.common, snd);
+                        snd.s_rawend = snd.s_soundtime;
                     }
                     let ssize = RllDecodeStereoToStereo(
                         cl,
@@ -1486,15 +1505,19 @@ pub fn RoQInterrupt(view: &mut EngineHostView, cl: &mut Client) {
                         0,
                         cl.cinTable[handle].roq_flags as c_ushort,
                     );
+                    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+                    let snd = unsafe { snd_from_view(view) };
+                    let volume = view.common.cvar(snd.s_volume).value;
                     S_RawSamples(
-                        cl,
+                        view.common,
+                        snd,
                         ssize as c_int,
                         22050,
                         2,
                         2,
-                        sbuf.as_mut_ptr() as *mut byte,
-                        view.common.cvar(cl.s_volume).value,
-                        1,
+                        raw_sample_bytes(&sbuf, ssize as usize, 2, 2),
+                        volume,
+                        true,
                     );
                 }
             }
@@ -1684,7 +1707,8 @@ pub fn CL_PlayCinematic_f(view: &mut EngineHostView, cl: &mut Client) {
         bits |= CIN_LOOP;
     }
 
-    S_StopAllSounds(cl);
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    S_StopAllSounds(unsafe { snd_from_view(view) });
 
     let arg_c = std::ffi::CString::new(arg.clone()).unwrap_or_default();
     cl.CL_handle = CIN_PlayCinematic(

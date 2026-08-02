@@ -24,7 +24,7 @@ use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::opaque_slots::{
     BotLib as SlotBotLib, Client as SlotClient, Ghoul2System as SlotGhoul2,
     RenderModels as SlotRenderModels, Renderer as SlotRenderer, RmManager as SlotRmManager,
-    Server as SlotServer,
+    Server as SlotServer, SoundSystem as SlotSoundSystem,
 };
 use mp_engine_qcommon::cvar_fns::{Cvar_Get, Cvar_Init};
 use mp_engine_qcommon::files_common::FS_InitFilesystem;
@@ -420,6 +420,7 @@ pub fn host_view<'a>(
         cm,
         sv: SlotServer::from_raw(sv),
         cl: SlotClient::from_raw(null_mut()),
+        snd: SlotSoundSystem::from_raw(null_mut()),
         bot: SlotBotLib::from_raw(null_mut()),
         rm: SlotRenderModels::from_raw(rm as *mut ()),
         // The harness holds its carriers as `UiHost` fields and splits them at

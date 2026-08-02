@@ -16,7 +16,7 @@ STATE frame1
   axis0 1.000000 0.000000 0.000000
   axis1 0.000000 1.000000 0.000000
   axis2 0.000000 0.000000 1.000000
-  loops 0 prints 15 dprints 0
+  loops 0 prints 15 dprints 2
   ch 0 ent 1 chan 0 lv 127 rv 127 mv 255 start 2204 fixed 1 loop 0 org 0.000000 0.000000 0.000000 sfx sound/null
   ch 1 ent 2 chan 0 lv 127 rv 127 mv 255 start 2204 fixed 1 loop 0 org 0.000000 0.000000 0.000000 sfx sound/null
   ch 2 ent 3 chan 0 lv 127 rv 127 mv 255 start 2204 fixed 1 loop 0 org 0.000000 0.000000 0.000000 sfx sound/sine440

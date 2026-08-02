@@ -15,4 +15,8 @@ extern int snd_oracle_dprint_count;
 // Seeds a cvar before S_Init, the way a config file would.
 cvar_t *snd_oracle_cvar_set(const char *name, const char *value);
 
+// Registers the engine cvars the sound code reads but never creates. The driver
+// calls it once before the script runs.
+void snd_oracle_host_init(void);
+
 #endif // SND_ORACLE_HOST_H

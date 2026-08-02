@@ -108,7 +108,14 @@ scripted cursor.
 
 `Com_Printf` and `Com_DPrintf` count their calls and drop the text. Raven's
 messages carry file names and byte sizes that the port words differently, so the
-goldens carry the counts instead.
+goldens carry the counts instead. A count only means something when the stub
+prints where Raven prints, so `FS_ReadFile` and `FS_FOpenFileRead` emit the
+`Can't find %s` line that Raven's own `FS_FOpenFileRead` emits on a miss
+(`oracle/codemp/qcommon/files.cpp:1387`).
+
+`snd_oracle_host_init` registers `com_buildScript`, which Raven's engine creates
+in `Com_Init`. `S_LoadSound_FileLoadAndNameAdjuster` dereferences it for every
+name under `sound/chars`, so a null pointer there would crash the `lipsync` run.
 
 ## Scripted command schema
 
@@ -146,6 +153,7 @@ harness slot index, 0 to 15, that `register` fills with the returned
 | `dumpstate <tag>` | Writes the state block |
 | `dumpsfx <tag>` | Writes the sfx table with a digest per sound |
 | `dumpring <tag>` | Writes the ring digests and keeps the ring copy for the `.bin` |
+| `dumplipsync <tag>` | Writes `s_entityWavVol` and `s_entityWavVol_back` for entities 0 to 7 |
 | `shutdown` | `S_Shutdown` |
 
 `<chan>` is the integer `soundChannel_t` (`oracle/codemp/game/q_shared.h:1945-1961`):
@@ -175,6 +183,7 @@ fixture is byte-identical on any host.
 | `sound/silence.wav` | 22050 Hz, 16 bit, mono, 2048 samples | A channel that holds a slot and paints nothing |
 | `sound/ramp64.wav` | 22050 Hz, 16 bit, mono, 64 samples | A sound that ends inside the first paint window |
 | `sound/stereo.wav` | 22050 Hz, 16 bit, stereo | The stereo reject in `S_LoadSound_Actual` |
+| `sound/chars/voice1.wav` | 22050 Hz, 16 bit, mono, 4408 samples | The lip-sync path, plus the `chars` language-pack branch of the loader. Four equal blocks step the amplitude, so each frame reports a different bucket |
 
 `sound/missing.wav` has no fixture on purpose: `badfiles` registers it to drive
 the not-found fallback.
@@ -195,24 +204,28 @@ digests, and `golden/<name>.bin`, the final 65536-byte ring.
 | `ringwrap` | Ten frames that carry the ring past its 16384-frame wrap twice |
 | `khz11`, `khz44` | `S_Init` at the other two `s_khz` rates |
 | `badfiles` | A missing file, a stereo file, and a repeated registration |
+| `lipsync` | `S_DoLipSynchs` and `S_CheckAmplitude` over a `sound/chars` voice line, on all three voice channels |
 
 ## How gh#24 consumes the goldens
 
-Ticket [#24](https://github.com/mheh/jka-rust/issues/24) lands the Rust paint
-chain. It reads the same scenario scripts, drives the Rust sound state with the
-same scripted clock and DMA cursor, and compares:
+Ticket [#24](https://github.com/mheh/jka-rust/issues/24) landed the Rust paint
+chain. `crates/mp/engine/core/tests/snd_oracle_parity.rs` reads the same scenario
+scripts, drives the Rust sound state with the same scripted clock and DMA cursor,
+and compares:
 
 1. the text dump, line for line, against `golden/<name>.txt`, and
 2. the ring bytes against `golden/<name>.bin`.
 
 The dump format is defined by `main.cpp`, so the Rust dumper mirrors it exactly,
-the way `tests/gp2_parity.rs` mirrors `tools/gp2-oracle/main.cpp`.
+the way `tests/gp2_parity.rs` mirrors `tools/gp2-oracle/main.cpp`. The rig writes
+a temporary game tree from these fixtures, so it needs no retail content and no
+C++ toolchain, and it runs in CI. Set `SND_ORACLE_DUMP=1` to write each Rust dump
+to the temp directory for a manual diff.
 
-`crates/mp/engine/client/tests/snd_oracle_goldens.rs` already gates the golden
-set today: it checks that both goldens exist for every scenario, that the ring
-size and block layout are right, that every run paints, and that each `.bin`
-matches the digest its text dump records. It needs no C++ toolchain, so it runs
-in CI. The mixer comparison joins it with gh#24.
+`crates/mp/engine/client/tests/snd_oracle_goldens.rs` gates the golden set
+itself: it checks that both goldens exist for every scenario, that the ring size
+and block layout are right, that every run paints, and that each `.bin` matches
+the digest its text dump records.
 
 ## Uncovered
 
@@ -225,6 +238,4 @@ The harness makes no claim on these, and no golden hides them:
   drives it. The `Sys_*StreamedFile` stubs abort if a script reaches them.
 - **The ambient-set parser.** `AS_Init` runs during `S_Init` and finds no set
   file, so the parser itself is unexercised.
-- **Lip sync.** `S_DoLipSynchs` runs on the software arm, but no fixture lives
-  under `sound/chars/`, so the lip-sync tables stay empty.
 - **The OpenAL and EAX arm.** Dropped by DEC-57.4.

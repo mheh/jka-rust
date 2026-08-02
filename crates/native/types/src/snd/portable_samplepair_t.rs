@@ -7,6 +7,7 @@ use core::ffi::c_int;
 /// Type definition source: `oracle/codemp/client/snd_local.h:30-33`
 /// Type definition source: `oracle/code/client/snd_local.h:30-33`
 #[repr(C)]
+#[derive(Default, Clone, Copy)]
 pub struct portable_samplepair_t {
     /// the final values will be clamped to +/- 0x00ffff00 and shifted down
     pub left: c_int,

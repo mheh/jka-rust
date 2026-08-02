@@ -40,6 +40,7 @@ use mp_renderer::renderer_frontend::RendererFrontend;
 use mp_renderer::tr_model::render_models::RenderModels;
 
 use crate::client_host::Client;
+use crate::snd::sound_system::SoundSystem;
 
 /// The addresses the two client shims dereference on every module trap.
 #[allow(clippy::missing_safety_doc)]
@@ -56,6 +57,9 @@ pub struct ClientDispatchCtx {
     /// the arming. A trap that arrives while it is `None` is a boot-order bug,
     /// and the shim reports it rather than reading a fabricated world.
     pub cl: *mut Option<Client>,
+    /// `&mut Engine.snd` — the DEC-57 software mixer, an `Option` field for the
+    /// same seating reason as `cl`.
+    pub snd: *mut Option<SoundSystem>,
     /// `Engine.bot` (erased; the client threads it only through the view).
     pub bot: *mut (),
     /// `Engine.render_models` — the one model registry the server and the

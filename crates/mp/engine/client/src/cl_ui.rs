@@ -71,9 +71,9 @@ use crate::cl_keys::{Key_KeynumToString, Key_SetBinding};
 use crate::client::client_static_t::{MAX_GLOBAL_SERVERS, MAX_OTHER_SERVERS};
 use crate::client::server_info_t::serverInfo_t;
 use crate::client_host::{bot_from_view, client_legacy_syscall, sv_from_view};
-use crate::snd_stubs::{
-    S_RegisterSound, S_StartBackgroundTrack, S_StartLocalSound, S_StopBackgroundTrack,
-};
+use crate::client_host::snd_from_view;
+use crate::snd_dma::{S_RegisterSound, S_StartLocalSound, S_StopBackgroundTrack};
+use crate::snd_stubs::S_StartBackgroundTrack;
 use crate::Client;
 
 /// Raven's `AS_LOCAL`/`AS_MPLAYER`/`AS_GLOBAL`/`AS_FAVORITES` server-source
@@ -1461,14 +1461,14 @@ pub fn CL_UISystemCalls(
         };
         0
     } else if trap == MpUiImport::UI_S_REGISTERSOUND as c_int {
-        unsafe {
-            S_RegisterSound(
-                cl,
-                &cstr_to_string(vma(view.common, args, 1) as *const c_char),
-            )
-        }
+        let name = unsafe { cstr_to_string(vma(view.common, args, 1) as *const c_char) };
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let snd = unsafe { snd_from_view(view) };
+        S_RegisterSound(view, snd, &name)
     } else if trap == MpUiImport::UI_S_STARTLOCALSOUND as c_int {
-        unsafe { S_StartLocalSound(cl, *args.offset(1), *args.offset(2)) };
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let snd = unsafe { snd_from_view(view) };
+        unsafe { S_StartLocalSound(view, snd, *args.offset(1), *args.offset(2)) };
         0
     } else if trap == MpUiImport::UI_KEY_KEYNUMTOSTRINGBUF as c_int {
         unsafe {
@@ -1879,17 +1879,15 @@ pub fn CL_UISystemCalls(
         unsafe { ((*sv.botlib_export).PC_RemoveAllGlobalDefines.unwrap())(bot) };
         0
     } else if trap == MpUiImport::UI_S_STOPBACKGROUNDTRACK as c_int {
-        S_StopBackgroundTrack(cl);
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        S_StopBackgroundTrack(unsafe { snd_from_view(view) });
         0
     } else if trap == MpUiImport::UI_S_STARTBACKGROUNDTRACK as c_int {
-        unsafe {
-            S_StartBackgroundTrack(
-                cl,
-                &cstr_to_string(vma(view.common, args, 1) as *const c_char),
-                &cstr_to_string(vma(view.common, args, 2) as *const c_char),
-                qfalse,
-            )
-        };
+        let intro = unsafe { cstr_to_string(vma(view.common, args, 1) as *const c_char) };
+        let loop_track = unsafe { cstr_to_string(vma(view.common, args, 2) as *const c_char) };
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let snd = unsafe { snd_from_view(view) };
+        S_StartBackgroundTrack(view, snd, &intro, &loop_track, qfalse);
         0
     } else if trap == MpUiImport::UI_REAL_TIME as c_int {
         unsafe {

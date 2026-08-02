@@ -1,0 +1,57 @@
+# lipsync — S_DoLipSynchs and S_CheckAmplitude over a voice line (DEC-62.7).
+# The file sits under sound/chars, so the load also walks the language-pack
+# branch of S_LoadSound_FileLoadAndNameAdjuster. The four amplitude steps in the
+# fixture put a different bucket in s_entityWavVol on each frame, and the backup
+# table shows what S_CheckAmplitude cached.
+cvar s_khz 22
+init
+beginreg
+register 0 sound/chars/voice1.wav
+register 1 sound/sine440.wav
+dumpsfx loaded
+
+# CHAN_VOICE on entity 3, plus a non-voice sound on entity 4 that must leave the
+# lip-sync table alone.
+respatialize 0 0 0 0 0
+startsound 0 0 0 3 3 0
+startsound 0 0 0 4 0 1
+dumpstate started
+dumplipsync started
+
+respatialize 0 0 0 0 0
+advance 1102
+update
+dumpstate frame1
+dumplipsync frame1
+dumpring frame1
+
+respatialize 0 0 0 0 0
+advance 1102
+update
+dumpstate frame2
+dumplipsync frame2
+
+respatialize 0 0 0 0 0
+advance 1102
+update
+dumpstate frame3
+dumplipsync frame3
+
+respatialize 0 0 0 0 0
+advance 1102
+update
+dumpstate frame4
+dumplipsync frame4
+dumpring frame4
+
+# CHAN_VOICE_ATTEN and CHAN_VOICE_GLOBAL take the same lip-sync path.
+respatialize 0 0 0 0 0
+startsound 200 0 0 5 4 0
+startsound 0 0 0 6 12 0
+respatialize 0 0 0 0 0
+advance 1102
+update
+dumpstate voices
+dumplipsync voices
+dumpring voices
+shutdown

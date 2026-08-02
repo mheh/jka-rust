@@ -132,6 +132,26 @@ impl Renderer {
     }
 }
 
+/// Type-erased slot for the `mp_engine_client` `SoundSystem` state (the DEC-57
+/// software mixer, owned by `Engine.snd`); qcommon is pass-through only — never
+/// dereferences it. Cast back to `&mut SoundSystem` at the client-crate boundary
+/// (`mp_engine_client::client_host::snd_from_view`). NULL on dedicated, where
+/// `Engine.snd` is `None` and no path reads it.
+///
+/// Ruling: opaque-slot (user, 2026-07-12, option A).
+#[repr(transparent)]
+pub struct SoundSystem(*mut ());
+
+impl SoundSystem {
+    pub fn from_raw(p: *mut ()) -> SoundSystem {
+        SoundSystem(p)
+    }
+
+    pub fn as_raw(&mut self) -> *mut () {
+        self.0
+    }
+}
+
 /// Type-erased slot for the `mp_engine_ghoul2` `Ghoul2System` state; qcommon is
 /// pass-through only — never dereferences it.
 ///
