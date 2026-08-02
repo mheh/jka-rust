@@ -7,10 +7,10 @@
 
 use core::ffi::{c_char, c_int};
 
-use crate::cl_console::Con_ClearNotify;
 use mp_abi::ui::exports::MpUiExport;
 use mp_abi::ui::public::ui_menu_command_t::UIMENU_MAIN;
 use mp_engine_qcommon::common::common::{com_printf, Common};
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::error::com_error;
 use mp_engine_qcommon::common_fns::{Com_DPrintf, Com_Memcpy};
 use mp_engine_qcommon::cvar_fns::Cvar_Get;
@@ -22,21 +22,43 @@ use mp_qshared::common::mp::cgame::stereo_frame_t::{
 use mp_qshared::shared::char_sizes::{BIGCHAR_WIDTH, SMALLCHAR_HEIGHT, SMALLCHAR_WIDTH};
 use mp_qshared::shared::connstate::connstate_t;
 use mp_qshared::shared::cvar::CVAR_CHEAT;
-use mp_qshared::shared::keycatch::KEYCATCH_UI;
 use mp_qshared::shared::error_parm::errorParm_t;
-use mp_qshared::shared::q_color::{g_color_table, Q_IsColorString};
-use native_types::qhandle_t;
+use mp_qshared::shared::keycatch::KEYCATCH_UI;
+use mp_qshared::shared::q_color::{g_color_table, ColorIndex, Q_IsColorString};
+use mp_renderer::hook_install::{re_from_view, rm_from_view};
+use mp_renderer::tr_cmds::{RE_BeginFrame, RE_EndFrame, RE_SetColor, RE_StretchPic};
+use mp_renderer::tr_shader::RE_RegisterShader;
+use native_types::{qfalse, qhandle_t, qtrue};
 
 use crate::cl_cgame::CL_CGameRendering;
 use crate::cl_cin::SCR_DrawCinematic;
-use crate::cl_console::Con_DrawConsole;
+use crate::cl_console::{Con_ClearNotify, Con_DrawConsole};
 use crate::client_host::{Client, MAX_SCR_LINES};
 use crate::snd_stubs::S_StopAllSounds;
+
+/// Read a module-space C string as an owned `String`, the shape a shader-name
+/// pointer needs before it reaches the `&str`-taking `RE_RegisterShader`.
+fn cstr_to_string(p: *const c_char) -> String {
+    // SAFETY: the caller passed a NUL-terminated string across the seam.
+    unsafe { core::ffi::CStr::from_ptr(p).to_string_lossy().into_owned() }
+}
+
+/// Converts Raven's nullable `float *color` into the `Option<[f32; 4]>` that
+/// `RE_SetColor` takes.
+fn color_from_ptr(ptr: *const f32) -> Option<[f32; 4]> {
+    if ptr.is_null() {
+        None
+    } else {
+        // SAFETY: a non-null caller pointer names a live 4-float RGBA color.
+        unsafe { Some(*(ptr as *const [f32; 4])) }
+    }
+}
 
 /// Raven `SCR_DrawNamedPic`.
 ///
 /// Source: `oracle/codemp/client/cl_scrn.cpp:24-31`
 pub fn SCR_DrawNamedPic(
+    view: &mut EngineHostView,
     cl: &mut Client,
     x: f32,
     y: f32,
@@ -46,23 +68,61 @@ pub fn SCR_DrawNamedPic(
 ) {
     assert!(width != 0.0);
 
-    // PORT-NOTE(missing-symbol): `refexport_t::RegisterShader` is not in the tree yet.
-    // Source: oracle/codemp/client/client.h:388
-    let hShader: qhandle_t = crate::cl_renderer::re(cl).RegisterShader(picname);
-    // PORT-NOTE(missing-symbol): `refexport_t::DrawStretchPic` is not in the tree yet.
-    // Source: oracle/codemp/client/client.h:388
-    crate::cl_renderer::re(cl).DrawStretchPic(x, y, width, height, 0.0, 0.0, 1.0, 1.0, hShader);
+    let name = cstr_to_string(picname);
+    // SAFETY (both casts): view-constructor slots, single-threaded, no other
+    // cast of the same slot is live across the call.
+    let re = unsafe { re_from_view(view) };
+    let rm = unsafe { rm_from_view(view) };
+    let hShader: qhandle_t = RE_RegisterShader(
+        &name,
+        &mut re.qs,
+        &mut re.frame,
+        &mut re.assets,
+        view,
+        &re.cvars,
+        &mut re.sim,
+        rm,
+        &mut re.img_state,
+        &mut re.gpu_res,
+        &mut re.sky_view,
+        &mut re.sky,
+    );
+    RE_StretchPic(
+        &mut re.frame_data,
+        &re.assets,
+        view.common,
+        x,
+        y,
+        width,
+        height,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        hShader,
+    );
 }
 
 /// Raven `SCR_FillRect`.
 ///
 /// Source: `oracle/codemp/client/cl_scrn.cpp:41-47`
-pub fn SCR_FillRect(cl: &mut Client, x: f32, y: f32, width: f32, height: f32, color: *const f32) {
-    // PORT-NOTE(missing-symbol): `refexport_t::SetColor` is not in the tree yet.
-    // Source: oracle/codemp/client/client.h:388
-    crate::cl_renderer::re(cl).SetColor(color);
+pub fn SCR_FillRect(
+    view: &mut EngineHostView,
+    cl: &mut Client,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    color: *const f32,
+) {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let re = unsafe { re_from_view(view) };
+    RE_SetColor(&mut re.frame_data, color_from_ptr(color));
 
-    crate::cl_renderer::re(cl).DrawStretchPic(
+    RE_StretchPic(
+        &mut re.frame_data,
+        &re.assets,
+        view.common,
         x,
         y,
         width,
@@ -74,20 +134,50 @@ pub fn SCR_FillRect(cl: &mut Client, x: f32, y: f32, width: f32, height: f32, co
         cl.cls.whiteShader,
     );
 
-    crate::cl_renderer::re(cl).SetColor(core::ptr::null());
+    RE_SetColor(&mut re.frame_data, None);
 }
 
 /// Raven `SCR_DrawPic`.
 ///
 /// Source: `oracle/codemp/client/cl_scrn.cpp:57-59`
-pub fn SCR_DrawPic(cl: &mut Client, x: f32, y: f32, width: f32, height: f32, hShader: qhandle_t) {
-    crate::cl_renderer::re(cl).DrawStretchPic(x, y, width, height, 0.0, 0.0, 1.0, 1.0, hShader);
+pub fn SCR_DrawPic(
+    view: &mut EngineHostView,
+    cl: &mut Client,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    hShader: qhandle_t,
+) {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let re = unsafe { re_from_view(view) };
+    RE_StretchPic(
+        &mut re.frame_data,
+        &re.assets,
+        view.common,
+        x,
+        y,
+        width,
+        height,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        hShader,
+    );
 }
 
 /// Raven `SCR_DrawChar` (Raven `static`, file-private in the oracle).
 ///
 /// Source: `oracle/codemp/client/cl_scrn.cpp:67-101`
-pub fn SCR_DrawChar(cl: &mut Client, x: c_int, y: c_int, size: f32, ch: c_int) {
+pub fn SCR_DrawChar(
+    view: &mut EngineHostView,
+    cl: &mut Client,
+    x: c_int,
+    y: c_int,
+    size: f32,
+    ch: c_int,
+) {
     let mut ch = ch & 255;
 
     if ch == ' ' as c_int {
@@ -111,7 +201,12 @@ pub fn SCR_DrawChar(cl: &mut Client, x: c_int, y: c_int, size: f32, ch: c_int) {
     let size = 0.03125f32 as f64 as f32;
     let size2 = 0.0625f32 as f64 as f32;
 
-    crate::cl_renderer::re(cl).DrawStretchPic(
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let re = unsafe { re_from_view(view) };
+    RE_StretchPic(
+        &mut re.frame_data,
+        &re.assets,
+        view.common,
         ax,
         ay,
         aw,
@@ -127,15 +222,19 @@ pub fn SCR_DrawChar(cl: &mut Client, x: c_int, y: c_int, size: f32, ch: c_int) {
 /// Raven `SCR_DrawSmallChar`.
 ///
 /// Source: `oracle/codemp/client/cl_scrn.cpp:107-142`
-pub fn SCR_DrawSmallChar(cl: &mut Client, x: c_int, y: c_int, ch: c_int) {
+pub fn SCR_DrawSmallChar(
+    view: &mut EngineHostView,
+    cl: &mut Client,
+    x: c_int,
+    y: c_int,
+    ch: c_int,
+) {
     let ch = ch & 255;
 
     if ch == ' ' as c_int {
         return;
     }
 
-    // PORT-NOTE(missing-symbol): `SMALLCHAR_HEIGHT` is not in the tree yet.
-    // Source: oracle/codemp/client/cl_scrn.h
     if (y as f32) < -(SMALLCHAR_HEIGHT as f32) {
         return;
     }
@@ -150,11 +249,14 @@ pub fn SCR_DrawSmallChar(cl: &mut Client, x: c_int, y: c_int, ch: c_int) {
     let size = 0.0625f32 as f64 as f32;
     let size2 = 0.0625f32 as f64 as f32;
 
-    crate::cl_renderer::re(cl).DrawStretchPic(
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let re = unsafe { re_from_view(view) };
+    RE_StretchPic(
+        &mut re.frame_data,
+        &re.assets,
+        view.common,
         x as f32 * cl.con.xadjust,
         y as f32 * cl.con.yadjust,
-        // PORT-NOTE(missing-symbol): `SMALLCHAR_WIDTH` is not in the tree yet.
-        // Source: oracle/codemp/client/cl_scrn.h
         SMALLCHAR_WIDTH as f32 * cl.con.xadjust,
         SMALLCHAR_HEIGHT as f32 * cl.con.yadjust,
         fcol,
@@ -219,38 +321,48 @@ pub fn SCR_DebugGraph(cl: &mut Client, value: f32, color: c_int) {
 /// Raven `SCR_DrawDebugGraph`.
 ///
 /// Source: `oracle/codemp/client/cl_scrn.cpp:338-367`
-pub fn SCR_DrawDebugGraph(common: &mut Common, cl: &mut Client) {
+pub fn SCR_DrawDebugGraph(view: &mut EngineHostView, cl: &mut Client) {
     let w: c_int = 640;
     let x: c_int = 0;
     let y: c_int = 480;
 
-    crate::cl_renderer::re(cl).SetColor(g_color_table[0].as_ptr());
-    crate::cl_renderer::re(cl).DrawStretchPic(
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let re = unsafe { re_from_view(view) };
+    RE_SetColor(&mut re.frame_data, Some(g_color_table[0]));
+    let graphheight = view.common.cvar(cl.cl_graphheight).integer;
+    RE_StretchPic(
+        &mut re.frame_data,
+        &re.assets,
+        view.common,
         x as f32,
-        (y - unsafe { (*cl.cl_graphheight).integer }) as f32,
+        (y - graphheight) as f32,
         w as f32,
-        unsafe { (*cl.cl_graphheight).integer } as f32,
+        graphheight as f32,
         0.0,
         0.0,
         0.0,
         0.0,
         cl.cls.whiteShader,
     );
-    crate::cl_renderer::re(cl).SetColor(core::ptr::null());
+    RE_SetColor(&mut re.frame_data, None);
 
     for a in 0..w {
         let i = ((cl.current - 1 - a + 1024) & 1023) as usize;
         let mut v = cl.values[i].value;
         let color = cl.values[i].color;
-        v = v * unsafe { (*cl.cl_graphscale).integer } as f32
-            + unsafe { (*cl.cl_graphshift).integer } as f32;
+        v = v * view.common.cvar(cl.cl_graphscale).integer as f32
+            + view.common.cvar(cl.cl_graphshift).integer as f32;
 
         if v < 0.0 {
-            let graphheight = unsafe { (*cl.cl_graphheight).integer };
+            let graphheight = view.common.cvar(cl.cl_graphheight).integer;
             v += graphheight as f32 * (1 + (-v / graphheight as f32) as c_int) as f32;
         }
-        let h = (v as c_int) % unsafe { (*cl.cl_graphheight).integer };
-        crate::cl_renderer::re(cl).DrawStretchPic(
+        let h = (v as c_int) % view.common.cvar(cl.cl_graphheight).integer;
+        let re = unsafe { re_from_view(view) };
+        RE_StretchPic(
+            &mut re.frame_data,
+            &re.assets,
+            view.common,
             (x + w - 1 - a) as f32,
             (y - h) as f32,
             1.0,
@@ -267,25 +379,21 @@ pub fn SCR_DrawDebugGraph(common: &mut Common, cl: &mut Client) {
 /// Raven `SCR_Init`.
 ///
 /// Source: `oracle/codemp/client/cl_scrn.cpp:376-384`
-pub fn SCR_Init(cl: &mut Client) {
-    // PORT-NOTE(scr-init): `Cvar_Get`'s LAW signature takes `&mut
-    // EngineHostView`, but this fn's resolved signature only threads `cl`; no
-    // view receiver is available here, so the call is transcribed with `cl`
-    // in that slot (see shape_mismatches).
-    cl.cl_timegraph = Cvar_Get(cl, "timegraph", "0", CVAR_CHEAT) as _;
-    cl.cl_debuggraph = Cvar_Get(cl, "debuggraph", "0", CVAR_CHEAT) as _;
-    cl.cl_graphheight = Cvar_Get(cl, "graphheight", "32", CVAR_CHEAT) as _;
-    cl.cl_graphscale = Cvar_Get(cl, "graphscale", "1", CVAR_CHEAT) as _;
-    cl.cl_graphshift = Cvar_Get(cl, "graphshift", "0", CVAR_CHEAT) as _;
+pub fn SCR_Init(view: &mut EngineHostView, cl: &mut Client) {
+    cl.cl_timegraph = Some(Cvar_Get(view, "timegraph", "0", CVAR_CHEAT));
+    cl.cl_debuggraph = Some(Cvar_Get(view, "debuggraph", "0", CVAR_CHEAT));
+    cl.cl_graphheight = Some(Cvar_Get(view, "graphheight", "32", CVAR_CHEAT));
+    cl.cl_graphscale = Some(Cvar_Get(view, "graphscale", "1", CVAR_CHEAT));
+    cl.cl_graphshift = Some(Cvar_Get(view, "graphshift", "0", CVAR_CHEAT));
 
-    cl.scr_initialized = true;
+    cl.scr_initialized = qtrue;
 }
 
 /// Raven `SCR_DrawStringExt`.
 ///
 /// Source: `oracle/codemp/client/cl_scrn.cpp:155-196`
 pub fn SCR_DrawStringExt(
-    common: &mut Common,
+    view: &mut EngineHostView,
     cl: &mut Client,
     x: c_int,
     y: c_int,
@@ -298,7 +406,11 @@ pub fn SCR_DrawStringExt(
     unsafe {
         color[3] = *setColor.add(3);
     }
-    crate::cl_renderer::re(cl).SetColor(color.as_ptr());
+    {
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let re = unsafe { re_from_view(view) };
+        RE_SetColor(&mut re.frame_data, Some(color));
+    }
 
     // draw the drop shadow
     let mut s = string;
@@ -310,7 +422,7 @@ pub fn SCR_DrawStringExt(
                 s = s.add(2);
                 continue;
             }
-            SCR_DrawChar(cl, xx + 2, y + 2, size, *s as c_int);
+            SCR_DrawChar(view, cl, xx + 2, y + 2, size, *s as c_int);
             xx += size as c_int;
             s = s.add(1);
         }
@@ -319,39 +431,45 @@ pub fn SCR_DrawStringExt(
     // draw the colored text
     let mut s = string;
     let mut xx = x;
-    crate::cl_renderer::re(cl).SetColor(setColor);
+    {
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let re = unsafe { re_from_view(view) };
+        RE_SetColor(&mut re.frame_data, color_from_ptr(setColor));
+    }
     unsafe {
         while *s != 0 {
             let pair = core::slice::from_raw_parts(s as *const u8, strlen_remaining(s));
             if Q_IsColorString(pair) {
                 if !forceColor {
-                    // PORT-NOTE(missing-symbol): `ColorIndex` is not in the tree yet.
-                    // Source: oracle/codemp/client/cl_scrn.cpp:184 (game/g_client.cpp local helper)
-                    let idx = ColorIndex(*s.add(1) as u8);
+                    let idx = ColorIndex(*s.add(1) as c_int);
                     Com_Memcpy(
                         color.as_mut_ptr() as *mut (),
                         g_color_table[idx as usize].as_ptr() as *const (),
                         core::mem::size_of::<[f32; 4]>(),
                     );
                     color[3] = *setColor.add(3);
-                    crate::cl_renderer::re(cl).SetColor(color.as_ptr());
+                    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+                    let re = re_from_view(view);
+                    RE_SetColor(&mut re.frame_data, Some(color));
                 }
                 s = s.add(2);
                 continue;
             }
-            SCR_DrawChar(cl, xx, y, size, *s as c_int);
+            SCR_DrawChar(view, cl, xx, y, size, *s as c_int);
             xx += size as c_int;
             s = s.add(1);
         }
     }
-    crate::cl_renderer::re(cl).SetColor(core::ptr::null());
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let re = unsafe { re_from_view(view) };
+    RE_SetColor(&mut re.frame_data, None);
 }
 
 /// Raven `SCR_DrawSmallStringExt`.
 ///
 /// Source: `oracle/codemp/client/cl_scrn.cpp:222-246`
 pub fn SCR_DrawSmallStringExt(
-    common: &mut Common,
+    view: &mut EngineHostView,
     cl: &mut Client,
     x: c_int,
     y: c_int,
@@ -362,34 +480,38 @@ pub fn SCR_DrawSmallStringExt(
     let mut color: [f32; 4] = [0.0; 4];
     let mut s = string;
     let mut xx = x;
-    crate::cl_renderer::re(cl).SetColor(setColor);
+    {
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let re = unsafe { re_from_view(view) };
+        RE_SetColor(&mut re.frame_data, color_from_ptr(setColor));
+    }
     unsafe {
         while *s != 0 {
             let pair = core::slice::from_raw_parts(s as *const u8, strlen_remaining(s));
             if Q_IsColorString(pair) {
                 if !forceColor {
-                    // PORT-NOTE(missing-symbol): `ColorIndex` is not in the tree yet.
-                    // Source: oracle/codemp/client/cl_scrn.cpp:234 (game/g_client.cpp local helper)
-                    let idx = ColorIndex(*s.add(1) as u8);
+                    let idx = ColorIndex(*s.add(1) as c_int);
                     Com_Memcpy(
                         color.as_mut_ptr() as *mut (),
                         g_color_table[idx as usize].as_ptr() as *const (),
                         core::mem::size_of::<[f32; 4]>(),
                     );
                     color[3] = *setColor.add(3);
-                    crate::cl_renderer::re(cl).SetColor(color.as_ptr());
+                    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+                    let re = re_from_view(view);
+                    RE_SetColor(&mut re.frame_data, Some(color));
                 }
                 s = s.add(2);
                 continue;
             }
-            SCR_DrawSmallChar(cl, xx, y, *s as c_int);
-            // PORT-NOTE(missing-symbol): `SMALLCHAR_WIDTH` is not in the tree yet.
-            // Source: oracle/codemp/client/cl_scrn.h
+            SCR_DrawSmallChar(view, cl, xx, y, *s as c_int);
             xx += SMALLCHAR_WIDTH;
             s = s.add(1);
         }
     }
-    crate::cl_renderer::re(cl).SetColor(core::ptr::null());
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let re = unsafe { re_from_view(view) };
+    RE_SetColor(&mut re.frame_data, None);
 }
 
 /// Raven `SCR_GetBigStringWidth`.
@@ -401,14 +523,12 @@ pub fn SCR_GetBigStringWidth(str: *const c_char) -> c_int {
 
 /// Raven `SCR_CenterPrint`.
 ///
-/// PORT-NOTE(scr-centerprint): the resolved signature threads only `cl`, but
-/// the body calls `Com_Printf`, whose LAW signature needs `common`; the call
-/// site below passes `cl` in that slot (see shape_mismatches). `RWL`-commented
-/// dead code (`width -= 30`, the `remote_type` check) is dropped, matching
-/// Raven's own `/* ... */` comment-out.
+/// PORT-NOTE(scr-centerprint): `RWL`-commented dead code (`width -= 30`, the
+/// `remote_type` check) is dropped, matching Raven's own `/* ... */`
+/// comment-out.
 ///
 /// Source: `oracle/codemp/client/cl_scrn.cpp:519-624`
-pub fn SCR_CenterPrint(cl: &mut Client, str: *mut c_char) {
+pub fn SCR_CenterPrint(common: &mut Common, cl: &mut Client, str: *mut c_char) {
     if str.is_null() {
         cl.scr_centertime_off = 0.0;
         return;
@@ -417,11 +537,9 @@ pub fn SCR_CenterPrint(cl: &mut Client, str: *mut c_char) {
     let mut width: c_int = 640 / 8;
     width -= 4;
 
-    cl.scr_centertime_off = cl.scr_centertime.value;
+    cl.scr_centertime_off = common.cvar(cl.scr_centertime).value;
 
-    // PORT-NOTE(scr-centerprint): `com_printf`'s LAW signature needs `common`,
-    // but this fn only threads `cl` (see shape_mismatches).
-    com_printf(cl, "\n");
+    com_printf(common, "\n");
 
     let mut num_lines: c_int = 0;
     let mut write_pos: *mut c_char = cl.scr_centerstring.as_mut_ptr();
@@ -465,10 +583,8 @@ pub fn SCR_CenterPrint(cl: &mut Client, str: *mut c_char) {
                 *write_pos = 0;
                 write_pos = write_pos.add(1);
 
-                // PORT-NOTE(scr-centerprint): `com_printf`'s LAW signature needs
-                // `common`, but this fn only threads `cl` (see shape_mismatches).
                 com_printf(
-                    cl,
+                    common,
                     &format!(
                         "{}\n",
                         core::ffi::CStr::from_ptr(save_pos).to_string_lossy()
@@ -477,15 +593,11 @@ pub fn SCR_CenterPrint(cl: &mut Client, str: *mut c_char) {
 
                 // PORT-NOTE(missing-symbol): `RWL / re.StrlenFont` is not in the tree yet.
                 // Source: oracle/codemp/client/cl_scrn.cpp:595
-                // PORT-NOTE(missing-symbol): `MAX_SCR_LINES` is not in the tree yet.
-                // Source: oracle/codemp/client/cl_scrn.h
                 cl.scr_center_widths[cl.scr_center_lines as usize] = 640;
 
                 cl.scr_center_lines += 1;
 
-                // PORT-NOTE(missing-symbol): `MAX_SCR_LINES` is not in the tree yet.
-                // Source: oracle/codemp/client/cl_scrn.h
-                if *s == 0 || cl.scr_center_lines >= MAX_SCR_LINES {
+                if *s == 0 || cl.scr_center_lines >= MAX_SCR_LINES as c_int {
                     done = true;
                 } else {
                     s = last;
@@ -505,9 +617,7 @@ pub fn SCR_CenterPrint(cl: &mut Client, str: *mut c_char) {
     }
 
     // echo it to the console
-    // PORT-NOTE(scr-centerprint): `com_printf`'s LAW signature needs `common`,
-    // but this fn only threads `cl` (see shape_mismatches).
-    com_printf(cl, "\n\n");
+    com_printf(common, "\n\n");
     Con_ClearNotify(cl);
 }
 
@@ -515,7 +625,7 @@ pub fn SCR_CenterPrint(cl: &mut Client, str: *mut c_char) {
 ///
 /// Source: `oracle/codemp/client/cl_scrn.cpp:199-205`
 pub fn SCR_DrawBigString(
-    common: &mut Common,
+    view: &mut EngineHostView,
     cl: &mut Client,
     x: c_int,
     y: c_int,
@@ -523,10 +633,8 @@ pub fn SCR_DrawBigString(
     alpha: f32,
 ) {
     let mut color: [f32; 4] = [1.0, 1.0, 1.0, alpha];
-    // PORT-NOTE(missing-symbol): `BIGCHAR_WIDTH` is not in the tree yet.
-    // Source: oracle/codemp/client/cl_scrn.h
     SCR_DrawStringExt(
-        common,
+        view,
         cl,
         x,
         y,
@@ -541,7 +649,7 @@ pub fn SCR_DrawBigString(
 ///
 /// Source: `oracle/codemp/client/cl_scrn.cpp:207-209`
 pub fn SCR_DrawBigStringColor(
-    common: &mut Common,
+    view: &mut EngineHostView,
     cl: &mut Client,
     x: c_int,
     y: c_int,
@@ -549,10 +657,8 @@ pub fn SCR_DrawBigStringColor(
     color: native_math::vector::vec4_t,
 ) {
     let mut color = color;
-    // PORT-NOTE(missing-symbol): `BIGCHAR_WIDTH` is not in the tree yet.
-    // Source: oracle/codemp/client/cl_scrn.h
     SCR_DrawStringExt(
-        common,
+        view,
         cl,
         x,
         y,
@@ -566,17 +672,15 @@ pub fn SCR_DrawBigStringColor(
 /// Raven `SCR_DrawDemoRecording`.
 ///
 /// Source: `oracle/codemp/client/cl_scrn.cpp:284-301`
-pub fn SCR_DrawDemoRecording(common: &mut Common, cl: &mut Client) {
-    if !cl.clc.demorecording {
+pub fn SCR_DrawDemoRecording(view: &mut EngineHostView, cl: &mut Client) {
+    if cl.clc.demorecording == qfalse {
         return;
     }
-    if cl.clc.spDemoRecording {
+    if cl.clc.spDemoRecording != qfalse {
         return;
     }
 
-    let pos = FS_FTell(common, cl.clc.demofile);
-    // PORT-NOTE(missing-symbol): `RECORDING` is not in the tree yet.
-    // Source: oracle/codemp/client/cl_scrn.cpp:297 (format string literal)
+    let pos = FS_FTell(view.common, cl.clc.demofile);
     let string = format!(
         "RECORDING {}: {}k",
         unsafe { core::ffi::CStr::from_ptr(cl.clc.demoName.as_ptr()).to_string_lossy() },
@@ -586,7 +690,7 @@ pub fn SCR_DrawDemoRecording(common: &mut Common, cl: &mut Client) {
 
     let mut color = g_color_table[7];
     SCR_DrawStringExt(
-        common,
+        view,
         cl,
         320 - (string.len() as c_int) * 4,
         20,
@@ -600,17 +704,32 @@ pub fn SCR_DrawDemoRecording(common: &mut Common, cl: &mut Client) {
 /// Raven `SCR_DrawScreenField`.
 ///
 /// Source: `oracle/codemp/client/cl_scrn.cpp:396-469`
-pub fn SCR_DrawScreenField(common: &mut Common, cl: &mut Client, stereoFrame: stereoFrame_t) {
-    // PORT-NOTE(missing-symbol): `refexport_t::BeginFrame` is not in the tree yet.
-    // Source: oracle/codemp/client/client.h:388
-    crate::cl_renderer::re(cl).BeginFrame(stereoFrame);
+pub fn SCR_DrawScreenField(view: &mut EngineHostView, cl: &mut Client, stereoFrame: stereoFrame_t) {
+    {
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let re = unsafe { re_from_view(view) };
+        RE_BeginFrame(
+            view,
+            &re.cvars,
+            &re.assets,
+            &mut re.frame,
+            &mut re.img_state,
+            &mut re.gpu_res,
+            stereoFrame,
+        );
+    }
 
     // wide aspect ratio screens need to have the sides cleared
     // unless they are displaying game renderings
     if cl.cls.state != connstate_t::CA_ACTIVE {
         if cl.cls.glconfig.vidWidth * 480 > cl.cls.glconfig.vidHeight * 640 {
-            crate::cl_renderer::re(cl).SetColor(g_color_table[0].as_ptr());
-            crate::cl_renderer::re(cl).DrawStretchPic(
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let re = unsafe { re_from_view(view) };
+            RE_SetColor(&mut re.frame_data, Some(g_color_table[0]));
+            RE_StretchPic(
+                &mut re.frame_data,
+                &re.assets,
+                view.common,
                 0.0,
                 0.0,
                 cl.cls.glconfig.vidWidth as f32,
@@ -621,14 +740,12 @@ pub fn SCR_DrawScreenField(common: &mut Common, cl: &mut Client, stereoFrame: st
                 0.0,
                 cl.cls.whiteShader,
             );
-            crate::cl_renderer::re(cl).SetColor(core::ptr::null());
+            RE_SetColor(&mut re.frame_data, None);
         }
     }
 
-    // PORT-NOTE(missing-symbol): `uivm` is not in the tree yet.
-    // Source: oracle/codemp/client/client.h:387
     if cl.uivm.is_null() {
-        Com_DPrintf(common, "draw screen without UI loaded\n");
+        Com_DPrintf(view.common, "draw screen without UI loaded\n");
         return;
     }
 
@@ -636,18 +753,23 @@ pub fn SCR_DrawScreenField(common: &mut Common, cl: &mut Client, stereoFrame: st
     // don't need to render anything under it
     // actually, yes you do, unless you want clients to cycle out their reliable
     // commands from sitting in the menu. -rww
-    if VM_Call(common, cl.uivm, MpUiExport::UI_IS_FULLSCREEN as c_int, &[]) == 0
+    if VM_Call(
+        view.common,
+        cl.uivm,
+        MpUiExport::UI_IS_FULLSCREEN as c_int,
+        &[],
+    ) == 0
         || (cl.cls.framecount & 7 == 0 && cl.cls.state == connstate_t::CA_ACTIVE)
     {
         match cl.cls.state {
             connstate_t::CA_CINEMATIC => {
-                SCR_DrawCinematic(cl);
+                SCR_DrawCinematic(view, cl);
             }
             connstate_t::CA_DISCONNECTED => {
                 // force menu up
                 S_StopAllSounds(cl);
                 VM_Call(
-                    common,
+                    view.common,
                     cl.uivm,
                     MpUiExport::UI_SET_ACTIVE_MENU as c_int,
                     &[UIMENU_MAIN as isize],
@@ -659,13 +781,13 @@ pub fn SCR_DrawScreenField(common: &mut Common, cl: &mut Client, stereoFrame: st
                 // connecting clients will only show the connection dialog
                 // refresh to update the time
                 VM_Call(
-                    common,
+                    view.common,
                     cl.uivm,
                     MpUiExport::UI_REFRESH as c_int,
                     &[cl.cls.realtime as isize],
                 );
                 VM_Call(
-                    common,
+                    view.common,
                     cl.uivm,
                     MpUiExport::UI_DRAW_CONNECT_SCREEN as c_int,
                     &[false as isize],
@@ -673,27 +795,27 @@ pub fn SCR_DrawScreenField(common: &mut Common, cl: &mut Client, stereoFrame: st
             }
             connstate_t::CA_LOADING | connstate_t::CA_PRIMED => {
                 // draw the game information screen and loading progress
-                CL_CGameRendering(common, cl, stereoFrame);
+                CL_CGameRendering(view, cl, stereoFrame);
 
                 // also draw the connection information, so it doesn't
                 // flash away too briefly on local or lan games
                 // refresh to update the time
                 VM_Call(
-                    common,
+                    view.common,
                     cl.uivm,
                     MpUiExport::UI_REFRESH as c_int,
                     &[cl.cls.realtime as isize],
                 );
                 VM_Call(
-                    common,
+                    view.common,
                     cl.uivm,
                     MpUiExport::UI_DRAW_CONNECT_SCREEN as c_int,
                     &[true as isize],
                 );
             }
             connstate_t::CA_ACTIVE => {
-                CL_CGameRendering(common, cl, stereoFrame);
-                SCR_DrawDemoRecording(common, cl);
+                CL_CGameRendering(view, cl, stereoFrame);
+                SCR_DrawDemoRecording(view, cl);
             }
             _ => {
                 com_error(
@@ -705,11 +827,9 @@ pub fn SCR_DrawScreenField(common: &mut Common, cl: &mut Client, stereoFrame: st
     }
 
     // the menu draws next
-    // PORT-NOTE(missing-symbol): `KEYCATCH_UI` is not in the tree yet.
-    // Source: oracle/codemp/client/cl_scrn.cpp:458
     if cl.cls.keyCatchers & KEYCATCH_UI != 0 && !cl.uivm.is_null() {
         VM_Call(
-            common,
+            view.common,
             cl.uivm,
             MpUiExport::UI_REFRESH as c_int,
             &[cl.cls.realtime as isize],
@@ -717,15 +837,14 @@ pub fn SCR_DrawScreenField(common: &mut Common, cl: &mut Client, stereoFrame: st
     }
 
     // console draws next
-    Con_DrawConsole(common, cl);
+    Con_DrawConsole(view, cl);
 
     // debug graph can be drawn on top of anything
-    if unsafe {
-        (*cl.cl_debuggraph).integer != 0
-            || (*cl.cl_timegraph).integer != 0
-            || (*cl.cl_debugMove).integer != 0
-    } {
-        SCR_DrawDebugGraph(common, cl);
+    let debug_graph_wanted = view.common.cvar(cl.cl_debuggraph).integer != 0
+        || view.common.cvar(cl.cl_timegraph).integer != 0
+        || view.common.cvar(cl.cl_debugMove).integer != 0;
+    if debug_graph_wanted {
+        SCR_DrawDebugGraph(view, cl);
     }
 }
 
@@ -737,8 +856,8 @@ pub fn SCR_DrawScreenField(common: &mut Common, cl: &mut Client, stereoFrame: st
 /// owning sub-struct lands the field.
 ///
 /// Source: `oracle/codemp/client/cl_scrn.cpp:479-506`
-pub fn SCR_UpdateScreen(common: &mut Common, cl: &mut Client) {
-    if !cl.scr_initialized {
+pub fn SCR_UpdateScreen(view: &mut EngineHostView, cl: &mut Client) {
+    if cl.scr_initialized == qfalse {
         return; // not initialized yet
     }
 
@@ -752,20 +871,26 @@ pub fn SCR_UpdateScreen(common: &mut Common, cl: &mut Client) {
     cl.recursive = 1;
 
     // if running in stereo, we need to draw the frame twice
-    if cl.cls.glconfig.stereoEnabled {
-        SCR_DrawScreenField(common, cl, STEREO_LEFT);
-        SCR_DrawScreenField(common, cl, STEREO_RIGHT);
+    if cl.cls.glconfig.stereoEnabled != qfalse {
+        SCR_DrawScreenField(view, cl, STEREO_LEFT);
+        SCR_DrawScreenField(view, cl, STEREO_RIGHT);
     } else {
-        SCR_DrawScreenField(common, cl, STEREO_CENTER);
+        SCR_DrawScreenField(view, cl, STEREO_CENTER);
     }
 
-    if common.cvar(common.com_speeds).integer != 0 {
-        // PORT-NOTE(missing-symbol): `refexport_t::EndFrame` is not in the tree yet.
-        // Source: oracle/codemp/client/client.h:388
-        crate::cl_renderer::re(cl).EndFrame(&mut cl.time_frontend, &mut cl.time_backend);
-    } else {
-        crate::cl_renderer::re(cl).EndFrame(core::ptr::null_mut(), core::ptr::null_mut());
-    }
+    // `RE_EndFrame`'s own doc records the `frontEndMsec`/`backEndMsec`
+    // out-params as dissolved (no R2 carrier); both of Raven's `com_speeds`
+    // branches now call the frontend identically, so the branch collapses to
+    // one call.
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let re = unsafe { re_from_view(view) };
+    RE_EndFrame(
+        &mut re.frame_data,
+        &mut re.scene,
+        &re.assets,
+        view.common,
+        &re.cvars,
+    );
 
     cl.recursive = 0;
 }

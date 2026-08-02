@@ -4,13 +4,12 @@
 
 #![allow(non_snake_case, non_upper_case_globals)]
 
-use core::ffi::c_int;
+use core::ffi::{c_char, c_int, CStr};
 
 use mp_abi::cgame::exports::MpCgameExport;
 use mp_abi::cgame::shared_buffer::autoMapInput_t;
 use mp_abi::ui::exports::MpUiExport;
 use mp_abi::ui::public::ui_menu_command_t::UIMENU_VOICECHAT;
-use mp_bg::weapons::weapon_t::WP_SABER;
 use mp_engine_qcommon::cmd::cmd_function_t::CmdFunction;
 use mp_engine_qcommon::cmd_common::Cmd_Argv;
 use mp_engine_qcommon::common::common::{com_printf, Common};
@@ -22,12 +21,13 @@ use mp_engine_qcommon::msg::{
     MSG_Bitstream, MSG_Init, MSG_WriteByte, MSG_WriteDeltaUsercmdKey, MSG_WriteLong,
     MSG_WriteString,
 };
+use mp_engine_qcommon::qcommon::clc_ops_e::clc_ops_e;
 use mp_engine_qcommon::qcommon::joystick_axis_t::joystickAxis_t;
 use mp_engine_qcommon::qcommon::net_limits::{
     MAX_MSGLEN, MAX_PACKET_USERCMDS, MAX_RELIABLE_COMMANDS, PACKET_MASK,
 };
+use mp_engine_qcommon::qcommon::netchan_t::netchan_t;
 use mp_engine_qcommon::sys_net::Sys_IsLANAddress;
-use mp_engine_qcommon::vm::vm_s::vm_t;
 use mp_engine_qcommon::vm_fns::VM_Call;
 use mp_game::prelude::byte;
 use mp_game::q_math::{PITCH, ROLL, YAW};
@@ -37,7 +37,6 @@ use mp_qshared::common::mp::qcommon::usercmd::usercmd_t;
 use mp_qshared::common::mp::qcommon::usercmd_button::{
     BUTTON_ANY, BUTTON_FORCEPOWER, BUTTON_TALK, BUTTON_USE, BUTTON_USE_HOLDABLE, BUTTON_WALKING,
 };
-use mp_qshared::shared::cbuf_exec::cbufExec_t::EXEC_APPEND;
 use mp_qshared::shared::connstate::connstate_t::{CA_ACTIVE, CA_CINEMATIC, CA_CONNECTED, CA_PRIMED};
 use mp_qshared::shared::error_parm::errorParm_t::ERR_DROP;
 use mp_qshared::shared::force_powers::{
@@ -54,11 +53,12 @@ use mp_qshared::shared::gen_cmds::genCmds_t::{
     GENCMD_USE_ELECTROBINOCULARS, GENCMD_USE_EWEB, GENCMD_USE_FIELD, GENCMD_USE_HEALTHDISP,
     GENCMD_USE_JETPACK, GENCMD_USE_SEEKER, GENCMD_USE_SENTRY, GENCMD_ZOOM,
 };
-use mp_qshared::shared::limits::ENTITYNUM_NONE;
-use mp_qshared::shared::qboolean;
+use mp_qshared::shared::keycatch::{KEYCATCH_CGAME, KEYCATCH_UI};
+use mp_qshared::shared::{qboolean, qfalse, qtrue};
 use native_math::qmath::{AngleNormalize180, AngleNormalize360, AngleSubtract, ClampChar, Q_rsqrt};
 use native_math::vector::vec3_t;
 use native_string::atoi::atoi;
+use native_string::cstr::latin1_to_string;
 
 use crate::cl_net_chan::{CL_Netchan_Transmit, CL_Netchan_TransmitNextFragment};
 use crate::cl_scrn::SCR_DebugGraph;
@@ -71,13 +71,25 @@ use crate::client_host::Client;
 const SHORT2ANGLE_SCALE: f32 = 360.0 / 65536.0;
 const ANGLE2SHORT_SCALE: f32 = 65536.0 / 360.0;
 
-fn short2angle(x: i16) -> f32 {
+fn short2angle(x: c_int) -> f32 {
     (x as f32) * SHORT2ANGLE_SCALE
 }
 
-fn angle2short(x: f32) -> i16 {
-    (((x * ANGLE2SHORT_SCALE) as i32) & 65535) as i16
+fn angle2short(x: f32) -> c_int {
+    ((x * ANGLE2SHORT_SCALE) as c_int) & 65535
 }
+
+/// Raven `CMD_MASK` — the `cl.cmds[CMD_BACKUP]` ring mask.
+///
+/// Source: `oracle/codemp/cgame/cg_public.h:6-7`
+const CMD_MASK: c_int = 63;
+
+/// Raven `OVERRIDE_MOUSE_SENSITIVITY` — the vehicle-mode turn rate that
+/// replaces the sensitivity cvars. `VEH_CONTROL_SCHEME_4` is never defined in
+/// the MP tree, so the `#else` value stands.
+///
+/// Source: `oracle/codemp/client/cl_input.cpp:20-24`
+const OVERRIDE_MOUSE_SENSITIVITY: f32 = 10.0;
 
 fn sqrtfast(x: f32) -> f32 {
     1.0 / Q_rsqrt(x)
@@ -87,20 +99,19 @@ fn sqrtfast(x: f32) -> f32 {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:177-179`
 pub fn IN_MLookDown(cl: &mut Client) {
-    cl.cl.in_mlooking = true;
+    cl.in_mlooking = qtrue;
 }
 
 /// Raven `IN_MLookUp`.
 ///
+/// The packet's printed signature omits `common`, but the `cl_freelook` read
+/// needs it, so this adds it (shape_mismatch).
+///
 /// Source: `oracle/codemp/client/cl_input.cpp:181-186`
-pub fn IN_MLookUp(cl: &mut Client) {
-    cl.cl.in_mlooking = false;
-    // PORT-NOTE(cvar-pointer): `cl_freelook` stays a raw `*mut cvar_t` field, mirroring
-    // Raven's `cvar_t*` global exactly (mechanical §C default for `T*`).
-    unsafe {
-        if (*cl.cl.cl_freelook).integer == 0 {
-            IN_CenterView(cl);
-        }
+pub fn IN_MLookUp(common: &mut Common, cl: &mut Client) {
+    cl.in_mlooking = qfalse;
+    if common.cvar(cl.cl_freelook).integer == 0 {
+        IN_CenterView(cl);
     }
 }
 
@@ -108,144 +119,144 @@ pub fn IN_MLookUp(cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:188-192`
 pub fn IN_GenCMD1(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_SABERSWITCH as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_SABERSWITCH as u8;
 }
 
 /// Raven `IN_GenCMD2`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:194-198`
 pub fn IN_GenCMD2(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_ENGAGE_DUEL as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_ENGAGE_DUEL as u8;
 }
 
 /// Raven `IN_GenCMD3`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:200-204`
 pub fn IN_GenCMD3(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_FORCE_HEAL as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_FORCE_HEAL as u8;
 }
 
 /// Raven `IN_GenCMD4`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:206-210`
 pub fn IN_GenCMD4(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_FORCE_SPEED as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_FORCE_SPEED as u8;
 }
 
 /// Raven `IN_GenCMD5`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:212-216`
 pub fn IN_GenCMD5(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_FORCE_PULL as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_FORCE_PULL as u8;
 }
 
 /// Raven `IN_GenCMD6`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:218-222`
 pub fn IN_GenCMD6(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_FORCE_DISTRACT as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_FORCE_DISTRACT as u8;
 }
 
 /// Raven `IN_GenCMD7`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:224-228`
 pub fn IN_GenCMD7(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_FORCE_RAGE as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_FORCE_RAGE as u8;
 }
 
 /// Raven `IN_GenCMD8`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:230-234`
 pub fn IN_GenCMD8(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_FORCE_PROTECT as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_FORCE_PROTECT as u8;
 }
 
 /// Raven `IN_GenCMD9`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:236-240`
 pub fn IN_GenCMD9(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_FORCE_ABSORB as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_FORCE_ABSORB as u8;
 }
 
 /// Raven `IN_GenCMD10`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:242-246`
 pub fn IN_GenCMD10(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_FORCE_HEALOTHER as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_FORCE_HEALOTHER as u8;
 }
 
 /// Raven `IN_GenCMD11`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:248-252`
 pub fn IN_GenCMD11(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_FORCE_FORCEPOWEROTHER as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_FORCE_FORCEPOWEROTHER as u8;
 }
 
 /// Raven `IN_GenCMD12`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:254-258`
 pub fn IN_GenCMD12(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_FORCE_SEEING as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_FORCE_SEEING as u8;
 }
 
 /// Raven `IN_GenCMD13`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:260-264`
 pub fn IN_GenCMD13(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_USE_SEEKER as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_USE_SEEKER as u8;
 }
 
 /// Raven `IN_GenCMD14`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:266-270`
 pub fn IN_GenCMD14(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_USE_FIELD as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_USE_FIELD as u8;
 }
 
 /// Raven `IN_GenCMD15`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:272-276`
 pub fn IN_GenCMD15(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_USE_BACTA as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_USE_BACTA as u8;
 }
 
 /// Raven `IN_GenCMD16`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:278-282`
 pub fn IN_GenCMD16(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_USE_ELECTROBINOCULARS as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_USE_ELECTROBINOCULARS as u8;
 }
 
 /// Raven `IN_GenCMD17`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:284-288`
 pub fn IN_GenCMD17(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_ZOOM as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_ZOOM as u8;
 }
 
 /// Raven `IN_GenCMD18`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:290-294`
 pub fn IN_GenCMD18(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_USE_SENTRY as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_USE_SENTRY as u8;
 }
 
 /// Raven `IN_GenCMD19`.
@@ -259,104 +270,104 @@ pub fn IN_GenCMD19(common: &mut Common, cl: &mut Client) {
     if Cvar_VariableIntegerValue(common, "d_saberStanceDebug") != 0 {
         com_printf(common, "SABERSTANCEDEBUG: Gencmd on client set successfully.\n");
     }
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_SABERATTACKCYCLE as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_SABERATTACKCYCLE as u8;
 }
 
 /// Raven `IN_GenCMD20`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:314-318`
 pub fn IN_GenCMD20(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_FORCE_THROW as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_FORCE_THROW as u8;
 }
 
 /// Raven `IN_GenCMD21`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:320-324`
 pub fn IN_GenCMD21(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_USE_JETPACK as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_USE_JETPACK as u8;
 }
 
 /// Raven `IN_GenCMD22`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:326-330`
 pub fn IN_GenCMD22(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_USE_BACTABIG as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_USE_BACTABIG as u8;
 }
 
 /// Raven `IN_GenCMD23`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:332-336`
 pub fn IN_GenCMD23(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_USE_HEALTHDISP as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_USE_HEALTHDISP as u8;
 }
 
 /// Raven `IN_GenCMD24`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:338-342`
 pub fn IN_GenCMD24(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_USE_AMMODISP as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_USE_AMMODISP as u8;
 }
 
 /// Raven `IN_GenCMD25`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:344-348`
 pub fn IN_GenCMD25(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_USE_EWEB as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_USE_EWEB as u8;
 }
 
 /// Raven `IN_GenCMD26`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:350-354`
 pub fn IN_GenCMD26(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_USE_CLOAK as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_USE_CLOAK as u8;
 }
 
 /// Raven `IN_GenCMD27`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:356-360`
 pub fn IN_GenCMD27(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_TAUNT as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_TAUNT as u8;
 }
 
 /// Raven `IN_GenCMD28`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:362-366`
 pub fn IN_GenCMD28(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_BOW as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_BOW as u8;
 }
 
 /// Raven `IN_GenCMD29`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:368-372`
 pub fn IN_GenCMD29(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_MEDITATE as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_MEDITATE as u8;
 }
 
 /// Raven `IN_GenCMD30`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:374-378`
 pub fn IN_GenCMD30(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_FLOURISH as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_FLOURISH as u8;
 }
 
 /// Raven `IN_GenCMD31`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:380-384`
 pub fn IN_GenCMD31(cl: &mut Client) {
-    cl.cl.gcmdSendValue = true;
-    cl.cl.gcmdValue = GENCMD_GLOAT as c_int;
+    cl.cl.gcmdSendValue = qtrue;
+    cl.cl.gcmdValue = GENCMD_GLOAT as u8;
 }
 
 /// Raven `IN_AutoMapButton`.
@@ -426,17 +437,17 @@ pub fn IN_KeyDown(common: &mut Common, b: *mut kbutton_t) {
             return;
         }
 
-        if (*b).active {
+        if (*b).active != 0 {
             // still down
             return;
         }
 
         // save timestamp for partial frame summing
         let c2 = Cmd_Argv(common, 2);
-        (*b).downtime = atoi(c2);
+        (*b).downtime = atoi(c2) as u32;
 
-        (*b).active = true;
-        (*b).wasPressed = true;
+        (*b).active = qtrue;
+        (*b).wasPressed = qtrue;
     }
 }
 
@@ -455,7 +466,7 @@ pub fn IN_KeyUp(common: &mut Common, cl: &mut Client, b: *mut kbutton_t) {
             // typed manually at the console, assume for unsticking, so clear all
             (*b).down[0] = 0;
             (*b).down[1] = 0;
-            (*b).active = false;
+            (*b).active = qfalse;
             return;
         };
 
@@ -472,18 +483,20 @@ pub fn IN_KeyUp(common: &mut Common, cl: &mut Client, b: *mut kbutton_t) {
             return;
         }
 
-        (*b).active = false;
+        (*b).active = qfalse;
 
         // save timestamp for partial frame summing
         let c2 = Cmd_Argv(common, 2);
         let uptime = atoi(c2);
         if uptime != 0 {
-            (*b).msec += uptime - (*b).downtime;
+            // Raven computes `uptime - b->downtime` in unsigned, so the wrapping
+            // subtraction keeps the C result for a stale downtime.
+            (*b).msec = (*b).msec.wrapping_add((uptime as u32).wrapping_sub((*b).downtime));
         } else {
-            (*b).msec += cl.frame_msec as i32 / 2;
+            (*b).msec += cl.frame_msec / 2;
         }
 
-        (*b).active = false;
+        (*b).active = qfalse;
     }
 }
 
@@ -495,14 +508,17 @@ pub fn CL_KeyState(common: &mut Common, cl: &mut Client, key: *mut kbutton_t) ->
         let mut msec = (*key).msec;
         (*key).msec = 0;
 
-        if (*key).active {
+        if (*key).active != 0 {
             // still down
             if (*key).downtime == 0 {
-                msec = common.com_frameTime;
+                msec = common.com_frameTime as u32;
             } else {
-                msec += common.com_frameTime - (*key).downtime;
+                // Raven computes `com_frameTime - key->downtime` in unsigned.
+                msec = msec.wrapping_add(
+                    (common.com_frameTime as u32).wrapping_sub((*key).downtime),
+                );
             }
-            (*key).downtime = common.com_frameTime;
+            (*key).downtime = common.com_frameTime as u32;
         }
 
         let mut val = msec as f32 / cl.frame_msec as f32;
@@ -527,29 +543,34 @@ pub fn CL_AutoMapKey(common: &mut Common, cl: &mut Client, autoMapKey: c_int, up
     let data = cl.cl.mSharedMemory as *mut autoMapInput_t;
 
     match autoMapKey {
-        //TODO: Port AUTOMAP_KEY_FORWARD
-        // Source: escalation — not in the rosetta yet.
         x if x == AUTOMAP_KEY_FORWARD => {
-            cl.g_clAutoMapInput.up = if up { 0.0 } else { 16.0 };
+            cl.g_clAutoMapInput.up = if up != 0 { 0.0 } else { 16.0 };
         }
         x if x == AUTOMAP_KEY_BACK => {
-            cl.g_clAutoMapInput.down = if up { 0.0 } else { 16.0 };
+            cl.g_clAutoMapInput.down = if up != 0 { 0.0 } else { 16.0 };
         }
         x if x == AUTOMAP_KEY_YAWLEFT => {
-            cl.g_clAutoMapInput.yaw = if up { 0.0 } else { -4.0 };
+            cl.g_clAutoMapInput.yaw = if up != 0 { 0.0 } else { -4.0 };
         }
         x if x == AUTOMAP_KEY_YAWRIGHT => {
-            cl.g_clAutoMapInput.yaw = if up { 0.0 } else { 4.0 };
+            cl.g_clAutoMapInput.yaw = if up != 0 { 0.0 } else { 4.0 };
         }
         x if x == AUTOMAP_KEY_PITCHUP => {
-            cl.g_clAutoMapInput.pitch = if up { 0.0 } else { -4.0 };
+            cl.g_clAutoMapInput.pitch = if up != 0 { 0.0 } else { -4.0 };
         }
         x if x == AUTOMAP_KEY_PITCHDOWN => {
-            cl.g_clAutoMapInput.pitch = if up { 0.0 } else { 4.0 };
+            cl.g_clAutoMapInput.pitch = if up != 0 { 0.0 } else { 4.0 };
         }
         x if x == AUTOMAP_KEY_DEFAULTVIEW => {
-            cl.g_clAutoMapInput = Default::default();
-            cl.g_clAutoMapInput.goToDefaults = true;
+            // Raven's `memset(&g_clAutoMapInput, 0, sizeof(autoMapInput_t))`.
+            cl.g_clAutoMapInput = autoMapInput_t {
+                up: 0.0,
+                down: 0.0,
+                yaw: 0.0,
+                pitch: 0.0,
+                goToDefaults: qfalse,
+            };
+            cl.g_clAutoMapInput.goToDefaults = qtrue;
         }
         _ => {}
     }
@@ -566,7 +587,7 @@ pub fn CL_AutoMapKey(common: &mut Common, cl: &mut Client, autoMapKey: c_int, up
         VM_Call(common, cl.cgvm, MpCgameExport::CG_AUTOMAP_INPUT as c_int, &[0]);
     }
 
-    cl.g_clAutoMapInput.goToDefaults = false;
+    cl.g_clAutoMapInput.goToDefaults = qfalse;
 }
 
 /// Raven `AUTOMAP_KEY_*` — the automap key codes that `CL_AutoMapKey` switches on.
@@ -595,12 +616,6 @@ pub fn IN_CenterView(cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:992-1013`
 pub fn CL_MouseEvent(common: &mut Common, cl: &mut Client, dx: c_int, dy: c_int, _time: c_int) {
-    //TODO: Port KEYCATCH_UI
-    //TODO: Port KEYCATCH_CGAME
-    // Source: escalation — not in the rosetta yet.
-    const KEYCATCH_UI: c_int = 1;
-    const KEYCATCH_CGAME: c_int = 2;
-
     if cl.g_clAutoMapMode && !cl.cgvm.is_null() {
         let data = cl.cl.mSharedMemory as *mut autoMapInput_t;
 
@@ -642,9 +657,6 @@ pub fn CL_MouseEvent(common: &mut Common, cl: &mut Client, dx: c_int, dy: c_int,
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:1022-1027`
 pub fn CL_JoystickEvent(cl: &mut Client, axis: c_int, value: c_int, _time: c_int) {
-    //TODO: Port MAX_JOYSTICK_AXIS
-    // Source: oracle/codemp/client/../qcommon/joystick_axis_t.h (rosetta row exists,
-    // resolved via joystickAxis_t below).
     if axis < 0 || axis >= joystickAxis_t::MAX_JOYSTICK_AXIS as c_int {
         com_error(ERR_DROP, format!("CL_JoystickEvent: bad axis {}", axis));
     }
@@ -654,33 +666,29 @@ pub fn CL_JoystickEvent(cl: &mut Client, axis: c_int, value: c_int, _time: c_int
 /// Raven `CL_JoystickMove`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:1035-1106`
-pub fn CL_JoystickMove(cl: &mut Client, cmd: *mut usercmd_t) {
-    //TODO: Port OVERRIDE_MOUSE_SENSITIVITY
-    // Source: escalation — not in the rosetta yet.
-    const OVERRIDE_MOUSE_SENSITIVITY: f32 = 1.0;
-
+pub fn CL_JoystickMove(common: &mut Common, cl: &mut Client, cmd: *mut usercmd_t) {
     unsafe {
-        if (*cl.in_joystick).integer == 0 {
+        if common.cvar(cl.in_joystick).integer == 0 {
             return;
         }
 
         let movespeed;
         let anglespeed;
 
-        if (cl.in_speed.active as c_int) ^ (*cl.cl_run).integer != 0 {
+        if cl.in_speed.active ^ common.cvar(cl.cl_run).integer != 0 {
             movespeed = 2;
         } else {
             movespeed = 1;
-            (*cmd).buttons |= BUTTON_WALKING as u8;
+            (*cmd).buttons |= BUTTON_WALKING;
         }
 
-        if cl.in_speed.active {
-            anglespeed = 0.001 * cl.cls.frametime as f32 * (*cl.cl_anglespeedkey).value;
+        if cl.in_speed.active != 0 {
+            anglespeed = 0.001 * cl.cls.frametime as f32 * common.cvar(cl.cl_anglespeedkey).value;
         } else {
             anglespeed = 0.001 * cl.cls.frametime as f32;
         }
 
-        if !cl.in_strafe.active {
+        if cl.in_strafe.active == 0 {
             if cl.cl_mYawOverride != 0.0 {
                 if cl.cl_mSensitivityOverride != 0.0 {
                     cl.cl.viewangles[YAW as usize] += cl.cl_mYawOverride
@@ -695,15 +703,16 @@ pub fn CL_JoystickMove(cl: &mut Client, cmd: *mut usercmd_t) {
                 }
             } else {
                 cl.cl.viewangles[YAW as usize] += anglespeed
-                    * ((*cl.cl_yawspeed).value / 100.0)
+                    * (common.cvar(cl.cl_yawspeed).value / 100.0)
                     * cl.cl.joystickAxis[joystickAxis_t::AXIS_SIDE as usize] as f32;
             }
         } else {
-            (*cmd).rightmove =
-                ClampChar((*cmd).rightmove as c_int + cl.cl.joystickAxis[joystickAxis_t::AXIS_SIDE as usize]);
+            (*cmd).rightmove = ClampChar(
+                (*cmd).rightmove as c_int + cl.cl.joystickAxis[joystickAxis_t::AXIS_SIDE as usize],
+            );
         }
 
-        if cl.in_mlooking || (*cl.cl_freelook).integer != 0 {
+        if cl.in_mlooking != 0 || common.cvar(cl.cl_freelook).integer != 0 {
             if cl.cl_mPitchOverride != 0.0 {
                 if cl.cl_mSensitivityOverride != 0.0 {
                     cl.cl.viewangles[PITCH as usize] += cl.cl_mPitchOverride
@@ -718,17 +727,19 @@ pub fn CL_JoystickMove(cl: &mut Client, cmd: *mut usercmd_t) {
                 }
             } else {
                 cl.cl.viewangles[PITCH as usize] += anglespeed
-                    * ((*cl.cl_pitchspeed).value / 100.0)
+                    * (common.cvar(cl.cl_pitchspeed).value / 100.0)
                     * cl.cl.joystickAxis[joystickAxis_t::AXIS_FORWARD as usize] as f32;
             }
         } else {
             (*cmd).forwardmove = ClampChar(
-                (*cmd).forwardmove as c_int + cl.cl.joystickAxis[joystickAxis_t::AXIS_FORWARD as usize],
+                (*cmd).forwardmove as c_int
+                    + cl.cl.joystickAxis[joystickAxis_t::AXIS_FORWARD as usize],
             );
         }
 
-        (*cmd).upmove =
-            ClampChar((*cmd).upmove as c_int + cl.cl.joystickAxis[joystickAxis_t::AXIS_UP as usize]);
+        (*cmd).upmove = ClampChar(
+            (*cmd).upmove as c_int + cl.cl.joystickAxis[joystickAxis_t::AXIS_UP as usize],
+        );
     }
 }
 
@@ -741,15 +752,15 @@ pub fn CL_JoystickMove(cl: &mut Client, cmd: *mut usercmd_t) {
 pub fn CL_MouseMove(common: &mut Common, cl: &mut Client, cmd: *mut usercmd_t) {
     let speed = cl.frame_msec as f32;
     unsafe {
-        let pitch = if cl.cl_bUseFighterPitch {
-            (*cl.m_pitchVeh).value
+        let pitch = if cl.cl_bUseFighterPitch != 0 {
+            common.cvar(cl.m_pitchVeh).value
         } else {
-            (*cl.m_pitch).value
+            common.cvar(cl.m_pitch).value
         };
 
         let (mut mx, mut my): (f32, f32);
         // The oracle's `_XBOX` arm never compiles on this target, so it is dropped (rule 20).
-        if (*cl.m_filter).integer != 0 {
+        if common.cvar(cl.m_filter).integer != 0 {
             mx = (cl.cl.mouseDx[0] + cl.cl.mouseDx[1]) as f32 * 0.5;
             my = (cl.cl.mouseDy[0] + cl.cl.mouseDy[1]) as f32 * 0.5;
         } else {
@@ -767,15 +778,17 @@ pub fn CL_MouseMove(common: &mut Common, cl: &mut Client, cmd: *mut usercmd_t) {
             if cl.cl_mSensitivityOverride != 0.0 {
                 accelSensitivity = cl.cl_mSensitivityOverride;
             } else {
-                accelSensitivity = (*cl.cl_sensitivity).value + rate * (*cl.cl_mouseAccel).value;
+                accelSensitivity = common.cvar(cl.cl_sensitivity).value
+                    + rate * common.cvar(cl.cl_mouseAccel).value;
                 accelSensitivity *= cl.cl.cgameSensitivity;
             }
         } else {
-            accelSensitivity = (*cl.cl_sensitivity).value + rate * (*cl.cl_mouseAccel).value;
+            accelSensitivity =
+                common.cvar(cl.cl_sensitivity).value + rate * common.cvar(cl.cl_mouseAccel).value;
             accelSensitivity *= cl.cl.cgameSensitivity;
         }
 
-        if rate != 0.0 && (*cl.cl_showMouseRate).integer != 0 {
+        if rate != 0.0 && common.cvar(cl.cl_showMouseRate).integer != 0 {
             com_printf(common, &format!("{} : {}\n", rate, accelSensitivity));
         }
 
@@ -787,28 +800,34 @@ pub fn CL_MouseMove(common: &mut Common, cl: &mut Client, cmd: *mut usercmd_t) {
         }
 
         // add mouse X/Y movement to cmd
-        if cl.in_strafe.active {
-            (*cmd).rightmove = ClampChar((*cmd).rightmove as c_int + ((*cl.m_side).value * mx) as c_int);
+        if cl.in_strafe.active != 0 {
+            (*cmd).rightmove =
+                ClampChar((*cmd).rightmove as c_int + (common.cvar(cl.m_side).value * mx) as c_int);
         } else if cl.cl_mYawOverride != 0.0 {
             cl.cl.viewangles[YAW as usize] -= cl.cl_mYawOverride * mx;
         } else {
-            cl.cl.viewangles[YAW as usize] -= (*cl.m_yaw).value * mx;
+            cl.cl.viewangles[YAW as usize] -= common.cvar(cl.m_yaw).value * mx;
         }
 
-        if (cl.in_mlooking || (*cl.cl_freelook).integer != 0) && !cl.in_strafe.active {
+        if (cl.in_mlooking != 0 || common.cvar(cl.cl_freelook).integer != 0)
+            && cl.in_strafe.active == 0
+        {
             let cl_pitchSensitivity: f32 = 1.0;
             if cl.cl_mPitchOverride != 0.0 {
                 if pitch > 0.0 {
-                    cl.cl.viewangles[PITCH as usize] += cl.cl_mPitchOverride * my * cl_pitchSensitivity;
+                    cl.cl.viewangles[PITCH as usize] +=
+                        cl.cl_mPitchOverride * my * cl_pitchSensitivity;
                 } else {
-                    cl.cl.viewangles[PITCH as usize] -= cl.cl_mPitchOverride * my * cl_pitchSensitivity;
+                    cl.cl.viewangles[PITCH as usize] -=
+                        cl.cl_mPitchOverride * my * cl_pitchSensitivity;
                 }
             } else {
                 cl.cl.viewangles[PITCH as usize] += pitch * my * cl_pitchSensitivity;
             }
         } else {
-            (*cmd).forwardmove =
-                ClampChar((*cmd).forwardmove as c_int - ((*cl.m_forward).value * my) as c_int);
+            (*cmd).forwardmove = ClampChar(
+                (*cmd).forwardmove as c_int - (common.cvar(cl.m_forward).value * my) as c_int,
+            );
         }
     }
 }
@@ -822,9 +841,14 @@ pub fn CL_MouseMove(common: &mut Common, cl: &mut Client, cmd: *mut usercmd_t) {
 pub fn CL_NoUseableForce(common: &mut Common, cl: &mut Client) -> qboolean {
     if cl.cgvm.is_null() {
         // no cgame loaded
-        return false;
+        return qfalse;
     }
-    VM_Call(common, cl.cgvm, MpCgameExport::CG_GET_USEABLE_FORCE as c_int, &[]) != 0
+    VM_Call(
+        common,
+        cl.cgvm,
+        MpCgameExport::CG_GET_USEABLE_FORCE as c_int,
+        &[],
+    ) as qboolean
 }
 
 /// Raven `CL_FinishMove`.
@@ -837,9 +861,9 @@ pub fn CL_FinishMove(cl: &mut Client, cmd: *mut usercmd_t) {
         (*cmd).forcesel = cl.cl.cgameForceSelection as u8;
         (*cmd).invensel = cl.cl.cgameInvenSelection as u8;
 
-        if cl.cl.gcmdSendValue {
-            (*cmd).generic_cmd = cl.cl.gcmdValue as u8;
-            cl.cl.gcmdSentValue = true;
+        if cl.cl.gcmdSendValue != 0 {
+            (*cmd).generic_cmd = cl.cl.gcmdValue;
+            cl.cl.gcmdSentValue = qtrue;
         } else {
             (*cmd).generic_cmd = 0;
         }
@@ -856,14 +880,19 @@ pub fn CL_FinishMove(cl: &mut Client, cmd: *mut usercmd_t) {
             cl.cl.cgameViewAngleForceTime = 0;
         }
 
-        if cl.cl_crazyShipControls {
-            let yawDelta = AngleSubtract(cl.cl.viewangles[YAW as usize], cl.cl_lastViewAngles[YAW as usize]);
+        if cl.cl_crazyShipControls != 0 {
+            let yawDelta = AngleSubtract(
+                cl.cl.viewangles[YAW as usize],
+                cl.cl_lastViewAngles[YAW as usize],
+            );
             cl.cl_sendAngles[ROLL as usize] -= yawDelta;
 
             let mut nRoll = cl.cl_sendAngles[ROLL as usize].abs();
 
-            let pitchDelta =
-                AngleSubtract(cl.cl.viewangles[PITCH as usize], cl.cl_lastViewAngles[PITCH as usize]);
+            let pitchDelta = AngleSubtract(
+                cl.cl.viewangles[PITCH as usize],
+                cl.cl_lastViewAngles[PITCH as usize],
+            );
             let mut pitchSubtract = pitchDelta * (nRoll / 90.0);
             cl.cl_sendAngles[PITCH as usize] += pitchDelta - pitchSubtract;
 
@@ -908,131 +937,105 @@ pub fn CL_FinishMove(cl: &mut Client, cmd: *mut usercmd_t) {
 /// Source: `oracle/codemp/client/cl_input.cpp:1529-1585`
 pub fn CL_ReadyToSendPacket(view: &mut EngineHostView, cl: &mut Client) -> qboolean {
     // don't send anything if playing back a demo
-    if cl.clc.demoplaying || cl.cls.state == CA_CINEMATIC as c_int {
-        return false;
+    if cl.clc.demoplaying != 0 || cl.cls.state == CA_CINEMATIC {
+        return qfalse;
     }
 
     // If we are downloading, we send no less than 50ms between packets
-    if !cl.clc.downloadTempName.is_empty() && cl.cls.realtime - cl.clc.lastPacketSentTime < 50 {
-        return false;
+    if cl.clc.downloadTempName[0] != 0 && cl.cls.realtime - cl.clc.lastPacketSentTime < 50 {
+        return qfalse;
     }
 
     // if we don't have a valid gamestate yet, only send one packet a second
-    if cl.cls.state != CA_ACTIVE as c_int
-        && cl.cls.state != CA_PRIMED as c_int
-        && cl.clc.downloadTempName.is_empty()
+    if cl.cls.state != CA_ACTIVE
+        && cl.cls.state != CA_PRIMED
+        && cl.clc.downloadTempName[0] == 0
         && cl.cls.realtime - cl.clc.lastPacketSentTime < 1000
     {
-        return false;
+        return qfalse;
     }
 
     // send every frame for loopbacks
-    if cl.clc.netchan.remoteAddress.kind == NA_LOOPBACK as c_int {
-        return true;
+    if cl.clc.netchan.remoteAddress.r#type == NA_LOOPBACK {
+        return qtrue;
     }
 
     // send every frame for LAN
     if Sys_IsLANAddress(&cl.clc.netchan.remoteAddress) {
-        return true;
+        return qtrue;
     }
 
     // check for exceeding cl_maxpackets
-    unsafe {
-        if (*cl.cl_maxpackets).integer < 15 {
-            Cvar_Set(view, "cl_maxpackets", "15");
-        } else if (*cl.cl_maxpackets).integer > 100 {
-            Cvar_Set(view, "cl_maxpackets", "100");
-        }
-
-        let oldPacketNum = ((cl.clc.netchan.outgoingSequence - 1) & PACKET_MASK) as usize;
-        let delta = cl.cls.realtime - cl.cl.outPackets[oldPacketNum].p_realtime;
-        if delta < 1000 / (*cl.cl_maxpackets).integer {
-            // the accumulated commands will go out in the next packet
-            return false;
-        }
+    if view.common.cvar(cl.cl_maxpackets).integer < 15 {
+        Cvar_Set(view, "cl_maxpackets", "15");
+    } else if view.common.cvar(cl.cl_maxpackets).integer > 100 {
+        Cvar_Set(view, "cl_maxpackets", "100");
     }
 
-    true
+    let oldPacketNum = ((cl.clc.netchan.outgoingSequence - 1) as usize) & PACKET_MASK;
+    let delta = cl.cls.realtime - cl.cl.outPackets[oldPacketNum].p_realtime;
+    if delta < 1000 / view.common.cvar(cl.cl_maxpackets).integer {
+        // the accumulated commands will go out in the next packet
+        return qfalse;
+    }
+
+    qtrue
 }
 
 /// Raven `CL_AdjustAngles`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:890-938`
 pub fn CL_AdjustAngles(common: &mut Common, cl: &mut Client) {
-    //TODO: Port OVERRIDE_MOUSE_SENSITIVITY
-    // Source: escalation — not in the rosetta yet.
-    const OVERRIDE_MOUSE_SENSITIVITY: f32 = 1.0;
+    // The key-hold pointers come out first, so `CL_KeyState` and the `viewangles`
+    // writes do not borrow `cl` at the same time. Raven calls right before left
+    // and lookup before lookdown, and that order stands.
+    let in_right = &mut cl.in_right as *mut kbutton_t;
+    let in_left = &mut cl.in_left as *mut kbutton_t;
+    let in_lookup = &mut cl.in_lookup as *mut kbutton_t;
+    let in_lookdown = &mut cl.in_lookdown as *mut kbutton_t;
 
-    unsafe {
-        let speed = if cl.in_speed.active {
-            0.001 * cl.cls.frametime as f32 * (*cl.cl_anglespeedkey).value
+    let speed = if cl.in_speed.active != 0 {
+        0.001 * cl.cls.frametime as f32 * common.cvar(cl.cl_anglespeedkey).value
+    } else {
+        0.001 * cl.cls.frametime as f32
+    };
+
+    if cl.in_strafe.active == 0 {
+        let yawspeed = common.cvar(cl.cl_yawspeed).value;
+        let ksRight = CL_KeyState(common, cl, in_right);
+        let ksLeft = CL_KeyState(common, cl, in_left);
+        if cl.cl_mYawOverride != 0.0 {
+            let sensitivity = if cl.cl_mSensitivityOverride != 0.0 {
+                cl.cl_mSensitivityOverride
+            } else {
+                OVERRIDE_MOUSE_SENSITIVITY
+            };
+            cl.cl.viewangles[YAW as usize] -=
+                cl.cl_mYawOverride * sensitivity * speed * yawspeed * ksRight;
+            cl.cl.viewangles[YAW as usize] +=
+                cl.cl_mYawOverride * sensitivity * speed * yawspeed * ksLeft;
         } else {
-            0.001 * cl.cls.frametime as f32
+            cl.cl.viewangles[YAW as usize] -= speed * yawspeed * ksRight;
+            cl.cl.viewangles[YAW as usize] += speed * yawspeed * ksLeft;
+        }
+    }
+
+    let pitchspeed = common.cvar(cl.cl_pitchspeed).value;
+    let ksLookup = CL_KeyState(common, cl, in_lookup);
+    let ksLookdown = CL_KeyState(common, cl, in_lookdown);
+    if cl.cl_mPitchOverride != 0.0 {
+        let sensitivity = if cl.cl_mSensitivityOverride != 0.0 {
+            cl.cl_mSensitivityOverride
+        } else {
+            OVERRIDE_MOUSE_SENSITIVITY
         };
-
-        if !cl.in_strafe.active {
-            if cl.cl_mYawOverride != 0.0 {
-                if cl.cl_mSensitivityOverride != 0.0 {
-                    cl.cl.viewangles[YAW as usize] -= cl.cl_mYawOverride
-                        * cl.cl_mSensitivityOverride
-                        * speed
-                        * (*cl.cl_yawspeed).value
-                        * CL_KeyState(common, cl, &mut cl.in_right as *mut kbutton_t);
-                    cl.cl.viewangles[YAW as usize] += cl.cl_mYawOverride
-                        * cl.cl_mSensitivityOverride
-                        * speed
-                        * (*cl.cl_yawspeed).value
-                        * CL_KeyState(common, cl, &mut cl.in_left as *mut kbutton_t);
-                } else {
-                    cl.cl.viewangles[YAW as usize] -= cl.cl_mYawOverride
-                        * OVERRIDE_MOUSE_SENSITIVITY
-                        * speed
-                        * (*cl.cl_yawspeed).value
-                        * CL_KeyState(common, cl, &mut cl.in_right as *mut kbutton_t);
-                    cl.cl.viewangles[YAW as usize] += cl.cl_mYawOverride
-                        * OVERRIDE_MOUSE_SENSITIVITY
-                        * speed
-                        * (*cl.cl_yawspeed).value
-                        * CL_KeyState(common, cl, &mut cl.in_left as *mut kbutton_t);
-                }
-            } else {
-                cl.cl.viewangles[YAW as usize] -=
-                    speed * (*cl.cl_yawspeed).value * CL_KeyState(common, cl, &mut cl.in_right as *mut kbutton_t);
-                cl.cl.viewangles[YAW as usize] +=
-                    speed * (*cl.cl_yawspeed).value * CL_KeyState(common, cl, &mut cl.in_left as *mut kbutton_t);
-            }
-        }
-
-        if cl.cl_mPitchOverride != 0.0 {
-            if cl.cl_mSensitivityOverride != 0.0 {
-                cl.cl.viewangles[PITCH as usize] -= cl.cl_mPitchOverride
-                    * cl.cl_mSensitivityOverride
-                    * speed
-                    * (*cl.cl_pitchspeed).value
-                    * CL_KeyState(common, cl, &mut cl.in_lookup as *mut kbutton_t);
-                cl.cl.viewangles[PITCH as usize] += cl.cl_mPitchOverride
-                    * cl.cl_mSensitivityOverride
-                    * speed
-                    * (*cl.cl_pitchspeed).value
-                    * CL_KeyState(common, cl, &mut cl.in_lookdown as *mut kbutton_t);
-            } else {
-                cl.cl.viewangles[PITCH as usize] -= cl.cl_mPitchOverride
-                    * OVERRIDE_MOUSE_SENSITIVITY
-                    * speed
-                    * (*cl.cl_pitchspeed).value
-                    * CL_KeyState(common, cl, &mut cl.in_lookup as *mut kbutton_t);
-                cl.cl.viewangles[PITCH as usize] += cl.cl_mPitchOverride
-                    * OVERRIDE_MOUSE_SENSITIVITY
-                    * speed
-                    * (*cl.cl_pitchspeed).value
-                    * CL_KeyState(common, cl, &mut cl.in_lookdown as *mut kbutton_t);
-            }
-        } else {
-            cl.cl.viewangles[PITCH as usize] -=
-                speed * (*cl.cl_pitchspeed).value * CL_KeyState(common, cl, &mut cl.in_lookup as *mut kbutton_t);
-            cl.cl.viewangles[PITCH as usize] +=
-                speed * (*cl.cl_pitchspeed).value * CL_KeyState(common, cl, &mut cl.in_lookdown as *mut kbutton_t);
-        }
+        cl.cl.viewangles[PITCH as usize] -=
+            cl.cl_mPitchOverride * sensitivity * speed * pitchspeed * ksLookup;
+        cl.cl.viewangles[PITCH as usize] +=
+            cl.cl_mPitchOverride * sensitivity * speed * pitchspeed * ksLookdown;
+    } else {
+        cl.cl.viewangles[PITCH as usize] -= speed * pitchspeed * ksLookup;
+        cl.cl.viewangles[PITCH as usize] += speed * pitchspeed * ksLookdown;
     }
 }
 
@@ -1040,32 +1043,46 @@ pub fn CL_AdjustAngles(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:947-985`
 pub fn CL_KeyMove(common: &mut Common, cl: &mut Client, cmd: *mut usercmd_t) {
+    // The key-hold pointers come out first, so `CL_KeyState` and the `cl` reads
+    // do not borrow `cl` at the same time.
+    let in_right = &mut cl.in_right as *mut kbutton_t;
+    let in_left = &mut cl.in_left as *mut kbutton_t;
+    let in_moveright = &mut cl.in_moveright as *mut kbutton_t;
+    let in_moveleft = &mut cl.in_moveleft as *mut kbutton_t;
+    let in_up = &mut cl.in_up as *mut kbutton_t;
+    let in_down = &mut cl.in_down as *mut kbutton_t;
+    let in_forward = &mut cl.in_forward as *mut kbutton_t;
+    let in_back = &mut cl.in_back as *mut kbutton_t;
+
     unsafe {
-        let movespeed;
-        if (cl.in_speed.active as c_int) ^ (*cl.cl_run).integer != 0 {
+        let movespeed: c_int;
+        if cl.in_speed.active ^ common.cvar(cl.cl_run).integer != 0 {
             movespeed = 127;
-            (*cmd).buttons &= !(BUTTON_WALKING as u8);
+            (*cmd).buttons &= !BUTTON_WALKING;
         } else {
-            (*cmd).buttons |= BUTTON_WALKING as u8;
+            (*cmd).buttons |= BUTTON_WALKING;
             movespeed = 46;
         }
 
-        let mut forward = 0;
-        let mut side = 0;
-        let mut up = 0;
-        if cl.in_strafe.active {
-            side += movespeed * CL_KeyState(common, cl, &mut cl.in_right as *mut kbutton_t) as i32;
-            side -= movespeed * CL_KeyState(common, cl, &mut cl.in_left as *mut kbutton_t) as i32;
+        // Raven accumulates an `int` from a float product, so each step
+        // truncates the running sum, the same as C's `int += float`.
+        let mut forward: c_int = 0;
+        let mut side: c_int = 0;
+        let mut up: c_int = 0;
+        if cl.in_strafe.active != 0 {
+            side = (side as f32 + movespeed as f32 * CL_KeyState(common, cl, in_right)) as c_int;
+            side = (side as f32 - movespeed as f32 * CL_KeyState(common, cl, in_left)) as c_int;
         }
 
-        side += movespeed * CL_KeyState(common, cl, &mut cl.in_moveright as *mut kbutton_t) as i32;
-        side -= movespeed * CL_KeyState(common, cl, &mut cl.in_moveleft as *mut kbutton_t) as i32;
+        side = (side as f32 + movespeed as f32 * CL_KeyState(common, cl, in_moveright)) as c_int;
+        side = (side as f32 - movespeed as f32 * CL_KeyState(common, cl, in_moveleft)) as c_int;
 
-        up += movespeed * CL_KeyState(common, cl, &mut cl.in_up as *mut kbutton_t) as i32;
-        up -= movespeed * CL_KeyState(common, cl, &mut cl.in_down as *mut kbutton_t) as i32;
+        up = (up as f32 + movespeed as f32 * CL_KeyState(common, cl, in_up)) as c_int;
+        up = (up as f32 - movespeed as f32 * CL_KeyState(common, cl, in_down)) as c_int;
 
-        forward += movespeed * CL_KeyState(common, cl, &mut cl.in_forward as *mut kbutton_t) as i32;
-        forward -= movespeed * CL_KeyState(common, cl, &mut cl.in_back as *mut kbutton_t) as i32;
+        forward =
+            (forward as f32 + movespeed as f32 * CL_KeyState(common, cl, in_forward)) as c_int;
+        forward = (forward as f32 - movespeed as f32 * CL_KeyState(common, cl, in_back)) as c_int;
 
         (*cmd).forwardmove = ClampChar(forward);
         (*cmd).rightmove = ClampChar(side);
@@ -1084,28 +1101,28 @@ pub fn CL_CmdButtons(common: &mut Common, cl: &mut Client, cmd: *mut usercmd_t) 
         // figure button bits, sending a button bit even if the key was pressed and
         // released in less than a frame
         for i in 0..15usize {
-            if cl.in_buttons[i].active || cl.in_buttons[i].wasPressed {
+            if cl.in_buttons[i].active != 0 || cl.in_buttons[i].wasPressed != 0 {
                 (*cmd).buttons |= 1 << i;
             }
-            cl.in_buttons[i].wasPressed = false;
+            cl.in_buttons[i].wasPressed = qfalse;
         }
 
-        if (*cmd).buttons & BUTTON_FORCEPOWER as u8 != 0 {
+        if (*cmd).buttons & BUTTON_FORCEPOWER != 0 {
             // check for transferring a use force to a use inventory
-            if (*cmd).buttons & BUTTON_USE as u8 != 0 || CL_NoUseableForce(common, cl) {
-                (*cmd).buttons &= !(BUTTON_FORCEPOWER as u8);
-                (*cmd).buttons |= BUTTON_USE_HOLDABLE as u8;
+            if (*cmd).buttons & BUTTON_USE != 0 || CL_NoUseableForce(common, cl) != 0 {
+                (*cmd).buttons &= !BUTTON_FORCEPOWER;
+                (*cmd).buttons |= BUTTON_USE_HOLDABLE;
             }
         }
 
         if cl.cls.keyCatchers != 0 {
-            (*cmd).buttons |= BUTTON_TALK as u8;
+            (*cmd).buttons |= BUTTON_TALK;
         }
 
         // allow the game to know if any key at all is currently pressed, even if it
         // isn't bound to anything
         if cl.kg.anykeydown != 0 && cl.cls.keyCatchers == 0 {
-            (*cmd).buttons |= BUTTON_ANY as u8;
+            (*cmd).buttons |= BUTTON_ANY;
         }
     }
 }
@@ -1149,8 +1166,8 @@ pub fn IN_UseGivenForce(common: &mut Common, cl: &mut Client) {
     }
 
     if genCmdNum != 0 {
-        cl.cl.gcmdSendValue = true;
-        cl.cl.gcmdValue = genCmdNum;
+        cl.cl.gcmdSendValue = qtrue;
+        cl.cl.gcmdValue = genCmdNum as u8;
     }
 }
 
@@ -1174,7 +1191,7 @@ pub fn CL_CreateCmd(common: &mut Common, cl: &mut Client) -> usercmd_t {
     CL_MouseMove(common, cl, &mut cmd as *mut usercmd_t);
 
     // get basic movement from joystick
-    CL_JoystickMove(cl, &mut cmd as *mut usercmd_t);
+    CL_JoystickMove(common, cl, &mut cmd as *mut usercmd_t);
 
     // check to make sure the angles haven't wrapped
     if cl.cl.viewangles[PITCH as usize] - oldAngles[PITCH as usize] > 90.0 {
@@ -1187,16 +1204,13 @@ pub fn CL_CreateCmd(common: &mut Common, cl: &mut Client) -> usercmd_t {
     CL_FinishMove(cl, &mut cmd as *mut usercmd_t);
 
     // draw debug graphs of turning for mouse testing
-    //TODO: Port SCR_DebugGraph
-    // Source: sibling packet `client__0195_SCR_DebugGraph.md`, not yet landed in this
-    // module — call kept exactly as resolved; the referee wires it at integration.
-    unsafe {
-        if (*cl.cl_debugMove).integer == 1 {
-            SCR_DebugGraph(cl, (cl.cl.viewangles[YAW as usize] - oldAngles[YAW as usize]).abs());
-        }
-        if (*cl.cl_debugMove).integer == 2 {
-            SCR_DebugGraph(cl, (cl.cl.viewangles[PITCH as usize] - oldAngles[PITCH as usize]).abs());
-        }
+    if common.cvar(cl.cl_debugMove).integer == 1 {
+        let value = (cl.cl.viewangles[YAW as usize] - oldAngles[YAW as usize]).abs();
+        SCR_DebugGraph(cl, value, 0);
+    }
+    if common.cvar(cl.cl_debugMove).integer == 2 {
+        let value = (cl.cl.viewangles[PITCH as usize] - oldAngles[PITCH as usize]).abs();
+        SCR_DebugGraph(cl, value, 0);
     }
 
     cmd
@@ -1204,125 +1218,139 @@ pub fn CL_CreateCmd(common: &mut Common, cl: &mut Client) -> usercmd_t {
 
 /// Raven `CL_WritePacket`.
 ///
-/// The packet's printed signature omits `common`, but `MSG_*`/`Com_Printf`
-/// need it, so this adds it (shape_mismatch).
+/// The packet's printed signature omits its receiver, but `MSG_Init` and
+/// `Cvar_Set` need `&mut EngineHostView`, so this takes `view` and reaches
+/// `Common` through `view.common` (shape_mismatch).
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:1608-1729`
-pub fn CL_WritePacket(common: &mut Common, cl: &mut Client) {
-    //TODO: Port CMD_MASK
-    // Source: escalation — not in the rosetta yet; mirrors Raven's `MAX_PACKET_USERCMDS - 1`
-    // command-ring mask.
-    const CMD_MASK: i32 = 63;
-    const MAX_MSGLEN_USIZE: usize = MAX_MSGLEN as usize;
-
+pub fn CL_WritePacket(view: &mut EngineHostView, cl: &mut Client) {
     // don't send anything if playing back a demo
-    if cl.clc.demoplaying || cl.cls.state == CA_CINEMATIC as c_int {
+    if cl.clc.demoplaying != 0 || cl.cls.state == CA_CINEMATIC {
         return;
     }
 
     let mut nullcmd: usercmd_t = unsafe { core::mem::zeroed() };
-    Com_Memset(&mut nullcmd as *mut usercmd_t as *mut (), 0, core::mem::size_of::<usercmd_t>());
+    Com_Memset(
+        &mut nullcmd as *mut usercmd_t as *mut (),
+        0,
+        core::mem::size_of::<usercmd_t>(),
+    );
     let mut oldcmd: *mut usercmd_t = &mut nullcmd as *mut usercmd_t;
 
-    let mut data = [0u8; MAX_MSGLEN_USIZE];
+    let mut data = [0u8; MAX_MSGLEN];
     let mut buf: msg_t = unsafe { core::mem::zeroed() };
-    MSG_Init(cl, &mut buf as *mut msg_t, data.as_mut_ptr() as *mut byte, MAX_MSGLEN);
+    MSG_Init(
+        view,
+        &mut buf as *mut msg_t,
+        data.as_mut_ptr() as *mut byte,
+        MAX_MSGLEN as c_int,
+    );
 
     MSG_Bitstream(&mut buf as *mut msg_t);
     // write the current serverId so the server can tell if this is from the current gameState
-    MSG_WriteLong(common, &mut buf as *mut msg_t, cl.cl.serverId);
+    MSG_WriteLong(view.common, &mut buf as *mut msg_t, cl.cl.serverId);
 
     // write the last message we received, which can be used for delta compression, and
     // is also used to tell if we dropped a gamestate
-    MSG_WriteLong(common, &mut buf as *mut msg_t, cl.clc.serverMessageSequence);
+    MSG_WriteLong(
+        view.common,
+        &mut buf as *mut msg_t,
+        cl.clc.serverMessageSequence,
+    );
 
     // write the last reliable message we received
-    MSG_WriteLong(common, &mut buf as *mut msg_t, cl.clc.serverCommandSequence);
+    MSG_WriteLong(
+        view.common,
+        &mut buf as *mut msg_t,
+        cl.clc.serverCommandSequence,
+    );
 
     // write any unacknowledged clientCommands
     for i in (cl.clc.reliableAcknowledge + 1)..=cl.clc.reliableSequence {
-        //TODO: Port clc_clientCommand
-        // Source: escalation — not in the rosetta yet.
-        const CLC_CLIENT_COMMAND: c_int = 5;
-        MSG_WriteByte(common, &mut buf as *mut msg_t, CLC_CLIENT_COMMAND);
-        MSG_WriteLong(common, &mut buf as *mut msg_t, i);
-        let idx = (i & (MAX_RELIABLE_COMMANDS - 1)) as usize;
-        MSG_WriteString(common, &mut buf as *mut msg_t, &cl.clc.reliableCommands[idx]);
+        MSG_WriteByte(
+            view.common,
+            &mut buf as *mut msg_t,
+            clc_ops_e::clc_clientCommand as c_int,
+        );
+        MSG_WriteLong(view.common, &mut buf as *mut msg_t, i);
+        let idx = (i as usize) & (MAX_RELIABLE_COMMANDS - 1);
+        // `reliableCommands` holds raw wire bytes, so the Latin-1 decode hands
+        // `MSG_WriteString` every byte back verbatim.
+        let command = latin1_to_string(
+            unsafe { CStr::from_ptr(cl.clc.reliableCommands[idx].as_ptr()) }.to_bytes(),
+        );
+        MSG_WriteString(view.common, &mut buf as *mut msg_t, &command);
     }
 
     // we want to send all the usercmds that were generated in the last few packets, so
     // even if a couple packets are dropped in a row, all the cmds will make it to the server
-    unsafe {
-        if (*cl.cl_packetdup).integer < 0 {
-            //TODO: Port view receiver for Cvar_Set
-            // Source: escalation — `Cvar_Set` needs `&mut EngineHostView`, not available here.
-        } else if (*cl.cl_packetdup).integer > 5 {
-            // same escalation as above
-        }
+    if view.common.cvar(cl.cl_packetdup).integer < 0 {
+        Cvar_Set(view, "cl_packetdup", "0");
+    } else if view.common.cvar(cl.cl_packetdup).integer > 5 {
+        Cvar_Set(view, "cl_packetdup", "5");
     }
 
+    let packetdup = view.common.cvar(cl.cl_packetdup).integer;
     let oldPacketNum =
-        unsafe { ((cl.clc.netchan.outgoingSequence - 1 - (*cl.cl_packetdup).integer) & PACKET_MASK) as usize };
+        ((cl.clc.netchan.outgoingSequence - 1 - packetdup) as usize) & PACKET_MASK;
     let mut count = cl.cl.cmdNumber - cl.cl.outPackets[oldPacketNum].p_cmdNumber;
-    if count > MAX_PACKET_USERCMDS {
-        count = MAX_PACKET_USERCMDS;
-        com_printf(common, "MAX_PACKET_USERCMDS\n");
+    if count > MAX_PACKET_USERCMDS as c_int {
+        count = MAX_PACKET_USERCMDS as c_int;
+        com_printf(view.common, "MAX_PACKET_USERCMDS\n");
     }
     if count >= 1 {
-        unsafe {
-            if (*cl.cl_showSend).integer != 0 {
-                com_printf(common, &format!("({})", count));
-            }
+        if view.common.cvar(cl.cl_showSend).integer != 0 {
+            com_printf(view.common, &format!("({})", count));
         }
 
-        //TODO: Port clc_moveNoDelta
-        //TODO: Port clc_move
-        // Source: escalation — not in the rosetta yet.
-        const CLC_MOVE_NO_DELTA: c_int = 6;
-        const CLC_MOVE: c_int = 7;
-
         // begin a client move command
-        unsafe {
-            if (*cl.cl_nodelta).integer != 0
-                || !cl.cl.snap.valid
-                || cl.clc.demowaiting
-                || cl.clc.serverMessageSequence != cl.cl.snap.messageNum
-            {
-                MSG_WriteByte(common, &mut buf as *mut msg_t, CLC_MOVE_NO_DELTA);
-            } else {
-                MSG_WriteByte(common, &mut buf as *mut msg_t, CLC_MOVE);
-            }
+        if view.common.cvar(cl.cl_nodelta).integer != 0
+            || cl.cl.snap.valid == 0
+            || cl.clc.demowaiting != 0
+            || cl.clc.serverMessageSequence != cl.cl.snap.messageNum
+        {
+            MSG_WriteByte(
+                view.common,
+                &mut buf as *mut msg_t,
+                clc_ops_e::clc_moveNoDelta as c_int,
+            );
+        } else {
+            MSG_WriteByte(
+                view.common,
+                &mut buf as *mut msg_t,
+                clc_ops_e::clc_move as c_int,
+            );
         }
 
         // write the command count
-        MSG_WriteByte(common, &mut buf as *mut msg_t, count);
+        MSG_WriteByte(view.common, &mut buf as *mut msg_t, count);
 
         // use the checksum feed in the key
         let mut key = cl.clc.checksumFeed;
         // also use the message acknowledge
         key ^= cl.clc.serverMessageSequence;
         // also use the last acknowledged server command in the key
-        let scIdx = (cl.clc.serverCommandSequence & (MAX_RELIABLE_COMMANDS - 1)) as usize;
-        key ^= Com_HashKey(cl.clc.serverCommands[scIdx].as_ptr() as *mut core::ffi::c_char, 32);
+        let scIdx = (cl.clc.serverCommandSequence as usize) & (MAX_RELIABLE_COMMANDS - 1);
+        key ^= Com_HashKey(cl.clc.serverCommands[scIdx].as_ptr() as *mut c_char, 32);
 
         // write all the commands, including the predicted command
         for i in 0..count {
             let j = ((cl.cl.cmdNumber - count + i + 1) & CMD_MASK) as usize;
             let cmd = &mut cl.cl.cmds[j] as *mut usercmd_t;
-            MSG_WriteDeltaUsercmdKey(common, &mut buf as *mut msg_t, key, oldcmd, cmd);
+            MSG_WriteDeltaUsercmdKey(view.common, &mut buf as *mut msg_t, key, oldcmd, cmd);
             oldcmd = cmd;
         }
 
-        if cl.cl.gcmdSentValue {
+        if cl.cl.gcmdSentValue != 0 {
             // clear here, hoping it resolves gencmd values sometimes not going through
-            cl.cl.gcmdSendValue = false;
-            cl.cl.gcmdSentValue = false;
+            cl.cl.gcmdSendValue = qfalse;
+            cl.cl.gcmdSentValue = qfalse;
             cl.cl.gcmdValue = 0;
         }
     }
 
     // deliver the message
-    let packetNum = (cl.clc.netchan.outgoingSequence & PACKET_MASK) as usize;
+    let packetNum = (cl.clc.netchan.outgoingSequence as usize) & PACKET_MASK;
     cl.cl.outPackets[packetNum].p_realtime = cl.cls.realtime;
     unsafe {
         cl.cl.outPackets[packetNum].p_serverTime = (*oldcmd).serverTime;
@@ -1330,24 +1358,17 @@ pub fn CL_WritePacket(common: &mut Common, cl: &mut Client) {
     cl.cl.outPackets[packetNum].p_cmdNumber = cl.cl.cmdNumber;
     cl.clc.lastPacketSentTime = cl.cls.realtime;
 
-    unsafe {
-        if (*cl.cl_showSend).integer != 0 {
-            com_printf(common, &format!("{} ", buf.cursize));
-        }
+    if view.common.cvar(cl.cl_showSend).integer != 0 {
+        com_printf(view.common, &format!("{} ", buf.cursize));
     }
 
-    //TODO: Port CL_Netchan_Transmit
-    // Source: sibling packet `client__0411_CL_Netchan_Transmit.md`, not yet landed in
-    // this module — call kept exactly as resolved; the referee wires it at integration.
-    CL_Netchan_Transmit(cl, &mut cl.clc.netchan, &mut buf as *mut msg_t);
+    let chan = &mut cl.clc.netchan as *mut netchan_t;
+    CL_Netchan_Transmit(view, cl, chan, &mut buf as *mut msg_t);
 
     // clients never really should have messages large enough to fragment, but in case
     // they do, fire them all off at once
-    while cl.clc.netchan.unsentFragments {
-        //TODO: Port CL_Netchan_TransmitNextFragment
-        // Source: sibling packet `client__0181_CL_Netchan_TransmitNextFragment.md`, not
-        // yet landed in this module — call kept exactly as resolved.
-        CL_Netchan_TransmitNextFragment(&mut cl.clc.netchan);
+    while cl.clc.netchan.unsentFragments != 0 {
+        CL_Netchan_TransmitNextFragment(view, chan);
     }
 }
 
@@ -1356,7 +1377,7 @@ pub fn CL_WritePacket(common: &mut Common, cl: &mut Client) {
 /// Source: `oracle/codemp/client/cl_input.cpp:1492-1516`
 pub fn CL_CreateNewCommands(common: &mut Common, cl: &mut Client) {
     // no need to create usercmds until we have a gamestate
-    if cl.cls.state < CA_PRIMED as c_int {
+    if (cl.cls.state as c_int) < CA_PRIMED as c_int {
         return;
     }
 
@@ -1375,46 +1396,38 @@ pub fn CL_CreateNewCommands(common: &mut Common, cl: &mut Client) {
     cl.cl.cmds[cmdNum] = CL_CreateCmd(common, cl);
 }
 
-//TODO: Port CMD_MASK
-// Source: escalation — not in the rosetta yet; mirrors Raven's usercmd ring mask.
-const CMD_MASK: i32 = 63;
-
 /// Raven `CL_SendCmd`.
 ///
+/// The packet's printed signature omits its receiver, but `CL_ReadyToSendPacket`
+/// needs `&mut EngineHostView`, so this takes `view` (shape_mismatch).
+///
 /// Source: `oracle/codemp/client/cl_input.cpp:1738-1761`
-pub fn CL_SendCmd(common: &mut Common, cl: &mut Client) {
+pub fn CL_SendCmd(view: &mut EngineHostView, cl: &mut Client) {
     // don't send any message if not connected
-    if cl.cls.state < CA_CONNECTED as c_int {
+    if (cl.cls.state as c_int) < CA_CONNECTED as c_int {
         return;
     }
 
     // don't send commands if paused
-    unsafe {
-        if (*common.com_sv_running).integer != 0
-            && (*common.sv_paused).integer != 0
-            && (*common.cl_paused).integer != 0
-        {
-            return;
-        }
+    if view.common.cvar(view.common.com_sv_running).integer != 0
+        && view.common.cvar(view.common.sv_paused).integer != 0
+        && view.common.cvar(view.common.cl_paused).integer != 0
+    {
+        return;
     }
 
     // we create commands even if a demo is playing
-    CL_CreateNewCommands(common, cl);
+    CL_CreateNewCommands(view.common, cl);
 
     // don't send a packet if the last packet was sent too recently
-    //TODO: Port view receiver for CL_ReadyToSendPacket
-    // Source: escalation — `CL_ReadyToSendPacket` needs `&mut EngineHostView`, not
-    // available in this signature; the referee wires it at integration.
-    if !CL_ReadyToSendPacket(cl) {
-        unsafe {
-            if (*cl.cl_showSend).integer != 0 {
-                com_printf(common, ". ");
-            }
+    if CL_ReadyToSendPacket(view, cl) == 0 {
+        if view.common.cvar(cl.cl_showSend).integer != 0 {
+            com_printf(view.common, ". ");
         }
         return;
     }
 
-    CL_WritePacket(common, cl);
+    CL_WritePacket(view, cl);
 }
 
 /// Raven `IN_UpDown`.
@@ -1425,7 +1438,7 @@ pub fn CL_SendCmd(common: &mut Common, cl: &mut Client) {
 /// Source: `oracle/codemp/client/cl_input.cpp:646-656`
 pub fn IN_UpDown(common: &mut Common, cl: &mut Client) {
     if cl.g_clAutoMapMode {
-        CL_AutoMapKey(common, cl, AUTOMAP_KEY_PITCHUP, false);
+        CL_AutoMapKey(common, cl, AUTOMAP_KEY_PITCHUP, qfalse);
     } else {
         IN_KeyDown(common, &mut cl.in_up as *mut kbutton_t);
     }
@@ -1439,9 +1452,10 @@ pub fn IN_UpDown(common: &mut Common, cl: &mut Client) {
 /// Source: `oracle/codemp/client/cl_input.cpp:657-667`
 pub fn IN_UpUp(common: &mut Common, cl: &mut Client) {
     if cl.g_clAutoMapMode {
-        CL_AutoMapKey(common, cl, AUTOMAP_KEY_PITCHUP, true);
+        CL_AutoMapKey(common, cl, AUTOMAP_KEY_PITCHUP, qtrue);
     } else {
-        IN_KeyUp(common, cl, &mut cl.in_up as *mut kbutton_t);
+        let b = &mut cl.in_up as *mut kbutton_t;
+        IN_KeyUp(common, cl, b);
     }
 }
 
@@ -1453,7 +1467,7 @@ pub fn IN_UpUp(common: &mut Common, cl: &mut Client) {
 /// Source: `oracle/codemp/client/cl_input.cpp:668-678`
 pub fn IN_DownDown(common: &mut Common, cl: &mut Client) {
     if cl.g_clAutoMapMode {
-        CL_AutoMapKey(common, cl, AUTOMAP_KEY_PITCHDOWN, false);
+        CL_AutoMapKey(common, cl, AUTOMAP_KEY_PITCHDOWN, qfalse);
     } else {
         IN_KeyDown(common, &mut cl.in_down as *mut kbutton_t);
     }
@@ -1467,9 +1481,10 @@ pub fn IN_DownDown(common: &mut Common, cl: &mut Client) {
 /// Source: `oracle/codemp/client/cl_input.cpp:679-689`
 pub fn IN_DownUp(common: &mut Common, cl: &mut Client) {
     if cl.g_clAutoMapMode {
-        CL_AutoMapKey(common, cl, AUTOMAP_KEY_PITCHDOWN, true);
+        CL_AutoMapKey(common, cl, AUTOMAP_KEY_PITCHDOWN, qtrue);
     } else {
-        IN_KeyUp(common, cl, &mut cl.in_down as *mut kbutton_t);
+        let b = &mut cl.in_down as *mut kbutton_t;
+        IN_KeyUp(common, cl, b);
     }
 }
 
@@ -1490,7 +1505,8 @@ pub fn IN_LeftDown(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:691`
 pub fn IN_LeftUp(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_left as *mut kbutton_t);
+    let b = &mut cl.in_left as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
 }
 
 /// Raven `IN_RightDown`.
@@ -1510,7 +1526,8 @@ pub fn IN_RightDown(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:693`
 pub fn IN_RightUp(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_right as *mut kbutton_t);
+    let b = &mut cl.in_right as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
 }
 
 /// Raven `IN_ForwardDown`.
@@ -1521,7 +1538,7 @@ pub fn IN_RightUp(common: &mut Common, cl: &mut Client) {
 /// Source: `oracle/codemp/client/cl_input.cpp:694-704`
 pub fn IN_ForwardDown(common: &mut Common, cl: &mut Client) {
     if cl.g_clAutoMapMode {
-        CL_AutoMapKey(common, cl, AUTOMAP_KEY_FORWARD, false);
+        CL_AutoMapKey(common, cl, AUTOMAP_KEY_FORWARD, qfalse);
     } else {
         IN_KeyDown(common, &mut cl.in_forward as *mut kbutton_t);
     }
@@ -1535,9 +1552,10 @@ pub fn IN_ForwardDown(common: &mut Common, cl: &mut Client) {
 /// Source: `oracle/codemp/client/cl_input.cpp:705-715`
 pub fn IN_ForwardUp(common: &mut Common, cl: &mut Client) {
     if cl.g_clAutoMapMode {
-        CL_AutoMapKey(common, cl, AUTOMAP_KEY_FORWARD, true);
+        CL_AutoMapKey(common, cl, AUTOMAP_KEY_FORWARD, qtrue);
     } else {
-        IN_KeyUp(common, cl, &mut cl.in_forward as *mut kbutton_t);
+        let b = &mut cl.in_forward as *mut kbutton_t;
+        IN_KeyUp(common, cl, b);
     }
 }
 
@@ -1549,7 +1567,7 @@ pub fn IN_ForwardUp(common: &mut Common, cl: &mut Client) {
 /// Source: `oracle/codemp/client/cl_input.cpp:716-726`
 pub fn IN_BackDown(common: &mut Common, cl: &mut Client) {
     if cl.g_clAutoMapMode {
-        CL_AutoMapKey(common, cl, AUTOMAP_KEY_BACK, false);
+        CL_AutoMapKey(common, cl, AUTOMAP_KEY_BACK, qfalse);
     } else {
         IN_KeyDown(common, &mut cl.in_back as *mut kbutton_t);
     }
@@ -1563,9 +1581,10 @@ pub fn IN_BackDown(common: &mut Common, cl: &mut Client) {
 /// Source: `oracle/codemp/client/cl_input.cpp:727-737`
 pub fn IN_BackUp(common: &mut Common, cl: &mut Client) {
     if cl.g_clAutoMapMode {
-        CL_AutoMapKey(common, cl, AUTOMAP_KEY_BACK, true);
+        CL_AutoMapKey(common, cl, AUTOMAP_KEY_BACK, qtrue);
     } else {
-        IN_KeyUp(common, cl, &mut cl.in_back as *mut kbutton_t);
+        let b = &mut cl.in_back as *mut kbutton_t;
+        IN_KeyUp(common, cl, b);
     }
 }
 
@@ -1586,7 +1605,8 @@ pub fn IN_LookupDown(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:739`
 pub fn IN_LookupUp(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_lookup as *mut kbutton_t);
+    let b = &mut cl.in_lookup as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
 }
 
 /// Raven `IN_LookdownDown`.
@@ -1606,7 +1626,8 @@ pub fn IN_LookdownDown(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:741`
 pub fn IN_LookdownUp(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_lookdown as *mut kbutton_t);
+    let b = &mut cl.in_lookdown as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
 }
 
 /// Raven `IN_MoveleftDown`.
@@ -1617,7 +1638,7 @@ pub fn IN_LookdownUp(common: &mut Common, cl: &mut Client) {
 /// Source: `oracle/codemp/client/cl_input.cpp:742-752`
 pub fn IN_MoveleftDown(common: &mut Common, cl: &mut Client) {
     if cl.g_clAutoMapMode {
-        CL_AutoMapKey(common, cl, AUTOMAP_KEY_YAWLEFT, false);
+        CL_AutoMapKey(common, cl, AUTOMAP_KEY_YAWLEFT, qfalse);
     } else {
         IN_KeyDown(common, &mut cl.in_moveleft as *mut kbutton_t);
     }
@@ -1631,9 +1652,10 @@ pub fn IN_MoveleftDown(common: &mut Common, cl: &mut Client) {
 /// Source: `oracle/codemp/client/cl_input.cpp:753-763`
 pub fn IN_MoveleftUp(common: &mut Common, cl: &mut Client) {
     if cl.g_clAutoMapMode {
-        CL_AutoMapKey(common, cl, AUTOMAP_KEY_YAWLEFT, true);
+        CL_AutoMapKey(common, cl, AUTOMAP_KEY_YAWLEFT, qtrue);
     } else {
-        IN_KeyUp(common, cl, &mut cl.in_moveleft as *mut kbutton_t);
+        let b = &mut cl.in_moveleft as *mut kbutton_t;
+        IN_KeyUp(common, cl, b);
     }
 }
 
@@ -1645,7 +1667,7 @@ pub fn IN_MoveleftUp(common: &mut Common, cl: &mut Client) {
 /// Source: `oracle/codemp/client/cl_input.cpp:764-774`
 pub fn IN_MoverightDown(common: &mut Common, cl: &mut Client) {
     if cl.g_clAutoMapMode {
-        CL_AutoMapKey(common, cl, AUTOMAP_KEY_YAWRIGHT, false);
+        CL_AutoMapKey(common, cl, AUTOMAP_KEY_YAWRIGHT, qfalse);
     } else {
         IN_KeyDown(common, &mut cl.in_moveright as *mut kbutton_t);
     }
@@ -1659,9 +1681,10 @@ pub fn IN_MoverightDown(common: &mut Common, cl: &mut Client) {
 /// Source: `oracle/codemp/client/cl_input.cpp:775-785`
 pub fn IN_MoverightUp(common: &mut Common, cl: &mut Client) {
     if cl.g_clAutoMapMode {
-        CL_AutoMapKey(common, cl, AUTOMAP_KEY_YAWRIGHT, true);
+        CL_AutoMapKey(common, cl, AUTOMAP_KEY_YAWRIGHT, qtrue);
     } else {
-        IN_KeyUp(common, cl, &mut cl.in_moveright as *mut kbutton_t);
+        let b = &mut cl.in_moveright as *mut kbutton_t;
+        IN_KeyUp(common, cl, b);
     }
 }
 
@@ -1682,7 +1705,8 @@ pub fn IN_SpeedDown(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:795`
 pub fn IN_SpeedUp(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_speed as *mut kbutton_t);
+    let b = &mut cl.in_speed as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
 }
 
 /// Raven `IN_StrafeDown`.
@@ -1702,7 +1726,8 @@ pub fn IN_StrafeDown(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:797`
 pub fn IN_StrafeUp(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_strafe as *mut kbutton_t);
+    let b = &mut cl.in_strafe as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
 }
 
 /// Raven `IN_Button0Down`.
@@ -1722,7 +1747,8 @@ pub fn IN_Button0Down(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:800-806`
 pub fn IN_Button0Up(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_buttons[0] as *mut kbutton_t);
+    let b = &mut cl.in_buttons[0] as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
     // The oracle's `_XBOX` arm (`sLastFireTime = Sys_Milliseconds()`) never compiles on
     // this target, so it is dropped (rule 20).
 }
@@ -1744,7 +1770,8 @@ pub fn IN_Button1Down(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:808`
 pub fn IN_Button1Up(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_buttons[1] as *mut kbutton_t);
+    let b = &mut cl.in_buttons[1] as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
 }
 
 /// Raven `IN_Button2Down`.
@@ -1764,7 +1791,8 @@ pub fn IN_Button2Down(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:810`
 pub fn IN_Button2Up(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_buttons[2] as *mut kbutton_t);
+    let b = &mut cl.in_buttons[2] as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
 }
 
 /// Raven `IN_Button3Down`.
@@ -1784,7 +1812,8 @@ pub fn IN_Button3Down(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:812`
 pub fn IN_Button3Up(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_buttons[3] as *mut kbutton_t);
+    let b = &mut cl.in_buttons[3] as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
 }
 
 /// Raven `IN_Button4Down`.
@@ -1804,7 +1833,8 @@ pub fn IN_Button4Down(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:814`
 pub fn IN_Button4Up(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_buttons[4] as *mut kbutton_t);
+    let b = &mut cl.in_buttons[4] as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
 }
 
 /// Raven `IN_Button5Down`.
@@ -1815,7 +1845,7 @@ pub fn IN_Button4Up(common: &mut Common, cl: &mut Client) {
 /// Source: `oracle/codemp/client/cl_input.cpp:815-825`
 pub fn IN_Button5Down(common: &mut Common, cl: &mut Client) {
     if cl.g_clAutoMapMode {
-        CL_AutoMapKey(common, cl, AUTOMAP_KEY_DEFAULTVIEW, false);
+        CL_AutoMapKey(common, cl, AUTOMAP_KEY_DEFAULTVIEW, qfalse);
     } else {
         IN_KeyDown(common, &mut cl.in_buttons[5] as *mut kbutton_t);
     }
@@ -1828,7 +1858,8 @@ pub fn IN_Button5Down(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:826`
 pub fn IN_Button5Up(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_buttons[5] as *mut kbutton_t);
+    let b = &mut cl.in_buttons[5] as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
 }
 
 /// Raven `IN_Button6Down`.
@@ -1848,7 +1879,8 @@ pub fn IN_Button6Down(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:828`
 pub fn IN_Button6Up(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_buttons[6] as *mut kbutton_t);
+    let b = &mut cl.in_buttons[6] as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
 }
 
 /// Raven `IN_Button7Down`.
@@ -1868,7 +1900,8 @@ pub fn IN_Button7Down(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:830-836`
 pub fn IN_Button7Up(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_buttons[7] as *mut kbutton_t);
+    let b = &mut cl.in_buttons[7] as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
     // The oracle's `_XBOX` arm (`sLastFireTime = Sys_Milliseconds()`) never compiles on
     // this target, so it is dropped (rule 20).
 }
@@ -1890,7 +1923,8 @@ pub fn IN_Button8Down(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:838`
 pub fn IN_Button8Up(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_buttons[8] as *mut kbutton_t);
+    let b = &mut cl.in_buttons[8] as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
 }
 
 /// Raven `IN_Button9Down`.
@@ -1910,7 +1944,8 @@ pub fn IN_Button9Down(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:840`
 pub fn IN_Button9Up(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_buttons[9] as *mut kbutton_t);
+    let b = &mut cl.in_buttons[9] as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
 }
 
 /// Raven `IN_Button10Down`.
@@ -1930,7 +1965,8 @@ pub fn IN_Button10Down(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:842`
 pub fn IN_Button10Up(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_buttons[10] as *mut kbutton_t);
+    let b = &mut cl.in_buttons[10] as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
 }
 
 /// Raven `IN_Button11Down`.
@@ -1950,7 +1986,8 @@ pub fn IN_Button11Down(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:844`
 pub fn IN_Button11Up(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_buttons[11] as *mut kbutton_t);
+    let b = &mut cl.in_buttons[11] as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
 }
 
 /// Raven `IN_Button12Down`.
@@ -1970,7 +2007,8 @@ pub fn IN_Button12Down(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:846`
 pub fn IN_Button12Up(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_buttons[12] as *mut kbutton_t);
+    let b = &mut cl.in_buttons[12] as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
 }
 
 /// Raven `IN_Button13Down`.
@@ -1990,7 +2028,8 @@ pub fn IN_Button13Down(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:848`
 pub fn IN_Button13Up(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_buttons[13] as *mut kbutton_t);
+    let b = &mut cl.in_buttons[13] as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
 }
 
 /// Raven `IN_Button14Down`.
@@ -2010,7 +2049,8 @@ pub fn IN_Button14Down(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:850`
 pub fn IN_Button14Up(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_buttons[14] as *mut kbutton_t);
+    let b = &mut cl.in_buttons[14] as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
 }
 
 /// Raven `IN_Button15Down`.
@@ -2030,7 +2070,8 @@ pub fn IN_Button15Down(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:852`
 pub fn IN_Button15Up(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_buttons[15] as *mut kbutton_t);
+    let b = &mut cl.in_buttons[15] as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
 }
 
 /// Raven `IN_ButtonDown`.
@@ -2050,7 +2091,8 @@ pub fn IN_ButtonDown(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:856-857`
 pub fn IN_ButtonUp(common: &mut Common, cl: &mut Client) {
-    IN_KeyUp(common, cl, &mut cl.in_buttons[1] as *mut kbutton_t);
+    let b = &mut cl.in_buttons[1] as *mut kbutton_t;
+    IN_KeyUp(common, cl, b);
 }
 
 /// Raven `CL_InitInput`.
@@ -2064,20 +2106,13 @@ pub fn IN_ButtonUp(common: &mut Common, cl: &mut Client) {
 /// Source: `oracle/codemp/client/cl_input.cpp:1769-1897`
 pub fn CL_InitInput(view: &mut EngineHostView, cl: &mut Client) {
     let _ = cl;
-    //TODO: Port Cmd_AddCommand command-table wiring
-    // Source: sibling packets (IN_CenterView, IN_UpDown, ..., IN_AutoMapButton,
-    // IN_AutoMapToggle, IN_VoiceChatButton) and `CmdFunction`'s no-receiver shape —
-    // the referee builds the adapter table at integration; kept as a PORT-NOTE
-    // rather than a stub call to avoid inventing an adapter shape here.
+    //TODO: Port CL_InitInput Cmd_AddCommand table
+    // Source: oracle/codemp/client/cl_input.cpp:1769-1893
+    // Every `+`/`-` handler in this file takes `common, cl` or `view, cl`, and
+    // `CmdFunction` is `fn(&mut EngineHostView)`. The `*_cmd` adapters that bridge
+    // the two are not written yet, so the table stays unregistered.
     let _: Option<CmdFunction> = None;
 
-    cl.cl_nodelta = Cvar_Get(view, "cl_nodelta", "0", 0);
-    cl.cl_debugMove = Cvar_Get(view, "cl_debugMove", "0", 0);
+    cl.cl_nodelta = Some(Cvar_Get(view, "cl_nodelta", "0", 0));
+    cl.cl_debugMove = Some(Cvar_Get(view, "cl_debugMove", "0", 0));
 }
-
-// `SCR_DebugGraph`, `CL_Netchan_Transmit`, and `CL_Netchan_TransmitNextFragment` are
-// sibling packets (`client__0195_SCR_DebugGraph.md`, `client__0411_CL_Netchan_Transmit.md`,
-// `client__0181_CL_Netchan_TransmitNextFragment.md`) outside this shard. The calls above
-// reference them by their resolved names exactly as the calling packets state; no local
-// shim is defined here (reported in missing_symbols for the referee to wire at
-// integration).

@@ -12,9 +12,11 @@ use mp_abi::cgame::exports::MpCgameExport;
 use mp_abi::cgame::public::tcgincoming_console_command::TCGIncomingConsoleCommand;
 use mp_abi::ui::exports::MpUiExport;
 use mp_abi::ui::public::ui_menu_command_t::{UIMENU_INGAME, UIMENU_MAIN};
+use mp_engine_qcommon::cmd::cmd_function_t::CmdFunction;
 use mp_engine_qcommon::cmd_common::{Cbuf_AddText, Cmd_Argc, Cmd_Argv, Cmd_TokenizeString};
 use mp_engine_qcommon::cmd_pc::{Cmd_AddCommand, Cmd_CommandCompletion};
 use mp_engine_qcommon::common::common::com_printf;
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::error::com_error;
 use mp_engine_qcommon::common::Common;
 use mp_engine_qcommon::common_fns::Com_Memcpy;
@@ -31,8 +33,10 @@ use mp_qshared::shared::keycatch::{
     KEYCATCH_CGAME, KEYCATCH_CONSOLE, KEYCATCH_MESSAGE, KEYCATCH_UI,
 };
 use mp_qshared::shared::limits::{MAX_STRING_CHARS, MAX_TOKEN_CHARS};
-use mp_qshared::shared::qboolean;
+use mp_qshared::shared::{qboolean, qfalse, qtrue};
 use mp_ui::keycodes::fake_ascii_t::fakeAscii_t;
+use mp_ui::keycodes::K_CHAR_FLAG;
+use native_platform::sys_main::Sys_GetClipboardData;
 use native_string::ctype::tolower;
 use native_string::q_string::Q_strcat;
 use native_string::q_string::{Q_stricmp, Q_stricmpn};
@@ -45,9 +49,17 @@ use crate::cl_main::{CL_AddReliableCommand, CL_Disconnect_f};
 use crate::cl_scrn::{
     SCR_DrawBigString, SCR_DrawSmallChar, SCR_DrawSmallStringExt, SCR_UpdateScreen,
 };
-use crate::client_host::Client;
+use crate::client_host::{cl_from_view, Client};
 use crate::keys::key_globals_s::{COMMAND_HISTORY, MAX_KEYS};
 use crate::snd_stubs::S_StopAllSounds;
+
+/// Raven's anonymous `enum { CGAME_EVENT_NONE, ... }` first member.
+/// The client crate does not depend on `mp_cgame` (cgame is a loaded VM, not a
+/// build dependency), so this mirrors the value `mp_cgame::cg_new_draw` also
+/// carries rather than crossing that boundary with a crate dependency.
+///
+/// Source: `oracle/codemp/cgame/cg_local.h`
+const CGAME_EVENT_NONE: c_int = 0;
 
 /// Raven `Field_Clear`.
 ///
@@ -101,7 +113,7 @@ pub fn FindMatches(cl: &mut Client, s: *const c_char) {
 /// Raven `PrintMatches` command-completion callback.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:699-703`
-pub fn PrintMatches(cl: &mut Client, s: *const c_char) {
+pub fn PrintMatches(common: &mut Common, cl: &mut Client, s: *const c_char) {
     unsafe {
         let s_str = core::ffi::CStr::from_ptr(s).to_string_lossy();
         let shortest_str = core::ffi::CStr::from_ptr(cl.shortestMatch.as_ptr()).to_string_lossy();
@@ -115,7 +127,7 @@ pub fn PrintMatches(cl: &mut Client, s: *const c_char) {
 /// Raven `keyConcatArgs`.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:705-724`
-pub fn keyConcatArgs(cl: &mut Client) {
+pub fn keyConcatArgs(common: &mut Common, cl: &mut Client) {
     unsafe {
         let argc = Cmd_Argc(common);
         for i in 1..argc {
@@ -167,7 +179,7 @@ pub fn Key_SetOverstrikeMode(cl: &mut Client, state: qboolean) {
 /// Source: `oracle/codemp/client/cl_keys.cpp:1005-1011`
 pub fn Key_IsDown(cl: &mut Client, keynum: c_int) -> qboolean {
     if keynum == -1 {
-        return qboolean::qfalse;
+        return qfalse;
     }
     let upper = cl.keynames[keynum as usize].upper as usize;
     cl.kg.keys[upper].down
@@ -285,7 +297,12 @@ pub fn Key_KeyToHex(cl: &mut Client, keynum: c_int) -> *const c_char {
 /// Raven `Key_SetBinding`.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:1215-1235`
-pub fn Key_SetBinding(common: &mut Common, cl: &mut Client, keynum: c_int, binding: *const c_char) {
+pub fn Key_SetBinding(
+    view: &mut EngineHostView,
+    cl: &mut Client,
+    keynum: c_int,
+    binding: *const c_char,
+) {
     if keynum == -1 {
         return;
     }
@@ -294,7 +311,7 @@ pub fn Key_SetBinding(common: &mut Common, cl: &mut Client, keynum: c_int, bindi
 
     // Free any old binding.
     if !cl.kg.keys[upper].binding.is_null() {
-        Z_Free(common, cl.kg.keys[upper].binding as *mut ());
+        Z_Free(view.common, cl.kg.keys[upper].binding as *mut ());
         cl.kg.keys[upper].binding = core::ptr::null_mut();
     }
 
@@ -305,7 +322,7 @@ pub fn Key_SetBinding(common: &mut Common, cl: &mut Client, keynum: c_int, bindi
 
     // A binding change is treated like modifying an archived cvar, so the file
     // write triggers at the next opportunity.
-    common.cvar_modifiedFlags |= CVAR_ARCHIVE;
+    view.common.cvar_modifiedFlags |= CVAR_ARCHIVE;
 }
 
 /// Raven `Key_GetBinding`.
@@ -341,17 +358,20 @@ pub fn Key_GetKey(cl: &mut Client, binding: *const c_char) -> c_int {
 
 /// Raven `CL_AddKeyUpCommands`.
 ///
-/// PORT-NOTE(receivers): the packet's resolved signature carries no `common`
-/// receiver, but `Cbuf_AddText` needs one; `common` and the file-scope `time`
-/// global are referenced unresolved (see `missing_symbols`/`shape_mismatches`).
+/// PORT-NOTE(blocked): Raven's body references a bare `time` identifier that
+/// is not one of its own parameters (`oracle/codemp/client/cl_keys.cpp:1433`).
+/// In the oracle TU this resolves to the libc `time` function decayed to an
+/// int, apparent Raven UB. Porting rule §F.19 requires a ruling on the one
+/// defined behavior to substitute, not a mechanical fix, so `time` stays
+/// unresolved here.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:1416-1453`
-pub fn CL_AddKeyUpCommands(key: c_int, kb: *mut c_char) {
+pub fn CL_AddKeyUpCommands(common: &mut Common, key: c_int, kb: *mut c_char) {
     unsafe {
         if kb.is_null() {
             return;
         }
-        let mut keyevent = qboolean::qfalse;
+        let mut keyevent = qfalse;
         let mut button = [0 as c_char; 1024];
         let mut button_len: usize = 0;
         let mut i: usize = 0;
@@ -364,8 +384,8 @@ pub fn CL_AddKeyUpCommands(key: c_int, kb: *mut c_char) {
                     let button_str = core::ffi::CStr::from_ptr(button.as_ptr()).to_string_lossy();
                     let cmd = format!("-{} {} {}\n", &button_str[1..], key, time);
                     Cbuf_AddText(common, &cmd);
-                    keyevent = qboolean::qtrue;
-                } else if keyevent == qboolean::qtrue {
+                    keyevent = qtrue;
+                } else if keyevent == qtrue {
                     // Down-only command.
                     let button_str = core::ffi::CStr::from_ptr(button.as_ptr()).to_string_lossy();
                     Cbuf_AddText(common, &button_str);
@@ -391,7 +411,7 @@ pub fn CL_AddKeyUpCommands(key: c_int, kb: *mut c_char) {
 /// Raven `Field_Paste`.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:471-488`
-pub fn Field_Paste(cl: &mut Client, edit: *mut field_t) {
+pub fn Field_Paste(common: &mut Common, cl: &mut Client, edit: *mut field_t) {
     unsafe {
         let cbd = Sys_GetClipboardData();
         if cbd.is_null() {
@@ -401,7 +421,7 @@ pub fn Field_Paste(cl: &mut Client, edit: *mut field_t) {
         // Send as if typed, so insert / overstrike works properly.
         let paste_len = strlen(cbd);
         for i in 0..paste_len {
-            Field_CharEvent(cl, edit, *cbd.add(i) as c_int);
+            Field_CharEvent(common, cl, edit, *cbd.add(i) as c_int);
         }
 
         Z_Free(common, cbd as *mut ());
@@ -411,11 +431,11 @@ pub fn Field_Paste(cl: &mut Client, edit: *mut field_t) {
 /// Raven `Field_CharEvent`.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:567-637`
-pub fn Field_CharEvent(cl: &mut Client, edit: *mut field_t, ch: c_int) {
+pub fn Field_CharEvent(common: &mut Common, cl: &mut Client, edit: *mut field_t, ch: c_int) {
     unsafe {
         if ch == b'v' as c_int - b'a' as c_int + 1 {
             // ctrl-v is paste
-            Field_Paste(cl, edit);
+            Field_Paste(common, cl, edit);
             return;
         }
 
@@ -463,7 +483,7 @@ pub fn Field_CharEvent(cl: &mut Client, edit: *mut field_t, ch: c_int) {
             return;
         }
 
-        if cl.kg.key_overstrikeMode == qboolean::qtrue {
+        if cl.kg.key_overstrikeMode == qtrue {
             if (*edit).cursor == (*edit).buffer.len() as c_int - 1 {
                 return;
             }
@@ -497,21 +517,23 @@ pub fn Field_CharEvent(cl: &mut Client, edit: *mut field_t, ch: c_int) {
 /// Raven `ConcatRemaining`.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:726-737`
-pub fn ConcatRemaining(cl: &mut Client, src: *const c_char, start: *const c_char) {
+pub fn ConcatRemaining(
+    common: &mut Common,
+    cl: &mut Client,
+    src: *const c_char,
+    start: *const c_char,
+) {
     unsafe {
         let found = strstr(src, start);
         if found.is_null() {
-            keyConcatArgs(cl);
+            keyConcatArgs(common, cl);
             return;
         }
 
         let str_ptr = found.add(strlen(start));
         let str_str = core::ffi::CStr::from_ptr(str_ptr).to_string_lossy();
-        Q_strcat(
-            &mut cl.kg.g_consoleField.buffer,
-            cl.kg.g_consoleField.buffer.len(),
-            &str_str,
-        );
+        let buffer_len = cl.kg.g_consoleField.buffer.len();
+        Q_strcat(&mut cl.kg.g_consoleField.buffer, buffer_len, &str_str);
     }
 }
 
@@ -560,31 +582,31 @@ pub fn Key_KeynumToString(cl: &mut Client, keynum: c_int) -> *const c_char {
 /// Raven `Key_Unbind_f`.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:1275-1293`
-pub fn Key_Unbind_f(common: &mut Common, cl: &mut Client) {
-    if Cmd_Argc(common) != 2 {
-        com_printf(common, "unbind <key> : remove commands from a key\n");
+pub fn Key_Unbind_f(view: &mut EngineHostView, cl: &mut Client) {
+    if Cmd_Argc(view.common) != 2 {
+        com_printf(view.common, "unbind <key> : remove commands from a key\n");
         return;
     }
 
-    let b = Key_StringToKeynum(cl, Cmd_Argv(common, 1).as_ptr() as *mut c_char);
+    let b = Key_StringToKeynum(cl, Cmd_Argv(view.common, 1).as_ptr() as *mut c_char);
     if b == -1 {
         com_printf(
-            common,
-            &format!("\"{}\" isn't a valid key\n", Cmd_Argv(common, 1)),
+            view.common,
+            &format!("\"{}\" isn't a valid key\n", Cmd_Argv(view.common, 1)),
         );
         return;
     }
 
-    Key_SetBinding(common, cl, b, c"".as_ptr());
+    Key_SetBinding(view, cl, b, c"".as_ptr());
 }
 
 /// Raven `Key_Unbindall_f`.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:1300-1311`
-pub fn Key_Unbindall_f(common: &mut Common, cl: &mut Client) {
+pub fn Key_Unbindall_f(view: &mut EngineHostView, cl: &mut Client) {
     for i in 0..MAX_KEYS {
         if !cl.kg.keys[i].binding.is_null() {
-            Key_SetBinding(common, cl, i as c_int, c"".as_ptr());
+            Key_SetBinding(view, cl, i as c_int, c"".as_ptr());
         }
     }
 }
@@ -592,19 +614,22 @@ pub fn Key_Unbindall_f(common: &mut Common, cl: &mut Client) {
 /// Raven `Key_Bind_f`.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:1320-1358`
-pub fn Key_Bind_f(common: &mut Common, cl: &mut Client) {
+pub fn Key_Bind_f(view: &mut EngineHostView, cl: &mut Client) {
     unsafe {
-        let c = Cmd_Argc(common);
+        let c = Cmd_Argc(view.common);
 
         if c < 2 {
-            com_printf(common, "bind <key> [command] : attach a command to a key\n");
+            com_printf(
+                view.common,
+                "bind <key> [command] : attach a command to a key\n",
+            );
             return;
         }
-        let b = Key_StringToKeynum(cl, Cmd_Argv(common, 1).as_ptr() as *mut c_char);
+        let b = Key_StringToKeynum(cl, Cmd_Argv(view.common, 1).as_ptr() as *mut c_char);
         if b == -1 {
             com_printf(
-                common,
-                &format!("\"{}\" isn't a valid key\n", Cmd_Argv(common, 1)),
+                view.common,
+                &format!("\"{}\" isn't a valid key\n", Cmd_Argv(view.common, 1)),
             );
             return;
         }
@@ -614,13 +639,13 @@ pub fn Key_Bind_f(common: &mut Common, cl: &mut Client) {
                 let bound =
                     core::ffi::CStr::from_ptr(cl.kg.keys[b as usize].binding).to_string_lossy();
                 com_printf(
-                    common,
-                    &format!("\"{}\" = \"{}\"\n", Cmd_Argv(common, 1), bound),
+                    view.common,
+                    &format!("\"{}\" = \"{}\"\n", Cmd_Argv(view.common, 1), bound),
                 );
             } else {
                 com_printf(
-                    common,
-                    &format!("\"{}\" is not bound\n", Cmd_Argv(common, 1)),
+                    view.common,
+                    &format!("\"{}\" is not bound\n", Cmd_Argv(view.common, 1)),
                 );
             }
             return;
@@ -630,7 +655,7 @@ pub fn Key_Bind_f(common: &mut Common, cl: &mut Client) {
         let mut cmd = [0u8; 1024];
         cmd[0] = 0;
         for i in 2..c {
-            let arg = Cmd_Argv(common, i);
+            let arg = Cmd_Argv(view.common, i);
             strcat(
                 cmd.as_mut_ptr() as *mut c_char,
                 arg.as_ptr() as *const c_char,
@@ -642,10 +667,10 @@ pub fn Key_Bind_f(common: &mut Common, cl: &mut Client) {
 
         let cmd_str = core::ffi::CStr::from_ptr(cmd.as_ptr() as *const c_char).to_string_lossy();
         Key_SetBinding(
-            common,
+            view,
             cl,
             b,
-            core::ffi::CString::new(&*cmd_str).unwrap().as_ptr(),
+            std::ffi::CString::new(&*cmd_str).unwrap().as_ptr(),
         );
     }
 }
@@ -653,13 +678,13 @@ pub fn Key_Bind_f(common: &mut Common, cl: &mut Client) {
 /// Raven `Field_KeyDownEvent`.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:500-560`
-pub fn Field_KeyDownEvent(cl: &mut Client, edit: *mut field_t, key: c_int) {
+pub fn Field_KeyDownEvent(common: &mut Common, cl: &mut Client, edit: *mut field_t, key: c_int) {
     unsafe {
         // shift-insert is paste
         if (key == fakeAscii_t::A_INSERT as c_int || key == fakeAscii_t::A_KP_0 as c_int)
-            && cl.kg.keys[fakeAscii_t::A_SHIFT as usize].down == qboolean::qtrue
+            && cl.kg.keys[fakeAscii_t::A_SHIFT as usize].down == qtrue
         {
-            Field_Paste(cl, edit);
+            Field_Paste(common, cl, edit);
             return;
         }
 
@@ -699,7 +724,7 @@ pub fn Field_KeyDownEvent(cl: &mut Client, edit: *mut field_t, key: c_int) {
 
         if key == fakeAscii_t::A_HOME as c_int
             || (cl.keynames[key as usize].lower == b'a' as u16
-                && cl.kg.keys[fakeAscii_t::A_CTRL as usize].down == qboolean::qtrue)
+                && cl.kg.keys[fakeAscii_t::A_CTRL as usize].down == qtrue)
         {
             (*edit).cursor = 0;
             return;
@@ -707,17 +732,17 @@ pub fn Field_KeyDownEvent(cl: &mut Client, edit: *mut field_t, key: c_int) {
 
         if key == fakeAscii_t::A_END as c_int
             || (cl.keynames[key as usize].lower == b'e' as u16
-                && cl.kg.keys[fakeAscii_t::A_CTRL as usize].down == qboolean::qtrue)
+                && cl.kg.keys[fakeAscii_t::A_CTRL as usize].down == qtrue)
         {
             (*edit).cursor = len;
             return;
         }
 
         if key == fakeAscii_t::A_INSERT as c_int {
-            cl.kg.key_overstrikeMode = if cl.kg.key_overstrikeMode == qboolean::qtrue {
-                qboolean::qfalse
+            cl.kg.key_overstrikeMode = if cl.kg.key_overstrikeMode == qtrue {
+                qfalse
             } else {
-                qboolean::qtrue
+                qtrue
             };
             return;
         }
@@ -726,13 +751,14 @@ pub fn Field_KeyDownEvent(cl: &mut Client, edit: *mut field_t, key: c_int) {
 
 /// Raven `CompleteCommand`.
 ///
-/// PORT-NOTE(receivers): `Cmd_CommandCompletion`/`Cvar_CommandCompletion` are LAW
-/// with an `extern "C" fn(*const c_char)` callback and a `common` receiver; this
-/// packet's `FindMatches`/`PrintMatches` take `(cl, s)` and this fn takes no
-/// `common`, so both are referenced as written and reported (shape_mismatches).
+/// PORT-NOTE(blocked): `Cmd_CommandCompletion`/`Cvar_CommandCompletion` take an
+/// `extern "C" fn(*const c_char)` callback, but `FindMatches` takes `(cl, s)`
+/// and `PrintMatches` takes `(common, cl, s)`. Neither shape matches the
+/// callback type, so both call sites need trampoline adapters. That adapter
+/// shape is a design decision, not a mechanical fix, so it stays unresolved.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:747-800`
-pub fn CompleteCommand(cl: &mut Client) {
+pub fn CompleteCommand(common: &mut Common, cl: &mut Client) {
     unsafe {
         let edit: *mut field_t = &mut cl.kg.g_consoleField;
         let mut temp: field_t = core::mem::zeroed();
@@ -772,7 +798,7 @@ pub fn CompleteCommand(cl: &mut Client) {
         if cl.matchCount == 1 {
             let shortest = core::ffi::CStr::from_ptr(cl.shortestMatch.as_ptr()).to_string_lossy();
             let out = format!("\\{}", shortest);
-            let out_c = core::ffi::CString::new(out).unwrap();
+            let out_c = std::ffi::CString::new(out).unwrap();
             core::ffi::CStr::from_ptr(out_c.as_ptr())
                 .to_bytes_with_nul()
                 .iter()
@@ -793,6 +819,7 @@ pub fn CompleteCommand(cl: &mut Client) {
                     .to_string_lossy()
                     .into_owned();
                 ConcatRemaining(
+                    common,
                     cl,
                     temp.buffer.as_ptr(),
                     completion_str.as_ptr() as *const c_char,
@@ -805,7 +832,7 @@ pub fn CompleteCommand(cl: &mut Client) {
         // Multiple matches, complete to the shortest.
         let shortest = core::ffi::CStr::from_ptr(cl.shortestMatch.as_ptr()).to_string_lossy();
         let out = format!("\\{}", shortest);
-        let out_c = core::ffi::CString::new(out).unwrap();
+        let out_c = std::ffi::CString::new(out).unwrap();
         out_c
             .as_bytes_with_nul()
             .iter()
@@ -820,6 +847,7 @@ pub fn CompleteCommand(cl: &mut Client) {
             .to_string_lossy()
             .into_owned();
         ConcatRemaining(
+            common,
             cl,
             temp.buffer.as_ptr(),
             completion_str.as_ptr() as *const c_char,
@@ -842,7 +870,7 @@ pub fn CompleteCommand(cl: &mut Client) {
 /// Raven `Key_WriteBindings`.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:1367-1376`
-pub fn Key_WriteBindings(cl: &mut Client, f: fileHandle_t) {
+pub fn Key_WriteBindings(common: &mut Common, cl: &mut Client, f: fileHandle_t) {
     unsafe {
         FS_Printf(common, f, "unbindall\n");
         for i in 0..MAX_KEYS {
@@ -859,7 +887,7 @@ pub fn Key_WriteBindings(cl: &mut Client, f: fileHandle_t) {
 /// Raven `Key_Bindlist_f`.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:1387-1395`
-pub fn Key_Bindlist_f(cl: &mut Client) {
+pub fn Key_Bindlist_f(common: &mut Common, cl: &mut Client) {
     unsafe {
         for i in 0..MAX_KEYS {
             if !cl.kg.keys[i].binding.is_null() && *cl.kg.keys[i].binding != 0 {
@@ -880,7 +908,7 @@ pub fn Key_Bindlist_f(cl: &mut Client) {
 /// Raven `CL_CharEvent`.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:1658-1681`
-pub fn CL_CharEvent(cl: &mut Client, key: c_int) {
+pub fn CL_CharEvent(common: &mut Common, cl: &mut Client, key: c_int) {
     // The console key never doubles as a char.
     if key == b'`' as c_int || key == b'~' as c_int {
         return;
@@ -888,18 +916,21 @@ pub fn CL_CharEvent(cl: &mut Client, key: c_int) {
 
     // Distribute the key-down event to the appropriate handler.
     if cl.cls.keyCatchers & KEYCATCH_CONSOLE != 0 {
-        Field_CharEvent(cl, &mut cl.kg.g_consoleField, key);
+        let edit: *mut field_t = &mut cl.kg.g_consoleField;
+        Field_CharEvent(common, cl, edit, key);
     } else if cl.cls.keyCatchers & KEYCATCH_UI != 0 {
         VM_Call(
             common,
             cl.uivm,
             MpUiExport::UI_KEY_EVENT as c_int,
-            &[(key | K_CHAR_FLAG) as isize, qboolean::qtrue as isize],
+            &[(key | K_CHAR_FLAG) as isize, qtrue as isize],
         );
     } else if cl.cls.keyCatchers & KEYCATCH_MESSAGE != 0 {
-        Field_CharEvent(cl, &mut cl.chatField, key);
+        let edit: *mut field_t = &mut cl.chatField;
+        Field_CharEvent(common, cl, edit, key);
     } else if cl.cls.state == connstate_t::CA_DISCONNECTED {
-        Field_CharEvent(cl, &mut cl.kg.g_consoleField, key);
+        let edit: *mut field_t = &mut cl.kg.g_consoleField;
+        Field_CharEvent(common, cl, edit, key);
     }
 }
 
@@ -956,15 +987,23 @@ pub fn Field_VariableSizeDraw(
 
         // Draw the field text.
         if size == SMALLCHAR_WIDTH {
-            let color = [1.0f32, 1.0, 1.0, 1.0];
-            SCR_DrawSmallStringExt(common, cl, x, y, str_buf.as_ptr(), &color, qboolean::qfalse);
+            let mut color = [1.0f32, 1.0, 1.0, 1.0];
+            SCR_DrawSmallStringExt(
+                common,
+                cl,
+                x,
+                y,
+                str_buf.as_ptr(),
+                color.as_mut_ptr(),
+                false,
+            );
         } else {
             // Draw the big string with a drop shadow.
             SCR_DrawBigString(common, cl, x, y, str_buf.as_ptr(), 1.0);
         }
 
         // Draw the cursor.
-        if showCursor != qboolean::qtrue {
+        if showCursor != qtrue {
             return;
         }
 
@@ -972,7 +1011,7 @@ pub fn Field_VariableSizeDraw(
             return; // off blink
         }
 
-        let cursor_char = if cl.kg.key_overstrikeMode == qboolean::qtrue {
+        let cursor_char = if cl.kg.key_overstrikeMode == qtrue {
             11
         } else {
             10
@@ -1035,7 +1074,7 @@ pub fn Field_BigDraw(
 /// Raven `Message_Key`.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:951-985`
-pub fn Message_Key(cl: &mut Client, key: c_int) {
+pub fn Message_Key(common: &mut Common, cl: &mut Client, key: c_int) {
     unsafe {
         let mut buffer = [0u8; MAX_STRING_CHARS];
 
@@ -1051,12 +1090,12 @@ pub fn Message_Key(cl: &mut Client, key: c_int) {
                     core::ffi::CStr::from_ptr(cl.chatField.buffer.as_ptr()).to_string_lossy();
                 let line = if cl.chat_playerNum != -1 {
                     format!("tell {} \"{}\"\n", cl.chat_playerNum, text)
-                } else if cl.chat_team == qboolean::qtrue {
+                } else if cl.chat_team == qtrue {
                     format!("say_team \"{}\"\n", text)
                 } else {
                     format!("say \"{}\"\n", text)
                 };
-                let line_c = core::ffi::CString::new(line).unwrap();
+                let line_c = std::ffi::CString::new(line).unwrap();
                 for (i, b) in line_c.as_bytes_with_nul().iter().enumerate() {
                     if i < buffer.len() {
                         buffer[i] = *b;
@@ -1070,21 +1109,55 @@ pub fn Message_Key(cl: &mut Client, key: c_int) {
             return;
         }
 
-        Field_KeyDownEvent(cl, &mut cl.chatField, key);
+        let edit: *mut field_t = &mut cl.chatField;
+        Field_KeyDownEvent(common, cl, edit, key);
     }
+}
+
+/// `Cmd_AddCommand` registers `Key_Bind_f`, whose real shape now takes
+/// `(view, cl)`. This adapter casts the client out of `view` first.
+///
+/// Source: `oracle/codemp/client/cl_keys.cpp:1403-1409`
+fn Key_Bind_f_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    Key_Bind_f(view, cl);
+}
+
+/// `Cmd_AddCommand` registers `Key_Unbind_f`, whose real shape now takes
+/// `(view, cl)`. This adapter casts the client out of `view` first.
+///
+/// Source: `oracle/codemp/client/cl_keys.cpp:1403-1409`
+fn Key_Unbind_f_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    Key_Unbind_f(view, cl);
+}
+
+/// `Cmd_AddCommand` registers `Key_Unbindall_f`, whose real shape now takes
+/// `(view, cl)`. This adapter casts the client out of `view` first.
+///
+/// Source: `oracle/codemp/client/cl_keys.cpp:1403-1409`
+fn Key_Unbindall_f_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    Key_Unbindall_f(view, cl);
+}
+
+/// `Cmd_AddCommand` registers `Key_Bindlist_f`, whose real shape now takes
+/// `(common, cl)`. This adapter casts the client out of `view` first.
+///
+/// Source: `oracle/codemp/client/cl_keys.cpp:1403-1409`
+fn Key_Bindlist_f_cmd(view: &mut EngineHostView) {
+    let cl = unsafe { cl_from_view(view) };
+    Key_Bindlist_f(view.common, cl);
 }
 
 /// Raven `CL_InitKeyCommands`.
 ///
-/// PORT-NOTE(receivers): `Cmd_AddCommand`'s `CmdFunction = fn(&mut EngineHostView)`
-/// does not match the `(common, cl)` handlers registered here (shape_mismatches).
-///
 /// Source: `oracle/codemp/client/cl_keys.cpp:1403-1409`
-pub fn CL_InitKeyCommands() {
-    Cmd_AddCommand(view, "bind", Some(Key_Bind_f));
-    Cmd_AddCommand(view, "unbind", Some(Key_Unbind_f));
-    Cmd_AddCommand(view, "unbindall", Some(Key_Unbindall_f));
-    Cmd_AddCommand(view, "bindlist", Some(Key_Bindlist_f));
+pub fn CL_InitKeyCommands(view: &mut EngineHostView) {
+    Cmd_AddCommand(view, "bind", Some(Key_Bind_f_cmd));
+    Cmd_AddCommand(view, "unbind", Some(Key_Unbind_f_cmd));
+    Cmd_AddCommand(view, "unbindall", Some(Key_Unbindall_f_cmd));
+    Cmd_AddCommand(view, "bindlist", Some(Key_Bindlist_f_cmd));
 }
 
 /// Raven `Console_Key`.
@@ -1094,7 +1167,7 @@ pub fn Console_Key(common: &mut Common, cl: &mut Client, key: c_int) {
     unsafe {
         // ctrl-L clears the screen
         if cl.keynames[key as usize].lower == b'l' as u16
-            && cl.kg.keys[fakeAscii_t::A_CTRL as usize].down == qboolean::qtrue
+            && cl.kg.keys[fakeAscii_t::A_CTRL as usize].down == qtrue
         {
             Cbuf_AddText(common, "clear\n");
             return;
@@ -1113,7 +1186,7 @@ pub fn Console_Key(common: &mut Common, cl: &mut Client, key: c_int) {
                 let mut temp_buf = [0 as c_char; MAX_STRING_CHARS];
                 Q_strncpyz(&mut temp_buf, &temp, MAX_STRING_CHARS);
                 let out = format!("\\{}", temp);
-                let out_c = core::ffi::CString::new(out).unwrap();
+                let out_c = std::ffi::CString::new(out).unwrap();
                 for (i, b) in out_c.as_bytes_with_nul().iter().enumerate() {
                     if i < cl.kg.g_consoleField.buffer.len() {
                         cl.kg.g_consoleField.buffer[i] = *b as c_char;
@@ -1122,7 +1195,7 @@ pub fn Console_Key(common: &mut Common, cl: &mut Client, key: c_int) {
                 cl.kg.g_consoleField.cursor += 1;
             } else {
                 // Explicit commands do not need a leading slash.
-                CompleteCommand(cl);
+                CompleteCommand(common, cl);
             }
 
             com_printf(
@@ -1147,7 +1220,7 @@ pub fn Console_Key(common: &mut Common, cl: &mut Client, key: c_int) {
                     let icc = cl.cl.mSharedMemory as *mut TCGIncomingConsoleCommand;
                     strcpy(
                         (*icc).conCommand.as_mut_ptr() as *mut c_char,
-                        core::ffi::CString::new(buf).unwrap().as_ptr(),
+                        std::ffi::CString::new(buf).unwrap().as_ptr(),
                     );
 
                     if VM_Call(
@@ -1209,14 +1282,14 @@ pub fn Console_Key(common: &mut Common, cl: &mut Client, key: c_int) {
 
         // Command completion.
         if key == fakeAscii_t::A_TAB as c_int {
-            CompleteCommand(cl);
+            CompleteCommand(common, cl);
             return;
         }
 
         // Command history (ctrl-p / ctrl-n for unix style).
         if key == fakeAscii_t::A_CURSOR_UP as c_int
             || (cl.keynames[key as usize].lower == b'p' as u16
-                && cl.kg.keys[fakeAscii_t::A_CTRL as usize].down == qboolean::qtrue)
+                && cl.kg.keys[fakeAscii_t::A_CTRL as usize].down == qtrue)
         {
             if cl.kg.nextHistoryLine - cl.kg.historyLine < COMMAND_HISTORY as c_int
                 && cl.kg.historyLine > 0
@@ -1230,7 +1303,7 @@ pub fn Console_Key(common: &mut Common, cl: &mut Client, key: c_int) {
 
         if key == fakeAscii_t::A_CURSOR_DOWN as c_int
             || (cl.keynames[key as usize].lower == b'n' as u16
-                && cl.kg.keys[fakeAscii_t::A_CTRL as usize].down == qboolean::qtrue)
+                && cl.kg.keys[fakeAscii_t::A_CTRL as usize].down == qtrue)
         {
             if cl.kg.historyLine == cl.kg.nextHistoryLine {
                 return;
@@ -1254,7 +1327,7 @@ pub fn Console_Key(common: &mut Common, cl: &mut Client, key: c_int) {
 
         // ctrl-home is the top of the console.
         if key == fakeAscii_t::A_HOME as c_int
-            && cl.kg.keys[fakeAscii_t::A_CTRL as usize].down == qboolean::qtrue
+            && cl.kg.keys[fakeAscii_t::A_CTRL as usize].down == qtrue
         {
             Con_Top(cl);
             return;
@@ -1262,43 +1335,50 @@ pub fn Console_Key(common: &mut Common, cl: &mut Client, key: c_int) {
 
         // ctrl-end is the bottom of the console.
         if key == fakeAscii_t::A_END as c_int
-            && cl.kg.keys[fakeAscii_t::A_CTRL as usize].down == qboolean::qtrue
+            && cl.kg.keys[fakeAscii_t::A_CTRL as usize].down == qtrue
         {
             Con_Bottom(cl);
             return;
         }
 
         // Pass to the normal editline routine.
-        Field_KeyDownEvent(cl, &mut cl.kg.g_consoleField, key);
+        let edit: *mut field_t = &mut cl.kg.g_consoleField;
+        Field_KeyDownEvent(common, cl, edit, key);
     }
 }
 
 /// Raven `CL_KeyEvent`.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:1462-1648`
-pub fn CL_KeyEvent(common: &mut Common, cl: &mut Client, key: c_int, down: qboolean, time: c_uint) {
+pub fn CL_KeyEvent(
+    view: &mut EngineHostView,
+    cl: &mut Client,
+    key: c_int,
+    down: qboolean,
+    time: c_uint,
+) {
     unsafe {
         // Update the auto-repeat status and BUTTON_ANY status.
         let upper = cl.keynames[key as usize].upper as usize;
         cl.kg.keys[upper].down = down;
-        if down == qboolean::qtrue {
+        if down == qtrue {
             cl.kg.keys[upper].repeats += 1;
             if cl.kg.keys[upper].repeats == 1 {
-                cl.kg.anykeydown = qboolean::qtrue;
+                cl.kg.anykeydown = qtrue;
                 cl.kg.keyDownCount += 1;
             }
         } else {
             cl.kg.keys[upper].repeats = 0;
             cl.kg.keyDownCount -= 1;
             if cl.kg.keyDownCount <= 0 {
-                cl.kg.anykeydown = qboolean::qfalse;
+                cl.kg.anykeydown = qfalse;
                 cl.kg.keyDownCount = 0;
             }
         }
 
         // The console key is hardcoded, so the user can never unbind it.
         if key == fakeAscii_t::A_CONSOLE as c_int {
-            if down != qboolean::qtrue {
+            if down != qtrue {
                 return;
             }
             Con_ToggleConsole_f(cl);
@@ -1307,21 +1387,18 @@ pub fn CL_KeyEvent(common: &mut Common, cl: &mut Client, key: c_int, down: qbool
 
         // Keys can still be used for bound actions.
         let mut key = key;
-        if down == qboolean::qtrue
-            && cl.cls.state == connstate_t::CA_CINEMATIC
-            && cl.cls.keyCatchers == 0
-        {
-            if Cvar_VariableValue(common, "com_cameraMode") == 0.0 {
+        if down == qtrue && cl.cls.state == connstate_t::CA_CINEMATIC && cl.cls.keyCatchers == 0 {
+            if Cvar_VariableValue(view.common, "com_cameraMode") == 0.0 {
                 Cvar_Set(view, "nextdemo", "");
                 key = fakeAscii_t::A_ESCAPE as c_int;
             }
         }
 
         // Escape is always handled specially.
-        if key == fakeAscii_t::A_ESCAPE as c_int && down == qboolean::qtrue {
+        if key == fakeAscii_t::A_ESCAPE as c_int && down == qtrue {
             if cl.cls.keyCatchers & KEYCATCH_MESSAGE != 0 {
                 // Clear message mode.
-                Message_Key(cl, key);
+                Message_Key(view.common, cl, key);
                 return;
             }
 
@@ -1329,7 +1406,7 @@ pub fn CL_KeyEvent(common: &mut Common, cl: &mut Client, key: c_int, down: qbool
             if cl.cls.keyCatchers & KEYCATCH_CGAME != 0 {
                 cl.cls.keyCatchers &= !KEYCATCH_CGAME;
                 VM_Call(
-                    common,
+                    view.common,
                     cl.cgvm,
                     MpCgameExport::CG_EVENT_HANDLING as c_int,
                     &[CGAME_EVENT_NONE as isize],
@@ -1338,9 +1415,9 @@ pub fn CL_KeyEvent(common: &mut Common, cl: &mut Client, key: c_int, down: qbool
             }
 
             if cl.cls.keyCatchers & KEYCATCH_UI == 0 {
-                if cl.cls.state == connstate_t::CA_ACTIVE && cl.clc.demoplaying != qboolean::qtrue {
+                if cl.cls.state == connstate_t::CA_ACTIVE && cl.clc.demoplaying != qtrue {
                     VM_Call(
-                        common,
+                        view.common,
                         cl.uivm,
                         MpUiExport::UI_SET_ACTIVE_MENU as c_int,
                         &[UIMENU_INGAME as isize],
@@ -1349,7 +1426,7 @@ pub fn CL_KeyEvent(common: &mut Common, cl: &mut Client, key: c_int, down: qbool
                     CL_Disconnect_f(cl);
                     S_StopAllSounds(cl);
                     VM_Call(
-                        common,
+                        view.common,
                         cl.uivm,
                         MpUiExport::UI_SET_ACTIVE_MENU as c_int,
                         &[UIMENU_MAIN as isize],
@@ -1359,7 +1436,7 @@ pub fn CL_KeyEvent(common: &mut Common, cl: &mut Client, key: c_int, down: qbool
             }
 
             VM_Call(
-                common,
+                view.common,
                 cl.uivm,
                 MpUiExport::UI_KEY_EVENT as c_int,
                 &[key as isize, down as isize],
@@ -1371,21 +1448,21 @@ pub fn CL_KeyEvent(common: &mut Common, cl: &mut Client, key: c_int, down: qbool
         // command (a leading `+`). These still run in console and menu mode,
         // to keep the character from continuing an action started before a
         // mode switch.
-        if down != qboolean::qtrue {
+        if down != qtrue {
             let kb = cl.kg.keys[upper].binding;
 
-            CL_AddKeyUpCommands(key, kb);
+            CL_AddKeyUpCommands(view.common, key, kb);
 
             if cl.cls.keyCatchers & KEYCATCH_UI != 0 && !cl.uivm.is_null() {
                 VM_Call(
-                    common,
+                    view.common,
                     cl.uivm,
                     MpUiExport::UI_KEY_EVENT as c_int,
                     &[key as isize, down as isize],
                 );
             } else if cl.cls.keyCatchers & KEYCATCH_CGAME != 0 && !cl.cgvm.is_null() {
                 VM_Call(
-                    common,
+                    view.common,
                     cl.cgvm,
                     MpCgameExport::CG_KEY_EVENT as c_int,
                     &[key as isize, down as isize],
@@ -1397,11 +1474,11 @@ pub fn CL_KeyEvent(common: &mut Common, cl: &mut Client, key: c_int, down: qbool
 
         // Distribute the key-down event to the appropriate handler.
         if cl.cls.keyCatchers & KEYCATCH_CONSOLE != 0 {
-            Console_Key(common, cl, key);
+            Console_Key(view.common, cl, key);
         } else if cl.cls.keyCatchers & KEYCATCH_UI != 0 {
             if !cl.uivm.is_null() {
                 VM_Call(
-                    common,
+                    view.common,
                     cl.uivm,
                     MpUiExport::UI_KEY_EVENT as c_int,
                     &[key as isize, down as isize],
@@ -1410,16 +1487,16 @@ pub fn CL_KeyEvent(common: &mut Common, cl: &mut Client, key: c_int, down: qbool
         } else if cl.cls.keyCatchers & KEYCATCH_CGAME != 0 {
             if !cl.cgvm.is_null() {
                 VM_Call(
-                    common,
+                    view.common,
                     cl.cgvm,
                     MpCgameExport::CG_KEY_EVENT as c_int,
                     &[key as isize, down as isize],
                 );
             }
         } else if cl.cls.keyCatchers & KEYCATCH_MESSAGE != 0 {
-            Message_Key(cl, key);
+            Message_Key(view.common, cl, key);
         } else if cl.cls.state == connstate_t::CA_DISCONNECTED {
-            Console_Key(common, cl, key);
+            Console_Key(view.common, cl, key);
         } else {
             // Send the bound action.
             let kb = cl.kg.keys[upper].binding;
@@ -1435,12 +1512,12 @@ pub fn CL_KeyEvent(common: &mut Common, cl: &mut Client, key: c_int, down: qbool
                                 let button_str =
                                     core::ffi::CStr::from_ptr(button.as_ptr()).to_string_lossy();
                                 let cmd = format!("{} {} {}\n", button_str, key, time);
-                                Cbuf_AddText(common, &cmd);
+                                Cbuf_AddText(view.common, &cmd);
                             } else {
                                 let button_str =
                                     core::ffi::CStr::from_ptr(button.as_ptr()).to_string_lossy();
-                                Cbuf_AddText(common, &button_str);
-                                Cbuf_AddText(common, "\n");
+                                Cbuf_AddText(view.common, &button_str);
+                                Cbuf_AddText(view.common, "\n");
                             }
                             button_len = 0;
                             while (*kb.add(i) as u8 as i32) <= b' ' as i32 && *kb.add(i) != 0
@@ -1464,7 +1541,7 @@ pub fn CL_KeyEvent(common: &mut Common, cl: &mut Client, key: c_int, down: qbool
                         strcpy((*icc).conCommand.as_mut_ptr() as *mut c_char, kb);
 
                         if VM_Call(
-                            common,
+                            view.common,
                             cl.cgvm,
                             MpCgameExport::CG_INCOMING_CONSOLE_COMMAND as c_int,
                             &[],
@@ -1472,22 +1549,22 @@ pub fn CL_KeyEvent(common: &mut Common, cl: &mut Client, key: c_int, down: qbool
                         {
                             // Let mod authors filter client console messages so they can cut them off if they want.
                             let kb_str = core::ffi::CStr::from_ptr(kb).to_string_lossy();
-                            Cbuf_AddText(common, &kb_str);
-                            Cbuf_AddText(common, "\n");
+                            Cbuf_AddText(view.common, &kb_str);
+                            Cbuf_AddText(view.common, "\n");
                         } else if (*icc).conCommand[0] != 0 {
                             // The VM call says to execute this command in place.
                             let text = core::ffi::CStr::from_ptr(
                                 (*icc).conCommand.as_ptr() as *const c_char
                             )
                             .to_string_lossy();
-                            Cbuf_AddText(common, &text);
-                            Cbuf_AddText(common, "\n");
+                            Cbuf_AddText(view.common, &text);
+                            Cbuf_AddText(view.common, "\n");
                         }
                     } else {
                         // Otherwise, just run it.
                         let kb_str = core::ffi::CStr::from_ptr(kb).to_string_lossy();
-                        Cbuf_AddText(common, &kb_str);
-                        Cbuf_AddText(common, "\n");
+                        Cbuf_AddText(view.common, &kb_str);
+                        Cbuf_AddText(view.common, "\n");
                     }
                 }
             }
@@ -1498,14 +1575,14 @@ pub fn CL_KeyEvent(common: &mut Common, cl: &mut Client, key: c_int, down: qbool
 /// Raven `Key_ClearStates`.
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:1689-1703`
-pub fn Key_ClearStates(common: &mut Common, cl: &mut Client) {
-    cl.kg.anykeydown = qboolean::qfalse;
+pub fn Key_ClearStates(view: &mut EngineHostView, cl: &mut Client) {
+    cl.kg.anykeydown = qfalse;
 
     for i in 0..MAX_KEYS {
-        if cl.kg.keys[i].down == qboolean::qtrue {
-            CL_KeyEvent(common, cl, i as c_int, qboolean::qfalse, 0);
+        if cl.kg.keys[i].down == qtrue {
+            CL_KeyEvent(view, cl, i as c_int, qfalse, 0);
         }
-        cl.kg.keys[i].down = qboolean::qfalse;
+        cl.kg.keys[i].down = qfalse;
         cl.kg.keys[i].repeats = 0;
     }
 }

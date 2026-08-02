@@ -5,8 +5,9 @@
 use core::ffi::{c_char, c_int, c_long, c_short, c_uchar, c_uint, c_ushort};
 
 use mp_qshared::shared::cbuf_exec::cbufExec_t;
-use mp_qshared::shared::connstate::connstate_t;
+use mp_qshared::shared::cin_flags::{CIN_HOLD, CIN_LOOP, CIN_SHADER, CIN_SILENT, CIN_SYSTEM};
 use mp_qshared::shared::cinematic_status::{e_status, FMV_EOF, FMV_IDLE, FMV_LOOPED, FMV_PLAY};
+use mp_qshared::shared::connstate::connstate_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::fs_origin::fsOrigin_t;
 use mp_qshared::shared::swap::LittleLong;
@@ -14,14 +15,17 @@ use native_types::{byte, qboolean, qfalse, qtrue};
 
 use mp_engine_qcommon::cmd_common::{Cbuf_ExecuteText, Cmd_Argv};
 use mp_engine_qcommon::common::common::{com_printf, Common};
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::error::com_error;
 use mp_engine_qcommon::common_fns::{Com_DPrintf, Com_Memcpy, Com_Memset};
 use mp_engine_qcommon::cvar_fns::{Cvar_Set, Cvar_VariableString};
 use mp_engine_qcommon::files_common::{FS_FCloseFile, FS_FOpenFileRead, FS_Read};
 use mp_engine_qcommon::files_pc::FS_Seek;
 use mp_engine_qcommon::sys_engine::Sys_StreamedRead;
+use mp_engine_qcommon::timing::sys_milliseconds;
 use mp_engine_qcommon::vm_fns::VM_Call;
 use mp_engine_qcommon::z_memman_pc::{Hunk_AllocateTempMemory, Hunk_FreeTempMemory};
+use native_platform::{Sys_BeginStreamedFile, Sys_EndStreamedFile};
 use native_string::q_string::Q_stricmp;
 
 use mp_abi::ui::exports::MpUiExport;
@@ -58,7 +62,7 @@ use crate::snd_stubs::{S_RawSamples, S_StopAllSounds, S_Update};
 pub fn CIN_HandleForVideo(cl: &mut Client) -> c_int {
     for i in 0..MAX_VIDEO_HANDLES {
         if cl.cinTable[i as usize].fileName[0] == 0 {
-            return i;
+            return i as c_int;
         }
     }
     com_error(
@@ -388,15 +392,15 @@ pub fn recurseQuad(
     let handle = cl.currentHandle as usize;
     let offset = cl.cinTable[handle].screenDelta;
 
-    let (lowx, lowy) = (0, 0);
-    let mut bigx = cl.cinTable[handle].xsize;
-    let mut bigy = cl.cinTable[handle].ysize;
+    let (lowx, lowy): (c_long, c_long) = (0, 0);
+    let mut bigx = cl.cinTable[handle].xsize as c_long;
+    let mut bigy = cl.cinTable[handle].ysize as c_long;
 
-    if bigx > cl.cinTable[handle].CIN_WIDTH {
-        bigx = cl.cinTable[handle].CIN_WIDTH;
+    if bigx > cl.cinTable[handle].CIN_WIDTH as c_long {
+        bigx = cl.cinTable[handle].CIN_WIDTH as c_long;
     }
-    if bigy > cl.cinTable[handle].CIN_HEIGHT {
-        bigy = cl.cinTable[handle].CIN_HEIGHT;
+    if bigy > cl.cinTable[handle].CIN_HEIGHT as c_long {
+        bigy = cl.cinTable[handle].CIN_HEIGHT as c_long;
     }
 
     if startX >= lowx
@@ -407,8 +411,8 @@ pub fn recurseQuad(
     {
         let useY = startY;
         unsafe {
-            let scroff = cl.cin.linbuf.offset(
-                (useY + ((cl.cinTable[handle].CIN_HEIGHT - bigy) >> 1) + yOff)
+            let scroff = cl.cin.linbuf.as_mut_ptr().offset(
+                (useY + ((cl.cinTable[handle].CIN_HEIGHT as c_long - bigy) >> 1) + yOff)
                     * cl.cinTable[handle].samplesPerLine
                     + (startX + xOff) * 4,
             );
@@ -439,39 +443,39 @@ pub fn recurseQuad(
 /// Raven `readQuadInfo`.
 ///
 /// Source: `oracle/codemp/client/cl_cin.cpp:788-827`
-pub fn readQuadInfo(cl: &mut Client, qData: *mut byte) {
+pub fn readQuadInfo(common: &mut Common, cl: &mut Client, qData: *mut byte) {
     if cl.currentHandle < 0 {
         return;
     }
     let handle = cl.currentHandle as usize;
 
     unsafe {
-        cl.cinTable[handle].xsize = *qData.add(0) as c_long + *qData.add(1) as c_long * 256;
-        cl.cinTable[handle].ysize = *qData.add(2) as c_long + *qData.add(3) as c_long * 256;
-        cl.cinTable[handle].maxsize = *qData.add(4) as c_long + *qData.add(5) as c_long * 256;
-        cl.cinTable[handle].minsize = *qData.add(6) as c_long + *qData.add(7) as c_long * 256;
+        cl.cinTable[handle].xsize = (*qData.add(0) as c_uint) + (*qData.add(1) as c_uint) * 256;
+        cl.cinTable[handle].ysize = (*qData.add(2) as c_uint) + (*qData.add(3) as c_uint) * 256;
+        cl.cinTable[handle].maxsize = (*qData.add(4) as c_uint) + (*qData.add(5) as c_uint) * 256;
+        cl.cinTable[handle].minsize = (*qData.add(6) as c_uint) + (*qData.add(7) as c_uint) * 256;
     }
 
-    cl.cinTable[handle].CIN_HEIGHT = cl.cinTable[handle].ysize;
-    cl.cinTable[handle].CIN_WIDTH = cl.cinTable[handle].xsize;
+    cl.cinTable[handle].CIN_HEIGHT = cl.cinTable[handle].ysize as c_int;
+    cl.cinTable[handle].CIN_WIDTH = cl.cinTable[handle].xsize as c_int;
 
-    cl.cinTable[handle].samplesPerLine = cl.cinTable[handle].CIN_WIDTH * 4;
+    cl.cinTable[handle].samplesPerLine = cl.cinTable[handle].CIN_WIDTH as c_long * 4;
     cl.cinTable[handle].screenDelta =
-        cl.cinTable[handle].CIN_HEIGHT * cl.cinTable[handle].samplesPerLine;
+        cl.cinTable[handle].CIN_HEIGHT as c_long * cl.cinTable[handle].samplesPerLine;
 
     cl.cinTable[handle].VQ0 = cl.cinTable[handle].VQNormal;
     cl.cinTable[handle].VQ1 = cl.cinTable[handle].VQBuffer;
 
     unsafe {
-        let linbuf = cl.cin.linbuf as usize;
+        let linbuf = cl.cin.linbuf.as_mut_ptr() as usize;
         cl.cinTable[handle].t[0] =
             (0 - linbuf as c_long) + linbuf as c_long + cl.cinTable[handle].screenDelta;
         cl.cinTable[handle].t[1] =
             (0 - (linbuf as c_long + cl.cinTable[handle].screenDelta)) + linbuf as c_long;
     }
 
-    cl.cinTable[handle].drawX = cl.cinTable[handle].CIN_WIDTH;
-    cl.cinTable[handle].drawY = cl.cinTable[handle].CIN_HEIGHT;
+    cl.cinTable[handle].drawX = cl.cinTable[handle].CIN_WIDTH as c_long;
+    cl.cinTable[handle].drawY = cl.cinTable[handle].CIN_HEIGHT as c_long;
     // jic the card sucks
     if cl.glConfig.maxTextureSize <= 256 {
         if cl.cinTable[handle].drawX > 256 {
@@ -481,8 +485,6 @@ pub fn readQuadInfo(cl: &mut Client, qData: *mut byte) {
             cl.cinTable[handle].drawY = 256;
         }
         if cl.cinTable[handle].CIN_WIDTH != 256 || cl.cinTable[handle].CIN_HEIGHT != 256 {
-            // PORT-NOTE(shape): `Com_Printf` needs `common: &mut Common`, but
-            // `readQuadInfo`'s resolved signature carries no `common` receiver.
             com_printf(
                 common,
                 "HACK: approxmimating cinematic for Rage Pro or Voodoo\n",
@@ -510,7 +512,7 @@ pub fn RoQPrepMcomp(cl: &mut Client, xoff: c_long, yoff: c_long) {
         for x in 0..16i64 {
             let temp = (x + xoff - 8) * j;
             cl.cin.mcomp[((x * 16) + y) as usize] =
-                cl.cinTable[handle].normalBuffer0 - (temp2 + temp);
+                (cl.cinTable[handle].normalBuffer0 - (temp2 + temp)) as c_uint;
         }
     }
 }
@@ -520,7 +522,8 @@ pub fn RoQPrepMcomp(cl: &mut Client, xoff: c_long, yoff: c_long) {
 /// Source: `oracle/codemp/client/cl_cin.cpp:1062-1083`
 pub fn RoQ_init(common: &mut Common, cl: &mut Client) {
     let handle = cl.currentHandle as usize;
-    let start = (crate::sys_milliseconds(common) as f32 * common.com_timescale.value) as c_long;
+    let start =
+        (sys_milliseconds(common) as f32 * common.cvar(common.com_timescale).value) as c_uint;
     cl.cinTable[handle].startTime = start;
     cl.cinTable[handle].lastTime = start;
 
@@ -535,11 +538,11 @@ pub fn RoQ_init(common: &mut Common, cl: &mut Client) {
 
     cl.cinTable[handle].numQuads = -1;
 
-    cl.cinTable[handle].roq_id = cl.cin.file[8] as c_ushort + cl.cin.file[9] as c_ushort * 256;
-    cl.cinTable[handle].RoQFrameSize = cl.cin.file[10] as c_long
-        + cl.cin.file[11] as c_long * 256
-        + cl.cin.file[12] as c_long * 65536;
-    cl.cinTable[handle].roq_flags = cl.cin.file[14] as c_ushort + cl.cin.file[15] as c_ushort * 256;
+    cl.cinTable[handle].roq_id = cl.cin.file[8] as c_uint + cl.cin.file[9] as c_uint * 256;
+    cl.cinTable[handle].RoQFrameSize = cl.cin.file[10] as c_uint
+        + cl.cin.file[11] as c_uint * 256
+        + cl.cin.file[12] as c_uint * 65536;
+    cl.cinTable[handle].roq_flags = cl.cin.file[14] as c_long + cl.cin.file[15] as c_long * 256;
 
     if cl.cinTable[handle].RoQFrameSize > 65536 || cl.cinTable[handle].RoQFrameSize == 0 {
         return;
@@ -549,7 +552,7 @@ pub fn RoQ_init(common: &mut Common, cl: &mut Client) {
 /// Raven `RoQShutdown`.
 ///
 /// Source: `oracle/codemp/client/cl_cin.cpp:1093-1127`
-pub fn RoQShutdown(cl: &mut Client) {
+pub fn RoQShutdown(view: &mut EngineHostView, cl: &mut Client) {
     let handle = cl.currentHandle as usize;
 
     if cl.cinTable[handle].buf.is_null() {
@@ -559,12 +562,12 @@ pub fn RoQShutdown(cl: &mut Client) {
     if cl.cinTable[handle].status == FMV_IDLE {
         return;
     }
-    Com_DPrintf(common, "finished cinematic\n");
+    Com_DPrintf(view.common, "finished cinematic\n");
     cl.cinTable[handle].status = FMV_IDLE;
 
     if cl.cinTable[handle].iFile != 0 {
-        crate::sys_end_streamed_file(cl.cinTable[handle].iFile);
-        FS_FCloseFile(common, cl.cinTable[handle].iFile);
+        Sys_EndStreamedFile(cl.cinTable[handle].iFile);
+        FS_FCloseFile(view.common, cl.cinTable[handle].iFile);
         cl.cinTable[handle].iFile = 0;
     }
 
@@ -574,18 +577,10 @@ pub fn RoQShutdown(cl: &mut Client) {
         // if we are aborting the intro cinematic with
         // a devmap command, nextmap would be valid by
         // the time it was referenced
-        let s = Cvar_VariableString(common, "nextmap");
+        let s = Cvar_VariableString(view.common, "nextmap").to_string();
         if !s.is_empty() {
-            // PORT-NOTE(shape): `Cbuf_ExecuteText`/`Cvar_Set` need
-            // `view: &mut EngineHostView`, but `RoQShutdown`'s resolved
-            // signature carries only `cl`. Passing `common` here is a
-            // placeholder the seam fixer must correct.
-            Cbuf_ExecuteText(
-                common,
-                cbufExec_t::EXEC_APPEND as c_int,
-                &format!("{}\n", s),
-            );
-            Cvar_Set(common, "nextmap", "");
+            Cbuf_ExecuteText(view, cbufExec_t::EXEC_APPEND as c_int, &format!("{}\n", s));
+            Cvar_Set(view, "nextmap", "");
         }
         cl.CL_handle = -1;
     }
@@ -597,7 +592,10 @@ pub fn RoQShutdown(cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_cin.cpp:1324-1331`
 pub fn CIN_SetExtents(cl: &mut Client, handle: c_int, x: c_int, y: c_int, w: c_int, h: c_int) {
-    if handle < 0 || handle >= MAX_VIDEO_HANDLES || cl.cinTable[handle as usize].status == FMV_EOF {
+    if handle < 0
+        || handle >= MAX_VIDEO_HANDLES as c_int
+        || cl.cinTable[handle as usize].status == FMV_EOF
+    {
         return;
     }
     cl.cinTable[handle as usize].xpos = x;
@@ -611,7 +609,10 @@ pub fn CIN_SetExtents(cl: &mut Client, handle: c_int, x: c_int, y: c_int, w: c_i
 ///
 /// Source: `oracle/codemp/client/cl_cin.cpp:1333-1336`
 pub fn CIN_SetLooping(cl: &mut Client, handle: c_int, r#loop: qboolean) {
-    if handle < 0 || handle >= MAX_VIDEO_HANDLES || cl.cinTable[handle as usize].status == FMV_EOF {
+    if handle < 0
+        || handle >= MAX_VIDEO_HANDLES as c_int
+        || cl.cinTable[handle as usize].status == FMV_EOF
+    {
         return;
     }
     cl.cinTable[handle as usize].looping = r#loop;
@@ -620,8 +621,11 @@ pub fn CIN_SetLooping(cl: &mut Client, handle: c_int, r#loop: qboolean) {
 /// Raven `CIN_DrawCinematic`.
 ///
 /// Source: `oracle/codemp/client/cl_cin.cpp:1344-1415`
-pub fn CIN_DrawCinematic(cl: &mut Client, handle: c_int) {
-    if handle < 0 || handle >= MAX_VIDEO_HANDLES || cl.cinTable[handle as usize].status == FMV_EOF {
+pub fn CIN_DrawCinematic(view: &mut EngineHostView, cl: &mut Client, handle: c_int) {
+    if handle < 0
+        || handle >= MAX_VIDEO_HANDLES as c_int
+        || cl.cinTable[handle as usize].status == FMV_EOF
+    {
         return;
     }
 
@@ -647,11 +651,7 @@ pub fn CIN_DrawCinematic(cl: &mut Client, handle: c_int) {
 
         unsafe {
             let buf3 = cl.cinTable[handle as usize].buf as *mut c_int;
-            // PORT-NOTE(shape): `Hunk_AllocateTempMemory` needs
-            // `view: &mut EngineHostView`, but `CIN_DrawCinematic`'s resolved
-            // signature carries only `cl`. Passing `common` is a placeholder
-            // the seam fixer must correct.
-            let buf2 = Hunk_AllocateTempMemory(common, 256 * 256 * 4) as *mut c_int;
+            let buf2 = Hunk_AllocateTempMemory(view, 256 * 256 * 4) as *mut c_int;
 
             if xm == 2 && ym == 2 {
                 let bc3 = buf3 as *mut byte;
@@ -695,35 +695,35 @@ pub fn CIN_DrawCinematic(cl: &mut Client, handle: c_int) {
                     }
                 }
             }
-            cl.re
-                .DrawStretchRaw(x, y, w, h, 256, 256, buf2 as *mut byte, handle, qtrue);
+            //TODO: Port DrawStretchRaw
+            // Source: oracle/codemp/client/cl_cin.cpp:1397 (refexport_t::DrawStretchRaw)
+            // DEC-59.1 has no mapping row for this receiver yet; the RE_StretchRaw
+            // frontend fn exists (crates/mp/renderer/src/tr_backend.rs) but is not
+            // wired through mappings.json, so the call stays in Raven shape:
+            // cl.re.DrawStretchRaw(x, y, w, h, 256, 256, buf2 as *mut byte, handle, qtrue);
+            let _ = (x, y, w, h, buf2);
             cl.cinTable[handle as usize].dirty = qfalse;
-            Hunk_FreeTempMemory(common, buf2 as *mut ());
+            Hunk_FreeTempMemory(view.common, buf2 as *mut ());
             return;
         }
     }
 
-    unsafe {
-        cl.re.DrawStretchRaw(
-            x,
-            y,
-            w,
-            h,
-            cl.cinTable[handle as usize].drawX,
-            cl.cinTable[handle as usize].drawY,
-            cl.cinTable[handle as usize].buf,
-            handle,
-            cl.cinTable[handle as usize].dirty,
-        );
-    }
+    //TODO: Port DrawStretchRaw
+    // Source: oracle/codemp/client/cl_cin.cpp:1409 (refexport_t::DrawStretchRaw)
+    // DEC-59.1 has no mapping row for this receiver yet; the call stays in Raven
+    // shape:
+    // cl.re.DrawStretchRaw(x, y, w, h, cl.cinTable[handle as usize].drawX,
+    //     cl.cinTable[handle as usize].drawY, cl.cinTable[handle as usize].buf,
+    //     handle, cl.cinTable[handle as usize].dirty);
+    let _ = (x, y, w, h);
     cl.cinTable[handle as usize].dirty = qfalse;
 }
 
 /// Raven `CIN_UploadCinematic`.
 ///
 /// Source: `oracle/codemp/client/cl_cin.cpp:1472-1493`
-pub fn CIN_UploadCinematic(cl: &mut Client, handle: c_int) {
-    if handle >= 0 && handle < MAX_VIDEO_HANDLES {
+pub fn CIN_UploadCinematic(view: &mut EngineHostView, cl: &mut Client, handle: c_int) {
+    if handle >= 0 && handle < MAX_VIDEO_HANDLES as c_int {
         if cl.cinTable[handle as usize].buf.is_null() {
             return;
         }
@@ -738,16 +738,17 @@ pub fn CIN_UploadCinematic(cl: &mut Client, handle: c_int) {
                 cl.cinTable[handle as usize].dirty = qfalse;
             }
         }
-        unsafe {
-            cl.re.UploadCinematic(
-                cl.cinTable[handle as usize].drawX,
-                cl.cinTable[handle as usize].drawY,
-                cl.cinTable[handle as usize].buf,
-                handle,
-                cl.cinTable[handle as usize].dirty,
-            );
-        }
-        if cl.cl_inGameVideo.integer == 0 && cl.cinTable[handle as usize].playonwalls == 1 {
+        //TODO: Port UploadCinematic
+        // Source: oracle/codemp/client/cl_cin.cpp:1489 (refexport_t::UploadCinematic)
+        // DEC-59.1 has no mapping row for this receiver yet; the RE_UploadCinematic
+        // frontend fn exists (crates/mp/renderer/src/tr_backend.rs) but is not wired
+        // through mappings.json, so the call stays in Raven shape:
+        // cl.re.UploadCinematic(cl.cinTable[handle as usize].drawX,
+        //     cl.cinTable[handle as usize].drawY, cl.cinTable[handle as usize].buf,
+        //     handle, cl.cinTable[handle as usize].dirty);
+        if view.common.cvar(cl.cl_inGameVideo).integer == 0
+            && cl.cinTable[handle as usize].playonwalls == 1
+        {
             cl.cinTable[handle as usize].playonwalls -= 1;
         }
     }
@@ -977,10 +978,10 @@ pub fn setupQuad(cl: &mut Client, xOff: c_long, yOff: c_long) {
 
     cl.cinTable[handle].onQuad = 0;
 
-    let mut y = 0;
-    while y < cl.cinTable[handle].ysize {
-        let mut x = 0;
-        while x < cl.cinTable[handle].xsize {
+    let mut y: c_long = 0;
+    while y < cl.cinTable[handle].ysize as c_long {
+        let mut x: c_long = 0;
+        while x < cl.cinTable[handle].xsize as c_long {
             recurseQuad(cl, x, y, 16, xOff, yOff);
             x += 16;
         }
@@ -998,34 +999,31 @@ pub fn setupQuad(cl: &mut Client, xOff: c_long, yOff: c_long) {
 /// Raven `RoQReset`.
 ///
 /// Source: `oracle/codemp/client/cl_cin.cpp:899-912`
-pub fn RoQReset(common: &mut Common, cl: &mut Client) {
+pub fn RoQReset(view: &mut EngineHostView, cl: &mut Client) {
     if cl.currentHandle < 0 {
         return;
     }
     let handle = cl.currentHandle as usize;
 
     if cl.cinTable[handle].iFile != 0 {
-        crate::sys_end_streamed_file(cl.cinTable[handle].iFile);
-        // PORT-NOTE(shape): `FS_Seek` needs `view: &mut EngineHostView`, but
-        // `RoQReset`'s resolved signature carries only `common`/`cl`. Passing
-        // `common` is a placeholder the seam fixer must correct.
+        Sys_EndStreamedFile(cl.cinTable[handle].iFile);
         FS_Seek(
-            common,
+            view,
             cl.cinTable[handle].iFile,
             0,
             fsOrigin_t::FS_SEEK_SET as c_int,
         );
         unsafe {
             FS_Read(
-                common,
+                view.common,
                 cl.cin.file.as_mut_ptr() as *mut (),
                 16,
                 cl.cinTable[handle].iFile,
             );
         }
-        RoQ_init(common, cl);
+        RoQ_init(view.common, cl);
         // let the background thread start reading ahead
-        crate::sys_begin_streamed_file(cl.cinTable[handle].iFile, 0x10000);
+        Sys_BeginStreamedFile(cl.cinTable[handle].iFile, 0x10000);
         cl.cinTable[handle].status = FMV_LOOPED;
     }
 }
@@ -1033,14 +1031,17 @@ pub fn RoQReset(common: &mut Common, cl: &mut Client) {
 /// Raven `CIN_StopCinematic`.
 ///
 /// Source: `oracle/codemp/client/cl_cin.cpp:1134-1154`
-pub fn CIN_StopCinematic(cl: &mut Client, handle: c_int) -> e_status {
-    if handle < 0 || handle >= MAX_VIDEO_HANDLES || cl.cinTable[handle as usize].status == FMV_EOF {
+pub fn CIN_StopCinematic(view: &mut EngineHostView, cl: &mut Client, handle: c_int) -> e_status {
+    if handle < 0
+        || handle >= MAX_VIDEO_HANDLES as c_int
+        || cl.cinTable[handle as usize].status == FMV_EOF
+    {
         return FMV_EOF;
     }
     cl.currentHandle = handle;
 
     Com_DPrintf(
-        common,
+        view.common,
         &format!(
             "trFMV::stop(), closing {}\n",
             String::from_utf8_lossy(&cl.cinTable[cl.currentHandle as usize].fileName)
@@ -1057,7 +1058,7 @@ pub fn CIN_StopCinematic(cl: &mut Client, handle: c_int) -> e_status {
         }
     }
     cl.cinTable[cl.currentHandle as usize].status = FMV_EOF;
-    RoQShutdown(cl);
+    RoQShutdown(view, cl);
 
     FMV_EOF
 }
@@ -1065,19 +1066,19 @@ pub fn CIN_StopCinematic(cl: &mut Client, handle: c_int) -> e_status {
 /// Raven `SCR_DrawCinematic`.
 ///
 /// Source: `oracle/codemp/client/cl_cin.cpp:1451-1455`
-pub fn SCR_DrawCinematic(cl: &mut Client) {
-    if cl.CL_handle >= 0 && cl.CL_handle < MAX_VIDEO_HANDLES {
-        CIN_DrawCinematic(cl, cl.CL_handle);
+pub fn SCR_DrawCinematic(view: &mut EngineHostView, cl: &mut Client) {
+    if cl.CL_handle >= 0 && cl.CL_handle < MAX_VIDEO_HANDLES as c_int {
+        CIN_DrawCinematic(view, cl, cl.CL_handle);
     }
 }
 
 /// Raven `CIN_CloseAllVideos`.
 ///
 /// Source: `oracle/codemp/client/cl_cin.cpp:126-134`
-pub fn CIN_CloseAllVideos(cl: &mut Client) {
+pub fn CIN_CloseAllVideos(view: &mut EngineHostView, cl: &mut Client) {
     for i in 0..MAX_VIDEO_HANDLES {
         if cl.cinTable[i as usize].fileName[0] != 0 {
-            CIN_StopCinematic(cl, i);
+            CIN_StopCinematic(view, cl, i as c_int);
         }
     }
 }
@@ -1101,7 +1102,7 @@ pub fn initRoQ(cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_cin.cpp:1237-1322`
 pub fn CIN_PlayCinematic(
-    common: &mut Common,
+    view: &mut EngineHostView,
     cl: &mut Client,
     arg: *const c_char,
     x: c_int,
@@ -1124,17 +1125,17 @@ pub fn CIN_PlayCinematic(
         format!("{}.roq", name)
     };
 
-    if systemBits & CIN_system == 0 {
+    if systemBits & CIN_SYSTEM == 0 {
         for i in 0..MAX_VIDEO_HANDLES {
             if String::from_utf8_lossy(&cl.cinTable[i as usize].fileName).trim_end_matches('\0')
                 == name
             {
-                return i;
+                return i as c_int;
             }
         }
     }
 
-    Com_DPrintf(common, &format!("SCR_PlayCinematic( {} )\n", arg_str));
+    Com_DPrintf(view.common, &format!("SCR_PlayCinematic( {} )\n", arg_str));
 
     Com_Memset(
         &mut cl.cin as *mut _ as *mut (),
@@ -1146,19 +1147,22 @@ pub fn CIN_PlayCinematic(
 
     let name_bytes = name.as_bytes();
     let copy_len = name_bytes.len().min(cl.cinTable[handle].fileName.len() - 1);
-    cl.cinTable[handle].fileName[..copy_len].copy_from_slice(&name_bytes[..copy_len]);
+    let name_bytes_i8: Vec<c_char> = name_bytes[..copy_len]
+        .iter()
+        .map(|&b| b as c_char)
+        .collect();
+    cl.cinTable[handle].fileName[..copy_len].copy_from_slice(&name_bytes_i8);
     cl.cinTable[handle].fileName[copy_len] = 0;
 
     cl.cinTable[handle].ROQSize = 0;
-    // PORT-NOTE(shape): `FS_FOpenFileRead` needs `view: &mut EngineHostView`,
-    // but `CIN_PlayCinematic`'s resolved signature carries only
-    // `common`/`cl`. Passing `common` is a placeholder the seam fixer must
-    // correct.
     cl.cinTable[handle].ROQSize =
-        FS_FOpenFileRead(common, &name, &mut cl.cinTable[handle].iFile, true);
+        FS_FOpenFileRead(view, &name, &mut cl.cinTable[handle].iFile, true);
 
     if cl.cinTable[handle].ROQSize <= 0 {
-        Com_DPrintf(common, &format!("cinematic failed to open {}\n", arg_str));
+        Com_DPrintf(
+            view.common,
+            &format!("cinematic failed to open {}\n", arg_str),
+        );
         cl.cinTable[handle].fileName[0] = 0;
         return -1;
     }
@@ -1167,32 +1171,32 @@ pub fn CIN_PlayCinematic(
     CIN_SetLooping(
         cl,
         cl.currentHandle,
-        if systemBits & CIN_loop != 0 {
+        if systemBits & CIN_LOOP != 0 {
             qtrue
         } else {
             qfalse
         },
     );
 
-    cl.cinTable[handle].CIN_HEIGHT = DEFAULT_CIN_HEIGHT;
-    cl.cinTable[handle].CIN_WIDTH = DEFAULT_CIN_WIDTH;
-    cl.cinTable[handle].holdAtEnd = if systemBits & CIN_hold != 0 {
+    cl.cinTable[handle].CIN_HEIGHT = DEFAULT_CIN_HEIGHT as c_int;
+    cl.cinTable[handle].CIN_WIDTH = DEFAULT_CIN_WIDTH as c_int;
+    cl.cinTable[handle].holdAtEnd = if systemBits & CIN_HOLD != 0 {
         qtrue
     } else {
         qfalse
     };
-    cl.cinTable[handle].alterGameState = if systemBits & CIN_system != 0 {
+    cl.cinTable[handle].alterGameState = if systemBits & CIN_SYSTEM != 0 {
         qtrue
     } else {
         qfalse
     };
     cl.cinTable[handle].playonwalls = 1;
-    cl.cinTable[handle].silent = if systemBits & CIN_silent != 0 {
+    cl.cinTable[handle].silent = if systemBits & CIN_SILENT != 0 {
         qtrue
     } else {
         qfalse
     };
-    cl.cinTable[handle].shader = if systemBits & CIN_shader != 0 {
+    cl.cinTable[handle].shader = if systemBits & CIN_SHADER != 0 {
         qtrue
     } else {
         qfalse
@@ -1202,21 +1206,21 @@ pub fn CIN_PlayCinematic(
         // close the menu
         if !cl.uivm.is_null() {
             VM_Call(
-                common,
+                view.common,
                 cl.uivm,
                 MpUiExport::UI_SET_ACTIVE_MENU as c_int,
                 &[UIMENU_NONE as isize],
             );
         }
     } else {
-        cl.cinTable[handle].playonwalls = cl.cl_inGameVideo.integer;
+        cl.cinTable[handle].playonwalls = view.common.cvar(cl.cl_inGameVideo).integer;
     }
 
     initRoQ(cl);
 
     unsafe {
         FS_Read(
-            common,
+            view.common,
             cl.cin.file.as_mut_ptr() as *mut (),
             16,
             cl.cinTable[handle].iFile,
@@ -1225,35 +1229,38 @@ pub fn CIN_PlayCinematic(
 
     let roq_id = cl.cin.file[0] as c_ushort + cl.cin.file[1] as c_ushort * 256;
     if roq_id == 0x1084 {
-        RoQ_init(common, cl);
+        RoQ_init(view.common, cl);
         // let the background thread start reading ahead
-        crate::sys_begin_streamed_file(cl.cinTable[handle].iFile, 0x10000);
+        Sys_BeginStreamedFile(cl.cinTable[handle].iFile, 0x10000);
 
         cl.cinTable[handle].status = FMV_PLAY;
-        Com_DPrintf(common, &format!("trFMV::play(), playing {}\n", arg_str));
+        Com_DPrintf(
+            view.common,
+            &format!("trFMV::play(), playing {}\n", arg_str),
+        );
 
         if cl.cinTable[handle].alterGameState != qfalse {
             cl.cls.state = connstate_t::CA_CINEMATIC;
         }
 
-        Con_Close(common, cl);
+        Con_Close(view.common, cl);
 
         cl.s_rawend = cl.s_soundtime;
 
         return cl.currentHandle;
     }
-    Com_DPrintf(common, "trFMV::play(), invalid RoQ ID\n");
+    Com_DPrintf(view.common, "trFMV::play(), invalid RoQ ID\n");
 
-    RoQShutdown(cl);
+    RoQShutdown(view, cl);
     -1
 }
 
 /// Raven `SCR_StopCinematic`.
 ///
 /// Source: `oracle/codemp/client/cl_cin.cpp:1464-1470`
-pub fn SCR_StopCinematic(cl: &mut Client) {
-    if cl.CL_handle >= 0 && cl.CL_handle < MAX_VIDEO_HANDLES {
-        CIN_StopCinematic(cl, cl.CL_handle);
+pub fn SCR_StopCinematic(view: &mut EngineHostView, cl: &mut Client) {
+    if cl.CL_handle >= 0 && cl.CL_handle < MAX_VIDEO_HANDLES as c_int {
+        CIN_StopCinematic(view, cl, cl.CL_handle);
         S_StopAllSounds(cl);
         cl.CL_handle = -1;
     }
@@ -1262,7 +1269,7 @@ pub fn SCR_StopCinematic(cl: &mut Client) {
 /// Raven `RoQInterrupt`.
 ///
 /// Source: `oracle/codemp/client/cl_cin.cpp:922-1052`
-pub fn RoQInterrupt(common: &mut Common, cl: &mut Client) {
+pub fn RoQInterrupt(view: &mut EngineHostView, cl: &mut Client) {
     if cl.currentHandle < 0 {
         return;
     }
@@ -1272,9 +1279,9 @@ pub fn RoQInterrupt(common: &mut Common, cl: &mut Client) {
 
     unsafe {
         Sys_StreamedRead(
-            common,
+            view.common,
             cl.cin.file.as_mut_ptr() as *mut (),
-            cl.cinTable[handle].RoQFrameSize + 8,
+            (cl.cinTable[handle].RoQFrameSize + 8) as c_int,
             1,
             cl.cinTable[handle].iFile,
         );
@@ -1282,7 +1289,7 @@ pub fn RoQInterrupt(common: &mut Common, cl: &mut Client) {
     if cl.cinTable[handle].RoQPlayed >= cl.cinTable[handle].ROQSize {
         if cl.cinTable[handle].holdAtEnd == qfalse {
             if cl.cinTable[handle].looping != qfalse {
-                RoQReset(common, cl);
+                RoQReset(view, cl);
             } else {
                 cl.cinTable[handle].status = FMV_EOF;
             }
@@ -1296,15 +1303,11 @@ pub fn RoQInterrupt(common: &mut Common, cl: &mut Client) {
 
     // new frame is ready
     'redump: loop {
-        match cl.cinTable[handle].roq_id as c_long {
+        match cl.cinTable[handle].roq_id {
             ROQ_QUAD_VQ => {
                 if (cl.cinTable[handle].numQuads & 1) != 0 {
                     cl.cinTable[handle].normalBuffer0 = cl.cinTable[handle].t[1];
-                    RoQPrepMcomp(
-                        cl,
-                        cl.cinTable[handle].roqF0 as c_long,
-                        cl.cinTable[handle].roqF1 as c_long,
-                    );
+                    RoQPrepMcomp(cl, cl.cinTable[handle].roqF0, cl.cinTable[handle].roqF1);
                     unsafe {
                         let vq1 = cl.cinTable[handle].VQ1;
                         // Raven: `cinTable[currentHandle].VQ1( (byte *)cin.qStatus[1], framedata)`.
@@ -1314,21 +1317,18 @@ pub fn RoQInterrupt(common: &mut Common, cl: &mut Client) {
                         cl.cinTable[handle].buf = cl
                             .cin
                             .linbuf
+                            .as_mut_ptr()
                             .offset(cl.cinTable[handle].screenDelta as isize);
                     }
                 } else {
                     cl.cinTable[handle].normalBuffer0 = cl.cinTable[handle].t[0];
-                    RoQPrepMcomp(
-                        cl,
-                        cl.cinTable[handle].roqF0 as c_long,
-                        cl.cinTable[handle].roqF1 as c_long,
-                    );
+                    RoQPrepMcomp(cl, cl.cinTable[handle].roqF0, cl.cinTable[handle].roqF1);
                     unsafe {
                         let vq0 = cl.cinTable[handle].VQ0;
                         let f: fn(*mut byte, *mut byte) =
                             std::mem::transmute::<*const (), fn(*mut byte, *mut byte)>(vq0);
                         f(cl.cin.qStatus[0].as_mut_ptr() as *mut byte, framedata);
-                        cl.cinTable[handle].buf = cl.cin.linbuf;
+                        cl.cinTable[handle].buf = cl.cin.linbuf.as_mut_ptr();
                     }
                 }
                 if cl.cinTable[handle].numQuads == 0 {
@@ -1337,10 +1337,12 @@ pub fn RoQInterrupt(common: &mut Common, cl: &mut Client) {
                         Com_Memcpy(
                             cl.cin
                                 .linbuf
+                                .as_mut_ptr()
                                 .offset(cl.cinTable[handle].screenDelta as isize)
                                 as *mut (),
-                            cl.cin.linbuf as *const (),
-                            (cl.cinTable[handle].samplesPerLine * cl.cinTable[handle].ysize)
+                            cl.cin.linbuf.as_ptr() as *const (),
+                            (cl.cinTable[handle].samplesPerLine
+                                * cl.cinTable[handle].ysize as c_long)
                                 as usize,
                         );
                     }
@@ -1349,7 +1351,7 @@ pub fn RoQInterrupt(common: &mut Common, cl: &mut Client) {
                 cl.cinTable[handle].dirty = qtrue;
             }
             ROQ_CODEBOOK => {
-                decodeCodeBook(cl, framedata, cl.cinTable[handle].roq_flags);
+                decodeCodeBook(cl, framedata, cl.cinTable[handle].roq_flags as c_ushort);
             }
             ZA_SOUND_MONO => {
                 if cl.cinTable[handle].silent == qfalse {
@@ -1359,7 +1361,7 @@ pub fn RoQInterrupt(common: &mut Common, cl: &mut Client) {
                         sbuf.as_mut_ptr(),
                         cl.cinTable[handle].RoQFrameSize as c_uint,
                         0,
-                        cl.cinTable[handle].roq_flags,
+                        cl.cinTable[handle].roq_flags as c_ushort,
                     );
                     S_RawSamples(
                         cl,
@@ -1368,7 +1370,7 @@ pub fn RoQInterrupt(common: &mut Common, cl: &mut Client) {
                         2,
                         1,
                         sbuf.as_mut_ptr() as *mut byte,
-                        common.s_volume.value,
+                        view.common.s_volume.value,
                         1,
                     );
                 }
@@ -1376,7 +1378,7 @@ pub fn RoQInterrupt(common: &mut Common, cl: &mut Client) {
             ZA_SOUND_STEREO => {
                 if cl.cinTable[handle].silent == qfalse {
                     if cl.cinTable[handle].numQuads == -1 {
-                        S_Update(common, cl);
+                        S_Update(view.common, cl);
                         cl.s_rawend = cl.s_soundtime;
                     }
                     let ssize = RllDecodeStereoToStereo(
@@ -1385,7 +1387,7 @@ pub fn RoQInterrupt(common: &mut Common, cl: &mut Client) {
                         sbuf.as_mut_ptr(),
                         cl.cinTable[handle].RoQFrameSize as c_uint,
                         0,
-                        cl.cinTable[handle].roq_flags,
+                        cl.cinTable[handle].roq_flags as c_ushort,
                     );
                     S_RawSamples(
                         cl,
@@ -1394,17 +1396,18 @@ pub fn RoQInterrupt(common: &mut Common, cl: &mut Client) {
                         2,
                         2,
                         sbuf.as_mut_ptr() as *mut byte,
-                        common.s_volume.value,
+                        view.common.s_volume.value,
                         1,
                     );
                 }
             }
             ROQ_QUAD_INFO => {
                 if cl.cinTable[handle].numQuads == -1 {
-                    readQuadInfo(cl, framedata);
+                    readQuadInfo(view.common, cl, framedata);
                     setupQuad(cl, 0, 0);
-                    let start = (crate::sys_milliseconds(common) as f32
-                        * common.com_timescale.value) as c_long;
+                    let start = (sys_milliseconds(view.common) as f32
+                        * view.common.cvar(view.common.com_timescale).value)
+                        as c_uint;
                     cl.cinTable[handle].startTime = start;
                     cl.cinTable[handle].lastTime = start;
                 }
@@ -1429,7 +1432,7 @@ pub fn RoQInterrupt(common: &mut Common, cl: &mut Client) {
         if cl.cinTable[handle].RoQPlayed >= cl.cinTable[handle].ROQSize {
             if cl.cinTable[handle].holdAtEnd == qfalse {
                 if cl.cinTable[handle].looping != qfalse {
-                    RoQReset(common, cl);
+                    RoQReset(view, cl);
                 } else {
                     cl.cinTable[handle].status = FMV_EOF;
                 }
@@ -1441,22 +1444,21 @@ pub fn RoQInterrupt(common: &mut Common, cl: &mut Client) {
 
         unsafe {
             framedata = framedata.offset(cl.cinTable[handle].RoQFrameSize as isize);
-            cl.cinTable[handle].roq_id =
-                *framedata as c_ushort + *framedata.add(1) as c_ushort * 256;
-            cl.cinTable[handle].RoQFrameSize = *framedata.add(2) as c_long
-                + *framedata.add(3) as c_long * 256
-                + *framedata.add(4) as c_long * 65536;
+            cl.cinTable[handle].roq_id = *framedata as c_uint + *framedata.add(1) as c_uint * 256;
+            cl.cinTable[handle].RoQFrameSize = *framedata.add(2) as c_uint
+                + *framedata.add(3) as c_uint * 256
+                + *framedata.add(4) as c_uint * 65536;
             cl.cinTable[handle].roq_flags =
-                *framedata.add(6) as c_ushort + *framedata.add(7) as c_ushort * 256;
-            cl.cinTable[handle].roqF0 = *framedata.add(7) as c_char;
-            cl.cinTable[handle].roqF1 = *framedata.add(6) as c_char;
+                *framedata.add(6) as c_long + *framedata.add(7) as c_long * 256;
+            cl.cinTable[handle].roqF0 = *framedata.add(7) as c_long;
+            cl.cinTable[handle].roqF1 = *framedata.add(6) as c_long;
         }
 
         if cl.cinTable[handle].RoQFrameSize > 65536 || cl.cinTable[handle].roq_id == 0x1084 {
-            Com_DPrintf(common, "roq_size>65536||roq_id==0x1084\n");
+            Com_DPrintf(view.common, "roq_size>65536||roq_id==0x1084\n");
             cl.cinTable[handle].status = FMV_EOF;
             if cl.cinTable[handle].looping != qfalse {
-                RoQReset(common, cl);
+                RoQReset(view, cl);
             }
             return;
         }
@@ -1469,7 +1471,7 @@ pub fn RoQInterrupt(common: &mut Common, cl: &mut Client) {
         }
 
         // one more frame hits the dust
-        cl.cinTable[handle].RoQPlayed += cl.cinTable[handle].RoQFrameSize + 8;
+        cl.cinTable[handle].RoQPlayed += cl.cinTable[handle].RoQFrameSize as c_long + 8;
         break;
     }
 }
@@ -1477,15 +1479,18 @@ pub fn RoQInterrupt(common: &mut Common, cl: &mut Client) {
 /// Raven `CIN_RunCinematic`.
 ///
 /// Source: `oracle/codemp/client/cl_cin.cpp:1165-1229`
-pub fn CIN_RunCinematic(common: &mut Common, cl: &mut Client, handle: c_int) -> e_status {
-    if handle < 0 || handle >= MAX_VIDEO_HANDLES || cl.cinTable[handle as usize].status == FMV_EOF {
+pub fn CIN_RunCinematic(view: &mut EngineHostView, cl: &mut Client, handle: c_int) -> e_status {
+    if handle < 0
+        || handle >= MAX_VIDEO_HANDLES as c_int
+        || cl.cinTable[handle as usize].status == FMV_EOF
+    {
         return FMV_EOF;
     }
 
     if cl.currentHandle != handle {
         cl.currentHandle = handle;
         cl.cinTable[cl.currentHandle as usize].status = FMV_EOF;
-        RoQReset(common, cl);
+        RoQReset(view, cl);
     }
 
     if cl.cinTable[handle as usize].playonwalls < -1 {
@@ -1505,23 +1510,27 @@ pub fn CIN_RunCinematic(common: &mut Common, cl: &mut Client, handle: c_int) -> 
         return cl.cinTable[ch].status;
     }
 
-    let thisTime = (crate::sys_milliseconds(common) as f32 * common.com_timescale.value) as c_long;
-    if cl.cinTable[ch].shader != qfalse && (thisTime - cl.cinTable[ch].lastTime).abs() > 100 {
+    let thisTime = (sys_milliseconds(view.common) as f32
+        * view.common.cvar(view.common.com_timescale).value) as c_uint;
+    if cl.cinTable[ch].shader != qfalse
+        && (thisTime as i64 - cl.cinTable[ch].lastTime as i64).abs() > 100
+    {
         cl.cinTable[ch].startTime += thisTime - cl.cinTable[ch].lastTime;
     }
-    cl.cinTable[ch].tfps = (((crate::sys_milliseconds(common) as f32 * common.com_timescale.value)
-        as c_long
-        - cl.cinTable[ch].startTime)
+    cl.cinTable[ch].tfps = (((sys_milliseconds(view.common) as f32
+        * view.common.cvar(view.common.com_timescale).value) as c_uint
+        - cl.cinTable[ch].startTime) as c_long
         * cl.cinTable[ch].roqFPS)
         / 1000;
 
     let mut start = cl.cinTable[ch].startTime;
     while cl.cinTable[ch].tfps != cl.cinTable[ch].numQuads && cl.cinTable[ch].status == FMV_PLAY {
-        RoQInterrupt(common, cl);
+        RoQInterrupt(view, cl);
         if start != cl.cinTable[ch].startTime {
-            cl.cinTable[ch].tfps = (((crate::sys_milliseconds(common) as f32
-                * common.com_timescale.value) as c_long
-                - cl.cinTable[ch].startTime)
+            cl.cinTable[ch].tfps = (((sys_milliseconds(view.common) as f32
+                * view.common.cvar(view.common.com_timescale).value)
+                as c_uint
+                - cl.cinTable[ch].startTime) as c_long
                 * cl.cinTable[ch].roqFPS)
                 / 1000;
             start = cl.cinTable[ch].startTime;
@@ -1536,9 +1545,9 @@ pub fn CIN_RunCinematic(common: &mut Common, cl: &mut Client, handle: c_int) -> 
 
     if cl.cinTable[ch].status == FMV_EOF {
         if cl.cinTable[ch].looping != qfalse {
-            RoQReset(common, cl);
+            RoQReset(view, cl);
         } else {
-            RoQShutdown(cl);
+            RoQShutdown(view, cl);
         }
     }
 
@@ -1548,41 +1557,41 @@ pub fn CIN_RunCinematic(common: &mut Common, cl: &mut Client, handle: c_int) -> 
 /// Raven `SCR_RunCinematic`.
 ///
 /// Source: `oracle/codemp/client/cl_cin.cpp:1457-1462`
-pub fn SCR_RunCinematic(common: &mut Common, cl: &mut Client) {
-    if cl.CL_handle >= 0 && cl.CL_handle < MAX_VIDEO_HANDLES {
-        CIN_RunCinematic(common, cl, cl.CL_handle);
+pub fn SCR_RunCinematic(view: &mut EngineHostView, cl: &mut Client) {
+    if cl.CL_handle >= 0 && cl.CL_handle < MAX_VIDEO_HANDLES as c_int {
+        CIN_RunCinematic(view, cl, cl.CL_handle);
     }
 }
 
 /// Raven `CL_PlayCinematic_f`.
 ///
 /// Source: `oracle/codemp/client/cl_cin.cpp:1417-1448`
-pub fn CL_PlayCinematic_f(common: &mut Common, cl: &mut Client) {
-    let mut bits: c_int = CIN_system;
+pub fn CL_PlayCinematic_f(view: &mut EngineHostView, cl: &mut Client) {
+    let mut bits: c_int = CIN_SYSTEM;
 
-    Com_DPrintf(common, "CL_PlayCinematic_f\n");
+    Com_DPrintf(view.common, "CL_PlayCinematic_f\n");
     if cl.cls.state == connstate_t::CA_CINEMATIC {
-        SCR_StopCinematic(cl);
+        SCR_StopCinematic(view, cl);
     }
 
-    let arg = Cmd_Argv(common, 1);
-    let s = Cmd_Argv(common, 2);
+    let arg = Cmd_Argv(view.common, 1).to_string();
+    let s = Cmd_Argv(view.common, 2).to_string();
 
     if (!s.is_empty() && s.as_bytes()[0] == b'1')
-        || Q_stricmp(arg, "demoend.roq") == 0
-        || Q_stricmp(arg, "end.roq") == 0
+        || Q_stricmp(&arg, "demoend.roq") == 0
+        || Q_stricmp(&arg, "end.roq") == 0
     {
-        bits |= CIN_hold;
+        bits |= CIN_HOLD;
     }
     if !s.is_empty() && s.as_bytes()[0] == b'2' {
-        bits |= CIN_loop;
+        bits |= CIN_LOOP;
     }
 
     S_StopAllSounds(cl);
 
-    let arg_c = std::ffi::CString::new(arg).unwrap_or_default();
+    let arg_c = std::ffi::CString::new(arg.clone()).unwrap_or_default();
     cl.CL_handle = CIN_PlayCinematic(
-        common,
+        view,
         cl,
         arg_c.as_ptr(),
         0,
@@ -1593,7 +1602,7 @@ pub fn CL_PlayCinematic_f(common: &mut Common, cl: &mut Client) {
     );
     if cl.CL_handle >= 0 {
         loop {
-            SCR_RunCinematic(common, cl);
+            SCR_RunCinematic(view, cl);
             let ch = cl.currentHandle as usize;
             if !(cl.cinTable[ch].buf.is_null() && cl.cinTable[ch].status == FMV_PLAY) {
                 break;
@@ -1601,7 +1610,7 @@ pub fn CL_PlayCinematic_f(common: &mut Common, cl: &mut Client) {
         }
     } else {
         com_printf(
-            common,
+            view.common,
             &format!(
                 "{}PlayCinematic(): Failed to open \"{}\"\n",
                 S_COLOR_RED, arg

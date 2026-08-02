@@ -14,9 +14,10 @@
 )]
 
 use std::ffi::CStr;
+use std::mem::take;
 use std::os::raw::{c_char, c_int};
 
-use native_platform::sys_main::Sys_CheckCD;
+use native_platform::sys_main::{Sys_CheckCD, Sys_MonkeyShouldBeSpanked};
 use native_string::atoi::atoi;
 use native_string::info::{Info_SetValueForKey, Info_ValueForKey};
 use native_string::q_string::{Q_strcat, Q_stricmp, Q_strncmp};
@@ -25,7 +26,6 @@ use native_types::{byte, qboolean, qfalse, qtrue, word, MAX_QPATH};
 
 use mp_abi::ui::exports::MpUiExport;
 use mp_abi::ui::public::ui_menu_command_t::{UIMENU_MAIN, UIMENU_NONE};
-use mp_engine_core::lifecycle::sys_milliseconds;
 use mp_engine_qcommon::cm_load::CM_ClearMap;
 use mp_engine_qcommon::cmd_common::{
     Cbuf_AddText, Cbuf_Execute, Cbuf_ExecuteText, Cmd_Argc, Cmd_Args, Cmd_Argv, Cmd_TokenizeString,
@@ -59,12 +59,15 @@ use mp_engine_qcommon::net_chan::{
     NET_OutOfBandPrint, NET_SendPacket, NET_StringToAdr, Netchan_Setup,
 };
 use mp_engine_qcommon::qcommon::filesystem_limits::{FS_CGAME_REF, FS_UI_REF};
+use mp_engine_qcommon::qcommon::netchan_t::netchan_t;
 use mp_engine_qcommon::qcommon::net_limits::{MAX_MSGLEN, MAX_RELIABLE_COMMANDS};
 use mp_engine_qcommon::qcommon::protocol::{
     MASTER_SERVER_NAME, NUM_SERVER_PORTS, PORT_MASTER, PORT_SERVER, PORT_UPDATE, PROTOCOL_VERSION,
     UPDATE_SERVER_NAME,
 };
-use mp_engine_qcommon::stringed::api::SE_GetString;
+use mp_engine_qcommon::stringed::api::{se_check_for_language_updates, SE_GetString};
+use mp_engine_qcommon::sys_net::Sys_ShowIP;
+use mp_engine_qcommon::timing::sys_milliseconds;
 use mp_engine_qcommon::vm_fns::VM_Call;
 use mp_engine_qcommon::z_memman_pc::{Hunk_Clear, Hunk_ClearToMark};
 use mp_engine_server::sv_init::SV_Shutdown;
@@ -83,7 +86,7 @@ use mp_qshared::shared::connstate::connstate_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::game_state::MAX_CONFIGSTRINGS;
 use mp_qshared::shared::limits::{
-    MAX_GENTITIES, MAX_INFO_STRING, MAX_NAME_LENGTH, MAX_STRING_CHARS,
+    MAX_GENTITIES, MAX_INFO_STRING, MAX_INFO_VALUE, MAX_NAME_LENGTH, MAX_STRING_CHARS,
 };
 use mp_qshared::shared::print_parm::printParm_t;
 use mp_qshared::shared::q_string::Com_sprintf;
@@ -95,6 +98,9 @@ use mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::{
     svc_baseline, svc_configstring, svc_gamestate, svc_EOF,
 };
 use mp_engine_icarus::q3_interface::{S_COLOR_RED, S_COLOR_YELLOW};
+use mp_renderer::hook_install::{re_from_view, rm_from_view};
+use mp_renderer::tr_init::RE_Shutdown;
+use mp_renderer::tr_shader::{RE_RegisterShader, RE_RegisterShaderNoMip};
 
 use crate::client::client_consts::RETRANSMIT_TIMEOUT;
 use crate::cl_cgame::{CL_InitCGame, CL_SetCGameTime, CL_ShutdownCGame};
@@ -177,7 +183,12 @@ pub fn CL_ChangeReliableCommand(common: &mut Common, cl: &mut Client) {
 ///
 /// Raven: the packet sequencing information is skipped by `headerBytes`.
 /// Source: `oracle/codemp/client/cl_main.cpp:218-231`
-pub fn CL_WriteDemoMessage(cl: &mut Client, msg: *mut msg_t, headerBytes: c_int) {
+pub fn CL_WriteDemoMessage(
+    common: &mut Common,
+    cl: &mut Client,
+    msg: *mut msg_t,
+    headerBytes: c_int,
+) {
     let mut len: c_int;
     let mut swlen: c_int;
 
@@ -207,7 +218,7 @@ pub fn CL_WriteDemoMessage(cl: &mut Client, msg: *mut msg_t, headerBytes: c_int)
 /// `CL_StopRecord_f` — closes the demo file and stops recording.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:241-258`
-pub fn CL_StopRecord_f(cl: &mut Client) {
+pub fn CL_StopRecord_f(common: &mut Common, cl: &mut Client) {
     let len: c_int;
 
     if cl.clc.demorecording == qfalse {
@@ -270,7 +281,7 @@ pub fn CL_DemoFilename(number: c_int, fileName: *mut c_char) {
 /// `CL_StartDemoLoop` — restarts the attract-mode demo loop.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:618-622`
-pub fn CL_StartDemoLoop(cl: &mut Client) {
+pub fn CL_StartDemoLoop(common: &mut Common, cl: &mut Client) {
     // start the demo loop again
     Cbuf_AddText(common, "d1\n");
     cl.cls.keyCatchers = 0;
@@ -279,10 +290,10 @@ pub fn CL_StartDemoLoop(cl: &mut Client) {
 /// `CL_NextDemo` — runs the `nextdemo` cvar as a command, then clears it.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:632-646`
-pub fn CL_NextDemo() {
+pub fn CL_NextDemo(view: &mut EngineHostView) {
     let mut v = [0 as c_char; MAX_STRING_CHARS as usize];
 
-    let next = Cvar_VariableString(common, "nextdemo").to_string();
+    let next = Cvar_VariableString(view.common, "nextdemo").to_string();
     Q_strncpyz(&mut v, &next, MAX_STRING_CHARS as usize);
     v[MAX_STRING_CHARS as usize - 1] = 0;
     let v_str: String = v
@@ -290,14 +301,14 @@ pub fn CL_NextDemo() {
         .take_while(|&&c| c != 0)
         .map(|&c| c as u8 as char)
         .collect();
-    Com_DPrintf(common, &format!("CL_NextDemo: {}\n", v_str));
+    Com_DPrintf(view.common, &format!("CL_NextDemo: {}\n", v_str));
     if v[0] == 0 {
         return;
     }
 
     Cvar_Set(view, "nextdemo", "");
-    Cbuf_AddText(common, &v_str);
-    Cbuf_AddText(common, "\n");
+    Cbuf_AddText(view.common, &v_str);
+    Cbuf_AddText(view.common, "\n");
     Cbuf_Execute(view);
 }
 
@@ -315,25 +326,25 @@ pub fn CL_ClearState(cl: &mut Client) {
 /// Raven: the challenge is randomized against `Com_Milliseconds` so the reply
 /// cannot be spoofed from a fixed seed.
 /// Source: `oracle/codemp/client/cl_main.cpp:945-986`
-pub fn CL_RequestMotd(common: &mut Common, cl: &mut Client) {
+pub fn CL_RequestMotd(view: &mut EngineHostView, cl: &mut Client) {
     let mut info = String::new();
 
-    if cl.cl_motd.integer == 0 {
+    if view.common.cvar(cl.cl_motd).integer == 0 {
         return;
     }
-    com_printf(common, &format!("Resolving {}\n", UPDATE_SERVER_NAME));
+    com_printf(view.common, &format!("Resolving {}\n", UPDATE_SERVER_NAME));
     if NET_StringToAdr(
         UPDATE_SERVER_NAME.as_ptr() as *const c_char,
         &mut cl.cls.updateServer,
     ) == qfalse
     {
-        com_printf(common, "Couldn't resolve address\n");
+        com_printf(view.common, "Couldn't resolve address\n");
         return;
     }
     cl.cls.updateServer.port = (PORT_UPDATE as u16).to_be();
     let adr = cl.cls.updateServer;
     com_printf(
-        common,
+        view.common,
         &format!(
             "{} resolved to {}.{}.{}.{}:{}\n",
             UPDATE_SERVER_NAME,
@@ -351,8 +362,8 @@ pub fn CL_RequestMotd(common: &mut Common, cl: &mut Client) {
     // NOTE: the Com_Milliseconds xoring only affects the lower 16-bit word,
     //   but I decided it was enough randomization
     // Two independent LCG draws, in Raven's left-to-right order.
-    let high = common.qrand.rand();
-    let low = common.qrand.rand();
+    let high = view.common.qrand.rand();
+    let low = view.common.qrand.rand();
     let challenge = ((high << 16) ^ low) ^ Com_Milliseconds(view);
     let challenge_len = cl.cls.updateChallenge.len() as c_int;
     Com_sprintf(
@@ -368,47 +379,40 @@ pub fn CL_RequestMotd(common: &mut Common, cl: &mut Client) {
         .take_while(|&&c| c != 0)
         .map(|&c| c as u8 as char)
         .collect();
-    let renderer_string: String = cl
-        .cls
-        .glconfig
-        .renderer_string
-        .iter()
-        .take_while(|&&c| c != 0)
-        .map(|&c| c as u8 as char)
-        .collect();
-    let vendor_string: String = cl
-        .cls
-        .glconfig
-        .vendor_string
-        .iter()
-        .take_while(|&&c| c != 0)
-        .map(|&c| c as u8 as char)
-        .collect();
+    // `glconfig_t` keeps these two as `*const c_char`, so the site reads the
+    // NUL-terminated bytes out of the pointer.
+    let renderer_string: String = unsafe { CStr::from_ptr(cl.cls.glconfig.renderer_string) }
+        .to_string_lossy()
+        .into_owned();
+    let vendor_string: String = unsafe { CStr::from_ptr(cl.cls.glconfig.vendor_string) }
+        .to_string_lossy()
+        .into_owned();
 
     Info_SetValueForKey(&mut info, "challenge", &updateChallenge);
     Info_SetValueForKey(&mut info, "renderer", &renderer_string);
     Info_SetValueForKey(&mut info, "rvendor", &vendor_string);
-    Info_SetValueForKey(&mut info, "version", &common.com_version.string);
+    let version = view.common.cvar(view.common.com_version).string.clone();
+    Info_SetValueForKey(&mut info, "version", &version);
 
     Info_SetValueForKey(
         &mut info,
         "cputype",
-        Cvar_VariableString(common, "sys_cpustring"),
+        Cvar_VariableString(view.common, "sys_cpustring"),
     );
     Info_SetValueForKey(
         &mut info,
         "mhz",
-        Cvar_VariableString(common, "sys_cpuspeed"),
+        Cvar_VariableString(view.common, "sys_cpuspeed"),
     );
     Info_SetValueForKey(
         &mut info,
         "memory",
-        Cvar_VariableString(common, "sys_memory"),
+        Cvar_VariableString(view.common, "sys_memory"),
     );
     Info_SetValueForKey(
         &mut info,
         "joystick",
-        Cvar_VariableString(common, "in_joystick"),
+        Cvar_VariableString(view.common, "in_joystick"),
     );
     Info_SetValueForKey(
         &mut info,
@@ -417,7 +421,7 @@ pub fn CL_RequestMotd(common: &mut Common, cl: &mut Client) {
     );
 
     NET_OutOfBandPrint(
-        common,
+        view.common,
         netsrc_t::NS_CLIENT,
         adr,
         format!("getmotd \"{}\"\n", info),
@@ -427,7 +431,7 @@ pub fn CL_RequestMotd(common: &mut Common, cl: &mut Client) {
 /// `CL_Reconnect_f` — reconnects to the last server we joined.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:1126-1133`
-pub fn CL_Reconnect_f(cl: &mut Client) {
+pub fn CL_Reconnect_f(view: &mut EngineHostView, cl: &mut Client) {
     let servername: String = cl
         .cls
         .servername
@@ -436,18 +440,18 @@ pub fn CL_Reconnect_f(cl: &mut Client) {
         .map(|&c| c as u8 as char)
         .collect();
     if servername.is_empty() || servername == "localhost" {
-        com_printf(common, "Can't reconnect to localhost.\n");
+        com_printf(view.common, "Can't reconnect to localhost.\n");
         return;
     }
     Cvar_Set(view, "ui_singlePlayerActive", "0");
-    Cbuf_AddText(common, &format!("connect {}\n", servername));
+    Cbuf_AddText(view.common, &format!("connect {}\n", servername));
 }
 
 /// `CL_Rcon_f` — sends an out-of-band rcon command to a server.
 ///
 /// Raven: the four leading `-1` bytes are the connectionless packet header.
 /// Source: `oracle/codemp/client/cl_main.cpp:1220-1264`
-pub fn CL_Rcon_f(cl: &mut Client) {
+pub fn CL_Rcon_f(common: &mut Common, cl: &mut Client) {
     let mut message: Vec<u8> = Vec::new();
     let mut to: netadr_t = unsafe { core::mem::zeroed() };
 
@@ -468,7 +472,8 @@ pub fn CL_Rcon_f(cl: &mut Client) {
 
     message.extend_from_slice(b"rcon ");
 
-    message.extend_from_slice(cl.rcon_client_password.string.as_bytes());
+    let rcon_password = common.cvar(cl.rcon_client_password).string.clone();
+    message.extend_from_slice(rcon_password.as_bytes());
     message.extend_from_slice(b" ");
 
     let argc = Cmd_Argc(common);
@@ -481,7 +486,7 @@ pub fn CL_Rcon_f(cl: &mut Client) {
     if cl.cls.state as c_int >= connstate_t::CA_CONNECTED as c_int {
         to = cl.clc.netchan.remoteAddress;
     } else {
-        if cl.rconAddress.string.is_empty() {
+        if common.cvar(cl.rconAddress).string.is_empty() {
             com_printf(
                 common,
                 "You must either be connected,\nor set the 'rconAddress' cvar\nto issue rcon commands\n",
@@ -489,7 +494,8 @@ pub fn CL_Rcon_f(cl: &mut Client) {
 
             return;
         }
-        NET_StringToAdr(cl.rconAddress.string.as_ptr() as *const c_char, &mut to);
+        let rcon_address = common.cvar(cl.rconAddress).string.clone();
+        NET_StringToAdr(rcon_address.as_ptr() as *const c_char, &mut to);
         if to.port == 0 {
             to.port = (PORT_SERVER as u16).to_be();
         }
@@ -507,7 +513,7 @@ pub fn CL_Rcon_f(cl: &mut Client) {
 /// `CL_OpenedPK3List_f` — prints the pk3 files the filesystem has open.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:1400-1402`
-pub fn CL_OpenedPK3List_f() {
+pub fn CL_OpenedPK3List_f(common: &mut Common) {
     let names = FS_LoadedPakNames(common);
     let names: String = unsafe { CStr::from_ptr(names) }
         .to_string_lossy()
@@ -518,7 +524,7 @@ pub fn CL_OpenedPK3List_f() {
 /// `CL_ReferencedPK3List_f` — prints the pk3 files the server referenced.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:1409-1411`
-pub fn CL_ReferencedPK3List_f() {
+pub fn CL_ReferencedPK3List_f(common: &mut Common) {
     let names = FS_ReferencedPakNames(common);
     let names: String = unsafe { CStr::from_ptr(names) }
         .to_string_lossy()
@@ -529,7 +535,7 @@ pub fn CL_ReferencedPK3List_f() {
 /// `CL_Configstrings_f` — dumps every non-empty configstring.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:1418-1434`
-pub fn CL_Configstrings_f(cl: &mut Client) {
+pub fn CL_Configstrings_f(common: &mut Common, cl: &mut Client) {
     let mut ofs: c_int;
 
     if cl.cls.state as c_int != connstate_t::CA_ACTIVE as c_int {
@@ -554,7 +560,7 @@ pub fn CL_Configstrings_f(cl: &mut Client) {
 /// `CL_Clientinfo_f` — prints the connection state and the userinfo block.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:1441-1448`
-pub fn CL_Clientinfo_f(cl: &mut Client) {
+pub fn CL_Clientinfo_f(common: &mut Common, cl: &mut Client) {
     com_printf(common, "--------- Client Information ---------\n");
     let state = cl.cls.state as c_int;
     com_printf(common, &format!("state: {}\n", state));
@@ -638,14 +644,14 @@ pub fn CL_CheckForResend(common: &mut Common, cl: &mut Client) {
 ///
 /// Raven: replies whose challenge does not match ours are dropped.
 /// Source: `oracle/codemp/client/cl_main.cpp:1771-1792`
-pub fn CL_MotdPacket(cl: &mut Client, from: netadr_t) {
+pub fn CL_MotdPacket(view: &mut EngineHostView, cl: &mut Client, from: netadr_t) {
     // if not from our server, ignore it
     let updateServer = cl.cls.updateServer;
-    if NET_CompareAdr(common, from, updateServer) == qfalse {
+    if NET_CompareAdr(view.common, from, updateServer) == qfalse {
         return;
     }
 
-    let info = Cmd_Argv(common, 1).to_string();
+    let info = Cmd_Argv(view.common, 1).to_string();
 
     // check challenge
     let mut challenge = Info_ValueForKey(&info, "challenge");
@@ -701,7 +707,7 @@ pub fn CL_InitServerInfo(server: *mut serverInfo_t, address: *mut serverAddress_
 /// Raven: "I don't really like doing this. But it utilizes the system that was
 /// already in place."
 /// Source: `oracle/codemp/client/cl_main.cpp:1951-2018`
-pub fn CL_CheckSVStringEdRef(buf: *mut c_char, str: *const c_char) {
+pub fn CL_CheckSVStringEdRef(view: &mut EngineHostView, buf: *mut c_char, str: *const c_char) {
     let mut i: c_int = 0;
     let mut b: c_int = 0;
     let mut strLen: c_int = 0;
@@ -800,20 +806,22 @@ pub fn CL_CheckSVStringEdRef(buf: *mut c_char, str: *const c_char) {
 ///
 /// Raven: "timeoutcount saves debugger".
 /// Source: `oracle/codemp/client/cl_main.cpp:2212-2229`
-pub fn CL_CheckTimeout(common: &mut Common, cl: &mut Client) {
+pub fn CL_CheckTimeout(view: &mut EngineHostView, cl: &mut Client) {
     //
     // check timeout
     //
-    if (common.cl_paused.integer == 0 || common.sv_paused.integer == 0)
+    if (view.common.cvar(view.common.cl_paused).integer == 0
+        || view.common.cvar(view.common.sv_paused).integer == 0)
         && cl.cls.state as c_int >= connstate_t::CA_CONNECTED as c_int
         && cl.cls.state as c_int != connstate_t::CA_CINEMATIC as c_int
-        && (cl.cls.realtime - cl.clc.lastPacketTime) as f32 > cl.cl_timeout.value * 1000.0
+        && (cl.cls.realtime - cl.clc.lastPacketTime) as f32
+            > view.common.cvar(cl.cl_timeout).value * 1000.0
     {
         cl.cl.timeoutcount += 1;
         if cl.cl.timeoutcount > 5 {
             // timeoutcount saves debugger
             let psTimedOut = SE_GetString(view, "MP_SVGAME_SERVER_CONNECTION_TIMED_OUT");
-            com_printf(common, &format!("\n{}\n", psTimedOut));
+            com_printf(view.common, &format!("\n{}\n", psTimedOut));
             com_error(errorParm_t::ERR_DROP, psTimedOut);
             //CL_Disconnect( qtrue );
             return;
@@ -826,7 +834,7 @@ pub fn CL_CheckTimeout(common: &mut Common, cl: &mut Client) {
 /// `CL_RefPrintf` — the renderer's print hook, routed by print level.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:2387-2402`
-pub fn CL_RefPrintf(print_level: c_int, fmt: *const c_char) {
+pub fn CL_RefPrintf(common: &mut Common, print_level: c_int, fmt: *const c_char) {
     // PORT-NOTE(varargs): the caller formats; `fmt` arrives already expanded.
     let msg: String = unsafe { CStr::from_ptr(fmt) }
         .to_string_lossy()
@@ -844,31 +852,87 @@ pub fn CL_RefPrintf(print_level: c_int, fmt: *const c_char) {
 /// `CL_ShutdownRef` — shuts the renderer down and clears its export table.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:2411-2417`
-pub fn CL_ShutdownRef(cl: &mut Client) {
-    if cl.re.Shutdown.is_none() {
-        return;
-    }
-    let shutdown = cl.re.Shutdown.unwrap();
-    shutdown(qtrue);
-    let size = core::mem::size_of::<refexport_t>();
-    Com_Memset(&mut cl.re as *mut refexport_t as *mut (), 0, size);
+pub fn CL_ShutdownRef(view: &mut EngineHostView, cl: &mut Client) {
+    // PORT-NOTE(dec-59.1): the `refexport_t` table is gone, so Raven's null
+    // test on `re.Shutdown` and the wipe of the table have no subject left.
+    // The site calls the `RE_Shutdown` frontend directly.
+    // SAFETY: view-constructor slot, single-threaded, no other cast of the same
+    // slot is live across the call.
+    let re = unsafe { re_from_view(view) };
+    RE_Shutdown(
+        view,
+        &re.cvars,
+        &mut re.assets,
+        &mut re.sim,
+        &mut re.img_state,
+        &mut re.gpu_res,
+        &mut re.font,
+        true,
+    );
 }
 
 /// `CL_InitRenderer` — starts the renderer and registers the console assets.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:2424-2435`
-pub fn CL_InitRenderer(cl: &mut Client) {
+pub fn CL_InitRenderer(view: &mut EngineHostView, cl: &mut Client) {
     // this sets up the renderer and calls R_Init
+    //TODO: Port RE_BeginRegistration
+    // Source: oracle/codemp/client/cl_main.cpp:2424-2435
+    // `RE_BeginRegistration` declares both `view: &mut EngineHostView` and a
+    // second `common: &mut Common`, which one view holder cannot supply, and it
+    // returns `GlConfig` where `clientStatic_t.glconfig` is the layout-frozen
+    // `glconfig_t`. The call stays in Raven shape until a ruling settles both.
     let beginRegistration = cl.re.BeginRegistration.unwrap();
     beginRegistration(&mut *cl.cls.glconfig);
 
     // load character sets
-    let registerShaderNoMip = cl.re.RegisterShaderNoMip.unwrap();
-    cl.cls.charSetShader = registerShaderNoMip("gfx/2d/charsgrid_med");
+    // SAFETY (both casts): view-constructor slots, single-threaded, no other
+    // cast of the same slot is live across the calls.
+    let re = unsafe { re_from_view(view) };
+    let rm = unsafe { rm_from_view(view) };
+    cl.cls.charSetShader = RE_RegisterShaderNoMip(
+        "gfx/2d/charsgrid_med",
+        &mut re.qs,
+        &mut re.frame,
+        &mut re.assets,
+        view,
+        &re.cvars,
+        &mut re.sim,
+        rm,
+        &mut re.img_state,
+        &mut re.gpu_res,
+        &mut re.sky_view,
+        &mut re.sky,
+    );
 
-    let registerShader = cl.re.RegisterShader.unwrap();
-    cl.cls.whiteShader = registerShader("white");
-    cl.cls.consoleShader = registerShader("console");
+    cl.cls.whiteShader = RE_RegisterShader(
+        "white",
+        &mut re.qs,
+        &mut re.frame,
+        &mut re.assets,
+        view,
+        &re.cvars,
+        &mut re.sim,
+        rm,
+        &mut re.img_state,
+        &mut re.gpu_res,
+        &mut re.sky_view,
+        &mut re.sky,
+    );
+    cl.cls.consoleShader = RE_RegisterShader(
+        "console",
+        &mut re.qs,
+        &mut re.frame,
+        &mut re.assets,
+        view,
+        &re.cvars,
+        &mut re.sim,
+        rm,
+        &mut re.img_state,
+        &mut re.gpu_res,
+        &mut re.sky_view,
+        &mut re.sky,
+    );
     cl.g_console_field_width = cl.cls.glconfig.vidWidth / SMALLCHAR_WIDTH - 2;
     cl.kg.g_consoleField.widthInChars = cl.g_console_field_width;
 }
@@ -876,7 +940,13 @@ pub fn CL_InitRenderer(cl: &mut Client) {
 /// `CL_InitRef` — binds the renderer export table into the client.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:2480-2499`
-pub fn CL_InitRef(cl: &mut Client) {
+pub fn CL_InitRef(view: &mut EngineHostView, cl: &mut Client) {
+    //TODO: Port GetRefAPI
+    // Source: oracle/codemp/client/cl_main.cpp:2480-2499
+    // DEC-59.1 removed `refexport_t`, `GetRefAPI`, and `REF_API_VERSION`. What
+    // seats `Engine.re` in place of the table fetch is a spine question (the
+    // DEC-56 platform shell), so the fetch stays in Raven shape until it is
+    // ruled.
     let ret: *mut refexport_t;
 
     ret = GetRefAPI(REF_API_VERSION);
@@ -901,10 +971,10 @@ pub fn CL_InitRef(cl: &mut Client) {
 /// Raven (rww): this is currently broken and does not seem to work for
 /// connecting clients.
 /// Source: `oracle/codemp/client/cl_main.cpp:2507-2536`
-pub fn CL_SetModel_f() {
+pub fn CL_SetModel_f(view: &mut EngineHostView) {
     let mut name = [0 as c_char; 256];
 
-    let arg = Cmd_Argv(common, 1).to_string();
+    let arg = Cmd_Argv(view.common, 1).to_string();
     if !arg.is_empty() {
         /*
         //If you wanted to be foolproof you would put this on the server I guess. But that
@@ -923,13 +993,13 @@ pub fn CL_SetModel_f() {
         //rww: this is currently broken and does not seem to work for connecting clients
         Cvar_Set(view, "model", &arg);
     } else {
-        Cvar_VariableStringBuffer(common, "model", name.as_mut_ptr(), name.len() as c_int);
+        Cvar_VariableStringBuffer(view.common, "model", name.as_mut_ptr(), name.len() as c_int);
         let name: String = name
             .iter()
             .take_while(|&&c| c != 0)
             .map(|&c| c as u8 as char)
             .collect();
-        com_printf(common, &format!("model is set to {}\n", name));
+        com_printf(view.common, &format!("model is set to {}\n", name));
     }
 }
 
@@ -983,7 +1053,11 @@ pub fn CL_SetServerInfo(server: *mut serverInfo_t, info: *const c_char, ping: c_
 ///
 /// Raven: an already-retrieved slot is reused before the oldest one.
 /// Source: `oracle/codemp/client/cl_main.cpp:2967-2995`
-pub fn CL_GetServerStatus(cl: &mut Client, from: netadr_t) -> *mut serverStatus_t {
+pub fn CL_GetServerStatus(
+    common: &mut Common,
+    cl: &mut Client,
+    from: netadr_t,
+) -> *mut serverStatus_t {
     let mut oldest: c_int;
     let mut oldestTime: c_int;
 
@@ -1019,7 +1093,12 @@ pub fn CL_GetServerStatus(cl: &mut Client, from: netadr_t) -> *mut serverStatus_
 /// Raven: the cvar block and the player rows are also printed when the request
 /// came from the `serverstatus` command.
 /// Source: `oracle/codemp/client/cl_main.cpp:3065-3155`
-pub fn CL_ServerStatusResponse(cl: &mut Client, from: netadr_t, msg: *mut msg_t) {
+pub fn CL_ServerStatusResponse(
+    view: &mut EngineHostView,
+    cl: &mut Client,
+    from: netadr_t,
+    msg: *mut msg_t,
+) {
     let mut info = [0 as c_char; MAX_INFO_STRING as usize];
     let mut score: c_int;
     let mut ping: c_int;
@@ -1028,7 +1107,7 @@ pub fn CL_ServerStatusResponse(cl: &mut Client, from: netadr_t, msg: *mut msg_t)
 
     for i in 0..MAX_SERVERSTATUSREQUESTS as c_int {
         let address = cl.cl_serverStatusList[i as usize].address;
-        if NET_CompareAdr(common, from, address) != qfalse {
+        if NET_CompareAdr(view.common, from, address) != qfalse {
             serverStatus = &mut cl.cl_serverStatusList[i as usize] as *mut serverStatus_t;
             break;
         }
@@ -1038,7 +1117,7 @@ pub fn CL_ServerStatusResponse(cl: &mut Client, from: netadr_t, msg: *mut msg_t)
         return;
     }
 
-    let line = MSG_ReadStringLine(common, msg);
+    let line = MSG_ReadStringLine(view.common, msg);
     let mut s: Vec<u8> = line.as_bytes().to_vec();
     s.push(0);
     let mut p: usize = 0;
@@ -1055,7 +1134,7 @@ pub fn CL_ServerStatusResponse(cl: &mut Client, from: netadr_t, msg: *mut msg_t)
         if (*serverStatus).print != qfalse {
             let address = (*serverStatus).address;
             com_printf(
-                common,
+                view.common,
                 &format!(
                     "Server ({}.{}.{}.{}:{})\n",
                     address.ip[0],
@@ -1065,7 +1144,7 @@ pub fn CL_ServerStatusResponse(cl: &mut Client, from: netadr_t, msg: *mut msg_t)
                     address.port.to_be()
                 ),
             );
-            com_printf(common, "Server settings:\n");
+            com_printf(view.common, "Server settings:\n");
             // print cvars
             while s[p] != 0 {
                 let mut i = 0;
@@ -1092,9 +1171,9 @@ pub fn CL_ServerStatusResponse(cl: &mut Client, from: netadr_t, msg: *mut msg_t)
                         .map(|&c| c as u8 as char)
                         .collect();
                     if i != 0 {
-                        com_printf(common, &format!("{}\n", text));
+                        com_printf(view.common, &format!("{}\n", text));
                     } else {
-                        com_printf(common, &format!("{:<24}", text));
+                        com_printf(view.common, &format!("{:<24}", text));
                     }
                     i += 1;
                 }
@@ -1114,11 +1193,11 @@ pub fn CL_ServerStatusResponse(cl: &mut Client, from: netadr_t, msg: *mut msg_t)
         );
 
         if (*serverStatus).print != qfalse {
-            com_printf(common, "\nPlayers:\n");
-            com_printf(common, "num: score: ping: name:\n");
+            com_printf(view.common, "\nPlayers:\n");
+            com_printf(view.common, "num: score: ping: name:\n");
         }
         let mut i: c_int = 0;
-        let mut row = MSG_ReadStringLine(common, msg);
+        let mut row = MSG_ReadStringLine(view.common, msg);
         while !row.is_empty() {
             len = (*serverStatus)
                 .string
@@ -1152,12 +1231,12 @@ pub fn CL_ServerStatusResponse(cl: &mut Client, from: netadr_t, msg: *mut msg_t)
                     },
                 };
                 com_printf(
-                    common,
+                    view.common,
                     &format!("{:<2}   {:<3}    {:<3}   {}\n", i, score, ping, name),
                 );
             }
             i += 1;
-            row = MSG_ReadStringLine(common, msg);
+            row = MSG_ReadStringLine(view.common, msg);
         }
         len = (*serverStatus)
             .string
@@ -1184,7 +1263,7 @@ pub fn CL_ServerStatusResponse(cl: &mut Client, from: netadr_t, msg: *mut msg_t)
 ///
 /// Raven: each message goes out twice in case one is dropped.
 /// Source: `oracle/codemp/client/cl_main.cpp:3162-3200`
-pub fn CL_LocalServers_f(cl: &mut Client) {
+pub fn CL_LocalServers_f(common: &mut Common, cl: &mut Client) {
     let message: &[u8];
     let mut to: netadr_t = unsafe { core::mem::zeroed() };
 
@@ -1244,7 +1323,7 @@ pub fn CL_LocalServers_f(cl: &mut Client) {
 /// `CL_GlobalServers_f` — asks a master server for its server list.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:3208-3255`
-pub fn CL_GlobalServers_f(cl: &mut Client) {
+pub fn CL_GlobalServers_f(common: &mut Common, cl: &mut Client) {
     let mut to: netadr_t = unsafe { core::mem::zeroed() };
     let mut command = String::new();
 
@@ -1376,7 +1455,7 @@ pub fn CL_GetFreePing(cl: &mut Client) -> *mut ping_t {
 
     // use oldest entry
     best = &mut cl.cl_pinglist[0] as *mut ping_t;
-    oldest = INT_MIN;
+    oldest = c_int::MIN;
     for i in 0..MAX_PINGREQUESTS as c_int {
         // scan for oldest
         time = cl.cls.realtime - cl.cl_pinglist[i as usize].start;
@@ -1392,8 +1471,8 @@ pub fn CL_GetFreePing(cl: &mut Client) -> *mut ping_t {
 /// `CL_ShowIP_f` — prints the machine's network addresses.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:3613-3615`
-pub fn CL_ShowIP_f() {
-    Sys_ShowIP();
+pub fn CL_ShowIP_f(common: &mut Common) {
+    Sys_ShowIP(common);
 }
 
 /// `CL_MakeMonkeyDoLaundry` — the monkey test's periodic packet corruption.
@@ -1415,7 +1494,7 @@ pub fn CL_MakeMonkeyDoLaundry(common: &mut Common, cl: &mut Client) {
 ///
 /// Raven: the rest of the demo file is copied straight from net messages.
 /// Source: `oracle/codemp/client/cl_main.cpp:295-453`
-pub fn CL_Record_f(cl: &mut Client) {
+pub fn CL_Record_f(view: &mut EngineHostView, cl: &mut Client) {
     let mut name = [0 as c_char; MAX_OSPATH as usize];
     let mut bufData = [0u8; MAX_MSGLEN as usize];
     let mut buf: msg_t = unsafe { core::mem::zeroed() };
@@ -1423,33 +1502,33 @@ pub fn CL_Record_f(cl: &mut Client) {
     let mut ent: *mut entityState_t;
     let mut nullstate: entityState_t = unsafe { core::mem::zeroed() };
 
-    if Cmd_Argc(common) > 2 {
-        com_printf(common, "record <demoname>\n");
+    if Cmd_Argc(view.common) > 2 {
+        com_printf(view.common, "record <demoname>\n");
         return;
     }
 
     if cl.clc.demorecording != qfalse {
         if cl.clc.spDemoRecording == qfalse {
-            com_printf(common, "Already recording.\n");
+            com_printf(view.common, "Already recording.\n");
         }
         return;
     }
 
     if cl.cls.state as c_int != connstate_t::CA_ACTIVE as c_int {
-        com_printf(common, "You must be in a level to record.\n");
+        com_printf(view.common, "You must be in a level to record.\n");
         return;
     }
 
-    if Cvar_VariableValue(common, "g_synchronousClients") == 0.0 {
+    if Cvar_VariableValue(view.common, "g_synchronousClients") == 0.0 {
         com_printf(
-            common,
+            view.common,
             "The server must have 'g_synchronousClients 1' set for demos\n",
         );
         return;
     }
 
-    if Cmd_Argc(common) == 2 {
-        let s = Cmd_Argv(common, 1).to_string();
+    if Cmd_Argc(view.common) == 2 {
+        let s = Cmd_Argv(view.common, 1).to_string();
         let destsize = cl.demoName.len();
         Q_strncpyz(&mut cl.demoName, &s, destsize);
         let demoName: String = cl
@@ -1498,14 +1577,14 @@ pub fn CL_Record_f(cl: &mut Client) {
         .take_while(|&&c| c != 0)
         .map(|&c| c as u8 as char)
         .collect();
-    com_printf(common, &format!("recording to {}.\n", name_str));
-    cl.clc.demofile = FS_FOpenFileWrite(common, &name_str);
+    com_printf(view.common, &format!("recording to {}.\n", name_str));
+    cl.clc.demofile = FS_FOpenFileWrite(view.common, &name_str);
     if cl.clc.demofile == 0 {
-        com_printf(common, "ERROR: couldn't open.\n");
+        com_printf(view.common, "ERROR: couldn't open.\n");
         return;
     }
     cl.clc.demorecording = qtrue;
-    if Cvar_VariableValue(common, "ui_recordSPDemo") != 0.0 {
+    if Cvar_VariableValue(view.common, "ui_recordSPDemo") != 0.0 {
         cl.clc.spDemoRecording = qtrue;
     } else {
         cl.clc.spDemoRecording = qfalse;
@@ -1528,10 +1607,10 @@ pub fn CL_Record_f(cl: &mut Client) {
     MSG_Bitstream(&mut buf);
 
     // NOTE, MRE: all server->client messages now acknowledge
-    MSG_WriteLong(common, &mut buf, cl.clc.reliableSequence);
+    MSG_WriteLong(view.common, &mut buf, cl.clc.reliableSequence);
 
-    MSG_WriteByte(common, &mut buf, svc_gamestate);
-    MSG_WriteLong(common, &mut buf, cl.clc.serverCommandSequence);
+    MSG_WriteByte(view.common, &mut buf, svc_gamestate as c_int);
+    MSG_WriteLong(view.common, &mut buf, cl.clc.serverCommandSequence);
 
     // configstrings
     for i in 0..MAX_CONFIGSTRINGS as c_int {
@@ -1544,9 +1623,9 @@ pub fn CL_Record_f(cl: &mut Client) {
             .take_while(|&&c| c != 0)
             .map(|&c| c as u8 as char)
             .collect();
-        MSG_WriteByte(common, &mut buf, svc_configstring);
-        MSG_WriteShort(common, &mut buf, i);
-        MSG_WriteBigString(common, &mut buf, &s);
+        MSG_WriteByte(view.common, &mut buf, svc_configstring as c_int);
+        MSG_WriteShort(view.common, &mut buf, i);
+        MSG_WriteBigString(view.common, &mut buf, &s);
     }
 
     // baselines
@@ -1557,47 +1636,55 @@ pub fn CL_Record_f(cl: &mut Client) {
         if unsafe { (*ent).number } == 0 {
             continue;
         }
-        MSG_WriteByte(common, &mut buf, svc_baseline);
-        MSG_WriteDeltaEntity(common, &mut buf, &mut nullstate, ent, qtrue);
+        MSG_WriteByte(view.common, &mut buf, svc_baseline as c_int);
+        MSG_WriteDeltaEntity(view.common, &mut buf, &mut nullstate, ent, qtrue);
     }
 
-    MSG_WriteByte(common, &mut buf, svc_EOF);
+    MSG_WriteByte(view.common, &mut buf, svc_EOF as c_int);
 
     // finished writing the gamestate stuff
 
     // write the client num
-    MSG_WriteLong(common, &mut buf, cl.clc.clientNum);
+    MSG_WriteLong(view.common, &mut buf, cl.clc.clientNum);
     // write the checksum feed
-    MSG_WriteLong(common, &mut buf, cl.clc.checksumFeed);
+    MSG_WriteLong(view.common, &mut buf, cl.clc.checksumFeed);
 
     // RMG stuff
     if cl.clc.rmgHeightMapSize != 0 {
         // Height map
-        MSG_WriteShort(common, &mut buf, cl.clc.rmgHeightMapSize as u16 as c_int);
-        MSG_WriteBits(common, &mut buf, 0, 1);
+        MSG_WriteShort(
+            view.common,
+            &mut buf,
+            cl.clc.rmgHeightMapSize as u16 as c_int,
+        );
+        MSG_WriteBits(view.common, &mut buf, 0, 1);
         MSG_WriteData(
-            common,
+            view.common,
             &mut buf,
             cl.clc.rmgHeightMap.as_ptr() as *const (),
             cl.clc.rmgHeightMapSize,
         );
 
         // Flatten map
-        MSG_WriteShort(common, &mut buf, cl.clc.rmgHeightMapSize as u16 as c_int);
-        MSG_WriteBits(common, &mut buf, 0, 1);
+        MSG_WriteShort(
+            view.common,
+            &mut buf,
+            cl.clc.rmgHeightMapSize as u16 as c_int,
+        );
+        MSG_WriteBits(view.common, &mut buf, 0, 1);
         MSG_WriteData(
-            common,
+            view.common,
             &mut buf,
             cl.clc.rmgFlattenMap.as_ptr() as *const (),
             cl.clc.rmgHeightMapSize,
         );
 
         // Seed
-        MSG_WriteLong(common, &mut buf, cl.clc.rmgSeed);
+        MSG_WriteLong(view.common, &mut buf, cl.clc.rmgSeed);
 
         // Automap symbols
         MSG_WriteShort(
-            common,
+            view.common,
             &mut buf,
             cl.clc.rmgAutomapSymbolCount as u16 as c_int,
         );
@@ -1607,22 +1694,22 @@ pub fn CL_Record_f(cl: &mut Client) {
             let mSide = sym.mSide as u8 as c_int;
             let x = sym.mOrigin[0] as c_int;
             let y = sym.mOrigin[1] as c_int;
-            MSG_WriteByte(common, &mut buf, mType);
-            MSG_WriteByte(common, &mut buf, mSide);
-            MSG_WriteLong(common, &mut buf, x);
-            MSG_WriteLong(common, &mut buf, y);
+            MSG_WriteByte(view.common, &mut buf, mType);
+            MSG_WriteByte(view.common, &mut buf, mSide);
+            MSG_WriteLong(view.common, &mut buf, x);
+            MSG_WriteLong(view.common, &mut buf, y);
         }
     } else {
-        MSG_WriteShort(common, &mut buf, 0);
+        MSG_WriteShort(view.common, &mut buf, 0);
     }
 
     // finished writing the client packet
-    MSG_WriteByte(common, &mut buf, svc_EOF);
+    MSG_WriteByte(view.common, &mut buf, svc_EOF as c_int);
 
     // write it to the demo file
     len = (cl.clc.serverMessageSequence - 1).to_le();
     FS_Write(
-        common,
+        view.common,
         &len as *const c_int as *const (),
         4,
         cl.clc.demofile,
@@ -1630,12 +1717,17 @@ pub fn CL_Record_f(cl: &mut Client) {
 
     len = buf.cursize.to_le();
     FS_Write(
-        common,
+        view.common,
         &len as *const c_int as *const (),
         4,
         cl.clc.demofile,
     );
-    FS_Write(common, buf.data as *const (), buf.cursize, cl.clc.demofile);
+    FS_Write(
+        view.common,
+        buf.data as *const (),
+        buf.cursize,
+        cl.clc.demofile,
+    );
 
     // the rest of the demo file will be copied from net messages
 }
@@ -1644,7 +1736,7 @@ pub fn CL_Record_f(cl: &mut Client) {
 ///
 /// Raven: key-up commands and `+` commands are never forwarded.
 /// Source: `oracle/codemp/client/cl_main.cpp:913-937`
-pub fn CL_ForwardCommandToServer(cl: &mut Client, string: *const c_char) {
+pub fn CL_ForwardCommandToServer(common: &mut Common, cl: &mut Client, string: *const c_char) {
     let cmd = Cmd_Argv(common, 0).to_string();
 
     // ignore key up commands
@@ -1670,7 +1762,7 @@ pub fn CL_ForwardCommandToServer(cl: &mut Client, string: *const c_char) {
 /// `CL_ForwardToServer_f` — the `cmd` command, forwards its arguments.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:1092-1102`
-pub fn CL_ForwardToServer_f(cl: &mut Client) {
+pub fn CL_ForwardToServer_f(common: &mut Common, cl: &mut Client) {
     if cl.cls.state as c_int != connstate_t::CA_ACTIVE as c_int || cl.clc.demoplaying != qfalse {
         com_printf(common, "Not connected to a server.\n");
         return;
@@ -1687,7 +1779,7 @@ pub fn CL_ForwardToServer_f(cl: &mut Client) {
 ///
 /// Raven: the two leading characters are shifted by 10, turning "Of" into "Yf".
 /// Source: `oracle/codemp/client/cl_main.cpp:1271-1289`
-pub fn CL_SendPureChecksums(cl: &mut Client) {
+pub fn CL_SendPureChecksums(common: &mut Common, cl: &mut Client) {
     let mut cMsg = [0 as c_char; MAX_INFO_VALUE as usize];
 
     // if we are pure we need to send back a command with our referenced pk3 checksums
@@ -1718,7 +1810,12 @@ pub fn CL_ResetPureClientAtServer(cl: &mut Client) {
 /// `CL_BeginDownload` — starts one file download and publishes it to the UI.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:1522-1542`
-pub fn CL_BeginDownload(cl: &mut Client, localName: *const c_char, remoteName: *const c_char) {
+pub fn CL_BeginDownload(
+    view: &mut EngineHostView,
+    cl: &mut Client,
+    localName: *const c_char,
+    remoteName: *const c_char,
+) {
     let localName: String = unsafe { CStr::from_ptr(localName) }
         .to_string_lossy()
         .into_owned();
@@ -1727,7 +1824,7 @@ pub fn CL_BeginDownload(cl: &mut Client, localName: *const c_char, remoteName: *
         .into_owned();
 
     Com_DPrintf(
-        common,
+        view.common,
         &format!(
             "***** CL_BeginDownload *****\nLocalname: {}\nRemotename: {}\n****************************\n",
             localName, remoteName
@@ -1760,7 +1857,12 @@ pub fn CL_BeginDownload(cl: &mut Client, localName: *const c_char, remoteName: *
 ///
 /// Raven: addresses past the browser list are kept in the extra global list.
 /// Source: `oracle/codemp/client/cl_main.cpp:1834-1946`
-pub fn CL_ServersResponsePacket(cl: &mut Client, from: netadr_t, msg: *mut msg_t) {
+pub fn CL_ServersResponsePacket(
+    common: &mut Common,
+    cl: &mut Client,
+    from: netadr_t,
+    msg: *mut msg_t,
+) {
     let mut count: c_int;
     let mut max: c_int;
     let total: c_int;
@@ -1918,7 +2020,7 @@ pub fn CL_CheckUserinfo(common: &mut Common, cl: &mut Client) {
         return;
     }
     // don't overflow the reliable command buffer when paused
-    if common.cl_paused.integer != 0 {
+    if common.cvar(common.cl_paused).integer != 0 {
         return;
     }
     // send a reliable userinfo update if needed
@@ -1933,6 +2035,7 @@ pub fn CL_CheckUserinfo(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:2803-2830`
 pub fn CL_SetServerInfoByAddress(
+    common: &mut Common,
     cl: &mut Client,
     from: netadr_t,
     info: *const c_char,
@@ -1989,6 +2092,7 @@ pub fn CL_SetServerInfoByAddress(
 /// releases the slot for that address.
 /// Source: `oracle/codemp/client/cl_main.cpp:3002-3058`
 pub fn CL_ServerStatus(
+    view: &mut EngineHostView,
     cl: &mut Client,
     serverAddress: *mut c_char,
     serverStatusString: *mut c_char,
@@ -2008,7 +2112,7 @@ pub fn CL_ServerStatus(
     if NET_StringToAdr(serverAddress, &mut to) == qfalse {
         return qfalse;
     }
-    let serverStatus = CL_GetServerStatus(cl, to);
+    let serverStatus = CL_GetServerStatus(view.common, cl, to);
     // if no server status string then reset the server status request for this address
     if serverStatusString.is_null() {
         unsafe {
@@ -2020,7 +2124,7 @@ pub fn CL_ServerStatus(
     unsafe {
         // if this server status request has the same address
         let address = (*serverStatus).address;
-        if NET_CompareAdr(common, to, address) != qfalse {
+        if NET_CompareAdr(view.common, to, address) != qfalse {
             // if we recieved an response for this server status request
             if (*serverStatus).pending == qfalse {
                 let text: String = (*serverStatus)
@@ -2037,14 +2141,14 @@ pub fn CL_ServerStatus(
             }
             // resend the request regularly
             else if (*serverStatus).startTime
-                < Com_Milliseconds(view) - cl.cl_serverStatusResendTime.integer
+                < Com_Milliseconds(view) - view.common.cvar(cl.cl_serverStatusResendTime).integer
             {
                 (*serverStatus).print = qfalse;
                 (*serverStatus).pending = qtrue;
                 (*serverStatus).retrieved = qfalse;
                 (*serverStatus).time = 0;
                 (*serverStatus).startTime = Com_Milliseconds(view);
-                NET_OutOfBandPrint(common, netsrc_t::NS_CLIENT, to, "getstatus".to_string());
+                NET_OutOfBandPrint(view.common, netsrc_t::NS_CLIENT, to, "getstatus".to_string());
                 return qfalse;
             }
         }
@@ -2056,7 +2160,7 @@ pub fn CL_ServerStatus(
             (*serverStatus).retrieved = qfalse;
             (*serverStatus).startTime = Com_Milliseconds(view);
             (*serverStatus).time = 0;
-            NET_OutOfBandPrint(common, netsrc_t::NS_CLIENT, to, "getstatus".to_string());
+            NET_OutOfBandPrint(view.common, netsrc_t::NS_CLIENT, to, "getstatus".to_string());
             return qfalse;
         }
     }
@@ -2066,7 +2170,7 @@ pub fn CL_ServerStatus(
 /// `CL_ServerStatus_f` — the `serverstatus` console command.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:3573-3606`
-pub fn CL_ServerStatus_f(cl: &mut Client) {
+pub fn CL_ServerStatus_f(common: &mut Common, cl: &mut Client) {
     let mut to: netadr_t = unsafe { core::mem::zeroed() };
     let server: String;
 
@@ -2097,7 +2201,7 @@ pub fn CL_ServerStatus_f(cl: &mut Client) {
 
     NET_OutOfBandPrint(common, netsrc_t::NS_CLIENT, to, "getstatus".to_string());
 
-    let serverStatus = CL_GetServerStatus(cl, to);
+    let serverStatus = CL_GetServerStatus(common, cl, to);
     unsafe {
         (*serverStatus).address = to;
         (*serverStatus).print = qtrue;
@@ -2109,7 +2213,12 @@ pub fn CL_ServerStatus_f(cl: &mut Client) {
 ///
 /// Raven: "make sure these types are in sync with the netnames strings in the UI".
 /// Source: `oracle/codemp/client/cl_main.cpp:2837-2960`
-pub fn CL_ServerInfoPacket(cl: &mut Client, from: netadr_t, msg: *mut msg_t) {
+pub fn CL_ServerInfoPacket(
+    common: &mut Common,
+    cl: &mut Client,
+    from: netadr_t,
+    msg: *mut msg_t,
+) {
     let mut type_: c_int;
     let mut str: &str;
     let prot: c_int;
@@ -2177,7 +2286,7 @@ pub fn CL_ServerInfoPacket(cl: &mut Client, from: netadr_t, msg: *mut msg_t) {
             let destsize = cl.cl_pinglist[i as usize].info.len();
             Q_strncpyz(&mut cl.cl_pinglist[i as usize].info, &slotinfo, destsize);
             let ping = cl.cl_pinglist[i as usize].time;
-            CL_SetServerInfoByAddress(cl, from, infoString.as_ptr() as *const c_char, ping);
+            CL_SetServerInfoByAddress(common, cl, from, infoString.as_ptr() as *const c_char, ping);
 
             return;
         }
@@ -2253,6 +2362,7 @@ pub fn CL_ServerInfoPacket(cl: &mut Client, from: netadr_t, msg: *mut msg_t) {
 /// Raven: a slot that has not answered inside `cl_maxPing` reports zero.
 /// Source: `oracle/codemp/client/cl_main.cpp:3263-3299`
 pub fn CL_GetPing(
+    common: &mut Common,
     cl: &mut Client,
     n: c_int,
     buf: *mut c_char,
@@ -2295,7 +2405,7 @@ pub fn CL_GetPing(
 
     let info = cl.cl_pinglist[n as usize].info.as_ptr();
     let ping = cl.cl_pinglist[n as usize].time;
-    CL_SetServerInfoByAddress(cl, adr, info, ping);
+    CL_SetServerInfoByAddress(common, cl, adr, info, ping);
 
     unsafe {
         *pingtime = time;
@@ -2305,7 +2415,7 @@ pub fn CL_GetPing(
 /// `CL_UpdateServerInfo` — refreshes the browser row behind one ping slot.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:3306-3314`
-pub fn CL_UpdateServerInfo(cl: &mut Client, n: c_int) {
+pub fn CL_UpdateServerInfo(common: &mut Common, cl: &mut Client, n: c_int) {
     if cl.cl_pinglist[n as usize].adr.port == 0 {
         return;
     }
@@ -2313,13 +2423,13 @@ pub fn CL_UpdateServerInfo(cl: &mut Client, n: c_int) {
     let adr = cl.cl_pinglist[n as usize].adr;
     let info = cl.cl_pinglist[n as usize].info.as_ptr();
     let ping = cl.cl_pinglist[n as usize].time;
-    CL_SetServerInfoByAddress(cl, adr, info, ping);
+    CL_SetServerInfoByAddress(common, cl, adr, info, ping);
 }
 
 /// `CL_Ping_f` — pings one named server from the console.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:3432-3459`
-pub fn CL_Ping_f(cl: &mut Client) {
+pub fn CL_Ping_f(common: &mut Common, cl: &mut Client) {
     let mut to: netadr_t = unsafe { core::mem::zeroed() };
     let pingptr: *mut ping_t;
     let server: String;
@@ -2346,7 +2456,7 @@ pub fn CL_Ping_f(cl: &mut Client) {
         (*pingptr).time = 0;
 
         let adr = (*pingptr).adr;
-        CL_SetServerInfoByAddress(cl, adr, core::ptr::null(), 0);
+        CL_SetServerInfoByAddress(common, cl, adr, core::ptr::null(), 0);
     }
 
     NET_OutOfBandPrint(common, netsrc_t::NS_CLIENT, to, "getinfo xxx".to_string());
@@ -2357,7 +2467,7 @@ pub fn CL_Ping_f(cl: &mut Client) {
 /// Raven: a global row that lost its ping packet is replaced from the extra
 /// address list, and "the server[i].visible flag stays untouched".
 /// Source: `oracle/codemp/client/cl_main.cpp:3466-3566`
-pub fn CL_UpdateVisiblePings_f(cl: &mut Client, source: c_int) -> qboolean {
+pub fn CL_UpdateVisiblePings_f(common: &mut Common, cl: &mut Client, source: c_int) -> qboolean {
     let mut slots: c_int;
     let mut buff = [0 as c_char; MAX_STRING_CHARS as usize];
     let mut pingTime: c_int = 0;
@@ -2468,6 +2578,7 @@ pub fn CL_UpdateVisiblePings_f(cl: &mut Client, source: c_int) -> qboolean {
             continue;
         }
         CL_GetPing(
+            common,
             cl,
             i,
             buff.as_mut_ptr(),
@@ -2487,19 +2598,31 @@ pub fn CL_UpdateVisiblePings_f(cl: &mut Client, source: c_int) -> qboolean {
 ///
 /// Raven: the renderer keeps its window and context.
 /// Source: `oracle/codemp/client/cl_main.cpp:657-682`
-pub fn CL_ShutdownAll(cl: &mut Client) {
+pub fn CL_ShutdownAll(view: &mut EngineHostView, cl: &mut Client) {
     // clear sounds
     S_DisableSounds(cl);
     // shutdown CGame
-    CL_ShutdownCGame(cl);
+    CL_ShutdownCGame(view.common, cl);
     // shutdown UI
-    CL_ShutdownUI(cl);
+    CL_ShutdownUI(view.common, cl);
 
     // shutdown the renderer
-    if cl.re.Shutdown.is_some() {
-        let shutdown = cl.re.Shutdown.unwrap();
-        shutdown(qfalse); // don't destroy window or context
-    }
+    // PORT-NOTE(dec-59.1): the `refexport_t` table is gone, so Raven's test for
+    // a bound `re.Shutdown` has no subject and the site calls `RE_Shutdown`
+    // directly.
+    // SAFETY: view-constructor slot, single-threaded, no other cast of the same
+    // slot is live across the call.
+    let re = unsafe { re_from_view(view) };
+    RE_Shutdown(
+        view,
+        &re.cvars,
+        &mut re.assets,
+        &mut re.sim,
+        &mut re.img_state,
+        &mut re.gpu_res,
+        &mut re.font,
+        false, // don't destroy window or context
+    );
 
     cl.cls.uiStarted = qfalse;
     cl.cls.cgameStarted = qfalse;
@@ -2511,8 +2634,8 @@ pub fn CL_ShutdownAll(cl: &mut Client) {
 ///
 /// Raven: the disconnect command goes out three times in case one is dropped.
 /// Source: `oracle/codemp/client/cl_main.cpp:837-901`
-pub fn CL_Disconnect(common: &mut Common, cl: &mut Client, showMainMenu: qboolean) {
-    if common.com_cl_running.integer == 0 {
+pub fn CL_Disconnect(view: &mut EngineHostView, cl: &mut Client, showMainMenu: qboolean) {
+    if view.common.cvar(view.common.com_cl_running).integer == 0 {
         return;
     }
 
@@ -2520,11 +2643,11 @@ pub fn CL_Disconnect(common: &mut Common, cl: &mut Client, showMainMenu: qboolea
     Cvar_Set(view, "r_uiFullScreen", "1");
 
     if cl.clc.demorecording != qfalse {
-        CL_StopRecord_f(cl);
+        CL_StopRecord_f(view.common, cl);
     }
 
     if cl.clc.download != 0 {
-        FS_FCloseFile(common, cl.clc.download);
+        FS_FCloseFile(view.common, cl.clc.download);
         cl.clc.download = 0;
     }
     cl.clc.downloadTempName[0] = 0;
@@ -2532,20 +2655,20 @@ pub fn CL_Disconnect(common: &mut Common, cl: &mut Client, showMainMenu: qboolea
     Cvar_Set(view, "cl_downloadName", "");
 
     if cl.clc.demofile != 0 {
-        FS_FCloseFile(common, cl.clc.demofile);
+        FS_FCloseFile(view.common, cl.clc.demofile);
         cl.clc.demofile = 0;
     }
 
     if !cl.uivm.is_null() && showMainMenu != qfalse {
         VM_Call(
-            common,
+            view.common,
             cl.uivm,
             MpUiExport::UI_SET_ACTIVE_MENU as c_int,
             &[UIMENU_NONE as isize],
         );
     }
 
-    SCR_StopCinematic(cl);
+    SCR_StopCinematic(view, cl);
     S_ClearSoundBuffer(cl);
 
     // send a disconnect message to the server
@@ -2553,9 +2676,9 @@ pub fn CL_Disconnect(common: &mut Common, cl: &mut Client, showMainMenu: qboolea
     if cl.cls.state as c_int >= connstate_t::CA_CONNECTED as c_int {
         let cmd = format!("disconnect");
         CL_AddReliableCommand(cl, cmd.as_ptr() as *const c_char);
-        CL_WritePacket(cl);
-        CL_WritePacket(cl);
-        CL_WritePacket(cl);
+        CL_WritePacket(view, cl);
+        CL_WritePacket(view, cl);
+        CL_WritePacket(view, cl);
     }
 
     CL_ClearState(cl);
@@ -2576,8 +2699,8 @@ pub fn CL_Disconnect(common: &mut Common, cl: &mut Client, showMainMenu: qboolea
 /// `CL_Disconnect_f` — the `disconnect` command; unwinds through `Com_Error`.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:1111-1117`
-pub fn CL_Disconnect_f(cl: &mut Client) {
-    SCR_StopCinematic(cl);
+pub fn CL_Disconnect_f(view: &mut EngineHostView, cl: &mut Client) {
+    SCR_StopCinematic(view, cl);
     Cvar_Set(view, "ui_singlePlayerActive", "0");
     if cl.cls.state as c_int != connstate_t::CA_DISCONNECTED as c_int
         && cl.cls.state as c_int != connstate_t::CA_CINEMATIC as c_int
@@ -2594,15 +2717,15 @@ pub fn CL_Disconnect_f(cl: &mut Client) {
 /// Raven: "This code will bring us back to the main menu after a demo is
 /// finished playing instead."
 /// Source: `oracle/codemp/client/cl_main.cpp:468-491`
-pub fn CL_DemoCompleted(cl: &mut Client) {
-    if cl.cl_timedemo.integer != 0 {
+pub fn CL_DemoCompleted(view: &mut EngineHostView, cl: &mut Client) {
+    if view.common.cvar(cl.cl_timedemo).integer != 0 {
         let time: c_int;
 
-        time = sys_milliseconds(engine, false) - cl.clc.timeDemoStart;
+        time = sys_milliseconds(view.common) - cl.clc.timeDemoStart;
         if time > 0 {
             let frames = cl.clc.timeDemoFrames;
             com_printf(
-                common,
+                view.common,
                 &format!(
                     "{} frames, {:.1} seconds: {:.1} fps\n",
                     frames,
@@ -2620,46 +2743,46 @@ pub fn CL_DemoCompleted(cl: &mut Client) {
     //rww - The above code seems to just stick you in a no-menu state and you can't do anything there.
     //I'm not sure why it ever worked in TA, but whatever. This code will bring us back to the main menu
     //after a demo is finished playing instead.
-    CL_Disconnect_f(cl);
+    CL_Disconnect_f(view, cl);
     S_StopAllSounds(cl);
     VM_Call(
-        common,
+        view.common,
         cl.uivm,
         MpUiExport::UI_SET_ACTIVE_MENU as c_int,
         &[UIMENU_MAIN as isize],
     );
 
-    CL_NextDemo();
+    CL_NextDemo(view);
 }
 
 /// `CL_Connect_f` — the `connect` command; resolves and starts the handshake.
 ///
 /// Raven: a local server is always killed first, even when we join localhost.
 /// Source: `oracle/codemp/client/cl_main.cpp:1141-1209`
-pub fn CL_Connect_f(common: &mut Common, cl: &mut Client) {
+pub fn CL_Connect_f(view: &mut EngineHostView, cl: &mut Client) {
     let server: String;
 
-    if Cvar_VariableValue(common, "fs_restrict") == 0.0 && Sys_CheckCD() == qfalse {
+    if Cvar_VariableValue(view.common, "fs_restrict") == 0.0 && Sys_CheckCD() == qfalse {
         let msg = SE_GetString(view, "CON_TEXT_NEED_CD");
         com_error(errorParm_t::ERR_NEED_CD, msg); //"Game CD not in drive" );
     }
 
-    if Cmd_Argc(common) != 2 {
-        com_printf(common, "usage: connect [server]\n");
+    if Cmd_Argc(view.common) != 2 {
+        com_printf(view.common, "usage: connect [server]\n");
         return;
     }
 
     Cvar_Set(view, "ui_singlePlayerActive", "0");
 
     // fire a message off to the motd server
-    CL_RequestMotd(common, cl);
+    CL_RequestMotd(view, cl);
 
     // clear any previous "server full" type messages
     cl.clc.serverMessage[0] = 0;
 
-    server = Cmd_Argv(common, 1).to_string();
+    server = Cmd_Argv(view.common, 1).to_string();
 
-    if common.com_sv_running.integer != 0 && server == "localhost" {
+    if view.common.cvar(view.common.com_sv_running).integer != 0 && server == "localhost" {
         // if running a local server, kill it
         SV_Shutdown(view, "Server quit\n");
     }
@@ -2668,8 +2791,8 @@ pub fn CL_Connect_f(common: &mut Common, cl: &mut Client) {
     Cvar_Set(view, "sv_killserver", "1");
     SV_Frame(view, 0);
 
-    CL_Disconnect(common, cl, qtrue);
-    Con_Close(common, cl);
+    CL_Disconnect(view, cl, qtrue);
+    Con_Close(view.common, cl);
 
     /* MrE: 2000-09-13: now called in CL_DownloadsComplete
     CL_FlushMemory( );
@@ -2690,7 +2813,7 @@ pub fn CL_Connect_f(common: &mut Common, cl: &mut Client) {
         &mut cl.clc.serverAddress,
     ) == qfalse
     {
-        com_printf(common, "Bad server address\n");
+        com_printf(view.common, "Bad server address\n");
         cl.cls.state = connstate_t::CA_DISCONNECTED;
         return;
     }
@@ -2699,7 +2822,7 @@ pub fn CL_Connect_f(common: &mut Common, cl: &mut Client) {
     }
     let adr = cl.clc.serverAddress;
     com_printf(
-        common,
+        view.common,
         &format!(
             "{} resolved to {}.{}.{}.{}:{}\n",
             servername,
@@ -2732,14 +2855,14 @@ pub fn CL_Connect_f(common: &mut Common, cl: &mut Client) {
 /// Raven: a packet inside the last three seconds of traffic might be a spoof,
 /// so it is ignored.
 /// Source: `oracle/codemp/client/cl_main.cpp:1738-1762`
-pub fn CL_DisconnectPacket(common: &mut Common, cl: &mut Client, from: netadr_t) {
+pub fn CL_DisconnectPacket(view: &mut EngineHostView, cl: &mut Client, from: netadr_t) {
     if (cl.cls.state as c_int) < connstate_t::CA_AUTHORIZING as c_int {
         return;
     }
 
     // if not from our server, ignore it
     let remote = cl.clc.netchan.remoteAddress;
-    if NET_CompareAdr(common, from, remote) == qfalse {
+    if NET_CompareAdr(view.common, from, remote) == qfalse {
         return;
     }
 
@@ -2750,9 +2873,9 @@ pub fn CL_DisconnectPacket(common: &mut Common, cl: &mut Client, from: netadr_t)
     }
 
     // drop the connection (Raven: a connection-dropped dialog is unimplemented)
-    com_printf(common, "Server disconnected for unknown reason\n");
+    com_printf(view.common, "Server disconnected for unknown reason\n");
 
-    CL_Disconnect(common, cl, qtrue);
+    CL_Disconnect(view, cl, qtrue);
 }
 
 /// `CL_Shutdown` — tears the whole client down and unregisters its commands.
@@ -2760,7 +2883,7 @@ pub fn CL_DisconnectPacket(common: &mut Common, cl: &mut Client, from: netadr_t)
 /// Raven: `CL_ShutdownRef` runs before `CL_ShutdownAll` so the images get
 /// dumped inside `RE_Shutdown`.
 /// Source: `oracle/codemp/client/cl_main.cpp:2719-2774`
-pub fn CL_Shutdown(common: &mut Common, cl: &mut Client) {
+pub fn CL_Shutdown(view: &mut EngineHostView, cl: &mut Client) {
     //Com_Printf( "----- CL_Shutdown -----\n" );
 
     if cl.recursive != qfalse {
@@ -2773,35 +2896,35 @@ pub fn CL_Shutdown(common: &mut Common, cl: &mut Client) {
         cl.G2VertSpaceClient = None;
     }
 
-    CL_Disconnect(common, cl, qtrue);
+    CL_Disconnect(view, cl, qtrue);
 
-    CL_ShutdownRef(cl); //must be before shutdown all so the images get dumped in RE_Shutdown
+    CL_ShutdownRef(view, cl); //must be before shutdown all so the images get dumped in RE_Shutdown
 
     // RJ: added the shutdown all to close down the cgame (to free up some memory, such as in the fx system)
-    CL_ShutdownAll(cl);
+    CL_ShutdownAll(view, cl);
 
     S_Shutdown(cl);
     //CL_ShutdownUI();
 
-    Cmd_RemoveCommand(common, "cmd");
-    Cmd_RemoveCommand(common, "configstrings");
-    Cmd_RemoveCommand(common, "userinfo");
-    Cmd_RemoveCommand(common, "snd_restart");
-    Cmd_RemoveCommand(common, "vid_restart");
-    Cmd_RemoveCommand(common, "disconnect");
-    Cmd_RemoveCommand(common, "record");
-    Cmd_RemoveCommand(common, "demo");
-    Cmd_RemoveCommand(common, "cinematic");
-    Cmd_RemoveCommand(common, "stoprecord");
-    Cmd_RemoveCommand(common, "connect");
-    Cmd_RemoveCommand(common, "localservers");
-    Cmd_RemoveCommand(common, "globalservers");
-    Cmd_RemoveCommand(common, "rcon");
-    Cmd_RemoveCommand(common, "ping");
-    Cmd_RemoveCommand(common, "serverstatus");
-    Cmd_RemoveCommand(common, "showip");
-    Cmd_RemoveCommand(common, "model");
-    Cmd_RemoveCommand(common, "forcepowers");
+    Cmd_RemoveCommand(view.common, "cmd");
+    Cmd_RemoveCommand(view.common, "configstrings");
+    Cmd_RemoveCommand(view.common, "userinfo");
+    Cmd_RemoveCommand(view.common, "snd_restart");
+    Cmd_RemoveCommand(view.common, "vid_restart");
+    Cmd_RemoveCommand(view.common, "disconnect");
+    Cmd_RemoveCommand(view.common, "record");
+    Cmd_RemoveCommand(view.common, "demo");
+    Cmd_RemoveCommand(view.common, "cinematic");
+    Cmd_RemoveCommand(view.common, "stoprecord");
+    Cmd_RemoveCommand(view.common, "connect");
+    Cmd_RemoveCommand(view.common, "localservers");
+    Cmd_RemoveCommand(view.common, "globalservers");
+    Cmd_RemoveCommand(view.common, "rcon");
+    Cmd_RemoveCommand(view.common, "ping");
+    Cmd_RemoveCommand(view.common, "serverstatus");
+    Cmd_RemoveCommand(view.common, "showip");
+    Cmd_RemoveCommand(view.common, "model");
+    Cmd_RemoveCommand(view.common, "forcepowers");
 
     Cvar_Set(view, "cl_running", "0");
 
@@ -2817,33 +2940,36 @@ pub fn CL_Shutdown(common: &mut Common, cl: &mut Client) {
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:2028-2141`
 pub fn CL_ConnectionlessPacket(
-    common: &mut Common,
+    view: &mut EngineHostView,
     cl: &mut Client,
     from: netadr_t,
     msg: *mut msg_t,
 ) {
     MSG_BeginReadingOOB(msg);
-    MSG_ReadLong(common, msg); // skip the -1
+    MSG_ReadLong(view.common, msg); // skip the -1
 
-    let s = MSG_ReadStringLine(common, msg);
+    let s = MSG_ReadStringLine(view.common, msg);
 
-    Cmd_TokenizeString(common, &s);
+    Cmd_TokenizeString(view.common, &s);
 
-    let c = Cmd_Argv(common, 0).to_string();
+    let c = Cmd_Argv(view.common, 0).to_string();
 
-    let adrstr = NET_AdrToString(common, from);
+    let adrstr = NET_AdrToString(view.common, from);
     let adrstr: String = unsafe { CStr::from_ptr(adrstr) }
         .to_string_lossy()
         .into_owned();
-    Com_DPrintf(common, &format!("CL packet {}: {}\n", adrstr, c));
+    Com_DPrintf(view.common, &format!("CL packet {}: {}\n", adrstr, c));
 
     // challenge from the server we are connecting to
     if Q_stricmp(&c, "challengeResponse") == 0 {
         if cl.cls.state as c_int != connstate_t::CA_CONNECTING as c_int {
-            com_printf(common, "Unwanted challenge response received.  Ignored.\n");
+            com_printf(
+                view.common,
+                "Unwanted challenge response received.  Ignored.\n",
+            );
         } else {
             // start sending challenge repsonse instead of challenge request packets
-            cl.clc.challenge = atoi(Cmd_Argv(common, 1));
+            cl.clc.challenge = atoi(Cmd_Argv(view.common, 1));
             cl.cls.state = connstate_t::CA_CHALLENGING;
             cl.clc.connectPacketCount = 0;
             cl.clc.connectTime = -99999;
@@ -2852,7 +2978,7 @@ pub fn CL_ConnectionlessPacket(
             // a server proxy to hand off connections to multiple servers
             cl.clc.serverAddress = from;
             let challenge = cl.clc.challenge;
-            Com_DPrintf(common, &format!("challengeResponse: {}\n", challenge));
+            Com_DPrintf(view.common, &format!("challengeResponse: {}\n", challenge));
         }
         return;
     }
@@ -2860,30 +2986,30 @@ pub fn CL_ConnectionlessPacket(
     // server connection
     if Q_stricmp(&c, "connectResponse") == 0 {
         if cl.cls.state as c_int >= connstate_t::CA_CONNECTED as c_int {
-            com_printf(common, "Dup connect received.  Ignored.\n");
+            com_printf(view.common, "Dup connect received.  Ignored.\n");
             return;
         }
         if cl.cls.state as c_int != connstate_t::CA_CHALLENGING as c_int {
             com_printf(
-                common,
+                view.common,
                 "connectResponse packet while not connecting.  Ignored.\n",
             );
             return;
         }
         let serverAddress = cl.clc.serverAddress;
-        if NET_CompareBaseAdr(common, from, serverAddress) == qfalse {
+        if NET_CompareBaseAdr(view.common, from, serverAddress) == qfalse {
             com_printf(
-                common,
+                view.common,
                 "connectResponse from a different address.  Ignored.\n",
             );
-            let a = NET_AdrToString(common, from);
+            let a = NET_AdrToString(view.common, from);
             let a: String = unsafe { CStr::from_ptr(a) }.to_string_lossy().into_owned();
-            let b = NET_AdrToString(common, serverAddress);
+            let b = NET_AdrToString(view.common, serverAddress);
             let b: String = unsafe { CStr::from_ptr(b) }.to_string_lossy().into_owned();
-            com_printf(common, &format!("{} should have been {}\n", a, b));
+            com_printf(view.common, &format!("{} should have been {}\n", a, b));
             return;
         }
-        let qport = Cvar_VariableValue(common, "net_qport") as c_int;
+        let qport = Cvar_VariableValue(view.common, "net_qport") as c_int;
         Netchan_Setup(netsrc_t::NS_CLIENT, &mut cl.clc.netchan, from, qport);
         cl.cls.state = connstate_t::CA_CONNECTED;
         cl.clc.lastPacketSentTime = -9999; // send first packet immediately
@@ -2892,27 +3018,27 @@ pub fn CL_ConnectionlessPacket(
 
     // server responding to an info broadcast
     if Q_stricmp(&c, "infoResponse") == 0 {
-        CL_ServerInfoPacket(cl, from, msg);
+        CL_ServerInfoPacket(view.common, cl, from, msg);
         return;
     }
 
     // server responding to a get playerlist
     if Q_stricmp(&c, "statusResponse") == 0 {
-        CL_ServerStatusResponse(cl, from, msg);
+        CL_ServerStatusResponse(view, cl, from, msg);
         return;
     }
 
     // a disconnect message from the server, which will happen if the server
     // dropped the connection but it is still getting packets from us
     if Q_stricmp(&c, "disconnect") == 0 {
-        CL_DisconnectPacket(common, cl, from);
+        CL_DisconnectPacket(view, cl, from);
         return;
     }
 
     // echo request from server
     if Q_stricmp(&c, "echo") == 0 {
-        let arg = Cmd_Argv(common, 1).to_string();
-        NET_OutOfBandPrint(common, netsrc_t::NS_CLIENT, from, arg);
+        let arg = Cmd_Argv(view.common, 1).to_string();
+        NET_OutOfBandPrint(view.common, netsrc_t::NS_CLIENT, from, arg);
         return;
     }
 
@@ -2924,7 +3050,7 @@ pub fn CL_ConnectionlessPacket(
 
     // global MOTD from id
     if Q_stricmp(&c, "motd") == 0 {
-        CL_MotdPacket(cl, from);
+        CL_MotdPacket(view, cl, from);
         return;
     }
 
@@ -2932,13 +3058,13 @@ pub fn CL_ConnectionlessPacket(
     if Q_stricmp(&c, "print") == 0 {
         let mut sTemp = [0 as c_char; MAX_STRINGED_SV_STRING as usize];
 
-        let body = MSG_ReadString(common, msg);
+        let body = MSG_ReadString(view.common, msg);
         let body_c: Vec<c_char> = body
             .bytes()
             .map(|b| b as c_char)
             .chain(core::iter::once(0))
             .collect();
-        CL_CheckSVStringEdRef(sTemp.as_mut_ptr(), body_c.as_ptr());
+        CL_CheckSVStringEdRef(view, sTemp.as_mut_ptr(), body_c.as_ptr());
         let text: String = sTemp
             .iter()
             .take_while(|&&c| c != 0)
@@ -2946,33 +3072,33 @@ pub fn CL_ConnectionlessPacket(
             .collect();
         let destsize = cl.clc.serverMessage.len();
         Q_strncpyz(&mut cl.clc.serverMessage, &text, destsize);
-        com_printf(common, &format!("{}", text));
+        com_printf(view.common, &format!("{}", text));
         return;
     }
 
     // echo request from server
     //	if ( !Q_stricmp(c, "getserversResponse\\") ) {
     if Q_strncmp(&c, "getserversResponse", 18) == 0 {
-        CL_ServersResponsePacket(cl, from, msg);
+        CL_ServersResponsePacket(view.common, cl, from, msg);
         return;
     }
 
-    Com_DPrintf(common, "Unknown connectionless packet command.\n");
+    Com_DPrintf(view.common, "Unknown connectionless packet command.\n");
 }
 
 /// `CL_MapLoading` — puts the client into the connect screen for a local map.
 ///
 /// Raven: an existing localhost connection is kept so the connect screen draws.
 /// Source: `oracle/codemp/client/cl_main.cpp:778-811`
-pub fn CL_MapLoading(common: &mut Common, cl: &mut Client) {
-    if common.com_cl_running.integer == 0 {
+pub fn CL_MapLoading(view: &mut EngineHostView, cl: &mut Client) {
+    if view.common.cvar(view.common.com_cl_running).integer == 0 {
         return;
     }
 
     // Set this to localhost.
     Cvar_Set(view, "cl_currentServerAddress", "Localhost");
 
-    Con_Close(common, cl);
+    Con_Close(view.common, cl);
     cl.cls.keyCatchers = 0;
 
     let servername: String = cl
@@ -2995,16 +3121,16 @@ pub fn CL_MapLoading(common: &mut Common, cl: &mut Client) {
         let size = core::mem::size_of_val(&cl.cl.gameState);
         Com_Memset(&mut cl.cl.gameState as *mut _ as *mut (), 0, size);
         cl.clc.lastPacketSentTime = -9999;
-        SCR_UpdateScreen(common, cl);
+        SCR_UpdateScreen(view, cl);
     } else {
         // clear nextmap so the cinematic shutdown doesn't execute it
         Cvar_Set(view, "nextmap", "");
-        CL_Disconnect(common, cl, qtrue);
+        CL_Disconnect(view, cl, qtrue);
         let destsize = cl.cls.servername.len();
         Q_strncpyz(&mut cl.cls.servername, "localhost", destsize);
         cl.cls.state = connstate_t::CA_CHALLENGING; // so the connect screen is drawn
         cl.cls.keyCatchers = 0;
-        SCR_UpdateScreen(common, cl);
+        SCR_UpdateScreen(view, cl);
         cl.clc.connectTime = -RETRANSMIT_TIMEOUT;
         NET_StringToAdr(
             "localhost\0".as_ptr() as *const c_char,
@@ -3012,7 +3138,7 @@ pub fn CL_MapLoading(common: &mut Common, cl: &mut Client) {
         );
         // we don't need a challenge on the localhost
 
-        CL_CheckForResend(common, cl);
+        CL_CheckForResend(view.common, cl);
     }
 }
 
@@ -3037,14 +3163,14 @@ pub fn CL_Snd_Restart_f(cl: &mut Client) {
 /// `CL_StartHunkUsers` — brings the renderer, sound, and UI back up.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:2445-2473`
-pub fn CL_StartHunkUsers(common: &mut Common, cl: &mut Client) {
-    if common.com_cl_running.integer == 0 {
+pub fn CL_StartHunkUsers(view: &mut EngineHostView, cl: &mut Client) {
+    if view.common.cvar(view.common.com_cl_running).integer == 0 {
         return;
     }
 
     if cl.cls.rendererStarted == qfalse {
         cl.cls.rendererStarted = qtrue;
-        CL_InitRenderer(cl);
+        CL_InitRenderer(view, cl);
     }
 
     if cl.cls.soundStarted == qfalse {
@@ -3059,7 +3185,7 @@ pub fn CL_StartHunkUsers(common: &mut Common, cl: &mut Client) {
 
     if cl.cls.uiStarted == qfalse {
         cl.cls.uiStarted = qtrue;
-        CL_InitUI(cl);
+        CL_InitUI(view, cl);
     }
 }
 
@@ -3067,24 +3193,24 @@ pub fn CL_StartHunkUsers(common: &mut Common, cl: &mut Client) {
 ///
 /// Raven: with a server running, only the client part of the hunk is cleared.
 /// Source: `oracle/codemp/client/cl_main.cpp:734-767`
-pub fn CL_FlushMemory(common: &mut Common, cl: &mut Client) {
+pub fn CL_FlushMemory(view: &mut EngineHostView, cl: &mut Client) {
     // shutdown all the client stuff
-    CL_ShutdownAll(cl);
+    CL_ShutdownAll(view, cl);
 
     // if not running a server clear the whole hunk
-    if common.com_sv_running.integer == 0 {
+    if view.common.cvar(view.common.com_sv_running).integer == 0 {
         // clear collision map data
-        CM_ClearMap(cm, rmg);
+        CM_ClearMap(&mut view.cm, &mut view.rmg);
         // clear the whole hunk
         Hunk_Clear(view);
 
         //clear everything else to avoid fragmentation
     } else {
         // clear all the client data on the hunk
-        Hunk_ClearToMark(common);
+        Hunk_ClearToMark(view.common);
     }
 
-    CL_StartHunkUsers(common, cl);
+    CL_StartHunkUsers(view, cl);
 }
 
 /// `CL_Vid_Restart_f` — the `vid_restart` command; restarts the renderer stack.
@@ -3092,7 +3218,7 @@ pub fn CL_FlushMemory(common: &mut Common, cl: &mut Client) {
 /// Raven: selecting a mod from the menu only issues a vid_restart, so the net
 /// overrides are re-checked here.
 /// Source: `oracle/codemp/client/cl_main.cpp:1311-1366`
-pub fn CL_Vid_Restart_f(common: &mut Common, cl: &mut Client) {
+pub fn CL_Vid_Restart_f(view: &mut EngineHostView, cl: &mut Client) {
     //rww - sort of nasty, but when a user selects a mod
     //from the menu all it does is a vid_restart, so we
     //have to check for new net overrides for the mod then.
@@ -3101,15 +3227,15 @@ pub fn CL_Vid_Restart_f(common: &mut Common, cl: &mut Client) {
     // don't let them loop during the restart
     S_StopAllSounds(cl);
     // shutdown the UI
-    CL_ShutdownUI(cl);
+    CL_ShutdownUI(view.common, cl);
     // shutdown the CGame
-    CL_ShutdownCGame(cl);
+    CL_ShutdownCGame(view.common, cl);
     // shutdown the renderer and clear the renderer interface
-    CL_ShutdownRef(cl);
+    CL_ShutdownRef(view, cl);
     // client is no longer pure untill new checksums are sent
     CL_ResetPureClientAtServer(cl);
     // clear pak references
-    FS_ClearPakReferences(common, FS_UI_REF | FS_CGAME_REF);
+    FS_ClearPakReferences(view.common, FS_UI_REF | FS_CGAME_REF);
     // reinitialize the filesystem if the game directory or checksum has changed
     FS_ConditionalRestart(view, cl.clc.checksumFeed);
 
@@ -3122,29 +3248,29 @@ pub fn CL_Vid_Restart_f(common: &mut Common, cl: &mut Client) {
     Cvar_Set(view, "cl_paused", "0");
 
     // if not running a server clear the whole hunk
-    if common.com_sv_running.integer == 0 {
-        CM_ClearMap(cm, rmg);
+    if view.common.cvar(view.common.com_sv_running).integer == 0 {
+        CM_ClearMap(&mut view.cm, &mut view.rmg);
         // clear the whole hunk
         Hunk_Clear(view);
     } else {
         // clear all the client data on the hunk
-        Hunk_ClearToMark(common);
+        Hunk_ClearToMark(view.common);
     }
 
     // initialize the renderer interface
-    CL_InitRef(cl);
+    CL_InitRef(view, cl);
 
     // startup all the client stuff
-    CL_StartHunkUsers(common, cl);
+    CL_StartHunkUsers(view, cl);
 
     // start the cgame if connected
     if cl.cls.state as c_int > connstate_t::CA_CONNECTED as c_int
         && cl.cls.state as c_int != connstate_t::CA_CINEMATIC as c_int
     {
         cl.cls.cgameStarted = qtrue;
-        CL_InitCGame(common, cl);
+        CL_InitCGame(view, cl);
         // send pure checksums
-        CL_SendPureChecksums(cl);
+        CL_SendPureChecksums(view.common, cl);
     }
 }
 
@@ -3152,7 +3278,7 @@ pub fn CL_Vid_Restart_f(common: &mut Common, cl: &mut Client) {
 ///
 /// Raven: sending `donedl` requests a new gamestate, so nothing loads yet.
 /// Source: `oracle/codemp/client/cl_main.cpp:1460-1509`
-pub fn CL_DownloadsComplete(common: &mut Common, cl: &mut Client) {
+pub fn CL_DownloadsComplete(view: &mut EngineHostView, cl: &mut Client) {
     // if we downloaded files we need to restart the file system
     if cl.clc.downloadRestart != qfalse {
         cl.clc.downloadRestart = qfalse;
@@ -3187,25 +3313,25 @@ pub fn CL_DownloadsComplete(common: &mut Common, cl: &mut Client) {
     // this will also (re)load the UI
     // if this is a local client then only the client part of the hunk
     // will be cleared, note that this is done after the hunk mark has been set
-    CL_FlushMemory(common, cl);
+    CL_FlushMemory(view, cl);
 
     // initialize the CGame
     cl.cls.cgameStarted = qtrue;
-    CL_InitCGame(common, cl);
+    CL_InitCGame(view, cl);
 
     // set pure checksums
-    CL_SendPureChecksums(cl);
+    CL_SendPureChecksums(view.common, cl);
 
-    CL_WritePacket(cl);
-    CL_WritePacket(cl);
-    CL_WritePacket(cl);
+    CL_WritePacket(view, cl);
+    CL_WritePacket(view, cl);
+    CL_WritePacket(view, cl);
 }
 
 /// `CL_NextDownload` — starts the next queued download, or finishes the stage.
 ///
 /// Raven: the list format is `@remotename@localname@remotename@localname`.
 /// Source: `oracle/codemp/client/cl_main.cpp:1551-1589`
-pub fn CL_NextDownload(common: &mut Common, cl: &mut Client) {
+pub fn CL_NextDownload(view: &mut EngineHostView, cl: &mut Client) {
     // We are looking to start a download here
     if cl.clc.downloadList[0] != 0 {
         let list: String = cl
@@ -3227,7 +3353,7 @@ pub fn CL_NextDownload(common: &mut Common, cl: &mut Client) {
 
         let first = match body.find('@') {
             None => {
-                CL_DownloadsComplete(common, cl);
+                CL_DownloadsComplete(view, cl);
                 return;
             }
             Some(x) => x,
@@ -3250,7 +3376,7 @@ pub fn CL_NextDownload(common: &mut Common, cl: &mut Client) {
             .map(|b| b as c_char)
             .chain(core::iter::once(0))
             .collect();
-        CL_BeginDownload(cl, localNameC.as_ptr(), remoteNameC.as_ptr());
+        CL_BeginDownload(view, cl, localNameC.as_ptr(), remoteNameC.as_ptr());
 
         cl.clc.downloadRestart = qtrue;
 
@@ -3261,7 +3387,7 @@ pub fn CL_NextDownload(common: &mut Common, cl: &mut Client) {
         return;
     }
 
-    CL_DownloadsComplete(common, cl);
+    CL_DownloadsComplete(view, cl);
 }
 
 /// `CL_InitDownloads` — compares our paks with the server's before loading.
@@ -3269,14 +3395,14 @@ pub fn CL_NextDownload(common: &mut Common, cl: &mut Client) {
 /// Raven: with autodownload off we still warn about the referenced files we do
 /// not have.
 /// Source: `oracle/codemp/client/cl_main.cpp:1601-1632`
-pub fn CL_InitDownloads(common: &mut Common, cl: &mut Client) {
+pub fn CL_InitDownloads(view: &mut EngineHostView, cl: &mut Client) {
     let mut missingfiles = [0 as c_char; 1024];
 
-    if cl.cl_allowDownload.integer == 0 {
+    if view.common.cvar(cl.cl_allowDownload).integer == 0 {
         // autodownload is disabled on the client
         // but it's possible that some referenced files on the server are missing
         if FS_ComparePaks(
-            common,
+            view.common,
             missingfiles.as_mut_ptr(),
             missingfiles.len() as c_int,
             qfalse,
@@ -3290,7 +3416,7 @@ pub fn CL_InitDownloads(common: &mut Common, cl: &mut Client) {
                 .map(|&c| c as u8 as char)
                 .collect();
             com_printf(
-                common,
+                view.common,
                 &format!(
                     "\nWARNING: You are missing some files referenced by the server:\n{}You might not be able to join the game\nGo to the setting menu to turn on autodownload, or get the file elsewhere\n\n",
                     missing
@@ -3300,7 +3426,7 @@ pub fn CL_InitDownloads(common: &mut Common, cl: &mut Client) {
     } else {
         let capacity = cl.clc.downloadList.len() as c_int;
         let listptr = cl.clc.downloadList.as_mut_ptr();
-        if FS_ComparePaks(common, listptr, capacity, qtrue) != qfalse {
+        if FS_ComparePaks(view.common, listptr, capacity, qtrue) != qfalse {
             let list: String = cl
                 .clc
                 .downloadList
@@ -3308,37 +3434,42 @@ pub fn CL_InitDownloads(common: &mut Common, cl: &mut Client) {
                 .take_while(|&&c| c != 0)
                 .map(|&c| c as u8 as char)
                 .collect();
-            com_printf(common, &format!("Need paks: {}\n", list));
+            com_printf(view.common, &format!("Need paks: {}\n", list));
 
             if cl.clc.downloadList[0] != 0 {
                 // if autodownloading is not enabled on the server
                 cl.cls.state = connstate_t::CA_CONNECTED;
-                CL_NextDownload(common, cl);
+                CL_NextDownload(view, cl);
                 return;
             }
         }
     }
-    CL_DownloadsComplete(common, cl);
+    CL_DownloadsComplete(view, cl);
 }
 
 /// `CL_ReadDemoMessage` — reads and parses one message out of the demo file.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:498-544`
-pub fn CL_ReadDemoMessage(common: &mut Common, cl: &mut Client) {
+pub fn CL_ReadDemoMessage(view: &mut EngineHostView, cl: &mut Client) {
     let mut r: c_int;
     let mut buf: msg_t = unsafe { core::mem::zeroed() };
     let mut bufData = [0u8; MAX_MSGLEN as usize];
     let mut s: c_int = 0;
 
     if cl.clc.demofile == 0 {
-        CL_DemoCompleted(cl);
+        CL_DemoCompleted(view, cl);
         return;
     }
 
     // get the sequence number
-    r = FS_Read(common, &mut s as *mut c_int as *mut (), 4, cl.clc.demofile);
+    r = FS_Read(
+        view.common,
+        &mut s as *mut c_int as *mut (),
+        4,
+        cl.clc.demofile,
+    );
     if r != 4 {
-        CL_DemoCompleted(cl);
+        CL_DemoCompleted(view, cl);
         return;
     }
     cl.clc.serverMessageSequence = s.to_le();
@@ -3348,18 +3479,18 @@ pub fn CL_ReadDemoMessage(common: &mut Common, cl: &mut Client) {
 
     // get the length
     r = FS_Read(
-        common,
+        view.common,
         &mut buf.cursize as *mut i32 as *mut (),
         4,
         cl.clc.demofile,
     );
     if r != 4 {
-        CL_DemoCompleted(cl);
+        CL_DemoCompleted(view, cl);
         return;
     }
     buf.cursize = buf.cursize.to_le();
     if buf.cursize == -1 {
-        CL_DemoCompleted(cl);
+        CL_DemoCompleted(view, cl);
         return;
     }
     if buf.cursize > buf.maxsize {
@@ -3368,29 +3499,39 @@ pub fn CL_ReadDemoMessage(common: &mut Common, cl: &mut Client) {
             "CL_ReadDemoMessage: demoMsglen > MAX_MSGLEN".to_string(),
         );
     }
-    r = FS_Read(common, buf.data as *mut (), buf.cursize, cl.clc.demofile);
+    r = FS_Read(
+        view.common,
+        buf.data as *mut (),
+        buf.cursize,
+        cl.clc.demofile,
+    );
     if r != buf.cursize {
-        com_printf(common, "Demo file was truncated.\n");
-        CL_DemoCompleted(cl);
+        com_printf(view.common, "Demo file was truncated.\n");
+        CL_DemoCompleted(view, cl);
         return;
     }
 
     cl.clc.lastPacketTime = cl.cls.realtime;
     buf.readcount = 0;
-    CL_ParseServerMessage(common, cl, &mut buf);
+    CL_ParseServerMessage(view, cl, &mut buf);
 }
 
 /// `CL_PacketEvent` — the client's inbound packet entry point.
 ///
 /// Raven: a demo message may only be saved after the frame is parsed.
 /// Source: `oracle/codemp/client/cl_main.cpp:2151-2204`
-pub fn CL_PacketEvent(common: &mut Common, cl: &mut Client, from: netadr_t, msg: *mut msg_t) {
+pub fn CL_PacketEvent(
+    view: &mut EngineHostView,
+    cl: &mut Client,
+    from: netadr_t,
+    msg: *mut msg_t,
+) {
     let headerBytes: c_int;
 
     cl.clc.lastPacketTime = cl.cls.realtime;
 
     if unsafe { (*msg).cursize } >= 4 && unsafe { *((*msg).data as *const c_int) } == -1 {
-        CL_ConnectionlessPacket(common, cl, from, msg);
+        CL_ConnectionlessPacket(view, cl, from, msg);
         return;
     }
 
@@ -3399,11 +3540,11 @@ pub fn CL_PacketEvent(common: &mut Common, cl: &mut Client, from: netadr_t, msg:
     }
 
     if unsafe { (*msg).cursize } < 4 {
-        let adrstr = NET_AdrToString(common, from);
+        let adrstr = NET_AdrToString(view.common, from);
         let adrstr: String = unsafe { CStr::from_ptr(adrstr) }
             .to_string_lossy()
             .into_owned();
-        com_printf(common, &format!("{}: Runt packet\n", adrstr));
+        com_printf(view.common, &format!("{}: Runt packet\n", adrstr));
         return;
     }
 
@@ -3411,20 +3552,23 @@ pub fn CL_PacketEvent(common: &mut Common, cl: &mut Client, from: netadr_t, msg:
     // packet from server
     //
     let remote = cl.clc.netchan.remoteAddress;
-    if NET_CompareAdr(common, from, remote) == qfalse {
-        let adrstr = NET_AdrToString(common, from);
+    if NET_CompareAdr(view.common, from, remote) == qfalse {
+        let adrstr = NET_AdrToString(view.common, from);
         let adrstr: String = unsafe { CStr::from_ptr(adrstr) }
             .to_string_lossy()
             .into_owned();
         Com_DPrintf(
-            common,
+            view.common,
             &format!("{}:sequenced packet without connection\n", adrstr),
         );
         // Raven asks here whether to send a client disconnect. It does not.
         return;
     }
 
-    if CL_Netchan_Process(cl, &mut cl.clc.netchan, msg) == qfalse {
+    // The netchan lives inside `cl`, and the callee takes `cl` as well, so the
+    // site hands the channel over as a raw pointer.
+    let chan = &mut cl.clc.netchan as *mut netchan_t;
+    if CL_Netchan_Process(view.common, cl, chan, msg) == qfalse {
         return; // out of order, duplicated, etc
     }
 
@@ -3437,14 +3581,14 @@ pub fn CL_PacketEvent(common: &mut Common, cl: &mut Client, from: netadr_t, msg:
     cl.clc.serverMessageSequence = unsafe { *((*msg).data as *const c_int) }.to_le();
 
     cl.clc.lastPacketTime = cl.cls.realtime;
-    CL_ParseServerMessage(common, cl, msg);
+    CL_ParseServerMessage(view, cl, msg);
 
     //
     // we don't know if it is ok to save a demo message until
     // after we have parsed the frame
     //
     if cl.clc.demorecording != qfalse && cl.clc.demowaiting == qfalse {
-        CL_WriteDemoMessage(cl, msg, headerBytes);
+        CL_WriteDemoMessage(view.common, cl, msg, headerBytes);
     }
 }
 
@@ -3453,26 +3597,26 @@ pub fn CL_PacketEvent(common: &mut Common, cl: &mut Client, from: netadr_t, msg:
 /// Raven: the first snapshot is skipped this frame so the gamestate load does
 /// not cause a time skip.
 /// Source: `oracle/codemp/client/cl_main.cpp:554-608`
-pub fn CL_PlayDemo_f(common: &mut Common, cl: &mut Client) {
+pub fn CL_PlayDemo_f(view: &mut EngineHostView, cl: &mut Client) {
     let mut name = [0 as c_char; MAX_OSPATH as usize];
     let mut extension = [0 as c_char; 32];
 
-    if Cmd_Argc(common) != 2 {
-        com_printf(common, "playdemo <demoname>\n");
+    if Cmd_Argc(view.common) != 2 {
+        com_printf(view.common, "playdemo <demoname>\n");
         return;
     }
 
     // make sure a local server is killed
     Cvar_Set(view, "sv_killserver", "1");
 
-    CL_Disconnect(common, cl, qtrue);
+    CL_Disconnect(view, cl, qtrue);
 
     /* MrE: 2000-09-13: now called in CL_DownloadsComplete
     CL_FlushMemory( );
     */
 
     // open the demo file
-    let arg = Cmd_Argv(common, 1).to_string();
+    let arg = Cmd_Argv(view.common, 1).to_string();
     Com_sprintf(
         extension.as_mut_ptr(),
         extension.len() as c_int,
@@ -3517,11 +3661,11 @@ pub fn CL_PlayDemo_f(common: &mut Common, cl: &mut Client) {
         }
         return;
     }
-    let arg1 = Cmd_Argv(common, 1).to_string();
+    let arg1 = Cmd_Argv(view.common, 1).to_string();
     let destsize = cl.clc.demoName.len();
     Q_strncpyz(&mut cl.clc.demoName, &arg1, destsize);
 
-    Con_Close(common, cl);
+    Con_Close(view.common, cl);
 
     cl.cls.state = connstate_t::CA_CONNECTED;
     cl.clc.demoplaying = qtrue;
@@ -3532,7 +3676,7 @@ pub fn CL_PlayDemo_f(common: &mut Common, cl: &mut Client) {
     while cl.cls.state as c_int >= connstate_t::CA_CONNECTED as c_int
         && (cl.cls.state as c_int) < connstate_t::CA_PRIMED as c_int
     {
-        CL_ReadDemoMessage(common, cl);
+        CL_ReadDemoMessage(view, cl);
     }
     // don't get the first snapshot this frame, to prevent the long
     // time from the gamestate load from messing causing a time skip
@@ -3544,24 +3688,29 @@ pub fn CL_PlayDemo_f(common: &mut Common, cl: &mut Client) {
 /// Raven: `SE_CheckForLanguageUpdates` costs nothing unless the language
 /// changed, and then it reloads the strings.
 /// Source: `oracle/codemp/client/cl_main.cpp:2268-2374`
-pub fn CL_Frame(common: &mut Common, cl: &mut Client, msec: c_int) {
+pub fn CL_Frame(view: &mut EngineHostView, cl: &mut Client, msec: c_int) {
     let mut msec = msec;
 
-    if common.com_cl_running.integer == 0 {
+    if view.common.cvar(view.common.com_cl_running).integer == 0 {
         return;
     }
 
-    SE_CheckForLanguageUpdates(); // will take zero time to execute unless language changes, then will reload strings.
-                                  //	of course this still doesn't work for menus...
+    // Raven `SE_CheckForLanguageUpdates` has no view-level wrapper, so the site
+    // lifts the package out of `Common` for the call the way `SE_GetString`
+    // does, then puts it back.
+    let mut pkg = take(&mut view.common.stringed);
+    se_check_for_language_updates(&mut pkg, &mut *view); // will take zero time to execute unless language changes, then will reload strings.
+                                                         //	of course this still doesn't work for menus...
+    view.common.stringed = pkg;
 
     if cl.cls.state as c_int == connstate_t::CA_DISCONNECTED as c_int
         && cl.cls.keyCatchers & KEYCATCH_UI == 0
-        && common.com_sv_running.integer == 0
+        && view.common.cvar(view.common.com_sv_running).integer == 0
     {
         // if disconnected, bring up the menu
         S_StopAllSounds(cl);
         VM_Call(
-            common,
+            view.common,
             cl.uivm,
             MpUiExport::UI_SET_ACTIVE_MENU as c_int,
             &[UIMENU_MAIN as isize],
@@ -3569,12 +3718,12 @@ pub fn CL_Frame(common: &mut Common, cl: &mut Client, msec: c_int) {
     }
 
     // if recording an avi, lock to a fixed fps
-    if cl.cl_avidemo.integer != 0 && msec != 0 {
+    if view.common.cvar(cl.cl_avidemo).integer != 0 && msec != 0 {
         // save the current screen
         if cl.cls.state as c_int == connstate_t::CA_ACTIVE as c_int
-            || cl.cl_forceavidemo.integer != 0
+            || view.common.cvar(cl.cl_forceavidemo).integer != 0
         {
-            if cl.cl_avidemo.integer > 0 {
+            if view.common.cvar(cl.cl_avidemo).integer > 0 {
                 Cbuf_ExecuteText(view, cbufExec_t::EXEC_NOW as c_int, "screenshot silent\n");
             } else {
                 Cbuf_ExecuteText(
@@ -3585,20 +3734,21 @@ pub fn CL_Frame(common: &mut Common, cl: &mut Client, msec: c_int) {
             }
         }
         // fixed time for next frame'
-        msec = ((1000 / cl.cl_avidemo.integer.abs()) as f32 * common.com_timescale.value) as c_int;
+        msec = ((1000 / view.common.cvar(cl.cl_avidemo).integer.abs()) as f32
+            * view.common.cvar(view.common.com_timescale).value) as c_int;
         if msec == 0 {
             msec = 1;
         }
     }
 
-    CL_MakeMonkeyDoLaundry(common, cl);
+    CL_MakeMonkeyDoLaundry(view.common, cl);
 
     // save the msec before checking pause
     cl.cls.realFrametime = msec;
 
     // decide the simulation time
     cl.cls.frametime = msec;
-    if cl.cl_framerate.integer != 0 {
+    if view.common.cvar(cl.cl_framerate).integer != 0 {
         cl.avgFrametime += msec as f32;
         if cl.frameCount & 0x1f == 0 {
             let mess = format!(
@@ -3606,7 +3756,7 @@ pub fn CL_Frame(common: &mut Common, cl: &mut Client, msec: c_int) {
                 1000.0f32 * (1.0 / (cl.avgFrametime / 32.0f32))
             );
             //		OutputDebugString(mess);
-            com_printf(common, &mess);
+            com_printf(view.common, &mess);
             cl.avgFrametime = 0.0f32;
         }
         cl.frameCount += 1;
@@ -3614,39 +3764,42 @@ pub fn CL_Frame(common: &mut Common, cl: &mut Client, msec: c_int) {
 
     cl.cls.realtime += cl.cls.frametime;
 
-    if cl.cl_timegraph.integer != 0 {
+    if view.common.cvar(cl.cl_timegraph).integer != 0 {
         let value = cl.cls.realFrametime as f32 * 0.25;
         SCR_DebugGraph(cl, value, 0);
     }
 
     // see if we need to update any userinfo
-    CL_CheckUserinfo(common, cl);
+    CL_CheckUserinfo(view.common, cl);
 
     // if we haven't gotten a packet in a long time,
     // drop the connection
-    CL_CheckTimeout(common, cl);
+    CL_CheckTimeout(view, cl);
 
     // send intentions now
-    CL_SendCmd(common, cl);
+    CL_SendCmd(view, cl);
 
     // resend a connection request if necessary
-    CL_CheckForResend(common, cl);
+    CL_CheckForResend(view.common, cl);
 
     // decide on the serverTime to render
-    CL_SetCGameTime(common, cl);
+    CL_SetCGameTime(view, cl);
 
     // update the screen
-    SCR_UpdateScreen(common, cl);
+    SCR_UpdateScreen(view, cl);
 
     // update audio
-    S_Update(common, cl);
+    S_Update(view.common, cl);
 
     // advance local effects for next frame
-    SCR_RunCinematic(common, cl);
+    SCR_RunCinematic(view, cl);
 
-    Con_RunConsole(cl);
+    Con_RunConsole(view.common, cl);
 
     // reset the heap for Ghoul2 vert transform space gameside
+    //TODO: Port CMiniHeap::ResetHeap
+    // Source: oracle/codemp/qcommon/MiniHeap.h:5-51
+    // `native_types`'s `CMiniHeap` is a layout-only port with no methods yet.
     if cl.G2VertSpaceServer.is_some() {
         cl.G2VertSpaceServer.as_mut().unwrap().ResetHeap();
     }
@@ -3657,10 +3810,10 @@ pub fn CL_Frame(common: &mut Common, cl: &mut Client, msec: c_int) {
 /// `CL_Init` — registers every client cvar and command, then starts the client.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:2549-2710`
-pub fn CL_Init(cl: &mut Client) {
+pub fn CL_Init(view: &mut EngineHostView, cl: &mut Client) {
     //	Com_Printf( "----- Client Initialization -----\n" );
 
-    Con_Init(cl);
+    Con_Init(view, cl);
 
     CL_ClearState(cl);
 
@@ -3668,66 +3821,66 @@ pub fn CL_Init(cl: &mut Client) {
 
     cl.cls.realtime = 0;
 
-    CL_InitInput(cl);
+    CL_InitInput(view, cl);
 
     //
     // register our variables
     //
-    cl.cl_noprint = Cvar_Get(view, "cl_noprint", "0", 0);
-    cl.cl_motd = Cvar_Get(view, "cl_motd", "1", 0);
+    cl.cl_noprint = Some(Cvar_Get(view, "cl_noprint", "0", 0));
+    cl.cl_motd = Some(Cvar_Get(view, "cl_motd", "1", 0));
 
-    cl.cl_timeout = Cvar_Get(view, "cl_timeout", "200", 0);
+    cl.cl_timeout = Some(Cvar_Get(view, "cl_timeout", "200", 0));
 
-    cl.cl_timeNudge = Cvar_Get(view, "cl_timeNudge", "0", CVAR_TEMP);
-    cl.cl_shownet = Cvar_Get(view, "cl_shownet", "0", CVAR_TEMP);
-    cl.cl_showSend = Cvar_Get(view, "cl_showSend", "0", CVAR_TEMP);
-    cl.cl_showTimeDelta = Cvar_Get(view, "cl_showTimeDelta", "0", CVAR_TEMP);
-    cl.cl_freezeDemo = Cvar_Get(view, "cl_freezeDemo", "0", CVAR_TEMP);
-    cl.rcon_client_password = Cvar_Get(view, "rconPassword", "", CVAR_TEMP);
-    cl.cl_activeAction = Cvar_Get(view, "activeAction", "", CVAR_TEMP);
+    cl.cl_timeNudge = Some(Cvar_Get(view, "cl_timeNudge", "0", CVAR_TEMP));
+    cl.cl_shownet = Some(Cvar_Get(view, "cl_shownet", "0", CVAR_TEMP));
+    cl.cl_showSend = Some(Cvar_Get(view, "cl_showSend", "0", CVAR_TEMP));
+    cl.cl_showTimeDelta = Some(Cvar_Get(view, "cl_showTimeDelta", "0", CVAR_TEMP));
+    cl.cl_freezeDemo = Some(Cvar_Get(view, "cl_freezeDemo", "0", CVAR_TEMP));
+    cl.rcon_client_password = Some(Cvar_Get(view, "rconPassword", "", CVAR_TEMP));
+    cl.cl_activeAction = Some(Cvar_Get(view, "activeAction", "", CVAR_TEMP));
 
-    cl.cl_timedemo = Cvar_Get(view, "timedemo", "0", 0);
-    cl.cl_avidemo = Cvar_Get(view, "cl_avidemo", "0", 0);
-    cl.cl_forceavidemo = Cvar_Get(view, "cl_forceavidemo", "0", 0);
+    cl.cl_timedemo = Some(Cvar_Get(view, "timedemo", "0", 0));
+    cl.cl_avidemo = Some(Cvar_Get(view, "cl_avidemo", "0", 0));
+    cl.cl_forceavidemo = Some(Cvar_Get(view, "cl_forceavidemo", "0", 0));
 
-    cl.rconAddress = Cvar_Get(view, "rconAddress", "", 0);
+    cl.rconAddress = Some(Cvar_Get(view, "rconAddress", "", 0));
 
-    cl.cl_yawspeed = Cvar_Get(view, "cl_yawspeed", "140", CVAR_ARCHIVE);
-    cl.cl_pitchspeed = Cvar_Get(view, "cl_pitchspeed", "140", CVAR_ARCHIVE);
-    cl.cl_anglespeedkey = Cvar_Get(view, "cl_anglespeedkey", "1.5", CVAR_ARCHIVE);
+    cl.cl_yawspeed = Some(Cvar_Get(view, "cl_yawspeed", "140", CVAR_ARCHIVE));
+    cl.cl_pitchspeed = Some(Cvar_Get(view, "cl_pitchspeed", "140", CVAR_ARCHIVE));
+    cl.cl_anglespeedkey = Some(Cvar_Get(view, "cl_anglespeedkey", "1.5", CVAR_ARCHIVE));
 
-    cl.cl_maxpackets = Cvar_Get(view, "cl_maxpackets", "30", CVAR_ARCHIVE);
-    cl.cl_packetdup = Cvar_Get(view, "cl_packetdup", "1", CVAR_ARCHIVE);
+    cl.cl_maxpackets = Some(Cvar_Get(view, "cl_maxpackets", "30", CVAR_ARCHIVE));
+    cl.cl_packetdup = Some(Cvar_Get(view, "cl_packetdup", "1", CVAR_ARCHIVE));
 
-    cl.cl_run = Cvar_Get(view, "cl_run", "1", CVAR_ARCHIVE);
-    cl.cl_sensitivity = Cvar_Get(view, "sensitivity", "5", CVAR_ARCHIVE);
-    cl.cl_mouseAccel = Cvar_Get(view, "cl_mouseAccel", "0", CVAR_ARCHIVE);
-    cl.cl_freelook = Cvar_Get(view, "cl_freelook", "1", CVAR_ARCHIVE);
+    cl.cl_run = Some(Cvar_Get(view, "cl_run", "1", CVAR_ARCHIVE));
+    cl.cl_sensitivity = Some(Cvar_Get(view, "sensitivity", "5", CVAR_ARCHIVE));
+    cl.cl_mouseAccel = Some(Cvar_Get(view, "cl_mouseAccel", "0", CVAR_ARCHIVE));
+    cl.cl_freelook = Some(Cvar_Get(view, "cl_freelook", "1", CVAR_ARCHIVE));
 
-    cl.cl_showMouseRate = Cvar_Get(view, "cl_showmouserate", "0", 0);
-    cl.cl_framerate = Cvar_Get(view, "cl_framerate", "0", CVAR_TEMP);
-    cl.cl_allowDownload = Cvar_Get(view, "cl_allowDownload", "0", CVAR_ARCHIVE);
-    cl.cl_allowAltEnter = Cvar_Get(view, "cl_allowAltEnter", "0", CVAR_ARCHIVE);
+    cl.cl_showMouseRate = Some(Cvar_Get(view, "cl_showmouserate", "0", 0));
+    cl.cl_framerate = Some(Cvar_Get(view, "cl_framerate", "0", CVAR_TEMP));
+    cl.cl_allowDownload = Some(Cvar_Get(view, "cl_allowDownload", "0", CVAR_ARCHIVE));
+    cl.cl_allowAltEnter = Some(Cvar_Get(view, "cl_allowAltEnter", "0", CVAR_ARCHIVE));
 
-    cl.cl_autolodscale = Cvar_Get(view, "cl_autolodscale", "1", CVAR_ARCHIVE);
+    cl.cl_autolodscale = Some(Cvar_Get(view, "cl_autolodscale", "1", CVAR_ARCHIVE));
 
-    cl.cl_conXOffset = Cvar_Get(view, "cl_conXOffset", "0", 0);
-    cl.cl_inGameVideo = Cvar_Get(view, "r_inGameVideo", "1", CVAR_ARCHIVE);
+    cl.cl_conXOffset = Some(Cvar_Get(view, "cl_conXOffset", "0", 0));
+    cl.cl_inGameVideo = Some(Cvar_Get(view, "r_inGameVideo", "1", CVAR_ARCHIVE));
 
-    cl.cl_serverStatusResendTime = Cvar_Get(view, "cl_serverStatusResendTime", "750", 0);
+    cl.cl_serverStatusResendTime = Some(Cvar_Get(view, "cl_serverStatusResendTime", "750", 0));
 
     // init autoswitch so the ui will have it correctly even
     // if the cgame hasn't been started
     Cvar_Get(view, "cg_autoswitch", "1", CVAR_ARCHIVE);
 
-    cl.m_pitchVeh = Cvar_Get(view, "m_pitchVeh", "0.022", CVAR_ARCHIVE);
-    cl.m_pitch = Cvar_Get(view, "m_pitch", "0.022", CVAR_ARCHIVE);
-    cl.m_yaw = Cvar_Get(view, "m_yaw", "0.022", CVAR_ARCHIVE);
-    cl.m_forward = Cvar_Get(view, "m_forward", "0.25", CVAR_ARCHIVE);
-    cl.m_side = Cvar_Get(view, "m_side", "0.25", CVAR_ARCHIVE);
-    cl.m_filter = Cvar_Get(view, "m_filter", "0", CVAR_ARCHIVE);
+    cl.m_pitchVeh = Some(Cvar_Get(view, "m_pitchVeh", "0.022", CVAR_ARCHIVE));
+    cl.m_pitch = Some(Cvar_Get(view, "m_pitch", "0.022", CVAR_ARCHIVE));
+    cl.m_yaw = Some(Cvar_Get(view, "m_yaw", "0.022", CVAR_ARCHIVE));
+    cl.m_forward = Some(Cvar_Get(view, "m_forward", "0.25", CVAR_ARCHIVE));
+    cl.m_side = Some(Cvar_Get(view, "m_side", "0.25", CVAR_ARCHIVE));
+    cl.m_filter = Some(Cvar_Get(view, "m_filter", "0", CVAR_ARCHIVE));
 
-    cl.cl_motdString = Cvar_Get(view, "cl_motdString", "", CVAR_ROM);
+    cl.cl_motdString = Some(Cvar_Get(view, "cl_motdString", "", CVAR_ROM));
 
     Cvar_Get(view, "cl_maxPing", "800", CVAR_ARCHIVE);
 
@@ -3795,14 +3948,18 @@ pub fn CL_Init(cl: &mut Client) {
     Cmd_AddCommand(view, "model", Some(CL_SetModel_f_cmd));
     Cmd_AddCommand(view, "forcepowers", Some(CL_SetForcePowers_f_cmd));
 
-    CL_InitRef(cl);
+    CL_InitRef(view, cl);
 
-    SCR_Init(cl);
+    SCR_Init(view, cl);
 
     Cbuf_Execute(view);
 
     Cvar_Set(view, "cl_running", "1");
 
+    //TODO: Port CMiniHeap::CMiniHeap
+    // Source: oracle/codemp/qcommon/MiniHeap.h:5-51
+    // `native_types`'s `CMiniHeap` is a layout-only port, so the constructor has
+    // no home yet.
     cl.G2VertSpaceClient = Some(Box::new(CMiniHeap::new(G2_VERT_SPACE_CLIENT_SIZE * 1024)));
 
     //	Com_Printf( "----- Client Initialization Complete -----\n" );
@@ -3820,37 +3977,37 @@ pub fn CL_Init(cl: &mut Client) {
 
 fn CL_ForwardToServer_f_cmd(view: &mut EngineHostView) {
     let cl = unsafe { cl_from_view(view) };
-    CL_ForwardToServer_f(cl)
+    CL_ForwardToServer_f(view.common, cl)
 }
 
 fn CL_GlobalServers_f_cmd(view: &mut EngineHostView) {
     let cl = unsafe { cl_from_view(view) };
-    CL_GlobalServers_f(cl)
+    CL_GlobalServers_f(view.common, cl)
 }
 
 fn CL_Record_f_cmd(view: &mut EngineHostView) {
     let cl = unsafe { cl_from_view(view) };
-    CL_Record_f(cl)
+    CL_Record_f(view, cl)
 }
 
 fn CL_PlayDemo_f_cmd(view: &mut EngineHostView) {
     let cl = unsafe { cl_from_view(view) };
-    CL_PlayDemo_f(view.common, cl)
+    CL_PlayDemo_f(view, cl)
 }
 
 fn CL_StopRecord_f_cmd(view: &mut EngineHostView) {
     let cl = unsafe { cl_from_view(view) };
-    CL_StopRecord_f(cl)
+    CL_StopRecord_f(view.common, cl)
 }
 
 fn CL_Configstrings_f_cmd(view: &mut EngineHostView) {
     let cl = unsafe { cl_from_view(view) };
-    CL_Configstrings_f(cl)
+    CL_Configstrings_f(view.common, cl)
 }
 
 fn CL_Clientinfo_f_cmd(view: &mut EngineHostView) {
     let cl = unsafe { cl_from_view(view) };
-    CL_Clientinfo_f(cl)
+    CL_Clientinfo_f(view.common, cl)
 }
 
 fn CL_Snd_Restart_f_cmd(view: &mut EngineHostView) {
@@ -3860,63 +4017,63 @@ fn CL_Snd_Restart_f_cmd(view: &mut EngineHostView) {
 
 fn CL_Vid_Restart_f_cmd(view: &mut EngineHostView) {
     let cl = unsafe { cl_from_view(view) };
-    CL_Vid_Restart_f(view.common, cl)
+    CL_Vid_Restart_f(view, cl)
 }
 
 fn CL_Disconnect_f_cmd(view: &mut EngineHostView) {
     let cl = unsafe { cl_from_view(view) };
-    CL_Disconnect_f(cl)
+    CL_Disconnect_f(view, cl)
 }
 
 fn CL_PlayCinematic_f_cmd(view: &mut EngineHostView) {
     let cl = unsafe { cl_from_view(view) };
-    CL_PlayCinematic_f(view.common, cl)
+    CL_PlayCinematic_f(view, cl)
 }
 
 fn CL_Connect_f_cmd(view: &mut EngineHostView) {
     let cl = unsafe { cl_from_view(view) };
-    CL_Connect_f(view.common, cl)
+    CL_Connect_f(view, cl)
 }
 
 fn CL_Reconnect_f_cmd(view: &mut EngineHostView) {
     let cl = unsafe { cl_from_view(view) };
-    CL_Reconnect_f(cl)
+    CL_Reconnect_f(view, cl)
 }
 
 fn CL_LocalServers_f_cmd(view: &mut EngineHostView) {
     let cl = unsafe { cl_from_view(view) };
-    CL_LocalServers_f(cl)
+    CL_LocalServers_f(view.common, cl)
 }
 
 fn CL_Rcon_f_cmd(view: &mut EngineHostView) {
     let cl = unsafe { cl_from_view(view) };
-    CL_Rcon_f(cl)
+    CL_Rcon_f(view.common, cl)
 }
 
 fn CL_Ping_f_cmd(view: &mut EngineHostView) {
     let cl = unsafe { cl_from_view(view) };
-    CL_Ping_f(cl)
+    CL_Ping_f(view.common, cl)
 }
 
 fn CL_ServerStatus_f_cmd(view: &mut EngineHostView) {
     let cl = unsafe { cl_from_view(view) };
-    CL_ServerStatus_f(cl)
+    CL_ServerStatus_f(view.common, cl)
 }
 
-fn CL_ShowIP_f_cmd(_view: &mut EngineHostView) {
-    CL_ShowIP_f()
+fn CL_ShowIP_f_cmd(view: &mut EngineHostView) {
+    CL_ShowIP_f(view.common)
 }
 
-fn CL_OpenedPK3List_f_cmd(_view: &mut EngineHostView) {
-    CL_OpenedPK3List_f()
+fn CL_OpenedPK3List_f_cmd(view: &mut EngineHostView) {
+    CL_OpenedPK3List_f(view.common)
 }
 
-fn CL_ReferencedPK3List_f_cmd(_view: &mut EngineHostView) {
-    CL_ReferencedPK3List_f()
+fn CL_ReferencedPK3List_f_cmd(view: &mut EngineHostView) {
+    CL_ReferencedPK3List_f(view.common)
 }
 
-fn CL_SetModel_f_cmd(_view: &mut EngineHostView) {
-    CL_SetModel_f()
+fn CL_SetModel_f_cmd(view: &mut EngineHostView) {
+    CL_SetModel_f(view)
 }
 
 fn CL_SetForcePowers_f_cmd(_view: &mut EngineHostView) {

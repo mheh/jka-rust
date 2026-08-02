@@ -20,6 +20,8 @@ use mp_game::prelude::byte;
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;
 use mp_qshared::shared::swap::LittleLong;
 use native_types::qboolean;
+use native_types::qfalse;
+use native_types::qtrue;
 
 use crate::client_host::Client;
 
@@ -41,7 +43,7 @@ pub fn CL_Netchan_Encode(common: &mut Common, cl: &mut Client, msg: *mut msg_t) 
 
         (*msg).bit = 0;
         (*msg).readcount = 0;
-        (*msg).oob = qboolean::qfalse;
+        (*msg).oob = qfalse;
 
         let serverId: c_int = MSG_ReadLong(common, msg);
         let messageAcknowledge: c_int = MSG_ReadLong(common, msg);
@@ -88,7 +90,7 @@ pub fn CL_Netchan_Decode(common: &mut Common, cl: &mut Client, msg: *mut msg_t) 
         let sbit = (*msg).bit;
         let soob = (*msg).oob;
 
-        (*msg).oob = qboolean::qfalse;
+        (*msg).oob = qfalse;
 
         let reliableAcknowledge: c_int = MSG_ReadLong(common, msg);
 
@@ -168,10 +170,10 @@ pub fn CL_Netchan_Process(
     // packet's state table beyond the write access. Threaded as a Client field
     // pending integration wiring.
     let ret = Netchan_Process(common, chan, msg);
-    if ret == qboolean::qfalse {
-        return qboolean::qfalse;
+    if ret == qfalse {
+        return qfalse;
     }
     CL_Netchan_Decode(common, cl, msg);
     cl.newsize += unsafe { (*msg).cursize };
-    qboolean::qtrue
+    qtrue
 }

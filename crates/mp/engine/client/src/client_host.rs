@@ -8,6 +8,7 @@ use mp_abi::cgame::shared_buffer::autoMapInput_t;
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::common::com_error;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
+use mp_engine_qcommon::miniheap::cmini_heap::CMiniHeap;
 use mp_engine_qcommon::vm::vm_s::vm_t;
 use mp_qshared::shared::cvar::CvarHandle;
 use mp_qshared::shared::error_parm::errorParm_t;
@@ -115,6 +116,12 @@ pub struct Client {
     /// Source: `oracle/codemp/client/cl_main.cpp:125-126`
     pub cl_serverStatusList: Box<[serverStatus_t; MAX_SERVERSTATUSREQUESTS]>,
     pub serverStatusCount: c_int,
+    /// Raven `G2VertSpaceClient` — the bump heap that `CL_InitCGame` allocates
+    /// for the cgame-side Ghoul2 vertex transforms and `CL_ShutdownCGame` frees.
+    /// `None` matches Raven's `= 0` initializer.
+    ///
+    /// Source: `oracle/codemp/client/cl_main.cpp:128,2701,2732-2733`
+    pub G2VertSpaceClient: Option<Box<CMiniHeap>>,
     /// Raven `CL_Record_f::demoName` (`static char[MAX_QPATH]`) — the record
     /// command's name buffer, a function-scope static that outlives the call.
     ///
@@ -386,6 +393,7 @@ impl Default for Client {
             cl_pinglist: zeroed_box(),
             cl_serverStatusList: zeroed_box(),
             serverStatusCount: 0,
+            G2VertSpaceClient: None,
             demoName: [0; MAX_QPATH],
             frameCount: 0,
             avgFrametime: 0.0,
