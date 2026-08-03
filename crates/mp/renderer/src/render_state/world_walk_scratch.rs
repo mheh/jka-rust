@@ -2,6 +2,7 @@
 //! into the world itself (W2-F4).
 
 use crate::render_state::placeholders::WorldAsset;
+use crate::render_state::walk_warnings::WalkWarnings;
 
 /// The runtime marks Raven keeps inside `msurface_t`/`mnode_t`, held beside an
 /// immutable world instead of inside it.
@@ -37,6 +38,10 @@ pub struct WorldWalkScratch {
     ///
     /// Source: `oracle/codemp/renderer/tr_local.h:1316`
     pub vis_count: i32,
+
+    /// The once-per-process print latches the walk shares. They ride here
+    /// because the walk already threads this carrier end to end.
+    pub warnings: WalkWarnings,
 }
 
 impl WorldWalkScratch {

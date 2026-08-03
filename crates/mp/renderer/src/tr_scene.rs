@@ -36,7 +36,8 @@ use crate::tr_local::decal_poly_s::{decalPoly_t, MAX_VERTS_ON_DECAL_POLY};
 use crate::tr_main::{DrawSurf, R_AddDrawSurf, SurfaceGeometry};
 use crate::tr_marks::{MarkNode, MarkState, R_MarkFragments};
 use crate::tr_public::ref_flags::{RDF_DRAWSKYBOX, RDF_NOWORLDMODEL, RDF_SKYBOXPORTAL};
-use crate::tr_shader::R_GetShaderByHandle;
+use crate::render_state::walk_warnings::WalkWarnings;
+use crate::tr_shader::R_GetShaderByHandleQuiet;
 
 // This wave threads `RenderAssets`, `FrameData`/`FrameEvent` and `Common`
 // (for `com_printf`) as the fns below expect them, per this packet's STATE
@@ -550,7 +551,7 @@ const QSORT_ENTITYNUM_SHIFT: u32 = 7;
 pub fn R_AddPolygonSurfaces<'a>(
     frame: &'a FrameData,
     assets: &RenderAssets,
-    common: &mut Common,
+    warnings: &mut WalkWarnings,
     draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
 ) {
     let current_entity_num = TR_WORLDENT as i32;
@@ -563,7 +564,7 @@ pub fn R_AddPolygonSurfaces<'a>(
             fog_index,
         } = event
         {
-            let sh = R_GetShaderByHandle(assets, common, shader.index() as i32);
+            let sh = R_GetShaderByHandleQuiet(assets, shader.index() as i32, warnings);
             let shader_sorted_index = assets.shaders.get(sh).map(|s| s.sorted_index).unwrap_or(0);
 
             // DEFERRED: rdf_nofog (`tr.refdef.rdflags & RDF_NOFOG`) — `TrRefdef`

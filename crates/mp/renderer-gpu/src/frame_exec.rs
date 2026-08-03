@@ -68,7 +68,8 @@ use mp_renderer::tr_local::tr_ref_entity_t::trRefEntity_t;
 use mp_renderer::tr_local::tr_refdef_t::trRefdef_t;
 use mp_renderer::tr_local::view_parms_t::viewParms_t;
 use mp_renderer::tr_main::{
-    tr_ref_entity_from_ref_entity, DrawSurf, R_RenderView, SurfaceGeometry, TrMainScratch,
+    tr_ref_entity_from_ref_entity, DrawSurf, EntityWalkHost, R_RenderView, SurfaceGeometry,
+    TrMainScratch,
 };
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_noise::NoiseState;
@@ -747,14 +748,22 @@ impl FrameExecutor {
         let mut draw_surfs: Vec<DrawSurf<SurfaceGeometry<'f>>> = Vec::new();
         let mut view = zeroed_view_parms();
 
+        // The world pass runs the entity walk through the sim-side host bundle
+        // while `WorldFrame` still carries it. A render-thread caller passes
+        // `None` and the `RT_MODEL` arm draws nothing (W2-F1).
+        let mut entity_host = EntityWalkHost {
+            engine_view: world.engine_view,
+            models: world.models,
+        };
+
         R_RenderView(
             &parms,
             frame_scene_num,
             refdef_time,
             &mut view,
-            world.engine_view,
+            Some(&mut entity_host),
             world.assets,
-            world.cvars,
+            cvars,
             world.frame,
             &mut self.walk_scratch,
             world.g2,
@@ -772,7 +781,6 @@ impl FrameExecutor {
             0,
             &mut entities,
             world.scratch,
-            world.models,
             &mut draw_surfs,
         );
 

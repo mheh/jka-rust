@@ -4,9 +4,6 @@
 
 use core::ffi::c_char;
 
-use mp_engine_qcommon::common::engine_host_view::EngineHostView;
-use mp_engine_qcommon::common::Common;
-use mp_engine_qcommon::common_fns::Com_DPrintf;
 use mp_engine_qcommon::qfiles::md3_frame_s::md3Frame_t;
 use mp_engine_qcommon::qfiles::md3_header_t::md3Header_t;
 use mp_engine_qcommon::qfiles::md3_shader_t::md3Shader_t;
@@ -21,9 +18,10 @@ use native_math::qmath::RadiusFromBounds;
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::placeholders::RefEntity;
 use crate::render_state::render_assets::RenderAssets;
-use crate::render_state::renderer_cvars::RendererCvars;
+use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::render_state::skin_asset::SkinAsset;
+use crate::render_state::walk_warnings::WalkWarnings;
 use crate::tr_image::R_GetSkinByHandle;
 use crate::tr_light::R_SetupEntityLighting;
 use crate::tr_local::dlight_s::dlight_t;
@@ -39,7 +37,7 @@ use crate::tr_main::{
 use crate::tr_model::render_models::RenderModels;
 use crate::tr_public::ref_flags::RDF_NOWORLDMODEL;
 use crate::tr_shade_calc::myftol;
-use crate::tr_shader::R_GetShaderByHandle;
+use crate::tr_shader::R_GetShaderByHandleQuiet;
 
 /// Reads one on-disk `md3Frame_t` off `header` by frame index, returning the
 /// bounds, local origin, and radius the cull and LOD math read. The oracle
@@ -203,8 +201,9 @@ pub fn re_get_model_bounds(_ref_ent: &RefEntity, _models: &RenderModels) -> (vec
 /// `tr.currentModel->numLods`.
 ///
 /// `current_model` is `tr.currentModel`; `view` is `tr.viewParms`
-/// (`ProjectRadius`); the three lod cvars read through `Common::cvar`. The
-/// frame-array read for the projected radius runs through [`read_md3_frame`].
+/// (`ProjectRadius`); the three lod cvars arrive on the frame's
+/// [`RenderCvarSnapshot`] (W2-F1). The frame-array read for the projected
+/// radius runs through [`read_md3_frame`].
 ///
 /// Source: `oracle/codemp/renderer/tr_mesh.cpp:173-236`
 fn r_compute_lod(
@@ -212,8 +211,7 @@ fn r_compute_lod(
     ent_frame: i32,
     ent_origin: vec3_t,
     view: &viewParms_t,
-    common: &Common,
-    cvars: &RendererCvars,
+    cvars: RenderCvarSnapshot,
 ) -> i32 {
     let mut lod;
 
@@ -231,8 +229,7 @@ fn r_compute_lod(
         let projected_radius = project_radius(radius, ent_origin, view);
         let flod;
         if projected_radius != 0.0 {
-            let mut lodscale =
-                common.cvar(cvars.r_lodscale).value + common.cvar(cvars.r_autolodscalevalue).value;
+            let mut lodscale = cvars.lodscale + cvars.autolodscalevalue;
             if lodscale > 20.0 {
                 lodscale = 20.0;
             } else if lodscale < 0.0 {
@@ -254,7 +251,7 @@ fn r_compute_lod(
         }
     }
 
-    lod += common.cvar(cvars.r_lodbias).integer;
+    lod += cvars.lodbias;
 
     if lod >= current_model.numLods {
         lod = current_model.numLods - 1;
@@ -338,7 +335,9 @@ fn r_cull_model(
 /// `models` resolves `tr.currentModel` (`R_GetModelByHandle`).
 /// `view` is `tr.viewParms` (`.isPortal`/`.frustum`).
 /// `ori` is the entity orientation `R_RotateForEntity` built.
-/// The cvars read through `engine_view.common`.
+/// The cvars arrive on the frame's [`RenderCvarSnapshot`] (W2-F1), and the
+/// three `Com_DPrintf` diagnostics print once each through `eprintln!`, since
+/// the render thread holds no `Common`.
 /// `assets` holds the shader and skin registries and the world fog list.
 /// `shifted_entity_num`/`rdf_nofog` feed `R_AddDrawSurf`'s sort key
 /// (the shader travels through the sort key, not the surface ref, DEC-43.3).
@@ -354,13 +353,12 @@ pub fn r_add_md3_surfaces<'a>(
     models: &RenderModels,
     view: &viewParms_t,
     ori: &orientationr_t,
-    engine_view: &mut EngineHostView,
-    cvars: &RendererCvars,
+    cvars: RenderCvarSnapshot,
+    warnings: &mut WalkWarnings,
     assets: &RenderAssets,
     frame: &FrameState,
     refdef_rdflags: i32,
     rdf_nofog: bool,
-    r_shadows_integer: i32,
     shifted_entity_num: i32,
     fogs: &[fog_t],
     dlights: &[dlight_t],
@@ -386,36 +384,28 @@ pub fn r_add_md3_surfaces<'a>(
     ent.e.frame = wrapped_frame;
     ent.e.oldframe = wrapped_oldframe;
     if bad_frame {
-        Com_DPrintf(
-            engine_view.common,
-            &format!(
-                "{}R_AddMD3Surfaces: no such frame {} to {} for '{}'\n",
+        if !warnings.md3_bad_frame {
+            warnings.md3_bad_frame = true;
+            eprintln!(
+                "{}R_AddMD3Surfaces: no such frame {} to {} for '{}'",
                 S_COLOR_RED.to_str().expect("S_COLOR_RED is ASCII"),
                 ent.e.oldframe,
                 ent.e.frame,
                 md3_name(&current_model.name),
-            ),
-        );
+            );
+        }
         ent.e.frame = 0;
         ent.e.oldframe = 0;
     }
 
     // compute LOD
-    let lod = r_compute_lod(
-        current_model,
-        ent.e.frame,
-        ent.e.origin,
-        view,
-        engine_view.common,
-        cvars,
-    );
+    let lod = r_compute_lod(current_model, ent.e.frame, ent.e.origin, view, cvars);
 
     let header = current_model.md3[lod as usize];
 
     // cull the whole model if the merged bounding box of both frames is
     // outside the view frustum
-    let r_nocull_integer = engine_view.common.cvar(cvars.r_nocull).integer;
-    let cull = r_cull_model(header, ent, ori, r_nocull_integer, &view.frustum);
+    let cull = r_cull_model(header, ent, ori, cvars.nocull, &view.frustum);
     if cull == CULL_OUT {
         return;
     }
@@ -425,17 +415,9 @@ pub fn r_add_md3_surfaces<'a>(
     // `frame.current_entity`, but `frame` arrives here shared, so this arm cannot.
     // No MD3 reader of `frame.current_entity` exists yet, so the fold is latent.
     // Source: oracle/codemp/renderer/tr_mesh.cpp:335-340
-    if !personal_model || r_shadows_integer > 1 {
+    if !personal_model || cvars.shadows > 1 {
         let mut re = ref_entity_from_tr(ent);
-        R_SetupEntityLighting(
-            engine_view.common,
-            cvars,
-            assets,
-            frame,
-            refdef_rdflags,
-            dlights,
-            &mut re,
-        );
+        R_SetupEntityLighting(cvars, assets, frame, refdef_rdflags, dlights, &mut re);
         write_back_lighting(ent, &re);
     }
 
@@ -454,7 +436,7 @@ pub fn r_add_md3_surfaces<'a>(
         let surface_name = md3_name(unsafe { &(*surf).name });
 
         let shader: ShaderHandle = if ent.e.customShader != 0 {
-            R_GetShaderByHandle(assets, engine_view.common, ent.e.customShader)
+            R_GetShaderByHandleQuiet(assets, ent.e.customShader, warnings)
         } else if ent.e.customSkin > 0
             && assets
                 .skins
@@ -473,15 +455,15 @@ pub fn r_add_md3_surfaces<'a>(
             }
 
             if resolved == ShaderHandle::slot_zero() {
-                Com_DPrintf(
-                    engine_view.common,
-                    &format!(
-                        "{}WARNING: no shader for surface {} in skin {}\n",
+                if !warnings.md3_skin_surface {
+                    warnings.md3_skin_surface = true;
+                    eprintln!(
+                        "{}WARNING: no shader for surface {} in skin {}",
                         S_COLOR_RED.to_str().expect("S_COLOR_RED is ASCII"),
                         surface_name,
                         skin_name,
-                    ),
-                );
+                    );
+                }
             } else if assets
                 .shaders
                 .get(resolved)
@@ -493,15 +475,15 @@ pub fn r_add_md3_surfaces<'a>(
                     .get(resolved)
                     .map(|s| s.name.clone())
                     .unwrap_or_default();
-                Com_DPrintf(
-                    engine_view.common,
-                    &format!(
-                        "{}WARNING: shader {} in skin {} not found\n",
+                if !warnings.md3_skin_shader {
+                    warnings.md3_skin_shader = true;
+                    eprintln!(
+                        "{}WARNING: shader {} in skin {} not found",
                         S_COLOR_RED.to_str().expect("S_COLOR_RED is ASCII"),
                         shader_name,
                         skin_name,
-                    ),
-                );
+                    );
+                }
             }
             resolved
         } else if num_shaders <= 0 {
@@ -514,7 +496,7 @@ pub fn r_add_md3_surfaces<'a>(
             let shaders_base = unsafe { (surf as *const u8).add((*surf).ofsShaders as usize) }
                 as *const md3Shader_t;
             let shader_index = unsafe { (*shaders_base.add(sel as usize)).shaderIndex };
-            R_GetShaderByHandle(assets, engine_view.common, shader_index)
+            R_GetShaderByHandleQuiet(assets, shader_index, warnings)
         };
 
         // DEFERRED: R_AddMD3Surfaces stencil-shadow and projection-shadow

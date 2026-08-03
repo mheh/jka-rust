@@ -65,6 +65,7 @@ use mp_qshared::shared::{qhandle_t, vec3_t};
 
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::render_assets::RenderAssets;
+use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_image::TrImageState;
 use crate::tr_landscape::ctrland_scape::CTRLandScape;
@@ -558,6 +559,9 @@ impl CTRLandScape {
         let real_area = land.real_area() as usize;
         let base_water_height = land.base_water_height();
         let overbright_bits = frame.overbright_bits;
+        // One cvar read for the whole grid: `R_LightForPoint` takes the frame
+        // snapshot since W2-F1, and this loop runs per vertex.
+        let cvar_snapshot = RenderCvarSnapshot::from_cvars(cvars, common);
 
         let render_map = self.render_map_mut(real_area);
 
@@ -586,7 +590,7 @@ impl CTRLandScape {
 
                 let coords = render_map[o].coords;
                 let Some((mut ambient, directed, direction)) =
-                    R_LightForPoint(common, cvars, assets, frame, coords)
+                    R_LightForPoint(cvar_snapshot, assets, frame, coords)
                 else {
                     let v = (255i32 >> overbright_bits) as u8;
                     render_map[o].tint[0] = v;
@@ -1095,8 +1099,7 @@ pub fn R_TerrainShutdown(cm: &mut CollisionWorld, land_scape: &mut srfTerrain_t)
 ///
 /// Source: `oracle/codemp/renderer/tr_terrain.cpp:993-1008`
 pub fn R_AddTerrainSurfaces<'a>(
-    engine: &Common,
-    cvars: &RendererCvars,
+    cvars: RenderCvarSnapshot,
     refdef: &trRefdef_t,
     land_scape: &srfTerrain_t,
     land: &CmLandScape,
@@ -1104,7 +1107,7 @@ pub fn R_AddTerrainSurfaces<'a>(
     shifted_entity_num: i32,
     draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
 ) {
-    if engine.cvar(cvars.r_drawTerrain).integer == 0 || (refdef.rdflags & RDF_NOWORLDMODEL) != 0 {
+    if cvars.draw_terrain == 0 || (refdef.rdflags & RDF_NOWORLDMODEL) != 0 {
         return;
     }
 

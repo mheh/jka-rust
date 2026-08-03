@@ -42,6 +42,7 @@ use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::light_style_table::LightStyleTable;
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::render_assets_sim::RenderAssetsSim;
+use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::render_state::renderer_cvars::RendererCvars;
 use mp_renderer::render_state::world_walk_scratch::WorldWalkScratch;
 use mp_renderer::renderer_frontend::{
@@ -57,7 +58,7 @@ use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
 use mp_renderer::tr_local::tr_ref_entity_t::trRefEntity_t;
 use mp_renderer::tr_local::tr_refdef_t::trRefdef_t;
 use mp_renderer::tr_main::{
-    DrawSurf, R_RenderView, SurfaceGeometry, TrMainScratch, WorldSurfaceRef,
+    DrawSurf, EntityWalkHost, R_RenderView, SurfaceGeometry, TrMainScratch, WorldSurfaceRef,
 };
 use mp_renderer::tr_model::frontend::RE_RegisterModel;
 use mp_renderer::tr_model::render_models::RenderModels;
@@ -747,15 +748,22 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
         if let Some(world) = assets.world.as_ref() {
             walk_scratch.set_world(world);
         }
+        // The spike runs on the sim thread, so it hands the entity walk the
+        // full host bundle (W2-F1).
+        let cvar_snapshot = RenderCvarSnapshot::from_cvars(cvars, engine_view.common);
+        let mut entity_host = EntityWalkHost {
+            engine_view: &mut engine_view,
+            models,
+        };
         let mut view = zeroed_view_parms();
         R_RenderView(
             &parms,
             frame_scene_num,
             0,
             &mut view,
-            &mut engine_view,
+            Some(&mut entity_host),
             assets,
-            cvars,
+            cvar_snapshot,
             frame,
             &mut walk_scratch,
             &mut g2_system,
@@ -773,7 +781,6 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
             0,
             &mut entities,
             &mut scratch,
-            models,
             &mut draw_surfs,
         );
 

@@ -117,6 +117,7 @@ use mp_qshared::shared::shared_ik_move_params::sharedIKMoveParams_t;
 use mp_qshared::shared::{pc_token_t, sharedERagEffector, sharedERagPhase};
 use mp_renderer::hook_install::{re_from_view, rm_from_view};
 use mp_renderer::render_state::frame_event::FrameEvent;
+use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::tr_bsp::{RE_LoadWorldMap, R_GetEntityToken};
 use mp_renderer::tr_cmds::{RE_RotatePic, RE_RotatePic2, RE_SetColor, RE_StretchPic};
 use mp_renderer::tr_font::{
@@ -2119,7 +2120,10 @@ pub fn CL_CgameSystemCalls(
         let light_dir_out = vma(vc, args, 4) as *mut vec3_t;
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let re = unsafe { re_from_view(view) };
-        match R_LightForPoint(view.common, &re.cvars, &re.sim.published, &re.frame, point) {
+        // W2-F1 put the cvar reads on the frame snapshot, so this synchronous
+        // trap resolves one before the call.
+        let cvar_snapshot = RenderCvarSnapshot::from_cvars(&re.cvars, view.common);
+        match R_LightForPoint(cvar_snapshot, &re.sim.published, &re.frame, point) {
             Some((ambient, directed, light_dir)) => {
                 // SAFETY: the three are the module's seam out-params (§D11).
                 unsafe {

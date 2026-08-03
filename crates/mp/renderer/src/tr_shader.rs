@@ -48,6 +48,7 @@ use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::{ShaderAsset, ShaderHandle};
 use crate::render_state::shader_stage::ShaderStage;
 use crate::render_state::texture_bundle::TextureBundle;
+use crate::render_state::walk_warnings::WalkWarnings;
 use crate::tr_image::{R_FindImageFile, TrImageState};
 use crate::tr_local::acff_t::acff_t;
 use crate::tr_local::alpha_gen_t::alphaGen_t;
@@ -2747,6 +2748,39 @@ pub fn R_GetShaderByHandle(
                 common,
                 &format!("R_GetShaderByHandle: out of range hShader '{}'\n", h_shader),
             );
+            ShaderHandle::slot_zero()
+        }
+    }
+}
+
+/// [`R_GetShaderByHandle`] for a render-thread caller.
+///
+/// The oracle's only difference between the two is the diagnostic on an
+/// out-of-range handle. A render-thread caller has no `Common`, so this twin
+/// prints the same text through `eprintln!` and prints it once per process
+/// (`frame_exec`'s warn-once precedent). Both fns return the same handle for
+/// the same input.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:3800-3810`
+pub fn R_GetShaderByHandleQuiet(
+    assets: &RenderAssets,
+    h_shader: i32,
+    warnings: &mut WalkWarnings,
+) -> ShaderHandle {
+    let resolved = if h_shader < 0 {
+        None
+    } else {
+        // `qhandle_t` crosses the module seam as a bare slot number, so the
+        // arena resolves it at the slot's CURRENT generation (DEC-42.2).
+        assets.shaders.handle_at_slot(h_shader as u32)
+    };
+    match resolved {
+        Some(handle) => handle,
+        None => {
+            if !warnings.shader_handle {
+                warnings.shader_handle = true;
+                eprintln!("R_GetShaderByHandle: out of range hShader '{}'", h_shader);
+            }
             ShaderHandle::slot_zero()
         }
     }

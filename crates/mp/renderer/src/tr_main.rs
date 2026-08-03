@@ -28,11 +28,9 @@ use crate::render_state::frame_state::FrameState;
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::placeholders::RefEntity;
 use crate::render_state::render_assets::RenderAssets;
-use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::tr_backend::{GL_Bind, GL_Cull};
 use crate::tr_bsp::{Surface, SurfaceData};
-use crate::tr_cmds::R_SyncRenderThread;
 use crate::tr_ghoul2::r_add_ghoul_surfaces;
 use crate::tr_local::cull_type_t::cullType_t;
 use crate::tr_local::dlight_s::dlight_t;
@@ -47,8 +45,9 @@ use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_mesh::r_add_md3_surfaces;
 use crate::tr_model::render_models::RenderModels;
 use crate::tr_public::ref_flags::{RDF_AUTOMAP, RDF_NOFOG, RDF_NOWORLDMODEL, RF_FIRST_PERSON};
+use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use crate::tr_scene::{ghoul2_token_decode, ghoul2_token_encode, R_AddPolygonSurfaces};
-use crate::tr_shader::R_GetShaderByHandle;
+use crate::tr_shader::R_GetShaderByHandleQuiet;
 use crate::tr_terrain::R_AddTerrainSurfaces;
 use crate::render_state::world_walk_scratch::WorldWalkScratch;
 use crate::tr_world::{R_AddBrushModelSurfaces, R_AddWorldSurfaces};
@@ -59,8 +58,7 @@ use mp_engine_ghoul2::api_models::g2api_have_we_ghoul2_models;
 use mp_engine_ghoul2::ghoul2_system::{BoneCacheId, Ghoul2System};
 use mp_engine_ghoul2::shared::cghoul2_info_v::CGhoul2Info_v;
 use mp_engine_qcommon::cm_terrain::CmLandScape;
-use mp_engine_qcommon::common::{com_error, Common, EngineHostView};
-use mp_engine_qcommon::common_fns::Com_DPrintf;
+use mp_engine_qcommon::common::{com_error, EngineHostView};
 use mp_engine_qcommon::qfiles::draw_vert_t::drawVert_t;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
@@ -154,6 +152,23 @@ pub struct TrMainScratch {
     ///
     /// Source: `oracle/codemp/renderer/tr_main.cpp` (file-scope static)
     pub pre_trans_ent_matrix: [f32; 16],
+}
+
+/// What `R_AddEntitySurfaces`' `RT_MODEL` arm needs on top of the frame's own
+/// state: the model registry every arm resolves `hModel` through, and the
+/// engine host the Ghoul2 arms reach `EngineHost::model_mdxm`/`model_mdxa`
+/// through.
+///
+/// W2-F1 moved the walk to the render thread, and neither of these two crosses
+/// yet: `ModelPool` is deliberately not `Clone` and holds raw block pointers,
+/// so it cannot enter an `Arc`-published registry
+/// (`tr_model/model_pool.rs`'s own module doc). A render-side caller therefore
+/// passes `None` and the `RT_MODEL` arm draws nothing, which is this wave's
+/// stated model scope. A sim-side caller (harness, golden test) passes `Some`
+/// and every arm runs as before.
+pub struct EntityWalkHost<'a, 'e> {
+    pub engine_view: &'a mut EngineHostView<'e>,
+    pub models: &'a RenderModels,
 }
 
 /// A minimal borrowed view over Raven's `surfaceType_t *` tagged-union
@@ -1083,8 +1098,7 @@ pub fn R_SetupProjection(
     refdef_fov_x: f32,
     refdef_fov_y: f32,
     distance_cull: f32,
-    common: &Common,
-    cvars: &RendererCvars,
+    cvars: RenderCvarSnapshot,
 ) {
     // dynamically compute far clip plane distance
     SetFarClip(refdef_rdflags, view, distance_cull);
@@ -1092,7 +1106,7 @@ pub fn R_SetupProjection(
     //
     // set up projection matrix
     //
-    let z_near = common.cvar(cvars.r_znear).value;
+    let z_near = cvars.znear;
     let z_far = view.zFar;
 
     // C promotes to double (M_PI, tan()); f64 intermediate per wave-0 ruling
@@ -1635,19 +1649,19 @@ pub fn SurfIsOffscreen<S>(
 ///
 /// Source: `oracle/codemp/renderer/tr_main.cpp:1573-1584`
 pub fn R_DebugGraphics(
-    r_debug_surface_integer: i32,
+    cvars: RenderCvarSnapshot,
     white_image: Option<ImageHandle>,
-    assets: &RenderAssets,
-    common: &Common,
-    cvars: &RendererCvars,
     frame: &FrameState,
 ) {
-    if r_debug_surface_integer == 0 {
+    if cvars.debug_surface == 0 {
         return;
     }
 
     // the render thread can't make callbacks to the main thread
-    R_SyncRenderThread(assets, common, cvars);
+    // W2-F1 drops the `R_SyncRenderThread` call here. Its whole body is
+    // `R_IssueRenderCommands(.., false)`, which DEC-50 already made a no-op,
+    // and the render thread holds no `Common` to call it with.
+    // Source: oracle/codemp/renderer/tr_main.cpp:1580
 
     GL_Bind(white_image);
     GL_Cull(frame, cullType_t::CT_FRONT_SIDED);
@@ -1851,10 +1865,9 @@ pub fn R_AddEntitySurfaces<'a>(
     entities: &mut [trRefEntity_t],
     view: &viewParms_t,
     scratch: &mut TrMainScratch,
-    engine_view: &mut EngineHostView<'_>,
-    assets: &mut RenderAssets,
-    models: &RenderModels,
-    cvars: &RendererCvars,
+    entity_host: Option<&mut EntityWalkHost<'_, '_>>,
+    assets: &RenderAssets,
+    cvars: RenderCvarSnapshot,
     frame: &mut FrameState,
     walk_scratch: &mut WorldWalkScratch,
     g2: &mut Ghoul2System,
@@ -1863,9 +1876,11 @@ pub fn R_AddEntitySurfaces<'a>(
     dlights: &mut [dlight_t],
     draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
 ) {
-    if engine_view.common.cvar(cvars.r_drawentities).integer == 0 {
+    if cvars.drawentities == 0 {
         return;
     }
+
+    let mut entity_host = entity_host;
 
     let rdf_nofog = refdef_rdflags & RDF_NOFOG != 0;
 
@@ -1913,7 +1928,11 @@ pub fn R_AddEntitySurfaces<'a>(
                 if (ent.e.renderfx & RF_THIRD_PERSON) != 0 && view.isPortal == 0 {
                     continue;
                 }
-                let shader = R_GetShaderByHandle(assets, engine_view.common, ent.e.customShader);
+                let shader = R_GetShaderByHandleQuiet(
+                    assets,
+                    ent.e.customShader,
+                    &mut walk_scratch.warnings,
+                );
                 let shader_sorted_index = assets
                     .shaders
                     .get(shader)
@@ -1946,22 +1965,37 @@ pub fn R_AddEntitySurfaces<'a>(
                 // (`render_state/placeholders.rs`), so there is no carrier to
                 // publish it through for the other two callees.
                 // Source: oracle/codemp/renderer/tr_main.cpp:1421-1442
+                //TODO: Port R_AddEntitySurfaces RT_MODEL on the render thread
+                // Source: oracle/codemp/renderer/tr_main.cpp:1421-1470
+                // Every arm below resolves `ent->e.hModel` through the model
+                // registry, and the Ghoul2 arms need the engine host as well.
+                // Neither crosses to the render thread in this wave, so a
+                // render-side caller passes `None` and this arm draws nothing.
+                let Some(host) = entity_host.as_deref_mut() else {
+                    if !walk_scratch.warnings.entity_models {
+                        walk_scratch.warnings.entity_models = true;
+                        eprintln!(
+                            "mp_renderer: R_AddEntitySurfaces draws no RT_MODEL entity render-side yet",
+                        );
+                    }
+                    continue;
+                };
+                let models = host.models;
+                let engine_view = &mut *host.engine_view;
                 let current_model = models.get_model(ent.e.hModel);
                 match current_model.r#type {
                     modtype_t::MOD_MESH => {
-                        let r_shadows_integer = engine_view.common.cvar(cvars.r_shadows).integer;
                         r_add_md3_surfaces(
                             ent,
                             models,
                             view,
                             &ori,
-                            engine_view,
                             cvars,
+                            &mut walk_scratch.warnings,
                             assets,
                             &*frame,
                             refdef_rdflags,
                             rdf_nofog,
-                            r_shadows_integer,
                             shifted_entity_num,
                             fogs,
                             dlights,
@@ -1970,7 +2004,6 @@ pub fn R_AddEntitySurfaces<'a>(
                     }
 
                     modtype_t::MOD_BRUSH => {
-                        let r_nocull_integer = engine_view.common.cvar(cvars.r_nocull).integer;
                         // `R_AddBrushModelSurfaces`'s two mutators both
                         // target `*tr.currentEntity` in the oracle — one
                         // object — but land in different carriers here:
@@ -1986,11 +2019,9 @@ pub fn R_AddEntitySurfaces<'a>(
                         R_AddBrushModelSurfaces(
                             &mut re,
                             models,
-                            r_nocull_integer,
+                            cvars,
                             &ori,
                             &view.frustum,
-                            engine_view,
-                            cvars,
                             assets,
                             frame,
                             walk_scratch,
@@ -2028,6 +2059,7 @@ pub fn R_AddEntitySurfaces<'a>(
                                 view,
                                 &ori,
                                 cvars,
+                                &mut walk_scratch.warnings,
                                 frame,
                                 g2,
                                 fogs,
@@ -2066,6 +2098,7 @@ pub fn R_AddEntitySurfaces<'a>(
                                     view,
                                     &ori,
                                     cvars,
+                                    &mut walk_scratch.warnings,
                                     frame,
                                     g2,
                                     fogs,
@@ -2106,7 +2139,11 @@ pub fn R_AddEntitySurfaces<'a>(
             }
 
             refEntityType_t::RT_ENT_CHAIN => {
-                let shader = R_GetShaderByHandle(assets, engine_view.common, ent.e.customShader);
+                let shader = R_GetShaderByHandleQuiet(
+                    assets,
+                    ent.e.customShader,
+                    &mut walk_scratch.warnings,
+                );
                 let shader_sorted_index = assets
                     .shaders
                     .get(shader)
@@ -2177,9 +2214,9 @@ pub fn R_AddEntitySurfaces<'a>(
 ///
 /// Source: `oracle/codemp/renderer/tr_main.cpp:1516-1531`
 pub fn R_GenerateDrawSurfs<'a>(
-    engine_view: &mut EngineHostView<'_>,
-    assets: &mut RenderAssets,
-    cvars: &mut RendererCvars,
+    entity_host: Option<&mut EntityWalkHost<'_, '_>>,
+    assets: &RenderAssets,
+    cvars: RenderCvarSnapshot,
     frame: &mut FrameState,
     walk_scratch: &mut WorldWalkScratch,
     g2: &mut Ghoul2System,
@@ -2198,13 +2235,11 @@ pub fn R_GenerateDrawSurfs<'a>(
     shifted_entity_num: i32,
     entities: &mut [trRefEntity_t],
     scratch: &mut TrMainScratch,
-    models: &RenderModels,
     draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
 ) {
     // `&view.world` is `R_RotateForViewer`'s `tr.ori`; world surfaces append
     // through the `SurfaceGeometry::World` arm of the one draw-surf list.
     R_AddWorldSurfaces(
-        engine_view,
         cvars,
         assets,
         frame,
@@ -2216,10 +2251,14 @@ pub fn R_GenerateDrawSurfs<'a>(
         draw_surfs,
     );
 
-    R_AddPolygonSurfaces(frame_data, assets, engine_view.common, draw_surfs);
+    R_AddPolygonSurfaces(
+        frame_data,
+        assets,
+        &mut walk_scratch.warnings,
+        draw_surfs,
+    );
 
     R_AddTerrainSurfaces(
-        engine_view.common,
         cvars,
         refdef,
         land_scape,
@@ -2245,7 +2284,6 @@ pub fn R_GenerateDrawSurfs<'a>(
         refdef_fov_x,
         refdef_fov_y,
         distance_cull,
-        engine_view.common,
         cvars,
     );
 
@@ -2253,9 +2291,8 @@ pub fn R_GenerateDrawSurfs<'a>(
         entities,
         view,
         scratch,
-        engine_view,
+        entity_host,
         assets,
-        models,
         cvars,
         frame,
         walk_scratch,
@@ -2362,9 +2399,9 @@ pub fn R_MirrorViewBySurface<'a>(
     entity_num: i32,
     frame_scene_num: i32,
     refdef_time: i32,
-    engine_view: &mut EngineHostView<'_>,
-    assets: &mut RenderAssets,
-    cvars: &mut RendererCvars,
+    entity_host: Option<&mut EntityWalkHost<'_, '_>>,
+    assets: &RenderAssets,
+    cvars: RenderCvarSnapshot,
     frame: &mut FrameState,
     walk_scratch: &mut WorldWalkScratch,
     g2: &mut Ghoul2System,
@@ -2383,24 +2420,23 @@ pub fn R_MirrorViewBySurface<'a>(
     shifted_entity_num: i32,
     entities: &mut [trRefEntity_t],
     scratch: &mut TrMainScratch,
-    models: &RenderModels,
     draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
 ) -> bool {
     // don't recursively mirror
     if view.isPortal != 0 {
-        Com_DPrintf(
-            engine_view.common,
-            &format!(
-                "{}WARNING: recursive mirror/portal found\n",
+        // W2-F1: the render thread holds no `Common`, so the `Com_DPrintf`
+        // prints once through `eprintln!`.
+        if !walk_scratch.warnings.recursive_portal {
+            walk_scratch.warnings.recursive_portal = true;
+            eprintln!(
+                "{}WARNING: recursive mirror/portal found",
                 S_COLOR_RED.to_str().expect("S_COLOR_RED is ASCII")
-            ),
-        );
+            );
+        }
         return false;
     }
 
-    if engine_view.common.cvar(cvars.r_noportals).integer != 0
-        || engine_view.common.cvar(cvars.r_fastsky).integer == 1
-    {
+    if cvars.noportals != 0 || cvars.fastsky == 1 {
         return false;
     }
 
@@ -2460,7 +2496,7 @@ pub fn R_MirrorViewBySurface<'a>(
         frame_scene_num,
         refdef_time,
         view,
-        engine_view,
+        entity_host,
         assets,
         cvars,
         frame,
@@ -2480,7 +2516,6 @@ pub fn R_MirrorViewBySurface<'a>(
         shifted_entity_num,
         entities,
         scratch,
-        models,
         draw_surfs,
     );
 
@@ -2534,9 +2569,9 @@ pub fn R_SortDrawSurfs<'a>(
     first_draw_surf: usize,
     frame_scene_num: i32,
     refdef_time: i32,
-    engine_view: &mut EngineHostView<'_>,
-    assets: &mut RenderAssets,
-    cvars: &mut RendererCvars,
+    mut entity_host: Option<&mut EntityWalkHost<'_, '_>>,
+    assets: &RenderAssets,
+    cvars: RenderCvarSnapshot,
     frame: &mut FrameState,
     walk_scratch: &mut WorldWalkScratch,
     g2: &mut Ghoul2System,
@@ -2554,9 +2589,7 @@ pub fn R_SortDrawSurfs<'a>(
     land: &CmLandScape,
     shifted_entity_num: i32,
     entities: &mut [trRefEntity_t],
-    scratch: &mut TrMainScratch,
-    models: &RenderModels,
-) {
+    scratch: &mut TrMainScratch,) {
     // it is possible for some views to not have any surfaces
     if draw_surfs.len() <= first_draw_surf {
         // R_AddDrawSurfCmd( drawSurfs, numDrawSurfs ) — PORT-NOTE above:
@@ -2608,7 +2641,7 @@ pub fn R_SortDrawSurfs<'a>(
             entity_num,
             frame_scene_num,
             refdef_time,
-            engine_view,
+            entity_host.as_deref_mut(),
             assets,
             cvars,
             frame,
@@ -2629,11 +2662,10 @@ pub fn R_SortDrawSurfs<'a>(
             shifted_entity_num,
             entities,
             scratch,
-            models,
             draw_surfs,
         ) {
             // this is a debug option to see exactly what is being mirrored
-            if engine_view.common.cvar(cvars.r_portalOnly).integer != 0 {
+            if cvars.portal_only != 0 {
                 return;
             }
             break; // only one mirror view at a time
@@ -2669,9 +2701,9 @@ pub fn R_RenderView<'a>(
     frame_scene_num: i32,
     refdef_time: i32,
     view: &mut viewParms_t,
-    engine_view: &mut EngineHostView<'_>,
-    assets: &mut RenderAssets,
-    cvars: &mut RendererCvars,
+    mut entity_host: Option<&mut EntityWalkHost<'_, '_>>,
+    assets: &RenderAssets,
+    cvars: RenderCvarSnapshot,
     frame: &mut FrameState,
     walk_scratch: &mut WorldWalkScratch,
     g2: &mut Ghoul2System,
@@ -2689,7 +2721,6 @@ pub fn R_RenderView<'a>(
     shifted_entity_num: i32,
     entities: &mut [trRefEntity_t],
     scratch: &mut TrMainScratch,
-    models: &RenderModels,
     draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
 ) {
     if parms.viewportWidth <= 0 || parms.viewportHeight <= 0 {
@@ -2732,7 +2763,7 @@ pub fn R_RenderView<'a>(
     frame.view.vis_bounds = view.visBounds;
 
     R_GenerateDrawSurfs(
-        engine_view,
+        entity_host.as_deref_mut(),
         assets,
         cvars,
         frame,
@@ -2753,7 +2784,6 @@ pub fn R_RenderView<'a>(
         shifted_entity_num,
         entities,
         scratch,
-        models,
         draw_surfs,
     );
 
@@ -2762,7 +2792,7 @@ pub fn R_RenderView<'a>(
         first_draw_surf,
         frame_scene_num,
         refdef_time,
-        engine_view,
+        entity_host,
         assets,
         cvars,
         frame,
@@ -2783,18 +2813,10 @@ pub fn R_RenderView<'a>(
         shifted_entity_num,
         entities,
         scratch,
-        models,
     );
 
     // draw main system development information (surface outlines, etc)
-    R_DebugGraphics(
-        engine_view.common.cvar(cvars.r_debugSurface).integer,
-        assets.white_image,
-        assets,
-        engine_view.common,
-        cvars,
-        frame,
-    );
+    R_DebugGraphics(cvars, assets.white_image, frame);
 }
 
 #[cfg(test)]

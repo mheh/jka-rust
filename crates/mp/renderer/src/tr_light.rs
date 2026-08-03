@@ -9,7 +9,6 @@
 // callers landing in later R3 waves.
 #![allow(dead_code)]
 
-use mp_engine_qcommon::common::{com_printf, Common};
 use mp_engine_qcommon::qfiles::draw_vert_t::MAXLIGHTMAPS;
 use mp_engine_qcommon::qfiles::light_style_limits::LS_LSNONE;
 use mp_qshared::shared::q_math::{
@@ -21,7 +20,7 @@ use mp_qshared::shared::vec3_t;
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::placeholders::{RefEntity, FUNCTABLE_SIZE};
 use crate::render_state::render_assets::RenderAssets;
-use crate::render_state::renderer_cvars::RendererCvars;
+use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use crate::tr_local::dlight_s::dlight_t;
 use crate::tr_local::mgrid_t::mgrid_t;
 use crate::tr_local::orientationr_t::orientationr_t;
@@ -100,13 +99,12 @@ pub fn R_TransformDlights(dl: &mut [dlight_t], ori: &orientationr_t) {
 ///
 /// Source: `oracle/codemp/renderer/tr_light.cpp:119-310`
 fn R_SetupEntityLightingGrid(
-    common: &Common,
-    cvars: &RendererCvars,
+    cvars: RenderCvarSnapshot,
     assets: &RenderAssets,
     frame: &FrameState,
     ent: &mut RefEntity,
 ) {
-    if common.cvar(cvars.r_fullbright).integer != 0 {
+    if cvars.fullbright != 0 {
         ent.ambient_light = [255.0, 255.0, 255.0];
         ent.directed_light = [255.0, 255.0, 255.0];
         _VectorCopy(frame.sun_direction, &mut ent.light_dir);
@@ -255,24 +253,19 @@ fn R_SetupEntityLightingGrid(
         _VectorScale(ent.directed_light, total_factor, &mut ent.directed_light);
     }
 
-    _VectorScale(
-        ent.ambient_light,
-        common.cvar(cvars.r_ambientScale).value,
-        &mut ent.ambient_light,
-    );
-    _VectorScale(
-        ent.directed_light,
-        common.cvar(cvars.r_directedScale).value,
-        &mut ent.directed_light,
-    );
+    _VectorScale(ent.ambient_light, cvars.ambient_scale, &mut ent.ambient_light);
+    _VectorScale(ent.directed_light, cvars.directed_scale, &mut ent.directed_light);
 
     VectorNormalize2(direction, &mut ent.light_dir);
 }
 
 /// Raven `LogLight`.
 ///
+/// W2-F1 moved the caller to the render thread, which has no `Common`, so the
+/// `Com_Printf` diagnostic goes to `eprintln!` (the `frame_exec` precedent).
+///
 /// Source: `oracle/codemp/renderer/tr_light.cpp:318-340`
-fn LogLight(common: &mut Common, ent: &RefEntity) {
+fn LogLight(ent: &RefEntity) {
     if ent.renderfx & RF_FIRST_PERSON == 0 {
         return;
     }
@@ -291,7 +284,7 @@ fn LogLight(common: &mut Common, ent: &RefEntity) {
         max2 = ent.directed_light[2] as i32;
     }
 
-    com_printf(common, &format!("amb:{}  dir:{}\n", max1, max2));
+    eprintln!("amb:{}  dir:{}", max1, max2);
 }
 
 // R3 wave 1 (this wave's 3 fns) needs several fields this file cannot add to
@@ -440,8 +433,7 @@ pub fn R_DlightBmodel(
 ///
 /// Source: `oracle/codemp/renderer/tr_light.cpp:350-460`
 pub fn R_SetupEntityLighting(
-    common: &mut Common,
-    cvars: &RendererCvars,
+    cvars: RenderCvarSnapshot,
     assets: &RenderAssets,
     frame: &FrameState,
     refdef_rdflags: i32,
@@ -473,7 +465,7 @@ pub fn R_SetupEntityLighting(
         .map(|w| w.light_grid_data.is_some())
         .unwrap_or(false);
     if refdef_rdflags & RDF_NOWORLDMODEL == 0 && has_light_grid {
-        R_SetupEntityLightingGrid(common, cvars, assets, frame, ent);
+        R_SetupEntityLightingGrid(cvars, assets, frame, ent);
     } else {
         ent.ambient_light = [
             frame.identity_light * 150.0,
@@ -542,8 +534,8 @@ pub fn R_SetupEntityLighting(
         }
     }
 
-    if common.cvar(cvars.r_debugLight).integer != 0 {
-        LogLight(common, ent);
+    if cvars.debug_light != 0 {
+        LogLight(ent);
     }
 
     // save out the byte packet version
@@ -584,8 +576,7 @@ pub fn R_SetupEntityLighting(
 ///
 /// Source: `oracle/codemp/renderer/tr_light.cpp:467-483`
 pub fn R_LightForPoint(
-    common: &Common,
-    cvars: &RendererCvars,
+    cvars: RenderCvarSnapshot,
     assets: &RenderAssets,
     frame: &FrameState,
     point: vec3_t,
@@ -602,7 +593,7 @@ pub fn R_LightForPoint(
 
     let mut ent = RefEntity::default();
     ent.origin = point;
-    R_SetupEntityLightingGrid(common, cvars, assets, frame, &mut ent);
+    R_SetupEntityLightingGrid(cvars, assets, frame, &mut ent);
 
     Some((ent.ambient_light, ent.directed_light, ent.light_dir))
 }

@@ -47,7 +47,7 @@ use mp_engine_ghoul2::shared::cghoul2_info::CGhoul2Info;
 use mp_engine_ghoul2::shared::surface_info_t::surfaceInfo_t;
 use mp_engine_ghoul2::surfaces::g2_find_override_surface;
 
-use mp_engine_qcommon::common::{com_error, com_printf, Common, EngineHostView};
+use mp_engine_qcommon::common::{com_error, com_printf, EngineHostView};
 use mp_engine_qcommon::qfiles::shader_limits::{SHADER_MAX_INDEXES, SHADER_MAX_VERTEXES};
 use native_string::q_string::Q_strlwr;
 
@@ -61,7 +61,9 @@ use crate::mdx_format::mdxm_vertex_t::mdxmVertex_t;
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::placeholders::RefEntity;
 use crate::render_state::render_assets::RenderAssets;
+use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use crate::render_state::renderer_cvars::RendererCvars;
+use crate::render_state::walk_warnings::WalkWarnings;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::render_state::skin_asset::SkinHandle;
 use crate::tr_image::{TrImageState, R_GetSkinByHandle};
@@ -84,7 +86,7 @@ use crate::tr_model::model_pool::ModelHandle;
 use crate::tr_model::render_models::RenderModels;
 use crate::tr_model::server_load::read_qpath;
 use crate::tr_shade_calc::myftol;
-use crate::tr_shader::{lightmapsNone, stylesDefault, R_FindShader, R_GetShaderByHandle};
+use crate::tr_shader::{lightmapsNone, stylesDefault, R_FindShader, R_GetShaderByHandleQuiet};
 use mp_qshared::common::mp::cgame::tr_types::RF_THIRD_PERSON;
 use crate::tr_sky::SkyState;
 use crate::tr_worldeffects::world_effects::WorldEffectsState;
@@ -668,8 +670,7 @@ pub fn g2_compute_lod(
     current_model: &model_t,
     lod_bias: i32,
     view: &viewParms_t,
-    common: &Common,
-    cvars: &RendererCvars,
+    cvars: RenderCvarSnapshot,
 ) -> i32 {
     // model has only 1 LOD level, skip computations and bias
     if current_model.numLods < 2 {
@@ -679,8 +680,8 @@ pub fn g2_compute_lod(
     let model_scale = ent.model_scale;
 
     let mut lod_bias = lod_bias;
-    if common.cvar(cvars.r_lodbias).integer > lod_bias {
-        lod_bias = common.cvar(cvars.r_lodbias).integer;
+    if cvars.lodbias > lod_bias {
+        lod_bias = cvars.lodbias;
     }
 
     // scale the radius if need be
@@ -705,8 +706,7 @@ pub fn g2_compute_lod(
     let projected_radius = project_radius(scaled_radius, ent.origin, view);
     let mut flod;
     if projected_radius != 0.0 {
-        let mut lodscale =
-            common.cvar(cvars.r_lodscale).value + common.cvar(cvars.r_autolodscalevalue).value;
+        let mut lodscale = cvars.lodscale + cvars.autolodscalevalue;
         if lodscale > 20.0 {
             lodscale = 20.0;
         } else if lodscale < 0.0 {
@@ -2265,7 +2265,8 @@ pub fn r_add_ghoul_surfaces<'a>(
     models: &RenderModels,
     view: &viewParms_t,
     ori: &orientationr_t,
-    cvars: &RendererCvars,
+    cvars: RenderCvarSnapshot,
+    warnings: &mut WalkWarnings,
     frame: &FrameState,
     g2: &mut Ghoul2System,
     fogs: &[fog_t],
@@ -2282,7 +2283,7 @@ pub fn r_add_ghoul_surfaces<'a>(
 
     // if we don't want server ghoul2 models and this is one, or we just don't
     // want ghoul2 models at all, then return
-    if host.common.cvar(cvars.r_noServerGhoul2).integer != 0 {
+    if cvars.no_server_ghoul2 != 0 {
         return;
     }
 
@@ -2293,7 +2294,7 @@ pub fn r_add_ghoul_surfaces<'a>(
     let current_time = g2api_get_time(g2, frame.refdef.time);
 
     // cull the entire model if the merged bounding box is outside the frustum
-    let r_nocull_integer = host.common.cvar(cvars.r_nocull).integer;
+    let r_nocull_integer = cvars.nocull;
     let mut cull_out = 0;
     let mut cull_in = 0;
     let mut cull_clip = 0;
@@ -2317,17 +2318,8 @@ pub fn r_add_ghoul_surfaces<'a>(
     // call with the non-`VV_LIGHTING` arm `!personalModel || r_shadows->integer
     // > 1`. The caller folds the lit fields back onto `entities[n]`.
     // Source: oracle/codemp/renderer/tr_ghoul2.cpp:3438-3443
-    let r_shadows_integer = host.common.cvar(cvars.r_shadows).integer;
-    if !personal_model || r_shadows_integer > 1 {
-        R_SetupEntityLighting(
-            host.common,
-            cvars,
-            assets,
-            frame,
-            refdef_rdflags,
-            dlights,
-            ent,
-        );
+    if !personal_model || cvars.shadows > 1 {
+        R_SetupEntityLighting(cvars, assets, frame, refdef_rdflags, dlights, ent);
     }
 
     // see if we are in a fog volume
@@ -2356,7 +2348,7 @@ pub fn r_add_ghoul_surfaces<'a>(
         let (cust_shader, skin): (Option<ShaderHandle>, Option<SkinHandle>) =
             if ent.custom_shader != 0 {
                 (
-                    Some(R_GetShaderByHandle(assets, host.common, ent.custom_shader)),
+                    Some(R_GetShaderByHandleQuiet(assets, ent.custom_shader, warnings)),
                     None,
                 )
             } else if inst.custom_skin != 0 {
@@ -2379,7 +2371,7 @@ pub fn r_add_ghoul_surfaces<'a>(
             };
 
         let current_model = models.get_model(inst.model);
-        let which_lod = g2_compute_lod(ent, current_model, inst.lod_bias, view, host.common, cvars);
+        let which_lod = g2_compute_lod(ent, current_model, inst.lod_bias, view, cvars);
 
         // The bone transforms already ran through `g2_construct_render_skeleton`
         // above, so the render only reads the built cache. Clone the surface

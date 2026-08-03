@@ -8,20 +8,16 @@ use core::ffi::c_int;
 
 use mp_engine_qcommon::cm_load::{CM_LeafArea, CM_LeafCluster};
 use mp_engine_qcommon::cm_test::{CM_ClusterPVSBits, CM_PointLeafnum};
-use mp_engine_qcommon::cm_trace::CM_BoxTrace;
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::EngineHostView;
 use mp_engine_qcommon::files_common::{
     FS_FCloseFile, FS_FOpenFileRead, FS_FOpenFileWrite, FS_Read, FS_Write,
 };
-use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::q_math::BoxOnPlaneSideRef;
-use mp_qshared::shared::{
-    cplane_t, qhandle_t, vec3_t, CONTENTS_SOLID, CONTENTS_TERRAIN, SURF_NOIMPACT,
-};
+use mp_qshared::shared::{cplane_t, qhandle_t, vec3_t, CONTENTS_SOLID};
 use native_math::qmath::{
-    _DotProduct, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin, ClearBoundsMP,
-    CrossProduct, VectorCompare, VectorInverse, VectorLength, VectorSet,
+    _DotProduct, _VectorScale, _VectorSubtract, vec3_origin, ClearBoundsMP, CrossProduct,
+    VectorCompare,
 };
 use native_types::fileHandle_t;
 
@@ -31,7 +27,7 @@ use crate::render_state::frame_state::FrameState;
 use crate::render_state::placeholders::RefEntity;
 use crate::render_state::arena::Arena;
 use crate::render_state::render_assets::RenderAssets;
-use crate::render_state::renderer_cvars::RendererCvars;
+use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use crate::render_state::world_walk_scratch::WorldWalkScratch;
 use crate::tr_bsp::{Node, Surface, SurfaceData, SurfaceFace, SurfaceTriangles};
 use crate::tr_curve::GridMesh;
@@ -1181,29 +1177,19 @@ pub fn R_CullGrid(
 /// through as plain parameters, matching the cvar/`ori`/`frustum` threading
 /// already established for `R_CullTriSurf`/`R_CullGrid` in this same file.
 ///
-/// PORT-NOTE: the six `static` locals inside the (rarely-taken)
-/// `r_cullRoofFaces` branch (`i`, `tr`, `basePoint`, `endPoint`, `nNormal`,
-/// `v`) are always fully written before they are read on every path through
-/// this block — Raven's `static` here is a stack-avoidance micro-optimization
-/// for a "very slow, only for automap screenshots" branch (per the oracle's
-/// own comment), not persisted cross-call state (three-kind rule: nothing
-/// survives to the next call), so they become ordinary function-local
-/// `let mut` bindings, never a carrier field.
+/// W2-F1: the four cvars arrive on the frame's [`RenderCvarSnapshot`] instead
+/// of one resolved int each, so the walk reads no live table.
 ///
 /// Source: `oracle/codemp/renderer/tr_world.cpp:138-275`
 #[allow(clippy::too_many_arguments)]
 pub fn R_CullSurface(
     surf: &Surface,
     shader: &ShaderAsset,
-    view: &mut EngineHostView<'_>,
+    warned_roof_cull: &mut bool,
+    cvars: RenderCvarSnapshot,
     ori: &orientationr_t,
     frustum: &[cplane_t; 4],
     current_entity_num: i32,
-    r_nocull_integer: i32,
-    r_nocurves_integer: i32,
-    r_face_plane_cull_integer: i32,
-    r_cull_roof_faces_integer: i32,
-    r_roof_cull_ceil_dist_value: f32,
     c_sphere_cull_patch_out: &mut i32,
     c_sphere_cull_patch_clip: &mut i32,
     c_sphere_cull_patch_in: &mut i32,
@@ -1211,7 +1197,7 @@ pub fn R_CullSurface(
     c_box_cull_patch_in: &mut i32,
     c_box_cull_patch_clip: &mut i32,
 ) -> bool {
-    if r_nocull_integer != 0 {
+    if cvars.nocull != 0 {
         return false;
     }
 
@@ -1220,8 +1206,8 @@ pub fn R_CullSurface(
             return R_CullGrid(
                 grid,
                 current_entity_num,
-                r_nocurves_integer,
-                r_nocull_integer,
+                cvars.nocurves,
+                cvars.nocull,
                 ori,
                 frustum,
                 c_sphere_cull_patch_out,
@@ -1233,7 +1219,7 @@ pub fn R_CullSurface(
             );
         }
         SurfaceData::Triangles(tris) => {
-            return R_CullTriSurf(tris, r_nocull_integer, ori, frustum);
+            return R_CullTriSurf(tris, cvars.nocull, ori, frustum);
         }
         SurfaceData::Face(face) => face,
         SurfaceData::Skip | SurfaceData::Flare(_) => return false,
@@ -1244,129 +1230,21 @@ pub fn R_CullSurface(
     }
 
     // face culling
-    if r_face_plane_cull_integer == 0 {
+    if cvars.face_plane_cull == 0 {
         return false;
     }
 
-    if r_cull_roof_faces_integer != 0 {
-        // Very slow, but this is only intended for taking shots for automap images.
-        if face.plane.normal[2] > 0.0 && !face.points.is_empty() {
-            // it's facing up I guess
-
-            // The fact that this point is in the middle of the array has no
-            // relation to the orientation in the surface outline.
-            let mut base_point = face.points[face.points.len() / 2].xyz;
-            base_point[2] += 2.0;
-
-            // the endpoint will be 8192 units from the chosen point in the
-            // direction of the surface normal
-
-            // just go straight up I guess, for now (slight hack)
-            let mut n_normal: vec3_t = [0.0; 3];
-            VectorSet(&mut n_normal, 0.0, 0.0, 1.0);
-            let mut end_point: vec3_t = [0.0; 3];
-            _VectorMA(base_point, 8192.0, n_normal, &mut end_point);
-
-            let mut trace = trace_t::zeroed();
-            // PORT-NOTE: the `*mut trace_t` out-param is the already-ported
-            // engine `CM_BoxTrace` signature's own shape, not a new interior
-            // type this file introduces; taking `&mut` as a pointer at the
-            // call site needs no `unsafe`.
-            CM_BoxTrace(
-                view,
-                &mut trace as *mut trace_t,
-                base_point,
-                end_point,
-                vec3_origin,
-                vec3_origin,
-                0,
-                CONTENTS_SOLID | CONTENTS_TERRAIN,
-                0,
-            );
-
-            if trace.startsolid == 0
-                && trace.allsolid == 0
-                && (trace.fraction == 1.0 || (trace.surfaceFlags & SURF_NOIMPACT) != 0)
-            {
-                // either hit nothing or sky, so this surface is near the top
-                // of the level I guess. Or the floor of a really tall room,
-                // but if that's the case we're just screwed.
-                let mut v: vec3_t = [0.0; 3];
-                _VectorSubtract(base_point, trace.endpos, &mut v);
-                if trace.fraction == 1.0 || VectorLength(v) < r_roof_cull_ceil_dist_value {
-                    // ignore it if it's not close to the top, unless it just
-                    // hit nothing
-
-                    // Let's try to dig back into the brush based on the
-                    // negative direction of the plane, and if we pop out on
-                    // the other side we'll see if it's ground or not.
-                    let mut i: i32 = 4;
-                    n_normal = face.plane.normal;
-                    VectorInverse(&mut n_normal);
-
-                    while i < 4096 {
-                        _VectorMA(base_point, i as f32, n_normal, &mut end_point);
-                        CM_BoxTrace(
-                            view,
-                            &mut trace as *mut trace_t,
-                            end_point,
-                            end_point,
-                            vec3_origin,
-                            vec3_origin,
-                            0,
-                            CONTENTS_SOLID | CONTENTS_TERRAIN,
-                            0,
-                        );
-                        if trace.startsolid == 0 && trace.allsolid == 0 && trace.fraction == 1.0 {
-                            // in the clear
-                            break;
-                        }
-                        i += 1;
-                    }
-                    if i < 4096 {
-                        // Make sure we got into clearance
-                        base_point = end_point;
-                        base_point[2] -= 2.0;
-
-                        // just go straight down I guess, for now (slight hack)
-                        VectorSet(&mut n_normal, 0.0, 0.0, -1.0);
-                        _VectorMA(base_point, 4096.0, n_normal, &mut end_point);
-
-                        // trace a second time from the clear point in the
-                        // inverse normal direction of the surface. If we hit
-                        // something within a set amount of units, we will
-                        // assume it's a bridge type object and leave it to be
-                        // drawn. Otherwise we will assume it is a roof or
-                        // other obstruction and cull it out.
-                        CM_BoxTrace(
-                            view,
-                            &mut trace as *mut trace_t,
-                            base_point,
-                            end_point,
-                            vec3_origin,
-                            vec3_origin,
-                            0,
-                            CONTENTS_SOLID | CONTENTS_TERRAIN,
-                            0,
-                        );
-
-                        if trace.startsolid == 0
-                            && trace.allsolid == 0
-                            && (trace.fraction != 1.0 && (trace.surfaceFlags & SURF_NOIMPACT) == 0)
-                        {
-                            // if we hit nothing or a noimpact going down then
-                            // this is probably "ground".
-                            _VectorSubtract(base_point, trace.endpos, &mut end_point);
-                            if VectorLength(end_point) > r_roof_cull_ceil_dist_value {
-                                // 128 (by default) is our maximum tolerance,
-                                // above that will be removed
-                                return true;
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    //TODO: Port R_CullSurface roof-cull traces
+    // Source: oracle/codemp/renderer/tr_world.cpp:1305-1420
+    // W2-F2: the roof cull runs three `CM_BoxTrace` calls against the collision
+    // world, which the render thread does not reach. The feature is inert here
+    // and reports itself once. `r_cullRoofFaces` is a CVAR_CHEAT that exists to
+    // take automap shots, so retail play never sets it.
+    if cvars.cull_roof_faces != 0 && !*warned_roof_cull {
+        *warned_roof_cull = true;
+        eprintln!(
+            "mp_renderer: r_cullRoofFaces is set, and the roof cull is inert on the render thread",
+        );
     }
 
     let d = _DotProduct(ori.viewOrigin, face.plane.normal);
@@ -1464,13 +1342,8 @@ pub fn R_AddWorldSurface<'a>(
     scratch: &mut WorldWalkScratch,
     shader: &ShaderAsset,
     current_entity_num: i32,
-    r_nocull_integer: i32,
-    r_nocurves_integer: i32,
-    r_face_plane_cull_integer: i32,
-    r_cull_roof_faces_integer: i32,
-    r_roof_cull_ceil_dist_value: f32,
+    cvars: RenderCvarSnapshot,
     rdf_nofog: bool,
-    view: &mut EngineHostView<'_>,
     ori: &orientationr_t,
     frustum: &[cplane_t; 4],
     c_sphere_cull_patch_out: &mut i32,
@@ -1503,15 +1376,11 @@ pub fn R_AddWorldSurface<'a>(
     if R_CullSurface(
         surf,
         shader,
-        view,
+        &mut scratch.warnings.roof_cull,
+        cvars,
         ori,
         frustum,
         current_entity_num,
-        r_nocull_integer,
-        r_nocurves_integer,
-        r_face_plane_cull_integer,
-        r_cull_roof_faces_integer,
-        r_roof_cull_ceil_dist_value,
         c_sphere_cull_patch_out,
         c_sphere_cull_patch_clip,
         c_sphere_cull_patch_in,
@@ -1640,12 +1509,10 @@ pub fn R_InitializeWireframeAutomap(
 pub fn R_AddBrushModelSurfaces<'a>(
     ent: &mut RefEntity,
     models: &RenderModels,
-    r_nocull_integer: i32,
+    cvars: RenderCvarSnapshot,
     ori: &orientationr_t,
     frustum: &[cplane_t; 4],
-    view: &mut EngineHostView<'_>,
-    cvars: &RendererCvars,
-    assets: &mut RenderAssets,
+    assets: &RenderAssets,
     frame: &mut FrameState,
     scratch: &mut WorldWalkScratch,
     refdef_rdflags: i32,
@@ -1667,22 +1534,14 @@ pub fn R_AddBrushModelSurfaces<'a>(
         .expect("R_AddBrushModelSurfaces needs the loaded world");
     let bmodel = &world.bmodels[bmodel_idx];
 
-    let clip = R_CullLocalBox(bmodel.bounds, r_nocull_integer, ori, frustum);
+    let clip = R_CullLocalBox(bmodel.bounds, cvars.nocull, ori, frustum);
     if clip == CULL_OUT {
         return;
     }
 
     if p_model.bspInstance != 0 {
         // rwwRMG - added
-        R_SetupEntityLighting(
-            view.common,
-            cvars,
-            assets,
-            frame,
-            refdef_rdflags,
-            dlights,
-            ent,
-        );
+        R_SetupEntityLighting(cvars, assets, frame, refdef_rdflags, dlights, ent);
     }
 
     // rww - Take this into account later?
@@ -1726,11 +1585,6 @@ pub fn R_AddBrushModelSurfaces<'a>(
     let view_count = scratch.view_count;
     let rdf_nofog = refdef_rdflags & RDF_NOFOG != 0;
 
-    let r_nocurves_integer = view.common.cvar(cvars.r_nocurves).integer;
-    let r_face_plane_cull_integer = view.common.cvar(cvars.r_facePlaneCull).integer;
-    let r_cull_roof_faces_integer = view.common.cvar(cvars.r_cullRoofFaces).integer;
-    let r_roof_cull_ceil_dist_value = view.common.cvar(cvars.r_roofCullCeilDist).value;
-
     // `frontEndCounters_t` scratch — UNMAPPED across the renderer, owned here
     // and threaded down (the `R_AddWorldSurfaces` precedent).
     let mut c_sphere_cull_patch_out = 0i32;
@@ -1765,13 +1619,8 @@ pub fn R_AddBrushModelSurfaces<'a>(
             scratch,
             shader,
             current_entity_num,
-            r_nocull_integer,
-            r_nocurves_integer,
-            r_face_plane_cull_integer,
-            r_cull_roof_faces_integer,
-            r_roof_cull_ceil_dist_value,
+            cvars,
             rdf_nofog,
-            view,
             ori,
             frustum,
             &mut c_sphere_cull_patch_out,
@@ -1836,14 +1685,9 @@ pub fn R_RecursiveWorldNode<'a>(
     shaders: &Arena<ShaderAsset>,
     frame: &mut FrameState,
     scratch: &mut WorldWalkScratch,
-    view: &mut EngineHostView<'_>,
+    cvars: RenderCvarSnapshot,
     ori: &orientationr_t,
     dlights: &[dlight_t],
-    r_nocull_integer: i32,
-    r_nocurves_integer: i32,
-    r_face_plane_cull_integer: i32,
-    r_cull_roof_faces_integer: i32,
-    r_roof_cull_ceil_dist_value: f32,
     view_count: i32,
     current_entity_num: i32,
     rdf_nofog: bool,
@@ -1874,7 +1718,7 @@ pub fn R_RecursiveWorldNode<'a>(
 
         // if the bounding volume is outside the frustum, nothing inside can be
         // visible
-        if r_nocull_integer != 1 {
+        if cvars.nocull != 1 {
             let mins = [
                 nodes[node_index].mins[0] as f32,
                 nodes[node_index].mins[1] as f32,
@@ -1913,7 +1757,7 @@ pub fn R_RecursiveWorldNode<'a>(
         // node is just a decision point, so go down both sides. determine
         // which dlights are needed
         let mut new_dlights = [0i32; 2];
-        if r_nocull_integer != 2 {
+        if cvars.nocull != 2 {
             if dlight_bits != 0 {
                 let plane = &planes[nodes[node_index]
                     .plane
@@ -1953,14 +1797,9 @@ pub fn R_RecursiveWorldNode<'a>(
             shaders,
             frame,
             scratch,
-            view,
+            cvars,
             ori,
             dlights,
-            r_nocull_integer,
-            r_nocurves_integer,
-            r_face_plane_cull_integer,
-            r_cull_roof_faces_integer,
-            r_roof_cull_ceil_dist_value,
             view_count,
             current_entity_num,
             rdf_nofog,
@@ -2027,13 +1866,8 @@ pub fn R_RecursiveWorldNode<'a>(
             scratch,
             shader,
             current_entity_num,
-            r_nocull_integer,
-            r_nocurves_integer,
-            r_face_plane_cull_integer,
-            r_cull_roof_faces_integer,
-            r_roof_cull_ceil_dist_value,
+            cvars,
             rdf_nofog,
-            view,
             ori,
             &frustum,
             c_sphere_cull_patch_out,
@@ -2113,8 +1947,7 @@ pub fn R_RecursiveWorldNode<'a>(
 /// Source: `oracle/codemp/renderer/tr_world.cpp:1934-1958`
 #[allow(clippy::too_many_arguments)]
 pub fn R_AddWorldSurfaces<'a>(
-    view: &mut EngineHostView<'_>,
-    cvars: &RendererCvars,
+    cvars: RenderCvarSnapshot,
     assets: &RenderAssets,
     frame: &mut FrameState,
     scratch: &mut WorldWalkScratch,
@@ -2124,7 +1957,7 @@ pub fn R_AddWorldSurfaces<'a>(
     refdef_num_dlights: i32,
     draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
 ) {
-    if view.common.cvar(cvars.r_drawworld).integer == 0 {
+    if cvars.drawworld == 0 {
         return;
     }
 
@@ -2138,9 +1971,7 @@ pub fn R_AddWorldSurfaces<'a>(
     let current_entity_num = TR_WORLDENT;
 
     // determine which leaves are in the PVS / areamask
-    let r_lockpvs_integer = view.common.cvar(cvars.r_lockpvs).integer;
-    let r_novis_integer = view.common.cvar(cvars.r_novis).integer;
-    R_MarkLeaves(r_lockpvs_integer, r_novis_integer, assets, frame, scratch);
+    R_MarkLeaves(cvars.lockpvs, cvars.novis, assets, frame, scratch);
 
     // clear out the visible min/max
     let [vb_mins, vb_maxs] = &mut frame.view.vis_bounds;
@@ -2154,12 +1985,6 @@ pub fn R_AddWorldSurfaces<'a>(
     let dlight_bits = 1i32
         .wrapping_shl(clamped_num_dlights as u32)
         .wrapping_sub(1);
-
-    let r_nocull_integer = view.common.cvar(cvars.r_nocull).integer;
-    let r_nocurves_integer = view.common.cvar(cvars.r_nocurves).integer;
-    let r_face_plane_cull_integer = view.common.cvar(cvars.r_facePlaneCull).integer;
-    let r_cull_roof_faces_integer = view.common.cvar(cvars.r_cullRoofFaces).integer;
-    let r_roof_cull_ceil_dist_value = view.common.cvar(cvars.r_roofCullCeilDist).value;
 
     let view_count = scratch.view_count;
     let rdf_nofog = refdef_rdflags & RDF_NOFOG != 0;
@@ -2196,14 +2021,9 @@ pub fn R_AddWorldSurfaces<'a>(
         shaders,
         frame,
         scratch,
-        view,
+        cvars,
         ori,
         dlights,
-        r_nocull_integer,
-        r_nocurves_integer,
-        r_face_plane_cull_integer,
-        r_cull_roof_faces_integer,
-        r_roof_cull_ceil_dist_value,
         view_count,
         current_entity_num,
         rdf_nofog,
