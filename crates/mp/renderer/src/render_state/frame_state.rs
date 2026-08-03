@@ -42,12 +42,11 @@ pub struct FrameState {
     ///
     /// Source: `oracle/codemp/renderer/tr_local.h:1313`
     pub frame_count: i32,
-    /// `tr.viewCount` — the frontend scratch counter `R_BoxSurfaces_r` stamps
-    /// surfaces with to avoid revisiting them (`## State ownership`'s "tr
-    /// frontend scratch/counters" row).
-    ///
-    /// Source: `oracle/codemp/renderer/tr_local.h:1315`
-    pub view_count: i32,
+    // W2-F4 moved `tr.viewCount` and `tr.visCount` to
+    // `WorldWalkScratch::view_count`/`vis_count`, beside the mark arrays they
+    // stamp. `R_MarkFragments` keeps its own counter on `MarkState`, so the
+    // decal path no longer shares the world walk's generation.
+    // Source: `oracle/codemp/renderer/tr_local.h:1315-1316`
     /// `tr.sceneCount` — Raven: incremented every scene. The light-flare code
     /// distinguishes per-scene surface visibility by this count.
     ///
@@ -58,13 +57,6 @@ pub struct FrameState {
     ///
     /// Source: `oracle/codemp/renderer/tr_local.h:1318`
     pub frame_scene_num: i32,
-    /// `tr.visCount` — Raven: "incremented every time a new vis cluster is
-    /// entered". `R_MarkLeaves` bumps it and stamps every visible node's
-    /// `visframe` with it; `R_RecursiveWorldNode` gates the walk on the
-    /// match. Distinct from `view_count` (`tr.viewCount`, per-surface).
-    ///
-    /// Source: `oracle/codemp/renderer/tr_local.h:1316`
-    pub vis_count: i32,
     /// `tr.viewCluster` — the PVS cluster the current view origin sits in,
     /// reset to `-1` by `RE_BeginRegistration` and by `R_MarkLeaves`'s
     /// novis path.

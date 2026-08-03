@@ -185,14 +185,10 @@ pub struct Node {
     /// are set in that loop) — leafs keep the zero-initialized value here,
     /// same as the oracle's zeroed `Hunk_Alloc` block.
     pub contents: i32,
-    /// `visframe` — Raven: "node needs to be traversed if current". The
-    /// per-node runtime visited-scratch `R_MarkLeaves` stamps with
-    /// `tr.visCount` and `R_RecursiveWorldNode` gates the walk on. Zero until
-    /// the first `R_MarkLeaves`, matching the oracle's zeroed `Hunk_Alloc`
-    /// block; grown by the `tr_world` PVS-walk wave that lands those two fns.
-    ///
-    /// Source: `oracle/codemp/renderer/tr_local.h:919`
-    pub visframe: i32,
+    // W2-F4 moved `visframe` out of the node. The loaded world is immutable
+    // after load, so `R_MarkLeaves` stamps `WorldWalkScratch::node_visframe`
+    // at this node's index instead.
+    // Source: `oracle/codemp/renderer/tr_local.h:919`
     /// `mins`/`maxs` — frustum-culling bounds (decision nodes and leafs
     /// alike).
     pub mins: [i32; 3],
@@ -1002,7 +998,6 @@ fn R_LoadNodesAndLeafs(
             parent: None,
             children,
             contents: -1, // CONTENTS_NODE — differentiate from leafs
-            visframe: 0,
             mins,
             maxs,
             plane: Some(plane_num as usize),
@@ -1047,7 +1042,6 @@ fn R_LoadNodesAndLeafs(
             // keep the zero-initialized default (see the `Node::contents`
             // doc comment).
             contents: 0,
-            visframe: 0,
             mins,
             maxs,
             plane: None,
@@ -2224,9 +2218,9 @@ pub struct FaceVertex {
 #[derive(Clone)]
 pub struct SurfaceFace {
     pub plane: cplane_t,
-    /// `dlightBits` — zero-initialized here; only `R_DlightFace` (a later
-    /// wave) writes it.
-    pub dlight_bits: i32,
+    // W2-F4 moved `dlightBits` out of the surface. The loaded world is
+    // immutable after load, so `R_DlightFace` writes
+    // `WorldWalkScratch::surf_dlight_bits` at the owning surface's index.
     pub points: Vec<FaceVertex>,
     pub indices: Vec<i32>,
 }
@@ -2243,9 +2237,8 @@ pub struct SurfaceFace {
 // `Clone` added by DEC-43.4, once `drawVert_t` gained its own derive.
 #[derive(Clone)]
 pub struct SurfaceTriangles {
-    /// `dlightBits` — zero-initialized here; only a later dlight wave writes
-    /// it.
-    pub dlight_bits: i32,
+    // W2-F4 moved `dlightBits` out of the surface. See `SurfaceFace` above for
+    // the same note.
     /// `bounds[2]` — culling information.
     pub bounds: [Vec3; 2],
     pub verts: Vec<drawVert_t>,
@@ -2291,8 +2284,10 @@ pub enum SurfaceData {
 /// Type definition source: `oracle/codemp/renderer/tr_local.h:872-878`
 #[derive(Clone)]
 pub struct Surface {
-    /// `viewCount` — Raven: if == tr.viewCount, already added.
-    pub view_count: i32,
+    // W2-F4 moved `viewCount` out of the surface. The loaded world is
+    // immutable after load, so `R_AddWorldSurface` stamps
+    // `WorldWalkScratch::surf_view_count` at this surface's flat index.
+    // Source: `oracle/codemp/renderer/tr_local.h:874`
     /// `shader`.
     pub shader: ShaderHandle,
     /// `fogIndex`.
@@ -2712,7 +2707,6 @@ pub fn ParseFace(
                 signbits,
                 pad: [0, 0],
             },
-            dlight_bits: 0,
             points,
             indices,
         },
@@ -3004,7 +2998,6 @@ pub fn ParseTriSurf(
         fog_index,
         shader,
         tri: SurfaceTriangles {
-            dlight_bits: 0,
             bounds: [mins, maxs],
             verts: tri_verts,
             indexes: tri_indexes,
@@ -3311,7 +3304,6 @@ pub fn R_LoadSurfaces(
                 world, index,
             );
             surfaces.push(Surface {
-                view_count: 0,
                 shader: parsed.shader,
                 fog_index: parsed.fog_index,
                 data: match parsed.data {
@@ -3325,7 +3317,6 @@ pub fn R_LoadSurfaces(
                 &indexes, world, index,
             );
             surfaces.push(Surface {
-                view_count: 0,
                 shader: parsed.shader,
                 fog_index: parsed.fog_index,
                 data: SurfaceData::Triangles(parsed.tri),
@@ -3336,7 +3327,6 @@ pub fn R_LoadSurfaces(
                 &indexes, world, index,
             );
             surfaces.push(Surface {
-                view_count: 0,
                 shader: parsed.shader,
                 fog_index: parsed.fog_index,
                 data: SurfaceData::Face(parsed.face),
@@ -3347,7 +3337,6 @@ pub fn R_LoadSurfaces(
                 index,
             );
             surfaces.push(Surface {
-                view_count: 0,
                 shader: parsed.shader,
                 fog_index: parsed.fog_index,
                 data: SurfaceData::Flare(parsed.flare),

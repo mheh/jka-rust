@@ -43,6 +43,7 @@ use mp_renderer::render_state::light_style_table::LightStyleTable;
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::render_assets_sim::RenderAssetsSim;
 use mp_renderer::render_state::renderer_cvars::RendererCvars;
+use mp_renderer::render_state::world_walk_scratch::WorldWalkScratch;
 use mp_renderer::renderer_frontend::{
     empty_render_assets, empty_sky_state, zeroed_frame_state, zeroed_view_parms,
 };
@@ -740,6 +741,12 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
         // The ui background render has no live Ghoul2 state, so it threads an
         // empty owned system (design point 2).
         let mut g2_system = Ghoul2System::default();
+        // The spike walks the world once, so its marks live and die with this
+        // call (W2-F4).
+        let mut walk_scratch = WorldWalkScratch::default();
+        if let Some(world) = assets.world.as_ref() {
+            walk_scratch.set_world(world);
+        }
         let mut view = zeroed_view_parms();
         R_RenderView(
             &parms,
@@ -750,6 +757,7 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
             assets,
             cvars,
             frame,
+            &mut walk_scratch,
             &mut g2_system,
             &frame_data,
             &refdef,
@@ -793,15 +801,18 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
                 SurfaceGeometry::Other => r.other += 1,
             }
         }
-    }
 
-    if let Some(w) = host.sim.published.world.as_ref() {
-        let vis_count = host.frame.vis_count;
-        r.visible_leaves = w
-            .nodes
-            .iter()
-            .filter(|n| n.contents != -1 && n.visframe == vis_count)
-            .count();
+        // The visible-leaf tally reads the walk marks, which W2-F4 moved out of
+        // the world and onto `walk_scratch`, so it runs inside this block.
+        if let Some(w) = assets.world.as_ref() {
+            let vis_count = walk_scratch.vis_count;
+            r.visible_leaves = w
+                .nodes
+                .iter()
+                .enumerate()
+                .filter(|(i, n)| n.contents != -1 && walk_scratch.node_visframe[*i] == vis_count)
+                .count();
+        }
     }
 
     r

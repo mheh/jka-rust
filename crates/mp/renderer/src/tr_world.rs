@@ -32,6 +32,7 @@ use crate::render_state::placeholders::RefEntity;
 use crate::render_state::arena::Arena;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
+use crate::render_state::world_walk_scratch::WorldWalkScratch;
 use crate::tr_bsp::{Node, Surface, SurfaceData, SurfaceFace, SurfaceTriangles};
 use crate::tr_curve::GridMesh;
 use crate::tr_light::{
@@ -69,8 +70,11 @@ pub fn Q_CastShort2Float(s: i16) -> f32 {
 /// caller slices them off `FrameState` once those waves land the fields.
 ///
 /// Source: `oracle/codemp/renderer/tr_world.cpp:278-301`
+/// W2-F4: the `surf->dlightBits = dlightBits` write-back moved to
+/// [`R_DlightSurface`], which stamps `WorldWalkScratch::surf_dlight_bits`.
+/// The face itself is read-only here.
 pub fn R_DlightFace(
-    face: &mut SurfaceFace,
+    face: &SurfaceFace,
     mut dlight_bits: i32,
     dlights: &[dlight_t],
     dlight_surfaces_culled: &mut u32,
@@ -90,7 +94,6 @@ pub fn R_DlightFace(
         *dlight_surfaces_culled += 1;
     }
 
-    face.dlight_bits = dlight_bits;
     dlight_bits
 }
 
@@ -100,8 +103,9 @@ pub fn R_DlightFace(
 /// PORT-NOTE: same threading rationale as `R_DlightFace`.
 ///
 /// Source: `oracle/codemp/renderer/tr_world.cpp:303-329`
+/// W2-F4: same write-back move as [`R_DlightFace`].
 pub fn R_DlightGrid(
-    grid: &mut GridMesh,
+    grid: &GridMesh,
     mut dlight_bits: i32,
     dlights: &[dlight_t],
     dlight_surfaces_culled: &mut u32,
@@ -126,7 +130,6 @@ pub fn R_DlightGrid(
         *dlight_surfaces_culled += 1;
     }
 
-    grid.dlight_bits = dlight_bits;
     dlight_bits
 }
 
@@ -137,8 +140,10 @@ pub fn R_DlightGrid(
 /// Raven: FIXME: more dlight culling to trisurfs...
 ///
 /// Source: `oracle/codemp/renderer/tr_world.cpp:332-363`
-pub fn R_DlightTrisurf(surf: &mut SurfaceTriangles, dlight_bits: i32) -> i32 {
-    surf.dlight_bits = dlight_bits;
+///
+/// W2-F4: same write-back move as [`R_DlightFace`], which leaves this body
+/// with nothing but the pass-through the oracle's early return produces.
+pub fn R_DlightTrisurf(_surf: &SurfaceTriangles, dlight_bits: i32) -> i32 {
     dlight_bits
 }
 
@@ -532,23 +537,40 @@ pub fn R_CullTriSurf(
 /// `FrameState` reference (porting-rules §4).
 ///
 /// PORT-NOTE: the tagged-union dispatch over `msurface_t.data` is a match on
-/// the owned [`SurfaceData`] (DEC-43.1); each arm mutates its concrete
-/// surface exactly as the oracle does, so `surf` is `&mut`, matching the
-/// oracle's own non-const `msurface_t *`. The `Skip`/`Flare` arms are the
+/// the owned [`SurfaceData`] (DEC-43.1). The `Skip`/`Flare` arms are the
 /// oracle's `default:` (no dlight handler).
+///
+/// W2-F4: the three per-kind `dlightBits` write-backs land in
+/// `scratch.surf_dlight_bits[surf_index]` here, so `surf` is read-only. The
+/// `Skip`/`Flare` arms leave the stored mask alone, exactly as the oracle's
+/// handler-free `default:` does.
 ///
 /// Source: `oracle/codemp/renderer/tr_world.cpp:374-390`
 pub fn R_DlightSurface(
-    surf: &mut Surface,
+    surf: &Surface,
+    surf_index: u32,
     dlight_bits: i32,
     dlights: &[dlight_t],
     dlight_surfaces_culled: &mut u32,
     dlight_surfaces: &mut u32,
+    scratch: &mut WorldWalkScratch,
 ) -> i32 {
-    let dlight_bits = match &mut surf.data {
-        SurfaceData::Face(face) => R_DlightFace(face, dlight_bits, dlights, dlight_surfaces_culled),
-        SurfaceData::Grid(grid) => R_DlightGrid(grid, dlight_bits, dlights, dlight_surfaces_culled),
-        SurfaceData::Triangles(tris) => R_DlightTrisurf(tris, dlight_bits),
+    let dlight_bits = match &surf.data {
+        SurfaceData::Face(face) => {
+            let bits = R_DlightFace(face, dlight_bits, dlights, dlight_surfaces_culled);
+            scratch.surf_dlight_bits[surf_index as usize] = bits;
+            bits
+        }
+        SurfaceData::Grid(grid) => {
+            let bits = R_DlightGrid(grid, dlight_bits, dlights, dlight_surfaces_culled);
+            scratch.surf_dlight_bits[surf_index as usize] = bits;
+            bits
+        }
+        SurfaceData::Triangles(tris) => {
+            let bits = R_DlightTrisurf(tris, dlight_bits);
+            scratch.surf_dlight_bits[surf_index as usize] = bits;
+            bits
+        }
         SurfaceData::Skip | SurfaceData::Flare(_) => 0,
     };
 
@@ -946,8 +968,9 @@ pub fn R_DrawWireframeAutomap(
 pub fn R_MarkLeaves(
     r_lockpvs_integer: i32,
     r_novis_integer: i32,
-    assets: &mut RenderAssets,
+    assets: &RenderAssets,
     frame: &mut FrameState,
+    scratch: &mut WorldWalkScratch,
 ) {
     // lockpvs lets designers walk around to determine the extent of the
     // current pvs
@@ -957,7 +980,7 @@ pub fn R_MarkLeaves(
 
     let world = assets
         .world
-        .as_mut()
+        .as_ref()
         .expect("R_MarkLeaves reached with no world loaded");
 
     // current viewcluster
@@ -974,30 +997,27 @@ pub fn R_MarkLeaves(
     // comment above (carrier gap).
     // Source: oracle/codemp/renderer/tr_world.cpp:1858-1864
 
-    frame.vis_count += 1;
+    scratch.vis_count += 1;
     frame.view_cluster = cluster;
 
     if r_novis_integer != 0 || frame.view_cluster == -1 {
-        for node in world.nodes.iter_mut() {
+        for (i, node) in world.nodes.iter().enumerate() {
             if node.contents != CONTENTS_SOLID {
-                node.visframe = frame.vis_count;
+                scratch.node_visframe[i] = scratch.vis_count;
             }
         }
         return;
     }
 
-    // Own the cluster's PVS row so the world.vis borrow ends before the loop
-    // mutates world.nodes (same `to_vec` shape as `R_inPVS` above).
     let vis = R_ClusterPVS(
         &world.vis,
         &world.novis,
         world.num_clusters,
         world.cluster_bytes,
         frame.view_cluster,
-    )
-    .to_vec();
+    );
 
-    let vis_count = frame.vis_count;
+    let vis_count = scratch.vis_count;
     let num_clusters = world.num_clusters;
     let areamask = frame.refdef.areamask;
 
@@ -1022,10 +1042,10 @@ pub fn R_MarkLeaves(
         // mark the leaf and every parent up to an already-marked node
         let mut parent = Some(i);
         while let Some(p) = parent {
-            if world.nodes[p].visframe == vis_count {
+            if scratch.node_visframe[p] == vis_count {
                 break;
             }
-            world.nodes[p].visframe = vis_count;
+            scratch.node_visframe[p] = vis_count;
             parent = world.nodes[p].parent;
         }
     }
@@ -1436,11 +1456,12 @@ const QSORT_ENTITYNUM_SHIFT: u32 = 7;
 /// Source: `oracle/codemp/renderer/tr_world.cpp:408-555`
 #[allow(clippy::too_many_arguments)]
 pub fn R_AddWorldSurface<'a>(
-    surf: &mut Surface,
+    surf: &Surface,
     surf_index: u32,
     mut dlight_bits: i32,
     no_view_count: bool,
     view_count: i32,
+    scratch: &mut WorldWalkScratch,
     shader: &ShaderAsset,
     current_entity_num: i32,
     r_nocull_integer: i32,
@@ -1464,17 +1485,17 @@ pub fn R_AddWorldSurface<'a>(
     draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
 ) {
     if !no_view_count {
-        if surf.view_count == view_count {
+        if scratch.surf_view_count[surf_index as usize] == view_count {
             // already in this view, but lets make sure all the dlight bits are set
-            match &mut surf.data {
-                SurfaceData::Face(face) => face.dlight_bits |= dlight_bits,
-                SurfaceData::Grid(grid) => grid.dlight_bits |= dlight_bits,
-                SurfaceData::Triangles(tris) => tris.dlight_bits |= dlight_bits,
-                SurfaceData::Skip | SurfaceData::Flare(_) => {}
+            // W2-F4: the three per-kind `|= dlightBits` merges are one merge on
+            // the scratch mask. `Skip`/`Flare` carry no `dlightBits` field in
+            // Raven, so those kinds keep the oracle's no-op.
+            if !matches!(surf.data, SurfaceData::Skip | SurfaceData::Flare(_)) {
+                scratch.surf_dlight_bits[surf_index as usize] |= dlight_bits;
             }
             return;
         }
-        surf.view_count = view_count;
+        scratch.surf_view_count[surf_index as usize] = view_count;
         // FIXME: bmodel fog?
     }
 
@@ -1505,10 +1526,12 @@ pub fn R_AddWorldSurface<'a>(
     if dlight_bits != 0 {
         dlight_bits = R_DlightSurface(
             surf,
+            surf_index,
             dlight_bits,
             dlights,
             dlight_surfaces_culled,
             dlight_surfaces,
+            scratch,
         );
         dlight_bits = (dlight_bits != 0) as i32;
     }
@@ -1624,6 +1647,7 @@ pub fn R_AddBrushModelSurfaces<'a>(
     cvars: &RendererCvars,
     assets: &mut RenderAssets,
     frame: &mut FrameState,
+    scratch: &mut WorldWalkScratch,
     refdef_rdflags: i32,
     current_entity_num: i32,
     dlights: &mut [dlight_t],
@@ -1664,20 +1688,26 @@ pub fn R_AddBrushModelSurfaces<'a>(
     // rww - Take this into account later?
     let first = bmodel.first_surface;
     let num = bmodel.num_surfaces.max(0) as usize;
+    // W2-F4: each surface's stored mask now comes from
+    // `scratch.surf_dlight_bits` at its flat index. The snapshot the port hands
+    // `R_DlightBmodel` stays a copy, so the fn's write-back is still discarded
+    // and the loop below passes `entity_dlight_bits` down instead, unchanged
+    // from before this ruling.
     let mut dlight_bmodel = DlightBmodel {
         bounds: bmodel.bounds,
         surfaces: world.surfaces[first..first + num]
             .iter()
-            .map(|s| DlightSurface {
+            .enumerate()
+            .map(|(i, s)| DlightSurface {
                 data: match &s.data {
-                    SurfaceData::Face(f) => DlightSurfaceData::Face {
-                        dlightBits: f.dlight_bits,
+                    SurfaceData::Face(_) => DlightSurfaceData::Face {
+                        dlightBits: scratch.surf_dlight_bits[first + i],
                     },
-                    SurfaceData::Grid(g) => DlightSurfaceData::Grid {
-                        dlightBits: g.dlight_bits,
+                    SurfaceData::Grid(_) => DlightSurfaceData::Grid {
+                        dlightBits: scratch.surf_dlight_bits[first + i],
                     },
-                    SurfaceData::Triangles(t) => DlightSurfaceData::Triangles {
-                        dlightBits: t.dlight_bits,
+                    SurfaceData::Triangles(_) => DlightSurfaceData::Triangles {
+                        dlightBits: scratch.surf_dlight_bits[first + i],
                     },
                     SurfaceData::Skip | SurfaceData::Flare(_) => DlightSurfaceData::Other,
                 },
@@ -1693,7 +1723,7 @@ pub fn R_AddBrushModelSurfaces<'a>(
         .as_ref()
         .expect("R_AddBrushModelSurfaces: tr.currentEntity not set")
         .dlight_bits;
-    let view_count = frame.view_count;
+    let view_count = scratch.view_count;
     let rdf_nofog = refdef_rdflags & RDF_NOFOG != 0;
 
     let r_nocurves_integer = view.common.cvar(cvars.r_nocurves).integer;
@@ -1717,7 +1747,7 @@ pub fn R_AddBrushModelSurfaces<'a>(
     let shaders = &assets.shaders;
     let world = assets
         .world
-        .as_mut()
+        .as_ref()
         .expect("R_AddBrushModelSurfaces needs the loaded world");
 
     for i in 0..num {
@@ -1727,11 +1757,12 @@ pub fn R_AddBrushModelSurfaces<'a>(
             .get(shader_handle)
             .expect("R_AddWorldSurface reached a surface with an unresolved shader handle");
         R_AddWorldSurface(
-            &mut world.surfaces[first + i],
+            &world.surfaces[first + i],
             surf_index,
             entity_dlight_bits,
             true,
             view_count,
+            scratch,
             shader,
             current_entity_num,
             r_nocull_integer,
@@ -1801,9 +1832,10 @@ pub fn R_RecursiveWorldNode<'a>(
     nodes: &[Node],
     planes: &[cplane_t],
     mark_surfaces: &[u32],
-    surfaces: &mut [Surface],
+    surfaces: &[Surface],
     shaders: &Arena<ShaderAsset>,
     frame: &mut FrameState,
+    scratch: &mut WorldWalkScratch,
     view: &mut EngineHostView<'_>,
     ori: &orientationr_t,
     dlights: &[dlight_t],
@@ -1836,7 +1868,7 @@ pub fn R_RecursiveWorldNode<'a>(
 
     loop {
         // if the node wasn't marked as potentially visible, exit
-        if nodes[node_index].visframe != frame.vis_count {
+        if scratch.node_visframe[node_index] != scratch.vis_count {
             return;
         }
 
@@ -1920,6 +1952,7 @@ pub fn R_RecursiveWorldNode<'a>(
             surfaces,
             shaders,
             frame,
+            scratch,
             view,
             ori,
             dlights,
@@ -1986,11 +2019,12 @@ pub fn R_RecursiveWorldNode<'a>(
             .get(shader_handle)
             .expect("R_AddWorldSurface reached a surface with an unresolved shader handle");
         R_AddWorldSurface(
-            &mut surfaces[surf_index as usize],
+            &surfaces[surf_index as usize],
             surf_index,
             dlight_bits,
             false,
             view_count,
+            scratch,
             shader,
             current_entity_num,
             r_nocull_integer,
@@ -2081,8 +2115,9 @@ pub fn R_RecursiveWorldNode<'a>(
 pub fn R_AddWorldSurfaces<'a>(
     view: &mut EngineHostView<'_>,
     cvars: &RendererCvars,
-    assets: &mut RenderAssets,
+    assets: &RenderAssets,
     frame: &mut FrameState,
+    scratch: &mut WorldWalkScratch,
     ori: &orientationr_t,
     dlights: &[dlight_t],
     refdef_rdflags: i32,
@@ -2105,7 +2140,7 @@ pub fn R_AddWorldSurfaces<'a>(
     // determine which leaves are in the PVS / areamask
     let r_lockpvs_integer = view.common.cvar(cvars.r_lockpvs).integer;
     let r_novis_integer = view.common.cvar(cvars.r_novis).integer;
-    R_MarkLeaves(r_lockpvs_integer, r_novis_integer, assets, frame);
+    R_MarkLeaves(r_lockpvs_integer, r_novis_integer, assets, frame, scratch);
 
     // clear out the visible min/max
     let [vb_mins, vb_maxs] = &mut frame.view.vis_bounds;
@@ -2126,7 +2161,7 @@ pub fn R_AddWorldSurfaces<'a>(
     let r_cull_roof_faces_integer = view.common.cvar(cvars.r_cullRoofFaces).integer;
     let r_roof_cull_ceil_dist_value = view.common.cvar(cvars.r_roofCullCeilDist).value;
 
-    let view_count = frame.view_count;
+    let view_count = scratch.view_count;
     let rdf_nofog = refdef_rdflags & RDF_NOFOG != 0;
 
     // `frontEndCounters_t` scratch — UNMAPPED across the renderer, owned here
@@ -2146,7 +2181,7 @@ pub fn R_AddWorldSurfaces<'a>(
     let shaders = &assets.shaders;
     let world = assets
         .world
-        .as_mut()
+        .as_ref()
         .expect("R_AddWorldSurfaces needs the loaded world");
 
     // `tr.world->nodes` (the tree root), `15` = all four frustum planeBits.
@@ -2157,9 +2192,10 @@ pub fn R_AddWorldSurfaces<'a>(
         &world.nodes,
         &world.planes,
         &world.mark_surfaces,
-        &mut world.surfaces,
+        &world.surfaces,
         shaders,
         frame,
+        scratch,
         view,
         ori,
         dlights,
@@ -2197,7 +2233,6 @@ mod tests {
             parent: None,
             children: [None, None],
             contents,
-            visframe: 0,
             mins: [0; 3],
             maxs: [0; 3],
             plane: None,
@@ -2213,7 +2248,6 @@ mod tests {
             parent: None,
             children: [Some(front), Some(back)],
             contents: -1,
-            visframe: 0,
             mins: [0; 3],
             maxs: [0; 3],
             plane: Some(plane),

@@ -59,6 +59,7 @@ use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::render_state::renderer_cvars::RendererCvars;
 use mp_renderer::render_state::shader_asset::ShaderHandle;
+use mp_renderer::render_state::world_walk_scratch::WorldWalkScratch;
 use mp_renderer::tr_image::PendingUpload;
 use mp_renderer::tr_local::dlight_s::dlight_t;
 use mp_renderer::tr_local::fog_t::fog_t;
@@ -226,6 +227,10 @@ pub struct FrameExecutor {
     /// The uploaded world mesh, `None` until [`FrameExecutor::set_world`] runs
     /// after a map load.
     world_geometry: Option<WorldGeometry>,
+    /// The per-walk marks Raven stamps into the world itself (W2-F4). The
+    /// world is immutable after load, so the render thread owns them here and
+    /// [`FrameExecutor::set_world`] sizes them.
+    walk_scratch: WorldWalkScratch,
     /// The stand-in a `RDF_NOWORLDMODEL` scene binds when no map is loaded. Its
     /// buffers are never read: every surface such a scene draws is entity-side
     /// and builds its own per-frame vertices.
@@ -270,6 +275,7 @@ impl FrameExecutor {
             pipeline: Pipeline2d::new(gpu, images),
             pipeline3d: Pipeline3d::new(gpu),
             world_geometry: None,
+            walk_scratch: WorldWalkScratch::default(),
             empty_geometry: WorldGeometry::empty(gpu),
             batch: QuadBatch::new(),
             scene_entities: Vec::new(),
@@ -281,11 +287,12 @@ impl FrameExecutor {
         }
     }
 
-    /// Uploads the loaded world's geometry so the world pass can draw it. Call
-    /// once after `RE_LoadWorldMap` and before the first frame that renders a
-    /// scene.
+    /// Uploads the loaded world's geometry so the world pass can draw it, and
+    /// sizes the walk marks to that world. Call once after `RE_LoadWorldMap`
+    /// and before the first frame that renders a scene.
     pub fn set_world(&mut self, gpu: &Gpu, world: &WorldAsset) {
         self.world_geometry = Some(WorldGeometry::upload(gpu, world));
+        self.walk_scratch.set_world(world);
     }
 
     /// Recreates the world depth texture on a window resize.
@@ -749,6 +756,7 @@ impl FrameExecutor {
             world.assets,
             world.cvars,
             world.frame,
+            &mut self.walk_scratch,
             world.g2,
             frame_data,
             &abi_refdef,

@@ -15,8 +15,6 @@ use mp_qshared::shared::q_math::BoxOnPlaneSideRef;
 use mp_qshared::shared::surface_flags::{CONTENTS_FOG, SURF_NOIMPACT, SURF_NOMARKS};
 use mp_qshared::shared::{cplane_t, markFragment_t, vec3_t};
 
-use crate::render_state::frame_state::FrameState;
-
 // `R_BoxSurfaces_r` walks the world's BSP node/surface tree, which per the
 // tier-2 transition audit (Group 1: `mnode_t`/`msurface_t` rows) resolves to
 // an index-linked node/surface arena owned by `tr_bsp`/`tr_world` and homed
@@ -29,11 +27,11 @@ use crate::render_state::frame_state::FrameState;
 // with `tr_bsp`'s own node/surface arena is an integration-time field-merge,
 // not a second port of `tr.world`.
 //
-// `tr.viewCount` (part of `trGlobals_t` frontend scratch, `## State
-// ownership`'s "frontend scratch/counters" row) is threaded via
-// `FrameState::view_count` — not yet a field on that struct (owned by
-// `render_state/frame_state.rs`, also out of this file's reach); expected to
-// land there at integration, same as any other cross-file state field.
+// `tr.viewCount` is threaded via [`MarkState::view_count`], this file's own
+// counter. Raven shares one `tr.viewCount` between the world walk and the
+// decal walk, and the two walks stamp different arrays, so W2-F4 gives the
+// decal path its own generation. The stamps stay internally consistent inside
+// each walk, which is all either one reads the counter for.
 
 /// Renderer-local `MAX_VERTS_ON_POLY` — the max vertex count
 /// `R_ChopPolyBehindPlane` clips against (distinct from `mp_cgame`'s
@@ -44,6 +42,21 @@ use crate::render_state::frame_state::FrameState;
 /// (`vec3_t inPoints[MAX_VERTS_ON_POLY]`, resolved 64 per the packet's oracle
 /// signature)
 const MAX_VERTS_ON_POLY: usize = 64;
+
+/// The decal walk's own generation counter.
+///
+/// Raven stamps `msurface_t::viewCount` from the one `tr.viewCount` in both
+/// the world walk and this file's `R_BoxSurfaces_r`. The two walks stamp
+/// separate arrays, so W2-F4 gives this one its own counter and leaves the
+/// world walk's on `WorldWalkScratch`.
+///
+/// Source: `oracle/codemp/renderer/tr_local.h:1315`
+#[derive(Default)]
+pub struct MarkState {
+    /// `tr.viewCount` as this walk reads it. `R_MarkFragments` bumps it once
+    /// per call, and `R_BoxSurfaces_r` compares each candidate surface to it.
+    pub view_count: i32,
+}
 
 /// `SIDE_FRONT`/`SIDE_BACK`/`SIDE_ON` — planar-side classification, used here
 /// purely as `counts`/`sides` array indices.
@@ -221,7 +234,7 @@ pub struct MarkGridVert {
 /// explicit C micro-optimization noted in its own comment) with one child
 /// explicitly recursed and the other looped into. Reshaped here as plain
 /// recursion on both children — same node-visitation order and the same
-/// `list`/`frame.view_count` accumulation, control-flow shape only
+/// `list`/`mark.view_count` accumulation, control-flow shape only
 /// (porting-rules §10).
 ///
 /// Source: `oracle/codemp/renderer/tr_marks.cpp:116-178`
@@ -232,24 +245,24 @@ pub fn R_BoxSurfaces_r(
     list: &mut Vec<MarkSurfaceData>,
     listsize: usize,
     dir: vec3_t,
-    frame: &FrameState,
+    mark: &MarkState,
 ) {
     if node.contents == -1 {
         let s = BoxOnPlaneSideRef(mins, maxs, &mut node.plane);
         if s == 1 {
             if let Some(child) = node.children[0].as_deref_mut() {
-                R_BoxSurfaces_r(child, mins, maxs, list, listsize, dir, frame);
+                R_BoxSurfaces_r(child, mins, maxs, list, listsize, dir, mark);
             }
         } else if s == 2 {
             if let Some(child) = node.children[1].as_deref_mut() {
-                R_BoxSurfaces_r(child, mins, maxs, list, listsize, dir, frame);
+                R_BoxSurfaces_r(child, mins, maxs, list, listsize, dir, mark);
             }
         } else {
             if let Some(child) = node.children[0].as_deref_mut() {
-                R_BoxSurfaces_r(child, mins, maxs, list, listsize, dir, frame);
+                R_BoxSurfaces_r(child, mins, maxs, list, listsize, dir, mark);
             }
             if let Some(child) = node.children[1].as_deref_mut() {
-                R_BoxSurfaces_r(child, mins, maxs, list, listsize, dir, frame);
+                R_BoxSurfaces_r(child, mins, maxs, list, listsize, dir, mark);
             }
         }
         return;
@@ -265,7 +278,7 @@ pub fn R_BoxSurfaces_r(
         if (surf.surface_flags & (SURF_NOIMPACT | SURF_NOMARKS)) != 0
             || (surf.content_flags & CONTENTS_FOG) != 0
         {
-            surf.view_count = frame.view_count;
+            surf.view_count = mark.view_count;
         }
         // extra check for surfaces to avoid list overflows
         else if let MarkSurfaceData::Face { plane, .. } = &mut surf.data {
@@ -275,18 +288,18 @@ pub fn R_BoxSurfaces_r(
             let s = BoxOnPlaneSideRef(mins, maxs, plane);
             let normal = plane.normal;
             if s == 1 || s == 2 {
-                surf.view_count = frame.view_count;
+                surf.view_count = mark.view_count;
             } else if normal[0] * dir[0] + normal[1] * dir[1] + normal[2] * dir[2] > -0.5 {
                 // don't add faces that make sharp angles with the projection direction
-                surf.view_count = frame.view_count;
+                surf.view_count = mark.view_count;
             }
         } else if !matches!(surf.data, MarkSurfaceData::Grid { .. }) {
-            surf.view_count = frame.view_count;
+            surf.view_count = mark.view_count;
         }
         // check the viewCount because the surface may have
         // already been added if it spans multiple leafs
-        if surf.view_count != frame.view_count {
-            surf.view_count = frame.view_count;
+        if surf.view_count != mark.view_count {
+            surf.view_count = mark.view_count;
             list.push(surf.data.clone());
         }
     }
@@ -394,10 +407,10 @@ pub fn R_MarkFragments(
     max_fragments: usize,
     fragment_buffer: &mut Vec<markFragment_t>,
     world_root: &mut MarkNode,
-    frame: &mut FrameState,
+    mark: &mut MarkState,
 ) -> i32 {
     // increment view count for double check prevention
-    frame.view_count += 1;
+    mark.view_count += 1;
 
     let mut projection_dir: vec3_t = [0.0; 3];
     VectorNormalize2(projection, &mut projection_dir);
@@ -458,7 +471,7 @@ pub fn R_MarkFragments(
         &mut surfaces,
         64,
         projection_dir,
-        frame,
+        mark,
     );
     //assert(numsurfaces <= 64);
     //assert(numsurfaces != 64);

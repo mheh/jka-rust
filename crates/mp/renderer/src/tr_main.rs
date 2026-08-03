@@ -50,6 +50,7 @@ use crate::tr_public::ref_flags::{RDF_AUTOMAP, RDF_NOFOG, RDF_NOWORLDMODEL, RF_F
 use crate::tr_scene::{ghoul2_token_decode, ghoul2_token_encode, R_AddPolygonSurfaces};
 use crate::tr_shader::R_GetShaderByHandle;
 use crate::tr_terrain::R_AddTerrainSurfaces;
+use crate::render_state::world_walk_scratch::WorldWalkScratch;
 use crate::tr_world::{R_AddBrushModelSurfaces, R_AddWorldSurfaces};
 
 use core::f64::consts::PI;
@@ -1855,6 +1856,7 @@ pub fn R_AddEntitySurfaces<'a>(
     models: &RenderModels,
     cvars: &RendererCvars,
     frame: &mut FrameState,
+    walk_scratch: &mut WorldWalkScratch,
     g2: &mut Ghoul2System,
     refdef_rdflags: i32,
     fogs: &[fog_t],
@@ -1991,6 +1993,7 @@ pub fn R_AddEntitySurfaces<'a>(
                             cvars,
                             assets,
                             frame,
+                            walk_scratch,
                             refdef_rdflags,
                             current_entity_num as i32,
                             dlights,
@@ -2178,6 +2181,7 @@ pub fn R_GenerateDrawSurfs<'a>(
     assets: &mut RenderAssets,
     cvars: &mut RendererCvars,
     frame: &mut FrameState,
+    walk_scratch: &mut WorldWalkScratch,
     g2: &mut Ghoul2System,
     frame_data: &'a FrameData,
     view: &mut viewParms_t,
@@ -2204,6 +2208,7 @@ pub fn R_GenerateDrawSurfs<'a>(
         cvars,
         assets,
         frame,
+        walk_scratch,
         &view.world,
         dlights,
         refdef_rdflags,
@@ -2253,6 +2258,7 @@ pub fn R_GenerateDrawSurfs<'a>(
         models,
         cvars,
         frame,
+        walk_scratch,
         g2,
         refdef_rdflags,
         fogs,
@@ -2360,6 +2366,7 @@ pub fn R_MirrorViewBySurface<'a>(
     assets: &mut RenderAssets,
     cvars: &mut RendererCvars,
     frame: &mut FrameState,
+    walk_scratch: &mut WorldWalkScratch,
     g2: &mut Ghoul2System,
     frame_data: &'a FrameData,
     view: &mut viewParms_t,
@@ -2457,6 +2464,7 @@ pub fn R_MirrorViewBySurface<'a>(
         assets,
         cvars,
         frame,
+        walk_scratch,
         g2,
         frame_data,
         refdef,
@@ -2530,6 +2538,7 @@ pub fn R_SortDrawSurfs<'a>(
     assets: &mut RenderAssets,
     cvars: &mut RendererCvars,
     frame: &mut FrameState,
+    walk_scratch: &mut WorldWalkScratch,
     g2: &mut Ghoul2System,
     frame_data: &'a FrameData,
     view: &mut viewParms_t,
@@ -2603,6 +2612,7 @@ pub fn R_SortDrawSurfs<'a>(
             assets,
             cvars,
             frame,
+            walk_scratch,
             g2,
             frame_data,
             view,
@@ -2663,6 +2673,7 @@ pub fn R_RenderView<'a>(
     assets: &mut RenderAssets,
     cvars: &mut RendererCvars,
     frame: &mut FrameState,
+    walk_scratch: &mut WorldWalkScratch,
     g2: &mut Ghoul2System,
     frame_data: &'a FrameData,
     refdef: &trRefdef_t,
@@ -2685,7 +2696,7 @@ pub fn R_RenderView<'a>(
         return;
     }
 
-    frame.view_count += 1;
+    walk_scratch.view_count += 1;
 
     *view = clone_view_parms(parms);
     view.frameSceneNum = frame_scene_num;
@@ -2694,7 +2705,7 @@ pub fn R_RenderView<'a>(
     let first_draw_surf = draw_surfs.len();
 
     // Raven increments `tr.viewCount` a second time here.
-    frame.view_count += 1;
+    walk_scratch.view_count += 1;
 
     // set viewParms.world
     //
@@ -2725,6 +2736,7 @@ pub fn R_RenderView<'a>(
         assets,
         cvars,
         frame,
+        walk_scratch,
         g2,
         frame_data,
         view,
@@ -2754,6 +2766,7 @@ pub fn R_RenderView<'a>(
         assets,
         cvars,
         frame,
+        walk_scratch,
         g2,
         frame_data,
         view,

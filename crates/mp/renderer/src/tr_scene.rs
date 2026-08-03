@@ -27,7 +27,6 @@ use mp_qshared::shared::qhandle_t;
 
 use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_event::FrameEvent;
-use crate::render_state::frame_state::FrameState;
 use crate::render_state::light_style_table::LightStyleTable;
 use crate::render_state::placeholders::{PolyVert, RefEntity, TrRefdef, Vec3};
 use crate::render_state::render_assets::RenderAssets;
@@ -35,7 +34,7 @@ use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::tr_local::decal_poly_s::{decalPoly_t, MAX_VERTS_ON_DECAL_POLY};
 use crate::tr_main::{DrawSurf, R_AddDrawSurf, SurfaceGeometry};
-use crate::tr_marks::{MarkNode, R_MarkFragments};
+use crate::tr_marks::{MarkNode, MarkState, R_MarkFragments};
 use crate::tr_public::ref_flags::{RDF_DRAWSKYBOX, RDF_NOWORLDMODEL, RDF_SKYBOXPORTAL};
 use crate::tr_shader::R_GetShaderByHandle;
 
@@ -1004,9 +1003,11 @@ const MAX_DECAL_POINTS: usize = 384;
 /// wave is scoped to `tr_scene.rs` only). `world_root`/`frame_state` are new
 /// to this wave: they are the two extra params `tr_marks`' landed (idiomatic,
 /// not the oracle's raw C shape) `R_MarkFragments` signature requires
-/// (`MarkNode` BSP-walk root and `FrameState::view_count`) — this fn is
+/// (`MarkNode` BSP-walk root and `MarkState::view_count`) — this fn is
 /// `R_MarkFragments`'s only caller so far, so they thread straight through
-/// rather than being invented state on this file's own carrier.
+/// rather than being invented state on this file's own carrier. W2-F4 swapped
+/// `FrameState` for `MarkState` there, so the decal walk stops sharing the
+/// world walk's generation counter.
 ///
 /// `alphaFade` (`_alpha_fade` — unread past the parameter list, same as the
 /// oracle body: no `decalPoly_t` field it could write to, and no branch reads
@@ -1030,7 +1031,7 @@ pub fn RE_AddDecalToScene(
     cvars: &RendererCvars,
     common: &mut Common,
     world_root: &mut MarkNode,
-    frame_state: &mut FrameState,
+    mark: &mut MarkState,
     refdef_time: i32,
     decal_shader: qhandle_t,
     origin: Vec3,
@@ -1095,7 +1096,7 @@ pub fn RE_AddDecalToScene(
         MAX_DECAL_FRAGMENTS,
         &mut mark_fragments,
         world_root,
-        frame_state,
+        mark,
     );
 
     // §19: C's out-of-range float->byte conversion is UB; Rust's `as u8`

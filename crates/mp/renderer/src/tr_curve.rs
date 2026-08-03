@@ -60,7 +60,9 @@ pub type ErrorTable = [[f32; MAX_GRID_SIZE]; 2];
 #[derive(Clone)]
 pub struct GridMesh {
     pub surface_type: surfaceType_t,
-    pub dlight_bits: i32,
+    // W2-F4 moved `dlightBits` out of the grid. The loaded world is immutable
+    // after load, so `R_DlightGrid` writes
+    // `WorldWalkScratch::surf_dlight_bits` at the owning surface's index.
     pub mesh_bounds: [vec3_t; 2],
     pub local_origin: vec3_t,
     pub mesh_radius: f32,
@@ -93,7 +95,6 @@ pub struct GridMesh {
 pub fn empty_grid_mesh() -> GridMesh {
     GridMesh {
         surface_type: surfaceType_t::SF_BAD,
-        dlight_bits: 0,
         mesh_bounds: [[0.0; 3]; 2],
         local_origin: [0.0; 3],
         mesh_radius: 0.0,
@@ -399,7 +400,6 @@ pub fn R_CreateSurfaceGridMesh(
 
     GridMesh {
         surface_type: surfaceType_t::SF_GRID,
-        dlight_bits: 0,
         mesh_bounds: [mins, maxs],
         local_origin,
         mesh_radius,
