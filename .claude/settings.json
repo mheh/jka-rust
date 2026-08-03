@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/handoff-absorb.sh",
+            "timeout": 15,
+            "statusMessage": "Looking for a parked handoff"
+          }
+        ]
+      }
+    ]
+  }
+}
