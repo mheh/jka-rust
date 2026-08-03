@@ -1339,16 +1339,10 @@ pub fn InitOpenGL(
 /// rather than a partial stub, matching `GL_SetDefaultState`'s treatment of
 /// its own `qgl*`-gated blocks above.
 ///
-/// `R_TerrainShutdown`'s already-ported (wave 0) signature is `fn(cm: &mut
-/// CollisionWorld, land_scape: &mut srfTerrain_t)`: `CollisionWorld` is
-/// reachable (`view.cm`), but `tr.landScape` (`srfTerrain_t`) is
-/// design-assigned to `RenderWorld::frame: FrameState`'s frontend-scratch
-/// bucket (`renderer-r2-design.md` `## Seam definition`: "...sun/fog
-/// fields, `landScape`, `distanceCull`...") and is not yet a landed
-/// `FrameState` field — the same class of gap this file's
-/// `tr.overbrightBits` notes already flag (`GfxInfo_f`/`R_TakeScreenshot`/
-/// `R_TakeScreenshotJPEG` above). The call is deferred rather than the
-/// carrier invented (preamble: "do NOT create a field").
+/// `R_TerrainShutdown` stays deferred.
+/// `tr.landScape` now has a home, `FrameState::land_scape`, but `RE_Shutdown` takes no `FrameState`.
+/// The teardown body is a `todo!()` anyway (`tr_terrain.rs:1046-1061`).
+/// `CTRLandScape` ownership is unsettled, so there is no allocation to reclaim.
 ///
 /// `GLimp_Shutdown` has no reachable path from this crate:
 /// `crates/mp/renderer/Cargo.toml` has no `mp_engine_client` dependency,
@@ -1406,10 +1400,9 @@ pub fn RE_Shutdown(
         // Source: oracle/codemp/renderer/tr_init.cpp:1354-1383
     }
 
-    // DEFERRED: R_TerrainShutdown(&mut *view.cm, &mut tr.landScape) —
-    // `tr.landScape` (`srfTerrain_t`) has no landed `FrameState` field yet
-    // (see doc comment above); `CollisionWorld` alone (`view.cm`) is not
-    // enough to make the call.
+    // DEFERRED: R_TerrainShutdown(&mut *view.cm, &mut tr.landScape).
+    // `tr.landScape` now lives on `FrameState`, which this fn does not take.
+    // The teardown body is a `todo!()` anyway, because `CTRLandScape` ownership is unsettled.
     // Source: oracle/codemp/renderer/tr_init.cpp:1386
 
     R_ShutdownFonts(font);
