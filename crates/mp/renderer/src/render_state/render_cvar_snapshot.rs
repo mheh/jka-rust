@@ -1,6 +1,10 @@
 //! `RenderCvarSnapshot` — the render cvar values one frame reads (DEC-37
 //! A13.1, R4 render-thread snapshot).
 
+use mp_engine_qcommon::common::common::Common;
+
+use crate::render_state::renderer_cvars::RendererCvars;
+
 /// The resolved render cvar values that one executor frame reads.
 ///
 /// `RendererCvars` holds the live `cvar_t*` handles. A13.1 deferred the
@@ -33,6 +37,21 @@ pub struct RenderCvarSnapshot {
     /// picks the PBR uber-shader. Retail default `0`. The harness rides an F9
     /// toggle and a `--pbr` boot flag on this field.
     pub pbr: i32,
+}
+
+impl RenderCvarSnapshot {
+    /// Reads the live cvar table once, at the frame boundary.
+    ///
+    /// `pbr` has no cvar handle yet, so it keeps its retail default. The
+    /// harness drives that field from its own F9 toggle instead.
+    pub fn from_cvars(cvars: &RendererCvars, common: &Common) -> RenderCvarSnapshot {
+        RenderCvarSnapshot {
+            skip_back_end: common.cvar(cvars.r_skipBackEnd).integer,
+            fastsky: common.cvar(cvars.r_fastsky).integer,
+            lod_curve_error: common.cvar(cvars.r_lodCurveError).value,
+            pbr: 0,
+        }
+    }
 }
 
 impl Default for RenderCvarSnapshot {

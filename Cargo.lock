@@ -988,6 +988,8 @@ dependencies = [
  "mp_engine_qcommon",
  "mp_renderer",
  "mp_renderer_gpu",
+ "native_math",
+ "wgpu",
  "winit",
 ]
 

@@ -244,7 +244,7 @@ impl App {
                     &view,
                     &frame_data,
                     &self.host.sim.published,
-                    &mut self.host.img_state,
+                    self.host.img_state.pending_uploads.drain().collect(),
                     images,
                     &self.host.noise,
                     float_time,

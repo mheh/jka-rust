@@ -15,4 +15,9 @@ mp_renderer = { path = "../renderer" }
 # The graduating platform stack (DEC-56.1): the wgpu device the render thread
 # owns is built by the same `Gpu` the world harness proved.
 mp_renderer_gpu = { path = "../renderer-gpu" }
+# `R_NoiseInit`'s msvcrt-replica `rand()` stream, for the render thread's own
+# copy of the noise tables.
+native_math = { path = "../../native/math" }
+# The surface texture view and the screenshot copy source.
+wgpu = "30.0.0"
 winit = "0.30.13"

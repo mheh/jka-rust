@@ -100,9 +100,12 @@ impl Gpu {
         }))
         .expect("request_device: adapter refused the device request");
 
-        let config = surface
+        let mut config = surface
             .get_default_config(&adapter, width, height)
             .expect("get_default_config: surface incompatible with adapter");
+        // `screenshot_tga` copies the presented frame out, so the surface
+        // texture must be a copy source.
+        config.usage |= wgpu::TextureUsages::COPY_SRC;
         surface.configure(&device, &config);
 
         Gpu {
@@ -426,4 +429,87 @@ pub fn read_target_rgba(gpu: &Gpu) -> (u32, u32, Vec<u8>) {
     buffer.unmap();
 
     (width, height, rgba)
+}
+
+/// Copies `texture` out as 24-bit RGB in `qglReadPixels` row order, which is
+/// bottom-up. The TGA screenshot header carries no flip bit, so it wants those
+/// rows in that order, and wgpu stores them top-down.
+///
+/// The caller passes the frame it just drew and has not presented yet. The
+/// surface is configured with `COPY_SRC` for exactly this.
+///
+/// Source: `oracle/codemp/renderer/tr_init.cpp:552`
+pub fn read_texture_rgb_bottom_up(gpu: &Gpu, texture: &wgpu::Texture) -> (u32, u32, Vec<u8>) {
+    let width = gpu.config.width;
+    let height = gpu.config.height;
+    let unpadded_bytes_per_row = width * 4;
+
+    // wgpu requires the copy's bytes-per-row to be a multiple of 256.
+    let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
+    let padded_bytes_per_row = unpadded_bytes_per_row.div_ceil(align) * align;
+
+    let buffer = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("mp_renderer_gpu screenshot buffer"),
+        size: (padded_bytes_per_row * height) as u64,
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    });
+
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("mp_renderer_gpu screenshot encoder"),
+        });
+    encoder.copy_texture_to_buffer(
+        wgpu::TexelCopyTextureInfo {
+            texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        wgpu::TexelCopyBufferInfo {
+            buffer: &buffer,
+            layout: wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(padded_bytes_per_row),
+                rows_per_image: Some(height),
+            },
+        },
+        wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
+    );
+    gpu.queue.submit(std::iter::once(encoder.finish()));
+
+    let slice = buffer.slice(..);
+    slice.map_async(wgpu::MapMode::Read, |_| {});
+    gpu.device
+        .poll(wgpu::PollType::Wait {
+            submission_index: None,
+            timeout: None,
+        })
+        .expect("poll: waiting for the screenshot map failed");
+
+    let mapped = slice
+        .get_mapped_range()
+        .expect("get_mapped_range: screenshot buffer was not mapped");
+
+    // The surface format is BGRA, so blue and red swap back into RGB order.
+    let mut rgb = Vec::with_capacity((width * height * 3) as usize);
+    for row in (0..height).rev() {
+        let start = (row * padded_bytes_per_row) as usize;
+        let row_bytes = &mapped[start..start + unpadded_bytes_per_row as usize];
+        for pixel in row_bytes.chunks_exact(4) {
+            rgb.push(pixel[2]);
+            rgb.push(pixel[1]);
+            rgb.push(pixel[0]);
+        }
+    }
+
+    drop(mapped);
+    buffer.unmap();
+
+    (width, height, rgb)
 }

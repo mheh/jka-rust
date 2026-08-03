@@ -11,13 +11,15 @@
 //!
 //! Source: `oracle/codemp/win32/win_wndproc.cpp:301-540`
 
-use std::sync::mpsc::{sync_channel, SyncSender};
+use std::sync::mpsc::{sync_channel, Receiver, Sender, SyncSender};
 use std::sync::Arc;
 use std::thread::Builder;
 use std::time::{Duration, Instant};
 
 use mp_engine_qcommon::common::platform_events::{PlatformEvent, PlatformEventSink};
 use mp_engine_qcommon::qcommon::sys_event_type_t::sysEventType_t;
+use mp_renderer::render_state::frame_data::FrameData;
+use mp_renderer::render_state::frame_package::FramePackage;
 use mp_renderer_gpu::Gpu;
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, ElementState, KeyEvent, MouseScrollDelta, WindowEvent};
@@ -52,16 +54,27 @@ pub struct Pump {
     events: PlatformEventSink,
     window: Option<Arc<Window>>,
     render: Option<SyncSender<RenderCommand>>,
+    /// The frame channel's render end, held until the window exists and the
+    /// render thread can take it.
+    packages: Option<Receiver<FramePackage>>,
+    /// The return channel's render end, handed across with `packages`.
+    recycled: Option<Sender<FrameData>>,
     /// Trackpad pixels not yet spent on a wheel notch.
     wheel_pixels: f64,
 }
 
 impl Pump {
-    pub fn new(events: PlatformEventSink) -> Pump {
+    pub fn new(
+        events: PlatformEventSink,
+        packages: Receiver<FramePackage>,
+        recycled: Sender<FrameData>,
+    ) -> Pump {
         Pump {
             events,
             window: None,
             render: None,
+            packages: Some(packages),
+            recycled: Some(recycled),
             wheel_pixels: 0.0,
         }
     }
@@ -110,9 +123,17 @@ impl ApplicationHandler for Pump {
         // then the whole GPU moves to the render thread for good.
         let gpu = Gpu::new(Arc::clone(&window));
         let (tx, rx) = sync_channel(RENDER_QUEUE);
+        let packages = self
+            .packages
+            .take()
+            .expect("resumed: the frame channel was already handed to a render thread");
+        let recycled = self
+            .recycled
+            .take()
+            .expect("resumed: the return channel was already handed to a render thread");
         Builder::new()
             .name("jamp-render".to_string())
-            .spawn(move || render_thread::run(gpu, rx))
+            .spawn(move || render_thread::run(gpu, rx, packages, recycled))
             .expect("spawn: the client could not start its render thread");
 
         window.request_redraw();

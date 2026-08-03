@@ -22,8 +22,11 @@
 //! gives them a real shape.
 
 pub mod arena;
+pub mod capture_request;
 pub mod frame_data;
 pub mod frame_event;
+pub mod frame_package;
+pub mod frame_sink;
 pub mod frame_state;
 pub mod handle;
 pub mod image_asset;

@@ -9,11 +9,12 @@ use core::ffi::c_int;
 use std::sync::Arc;
 
 use mp_engine_qcommon::cmd_common::{Cmd_Argc, Cmd_Argv};
-use mp_engine_qcommon::cmd_pc::Cmd_RemoveCommand;
+use mp_engine_qcommon::cmd_pc::{Cmd_AddCommand, Cmd_RemoveCommand};
 use mp_engine_qcommon::common::common::{com_printf, Common};
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::cvar_fns::{Cvar_Get, Cvar_Set, Cvar_VariableString};
-use mp_engine_qcommon::files_common::FS_WriteFile;
+use mp_engine_qcommon::files_common::{FS_BuildOSPath, FS_WriteFile};
+use mp_engine_qcommon::files_pc::FS_FileExists;
 use mp_engine_qcommon::qfiles::light_style_limits::MAX_LIGHT_STYLES;
 use mp_qshared::common::mp::cgame::texture_compression_t::textureCompression_t;
 use mp_qshared::shared::com_parse::QSharedScratch;
@@ -25,6 +26,8 @@ use native_math::rng::Rng;
 use native_platform::Sys_LowPhysicalMemory;
 
 use crate::gl_constants::GL_CLAMP;
+use crate::hook_install::re_from_view;
+use crate::render_state::capture_request::CaptureRequest;
 use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::placeholders::{
@@ -471,31 +474,31 @@ pub fn RE_SetLightStyle(sim: &mut RenderAssetsSim, style: usize, color: [u8; 4])
 // three-kind-rule classification is moot once the carrier is gone).
 // Source: oracle/codemp/renderer/tr_init.cpp:1459-1531
 
-/// Raven `R_TakeScreenshot`.
+/// Raven `R_TakeScreenshot`'s buffer half: wraps one frame of RGB pixels in an
+/// uncompressed 24-bit TGA.
 ///
-/// `Hunk_AllocateTempMemory`/`Hunk_FreeTempMemory` collapse to an owned local
-/// `Vec<u8>` (porting-rules §C9 — the established `R_MipMap2` precedent,
-/// `tr_image.rs:180-187`), never a raw-pointer alloc/free pair; the "swap rgb
-/// to bgr" pointer walk becomes `Vec::swap` (same behavior, idiomatic shape,
-/// porting-rules §C10).
+/// Raven read the pixels with `qglReadPixels` and wrote the file with
+/// `FS_WriteFile` in one function. Both ends moved: the render thread owns the
+/// presented texture and the readback, and it writes the file itself, so this
+/// keeps only the part that is neither GPU nor filesystem. The caller passes
+/// `rgb` bottom-up, the order `qglReadPixels` produced.
+///
+/// `Hunk_AllocateTempMemory`/`Hunk_FreeTempMemory` collapse to an owned
+/// `Vec<u8>` (porting-rules §C9), and the "swap rgb to bgr" pointer walk
+/// becomes `Vec::swap` (§C10).
+///
+/// DEFERRED: `if (tr.overbrightBits > 0 && glConfig.deviceSupportsGamma)
+/// R_GammaCorrect(...)` — `tr.overbrightBits` has no landed `FrameState`
+/// field, so the gate cannot be evaluated and the whole conditional is skipped
+/// rather than guessed (porting-rules §A2).
+/// Source: oracle/codemp/renderer/tr_init.cpp:562-565
 ///
 /// Source: `oracle/codemp/renderer/tr_init.cpp:537-571`
-// `x`/`y` are read only by the R4-deferred `qglReadPixels` call below.
-#[allow(unused_variables)]
-pub fn R_TakeScreenshot(
-    common: &mut Common,
-    assets: &RenderAssets,
-    x: i32,
-    y: i32,
-    width: i32,
-    height: i32,
-    file_name: &str,
-) {
-    let vid_width = assets.glconfig.vid_width;
-    let vid_height = assets.glconfig.vid_height;
+pub fn R_TakeScreenshot(rgb: &[u8], width: i32, height: i32) -> Vec<u8> {
+    let c = (18 + width * height * 3).max(18) as usize;
 
     // `Com_Memset(buffer, 0, 18)` — `vec![0u8; N]` is already zero-filled.
-    let mut buffer = vec![0u8; (vid_width * vid_height * 3 + 18).max(0) as usize];
+    let mut buffer = vec![0u8; c];
     buffer[2] = 2; // uncompressed type
     buffer[12] = (width & 255) as u8;
     buffer[13] = (width >> 8) as u8;
@@ -503,35 +506,17 @@ pub fn R_TakeScreenshot(
     buffer[15] = (height >> 8) as u8;
     buffer[16] = 24; // pixel size
 
-    // DEFERRED: R4 — `qglReadPixels(x, y, width, height, GL_RGB,
-    // GL_UNSIGNED_BYTE, buffer+18)`: the fixed-function GL surface has no R3
-    // home (DEC-01/DEC-37 A13.2 — the render thread owns the GL state,
-    // DEC-63.4). `buffer[18..]` stays zero-filled
-    // until R4 fills it; the surrounding CPU logic (header, channel swap,
-    // gamma, file write) is still ported per this wave's threading digest
-    // ("port the CPU logic").
-    // Source: oracle/codemp/renderer/tr_init.cpp:552
+    let pixels = c - 18;
+    buffer[18..18 + pixels.min(rgb.len())].copy_from_slice(&rgb[..pixels.min(rgb.len())]);
 
     // swap rgb to bgr
-    let c = (18 + width * height * 3) as usize;
     let mut i = 18usize;
-    while i < c {
+    while i + 2 < c {
         buffer.swap(i, i + 2);
         i += 3;
     }
 
-    // DEFERRED: `tr.overbrightBits > 0` — `trGlobals_t` frontend scratch ->
-    // `RenderWorld::frame: FrameState` (`## State ownership` "tr frontend
-    // scratch/counters" row); the field is not yet landed on `FrameState`
-    // (same gap `GfxInfo_f`'s GAMMA-line note above already flags), so the
-    // gamma-correct gate can't be evaluated and the whole conditional is
-    // skipped rather than guessed (porting-rules §A2).
-    // Source: oracle/codemp/renderer/tr_init.cpp:562-565
-
-    FS_WriteFile(common, file_name, buffer.as_ptr() as *const (), c as c_int);
-
-    // `Hunk_FreeTempMemory(buffer)` — no-op: `buffer` (owned `Vec<u8>`) drops
-    // here (porting-rules §C9).
+    buffer
 }
 
 // DEFERRED: `R_LevelShot` — two state-home gaps stack on this fn, neither
@@ -947,6 +932,18 @@ pub fn R_Register(view: &mut EngineHostView, cvars: &mut RendererCvars) {
     // plus the renderer state), and nothing hands a `Cmd_AddCommand` callback
     // that state today.
 
+    // `screenshot_tga` is live. `re_from_view` (DEC-59.1) is the
+    // renderer-state-carrying adapter the note above says is missing, so a
+    // `CmdFunction` can now reach the bundle.
+    // Source: oracle/codemp/renderer/tr_init.cpp:1193
+    Cmd_AddCommand(view, "screenshot_tga", Some(screenshot_tga_cmd));
+
+    //TODO: Port R_ScreenShot_f
+    // Source: oracle/codemp/renderer/tr_init.cpp:1192
+    // Raven binds `screenshot` to the JPEG variant, which needs a JPEG
+    // encoder dependency. That dependency waits for its own ruling, so the
+    // command stays unregistered and `screenshot_tga` is the live one.
+
     //TODO: Port R_Modellist_f
     // Source: oracle/codemp/renderer/tr_init.cpp:1199
     // Registered unconditionally (outside `#ifndef DEDICATED`) as
@@ -1026,36 +1023,42 @@ pub fn R_TakeScreenshotJPEG(
     // drops here (porting-rules §C9).
 }
 
-/// Raven `R_ScreenShotTGA_f`.
+/// The `screenshot_tga` console-command slot.
 ///
-/// The "levelshot" branch calls `R_LevelShot`, which — despite this wave's
-/// RESOLVED CALL SURFACE listing it as already landed in wave 1
-/// (`oracle/codemp/renderer/tr_init.cpp:632-691`) — is actually DEFERRED
-/// WHOLE above (no callable Rust fn exists; blocked on `tr.world
-/// ->baseName`'s missing state home plus the R4 `qglReadPixels` gap): a
-/// wave-planning discrepancy, raised as an escalation rather than silently
-/// reconciled. The free-filename-scan `else` branch needs the fn-scope
-/// static `lastNumber` (`static int lastNumber = -1`), classified genuine
-/// cross-frame state (kind 3, three-kind rule) with NO R2 carrier assigned
-/// (preamble: "a kind-3 static is an escalation… never an invented
-/// field"). Both blocking points are transcribed as `todo!()` at the exact
-/// site that needs them — the `GL_TextureMode`
-/// `modes[6]`/`Taiwanese_CollapseBig5Code` precedent: transcribe
-/// everything computable, block only at the dependency itself — rather
-/// than deferring the whole function; the explicit-filename path
-/// (`Cmd_Argc() == 2 && !silent`) has neither gap and runs for real.
+/// SAFETY: view-constructor slot, single-threaded, no other live cast. The
+/// dispatch site (`Cmd_ExecuteString`) passes the view, and this handler casts
+/// the type-erased `re` slot at its boundary, the shape `CmdFunction`'s own
+/// doc comment describes.
+fn screenshot_tga_cmd(view: &mut EngineHostView) {
+    let re = unsafe { re_from_view(view) };
+    R_ScreenShotTGA_f(view, &mut re.screenshot_last_number, &mut re.pending_capture);
+}
+
+/// Raven `R_ScreenShotTGA_f` — the `screenshot_tga` console command.
 ///
-/// `Com_sprintf`/`va` -> `format!` per the translation dictionary (the
-/// `R_ScreenshotFilename` precedent above).
+/// The filename decision and the free-number scan run here, because the
+/// filesystem is the sim thread's. The readback, the TGA write and the
+/// `Wrote %s` print run on the render thread, which owns the presented frame,
+/// so this leaves a [`CaptureRequest`] for the next frame to carry.
+///
+/// `last_number` is Raven's fn-scope `static int lastNumber`, now a field on
+/// the renderer bundle. It holds the scan position across calls, so a burst of
+/// shots does not rescan thousands of names.
+///
+/// `Com_sprintf`/`va` -> `format!` per the translation dictionary.
+///
+//TODO: Port R_LevelShot
+// Source: oracle/codemp/renderer/tr_init.cpp:632-691,711-714
+// The `screenshot_tga levelshot` argument needs `tr.world->baseName`, which
+// has no landed state home, plus a 256x256 downsample of the read-back frame.
+// The argument falls through to a normal shot until both land.
 ///
 /// Source: `oracle/codemp/renderer/tr_init.cpp:705-759`
-pub fn R_ScreenShotTGA_f(view: &mut EngineHostView, assets: &RenderAssets) {
-    if Cmd_Argv(view.common, 1) == "levelshot" {
-        todo!(
-            "Port R_LevelShot call — R_LevelShot is DEFERRED WHOLE above (tr_init.rs); oracle/codemp/renderer/tr_init.cpp:711-714"
-        )
-    }
-
+pub fn R_ScreenShotTGA_f(
+    view: &mut EngineHostView,
+    last_number: &mut i32,
+    pending_capture: &mut Option<CaptureRequest>,
+) {
     let silent = Cmd_Argv(view.common, 1) == "silent";
 
     let checkname = if Cmd_Argc(view.common) == 2 && !silent {
@@ -1063,40 +1066,47 @@ pub fn R_ScreenShotTGA_f(view: &mut EngineHostView, assets: &RenderAssets) {
         format!("screenshots/{}.tga", Cmd_Argv(view.common, 1))
     } else {
         // scan for a free filename
-        todo!(
-            "Port R_ScreenShotTGA_f's free-filename scan — needs fn-scope static `lastNumber` (kind-3, no R2 carrier assigned); oracle/codemp/renderer/tr_init.cpp:722-749"
-        )
+
+        // if we have saved a previous screenshot, don't scan
+        // again, because recording demo avis can involve
+        // thousands of shots
+        if *last_number == -1 {
+            *last_number = 0;
+        }
+        // scan for a free number
+        let mut name = String::new();
+        while *last_number <= 9999 {
+            name = R_ScreenshotFilename(*last_number, ".tga");
+            if !FS_FileExists(view.common, &name) {
+                break; // file doesn't exist
+            }
+            *last_number += 1;
+        }
+
+        if *last_number >= 9999 {
+            com_printf(view.common, "ScreenShot: Couldn't create a file\n");
+            return;
+        }
+
+        *last_number += 1;
+        name
     };
 
-    R_TakeScreenshot(
-        view.common,
-        assets,
-        0,
-        0,
-        assets.glconfig.vid_width,
-        assets.glconfig.vid_height,
-        &checkname,
-    );
-
-    if !silent {
-        com_printf(view.common, &format!("Wrote {}\n", checkname));
-    }
+    // The render thread has no `Common`, so the qpath resolves here.
+    let os_path = FS_BuildOSPath(view.common, &checkname);
+    *pending_capture = Some(CaptureRequest { os_path, silent });
 }
 
 /// Raven `R_ScreenShot_f`.
 ///
-/// Mirrors the `R_ScreenShotTGA_f` precedent above (same fn-scope-static and
-/// `R_LevelShot`-deferred-whole gaps, same `todo!()`-at-the-site treatment
-/// rather than deferring the whole function): the "levelshot" branch calls
-/// `R_LevelShot`, DEFERRED WHOLE above (no callable Rust fn exists — blocked
-/// on `tr.world->baseName`'s missing state home plus the R4 `qglReadPixels`
-/// gap). The free-filename-scan `else` branch needs the fn-scope static
-/// `lastNumber` (`static int lastNumber = -1`), classified genuine
-/// cross-frame state (kind 3, three-kind rule) with NO R2 carrier assigned
-/// (preamble: "a kind-3 static is an escalation… never an invented field").
-/// Both blocking points are transcribed as `todo!()` at the exact site that
-/// needs them; the explicit-filename path (`Cmd_Argc() == 2 && !silent`) has
-/// neither gap and runs for real.
+/// Raven binds this to `screenshot`, and it writes a JPEG. The command stays
+/// unregistered until the JPEG encoder dependency is settled, so nothing
+/// reaches this fn and its two `todo!()` sites cannot fire. `R_ScreenShotTGA_f`
+/// above is the live command and carries the completed scan.
+///
+/// The "levelshot" branch calls `R_LevelShot`, which is deferred whole above.
+/// The free-filename scan reads the same `lastNumber` carrier the TGA path
+/// uses, and lands when the encoder does.
 ///
 /// `Com_sprintf`/`va` -> `format!` per the translation dictionary (the
 /// `R_ScreenshotFilename`/`R_ScreenShotTGA_f` precedent).

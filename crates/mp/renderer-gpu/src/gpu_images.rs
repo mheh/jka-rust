@@ -22,7 +22,7 @@ use std::collections::HashMap;
 use mp_renderer::gl_constants::GL_REPEAT;
 use mp_renderer::render_state::image_asset::ImageHandle;
 use mp_renderer::render_state::render_assets::RenderAssets;
-use mp_renderer::tr_image::TrImageState;
+use mp_renderer::tr_image::{PendingUpload, TrImageState};
 use wgpu::{AddressMode, BindGroup, BindGroupLayout, Sampler, Texture, TextureView};
 
 use crate::gpu::Gpu;
@@ -227,12 +227,25 @@ impl GpuImages {
         img_state: &mut TrImageState,
         assets: &RenderAssets,
     ) -> usize {
-        if img_state.pending_uploads.is_empty() {
+        let staged: Vec<(ImageHandle, PendingUpload)> = img_state.pending_uploads.drain().collect();
+        self.upload_staged(gpu, staged, assets)
+    }
+
+    /// The same upload, for staged pixels that already crossed a thread
+    /// boundary inside a `FramePackage` and so are owned rather than drained
+    /// from a live `TrImageState`.
+    pub fn upload_staged(
+        &mut self,
+        gpu: &Gpu,
+        staged: Vec<(ImageHandle, PendingUpload)>,
+        assets: &RenderAssets,
+    ) -> usize {
+        if staged.is_empty() {
             return 0;
         }
 
         let mut uploaded = 0;
-        for (handle, pending) in img_state.pending_uploads.drain() {
+        for (handle, pending) in staged {
             let Some(asset) = assets.images.get(handle) else {
                 eprintln!(
                     "mp_renderer_gpu: staged upload for a vanished image slot \

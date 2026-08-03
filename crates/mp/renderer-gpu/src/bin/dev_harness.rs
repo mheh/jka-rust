@@ -152,7 +152,7 @@ impl ApplicationHandler for App {
                             &view,
                             &test_pattern(self.registries.checker),
                             &self.registries.assets,
-                            &mut self.registries.img_state,
+                            self.registries.img_state.pending_uploads.drain().collect(),
                             images,
                             &NoiseState::default(),
                             self.start.elapsed().as_secs_f32(),

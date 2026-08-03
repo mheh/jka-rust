@@ -32,7 +32,9 @@ use mp_qshared::shared::com_parse::QSharedScratch;
 use native_math::rng::Rng;
 
 use crate::render_state::arena::Arena;
+use crate::render_state::capture_request::CaptureRequest;
 use crate::render_state::frame_data::FrameData;
+use crate::render_state::frame_sink::FrameSink;
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::light_style_table::LightStyleTable;
 use crate::render_state::placeholders::{
@@ -75,6 +77,19 @@ pub struct RendererFrontend {
     /// The ordered event stream this frame appends to, which replaces the
     /// oracle's `backEndData_t` command list.
     pub frame_data: FrameData,
+    /// The render thread's end of the frame channel, `Some` only on a client
+    /// build that started one. `RE_EndFrame` sends a `FramePackage` when this
+    /// is installed, and clears the stream in place when it is not.
+    pub frame_sink: Option<FrameSink>,
+    /// A `screenshot_tga` waiting for the next frame to carry it.
+    pub pending_capture: Option<CaptureRequest>,
+    /// Raven's `R_ScreenShotTGA_f`-local `static int lastNumber`, which starts
+    /// at `-1` and holds the scan position across calls so a burst of shots
+    /// does not rescan thousands of names. Genuine cross-call state, so it
+    /// sits on the bundle (three-kind rule, kind 3).
+    ///
+    /// Source: `oracle/codemp/renderer/tr_init.cpp:708`
+    pub screenshot_last_number: i32,
     /// `tr_scene.cpp`'s per-scene accumulation state.
     pub scene: SceneState,
     /// The Perlin noise tables `R_NoiseInit` fills once.
@@ -232,6 +247,9 @@ impl RendererFrontend {
             img_state: TrImageState::default(),
             frame: zeroed_frame_state(),
             frame_data: FrameData { events: Vec::new() },
+            frame_sink: None,
+            pending_capture: None,
+            screenshot_last_number: -1,
             scene: SceneState::default(),
             noise: NoiseState::default(),
             rng: Rng::new(),

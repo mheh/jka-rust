@@ -14,10 +14,18 @@ use mp_qshared::common::mp::cgame::stereo_frame_t::{
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::qhandle_t;
 
+use std::mem;
+use std::sync::Arc;
+
+use crate::render_state::capture_request::CaptureRequest;
 use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_event::FrameEvent;
+use crate::render_state::frame_package::FramePackage;
+use crate::render_state::frame_sink::FrameSink;
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::render_assets::RenderAssets;
+use crate::render_state::render_assets_sim::RenderAssetsSim;
+use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_image::{GL_TextureMode, R_SetColorMappings, TrImageState};
 use crate::tr_scene::{R_ToggleSmpFrame, SceneState};
@@ -309,15 +317,29 @@ pub fn R_SyncRenderThread(assets: &RenderAssets, common: &Common, cvars: &Render
 
 /// Raven `RE_EndFrame`.
 ///
+/// This is where the finished frame leaves the sim thread. Raven's comment
+/// below ("use the other buffers next frame") describes its own SMP handoff,
+/// and the port's handoff is the [`FramePackage`] send: the event stream, the
+/// registry generation it resolves against, the staged image uploads, the cvar
+/// values it was built with, and any pending screenshot all travel together.
+///
+/// With no sink installed, which is every dedicated build, harness and test,
+/// the old behavior stands and `R_ToggleSmpFrame` clears the stream in place.
+///
 /// Source: `oracle/codemp/renderer/tr_cmds.cpp:441-475`
+#[allow(clippy::too_many_arguments)]
 pub fn RE_EndFrame(
     frame: &mut FrameData,
     scene: &mut SceneState,
-    assets: &RenderAssets,
+    sim: &RenderAssetsSim,
+    img_state: &mut TrImageState,
+    sink: Option<&mut FrameSink>,
+    pending_capture: &mut Option<CaptureRequest>,
+    float_time: f32,
     common: &Common,
     cvars: &RendererCvars,
 ) {
-    if !assets.registered {
+    if !sim.published.registered {
         return;
     }
 
@@ -337,6 +359,34 @@ pub fn RE_EndFrame(
 
     // use the other buffers next frame, because another CPU
     // may still be rendering into the current ones
+    match sink {
+        Some(sink) => {
+            // Take a returned buffer if the render thread has finished with
+            // one, so the steady state reuses its allocation. A miss just
+            // builds a fresh stream.
+            let spare = sink.recycled.try_recv().unwrap_or(FrameData {
+                events: Vec::new(),
+            });
+            let package = FramePackage {
+                frame_data: mem::replace(frame, spare),
+                float_time,
+                cvars: RenderCvarSnapshot::from_cvars(cvars, common),
+                assets: Arc::clone(&sim.published),
+                uploads: img_state.pending_uploads.drain().collect(),
+                capture: pending_capture.take(),
+            };
+            // Blocking, not `try_send`. The bound paces the sim thread, and a
+            // dropped frame would lose draws the client already issued.
+            // A closed channel means the render thread is gone, and the
+            // process is on its way down, so the frame is discarded.
+            let _ = sink.packages.send(package);
+        }
+        None => {}
+    }
+
+    // `frame` now holds the next frame's stream, either the recycled buffer or
+    // the one just cleared in place, so the same Raven call starts it either
+    // way.
     R_ToggleSmpFrame(frame, scene);
 
     // DEFERRED: `if (frontEndMsec) *frontEndMsec = tr.frontEndMsec;

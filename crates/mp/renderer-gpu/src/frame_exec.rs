@@ -43,12 +43,15 @@
 //! image has not been uploaded. Both log once per process rather than dropping
 //! the quad.
 
+use std::mem;
+
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::cm_terrain::CmLandScape;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::qfiles::light_style_limits::MAX_LIGHT_STYLES;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::frame_event::FrameEvent;
+use mp_renderer::render_state::frame_package::FramePackage;
 use mp_renderer::render_state::frame_state::FrameState;
 use mp_renderer::render_state::image_asset::ImageHandle;
 use mp_renderer::render_state::placeholders::{RefEntity, TrRefdef, WorldAsset};
@@ -56,7 +59,7 @@ use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::render_state::renderer_cvars::RendererCvars;
 use mp_renderer::render_state::shader_asset::ShaderHandle;
-use mp_renderer::tr_image::TrImageState;
+use mp_renderer::tr_image::PendingUpload;
 use mp_renderer::tr_local::dlight_s::dlight_t;
 use mp_renderer::tr_local::fog_t::fog_t;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
@@ -303,6 +306,36 @@ impl FrameExecutor {
         self.pipeline3d.take_ghoul2_capture()
     }
 
+    /// Replays one package that arrived over the frame channel, and returns it
+    /// so the caller can hand its event buffer back to the sim thread.
+    ///
+    /// This is the live client's whole draw path. The scene arms are counted
+    /// and skipped: a world frame needs the engine-side borrows a package does
+    /// not carry, so the world lands in the next wave. The 2D arms draw for
+    /// real, which is what puts menus and the HUD on the screen.
+    pub fn execute_package(
+        &mut self,
+        gpu: &mut Gpu,
+        target: &TextureView,
+        package: &mut FramePackage,
+        gpu_images: &mut GpuImages,
+        noise: &NoiseState,
+    ) -> FrameStats {
+        let uploads = mem::take(&mut package.uploads);
+        self.execute_frame(
+            gpu,
+            target,
+            &package.frame_data,
+            &package.assets,
+            uploads,
+            gpu_images,
+            noise,
+            package.float_time,
+            package.cvars,
+            None,
+        )
+    }
+
     /// Replays `frame_data`'s events in order into `target`.
     ///
     /// The colour register is per-frame, not persistent: the oracle's
@@ -316,6 +349,11 @@ impl FrameExecutor {
     /// (`rgbGen wave`, `tcMod scroll`/`rotate`, `animMap`) is driven from it.
     ///
     /// Source: `oracle/codemp/renderer/tr_backend.cpp:1289-1291`
+    ///
+    /// The live client reaches this through [`FrameExecutor::execute_package`],
+    /// which unpacks a `FramePackage` that arrived over the frame channel. A
+    /// harness or golden test calls it directly with the borrows it already
+    /// holds.
     #[allow(clippy::too_many_arguments)]
     pub fn execute_frame(
         &mut self,
@@ -323,7 +361,7 @@ impl FrameExecutor {
         target: &TextureView,
         frame_data: &FrameData,
         assets: &RenderAssets,
-        img_state: &mut TrImageState,
+        uploads: Vec<(ImageHandle, PendingUpload)>,
         gpu_images: &mut GpuImages,
         noise: &NoiseState,
         float_time: f32,
@@ -353,7 +391,7 @@ impl FrameExecutor {
             Some(w) => &*w.assets,
             None => assets,
         };
-        stats.images_uploaded = gpu_images.upload_pending(gpu, img_state, upload_assets) as u32;
+        stats.images_uploaded = gpu_images.upload_staged(gpu, uploads, upload_assets) as u32;
 
         self.batch.clear();
 

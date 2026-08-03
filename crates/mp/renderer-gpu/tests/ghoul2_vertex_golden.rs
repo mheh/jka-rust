@@ -481,7 +481,7 @@ fn golden_ghoul2_verts_stormtrooper() {
             &target,
             &frame_data,
             &dummy_assets,
-            img_state,
+            img_state.pending_uploads.drain().collect(),
             &mut images,
             noise,
             float_time,

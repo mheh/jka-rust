@@ -20,6 +20,7 @@ mod pump;
 mod render_thread;
 mod sim;
 
+use std::sync::mpsc::{channel, sync_channel};
 use std::thread::Builder;
 
 use mp_engine_qcommon::common::platform_events::platform_event_bus;
@@ -27,6 +28,9 @@ use mp_engine_qcommon::common::ComError;
 use winit::event_loop::EventLoop;
 
 use crate::pump::{Pump, PUMP_CONTROL_FLOW};
+
+/// Frames the sim thread may run ahead before it blocks on the render thread.
+const FRAME_QUEUE: usize = 2;
 
 /// Join process argv into the single command string `Com_ParseCommandLine`
 /// splits, Raven's merge-argv step.
@@ -52,15 +56,24 @@ fn main() {
     }));
 
     let (sink, source) = platform_event_bus();
+
+    // The frame channel, sim to render. The bound paces the sim thread rather
+    // than dropping frames, and two in flight is enough to keep the render
+    // thread busy across one frame's jitter.
+    let (packages_tx, packages_rx) = sync_channel(FRAME_QUEUE);
+    // The return channel, render to sim: emptied event buffers, reused
+    // (`R2-D8`).
+    let (recycled_tx, recycled_rx) = channel();
+
     let arguments = command_line();
     Builder::new()
         .name("jamp-sim".to_string())
-        .spawn(move || sim::run(source, arguments))
+        .spawn(move || sim::run(source, arguments, packages_tx, recycled_rx))
         .expect("spawn: the client could not start its sim thread");
 
     let event_loop = EventLoop::new().expect("EventLoop::new: the client has no window system");
     event_loop.set_control_flow(PUMP_CONTROL_FLOW);
-    let mut pump = Pump::new(sink);
+    let mut pump = Pump::new(sink, packages_rx, recycled_tx);
     event_loop
         .run_app(&mut pump)
         .expect("run_app: the client event loop failed");

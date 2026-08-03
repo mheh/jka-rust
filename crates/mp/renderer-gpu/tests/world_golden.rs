@@ -266,7 +266,7 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
             &target,
             &frame_data,
             &dummy_assets,
-            img_state,
+            img_state.pending_uploads.drain().collect(),
             &mut images,
             noise,
             float_time,
