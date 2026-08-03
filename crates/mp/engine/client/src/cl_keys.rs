@@ -1024,7 +1024,7 @@ pub fn Message_Key(common: &mut Common, cl: &mut Client, key: c_int) {
                     }
                 }
 
-                CL_AddReliableCommand(cl, buffer.as_ptr() as *const c_char);
+                CL_AddReliableCommand(cl, &buf_to_string(&buffer));
             }
             cl.cls.keyCatchers &= !KEYCATCH_MESSAGE;
             Field_Clear(&mut cl.chatField);

@@ -2007,21 +2007,28 @@ pub fn CL_UISystemCalls(
         };
         0
     } else if trap == MpUiImport::UI_G2_HAVEWEGHOULMODELS as c_int {
-        unsafe {
-            mp_engine_ghoul2::api_models::g2api_have_we_ghoul2_models(
-                g2,
-                &*(*args.offset(1) as *const CGhoul2Info_v),
-            ) as c_int
+        // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
+        // Source: `oracle/codemp/ghoul2/G2_API.cpp:1923`
+        let p = unsafe { *args.offset(1) } as *const CGhoul2Info_v;
+        if p.is_null() {
+            0
+        } else {
+            unsafe { mp_engine_ghoul2::api_models::g2api_have_we_ghoul2_models(g2, &*p) as c_int }
         }
     } else if trap == MpUiImport::UI_G2_SETMODELS as c_int {
-        unsafe {
-            mp_engine_ghoul2::api_models::g2api_set_ghoul2_model_indexes(
-                g2,
-                &mut *(*args.offset(1) as *mut CGhoul2Info_v),
-                core::slice::from_raw_parts(vma(view.common, args, 2) as *const _, 0),
-                core::slice::from_raw_parts(vma(view.common, args, 3) as *const _, 0),
-            )
-        };
+        // A null handle makes Raven's `if ((int)&ghoul2)` false, and the call does nothing.
+        // Source: `oracle/codemp/ghoul2/G2_API.cpp:1942`
+        let p = unsafe { *args.offset(1) } as *mut CGhoul2Info_v;
+        if !p.is_null() {
+            unsafe {
+                mp_engine_ghoul2::api_models::g2api_set_ghoul2_model_indexes(
+                    g2,
+                    &mut *p,
+                    core::slice::from_raw_parts(vma(view.common, args, 2) as *const _, 0),
+                    core::slice::from_raw_parts(vma(view.common, args, 3) as *const _, 0),
+                )
+            };
+        }
         0
     } else if trap == MpUiImport::UI_G2_GETBOLT as c_int {
         get_bolt_matrix_arm(view, g2, args) as c_int
@@ -2072,28 +2079,35 @@ pub fn CL_UISystemCalls(
         // Raven: "not supported for ui" — both arms return 0.
         0
     } else if trap == MpUiImport::UI_G2_ANGLEOVERRIDE as c_int {
-        // SAFETY: every pointer here is module-space (porting-rules §D11), and
-        // `args` is the trampoline's 16-word frame.
-        unsafe {
-            let bone_name = cstr_to_string(vma(view.common, args, 3) as *const c_char);
-            let angles = *(vma(view.common, args, 4) as *const vec3_t);
-            let model_list =
-                core::slice::from_raw_parts(vma(view.common, args, 9) as *const qhandle_t, 0);
-            g2api_set_bone_angles(
-                g2,
-                view,
-                &mut *(*args.offset(1) as *mut CGhoul2Info_v),
-                *args.offset(2) as c_int,
-                &bone_name,
-                angles,
-                *args.offset(5) as c_int,
-                core::mem::transmute::<c_int, Eorientations>(*args.offset(6) as c_int),
-                core::mem::transmute::<c_int, Eorientations>(*args.offset(7) as c_int),
-                core::mem::transmute::<c_int, Eorientations>(*args.offset(8) as c_int),
-                model_list,
-                *args.offset(10) as c_int,
-                *args.offset(11) as c_int,
-            ) as c_int
+        // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
+        // Source: `oracle/codemp/ghoul2/G2_API.cpp:1302`
+        let p = unsafe { *args.offset(1) } as *mut CGhoul2Info_v;
+        if p.is_null() {
+            0
+        } else {
+            // SAFETY: every pointer here is module-space (porting-rules §D11), and
+            // `args` is the trampoline's 16-word frame.
+            unsafe {
+                let bone_name = cstr_to_string(vma(view.common, args, 3) as *const c_char);
+                let angles = *(vma(view.common, args, 4) as *const vec3_t);
+                let model_list =
+                    core::slice::from_raw_parts(vma(view.common, args, 9) as *const qhandle_t, 0);
+                g2api_set_bone_angles(
+                    g2,
+                    view,
+                    &mut *p,
+                    *args.offset(2) as c_int,
+                    &bone_name,
+                    angles,
+                    *args.offset(5) as c_int,
+                    core::mem::transmute::<c_int, Eorientations>(*args.offset(6) as c_int),
+                    core::mem::transmute::<c_int, Eorientations>(*args.offset(7) as c_int),
+                    core::mem::transmute::<c_int, Eorientations>(*args.offset(8) as c_int),
+                    model_list,
+                    *args.offset(10) as c_int,
+                    *args.offset(11) as c_int,
+                ) as c_int
+            }
         }
     } else if trap == MpUiImport::UI_G2_CLEANMODELS as c_int {
         // SAFETY: `VMA(1)` is the module's `CGhoul2Info_v *` slot (§D11).
@@ -2109,20 +2123,27 @@ pub fn CL_UISystemCalls(
         }
         0
     } else if trap == MpUiImport::UI_G2_PLAYANIM as c_int {
-        unsafe {
-            mp_engine_ghoul2::api_bones::g2api_set_bone_anim(
-                g2,
-                &mut *(*args.offset(1) as *mut CGhoul2Info_v),
-                *args.offset(2) as c_int,
-                &cstr_to_string(vma(view.common, args, 3) as *const c_char),
-                *args.offset(4) as c_int,
-                *args.offset(5) as c_int,
-                *args.offset(6) as c_int,
-                vmf(args, 7),
-                *args.offset(8) as c_int,
-                vmf(args, 9),
-                *args.offset(10) as c_int,
-            ) as c_int
+        // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
+        // Source: `oracle/codemp/ghoul2/G2_API.cpp:1103`
+        let p = unsafe { *args.offset(1) } as *mut CGhoul2Info_v;
+        if p.is_null() {
+            0
+        } else {
+            unsafe {
+                mp_engine_ghoul2::api_bones::g2api_set_bone_anim(
+                    g2,
+                    &mut *p,
+                    *args.offset(2) as c_int,
+                    &cstr_to_string(vma(view.common, args, 3) as *const c_char),
+                    *args.offset(4) as c_int,
+                    *args.offset(5) as c_int,
+                    *args.offset(6) as c_int,
+                    vmf(args, 7),
+                    *args.offset(8) as c_int,
+                    vmf(args, 9),
+                    *args.offset(10) as c_int,
+                ) as c_int
+            }
         }
     } else if trap == MpUiImport::UI_G2_GETBONEANIM as c_int {
         unsafe {
@@ -2173,17 +2194,23 @@ pub fn CL_UISystemCalls(
             }
         }
     } else if trap == MpUiImport::UI_G2_GETGLANAME as c_int {
-        unsafe {
-            let point = vma(view.common, args, 3) as *mut c_char;
-            if let Some(local) = mp_engine_ghoul2::api_saveload::g2api_get_gla_name(
-                g2,
-                view,
-                &*(*args.offset(1) as *const CGhoul2Info_v),
-                *args.offset(2) as c_int,
-            ) {
-                let s = string_to_latin1(&local);
-                core::ptr::copy_nonoverlapping(s.as_ptr(), point as *mut u8, s.len());
-                *point.add(s.len()) = 0;
+        // Raven reads the handle before its `if ((int)&ghoul2)` check, so a null handle is UB.
+        // §19: we take the NULL-name path, which leaves the out-buffer alone.
+        // Source: `oracle/codemp/ghoul2/G2_API.cpp:2414-2416`
+        let p = unsafe { *args.offset(1) } as *const CGhoul2Info_v;
+        if !p.is_null() {
+            unsafe {
+                let point = vma(view.common, args, 3) as *mut c_char;
+                if let Some(local) = mp_engine_ghoul2::api_saveload::g2api_get_gla_name(
+                    g2,
+                    view,
+                    &*p,
+                    *args.offset(2) as c_int,
+                ) {
+                    let s = string_to_latin1(&local);
+                    core::ptr::copy_nonoverlapping(s.as_ptr(), point as *mut u8, s.len());
+                    *point.add(s.len()) = 0;
+                }
             }
         }
         0
@@ -2197,15 +2224,22 @@ pub fn CL_UISystemCalls(
             )
         }
     } else if trap == MpUiImport::UI_G2_COPYSPECIFICGHOUL2MODEL as c_int {
-        unsafe {
-            mp_engine_ghoul2::api_models::g2api_copy_specific_g2_model(
-                g2,
-                &mut *(*args.offset(1) as *mut CGhoul2Info_v),
-                *args.offset(2) as c_int,
-                &mut *(*args.offset(3) as *mut CGhoul2Info_v),
-                *args.offset(4) as c_int,
-            )
-        };
+        // A null handle makes Raven's `if (((int)&ghoul2From) && ((int)&ghoul2To))` false,
+        // and the call does nothing.
+        // Source: `oracle/codemp/ghoul2/G2_API.cpp:2291`
+        let p_from = unsafe { *args.offset(1) } as *mut CGhoul2Info_v;
+        let p_to = unsafe { *args.offset(3) } as *mut CGhoul2Info_v;
+        if !p_from.is_null() && !p_to.is_null() {
+            unsafe {
+                mp_engine_ghoul2::api_models::g2api_copy_specific_g2_model(
+                    g2,
+                    &mut *p_from,
+                    *args.offset(2) as c_int,
+                    &mut *p_to,
+                    *args.offset(4) as c_int,
+                )
+            };
+        }
         0
     } else if trap == MpUiImport::UI_G2_DUPLICATEGHOUL2INSTANCE as c_int {
         // Raven returns on a live destination (assert dropped, NDEBUG) and
@@ -2253,25 +2287,37 @@ pub fn CL_UISystemCalls(
             }
         }
     } else if trap == MpUiImport::UI_G2_ADDBOLT as c_int {
-        unsafe {
-            let bone_name = cstr_to_string(vma(view.common, args, 3) as *const c_char);
-            mp_engine_ghoul2::api_bolts::g2api_add_bolt(
-                g2,
-                view,
-                &mut *(*args.offset(1) as *mut CGhoul2Info_v),
-                *args.offset(2) as c_int,
-                &bone_name,
-            )
+        // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is -1.
+        // Source: `oracle/codemp/ghoul2/G2_API.cpp:1637`
+        let p = unsafe { *args.offset(1) } as *mut CGhoul2Info_v;
+        if p.is_null() {
+            -1
+        } else {
+            unsafe {
+                let bone_name = cstr_to_string(vma(view.common, args, 3) as *const c_char);
+                mp_engine_ghoul2::api_bolts::g2api_add_bolt(
+                    g2,
+                    view,
+                    &mut *p,
+                    *args.offset(2) as c_int,
+                    &bone_name,
+                )
+            }
         }
     } else if trap == MpUiImport::UI_G2_SETBOLTON as c_int {
-        unsafe {
-            mp_engine_ghoul2::api_bolts::g2api_set_bolt_info(
-                g2,
-                &mut *(*args.offset(1) as *mut CGhoul2Info_v),
-                *args.offset(2) as c_int,
-                *args.offset(3) as c_int,
-            )
-        };
+        // A null handle makes Raven's `if ((int)&ghoul2)` false, and the call does nothing.
+        // Source: `oracle/codemp/ghoul2/G2_API.cpp:1686`
+        let p = unsafe { *args.offset(1) } as *mut CGhoul2Info_v;
+        if !p.is_null() {
+            unsafe {
+                mp_engine_ghoul2::api_bolts::g2api_set_bolt_info(
+                    g2,
+                    &mut *p,
+                    *args.offset(2) as c_int,
+                    *args.offset(3) as c_int,
+                )
+            };
+        }
         0
     } else if trap == MpUiImport::UI_G2_SETROOTSURFACE as c_int {
         unsafe {
@@ -2285,24 +2331,38 @@ pub fn CL_UISystemCalls(
             ) as c_int
         }
     } else if trap == MpUiImport::UI_G2_SETSURFACEONOFF as c_int {
-        unsafe {
-            let surface_name = cstr_to_string(vma(view.common, args, 2) as *const c_char);
-            mp_engine_ghoul2::api_surfaces::g2api_set_surface_on_off(
-                g2,
-                view,
-                &mut *(*args.offset(1) as *mut CGhoul2Info_v),
-                &surface_name,
-                *args.offset(3) as c_int,
-            ) as c_int
+        // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
+        // Source: `oracle/codemp/ghoul2/G2_API.cpp:710`
+        let p = unsafe { *args.offset(1) } as *mut CGhoul2Info_v;
+        if p.is_null() {
+            0
+        } else {
+            unsafe {
+                let surface_name = cstr_to_string(vma(view.common, args, 2) as *const c_char);
+                mp_engine_ghoul2::api_surfaces::g2api_set_surface_on_off(
+                    g2,
+                    view,
+                    &mut *p,
+                    &surface_name,
+                    *args.offset(3) as c_int,
+                ) as c_int
+            }
         }
     } else if trap == MpUiImport::UI_G2_SETNEWORIGIN as c_int {
-        unsafe {
-            mp_engine_ghoul2::api_bolts::g2api_set_new_origin(
-                g2,
-                view,
-                &mut *(*args.offset(1) as *mut CGhoul2Info_v),
-                *args.offset(2) as c_int,
-            ) as c_int
+        // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
+        // Source: `oracle/codemp/ghoul2/G2_API.cpp:2432`
+        let p = unsafe { *args.offset(1) } as *mut CGhoul2Info_v;
+        if p.is_null() {
+            0
+        } else {
+            unsafe {
+                mp_engine_ghoul2::api_bolts::g2api_set_new_origin(
+                    g2,
+                    view,
+                    &mut *p,
+                    *args.offset(2) as c_int,
+                ) as c_int
+            }
         }
     } else if trap == MpUiImport::UI_G2_GETTIME as c_int {
         mp_engine_ghoul2::api_collision::g2api_get_time(g2, 0)
@@ -2386,18 +2446,28 @@ pub fn CL_UISystemCalls(
             ) as c_int
         }
     } else if trap == MpUiImport::UI_G2_ATTACHG2MODEL as c_int {
-        unsafe {
-            let g2_from = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
-            let g2_to = &mut *(*args.offset(3) as *mut CGhoul2Info_v);
-            mp_engine_ghoul2::api_bolts::g2api_attach_g2_model(
-                g2,
-                view,
-                g2_from,
-                *args.offset(2) as c_int,
-                g2_to,
-                *args.offset(4) as c_int,
-                *args.offset(5) as c_int,
-            ) as c_int
+        // Raven sets up both handles before its `if (((int)&ghoul2From) && ((int)&ghoul2To))`
+        // check, so a null handle is UB.
+        // §19: we answer qfalse, which is the result the check gives.
+        // Source: `oracle/codemp/ghoul2/G2_API.cpp:1665-1669`
+        let p_from = unsafe { *args.offset(1) } as *mut CGhoul2Info_v;
+        let p_to = unsafe { *args.offset(3) } as *mut CGhoul2Info_v;
+        if p_from.is_null() || p_to.is_null() {
+            0
+        } else {
+            unsafe {
+                let g2_from = &mut *p_from;
+                let g2_to = &mut *p_to;
+                mp_engine_ghoul2::api_bolts::g2api_attach_g2_model(
+                    g2,
+                    view,
+                    g2_from,
+                    *args.offset(2) as c_int,
+                    g2_to,
+                    *args.offset(4) as c_int,
+                    *args.offset(5) as c_int,
+                ) as c_int
+            }
         }
     } else {
         com_error(errorParm_t::ERR_DROP, format!("Bad UI system trap: {trap}"));

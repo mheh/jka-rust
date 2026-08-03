@@ -20,9 +20,10 @@ use std::sync::Arc;
 
 use native_platform::sys_main::{Sys_CheckCD, Sys_MonkeyShouldBeSpanked};
 use native_string::atoi::atoi;
+use native_string::cstr::{cstr, latin1_to_string, string_to_latin1};
 use native_string::info::{Info_SetValueForKey, Info_ValueForKey};
 use native_string::q_string::{Q_strcat, Q_stricmp, Q_strncmp};
-use native_string::q_strncpyz::Q_strncpyz;
+use native_string::q_strncpyz::{Q_strncpyz, Q_strncpyzBytes};
 use native_types::{byte, qboolean, qfalse, qtrue, word, MAX_QPATH};
 
 use mp_abi::ui::exports::MpUiExport;
@@ -143,7 +144,7 @@ use crate::snd_dma::S_RestartMusic;
 /// Raven: if we would be losing an old command that has not been acknowledged,
 /// we must drop the connection.
 /// Source: `oracle/codemp/client/cl_main.cpp:156-167`
-pub fn CL_AddReliableCommand(cl: &mut Client, cmd: *const c_char) {
+pub fn CL_AddReliableCommand(cl: &mut Client, cmd: &str) {
     let index: c_int;
 
     // if we would be losing an old command that hasn't been acknowledged,
@@ -153,11 +154,11 @@ pub fn CL_AddReliableCommand(cl: &mut Client, cmd: *const c_char) {
     }
     cl.clc.reliableSequence += 1;
     index = cl.clc.reliableSequence & (MAX_RELIABLE_COMMANDS as c_int - 1);
-    let src: String = unsafe { CStr::from_ptr(cmd) }
-        .to_string_lossy()
-        .into_owned();
+    // Raven copies the caller's bytes without a change.
+    // The Latin-1 encode writes those same bytes into the command slot.
+    let src = string_to_latin1(cmd);
     let destsize = cl.clc.reliableCommands[index as usize].len();
-    Q_strncpyz(&mut cl.clc.reliableCommands[index as usize], &src, destsize);
+    Q_strncpyzBytes(&mut cl.clc.reliableCommands[index as usize], &src, destsize);
 }
 
 /// `CL_ChangeReliableCommand` — corrupts the newest reliable command on purpose.
@@ -500,8 +501,8 @@ pub fn CL_Rcon_f(common: &mut Common, cl: &mut Client) {
 
             return;
         }
-        let rcon_address = common.cvar(cl.rconAddress).string.clone();
-        NET_StringToAdr(rcon_address.as_ptr() as *const c_char, &mut to);
+        let rcon_address = cstr(&common.cvar(cl.rconAddress).string);
+        NET_StringToAdr(rcon_address.as_ptr(), &mut to);
         if to.port == 0 {
             to.port = (PORT_SERVER as u16).to_be();
         }
@@ -581,8 +582,8 @@ pub fn CL_Clientinfo_f(common: &mut Common, cl: &mut Client) {
     com_printf(common, "User info settings:\n");
     // PORT-NOTE(info-print): `Cvar_InfoString` returns an owned `String`, and
     // `Info_Print` still takes the raw seam pointer.
-    let userinfo = Cvar_InfoString(common, CVAR_USERINFO);
-    Info_Print(common, userinfo.as_ptr() as *const c_char);
+    let userinfo = cstr(&Cvar_InfoString(common, CVAR_USERINFO));
+    Info_Print(common, userinfo.as_ptr());
     com_printf(common, "--------------------------------------\n");
 }
 
@@ -1767,7 +1768,7 @@ pub fn CL_Record_f(view: &mut EngineHostView, cl: &mut Client) {
 ///
 /// Raven: key-up commands and `+` commands are never forwarded.
 /// Source: `oracle/codemp/client/cl_main.cpp:913-937`
-pub fn CL_ForwardCommandToServer(common: &mut Common, cl: &mut Client, string: *const c_char) {
+pub fn CL_ForwardCommandToServer(common: &mut Common, cl: &mut Client, string: &str) {
     let cmd = Cmd_Argv(common, 0).to_string();
 
     // ignore key up commands
@@ -1786,7 +1787,7 @@ pub fn CL_ForwardCommandToServer(common: &mut Common, cl: &mut Client, string: *
     if Cmd_Argc(common) > 1 {
         CL_AddReliableCommand(cl, string);
     } else {
-        CL_AddReliableCommand(cl, cmd.as_ptr() as *const c_char);
+        CL_AddReliableCommand(cl, &cmd);
     }
 }
 
@@ -1802,7 +1803,7 @@ pub fn CL_ForwardToServer_f(common: &mut Common, cl: &mut Client) {
     // don't forward the first argument
     if Cmd_Argc(common) > 1 {
         let args = Cmd_Args(common);
-        CL_AddReliableCommand(cl, args.as_ptr() as *const c_char);
+        CL_AddReliableCommand(cl, &args);
     }
 }
 
@@ -1827,15 +1828,15 @@ pub fn CL_SendPureChecksums(common: &mut Common, cl: &mut Client) {
     for i in 0..2 {
         cMsg[i] += 10;
     }
-    CL_AddReliableCommand(cl, cMsg.as_ptr());
+    let msg = latin1_to_string(unsafe { CStr::from_ptr(cMsg.as_ptr()) }.to_bytes());
+    CL_AddReliableCommand(cl, &msg);
 }
 
 /// `CL_ResetPureClientAtServer` — tells the server to forget our pure state.
 ///
 /// Source: `oracle/codemp/client/cl_main.cpp:1296-1298`
 pub fn CL_ResetPureClientAtServer(cl: &mut Client) {
-    let cmd = format!("vdr");
-    CL_AddReliableCommand(cl, cmd.as_ptr() as *const c_char);
+    CL_AddReliableCommand(cl, "vdr");
 }
 
 /// `CL_BeginDownload` — starts one file download and publishes it to the UI.
@@ -1880,8 +1881,7 @@ pub fn CL_BeginDownload(
     cl.clc.downloadBlock = 0; // Starting new file
     cl.clc.downloadCount = 0;
 
-    let cmd = format!("download {}", remoteName);
-    CL_AddReliableCommand(cl, cmd.as_ptr() as *const c_char);
+    CL_AddReliableCommand(cl, &format!("download {}", remoteName));
 }
 
 /// `CL_ServersResponsePacket` — parses a master server's packed address list.
@@ -2058,7 +2058,7 @@ pub fn CL_CheckUserinfo(common: &mut Common, cl: &mut Client) {
     if common.cvar_modifiedFlags & CVAR_USERINFO != 0 {
         common.cvar_modifiedFlags &= !CVAR_USERINFO;
         let cmd = format!("userinfo \"{}\"", Cvar_InfoString(common, CVAR_USERINFO));
-        CL_AddReliableCommand(cl, cmd.as_ptr() as *const c_char);
+        CL_AddReliableCommand(cl, &cmd);
     }
 }
 
@@ -2226,7 +2226,7 @@ pub fn CL_ServerStatus_f(common: &mut Common, cl: &mut Client) {
         server = Cmd_Argv(common, 1).to_string();
     }
 
-    if NET_StringToAdr(server.as_ptr() as *const c_char, &mut to) == qfalse {
+    if NET_StringToAdr(cstr(&server).as_ptr(), &mut to) == qfalse {
         return;
     }
 
@@ -2317,7 +2317,8 @@ pub fn CL_ServerInfoPacket(
             let destsize = cl.cl_pinglist[i as usize].info.len();
             Q_strncpyz(&mut cl.cl_pinglist[i as usize].info, &slotinfo, destsize);
             let ping = cl.cl_pinglist[i as usize].time;
-            CL_SetServerInfoByAddress(common, cl, from, infoString.as_ptr() as *const c_char, ping);
+            let infoString_c = cstr(&infoString);
+            CL_SetServerInfoByAddress(common, cl, from, infoString_c.as_ptr(), ping);
 
             return;
         }
@@ -2475,7 +2476,7 @@ pub fn CL_Ping_f(common: &mut Common, cl: &mut Client) {
 
     server = Cmd_Argv(common, 1).to_string();
 
-    if NET_StringToAdr(server.as_ptr() as *const c_char, &mut to) == qfalse {
+    if NET_StringToAdr(cstr(&server).as_ptr(), &mut to) == qfalse {
         return;
     }
 
@@ -2709,8 +2710,7 @@ pub fn CL_Disconnect(view: &mut EngineHostView, cl: &mut Client, showMainMenu: q
     // send a disconnect message to the server
     // send it a few times in case one is dropped
     if cl.cls.state as c_int >= connstate_t::CA_CONNECTED as c_int {
-        let cmd = format!("disconnect");
-        CL_AddReliableCommand(cl, cmd.as_ptr() as *const c_char);
+        CL_AddReliableCommand(cl, "disconnect");
         CL_WritePacket(view, cl);
         CL_WritePacket(view, cl);
         CL_WritePacket(view, cl);
@@ -2848,11 +2848,7 @@ pub fn CL_Connect_f(view: &mut EngineHostView, cl: &mut Client) {
         .take_while(|&&c| c != 0)
         .map(|&c| c as u8 as char)
         .collect();
-    if NET_StringToAdr(
-        servername.as_ptr() as *const c_char,
-        &mut cl.clc.serverAddress,
-    ) == qfalse
-    {
+    if NET_StringToAdr(cstr(&servername).as_ptr(), &mut cl.clc.serverAddress) == qfalse {
         com_printf(view.common, "Bad server address\n");
         cl.cls.state = connstate_t::CA_DISCONNECTED;
         return;
@@ -3338,8 +3334,7 @@ pub fn CL_DownloadsComplete(view: &mut EngineHostView, cl: &mut Client) {
         FS_Restart(view, cl.clc.checksumFeed); // We possibly downloaded a pak, restart the file system to load it
 
         // inform the server so we get new gamestate info
-        let cmd = format!("donedl");
-        CL_AddReliableCommand(cl, cmd.as_ptr() as *const c_char);
+        CL_AddReliableCommand(cl, "donedl");
 
         // by sending the donenl command we request a new gamestate
         // so we don't want to load stuff yet

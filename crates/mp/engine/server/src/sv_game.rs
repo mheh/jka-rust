@@ -3037,12 +3037,24 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_HAVEWEGHOULMODELS as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &*(*args.offset(1) as *const CGhoul2Info_v);
+            // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
+            // Source: `oracle/codemp/ghoul2/G2_API.cpp:1923`
+            let p = *args.offset(1) as *const CGhoul2Info_v;
+            if p.is_null() {
+                return 0;
+            }
+            let ghoul2 = &*p;
             return g2api_have_we_ghoul2_models(g2, ghoul2) as isize;
         } else if trap == G::G_G2_SETMODELS as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            // A null handle makes Raven's `if ((int)&ghoul2)` false, and the call does nothing.
+            // Source: `oracle/codemp/ghoul2/G2_API.cpp:1942`
+            let p = *args.offset(1) as *mut CGhoul2Info_v;
+            if p.is_null() {
+                return 0;
+            }
+            let ghoul2 = &mut *p;
             // Raven's `(qhandle_t*)VMA(2)`/`VMA(3)` arrays are length-less at the
             // seam and the ported fn ignores both (api_models.rs) — empty slices.
             g2api_set_ghoul2_model_indexes(g2, ghoul2, &[], &[]);
@@ -3163,7 +3175,13 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_ADDBOLT as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is -1.
+            // Source: `oracle/codemp/ghoul2/G2_API.cpp:1637`
+            let p = *args.offset(1) as *mut CGhoul2Info_v;
+            if p.is_null() {
+                return -1;
+            }
+            let ghoul2 = &mut *p;
             let bone_name = core::ffi::CStr::from_ptr(vma(view.common, args, 3) as *const c_char)
                 .to_str()
                 .unwrap_or("");
@@ -3171,7 +3189,13 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_SETBOLTINFO as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            // A null handle makes Raven's `if ((int)&ghoul2)` false, and the call does nothing.
+            // Source: `oracle/codemp/ghoul2/G2_API.cpp:1686`
+            let p = *args.offset(1) as *mut CGhoul2Info_v;
+            if p.is_null() {
+                return 0;
+            }
+            let ghoul2 = &mut *p;
             g2api_set_bolt_info(
                 g2,
                 ghoul2,
@@ -3182,7 +3206,13 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_ANGLEOVERRIDE as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
+            // Source: `oracle/codemp/ghoul2/G2_API.cpp:1302`
+            let p = *args.offset(1) as *mut CGhoul2Info_v;
+            if p.is_null() {
+                return 0;
+            }
+            let ghoul2 = &mut *p;
             let bone_name = core::ffi::CStr::from_ptr(vma(view.common, args, 3) as *const c_char)
                 .to_str()
                 .unwrap_or("");
@@ -3223,7 +3253,13 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_PLAYANIM as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
+            // Source: `oracle/codemp/ghoul2/G2_API.cpp:1103`
+            let p = *args.offset(1) as *mut CGhoul2Info_v;
+            if p.is_null() {
+                return 0;
+            }
+            let ghoul2 = &mut *p;
             let bone_name = core::ffi::CStr::from_ptr(vma(view.common, args, 3) as *const c_char)
                 .to_str()
                 .unwrap_or("");
@@ -3284,7 +3320,14 @@ pub fn SV_GameSystemCalls(
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
             let point = vma(view.common, args, 3) as *mut c_char;
-            let ghoul2 = &*(*args.offset(1) as *const CGhoul2Info_v);
+            // Raven reads the handle before its `if ((int)&ghoul2)` check, so a null handle is UB.
+            // §19: we take the NULL-name path, which leaves the out-buffer alone.
+            // Source: `oracle/codemp/ghoul2/G2_API.cpp:2414-2416`
+            let p = *args.offset(1) as *const CGhoul2Info_v;
+            if p.is_null() {
+                return 0;
+            }
+            let ghoul2 = &*p;
             // Raven shoves the name into the VM-supplied buffer instead of
             // returning a pointer; the ported fn returns `Option<String>`.
             if let Some(name) = g2api_get_gla_name(g2, view, ghoul2, *args.offset(2) as c_int) {
@@ -3303,8 +3346,16 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_COPYSPECIFICGHOUL2MODEL as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let g2_from = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
-            let g2_to = &mut *(*args.offset(3) as *mut CGhoul2Info_v);
+            // A null handle makes Raven's `if (((int)&ghoul2From) && ((int)&ghoul2To))` false,
+            // and the call does nothing.
+            // Source: `oracle/codemp/ghoul2/G2_API.cpp:2291`
+            let p_from = *args.offset(1) as *mut CGhoul2Info_v;
+            let p_to = *args.offset(3) as *mut CGhoul2Info_v;
+            if p_from.is_null() || p_to.is_null() {
+                return 0;
+            }
+            let g2_from = &mut *p_from;
+            let g2_to = &mut *p_to;
             g2api_copy_specific_g2_model(
                 g2,
                 g2_from,
@@ -3439,7 +3490,13 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_SETSURFACEONOFF as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
+            // Source: `oracle/codemp/ghoul2/G2_API.cpp:710`
+            let p = *args.offset(1) as *mut CGhoul2Info_v;
+            if p.is_null() {
+                return 0;
+            }
+            let ghoul2 = &mut *p;
             let surface_name =
                 core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
                     .to_str()
@@ -3454,7 +3511,13 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_SETNEWORIGIN as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
+            // Source: `oracle/codemp/ghoul2/G2_API.cpp:2432`
+            let p = *args.offset(1) as *mut CGhoul2Info_v;
+            if p.is_null() {
+                return 0;
+            }
+            let ghoul2 = &mut *p;
             return g2api_set_new_origin(g2, view, ghoul2, *args.offset(2) as c_int) as isize;
         } else if trap == G::G_G2_DOESBONEEXIST as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.

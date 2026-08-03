@@ -659,7 +659,7 @@ pub fn CL_ParseDownload(view: &mut EngineHostView, cl: &mut Client, msg: *mut ms
                 view.common,
                 "Server sending download, but no download was requested\n",
             );
-            CL_AddReliableCommand(cl, c"stopdl".as_ptr());
+            CL_AddReliableCommand(cl, "stopdl");
             return;
         }
 
@@ -667,7 +667,7 @@ pub fn CL_ParseDownload(view: &mut EngineHostView, cl: &mut Client, msg: *mut ms
 
         if cl.clc.download == 0 {
             com_printf(view.common, &format!("Could not create {}\n", temp_name));
-            CL_AddReliableCommand(cl, c"stopdl".as_ptr());
+            CL_AddReliableCommand(cl, "stopdl");
             CL_NextDownload(view, cl);
             return;
         }
@@ -682,8 +682,7 @@ pub fn CL_ParseDownload(view: &mut EngineHostView, cl: &mut Client, msg: *mut ms
         );
     }
 
-    let nextdl_cmd = format!("nextdl {}\0", cl.clc.downloadBlock);
-    CL_AddReliableCommand(cl, nextdl_cmd.as_ptr() as *const c_char);
+    CL_AddReliableCommand(cl, &format!("nextdl {}", cl.clc.downloadBlock));
     cl.clc.downloadBlock += 1;
 
     cl.clc.downloadCount += size;
