@@ -69,7 +69,7 @@ use mp_engine_qcommon::common_fns::{
 use mp_engine_qcommon::cvar_fns::{
     Cvar_Register, Cvar_Set, Cvar_Update, Cvar_VariableStringBuffer, Cvar_VariableValue,
 };
-use mp_engine_qcommon::files_common::{FS_FCloseFile, FS_Write};
+use mp_engine_qcommon::files_common::{FS_FCloseFile, FS_FOpenFileRead, FS_Write};
 use mp_engine_qcommon::files_pc::{FS_FOpenFileByMode, FS_GetFileList, FS_Read2};
 use mp_engine_qcommon::qcommon::net_limits::{MAX_RELIABLE_COMMANDS, PACKET_BACKUP, PACKET_MASK};
 use mp_engine_qcommon::qcommon::shared_traps_t::sharedTraps_t;
@@ -1117,6 +1117,17 @@ pub fn CL_InitCGame(view: &mut EngineHostView, cl: &mut Client) {
                 Cvar_VariableValue(view.common, "vm_cgame") as c_int,
             )
         };
+    }
+    // Raven's win32 client opens the module dll through the pak search before
+    // the OS load, which marks that pak's FS_CGAME_REF for the pure reply
+    // (`SV_VerifyPaks_f` expects it first, `sv_client.cpp:1301-1341`). The
+    // disk-side dylib load skips the pak search, so the same open lands here.
+    {
+        let mut h: fileHandle_t = 0;
+        FS_FOpenFileRead(view, "cgamex86.dll", &mut h, false);
+        if h != 0 {
+            FS_FCloseFile(view.common, h);
+        }
     }
     cl.cgvm = VM_Create(
         view,

@@ -26,7 +26,9 @@ use mp_engine_qcommon::cvar_fns::{
     Cvar_Get, Cvar_InfoStringBuffer, Cvar_Register, Cvar_Reset, Cvar_Set, Cvar_SetValue,
     Cvar_Update, Cvar_VariableStringBuffer, Cvar_VariableValue,
 };
-use mp_engine_qcommon::files_common::{FS_FCloseFile, FS_Read, FS_SV_FOpenFileRead, FS_Write};
+use mp_engine_qcommon::files_common::{
+    FS_FCloseFile, FS_FOpenFileRead, FS_Read, FS_SV_FOpenFileRead, FS_Write,
+};
 use mp_engine_qcommon::files_pc::{
     FS_FOpenFileByMode, FS_GetFileList, FS_Read2, FS_SV_FOpenFileWrite,
 };
@@ -65,7 +67,7 @@ use mp_renderer::tr_shader::{RE_RegisterShaderNoMip, RE_ShaderNameFromIndex, R_R
 use native_math::eorientations::Eorientations;
 use native_math::qmath::{AngleVectors, MatrixMultiply, PerpendicularVectorMP};
 use native_math::vector::vec3_t;
-use native_types::{mdxaBone_t, qhandle_t};
+use native_types::{fileHandle_t, mdxaBone_t, qhandle_t};
 use native_string::info::Info_SetValueForKey;
 use native_string::q_strncpyz::Q_strncpyz;
 use native_string::{latin1_to_string, string_to_latin1};
@@ -2424,6 +2426,15 @@ pub fn CL_InitUI(view: &mut EngineHostView, cl: &mut Client) {
             )
         }
     };
+    // The ui twin of the cgame pure-reference open (`CL_InitCGame`): the pak
+    // that holds `uix86.dll` gains FS_UI_REF, which the pure reply lists second.
+    {
+        let mut h: fileHandle_t = 0;
+        FS_FOpenFileRead(view, "uix86.dll", &mut h, false);
+        if h != 0 {
+            FS_FCloseFile(view.common, h);
+        }
+    }
     cl.uivm = VM_Create(view, "ui", Some(CL_UISystemCalls_trampoline), interpret);
     if cl.uivm.is_null() {
         com_error(errorParm_t::ERR_FATAL, "VM_Create on UI failed".to_string());
