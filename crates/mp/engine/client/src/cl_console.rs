@@ -722,7 +722,7 @@ pub fn Con_DrawNotify(view: &mut EngineHostView, cl: &mut Client) {
             // behavior change.
             let font_index_asian_notify = RE_RegisterFont(
                 &mut re.qs,
-                &mut re.frame,
+                &mut re.world_load,
                 Arc::make_mut(&mut re.sim.published),
                 view,
                 &re.cvars,
@@ -739,7 +739,7 @@ pub fn Con_DrawNotify(view: &mut EngineHostView, cl: &mut Client) {
                 + ((1.3f32 / cl.con.yadjust)
                     * RE_Font_HeightPixels(
                         &mut re.qs,
-                        &mut re.frame,
+                        &mut re.world_load,
                         Arc::make_mut(&mut re.sim.published),
                         view,
                         &re.cvars,
@@ -767,7 +767,7 @@ pub fn Con_DrawNotify(view: &mut EngineHostView, cl: &mut Client) {
 
             RE_Font_DrawString(
                 &mut re.qs,
-                &mut re.frame,
+                &mut re.world_load,
                 Arc::make_mut(&mut re.sim.published),
                 view,
                 &re.cvars,
@@ -986,7 +986,7 @@ pub fn Con_DrawSolidConsole(view: &mut EngineHostView, cl: &mut Client, frac: f3
         if cl.iFontIndexForAsian == 0 {
             cl.iFontIndexForAsian = RE_RegisterFont(
                 &mut re.qs,
-                &mut re.frame,
+                &mut re.world_load,
                 Arc::make_mut(&mut re.sim.published),
                 view,
                 &re.cvars,
@@ -1003,7 +1003,7 @@ pub fn Con_DrawSolidConsole(view: &mut EngineHostView, cl: &mut Client, frac: f3
         pixel_height_to_advance = ((1.3f32 / cl.con.yadjust)
             * RE_Font_HeightPixels(
                 &mut re.qs,
-                &mut re.frame,
+                &mut re.world_load,
                 Arc::make_mut(&mut re.sim.published),
                 view,
                 &re.cvars,
@@ -1050,7 +1050,7 @@ pub fn Con_DrawSolidConsole(view: &mut EngineHostView, cl: &mut Client, frac: f3
 
             RE_Font_DrawString(
                 &mut re.qs,
-                &mut re.frame,
+                &mut re.world_load,
                 Arc::make_mut(&mut re.sim.published),
                 view,
                 &re.cvars,

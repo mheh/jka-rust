@@ -1188,12 +1188,7 @@ pub fn CL_InitCGame(view: &mut EngineHostView, cl: &mut Client) {
     if !ref_headless(cl) {
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let re = unsafe { re_from_view(view) };
-        RE_EndRegistration(
-            view.common,
-            &re.cvars,
-            &re.sim.published,
-            &mut re.frame,
-        );
+        RE_EndRegistration(view.common, &re.cvars, &re.sim.published, &mut re.frame);
     }
 
     // Make sure everything is paged in.
@@ -1837,7 +1832,8 @@ pub fn CL_CgameSystemCalls(
         let re = unsafe { re_from_view(view) };
         RE_LoadWorldMap(
             &mut re.qs,
-            &mut re.frame,
+            &mut re.world_load,
+            &mut re.scene,
             Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
@@ -1855,7 +1851,7 @@ pub fn CL_CgameSystemCalls(
         let re = unsafe { re_from_view(view) };
         RE_RegisterModel(
             &mut re.qs,
-            &mut re.frame,
+            &mut re.world_load,
             Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
@@ -1872,7 +1868,7 @@ pub fn CL_CgameSystemCalls(
         let re = unsafe { re_from_view(view) };
         RE_RegisterSkin(
             &mut re.qs,
-            &mut re.frame,
+            &mut re.world_load,
             Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
@@ -1889,7 +1885,7 @@ pub fn CL_CgameSystemCalls(
         RE_RegisterShader(
             &name,
             &mut re.qs,
-            &mut re.frame,
+            &mut re.world_load,
             Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
@@ -1905,7 +1901,7 @@ pub fn CL_CgameSystemCalls(
         RE_RegisterShaderNoMip(
             &name,
             &mut re.qs,
-            &mut re.frame,
+            &mut re.world_load,
             Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
@@ -1922,7 +1918,7 @@ pub fn CL_CgameSystemCalls(
         let mod_count = re.font.iSE_Language_ModificationCount.unwrap_or(-1234);
         RE_RegisterFont(
             &mut re.qs,
-            &mut re.frame,
+            &mut re.world_load,
             Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
@@ -1943,7 +1939,7 @@ pub fn CL_CgameSystemCalls(
         let mod_count = re.font.iSE_Language_ModificationCount.unwrap_or(-1234);
         RE_Font_StrLenPixels(
             &mut re.qs,
-            &mut re.frame,
+            &mut re.world_load,
             Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
@@ -1971,7 +1967,7 @@ pub fn CL_CgameSystemCalls(
         let mod_count = re.font.iSE_Language_ModificationCount.unwrap_or(-1234);
         RE_Font_HeightPixels(
             &mut re.qs,
-            &mut re.frame,
+            &mut re.world_load,
             Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
@@ -1995,7 +1991,7 @@ pub fn CL_CgameSystemCalls(
         let millis = sys_milliseconds(view.common);
         RE_Font_DrawString(
             &mut re.qs,
-            &mut re.frame,
+            &mut re.world_load,
             Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
@@ -2123,7 +2119,13 @@ pub fn CL_CgameSystemCalls(
         // W2-F1 put the cvar reads on the frame snapshot, so this synchronous
         // trap resolves one before the call.
         let cvar_snapshot = RenderCvarSnapshot::from_cvars(&re.cvars, view.common);
-        match R_LightForPoint(cvar_snapshot, &re.sim.published, &re.frame, point) {
+        match R_LightForPoint(
+            cvar_snapshot,
+            &re.sim.published,
+            &re.world_load,
+            &re.frame,
+            point,
+        ) {
             Some((ambient, directed, light_dir)) => {
                 // SAFETY: the three are the module's seam out-params (§D11).
                 unsafe {
@@ -2447,7 +2449,7 @@ pub fn CL_CgameSystemCalls(
             &b,
             Some(&c),
             &mut re.qs,
-            &mut re.frame,
+            &mut re.world_load,
             Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,

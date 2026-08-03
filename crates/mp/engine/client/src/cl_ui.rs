@@ -1258,7 +1258,7 @@ pub fn CL_UISystemCalls(
             let rm = rm_from_view(view);
             RE_RegisterModel(
                 &mut re.qs,
-                &mut re.frame,
+                &mut re.world_load,
                 Arc::make_mut(&mut re.sim.published),
                 view,
                 &re.cvars,
@@ -1277,7 +1277,7 @@ pub fn CL_UISystemCalls(
             let rm = rm_from_view(view);
             RE_RegisterSkin(
                 &mut re.qs,
-                &mut re.frame,
+                &mut re.world_load,
                 Arc::make_mut(&mut re.sim.published),
                 view,
                 &re.cvars,
@@ -1296,7 +1296,7 @@ pub fn CL_UISystemCalls(
             RE_RegisterShaderNoMip(
                 &name,
                 &mut re.qs,
-                &mut re.frame,
+                &mut re.world_load,
                 Arc::make_mut(&mut re.sim.published),
                 view,
                 &re.cvars,
@@ -1677,7 +1677,7 @@ pub fn CL_UISystemCalls(
         let mod_count = re.font.iSE_Language_ModificationCount.unwrap_or(-1234);
         RE_RegisterFont(
             &mut re.qs,
-            &mut re.frame,
+            &mut re.world_load,
             Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
@@ -1701,7 +1701,7 @@ pub fn CL_UISystemCalls(
         let mod_count = re.font.iSE_Language_ModificationCount.unwrap_or(-1234);
         RE_Font_StrLenPixels(
             &mut re.qs,
-            &mut re.frame,
+            &mut re.world_load,
             Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
@@ -1732,7 +1732,7 @@ pub fn CL_UISystemCalls(
         let mod_count = re.font.iSE_Language_ModificationCount.unwrap_or(-1234);
         RE_Font_HeightPixels(
             &mut re.qs,
-            &mut re.frame,
+            &mut re.world_load,
             Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
@@ -1767,7 +1767,7 @@ pub fn CL_UISystemCalls(
         let mod_count = re.font.iSE_Language_ModificationCount.unwrap_or(-1234);
         RE_Font_DrawString(
             &mut re.qs,
-            &mut re.frame,
+            &mut re.world_load,
             Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
@@ -1944,7 +1944,7 @@ pub fn CL_UISystemCalls(
                 &new_shader_name,
                 Some(&time_offset),
                 &mut re.qs,
-                &mut re.frame,
+                &mut re.world_load,
                 Arc::make_mut(&mut re.sim.published),
                 view,
                 &re.cvars,

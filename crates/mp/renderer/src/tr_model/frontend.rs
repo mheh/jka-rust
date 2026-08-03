@@ -57,6 +57,7 @@ use super::render_models::RenderModels;
 use super::server_load::read_qpath;
 use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_state::FrameState;
+use crate::render_state::world_load_state::WorldLoadState;
 use crate::render_state::placeholders::{GlConfig, WorldAsset};
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
@@ -370,7 +371,7 @@ pub unsafe fn r_model_bounds(
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn re_register_models_malloc(
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -403,7 +404,7 @@ pub(crate) fn re_register_models_malloc(
                 &stylesDefault,
                 true,
                 qs,
-                frame,
+                world_load,
                 assets,
                 view,
                 cvars,
@@ -492,7 +493,7 @@ fn ll(x: i32) -> i32 {
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn r_load_md3(
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -532,7 +533,7 @@ pub(crate) fn r_load_md3(
 
     let (ptr, already_found) = re_register_models_malloc(
         qs,
-        frame,
+        world_load,
         assets,
         view,
         cvars,
@@ -673,7 +674,7 @@ pub(crate) fn r_load_md3(
                     &stylesDefault,
                     true,
                     qs,
-                    frame,
+                    world_load,
                     assets,
                     view,
                     cvars,
@@ -748,6 +749,7 @@ pub fn RE_BeginRegistration(
     state: &mut TrImageState,
     models: &mut RenderModels,
     frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     scene: &mut SceneState,
     frame_data: &mut FrameData,
     noise: &mut NoiseState,
@@ -765,6 +767,7 @@ pub fn RE_BeginRegistration(
         state,
         models,
         frame,
+        world_load,
         scene,
         frame_data,
         noise,
@@ -893,7 +896,7 @@ fn write_qpath(dest: &mut [c_char; MAX_QPATH], src: &str) {
 #[allow(clippy::too_many_arguments)]
 fn RE_RegisterModel_Actual(
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -933,7 +936,7 @@ fn RE_RegisterModel_Actual(
         let mut world = WorldAsset::default();
         RE_LoadWorldMap_Actual(
             qs,
-            frame,
+            world_load,
             assets,
             view,
             cvars,
@@ -1029,7 +1032,7 @@ fn RE_RegisterModel_Actual(
             let loaded = match ident {
                 MDXA_IDENT => rm.r_load_mdxa(
                     qs,
-                    frame,
+                    world_load,
                     assets,
                     view,
                     cvars,
@@ -1043,7 +1046,7 @@ fn RE_RegisterModel_Actual(
                 ),
                 MDXM_IDENT => rm.r_load_mdxm(
                     qs,
-                    frame,
+                    world_load,
                     assets,
                     view,
                     cvars,
@@ -1058,7 +1061,7 @@ fn RE_RegisterModel_Actual(
                 ),
                 MD3_IDENT => r_load_md3(
                     qs,
-                    frame,
+                    world_load,
                     assets,
                     view,
                     cvars,
@@ -1153,7 +1156,7 @@ fn RE_RegisterModel_Actual(
 #[allow(clippy::too_many_arguments)]
 pub fn RE_RegisterModel(
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -1169,7 +1172,7 @@ pub fn RE_RegisterModel(
 
     let q = RE_RegisterModel_Actual(
         qs,
-        frame,
+        world_load,
         assets,
         view,
         cvars,

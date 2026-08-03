@@ -22,7 +22,7 @@ use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_event::FrameEvent;
 use crate::render_state::frame_package::FramePackage;
 use crate::render_state::frame_sink::FrameSink;
-use crate::render_state::frame_state::FrameState;
+use crate::render_state::world_load_state::WorldLoadState;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
@@ -443,7 +443,7 @@ pub fn RE_BeginFrame(
     view: &mut EngineHostView,
     cvars: &RendererCvars,
     assets: &RenderAssets,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     image_state: &mut TrImageState,
     stereo_frame: stereoFrame_t,
 ) {
@@ -454,7 +454,7 @@ pub fn RE_BeginFrame(
     // `glState.finishCalled = qfalse;` — DEFERRED (see doc comment above)
     // Source: oracle/codemp/renderer/tr_cmds.cpp:328
 
-    frame.frame_count += 1;
+    world_load.frame_count += 1;
     // `tr.frameSceneNum = 0;` — DEFERRED (see doc comment above)
     // Source: oracle/codemp/renderer/tr_cmds.cpp:331
 
@@ -516,7 +516,7 @@ pub fn RE_BeginFrame(
         view.common.cvar_mut(cvars.r_gamma).modified = false;
 
         R_SyncRenderThread(assets, view.common, cvars);
-        R_SetColorMappings(view, cvars, &assets.glconfig, image_state, frame);
+        R_SetColorMappings(view, cvars, &assets.glconfig, image_state, world_load);
     }
 
     // check for errors

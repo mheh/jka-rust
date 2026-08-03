@@ -8,6 +8,7 @@ use mp_qshared::shared::com_parse::QSharedScratch;
 use mp_renderer::render_state::frame_state::FrameState;
 use mp_renderer::render_state::render_assets_sim::RenderAssetsSim;
 use mp_renderer::render_state::renderer_cvars::RendererCvars;
+use mp_renderer::render_state::world_load_state::WorldLoadState;
 use mp_renderer::tr_font::FontState;
 use mp_renderer::tr_image::TrImageState;
 use mp_renderer::tr_local::view_parms_t::viewParms_t;
@@ -43,6 +44,9 @@ pub struct UiHost {
     pub sim: RenderAssetsSim,
     pub img_state: TrImageState,
     pub frame: FrameState,
+    /// The `tr` fields the sim writes at load and the render side only reads
+    /// (W2-F3), the harness twin of `RendererFrontend::world_load`.
+    pub world_load: WorldLoadState,
     pub scene: SceneState,
     pub noise: NoiseState,
     pub rng: Rng,

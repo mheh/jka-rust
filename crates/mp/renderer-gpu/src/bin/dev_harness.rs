@@ -342,6 +342,7 @@ fn dev_registries() -> DevRegistries {
         projection_shadow_shader: ShaderHandle::slot_zero(),
         sun_shader: ShaderHandle::slot_zero(),
         world: None,
+        external_vis_data: None,
         bsp_models: Vec::new(),
         function_tables: FunctionTables::default(),
         distance_cull: 0.0,

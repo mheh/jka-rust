@@ -923,9 +923,9 @@ impl App {
                     let UiHost {
                         engine,
                         models,
-                        cvars,
                         sim,
                         frame: fstate,
+                        world_load,
                         img_state,
                         noise,
                         sky,
@@ -942,7 +942,7 @@ impl App {
                     let mut world = WorldFrame {
                         engine_view: &mut engine_view,
                         assets: Arc::make_mut(&mut sim.published),
-                        cvars,
+                        world_load,
                         frame: fstate,
                         g2,
                         sky,

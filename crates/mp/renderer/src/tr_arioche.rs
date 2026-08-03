@@ -15,7 +15,7 @@ use mp_qshared::shared::MAX_QPATH;
 use native_math::qmath::{ColorBytes4, Com_Clampi, NormalToLatLong};
 use native_string::{atoi, buf_to_string};
 
-use crate::render_state::frame_state::FrameState;
+use crate::render_state::world_load_state::WorldLoadState;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
@@ -68,7 +68,7 @@ use crate::tr_worldeffects::world_effects::WorldEffectsState;
 #[allow(clippy::too_many_arguments)]
 pub fn R_RMGInit(
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -110,7 +110,7 @@ pub fn R_RMGInit(
         &new_sky,
         None,
         qs,
-        frame,
+        world_load,
         assets,
         view,
         cvars,
@@ -137,12 +137,12 @@ pub fn R_RMGInit(
                 // with a throwaway alpha slot, reproducing the 3-component
                 // result byte-for-byte.
                 let ambient_in: [u8; 4] = [
-                    Com_Clampi(0, 255, (frame.sun_ambient[0] * 255.0) as c_int) as u8,
-                    Com_Clampi(0, 255, (frame.sun_ambient[1] * 255.0) as c_int) as u8,
-                    Com_Clampi(0, 255, (frame.sun_ambient[2] * 255.0) as c_int) as u8,
+                    Com_Clampi(0, 255, (world_load.sun_ambient[0] * 255.0) as c_int) as u8,
+                    Com_Clampi(0, 255, (world_load.sun_ambient[1] * 255.0) as c_int) as u8,
+                    Com_Clampi(0, 255, (world_load.sun_ambient[2] * 255.0) as c_int) as u8,
                     0,
                 ];
-                let ambient_out = R_ColorShiftLightingBytes(frame, ambient_in);
+                let ambient_out = R_ColorShiftLightingBytes(world_load, ambient_in);
                 first.ambientLight[0] = [ambient_out[0], ambient_out[1], ambient_out[2]];
 
                 // DEFERRED: `grid->directLight[0]` (oracle:57-60) —
@@ -150,7 +150,7 @@ pub fn R_RMGInit(
                 // above).
                 // Source: oracle/codemp/renderer/tr_arioche.cpp:57-60
 
-                NormalToLatLong(frame.sun_direction, first.latLong.as_mut_ptr());
+                NormalToLatLong(world_load.sun_direction, first.latLong.as_mut_ptr());
             }
 
             let n =
@@ -180,7 +180,7 @@ pub fn R_RMGInit(
             &stylesDefault,
             false,
             qs,
-            frame,
+            world_load,
             assets,
             view,
             cvars,

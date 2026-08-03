@@ -21,6 +21,7 @@ use crate::render_state::frame_state::FrameState;
 use crate::render_state::placeholders::{RefEntity, FUNCTABLE_SIZE};
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
+use crate::render_state::world_load_state::WorldLoadState;
 use crate::tr_local::dlight_s::dlight_t;
 use crate::tr_local::mgrid_t::mgrid_t;
 use crate::tr_local::orientationr_t::orientationr_t;
@@ -101,13 +102,14 @@ pub fn R_TransformDlights(dl: &mut [dlight_t], ori: &orientationr_t) {
 fn R_SetupEntityLightingGrid(
     cvars: RenderCvarSnapshot,
     assets: &RenderAssets,
+    world_load: &WorldLoadState,
     frame: &FrameState,
     ent: &mut RefEntity,
 ) {
     if cvars.fullbright != 0 {
         ent.ambient_light = [255.0, 255.0, 255.0];
         ent.directed_light = [255.0, 255.0, 255.0];
-        _VectorCopy(frame.sun_direction, &mut ent.light_dir);
+        _VectorCopy(world_load.sun_direction, &mut ent.light_dir);
         return;
     }
 
@@ -435,6 +437,7 @@ pub fn R_DlightBmodel(
 pub fn R_SetupEntityLighting(
     cvars: RenderCvarSnapshot,
     assets: &RenderAssets,
+    world_load: &WorldLoadState,
     frame: &FrameState,
     refdef_rdflags: i32,
     dlights: &[dlight_t],
@@ -465,15 +468,15 @@ pub fn R_SetupEntityLighting(
         .map(|w| w.light_grid_data.is_some())
         .unwrap_or(false);
     if refdef_rdflags & RDF_NOWORLDMODEL == 0 && has_light_grid {
-        R_SetupEntityLightingGrid(cvars, assets, frame, ent);
+        R_SetupEntityLightingGrid(cvars, assets, world_load, frame, ent);
     } else {
         ent.ambient_light = [
-            frame.identity_light * 150.0,
-            frame.identity_light * 150.0,
-            frame.identity_light * 150.0,
+            world_load.identity_light * 150.0,
+            world_load.identity_light * 150.0,
+            world_load.identity_light * 150.0,
         ];
         ent.directed_light = ent.ambient_light;
-        _VectorCopy(frame.sun_direction, &mut ent.light_dir);
+        _VectorCopy(world_load.sun_direction, &mut ent.light_dir);
     }
 
     // bonus items and view weapons have a fixed minimum add
@@ -483,20 +486,20 @@ pub fn R_SetupEntityLighting(
     // binary; transcribed as such (porting-rules §2 — port what actually
     // executes, not the disabled comment).
     // give everything a minimum light add
-    ent.ambient_light[0] += frame.identity_light * 32.0;
-    ent.ambient_light[1] += frame.identity_light * 32.0;
-    ent.ambient_light[2] += frame.identity_light * 32.0;
+    ent.ambient_light[0] += world_load.identity_light * 32.0;
+    ent.ambient_light[1] += world_load.identity_light * 32.0;
+    ent.ambient_light[2] += world_load.identity_light * 32.0;
 
     // the minlight flag is now for items rotating on their holo thing
     if ent.renderfx & RF_MINLIGHT != 0 {
         if ent.shader_rgba[0] == 255 && ent.shader_rgba[1] == 255 && ent.shader_rgba[2] == 0 {
-            ent.ambient_light[0] += frame.identity_light * 255.0;
-            ent.ambient_light[1] += frame.identity_light * 255.0;
-            ent.ambient_light[2] += frame.identity_light * 0.0;
+            ent.ambient_light[0] += world_load.identity_light * 255.0;
+            ent.ambient_light[1] += world_load.identity_light * 255.0;
+            ent.ambient_light[2] += world_load.identity_light * 0.0;
         } else {
-            ent.ambient_light[0] += frame.identity_light * 16.0;
-            ent.ambient_light[1] += frame.identity_light * 96.0;
-            ent.ambient_light[2] += frame.identity_light * 150.0;
+            ent.ambient_light[0] += world_load.identity_light * 16.0;
+            ent.ambient_light[1] += world_load.identity_light * 96.0;
+            ent.ambient_light[2] += world_load.identity_light * 150.0;
         }
     }
 
@@ -529,8 +532,8 @@ pub fn R_SetupEntityLighting(
 
     // clamp ambient
     for i in 0..3 {
-        if ent.ambient_light[i] > frame.identity_light_byte as f32 {
-            ent.ambient_light[i] = frame.identity_light_byte as f32;
+        if ent.ambient_light[i] > world_load.identity_light_byte as f32 {
+            ent.ambient_light[i] = world_load.identity_light_byte as f32;
         }
     }
 
@@ -578,6 +581,7 @@ pub fn R_SetupEntityLighting(
 pub fn R_LightForPoint(
     cvars: RenderCvarSnapshot,
     assets: &RenderAssets,
+    world_load: &WorldLoadState,
     frame: &FrameState,
     point: vec3_t,
 ) -> Option<(vec3_t, vec3_t, vec3_t)> {
@@ -593,7 +597,7 @@ pub fn R_LightForPoint(
 
     let mut ent = RefEntity::default();
     ent.origin = point;
-    R_SetupEntityLightingGrid(cvars, assets, frame, &mut ent);
+    R_SetupEntityLightingGrid(cvars, assets, world_load, frame, &mut ent);
 
     Some((ent.ambient_light, ent.directed_light, ent.light_dir))
 }

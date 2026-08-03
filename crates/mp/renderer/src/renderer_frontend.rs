@@ -39,12 +39,13 @@ use crate::render_state::frame_state::FrameState;
 use crate::render_state::light_style_table::LightStyleTable;
 use crate::render_state::placeholders::{
     AutomapWireframe, BackEndCounters, FunctionTables, GlConfig, OrientationR, RefEntity, TrRefdef,
-    Vec3, ViewParms,
+    ViewParms,
 };
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::{ShaderAsset, ShaderHandle};
+use crate::render_state::world_load_state::WorldLoadState;
 use crate::render_state::skin_asset::SkinAsset;
 use crate::tr_font::FontState;
 use crate::tr_image::TrImageState;
@@ -74,6 +75,9 @@ pub struct RendererFrontend {
     /// The frontend's per-frame scratch — the oracle's `tr` fields that are
     /// neither registry nor GPU.
     pub frame: FrameState,
+    /// The `tr` fields the sim writes at load and the render side only reads
+    /// (W2-F3). A copy rides on every `FramePackage`.
+    pub world_load: WorldLoadState,
     /// The ordered event stream this frame appends to, which replaces the
     /// oracle's `backEndData_t` command list.
     pub frame_data: FrameData,
@@ -155,6 +159,7 @@ pub fn empty_render_assets() -> RenderAssets {
         projection_shadow_shader: ShaderHandle::slot_zero(),
         sun_shader: ShaderHandle::slot_zero(),
         world: None,
+        external_vis_data: None,
         bsp_models: Vec::new(),
         function_tables: FunctionTables::default(),
         distance_cull: 0.0,
@@ -186,19 +191,12 @@ pub fn zeroed_frame_state() -> FrameState {
         vertexes_2d: false,
         entity_2d: RefEntity::default(),
         scene_light_styles: [[0u8; 4]; MAX_LIGHT_STYLES],
-        frame_count: 0,
         scene_count: 0,
         frame_scene_num: 0,
         view_cluster: 0,
         skyboxportal: 0,
         drawskyboxportal: 0,
         render_glowing_objects: false,
-        identity_light: 1.0,
-        identity_light_byte: 255,
-        overbright_bits: 0,
-        sun_direction: Vec3::default(),
-        sun_ambient: Vec3::default(),
-        external_vis_data: None,
     }
 }
 
@@ -244,6 +242,7 @@ impl RendererFrontend {
             },
             img_state: TrImageState::default(),
             frame: zeroed_frame_state(),
+            world_load: WorldLoadState::default(),
             frame_data: FrameData { events: Vec::new() },
             frame_sink: None,
             pending_capture: None,

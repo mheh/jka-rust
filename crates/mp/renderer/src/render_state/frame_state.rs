@@ -3,7 +3,7 @@
 use mp_engine_qcommon::qfiles::light_style_limits::MAX_LIGHT_STYLES;
 
 use crate::render_state::placeholders::{
-    BackEndCounters, OrientationR, RefEntity, TrRefdef, Vec3, ViewParms,
+    BackEndCounters, OrientationR, RefEntity, TrRefdef, ViewParms,
 };
 
 /// Render-thread-local scratch, replacing `backEndState_t`'s role in full —
@@ -38,10 +38,11 @@ pub struct FrameState {
     /// `oracle/codemp/renderer/tr_light.cpp:234-274`). A per-frame copy, not
     /// sim-owned `LightStyleTable` itself (`R2-D5`).
     pub scene_light_styles: [[u8; 4]; MAX_LIGHT_STYLES],
-    /// `tr.frameCount` — Raven: incremented every frame.
-    ///
-    /// Source: `oracle/codemp/renderer/tr_local.h:1313`
-    pub frame_count: i32,
+    // W2-F3 moved `tr.frameCount`, `tr.identityLight`,
+    // `tr.identityLightByte`, `tr.overbrightBits`, `tr.sunDirection` and
+    // `tr.sunAmbient` to `WorldLoadState`, and `tr.externalVisData` to
+    // `RenderAssets`. The sim writes all seven, and this struct keeps only
+    // what the render thread owns.
     // W2-F4 moved `tr.viewCount` and `tr.visCount` to
     // `WorldWalkScratch::view_count`/`vis_count`, beside the mark arrays they
     // stamp. `R_MarkFragments` keeps its own counter on `MarkState`, so the
@@ -81,34 +82,4 @@ pub struct FrameState {
     ///
     /// Source: `oracle/codemp/renderer/tr_backend.cpp:32`
     pub render_glowing_objects: bool,
-    /// `tr.identityLight` — `1.0 / ( 1 << overbrightBits )`.
-    ///
-    /// Source: `oracle/codemp/renderer/tr_local.h:1374`
-    pub identity_light: f32,
-    /// `tr.identityLightByte` — `identityLight * 255`, truncated to `int` by
-    /// the oracle's assignment.
-    ///
-    /// Source: `oracle/codemp/renderer/tr_local.h:1375`
-    pub identity_light_byte: i32,
-    /// `tr.overbrightBits` — the lightmap/vertex-color shift
-    /// `R_ColorShiftLightingBytes` applies at BSP load.
-    ///
-    /// Source: `oracle/codemp/renderer/tr_local.h:1376`
-    pub overbright_bits: i32,
-    /// `tr.sunDirection`.
-    ///
-    /// Source: `oracle/codemp/renderer/tr_local.h:1385`
-    pub sun_direction: Vec3,
-    /// `tr.sunAmbient` — Raven: "from the sky shader (only used for John's
-    /// terrain system)" (wave-10 field merge; see `tr_bsp.rs`'s WAVE 10
-    /// ADDITIONS note).
-    ///
-    /// Source: `oracle/codemp/renderer/tr_local.h:1387`
-    pub sun_ambient: Vec3,
-    /// `tr.externalVisData` — Raven: "from `RE_SetWorldVisData`, shared with
-    /// `CM_Load`". Owned here rather than aliasing the collision world's
-    /// buffer (interior-safety law); `None` until `CM_LoadMap` hands one over.
-    ///
-    /// Source: `oracle/codemp/renderer/tr_local.h:1326`
-    pub external_vis_data: Option<Vec<u8>>,
 }

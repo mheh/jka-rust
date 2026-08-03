@@ -40,7 +40,7 @@ use native_string::atof::atof;
 use native_string::Q_stricmpn;
 
 use crate::gl_constants::{GL_CLAMP, GL_REPEAT};
-use crate::render_state::frame_state::FrameState;
+use crate::render_state::world_load_state::WorldLoadState;
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::placeholders::SkyParms;
 use crate::render_state::render_assets::RenderAssets;
@@ -5257,7 +5257,7 @@ pub fn ParseShader<'a>(
     text: &mut Option<&'a [u8]>,
     qs: &mut QSharedScratch,
     state: &mut ShaderParseState,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -5379,9 +5379,9 @@ pub fn ParseShader<'a>(
             let mut b: f32 = atof(&token) as f32;
             b = (b as f64 / 180.0 * PI) as f32;
 
-            frame.sun_direction[0] = ((a as f64).cos() * (b as f64).cos()) as f32;
-            frame.sun_direction[1] = ((a as f64).sin() * (b as f64).cos()) as f32;
-            frame.sun_direction[2] = (b as f64).sin() as f32;
+            world_load.sun_direction[0] = ((a as f64).cos() * (b as f64).cos()) as f32;
+            world_load.sun_direction[1] = ((a as f64).sin() * (b as f64).cos()) as f32;
+            world_load.sun_direction[2] = (b as f64).sin() as f32;
         }
         // q3map_surfacelight deprecated as of 16 Jul 01
         else if token.eq_ignore_ascii_case("surfacelight")
@@ -5578,7 +5578,7 @@ pub fn R_FindShader(
     styles: &[u8],
     mip_raw_image: bool,
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -5640,7 +5640,7 @@ pub fn R_FindShader(
             &mut cursor,
             qs,
             &mut state,
-            frame,
+            world_load,
             assets,
             view,
             cvars,
@@ -5761,7 +5761,7 @@ pub fn RE_RegisterShaderLightMap(
     lightmap_index: &[i32],
     styles: &[u8],
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -5781,7 +5781,7 @@ pub fn RE_RegisterShaderLightMap(
         styles,
         true,
         qs,
-        frame,
+        world_load,
         assets,
         view,
         cvars,
@@ -5819,7 +5819,7 @@ pub fn RE_RegisterShaderLightMap(
 pub fn RE_RegisterShader(
     name: &str,
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -5839,7 +5839,7 @@ pub fn RE_RegisterShader(
         &stylesDefault,
         true,
         qs,
-        frame,
+        world_load,
         assets,
         view,
         cvars,
@@ -5872,7 +5872,7 @@ pub fn RE_RegisterShader(
 pub fn RE_RegisterShaderNoMip(
     name: &str,
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -5892,7 +5892,7 @@ pub fn RE_RegisterShaderNoMip(
         &stylesDefault,
         false,
         qs,
-        frame,
+        world_load,
         assets,
         view,
         cvars,
@@ -5923,7 +5923,7 @@ pub fn RE_RegisterShaderNoMip(
 #[allow(clippy::too_many_arguments)]
 pub fn CreateExternalShaders(
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -5938,7 +5938,7 @@ pub fn CreateExternalShaders(
         &stylesDefault,
         true,
         qs,
-        frame,
+        world_load,
         assets,
         view,
         cvars,
@@ -5958,7 +5958,7 @@ pub fn CreateExternalShaders(
         &stylesDefault,
         true,
         qs,
-        frame,
+        world_load,
         assets,
         view,
         cvars,
@@ -6001,7 +6001,7 @@ pub fn R_RemapShader(
     new_shader_name: &str,
     time_offset: Option<&str>,
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -6015,7 +6015,7 @@ pub fn R_RemapShader(
         new_shader_name,
         time_offset,
         qs,
-        frame,
+        world_load,
         assets,
         view,
         cvars,
@@ -6102,7 +6102,7 @@ pub fn R_MergeShaders(
 pub fn R_InitShaders(
     server: bool,
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -6136,7 +6136,7 @@ pub fn R_InitShaders(
         ScanAndLoadShaderFiles(assets, qs, view, "shaders");
 
         CreateExternalShaders(
-            qs, frame, assets, view, cvars, models, img_state, sky_view, sky,
+            qs, world_load, assets, view, cvars, models, img_state, sky_view, sky,
         );
     }
     // #endif

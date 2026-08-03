@@ -232,9 +232,9 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
         let UiHost {
             engine,
             models,
-            cvars,
             sim,
             frame: fstate,
+            world_load,
             img_state,
             noise,
             sky,
@@ -251,7 +251,7 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
         let mut world = WorldFrame {
             engine_view: &mut engine_view,
             assets: Arc::make_mut(&mut sim.published),
-            cvars,
+            world_load,
             frame: fstate,
             g2: &mut g2_system,
             sky,

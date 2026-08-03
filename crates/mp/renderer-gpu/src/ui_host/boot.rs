@@ -43,6 +43,7 @@ use mp_renderer::render_state::light_style_table::LightStyleTable;
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::render_assets_sim::RenderAssetsSim;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
+use mp_renderer::render_state::world_load_state::WorldLoadState;
 use mp_renderer::render_state::renderer_cvars::RendererCvars;
 use mp_renderer::render_state::world_walk_scratch::WorldWalkScratch;
 use mp_renderer::renderer_frontend::{
@@ -187,6 +188,7 @@ pub fn boot_renderer(cfg: &BootConfig) -> UiHost {
         },
         img_state: TrImageState::default(),
         frame: zeroed_frame_state(),
+        world_load: WorldLoadState::default(),
         scene: SceneState::default(),
         noise: NoiseState::default(),
         rng: Rng::new(),
@@ -210,6 +212,7 @@ pub fn boot_renderer(cfg: &BootConfig) -> UiHost {
             sim,
             img_state,
             frame,
+            world_load,
             scene,
             noise,
             rng,
@@ -232,6 +235,7 @@ pub fn boot_renderer(cfg: &BootConfig) -> UiHost {
             img_state,
             models,
             frame,
+            world_load,
             scene,
             &mut frame_data,
             noise,
@@ -352,7 +356,7 @@ pub fn with_dc<R>(host: &mut UiHost, body: impl FnOnce(&mut HarnessDc, &mut UiSt
         cvars,
         sim,
         img_state,
-        frame,
+        world_load,
         font,
         qs,
         sky_view,
@@ -383,7 +387,7 @@ pub fn with_dc<R>(host: &mut UiHost, body: impl FnOnce(&mut HarnessDc, &mut UiSt
         assets: Arc::make_mut(&mut sim.published),
         models,
         img_state,
-        frame,
+        world_load,
         qs,
         sky_view,
         sky,
@@ -484,7 +488,8 @@ pub fn load_world(host: &mut UiHost, map: &str) -> (bool, srfTerrain_t) {
             cvars,
             sim,
             img_state,
-            frame,
+            world_load,
+            scene,
             qs,
             sky_view,
             sky,
@@ -497,7 +502,8 @@ pub fn load_world(host: &mut UiHost, map: &str) -> (bool, srfTerrain_t) {
         let mut view = host_view(common, cm, sv_ptr, models_ptr);
         RE_LoadWorldMap(
             qs,
-            frame,
+            world_load,
+            scene,
             Arc::make_mut(&mut sim.published),
             &mut view,
             cvars,
@@ -556,7 +562,7 @@ pub fn register_model(host: &mut UiHost, name: &str) -> qhandle_t {
         cvars,
         sim,
         img_state,
-        frame,
+        world_load,
         qs,
         sky_view,
         sky,
@@ -569,7 +575,7 @@ pub fn register_model(host: &mut UiHost, name: &str) -> qhandle_t {
     let mut view = host_view(common, cm, sv_ptr, models_ptr);
     RE_RegisterModel(
         qs,
-        frame,
+        world_load,
         Arc::make_mut(&mut sim.published),
         &mut view,
         cvars,
@@ -599,7 +605,8 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
             cvars,
             sim,
             img_state,
-            frame,
+            world_load,
+            scene,
             qs,
             sky_view,
             sky,
@@ -612,7 +619,8 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
         let mut view = host_view(common, cm, sv_ptr, models_ptr);
         RE_LoadWorldMap(
             qs,
-            frame,
+            world_load,
+            scene,
             Arc::make_mut(&mut sim.published),
             &mut view,
             cvars,
@@ -712,6 +720,7 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
             cvars,
             sim,
             frame,
+            world_load,
             ..
         } = &mut *host;
         let assets = Arc::make_mut(&mut sim.published);
@@ -764,6 +773,7 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
             Some(&mut entity_host),
             assets,
             cvar_snapshot,
+            world_load,
             frame,
             &mut walk_scratch,
             &mut g2_system,

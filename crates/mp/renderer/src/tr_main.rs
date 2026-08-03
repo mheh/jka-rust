@@ -46,6 +46,7 @@ use crate::tr_mesh::r_add_md3_surfaces;
 use crate::tr_model::render_models::RenderModels;
 use crate::tr_public::ref_flags::{RDF_AUTOMAP, RDF_NOFOG, RDF_NOWORLDMODEL, RF_FIRST_PERSON};
 use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
+use crate::render_state::world_load_state::WorldLoadState;
 use crate::tr_scene::{ghoul2_token_decode, ghoul2_token_encode, R_AddPolygonSurfaces};
 use crate::tr_shader::R_GetShaderByHandleQuiet;
 use crate::tr_terrain::R_AddTerrainSurfaces;
@@ -1868,6 +1869,7 @@ pub fn R_AddEntitySurfaces<'a>(
     entity_host: Option<&mut EntityWalkHost<'_, '_>>,
     assets: &RenderAssets,
     cvars: RenderCvarSnapshot,
+    world_load: &WorldLoadState,
     frame: &mut FrameState,
     walk_scratch: &mut WorldWalkScratch,
     g2: &mut Ghoul2System,
@@ -1993,6 +1995,7 @@ pub fn R_AddEntitySurfaces<'a>(
                             cvars,
                             &mut walk_scratch.warnings,
                             assets,
+                            world_load,
                             &*frame,
                             refdef_rdflags,
                             rdf_nofog,
@@ -2023,6 +2026,7 @@ pub fn R_AddEntitySurfaces<'a>(
                             &ori,
                             &view.frustum,
                             assets,
+                            world_load,
                             frame,
                             walk_scratch,
                             refdef_rdflags,
@@ -2060,6 +2064,7 @@ pub fn R_AddEntitySurfaces<'a>(
                                 &ori,
                                 cvars,
                                 &mut walk_scratch.warnings,
+                                world_load,
                                 frame,
                                 g2,
                                 fogs,
@@ -2099,6 +2104,7 @@ pub fn R_AddEntitySurfaces<'a>(
                                     &ori,
                                     cvars,
                                     &mut walk_scratch.warnings,
+                                    world_load,
                                     frame,
                                     g2,
                                     fogs,
@@ -2217,6 +2223,7 @@ pub fn R_GenerateDrawSurfs<'a>(
     entity_host: Option<&mut EntityWalkHost<'_, '_>>,
     assets: &RenderAssets,
     cvars: RenderCvarSnapshot,
+    world_load: &WorldLoadState,
     frame: &mut FrameState,
     walk_scratch: &mut WorldWalkScratch,
     g2: &mut Ghoul2System,
@@ -2294,6 +2301,7 @@ pub fn R_GenerateDrawSurfs<'a>(
         entity_host,
         assets,
         cvars,
+        world_load,
         frame,
         walk_scratch,
         g2,
@@ -2402,6 +2410,7 @@ pub fn R_MirrorViewBySurface<'a>(
     entity_host: Option<&mut EntityWalkHost<'_, '_>>,
     assets: &RenderAssets,
     cvars: RenderCvarSnapshot,
+    world_load: &WorldLoadState,
     frame: &mut FrameState,
     walk_scratch: &mut WorldWalkScratch,
     g2: &mut Ghoul2System,
@@ -2499,6 +2508,7 @@ pub fn R_MirrorViewBySurface<'a>(
         entity_host,
         assets,
         cvars,
+        world_load,
         frame,
         walk_scratch,
         g2,
@@ -2572,6 +2582,7 @@ pub fn R_SortDrawSurfs<'a>(
     mut entity_host: Option<&mut EntityWalkHost<'_, '_>>,
     assets: &RenderAssets,
     cvars: RenderCvarSnapshot,
+    world_load: &WorldLoadState,
     frame: &mut FrameState,
     walk_scratch: &mut WorldWalkScratch,
     g2: &mut Ghoul2System,
@@ -2644,6 +2655,7 @@ pub fn R_SortDrawSurfs<'a>(
             entity_host.as_deref_mut(),
             assets,
             cvars,
+            world_load,
             frame,
             walk_scratch,
             g2,
@@ -2704,6 +2716,7 @@ pub fn R_RenderView<'a>(
     mut entity_host: Option<&mut EntityWalkHost<'_, '_>>,
     assets: &RenderAssets,
     cvars: RenderCvarSnapshot,
+    world_load: &WorldLoadState,
     frame: &mut FrameState,
     walk_scratch: &mut WorldWalkScratch,
     g2: &mut Ghoul2System,
@@ -2731,7 +2744,7 @@ pub fn R_RenderView<'a>(
 
     *view = clone_view_parms(parms);
     view.frameSceneNum = frame_scene_num;
-    view.frameCount = frame.frame_count;
+    view.frameCount = world_load.frame_count;
 
     let first_draw_surf = draw_surfs.len();
 
@@ -2766,6 +2779,7 @@ pub fn R_RenderView<'a>(
         entity_host.as_deref_mut(),
         assets,
         cvars,
+        world_load,
         frame,
         walk_scratch,
         g2,
@@ -2795,6 +2809,7 @@ pub fn R_RenderView<'a>(
         entity_host,
         assets,
         cvars,
+        world_load,
         frame,
         walk_scratch,
         g2,

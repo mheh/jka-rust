@@ -28,6 +28,7 @@ use crate::render_state::placeholders::RefEntity;
 use crate::render_state::arena::Arena;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
+use crate::render_state::world_load_state::WorldLoadState;
 use crate::render_state::world_walk_scratch::WorldWalkScratch;
 use crate::tr_bsp::{Node, Surface, SurfaceData, SurfaceFace, SurfaceTriangles};
 use crate::tr_curve::GridMesh;
@@ -1513,6 +1514,7 @@ pub fn R_AddBrushModelSurfaces<'a>(
     ori: &orientationr_t,
     frustum: &[cplane_t; 4],
     assets: &RenderAssets,
+    world_load: &WorldLoadState,
     frame: &mut FrameState,
     scratch: &mut WorldWalkScratch,
     refdef_rdflags: i32,
@@ -1541,7 +1543,7 @@ pub fn R_AddBrushModelSurfaces<'a>(
 
     if p_model.bspInstance != 0 {
         // rwwRMG - added
-        R_SetupEntityLighting(cvars, assets, frame, refdef_rdflags, dlights, ent);
+        R_SetupEntityLighting(cvars, assets, world_load, frame, refdef_rdflags, dlights, ent);
     }
 
     // rww - Take this into account later?

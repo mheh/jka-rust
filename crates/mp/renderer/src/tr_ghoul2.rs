@@ -64,6 +64,7 @@ use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::walk_warnings::WalkWarnings;
+use crate::render_state::world_load_state::WorldLoadState;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::render_state::skin_asset::SkinHandle;
 use crate::tr_image::{TrImageState, R_GetSkinByHandle};
@@ -1680,7 +1681,7 @@ impl RenderModels {
     pub(crate) fn r_load_mdxa(
         &mut self,
         qs: &mut QSharedScratch,
-        frame: &mut FrameState,
+        world_load: &mut WorldLoadState,
         assets: &mut RenderAssets,
         view: &mut EngineHostView,
         cvars: &RendererCvars,
@@ -1721,7 +1722,7 @@ impl RenderModels {
 
         let (ptr, already_found) = re_register_models_malloc(
             qs,
-            frame,
+            world_load,
             assets,
             view,
             cvars,
@@ -1904,7 +1905,7 @@ impl RenderModels {
     pub(crate) fn r_load_mdxm(
         &mut self,
         qs: &mut QSharedScratch,
-        frame: &mut FrameState,
+        world_load: &mut WorldLoadState,
         assets: &mut RenderAssets,
         view: &mut EngineHostView,
         cvars: &RendererCvars,
@@ -1946,7 +1947,7 @@ impl RenderModels {
 
         let (ptr, already_found) = re_register_models_malloc(
             qs,
-            frame,
+            world_load,
             assets,
             view,
             cvars,
@@ -2005,7 +2006,7 @@ impl RenderModels {
         // into `tr_model/frontend.rs`.
         let anim_index = RE_RegisterModel(
             qs,
-            frame,
+            world_load,
             assets,
             view,
             cvars,
@@ -2104,7 +2105,7 @@ impl RenderModels {
                     &stylesDefault,
                     true,
                     qs,
-                    frame,
+                    world_load,
                     assets,
                     view,
                     cvars,
@@ -2267,6 +2268,7 @@ pub fn r_add_ghoul_surfaces<'a>(
     ori: &orientationr_t,
     cvars: RenderCvarSnapshot,
     warnings: &mut WalkWarnings,
+    world_load: &WorldLoadState,
     frame: &FrameState,
     g2: &mut Ghoul2System,
     fogs: &[fog_t],
@@ -2319,7 +2321,7 @@ pub fn r_add_ghoul_surfaces<'a>(
     // > 1`. The caller folds the lit fields back onto `entities[n]`.
     // Source: oracle/codemp/renderer/tr_ghoul2.cpp:3438-3443
     if !personal_model || cvars.shadows > 1 {
-        R_SetupEntityLighting(cvars, assets, frame, refdef_rdflags, dlights, ent);
+        R_SetupEntityLighting(cvars, assets, world_load, frame, refdef_rdflags, dlights, ent);
     }
 
     // see if we are in a fog volume

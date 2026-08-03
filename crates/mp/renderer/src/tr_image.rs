@@ -35,7 +35,7 @@ use crate::gl_constants::{
     GL_NEAREST_MIPMAP_LINEAR, GL_NEAREST_MIPMAP_NEAREST, GL_REPEAT, GL_RGB4_S3TC, GL_RGB5, GL_RGB8,
     GL_RGBA, GL_RGBA4, GL_RGBA8,
 };
-use crate::render_state::frame_state::FrameState;
+use crate::render_state::world_load_state::WorldLoadState;
 use crate::render_state::image_asset::{ImageAsset, ImageHandle};
 use crate::render_state::placeholders::{GlConfig, FOG_TABLE_SIZE};
 use crate::render_state::render_assets::RenderAssets;
@@ -941,7 +941,7 @@ pub fn R_SetColorMappings(
     cvars: &RendererCvars,
     glconfig: &GlConfig,
     state: &mut TrImageState,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
 ) {
     // setup the overbright lighting
     let mut overbright_bits = view.common.cvar(cvars.r_overBrightBits).integer;
@@ -963,9 +963,9 @@ pub fn R_SetColorMappings(
     // writes deferred then run for real now. A zero `identity_light` bakes
     // every fog volume's `colorInt` black at world load.
     // Source: oracle/codemp/renderer/tr_image.cpp:2873-2874
-    frame.overbright_bits = overbright_bits;
-    frame.identity_light = 1.0 / (1 << overbright_bits) as f32;
-    frame.identity_light_byte = (255.0 * frame.identity_light) as i32;
+    world_load.overbright_bits = overbright_bits;
+    world_load.identity_light = 1.0 / (1 << overbright_bits) as f32;
+    world_load.identity_light_byte = (255.0 * world_load.identity_light) as i32;
 
     if view.common.cvar(cvars.r_intensity).value < 1.0 {
         Cvar_Set(view, "r_intensity", "1");
@@ -1131,7 +1131,7 @@ pub fn GL_TextureMode(
 /// accumulating in `f32` and casting once at the end.
 ///
 /// Source: oracle/codemp/renderer/tr_image.cpp:206-228
-pub fn R_SumOfUsedImages(assets: &RenderAssets, frame: &FrameState, use_format: bool) -> f32 {
+pub fn R_SumOfUsedImages(assets: &RenderAssets, world_load: &WorldLoadState, use_format: bool) -> f32 {
     let mut total: i32 = 0;
 
     let _ = R_Images_StartIteration(assets);
@@ -1142,7 +1142,7 @@ pub fn R_SumOfUsedImages(assets: &RenderAssets, frame: &FrameState, use_format: 
             None => continue,
         };
         // it has already been advanced for the next frame, so...
-        if image.frame_used == frame.frame_count - 1 {
+        if image.frame_used == world_load.frame_count - 1 {
             if use_format {
                 let byte_per_tex = R_BytesPerTex(&assets.glconfig, image.internal_format);
                 total = (total as f32 + byte_per_tex * (image.width * image.height) as f32) as i32;
@@ -2664,7 +2664,7 @@ pub fn R_CreateBuiltinImages(
     assets: &mut RenderAssets,
     models: &RenderModels,
     state: &mut TrImageState,
-    frame: &FrameState,
+    world_load: &WorldLoadState,
 ) {
     R_CreateDefaultImage(view, cvars, assets, models, state);
 
@@ -2718,7 +2718,7 @@ pub fn R_CreateBuiltinImages(
 
     // with overbright bits active, we need an image which is some fraction of
     // full color, for default lightmaps, etc
-    let identity_byte = frame.identity_light_byte as u8;
+    let identity_byte = world_load.identity_light_byte as u8;
     for row in data.iter_mut() {
         for px in row.iter_mut() {
             *px = [identity_byte, identity_byte, identity_byte, 255];
@@ -2794,13 +2794,13 @@ pub fn R_InitImages(
     assets: &mut RenderAssets,
     models: &RenderModels,
     state: &mut TrImageState,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
 ) {
     // build brightness translation tables
-    R_SetColorMappings(view, cvars, &assets.glconfig, state, frame);
+    R_SetColorMappings(view, cvars, &assets.glconfig, state, world_load);
 
     // create default texture and white texture
-    R_CreateBuiltinImages(view, cvars, assets, models, state, &*frame);
+    R_CreateBuiltinImages(view, cvars, assets, models, state, &*world_load);
 }
 
 // ============================================================================
@@ -2831,7 +2831,7 @@ pub fn R_InitImages(
 #[allow(clippy::too_many_arguments)]
 pub fn RE_RegisterIndividualSkin(
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -2914,7 +2914,7 @@ pub fn RE_RegisterIndividualSkin(
             &stylesDefault,
             true,
             qs,
-            frame,
+            world_load,
             assets,
             view,
             cvars,
@@ -2980,7 +2980,7 @@ pub fn RE_RegisterIndividualSkin(
 #[allow(clippy::too_many_arguments)]
 pub fn RE_RegisterSkin(
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -3032,17 +3032,17 @@ pub fn RE_RegisterSkin(
     let h_skin = if let Some((skinhead, skintorso, skinlower)) = re_split_skins(name) {
         // three part
         let mut h_skin = RE_RegisterIndividualSkin(
-            qs, frame, assets, view, cvars, models, img_state, sky_view, sky, &skinhead,
+            qs, world_load, assets, view, cvars, models, img_state, sky_view, sky, &skinhead,
             h_skin,
         );
         if h_skin != SkinHandle::slot_zero() {
             h_skin = RE_RegisterIndividualSkin(
-                qs, frame, assets, view, cvars, models, img_state, sky_view, sky,
+                qs, world_load, assets, view, cvars, models, img_state, sky_view, sky,
                 &skintorso, h_skin,
             );
             if h_skin != SkinHandle::slot_zero() {
                 h_skin = RE_RegisterIndividualSkin(
-                    qs, frame, assets, view, cvars, models, img_state, sky_view, sky,
+                    qs, world_load, assets, view, cvars, models, img_state, sky_view, sky,
                     &skinlower, h_skin,
                 );
             }
@@ -3051,7 +3051,7 @@ pub fn RE_RegisterSkin(
     } else {
         // single skin
         RE_RegisterIndividualSkin(
-            qs, frame, assets, view, cvars, models, img_state, sky_view, sky, name,
+            qs, world_load, assets, view, cvars, models, img_state, sky_view, sky, name,
             h_skin,
         )
     };

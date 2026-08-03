@@ -22,6 +22,7 @@ use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::render_state::skin_asset::SkinAsset;
 use crate::render_state::walk_warnings::WalkWarnings;
+use crate::render_state::world_load_state::WorldLoadState;
 use crate::tr_image::R_GetSkinByHandle;
 use crate::tr_light::R_SetupEntityLighting;
 use crate::tr_local::dlight_s::dlight_t;
@@ -356,6 +357,7 @@ pub fn r_add_md3_surfaces<'a>(
     cvars: RenderCvarSnapshot,
     warnings: &mut WalkWarnings,
     assets: &RenderAssets,
+    world_load: &WorldLoadState,
     frame: &FrameState,
     refdef_rdflags: i32,
     rdf_nofog: bool,
@@ -417,7 +419,7 @@ pub fn r_add_md3_surfaces<'a>(
     // Source: oracle/codemp/renderer/tr_mesh.cpp:335-340
     if !personal_model || cvars.shadows > 1 {
         let mut re = ref_entity_from_tr(ent);
-        R_SetupEntityLighting(cvars, assets, frame, refdef_rdflags, dlights, &mut re);
+        R_SetupEntityLighting(cvars, assets, world_load, frame, refdef_rdflags, dlights, &mut re);
         write_back_lighting(ent, &re);
     }
 

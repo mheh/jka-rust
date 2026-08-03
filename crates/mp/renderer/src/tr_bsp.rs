@@ -49,7 +49,8 @@ use native_math::qmath::{
 use native_string::sscanf::sscanf_f32s;
 
 use crate::gl_constants::{GL_CLAMP, GL_RGBA};
-use crate::render_state::frame_state::FrameState;
+use crate::render_state::world_load_state::WorldLoadState;
+use crate::tr_scene::SceneState;
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::placeholders::{Vec3, WorldAsset};
 use crate::render_state::render_assets::RenderAssets;
@@ -328,11 +329,11 @@ fn HSVtoRGB(h: f32, s: f32, v: f32) -> [f32; 3] {
 /// Raven `R_ColorShiftLightingBytes` (4-component, `in`→`out`). //rwwRMG - modified
 ///
 /// Source: `oracle/codemp/renderer/tr_bsp.cpp:83-119`
-pub fn R_ColorShiftLightingBytes(frame: &FrameState, color_in: [u8; 4]) -> [u8; 4] {
+pub fn R_ColorShiftLightingBytes(world_load: &WorldLoadState, color_in: [u8; 4]) -> [u8; 4] {
     // should NOT do it if overbrightBits is 0
     let mut shift = 0i32;
-    if frame.overbright_bits != 0 {
-        shift = 1 - frame.overbright_bits;
+    if world_load.overbright_bits != 0 {
+        shift = 1 - world_load.overbright_bits;
     }
 
     if shift == 0 {
@@ -364,10 +365,10 @@ pub fn R_ColorShiftLightingBytes(frame: &FrameState, color_in: [u8; 4]) -> [u8; 
 /// bytes instead of mutating `in` in place.
 ///
 /// Source: `oracle/codemp/renderer/tr_bsp.cpp:127-159`
-fn R_ColorShiftLightingBytesRGB(frame: &FrameState, color_in: [u8; 3]) -> [u8; 3] {
+fn R_ColorShiftLightingBytesRGB(world_load: &WorldLoadState, color_in: [u8; 3]) -> [u8; 3] {
     let mut shift = 0i32;
-    if frame.overbright_bits != 0 {
-        shift = 1 - frame.overbright_bits;
+    if world_load.overbright_bits != 0 {
+        shift = 1 - world_load.overbright_bits;
     }
 
     if shift == 0 {
@@ -392,8 +393,8 @@ fn R_ColorShiftLightingBytesRGB(frame: &FrameState, color_in: [u8; 3]) -> [u8; 3
 /// Raven `RE_SetWorldVisData`.
 ///
 /// Source: `oracle/codemp/renderer/tr_bsp.cpp:258-260`
-pub fn RE_SetWorldVisData(frame: &mut FrameState, vis: Vec<u8>) {
-    frame.external_vis_data = Some(vis);
+pub fn RE_SetWorldVisData(assets: &mut RenderAssets, vis: Vec<u8>) {
+    assets.external_vis_data = Some(vis);
 }
 
 /// Raven `R_LoadVisibility`.
@@ -405,7 +406,12 @@ pub fn RE_SetWorldVisData(frame: &mut FrameState, vis: Vec<u8>) {
 /// — `WorldAsset`'s buffers are owned `Vec`s, not hunk-allocated raw
 /// pointers, so the `Hunk_Alloc`/`Com_Mem*` seam calls have no idiomatic-
 /// interior counterpart here.
-fn R_LoadVisibility(ctx: &BspLoadContext, frame: &FrameState, l: &lump_t, world: &mut WorldAsset) {
+fn R_LoadVisibility(
+    ctx: &BspLoadContext,
+    external_vis_data: Option<&Vec<u8>>,
+    l: &lump_t,
+    world: &mut WorldAsset,
+) {
     let len = (world.num_clusters + 63) & !63;
     world.novis = vec![0xffu8; len.max(0) as usize];
 
@@ -423,7 +429,7 @@ fn R_LoadVisibility(ctx: &BspLoadContext, frame: &FrameState, l: &lump_t, world:
 
     // CM_Load should have given us the vis data to share, so
     // we don't need to allocate another copy
-    if let Some(external) = &frame.external_vis_data {
+    if let Some(external) = external_vis_data {
         world.vis = external.clone();
     } else {
         world.vis = buf[8..filelen].to_vec();
@@ -1078,7 +1084,7 @@ fn R_LoadNodesAndLeafs(
 /// Source: `oracle/codemp/renderer/tr_bsp.cpp:1813-1848`
 pub fn R_LoadLightGrid(
     ctx: &BspLoadContext,
-    frame: &FrameState,
+    world_load: &WorldLoadState,
     l: &lump_t,
     world: &mut WorldAsset,
 ) {
@@ -1137,8 +1143,8 @@ pub fn R_LoadLightGrid(
 
         // deal with overbright bits
         for j in 0..MAXLIGHTMAPS {
-            grid.ambientLight[j] = R_ColorShiftLightingBytesRGB(frame, grid.ambientLight[j]);
-            grid.directLight[j] = R_ColorShiftLightingBytesRGB(frame, grid.directLight[j]);
+            grid.ambientLight[j] = R_ColorShiftLightingBytesRGB(world_load, grid.ambientLight[j]);
+            grid.directLight[j] = R_ColorShiftLightingBytesRGB(world_load, grid.directLight[j]);
         }
 
         light_grid_data.push(grid);
@@ -1868,7 +1874,7 @@ pub fn R_StitchAllPatches(world_data: &mut [Surface]) {
 #[allow(clippy::too_many_arguments)]
 fn ShaderForShaderNum(
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -1909,7 +1915,7 @@ fn ShaderForShaderNum(
         styles,
         true,
         qs,
-        frame,
+        world_load,
         assets,
         view,
         cvars,
@@ -1956,7 +1962,7 @@ fn ShaderForShaderNum(
 #[allow(clippy::too_many_arguments)]
 fn R_LoadFogs(
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -2095,7 +2101,7 @@ fn R_LoadFogs(
             &stylesDefault,
             true,
             qs,
-            frame,
+            world_load,
             assets,
             view,
             cvars,
@@ -2122,9 +2128,9 @@ fn R_LoadFogs(
         }
 
         out.color_int = ColorBytes4(
-            out.parms.color[0] * frame.identity_light,
-            out.parms.color[1] * frame.identity_light,
-            out.parms.color[2] * frame.identity_light,
+            out.parms.color[0] * world_load.identity_light,
+            out.parms.color[1] * world_load.identity_light,
+            out.parms.color[2] * world_load.identity_light,
             1.0,
         );
         let d = if out.parms.depth_for_opaque < 1.0 {
@@ -2400,7 +2406,7 @@ const LIGHTMAP_SIZE: usize = 128;
 /// Source: `oracle/codemp/renderer/tr_bsp.cpp:168-247`
 #[allow(clippy::too_many_arguments)]
 pub fn R_LoadLightmaps(
-    frame: &FrameState,
+    world_load: &WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -2485,7 +2491,7 @@ pub fn R_LoadLightmaps(
                     ctx.file_base[src + 2],
                     0,
                 ];
-                let out = R_ColorShiftLightingBytes(frame, color_in);
+                let out = R_ColorShiftLightingBytes(world_load, color_in);
                 image[j * 4] = out[0];
                 image[j * 4 + 1] = out[1];
                 image[j * 4 + 2] = out[2];
@@ -2534,7 +2540,7 @@ pub fn R_LoadLightmaps(
 #[allow(clippy::too_many_arguments)]
 pub fn R_GetShaderByNum(
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -2555,7 +2561,7 @@ pub fn R_GetShaderByNum(
     RE_RegisterShader(
         &world.shaders[shader_num as usize].shader,
         qs,
-        frame,
+        world_load,
         assets,
         view,
         cvars,
@@ -2575,7 +2581,7 @@ pub fn R_GetShaderByNum(
 #[allow(clippy::too_many_arguments)]
 pub fn ParseFace(
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -2607,7 +2613,7 @@ pub fn ParseFace(
     // get shader value
     let mut shader = ShaderForShaderNum(
         qs,
-        frame,
+        world_load,
         assets,
         view,
         cvars,
@@ -2661,7 +2667,7 @@ pub fn ParseFace(
         }
         let mut color = [[0u8; 4]; MAXLIGHTMAPS];
         for k in 0..MAXLIGHTMAPS {
-            color[k] = R_ColorShiftLightingBytes(frame, v.color[k]);
+            color[k] = R_ColorShiftLightingBytes(world_load, v.color[k]);
         }
         points.push(FaceVertex {
             xyz,
@@ -2723,7 +2729,7 @@ pub fn ParseFace(
 #[allow(clippy::too_many_arguments)]
 pub fn ParseMesh(
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -2754,7 +2760,7 @@ pub fn ParseMesh(
     // get shader value
     let mut shader = ShaderForShaderNum(
         qs,
-        frame,
+        world_load,
         assets,
         view,
         cvars,
@@ -2800,7 +2806,7 @@ pub fn ParseMesh(
         let v = &verts[first_vert + i];
         let mut color = [[0u8; 4]; MAXLIGHTMAPS];
         for k in 0..MAXLIGHTMAPS {
-            color[k] = R_ColorShiftLightingBytes(frame, v.color[k]);
+            color[k] = R_ColorShiftLightingBytes(world_load, v.color[k]);
         }
         let mut lightmap = [[0.0f32; 2]; MAXLIGHTMAPS];
         for k in 0..MAXLIGHTMAPS {
@@ -2861,7 +2867,7 @@ pub fn ParseMesh(
 #[allow(clippy::too_many_arguments)]
 pub fn ParseTriSurf(
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -2888,7 +2894,7 @@ pub fn ParseTriSurf(
     // get shader
     let mut shader = ShaderForShaderNum(
         qs,
-        frame,
+        world_load,
         assets,
         view,
         cvars,
@@ -2969,7 +2975,7 @@ pub fn ParseTriSurf(
         }
         let mut color = [[0u8; 4]; MAXLIGHTMAPS];
         for k in 0..MAXLIGHTMAPS {
-            color[k] = R_ColorShiftLightingBytes(frame, v.color[k]);
+            color[k] = R_ColorShiftLightingBytes(world_load, v.color[k]);
         }
         tri_verts.push(drawVert_t {
             xyz,
@@ -3026,7 +3032,7 @@ pub struct ParsedTriSurf {
 #[allow(clippy::too_many_arguments)]
 pub fn ParseFlare(
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -3052,7 +3058,7 @@ pub fn ParseFlare(
     let lightmaps = [LIGHTMAP_BY_VERTEX, 0, 0, 0];
     let mut shader = ShaderForShaderNum(
         qs,
-        frame,
+        world_load,
         assets,
         view,
         cvars,
@@ -3222,7 +3228,7 @@ fn decode_map_vert(rec: &[u8]) -> mapVert_t {
 #[allow(clippy::too_many_arguments)]
 pub fn R_LoadSurfaces(
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -3300,7 +3306,7 @@ pub fn R_LoadSurfaces(
 
         if surface_type == mapSurfaceType_t::MST_PATCH as i32 {
             let parsed = ParseMesh(
-                qs, frame, assets, view, cvars, models, img_state, sky_view, sky, &ds, &dv,
+                qs, world_load, assets, view, cvars, models, img_state, sky_view, sky, &ds, &dv,
                 world, index,
             );
             surfaces.push(Surface {
@@ -3313,7 +3319,7 @@ pub fn R_LoadSurfaces(
             });
         } else if surface_type == mapSurfaceType_t::MST_TRIANGLE_SOUP as i32 {
             let parsed = ParseTriSurf(
-                qs, frame, assets, view, cvars, models, img_state, sky_view, sky, &ds, &dv,
+                qs, world_load, assets, view, cvars, models, img_state, sky_view, sky, &ds, &dv,
                 &indexes, world, index,
             );
             surfaces.push(Surface {
@@ -3323,7 +3329,7 @@ pub fn R_LoadSurfaces(
             });
         } else if surface_type == mapSurfaceType_t::MST_PLANAR as i32 {
             let parsed = ParseFace(
-                qs, frame, assets, view, cvars, models, img_state, sky_view, sky, &ds, &dv,
+                qs, world_load, assets, view, cvars, models, img_state, sky_view, sky, &ds, &dv,
                 &indexes, world, index,
             );
             surfaces.push(Surface {
@@ -3333,7 +3339,7 @@ pub fn R_LoadSurfaces(
             });
         } else if surface_type == mapSurfaceType_t::MST_FLARE as i32 {
             let parsed = ParseFlare(
-                qs, frame, assets, view, cvars, models, img_state, sky_view, sky, &ds, world,
+                qs, world_load, assets, view, cvars, models, img_state, sky_view, sky, &ds, world,
                 index,
             );
             surfaces.push(Surface {
@@ -3390,7 +3396,7 @@ pub fn R_LoadSurfaces(
 #[allow(clippy::too_many_arguments)]
 pub fn R_LoadEntities(
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -3406,7 +3412,7 @@ pub fn R_LoadEntities(
 
     world.light_grid_size = [64.0, 64.0, 128.0];
 
-    frame.sun_ambient = [1.0, 1.0, 1.0];
+    world_load.sun_ambient = [1.0, 1.0, 1.0];
     assets.distance_cull = 6000.0; // DEFAULT_DISTANCE_CULL
 
     let base = l.fileofs as usize;
@@ -3462,7 +3468,7 @@ pub fn R_LoadEntities(
                     new_shader_name,
                     Some("0"),
                     qs,
-                    frame,
+                    world_load,
                     assets,
                     view,
                     cvars,
@@ -3490,7 +3496,7 @@ pub fn R_LoadEntities(
                 new_shader_name,
                 Some("0"),
                 qs,
-                frame,
+                world_load,
                 assets,
                 view,
                 cvars,
@@ -3516,9 +3522,9 @@ pub fn R_LoadEntities(
         }
         // find the optional world ambient for arioche
         if keyname.eq_ignore_ascii_case("_color") {
-            let mut out = frame.sun_ambient;
+            let mut out = world_load.sun_ambient;
             sscanf_f32s(&value, &mut out);
-            frame.sun_ambient = out;
+            world_load.sun_ambient = out;
             continue;
         }
         if keyname.eq_ignore_ascii_case("ambient") {
@@ -3529,8 +3535,8 @@ pub fn R_LoadEntities(
         }
     }
     // both default to 1 so no harm if not present.
-    let sun_ambient = frame.sun_ambient;
-    _VectorScale(sun_ambient, ambient, &mut frame.sun_ambient);
+    let sun_ambient = world_load.sun_ambient;
+    _VectorScale(sun_ambient, ambient, &mut world_load.sun_ambient);
 }
 
 // --- R3 wave 11 --------------------------------------------------------
@@ -3588,7 +3594,7 @@ pub fn R_LoadEntities(
 #[allow(clippy::too_many_arguments)]
 pub fn RE_LoadWorldMap_Actual(
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -3609,18 +3615,15 @@ pub fn RE_LoadWorldMap_Actual(
     }
 
     if index == 0 {
-        // skyboxportal = 0;
-        // Landed: `FrameState::skyboxportal` is the DEC-37 A13.3 home
-        // campaign #41 batch 1 gave this cross-TU static, and this fn already
-        // receives `frame`.
+        // The `skyboxportal = 0` reset lives in `RE_LoadWorldMap`, this fn's
+        // only `index == 0` caller. See that fn for why (W2-F3).
         // Source: oracle/codemp/renderer/tr_bsp.cpp:2016
-        frame.skyboxportal = 0;
 
         // set default sun direction to be used if it isn't
         // overridden by a shader
-        frame.sun_direction = [0.45, 0.3, 0.9];
+        world_load.sun_direction = [0.45, 0.3, 0.9];
 
-        VectorNormalize(&mut frame.sun_direction);
+        VectorNormalize(&mut world_load.sun_direction);
 
         assets.world_map_loaded = true;
 
@@ -3732,7 +3735,7 @@ pub fn RE_LoadWorldMap_Actual(
     // load into heap
     R_LoadShaders(&ctx, &lumps[LUMP_SHADERS], world);
     R_LoadLightmaps(
-        frame,
+        world_load,
         assets,
         view,
         cvars,
@@ -3746,7 +3749,7 @@ pub fn RE_LoadWorldMap_Actual(
     R_LoadPlanes(&ctx, &lumps[LUMP_PLANES], world);
     R_LoadFogs(
         qs,
-        frame,
+        world_load,
         assets,
         view,
         cvars,
@@ -3763,7 +3766,7 @@ pub fn RE_LoadWorldMap_Actual(
     );
     R_LoadSurfaces(
         qs,
-        frame,
+        world_load,
         assets,
         view,
         cvars,
@@ -3781,12 +3784,17 @@ pub fn RE_LoadWorldMap_Actual(
     R_LoadMarksurfaces(&ctx, &lumps[LUMP_LEAFSURFACES], world);
     R_LoadNodesAndLeafs(&ctx, &lumps[LUMP_NODES], &lumps[LUMP_LEAFS], world);
     R_LoadSubmodels(&ctx, &lumps[LUMP_MODELS], world, models, index);
-    R_LoadVisibility(&ctx, frame, &lumps[LUMP_VISIBILITY], world);
+    R_LoadVisibility(
+        &ctx,
+        assets.external_vis_data.as_ref(),
+        &lumps[LUMP_VISIBILITY],
+        world,
+    );
 
     if index == 0 {
         R_LoadEntities(
             qs,
-            frame,
+            world_load,
             assets,
             view,
             cvars,
@@ -3798,7 +3806,7 @@ pub fn RE_LoadWorldMap_Actual(
             &lumps[LUMP_ENTITIES],
             world,
         );
-        R_LoadLightGrid(&ctx, frame, &lumps[LUMP_LIGHTGRID], world);
+        R_LoadLightGrid(&ctx, world_load, &lumps[LUMP_LIGHTGRID], world);
         R_LoadLightGridArray(view.common, &ctx, &lumps[LUMP_LIGHTARRAY], world);
 
         // only set tr.world now that we know the entire level has loaded properly
@@ -3808,7 +3816,7 @@ pub fn RE_LoadWorldMap_Actual(
             if view.common.cvar(h).integer != 0 {
                 R_RMGInit(
                     qs,
-                    frame,
+                    world_load,
                     assets,
                     view,
                     cvars,
@@ -3867,7 +3875,8 @@ pub fn RE_LoadWorldMap_Actual(
 #[allow(clippy::too_many_arguments)]
 pub fn RE_LoadWorldMap(
     qs: &mut QSharedScratch,
-    frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
+    scene: &mut SceneState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -3880,10 +3889,20 @@ pub fn RE_LoadWorldMap(
 ) {
     view.cm.gbUsingCachedMapDataRightNow = qtrue; // !!!!!!!!!!!!
 
+    // skyboxportal = 0;
+    // W2-F3 split the oracle's one `skyboxportal` static in two: the sim owns
+    // the write side on `SceneState`, and each `RenderScene` event carries the
+    // value to the render side. The reset sits here rather than inside
+    // `RE_LoadWorldMap_Actual`'s `index == 0` block because this fn is that
+    // block's only caller, and keeping it here spares the sub-BSP model
+    // registration chain a `SceneState` it never uses.
+    // Source: oracle/codemp/renderer/tr_bsp.cpp:2016
+    scene.skyboxportal = 0;
+
     let mut world = WorldAsset::default();
     RE_LoadWorldMap_Actual(
         qs,
-        frame,
+        world_load,
         assets,
         view,
         cvars,

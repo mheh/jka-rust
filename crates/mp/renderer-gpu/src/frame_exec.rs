@@ -57,8 +57,8 @@ use mp_renderer::render_state::image_asset::ImageHandle;
 use mp_renderer::render_state::placeholders::{RefEntity, TrRefdef, WorldAsset};
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
-use mp_renderer::render_state::renderer_cvars::RendererCvars;
 use mp_renderer::render_state::shader_asset::ShaderHandle;
+use mp_renderer::render_state::world_load_state::WorldLoadState;
 use mp_renderer::render_state::world_walk_scratch::WorldWalkScratch;
 use mp_renderer::tr_image::PendingUpload;
 use mp_renderer::tr_local::dlight_s::dlight_t;
@@ -203,7 +203,7 @@ impl Warned {
 pub struct WorldFrame<'a, 'e> {
     pub engine_view: &'a mut EngineHostView<'e>,
     pub assets: &'a mut RenderAssets,
-    pub cvars: &'a mut RendererCvars,
+    pub world_load: &'a WorldLoadState,
     pub frame: &'a mut FrameState,
     /// The engine's Ghoul2 instance owner, threaded into `R_RenderView` so the
     /// entity walk reaches `R_AddGhoulSurfaces`. A caller with no live Ghoul2
@@ -764,6 +764,7 @@ impl FrameExecutor {
             Some(&mut entity_host),
             world.assets,
             cvars,
+            world.world_load,
             world.frame,
             &mut self.walk_scratch,
             world.g2,

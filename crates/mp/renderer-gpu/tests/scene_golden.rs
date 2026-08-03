@@ -264,7 +264,7 @@ fn register_shader(host: &mut UiHost, name: &str) -> qhandle_t {
         cvars,
         sim,
         img_state,
-        frame,
+        world_load,
         qs,
         sky_view,
         sky,
@@ -277,7 +277,7 @@ fn register_shader(host: &mut UiHost, name: &str) -> qhandle_t {
     RE_RegisterShader(
         name,
         qs,
-        frame,
+        world_load,
         Arc::make_mut(&mut sim.published),
         &mut view,
         cvars,
@@ -405,9 +405,9 @@ fn run_scene(scene: &Scene) {
         let UiHost {
             engine,
             models,
-            cvars,
             sim,
             frame: fstate,
+            world_load,
             img_state,
             noise,
             sky,
@@ -422,7 +422,7 @@ fn run_scene(scene: &Scene) {
         let mut world = WorldFrame {
             engine_view: &mut engine_view,
             assets: Arc::make_mut(&mut sim.published),
-            cvars,
+            world_load,
             frame: fstate,
             g2: &mut g2_system,
             sky,

@@ -28,7 +28,7 @@ use mp_qshared::shared::{fileHandle_t, g_color_table, MAX_QPATH};
 use native_string::q_string::Q_stricmp;
 
 use crate::render_state::frame_data::FrameData;
-use crate::render_state::frame_state::FrameState;
+use crate::render_state::world_load_state::WorldLoadState;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_cmds::{RE_SetColor, RE_StretchPic};
@@ -500,7 +500,7 @@ impl CFontInfo {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         qs: &mut QSharedScratch,
-        frame_state: &mut FrameState,
+        world_load: &mut WorldLoadState,
         assets: &mut RenderAssets,
         view: &mut EngineHostView,
         cvars: &RendererCvars,
@@ -598,7 +598,7 @@ impl CFontInfo {
         me.mShader = RE_RegisterShaderNoMip(
             &me.m_sFontName,
             qs,
-            frame_state,
+            world_load,
             assets,
             view,
             cvars,
@@ -611,7 +611,7 @@ impl CFontInfo {
         me.FlagNoAsianGlyphs();
         me.UpdateAsianIfNeeded(
             qs,
-            frame_state,
+            world_load,
             assets,
             view,
             cvars,
@@ -776,7 +776,7 @@ impl CFontInfo {
     pub fn UpdateAsianIfNeeded(
         &mut self,
         qs: &mut QSharedScratch,
-        frame_state: &mut FrameState,
+        world_load: &mut WorldLoadState,
         assets: &mut RenderAssets,
         view: &mut EngineHostView,
         cvars: &RendererCvars,
@@ -871,7 +871,7 @@ impl CFontInfo {
                         self.m_hAsianShaders[i] = RE_RegisterShaderNoMip(
                             &sTemp,
                             qs,
-                            frame_state,
+                            world_load,
                             assets,
                             view,
                             cvars,
@@ -1885,7 +1885,7 @@ pub fn Language_UsesSpaces(eLanguage: Language_e) -> bool {
 #[allow(clippy::too_many_arguments)]
 pub fn GetFont_Actual(
     qs: &mut QSharedScratch,
-    frame_state: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -1905,7 +1905,7 @@ pub fn GetFont_Actual(
 
         pFont.UpdateAsianIfNeeded(
             qs,
-            frame_state,
+            world_load,
             assets,
             view,
             cvars,
@@ -1943,7 +1943,7 @@ pub fn GetFont_Actual(
 #[allow(clippy::too_many_arguments)]
 pub fn RE_RegisterFont(
     qs: &mut QSharedScratch,
-    frame_state: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -1964,7 +1964,7 @@ pub fn RE_RegisterFont(
     //
     let iFontIndex = CFontInfo::new(
         qs,
-        frame_state,
+        world_load,
         assets,
         view,
         cvars,
@@ -2020,7 +2020,7 @@ pub fn RE_RegisterFont(
 #[allow(clippy::too_many_arguments)]
 pub fn GetFont_SBCSOverride(
     qs: &mut QSharedScratch,
-    frame_state: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -2062,7 +2062,7 @@ pub fn GetFont_SBCSOverride(
             };
             let iAltFontIndex = RE_RegisterFont(
                 qs,
-                frame_state,
+                world_load,
                 assets,
                 view,
                 cvars,
@@ -2077,7 +2077,7 @@ pub fn GetFont_SBCSOverride(
             );
             let pAltFont = GetFont_Actual(
                 qs,
-                frame_state,
+                world_load,
                 assets,
                 view,
                 cvars,
@@ -2139,7 +2139,7 @@ pub fn GetFont_SBCSOverride(
         if m_iAltSBCSFont > 0 {
             return GetFont_Actual(
                 qs,
-                frame_state,
+                world_load,
                 assets,
                 view,
                 cvars,
@@ -2170,7 +2170,7 @@ pub fn GetFont_SBCSOverride(
 #[allow(clippy::too_many_arguments)]
 pub fn GetFont(
     qs: &mut QSharedScratch,
-    frame_state: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -2185,7 +2185,7 @@ pub fn GetFont(
 ) -> Option<i32> {
     let pFont = GetFont_Actual(
         qs,
-        frame_state,
+        world_load,
         assets,
         view,
         cvars,
@@ -2205,7 +2205,7 @@ pub fn GetFont(
         for entry in g_SBCSOverrideLanguages.iter() {
             let pAltFont = GetFont_SBCSOverride(
                 qs,
-                frame_state,
+                world_load,
                 assets,
                 view,
                 cvars,
@@ -2275,7 +2275,7 @@ pub fn R_ShutdownFonts(font: &mut FontState) {
 #[allow(clippy::too_many_arguments)]
 pub fn R_ReloadFonts_f(
     qs: &mut QSharedScratch,
-    frame_state: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -2322,7 +2322,7 @@ pub fn R_ReloadFonts_f(
         for (iFont, name) in vstrFonts.iter().enumerate() {
             let iNewFontHandle = RE_RegisterFont(
                 qs,
-                frame_state,
+                world_load,
                 assets,
                 view,
                 cvars,
@@ -2417,7 +2417,7 @@ fn ColorIndex(c: u8) -> i32 {
 #[allow(clippy::too_many_arguments)]
 pub fn RE_Font_StrLenPixels(
     qs: &mut QSharedScratch,
-    frame_state: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -2434,7 +2434,7 @@ pub fn RE_Font_StrLenPixels(
 ) -> i32 {
     let iFont = match GetFont(
         qs,
-        frame_state,
+        world_load,
         assets,
         view,
         cvars,
@@ -2564,7 +2564,7 @@ pub fn RE_Font_StrLenChars(font: &FontState, eLanguage: Language_e, psText: &[u8
 #[allow(clippy::too_many_arguments)]
 pub fn RE_Font_HeightPixels(
     qs: &mut QSharedScratch,
-    frame_state: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -2580,7 +2580,7 @@ pub fn RE_Font_HeightPixels(
 ) -> i32 {
     let iFont = match GetFont(
         qs,
-        frame_state,
+        world_load,
         assets,
         view,
         cvars,
@@ -3067,13 +3067,13 @@ pub fn layout_font_string(
 /// `common` is no longer a separate parameter because `view.common` is the
 /// same `Common` (two `&mut` borrows of it could not coexist). `frame` stays
 /// the `FrameData` draw-command buffer, distinct from the carrier list's
-/// `frame_state`.
+/// `world_load`.
 ///
 /// Source: `oracle/codemp/renderer/tr_font.cpp:1430-1614`
 #[allow(clippy::too_many_arguments)]
 pub fn RE_Font_DrawString(
     qs: &mut QSharedScratch,
-    frame_state: &mut FrameState,
+    world_load: &mut WorldLoadState,
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
@@ -3102,7 +3102,7 @@ pub fn RE_Font_DrawString(
 
     let iFont = match GetFont(
         qs,
-        frame_state,
+        world_load,
         assets,
         view,
         cvars,

@@ -83,7 +83,7 @@ fn re_register_model_hook(view: &mut EngineHostView, name: &str) -> qhandle_t {
     let rm = unsafe { rm_from_view(view) };
     RE_RegisterModel(
         &mut re.qs,
-        &mut re.frame,
+        &mut re.world_load,
         Arc::make_mut(&mut re.sim.published),
         view,
         &re.cvars,

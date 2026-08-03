@@ -16,7 +16,7 @@
 // established. Flagged for the integrator: once `FrameState::view` lands a
 // real shape, thread `&frame.view` instead.
 
-use mp_engine_qcommon::common::{com_error, Common};
+use mp_engine_qcommon::common::com_error;
 use mp_engine_qcommon::common_fns::Q_acos;
 use mp_engine_qcommon::qfiles::shader_limits::SHADER_MAX_VERTEXES;
 use mp_qshared::shared::error_parm::errorParm_t;
@@ -30,7 +30,8 @@ use native_math::qmath::VectorNormalize;
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::placeholders::SkyParms;
-use crate::render_state::renderer_cvars::RendererCvars;
+use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
+use crate::render_state::world_load_state::WorldLoadState;
 use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_public::ref_flags::RDF_SKYBOXPORTAL;
 use crate::tr_shade_calc::myftol;
@@ -992,11 +993,16 @@ pub fn R_BuildCloudData(
 /// so the quad body can port whenever the `#if 0` guard is lifted.
 ///
 /// Source: `oracle/codemp/renderer/tr_sky.cpp:687-772`
-pub fn RB_DrawSun(frame: &FrameState, common: &Common, cvars: &RendererCvars, view: &viewParms_t) {
+pub fn RB_DrawSun(
+    frame: &FrameState,
+    world_load: &WorldLoadState,
+    cvars: RenderCvarSnapshot,
+    view: &viewParms_t,
+) {
     if !frame.sky_rendered_this_view {
         return;
     }
-    if common.cvar(cvars.r_drawSun).integer == 0 {
+    if cvars.draw_sun == 0 {
         return;
     }
 
@@ -1009,11 +1015,11 @@ pub fn RB_DrawSun(frame: &FrameState, common: &Common, cvars: &RendererCvars, vi
     let size = (dist as f64 * 0.4_f64) as f32;
 
     let mut origin: vec3_t = [0.0; 3];
-    VectorScale(frame.sun_direction, dist, &mut origin);
+    VectorScale(world_load.sun_direction, dist, &mut origin);
     let mut vec1: vec3_t = [0.0; 3];
-    PerpendicularVector(&mut vec1, frame.sun_direction);
+    PerpendicularVector(&mut vec1, world_load.sun_direction);
     let mut vec2: vec3_t = [0.0; 3];
-    CrossProduct(frame.sun_direction, vec1, &mut vec2);
+    CrossProduct(world_load.sun_direction, vec1, &mut vec2);
 
     VectorScale(vec1, size, &mut vec1);
     VectorScale(vec2, size, &mut vec2);

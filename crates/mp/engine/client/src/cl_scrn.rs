@@ -78,7 +78,7 @@ pub fn SCR_DrawNamedPic(
     let hShader: qhandle_t = RE_RegisterShader(
         &name,
         &mut re.qs,
-        &mut re.frame,
+        &mut re.world_load,
         Arc::make_mut(&mut re.sim.published),
         view,
         &re.cvars,
@@ -712,7 +712,7 @@ pub fn SCR_DrawScreenField(view: &mut EngineHostView, cl: &mut Client, stereoFra
             view,
             &re.cvars,
             &re.sim.published,
-            &mut re.frame,
+            &mut re.world_load,
             &mut re.img_state,
             stereoFrame,
         );

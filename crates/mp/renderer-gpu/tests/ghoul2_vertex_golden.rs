@@ -448,9 +448,9 @@ fn golden_ghoul2_verts_stormtrooper() {
         let UiHost {
             engine,
             models,
-            cvars,
             sim,
             frame: fstate,
+            world_load,
             img_state,
             noise,
             sky,
@@ -466,7 +466,7 @@ fn golden_ghoul2_verts_stormtrooper() {
         let mut world = WorldFrame {
             engine_view: &mut engine_view,
             assets: Arc::make_mut(&mut sim.published),
-            cvars,
+            world_load,
             frame: fstate,
             g2: &mut g2,
             sky,

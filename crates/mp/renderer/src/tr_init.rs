@@ -30,6 +30,7 @@ use crate::hook_install::re_from_view;
 use crate::render_state::capture_request::CaptureRequest;
 use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_state::FrameState;
+use crate::render_state::world_load_state::WorldLoadState;
 use crate::render_state::placeholders::{
     BackEndCounters, OrientationR, RefEntity, TrRefdef, ViewParms, FUNCTABLE_SIZE,
 };
@@ -1584,6 +1585,7 @@ pub fn R_Init(
     state: &mut TrImageState,
     models: &mut RenderModels,
     frame: &mut FrameState,
+    world_load: &mut WorldLoadState,
     scene: &mut SceneState,
     frame_data: &mut FrameData,
     noise: &mut NoiseState,
@@ -1645,19 +1647,23 @@ pub fn R_Init(
         vertexes_2d: false,
         entity_2d: RefEntity::default(),
         scene_light_styles: [[0; 4]; MAX_LIGHT_STYLES],
-        frame_count: 0,
         scene_count: 0,
         frame_scene_num: 0,
         view_cluster: 0,
         skyboxportal: 0,
         drawskyboxportal: 0,
         render_glowing_objects: false,
+    };
+
+    // The sim-written half of the same `Com_Memset( &tr, 0, sizeof( tr ) )`
+    // (W2-F3).
+    *world_load = WorldLoadState {
+        frame_count: 0,
         identity_light: 0.0,
         identity_light_byte: 0,
         overbright_bits: 0,
         sun_direction: [0.0; 3],
         sun_ambient: [0.0; 3],
-        external_vis_data: None,
     };
 
     // DEFERRED: `tess` (`shaderCommands_t`) memset + the `tess.xyz` 16-byte
@@ -1728,10 +1734,10 @@ pub fn R_Init(
 
     InitOpenGL(view, cvars, &mut *assets, state, &*models, frame);
 
-    R_InitImages(view, cvars, assets, &*models, state, &mut *frame);
+    R_InitImages(view, cvars, assets, &*models, state, &mut *world_load);
 
     R_InitShaders(
-        false, qs, frame, assets, view, cvars, &*models, state, sky_view, sky,
+        false, qs, world_load, assets, view, cvars, &*models, state, sky_view, sky,
     );
     // R_InitSkins(): the client registry (`RenderAssets::skins`) and, for the
     // dedicated link set's own `RenderModels.skins` pool, its twin — one

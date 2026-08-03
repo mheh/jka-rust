@@ -131,6 +131,14 @@ pub struct RenderAssets {
     // is deferred to the client-engine island.
     /// `tr.world` — replaced wholesale on level load.
     pub world: Option<WorldAsset>,
+    /// `tr.externalVisData` — Raven: "from `RE_SetWorldVisData`, shared with
+    /// `CM_Load`". Owned here rather than aliasing the collision world's
+    /// buffer (interior-safety law); `None` until `CM_LoadMap` hands one over.
+    /// W2-F3 homes it beside `world`: `RE_SetWorldVisData` writes it and
+    /// `R_LoadVisibility` reads it, both at BSP load on the sim thread.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1326`
+    pub external_vis_data: Option<Vec<u8>>,
     /// `tr.bspModels[MAX_SUB_BSP]` — sub-BSP worlds, homed beside `world`
     /// rather than a fifth arena.
     ///

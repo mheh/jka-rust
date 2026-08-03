@@ -69,7 +69,7 @@ use mp_qshared::shared::com_parse::QSharedScratch;
 use mp_qshared::shared::{pc_token_t, qhandle_t, sfxHandle_t, vec3_t, vec4_t, MAX_TOKENLENGTH};
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::frame_event::FrameEvent;
-use mp_renderer::render_state::frame_state::FrameState;
+use mp_renderer::render_state::world_load_state::WorldLoadState;
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::renderer_cvars::RendererCvars;
 use mp_renderer::render_state::shader_asset::ShaderHandle;
@@ -126,7 +126,7 @@ pub struct HarnessDc<'a> {
     pub assets: &'a mut RenderAssets,
     pub models: &'a mut RenderModels,
     pub img_state: &'a mut TrImageState,
-    pub frame: &'a mut FrameState,
+    pub world_load: &'a mut WorldLoadState,
     pub qs: &'a mut QSharedScratch,
     pub sky_view: &'a mut viewParms_t,
     pub sky: &'a mut SkyState,
@@ -197,7 +197,7 @@ impl HarnessDc<'_> {
         let bytes = string_to_latin1(text);
         RE_Font_StrLenPixels(
             self.qs,
-            self.frame,
+            self.world_load,
             self.assets,
             &mut self.view,
             &*self.cvars,
@@ -231,7 +231,7 @@ impl HarnessDc<'_> {
         let millis = self.millis;
         RE_Font_DrawString(
             self.qs,
-            self.frame,
+            self.world_load,
             self.assets,
             &mut self.view,
             &*self.cvars,
@@ -498,7 +498,7 @@ impl DisplayContext for HarnessDc<'_> {
         RE_RegisterShaderNoMip(
             p,
             self.qs,
-            self.frame,
+            self.world_load,
             self.assets,
             &mut self.view,
             &*self.cvars,
@@ -594,7 +594,7 @@ impl DisplayContext for HarnessDc<'_> {
         let iFontIndex = MenuFontToHandle(ds, iMenuFont);
         RE_Font_HeightPixels(
             self.qs,
-            self.frame,
+            self.world_load,
             self.assets,
             &mut self.view,
             &*self.cvars,
@@ -682,7 +682,7 @@ impl DisplayContext for HarnessDc<'_> {
     fn RegisterFont(&mut self, fontName: &str) -> qhandle_t {
         RE_RegisterFont(
             self.qs,
-            self.frame,
+            self.world_load,
             self.assets,
             &mut self.view,
             &*self.cvars,
@@ -713,7 +713,7 @@ impl DisplayContext for HarnessDc<'_> {
     fn Font_HeightPixels(&mut self, iFontIndex: c_int, scale: f32) -> c_int {
         RE_Font_HeightPixels(
             self.qs,
-            self.frame,
+            self.world_load,
             self.assets,
             &mut self.view,
             &*self.cvars,
@@ -1134,7 +1134,7 @@ impl DisplayContext for HarnessDc<'_> {
     fn R_RegisterSkin(&mut self, name: &str) -> qhandle_t {
         RE_RegisterSkin(
             self.qs,
-            self.frame,
+            self.world_load,
             self.assets,
             &mut self.view,
             &*self.cvars,

@@ -929,6 +929,7 @@ pub fn CL_InitRenderer(view: &mut EngineHostView, cl: &mut Client) {
         &mut re.img_state,
         rm,
         &mut re.frame,
+        &mut re.world_load,
         &mut re.scene,
         &mut re.frame_data,
         &mut re.noise,
@@ -945,7 +946,7 @@ pub fn CL_InitRenderer(view: &mut EngineHostView, cl: &mut Client) {
     cl.cls.charSetShader = RE_RegisterShaderNoMip(
         "gfx/2d/charsgrid_med",
         &mut re.qs,
-        &mut re.frame,
+        &mut re.world_load,
         Arc::make_mut(&mut re.sim.published),
         view,
         &re.cvars,
@@ -958,7 +959,7 @@ pub fn CL_InitRenderer(view: &mut EngineHostView, cl: &mut Client) {
     cl.cls.whiteShader = RE_RegisterShader(
         "white",
         &mut re.qs,
-        &mut re.frame,
+        &mut re.world_load,
         Arc::make_mut(&mut re.sim.published),
         view,
         &re.cvars,
@@ -970,7 +971,7 @@ pub fn CL_InitRenderer(view: &mut EngineHostView, cl: &mut Client) {
     cl.cls.consoleShader = RE_RegisterShader(
         "console",
         &mut re.qs,
-        &mut re.frame,
+        &mut re.world_load,
         Arc::make_mut(&mut re.sim.published),
         view,
         &re.cvars,
