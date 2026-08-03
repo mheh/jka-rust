@@ -2110,12 +2110,16 @@ pub fn CL_UISystemCalls(
         }
     } else if trap == MpUiImport::UI_G2_CLEANMODELS as c_int {
         // SAFETY: `VMA(1)` is the module's `CGhoul2Info_v *` slot (§D11).
+        // Raven guards the null pointee and then deletes and nulls the handle
+        // (`G2_API.cpp:496-564`); the engine drops the `Box` it made at init.
         unsafe {
-            g2api_clean_ghoul2_models(
-                g2,
-                &mut **(vma(view.common, args, 1) as *mut *mut CGhoul2Info_v),
-            )
-        };
+            let pp = vma(view.common, args, 1) as *mut *mut CGhoul2Info_v;
+            if !(*pp).is_null() {
+                g2api_clean_ghoul2_models(g2, &mut **pp);
+                drop(Box::from_raw(*pp));
+                *pp = core::ptr::null_mut();
+            }
+        }
         0
     } else if trap == MpUiImport::UI_G2_PLAYANIM as c_int {
         unsafe {
@@ -2217,29 +2221,49 @@ pub fn CL_UISystemCalls(
         };
         0
     } else if trap == MpUiImport::UI_G2_DUPLICATEGHOUL2INSTANCE as c_int {
+        // Raven returns on a live destination (assert dropped, NDEBUG) and
+        // allocates on a null one (`G2_API.cpp:2330-2340`). The engine owns
+        // the `Box`, the module holds the raw pointer.
         unsafe {
-            mp_engine_ghoul2::api_models::g2api_duplicate_ghoul2_instance(
-                g2,
-                &mut *(*args.offset(1) as *mut CGhoul2Info_v),
-                &mut **(vma(view.common, args, 2) as *mut *mut CGhoul2Info_v),
-            )
+            let pp = vma(view.common, args, 2) as *mut *mut CGhoul2Info_v;
+            if (*pp).is_null() {
+                *pp = Box::into_raw(Box::new(CGhoul2Info_v { mItem: 0 }));
+                mp_engine_ghoul2::api_models::g2api_duplicate_ghoul2_instance(
+                    g2,
+                    &mut *(*args.offset(1) as *mut CGhoul2Info_v),
+                    &mut **pp,
+                );
+            }
         };
         0
     } else if trap == MpUiImport::UI_G2_HASGHOUL2MODELONINDEX as c_int {
-        unsafe {
-            mp_engine_ghoul2::api_models::g2api_has_ghoul2_model_on_index(
-                g2,
-                &**(vma(view.common, args, 1) as *mut *mut CGhoul2Info_v),
-                *args.offset(2) as c_int,
-            ) as c_int
+        // §19: Raven derefs the null pointee; the gone-instance sanity answer
+        // is qfalse, so the null pointee takes it too.
+        let pp = unsafe { vma(view.common, args, 1) as *mut *mut CGhoul2Info_v };
+        if unsafe { (*pp).is_null() } {
+            0
+        } else {
+            unsafe {
+                mp_engine_ghoul2::api_models::g2api_has_ghoul2_model_on_index(
+                    g2,
+                    &**pp,
+                    *args.offset(2) as c_int,
+                ) as c_int
+            }
         }
     } else if trap == MpUiImport::UI_G2_REMOVEGHOUL2MODEL as c_int {
-        unsafe {
-            mp_engine_ghoul2::api_models::g2api_remove_ghoul2_model(
-                g2,
-                &mut **(vma(view.common, args, 1) as *mut *mut CGhoul2Info_v),
-                *args.offset(2) as c_int,
-            ) as c_int
+        // §19: same null-pointee answer as the HASGHOUL2MODELONINDEX arm.
+        let pp = unsafe { vma(view.common, args, 1) as *mut *mut CGhoul2Info_v };
+        if unsafe { (*pp).is_null() } {
+            0
+        } else {
+            unsafe {
+                mp_engine_ghoul2::api_models::g2api_remove_ghoul2_model(
+                    g2,
+                    &mut **pp,
+                    *args.offset(2) as c_int,
+                ) as c_int
+            }
         }
     } else if trap == MpUiImport::UI_G2_ADDBOLT as c_int {
         unsafe {

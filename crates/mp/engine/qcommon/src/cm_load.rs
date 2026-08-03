@@ -382,6 +382,7 @@ pub fn CM_DeleteCachedMap(
                 Z_Free(common, cm.gpvCachedMapDiskImage);
             }
             cm.gpvCachedMapDiskImage = core::ptr::null_mut();
+            cm.gpvCachedMapDiskImageLen = 0;
 
             bActuallyFreedSomething = mp_qshared::shared::qtrue;
         }
@@ -393,6 +394,31 @@ pub fn CM_DeleteCachedMap(
     }
 
     bActuallyFreedSomething
+}
+
+/// Take the retained CM map disk image as an owned buffer for the renderer.
+/// Raven reads the block in place (`tr_bsp.cpp:2035-2039`) and frees it after
+/// the world load (`:2101-2104`); the port copies and frees at the take, so
+/// the renderer never holds the raw pointer.
+pub fn CM_TakeCachedMapDiskImage(view: &mut EngineHostView) -> Option<Vec<u8>> {
+    if view.cm.gpvCachedMapDiskImage.is_null() {
+        return None;
+    }
+    // SAFETY: the pointer and length are written together at the `CM_LoadMap`
+    // fill site and cleared together at every free site.
+    let bytes = unsafe {
+        core::slice::from_raw_parts(
+            view.cm.gpvCachedMapDiskImage as *const u8,
+            view.cm.gpvCachedMapDiskImageLen,
+        )
+        .to_vec()
+    };
+    unsafe {
+        Z_Free(view.common, view.cm.gpvCachedMapDiskImage);
+    }
+    view.cm.gpvCachedMapDiskImage = core::ptr::null_mut();
+    view.cm.gpvCachedMapDiskImageLen = 0;
+    Some(bytes)
 }
 
 /// Raven `CM_Checksum`.
@@ -1209,6 +1235,7 @@ pub fn CM_LoadMap_Actual(
             buf = new_buff as *mut c_int;
             if core::ptr::eq(cmap as *const clipMap_t, &view.cm.cmg as *const clipMap_t) {
                 view.cm.gpvCachedMapDiskImage = new_buff;
+                view.cm.gpvCachedMapDiskImageLen = bsp_len as usize;
             }
         }
 
@@ -1235,6 +1262,7 @@ pub fn CM_LoadMap_Actual(
                 Z_Free(view.common, view.cm.gpvCachedMapDiskImage);
             }
             view.cm.gpvCachedMapDiskImage = core::ptr::null_mut();
+            view.cm.gpvCachedMapDiskImageLen = 0;
 
             com_error(
                 errorParm_t::ERR_DROP,
@@ -1287,6 +1315,7 @@ pub fn CM_LoadMap_Actual(
                 Z_Free(view.common, view.cm.gpvCachedMapDiskImage);
             }
             view.cm.gpvCachedMapDiskImage = core::ptr::null_mut();
+            view.cm.gpvCachedMapDiskImageLen = 0;
         } else {
             // ... do nothing, and let the renderer free it after it's finished
             // playing with it...

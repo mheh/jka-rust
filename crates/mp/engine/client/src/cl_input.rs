@@ -33,6 +33,7 @@ use mp_game::prelude::byte;
 use mp_game::q_math::{PITCH, ROLL, YAW};
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;
 use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t::NA_LOOPBACK;
+use mp_qshared::shared::cvar::{CVAR_ARCHIVE, CVAR_LATCH};
 use mp_qshared::common::mp::qcommon::usercmd::usercmd_t;
 use mp_qshared::common::mp::qcommon::usercmd_button::{
     BUTTON_ANY, BUTTON_FORCEPOWER, BUTTON_TALK, BUTTON_USE, BUTTON_USE_HOLDABLE, BUTTON_WALKING,
@@ -2868,4 +2869,15 @@ pub fn CL_InitInput(view: &mut EngineHostView, cl: &mut Client) {
 
     cl.cl_nodelta = Some(Cvar_Get(view, "cl_nodelta", "0", 0));
     cl.cl_debugMove = Some(Cvar_Get(view, "cl_debugMove", "0", 0));
+
+    // The IN_Init tail: Raven registers this in the platform input layer,
+    // and CL_JoystickMove reads the handle every frame. The seat lives here
+    // until the platform shell carries a real IN_Init (ticket gh#22 debt).
+    // Source: `oracle/codemp/win32/win_input.cpp:674`
+    cl.in_joystick = Some(Cvar_Get(
+        view,
+        "in_joystick",
+        "0",
+        CVAR_ARCHIVE | CVAR_LATCH,
+    ));
 }

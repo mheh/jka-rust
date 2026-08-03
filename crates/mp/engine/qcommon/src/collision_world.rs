@@ -175,6 +175,11 @@ pub struct CollisionWorld {
     ///
     /// Source: `oracle/codemp/qcommon/cm_load.cpp:568-570`
     pub gpvCachedMapDiskImage: *mut (),
+    /// The byte length of `gpvCachedMapDiskImage`, written and cleared beside
+    /// the pointer. Raven never stores it (the renderer reads in place); the
+    /// port needs it so the renderer can take the buffer without an unbounded
+    /// pointer read.
+    pub gpvCachedMapDiskImageLen: usize,
     pub gsCachedMapDiskImage: [c_char; MAX_QPATH],
     pub gbUsingCachedMapDataRightNow: qboolean,
 

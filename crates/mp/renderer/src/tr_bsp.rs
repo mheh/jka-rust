@@ -11,6 +11,7 @@
 
 use core::mem::{replace, size_of};
 
+use mp_engine_qcommon::cm_load::CM_TakeCachedMapDiskImage;
 use mp_engine_qcommon::common::{com_error, com_printf, Common, EngineHostView};
 use mp_engine_qcommon::files_common::FS_ReadFileVec;
 use mp_engine_qcommon::qfiles::bsp_limits::BSP_VERSION;
@@ -3684,28 +3685,11 @@ pub fn RE_LoadWorldMap_Actual(
 
     // check for cached disk file from the server first...
     //
-    let buffer: Vec<u8> = if !view.cm.gpvCachedMapDiskImage.is_null() {
-        //TODO: Port gpvCachedMapDiskImage
-        // Source: oracle/codemp/renderer/tr_bsp.cpp:2035-2039
-        //
-        // `CollisionWorld::gpvCachedMapDiskImage`
-        // (`crates/mp/engine/qcommon/src/collision_world.rs:171-176`) is a
-        // raw `*mut ()` with no companion length field this file can read
-        // without an unsafe, unbounded-length pointer dereference — banned
-        // in this file's interior (UNSAFE IS BANNED wave instruction; no
-        // existing quarantine accessor exposes it as an owned, length-known
-        // buffer). This branch is live on the client track: `CM_LoadMap`
-        // (`cm_load.rs:1284-1290`) frees and nulls the field only when
-        // `Sys_LowPhysicalMemory() || com_dedicated` — both false in a
-        // `jamp` client, where the buffer is deliberately retained for the
-        // renderer to chew on (oracle `tr_bsp.cpp:2033-2048`). Left as a
-        // loud stub, not silently skipped: the retention seam is genuinely
-        // unwired, and whichever wave adds a length-carrying quarantine
-        // accessor for `gpvCachedMapDiskImage` closes it.
-        todo!(
-            "Port RE_LoadWorldMap_Actual's gpvCachedMapDiskImage read path — \
-             oracle/codemp/renderer/tr_bsp.cpp:2035-2039"
-        )
+    // Raven reads the retained block in place and frees it after the load
+    // (`tr_bsp.cpp:2101-2104`); the take copies and frees now, so this file
+    // never touches the raw pointer.
+    let buffer: Vec<u8> = if let Some(cached) = CM_TakeCachedMapDiskImage(view) {
+        cached
     } else {
         // still needs loading...
         match FS_ReadFileVec(view, name) {
