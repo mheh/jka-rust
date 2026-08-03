@@ -2337,14 +2337,22 @@ pub fn CL_UISystemCalls(
         0
     } else if trap == MpUiImport::UI_G2_SETBONEIKSTATE as c_int {
         unsafe {
-            let bone_name = cstr_to_string(vma(view.common, args, 3) as *const c_char);
+            // A NULL bone name is Raven's own contract: it tells
+            // `G2_SetBoneIKState` to initialize the IK state on this instance.
+            // Source: `oracle/codemp/ghoul2/G2_bones.cpp:4674-4676`
+            let bone_name_ptr = vma(view.common, args, 3) as *const c_char;
+            let bone_name = if bone_name_ptr.is_null() {
+                None
+            } else {
+                Some(cstr_to_string(bone_name_ptr))
+            };
             let params = (vma(view.common, args, 5) as *mut sharedSetBoneIKStateParams_t).as_mut();
             mp_engine_ghoul2::api_ragdoll::g2api_set_bone_ik_state(
                 g2,
                 view,
                 &mut *(*args.offset(1) as *mut CGhoul2Info_v),
                 *args.offset(2) as c_int,
-                Some(&bone_name),
+                bone_name.as_deref(),
                 *args.offset(4) as c_int,
                 params,
             ) as c_int

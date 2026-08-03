@@ -220,6 +220,22 @@ fn vec3_from_module(p: *const vec3_t) -> Option<vec3_t> {
     Some(unsafe { *p })
 }
 
+/// Read a module-space trace bound, where a NULL pointer is the origin.
+///
+/// Raven's trace entry points take `mins`/`maxs` as pointers and let a module
+/// pass NULL for a point trace; `CM_Trace` substitutes `vec3_origin` for each
+/// NULL bound. This port takes the bounds by value, so the substitution happens
+/// where the seam reads the module pointer.
+///
+/// Source: `oracle/codemp/qcommon/cm_trace.cpp:1602-1608`
+fn vec3_or_origin(p: *const vec3_t) -> vec3_t {
+    if p.is_null() {
+        return vec3_origin;
+    }
+    // SAFETY: the module passed a live `vec3_t` across the seam.
+    unsafe { *p }
+}
+
 /// Read a module-space C string as an owned `String`, the shape every trap arm
 /// that takes a `const char *` needs.
 fn cstr_to_string(p: *const c_char) -> String {
@@ -1622,8 +1638,8 @@ pub fn CL_CgameSystemCalls(
             vma(vc, args, 1) as *mut trace_t,
             unsafe { *(vma(vc, args, 2) as *const vec3_t) },
             unsafe { *(vma(vc, args, 3) as *const vec3_t) },
-            unsafe { *(vma(vc, args, 4) as *const vec3_t) },
-            unsafe { *(vma(vc, args, 5) as *const vec3_t) },
+            vec3_or_origin(vma(vc, args, 4) as *const vec3_t),
+            vec3_or_origin(vma(vc, args, 5) as *const vec3_t),
             arg(6),
             arg(7),
             qfalse as c_int,
@@ -1635,8 +1651,8 @@ pub fn CL_CgameSystemCalls(
             vma(vc, args, 1) as *mut trace_t,
             unsafe { *(vma(vc, args, 2) as *const vec3_t) },
             unsafe { *(vma(vc, args, 3) as *const vec3_t) },
-            unsafe { *(vma(vc, args, 4) as *const vec3_t) },
-            unsafe { *(vma(vc, args, 5) as *const vec3_t) },
+            vec3_or_origin(vma(vc, args, 4) as *const vec3_t),
+            vec3_or_origin(vma(vc, args, 5) as *const vec3_t),
             arg(6),
             arg(7),
             qtrue as c_int,
@@ -1648,8 +1664,8 @@ pub fn CL_CgameSystemCalls(
             vma(vc, args, 1) as *mut trace_t,
             unsafe { *(vma(vc, args, 2) as *const vec3_t) },
             unsafe { *(vma(vc, args, 3) as *const vec3_t) },
-            unsafe { *(vma(vc, args, 4) as *const vec3_t) },
-            unsafe { *(vma(vc, args, 5) as *const vec3_t) },
+            vec3_or_origin(vma(vc, args, 4) as *const vec3_t),
+            vec3_or_origin(vma(vc, args, 5) as *const vec3_t),
             arg(6),
             arg(7),
             unsafe { *(vma(vc, args, 8) as *const vec3_t) },
@@ -1663,8 +1679,8 @@ pub fn CL_CgameSystemCalls(
             vma(vc, args, 1) as *mut trace_t,
             unsafe { *(vma(vc, args, 2) as *const vec3_t) },
             unsafe { *(vma(vc, args, 3) as *const vec3_t) },
-            unsafe { *(vma(vc, args, 4) as *const vec3_t) },
-            unsafe { *(vma(vc, args, 5) as *const vec3_t) },
+            vec3_or_origin(vma(vc, args, 4) as *const vec3_t),
+            vec3_or_origin(vma(vc, args, 5) as *const vec3_t),
             arg(6),
             arg(7),
             unsafe { *(vma(vc, args, 8) as *const vec3_t) },
