@@ -452,7 +452,6 @@ fn golden_ghoul2_verts_stormtrooper() {
             sim,
             frame: fstate,
             img_state,
-            font,
             noise,
             sky,
             ..
@@ -484,7 +483,6 @@ fn golden_ghoul2_verts_stormtrooper() {
             &dummy_assets,
             img_state,
             &mut images,
-            font,
             noise,
             float_time,
             RenderCvarSnapshot::default(),

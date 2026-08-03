@@ -176,20 +176,11 @@ pub enum FrameEvent {
         angle: f32,
         shader: ShaderHandle,
     },
-    /// `CG_R_/UI_R_FONT_DRAWSTRING`. `set_index` is the registered font's
-    /// handle, `text` the owned Latin-1 string replacing the oracle's
-    /// `const char *`, `rgba` its four-float colour by value.
-    ///
-    /// Source: `oracle/codemp/renderer/tr_public.h:97`
-    DrawString {
-        ox: i32,
-        oy: i32,
-        text: String,
-        rgba: [f32; 4],
-        set_index: i32,
-        char_limit: i32,
-        scale: f32,
-    },
+    // `CG_R_/UI_R_FONT_DRAWSTRING` has no variant of its own. Raven lays a
+    // string out at trap time and issues one `RE_SetColor`/`RE_StretchPic` per
+    // glyph, so `RE_Font_DrawString` records exactly those events and the
+    // stream carries finished glyph quads (user ruling 2026-08-02).
+    // Source: `oracle/codemp/renderer/tr_font.cpp:1491-1613`
 
     // --- world-effects / automap tail (RC_WORLD_EFFECTS / RC_AUTO_MAP) ---
     /// `CG_R_WORLDEFFECTCOMMAND` — cgame-only.

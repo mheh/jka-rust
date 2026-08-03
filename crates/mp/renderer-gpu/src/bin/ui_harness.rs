@@ -246,7 +246,6 @@ impl App {
                     &self.host.sim.published,
                     &mut self.host.img_state,
                     images,
-                    &mut self.host.font,
                     &self.host.noise,
                     float_time,
                     // No live cvar table in the harness, so the retail defaults
@@ -297,12 +296,10 @@ impl App {
 
 fn report(label: &str, stats: &FrameStats) {
     println!(
-        "ui_harness: {label} — {} images uploaded, {} quads ({} glyphs across {} strings), \
+        "ui_harness: {label} — {} images uploaded, {} quads, \
          {} color changes, {} draw calls, {} events skipped, {} zero-pass pics",
         stats.images_uploaded,
         stats.quads,
-        stats.glyphs,
-        stats.strings,
         stats.color_changes,
         stats.draw_calls,
         stats.skipped_events(),

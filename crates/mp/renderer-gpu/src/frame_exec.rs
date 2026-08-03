@@ -17,8 +17,11 @@
 //! earlier changes nothing about this file. The sim/render thread split is a
 //! later R4 slice.
 //!
-//! Wave 2 renders `SetColor`, `DrawStretchPic` and `DrawString`. The
-//! rotate-pic pair and the whole scene-composition half of the enum are
+//! Wave 2 renders `SetColor` and `DrawStretchPic`. A string arrives already
+//! laid out: `RE_Font_DrawString` runs the glyph walk on the sim side and
+//! records one `SetColor`/`DrawStretchPic` pair per glyph, exactly as Raven
+//! issues them, so this side needs no font tables (user ruling 2026-08-02).
+//! The rotate-pic pair and the whole scene-composition half of the enum are
 //! counted and skipped, with one `eprintln!` the first time each kind is
 //! seen. Skipping, not panicking: a real `ui` frame emits scene events from
 //! day one, and a loud-but-live frame loop is what makes the next slices
@@ -43,7 +46,6 @@
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::cm_terrain::CmLandScape;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
-use mp_engine_qcommon::qfiles::font_style::SET_MASK;
 use mp_engine_qcommon::qfiles::light_style_limits::MAX_LIGHT_STYLES;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::frame_event::FrameEvent;
@@ -54,7 +56,6 @@ use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::render_state::renderer_cvars::RendererCvars;
 use mp_renderer::render_state::shader_asset::ShaderHandle;
-use mp_renderer::tr_font::{layout_font_string, FontDrawItem, FontState, Language_e};
 use mp_renderer::tr_image::TrImageState;
 use mp_renderer::tr_local::dlight_s::dlight_t;
 use mp_renderer::tr_local::fog_t::fog_t;
@@ -90,7 +91,8 @@ const DEFAULT_COLOR: [f32; 4] = [1.0, 1.0, 1.0, 1.0];
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FrameStats {
     /// Quads batched — one per active stage of every `DrawStretchPic`'s
-    /// shader, plus every glyph a `DrawString` laid out.
+    /// shader. A string arrives as one `DrawStretchPic` per glyph, so its
+    /// glyphs are counted here too.
     pub quads: u32,
     /// `DrawStretchPic` events whose shader had stages but none active, so no
     /// pass was drawn (the oracle's zero-iteration `RB_StageIteratorGeneric`).
@@ -101,13 +103,6 @@ pub struct FrameStats {
     pub draw_calls: u32,
     /// Images uploaded this frame (`pending_uploads` drained at frame start).
     pub images_uploaded: u32,
-    /// `DrawString` events laid out into glyph quads.
-    pub strings: u32,
-    /// Glyph quads those strings produced.
-    pub glyphs: u32,
-    /// `DrawString` events whose font index resolved to nothing — the string
-    /// laid out empty, so nothing was drawn.
-    pub skipped_strings: u32,
     /// `DrawRotatePic`/`DrawRotatePic2` events skipped.
     pub skipped_rotate_pics: u32,
     /// Scene-composition events skipped (lights, polys, decals, …) — later
@@ -131,10 +126,7 @@ pub struct FrameStats {
 impl FrameStats {
     /// Total events the executor could not render yet.
     pub fn skipped_events(&self) -> u32 {
-        self.skipped_strings
-            + self.skipped_rotate_pics
-            + self.skipped_scene_events
-            + self.skipped_other
+        self.skipped_rotate_pics + self.skipped_scene_events + self.skipped_other
     }
 }
 
@@ -150,10 +142,6 @@ enum Warned {
     UnknownShader,
     /// An active stage's image is missing or not uploaded yet.
     NoStageImage,
-    /// A `DrawString`'s font index addressed no loaded font.
-    UnknownFont,
-    /// A glyph's page shader resolved to no uploaded image.
-    NoGlyphImage,
     /// A `RenderScene` arrived before the world geometry was uploaded.
     NoWorldGeometry,
     /// The loaded world carried fog volumes, so the fog pass is live. This is a
@@ -164,7 +152,7 @@ enum Warned {
 }
 
 impl Warned {
-    const COUNT: usize = 9;
+    const COUNT: usize = 7;
 
     fn slot(self) -> usize {
         match self {
@@ -173,10 +161,8 @@ impl Warned {
             Warned::Other => 2,
             Warned::UnknownShader => 3,
             Warned::NoStageImage => 4,
-            Warned::UnknownFont => 5,
-            Warned::NoGlyphImage => 6,
-            Warned::NoWorldGeometry => 7,
-            Warned::Fog => 8,
+            Warned::NoWorldGeometry => 5,
+            Warned::Fog => 6,
         }
     }
 
@@ -189,8 +175,6 @@ impl Warned {
             Warned::Other => "skips world-effect / automap commands — not rendered yet",
             Warned::UnknownShader => "drew a pic whose shader handle is not registered — white",
             Warned::NoStageImage => "drew a stage whose image is not uploaded — white",
-            Warned::UnknownFont => "drew a string with an unloaded font handle — nothing drawn",
-            Warned::NoGlyphImage => "drew a glyph whose page shader has no image — white",
             Warned::NoWorldGeometry => "got a RenderScene before the world geometry uploaded",
             Warned::Fog => "world carries fog volumes — fog pass is live",
         }
@@ -341,7 +325,6 @@ impl FrameExecutor {
         assets: &RenderAssets,
         img_state: &mut TrImageState,
         gpu_images: &mut GpuImages,
-        fonts: &mut FontState,
         noise: &NoiseState,
         float_time: f32,
         cvars: RenderCvarSnapshot,
@@ -461,36 +444,6 @@ impl FrameExecutor {
                     stats.quads += 1;
                 }
 
-                FrameEvent::DrawString {
-                    ox,
-                    oy,
-                    text,
-                    rgba,
-                    set_index,
-                    char_limit,
-                    scale,
-                } => {
-                    let drawn = self.draw_string(
-                        assets,
-                        gpu_images,
-                        fonts,
-                        &mut color,
-                        *ox,
-                        *oy,
-                        text,
-                        *rgba,
-                        *set_index,
-                        *char_limit,
-                        *scale,
-                    );
-                    if drawn == 0 {
-                        stats.skipped_strings += 1;
-                    } else {
-                        stats.strings += 1;
-                        stats.glyphs += drawn;
-                        stats.quads += drawn;
-                    }
-                }
                 FrameEvent::DrawRotatePic { .. } | FrameEvent::DrawRotatePic2 { .. } => {
                     stats.skipped_rotate_pics += 1;
                     self.warn_once(Warned::RotatePic);
@@ -906,120 +859,6 @@ impl FrameExecutor {
         );
     }
 
-    /// Lays a `DrawString` out into glyph quads and pushes them into the
-    /// batch, returning how many landed.
-    ///
-    /// The layout is `mp_renderer`'s — `tr_font`'s own per-glyph walk, reused
-    /// through `layout_font_string` — so advance, kerning, dropshadow,
-    /// `^N` colour codes and the `iMaxPixelWidth` clip all behave as
-    /// `RE_Font_DrawString` does. The trap records the string whole, so the
-    /// per-glyph stretch-pics the oracle emitted inline are re-derived here
-    /// instead of arriving as events.
-    ///
-    /// Each glyph's page shader is a raw `qhandle_t` (`CFontInfo::mShader`),
-    /// resolved through `handle_at_slot` — the "slot = index" rule for oracle
-    /// code that stores plain ints (DEC-42.2).
-    ///
-    /// The colour register is left where the layout leaves it, matching
-    /// `RE_Font_DrawString`'s own `RE_SetColor` side effects: the oracle does
-    /// not restore the caller's colour either.
-    ///
-    /// Source: `oracle/codemp/renderer/tr_font.cpp:1430-1614`
-    //TODO: Port GetFont's SBCS-override / Asian-page resolution at the backend
-    // Source: oracle/codemp/renderer/tr_font.cpp:1341-1428
-    // `GetFont` needs the whole engine carrier list (filesystem, cvars,
-    // shader registration) to substitute an alternate single-byte font or
-    // load an Asian glyph page. A backend replaying a recorded frame has
-    // none of it, so the event's own font index is used directly — correct
-    // for western fonts, which is every font wave 2 can build.
-    #[allow(clippy::too_many_arguments)]
-    fn draw_string(
-        &mut self,
-        assets: &RenderAssets,
-        gpu_images: &GpuImages,
-        fonts: &mut FontState,
-        color: &mut [f32; 4],
-        ox: i32,
-        oy: i32,
-        text: &str,
-        rgba: [f32; 4],
-        set_index: i32,
-        char_limit: i32,
-        scale: f32,
-    ) -> u32 {
-        // `text` is Latin-1 on the wire (the seam's `const char *`), and
-        // `tr_font` reads it byte-wise for its MBCS decode.
-        let bytes = latin1_bytes(text);
-
-        let items = layout_font_string(
-            fonts,
-            Language_e::eWestern,
-            set_index & SET_MASK as i32,
-            ox,
-            oy,
-            &bytes,
-            Some(rgba),
-            set_index,
-            char_limit,
-            scale,
-        );
-        if items.is_empty() {
-            self.warn_once(Warned::UnknownFont);
-            return 0;
-        }
-
-        let blend = blend_state_from_gls(GLS_2D_DEFAULT);
-        let mut drawn = 0;
-        for item in &items {
-            match *item {
-                FontDrawItem::Color(rgba) => *color = rgba.unwrap_or(DEFAULT_COLOR),
-                FontDrawItem::Glyph(glyph) => {
-                    let image = self.glyph_image(glyph.h_shader, assets, gpu_images);
-                    self.batch.push_quad(
-                        Rect {
-                            x: glyph.x,
-                            y: glyph.y,
-                            w: glyph.w,
-                            h: glyph.h,
-                        },
-                        UvRect {
-                            s1: glyph.s1,
-                            t1: glyph.t1,
-                            s2: glyph.s2,
-                            t2: glyph.t2,
-                        },
-                        *color,
-                        blend,
-                        image,
-                    );
-                    drawn += 1;
-                }
-            }
-        }
-        drawn
-    }
-
-    /// The uploaded texture behind a glyph page's raw shader handle.
-    fn glyph_image(
-        &mut self,
-        h_shader: i32,
-        assets: &RenderAssets,
-        gpu_images: &GpuImages,
-    ) -> Option<ImageHandle> {
-        let image = u32::try_from(h_shader)
-            .ok()
-            .and_then(|slot| assets.shaders.handle_at_slot(slot))
-            .and_then(|handle| assets.shaders.get(handle))
-            .and_then(|asset| asset.stages.iter().find(|stage| stage.active))
-            .and_then(|stage| stage.bundle[0].image)
-            .filter(|image| gpu_images.contains(*image));
-
-        if image.is_none() {
-            self.warn_once(Warned::NoGlyphImage);
-        }
-        image
-    }
-
     /// Logs a skipped event kind or a fallback the first time it is seen.
     fn warn_once(&mut self, kind: Warned) {
         let slot = kind.slot();
@@ -1029,15 +868,6 @@ impl FrameExecutor {
         self.warned[slot] = true;
         eprintln!("mp_renderer_gpu: frame_exec {}", kind.describe());
     }
-}
-
-/// The seam's `const char *` is Latin-1 (DEC-38's wire-string discipline), so
-/// a `char` above U+00FF cannot have come from a trap; it is clamped to `?`
-/// rather than dropped, keeping the glyph count equal to the character count.
-fn latin1_bytes(text: &str) -> Vec<u8> {
-    text.chars()
-        .map(|c| if (c as u32) < 0x100 { c as u8 } else { b'?' })
-        .collect()
 }
 
 /// One `RE_AddDynamicLightToScene` payload, held between the event replay and

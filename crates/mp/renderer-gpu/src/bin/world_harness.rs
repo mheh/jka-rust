@@ -927,7 +927,6 @@ impl App {
                         sim,
                         frame: fstate,
                         img_state,
-                        font,
                         noise,
                         sky,
                         ..
@@ -960,7 +959,6 @@ impl App {
                         &*dummy_assets,
                         img_state,
                         images,
-                        font,
                         noise,
                         float_time,
                         // The harness rides the F9-driven snapshot. Every field

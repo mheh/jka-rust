@@ -236,7 +236,6 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
             sim,
             frame: fstate,
             img_state,
-            font,
             noise,
             sky,
             ..
@@ -269,7 +268,6 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
             &dummy_assets,
             img_state,
             &mut images,
-            font,
             noise,
             float_time,
             // No live cvar table in the test, so the retail defaults keep the

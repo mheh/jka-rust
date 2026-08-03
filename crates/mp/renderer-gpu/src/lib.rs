@@ -33,8 +33,8 @@
 //! [`blend`] decodes `mp_renderer`'s `GLS_*` state bits into pipeline blend
 //! states, and [`gpu_images`] uploads `R_CreateImage`'s staged pixels into
 //! textures. A `DrawStretchPic` now resolves its shader to a real texture and
-//! its stage's blend mode; a `DrawString` is laid out into glyph quads by
-//! `tr_font`'s own per-glyph walk.
+//! its stage's blend mode. A string reaches this crate already laid out, as
+//! one `DrawStretchPic` per glyph.
 //!
 //! **Staging: single-threaded first light.** DEC-37 ruling 2's sim/render
 //! thread split is a later R4 slice — today the dev harness builds a

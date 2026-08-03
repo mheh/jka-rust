@@ -409,7 +409,6 @@ fn run_scene(scene: &Scene) {
             sim,
             frame: fstate,
             img_state,
-            font,
             noise,
             sky,
             ..
@@ -440,7 +439,6 @@ fn run_scene(scene: &Scene) {
             &dummy_assets,
             img_state,
             &mut images,
-            font,
             noise,
             float_time,
             RenderCvarSnapshot::default(),

@@ -41,7 +41,6 @@ use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::render_state::shader_asset::{ShaderAsset, ShaderHandle};
 use mp_renderer::render_state::shader_stage::ShaderStage;
 use mp_renderer::tr_shader::{CullType, FogPass};
-use mp_renderer::tr_font::FontState;
 use mp_renderer::tr_image::{PendingUpload, TrImageState};
 use mp_renderer::tr_noise::NoiseState;
 use mp_renderer::tr_shader::ShaderStageParse;
@@ -74,7 +73,6 @@ struct App {
     images: Option<GpuImages>,
     executor: Option<FrameExecutor>,
     registries: DevRegistries,
-    fonts: FontState,
     /// Wall clock since boot, standing in for `ri.Milliseconds()` — the 2D
     /// shader clock `RB_SetGL2D` installs.
     start: std::time::Instant,
@@ -91,7 +89,6 @@ impl App {
             images: None,
             executor: None,
             registries: dev_registries(),
-            fonts: FontState::default(),
             start: std::time::Instant::now(),
             reported: false,
         }
@@ -157,7 +154,6 @@ impl ApplicationHandler for App {
                             &self.registries.assets,
                             &mut self.registries.img_state,
                             images,
-                            &mut self.fonts,
                             &NoiseState::default(),
                             self.start.elapsed().as_secs_f32(),
                             // No live cvar table in the harness, so the retail
@@ -189,7 +185,7 @@ impl ApplicationHandler for App {
 /// screen — opaque red, green and blue staggered down the diagonal, then a
 /// half-transparent white band across their overlap so the alpha blend is
 /// visible — the checkerboard drawn twice beside them (once at 1:1 UVs,
-/// once tiled 3x3 to exercise the wrap sampler), and one `DrawString`.
+/// once tiled 3x3 to exercise the wrap sampler).
 ///
 /// The colour quads carry `ShaderHandle::slot_zero()`, the registries' default
 /// entry (A12), which has no stages: they resolve to the white texel and
@@ -270,16 +266,6 @@ fn test_pattern(checker: ShaderHandle) -> FrameData {
         1.0,
         1.0,
     );
-
-    events.push(FrameEvent::DrawString {
-        ox: 16,
-        oy: 16,
-        text: String::from("mp_renderer_gpu 2D textures"),
-        rgba: white,
-        set_index: 0,
-        char_limit: -1,
-        scale: 1.0,
-    });
 
     FrameData { events }
 }
@@ -421,13 +407,10 @@ fn shader_asset(name: &str, stages: Vec<ShaderStage>) -> ShaderAsset {
 
 fn report(stats: &FrameStats) {
     println!(
-        "dev_harness: first frame executed — {} images uploaded, {} quads \
-         ({} glyphs across {} strings), {} color changes, {} draw calls, \
-         {} events skipped",
+        "dev_harness: first frame executed — {} images uploaded, {} quads, \
+         {} color changes, {} draw calls, {} events skipped",
         stats.images_uploaded,
         stats.quads,
-        stats.glyphs,
-        stats.strings,
         stats.color_changes,
         stats.draw_calls,
         stats.skipped_events()

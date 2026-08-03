@@ -2623,9 +2623,7 @@ const V4_DK_GREY2: [f32; 4] = [0.15, 0.15, 0.15, 1.0];
 /// [`layout_font_glyph`] instead of being pushed straight into a
 /// [`FrameData`]. Same numbers, in the same order, that
 /// `oracle/codemp/renderer/tr_font.cpp:1588-1601`'s call passes; splitting
-/// them out lets the GPU backend re-run the oracle's glyph layout for a
-/// `FrameEvent::DrawString` it received whole (the trap records the string,
-/// not the per-glyph pics).
+/// them out lets a caller record the layout instead of drawing it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FontGlyphQuad {
     pub x: f32,
@@ -2806,10 +2804,9 @@ fn RE_Font_DrawString_body(
 
 /// [`RE_Font_DrawString_body`]'s layout half: the per-letter walk, recording
 /// each `RE_SetColor`/`RE_StretchPic` it would issue into `out` (see
-/// [`FontDrawItem`]) rather than pushing it into a [`FrameData`]. Extracted so
-/// the GPU backend can re-run the oracle's glyph layout for a whole-string
-/// `FrameEvent::DrawString`; behaviour, including the dropshadow recursion's
-/// shadow-before-text ordering, is unchanged.
+/// [`FontDrawItem`]) rather than pushing it into a [`FrameData`]. Behaviour,
+/// including the dropshadow recursion's shadow-before-text ordering, is
+/// unchanged.
 ///
 /// Source: `oracle/codemp/renderer/tr_font.cpp:1491-1613`
 #[allow(clippy::too_many_arguments)]
@@ -2960,16 +2957,20 @@ fn layout_font_string_body(
     }
 }
 
-/// R4a bridge — [`RE_Font_DrawString`]'s tail for a caller that already knows
-/// which font index to use: takes `iFont` out of the arena, runs
+/// [`RE_Font_DrawString`]'s tail for a caller that already knows which font
+/// index to use: takes `iFont` out of the arena, runs
 /// [`layout_font_string_body`], puts it back, and returns the recorded
 /// `RE_SetColor`/`RE_StretchPic` sequence.
 ///
 /// No `GetFont` call: that resolution needs the whole engine carrier list
-/// (SBCS override, `UpdateAsianIfNeeded`'s glyph-page registration), which a
-/// backend replaying an already-recorded frame does not have. The caller
-/// passes the index it wants; an out-of-range one yields an empty layout, the
-/// same nothing-drawn outcome as `GetFont` returning `None`.
+/// (SBCS override, `UpdateAsianIfNeeded`'s glyph-page registration). The
+/// caller passes the index it wants, and an out-of-range one yields an empty
+/// layout, the same nothing-drawn outcome as `GetFont` returning `None`.
+///
+/// The layout runs on the sim side only, so this takes `&mut FontState` and
+/// `CFontInfo::GetLetter` keeps its Raven-faithful `m_AsianGlyph` scratch
+/// writes (user ruling 2026-08-02). No caller in this tree uses it today:
+/// `RE_Font_DrawString` reaches the body directly.
 ///
 /// Source: `oracle/codemp/renderer/tr_font.cpp:1430-1614`
 #[allow(clippy::too_many_arguments)]
