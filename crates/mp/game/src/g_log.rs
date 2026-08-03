@@ -299,7 +299,7 @@ pub fn G_LogWeaponOutput(ctx: &mut GameContext) {
 
         // Helper: the player's netname (or "<Unknown>" when clientless).
         let player_name = |i: usize| -> String {
-            let pc = (*world_ptr).g_entities[i].client;
+            let pc = (*world_ptr).g_entities.entities[i].client;
             if !pc.is_null() {
                 (*pc).pers.netname.clone().to_string()
             } else {

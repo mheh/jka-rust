@@ -450,9 +450,9 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 world: &mut *self.world,
                 engine: self.engine,
             };
-            let targ = &mut (*self.world).g_entities[targNum as usize] as *mut gentity_t;
-            let inflictor = &mut (*self.world).g_entities[inflictorNum as usize] as *mut gentity_t;
-            let attacker = &mut (*self.world).g_entities[attackerNum as usize] as *mut gentity_t;
+            let targ = &mut (*self.world).g_entities.entities[targNum as usize] as *mut gentity_t;
+            let inflictor = &mut (*self.world).g_entities.entities[inflictorNum as usize] as *mut gentity_t;
+            let attacker = &mut (*self.world).g_entities.entities[attackerNum as usize] as *mut gentity_t;
             let dir = if dir.is_null() {
                 None
             } else {
@@ -498,9 +498,9 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 world: &mut *self.world,
                 engine: self.engine,
             };
-            let pEnt = &mut (*self.world).g_entities[targNum as usize] as *mut gentity_t;
-            let pVehEnt = &mut (*self.world).g_entities[inflictorNum as usize] as *mut gentity_t;
-            let attacker = &mut (*self.world).g_entities[attackerNum as usize] as *mut gentity_t;
+            let pEnt = &mut (*self.world).g_entities.entities[targNum as usize] as *mut gentity_t;
+            let pVehEnt = &mut (*self.world).g_entities.entities[inflictorNum as usize] as *mut gentity_t;
+            let attacker = &mut (*self.world).g_entities.entities[attackerNum as usize] as *mut gentity_t;
             let pEnt_id = ctx.entity_id_of(pEnt);
             let pVehEnt_id = ctx.entity_id_of(pVehEnt);
             let attacker_id_2 = ctx.entity_id_of(attacker);
@@ -520,15 +520,15 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // `G_AddEvent` is ctx-free and takes a `gentity_t*`; resolve `entNum`.
         // Source: `oracle/codemp/game/g_utils.c` (`G_AddEvent`).
         unsafe {
-            let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
+            let ent = &mut (*self.world).g_entities.entities[entNum as usize] as *mut gentity_t;
             G_AddEvent(&mut *(ent), event, eventParm);
         }
     }
     fn entity_legs_anim(&self, entNum: c_int) -> c_int {
-        unsafe { (*self.world).g_entities[entNum as usize].s.legsAnim }
+        unsafe { (*self.world).g_entities.entities[entNum as usize].s.legsAnim }
     }
     fn entity_torso_anim(&self, entNum: c_int) -> c_int {
-        unsafe { (*self.world).g_entities[entNum as usize].s.torsoAnim }
+        unsafe { (*self.world).g_entities.entities[entNum as usize].s.torsoAnim }
     }
     fn alloc(&mut self, size: c_int) -> *mut c_void {
         // `G_Alloc` bumps the game pool via `ctx.world`; rebuild the ctx from the
@@ -624,8 +624,8 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 world: &mut *self.world,
                 engine: self.engine,
             };
-            let self_ = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
-            let other = &mut (*self.world).g_entities[impactNum as usize] as *mut gentity_t;
+            let self_ = &mut (*self.world).g_entities.entities[entNum as usize] as *mut gentity_t;
+            let other = &mut (*self.world).g_entities.entities[impactNum as usize] as *mut gentity_t;
             let self_id_2 = ctx.entity_id_of(self_);
             let other_id = ctx.entity_id_of(other);
             Client_CheckImpactBBrush(&mut ctx, self_id_2, other_id);
@@ -667,7 +667,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 world: &mut *self.world,
                 engine: self.engine,
             };
-            let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
+            let ent = &mut (*self.world).g_entities.entities[entNum as usize] as *mut gentity_t;
             let ent_id_2 = ctx.entity_id_of(ent).unwrap();
             G_SetAnim(
                 &mut ctx,
@@ -688,7 +688,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 world: &mut *self.world,
                 engine: self.engine,
             };
-            let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
+            let ent = &mut (*self.world).g_entities.entities[entNum as usize] as *mut gentity_t;
             let ent_id_3 = ctx.entity_id_of(ent).unwrap();
             NPC_SetAnim(&mut ctx, ent_id_3, type_, anim, priority);
         }
@@ -707,8 +707,8 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 world: &mut *self.world,
                 engine: self.engine,
             };
-            let ent = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
-            let pilot = &mut (*self.world).g_entities[pilotEntNum as usize] as *mut gentity_t;
+            let ent = &mut (*self.world).g_entities.entities[vehEntNum as usize] as *mut gentity_t;
+            let pilot = &mut (*self.world).g_entities.entities[pilotEntNum as usize] as *mut gentity_t;
             let ent_id_4 = ctx.entity_id_of(ent).unwrap();
             let pilot_id = ctx.entity_id_of(pilot).unwrap();
             WP_GetVehicleCamPos(&mut ctx, ent_id_4, pilot_id, &mut *camPos);
@@ -722,8 +722,8 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 world: &mut *self.world,
                 engine: self.engine,
             };
-            let self_ = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
-            let enemy = &mut (*self.world).g_entities[otherNum as usize] as *mut gentity_t;
+            let self_ = &mut (*self.world).g_entities.entities[entNum as usize] as *mut gentity_t;
+            let enemy = &mut (*self.world).g_entities.entities[otherNum as usize] as *mut gentity_t;
             let self_id = ctx.entity_id_of(self_).unwrap();
             let enemy_id = ctx.entity_id_of(enemy).unwrap();
             G_CanBeEnemy(&mut ctx, self_id, enemy_id) as qboolean
@@ -743,7 +743,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 world: &mut *self.world,
                 engine: self.engine,
             };
-            let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
+            let ent = &mut (*self.world).g_entities.entities[entNum as usize] as *mut gentity_t;
             let ent_id = ctx.entity_id_of(ent).unwrap();
             TryGrapple(&mut ctx, ent_id)
         }
@@ -770,10 +770,10 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 world: &mut *self.world,
                 engine: self.engine,
             };
-            let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
+            let vehEnt = &mut (*self.world).g_entities.entities[vehEntNum as usize] as *mut gentity_t;
             let pVeh = (*vehEnt).m_pVehicle;
             let pEnt =
-                &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t as *mut bgEntity_t;
+                &mut (*self.world).g_entities.entities[entNum as usize] as *mut gentity_t as *mut bgEntity_t;
             veh_dispatch::board(&mut ctx, pVeh, pEnt)
         }
     }
@@ -785,7 +785,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 world: &mut *self.world,
                 engine: self.engine,
             };
-            let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
+            let vehEnt = &mut (*self.world).g_entities.entities[vehEntNum as usize] as *mut gentity_t;
             let pVeh = (*vehEnt).m_pVehicle;
             veh_dispatch::update(&mut ctx, pVeh, ucmd);
         }
@@ -798,7 +798,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 world: &mut *self.world,
                 engine: self.engine,
             };
-            let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
+            let vehEnt = &mut (*self.world).g_entities.entities[vehEntNum as usize] as *mut gentity_t;
             let pVeh = (*vehEnt).m_pVehicle;
             veh_dispatch::animate(&mut ctx, pVeh);
         }
@@ -812,9 +812,9 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 world: &mut *self.world,
                 engine: self.engine,
             };
-            let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
+            let vehEnt = &mut (*self.world).g_entities.entities[vehEntNum as usize] as *mut gentity_t;
             let pVeh = (*vehEnt).m_pVehicle;
-            let rider = &mut (*self.world).g_entities[riderEntNum as usize] as *mut gentity_t;
+            let rider = &mut (*self.world).g_entities.entities[riderEntNum as usize] as *mut gentity_t;
             let cmd = if ucmd.is_null() {
                 if (*rider).inuse == qfalse || (*rider).client.is_null() {
                     return;
@@ -834,7 +834,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 world: &mut *self.world,
                 engine: self.engine,
             };
-            let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
+            let vehEnt = &mut (*self.world).g_entities.entities[vehEntNum as usize] as *mut gentity_t;
             let pVeh = (*vehEnt).m_pVehicle;
             veh_dispatch::attach_riders(&mut ctx, pVeh);
         }
@@ -844,7 +844,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // unless the client is in use, has a `client`, and that saber has a
         // model. Source: `oracle/codemp/game/bg_saber.c:4100-4141`.
         unsafe {
-            let ent = &(*self.world).g_entities[client_num as usize] as *const gentity_t;
+            let ent = &(*self.world).g_entities.entities[client_num as usize] as *const gentity_t;
             if (*ent).inuse != 0 && !(*ent).client.is_null() {
                 let saber = &mut (*((*ent).client)).saber[saber_num as usize] as *mut saberInfo_t;
                 if (*saber).model[0] == 0 {
@@ -858,7 +858,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     fn suspended_vehicle_boardable(&self, veh_ent_num: c_int) -> qboolean {
         // `PM_GroundTrace` suspended-vehicle gate. Source: `bg_pmove.c`.
         unsafe {
-            let ent = &(*self.world).g_entities[veh_ent_num as usize] as *const gentity_t;
+            let ent = &(*self.world).g_entities.entities[veh_ent_num as usize] as *const gentity_t;
             (!(*ent).client.is_null()
                 && (*((*ent).client)).ps.m_iVehicleNum == 0
                 && (*ent).spawnflags & 2 != 0) as qboolean
@@ -874,7 +874,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // `gametype` is read bg-side (`pm->gametype`) and passed in. Source:
         // `oracle/codemp/game/bg_pmove.c` (PM_CrashLand landed-vehicle board).
         unsafe {
-            let trEnt = &(*self.world).g_entities[tr_ent_num as usize] as *const gentity_t;
+            let trEnt = &(*self.world).g_entities.entities[tr_ent_num as usize] as *const gentity_t;
             let veh = (*trEnt).m_pVehicle;
             if (*trEnt).inuse != 0
                 && !(*trEnt).client.is_null()
@@ -885,7 +885,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 && (*(*veh).m_pVehicleInfo).r#type as c_int != vehicleType_t::VH_WALKER as c_int
                 && (*(*veh).m_pVehicleInfo).r#type as c_int != vehicleType_t::VH_FIGHTER as c_int
             {
-                let servEnt = &(*self.world).g_entities[self_num as usize] as *const gentity_t;
+                let servEnt = &(*self.world).g_entities.entities[self_num as usize] as *const gentity_t;
                 if gametype < GT_TEAM as c_int
                     || (*trEnt).alliedTeam as c_int == 0
                     || (*trEnt).alliedTeam as c_int
@@ -901,7 +901,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // `PM_AdjustBBox` solidHack. Source: `bg_pmove.c` (PM_AdjustBBox).
         unsafe {
             let time = (*self.world).level.time;
-            let ent = &(*self.world).g_entities[ent_num as usize] as *const gentity_t;
+            let ent = &(*self.world).g_entities.entities[ent_num as usize] as *const gentity_t;
             if (*ent).inuse != 0 && !(*ent).client.is_null() {
                 (*((*ent).client)).solidHack = time + 200;
             }
@@ -910,7 +910,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     fn humanoid_inuse_client(&self, ent_num: c_int) -> qboolean {
         // `PM_Weapon` NPC-no-weapon humanoid test. Source: `bg_pmove.c`.
         unsafe {
-            let ent = &(*self.world).g_entities[ent_num as usize] as *const gentity_t;
+            let ent = &(*self.world).g_entities.entities[ent_num as usize] as *const gentity_t;
             ((*ent).inuse != 0 && !(*ent).client.is_null() && (*ent).localAnimIndex == 0)
                 as qboolean
         }
@@ -918,7 +918,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     fn fighter_not_suspended(&self, ent_num: c_int) -> qboolean {
         // `PM_VehicleImpact` turn-away suspended gate.
         // Source: `oracle/codemp/game/bg_slidemove.c:313-398`.
-        unsafe { ((*self.world).g_entities[ent_num as usize].spawnflags & 2 == 0) as qboolean }
+        unsafe { ((*self.world).g_entities.entities[ent_num as usize].spawnflags & 2 == 0) as qboolean }
     }
     fn set_other_killer(
         &mut self,
@@ -930,7 +930,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // `PM_VehicleImpact` knockdown: the three `gclient_t` killer-credit
         // fields (not on `ps`). Source: `oracle/codemp/game/bg_slidemove.c:402-542`.
         unsafe {
-            let client = (*self.world).g_entities[ent_num as usize].client;
+            let client = (*self.world).g_entities.entities[ent_num as usize].client;
             (*client).otherKillerMOD = mod_;
             (*client).otherKillerVehWeapon = veh_weapon;
             (*client).otherKillerWeaponType = weapon_type;
@@ -939,17 +939,17 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     fn entity_inuse(&self, ent_num: c_int) -> qboolean {
         // `PM_VehicleImpact` hit-entity `inuse` read.
         // Source: `oracle/codemp/game/bg_slidemove.c:49-557`.
-        unsafe { (*self.world).g_entities[ent_num as usize].inuse }
+        unsafe { (*self.world).g_entities.entities[ent_num as usize].inuse }
     }
     fn entity_spawnflags(&self, ent_num: c_int) -> c_int {
         // `PM_VehicleImpact` hit-entity `spawnflags` read.
         // Source: `oracle/codemp/game/bg_slidemove.c:49-557`.
-        unsafe { (*self.world).g_entities[ent_num as usize].spawnflags }
+        unsafe { (*self.world).g_entities.entities[ent_num as usize].spawnflags }
     }
     fn entity_takedamage(&self, ent_num: c_int) -> qboolean {
         // `PM_VehicleImpact` hit-entity `takedamage` read.
         // Source: `oracle/codemp/game/bg_slidemove.c:49-557`.
-        unsafe { (*self.world).g_entities[ent_num as usize].takedamage }
+        unsafe { (*self.world).g_entities.entities[ent_num as usize].takedamage }
     }
     fn fighter_is_landed(&self, veh_ent_num: c_int) -> qboolean {
         // Reproduces the inline `FighterIsLanded(hitEnt->m_pVehicle,
@@ -958,7 +958,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // Source: `oracle/codemp/game/bg_slidemove.c:313-398`;
         // `oracle/codemp/game/FighterNPC.c:300-308`.
         unsafe {
-            let ent = &(*self.world).g_entities[veh_ent_num as usize] as *const gentity_t;
+            let ent = &(*self.world).g_entities.entities[veh_ent_num as usize] as *const gentity_t;
             FighterIsLanded((*ent).m_pVehicle, (*ent).playerState)
         }
     }
@@ -971,7 +971,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 world: &mut *self.world,
                 engine: self.engine,
             };
-            let ent = &mut (*self.world).g_entities[ent_num as usize] as *mut gentity_t;
+            let ent = &mut (*self.world).g_entities.entities[ent_num as usize] as *mut gentity_t;
             let ent_id = ctx.entity_id_of(ent).unwrap();
             G_EntitySound(&mut ctx, ent_id, channel, sound_index);
         }
@@ -981,7 +981,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // resolve `ent_num` and delegate the read-only check.
         // Source: `oracle/codemp/game/FighterNPC.c:275-287`.
         unsafe {
-            let ent = &(*self.world).g_entities[ent_num as usize];
+            let ent = &(*self.world).g_entities.entities[ent_num as usize];
             FighterIsInSpace(ent)
         }
     }
@@ -996,7 +996,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 world: &mut *self.world,
                 engine: self.engine,
             };
-            let veh_ent = &mut (*self.world).g_entities[veh_ent_num as usize] as *mut gentity_t;
+            let veh_ent = &mut (*self.world).g_entities.entities[veh_ent_num as usize] as *mut gentity_t;
             let pVeh = (*veh_ent).m_pVehicle;
             let iTurboStartFX = (*pVeh)
                 .m_pVehicleInfo
@@ -1060,7 +1060,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 world: &mut *self.world,
                 engine: self.engine,
             };
-            let parent = &mut (*self.world).g_entities[parent_ent_num as usize] as *mut gentity_t;
+            let parent = &mut (*self.world).g_entities.entities[parent_ent_num as usize] as *mut gentity_t;
             let parent_id = ctx.entity_id_of(parent).unwrap();
             let parent_client = (*parent).client;
             let parent_origin = (*parent_client).ps.origin;

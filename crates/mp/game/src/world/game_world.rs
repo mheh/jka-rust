@@ -10,6 +10,7 @@ use mp_qshared::shared::{MAX_CLIENTS, MAX_GENTITIES};
 use crate::client::gclient_t;
 use crate::game_cvars::GameCvars;
 use crate::level::level_locals::level_locals_t;
+use crate::world::guarded_entities::GuardedEntities;
 use crate::world::EntityId;
 
 /// A value type owned by the module crate. NOT a global. Field types are the
@@ -21,8 +22,10 @@ pub struct GameWorld {
     /// `level` (`level_locals_t`, `g_main.c:9`).
     pub level: level_locals_t,
     /// `g_entities[MAX_GENTITIES]` (`g_main.c:27`; contiguous `#[repr(C)]`,
-    /// size-asserted 1832 B).
-    pub g_entities: Box<[gentity_t; MAX_GENTITIES]>,
+    /// size-asserted 1832 B), plus the [`GuardedEntities`] guard slot for the
+    /// engine's `SV_GentityNum(-1)` read. `Deref` keeps `g_entities[i]` and
+    /// `.as_mut_ptr()` pointed at the real element 0.
+    pub g_entities: Box<GuardedEntities>,
     /// `g_clients[MAX_CLIENTS]` (reached as `level.clients`, `g_main.c:28`;
     /// asserted 7344 B). MP only.
     pub clients: Box<[gclient_t; MAX_CLIENTS]>,
@@ -137,29 +140,34 @@ fn zeroed_clients() -> Box<[gclient_t; MAX_CLIENTS]> {
     }
 }
 
-/// Zeroed `g_entities` array, built directly on the heap (never on the stack —
-/// the by-value array is ~1.83 MB). `gentity_t` stopped being `ZeroValid` when
-/// its owned-`String` tail fields landed, so this mirrors
+/// Zeroed `g_entities` storage with its guard slot, built directly on the heap
+/// (never on the stack — the by-value array is ~1.83 MB). `gentity_t` stopped
+/// being `ZeroValid` when its owned-`String` tail fields landed, so this mirrors
 /// `native_platform::zeroed_box` and then seats a valid empty `String` into each
 /// entity's owned-`String` slots ([`gentity_t::seat_owned_strings`]) before the
 /// array is ever read, matching Raven's `memset(g_entities, 0, ...)` (every
 /// scalar 0, every pointer null, every owned string ""). The zeroed bytes leave
 /// each entity's `FnId<EntXxx>` handler fields as `None` by construction.
-fn zeroed_entities() -> Box<[gentity_t; MAX_GENTITIES]> {
-    let layout = Layout::new::<[gentity_t; MAX_GENTITIES]>();
+/// The guard slot gets the same string seating (drop safety) plus its
+/// [`GuardedEntities::seat_guard`] contract fields.
+fn zeroed_entities() -> Box<GuardedEntities> {
+    let layout = Layout::new::<GuardedEntities>();
     // SAFETY: `alloc_zeroed` yields storage that is all-zero-valid for every
     // `gentity_t` field save the owned `String`s; `seat_owned_strings` overwrites
     // each such slot with a valid empty `String` (its zeroed bytes never dropped)
-    // before ownership passes to the `Box`, so the whole array is initialized.
+    // before ownership passes to the `Box`, so the whole value is initialized.
+    // The guard is entity slot 0 of the allocation, the real array follows.
     unsafe {
         let base = alloc_zeroed(layout) as *mut gentity_t;
         if base.is_null() {
             handle_alloc_error(layout);
         }
-        for i in 0..MAX_GENTITIES {
+        for i in 0..(MAX_GENTITIES + 1) {
             gentity_t::seat_owned_strings(base.add(i));
         }
-        Box::from_raw(base as *mut [gentity_t; MAX_GENTITIES])
+        let mut boxed = Box::from_raw(base as *mut GuardedEntities);
+        boxed.seat_guard();
+        boxed
     }
 }
 
