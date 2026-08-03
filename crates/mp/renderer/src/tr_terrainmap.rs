@@ -19,7 +19,7 @@ use mp_engine_qcommon::cm::cm_terrainmap_consts::{TM_HEIGHT, TM_WIDTH};
 use mp_engine_qcommon::cm::terrain_map_images::TerrainMapImages;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 
-use crate::render_state::render_assets_sim::RenderAssetsSim;
+use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_image::{R_CreateAutomapImage, R_LoadImage, TrImageState};
 use crate::tr_model::render_models::RenderModels;
@@ -59,13 +59,13 @@ fn load(view: &mut EngineHostView, shortname: &str) -> AutomapImage {
 pub fn R_UploadTerrainAutomap(
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
+    assets: &mut RenderAssets,
     models: &RenderModels,
     state: &mut TrImageState,
     pic: &[u8],
 ) {
     R_CreateAutomapImage(
-        view, cvars, sim, models, state, "*automap", pic, TM_WIDTH, TM_HEIGHT, false, false,
+        view, cvars, assets, models, state, "*automap", pic, TM_WIDTH, TM_HEIGHT, false, false,
         true, 0,
     );
 }

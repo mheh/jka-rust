@@ -6,8 +6,6 @@
 // transcription, matching the rest of the renderer/engine crates.
 #![allow(non_snake_case)]
 
-use std::sync::Arc;
-
 use mp_engine_qcommon::common::com_error;
 use mp_engine_qcommon::common::com_printf;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
@@ -22,7 +20,6 @@ use crate::render_state::frame_state::FrameState;
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::placeholders::Vec3;
 use crate::render_state::render_assets::RenderAssets;
-use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::tr_cmds::R_SyncRenderThread;
@@ -463,7 +460,7 @@ pub fn RB_SetGL2D(frame: &mut FrameState, _assets: &RenderAssets) {
 ///
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:1327-1344,1367-1395`
 fn R_UploadScratchFrame(
-    sim: &mut RenderAssetsSim,
+    assets: &mut RenderAssets,
     img_state: &mut TrImageState,
     cols: i32,
     rows: i32,
@@ -471,8 +468,7 @@ fn R_UploadScratchFrame(
     client: i32,
     dirty: bool,
 ) -> Option<ImageHandle> {
-    let handle = *sim.published.scratch_images.get(client as usize)?;
-    let assets = Arc::make_mut(&mut sim.published);
+    let handle = *assets.scratch_images.get(client as usize)?;
     let asset = assets.images.get_mut(handle)?;
 
     let resized = cols != asset.width || rows != asset.height;
@@ -505,7 +501,7 @@ fn R_UploadScratchFrame(
 ///
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:1367-1395`
 pub fn RE_UploadCinematic(
-    sim: &mut RenderAssetsSim,
+    assets: &mut RenderAssets,
     img_state: &mut TrImageState,
     cols: i32,
     rows: i32,
@@ -513,7 +509,7 @@ pub fn RE_UploadCinematic(
     client: i32,
     dirty: bool,
 ) {
-    R_UploadScratchFrame(sim, img_state, cols, rows, data, client, dirty);
+    R_UploadScratchFrame(assets, img_state, cols, rows, data, client, dirty);
 }
 
 /// Raven `RB_BlurGlowTexture` — the dynamic-glow blur pass: N iterations
@@ -1079,7 +1075,7 @@ pub fn RB_DrawSurfs(
 pub fn RE_StretchRaw(
     frame: &mut FrameState,
     frame_data: &mut FrameData,
-    sim: &mut RenderAssetsSim,
+    assets: &mut RenderAssets,
     img_state: &mut TrImageState,
     cvars: &RendererCvars,
     common: &mut Common,
@@ -1093,13 +1089,12 @@ pub fn RE_StretchRaw(
     client: i32,
     dirty: bool,
 ) {
-    if !sim.published.registered {
+    if !assets.registered {
         return;
     }
-    // Every read below borrows `sim.published` for the length of one call and
-    // no longer. A second live `Arc` handle would make `Arc::make_mut` inside
-    // `R_UploadScratchFrame` deep-clone the whole registry once per frame.
-    R_SyncRenderThread(&sim.published, common, cvars);
+    // `assets` is the single published registry.
+    // Every call below reads it or writes it directly.
+    R_SyncRenderThread(assets, common, cvars);
 
     // DEFERRED: R4 — qglFinish() (see doc comment above) (DEC-37 A13.2)
     // Source: oracle/codemp/renderer/tr_backend.cpp:1313-1314
@@ -1118,7 +1113,7 @@ pub fn RE_StretchRaw(
         );
     }
 
-    let image = R_UploadScratchFrame(sim, img_state, cols, rows, data, client, dirty);
+    let image = R_UploadScratchFrame(assets, img_state, cols, rows, data, client, dirty);
 
     // `r_speeds->integer` can't change between the two oracle checks (nothing
     // in between re-enters cvar code), so `start.is_some()` stands in for the
@@ -1132,7 +1127,7 @@ pub fn RE_StretchRaw(
         );
     }
 
-    RB_SetGL2D(frame, &sim.published);
+    RB_SetGL2D(frame, assets);
 
     // DEFERRED: R4. qglColor3f(tr.identityLight x 3) (see doc comment above)
     // Source: oracle/codemp/renderer/tr_backend.cpp:1353

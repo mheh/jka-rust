@@ -243,10 +243,6 @@ impl App {
                     gpu,
                     &view,
                     &frame_data,
-                    &self.host.assets,
-                    // Image registration writes the sim-published master (A9)
-                    // — stage image handles resolve there, not in
-                    // `host.assets` (see `execute_frame`'s doc).
                     &self.host.sim.published,
                     &mut self.host.img_state,
                     images,

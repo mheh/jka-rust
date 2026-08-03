@@ -6,6 +6,7 @@
 #![allow(non_snake_case, non_camel_case_types, unused_variables, unused_mut)]
 
 use core::ffi::{c_char, c_int};
+use std::sync::Arc;
 
 use mp_abi::ui::exports::MpUiExport;
 use mp_abi::ui::public::ui_menu_command_t::UIMENU_MAIN;
@@ -78,10 +79,9 @@ pub fn SCR_DrawNamedPic(
         &name,
         &mut re.qs,
         &mut re.frame,
-        &mut re.assets,
+        Arc::make_mut(&mut re.sim.published),
         view,
         &re.cvars,
-        &mut re.sim,
         rm,
         &mut re.img_state,
         &mut re.sky_view,
@@ -89,7 +89,7 @@ pub fn SCR_DrawNamedPic(
     );
     RE_StretchPic(
         &mut re.frame_data,
-        &re.assets,
+        &re.sim.published,
         view.common,
         x,
         y,
@@ -121,7 +121,7 @@ pub fn SCR_FillRect(
 
     RE_StretchPic(
         &mut re.frame_data,
-        &re.assets,
+        &re.sim.published,
         view.common,
         x,
         y,
@@ -153,7 +153,7 @@ pub fn SCR_DrawPic(
     let re = unsafe { re_from_view(view) };
     RE_StretchPic(
         &mut re.frame_data,
-        &re.assets,
+        &re.sim.published,
         view.common,
         x,
         y,
@@ -205,7 +205,7 @@ pub fn SCR_DrawChar(
     let re = unsafe { re_from_view(view) };
     RE_StretchPic(
         &mut re.frame_data,
-        &re.assets,
+        &re.sim.published,
         view.common,
         ax,
         ay,
@@ -253,7 +253,7 @@ pub fn SCR_DrawSmallChar(
     let re = unsafe { re_from_view(view) };
     RE_StretchPic(
         &mut re.frame_data,
-        &re.assets,
+        &re.sim.published,
         view.common,
         x as f32 * cl.con.xadjust,
         y as f32 * cl.con.yadjust,
@@ -332,7 +332,7 @@ pub fn SCR_DrawDebugGraph(view: &mut EngineHostView, cl: &mut Client) {
     let graphheight = view.common.cvar(cl.cl_graphheight).integer;
     RE_StretchPic(
         &mut re.frame_data,
-        &re.assets,
+        &re.sim.published,
         view.common,
         x as f32,
         (y - graphheight) as f32,
@@ -361,7 +361,7 @@ pub fn SCR_DrawDebugGraph(view: &mut EngineHostView, cl: &mut Client) {
         let re = unsafe { re_from_view(view) };
         RE_StretchPic(
             &mut re.frame_data,
-            &re.assets,
+            &re.sim.published,
             view.common,
             (x + w - 1 - a) as f32,
             (y - h) as f32,
@@ -711,7 +711,7 @@ pub fn SCR_DrawScreenField(view: &mut EngineHostView, cl: &mut Client, stereoFra
         RE_BeginFrame(
             view,
             &re.cvars,
-            &re.assets,
+            &re.sim.published,
             &mut re.frame,
             &mut re.img_state,
             stereoFrame,
@@ -727,7 +727,7 @@ pub fn SCR_DrawScreenField(view: &mut EngineHostView, cl: &mut Client, stereoFra
             RE_SetColor(&mut re.frame_data, Some(g_color_table[0]));
             RE_StretchPic(
                 &mut re.frame_data,
-                &re.assets,
+                &re.sim.published,
                 view.common,
                 0.0,
                 0.0,
@@ -888,7 +888,7 @@ pub fn SCR_UpdateScreen(view: &mut EngineHostView, cl: &mut Client) {
     RE_EndFrame(
         &mut re.frame_data,
         &mut re.scene,
-        &re.assets,
+        &re.sim.published,
         view.common,
         &re.cvars,
     );

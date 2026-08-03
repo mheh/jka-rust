@@ -44,7 +44,6 @@ use crate::render_state::frame_state::FrameState;
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::placeholders::SkyParms;
 use crate::render_state::render_assets::RenderAssets;
-use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::{ShaderAsset, ShaderHandle};
 use crate::render_state::shader_stage::ShaderStage;
@@ -4414,10 +4413,9 @@ pub fn ParseStage<'a>(
     text: &mut Option<&'a [u8]>,
     qs: &mut QSharedScratch,
     state: &mut ShaderParseState,
-    assets: &RenderAssets,
+    assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
 ) -> bool {
@@ -4487,7 +4485,7 @@ pub fn ParseStage<'a>(
                 let handle = R_FindImageFile(
                     view,
                     cvars,
-                    sim,
+                    assets,
                     models,
                     img_state,
                     Some(t.as_str()),
@@ -4530,7 +4528,7 @@ pub fn ParseStage<'a>(
             let handle = R_FindImageFile(
                 view,
                 cvars,
-                sim,
+                assets,
                 models,
                 img_state,
                 Some(t.as_str()),
@@ -4596,7 +4594,7 @@ pub fn ParseStage<'a>(
                     let handle = R_FindImageFile(
                         view,
                         cvars,
-                        sim,
+                        assets,
                         models,
                         img_state,
                         Some(img_token.as_str()),
@@ -5052,7 +5050,7 @@ pub fn ParseStage<'a>(
 /// non-null `shader->sky`. The six `R_FindImageFile` calls now store their
 /// handles into `SkyParms::outerbox` and reproduce the oracle fallback chain:
 /// a face whose file does not load takes the previous face's image, and face
-/// 0 takes `tr.defaultImage` (`sim.published.default_image`). `cloudHeight`
+/// 0 takes `tr.defaultImage` (`assets.default_image`). `cloudHeight`
 /// stores into `SkyParms::cloud_height` with the default-512 rule. The
 /// `#ifdef DEDICATED` arm (`outerbox[i] = NULL`) is not reproduced: this
 /// crate is the client renderer, and `R_FindImageFile` already returns `None`
@@ -5072,7 +5070,7 @@ pub fn ParseSkyParms<'a>(
     state: &mut ShaderParseState,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
+    assets: &mut RenderAssets,
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
@@ -5100,14 +5098,14 @@ pub fn ParseSkyParms<'a>(
         return;
     }
     if token != "-" {
-        let default_image = sim.published.default_image;
+        let default_image = assets.default_image;
         let mut outerbox: [Option<ImageHandle>; 6] = [None; 6];
         for (i, suf) in SUF.iter().enumerate() {
             let pathname = format!("{}_{}", token, suf);
             let mut image = R_FindImageFile(
                 view,
                 cvars,
-                sim,
+                assets,
                 models,
                 img_state,
                 Some(pathname.as_str()),
@@ -5226,10 +5224,9 @@ pub fn ParseShader<'a>(
     qs: &mut QSharedScratch,
     state: &mut ShaderParseState,
     frame: &mut FrameState,
-    assets: &RenderAssets,
+    assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
@@ -5298,7 +5295,6 @@ pub fn ParseShader<'a>(
                 assets,
                 view,
                 cvars,
-                sim,
                 models,
                 img_state,
             );
@@ -5453,7 +5449,7 @@ pub fn ParseShader<'a>(
         // skyparms <cloudheight> <outerbox> <innerbox>
         else if token.eq_ignore_ascii_case("skyparms") {
             ParseSkyParms(
-                text, qs, state, view, cvars, sim, models, img_state, sky_view, sky,
+                text, qs, state, view, cvars, assets, models, img_state, sky_view, sky,
             );
         }
         // light <value> determines flaring in q3map, not needed here
@@ -5552,7 +5548,6 @@ pub fn R_FindShader(
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
@@ -5612,10 +5607,9 @@ pub fn R_FindShader(
             qs,
             &mut state,
             frame,
-            &*assets,
+            assets,
             view,
             cvars,
-            sim,
             models,
             img_state,
             sky_view,
@@ -5637,7 +5631,7 @@ pub fn R_FindShader(
     let image = R_FindImageFile(
         view,
         cvars,
-        sim,
+        assets,
         models,
         img_state,
         Some(stripped_name.as_str()),
@@ -5737,7 +5731,6 @@ pub fn RE_RegisterShaderLightMap(
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
@@ -5758,7 +5751,6 @@ pub fn RE_RegisterShaderLightMap(
         assets,
         view,
         cvars,
-        sim,
         models,
         img_state,
         sky_view,
@@ -5797,7 +5789,6 @@ pub fn RE_RegisterShader(
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
@@ -5818,7 +5809,6 @@ pub fn RE_RegisterShader(
         assets,
         view,
         cvars,
-        sim,
         models,
         img_state,
         sky_view,
@@ -5852,7 +5842,6 @@ pub fn RE_RegisterShaderNoMip(
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
@@ -5873,7 +5862,6 @@ pub fn RE_RegisterShaderNoMip(
         assets,
         view,
         cvars,
-        sim,
         models,
         img_state,
         sky_view,
@@ -5905,7 +5893,6 @@ pub fn CreateExternalShaders(
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
@@ -5921,7 +5908,6 @@ pub fn CreateExternalShaders(
         assets,
         view,
         cvars,
-        sim,
         models,
         img_state,
         sky_view,
@@ -5942,7 +5928,6 @@ pub fn CreateExternalShaders(
         assets,
         view,
         cvars,
-        sim,
         models,
         img_state,
         sky_view,
@@ -5986,7 +5971,6 @@ pub fn R_RemapShader(
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
@@ -6001,7 +5985,6 @@ pub fn R_RemapShader(
         assets,
         view,
         cvars,
-        sim,
         models,
         img_state,
         sky_view,
@@ -6089,7 +6072,6 @@ pub fn R_InitShaders(
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
@@ -6120,7 +6102,7 @@ pub fn R_InitShaders(
         ScanAndLoadShaderFiles(assets, qs, view, "shaders");
 
         CreateExternalShaders(
-            qs, frame, assets, view, cvars, sim, models, img_state, sky_view, sky,
+            qs, frame, assets, view, cvars, models, img_state, sky_view, sky,
         );
     }
     // #endif

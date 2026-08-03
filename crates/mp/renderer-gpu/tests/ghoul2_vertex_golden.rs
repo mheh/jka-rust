@@ -42,6 +42,7 @@
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use mp_engine_core::Engine;
 use mp_engine_ghoul2::api_models::g2api_init_ghoul2_model;
@@ -362,7 +363,7 @@ fn golden_ghoul2_verts_stormtrooper() {
     // Force the first `R_MarkLeaves` to re-mark, and set the registered flag the
     // ui boot path never sets, the same two settings `world_golden` makes.
     host.frame.view_cluster = -1;
-    host.assets.registered = true;
+    Arc::make_mut(&mut host.sim.published).registered = true;
 
     // Init one stormtrooper in its default skeleton pose. No animation call runs,
     // so the pose is deterministic.
@@ -371,7 +372,8 @@ fn golden_ghoul2_verts_stormtrooper() {
 
     // The camera sits at a spawn origin, bumped to eye height.
     let eye = host
-        .assets
+        .sim
+        .published
         .world
         .as_ref()
         .and_then(|w| boot::find_spawn_origin(&w.entity_string))
@@ -403,12 +405,12 @@ fn golden_ghoul2_verts_stormtrooper() {
     ent.oldframe = 0;
     ent.shaderRGBA = [255, 255, 255, 255];
     AnglesToAxis([0.0, 0.0, 0.0], ent.axis.as_mut_ptr());
-    RE_AddRefEntityToScene(&mut frame_data, &host.assets, &mut host.scene, &ent);
+    RE_AddRefEntityToScene(&mut frame_data, &host.sim.published, &mut host.scene, &ent);
 
     RE_RenderScene(
         &refdef,
         &mut frame_data,
-        &host.assets,
+        &host.sim.published,
         &host.cvars,
         &mut host.scene,
         &mut host.engine.common,
@@ -419,7 +421,7 @@ fn golden_ghoul2_verts_stormtrooper() {
     let mut gpu = Gpu::new_headless(GOLDEN_WIDTH, GOLDEN_HEIGHT);
     let mut images = GpuImages::new(&gpu);
     let mut executor = FrameExecutor::new(&gpu, &images);
-    if let Some(world) = host.assets.world.as_ref() {
+    if let Some(world) = host.sim.published.world.as_ref() {
         executor.set_world(&gpu, world);
     }
 
@@ -447,7 +449,7 @@ fn golden_ghoul2_verts_stormtrooper() {
             engine,
             models,
             cvars,
-            assets,
+            sim,
             frame: fstate,
             img_state,
             font,
@@ -464,7 +466,7 @@ fn golden_ghoul2_verts_stormtrooper() {
         // the stormtrooper skeleton and deforms its surfaces.
         let mut world = WorldFrame {
             engine_view: &mut engine_view,
-            assets,
+            assets: Arc::make_mut(&mut sim.published),
             cvars,
             frame: fstate,
             g2: &mut g2,
@@ -479,7 +481,6 @@ fn golden_ghoul2_verts_stormtrooper() {
             &mut gpu,
             &target,
             &frame_data,
-            &dummy_assets,
             &dummy_assets,
             img_state,
             &mut images,

@@ -4,6 +4,7 @@
 //! Source: `oracle/codemp/client/cl_ui.cpp`
 
 use core::ffi::{c_char, c_int};
+use std::sync::Arc;
 
 use mp_abi::ui::exports::MpUiExport;
 use mp_abi::ui::imports::MpUiImport;
@@ -1258,10 +1259,9 @@ pub fn CL_UISystemCalls(
             RE_RegisterModel(
                 &mut re.qs,
                 &mut re.frame,
-                &mut re.assets,
+                Arc::make_mut(&mut re.sim.published),
                 view,
                 &re.cvars,
-                &mut re.sim,
                 rm,
                 &mut re.img_state,
                 &mut re.sky_view,
@@ -1278,10 +1278,9 @@ pub fn CL_UISystemCalls(
             RE_RegisterSkin(
                 &mut re.qs,
                 &mut re.frame,
-                &mut re.assets,
+                Arc::make_mut(&mut re.sim.published),
                 view,
                 &re.cvars,
-                &mut re.sim,
                 rm,
                 &mut re.img_state,
                 &mut re.sky_view,
@@ -1298,10 +1297,9 @@ pub fn CL_UISystemCalls(
                 &name,
                 &mut re.qs,
                 &mut re.frame,
-                &mut re.assets,
+                Arc::make_mut(&mut re.sim.published),
                 view,
                 &re.cvars,
-                &mut re.sim,
                 rm,
                 &mut re.img_state,
                 &mut re.sky_view,
@@ -1312,7 +1310,7 @@ pub fn CL_UISystemCalls(
         unsafe {
             let game_mem = vma(view.common, args, 1) as *mut c_char;
             let re = re_from_view(view);
-            let ret_mem = RE_ShaderNameFromIndex(&re.assets, *args.offset(2) as c_int);
+            let ret_mem = RE_ShaderNameFromIndex(&re.sim.published, *args.offset(2) as c_int);
             if !ret_mem.is_empty() {
                 let s = string_to_latin1(ret_mem);
                 core::ptr::copy_nonoverlapping(s.as_ptr(), game_mem as *mut u8, s.len());
@@ -1330,7 +1328,7 @@ pub fn CL_UISystemCalls(
         unsafe {
             let ent = &*(vma(view.common, args, 1) as *const _);
             let re = re_from_view(view);
-            RE_AddRefEntityToScene(&mut re.frame_data, &re.assets, &mut re.scene, ent)
+            RE_AddRefEntityToScene(&mut re.frame_data, &re.sim.published, &mut re.scene, ent)
         };
         0
     } else if trap == MpUiImport::UI_R_ADDPOLYTOSCENE as c_int {
@@ -1342,7 +1340,7 @@ pub fn CL_UISystemCalls(
             let re = re_from_view(view);
             RE_AddPolyToScene(
                 &mut re.frame_data,
-                &re.assets,
+                &re.sim.published,
                 view.common,
                 hshader,
                 verts,
@@ -1357,7 +1355,7 @@ pub fn CL_UISystemCalls(
             let re = re_from_view(view);
             RE_AddLightToScene(
                 &mut re.frame_data,
-                &re.assets,
+                &re.sim.published,
                 org,
                 vmf(args, 2),
                 vmf(args, 3),
@@ -1375,7 +1373,7 @@ pub fn CL_UISystemCalls(
         RE_RenderScene(
             unsafe { &*fd },
             &mut re.frame_data,
-            &re.assets,
+            &re.sim.published,
             &re.cvars,
             &mut re.scene,
             view.common,
@@ -1410,7 +1408,7 @@ pub fn CL_UISystemCalls(
             let re = re_from_view(view);
             RE_StretchPic(
                 &mut re.frame_data,
-                &re.assets,
+                &re.sim.published,
                 view.common,
                 x,
                 y,
@@ -1431,7 +1429,7 @@ pub fn CL_UISystemCalls(
             let maxs_ptr = vma(view.common, args, 3) as *mut f32;
             let rm = rm_from_view(view);
             let re = re_from_view(view);
-            let (mins, maxs) = r_model_bounds(rm, &re.assets, handle);
+            let (mins, maxs) = r_model_bounds(rm, &re.sim.published, handle);
             core::ptr::copy_nonoverlapping(mins.as_ptr(), mins_ptr, 3);
             core::ptr::copy_nonoverlapping(maxs.as_ptr(), maxs_ptr, 3);
         };
@@ -1680,10 +1678,9 @@ pub fn CL_UISystemCalls(
         RE_RegisterFont(
             &mut re.qs,
             &mut re.frame,
-            &mut re.assets,
+            Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
-            &mut re.sim,
             rm,
             &mut re.img_state,
             &mut re.sky_view,
@@ -1705,10 +1702,9 @@ pub fn CL_UISystemCalls(
         RE_Font_StrLenPixels(
             &mut re.qs,
             &mut re.frame,
-            &mut re.assets,
+            Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
-            &mut re.sim,
             rm,
             &mut re.img_state,
             &mut re.sky_view,
@@ -1737,10 +1733,9 @@ pub fn CL_UISystemCalls(
         RE_Font_HeightPixels(
             &mut re.qs,
             &mut re.frame,
-            &mut re.assets,
+            Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
-            &mut re.sim,
             rm,
             &mut re.img_state,
             &mut re.sky_view,
@@ -1773,10 +1768,9 @@ pub fn CL_UISystemCalls(
         RE_Font_DrawString(
             &mut re.qs,
             &mut re.frame,
-            &mut re.assets,
+            Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
-            &mut re.sim,
             rm,
             &mut re.img_state,
             &mut re.sky_view,
@@ -1951,10 +1945,9 @@ pub fn CL_UISystemCalls(
                 Some(&time_offset),
                 &mut re.qs,
                 &mut re.frame,
-                &mut re.assets,
+                Arc::make_mut(&mut re.sim.published),
                 view,
                 &re.cvars,
-                &mut re.sim,
                 rm,
                 &mut re.img_state,
                 &mut re.sky_view,

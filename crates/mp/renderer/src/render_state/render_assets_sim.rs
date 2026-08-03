@@ -10,13 +10,15 @@ use mp_qshared::shared::error_parm::errorParm_t;
 use crate::render_state::light_style_table::LightStyleTable;
 use crate::render_state::render_assets::RenderAssets;
 
-/// Sim-thread-owned. `published` IS the master — there is no separate
-/// mutable-then-copied staging struct (NB-1). Registration calls
+/// Sim-thread-owned. `published` IS the one registry: images, shaders, skins
+/// and the world asset all live in it, and there is no second instance
+/// (user ruling 2026-08-02, which closed a live bug where a draw read one
+/// instance while registration wrote the other). Registration calls
 /// `Arc::make_mut(&mut self.published)`, which mutates the existing allocation
 /// in place when the render thread holds no other reference and clones once
-/// when it does — ordinary copy-on-write, no locks; the result becomes visible
-/// to the render thread (`RenderWorld::assets`) at the next frame boundary
-/// (A9). `LightStyleTable` sits adjacent, not behind the `Arc` (A6/A9).
+/// when it does. That is ordinary copy-on-write with no locks. The result
+/// becomes visible to the render thread at the next frame boundary (A9).
+/// `LightStyleTable` sits adjacent, not behind the `Arc` (A6/A9).
 ///
 /// New construct, no single Raven counterpart: the oracle's `tr` registries
 /// are globals mutated in place with no publish step (ruling 1).

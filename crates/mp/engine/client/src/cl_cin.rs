@@ -9,6 +9,7 @@
 //! Source: `oracle/codemp/client/cl_cin.cpp`
 
 use core::ffi::{c_char, c_int, c_long, c_short, c_uchar, c_uint, c_ushort};
+use std::sync::Arc;
 
 use mp_qshared::shared::cbuf_exec::cbufExec_t;
 use mp_qshared::shared::cin_flags::{CIN_HOLD, CIN_LOOP, CIN_SHADER, CIN_SILENT, CIN_SYSTEM};
@@ -793,7 +794,7 @@ pub fn CIN_DrawCinematic(view: &mut EngineHostView, cl: &mut Client, handle: c_i
             RE_StretchRaw(
                 &mut re.frame,
                 &mut re.frame_data,
-                &mut re.sim,
+                Arc::make_mut(&mut re.sim.published),
                 &mut re.img_state,
                 &re.cvars,
                 view.common,
@@ -828,7 +829,7 @@ pub fn CIN_DrawCinematic(view: &mut EngineHostView, cl: &mut Client, handle: c_i
     RE_StretchRaw(
         &mut re.frame,
         &mut re.frame_data,
-        &mut re.sim,
+        Arc::make_mut(&mut re.sim.published),
         &mut re.img_state,
         &re.cvars,
         view.common,
@@ -876,7 +877,15 @@ pub fn CIN_UploadCinematic(view: &mut EngineHostView, cl: &mut Client, handle: c
         };
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let re = unsafe { re_from_view(view) };
-        RE_UploadCinematic(&mut re.sim, &mut re.img_state, cols, rows, data, handle, dirty);
+        RE_UploadCinematic(
+            Arc::make_mut(&mut re.sim.published),
+            &mut re.img_state,
+            cols,
+            rows,
+            data,
+            handle,
+            dirty,
+        );
 
         if view.common.cvar(cl.cl_inGameVideo).integer == 0
             && cl.cinTable[handle as usize].playonwalls == 1

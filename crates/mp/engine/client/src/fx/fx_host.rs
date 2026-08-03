@@ -16,6 +16,7 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
 use core::ffi::c_int;
+use std::sync::Arc;
 
 use mp_abi::cgame::exports::MpCgameExport;
 use mp_abi::cgame::shared_buffer::{
@@ -177,10 +178,9 @@ impl FxHost<'_, '_> {
                     name,
                     &mut re.qs,
                     &mut re.frame,
-                    &mut re.assets,
+                    Arc::make_mut(&mut re.sim.published),
                     view,
                     &re.cvars,
-                    &mut re.sim,
                     rm,
                     &mut re.img_state,
                     &mut re.sky_view,
@@ -206,10 +206,9 @@ impl FxHost<'_, '_> {
                 RE_RegisterModel(
                     &mut re.qs,
                     &mut re.frame,
-                    &mut re.assets,
+                    Arc::make_mut(&mut re.sim.published),
                     view,
                     &re.cvars,
-                    &mut re.sim,
                     rm,
                     &mut re.img_state,
                     &mut re.sky_view,
@@ -311,7 +310,7 @@ impl FxHost<'_, '_> {
             FxHost::Engine { view, .. } => {
                 // SAFETY: view-constructor slot, single-threaded, no other live cast.
                 let re = unsafe { re_from_view(view) };
-                RE_AddMiniRefEntityToScene(&mut re.frame_data, &re.assets, &mut re.scene, ent);
+                RE_AddMiniRefEntityToScene(&mut re.frame_data, &re.sim.published, &mut re.scene, ent);
             }
             FxHost::Harness(h) => match ent {
                 Some(e) => {
@@ -333,7 +332,7 @@ impl FxHost<'_, '_> {
                 let re = unsafe { re_from_view(view) };
                 RE_AddLightToScene(
                     &mut re.frame_data,
-                    &re.assets,
+                    &re.sim.published,
                     org,
                     radius,
                     red,
@@ -362,7 +361,7 @@ impl FxHost<'_, '_> {
                 let re = unsafe { re_from_view(view) };
                 RE_AddPolyToScene(
                     &mut re.frame_data,
-                    &re.assets,
+                    &re.sim.published,
                     view.common,
                     shader,
                     verts,
@@ -493,7 +492,7 @@ impl FxHost<'_, '_> {
                 let re = unsafe { re_from_view(view) };
                 RE_StretchPic(
                     &mut re.frame_data,
-                    &re.assets,
+                    &re.sim.published,
                     view.common,
                     x,
                     y,

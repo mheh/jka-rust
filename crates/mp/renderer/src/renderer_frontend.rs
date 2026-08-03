@@ -11,10 +11,15 @@
 //! Field names match the receiver names the `RE_*` signatures use, so a call
 //! site reads `RE_SetColor(&mut re.frame_data, color)` with no renaming.
 //!
-//! State-partition law (DEC-55.2): a synchronous path reads `assets` (the CPU
-//! registry) and appends to `frame_data`. This bundle carries no GPU state.
-//! DEC-63.4 deleted the empty `GpuResources` carrier, and `mp_renderer_gpu`
-//! owns every real GPU object on the render thread.
+//! State-partition law (DEC-55.2): a synchronous path reads `sim.published`
+//! (the one CPU registry) and appends to `frame_data`. This bundle carries no
+//! GPU state. DEC-63.4 deleted the empty `GpuResources` carrier, and
+//! `mp_renderer_gpu` owns every real GPU object on the render thread.
+//!
+//! One registry, not two (user ruling 2026-08-02). A second direct
+//! `RenderAssets` instance used to take the shader and skin registrations while
+//! image registration wrote the published generation, so a draw could read a
+//! registry the registration never reached.
 //!
 //! Source: `docs/decisions.md` DEC-42.3, DEC-55.2, DEC-59.1;
 //! `crates/mp/renderer-gpu/src/ui_host/state.rs` (the harness's seated twin).
@@ -57,11 +62,9 @@ use crate::tr_worldeffects::world_effects::WorldEffectsState;
 pub struct RendererFrontend {
     /// The registered `r_*` cvar handles.
     pub cvars: RendererCvars,
-    /// The CPU-side registry root: images, shaders, skins, the world asset.
-    /// A synchronous trap arm reads this and nothing else on the asset side.
-    pub assets: RenderAssets,
-    /// The mutation half of the registry, which publishes new `RenderAssets`
-    /// generations through `Arc::make_mut`.
+    /// The one CPU-side registry: images, shaders, skins, the world asset.
+    /// Every registration writes `sim.published` through `Arc::make_mut`, and
+    /// draw time reads the generation that publish produced.
     pub sim: RenderAssetsSim,
     /// `tr_image.cpp`'s file-scope state (the scratch buffers and the load
     /// counters).
@@ -220,7 +223,6 @@ impl RendererFrontend {
     pub fn new() -> RendererFrontend {
         RendererFrontend {
             cvars: RendererCvars::default(),
-            assets: empty_render_assets(),
             sim: RenderAssetsSim {
                 published: Arc::new(empty_render_assets()),
                 light_styles: LightStyleTable {

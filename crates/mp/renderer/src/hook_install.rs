@@ -11,6 +11,7 @@
 //! touch only `view.common`).
 
 use core::ffi::c_void;
+use std::sync::Arc;
 
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::EngineHooks;
@@ -40,7 +41,7 @@ pub unsafe fn rm_from_view<'a>(view: &mut EngineHostView) -> &'a mut RenderModel
 /// carrier bundle — the client's one reach to the `RE_*` receivers (DEC-59.1).
 /// A call site splits the returned bundle into the individual receivers its
 /// `RE_*` function declares. The DEC-55.2 partition binds module trap arms:
-/// `assets` and `frame_data` on a synchronous trap, and no GPU state at all.
+/// `sim.published` and `frame_data` on a synchronous trap, and no GPU state.
 ///
 /// The DEC-60.1 re-audit ran with the gh#22 thread split (2026-08-02) and found
 /// no GPU-tier access to re-home. DEC-63.4 then deleted the empty
@@ -83,10 +84,9 @@ fn re_register_model_hook(view: &mut EngineHostView, name: &str) -> qhandle_t {
     RE_RegisterModel(
         &mut re.qs,
         &mut re.frame,
-        &mut re.assets,
+        Arc::make_mut(&mut re.sim.published),
         view,
         &re.cvars,
-        &mut re.sim,
         rm,
         &mut re.img_state,
         &mut re.sky_view,
@@ -101,7 +101,7 @@ fn re_register_model_hook(view: &mut EngineHostView, name: &str) -> qhandle_t {
 fn shader_hash_table_exists_hook(view: &mut EngineHostView) -> qboolean {
     // SAFETY: view-constructor slot, single-threaded, no other live cast.
     let re = unsafe { re_from_view(view) };
-    if ShaderHashTableExists(&re.assets) {
+    if ShaderHashTableExists(&re.sim.published) {
         qtrue
     } else {
         qfalse

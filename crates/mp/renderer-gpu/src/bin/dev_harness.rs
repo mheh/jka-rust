@@ -155,9 +155,6 @@ impl ApplicationHandler for App {
                             &view,
                             &test_pattern(self.registries.checker),
                             &self.registries.assets,
-                            // Single-registry harness: images live in the same
-                            // instance as the shaders.
-                            &self.registries.assets,
                             &mut self.registries.img_state,
                             images,
                             &mut self.fonts,

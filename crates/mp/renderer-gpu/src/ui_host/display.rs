@@ -71,7 +71,6 @@ use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::frame_event::FrameEvent;
 use mp_renderer::render_state::frame_state::FrameState;
 use mp_renderer::render_state::render_assets::RenderAssets;
-use mp_renderer::render_state::render_assets_sim::RenderAssetsSim;
 use mp_renderer::render_state::renderer_cvars::RendererCvars;
 use mp_renderer::render_state::shader_asset::ShaderHandle;
 use mp_renderer::tr_font::{
@@ -125,7 +124,6 @@ pub struct HarnessDc<'a> {
     pub bot: &'a mut BotLib,
     pub cvars: &'a mut RendererCvars,
     pub assets: &'a mut RenderAssets,
-    pub sim: &'a mut RenderAssetsSim,
     pub models: &'a mut RenderModels,
     pub img_state: &'a mut TrImageState,
     pub frame: &'a mut FrameState,
@@ -203,7 +201,6 @@ impl HarnessDc<'_> {
             self.assets,
             &mut self.view,
             &*self.cvars,
-            self.sim,
             &*self.models,
             self.img_state,
             self.sky_view,
@@ -238,7 +235,6 @@ impl HarnessDc<'_> {
             self.assets,
             &mut self.view,
             &*self.cvars,
-            self.sim,
             &*self.models,
             self.img_state,
             self.sky_view,
@@ -506,7 +502,6 @@ impl DisplayContext for HarnessDc<'_> {
             self.assets,
             &mut self.view,
             &*self.cvars,
-            self.sim,
             &*self.models,
             self.img_state,
             self.sky_view,
@@ -603,7 +598,6 @@ impl DisplayContext for HarnessDc<'_> {
             self.assets,
             &mut self.view,
             &*self.cvars,
-            self.sim,
             &*self.models,
             self.img_state,
             self.sky_view,
@@ -692,7 +686,6 @@ impl DisplayContext for HarnessDc<'_> {
             self.assets,
             &mut self.view,
             &*self.cvars,
-            self.sim,
             &*self.models,
             self.img_state,
             self.sky_view,
@@ -724,7 +717,6 @@ impl DisplayContext for HarnessDc<'_> {
             self.assets,
             &mut self.view,
             &*self.cvars,
-            self.sim,
             &*self.models,
             self.img_state,
             self.sky_view,
@@ -1146,7 +1138,6 @@ impl DisplayContext for HarnessDc<'_> {
             self.assets,
             &mut self.view,
             &*self.cvars,
-            self.sim,
             &*self.models,
             self.img_state,
             self.sky_view,

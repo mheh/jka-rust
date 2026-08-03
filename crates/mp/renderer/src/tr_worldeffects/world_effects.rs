@@ -26,7 +26,6 @@ use crate::gl_constants::GL_CLAMP;
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::render_assets::RenderAssets;
-use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_backend::{GL_Bind, SetViewportAndScissor};
 use crate::tr_image::{R_FindImageFile, TrImageState};
@@ -985,7 +984,7 @@ impl CWeatherParticleCloud {
     /// Raven declares `int VertexCount=4`; Rust has no default arguments, so
     /// every call site passes it explicitly. `rng` carries `mMass.Pick`'s
     /// msvcrt `rand()` stream, threaded rather than reached (porting-rules
-    /// §B4). `view`/`cvars`/`sim`/`models`/`image_state` thread
+    /// §B4). `view`/`cvars`/`assets`/`models`/`image_state` thread
     /// `R_FindImageFile`/`GL_Bind`'s carriers (wave 4 / wave 0, resolved call
     /// surface LAW) rather than reaching them.
     /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:902-945`
@@ -995,7 +994,7 @@ impl CWeatherParticleCloud {
         rng: &mut Rng,
         view: &mut EngineHostView,
         cvars: &RendererCvars,
-        sim: &mut RenderAssetsSim,
+        assets: &mut RenderAssets,
         models: &RenderModels,
         image_state: &mut TrImageState,
         count: i32,
@@ -1011,7 +1010,7 @@ impl CWeatherParticleCloud {
         self.mImage = R_FindImageFile(
             view,
             cvars,
-            sim,
+            assets,
             models,
             image_state,
             Some(texture_path),
@@ -1553,7 +1552,7 @@ impl WorldEffectsState {
     /// default-constructs in place, then is filled through the returned
     /// reference) becomes a `CWeatherParticleCloud::new()` local pushed once
     /// its fields are written.
-    /// `cvars`/`sim`/`models`/`image_state` thread the carriers each
+    /// `cvars`/`assets`/`models`/`image_state` thread the carriers each
     /// `CWeatherParticleCloud::Initialize` call needs (wave 5 reconciliation:
     /// `R_FindImageFile`/`GL_Bind` are now real calls, not deferrals).
     /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1593-1986`
@@ -1563,7 +1562,7 @@ impl WorldEffectsState {
         qs: &mut QSharedScratch,
         host: &mut EngineHostView,
         cvars: &RendererCvars,
-        sim: &mut RenderAssetsSim,
+        assets: &mut RenderAssets,
         models: &RenderModels,
         image_state: &mut TrImageState,
         command: Option<&[u8]>,
@@ -1676,7 +1675,7 @@ impl WorldEffectsState {
                 &mut self.rng,
                 host,
                 cvars,
-                sim,
+                assets,
                 models,
                 image_state,
                 500,
@@ -1705,7 +1704,7 @@ impl WorldEffectsState {
                 &mut self.rng,
                 host,
                 cvars,
-                sim,
+                assets,
                 models,
                 image_state,
                 1000,
@@ -1734,7 +1733,7 @@ impl WorldEffectsState {
                 &mut self.rng,
                 host,
                 cvars,
-                sim,
+                assets,
                 models,
                 image_state,
                 1000,
@@ -1770,7 +1769,7 @@ impl WorldEffectsState {
                 &mut self.rng,
                 host,
                 cvars,
-                sim,
+                assets,
                 models,
                 image_state,
                 1000,
@@ -1802,7 +1801,7 @@ impl WorldEffectsState {
                 &mut self.rng,
                 host,
                 cvars,
-                sim,
+                assets,
                 models,
                 image_state,
                 1000,
@@ -1831,7 +1830,7 @@ impl WorldEffectsState {
                 &mut self.rng,
                 host,
                 cvars,
-                sim,
+                assets,
                 models,
                 image_state,
                 count,
@@ -1866,7 +1865,7 @@ impl WorldEffectsState {
                 &mut self.rng,
                 host,
                 cvars,
-                sim,
+                assets,
                 models,
                 image_state,
                 400,
@@ -1901,7 +1900,7 @@ impl WorldEffectsState {
                 &mut self.rng,
                 host,
                 cvars,
-                sim,
+                assets,
                 models,
                 image_state,
                 60,
@@ -1933,7 +1932,7 @@ impl WorldEffectsState {
                 &mut self.rng,
                 host,
                 cvars,
-                sim,
+                assets,
                 models,
                 image_state,
                 70,
@@ -1968,7 +1967,7 @@ impl WorldEffectsState {
                 &mut self.rng,
                 host,
                 cvars,
-                sim,
+                assets,
                 models,
                 image_state,
                 40,
@@ -2054,7 +2053,7 @@ pub fn R_ShutdownWorldEffects(state: &mut WorldEffectsState, host: &mut EngineHo
 /// (`host.common` supplies `Cvar_VariableIntegerValue`'s `Common`).
 ///
 /// Raven's `char temp[2048]` scratch is [`Cmd_ArgsBuffer`]'s owned return; its
-/// `sizeof(temp)` becomes the `buffer_length` cap. `cvars`/`sim`/`models`/
+/// `sizeof(temp)` becomes the `buffer_length` cap. `cvars`/`assets`/`models`/
 /// `image_state` thread `R_WorldEffectCommand`'s own added carriers
 /// through (wave 5 reconciliation), matching its signature.
 /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1583-1591`
@@ -2064,7 +2063,7 @@ pub fn R_WorldEffect_f(
     qs: &mut QSharedScratch,
     host: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
+    assets: &mut RenderAssets,
     models: &RenderModels,
     image_state: &mut TrImageState,
 ) {
@@ -2074,7 +2073,7 @@ pub fn R_WorldEffect_f(
             qs,
             host,
             cvars,
-            sim,
+            assets,
             models,
             image_state,
             Some(temp.as_bytes()),

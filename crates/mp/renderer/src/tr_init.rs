@@ -1239,16 +1239,15 @@ pub fn GL_SetDefaultState(
 pub fn R_Splash(
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
     models: &RenderModels,
     state: &mut TrImageState,
     frame: &mut FrameState,
-    assets: &RenderAssets,
+    assets: &mut RenderAssets,
 ) {
     let p_image = R_FindImageFile(
         view,
         cvars,
-        sim,
+        assets,
         models,
         state,
         Some("menu/splash"),
@@ -1294,9 +1293,8 @@ pub fn R_Splash(
 pub fn InitOpenGL(
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    assets: &RenderAssets,
+    assets: &mut RenderAssets,
     state: &mut TrImageState,
-    sim: &mut RenderAssetsSim,
     models: &RenderModels,
     frame: &mut FrameState,
 ) {
@@ -1307,7 +1305,7 @@ pub fn InitOpenGL(
 
         // print info the first time only
         GL_SetDefaultState(view, cvars, assets, state);
-        R_Splash(view, cvars, sim, models, state, frame, assets); // get something on screen asap
+        R_Splash(view, cvars, models, state, frame, assets); // get something on screen asap
         GfxInfo_f(view, cvars, assets);
     } else {
         // set default state
@@ -1365,7 +1363,6 @@ pub fn RE_Shutdown(
     view: &mut EngineHostView,
     cvars: &RendererCvars,
     assets: &mut RenderAssets,
-    sim: &mut RenderAssetsSim,
     state: &mut TrImageState,
     font: &mut FontState,
     destroy_window: bool,
@@ -1412,7 +1409,7 @@ pub fn RE_Shutdown(
         if destroy_window {
             // only do this for vid_restart now, not during things like map
             // load
-            R_DeleteTextures(sim, state);
+            R_DeleteTextures(assets, state);
         }
     }
 
@@ -1562,19 +1559,17 @@ const MAX_POLYVERTS: i32 = 3000;
 /// fixed-function GL surface DEC-01/DEC-37 leave unhomed until the R4 wgpu
 /// rewrite (A13.2), same treatment as every other `qgl*` call in this file.
 ///
-/// `assets: &mut RenderAssets` and `sim: &mut RenderAssetsSim` (whose own
-/// `published: Arc<RenderAssets>` is a *separate* instance) are threaded as
-/// independent sibling parameters, mirroring `R_InitShaders`'s own
-/// already-ported (wave 9) signature, which carries the same duality.
-/// Reconciling them into one Arc-published instance across a frame boundary
-/// (A9) is engine call-site wiring outside this single-fn packet's scope.
+/// `sim` is the only registry parameter. The registry itself is
+/// `sim.published`, which this fn reaches through `Arc::make_mut` in two
+/// scopes so the light-style loop between them can still borrow `sim` whole.
+/// Light styles sit beside the `Arc`, not inside it, so `RE_SetLightStyle`
+/// needs the outer struct. The two scopes keep Raven's statement order.
 ///
 /// Source: `oracle/codemp/renderer/tr_init.cpp:1214-1326`
 #[allow(clippy::too_many_arguments)]
 pub fn R_Init(
     view: &mut EngineHostView,
     cvars: &mut RendererCvars,
-    assets: &mut RenderAssets,
     sim: &mut RenderAssetsSim,
     state: &mut TrImageState,
     models: &mut RenderModels,
@@ -1589,6 +1584,10 @@ pub fn R_Init(
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
 ) {
+    // First registry scope. It ends before the light-style loop, which needs
+    // `sim` whole.
+    let assets = Arc::make_mut(&mut sim.published);
+
     // Com_Memset(&tr, 0, sizeof(tr)) — partial reset; see doc comment above
     // for the residual-field reasoning.
     assets.default_image = None;
@@ -1685,12 +1684,8 @@ pub fn R_Init(
     }
 
     R_InitFogTable(assets);
-    // `R_CreateFogImage` reads the fog table through `sim.published` (the A9
-    // duality), so the table mirrors across, as the four internal image
-    // handles do below. Without this the baked fog image has zero alpha in
-    // every texel.
-    Arc::make_mut(&mut sim.published).function_tables.fog_table =
-        assets.function_tables.fog_table;
+    // `R_CreateFogImage` reads the fog table straight from `assets`, the one
+    // registry shader, image, and skin registration all write.
 
     R_NoiseInit(noise, rng);
 
@@ -1720,33 +1715,15 @@ pub fn R_Init(
         RE_SetLightStyle(sim, i, [0xFF; 4]);
     }
 
-    InitOpenGL(view, cvars, &*assets, state, sim, &*models, frame);
+    // Second registry scope, for the rest of Raven's statement order.
+    let assets = Arc::make_mut(&mut sim.published);
 
-    R_InitImages(
-        view,
-        cvars,
-        &assets.glconfig,
-        sim,
-        &*models,
-        state,
-        &mut *frame,
-    );
-    // PORT-NOTE: Raven has one `tr`, so `R_InitImages`' internal-image handles
-    // (`tr.defaultImage`/`whiteImage`/`fogImage`/`dlightImage`) are already
-    // visible to `R_InitShaders` when it builds `<default>`/`white`/`fog`.
-    // Here the image registry is the sim-published master (A9) and the shader
-    // registry is `assets`, so the four handles are mirrored across before the
-    // shader init reads them — without this `CreateInternalShaders` binds
-    // `tr.defaultImage == NULL` and every internal shader loses its only stage.
-    // The handles stay valid on either side: both name slots in the one image
-    // arena `R_CreateImage` writes.
-    assets.default_image = sim.published.default_image;
-    assets.fog_image = sim.published.fog_image;
-    assets.dlight_image = sim.published.dlight_image;
-    assets.white_image = sim.published.white_image;
+    InitOpenGL(view, cvars, &mut *assets, state, &*models, frame);
+
+    R_InitImages(view, cvars, assets, &*models, state, &mut *frame);
 
     R_InitShaders(
-        false, qs, frame, assets, view, cvars, sim, &*models, state, sky_view, sky,
+        false, qs, frame, assets, view, cvars, &*models, state, sky_view, sky,
     );
     // R_InitSkins(): the client registry (`RenderAssets::skins`) and, for the
     // dedicated link set's own `RenderModels.skins` pool, its twin — one

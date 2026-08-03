@@ -65,7 +65,6 @@ use mp_qshared::shared::{qhandle_t, vec3_t};
 
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::render_assets::RenderAssets;
-use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_image::TrImageState;
 use crate::tr_landscape::ctrland_scape::CTRLandScape;
@@ -696,7 +695,7 @@ impl CTRLandScape {
     /// The `water`/`flattexture` cases' `RE_RegisterShader` calls thread
     /// through the whole shader-registration surface (`QSharedScratch`,
     /// `FrameState`, `RenderAssets`, `EngineHostView`, `RendererCvars`,
-    /// `RenderAssetsSim`, `RenderModels`, `TrImageState`, `viewParms_t`,
+    /// `RenderModels`, `TrImageState`, `viewParms_t`,
     /// `SkyState`) per its own wave-8 LAW signature. That
     /// callee is itself still a whole-fn loud `todo!()` stub pending its
     /// `lightmaps2d`/`stylesDefault` gap (`tr_shader.rs`); any non-empty
@@ -724,7 +723,6 @@ impl CTRLandScape {
         frame: &mut FrameState,
         assets: &mut RenderAssets,
         cvars: &RendererCvars,
-        sim: &mut RenderAssetsSim,
         models: &RenderModels,
         img_state: &mut TrImageState,
         sky_view: &mut viewParms_t,
@@ -767,7 +765,6 @@ impl CTRLandScape {
                             assets,
                             view,
                             cvars,
-                            sim,
                             models,
                             img_state,
                             sky_view,
@@ -786,7 +783,6 @@ impl CTRLandScape {
                         assets,
                         view,
                         cvars,
-                        sim,
                         models,
                         img_state,
                         sky_view,
@@ -807,7 +803,6 @@ impl CTRLandScape {
                         assets,
                         view,
                         cvars,
-                        sim,
                         models,
                         img_state,
                         sky_view,

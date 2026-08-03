@@ -407,12 +407,12 @@ struct App {
     images: Option<GpuImages>,
     executor: Option<FrameExecutor>,
     host: UiHost,
-    /// The 2D command surface reads these, and this harness draws no 2D, so
-    /// they stand in for the `assets`/`image_assets` parameters. The world's
-    /// own registry (`host.assets`) is borrowed by the `WorldFrame`, so it
-    /// cannot also fill those parameters. The harness therefore drains the
-    /// staged image uploads against the real registry itself, before the
-    /// split borrow (see `draw_world_frame`).
+    /// The 2D command surface reads this, and this harness draws no 2D, so it
+    /// stands in for the `assets` parameter. The real registry
+    /// (`host.sim.published`) is borrowed by the `WorldFrame`, so it cannot
+    /// also fill that parameter. The harness therefore drains the staged image
+    /// uploads against the real registry itself, before the split borrow (see
+    /// `draw_world_frame`).
     dummy_assets: RenderAssets,
     /// The null-landscape terrain surface, initialized once and reused every
     /// frame.
@@ -736,7 +736,7 @@ impl App {
         RE_RenderScene(
             refdef,
             &mut frame_data,
-            &self.host.assets,
+            &self.host.sim.published,
             &self.host.cvars,
             &mut self.host.scene,
             &mut self.host.engine.common,
@@ -767,7 +767,7 @@ impl App {
         ent.shaderRGBA = [255, 255, 255, 255];
         AnglesToAxis([0.0, 0.0, 0.0], ent.axis.as_mut_ptr());
 
-        RE_AddRefEntityToScene(frame_data, &self.host.assets, &mut self.host.scene, &ent);
+        RE_AddRefEntityToScene(frame_data, &self.host.sim.published, &mut self.host.scene, &ent);
     }
 
     /// Records the MD3 map-object entity through `RE_AddRefEntityToScene`. It
@@ -798,7 +798,7 @@ impl App {
         ent.shaderRGBA = [255, 255, 255, 255];
         AnglesToAxis([0.0, yaw, 0.0], ent.axis.as_mut_ptr());
 
-        RE_AddRefEntityToScene(frame_data, &self.host.assets, &mut self.host.scene, &ent);
+        RE_AddRefEntityToScene(frame_data, &self.host.sim.published, &mut self.host.scene, &ent);
     }
 
     /// Records the Ghoul2 skinned test entity through `RE_AddRefEntityToScene`.
@@ -835,7 +835,7 @@ impl App {
         ent.shaderRGBA = [255, 255, 255, 255];
         AnglesToAxis([0.0, yaw, 0.0], ent.axis.as_mut_ptr());
 
-        RE_AddRefEntityToScene(frame_data, &self.host.assets, &mut self.host.scene, &ent);
+        RE_AddRefEntityToScene(frame_data, &self.host.sim.published, &mut self.host.scene, &ent);
     }
 
     /// One frame: advance the camera, record the scene, draw it.
@@ -909,13 +909,12 @@ impl App {
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
                 // Drain the staged image uploads before the split borrow
-                // below. `execute_frame` drains with its `image_assets`
-                // parameter, which this harness fills with `dummy_assets`,
-                // and a drain against an empty registry drops every staged
-                // world texture and lightmap for good.
-                // Image registration writes the sim-published master (A9),
-                // so the drain resolves the staged handles there, not in
-                // `host.assets`.
+                // below. `execute_frame` drains with its `assets` parameter,
+                // which this harness fills with `dummy_assets`, and a drain
+                // against an empty registry drops every staged world texture
+                // and lightmap for good. Every registration writes the one
+                // published registry (A9), so the drain resolves the staged
+                // handles there.
                 let uploaded = images.upload_pending(gpu, &mut host.img_state, &host.sim.published);
 
                 let mut stats = {
@@ -925,7 +924,7 @@ impl App {
                         engine,
                         models,
                         cvars,
-                        assets,
+                        sim,
                         frame: fstate,
                         img_state,
                         font,
@@ -943,7 +942,7 @@ impl App {
                     // (design point 2).
                     let mut world = WorldFrame {
                         engine_view: &mut engine_view,
-                        assets,
+                        assets: Arc::make_mut(&mut sim.published),
                         cvars,
                         frame: fstate,
                         g2,
@@ -958,7 +957,6 @@ impl App {
                         gpu,
                         &target,
                         frame_data,
-                        &*dummy_assets,
                         &*dummy_assets,
                         img_state,
                         images,
@@ -1014,7 +1012,7 @@ impl ApplicationHandler for App {
         let mut executor = FrameExecutor::new(&gpu, &images);
 
         // Upload the loaded world's geometry once, before the first frame.
-        if let Some(world) = self.host.assets.world.as_ref() {
+        if let Some(world) = self.host.sim.published.world.as_ref() {
             executor.set_world(&gpu, world);
         }
 
@@ -1247,11 +1245,12 @@ fn main() {
     // renderer is unregistered. Only `RE_BeginRegistration` sets the flag
     // (`tr_model/frontend.rs:791`), and this harness boots through the ui
     // path without it, so we set the flag here.
-    host.assets.registered = true;
+    Arc::make_mut(&mut host.sim.published).registered = true;
 
     // Start the camera at a spawn origin, bumped to eye height.
     let eye = host
-        .assets
+        .sim
+        .published
         .world
         .as_ref()
         .and_then(|w| boot::find_spawn_origin(&w.entity_string))
@@ -1267,7 +1266,8 @@ fn main() {
     // Inline brush geometry sits at absolute map coordinates, so the entity
     // shows at its compile spot. Aim the starting camera at that spot.
     let entity_center = host
-        .assets
+        .sim
+        .published
         .world
         .as_ref()
         .and_then(|w| w.bmodels.get(1))

@@ -6,6 +6,7 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
 use core::ffi::{c_char, c_int};
+use std::sync::Arc;
 
 use libc::{strcat, strlen};
 
@@ -722,10 +723,9 @@ pub fn Con_DrawNotify(view: &mut EngineHostView, cl: &mut Client) {
             let font_index_asian_notify = RE_RegisterFont(
                 &mut re.qs,
                 &mut re.frame,
-                &mut re.assets,
+                Arc::make_mut(&mut re.sim.published),
                 view,
                 &re.cvars,
-                &mut re.sim,
                 rm,
                 &mut re.img_state,
                 &mut re.sky_view,
@@ -740,10 +740,9 @@ pub fn Con_DrawNotify(view: &mut EngineHostView, cl: &mut Client) {
                     * RE_Font_HeightPixels(
                         &mut re.qs,
                         &mut re.frame,
-                        &mut re.assets,
+                        Arc::make_mut(&mut re.sim.published),
                         view,
                         &re.cvars,
-                        &mut re.sim,
                         rm,
                         &mut re.img_state,
                         &mut re.sky_view,
@@ -769,10 +768,9 @@ pub fn Con_DrawNotify(view: &mut EngineHostView, cl: &mut Client) {
             RE_Font_DrawString(
                 &mut re.qs,
                 &mut re.frame,
-                &mut re.assets,
+                Arc::make_mut(&mut re.sim.published),
                 view,
                 &re.cvars,
-                &mut re.sim,
                 rm,
                 &mut re.img_state,
                 &mut re.sky_view,
@@ -915,7 +913,7 @@ pub fn Con_DrawSolidConsole(view: &mut EngineHostView, cl: &mut Client, frac: f3
     RE_SetColor(&mut re.frame_data, Some(color));
     RE_StretchPic(
         &mut re.frame_data,
-        &re.assets,
+        &re.sim.published,
         view.common,
         0.0,
         y as f32,
@@ -989,10 +987,9 @@ pub fn Con_DrawSolidConsole(view: &mut EngineHostView, cl: &mut Client, frac: f3
             cl.iFontIndexForAsian = RE_RegisterFont(
                 &mut re.qs,
                 &mut re.frame,
-                &mut re.assets,
+                Arc::make_mut(&mut re.sim.published),
                 view,
                 &re.cvars,
-                &mut re.sim,
                 rm,
                 &mut re.img_state,
                 &mut re.sky_view,
@@ -1007,10 +1004,9 @@ pub fn Con_DrawSolidConsole(view: &mut EngineHostView, cl: &mut Client, frac: f3
             * RE_Font_HeightPixels(
                 &mut re.qs,
                 &mut re.frame,
-                &mut re.assets,
+                Arc::make_mut(&mut re.sim.published),
                 view,
                 &re.cvars,
-                &mut re.sim,
                 rm,
                 &mut re.img_state,
                 &mut re.sky_view,
@@ -1055,10 +1051,9 @@ pub fn Con_DrawSolidConsole(view: &mut EngineHostView, cl: &mut Client, frac: f3
             RE_Font_DrawString(
                 &mut re.qs,
                 &mut re.frame,
-                &mut re.assets,
+                Arc::make_mut(&mut re.sim.published),
                 view,
                 &re.cvars,
-                &mut re.sim,
                 rm,
                 &mut re.img_state,
                 &mut re.sky_view,

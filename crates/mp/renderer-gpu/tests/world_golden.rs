@@ -20,6 +20,7 @@
 
 use std::fs::File;
 use std::io::BufReader;
+use std::sync::Arc;
 use std::io::BufWriter;
 use std::path::Path;
 use std::path::PathBuf;
@@ -95,7 +96,7 @@ fn record_scene(host: &mut UiHost, refdef: &refdef_t) -> FrameData {
     RE_RenderScene(
         refdef,
         &mut frame_data,
-        &host.assets,
+        &host.sim.published,
         &host.cvars,
         &mut host.scene,
         &mut host.engine.common,
@@ -183,11 +184,12 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
     // Force the first `R_MarkLeaves` to re-mark, and set the registered flag
     // the ui boot path never sets, the same two settings `world_harness` makes.
     host.frame.view_cluster = -1;
-    host.assets.registered = true;
+    Arc::make_mut(&mut host.sim.published).registered = true;
 
     // The camera sits at a spawn origin, bumped to eye height.
     let eye = host
-        .assets
+        .sim
+        .published
         .world
         .as_ref()
         .and_then(|w| boot::find_spawn_origin(&w.entity_string))
@@ -201,7 +203,7 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
     let mut gpu = Gpu::new_headless(GOLDEN_WIDTH, GOLDEN_HEIGHT);
     let mut images = GpuImages::new(&gpu);
     let mut executor = FrameExecutor::new(&gpu, &images);
-    if let Some(world) = host.assets.world.as_ref() {
+    if let Some(world) = host.sim.published.world.as_ref() {
         executor.set_world(&gpu, world);
     }
 
@@ -231,7 +233,7 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
             engine,
             models,
             cvars,
-            assets,
+            sim,
             frame: fstate,
             img_state,
             font,
@@ -249,7 +251,7 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
         let mut g2_system = Ghoul2System::default();
         let mut world = WorldFrame {
             engine_view: &mut engine_view,
-            assets,
+            assets: Arc::make_mut(&mut sim.published),
             cvars,
             frame: fstate,
             g2: &mut g2_system,
@@ -264,7 +266,6 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
             &mut gpu,
             &target,
             &frame_data,
-            &dummy_assets,
             &dummy_assets,
             img_state,
             &mut images,

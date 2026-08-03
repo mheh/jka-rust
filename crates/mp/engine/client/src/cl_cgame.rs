@@ -6,6 +6,7 @@
 #![allow(non_snake_case, non_camel_case_types, unused_variables, unused_mut)]
 
 use core::ffi::{c_char, c_int};
+use std::sync::Arc;
 
 use mp_abi::cgame::exports::MpCgameExport;
 use mp_abi::cgame::imports::MpCgameImport;
@@ -1189,7 +1190,7 @@ pub fn CL_InitCGame(view: &mut EngineHostView, cl: &mut Client) {
         RE_EndRegistration(
             view.common,
             &re.cvars,
-            &re.assets,
+            &re.sim.published,
             &mut re.frame,
         );
     }
@@ -1221,7 +1222,7 @@ pub fn CL_FirstSnapshot(view: &mut EngineHostView, cl: &mut Client) {
     let re = unsafe { re_from_view(view) };
     let rm = unsafe { rm_from_view(view) };
     rm.models_level_load_end(view, false);
-    RE_RegisterImages_LevelLoadEnd(&mut re.sim, &mut re.img_state, view, rm);
+    RE_RegisterImages_LevelLoadEnd(Arc::make_mut(&mut re.sim.published), &mut re.img_state, view, rm);
     // SAFETY: view-constructor slot, single-threaded, no other live cast.
     let snd = unsafe { snd_from_view(view) };
     S_RestartMusic(view, snd);
@@ -1836,10 +1837,9 @@ pub fn CL_CgameSystemCalls(
         RE_LoadWorldMap(
             &mut re.qs,
             &mut re.frame,
-            &mut re.assets,
+            Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
-            &mut re.sim,
             rm,
             &mut re.img_state,
             &mut re.sky_view,
@@ -1855,10 +1855,9 @@ pub fn CL_CgameSystemCalls(
         RE_RegisterModel(
             &mut re.qs,
             &mut re.frame,
-            &mut re.assets,
+            Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
-            &mut re.sim,
             rm,
             &mut re.img_state,
             &mut re.sky_view,
@@ -1873,10 +1872,9 @@ pub fn CL_CgameSystemCalls(
         RE_RegisterSkin(
             &mut re.qs,
             &mut re.frame,
-            &mut re.assets,
+            Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
-            &mut re.sim,
             rm,
             &mut re.img_state,
             &mut re.sky_view,
@@ -1891,10 +1889,9 @@ pub fn CL_CgameSystemCalls(
             &name,
             &mut re.qs,
             &mut re.frame,
-            &mut re.assets,
+            Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
-            &mut re.sim,
             rm,
             &mut re.img_state,
             &mut re.sky_view,
@@ -1908,10 +1905,9 @@ pub fn CL_CgameSystemCalls(
             &name,
             &mut re.qs,
             &mut re.frame,
-            &mut re.assets,
+            Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
-            &mut re.sim,
             rm,
             &mut re.img_state,
             &mut re.sky_view,
@@ -1926,10 +1922,9 @@ pub fn CL_CgameSystemCalls(
         RE_RegisterFont(
             &mut re.qs,
             &mut re.frame,
-            &mut re.assets,
+            Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
-            &mut re.sim,
             rm,
             &mut re.img_state,
             &mut re.sky_view,
@@ -1948,10 +1943,9 @@ pub fn CL_CgameSystemCalls(
         RE_Font_StrLenPixels(
             &mut re.qs,
             &mut re.frame,
-            &mut re.assets,
+            Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
-            &mut re.sim,
             rm,
             &mut re.img_state,
             &mut re.sky_view,
@@ -1977,10 +1971,9 @@ pub fn CL_CgameSystemCalls(
         RE_Font_HeightPixels(
             &mut re.qs,
             &mut re.frame,
-            &mut re.assets,
+            Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
-            &mut re.sim,
             rm,
             &mut re.img_state,
             &mut re.sky_view,
@@ -2002,10 +1995,9 @@ pub fn CL_CgameSystemCalls(
         RE_Font_DrawString(
             &mut re.qs,
             &mut re.frame,
-            &mut re.assets,
+            Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
-            &mut re.sim,
             rm,
             &mut re.img_state,
             &mut re.sky_view,
@@ -2068,7 +2060,7 @@ pub fn CL_CgameSystemCalls(
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let re = unsafe { re_from_view(view) };
         // SAFETY: `VMA(1)` is the module's `refEntity_t` (porting-rules §D11).
-        RE_AddRefEntityToScene(&mut re.frame_data, &re.assets, &mut re.scene, unsafe {
+        RE_AddRefEntityToScene(&mut re.frame_data, &re.sim.published, &mut re.scene, unsafe {
             &*ent
         });
         0
@@ -2082,7 +2074,7 @@ pub fn CL_CgameSystemCalls(
         let re = unsafe { re_from_view(view) };
         RE_AddPolyToScene(
             &mut re.frame_data,
-            &re.assets,
+            &re.sim.published,
             view.common,
             arg(1),
             verts,
@@ -2104,7 +2096,7 @@ pub fn CL_CgameSystemCalls(
         let re = unsafe { re_from_view(view) };
         RE_AddPolyToScene(
             &mut re.frame_data,
-            &re.assets,
+            &re.sim.published,
             view.common,
             arg(1),
             verts,
@@ -2127,7 +2119,7 @@ pub fn CL_CgameSystemCalls(
         let light_dir_out = vma(vc, args, 4) as *mut vec3_t;
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let re = unsafe { re_from_view(view) };
-        match R_LightForPoint(view.common, &re.cvars, &re.assets, &re.frame, point) {
+        match R_LightForPoint(view.common, &re.cvars, &re.sim.published, &re.frame, point) {
             Some((ambient, directed, light_dir)) => {
                 // SAFETY: the three are the module's seam out-params (§D11).
                 unsafe {
@@ -2145,7 +2137,7 @@ pub fn CL_CgameSystemCalls(
         let re = unsafe { re_from_view(view) };
         RE_AddLightToScene(
             &mut re.frame_data,
-            &re.assets,
+            &re.sim.published,
             org,
             vmf(vc, args, 2),
             vmf(vc, args, 3),
@@ -2159,7 +2151,7 @@ pub fn CL_CgameSystemCalls(
         let re = unsafe { re_from_view(view) };
         RE_AddAdditiveLightToScene(
             &mut re.frame_data,
-            &re.assets,
+            &re.sim.published,
             org,
             vmf(vc, args, 2),
             vmf(vc, args, 3),
@@ -2175,7 +2167,7 @@ pub fn CL_CgameSystemCalls(
         RE_RenderScene(
             unsafe { &*fd },
             &mut re.frame_data,
-            &re.assets,
+            &re.sim.published,
             &re.cvars,
             &mut re.scene,
             view.common,
@@ -2193,7 +2185,7 @@ pub fn CL_CgameSystemCalls(
         let re = unsafe { re_from_view(view) };
         RE_StretchPic(
             &mut re.frame_data,
-            &re.assets,
+            &re.sim.published,
             view.common,
             vmf(vc, args, 1),
             vmf(vc, args, 2),
@@ -2213,7 +2205,7 @@ pub fn CL_CgameSystemCalls(
         let re = unsafe { re_from_view(view) };
         // SAFETY: the two are the module's seam out-params (porting-rules §D11).
         unsafe {
-            let (mins, maxs) = r_model_bounds(rm, &re.assets, arg(1));
+            let (mins, maxs) = r_model_bounds(rm, &re.sim.published, arg(1));
             *mins_out = mins;
             *maxs_out = maxs;
         }
@@ -2238,7 +2230,7 @@ pub fn CL_CgameSystemCalls(
         let re = unsafe { re_from_view(view) };
         RE_RotatePic(
             &mut re.frame_data,
-            &re.assets,
+            &re.sim.published,
             view.common,
             vmf(vc, args, 1),
             vmf(vc, args, 2),
@@ -2257,7 +2249,7 @@ pub fn CL_CgameSystemCalls(
         let re = unsafe { re_from_view(view) };
         RE_RotatePic2(
             &mut re.frame_data,
-            &re.assets,
+            &re.sim.published,
             view.common,
             vmf(vc, args, 1),
             vmf(vc, args, 2),
@@ -2452,10 +2444,9 @@ pub fn CL_CgameSystemCalls(
             Some(&c),
             &mut re.qs,
             &mut re.frame,
-            &mut re.assets,
+            Arc::make_mut(&mut re.sim.published),
             view,
             &re.cvars,
-            &mut re.sim,
             rm,
             &mut re.img_state,
             &mut re.sky_view,
@@ -2479,7 +2470,7 @@ pub fn CL_CgameSystemCalls(
         let verts_out = vma(vc, args, 2) as *mut vec3_t;
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let re = unsafe { re_from_view(view) };
-        let verts = RE_GetBModelVerts(arg(1), rm, &re.assets, &re.frame);
+        let verts = RE_GetBModelVerts(arg(1), rm, &re.sim.published, &re.frame);
         // SAFETY: `VMA(2)` is the module's four-vertex out-buffer (§D11).
         unsafe { core::ptr::copy_nonoverlapping(verts.as_ptr(), verts_out, 4) };
         0
@@ -2488,7 +2479,7 @@ pub fn CL_CgameSystemCalls(
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let re = unsafe { re_from_view(view) };
         // SAFETY: `VMA(1)` is the module's seam out-param (porting-rules §D11).
-        unsafe { *out = re.assets.distance_cull };
+        unsafe { *out = re.sim.published.distance_cull };
         0
     } else if op == MpCgameImport::CG_R_GETREALRES as c_int {
         let w_out = vma(vc, args, 1) as *mut c_int;
@@ -2497,8 +2488,8 @@ pub fn CL_CgameSystemCalls(
         let re = unsafe { re_from_view(view) };
         // SAFETY: both are the module's seam out-params (porting-rules §D11).
         unsafe {
-            *w_out = re.assets.glconfig.vid_width;
-            *h_out = re.assets.glconfig.vid_height;
+            *w_out = re.sim.published.glconfig.vid_width;
+            *h_out = re.sim.published.glconfig.vid_height;
         }
         0
     } else if op == MpCgameImport::CG_R_AUTOMAPELEVADJ as c_int {
@@ -2510,12 +2501,12 @@ pub fn CL_CgameSystemCalls(
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let re = unsafe { re_from_view(view) };
         let disable = view.common.cvar(re.cvars.r_autoMapDisable).integer;
-        R_InitializeWireframeAutomap(&mut re.automap, &re.assets, disable) as c_int
+        R_InitializeWireframeAutomap(&mut re.automap, &re.sim.published, disable) as c_int
     } else if op == MpCgameImport::CG_GET_ENTITY_TOKEN as c_int {
         let buffer = vma(vc, args, 1) as *mut c_char;
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let re = unsafe { re_from_view(view) };
-        let Some(world) = re.assets.world.as_mut() else {
+        let Some(world) = Arc::make_mut(&mut re.sim.published).world.as_mut() else {
             return qfalse;
         };
         let (found, token) = R_GetEntityToken(world, arg(2));
@@ -3484,7 +3475,7 @@ pub fn CL_CgameSystemCalls(
             &mut re.qs,
             view,
             &re.cvars,
-            &mut re.sim,
+            Arc::make_mut(&mut re.sim.published),
             rm,
             &mut re.img_state,
             Some(command),

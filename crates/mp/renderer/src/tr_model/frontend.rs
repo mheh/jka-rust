@@ -9,7 +9,7 @@
 //! — takes `view: &mut EngineHostView` as its engine carrier and threads the
 //! renderer-state bundle `R_FindShader`/`RE_LoadWorldMap_Actual` need beside
 //! it, in those two fns' own parameter order (`qs, frame, assets, view,
-//! cvars, sim, models, img_state, sky_view, sky[, world_effects]`).
+//! cvars, models, img_state, sky_view, sky[, world_effects]`).
 //! `common` is reached as `view.common` by sequential reborrow; server-shared
 //! helpers that take `host: &mut impl EngineHost`
 //! (`re_register_models_get_disk_file`, `re_register_server_models_malloc`)
@@ -31,6 +31,7 @@
 #![allow(non_snake_case)]
 
 use core::ffi::{c_char, c_void};
+use std::sync::Arc;
 
 use mp_engine_qcommon::common::{com_error, com_printf, EngineHostView};
 use mp_engine_qcommon::common_fns::Com_DPrintf;
@@ -373,7 +374,6 @@ pub(crate) fn re_register_models_malloc(
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
     rm: &mut RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
@@ -407,7 +407,6 @@ pub(crate) fn re_register_models_malloc(
                 assets,
                 view,
                 cvars,
-                sim,
                 rm,
                 img_state,
                 sky_view,
@@ -497,7 +496,6 @@ pub(crate) fn r_load_md3(
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
     rm: &mut RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
@@ -538,7 +536,6 @@ pub(crate) fn r_load_md3(
         assets,
         view,
         cvars,
-        sim,
         rm,
         img_state,
         sky_view,
@@ -680,7 +677,6 @@ pub(crate) fn r_load_md3(
                     assets,
                     view,
                     cvars,
-                    sim,
                     rm,
                     img_state,
                     sky_view,
@@ -748,7 +744,6 @@ pub(crate) fn r_load_md3(
 pub fn RE_BeginRegistration(
     view: &mut EngineHostView,
     cvars: &mut RendererCvars,
-    assets: &mut RenderAssets,
     sim: &mut RenderAssetsSim,
     state: &mut TrImageState,
     models: &mut RenderModels,
@@ -766,7 +761,6 @@ pub fn RE_BeginRegistration(
     R_Init(
         view,
         cvars,
-        assets,
         sim,
         state,
         models,
@@ -781,6 +775,9 @@ pub fn RE_BeginRegistration(
         sky_view,
         sky,
     );
+
+    // `R_Init` returned the registry, so this scope reaches it again.
+    let assets = Arc::make_mut(&mut sim.published);
 
     let glconfig_out = assets.glconfig.clone();
 
@@ -900,7 +897,6 @@ fn RE_RegisterModel_Actual(
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
     rm: &mut RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
@@ -941,7 +937,6 @@ fn RE_RegisterModel_Actual(
             assets,
             view,
             cvars,
-            sim,
             rm,
             img_state,
             sky_view,
@@ -1038,7 +1033,6 @@ fn RE_RegisterModel_Actual(
                     assets,
                     view,
                     cvars,
-                    sim,
                     img_state,
                     sky_view,
                     sky,
@@ -1053,7 +1047,6 @@ fn RE_RegisterModel_Actual(
                     assets,
                     view,
                     cvars,
-                    sim,
                     img_state,
                     sky_view,
                     sky,
@@ -1069,7 +1062,6 @@ fn RE_RegisterModel_Actual(
                     assets,
                     view,
                     cvars,
-                    sim,
                     rm,
                     img_state,
                     sky_view,
@@ -1165,7 +1157,6 @@ pub fn RE_RegisterModel(
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
     rm: &mut RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
@@ -1182,7 +1173,6 @@ pub fn RE_RegisterModel(
         assets,
         view,
         cvars,
-        sim,
         rm,
         img_state,
         sky_view,

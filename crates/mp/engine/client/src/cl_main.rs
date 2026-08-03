@@ -16,6 +16,7 @@
 use std::ffi::{CStr, CString};
 use std::mem::take;
 use std::os::raw::{c_char, c_int};
+use std::sync::Arc;
 
 use native_platform::sys_main::{Sys_CheckCD, Sys_MonkeyShouldBeSpanked};
 use native_string::atoi::atoi;
@@ -867,8 +868,7 @@ pub fn CL_ShutdownRef(view: &mut EngineHostView, cl: &mut Client) {
     RE_Shutdown(
         view,
         &re.cvars,
-        &mut re.assets,
-        &mut re.sim,
+        Arc::make_mut(&mut re.sim.published),
         &mut re.img_state,
         &mut re.font,
         true,
@@ -925,7 +925,6 @@ pub fn CL_InitRenderer(view: &mut EngineHostView, cl: &mut Client) {
     let glconfig = RE_BeginRegistration(
         view,
         &mut re.cvars,
-        &mut re.assets,
         &mut re.sim,
         &mut re.img_state,
         rm,
@@ -947,10 +946,9 @@ pub fn CL_InitRenderer(view: &mut EngineHostView, cl: &mut Client) {
         "gfx/2d/charsgrid_med",
         &mut re.qs,
         &mut re.frame,
-        &mut re.assets,
+        Arc::make_mut(&mut re.sim.published),
         view,
         &re.cvars,
-        &mut re.sim,
         rm,
         &mut re.img_state,
         &mut re.sky_view,
@@ -961,10 +959,9 @@ pub fn CL_InitRenderer(view: &mut EngineHostView, cl: &mut Client) {
         "white",
         &mut re.qs,
         &mut re.frame,
-        &mut re.assets,
+        Arc::make_mut(&mut re.sim.published),
         view,
         &re.cvars,
-        &mut re.sim,
         rm,
         &mut re.img_state,
         &mut re.sky_view,
@@ -974,10 +971,9 @@ pub fn CL_InitRenderer(view: &mut EngineHostView, cl: &mut Client) {
         "console",
         &mut re.qs,
         &mut re.frame,
-        &mut re.assets,
+        Arc::make_mut(&mut re.sim.published),
         view,
         &re.cvars,
-        &mut re.sim,
         rm,
         &mut re.img_state,
         &mut re.sky_view,
@@ -2655,8 +2651,7 @@ pub fn CL_ShutdownAll(view: &mut EngineHostView, cl: &mut Client) {
     RE_Shutdown(
         view,
         &re.cvars,
-        &mut re.assets,
-        &mut re.sim,
+        Arc::make_mut(&mut re.sim.published),
         &mut re.img_state,
         &mut re.font,
         false, // don't destroy window or context

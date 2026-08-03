@@ -6,7 +6,6 @@ use std::collections::BTreeMap;
 use mp_engine_core::Engine;
 use mp_qshared::shared::com_parse::QSharedScratch;
 use mp_renderer::render_state::frame_state::FrameState;
-use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::render_assets_sim::RenderAssetsSim;
 use mp_renderer::render_state::renderer_cvars::RendererCvars;
 use mp_renderer::tr_font::FontState;
@@ -39,7 +38,8 @@ pub struct UiHost {
     // ---- renderer carrier bundle (DEC-42.3) ----------------------------
     pub models: RenderModels,
     pub cvars: RendererCvars,
-    pub assets: RenderAssets,
+    /// The one CPU registry. Every registration writes `sim.published`, so a
+    /// harness draw reads the generation the registration produced.
     pub sim: RenderAssetsSim,
     pub img_state: TrImageState,
     pub frame: FrameState,

@@ -61,7 +61,6 @@ use crate::mdx_format::mdxm_vertex_t::mdxmVertex_t;
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::placeholders::RefEntity;
 use crate::render_state::render_assets::RenderAssets;
-use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::render_state::skin_asset::SkinHandle;
@@ -1685,7 +1684,6 @@ impl RenderModels {
         assets: &mut RenderAssets,
         view: &mut EngineHostView,
         cvars: &RendererCvars,
-        sim: &mut RenderAssetsSim,
         img_state: &mut TrImageState,
         sky_view: &mut viewParms_t,
         sky: &mut SkyState,
@@ -1727,7 +1725,6 @@ impl RenderModels {
             assets,
             view,
             cvars,
-            sim,
             self,
             img_state,
             sky_view,
@@ -1911,7 +1908,6 @@ impl RenderModels {
         assets: &mut RenderAssets,
         view: &mut EngineHostView,
         cvars: &RendererCvars,
-        sim: &mut RenderAssetsSim,
         img_state: &mut TrImageState,
         sky_view: &mut viewParms_t,
         sky: &mut SkyState,
@@ -1954,7 +1950,6 @@ impl RenderModels {
             assets,
             view,
             cvars,
-            sim,
             self,
             img_state,
             sky_view,
@@ -2014,7 +2009,6 @@ impl RenderModels {
             assets,
             view,
             cvars,
-            sim,
             self,
             img_state,
             sky_view,
@@ -2114,7 +2108,6 @@ impl RenderModels {
                     assets,
                     view,
                     cvars,
-                    sim,
                     self,
                     img_state,
                     sky_view,

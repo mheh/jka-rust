@@ -8,7 +8,6 @@
 
 use std::collections::HashMap;
 use std::f64::consts::PI;
-use std::sync::Arc;
 
 use mp_engine_qcommon::common::common::com_printf;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
@@ -40,7 +39,6 @@ use crate::render_state::frame_state::FrameState;
 use crate::render_state::image_asset::{ImageAsset, ImageHandle};
 use crate::render_state::placeholders::{GlConfig, FOG_TABLE_SIZE};
 use crate::render_state::render_assets::RenderAssets;
-use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::render_state::skin_asset::{SkinAsset, SkinHandle, SkinSurface};
@@ -145,11 +143,10 @@ pub struct TrImageState {
     /// counterpart (see [`PendingUpload`]'s doc comment for the full
     /// rationale). Keyed by [`ImageHandle`] rather than folded onto
     /// [`ImageAsset`] (`crate::render_state::image_asset`): `ImageAsset`
-    /// lives inside `RenderAssets`, which is `Arc`-shared and mutated only
-    /// through `Arc::make_mut`'s copy-on-write clone
-    /// (`RenderAssets::images` — see `R_CreateImage`'s `Arc::make_mut` call
-    /// below) — a fat `Vec<u8>` riding on every arena slot would deep-copy
-    /// every already-registered image's pixels on any unrelated
+    /// lives inside `RenderAssets`, published to the render thread as an
+    /// `Arc` and mutated by copy-on-write (`RenderAssets::images`) — a fat
+    /// `Vec<u8>` riding on every arena slot would deep-copy every
+    /// already-registered image's pixels on any unrelated
     /// `RenderAssets` mutation while the render thread still holds a
     /// reference. `TrImageState` is sim-owned and threaded by `&mut`, never
     /// `Arc`-shared, so inserting here costs exactly the new image's bytes.
@@ -445,8 +442,8 @@ pub fn R_Images_GetNextIteration(assets: &RenderAssets, cursor: &mut usize) -> O
 /// Raven: `assert(pImage); // should never be called with NULL` — dropped;
 /// an `ImageHandle` cannot be null (§B5 index-not-pointer). `Z_Free(pImage)`
 /// is replaced by the arena slot's own drop (owned Rust storage, porting-
-/// rules §C9). Registry mutation goes through `Arc::make_mut` (A9), matching
-/// every other `RenderAssets` registry write.
+/// rules §C9). Registry mutation writes directly on the one published
+/// `RenderAssets` instance (A9).
 ///
 /// `state: &mut TrImageState` is this wave's addition (not an oracle
 /// parameter): the R4a `pending_uploads` staging table
@@ -455,7 +452,7 @@ pub fn R_Images_GetNextIteration(assets: &RenderAssets, cursor: &mut usize) -> O
 ///
 /// Source: oracle/codemp/renderer/tr_image.cpp:561-571
 pub fn R_Images_DeleteImageContents(
-    sim: &mut RenderAssetsSim,
+    assets: &mut RenderAssets,
     state: &mut TrImageState,
     handle: ImageHandle,
 ) {
@@ -464,7 +461,7 @@ pub fn R_Images_DeleteImageContents(
     // wgpu rewrite (DEC-01/DEC-37 A13.2; the render thread owns the GL
     // binding cache, DEC-63.4).
     // Source: oracle/codemp/renderer/tr_image.cpp:566-567
-    Arc::make_mut(&mut sim.published).images.remove(handle);
+    assets.images.remove(handle);
     state.pending_uploads.remove(&handle);
 }
 
@@ -894,19 +891,11 @@ pub fn Lanczos3(t: f32) -> f32 {
     0.0
 }
 
-/// Raven `R_InitFogTable`. Writes `RenderAssets::function_tables` on the
-/// frontend `RenderAssets` its sole reader [`R_FogFactor`] takes, not on
-/// `RenderAssetsSim::published` — the oracle has one `tr` holding all six
-/// function tables, written together by `R_Init`
-/// (`oracle/codemp/renderer/tr_init.cpp:1255-1279`), and `R_Init`'s own five
-/// -table loop already writes the frontend instance. Taking `sim` here left
-/// `R_FogFactor` reading an all-zero table
-/// (`tr_shade_calc.rs`'s three `RB_CalcFogTexCoords` call sites).
-///
-/// The one remaining sim-side reader, `R_CreateFogImage` below, still reads
-/// `sim.published` — the pre-existing A9 duality (`R_Init`'s own doc comment:
-/// `assets` and `sim.published` are separate instances), not this fn's to
-/// reconcile.
+/// Raven `R_InitFogTable`. Writes `RenderAssets::function_tables`, read by
+/// [`R_FogFactor`] — the oracle has one `tr` holding all six function
+/// tables, written together by `R_Init`
+/// (`oracle/codemp/renderer/tr_init.cpp:1255-1279`), and `R_Init`'s own
+/// five-table loop already writes this same instance.
 ///
 /// Source: oracle/codemp/renderer/tr_image.cpp:2633-2645
 pub fn R_InitFogTable(assets: &mut RenderAssets) {
@@ -1344,20 +1333,19 @@ pub fn GL_ResetBinds() {
 ///
 /// Source: oracle/codemp/renderer/tr_image.cpp:1035-1049
 pub fn R_Images_DeleteImage(
-    sim: &mut RenderAssetsSim,
+    assets: &mut RenderAssets,
     state: &mut TrImageState,
     handle: ImageHandle,
 ) {
-    let name = sim
-        .published
+    let name = assets
         .images
         .get(handle)
         .map(|image| image.img_name.clone());
 
     match name {
         Some(name) => {
-            R_Images_DeleteImageContents(sim, state, handle);
-            Arc::make_mut(&mut sim.published).image_names.remove(&name);
+            R_Images_DeleteImageContents(assets, state, handle);
+            assets.image_names.remove(&name);
         }
         None => {
             debug_assert!(false, "R_Images_DeleteImage: handle not found in registry");
@@ -1374,18 +1362,18 @@ pub fn R_Images_DeleteImage(
 /// `giTextureBindNum` lands on `TrImageState` (A13.3, named by this wave).
 ///
 /// Source: oracle/codemp/renderer/tr_image.cpp:1053-1066
-pub fn R_Images_Clear(sim: &mut RenderAssetsSim, state: &mut TrImageState) {
-    let _ = R_Images_StartIteration(&sim.published);
+pub fn R_Images_Clear(assets: &mut RenderAssets, state: &mut TrImageState) {
+    let _ = R_Images_StartIteration(assets);
     let mut cursor = 0usize;
     let mut handles = Vec::new();
-    while let Some(handle) = R_Images_GetNextIteration(&sim.published, &mut cursor) {
+    while let Some(handle) = R_Images_GetNextIteration(assets, &mut cursor) {
         handles.push(handle);
     }
     for handle in handles {
-        R_Images_DeleteImageContents(sim, state, handle);
+        R_Images_DeleteImageContents(assets, state, handle);
     }
 
-    Arc::make_mut(&mut sim.published).image_names.clear();
+    assets.image_names.clear();
 
     state.gi_texture_bind_num = 1024;
 }
@@ -1456,15 +1444,15 @@ pub fn RE_RegisterImages_Info_f(
 /// `const char *name`'s NULL check becomes `Option<&str>` (idiomatic
 /// nullable-pointer translation, no Rust `&str` can be null); the std::map
 /// `find` collapses to `RenderAssets::image_names`' `HashMap` lookup
-/// (`R2-D3`/`R2-D4`); the `iLastLevelUsedOn` write goes through
-/// `Arc::make_mut` (A9), matching every other `RenderAssets` mutation.
-/// `allowTC` is read nowhere in the oracle body (dead parameter even in
+/// (`R2-D3`/`R2-D4`); the `iLastLevelUsedOn` write lands directly on the
+/// one published `RenderAssets` instance (A9). `allowTC` is read nowhere
+/// in the oracle body (dead parameter even in
 /// retail) — dropped rather than threaded through unused (porting-rules
 /// data-flow principle; the oracle itself never reads it).
 ///
 /// Source: oracle/codemp/renderer/tr_image.cpp:1157-1193
 pub fn R_FindImageFile_NoLoad(
-    sim: &mut RenderAssetsSim,
+    assets: &mut RenderAssets,
     view: &mut EngineHostView,
     models: &RenderModels,
     name: Option<&str>,
@@ -1475,10 +1463,10 @@ pub fn R_FindImageFile_NoLoad(
     let name = name?;
     let p_name = GenerateImageMappingName(name);
 
-    let handle = *sim.published.image_names.get(&p_name)?;
+    let handle = *assets.image_names.get(&p_name)?;
 
     if p_name != "*white" {
-        if let Some(image) = sim.published.images.get(handle) {
+        if let Some(image) = assets.images.get(handle) {
             if image.mipmap != mipmap {
                 com_printf(
                     view.common,
@@ -1512,7 +1500,7 @@ pub fn R_FindImageFile_NoLoad(
         }
     }
 
-    Arc::make_mut(&mut sim.published)
+    assets
         .images
         .get_mut(handle)?
         .last_level_used_on = models.media_get_level();
@@ -1964,14 +1952,14 @@ pub fn Upload32(
 ///
 /// Source: oracle/codemp/renderer/tr_image.cpp:1006-1031
 pub fn R_Images_DeleteLightMaps(
-    sim: &mut RenderAssetsSim,
+    assets: &mut RenderAssets,
     state: &mut TrImageState,
 ) {
-    let _ = R_Images_StartIteration(&sim.published);
+    let _ = R_Images_StartIteration(assets);
     let mut cursor = 0usize;
     let mut targets = Vec::new();
-    while let Some(handle) = R_Images_GetNextIteration(&sim.published, &mut cursor) {
-        if let Some(image) = sim.published.images.get(handle) {
+    while let Some(handle) = R_Images_GetNextIteration(assets, &mut cursor) {
+        if let Some(image) = assets.images.get(handle) {
             // loose check, but should be ok
             if image.img_name.starts_with('*') && image.img_name.contains("lightmap") {
                 targets.push((handle, image.img_name.clone()));
@@ -1980,8 +1968,8 @@ pub fn R_Images_DeleteLightMaps(
     }
 
     for (handle, name) in targets {
-        R_Images_DeleteImageContents(sim, state, handle);
-        Arc::make_mut(&mut sim.published).image_names.remove(&name);
+        R_Images_DeleteImageContents(assets, state, handle);
+        assets.image_names.remove(&name);
     }
 
     GL_ResetBinds();
@@ -2002,7 +1990,7 @@ pub fn R_Images_DeleteLightMaps(
 ///
 /// Source: oracle/codemp/renderer/tr_image.cpp:1097-1148
 pub fn RE_RegisterImages_LevelLoadEnd(
-    sim: &mut RenderAssetsSim,
+    assets: &mut RenderAssets,
     state: &mut TrImageState,
     view: &mut EngineHostView,
     models: &RenderModels,
@@ -2017,11 +2005,11 @@ pub fn RE_RegisterImages_LevelLoadEnd(
 
     let mut erase_occured = false;
 
-    let _ = R_Images_StartIteration(&sim.published);
+    let _ = R_Images_StartIteration(assets);
     let mut cursor = 0usize;
     let mut targets = Vec::new();
-    while let Some(handle) = R_Images_GetNextIteration(&sim.published, &mut cursor) {
-        if let Some(image) = sim.published.images.get(handle) {
+    while let Some(handle) = R_Images_GetNextIteration(assets, &mut cursor) {
+        if let Some(image) = assets.images.get(handle) {
             // don't un-register system shaders (*fog, *dlight, *white,
             // *default), but DO de-register lightmaps
             // ("*<mapname>/lightmap%d")
@@ -2044,8 +2032,8 @@ pub fn RE_RegisterImages_LevelLoadEnd(
     }
 
     for (handle, name) in targets {
-        R_Images_DeleteImageContents(sim, state, handle);
-        Arc::make_mut(&mut sim.published).image_names.remove(&name);
+        R_Images_DeleteImageContents(assets, state, handle);
+        assets.image_names.remove(&name);
         erase_occured = true;
     }
 
@@ -2066,10 +2054,10 @@ pub fn RE_RegisterImages_LevelLoadEnd(
 ///
 /// Source: oracle/codemp/renderer/tr_image.cpp:2942-2946
 pub fn R_DeleteTextures(
-    sim: &mut RenderAssetsSim,
+    assets: &mut RenderAssets,
     state: &mut TrImageState,
 ) {
-    R_Images_Clear(sim, state);
+    R_Images_Clear(assets, state);
     GL_ResetBinds();
 }
 
@@ -2081,9 +2069,9 @@ pub fn R_DeleteTextures(
 ///
 /// Registration path per this packet's STATE HOMES table (`R2-D3`/`R2-D4`):
 /// the oracle's `Z_Malloc`-then-`AllocatedImages[name] = image` sequence
-/// becomes one `Arena<ImageAsset>::insert` + `image_names` map insert at the
-/// end, through `Arc::make_mut(&mut sim.published)` (A9), matching every
-/// other `RenderAssets` registry write in this file. The image arena is
+/// becomes one `Arena<ImageAsset>::insert` + `image_names` map insert at
+/// the end, directly on the caller's `assets: &mut RenderAssets` (A9), the
+/// one published instance every registry write shares. The image arena is
 /// unbounded (A5) so `insert` never fails — this fn's Rust return type is a
 /// bare `ImageHandle`, not `Option`, matching the oracle's "always succeeds"
 /// contract (`Z_Malloc` panics rather than returning NULL on OOM, oracle-side
@@ -2113,7 +2101,7 @@ pub fn R_DeleteTextures(
 pub fn R_CreateImage(
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
+    assets: &mut RenderAssets,
     models: &RenderModels,
     state: &mut TrImageState,
     name: &str,
@@ -2135,7 +2123,7 @@ pub fn R_CreateImage(
     }
 
     let mut gl_wrap_clamp_mode = gl_wrap_clamp_mode;
-    if sim.published.glconfig.clamp_to_edge_available && gl_wrap_clamp_mode == GL_CLAMP {
+    if assets.glconfig.clamp_to_edge_available && gl_wrap_clamp_mode == GL_CLAMP {
         gl_wrap_clamp_mode = GL_CLAMP_TO_EDGE;
     }
 
@@ -2161,7 +2149,7 @@ pub fn R_CreateImage(
     }
 
     if let Some(handle) = R_FindImageFile_NoLoad(
-        sim,
+        assets,
         view,
         models,
         Some(name),
@@ -2204,7 +2192,7 @@ pub fn R_CreateImage(
     let (internal_format, out_width, out_height, level0) = Upload32(
         view,
         cvars,
-        &*sim.published,
+        &*assets,
         &*state,
         &mut data,
         format,
@@ -2228,7 +2216,6 @@ pub fn R_CreateImage(
     // `image` is read again — only the final mapped name is transcribed.
     let p_name = GenerateImageMappingName(name);
 
-    let assets = Arc::make_mut(&mut sim.published);
     let handle = assets.images.insert(ImageAsset {
         img_name: p_name.clone(),
         width: out_width as i32,
@@ -2280,7 +2267,7 @@ pub fn R_CreateImage(
 pub fn R_CreateAutomapImage(
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
+    assets: &mut RenderAssets,
     models: &RenderModels,
     state: &mut TrImageState,
     name: &str,
@@ -2295,7 +2282,7 @@ pub fn R_CreateAutomapImage(
     R_CreateImage(
         view,
         cvars,
-        sim,
+        assets,
         models,
         state,
         name,
@@ -2332,7 +2319,7 @@ pub fn R_CreateAutomapImage(
 pub fn R_FindImageFile(
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
+    assets: &mut RenderAssets,
     models: &RenderModels,
     state: &mut TrImageState,
     name: Option<&str>,
@@ -2352,12 +2339,12 @@ pub fn R_FindImageFile(
     // R_FindImageFile_NoLoad() may complain about different clamp parms
     // used...
     let mut gl_wrap_clamp_mode = gl_wrap_clamp_mode;
-    if sim.published.glconfig.clamp_to_edge_available && gl_wrap_clamp_mode == GL_CLAMP {
+    if assets.glconfig.clamp_to_edge_available && gl_wrap_clamp_mode == GL_CLAMP {
         gl_wrap_clamp_mode = GL_CLAMP_TO_EDGE;
     }
 
     if let Some(handle) = R_FindImageFile_NoLoad(
-        sim,
+        assets,
         view,
         models,
         Some(name),
@@ -2386,7 +2373,7 @@ pub fn R_FindImageFile(
     let image = R_CreateImage(
         view,
         cvars,
-        sim,
+        assets,
         models,
         state,
         name,
@@ -2425,16 +2412,16 @@ const DLIGHT_SIZE: usize = 16;
 pub fn R_CreateDlightImage(
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
+    assets: &mut RenderAssets,
     models: &RenderModels,
     state: &mut TrImageState,
 ) {
     if let Some((pic, width, height, _format)) = R_LoadImage(view, "gfx/2d/dlight") {
         let handle = R_CreateImage(
-            view, cvars, sim, models, state, "*dlight", &pic, width, height, GL_RGBA, false,
+            view, cvars, assets, models, state, "*dlight", &pic, width, height, GL_RGBA, false,
             false, false, GL_CLAMP, false,
         );
-        Arc::make_mut(&mut sim.published).dlight_image = Some(handle);
+        assets.dlight_image = Some(handle);
         // `Z_Free(pic)` — `pic: Vec<u8>` is owned and drops on its own
         // (porting-rules §C9).
     } else {
@@ -2469,7 +2456,7 @@ pub fn R_CreateDlightImage(
         let handle = R_CreateImage(
             view,
             cvars,
-            sim,
+            assets,
             models,
             state,
             "*dlight",
@@ -2483,7 +2470,7 @@ pub fn R_CreateDlightImage(
             GL_CLAMP,
             false,
         );
-        Arc::make_mut(&mut sim.published).dlight_image = Some(handle);
+        assets.dlight_image = Some(handle);
     }
 }
 
@@ -2515,7 +2502,7 @@ const FOG_T: i32 = 32;
 pub fn R_CreateFogImage(
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
+    assets: &mut RenderAssets,
     models: &RenderModels,
     state: &mut TrImageState,
 ) {
@@ -2524,7 +2511,7 @@ pub fn R_CreateFogImage(
     for x in 0..FOG_S {
         for y in 0..FOG_T {
             let d = R_FogFactor(
-                &sim.published,
+                &*assets,
                 (x as f32 + 0.5) / FOG_S as f32,
                 (y as f32 + 0.5) / FOG_T as f32,
             );
@@ -2541,10 +2528,10 @@ pub fn R_CreateFogImage(
     // the border color at the edges.  OpenGL 1.2 has clamp-to-edge, which
     // does what we want.
     let handle = R_CreateImage(
-        view, cvars, sim, models, state, "*fog", &data, FOG_S, FOG_T, GL_RGBA, false, false,
+        view, cvars, assets, models, state, "*fog", &data, FOG_S, FOG_T, GL_RGBA, false, false,
         false, GL_CLAMP, false,
     );
-    Arc::make_mut(&mut sim.published).fog_image = Some(handle);
+    assets.fog_image = Some(handle);
 
     // DEFERRED: R4 — `borderColor[4] = {1,1,1,1}` +
     // `qglTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR,
@@ -2570,7 +2557,7 @@ const DEFAULT_SIZE: usize = 16;
 pub fn R_CreateDefaultImage(
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
+    assets: &mut RenderAssets,
     models: &RenderModels,
     state: &mut TrImageState,
 ) {
@@ -2592,7 +2579,7 @@ pub fn R_CreateDefaultImage(
     let handle = R_CreateImage(
         view,
         cvars,
-        sim,
+        assets,
         models,
         state,
         "*default",
@@ -2606,7 +2593,7 @@ pub fn R_CreateDefaultImage(
         GL_REPEAT,
         false,
     );
-    Arc::make_mut(&mut sim.published).default_image = Some(handle);
+    assets.default_image = Some(handle);
 }
 
 // ============================================================================
@@ -2674,12 +2661,12 @@ pub const NUM_SCRATCH_IMAGES: usize = 16;
 pub fn R_CreateBuiltinImages(
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
+    assets: &mut RenderAssets,
     models: &RenderModels,
     state: &mut TrImageState,
     frame: &FrameState,
 ) {
-    R_CreateDefaultImage(view, cvars, sim, models, state);
+    R_CreateDefaultImage(view, cvars, assets, models, state);
 
     // we use a solid white image instead of disabling texturing
     let mut data = [[[0u8; 4]; DEFAULT_SIZE]; DEFAULT_SIZE];
@@ -2690,15 +2677,15 @@ pub fn R_CreateBuiltinImages(
     }
     let flat: Vec<u8> = data.iter().flatten().flatten().copied().collect();
     let white = R_CreateImage(
-        view, cvars, sim, models, state, "*white", &flat, 8, 8, GL_RGBA, false, false, false,
+        view, cvars, assets, models, state, "*white", &flat, 8, 8, GL_RGBA, false, false, false,
         GL_REPEAT, false,
     );
-    Arc::make_mut(&mut sim.published).white_image = Some(white);
+    assets.white_image = Some(white);
 
     // ESCALATION: `tr.screenImage` — see the doc comment above. Call
     // preserved for its registry/counter side effects.
     let _ = R_CreateImage(
-        view, cvars, sim, models, state, "*screen", &flat, 8, 8, GL_RGBA, false, false, false,
+        view, cvars, assets, models, state, "*screen", &flat, 8, 8, GL_RGBA, false, false, false,
         GL_REPEAT, false,
     );
 
@@ -2743,7 +2730,7 @@ pub fn R_CreateBuiltinImages(
     let _ = R_CreateImage(
         view,
         cvars,
-        sim,
+        assets,
         models,
         state,
         "*identityLight",
@@ -2766,7 +2753,7 @@ pub fn R_CreateBuiltinImages(
         let handle = R_CreateImage(
             view,
             cvars,
-            sim,
+            assets,
             models,
             state,
             &format!("*scratch{}", x),
@@ -2782,10 +2769,10 @@ pub fn R_CreateBuiltinImages(
         );
         scratch.push(handle);
     }
-    Arc::make_mut(&mut sim.published).scratch_images = scratch;
+    assets.scratch_images = scratch;
 
-    R_CreateDlightImage(view, cvars, sim, models, state);
-    R_CreateFogImage(view, cvars, sim, models, state);
+    R_CreateDlightImage(view, cvars, assets, models, state);
+    R_CreateFogImage(view, cvars, assets, models, state);
 }
 
 // ============================================================================
@@ -2804,17 +2791,16 @@ pub fn R_CreateBuiltinImages(
 pub fn R_InitImages(
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    glconfig: &GlConfig,
-    sim: &mut RenderAssetsSim,
+    assets: &mut RenderAssets,
     models: &RenderModels,
     state: &mut TrImageState,
     frame: &mut FrameState,
 ) {
     // build brightness translation tables
-    R_SetColorMappings(view, cvars, glconfig, state, frame);
+    R_SetColorMappings(view, cvars, &assets.glconfig, state, frame);
 
     // create default texture and white texture
-    R_CreateBuiltinImages(view, cvars, sim, models, state, &*frame);
+    R_CreateBuiltinImages(view, cvars, assets, models, state, &*frame);
 }
 
 // ============================================================================
@@ -2849,7 +2835,6 @@ pub fn RE_RegisterIndividualSkin(
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
@@ -2933,7 +2918,6 @@ pub fn RE_RegisterIndividualSkin(
             assets,
             view,
             cvars,
-            sim,
             models,
             img_state,
             sky_view,
@@ -3000,7 +2984,6 @@ pub fn RE_RegisterSkin(
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
@@ -3049,17 +3032,17 @@ pub fn RE_RegisterSkin(
     let h_skin = if let Some((skinhead, skintorso, skinlower)) = re_split_skins(name) {
         // three part
         let mut h_skin = RE_RegisterIndividualSkin(
-            qs, frame, assets, view, cvars, sim, models, img_state, sky_view, sky, &skinhead,
+            qs, frame, assets, view, cvars, models, img_state, sky_view, sky, &skinhead,
             h_skin,
         );
         if h_skin != SkinHandle::slot_zero() {
             h_skin = RE_RegisterIndividualSkin(
-                qs, frame, assets, view, cvars, sim, models, img_state, sky_view, sky,
+                qs, frame, assets, view, cvars, models, img_state, sky_view, sky,
                 &skintorso, h_skin,
             );
             if h_skin != SkinHandle::slot_zero() {
                 h_skin = RE_RegisterIndividualSkin(
-                    qs, frame, assets, view, cvars, sim, models, img_state, sky_view, sky,
+                    qs, frame, assets, view, cvars, models, img_state, sky_view, sky,
                     &skinlower, h_skin,
                 );
             }
@@ -3068,7 +3051,7 @@ pub fn RE_RegisterSkin(
     } else {
         // single skin
         RE_RegisterIndividualSkin(
-            qs, frame, assets, view, cvars, sim, models, img_state, sky_view, sky, name,
+            qs, frame, assets, view, cvars, models, img_state, sky_view, sky, name,
             h_skin,
         )
     };

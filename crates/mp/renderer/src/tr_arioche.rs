@@ -17,7 +17,6 @@ use native_string::{atoi, buf_to_string};
 
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::render_assets::RenderAssets;
-use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
 use crate::tr_bsp::R_ColorShiftLightingBytes;
@@ -73,7 +72,6 @@ pub fn R_RMGInit(
     assets: &mut RenderAssets,
     view: &mut EngineHostView,
     cvars: &RendererCvars,
-    sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
@@ -116,7 +114,6 @@ pub fn R_RMGInit(
         assets,
         view,
         cvars,
-        sim,
         models,
         img_state,
         sky_view,
@@ -187,7 +184,6 @@ pub fn R_RMGInit(
             assets,
             view,
             cvars,
-            sim,
             models,
             img_state,
             sky_view,
@@ -250,7 +246,7 @@ pub fn R_RMGInit(
                 qs,
                 view,
                 cvars,
-                sim,
+                assets,
                 models,
                 img_state,
                 Some(b"rain init 1000"),
@@ -259,7 +255,7 @@ pub fn R_RMGInit(
                 qs,
                 view,
                 cvars,
-                sim,
+                assets,
                 models,
                 img_state,
                 Some(b"rain outside"),
@@ -270,7 +266,7 @@ pub fn R_RMGInit(
                 qs,
                 view,
                 cvars,
-                sim,
+                assets,
                 models,
                 img_state,
                 Some(b"snow init 1000 outside"),
@@ -279,7 +275,7 @@ pub fn R_RMGInit(
                 qs,
                 view,
                 cvars,
-                sim,
+                assets,
                 models,
                 img_state,
                 Some(b"snow outside"),

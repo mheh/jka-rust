@@ -12,6 +12,7 @@
 
 use core::ffi::c_int;
 use core::ptr::null_mut;
+use std::sync::Arc;
 
 use mp_engine_botlib::l_precomp_fns::PC_SetBaseFolder;
 use mp_engine_core::Engine;
@@ -176,9 +177,8 @@ pub fn boot_renderer(cfg: &BootConfig) -> UiHost {
         engine,
         models,
         cvars: RendererCvars::default(),
-        assets: empty_assets(),
         sim: RenderAssetsSim {
-            published: std::sync::Arc::new(empty_assets()),
+            published: Arc::new(empty_assets()),
             light_styles: LightStyleTable {
                 colors: [[0u8; 4]; mp_engine_qcommon::qfiles::light_style_limits::MAX_LIGHT_STYLES],
             },
@@ -205,7 +205,6 @@ pub fn boot_renderer(cfg: &BootConfig) -> UiHost {
             engine,
             models,
             cvars,
-            assets,
             sim,
             img_state,
             frame,
@@ -227,7 +226,6 @@ pub fn boot_renderer(cfg: &BootConfig) -> UiHost {
         R_Init(
             &mut view,
             cvars,
-            assets,
             sim,
             img_state,
             models,
@@ -245,8 +243,8 @@ pub fn boot_renderer(cfg: &BootConfig) -> UiHost {
     }
     println!(
         "ui_harness: R_Init done — {} shaders, {} images registered",
-        host.assets.shaders.iter().count(),
-        host.assets.images.iter().count()
+        host.sim.published.shaders.iter().count(),
+        host.sim.published.images.iter().count()
     );
 
     host
@@ -350,7 +348,6 @@ pub fn with_dc<R>(host: &mut UiHost, body: impl FnOnce(&mut HarnessDc, &mut UiSt
         engine,
         models,
         cvars,
-        assets,
         sim,
         img_state,
         frame,
@@ -381,8 +378,7 @@ pub fn with_dc<R>(host: &mut UiHost, body: impl FnOnce(&mut HarnessDc, &mut UiSt
         view,
         bot,
         cvars,
-        assets,
-        sim,
+        assets: Arc::make_mut(&mut sim.published),
         models,
         img_state,
         frame,
@@ -484,7 +480,6 @@ pub fn load_world(host: &mut UiHost, map: &str) -> (bool, srfTerrain_t) {
             engine,
             models,
             cvars,
-            assets,
             sim,
             img_state,
             frame,
@@ -501,10 +496,9 @@ pub fn load_world(host: &mut UiHost, map: &str) -> (bool, srfTerrain_t) {
         RE_LoadWorldMap(
             qs,
             frame,
-            assets,
+            Arc::make_mut(&mut sim.published),
             &mut view,
             cvars,
-            sim,
             models,
             img_state,
             sky_view,
@@ -514,7 +508,7 @@ pub fn load_world(host: &mut UiHost, map: &str) -> (bool, srfTerrain_t) {
         );
     }
 
-    let loaded = host.assets.world.is_some();
+    let loaded = host.sim.published.world.is_some();
     println!(
         "world_harness: RE_LoadWorldMap(\"{map}\") -> {}",
         if loaded { "loaded" } else { "NOT LOADED" }
@@ -539,14 +533,14 @@ pub fn init_terrain(host: &mut UiHost) -> srfTerrain_t {
         engine,
         models,
         cvars,
-        assets,
+        sim,
         ..
     } = &mut *host;
     let models_ptr: *mut RenderModels = &mut *models;
     let Engine { common, cm, sv, .. } = &mut **engine;
     let sv_ptr: *mut () = sv as *mut Server as *mut ();
     let mut view = host_view(common, cm, sv_ptr, models_ptr);
-    R_TerrainInit(&mut view, cvars, assets, &mut land_scape);
+    R_TerrainInit(&mut view, cvars, Arc::make_mut(&mut sim.published), &mut land_scape);
     land_scape
 }
 
@@ -558,7 +552,6 @@ pub fn register_model(host: &mut UiHost, name: &str) -> qhandle_t {
         engine,
         models,
         cvars,
-        assets,
         sim,
         img_state,
         frame,
@@ -575,10 +568,9 @@ pub fn register_model(host: &mut UiHost, name: &str) -> qhandle_t {
     RE_RegisterModel(
         qs,
         frame,
-        assets,
+        Arc::make_mut(&mut sim.published),
         &mut view,
         cvars,
-        sim,
         models,
         img_state,
         sky_view,
@@ -603,7 +595,6 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
             engine,
             models,
             cvars,
-            assets,
             sim,
             img_state,
             frame,
@@ -620,10 +611,9 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
         RE_LoadWorldMap(
             qs,
             frame,
-            assets,
+            Arc::make_mut(&mut sim.published),
             &mut view,
             cvars,
-            sim,
             models,
             img_state,
             sky_view,
@@ -633,7 +623,7 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
         );
     }
 
-    let loaded = host.assets.world.is_some();
+    let loaded = host.sim.published.world.is_some();
     println!(
         "world_spike: RE_LoadWorldMap(\"{map}\") -> {}",
         if loaded { "loaded" } else { "NOT LOADED" }
@@ -641,7 +631,8 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
 
     // A spawn origin from the stored entity lump, bumped to eye height.
     let eye = host
-        .assets
+        .sim
+        .published
         .world
         .as_ref()
         .and_then(|w| find_spawn_origin(&w.entity_string))
@@ -679,7 +670,8 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
         // frontend fog-num math reads. The spike adds no entities, so the list
         // only feeds `R_RenderView`'s fog tagging.
         let fogs: Vec<fog_t> = host
-            .assets
+            .sim
+            .published
             .world
             .as_ref()
             .map(|w| w.fogs.iter().map(|f| f.to_fog_t()).collect())
@@ -716,10 +708,11 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
             engine,
             models,
             cvars,
-            assets,
+            sim,
             frame,
             ..
         } = &mut *host;
+        let assets = Arc::make_mut(&mut sim.published);
         // Force `R_MarkLeaves` to re-mark this frame regardless of the leftover
         // view cluster.
         frame.refdef.areamask_modified = true;
@@ -802,7 +795,7 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
         }
     }
 
-    if let Some(w) = host.assets.world.as_ref() {
+    if let Some(w) = host.sim.published.world.as_ref() {
         let vis_count = host.frame.vis_count;
         r.visible_leaves = w
             .nodes

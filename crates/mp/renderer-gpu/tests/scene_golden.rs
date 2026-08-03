@@ -29,6 +29,7 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use mp_engine_core::Engine;
@@ -95,7 +96,7 @@ struct Scene {
 /// here use.
 fn record_entities(host: &mut UiHost, frame_data: &mut FrameData, entities: &[refEntity_t]) {
     for ent in entities {
-        RE_AddRefEntityToScene(frame_data, &host.assets, &mut host.scene, ent);
+        RE_AddRefEntityToScene(frame_data, &host.sim.published, &mut host.scene, ent);
     }
 }
 
@@ -249,7 +250,7 @@ fn boot_synthetic() -> UiHost {
     let mut host = boot::boot_renderer(&cfg);
     // The ui boot path is what normally sets this; every `RE_Add*ToScene` trap
     // drops its submission while it is false.
-    host.assets.registered = true;
+    Arc::make_mut(&mut host.sim.published).registered = true;
     host
 }
 
@@ -261,7 +262,6 @@ fn register_shader(host: &mut UiHost, name: &str) -> qhandle_t {
         engine,
         models,
         cvars,
-        assets,
         sim,
         img_state,
         frame,
@@ -275,7 +275,16 @@ fn register_shader(host: &mut UiHost, name: &str) -> qhandle_t {
     let sv_ptr: *mut () = sv as *mut Server as *mut ();
     let mut view = boot::host_view(common, cm, sv_ptr, models_ptr);
     RE_RegisterShader(
-        name, qs, frame, assets, &mut view, cvars, sim, models, img_state, sky_view, sky,
+        name,
+        qs,
+        frame,
+        Arc::make_mut(&mut sim.published),
+        &mut view,
+        cvars,
+        models,
+        img_state,
+        sky_view,
+        sky,
     )
 }
 
@@ -368,7 +377,7 @@ fn run_scene(scene: &Scene) {
     RE_RenderScene(
         &refdef,
         &mut frame_data,
-        &host.assets,
+        &host.sim.published,
         &host.cvars,
         &mut host.scene,
         &mut host.engine.common,
@@ -397,7 +406,7 @@ fn run_scene(scene: &Scene) {
             engine,
             models,
             cvars,
-            assets,
+            sim,
             frame: fstate,
             img_state,
             font,
@@ -413,7 +422,7 @@ fn run_scene(scene: &Scene) {
         let mut g2_system = Ghoul2System::default();
         let mut world = WorldFrame {
             engine_view: &mut engine_view,
-            assets,
+            assets: Arc::make_mut(&mut sim.published),
             cvars,
             frame: fstate,
             g2: &mut g2_system,
@@ -428,7 +437,6 @@ fn run_scene(scene: &Scene) {
             &mut gpu,
             &target,
             &frame_data,
-            &dummy_assets,
             &dummy_assets,
             img_state,
             &mut images,
@@ -645,7 +653,7 @@ fn scene_polys(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_t)
 
         RE_AddPolyToScene(
             frame_data,
-            &host.assets,
+            &host.sim.published,
             &mut host.engine.common,
             shader,
             &verts,
@@ -673,7 +681,7 @@ fn scene_dlights(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_
     ] {
         RE_AddDynamicLightToScene(
             frame_data,
-            &host.assets,
+            &host.sim.published,
             org,
             intensity,
             color[0],

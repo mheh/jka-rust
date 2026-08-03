@@ -339,7 +339,6 @@ impl FrameExecutor {
         target: &TextureView,
         frame_data: &FrameData,
         assets: &RenderAssets,
-        image_assets: &RenderAssets,
         img_state: &mut TrImageState,
         gpu_images: &mut GpuImages,
         fonts: &mut FontState,
@@ -355,11 +354,10 @@ impl FrameExecutor {
         // `render_world` backend draw and the final 2D `self.pipeline.draw`.
         // Source: oracle/codemp/renderer/tr_cmds.cpp:105-109
 
-        // Two registries by design (A9): shader registration writes the direct
-        // `assets` instance, image registration writes the sim-published Arc
-        // master (`Arc::make_mut(&mut sim.published)` in `tr_image.rs`), so
-        // stage image handles resolve against `image_assets` = the published
-        // side. A single-registry caller passes the same reference twice.
+        // One registry (user ruling 2026-08-02): shader, skin and image
+        // registration all write the sim-published generation, so a shader
+        // handle and its stage image handles resolve against the same
+        // `assets`.
         let mut stats = FrameStats::default();
         let mut color = DEFAULT_COLOR;
 
@@ -370,7 +368,7 @@ impl FrameExecutor {
         // so uploads resolve there.
         let upload_assets: &RenderAssets = match world.as_deref() {
             Some(w) => &*w.assets,
-            None => image_assets,
+            None => assets,
         };
         stats.images_uploaded = gpu_images.upload_pending(gpu, img_state, upload_assets) as u32;
 
