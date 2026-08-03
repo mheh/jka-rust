@@ -49,6 +49,7 @@ use crate::tr_model::render_models::RenderModels;
 use crate::tr_noise::{NoiseState, R_NoiseInit};
 use crate::tr_scene::{R_InitDecals, R_ToggleSmpFrame, SceneState};
 use crate::tr_shader::{R_InitShaders, GLS_DSTBLEND_ZERO, GLS_SRCBLEND_ONE, GL_MODULATE};
+use crate::tr_terrain::R_TerrainInit;
 use crate::tr_worldeffects::world_effects::WorldEffectsState;
 
 /// `VidModeTable` — the built-in video-mode list `R_GetModeInfo`/
@@ -1558,12 +1559,8 @@ const MAX_POLYVERTS: i32 = 3000;
 /// scratch heap), so this allocation drops"); the client-side singleton
 /// assignment is the same dead surface (porting-rules §20).
 ///
-/// `R_TerrainInit()` — its already-ported (wave 0) signature needs
-/// `land_scape: &mut srfTerrain_t` (`tr.landScape`), which is
-/// design-assigned to `FrameState`'s frontend-scratch bucket but not yet a
-/// landed field (the same gap `RE_Shutdown`'s `R_TerrainShutdown` doc
-/// comment above already escalates for the same global) — deferred rather
-/// than inventing the field.
+/// `R_TerrainInit()` runs at Raven's statement position.
+/// Its `land_scape` parameter is `FrameState::land_scape`, the sim instance's `tr.landScape`.
 ///
 /// `int err = qglGetError(); if (err != GL_NO_ERROR) Com_Printf(...)` — the
 /// fixed-function GL surface DEC-01/DEC-37 leave unhomed until the R4 wgpu
@@ -1651,6 +1648,10 @@ pub fn R_Init(
         skyboxportal: 0,
         drawskyboxportal: 0,
         render_glowing_objects: false,
+        // SAFETY: `srfTerrain_t` is a `#[repr(C)]` struct of one enum and one raw pointer.
+        // The all-zero bit pattern is `SF_BAD` with a null `landscape`.
+        // `R_TerrainInit` below writes both fields again, in Raven's memset-then-init order.
+        land_scape: unsafe { core::mem::zeroed() },
     };
 
     // The sim-written half of the same `Com_Memset( &tr, 0, sizeof( tr ) )`
@@ -1743,10 +1744,10 @@ pub fn R_Init(
     R_InitSkins(assets);
     models.init_skins();
 
-    // DEFERRED: `R_TerrainInit()` — its already-ported signature needs
-    // `land_scape: &mut srfTerrain_t` (`tr.landScape`), not yet a landed
-    // `FrameState` field (see doc comment above).
+    // The W2 cvar snapshot reads `r_drawTerrain` every frame, so this call must run.
+    // It seeds `frame.land_scape`, then registers that cvar with the three beside it.
     // Source: oracle/codemp/renderer/tr_init.cpp:1310
+    R_TerrainInit(view, cvars, assets, &mut frame.land_scape);
 
     R_InitFonts(font);
 

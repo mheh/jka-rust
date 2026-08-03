@@ -5,6 +5,7 @@ use mp_engine_qcommon::qfiles::light_style_limits::MAX_LIGHT_STYLES;
 use crate::render_state::placeholders::{
     BackEndCounters, OrientationR, RefEntity, TrRefdef, ViewParms,
 };
+use crate::tr_local::srf_terrain_s::srfTerrain_t;
 
 /// Render-thread-local scratch, replacing `backEndState_t`'s role in full —
 /// all 11 fields accounted for (B5) — plus the frontend scratch/counters
@@ -86,4 +87,9 @@ pub struct FrameState {
     ///
     /// Source: `oracle/codemp/renderer/tr_backend.cpp:32`
     pub render_glowing_objects: bool,
+    /// `tr.landScape` on the sim instance, seeded by `R_TerrainInit`.
+    /// The executor keeps its own render-side seed (W2-F6), so this copy never crosses threads.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1422`, `tr_terrain.cpp:1028-1029`
+    pub land_scape: srfTerrain_t,
 }

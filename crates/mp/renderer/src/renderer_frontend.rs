@@ -206,6 +206,9 @@ pub fn zeroed_frame_state() -> FrameState {
         skyboxportal: 0,
         drawskyboxportal: 0,
         render_glowing_objects: false,
+        // SAFETY: `srfTerrain_t` is a `#[repr(C)]` struct of one enum and one raw pointer.
+        // The all-zero bit pattern is `SF_BAD` with a null `landscape`, which is the W2-F6 seed.
+        land_scape: unsafe { core::mem::zeroed() },
     }
 }
 
