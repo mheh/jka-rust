@@ -1191,7 +1191,6 @@ pub fn CL_InitCGame(view: &mut EngineHostView, cl: &mut Client) {
             &re.cvars,
             &re.assets,
             &mut re.frame,
-            &mut re.gpu_res,
         );
     }
 
@@ -1222,7 +1221,7 @@ pub fn CL_FirstSnapshot(view: &mut EngineHostView, cl: &mut Client) {
     let re = unsafe { re_from_view(view) };
     let rm = unsafe { rm_from_view(view) };
     rm.models_level_load_end(view, false);
-    RE_RegisterImages_LevelLoadEnd(&mut re.sim, &mut re.img_state, &mut re.gpu_res, view, rm);
+    RE_RegisterImages_LevelLoadEnd(&mut re.sim, &mut re.img_state, view, rm);
     // SAFETY: view-constructor slot, single-threaded, no other live cast.
     let snd = unsafe { snd_from_view(view) };
     S_RestartMusic(view, snd);
@@ -1843,7 +1842,6 @@ pub fn CL_CgameSystemCalls(
             &mut re.sim,
             rm,
             &mut re.img_state,
-            &mut re.gpu_res,
             &mut re.sky_view,
             &mut re.sky,
             &mut re.world_effects,
@@ -1863,7 +1861,6 @@ pub fn CL_CgameSystemCalls(
             &mut re.sim,
             rm,
             &mut re.img_state,
-            &mut re.gpu_res,
             &mut re.sky_view,
             &mut re.sky,
             &mut re.world_effects,
@@ -1882,7 +1879,6 @@ pub fn CL_CgameSystemCalls(
             &mut re.sim,
             rm,
             &mut re.img_state,
-            &mut re.gpu_res,
             &mut re.sky_view,
             &mut re.sky,
             &name,
@@ -1901,7 +1897,6 @@ pub fn CL_CgameSystemCalls(
             &mut re.sim,
             rm,
             &mut re.img_state,
-            &mut re.gpu_res,
             &mut re.sky_view,
             &mut re.sky,
         )
@@ -1919,7 +1914,6 @@ pub fn CL_CgameSystemCalls(
             &mut re.sim,
             rm,
             &mut re.img_state,
-            &mut re.gpu_res,
             &mut re.sky_view,
             &mut re.sky,
         )
@@ -1938,7 +1932,6 @@ pub fn CL_CgameSystemCalls(
             &mut re.sim,
             rm,
             &mut re.img_state,
-            &mut re.gpu_res,
             &mut re.sky_view,
             &mut re.sky,
             &mut re.font,
@@ -1961,7 +1954,6 @@ pub fn CL_CgameSystemCalls(
             &mut re.sim,
             rm,
             &mut re.img_state,
-            &mut re.gpu_res,
             &mut re.sky_view,
             &mut re.sky,
             &mut re.font,
@@ -1991,7 +1983,6 @@ pub fn CL_CgameSystemCalls(
             &mut re.sim,
             rm,
             &mut re.img_state,
-            &mut re.gpu_res,
             &mut re.sky_view,
             &mut re.sky,
             &mut re.font,
@@ -2017,7 +2008,6 @@ pub fn CL_CgameSystemCalls(
             &mut re.sim,
             rm,
             &mut re.img_state,
-            &mut re.gpu_res,
             &mut re.sky_view,
             &mut re.sky,
             &mut re.font,
@@ -2468,7 +2458,6 @@ pub fn CL_CgameSystemCalls(
             &mut re.sim,
             rm,
             &mut re.img_state,
-            &mut re.gpu_res,
             &mut re.sky_view,
             &mut re.sky,
         );
@@ -3498,7 +3487,6 @@ pub fn CL_CgameSystemCalls(
             &mut re.sim,
             rm,
             &mut re.img_state,
-            &mut re.gpu_res,
             Some(command),
         );
         0

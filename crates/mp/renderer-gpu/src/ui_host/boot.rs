@@ -38,9 +38,7 @@ use mp_qshared::shared::cvar::CVAR_INIT;
 use mp_qshared::shared::qfalse;
 use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
-use mp_renderer::render_state::gpu_resources::GpuResources;
 use mp_renderer::render_state::light_style_table::LightStyleTable;
-use mp_renderer::render_state::placeholders::GlStatePlaceholder;
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::render_assets_sim::RenderAssetsSim;
 use mp_renderer::render_state::renderer_cvars::RendererCvars;
@@ -186,9 +184,6 @@ pub fn boot_renderer(cfg: &BootConfig) -> UiHost {
             },
         },
         img_state: TrImageState::default(),
-        gpu_res: GpuResources {
-            gl_state: GlStatePlaceholder {},
-        },
         frame: zeroed_frame_state(),
         scene: SceneState::default(),
         noise: NoiseState::default(),
@@ -213,7 +208,6 @@ pub fn boot_renderer(cfg: &BootConfig) -> UiHost {
             assets,
             sim,
             img_state,
-            gpu_res,
             frame,
             scene,
             noise,
@@ -236,7 +230,6 @@ pub fn boot_renderer(cfg: &BootConfig) -> UiHost {
             assets,
             sim,
             img_state,
-            gpu_res,
             models,
             frame,
             scene,
@@ -360,7 +353,6 @@ pub fn with_dc<R>(host: &mut UiHost, body: impl FnOnce(&mut HarnessDc, &mut UiSt
         assets,
         sim,
         img_state,
-        gpu_res,
         frame,
         font,
         qs,
@@ -393,7 +385,6 @@ pub fn with_dc<R>(host: &mut UiHost, body: impl FnOnce(&mut HarnessDc, &mut UiSt
         sim,
         models,
         img_state,
-        gpu: gpu_res,
         frame,
         qs,
         sky_view,
@@ -496,7 +487,6 @@ pub fn load_world(host: &mut UiHost, map: &str) -> (bool, srfTerrain_t) {
             assets,
             sim,
             img_state,
-            gpu_res,
             frame,
             qs,
             sky_view,
@@ -517,7 +507,6 @@ pub fn load_world(host: &mut UiHost, map: &str) -> (bool, srfTerrain_t) {
             sim,
             models,
             img_state,
-            gpu_res,
             sky_view,
             sky,
             world_effects,
@@ -572,7 +561,6 @@ pub fn register_model(host: &mut UiHost, name: &str) -> qhandle_t {
         assets,
         sim,
         img_state,
-        gpu_res,
         frame,
         qs,
         sky_view,
@@ -593,7 +581,6 @@ pub fn register_model(host: &mut UiHost, name: &str) -> qhandle_t {
         sim,
         models,
         img_state,
-        gpu_res,
         sky_view,
         sky,
         world_effects,
@@ -619,7 +606,6 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
             assets,
             sim,
             img_state,
-            gpu_res,
             frame,
             qs,
             sky_view,
@@ -640,7 +626,6 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
             sim,
             models,
             img_state,
-            gpu_res,
             sky_view,
             sky,
             world_effects,
@@ -732,7 +717,6 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
             models,
             cvars,
             assets,
-            gpu_res,
             frame,
             ..
         } = &mut *host;
@@ -774,7 +758,6 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
             cvars,
             frame,
             &mut g2_system,
-            gpu_res,
             &frame_data,
             &refdef,
             0,

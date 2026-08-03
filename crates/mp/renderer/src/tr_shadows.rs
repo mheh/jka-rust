@@ -112,8 +112,8 @@ pub fn RB_ProjectionShadowDeform() {
 /// `tess.numIndexes` to bound or drive either loop) or is itself GL-call
 /// choreography (`GL_Bind`/`GL_Cull`/`GL_State`/`qglColor3f`/`qglColorMask`/
 /// `qglEnable`/`qglDepthFunc`/`qglStencilFunc`/`qglStencilOp` — the
-/// fixed-function GL surface, unhomed until R4, DEC-01/DEC-37;
-/// `GpuResources::gl_state` is a named placeholder). `numEdgeDefs`/
+/// fixed-function GL surface, unhomed until R4, DEC-01/DEC-37; the render
+/// thread owns the GL state, DEC-63.4). `numEdgeDefs`/
 /// `edgeDefs` (`TrShadowsState`/`R_AddEdgeDef`/`R_RenderShadowEdges`, A13.3)
 /// and `glConfig.stencilBits`/`backEnd.ori`/`backEnd.currentEntity` are real
 /// R3 carriers but have nothing to drive without the tess vertex/index
@@ -147,8 +147,8 @@ pub fn RB_DoShadowTessEnd() {
 /// (`qglEnable`/`qglStencilFunc`/`qglStencilOp`/`qglIsEnabled`/`GL_Cull`/
 /// `GL_Bind(tr.whiteImage)`/`qglPushMatrix`/`qglLoadIdentity`/`qglColor4f`/
 /// `GL_State`/`qglBegin`..`qglEnd`/`qglDisable`/`qglPopMatrix`) — unhomed
-/// until R4 (DEC-01/DEC-37; `GpuResources::gl_state` is a named
-/// placeholder), matching this file's `GL_Cull`-guard-then-defer precedent
+/// until R4 (DEC-01/DEC-37; the render thread owns the GL state, DEC-63.4),
+/// matching this file's `GL_Cull`-guard-then-defer precedent
 /// (`tr_backend.rs`). `tr.whiteImage` has an R3 carrier
 /// (`RenderAssets::white_image`), but `GL_Bind` is itself a DEFERRED-R4
 /// no-op, so nothing here becomes computable.
@@ -199,8 +199,8 @@ pub fn RB_ShadowTessEnd() {
 /// `qglStencilOp`/`qglDisable(GL_CLIP_PLANE0)`/`GL_Cull`/`qglMatrixMode`/
 /// `qglPushMatrix`/`qglLoadIdentity`/`qglOrtho`/`GL_State`/
 /// `qglBegin`..`qglEnd`/`qglColor4f`/`qglTexCoord2f`/`qglVertex2f`/
-/// `qglPopMatrix`) — unhomed until R4 (DEC-01/DEC-37; `GpuResources::gl_state`
-/// is a named placeholder), matching this file's `RB_ShadowFinish`
+/// `qglPopMatrix`) — unhomed until R4 (DEC-01/DEC-37; the render thread owns
+/// the GL state, DEC-63.4), matching this file's `RB_ShadowFinish`
 /// guard-then-defer precedent. The `spost`/`spost2` stretch-animation
 /// arithmetic (`sin(tr.refdef.time*0.0005f)`/`sin(tr.refdef.time*0.0008f)`)
 /// exists solely to parameterize that GL sequence and additionally has no R3
@@ -238,8 +238,8 @@ pub fn RB_DistortionFill(
 ///
 /// DEFERRED: R4 — the capture-rect arithmetic (`radX`/`radY`/`cX`/`cY`)
 /// exists solely to parameterize `qglCopyTexImage2D`, the fixed-function GL
-/// call itself (unhomed until R4, DEC-01/DEC-37; `GpuResources::gl_state` is
-/// a named placeholder) — matches this crate's `RB_Hyperspace`
+/// call itself (unhomed until R4, DEC-01/DEC-37; the render thread owns the
+/// GL state, DEC-63.4) — matches this crate's `RB_Hyperspace`
 /// (`tr_backend.rs`) precedent of deferring GL-only-consumed arithmetic
 /// alongside its GL call rather than stranding an orphan return value.
 /// `GL_Bind(tr.screenImage)` is also unhomed: `tr.screenImage` is a frontend

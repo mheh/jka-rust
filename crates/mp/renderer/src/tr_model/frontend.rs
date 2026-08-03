@@ -9,7 +9,7 @@
 //! — takes `view: &mut EngineHostView` as its engine carrier and threads the
 //! renderer-state bundle `R_FindShader`/`RE_LoadWorldMap_Actual` need beside
 //! it, in those two fns' own parameter order (`qs, frame, assets, view,
-//! cvars, sim, models, img_state, gpu, sky_view, sky[, world_effects]`).
+//! cvars, sim, models, img_state, sky_view, sky[, world_effects]`).
 //! `common` is reached as `view.common` by sequential reborrow; server-shared
 //! helpers that take `host: &mut impl EngineHost`
 //! (`re_register_models_get_disk_file`, `re_register_server_models_malloc`)
@@ -56,7 +56,6 @@ use super::render_models::RenderModels;
 use super::server_load::read_qpath;
 use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_state::FrameState;
-use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::placeholders::{GlConfig, WorldAsset};
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
@@ -377,7 +376,6 @@ pub(crate) fn re_register_models_malloc(
     sim: &mut RenderAssetsSim,
     rm: &mut RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
     size: i32,
@@ -412,7 +410,6 @@ pub(crate) fn re_register_models_malloc(
                 sim,
                 rm,
                 img_state,
-                gpu,
                 sky_view,
                 sky,
             );
@@ -503,7 +500,6 @@ pub(crate) fn r_load_md3(
     sim: &mut RenderAssetsSim,
     rm: &mut RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
     model: qhandle_t,
@@ -545,7 +541,6 @@ pub(crate) fn r_load_md3(
         sim,
         rm,
         img_state,
-        gpu,
         sky_view,
         sky,
         size,
@@ -688,7 +683,6 @@ pub(crate) fn r_load_md3(
                     sim,
                     rm,
                     img_state,
-                    gpu,
                     sky_view,
                     sky,
                 );
@@ -757,7 +751,6 @@ pub fn RE_BeginRegistration(
     assets: &mut RenderAssets,
     sim: &mut RenderAssetsSim,
     state: &mut TrImageState,
-    gpu: &mut GpuResources,
     models: &mut RenderModels,
     frame: &mut FrameState,
     scene: &mut SceneState,
@@ -776,7 +769,6 @@ pub fn RE_BeginRegistration(
         assets,
         sim,
         state,
-        gpu,
         models,
         frame,
         scene,
@@ -911,7 +903,6 @@ fn RE_RegisterModel_Actual(
     sim: &mut RenderAssetsSim,
     rm: &mut RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
     world_effects: &mut WorldEffectsState,
@@ -953,7 +944,6 @@ fn RE_RegisterModel_Actual(
             sim,
             rm,
             img_state,
-            gpu,
             sky_view,
             sky,
             world_effects,
@@ -1050,7 +1040,6 @@ fn RE_RegisterModel_Actual(
                     cvars,
                     sim,
                     img_state,
-                    gpu,
                     sky_view,
                     sky,
                     handle,
@@ -1066,7 +1055,6 @@ fn RE_RegisterModel_Actual(
                     cvars,
                     sim,
                     img_state,
-                    gpu,
                     sky_view,
                     sky,
                     world_effects,
@@ -1084,7 +1072,6 @@ fn RE_RegisterModel_Actual(
                     sim,
                     rm,
                     img_state,
-                    gpu,
                     sky_view,
                     sky,
                     handle,
@@ -1181,7 +1168,6 @@ pub fn RE_RegisterModel(
     sim: &mut RenderAssetsSim,
     rm: &mut RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
     world_effects: &mut WorldEffectsState,
@@ -1199,7 +1185,6 @@ pub fn RE_RegisterModel(
         sim,
         rm,
         img_state,
-        gpu,
         sky_view,
         sky,
         world_effects,

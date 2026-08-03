@@ -40,15 +40,13 @@ pub unsafe fn rm_from_view<'a>(view: &mut EngineHostView) -> &'a mut RenderModel
 /// carrier bundle — the client's one reach to the `RE_*` receivers (DEC-59.1).
 /// A call site splits the returned bundle into the individual receivers its
 /// `RE_*` function declares. The DEC-55.2 partition binds module trap arms:
-/// `assets` and `frame_data` on a synchronous trap, never `gpu_res`.
+/// `assets` and `frame_data` on a synchronous trap, and no GPU state at all.
 ///
 /// The DEC-60.1 re-audit ran with the gh#22 thread split (2026-08-02) and found
-/// no GPU-tier access to re-home: `GpuResources` holds one empty
-/// `GlStatePlaceholder`, and no function in this crate reads or writes it. Every
-/// real GPU object lives in `mp_renderer_gpu` on the render thread, which the
-/// sim thread has no handle to. The 104 `gpu_res` parameters are call shape for
-/// the R4 wave that fills the struct; that wave must move it to the render
-/// thread rather than keep it in this bundle.
+/// no GPU-tier access to re-home. DEC-63.4 then deleted the empty
+/// `GpuResources` carrier and its 104 inert parameter threads. Every real GPU
+/// object lives in `mp_renderer_gpu` on the render thread, which the sim thread
+/// has no handle to.
 ///
 /// SAFETY (caller): the slot was built by `mp_engine_core`'s view constructor
 /// from the live, unique `&mut Engine.re`; the engine is single-threaded and no
@@ -91,7 +89,6 @@ fn re_register_model_hook(view: &mut EngineHostView, name: &str) -> qhandle_t {
         &mut re.sim,
         rm,
         &mut re.img_state,
-        &mut re.gpu_res,
         &mut re.sky_view,
         &mut re.sky,
         &mut re.world_effects,

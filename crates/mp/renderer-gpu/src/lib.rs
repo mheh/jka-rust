@@ -23,10 +23,9 @@
 //! (`R_RegisterShaderNoMip`, `R_DrawStretchPic`, `R_SetColor`, `R_Font_*`,
 //! …) rendered end-to-end through this backend; backend #2 (PBR, materials
 //! only per DEC-44 ruling 3) starts once the world slice (R3) is
-//! gate-green. Reconciling `mp_renderer`'s `GpuResources` stub — the
-//! CPU-registry-to-GPU-resource bridge — against this crate's device/queue
-//! is an R4a design item, not scaffold scope: this file only stands up the
-//! device/surface plumbing every later slice needs.
+//! gate-green. DEC-63.4 deleted `mp_renderer`'s `GpuResources` stub, so this
+//! crate's device and queue own every real GPU object. This file stands up
+//! the device and surface plumbing every later slice needs.
 //! ## R4a wave 2 — real textures and text (this crate's current state)
 //!
 //! Landed: [`frame_exec`] walks a `FrameData` event stream in trap-call order,

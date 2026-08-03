@@ -6,7 +6,6 @@ use std::collections::BTreeMap;
 use mp_engine_core::Engine;
 use mp_qshared::shared::com_parse::QSharedScratch;
 use mp_renderer::render_state::frame_state::FrameState;
-use mp_renderer::render_state::gpu_resources::GpuResources;
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::render_assets_sim::RenderAssetsSim;
 use mp_renderer::render_state::renderer_cvars::RendererCvars;
@@ -43,7 +42,6 @@ pub struct UiHost {
     pub assets: RenderAssets,
     pub sim: RenderAssetsSim,
     pub img_state: TrImageState,
-    pub gpu_res: GpuResources,
     pub frame: FrameState,
     pub scene: SceneState,
     pub noise: NoiseState,

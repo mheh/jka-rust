@@ -50,7 +50,6 @@ use native_string::sscanf::sscanf_f32s;
 
 use crate::gl_constants::{GL_CLAMP, GL_RGBA};
 use crate::render_state::frame_state::FrameState;
-use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::placeholders::{Vec3, WorldAsset};
 use crate::render_state::render_assets::RenderAssets;
@@ -1867,7 +1866,7 @@ pub fn R_StitchAllPatches(world_data: &mut [Surface]) {
 /// parameter (a specific BSP instance the caller passes, not necessarily
 /// `tr.world`) — read-only here, matching the oracle body (no field of
 /// `worldData` is mutated). The `R_FindShader` bundle
-/// (`qs`/`frame`/`assets`/`view`/`cvars`/`sim`/`models`/`img_state`/`gpu`/
+/// (`qs`/`frame`/`assets`/`view`/`cvars`/`sim`/`models`/`img_state`/
 /// `sky_view`/`sky`) is threaded verbatim in the shape wave 7 landed it
 /// (`tr_shader.rs::R_FindShader`) — this fn has no state of its own beyond
 /// what that call needs.
@@ -1883,7 +1882,6 @@ fn ShaderForShaderNum(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
     shader_num: i32,
@@ -1926,7 +1924,6 @@ fn ShaderForShaderNum(
         sim,
         models,
         img_state,
-        gpu,
         sky_view,
         sky,
     );
@@ -1975,7 +1972,6 @@ fn R_LoadFogs(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
     ctx: &BspLoadContext,
@@ -2116,7 +2112,6 @@ fn R_LoadFogs(
             sim,
             models,
             img_state,
-            gpu,
             sky_view,
             sky,
         );
@@ -2422,7 +2417,6 @@ pub fn R_LoadLightmaps(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     ctx: &BspLoadContext,
     l: &lump_t,
     ps_map_name: &str,
@@ -2517,7 +2511,6 @@ pub fn R_LoadLightmaps(
             sim,
             models,
             img_state,
-            gpu,
             &format!("*{}/lightmap{}", s_map_name, i),
             &image,
             LIGHTMAP_SIZE as i32,
@@ -2559,7 +2552,6 @@ pub fn R_GetShaderByNum(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
     shader_num: i32,
@@ -2582,7 +2574,6 @@ pub fn R_GetShaderByNum(
         sim,
         models,
         img_state,
-        gpu,
         sky_view,
         sky,
     )
@@ -2604,7 +2595,6 @@ pub fn ParseFace(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
     ds: &dsurface_t,
@@ -2638,7 +2628,6 @@ pub fn ParseFace(
         sim,
         models,
         img_state,
-        gpu,
         sky_view,
         sky,
         ds.shaderNum,
@@ -2757,7 +2746,6 @@ pub fn ParseMesh(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
     ds: &dsurface_t,
@@ -2790,7 +2778,6 @@ pub fn ParseMesh(
         sim,
         models,
         img_state,
-        gpu,
         sky_view,
         sky,
         ds.shaderNum,
@@ -2899,7 +2886,6 @@ pub fn ParseTriSurf(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
     ds: &dsurface_t,
@@ -2928,7 +2914,6 @@ pub fn ParseTriSurf(
         sim,
         models,
         img_state,
-        gpu,
         sky_view,
         sky,
         ds.shaderNum,
@@ -3069,7 +3054,6 @@ pub fn ParseFlare(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
     ds: &dsurface_t,
@@ -3097,7 +3081,6 @@ pub fn ParseFlare(
         sim,
         models,
         img_state,
-        gpu,
         sky_view,
         sky,
         ds.shaderNum,
@@ -3269,7 +3252,6 @@ pub fn R_LoadSurfaces(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
     ctx: &BspLoadContext,
@@ -3342,8 +3324,8 @@ pub fn R_LoadSurfaces(
 
         if surface_type == mapSurfaceType_t::MST_PATCH as i32 {
             let parsed = ParseMesh(
-                qs, frame, assets, view, cvars, sim, models, img_state, gpu, sky_view, sky, &ds,
-                &dv, world, index,
+                qs, frame, assets, view, cvars, sim, models, img_state, sky_view, sky, &ds, &dv,
+                world, index,
             );
             surfaces.push(Surface {
                 view_count: 0,
@@ -3356,8 +3338,8 @@ pub fn R_LoadSurfaces(
             });
         } else if surface_type == mapSurfaceType_t::MST_TRIANGLE_SOUP as i32 {
             let parsed = ParseTriSurf(
-                qs, frame, assets, view, cvars, sim, models, img_state, gpu, sky_view, sky, &ds,
-                &dv, &indexes, world, index,
+                qs, frame, assets, view, cvars, sim, models, img_state, sky_view, sky, &ds, &dv,
+                &indexes, world, index,
             );
             surfaces.push(Surface {
                 view_count: 0,
@@ -3367,8 +3349,8 @@ pub fn R_LoadSurfaces(
             });
         } else if surface_type == mapSurfaceType_t::MST_PLANAR as i32 {
             let parsed = ParseFace(
-                qs, frame, assets, view, cvars, sim, models, img_state, gpu, sky_view, sky, &ds,
-                &dv, &indexes, world, index,
+                qs, frame, assets, view, cvars, sim, models, img_state, sky_view, sky, &ds, &dv,
+                &indexes, world, index,
             );
             surfaces.push(Surface {
                 view_count: 0,
@@ -3378,8 +3360,8 @@ pub fn R_LoadSurfaces(
             });
         } else if surface_type == mapSurfaceType_t::MST_FLARE as i32 {
             let parsed = ParseFlare(
-                qs, frame, assets, view, cvars, sim, models, img_state, gpu, sky_view, sky, &ds,
-                world, index,
+                qs, frame, assets, view, cvars, sim, models, img_state, sky_view, sky, &ds, world,
+                index,
             );
             surfaces.push(Surface {
                 view_count: 0,
@@ -3443,7 +3425,6 @@ pub fn R_LoadEntities(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
     ctx: &BspLoadContext,
@@ -3517,7 +3498,6 @@ pub fn R_LoadEntities(
                     sim,
                     models,
                     img_state,
-                    gpu,
                     sky_view,
                     sky,
                 );
@@ -3547,7 +3527,6 @@ pub fn R_LoadEntities(
                 sim,
                 models,
                 img_state,
-                gpu,
                 sky_view,
                 sky,
             );
@@ -3647,7 +3626,6 @@ pub fn RE_LoadWorldMap_Actual(
     sim: &mut RenderAssetsSim,
     models: &mut RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
     world_effects: &mut WorldEffectsState,
@@ -3793,7 +3771,6 @@ pub fn RE_LoadWorldMap_Actual(
         sim,
         models,
         img_state,
-        gpu,
         &ctx,
         &lumps[LUMP_LIGHTMAPS],
         name,
@@ -3809,7 +3786,6 @@ pub fn RE_LoadWorldMap_Actual(
         sim,
         models,
         img_state,
-        gpu,
         sky_view,
         sky,
         &ctx,
@@ -3828,7 +3804,6 @@ pub fn RE_LoadWorldMap_Actual(
         sim,
         models,
         img_state,
-        gpu,
         sky_view,
         sky,
         &ctx,
@@ -3853,7 +3828,6 @@ pub fn RE_LoadWorldMap_Actual(
             sim,
             models,
             img_state,
-            gpu,
             sky_view,
             sky,
             &ctx,
@@ -3877,7 +3851,6 @@ pub fn RE_LoadWorldMap_Actual(
                     sim,
                     models,
                     img_state,
-                    gpu,
                     sky_view,
                     sky,
                     world_effects,
@@ -3938,7 +3911,6 @@ pub fn RE_LoadWorldMap(
     sim: &mut RenderAssetsSim,
     models: &mut RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
     world_effects: &mut WorldEffectsState,
@@ -3956,7 +3928,6 @@ pub fn RE_LoadWorldMap(
         sim,
         models,
         img_state,
-        gpu,
         sky_view,
         sky,
         world_effects,

@@ -183,7 +183,6 @@ impl FxHost<'_, '_> {
                     &mut re.sim,
                     rm,
                     &mut re.img_state,
-                    &mut re.gpu_res,
                     &mut re.sky_view,
                     &mut re.sky,
                 )
@@ -213,7 +212,6 @@ impl FxHost<'_, '_> {
                     &mut re.sim,
                     rm,
                     &mut re.img_state,
-                    &mut re.gpu_res,
                     &mut re.sky_view,
                     &mut re.sky,
                     &mut re.world_effects,

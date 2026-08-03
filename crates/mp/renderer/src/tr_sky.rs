@@ -978,8 +978,8 @@ pub fn R_BuildCloudData(
 /// assignment (wave-0 ruling 12).
 ///
 /// `qglLoadMatrixf`/`qglTranslatef`/`qglDepthRange` are unhomed GL/WGL entry
-/// points (DEC-01/DEC-37, `GpuResources::gl_state` a named placeholder until
-/// R4) — DEFERRED at their call sites; the surrounding CPU math (`dist`/
+/// points (DEC-01/DEC-37, the render thread owns the GL binding cache,
+/// DEC-63.4) — DEFERRED at their call sites; the surrounding CPU math (`dist`/
 /// `size`/`origin`/`vec1`/`vec2`) is transcribed for real, since none of it
 /// depends on a GL call's result.
 ///

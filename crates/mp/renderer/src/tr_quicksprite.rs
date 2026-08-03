@@ -8,7 +8,6 @@ use mp_qshared::common::mp::cgame::color4ub_t::color4ub_t;
 use mp_qshared::shared::{vec2_t, vec4_t};
 
 use crate::render_state::frame_state::FrameState;
-use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_backend::GL_State;
@@ -184,7 +183,6 @@ impl CQuickSpriteSystem {
     /// Source: `oracle/codemp/renderer/tr_quicksprite.cpp:52-144`
     pub fn flush(
         &mut self,
-        gpu: &mut GpuResources,
         _assets: &RenderAssets,
         _frame: &mut FrameState,
         _common: &Common,
@@ -206,7 +204,7 @@ impl CQuickSpriteSystem {
         // site could never legitimately reach without a real bundle to
         // inspect.
         // Source: oracle/codemp/renderer/tr_quicksprite.cpp:80
-        GL_State(gpu, self.gl_state_bits);
+        GL_State(self.gl_state_bits);
 
         // DEFERRED: R4 — qglTexCoordPointer/qglEnableClientState(GL_TEXTURE_
         // COORD_ARRAY)/qglEnableClientState(GL_COLOR_ARRAY)/qglColorPointer/

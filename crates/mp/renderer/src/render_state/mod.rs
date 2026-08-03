@@ -5,9 +5,10 @@
 //! DEC-37 rulings 1/3/11/14 + addenda A1-A13. Nothing here has a Raven
 //! counterpart struct-for-struct: `trGlobals_t`/`backEndState_t`/
 //! `backEndData_t` are re-partitioned into `RenderAssets` (CPU, `Arc`-shared,
-//! sim-readable), `GpuResources` (render-thread-only), `FrameState`
-//! (render-thread scratch) and `FrameData`/`FrameEvent` (the ordered event
-//! stream that replaces `renderCommandList_t`).
+//! sim-readable), `FrameState` (render-thread scratch) and
+//! `FrameData`/`FrameEvent` (the ordered event stream that replaces
+//! `renderCommandList_t`). The GPU tier is `mp_renderer_gpu`'s alone since
+//! DEC-63.4 deleted the empty `GpuResources` carrier.
 //!
 //! **Interior-safety law** (`### Type tiers and the interior-safety law`,
 //! binding on every R3/R4 wave): no type in this module carries raw pointers,
@@ -24,7 +25,6 @@ pub mod arena;
 pub mod frame_data;
 pub mod frame_event;
 pub mod frame_state;
-pub mod gpu_resources;
 pub mod handle;
 pub mod image_asset;
 pub mod light_style_table;

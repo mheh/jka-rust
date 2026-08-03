@@ -264,7 +264,6 @@ fn register_shader(host: &mut UiHost, name: &str) -> qhandle_t {
         assets,
         sim,
         img_state,
-        gpu_res,
         frame,
         qs,
         sky_view,
@@ -276,7 +275,7 @@ fn register_shader(host: &mut UiHost, name: &str) -> qhandle_t {
     let sv_ptr: *mut () = sv as *mut Server as *mut ();
     let mut view = boot::host_view(common, cm, sv_ptr, models_ptr);
     RE_RegisterShader(
-        name, qs, frame, assets, &mut view, cvars, sim, models, img_state, gpu_res, sky_view, sky,
+        name, qs, frame, assets, &mut view, cvars, sim, models, img_state, sky_view, sky,
     )
 }
 
@@ -400,7 +399,6 @@ fn run_scene(scene: &Scene) {
             cvars,
             assets,
             frame: fstate,
-            gpu_res,
             img_state,
             font,
             noise,
@@ -419,7 +417,6 @@ fn run_scene(scene: &Scene) {
             cvars,
             frame: fstate,
             g2: &mut g2_system,
-            gpu_res,
             sky,
             models: &*models,
             land_scape: &land_scape,

@@ -48,7 +48,6 @@ use mp_engine_qcommon::qfiles::light_style_limits::MAX_LIGHT_STYLES;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::frame_event::FrameEvent;
 use mp_renderer::render_state::frame_state::FrameState;
-use mp_renderer::render_state::gpu_resources::GpuResources;
 use mp_renderer::render_state::image_asset::ImageHandle;
 use mp_renderer::render_state::placeholders::{RefEntity, TrRefdef, WorldAsset};
 use mp_renderer::render_state::render_assets::RenderAssets;
@@ -221,7 +220,6 @@ pub struct WorldFrame<'a, 'e> {
     /// entity walk reaches `R_AddGhoulSurfaces`. A caller with no live Ghoul2
     /// state (the golden test, the world spike) threads an empty owned system.
     pub g2: &'a mut Ghoul2System,
-    pub gpu_res: &'a mut GpuResources,
     /// The sky-box scratch carrier `ParseSkyParms` seeded through
     /// `R_InitSkyTexCoords`. The world pass reads its cloud tex-coord tables
     /// and reuses its grid scratch when a sky-shader surface draws (DEC-50).
@@ -763,7 +761,6 @@ impl FrameExecutor {
             world.cvars,
             world.frame,
             world.g2,
-            world.gpu_res,
             frame_data,
             &abi_refdef,
             refdef_rdflags,

@@ -12,8 +12,9 @@
 //! site reads `RE_SetColor(&mut re.frame_data, color)` with no renaming.
 //!
 //! State-partition law (DEC-55.2): a synchronous path reads `assets` (the CPU
-//! registry) and appends to `frame_data`. `gpu_res` belongs to the render
-//! thread, and no trap arm touches it.
+//! registry) and appends to `frame_data`. This bundle carries no GPU state.
+//! DEC-63.4 deleted the empty `GpuResources` carrier, and `mp_renderer_gpu`
+//! owns every real GPU object on the render thread.
 //!
 //! Source: `docs/decisions.md` DEC-42.3, DEC-55.2, DEC-59.1;
 //! `crates/mp/renderer-gpu/src/ui_host/state.rs` (the harness's seated twin).
@@ -28,11 +29,10 @@ use native_math::rng::Rng;
 use crate::render_state::arena::Arena;
 use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_state::FrameState;
-use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::light_style_table::LightStyleTable;
 use crate::render_state::placeholders::{
-    AutomapWireframe, BackEndCounters, FunctionTables, GlConfig, GlStatePlaceholder, OrientationR,
-    RefEntity, TrRefdef, Vec3, ViewParms,
+    AutomapWireframe, BackEndCounters, FunctionTables, GlConfig, OrientationR, RefEntity, TrRefdef,
+    Vec3, ViewParms,
 };
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
@@ -53,8 +53,7 @@ use crate::tr_worldeffects::world_effects::WorldEffectsState;
 ///
 /// `Engine.re` holds this as an `Option`, `Some` on a client build and `None`
 /// on dedicated — the same shape `Engine.cl` and `Engine.snd` already use. The
-/// seating constructor lands with the platform shell (the winit boot, DEC-56),
-/// which is the first code that has a device to seat `gpu_res` against.
+/// seating constructor lands with the platform shell (the winit boot, DEC-56).
 pub struct RendererFrontend {
     /// The registered `r_*` cvar handles.
     pub cvars: RendererCvars,
@@ -67,14 +66,6 @@ pub struct RendererFrontend {
     /// `tr_image.cpp`'s file-scope state (the scratch buffers and the load
     /// counters).
     pub img_state: TrImageState,
-    /// The render thread's GPU objects. The state-partition law puts this off
-    /// limits to every synchronous path.
-    ///
-    /// The struct is still empty (DEC-60.1 re-audit, 2026-08-02): every live GPU
-    /// object is `mp_renderer_gpu`'s, owned by the render thread. The R4 wave
-    /// that gives `GpuResources` real wgpu fields moves it there, out of this
-    /// bundle.
-    pub gpu_res: GpuResources,
     /// The frontend's per-frame scratch — the oracle's `tr` fields that are
     /// neither registry nor GPU.
     pub frame: FrameState,
@@ -237,9 +228,6 @@ impl RendererFrontend {
                 },
             },
             img_state: TrImageState::default(),
-            gpu_res: GpuResources {
-                gl_state: GlStatePlaceholder {},
-            },
             frame: zeroed_frame_state(),
             frame_data: FrameData { events: Vec::new() },
             scene: SceneState::default(),

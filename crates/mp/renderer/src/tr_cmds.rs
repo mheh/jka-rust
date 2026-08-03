@@ -17,7 +17,6 @@ use mp_qshared::shared::qhandle_t;
 use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_event::FrameEvent;
 use crate::render_state::frame_state::FrameState;
-use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_image::{GL_TextureMode, R_SetColorMappings, TrImageState};
@@ -358,10 +357,9 @@ pub fn RE_EndFrame(
 
 /// Raven `RE_BeginFrame`.
 ///
-/// `glState.finishCalled = qfalse;` — DEFERRED: `GpuResources::gl_state`
-/// (`GlStatePlaceholder`) is a field-less named placeholder until R4 defines
-/// the real pipeline/bind-group cache (R2 `## State ownership` row
-/// `glState`, `R2-D1`/B6); nothing to write to.
+/// `glState.finishCalled = qfalse;` — DEFERRED: the render thread owns
+/// the GL binding cache (DEC-63.4; R2 `## State ownership` row `glState`,
+/// `R2-D1`/B6). Nothing to write to.
 ///
 /// `tr.frameSceneNum = 0;` — DEFERRED: `tr`'s frontend-scratch bucket routes
 /// to `FrameState` per this packet's STATE HOMES table, but only
@@ -397,7 +395,6 @@ pub fn RE_BeginFrame(
     assets: &RenderAssets,
     frame: &mut FrameState,
     image_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     stereo_frame: stereoFrame_t,
 ) {
     if !assets.registered {
@@ -457,7 +454,7 @@ pub fn RE_BeginFrame(
     {
         R_SyncRenderThread(assets, view.common, cvars);
         let texture_mode = view.common.cvar(cvars.r_textureMode).string.clone();
-        GL_TextureMode(view, cvars, assets, image_state, gpu, &texture_mode);
+        GL_TextureMode(view, cvars, assets, image_state, &texture_mode);
         view.common.cvar_mut(cvars.r_textureMode).modified = false;
         view.common
             .cvar_mut(cvars.r_ext_texture_filter_anisotropic)

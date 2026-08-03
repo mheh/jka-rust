@@ -24,7 +24,6 @@ use native_string::atoi;
 
 use crate::gl_constants::GL_CLAMP;
 use crate::render_state::frame_state::FrameState;
-use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
@@ -986,7 +985,7 @@ impl CWeatherParticleCloud {
     /// Raven declares `int VertexCount=4`; Rust has no default arguments, so
     /// every call site passes it explicitly. `rng` carries `mMass.Pick`'s
     /// msvcrt `rand()` stream, threaded rather than reached (porting-rules
-    /// §B4). `view`/`cvars`/`sim`/`models`/`image_state`/`gpu` thread
+    /// §B4). `view`/`cvars`/`sim`/`models`/`image_state` thread
     /// `R_FindImageFile`/`GL_Bind`'s carriers (wave 4 / wave 0, resolved call
     /// surface LAW) rather than reaching them.
     /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:902-945`
@@ -999,7 +998,6 @@ impl CWeatherParticleCloud {
         sim: &mut RenderAssetsSim,
         models: &RenderModels,
         image_state: &mut TrImageState,
-        gpu: &mut GpuResources,
         count: i32,
         texture_path: &str,
         vertex_count: i32,
@@ -1016,7 +1014,6 @@ impl CWeatherParticleCloud {
             sim,
             models,
             image_state,
-            gpu,
             Some(texture_path),
             false,
             false,
@@ -1030,7 +1027,7 @@ impl CWeatherParticleCloud {
             );
         }
 
-        GL_Bind(gpu, self.mImage);
+        GL_Bind(self.mImage);
 
         // Create The Particles
         //----------------------
@@ -1314,8 +1311,9 @@ impl CWeatherParticleCloud {
     /// callees (`GL_State`/`GL_Bind`/`GL_Cull`) are themselves already
     /// DEFERRED no-ops at their own definitions (`tr_backend.rs`, DEC-37
     /// A13.2); R2 leaves the fixed-function GL surface with no R3 home — it
-    /// dissolves into R4's wgpu rewrite (`GpuResources::gl_state` is a named
-    /// placeholder). Only the CPU-only counter effect survives this wave.
+    /// dissolves into R4's wgpu rewrite (the render thread owns the GL
+    /// binding cache, DEC-63.4). Only the CPU-only counter effect survives
+    /// this wave.
     /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1311-1480`
     pub fn Render(&self, particles_rendered: &mut i32) {
         *particles_rendered += self.mParticleCountRender;
@@ -1555,7 +1553,7 @@ impl WorldEffectsState {
     /// default-constructs in place, then is filled through the returned
     /// reference) becomes a `CWeatherParticleCloud::new()` local pushed once
     /// its fields are written.
-    /// `cvars`/`sim`/`models`/`image_state`/`gpu` thread the carriers each
+    /// `cvars`/`sim`/`models`/`image_state` thread the carriers each
     /// `CWeatherParticleCloud::Initialize` call needs (wave 5 reconciliation:
     /// `R_FindImageFile`/`GL_Bind` are now real calls, not deferrals).
     /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1593-1986`
@@ -1568,7 +1566,6 @@ impl WorldEffectsState {
         sim: &mut RenderAssetsSim,
         models: &RenderModels,
         image_state: &mut TrImageState,
-        gpu: &mut GpuResources,
         command: Option<&[u8]>,
     ) {
         if command.is_none() {
@@ -1682,7 +1679,6 @@ impl WorldEffectsState {
                 sim,
                 models,
                 image_state,
-                gpu,
                 500,
                 "gfx/world/rain.jpg",
                 3,
@@ -1712,7 +1708,6 @@ impl WorldEffectsState {
                 sim,
                 models,
                 image_state,
-                gpu,
                 1000,
                 "gfx/world/rain.jpg",
                 3,
@@ -1742,7 +1737,6 @@ impl WorldEffectsState {
                 sim,
                 models,
                 image_state,
-                gpu,
                 1000,
                 "gfx/world/rain.jpg",
                 3,
@@ -1779,7 +1773,6 @@ impl WorldEffectsState {
                 sim,
                 models,
                 image_state,
-                gpu,
                 1000,
                 "gfx/world/rain.jpg",
                 3,
@@ -1812,7 +1805,6 @@ impl WorldEffectsState {
                 sim,
                 models,
                 image_state,
-                gpu,
                 1000,
                 "gfx/effects/snowflake1.bmp",
                 4,
@@ -1842,7 +1834,6 @@ impl WorldEffectsState {
                 sim,
                 models,
                 image_state,
-                gpu,
                 count,
                 "gfx/effects/snowpuff1.tga",
                 4,
@@ -1878,7 +1869,6 @@ impl WorldEffectsState {
                 sim,
                 models,
                 image_state,
-                gpu,
                 400,
                 "gfx/effects/alpha_smoke2b.tga",
                 4,
@@ -1914,7 +1904,6 @@ impl WorldEffectsState {
                 sim,
                 models,
                 image_state,
-                gpu,
                 60,
                 "gfx/effects/alpha_smoke2b.tga",
                 4,
@@ -1947,7 +1936,6 @@ impl WorldEffectsState {
                 sim,
                 models,
                 image_state,
-                gpu,
                 70,
                 "gfx/effects/alpha_smoke2b.tga",
                 4,
@@ -1983,7 +1971,6 @@ impl WorldEffectsState {
                 sim,
                 models,
                 image_state,
-                gpu,
                 40,
                 "gfx/effects/alpha_smoke2b.tga",
                 4,
@@ -2068,7 +2055,7 @@ pub fn R_ShutdownWorldEffects(state: &mut WorldEffectsState, host: &mut EngineHo
 ///
 /// Raven's `char temp[2048]` scratch is [`Cmd_ArgsBuffer`]'s owned return; its
 /// `sizeof(temp)` becomes the `buffer_length` cap. `cvars`/`sim`/`models`/
-/// `image_state`/`gpu` thread `R_WorldEffectCommand`'s own added carriers
+/// `image_state` thread `R_WorldEffectCommand`'s own added carriers
 /// through (wave 5 reconciliation), matching its signature.
 /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1583-1591`
 #[allow(clippy::too_many_arguments)]
@@ -2080,7 +2067,6 @@ pub fn R_WorldEffect_f(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     image_state: &mut TrImageState,
-    gpu: &mut GpuResources,
 ) {
     if Cvar_VariableIntegerValue(host.common, "sv_cheats") != 0 {
         let temp = Cmd_ArgsBuffer(host.common, 2048);
@@ -2091,7 +2077,6 @@ pub fn R_WorldEffect_f(
             sim,
             models,
             image_state,
-            gpu,
             Some(temp.as_bytes()),
         );
     }

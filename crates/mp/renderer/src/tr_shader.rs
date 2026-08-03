@@ -41,7 +41,6 @@ use native_string::Q_stricmpn;
 
 use crate::gl_constants::{GL_CLAMP, GL_REPEAT};
 use crate::render_state::frame_state::FrameState;
-use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::placeholders::SkyParms;
 use crate::render_state::render_assets::RenderAssets;
@@ -4421,7 +4420,6 @@ pub fn ParseStage<'a>(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
 ) -> bool {
     let warn = S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII");
 
@@ -4492,7 +4490,6 @@ pub fn ParseStage<'a>(
                     sim,
                     models,
                     img_state,
-                    gpu,
                     Some(t.as_str()),
                     !state.no_mip_maps,
                     !state.no_pic_mip,
@@ -4536,7 +4533,6 @@ pub fn ParseStage<'a>(
                 sim,
                 models,
                 img_state,
-                gpu,
                 Some(t.as_str()),
                 !state.no_mip_maps,
                 !state.no_pic_mip,
@@ -4603,7 +4599,6 @@ pub fn ParseStage<'a>(
                         sim,
                         models,
                         img_state,
-                        gpu,
                         Some(img_token.as_str()),
                         !state.no_mip_maps,
                         !state.no_pic_mip,
@@ -5080,7 +5075,6 @@ pub fn ParseSkyParms<'a>(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
 ) {
@@ -5116,7 +5110,6 @@ pub fn ParseSkyParms<'a>(
                 sim,
                 models,
                 img_state,
-                gpu,
                 Some(pathname.as_str()),
                 true,
                 true,
@@ -5239,7 +5232,6 @@ pub fn ParseShader<'a>(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
 ) -> bool {
@@ -5309,7 +5301,6 @@ pub fn ParseShader<'a>(
                 sim,
                 models,
                 img_state,
-                gpu,
             );
             state.stages[s] = current_stage;
             if !ok {
@@ -5462,7 +5453,7 @@ pub fn ParseShader<'a>(
         // skyparms <cloudheight> <outerbox> <innerbox>
         else if token.eq_ignore_ascii_case("skyparms") {
             ParseSkyParms(
-                text, qs, state, view, cvars, sim, models, img_state, gpu, sky_view, sky,
+                text, qs, state, view, cvars, sim, models, img_state, sky_view, sky,
             );
         }
         // light <value> determines flaring in q3map, not needed here
@@ -5564,7 +5555,6 @@ pub fn R_FindShader(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
 ) -> ShaderHandle {
@@ -5628,7 +5618,6 @@ pub fn R_FindShader(
             sim,
             models,
             img_state,
-            gpu,
             sky_view,
             sky,
         ) {
@@ -5651,7 +5640,6 @@ pub fn R_FindShader(
         sim,
         models,
         img_state,
-        gpu,
         Some(stripped_name.as_str()),
         mip_raw_image,
         mip_raw_image,
@@ -5752,7 +5740,6 @@ pub fn RE_RegisterShaderLightMap(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
 ) -> i32 {
@@ -5774,7 +5761,6 @@ pub fn RE_RegisterShaderLightMap(
         sim,
         models,
         img_state,
-        gpu,
         sky_view,
         sky,
     );
@@ -5814,7 +5800,6 @@ pub fn RE_RegisterShader(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
 ) -> i32 {
@@ -5836,7 +5821,6 @@ pub fn RE_RegisterShader(
         sim,
         models,
         img_state,
-        gpu,
         sky_view,
         sky,
     );
@@ -5871,7 +5855,6 @@ pub fn RE_RegisterShaderNoMip(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
 ) -> i32 {
@@ -5893,7 +5876,6 @@ pub fn RE_RegisterShaderNoMip(
         sim,
         models,
         img_state,
-        gpu,
         sky_view,
         sky,
     );
@@ -5926,7 +5908,6 @@ pub fn CreateExternalShaders(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
 ) {
@@ -5943,7 +5924,6 @@ pub fn CreateExternalShaders(
         sim,
         models,
         img_state,
-        gpu,
         sky_view,
         sky,
     );
@@ -5965,7 +5945,6 @@ pub fn CreateExternalShaders(
         sim,
         models,
         img_state,
-        gpu,
         sky_view,
         sky,
     );
@@ -6010,7 +5989,6 @@ pub fn R_RemapShader(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
 ) {
@@ -6026,7 +6004,6 @@ pub fn R_RemapShader(
         sim,
         models,
         img_state,
-        gpu,
         sky_view,
         sky,
     );
@@ -6115,7 +6092,6 @@ pub fn R_InitShaders(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
 ) {
@@ -6144,7 +6120,7 @@ pub fn R_InitShaders(
         ScanAndLoadShaderFiles(assets, qs, view, "shaders");
 
         CreateExternalShaders(
-            qs, frame, assets, view, cvars, sim, models, img_state, gpu, sky_view, sky,
+            qs, frame, assets, view, cvars, sim, models, img_state, sky_view, sky,
         );
     }
     // #endif

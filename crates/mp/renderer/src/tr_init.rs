@@ -27,7 +27,6 @@ use native_platform::Sys_LowPhysicalMemory;
 use crate::gl_constants::GL_CLAMP;
 use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_state::FrameState;
-use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::placeholders::{
     BackEndCounters, OrientationR, RefEntity, TrRefdef, ViewParms, FUNCTABLE_SIZE,
 };
@@ -506,8 +505,8 @@ pub fn R_TakeScreenshot(
 
     // DEFERRED: R4 — `qglReadPixels(x, y, width, height, GL_RGB,
     // GL_UNSIGNED_BYTE, buffer+18)`: the fixed-function GL surface has no R3
-    // home (DEC-01/DEC-37 A13.2 — `GpuResources::gl_state` is a named
-    // placeholder until the wgpu rewrite). `buffer[18..]` stays zero-filled
+    // home (DEC-01/DEC-37 A13.2 — the render thread owns the GL state,
+    // DEC-63.4). `buffer[18..]` stays zero-filled
     // until R4 fills it; the surrounding CPU logic (header, channel swap,
     // gamma, file write) is still ported per this wave's threading digest
     // ("port the CPU logic").
@@ -1001,8 +1000,8 @@ pub fn R_TakeScreenshotJPEG(
 
     // DEFERRED: R4 — `qglReadPixels( x, y, width, height, GL_RGBA,
     // GL_UNSIGNED_BYTE, buffer )`: the fixed-function GL surface has no R3
-    // home (DEC-01/DEC-37 A13.2 — `GpuResources::gl_state` is a named
-    // placeholder until the wgpu rewrite). `buffer` stays zero-filled until
+    // home (DEC-01/DEC-37 A13.2 — the render thread owns the GL state,
+    // DEC-63.4). `buffer` stays zero-filled until
     // R4 fills it; the surrounding CPU logic is still ported per this
     // wave's threading digest ("port the CPU logic").
     // Source: oracle/codemp/renderer/tr_init.cpp:584
@@ -1152,10 +1151,9 @@ pub fn R_ScreenShot_f(view: &mut EngineHostView, assets: &RenderAssets) {
 /// guarded block (the `GL_SelectTexture`/`GL_TextureMode`/`GL_TexEnv`/
 /// `qglDisable` sequence) is skipped rather than guessed at (porting-rules
 /// §A2) — the unconditional `GL_TextureMode`/`GL_TexEnv` calls below it
-/// still run. `glState.glStateBits` writes into `GpuResources::gl_state`
-/// (`GlStatePlaceholder`), which the R2 design leaves field-less until R4
-/// defines the real pipeline/bind-group cache — the write has no field to
-/// land on yet.
+/// still run. `glState.glStateBits` writes into the render thread's GL
+/// state, which this side never reaches (DEC-63.4) — the write has no
+/// field to land on yet.
 ///
 /// Source: `oracle/codemp/renderer/tr_init.cpp:822-865`
 pub fn GL_SetDefaultState(
@@ -1163,7 +1161,6 @@ pub fn GL_SetDefaultState(
     cvars: &RendererCvars,
     assets: &RenderAssets,
     state: &mut TrImageState,
-    gpu: &mut GpuResources,
 ) {
     // DEFERRED: R4 — qglClearDepth(1.0f); qglCullFace(GL_FRONT);
     // qglColor4f(1,1,1,1). Fixed-function GL surface, no R3 home (DEC-01/
@@ -1184,8 +1181,8 @@ pub fn GL_SetDefaultState(
     // Source: oracle/codemp/renderer/tr_init.cpp:840
 
     let texture_mode = view.common.cvar(cvars.r_textureMode).string.clone();
-    GL_TextureMode(view, cvars, assets, state, gpu, &texture_mode);
-    GL_TexEnv(gpu, GL_MODULATE as u32);
+    GL_TextureMode(view, cvars, assets, state, &texture_mode);
+    GL_TexEnv(GL_MODULATE as u32);
 
     // DEFERRED: R4 — qglShadeModel(GL_SMOOTH); qglDepthFunc(GL_LEQUAL);
     // qglEnableClientState(GL_VERTEX_ARRAY). Fixed-function GL surface, no
@@ -1195,11 +1192,10 @@ pub fn GL_SetDefaultState(
     // Source: oracle/codemp/renderer/tr_init.cpp:844-849
 
     // `glState.glStateBits = GLS_DEPTHTEST_DISABLE | GLS_DEPTHMASK_TRUE;` —
-    // DEFERRED: `GpuResources::gl_state` (`GlStatePlaceholder`) carries no
-    // fields yet (R2 leaves the pipeline/bind-group cache to R4); nothing
-    // to write to. The `GLS_*` bit-flag `#define`s are also not yet ported
-    // to Rust consts (same gap `GL_State`'s doc comment in `tr_backend.rs`
-    // already flags).
+    // DEFERRED: the render thread owns the GL state (DEC-63.4). This side
+    // has nothing to write to. The `GLS_*` bit-flag `#define`s are also not
+    // yet ported to Rust consts (same gap `GL_State`'s doc comment in
+    // `tr_backend.rs` already flags).
     // Source: oracle/codemp/renderer/tr_init.cpp:854
 
     // DEFERRED: R4 — qglPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -1246,7 +1242,6 @@ pub fn R_Splash(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     state: &mut TrImageState,
-    gpu: &mut GpuResources,
     frame: &mut FrameState,
     assets: &RenderAssets,
 ) {
@@ -1256,7 +1251,6 @@ pub fn R_Splash(
         sim,
         models,
         state,
-        gpu,
         Some("menu/splash"),
         false,
         false,
@@ -1264,12 +1258,12 @@ pub fn R_Splash(
         GL_CLAMP,
     );
 
-    RB_SetGL2D(frame, gpu, assets);
+    RB_SetGL2D(frame, assets);
     if p_image.is_some() {
         // invalid paths?
-        GL_Bind(gpu, p_image);
+        GL_Bind(p_image);
     }
-    GL_State(gpu, GLS_SRCBLEND_ONE as u32 | GLS_DSTBLEND_ZERO as u32);
+    GL_State(GLS_SRCBLEND_ONE as u32 | GLS_DSTBLEND_ZERO as u32);
 
     // DEFERRED: R4 — qglBegin(GL_TRIANGLE_STRIP) / qglTexCoord2f /
     // qglVertex2f x4 / qglEnd() (see doc comment above). Fixed-function GL
@@ -1302,7 +1296,6 @@ pub fn InitOpenGL(
     cvars: &RendererCvars,
     assets: &RenderAssets,
     state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     frame: &mut FrameState,
@@ -1313,12 +1306,12 @@ pub fn InitOpenGL(
         // Source: oracle/codemp/renderer/tr_init.cpp:394
 
         // print info the first time only
-        GL_SetDefaultState(view, cvars, assets, state, gpu);
-        R_Splash(view, cvars, sim, models, state, gpu, frame, assets); // get something on screen asap
+        GL_SetDefaultState(view, cvars, assets, state);
+        R_Splash(view, cvars, sim, models, state, frame, assets); // get something on screen asap
         GfxInfo_f(view, cvars, assets);
     } else {
         // set default state
-        GL_SetDefaultState(view, cvars, assets, state, gpu);
+        GL_SetDefaultState(view, cvars, assets, state);
     }
     // init command buffers and SMP
     r_init_command_buffers();
@@ -1374,7 +1367,6 @@ pub fn RE_Shutdown(
     assets: &mut RenderAssets,
     sim: &mut RenderAssetsSim,
     state: &mut TrImageState,
-    gpu: &mut GpuResources,
     font: &mut FontState,
     destroy_window: bool,
 ) {
@@ -1420,7 +1412,7 @@ pub fn RE_Shutdown(
         if destroy_window {
             // only do this for vid_restart now, not during things like map
             // load
-            R_DeleteTextures(sim, state, gpu);
+            R_DeleteTextures(sim, state);
         }
     }
 
@@ -1450,11 +1442,10 @@ pub fn RE_EndRegistration(
     cvars: &RendererCvars,
     assets: &RenderAssets,
     frame: &mut FrameState,
-    gpu: &mut GpuResources,
 ) {
     R_SyncRenderThread(assets, common, cvars);
     if Sys_LowPhysicalMemory() == 0 {
-        RB_ShowImages(frame, gpu, assets, cvars);
+        RB_ShowImages(frame, assets, cvars);
     }
 }
 
@@ -1586,7 +1577,6 @@ pub fn R_Init(
     assets: &mut RenderAssets,
     sim: &mut RenderAssetsSim,
     state: &mut TrImageState,
-    gpu: &mut GpuResources,
     models: &mut RenderModels,
     frame: &mut FrameState,
     scene: &mut SceneState,
@@ -1730,7 +1720,7 @@ pub fn R_Init(
         RE_SetLightStyle(sim, i, [0xFF; 4]);
     }
 
-    InitOpenGL(view, cvars, &*assets, state, gpu, sim, &*models, frame);
+    InitOpenGL(view, cvars, &*assets, state, sim, &*models, frame);
 
     R_InitImages(
         view,
@@ -1739,7 +1729,6 @@ pub fn R_Init(
         sim,
         &*models,
         state,
-        gpu,
         &mut *frame,
     );
     // PORT-NOTE: Raven has one `tr`, so `R_InitImages`' internal-image handles
@@ -1757,7 +1746,7 @@ pub fn R_Init(
     assets.white_image = sim.published.white_image;
 
     R_InitShaders(
-        false, qs, frame, assets, view, cvars, sim, &*models, state, gpu, sky_view, sky,
+        false, qs, frame, assets, view, cvars, sim, &*models, state, sky_view, sky,
     );
     // R_InitSkins(): the client registry (`RenderAssets::skins`) and, for the
     // dedicated link set's own `RenderModels.skins` pool, its twin — one

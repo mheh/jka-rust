@@ -37,7 +37,6 @@ use crate::gl_constants::{
     GL_RGBA, GL_RGBA4, GL_RGBA8,
 };
 use crate::render_state::frame_state::FrameState;
-use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::image_asset::{ImageAsset, ImageHandle};
 use crate::render_state::placeholders::{GlConfig, FOG_TABLE_SIZE};
 use crate::render_state::render_assets::RenderAssets;
@@ -180,8 +179,8 @@ impl Default for TrImageState {
 }
 
 /// R4a bridge — the renderer-gpu upload (a separate crate this CPU-only
-/// crate cannot depend on at R3; see `GpuResources`' own doc comment) reads
-/// this to call `wgpu`'s texture-upload path; the oracle frees the sys-RAM
+/// crate cannot depend on at R3; the render thread owns GPU state, DEC-63.4)
+/// reads this to call `wgpu`'s texture-upload path; the oracle frees the sys-RAM
 /// copy after `qglTexImage2D` (the `R_FindImageFile` caller's
 /// `Z_Free(pic)` immediately after its `R_CreateImage` call returns,
 /// `oracle/codemp/renderer/tr_image.cpp:2574-2575`), we deliberately retain
@@ -462,8 +461,8 @@ pub fn R_Images_DeleteImageContents(
 ) {
     // DEFERRED: R4 — qglDeleteTextures(1, &pImage->texnum): the fixed-
     // function GL surface; R2 leaves GL entry points unhomed until the R4
-    // wgpu rewrite (DEC-01/DEC-37 A13.2; `GpuResources::gl_state` named
-    // placeholder).
+    // wgpu rewrite (DEC-01/DEC-37 A13.2; the render thread owns the GL
+    // binding cache, DEC-63.4).
     // Source: oracle/codemp/renderer/tr_image.cpp:566-567
     Arc::make_mut(&mut sim.published).images.remove(handle);
     state.pending_uploads.remove(&handle);
@@ -1092,7 +1091,6 @@ pub fn GL_TextureMode(
     cvars: &RendererCvars,
     assets: &RenderAssets,
     state: &mut TrImageState,
-    _gpu: &mut GpuResources,
     string: &str,
 ) {
     let found = TEXTURE_MODES
@@ -1329,7 +1327,7 @@ pub fn R_MipMap(
 /// `GL_Bind`'s identical empty-body precedent in the same crate.
 ///
 /// Source: oracle/codemp/renderer/tr_image.cpp:982-999
-pub fn GL_ResetBinds(_gpu: &mut GpuResources) {
+pub fn GL_ResetBinds() {
     // DEFERRED: R4 — GL_ResetBinds body (see doc comment above) (DEC-37 A13.2)
     // Source: oracle/codemp/renderer/tr_image.cpp:982-999
 }
@@ -1765,7 +1763,6 @@ pub fn Upload32(
     cvars: &RendererCvars,
     assets: &RenderAssets,
     state: &TrImageState,
-    _gpu: &mut GpuResources,
     data: &mut [u8],
     format: i32,
     mipmap: bool,
@@ -1969,7 +1966,6 @@ pub fn Upload32(
 pub fn R_Images_DeleteLightMaps(
     sim: &mut RenderAssetsSim,
     state: &mut TrImageState,
-    gpu: &mut GpuResources,
 ) {
     let _ = R_Images_StartIteration(&sim.published);
     let mut cursor = 0usize;
@@ -1988,7 +1984,7 @@ pub fn R_Images_DeleteLightMaps(
         Arc::make_mut(&mut sim.published).image_names.remove(&name);
     }
 
-    GL_ResetBinds(gpu);
+    GL_ResetBinds();
 }
 
 /// Raven `RE_RegisterImages_LevelLoadEnd`.
@@ -2008,7 +2004,6 @@ pub fn R_Images_DeleteLightMaps(
 pub fn RE_RegisterImages_LevelLoadEnd(
     sim: &mut RenderAssetsSim,
     state: &mut TrImageState,
-    gpu: &mut GpuResources,
     view: &mut EngineHostView,
     models: &RenderModels,
 ) -> bool {
@@ -2062,7 +2057,7 @@ pub fn RE_RegisterImages_LevelLoadEnd(
         ),
     );
 
-    GL_ResetBinds(gpu);
+    GL_ResetBinds();
 
     erase_occured
 }
@@ -2073,10 +2068,9 @@ pub fn RE_RegisterImages_LevelLoadEnd(
 pub fn R_DeleteTextures(
     sim: &mut RenderAssetsSim,
     state: &mut TrImageState,
-    gpu: &mut GpuResources,
 ) {
     R_Images_Clear(sim, state);
-    GL_ResetBinds(gpu);
+    GL_ResetBinds();
 }
 
 // ============================================================================
@@ -2122,7 +2116,6 @@ pub fn R_CreateImage(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     state: &mut TrImageState,
-    gpu: &mut GpuResources,
     name: &str,
     pic: &[u8],
     width: i32,
@@ -2213,7 +2206,6 @@ pub fn R_CreateImage(
         cvars,
         &*sim.published,
         &*state,
-        gpu,
         &mut data,
         format,
         mipmap,
@@ -2227,8 +2219,8 @@ pub fn R_CreateImage(
 
     // DEFERRED: R4 — `qglTexParameterf(uiTarget, GL_TEXTURE_WRAP_S/T, …)` x2,
     // `qglBindTexture(uiTarget, 0)`, and `glState.currenttextures
-    // [glState.currenttmu] = 0` (`GpuResources::gl_state` is a named
-    // placeholder with no `currenttextures`/`currenttmu` fields yet).
+    // [glState.currenttmu] = 0` (the render thread owns the GL binding
+    // cache, DEC-63.4).
     // Source: oracle/codemp/renderer/tr_image.cpp:1281-1285
 
     // Raven: `Q_strncpyz(image->imgName, name, …)` at `:1248` is overwritten
@@ -2291,7 +2283,6 @@ pub fn R_CreateAutomapImage(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     state: &mut TrImageState,
-    gpu: &mut GpuResources,
     name: &str,
     pic: &[u8],
     width: i32,
@@ -2307,7 +2298,6 @@ pub fn R_CreateAutomapImage(
         sim,
         models,
         state,
-        gpu,
         name,
         pic,
         width,
@@ -2345,7 +2335,6 @@ pub fn R_FindImageFile(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     state: &mut TrImageState,
-    gpu: &mut GpuResources,
     name: Option<&str>,
     mipmap: bool,
     allow_picmip: bool,
@@ -2400,7 +2389,6 @@ pub fn R_FindImageFile(
         sim,
         models,
         state,
-        gpu,
         name,
         &pic,
         width,
@@ -2440,11 +2428,10 @@ pub fn R_CreateDlightImage(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     state: &mut TrImageState,
-    gpu: &mut GpuResources,
 ) {
     if let Some((pic, width, height, _format)) = R_LoadImage(view, "gfx/2d/dlight") {
         let handle = R_CreateImage(
-            view, cvars, sim, models, state, gpu, "*dlight", &pic, width, height, GL_RGBA, false,
+            view, cvars, sim, models, state, "*dlight", &pic, width, height, GL_RGBA, false,
             false, false, GL_CLAMP, false,
         );
         Arc::make_mut(&mut sim.published).dlight_image = Some(handle);
@@ -2485,7 +2472,6 @@ pub fn R_CreateDlightImage(
             sim,
             models,
             state,
-            gpu,
             "*dlight",
             &flat,
             DLIGHT_SIZE as i32,
@@ -2532,7 +2518,6 @@ pub fn R_CreateFogImage(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     state: &mut TrImageState,
-    gpu: &mut GpuResources,
 ) {
     // S is distance, T is depth
     let mut data = vec![0u8; (FOG_S * FOG_T * 4).max(0) as usize];
@@ -2556,7 +2541,7 @@ pub fn R_CreateFogImage(
     // the border color at the edges.  OpenGL 1.2 has clamp-to-edge, which
     // does what we want.
     let handle = R_CreateImage(
-        view, cvars, sim, models, state, gpu, "*fog", &data, FOG_S, FOG_T, GL_RGBA, false, false,
+        view, cvars, sim, models, state, "*fog", &data, FOG_S, FOG_T, GL_RGBA, false, false,
         false, GL_CLAMP, false,
     );
     Arc::make_mut(&mut sim.published).fog_image = Some(handle);
@@ -2588,7 +2573,6 @@ pub fn R_CreateDefaultImage(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     state: &mut TrImageState,
-    gpu: &mut GpuResources,
 ) {
     // the default image will be a box, to allow you to see the mapping
     // coordinates
@@ -2611,7 +2595,6 @@ pub fn R_CreateDefaultImage(
         sim,
         models,
         state,
-        gpu,
         "*default",
         &flat,
         DEFAULT_SIZE as i32,
@@ -2659,8 +2642,8 @@ pub const NUM_SCRATCH_IMAGES: usize = 16;
 /// `tr.screenGlow`/`tr.sceneImage`/`tr.blurImage` are raw GL texture names
 /// (`1024 + giTextureBindNum++` handed straight to `qglBindTexture`, never
 /// routed through `R_CreateImage`/the image arena) — DEFERRED: R4 for the GL
-/// calls themselves (DEC-37 A13.2, `GpuResources::gl_state` unhomed), but
-/// each block's `giTextureBindNum++` is pure CPU counter state
+/// calls themselves (DEC-37 A13.2, the render thread owns GL state, DEC-63.4),
+/// but each block's `giTextureBindNum++` is pure CPU counter state
 /// (`TrImageState::gi_texture_bind_num`, A13.3, named by wave 1) and is
 /// preserved so later `R_CreateImage`-issued texture names keep sequencing
 /// correctly. The `r_DynamicGlowWidth`/`r_DynamicGlowHeight` clamp
@@ -2694,10 +2677,9 @@ pub fn R_CreateBuiltinImages(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     state: &mut TrImageState,
-    gpu: &mut GpuResources,
     frame: &FrameState,
 ) {
-    R_CreateDefaultImage(view, cvars, sim, models, state, gpu);
+    R_CreateDefaultImage(view, cvars, sim, models, state);
 
     // we use a solid white image instead of disabling texturing
     let mut data = [[[0u8; 4]; DEFAULT_SIZE]; DEFAULT_SIZE];
@@ -2708,7 +2690,7 @@ pub fn R_CreateBuiltinImages(
     }
     let flat: Vec<u8> = data.iter().flatten().flatten().copied().collect();
     let white = R_CreateImage(
-        view, cvars, sim, models, state, gpu, "*white", &flat, 8, 8, GL_RGBA, false, false, false,
+        view, cvars, sim, models, state, "*white", &flat, 8, 8, GL_RGBA, false, false, false,
         GL_REPEAT, false,
     );
     Arc::make_mut(&mut sim.published).white_image = Some(white);
@@ -2716,7 +2698,7 @@ pub fn R_CreateBuiltinImages(
     // ESCALATION: `tr.screenImage` — see the doc comment above. Call
     // preserved for its registry/counter side effects.
     let _ = R_CreateImage(
-        view, cvars, sim, models, state, gpu, "*screen", &flat, 8, 8, GL_RGBA, false, false, false,
+        view, cvars, sim, models, state, "*screen", &flat, 8, 8, GL_RGBA, false, false, false,
         GL_REPEAT, false,
     );
 
@@ -2764,7 +2746,6 @@ pub fn R_CreateBuiltinImages(
         sim,
         models,
         state,
-        gpu,
         "*identityLight",
         &flat,
         8,
@@ -2788,7 +2769,6 @@ pub fn R_CreateBuiltinImages(
             sim,
             models,
             state,
-            gpu,
             &format!("*scratch{}", x),
             &flat,
             DEFAULT_SIZE as i32,
@@ -2804,8 +2784,8 @@ pub fn R_CreateBuiltinImages(
     }
     Arc::make_mut(&mut sim.published).scratch_images = scratch;
 
-    R_CreateDlightImage(view, cvars, sim, models, state, gpu);
-    R_CreateFogImage(view, cvars, sim, models, state, gpu);
+    R_CreateDlightImage(view, cvars, sim, models, state);
+    R_CreateFogImage(view, cvars, sim, models, state);
 }
 
 // ============================================================================
@@ -2828,14 +2808,13 @@ pub fn R_InitImages(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     state: &mut TrImageState,
-    gpu: &mut GpuResources,
     frame: &mut FrameState,
 ) {
     // build brightness translation tables
     R_SetColorMappings(view, cvars, glconfig, state, frame);
 
     // create default texture and white texture
-    R_CreateBuiltinImages(view, cvars, sim, models, state, gpu, &*frame);
+    R_CreateBuiltinImages(view, cvars, sim, models, state, &*frame);
 }
 
 // ============================================================================
@@ -2873,7 +2852,6 @@ pub fn RE_RegisterIndividualSkin(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
     name: &str,
@@ -2958,7 +2936,6 @@ pub fn RE_RegisterIndividualSkin(
             sim,
             models,
             img_state,
-            gpu,
             sky_view,
             sky,
         );
@@ -3026,7 +3003,6 @@ pub fn RE_RegisterSkin(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
     name: &str,
@@ -3073,17 +3049,17 @@ pub fn RE_RegisterSkin(
     let h_skin = if let Some((skinhead, skintorso, skinlower)) = re_split_skins(name) {
         // three part
         let mut h_skin = RE_RegisterIndividualSkin(
-            qs, frame, assets, view, cvars, sim, models, img_state, gpu, sky_view, sky, &skinhead,
+            qs, frame, assets, view, cvars, sim, models, img_state, sky_view, sky, &skinhead,
             h_skin,
         );
         if h_skin != SkinHandle::slot_zero() {
             h_skin = RE_RegisterIndividualSkin(
-                qs, frame, assets, view, cvars, sim, models, img_state, gpu, sky_view, sky,
+                qs, frame, assets, view, cvars, sim, models, img_state, sky_view, sky,
                 &skintorso, h_skin,
             );
             if h_skin != SkinHandle::slot_zero() {
                 h_skin = RE_RegisterIndividualSkin(
-                    qs, frame, assets, view, cvars, sim, models, img_state, gpu, sky_view, sky,
+                    qs, frame, assets, view, cvars, sim, models, img_state, sky_view, sky,
                     &skinlower, h_skin,
                 );
             }
@@ -3092,7 +3068,7 @@ pub fn RE_RegisterSkin(
     } else {
         // single skin
         RE_RegisterIndividualSkin(
-            qs, frame, assets, view, cvars, sim, models, img_state, gpu, sky_view, sky, name,
+            qs, frame, assets, view, cvars, sim, models, img_state, sky_view, sky, name,
             h_skin,
         )
     };

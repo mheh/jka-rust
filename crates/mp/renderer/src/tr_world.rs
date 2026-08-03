@@ -831,7 +831,7 @@ pub fn R_DrawWireframeAutomap(
     // `GLS_SRCBLEND_SRC_ALPHA` 0x5, `GLS_DSTBLEND_SRC_COLOR` 0x30 —
     // oracle/codemp/renderer/tr_local.h:1652,1661,1669,1671); what is
     // deferred is the call itself: `GL_Cull`/`GL_State` are DEFERRED-R4 no-op
-    // bodies (`GpuResources::gl_state` placeholder, DEC-37 A13.2), so the
+    // bodies (the render thread owns the GL binding cache, DEC-63.4), so the
     // mode choice has no observable effect yet either way.
     // Source: oracle/codemp/renderer/tr_world.cpp:1340-1352
 

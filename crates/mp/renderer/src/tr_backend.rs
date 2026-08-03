@@ -19,7 +19,6 @@ use native_math::rng::Rng;
 use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_event::FrameEvent;
 use crate::render_state::frame_state::FrameState;
-use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::placeholders::Vec3;
 use crate::render_state::render_assets::RenderAssets;
@@ -83,14 +82,13 @@ pub struct PixelShaderState {
 /// DEFERRED: R4 — `RenderAssets::default_image`/`dlight_image` have landed,
 /// but every value this fn actually compares and stores has not:
 /// `ImageAsset::texnum` (the whole `texnum` decision, R4 GPU wave),
-/// `ImageAsset::frame_used` against `FrameState::frame_count`, and
-/// `GpuResources::gl_state`'s `currenttextures`/`currenttmu` cache (a named
-/// placeholder until R4 defines the real pipeline/bind-group cache). The
+/// `ImageAsset::frame_used` against `FrameState::frame_count`, and the
+/// render thread's `currenttextures`/`currenttmu` cache (DEC-63.4). The
 /// bind decision and the `qglBindTexture` call are GL-only regardless
 /// (DEC-37 A13.2).
 ///
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:61-82`
-pub fn GL_Bind(_gpu: &mut GpuResources, _image: Option<ImageHandle>) {
+pub fn GL_Bind(_image: Option<ImageHandle>) {
     // DEFERRED: R4 — GL_Bind (see doc comment above) (DEC-37 A13.2)
     // Source: oracle/codemp/renderer/tr_backend.cpp:61-82
 }
@@ -101,7 +99,7 @@ pub fn GL_Bind(_gpu: &mut GpuResources, _image: Option<ImageHandle>) {
 /// DEFERRED: R4 — same dependency set as `GL_Bind` (DEC-37 A13.2).
 ///
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:85-107`
-pub fn GL_Bind3D(_gpu: &mut GpuResources, _image: Option<ImageHandle>) {
+pub fn GL_Bind3D(_image: Option<ImageHandle>) {
     // DEFERRED: R4 — GL_Bind3D (see doc comment above) (DEC-37 A13.2)
     // Source: oracle/codemp/renderer/tr_backend.cpp:85-107
 }
@@ -110,13 +108,13 @@ pub fn GL_Bind3D(_gpu: &mut GpuResources, _image: Option<ImageHandle>) {
 /// texture state changes; `unit` must be `0..=3`.
 ///
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:112-152`
-pub fn GL_SelectTexture(_gpu: &mut GpuResources, unit: i32) {
+pub fn GL_SelectTexture(unit: i32) {
     match unit {
         0..=3 => {
             // DEFERRED: R4 — GL_SelectTexture glState.currenttmu
             // cache-compare, qglActiveTextureARB/qglClientActiveTextureARB
-            // per unit, and the GLimp_LogComment trace calls
-            // (GpuResources::gl_state is a named placeholder until R4)
+            // per unit, and the GLimp_LogComment trace calls (the render
+            // thread owns glState, DEC-63.4)
             // (DEC-37 A13.2)
             // Source: oracle/codemp/renderer/tr_backend.cpp:114-151
         }
@@ -132,10 +130,9 @@ pub fn GL_SelectTexture(_gpu: &mut GpuResources, unit: i32) {
 /// always disables culling).
 ///
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:158-198`
-pub fn GL_Cull(frame: &FrameState, _gpu: &mut GpuResources, cull_type: cullType_t) {
+pub fn GL_Cull(frame: &FrameState, cull_type: cullType_t) {
     // DEFERRED: R4 — GL_Cull glState.faceCulling cache-compare + write
-    // (GpuResources::gl_state is a named placeholder until R4 defines the
-    // real pipeline/bind-group cache) (DEC-37 A13.2)
+    // (the render thread owns the GL binding cache, DEC-63.4) (DEC-37 A13.2)
     // Source: oracle/codemp/renderer/tr_backend.cpp:159-162
 
     if frame.projection_2d {
@@ -154,12 +151,12 @@ pub fn GL_Cull(frame: &FrameState, _gpu: &mut GpuResources, cull_type: cullType_
 /// the current TMU.
 ///
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:203-236`
-pub fn GL_TexEnv(_gpu: &mut GpuResources, env: u32) {
+pub fn GL_TexEnv(env: u32) {
     match env {
         GL_MODULATE | GL_REPLACE | GL_DECAL | GL_ADD => {
             // DEFERRED: R4 — GL_TexEnv glState.texEnv[currenttmu]
             // cache-compare + qglTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE,
-            // env) (GpuResources::gl_state is a named placeholder until R4)
+            // env) (the render thread owns glState, DEC-63.4)
             // (DEC-37 A13.2)
             // Source: oracle/codemp/renderer/tr_backend.cpp:210-226
         }
@@ -176,13 +173,12 @@ pub fn GL_TexEnv(_gpu: &mut GpuResources, env: u32) {
 /// changed.
 ///
 /// DEFERRED: R4 — pure fixed-function GL state translation; every branch
-/// both reads and writes `GpuResources::gl_state`, a named placeholder until
-/// R4 defines the real pipeline/bind-group cache. The `GLS_*` bit-flag
-/// `#define`s this decodes are not yet ported to Rust consts — left
-/// undecoded rather than guessed at (DEC-37 A13.2).
+/// both reads and writes the render thread's GL state cache (DEC-63.4). The
+/// `GLS_*` bit-flag `#define`s this decodes are not yet ported to Rust
+/// consts — left undecoded rather than guessed at (DEC-37 A13.2).
 ///
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:244-431`
-pub fn GL_State(_gpu: &mut GpuResources, _state_bits: u32) {
+pub fn GL_State(_state_bits: u32) {
     // DEFERRED: R4 — GL_State (see doc comment above) (DEC-37 A13.2)
     // Source: oracle/codemp/renderer/tr_backend.cpp:244-431
 }
@@ -385,8 +381,7 @@ pub fn EndPixelShader(pixel_shader: &PixelShaderState) {
 ///   reached by the portable slice below);
 /// - every `qgl*` call (`qglFinish`/`qglClearColor`/`qglClear`/
 ///   `qglLoadMatrixf`/`qglClipPlane`/`qglEnable`/`qglDisable`) is GL-only —
-///   `GpuResources::gl_state` stays a named placeholder until R4 (DEC-37
-///   A13.2).
+///   the render thread owns the GL state cache (DEC-63.4, DEC-37 A13.2).
 ///
 /// Only the one unconditional field write lands here: `backEnd.projection2D
 /// = qfalse;`. `SetViewportAndScissor`/`GL_State`/`RB_Hyperspace` (the
@@ -396,7 +391,6 @@ pub fn EndPixelShader(pixel_shader: &PixelShaderState) {
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:477-593`
 pub fn RB_BeginDrawingView(
     frame: &mut FrameState,
-    _gpu: &mut GpuResources,
     _assets: &RenderAssets,
     _cvars: &RendererCvars,
 ) {
@@ -447,7 +441,7 @@ pub fn R_WorldCoordToScreenCoord(
 /// = qtrue;`.
 ///
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:1266-1292`
-pub fn RB_SetGL2D(frame: &mut FrameState, _gpu: &mut GpuResources, _assets: &RenderAssets) {
+pub fn RB_SetGL2D(frame: &mut FrameState, _assets: &RenderAssets) {
     frame.projection_2d = true;
 
     // DEFERRED: R4 — the rest of RB_SetGL2D (see doc comment above) (DEC-37
@@ -532,15 +526,14 @@ pub fn RE_UploadCinematic(
 /// `r_DynamicGlowPasses`/`r_DynamicGlowDelta`'s live values, A13.1);
 /// `tr.glowVShader`/`glowPShader`/`screenGlow`/`blurImage` are GL program/
 /// texture handles with no R2-assigned carrier (GPU-facing state, an R4
-/// concern per `GpuResources`'s own doc comment); `g_bTextureRectangleHack`
+/// concern owned by the render thread, DEC-63.4); `g_bTextureRectangleHack`
 /// is homed outside this TU with no confirmed receiver; every `qgl*` call is
-/// GL-only and the `glState.currenttmu` write is a named placeholder until
-/// R4 (DEC-37 A13.2).
+/// GL-only and the `glState.currenttmu` write belongs to the render thread
+/// (DEC-37 A13.2).
 ///
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:2015-2189`
 pub fn RB_BlurGlowTexture(
     _frame: &FrameState,
-    _gpu: &mut GpuResources,
     _assets: &RenderAssets,
     _cvars: &RendererCvars,
 ) {
@@ -560,7 +553,7 @@ pub fn RB_BlurGlowTexture(
 /// call is GL-only (DEC-37 A13.2).
 ///
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:2192-2325`
-pub fn RB_DrawGlowOverlay(_gpu: &mut GpuResources, _assets: &RenderAssets, _cvars: &RendererCvars) {
+pub fn RB_DrawGlowOverlay(_assets: &RenderAssets, _cvars: &RendererCvars) {
     // DEFERRED: R4 — RB_DrawGlowOverlay (see doc comment above) (DEC-37 A13.2)
     // Source: oracle/codemp/renderer/tr_backend.cpp:2192-2325
 }
@@ -591,7 +584,6 @@ pub fn RB_DrawGlowOverlay(_gpu: &mut GpuResources, _assets: &RenderAssets, _cvar
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:1498-1540`
 pub fn RB_RotatePic(
     frame: &mut FrameState,
-    gpu: &mut GpuResources,
     assets: &RenderAssets,
     shader: ShaderHandle,
     _x: f32,
@@ -612,14 +604,14 @@ pub fn RB_RotatePic(
 
     if let Some(image) = image {
         if !frame.projection_2d {
-            RB_SetGL2D(frame, gpu, assets);
+            RB_SetGL2D(frame, assets);
         }
 
         // DEFERRED: R4 — qglColor4ubv/qglPushMatrix/qglTranslatef/qglRotatef
         // (see doc comment above) (DEC-37 A13.2)
         // Source: oracle/codemp/renderer/tr_backend.cpp:1514-1518
 
-        GL_Bind(gpu, Some(image));
+        GL_Bind(Some(image));
 
         // DEFERRED: R4 — the qglBegin(GL_QUADS)/qglTexCoord2f/qglVertex2f
         // quad and qglEnd/qglPopMatrix (see doc comment above) (DEC-37 A13.2)
@@ -660,7 +652,6 @@ pub fn RB_RotatePic(
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:1547-1607`
 pub fn RB_RotatePic2(
     frame: &mut FrameState,
-    gpu: &mut GpuResources,
     assets: &RenderAssets,
     shader: ShaderHandle,
     _x: f32,
@@ -686,18 +677,18 @@ pub fn RB_RotatePic2(
 
     if let Some(image) = image {
         if !frame.projection_2d {
-            RB_SetGL2D(frame, gpu, assets);
+            RB_SetGL2D(frame, assets);
         }
 
         // Get our current blend mode, etc.
         let state_bits = first_stage.map(|stage| stage.state_bits).unwrap_or(0);
-        GL_State(gpu, state_bits);
+        GL_State(state_bits);
 
         // DEFERRED: R4 — qglColor4ubv/qglPushMatrix/qglTranslatef/qglRotatef
         // (see doc comment above) (DEC-37 A13.2)
         // Source: oracle/codemp/renderer/tr_backend.cpp:1571-1576
 
-        GL_Bind(gpu, Some(image));
+        GL_Bind(Some(image));
 
         // DEFERRED: R4 — the qglBegin(GL_QUADS)/qglTexCoord2f/qglVertex2f
         // quad, qglEnd/qglPopMatrix, and the trailing "Hmmm, this is not too
@@ -720,12 +711,11 @@ pub fn RB_RotatePic2(
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:1776-1829`
 pub fn RB_ShowImages(
     frame: &mut FrameState,
-    gpu: &mut GpuResources,
     assets: &RenderAssets,
     cvars: &RendererCvars,
 ) {
     if !frame.projection_2d {
-        RB_SetGL2D(frame, gpu, assets);
+        RB_SetGL2D(frame, assets);
     }
 
     // DEFERRED: R4 — qglClear(GL_COLOR_BUFFER_BIT) / qglFinish() (DEC-37 A13.2)
@@ -752,7 +742,7 @@ pub fn RB_ShowImages(
         // own body is itself deferred pending the glState.currenttextures
         // cache wiring.
         // Source: oracle/codemp/renderer/tr_backend.cpp:1807-1821
-        GL_Bind(gpu, Some(handle));
+        GL_Bind(Some(handle));
 
         i += 1;
     }
@@ -826,11 +816,10 @@ pub fn RB_ShowImages(
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:705-1249`
 pub fn RB_RenderDrawSurfList(
     frame: &mut FrameState,
-    gpu: &mut GpuResources,
     assets: &RenderAssets,
     draw_surfs: &[DrawSurf<SurfaceGeometry<'_>>],
 ) {
-    let _ = (frame, gpu, assets, draw_surfs);
+    let _ = (frame, assets, draw_surfs);
     todo!("Port RB_RenderDrawSurfList — oracle/codemp/renderer/tr_backend.cpp:705-1249")
 }
 
@@ -843,14 +832,14 @@ pub fn RB_RenderDrawSurfList(
 /// decoded-event argument (`R2-D2`/A1).
 ///
 /// - `tess.numIndexes`/`RB_EndSurface()` flush and `tess.numIndexes`-summed
-///   overdraw/`glState.finishCalled` gate are all `tess`/`GpuResources
-///   ::gl_state`-dependent — `tess` dissolves into R4's pipeline (R2 `##
-///   State ownership` row `tess`), `gl_state` is a named placeholder until
-///   R4 (DEC-37 A13.2).
+///   overdraw/`glState.finishCalled` gate both depend on state the render
+///   thread now owns — `tess` dissolves into R4's pipeline (R2 `## State
+///   ownership` row `tess`), `gl_state` belongs to the render thread
+///   (DEC-63.4, DEC-37 A13.2).
 /// - `r_showImages->integer` gates a real call: `common` threaded for
 ///   `Common::cvar` reads is established practice (`tr_image.rs`'s
 ///   anisotropy-clamp read is precedent), so this lands as
-///   `RB_ShowImages(frame, gpu, assets, cvars)`.
+///   `RB_ShowImages(frame, assets, cvars)`.
 /// - `r_measureOverdraw`'s live integer value gates the stencil-readback
 ///   block (`Hunk_AllocateTempMemory`/`qglReadPixels`/`Hunk_FreeTempMemory`,
 ///   `backEnd.pc.c_overDraw += sum`), which is additionally blocked by
@@ -874,7 +863,6 @@ pub fn RB_RenderDrawSurfList(
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:1838-1884`
 pub fn RB_SwapBuffers(
     frame: &mut FrameState,
-    gpu: &mut GpuResources,
     assets: &RenderAssets,
     cvars: &RendererCvars,
     common: &Common,
@@ -887,7 +875,7 @@ pub fn RB_SwapBuffers(
 
     // texture swapping test
     if common.cvar(cvars.r_showImages).integer != 0 {
-        RB_ShowImages(frame, gpu, assets, cvars);
+        RB_ShowImages(frame, assets, cvars);
     }
 
     frame.projection_2d = false;
@@ -955,7 +943,6 @@ pub fn RB_WorldEffects(
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:1422-1490`
 pub fn RB_StretchPic(
     frame: &mut FrameState,
-    gpu: &mut GpuResources,
     assets: &RenderAssets,
     _x: f32,
     _y: f32,
@@ -968,7 +955,7 @@ pub fn RB_StretchPic(
     _shader: ShaderHandle,
 ) {
     if !frame.projection_2d {
-        RB_SetGL2D(frame, gpu, assets);
+        RB_SetGL2D(frame, assets);
     }
 
     // DEFERRED: R4 — the rest of RB_StretchPic (see doc comment above)
@@ -1033,12 +1020,11 @@ pub fn RB_StretchPic(
 /// Panics via `RB_RenderDrawSurfList`'s loud stub until its owning wave lands.
 pub fn RB_DrawSurfs(
     frame: &mut FrameState,
-    gpu: &mut GpuResources,
     assets: &RenderAssets,
     refdef_rdflags: i32,
     draw_surfs: &[DrawSurf<SurfaceGeometry<'_>>],
 ) {
-    RB_RenderDrawSurfList(frame, gpu, assets, draw_surfs);
+    RB_RenderDrawSurfList(frame, assets, draw_surfs);
 
     // Render dynamic glowing/flaring objects.
     if refdef_rdflags & RDF_NOWORLDMODEL == 0 {
@@ -1095,7 +1081,6 @@ pub fn RE_StretchRaw(
     frame_data: &mut FrameData,
     sim: &mut RenderAssetsSim,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     cvars: &RendererCvars,
     common: &mut Common,
     x: i32,
@@ -1147,7 +1132,7 @@ pub fn RE_StretchRaw(
         );
     }
 
-    RB_SetGL2D(frame, gpu, &sim.published);
+    RB_SetGL2D(frame, &sim.published);
 
     // DEFERRED: R4. qglColor3f(tr.identityLight x 3) (see doc comment above)
     // Source: oracle/codemp/renderer/tr_backend.cpp:1353

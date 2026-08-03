@@ -70,7 +70,6 @@ use mp_qshared::shared::{pc_token_t, qhandle_t, sfxHandle_t, vec3_t, vec4_t, MAX
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::frame_event::FrameEvent;
 use mp_renderer::render_state::frame_state::FrameState;
-use mp_renderer::render_state::gpu_resources::GpuResources;
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::render_assets_sim::RenderAssetsSim;
 use mp_renderer::render_state::renderer_cvars::RendererCvars;
@@ -129,7 +128,6 @@ pub struct HarnessDc<'a> {
     pub sim: &'a mut RenderAssetsSim,
     pub models: &'a mut RenderModels,
     pub img_state: &'a mut TrImageState,
-    pub gpu: &'a mut GpuResources,
     pub frame: &'a mut FrameState,
     pub qs: &'a mut QSharedScratch,
     pub sky_view: &'a mut viewParms_t,
@@ -208,7 +206,6 @@ impl HarnessDc<'_> {
             self.sim,
             &*self.models,
             self.img_state,
-            self.gpu,
             self.sky_view,
             self.sky,
             self.font,
@@ -244,7 +241,6 @@ impl HarnessDc<'_> {
             self.sim,
             &*self.models,
             self.img_state,
-            self.gpu,
             self.sky_view,
             self.sky,
             self.font,
@@ -513,7 +509,6 @@ impl DisplayContext for HarnessDc<'_> {
             self.sim,
             &*self.models,
             self.img_state,
-            self.gpu,
             self.sky_view,
             self.sky,
         )
@@ -611,7 +606,6 @@ impl DisplayContext for HarnessDc<'_> {
             self.sim,
             &*self.models,
             self.img_state,
-            self.gpu,
             self.sky_view,
             self.sky,
             self.font,
@@ -701,7 +695,6 @@ impl DisplayContext for HarnessDc<'_> {
             self.sim,
             &*self.models,
             self.img_state,
-            self.gpu,
             self.sky_view,
             self.sky,
             self.font,
@@ -734,7 +727,6 @@ impl DisplayContext for HarnessDc<'_> {
             self.sim,
             &*self.models,
             self.img_state,
-            self.gpu,
             self.sky_view,
             self.sky,
             self.font,
@@ -1157,7 +1149,6 @@ impl DisplayContext for HarnessDc<'_> {
             self.sim,
             &*self.models,
             self.img_state,
-            self.gpu,
             self.sky_view,
             self.sky,
             name,

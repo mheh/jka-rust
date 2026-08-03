@@ -25,7 +25,6 @@
 
 use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_state::FrameState;
-use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::placeholders::RefEntity;
 use crate::render_state::render_assets::RenderAssets;
@@ -1300,8 +1299,8 @@ pub fn qsortFast<S>(surfs: &mut [DrawSurf<S>]) {
 /// `GL_State` (already-ported wave-0, but purely a GL binding-state write —
 /// no CPU-only remainder to extract here). DEC-01/DEC-37 rule the R4 backend
 /// an idiomatic wgpu rewrite, not a GL transcription, and R2 leaves these
-/// entry points unhomed (`GpuResources::gl_state` a named placeholder until
-/// R4). No CPU logic survives the deferral: `color`/`points` only exist to
+/// entry points unhomed (the render thread owns the GL state, DEC-63.4).
+/// No CPU logic survives the deferral: `color`/`points` only exist to
 /// feed the deferred draw calls (the bit-unpack `color&1`/`(color>>1)&1`/
 /// `(color>>2)&1` is itself only a GL color-component argument).
 ///
@@ -1620,9 +1619,8 @@ pub fn SurfIsOffscreen<S>(
 /// `white_image` is `tr.whiteImage` (`RenderAssets::white_image`, STATE
 /// HOMES SPLIT row — a registry field, `R2-D3`/`R2-D4`). `assets`/`common`/
 /// `cvars` thread straight through to `R_SyncRenderThread`'s own landed
-/// signature (`tr_cmds.rs`); `frame`/`gpu` thread `GL_Cull`/`GL_Bind`'s own
-/// parameters straight through (both already-landed DEFERRED-R4 stubs,
-/// `tr_backend.rs`).
+/// signature (`tr_cmds.rs`); `frame` threads `GL_Cull`'s own parameter
+/// straight through (an already-landed DEFERRED-R4 stub, `tr_backend.rs`).
 ///
 /// DEFERRED: `CM_DrawDebugSurface( R_DebugPolygon )` — the collision-debug
 /// surface walk `cm_patch_fns.rs` explicitly dropped as dead surface (§20):
@@ -1642,7 +1640,6 @@ pub fn R_DebugGraphics(
     common: &Common,
     cvars: &RendererCvars,
     frame: &FrameState,
-    gpu: &mut GpuResources,
 ) {
     if r_debug_surface_integer == 0 {
         return;
@@ -1651,8 +1648,8 @@ pub fn R_DebugGraphics(
     // the render thread can't make callbacks to the main thread
     R_SyncRenderThread(assets, common, cvars);
 
-    GL_Bind(gpu, white_image);
-    GL_Cull(frame, gpu, cullType_t::CT_FRONT_SIDED);
+    GL_Bind(white_image);
+    GL_Cull(frame, cullType_t::CT_FRONT_SIDED);
 
     // DEFERRED: CM_DrawDebugSurface( R_DebugPolygon ) — see doc comment above.
     // Source: oracle/codemp/renderer/tr_main.cpp:1583
@@ -2273,7 +2270,7 @@ pub fn R_GenerateDrawSurfs<'a>(
 // bundle this file's `R_GenerateDrawSurfs` (wave 11, LAW) already
 // established — `R_RenderView` calls it directly, so its own signature is
 // that bundle plus this fn's own inputs (`parms`, `frame_scene_num`,
-// `refdef_time`, `gpu`); `R_SortDrawSurfs`/`R_MirrorViewBySurface` need the
+// `refdef_time`); `R_SortDrawSurfs`/`R_MirrorViewBySurface` need the
 // same bundle purely to forward it through the recursion.
 
 /// Raven `MAX_DRAWSURFS` — `backEndData_t::drawSurfs` capacity, cited
@@ -2348,12 +2345,9 @@ fn clone_view_parms(v: &viewParms_t) -> viewParms_t {
 /// established `refdef_rdflags`-style precedent for "no landed carrier field
 /// yet", forwarded straight through to the `R_RenderView` call).
 /// `refdef_time` is `tr.refdef.time`, `R_GetPortalOrientations`'s own
-/// already-ported parameter. `gpu` is `RenderWorld::frame`-adjacent render
-/// -thread-local `GpuResources` (R2 `glState` row) — not part of
-/// `R_GenerateDrawSurfs`'s own parameter list, but required to forward
-/// through to `R_RenderView`'s own `R_DebugGraphics` call. Every other
-/// parameter is `R_GenerateDrawSurfs`'s own already-ported bundle (wave 11),
-/// forwarded straight through the recursion.
+/// already-ported parameter. Every other parameter is `R_GenerateDrawSurfs`'s
+/// own already-ported bundle (wave 11), forwarded straight through the
+/// recursion.
 ///
 /// Source: `oracle/codemp/renderer/tr_main.cpp:971-1019`
 #[allow(clippy::too_many_arguments)]
@@ -2367,7 +2361,6 @@ pub fn R_MirrorViewBySurface<'a>(
     cvars: &mut RendererCvars,
     frame: &mut FrameState,
     g2: &mut Ghoul2System,
-    gpu: &mut GpuResources,
     frame_data: &'a FrameData,
     view: &mut viewParms_t,
     refdef: &trRefdef_t,
@@ -2465,7 +2458,6 @@ pub fn R_MirrorViewBySurface<'a>(
         cvars,
         frame,
         g2,
-        gpu,
         frame_data,
         refdef,
         refdef_rdflags,
@@ -2539,7 +2531,6 @@ pub fn R_SortDrawSurfs<'a>(
     cvars: &mut RendererCvars,
     frame: &mut FrameState,
     g2: &mut Ghoul2System,
-    gpu: &mut GpuResources,
     frame_data: &'a FrameData,
     view: &mut viewParms_t,
     refdef: &trRefdef_t,
@@ -2613,7 +2604,6 @@ pub fn R_SortDrawSurfs<'a>(
             cvars,
             frame,
             g2,
-            gpu,
             frame_data,
             view,
             refdef,
@@ -2656,13 +2646,11 @@ pub fn R_SortDrawSurfs<'a>(
 /// carrier `tr_cmds.rs`/`tr_image.rs` already use for `tr.frameCount`).
 /// `frame_scene_num` is `tr.frameSceneNum` — see `R_MirrorViewBySurface`'s
 /// own doc comment for why it's threaded as a bare scalar rather than a
-/// `FrameState` field. `gpu` is `RenderWorld`'s render-thread-local
-/// `GpuResources`, needed only for the trailing `R_DebugGraphics` call
-/// (`R_GenerateDrawSurfs` itself doesn't touch GL state). Every other
-/// parameter is `R_GenerateDrawSurfs`'s own already-ported bundle (wave 11),
-/// forwarded straight through; `tr.refdef.numDrawSurfs`/the oracle's
-/// `firstDrawSurf` local are `draw_surfs.len()` snapshots (see
-/// `R_SortDrawSurfs`'s own doc comment for the `Vec`-append equivalence).
+/// `FrameState` field. Every other parameter is `R_GenerateDrawSurfs`'s own
+/// already-ported bundle (wave 11), forwarded straight through;
+/// `tr.refdef.numDrawSurfs`/the oracle's `firstDrawSurf` local are
+/// `draw_surfs.len()` snapshots (see `R_SortDrawSurfs`'s own doc comment for
+/// the `Vec`-append equivalence).
 ///
 /// Source: `oracle/codemp/renderer/tr_main.cpp:1595-1627`
 #[allow(clippy::too_many_arguments)]
@@ -2676,7 +2664,6 @@ pub fn R_RenderView<'a>(
     cvars: &mut RendererCvars,
     frame: &mut FrameState,
     g2: &mut Ghoul2System,
-    gpu: &mut GpuResources,
     frame_data: &'a FrameData,
     refdef: &trRefdef_t,
     refdef_rdflags: i32,
@@ -2768,7 +2755,6 @@ pub fn R_RenderView<'a>(
         cvars,
         frame,
         g2,
-        gpu,
         frame_data,
         view,
         refdef,
@@ -2795,7 +2781,6 @@ pub fn R_RenderView<'a>(
         engine_view.common,
         cvars,
         frame,
-        gpu,
     );
 }
 

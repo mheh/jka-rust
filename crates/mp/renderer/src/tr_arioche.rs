@@ -16,7 +16,6 @@ use native_math::qmath::{ColorBytes4, Com_Clampi, NormalToLatLong};
 use native_string::{atoi, buf_to_string};
 
 use crate::render_state::frame_state::FrameState;
-use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
@@ -77,7 +76,6 @@ pub fn R_RMGInit(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     img_state: &mut TrImageState,
-    gpu: &mut GpuResources,
     sky_view: &mut viewParms_t,
     sky: &mut SkyState,
     world_effects: &mut WorldEffectsState,
@@ -121,7 +119,6 @@ pub fn R_RMGInit(
         sim,
         models,
         img_state,
-        gpu,
         sky_view,
         sky,
     );
@@ -193,7 +190,6 @@ pub fn R_RMGInit(
             sim,
             models,
             img_state,
-            gpu,
             sky_view,
             sky,
         );
@@ -257,7 +253,6 @@ pub fn R_RMGInit(
                 sim,
                 models,
                 img_state,
-                gpu,
                 Some(b"rain init 1000"),
             );
             world_effects.R_WorldEffectCommand(
@@ -267,7 +262,6 @@ pub fn R_RMGInit(
                 sim,
                 models,
                 img_state,
-                gpu,
                 Some(b"rain outside"),
             );
         }
@@ -279,7 +273,6 @@ pub fn R_RMGInit(
                 sim,
                 models,
                 img_state,
-                gpu,
                 Some(b"snow init 1000 outside"),
             );
             world_effects.R_WorldEffectCommand(
@@ -289,7 +282,6 @@ pub fn R_RMGInit(
                 sim,
                 models,
                 img_state,
-                gpu,
                 Some(b"snow outside"),
             );
         }

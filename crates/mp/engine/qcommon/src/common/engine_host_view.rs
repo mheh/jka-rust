@@ -64,15 +64,15 @@ use crate::sys_net::Sys_IsLANAddress;
 /// - `re` — the `RendererFrontend` carrier bundle (`Engine.re`), cast back by
 ///   `mp_renderer::hook_install::re_from_view`. Its fields ARE the receiver
 ///   names the `RE_*` signatures use: `frame_data`, `assets`, `sim`, `cvars`,
-///   `frame`, `scene`, `img_state`, `gpu_res`, `font`, `noise`, `rng`, `qs`,
+///   `frame`, `scene`, `img_state`, `font`, `noise`, `rng`, `qs`,
 ///   `sky_view`, `sky`, `world_effects`.
 /// - `rm` — the one `RenderModels` registry (`Engine.render_models`), cast back
 ///   by `mp_renderer::hook_install::rm_from_view`.
 ///
 /// State-partition law (DEC-55.2): a synchronous path — a cgame or ui trap arm,
 /// a `cl_scrn`/`cl_console` draw — reads the CPU-side `re.assets` and appends to
-/// `re.frame_data`. It never reaches `re.gpu_res`, which the render thread
-/// owns. `re` is NULL on dedicated, where `Engine.re` is `None`.
+/// `re.frame_data`. DEC-63.4 removed `GpuResources`. GPU state lives on the
+/// render thread. `re` is NULL on dedicated, where `Engine.re` is `None`.
 #[allow(non_snake_case)]
 pub struct EngineHostView<'a> {
     /// cvars, cmd, cbuf, fs, net, modules, hooks — `Engine.common`.

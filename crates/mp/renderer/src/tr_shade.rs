@@ -10,7 +10,6 @@
 #![allow(dead_code)]
 
 use crate::render_state::frame_state::FrameState;
-use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::light_style_table::LightStyleTable;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
@@ -44,11 +43,11 @@ pub struct TrShadeCounters {
 /// DEFERRED: R4 — every touched value lives on `tess` (dissolved into R4's
 /// tessellation/vertex-building pipeline, R2 `## State ownership` row
 /// `tess`; no R3 carrier holds `tess.svars.colors`/`texcoords`/`xyz` to read
-/// from) and `glState.currenttmu` (`GpuResources::gl_state`, a named
-/// placeholder until R4). The body is GL calls only (DEC-37 A13.2).
+/// from) and `glState.currenttmu` (the render thread owns the GL state,
+/// DEC-63.4). The body is GL calls only (DEC-37 A13.2).
 ///
 /// Source: `oracle/codemp/renderer/tr_shade.cpp:37-48`
-fn R_ArrayElementDiscrete(_gpu: &mut GpuResources, _index: i32) {
+fn R_ArrayElementDiscrete(_index: i32) {
     // DEFERRED: R4 — R_ArrayElementDiscrete (see doc comment above)
     // Source: oracle/codemp/renderer/tr_shade.cpp:37-48
 }
@@ -195,7 +194,7 @@ pub fn ForceAlpha(_dst_colors: &mut [u8], _force_ent_alpha: i32) {
 /// state above (same treatment as `RB_BeginDrawingView`'s deferred callees).
 ///
 /// Source: `oracle/codemp/renderer/tr_shade.cpp:162-216`
-pub fn R_DrawElements(_gpu: &mut GpuResources, _cvars: &RendererCvars, _indexes: &[glIndex_t]) {
+pub fn R_DrawElements(_cvars: &RendererCvars, _indexes: &[glIndex_t]) {
     // DEFERRED: R4 — R_DrawElements (see doc comment above)
     // Source: oracle/codemp/renderer/tr_shade.cpp:162-216
 }
@@ -231,7 +230,6 @@ pub fn R_DrawElements(_gpu: &mut GpuResources, _cvars: &RendererCvars, _indexes:
 ///
 /// Source: `oracle/codemp/renderer/tr_shade.cpp:239-290`
 pub fn R_BindAnimatedImage(
-    _gpu: &mut GpuResources,
     _assets: &RenderAssets,
     _frame: &FrameState,
     _cvars: &RendererCvars,
@@ -265,7 +263,7 @@ pub fn R_BindAnimatedImage(
 /// otherwise observed.
 ///
 /// Source: `oracle/codemp/renderer/tr_shade.cpp:333-351`
-pub fn DrawNormals(_gpu: &mut GpuResources) {
+pub fn DrawNormals() {
     // DEFERRED: R4 — DrawNormals (see doc comment above)
     // Source: oracle/codemp/renderer/tr_shade.cpp:333-351
 }
@@ -286,7 +284,7 @@ pub fn DrawNormals(_gpu: &mut GpuResources) {
 /// once both are removed.
 ///
 /// Source: `oracle/codemp/renderer/tr_shade.cpp:299-323`
-pub fn DrawTris(_gpu: &mut GpuResources) {
+pub fn DrawTris() {
     // DEFERRED: R4 — DrawTris (see doc comment above)
     // Source: oracle/codemp/renderer/tr_shade.cpp:299-323
 }
@@ -311,7 +309,7 @@ pub fn DrawTris(_gpu: &mut GpuResources) {
 /// above are removed.
 ///
 /// Source: `oracle/codemp/renderer/tr_shade.cpp:394-443`
-pub fn DrawMultitextured(_gpu: &mut GpuResources, _stage: i32) {
+pub fn DrawMultitextured(_stage: i32) {
     // DEFERRED: R4 — DrawMultitextured (see doc comment above)
     // Source: oracle/codemp/renderer/tr_shade.cpp:394-443
 }
@@ -351,7 +349,7 @@ pub fn DrawMultitextured(_gpu: &mut GpuResources, _stage: i32) {
 /// the dissolved `tess`/un-landed `backEnd.refdef` fields.
 ///
 /// Source: `oracle/codemp/renderer/tr_shade.cpp:523-838`
-pub fn ProjectDlightTexture2(_gpu: &mut GpuResources) {
+pub fn ProjectDlightTexture2() {
     // DEFERRED: R4 — ProjectDlightTexture2 (see doc comment above)
     // Source: oracle/codemp/renderer/tr_shade.cpp:523-838
 }
@@ -384,7 +382,7 @@ pub fn ProjectDlightTexture2(_gpu: &mut GpuResources) {
 /// inputs are the dissolved `tess`/un-landed `backEnd.refdef` fields.
 ///
 /// Source: `oracle/codemp/renderer/tr_shade.cpp:840-1170`
-pub fn ProjectDlightTexture(_gpu: &mut GpuResources) {
+pub fn ProjectDlightTexture() {
     // DEFERRED: R4 — ProjectDlightTexture (see doc comment above)
     // Source: oracle/codemp/renderer/tr_shade.cpp:840-1170
 }
@@ -471,7 +469,7 @@ pub fn RB_FogPass(
 /// above is removed.
 ///
 /// Source: `oracle/codemp/renderer/tr_shade.cpp:2391-2474`
-pub fn RB_EndSurface(_gpu: &mut GpuResources) {
+pub fn RB_EndSurface() {
     todo!("Port RB_EndSurface — oracle/codemp/renderer/tr_shade.cpp:2391-2474")
 }
 
@@ -649,7 +647,7 @@ pub fn ComputeColors(
 /// partial-body fns keep DEFERRED comments instead).
 ///
 /// Source: `oracle/codemp/renderer/tr_shade.cpp:1953-2231`
-pub fn RB_IterateStagesGeneric(_gpu: &mut GpuResources) {
+pub fn RB_IterateStagesGeneric() {
     todo!("Port RB_IterateStagesGeneric — oracle/codemp/renderer/tr_shade.cpp:1953-2231")
 }
 
@@ -718,6 +716,6 @@ pub fn RB_IterateStagesGeneric(_gpu: &mut GpuResources) {
 /// partial-body fns keep DEFERRED comments instead).
 ///
 /// Source: `oracle/codemp/renderer/tr_shade.cpp:2237-2385`
-pub fn RB_StageIteratorGeneric(_gpu: &mut GpuResources) {
+pub fn RB_StageIteratorGeneric() {
     todo!("Port RB_StageIteratorGeneric — oracle/codemp/renderer/tr_shade.cpp:2237-2385")
 }

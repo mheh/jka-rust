@@ -9,8 +9,8 @@
 //! `R_LoadTerrainMapImages` feeds `CM_TM_Create`, and `R_UploadTerrainAutomap`
 //! consumes what `CM_TM_Upload` returns.
 //!
-//! Both functions run at map load, not on a module trap arm, so they may take
-//! `gpu_res` (DEC-60.1).
+//! Both functions run at map load, not on a module trap arm.
+//! The render thread owns all GPU state (DEC-63.4).
 //!
 //! Source: `oracle/codemp/qcommon/cm_terrainmap.cpp:80-96,365-387`
 
@@ -19,7 +19,6 @@ use mp_engine_qcommon::cm::cm_terrainmap_consts::{TM_HEIGHT, TM_WIDTH};
 use mp_engine_qcommon::cm::terrain_map_images::TerrainMapImages;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 
-use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_image::{R_CreateAutomapImage, R_LoadImage, TrImageState};
@@ -63,11 +62,10 @@ pub fn R_UploadTerrainAutomap(
     sim: &mut RenderAssetsSim,
     models: &RenderModels,
     state: &mut TrImageState,
-    gpu: &mut GpuResources,
     pic: &[u8],
 ) {
     R_CreateAutomapImage(
-        view, cvars, sim, models, state, gpu, "*automap", pic, TM_WIDTH, TM_HEIGHT, false, false,
+        view, cvars, sim, models, state, "*automap", pic, TM_WIDTH, TM_HEIGHT, false, false,
         true, 0,
     );
 }

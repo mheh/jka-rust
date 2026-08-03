@@ -870,7 +870,6 @@ pub fn CL_ShutdownRef(view: &mut EngineHostView, cl: &mut Client) {
         &mut re.assets,
         &mut re.sim,
         &mut re.img_state,
-        &mut re.gpu_res,
         &mut re.font,
         true,
     );
@@ -929,7 +928,6 @@ pub fn CL_InitRenderer(view: &mut EngineHostView, cl: &mut Client) {
         &mut re.assets,
         &mut re.sim,
         &mut re.img_state,
-        &mut re.gpu_res,
         rm,
         &mut re.frame,
         &mut re.scene,
@@ -955,7 +953,6 @@ pub fn CL_InitRenderer(view: &mut EngineHostView, cl: &mut Client) {
         &mut re.sim,
         rm,
         &mut re.img_state,
-        &mut re.gpu_res,
         &mut re.sky_view,
         &mut re.sky,
     );
@@ -970,7 +967,6 @@ pub fn CL_InitRenderer(view: &mut EngineHostView, cl: &mut Client) {
         &mut re.sim,
         rm,
         &mut re.img_state,
-        &mut re.gpu_res,
         &mut re.sky_view,
         &mut re.sky,
     );
@@ -984,7 +980,6 @@ pub fn CL_InitRenderer(view: &mut EngineHostView, cl: &mut Client) {
         &mut re.sim,
         rm,
         &mut re.img_state,
-        &mut re.gpu_res,
         &mut re.sky_view,
         &mut re.sky,
     );
@@ -2663,7 +2658,6 @@ pub fn CL_ShutdownAll(view: &mut EngineHostView, cl: &mut Client) {
         &mut re.assets,
         &mut re.sim,
         &mut re.img_state,
-        &mut re.gpu_res,
         &mut re.font,
         false, // don't destroy window or context
     );

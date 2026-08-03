@@ -84,7 +84,6 @@ pub fn SCR_DrawNamedPic(
         &mut re.sim,
         rm,
         &mut re.img_state,
-        &mut re.gpu_res,
         &mut re.sky_view,
         &mut re.sky,
     );
@@ -715,7 +714,6 @@ pub fn SCR_DrawScreenField(view: &mut EngineHostView, cl: &mut Client, stereoFra
             &re.assets,
             &mut re.frame,
             &mut re.img_state,
-            &mut re.gpu_res,
             stereoFrame,
         );
     }

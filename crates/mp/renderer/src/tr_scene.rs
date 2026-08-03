@@ -1192,7 +1192,7 @@ pub fn RE_AddDecalToScene(
 /// scene into `FrameData` and returns. The render side replays the event and
 /// runs `R_RenderView` against render-side world assets, so this fn never
 /// calls `R_RenderView` itself (ruling 3: `R_RenderView` touches
-/// render-thread-only `GpuResources`).
+/// render-thread GPU state, DEC-63.4).
 ///
 /// The `refdef` payload carries the scalar `trRefdef_t` fields. The four
 /// oracle count+pointer pairs (entities, polys, dlights, draw surfaces) stay

@@ -59,7 +59,6 @@ use crate::mdx_format::mdxm_surf_hierarchy_t::mdxmSurfHierarchy_t;
 use crate::mdx_format::mdxm_surface_t::mdxmSurface_t;
 use crate::mdx_format::mdxm_vertex_t::mdxmVertex_t;
 use crate::render_state::frame_state::FrameState;
-use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::placeholders::RefEntity;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
@@ -1688,7 +1687,6 @@ impl RenderModels {
         cvars: &RendererCvars,
         sim: &mut RenderAssetsSim,
         img_state: &mut TrImageState,
-        gpu: &mut GpuResources,
         sky_view: &mut viewParms_t,
         sky: &mut SkyState,
         model: qhandle_t,
@@ -1732,7 +1730,6 @@ impl RenderModels {
             sim,
             self,
             img_state,
-            gpu,
             sky_view,
             sky,
             size,
@@ -1916,7 +1913,6 @@ impl RenderModels {
         cvars: &RendererCvars,
         sim: &mut RenderAssetsSim,
         img_state: &mut TrImageState,
-        gpu: &mut GpuResources,
         sky_view: &mut viewParms_t,
         sky: &mut SkyState,
         world_effects: &mut WorldEffectsState,
@@ -1961,7 +1957,6 @@ impl RenderModels {
             sim,
             self,
             img_state,
-            gpu,
             sky_view,
             sky,
             size,
@@ -2022,7 +2017,6 @@ impl RenderModels {
             sim,
             self,
             img_state,
-            gpu,
             sky_view,
             sky,
             world_effects,
@@ -2123,7 +2117,6 @@ impl RenderModels {
                     sim,
                     self,
                     img_state,
-                    gpu,
                     sky_view,
                     sky,
                 );

@@ -25,7 +25,6 @@ use native_math::qmath::{
 };
 
 use crate::render_state::frame_state::FrameState;
-use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::placeholders::RefEntity;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_local::orientationr_t::orientationr_t;
@@ -205,8 +204,8 @@ pub fn RB_SurfaceBad(_surf_type: &surfaceType_t, common: &mut Common) {
 ///
 /// DEFERRED: R4 — pure fixed-function GL (`qglCallList`); DEC-01/DEC-37: the
 /// backend is an idiomatic wgpu rewrite, not a GL transcription, and R2
-/// leaves this entry point unhomed (`GpuResources::gl_state` is a named
-/// placeholder until R4).
+/// leaves this entry point unhomed (the render thread owns the GL state,
+/// DEC-63.4).
 ///
 /// Source: `oracle/codemp/renderer/tr_surface.cpp:2004-2008`
 pub fn RB_SurfaceDisplayList(surf: &srfDisplayList_t) {
@@ -232,10 +231,10 @@ pub fn RB_SurfaceSkip() {}
 /// DEFERRED: R4 — the vertex emission (`GL_Bind`/`GL_State`/`qglColor3f`/
 /// `qglBegin`/`qglVertex3fv`/`qglEnd`) is the fixed-function GL surface;
 /// DEC-01/DEC-37: the backend is an idiomatic wgpu rewrite, not a GL
-/// transcription, and R2 leaves these entry points unhomed
-/// (`GpuResources::gl_state` is a named placeholder until R4). The CPU-side
-/// geometry (`start_points`/`end_points`) is still computed below per this
-/// wave's threading digest ("port the CPU logic").
+/// transcription, and R2 leaves these entry points unhomed (the render
+/// thread owns the GL state, DEC-63.4). The CPU-side geometry
+/// (`start_points`/`end_points`) is still computed below per this wave's
+/// threading digest ("port the CPU logic").
 ///
 /// Source: `oracle/codemp/renderer/tr_surface.cpp:478-528`
 pub fn RB_SurfaceBeam(current_entity: Option<&RefEntity>) {
@@ -339,8 +338,8 @@ pub fn LerpMeshVertexes(backlerp: f32) {
 /// (`GL_Bind`/`qglLineWidth`/`qglBegin`/`qglColor3f`/`qglVertex3f`/`qglEnd`),
 /// with no CPU-side computation at all (every vertex is a literal constant);
 /// DEC-01/DEC-37: the backend is an idiomatic wgpu rewrite, not a GL
-/// transcription, and R2 leaves these entry points unhomed
-/// (`GpuResources::gl_state` is a named placeholder until R4).
+/// transcription, and R2 leaves these entry points unhomed (the render
+/// thread owns the GL state, DEC-63.4).
 ///
 /// Source: `oracle/codemp/renderer/tr_surface.cpp:1782-1801`
 pub fn RB_SurfaceAxis() {
@@ -362,14 +361,14 @@ pub fn RB_SurfaceAxis() {
 /// be *read* through their existing shapes until their owning wave replaces
 /// them).
 ///
-/// DEFERRED: R4 — `glState.finishCalled = qfalse` has no target
-/// (`GpuResources::gl_state` is the named `GlStatePlaceholder {}`, B6, with
-/// no `finishCalled` field yet) and `qglReadPixels` is the fixed-function GL
-/// surface (DEC-01/DEC-37 A13.2). `depth` stays at the oracle's own `float
-/// depth = 0.0f;` initializer until R4 fills it in (`R_TakeScreenshot`
-/// precedent, `tr_init.rs:475-482`); every other statement — the two
-/// transform calls, both bounds checks, the `r_flares` early-out, and the
-/// final `screenZ`/`visible` formula — is real CPU logic, ported below.
+/// DEFERRED: R4 — `glState.finishCalled = qfalse` has no target (the render
+/// thread owns the GL state, DEC-63.4) and `qglReadPixels` is the
+/// fixed-function GL surface (DEC-01/DEC-37 A13.2). `depth` stays at the
+/// oracle's own `float depth = 0.0f;` initializer until R4 fills it in
+/// (`R_TakeScreenshot` precedent, `tr_init.rs:475-482`); every other
+/// statement — the two transform calls, both bounds checks, the `r_flares`
+/// early-out, and the final `screenZ`/`visible` formula — is real CPU logic,
+/// ported below.
 ///
 /// Source: `oracle/codemp/renderer/tr_surface.cpp:1881-1927`
 pub fn RB_TestZFlare(
@@ -378,11 +377,9 @@ pub fn RB_TestZFlare(
     view: &viewParms_t,
     cvars: &RendererCvars,
     common: &Common,
-    gpu: &mut GpuResources,
 ) -> bool {
-    // DEFERRED: R4 — `glState.finishCalled` write target (see doc comment
-    // above); `gpu` is threaded for when R4 supplies it.
-    let _ = gpu;
+    // DEFERRED: R4 — glState.finishCalled write target (see doc comment
+    // above).
 
     // if the point is off the screen, don't bother adding it
     // calculate screen coordinates and depth
@@ -1165,14 +1162,13 @@ pub fn RB_SurfaceFlare(
     view: &viewParms_t,
     cvars: &RendererCvars,
     common: &Common,
-    gpu: &mut GpuResources,
     frame: &mut FrameState,
 ) {
     if common.cvar(cvars.r_flares).integer == 0 {
         return;
     }
 
-    if !RB_TestZFlare(surf.origin, ori, view, cvars, common, gpu) {
+    if !RB_TestZFlare(surf.origin, ori, view, cvars, common) {
         return;
     }
 

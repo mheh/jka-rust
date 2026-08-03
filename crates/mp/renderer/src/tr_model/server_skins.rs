@@ -93,7 +93,7 @@ impl RenderModels {
         // Source: oracle/codemp/renderer/tr_image.cpp:3304-3310
         // The `com_cl_running` arm returns the CLIENT `RE_RegisterSkin`
         // (`crates/mp/renderer/src/tr_image.rs`), which needs the `qs`/`frame`/
-        // `assets`/`view`/`cvars`/`sim`/`models`/`img_state`/`gpu`/`sky_view`/
+        // `assets`/`view`/`cvars`/`sim`/`models`/`img_state`/`sky_view`/
         // `sky` bundle every client renderer fn takes (DEC-42.3). This fn
         // receives only `&mut self` (a `RenderModels`, which `models: &Render
         // Models` would alias) and `&mut impl EngineHost`, reaching neither

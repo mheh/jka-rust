@@ -64,7 +64,6 @@ use mp_qshared::shared::q_math::{
 use mp_qshared::shared::{qhandle_t, vec3_t};
 
 use crate::render_state::frame_state::FrameState;
-use crate::render_state::gpu_resources::GpuResources;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::renderer_cvars::RendererCvars;
@@ -697,8 +696,8 @@ impl CTRLandScape {
     /// The `water`/`flattexture` cases' `RE_RegisterShader` calls thread
     /// through the whole shader-registration surface (`QSharedScratch`,
     /// `FrameState`, `RenderAssets`, `EngineHostView`, `RendererCvars`,
-    /// `RenderAssetsSim`, `RenderModels`, `TrImageState`, `GpuResources`,
-    /// `viewParms_t`, `SkyState`) per its own wave-8 LAW signature. That
+    /// `RenderAssetsSim`, `RenderModels`, `TrImageState`, `viewParms_t`,
+    /// `SkyState`) per its own wave-8 LAW signature. That
     /// callee is itself still a whole-fn loud `todo!()` stub pending its
     /// `lightmaps2d`/`stylesDefault` gap (`tr_shader.rs`); any non-empty
     /// `shader` name reaching this fn panics through it until that wave
@@ -728,7 +727,6 @@ impl CTRLandScape {
         sim: &mut RenderAssetsSim,
         models: &RenderModels,
         img_state: &mut TrImageState,
-        gpu: &mut GpuResources,
         sky_view: &mut viewParms_t,
         sky: &mut SkyState,
     ) {
@@ -772,7 +770,6 @@ impl CTRLandScape {
                             sim,
                             models,
                             img_state,
-                            gpu,
                             sky_view,
                             sky,
                         );
@@ -792,7 +789,6 @@ impl CTRLandScape {
                         sim,
                         models,
                         img_state,
-                        gpu,
                         sky_view,
                         sky,
                     );
@@ -814,7 +810,6 @@ impl CTRLandScape {
                         sim,
                         models,
                         img_state,
-                        gpu,
                         sky_view,
                         sky,
                     );

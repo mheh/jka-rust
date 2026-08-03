@@ -5,7 +5,7 @@
 //! Each type below is a shape the R3/R4 wave that owns it fills in and moves
 //! to its own file (house one-type-per-file convention); they exist here so
 //! the root types this module freezes — `RenderAssets`, `FrameState`,
-//! `FrameEvent`, `GpuResources` — compile at R3 skeleton time without any wave
+//! `FrameEvent` — compile at R3 skeleton time without any wave
 //! inventing their interiors early. Every one of them is bound by the
 //! interior-safety law: owned fields, handles and indices only.
 //!
@@ -17,8 +17,8 @@
 //! `ViewParms` and `TrRefdef` carry only the subset of fields the world
 //! PVS-walk wave (`R_MarkLeaves`/`R_RecursiveWorldNode`) reads or writes; the
 //! rest lands with the `tr_main`/`tr_scene` waves. `Poly`, `BackEndCounters`,
-//! `SkyParms`, `AutomapWireframe` and `GlStatePlaceholder` are untouched by
-//! wave-0 and stay empty.
+//! `SkyParms` and `AutomapWireframe` are untouched by wave-0 and stay empty.
+//! DEC-63.4 deleted `GlStatePlaceholder` with its `GpuResources` owner.
 //!
 //! Two exceptions carry a real shape already, because the oracle payload they
 //! stand for is itself pointer-free and already ported at the seam: `Vec3` and
@@ -664,11 +664,3 @@ pub struct SkyParms {
 /// Source: `oracle/codemp/renderer/tr_world.cpp:782,784`
 #[derive(Clone)]
 pub struct AutomapWireframe {}
-
-/// `GpuResources::gl_state` — the named placeholder standing in for Raven
-/// `glstate_t` (B6/`R2-D1`): the GL binding cache has no meaning under wgpu,
-/// so it holds nothing until R4 defines the real pipeline/bind-group cache.
-///
-/// Source: `oracle/codemp/renderer/tr_local.h:1253-1260`
-#[derive(Clone)]
-pub struct GlStatePlaceholder {}
