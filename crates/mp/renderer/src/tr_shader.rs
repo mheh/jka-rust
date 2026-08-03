@@ -2700,15 +2700,19 @@ pub fn IsShader(sh: &ShaderAsset, name: &str, lightmap_index: &[i32], styles: &[
 
 /// Raven `RE_ShaderNameFromIndex`.
 ///
-/// The oracle's `qhandle_t`/positional-index seam convention: `Handle {
-/// index, generation: 0 }` is the identity mapping at the seam (`R2-D3`
-/// `Handle` doc). Falls back to the default shader's name rather than the
-/// oracle's debug-only `assert` (§19: pick the one defined behavior).
+/// `index` arrives from another module as a bare slot number, so
+/// `Arena::handle_at_slot` resolves it at the slot's current generation
+/// (DEC-42.2 "slot = index") - the oracle's `tr.shaders[index]` read. Falls
+/// back to the default shader's name rather than the oracle's debug-only
+/// `assert` (§19: pick the one defined behavior).
 ///
 /// Source: `oracle/codemp/renderer/tr_shader.cpp:3785-3789`
 pub fn RE_ShaderNameFromIndex(assets: &RenderAssets, index: i32) -> &str {
-    let handle = ShaderHandle::new(index.max(0) as u32, 0);
-    match assets.shaders.get(handle) {
+    match assets
+        .shaders
+        .handle_at_slot(index.max(0) as u32)
+        .and_then(|handle| assets.shaders.get(handle))
+    {
         Some(shader) => shader.name.as_str(),
         None => assets
             .shaders
@@ -2733,15 +2737,21 @@ pub fn R_GetShaderByHandle(
         );
         return ShaderHandle::slot_zero();
     }
-    let handle = ShaderHandle::new(h_shader as u32, 0);
-    if assets.shaders.get(handle).is_none() {
-        com_printf(
-            common,
-            &format!("R_GetShaderByHandle: out of range hShader '{}'\n", h_shader),
-        );
-        return ShaderHandle::slot_zero();
+    // `qhandle_t` crosses the module seam as a bare slot number, so the arena
+    // resolves it at the slot's CURRENT generation (DEC-42.2 "slot = index").
+    // This is the oracle's raw `tr.shaders[hShader]` read. A generation-0
+    // handle misses every slot that a renderer restart recycled through
+    // `CreateInternalShaders`' `Arena::reset` (DEC-42.1).
+    match assets.shaders.handle_at_slot(h_shader as u32) {
+        Some(handle) => handle,
+        None => {
+            com_printf(
+                common,
+                &format!("R_GetShaderByHandle: out of range hShader '{}'\n", h_shader),
+            );
+            ShaderHandle::slot_zero()
+        }
     }
-    handle
 }
 
 /// Raven `R_ShaderList_f`.

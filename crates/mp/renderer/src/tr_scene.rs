@@ -275,7 +275,14 @@ pub fn RE_AddPolyToScene(
         com_printf(common, "^3WARNING: RE_AddPolyToScene: NULL poly shader\n");
         return;
     }
-    let shader = ShaderHandle::new(hshader as u32, 0);
+    // The seam hands over a bare slot number, so the arena resolves it at the
+    // slot's current generation (DEC-42.2 "slot = index"). An unresolvable
+    // slot keeps its raw number here and lets `R_AddPolygonSurfaces`'
+    // `R_GetShaderByHandle` print the oracle's warning at the oracle's time.
+    let shader = assets
+        .shaders
+        .handle_at_slot(hshader as u32)
+        .unwrap_or(ShaderHandle::new(hshader as u32, 0));
 
     let (mut num_polys_so_far, mut num_polyverts_so_far) = frame_poly_counts(frame);
     for j in 0..num_polys {
