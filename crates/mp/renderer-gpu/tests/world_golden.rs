@@ -26,14 +26,11 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use mp_engine_core::Engine;
-use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
-use mp_engine_qcommon::cm_terrain::CmLandScape;
 use mp_engine_server::Server;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
-use mp_renderer::tr_main::TrMainScratch;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_scene::RE_RenderScene;
 use mp_renderer_gpu::ui_host::boot;
@@ -178,7 +175,9 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
         cfg.basepath = basepath;
     }
     let mut host = boot::boot(&cfg);
-    let (loaded, land_scape): (bool, srfTerrain_t) = boot::load_world(&mut host, map);
+    // The terrain surface `load_world` returns is the null-landscape seed. The
+    // executor owns its own copy since W2-F6, so this one is dropped.
+    let (loaded, _land_scape): (bool, srfTerrain_t) = boot::load_world(&mut host, map);
     assert!(loaded, "{map} did not load");
 
     // Force the first `R_MarkLeaves` to re-mark, and set the registered flag
@@ -208,10 +207,6 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
     }
 
     let dummy_assets = boot::empty_assets();
-    let land = CmLandScape::empty();
-    let mut scratch = TrMainScratch {
-        pre_trans_ent_matrix: [0.0; 16],
-    };
 
     // ---- draw the frame into the offscreen target ----------------------
     let target = gpu.headless_view();
@@ -245,20 +240,15 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
         let sv_ptr: *mut () = sv as *mut Server as *mut ();
         let mut engine_view = boot::host_view(common, cm, sv_ptr, models_ptr);
 
-        // The golden test has no live Ghoul2 state, so it threads an empty
-        // owned system (design point 2).
-        let mut g2_system = Ghoul2System::default();
+        // The golden test has no live Ghoul2 state, and the executor's own
+        // empty system is what the world pass uses (W2-F5).
         let mut world = WorldFrame {
             engine_view: &mut engine_view,
             assets: Arc::make_mut(&mut sim.published),
             world_load,
             frame: fstate,
-            g2: &mut g2_system,
             sky,
             models: &*models,
-            land_scape: &land_scape,
-            land: &land,
-            scratch: &mut scratch,
         };
 
         let stats = executor.execute_frame(

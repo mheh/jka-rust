@@ -44,6 +44,7 @@
 
 use std::collections::HashSet;
 use std::fs;
+use std::mem;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
@@ -53,7 +54,6 @@ use mp_engine_ghoul2::api_models::g2api_init_ghoul2_model;
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_ghoul2::info_array::Ghoul2Handle;
 use mp_engine_ghoul2::shared::cghoul2_info_v::CGhoul2Info_v;
-use mp_engine_qcommon::cm_terrain::CmLandScape;
 use mp_engine_server::Server;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
@@ -62,8 +62,6 @@ use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
-use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
-use mp_renderer::tr_main::TrMainScratch;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_scene::{
     ghoul2_token_encode, RE_AddRefEntityToScene, RE_ClearScene, RE_RenderScene,
@@ -414,14 +412,9 @@ struct App {
     /// uploads against the real registry itself, before the split borrow (see
     /// `draw_world_frame`).
     dummy_assets: RenderAssets,
-    /// The null-landscape terrain surface, initialized once and reused every
-    /// frame.
-    land_scape: srfTerrain_t,
-    land: CmLandScape,
-    /// Empty per-frame scratch. Neither the fog list nor the dlight list is
-    /// held here: `render_world` copies the fogs from the loaded world and
-    /// rebuilds the dlights from this frame's events.
-    scratch: TrMainScratch,
+    // W2-F5/F6 moved the null-landscape terrain seed, its collision twin, and
+    // the `tr_main` matrix scratch onto `FrameExecutor`, which owns them for
+    // the process lifetime.
     camera: Camera,
     /// The brush submodel handle the one test entity draws (`*1`), computed
     /// once at boot. The entity origin is the per-frame bob, not a field.
@@ -483,7 +476,6 @@ impl App {
     #[allow(clippy::too_many_arguments)]
     fn new(
         host: UiHost,
-        land_scape: srfTerrain_t,
         dummy_assets: RenderAssets,
         eye: [f32; 3],
         test_model: qhandle_t,
@@ -500,11 +492,6 @@ impl App {
             executor: None,
             host,
             dummy_assets,
-            land_scape,
-            land: CmLandScape::empty(),
-            scratch: TrMainScratch {
-                pre_trans_ent_matrix: [0.0; 16],
-            },
             camera: Camera {
                 pos: eye,
                 pitch: 0.0,
@@ -883,13 +870,9 @@ impl App {
             images,
             window,
             dummy_assets,
-            land_scape,
-            land,
-            scratch,
             reported,
             surface_warned,
             md3_model,
-            g2,
             ghoul2_handle,
             ..
         } = self;
@@ -944,12 +927,8 @@ impl App {
                         assets: Arc::make_mut(&mut sim.published),
                         world_load,
                         frame: fstate,
-                        g2,
                         sky,
                         models: &*models,
-                        land_scape: &*land_scape,
-                        land: &*land,
-                        scratch,
                     };
 
                     executor.execute_frame(
@@ -1008,6 +987,10 @@ impl ApplicationHandler for App {
         let gpu = Gpu::new(window.clone());
         let images = GpuImages::new(&gpu);
         let mut executor = FrameExecutor::new(&gpu, &images);
+
+        // The executor owns the Ghoul2 instances since W2-F5, so the set this
+        // harness built before the GPU came up moves in here.
+        executor.set_ghoul2(mem::take(&mut self.g2));
 
         // Upload the loaded world's geometry once, before the first frame.
         if let Some(world) = self.host.sim.published.world.as_ref() {
@@ -1228,7 +1211,9 @@ fn main() {
     let map = map.unwrap_or_else(|| String::from("maps/mp/duel1.bsp"));
 
     let mut host = boot::boot(&cfg);
-    let (loaded, land_scape) = boot::load_world(&mut host, &map);
+    // The terrain surface `load_world` returns is the null-landscape seed. The
+    // executor owns its own copy since W2-F6, so this one is dropped.
+    let (loaded, _land_scape) = boot::load_world(&mut host, &map);
     if !loaded {
         eprintln!("world_harness: {map} did not load, exiting");
         return;
@@ -1316,7 +1301,6 @@ fn main() {
     let dummy_assets = boot::empty_assets();
     let mut app = App::new(
         host,
-        land_scape,
         dummy_assets,
         eye,
         test_model,

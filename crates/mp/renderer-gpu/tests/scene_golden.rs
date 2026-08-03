@@ -33,8 +33,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use mp_engine_core::Engine;
-use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
-use mp_engine_qcommon::cm_terrain::CmLandScape;
 use mp_engine_qcommon::common::error::ComError;
 use mp_engine_qcommon::files_common::FS_ProductIdFile;
 use mp_engine_server::Server;
@@ -46,7 +44,6 @@ use mp_qshared::common::mp::cgame::tr_types::{RF_DEPTHHACK, RF_FORCE_ENT_ALPHA, 
 use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
-use mp_renderer::tr_main::TrMainScratch;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_public::ref_flags::{RDF_DRAWSKYBOX, RDF_NOWORLDMODEL};
 use mp_renderer::tr_scene::{
@@ -389,11 +386,9 @@ fn run_scene(scene: &Scene) {
     let mut executor = FrameExecutor::new(&gpu, &images);
 
     let dummy_assets = boot::empty_assets();
-    let land = CmLandScape::empty();
-    let land_scape = boot::init_terrain(&mut host);
-    let mut scratch = TrMainScratch {
-        pre_trans_ent_matrix: [0.0; 16],
-    };
+    // W2-F6 homes the null-landscape seed on the executor, so this test only
+    // runs the terrain init for its cvar registrations.
+    let _land_scape = boot::init_terrain(&mut host);
 
     let target = gpu.headless_view();
     gpu.clear_headless(&target);
@@ -418,18 +413,13 @@ fn run_scene(scene: &Scene) {
         let sv_ptr: *mut () = sv as *mut Server as *mut ();
         let mut engine_view = boot::host_view(common, cm, sv_ptr, models_ptr);
 
-        let mut g2_system = Ghoul2System::default();
         let mut world = WorldFrame {
             engine_view: &mut engine_view,
             assets: Arc::make_mut(&mut sim.published),
             world_load,
             frame: fstate,
-            g2: &mut g2_system,
             sky,
             models: &*models,
-            land_scape: &land_scape,
-            land: &land,
-            scratch: &mut scratch,
         };
 
         executor.execute_frame(

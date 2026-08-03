@@ -200,23 +200,28 @@ impl Warned {
 /// passed in either: the executor accumulates `AddRefEntityToScene` payloads
 /// itself and rebuilds `tr.refdef.entities` from them at `RenderScene`
 /// (DEC-50).
+/// W2-F5/F6 moved four members out of this bundle and onto
+/// [`FrameExecutor`]: the Ghoul2 instance owner, the `tr_main` matrix
+/// scratch, and the two null-landscape terrain seeds. All four are
+/// render-thread-resident and outlive one frame, so the executor owns them and
+/// no caller threads them any more.
 pub struct WorldFrame<'a, 'e> {
     pub engine_view: &'a mut EngineHostView<'e>,
     pub assets: &'a mut RenderAssets,
     pub world_load: &'a WorldLoadState,
     pub frame: &'a mut FrameState,
-    /// The engine's Ghoul2 instance owner, threaded into `R_RenderView` so the
-    /// entity walk reaches `R_AddGhoulSurfaces`. A caller with no live Ghoul2
-    /// state (the golden test, the world spike) threads an empty owned system.
-    pub g2: &'a mut Ghoul2System,
     /// The sky-box scratch carrier `ParseSkyParms` seeded through
     /// `R_InitSkyTexCoords`. The world pass reads its cloud tex-coord tables
     /// and reuses its grid scratch when a sky-shader surface draws (DEC-50).
+    ///
+    //TODO: Port SkyState split
+    // Source: oracle/codemp/renderer/tr_sky.cpp:699-760
+    // W2-F3 splits this carrier: the parse-time cloud tables belong on the
+    // published assets and only the per-view grid scratch belongs on the
+    // executor. Until that split lands, the whole carrier stays sim-owned and
+    // crosses by reference, which pins the world pass to the sim thread.
     pub sky: &'a mut SkyState,
     pub models: &'a RenderModels,
-    pub land_scape: &'a srfTerrain_t,
-    pub land: &'a CmLandScape,
-    pub scratch: &'a mut TrMainScratch,
 }
 
 /// Owns the render-thread state one frame's execution needs: the 2D and world
@@ -232,6 +237,22 @@ pub struct FrameExecutor {
     /// world is immutable after load, so the render thread owns them here and
     /// [`FrameExecutor::set_world`] sizes them.
     walk_scratch: WorldWalkScratch,
+    /// `preTransEntMatrix` — the `tr_main` matrix scratch `R_RotateForEntity`
+    /// writes and `R_WorldNormalToEntity` reads back inside one walk.
+    /// Render-thread-resident since W2-F3.
+    tr_main_scratch: TrMainScratch,
+    /// `tr.theGhoul2InfoArray` and its bone caches. W2-F5 homes the instance
+    /// owner here, so the caches the render path builds persist across frames
+    /// without a caller threading them in.
+    ghoul2: Ghoul2System,
+    /// `tr.landScape` at its null-landscape seed, plus the empty collision
+    /// landscape beside it. W2-F6 freezes terrain at that seed for this wave:
+    /// `R_AddTerrainSurfaces` returns on the null pointer, so neither value is
+    /// read past that guard.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_terrain.cpp:1005`
+    land_scape: srfTerrain_t,
+    land: CmLandScape,
     /// The stand-in a `RDF_NOWORLDMODEL` scene binds when no map is loaded. Its
     /// buffers are never read: every surface such a scene draws is entity-side
     /// and builds its own per-frame vertices.
@@ -277,6 +298,16 @@ impl FrameExecutor {
             pipeline3d: Pipeline3d::new(gpu),
             world_geometry: None,
             walk_scratch: WorldWalkScratch::default(),
+            tr_main_scratch: TrMainScratch {
+                pre_trans_ent_matrix: [0.0; 16],
+            },
+            ghoul2: Ghoul2System::default(),
+            // SAFETY: `srfTerrain_t` is a frozen `#[repr(C)]` POD of scalars
+            // and a raw pointer whose all-zero value is null. A null
+            // `landscape` is exactly the seed `R_AddTerrainSurfaces` returns
+            // on (W2-F6).
+            land_scape: unsafe { core::mem::zeroed() },
+            land: CmLandScape::empty(),
             empty_geometry: WorldGeometry::empty(gpu),
             batch: QuadBatch::new(),
             scene_entities: Vec::new(),
@@ -294,6 +325,22 @@ impl FrameExecutor {
     pub fn set_world(&mut self, gpu: &Gpu, world: &WorldAsset) {
         self.world_geometry = Some(WorldGeometry::upload(gpu, world));
         self.walk_scratch.set_world(world);
+    }
+
+    /// Installs a prepared Ghoul2 instance owner, replacing the empty one the
+    /// executor starts with.
+    ///
+    /// W2-F5 homes the owner here, and a harness that built its instances
+    /// through `G2API_InitGhoul2Model` before the GPU came up hands the result
+    /// over with this. The bone caches then persist for the process lifetime.
+    pub fn set_ghoul2(&mut self, g2: Ghoul2System) {
+        self.ghoul2 = g2;
+    }
+
+    /// The executor's Ghoul2 instance owner, for a caller that drives
+    /// `G2API_*` between frames.
+    pub fn ghoul2_mut(&mut self) -> &mut Ghoul2System {
+        &mut self.ghoul2
     }
 
     /// Recreates the world depth texture on a window resize.
@@ -711,6 +758,14 @@ impl FrameExecutor {
         world.frame.refdef = refdef.clone();
         world.frame.scene_light_styles = *light_styles;
 
+        // W2-F3 G1: the two sky-portal flags ride the `RenderScene` payload,
+        // and this is where they land. `tr_sky`'s `R_DrawSkyBox` gate and the
+        // world clear colour both read them, and both saw a permanent zero
+        // before this assignment existed.
+        // Source: oracle/codemp/renderer/tr_scene.cpp:806-813
+        world.frame.skyboxportal = refdef.skyboxportal;
+        world.frame.drawskyboxportal = refdef.drawskyboxportal;
+
         // Bump the per-scene counters, the render-side stand-in for the
         // oracle's `tr.frameSceneNum++`/`tr.sceneCount++`. Ruling 3 keeps that
         // off the trap-time `RE_RenderScene`, so the render-side driver does it.
@@ -767,7 +822,7 @@ impl FrameExecutor {
             world.world_load,
             world.frame,
             &mut self.walk_scratch,
-            world.g2,
+            &mut self.ghoul2,
             frame_data,
             &abi_refdef,
             refdef_rdflags,
@@ -777,11 +832,11 @@ impl FrameExecutor {
             dlights.as_mut_slice(),
             &abi_fogs,
             distance_cull,
-            world.land_scape,
-            world.land,
+            &self.land_scape,
+            &self.land,
             0,
             &mut entities,
-            world.scratch,
+            &mut self.tr_main_scratch,
             &mut draw_surfs,
         );
 
@@ -809,9 +864,9 @@ impl FrameExecutor {
             refdef.float_time,
             &view,
             &entities,
-            world.scratch,
+            &mut self.tr_main_scratch,
             world.models,
-            world.g2,
+            &mut self.ghoul2,
             world.frame,
             world.sky,
             &abi_fogs,

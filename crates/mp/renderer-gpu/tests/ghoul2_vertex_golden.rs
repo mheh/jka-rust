@@ -49,7 +49,6 @@ use mp_engine_ghoul2::api_models::g2api_init_ghoul2_model;
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_ghoul2::info_array::Ghoul2Handle;
 use mp_engine_ghoul2::shared::cghoul2_info_v::CGhoul2Info_v;
-use mp_engine_qcommon::cm_terrain::CmLandScape;
 use mp_engine_server::Server;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
@@ -58,7 +57,6 @@ use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
-use mp_renderer::tr_main::TrMainScratch;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_scene::{
     ghoul2_token_encode, RE_AddRefEntityToScene, RE_ClearScene, RE_RenderScene,
@@ -356,7 +354,9 @@ fn golden_ghoul2_verts_stormtrooper() {
         cfg.basepath = basepath;
     }
     let mut host = boot::boot(&cfg);
-    let (loaded, land_scape): (bool, srfTerrain_t) =
+    // The terrain surface `load_world` returns is the null-landscape seed. The
+    // executor owns its own copy since W2-F6, so this one is dropped.
+    let (loaded, _land_scape): (bool, srfTerrain_t) =
         boot::load_world(&mut host, "maps/mp/duel1.bsp");
     assert!(loaded, "maps/mp/duel1.bsp did not load");
 
@@ -367,7 +367,7 @@ fn golden_ghoul2_verts_stormtrooper() {
 
     // Init one stormtrooper in its default skeleton pose. No animation call runs,
     // so the pose is deterministic.
-    let (mut g2, ghoul2_handle, ghoul2_model) =
+    let (g2, ghoul2_handle, ghoul2_model) =
         init_ghoul2(&mut host, GHOUL2_MODEL_NAME).expect("stormtrooper .glm did not init");
 
     // The camera sits at a spawn origin, bumped to eye height.
@@ -421,15 +421,14 @@ fn golden_ghoul2_verts_stormtrooper() {
     let mut gpu = Gpu::new_headless(GOLDEN_WIDTH, GOLDEN_HEIGHT);
     let mut images = GpuImages::new(&gpu);
     let mut executor = FrameExecutor::new(&gpu, &images);
+    // The executor owns the Ghoul2 instances since W2-F5, so the stormtrooper
+    // this test built moves in before the frame runs.
+    executor.set_ghoul2(g2);
     if let Some(world) = host.sim.published.world.as_ref() {
         executor.set_world(&gpu, world);
     }
 
     let dummy_assets = boot::empty_assets();
-    let land = CmLandScape::empty();
-    let mut scratch = TrMainScratch {
-        pre_trans_ent_matrix: [0.0; 16],
-    };
 
     // ---- draw the frame with the capture sink armed --------------------
     let target = gpu.headless_view();
@@ -468,12 +467,8 @@ fn golden_ghoul2_verts_stormtrooper() {
             assets: Arc::make_mut(&mut sim.published),
             world_load,
             frame: fstate,
-            g2: &mut g2,
             sky,
             models: &*models,
-            land_scape: &land_scape,
-            land: &land,
-            scratch: &mut scratch,
         };
 
         executor.execute_frame(
