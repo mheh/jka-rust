@@ -11,6 +11,10 @@ use crate::render_state::placeholders::{
 /// `trGlobals_t` used to hold. `backEndData_t`'s double buffer is NOT
 /// reproduced here (`### A1 disposition table`, `R2-D8`).
 ///
+/// W2-F3 split this struct: the sim-written half is `WorldLoadState` and what
+/// stays is the walk-and-view half, which `FrameExecutor` owns. The `ViewState`
+/// rename that name change implies is cosmetic, and the user parked it.
+///
 /// Source: `oracle/codemp/renderer/tr_local.h:1279-1292`
 pub struct FrameState {
     pub refdef: TrRefdef,
