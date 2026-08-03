@@ -29,6 +29,7 @@ use mp_engine_core::Engine;
 use mp_engine_server::Server;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_renderer::render_state::frame_data::FrameData;
+use mp_renderer::render_state::bmodel_table::BModelTable;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
 use mp_renderer::tr_model::render_models::RenderModels;
@@ -202,8 +203,9 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
     let mut gpu = Gpu::new_headless(GOLDEN_WIDTH, GOLDEN_HEIGHT);
     let mut images = GpuImages::new(&gpu);
     let mut executor = FrameExecutor::new(&gpu, &images);
+    let bmodel_table = BModelTable::build(&host.models);
     if let Some(world) = host.sim.published.world.as_ref() {
-        executor.set_world(&gpu, world);
+        executor.set_world(&gpu, world, bmodel_table);
     }
 
     let dummy_assets = boot::empty_assets();

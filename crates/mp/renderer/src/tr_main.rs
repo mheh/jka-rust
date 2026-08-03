@@ -45,6 +45,7 @@ use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_mesh::r_add_md3_surfaces;
 use crate::tr_model::render_models::RenderModels;
 use crate::tr_public::ref_flags::{RDF_AUTOMAP, RDF_NOFOG, RDF_NOWORLDMODEL, RF_FIRST_PERSON};
+use crate::render_state::bmodel_table::BModelTable;
 use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use crate::render_state::world_load_state::WorldLoadState;
 use crate::tr_scene::{ghoul2_token_decode, ghoul2_token_encode, R_AddPolygonSurfaces};
@@ -1868,6 +1869,7 @@ pub fn R_AddEntitySurfaces<'a>(
     scratch: &mut TrMainScratch,
     entity_host: Option<&mut EntityWalkHost<'_, '_>>,
     assets: &RenderAssets,
+    bmodels: &BModelTable,
     cvars: RenderCvarSnapshot,
     world_load: &WorldLoadState,
     frame: &mut FrameState,
@@ -1967,25 +1969,69 @@ pub fn R_AddEntitySurfaces<'a>(
                 // (`render_state/placeholders.rs`), so there is no carrier to
                 // publish it through for the other two callees.
                 // Source: oracle/codemp/renderer/tr_main.cpp:1421-1442
-                //TODO: Port R_AddEntitySurfaces RT_MODEL on the render thread
-                // Source: oracle/codemp/renderer/tr_main.cpp:1421-1470
-                // Every arm below resolves `ent->e.hModel` through the model
-                // registry, and the Ghoul2 arms need the engine host as well.
-                // Neither crosses to the render thread in this wave, so a
-                // render-side caller passes `None` and this arm draws nothing.
+
+                // W2-F8: `tr.currentModel`'s three scalars arrive on the frame
+                // package's `BModelTable`, so the brush arm needs no model
+                // registry and runs render-side.
+                let model = bmodels.get(ent.e.hModel);
+                if matches!(model.model_type, modtype_t::MOD_BRUSH) {
+                    // `R_AddBrushModelSurfaces`'s two mutators both target
+                    // `*tr.currentEntity` in the oracle — one object — but land
+                    // in different carriers here: `R_SetupEntityLighting`
+                    // writes the `&mut RefEntity` this call passes,
+                    // `R_DlightBmodel` writes `frame.current_entity`
+                    // (`oracle/codemp/renderer/tr_light.cpp:78-79`). The
+                    // lighting writes are folded back onto
+                    // `frame.current_entity` so the single reconciled entity is
+                    // the one written back to `entities[n]`.
+                    let mut re = ref_entity_from_tr(ent);
+                    R_AddBrushModelSurfaces(
+                        &mut re,
+                        model,
+                        cvars,
+                        &ori,
+                        &view.frustum,
+                        assets,
+                        world_load,
+                        frame,
+                        walk_scratch,
+                        refdef_rdflags,
+                        current_entity_num as i32,
+                        dlights,
+                        draw_surfs,
+                    );
+                    let current_entity = frame
+                        .current_entity
+                        .as_mut()
+                        .expect("R_AddEntitySurfaces: current_entity set above");
+                    current_entity.lighting_calculated = re.lighting_calculated;
+                    current_entity.light_dir = re.light_dir;
+                    current_entity.ambient_light = re.ambient_light;
+                    current_entity.ambient_light_int = re.ambient_light_int;
+                    current_entity.directed_light = re.directed_light;
+                    write_back_lighting(ent, current_entity);
+                    continue;
+                }
+
+                //TODO: Port R_AddEntitySurfaces MD3 and Ghoul2 arms render-side
+                // Source: oracle/codemp/renderer/tr_main.cpp:1444-1470
+                // Both arms read the `md3`/`mdxm`/`mdxa` blocks themselves, and
+                // the Ghoul2 arm reaches them through the engine host. W2-F8
+                // part 2 keeps them gated: a render-side caller passes `None`
+                // and they draw nothing. Who owns those blocks is wave 3's
+                // opening question.
                 let Some(host) = entity_host.as_deref_mut() else {
                     if !walk_scratch.warnings.entity_models {
                         walk_scratch.warnings.entity_models = true;
                         eprintln!(
-                            "mp_renderer: R_AddEntitySurfaces draws no RT_MODEL entity render-side yet",
+                            "mp_renderer: R_AddEntitySurfaces draws no MD3 or Ghoul2 entity render-side yet",
                         );
                     }
                     continue;
                 };
                 let models = host.models;
                 let engine_view = &mut *host.engine_view;
-                let current_model = models.get_model(ent.e.hModel);
-                match current_model.r#type {
+                match model.model_type {
                     modtype_t::MOD_MESH => {
                         r_add_md3_surfaces(
                             ent,
@@ -2006,45 +2052,8 @@ pub fn R_AddEntitySurfaces<'a>(
                         );
                     }
 
-                    modtype_t::MOD_BRUSH => {
-                        // `R_AddBrushModelSurfaces`'s two mutators both
-                        // target `*tr.currentEntity` in the oracle — one
-                        // object — but land in different carriers here:
-                        // `R_SetupEntityLighting` writes the `&mut
-                        // RefEntity` this call passes, `R_DlightBmodel`
-                        // writes `frame.current_entity`
-                        // (`oracle/codemp/renderer/tr_light.cpp:78-79`).
-                        // The lighting writes are folded back onto
-                        // `frame.current_entity` so the single reconciled
-                        // entity is the one written back to
-                        // `entities[n]`.
-                        let mut re = ref_entity_from_tr(ent);
-                        R_AddBrushModelSurfaces(
-                            &mut re,
-                            models,
-                            cvars,
-                            &ori,
-                            &view.frustum,
-                            assets,
-                            world_load,
-                            frame,
-                            walk_scratch,
-                            refdef_rdflags,
-                            current_entity_num as i32,
-                            dlights,
-                            draw_surfs,
-                        );
-                        let current_entity = frame
-                            .current_entity
-                            .as_mut()
-                            .expect("R_AddEntitySurfaces: current_entity set above");
-                        current_entity.lighting_calculated = re.lighting_calculated;
-                        current_entity.light_dir = re.light_dir;
-                        current_entity.ambient_light = re.ambient_light;
-                        current_entity.ambient_light_int = re.ambient_light_int;
-                        current_entity.directed_light = re.directed_light;
-                        write_back_lighting(ent, current_entity);
-                    }
+                    // `MOD_BRUSH` took the branch above, before the host gate.
+                    modtype_t::MOD_BRUSH => {}
 
                     // g2r
                     modtype_t::MOD_MDXM => {
@@ -2222,6 +2231,7 @@ pub fn R_AddEntitySurfaces<'a>(
 pub fn R_GenerateDrawSurfs<'a>(
     entity_host: Option<&mut EntityWalkHost<'_, '_>>,
     assets: &RenderAssets,
+    bmodels: &BModelTable,
     cvars: RenderCvarSnapshot,
     world_load: &WorldLoadState,
     frame: &mut FrameState,
@@ -2300,6 +2310,7 @@ pub fn R_GenerateDrawSurfs<'a>(
         scratch,
         entity_host,
         assets,
+        bmodels,
         cvars,
         world_load,
         frame,
@@ -2409,6 +2420,7 @@ pub fn R_MirrorViewBySurface<'a>(
     refdef_time: i32,
     entity_host: Option<&mut EntityWalkHost<'_, '_>>,
     assets: &RenderAssets,
+    bmodels: &BModelTable,
     cvars: RenderCvarSnapshot,
     world_load: &WorldLoadState,
     frame: &mut FrameState,
@@ -2507,6 +2519,7 @@ pub fn R_MirrorViewBySurface<'a>(
         view,
         entity_host,
         assets,
+        bmodels,
         cvars,
         world_load,
         frame,
@@ -2581,6 +2594,7 @@ pub fn R_SortDrawSurfs<'a>(
     refdef_time: i32,
     mut entity_host: Option<&mut EntityWalkHost<'_, '_>>,
     assets: &RenderAssets,
+    bmodels: &BModelTable,
     cvars: RenderCvarSnapshot,
     world_load: &WorldLoadState,
     frame: &mut FrameState,
@@ -2654,6 +2668,7 @@ pub fn R_SortDrawSurfs<'a>(
             refdef_time,
             entity_host.as_deref_mut(),
             assets,
+            bmodels,
             cvars,
             world_load,
             frame,
@@ -2715,6 +2730,7 @@ pub fn R_RenderView<'a>(
     view: &mut viewParms_t,
     mut entity_host: Option<&mut EntityWalkHost<'_, '_>>,
     assets: &RenderAssets,
+    bmodels: &BModelTable,
     cvars: RenderCvarSnapshot,
     world_load: &WorldLoadState,
     frame: &mut FrameState,
@@ -2778,6 +2794,7 @@ pub fn R_RenderView<'a>(
     R_GenerateDrawSurfs(
         entity_host.as_deref_mut(),
         assets,
+        bmodels,
         cvars,
         world_load,
         frame,
@@ -2808,6 +2825,7 @@ pub fn R_RenderView<'a>(
         refdef_time,
         entity_host,
         assets,
+        bmodels,
         cvars,
         world_load,
         frame,

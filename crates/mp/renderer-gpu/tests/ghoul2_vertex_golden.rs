@@ -55,6 +55,7 @@ use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
+use mp_renderer::render_state::bmodel_table::BModelTable;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
 use mp_renderer::tr_model::render_models::RenderModels;
@@ -424,8 +425,9 @@ fn golden_ghoul2_verts_stormtrooper() {
     // The executor owns the Ghoul2 instances since W2-F5, so the stormtrooper
     // this test built moves in before the frame runs.
     executor.set_ghoul2(g2);
+    let bmodel_table = BModelTable::build(&host.models);
     if let Some(world) = host.sim.published.world.as_ref() {
-        executor.set_world(&gpu, world);
+        executor.set_world(&gpu, world, bmodel_table);
     }
 
     let dummy_assets = boot::empty_assets();

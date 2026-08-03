@@ -22,6 +22,7 @@
 //! gives them a real shape.
 
 pub mod arena;
+pub mod bmodel_table;
 pub mod capture_request;
 pub mod frame_data;
 pub mod frame_event;

@@ -61,6 +61,7 @@ use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::render_assets::RenderAssets;
+use mp_renderer::render_state::bmodel_table::BModelTable;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_scene::{
@@ -992,9 +993,11 @@ impl ApplicationHandler for App {
         // harness built before the GPU came up moves in here.
         executor.set_ghoul2(mem::take(&mut self.g2));
 
-        // Upload the loaded world's geometry once, before the first frame.
+        // Upload the loaded world's geometry once, before the first frame. The
+        // brush-submodel rows the same map load registered go with it (W2-F8).
+        let bmodel_table = BModelTable::build(&self.host.models);
         if let Some(world) = self.host.sim.published.world.as_ref() {
-            executor.set_world(&gpu, world);
+            executor.set_world(&gpu, world, bmodel_table);
         }
 
         let size = window.inner_size();

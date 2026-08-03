@@ -42,6 +42,7 @@ use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::light_style_table::LightStyleTable;
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::render_assets_sim::RenderAssetsSim;
+use mp_renderer::render_state::bmodel_table::BModelTable;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::render_state::world_load_state::WorldLoadState;
 use mp_renderer::render_state::renderer_cvars::RendererCvars;
@@ -760,6 +761,9 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
         // The spike runs on the sim thread, so it hands the entity walk the
         // full host bundle (W2-F1).
         let cvar_snapshot = RenderCvarSnapshot::from_cvars(cvars, engine_view.common);
+        // The spike walks once, so its brush-submodel rows live and die with
+        // this call (W2-F8).
+        let bmodel_table = BModelTable::build(models);
         let mut entity_host = EntityWalkHost {
             engine_view: &mut engine_view,
             models,
@@ -772,6 +776,7 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
             &mut view,
             Some(&mut entity_host),
             assets,
+            &bmodel_table,
             cvar_snapshot,
             world_load,
             frame,

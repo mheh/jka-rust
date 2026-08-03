@@ -26,6 +26,7 @@ use crate::render_state::frame_event::FrameEvent;
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::placeholders::RefEntity;
 use crate::render_state::arena::Arena;
+use crate::render_state::bmodel_table::BModelEntry;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use crate::render_state::world_load_state::WorldLoadState;
@@ -1509,7 +1510,7 @@ pub fn R_InitializeWireframeAutomap(
 #[allow(clippy::too_many_arguments)]
 pub fn R_AddBrushModelSurfaces<'a>(
     ent: &mut RefEntity,
-    models: &RenderModels,
+    model: BModelEntry,
     cvars: RenderCvarSnapshot,
     ori: &orientationr_t,
     frustum: &[cplane_t; 4],
@@ -1522,26 +1523,27 @@ pub fn R_AddBrushModelSurfaces<'a>(
     dlights: &mut [dlight_t],
     draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
 ) {
-    let p_model = models.get_model(ent.h_model);
-
     // `pModel->bmodel` — the handle resolves to its `WorldAsset::bmodels` index
     // through the side map `R_LoadSubmodels` fills, and the owned submodel row
-    // lives on the loaded world.
-    let bmodel_idx = models
-        .bmodel_index(ent.h_model)
-        .expect("R_AddBrushModelSurfaces reached a non-brush model handle");
+    // lives on the loaded world. W2-F8 crosses that index, and `bspInstance`
+    // beside it, on the frame package's `BModelTable`, because the model
+    // registry itself cannot reach the render thread.
+    assert!(
+        model.bmodel_index >= 0,
+        "R_AddBrushModelSurfaces reached a non-brush model handle",
+    );
     let world = assets
         .world
         .as_ref()
         .expect("R_AddBrushModelSurfaces needs the loaded world");
-    let bmodel = &world.bmodels[bmodel_idx];
+    let bmodel = &world.bmodels[model.bmodel_index as usize];
 
     let clip = R_CullLocalBox(bmodel.bounds, cvars.nocull, ori, frustum);
     if clip == CULL_OUT {
         return;
     }
 
-    if p_model.bspInstance != 0 {
+    if model.bsp_instance != 0 {
         // rwwRMG - added
         R_SetupEntityLighting(cvars, assets, world_load, frame, refdef_rdflags, dlights, ent);
     }

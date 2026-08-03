@@ -221,6 +221,14 @@ impl RenderModels {
         self.models.by_handle(handle)
     }
 
+    /// `tr.numModels` — the registered high-water mark. `BModelTable::build`
+    /// walks `0..num_models` to read every live row.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1397`
+    pub fn num_models(&self) -> i32 {
+        self.models.num_models()
+    }
+
     /// Raven `R_Modellist_f` — prints each registered model's `dataSize`/LOD
     /// count/name (`host.print`), then the running total.
     ///

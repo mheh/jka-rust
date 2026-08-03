@@ -58,6 +58,7 @@ use mp_renderer::render_state::placeholders::{RefEntity, TrRefdef, WorldAsset};
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::render_state::shader_asset::ShaderHandle;
+use mp_renderer::render_state::bmodel_table::BModelTable;
 use mp_renderer::render_state::world_load_state::WorldLoadState;
 use mp_renderer::render_state::world_walk_scratch::WorldWalkScratch;
 use mp_renderer::tr_image::PendingUpload;
@@ -237,6 +238,10 @@ pub struct FrameExecutor {
     /// world is immutable after load, so the render thread owns them here and
     /// [`FrameExecutor::set_world`] sizes them.
     walk_scratch: WorldWalkScratch,
+    /// The brush-submodel rows the entity walk reads instead of the model
+    /// registry (W2-F8). Rebuilt with the world, since the inline submodels
+    /// register during the same map load.
+    bmodel_table: BModelTable,
     /// `preTransEntMatrix` — the `tr_main` matrix scratch `R_RotateForEntity`
     /// writes and `R_WorldNormalToEntity` reads back inside one walk.
     /// Render-thread-resident since W2-F3.
@@ -298,6 +303,7 @@ impl FrameExecutor {
             pipeline3d: Pipeline3d::new(gpu),
             world_geometry: None,
             walk_scratch: WorldWalkScratch::default(),
+            bmodel_table: BModelTable::empty(),
             tr_main_scratch: TrMainScratch {
                 pre_trans_ent_matrix: [0.0; 16],
             },
@@ -319,12 +325,17 @@ impl FrameExecutor {
         }
     }
 
-    /// Uploads the loaded world's geometry so the world pass can draw it, and
-    /// sizes the walk marks to that world. Call once after `RE_LoadWorldMap`
-    /// and before the first frame that renders a scene.
-    pub fn set_world(&mut self, gpu: &Gpu, world: &WorldAsset) {
+    /// Uploads the loaded world's geometry so the world pass can draw it,
+    /// sizes the walk marks to that world, and takes the brush-submodel rows
+    /// the same map load registered. Call once after `RE_LoadWorldMap` and
+    /// before the first frame that renders a scene.
+    ///
+    /// The three arrive together because one map load produces all three
+    /// (W2-F7/F8).
+    pub fn set_world(&mut self, gpu: &Gpu, world: &WorldAsset, bmodels: BModelTable) {
         self.world_geometry = Some(WorldGeometry::upload(gpu, world));
         self.walk_scratch.set_world(world);
+        self.bmodel_table = bmodels;
     }
 
     /// Installs a prepared Ghoul2 instance owner, replacing the empty one the
@@ -818,6 +829,7 @@ impl FrameExecutor {
             &mut view,
             Some(&mut entity_host),
             world.assets,
+            &self.bmodel_table,
             cvars,
             world.world_load,
             world.frame,
