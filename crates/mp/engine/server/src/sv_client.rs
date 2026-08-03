@@ -10,6 +10,7 @@ use core::ffi::{c_char, c_int, CStr};
 
 use mp_engine_qcommon::common::common::{info_set_report, Common};
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
+use mp_engine_qcommon::common_fns::Com_DPrintf;
 use mp_engine_qcommon::cvar_fns::{Cvar_Set, Cvar_VariableValue};
 use mp_engine_qcommon::qcommon::net_limits::{MAX_DOWNLOAD_BLKSIZE, MAX_DOWNLOAD_WINDOW};
 use mp_host_interface::engine_host::EngineHost;
@@ -257,7 +258,7 @@ pub fn SV_ClientEnterWorld(
     // client text command, so it needs its own tape event.
     crate::sv_referee::ref_tap_enter_world(sv, client, cmd);
     unsafe {
-        mp_engine_qcommon::common::common::com_printf(
+        Com_DPrintf(
             common,
             &format!("Going from CS_PRIMED to CS_ACTIVE for {}\n", (*client).name),
         );
@@ -297,7 +298,7 @@ pub fn SV_StopDownload_f(common: &mut Common, sv: &mut Server, cl: *mut client_t
             let client_num = ((cl as *mut u8).offset_from(sv.svs.clients.as_mut_ptr() as *mut u8)
                 as isize
                 / core::mem::size_of::<client_t>() as isize) as c_int;
-            mp_engine_qcommon::common::common::com_printf(
+            Com_DPrintf(
                 common,
                 &format!(
                     "clientDownload: {} : file \"{}\" aborted\n",
@@ -322,7 +323,7 @@ pub fn SV_NextDownload_f(common: &mut Common, sv: &mut Server, cl: *mut client_t
             / core::mem::size_of::<client_t>() as isize) as c_int;
 
         if block == (*cl).downloadClientBlock {
-            mp_engine_qcommon::common_fns::Com_DPrintf(
+            Com_DPrintf(
                 common,
                 &format!(
                     "clientDownload: {} : client acknowledge of block {}\n",
@@ -628,7 +629,7 @@ pub fn SV_AuthorizeIpPacket(view: &mut EngineHostView, sv: &mut Server, from: ne
 /// sync) is dead under this dedicated/non-XBOX build target; not transcribed.
 pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
     unsafe {
-        mp_engine_qcommon::common::common::com_printf(view.common, "SVC_DirectConnect ()\n");
+        Com_DPrintf(view.common, "SVC_DirectConnect ()\n");
 
         // Raven `Q_strncpyz(userinfo, Cmd_Argv(1), sizeof(userinfo))` — byte-
         // truncate the argv to MAX_INFO_STRING into the owned info string.
@@ -645,7 +646,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
                     mp_engine_qcommon::qcommon::protocol::PROTOCOL_VERSION
                 ),
             );
-            mp_engine_qcommon::common::common::com_printf(
+            Com_DPrintf(
                 view.common,
                 &format!("    rejected connect from version {}\n", version),
             );
@@ -681,7 +682,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
                             "print\nReconnect rejected : too soon\n".to_string(),
                         );
                         let adr = mp_engine_qcommon::net_chan::NET_AdrToString(view.common, from);
-                        mp_engine_qcommon::common::common::com_printf(
+                        Com_DPrintf(
                             view.common,
                             &format!(
                                 "{}:reconnect rejected : too soon\n",
@@ -764,7 +765,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
                         "CLIENT_REJECTED_LOW_PING",
                     )
                     .replace("%i", &i.to_string());
-                    mp_engine_qcommon::common::common::com_printf(view.common, &rejected_msg);
+                    Com_DPrintf(view.common, &rejected_msg);
                     // reset the address otherwise their ping will keep increasing
                     // with each connect message and they'd eventually be able to connect
                     sv.svs.challenges[i].adr.port = 0;
@@ -789,7 +790,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
                         "CLIENT_REJECTED_HIGH_PING",
                     )
                     .replace("%i", &i.to_string());
-                    mp_engine_qcommon::common::common::com_printf(view.common, &rejected_msg);
+                    Com_DPrintf(view.common, &rejected_msg);
                     return;
                 }
             }
@@ -923,10 +924,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
                                 crate::SV_GetStringEdString(sv, "MP_SVGAME", "SERVER_IS_FULL")
                             ),
                         );
-                        mp_engine_qcommon::common::common::com_printf(
-                            view.common,
-                            "Rejected a connection.\n",
-                        );
+                        Com_DPrintf(view.common, "Rejected a connection.\n");
                         return;
                     }
                 }
@@ -993,7 +991,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
                     latin1_to_string(core::ffi::CStr::from_ptr(denied_ptr).to_bytes())
                 ),
             );
-            mp_engine_qcommon::common::common::com_printf(
+            Com_DPrintf(
                 view.common,
                 &format!(
                     "Game rejected a connection: {}.\n",
@@ -1013,7 +1011,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
             "connectResponse".to_string(),
         );
 
-        mp_engine_qcommon::common::common::com_printf(
+        Com_DPrintf(
             view.common,
             &format!(
                 "Going from CS_FREE to CS_CONNECTED for {}\n",
@@ -1090,11 +1088,11 @@ pub fn SV_SendClientGameState(view: &mut EngineHostView, sv: &mut Server, client
             mp_engine_qcommon::net_chan::Netchan_TransmitNextFragment(view, &mut (*client).netchan);
         }
 
-        mp_engine_qcommon::common::common::com_printf(
+        Com_DPrintf(
             view.common,
             &format!("SV_SendClientGameState() for {}\n", (*client).name),
         );
-        mp_engine_qcommon::common::common::com_printf(
+        Com_DPrintf(
             view.common,
             &format!(
                 "Going from CS_CONNECTED to CS_PRIMED for {}\n",
@@ -1437,7 +1435,7 @@ pub fn SV_VerifyPaks_f(view: &mut EngineHostView, sv: &mut Server, cl: *mut clie
 /// Source: `oracle/codemp/server/sv_client.cpp:1029-1033`
 pub fn SV_DoneDownload_f(view: &mut EngineHostView, sv: &mut Server, cl: *mut client_t) {
     unsafe {
-        mp_engine_qcommon::common::common::com_printf(
+        Com_DPrintf(
             view.common,
             &format!("clientDownload: {} Done\n", (*cl).name),
         );
@@ -1465,7 +1463,7 @@ pub fn SV_ClientCommand(
             return qtrue;
         }
 
-        mp_engine_qcommon::common::common::com_printf(
+        Com_DPrintf(
             view.common,
             &format!("clientCommand: {} : {seq} : {s}\n", (*cl).name,),
         );
@@ -1498,7 +1496,7 @@ pub fn SV_ClientCommand(
         {
             // ignore any other text messages from this client but let them keep playing
             client_ok = qfalse;
-            mp_engine_qcommon::common::common::com_printf(
+            Com_DPrintf(
                 view.common,
                 &format!("client text ignored for {}\n", (*cl).name),
             );
@@ -1681,7 +1679,7 @@ pub fn SV_ExecuteClientMessage(
             // if we can tell that the client has dropped the last
             // gamestate we sent them, resend it
             if (*cl).messageAcknowledge > (*cl).gamestateMessageNum {
-                mp_engine_qcommon::common::common::com_printf(
+                Com_DPrintf(
                     view.common,
                     &format!("{} : dropped gamestate, resending\n", (*cl).name),
                 );
@@ -1772,10 +1770,7 @@ pub fn SV_DropClient(common: &mut Common, sv: &mut Server, drop: *mut client_t, 
             &format!("print \"{name}^7 {reason}\n\""),
         );
 
-        mp_engine_qcommon::common_fns::Com_DPrintf(
-            common,
-            &format!("Going to CS_ZOMBIE for {}\n", name),
-        );
+        Com_DPrintf(common, &format!("Going to CS_ZOMBIE for {}\n", name));
         (*drop).state = clientState_t::CS_ZOMBIE; // become free in a few seconds
 
         if (*drop).download != 0 {
@@ -2108,7 +2103,7 @@ pub fn SV_WriteDownloadToClient(
                 );
             }
 
-            mp_engine_qcommon::common_fns::Com_DPrintf(
+            Com_DPrintf(
                 view.common,
                 &format!(
                     "clientDownload: {} : writing block {}\n",
