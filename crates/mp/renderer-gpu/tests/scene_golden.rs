@@ -52,7 +52,8 @@ use mp_renderer::tr_scene::{
 use mp_renderer::tr_shader::RE_RegisterShader;
 use mp_renderer_gpu::ui_host::boot;
 use mp_renderer_gpu::ui_host::{BootConfig, UiHost};
-use mp_renderer_gpu::{read_target_rgba, FrameExecutor, Gpu, GpuImages, WorldFrame};
+use mp_renderer::tr_main::EntityWalkHost;
+use mp_renderer_gpu::{read_target_rgba, FrameExecutor, Gpu, GpuImages};
 use native_math::qmath::AnglesToAxis;
 
 /// The golden viewport in physical pixels. Fixed so the projection and the
@@ -383,7 +384,6 @@ fn run_scene(scene: &Scene) {
     let mut images = GpuImages::new(&gpu);
     let mut executor = FrameExecutor::new(&gpu, &images);
 
-    let dummy_assets = boot::empty_assets();
     // W2-F6 homes the null-landscape seed on the executor, so this test only
     // runs the terrain init for its cvar registrations.
     let _land_scape = boot::init_terrain(&mut host);
@@ -399,7 +399,6 @@ fn run_scene(scene: &Scene) {
             engine,
             models,
             sim,
-            frame: fstate,
             world_load,
             img_state,
             noise,
@@ -410,11 +409,10 @@ fn run_scene(scene: &Scene) {
         let sv_ptr: *mut () = sv as *mut Server as *mut ();
         let mut engine_view = boot::host_view(common, cm, sv_ptr, models_ptr);
 
-        let mut world = WorldFrame {
+        // A sim-side caller hands the entity walk the full host bundle, so
+        // every `RT_MODEL` arm runs (W2-F8).
+        let mut entity_host = EntityWalkHost {
             engine_view: &mut engine_view,
-            assets: Arc::make_mut(&mut sim.published),
-            world_load,
-            frame: fstate,
             models: &*models,
         };
 
@@ -422,13 +420,14 @@ fn run_scene(scene: &Scene) {
             &mut gpu,
             &target,
             &frame_data,
-            &dummy_assets,
+            &sim.published,
+            world_load,
+            Some(&mut entity_host),
             img_state.pending_uploads.drain().collect(),
             &mut images,
             noise,
             float_time,
             RenderCvarSnapshot::default(),
-            Some(&mut world),
         )
     };
 

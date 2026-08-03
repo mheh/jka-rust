@@ -10,6 +10,7 @@
 #![allow(dead_code)]
 
 use core::mem::{replace, size_of};
+use std::sync::Arc;
 
 use mp_engine_qcommon::cm_load::CM_TakeCachedMapDiskImage;
 use mp_engine_qcommon::common::{com_error, com_printf, Common, EngineHostView};
@@ -3787,7 +3788,7 @@ pub fn RE_LoadWorldMap_Actual(
         R_LoadLightGridArray(view.common, &ctx, &lumps[LUMP_LIGHTARRAY], world);
 
         // only set tr.world now that we know the entire level has loaded properly
-        assets.world = Some(world.clone());
+        assets.world = Some(Arc::new(world.clone()));
 
         if let Some(h) = view.common.com_RMG {
             if view.common.cvar(h).integer != 0 {
@@ -3813,7 +3814,7 @@ pub fn RE_LoadWorldMap_Actual(
                 // law's no-raw-pointers rule, applied only where the
                 // aliasing is actually exercised (this branch).
                 if let Some(updated) = &assets.world {
-                    *world = updated.clone();
+                    *world = (**updated).clone();
                 }
             }
         }

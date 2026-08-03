@@ -1127,7 +1127,7 @@ impl Pipeline3d {
         view: &viewParms_t,
         entities: &[trRefEntity_t],
         scratch: &mut TrMainScratch,
-        models: &RenderModels,
+        models: Option<&RenderModels>,
         g2: &mut Ghoul2System,
         frame: &mut FrameState,
         sky: &mut SkyState,
@@ -1424,7 +1424,7 @@ impl Pipeline3d {
         stats: &mut WorldStats,
         slot_map: &HashMap<i32, u32>,
         entities: &[trRefEntity_t],
-        models: &RenderModels,
+        models: Option<&RenderModels>,
         g2: &mut Ghoul2System,
         frame: &mut FrameState,
         sky: &mut SkyState,
@@ -1467,6 +1467,12 @@ impl Pipeline3d {
                     );
                 }
                 SurfaceGeometry::Md3(md3_ref) => {
+                    // W2-F8: the frontend only appends this arm when a
+                    // sim-side caller supplied the model registry, so a
+                    // render-side frame never reaches it.
+                    let Some(models) = models else {
+                        continue;
+                    };
                     self.collect_md3_surface(
                         surf.sort,
                         md3_ref,
@@ -1491,6 +1497,10 @@ impl Pipeline3d {
                     );
                 }
                 SurfaceGeometry::Ghoul2(g2_ref) => {
+                    // Same gate as the MD3 arm above (W2-F8).
+                    let Some(models) = models else {
+                        continue;
+                    };
                     self.collect_ghoul2_surface(
                         surf.sort,
                         g2_ref,

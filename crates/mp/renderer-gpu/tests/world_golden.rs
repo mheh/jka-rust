@@ -36,7 +36,8 @@ use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_scene::RE_RenderScene;
 use mp_renderer_gpu::ui_host::boot;
 use mp_renderer_gpu::ui_host::{BootConfig, UiHost};
-use mp_renderer_gpu::{read_target_rgba, FrameExecutor, Gpu, GpuImages, WorldFrame};
+use mp_renderer::tr_main::EntityWalkHost;
+use mp_renderer_gpu::{read_target_rgba, FrameExecutor, Gpu, GpuImages};
 use native_math::qmath::AnglesToAxis;
 
 /// The golden viewport in physical pixels. Fixed so the projection and the
@@ -208,7 +209,6 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
         executor.set_world(&gpu, world, bmodel_table);
     }
 
-    let dummy_assets = boot::empty_assets();
 
     // ---- draw the frame into the offscreen target ----------------------
     let target = gpu.headless_view();
@@ -230,7 +230,6 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
             engine,
             models,
             sim,
-            frame: fstate,
             world_load,
             img_state,
             noise,
@@ -243,11 +242,10 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
 
         // The golden test has no live Ghoul2 state, and the executor's own
         // empty system is what the world pass uses (W2-F5).
-        let mut world = WorldFrame {
+        // A sim-side caller hands the entity walk the full host bundle, so
+        // every `RT_MODEL` arm runs (W2-F8).
+        let mut entity_host = EntityWalkHost {
             engine_view: &mut engine_view,
-            assets: Arc::make_mut(&mut sim.published),
-            world_load,
-            frame: fstate,
             models: &*models,
         };
 
@@ -255,7 +253,9 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
             &mut gpu,
             &target,
             &frame_data,
-            &dummy_assets,
+            &sim.published,
+            world_load,
+            Some(&mut entity_host),
             img_state.pending_uploads.drain().collect(),
             &mut images,
             noise,
@@ -263,7 +263,6 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
             // No live cvar table in the test, so the retail defaults keep the
             // golden byte-exact.
             RenderCvarSnapshot::default(),
-            Some(&mut world),
         );
 
         // The chain must draw the world, or a blank render blesses as the

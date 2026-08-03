@@ -16,9 +16,10 @@
 //! borrowed back from the sim thread. The emptied event buffer goes back down
 //! the return channel, so the next frame reuses its allocation.
 //!
-//! The world pass is the next wave. A `RenderScene` event needs the engine-side
-//! borrows a package does not carry, so the scene arms are counted and skipped
-//! and the 2D arms draw for real.
+//! The world pass runs here too since W2-F7. A package carries the loaded
+//! world on the frame it changes, so this thread uploads the geometry once and
+//! then walks the BSP, the sky, the fog and the dynamic lights itself. The MD3
+//! and Ghoul2 entity arms stay dark until the model blocks cross (wave 3).
 
 use std::fs;
 use std::path::Path;

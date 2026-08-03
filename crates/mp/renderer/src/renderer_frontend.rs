@@ -48,6 +48,7 @@ use crate::render_state::shader_asset::{ShaderAsset, ShaderHandle};
 use crate::render_state::world_load_state::WorldLoadState;
 use crate::render_state::skin_asset::SkinAsset;
 use crate::render_state::sky_parse::SkyParse;
+use crate::render_state::world_generation::WorldGeneration;
 use crate::tr_font::FontState;
 use crate::tr_image::TrImageState;
 use crate::tr_local::view_parms_t::viewParms_t;
@@ -88,6 +89,10 @@ pub struct RendererFrontend {
     pub frame_sink: Option<FrameSink>,
     /// A `screenshot_tga` waiting for the next frame to carry it.
     pub pending_capture: Option<CaptureRequest>,
+    /// A world change waiting for the next frame to carry it (W2-F7). Set on a
+    /// map load, a map drop, and a video restart. `RE_EndFrame` moves it onto
+    /// the package, so the render thread sees each change exactly once.
+    pub pending_world: Option<WorldGeneration>,
     /// Raven's `R_ScreenShotTGA_f`-local `static int lastNumber`, which starts
     /// at `-1` and holds the scan position across calls so a burst of shots
     /// does not rescan thousands of names. Genuine cross-call state, so it
@@ -249,6 +254,7 @@ impl RendererFrontend {
             frame_data: FrameData { events: Vec::new() },
             frame_sink: None,
             pending_capture: None,
+            pending_world: None,
             screenshot_last_number: -1,
             scene: SceneState::default(),
             noise: NoiseState::default(),

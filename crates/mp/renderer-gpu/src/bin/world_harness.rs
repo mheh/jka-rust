@@ -60,7 +60,6 @@ use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
-use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::bmodel_table::BModelTable;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::tr_model::render_models::RenderModels;
@@ -69,7 +68,8 @@ use mp_renderer::tr_scene::{
 };
 use mp_renderer_gpu::ui_host::boot;
 use mp_renderer_gpu::ui_host::{BootConfig, UiHost};
-use mp_renderer_gpu::{FrameExecutor, FrameStats, Gpu, GpuImages, WorldFrame};
+use mp_renderer::tr_main::EntityWalkHost;
+use mp_renderer_gpu::{FrameExecutor, FrameStats, Gpu, GpuImages};
 use native_math::qmath::{AngleVectors, AnglesToAxis};
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, ElementState, KeyEvent, WindowEvent};
@@ -406,13 +406,9 @@ struct App {
     images: Option<GpuImages>,
     executor: Option<FrameExecutor>,
     host: UiHost,
-    /// The 2D command surface reads this, and this harness draws no 2D, so it
-    /// stands in for the `assets` parameter. The real registry
-    /// (`host.sim.published`) is borrowed by the `WorldFrame`, so it cannot
-    /// also fill that parameter. The harness therefore drains the staged image
-    /// uploads against the real registry itself, before the split borrow (see
-    /// `draw_world_frame`).
-    dummy_assets: RenderAssets,
+    // W2-F7 retired the stand-in registry. `WorldFrame` used to borrow the real
+    // one, which forced a second empty one into the `assets` parameter. One
+    // registry now serves both passes.
     // W2-F5/F6 moved the null-landscape terrain seed, its collision twin, and
     // the `tr_main` matrix scratch onto `FrameExecutor`, which owns them for
     // the process lifetime.
@@ -477,7 +473,6 @@ impl App {
     #[allow(clippy::too_many_arguments)]
     fn new(
         host: UiHost,
-        dummy_assets: RenderAssets,
         eye: [f32; 3],
         test_model: qhandle_t,
         md3_model: qhandle_t,
@@ -492,7 +487,6 @@ impl App {
             images: None,
             executor: None,
             host,
-            dummy_assets,
             camera: Camera {
                 pos: eye,
                 pitch: 0.0,
@@ -870,7 +864,6 @@ impl App {
             executor,
             images,
             window,
-            dummy_assets,
             reported,
             surface_warned,
             md3_model,
@@ -908,7 +901,6 @@ impl App {
                         engine,
                         models,
                         sim,
-                        frame: fstate,
                         world_load,
                         img_state,
                         noise,
@@ -922,11 +914,8 @@ impl App {
                     // The persisted Ghoul2 state threads into the frame, so the
                     // bone caches the render path builds survive across frames
                     // (design point 2).
-                    let mut world = WorldFrame {
+                    let mut entity_host = EntityWalkHost {
                         engine_view: &mut engine_view,
-                        assets: Arc::make_mut(&mut sim.published),
-                        world_load,
-                        frame: fstate,
                         models: &*models,
                     };
 
@@ -934,7 +923,9 @@ impl App {
                         gpu,
                         &target,
                         frame_data,
-                        &*dummy_assets,
+                        &sim.published,
+                        world_load,
+                        Some(&mut entity_host),
                         img_state.pending_uploads.drain().collect(),
                         images,
                         noise,
@@ -942,7 +933,6 @@ impl App {
                         // The harness rides the F9-driven snapshot. Every field
                         // but `pbr` keeps the retail default.
                         cvar_snapshot,
-                        Some(&mut world),
                     )
                 };
 
@@ -1299,10 +1289,8 @@ fn main() {
         }
     };
 
-    let dummy_assets = boot::empty_assets();
     let mut app = App::new(
         host,
-        dummy_assets,
         eye,
         test_model,
         md3_model,

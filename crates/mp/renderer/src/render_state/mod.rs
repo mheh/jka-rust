@@ -49,5 +49,6 @@ pub mod skin_asset;
 pub mod sky_parse;
 pub mod texture_bundle;
 pub mod walk_warnings;
+pub mod world_generation;
 pub mod world_load_state;
 pub mod world_walk_scratch;

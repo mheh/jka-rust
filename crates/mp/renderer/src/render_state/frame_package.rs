@@ -7,6 +7,8 @@ use crate::render_state::frame_data::FrameData;
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
+use crate::render_state::world_generation::WorldGeneration;
+use crate::render_state::world_load_state::WorldLoadState;
 use crate::tr_image::PendingUpload;
 
 /// Everything the render thread needs to draw one frame, and nothing it would
@@ -28,6 +30,13 @@ pub struct FramePackage {
     /// The `r_*` values this frame was built against, read once on the sim
     /// side so the replay never reaches a live cvar table.
     pub cvars: RenderCvarSnapshot,
+    /// The `tr` fields the sim writes at load and bumps per frame, which the
+    /// world walk and the draw both read (W2-F3).
+    pub world_load: WorldLoadState,
+    /// Set only on a frame where the loaded world changed (W2-F7). The render
+    /// thread uploads the new geometry before it replays this frame's events,
+    /// and leaves its world alone on every other frame.
+    pub world: Option<WorldGeneration>,
     /// The registry generation this frame's handles resolve against. Cloning
     /// the `Arc` is what keeps the render thread off the sim's registry.
     pub assets: Arc<RenderAssets>,

@@ -117,7 +117,9 @@ use mp_qshared::shared::shared_ik_move_params::sharedIKMoveParams_t;
 use mp_qshared::shared::{pc_token_t, sharedERagEffector, sharedERagPhase};
 use mp_renderer::hook_install::{re_from_view, rm_from_view};
 use mp_renderer::render_state::frame_event::FrameEvent;
+use mp_renderer::render_state::bmodel_table::BModelTable;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
+use mp_renderer::render_state::world_generation::WorldGeneration;
 use mp_renderer::tr_bsp::{RE_LoadWorldMap, R_GetEntityToken};
 use mp_renderer::tr_cmds::{RE_RotatePic, RE_RotatePic2, RE_SetColor, RE_StretchPic};
 use mp_renderer::tr_font::{
@@ -1844,6 +1846,13 @@ pub fn CL_CgameSystemCalls(
             &mut re.world_effects,
             &name,
         );
+        // W2-F7: hand the render thread the new world and the brush-submodel
+        // rows this load registered. `RE_EndFrame` moves them onto the next
+        // package, so the render thread uploads the geometry once.
+        re.pending_world = Some(WorldGeneration {
+            world: re.sim.published.world.clone(),
+            bmodels: BModelTable::build(rm),
+        });
         0
     } else if op == MpCgameImport::CG_R_REGISTERMODEL as c_int {
         let name = cstr_to_string(vma(vc, args, 1) as *const c_char);
@@ -2503,7 +2512,15 @@ pub fn CL_CgameSystemCalls(
         let buffer = vma(vc, args, 1) as *mut c_char;
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let re = unsafe { re_from_view(view) };
-        let Some(world) = Arc::make_mut(&mut re.sim.published).world.as_mut() else {
+        // `R_GetEntityToken` advances the world's own parse cursor, so this
+        // takes the world mutably. W2-F7 put it behind its own `Arc`, and
+        // `make_mut` copies only while the render thread still holds the
+        // generation this trap is walking.
+        let Some(world) = Arc::make_mut(&mut re.sim.published)
+            .world
+            .as_mut()
+            .map(Arc::make_mut)
+        else {
             return qfalse;
         };
         let (found, token) = R_GetEntityToken(world, arg(2));

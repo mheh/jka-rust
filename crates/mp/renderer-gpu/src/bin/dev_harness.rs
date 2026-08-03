@@ -38,6 +38,7 @@ use mp_renderer::render_state::image_asset::ImageAsset;
 use mp_renderer::render_state::placeholders::{AutomapWireframe, FunctionTables, GlConfig};
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::sky_parse::SkyParse;
+use mp_renderer::render_state::world_load_state::WorldLoadState;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::render_state::shader_asset::{ShaderAsset, ShaderHandle};
 use mp_renderer::render_state::shader_stage::ShaderStage;
@@ -153,6 +154,9 @@ impl ApplicationHandler for App {
                             &view,
                             &test_pattern(self.registries.checker),
                             &self.registries.assets,
+                            &WorldLoadState::default(),
+                            // 2D-only harness: no entity walk to host.
+                            None,
                             self.registries.img_state.pending_uploads.drain().collect(),
                             images,
                             &NoiseState::default(),
@@ -160,8 +164,6 @@ impl ApplicationHandler for App {
                             // No live cvar table in the harness, so the retail
                             // defaults apply.
                             RenderCvarSnapshot::default(),
-                            // 2D-only harness: no world scene to render.
-                            None,
                         );
                         if !self.reported {
                             self.reported = true;

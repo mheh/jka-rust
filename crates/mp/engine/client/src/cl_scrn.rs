@@ -896,6 +896,8 @@ pub fn SCR_UpdateScreen(view: &mut EngineHostView, cl: &mut Client) {
         &mut re.img_state,
         re.frame_sink.as_mut(),
         &mut re.pending_capture,
+        &mut re.pending_world,
+        &re.world_load,
         float_time,
         view.common,
         &re.cvars,

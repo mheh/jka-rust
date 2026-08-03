@@ -22,6 +22,7 @@ use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_event::FrameEvent;
 use crate::render_state::frame_package::FramePackage;
 use crate::render_state::frame_sink::FrameSink;
+use crate::render_state::world_generation::WorldGeneration;
 use crate::render_state::world_load_state::WorldLoadState;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_assets_sim::RenderAssetsSim;
@@ -335,6 +336,8 @@ pub fn RE_EndFrame(
     img_state: &mut TrImageState,
     sink: Option<&mut FrameSink>,
     pending_capture: &mut Option<CaptureRequest>,
+    pending_world: &mut Option<WorldGeneration>,
+    world_load: &WorldLoadState,
     float_time: f32,
     common: &Common,
     cvars: &RendererCvars,
@@ -374,6 +377,8 @@ pub fn RE_EndFrame(
                 assets: Arc::clone(&sim.published),
                 uploads: img_state.pending_uploads.drain().collect(),
                 capture: pending_capture.take(),
+                world_load: *world_load,
+                world: pending_world.take(),
             };
             // Blocking, not `try_send`. The bound paces the sim thread, and a
             // dropped frame would lose draws the client already issued.

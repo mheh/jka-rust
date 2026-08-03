@@ -2,6 +2,7 @@
 //! (`R2-D1`/`R2-D3`/`R2-D4`).
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::render_state::arena::Arena;
 use crate::render_state::image_asset::{ImageAsset, ImageHandle};
@@ -137,7 +138,13 @@ pub struct RenderAssets {
     // arena mechanics` (#51). Unifying the server and client model registries
     // is deferred to the client-engine island.
     /// `tr.world` — replaced wholesale on level load.
-    pub world: Option<WorldAsset>,
+    ///
+    /// Behind its own `Arc` since W2-F7: the world is immutable after load
+    /// (W2-F4) and it is the largest thing in this struct, so an `Arc` keeps
+    /// `Arc::make_mut` on the published registry cheap while the render thread
+    /// holds a frame, and lets the frame package name one generation without
+    /// copying the BSP.
+    pub world: Option<Arc<WorldAsset>>,
     /// `tr.externalVisData` — Raven: "from `RE_SetWorldVisData`, shared with
     /// `CM_Load`". Owned here rather than aliasing the collision world's
     /// buffer (interior-safety law); `None` until `CM_LoadMap` hands one over.

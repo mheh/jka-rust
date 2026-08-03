@@ -47,7 +47,6 @@ use std::mem;
 
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::cm_terrain::CmLandScape;
-use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::qfiles::light_style_limits::MAX_LIGHT_STYLES;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::frame_event::FrameEvent;
@@ -72,10 +71,9 @@ use mp_renderer::tr_main::{
     tr_ref_entity_from_ref_entity, DrawSurf, EntityWalkHost, R_RenderView, SurfaceGeometry,
     TrMainScratch,
 };
-use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_noise::NoiseState;
 use mp_renderer::tr_public::ref_flags::RDF_NOWORLDMODEL;
-use mp_renderer::renderer_frontend::empty_sky_state;
+use mp_renderer::renderer_frontend::{empty_sky_state, zeroed_frame_state};
 use mp_renderer::tr_sky::SkyState;
 use wgpu::TextureView;
 
@@ -188,32 +186,11 @@ impl Warned {
     }
 }
 
-/// The render-side world state one `RenderScene` event needs to run
-/// `R_RenderView` and draw. The harness split-borrows its host and engine into
-/// this bundle each frame, the same borrows `load_world_and_render` builds.
-///
-/// The terrain surface is the null-landscape one. The dlight list is not passed
-/// in either: the executor accumulates `AddLightToScene` payloads itself and
-/// rebuilds `tr.refdef.dlights` from them at `RenderScene`, the same window rule
-/// the entity list follows.
-/// The fog list is not passed in: [`FrameExecutor::render_world`] copies the
-/// loaded world's own `Fog` volumes into a per-frame `Vec<fog_t>`, since the
-/// `assets` borrow cannot also lend the fog list out. The entity list is not
-/// passed in either: the executor accumulates `AddRefEntityToScene` payloads
-/// itself and rebuilds `tr.refdef.entities` from them at `RenderScene`
-/// (DEC-50).
-/// W2-F5/F6 moved four members out of this bundle and onto
-/// [`FrameExecutor`]: the Ghoul2 instance owner, the `tr_main` matrix
-/// scratch, and the two null-landscape terrain seeds. All four are
-/// render-thread-resident and outlive one frame, so the executor owns them and
-/// no caller threads them any more.
-pub struct WorldFrame<'a, 'e> {
-    pub engine_view: &'a mut EngineHostView<'e>,
-    pub assets: &'a mut RenderAssets,
-    pub world_load: &'a WorldLoadState,
-    pub frame: &'a mut FrameState,
-    pub models: &'a RenderModels,
-}
+// `WorldFrame` is gone. Wave 2 emptied it one ruling at a time: W2-F3 took the
+// view state and the sky scratch, W2-F4 the walk marks, W2-F5 the Ghoul2
+// owner, W2-F6 the terrain seeds, W2-F8 the model registry. What is left is
+// the registry (a package field), the load state (a package field), and
+// `EntityWalkHost`, which only a sim-side caller supplies.
 
 /// Owns the render-thread state one frame's execution needs: the 2D and world
 /// pipelines, the uploaded world geometry, the reused 2D batch, and the
@@ -245,6 +222,10 @@ pub struct FrameExecutor {
     /// parse-time cloud tables it used to sit beside ride the published
     /// registry instead.
     sky: SkyState,
+    /// The walk-and-view half of the old `FrameState` (W2-F3). It stays
+    /// spelled `FrameState` because the `ViewState` rename is cosmetic and the
+    /// user parked it.
+    view_state: FrameState,
     /// `tr.landScape` at its null-landscape seed, plus the empty collision
     /// landscape beside it. W2-F6 freezes terrain at that seed for this wave:
     /// `R_AddTerrainSurfaces` returns on the null pointer, so neither value is
@@ -304,6 +285,7 @@ impl FrameExecutor {
             },
             ghoul2: Ghoul2System::default(),
             sky: empty_sky_state(),
+            view_state: zeroed_frame_state(),
             // SAFETY: `srfTerrain_t` is a frozen `#[repr(C)]` POD of scalars
             // and a raw pointer whose all-zero value is null. A null
             // `landscape` is exactly the seed `R_AddTerrainSurfaces` returns
@@ -331,6 +313,16 @@ impl FrameExecutor {
     pub fn set_world(&mut self, gpu: &Gpu, world: &WorldAsset, bmodels: BModelTable) {
         self.world_geometry = Some(WorldGeometry::upload(gpu, world));
         self.walk_scratch.set_world(world);
+        self.bmodel_table = bmodels;
+    }
+
+    /// Drops the loaded world, the state `RE_LoadWorldMap`'s own
+    /// `tr.world = NULL` leaves the renderer in between maps.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_bsp.cpp:2028`
+    pub fn drop_world(&mut self, bmodels: BModelTable) {
+        self.world_geometry = None;
+        self.walk_scratch.resize(0, 0);
         self.bmodel_table = bmodels;
     }
 
@@ -371,10 +363,11 @@ impl FrameExecutor {
     /// Replays one package that arrived over the frame channel, and returns it
     /// so the caller can hand its event buffer back to the sim thread.
     ///
-    /// This is the live client's whole draw path. The scene arms are counted
-    /// and skipped: a world frame needs the engine-side borrows a package does
-    /// not carry, so the world lands in the next wave. The 2D arms draw for
-    /// real, which is what puts menus and the HUD on the screen.
+    /// This is the live client's whole draw path. Both halves draw for real
+    /// since W2-F7: the 2D arms put menus and the HUD on the screen, and a
+    /// `RenderScene` runs the BSP walk, the sky, the fog and the dynamic
+    /// lights. Only the MD3 and Ghoul2 entity arms stay dark, since the model
+    /// blocks do not cross yet (W2-F8, wave 3).
     pub fn execute_package(
         &mut self,
         gpu: &mut Gpu,
@@ -383,18 +376,33 @@ impl FrameExecutor {
         gpu_images: &mut GpuImages,
         noise: &NoiseState,
     ) -> FrameStats {
+        // A world change arrives on the frame the sim loaded it, and only that
+        // frame (W2-F7). Upload the geometry, resize the walk marks, take the
+        // brush-submodel rows, and force the first `R_MarkLeaves` of the new
+        // world to re-mark (G6).
+        if let Some(generation) = package.world.take() {
+            match generation.world.as_deref() {
+                Some(world) => self.set_world(gpu, world, generation.bmodels),
+                None => self.drop_world(generation.bmodels),
+            }
+            // tr.viewCluster = -1
+            // Source: oracle/codemp/renderer/tr_model.cpp:1447
+            self.view_state.view_cluster = -1;
+        }
+
         let uploads = mem::take(&mut package.uploads);
         self.execute_frame(
             gpu,
             target,
             &package.frame_data,
             &package.assets,
+            &package.world_load,
+            None,
             uploads,
             gpu_images,
             noise,
             package.float_time,
             package.cvars,
-            None,
         )
     }
 
@@ -423,12 +431,13 @@ impl FrameExecutor {
         target: &TextureView,
         frame_data: &FrameData,
         assets: &RenderAssets,
+        world_load: &WorldLoadState,
+        mut entity_host: Option<&mut EntityWalkHost>,
         uploads: Vec<(ImageHandle, PendingUpload)>,
         gpu_images: &mut GpuImages,
         noise: &NoiseState,
         float_time: f32,
         cvars: RenderCvarSnapshot,
-        mut world: Option<&mut WorldFrame>,
     ) -> FrameStats {
         // `r_skipBackEnd` gates only the backend draw replay, like the oracle's
         // guard around `RB_ExecuteRenderCommands`. The frontend work runs either
@@ -446,14 +455,9 @@ impl FrameExecutor {
 
         // Frame start: every image `R_CreateImage` staged since the last
         // frame becomes a texture, so a shader registered mid-frame is
-        // drawable by the time its quad is bound. A world frame keeps its
-        // textures (lightmaps, surface diffuse maps) in its own asset registry,
-        // so uploads resolve there.
-        let upload_assets: &RenderAssets = match world.as_deref() {
-            Some(w) => &*w.assets,
-            None => assets,
-        };
-        stats.images_uploaded = gpu_images.upload_staged(gpu, uploads, upload_assets) as u32;
+        // drawable by the time its quad is bound. One registry serves the 2D
+        // pass and the world pass alike (user ruling 2026-08-02).
+        stats.images_uploaded = gpu_images.upload_staged(gpu, uploads, assets) as u32;
 
         self.batch.clear();
 
@@ -554,36 +558,31 @@ impl FrameExecutor {
                     light_styles,
                     disable_dynamic_light,
                 } => {
-                    match world.as_deref_mut() {
-                        // DEC-50: the render side rebuilds the view and runs
-                        // `R_RenderView` itself, then draws the world surfaces.
-                        Some(w) => {
-                            stats.entities =
-                                (self.scene_entities.len() - self.first_scene_entity) as u32;
-                            stats.dlights = if *disable_dynamic_light {
-                                0
-                            } else {
-                                (self.scene_dlights.len() - self.first_scene_dlight) as u32
-                            };
-                            stats.world = self.render_world(
-                                gpu,
-                                target,
-                                w,
-                                frame_data,
-                                refdef,
-                                light_styles,
-                                *disable_dynamic_light,
-                                gpu_images,
-                                noise,
-                                cvars,
-                            );
-                        }
-                        // No world context, so this frame cannot draw a scene.
-                        None => {
-                            stats.skipped_scene_events += 1;
-                            self.warn_once(Warned::SceneEvent);
-                        }
-                    }
+                    // DEC-50: the render side rebuilds the view and runs
+                    // `R_RenderView` itself, then draws the world surfaces.
+                    // W2-F7 made this unconditional: everything the pass needs
+                    // is either executor-resident or a package field.
+                    stats.entities =
+                        (self.scene_entities.len() - self.first_scene_entity) as u32;
+                    stats.dlights = if *disable_dynamic_light {
+                        0
+                    } else {
+                        (self.scene_dlights.len() - self.first_scene_dlight) as u32
+                    };
+                    stats.world = self.render_world(
+                        gpu,
+                        target,
+                        assets,
+                        world_load,
+                        entity_host.as_deref_mut(),
+                        frame_data,
+                        refdef,
+                        light_styles,
+                        *disable_dynamic_light,
+                        gpu_images,
+                        noise,
+                        cvars,
+                    );
 
                     // The next scene in this frame tacks on after this one, so
                     // the window starts move to the current list ends.
@@ -613,15 +612,9 @@ impl FrameExecutor {
                 // A scene polygon needs no work here: `R_AddPolygonSurfaces`
                 // reads the recorded events straight off `frame_data` at
                 // `RenderScene`, so the poly is already on the draw-surf list by
-                // the time the world pass runs. Without a world context there is
-                // no such pass, so it counts as a skip.
+                // the time the world pass runs.
                 // Source: oracle/codemp/renderer/tr_scene.cpp:97-109
-                FrameEvent::AddPolyToScene { .. } => {
-                    if world.is_none() {
-                        stats.skipped_scene_events += 1;
-                        self.warn_once(Warned::SceneEvent);
-                    }
-                }
+                FrameEvent::AddPolyToScene { .. } => {}
 
                 // `RE_AddDynamicLightToScene` already dropped a zero-intensity
                 // light and anything past `MAX_DLIGHTS`, so the payload lands
@@ -685,7 +678,9 @@ impl FrameExecutor {
         &mut self,
         gpu: &mut Gpu,
         target: &TextureView,
-        world: &mut WorldFrame,
+        assets: &RenderAssets,
+        world_load: &WorldLoadState,
+        entity_host: Option<&mut EntityWalkHost>,
         frame_data: &'f FrameData,
         refdef: &TrRefdef,
         light_styles: &[[u8; 4]; MAX_LIGHT_STYLES],
@@ -698,12 +693,11 @@ impl FrameExecutor {
         // frontend fog-num math (`r_compute_fog_num`, `R_SpriteFogNum`) and the
         // backend fog pass (`RB_FogPass`, `RB_CalcModulate*ByFog`) all read the
         // ABI `fog_t`, so the `Fog` list is copied once here. This read of
-        // `world.assets` ends before the mutable borrows below, since the `Vec`
+        // `assets` ends before the mutable borrows below, since the `Vec`
         // owns its elements. An empty list keeps every surface unfogged. The
         // copy and its warn run before the `geometry` borrow, so the warn-once
         // `&mut self` does not clash with that shared borrow.
-        let abi_fogs: Vec<fog_t> = world
-            .assets
+        let abi_fogs: Vec<fog_t> = assets
             .world
             .as_ref()
             .map(|w| w.fogs.iter().map(|f| f.to_fog_t()).collect())
@@ -762,24 +756,24 @@ impl FrameExecutor {
         // areamask, view-cluster mask, and time. `R_MarkLeaves` reads
         // `frame.refdef.areamask`/`areamask_modified`, and the shader clock
         // reads `frame.refdef.time`.
-        world.frame.refdef = refdef.clone();
-        world.frame.scene_light_styles = *light_styles;
+        self.view_state.refdef = refdef.clone();
+        self.view_state.scene_light_styles = *light_styles;
 
         // W2-F3 G1: the two sky-portal flags ride the `RenderScene` payload,
         // and this is where they land. `tr_sky`'s `R_DrawSkyBox` gate and the
         // world clear colour both read them, and both saw a permanent zero
         // before this assignment existed.
         // Source: oracle/codemp/renderer/tr_scene.cpp:806-813
-        world.frame.skyboxportal = refdef.skyboxportal;
-        world.frame.drawskyboxportal = refdef.drawskyboxportal;
+        self.view_state.skyboxportal = refdef.skyboxportal;
+        self.view_state.drawskyboxportal = refdef.drawskyboxportal;
 
         // Bump the per-scene counters, the render-side stand-in for the
         // oracle's `tr.frameSceneNum++`/`tr.sceneCount++`. Ruling 3 keeps that
         // off the trap-time `RE_RenderScene`, so the render-side driver does it.
         // Source: oracle/codemp/renderer/tr_scene.cpp:829-830
-        world.frame.frame_scene_num += 1;
-        world.frame.scene_count += 1;
-        let frame_scene_num = world.frame.frame_scene_num;
+        self.view_state.frame_scene_num += 1;
+        self.view_state.scene_count += 1;
+        let frame_scene_num = self.view_state.frame_scene_num;
 
         let refdef_rdflags = refdef.rdflags;
         let fov_x = refdef.fov_x;
@@ -799,7 +793,7 @@ impl FrameExecutor {
                 .collect()
         };
         let refdef_num_dlights = dlights.len() as i32;
-        let distance_cull = world.assets.distance_cull;
+        let distance_cull = assets.distance_cull;
 
         // SAFETY: `trRefdef_t` is a frozen `#[repr(C)]` POD (scalars, fixed
         // arrays, and raw pointers whose all-zero value is null).
@@ -810,25 +804,21 @@ impl FrameExecutor {
         let mut draw_surfs: Vec<DrawSurf<SurfaceGeometry<'f>>> = Vec::new();
         let mut view = zeroed_view_parms();
 
-        // The world pass runs the entity walk through the sim-side host bundle
-        // while `WorldFrame` still carries it. A render-thread caller passes
-        // `None` and the `RT_MODEL` arm draws nothing (W2-F1).
-        let mut entity_host = EntityWalkHost {
-            engine_view: world.engine_view,
-            models: world.models,
-        };
+        // The backend needs the same registry the frontend walked with, so it
+        // reads it back off the optional host bundle (W2-F8).
+        let backend_models = entity_host.as_deref().map(|host| host.models);
 
         R_RenderView(
             &parms,
             frame_scene_num,
             refdef_time,
             &mut view,
-            Some(&mut entity_host),
-            world.assets,
+            entity_host,
+            assets,
             &self.bmodel_table,
             cvars,
-            world.world_load,
-            world.frame,
+            world_load,
+            &mut self.view_state,
             &mut self.walk_scratch,
             &mut self.ghoul2,
             frame_data,
@@ -851,7 +841,7 @@ impl FrameExecutor {
         // The view begins here, so the sky flag resets before any sky surface
         // can set it, as `RB_BeginDrawingView` does.
         // Source: oracle/codemp/renderer/tr_backend.cpp:570
-        world.frame.sky_rendered_this_view = false;
+        self.view_state.sky_rendered_this_view = false;
 
         // The world walk above is frontend work and ran already. The draw below
         // is the backend submit, so `r_skipBackEnd` drops it and reports empty
@@ -866,16 +856,16 @@ impl FrameExecutor {
             target,
             &draw_surfs,
             geometry,
-            world.assets,
+            assets,
             gpu_images,
             noise,
             refdef.float_time,
             &view,
             &entities,
             &mut self.tr_main_scratch,
-            world.models,
+            backend_models,
             &mut self.ghoul2,
-            world.frame,
+            &mut self.view_state,
             &mut self.sky,
             &abi_fogs,
             cvars,

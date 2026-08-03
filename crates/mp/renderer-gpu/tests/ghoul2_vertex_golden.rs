@@ -64,7 +64,8 @@ use mp_renderer::tr_scene::{
 };
 use mp_renderer_gpu::ui_host::boot;
 use mp_renderer_gpu::ui_host::{BootConfig, UiHost};
-use mp_renderer_gpu::{FrameExecutor, Ghoul2SurfaceCapture, Gpu, GpuImages, WorldFrame};
+use mp_renderer::tr_main::EntityWalkHost;
+use mp_renderer_gpu::{FrameExecutor, Ghoul2SurfaceCapture, Gpu, GpuImages};
 use native_math::qmath::AnglesToAxis;
 
 /// The offscreen viewport in physical pixels. Fixed so the projection and the
@@ -430,7 +431,6 @@ fn golden_ghoul2_verts_stormtrooper() {
         executor.set_world(&gpu, world, bmodel_table);
     }
 
-    let dummy_assets = boot::empty_assets();
 
     // ---- draw the frame with the capture sink armed --------------------
     let target = gpu.headless_view();
@@ -450,7 +450,6 @@ fn golden_ghoul2_verts_stormtrooper() {
             engine,
             models,
             sim,
-            frame: fstate,
             world_load,
             img_state,
             noise,
@@ -463,11 +462,8 @@ fn golden_ghoul2_verts_stormtrooper() {
 
         // The live Ghoul2 state threads into the frame, so the render path builds
         // the stormtrooper skeleton and deforms its surfaces.
-        let mut world = WorldFrame {
+        let mut entity_host = EntityWalkHost {
             engine_view: &mut engine_view,
-            assets: Arc::make_mut(&mut sim.published),
-            world_load,
-            frame: fstate,
             models: &*models,
         };
 
@@ -475,13 +471,14 @@ fn golden_ghoul2_verts_stormtrooper() {
             &mut gpu,
             &target,
             &frame_data,
-            &dummy_assets,
+            &sim.published,
+            world_load,
+            Some(&mut entity_host),
             img_state.pending_uploads.drain().collect(),
             &mut images,
             noise,
             float_time,
             RenderCvarSnapshot::default(),
-            Some(&mut world),
         );
     }
 

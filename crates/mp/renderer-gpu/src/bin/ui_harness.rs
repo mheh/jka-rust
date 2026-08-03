@@ -244,6 +244,9 @@ impl App {
                     &view,
                     &frame_data,
                     &self.host.sim.published,
+                    &self.host.world_load,
+                    // Menu frames draw 2D only; no entity walk to host.
+                    None,
                     self.host.img_state.pending_uploads.drain().collect(),
                     images,
                     &self.host.noise,
@@ -251,8 +254,6 @@ impl App {
                     // No live cvar table in the harness, so the retail defaults
                     // apply.
                     RenderCvarSnapshot::default(),
-                    // Menu frames draw 2D only; no world scene.
-                    None,
                 );
                 if !self.reported {
                     self.reported = true;

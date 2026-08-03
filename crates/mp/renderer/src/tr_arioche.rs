@@ -7,6 +7,7 @@
 #![allow(non_snake_case)]
 
 use core::ffi::{c_char, c_int};
+use std::sync::Arc;
 
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::cvar_fns::{Cvar_Set, Cvar_VariableStringBuffer};
@@ -118,7 +119,9 @@ pub fn R_RMGInit(
     );
 
     // Fill in the lightgrid with sunlight
-    if let Some(world) = assets.world.as_mut() {
+    // W2-F7 put the world behind its own `Arc`. This runs at load, before the
+    // render thread has ever seen the generation, so `make_mut` never copies.
+    if let Some(world) = assets.world.as_mut().map(Arc::make_mut) {
         let has_light_grid = world.light_grid_data.is_some();
         if has_light_grid {
             if let Some(first) = world.light_grid_data.as_mut().and_then(|g| g.get_mut(0)) {
@@ -194,7 +197,7 @@ pub fn R_RMGInit(
             // the oracle (UB). The defined substitute picked here is to skip
             // the write, the one defined behavior available.
             if let Some(fog_parms) = assets.shaders.get(fog).and_then(|s| s.fog_parms) {
-                if let Some(world) = assets.world.as_mut() {
+                if let Some(world) = assets.world.as_mut().map(Arc::make_mut) {
                     if let Some(gfog) = world.fogs.get_mut(global_fog_index as usize) {
                         gfog.parms = fog_parms;
                         if gfog.parms.depth_for_opaque != 0.0 {
