@@ -53,7 +53,6 @@ use crate::tr_model::render_models::RenderModels;
 // to the pass that may restructure `server_skins.rs`.
 use crate::tr_model::server_skins::{comma_parse, re_split_skins, MAX_SKIN_SURFACES};
 use crate::tr_shader::{lightmapsNone, stylesDefault, R_FindShader};
-use crate::tr_sky::SkyState;
 
 // PORT-NOTE: several functions below read/write fields on two root types
 // this crate owns elsewhere (`render_state::placeholders::{GlConfig,
@@ -2838,7 +2837,6 @@ pub fn RE_RegisterIndividualSkin(
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
-    sky: &mut SkyState,
     name: &str,
     h_skin: SkinHandle,
 ) -> SkinHandle {
@@ -2921,7 +2919,6 @@ pub fn RE_RegisterIndividualSkin(
             models,
             img_state,
             sky_view,
-            sky,
         );
         assets
             .skins
@@ -2987,7 +2984,6 @@ pub fn RE_RegisterSkin(
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
-    sky: &mut SkyState,
     name: &str,
 ) -> qhandle_t {
     if name.is_empty() {
@@ -3032,17 +3028,17 @@ pub fn RE_RegisterSkin(
     let h_skin = if let Some((skinhead, skintorso, skinlower)) = re_split_skins(name) {
         // three part
         let mut h_skin = RE_RegisterIndividualSkin(
-            qs, world_load, assets, view, cvars, models, img_state, sky_view, sky, &skinhead,
+            qs, world_load, assets, view, cvars, models, img_state, sky_view, &skinhead,
             h_skin,
         );
         if h_skin != SkinHandle::slot_zero() {
             h_skin = RE_RegisterIndividualSkin(
-                qs, world_load, assets, view, cvars, models, img_state, sky_view, sky,
+                qs, world_load, assets, view, cvars, models, img_state, sky_view,
                 &skintorso, h_skin,
             );
             if h_skin != SkinHandle::slot_zero() {
                 h_skin = RE_RegisterIndividualSkin(
-                    qs, world_load, assets, view, cvars, models, img_state, sky_view, sky,
+                    qs, world_load, assets, view, cvars, models, img_state, sky_view,
                     &skinlower, h_skin,
                 );
             }
@@ -3051,7 +3047,7 @@ pub fn RE_RegisterSkin(
     } else {
         // single skin
         RE_RegisterIndividualSkin(
-            qs, world_load, assets, view, cvars, models, img_state, sky_view, sky, name,
+            qs, world_load, assets, view, cvars, models, img_state, sky_view, name,
             h_skin,
         )
     };

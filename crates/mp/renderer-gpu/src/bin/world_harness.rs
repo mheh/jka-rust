@@ -912,7 +912,6 @@ impl App {
                         world_load,
                         img_state,
                         noise,
-                        sky,
                         ..
                     } = host;
                     let models_ptr: *mut RenderModels = &mut *models;
@@ -928,7 +927,6 @@ impl App {
                         assets: Arc::make_mut(&mut sim.published),
                         world_load,
                         frame: fstate,
-                        sky,
                         models: &*models,
                     };
 

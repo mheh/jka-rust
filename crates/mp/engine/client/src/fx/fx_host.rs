@@ -184,7 +184,6 @@ impl FxHost<'_, '_> {
                     rm,
                     &mut re.img_state,
                     &mut re.sky_view,
-                    &mut re.sky,
                 )
             }
             FxHost::Harness(h) => {
@@ -212,7 +211,6 @@ impl FxHost<'_, '_> {
                     rm,
                     &mut re.img_state,
                     &mut re.sky_view,
-                    &mut re.sky,
                     &mut re.world_effects,
                     name,
                 )

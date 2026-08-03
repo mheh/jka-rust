@@ -81,7 +81,6 @@ use mp_renderer::tr_image::{RE_RegisterSkin, TrImageState};
 use mp_renderer::tr_local::view_parms_t::viewParms_t;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_shader::RE_RegisterShaderNoMip;
-use mp_renderer::tr_sky::SkyState;
 use mp_ui::ui_main::MenuFontToHandle;
 use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::shared::display_state::DisplayState;
@@ -129,7 +128,9 @@ pub struct HarnessDc<'a> {
     pub world_load: &'a mut WorldLoadState,
     pub qs: &'a mut QSharedScratch,
     pub sky_view: &'a mut viewParms_t,
-    pub sky: &'a mut SkyState,
+    // W2-F3 removed the `SkyState` carrier. The registration chain never
+    // needed the per-view scratch, and the two cloud tables it did need now
+    // ride the published registry.
     pub font: &'a mut FontState,
     /// The frame's event stream, drained by the caller after painting.
     pub frame_data: FrameData,
@@ -204,7 +205,6 @@ impl HarnessDc<'_> {
             &*self.models,
             self.img_state,
             self.sky_view,
-            self.sky,
             self.font,
             HARNESS_LANGUAGE,
             HARNESS_LANGUAGE_MODCOUNT,
@@ -238,7 +238,6 @@ impl HarnessDc<'_> {
             &*self.models,
             self.img_state,
             self.sky_view,
-            self.sky,
             self.font,
             HARNESS_LANGUAGE,
             HARNESS_LANGUAGE_MODCOUNT,
@@ -505,7 +504,6 @@ impl DisplayContext for HarnessDc<'_> {
             &*self.models,
             self.img_state,
             self.sky_view,
-            self.sky,
         )
     }
 
@@ -601,7 +599,6 @@ impl DisplayContext for HarnessDc<'_> {
             &*self.models,
             self.img_state,
             self.sky_view,
-            self.sky,
             self.font,
             HARNESS_LANGUAGE,
             HARNESS_LANGUAGE_MODCOUNT,
@@ -689,7 +686,6 @@ impl DisplayContext for HarnessDc<'_> {
             &*self.models,
             self.img_state,
             self.sky_view,
-            self.sky,
             self.font,
             HARNESS_LANGUAGE,
             HARNESS_LANGUAGE_MODCOUNT,
@@ -720,7 +716,6 @@ impl DisplayContext for HarnessDc<'_> {
             &*self.models,
             self.img_state,
             self.sky_view,
-            self.sky,
             self.font,
             HARNESS_LANGUAGE,
             HARNESS_LANGUAGE_MODCOUNT,
@@ -1141,7 +1136,6 @@ impl DisplayContext for HarnessDc<'_> {
             &*self.models,
             self.img_state,
             self.sky_view,
-            self.sky,
             name,
         )
     }

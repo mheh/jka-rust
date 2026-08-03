@@ -939,7 +939,6 @@ pub fn CL_InitRenderer(view: &mut EngineHostView, cl: &mut Client) {
         &mut re.world_effects,
         &mut re.qs,
         &mut re.sky_view,
-        &mut re.sky,
     );
     cl_set_glconfig(cl, &glconfig);
 
@@ -954,7 +953,6 @@ pub fn CL_InitRenderer(view: &mut EngineHostView, cl: &mut Client) {
         rm,
         &mut re.img_state,
         &mut re.sky_view,
-        &mut re.sky,
     );
 
     cl.cls.whiteShader = RE_RegisterShader(
@@ -967,7 +965,6 @@ pub fn CL_InitRenderer(view: &mut EngineHostView, cl: &mut Client) {
         rm,
         &mut re.img_state,
         &mut re.sky_view,
-        &mut re.sky,
     );
     cl.cls.consoleShader = RE_RegisterShader(
         "console",
@@ -979,7 +976,6 @@ pub fn CL_InitRenderer(view: &mut EngineHostView, cl: &mut Client) {
         rm,
         &mut re.img_state,
         &mut re.sky_view,
-        &mut re.sky,
     );
     cl.g_console_field_width = cl.cls.glconfig.vidWidth / SMALLCHAR_WIDTH - 2;
     cl.kg.g_consoleField.widthInChars = cl.g_console_field_width;

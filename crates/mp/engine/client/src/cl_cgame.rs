@@ -1841,7 +1841,6 @@ pub fn CL_CgameSystemCalls(
             rm,
             &mut re.img_state,
             &mut re.sky_view,
-            &mut re.sky,
             &mut re.world_effects,
             &name,
         );
@@ -1859,7 +1858,6 @@ pub fn CL_CgameSystemCalls(
             rm,
             &mut re.img_state,
             &mut re.sky_view,
-            &mut re.sky,
             &mut re.world_effects,
             &name,
         )
@@ -1876,7 +1874,6 @@ pub fn CL_CgameSystemCalls(
             rm,
             &mut re.img_state,
             &mut re.sky_view,
-            &mut re.sky,
             &name,
         )
     } else if op == MpCgameImport::CG_R_REGISTERSHADER as c_int {
@@ -1893,7 +1890,6 @@ pub fn CL_CgameSystemCalls(
             rm,
             &mut re.img_state,
             &mut re.sky_view,
-            &mut re.sky,
         )
     } else if op == MpCgameImport::CG_R_REGISTERSHADERNOMIP as c_int {
         let name = cstr_to_string(vma(vc, args, 1) as *const c_char);
@@ -1909,7 +1905,6 @@ pub fn CL_CgameSystemCalls(
             rm,
             &mut re.img_state,
             &mut re.sky_view,
-            &mut re.sky,
         )
     } else if op == MpCgameImport::CG_R_REGISTERFONT as c_int {
         let name = cstr_to_string(vma(vc, args, 1) as *const c_char);
@@ -1926,7 +1921,6 @@ pub fn CL_CgameSystemCalls(
             rm,
             &mut re.img_state,
             &mut re.sky_view,
-            &mut re.sky,
             &mut re.font,
             language,
             mod_count,
@@ -1947,7 +1941,6 @@ pub fn CL_CgameSystemCalls(
             rm,
             &mut re.img_state,
             &mut re.sky_view,
-            &mut re.sky,
             &mut re.font,
             language,
             mod_count,
@@ -1975,7 +1968,6 @@ pub fn CL_CgameSystemCalls(
             rm,
             &mut re.img_state,
             &mut re.sky_view,
-            &mut re.sky,
             &mut re.font,
             language,
             mod_count,
@@ -1999,7 +1991,6 @@ pub fn CL_CgameSystemCalls(
             rm,
             &mut re.img_state,
             &mut re.sky_view,
-            &mut re.sky,
             &mut re.font,
             language,
             mod_count,
@@ -2457,7 +2448,6 @@ pub fn CL_CgameSystemCalls(
             rm,
             &mut re.img_state,
             &mut re.sky_view,
-            &mut re.sky,
         );
         0
     } else if op == MpCgameImport::CG_R_GET_LIGHT_STYLE as c_int {

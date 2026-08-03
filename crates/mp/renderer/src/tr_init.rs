@@ -49,7 +49,6 @@ use crate::tr_model::render_models::RenderModels;
 use crate::tr_noise::{NoiseState, R_NoiseInit};
 use crate::tr_scene::{R_InitDecals, R_ToggleSmpFrame, SceneState};
 use crate::tr_shader::{R_InitShaders, GLS_DSTBLEND_ZERO, GLS_SRCBLEND_ONE, GL_MODULATE};
-use crate::tr_sky::SkyState;
 use crate::tr_worldeffects::world_effects::WorldEffectsState;
 
 /// `VidModeTable` — the built-in video-mode list `R_GetModeInfo`/
@@ -1594,7 +1593,6 @@ pub fn R_Init(
     world_effects: &mut WorldEffectsState,
     qs: &mut QSharedScratch,
     sky_view: &mut viewParms_t,
-    sky: &mut SkyState,
 ) {
     // First registry scope. It ends before the light-style loop, which needs
     // `sim` whole.
@@ -1737,7 +1735,7 @@ pub fn R_Init(
     R_InitImages(view, cvars, assets, &*models, state, &mut *world_load);
 
     R_InitShaders(
-        false, qs, world_load, assets, view, cvars, &*models, state, sky_view, sky,
+        false, qs, world_load, assets, view, cvars, &*models, state, sky_view,
     );
     // R_InitSkins(): the client registry (`RenderAssets::skins`) and, for the
     // dedicated link set's own `RenderModels.skins` pool, its twin — one

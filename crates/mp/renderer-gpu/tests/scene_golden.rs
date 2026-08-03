@@ -264,7 +264,6 @@ fn register_shader(host: &mut UiHost, name: &str) -> qhandle_t {
         world_load,
         qs,
         sky_view,
-        sky,
         ..
     } = host;
     let models_ptr: *mut RenderModels = &mut *models;
@@ -281,7 +280,6 @@ fn register_shader(host: &mut UiHost, name: &str) -> qhandle_t {
         models,
         img_state,
         sky_view,
-        sky,
     )
 }
 
@@ -405,7 +403,6 @@ fn run_scene(scene: &Scene) {
             world_load,
             img_state,
             noise,
-            sky,
             ..
         } = &mut host;
         let models_ptr: *mut RenderModels = &mut *models;
@@ -418,7 +415,6 @@ fn run_scene(scene: &Scene) {
             assets: Arc::make_mut(&mut sim.published),
             world_load,
             frame: fstate,
-            sky,
             models: &*models,
         };
 

@@ -37,6 +37,7 @@ use mp_renderer::render_state::frame_event::FrameEvent;
 use mp_renderer::render_state::image_asset::ImageAsset;
 use mp_renderer::render_state::placeholders::{AutomapWireframe, FunctionTables, GlConfig};
 use mp_renderer::render_state::render_assets::RenderAssets;
+use mp_renderer::render_state::sky_parse::SkyParse;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::render_state::shader_asset::{ShaderAsset, ShaderHandle};
 use mp_renderer::render_state::shader_stage::ShaderStage;
@@ -343,6 +344,7 @@ fn dev_registries() -> DevRegistries {
         sun_shader: ShaderHandle::slot_zero(),
         world: None,
         external_vis_data: None,
+        sky_parse: SkyParse::default(),
         bsp_models: Vec::new(),
         function_tables: FunctionTables::default(),
         distance_cull: 0.0,

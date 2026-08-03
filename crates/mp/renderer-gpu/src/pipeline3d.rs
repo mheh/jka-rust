@@ -2365,6 +2365,7 @@ impl Pipeline3d {
         let Some(data) = RB_StageIteratorSky(
             frame,
             sky,
+            &assets.sky_parse,
             sky_parms,
             shader.num_unfogged_passes,
             assets.default_image,

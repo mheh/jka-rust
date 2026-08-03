@@ -8,6 +8,7 @@ use crate::render_state::image_asset::{ImageAsset, ImageHandle};
 use crate::render_state::placeholders::{AutomapWireframe, FunctionTables, GlConfig, WorldAsset};
 use crate::render_state::shader_asset::{ShaderAsset, ShaderHandle};
 use crate::render_state::skin_asset::{SkinAsset, SkinHandle};
+use crate::render_state::sky_parse::SkyParse;
 
 /// The registries `trGlobals_t` used to hold, plus the session state a
 /// synchronous trap has to reach: CPU-only, immutable-after-publish,
@@ -122,6 +123,12 @@ pub struct RenderAssets {
     ///
     /// Source: `oracle/codemp/renderer/tr_local.h:1361`
     pub sun_shader: ShaderHandle,
+    /// The cloud tables `ParseSkyParms` precomputes through
+    /// `R_InitSkyTexCoords`. They ride the published registry so the world
+    /// pass reads them render-side (W2-F3 sky split).
+    ///
+    /// Source: `oracle/codemp/renderer/tr_sky.cpp:39-40`
+    pub sky_parse: SkyParse,
     // The model registry (`models: Arena<ModelAsset>` + `model_lookup`) is
     // RETIRED from this struct: `tr.models[]`/`tr.numModels`/`mhHashTable`
     // keep their arena mechanics in place on `RenderModels`

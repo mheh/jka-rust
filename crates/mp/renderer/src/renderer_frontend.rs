@@ -47,6 +47,7 @@ use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::{ShaderAsset, ShaderHandle};
 use crate::render_state::world_load_state::WorldLoadState;
 use crate::render_state::skin_asset::SkinAsset;
+use crate::render_state::sky_parse::SkyParse;
 use crate::tr_font::FontState;
 use crate::tr_image::TrImageState;
 use crate::tr_local::view_parms_t::viewParms_t;
@@ -108,8 +109,10 @@ pub struct RendererFrontend {
     pub qs: QSharedScratch,
     /// The sky-portal view parms `RE_RegisterShader`'s sky path writes.
     pub sky_view: viewParms_t,
-    /// `tr_sky.cpp`'s cloud and sky-box state.
-    pub sky: SkyState,
+    // W2-F3 split `tr_sky.cpp`'s file-scope state. The parse-time cloud tables
+    // ride `RenderAssets::sky_parse`, and the per-view scratch is
+    // render-thread-resident on `FrameExecutor`, so this bundle carries
+    // neither.
     /// `tr_world.cpp`'s wireframe-automap generator state.
     pub automap: WireframeAutomap,
 }
@@ -158,6 +161,7 @@ pub fn empty_render_assets() -> RenderAssets {
         skin_lookup: Default::default(),
         projection_shadow_shader: ShaderHandle::slot_zero(),
         sun_shader: ShaderHandle::slot_zero(),
+        sky_parse: SkyParse::default(),
         world: None,
         external_vis_data: None,
         bsp_models: Vec::new(),
@@ -218,10 +222,9 @@ pub fn empty_sky_state() -> SkyState {
         sky_min: 0.0,
         sky_max: 0.0,
         sky_clip: [[0.0; 3]; 6],
+        // The two cloud tables moved to `RenderAssets::sky_parse` (W2-F3).
         sky_points: Vec::new(),
         sky_tex_coords: Vec::new(),
-        cloud_tex_coords: Vec::new(),
-        cloud_tex_p: Vec::new(),
     }
 }
 
@@ -254,7 +257,6 @@ impl RendererFrontend {
             world_effects: WorldEffectsState::default(),
             qs: QSharedScratch::zeroed(),
             sky_view: zeroed_view_parms(),
-            sky: empty_sky_state(),
             automap: WireframeAutomap::default(),
         }
     }

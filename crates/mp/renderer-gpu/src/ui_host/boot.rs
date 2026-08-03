@@ -48,7 +48,7 @@ use mp_renderer::render_state::world_load_state::WorldLoadState;
 use mp_renderer::render_state::renderer_cvars::RendererCvars;
 use mp_renderer::render_state::world_walk_scratch::WorldWalkScratch;
 use mp_renderer::renderer_frontend::{
-    empty_render_assets, empty_sky_state, zeroed_frame_state, zeroed_view_parms,
+    empty_render_assets, zeroed_frame_state, zeroed_view_parms,
 };
 use mp_renderer::tr_bsp::RE_LoadWorldMap;
 use mp_renderer::tr_font::FontState;
@@ -66,7 +66,6 @@ use mp_renderer::tr_model::frontend::RE_RegisterModel;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_noise::NoiseState;
 use mp_renderer::tr_scene::SceneState;
-use mp_renderer::tr_sky::SkyState;
 use mp_renderer::tr_terrain::R_TerrainInit;
 use mp_renderer::tr_worldeffects::world_effects::WorldEffectsState;
 use mp_ui::world::ui_state::UiState;
@@ -197,7 +196,6 @@ pub fn boot_renderer(cfg: &BootConfig) -> UiHost {
         world_effects: WorldEffectsState::default(),
         qs: QSharedScratch::zeroed(),
         sky_view: zeroed_view_parms(),
-        sky: empty_sky(),
         ui: UiState::default(),
         input: InputState::default(),
         stubs: StubLog::default(),
@@ -221,7 +219,6 @@ pub fn boot_renderer(cfg: &BootConfig) -> UiHost {
             world_effects,
             qs,
             sky_view,
-            sky,
             ..
         } = &mut host;
         let mut frame_data = FrameData { events: Vec::new() };
@@ -245,7 +242,6 @@ pub fn boot_renderer(cfg: &BootConfig) -> UiHost {
             world_effects,
             qs,
             sky_view,
-            sky,
         );
     }
     println!(
@@ -361,7 +357,6 @@ pub fn with_dc<R>(host: &mut UiHost, body: impl FnOnce(&mut HarnessDc, &mut UiSt
         font,
         qs,
         sky_view,
-        sky,
         ui,
         input,
         stubs,
@@ -391,7 +386,6 @@ pub fn with_dc<R>(host: &mut UiHost, body: impl FnOnce(&mut HarnessDc, &mut UiSt
         world_load,
         qs,
         sky_view,
-        sky,
         font,
         frame_data: FrameData { events: Vec::new() },
         input,
@@ -493,7 +487,6 @@ pub fn load_world(host: &mut UiHost, map: &str) -> (bool, srfTerrain_t) {
             scene,
             qs,
             sky_view,
-            sky,
             world_effects,
             ..
         } = &mut *host;
@@ -511,7 +504,6 @@ pub fn load_world(host: &mut UiHost, map: &str) -> (bool, srfTerrain_t) {
             models,
             img_state,
             sky_view,
-            sky,
             world_effects,
             map,
         );
@@ -566,7 +558,6 @@ pub fn register_model(host: &mut UiHost, name: &str) -> qhandle_t {
         world_load,
         qs,
         sky_view,
-        sky,
         world_effects,
         ..
     } = &mut *host;
@@ -583,7 +574,6 @@ pub fn register_model(host: &mut UiHost, name: &str) -> qhandle_t {
         models,
         img_state,
         sky_view,
-        sky,
         world_effects,
         name,
     )
@@ -610,7 +600,6 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
             scene,
             qs,
             sky_view,
-            sky,
             world_effects,
             ..
         } = &mut *host;
@@ -628,7 +617,6 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
             models,
             img_state,
             sky_view,
-            sky,
             world_effects,
             map,
         );
@@ -867,7 +855,3 @@ pub fn find_spawn_origin(entities: &str) -> Option<[f32; 3]> {
     None
 }
 
-/// A `SkyState` at rest (`tr_sky`'s file-scope statics, zeroed).
-fn empty_sky() -> SkyState {
-    empty_sky_state()
-}

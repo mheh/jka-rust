@@ -74,7 +74,6 @@ use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_noise::NoiseState;
 use crate::tr_scene::{RE_ClearScene, SceneState};
 use crate::tr_shader::{lightmapsNone, stylesDefault, R_FindShader};
-use crate::tr_sky::SkyState;
 use crate::tr_worldeffects::world_effects::WorldEffectsState;
 
 // PORT-NOTE: R3 wave-0 packet `tr_model.wave0.md` lists 13 fns; 12 of them
@@ -378,7 +377,6 @@ pub(crate) fn re_register_models_malloc(
     rm: &mut RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
-    sky: &mut SkyState,
     size: i32,
     disk_buffer_if_just_loaded: Option<&[u8]>,
     model_file_name: &str,
@@ -411,7 +409,6 @@ pub(crate) fn re_register_models_malloc(
                 rm,
                 img_state,
                 sky_view,
-                sky,
             );
             let is_default_shader = assets
                 .shaders
@@ -500,7 +497,6 @@ pub(crate) fn r_load_md3(
     rm: &mut RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
-    sky: &mut SkyState,
     model: qhandle_t,
     lod: i32,
     buffer: &[u8],
@@ -540,7 +536,6 @@ pub(crate) fn r_load_md3(
         rm,
         img_state,
         sky_view,
-        sky,
         size,
         Some(buffer),
         mod_name,
@@ -681,7 +676,6 @@ pub(crate) fn r_load_md3(
                     rm,
                     img_state,
                     sky_view,
-                    sky,
                 );
                 let is_default_shader = assets
                     .shaders
@@ -758,7 +752,6 @@ pub fn RE_BeginRegistration(
     world_effects: &mut WorldEffectsState,
     qs: &mut QSharedScratch,
     sky_view: &mut viewParms_t,
-    sky: &mut SkyState,
 ) -> GlConfig {
     R_Init(
         view,
@@ -776,7 +769,6 @@ pub fn RE_BeginRegistration(
         world_effects,
         qs,
         sky_view,
-        sky,
     );
 
     // `R_Init` returned the registry, so this scope reaches it again.
@@ -903,7 +895,6 @@ fn RE_RegisterModel_Actual(
     rm: &mut RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
-    sky: &mut SkyState,
     world_effects: &mut WorldEffectsState,
     name: &str,
 ) -> qhandle_t {
@@ -943,7 +934,6 @@ fn RE_RegisterModel_Actual(
             rm,
             img_state,
             sky_view,
-            sky,
             world_effects,
             &format!("maps/{}.bsp", &name[1..]),
             &mut world,
@@ -1038,7 +1028,6 @@ fn RE_RegisterModel_Actual(
                     cvars,
                     img_state,
                     sky_view,
-                    sky,
                     handle,
                     &buf,
                     &filename,
@@ -1052,7 +1041,6 @@ fn RE_RegisterModel_Actual(
                     cvars,
                     img_state,
                     sky_view,
-                    sky,
                     world_effects,
                     handle,
                     &buf,
@@ -1068,7 +1056,6 @@ fn RE_RegisterModel_Actual(
                     rm,
                     img_state,
                     sky_view,
-                    sky,
                     handle,
                     lod,
                     &buf,
@@ -1163,7 +1150,6 @@ pub fn RE_RegisterModel(
     rm: &mut RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
-    sky: &mut SkyState,
     world_effects: &mut WorldEffectsState,
     name: &str,
 ) -> qhandle_t {
@@ -1179,7 +1165,6 @@ pub fn RE_RegisterModel(
         rm,
         img_state,
         sky_view,
-        sky,
         world_effects,
         name,
     );

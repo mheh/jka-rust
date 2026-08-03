@@ -81,7 +81,6 @@ use crate::tr_main::{DrawSurf, R_AddDrawSurf, SurfaceGeometry};
 use crate::tr_model::render_models::RenderModels;
 use crate::tr_public::ref_flags::{RDF_NOFOG, RDF_NOWORLDMODEL};
 use crate::tr_shader::{RE_RegisterShader, R_CreateBlendedShader, R_GetShaderByHandle};
-use crate::tr_sky::SkyState;
 use crate::tr_surface::RB_CheckOverflow;
 
 /// Raven `HEIGHT_RESOLUTION` — the size of `CTRLandScape::mHeightDetails[]`.
@@ -732,7 +731,6 @@ impl CTRLandScape {
         models: &RenderModels,
         img_state: &mut TrImageState,
         sky_view: &mut viewParms_t,
-        sky: &mut SkyState,
     ) {
         let mut path = format!("ext_data/RMG/{td}.terrain");
         com_printf(
@@ -774,7 +772,6 @@ impl CTRLandScape {
                             models,
                             img_state,
                             sky_view,
-                            sky,
                         );
                         if shader != 0 {
                             self.set_shaders(height, shader);
@@ -792,7 +789,6 @@ impl CTRLandScape {
                         models,
                         img_state,
                         sky_view,
-                        sky,
                     );
                     // DEFERRED: mWaterShader store — raw-pointer tier-2
                     // field, no Handle<Shader> replacement landed yet
@@ -812,7 +808,6 @@ impl CTRLandScape {
                         models,
                         img_state,
                         sky_view,
-                        sky,
                     );
                 }
             }

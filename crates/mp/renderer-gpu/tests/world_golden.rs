@@ -234,7 +234,6 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
             world_load,
             img_state,
             noise,
-            sky,
             ..
         } = &mut host;
         let models_ptr: *mut RenderModels = &mut *models;
@@ -249,7 +248,6 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
             assets: Arc::make_mut(&mut sim.published),
             world_load,
             frame: fstate,
-            sky,
             models: &*models,
         };
 

@@ -90,7 +90,6 @@ fn re_register_model_hook(view: &mut EngineHostView, name: &str) -> qhandle_t {
         rm,
         &mut re.img_state,
         &mut re.sky_view,
-        &mut re.sky,
         &mut re.world_effects,
         name,
     )

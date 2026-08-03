@@ -24,7 +24,6 @@ use crate::tr_image::TrImageState;
 use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_model::render_models::RenderModels;
 use crate::tr_shader::{lightmapsNone, stylesDefault, R_FindShader, R_RemapShader};
-use crate::tr_sky::SkyState;
 use crate::tr_worldeffects::world_effects::WorldEffectsState;
 
 /// Raven `R_RMGInit` — RMG (dynamic-terrain) level-load hook: remaps the sky
@@ -75,7 +74,6 @@ pub fn R_RMGInit(
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
-    sky: &mut SkyState,
     world_effects: &mut WorldEffectsState,
 ) {
     // PORT-NOTE: `Cvar_VariableStringBuffer`'s LAW signature writes through a
@@ -117,7 +115,6 @@ pub fn R_RMGInit(
         models,
         img_state,
         sky_view,
-        sky,
     );
 
     // Fill in the lightgrid with sunlight
@@ -187,7 +184,6 @@ pub fn R_RMGInit(
             models,
             img_state,
             sky_view,
-            sky,
         );
 
         if fog != ShaderHandle::slot_zero() {

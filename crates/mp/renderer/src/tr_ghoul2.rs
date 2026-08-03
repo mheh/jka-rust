@@ -89,7 +89,6 @@ use crate::tr_model::server_load::read_qpath;
 use crate::tr_shade_calc::myftol;
 use crate::tr_shader::{lightmapsNone, stylesDefault, R_FindShader, R_GetShaderByHandleQuiet};
 use mp_qshared::common::mp::cgame::tr_types::RF_THIRD_PERSON;
-use crate::tr_sky::SkyState;
 use crate::tr_worldeffects::world_effects::WorldEffectsState;
 
 // ---------------------------------------------------------------------------
@@ -1687,7 +1686,6 @@ impl RenderModels {
         cvars: &RendererCvars,
         img_state: &mut TrImageState,
         sky_view: &mut viewParms_t,
-        sky: &mut SkyState,
         model: qhandle_t,
         buffer: &[u8],
         mod_name: &str,
@@ -1729,7 +1727,6 @@ impl RenderModels {
             self,
             img_state,
             sky_view,
-            sky,
             size,
             Some(buffer),
             mod_name,
@@ -1911,7 +1908,6 @@ impl RenderModels {
         cvars: &RendererCvars,
         img_state: &mut TrImageState,
         sky_view: &mut viewParms_t,
-        sky: &mut SkyState,
         world_effects: &mut WorldEffectsState,
         model: qhandle_t,
         buffer: &[u8],
@@ -1954,7 +1950,6 @@ impl RenderModels {
             self,
             img_state,
             sky_view,
-            sky,
             size,
             Some(buffer),
             mod_name,
@@ -2013,7 +2008,6 @@ impl RenderModels {
             self,
             img_state,
             sky_view,
-            sky,
             world_effects,
             &anim_filename,
         );
@@ -2112,7 +2106,6 @@ impl RenderModels {
                     self,
                     img_state,
                     sky_view,
-                    sky,
                 );
                 // insert it in the surface list
                 let is_default_shader = assets

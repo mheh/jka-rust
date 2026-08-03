@@ -30,6 +30,7 @@ use native_math::qmath::VectorNormalize;
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::placeholders::SkyParms;
+use crate::render_state::sky_parse::SkyParse;
 use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use crate::render_state::world_load_state::WorldLoadState;
 use crate::tr_local::view_parms_t::viewParms_t;
@@ -90,21 +91,11 @@ pub struct SkyState {
     ///
     /// Source: `oracle/codemp/renderer/tr_sky.cpp:345` (file-scope static)
     pub sky_tex_coords: Vec<Vec<[f32; 2]>>,
-    /// Raven `s_cloudTexCoords[6][SKY_SUBDIVISIONS+1][SKY_SUBDIVISIONS+1]` —
-    /// per-face cloud-layer texture coordinates, precomputed by
-    /// `R_InitSkyTexCoords` and consumed by `FillCloudBox`. Same sizing note
-    /// as `sky_points`.
-    ///
-    /// Source: `oracle/codemp/renderer/tr_sky.cpp` (file-scope static, not in
-    /// this packet's slice)
-    pub cloud_tex_coords: Vec<Vec<Vec<[f32; 2]>>>,
-    /// Raven `s_cloudTexP[6][SKY_SUBDIVISIONS+1][SKY_SUBDIVISIONS+1]` — the
-    /// per-vertex cloud-layer intersection parameter `R_InitSkyTexCoords`
-    /// precomputes. Same sizing note as `sky_points`.
-    ///
-    /// Source: `oracle/codemp/renderer/tr_sky.cpp` (file-scope static, not in
-    /// this packet's slice)
-    pub cloud_tex_p: Vec<Vec<Vec<f32>>>,
+    // W2-F3 moved `s_cloudTexCoords` and `s_cloudTexP` to
+    // `RenderAssets::sky_parse`. `ParseSkyParms` fills them once and the world
+    // pass only reads them, so they belong on the published side and this
+    // carrier keeps only per-view scratch.
+    // Source: `oracle/codemp/renderer/tr_sky.cpp:39-40`
 }
 
 /// One outer-box face's draw list — the render-side product of one iteration
@@ -370,7 +361,8 @@ pub fn MakeSkyVec(
     t: f32,
     axis: usize,
     view: &viewParms_t,
-    sky: &SkyState,
+    sky_min: f32,
+    sky_max: f32,
 ) -> (vec3_t, [f32; 2]) {
     // 1 = s, 2 = t, 3 = 2048
     let box_size = view.zFar / 1.75; // div sqrt(3)
@@ -389,16 +381,16 @@ pub fn MakeSkyVec(
     // avoid bilerp seam
     let mut s = (s + 1.0) * 0.5;
     let mut t = (t + 1.0) * 0.5;
-    if s < sky.sky_min {
-        s = sky.sky_min;
-    } else if s > sky.sky_max {
-        s = sky.sky_max;
+    if s < sky_min {
+        s = sky_min;
+    } else if s > sky_max {
+        s = sky_max;
     }
 
-    if t < sky.sky_min {
-        t = sky.sky_min;
-    } else if t > sky.sky_max {
-        t = sky.sky_max;
+    if t < sky_min {
+        t = sky_min;
+    } else if t > sky_max {
+        t = sky_max;
     }
 
     t = 1.0 - t;
@@ -588,6 +580,7 @@ pub fn FillCloudBox(
     stage: i32,
     view: &viewParms_t,
     sky: &mut SkyState,
+    sky_parse: &SkyParse,
     cloud: &mut SkyCloudData,
 ) {
     for i in 0..6usize {
@@ -658,12 +651,13 @@ pub fn FillCloudBox(
                     (t - HALF_SKY_SUBDIVISIONS) as f32 / HALF_SKY_SUBDIVISIONS as f32,
                     i,
                     view,
-                    sky,
+                    sky.sky_min,
+                    sky.sky_max,
                 );
                 sky.sky_points[t as usize][s as usize] = xyz;
 
                 sky.sky_tex_coords[t as usize][s as usize] =
-                    sky.cloud_tex_coords[i][t as usize][s as usize];
+                    sky_parse.cloud_tex_coords[i][t as usize][s as usize];
             }
         }
 
@@ -697,7 +691,7 @@ pub fn FillCloudBox(
 /// regions, not one blanket `f64` computation, to match that exactly.
 ///
 /// Source: `oracle/codemp/renderer/tr_sky.cpp:626-680`
-pub fn R_InitSkyTexCoords(height_cloud: f32, view: &mut viewParms_t, sky: &mut SkyState) {
+pub fn R_InitSkyTexCoords(height_cloud: f32, view: &mut viewParms_t, sky: &mut SkyParse) {
     let radius_world: f32 = 4096.0;
 
     // Raven's `s_cloudTexP[6][SKY_SUBDIVISIONS+1][SKY_SUBDIVISIONS+1]` and
@@ -718,12 +712,17 @@ pub fn R_InitSkyTexCoords(height_cloud: f32, view: &mut viewParms_t, sky: &mut S
         for t in 0..=SKY_SUBDIVISIONS {
             for s in 0..=SKY_SUBDIVISIONS {
                 // compute vector from view origin to sky side integral point
+                // This fn discards the texture coordinate, and `MakeSkyVec`'s
+                // xyz half never reads the clamp bounds, so the pair passed
+                // here cannot change the result. `DrawSkyBox`'s own `0`/`1`
+                // stands in for whatever the globals happened to hold.
                 let (sky_vec, _st) = MakeSkyVec(
                     (s - HALF_SKY_SUBDIVISIONS) as f32 / HALF_SKY_SUBDIVISIONS as f32,
                     (t - HALF_SKY_SUBDIVISIONS) as f32 / HALF_SKY_SUBDIVISIONS as f32,
                     i,
                     view,
-                    sky,
+                    0.0,
+                    1.0,
                 );
 
                 // compute parametric value 'p' that intersects with cloud layer
@@ -898,7 +897,8 @@ pub fn DrawSkyBox(
                     (t - HALF_SKY_SUBDIVISIONS) as f32 / HALF_SKY_SUBDIVISIONS as f32,
                     i,
                     view,
-                    sky,
+                    sky.sky_min,
+                    sky.sky_max,
                 );
                 sky.sky_tex_coords[t as usize][s as usize] = st;
                 sky.sky_points[t as usize][s as usize] = xyz;
@@ -941,6 +941,7 @@ pub fn R_BuildCloudData(
     num_unfogged_passes: i32,
     view: &viewParms_t,
     sky: &mut SkyState,
+    sky_parse: &SkyParse,
     cloud: &mut SkyCloudData,
 ) {
     // FIXME: not correct?
@@ -954,7 +955,7 @@ pub fn R_BuildCloudData(
 
     if sky_parms.cloud_height != 0.0 {
         for i in 0..num_unfogged_passes {
-            FillCloudBox(i, view, sky, cloud);
+            FillCloudBox(i, view, sky, sky_parse, cloud);
         }
     }
 }
@@ -1074,6 +1075,7 @@ pub fn RB_DrawSun(
 pub fn RB_StageIteratorSky(
     frame: &mut FrameState,
     sky: &mut SkyState,
+    sky_parse: &SkyParse,
     sky_parms: &SkyParms,
     num_unfogged_passes: i32,
     default_image: Option<ImageHandle>,
@@ -1125,7 +1127,7 @@ pub fn RB_StageIteratorSky(
     // generate the vertexes for all the clouds, which the backend draws
     // through its generic stage machinery (RB_StageIteratorGeneric)
     let mut cloud = SkyCloudData::default();
-    R_BuildCloudData(sky_parms, num_unfogged_passes, view, sky, &mut cloud);
+    R_BuildCloudData(sky_parms, num_unfogged_passes, view, sky, sky_parse, &mut cloud);
 
     // note that sky was drawn so we will draw a sun later
     frame.sky_rendered_this_view = true;

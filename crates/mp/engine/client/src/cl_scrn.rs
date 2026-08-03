@@ -85,7 +85,6 @@ pub fn SCR_DrawNamedPic(
         rm,
         &mut re.img_state,
         &mut re.sky_view,
-        &mut re.sky,
     );
     RE_StretchPic(
         &mut re.frame_data,

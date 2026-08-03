@@ -1265,7 +1265,6 @@ pub fn CL_UISystemCalls(
                 rm,
                 &mut re.img_state,
                 &mut re.sky_view,
-                &mut re.sky,
                 &mut re.world_effects,
                 &name,
             )
@@ -1284,7 +1283,6 @@ pub fn CL_UISystemCalls(
                 rm,
                 &mut re.img_state,
                 &mut re.sky_view,
-                &mut re.sky,
                 &name,
             )
         }
@@ -1303,7 +1301,6 @@ pub fn CL_UISystemCalls(
                 rm,
                 &mut re.img_state,
                 &mut re.sky_view,
-                &mut re.sky,
             )
         }
     } else if trap == MpUiImport::UI_R_SHADERNAMEFROMINDEX as c_int {
@@ -1684,7 +1681,6 @@ pub fn CL_UISystemCalls(
             rm,
             &mut re.img_state,
             &mut re.sky_view,
-            &mut re.sky,
             &mut re.font,
             language,
             mod_count,
@@ -1708,7 +1704,6 @@ pub fn CL_UISystemCalls(
             rm,
             &mut re.img_state,
             &mut re.sky_view,
-            &mut re.sky,
             &mut re.font,
             language,
             mod_count,
@@ -1739,7 +1734,6 @@ pub fn CL_UISystemCalls(
             rm,
             &mut re.img_state,
             &mut re.sky_view,
-            &mut re.sky,
             &mut re.font,
             language,
             mod_count,
@@ -1774,7 +1768,6 @@ pub fn CL_UISystemCalls(
             rm,
             &mut re.img_state,
             &mut re.sky_view,
-            &mut re.sky,
             &mut re.font,
             language,
             mod_count,
@@ -1951,7 +1944,6 @@ pub fn CL_UISystemCalls(
                 rm,
                 &mut re.img_state,
                 &mut re.sky_view,
-                &mut re.sky,
             )
         };
         0

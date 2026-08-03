@@ -15,7 +15,6 @@ use mp_renderer::tr_local::view_parms_t::viewParms_t;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_noise::NoiseState;
 use mp_renderer::tr_scene::SceneState;
-use mp_renderer::tr_sky::SkyState;
 use mp_renderer::tr_worldeffects::world_effects::WorldEffectsState;
 use mp_ui::world::ui_state::UiState;
 use native_math::rng::Rng;
@@ -54,7 +53,7 @@ pub struct UiHost {
     pub world_effects: WorldEffectsState,
     pub qs: QSharedScratch,
     pub sky_view: viewParms_t,
-    pub sky: SkyState,
+    // W2-F3: the sky scratch is render-thread-resident on `FrameExecutor`.
 
     // ---- the ui module -------------------------------------------------
     /// The real [`mp_ui::world::ui_state::UiState`]; the harness drives its

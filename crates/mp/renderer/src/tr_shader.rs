@@ -63,7 +63,7 @@ use crate::tr_local::tex_mod_t::texMod_t;
 use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_local::wave_form_t::waveForm_t;
 use crate::tr_model::render_models::RenderModels;
-use crate::tr_sky::{R_InitSkyTexCoords, SkyState};
+use crate::tr_sky::R_InitSkyTexCoords;
 
 // PORT-NOTE: this wave is `tr_shader`'s first (wave 0) — the R3 wave the
 // tier-2 transition audit assigns `ShaderAsset`'s fields to
@@ -5108,7 +5108,6 @@ pub fn ParseSkyParms<'a>(
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
-    sky: &mut SkyState,
 ) {
     let warn = S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII");
     const SUF: [&str; 6] = ["rt", "lf", "bk", "ft", "up", "dn"];
@@ -5183,7 +5182,10 @@ pub fn ParseSkyParms<'a>(
     if let Some(sky) = state.sky.as_mut() {
         sky.cloud_height = cloud_height;
     }
-    R_InitSkyTexCoords(cloud_height, sky_view, sky);
+    // W2-F3: the two cloud tables live on the published registry, so this
+    // parse-time writer reaches them through `assets` and the whole
+    // registration chain drops its `SkyState` parameter.
+    R_InitSkyTexCoords(cloud_height, sky_view, &mut assets.sky_parse);
 
     // innerbox
     let (token, rest) = COM_ParseExt(qs, *text, false);
@@ -5264,7 +5266,6 @@ pub fn ParseShader<'a>(
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
-    sky: &mut SkyState,
 ) -> bool {
     let warn = S_COLOR_YELLOW.to_str().expect("S_COLOR_YELLOW is ASCII");
     let mut s: usize = 0;
@@ -5483,7 +5484,7 @@ pub fn ParseShader<'a>(
         // skyparms <cloudheight> <outerbox> <innerbox>
         else if token.eq_ignore_ascii_case("skyparms") {
             ParseSkyParms(
-                text, qs, state, view, cvars, assets, models, img_state, sky_view, sky,
+                text, qs, state, view, cvars, assets, models, img_state, sky_view,
             );
         }
         // light <value> determines flaring in q3map, not needed here
@@ -5585,7 +5586,6 @@ pub fn R_FindShader(
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
-    sky: &mut SkyState,
 ) -> ShaderHandle {
     if name.is_empty() {
         return ShaderHandle::slot_zero(); // tr.defaultShader
@@ -5647,7 +5647,6 @@ pub fn R_FindShader(
             models,
             img_state,
             sky_view,
-            sky,
         ) {
             // had errors, so use default shader
             state.default_shader = true;
@@ -5768,7 +5767,6 @@ pub fn RE_RegisterShaderLightMap(
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
-    sky: &mut SkyState,
 ) -> i32 {
     if name.len() >= MAX_QPATH as usize {
         com_printf(view.common, "Shader name exceeds MAX_QPATH\n");
@@ -5788,7 +5786,6 @@ pub fn RE_RegisterShaderLightMap(
         models,
         img_state,
         sky_view,
-        sky,
     );
 
     // we want to return 0 if the shader failed to
@@ -5826,7 +5823,6 @@ pub fn RE_RegisterShader(
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
-    sky: &mut SkyState,
 ) -> i32 {
     if name.len() >= MAX_QPATH as usize {
         com_printf(view.common, "Shader name exceeds MAX_QPATH\n");
@@ -5846,7 +5842,6 @@ pub fn RE_RegisterShader(
         models,
         img_state,
         sky_view,
-        sky,
     );
 
     // we want to return 0 if the shader failed to
@@ -5879,7 +5874,6 @@ pub fn RE_RegisterShaderNoMip(
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
-    sky: &mut SkyState,
 ) -> i32 {
     if name.len() >= MAX_QPATH as usize {
         com_printf(view.common, "Shader name exceeds MAX_QPATH\n");
@@ -5899,7 +5893,6 @@ pub fn RE_RegisterShaderNoMip(
         models,
         img_state,
         sky_view,
-        sky,
     );
 
     // we want to return 0 if the shader failed to
@@ -5930,7 +5923,6 @@ pub fn CreateExternalShaders(
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
-    sky: &mut SkyState,
 ) {
     let projection_shadow = R_FindShader(
         "projectionShadow",
@@ -5945,7 +5937,6 @@ pub fn CreateExternalShaders(
         models,
         img_state,
         sky_view,
-        sky,
     );
     assets.projection_shadow_shader = projection_shadow;
     // tr.projectionShadowShader->sort = SS_STENCIL_SHADOW;
@@ -5965,7 +5956,6 @@ pub fn CreateExternalShaders(
         models,
         img_state,
         sky_view,
-        sky,
     );
 }
 
@@ -6008,7 +5998,6 @@ pub fn R_RemapShader(
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
-    sky: &mut SkyState,
 ) {
     let _ = (
         shader_name,
@@ -6022,7 +6011,6 @@ pub fn R_RemapShader(
         models,
         img_state,
         sky_view,
-        sky,
     );
     // DEFERRED: body not transcribed — the destination fields exist now, the
     // lookup/hash-chain walk does not. See doc comment above.
@@ -6109,7 +6097,6 @@ pub fn R_InitShaders(
     models: &RenderModels,
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
-    sky: &mut SkyState,
 ) {
     //Com_Printf ("Initializing Shaders\n" );
 
@@ -6136,7 +6123,7 @@ pub fn R_InitShaders(
         ScanAndLoadShaderFiles(assets, qs, view, "shaders");
 
         CreateExternalShaders(
-            qs, world_load, assets, view, cvars, models, img_state, sky_view, sky,
+            qs, world_load, assets, view, cvars, models, img_state, sky_view,
         );
     }
     // #endif

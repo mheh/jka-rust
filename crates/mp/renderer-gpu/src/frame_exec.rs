@@ -75,6 +75,7 @@ use mp_renderer::tr_main::{
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_noise::NoiseState;
 use mp_renderer::tr_public::ref_flags::RDF_NOWORLDMODEL;
+use mp_renderer::renderer_frontend::empty_sky_state;
 use mp_renderer::tr_sky::SkyState;
 use wgpu::TextureView;
 
@@ -211,17 +212,6 @@ pub struct WorldFrame<'a, 'e> {
     pub assets: &'a mut RenderAssets,
     pub world_load: &'a WorldLoadState,
     pub frame: &'a mut FrameState,
-    /// The sky-box scratch carrier `ParseSkyParms` seeded through
-    /// `R_InitSkyTexCoords`. The world pass reads its cloud tex-coord tables
-    /// and reuses its grid scratch when a sky-shader surface draws (DEC-50).
-    ///
-    //TODO: Port SkyState split
-    // Source: oracle/codemp/renderer/tr_sky.cpp:699-760
-    // W2-F3 splits this carrier: the parse-time cloud tables belong on the
-    // published assets and only the per-view grid scratch belongs on the
-    // executor. Until that split lands, the whole carrier stays sim-owned and
-    // crosses by reference, which pins the world pass to the sim thread.
-    pub sky: &'a mut SkyState,
     pub models: &'a RenderModels,
 }
 
@@ -250,6 +240,11 @@ pub struct FrameExecutor {
     /// owner here, so the caches the render path builds persist across frames
     /// without a caller threading them in.
     ghoul2: Ghoul2System,
+    /// `tr_sky.cpp`'s per-view scratch: the projected sky-box extents and the
+    /// grid the backend snapshots per face. W2-F3 homes it here, and the
+    /// parse-time cloud tables it used to sit beside ride the published
+    /// registry instead.
+    sky: SkyState,
     /// `tr.landScape` at its null-landscape seed, plus the empty collision
     /// landscape beside it. W2-F6 freezes terrain at that seed for this wave:
     /// `R_AddTerrainSurfaces` returns on the null pointer, so neither value is
@@ -308,6 +303,7 @@ impl FrameExecutor {
                 pre_trans_ent_matrix: [0.0; 16],
             },
             ghoul2: Ghoul2System::default(),
+            sky: empty_sky_state(),
             // SAFETY: `srfTerrain_t` is a frozen `#[repr(C)]` POD of scalars
             // and a raw pointer whose all-zero value is null. A null
             // `landscape` is exactly the seed `R_AddTerrainSurfaces` returns
@@ -880,7 +876,7 @@ impl FrameExecutor {
             world.models,
             &mut self.ghoul2,
             world.frame,
-            world.sky,
+            &mut self.sky,
             &abi_fogs,
             cvars,
         )
