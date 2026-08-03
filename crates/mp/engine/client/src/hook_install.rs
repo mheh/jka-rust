@@ -9,7 +9,7 @@
 
 #![allow(non_snake_case)]
 
-use core::ffi::{c_char, c_int, c_uint};
+use core::ffi::{c_int, c_uint};
 
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::EngineHooks;
@@ -151,15 +151,12 @@ fn CL_KeyEvent_hook(view: &mut EngineHostView, key: c_int, down: bool, time: c_i
     CL_KeyEvent(view, cl, key, down, time as c_uint);
 }
 
-/// Raven `CL_ForwardCommandToServer`. The hook hands a `&str`, and the body
-/// forwards a C string, so the adapter appends the NUL here.
+/// Raven `CL_ForwardCommandToServer`.
 /// Source: `oracle/codemp/client/cl_main.cpp:913`
 fn CL_ForwardCommandToServer_hook(view: &mut EngineHostView, string: &str) {
     // SAFETY: view-constructor slot, single-threaded, no other live cast.
     let cl = unsafe { cl_from_view(view) };
-    let mut buf = string.as_bytes().to_vec();
-    buf.push(0);
-    CL_ForwardCommandToServer(view.common, cl, buf.as_ptr() as *const c_char);
+    CL_ForwardCommandToServer(view.common, cl, string);
 }
 
 /// Raven `CL_GameCommand`. Source: `oracle/codemp/client/cl_cgame.cpp:1815`

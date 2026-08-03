@@ -1583,7 +1583,8 @@ pub fn CL_CgameSystemCalls(
         Cmd_RemoveCommand(view.common, &s);
         0
     } else if op == MpCgameImport::CG_SENDCLIENTCOMMAND as c_int {
-        CL_AddReliableCommand(cl, vma(vc, args, 1) as *const c_char);
+        let s = cstr_to_string(vma(vc, args, 1) as *const c_char);
+        CL_AddReliableCommand(cl, &s);
         0
     } else if op == MpCgameImport::CG_UPDATESCREEN as c_int {
         // This is used during lengthy level loading, so pump message loop.
