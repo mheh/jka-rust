@@ -8,6 +8,8 @@
 
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::mpsc::{Receiver, SyncSender};
+use std::sync::Arc;
+use std::time::Duration;
 
 use mp_engine_client::snd::sound_system::SoundSystem;
 use mp_engine_client::Client;
@@ -53,13 +55,34 @@ fn boot_and_run(
     // game dispatch note captures the `cl` and `re` addresses by value and a
     // module trap would otherwise reach a null one.
     engine.cl = Some(Client::default());
-    engine.re = Some(RendererFrontend {
+
+    // Block here until the pump reports a real drawable size.
+    // This is the port's `GLimp_Init` stand-in.
+    // Raven's `R_Init` did not return until `GLimp_Init` had created the window and measured it.
+    // Source: `oracle/codemp/win32/win_glimp.cpp:713` (`GLimp_Init`, via `GLW_SetMode`'s `R_GetModeInfo`)
+    let (drawable_width, drawable_height) = loop {
+        let (width, height) = events.drawable_size();
+        if width != 0 && height != 0 {
+            break (width, height);
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    };
+
+    let mut renderer = RendererFrontend {
         // Installing the sink is what turns `RE_EndFrame` from "clear the
         // stream" into "send the frame". Only a client build with a render
         // thread does it.
         frame_sink: Some(FrameSink { packages, recycled }),
         ..RendererFrontend::new()
-    });
+    };
+    // Seed `glconfig` once at boot from the measured window.
+    // It stays boot-static after this, as in Raven.
+    // A later change needs `vid_restart`.
+    let assets = Arc::make_mut(&mut renderer.sim.published);
+    assets.glconfig.vid_width = drawable_width;
+    assets.glconfig.vid_height = drawable_height;
+    engine.re = Some(renderer);
+
     engine.snd = Some(SoundSystem {
         // The platform shell is the arm that has a device (DEC-57.1).
         device_enabled: true,

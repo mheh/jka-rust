@@ -59,8 +59,8 @@ struct MouseDelta {
     dy: AtomicI32,
 }
 
-/// The shared half of the bus: the mouse accumulator, the quit request, and the
-/// overflow flag.
+/// The shared half of the bus: the mouse accumulator, the quit request, the
+/// overflow flag, and the window's drawable size.
 #[derive(Default)]
 struct PlatformShared {
     mouse: MouseDelta,
@@ -70,6 +70,15 @@ struct PlatformShared {
     quit: AtomicBool,
     /// Set when the pump had to drop an event, cleared once the drain reports it.
     overflowed: AtomicBool,
+    /// The window's drawable width, in physical pixels.
+    /// It stays zero until the pump creates the window.
+    ///
+    /// The sim thread reads it once at renderer boot, the port's `GLimp_Init` stand-in.
+    ///
+    /// Source: `oracle/codemp/win32/win_glimp.cpp:713` (`GLimp_Init`, via `GLW_SetMode`'s `R_GetModeInfo`)
+    drawable_width: AtomicI32,
+    /// The paired height for `drawable_width`.
+    drawable_height: AtomicI32,
 }
 
 /// The pump half, owned by the main thread.
@@ -137,6 +146,17 @@ impl PlatformEventSink {
     pub fn request_quit(&self) {
         self.shared.quit.store(true, Ordering::Relaxed);
     }
+
+    /// Publish the window's drawable size, in physical pixels.
+    ///
+    /// The pump calls this once the window exists, and again on every resize.
+    /// The sim thread reads it once at renderer boot, the port's `GLimp_Init` stand-in.
+    ///
+    /// Source: `oracle/codemp/win32/win_glimp.cpp:713` (`GLimp_Init`, via `GLW_SetMode`'s `R_GetModeInfo`)
+    pub fn publish_drawable_size(&self, width: c_int, height: c_int) {
+        self.shared.drawable_width.store(width, Ordering::Relaxed);
+        self.shared.drawable_height.store(height, Ordering::Relaxed);
+    }
 }
 
 /// Add one float delta to a thousandths-of-a-count accumulator.
@@ -173,6 +193,16 @@ impl PlatformEventSource {
     /// Report and clear the overflow flag, so the drain warns once per burst.
     pub fn take_overflow(&self) -> bool {
         self.shared.overflowed.swap(false, Ordering::Relaxed)
+    }
+
+    /// Read the window's drawable size, in physical pixels.
+    ///
+    /// Both values stay zero until the pump creates the window.
+    pub fn drawable_size(&self) -> (c_int, c_int) {
+        (
+            self.shared.drawable_width.load(Ordering::Relaxed),
+            self.shared.drawable_height.load(Ordering::Relaxed),
+        )
     }
 }
 

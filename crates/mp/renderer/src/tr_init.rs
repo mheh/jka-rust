@@ -1310,9 +1310,11 @@ pub fn InitOpenGL(
     frame: &mut FrameState,
 ) {
     if assets.glconfig.vid_width == 0 {
-        // DEFERRED: GLimp_Init — no reachable path from this crate (see doc
-        // comment above).
-        // Source: oracle/codemp/renderer/tr_init.cpp:394
+        // The client host fills the dimension half of `GLimp_Init` now.
+        // The window pump publishes the drawable size.
+        // `mp_client_app::sim` seeds `glconfig.vid_width`/`vid_height` from it before this call.
+        // A live client always takes the nonzero arm below.
+        // Source: oracle/codemp/renderer/tr_init.cpp:394; oracle/codemp/win32/win_glimp.cpp:713
 
         // print info the first time only
         GL_SetDefaultState(view, cvars, assets, state);

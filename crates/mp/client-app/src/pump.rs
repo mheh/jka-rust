@@ -11,6 +11,7 @@
 //!
 //! Source: `oracle/codemp/win32/win_wndproc.cpp:301-540`
 
+use core::ffi::c_int;
 use std::sync::mpsc::{sync_channel, Receiver, Sender, SyncSender};
 use std::sync::Arc;
 use std::thread::Builder;
@@ -119,6 +120,12 @@ impl ApplicationHandler for Pump {
                 .expect("create_window: the client could not open its window"),
         );
 
+        // The sim thread waits on this to seed `glconfig`,
+        // the port's `GLimp_Init` stand-in (`platform_events.rs`).
+        let size = window.inner_size();
+        self.events
+            .publish_drawable_size(size.width as c_int, size.height as c_int);
+
         // The surface is built here, on the thread that owns the window, and
         // then the whole GPU moves to the render thread for good.
         let gpu = Gpu::new(Arc::clone(&window));
@@ -162,6 +169,10 @@ impl ApplicationHandler for Pump {
                 self.events.request_quit();
             }
             WindowEvent::Resized(size) => {
+                // `glconfig` reads the drawable size once at boot.
+                // A live resize here waits for `vid_restart` semantics.
+                self.events
+                    .publish_drawable_size(size.width as c_int, size.height as c_int);
                 self.send_render(RenderCommand::Resize {
                     width: size.width,
                     height: size.height,
