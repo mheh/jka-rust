@@ -555,9 +555,11 @@ pub fn g2api_remove_ghoul2_models(g2: &mut Ghoul2System, ghoul2: &mut CGhoul2Inf
 /// Raven `qboolean G2API_HaveWeGhoul2Models(CGhoul2Info_v &ghoul2)` — `qtrue`
 /// iff any model instance has `mModelindex != -1`. Pure read.
 ///
-/// Raven's `if ((int)&ghoul2)` address-of-reference check is always true
-/// (dropped, mechanical — a reference is never null in valid C++; the same
-/// boilerplate several other `G2API_*` functions in this file also discard).
+/// Raven's `if ((int)&ghoul2)` is the null-handle guard on the trap path, where the
+/// dispatcher makes the reference out of the module's raw word.
+/// A Rust reference is never null, so the dispatcher arms carry the guard instead
+/// (`cl_cgame.rs` CG_G2_HAVEWEGHOULMODELS, `cl_ui.rs` UI_G2_HAVEWEGHOULMODELS,
+/// `sv_game.rs` G_G2_HAVEWEGHOULMODELS).
 ///
 /// Source: `oracle/codemp/ghoul2/G2_API.cpp:1920-1934`
 pub fn g2api_have_we_ghoul2_models(g2: &Ghoul2System, ghoul2: &CGhoul2Info_v) -> bool {
@@ -571,6 +573,10 @@ pub fn g2api_have_we_ghoul2_models(g2: &Ghoul2System, ghoul2: &CGhoul2Info_v) ->
 /// dead-body fold), not a §20 drop — it is still a live `SV_GameSystemCalls`
 /// switch target (`sv_game.cpp:1328`, `G_G2_SETMODELINDEXES`), so the 1:1
 /// signature is kept and reached, but the body genuinely does nothing.
+///
+/// The dead body's `if ((int)&ghoul2)` (`:1942`) is the null-handle guard on the trap
+/// path, and the dispatcher arms carry it (`cl_cgame.rs` CG_G2_SETMODELS, `cl_ui.rs`
+/// UI_G2_SETMODELS, `sv_game.rs` G_G2_SETMODELS).
 ///
 /// Source: `oracle/codemp/ghoul2/G2_API.cpp:1937-1960`
 pub fn g2api_set_ghoul2_model_indexes(
@@ -672,8 +678,10 @@ pub fn g2api_copy_ghoul2_instance(
 /// (plain struct copy). The dead `forceReconstruct`/`mSkelFrameNum` reset under
 /// `#if 0` (`:2284-2286,2301-2304,2317-2324`) is dropped (§F20, never compiled).
 ///
-/// Raven's `((int)&ghoul2From) && ((int)&ghoul2To)` address-of-reference
-/// check is always true (dropped, mechanical — see `g2api_have_we_ghoul2_models`).
+/// Raven's `((int)&ghoul2From) && ((int)&ghoul2To)` is the null-handle guard on the
+/// trap path, and the dispatcher arms carry it (`cl_cgame.rs`
+/// CG_G2_COPYSPECIFICGHOUL2MODEL, `cl_ui.rs` UI_G2_COPYSPECIFICGHOUL2MODEL,
+/// `sv_game.rs` G_G2_COPYSPECIFICGHOUL2MODEL).
 ///
 /// Source: `oracle/codemp/ghoul2/G2_API.cpp:2282-2327`
 pub fn g2api_copy_specific_g2_model(
