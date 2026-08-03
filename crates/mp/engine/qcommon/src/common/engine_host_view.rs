@@ -31,6 +31,7 @@ use mp_qshared::shared::{fileHandle_t, qboolean, qhandle_t, vec3_t, FS_WRITE};
 
 use crate::collision_world::CollisionWorld;
 use crate::common::common::{com_printf, Common};
+use crate::z_memman_pc::Com_TheHunkMarkHasBeenMade;
 use crate::common::error::com_error;
 use crate::common::opaque_slots::{
     BotLib, Client, FxSystem, Ghoul2System, RenderModels, Renderer, RmManager, Server,
@@ -399,6 +400,47 @@ impl EngineHost for EngineHostView<'_> {
             .R_RegisterServerModel
             .expect("R_RegisterServerModel hook — installed by the renderer at boot");
         f(self, name)
+    }
+
+    /// Raven `RE_RegisterModel` — the client-path register twin.
+    /// Source: `oracle/codemp/renderer/tr_model.cpp:497`
+    fn model_register_client(&mut self, name: &str) -> qhandle_t {
+        let f = self
+            .common
+            .hooks
+            .RE_RegisterModel
+            .expect("RE_RegisterModel hook — installed by the renderer at boot");
+        f(self, name)
+    }
+
+    /// Raven `currentVM && currentVM == gvm`. One game slot exists, and
+    /// `VM_Create` names it `jampgame`, so the name identifies the pointer.
+    /// Source: `oracle/codemp/ghoul2/G2_API.cpp:570`
+    fn vm_current_is_game(&mut self) -> bool {
+        let vm = self.common.currentVM;
+        if vm.is_null() {
+            return false;
+        }
+        // SAFETY: `currentVM` points at the live registry slot for the whole
+        // dispatch (the `VM_ArgPtr` contract).
+        unsafe { (*vm).name == "jampgame" }
+    }
+
+    /// Raven `Com_TheHunkMarkHasBeenMade()`.
+    /// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:664`
+    fn hunk_mark_made(&mut self) -> bool {
+        Com_TheHunkMarkHasBeenMade(self.common) != 0
+    }
+
+    /// Raven `ShaderHashTableExists()` — renderer-installed accessor.
+    /// Source: `oracle/codemp/renderer/tr_shader.cpp:116`
+    fn shader_hash_table_exists(&mut self) -> bool {
+        let f = self
+            .common
+            .hooks
+            .ShaderHashTableExists
+            .expect("ShaderHashTableExists hook — installed by the renderer at boot");
+        f(self) != 0
     }
 
     /// Raven unix `Sys_Init` — arch/username cvars; the input-layer tail

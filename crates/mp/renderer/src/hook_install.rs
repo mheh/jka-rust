@@ -14,10 +14,12 @@ use core::ffi::c_void;
 
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::EngineHooks;
-use mp_qshared::shared::{qboolean, qfalse, qhandle_t};
+use mp_qshared::shared::{qboolean, qfalse, qhandle_t, qtrue};
 
 use crate::renderer_frontend::RendererFrontend;
+use crate::tr_model::frontend::RE_RegisterModel;
 use crate::tr_model::render_models::RenderModels;
+use crate::tr_shader::ShaderHashTableExists;
 
 /// Cast the view's type-erased `rm` slot back to the live `RenderModels`. The
 /// raw pointer is copied out first (`as_raw`), so the returned borrow is NOT
@@ -65,6 +67,48 @@ pub fn install_engine_hooks(hooks: &mut EngineHooks) {
     hooks.R_ModelMdxa = Some(r_model_mdxa_hook);
     hooks.R_SkinSurfaces = Some(r_skin_surfaces_hook);
     hooks.R_RegisterServerModel = Some(r_register_server_model_hook);
+    hooks.RE_RegisterModel = Some(re_register_model_hook);
+    hooks.ShaderHashTableExists = Some(shader_hash_table_exists_hook);
+}
+
+/// Raven `RE_RegisterModel` — the client-path register behind
+/// `EngineHost::model_register_client`. A dedicated build installs it but
+/// never fires it: `G2_ShouldRegisterServer` short-circuits on `cl_running`
+/// before any client-path read, and the `re` slot is NULL there.
+/// Source: `oracle/codemp/renderer/tr_model.cpp:497`
+fn re_register_model_hook(view: &mut EngineHostView, name: &str) -> qhandle_t {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let re = unsafe { re_from_view(view) };
+    // SAFETY: same rule for the `rm` slot; `RE_RegisterModel` reads the view
+    // only for host services, never this slot.
+    let rm = unsafe { rm_from_view(view) };
+    RE_RegisterModel(
+        &mut re.qs,
+        &mut re.frame,
+        &mut re.assets,
+        view,
+        &re.cvars,
+        &mut re.sim,
+        rm,
+        &mut re.img_state,
+        &mut re.gpu_res,
+        &mut re.sky_view,
+        &mut re.sky,
+        &mut re.world_effects,
+        name,
+    )
+}
+
+/// Raven `ShaderHashTableExists` behind `EngineHost::shader_hash_table_exists`.
+/// Source: `oracle/codemp/renderer/tr_shader.cpp:116`
+fn shader_hash_table_exists_hook(view: &mut EngineHostView) -> qboolean {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let re = unsafe { re_from_view(view) };
+    if ShaderHashTableExists(&re.assets) {
+        qtrue
+    } else {
+        qfalse
+    }
 }
 
 /// Raven `RE_RegisterModels_LevelLoadEnd` — the live eviction path.

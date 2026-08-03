@@ -140,30 +140,25 @@ fn dup_cghoul2_info(src: &CGhoul2Info) -> CGhoul2Info {
 /// `G2_SetupModelPointers` (the latter is `misc.rs`'s roster item; this doc
 /// module owns the copy this file's own callers need per §F21 colocation).
 ///
-/// See the module doc-comment gap note: `currentVM`/`gvm`/`com_cl_running`/
-/// `Com_TheHunkMarkHasBeenMade`/`ShaderHashTableExists` have no `EngineHost`
-/// method yet — this body reads what it CAN (`cl_running` is a real cvar) and
-/// folds the rest to the fact established there: `currentVM == gvm` always
-/// holds at every call site this crate reaches, so absent a `cl_running`
-/// surprise this always returns `true`.
+/// The former gap closed with the client build (2026-08-02): the four reads
+/// (`currentVM == gvm`, `cl_running`, the hunk mark, the shader table) are the
+/// `EngineHost` services `vm_current_is_game`/`cvar_integer`/`hunk_mark_made`/
+/// `shader_hash_table_exists`, and the body is Raven's own.
 ///
 /// Source: `oracle/codemp/ghoul2/G2_API.cpp:568-583`
 pub(crate) fn g2_should_register_server(host: &mut impl EngineHost) -> bool {
-    if host.cvar_integer("cl_running") != 0 {
-        // `Com_TheHunkMarkHasBeenMade`/`ShaderHashTableExists` have no
-        // `EngineHost` equivalent (module doc-comment gap note) and this arm
-        // is unreachable in the DEDICATED build this crate targets
-        // (`cl_running` is `CVAR_ROM` default `0`, only ever set by client
-        // startup code that never runs here, `common.cpp:1328`) — but if it
-        // somehow fired, silently guessing the answer would be worse than
-        // stopping loudly.
-        host.error(
-            errorParm_t::ERR_DROP,
-            "G2_ShouldRegisterServer: cl_running set in a DEDICATED build \u{2014} \
-             Com_TheHunkMarkHasBeenMade/ShaderHashTableExists have no EngineHost service",
-        );
+    if host.vm_current_is_game() {
+        if host.cvar_integer("cl_running") != 0
+            && host.hunk_mark_made()
+            && host.shader_hash_table_exists()
+        {
+            // Raven: the hunk mark means client assets load now, so do not
+            // load on the server.
+            return false;
+        }
+        return true;
     }
-    true
+    false
 }
 
 /// Raven `RE_RegisterServerModel( fileName )` through the
@@ -174,22 +169,12 @@ pub(crate) fn register_server_model(host: &mut impl EngineHost, file_name: &str)
     host.model_register(file_name)
 }
 
-/// `RE_RegisterModel`'s client-path twin of [`register_server_model`]; same
-/// gap, same divergence treatment. `context`/`cite` let each call site cite its
-/// own oracle location in the `host.error` message.
-pub(crate) fn register_model(
-    host: &mut impl EngineHost,
-    file_name: &str,
-    context: &str,
-    cite: &str,
-) -> qhandle_t {
-    host.error(
-        errorParm_t::ERR_DROP,
-        &format!(
-            "{context}: EngineHost has no RE_RegisterModel(\"{file_name}\") equivalent yet \
-             (docs/subsystems/ghoul2-server.md gap note, {cite})"
-        ),
-    )
+/// Raven `RE_RegisterModel( fileName )` — the client-path twin of
+/// [`register_server_model`], through `EngineHost::model_register_client`
+/// (the former divergence closed with the client build, 2026-08-02).
+/// Source: `oracle/codemp/renderer/tr_model.cpp:497`
+pub(crate) fn register_model(host: &mut impl EngineHost, file_name: &str) -> qhandle_t {
+    host.model_register_client(file_name)
 }
 
 /// Raven `qboolean G2_TestModelPointers(CGhoul2Info *ghlInfo)` — registers
@@ -215,7 +200,7 @@ fn g2_test_model_pointers(ghl_info: &mut CGhoul2Info, host: &mut impl EngineHost
         ghl_info.model = if dedicated {
             register_server_model(host, &ghl_info.file_name)
         } else {
-            register_model(host, &ghl_info.file_name, "G2API models", "G2_API.cpp:593")
+            register_model(host, &ghl_info.file_name)
         };
 
         let mdxm = host.model_mdxm(ghl_info.model);
@@ -267,7 +252,7 @@ pub fn g2api_precache_ghoul2_model(host: &mut impl EngineHost, file_name: &str) 
     if g2_should_register_server(host) {
         register_server_model(host, file_name)
     } else {
-        register_model(host, file_name, "G2API models", "G2_API.cpp:593")
+        register_model(host, file_name)
     }
 }
 
@@ -836,14 +821,12 @@ mod tests {
     }
 
     #[test]
-    fn g2_should_register_server_errors_when_cl_running_is_set() {
+    fn g2_should_register_server_stays_true_when_the_client_has_no_assets_yet() {
+        // Raven: `cl_running` alone does not flip the answer. The hunk mark
+        // and the shader table must both exist, and the mock has neither.
         let mut host = MockHost::new();
         host.set_cvar("cl_running", "1");
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            g2_should_register_server(&mut host)
-        }));
-        assert!(result.is_err());
-        assert_eq!(host.errors.len(), 1);
+        assert!(g2_should_register_server(&mut host));
     }
 
     #[test]

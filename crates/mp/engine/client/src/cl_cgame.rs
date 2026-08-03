@@ -2897,7 +2897,16 @@ pub fn CL_CgameSystemCalls(
     } else if op == MpCgameImport::CG_G2_INITGHOUL2MODEL as c_int {
         let file_name = cstr_to_string(vma(vc, args, 2) as *const c_char);
         // SAFETY: `VMA(1)` is the module's `CGhoul2Info_v *` slot (§D11).
-        let ghoul2 = unsafe { &mut **(vma(vc, args, 1) as *mut *mut CGhoul2Info_v) };
+        // Raven `if (!(*ghoul2Ptr)) *ghoul2Ptr = new CGhoul2Info_v;` - the
+        // handle object's `new`/`delete` is the engine's job: the engine owns
+        // the `Box`, the module holds the raw pointer, freed at CG_G2_CLEANMODELS.
+        let ghoul2 = unsafe {
+            let pp = vma(vc, args, 1) as *mut *mut CGhoul2Info_v;
+            if (*pp).is_null() {
+                *pp = Box::into_raw(Box::new(CGhoul2Info_v { mItem: 0 }));
+            }
+            &mut **pp
+        };
         g2api_init_ghoul2_model(
             g2,
             view,

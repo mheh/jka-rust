@@ -287,7 +287,7 @@ fn identity_mdxa_bone() -> mdxaBone_t {
 ///
 /// Source: `oracle/codemp/ghoul2/G2_misc.cpp:279-304`
 pub fn g2_list_model_surfaces(host: &mut impl EngineHost, file_name: &str) {
-    let model = register_model(host, file_name, "G2_Misc internal", "G2_API.cpp:282,312,359,2714");
+    let model = register_model(host, file_name);
     let Some(view) = host.model_mdxm(model) else {
         return;
     };
@@ -321,7 +321,7 @@ pub fn g2_list_model_surfaces(host: &mut impl EngineHost, file_name: &str) {
 /// Source: `oracle/codemp/ghoul2/G2_misc.cpp:307-342`
 pub fn g2_list_model_bones(host: &mut impl EngineHost, file_name: &str, frame: i32) {
     let _ = frame;
-    let mod_m = register_model(host, file_name, "G2_Misc internal", "G2_API.cpp:282,312,359,2714");
+    let mod_m = register_model(host, file_name);
     let Some(mdxm) = host.model_mdxm(mod_m) else {
         return;
     };
@@ -363,7 +363,7 @@ pub fn g2_list_model_bones(host: &mut impl EngineHost, file_name: &str, frame: i
 ///
 /// Source: `oracle/codemp/ghoul2/G2_misc.cpp:356-367`
 pub fn g2_get_anim_file_name(host: &mut impl EngineHost, file_name: &str) -> Option<String> {
-    let model = register_model(host, file_name, "G2_Misc internal", "G2_API.cpp:282,312,359,2714");
+    let model = register_model(host, file_name);
     let Some(mdxm) = host.model_mdxm(model) else {
         return None;
     };
@@ -400,12 +400,7 @@ pub fn g2_setup_model_pointers(host: &mut impl EngineHost, ghl_info: &mut CGhoul
         ghl_info.model = if dedicated {
             register_server_model(host, &ghl_info.file_name)
         } else {
-            register_model(
-                host,
-                &ghl_info.file_name,
-                "G2_Misc internal",
-                "G2_API.cpp:282,312,359,2714",
-            )
+            register_model(host, &ghl_info.file_name)
         };
 
         let mdxm = host.model_mdxm(ghl_info.model);
@@ -1915,19 +1910,14 @@ mod tests {
     // `api_models.rs`'s identically-named helpers) ---------------------------
 
     #[test]
-    fn register_model_diverges_via_host_error() {
+    fn register_model_panics_on_a_host_without_a_client_renderer() {
+        // The mock keeps the `model_register_client` default, which panics:
+        // a host that serves no client must not fake a handle.
         let mut host = MockHost::new();
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            register_model(
-                &mut host,
-                "models/x.glm",
-                "G2_Misc internal",
-                "G2_API.cpp:282,312,359,2714",
-            )
+            register_model(&mut host, "models/x.glm")
         }));
         assert!(result.is_err());
-        assert_eq!(host.errors.len(), 1);
-        assert_eq!(host.errors[0].0, errorParm_t::ERR_DROP);
     }
 
     #[test]

@@ -252,11 +252,43 @@ pub trait EngineHost {
     /// register (filename → `qhandle_t`; 0 = failed load), closing the
     /// ghoul2-server.md gap note (user ruling 2026-07-12; the rulings-36/55
     /// method-extension precedent). `G2_RegisterModel`'s server branch reaches
-    /// it; the client-path `RE_RegisterModel` twin stays out — dead under
-    /// DEDICATED (`G2_ShouldRegisterServer` is always true there).
+    /// it.
     /// Source: `oracle/codemp/renderer/tr_model.cpp:588` (decl `tr_local.h`);
     /// chain: `oracle/codemp/ghoul2/G2_API.cpp:2710`
     fn model_register(&mut self, name: &str) -> qhandle_t;
+
+    /// Raven `RE_RegisterModel( name )` — the client-path twin of
+    /// [`Self::model_register`], live once a client build exists (same
+    /// method-extension precedent). The default panics, so a host that never
+    /// serves a client fails loudly instead of faking a handle.
+    /// Source: `oracle/codemp/renderer/tr_model.cpp:497`;
+    /// chain: `oracle/codemp/ghoul2/G2_API.cpp:589-594`
+    fn model_register_client(&mut self, name: &str) -> qhandle_t {
+        let _ = name;
+        panic!("EngineHost::model_register_client — this host serves no client renderer")
+    }
+
+    /// Raven `currentVM && currentVM == gvm` — is the dispatching VM the game
+    /// VM. `G2_ShouldRegisterServer` reads it to split server-path from
+    /// client-path model registration. The default is `true`: a host without a
+    /// client only ever dispatches the game VM (the pinned dedicated fact).
+    /// Source: `oracle/codemp/ghoul2/G2_API.cpp:570`
+    fn vm_current_is_game(&mut self) -> bool {
+        true
+    }
+
+    /// Raven `Com_TheHunkMarkHasBeenMade()` — has the client marked the hunk
+    /// for its own asset load.
+    /// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:664`
+    fn hunk_mark_made(&mut self) -> bool {
+        false
+    }
+
+    /// Raven `ShaderHashTableExists()` — is the renderer's shader table up.
+    /// Source: `oracle/codemp/renderer/tr_shader.cpp:116`
+    fn shader_hash_table_exists(&mut self) -> bool {
+        false
+    }
 
     /// Raven `Sys_Init` — one-time platform-layer init (`Com_Init` calls it late,
     /// `common.cpp:1287`). No-op in a test mock.

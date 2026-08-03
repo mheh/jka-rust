@@ -2048,7 +2048,16 @@ pub fn CL_UISystemCalls(
     } else if trap == MpUiImport::UI_G2_INITGHOUL2MODEL as c_int {
         let file_name = unsafe { cstr_to_string(vma(view.common, args, 2) as *const c_char) };
         // SAFETY: `VMA(1)` is the module's `CGhoul2Info_v *` slot (§D11).
-        let ghoul2 = unsafe { &mut **(vma(view.common, args, 1) as *mut *mut CGhoul2Info_v) };
+        // Raven `if (!(*ghoul2Ptr)) *ghoul2Ptr = new CGhoul2Info_v;` - the
+        // handle object's `new`/`delete` is the engine's job: the engine owns
+        // the `Box`, the module holds the raw pointer, freed at UI_G2_CLEANMODELS.
+        let ghoul2 = unsafe {
+            let pp = vma(view.common, args, 1) as *mut *mut CGhoul2Info_v;
+            if (*pp).is_null() {
+                *pp = Box::into_raw(Box::new(CGhoul2Info_v { mItem: 0 }));
+            }
+            &mut **pp
+        };
         // SAFETY: `args` is the trampoline's 16-word frame (§D11).
         let (model_index, custom_skin, custom_shader, model_flags, lod_bias) = unsafe {
             (

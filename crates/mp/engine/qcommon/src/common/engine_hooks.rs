@@ -163,6 +163,11 @@ pub struct EngineHooks {
     /// Backs `EngineHost::model_register` — Raven `RE_RegisterServerModel`.
     /// Source: `oracle/codemp/renderer/tr_model.cpp:588`
     pub R_RegisterServerModel: Option<fn(&mut EngineHostView, &str) -> qhandle_t>,
+    /// The client-path register twin, live once a client build exists.
+    /// Source: `oracle/codemp/renderer/tr_model.cpp:497` (`RE_RegisterModel`)
+    pub RE_RegisterModel: Option<fn(&mut EngineHostView, &str) -> qhandle_t>,
+    /// Source: `oracle/codemp/renderer/tr_shader.cpp:116` (`ShaderHashTableExists`)
+    pub ShaderHashTableExists: Option<fn(&mut EngineHostView) -> qboolean>,
 }
 
 impl EngineHooks {
@@ -209,6 +214,8 @@ impl EngineHooks {
             R_ModelMdxa: None,
             R_SkinSurfaces: None,
             R_RegisterServerModel: None,
+            RE_RegisterModel: None,
+            ShaderHashTableExists: None,
         }
     }
 }
