@@ -74,3 +74,11 @@ Hold on the branch. Lane-review runs against this packet with a conformance cler
 ## Amendments
 
 **2026-08-04 - ratified at draft.** The user ruled "do A1 and A2" in chat after reading the audit, which is the explicit go. No separate packet audit round was held; the surface comes verbatim from the audited record.
+
+### Pause: fact 3 is false, and A2 as specified cannot work
+
+**2026-08-04, the lane's stop.** Commit 1 (A1) landed clean, and its control run came back byte-identical to the fixture: the surface order matches exactly, so the 2026-08-04 experiment reorder is proven experiment-caused and mainline moved nothing since the bless at `bc856508`.
+
+Fact 3 claimed nothing past the init call reads the `re` slot, resting on the `dedicated` experiment. That experiment proved nothing about the slot: a nonzero `dedicated` short-circuits every `dedicated || g2_should_register_server(host)` guard in the ghoul2 crate to the server path, so it masked the second call site. `G2_SetupModelPointers` re-registers the model on every frame's entity walk (`crates/mp/engine/ghoul2/src/misc.rs:403`, faithful Raven behavior), so the client path needs a seated `re` for the whole frame render, not for an init window. With the window seated, the init succeeded and the abort moved to draw time, same panic line.
+
+The lane stopped on the contract-signature pause trigger, committed nothing red, and preserved its A2 attempt as `a2-attempt.patch` in this folder (3 files, +82/-85, compiles clean, golden aborts at draw). The A2 ruling is open and belongs to the user.
