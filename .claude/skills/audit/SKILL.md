@@ -26,6 +26,10 @@ Apply this decision rule after an agent lands work or returns an investigation:
   4. Follow-ups appended as they land, each under its own heading, marked as the frozen record if the living text moved elsewhere (a packet, the DEC ledger).
 - The record is append-only after its first commit. Corrections append with a date, they do not rewrite.
 
+## Who writes the record
+
+The session or the work lane writes the record. A review agent (a conformance clerk, a logic auditor) never writes or commits it - review agents deliver their report to the session, and the session decides whether and where it lands. A record that already covers the work is final: the auto-rule does not fire twice, and a later pass appends under its own heading instead of writing a second file.
+
 ## Linking
 
 - The artifact the audit serves (a packet's Amendments section, a ticket, a DEC entry) carries one pointer line to the audit file. Never paste the report into two homes - the audit file is the frozen record, the packet or ledger holds the living text.

@@ -71,3 +71,14 @@ The read-only audit confirmed the token scheme end to end (renderer decode, FX `
 3. `g2api_copy_specific_g2_model` can alloc through an empty destination cell (`api_models.rs:697`). With amendment 1 that state is a null slot and the arm no-ops, matching Raven. A §19 site note records that the current Rust is the outlier.
 4. The pre-flight audit now names the full mutator inventory and audits the has/remove family as slot-address arms, not value-passed.
 5. The `sv_world.rs:785` diagnostic print gains a `size(g2) > 0` guard so an empty or stale cell skips the print instead of panicking.
+
+**2026-08-04 - lane-review close: four accepted deviations, one lint commit, one ticket.**
+
+The lane landed all five bundle commits plus the landing-audit commit, every gate reproduced by the conformance clerk (evidence: `docs/audits/2026-08-03-ghoul2-token-conversion-renderer.md`, the conformance section). The user accepted these deviations:
+
+1. The sv `G_G2_DUPLICATEGHOUL2INSTANCE` arm calls the callee only on a null slot, where the class-1 rule said call unconditionally. The callee self-guards on a valid destination, every first-party caller passes a null destination, and the remove write-back makes a stale non-null token unreachable through legal trap sequences, so the skip is observably equivalent and matches the two client twins' pre-existing shape.
+2. `placeholders.rs` (one doc cite line) and the audit file (the landing commit `d666bad3`) sit outside the write scopes. The first was a drafting gap in this packet, the second follows the audit rule that postdates the packet.
+3. The destination cell builds as the literal `CGhoul2Info_v { mItem: 0 }` in the null branch instead of `from_token`, an identical result on a null token.
+4. House-style nits on added lines, closed by the `style(gh#31 s001)` lint commit. The word "seam" stays: `porting-rules.md` uses it normatively for the ABI boundary, so it is domain vocabulary in this repo, not pet vocabulary.
+
+The pre-existing `ghoul2_vertex_golden --ignored` abort is ticketed as gh#35 and blocks the image-golden half of the DEC-65 gate for later steps.
