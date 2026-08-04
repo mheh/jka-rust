@@ -1,0 +1,282 @@
+diff --git a/crates/mp/renderer-gpu/src/bin/world_harness.rs b/crates/mp/renderer-gpu/src/bin/world_harness.rs
+index c407356f..a8651e56 100644
+--- a/crates/mp/renderer-gpu/src/bin/world_harness.rs
++++ b/crates/mp/renderer-gpu/src/bin/world_harness.rs
+@@ -50,10 +50,8 @@ use std::sync::Arc;
+ use std::time::Instant;
+ 
+ use mp_engine_core::Engine;
+-use mp_engine_ghoul2::api_models::g2api_init_ghoul2_model;
+ use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
+ use mp_engine_ghoul2::info_array::Ghoul2Handle;
+-use mp_engine_ghoul2::shared::cghoul2_info_v::CGhoul2Info_v;
+ use mp_engine_server::Server;
+ use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
+ use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
+@@ -1118,34 +1116,6 @@ fn report(stats: &FrameStats, md3_model: qhandle_t, ghoul2_handle: Option<Ghoul2
+     );
+ }
+ 
+-/// Inits one Ghoul2 model instance through the real `mp_engine_ghoul2` init
+-/// path (`G2API_InitGhoul2Model`). It allocates a `CGhoul2Info_v` handle, loads
+-/// the `.glm` through the renderer model path the init helper drives, and reads
+-/// back the instance's model handle. Returns the live system, the instance
+-/// handle for the `refEntity_t.ghoul2` token, and the model handle for
+-/// `hModel`. Returns `None` when the model file is absent (the init returns a
+-/// negative model index), so the harness draws no Ghoul2 entity.
+-fn init_ghoul2(host: &mut UiHost, name: &str) -> Option<(Ghoul2System, Ghoul2Handle, qhandle_t)> {
+-    let mut g2 = Ghoul2System::default();
+-    let mut info = CGhoul2Info_v { mItem: 0 };
+-    info.alloc(&mut g2);
+-
+-    let model_index = {
+-        let UiHost { engine, models, .. } = &mut *host;
+-        let models_ptr: *mut RenderModels = &mut *models;
+-        let Engine { common, cm, sv, .. } = &mut **engine;
+-        let sv_ptr: *mut () = sv as *mut Server as *mut ();
+-        let mut view = boot::host_view(common, cm, sv_ptr, models_ptr);
+-        g2api_init_ghoul2_model(&mut g2, &mut view, &mut info, name, 0, 0, 0, 0, 0)
+-    };
+-    if model_index < 0 {
+-        return None;
+-    }
+-
+-    let model_handle = info.get(&g2, 0).model;
+-    Some((g2, Ghoul2Handle(info.mItem), model_handle))
+-}
+-
+ fn main() {
+     // The `--flythrough` flag may sit anywhere. The two positionals stay
+     // `[basepath] [map]`, in order. An unknown flag or a third positional
+@@ -1271,7 +1241,7 @@ fn main() {
+ 
+     // Init one Ghoul2 model through the real init path. A missing `.glm` file
+     // leaves the state empty and the harness draws no Ghoul2 entity.
+-    let (g2, ghoul2_handle, ghoul2_model) = match init_ghoul2(&mut host, GHOUL2_MODEL_NAME) {
++    let (g2, ghoul2_handle, ghoul2_model) = match boot::init_ghoul2(&mut host, GHOUL2_MODEL_NAME) {
+         Some((g2, handle, model)) => {
+             println!(
+                 "world_harness: ghoul2 entity model {GHOUL2_MODEL_NAME} = {model}, \
+diff --git a/crates/mp/renderer-gpu/src/ui_host/boot.rs b/crates/mp/renderer-gpu/src/ui_host/boot.rs
+index 36126055..0c5e2f4c 100644
+--- a/crates/mp/renderer-gpu/src/ui_host/boot.rs
++++ b/crates/mp/renderer-gpu/src/ui_host/boot.rs
+@@ -11,12 +11,16 @@
+ //! a cvar table and a command buffer, and nothing else the engine provides.
+ 
+ use core::ffi::c_int;
++use core::mem::swap;
+ use core::ptr::null_mut;
+ use std::sync::Arc;
+ 
+ use mp_engine_botlib::l_precomp_fns::PC_SetBaseFolder;
+ use mp_engine_core::Engine;
++use mp_engine_ghoul2::api_models::g2api_init_ghoul2_model;
+ use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
++use mp_engine_ghoul2::info_array::Ghoul2Handle;
++use mp_engine_ghoul2::shared::cghoul2_info_v::CGhoul2Info_v;
+ use mp_engine_qcommon::cm_terrain::CmLandScape;
+ use mp_engine_qcommon::cmd_common::{Cbuf_Init, Cmd_Init};
+ use mp_engine_qcommon::collision_world::CollisionWorld;
+@@ -48,7 +52,7 @@ use mp_renderer::render_state::world_load_state::WorldLoadState;
+ use mp_renderer::render_state::renderer_cvars::RendererCvars;
+ use mp_renderer::render_state::world_walk_scratch::WorldWalkScratch;
+ use mp_renderer::renderer_frontend::{
+-    empty_render_assets, zeroed_frame_state, zeroed_view_parms,
++    empty_render_assets, zeroed_frame_state, zeroed_view_parms, RendererFrontend,
+ };
+ use mp_renderer::tr_bsp::RE_LoadWorldMap;
+ use mp_renderer::tr_font::FontState;
+@@ -130,13 +134,6 @@ pub fn boot_renderer(cfg: &BootConfig) -> UiHost {
+     mp_engine_server::hook_install::install_engine_hooks(&mut engine.common.hooks);
+     mp_renderer::hook_install::install_engine_hooks(&mut engine.common.hooks);
+ 
+-    // The gh#35 control configuration: `RE_RegisterModel` routes to the server registration path.
+-    // This reproduces the configuration the ghoul2 vertex fixture was blessed under (`bc856508`, 2026-07-31),
+-    // so the control run compares today's draw-surf order against that fixture.
+-    // The two hooks have one signature, so the reassignment needs no adapter.
+-    // Commit 2 of gh#35 step-001 removes this override and seats a real `RendererFrontend` for the init call.
+-    engine.common.hooks.RE_RegisterModel = engine.common.hooks.R_RegisterServerModel;
+-
+     // The renderer's model pool, built before the engine subset because
+     // `Com_InitHunkMemory` -> `Hunk_Clear` calls the `R_HunkClearCrap` hook,
+     // which casts the view's `rm` slot before doing anything else.
+@@ -413,11 +410,12 @@ pub fn with_dc<R>(host: &mut UiHost, body: impl FnOnce(&mut HarnessDc, &mut UiSt
+ /// this slot before testing the game VM, so a null slot is a hard crash rather
+ /// than a no-op.
+ ///
+-/// `rm` points at the harness's own [`RenderModels`] (the renderer's model
+-/// pool), not `engine.render_models` — the engine's copy belongs to the
+-/// headless server subset and is not what `R_Init` initialised. Every other
+-/// opaque slot is null: no path this harness runs reads them, and a null slot
+-/// makes that a loud crash rather than a silent wrong-island read.
++/// `rm` points at the harness's own [`RenderModels`] (the renderer's model pool), not `engine.render_models`.
++/// The engine's copy belongs to the headless server subset and is not what `R_Init` initialized.
++/// Every other opaque slot is null: no path this harness runs reads them,
++/// and a null slot makes that a loud crash rather than a silent wrong-island read.
++/// One exception: [`init_ghoul2`] seats the `re` slot on its own view for the length of the client register call,
++/// because Raven's client path reaches the renderer through it.
+ pub fn host_view<'a>(
+     common: &'a mut Common,
+     cm: &'a mut CollisionWorld,
+@@ -432,8 +430,8 @@ pub fn host_view<'a>(
+         snd: SlotSoundSystem::from_raw(null_mut()),
+         bot: SlotBotLib::from_raw(null_mut()),
+         rm: SlotRenderModels::from_raw(rm as *mut ()),
+-        // The harness holds its carriers as `UiHost` fields and splits them at
+-        // each call, so it never reaches the renderer through this slot.
++        // The harness splits its carriers out of `UiHost` at each call, so it does not reach the renderer through this slot.
++        // `init_ghoul2` overwrites the slot on its own view, because Raven's client register path needs a seated frontend.
+         re: SlotRenderer::from_raw(null_mut()),
+         rmg: SlotRmManager::from_raw(null_mut()),
+         g2: SlotGhoul2::from_raw(null_mut()),
+@@ -586,6 +584,62 @@ pub fn register_model(host: &mut UiHost, name: &str) -> qhandle_t {
+     )
+ }
+ 
++/// Inits one Ghoul2 model through the real client register path.
++///
++/// The client path needs the view's `re` slot seated, so this seats a real [`RendererFrontend`] for the length of the call.
++/// The 12 twin fields swap out of `UiHost`, the 7 frontend-only fields hold their defaults, and the twins swap back before return.
++/// Returns `None` when the model file is absent, which the init reports as a negative model index.
++pub fn init_ghoul2(host: &mut UiHost, name: &str) -> Option<(Ghoul2System, Ghoul2Handle, qhandle_t)> {
++    let mut g2 = Ghoul2System::default();
++    let mut info = CGhoul2Info_v { mItem: 0 };
++    info.alloc(&mut g2);
++
++    // The frontend window opens here and closes at the second swap below.
++    // `RendererFrontend::new` writes no cvar and touches no engine state, so the placeholder twins it builds cost nothing.
++    let mut re = RendererFrontend::new();
++    swap_frontend_twins(host, &mut re);
++
++    let model_index = {
++        // The frontend outlives the view this block builds, so the seated slot stays valid for the whole init call.
++        let re_ptr: *mut RendererFrontend = &mut re;
++        let UiHost { engine, models, .. } = &mut *host;
++        let models_ptr: *mut RenderModels = &mut *models;
++        let Engine { common, cm, sv, .. } = &mut **engine;
++        let sv_ptr: *mut () = sv as *mut Server as *mut ();
++        let mut view = host_view(common, cm, sv_ptr, models_ptr);
++        view.re = SlotRenderer::from_raw(re_ptr as *mut ());
++        g2api_init_ghoul2_model(&mut g2, &mut view, &mut info, name, 0, 0, 0, 0, 0)
++    };
++
++    swap_frontend_twins(host, &mut re);
++
++    if model_index < 0 {
++        return None;
++    }
++
++    let model_handle = info.get(&g2, 0).model;
++    Some((g2, Ghoul2Handle(info.mItem), model_handle))
++}
++
++/// Swaps the 12 carrier fields `UiHost` and [`RendererFrontend`] both hold.
++///
++/// A pair of calls opens and closes one window where the frontend holds the live carriers.
++/// The client register path writes only inside that set, so the swap back discards no mutation.
++fn swap_frontend_twins(host: &mut UiHost, re: &mut RendererFrontend) {
++    swap(&mut host.cvars, &mut re.cvars);
++    swap(&mut host.sim, &mut re.sim);
++    swap(&mut host.img_state, &mut re.img_state);
++    swap(&mut host.frame, &mut re.frame);
++    swap(&mut host.world_load, &mut re.world_load);
++    swap(&mut host.scene, &mut re.scene);
++    swap(&mut host.noise, &mut re.noise);
++    swap(&mut host.rng, &mut re.rng);
++    swap(&mut host.font, &mut re.font);
++    swap(&mut host.world_effects, &mut re.world_effects);
++    swap(&mut host.qs, &mut re.qs);
++    swap(&mut host.sky_view, &mut re.sky_view);
++}
++
+ /// Loads a BSP through `RE_LoadWorldMap`, builds a refdef at a spawn point, and
+ /// drives one `R_RenderView` — the R4 world feasibility spike.
+ ///
+diff --git a/crates/mp/renderer-gpu/tests/ghoul2_vertex_golden.rs b/crates/mp/renderer-gpu/tests/ghoul2_vertex_golden.rs
+index 68cd53e4..f8766905 100644
+--- a/crates/mp/renderer-gpu/tests/ghoul2_vertex_golden.rs
++++ b/crates/mp/renderer-gpu/tests/ghoul2_vertex_golden.rs
+@@ -10,12 +10,17 @@
+ //! delta report names the exact slot count any future change moves.
+ //! Source: `oracle/codemp/renderer/tr_ghoul2.cpp:4313-4374`.
+ //!
+-//! The scene boots exactly like `tests/world_golden.rs`: the same `BootConfig`,
+-//! the `JKA_BASEPATH` override, an offscreen `Gpu`, and `maps/mp/duel1.bsp`. It
+-//! then inits one Ghoul2 stormtrooper the way `bin/world_harness.rs` does, adds
+-//! it at a fixed origin with an identity axis, and records one frame at the
+-//! frozen clock. The capture sink on `FrameExecutor` records each decoded ghoul2
+-//! surface stream in draw-surf order.
++//! The scene boots exactly like `tests/world_golden.rs`:
++//! the same `BootConfig`, the `JKA_BASEPATH` override, an offscreen `Gpu`, and `maps/mp/duel1.bsp`.
++//! It then inits one Ghoul2 stormtrooper through `boot::init_ghoul2`, the shared helper `bin/world_harness.rs` also calls,
++//! adds it at a fixed origin with an identity axis, and records one frame at the frozen clock.
++//! The capture sink on `FrameExecutor` records each decoded ghoul2 surface stream in draw-surf order.
++//!
++//! Bless provenance: the fixture ran on the server registration path until gh#35 step-001 on 2026-08-04.
++//! `boot::init_ghoul2` now seats a real `RendererFrontend`,
++//! so the init runs Raven's client `RE_RegisterModel` and each surface gets its real shader index.
++//! Real shader indices untie the 22 sort keys, which moves the draw-surf order, so the fixture was re-blessed under the client path.
++//! The surface content did not move: the stormtrooper reports 53 bones, so the 72-bone `_humanoid` remap does not fire.
+ //!
+ //! Fixture format (`tests/goldens/ghoul2_verts_stormtrooper.bin`, all
+ //! little-endian):
+@@ -45,15 +50,10 @@ use std::path::PathBuf;
+ use std::sync::Arc;
+ 
+ use mp_engine_core::Engine;
+-use mp_engine_ghoul2::api_models::g2api_init_ghoul2_model;
+-use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
+-use mp_engine_ghoul2::info_array::Ghoul2Handle;
+-use mp_engine_ghoul2::shared::cghoul2_info_v::CGhoul2Info_v;
+ use mp_engine_server::Server;
+ use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
+ use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
+ use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
+-use mp_qshared::shared::qhandle_t;
+ use mp_renderer::render_state::frame_data::FrameData;
+ use mp_renderer::render_state::bmodel_table::BModelTable;
+ use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
+@@ -120,33 +120,6 @@ fn build_refdef(eye: [f32; 3]) -> refdef_t {
+     rd
+ }
+ 
+-/// Inits one Ghoul2 model instance through the real `mp_engine_ghoul2` init path,
+-/// the same call `world_harness::init_ghoul2` makes. It allocates the handle,
+-/// loads the `.glm`, and reads the instance model handle. Returns `None`
+-/// when the model file is absent (a negative model index).
+-fn init_ghoul2(host: &mut UiHost, name: &str) -> Option<(Ghoul2System, Ghoul2Handle, qhandle_t)> {
+-    let mut g2 = Ghoul2System::default();
+-    let mut info = CGhoul2Info_v { mItem: 0 };
+-    info.alloc(&mut g2);
+-
+-    let model_index = {
+-        let UiHost {
+-            engine, models, ..
+-        } = &mut *host;
+-        let models_ptr: *mut RenderModels = &mut *models;
+-        let Engine { common, cm, sv, .. } = &mut **engine;
+-        let sv_ptr: *mut () = sv as *mut Server as *mut ();
+-        let mut view = boot::host_view(common, cm, sv_ptr, models_ptr);
+-        g2api_init_ghoul2_model(&mut g2, &mut view, &mut info, name, 0, 0, 0, 0, 0)
+-    };
+-    if model_index < 0 {
+-        return None;
+-    }
+-
+-    let model_handle = info.get(&g2, 0).model;
+-    Some((g2, Ghoul2Handle(info.mItem), model_handle))
+-}
+-
+ /// The absolute path of the committed golden.
+ fn golden_path() -> PathBuf {
+     Path::new(env!("CARGO_MANIFEST_DIR"))
+@@ -369,7 +342,7 @@ fn golden_ghoul2_verts_stormtrooper() {
+     // Init one stormtrooper in its default skeleton pose. No animation call runs,
+     // so the pose is deterministic.
+     let (g2, ghoul2_handle, ghoul2_model) =
+-        init_ghoul2(&mut host, GHOUL2_MODEL_NAME).expect("stormtrooper .glm did not init");
++        boot::init_ghoul2(&mut host, GHOUL2_MODEL_NAME).expect("stormtrooper .glm did not init");
+ 
+     // The camera sits at a spawn origin, bumped to eye height.
+     let eye = host
