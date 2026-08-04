@@ -1060,6 +1060,12 @@ const MAX_READ: usize = 1 << 20;
 // Mach-checked copies. The kernel validates the address range, so a quirk
 // pointer from the module (a record-time host token passed as an address, the
 // CleanModels value-passing site) returns an error instead of SIGBUS.
+//
+// The rig replays a macOS dylib, so these symbols are gated to macOS. On other
+// hosts the two copies below read nothing and write nothing, which keeps the
+// workspace test compile linkable where `mach_task_self` does not exist. Every
+// test in this rig carries `#[ignore]`, so no other host runs the stub arm.
+#[cfg(target_os = "macos")]
 extern "C" {
     fn mach_task_self() -> u32;
     fn vm_read_overwrite(
@@ -1078,22 +1084,29 @@ fn read_module(ptr: i64, len: usize) -> Vec<u8> {
     if ptr == 0 || len == 0 || len > MAX_READ {
         return Vec::new();
     }
-    let mut buf = vec![0u8; len];
-    let mut got: usize = 0;
-    // SAFETY: kernel-validated copy into our owned buffer.
-    let kr = unsafe {
-        vm_read_overwrite(
-            mach_task_self(),
-            ptr as usize,
-            len,
-            buf.as_mut_ptr() as usize,
-            &mut got,
-        )
-    };
-    if kr != 0 || got != len {
-        return Vec::new();
+    #[cfg(target_os = "macos")]
+    {
+        let mut buf = vec![0u8; len];
+        let mut got: usize = 0;
+        // SAFETY: kernel-validated copy into our owned buffer.
+        let kr = unsafe {
+            vm_read_overwrite(
+                mach_task_self(),
+                ptr as usize,
+                len,
+                buf.as_mut_ptr() as usize,
+                &mut got,
+            )
+        };
+        if kr != 0 || got != len {
+            return Vec::new();
+        }
+        buf
     }
-    buf
+    #[cfg(not(target_os = "macos"))]
+    {
+        Vec::new()
+    }
 }
 
 /// Reads a NUL-terminated C string of module memory at `ptr`, capped. Walks in
@@ -1127,14 +1140,17 @@ fn write_module(ptr: i64, bytes: &[u8]) {
     if ptr == 0 || bytes.is_empty() {
         return;
     }
-    // SAFETY: kernel-validated copy from our owned buffer.
-    unsafe {
-        vm_write(
-            mach_task_self(),
-            ptr as usize,
-            bytes.as_ptr() as usize,
-            bytes.len() as u32,
-        );
+    #[cfg(target_os = "macos")]
+    {
+        // SAFETY: kernel-validated copy from our owned buffer.
+        unsafe {
+            vm_write(
+                mach_task_self(),
+                ptr as usize,
+                bytes.as_ptr() as usize,
+                bytes.len() as u32,
+            );
+        }
     }
 }
 
