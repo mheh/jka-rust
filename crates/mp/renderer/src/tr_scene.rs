@@ -11,9 +11,7 @@ use native_math::qmath::{
     RotatePointAroundVector, VectorNormalize2,
 };
 
-use core::ffi::c_void;
-
-use mp_engine_ghoul2::info_array::Ghoul2Handle;
+use mp_engine_ghoul2::token::ghoul2_token_decode;
 use mp_engine_qcommon::common::{com_error, com_printf, Common};
 use mp_qshared::common::mp::cgame::mini_ref_entity_s::miniRefEntity_t;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
@@ -311,41 +309,6 @@ pub fn RE_AddPolyToScene(
 
         num_polys_so_far += 1;
         num_polyverts_so_far += num_verts;
-    }
-}
-
-/// Decodes the tier-1 `refEntity_t.ghoul2` pointer field into a
-/// [`Ghoul2Handle`].
-///
-/// The engine owns every Ghoul2 instance and hands cgame an opaque token in the
-/// `refEntity_t.ghoul2` pointer field. This repo encodes the `Ghoul2System`
-/// instance handle as `handle + 1` cast to pointer width, so a null pointer
-/// reads as no instance (`None`). The render side threads a `&mut Ghoul2System`
-/// and looks the list up by the handle, so the raw pointer never crosses into
-/// safe code. [`ghoul2_token_encode`] is the inverse.
-///
-/// RECONCILE (DEC-51): the live server ghoul2 seam does not yet produce this
-/// token. `sv_game.rs:3116-3125` hands a module a raw `Box<CGhoul2Info_v>`
-/// pointer in the `void*` ghoul2 slot (freed at `G_G2_CLEANMODELS`,
-/// `:3347-3358`), and cgame copies that raw pointer into `refEntity_t.ghoul2`.
-/// A raw pointer decoded here as `ptr - 1` yields a garbage handle. Today only
-/// the render harness fills the field, through [`ghoul2_token_encode`], so
-/// nothing is wrong yet. When the real cgame path lands, the raw-pointer seam
-/// and this token convention must be reconciled to one scheme.
-pub fn ghoul2_token_decode(token: *mut c_void) -> Option<Ghoul2Handle> {
-    if token.is_null() {
-        None
-    } else {
-        Some(Ghoul2Handle(token as i32 - 1))
-    }
-}
-
-/// Encodes a [`Ghoul2Handle`] back into the tier-1 `refEntity_t.ghoul2` pointer
-/// token. The inverse of [`ghoul2_token_decode`]; `None` encodes as null.
-pub fn ghoul2_token_encode(handle: Option<Ghoul2Handle>) -> *mut c_void {
-    match handle {
-        Some(h) => (h.0 + 1) as *mut c_void,
-        None => core::ptr::null_mut(),
     }
 }
 
@@ -1391,27 +1354,4 @@ pub fn RE_RenderScene(
     // `RE_RenderWorldEffects` above, `tr_cmds.rs` carries its own
     // `DEFERRED: RE_RenderAutoMap` marker.
     // Source: oracle/codemp/renderer/tr_scene.cpp:870-873
-}
-
-#[cfg(test)]
-mod ghoul2_token_tests {
-    use super::{ghoul2_token_decode, ghoul2_token_encode};
-    use mp_engine_ghoul2::info_array::Ghoul2Handle;
-
-    // A null token decodes to no instance, and no instance encodes to null.
-    #[test]
-    fn null_token_round_trips_to_none() {
-        assert!(ghoul2_token_decode(ghoul2_token_encode(None)).is_none());
-        assert!(ghoul2_token_encode(None).is_null());
-    }
-
-    // A live handle survives encode then decode unchanged. The first handle a
-    // fresh arena issues is `MAX_G2_MODELS` (1024), so this covers a real value.
-    #[test]
-    fn live_handle_round_trips_through_the_token() {
-        let handle = Ghoul2Handle(1024);
-        let token = ghoul2_token_encode(Some(handle));
-        assert!(!token.is_null());
-        assert_eq!(ghoul2_token_decode(token), Some(handle));
-    }
 }

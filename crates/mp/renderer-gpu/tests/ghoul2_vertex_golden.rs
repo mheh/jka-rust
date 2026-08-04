@@ -59,9 +59,8 @@ use mp_renderer::render_state::bmodel_table::BModelTable;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
 use mp_renderer::tr_model::render_models::RenderModels;
-use mp_renderer::tr_scene::{
-    ghoul2_token_encode, RE_AddRefEntityToScene, RE_ClearScene, RE_RenderScene,
-};
+use mp_engine_ghoul2::token::ghoul2_token_encode;
+use mp_renderer::tr_scene::{RE_AddRefEntityToScene, RE_ClearScene, RE_RenderScene};
 use mp_renderer_gpu::ui_host::boot;
 use mp_renderer_gpu::ui_host::{BootConfig, UiHost};
 use mp_renderer::tr_main::EntityWalkHost;

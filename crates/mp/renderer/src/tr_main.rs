@@ -48,7 +48,7 @@ use crate::tr_public::ref_flags::{RDF_AUTOMAP, RDF_NOFOG, RDF_NOWORLDMODEL, RF_F
 use crate::render_state::bmodel_table::BModelTable;
 use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use crate::render_state::world_load_state::WorldLoadState;
-use crate::tr_scene::{ghoul2_token_decode, ghoul2_token_encode, R_AddPolygonSurfaces};
+use crate::tr_scene::R_AddPolygonSurfaces;
 use crate::tr_shader::R_GetShaderByHandleQuiet;
 use crate::tr_terrain::R_AddTerrainSurfaces;
 use crate::render_state::world_walk_scratch::WorldWalkScratch;
@@ -59,6 +59,7 @@ use core::f64::consts::PI;
 use mp_engine_ghoul2::api_models::g2api_have_we_ghoul2_models;
 use mp_engine_ghoul2::ghoul2_system::{BoneCacheId, Ghoul2System};
 use mp_engine_ghoul2::shared::cghoul2_info_v::CGhoul2Info_v;
+use mp_engine_ghoul2::token::{ghoul2_token_decode, ghoul2_token_encode};
 use mp_engine_qcommon::cm_terrain::CmLandScape;
 use mp_engine_qcommon::common::{com_error, EngineHostView};
 use mp_engine_qcommon::qfiles::draw_vert_t::drawVert_t;
