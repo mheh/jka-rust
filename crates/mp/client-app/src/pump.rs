@@ -26,7 +26,7 @@ use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, ElementState, KeyEvent, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow};
 use winit::keyboard::{KeyCode, PhysicalKey};
-use winit::window::{Window, WindowId};
+use winit::window::{CursorGrabMode, Window, WindowId};
 
 use crate::keymap::{map_char, map_key, map_mouse_button, wheel_key};
 use crate::render_thread::{self, RenderCommand};
@@ -62,6 +62,12 @@ pub struct Pump {
     recycled: Option<Sender<FrameData>>,
     /// Trackpad pixels not yet spent on a wheel notch.
     wheel_pixels: f64,
+    /// Whether the pointer is captured right now, Raven's `s_wmv.mouseActive`.
+    /// The window boots with a free visible pointer, so it starts false.
+    /// Source: `oracle/codemp/win32/win_input.cpp:477-527`
+    mouse_captured: bool,
+    /// Set once the window has refused a grab, so the report does not repeat every frame.
+    grab_refused: bool,
 }
 
 impl Pump {
@@ -77,6 +83,8 @@ impl Pump {
             packages: Some(packages),
             recycled: Some(recycled),
             wheel_pixels: 0.0,
+            mouse_captured: false,
+            grab_refused: false,
         }
     }
 
@@ -97,6 +105,42 @@ impl Pump {
         let key = wheel_key(up);
         self.queue(sysEventType_t::SE_KEY, key, 1);
         self.queue(sysEventType_t::SE_KEY, key, 0);
+    }
+
+    /// Apply the sim thread's mouse-capture decision, Raven's `IN_ActivateMouse` and `IN_DeactivateMouse`.
+    ///
+    /// Raven called both from the thread that owned the window, and this is that thread.
+    /// Both were idempotent through `s_wmv.mouseActive`, so this only touches the window on a change.
+    ///
+    /// Source: `oracle/codemp/win32/win_input.cpp:477-527`
+    fn apply_mouse_capture(&mut self) {
+        let wanted = self.events.mouse_active();
+        if wanted == self.mouse_captured {
+            return;
+        }
+        let Some(window) = self.window.as_ref() else {
+            return;
+        };
+
+        // macOS grants the locked grab. Confined is the fallback for a platform that refuses it.
+        let grab = if wanted {
+            window
+                .set_cursor_grab(CursorGrabMode::Locked)
+                .or_else(|_| window.set_cursor_grab(CursorGrabMode::Confined))
+        } else {
+            window.set_cursor_grab(CursorGrabMode::None)
+        };
+        if let Err(error) = grab {
+            // The pointer stays free and the client stays playable, so this reports once and carries on.
+            if !self.grab_refused {
+                self.grab_refused = true;
+                eprintln!("jamp: the window refused the pointer grab: {error}");
+            }
+        }
+
+        window.set_cursor_visible(!wanted);
+        // The state records the decision even after a refusal, or every frame would retry a call the window will not grant.
+        self.mouse_captured = wanted;
     }
 
     fn send_render(&self, command: RenderCommand) {
@@ -178,15 +222,13 @@ impl ApplicationHandler for Pump {
                     height: size.height,
                 });
             }
-            //TODO: Port IN_ActivateMouse
-            // Source: oracle/codemp/win32/win_input.cpp:498-560. Raven grabbed
-            // the pointer while the app was active and released it for the
-            // console and the menus, which it read from `Key_GetCatcher`. The
-            // pump has no key catcher to read until the client hooks are live,
-            // and a grab with no release path traps the user, so the grab lands
-            // with first light. Raw motion already reaches `SE_MOUSE` without
-            // it.
-            WindowEvent::Focused(_) => {}
+            // Raven's `WM_ACTIVATE` arm, which reached `IN_Activate` and set `in_appactive`.
+            // The sim thread reads the flag and decides the capture, Raven's `IN_Frame` placement.
+            // Raven cleared the key states on the same edge, which needs a client call the pump cannot make.
+            // Source: `oracle/codemp/win32/win_wndproc.cpp:71-95,404-414`
+            WindowEvent::Focused(focused) => {
+                self.events.publish_app_active(focused);
+            }
             WindowEvent::KeyboardInput {
                 event:
                     KeyEvent {
@@ -250,6 +292,10 @@ impl ApplicationHandler for Pump {
             }
             _ => {}
         }
+
+        // A window event can be the one that changed the decision, so the answer lands with it.
+        // The console key returns out of the match above, and `about_to_wait` catches that stroke a moment later.
+        self.apply_mouse_capture();
     }
 
     /// Ask for the next frame here rather than inside `RedrawRequested`: winit
@@ -259,6 +305,8 @@ impl ApplicationHandler for Pump {
     /// present rate, well above any display refresh; the sim thread keeps its
     /// own clock through `com_maxfps`.
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        // The sim thread decides the capture on its own clock, so the pump reads the answer on every pass.
+        self.apply_mouse_capture();
         if let Some(window) = self.window.as_ref() {
             window.request_redraw();
         }

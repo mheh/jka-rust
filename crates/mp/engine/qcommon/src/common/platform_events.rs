@@ -60,7 +60,7 @@ struct MouseDelta {
 }
 
 /// The shared half of the bus: the mouse accumulator, the quit request, the
-/// overflow flag, and the window's drawable size.
+/// overflow flag, the window's drawable size, and the two mouse-capture flags.
 #[derive(Default)]
 struct PlatformShared {
     mouse: MouseDelta,
@@ -79,6 +79,14 @@ struct PlatformShared {
     drawable_width: AtomicI32,
     /// The paired height for `drawable_width`.
     drawable_height: AtomicI32,
+    /// Set while the window has focus, Raven's `in_appactive`.
+    /// This one runs pump to sim: the pump writes it from the focus event and the sim thread reads it.
+    /// Source: `oracle/codemp/win32/win_input.cpp:70,690-702`
+    app_active: AtomicBool,
+    /// Set while the pointer must be captured, the answer `IN_Frame` reached before it called `IN_ActivateMouse` or `IN_DeactivateMouse`.
+    /// This one runs sim to pump: the decision needs the key catchers, which only the sim thread holds, and the window only the pump can touch.
+    /// Source: `oracle/codemp/win32/win_input.cpp:714-739`
+    mouse_active: AtomicBool,
 }
 
 /// The pump half, owned by the main thread.
@@ -157,6 +165,24 @@ impl PlatformEventSink {
         self.shared.drawable_width.store(width, Ordering::Relaxed);
         self.shared.drawable_height.store(height, Ordering::Relaxed);
     }
+
+    /// Report whether the window has focus, Raven's `IN_Activate` call from `WM_ACTIVATE`.
+    ///
+    /// Raven also dropped the flag for a minimized window.
+    /// macOS takes focus away when a window minimizes, so focus alone carries the decision here.
+    ///
+    /// Source: `oracle/codemp/win32/win_wndproc.cpp:71-95,404-414`,
+    /// `oracle/codemp/win32/win_input.cpp:690-702`
+    pub fn publish_app_active(&self, active: bool) {
+        self.shared.app_active.store(active, Ordering::Relaxed);
+    }
+
+    /// Read the sim thread's mouse-capture decision, which the pump applies to the window.
+    ///
+    /// Source: `oracle/codemp/win32/win_input.cpp:714-739`
+    pub fn mouse_active(&self) -> bool {
+        self.shared.mouse_active.load(Ordering::Relaxed)
+    }
 }
 
 /// Add one float delta to a thousandths-of-a-count accumulator.
@@ -203,6 +229,22 @@ impl PlatformEventSource {
             self.shared.drawable_width.load(Ordering::Relaxed),
             self.shared.drawable_height.load(Ordering::Relaxed),
         )
+    }
+
+    /// Read whether the window has focus, Raven's `in_appactive`.
+    ///
+    /// It stays false until the pump reports the first focus event, the same start Raven's zero-initialized global had.
+    ///
+    /// Source: `oracle/codemp/win32/win_input.cpp:70,690-702`
+    pub fn app_active(&self) -> bool {
+        self.shared.app_active.load(Ordering::Relaxed)
+    }
+
+    /// Publish this frame's mouse-capture decision for the pump to apply.
+    ///
+    /// Source: `oracle/codemp/win32/win_input.cpp:714-739`
+    pub fn publish_mouse_active(&self, active: bool) {
+        self.shared.mouse_active.store(active, Ordering::Relaxed);
     }
 }
 
@@ -266,6 +308,22 @@ mod tests {
         sink.request_quit();
         assert!(source.take_quit());
         assert!(!source.take_quit());
+    }
+
+    #[test]
+    fn the_two_mouse_capture_flags_cross_both_ways() {
+        let (sink, source) = platform_event_bus();
+        // Both start false: no focus reported yet, and no capture decided yet.
+        assert!(!source.app_active());
+        assert!(!sink.mouse_active());
+
+        sink.publish_app_active(true);
+        assert!(source.app_active());
+
+        source.publish_mouse_active(true);
+        assert!(sink.mouse_active());
+        // The decision is a level, not an edge, so a read leaves it standing.
+        assert!(sink.mouse_active());
     }
 
     #[test]

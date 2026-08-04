@@ -18,6 +18,7 @@ use mp_engine_core::{
 };
 use mp_engine_qcommon::common::platform_events::PlatformEventSource;
 use mp_engine_qcommon::sys_net::NET_Init;
+use mp_qshared::shared::keycatch::KEYCATCH_CONSOLE;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::frame_package::FramePackage;
 use mp_renderer::render_state::frame_sink::FrameSink;
@@ -106,6 +107,42 @@ fn boot_and_run(
     // Raven sleeps only when minimized or dedicated; a live client spins and
     // `Com_Frame` holds the frame rate down through `com_maxfps`.
     loop {
+        publish_mouse_capture(&engine);
         com_frame(&mut engine);
     }
+}
+
+/// Raven `IN_Frame`'s mouse-capture decision, published for the pump to apply.
+///
+/// Raven released the pointer for a console on a windowed client, and released it whenever the app was not active.
+/// Everything else captured, the menus included: `IN_Frame` reads `KEYCATCH_CONSOLE` and never `KEYCATCH_UI`.
+///
+/// Raven read `r_fullscreen->value`, which `GLW_SetMode` had already applied to the window.
+/// This port applies no fullscreen mode, so `glconfig.isFullscreen` is the field that describes the real window.
+///
+/// Raven also gated the whole thing on `s_wmv.mouseInitialized`, which `IN_StartupMouse` cleared for `in_mouse 0`.
+/// The port has no `in_mouse` cvar and no mouse startup, so nothing carries that gate yet.
+///
+/// Source: `oracle/codemp/win32/win_input.cpp:714-739`
+fn publish_mouse_capture(engine: &Engine) {
+    let Some(events) = engine.common.platform_events.as_ref() else {
+        return;
+    };
+
+    let console_up = match engine.cl.as_ref() {
+        Some(cl) => cl.cls.keyCatchers & KEYCATCH_CONSOLE != 0,
+        None => false,
+    };
+    let fullscreen = match engine.re.as_ref() {
+        Some(re) => re.sim.published.glconfig.is_fullscreen,
+        None => false,
+    };
+
+    // temporarily deactivate if not in the game and running on the desktop
+    if console_up && !fullscreen {
+        events.publish_mouse_active(false);
+        return;
+    }
+
+    events.publish_mouse_active(events.app_active());
 }
