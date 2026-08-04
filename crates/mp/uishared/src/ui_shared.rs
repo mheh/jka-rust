@@ -3901,6 +3901,10 @@ pub fn Item_TextScroll_BuildLines(
         psCurrentTextReadPos = psReadPosAtLineStart;
         let mut sLineForDisplay: Vec<u8> = Vec::new();
         let mut assigned = false;
+        // Raven declares `psLastGood_s` uninitialized (`:9060`) and first assigns it at the inner loop head, so this initializer is dead.
+        // Rust requires it, because the compiler cannot prove the loop runs before the read.
+        // Source: `oracle/codemp/ui/ui_shared.c:9060,9088`
+        #[allow(unused_assignments)]
         let mut psLastGood_s = psCurrentTextReadPos;
 
         while psCurrentTextReadPos < psText.len() {
@@ -5664,6 +5668,10 @@ pub fn Item_ListBox_Paint(
         }
 
         // adjust size for item painting
+        // Dead as translated: the loop head below reassigns `sizeWidth` before any read.
+        // Raven's own store at `:6144` dies the same way at `:6159`.
+        // Source: `oracle/codemp/ui/ui_shared.c:6144,6159`
+        #[allow(unused_assignments)]
         let mut sizeWidth = rect.w - 2.0;
         let mut sizeHeight = rect.h - 2.0;
 

@@ -26,8 +26,7 @@
 //! rig has no path to. The probe calls no renderer trap and no sound trap, so
 //! the run stays headless.
 
-// Two hosts include this file, and each drives a subset of the probe surface, so
-// a method with no caller in one host is live in the other.
+// Two hosts include this file, and each drives a subset of the probe surface, so a method with no caller in one host is live in the other.
 #![allow(dead_code)]
 
 use std::path::Path;

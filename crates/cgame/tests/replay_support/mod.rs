@@ -1057,14 +1057,14 @@ impl ReplayState {
 /// (or allocate) gigabytes. Mirrors the recorder's MAX_BLOB.
 const MAX_READ: usize = 1 << 20;
 
-// Mach-checked copies. The kernel validates the address range, so a quirk
-// pointer from the module (a record-time host token passed as an address, the
-// CleanModels value-passing site) returns an error instead of SIGBUS.
+// Mach-checked copies.
+// The kernel validates the address range, so a quirk pointer from the module returns an error instead of SIGBUS.
+// A quirk pointer is a record-time host token passed as an address, at the CleanModels value-passing site.
 //
-// The rig replays a macOS dylib, so these symbols are gated to macOS. On other
-// hosts the two copies below read nothing and write nothing, which keeps the
-// workspace test compile linkable where `mach_task_self` does not exist. Every
-// test in this rig carries `#[ignore]`, so no other host runs the stub arm.
+// The rig replays a macOS dylib, so these symbols are gated to macOS.
+// On other hosts the two copies below read nothing and write nothing.
+// That keeps the workspace test compile linkable where `mach_task_self` does not exist.
+// Every test in this rig carries `#[ignore]`, so no other host runs the stub arm.
 #[cfg(target_os = "macos")]
 extern "C" {
     fn mach_task_self() -> u32;

@@ -629,6 +629,9 @@ pub fn CL_ParseDownload(view: &mut EngineHostView, cl: &mut Client, msg: *mut ms
 
         if cl.clc.downloadSize < 0 {
             com_error(errorParm_t::ERR_DROP, MSG_ReadString(view.common, msg));
+            // Unreachable as translated: `com_error` diverges, as Raven's `Com_Error` does.
+            // Source: `oracle/codemp/client/cl_parse.cpp:694-695`
+            #[allow(unreachable_code)]
             return;
         }
     }
@@ -859,6 +862,9 @@ pub fn CL_ParseServerMessage(view: &mut EngineHostView, cl: &mut Client, msg: *m
                 errorParm_t::ERR_DROP,
                 "CL_ParseServerMessage: read past end of server message".to_string(),
             );
+            // Unreachable as translated: `com_error` diverges, as Raven's `Com_Error` does.
+            // Source: `oracle/codemp/client/cl_parse.cpp:877-878`
+            #[allow(unreachable_code)]
             break;
         }
 
@@ -917,6 +923,10 @@ pub fn CL_ParseServerMessage(view: &mut EngineHostView, cl: &mut Client, msg: *m
                 errorParm_t::ERR_DROP,
                 "CL_ParseServerMessage: Illegible server message\n".to_string(),
             );
+            // Unreachable as translated: `com_error` diverges, as Raven's `Com_Error` does.
+            // This arm is Raven's `default:` case.
+            // Source: `oracle/codemp/client/cl_parse.cpp:899-900`
+            #[allow(unreachable_code)]
             break;
         }
     }

@@ -870,8 +870,7 @@ pub fn Field_VariableSizeDraw(
     edit: *mut field_t,
     x: c_int,
     y: c_int,
-    // Raven's own body never reads `width`, so the port keeps the parameter and
-    // marks it dead.
+    // Raven's own body never reads `width`, so the port keeps the parameter and marks it dead.
     _width: c_int,
     size: c_int,
     showCursor: qboolean,

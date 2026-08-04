@@ -831,6 +831,9 @@ pub fn CL_CheckTimeout(view: &mut EngineHostView, cl: &mut Client) {
             com_printf(view.common, &format!("\n{}\n", psTimedOut));
             com_error(errorParm_t::ERR_DROP, psTimedOut);
             //CL_Disconnect( qtrue );
+            // Unreachable as translated: `com_error` diverges, and Raven's `Com_Error` does not return, so this `return` is dead in both trees.
+            // Source: `oracle/codemp/client/cl_main.cpp:2222-2224`
+            #[allow(unreachable_code)]
             return;
         }
     } else {
@@ -3709,6 +3712,9 @@ pub fn CL_PlayDemo_f(view: &mut EngineHostView, cl: &mut Client) {
         } else {
             com_error(errorParm_t::ERR_DROP, format!("couldn't open {}", name_str));
         }
+        // Unreachable as translated: both arms diverge, as Raven's `Com_Error` does.
+        // Source: `oracle/codemp/client/cl_main.cpp:585-591`
+        #[allow(unreachable_code)]
         return;
     }
     let arg1 = Cmd_Argv(view.common, 1).to_string();

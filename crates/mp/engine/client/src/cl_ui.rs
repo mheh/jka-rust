@@ -2492,6 +2492,9 @@ pub fn CL_UISystemCalls(
 /// Raven `void CL_InitUI( void )` — creates and initializes the `ui` VM.
 ///
 /// Source: `oracle/codemp/client/cl_ui.cpp:1462-1496`
+// The allow covers the `uiStarted` store after the version-check `com_error`, noted at the site.
+// Rust does not take a lint attribute on that statement.
+#[allow(unreachable_code)]
 pub fn CL_InitUI(view: &mut EngineHostView, cl: &mut Client) {
     let interpret = if cl.cl_connectedToPureServer != 0 {
         // Raven's `#if 0`-disabled `interpret = VMI_COMPILED;` branch never
@@ -2529,6 +2532,9 @@ pub fn CL_InitUI(view: &mut EngineHostView, cl: &mut Client) {
             errorParm_t::ERR_DROP,
             format!("User Interface is version {v}, expected {UI_API_VERSION}"),
         );
+        // Unreachable as translated: `com_error` diverges, as Raven's `Com_Error` does, so Raven never reaches this store either.
+        // The lint allow sits on the fn, because a statement attribute is not stable here.
+        // Source: `oracle/codemp/client/cl_ui.cpp:1486-1487`
         cl.cls.uiStarted = qfalse;
     } else {
         // rww - changed to <= CA_ACTIVE, because that is the state when we

@@ -669,12 +669,19 @@ pub fn CL_JoystickEvent(cl: &mut Client, axis: c_int, value: c_int, _time: c_int
 /// Raven `CL_JoystickMove`.
 ///
 /// Source: `oracle/codemp/client/cl_input.cpp:1035-1106`
+// The allow covers `movespeed`, which Raven declares and assigns but never reads, noted at the site.
+// Rust does not take a lint attribute on the assignment statements themselves.
+#[allow(unused_variables, unused_assignments)]
 pub fn CL_JoystickMove(common: &mut Common, cl: &mut Client, cmd: *mut usercmd_t) {
     unsafe {
         if common.cvar(cl.in_joystick).integer == 0 {
             return;
         }
 
+        // Dead as translated: Raven declares `movespeed`, assigns it in both arms, and never reads it.
+        // The live effect of the else arm is the `BUTTON_WALKING` store below.
+        // The lint allow sits on the fn.
+        // Source: `oracle/codemp/client/cl_input.cpp:1043,1047,1049`
         let movespeed;
         let anglespeed;
 
