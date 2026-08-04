@@ -16,13 +16,12 @@
 //! in-place mutable for the endian swap. `Drop` deallocates the same `Layout`
 //! it was allocated with (mirrors `Z_Free`).
 //!
-//! Consumed by `ModelBlock` (`render_state/model_block.rs`), which
-//! `CachedEndianedModelBinary::disk_image` holds as `Option<Arc<ModelBlock>>`
-//! since DEC-65 ruling 1 (`None` mirrors `pModelDiskImage == NULL`); by
-//! `server_load.rs`'s `*mut mdxaHeader_t`/`*mut mdxmHeader_t` cast sites; and
-//! by the `model_mdxm`/`model_mdxa` `EngineHost` seam (`G2SV-D5`) — all of which
-//! stay `unsafe`-confined at the point of cast (§D11) with a debug alignment
-//! assert at each cast site; the mdx header types are never named here.
+//! `ModelBlock` (`render_state/model_block.rs`) consumes this buffer, and `CachedEndianedModelBinary::disk_image`
+//! holds that block as `Option<Arc<ModelBlock>>` since DEC-65 ruling 1 (`None` mirrors `pModelDiskImage == NULL`).
+//! The other consumers are `server_load.rs`'s `*mut mdxaHeader_t`/`*mut mdxmHeader_t` cast sites and the
+//! `model_mdxm`/`model_mdxa` `EngineHost` seam (`G2SV-D5`).
+//! All of them stay `unsafe`-confined at the point of cast (§D11) with a debug alignment assert at each cast site.
+//! The mdx header types are never named here.
 //!
 //! This type stays `!Send` and `!Sync`. `ModelBlock` carries the `Send`/`Sync` claim for the published block, and
 //! its impl comment holds the four invariants that pay for it.

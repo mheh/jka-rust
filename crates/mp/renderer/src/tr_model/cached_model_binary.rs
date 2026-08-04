@@ -298,8 +298,8 @@ impl RenderModels {
         let key = model_file_name.to_lowercase();
         if let Some(entry) = self.cached.get_mut(&key) {
             if let Some(block) = entry.disk_image.as_mut() {
-                // SAFETY: DEC-35 — the block is the live, endian-swap-completed
-                // `.glm` block (self-sized by `ofsEnd`); parsing is a pure read.
+                // SAFETY: DEC-35 - the block is the live, endian-swap-completed `.glm` block, self-sized by
+                // `ofsEnd`. Parsing is a pure read.
                 let view = unsafe { MdxmView::from_block(block.base_ptr() as *const c_void) };
                 let parsed = MdxmParsed::parse(view);
                 Arc::get_mut(block)
@@ -315,8 +315,8 @@ impl RenderModels {
         let key = model_file_name.to_lowercase();
         if let Some(entry) = self.cached.get_mut(&key) {
             if let Some(block) = entry.disk_image.as_mut() {
-                // SAFETY: DEC-35 — the block is the live, endian-swap-completed
-                // `.gla` block (self-sized by `ofsEnd`); parsing is a pure read.
+                // SAFETY: DEC-35 - the block is the live, endian-swap-completed `.gla` block, self-sized by
+                // `ofsEnd`. Parsing is a pure read.
                 let view = unsafe { MdxaView::from_block(block.base_ptr() as *const c_void) };
                 let parsed = MdxaParsed::parse(view);
                 Arc::get_mut(block)
