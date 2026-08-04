@@ -595,9 +595,12 @@ pub fn RoQPrepMcomp(cl: &mut Client, xoff: c_long, yoff: c_long) {
         i += i;
     }
 
-    for y in 0..16i64 {
+    // Raven declares `long i, j, x, y, temp, temp2` (`cl_cin.cpp:839`), so the
+    // two counters are `c_long`. An `i64` literal here matches `c_long` on a
+    // 64-bit target only, and breaks the ILP32 build.
+    for y in 0..16 as c_long {
         let temp2 = (y + yoff - 8) * i;
-        for x in 0..16i64 {
+        for x in 0..16 as c_long {
             let temp = (x + xoff - 8) * j;
             cl.cin.mcomp[((x * 16) + y) as usize] =
                 (cl.cinTable[handle].normalBuffer0 - (temp2 + temp)) as c_uint;
