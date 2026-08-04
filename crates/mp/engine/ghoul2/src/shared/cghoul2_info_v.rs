@@ -45,6 +45,11 @@ const _: () = assert!(core::mem::offset_of!(CGhoul2Info_v, mItem) == 0);
 // trivial constructors (`:362-369`, zero-init / raw-handle-init) need no
 // method port either — callers build `CGhoul2Info_v { mItem: ... }` directly
 // since the field is `pub`.
+//
+// Lifecycle at the module seam (DEC-65 ruling 3): a module never holds this object.
+// It holds the `Ghoul2Handle + 1` token (`token.rs`), and each trap arm builds a stack cell with `from_token`,
+// calls the `g2api_*` function, and writes the cell back with `to_token` when the arm owns the module's slot address.
+// The arena entry the handle names is the only thing that lives across a trap return.
 impl CGhoul2Info_v {
     /// Builds the stack cell a trap arm works through, from the module-visible token (DEC-65 ruling 3).
     /// A null token gives `mItem: 0`, the always-invalid handle.

@@ -168,7 +168,7 @@ pub struct RefEntity {
     /// Source: `oracle/codemp/cgame/tr_types.h:245`
     pub model_scale: Vec3,
     /// The entity's attached Ghoul2 instance list, decoded from the tier-1
-    /// `*mut c_void ghoul2` token (`ghoul2_token_decode`, `tr_scene.rs`). Raven
+    /// `*mut c_void ghoul2` token (`ghoul2_token_decode`, `mp_engine_ghoul2::token`). Raven
     /// carries a raw `CGhoul2Info_v *`. The render side threads a
     /// `&mut Ghoul2System` and looks the list up by this `Ghoul2Handle`, so no
     /// raw pointer crosses the seam.

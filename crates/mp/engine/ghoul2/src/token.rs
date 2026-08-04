@@ -5,6 +5,10 @@
 //! One scheme serves the module `void*` slots and `refEntity_t.ghoul2`.
 //! That is what lets cgame copy its slot value straight into the render entity, and the renderer decode it.
 //! Raw ghoul2 pointers never leave the engine.
+//!
+//! The scheme is live at every seam as of 2026-08-03, which closes the split `tr_scene.rs` used to flag.
+//! The render trap decoded tokens while `sv_game.rs` handed out `Box<CGhoul2Info_v>` pointers in the same `void*` slot.
+//! All 115 ghoul2 trap arms in `sv_game.rs`, `cl_cgame.rs`, and `cl_ui.rs`, plus the two `sv_world.rs` slot readers, now decode this token.
 
 use core::ffi::c_void;
 
