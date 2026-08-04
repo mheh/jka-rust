@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use crate::render_state::arena::Arena;
 use crate::render_state::image_asset::{ImageAsset, ImageHandle};
+use crate::render_state::model_blocks::ModelBlocks;
 use crate::render_state::placeholders::{AutomapWireframe, FunctionTables, GlConfig, WorldAsset};
 use crate::render_state::shader_asset::{ShaderAsset, ShaderHandle};
 use crate::render_state::skin_asset::{SkinAsset, SkinHandle};
@@ -137,6 +138,15 @@ pub struct RenderAssets {
     // `docs/subsystems/tr-model.md` `## Amendment 2026-07-27 — models pool:
     // arena mechanics` (#51). Unifying the server and client model registries
     // is deferred to the client-engine island.
+    // DEC-65 ruling 1 publishes the model blocks here as `models`, while the registry itself stays on
+    // `RenderModels`.
+    /// The DEC-65 ruling 1 published model blocks: one entry per registered slot, naming its bytes by `Arc` and
+    /// byte offset.
+    ///
+    /// Behind its own `Arc` for the same reason as [`Self::world`]. `RenderModels` owns the registry and
+    /// `RE_EndFrame` replaces this whole field when it changed, so `Arc::make_mut` on the published registry
+    /// costs a refcount rather than a copy of every block handle.
+    pub models: Arc<ModelBlocks>,
     /// `tr.world` — replaced wholesale on level load.
     ///
     /// Behind its own `Arc` since W2-F7: the world is immutable after load

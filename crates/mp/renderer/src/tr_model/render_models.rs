@@ -17,6 +17,7 @@ use mp_engine_qcommon::qfiles::md3_limits::MD3_MAX_LODS;
 use mp_host_interface::EngineHost;
 use mp_qshared::shared::{qhandle_t, qtrue};
 
+use crate::render_state::model_blocks::{ModelBlocks, PublishedModel};
 use crate::tr_local::modtype_t::modtype_t;
 
 use super::cached_model_binary::CachedEndianedModelBinary;
@@ -120,6 +121,18 @@ pub struct RenderModels {
     ///
     /// Source: `oracle/codemp/renderer/tr_bsp.cpp:1441`
     pub(crate) bmodel_indices: HashMap<qhandle_t, usize>,
+
+    /// The DEC-65 ruling 1 published view of this registry: one entry per registered slot, naming its blocks by
+    /// `Arc` and byte offset. `RE_EndFrame` hands a clone to `RenderAssetsSim`, and the render thread reads it out
+    /// of the frame package.
+    ///
+    /// No oracle counterpart: Raven's renderer has one thread and no publish step.
+    pub(crate) blocks: ModelBlocks,
+
+    /// Set by every registration, eviction and pool reset, cleared by [`Self::publish_blocks`].
+    /// The dedicated server marks slots with no render thread to publish to, and this flag is what lets that stay
+    /// inert instead of failing.
+    pub(crate) blocks_dirty: bool,
 }
 
 impl Default for RenderModels {
@@ -141,6 +154,8 @@ impl Default for RenderModels {
             skins: Vec::new(),
             server_shaders: Vec::new(),
             bmodel_indices: HashMap::new(),
+            blocks: ModelBlocks::default(),
+            blocks_dirty: false,
         }
     }
 }
@@ -167,6 +182,9 @@ impl RenderModels {
         // stale; `r_alloc_model` re-creates slot 0 below.
         self.models.reset();
         self.hash.clear();
+        // The reset renumbers every handle above slot 0, so the published entries no longer name what they claim.
+        self.blocks.clear();
+        self.blocks_dirty = true;
 
         // leave a space for NULL model
         let null_model = self
@@ -206,6 +224,9 @@ impl RenderModels {
         // (Raven's `R_HunkClearCrap` drops the mark and stops there).
         self.models.reset();
         self.hash.clear();
+        // Same reason as `model_init`: the reset invalidates every published handle.
+        self.blocks.clear();
+        self.blocks_dirty = true;
         // `tr.numSkins = 0` (the skin memory itself lived on the just-reset
         // hunk); `tr.numShaders = 0` stays §20, not a field of this struct.
         self.skins.clear();
@@ -352,6 +373,43 @@ impl RenderModels {
     /// (`RE_RegisterModel_Actual` hash lookup)
     pub fn handle_for_name(&self, name: &str) -> Option<qhandle_t> {
         self.hash.get(&name.to_ascii_lowercase()).copied()
+    }
+
+    /// The published block registry, but only when a registration, an eviction or a reset changed it since the
+    /// last call. `RE_EndFrame` drains this once per frame.
+    pub fn publish_blocks(&mut self) -> Option<ModelBlocks> {
+        if !self.blocks_dirty {
+            return None;
+        }
+        self.blocks_dirty = false;
+        Some(self.blocks.clone())
+    }
+
+    /// Record one finished model slot into the published registry.
+    /// This runs at registration completion, after the LOD-duplicate loop, so the recorded offsets match the final
+    /// `model_t` pointers and an already-found load carries its replayed shader pokes.
+    pub(super) fn mark_block(&mut self, handle: qhandle_t) {
+        let model = self.get_model(handle);
+        let model_type = model.r#type;
+        let num_lods = model.numLods;
+        let md3 = model.md3;
+        let mdxm = model.mdxm;
+        let mdxa = model.mdxa;
+
+        let entry = PublishedModel {
+            model_type,
+            num_lods,
+            md3: [
+                self.block_containing(md3[0] as *const u8),
+                self.block_containing(md3[1] as *const u8),
+                self.block_containing(md3[2] as *const u8),
+            ],
+            mdxm: self.block_containing(mdxm as *const u8),
+            mdxa: self.block_containing(mdxa as *const u8),
+        };
+
+        self.blocks.set(handle, entry);
+        self.blocks_dirty = true;
     }
 }
 

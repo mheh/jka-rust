@@ -169,6 +169,9 @@ pub struct TrMainScratch {
 /// passes `None` and the `RT_MODEL` arm draws nothing, which is this wave's
 /// stated model scope. A sim-side caller (harness, golden test) passes `Some`
 /// and every arm runs as before.
+///
+/// DEC-65 ruling 1 publishes the model bytes as `Arc<ModelBlocks>` on `RenderAssets`, so the render thread now
+/// has the blocks even though the pool stays sim-side. Migrating these arms to read that copy is gh#31 step-003.
 pub struct EntityWalkHost<'a, 'e> {
     pub engine_view: &'a mut EngineHostView<'e>,
     pub models: &'a RenderModels,

@@ -38,6 +38,8 @@ pub mod light_style_table;
 // (`crate::tr_model::model_pool`), per `docs/subsystems/tr-model.md`
 // `## Amendment 2026-07-27 — models pool: arena mechanics` (#51). Unifying the
 // server and client model registries is deferred to the client-engine island.
+pub mod model_block;
+pub mod model_blocks;
 pub mod placeholders;
 pub mod render_assets;
 pub mod render_assets_sim;
