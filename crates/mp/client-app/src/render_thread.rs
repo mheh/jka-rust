@@ -85,13 +85,18 @@ pub fn run(
                 // Take at most one new package per present, so a sim thread
                 // running ahead cannot starve the window of frames.
                 match packages.try_recv() {
-                    Ok(package) => {
-                        if let Some(previous) = held.replace(package) {
+                    Ok(mut package) => {
+                        if let Some(previous) = held.take() {
+                            // `begin_frame` below can fail (`NeedsReconfigure`, `Skip`) on the very iteration that received `previous`,
+                            // so it may never reach `execute_package`.
+                            // Its one-shot payloads (the world generation, the staged image uploads, a pending screenshot)
+                            // cross the channel exactly once, so `absorb` carries any it still holds into `package` before the buffer recycles.
+                            let mut buffer = package.absorb(previous);
                             // Hand the emptied buffer back with its capacity.
-                            let mut buffer = previous.frame_data;
                             buffer.events.clear();
                             let _ = recycled.send(buffer);
                         }
+                        held = Some(package);
                     }
                     Err(TryRecvError::Empty) => {}
                     Err(TryRecvError::Disconnected) => break,

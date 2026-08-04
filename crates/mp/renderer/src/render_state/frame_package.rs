@@ -48,3 +48,28 @@ pub struct FramePackage {
     /// A pending `screenshot_tga`, answered after the frame presents.
     pub capture: Option<CaptureRequest>,
 }
+
+impl FramePackage {
+    /// Moves `previous`'s undelivered one-shot payloads into `self`, then returns `previous`'s frame-data buffer for recycling.
+    ///
+    /// A held package can be replaced before it ever executes:
+    /// `begin_frame` can fail with `NeedsReconfigure` or `Skip` on the same iteration that received a package.
+    /// `world`, `uploads`, and `capture` each cross the channel exactly once,
+    /// so a package that never executed must hand them to the package that replaces it, or they are lost for good.
+    /// `world` and `capture` keep `self`'s value when `self` already has one;
+    /// `uploads` prepends `previous`'s entries ahead of `self`'s, preserving arrival order.
+    /// An executed package has already taken these fields to `None`/empty, so the move is a no-op in the common case.
+    pub fn absorb(&mut self, mut previous: FramePackage) -> FrameData {
+        if self.world.is_none() {
+            self.world = previous.world.take();
+        }
+        if self.capture.is_none() {
+            self.capture = previous.capture.take();
+        }
+        if !previous.uploads.is_empty() {
+            previous.uploads.append(&mut self.uploads);
+            self.uploads = previous.uploads;
+        }
+        previous.frame_data
+    }
+}
