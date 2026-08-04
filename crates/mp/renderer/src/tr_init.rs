@@ -1048,6 +1048,10 @@ pub fn R_ScreenShotTGA_f(
             *last_number += 1;
         }
 
+        // Raven's two screenshot commands disagree on this bound.
+        // The TGA one stops at 9999 and the JPEG one stops at 10000, so `screenshot_tga` refuses the last number and `screenshot` takes it.
+        // Both are transcribed as written.
+        // Source: `oracle/codemp/renderer/tr_init.cpp:744,800`
         if *last_number >= 9999 {
             com_printf(view.common, "ScreenShot: Couldn't create a file\n");
             return;
