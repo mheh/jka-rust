@@ -5,7 +5,7 @@
 
 #![allow(non_snake_case, non_camel_case_types, unused_variables, unused_mut)]
 
-use core::ffi::{c_char, c_int};
+use core::ffi::{c_char, c_int, c_void};
 use std::sync::Arc;
 
 use mp_abi::cgame::exports::MpCgameExport;
@@ -278,12 +278,12 @@ fn get_bolt_matrix_arm(
     // SAFETY: the handle, the model list, and the matrix out-param are all
     // module-space (porting-rules §D11).
     unsafe {
-        let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+        let mut ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
         let bolt_matrix = &mut *(vma(vc, args, 4) as *mut mdxaBone_t);
         g2api_get_bolt_matrix(
             g2,
             view,
-            ghoul2,
+            &mut ghoul2,
             arg(2),
             arg(3),
             *(vma(vc, args, 5) as *const vec3_t),
@@ -2651,10 +2651,10 @@ pub fn CL_CgameSystemCalls(
         FX_PlayEntityEffectID(fx, &mut host, id, org, axis, bolt_info, ent_num, vol, rad);
         0
     } else if op == MpCgameImport::CG_FX_PLAY_BOLTED_EFFECT_ID as c_int {
-        // SAFETY: `args[3]` is the module's `CGhoul2Info_v` handle (§D11).
+        // SAFETY: `args[3]` is the module's ghoul2 token (§D11).
         unsafe {
-            let g2v = &mut *(argw(3) as *mut CGhoul2Info_v);
-            let ghl_info = g2_info(g2, g2v, arg(6));
+            let g2v = CGhoul2Info_v::from_token(argw(3) as *mut c_void);
+            let ghl_info = g2_info(g2, &g2v, arg(6));
             match g2api_attach_ent(g2, view, ghl_info, arg(4), arg(5), arg(6)) {
                 Some(boltInfo) => {
                     let org = *(vma(vc, args, 2) as *const vec3_t);
@@ -2895,27 +2895,26 @@ pub fn CL_CgameSystemCalls(
         g2api_list_bones(g2, view, ghl_info, arg(2));
         0
     } else if op == MpCgameImport::CG_G2_HAVEWEGHOULMODELS as c_int {
-        // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
+        // A null token makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
         // Source: `oracle/codemp/ghoul2/G2_API.cpp:1923`
-        let p = argw(1) as *const CGhoul2Info_v;
-        if p.is_null() {
+        let token = argw(1) as *mut c_void;
+        if token.is_null() {
             0
         } else {
-            // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-            let ghoul2 = unsafe { &*p };
-            g2api_have_we_ghoul2_models(g2, ghoul2) as c_int
+            let ghoul2 = CGhoul2Info_v::from_token(token);
+            g2api_have_we_ghoul2_models(g2, &ghoul2) as c_int
         }
     } else if op == MpCgameImport::CG_G2_SETMODELS as c_int {
-        // A null handle makes Raven's `if ((int)&ghoul2)` false, and the call does nothing.
+        // A null token makes Raven's `if ((int)&ghoul2)` false, and the call does nothing.
         // Source: `oracle/codemp/ghoul2/G2_API.cpp:1942`
-        let p = argw(1) as *mut CGhoul2Info_v;
-        if !p.is_null() {
-            // SAFETY: the handle and the two lists are module-space (§D11).
+        let token = argw(1) as *mut c_void;
+        if !token.is_null() {
+            let mut ghoul2 = CGhoul2Info_v::from_token(token);
+            // SAFETY: the two lists are module-space (§D11).
             unsafe {
-                let ghoul2 = &mut *p;
                 g2api_set_ghoul2_model_indexes(
                     g2,
-                    ghoul2,
+                    &mut ghoul2,
                     core::slice::from_raw_parts(vma(vc, args, 2) as *const qhandle_t, 0),
                     core::slice::from_raw_parts(vma(vc, args, 3) as *const qhandle_t, 0),
                 );
@@ -2933,41 +2932,39 @@ pub fn CL_CgameSystemCalls(
         get_bolt_matrix_arm(view, g2, vc, args, &arg) as c_int
     } else if op == MpCgameImport::CG_G2_INITGHOUL2MODEL as c_int {
         let file_name = cstr_to_string(vma(vc, args, 2) as *const c_char);
-        // SAFETY: `VMA(1)` is the module's `CGhoul2Info_v *` slot (§D11).
-        // Raven `if (!(*ghoul2Ptr)) *ghoul2Ptr = new CGhoul2Info_v;` - the
-        // handle object's `new`/`delete` is the engine's job: the engine owns
-        // the `Box`, the module holds the raw pointer, freed at CG_G2_CLEANMODELS.
-        let ghoul2 = unsafe {
-            let pp = vma(vc, args, 1) as *mut *mut CGhoul2Info_v;
-            if (*pp).is_null() {
-                *pp = Box::into_raw(Box::new(CGhoul2Info_v { mItem: 0 }));
-            }
-            &mut **pp
-        };
-        g2api_init_ghoul2_model(
+        // SAFETY: `VMA(1)` is the module's ghoul2 token slot (§D11).
+        // Raven `if (!(*ghoul2Ptr)) *ghoul2Ptr = new CGhoul2Info_v;` builds the handle object the module then holds.
+        // The token scheme (DEC-65 ruling 3) needs no allocation.
+        // The slot reads into a stack cell, and the write-back below carries the new handle out.
+        let pp = vma(vc, args, 1) as *mut *mut c_void;
+        // SAFETY: the slot lives in module memory for the whole dispatch (§D11).
+        let mut ghoul2 = unsafe { CGhoul2Info_v::from_token(*pp) };
+        let answer = g2api_init_ghoul2_model(
             g2,
             view,
-            ghoul2,
+            &mut ghoul2,
             &file_name,
             arg(3),
             arg(4) as qhandle_t,
             arg(5) as qhandle_t,
             arg(6),
             arg(7),
-        )
+        );
+        unsafe { *pp = ghoul2.to_token() };
+        answer
     } else if op == MpCgameImport::CG_G2_SETSKIN as c_int {
-        // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let g2v = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
-        let ghl_info = g2_info(g2, g2v, arg(2));
+        // `args[1]` is the module's ghoul2 token (§D11).
+        let g2v = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
+        let ghl_info = g2_info(g2, &g2v, arg(2));
         g2api_set_skin(g2, view, ghl_info, arg(3), arg(4)) as c_int
     } else if op == MpCgameImport::CG_G2_COLLISIONDETECT as c_int {
         let out = vma(vc, args, 1) as *mut CollisionRecord_t;
-        // SAFETY: `args[2]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &mut *(argw(2) as *mut CGhoul2Info_v) };
+        // `args[2]` is the module's ghoul2 token (§D11).
+        let mut ghoul2 = CGhoul2Info_v::from_token(argw(2) as *mut c_void);
         let hits = g2api_collision_detect(
             g2,
             view,
-            ghoul2,
+            &mut ghoul2,
             unsafe { *(vma(vc, args, 3) as *const vec3_t) },
             unsafe { *(vma(vc, args, 4) as *const vec3_t) },
             arg(5),
@@ -2983,12 +2980,12 @@ pub fn CL_CgameSystemCalls(
         0
     } else if op == MpCgameImport::CG_G2_COLLISIONDETECTCACHE as c_int {
         let out = vma(vc, args, 1) as *mut CollisionRecord_t;
-        // SAFETY: `args[2]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &mut *(argw(2) as *mut CGhoul2Info_v) };
+        // `args[2]` is the module's ghoul2 token (§D11).
+        let mut ghoul2 = CGhoul2Info_v::from_token(argw(2) as *mut c_void);
         let hits = g2api_collision_detect_cache(
             g2,
             view,
-            ghoul2,
+            &mut ghoul2,
             unsafe { *(vma(vc, args, 3) as *const vec3_t) },
             unsafe { *(vma(vc, args, 4) as *const vec3_t) },
             arg(5),
@@ -3003,20 +3000,20 @@ pub fn CL_CgameSystemCalls(
         write_collision_records(out, &hits);
         0
     } else if op == MpCgameImport::CG_G2_ANGLEOVERRIDE as c_int {
-        // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
+        // A null token makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
         // Source: `oracle/codemp/ghoul2/G2_API.cpp:1302`
-        let p = argw(1) as *mut CGhoul2Info_v;
-        if p.is_null() {
+        let token = argw(1) as *mut c_void;
+        if token.is_null() {
             0
         } else {
             let bone_name = cstr_to_string(vma(vc, args, 3) as *const c_char);
-            // SAFETY: the handle, the angles, and the model list are module-space.
+            let mut ghoul2 = CGhoul2Info_v::from_token(token);
+            // SAFETY: the angles and the model list are module-space.
             unsafe {
-                let ghoul2 = &mut *p;
                 g2api_set_bone_angles(
                     g2,
                     view,
-                    ghoul2,
+                    &mut ghoul2,
                     arg(2),
                     &bone_name,
                     *(vma(vc, args, 4) as *const vec3_t),
@@ -3031,31 +3028,31 @@ pub fn CL_CgameSystemCalls(
             }
         }
     } else if op == MpCgameImport::CG_G2_CLEANMODELS as c_int {
-        // SAFETY: `VMA(1)` is the module's `CGhoul2Info_v *` slot (§D11).
-        // Raven guards the null pointee and then deletes and nulls the handle
-        // (`G2_API.cpp:496-564`); the engine drops the `Box` it made at init.
+        // SAFETY: `VMA(1)` is the module's ghoul2 token slot (§D11).
+        // Raven guards the null pointee and then deletes and nulls the handle (`G2_API.cpp:496-564`).
+        // `g2api_clean_ghoul2_models` zeroes `mItem`, and a zeroed cell encodes back to the null token.
+        // The write-back is therefore Raven's `*ghoul2Ptr = NULL`.
         unsafe {
-            let pp = vma(vc, args, 1) as *mut *mut CGhoul2Info_v;
+            let pp = vma(vc, args, 1) as *mut *mut c_void;
             if !(*pp).is_null() {
-                g2api_clean_ghoul2_models(g2, &mut **pp);
-                drop(Box::from_raw(*pp));
-                *pp = core::ptr::null_mut();
+                let mut ghoul2 = CGhoul2Info_v::from_token(*pp);
+                g2api_clean_ghoul2_models(g2, &mut ghoul2);
+                *pp = ghoul2.to_token();
             }
         }
         0
     } else if op == MpCgameImport::CG_G2_PLAYANIM as c_int {
-        // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
+        // A null token makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
         // Source: `oracle/codemp/ghoul2/G2_API.cpp:1103`
-        let p = argw(1) as *mut CGhoul2Info_v;
-        if p.is_null() {
+        let token = argw(1) as *mut c_void;
+        if token.is_null() {
             0
         } else {
             let bone_name = cstr_to_string(vma(vc, args, 3) as *const c_char);
-            // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-            let ghoul2 = unsafe { &mut *p };
+            let mut ghoul2 = CGhoul2Info_v::from_token(token);
             g2api_set_bone_anim(
                 g2,
-                ghoul2,
+                &mut ghoul2,
                 arg(2),
                 &bone_name,
                 arg(4),
@@ -3072,8 +3069,8 @@ pub fn CL_CgameSystemCalls(
         // SAFETY: the handle, the model list, and the five out-params are
         // module-space (porting-rules §D11).
         unsafe {
-            let g2v = &mut *(argw(1) as *mut CGhoul2Info_v);
-            let ghl_info = g2_info(g2, g2v, arg(10));
+            let g2v = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
+            let ghl_info = g2_info(g2, &g2v, arg(10));
             match g2api_get_bone_anim(
                 g2,
                 view,
@@ -3098,8 +3095,8 @@ pub fn CL_CgameSystemCalls(
         let bone_name = cstr_to_string(vma(vc, args, 2) as *const c_char);
         // SAFETY: the handle, the model list, and the out-param are module-space.
         unsafe {
-            let g2v = &mut *(argw(1) as *mut CGhoul2Info_v);
-            let ghl_info = g2_info(g2, g2v, arg(6));
+            let g2v = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
+            let ghl_info = g2_info(g2, &g2v, arg(6));
             match g2api_get_bone_anim(
                 g2,
                 view,
@@ -3120,12 +3117,11 @@ pub fn CL_CgameSystemCalls(
         // Raven reads the handle before its `if ((int)&ghoul2)` check, so a null handle is UB.
         // §19: we take the NULL-name path, which leaves the out-buffer alone.
         // Source: `oracle/codemp/ghoul2/G2_API.cpp:2414-2416`
-        let p = argw(1) as *const CGhoul2Info_v;
-        if !p.is_null() {
+        let token = argw(1) as *mut c_void;
+        if !token.is_null() {
             let point = vma(vc, args, 3) as *mut c_char;
-            // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-            let ghoul2 = unsafe { &*p };
-            if let Some(local) = g2api_get_gla_name(g2, view, ghoul2, arg(2)) {
+            let ghoul2 = CGhoul2Info_v::from_token(token);
+            if let Some(local) = g2api_get_gla_name(g2, view, &ghoul2, arg(2)) {
                 let local_c = std::ffi::CString::new(local).unwrap_or_default();
                 // SAFETY: `VMA(3)` is the module's seam out-buffer (§D11).
                 unsafe { libc::strcpy(point, local_c.as_ptr()) };
@@ -3133,67 +3129,80 @@ pub fn CL_CgameSystemCalls(
         }
         0
     } else if op == MpCgameImport::CG_G2_COPYGHOUL2INSTANCE as c_int {
-        // SAFETY: both handles are module-space (porting-rules §D11).
-        unsafe {
-            let g2_from = &mut *(argw(1) as *mut CGhoul2Info_v);
-            let g2_to = &mut *(argw(2) as *mut CGhoul2Info_v);
-            g2api_copy_ghoul2_instance(g2, g2_from, g2_to, arg(3))
+        // Both sides come across by value, so this arm has no slot to write back through.
+        // In-place `deep_copy` (DEC-65 ruling 3) keeps a live destination's handle, so the discarded cell is correct.
+        // §19: a null destination is Raven's own crash on a null reference (`G2_API.cpp:2239-2259`).
+        // A call would allocate into the discarded cell and strand the arena slot, so this answers -1 without calling.
+        // The arm is dead in both trees.
+        // No Rust module calls it, and no oracle game, cgame, or ui source calls `trap_G2API_CopyGhoul2Instance`.
+        let to_token = argw(2) as *mut c_void;
+        if to_token.is_null() {
+            -1
+        } else {
+            let mut g2_from = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
+            let mut g2_to = CGhoul2Info_v::from_token(to_token);
+            g2api_copy_ghoul2_instance(g2, &mut g2_from, &mut g2_to, arg(3))
         }
     } else if op == MpCgameImport::CG_G2_COPYSPECIFICGHOUL2MODEL as c_int {
-        // A null handle makes Raven's `if (((int)&ghoul2From) && ((int)&ghoul2To))` false,
+        // A null token makes Raven's `if (((int)&ghoul2From) && ((int)&ghoul2To))` false,
         // and the call does nothing.
         // Source: `oracle/codemp/ghoul2/G2_API.cpp:2291`
-        let p_from = argw(1) as *mut CGhoul2Info_v;
-        let p_to = argw(3) as *mut CGhoul2Info_v;
-        if !p_from.is_null() && !p_to.is_null() {
-            // SAFETY: both handles are module-space (porting-rules §D11).
-            unsafe {
-                let ghoul2_from = &mut *p_from;
-                let ghoul2_to = &mut *p_to;
-                g2api_copy_specific_g2_model(g2, ghoul2_from, arg(2), ghoul2_to, arg(4));
-            }
+        // §19: after a remove empties a slot the slot now reads null, so this arm no-ops.
+        // Raven no-ops there too, because Raven nulls the slot at remove (`G2_API.cpp:868-869`).
+        // The pointer code that preceded this reallocated through a kept empty cell (`api_models.rs:695-697`), which was the outlier.
+        let from_token = argw(1) as *mut c_void;
+        let to_token = argw(3) as *mut c_void;
+        if !from_token.is_null() && !to_token.is_null() {
+            let mut ghoul2_from = CGhoul2Info_v::from_token(from_token);
+            let mut ghoul2_to = CGhoul2Info_v::from_token(to_token);
+            g2api_copy_specific_g2_model(g2, &mut ghoul2_from, arg(2), &mut ghoul2_to, arg(4));
         }
         0
     } else if op == MpCgameImport::CG_G2_DUPLICATEGHOUL2INSTANCE as c_int {
-        // SAFETY: the handle and the `CGhoul2Info_v *` slot are module-space.
+        // SAFETY: `VMA(2)` is the module's ghoul2 token slot (§D11).
         unsafe {
-            let g2_from = &mut *(argw(1) as *mut CGhoul2Info_v);
-            let pp = vma(vc, args, 2) as *mut *mut CGhoul2Info_v;
+            let mut g2_from = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
+            let pp = vma(vc, args, 2) as *mut *mut c_void;
             // Raven returns on a live destination (assert dropped, NDEBUG) and
-            // allocates on a null one (`G2_API.cpp:2330-2340`). The engine
-            // owns the `Box`, the module holds the raw pointer.
+            // allocates on a null one (`G2_API.cpp:2330-2340`).
+            // The destination starts empty, so the copy allocates and the write-back carries the new handle to the module.
             if (*pp).is_null() {
-                *pp = Box::into_raw(Box::new(CGhoul2Info_v { mItem: 0 }));
-                let g2_to = &mut **pp;
-                g2api_duplicate_ghoul2_instance(g2, g2_from, g2_to);
+                let mut g2_to = CGhoul2Info_v { mItem: 0 };
+                g2api_duplicate_ghoul2_instance(g2, &mut g2_from, &mut g2_to);
+                *pp = g2_to.to_token();
             }
         }
         0
     } else if op == MpCgameImport::CG_G2_HASGHOUL2MODELONINDEX as c_int {
-        // SAFETY: `VMA(1)` is the module's `CGhoul2Info_v *` slot (§D11).
+        // SAFETY: `VMA(1)` is the module's ghoul2 token slot (§D11).
         // §19: Raven derefs the null pointee; the gone-instance sanity answer
         // is qfalse, so the null pointee takes it too.
-        let pp = vma(vc, args, 1) as *mut *mut CGhoul2Info_v;
+        // The arm reads the slot but never writes it, because the call is a pure read.
+        let pp = vma(vc, args, 1) as *mut *mut c_void;
         if unsafe { (*pp).is_null() } {
             0
         } else {
-            let ghoul2 = unsafe { &**pp };
-            g2api_has_ghoul2_model_on_index(g2, ghoul2, arg(2)) as c_int
+            let ghoul2 = unsafe { CGhoul2Info_v::from_token(*pp) };
+            g2api_has_ghoul2_model_on_index(g2, &ghoul2, arg(2)) as c_int
         }
     } else if op == MpCgameImport::CG_G2_REMOVEGHOUL2MODEL as c_int {
-        // SAFETY: `VMA(1)` is the module's `CGhoul2Info_v *` slot (§D11).
+        // SAFETY: `VMA(1)` is the module's ghoul2 token slot (§D11).
         // §19: same null-pointee answer as the HASGHOUL2MODELONINDEX arm.
-        let pp = vma(vc, args, 1) as *mut *mut CGhoul2Info_v;
+        // The callee frees the handle when the vector empties (`api_models.rs:497`).
+        // The write-back therefore restores Raven's `*ghlRemove = NULL` (`G2_API.cpp:868-869`).
+        let pp = vma(vc, args, 1) as *mut *mut c_void;
         if unsafe { (*pp).is_null() } {
             0
         } else {
-            let ghoul2 = unsafe { &mut **pp };
-            g2api_remove_ghoul2_model(g2, ghoul2, arg(2)) as c_int
+            let mut ghoul2 = unsafe { CGhoul2Info_v::from_token(*pp) };
+            let answer = g2api_remove_ghoul2_model(g2, &mut ghoul2, arg(2)) as c_int;
+            unsafe { *pp = ghoul2.to_token() };
+            answer
         }
     } else if op == MpCgameImport::CG_G2_SKINLESSMODEL as c_int {
-        // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let g2v = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
-        let ghl_info = g2_info(g2, g2v, arg(2));
+        // `args[1]` is the module's ghoul2 token (§D11).
+        let g2v = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
+        let ghl_info = g2_info(g2, &g2v, arg(2));
         g2api_skinless_model(g2, view, ghl_info) as c_int
     } else if op == MpCgameImport::CG_G2_GETNUMGOREMARKS as c_int {
         // Raven gates this on `_G2_GORE`, undefined in this build; the oracle falls through
@@ -3206,27 +3215,26 @@ pub fn CL_CgameSystemCalls(
         // Raven gates this on `_G2_GORE`, undefined in this build.
         0
     } else if op == MpCgameImport::CG_G2_SIZE as c_int {
-        // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &*(argw(1) as *const CGhoul2Info_v) };
-        g2api_ghoul2_size(g2, ghoul2)
+        // `args[1]` is the module's ghoul2 token (§D11).
+        let ghoul2 = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
+        g2api_ghoul2_size(g2, &ghoul2)
     } else if op == MpCgameImport::CG_G2_ADDBOLT as c_int {
-        // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is -1.
+        // A null token makes Raven's `if ((int)&ghoul2)` false, and the answer is -1.
         // Source: `oracle/codemp/ghoul2/G2_API.cpp:1637`
-        let p = argw(1) as *mut CGhoul2Info_v;
-        if p.is_null() {
+        let token = argw(1) as *mut c_void;
+        if token.is_null() {
             -1
         } else {
             let bone_name = cstr_to_string(vma(vc, args, 3) as *const c_char);
-            // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-            let ghoul2 = unsafe { &mut *p };
-            g2api_add_bolt(g2, view, ghoul2, arg(2), &bone_name)
+            let mut ghoul2 = CGhoul2Info_v::from_token(token);
+            g2api_add_bolt(g2, view, &mut ghoul2, arg(2), &bone_name)
         }
     } else if op == MpCgameImport::CG_G2_ATTACHENT as c_int {
         // G2API_AttachEnt(int *boltInfo, CGhoul2Info *ghlInfoTo, int toBoltIndex, int entNum, int toModelNum)
         let bolt_info_out = vma(vc, args, 1) as *mut c_int;
-        // SAFETY: `args[2]` is the module's `CGhoul2Info_v` handle (§D11).
-        let g2v = unsafe { &mut *(argw(2) as *mut CGhoul2Info_v) };
-        let ghl_info = g2_info(g2, g2v, 0);
+        // `args[2]` is the module's ghoul2 token (§D11).
+        let g2v = CGhoul2Info_v::from_token(argw(2) as *mut c_void);
+        let ghl_info = g2_info(g2, &g2v, 0);
         match g2api_attach_ent(g2, view, ghl_info, arg(3), arg(4), arg(5)) {
             Some(bolt_info) => {
                 // SAFETY: `VMA(1)` is the module's seam out-param (§D11).
@@ -3236,54 +3244,51 @@ pub fn CL_CgameSystemCalls(
             None => qfalse,
         }
     } else if op == MpCgameImport::CG_G2_SETBOLTON as c_int {
-        // A null handle makes Raven's `if ((int)&ghoul2)` false, and the call does nothing.
+        // A null token makes Raven's `if ((int)&ghoul2)` false, and the call does nothing.
         // Source: `oracle/codemp/ghoul2/G2_API.cpp:1686`
-        let p = argw(1) as *mut CGhoul2Info_v;
-        if !p.is_null() {
-            // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-            let ghoul2 = unsafe { &mut *p };
-            g2api_set_bolt_info(g2, ghoul2, arg(2), arg(3));
+        let token = argw(1) as *mut c_void;
+        if !token.is_null() {
+            let mut ghoul2 = CGhoul2Info_v::from_token(token);
+            g2api_set_bolt_info(g2, &mut ghoul2, arg(2), arg(3));
         }
         0
     } else if op == MpCgameImport::CG_G2_SETROOTSURFACE as c_int {
         let surface_name = cstr_to_string(vma(vc, args, 3) as *const c_char);
-        // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
-        g2api_set_root_surface(g2, view, ghoul2, arg(2), &surface_name) as c_int
+        // `args[1]` is the module's ghoul2 token (§D11).
+        let mut ghoul2 = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
+        g2api_set_root_surface(g2, view, &mut ghoul2, arg(2), &surface_name) as c_int
     } else if op == MpCgameImport::CG_G2_SETSURFACEONOFF as c_int {
-        // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
+        // A null token makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
         // Source: `oracle/codemp/ghoul2/G2_API.cpp:710`
-        let p = argw(1) as *mut CGhoul2Info_v;
-        if p.is_null() {
+        let token = argw(1) as *mut c_void;
+        if token.is_null() {
             0
         } else {
             let surface_name = cstr_to_string(vma(vc, args, 2) as *const c_char);
-            // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-            let ghoul2 = unsafe { &mut *p };
-            g2api_set_surface_on_off(g2, view, ghoul2, &surface_name, arg(3)) as c_int
+            let mut ghoul2 = CGhoul2Info_v::from_token(token);
+            g2api_set_surface_on_off(g2, view, &mut ghoul2, &surface_name, arg(3)) as c_int
         }
     } else if op == MpCgameImport::CG_G2_SETNEWORIGIN as c_int {
-        // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
+        // A null token makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
         // Source: `oracle/codemp/ghoul2/G2_API.cpp:2432`
-        let p = argw(1) as *mut CGhoul2Info_v;
-        if p.is_null() {
+        let token = argw(1) as *mut c_void;
+        if token.is_null() {
             0
         } else {
-            // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-            let ghoul2 = unsafe { &mut *p };
-            g2api_set_new_origin(g2, view, ghoul2, arg(2)) as c_int
+            let mut ghoul2 = CGhoul2Info_v::from_token(token);
+            g2api_set_new_origin(g2, view, &mut ghoul2, arg(2)) as c_int
         }
     } else if op == MpCgameImport::CG_G2_DOESBONEEXIST as c_int {
         let bone_name = cstr_to_string(vma(vc, args, 3) as *const c_char);
-        // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let g2v = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
-        let ghl_info = g2_info(g2, g2v, arg(2));
+        // `args[1]` is the module's ghoul2 token (§D11).
+        let g2v = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
+        let ghl_info = g2_info(g2, &g2v, arg(2));
         g2api_does_bone_exist(g2, view, ghl_info, &bone_name) as c_int
     } else if op == MpCgameImport::CG_G2_GETSURFACERENDERSTATUS as c_int {
         let surface_name = cstr_to_string(vma(vc, args, 3) as *const c_char);
-        // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let g2v = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
-        let ghl_info = g2_info(g2, g2v, arg(2));
+        // `args[1]` is the module's ghoul2 token (§D11).
+        let g2v = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
+        let ghl_info = g2_info(g2, &g2v, arg(2));
         g2api_get_surface_render_status(g2, view, ghl_info, &surface_name)
     } else if op == MpCgameImport::CG_G2_GETTIME as c_int {
         g2api_get_time(g2, 0)
@@ -3291,18 +3296,18 @@ pub fn CL_CgameSystemCalls(
         g2api_set_time(g2, arg(1), arg(2));
         0
     } else if op == MpCgameImport::CG_G2_ABSURDSMOOTHING as c_int {
-        // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
-        g2api_absurd_smoothing(g2, ghoul2, arg(2) != 0);
+        // `args[1]` is the module's ghoul2 token (§D11).
+        let mut ghoul2 = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
+        g2api_absurd_smoothing(g2, &mut ghoul2, arg(2) != 0);
         0
     } else if op == MpCgameImport::CG_G2_SETRAGDOLL as c_int {
         // Converts the info in the shared structure over to the class-based version.
         // SAFETY: the handle and `VMA(2)` are module-space (porting-rules §D11).
         unsafe {
             let rdParamst = vma(vc, args, 2) as *mut sharedRagDollParams_t;
-            let ghoul2 = &mut *(argw(1) as *mut CGhoul2Info_v);
+            let mut ghoul2 = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
             if rdParamst.is_null() {
-                g2api_reset_ragdoll(g2, ghoul2);
+                g2api_reset_ragdoll(g2, &mut ghoul2);
                 return 0;
             }
 
@@ -3330,7 +3335,7 @@ pub fn CL_CgameSystemCalls(
                 ),
             };
 
-            g2api_set_ragdoll(g2, view, ghoul2, &mut rdParams);
+            g2api_set_ragdoll(g2, view, &mut ghoul2, &mut rdParams);
         }
         0
     } else if op == MpCgameImport::CG_G2_ANIMATEG2MODELS as c_int {
@@ -3353,18 +3358,18 @@ pub fn CL_CgameSystemCalls(
                 kind: RagDollUpdateKind::Server,
             };
 
-            let ghoul2 = &mut *(argw(1) as *mut CGhoul2Info_v);
-            g2api_animate_g2_models_rag(g2, view, ghoul2, arg(2), &mut rduParams);
+            let mut ghoul2 = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
+            g2api_animate_g2_models_rag(g2, view, &mut ghoul2, arg(2), &mut rduParams);
         }
         0
     } else if op == MpCgameImport::CG_G2_RAGPCJCONSTRAINT as c_int {
         let bone_name = cstr_to_string(vma(vc, args, 2) as *const c_char);
         // SAFETY: the handle and the two vectors are module-space (§D11).
         unsafe {
-            let ghoul2 = &mut *(argw(1) as *mut CGhoul2Info_v);
+            let mut ghoul2 = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
             g2api_rag_pcj_constraint(
                 g2,
-                ghoul2,
+                &mut ghoul2,
                 &bone_name,
                 *(vma(vc, args, 3) as *const vec3_t),
                 *(vma(vc, args, 4) as *const vec3_t),
@@ -3372,21 +3377,21 @@ pub fn CL_CgameSystemCalls(
         }
     } else if op == MpCgameImport::CG_G2_RAGPCJGRADIENTSPEED as c_int {
         let bone_name = cstr_to_string(vma(vc, args, 2) as *const c_char);
-        // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
-        g2api_rag_pcj_gradient_speed(g2, ghoul2, &bone_name, vmf(vc, args, 3)) as c_int
+        // `args[1]` is the module's ghoul2 token (§D11).
+        let mut ghoul2 = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
+        g2api_rag_pcj_gradient_speed(g2, &mut ghoul2, &bone_name, vmf(vc, args, 3)) as c_int
     } else if op == MpCgameImport::CG_G2_RAGEFFECTORGOAL as c_int {
         let bone_name = cstr_to_string(vma(vc, args, 2) as *const c_char);
         let pos_ptr = vma(vc, args, 3) as *const vec3_t;
         // SAFETY: the handle and a non-NULL `VMA(3)` are module-space (§D11).
         unsafe {
-            let ghoul2 = &mut *(argw(1) as *mut CGhoul2Info_v);
+            let mut ghoul2 = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
             let pos = if pos_ptr.is_null() {
                 None
             } else {
                 Some(*pos_ptr)
             };
-            g2api_rag_effector_goal(g2, ghoul2, &bone_name, pos) as c_int
+            g2api_rag_effector_goal(g2, &mut ghoul2, &bone_name, pos) as c_int
         }
     } else if op == MpCgameImport::CG_G2_GETRAGBONEPOS as c_int {
         let bone_name = cstr_to_string(vma(vc, args, 2) as *const c_char);
@@ -3394,10 +3399,10 @@ pub fn CL_CgameSystemCalls(
         // SAFETY: the handle, the three inputs, and the out-param are all
         // module-space (porting-rules §D11).
         unsafe {
-            let ghoul2 = &mut *(argw(1) as *mut CGhoul2Info_v);
+            let mut ghoul2 = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
             match g2api_get_rag_bone_pos(
                 g2,
-                ghoul2,
+                &mut ghoul2,
                 &bone_name,
                 *(vma(vc, args, 4) as *const vec3_t),
                 *(vma(vc, args, 5) as *const vec3_t),
@@ -3414,14 +3419,18 @@ pub fn CL_CgameSystemCalls(
         let bone_name = cstr_to_string(vma(vc, args, 2) as *const c_char);
         // SAFETY: the handle and the velocity are module-space (§D11).
         unsafe {
-            let ghoul2 = &mut *(argw(1) as *mut CGhoul2Info_v);
-            g2api_rag_effector_kick(g2, ghoul2, &bone_name, *(vma(vc, args, 3) as *const vec3_t))
-                as c_int
+            let mut ghoul2 = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
+            g2api_rag_effector_kick(
+                g2,
+                &mut ghoul2,
+                &bone_name,
+                *(vma(vc, args, 3) as *const vec3_t),
+            ) as c_int
         }
     } else if op == MpCgameImport::CG_G2_RAGFORCESOLVE as c_int {
-        // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
-        g2api_rag_force_solve(g2, ghoul2, arg(2) != 0) as c_int
+        // `args[1]` is the module's ghoul2 token (§D11).
+        let mut ghoul2 = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
+        g2api_rag_force_solve(g2, &mut ghoul2, arg(2) != 0) as c_int
     } else if op == MpCgameImport::CG_G2_SETBONEIKSTATE as c_int {
         let bone_name_ptr = vma(vc, args, 3) as *const c_char;
         let bone_name = if bone_name_ptr.is_null() {
@@ -3432,7 +3441,7 @@ pub fn CL_CgameSystemCalls(
         let params_ptr = vma(vc, args, 5) as *mut sharedSetBoneIKStateParams_t;
         // SAFETY: the handle and a non-NULL `VMA(5)` are module-space (§D11).
         unsafe {
-            let ghoul2 = &mut *(argw(1) as *mut CGhoul2Info_v);
+            let mut ghoul2 = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
             let params = if params_ptr.is_null() {
                 None
             } else {
@@ -3441,7 +3450,7 @@ pub fn CL_CgameSystemCalls(
             g2api_set_bone_ik_state(
                 g2,
                 view,
-                ghoul2,
+                &mut ghoul2,
                 arg(2),
                 bone_name.as_deref(),
                 arg(4),
@@ -3451,20 +3460,20 @@ pub fn CL_CgameSystemCalls(
     } else if op == MpCgameImport::CG_G2_IKMOVE as c_int {
         // SAFETY: the handle and `VMA(3)` are module-space (porting-rules §D11).
         unsafe {
-            let ghoul2 = &mut *(argw(1) as *mut CGhoul2Info_v);
+            let mut ghoul2 = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
             let params = &mut *(vma(vc, args, 3) as *mut sharedIKMoveParams_t);
-            g2api_ik_move(g2, view, ghoul2, arg(2), params) as c_int
+            g2api_ik_move(g2, view, &mut ghoul2, arg(2), params) as c_int
         }
     } else if op == MpCgameImport::CG_G2_REMOVEBONE as c_int {
         let bone_name = cstr_to_string(vma(vc, args, 2) as *const c_char);
-        // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let g2v = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
-        let ghl_info = g2_info(g2, g2v, arg(3));
+        // `args[1]` is the module's ghoul2 token (§D11).
+        let g2v = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
+        let ghl_info = g2_info(g2, &g2v, arg(3));
         g2api_remove_bone(g2, view, ghl_info, &bone_name) as c_int
     } else if op == MpCgameImport::CG_G2_ATTACHINSTANCETOENTNUM as c_int {
-        // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let ghoul2 = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
-        g2api_attach_instance_to_ent_num(g2, ghoul2, arg(2), arg(3) != 0);
+        // `args[1]` is the module's ghoul2 token (§D11).
+        let mut ghoul2 = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
+        g2api_attach_instance_to_ent_num(g2, &mut ghoul2, arg(2), arg(3) != 0);
         0
     } else if op == MpCgameImport::CG_G2_CLEARATTACHEDINSTANCE as c_int {
         g2api_clear_attached_instance(g2, arg(1));
@@ -3473,17 +3482,17 @@ pub fn CL_CgameSystemCalls(
         g2api_clean_ent_attachments(g2);
         0
     } else if op == MpCgameImport::CG_G2_OVERRIDESERVER as c_int {
-        // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let g2v = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
-        let ghl_info = g2_info(g2, g2v, 0);
+        // `args[1]` is the module's ghoul2 token (§D11).
+        let g2v = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
+        let ghl_info = g2_info(g2, &g2v, 0);
         g2api_override_server_with_client_data(g2, ghl_info) as c_int
     } else if op == MpCgameImport::CG_G2_GETSURFACENAME as c_int {
         // Since returning a pointer in such a way to a VM seems to cause reliability
         // problems, we shove data into the pointer the vm passes instead.
         let point = vma(vc, args, 4) as *mut c_char;
-        // SAFETY: `args[1]` is the module's `CGhoul2Info_v` handle (§D11).
-        let g2v = unsafe { &mut *(argw(1) as *mut CGhoul2Info_v) };
-        let ghl_info = g2_info(g2, g2v, arg(3));
+        // `args[1]` is the module's ghoul2 token (§D11).
+        let g2v = CGhoul2Info_v::from_token(argw(1) as *mut c_void);
+        let ghl_info = g2_info(g2, &g2v, arg(3));
         let local = g2api_get_surface_name(g2, view, ghl_info, arg(2));
         if !local.is_empty() {
             let local_c = std::ffi::CString::new(local).unwrap_or_default();
